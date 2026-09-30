@@ -387,9 +387,9 @@ Section ProofArgraw.
               ltac:(vm_compute; discriminate)
               with "Hcg Hpc []").
     { iApply (ari_34 with "Htext"). }
-    iIntros (CID5 Hs5) "Hcg Hpc".
+    iIntros (CID5 Hs5) "Hlc Hcg Hpc".
     iEval (rewrite Hrt34) in "Hpc".
-    iSpecialize ("Hcont" $! CID5 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CID5 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! T4 with "[%] Hcg Hpc").
     split; [rewrite /T4 upd_eq; exact Hwv|].
     split. { rewrite /T4 upd_ne; [| vm_compute; discriminate].
@@ -484,9 +484,9 @@ Section ProofArgraw.
               M av' b ltac:(rewrite (ar_cj_tgt k Hk1); vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (ar_i_cj k Hk1 with "Htext"). }
-    iApply bi.later_intro. iIntros (CID1 Hs1). iIntros "Hcg Hpc".
+    iApply bi.later_intro. iIntros (CID1 Hs1) "Hlc". iIntros "Hcg Hpc".
     iEval (rewrite (ar_cj_tgt k Hk1)) in "Hpc".
-    iSpecialize ("Hcont" $! CID1 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CID1 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" with "Hcg Hpc").
   Qed.
 
@@ -649,9 +649,9 @@ Section ProofArgraw.
       rewrite /B5 upd_ne; [| vm_compute; discriminate]. exact HMsp. }
     iApply (ar_tail C1 sp0 ra0 s00 s10 vgap av' b p HC1sp
               with "Hcg Htext Hpc Hr24 Hr16 Hr8 Hgap").
-    iIntros (CID7 Hs7 Mf) "%HMf Hcg Hpc".
+    iIntros (CID7 Hs7) "Hlc". iIntros (Mf) "%HMf Hcg Hpc".
     destruct HMf as (Hfsp & Hfs0 & Hfs1 & Hfa0 & Hfthr).
-    iSpecialize ("Hcont" $! CID7 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CID7 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! Mf with "[%] Hcg Hpc Htfp Htf").
     split; [exact Hfsp|]. split; [exact Hfs0|]. split; [exact Hfs1|].
     split. { rewrite Hfa0 /C1 upd_eq. reflexivity. }
@@ -769,9 +769,9 @@ Section ProofArgraw.
       rewrite /B5 upd_ne; [| vm_compute; discriminate]. exact HMsp. }
     iApply (ar_tail C1 sp0 ra0 s00 s10 vgap av' b p HC1sp
               with "Hcg Htext Hpc Hr24 Hr16 Hr8 Hgap").
-    iIntros (CID7 Hs7 Mf) "%HMf Hcg Hpc".
+    iIntros (CID7 Hs7) "Hlc". iIntros (Mf) "%HMf Hcg Hpc".
     destruct HMf as (Hfsp & Hfs0 & Hfs1 & Hfa0 & Hfthr).
-    iSpecialize ("Hcont" $! CID7 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CID7 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! Mf with "[%] Hcg Hpc Htfp Htf").
     split; [exact Hfsp|]. split; [exact Hfs0|]. split; [exact Hfs1|].
     split. { rewrite Hfa0 /C1 upd_eq. reflexivity. }
@@ -889,9 +889,9 @@ Section ProofArgraw.
       rewrite /B5 upd_ne; [| vm_compute; discriminate]. exact HMsp. }
     iApply (ar_tail C1 sp0 ra0 s00 s10 vgap av' b p HC1sp
               with "Hcg Htext Hpc Hr24 Hr16 Hr8 Hgap").
-    iIntros (CID7 Hs7 Mf) "%HMf Hcg Hpc".
+    iIntros (CID7 Hs7) "Hlc". iIntros (Mf) "%HMf Hcg Hpc".
     destruct HMf as (Hfsp & Hfs0 & Hfs1 & Hfa0 & Hfthr).
-    iSpecialize ("Hcont" $! CID7 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CID7 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! Mf with "[%] Hcg Hpc Htfp Htf").
     split; [exact Hfsp|]. split; [exact Hfs0|]. split; [exact Hfs1|].
     split. { rewrite Hfa0 /C1 upd_eq. reflexivity. }
@@ -1009,9 +1009,9 @@ Section ProofArgraw.
       rewrite /B5 upd_ne; [| vm_compute; discriminate]. exact HMsp. }
     iApply (ar_tail C1 sp0 ra0 s00 s10 vgap av' b p HC1sp
               with "Hcg Htext Hpc Hr24 Hr16 Hr8 Hgap").
-    iIntros (CID7 Hs7 Mf) "%HMf Hcg Hpc".
+    iIntros (CID7 Hs7) "Hlc". iIntros (Mf) "%HMf Hcg Hpc".
     destruct HMf as (Hfsp & Hfs0 & Hfs1 & Hfa0 & Hfthr).
-    iSpecialize ("Hcont" $! CID7 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CID7 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! Mf with "[%] Hcg Hpc Htfp Htf").
     split; [exact Hfsp|]. split; [exact Hfs0|]. split; [exact Hfs1|].
     split. { rewrite Hfa0 /C1 upd_eq. reflexivity. }
@@ -1129,9 +1129,9 @@ Section ProofArgraw.
       rewrite /B5 upd_ne; [| vm_compute; discriminate]. exact HMsp. }
     iApply (ar_tail C1 sp0 ra0 s00 s10 vgap av' b p HC1sp
               with "Hcg Htext Hpc Hr24 Hr16 Hr8 Hgap").
-    iIntros (CID7 Hs7 Mf) "%HMf Hcg Hpc".
+    iIntros (CID7 Hs7) "Hlc". iIntros (Mf) "%HMf Hcg Hpc".
     destruct HMf as (Hfsp & Hfs0 & Hfs1 & Hfa0 & Hfthr).
-    iSpecialize ("Hcont" $! CID7 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CID7 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! Mf with "[%] Hcg Hpc Htfp Htf").
     split; [exact Hfsp|]. split; [exact Hfs0|]. split; [exact Hfs1|].
     split. { rewrite Hfa0 /C1 upd_eq. reflexivity. }
@@ -1249,9 +1249,9 @@ Section ProofArgraw.
       rewrite /B5 upd_ne; [| vm_compute; discriminate]. exact HMsp. }
     iApply (ar_tail C1 sp0 ra0 s00 s10 vgap av' b p HC1sp
               with "Hcg Htext Hpc Hr24 Hr16 Hr8 Hgap").
-    iIntros (CID7 Hs7 Mf) "%HMf Hcg Hpc".
+    iIntros (CID7 Hs7) "Hlc". iIntros (Mf) "%HMf Hcg Hpc".
     destruct HMf as (Hfsp & Hfs0 & Hfs1 & Hfa0 & Hfthr).
-    iSpecialize ("Hcont" $! CID7 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CID7 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! Mf with "[%] Hcg Hpc Htfp Htf").
     split; [exact Hfsp|]. split; [exact Hfs0|]. split; [exact Hfs1|].
     split. { rewrite Hfa0 /C1 upd_eq. reflexivity. }
@@ -1539,12 +1539,12 @@ Section ProofArgraw.
                    (m !!! Regidx ar_s1) vgap p tfp ws v dqt b
               Hi Hargs HB4s1 HB4a4 HB4a0 HB4sp Hpv
               with "Htext Hdata Hcg Hpc Htfp Htf Hr24 Hr16 Hr8 Hgap").
-    iIntros (CID15 Hs15 Mf) "%HMf Hcg Hpc Htfp Htf".
+    iIntros (CID15 Hs15) "Hlc". iIntros (Mf) "%HMf Hcg Hpc Htfp Htf".
     destruct HMf as (Hfsp & Hfs0 & Hfs1 & Hfa0 & Hfthr).
     assert (Hnk : ((av - 4) + 4)%nat = av) by lia.
     iEval (rewrite Hnk) in "Hcg".
     iDestruct (cpu_own_transport CID8 CID15 n eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-    iSpecialize ("Hcont" $! CID15 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CID15 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! Mf with "[%] Hcg Hcpu Hpc Htfp Htf").
     split; [| exact Hfa0].
     unfold callee_saved.

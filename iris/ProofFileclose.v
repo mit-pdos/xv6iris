@@ -610,7 +610,7 @@ Section ProofFileclose.
                 (m !!! Regidx Rs0) (m !!! Regidx Rs1) u4 u5 u6 u7 u8 p b
                 ltac:(lia) eq_refl eq_refl eq_refl eq_refl Hmrsp Hmrthr
                 with "Hcg Htext Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8").
-      iIntros (CIDe Hse mf) "%Hcsf Hcg Hpc".
+      iIntros (CIDe Hse) "Hlc". iIntros (mf) "%Hcsf Hcg Hpc".
       iDestruct (cpu_own_transport CIDr CIDe n eb p b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
       (* ONE WIDE HOP for the complement: nothing on this path threads it
@@ -620,7 +620,7 @@ Section ProofFileclose.
                    with "Hextc") as "Hextc".
       iDestruct (cpu_claim_ext_transport CID CIDe eb p ltac:(ext_chain Hebf b)
                    with "Hextm") as "Hextm".
-      iSpecialize ("Hcont" $! CIDe with "[]"); [iPureIntro; wp_next_chain|].
+      iSpecialize ("Hcont" $! CIDe with "[] Hlc"); [iPureIntro; wp_next_chain|].
       iApply ("Hcont" $! mf (pv_ev (us_V Upr)) with
                 "Hcg Hcnt Hextc Hextm [Hpc] [%] [%] Hunit Hiru [Henv] Hcpost [Hpbare]").
       { iEval (rewrite /ret_tgt). iExact "Hpc". }
@@ -1255,7 +1255,7 @@ Section ProofFileclose.
                   (m !!! Regidx Rs5) u8 p b
                   ltac:(lia) eq_refl eq_refl eq_refl eq_refl HMrsp HMrall
                   with "Hcg Htext Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8").
-        iIntros (CIDp7 Hsp7 mf) "%Hcsf Hcg Hpc".
+        iIntros (CIDp7 Hsp7) "Hlc". iIntros (mf) "%Hcsf Hcg Hpc".
         iDestruct (cpu_own_transport CIDp5 CIDp7 n eb p b ltac:(wp_next_chain)
                      with "Hcnt") as "Hcnt".
         (* ONE WIDE HOP again: pipeclose does not thread the complement
@@ -1264,7 +1264,7 @@ Section ProofFileclose.
                      with "Hextc") as "Hextc".
         iDestruct (cpu_claim_ext_transport CID CIDp7 eb p ltac:(ext_chain Hebf b)
                      with "Hextm") as "Hextm".
-        iSpecialize ("Hcont" $! CIDp7 with "[]"); [iPureIntro; wp_next_chain|].
+        iSpecialize ("Hcont" $! CIDp7 with "[] Hlc"); [iPureIntro; wp_next_chain|].
         iApply ("Hcont" $! mf kc2 with
                   "Hcg Hcnt Hextc Hextm [Hpc] [%] [%] Hfd Hiru [Hav] Hcpost Hpbare").
         { iEval (rewrite /ret_tgt). iExact "Hpc". }
@@ -1669,14 +1669,14 @@ Section ProofFileclose.
                     (m !!! Regidx Rs5) u8 (proc_addr (fcn_j fn)) b
                     ltac:(lia) eq_refl eq_refl eq_refl eq_refl HMrsp HMrall
                     with "Hcg Htext Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8").
-          iIntros (CIDf10 Hsf10 mf) "%Hcsf Hcg Hpc".
+          iIntros (CIDf10 Hsf10) "Hlc". iIntros (mf) "%Hcsf Hcg Hpc".
           iDestruct (cpu_own_transport CIDf8 CIDf10 0 eb (proc_addr (fcn_j fn)) b
                        ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
           iDestruct (trap_csrs_ext_transport CIDf8 CIDf10 eb (proc_addr (fcn_j fn))
                        ltac:(ext_chain Hebf b) with "Hextc") as "Hextc".
           iDestruct (cpu_claim_ext_transport CIDf8 CIDf10 eb (proc_addr (fcn_j fn))
                        ltac:(ext_chain Hebf b) with "Hextm") as "Hextm".
-          iSpecialize ("Hcont" $! CIDf10 with "[]"); [iPureIntro; wp_next_chain|].
+          iSpecialize ("Hcont" $! CIDf10 with "[] Hlc"); [iPureIntro; wp_next_chain|].
           (* [Hislot] is [iput]'s give-back, and it is what REPAYS the loan the
              free-slot construction above spent.  It used to be dropped here
              -- SpecFileclose.v recorded that as a leak of one unit of the
@@ -1762,14 +1762,14 @@ Section ProofFileclose.
                     (m !!! Regidx Rs5) u8 p b
                     ltac:(lia) eq_refl eq_refl eq_refl eq_refl HMrsp HMrall
                     with "Hcg Htext Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8").
-          iIntros (CIDz3 Hsz3 mf) "%Hcsf Hcg Hpc".
+          iIntros (CIDz3 Hsz3) "Hlc". iIntros (mf) "%Hcsf Hcg Hpc".
           iDestruct (cpu_own_transport CIDr2 CIDz3 n eb p b ltac:(wp_next_chain)
                        with "Hcnt") as "Hcnt".
           iDestruct (trap_csrs_ext_transport CID CIDz3 eb p ltac:(ext_chain Hebf b)
                        with "Hextc") as "Hextc".
           iDestruct (cpu_claim_ext_transport CID CIDz3 eb p ltac:(ext_chain Hebf b)
                        with "Hextm") as "Hextm".
-          iSpecialize ("Hcont" $! CIDz3 with "[]"); [iPureIntro; wp_next_chain|].
+          iSpecialize ("Hcont" $! CIDz3 with "[] Hlc"); [iPureIntro; wp_next_chain|].
           iApply ("Hcont" $! mf (pv_ev (us_V Upr)) with
                     "Hcg Hcnt Hextc Hextm [Hpc] [%] [%] Hfd [Hcore] [Henv] Hcpost [Hpbare]").
           { iEval (rewrite /ret_tgt). iExact "Hpc". }

@@ -610,12 +610,12 @@ Section ProofFreewalk.
     iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.freewalk + 0x5a)) Rra E7 K b
               ltac:(vm_compute; discriminate) with "Hcg Hpc []").
     { iApply (fwi_5a with "Htext"). }
-    iIntros (CIDe9 Hse9) "Hcg Hpc".
+    iIntros (CIDe9 Hse9) "Hlc Hcg Hpc".
     iEval (rgne) in "Hpc".
     iEval (rewrite HE7ra) in "Hpc".
     iDestruct (cpu_own_transport CIDkf CIDe9 ilvl eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iSpecialize ("Hcont" $! CIDe9 with "[]"); [iPureIntro; wp_next_chain|].
+    iSpecialize ("Hcont" $! CIDe9 with "[] Hlc"); [iPureIntro; wp_next_chain|].
     iApply ("Hcont" $! E7 with "Hcg Hcnt Hpc [%]").
     unfold callee_saved. split_and!.
     - rewrite /E7 upd_eq. rewrite Hwv. symmetry. exact Hmmsp.
@@ -751,7 +751,7 @@ Section ProofFreewalk.
                   Hcmp ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc []").
         { iApply (fwi_26 with "Htext"). }
-        iApply bi.later_intro. iIntros (CIDt2 Hst2) "Hcg Hpc".
+        iApply bi.later_intro. iIntros (CIDt2 Hst2) "Hlc Hcg Hpc".
         assert (Htgt48 : add_vec (mword_of_int (KernelSyms.freewalk + 0x26) : mword 64)
                   (sign_extend' 64 (mword_of_int 34 : mword 13))
                 = mword_of_int (KernelSyms.freewalk + 0x48)) by (apply bv_eq; vm_compute; reflexivity).
@@ -759,7 +759,7 @@ Section ProofFreewalk.
         iEval (rewrite Hd512) in "Hdone".
         iDestruct (cpu_own_transport CIDx CIDt2 ilvl eb p b ltac:(wp_next_chain)
                      with "Hcnt") as "Hcnt".
-        iSpecialize ("Hcont" $! CIDt2 with "[]"); [iPureIntro; wp_next_chain|].
+        iSpecialize ("Hcont" $! CIDt2 with "[] Hlc"); [iPureIntro; wp_next_chain|].
         iApply ("Hcont" $! T1 with "[%] Hcg Hcnt Hpc Hdone").
         split_and!; assumption. }
       (* more slots: back to the loop head *)
@@ -1284,8 +1284,8 @@ Section ProofFreewalk.
               with "Hcg Hcnt Htext Hpc [Hdone] Henv Hk1 Hk2 Hk3 Hk4 Hk5 [Hk6]").
     { iApply (pt_slots_kfree_pre (pt_base t) Hpv with "Hkmapb Hdone"). }
     { iExists u6. iExact "Hk6". }
-    iIntros (CIDy Hsy mf) "Hcg Hcnt Hpc %Hcs".
-    iSpecialize ("Hcont" $! CIDy with "[]"); [iPureIntro; wp_next_chain|].
+    iIntros (CIDy Hsy) "Hlc". iIntros (mf) "Hcg Hcnt Hpc %Hcs".
+    iSpecialize ("Hcont" $! CIDy with "[] Hlc"); [iPureIntro; wp_next_chain|].
     iApply ("Hcont" $! mf with "Hcg Hcnt Hpc [%]").
     exact Hcs.
   Qed.

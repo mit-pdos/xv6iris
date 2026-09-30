@@ -561,7 +561,7 @@ Section ProofSafestrcpy.
     iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.safestrcpy + 0x34)) Rra T3 K b
               ltac:(vm_compute; discriminate) with "Hcg Hpc []").
     { iApply (sscp_34 with "Htext"). }
-    iIntros (CID4 Hs4) "Hcg Hpc".
+    iIntros (CID4 Hs4) "Hlc Hcg Hpc".
     iEval (rewrite HT3ra') in "Hpc".
     (* ---- the postcondition ---- *)
     assert (HT3a0 : T3 !!! Regidx Ra0 = rv).
@@ -574,7 +574,7 @@ Section ProofSafestrcpy.
       rewrite /T2 upd_ne; [| intro He; injection He as He'; congruence].
       rewrite /T1 upd_ne; [| apply cs_ne; [vm_compute; reflexivity | exact Hr]].
       apply Hthr; assumption. }
-    iSpecialize ("Hcont" $! CID4 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CID4 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! T3 with "[%] Hcg Hpc").
     split; [| exact HT3a0].
     unfold callee_saved. split_and!.
@@ -672,7 +672,7 @@ Section ProofSafestrcpy.
                 with "Hcg Hpc [] [Hdb]").
       { iApply (sscp_2a with "Htext"). }
       { iEval (rewrite (Ha5' _) addv_sext0). iExact "Hdb". }
-      iIntros (CID2 Hs2) "Hcg Hpc Hdb".
+      iIntros (CID2 Hs2) "Hlc Hcg Hpc Hdb".
       iEval (rewrite (Ha5' _) addv_sext0) in "Hdb".
       iEval (rewrite (ssc_sb_zero M Hx0 _)) in "Hdb".
       iDestruct ("Hdback" $! (bb_upd h d (mword_of_int 0 : mword 8)) with "[%] [Hdb]") as "Hdst".
@@ -686,7 +686,7 @@ Section ProofSafestrcpy.
                      = mword_of_int (KernelSyms.safestrcpy + 0x2e))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hq2e) in "Hpc".
-      iSpecialize ("Hcont" $! CID2 with "[%]"); [wp_next_chain|].
+      iSpecialize ("Hcont" $! CID2 with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hcont" $! M hf with "[%] [%] [%] [%] Hcg Hpc Hsrc Hdst").
       + exact Hex.
       + exact Hsp.
@@ -841,7 +841,7 @@ Section ProofSafestrcpy.
                   with "Hcg Hpc [] [Hdb2]").
         { iApply (sscp_2a with "Htext"). }
         { iEval (rewrite (HQ3a5'' _) addv_sext0). iExact "Hdb2". }
-        iIntros (CID7 Hs7) "Hcg Hpc Hdb2".
+        iIntros (CID7 Hs7) "Hlc Hcg Hpc Hdb2".
         iEval (rewrite (HQ3a5'' _) addv_sext0) in "Hdb2".
         iEval (rewrite (ssc_sb_zero Q3 Hx0 _)) in "Hdb2".
         iDestruct ("Hdback2" $! (bb_upd h' (S d) (mword_of_int 0 : mword 8)) with "[%] [Hdb2]") as "Hdst".
@@ -854,7 +854,7 @@ Section ProofSafestrcpy.
                        = mword_of_int (KernelSyms.safestrcpy + 0x2e))
           by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hq2e') in "Hpc".
-        iSpecialize ("Hcont" $! CID7 with "[%]"); [wp_next_chain|].
+        iSpecialize ("Hcont" $! CID7 with "[%] Hlc"); [wp_next_chain|].
         iApply ("Hcont" $! Q3 hf with "[%] [%] [%] [%] Hcg Hpc Hsrc Hdst").
         * exact Hex.
         * exact HQ3sp.
@@ -1015,8 +1015,8 @@ Section ProofSafestrcpy.
                 HK ltac:(reflexivity) ltac:(reflexivity) ltac:(reflexivity)
                 HR2sp HR2a0 HR2thr
                 with "Hcg Htext Hpc Hb1 Hb2").
-      iIntros (CID6 Hs6 mf) "[%Hcs %Hfa0] Hcg Hpc".
-      iSpecialize ("Hcont" $! CID6 with "[%]"); [wp_next_chain|].
+      iIntros (CID6 Hs6) "Hlc". iIntros (mf) "[%Hcs %Hfa0] Hcg Hpc".
+      iSpecialize ("Hcont" $! CID6 with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hcont" $! mf g with "Hcg Hpc Hsrc Hdst [%] [%] [%]").
       + exact Hcs.
       + exact Hfa0.
@@ -1167,8 +1167,8 @@ Section ProofSafestrcpy.
                 HK ltac:(reflexivity) ltac:(reflexivity) ltac:(reflexivity)
                 Htsp Hta0 Htthr
                 with "Hcg Htext Hpc Hb1 Hb2").
-      iIntros (CID12 Hs12 mf) "[%Hcs %Hfa0] Hcg Hpc".
-      iSpecialize ("Hcont" $! CID12 with "[%]"); [wp_next_chain|].
+      iIntros (CID12 Hs12) "Hlc". iIntros (mf) "[%Hcs %Hfa0] Hcg Hpc".
+      iSpecialize ("Hcont" $! CID12 with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hcont" $! mf hf with "Hcg Hpc Hsrc Hdst [%] [%] [%]").
       + exact Hcs.
       + exact Hfa0.

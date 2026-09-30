@@ -358,11 +358,11 @@ Section ProofPlicinit.
               ltac:(vm_compute; discriminate)
               with "Hcg Hpc []").
     { iApply (pi_1a with "Htext"). }
-    iIntros (CID12 Hs12) "Hcg Hpc".
+    iIntros (CID12 Hs12) "Hlc Hcg Hpc".
     assert (Hra_final : forall (CID' : CpuId), ret_pc (rget (CID := CID') m7 ra_idx) = ret_tgt)
       by (intros CID'; rgne; rewrite Hm7ra; reflexivity).
     iEval (rewrite Hra_final) in "Hpc".
-    iSpecialize ("Hcont" $! CID12 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CID12 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! m7 with "Hcg Hpc [%]").
     split.
     - assert (Hm7w : m7 = apply_writes

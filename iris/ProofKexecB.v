@@ -807,7 +807,7 @@ Section KexecBBody.
                   ltac:(rewrite Htgt1f2; vm_compute; reflexivity)
                   with "Hcg Hpc []").
         { iApply (kxc_0ae with "Htext"). }
-        iIntros (CID15 Hsq15). iApply bi.later_intro. iIntros "Hcg Hpc".
+        iIntros (CID15 Hsq15) "Hlc". iApply bi.later_intro. iIntros "Hcg Hpc".
         iEval (rewrite Htgt1f2) in "Hpc".
         iDestruct ("Hpvbk" with "Htfc Hev") as "Hpriv".
         iDestruct (cpu_own_transport CID4 CID15 0%nat eb (proc_addr jp) eb
@@ -816,7 +816,7 @@ Section KexecBBody.
                      ltac:(try rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
         iDestruct (cpu_claim_ext_transport CID3 CID15 eb (proc_addr jp)
                      ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
-        iSpecialize ("Hcont1a2" $! CID15 with "[%]"); [wp_next_chain |].
+        iSpecialize ("Hcont1a2" $! CID15 with "[%] Hlc"); [wp_next_chain |].
         iDestruct (wp_next_retarget CID0 CID15 true (proc_addr jp) _
                      ltac:(wp_next_chain) with "Hcont") as "Hcont".
         (* [elf.phnum = 0] IS what this edge decided, and the phdr loop's
@@ -1146,7 +1146,7 @@ Section KexecBBody.
                   ltac:(rewrite Htgt12c; vm_compute; reflexivity)
                   with "Hcg Hpc []").
         { iApply (kxc_0cc with "Htext"). }
-        iApply bi.later_intro. iIntros (CID24 Hsq24). iIntros "Hcg Hpc".
+        iApply bi.later_intro. iIntros (CID24 Hsq24) "Hlc". iIntros "Hcg Hpc".
         iEval (rewrite Htgt12c) in "Hpc".
         iDestruct ("Hpvbk" with "Htfc Hev") as "Hpriv".
         iDestruct (cpu_own_transport CID4 CID24 0%nat eb (proc_addr jp) eb
@@ -1155,7 +1155,7 @@ Section KexecBBody.
                      ltac:(try rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
         iDestruct (cpu_claim_ext_transport CID3 CID24 eb (proc_addr jp)
                      ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
-        iSpecialize ("Hcont12c" $! CID24 with "[%]"); [wp_next_chain |].
+        iSpecialize ("Hcont12c" $! CID24 with "[%] Hlc"); [wp_next_chain |].
         iDestruct (wp_next_retarget CID0 CID24 true (proc_addr jp) _
                      ltac:(wp_next_chain) with "Hcont") as "Hcont".
         (* [elf.phnum] IS POSITIVE on this path -- the +0x0b0 test said so,

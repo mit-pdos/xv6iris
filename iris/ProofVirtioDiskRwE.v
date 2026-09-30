@@ -408,7 +408,7 @@ Section ProofVirtioDiskRwE.
     intros HK Hj Hjl Hbnz Hbelow.
     iIntros "#Htext #Hpinv #Hdinv #Hlk Hexit".
     rewrite /P4.vdrw_p4_exit.
-    iIntros (CIDx Hsx M q np nr cm fr h m2 t pin)
+    iIntros (CIDx Hsx) "Hlc". iIntros (M q np nr cm fr h m2 t pin)
             "%Hrh %Ha1 %Hok %Hpinr %Hal Hcg Hown Htc Hclm Hpc Htok Hbody Hact Hfm Hft Hrm Hrt Hidx".
     destruct Hrh as (Hregs & Hhi).
     pose proof Hok as (Hhm & Hht & Hmt & Hh8 & Hm8 & Ht8). cbn in Hh8, Hm8, Ht8.
@@ -639,7 +639,7 @@ Section ProofVirtioDiskRwE.
                 with "Hcg Hown Htext Hpc []").
       all: try lkbelow.
       { iEval (rewrite HW7a0). iExact "Hlk". }
-      iIntros (CIDaq Hsaq msA Mf) "_ Hcg Hpc %Hacs Htok HR _ Hown Hpay". rgall.
+      iIntros (CIDaq Hsaq) "Hlc". iIntros (msA Mf) "_ Hcg Hpc %Hacs Htok HR _ Hown Hpay". rgall.
       assert (Hret : ret_pc (W7 !!! Regidx Rra) = mword_of_int (KernelSyms.virtio_disk_rw + 0x1ca))
         by (rewrite HW7ra; pcstep).
       iEval (rewrite Hret) in "Hpc".
@@ -757,7 +757,7 @@ Section ProofVirtioDiskRwE.
                         = mword_of_int (KernelSyms.virtio_disk_rw + 0x1d2)) by pcstep.
         iEval (rewrite Hp1b0) in "Hpc".
         rewrite /vdrw_p5_exit.
-        iSpecialize ("HexitL" $! CIDaq with "[%]"); [wp_next_chain|].
+        iSpecialize ("HexitL" $! CIDaq with "[%] Hlc"); [wp_next_chain|].
         (* the row's pieces, spelled at the claim's projections *)
         iEval (rewrite /V; cbn [dc_buf dc_slot dc_pin];
                rewrite (vdrwd_slot_head kq b h wr sector _ Hh8)) in "Hib".
@@ -992,7 +992,7 @@ Section ProofVirtioDiskRwE.
                       = mword_of_int (KernelSyms.virtio_disk_rw + 0x1d2)) by pcstep.
       iEval (rewrite Hb1b0) in "Hpc".
       rewrite /vdrw_p5_exit.
-      iSpecialize ("Hexit" $! CIDx with "[%]"); [wp_next_chain|].
+      iSpecialize ("Hexit" $! CIDx with "[%] Hlc"); [wp_next_chain|].
       (* the row's pieces, spelled at the claim's projections *)
       iEval (rewrite /V; cbn [dc_buf dc_slot dc_pin];
              rewrite (vdrwd_slot_head kq b h wr sector _ Hh8)) in "Hib".

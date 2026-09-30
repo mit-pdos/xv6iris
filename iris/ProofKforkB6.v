@@ -909,7 +909,7 @@ Section KforkPrologue.
               ltac:(lia) ltac:(lia) Hbelow
               with "HKp Hcg Hcpu Htext Hpc Hprocs Hplock Henv Hpavf Hlend").
     all: try lkbelow.
-    iIntros (CID11 Hs11 mf6) "%HcsB Hpc (%kl & %Hkl & Hlend) Hpost".
+    iIntros (CID11 Hs11) "Hlc". iIntros (mf6) "%HcsB Hpc (%kl & %Hkl & Hlend) Hpost".
     iDestruct ("Hpvb" $! kl with "[%] Hlend") as (Up1) "[%HUp1 Hpv]"; [exact Hkl|].
     destruct HUp1 as (k1 & Hk1 & ->).
     assert (Hpc16 : ret_pc (M5 !!! Regidx Rra) = mword_of_int (KF + 0x16))
@@ -948,7 +948,7 @@ Section KforkPrologue.
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (kfk_016 with "Htext"). }
-      iApply bi.later_intro. iIntros (CID12 Hs12) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID12 Hs12) "Hlc Hcg Hpc".
       (* [cpu_own] is the one bundle no leaf re-anchors: it came out of
          [allocproc_post] at CID11 and the continuation is at CID12, and the
          two print IDENTICALLY.  durable-notes' rule. *)
@@ -960,7 +960,7 @@ Section KforkPrologue.
         iSplitL "Hb6"; [iExists u6; iExact "Hb6"|].
         iSplitL "Hb5"; [iExists u5; iExact "Hb5"|].
         iExists u8; iExact "Hb8". }
-      iSpecialize ("Hcont10a" $! CID12 with "[%]"); [wp_next_chain|].
+      iSpecialize ("Hcont10a" $! CID12 with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hcont10a" $! mf6 k1 with "[%] [%] [%] Hcg Hcpu Htext Hpc Hframe_alloc Hpv Hpfrag [Henv'] HR").
       + exact Hk1.
       + exact HBsp.
@@ -1291,7 +1291,7 @@ Section KforkPrologue.
                   ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc []").
         { iApply (kfk_02c with "Htext"). }
-        iApply bi.later_intro. iIntros (CID20 Hs20) "Hcg Hpc".
+        iApply bi.later_intro. iIntros (CID20 Hs20) "Hlc Hcg Hpc".
         (* [proc_held]/[arm_pay] name the AMBIENT hart explicitly ([cpu_id]),
            unlike [sie_cap_gpr]/[pc_is]/etc which are re-quantified fresh by
            every leaf: bring them from CID11 (where allocproc's found arm
@@ -1340,8 +1340,8 @@ Section KforkPrologue.
           iEval (rgne) in "Hb6". iEval (rewrite Hslot6) in "Hb6".
           iFrame "Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7".
           iExists u8; iExact "Hb8". }
-        iSpecialize ("Hcont7c" $! CID11 with "[%]"); [wp_next_chain|].
-        iSpecialize ("Hcont7c" $! CID20 with "[%]"); [wp_next_chain|].
+        iSpecialize ("Hcont7c" $! CID11 with "[%] Hlc"); [wp_next_chain|].
+        iSpecialize ("Hcont7c" $! CID20 with "[%] Hlc"); [wp_next_chain|].
         iSpecialize ("Hcont7c" $! mf9 npa j γl2 pid_c ch (MkUstate Vc MCo) k2
                   with "[%] [%] [%] [%] [%] [%] [%]").
         { exact Hk2'. }
@@ -1517,7 +1517,7 @@ Section KforkPrologue.
                   N9 (trap_res b + K1)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
                   with "Hcg Hpc []").
         { iApply (kfk_046 with "Htext"). }
-        iIntros (CID28 Hs28) "Hcg Hpc".
+        iIntros (CID28 Hs28) "Hlc Hcg Hpc".
         iDestruct (cpu_own_transport CID19 CID28 (S lvl) eb pme false ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
         assert (Hchain4a : false = false \/ pme = zero_reg -> (CID28 : CPU) = (CID11 : CPU))
           by wp_next_chain.
@@ -1662,8 +1662,8 @@ Section KforkPrologue.
           iEval (rgne) in "Hb6". iEval (rewrite Hslot6') in "Hb6".
           iFrame "Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7".
           iExists u8; iExact "Hb8". }
-        iSpecialize ("Hcont4a" $! CID11 with "[%]"); [wp_next_chain|].
-        iSpecialize ("Hcont4a" $! CID28 with "[%]"); [wp_next_chain|].
+        iSpecialize ("Hcont4a" $! CID11 with "[%] Hlc"); [wp_next_chain|].
+        iSpecialize ("Hcont4a" $! CID28 with "[%] Hlc"); [wp_next_chain|].
         iApply ("Hcont4a" $! N10 npa j γl2 pid_c ch
                   (MkUstate (upd_lazy (upd_pt (upd_sz Vc (pv_sz (us_V Up))) P' (pv_tf Vc))
                                (pv_lazy (us_V Up)))
@@ -1703,7 +1703,7 @@ Section KforkPrologue.
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (kfk_016 with "Htext"). }
-      iApply bi.later_intro. iIntros (CID12 Hs12) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID12 Hs12) "Hlc Hcg Hpc".
       (* [cpu_own] is the one bundle no leaf re-anchors: it came out of
          [allocproc_post] at CID11 and the continuation is at CID12, and the
          two print IDENTICALLY.  durable-notes' rule. *)
@@ -1715,7 +1715,7 @@ Section KforkPrologue.
         iSplitL "Hb6"; [iExists u6; iExact "Hb6"|].
         iSplitL "Hb5"; [iExists u5; iExact "Hb5"|].
         iExists u8; iExact "Hb8". }
-      iSpecialize ("Hcont10a" $! CID12 with "[%]"); [wp_next_chain|].
+      iSpecialize ("Hcont10a" $! CID12 with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hcont10a" $! mf6 k1 with "[%] [%] [%] Hcg Hcpu Htext Hpc Hframe_alloc Hpv Hpfrag [Henv'] HR").
       + exact Hk1.
       + exact HBsp.

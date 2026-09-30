@@ -1820,11 +1820,11 @@ Section ProofSysUnlinkW3.
         { iApply su_bs3. iFrame "Hbslot Hbs2". }
         { iApply (log_opS_opb with "HopS"). }
         iEval (rewrite /wp_next).
-        iIntros (CIDy) "%Hqy". iIntros (mf) "%Hcsf %Ha0f Hcg Hown Htce
+        iIntros (CIDy) "%Hqy" Hlc. iIntros (mf) "%Hcsf %Ha0f Hcg Hown Htce
                                         Hcce Hpc Hpidq Hsbb Hsbi Hbsl
                                         Hislots".
         iDestruct ("Hpre" with "Hpidq") as "Hpriv".
-        iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain |].
+        iSpecialize ("Hcont" $! CIDy with "[%] Hlc"); [wp_next_chain |].
         iApply ("Hcont" $! mf P1 (pv_ev (us_V U)) with "[%] [%] [%] Hcg Hown Htce Hcce Hpc
                   Hbsl Hsbb Hsbi Hsbs [Hislots] Hpriv
                   [HP Hcent Hctgt Hex Hcmiss]").

@@ -606,14 +606,14 @@ Section ProofFilewriteParts.
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (fwri_014 with "Htext"). }
-    iIntros (CID7 Hq7) "Hcg Hpc".
+    iIntros (CID7 Hq7) "Hlc Hcg Hpc".
     set (R2 := <[Regidx Rs0 := regval_into_reg
                   (add_vec (R1 !!! Regidx csp_rs1)
                      (sign_extend' 64 (caddi4spn_imm (mword_of_int 24 : mword 8))))]> R1).
     assert (Hpp16 : add_vec_int (mword_of_int (FW + 0x14) : mword 64) 2
                     = mword_of_int (FW + 0x16)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp16) in "Hpc".
-    iSpecialize ("Hcont" $! CID7 with "[]"); [iPureIntro; wp_next_chain|].
+    iSpecialize ("Hcont" $! CID7 with "[] Hlc"); [iPureIntro; wp_next_chain|].
     iApply ("Hcont" $! R2 u3 u5 u6 u9 u10 u11 u12 with
               "[%] Hcg Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10 Hb11 Hb12").
     split.
@@ -810,10 +810,10 @@ Section ProofFilewriteParts.
     iApply (wp_cret_s_sconf (mword_of_int (FW + 0x100)) Rra T6 K b
               ltac:(vm_compute; discriminate) with "Hcg Hpc []").
     { iApply (fwri_100 with "Htext"). }
-    iIntros (CID7 Hs7) "Hcg Hpc".
+    iIntros (CID7 Hs7) "Hlc Hcg Hpc".
     iEval (rgne) in "Hpc".
     iEval (rewrite HT6ra) in "Hpc".
-    iSpecialize ("Hcont" $! CID7 with "[]"); [iPureIntro; wp_next_chain|].
+    iSpecialize ("Hcont" $! CID7 with "[] Hlc"); [iPureIntro; wp_next_chain|].
     iApply ("Hcont" $! T6 with "[%] Hcg Hpc").
     assert (Hrest : forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
                       r <> Rs0 -> r <> Rs2 -> r <> Rs5 -> r <> Rs6 -> r <> Rra ->
@@ -1007,12 +1007,12 @@ Section ProofFilewriteParts.
     iApply (wp_cldsp_s_sconf (mword_of_int zf) (mword_of_int 1 : mword 6) Rs9
               U5 K v9 b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hif Hb11").
-    iIntros (CIDr5 Hqr5) "Hcg Hpc Hb11". iEval (rewrite Hpa11) in "Hb11".
+    iIntros (CIDr5 Hqr5) "Hlc Hcg Hpc Hb11". iEval (rewrite Hpa11) in "Hb11".
     set (U6 := <[Regidx Rs9 := regval_into_reg v9]> U5).
     assert (HU6sp : U6 !!! Regidx csp_rs1 = pa_stk sp0 12)
       by (rewrite /U6 upd_ne; [exact HU5sp | vm_compute; discriminate]).
     iEval (rewrite Hfg) in "Hpc".
-    iSpecialize ("Hcont" $! CIDr5 with "[]"); [iPureIntro; wp_next_chain|].
+    iSpecialize ("Hcont" $! CIDr5 with "[] Hlc"); [iPureIntro; wp_next_chain|].
     iApply ("Hcont" $! U6 with "[%] Hcg Hpc Hb3 Hb5 Hb6 Hb9 Hb10 Hb11").
     split; [exact HU6sp|].
     split.
@@ -1083,9 +1083,9 @@ Section ProofFilewriteParts.
     iApply (wp_cj_s_sconf (mword_of_int zb) jimm W1 K b
               ltac:(rewrite Hjt; vm_compute; reflexivity)
               with "Hcg Hpc Hib").
-    iApply bi.later_intro. iIntros (CID2 Hq2). iIntros "Hcg Hpc".
+    iApply bi.later_intro. iIntros (CID2 Hq2) "Hlc". iIntros "Hcg Hpc".
     iEval (rewrite Hjt) in "Hpc".
-    iSpecialize ("Hcont" $! CID2 with "[]"); [iPureIntro; wp_next_chain|].
+    iSpecialize ("Hcont" $! CID2 with "[] Hlc"); [iPureIntro; wp_next_chain|].
     iApply ("Hcont" $! W1 with "[%] Hcg Hpc").
     split; [rewrite /W1; apply upd_eq|].
     intros r Hr. rewrite /W1 upd_ne; [reflexivity | regne].
@@ -1150,9 +1150,9 @@ Section ProofFilewriteParts.
     iApply (wp_cj_s_sconf (mword_of_int zc) jimm W2 K b
               ltac:(rewrite Hjt; vm_compute; reflexivity)
               with "Hcg Hpc Hic").
-    iApply bi.later_intro. iIntros (CID3 Hq3). iIntros "Hcg Hpc".
+    iApply bi.later_intro. iIntros (CID3 Hq3) "Hlc". iIntros "Hcg Hpc".
     iEval (rewrite Hjt) in "Hpc".
-    iSpecialize ("Hcont" $! CID3 with "[]"); [iPureIntro; wp_next_chain|].
+    iSpecialize ("Hcont" $! CID3 with "[] Hlc"); [iPureIntro; wp_next_chain|].
     iApply ("Hcont" $! W2 with "[%] Hcg Hpc Hb6").
     split.
     { rewrite /W2 upd_ne; [| vm_compute; discriminate].
@@ -1270,12 +1270,12 @@ Section ProofFilewriteParts.
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc [] Hslot").
     { iApply (fwri_080 with "Htext"). }
-    iIntros (CID5 Hq5) "Hcg Hpc Hslot". iEval (rewrite Hpsl) in "Hslot".
+    iIntros (CID5 Hq5) "Hlc Hcg Hpc Hslot". iEval (rewrite Hpsl) in "Hslot".
     set (D5 := <[Regidx Ra5 := regval_into_reg slot]> D4).
     assert (Hpp82 : add_vec_int (mword_of_int (FW + 0x80) : mword 64) 2
                     = mword_of_int (FW + 0x82)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp82) in "Hpc".
-    iSpecialize ("Hcont" $! CID5 with "[]"); [iPureIntro; wp_next_chain|].
+    iSpecialize ("Hcont" $! CID5 with "[] Hlc"); [iPureIntro; wp_next_chain|].
     iApply ("Hcont" $! D5 with "[%] Hcg Hpc Hslot").
     split; [rewrite /D5; apply upd_eq|].
     intros r N4 N5.
@@ -1636,9 +1636,9 @@ Section ProofFilewriteParts.
                 (mword_of_int nz) cs1 cs3 s40 cs7 cs8 cs9 w12 p b
                 HK Hsp0 Hra0 Hs00 Hs20 Hs50 Hs60 HMrsp HMra0 HMrthr2
                 with "Hcg Htext Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10 Hb11 Hb12").
-      iIntros (CIDe Hse mf) "%Hcsr Hcg Hpc".
+      iIntros (CIDe Hse) "Hlc". iIntros (mf) "%Hcsr Hcg Hpc".
       destruct Hcsr as [Hcsf Hrv].
-      iSpecialize ("Hcont" $! CIDe with "[]"); [iPureIntro; wp_next_chain|].
+      iSpecialize ("Hcont" $! CIDe with "[] Hlc"); [iPureIntro; wp_next_chain|].
       iApply ("Hcont" $! mf (mword_of_int nz) with "[%] Hcg Hpc").
       split_and!; [exact Hcsf | exact Hrv |].
       right. split; [exact Hzi | reflexivity].
@@ -1725,9 +1725,9 @@ Section ProofFilewriteParts.
                 (mword_of_int (-1)) cs1 cs3 s40 cs7 cs8 cs9 w12 p b
                 HK Hsp0 Hra0 Hs00 Hs20 Hs50 Hs60 HMrsp HMra0 HMrthr2
                 with "Hcg Htext Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10 Hb11 Hb12").
-      iIntros (CIDe Hse mf) "%Hcsr Hcg Hpc".
+      iIntros (CIDe Hse) "Hlc". iIntros (mf) "%Hcsr Hcg Hpc".
       destruct Hcsr as [Hcsf Hrv].
-      iSpecialize ("Hcont" $! CIDe with "[]"); [iPureIntro; wp_next_chain|].
+      iSpecialize ("Hcont" $! CIDe with "[] Hlc"); [iPureIntro; wp_next_chain|].
       iApply ("Hcont" $! mf (mword_of_int (-1)) with "[%] Hcg Hpc").
       split_and!; [exact Hcsf | exact Hrv |]. by left.
   Qed.

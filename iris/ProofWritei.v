@@ -914,7 +914,7 @@ Section WriteiRet.
     iApply (wp_cret_s_sconf (mword_of_int (WI + 0xec)) Rra P8 K b ltac:(nz)
               with "Hcg Hpc []").
     { iApply (wri_ec with "Htext"). }
-    iIntros (CID9 Hq9) "Hcg Hpc".
+    iIntros (CID9 Hq9) "Hlc Hcg Hpc".
     iEval (rgne) in "Hpc".
     assert (Hretf : ret_pc (P8 !!! Regidx Rra : mword 64)
                     = ret_pc (m !!! Regidx Rra : mword 64))
@@ -975,7 +975,7 @@ Section WriteiRet.
     iDestruct (IntrDefs.cpu_claim_ext_transport CID0 CID9 eb (proc_addr j)
                  ltac:(rewrite Hbm; wp_next_chain) with "Hextm") as "Hextm".
     rewrite /wi_cont.
-    iSpecialize ("Hcont" $! CID9 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CID9 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! P8 tot bm' data' dn' dn0' n' wrote dist dstb P' Sb' kv
               with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] Hcg Hcnt Hextc Hextm Hpc Hidev Hinum Hmeta Hmap Hblocks Hsb Hba Hdn
                     Hsrc Hsl Hop").
@@ -4174,14 +4174,14 @@ Section WriteiMain.
                ip inum bm data dn dn0 user off n src_bytes U ncount Sb
                pidv dq dqd dqn dqs A j m K eb b lks)%I with "[Hcont]" as "Hcont".
     { rewrite /wi_cont. iEval (rewrite /wp_next).
-      iIntros (CIDf) "%Hchain".
+      iIntros (CIDf) "%Hchain" Hlc.
       iIntros (mf tot bm2 data2 dn2 dn02 n2 wrote dist dstb P2 SbF kv)
         "%C1 %C2 %C3 %C4 %C5 %C6 %Ccap %Csz %C7 %C8 %C8k %Cwhy %C9 %C10 %C10u %C11 %C12 %Csb
          %Cwi %Cwiany %Cwiat %C13 %Ckv
          Hcg Hcnt Hextc Hextm Hpc Hidev Hinum Hmeta Hmap Hblocks Hsb
          Hba Hdn Hsrc Hsl Hop".
       iDestruct "Hba" as "(%Hgok2 & Hszc & Hbmsc & _)".
-      iSpecialize ("Hcont" $! CIDf with "[%]"); [exact Hchain|].
+      iSpecialize ("Hcont" $! CIDf with "[%] Hlc"); [exact Hchain|].
       iApply ("Hcont" $! mf tot bm2 data2 dn2 dn02 n2 wrote dist dstb P2 SbF
                 with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%]
                       [%] [%] [%] [%] [%] [%] [%]
@@ -4258,7 +4258,7 @@ Section WriteiMain.
       iApply (wp_cret_s_sconf (mword_of_int (WI + 0x100)) Rra X1 K b ltac:(nz)
                 with "Hcg Hpc []").
       { iApply (wri_100 with "Htext"). }
-      iIntros (CIDx3 Hqx3) "Hcg Hpc".
+      iIntros (CIDx3 Hqx3) "Hlc Hcg Hpc".
       iEval (rgne) in "Hpc".
       assert (Hretf : ret_pc (X1 !!! Regidx Rra : mword 64)
                       = ret_pc (m !!! Regidx Rra : mword 64))
@@ -4276,7 +4276,7 @@ Section WriteiMain.
       iDestruct (IntrDefs.cpu_claim_ext_transport CID CIDx3 eb (proc_addr j)
                    ltac:(rewrite Hbm; wp_next_chain) with "Hextm") as "Hextm".
       rewrite /wi_cont.
-      iSpecialize ("Hcont" $! CIDx3 with "[%]"); [wp_next_chain|].
+      iSpecialize ("Hcont" $! CIDx3 with "[%] Hlc"); [wp_next_chain|].
       (* the -1 arm returns before anything is logged, so the op's set is
          the one it came in with *)
       iApply ("Hcont" $! X1 0%nat bm data dn dn0 ncount
@@ -5184,13 +5184,13 @@ Section WriteiMain.
                     Hprocs Hdevi Hdgeom Hdlock Hsl Hop [Hcont Htx]").
     all: try lkbelow.
     iEval (rewrite /wp_next).
-    iIntros (CIDf) "%Hchain".
+    iIntros (CIDf) "%Hchain" Hlc.
     iIntros (mf tot bm' data' dn' dn0' n' wrote dist dstb P' Sb')
       "%D1 %D3 %D4 %D5 %D6 %D7 %Dcap %Dsz %D8 %D9 %D9k %Dwhy %D10 %D11 %D11u %D12 %D13
        %Dsb %Dwi %Dwiany %Dwiat %D14
        Hcg Hcnt Hextc Hextm Hpc Hidev Hinum Hmeta Hmap Hblocks Hsb
        Hszc Hbmsc Hdn Hsrc Hsl Hop".
-    iSpecialize ("Hcont" $! CIDf with "[%]"); [exact Hchain|].
+    iSpecialize ("Hcont" $! CIDf with "[%] Hlc"); [exact Hchain|].
     iApply ("Hcont" $! mf tot bm' data' dn' dn0' n' wrote dist dstb P'
               with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%]
                     [%] [%] [%]

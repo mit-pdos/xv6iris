@@ -815,7 +815,7 @@ Section UwBodies.
     iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.uartwrite + 0x8a)) Rra E10 av true ltac:(nz)
               with "Hcg Hpc []").
     { iApply (uwi_8a with "Ht"). }
-    iIntros (CIDe11 Hse11) "Hcg Hpc". iEval (rgne) in "Hpc".
+    iIntros (CIDe11 Hse11) "Hlc Hcg Hpc". iEval (rgne) in "Hpc".
     iEval (rewrite HE10ra) in "Hpc".
     (* ---- callee_saved m0 E10 ---- *)
     assert (HE10sp : E10 !!! Regidx csp_rs1 = m0 !!! Regidx csp_rs1)
@@ -859,7 +859,7 @@ Section UwBodies.
     iDestruct (cpu_own_transport CID CIDe11 0 true pj true ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
     rewrite /uw_ret.
-    iSpecialize ("Hcont" $! CIDe11 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CIDe11 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! E10 with "[%] Hcg Hcnt Hpc Hbuf Hpid Hch").
     unfold callee_saved.
     split; [exact HE10sp|].
@@ -1236,9 +1236,9 @@ Section UwBodies.
                   (mword_of_int 52 : mword 13) Rs3 Rs1 MS (av - 8)%nat true
                   ltac:(nz) ltac:(nz) Hcmp with "Hcg Hpc []").
         { iApply (uwi_44 with "Ht"). }
-        iIntros (CIDb Hsb) "Hcg Hpc".
+        iIntros (CIDb Hsb) "Hlc Hcg Hpc".
         iEval (rewrite P48) in "Hpc".
-        iSpecialize ("IH" $! CIDb with "[%]"); [wp_next_chain|].
+        iSpecialize ("IH" $! CIDb with "[%] Hlc"); [wp_next_chain|].
         iApply ("IH" $! MS with "[%] Hcg Hcnt Hpc Hpid Hch Hfull Hbuf Hcont").
         exact HregsS.
       - (* THRE set: push the byte, release, bump the index *)
@@ -1412,13 +1412,13 @@ Section UwBodies.
                     ltac:(nz) ltac:(nz) Hcmp ltac:(vm_compute; reflexivity)
                     with "Hcg Hpc []").
           { iApply (uwi_44 with "Ht"). }
-          iApply bi.later_intro. iIntros (CIDx Hsx) "Hcg Hpc".
+          iApply bi.later_intro. iIntros (CIDx Hsx) "Hlc Hcg Hpc".
           iEval (rewrite Jexit) in "Hpc".
           iDestruct (cpu_own_transport CIDa7 CIDx 0 true pj true ltac:(wp_next_chain)
                        with "Hcnt") as "Hcnt".
           iDestruct "Hcont" as "[_ Hexit]".
           rewrite /uw_exit_cont.
-          iSpecialize ("Hexit" $! CIDx with "[%]"); [wp_next_chain|].
+          iSpecialize ("Hexit" $! CIDx with "[%] Hlc"); [wp_next_chain|].
           subst n.
           (* the residue is empty at the last byte: the chain IS its payload *)
           iEval (rewrite (uw_drop_all f (S i))) in "Hch".
@@ -1431,13 +1431,13 @@ Section UwBodies.
                     (mword_of_int 52 : mword 13) Rs3 Rs1 G5 (av - 8)%nat true
                     ltac:(nz) ltac:(nz) Hcmp with "Hcg Hpc []").
           { iApply (uwi_44 with "Ht"). }
-          iIntros (CIDy Hsy) "Hcg Hpc".
+          iIntros (CIDy Hsy) "Hlc Hcg Hpc".
           iEval (rewrite P48) in "Hpc".
           iDestruct (cpu_own_transport CIDa7 CIDy 0 true pj true ltac:(wp_next_chain)
                        with "Hcnt") as "Hcnt".
           iDestruct "Hcont" as "[Hnext _]".
           rewrite /uw_next_cont.
-          iSpecialize ("Hnext" $! CIDy with "[%]"); [wp_next_chain|].
+          iSpecialize ("Hnext" $! CIDy with "[%] Hlc"); [wp_next_chain|].
           iApply ("Hnext" $! G5 with "[%] [%] Hcg Hcnt Hpc Hpid Hch Hfull Hbuf").
           * exact Hendn.
           * exact HG5regs. }
@@ -1550,10 +1550,10 @@ Section ProofUartwrite.
       iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.uartwrite + 0x8c)) Rra m av true ltac:(nz)
                 with "Hcg Hpc []").
       { iApply (uwi_8c with "Ht"). }
-      iIntros (CID2 Hs2) "Hcg Hpc". iEval (rgne) in "Hpc".
+      iIntros (CID2 Hs2) "Hlc Hcg Hpc". iEval (rgne) in "Hpc".
       iDestruct (cpu_own_transport CID CID2 0 eb pj true ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
-      iSpecialize ("Hcont" $! CID2 with "[%]"); [wp_next_chain|].
+      iSpecialize ("Hcont" $! CID2 with "[%] Hlc"); [wp_next_chain|].
       (* n = 0: the chain is EMPTY, so it IS its payload and nothing is
          owed -- the path never takes the lock and never stores. *)
       iApply ("Hcont" $! m with "[%] Hcg Hcnt Hpc Hbuf Hpid [Hch]").
@@ -1944,8 +1944,8 @@ Section ProofUartwrite.
                 ltac:(wp_next_chain)
                 with "Ht Hcg Hcnt Hpc Hpid Hout Hfull Hbuf [Hcont]").
       rewrite /uw_ret.
-      iIntros (CIDz Hsz mf) "%Hcs Hcg Hcnt Hpc Hbuf Hpid Hout2".
-      iSpecialize ("Hcont" $! CIDz with "[%]"); [wp_next_chain|].
+      iIntros (CIDz Hsz) "Hlc". iIntros (mf) "%Hcs Hcg Hcnt Hpc Hbuf Hpid Hout2".
+      iSpecialize ("Hcont" $! CIDz with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hcont" $! mf with "[%] Hcg Hcnt Hpc [Hbuf] Hpid [Hout2]").
       + exact Hcs.
       + rewrite /uw_buf. iExact "Hbuf".

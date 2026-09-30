@@ -490,7 +490,7 @@ Section CwBodies.
     iApply (wp_cret_s_sconf (mword_of_int (CW + 0xa2)) Rra E5 av true
               ltac:(nz) with "Hcg Hpc []").
     { iApply (cnwi_a2 with "Ht"). }
-    iIntros (CID6 Hs6) "Hcg Hpc". iEval (rgne) in "Hpc".
+    iIntros (CID6 Hs6) "Hlc Hcg Hpc". iEval (rgne) in "Hpc".
     assert (HE5ra : E5 !!! Regidx Rra = m0 !!! Regidx Rra).
     { rewrite /E5 upd_ne; [| reg_neq]. rewrite /E4 upd_ne; [| reg_neq].
       rewrite /E3 upd_ne; [| reg_neq]. rewrite /E2 upd_eq. reflexivity. }
@@ -526,7 +526,7 @@ Section CwBodies.
     iDestruct (cpu_own_transport CID CID6 0%nat eb pj true ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
     rewrite /cw_ret.
-    iSpecialize ("Hcont" $! CID6 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CID6 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! E5 r (pv_upt (us_V U)) (pv_ev (us_V U))
               with "[%] [%] [%] [%] [%] [%] Hcg Hcnt Hpc [Hpriv] Hrcpt").
     - exact Hcs.

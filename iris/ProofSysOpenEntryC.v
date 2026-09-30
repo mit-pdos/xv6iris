@@ -638,10 +638,10 @@ Section ProofSysOpenEntryC.
       { rewrite Heb /trap_csrs_ext. done. }
       { rewrite Heb /cpu_claim_ext. done. }
       iEval (rewrite /wp_next).
-      iIntros (CIDy) "%Hqy". iIntros (mf) "%Hcsf %Ha0f Hcg Hown Htce Hcce Hpc
+      iIntros (CIDy) "%Hqy" Hlc. iIntros (mf) "%Hcsf %Ha0f Hcg Hown Htce Hcce Hpc
                                            Hpbare".
       iDestruct ("Hpback" with "Hpbare") as "Hpriv".
-      iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain |].
+      iSpecialize ("Hcont" $! CIDy with "[%] Hlc"); [wp_next_chain |].
       (* this arm lends nothing: the count it came in at (permit sweep L1b) *)
       iSpecialize ("Hcont" $! mf ns1 (pv_ev (us_V U))).
       iEval (rewrite upd_ev_id upd_usV_id) in "Hcont".
@@ -761,10 +761,10 @@ Section ProofSysOpenEntryC.
                                 (fn_nlink (era_node dn bm data))))
                     (socr_ft (bview plen bp) P Phiarm Phiok Phiex (bv_unsigned inum) Phit) m K eb b lks))
         with "[Hcont Hsbn Hsbs HR]" as "Hcontj".
-      { iEval (rewrite /wp_next). iIntros (CIDz) "%Hqz".
+      { iEval (rewrite /wp_next). iIntros (CIDz) "%Hqz" Hlc.
         iEval (rewrite /so_cont_au). iIntros (mf ns2 k2) "%Hcsf %Hns2 %Hk2".
         iIntros "Hcg Hown Htce Hcce Hpc Hsbb Hsbi Hbsl Hisl Hpost".
-        iSpecialize ("Hcont" $! CIDz with "[%]"); [wp_next_chain |].
+        iSpecialize ("Hcont" $! CIDz with "[%] Hlc"); [wp_next_chain |].
         iApply fupd_wp.
         iMod (socr_arms_fresh omo gf (proc_addr jx) pidv Mim pvv vom P Pmiss
                 Phiarm Phiun Phiok Phiex Phio Phit (upd_usV U (upd_ev (us_V U) k2)) sts _ (bview plen bp) (bv_unsigned inum)
@@ -853,10 +853,10 @@ Section ProofSysOpenEntryC.
                        (abs_row (era_node dn bm data)) Phio)
                     (socr_ft_ex (bview plen bp) P Phiarm Phiex (bv_unsigned inum) Phit) m K eb b lks))
         with "[Hcont Hsbn Hsbs HR]" as "Hcontj".
-      { iEval (rewrite /wp_next). iIntros (CIDz) "%Hqz".
+      { iEval (rewrite /wp_next). iIntros (CIDz) "%Hqz" Hlc.
         iEval (rewrite /so_cont_au). iIntros (mf ns2 k2) "%Hcsf %Hns2 %Hk2".
         iIntros "Hcg Hown Htce Hcce Hpc Hsbb Hsbi Hbsl Hisl Hpost".
-        iSpecialize ("Hcont" $! CIDz with "[%]"); [wp_next_chain |].
+        iSpecialize ("Hcont" $! CIDz with "[%] Hlc"); [wp_next_chain |].
         iApply fupd_wp.
         iMod (socr_arms_exists omo gf (proc_addr jx) pidv Mim pvv vom P Pmiss
                 Phiarm Phiun Phiok Phiex Phio Phit (upd_usV U (upd_ev (us_V U) k2)) sts _ (bview plen bp) (bv_unsigned inum)

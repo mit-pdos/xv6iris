@@ -414,11 +414,11 @@ Section KforkArms.
               with "Hcg Hcpu Hpay Htext Hpc Hb1 Hb2 Hb3 Hb4x Hb5x Hb6 Hb7 Hb8
                     Hheld Hhart Hislock Hplock Hkalloc Hfprest Hcrow Hcxb Hcsg Hcpr Hfppt Hfptf Hlend").
     all: try lkbelow.
-    iIntros (CID Hcross mf) "%Hpf Hcg Hpc Hcpu2 (%kl & %Hkl & Hlend) Hkalloc2".
+    iIntros (CID Hcross) "Hlc". iIntros (mf) "%Hpf Hcg Hpc Hcpu2 (%kl & %Hkl & Hlend) Hkalloc2".
     iDestruct ("Hpvb" $! kl with "[%] Hlend") as (Up2) "[%HUp2 Hpv]"; [exact Hkl|].
     destruct HUp2 as (k2 & Hk2 & ->).
     destruct Hpf as [Hcsmf Hmfa0].
-    iSpecialize ("Hcont" $! CID with "[%]").
+    iSpecialize ("Hcont" $! CID with "[%] Hlc").
     { rewrite -Hbeq. exact Hcross. }
     iApply ("Hcont" $! mf with "[%] Hpc [Hcg Hcpu2 Hpv Hpfrag Hkalloc2 Hprow HRc]").
     - exact Hcsmf.
@@ -502,10 +502,10 @@ Section KforkArms.
     iApply (ProofKfork.kfk_exit_alloc m Mt K sp0 ra0 s00 s10 s50 pme b
               HK8 Hmsp Hmra Hms0 Hms1 Hms5 HMtsp HMtthr
               with "Hcg Htext Hpc Hframe").
-    iIntros (CID Hcross mf) "%Hpf Hcg Hpc".
+    iIntros (CID Hcross) "Hlc". iIntros (mf) "%Hpf Hcg Hpc".
     destruct Hpf as [Hcsmf Hmfa0].
     iDestruct (cpu_own_transport CID0 CID lvl eb pme b Hcross with "Hcpu") as "Hcpu".
-    iSpecialize ("Hcont" $! CID with "[%]"); [exact Hcross |].
+    iSpecialize ("Hcont" $! CID with "[%] Hlc"); [exact Hcross |].
     iApply ("Hcont" $! mf with "[%] Hpc [Hcg Hcpu Hpv Hpfrag Hkalloc Hprow HRc]").
     - exact Hcsmf.
     - rewrite /kfork_post.
@@ -1033,10 +1033,10 @@ Section KforkArms.
                 (sign_extend' 64 pid_c) w8 pme b
                 ltac:(lia) Hmsp Hmra Hms0 Hms1 Hms5 Hmf5sp Hmf5s1 Hmf5thr
                 with "Hsc5 Htext Hpc5 Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8").
-      iIntros (CID6 Hcross6 mr) "%Hpost Hsc6 Hpc6".
+      iIntros (CID6 Hcross6) "Hlc". iIntros (mr) "%Hpost Hsc6 Hpc6".
       destruct Hpost as (Hcsm & Hrv).
       iDestruct (cpu_own_transport CID5 CID6 lvl eb pme b Hcross6 with "Hown5") as "Hown5".
-      iSpecialize ("Hcont" $! CID6 with "[%]").
+      iSpecialize ("Hcont" $! CID6 with "[%] Hlc").
       { intros Hdisj. transitivity CID5; [exact (Hcross6 Hdisj) | exact (Hcross5 Hdisj)]. }
       iApply ("Hcont" $! mr with "[%] Hpc6 [Hsc6 Hown5 Hpvx4 Hpfrag Hkalloc Htok Hprow]").
       + exact Hcsm.

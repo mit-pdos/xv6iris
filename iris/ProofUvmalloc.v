@@ -1911,12 +1911,12 @@ Section ProofUvmalloc.
       iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.uvmalloc + 0xa4)) Rra Y1 K b
                 ltac:(vm_compute; discriminate) with "Hcg Hpc []").
       { iApply (uai_a4 with "Htext"). }
-      iIntros (CIDu51 Hsu51) "Hcg Hpc".
+      iIntros (CIDu51 Hsu51) "Hlc Hcg Hpc".
       assert (HY1ra : Y1 !!! Regidx Rra = mm !!! Regidx Rra)
         by (rewrite /Y1; rewrite upd_ne; [reflexivity | reg_neq]).
       assert (Hretf : ret_pc (Y1 !!! Regidx Rra) = ret_tgt) by (rewrite HY1ra; reflexivity).
       iEval (rewrite Hretf) in "Hpc".
-      iSpecialize ("Hcont" $! CIDu51 with "[%]"); [wp_next_chain|].
+      iSpecialize ("Hcont" $! CIDu51 with "[%] Hlc"); [wp_next_chain|].
       iDestruct (cpu_own_transport CID CIDu51 0%nat eb p b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
       iApply ("Hcont" $! Y1 with "Hcg Hcnt Hlend Hpc [%] [Hpt]").
@@ -2406,10 +2406,10 @@ Section ProofUvmalloc.
       iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.uvmalloc + 0x86)) Rra E7 K b
                 ltac:(vm_compute; discriminate) with "Hcg Hpc []").
       { iApply (uai_86 with "Htext"). }
-      iIntros (CIDu76 Hsu76) "Hcg Hpc".
+      iIntros (CIDu76 Hsu76) "Hlc Hcg Hpc".
       assert (Hretf : ret_pc (E7 !!! Regidx Rra) = ret_tgt) by (rewrite HE7ra; reflexivity).
       iEval (rewrite Hretf) in "Hpc".
-      iSpecialize ("Hcont" $! CIDu76 with "[%]"); [wp_next_chain|].
+      iSpecialize ("Hcont" $! CIDu76 with "[%] Hlc"); [wp_next_chain|].
       iDestruct (cpu_own_transport CIDu86 CIDu76 0%nat eb p b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
       iApply ("Hcont" $! E7 with "Hcg Hcnt Hlend Hpc [%] [Hpost]").
@@ -2501,10 +2501,10 @@ Section ProofUvmalloc.
                 Z1 (K - 10)%nat b ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (uai_a8 with "Htext"). }
-      iApply bi.later_intro. iIntros (CIDu79 Hsu79). iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CIDu79 Hsu79) "Hlc". iIntros "Hcg Hpc".
       iEval (rewrite Hjta8) in "Hpc".
       iEval (rewrite /ua_exit) in "Hepi".
-      iSpecialize ("Hepi" $! CIDu79 with "[%]"); [wp_next_chain|].
+      iSpecialize ("Hepi" $! CIDu79 with "[%] Hlc"); [wp_next_chain|].
       iDestruct (cpu_own_transport CID CIDu79 0%nat eb p b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
       iApply ("Hepi" $! Z1 newsz with "[%] Hcg Hcnt Hlend Hpc [Hk3 Hk5 Hk8] [Hpt]").

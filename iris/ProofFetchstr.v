@@ -345,7 +345,7 @@ Section ProofFetchstr.
               Rra T6 av b ltac:(vm_compute; discriminate)
               with "Hcg Hpc []").
     { iApply (fsi_3c with "Htext"). }
-    iIntros (CID7 Hk7) "Hcg Hpc".
+    iIntros (CID7 Hk7) "Hlc Hcg Hpc".
     iEval (rewrite (rget_ne (CID := CID6) T6 Rra ltac:(vm_compute; discriminate))) in "Hpc".
     iEval (rewrite HT6ra) in "Hpc".
     (* ---- the postcondition ---- *)
@@ -389,7 +389,7 @@ Section ProofFetchstr.
       rewrite /T2 upd_ne; [| congruence].
       rewrite /T1 upd_ne; [| congruence].
       apply Hthr; assumption. }
-    iSpecialize ("Hcont" $! CID7 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CID7 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! T6 with "[%] Hcg Hpc").
     split; [| exact HT6a0].
     unfold callee_saved.
@@ -950,12 +950,12 @@ Section ProofFetchstr.
                 ltac:(lia) eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl
                 Hslsp Hsla0 Hthrsl
                 with "Hcg Htext Hpc Hs1 Hs2 Hs3 Hs4 Hs5 Hs6").
-      iIntros (CID23 Hk23 mf) "[%Hcsf %Hfa0] Hcg Hpc".
+      iIntros (CID23 Hk23) "Hlc". iIntros (mf) "[%Hcsf %Hfa0] Hcg Hpc".
       (* [Hcpu] has been sitting at [CID12] (myproc's exit hart) ever since;
          re-anchor it at the final hart before it can feed the function's own
          [Hcont]. *)
       iDestruct (cpu_own_transport CID18 CID23 n eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-      iSpecialize ("Hcont" $! CID23 with "[%]"); [wp_next_chain|].
+      iSpecialize ("Hcont" $! CID23 with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hcont" $! mf P' dst_new kc2 with "[%] [%] [%] Hcg Hcpu Hpc Hpriv Hbuf [%] [%]").
       { exact Hcsf. }
       { exact Hext. }
@@ -1020,9 +1020,9 @@ Section ProofFetchstr.
                 ltac:(lia) eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl
                 HE1sp HE1a0 HthrE1
                 with "Hcg Htext Hpc Hs1 Hs2 Hs3 Hs4 Hs5 Hs6").
-      iIntros (CID22 Hk22 mf) "[%Hcsf %Hfa0] Hcg Hpc".
+      iIntros (CID22 Hk22) "Hlc". iIntros (mf) "[%Hcsf %Hfa0] Hcg Hpc".
       iDestruct (cpu_own_transport CID18 CID22 n eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-      iSpecialize ("Hcont" $! CID22 with "[%]"); [wp_next_chain|].
+      iSpecialize ("Hcont" $! CID22 with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hcont" $! mf P' dst_new kc2 with "[%] [%] [%] Hcg Hcpu Hpc Hpriv Hbuf [%] [%]").
       { exact Hcsf. }
       { exact Hext. }

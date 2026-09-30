@@ -304,7 +304,7 @@ Section ProofGrowproc.
               Rra T5 av b ltac:(vm_compute; discriminate)
               with "Hcg Hpc []").
     { iApply (gpi_46 with "Htext"). }
-    iIntros (CIDt6 Hnt6) "Hcg Hpc".
+    iIntros (CIDt6 Hnt6) "Hlc Hcg Hpc".
     iEval (rewrite Hrt) in "Hpc".
     assert (HT5sp : T5 !!! Regidx csp_rs1 = m !!! Regidx csp_rs1)
       by (rewrite /T5 upd_eq Hwv; symmetry; exact Hsp0).
@@ -338,7 +338,7 @@ Section ProofGrowproc.
       rewrite /T2 upd_ne; [| congruence].
       rewrite /T1 upd_ne; [| congruence].
       apply Hthr; assumption. }
-    iSpecialize ("Hcont" $! CIDt6 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CIDt6 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! T5 with "[%] Hcg Hpc").
     split; [| exact HT5a0].
     unfold callee_saved.
@@ -404,11 +404,11 @@ Section ProofGrowproc.
               ltac:(apply bv_eq; vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (gpi_3a with "Htext"). }
-    iIntros (CIDp2 Hnp2) "Hcg Hpc".
+    iIntros (CIDp2 Hnp2) "Hlc Hcg Hpc".
     assert (Hpp3c : add_vec_int (mword_of_int (KernelSyms.growproc + 0x3a) : mword 64) 2
                     = mword_of_int (KernelSyms.growproc + 0x3c)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp3c) in "Hpc".
-    iSpecialize ("Hcont" $! CIDp2 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CIDp2 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! (<[Regidx Ra0 := regval_into_reg (mword_of_int 0 : mword 64)]> Ms)
               with "[%] [%] Hcg Hpc Hsz").
     - rewrite upd_eq. reflexivity.
@@ -764,10 +764,10 @@ Section ProofGrowproc.
                 ltac:(lia) eq_refl eq_refl eq_refl eq_refl eq_refl
                 Hfsp Hfa0 Hfthr
                 with "Hcg Htext Hpc Hb1 Hb2 Hb3 Hb4").
-      iIntros (CIDf Hnf mf) "[%Hcsf %Hmfa0] Hcg Hpc".
+      iIntros (CIDf Hnf) "Hlc". iIntros (mf) "[%Hcsf %Hmfa0] Hcg Hpc".
       iDestruct (cpu_own_transport CIDx CIDf 0%nat eb p b ltac:(wp_next_chain)
                    with "Hcpu") as "Hcpu".
-      iSpecialize ("Hcont" $! CIDf with "[%]"); [wp_next_chain|].
+      iSpecialize ("Hcont" $! CIDf with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hcont" $! mf P' szv' M' k' with "[%] [%] [%] Hcg Hcpu Hpc Hpriv").
       { exact Hcsf. }
       { rewrite Hmfa0. exact Hok. }

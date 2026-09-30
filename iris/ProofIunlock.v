@@ -784,7 +784,7 @@ Section ProofIunlockMain.
     iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.iunlock + 0x32)) Rra P5 K b ltac:(nz)
               with "Hcg Hpc []").
     { iApply (iui2_32 with "Htext"). }
-    iIntros (CID24 Hq24) "Hcg Hpc".
+    iIntros (CID24 Hq24) "Hlc Hcg Hpc".
     iEval (rgne) in "Hpc".
     assert (Hretf : ret_pc (P5 !!! Regidx Rra : mword 64)
                     = ret_pc (m !!! Regidx Rra : mword 64))
@@ -834,7 +834,7 @@ Section ProofIunlockMain.
     iDestruct (cpu_own_transport CID18 CID24 0%nat eb p b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     rewrite /iul_cont.
-    iSpecialize ("Hcont" $! CID24 with "[%]"); [wp_next_chain |].
+    iSpecialize ("Hcont" $! CID24 with "[%] Hlc"); [wp_next_chain |].
     iApply ("Hcont" $! P5 with "[%] Hcg Hcnt Hpc Hppid Href Hside").
     { unfold callee_saved. split_and!; assumption. }
   Qed.

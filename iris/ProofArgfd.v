@@ -191,13 +191,13 @@ Section ProofArgfd.
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (afi_38 with "Htext"). }
-      iApply bi.later_intro. iIntros (CID1 Hk1) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID1 Hk1) "Hlc Hcg Hpc".
       assert (Htgt : add_vec (mword_of_int (KernelSyms.argfd + 0x38) : mword 64)
                        (sign_extend' 64 (mword_of_int 8 : mword 13))
                      = mword_of_int (KernelSyms.argfd + 0x40))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgt) in "Hpc".
-      iSpecialize ("Hcont" $! CID1 with "[%]"); [wp_next_chain|].
+      iSpecialize ("Hcont" $! CID1 with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hcont" with "Hcg Hpc Hout").
     - (* pfd <> 0: fall through and store *)
       iDestruct (ofd_out_elim pfd oldfd Hnz with "Hcell") as "Hcell".
@@ -220,13 +220,13 @@ Section ProofArgfd.
                 Mt nav oldfd b
                 with "Hcg Hpc [] Hcell").
       { iApply (afi_3c with "Htext"). }
-      iIntros (CID2 Hk2) "Hcg Hpc Hcell".
+      iIntros (CID2 Hk2) "Hlc Hcg Hpc Hcell".
       iEval (rewrite Haddrp Ha4' trunc32_sext64) in "Hcell".
       assert (Hpp40 : add_vec_int (mword_of_int (KernelSyms.argfd + 0x3c) : mword 64) 4
                       = mword_of_int (KernelSyms.argfd + 0x40)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp40) in "Hpc".
       iDestruct (ofd_out_intro pfd wfd Hnz with "Hcell") as "Hout".
-      iSpecialize ("Hcont" $! CID2 with "[%]"); [wp_next_chain|].
+      iSpecialize ("Hcont" $! CID2 with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hcont" with "Hcg Hpc Hout").
   Qed.
 
@@ -391,7 +391,7 @@ Section ProofArgfd.
               ltac:(vm_compute; discriminate)
               with "Hcg Hpc []").
     { iApply (afi_50 with "Htext"). }
-    iIntros (CIDt6 Hkt6) "Hcg Hpc".
+    iIntros (CIDt6 Hkt6) "Hlc Hcg Hpc".
     iEval (rewrite (rget_ne (CID := CIDt5) T5 (mword_of_int 1 : mword 5)
                       ltac:(vm_compute; discriminate))) in "Hpc".
     iEval (rewrite HT5ra) in "Hpc".
@@ -429,7 +429,7 @@ Section ProofArgfd.
       rewrite /T2 upd_ne; [| congruence].
       rewrite /T1 upd_ne; [| congruence].
       apply Hthr; assumption. }
-    iSpecialize ("Hcont" $! CIDt6 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CIDt6 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! T5 with "[%] Hcg Hpc").
     split; [| exact HT5a0].
     unfold callee_saved.
@@ -1075,9 +1075,9 @@ Section ProofArgfd.
         iApply (af_tail m D av (mword_of_int (-1) : mword 64) sp0 ra0 s00 s10 s20 _ w6 p b
                   ltac:(lia) eq_refl eq_refl eq_refl eq_refl eq_refl HDsp HDa0 HthrD
                   with "Hcg Htext Hpc Hs1 Hs2 Hs3 Hs4 Hs5 Hs6").
-        iIntros (CID25 Hk25 mf) "[%Hcsf %Hmfa0] Hcg Hpc".
+        iIntros (CID25 Hk25) "Hlc". iIntros (mf) "[%Hcsf %Hmfa0] Hcg Hpc".
         iDestruct (cpu_own_transport CID16 CID25 n eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-        iSpecialize ("Hcont" $! CID25 with "[%]"); [wp_next_chain|].
+        iSpecialize ("Hcont" $! CID25 with "[%] Hlc"); [wp_next_chain|].
         iApply ("Hcont" $! mf with "[%] Hcg Hcpu Hpc Hpriv [Hfdcell Hfcell]"); [exact Hcsf|].
         rewrite /argfd_post. iLeft. iFrame "Hfdcell Hfcell". iPureIntro.
         split; [exact Hmfa0|].
@@ -1166,9 +1166,9 @@ Section ProofArgfd.
         iApply (af_tail m E1 av (zero_reg : mword 64) sp0 ra0 s00 s10 s20 _ w6 p b
                   ltac:(lia) eq_refl eq_refl eq_refl eq_refl eq_refl HE1sp HE1a0 HthrE1
                   with "Hcg Htext Hpc Hs1 Hs2 Hs3 Hs4 Hs5 Hs6").
-        iIntros (CID28 Hk28 mf) "[%Hcsf %Hmfa0] Hcg Hpc".
+        iIntros (CID28 Hk28) "Hlc". iIntros (mf) "[%Hcsf %Hmfa0] Hcg Hpc".
         iDestruct (cpu_own_transport CID16 CID28 n eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-        iSpecialize ("Hcont" $! CID28 with "[%]"); [wp_next_chain|].
+        iSpecialize ("Hcont" $! CID28 with "[%] Hlc"); [wp_next_chain|].
         iApply ("Hcont" $! mf with "[%] Hcg Hcpu Hpc Hpriv [Hfdcell Hfcell]"); [exact Hcsf|].
         rewrite /argfd_post. iRight. iExists fd, fv. iFrame "Hfdcell Hfcell". iPureIntro.
         split; [exact Hmfa0|].
@@ -1232,9 +1232,9 @@ Section ProofArgfd.
       iApply (af_tail m F av (mword_of_int (-1) : mword 64) sp0 ra0 s00 s10 s20 _ w6 p b
                 ltac:(lia) eq_refl eq_refl eq_refl eq_refl eq_refl HFsp HFa0 HthrF
                 with "Hcg Htext Hpc Hs1 Hs2 Hs3 Hs4 Hs5 Hs6").
-      iIntros (CID17 Hk17 mf) "[%Hcsf %Hmfa0] Hcg Hpc".
+      iIntros (CID17 Hk17) "Hlc". iIntros (mf) "[%Hcsf %Hmfa0] Hcg Hpc".
       iDestruct (cpu_own_transport CID11 CID17 n eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-      iSpecialize ("Hcont" $! CID17 with "[%]"); [wp_next_chain|].
+      iSpecialize ("Hcont" $! CID17 with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hcont" $! mf with "[%] Hcg Hcpu Hpc Hpriv [Hfdcell Hfcell]"); [exact Hcsf|].
       rewrite /argfd_post. iLeft. iFrame "Hfdcell Hfcell". iPureIntro.
       split; [exact Hmfa0|].

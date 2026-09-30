@@ -616,7 +616,7 @@ Proof using .
     { rewrite Heb /trap_csrs_ext. done. }
     { rewrite Heb /cpu_claim_ext. done. }
     { rewrite /ic_dep_side. iExact "Htx". }
-    iIntros (CID8 Hq8 Mo dnc bmc filled)
+    iIntros (CID8 Hq8) "Hlc". iIntros (Mo dnc bmc filled)
       "%Hcso _ Hcg Hcnt _ _ Hpc Hppid Hsbi Hbs1 Hslq Hdep Hoffr
        Hcidev Hciinum Hcivalid Hcload #Hcshot Hcfrz %Hfrf Hwb %Hilkp".
     (* THE CLAIM ARM'S PAYOUT IS A PAIR since durable-disk C-5: the plain
@@ -632,7 +632,7 @@ Proof using .
     iEval (rewrite Hpcb4) in "Hpc".
     iDestruct (cft_bs3 with "[Hbs1 Hbs2]") as "Hbsl";
       [iSplitL "Hbs1"; [iExact "Hbs1" | iExact "Hbs2"] |].
-    iSpecialize ("Hcont" $! CID8 with "[%]"); [wp_next_chain |].
+    iSpecialize ("Hcont" $! CID8 with "[%] Hlc"); [wp_next_chain |].
     iApply ("Hcont" $! Mo true kslot q gsh inum gilc gislc dnc bmc
               with "[%] Hcg Hcnt Hsbn Hsbi Hppid Hbsl Hidev
                     [Hpc Hslq Hdep Hoffr Hcidev Hciinum Hcivalid Hcload Hcfrz
@@ -684,13 +684,13 @@ Proof using .
               with "Hcg Hpc []").
     { iApply (cri_0ae with "Htext"). }
     iApply bi.later_intro.
-    iIntros (CID6 Hq6) "Hcg Hpc".
+    iIntros (CID6 Hq6) "Hlc Hcg Hpc".
     iEval (rewrite Htk) in "Hpc".
     iDestruct (cft_bs3 with "[Hbs1 Hbs2]") as "Hbsl";
       [iSplitL "Hbs1"; [iExact "Hbs1" | iExact "Hbs2"] |].
     iDestruct (cpu_own_transport CID4 CID6 0%nat eb (proc_addr j) b
                  ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
-    iSpecialize ("Hcont" $! CID6 with "[%]"); [wp_next_chain |].
+    iSpecialize ("Hcont" $! CID6 with "[%] Hlc"); [wp_next_chain |].
     iApply ("Hcont" $! F1 false 0%nat 1%Qp γl inum γl γl dn' bm_empty
               with "[%] Hcg Hcnt Hsbn Hsbi Hppid Hbsl Hidev [Hpc Hisl Htx Htc Hop]").
     { intros c Hc Hne.

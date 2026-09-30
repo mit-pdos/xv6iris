@@ -767,7 +767,7 @@ Section AslBodies.
               ltac:(vm_compute; discriminate)
               with "Hcg Hpc []").
     { iApply (asl_52 with "Htext"). }
-    iIntros (CIDe6 Hse6) "Hcg Hpc".
+    iIntros (CIDe6 Hse6) "Hlc Hcg Hpc".
     iEval (rgne) in "Hpc".
     assert (Hretf : ret_pc (Q42 !!! Regidx (mword_of_int 1 : mword 5)) = ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)))
       by (rewrite HQ42ra; reflexivity).
@@ -794,7 +794,7 @@ Section AslBodies.
                  with "Hextc") as "Hextc".
     iDestruct (cpu_claim_ext_transport CID CIDe6 eb pj ltac:(wp_next_chain)
                  with "Hextm") as "Hextm".
-    iSpecialize ("Hcont" $! CIDe6 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CIDe6 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! Q42 with "[%] Hcg Hown Hextc Hextm Hpc Hstok HR Hpid").
     { unfold callee_saved.
       split. { (* sp *) rewrite /Q42 upd_eq. rewrite Hwv. exact Hsp0. }
@@ -1412,8 +1412,8 @@ Section ProofAcquiresleep.
       iApply (asl_exit_body (CID := CIDx) CID γs j γl γsl s R H q m M pidv av Upr slk spd sp0 eb lks
                 Hav Hsx Hspd Hsp0 HaslE Hbelow
                 with "Htext Hslk Hr24 Hr16 Hr8 Hr0 Htok Hstok HHq HRx Hw Hpid Hown Htc Hclm Hcg Hpc [Hcont]").
-      iIntros (CIDz) "%Hsz".
-      iSpecialize ("Hcont" $! CIDz with "[%]"); [exact Hsz|].
+      iIntros (CIDz) "%Hsz" Hlc.
+      iSpecialize ("Hcont" $! CIDz with "[%] Hlc"); [exact Hsz|].
       iIntros (mf) "%Hcs Hcg2 Hown2 Htce2 Hcce2 Hpc2 Hstok2 HR2 Hpid2".
       iApply ("Hcont" $! mf with "[%] Hcg2 Hown2 Htce2 Hcce2 Hpc2 Hpaira Hstok2 HR2 Hpid2").
       exact Hcs. }
@@ -1503,8 +1503,8 @@ Section ProofAcquiresleep.
     specialize (HK Hj Hav Hbelow).
     iIntros "Hcg Hown Hextc Hextm #Htext Hpc #Hslk #Hllb HHq Hpid #Hpinv Hcont".
     iApply (HK with "Hcg Hown Hextc Hextm Htext Hpc Hslk Hllb HHq Hpid Hpinv [Hcont]").
-    iIntros (CIDz) "%Hsz".
-    iSpecialize ("Hcont" $! CIDz with "[%]"); [exact Hsz|].
+    iIntros (CIDz) "%Hsz" Hlc.
+    iSpecialize ("Hcont" $! CIDz with "[%] Hlc"); [exact Hsz|].
     iIntros (mf) "%Hcs Hcg2 Hown2 Htce2 Hcce2 Hpc2 #Hpaira2 Hstok2 HR2 Hpid2".
     iApply ("Hcont" $! mf with "[%] Hcg2 Hown2 Htce2 Hcce2 Hpc2 Hpaira2 Hstok2 HR2 Hpid2").
     exact Hcs.
@@ -2798,8 +2798,8 @@ Section ProofAcquiresleep.
               Hj Hav Hbelow
               with "Hcg Hown Hextc Hextm Htext Hpc Hslk [] HHq Hpid Hpinv [Hcont]").
     { iApply TsoGhost.llb_0. }
-    iIntros (CIDz) "%Hsz".
-    iSpecialize ("Hcont" $! CIDz with "[%]"); [exact Hsz|].
+    iIntros (CIDz) "%Hsz" Hlc.
+    iSpecialize ("Hcont" $! CIDz with "[%] Hlc"); [exact Hsz|].
     iIntros (mf) "%Hcs Hcg Hown Htce Hcce Hpc _ Hstok HR Hpid".
     iApply ("Hcont" $! mf with "[%] Hcg Hown Htce Hcce Hpc Hstok HR Hpid").
     exact Hcs.
@@ -2819,8 +2819,8 @@ Section ProofAcquiresleep.
     iApply (wp_acquiresleep_gen_sconf γs j γl γsl s R sl_untracked 1%Qp m pidv Upr av eb b lks
               Hj Hav Hbelow
               with "Hcg Hown Hextc Hextm Htext Hpc Hslk Hemp Hpid Hpinv [Hcont]").
-    iIntros (CIDf Hsf mf) "%Hcs Hcg Hown Hextc Hextm Hpc Hstok HR Hpid".
-    iSpecialize ("Hcont" $! CIDf with "[%]"); [ exact Hsf |].
+    iIntros (CIDf Hsf) "Hlc". iIntros (mf) "%Hcs Hcg Hown Hextc Hextm Hpc Hstok HR Hpid".
+    iSpecialize ("Hcont" $! CIDf with "[%] Hlc"); [ exact Hsf |].
     iAssert (sleeplocked γsl slk pidv) with "[Hstok]" as "Hstok";
       [ iExists 1%Qp; iFrame |].
     iApply ("Hcont" $! mf with "[%] Hcg Hown Hextc Hextm Hpc Hstok HR Hpid").

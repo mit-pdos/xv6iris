@@ -246,11 +246,11 @@ Section WpInitlockWrapper.
     iApply (wp_cret_s_sconf (mword_of_int (F + 0x22)) (mword_of_int 1 : mword 5) E3 K b
               ltac:(vm_compute; discriminate)
               with "Hcg Hpc Hi22 [-]").
-    iEval (rewrite /wp_next). iIntros (CID14 Hs14) "Hcg Hpc".
+    iEval (rewrite /wp_next). iIntros (CID14 Hs14) "Hlc Hcg Hpc".
     assert (Hretf : ret_pc (E3 !!! Regidx (mword_of_int 1 : mword 5)) = ret_tgt)
       by (rewrite HE3ra; reflexivity).
     iEval (rewrite Hretf) in "Hpc".
-    iSpecialize ("Hcont" $! CID14 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CID14 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! E3 with "Hcg Hpc [%] Hlock Hlnm Hcpu").
     (* callee_saved m E3: the sub-call preserves s1..s11; the epilogue
        restores sp/s0, and ra (caller-saved) is irrelevant. *)

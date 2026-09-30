@@ -962,13 +962,13 @@ Section ProofIget.
       iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.iget + 0x9c)) Rra P8 K b
                 ltac:(nz) with "Hcg Hpc []").
       { iApply (igi_9c with "Htext"). }
-      iIntros (CIDt9 Hst9) "Hcg Hpc".
+      iIntros (CIDt9 Hst9) "Hlc Hcg Hpc".
       iEval (rgne) in "Hpc".
       assert (Hretf : ret_pc (P8 !!! Regidx Rra) = ret_tgt) by (rewrite HP8ra; reflexivity).
       iEval (rewrite Hretf) in "Hpc".
       iDestruct (cpu_own_transport CIDt CIDt9 n eb p b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
-      iSpecialize ("Hcont" $! CIDt9 with "[]"); [ iPureIntro; wp_next_chain | ].
+      iSpecialize ("Hcont" $! CIDt9 with "[] Hlc"); [ iPureIntro; wp_next_chain | ].
       (* SIMP-2: the post is ONE row -- the reference and its minted unit,
          packaged by [IcacheRef.inode_refb] (its intro is [iFrame]). *)
       iApply ("Hcont" $! P8 kk q with "Hcg Hcnt Hpc [%] [$Href $Hru] Hlic").

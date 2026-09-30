@@ -873,12 +873,12 @@ Section InitlogBlocks.
                 ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
                 Hcmp with "Hcg Hpc []").
       { iApply (ili_5a with "Htext"). }
-      iIntros (CIDc5 Hsc5) "Hcg Hpc".
+      iIntros (CIDc5 Hsc5) "Hlc Hcg Hpc".
       assert (Hpp5e : add_vec_int (mword_of_int (KernelSyms.initlog + 0x5a) : SailStdpp.Values.mword 64) 4
                       = mword_of_int (KernelSyms.initlog + 0x5e))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp5e) in "Hpc".
-      iSpecialize ("Hcont" $! CIDc5 with "[%]"); [wp_next_chain|].
+      iSpecialize ("Hcont" $! CIDc5 with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hcont" $! E3 with "[%] [%] Hcg Hpc Hby [Hdone] [Hjunk]").
       + exact HE3cs.
       + exact HE3a0.
@@ -903,8 +903,8 @@ Section InitlogBlocks.
       iEval (rewrite Htgt52) in "Hpc".
       iApply (IH CIDc5 (S t) E3 ltac:(lia) ltac:(lia) HE3a5 HE3a4 HE3a2 HE3a0
                 with "Hcg Hpc Htext Hby Hdone Hjunk [Hcont]").
-      rewrite /wp_next. iIntros (CIDo Hso M') "%HcsX %Ha0X HcgX HpcX HbyX HdoneX HjunkX".
-      iSpecialize ("Hcont" $! CIDo with "[%]"); [wp_next_chain|].
+      rewrite /wp_next. iIntros (CIDo Hso) "Hlc". iIntros (M') "%HcsX %Ha0X HcgX HpcX HbyX HdoneX HjunkX".
+      iSpecialize ("Hcont" $! CIDo with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hcont" $! M' with "[%] [%] HcgX HpcX HbyX HdoneX HjunkX").
       + intros c Hc. rewrite (HcsX c Hc). exact (HE3cs c Hc).
       + exact Ha0X.
@@ -963,13 +963,13 @@ Section InitlogBlocks.
                 ltac:(vm_compute; discriminate) Hcmp ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (ili_40 with "Htext"). }
-      iNext. iIntros (CIDh1 Hsh1) "Hcg Hpc".
+      iNext. iIntros (CIDh1 Hsh1) "Hlc Hcg Hpc".
       assert (Htgt5e : add_vec (mword_of_int (KernelSyms.initlog + 0x40) : SailStdpp.Values.mword 64)
                          (sign_extend' 64 (mword_of_int 30 : SailStdpp.Values.mword 13))
                        = mword_of_int (KernelSyms.initlog + 0x5e))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgt5e) in "Hpc".
-      iSpecialize ("Hcont" $! CIDh1 with "[%]"); [wp_next_chain|].
+      iSpecialize ("Hcont" $! CIDh1 with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hcont" $! M with "[%] [%] Hcg Hpc Hby [] [Hjunk]").
       + intros c Hc. reflexivity.
       + exact Ha0.
@@ -1127,8 +1127,8 @@ Section InitlogBlocks.
       iApply (il_copy nh kk nh bs_hdr pj nK b Hkk Hnh Hlen CIDh6 0%nat F5
                 Hposn ltac:(lia) HF5a5 HF5a4 HF5a2 HF5a0
                 with "Hcg Hpc Htext Hby Hdone Hjunk [Hcont]").
-      rewrite /wp_next. iIntros (CIDo Hso M') "%HcsX %Ha0X HcgX HpcX HbyX HdoneX HjunkX".
-      iSpecialize ("Hcont" $! CIDo with "[%]"); [wp_next_chain|].
+      rewrite /wp_next. iIntros (CIDo Hso) "Hlc". iIntros (M') "%HcsX %Ha0X HcgX HpcX HbyX HdoneX HjunkX".
+      iSpecialize ("Hcont" $! CIDo with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hcont" $! M' with "[%] [%] HcgX HpcX HbyX HdoneX HjunkX").
       + intros c Hc. rewrite (HcsX c Hc). exact (HF5cs c Hc).
       + exact Ha0X.
@@ -2517,7 +2517,7 @@ Section ProofInitlog.
     iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.initlog + 0x80)) Rra P6 K b
               ltac:(vm_compute; discriminate) with "Hcg Hpc []").
     { iApply (ili_80 with "Htext"). }
-    iIntros (CID41 Hs41) "Hcg Hpc".
+    iIntros (CID41 Hs41) "Hlc Hcg Hpc".
     iEval (rgne) in "Hpc".
     assert (Hretf : ret_pc (P6 !!! Regidx Rra : mword 64)
                     = ret_pc (m !!! Regidx Rra : mword 64))
@@ -2768,7 +2768,7 @@ Section ProofInitlog.
                  ltac:(rewrite Hbm; wp_next_chain) with "Hextc") as "Hextc".
     iDestruct (cpu_claim_ext_transport CID34 CID41 eb pj
                  ltac:(rewrite Hbm; wp_next_chain) with "Hclmc") as "Hclmc".
-    iSpecialize ("Hcont" $! CID41 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CID41 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! P6 with "[%] Hcg Hcnt Hextc Hclmc Hpc Hppid Hsbf Hs2 Hctx").
     { unfold callee_saved. repeat split; assumption. }
   Qed.

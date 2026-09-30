@@ -557,11 +557,11 @@ Section SysExecBreakAU.
       iSplitL "P7"; [iExact "P7" |]. iSplitL "P8"; [iExact "P8" |].
       iSplitL "P9"; [iExact "P9" |]. iSplitL "F10"; [iExact "F10" |].
       iSplitL "Hpb"; [iExact "Hpb" | iExact "Hps"]. }
-    iIntros (CID9) "%Hq9". iIntros (mg) "%Hcsg %Hga0 Hcg Hcnt Hpc Hpriv".
+    iIntros (CID9) "%Hq9" Hlc. iIntros (mg) "%Hcsg %Hga0 Hcg Hcnt Hpc Hpriv".
     (* kexec's crossing is the literal [true] now, so the chain back to this
        block's own [b]-indexed continuation goes through [Hbt] -- sys_exec is
        still an [eb = true] caller and that is exactly what pins it. *)
-    iSpecialize ("Hout" $! CID9 with "[%]"); [rewrite Hbt; wp_next_chain |].
+    iSpecialize ("Hout" $! CID9 with "[%] Hlc"); [rewrite Hbt; wp_next_chain |].
     iApply ("Hout" $! mg U'
              with "[%] [Harms] [%] [%] [%] Hcg Hcnt Hpc Hbmp Hisp Hbs Hir Hpriv").
     { exact Hcsg. }
@@ -657,10 +657,10 @@ Section SysExecWhole.
     (* ===== +0x000 .. +0x026 : the prologue ===== *)
     iApply (sx_head γf j pid U v0 v1 m K true true ∅
               HK Harg0 Harg1 Hlb with "Hcg Hcnt Htext Hdata Hpc Hpriv Hka").
-    iIntros (CID1 Hq1 M P' plen pfun rst v60 kh) "[Hm1 | Hft]".
+    iIntros (CID1 Hq1) "Hlc". iIntros (M P' plen pfun rst v60 kh) "[Hm1 | Hft]".
     { (* ---- argstr failed: -1, and the block never moved ---- *)
       iDestruct "Hm1" as "((%Hcs & %Hext & %Ha0 & %Hkh) & Hcg & Hcnt & Hpc & Hpriv)".
-      iSpecialize ("Hcont" $! CID1 with "[%]"); [wp_next_chain |].
+      iSpecialize ("Hcont" $! CID1 with "[%] Hlc"); [wp_next_chain |].
       iApply ("Hcont" $! M P' (us_M U) kh
                with "[%] [%] [%] Hcg Hcnt Htcx Hccx Hpc Hbmp Hisp Hbs Hka
                      Hir [Hpriv Hau]").
@@ -744,9 +744,9 @@ Section SysExecWhole.
                 eq_refl eq_refl Hnul3 Halp Hroot Hnib0
                 Hlg Hsize Hbm0 Hbmc Hbml Hist0 Hcb Hireg Hjp Hgl eq_refl eq_refl
                 with "Htext Hfab Hka Hbmp Hisp Hbmr Hbs Hir Hmp Hau Hbrk").
-      iIntros (CID4 Hq4 mf Ubk)
+      iIntros (CID4 Hq4) "Hlc". iIntros (mf Ubk)
         "%Hcs Harms %Hargs %Hext3 %Hk3 Hcg Hcnt Hpc Hbmp Hisp Hbs Hir Hpriv".
-      iSpecialize ("Hcont" $! CID4 with "[%]"); [wp_next_chain |].
+      iSpecialize ("Hcont" $! CID4 with "[%] Hlc"); [wp_next_chain |].
       iApply ("Hcont" $! mf P3 (us_M Ubk) k3
                with "[%] [%] [%] Hcg Hcnt Htcx Hccx Hpc Hbmp Hisp Hbs Hka
                      Hir [Hpriv Harms]").
@@ -781,8 +781,8 @@ Section SysExecWhole.
       iApply (sx_bad_tail (CID0 := CID3) γf j pid U K true true ∅ sp0 m
                 plen pfun rst v1 M3 P3 k3 i3 pg3 af3
                 HK Hlb eq_refl Hplen Halp with "Htext Hka Hbad").
-      iIntros (CID4 Hq4 mf) "%Hcs %Ha0 %Hext3 %Hk3 Hcg Hcnt Hpc Hpriv".
-      iSpecialize ("Hcont" $! CID4 with "[%]"); [wp_next_chain |].
+      iIntros (CID4 Hq4) "Hlc". iIntros (mf) "%Hcs %Ha0 %Hext3 %Hk3 Hcg Hcnt Hpc Hpriv".
+      iSpecialize ("Hcont" $! CID4 with "[%] Hlc"); [wp_next_chain |].
       iApply ("Hcont" $! mf P3 (us_M U) k3
                with "[%] [%] [%] Hcg Hcnt Htcx Hccx Hpc Hbmp Hisp Hbs Hka
                      Hir [Hpriv Hau]").

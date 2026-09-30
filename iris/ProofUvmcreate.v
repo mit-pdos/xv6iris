@@ -228,7 +228,7 @@ Section ProofUvmcreate.
     iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.uvmcreate + 0x24)) (mword_of_int 1 : mword 5) E4 K b
               ltac:(vm_compute; discriminate) with "Hcg Hpc []").
     { iApply (uvci_24 with "Htext"). }
-    iIntros (CID11 Hs11) "Hcg Hpc". iEval (rewrite Hrt) in "Hpc".
+    iIntros (CID11 Hs11) "Hlc Hcg Hpc". iEval (rewrite Hrt) in "Hpc".
     (* [Hts1] is about [Mt !!! Regidx 9]; the leaf's write is [rget Mt 9]
        (same [CID0] annotation as [E0] above -- this is the SAME [wval],
        just re-derived here) -- bridge with [rgne] before chasing the
@@ -250,7 +250,7 @@ Section ProofUvmcreate.
       rewrite /E1 upd_ne; [| congruence].
       rewrite /E0 upd_ne; [| congruence].
       exact (Htrest r Hr Ncsp N8 N9). }
-    iSpecialize ("Hcont" $! CID11 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CID11 with "[%] Hlc"); [wp_next_chain|].
     (* [cpu_own] was obtained at this lemma's OWN entry hart [CID0] and is
        never rebound by any of the six plain leaves above (none of them
        mention [cpu_own]); the continuation needs it at [CID11].
@@ -494,8 +494,8 @@ Section ProofUvmcreate.
          [CID].  Re-derive it at the fresh hart the same way [uvc_htail]
          discharges its OWN continuation: [iIntros] the fresh hart plus the
          crossing equality, chase [Hcont] there with [iSpecialize], done. *)
-      iIntros (CIDx Hsx).
-      iSpecialize ("Hcont" $! CIDx with "[%]"); [wp_next_chain|].
+      iIntros (CIDx Hsx) "Hlc".
+      iSpecialize ("Hcont" $! CIDx with "[%] Hlc"); [wp_next_chain|].
       iExact "Hcont".
     }
     iAssert (kalloc_env_at γa γk (avail_sub on 1))
@@ -641,8 +641,8 @@ Section ProofUvmcreate.
       iFrame "Hptree Henv". }
     (* same re-derivation as the taken branch: [uvc_htail]'s [wp_next]
        obligation here is at CID13, not [Hcont]'s (outer-entry-hart) one. *)
-    iIntros (CIDy Hsy).
-    iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain|].
+    iIntros (CIDy Hsy) "Hlc".
+    iSpecialize ("Hcont" $! CIDy with "[%] Hlc"); [wp_next_chain|].
     iExact "Hcont".
   Qed.
 

@@ -407,9 +407,9 @@ Section ProofWalkNoalloc.
               ltac:(vm_compute; discriminate)
               with "Hcg Hpc []").
     { iApply (wi_64 with "Htext"). }
-    iIntros (CID10 Hs10) "Hcg Hpc".
+    iIntros (CID10 Hs10) "Hlc Hcg Hpc".
     iEval (rewrite Hrt) in "Hpc".
-    iSpecialize ("Hcont" $! CID10 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CID10 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! E9 with "Hcg Hpc Hptree [%] [%]").
     { (* callee_saved mm E9 -- 13 conjuncts (sp, s0..s11), no tp slot: the
          [callee_saved] definition dropped its old tp conjunct (tp_pin makes
@@ -545,8 +545,8 @@ Section ProofWalkNoalloc.
               with "Hcg Htext Hpc
                     Hc56 Hc48 Hc40 Hc32 Hc24 Hc16 Hc08 Hc00
                     Hptree").
-    iIntros (CIDd Hsd).
-    iSpecialize ("Hcont" $! CIDd with "[%]"); [wp_next_chain|].
+    iIntros (CIDd Hsd) "Hlc".
+    iSpecialize ("Hcont" $! CIDd with "[%] Hlc"); [wp_next_chain|].
     iExact "Hcont".
   Qed.
 
@@ -705,8 +705,8 @@ Section ProofWalkNoalloc.
               with "Hcg Htext Hpc
                     Hc56 Hc48 Hc40 Hc32 Hc24 Hc16 Hc08 Hc00
                     Hptree").
-    iIntros (CIDe Hte).
-    iSpecialize ("Hcont" $! CIDe with "[%]"); [wp_next_chain|].
+    iIntros (CIDe Hte) "Hlc".
+    iSpecialize ("Hcont" $! CIDe with "[%] Hlc"); [wp_next_chain|].
     iExact "Hcont".
   Qed.
 
@@ -827,10 +827,10 @@ Section ProofWalkNoalloc.
               ltac:(rgne; rewrite /L5 upd_eq; reflexivity)
               with "Hcg Hpc []").
     { iApply (wi_36 with "Htext"). }
-    iIntros (CID6 Hpf) "Hcg Hpc".
+    iIntros (CID6 Hpf) "Hlc Hcg Hpc".
     assert (Hpp3a : add_vec_int (mword_of_int (KernelSyms.walk + 0x36) : mword 64) 4 = mword_of_int (KernelSyms.walk + 0x3a)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp3a) in "Hpc".
-    iSpecialize ("Hcont" $! CID6 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CID6 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" with "Hcg Hpc Hown").
   Qed.
 
@@ -1205,8 +1205,8 @@ Section ProofWalkNoalloc.
                 with "Hcg Htext Hpc
                       Hc56 Hc48 Hc40 Hc32 Hc24 Hc16 Hc08 Hc00
                       Hptree").
-      iIntros (CIDf1 Hwf1).
-      iSpecialize ("Hcont" $! CIDf1 with "[%]"); [wp_next_chain|].
+      iIntros (CIDf1 Hwf1) "Hlc".
+      iSpecialize ("Hcont" $! CIDf1 with "[%] Hlc"); [wp_next_chain|].
       iExact "Hcont". }
     (* ===== V=1 at level 2: descend into c1 ===== *)
     assert (Hvbit2 : Z.testbit (bv_unsigned pte2) 0 = true).
@@ -1350,8 +1350,8 @@ Section ProofWalkNoalloc.
                 with "Hcg Htext Hpc
                       Hc56 Hc48 Hc40 Hc32 Hc24 Hc16 Hc08 Hc00
                       Hptree").
-      iIntros (CIDf2 Hwf2).
-      iSpecialize ("Hcont" $! CIDf2 with "[%]"); [wp_next_chain|].
+      iIntros (CIDf2 Hwf2) "Hlc".
+      iSpecialize ("Hcont" $! CIDf2 with "[%] Hlc"); [wp_next_chain|].
       iExact "Hcont". }
     (* ===== V=1 at level 1: descend into c0, then the tail ===== *)
     assert (Hvbit1 : Z.testbit (bv_unsigned pte1) 0 = true).
@@ -1446,8 +1446,8 @@ Section ProofWalkNoalloc.
               with "Hcg Htext Hpc
                     Hc56 Hc48 Hc40 Hc32 Hc24 Hc16 Hc08 Hc00
                     Hptree").
-    iIntros (CIDt Hwt).
-    iSpecialize ("Hcont" $! CIDt with "[%]"); [wp_next_chain|].
+    iIntros (CIDt Hwt) "Hlc".
+    iSpecialize ("Hcont" $! CIDt with "[%] Hlc"); [wp_next_chain|].
     iExact "Hcont".
   Qed.
 

@@ -228,7 +228,7 @@ Section ProofFreerange.
               ltac:(vm_compute; discriminate)
               with "Hcg Hpc []").
     { iApply (fri_46 with "Htext"). }
-    iIntros (CIDf5 Hsf5) "Hcg Hpc".
+    iIntros (CIDf5 Hsf5) "Hlc Hcg Hpc".
     iEval (rgne) in "Hpc".
     assert (Hretf : ret_pc (E4 !!! Regidx (mword_of_int 1 : mword 5)) = ret_tgt)
       by (rewrite HE4ra; reflexivity).
@@ -238,7 +238,7 @@ Section ProofFreerange.
        last one, [CIDf5]) wants it there. *)
     iDestruct (cpu_own_transport CID0 CIDf5 ncnt eb pcur b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iSpecialize ("Hcont" $! CIDf5 with "[]"); [ iPureIntro; wp_next_chain | ].
+    iSpecialize ("Hcont" $! CIDf5 with "[] Hlc"); [ iPureIntro; wp_next_chain | ].
     iApply ("Hcont" $! E4 with "Hcg Hcnt Hpc [%] Havail").
     (* callee_saved m E4 *)
     assert (Hthread : forall c : mword 5, is_cs_idx c = true -> c <> mword_of_int 1 -> c <> mword_of_int 8 -> c <> mword_of_int 9 -> c <> csp_rs1 -> E4 !!! Regidx c = m !!! Regidx c).

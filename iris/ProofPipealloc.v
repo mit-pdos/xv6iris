@@ -483,7 +483,7 @@ Section ProofPipealloc.
       iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.pipealloc + 0xc2)) Rra P5 K b
                 ltac:(vm_compute; discriminate) with "Hcg Hpc []").
       { iApply (pai_c2 with "Htext"). }
-      iIntros (CIDf6 Hsf6) "Hcg Hpc".
+      iIntros (CIDf6 Hsf6) "Hlc Hcg Hpc".
       iEval (rgne) in "Hpc".
       assert (Hretf : ret_pc (P5 !!! Regidx Rra) = ret_tgt) by (rewrite HP5ra; reflexivity).
       iEval (rewrite Hretf) in "Hpc".
@@ -495,7 +495,7 @@ Section ProofPipealloc.
                    with "Hextc") as "Hextc".
       iDestruct (cpu_claim_ext_transport CIDe CIDf6 eb p ltac:(ext_chain Hbf)
                    with "Hextm") as "Hextm".
-      iSpecialize ("Hcont" $! CIDf6 with "[%]"); [wp_next_chain|].
+      iSpecialize ("Hcont" $! CIDf6 with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hcont" $! P5 kx with "Hcg Hcnt Hextc Hextm Hpc [%] [%] [Hpost] Hpbare Hiru").
       2:{ exact Hkx. }
       2:{ rewrite HP5a0. iExact "Hpost". }
@@ -852,14 +852,14 @@ Section ProofPipealloc.
       { iApply fileclose_env_none. }
       { iApply fileclose_cpay_none. }
       (* the READ end's unit, banked for T8 *)
-      iIntros (CIDu2 Hsu2 mr kx2) "Hcg Hcnt Hextc Hextm Hpc %Hfcpins %Hkx2 Hunit0 Hiru _ _ Hpbare".
+      iIntros (CIDu2 Hsu2) "Hlc". iIntros (mr kx2) "Hcg Hcnt Hextc Hextm Hpc %Hfcpins %Hkx2 Hunit0 Hiru _ _ Hpbare".
       iAssert (∃ k' : nat, ⌜(pv_ev (us_V Upr) <= k')%nat⌝ ∗ proc_priv_bare p pidv (upd_usV Upr (upd_ev (us_V Upr) k')))%I with "[Hpbare]" as "Hpbare".
       { iExists kx2. iSplit; [iPureIntro; cbn in Hkx2; lia|]. iExact "Hpbare". }
       assert (Hpca8 : ret_pc (V1 !!! Regidx Rra) = mword_of_int (KernelSyms.pipealloc + 0xa8))
         by (rewrite HV1ra; apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpca8) in "Hpc".
       pose proof Hfcpins as Hfcpins_cs.
-      iSpecialize ("Ht8" $! CIDu2 with "[%]"); [wp_next_chain|].
+      iSpecialize ("Ht8" $! CIDu2 with "[%] Hlc"); [wp_next_chain|].
       iApply ("Ht8" $! mr with "[%] Hcg Hpc Hcnt Hextc Hextm Hslots Hcell0 Hunit0 Hcell1 Hav Hpbare Hiru").
       split.
       { rewrite (callee_saved_lookup Hfcpins_cs csp_rs1 ltac:(vm_compute; reflexivity)).
@@ -953,7 +953,7 @@ Section ProofPipealloc.
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (pai_1e with "Htext"). }
-      iApply bi.later_intro. iIntros (CID14 Hs14) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID14 Hs14) "Hlc Hcg Hpc".
       assert (HtgtA : add_vec (mword_of_int (KernelSyms.pipealloc + 0x1e) : mword 64)
                         (sign_extend' 64 (sign_extend' 13 (concat_vec (mword_of_int 69 : mword 8) ('b"0"))))
                       = mword_of_int (KernelSyms.pipealloc + 0xa8))
@@ -970,7 +970,7 @@ Section ProofPipealloc.
                    with "Hextc") as "Hextc".
       iDestruct (cpu_claim_ext_transport CID CID14 eb p ltac:(ext_chain Hbf)
                    with "Hextm") as "Hextm".
-      iSpecialize ("Ht8" $! CID14 with "[%]"); [wp_next_chain|].
+      iSpecialize ("Ht8" $! CID14 with "[%] Hlc"); [wp_next_chain|].
       iApply ("Ht8" $! mB with "[%] Hcg Hpc Hcnt Hextc Hextm [Hr16 Hr8] [Hc0] Hslota' [Hc1 Hslotb] Hav Hpbare Hiru").
       { split; [exact HmBsp|]. split; [exact HmBs4 | exact HmBthr]. }
       { iExists u16, u8. iFrame "Hr16 Hr8". }
@@ -1103,7 +1103,7 @@ Section ProofPipealloc.
                 ltac:(rgne; rewrite HB1a0; apply fnode_nonzero; exact Hk0lt)
                 with "Hcg Hpc []").
       { iApply (pai_a2 with "Htext"). }
-      iIntros (CID20 Hs20) "Hcg Hpc".
+      iIntros (CID20 Hs20) "Hlc Hcg Hpc".
       assert (Hppa4 : add_vec_int (mword_of_int (KernelSyms.pipealloc + 0xa2) : mword 64) 2 = mword_of_int (KernelSyms.pipealloc + 0xa4))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hppa4) in "Hpc".
@@ -1115,7 +1115,7 @@ Section ProofPipealloc.
                    with "Hextc") as "Hextc".
       iDestruct (cpu_claim_ext_transport CID CID20 eb p ltac:(ext_chain Hbf)
                    with "Hextm") as "Hextm".
-      iSpecialize ("Ht4" $! CID20 with "[%]"); [wp_next_chain|].
+      iSpecialize ("Ht4" $! CID20 with "[%] Hlc"); [wp_next_chain|].
       iApply ("Ht4" $! B1 k0 with "[%] Hcg Hpc Hcnt Hextc Hextm Href0 [Hr16 Hr8] [Hc0] [Hc1 Hslotb'] Hav Hpbare Hiru").
       { split; [exact HB1sp|]. split; [exact HB1s4|].
         split; [exact HB1a0 | exact HB1thr]. }
@@ -1319,7 +1319,7 @@ Section ProofPipealloc.
                 C2 (K - 6)%nat b ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (pai_9a with "Htext"). }
-      iApply bi.later_intro. iIntros (CID27 Hs27). iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID27 Hs27) "Hlc". iIntros "Hcg Hpc".
       assert (HtgtC4 : add_vec (mword_of_int (KernelSyms.pipealloc + 0x9a) : mword 64)
                         (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 5 : mword 11) ('b"0"))))
                       = mword_of_int (KernelSyms.pipealloc + 0xa4))
@@ -1335,7 +1335,7 @@ Section ProofPipealloc.
                    with "Hextc") as "Hextc".
       iDestruct (cpu_claim_ext_transport CID CID27 eb p ltac:(ext_chain Hbf)
                    with "Hextm") as "Hextm".
-      iSpecialize ("Ht4" $! CID27 with "[%]"); [wp_next_chain|].
+      iSpecialize ("Ht4" $! CID27 with "[%] Hlc"); [wp_next_chain|].
       iApply ("Ht4" $! C2 k0 with "[%] Hcg Hpc Hcnt Hextc Hextm Href0 [Hr16 Hr8] [Hc0] [Hc1 Href1] Hav Hpbare Hiru").
       { split; [exact HC2sp|]. split; [exact HC2s4|].
         split; [exact HC2a0 | exact HC2thr]. }

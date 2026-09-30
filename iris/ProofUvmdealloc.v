@@ -327,13 +327,13 @@ Section ProofUvmdealloc.
     iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.uvmdealloc + 0x30)) Rra E4 K b
               ltac:(vm_compute; discriminate) with "Hcg Hpc []").
     { iApply (udi_30 with "Htext"). }
-    iIntros (CID6 Hs6) "Hcg Hpc".
+    iIntros (CID6 Hs6) "Hlc Hcg Hpc".
     iEval (rgne) in "Hpc".
     assert (Hretf : ret_pc (E4 !!! Regidx Rra) = ret_tgt) by (rewrite HE4ra Hrettgt; reflexivity).
     iEval (rewrite Hretf) in "Hpc".
     iDestruct (cpu_own_transport CID0 CID6 0%nat eb p b ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
-    iSpecialize ("Hcont" $! CID6 with "[]"); [ iPureIntro; wp_next_chain | ].
+    iSpecialize ("Hcont" $! CID6 with "[] Hlc"); [ iPureIntro; wp_next_chain | ].
     iApply ("Hcont" $! E4 with "Hcg Hcpu Hlend Hpc [%] [%] Hpt").
     { unfold callee_saved. split_and!;
         first [ exact HE4sp | exact HE4s0 | exact HE4s1

@@ -360,7 +360,7 @@ Section ProofFetchaddr.
               Rra T5 av b ltac:(vm_compute; discriminate)
               with "Hcg Hpc []").
     { iApply (fai_40 with "Htext"). }
-    iIntros (CIDt6 Hkt6) "Hcg Hpc".
+    iIntros (CIDt6 Hkt6) "Hlc Hcg Hpc".
     iEval (rewrite (rget_ne (CID := CIDt5) T5 Rra ltac:(vm_compute; discriminate))) in "Hpc".
     iEval (rewrite HT5ra) in "Hpc".
     (* ---- the postcondition ---- *)
@@ -396,7 +396,7 @@ Section ProofFetchaddr.
       rewrite /T2 upd_ne; [| congruence].
       rewrite /T1 upd_ne; [| congruence].
       apply Hthr; assumption. }
-    iSpecialize ("Hcont" $! CIDt6 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CIDt6 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! T5 with "[%] Hcg Hpc").
     split; [| exact HT5a0].
     unfold callee_saved.
@@ -724,12 +724,12 @@ Section ProofFetchaddr.
                 ltac:(lia) eq_refl eq_refl eq_refl eq_refl eq_refl
                 HE1sp HE1a0 HthrE1
                 with "Hcg Htext Hpc Hs1 Hs2 Hs3 Hs4").
-      iIntros (CID15 Hk15 mf) "[%Hcsf %Hfa0] Hcg Hpc".
+      iIntros (CID15 Hk15) "Hlc". iIntros (mf) "[%Hcsf %Hfa0] Hcg Hpc".
       iAssert (⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) (pv_upt (us_V U))⌝)%I as "#Hxr";
         [iPureIntro; apply uptd_ext_sz_refl|].
       iDestruct ("Hpback" $! (pv_upt (us_V U)) (us_M U) (pv_ev (us_V U)) with "Hxr Hszc Hptc Hpt Hev") as "Hpriv".
       iDestruct (cpu_own_transport CID10 CID15 0%nat eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-      iSpecialize ("Hcont" $! CID15 with "[%]"); [wp_next_chain|].
+      iSpecialize ("Hcont" $! CID15 with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hcont" $! mf (pv_upt (us_V U)) (pv_ev (us_V U)) with "[%] [%] [%] Hcg Hcpu Hpc Hpriv [Hip]").
       { exact Hcsf. }
       { apply uptd_ext_sz_refl. }
@@ -847,12 +847,12 @@ Section ProofFetchaddr.
                   ltac:(lia) eq_refl eq_refl eq_refl eq_refl eq_refl
                   HE2sp HE2a0 HthrE2
                   with "Hcg Htext Hpc Hs1 Hs2 Hs3 Hs4").
-        iIntros (CID17 Hk17 mf) "[%Hcsf %Hfa0] Hcg Hpc".
+        iIntros (CID17 Hk17) "Hlc". iIntros (mf) "[%Hcsf %Hfa0] Hcg Hpc".
         iAssert (⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) (pv_upt (us_V U))⌝)%I as "#Hxr";
           [iPureIntro; apply uptd_ext_sz_refl|].
         iDestruct ("Hpback" $! (pv_upt (us_V U)) (us_M U) (pv_ev (us_V U)) with "Hxr Hszc Hptc Hpt Hev") as "Hpriv".
         iDestruct (cpu_own_transport CID10 CID17 0%nat eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-        iSpecialize ("Hcont" $! CID17 with "[%]"); [wp_next_chain|].
+        iSpecialize ("Hcont" $! CID17 with "[%] Hlc"); [wp_next_chain|].
         iApply ("Hcont" $! mf (pv_upt (us_V U)) (pv_ev (us_V U)) with "[%] [%] [%] Hcg Hcpu Hpc Hpriv [Hip]").
         { exact Hcsf. }
         { apply uptd_ext_sz_refl. }
@@ -1105,9 +1105,9 @@ Section ProofFetchaddr.
                   ltac:(lia) eq_refl eq_refl eq_refl eq_refl eq_refl
                   HB2sp HB2a0 HthrB2
                   with "Hcg Htext Hpc Hs1 Hs2 Hs3 Hs4").
-        iIntros (CID23 Hk23 mf) "[%Hcsf %Hfa0] Hcg Hpc".
+        iIntros (CID23 Hk23) "Hlc". iIntros (mf) "[%Hcsf %Hfa0] Hcg Hpc".
         iDestruct (cpu_own_transport CID20 CID23 0%nat eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-        iSpecialize ("Hcont" $! CID23 with "[%]"); [wp_next_chain|].
+        iSpecialize ("Hcont" $! CID23 with "[%] Hlc"); [wp_next_chain|].
         iApply ("Hcont" $! mf P' kc2 with "[%] [%] [%] Hcg Hcpu Hpc Hpriv [Hip]").
         { exact Hcsf. }
         { exact Hext. }

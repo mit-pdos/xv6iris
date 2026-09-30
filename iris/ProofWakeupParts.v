@@ -221,7 +221,7 @@ Section ProofWakeupPartsEpi.
               ltac:(vm_compute; discriminate)
               with "Hcg Hpc []").
     { iApply (wki_64 with "Htext"). }
-    iIntros (CID9 Hst9) "Hcg Hpc".
+    iIntros (CID9 Hst9) "Hlc Hcg Hpc".
     (* [wp_cret_s_sconf]'s target is [ret_pc (rget m ra)]: bridge from the
        plain map fact via [rgne], pinned at the hart we were on right before
        this call (the pop's own resuming hart, CID8). *)
@@ -230,7 +230,7 @@ Section ProofWakeupPartsEpi.
     assert (Hretf : ret_pc (rget (CID := CID8) E8 (mword_of_int 1 : mword 5)) = rettgt)
       by (rewrite HE8ra_rg; reflexivity).
     iEval (rewrite Hretf) in "Hpc".
-    iSpecialize ("Hcont" $! CID9 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CID9 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! E8 with "[%] Hcg Hpc").
     (* the E8 register facts *)
     rewrite /E8 /E7 /E6 /E5 /E4 /E3 /E2 /E1.
@@ -478,12 +478,12 @@ Section ProofWakeupPartsPro.
               with "Hcg Hpc []").
     { iApply (wki_28 with "Htext"). }
     iApply bi.later_intro.
-    iIntros (CID17 Hst17). iIntros "Hcg Hpc".
+    iIntros (CID17 Hst17) "Hlc". iIntros "Hcg Hpc".
     assert (Htgtj : add_vec (mword_of_int (KernelSyms.wakeup + 0x28) : mword 64) (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 8 : mword 11) ('b"0")))) = mword_of_int (KernelSyms.wakeup + 0x38))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtj) in "Hpc".
     (* the R9 register facts + hand the frame cells to the continuation *)
-    iSpecialize ("Hcont" $! CID17 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CID17 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! R9 v8 with "[%] Hcg Hpc Hc1 Hc2 Hc3 Hc4 Hc5 Hc6 Hc7 Hc8").
     (* [ptp c]: peel R9..R1's own inserts (all keys distinct from an untouched
        reg) down to m. *)

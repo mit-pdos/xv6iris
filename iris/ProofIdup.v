@@ -923,13 +923,13 @@ Section ProofIdup.
     iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.idup + 0x34)) Rra P5 K b
               ltac:(vm_compute; discriminate) with "Hcg Hpc []").
     { iApply (idi_34 with "Htext"). }
-    iIntros (CIDe6 Hse6) "Hcg Hpc".
+    iIntros (CIDe6 Hse6) "Hlc Hcg Hpc".
     iEval (rgne) in "Hpc".
     assert (Hretf : ret_pc (P5 !!! Regidx Rra) = ret_tgt) by (rewrite HP5ra; reflexivity).
     iEval (rewrite Hretf) in "Hpc".
     iDestruct (cpu_own_transport CIDr CIDe6 n eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iSpecialize ("Hcont" $! CIDe6 with "[]"); [ iPureIntro; wp_next_chain | ].
+    iSpecialize ("Hcont" $! CIDe6 with "[] Hlc"); [ iPureIntro; wp_next_chain | ].
     (* A6.146: the share's bundle rebuilds at its own retained credential *)
     iAssert (IcacheRef.live_fracc k s) with "[Hrlive]" as "Hrlive".
     { iExists gsh, losh, tlsh. iFrame "Hrlive".

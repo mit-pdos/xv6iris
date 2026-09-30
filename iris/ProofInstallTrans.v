@@ -1152,7 +1152,7 @@ Section InstallTransBlocks.
                 mfp (K - 10)%nat eb ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (iti_52 with "Htext"). }
-      iApply bi.later_intro. iIntros (CIDh7 Hsh7). iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CIDh7 Hsh7) "Hlc". iIntros "Hcg Hpc".
       assert (Htgt52 : add_vec (mword_of_int (KernelSyms.install_trans + 0x52) : mword 64)
                          (sign_extend' 64 (sign_extend' 21
                             (concat_vec (mword_of_int 15 : mword 11) ('b"0"))))
@@ -1161,7 +1161,7 @@ Section InstallTransBlocks.
       iEval (rewrite Htgt52) in "Hpc".
       iDestruct (cpu_own_transport CIDh6 CIDh7 0%nat eb (proc_addr j) eb
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-      iSpecialize ("Hcont" $! CIDh7 with "[%]"); [wp_next_chain|].
+      iSpecialize ("Hcont" $! CIDh7 with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hcont" $! mfp with "[%] Hcg Hcnt Hpc Hblk").
       exact Hmfpregs.
     - (* ---- recovering = 0 : the branch falls through ---- *)
@@ -1171,14 +1171,14 @@ Section InstallTransBlocks.
                 (mword_of_int 8154 : mword 13) Rs6 M (K - 10)%nat eb
                 ltac:(vm_compute; discriminate) Hnz with "Hcg Hpc []").
       { iApply (iti_6c with "Htext"). }
-      iIntros (CIDh1 Hsh1) "Hcg Hpc".
+      iIntros (CIDh1 Hsh1) "Hlc Hcg Hpc".
       assert (Hpp70 : add_vec_int (mword_of_int (KernelSyms.install_trans + 0x6c) : mword 64) 4
                       = mword_of_int (KernelSyms.install_trans + 0x70))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp70) in "Hpc".
       iDestruct (cpu_own_transport CID0 CIDh1 0%nat eb (proc_addr j) eb
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-      iSpecialize ("Hcont" $! CIDh1 with "[%]"); [wp_next_chain|].
+      iSpecialize ("Hcont" $! CIDh1 with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hcont" $! M with "[%] Hcg Hcnt Hpc Hblk").
       exact Hregs.
   Qed.
@@ -1231,7 +1231,7 @@ Section InstallTransBlocks.
                 ltac:(vm_compute; discriminate) Hnz
                 ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
       { iApply (iti_a6 with "Htext"). }
-      iApply bi.later_intro. iIntros (CIDk1 Hsk1) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CIDk1 Hsk1) "Hlc Hcg Hpc".
       assert (Htgt54 : add_vec (mword_of_int (KernelSyms.install_trans + 0xa6) : mword 64)
                          (sign_extend' 64 (mword_of_int 8110 : mword 13))
                        = mword_of_int (KernelSyms.install_trans + 0x54))
@@ -1239,7 +1239,7 @@ Section InstallTransBlocks.
       iEval (rewrite Htgt54) in "Hpc".
       iDestruct (cpu_own_transport CID0 CIDk1 0%nat eb (proc_addr j) eb
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-      iSpecialize ("Hcont" $! CIDk1 with "[%]"); [wp_next_chain|].
+      iSpecialize ("Hcont" $! CIDk1 with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hcont" $! M with "[%] [%] [%] Hcg Hcnt Hpc [//]");
         [exact Hregs | exact Hs1v | reflexivity].
     - (* ---- recovering = 0 : the bunpin runs ---- *)
@@ -1328,7 +1328,7 @@ Section InstallTransBlocks.
                 mf5 (K - 10)%nat eb ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (iti_b0 with "Htext"). }
-      iApply bi.later_intro. iIntros (CIDk5 Hsk5). iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CIDk5 Hsk5) "Hlc". iIntros "Hcg Hpc".
       assert (Htgtb0 : add_vec (mword_of_int (KernelSyms.install_trans + 0xb0) : mword 64)
                          (sign_extend' 64 (sign_extend' 21
                             (concat_vec (mword_of_int 2002 : mword 11) ('b"0"))))
@@ -1337,7 +1337,7 @@ Section InstallTransBlocks.
       iEval (rewrite Htgtb0) in "Hpc".
       iDestruct (cpu_own_transport CIDk4 CIDk5 0%nat eb (proc_addr j) eb
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-      iSpecialize ("Hcont" $! CIDk5 with "[%]"); [wp_next_chain|].
+      iSpecialize ("Hcont" $! CIDk5 with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hcont" $! mf5 with "[%] [%] [%] Hcg Hcnt Hpc Hu3");
         [exact Hmf5regs | exact Hmf5s1 | exact Hmf5s2].
   Qed.
@@ -1636,7 +1636,7 @@ Section InstallTransBlocks.
     iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.install_trans + 0xc8)) Rra P11 K eb
               ltac:(vm_compute; discriminate) with "Hcg Hpc []").
     { iApply (iti_c8 with "Htext"). }
-    iIntros (CID12 Hs12) "Hcg Hpc".
+    iIntros (CID12 Hs12) "Hlc Hcg Hpc".
     assert (Hretf : ret_pc (rget P11 Rra) = ret_pc (m !!! Regidx Rra : mword 64)).
     { rewrite rget_ne; [ by rewrite HP11ra
                        | intro Hq; injection Hq as Hq2; vm_compute in Hq2; congruence ]. }
@@ -1760,7 +1760,7 @@ Section InstallTransBlocks.
                  Xexc L D
                  pidv dq m K eb eb R lks Upr ltac:(wp_next_chain) with "Hcont") as "Hcont".
     rewrite /it_cont.
-    iSpecialize ("Hcont" $! CID12 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CID12 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! P11 with "[%] Hcg Hcnt Hextc Hextm Hpc Hppid Hncell Hblks
                                  HauthL HauthD Hxo Hents Hslots HR").
     exact Hcs.
@@ -2800,7 +2800,7 @@ Section ProofInstallTrans.
       iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.install_trans + 0xca)) Rra R2 K eb
                 ltac:(vm_compute; discriminate) with "Hcg Hpc []").
       { iApply (iti_ca with "Htext"). }
-      iIntros (CID4 Hs4) "Hcg Hpc".
+      iIntros (CID4 Hs4) "Hlc Hcg Hpc".
       assert (Hretf : ret_pc (rget R2 Rra) = ret_tgt).
       { rgne. rewrite HR2ra. reflexivity. }
       iEval (rewrite Hretf) in "Hpc".
@@ -2823,7 +2823,7 @@ Section ProofInstallTrans.
       iDestruct (it_cont_shift (CIDa := CID) (CIDb := CID4)  j bn γfs logstart recovering n []
                    Lw Xexc L D pidv dq m K eb eb (R n) lks (upd_usM Upr _) ltac:(wp_next_chain) with "Hcont") as "Hcont".
       rewrite /it_cont.
-      iSpecialize ("Hcont" $! CID4 with "[%]"); [wp_next_chain|].
+      iSpecialize ("Hcont" $! CID4 with "[%] Hlc"); [wp_next_chain|].
       iEval (rewrite HeqL HeqD Heqs) in "Hcont".
       (* at [W = []] the exception set does not move either *)
       assert (HeqX : Xexc ∖ list_to_set (map uint ([] : list (mword 32))) = Xexc)

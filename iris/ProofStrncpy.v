@@ -286,7 +286,7 @@ Section MachineProof.
     iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.strncpy + 0x44)) Rra T3 K b
               ltac:(vm_compute; discriminate) with "Hcg Hpc []").
     { iApply (sncp_44 with "Htext"). }
-    iIntros (CID4 Hs4) "Hcg Hpc". iEval (rewrite HT3ra') in "Hpc".
+    iIntros (CID4 Hs4) "Hlc Hcg Hpc". iEval (rewrite HT3ra') in "Hpc".
     assert (HT3a0 : T3 !!! Regidx Ra0 = rv).
     { rewrite /T3 upd_ne; [| reg_neq]. rewrite /T2 upd_ne; [| reg_neq].
       rewrite /T1 upd_ne; [| reg_neq]. exact Hmta0. }
@@ -297,7 +297,7 @@ Section MachineProof.
       rewrite /T2 upd_ne; [| intro He; injection He as He'; congruence].
       rewrite /T1 upd_ne; [| apply snc_cs_ne; [vm_compute; reflexivity | exact Hr]].
       apply Hthr; assumption. }
-    iSpecialize ("Hcont" $! CID4 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CID4 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! T3 with "[%] Hcg Hpc"). split; [| exact HT3a0].
     unfold callee_saved. split_and!.
     - rewrite /T3 upd_eq Hwv. symmetry. exact Hsp0.
@@ -490,7 +490,7 @@ Qed.
                 ltac:(rgne; rewrite /P2 upd_eq; vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (sncp_3a with "Htext"). }
-      iIntros (CID4 Hs4) "Hcg Hpc".
+      iIntros (CID4 Hs4) "Hlc Hcg Hpc".
       assert (Hp3e : add_vec_int (mword_of_int (KernelSyms.strncpy + 0x3a) : mword 64) 4
                      = mword_of_int (KernelSyms.strncpy + 0x3e)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hp3e) in "Hpc".
@@ -504,7 +504,7 @@ Qed.
       assert (Hpost : snc_post f h' n).
       { apply snc_post_padded with (k:=k0); [exact Hk0n|exact Hcstr|exact Hcopy'|].
         intros j Hj0 Hjn. apply Hzero'; [exact Hj0|lia]. }
-      iSpecialize ("Hcont" $! CID4 with "[%]"); [wp_next_chain|].
+      iSpecialize ("Hcont" $! CID4 with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hcont" $! P2 h' with "[%] [%] [%] [%] Hcg Hpc Hsrc Hdst"); assumption.
     - (* at least two remained; the positive difference takes the back edge *)
       assert (HsubS : sign_extend' 64
@@ -603,7 +603,7 @@ Qed.
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (sncp_0e with "Htext"). }
-      iApply bi.later_intro. iIntros (CID1 Hs1) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID1 Hs1) "Hlc Hcg Hpc".
       assert (Hpc3e : add_vec (mword_of_int (KernelSyms.strncpy + 0x0e) : mword 64)
                        (sign_extend' 64 (mword_of_int 48 : mword 13))
                      = mword_of_int (KernelSyms.strncpy + 0x3e))
@@ -612,7 +612,7 @@ Qed.
       assert (Hd : d = n) by lia.
       assert (Hpost : snc_post f h n).
       { apply snc_post_full; [rewrite -Hd; exact Hnn|]. intros j Hj. apply Hcopy; lia. }
-      iSpecialize ("Hcont" $! CID1 with "[%]"); [wp_next_chain|].
+      iSpecialize ("Hcont" $! CID1 with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hcont" $! M h with "[%] [%] [%] [%] Hcg Hpc Hsrc Hdst"); assumption.
     - (* a byte remains: decrement the int count, copy it, then inspect it *)
       assert (Hrem31 : (Z.of_nat (S rem) < 2 ^ 31)%Z) by lia.
@@ -847,7 +847,7 @@ Qed.
                     ltac:(vm_compute; reflexivity)
                     with "Hcg Hpc []").
           { iApply (sncp_28 with "Htext"). }
-          iApply bi.later_intro. iIntros (CID10 Hs10) "Hcg Hpc".
+          iApply bi.later_intro. iIntros (CID10 Hs10) "Hlc Hcg Hpc".
           assert (Hto3e : add_vec (mword_of_int (KernelSyms.strncpy + 0x28) : mword 64)
                             (sign_extend' 64 (mword_of_int 22 : mword 13))
                           = mword_of_int (KernelSyms.strncpy + 0x3e))
@@ -858,7 +858,7 @@ Qed.
             - intros j Hj. apply Hcopy'; lia.
             - intros j Hjd Hjn. assert (j = d) by lia. subst j.
               rewrite /h' bb_upd_eq Hz. reflexivity. }
-          iSpecialize ("Hcont" $! CID10 with "[%]"); [wp_next_chain|].
+          iSpecialize ("Hcont" $! CID10 with "[%] Hlc"); [wp_next_chain|].
           iApply ("Hcont" $! C6 h' with "[%] [%] [%] [%] Hcg Hpc Hsrc Hdst"); assumption.
         * (* at least one padding byte remains *)
           iApply (wp_bge_x0_fall_s_sconf (mword_of_int (KernelSyms.strncpy + 0x28))
@@ -1150,8 +1150,8 @@ Qed.
                 HK ltac:(reflexivity) ltac:(reflexivity) ltac:(reflexivity)
                 HR3sp HR3a0 HR3thr
                 with "Hcg Htext Hpc Hb1 Hb2").
-      iIntros (CID8 Hs8 mf) "[%Hcs %Hfa0] Hcg Hpc".
-      iSpecialize ("Hcont" $! CID8 with "[%]"); [wp_next_chain|].
+      iIntros (CID8 Hs8) "Hlc". iIntros (mf) "[%Hcs %Hfa0] Hcg Hpc".
+      iSpecialize ("Hcont" $! CID8 with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hcont" $! mf g with "Hcg Hpc Hsrc Hdst [%] [%] [%]").
       + exact Hcs.
       + exact Hfa0.
@@ -1172,8 +1172,8 @@ Qed.
                 HK ltac:(reflexivity) ltac:(reflexivity) ltac:(reflexivity)
                 Htsp Hta0 Htthr
                 with "Hcg Htext Hpc Hb1 Hb2").
-      iIntros (CID8 Hs8 mf) "[%Hcs %Hfa0] Hcg Hpc".
-      iSpecialize ("Hcont" $! CID8 with "[%]"); [wp_next_chain|].
+      iIntros (CID8 Hs8) "Hlc". iIntros (mf) "[%Hcs %Hfa0] Hcg Hpc".
+      iSpecialize ("Hcont" $! CID8 with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hcont" $! mf hf with "Hcg Hpc Hsrc Hdst [%] [%] [%]").
       + exact Hcs.
       + exact Hfa0.

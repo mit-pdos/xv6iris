@@ -445,7 +445,7 @@ Section ProofPipeclose.
       iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.pipeclose + 0x40)) (mword_of_int 1 : mword 5) E5 av b
                 ltac:(nz) with "Hcg Hpc []").
       { iApply (pci_40 with "Htext"). }
-      iIntros (CIDe6 Hse6) "Hcg Hpc".
+      iIntros (CIDe6 Hse6) "Hlc Hcg Hpc".
       iEval (rgne) in "Hpc".
       assert (Hra_final : ret_pc (E5 !!! Regidx (mword_of_int 1 : mword 5)) = ret_tgt)
         by (rewrite HE5ra; reflexivity).
@@ -454,7 +454,7 @@ Section ProofPipeclose.
          [CIDe6], and [Hch] carries the rest of the chain back to entry. *)
       iDestruct (cpu_own_transport CID0 CIDe6 n eb pme b ltac:(wp_next_chain)
                    with "Hown") as "Hown".
-      iSpecialize ("Hcont" $! CIDe6 with "[]"); [ iPureIntro; wp_next_chain | ].
+      iSpecialize ("Hcont" $! CIDe6 with "[] Hlc"); [ iPureIntro; wp_next_chain | ].
       iApply ("Hcont" $! E5 with "Hcg Hown Hpc [%] Hav Hcpost").
       (* [repeat split] discharges s0/s1/s2 by conversion -- the epilogue
          reloaded them from the frame, so those equalities are definitional.

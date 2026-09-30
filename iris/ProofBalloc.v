@@ -531,7 +531,7 @@ Section BallocEpilogue.
     iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.balloc + 0x88)) Rra P4 K b
               ltac:(nz) with "Hcg Hpc []").
     { iApply (bai_088 with "Htext"). }
-    iIntros (CID6 Hq6) "Hcg Hpc".
+    iIntros (CID6 Hq6) "Hlc Hcg Hpc".
     iEval (rgne) in "Hpc".
     assert (Hretf : ret_pc (P4 !!! Regidx Rra : mword 64)
                     = ret_pc (m !!! Regidx Rra : mword 64))
@@ -580,7 +580,7 @@ Section BallocEpilogue.
     iDestruct (IntrDefs.cpu_claim_ext_transport CID0 CID6 eb (proc_addr j)
                  ltac:(rewrite Hbm; wp_next_chain) with "Hextm") as "Hextm".
     rewrite /ba_cont.
-    iSpecialize ("Hcont" $! CID6 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CID6 with "[%] Hlc"); [wp_next_chain|].
     rewrite /ba_arms.
     iDestruct "Harms" as "[(%Hz & Hop) | (%Hnz & %Hcv & %Hlg & Hfsb & Hop)]".
     - iApply ("Hcont" $! P4 with "[%] Hcg Hcnt Hextc Hextm Hpc Hppid Hsbsz Hsbbm
@@ -4437,7 +4437,7 @@ Section BallocMain.
               Hj Hgl Ha0 Hbelow
               with "Hcg Hcnt Hextc Hextm Htext Hpc Hkdata Hpenv Hbio Hlctx Hppid
                     Hsbsz Hsbbm Hbminv Hprocs Hdevi Hdgeom Hdlock Hsl Hop [Hcont Htx]").
-    iIntros (CIDx) "%Hchain". iSpecialize ("Hcont" $! CIDx with "[%]"); [exact Hchain|].
+    iIntros (CIDx) "%Hchain" Hlc. iSpecialize ("Hcont" $! CIDx with "[%] Hlc"); [exact Hchain|].
     iIntros (mf) "%Hcs Hsie Hcnt Htc Hclm Hpc Hppid Hsbsz Hsbbm Hsl Harms".
     iApply ("Hcont" $! mf with "[%] Hsie Hcnt Htc Hclm Hpc Hppid Hsbsz Hsbbm Hsl [Harms Htx]");
       [exact Hcs|].

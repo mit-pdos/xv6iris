@@ -422,7 +422,7 @@ Section SleepJoin.
               ltac:(vm_compute; discriminate)
               with "Hcg Hpc []").
     { iApply (sli_2e with "Htext"). }
-    iIntros (CIDe5 Hse5) "Hcg Hpc".
+    iIntros (CIDe5 Hse5) "Hlc Hcg Hpc".
     assert (Hra_final : ret_pc (rget E4 (mword_of_int 1 : mword 5))
                         = ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)))
       by (rgne; rewrite HE4ra; reflexivity).
@@ -485,7 +485,7 @@ Section SleepJoin.
                  with "Hclmx") as "Hclmx".
     (* The handler resource needs no transport of its own any more: it rides
        inside [trap_csrs_ext], which was already transported above. *)
-    iSpecialize ("Hcont" $! CIDe5 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CIDe5 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! E4 with "[%] Hcg Hcpu Hpc Hext Hclmx").
     unfold callee_saved. repeat split; assumption.
   Qed.

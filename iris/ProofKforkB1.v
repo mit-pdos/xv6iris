@@ -423,11 +423,11 @@ Section KforkB1Proof.
               (match lvl with O => eb | S _ => false end)
               (kfkb1_K8 K HK) Hsp0 Hra0 Hs00 Hs10 Hs50 HT5sp HT5s1 HT5thr
               with "Hcg Htext Hpc Hframe").
-    iIntros (CIDf Hsf mf) "%Hpost Hcg Hpc".
+    iIntros (CIDf Hsf) "Hlc". iIntros (mf) "%Hpost Hcg Hpc".
     iDestruct (cpu_own_transport CIDr CIDf lvl eb pme
                 (match lvl with O => eb | S _ => false end)
                 ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-    iSpecialize ("Hcont" $! CIDf with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CIDf with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! mf with "[%] Hcg Hpc Hcpu Hlend Henv"). exact Hpost.
   Qed.
 

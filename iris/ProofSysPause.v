@@ -547,7 +547,7 @@ Section SpBodies.
               (mword_of_int 1 : mword 5) E3 av true ltac:(vm_compute; discriminate)
               with "Hcg Hpc []").
     { iApply (spi_94 with "Htext"). }
-    iIntros (CIDe4 Hse4) "Hcg Hpc".
+    iIntros (CIDe4 Hse4) "Hlc Hcg Hpc".
     iEval (rgne) in "Hpc".
     assert (Hretfin : ret_pc (E3 !!! Regidx (mword_of_int 1 : mword 5)) = ret_tgt)
       by (rewrite HE3ra; reflexivity).
@@ -564,7 +564,7 @@ Section SpBodies.
       by (rewrite (HE3thr (mword_of_int 10 : mword 5) ltac:(reg_neq) ltac:(reg_neq) ltac:(reg_neq)); exact Hra0).
     iDestruct (cpu_own_transport CID CIDe4 0 eb pj true ltac:(wp_next_chain)
                  with "Hown") as "Hown".
-    iSpecialize ("Hcont" $! CIDe4 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CIDe4 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! E3 r with "[%] Hcg Hown Hpc Htf Hpage").
     split; [| split; [exact HE3a0 | exact Hrv]].
     unfold callee_saved.
@@ -684,7 +684,7 @@ Section SpBodies.
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(apply bv_eq; vm_compute; reflexivity) with "Hcg Hpc []").
     { iApply (spi_8c with "Htext"). }
-    iIntros (CIDl Hsl) "Hcg Hpc".
+    iIntros (CIDl Hsl) "Hlc Hcg Hpc".
     set (X3 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg (zero_reg : mword 64)]> mrl).
     change (<[Regidx (mword_of_int 10 : mword 5) := regval_into_reg (zero_reg : mword 64)]> mrl) with X3.
     assert (Hx7e : add_vec_int (mword_of_int (KernelSyms.sys_pause + 0x8c) : mword 64) 2 = mword_of_int (KernelSyms.sys_pause + 0x8e)) by pcstep.
@@ -694,7 +694,7 @@ Section SpBodies.
     iDestruct (cpu_own_transport CIDr CIDl 0 true pj true ltac:(wp_next_chain)
                  with "Hown") as "Hown".
     rewrite /sp_tail.
-    iSpecialize ("Htail" $! CIDl with "[%]"); [wp_next_chain|].
+    iSpecialize ("Htail" $! CIDl with "[%] Hlc"); [wp_next_chain|].
     iApply ("Htail" $! X3 (zero_reg : mword 64)
               with "[%] Hx1 Hx2 Hfree Hx7 Hcg Hown Hpc").
     split; [exact (sp_base_cs m mrl X3 sp0 HcsRlX3 HbRl) |].
@@ -868,7 +868,7 @@ Section SpBodies.
               (sign_extend' 21 (concat_vec (mword_of_int 2031 : mword 11) ('b"0")))
               K6 (av - 8)%nat true ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
     { iApply (spi_b0 with "Htext"). }
-    iApply bi.later_intro. iIntros (CIDk5 Hsk5). iIntros "Hcg Hpc".
+    iApply bi.later_intro. iIntros (CIDk5 Hsk5) "Hlc". iIntros "Hcg Hpc".
     assert (Htg7e : add_vec (mword_of_int (KernelSyms.sys_pause + 0xb0) : mword 64)
                       (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 2031 : mword 11) ('b"0"))))
                     = mword_of_int (KernelSyms.sys_pause + 0x8e)) by pcstep.
@@ -882,7 +882,7 @@ Section SpBodies.
     iDestruct (cpu_own_transport CIDr CIDk5 0 true pj true ltac:(wp_next_chain)
                  with "Hown") as "Hown".
     rewrite /sp_tail.
-    iSpecialize ("Htail" $! CIDk5 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Htail" $! CIDk5 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Htail" $! K6 (mword_of_int (-1) : mword 64)
               with "[%] Hy1 Hy2 [Hy3 Hy4 Hy5 Hy6 Hy8] Hy7 Hcg Hown Hpc").
     { split.
@@ -1599,7 +1599,7 @@ Section SpBodies.
               Hn0 ltac:(lia) Hfresh with "Hcg Hown Htext Hpc []").
     all: try lkbelow.
     { iEval (rewrite HQ2a0). iExact "Hlk2". }
-    iIntros (CIDa Hsa msA Macq) "%HmsA Hcg Hpc %HcsQ2 Htok HR _ Hown Hpay".
+    iIntros (CIDa Hsa) "Hlc". iIntros (msA Macq) "%HmsA Hcg Hpc %HcsQ2 Htok HR _ Hown Hpay".
     assert (Hq26 : ret_pc (Q2 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.sys_pause + 0x26))
       by (rewrite HQ2ra; pcstep).
     iEval (rewrite Hq26) in "Hpc".
@@ -1847,7 +1847,7 @@ Section SpBodies.
 
       (* enter the loop *)
       rewrite /sp_loop.
-      iSpecialize ("Hloop" $! CIDa with "[%]"); [wp_next_chain|].
+      iSpecialize ("Hloop" $! CIDa with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hloop" $! P5 with "[%] Hs1 Hs2 Hs3 Hs4 Hs5 Hf6 Hf8 Hnc Hjoin7 Htok HR Hcg Hown Hpay Hpc Hexit0 Hexitk Htail").
       split; [exact HbP5 | exact HlP5].
   Qed.
@@ -2130,7 +2130,7 @@ Section ProofSysPause.
                 (sign_extend' 21 (concat_vec (mword_of_int 1984 : mword 11) ('b"0")))
                 A1 (av - 8)%nat true ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
       { iApply (spi_9a with "Htext"). }
-      iApply bi.later_intro. iIntros (CID12 Hs12). iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID12 Hs12) "Hlc". iIntros "Hcg Hpc".
       assert (Htgt1a : add_vec (mword_of_int (KernelSyms.sys_pause + 0x9a) : mword 64)
                          (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 1984 : mword 11) ('b"0"))))
                        = mword_of_int (KernelSyms.sys_pause + 0x1a)) by pcstep.
@@ -2138,7 +2138,7 @@ Section ProofSysPause.
       iDestruct (cpu_own_transport CID8 CID12 0 eb pj true ltac:(wp_next_chain)
                    with "Hown") as "Hown".
       rewrite /sp_acq.
-      iSpecialize ("Hacq" $! CID12 with "[%]"); [wp_next_chain|].
+      iSpecialize ("Hacq" $! CID12 with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hacq" $! A1 (mword_of_int 0 : mword 32)
                 with "[%] Hs1 Hs2 [S3 S4 S5 S6 S8] Hs7hi Hjoin7 Hcg Hown Hpc Htail").
       { split; [exact HbaseA1 | exact HsavA1]. }
@@ -2151,14 +2151,14 @@ Section ProofSysPause.
                 ltac:(vm_compute; discriminate) ltac:(rgne; exact Hneg)
                 with "Hcg Hpc []").
       { iApply (spi_16 with "Htext"). }
-      iIntros (CID10 Hs10) "Hcg Hpc".
+      iIntros (CID10 Hs10) "Hlc Hcg Hpc".
       assert (Hp1a : add_vec_int (mword_of_int (KernelSyms.sys_pause + 0x16) : mword 64) 4
                      = mword_of_int (KernelSyms.sys_pause + 0x1a)) by pcstep.
       iEval (rewrite Hp1a) in "Hpc".
       iDestruct (cpu_own_transport CID8 CID10 0 eb pj true ltac:(wp_next_chain)
                    with "Hown") as "Hown".
       rewrite /sp_acq.
-      iSpecialize ("Hacq" $! CID10 with "[%]"); [wp_next_chain|].
+      iSpecialize ("Hacq" $! CID10 with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hacq" $! A1 (arg_int32 v)
                 with "[%] Hs1 Hs2 [S3 S4 S5 S6 S8] Hs7hi Hjoin7 Hcg Hown Hpc Htail").
       { split; [exact HbaseA1 | exact HsavA1]. }

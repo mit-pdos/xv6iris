@@ -1167,7 +1167,7 @@ Section ProofUserinit.
     iApply (wp_cret_s_sconf (mword_of_int (UI + 0x40)) Rra P4 K b
               ltac:(nz) with "Hcg Hpc []").
     { iApply (uin_40 with "Htext"). }
-    iIntros (CID25 Hq25) "Hcg Hpc".
+    iIntros (CID25 Hq25) "Hlc Hcg Hpc".
     iEval (rgne) in "Hpc".
     assert (Hretf : ret_pc (P4 !!! Regidx Rra : mword 64)
                     = ret_pc (m !!! Regidx Rra : mword 64))
@@ -1217,7 +1217,7 @@ Section ProofUserinit.
       by (apply Hfin; namidx).
     iDestruct (cpu_own_transport CID20 CID25 0%nat b pj b
                  ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-    iSpecialize ("Hcont" $! CID25 with "[%]"); [wp_next_chain |].
+    iSpecialize ("Hcont" $! CID25 with "[%] Hlc"); [wp_next_chain |].
     iApply ("Hcont" $! P4 with "Hcg Hpc [%] Hcpu [] Hpav [Hinitproc]").
     - split; [| exact HP4ra].
       unfold callee_saved. split_and!; assumption.

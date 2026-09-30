@@ -472,7 +472,7 @@ Section KforkB3Proof.
                     ltac:(rgne; rgne; exact Hcmp) ltac:(vm_compute; reflexivity)
                     with "Hcg Hpc []").
           { iApply (kfk_092 with "Htext"). }
-          iApply bi.later_intro. iIntros (CID3 Hst3) "Hcg Hpc".
+          iApply bi.later_intro. iIntros (CID3 Hst3) "Hlc Hcg Hpc".
           assert (Htgta4 : add_vec (mword_of_int (KF + 0x92) : mword 64)
                              (sign_extend' 64 (mword_of_int 18 : mword 13))
                            = mword_of_int (KF + 0xa4))
@@ -486,7 +486,7 @@ Section KforkB3Proof.
             in "Hcfrag".
           iDestruct (cpu_own_transport CIDta CID3 n eb pme b ltac:(wp_next_chain) with "Hown")
             as "Hown".
-          iSpecialize ("Hqx" $! CID3 with "[%]"); [wp_next_chain|].
+          iSpecialize ("Hqx" $! CID3 with "[%] Hlc"); [wp_next_chain|].
           iApply ("Hqx" $! T2 with "[%] Hcg Hown Hpc Hpv Hpv2 Hpfrag Hcfrag").
           split; [exact HT2csp|]. split; [exact HT2s0|].
           split; [exact HT2s4|]. split; [exact HT2s5|]. exact HT2thr.
@@ -502,13 +502,13 @@ Section KforkB3Proof.
                     ltac:(rgne; rgne; exact Hcmp)
                     with "Hcg Hpc []").
           { iApply (kfk_092 with "Htext"). }
-          iIntros (CID3 Hst3) "Hcg Hpc".
+          iIntros (CID3 Hst3) "Hlc Hcg Hpc".
           assert (Hpp96 : add_vec_int (mword_of_int (KF + 0x92) : mword 64) 4
                          = mword_of_int (KF + 0x96)) by (apply bv_eq; vm_compute; reflexivity).
           iEval (rewrite Hpp96) in "Hpc".
           iDestruct (cpu_own_transport CIDta CID3 n eb pme b ltac:(wp_next_chain) with "Hown")
             as "Hown".
-          iSpecialize ("IHf" $! CID3 with "[%]"); [wp_next_chain|].
+          iSpecialize ("IHf" $! CID3 with "[%] Hlc"); [wp_next_chain|].
           iApply ("IHf" $! (S i) T2 with "[%] [%] [%] Hqx Hcg Hown Hpc Hpv Hpv2 Hpfrag Hcfrag").
           + unfold NOFILE in Hfuel |- *. lia.
           + unfold NOFILE in Hne, Hi |- *. lia.
@@ -574,7 +574,7 @@ Section KforkB3Proof.
                   Hz ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc []").
         { iApply (kfk_098 with "Htext"). }
-        iApply bi.later_intro. iIntros (CIDm Hstm) "Hcg Hpc".
+        iApply bi.later_intro. iIntros (CIDm Hstm) "Hlc Hcg Hpc".
         assert (Htgt8e : add_vec (mword_of_int (KF + 0x98) : mword 64)
                            (sign_extend' 64 (sign_extend' 13
                               (concat_vec (mword_of_int 251 : mword 8) ('b"0"))))
@@ -607,7 +607,7 @@ Section KforkB3Proof.
         iEval (rewrite HstepS) in "Hcfrag".
         iDestruct (cpu_own_transport CIDk CIDm n eb pme b ltac:(wp_next_chain) with "Hown")
           as "Hown".
-        iSpecialize ("Htail" $! CIDm with "[%]"); [wp_next_chain|].
+        iSpecialize ("Htail" $! CIDm with "[%] Hlc"); [wp_next_chain|].
         iApply ("Htail" $! L1 with "[%] Hcg Hown Hpc Hpv Hpv2 Hpfrag Hcfrag").
         split; [exact HL1csp|]. split; [exact HL1s0|]. split; [exact HL1s1|].
         split; [exact HL1s2|]. split; [exact HL1s3|]. split; [exact HL1s4|].
@@ -782,7 +782,7 @@ Section KforkB3Proof.
                   mr (rsv + (K - 8))%nat b ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc []").
         { iApply (kfk_0a2 with "Htext"). }
-        iApply bi.later_intro. iIntros (CIDq Hstq). iIntros "Hcg Hpc".
+        iApply bi.later_intro. iIntros (CIDq Hstq) "Hlc". iIntros "Hcg Hpc".
         assert (Htgt8e' : add_vec (mword_of_int (KF + 0xa2) : mword 64)
                            (sign_extend' 64 (sign_extend' 21
                               (concat_vec (mword_of_int 2038 : mword 11) ('b"0"))))
@@ -791,7 +791,7 @@ Section KforkB3Proof.
         iEval (rewrite Htgt8e') in "Hpc".
         iDestruct (cpu_own_transport CIDo CIDq n eb pme b ltac:(wp_next_chain) with "Hown")
           as "Hown".
-        iSpecialize ("Htail" $! CIDq with "[%]"); [wp_next_chain|].
+        iSpecialize ("Htail" $! CIDq with "[%] Hlc"); [wp_next_chain|].
         iApply ("Htail" $! mr with "[%] Hcg Hown Hpc Hpv Hpv2 Hpfrag Hcfrag").
         split; [exact Hmrcsp|]. split; [exact Hmrs0|]. split; [exact Hmrs1|].
         split; [exact Hmrs2|]. split; [exact Hmrs3|]. split; [exact Hmrs4|].

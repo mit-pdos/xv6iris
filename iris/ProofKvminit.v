@@ -249,7 +249,7 @@ Section KvminitBody.
     iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.kvminit + 0x1a)) (mword_of_int 1 : mword 5) Efin K b
               ltac:(vm_compute; discriminate) with "Hcg Hpc []").
     { iApply (kii_1a with "Htext"). }
-    iIntros (CID12 Hs12) "Hcg Hpc".
+    iIntros (CID12 Hs12) "Hlc Hcg Hpc".
     iEval (rgne) in "Hpc".
     iEval (rewrite Hrt) in "Hpc".
     (* [cpu_own] again: it was delivered at CID6 by kvmmake's own [wp_next];
@@ -257,7 +257,7 @@ Section KvminitBody.
        have moved the hart to CID12. *)
     iDestruct (cpu_own_transport CID6 CID12 0%nat eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iSpecialize ("Hcont" $! CID12 with "[]"); [ iPureIntro; wp_next_chain | ].
+    iSpecialize ("Hcont" $! CID12 with "[] Hlc"); [ iPureIntro; wp_next_chain | ].
     (* ---- hand the continuation kvmmake's post + the updated cell ---- *)
     iApply ("Hcont" $! Efin t pas with "Hcg Hcnt Hpc Hptree Hcell [%] [%] Henv [%] [%] Hpages").
     { exact Hrep. }

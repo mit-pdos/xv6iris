@@ -589,7 +589,7 @@ Section VtPrologue.
               with "Hcg Hcnt Htext Hpc [Hlk]").
     all: try lkbelow.
     { iEval (rewrite HA6a0). iExact "Hlk". }
-    iIntros (CID11 Hs11 ms MA) "%Hms Hcg Hpc %HcsA Htok HR _ Hcnt Hpay".
+    iIntros (CID11 Hs11) "Hlc". iIntros (ms MA) "%Hms Hcg Hpc %HcsA Htok HR _ Hcnt Hpay".
     assert (Hpc1e : ret_pc (A6 !!! Regidx ra_idx) = mword_of_int (KernelSyms.virtio_disk_intr + 0x1e))
       by (rewrite HA6ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc1e) in "Hpc".
@@ -622,7 +622,7 @@ Section VtPrologue.
     iEval (rgne) in "Hr24". iEval (rewrite HcspA0 HraA0 -Hb1) in "Hr24".
     iEval (rgne) in "Hr16". iEval (rewrite HcspA0 Hs0A0 -Hb2) in "Hr16".
     iEval (rgne) in "Hr8".  iEval (rewrite HcspA0 Hs1A0 -Hb3) in "Hr8".
-    iSpecialize ("Hcont" $! CID11 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CID11 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! MA sp0 with "[%] Hcg Hpc Htok HR Hcnt Hpay Hr24 Hr16 Hr8 [Hgap]").
     { split_and!; [ reflexivity | exact HMAcsp | exact HMAs1 | exact Hthr ]. }
     { iExists vgap. iEval (rewrite Hspd4 -HcspA0). iExact "Hgap". }
@@ -867,7 +867,7 @@ Section VtEpilogue.
     iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.virtio_disk_intr + 0x9e)) ra_idx E6 av b
               ltac:(vm_compute; discriminate) with "Hcg Hpc []").
     { iApply (vti_9e with "Htext"). }
-    iIntros (CID6 Hs6) "Hcg Hpc".
+    iIntros (CID6 Hs6) "Hlc Hcg Hpc".
     iEval (rgne) in "Hpc". iEval (rewrite HE6ra) in "Hpc".
     (* ---- the callee-saved postcondition ---- *)
     assert (HE6s0 : E6 !!! Regidx s0_idx = m !!! Regidx s0_idx).
@@ -895,7 +895,7 @@ Section VtEpilogue.
       rewrite /E0 upd_ne; [| congruence].
       exact (HMBthr r Hr Ncsp N8 N9). }
     iDestruct (cpu_own_transport CID1 CID6 n eb pme b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iSpecialize ("Hcont" $! CID6 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CID6 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! E6 with "[%] Hcg Hcnt Hpc").
     unfold callee_saved.
     split; [exact HE6csp|].
@@ -3430,8 +3430,8 @@ Section ProofVirtioDiskIntr.
       iApply (Epi.wp_vt_epilogue (CID:=CIDa) γk γd pd pav pu m MB K lvl eb pme sp0 b lks
                 Hsp0 HBcsp HBthr HKav Hbeq Hfresh
                 with "Hcg Htext Hpc Hlk Htok HR Hown Hpay Hr24 Hr16 Hr8 Hgap").
-      iIntros (CIDz Hsz MF HcsF) "Hcg Hown Hpc".
-      iSpecialize ("Hcont" $! CIDz with "[%]"); [wp_next_chain|].
+      iIntros (CIDz Hsz) "Hlc". iIntros (MF HcsF) "Hcg Hown Hpc".
+      iSpecialize ("Hcont" $! CIDz with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hcont" $! MF with "[%] Hcg Hown Htext Hpc").
       split; [exact HcsF | intro r; apply rf_to_gmap_dom]. }
     (* ===================== the loop-entry test ===================== *)

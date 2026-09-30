@@ -422,7 +422,7 @@ Section ProofNamecmpMain.
     iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.namecmp + 0x14)) Rra P3 K b
               ltac:(nz) with "Hcg Hpc []").
     { iApply (nci_14 with "Htext"). }
-    iIntros (CID11 Hq11) "Hcg Hpc".
+    iIntros (CID11 Hq11) "Hlc Hcg Hpc".
     iEval (rgne) in "Hpc".
     assert (Hretf : ret_pc (P3 !!! Regidx Rra : mword 64)
                     = ret_pc (mm !!! Regidx Rra : mword 64))
@@ -471,7 +471,7 @@ Section ProofNamecmpMain.
     assert (Cs11 : P3 !!! Regidx (mword_of_int 27 : mword 5)
                   = (mm !!! Regidx (mword_of_int 27 : mword 5) : mword 64))
       by (apply Hfin; ncidx).
-    iSpecialize ("Hcont" $! CID11 with "[%]"); [wp_next_chain |].
+    iSpecialize ("Hcont" $! CID11 with "[%] Hlc"); [wp_next_chain |].
     iApply ("Hcont" $! P3 with "[%] Hcg Hpc Hb1 Hb2 [%]").
     { unfold callee_saved. split_and!; assumption. }
     { rewrite HP3a0. exact (nc_res_iff f g (mS !!! Regidx Ra0) Hres). }

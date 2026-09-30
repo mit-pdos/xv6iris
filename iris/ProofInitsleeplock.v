@@ -451,10 +451,10 @@ Section ProofInitsleeplock.
               ltac:(vm_compute; discriminate)
               with "Hcg Hpc []").
     { iApply (isl_34 with "Htext"). }
-    iIntros (CID22 Hs22) "Hcg Hpc".
+    iIntros (CID22 Hs22) "Hlc Hcg Hpc".
     iEval (rgne; rewrite HE5ra) in "Hpc".
     (* ===== hand everything back to the caller ===== *)
-    iSpecialize ("Hcont" $! CID22 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CID22 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! E5 with "Hcg Hpc [%] Hlocked Hlk Hlnm Hcpu Hslname Hpid").
     (* callee_saved m E5 (13 conjuncts -- sp,s0,s1,s2,s3..s11) *)
     assert (Hthread : forall c : mword 5, is_cs_idx c = true ->

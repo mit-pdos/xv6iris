@@ -854,12 +854,12 @@ Section ProofFreeproc.
       iApply (wp_cret_s_sconf (mword_of_int (FR + 0x62)) Rra E3 K false
                 ltac:(vm_compute; discriminate) with "Hcg Hpc []").
       { iApply (fri_62 with "Htext"). }
-      iIntros (CIDzd Hszd) "Hcg Hpc".
+      iIntros (CIDzd Hszd) "Hlc Hcg Hpc".
       iEval (rgne) in "Hpc". iEval (rewrite Hrt) in "Hpc".
       (* ---- hand everything back ---- *)
       iDestruct (cpu_own_transport CIDrel CIDzd ilvl eb pme false ltac:(wp_next_chain)
                    with "Hcpu") as "Hcpu".
-      iSpecialize ("Hcont" $! CIDzd with "[]"); [ iPureIntro; wp_next_chain | ].
+      iSpecialize ("Hcont" $! CIDzd with "[] Hlc"); [ iPureIntro; wp_next_chain | ].
       (* THE ZEROED xstate CELL, RE-SPLIT: <p->lock>'s half goes back into
          [proc_held]'s public payload, the slot's into the UNUSED block. *)
       assert (Hxhalf2 : (1/2 + 1/2)%Qp = 1%Qp) by compute_done.
@@ -1049,13 +1049,13 @@ Section ProofFreeproc.
                   ltac:(rewrite HB2a1; exact Hbelow)
                   with "Hcg Hcpu Htext Hpc Hpt Henv Hlend").
         all: try lkbelow.
-        iIntros (CIDp6 Hsp6 mr) "Hcg Hcpu (%kev2 & %Hkev2 & Hlend) Hpc %Hcs".
+        iIntros (CIDp6 Hsp6) "Hlc". iIntros (mr) "Hcg Hcpu (%kev2 & %Hkev2 & Hlend) Hpc %Hcs".
         iAssert (∃ k' : nat, ⌜(kev <= k')%nat⌝ ∗ act_lend pme k')%I with "[Hlend]" as "Hlend".
         { iExists kev2. iFrame "Hlend". iPureIntro; lia. }
         assert (Hret22 : ret_pc (B2 !!! Regidx Rra) = mword_of_int (FR + 0x22)).
         { rewrite HB2ra. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
         iEval (rewrite Hret22) in "Hpc".
-        iSpecialize ("ZERO" $! CIDp6 with "[%]"); [wp_next_chain|].
+        iSpecialize ("ZERO" $! CIDp6 with "[%] Hlc"); [wp_next_chain|].
         iApply ("ZERO" $! mr (page_base P.(ud_root)) with "[%] Hcg Hcpu Hlend Hpc Hpgc Htf Hsz").
         split_and!.
         + rewrite (callee_saved_lookup Hcs csp_rs1 ltac:(vm_compute; reflexivity)). exact HB2sp.
@@ -1090,14 +1090,14 @@ Section ProofFreeproc.
                   ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc []").
         { iApply (fri_1a with "Htext"). }
-        iApply bi.later_intro. iIntros (CIDp3 Hsp3) "Hcg Hpc".
+        iApply bi.later_intro. iIntros (CIDp3 Hsp3) "Hlc Hcg Hpc".
         assert (Htg22 : add_vec (mword_of_int (FR + 0x1a) : mword 64)
                           (sign_extend' 64 (sign_extend' 13 (concat_vec (mword_of_int 4 : mword 8) ('b"0"))))
                         = mword_of_int (FR + 0x22)) by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Htg22) in "Hpc".
         iDestruct (cpu_own_transport CIDp CIDp3 ilvl eb pme false ltac:(wp_next_chain)
                      with "Hcpu") as "Hcpu".
-        iSpecialize ("ZERO" $! CIDp3 with "[%]"); [wp_next_chain|].
+        iSpecialize ("ZERO" $! CIDp3 with "[%] Hlc"); [wp_next_chain|].
         iApply ("ZERO" $! B0 (zero_reg : mword 64) with "[%] Hcg Hcpu Hlend Hpc Hpg Htf Hsz").
         split_and!; [exact HB0sp | exact HB0s1 | exact HB0thr]. }
 
@@ -1186,11 +1186,11 @@ Section ProofFreeproc.
       all: try lkbelow.
       { rewrite /kfree_pre. iSplitR; [iPureIntro; rewrite HT1a0; exact Htfval |].
         iEval (rewrite HT1a0). iExact "Hpage". }
-      iIntros (CIDk Hsk mrk) "Hcg Hcpu Hpc %Hcsk _".
+      iIntros (CIDk Hsk) "Hlc". iIntros (mrk) "Hcg Hcpu Hpc %Hcsk _".
       assert (Hret14 : ret_pc (T1 !!! Regidx Rra) = mword_of_int (FR + 0x14)).
       { rewrite HT1ra. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
       iEval (rewrite Hret14) in "Hpc".
-      iSpecialize ("PGT" $! CIDk with "[%]"); [wp_next_chain|].
+      iSpecialize ("PGT" $! CIDk with "[%] Hlc"); [wp_next_chain|].
       iApply ("PGT" $! mrk (page_base tfp) with "[%] Hcg Hcpu Hlend Hpc Htfc Hsz").
       split_and!.
       + rewrite (callee_saved_lookup Hcsk csp_rs1 ltac:(vm_compute; reflexivity)). exact HT1sp.
@@ -1225,14 +1225,14 @@ Section ProofFreeproc.
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (fri_0e with "Htext"). }
-      iApply bi.later_intro. iIntros (CID8 Hs8) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID8 Hs8) "Hlc Hcg Hpc".
       assert (Htg14 : add_vec (mword_of_int (FR + 0x0e) : mword 64)
                         (sign_extend' 64 (sign_extend' 13 (concat_vec (mword_of_int 3 : mword 8) ('b"0"))))
                       = mword_of_int (FR + 0x14)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htg14) in "Hpc".
       iDestruct (cpu_own_transport CID CID8 ilvl eb pme false ltac:(wp_next_chain)
                    with "Hcpu") as "Hcpu".
-      iSpecialize ("PGT" $! CID8 with "[%]"); [wp_next_chain|].
+      iSpecialize ("PGT" $! CID8 with "[%] Hlc"); [wp_next_chain|].
       iApply ("PGT" $! T0 (zero_reg : mword 64) with "[%] Hcg Hcpu Hlend Hpc Htf Hsz").
       split_and!; [exact HT0sp | exact HT0s1 | exact HT0thr].
   Qed.

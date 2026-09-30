@@ -275,9 +275,9 @@ Section ProofWalkaddr.
         iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.walkaddr + 0x0a)) (mword_of_int 1 : mword 5) V3 K b
                   ltac:(vm_compute; discriminate) with "Hcg Hpc []").
         { iApply (wai_0a with "Htext"). }
-        iIntros (CID5 Hs5) "Hcg Hpc".
+        iIntros (CID5 Hs5) "Hlc Hcg Hpc".
         iEval (rewrite Hrtg) in "Hpc".
-        iSpecialize ("Hcont" $! CID5 with "[%]"); [wp_next_chain|].
+        iSpecialize ("Hcont" $! CID5 with "[%] Hlc"); [wp_next_chain|].
         iApply ("Hcont" $! V3 with "Hcg Hpc Hptree [%] [%]").
         { rewrite /V3. apply callee_saved_insert_r; [vm_compute; reflexivity |].
           rewrite /V2. apply callee_saved_insert_r; [vm_compute; reflexivity |].
@@ -586,9 +586,9 @@ Section ProofWalkaddr.
       iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.walkaddr + 0x30)) (mword_of_int 1 : mword 5) E3 K b
                 ltac:(vm_compute; discriminate) with "Hcg Hpc []").
       { iApply (wai_30 with "Htext"). }
-      iIntros (CID17 Hs17) "Hcg Hpc".
+      iIntros (CID17 Hs17) "Hlc Hcg Hpc".
       iEval (rewrite Hrtg) in "Hpc".
-      iSpecialize ("Hcont" $! CID17 with "[%]"); [wp_next_chain|].
+      iSpecialize ("Hcont" $! CID17 with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hcont" $! E3 with "Hcg Hpc Hptree [%] [%]").
       { unfold callee_saved. split_and!.
         - rewrite HspE3. rewrite /sp0 /V2.

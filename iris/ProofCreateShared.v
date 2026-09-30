@@ -2332,7 +2332,7 @@ Section ProofCreateMain.
     iApply (wp_cret_s_sconf (mword_of_int (CK + 0x82)) Rra P8 K b
               ltac:(nz) with "Hcg Hpc []").
     { iApply (cri_082 with "Htext"). }
-    iIntros (CIDT9 HqT9) "Hcg Hpc".
+    iIntros (CIDT9 HqT9) "Hlc Hcg Hpc".
     iEval (rgne) in "Hpc".
     assert (Hretf : ret_pc (P8 !!! Regidx Rra : mword 64) = ret_tgt)
       by (rewrite CPra; exact Hrt).
@@ -2381,7 +2381,7 @@ Section ProofCreateMain.
       rewrite /P4 upd_ne; [| nz]. rewrite /P3 upd_ne; [| nz].
       rewrite /P2 upd_ne; [| nz]. rewrite /P1 upd_ne; [| nz].
       rewrite /P0 upd_eq. apply add_vec_zero_l. }
-    iSpecialize ("Hqc" $! CIDT9 with "[%]"); [wp_next_chain |].
+    iSpecialize ("Hqc" $! CIDT9 with "[%] Hlc"); [wp_next_chain |].
     iApply ("Hqc" $! P8 with "[%] [%] Hcg Hpc").
     - unfold callee_saved. split_and!;
         first [ exact CPsp | exact CPs0 | exact CPs1 | exact CPs2

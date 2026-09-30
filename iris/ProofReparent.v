@@ -358,11 +358,11 @@ Section ProofReparentEnds.
               with "Hcg Hpc []").
     { iApply (rpi_2a with "Htext"). }
     iApply bi.later_intro.
-    iIntros (CID16 Hst16). iIntros "Hcg Hpc".
+    iIntros (CID16 Hst16) "Hlc". iIntros "Hcg Hpc".
     assert (Htgtj : add_vec (mword_of_int (KernelSyms.reparent + 0x2a) : mword 64) (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 5 : mword 11) ('b"0")))) = mword_of_int (KernelSyms.reparent + 0x34))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtj) in "Hpc".
-    iSpecialize ("Hcont" $! CID16 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CID16 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! R9 with "[%] Hcg Hpc [Hc1 Hc2 Hc3 Hc4 Hc5 Hc6]").
     - (* rpl_regs R9 spF p ... 0 *)
       assert (Hthread : forall c : mword 5, c <> mword_of_int 8 -> c <> mword_of_int 9 ->
@@ -581,11 +581,11 @@ Section ProofReparentEnds.
               ltac:(vm_compute; discriminate)
               with "Hcg Hpc []").
     { iApply (rpi_54 with "Htext"). }
-    iIntros (CID8 Hst8) "Hcg Hpc".
+    iIntros (CID8 Hst8) "Hlc Hcg Hpc".
     assert (HE7ra_rg : rget (CID := CID7) E7 (mword_of_int 1 : mword 5) = vra)
       by (rgne; exact HE7ra).
     iEval (rewrite HE7ra_rg) in "Hpc".
-    iSpecialize ("Hcont" $! CID8 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CID8 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! E7 with "[%] Hcg Hpc").
     rewrite /E7 /E6 /E5 /E4 /E3 /E2 /E1.
     repeat split.
@@ -720,7 +720,7 @@ Section ProofReparentLoop.
                     Hcmpr ltac:(vm_compute; reflexivity)
                     with "Hcg Hpc []").
           { iApply (rpi_30 with "Htext"). }
-          iApply bi.later_intro. iIntros (CIDt2 Hst2) "Hcg Hpc".
+          iApply bi.later_intro. iIntros (CIDt2 Hst2) "Hlc Hcg Hpc".
           assert (Htgt46 : add_vec (mword_of_int (KernelSyms.reparent + 0x30) : mword 64)
                              (sign_extend' 64 (mword_of_int 22 : mword 13)) = mword_of_int (KernelSyms.reparent + 0x46))
             by (apply bv_eq; vm_compute; reflexivity).
@@ -735,7 +735,7 @@ Section ProofReparentLoop.
           iEval (rewrite Hfull) in "Hpar".
           iDestruct (cpu_own_transport CIDt CIDt2 lvl eb pme b ltac:(wp_next_chain)
                        with "Hown") as "Hown".
-          iSpecialize ("Hqx" $! CIDt2 with "[%]"); [wp_next_chain|].
+          iSpecialize ("Hqx" $! CIDt2 with "[%] Hlc"); [wp_next_chain|].
           iApply ("Hqx" $! Mt2c with "[] Hcg Hown Htext Hpc Hframe Hinit Hpar").
           iPureIntro. unfold rpx_regs.
           split; [rewrite /Mt2c upd_ne; [exact Htsp | vm_compute; discriminate]|].
@@ -756,7 +756,7 @@ Section ProofReparentLoop.
                     Mt2c av b ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
                     Hcmpr with "Hcg Hpc []").
           { iApply (rpi_30 with "Htext"). }
-          iIntros (CIDt2 Hst2) "Hcg Hpc".
+          iIntros (CIDt2 Hst2) "Hlc Hcg Hpc".
           assert (HkS : (S k < NPROC)%nat).
           { destruct (Nat.lt_ge_cases (S k) NPROC) as [Hlt | Hge]; [exact Hlt|].
             assert (HeqN : S k = NPROC) by lia.
@@ -770,7 +770,7 @@ Section ProofReparentLoop.
           iEval (rewrite Hpp34) in "Hpc".
           iDestruct (cpu_own_transport CIDt CIDt2 lvl eb pme b ltac:(wp_next_chain)
                        with "Hown") as "Hown".
-          iSpecialize ("IHf" $! CIDt2 with "[%]"); [wp_next_chain|].
+          iSpecialize ("IHf" $! CIDt2 with "[%] Hlc"); [wp_next_chain|].
           iApply ("IHf" $! (S k) Mt2c with "[%] [%] [%] Hqx Hcg Hown Htext Hpc Hframe Hinit Hpar").
           * lia.
           * exact HkS.
@@ -939,7 +939,7 @@ Section ProofReparentLoop.
                   with "Hcg Hpc []").
         { iApply (rpi_44 with "Htext"). }
         iApply bi.later_intro.
-        iIntros (CIDr Hsr). iIntros "Hcg Hpc".
+        iIntros (CIDr Hsr) "Hlc". iIntros "Hcg Hpc".
         assert (Htgt2c : add_vec (mword_of_int (KernelSyms.reparent + 0x44) : mword 64)
                            (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 2036 : mword 11) ('b"0"))))
                          = mword_of_int (KernelSyms.reparent + 0x2c))
@@ -947,7 +947,7 @@ Section ProofReparentLoop.
         iEval (rewrite Htgt2c) in "Hpc".
         iDestruct (cpu_own_transport CIDq CIDr lvl eb pme b ltac:(wp_next_chain)
                      with "Hown") as "Hown".
-        iSpecialize ("Htail" $! CIDr with "[%]"); [wp_next_chain|].
+        iSpecialize ("Htail" $! CIDr with "[%] Hlc"); [wp_next_chain|].
         iApply ("Htail" $! Mw with "[%] Hcg Hown Hpc Hframe Hinit Hpar").
         (* the [rpl_regs] shape survives wakeup by [callee_saved] *)
         unfold rpl_regs.
@@ -1022,7 +1022,7 @@ Section ProofReparentLoop.
                   Htaken ltac:(rewrite Htgt2c; vm_compute; reflexivity)
                   with "Hcg Hpc []").
         { iApply (rpi_36 with "Htext"). }
-        iApply bi.later_intro. iIntros (CIDm Hsm) "Hcg Hpc".
+        iApply bi.later_intro. iIntros (CIDm Hsm) "Hlc Hcg Hpc".
         iEval (rewrite Htgt2c) in "Hpc".
         (* the cell goes back unchanged, and [rp_slot pv ip v = v] *)
         iDestruct ("Hback" $! v with "Hcell") as "Hpar".
@@ -1032,7 +1032,7 @@ Section ProofReparentLoop.
         iEval (rewrite Hstep) in "Hpar".
         iDestruct (cpu_own_transport CIDk CIDm lvl eb pme b ltac:(wp_next_chain)
                      with "Hown") as "Hown".
-        iSpecialize ("Htail" $! CIDm with "[%]"); [wp_next_chain|].
+        iSpecialize ("Htail" $! CIDm with "[%] Hlc"); [wp_next_chain|].
         iApply ("Htail" $! M34 with "[%] Hcg Hown Hpc Hframe Hinit Hpar").
         exact HM34regs. }
     iIntros (k M) "%Hk %Hregs Hcg Hown Htext Hpc Hframe Hinit Hpar".
@@ -1092,14 +1092,14 @@ Section ProofReparent.
                 ltac:(lia) Hedom
                 with "Hcg Htextx Hpc [Hframe]").
       { iEval (rewrite Hecsp). iExact "Hframe". }
-      iIntros (CIDend Hsend Mf) "%Hepi Hcg Hpc".
+      iIntros (CIDend Hsend) "Hlc". iIntros (Mf) "%Hepi Hcg Hpc".
       destruct Hepi as (Hf1v & Hf0v & Hf9v & Hf18v & Hf19v & Hf20v & Hfcsp & Hf21v & Hf22v & Hf23v & Hf24v & Hf25v & Hf26v & Hf27v & Hfdom).
       assert (Hspcancel : add_vec (Mexit !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 3 : mword 6)))
                           = m !!! Regidx csp_rs1)
         by (rewrite Hecsp; apply frame_cancel_48).
       iDestruct (cpu_own_transport CIDex CIDend lvl eb pme b ltac:(wp_next_chain)
                    with "Hown") as "Hown".
-      iSpecialize ("Hcont" $! CIDend with "[%]"); [wp_next_chain|].
+      iSpecialize ("Hcont" $! CIDend with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hcont" $! Mf with "[%] Hcg Hown Htext [Hpc] Hinit Hpar").
       - split; [| exact Hfdom].
         unfold callee_saved.

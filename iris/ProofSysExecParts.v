@@ -845,7 +845,7 @@ Section SysExecEpilogue.
     iApply (wp_cret_s_sconf (mword_of_int (SX + 0x10a)) Rra M3 K b
               ltac:(nz) with "Hcg Hpc []").
     { iApply (sxi_10a with "Htext"). }
-    iIntros (CID4 Hq4) "Hcg Hpc".
+    iIntros (CID4 Hq4) "Hlc Hcg Hpc".
     iEval (rgne) in "Hpc".
     assert (Hretf : ret_pc (M3 !!! Regidx Rra : mword 64)
                     = ret_pc (m !!! Regidx Rra : mword 64))
@@ -880,7 +880,7 @@ Section SysExecEpilogue.
     assert (Hfin : sx_thr m M3).
     { intros c Hc N2 N8 N9 N18 N19 N20 N21 N22 N23. rewrite /M3 upd_ne; [| regne].
       exact (HM2thr c Hc N2 N8 N9 N18 N19 N20 N21 N22 N23). }
-    iSpecialize ("Hcont" $! CID4 with "[%]"); [wp_next_chain |].
+    iSpecialize ("Hcont" $! CID4 with "[%] Hlc"); [wp_next_chain |].
     iApply ("Hcont" $! M3 with "[%] [%] Hcg Hpc").
     { unfold callee_saved. split_and!;
         [ exact Csp | exact Cs0 | exact Crs1 | exact Crs2 | exact Crs3

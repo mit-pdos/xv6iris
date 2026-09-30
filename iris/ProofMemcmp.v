@@ -276,7 +276,7 @@ Section ProofMemcmp.
     iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.memcmp + 0x34)) Rra T3 K b
               ltac:(vm_compute; discriminate) with "Hcg Hpc []").
     { iApply (mci_34 with "Htext"). }
-    iIntros (CID4 Hs4) "Hcg Hpc".
+    iIntros (CID4 Hs4) "Hlc Hcg Hpc".
     iEval (rewrite HT3ra') in "Hpc".
     (* ---- postcondition ---- *)
     assert (HT3a0 : T3 !!! Regidx Ra0 = rv).
@@ -289,7 +289,7 @@ Section ProofMemcmp.
       rewrite /T2 upd_ne; [| intro He; injection He as He'; congruence].
       rewrite /T1 upd_ne; [| apply cs_ne; [vm_compute; reflexivity | exact Hr]].
       apply Hthr; assumption. }
-    iSpecialize ("Hcont" $! CID4 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CID4 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! T3 with "[%] Hcg Hpc").
     split; [| exact HT3a0].
     unfold callee_saved. split_and!.
@@ -530,7 +530,7 @@ Section ProofMemcmp.
                   M5 (K - 2)%nat b ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc []").
         { iApply (mci_28 with "Htext"). }
-        iApply bi.later_intro. iIntros (CID8 Hs8). iIntros "Hcg Hpc".
+        iApply bi.later_intro. iIntros (CID8 Hs8) "Hlc". iIntros "Hcg Hpc".
         assert (Ht2e : add_vec (mword_of_int (KernelSyms.memcmp + 0x28) : mword 64)
                   (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 3 : mword 11) ('b"0"))))
                 = mword_of_int (KernelSyms.memcmp + 0x2e))
@@ -545,7 +545,7 @@ Section ProofMemcmp.
         { intros r Hr Ncsp Ns0.
           rewrite /M5 upd_ne; [apply HM4thr; assumption
                               | apply cs_ne; [vm_compute; reflexivity | exact Hr]]. }
-        iSpecialize ("Hcont" $! CID8 with "[%]"); [wp_next_chain|].
+        iSpecialize ("Hcont" $! CID8 with "[%] Hlc"); [wp_next_chain|].
         iApply ("Hcont" $! M5 with "[%] [%] [%] Hcg Hpc Hbuf1 Hbuf2").
         * exact HM5sp.
         * rewrite HM5a0. right. split; [| reflexivity].
@@ -595,7 +595,7 @@ Section ProofMemcmp.
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc []").
       { iApply (mci_2a with "Htext"). }
-      iIntros (CID4 Hs4) "Hcg Hpc".
+      iIntros (CID4 Hs4) "Hlc Hcg Hpc".
       set (M3 := <[Regidx Ra0 := regval_into_reg
                     (sign_extend' 64
                        (sub_vec (subrange_vec_dec (rget M2 Ra5) 31 0 : mword 32)
@@ -618,7 +618,7 @@ Section ProofMemcmp.
       { intros r Hr Ncsp Ns0.
         rewrite /M3 upd_ne; [apply HM2thr; assumption
                             | apply cs_ne; [vm_compute; reflexivity | exact Hr]]. }
-      iSpecialize ("Hcont" $! CID4 with "[%]"); [wp_next_chain|].
+      iSpecialize ("Hcont" $! CID4 with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hcont" $! M3 with "[%] [%] [%] Hcg Hpc Hbuf1 Hbuf2").
       + exact HM3sp.
       + rewrite HM3a0. left. exists t.
@@ -796,8 +796,8 @@ Section ProofMemcmp.
                 HK ltac:(reflexivity) ltac:(reflexivity) ltac:(reflexivity)
                 HZ1sp HZ1a0 HZ1thr
                 with "Hcg Htext Hpc Hb1 Hb2").
-      iIntros (CID8 Hs8 mf) "[%Hcs %Hfa0] Hcg Hpc".
-      iSpecialize ("Hcont" $! CID8 with "[%]"); [wp_next_chain|].
+      iIntros (CID8 Hs8) "Hlc". iIntros (mf) "[%Hcs %Hfa0] Hcg Hpc".
+      iSpecialize ("Hcont" $! CID8 with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hcont" $! mf with "Hcg Hpc Hbuf1 Hbuf2 [%] [%]").
       + exact Hcs.
       + rewrite Hfa0. right. split; [| reflexivity].
@@ -922,8 +922,8 @@ Section ProofMemcmp.
                 HK ltac:(reflexivity) ltac:(reflexivity) ltac:(reflexivity)
                 HMtsp ltac:(reflexivity) HMtthr
                 with "Hcg Htext Hpc Hb1 Hb2").
-      iIntros (CID10 Hs10 mf) "[%Hcs %Hfa0] Hcg Hpc".
-      iSpecialize ("Hcont" $! CID10 with "[%]"); [wp_next_chain|].
+      iIntros (CID10 Hs10) "Hlc". iIntros (mf) "[%Hcs %Hfa0] Hcg Hpc".
+      iSpecialize ("Hcont" $! CID10 with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hcont" $! mf with "Hcg Hpc Hbuf1 Hbuf2 [%] [%]").
       + exact Hcs.
       + rewrite Hfa0. exact HMtres.

@@ -366,9 +366,9 @@ Section ProofPMS.
               ltac:(vm_compute; discriminate)
               with "Hcg Hpc []").
     { iApply (pmsi_96 with "Htext"). }
-    iIntros (CIDe12 Hse12) "Hcg Hpc".
+    iIntros (CIDe12 Hse12) "Hlc Hcg Hpc".
     iEval (rewrite Hrt) in "Hpc".
-    iSpecialize ("Hcont" $! CIDe12 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CIDe12 with "[%] Hlc"); [wp_next_chain|].
     (* [Hcnt] entered this lemma at its OWN entry hart [CID]; the twelve
        plain-instruction crossings above (ten loads, the pop, the ret)
        landed on [CIDe12] -- transport it there once before handing it

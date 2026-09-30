@@ -510,12 +510,12 @@ Section ProofFlags2perm.
                 (mword_of_int 1 : mword 5) N3 K b ltac:(vm_compute; discriminate)
                 with "Hcg Hpc []").
       { iApply (fpi_1e with "Htext"). }
-      iIntros (CIDx Hsx) "Hcg Hpc".
+      iIntros (CIDx Hsx) "Hlc Hcg Hpc".
       assert (Hretf : forall CIDy : CpuId,
                 ret_pc (rget (CID := CIDy) N3 (mword_of_int 1 : mword 5)) = ret_tgt).
       { intros CIDy. rewrite Hrg1. rewrite HN3ra. reflexivity. }
       iEval (rewrite Hretf) in "Hpc".
-      iSpecialize ("Hcont" $! CIDx with "[%]"); [wp_next_chain|].
+      iSpecialize ("Hcont" $! CIDx with "[%] Hlc"); [wp_next_chain|].
       (* the two facts the contract owes *)
       assert (HN3thr : forall c : mword 5,
                 c <> csp_rs1 -> c <> (mword_of_int 8 : mword 5) ->
@@ -569,14 +569,14 @@ Section ProofFlags2perm.
                 ltac:(vm_compute; discriminate) ltac:(rdok) (Hor _)
                 with "Hcg Hpc []").
       { iApply (fpi_14 with "Htext"). }
-      iIntros (CID10 Hs10) "Hcg Hpc".
+      iIntros (CID10 Hs10) "Hlc Hcg Hpc".
       set (R7 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg w12]> R6).
       change (<[Regidx (mword_of_int 10 : mword 5) := regval_into_reg w12]> R6) with R7.
       assert (Hpp18 : add_vec_int (mword_of_int (KernelSyms.flags2perm + 0x14) : mword 64) 4
                       = mword_of_int (KernelSyms.flags2perm + 0x18))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp18) in "Hpc".
-      iSpecialize ("TAIL" $! CID10 with "[%]"); [wp_next_chain|].
+      iSpecialize ("TAIL" $! CID10 with "[%] Hlc"); [wp_next_chain|].
       iApply ("TAIL" $! R7 with "[%] Hcg Hpc").
       split; [| split].
       + rewrite /R7 upd_ne; [exact HspR6 | vm_compute; discriminate].
@@ -597,14 +597,14 @@ Section ProofFlags2perm.
                 with "Hcg Hpc []").
       { iApply (fpi_12 with "Htext"). }
       iApply bi.later_intro.
-      iIntros (CID9 Hs9) "Hcg Hpc".
+      iIntros (CID9 Hs9) "Hlc Hcg Hpc".
       assert (Htgt18 : add_vec (mword_of_int (KernelSyms.flags2perm + 0x12) : mword 64)
                          (sign_extend' 64 (sign_extend' 13
                             (concat_vec (mword_of_int 3 : mword 8) ('b"0"))))
                        = mword_of_int (KernelSyms.flags2perm + 0x18))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgt18) in "Hpc".
-      iSpecialize ("TAIL" $! CID9 with "[%]"); [wp_next_chain|].
+      iSpecialize ("TAIL" $! CID9 with "[%] Hlc"); [wp_next_chain|].
       iApply ("TAIL" $! R6 with "[%] Hcg Hpc").
       split; [| split].
       + exact HspR6.

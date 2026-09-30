@@ -633,7 +633,7 @@ Section ProofHoldingsleep.
               ltac:(vm_compute; discriminate)
               with "Hcg Hpc []").
     { iApply (hsl_30 with "Htext"). }
-    iIntros (CIDe7 Hse7) "Hcg Hpc".
+    iIntros (CIDe7 Hse7) "Hlc Hcg Hpc".
     assert (Hretfin : ret_pc (E2e !!! Regidx (mword_of_int 1 : mword 5)) = ret_tgt)
       by (rewrite HE2era; reflexivity).
     iEval (rewrite Hretfin) in "Hpc".
@@ -709,7 +709,7 @@ Section ProofHoldingsleep.
        case split on [b]. *)
     iDestruct (cpu_own_transport CIDrel CIDe7 0%nat b p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iSpecialize ("Hcont" $! CIDe7 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CIDe7 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! E2e with "[%] Hcg Hcnt Hpc Hsl Hpidproc").
     { split.
       - unfold callee_saved.
@@ -755,8 +755,8 @@ Section ProofHoldingsleep.
     iDestruct "Hsl" as (q) "Hsl".
     iApply (wp_holdingsleep_gen_sconf γl γsl s R sl_untracked q m p pidv av eb b lks Upr
               Hav Hbelow with "Hcg Hcnt Htext Hpc Hslk Hsl Hpidproc").
-    iIntros (CIDf Hsf mf Hcs) "Hcg Hcnt Hpc Hsl Hpidproc".
-    iSpecialize ("Hcont" $! CIDf with "[%]"); [ exact Hsf |].
+    iIntros (CIDf Hsf) "Hlc". iIntros (mf Hcs) "Hcg Hcnt Hpc Hsl Hpidproc".
+    iSpecialize ("Hcont" $! CIDf with "[%] Hlc"); [ exact Hsf |].
     iApply ("Hcont" $! mf with "[%] Hcg Hcnt Hpc [Hsl] Hpidproc"); [ exact Hcs |].
     iExists q. iExact "Hsl".
   Qed.

@@ -223,11 +223,11 @@ Section ProofIinit.
               ltac:(vm_compute; discriminate)
               with "Hcg Hpc []").
     { iApply (iii_56 with "Htext"). }
-    iIntros (CID7 Hs7) "Hcg Hpc".
+    iIntros (CID7 Hs7) "Hlc Hcg Hpc".
     assert (Hretf : ret_pc (E6 !!! Regidx (mword_of_int 1 : mword 5)) = ret_tgt)
       by (rewrite HE6ra; reflexivity).
     iEval (rewrite Hretf) in "Hpc".
-    iSpecialize ("Hcont" $! CID7 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CID7 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! E6 with "Hcg Hpc [%]").
     (* callee_saved m E6 *)
     assert (Hthread : forall c : mword 5, is_cs_idx c = true ->
@@ -495,8 +495,8 @@ Section ProofIinit.
       iDestruct (wp_next_shift Hshift with "Hpost") as "Hpost".
       iApply (iiepi m N1 K b p ltac:(lia) HN1sp HN1cs
                 with "Htext Hcg Hpc Hc1 Hc2 Hc3 Hc4 Hc5 Hf6").
-      iIntros (CIDg Hsg mr) "Hcg Hpc %Hcs".
-      iSpecialize ("Hpost" $! CIDg with "[%]"); [wp_next_chain|].
+      iIntros (CIDg Hsg) "Hlc". iIntros (mr) "Hcg Hpc %Hcs".
+      iSpecialize ("Hpost" $! CIDg with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hpost" $! mr with "Hcg Hpc [//] Hdone").
     - (* more inodes: bne TAKEN -> back edge to +0x3a at cursor S j *)
       assert (Htgt3a : add_vec (mword_of_int (KernelSyms.iinit + 0x46) : mword 64) (sign_extend' 64 (mword_of_int 8180 : mword 13)) = mword_of_int (KernelSyms.iinit + 0x3a))

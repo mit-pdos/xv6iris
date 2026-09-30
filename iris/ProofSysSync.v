@@ -668,7 +668,7 @@ Section SsBodies.
               ltac:(vm_compute; discriminate)
               with "Hcg Hpc []").
     { iApply (ssi_72 with "Htext"). }
-    iIntros (CIDe4 Hse4) "Hcg Hpc".
+    iIntros (CIDe4 Hse4) "Hlc Hcg Hpc".
     iEval (rgne) in "Hpc".
     assert (Hretf : ret_pc (Q3 !!! Regidx Rra) = ret_pc (m !!! Regidx Rra))
       by (rewrite HQ3ra; reflexivity).
@@ -691,7 +691,7 @@ Section SsBodies.
                  with "Hextc") as "Hextc".
     iDestruct (cpu_claim_ext_transport CID CIDe4 eb pj ltac:(wp_next_chain)
                  with "Hextm") as "Hextm".
-    iSpecialize ("Hcont" $! CIDe4 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CIDe4 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! Q3 with "[%] [%] Hcg Hown Hextc Hextm Hpc").
     { unfold callee_saved.
       split. { rewrite /Q3 upd_eq. rewrite Hwv. exact Hsp0. }
@@ -948,7 +948,7 @@ Section SsBodies.
               with "Hcg Hown Htext Hpc []").
     all: try lkbelow.
     { iEval (rewrite HA6a0). iExact "Hislock". }
-    iIntros (CIDa Hsa msA mfa) "%Hmsf Hcg Hpc %Hacs Htok Hres _ Hown Hpay".
+    iIntros (CIDa Hsa) "Hlc". iIntros (msA mfa) "%Hmsf Hcg Hpc %Hacs Htok Hres _ Hown Hpay".
     assert (Hp54 : ret_pc (A6 !!! Regidx Rra) = mword_of_int (SS + 0x54))
       by (rewrite HA6ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp54) in "Hpc".
@@ -1073,7 +1073,7 @@ Section SsBodies.
             first [ exact P19 | exact P20 | exact P21 | exact P22 | exact P23
                   | exact P24 | exact P25 | exact P26 | exact P27 ]. }
       rewrite /ss_exit.
-      iSpecialize ("Hexit" $! CIDa with "[%]"); [wp_next_chain|].
+      iSpecialize ("Hexit" $! CIDa with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hexit" $! Z3 with "[%] Hr24 Hr16 [Hr8] [Hr0] Htok Hres Hown Htc Hclm Hcg Hpc HQ").
       { exact HssZ3. }
       { iExists (m !!! Regidx Rs1). iExact "Hr8". }
@@ -1417,7 +1417,7 @@ Section ProofSysSync.
               with "Hcg Hown Htext Hpc []").
     all: try lkbelow.
     { iEval (rewrite HMaqa0). iExact "Hislock". }
-    iIntros (CIDa Hsa ms Macq) "%Hmsf Hcg Hpc %Hcsacq Htok Hres _ Hown Hpay".
+    iIntros (CIDa Hsa) "Hlc". iIntros (ms Macq) "%Hmsf Hcg Hpc %Hcsacq Htok Hres _ Hown Hpay".
     iDestruct (trap_csrs_ext_transport CID CIDa eb pj ltac:(wp_next_chain)
                  with "Hextc") as "Hextc".
     iDestruct (cpu_claim_ext_transport CID CIDa eb pj ltac:(wp_next_chain)
@@ -1448,8 +1448,8 @@ Section ProofSysSync.
       (* [ss_tail_body] promises an abstract exit, so the same tail serves
          whatever the contract adds above it; the hook's [Q] is injected
          here, on the way into the contract's own continuation *)
-      iIntros (CIDret) "%Hgret". iIntros (mfret) "%Hcsret %Ha0ret Hcgf Hcntf Hextcf Hextmf Hpcf".
-      iDestruct ("Hcont" $! CIDret with "[%]") as "Hc"; [exact Hgret |].
+      iIntros (CIDret) "%Hgret" Hlc. iIntros (mfret) "%Hcsret %Ha0ret Hcgf Hcntf Hextcf Hextmf Hpcf".
+      iDestruct ("Hcont" $! CIDret with "[%] Hlc") as "Hc"; [exact Hgret |].
       iSpecialize ("Hc" $! mfret).
       iSpecialize ("Hc" with "[%]"); [exact Hcsret |].
       iSpecialize ("Hc" with "[%]"); [exact Ha0ret |].
@@ -1623,7 +1623,7 @@ Section ProofSysSync.
         iApply bi.later_intro. iApply wp_next_off_intro. iIntros "Hcg Hpc".
         iEval (rewrite Htgt5e) in "Hpc".
         rewrite /ss_exit.
-        iSpecialize ("Hexit" $! CIDa with "[%]"); [wp_next_chain|].
+        iSpecialize ("Hexit" $! CIDa with "[%] Hlc"); [wp_next_chain|].
         iApply ("Hexit" $! G4 with "[%] Hr24 Hr16 [S3] [S4] Htok Hres Hown Htc Hclm Hcg Hpc HQ").
         { exact HssG4. }
         { iExact "S3". }

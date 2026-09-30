@@ -435,10 +435,10 @@ Section ProofKexecParts.
     iApply (wp_cret_s_sconf (mword_of_int (KX + 0x086)) Rra T5 K b
               ltac:(vm_compute; discriminate) with "Hcg Hpc []").
     { iApply (kxc_086 with "Htext"). }
-    iIntros (CID6 Hs6) "Hcg Hpc".
+    iIntros (CID6 Hs6) "Hlc Hcg Hpc".
     iEval (rgne) in "Hpc".
     iEval (rewrite HT5ra) in "Hpc".
-    iSpecialize ("Hcont" $! CID6 with "[]"); [iPureIntro; wp_next_chain|].
+    iSpecialize ("Hcont" $! CID6 with "[] Hlc"); [iPureIntro; wp_next_chain|].
     iApply ("Hcont" $! T5 with "[%] [%] Hcg Hpc").
     2:{ intros r Nsp Nra Ns0 Ns1 Ns2.
         rewrite /T5 upd_ne; [| congruence].

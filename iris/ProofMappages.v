@@ -356,7 +356,7 @@ Section ProofMappages.
               ltac:(vm_compute; discriminate)
               with "Hcg Hpc []").
     { iApply (mi_b0 with "Htext"). }
-    iIntros (CID11 Hs11) "Hcg Hpc".
+    iIntros (CID11 Hs11) "Hlc Hcg Hpc".
     iEval (rewrite Hrt) in "Hpc".
     assert (HE10a0 : E10 !!! Regidx (mword_of_int 10 : mword 5) = Mf !!! Regidx (mword_of_int 10 : mword 5)).
     { rewrite /E10 /E9 /E8 /E7 /E6 /E5 /E4 /E3 /E2 /E1.
@@ -364,7 +364,7 @@ Section ProofMappages.
       reflexivity. }
     iDestruct (cpu_own_transport CID0 CID11 lvl eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iSpecialize ("Hcont" $! CID11 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CID11 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! E10 tf k q with "Hcg Hcnt Hpc Hptree [%] Henv [%] [%] [%] [%] [%] [%]").
     { exact Hnodes. }
     { (* callee_saved mm E10 -- [callee_saved] is TP-FREE now (13 conjuncts:
@@ -1650,9 +1650,9 @@ Section ProofMappages.
        and finish every "%"-obligation with a bare [exact] instead, which
        goes through ordinary term elaboration (full conversion) rather than
        the automatic matcher. *)
-    iIntros (CIDf Hcrossf mr t' kf g)
+    iIntros (CIDf Hcrossf) "Hlc". iIntros (mr t' kf g)
       "Hcgf Hcntf Hpcf Hptreef %Hnodesf Henvf %Hcsf %Hbasef %Hrepf %Hpresf %Hmissf %Hpayf".
-    iSpecialize ("Hcont" $! CIDf with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CIDf with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! mr t' kf g
               with "Hcgf Hcntf Hpcf Hptreef [%] Henvf [%] [%] [%] [%] [%] [%]").
     { exact Hnodesf. }

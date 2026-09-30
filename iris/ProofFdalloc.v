@@ -374,7 +374,7 @@ Section ProofFdalloc.
               Rra T4 av b ltac:(vm_compute; discriminate)
               with "Hcg Hpc []").
     { iApply (fdi_30 with "Htext"). }
-    iIntros (CID5 Hs5) "Hcg Hpc".
+    iIntros (CID5 Hs5) "Hlc Hcg Hpc".
     iEval (rgne; rewrite HT4ra) in "Hpc".
     (* ---- the postcondition ---- *)
     assert (HT4sp : T4 !!! Regidx csp_rs1 = m !!! Regidx csp_rs1)
@@ -400,7 +400,7 @@ Section ProofFdalloc.
       rewrite /T3 upd_ne; [| congruence].
       rewrite /T2 upd_ne; [| congruence].
       rewrite /T1 upd_ne; [| congruence]. apply Hthr; assumption. }
-    iSpecialize ("Hcont" $! CID5 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CID5 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! T4 with "[%] Hcg Hpc").
     split; [| exact HT4a0].
     unfold callee_saved.
@@ -881,9 +881,9 @@ Section ProofFdalloc.
                   (m !!! Regidx Rra) (m !!! Regidx Rs0) (m !!! Regidx Rs1) vgap p b
                   ltac:(lia) eq_refl eq_refl eq_refl eq_refl HG3sp HG3a0 HG3cs
                   with "Hcg Htext Hpc Hc1 Hc2 Hc3 Hc4").
-        iIntros (CIDfx HsFx mf) "[%Hcsf %Hfa0] Hcg Hpc".
+        iIntros (CIDfx HsFx) "Hlc". iIntros (mf) "[%Hcsf %Hfa0] Hcg Hpc".
         iDestruct (cpu_own_transport CID0 CIDfx n eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-        iSpecialize ("Hcont" $! CIDfx with "[%]"); [wp_next_chain|].
+        iSpecialize ("Hcont" $! CIDfx with "[%] Hlc"); [wp_next_chain|].
         destruct (fda_frees_found _ fd Hw Hpre) as [l Hfrees].
         iApply ("Hcont" $! mf with "[%] Hcg Hcpu Hpc Hcore [Hpv Hfdslot Hauth]"); [exact Hcsf|].
         rewrite /fdalloc_post. iRight. iExists fd, l.
@@ -1001,9 +1001,9 @@ Section ProofFdalloc.
                     (m !!! Regidx Rra) (m !!! Regidx Rs0) (m !!! Regidx Rs1) vgap p b
                     ltac:(lia) eq_refl eq_refl eq_refl eq_refl HF1sp HF1a0 HF1cs
                     with "Hcg Htext Hpc Hc1 Hc2 Hc3 Hc4").
-          iIntros (CIDfy HsFy mf) "[%Hcsf %Hfa0] Hcg Hpc".
+          iIntros (CIDfy HsFy) "Hlc". iIntros (mf) "[%Hcsf %Hfa0] Hcg Hpc".
           iDestruct (cpu_own_transport CID0 CIDfy n eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-          iSpecialize ("Hcont" $! CIDfy with "[%]"); [wp_next_chain|].
+          iSpecialize ("Hcont" $! CIDfy with "[%] Hlc"); [wp_next_chain|].
           iApply ("Hcont" $! mf with "[%] Hcg Hcpu Hpc Hcore [Hpv]"); [exact Hcsf|].
           rewrite /fdalloc_post. iLeft.
           iSplitR; [| iFrame "Hpv"].

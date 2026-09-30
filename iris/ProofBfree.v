@@ -916,7 +916,7 @@ Section BfreeTail.
     iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.bfree + 0x5e)) Rra P5 K b
               ltac:(nz) with "Hcg Hpc []").
     { iApply (bfi_5e with "Htext"). }
-    iIntros (CID11 Hq11) "Hcg Hpc".
+    iIntros (CID11 Hq11) "Hlc Hcg Hpc".
     iEval (rgne) in "Hpc".
     assert (Hretf : ret_pc (P5 !!! Regidx Rra : mword 64)
                     = ret_pc (m !!! Regidx Rra : mword 64))
@@ -974,7 +974,7 @@ Section BfreeTail.
     iDestruct (cpu_claim_ext_transport CID0 CID11 b (proc_addr j)
                  ltac:(wp_next_chain) with "Hextm") as "Hextm".
     rewrite /bf_cont.
-    iSpecialize ("Hcont" $! CID11 with "[%]"); [wp_next_chain |].
+    iSpecialize ("Hcont" $! CID11 with "[%] Hlc"); [wp_next_chain |].
     iApply ("Hcont" $! P5 with "[%] Hcg Hcnt Hextc Hextm Hpc Hppid Hsb
                      Hsl Hop").
     { unfold callee_saved. split_and!; assumption. }
@@ -1850,7 +1850,7 @@ Section ProofBfreeMain.
               with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hlctx Hsb Hbmr Hfsb Hppid
                     Hprocs Hdevi Hdgeom Hdlock Hsl Hcredit Hop [Hcont Htx]").
     all: try lkbelow.
-    iIntros (CIDx) "%Hchain". iSpecialize ("Hcont" $! CIDx with "[%]"); [exact Hchain|].
+    iIntros (CIDx) "%Hchain" Hlc. iSpecialize ("Hcont" $! CIDx with "[%] Hlc"); [exact Hchain|].
     iIntros (mf) "%Hcs Hsie Hcnt Hextc Hextm Hpc Hppid Hsb Hsl HopS".
     iDestruct (log_opSe_opS with "HopS") as "HopS".
     iDestruct (log_opS_op with "HopS Htx") as "Hop".

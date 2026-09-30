@@ -568,7 +568,7 @@ Section ProofMyproc.
               ltac:(vm_compute; discriminate)
               with "Hcg Hpc []").
     { iApply (mpi_30 with "Htext"). }
-    iIntros (CIDe6 Hse6) "Hcg Hpc".
+    iIntros (CIDe6 Hse6) "Hlc Hcg Hpc".
     assert (Hra_final : ret_pc (rget E4 (mword_of_int 1 : mword 5)) = ret_tgt).
     { rgne. rewrite HE4ra. reflexivity. }
     iEval (rewrite Hra_final) in "Hpc".
@@ -577,7 +577,7 @@ Section ProofMyproc.
        everything back to [Hcont]. *)
     iDestruct (cpu_own_transport CIDpp CIDe6 n eb p b ltac:(wp_next_chain)
                  with "Hown") as "Hown".
-    iSpecialize ("Hcont" $! CIDe6 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CIDe6 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! ms E4 with "[%] Hcg Hown Hpc [%]").
     { exact Hmsf. }
     (* callee_saved m E4  /\  E4!!!a0 = p *)

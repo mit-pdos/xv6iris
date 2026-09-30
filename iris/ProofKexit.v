@@ -491,14 +491,14 @@ Section KexitPro.
               R2 (K - 6)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (kxi_10 with "Htext"). }
-    iIntros (CID9 Hst9) "Hcg Hpc".
+    iIntros (CID9 Hst9) "Hlc Hcg Hpc".
     assert (Ha0_rg : rget (CID := CID8) R2 (mword_of_int 10 : mword 5) = R2 !!! Regidx (mword_of_int 10 : mword 5))
       by (rgne; reflexivity).
     iEval (rewrite Ha0_rg) in "Hcg".
     set (R3 := <[Regidx (mword_of_int 20 : mword 5) := regval_into_reg (add_vec zero_reg (R2 !!! Regidx (mword_of_int 10 : mword 5)))]> R2).
     assert (Hpp12 : add_vec_int (mword_of_int (KX + 0x10) : mword 64) 2 = mword_of_int (KX + 0x12)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp12) in "Hpc".
-    iSpecialize ("Hcont" $! CID9 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CID9 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! R3 with "[%] Hcg Hpc [Hc1 Hc2 Hc3 Hc4 Hc5 Hc6]").
     - split; [| split; [| intro r; apply rf_to_gmap_dom]].
       + rewrite /R3 upd_eq. unfold regval_into_reg. rewrite add_vec_zero_l.
@@ -767,7 +767,7 @@ Section KexitLoop.
                     Hcmpr ltac:(vm_compute; reflexivity)
                     with "Hcg Hpc []").
           { iApply (kxi_3a with "Htext"). }
-          iApply bi.later_intro. iIntros (CIDt2 Hst2) "Hcg Hpc".
+          iApply bi.later_intro. iIntros (CIDt2 Hst2) "Hlc Hcg Hpc".
           assert (Htgt4c : add_vec (mword_of_int (KX + 0x3a) : mword 64)
                              (sign_extend' 64 (mword_of_int 18 : mword 13)) = mword_of_int (KX + 0x4c))
             by (apply bv_eq; vm_compute; reflexivity).
@@ -788,7 +788,7 @@ Section KexitLoop.
           iDestruct "Hfrag" as (stsq) "[Hfrq _]".
           iAssert (fd_frags_any (pv_fdg (us_V Ut)))%I with "[Hfrq]" as "Hfrag";
             [by iExists stsq |].
-          iSpecialize ("Hqx" $! CIDt2 with "[%]"); [wp_next_chain|].
+          iSpecialize ("Hqx" $! CIDt2 with "[%] Hlc"); [wp_next_chain|].
           iApply ("Hqx" $! Mt38 Ut with "[%] [%] [%] [%] [%] [%] Hcg Hown Htce Hcce Hpc Hpriv Hfrag Hpenv Hfenv Hiru").
           * split; [exact HM19|]. split; [exact HM20|]. split; [exact HMsp|].
             exact HMdom.
@@ -806,7 +806,7 @@ Section KexitLoop.
                     Mt38 av b ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
                     Hcmpr with "Hcg Hpc []").
           { iApply (kxi_3a with "Htext"). }
-          iIntros (CIDt2 Hst2) "Hcg Hpc".
+          iIntros (CIDt2 Hst2) "Hlc Hcg Hpc".
           assert (HkS : (S fd < NOFILE)%nat).
           { destruct (Nat.lt_ge_cases (S fd) NOFILE) as [Hlt | Hge]; [exact Hlt|].
             assert (HeqN : S fd = NOFILE) by (unfold NOFILE in *; lia).
@@ -824,7 +824,7 @@ Section KexitLoop.
                        ltac:(rewrite Hbt; wp_next_chain) with "Htce") as "Htce".
           iDestruct (cpu_claim_ext_transport CIDt CIDt2 eb pj
                        ltac:(rewrite Hbt; wp_next_chain) with "Hcce") as "Hcce".
-          iSpecialize ("IHf" $! CIDt2 with "[%]"); [wp_next_chain|].
+          iSpecialize ("IHf" $! CIDt2 with "[%] Hlc"); [wp_next_chain|].
           iApply ("IHf" $! (S fd) Mt38 Ut with "[%] [%] [%] [%] Hqx Hcg Hown Htce Hcce Hpc Hpriv Hfrag Hpenv Hfenv Hiru").
           * unfold NOFILE in *; lia.
           * exact HkS.
@@ -881,7 +881,7 @@ Section KexitLoop.
                   Hzr ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc []").
         { iApply (kxi_40 with "Htext"). }
-        iApply bi.later_intro. iIntros (CIDm Hsm) "Hcg Hpc".
+        iApply bi.later_intro. iIntros (CIDm Hsm) "Hlc Hcg Hpc".
         assert (Htgt38 : add_vec (mword_of_int (KX + 0x40) : mword 64)
                            (sign_extend' 64 (sign_extend' 13 (concat_vec (mword_of_int 252 : mword 8) ('b"0"))))
                          = mword_of_int (KX + 0x38))
@@ -898,7 +898,7 @@ Section KexitLoop.
                      ltac:(rewrite Hb; wp_next_chain) with "Htce") as "Htce".
         iDestruct (cpu_claim_ext_transport CIDk CIDm eb pj
                      ltac:(rewrite Hb; wp_next_chain) with "Hcce") as "Hcce".
-        iSpecialize ("Htail" $! CIDm with "[%]"); [wp_next_chain|].
+        iSpecialize ("Htail" $! CIDm with "[%] Hlc"); [wp_next_chain|].
         iApply ("Htail" $! M3e U with "[%] [%] Hcg Hown Htce Hcce Hpc Hpriv Hfrag Hpenv Hfenv Hiru").
         + split; [exact HM3e_9|]. split; [exact HM3e_18|]. split; [exact HM3e_19|].
           split; [exact HM3e_20|]. split; [exact HM3e_sp|].
@@ -1034,7 +1034,7 @@ Section KexitLoop.
                   with "Hcg Hpc []").
         { iApply (kxi_4a with "Htext"). }
         iApply bi.later_intro.
-        iIntros (CIDr Hsr). iIntros "Hcg Hpc".
+        iIntros (CIDr Hsr) "Hlc". iIntros "Hcg Hpc".
         assert (Htgt38 : add_vec (mword_of_int (KX + 0x4a) : mword 64)
                            (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 2039 : mword 11) ('b"0"))))
                          = mword_of_int (KX + 0x38))
@@ -1046,7 +1046,7 @@ Section KexitLoop.
                      ltac:(rewrite Hb; wp_next_chain) with "Htce") as "Htce".
         iDestruct (cpu_claim_ext_transport CIDo CIDr eb pj
                      ltac:(rewrite Hb; wp_next_chain) with "Hcce") as "Hcce".
-        iSpecialize ("Htail" $! CIDr with "[%]"); [wp_next_chain|].
+        iSpecialize ("Htail" $! CIDr with "[%] Hlc"); [wp_next_chain|].
         iApply ("Htail" $! mr (us_ofile (upd_usV U (upd_ev (us_V U) kev)) fd (zero_reg : mword 64))
                   with "[%] [%] Hcg Hown Htce Hcce Hpc Hpriv Hfrag Hpenv Hfenv Hiru").
         + split; [exact Hmr9|]. split; [exact Hmr18|]. split; [exact Hmr19|].

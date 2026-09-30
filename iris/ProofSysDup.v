@@ -291,7 +291,7 @@ Section ProofSysDup.
               ltac:(vm_compute; discriminate)
               with "Hcg Hpc []").
     { iApply (sdi_44 with "Htext"). }
-    iIntros (CIDt4 Hkt4) "Hcg Hpc".
+    iIntros (CIDt4 Hkt4) "Hlc Hcg Hpc".
     iEval (rewrite (rget_ne (CID := CIDt3) T3 Rra ltac:(vm_compute; discriminate))) in "Hpc".
     iEval (rewrite HT3ra) in "Hpc".
     (* ---- the postcondition ---- *)
@@ -316,7 +316,7 @@ Section ProofSysDup.
       rewrite /T1 upd_ne; [| congruence].
       rewrite /T0 upd_ne; [| congruence].
       apply Hthr; assumption. }
-    iSpecialize ("Hcont" $! CIDt4 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CIDt4 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! T3 with "[%] Hcg Hpc").
     split; [| exact HT3a0].
     unfold callee_saved.
@@ -609,11 +609,11 @@ Section ProofSysDup.
                 sp0 ra0 s00 u3 u4 w5 w6 p b
                 ltac:(lia) eq_refl eq_refl eq_refl HB1sp HB1a5 HB1thr
                 with "Hcg Htext Hpc Hs1 Hs2 Hs3 Hs4 Hs5 Hs6").
-      iIntros (CIDz1 Hkz1 Fz1) "%HcsF Hcg Hpc".
+      iIntros (CIDz1 Hkz1) "Hlc". iIntros (Fz1) "%HcsF Hcg Hpc".
       destruct HcsF as [HcsF HFa0].
       iDestruct (cpu_own_transport CID9 CIDz1 n eb p b ltac:(wp_next_chain) with "Hcpu")
       as "Hcpu".
-    iSpecialize ("Hcont" $! CIDz1 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CIDz1 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! Fz1 with "[%] Hcg Hcpu Hpc [Hpriv Hfrag]"); [exact HcsF|].
       rewrite /sys_dup_post. iLeft. iSplitR; [| iFrame "Hpriv Hfrag"].
       iPureIntro. split; [exact HFa0 | exact Hnone]. }
@@ -914,11 +914,11 @@ Section ProofSysDup.
                 sp0 ra0 s00 (m !!! Regidx Rs1) (m !!! Regidx Rs2) fv w6 p b
                 ltac:(lia) eq_refl eq_refl eq_refl HF2sp HF2a5 HF2thr
                 with "Hcg Htext Hpc Hs1 Hs2 Hs3 Hs4 Hs5 Hs6").
-      iIntros (CIDz2 Hkz2 Fz2) "%HcsF Hcg Hpc".
+      iIntros (CIDz2 Hkz2) "Hlc". iIntros (Fz2) "%HcsF Hcg Hpc".
       destruct HcsF as [HcsF HFa0].
       iDestruct (cpu_own_transport CID17 CIDz2 n eb p b ltac:(wp_next_chain) with "Hcpu")
       as "Hcpu".
-    iSpecialize ("Hcont" $! CIDz2 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CIDz2 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! Fz2 with "[%] Hcg Hcpu Hpc [Hpriv Hfrag]"); [exact HcsF|].
       rewrite /sys_dup_post. iRight. iLeft.
       iExists fd0, fv. iSplitR; [| iFrame "Hpriv Hfrag"].
@@ -1142,11 +1142,11 @@ Section ProofSysDup.
               sp0 ra0 s00 (m !!! Regidx Rs1) (m !!! Regidx Rs2) fv w6 p b
               ltac:(lia) eq_refl eq_refl eq_refl HG6sp HG6a5 HG6thr
               with "Hcg Htext Hpc Hs1 Hs2 Hs3 Hs4 Hs5 Hs6").
-    iIntros (CIDz3 Hkz3 Fz3) "%HcsF Hcg Hpc".
+    iIntros (CIDz3 Hkz3) "Hlc". iIntros (Fz3) "%HcsF Hcg Hpc".
     destruct HcsF as [HcsF HFa0].
     iDestruct (cpu_own_transport CID23 CIDz3 n eb p b ltac:(wp_next_chain) with "Hcpu")
       as "Hcpu".
-    iSpecialize ("Hcont" $! CIDz3 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CIDz3 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! Fz3 with "[%] Hcg Hcpu Hpc [Hpriv Hfrag]"); [exact HcsF|].
     rewrite /sys_dup_post. iRight. iRight.
     iExists fd0, fd1, fv, l. iSplitR.

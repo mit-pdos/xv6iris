@@ -458,7 +458,7 @@ Section FsinitEpilogue.
     iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.fsinit + 0x62)) Rra P5 K b
               ltac:(nz) with "Hcg Hpc []").
     { iApply (fsi_62 with "Htext"). }
-    iIntros (CID6 Hq6) "Hcg Hpc".
+    iIntros (CID6 Hq6) "Hlc Hcg Hpc".
     iEval (rgne) in "Hpc".
     assert (Hretf : ret_pc (P5 !!! Regidx Rra : mword 64)
                     = ret_pc (m !!! Regidx Rra : mword 64))
@@ -514,7 +514,7 @@ Section FsinitEpilogue.
    iDestruct (cpu_claim_ext_transport CID0 CID6 eb (proc_addr j)
                 ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
     rewrite /fsi_cont.
-    iSpecialize ("Hcont" $! CID6 with "[%]"); [wp_next_chain |].
+    iSpecialize ("Hcont" $! CID6 with "[%] Hlc"); [wp_next_chain |].
     iApply ("Hcont" $! P5 with "[%] Hcg Hcnt Hextc Hclmc Hpc Hppid Hmg Hsz Hnb Hni
                                   Hnl Hls Hist Hbms Hlctx Hsl Hiref
                                   Hboot");

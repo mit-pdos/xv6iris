@@ -426,7 +426,7 @@ Section ProofSetkilled.
     iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.setkilled + 0x22)) sk_ra E3 av b
               ltac:(vm_compute; discriminate) with "Hcg Hpc []").
     { iApply (ski_22 with "Htext"). }
-    iIntros (CIDe7 Hse7) "Hcg Hpc".
+    iIntros (CIDe7 Hse7) "Hlc Hcg Hpc".
     iEval (rgne) in "Hpc".
     assert (Hretfin : ret_pc (E3 !!! Regidx sk_ra) = ret_tgt) by (rewrite HE3ra; reflexivity).
     iEval (rewrite Hretfin) in "Hpc".
@@ -463,7 +463,7 @@ Section ProofSetkilled.
       rewrite /M1 upd_ne; [| congruence]. reflexivity. }
     iDestruct (cpu_own_transport CIDrel CIDe7 n eb p b ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
-    iSpecialize ("Hcont" $! CIDe7 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CIDe7 with "[%] Hlc"); [wp_next_chain|].
     (* ...AND THE SIDE THE WRITE DID NOT SPEND (design/pipe.md, "The exit
        path"): a third-party killer gets its taint back (persistent), a
        self-kill its own death payload -- the row it founded is the SPENT

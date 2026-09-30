@@ -390,10 +390,10 @@ Section ProofUvmunmap.
     iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.uvmunmap + 0x88)) Rra E8 K b
               ltac:(vm_compute; discriminate) with "Hcg Hpc []").
     { iApply (uui_88 with "Htext"). }
-    iIntros (CID9 Hs9) "Hcg Hpc".
+    iIntros (CID9 Hs9) "Hlc Hcg Hpc".
     iEval (rgne) in "Hpc".
     iEval (rewrite HE8ra) in "Hpc".
-    iSpecialize ("Hcont" $! CID9 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CID9 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! E8 with "Hcg Hpc [%]").
     unfold callee_saved. split_and!.
     - (* sp *) rewrite /E8 upd_eq. rewrite Hwv. symmetry. exact Hmmsp.
@@ -629,7 +629,7 @@ Section ProofUvmunmap.
                   Hcmp ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc []").
         { iApply (uui_4c with "Htext"). }
-        iApply bi.later_intro. iIntros (CIDv Hsv) "Hcg Hpc".
+        iApply bi.later_intro. iIntros (CIDv Hsv) "Hlc Hcg Hpc".
         assert (Htgt76 : add_vec (mword_of_int (KernelSyms.uvmunmap + 0x4c) : mword 64)
                   (sign_extend' 64 (mword_of_int 42 : mword 13))
                 = mword_of_int (KernelSyms.uvmunmap + 0x76)) by (apply bv_eq; vm_compute; reflexivity).
@@ -643,7 +643,7 @@ Section ProofUvmunmap.
                      Htview Htrep Htbase with "Hptree") as "Hpt".
         iDestruct (cpu_own_transport CIDt CIDv ilvl eb p b ltac:(wp_next_chain)
                      with "Hcnt") as "Hcnt".
-        iSpecialize ("Hcont" $! CIDv with "[%]"); [wp_next_chain|].
+        iSpecialize ("Hcont" $! CIDv with "[%] Hlc"); [wp_next_chain|].
         iApply ("Hcont" $! T1 with "[%] [%] Hcg Hcnt Hpc Hpt Hown").
         - exact HT1sp.
         - exact HT1thr. }
@@ -821,13 +821,13 @@ Section ProofUvmunmap.
                 Hbz ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (uui_5c with "Htext"). }
-      iApply bi.later_intro. iIntros (CIDz Hsz) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CIDz Hsz) "Hlc Hcg Hpc".
       iEval (rewrite Htgt4a) in "Hpc".
       destruct (uu_step_absent df fx um m_ad (svpn_of va) done
                   Hwf Hfx Hvok Hview Hnone) as (HstepF & Hstep).
       iDestruct (cpu_own_transport CID0 CIDz ilvl eb p b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
-      iSpecialize ("TAIL" $! CIDz with "[%]"); [wp_next_chain|].
+      iSpecialize ("TAIL" $! CIDz with "[%] Hlc"); [wp_next_chain|].
       iApply ("TAIL" $! B1 t m_ad with "[%] Hcg Hcnt Hpc Hptree [Hown]").
       { split_and!; try assumption; try exact Hbase.
         rewrite HstepF Hstep. exact Hview. }
@@ -928,13 +928,13 @@ Section ProofUvmunmap.
                 Hbz ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (uui_64 with "Htext"). }
-      iApply bi.later_intro. iIntros (CIDz4 Hsz4) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CIDz4 Hsz4) "Hlc Hcg Hpc".
       iEval (rewrite Htgt4a') in "Hpc".
       destruct (uu_step_absent df fx um m_ad (svpn_of va) done
                   Hwf Hfx Hvok Hview Hnone) as (HstepF & Hstep).
       iDestruct (cpu_own_transport CID0 CIDz4 ilvl eb p b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
-      iSpecialize ("TAIL" $! CIDz4 with "[%]"); [wp_next_chain|].
+      iSpecialize ("TAIL" $! CIDz4 with "[%] Hlc"); [wp_next_chain|].
       iApply ("TAIL" $! B3 t m_ad with "[%] Hcg Hcnt Hpc Hptree [Hown]").
       { split_and!; try assumption; try exact Hbase.
         rewrite HstepF Hstep. exact Hview. }
@@ -995,7 +995,7 @@ Section ProofUvmunmap.
                 with "Hcg Hpc [] [Hcell]").
       { iApply (uui_46 with "Htext"). }
       { iEval (rewrite Hzoff; rgne; rewrite Hss1 Ha0v). iExact "Hcell". }
-      iIntros (CIDk3 Hsk3) "Hcg Hpc Hcell".
+      iIntros (CIDk3 Hsk3) "Hlc Hcg Hpc Hcell".
       iEval (rewrite Hzoff; rgne; rewrite Hss1 Ha0v) in "Hcell".
       assert (Hzr : (zero_reg : mword 64) = mword_of_int 0)
         by (apply bv_eq; vm_compute; reflexivity).
@@ -1020,7 +1020,7 @@ Section ProofUvmunmap.
                  Hwf Hfx Hvok Hview). }
       iDestruct (cpu_own_transport CIDs CIDk3 ilvl eb p b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
-      iSpecialize ("TAIL" $! CIDk3 with "[%]"); [wp_next_chain|].
+      iSpecialize ("TAIL" $! CIDk3 with "[%] Hlc"); [wp_next_chain|].
       iApply ("TAIL" $! ms (ptree_set_leaf t (vpn_at (svpn_of va) done) (mword_of_int 0))
                           (delete (vpn_at (svpn_of va) done) m_ad)
                 with "[%] Hcg Hcnt Hpc Hptree [Hown]").
@@ -1043,14 +1043,14 @@ Section ProofUvmunmap.
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (uui_66 with "Htext"). }
-      iApply bi.later_intro. iIntros (CIDz6 Hsz6) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CIDz6 Hsz6) "Hlc Hcg Hpc".
       assert (Htgt46' : add_vec (mword_of_int (KernelSyms.uvmunmap + 0x66) : mword 64)
                 (sign_extend' 64 (mword_of_int 8160 : mword 13))
               = mword_of_int (KernelSyms.uvmunmap + 0x46)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgt46') in "Hpc".
       iDestruct (cpu_own_transport CID0 CIDz6 ilvl eb p b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
-      iSpecialize ("STORE" $! CIDz6 with "[%]"); [wp_next_chain|].
+      iSpecialize ("STORE" $! CIDz6 with "[%] Hlc"); [wp_next_chain|].
       iApply ("STORE" $! B3 with "[%] Hcg Hcnt Hpc Hptree [Hown]").
       { split_and!; assumption. }
       { iApply ("HSKIP" $! done with "[%] [%] Hown"); [lia | reflexivity]. } }
@@ -1199,7 +1199,7 @@ Section ProofUvmunmap.
               mk (K - 8) b ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (uui_74 with "Htext"). }
-    iApply bi.later_intro. iIntros (CIDk2 Hsk2). iIntros "Hcg Hpc".
+    iApply bi.later_intro. iIntros (CIDk2 Hsk2) "Hlc". iIntros "Hcg Hpc".
     assert (Htgt46 : add_vec (mword_of_int (KernelSyms.uvmunmap + 0x74) : mword 64)
               (sign_extend' 64 (sign_extend' 21
                  (concat_vec (mword_of_int 2025 : mword 11) ('b"0"))))
@@ -1207,7 +1207,7 @@ Section ProofUvmunmap.
     iEval (rewrite Htgt46) in "Hpc".
     iDestruct (cpu_own_transport CIDk1 CIDk2 ilvl eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iSpecialize ("STORE" $! CIDk2 with "[%]"); [wp_next_chain|].
+    iSpecialize ("STORE" $! CIDk2 with "[%] Hlc"); [wp_next_chain|].
     iApply ("STORE" $! mk with "[%] Hcg Hcnt Hpc Hptree [Hown]").
     { split_and!; assumption. }
     { iExact "Hown". }
@@ -1577,10 +1577,10 @@ Section ProofUvmunmap.
       iApply (uu_epilogue mm R9 K sp0 b p ltac:(lia) Hspm HR9sp HR9thr1
                 with "Hcg Htext Hpc Hk1 Hk2 [Hk3] Hk4 Hk5 Hk6 Hk7 Hk8").
       { iExists u3. iExact "Hk3". }
-      iIntros (CIDr2 Hsr2 mf) "Hcg Hpc %Hcs".
+      iIntros (CIDr2 Hsr2) "Hlc". iIntros (mf) "Hcg Hpc %Hcs".
       iDestruct (cpu_own_transport CID CIDr2 ilvl eb p b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
-      iSpecialize ("Hcont" $! CIDr2 with "[%]"); [wp_next_chain|].
+      iSpecialize ("Hcont" $! CIDr2 with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hcont" $! mf with "Hcg Hcnt Hpc [%] [Hpt] [Hown]").
       { exact Hcs. }
       { rewrite Hnp0. rewrite /uu_fx /uu_um.
@@ -1665,10 +1665,10 @@ Section ProofUvmunmap.
     iApply (uu_epilogue mm F1 K sp0 b p ltac:(lia) Hspm HF1sp HF1thr1
               with "Hcg Htext Hpc Hk1 Hk2 [Hk3] Hk4 Hk5 Hk6 Hk7 Hk8").
     { iExists (mm !!! Regidx Rs1). iExact "Hk3". }
-    iIntros (CIDr8 Hsr8 mf) "Hcg Hpc %Hcs".
+    iIntros (CIDr8 Hsr8) "Hlc". iIntros (mf) "Hcg Hpc %Hcs".
     iDestruct (cpu_own_transport CIDr6 CIDr8 ilvl eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iSpecialize ("Hcont" $! CIDr8 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CIDr8 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! mf with "Hcg Hcnt Hpc [%] Hpt Hown").
     exact Hcs.
   Qed.
@@ -1974,13 +1974,13 @@ Section SealUvmunmap.
               (uu_range_wide va npages Hrange) (uu_side_user va npages Hrz) Hbelow
               with "HPEEL HSKIP Hcg Hcnt Htext Hpc Hpt [Hm] Henv").
     { iExists M1. iSplitR; [iPureIntro; exact Hsub1 |]. iExact "Hm". }
-    iIntros (CID1 Hs1 mr) "Hcg Hcnt Hpc %Hcs Hpt Hown".
+    iIntros (CID1 Hs1) "Hlc". iIntros (mr) "Hcg Hcnt Hpc %Hcs Hpt Hown".
     iDestruct "Hown" as (M') "[%Hsub' Hm]".
     iDestruct (umem_lazy_dom with "Hm") as %HdomM'.
     assert (HM' : M' = umem_del M (bv_unsigned va) (4096 * npages))
       by (exact (uu_mem_pin P va npages sz szn M M' Halign Hrz38 HliveZ
                    Hsub' HdomM HdomM')).
-    iSpecialize ("Hcont" $! CID1 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CID1 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! mr with "Hcg Hcnt Hpc [%] [Hpt Hm]").
     { exact Hcs. }
     rewrite uint_unsigned. rewrite <- HM'.
@@ -2119,8 +2119,8 @@ Section SealUvmunmap.
               (uu_range_wide va npages Hrange) (uu_side_user va npages Hrz) Hbelow
               with "HPEEL HSKIP Hcg Hcnt Htext Hpc Hpt [Hm] Henv").
     { rewrite Nat.mul_0_r. cbn [umem_write]. iExact "Hm". }
-    iIntros (CID1 Hs1 mr) "Hcg Hcnt Hpc %Hcs Hpt Hm".
-    iSpecialize ("Hcont" $! CID1 with "[%]"); [wp_next_chain|].
+    iIntros (CID1 Hs1) "Hlc". iIntros (mr) "Hcg Hcnt Hpc %Hcs Hpt Hm".
+    iSpecialize ("Hcont" $! CID1 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! mr with "Hcg Hcnt Hpc [%] [Hpt Hm]").
     { exact Hcs. }
     rewrite uint_unsigned.
@@ -2175,9 +2175,9 @@ Section SealUvmunmapBare.
               HK Hilvl Hroot Hval Hnpr Hdf
               (uu_range_wide va npages Hrange) (uu_side_user va npages Hrz) Hbelow
               with "HPEEL HSKIP Hcg Hcnt Htext Hpc Hpt Hown Henv").
-    iIntros (CID1 Hs1 mr) "Hcg Hcnt Hpc %Hcs Hpt Hown".
+    iIntros (CID1 Hs1) "Hlc". iIntros (mr) "Hcg Hcnt Hpc %Hcs Hpt Hown".
     iDestruct (uptg_join with "Hpt Hown") as "Hpt".
-    iSpecialize ("Hcont" $! CID1 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CID1 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! mr with "Hcg Hcnt Hpc [%] [Hpt]").
     { exact Hcs. }
     rewrite /bare_pt. iExact "Hpt".
@@ -2236,9 +2236,9 @@ Section SealUvmunmapFixed.
               HK Hilvl Hroot Hval
               ltac:(rewrite Hnpr; reflexivity) Hdf Hrange Hside I
               with "HPEEL HSKIP Hcg Hcnt Htext Hpc Hpt Hown Henv").
-    iIntros (CID1 Hs1 mr) "Hcg Hcnt Hpc %Hcs Hpt Hown".
+    iIntros (CID1 Hs1) "Hlc". iIntros (mr) "Hcg Hcnt Hpc %Hcs Hpt Hown".
     iDestruct (uptg_join with "Hpt Hown") as "Hpt".
-    iSpecialize ("Hcont" $! CID1 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CID1 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! mr with "Hcg Hcnt Hpc [%] [Hpt]").
     { exact Hcs. }
     (* [uu_fx false fx vpn0 1] is [delete (vpn_at vpn0 0) fx]; [uu_um false]

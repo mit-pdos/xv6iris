@@ -464,9 +464,9 @@ Section ProofUvmclear.
               ltac:(vm_compute; discriminate)
               with "Hcg Hpc []").
     { iApply (ucli_1c with "Htext"). }
-    iIntros (CID15 Hs15) "Hcg Hpc".
+    iIntros (CID15 Hs15) "Hlc Hcg Hpc".
     iEval (rgne; rewrite HE3ra) in "Hpc".
-    iSpecialize ("Hcont" $! CID15 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CID15 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! E3 with "Hcg Hpc [%] Hpt").
     (* callee_saved mm E3 *)
     unfold callee_saved. split_and!.

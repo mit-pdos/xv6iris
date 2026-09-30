@@ -897,7 +897,7 @@ Section BmapEpilogue.
     iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.bmap + 0x98)) Rra P6 K b ltac:(nz)
               with "Hcg Hpc []").
     { iApply (bmi_98 with "Htext"). }
-    iIntros (CID8 Hq8) "Hcg Hpc".
+    iIntros (CID8 Hq8) "Hlc Hcg Hpc".
     iEval (rgne) in "Hpc".
     assert (Hretf : ret_pc (P6 !!! Regidx Rra : mword 64)
                     = ret_pc (m !!! Regidx Rra : mword 64))
@@ -954,7 +954,7 @@ Section BmapEpilogue.
     iDestruct (cpu_claim_ext_transport CID0 CID8 eb (proc_addr j)
                  ltac:(rewrite Heb2b; wp_next_chain) with "Hextm") as "Hextm".
     rewrite /bm_cont.
-    iSpecialize ("Hcont" $! CID8 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CID8 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! P6 bm' n' data' Sb' with "[%] [%] [%] [%] [%] [%] Hcg Hcnt Hextc Hextm Hpc
                      Hppid Hidev Hmap [%] Hblocks Hsl [%] Hkit").
     { unfold callee_saved. split_and!; assumption. }
@@ -3648,7 +3648,7 @@ Section BmapSeal.
                     Hprocs Hdevi Hdgeom Hdlock Hsl1 Hkit [Hcont Htx]").
     all: try lkbelow.
     iEval (rewrite /wp_next).
-    iIntros (CIDf) "%Hchain".
+    iIntros (CIDf) "%Hchain" Hlc.
     iIntros (mf bm' n' data' Sb') "%Hcs %Hwf' %Hag %Hkeep %Hnoal %Harm
               Hcg Hcnt Hextc Hextm Hpc Hppid Hidev Hmap %Hdat Hblocks Hsl1 %Hled Hkit".
     iDestruct (inode_map_q_1_of _ _ _ _ eq_refl with "Hmap") as "Hmap".
@@ -3657,7 +3657,7 @@ Section BmapSeal.
                  dev n' Sb' eq_refl with "Hkit")
       as "(_ & _ & Hsl2 & Hop & Hsbsz & Hsbbm & _)".
     iDestruct (bm_slots_join 1 2 with "Hsl1 Hsl2") as "Hsl".
-    iSpecialize ("Hcont" $! CIDf with "[%]"); [exact Hchain|].
+    iSpecialize ("Hcont" $! CIDf with "[%] Hlc"); [exact Hchain|].
     iApply ("Hcont" $! mf bm' n' data'
               with "[%] [%] [%] [%] [%] Hcg Hcnt Hextc Hextm Hpc Hppid Hsbsz Hsbbm Hidev Hmap [%] Hblocks [Hsl] [%] [Hop Htx]").
     { exact Hcs. }
@@ -3732,7 +3732,7 @@ Section BmapSeal.
                     Hprocs Hdevi Hdgeom Hdlock Hsl1 Hkit [Hcont]").
     all: try lkbelow.
     iEval (rewrite /wp_next).
-    iIntros (CIDf) "%Hchain".
+    iIntros (CIDf) "%Hchain" Hlc.
     iIntros (mf bm' n' data' Sb') "%Hcs %Hwf' %Hag %Hkeep %Hnoal %Harm
               Hcg Hcnt Hextc Hextm Hpc Hppid Hidev Hmap %Hdat Hblocks Hsl1 %Hled Hkit".
     iDestruct (inode_map_q_1_of _ _ _ _ eq_refl with "Hmap") as "Hmap".
@@ -3741,7 +3741,7 @@ Section BmapSeal.
                  dev n' Sb' eq_refl with "Hkit")
       as "(_ & _ & Hsl2 & Hop & Hsbsz & Hsbbm & _)".
     iDestruct (bm_slots_join 1 2 with "Hsl1 Hsl2") as "Hsl".
-    iSpecialize ("Hcont" $! CIDf with "[%]"); [exact Hchain|].
+    iSpecialize ("Hcont" $! CIDf with "[%] Hlc"); [exact Hchain|].
     iApply ("Hcont" $! mf bm' n' data' Sb'
               with "[%] [%] [%] [%] [%] Hcg Hcnt Hextc Hextm Hpc Hppid Hsbsz Hsbbm Hidev Hmap [%] Hblocks [Hsl] [%] Hop").
     { exact Hcs. }
@@ -3806,7 +3806,7 @@ Section BmapNoallocSeal.
     { iApply bm_prk_none. }
     { iApply bm_kit_none. }
     iEval (rewrite /wp_next).
-    iIntros (CIDf) "%Hchain".
+    iIntros (CIDf) "%Hchain" Hlc.
     iIntros (mf bm' n' data' Sb') "%Hcs %Hwf' %Hag %Hkeep %Hnoal %Harm
               Hcg Hcnt Hextc Hextm Hpc Hppid Hidev Hmap %Hdat Hblocks Hsl %Hbud Hkit".
     (* NOTHING MOVED: that is the whole content of the no-alloc contract *)
@@ -3815,7 +3815,7 @@ Section BmapNoallocSeal.
     assert (Ha0f : mf !!! Regidx (mword_of_int 10 : mword 5)
                    = sign_extend' 64 (blkmap_get bm fbn : mword 32)).
     { destruct Harm as [[_ Hz] | [He _]]; [exfalso; exact (Hnz Hz) | exact He]. }
-    iSpecialize ("Hcont" $! CIDf with "[%]"); [exact Hchain|].
+    iSpecialize ("Hcont" $! CIDf with "[%] Hlc"); [exact Hchain|].
     iApply ("Hcont" $! mf with "[%] [%] Hcg Hcnt Hextc Hextm Hpc Hppid Hidev
               Hmap Hblocks [Hsl]").
     { exact Hcs. }

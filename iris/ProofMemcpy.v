@@ -193,7 +193,7 @@ Section ProofMemcpy.
     iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.memcpy + 0x12)) Rra T3 K b
               ltac:(vm_compute; discriminate) with "Hcg Hpc []").
     { iApply (mcpi_12 with "Htext"). }
-    iIntros (CID4 Hs4) "Hcg Hpc".
+    iIntros (CID4 Hs4) "Hlc Hcg Hpc".
     iEval (rewrite HT3ra') in "Hpc".
     (* ---- postcondition ---- *)
     assert (HT3a0 : T3 !!! Regidx Ra0 = rv).
@@ -206,7 +206,7 @@ Section ProofMemcpy.
       rewrite /T2 upd_ne; [| intro He; injection He as He'; congruence].
       rewrite /T1 upd_ne; [| apply cs_ne; [vm_compute; reflexivity | exact Hr]].
       apply Hthr; assumption. }
-    iSpecialize ("Hcont" $! CID4 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CID4 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! T3 with "[%] Hcg Hpc").
     split; [| exact HT3a0].
     unfold callee_saved. split_and!.
@@ -378,8 +378,8 @@ Section ProofMemcpy.
               ltac:(lia) ltac:(reflexivity) ltac:(reflexivity) ltac:(reflexivity)
               HmMsp HmMa0' HmMthr
               with "Hcg Htext Hpc Hb1 Hb2").
-    iIntros (CID7 Hs7 mf) "[%Hcs %Hfa0] Hcg Hpc".
-    iSpecialize ("Hcont" $! CID7 with "[%]"); [wp_next_chain|].
+    iIntros (CID7 Hs7) "Hlc". iIntros (mf) "[%Hcs %Hfa0] Hcg Hpc".
+    iSpecialize ("Hcont" $! CID7 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! mf with "Hcg Hpc Hsrc Hdst [%] [%]").
     - exact Hfa0.
     - exact Hcs.

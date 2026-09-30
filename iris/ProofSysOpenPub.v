@@ -385,7 +385,7 @@ Section ProofSysOpenPub.
                     [Hkeep Hru Hfref Hflive Hflds Hfpn Hcoff Hiru Hcback Howe
                      Hsbb Hsbi Hbsl Hisl Hfds Hfrag Hauth Hpub Harm Hcont]").
     iEval (rewrite /wp_next).
-    iIntros (CIDy) "%Hqy". iIntros (mf) "%Hcsf %Ha0f Hcg Hown Htce Hcce Hpc
+    iIntros (CIDy) "%Hqy" Hlc. iIntros (mf) "%Hcsf %Ha0f Hcg Hown Htce Hcce Hpc
                                          Hpbare Hshr".
     iDestruct ("Hcback" with "Hpbare") as "Hcore".
     (* ---- THE PUBLICATION: one ghost step ---- *)
@@ -447,7 +447,7 @@ Section ProofSysOpenPub.
       destruct Htyt as [[Hct ->] | [Hct ->]]; cbn; by repeat split. }
     assert (Hpub : stpub = FdOpen (om_readable vom) (om_writable vom) t)
       by exact (fdstate_ok_inj inum g omo (fp_pipe pn) C stpub _ Hokpub Hstok).
-    iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain |].
+    iSpecialize ("Hcont" $! CIDy with "[%] Hlc"); [wp_next_chain |].
     iDestruct (iref_slots_combine nsj 1 with "Hisl Hiru") as "Hisl".
     replace (nsj + 1)%nat with (S nsj) by lia.
     (* this arm lends nothing: the count it came in at (permit sweep L1b) *)

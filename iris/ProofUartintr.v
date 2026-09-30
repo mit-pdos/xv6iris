@@ -449,7 +449,7 @@ Section ProofUartintr.
     iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.uartintr + 0x7e)) Rra E4 av b ltac:(nz)
               with "Hcg Hpc []").
     { iApply (uii2_7e with "Ht"). }
-    iIntros (CID5 Hs5) "Hcg Hpc". iEval (rewrite HE4rg) in "Hpc".
+    iIntros (CID5 Hs5) "Hlc Hcg Hpc". iEval (rewrite HE4rg) in "Hpc".
     (* ---- callee_saved m0 E4 ---- *)
     assert (Hpeel : forall r : mword 5,
               r <> csp_rs1 -> r <> Rra -> r <> Rs0 -> r <> Rs1 ->
@@ -459,7 +459,7 @@ Section ProofUartintr.
       rewrite /E2 upd_ne; [| congruence]. rewrite /E1 upd_ne; [| congruence]. reflexivity. }
     iDestruct (cpu_own_transport CID0 CID5 lvl eb pme b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     rewrite /ui_ret_cont.
-    iSpecialize ("Hcont" $! CID5 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CID5 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! E4 with "[%] Hcg Hcnt Hpc Htok").
     split; [| intro r; apply rf_to_gmap_dom].
     unfold callee_saved.

@@ -276,7 +276,7 @@ Section ProofSysClose.
               ltac:(vm_compute; discriminate)
               with "Hcg Hpc []").
     { iApply (sci_42 with "Htext"). }
-    iIntros (CID5 Hs5) "Hcg Hpc".
+    iIntros (CID5 Hs5) "Hlc Hcg Hpc".
     iEval (rgne; rewrite HT4ra) in "Hpc".
     (* ---- the postcondition ---- *)
     assert (HT4sp : T4 !!! Regidx csp_rs1 = m !!! Regidx csp_rs1)
@@ -302,7 +302,7 @@ Section ProofSysClose.
       rewrite /T2 upd_ne; [| congruence].
       rewrite /T1 upd_ne; [| congruence].
       apply Hthr; assumption. }
-    iSpecialize ("Hcont" $! CID5 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CID5 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! T4 with "[%] Hcg Hpc").
     split; [| exact HT4a0].
     unfold callee_saved.
@@ -620,7 +620,7 @@ Section ProofSysClose.
       iApply (sc_tail (CID0 := CID11) m A7 av (mword_of_int (-1) : mword 64) sp0 ra0 s00 _ w4 b p
                 ltac:(lia) eq_refl eq_refl eq_refl HA7sp HA7a5 HthrA
                 with "Hcg Htext Hpc Hs1 Hs2 Hs3 Hfcell").
-      iIntros (CID12 Hs12 mf) "[%Hcsf %Hmfa0] Hcg Hpc".
+      iIntros (CID12 Hs12) "Hlc". iIntros (mf) "[%Hcsf %Hmfa0] Hcg Hpc".
       iDestruct (cpu_own_transport CID9 CID12 n eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
       (* [Hextc]/[Hextm] never moved: argfd does not mention them, so they
          rode along in the frame at the ENTRY hart.  ONE WIDE HOP from there,
@@ -629,7 +629,7 @@ Section ProofSysClose.
                    ltac:(rewrite Hb; wp_next_chain) with "Hextc") as "Hextc".
       iDestruct (cpu_claim_ext_transport CID CID12 eb p
                    ltac:(rewrite Hb; wp_next_chain) with "Hextm") as "Hextm".
-      iSpecialize ("Hcont" $! CID12 with "[%]"); [wp_next_chain|].
+      iSpecialize ("Hcont" $! CID12 with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hcont" $! mf (pv_ev (us_V U)) with "[%] [%] Hcg Hcpu Hextc Hextm Hpc [Hpriv Hfrag] [Hcpay] [Hpenv] Hfenv Hiru");
         [exact Hcsf| lia | | |].
       { rewrite upd_ev_id upd_usV_id /sys_close_post. iLeft. iFrame "Hpriv Hfrag". iPureIntro.
@@ -966,7 +966,7 @@ Section ProofSysClose.
       iApply (sc_tail (CID0 := CID22) m R8 av (zero_reg : mword 64) sp0 ra0 s00 _ fv b p
                 ltac:(lia) eq_refl eq_refl eq_refl HR8sp HR8a5 HthrR
                 with "Hcg Htext Hpc Hs1 Hs2 Hs3 Hfcell").
-      iIntros (CID23 Hs23 mf) "[%Hcsf %Hmfa0] Hcg Hpc".
+      iIntros (CID23 Hs23) "Hlc". iIntros (mf) "[%Hcsf %Hmfa0] Hcg Hpc".
       iDestruct (cpu_own_transport CID21 CID23 n eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
       (* fileclose gave the complement back re-indexed at its own return hart
          [CID21], so this hop starts THERE -- it does not have to span
@@ -976,7 +976,7 @@ Section ProofSysClose.
                    ltac:(rewrite Hb; wp_next_chain) with "Hextc") as "Hextc".
       iDestruct (cpu_claim_ext_transport CID21 CID23 eb p
                    ltac:(rewrite Hb; wp_next_chain) with "Hextm") as "Hextm".
-      iSpecialize ("Hcont" $! CID23 with "[%]"); [wp_next_chain|].
+      iSpecialize ("Hcont" $! CID23 with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hcont" $! mf kev with "[%] [%] Hcg Hcpu Hextc Hextm Hpc [Hpriv Hfrag] [Hcpost] Hpenv Hfenv Hiru");
         [exact Hcsf| exact Hkev | |].
       { rewrite /sys_close_post. iRight. iExists fd, fv. iFrame "Hpriv Hfrag". iPureIntro.

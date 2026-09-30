@@ -582,7 +582,7 @@ Section ProofFiledup.
     iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.filedup + 0x38)) Rra P5 K b
               ltac:(vm_compute; discriminate) with "Hcg Hpc []").
     { iApply (fdi_38 with "Htext"). }
-    iIntros (CIDe6 Hse6) "Hcg Hpc".
+    iIntros (CIDe6 Hse6) "Hlc Hcg Hpc".
     iEval (rgne) in "Hpc".
     assert (Hretf : ret_pc (P5 !!! Regidx Rra) = ret_tgt) by (rewrite HP5ra; reflexivity).
     iEval (rewrite Hretf) in "Hpc".
@@ -590,7 +590,7 @@ Section ProofFiledup.
        plain instructions have moved us to CIDe6. *)
     iDestruct (cpu_own_transport CIDr CIDe6 n eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iSpecialize ("Hcont" $! CIDe6 with "[]"); [ iPureIntro; wp_next_chain | ].
+    iSpecialize ("Hcont" $! CIDe6 with "[] Hlc"); [ iPureIntro; wp_next_chain | ].
     iApply ("Hcont" $! P5 with "Hcg Hcnt Hpc [%] Href1 Href2").
     (* callee_saved m P5, and a0 = f *)
     split; [| exact HP5a0].

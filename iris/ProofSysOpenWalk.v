@@ -526,10 +526,10 @@ Section ProofSysOpenWalk.
       { rewrite Heb /trap_csrs_ext. done. }
       { rewrite Heb /cpu_claim_ext. done. }
       iEval (rewrite /wp_next).
-      iIntros (CIDy) "%Hqy". iIntros (mf) "%Hcsf %Ha0f Hcg Hown Htce Hcce Hpc
+      iIntros (CIDy) "%Hqy" Hlc. iIntros (mf) "%Hcsf %Ha0f Hcg Hown Htce Hcce Hpc
                                            Hpbare".
       iDestruct ("Hpback2" with "Hpbare") as "Hpriv".
-      iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain |].
+      iSpecialize ("Hcont" $! CIDy with "[%] Hlc"); [wp_next_chain |].
       (* this arm lends nothing: the count it came in at (permit sweep L1b) *)
       iSpecialize ("Hcont" $! mf ns (pv_ev (us_V U))).
       iEval (rewrite upd_ev_id upd_usV_id) in "Hcont".
@@ -791,10 +791,10 @@ Section ProofSysOpenWalk.
                           (ns - 1)%nat dqb dqs (proc_addr jx) pidv Mim pvv vom U sts
                           P Pmiss Fo Ft m K eb b lks))
         with "[Hcont Hsbn Hsbs]" as "Hcontj".
-      { iEval (rewrite /wp_next). iIntros (CIDz) "%Hqz".
+      { iEval (rewrite /wp_next). iIntros (CIDz) "%Hqz" Hlc.
         iEval (rewrite /so_cont_au). iIntros (mf ns2 k2) "%Hcsf %Hns2 %Hk2".
         iIntros "Hcg Hown Htce Hcce Hpc Hsbb Hsbi Hbsl Hisl Hpost".
-        iSpecialize ("Hcont" $! CIDz with "[%]"); [wp_next_chain |].
+        iSpecialize ("Hcont" $! CIDz with "[%] Hlc"); [wp_next_chain |].
         iApply ("Hcont" $! mf ns2 k2 with "[%] [%] [%] Hcg Hown Htce Hcce Hpc
                   Hsbn Hsbi Hsbs Hsbb Hbsl Hisl Hpost").
         { exact Hcsf. }
@@ -887,10 +887,10 @@ Section ProofSysOpenWalk.
                           (ns - 1)%nat dqb dqs (proc_addr jx) pidv Mim pvv vom U sts
                           P Pmiss Fo Ft m K eb b lks))
         with "[Hcont Hsbn Hsbs]" as "Hcontj".
-      { iEval (rewrite /wp_next). iIntros (CIDz) "%Hqz".
+      { iEval (rewrite /wp_next). iIntros (CIDz) "%Hqz" Hlc.
         iEval (rewrite /so_cont_au). iIntros (mf ns2 k2) "%Hcsf %Hns2 %Hk2".
         iIntros "Hcg Hown Htce Hcce Hpc Hsbb Hsbi Hbsl Hisl Hpost".
-        iSpecialize ("Hcont" $! CIDz with "[%]"); [wp_next_chain |].
+        iSpecialize ("Hcont" $! CIDz with "[%] Hlc"); [wp_next_chain |].
         iApply ("Hcont" $! mf ns2 k2 with "[%] [%] [%] Hcg Hown Htce Hcce Hpc
                   Hsbn Hsbi Hsbs Hsbb Hbsl Hisl Hpost").
         { exact Hcsf. }
@@ -962,7 +962,7 @@ Section ProofSysOpenWalk.
     { rewrite Heb /trap_csrs_ext. done. }
     { rewrite Heb /cpu_claim_ext. done. }
     iEval (rewrite /wp_next).
-    iIntros (CIDy) "%Hqy". iIntros (mf)
+    iIntros (CIDy) "%Hqy" Hlc. iIntros (mf)
       "%Hcsf %Ha0f Hcg Hown Htce Hcce Hpc Hpbare Hsbb Hsbi Hbsl
        Hislot".
     iDestruct ("Hpback2" with "Hpbare") as "Hpriv".
@@ -970,7 +970,7 @@ Section ProofSysOpenWalk.
     iDestruct (iref_slots_combine 1 (ns - 1) with "Hislot Hisl") as "Hisl".
     assert (Hnsc : (1 + (ns - 1))%nat = ns) by lia.
     iEval (rewrite Hnsc) in "Hisl".
-    iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain |].
+    iSpecialize ("Hcont" $! CIDy with "[%] Hlc"); [wp_next_chain |].
     (* this arm lends nothing: the count it came in at (permit sweep L1b) *)
     iSpecialize ("Hcont" $! mf ns (pv_ev (us_V U))).
     iEval (rewrite upd_ev_id upd_usV_id) in "Hcont".

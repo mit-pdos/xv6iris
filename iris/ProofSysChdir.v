@@ -664,7 +664,7 @@ Section ProofSysChdirEpilogue.
     iApply (wp_cret_s_sconf (mword_of_int (SC + 0x64)) Rra M4 K b
               ltac:(nz) with "Hcg Hpc []").
     { iApply (schdi_64 with "Htext"). }
-    iIntros (CID5 Hq5) "Hcg Hpc".
+    iIntros (CID5 Hq5) "Hlc Hcg Hpc".
     iEval (rgne) in "Hpc".
     assert (Hretf : ret_pc (M4 !!! Regidx Rra : mword 64)
                     = ret_pc (m !!! Regidx Rra : mword 64))
@@ -689,7 +689,7 @@ Section ProofSysChdirEpilogue.
     assert (Hfin : sc_thr m M4).
     { intros c Hc N2 N8 N9 N18. rewrite /M4 upd_ne; [| regne].
       exact (HM3thr c Hc N2 N8 N9 N18). }
-    iSpecialize ("Hcont" $! CID5 with "[%]"); [wp_next_chain |].
+    iSpecialize ("Hcont" $! CID5 with "[%] Hlc"); [wp_next_chain |].
     iApply ("Hcont" $! M4 with "[%] [%] Hcg Hpc").
     { unfold callee_saved. split_and!;
         [ exact Csp | exact Cs0 | exact Cs1 | exact Cs2
@@ -874,14 +874,14 @@ Section ProofSysChdirM1Tail.
               HK20 Kpop Hsp0 HP1sp HP1thr HP1s1 Hal
               with "Hcg Htext Hpc Hf1 Hf2 Hf3 Hf4 Hbuf [Hown Htce Hcce Hpid Hcont]").
     iEval (rewrite /wp_next).
-    iIntros (CIDy) "%Hqy". iIntros (mf) "%Hcsf %Ha0f Hcg Hpc".
+    iIntros (CIDy) "%Hqy" Hlc. iIntros (mf) "%Hcsf %Ha0f Hcg Hpc".
     iDestruct (cpu_own_transport CID4 CIDy 0 eb (proc_addr jx) b
                  ltac:(wp_next_chain) with "Hown") as "Hown".
     iDestruct (trap_csrs_ext_transport CID4 CIDy eb (proc_addr jx)
                  ltac:(rewrite Hb; wp_next_chain) with "Htce") as "Htce".
     iDestruct (cpu_claim_ext_transport CID4 CIDy eb (proc_addr jx)
                  ltac:(rewrite Hb; wp_next_chain) with "Hcce") as "Hcce".
-    iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain |].
+    iSpecialize ("Hcont" $! CIDy with "[%] Hlc"); [wp_next_chain |].
     iApply ("Hcont" $! mf with "[%] [%] Hcg Hown Htce Hcce Hpc Hpid").
     { exact Hcsf. }
     { rewrite Ha0f. exact HP1a0. }
@@ -2093,10 +2093,10 @@ Section ProofSysChdirBody.
                     with "Hcg Htext Hpc Hf1 Hf2 Hf3 Hf4 Hbuf
                           [Hown Hbsl Hsbb Hsbi Hir Hpriv HP Hobs Hcont]").
           iEval (rewrite /wp_next).
-          iIntros (CIDz) "%Hqz". iIntros (mf) "%Hcsf %Ha0f Hcg Hpc".
+          iIntros (CIDz) "%Hqz" Hlc. iIntros (mf) "%Hcsf %Ha0f Hcg Hpc".
           iDestruct (cpu_own_transport CID35 CIDz 0 eb pj b
                        ltac:(wp_next_chain) with "Hown") as "Hown".
-          iSpecialize ("Hcont" $! CIDz with "[%]"); [wp_next_chain |].
+          iSpecialize ("Hcont" $! CIDz with "[%] Hlc"); [wp_next_chain |].
           iApply ("Hcont" $! mf P' kA with "[%] [%] [%] Hcg Hown [] [] Hpc Hbsl
                     Hsbb Hsbi Hir [Hpriv HP Hobs]").
           { exact Hcsf. }
@@ -2352,10 +2352,10 @@ Section ProofSysChdirBody.
                     with "Hcg Htext Hpc Hf1 Hf2 Hf3 Hf4 Hbuf
                           [Hown Hbsl Hsbb Hsbi Hir Hpriv HP Hobs Hcont]").
           iEval (rewrite /wp_next).
-          iIntros (CIDz) "%Hqz". iIntros (mf) "%Hcsf %Ha0f Hcg Hpc".
+          iIntros (CIDz) "%Hqz" Hlc. iIntros (mf) "%Hcsf %Ha0f Hcg Hpc".
           iDestruct (cpu_own_transport CID35 CIDz 0 eb pj b
                        ltac:(wp_next_chain) with "Hown") as "Hown".
-          iSpecialize ("Hcont" $! CIDz with "[%]"); [wp_next_chain |].
+          iSpecialize ("Hcont" $! CIDz with "[%] Hlc"); [wp_next_chain |].
           iApply ("Hcont" $! mf P' kA with "[%] [%] [%] Hcg Hown [] [] Hpc Hbsl
                     Hsbb Hsbi Hir [Hpriv HP Hobs]").
           { exact Hcsf. }
@@ -2429,7 +2429,7 @@ Section ProofSysChdirBody.
         { rewrite Heb /cpu_claim_ext. done. }
         { iApply (log_opS_op with "HopS Htx"). }
         iEval (rewrite /wp_next).
-        iIntros (CIDz) "%Hqz". iIntros (mf) "%Hcsf %Ha0f Hcg Hown _ _ Hpc Hpbare".
+        iIntros (CIDz) "%Hqz" Hlc. iIntros (mf) "%Hcsf %Ha0f Hcg Hown _ _ Hpc Hpbare".
         iDestruct (cwd_ref_at_of_held_at with "Hcwdref") as "Href".
         iAssert (proc_priv gf pj pid (us_upt (upd_usV U (upd_ev (us_V U) kA)) P'))
           with "[Hpbare Hofiles Href Hftok]" as "Hpriv".
@@ -2438,7 +2438,7 @@ Section ProofSysChdirBody.
           iSplitR "Href Hftok".
           - iSplitL "Hpbare"; [iExact "Hpbare" | iExact "Hofiles"].
           - iEval (cbn [upd_upt pv_cwd pv_fdg]). iFrame "Href Hftok". }
-        iSpecialize ("Hcont" $! CIDz with "[%]"); [wp_next_chain |].
+        iSpecialize ("Hcont" $! CIDz with "[%] Hlc"); [wp_next_chain |].
         iApply ("Hcont" $! mf P' kA with "[%] [%] [%] Hcg Hown [] [] Hpc Hbsl
                   Hsbb Hsbi Hir [Hpriv Hdead Hoc]").
         { exact Hcsf. }
@@ -2481,9 +2481,9 @@ Section ProofSysChdirBody.
       { rewrite Heb /trap_csrs_ext. done. }
       { rewrite Heb /cpu_claim_ext. done. }
       iEval (rewrite /wp_next).
-      iIntros (CIDz) "%Hqz". iIntros (mf) "%Hcsf %Ha0f Hcg Hown _ _ Hpc Hpbare".
+      iIntros (CIDz) "%Hqz" Hlc. iIntros (mf) "%Hcsf %Ha0f Hcg Hown _ _ Hpc Hpbare".
       iDestruct ("Hpback" with "Hpbare") as "Hpriv".
-      iSpecialize ("Hcont" $! CIDz with "[%]"); [wp_next_chain |].
+      iSpecialize ("Hcont" $! CIDz with "[%] Hlc"); [wp_next_chain |].
       iApply ("Hcont" $! mf P' kA with "[%] [%] [%] Hcg Hown [] [] Hpc Hbsl
                 Hsbb Hsbi Hir [Hpriv Hwp Hoc]").
       { exact Hcsf. }

@@ -1231,7 +1231,7 @@ Section CtBodies.
     iApply (wp_cret_s_sconf (mword_of_int (CT + 0x118)) Rra E4 K b
               ltac:(nz) with "Hcg Hpc []").
     { iApply (cnti_118 with "Ht"). }
-    iIntros (CIDr Hsr) "Hcg Hpc".
+    iIntros (CIDr Hsr) "Hlc Hcg Hpc".
     iEval (rewrite rget_ne; [| reg_neq]) in "Hpc".
     iEval (rewrite HE4ra) in "Hpc".
     assert (Hcs : callee_saved m0 E4).
@@ -1260,7 +1260,7 @@ Section CtBodies.
     iDestruct (cpu_own_transport CID CIDr lvl eb pme b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
     rewrite /ct_ret.
-    iSpecialize ("Hcont" $! CIDr with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CIDr with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! E4 with "[%] Hcg Hcnt Ht Hpc Hhiout Hlgh Hwin").
     split; [exact Hcs | intro r; apply rf_to_gmap_dom].
   Qed.
@@ -1853,7 +1853,7 @@ Section ProofConsoleintr.
       lkbelow. }
     iIntros "#Ht #Hpinv".
     rewrite /ct_wake_prop.
-    iIntros (CIDw Hsw M rr ww ee bs ts)
+    iIntros (CIDw Hsw) "Hlc". iIntros (M rr ww ee bs ts)
       "%Hsp %Ha2 %Hcs %Hlenb %Hlent %Hok %Hrow Hcg Hpc Hcnt Hpay Hlocked
        Hrc Hwc Hec Hdat Hts Hgh Hrest Hhiout Howed Hwin EXIT".
     (* +0x156 auipc a5,0x12 *)
@@ -1961,7 +1961,7 @@ Section ProofConsoleintr.
                          (concat_vec (mword_of_int 1997 : mword 11) ('b"0"))))
                     = mword_of_int (CT + 0x104)) by pcw.
     iEval (rewrite Hj104) in "Hpc".
-    iSpecialize ("EXIT" $! CIDw with "[%]"); [wp_next_chain|].
+    iSpecialize ("EXIT" $! CIDw with "[%] Hlc"); [wp_next_chain|].
     iApply ("EXIT" $! Mw with "[%] [%] Hcg Hpc Hcnt Hpay Hlocked Hres Hrest
               Hhiout Howed Hwin").
     - rewrite (Hthr csp_rs1 ltac:(vm_compute; reflexivity)). exact Hsp.

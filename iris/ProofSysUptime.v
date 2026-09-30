@@ -548,7 +548,7 @@ Section ProofSysUptime.
               ltac:(vm_compute; discriminate)
               with "Hcg Hpc []").
     { iApply (sui_3a with "Htext"). }
-    iIntros (CID17 Hs17) "Hcg Hpc".
+    iIntros (CID17 Hs17) "Hlc Hcg Hpc".
     assert (Hretfin : ret_pc (E4 !!! Regidx (mword_of_int 1 : mword 5)) = ret_tgt)
       by (rewrite HE4ra; reflexivity).
     iEval (rewrite Hretfin) in "Hpc".
@@ -597,7 +597,7 @@ Section ProofSysUptime.
       rewrite /A1 upd_ne; [| congruence].
       rewrite /A0 upd_ne; [| congruence]. reflexivity. }
     iDestruct (cpu_own_transport CID10 CID17 n eb p b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iSpecialize ("Hcont" $! CID17 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CID17 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! E4 t with "[%] [] Hcg Hcnt Hpc");
       [| iExists k; iFrame "Htklb"; iPureIntro; exact (ticks_tie_of_int t k Htie)].
     split; [| exact HE4a0].

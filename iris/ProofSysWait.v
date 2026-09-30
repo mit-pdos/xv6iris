@@ -389,7 +389,7 @@ Section ProofSysWait.
     iApply (wp_cret_s_sconf (mword_of_int (SW + 0x20)) Rra E2 av b
               ltac:(vm_compute; discriminate) with "Hcg Hpc []").
     { iApply (swi_20 with "Htext"). }
-    iIntros (CID15 Hk15) "Hcg Hpc".
+    iIntros (CID15 Hk15) "Hlc Hcg Hpc".
     iEval (rgne) in "Hpc".
     assert (Hretfin : ret_pc (E2 !!! Regidx Rra) = ret_tgt) by (rewrite HE2ra; reflexivity).
     iEval (rewrite Hretfin) in "Hpc".
@@ -422,7 +422,7 @@ Section ProofSysWait.
       rewrite /A1 upd_ne; [| congruence].
       rewrite /M1 upd_ne; [| congruence]. reflexivity. }
     iDestruct (cpu_own_transport CID11 CID15 0%nat eb pj b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-    iSpecialize ("Hcont" $! CID15 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CID15 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! E2 P' rv d xw cs' kev
               with "[%] [%] [%] [%] [%] Hans Hcg Hcpu Hpc [%] Hpriv Hmyrow").
     { split; [| exact HE2a0].

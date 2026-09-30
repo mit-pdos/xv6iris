@@ -230,8 +230,8 @@ Section WpSconfUartAccess.
         iModIntro. iFrame "Hs Hout Htx Hdl Hcol Hown". iIntros (_). iExact "Hlb".
       + iModIntro. iFrame "Hs Hout Htx Hdl Hcol Hown".
         iIntros (Hc). rewrite (uart_nothre_beqz u Hthre) in Hc. discriminate.
-    - iEval (rewrite /wp_next). iIntros (CID1 Hs1 bt) "Hcg Hpc [Hown Hlb]".
-      iSpecialize ("Hcont" $! CID1 with "[]"); [iPureIntro; exact Hs1|].
+    - iEval (rewrite /wp_next). iIntros (CID1 Hs1) "Hlc". iIntros (bt) "Hcg Hpc [Hown Hlb]".
+      iSpecialize ("Hcont" $! CID1 with "[] Hlc"); [iPureIntro; exact Hs1|].
       iApply ("Hcont" $! bt with "Hcg Hpc Hown Hlb").
   Qed.
 
@@ -330,8 +330,8 @@ Section WpSconfUartAccess.
                 ltac:(exact (proj1 (uart_read_stable _ _ _ _ Hread)))
                 ltac:(exact (uart_read_recv _ _ _ _ Hread))
                 with "Hcol").
-    - iEval (rewrite /wp_next). iIntros (CID1 Hs1 bt) "Hcg Hpc _".
-      iSpecialize ("Hcont" $! CID1 with "[]"); [iPureIntro; exact Hs1|].
+    - iEval (rewrite /wp_next). iIntros (CID1 Hs1) "Hlc". iIntros (bt) "Hcg Hpc _".
+      iSpecialize ("Hcont" $! CID1 with "[] Hlc"); [iPureIntro; exact Hs1|].
       iApply ("Hcont" $! bt with "Hcg Hpc").
   Qed.
 
@@ -436,8 +436,8 @@ Section WpSconfUartAccess.
       iEval (rewrite Hacc') in "Hown". iEval (rewrite Hacc') in "Hsent".
       iModIntro. rewrite /uart_ghosts.
       iFrame "Hs Hout Htx Hdl Hcol Hin Hown Hsent HΦ".
-    - iEval (rewrite /wp_next). iIntros (CID1 Hs1) "Hcg Hpc (Hown & Hsent & HΦ)".
-      iApply ("Hcont" $! CID1 with "[] Hcg Hpc Hown Hsent HΦ").
+    - iEval (rewrite /wp_next). iIntros (CID1 Hs1) "Hlc Hcg Hpc (Hown & Hsent & HΦ)".
+      iApply ("Hcont" $! CID1 with "[] Hlc Hcg Hpc Hown Hsent HΦ").
       iPureIntro. exact Hs1.
   Qed.
 
@@ -515,8 +515,8 @@ Section WpSconfUartAccess.
         iSplitL "Hcol"; [iExact "Hcol"|].
         iSplitL "Htok"; [iExact "Htok"|].
         iIntros (Hbit). rewrite (uart_nodr_beqz u Hdr) in Hbit. discriminate.
-    - iEval (rewrite /wp_next). iIntros (CID1 Hs1 bt) "Hcg Hpc [Htok Hlb]".
-      iSpecialize ("Hcont" $! CID1 with "[]"); [iPureIntro; exact Hs1|].
+    - iEval (rewrite /wp_next). iIntros (CID1 Hs1) "Hlc". iIntros (bt) "Hcg Hpc [Htok Hlb]".
+      iSpecialize ("Hcont" $! CID1 with "[] Hlc"); [iPureIntro; exact Hs1|].
       iApply ("Hcont" $! bt with "Hcg Hpc Htok Hlb").
   Qed.
 
@@ -607,8 +607,8 @@ Section WpSconfUartAccess.
       iExists hh. iFrame "Htg Hlbh Hwlb Htok". iPureIntro.
       split_and!; [exact He | exact Hx | exact Hbts | exact Hnum | exact Hanum
                   | exact Hshh].
-    - iEval (rewrite /wp_next). iIntros (CID1 Hs1 c) "Hcg Hpc Hh".
-      iSpecialize ("Hcont" $! CID1 with "[]"); [iPureIntro; exact Hs1|].
+    - iEval (rewrite /wp_next). iIntros (CID1 Hs1) "Hlc". iIntros (c) "Hcg Hpc Hh".
+      iSpecialize ("Hcont" $! CID1 with "[] Hlc"); [iPureIntro; exact Hs1|].
       iApply ("Hcont" $! c with "Hcg Hpc Hh").
   Qed.
 
@@ -705,8 +705,8 @@ Section WpSconfUartAccess.
         (* the clear found an EMPTY FIFO: nothing was discarded and the
            anchor did not move. *)
         iPureIntro. by left.
-    - iEval (rewrite /wp_next). iIntros (CID1 Hs1) "Hcg Hpc [Htok HS]".
-      iApply ("Hcont" $! CID1 with "[] Hcg Hpc Htok HS").
+    - iEval (rewrite /wp_next). iIntros (CID1 Hs1) "Hlc Hcg Hpc [Htok HS]".
+      iApply ("Hcont" $! CID1 with "[] Hlc Hcg Hpc Htok HS").
       iPureIntro. exact Hs1.
   Qed.
 

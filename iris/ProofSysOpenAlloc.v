@@ -453,7 +453,7 @@ Section ProofSysOpenAlloc.
                       HbP H23 H24
                       [Hpback Hfds Hfrag Hisl Hires HP Hobs Htc Hcont]").
       iEval (rewrite /wp_next).
-      iIntros (CIDy) "%Hqy". iIntros (mf)
+      iIntros (CIDy) "%Hqy" Hlc. iIntros (mf)
         "%Hcsf %Ha0f Hcg Hown Htce Hcce Hpc Hpbare Hsbb Hsbi
          Hbsl Hislot".
       iDestruct ("Hpback" with "Hpbare") as "Hpriv".
@@ -462,7 +462,7 @@ Section ProofSysOpenAlloc.
       iDestruct (iref_slots_combine (nsj - 1) 1 with "Hisl Hires") as "Hisl".
       iDestruct (iref_slots_combine (nsj - 1 + 1) 1 with "Hisl Hislot") as "Hisl".
       replace (nsj - 1 + 1 + 1)%nat with (S nsj) by lia.
-      iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain |].
+      iSpecialize ("Hcont" $! CIDy with "[%] Hlc"); [wp_next_chain |].
       (* this arm lends nothing: the count it came in at (permit sweep L1b) *)
       iSpecialize ("Hcont" $! mf (S nsj) (pv_ev (us_V U))).
       iEval (rewrite upd_ev_id upd_usV_id) in "Hcont".
@@ -644,7 +644,7 @@ Section ProofSysOpenAlloc.
          nothing ([SpecFileclose.fileclose_cpay_none]) *)
       { iApply fileclose_cpay_none. }
       iEval (rewrite /wp_next).
-      iIntros (CIDy) "%Hqy". iIntros (mf kev)
+      iIntros (CIDy) "%Hqy" Hlc. iIntros (mf kev)
         "%Hcsf %Ha0f %Hkev Hcg Hown Htce Hcce Hpc Hpbare Hsbb Hsbi
          Hbsl Hislot Hfds Hfout".
       iDestruct ("Hcback" $! kev with "Hpbare") as "Hcore".
@@ -653,7 +653,7 @@ Section ProofSysOpenAlloc.
          iput released.  With the one taken off the top, that is [S nsj]. *)
       iDestruct (iref_slots_combine (nsj - 1) 2 with "Hisl Hislot") as "Hisl".
       replace (nsj - 1 + 2)%nat with (S nsj) by lia.
-      iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain |].
+      iSpecialize ("Hcont" $! CIDy with "[%] Hlc"); [wp_next_chain |].
       iApply ("Hcont" $! mf (S nsj) kev with "[%] [%] [%] Hcg Hown Htce Hcce
                 Hpc Hsbb Hsbi Hbsl Hisl [Hpriv Hfds Hfrag HP Hobs Htc]").
       { exact Hcsf. }

@@ -454,7 +454,7 @@ Section ProofNameiparentMain.
     iApply (wp_cret_s_sconf (mword_of_int (NP + 0x16)) Rra P3 K b
               ltac:(nz) with "Hcg Hpc []").
     { iApply (npi_16 with "Htext"). }
-    iIntros (CID12 Hq12) "Hcg Hpc".
+    iIntros (CID12 Hq12) "Hlc Hcg Hpc".
     iEval (rgne) in "Hpc".
     assert (Hretf : ret_pc (P3 !!! Regidx Rra : mword 64)
                     = ret_pc (m !!! Regidx Rra : mword 64))
@@ -524,7 +524,7 @@ Section ProofNameiparentMain.
                  ltac:(try rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
     iDestruct (cpu_claim_ext_transport CID8 CID12 eb (proc_addr j)
                  ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
-    iSpecialize ("Hcont" $! CID12 with "[%]"); [wp_next_chain |].
+    iSpecialize ("Hcont" $! CID12 with "[%] Hlc"); [wp_next_chain |].
     iApply ("Hcont" $! P3 n' Sb' ok nf ipv w
               with "[%] Hcg Hcnt Hextc Hclmc Hpc Hbmap Hinos Hppid Hcwdr
                     Hpath Hname Hbslot [%] [%] [%] Hlog Hok").
@@ -574,11 +574,11 @@ Section ProofNameiparentMain.
               _ Upr HK Hroot Hnib0 Hlg Hsize Hbmap0 Hbmapcov Hbmaplog Hinos0 Hcovb Hiregb Hcstr Hplen (walk_need_counted L n Hbud) Hj Hgs
               with "Hcg Hcnt Hextc Hclmc Htext Hkd Hpc Hpenv Hbio Hlogc Hkenv Hitb2 Hitbl Hesc Hslks Hireg Hropen Hprocs Hdev Hgeom Hdlk Hbmap Hinos Hbits Hppid Hcwdr Hpath Hname Hbslot Hislot Hlog [Hcont]").
     iEval (rewrite /wp_next).
-    iIntros (CIDf) "%Hchain".
+    iIntros (CIDf) "%Hchain" Hlc.
     iIntros (mf n' Sb' ok nf ipv w)
       "%Hcs Hcg Hcnt Hextc Hclmc Hpc Hbmap Hinos Hppid Hcwdr
        Hpath Hname Hbslot %Hssub %Hwbm %Hbnd Hlog Hok".
-    iSpecialize ("Hcont" $! CIDf with "[%]"); [exact Hchain|].
+    iSpecialize ("Hcont" $! CIDf with "[%] Hlc"); [exact Hchain|].
     (* the counted caller asked for a plain reference; the type witness
        the gen post now carries is dropped here (fs-log.md §G.24) *)
     iAssert (if ok

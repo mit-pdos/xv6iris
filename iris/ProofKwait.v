@@ -926,10 +926,10 @@ Section ProofKwait.
     iApply (wp_cret_s_sconf (mword_of_int (KW + 0x92)) Rra E10 K bx
               ltac:(vm_compute; discriminate) with "Hcg Hpc []").
     { iApply (kwi_92 with "Htext"). }
-    iIntros (CIDe11 Hse11) "Hcg Hpc".
+    iIntros (CIDe11 Hse11) "Hlc Hcg Hpc".
     iEval (rgne) in "Hpc".
     iEval (rewrite Hrt) in "Hpc".
-    iSpecialize ("Hcont" $! CIDe11 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CIDe11 with "[%] Hlc"); [wp_next_chain|].
     assert (HownC : bx = false \/ pme = zero_reg -> (CIDe11 : CPU) = (CIDe : CPU))
       by wp_next_chain.
     iDestruct (cpu_own_transport CIDe CIDe11 lvl eb pme bx HownC with "Hown") as "Hown".
@@ -1808,8 +1808,8 @@ Section ProofKwait.
     iApply (kw_epilogue mm mr pme (sign_extend' 64 pidc) K 0%nat eb eb lks
               ltac:(pose proof (kw_K10K K HK); lia) Hmrsp Hmrs3 Hmrcs with "Hcg Hown Htext Hpc Hframe").
     iApply (kw_next_reanchor CIDp CIDr2 eb pme with "[Hcont Hmyrow Hesc Hsgq Hlend]"); [wp_next_chain |].
-    iIntros (CIDx Hsx mf) "%Hcsf %Ha0f Hcgf Hownf Hpcf".
-    iSpecialize ("Hcont" $! CIDx with "[%]"); [exact Hsx |].
+    iIntros (CIDx Hsx) "Hlc". iIntros (mf) "%Hcsf %Ha0f Hcgf Hownf Hpcf".
+    iSpecialize ("Hcont" $! CIDx with "[%] Hlc"); [exact Hsx |].
     (* THE ANSWER, at the generation this walk reaped: the row lost it, its
        escrow is in the caller's hands at the status the copyout placed, and
        no other child of the caller carries the pid the caller is about to
@@ -1977,10 +1977,10 @@ Section ProofKwait.
                 with "Hcg Hown Hpay1 Hpay0 Htext Hpc Henv Hlend Hplk Hlkk Htokk Hstate Hpsg Hchan
                       Hkilled Hxstate Hpidhalf Hkrow Hdorm Hpark Hmk Hlk Htok Hsgq Hcols Hmyrow Hframe
                       [Hcont Hsgback]").
-      iIntros (CIDz) "%Hsz". iIntros (mf cs') "%Hcsf %Ha0 Hans Hzr Hcg Hown (%kl2 & %Hkl2 & Hlend) Hpc Hsgq Hmyrow".
+      iIntros (CIDz) "%Hsz" Hlc. iIntros (mf cs') "%Hcsf %Ha0 Hans Hzr Hcg Hown (%kl2 & %Hkl2 & Hlend) Hpc Hsgq Hmyrow".
       iDestruct (act_lend_back with "Hlend") as "Hcnt"; [exact Hpmenz|].
       iDestruct ("Hsgback" $! kl2 with "Hsgq Hcnt") as "Hpriv".
-      iSpecialize ("Hcont" $! CIDz with "[%]"); [wp_next_chain |].
+      iSpecialize ("Hcont" $! CIDz with "[%] Hlc"); [wp_next_chain |].
       (* THE WINDOW IS EMPTY AND THE ANSWER IS THE REAP's: a null status
          pointer copies nothing ([d = 0]), and the word the answer's escrow
          is keyed at is the zombie's [p->xstate], which is what this arm
@@ -2301,8 +2301,8 @@ Section ProofKwait.
                   with "Hcg Hown Hpay1 Hpay0 Htext Hpc Hlkk Htokk HRk Hlk Htok
                         [Hcols] Hframe [Hcont Hpriv Hmyrow]").
         { iApply (kw_pay_res with "Hcols"). }
-        iIntros (CIDz) "%Hsz". iIntros (mf) "%Hcsf %Ha0 Hcg Hown Hpc".
-        iSpecialize ("Hcont" $! CIDz with "[%]"); [wp_next_chain |].
+        iIntros (CIDz) "%Hsz" Hlc. iIntros (mf) "%Hcsf %Ha0 Hcg Hown Hpc".
+        iSpecialize ("Hcont" $! CIDz with "[%] Hlc"); [wp_next_chain |].
         iApply ("Hcont" $! mf P' (mword_of_int (-1) : mword 32) d xs cs kc2
                   with "[%] [%] [%] [%] [%] [%] [] [] Hcg Hown Hpc [%] Hpriv Hmyrow").
         { exact Hcsf. }
@@ -2352,10 +2352,10 @@ Section ProofKwait.
                   with "Hcg Hown Hpay1 Hpay0 Htext Hpc Henv Hlend Hplk Hlkk Htokk Hstate Hpsg Hchan
                         Hkilled Hxstate Hpidhalf Hkrow Hdorm Hpark Hmk Hlk Htok Hsgq Hcols Hmyrow Hframe
                         [Hcont Hsgback]").
-        iIntros (CIDz) "%Hsz". iIntros (mf cs') "%Hcsf %Ha0 Hans Hzr Hcg Hown (%kl2 & %Hkl2 & Hlend) Hpc Hsgq Hmyrow".
+        iIntros (CIDz) "%Hsz" Hlc. iIntros (mf cs') "%Hcsf %Ha0 Hans Hzr Hcg Hown (%kl2 & %Hkl2 & Hlend) Hpc Hsgq Hmyrow".
         iDestruct (act_lend_back with "Hlend") as "Hcnt"; [exact Hpmenz|].
         iDestruct ("Hsgback" $! kl2 with "Hsgq Hcnt") as "Hpriv".
-        iSpecialize ("Hcont" $! CIDz with "[%]"); [wp_next_chain |].
+        iSpecialize ("Hcont" $! CIDz with "[%] Hlc"); [wp_next_chain |].
         (* the bytes this arm placed ARE the word the answer's escrow is
            keyed at: copyout was handed [p->xstate]'s own bytes. *)
         iApply ("Hcont" $! mf P' pidc d xs cs' kl2
@@ -2942,8 +2942,8 @@ Section ProofKwait.
               with "Hcg Hown Hpay Htext Hpc Hlk Htok [Hcols] Hframe [Hqfn Hpriv Hmyrow]").
     { iApply (kw_pay_res with "Hcols"). }
     rewrite /kw_exit_fn.
-    iIntros (CIDx Hsx mf) "%Hcsx %Ha0x Hcgx Hownx Hpcx".
-    iSpecialize ("Hqfn" $! CIDx with "[%]"); [exact Hsx |].
+    iIntros (CIDx Hsx) "Hlc". iIntros (mf) "%Hcsx %Ha0x Hcgx Hownx Hpcx".
+    iSpecialize ("Hqfn" $! CIDx with "[%] Hlc"); [exact Hsx |].
     iApply ("Hqfn" $! mf (pv_upt (us_V U)) (mword_of_int (-1) : mword 32) 0%nat
               (mword_of_int 0 : mword 32) cs (pv_ev (us_V U))
               with "[%] [%] [%] [%] [%] [%] [] [] Hcgx Hownx Hpcx [%] [Hpriv] Hmyrow").
@@ -3417,7 +3417,7 @@ Section ProofKwait.
                   with "Hcg Hown Htext Hpc []").
         all: try lkbelow.
         { iEval (rewrite HT8a0). iExact "Hlk". }
-        iIntros (CIDa Hsa msA mfa) "%HmsA Hcg Hpc %Hacs Htok Hres _ Hown Hpay".
+        iIntros (CIDa Hsa) "Hlc". iIntros (msA mfa) "%HmsA Hcg Hpc %Hacs Htok Hres _ Hown Hpay".
         assert (Hpee : ret_pc (T8 !!! Regidx Rra) = mword_of_int (KW + 0xee))
           by (rewrite HT8ra; pcstep).
         iEval (rewrite Hpee) in "Hpc".
@@ -3428,7 +3428,7 @@ Section ProofKwait.
         assert (Hchn : (true = false \/ proc_addr jj = zero_reg
                         -> (CIDa : CPU) = (CIDt : CPU))) by wp_next_chain.
         rewrite /kw_round.
-        iSpecialize ("IH" $! CIDa with "[%]"); [wp_next_chain |].
+        iSpecialize ("IH" $! CIDa with "[%] Hlc"); [wp_next_chain |].
         iApply ("IH" $! mfa with "[%] Hcg Hown Hpay Hpc Htok Hres Hmyrow Hpriv Hframe
                                    [Hqfn]").
         { exact Hrfa. }
@@ -3968,7 +3968,7 @@ Section ProofKwaitMain.
               with "Hcg Hown Htext Hpc [Hlk]").
     all: try lkbelow.
     { iEval (rewrite HP7a0). iExact "Hlk". }
-    iIntros (CID19 Hs19 msa Macq) "%Hmsa Hcg Hpc %Hacs Htok Hres _ Hown Hpay".
+    iIntros (CID19 Hs19) "Hlc". iIntros (msa Macq) "%Hmsa Hcg Hpc %Hacs Htok Hres _ Hown Hpay".
     assert (Hp2a : ret_pc (P7 !!! Regidx Rra) = mword_of_int (KW + 0x2a))
       by (rewrite HP7ra; pcstep).
     iEval (rewrite Hp2a) in "Hpc".
@@ -4110,9 +4110,9 @@ Section ProofKwaitMain.
     iAssert (kw_exit_fn CID19 γf m pj adr av eb pid U (pv_chg (us_V U)) cs lks)
       with "[Hcont]" as "Hqfn".
     { rewrite /kw_exit_fn.
-      iIntros (CIDx Hsx mf P' rv d xw cs' k')
+      iIntros (CIDx Hsx) "Hlc". iIntros (mf P' rv d xw cs' k')
         "%Hcsx %Ha0x %Hextx %Hdx %Hnullx %Hfullx Hansx Hzrx Hcgx Hownx Hpcx %Hkx Hprivx Hrowx".
-      iSpecialize ("Hcont" $! CIDx with "[%]"); [wp_next_chain |].
+      iSpecialize ("Hcont" $! CIDx with "[%] Hlc"); [wp_next_chain |].
       (* THE STEP ACROSS, taken once (lane TRAP-ROWS-3/4, T4(b)) *)
       iDestruct (wait_ans_of_gen with "Hgpme Hipis Hansx") as "Hansx".
       (* ...and the reap's receipt beside it (design ni-zombie-ledger.md D4) *)
@@ -4143,7 +4143,7 @@ Section ProofKwaitMain.
     (* the loop's own index is the literal [true] (sleep's crossing), while
        the prologue's chain is stated at [eb] -- [kw_chain_true] is the one
        step [wp_next_chain]'s [specialize] cannot take. *)
-    iSpecialize ("Hround" $! CID19 with "[%]");
+    iSpecialize ("Hround" $! CID19 with "[%] Hlc");
       [ apply (kw_chain_true eb pj CID19 CID Heb); wp_next_chain |].
     iApply ("Hround" $! Q5 with "[%] Hcg Hown Hpay Hpc Htok Hres Hmyrow Hpriv Hkframe
                                  Hqfn").

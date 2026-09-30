@@ -428,13 +428,13 @@ Section ProofKalloc.
                 ltac:(vm_compute; discriminate)
                 with "Hcg Hpc []").
       { iApply (kai_4a with "Htext"). }
-      iIntros (CIDe7 Hse7) "Hcg Hpc".
+      iIntros (CIDe7 Hse7) "Hlc Hcg Hpc".
       assert (Hretf : ret_pc (P45 !!! Regidx (mword_of_int 1 : mword 5)) = ret_tgt)
         by (rewrite HP45ra; reflexivity).
       iEval (rewrite Hretf) in "Hpc".
       iDestruct (cpu_own_transport CIDrel CIDe7 n eb p b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
-      iSpecialize ("Hcont" $! CIDe7 with "[%]"); [wp_next_chain|].
+      iSpecialize ("Hcont" $! CIDe7 with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hcont" $! P45 with "Hcg Hcnt Hpc [%] [Havail]").
       { (* callee_saved m P45 *)
         assert (Hthread : forall c : mword 5, is_cs_idx c = true ->
@@ -793,13 +793,13 @@ Section ProofKalloc.
                 ltac:(vm_compute; discriminate)
                 with "Hcg Hpc []").
       { iApply (kai_4a with "Htext"). }
-      iIntros (CIDg6 Hsg6) "Hcg Hpc".
+      iIntros (CIDg6 Hsg6) "Hlc Hcg Hpc".
       assert (Hretf : ret_pc (Q45 !!! Regidx (mword_of_int 1 : mword 5)) = ret_tgt)
         by (rewrite HQ45ra; reflexivity).
       iEval (rewrite Hretf) in "Hpc".
       iDestruct (cpu_own_transport CIDrel CIDg6 n eb p b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
-      iSpecialize ("Hcont" $! CIDg6 with "[%]"); [wp_next_chain|].
+      iSpecialize ("Hcont" $! CIDg6 with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hcont" $! Q45 with "Hcg Hcnt Hpc [%] [Hpage Havail]").
       { (* callee_saved m Q45 *)
         assert (Hthread : forall c : mword 5, is_cs_idx c = true ->

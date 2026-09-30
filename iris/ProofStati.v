@@ -457,7 +457,7 @@ Section ProofStatiMain.
     iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.stati + 0x2c)) Rra P3 K b
               ltac:(nz) with "Hcg Hpc []").
     { iApply (sti_2c with "Htext"). }
-    iIntros (CID18 Hq18) "Hcg Hpc".
+    iIntros (CID18 Hq18) "Hlc Hcg Hpc".
     iEval (rgne) in "Hpc".
     assert (Hretf : ret_pc (P3 !!! Regidx Rra : mword 64)
                     = ret_pc (mm !!! Regidx Rra : mword 64))
@@ -504,7 +504,7 @@ Section ProofStatiMain.
     assert (Cs11 : P3 !!! Regidx (mword_of_int 27 : mword 5)
                   = (mm !!! Regidx (mword_of_int 27 : mword 5) : mword 64))
       by (apply Hfin; stidx).
-    iSpecialize ("Hcont" $! CID18 with "[%]"); [wp_next_chain |].
+    iSpecialize ("Hcont" $! CID18 with "[%] Hlc"); [wp_next_chain |].
     iApply ("Hcont" $! P3 with "[%] Hcg Hpc Hidev Hinum
                                  [Hity Himaj Himin Hinl Hisz]
                                  [Hsdev Hsino Hsty Hsnl Hssz]").

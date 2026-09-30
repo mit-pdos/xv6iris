@@ -386,7 +386,7 @@ Section ProofNameiRoot.
     iApply (wp_cret_s_sconf (mword_of_int (NM + 0x18)) Rra P3 K b
               ltac:(nz) with "Hcg Hpc []").
     { iApply (nmi_18 with "Htext"). }
-    iIntros (CID12 Hq12) "Hcg Hpc".
+    iIntros (CID12 Hq12) "Hlc Hcg Hpc".
     iEval (rgne) in "Hpc".
     assert (Hretf : ret_pc (P3 !!! Regidx Rra : mword 64)
                     = ret_pc (m !!! Regidx Rra : mword 64))
@@ -438,7 +438,7 @@ Section ProofNameiRoot.
       by (apply Hfin; namidx).
     iDestruct (cpu_own_transport CID8 CID12 n eb p b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iSpecialize ("Hcont" $! CID12 with "[%]"); [wp_next_chain |].
+    iSpecialize ("Hcont" $! CID12 with "[%] Hlc"); [wp_next_chain |].
     iApply ("Hcont" $! P3 ipv with "[%] Hcg Hcnt Hpc Hp0 Hp1 Hip").
     split; [| exact HP3a0].
     unfold callee_saved. split_and!; assumption.

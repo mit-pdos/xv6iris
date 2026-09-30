@@ -1371,11 +1371,11 @@ Section ProofPiperead.
       iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.piperead + 0xfa)) Rra F8 av true ltac:(nz)
                 with "Hcg Hpc []").
       { iApply (pri_fa with "Htext"). }
-      iIntros (CIDp18 Hsp18) "Hcg Hpc". rgall.
+      iIntros (CIDp18 Hsp18) "Hlc Hcg Hpc". rgall.
       assert (Hrafin : ret_pc (F8 !!! Regidx Rra) = ret_tgt) by (rewrite HF8ra; reflexivity).
       iEval (rewrite Hrafin) in "Hpc".
       clear Hrafin.
-      iSpecialize ("Hcont" $! CIDp18 with "[%]"); [wp_next_chain|].
+      iSpecialize ("Hcont" $! CIDp18 with "[%] Hlc"); [wp_next_chain|].
       iEval (rewrite -HF8a0) in "HRP".
       iApply ("Hcont" $! F8 P' dw bsw k'
                 with "[%] [%] [%] [%] [%] [%] Hcg Hown Hpc Href HRP Hpriv").
@@ -1603,7 +1603,7 @@ Section ProofPiperead.
               with "Hcg Hown Htext Hpc [] Href").
     all: try lkbelow.
     { rgall. iEval (rewrite HA3a0). iExact "Hopen". }
-    iIntros (CIDaq Hsaq ms2 M0) "%Hms2 Href Hcg Hpc %HcsM0 Hlocked Hres _ Hown Hpay". rgall.
+    iIntros (CIDaq Hsaq) "Hlc". iIntros (ms2 M0) "%Hms2 Href Hcg Hpc %HcsM0 Hlocked Hres _ Hown Hpay". rgall.
     iEval (rewrite HA3ra) in "Hpc".
     clear HA3ra.
     assert (Hpc24 : ret_pc (add_vec_int (mword_of_int (KernelSyms.piperead + 0x20) : mword 64) 4)
@@ -3008,7 +3008,7 @@ Section ProofPiperead.
       pr_wloop_body W0 av pj γl pi γp w q pid U sp0 EPIC CPP CIDl lks Q Qe n))%I
       with "[]" as "WLOOP".
     { iLöb as "IH".
-      iIntros (CIDl Hsl M) "%HcsM HEX Hcg Hpc Hown Hpay Hlocked Hres Href HR Hpriv Hq8 Hq9 Hq10 Hq11 Hq12".
+      iIntros (CIDl Hsl) "Hlc". iIntros (M) "%HcsM HEX Hcg Hpc Hown Hpay Hlocked Hres Href HR Hpriv Hq8 Hq9 Hq10 Hq11 Hq12".
       assert (HMcsp : M !!! Regidx csp_rs1 = spr)
         by (rewrite (callee_saved_lookup HcsM csp_rs1 ltac:(vm_compute; reflexivity)); exact HW0csp).
       assert (HMs0 : M !!! Regidx Rs0 = s0v)
@@ -3112,7 +3112,7 @@ Section ProofPiperead.
         iEval (rewrite Hw84) in "Hpc".
         clear Hw84.
         iDestruct "HEX" as "[_ HCP]". iEval (rewrite /CPP) in "HCP".
-        iSpecialize ("HCP" $! CIDl with "[%]"); [wp_next_chain|].
+        iSpecialize ("HCP" $! CIDl with "[%] Hlc"); [wp_next_chain|].
         (* THE WRITE END IS SHUT -- the reading the copy loop's round-0
            break needs to call its empty ring an end-of-file. *)
         assert (Hwoc1 : ~ pflag_open wo1).
@@ -3321,7 +3321,7 @@ Section ProofPiperead.
                   (sign_extend' 21 (concat_vec (mword_of_int 54 : mword 11) ('b"0")))
                   N3 (av - 12)%nat true ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
         { iApply (pri_7c with "Htext"). }
-        iApply bi.later_intro. iIntros (CIDp31 Hsp31). iIntros "Hcg Hpc". rgall.
+        iApply bi.later_intro. iIntros (CIDp31 Hsp31) "Hlc". iIntros "Hcg Hpc". rgall.
         assert (Hje4 : add_vec (mword_of_int (KernelSyms.piperead + 0x7c) : mword 64)
                          (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 54 : mword 11) ('b"0"))))
                        = mword_of_int (KernelSyms.piperead + 0xe8)) by (apply bv_eq; vm_compute; reflexivity).
@@ -3336,7 +3336,7 @@ Section ProofPiperead.
            "pipe"]}]; [lks = ∅] at depth 0 makes that the empty set, which is
            renamed back to [lks] for the exit continuation. *)
         iEval (rewrite Hlkempty locks_union_empty locks_self_del -Hlkempty) in "Hown".
-        iSpecialize ("HEPI" $! CIDp31 with "[%]"); [wp_next_chain|].
+        iSpecialize ("HEPI" $! CIDp31 with "[%] Hlc"); [wp_next_chain|].
         (* the flag was NONZERO, so [killed] handed the incarnation's shot
            over: the post's kill stop, with node [] untouched *)
         iDestruct "Hkw" as "[%Hz0 | #Hshot]".
@@ -3619,7 +3619,7 @@ Section ProofPiperead.
                 with "Hcg Hown Htext Hpc [] Href").
       all: try lkbelow.
       { rgall. iEval (rewrite HSl7a0). iExact "Hopen". }
-      iIntros (CIDsl Hssl ms3 mfs) "%Hms3 Href Hcg Hpc %Hcsaq2 Hlocked Hres _ Hown Hpay". rgall.
+      iIntros (CIDsl Hssl) "Hlc". iIntros (ms3 mfs) "%Hms3 Href Hcg Hpc %Hcsaq2 Hlocked Hres _ Hown Hpay". rgall.
       iEval (rewrite HSl7ra) in "Hpc".
       clear HSl7ra.
       assert (Hw58 : ret_pc (add_vec_int (mword_of_int (KernelSyms.piperead + 0x54) : mword 64) 4)
@@ -3700,7 +3700,7 @@ Section ProofPiperead.
           by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hbk34) in "Hpc".
         clear Hbk34.
-        iSpecialize ("IH" $! CIDsl with "[%]"); [wp_next_chain|].
+        iSpecialize ("IH" $! CIDsl with "[%] Hlc"); [wp_next_chain|].
         iApply ("IH" $! L8 with "[%] HEX Hcg Hpc Hown Hpay Hlocked Hres Href HR Hpriv Hq8 Hq9 Hq10 Hq11 Hq12").
         exact HcsWL8. }
       (* data arrived: fall to +0x64, save s6..s8 and jump to the copy phase *)
@@ -3761,7 +3761,7 @@ Section ProofPiperead.
       iEval (rewrite Hj84) in "Hpc".
       clear Hj84.
       iDestruct "HEX" as "[_ HCP]". iEval (rewrite /CPP) in "HCP".
-      iSpecialize ("HCP" $! CIDsl with "[%]"); [wp_next_chain|].
+      iSpecialize ("HCP" $! CIDsl with "[%] Hlc"); [wp_next_chain|].
       (* the ring is NOT empty -- what a round-0 break would have to refute *)
       assert (Hne2 : nr2 <> nw2)
         by (apply not_eq_sym; exact (pr_sext_neq nr2 nw2 Hstill)).
@@ -3835,7 +3835,7 @@ Section ProofPiperead.
       iEval (rewrite Hj84b) in "Hpc".
       clear Hj84b.
       iDestruct "EXITS" as "[_ HCP]". iEval (rewrite /CPP) in "HCP".
-      iSpecialize ("HCP" $! CIDaq with "[%]"); [wp_next_chain|].
+      iSpecialize ("HCP" $! CIDaq with "[%] Hlc"); [wp_next_chain|].
       (* data was already there: the ring is NOT empty, which is what a
          round-0 break in the copy loop would have to refute *)
       assert (Hne0 : nr0 <> nw0).
@@ -3863,7 +3863,7 @@ Section ProofPiperead.
     iAssert (pipe_res γp pi) with "[Hnm Hnr Hnw Hro Hwo Hst0 Hst1 Hdat Hslack Hqr]" as "Hres".
     { iExists nr0, nw0, ro0, wo0, vnm0, bs0.
       iFrame "Hnm Hnr Hnw Hro Hwo Hst0 Hst1 Hdat Hslack Hqr". iPureIntro. split; assumption. }
-    iSpecialize ("WLOOP" $! CIDaq with "[%]"); [wp_next_chain|].
+    iSpecialize ("WLOOP" $! CIDaq with "[%] Hlc"); [wp_next_chain|].
     iApply ("WLOOP" $! W0 with "[%] EXITS Hcg Hpc Hown Hpay Hlocked Hres Href HR Hpriv Q8 Q9 Q10 Q11 Q12").
     apply callee_saved_refl.
   Qed.

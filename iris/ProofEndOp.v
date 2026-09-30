@@ -1332,7 +1332,7 @@ Section EndOpBlocks.
     iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.end_op + 0x9c)) Rra P5 K b
               ltac:(vm_compute; discriminate) with "Hcg Hpc []").
     { iApply (eoi_9c with "Htext"). }
-    iIntros (CID6 Hs6) "Hcg Hpc".
+    iIntros (CID6 Hs6) "Hlc Hcg Hpc".
     iEval (rgne) in "Hpc".
     assert (Hretf : ret_pc (P5 !!! Regidx Rra : mword 64)
                     = ret_pc (m !!! Regidx Rra : mword 64))
@@ -1395,7 +1395,7 @@ Section EndOpBlocks.
     iDestruct (cpu_claim_ext_transport CID0 CID6 eb (proc_addr j)
                  ltac:(rewrite Hbm; wp_next_chain) with "Hextm") as "Hextm".
     rewrite /eo_cont.
-    iSpecialize ("Hcont" $! CID6 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CID6 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! P5 with "[%] Hcg Hcnt Hextc Hextm Hpc Hppid").
     { unfold callee_saved. repeat split; assumption. }
   Qed.

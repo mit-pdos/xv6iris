@@ -706,7 +706,7 @@ Section BoBodies.
               ltac:(vm_compute; discriminate)
               with "Hcg Hpc []").
     { iApply (boi_8a with "Htext"). }
-    iIntros (CIDe6 Hse6) "Hcg Hpc".
+    iIntros (CIDe6 Hse6) "Hlc Hcg Hpc".
     iEval (rgne) in "Hpc".
     assert (Hretf : ret_pc (Q6c !!! Regidx (mword_of_int 1 : mword 5)) = ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)))
       by (rewrite HQ6cra; reflexivity).
@@ -730,7 +730,7 @@ Section BoBodies.
                  with "Hextc") as "Hextc".
     iDestruct (cpu_claim_ext_transport CID CIDe6 eb pj ltac:(wp_next_chain)
                  with "Hextm") as "Hextm".
-    iSpecialize ("Hcont" $! CIDe6 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CIDe6 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! Q6c with "[%] Hcg Hown Hextc Hextm Hpc Hpid Hop").
     { unfold callee_saved.
       split. { rewrite /Q6c upd_eq. rewrite Hwv. exact Hsp0. }
@@ -1004,7 +1004,7 @@ Section BoBodies.
               with "Hcg Hown Htext Hpc []").
     all: try lkbelow.
     { iEval (rewrite HA6a0). iExact "Hislock". }
-    iIntros (CIDAa HAsa msA mfa) "%HAms Hcg Hpc %HAacs Htok Hres _ Hown Hpay".
+    iIntros (CIDAa HAsa) "Hlc". iIntros (msA mfa) "%HAms Hcg Hpc %HAacs Htok Hres _ Hown Hpay".
     assert (HAp8 : ret_pc (A6 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.begin_op + 0x3a))
       by (rewrite HA6ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite HAp8) in "Hpc".
@@ -1015,7 +1015,7 @@ Section BoBodies.
     iDestruct (arm_pay_ext_join eb pj with "Hpay [Htcx Hclmx]") as "[Htc Hclm]".
     { iSplitL "Htcx"; [iExact "Htcx" | iExact "Hclmx"]. }
     rewrite /bo_loop.
-    iSpecialize ("IH" $! CIDAa with "[%]"); [wp_next_chain|].
+    iSpecialize ("IH" $! CIDAa with "[%] Hlc"); [wp_next_chain|].
     iApply ("IH" $! mfa with "[%] Hr24 Hr16 Hr8 Hr0 Htok Hres Hpid Hown Htc Hclm Hcg Hpc Hexit").
     exact HboAAq.
   Qed.
@@ -1265,7 +1265,7 @@ Section BoBodies.
               with "Hcg Hown Htext Hpc []").
     all: try lkbelow.
     { iEval (rewrite HB6a0). iExact "Hislock". }
-    iIntros (CIDBa HBsa msA mfa) "%HBms Hcg Hpc %HBacs Htok Hres _ Hown Hpay".
+    iIntros (CIDBa HBsa) "Hlc". iIntros (msA mfa) "%HBms Hcg Hpc %HBacs Htok Hres _ Hown Hpay".
     assert (HBp8 : ret_pc (B6 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.begin_op + 0x6a))
       by (rewrite HB6ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite HBp8) in "Hpc".
@@ -1290,7 +1290,7 @@ Section BoBodies.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hbk) in "Hpc".
     rewrite /bo_loop.
-    iSpecialize ("IH" $! CIDBa with "[%]"); [wp_next_chain|].
+    iSpecialize ("IH" $! CIDBa with "[%] Hlc"); [wp_next_chain|].
     iApply ("IH" $! mfa with "[%] Hr24 Hr16 Hr8 Hr0 Htok Hres Hpid Hown Htc Hclm Hcg Hpc Hexit").
     exact HboBAq.
   Qed.
@@ -2000,7 +2000,7 @@ Section ProofBeginOp.
               with "Hcg Hown Htext Hpc []").
     all: try lkbelow.
     { iEval (rewrite HMaqa0). iExact "Hislock". }
-    iIntros (CIDa Hsa ms Macq) "%Hmsf Hcg Hpc %Hcsacq Htok Hres _ Hown Hpay".
+    iIntros (CIDa Hsa) "Hlc". iIntros (ms Macq) "%Hmsf Hcg Hpc %Hcsacq Htok Hres _ Hown Hpay".
     (* JOIN AT THE INDEX: the acquire's push_off freed the pair at
        [eb = true] and nothing at [eb = false], where the caller brought it.
        From here the loop carries [trap_csrs ∗ cpu_claim pj] index-free.
@@ -2121,7 +2121,7 @@ Section ProofBeginOp.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgt2c) in "Hpc".
     rewrite /bo_loop.
-    iSpecialize ("Hloop" $! CIDa with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hloop" $! CIDa with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hloop" $! T3 with "[%] Hr24 Hr16 Hr8 Hr0 Htok Hres Hpid Hown Htc Hclm Hcg Hpc Hexit").
     exact HboT3.
   Qed.

@@ -301,14 +301,14 @@ Section ProofWakeup.
                     Hcmpr ltac:(vm_compute; reflexivity)
                     with "Hcg Hpc []").
           { iApply (wki_34 with "Htext"). }
-          iApply bi.later_intro. iIntros (CIDt2 Hst2) "Hcg Hpc".
+          iApply bi.later_intro. iIntros (CIDt2 Hst2) "Hlc Hcg Hpc".
           assert (Htgt54 : add_vec (mword_of_int (KernelSyms.wakeup + 0x34) : mword 64)
                              (sign_extend' 64 (mword_of_int 32 : mword 13)) = mword_of_int (KernelSyms.wakeup + 0x54))
             by (apply bv_eq; vm_compute; reflexivity).
           iEval (rewrite Htgt54) in "Hpc".
           iDestruct (cpu_own_transport CIDt CIDt2 lvl eb pme b ltac:(wp_next_chain)
                        with "Hown") as "Hown".
-          iSpecialize ("Hqx" $! CIDt2 with "[%]"); [wp_next_chain|].
+          iSpecialize ("Hqx" $! CIDt2 with "[%] Hlc"); [wp_next_chain|].
           iApply ("Hqx" $! Mt30 with "[] Hcg Hown Htext Hpc Hframe").
           iPureIntro.
           split; [rewrite /Mt30 upd_ne; [exact Htsp | vm_compute; discriminate]|].
@@ -328,7 +328,7 @@ Section ProofWakeup.
                     Mt30 av b ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
                     Hcmpr with "Hcg Hpc []").
           { iApply (wki_34 with "Htext"). }
-          iIntros (CIDt2 Hst2) "Hcg Hpc".
+          iIntros (CIDt2 Hst2) "Hlc Hcg Hpc".
           assert (HkS : (S k < NPROC)%nat).
           { destruct (Nat.lt_ge_cases (S k) NPROC) as [Hlt | Hge]; [exact Hlt|].
             assert (HeqN : S k = NPROC) by lia.
@@ -342,7 +342,7 @@ Section ProofWakeup.
           iEval (rewrite Hpp38) in "Hpc".
           iDestruct (cpu_own_transport CIDt CIDt2 lvl eb pme b ltac:(wp_next_chain)
                        with "Hown") as "Hown".
-          iSpecialize ("IHf" $! CIDt2 with "[%]"); [wp_next_chain|].
+          iSpecialize ("IHf" $! CIDt2 with "[%] Hlc"); [wp_next_chain|].
           iApply ("IHf" $! (S k) Mt30 with "[%] [%] [%] Hqx Hcg Hown Htext Hpc Hframe").
           * lia.
           * exact HkS.
@@ -520,7 +520,7 @@ Section ProofWakeup.
                   ltac:(lia)
                   with "Hcg Htext Hpc Hlockk Htok HR Hown Hpay").
         rewrite -Hbmatch.
-        iIntros (CIDg Hsg mr) "Hcg Hpc %Hpinsr Hown".
+        iIntros (CIDg Hsg) "Hlc". iIntros (mr) "Hcg Hpc %Hpinsr Hown".
         (* each iteration is BALANCED: what it acquired it released, so the
            set release hands back collapses to the loop invariant's [lks]. *)
         pose proof (locks_below_not_elem lks "proc" Hfresh) as Hnotin.
@@ -533,7 +533,7 @@ Section ProofWakeup.
         { rewrite HMr2c_ra. apply bv_eq; vm_compute; reflexivity. }
         iEval (rewrite Hpc30) in "Hpc".
         assert (Hdommr : forall r : regidx, r ∈ dom (rf_to_gmap mr)) by (intro r; apply rf_to_gmap_dom).
-        iSpecialize ("Htail" $! CIDg with "[%]"); [wp_next_chain|].
+        iSpecialize ("Htail" $! CIDg with "[%] Hlc"); [wp_next_chain|].
         iApply ("Htail" $! mr with "[%] Hcg Hown Hpc Hframe").
         (* wkl_regs mr spF chan k *)
         unfold wkl_regs.
@@ -903,14 +903,14 @@ Section ProofWakeup.
       { iEval (rewrite Hecsp). iExact "Hf2". }
       { iEval (rewrite Hecsp). iExact "Hf1". }
       { iEval (rewrite Hecsp). iExact "Hf0". }
-      iIntros (CIDend Hsend Mf) "%Hepi Hcg Hpc".
+      iIntros (CIDend Hsend) "Hlc". iIntros (Mf) "%Hepi Hcg Hpc".
       destruct Hepi as (Hf1v & Hf0v & Hf9v & Hf18v & Hf19v & Hf20v & Hf21v & Hfcsp & Hf22v & Hf23v & Hf24v & Hf25v & Hf26v & Hf27v & Hfdom).
       (* the epilogue's restored sp equals the caller's sp0 (the -64/+60+4 cancel) *)
       assert (Hspcancel : add_vec (Mexit !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 4 : mword 6))) = sp0)
         by (rewrite Hecsp; subst spF sp0; apply frame_cancel_64).
       iDestruct (cpu_own_transport CIDex CIDend lvl eb pme b ltac:(wp_next_chain)
                    with "Hown") as "Hown".
-      iSpecialize ("Hcont" $! CIDend with "[%]"); [wp_next_chain|].
+      iSpecialize ("Hcont" $! CIDend with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hcont" $! Mf with "[%] Hcg Hown Htext [Hpc]").
       - (* callee_saved m Mf /\ dom Mf *)
         split; [| exact Hfdom].

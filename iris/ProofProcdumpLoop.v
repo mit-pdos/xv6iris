@@ -566,7 +566,7 @@ Section ProofProcdumpLoop.
                     (mword_of_int 36 : mword 13) Rs2 Rs1 Ma66 K' b
                     ltac:(nz) ltac:(nz) Hcmp ltac:(vm_compute; reflexivity)
                     with "Hcg Hpc Hi6a").
-          iApply bi.later_intro. iIntros (CIDc Hsc) "Hcg Hpc".
+          iApply bi.later_intro. iIntros (CIDc Hsc) "Hlc Hcg Hpc".
           assert (Htgt8e : add_vec
                              (mword_of_int (KernelSyms.procdump + 0x6a) : mword 64)
                              (sign_extend' 64 (mword_of_int 36 : mword 13))
@@ -574,7 +574,7 @@ Section ProofProcdumpLoop.
           iEval (rewrite Htgt8e) in "Hpc".
          iDestruct (cpu_own_transport CIDa CIDc 0%nat eb p b 
                        ltac:(wp_next_chain) with "Hown") as "Hown".
-          iSpecialize ("Hqx2" $! CIDc with "[%]"); [wp_next_chain|].
+          iSpecialize ("Hqx2" $! CIDc with "[%] Hlc"); [wp_next_chain|].
           iApply ("Hqx2" $! Ma66 with "[%] Hcg Hown Hpc [Hpre2]").
           + split; [exact (pdl_get_sp Ma66 spv (S j) Hral66) | exact Hrah66].
           + rewrite /procdump_view -Heq. iExact "Hpre2".
@@ -588,14 +588,14 @@ Section ProofProcdumpLoop.
                     (mword_of_int (KernelSyms.procdump + 0x6a))
                     (mword_of_int 36 : mword 13) Rs2 Rs1 Ma66 K' b
                     ltac:(nz) ltac:(nz) Hcmp with "Hcg Hpc Hi6a").
-          iIntros (CIDc Hsc) "Hcg Hpc".
+          iIntros (CIDc Hsc) "Hlc Hcg Hpc".
           assert (Hpp6e : add_vec_int
                             (mword_of_int (KernelSyms.procdump + 0x6a) : mword 64) 4
                           = mword_of_int (KernelSyms.procdump + 0x6e)) by pcw.
           iEval (rewrite Hpp6e) in "Hpc".
           iDestruct (cpu_own_transport CIDa CIDc 0%nat eb p b 
                        ltac:(wp_next_chain) with "Hown") as "Hown".
-          iSpecialize ("IHf" $! CIDc with "[%]"); [wp_next_chain|].
+          iSpecialize ("IHf" $! CIDc with "[%] Hlc"); [wp_next_chain|].
           iApply ("IHf" $! (S j) Ma66 with "[%] [%] [%] Hqx2 Hcg Hown Hpc Hpre2 Hsuf2").
           + exact (pdl_fuel_le j fuel Hfuel).
           + exact HSjLt.
@@ -791,7 +791,7 @@ Section ProofProcdumpLoop.
         all: try lkbelow.
         { rewrite Ha0_62. iExact "Hnlstr". }
         { done. }
-        iIntros (CIDq7 Hsq7 mP2) "Hcg Hpc %Hcsp2 Hown _ _".
+        iIntros (CIDq7 Hsq7) "Hlc". iIntros (mP2) "Hcg Hpc %Hcsp2 Hown _ _".
         destruct Hcsp2 as [Hcs2 Hra2].
         assert (Hpc66 : ret_pc (P62 !!! Regidx Rra : mword 64)
                         = mword_of_int (KernelSyms.procdump + 0x66))
@@ -806,7 +806,7 @@ Section ProofProcdumpLoop.
         iDestruct (pdl_slot_mk (proc_addr j) dq1 dq2 dq3 st2 pid2 nm2 Hnm2
                      with "Hst2 Hpid2 Hnmc2") as "Hslot2".
         iDestruct (pdl_prefix_step j with "Hpre2 Hslot2") as "Hpre2".
-        iSpecialize ("Hadv" $! CIDq7 with "[%]"); [wp_next_chain|].
+        iSpecialize ("Hadv" $! CIDq7 with "[%] Hlc"); [wp_next_chain|].
         iApply ("Hadv" $! mP2 with "[%] Hqx2 Hcg Hown Hpc Hpre2 Hsuf2").
         split; [exact HrlP2 | exact HrhP2]. }
       (* ================================================================ *)
@@ -874,7 +874,7 @@ Section ProofProcdumpLoop.
                   (mword_of_int 249 : mword 8) (Cregidx (mword_of_int 7)) Ra5 H70 K' b
                   ltac:(vm_compute; reflexivity) ltac:(nz) Hcmp74
                   ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi74").
-        iApply bi.later_intro. iIntros (CID3 Hs3) "Hcg Hpc".
+        iApply bi.later_intro. iIntros (CID3 Hs3) "Hlc Hcg Hpc".
         assert (Htgt66 : add_vec
                            (mword_of_int (KernelSyms.procdump + 0x74) : mword 64)
                            (sign_extend' 64
@@ -887,7 +887,7 @@ Section ProofProcdumpLoop.
         iDestruct (pdl_prefix_step j with "Hpre Hslot") as "Hpre".
         iDestruct (cpu_own_transport CIDf CID3 0%nat eb p b
                      ltac:(wp_next_chain) with "Hown") as "Hown".
-        iSpecialize ("Hadv" $! CID3 with "[%]"); [wp_next_chain|].
+        iSpecialize ("Hadv" $! CID3 with "[%] Hlc"); [wp_next_chain|].
         iApply ("Hadv" $! H70 with "[%] Hqx Hcg Hown Hpc Hpre Hsuf").
         split; [exact Hrl70 | exact Hrh70]. }
       (* state <> UNUSED *)
@@ -944,7 +944,7 @@ Section ProofProcdumpLoop.
                   (mword_of_int 8158 : mword 13) Ra5 Rs6 H76 K' b
                   ltac:(nz) ltac:(nz) Hcmp78 ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc Hi78").
-        iApply bi.later_intro. iIntros (CID5 Hs5) "Hcg Hpc".
+        iApply bi.later_intro. iIntros (CID5 Hs5) "Hlc Hcg Hpc".
         assert (Htgt56 : add_vec
                            (mword_of_int (KernelSyms.procdump + 0x78) : mword 64)
                            (sign_extend' 64 (mword_of_int 8158 : mword 13))
@@ -953,7 +953,7 @@ Section ProofProcdumpLoop.
         iPoseProof (pd_qqq_str with "Hkd") as "Hqqq".
         iDestruct (cpu_own_transport CIDf CID5 0%nat eb p b
                      ltac:(wp_next_chain) with "Hown") as "Hown".
-        iSpecialize ("Hprint" $! CID5 with "[%]"); [wp_next_chain|].
+        iSpecialize ("Hprint" $! CID5 with "[%] Hlc"); [wp_next_chain|].
         iApply ("Hprint" $! H76 (mword_of_int pd_qqq_a : mword 64) pd_qqq nm
                   dqs dqp dqn st pid
                   with "[%] [%] [%] Hqqq Hqx Hcg Hown Hpc Hst Hpid Hnmc Hpre Hsuf").
@@ -1109,7 +1109,7 @@ Section ProofProcdumpLoop.
                 (mword_of_int 231 : mword 8) (Cregidx (mword_of_int 4)) Ra2 H86 K' b
                 ltac:(vm_compute; reflexivity) ltac:(nz) Hcmp88
                 ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi88").
-      iApply bi.later_intro. iIntros (CID10 Hs10) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID10 Hs10) "Hlc Hcg Hpc".
       assert (Htgt56b : add_vec
                           (mword_of_int (KernelSyms.procdump + 0x88) : mword 64)
                           (sign_extend' 64
@@ -1120,7 +1120,7 @@ Section ProofProcdumpLoop.
       iPoseProof (pd_state_str k Hk6 with "Hkd") as "Hsstr".
       iDestruct (cpu_own_transport CIDf CID10 0%nat eb p b
                    ltac:(wp_next_chain) with "Hown") as "Hown".
-      iSpecialize ("Hprint" $! CID10 with "[%]"); [wp_next_chain|].
+      iSpecialize ("Hprint" $! CID10 with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hprint" $! H86 (pd_state_p k) (pd_state_name k) nm
                 dqs dqp dqn st pid
                 with "[%] [%] [%] Hsstr Hqx Hcg Hown Hpc Hst Hpid Hnmc Hpre Hsuf").

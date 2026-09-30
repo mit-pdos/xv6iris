@@ -589,7 +589,7 @@ Section IreclaimEpilogue.
     iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.ireclaim + 0xc4)) Rra P9 K b
               ltac:(nz) with "Hcg Hpc []").
     { iApply (irci_c4 with "Htext"). }
-    iIntros (CID10 Hq10) "Hcg Hpc".
+    iIntros (CID10 Hq10) "Hlc Hcg Hpc".
     iEval (rgne) in "Hpc".
     assert (Hretf : ret_pc (P9 !!! Regidx Rra : mword 64)
                     = ret_pc (m !!! Regidx Rra : mword 64))
@@ -652,7 +652,7 @@ Section IreclaimEpilogue.
    iDestruct (cpu_claim_ext_transport CID0 CID10 eb (proc_addr j)
                 ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
     rewrite /irc_cont.
-    iSpecialize ("Hcont" $! CID10 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CID10 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! P9 with "[%] Hcg Hcnt Hextc Hclmc Hpc Hsbn Hsbi Hsbb Hppid
                                   Hsl Hiref Hboot");
       [exact Hcs].

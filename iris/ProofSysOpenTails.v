@@ -335,14 +335,14 @@ Section ProofSysOpenTails.
               with "Hcg Htext Hpc Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbP H23 H24
                     [Hown Htce Hcce Hpid Hcont]").
     iEval (rewrite /wp_next).
-    iIntros (CIDy) "%Hqy". iIntros (mf) "%Hcsf %Ha0f Hcg Hpc".
+    iIntros (CIDy) "%Hqy" Hlc. iIntros (mf) "%Hcsf %Ha0f Hcg Hpc".
     iDestruct (cpu_own_transport CID5 CIDy 0 eb (proc_addr jx) b
                  ltac:(wp_next_chain) with "Hown") as "Hown".
     iDestruct (trap_csrs_ext_transport CID5 CIDy eb (proc_addr jx)
                  ltac:(rewrite Hb; wp_next_chain) with "Htce") as "Htce".
     iDestruct (cpu_claim_ext_transport CID5 CIDy eb (proc_addr jx)
                  ltac:(rewrite Hb; wp_next_chain) with "Hcce") as "Hcce".
-    iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain |].
+    iSpecialize ("Hcont" $! CIDy with "[%] Hlc"); [wp_next_chain |].
     iApply ("Hcont" $! mf with "[%] [%] Hcg Hown Htce Hcce Hpc Hpid").
     { exact Hcsf. }
     { rewrite Ha0f. exact HP2a0. }
@@ -543,14 +543,14 @@ Section ProofSysOpenTails.
               with "Hcg Htext Hpc Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbP H23 H24
                     [Hown Htce Hcce Hpid Hcont]").
     iEval (rewrite /wp_next).
-    iIntros (CIDy) "%Hqy". iIntros (mf) "%Hcsf %Ha0f Hcg Hpc".
+    iIntros (CIDy) "%Hqy" Hlc. iIntros (mf) "%Hcsf %Ha0f Hcg Hpc".
     iDestruct (cpu_own_transport CID5 CIDy 0 eb (proc_addr jx) b
                  ltac:(wp_next_chain) with "Hown") as "Hown".
     iDestruct (trap_csrs_ext_transport CID5 CIDy eb (proc_addr jx)
                  ltac:(rewrite Hb; wp_next_chain) with "Htce") as "Htce".
     iDestruct (cpu_claim_ext_transport CID5 CIDy eb (proc_addr jx)
                  ltac:(rewrite Hb; wp_next_chain) with "Hcce") as "Hcce".
-    iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain |].
+    iSpecialize ("Hcont" $! CIDy with "[%] Hlc"); [wp_next_chain |].
     iApply ("Hcont" $! mf with "[%] [%] Hcg Hown Htce Hcce Hpc Hpid").
     { exact Hcsf. }
     { rewrite Ha0f. exact HP2a0. }
@@ -905,14 +905,14 @@ Section ProofSysOpenTails.
               with "Hcg Htext Hpc Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbP H23 H24
                     [Hown Htce Hcce Hpid Hsbb Hsbi Hbsl Hislot Hcont]").
     iEval (rewrite /wp_next).
-    iIntros (CIDy) "%Hqy". iIntros (mf) "%Hcsf %Ha0f Hcg Hpc".
+    iIntros (CIDy) "%Hqy" Hlc. iIntros (mf) "%Hcsf %Ha0f Hcg Hpc".
     iDestruct (cpu_own_transport CID8 CIDy 0 eb (proc_addr jx) b
                  ltac:(wp_next_chain) with "Hown") as "Hown".
     iDestruct (trap_csrs_ext_transport CID8 CIDy eb (proc_addr jx)
                  ltac:(rewrite Hb; wp_next_chain) with "Htce") as "Htce".
     iDestruct (cpu_claim_ext_transport CID8 CIDy eb (proc_addr jx)
                  ltac:(rewrite Hb; wp_next_chain) with "Hcce") as "Hcce".
-    iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain |].
+    iSpecialize ("Hcont" $! CIDy with "[%] Hlc"); [wp_next_chain |].
     iApply ("Hcont" $! mf with "[%] [%] Hcg Hown Htce Hcce Hpc Hpid
               Hsbb Hsbi Hbsl Hislot").
     { exact Hcsf. }
@@ -1256,14 +1256,14 @@ Section ProofSysOpenTails.
               with "Hcg Htext Hpc Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbP H23 H24
                     [Hown Htce Hcce Hpid Hsbb Hsbi Hbsl Hislot Hcont]").
     iEval (rewrite /wp_next).
-    iIntros (CIDy) "%Hqy". iIntros (mf) "%Hcsf %Ha0f Hcg Hpc".
+    iIntros (CIDy) "%Hqy" Hlc. iIntros (mf) "%Hcsf %Ha0f Hcg Hpc".
     iDestruct (cpu_own_transport CID8 CIDy 0 eb (proc_addr jx) b
                  ltac:(wp_next_chain) with "Hown") as "Hown".
     iDestruct (trap_csrs_ext_transport CID8 CIDy eb (proc_addr jx)
                  ltac:(rewrite Hb; wp_next_chain) with "Htce") as "Htce".
     iDestruct (cpu_claim_ext_transport CID8 CIDy eb (proc_addr jx)
                  ltac:(rewrite Hb; wp_next_chain) with "Hcce") as "Hcce".
-    iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain |].
+    iSpecialize ("Hcont" $! CIDy with "[%] Hlc"); [wp_next_chain |].
     iApply ("Hcont" $! mf with "[%] [%] Hcg Hown Htce Hcce Hpc Hpid
               Hsbb Hsbi Hbsl Hislot").
     { exact Hcsf. }
@@ -1624,14 +1624,14 @@ Section ProofSysOpenTails.
               with "Hcg Htext Hpc Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbP H23 H24
                     [Hown Htce Hcce Hpid Hsbb Hsbi Hbsl Hislot Hcont]").
     iEval (rewrite /wp_next).
-    iIntros (CIDy) "%Hqy". iIntros (mf) "%Hcsf %Ha0f Hcg Hpc".
+    iIntros (CIDy) "%Hqy" Hlc. iIntros (mf) "%Hcsf %Ha0f Hcg Hpc".
     iDestruct (cpu_own_transport CID8 CIDy 0 eb (proc_addr jx) b
                  ltac:(wp_next_chain) with "Hown") as "Hown".
     iDestruct (trap_csrs_ext_transport CID8 CIDy eb (proc_addr jx)
                  ltac:(rewrite Hb; wp_next_chain) with "Htce") as "Htce".
     iDestruct (cpu_claim_ext_transport CID8 CIDy eb (proc_addr jx)
                  ltac:(rewrite Hb; wp_next_chain) with "Hcce") as "Hcce".
-    iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain |].
+    iSpecialize ("Hcont" $! CIDy with "[%] Hlc"); [wp_next_chain |].
     iApply ("Hcont" $! mf with "[%] [%] Hcg Hown Htce Hcce Hpc Hpid
               Hsbb Hsbi Hbsl Hislot").
     { exact Hcsf. }
@@ -1931,10 +1931,10 @@ Section ProofSysOpenTails.
                     Hprocs Hdev Hgeo Hdlk Hbsl Hop Hf1 Hf2 Hf3 Hf4 Hf5 Hf6
                     HbP H23 H24 [Hfd Hfout Hiru Hcont]").
     iEval (rewrite /wp_next).
-    iIntros (CIDz) "%Hqz". iIntros (mf)
+    iIntros (CIDz) "%Hqz" Hlc. iIntros (mf)
       "%Hcsf %Ha0f Hcg Hown Htce Hcce Hpc Hpid Hsbb Hsbi Hbsl
        Hislot".
-    iSpecialize ("Hcont" $! CIDz with "[%]"); [wp_next_chain |].
+    iSpecialize ("Hcont" $! CIDz with "[%] Hlc"); [wp_next_chain |].
     iDestruct (so_iref_two with "Hiru Hislot") as "Hislot".
     iApply ("Hcont" $! mf kev with "[%] [%] [%] Hcg Hown Htce Hcce Hpc Hpid
               Hsbb Hsbi Hbsl Hislot Hfd Hfout").
@@ -2304,14 +2304,14 @@ Section ProofSysOpenTails.
               with "Hcg Htext Hpc Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbP H23 H24
                     [Hown Htce Hcce Hpid Hshr Hcont]").
     iEval (rewrite /wp_next).
-    iIntros (CIDy) "%Hqy". iIntros (mf) "%Hcsf %Ha0f Hcg Hpc".
+    iIntros (CIDy) "%Hqy" Hlc. iIntros (mf) "%Hcsf %Ha0f Hcg Hpc".
     iDestruct (cpu_own_transport CID9 CIDy 0 eb (proc_addr jx) b
                  ltac:(wp_next_chain) with "Hown") as "Hown".
     iDestruct (trap_csrs_ext_transport CID9 CIDy eb (proc_addr jx)
                  ltac:(rewrite Hb; wp_next_chain) with "Htce") as "Htce".
     iDestruct (cpu_claim_ext_transport CID9 CIDy eb (proc_addr jx)
                  ltac:(rewrite Hb; wp_next_chain) with "Hcce") as "Hcce".
-    iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain |].
+    iSpecialize ("Hcont" $! CIDy with "[%] Hlc"); [wp_next_chain |].
     iApply ("Hcont" $! mf with "[%] [%] Hcg Hown Htce Hcce Hpc Hpid Hshr").
     { exact Hcsf. }
     { rewrite Ha0f. exact HP4a0. }

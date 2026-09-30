@@ -206,12 +206,12 @@ Section IsmappedEpi.
               ltac:(vm_compute; discriminate)
               with "Hcg Hpc []").
     { iApply (imi_1a with "Htext"). }
-    iIntros (CIDd Hsd) "Hcg Hpc".
+    iIntros (CIDd Hsd) "Hlc Hcg Hpc".
     iEval (rgne) in "Hpc".
     assert (Hrt : ret_pc (E3 !!! Regidx (mword_of_int 1 : mword 5)) = ret_tgt)
       by (rewrite HE3ra Hrt_def; reflexivity).
     iEval (rewrite Hrt) in "Hpc".
-    iSpecialize ("Hcont" $! CIDd with "[]"); [iPureIntro; wp_next_chain|].
+    iSpecialize ("Hcont" $! CIDd with "[] Hlc"); [iPureIntro; wp_next_chain|].
     iApply ("Hcont" $! E3 with "Hcg Hpc Hptree [%] [%]").
     { (* callee_saved mm E3 *)
       unfold callee_saved. split_and!.
@@ -400,8 +400,8 @@ Section ProofIsmapped.
                 with "[%] Htext Hcg Hpc Hptree Hc1 Hc2 [%]").
       { apply callee_saved_refl. }
       { left. split; [exact Ha0z | exact Hnone]. }
-      iIntros (CID9 Hs9 mr) "Hcg Hpc Hptree %Hcs %Hpay2".
-      iSpecialize ("Hcont" $! CID9 with "[]"); [iPureIntro; wp_next_chain|].
+      iIntros (CID9 Hs9) "Hlc". iIntros (mr) "Hcg Hpc Hptree %Hcs %Hpay2".
+      iSpecialize ("Hcont" $! CID9 with "[] Hlc"); [iPureIntro; wp_next_chain|].
       iApply ("Hcont" $! mr with "Hcg Hpc Hptree [%] [%]").
       { exact Hcs. } { exact Hpay2. } }
     (* ---- walk returned the L0 slot address: read it ---- *)
@@ -484,8 +484,8 @@ Section ProofIsmapped.
       { exact HcsB2. }
       { right. exists w0. split; [exact Hsome |].
         rewrite HB2a0. exact (pte_valid_bit0 w0 Hpv). }
-      iIntros (CID13 Hs13 mr) "Hcg Hpc Hptree %Hcs %Hpay2".
-      iSpecialize ("Hcont" $! CID13 with "[]"); [iPureIntro; wp_next_chain|].
+      iIntros (CID13 Hs13) "Hlc". iIntros (mr) "Hcg Hpc Hptree %Hcs %Hpay2".
+      iSpecialize ("Hcont" $! CID13 with "[] Hlc"); [iPureIntro; wp_next_chain|].
       iApply ("Hcont" $! mr with "Hcg Hpc Hptree [%] [%]").
       { exact Hcs. } { exact Hpay2. } }
     (* unmapped-with-path: the slot holds the literal zero *)
@@ -494,8 +494,8 @@ Section ProofIsmapped.
     { exact HcsB2. }
     { left. split; [| exact Hnone].
       rewrite HB2a0 Hw0z. apply bv_eq; vm_compute; reflexivity. }
-    iIntros (CID14 Hs14 mr) "Hcg Hpc Hptree %Hcs %Hpay2".
-    iSpecialize ("Hcont" $! CID14 with "[]"); [iPureIntro; wp_next_chain|].
+    iIntros (CID14 Hs14) "Hlc". iIntros (mr) "Hcg Hpc Hptree %Hcs %Hpay2".
+    iSpecialize ("Hcont" $! CID14 with "[] Hlc"); [iPureIntro; wp_next_chain|].
     iApply ("Hcont" $! mr with "Hcg Hpc Hptree [%] [%]").
     { exact Hcs. } { exact Hpay2. }
   Qed.

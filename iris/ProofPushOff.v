@@ -210,12 +210,12 @@ Section ProofPushOff.
               ltac:(vm_compute; discriminate)
               with "Hcg Hpc []").
     { iApply (ppi_2e with "Htext"). }
-    iIntros (CID4 Hh4) "Hcg Hpc".
+    iIntros (CID4 Hh4) "Hlc Hcg Hpc".
     iEval (rgne) in "Hpc".
     assert (Hra_final : ret_pc (M6 !!! Regidx (mword_of_int 1 : mword 5)) = ret_tgt)
       by (rewrite HM6ra; reflexivity).
     iEval (rewrite Hra_final) in "Hpc".
-    iSpecialize ("Hcont" $! CID4 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CID4 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! M6 with "Hcg Hpc [%]").
     rewrite /M6 /M5 /M4 Hsp5. reflexivity.
   Qed.
@@ -702,9 +702,9 @@ Section ProofPushOff.
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hcnt Hpc []").
     { iApply (poi_0a with "Htext"). }
-    iIntros (CID6 Hh6 mstatus0) "%Hmsf %Hsie Hcg Hcnt Htcp Hclm Hpay Hpc".
+    iIntros (CID6 Hh6) "Hlc". iIntros (mstatus0) "%Hmsf %Hsie Hcg Hcnt Htcp Hclm Hpay Hpc".
     iDestruct (po_cells_transport CID5 CID6 n eb p b lks ltac:(wp_next_chain) with "Hcells0") as "Hcells0".
-    iSpecialize ("Hcont" $! CID6 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CID6 with "[%] Hlc"); [wp_next_chain|].
     (* THE HART IS PINNED AT CID6 FROM HERE ON (push_off never re-enables),
        so drop the entry hart, the five prologue harts and their conditional
        equalities: with exactly one [CpuId] left in context the ambient
@@ -1915,11 +1915,11 @@ Section ProofPushOff.
                   with "Hcg Htext Hpc [Hr8] [Hr0]").
         { iEval (rewrite HcspP7). iExact "Hr8". }
         { iEval (rewrite HcspP7). iExact "Hr0". }
-        iIntros (CIDe Hse mf) "Hcg Hpc %Hmf".
+        iIntros (CIDe Hse) "Hlc". iIntros (mf) "Hcg Hpc %Hmf".
         assert (Hav2 : (av - 2 + 2)%nat = av) by lia.
         iEval (rewrite Hav2) in "Hcg".
         subst mf.
-        iSpecialize ("Hcont" $! CIDe with "[%]"); [wp_next_chain|].
+        iSpecialize ("Hcont" $! CIDe with "[%] Hlc"); [wp_next_chain|].
         iApply ("Hcont" with "Hcg [] Hpc [%]").
         { rewrite (size_le_zero_empty lks Hszlks).
           iApply (cpu_own_on_intro p). }

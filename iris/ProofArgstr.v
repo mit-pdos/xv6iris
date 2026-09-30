@@ -523,7 +523,7 @@ Section ProofArgstr.
               Rra T5 av b ltac:(vm_compute; discriminate)
               with "Hcg Hpc []").
     { iApply (asi_26 with "Htext"). }
-    iIntros (CID20 Hk20) "Hcg Hpc".
+    iIntros (CID20 Hk20) "Hlc Hcg Hpc".
     assert (Hretfin : ret_pc (rget T5 Rra) = ret_tgt).
     { rgne. rewrite HT5ra. reflexivity. }
     iEval (rewrite Hretfin) in "Hpc".
@@ -563,7 +563,7 @@ Section ProofArgstr.
     (* [Hcpu] was delivered at [CID14] by fetchstr's own [wp_next]; six more
        plain instructions have moved the hart to [CID20]. *)
     iDestruct (cpu_own_transport CID14 CID20 n eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-    iSpecialize ("Hcont" $! CID20 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CID20 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! T5 P' buf_new kev with "[%] [%] [%] Hcg Hcpu Hpc Hpriv Hbuf [%] [%]").
     { unfold callee_saved.
       split; [exact HT5sp|].

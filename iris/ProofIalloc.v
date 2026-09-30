@@ -689,7 +689,7 @@ Section IallocEpilogue.
     iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.ialloc + 0x86)) Rra P3 K b
               ltac:(nz) with "Hcg Hpc []").
     { iApply (iali_86 with "Htext"). }
-    iIntros (CID4 Hq4) "Hcg Hpc".
+    iIntros (CID4 Hq4) "Hlc Hcg Hpc".
     iEval (rgne) in "Hpc".
     assert (Hretf : ret_pc (P3 !!! Regidx Rra : mword 64)
                     = ret_pc (m !!! Regidx Rra : mword 64))
@@ -736,7 +736,7 @@ Section IallocEpilogue.
     iDestruct (cpu_own_transport CID0 CID4 0 true (proc_addr j) b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     rewrite /ia_cont.
-    iSpecialize ("Hcont" $! CID4 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CID4 with "[%] Hlc"); [wp_next_chain|].
     rewrite /ia_arms.
     iDestruct "Harms" as "[(%Hz & Hiref & Hop) | Hcl]".
     - iApply ("Hcont" $! P3 false 0%nat 1%Qp (mword_of_int 0 : mword 32) ia_dzero

@@ -506,14 +506,14 @@ Section ProofBrelse.
     iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.brelse + 0x76)) Rra P5 K eb
               ltac:(vm_compute; discriminate) with "Hcg Hpc []").
     { iApply (bri_76 with "Htext"). }
-    iIntros (CIDe6 Hse6) "Hcg Hpc".
+    iIntros (CIDe6 Hse6) "Hlc Hcg Hpc".
     iEval (rgne) in "Hpc".
     iEval (rewrite HP5ra) in "Hpc".
     (* [cpu_own] is the one resource a leaf's [wp_next] does NOT re-deliver:
        release handed it back at [CIDr], the six epilogue leaves moved on. *)
     iDestruct (cpu_own_transport CIDr CIDe6 0%nat eb p eb ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iSpecialize ("Hcont" $! CIDe6 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CIDe6 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! P5 with "[%] Hcg Hcnt Hpc").
     (* callee_saved m P5 *)
     assert (Hthread : forall c : mword 5, is_cs_idx c = true ->
@@ -1402,8 +1402,8 @@ Section ProofBrelse.
         rewrite /D1 upd_ne; [| regne]. exact (HmQthr c Hcs N2 N8 N9 N18). }
       iApply (brelse_tail (CID0 := CIDa)  bn V m E9 K b p lks tl HK HE9sp HE9thr Hbelow
                 with "Hcg Htext Hpc Hlock Htok Hafter Hcnt Hpay Hr24 Hr16 Hr8 Hg4").
-      iIntros (CIDf Hsf mf) "%Hcsf Hcg Hcnt Hpc".
-      iSpecialize ("Hcont" $! CIDf with "[%]"); [wp_next_chain|].
+      iIntros (CIDf Hsf) "Hlc". iIntros (mf) "%Hcsf Hcg Hcnt Hpc".
+      iSpecialize ("Hcont" $! CIDf with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hcont" $! mf with "[%] Hcg Hcnt Hpc Hppid [Hfd]").
       { exact Hcsf. }
       { rewrite /bslot. iExact "Hfd". }
@@ -1503,8 +1503,8 @@ Section ProofBrelse.
         rewrite /D1 upd_ne; [| regne]. exact (HmQthr c Hcs N2 N8 N9 N18). }
       iApply (brelse_tail (CID0 := CIDa)  bn V m D2 K b p lks tl HK HD2sp HD2thr Hbelow
                 with "Hcg Htext Hpc Hlock Htok Hafter Hcnt Hpay Hr24 Hr16 Hr8 Hg4").
-      iIntros (CIDf Hsf mf) "%Hcsf Hcg Hcnt Hpc".
-      iSpecialize ("Hcont" $! CIDf with "[%]"); [wp_next_chain|].
+      iIntros (CIDf Hsf) "Hlc". iIntros (mf) "%Hcsf Hcg Hcnt Hpc".
+      iSpecialize ("Hcont" $! CIDf with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hcont" $! mf with "[%] Hcg Hcnt Hpc Hppid [Hout]").
       { exact Hcsf. }
       { rewrite /bslot. iExact "Hout". }

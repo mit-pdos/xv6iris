@@ -2513,7 +2513,7 @@ Section ProofCreateMkdir.
                     "[%] Hcg Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hnb16").
           { exact (cr_tregs_of_regs3 m sp0 (ientry kd) (ientry kslot)
                      ty major minor T4 HT4regs). }
-          iIntros (CIDfm Hsfm mf) "%Hcsf %Ha0f Hcg Hpc".
+          iIntros (CIDfm Hsfm) "Hlc". iIntros (mf) "%Hcsf %Ha0f Hcg Hpc".
           iDestruct (cpu_own_transport CIDT3 CIDfm 0%nat eb (proc_addr j) b
                        ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
           iDestruct (iref_slots_combine with "Hislk Hisl2") as "Hisl".
@@ -2528,7 +2528,7 @@ Section ProofCreateMkdir.
             as "(Hcivalid & Hcdep)".
           iModIntro.
           iDestruct (ic_tx_dep_intro with "Hcdep Htx") as "Hcdep".
-          iSpecialize ("Hcont" $! CIDfm with "[%]"); [wp_next_chain |].
+          iSpecialize ("Hcont" $! CIDfm with "[%] Hlc"); [wp_next_chain |].
           iApply ("Hcont" $! mf true true kslot (q/2)%Qp (q/2)%Qp g cinum
                     dc2 bm2 n7 Sb7 (1 + (1 + (ns - 3)))%nat
                     with "[%] Hcg Hcnt Hpc Hsbn Hsbi Hsbs Hsbb Hpriv

@@ -359,7 +359,7 @@ Section ProofSysKill.
     iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.sys_kill + 0x20)) Rra E2 av b
               ltac:(vm_compute; discriminate) with "Hcg Hpc []").
     { iApply (skli_20 with "Htext"). }
-    iIntros (CID15 Hk15) "Hcg Hpc".
+    iIntros (CID15 Hk15) "Hlc Hcg Hpc".
     iEval (rgne) in "Hpc".
     assert (Hretfin : ret_pc (E2 !!! Regidx Rra) = ret_tgt) by (rewrite HE2ra; reflexivity).
     iEval (rewrite Hretfin) in "Hpc".
@@ -392,7 +392,7 @@ Section ProofSysKill.
       rewrite /A1 upd_ne; [| congruence].
       rewrite /M1 upd_ne; [| congruence]. reflexivity. }
     iDestruct (cpu_own_transport CID11 CID15 n eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-    iSpecialize ("Hcont" $! CID15 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CID15 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! E2 rv with "[%] Hcg Hcpu Hpc Htf Hpage").
     split; [| split; [exact HE2a0 | exact Hrv]].
     unfold callee_saved.

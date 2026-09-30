@@ -1063,7 +1063,7 @@ Section ProofNamexRoot.
     iApply (wp_cret_s_sconf (mword_of_int (NX + 0x78)) Rra P13 K b
               ltac:(nz) with "Hcg Hpc []").
     { iApply (nxi_078 with "Htext"). }
-    iIntros (CIDT14 HqT14) "Hcg Hpc".
+    iIntros (CIDT14 HqT14) "Hlc Hcg Hpc".
     iEval (rgne) in "Hpc".
     assert (Hretf : ret_pc (P13 !!! Regidx Rra : mword 64) = ret_tgt)
       by (rewrite CPra; reflexivity).
@@ -1157,7 +1157,7 @@ Section ProofNamexRoot.
     iEval (rewrite -(pa_add_0 pv)) in "Hp0".
     iDestruct (cpu_own_transport CIDig CIDT14 n eb p b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iSpecialize ("Hcont" $! CIDT14 with "[%]"); [wp_next_chain |].
+    iSpecialize ("Hcont" $! CIDT14 with "[%] Hlc"); [wp_next_chain |].
     iApply ("Hcont" $! P13 (ientry kig) with "[%] Hcg Hcnt Hpc Hp0 Hp1 Hip").
     split; [| exact CPa0].
     unfold callee_saved. split_and!;

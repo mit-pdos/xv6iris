@@ -319,9 +319,9 @@ Section ProofWalk.
               ltac:(vm_compute; discriminate)
               with "Hcg Hpc []").
     { iApply (wi_64 with "Htext"). }
-    iIntros (CIDe10 Hse10) "Hcg Hpc".
+    iIntros (CIDe10 Hse10) "Hlc Hcg Hpc".
     iEval (rewrite Hrt) in "Hpc".
-    iSpecialize ("Hcont" $! CIDe10 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CIDe10 with "[%] Hlc"); [wp_next_chain|].
     assert (HcntCE : b = false \/ p = zero_reg -> (CIDe10 : CPU) = (CID : CPU)) by wp_next_chain.
    iDestruct (cpu_own_transport CID CIDe10 lvl eb p b  HcntCE with "Hcnt") as "Hcnt".
     iApply ("Hcont" $! E9 tf q with "Hcg Hcnt Hpc Hptree [%] Henv [%] [%] [%] [%] [%] [%]").
@@ -643,10 +643,10 @@ Section ProofWalk.
               ltac:(rgne; rewrite /L5 upd_eq; reflexivity)
               with "Hcg Hpc []").
     { iApply (wi_36 with "Htext"). }
-    iIntros (CIDq6 Hsq6) "Hcg Hpc".
+    iIntros (CIDq6 Hsq6) "Hlc Hcg Hpc".
     assert (Hpp3a : add_vec_int (mword_of_int (KernelSyms.walk + 0x36) : mword 64) 4 = mword_of_int (KernelSyms.walk + 0x3a)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp3a) in "Hpc".
-    iSpecialize ("Hcont" $! CIDq6 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CIDq6 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" with "Hcg Hpc Hown").
   Qed.
 
@@ -692,8 +692,8 @@ Section ProofWalk.
               Hn ltac:(vm_compute; reflexivity) Hcval Ha2'
               with "Hcg Htext Hpc [Hpage]").
     { iApply (big_sepL_impl with "Hpage"). iIntros "!>" (k j _) "H". iExact "H". }
-    iIntros (CIDm Hsm mfin) "Hcg Hpc Hbuf %Hcs".
-    iSpecialize ("Hcont" $! CIDm with "[%]"); [wp_next_chain|].
+    iIntros (CIDm Hsm) "Hlc". iIntros (mfin) "Hcg Hpc Hbuf %Hcs".
+    iSpecialize ("Hcont" $! CIDm with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! mfin with "Hcg Hpc Hbuf [%]").
     exact Hcs.
   Qed.

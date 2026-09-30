@@ -937,7 +937,7 @@ Section WriteHeadBlocks.
     iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.write_head + 0x5c)) Rra P5 K b
               ltac:(vm_compute; discriminate) with "Hcg Hpc []").
     { iApply (whi_5c with "Htext"). }
-    iIntros (CID12 Hs12) "Hcg Hpc".
+    iIntros (CID12 Hs12) "Hlc Hcg Hpc".
     iEval (rgne) in "Hpc".
     assert (Hretf : ret_pc (P5 !!! Regidx Rra : mword 64)
                     = ret_pc (m !!! Regidx Rra : mword 64))
@@ -1008,7 +1008,7 @@ Section WriteHeadBlocks.
     iDestruct (cpu_claim_ext_transport CID5 CID12 eb (proc_addr j)
                  ltac:(rewrite Hbm; wp_next_chain) with "Hextm") as "Hextm".
     rewrite /wh_cont.
-    iSpecialize ("Hcont" $! CID12 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CID12 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! P5 (f <$> seq 0 1024) with "[%] Hcg Hcnt Hextc Hextm Hpc Hppid
                      Hncell HW HLauth Hfsb [%] [%] Hslot HQ").
     { unfold callee_saved. repeat split; assumption. }

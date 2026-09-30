@@ -194,12 +194,12 @@ Section ProofMemset.
                 with "Hcg [Hpc] []").
       { unfold pc6. iExact "Hpc". }
       { iApply (Hext6 with "Htext"). }
-      iIntros (CID3 Hs3) "Hcg Hpc".
+      iIntros (CID3 Hs3) "Hlc Hcg Hpc".
       (* the cursor's final value IS [ms_addr p N] on the last iteration *)
       assert (Hm'N : m' = <[Regidx ra5 := regval_into_reg (ms_addr p N)]> m)
         by (unfold m'; rewrite HSN; reflexivity).
       iEval (rewrite Hm'N) in "Hcg".
-      iSpecialize ("Hcont" $! CID3 with "[%]"); [wp_next_chain|].
+      iSpecialize ("Hcont" $! CID3 with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hcont" with "Hcg Hpc [Hb0 Hbuf]").
       (* buffer: seq off 1 = [off], the single filled byte *)
       cbn [seq]. rewrite big_sepL_cons.
@@ -227,12 +227,12 @@ Section ProofMemset.
            seq off (S(S rem'')) filled.  Introducing IH's own [wp_next] is
            what re-anchors the caller's ["Hcont"]: the hart it hands back is
            related to THIS invocation's by the whole [Hs1..Hs4] chain. *)
-        iEval (rewrite /wp_next). iIntros (CID4 Hs4) "Hcg Hpc Hbuf'".
+        iEval (rewrite /wp_next). iIntros (CID4 Hs4) "Hlc Hcg Hpc Hbuf'".
         assert (Hmeq : <[Regidx ra5 := regval_into_reg (ms_addr p N)]> m'
                      = <[Regidx ra5 := regval_into_reg (ms_addr p N)]> m)
           by (unfold m'; apply upd_upd).
         iEval (rewrite Hmeq) in "Hcg".
-        iSpecialize ("Hcont" $! CID4 with "[%]"); [wp_next_chain|].
+        iSpecialize ("Hcont" $! CID4 with "[%] Hlc"); [wp_next_chain|].
         iApply ("Hcont" with "Hcg Hpc [Hb0 Hbuf']").
         change (seq off (S (S rem''))) with (off :: seq (S off) (S rem'')).
         rewrite big_sepL_cons.
@@ -336,12 +336,12 @@ Section ProofMemset.
     iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.memset + 0x24)) (mword_of_int 1 : mword 5) M6 (n + 2)%nat b
               ltac:(vm_compute; discriminate)
               with "Hcg Hpc Hi2e").
-    iIntros (CID4 Hs4) "Hcg Hpc".
+    iIntros (CID4 Hs4) "Hlc Hcg Hpc".
     iEval (rgne) in "Hpc".
     assert (Hra_final : ret_pc (M6 !!! Regidx (mword_of_int 1 : mword 5)) = ret_tgt)
       by (rewrite HM6ra; reflexivity).
     iEval (rewrite Hra_final) in "Hpc".
-    iSpecialize ("Hcont" $! CID4 with "[]"); [iPureIntro; wp_next_chain|].
+    iSpecialize ("Hcont" $! CID4 with "[] Hlc"); [iPureIntro; wp_next_chain|].
     iApply ("Hcont" $! M6 with "Hcg Hpc [%]").
     rewrite /M6 /M5 /M4 Hsp5. reflexivity.
   Qed.
@@ -398,14 +398,14 @@ Section ProofMemset.
     iApply (wp_caddi4spn_s_sconf (mword_of_int (KernelSyms.memset + 0x06)) (Cregidx (mword_of_int 0)) nzimm_s0 s0_idx m1 (n - 2)%nat b
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi06").
-    iIntros (CID4 Hs4) "Hcg Hpc".
+    iIntros (CID4 Hs4) "Hlc Hcg Hpc".
     assert (Hpp08 : add_vec_int (mword_of_int (KernelSyms.memset + 0x06) : mword 64) 2 = add_vec_int (pcE : mword 64) 8) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp08) in "Hpc".
     change (<[Regidx s0_idx := regval_into_reg (add_vec (m1 !!! Regidx csp_rs1) (sign_extend' 64 (caddi4spn_imm nzimm_s0)))]> m1) with m2.
     (* frame cells hold ra0/s00 at pa_ra/pa_s0 (via Hcsp1: m1!!!csp = sp') *)
     iEval (rgne) in "Hbra". iEval (rewrite Hcsp1 Hra0v) in "Hbra".
     iEval (rgne) in "Hbs0". iEval (rewrite Hcsp1 Hs00v) in "Hbs0".
-    iApply ("Hcont" $! CID4 with "[%] Hcg Hpc Hbra Hbs0").
+    iApply ("Hcont" $! CID4 with "[%] Hlc Hcg Hpc Hbra Hbs0").
     wp_next_chain.
   Qed.
 
@@ -429,9 +429,9 @@ Section ProofMemset.
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate) Hz' Hal
               with "Hcg Hpc Hi08").
     iApply bi.later_intro.
-    iIntros (CID1 Hs1) "Hcg Hpc".
+    iIntros (CID1 Hs1) "Hlc Hcg Hpc".
     iEval (rewrite Htgt) in "Hpc".
-    iApply ("Hcont" $! CID1 with "[%] Hcg Hpc").
+    iApply ("Hcont" $! CID1 with "[%] Hlc Hcg Hpc").
     wp_next_chain.
   Qed.
 
@@ -488,11 +488,11 @@ Section ProofMemset.
     iApply (wp_add_s_sconf (mword_of_int (KernelSyms.memset + 0x10)) a4_idx a2_idx a0_idx wval_add m5 n b
               ltac:(vm_compute; discriminate) ltac:(rdok) Hvalue_add'
               with "Hcg Hpc Hi10").
-    iIntros (CID5 Hs5) "Hcg Hpc".
+    iIntros (CID5 Hs5) "Hlc Hcg Hpc".
     assert (Hpp14 : add_vec_int (mword_of_int (KernelSyms.memset + 0x10) : mword 64) 4 = add_vec_int (pcE : mword 64) 20) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp14) in "Hpc".
     change (<[Regidx a4_idx := regval_into_reg wval_add]> m5) with m6.
-    iApply ("Hcont" $! CID5 with "[%] Hcg Hpc").
+    iApply ("Hcont" $! CID5 with "[%] Hlc Hcg Hpc").
     wp_next_chain.
   Qed.
 

@@ -618,7 +618,7 @@ Section ProofUvmfree.
       iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.uvmfree + 0x1c)) Rra E3 K b
                 ltac:(vm_compute; discriminate) with "Hcg Hpc []").
       { iApply (ufi_1c with "Htext"). }
-      iIntros (CIDk8 Hsk8) "Hcg Hpc".
+      iIntros (CIDk8 Hsk8) "Hlc Hcg Hpc".
       iEval (rgne) in "Hpc".
       assert (Hretf : ret_pc (E3 !!! Regidx Rra) = ret_tgt) by (rewrite HE3ra; reflexivity).
       iEval (rewrite Hretf) in "Hpc".
@@ -626,7 +626,7 @@ Section ProofUvmfree.
          four more plain instructions have moved the hart to [CIDk8]. *)
       iDestruct (cpu_own_transport CIDk3 CIDk8 ilvl eb p b ltac:(wp_next_chain)
                    with "Hcpu") as "Hcpu".
-      iSpecialize ("Hcont" $! CIDk8 with "[%]"); [wp_next_chain|].
+      iSpecialize ("Hcont" $! CIDk8 with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hcont" $! E3 with "Hcg Hcpu Hlend Hpc [%]").
       unfold callee_saved. split_and!;
           first [ exact HE3sp | exact HE3s0 | exact HE3s1

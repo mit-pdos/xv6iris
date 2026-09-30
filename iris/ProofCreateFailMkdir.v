@@ -790,7 +790,7 @@ Section ProofCreateFailMkdir.
               "[%] Hcg Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hnb16").
     { exact (cr_tregs_of_regs3 m sp0 (ientry kd)
                (mword_of_int 0 : mword 64) ty major minor G7 HG7regs). }
-    iIntros (CIDfin Hsfin mf) "%Hcsf %Ha0f Hcg Hpc".
+    iIntros (CIDfin Hsfin) "Hlc". iIntros (mf) "%Hcsf %Ha0f Hcg Hpc".
     iDestruct (cpu_own_transport CIDGA CIDfin 0%nat eb (proc_addr j) b
                  ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (iref_slots_combine with "Hisl1 Hisl2") as "Hisl".
@@ -803,7 +803,7 @@ Section ProofCreateFailMkdir.
                  (bv_unsigned minor) Nm Nd P Pmiss Farm Fdots Fun Fok Fex
                  (bview plen pfun) (bv_unsigned dind) (bv_unsigned cinum)
                  with "HPpar Hdlkc Hacre Hdotsx Hunr") as "Hcf".
-    iSpecialize ("Hcont" $! CIDfin with "[%]"); [wp_next_chain |].
+    iSpecialize ("Hcont" $! CIDfin with "[%] Hlc"); [wp_next_chain |].
     iApply ("Hcont" $! mf false false 0%nat 1%Qp 1%Qp γf
               (mword_of_int 0 : mword 32) dp bmp n6 Sb6
               (1 + (1 + (ns - 2)))%nat

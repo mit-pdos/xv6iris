@@ -1555,7 +1555,7 @@ Section ProofCreateAlloc.
                        "[%] Hcg Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hnb16").
              { exact (cr_tregs_of_regs3 m sp0 (ientry kd) (ientry kslot)
                         ty major minor Y4 HY4regs). }
-             iIntros (CIDf Hsf mf) "%Hcsf %Ha0f Hcg Hpc".
+             iIntros (CIDf Hsf) "Hlc". iIntros (mf) "%Hcsf %Ha0f Hcg Hpc".
              iDestruct (cpu_own_transport CIDU2 CIDf 0%nat eb (proc_addr j) b
                           ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
              iDestruct (iref_slots_combine with "Hislk Hisl2") as "Hisl".
@@ -1569,7 +1569,7 @@ Section ProofCreateAlloc.
                as "(Hcivalid & Hcdep)".
              iModIntro.
              iDestruct (ic_tx_dep_intro with "Hcdep Htx") as "Hcdep".
-             iSpecialize ("Hcont" $! CIDf with "[%]"); [wp_next_chain |].
+             iSpecialize ("Hcont" $! CIDf with "[%] Hlc"); [wp_next_chain |].
              iApply ("Hcont" $! mf true true kslot (q/2)%Qp (q/2)%Qp g cinum
                        (cr_setf dnc major minor (mword_of_int 1 : mword 16)) bmc
                        n2 Sb2 (1 + (1 + (ns - 3)))%nat
@@ -1976,7 +1976,7 @@ Section ProofCreateAlloc.
                 "[%] Hcg Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hnb16").
       { exact (cr_tregs_of_regs3 m sp0 (ientry kd)
                  (mword_of_int 0 : mword 64) ty major minor Z4 HZ4regs). }
-      iIntros (CIDf Hsf mf) "%Hcsf %Ha0f Hcg Hpc".
+      iIntros (CIDf Hsf) "Hlc". iIntros (mf) "%Hcsf %Ha0f Hcg Hpc".
       iDestruct (cpu_own_transport CIDU CIDf 0%nat eb (proc_addr j) b
                    ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
       iDestruct (iref_slots_combine with "Hislg Hisl") as "Hisl".
@@ -1994,7 +1994,7 @@ Section ProofCreateAlloc.
                    (bv_unsigned minor) Nm Nd P Pmiss Farm Fdots Fun Fok Fex
                    (bview plen pfun) (bv_unsigned dind)
                    with "HPpar Hdlkc Hcre") as "Hcf".
-      iSpecialize ("Hcont" $! CIDf with "[%]"); [wp_next_chain |].
+      iSpecialize ("Hcont" $! CIDf with "[%] Hlc"); [wp_next_chain |].
       iApply ("Hcont" $! mf false false 0%nat 1%Qp 1%Qp γf
                 (mword_of_int 0 : mword 32) dn bm n2 Sb2
                 (1 + (1 + (ns - 2)))%nat

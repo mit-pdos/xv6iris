@@ -166,10 +166,10 @@ Section ProofProcdumpMain.
       destruct Hxc as [Hxsp Hxhi].
       iApply (wp_pd_epilogue (CID0 := CIDx) m Mx K b p (pd_K10 K HK) Hxsp Hxhi
                 with "Hcg Htext Hpc Hframe").
-      iIntros (CIDy Hsy mf) "%Hcsf Hcg Hpc".
+      iIntros (CIDy Hsy) "Hlc". iIntros (mf) "%Hcsf Hcg Hpc".
       iDestruct (cpu_own_transport CIDx CIDy 0%nat eb p b
                    ltac:(wp_next_chain) with "Hcnt2") as "Hcnt2".
-      iSpecialize ("Hcont" $! CIDy with "[%]"); [ wp_next_chain |].
+      iSpecialize ("Hcont" $! CIDy with "[%] Hlc"); [ wp_next_chain |].
       iApply ("Hcont" $! mf with "Hcg Hpc [%] Hcnt2 Hview").
       exact Hcsf. }
     iApply ("Hscan" $! 0%nat M' with "[%] [%] Hcg Hcnt Hpc [] [Hview]").

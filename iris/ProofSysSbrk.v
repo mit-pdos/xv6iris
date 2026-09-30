@@ -265,7 +265,7 @@ Section ProofSysSbrk.
               Rra T4 av b ltac:(vm_compute; discriminate)
               with "Hcg Hpc []").
     { iApply (ssi_6e with "Htext"). }
-    iIntros (CID6 Hs6) "Hcg Hpc".
+    iIntros (CID6 Hs6) "Hlc Hcg Hpc".
     iEval (rgne; rewrite HT4ra) in "Hpc".
     assert (HT4sp : T4 !!! Regidx csp_rs1 = m !!! Regidx csp_rs1)
       by (rewrite /T4 upd_eq Hwv; symmetry; exact Hsp0).
@@ -295,7 +295,7 @@ Section ProofSysSbrk.
       rewrite /T1 upd_ne; [| congruence].
       rewrite /T0 upd_ne; [| congruence].
       apply Hthr; assumption. }
-    iSpecialize ("Hcont" $! CID6 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CID6 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! T4 with "[%] Hcg Hpc").
     split; [| exact HT4a0].
     unfold callee_saved.
@@ -464,10 +464,10 @@ Section ProofSysSbrk.
                 ltac:(rewrite Htgt64; vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (ssi_72 with "Htext"). }
-      iApply bi.later_intro. iIntros (CIDv Hsv). iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CIDv Hsv) "Hlc". iIntros "Hcg Hpc".
       iEval (rewrite Htgt64) in "Hpc".
       iDestruct (cpu_own_transport CIDg CIDv 0%nat eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-      iSpecialize ("Hcont" $! CIDv with "[%]"); [wp_next_chain|].
+      iSpecialize ("Hcont" $! CIDv with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hcont" $! X1 P' M' szv' (mword_of_int (-1) : mword 64) k'
                 with "[%] [%] [%] [%] [%] Hcg Hcpu Hpc Hpriv Hnw").
       - rewrite /X1 upd_ne; [exact Hgsp | reg_neq].
@@ -488,12 +488,12 @@ Section ProofSysSbrk.
               ltac:(vm_compute; discriminate) ltac:(rgne; exact Hpos)
               with "Hcg Hpc []").
     { iApply (ssi_60 with "Htext"). }
-    iIntros (CIDw Hsw) "Hcg Hpc".
+    iIntros (CIDw Hsw) "Hlc Hcg Hpc".
     assert (Hpp64 : add_vec_int (mword_of_int (KernelSyms.sys_sbrk + 0x60) : mword 64) 4
                     = mword_of_int (KernelSyms.sys_sbrk + 0x64)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp64) in "Hpc".
     iDestruct (cpu_own_transport CIDg CIDw 0%nat eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-    iSpecialize ("Hcont" $! CIDw with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CIDw with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! mg P' M' szv' (pv_sz (us_V U)) k'
               with "[%] [%] [%] [%] [%] Hcg Hcpu Hpc Hpriv Hnw").
     - exact Hgsp.
@@ -963,9 +963,9 @@ Section ProofSysSbrk.
       iApply (ss_tail (CID0 := CIDx) m Mf av b p rv sp0 ra0 s00 s10 u4 w5 u6
                 ltac:(lia) eq_refl eq_refl eq_refl eq_refl Hfsp Hfs1 Hfthr
                 with "Hcg Htext Hpc Hs1 Hs2 Hs3 Hs4 Hs5 Hs6").
-      iIntros (CIDy Hqy mf) "[%Hcsf %Hmfa0] Hcg Hpc".
+      iIntros (CIDy Hqy) "Hlc". iIntros (mf) "[%Hcsf %Hmfa0] Hcg Hpc".
       iDestruct (cpu_own_transport CIDx CIDy 0%nat eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-      iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain|].
+      iSpecialize ("Hcont" $! CIDy with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hcont" $! mf P' szv' lz' M' k' with "[%] [%] [%] Hcg Hcpu Hpc Hpriv").
       { exact Hcsf. }
       { rewrite Hmfa0. exact Hok. }

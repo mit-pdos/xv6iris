@@ -940,13 +940,13 @@ Section ProofProcFreepagetable.
     iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.proc_freepagetable + 0x44)) Rra E4 K b
               ltac:(vm_compute; discriminate) with "Hcg Hpc []").
     { iApply (pfi_44 with "Htext"). }
-    iIntros (CID33 Hs33) "Hcg Hpc".
+    iIntros (CID33 Hs33) "Hlc Hcg Hpc".
     iEval (rgne) in "Hpc".
     assert (Hretf : ret_pc (E4 !!! Regidx Rra) = ret_tgt) by (rewrite HE4ra; reflexivity).
     iEval (rewrite Hretf) in "Hpc".
     iDestruct (cpu_own_transport CID27 CID33 ilvl eb p b ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
-    iSpecialize ("Hcont" $! CID33 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CID33 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! E4 with "Hcg Hcpu Hlend Hpc [%]").
     unfold callee_saved. split_and!;
         first [ exact HE4sp | exact HE4s0 | exact HE4s1 | exact HE4s2

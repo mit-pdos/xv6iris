@@ -332,7 +332,7 @@ Section ProofArgint.
               ltac:(vm_compute; discriminate)
               with "Hcg Hpc []").
     { iApply (ai_1a with "Htext"). }
-    iIntros (CID14 Hs14) "Hcg Hpc".
+    iIntros (CID14 Hs14) "Hlc Hcg Hpc".
     assert (Hretfin : ret_pc (rget E5 (mword_of_int 1 : mword 5)) = ret_tgt).
     { rgne. rewrite HE5ra. reflexivity. }
     iEval (rewrite Hretfin) in "Hpc".
@@ -363,7 +363,7 @@ Section ProofArgint.
     (* [Hcpu] was delivered at [CID8] by argraw's own [wp_next]; six more
        plain instructions have moved the hart to [CID14]. *)
     iDestruct (cpu_own_transport CID8 CID14 n eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-    iSpecialize ("Hcont" $! CID14 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CID14 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! E5 with "[%] Hcg Hcpu Hpc Htfp Htfa Hip").
     unfold callee_saved.
     split; [exact HE5csp|].

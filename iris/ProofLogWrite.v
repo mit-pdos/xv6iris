@@ -715,7 +715,7 @@ Section LogWriteBlocks.
     iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.log_write + 0xc2)) Rra P4 K b
               ltac:(vm_compute; discriminate) with "Hcg Hpc []").
     { iApply (lwi_c2 with "Htext"). }
-    iIntros (CID6 Hs6) "Hcg Hpc".
+    iIntros (CID6 Hs6) "Hlc Hcg Hpc".
     assert (Hretf : ret_pc (P4 !!! Regidx Rra : mword 64)
                     = ret_pc (m !!! Regidx Rra : mword 64)) by (rewrite HP4ra; reflexivity).
     iEval (rewrite Hretf) in "Hpc".
@@ -736,7 +736,7 @@ Section LogWriteBlocks.
     iDestruct (lw_cont_shift (CIDa := CID0) (CIDb := CID6) bn γ γfs γd cov dev k pidv bno
                  bs bsd Fb Bud m K n eb p b lks ltac:(wp_next_chain) with "Hcont") as "Hcont".
     rewrite /lw_cont.
-    iSpecialize ("Hcont" $! CID6 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CID6 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! P4 with "Hcg Hcnt Hpc [%] Hop Hfsb Hlk Hslot").
     unfold callee_saved.
     assert (Hc2 : P4 !!! Regidx csp_rs1 = (m !!! Regidx csp_rs1 : mword 64))
@@ -2913,8 +2913,8 @@ Section ProofLogWrite.
               HK Hnoff Hk Ha0 Hcovbno Hnotlog ltac:(set_solver) Hno
               with "Hcg Hcnt Htext Hpc Hbio Hlctx Hbslot Hlb0 Hcred Hop [Hfsb] Hheld [Hcont]").
     all: try lkbelow.
-    2: { iIntros (CIDx) "%Hchain".
-         iSpecialize ("Hcont" $! CIDx with "[%]"); [exact Hchain|].
+    2: { iIntros (CIDx) "%Hchain" Hlc.
+         iSpecialize ("Hcont" $! CIDx with "[%] Hlc"); [exact Hchain|].
          iIntros (mr) "Hsie Hcnt Hpc %Hcs HopW Hfsb Hlk Hslot".
          rewrite /log_opSwe.
          iDestruct "HopW" as "(HopS & #Hwit & _)".
@@ -2966,8 +2966,8 @@ Section ProofLogWrite.
        landed [wp_log_write_gen] caller byte-stable: only the epoch-exposed
        and atomic-update forms -- the walkers', and the one §G.3's receipt is
        deposited from -- carry the epoch-stamped row. *)
-    iIntros (CIDx) "%Hchain".
-    iSpecialize ("Hcont" $! CIDx with "[%]"); [exact Hchain|].
+    iIntros (CIDx) "%Hchain" Hlc.
+    iSpecialize ("Hcont" $! CIDx with "[%] Hlc"); [exact Hchain|].
     iIntros (mr) "Hsie Hcnt Hpc %Hcs HopS _ Hfsb Hlk Hslot".
     iDestruct (log_opSe_opS with "HopS") as "HopS".
     iApply ("Hcont" $! mr with "Hsie Hcnt Hpc [%] HopS Hfsb Hlk Hslot").
@@ -3001,7 +3001,7 @@ Section ProofLogWrite.
               HK Hnoff Hk Ha0 Hcovbno Hnotlog ltac:(discriminate) Hno
               with "Hcg Hcnt Htext Hpc Hbio Hlctx Hbslot Hop Hfsb Hheld [Hcont Htx]").
     all: try lkbelow.
-    iIntros (CIDx) "%Hchain". iSpecialize ("Hcont" $! CIDx with "[%]"); [exact Hchain|].
+    iIntros (CIDx) "%Hchain" Hlc. iSpecialize ("Hcont" $! CIDx with "[%] Hlc"); [exact Hchain|].
     iIntros (mr) "Hsie Hcnt Hpc %Hcs HopS Hfsb Hlk Hslot".
     iDestruct (log_opS_op with "HopS Htx") as "Hop".
     iApply ("Hcont" $! mr with "Hsie Hcnt Hpc [%] Hop Hfsb Hlk Hslot").

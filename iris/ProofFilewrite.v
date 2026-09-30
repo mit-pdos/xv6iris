@@ -1295,9 +1295,9 @@ Section ProofFilewrite.
                 (mword_of_int nz) cs1 cs3 s40 cs7 cs8 cs9 w12 pp b
                 HK Hsp0 Hra0 Hs00 Hs20 Hs50 Hs60 HMrsp HMra0 HMrthr2
                 with "Hcg Htext Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10 Hb11 Hb12").
-      iIntros (CIDe Hse mf) "%Hcsr Hcg Hpc".
+      iIntros (CIDe Hse) "Hlc". iIntros (mf) "%Hcsr Hcg Hpc".
       destruct Hcsr as [Hcsf Hrv].
-      iSpecialize ("Hcont" $! CIDe with "[]"); [iPureIntro; wp_next_chain|].
+      iSpecialize ("Hcont" $! CIDe with "[] Hlc"); [iPureIntro; wp_next_chain|].
       iApply ("Hcont" $! mf (mword_of_int nz) with "[%] Hcg Hpc").
       split_and!; [exact Hcsf | exact Hrv |].
       left. split; [exact Hzi | reflexivity].
@@ -1383,9 +1383,9 @@ Section ProofFilewrite.
                 (mword_of_int (-1)) cs1 cs3 s40 cs7 cs8 cs9 w12 pp b
                 HK Hsp0 Hra0 Hs00 Hs20 Hs50 Hs60 HMrsp HMra0 HMrthr2
                 with "Hcg Htext Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10 Hb11 Hb12").
-      iIntros (CIDe Hse mf) "%Hcsr Hcg Hpc".
+      iIntros (CIDe Hse) "Hlc". iIntros (mf) "%Hcsr Hcg Hpc".
       destruct Hcsr as [Hcsf Hrv].
-      iSpecialize ("Hcont" $! CIDe with "[]"); [iPureIntro; wp_next_chain|].
+      iSpecialize ("Hcont" $! CIDe with "[] Hlc"); [iPureIntro; wp_next_chain|].
       iApply ("Hcont" $! mf (mword_of_int (-1)) with "[%] Hcg Hpc").
       split_and!; [exact Hcsf | exact Hrv |].
       right. split; [exact Hne | reflexivity].
@@ -1606,9 +1606,9 @@ Section ProofFilewrite.
                 ltac:(rewrite Htgt82; vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (fwri_0da with "Htext"). }
-      iApply bi.later_intro. iIntros (CID3 Hq3) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID3 Hq3) "Hlc Hcg Hpc".
       iEval (rewrite Htgt82) in "Hpc".
-      iSpecialize ("Hcont" $! CID3 with "[]"); [iPureIntro; wp_next_chain|].
+      iSpecialize ("Hcont" $! CID3 with "[] Hlc"); [iPureIntro; wp_next_chain|].
       iApply ("Hcont" $! (nz - iz)%Z T2 with "[%] Hcg Hpc").
       split_and!; [lia | lia | lia | lia | exact HT2s3 | exact HT2thr].
     - (* ---- FALL: the chunk is the CAP ([fw_chunk_cap]).  [Z.geb_le] is
@@ -1665,9 +1665,9 @@ Section ProofFilewrite.
                 ltac:(rewrite Htgt82b; vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (fwri_0e0 with "Htext"). }
-      iApply bi.later_intro. iIntros (CID5 Hq5). iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID5 Hq5) "Hlc". iIntros "Hcg Hpc".
       iEval (rewrite Htgt82b) in "Hpc".
-      iSpecialize ("Hcont" $! CID5 with "[]"); [iPureIntro; wp_next_chain|].
+      iSpecialize ("Hcont" $! CID5 with "[] Hlc"); [iPureIntro; wp_next_chain|].
       iApply ("Hcont" $! SysWriteDefs.FW_MAX T3 with "[%] Hcg Hpc").
       split_and!; [lia | lia | lia | lia | exact HT3s3 | exact HT3thr].
   Qed.
@@ -1744,9 +1744,9 @@ Section ProofFilewrite.
                 ltac:(rewrite Htgtb4; vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (fwri_0ae with "Htext"). }
-      iApply bi.later_intro. iIntros (CID1 Hq1) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID1 Hq1) "Hlc Hcg Hpc".
       iEval (rewrite Htgtb4) in "Hpc".
-      iSpecialize ("Hcont" $! CID1 with "[]"); [iPureIntro; wp_next_chain|].
+      iSpecialize ("Hcont" $! CID1 with "[] Hlc"); [iPureIntro; wp_next_chain|].
       iApply ("Hcont" $! Mt v with "[%] Hcg Hpc Hcell").
       split; [exact Hwf |]. split; [| intros r _; reflexivity].
       left. split; [exact Hle | reflexivity].
@@ -1824,13 +1824,13 @@ Section ProofFilewrite.
                 (mword_of_int 32 : mword 12) U2 Kn v b
                 with "Hcg Hpc [] Hcell").
       { iApply (fwri_0b8 with "Htext"). }
-      iIntros (CID4 Hq4) "Hcg Hpc Hcell".
+      iIntros (CID4 Hq4) "Hlc Hcg Hpc Hcell".
       iEval (rewrite Hpoff2) in "Hcell". iEval (rewrite Hstv) in "Hcell".
       assert (Hppbc : add_vec_int (mword_of_int (FW + 0xb8) : mword 64) 4
                       = mword_of_int (FW + 0xbc))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hppbc) in "Hpc".
-      iSpecialize ("Hcont" $! CID4 with "[]"); [iPureIntro; wp_next_chain|].
+      iSpecialize ("Hcont" $! CID4 with "[] Hlc"); [iPureIntro; wp_next_chain|].
       iApply ("Hcont" $! U2 (mword_of_int (bv_unsigned v + rz) : mword 32)
                 with "[%] Hcg Hpc Hcell").
       split.
@@ -3567,7 +3567,7 @@ Section ProofFilewrite.
                   eq_refl HY1sp HY1s5 HY1s4 HY1thr2
                   with "Hcg Htext Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9
                         Hb10 Hb11 Hb12").
-        iIntros (CIDe Hse mfin rv) "%Hcsr Hcg Hpc".
+        iIntros (CIDe Hse) "Hlc". iIntros (mfin rv) "%Hcsr Hcg Hpc".
         destruct Hcsr as (Hcsf & Hrv & Hdisj).
         (* AU EDIT: the tail's KEYED post.  [iz + c = n] here, so the
            answer is [n] and not [-1] -- which is the whole reason
@@ -3577,7 +3577,7 @@ Section ProofFilewrite.
             [exact Hq | exfalso; exact (Hne Hizn)]. }
         iDestruct (cpu_own_transport CIDeo CIDe 0%nat eb (proc_addr jx) b
                      ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
-        iSpecialize ("Hcont" $! CIDe with "[]"); [iPureIntro; wp_next_chain|].
+        iSpecialize ("Hcont" $! CIDe with "[] Hlc"); [iPureIntro; wp_next_chain|].
         iApply ("Hcont" $! mfin rv P' kw
                   with "[%] [%] [%] [%] Hcg Hcnt Hpc Href Hpriv [Hout] [Hau]").
         { exact Hcsf. }
@@ -3708,7 +3708,7 @@ Section ProofFilewrite.
                 eq_refl Heosp Heos5 Heos4 Heothr2
                 with "Hcg Htext Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9
                       Hb10 Hb11 Hb12").
-      iIntros (CIDe Hse mfin rv) "%Hcsr Hcg Hpc".
+      iIntros (CIDe Hse) "Hlc". iIntros (mfin rv) "%Hcsr Hcg Hpc".
       destruct Hcsr as (Hcsf & Hrv & Hdisj).
       (* AU EDIT: [iz < n] on this arm, so the tail's keyed post answers
          [-1]; and the chunk that ended the loop was not full, so it did
@@ -3721,7 +3721,7 @@ Section ProofFilewrite.
         exfalso. rewrite E4 Z.eqb_refl in Hce. discriminate Hce. }
       iDestruct (cpu_own_transport CIDeo CIDe 0%nat eb (proc_addr jx) b
                    ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
-      iSpecialize ("Hcont" $! CIDe with "[]"); [iPureIntro; wp_next_chain|].
+      iSpecialize ("Hcont" $! CIDe with "[] Hlc"); [iPureIntro; wp_next_chain|].
       iApply ("Hcont" $! mfin rv P' kw
                 with "[%] [%] [%] [%] Hcg Hcnt Hpc Href Hpriv [Hout] [Hau]").
       { exact Hcsf. }
@@ -3852,11 +3852,11 @@ Section ProofFilewrite.
       iApply (wp_cret_s_sconf (mword_of_int (FW + 0x13c)) Rra A1 K b
                 ltac:(vm_compute; discriminate) with "Hcg Hpc []").
       { iApply (fwri_13c with "Htext"). }
-      iIntros (CID4 Hs4) "Hcg Hpc".
+      iIntros (CID4 Hs4) "Hlc Hcg Hpc".
       iEval (rewrite HA1ra) in "Hpc".
       iDestruct (cpu_own_transport CID CID4 0%nat eb pj b ltac:(rewrite Hb; wp_next_chain)
                    with "Hcnt") as "Hcnt".
-      iSpecialize ("Hcont" $! CID4 with "[]"); [iPureIntro; wp_next_chain|].
+      iSpecialize ("Hcont" $! CID4 with "[] Hlc"); [iPureIntro; wp_next_chain|].
       assert (HVid : us_upt U (pv_upt (us_V U)) = U) by (apply us_upt_id).
       iApply ("Hcont" $! A1 (mword_of_int (-1)) (pv_upt (us_V U)) (pv_ev (us_V U))
                 with "[%] [%] [%] [%] Hcg Hcnt [Hpc]
@@ -4073,11 +4073,11 @@ Section ProofFilewrite.
                   HMgsp Hmga0 HMgthr
                   with "Hcg Htext Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9
                         Hb10 Hb11 Hb12").
-        iIntros (CIDe Hse mfin) "%Hcsr Hcg Hpc".
+        iIntros (CIDe Hse) "Hlc". iIntros (mfin) "%Hcsr Hcg Hpc".
         destruct Hcsr as [Hcsf Hrv].
         iDestruct (cpu_own_transport CID CIDe 0%nat eb pj b
                      ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
-        iSpecialize ("Hcont" $! CIDe with "[]"); [iPureIntro; wp_next_chain|].
+        iSpecialize ("Hcont" $! CIDe with "[] Hlc"); [iPureIntro; wp_next_chain|].
         assert (HVid : us_upt U (pv_upt (us_V U)) = U) by (apply us_upt_id).
         iApply ("Hcont" $! mfin (mword_of_int (-1)) (pv_upt (us_V U)) (pv_ev (us_V U))
                   with "[%] [%] [%] [%] Hcg Hcnt [Hpc]
@@ -4329,11 +4329,11 @@ Section ProofFilewrite.
                   Hmfsp eq_refl Hmfthr
                   with "Hcg Htext Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10
                         Hb11 Hb12").
-        iIntros (CIDe Hse mfin) "%Hcsr Hcg Hpc".
+        iIntros (CIDe Hse) "Hlc". iIntros (mfin) "%Hcsr Hcg Hpc".
         destruct Hcsr as [Hcsf Hrv].
         iDestruct (cpu_own_transport CIDpw CIDe 0%nat eb pj b ltac:(rewrite Hb; wp_next_chain)
                      with "Hcnt") as "Hcnt".
-        iSpecialize ("Hcont" $! CIDe with "[]"); [iPureIntro; wp_next_chain|].
+        iSpecialize ("Hcont" $! CIDe with "[] Hlc"); [iPureIntro; wp_next_chain|].
         iApply ("Hcont" $! mfin (mf !!! Regidx Ra0) P' kpw
                   with "[%] [%] [%] [%] Hcg Hcnt [Hpc]
                         [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hpn Hpref Hiru Hoh Hrlv]
@@ -4652,11 +4652,11 @@ Section ProofFilewrite.
                           HErsp HEra0 HErthr2
                           with "Hcg Htext Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10
                                 Hb11 Hb12").
-                iIntros (CIDe Hse mfin) "%Hcsr Hcg Hpc".
+                iIntros (CIDe Hse) "Hlc". iIntros (mfin) "%Hcsr Hcg Hpc".
                 destruct Hcsr as [Hcsf Hrv].
                 iDestruct (cpu_own_transport CID CIDe 0%nat eb pj b ltac:(rewrite Hb; wp_next_chain)
                              with "Hcnt") as "Hcnt".
-                iSpecialize ("Hcont" $! CIDe with "[]"); [iPureIntro; wp_next_chain|].
+                iSpecialize ("Hcont" $! CIDe with "[] Hlc"); [iPureIntro; wp_next_chain|].
                 assert (HVid : us_upt U (pv_upt (us_V U)) = U) by (apply us_upt_id).
                 iApply ("Hcont" $! mfin (mword_of_int (-1)) (pv_upt (us_V U)) (pv_ev (us_V U))
                           with "[%] [%] [%] [%] Hcg Hcnt [Hpc]
@@ -4833,11 +4833,11 @@ Section ProofFilewrite.
                           Hmfsp Hra0 Hmfthr
                           with "Hcg Htext Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10
                                 Hb11 Hb12").
-                iIntros (CIDe Hse mfin) "%Hcsr Hcg Hpc".
+                iIntros (CIDe Hse) "Hlc". iIntros (mfin) "%Hcsr Hcg Hpc".
                 destruct Hcsr as [Hcsf Hrv].
                 iDestruct (cpu_own_transport CIDcw CIDe 0%nat eb pj b ltac:(rewrite Hb; wp_next_chain)
                              with "Hcnt") as "Hcnt".
-                iSpecialize ("Hcont" $! CIDe with "[]"); [iPureIntro; wp_next_chain|].
+                iSpecialize ("Hcont" $! CIDe with "[] Hlc"); [iPureIntro; wp_next_chain|].
                 iApply ("Hcont" $! mfin (mword_of_int r) P' kcw
                           with "[%] [%] [%] [%] Hcg Hcnt [Hpc]
                                 [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv]
@@ -4928,11 +4928,11 @@ Section ProofFilewrite.
                        HErsp HEra0 HErthr2
                        with "Hcg Htext Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10
                              Hb11 Hb12").
-             iIntros (CIDe Hse mfin) "%Hcsr Hcg Hpc".
+             iIntros (CIDe Hse) "Hlc". iIntros (mfin) "%Hcsr Hcg Hpc".
              destruct Hcsr as [Hcsf Hrv].
              iDestruct (cpu_own_transport CID CIDe 0%nat eb pj b ltac:(rewrite Hb; wp_next_chain)
                           with "Hcnt") as "Hcnt".
-             iSpecialize ("Hcont" $! CIDe with "[]"); [iPureIntro; wp_next_chain|].
+             iSpecialize ("Hcont" $! CIDe with "[] Hlc"); [iPureIntro; wp_next_chain|].
              assert (HVid : us_upt U (pv_upt (us_V U)) = U) by (apply us_upt_id).
              iApply ("Hcont" $! mfin (mword_of_int (-1)) (pv_upt (us_V U)) (pv_ev (us_V U))
                        with "[%] [%] [%] [%] Hcg Hcnt [Hpc]
@@ -5136,11 +5136,11 @@ Section ProofFilewrite.
                            eq_refl HZ1sp HZ1a0 HZ1thr
                            with "Hcg Htext Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9
                                  Hb10 Hb11 Hb12").
-                 iIntros (CIDe Hse mfin) "%Hcsr Hcg Hpc".
+                 iIntros (CIDe Hse) "Hlc". iIntros (mfin) "%Hcsr Hcg Hpc".
                  destruct Hcsr as [Hcsf Hrv].
                  iDestruct (cpu_own_transport CID CIDe 0%nat eb pj b
                               ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
-                 iSpecialize ("Hcont" $! CIDe with "[]"); [iPureIntro; wp_next_chain|].
+                 iSpecialize ("Hcont" $! CIDe with "[] Hlc"); [iPureIntro; wp_next_chain|].
                  assert (HVid : us_upt U (pv_upt (us_V U)) = U) by (apply us_upt_id).
                  iApply ("Hcont" $! mfin (mword_of_int n) (pv_upt (us_V U)) (pv_ev (us_V U))
                            with "[%] [%] [%] [%] Hcg Hcnt [Hpc]
@@ -5591,9 +5591,9 @@ Section ProofFilewrite.
                    iApply (filewrite_in_inode_any rx omfx (bv_unsigned inumx) γox n
                              (us_M U) uaddr Q Qe with "[Hfin]").
                    rewrite Hstx. iExact "Hfin". }
-                 iIntros (CIDx Hsx mf rv P' kx')
+                 iIntros (CIDx Hsx) "Hlc". iIntros (mf rv P' kx')
                    "%Hcs %Hup %Hra %Hkx' Hcg Hcnt Hpc Href Hpriv Henvo Harms".
-                 iSpecialize ("Hcont" $! CIDx with "[]"); [iPureIntro; wp_next_chain|].
+                 iSpecialize ("Hcont" $! CIDx with "[] Hlc"); [iPureIntro; wp_next_chain|].
                  iApply ("Hcont" $! mf rv P' kx'
                            with "[%] [%] [%] [%] Hcg Hcnt Hpc Href Hpriv Henvo
                                  [Harms]").

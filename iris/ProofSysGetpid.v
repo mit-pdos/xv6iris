@@ -274,7 +274,7 @@ Section ProofSysGetpid.
               ltac:(vm_compute; discriminate)
               with "Hcg Hpc []").
     { iApply (sg_14 with "Htext"). }
-    iIntros (CID11 Hs11) "Hcg Hpc".
+    iIntros (CID11 Hs11) "Hlc Hcg Hpc".
     assert (Hra_final : ret_pc (E12 !!! Regidx (mword_of_int 1 : mword 5)) = ret_tgt)
       by (rewrite HE12ra; reflexivity).
     iEval (rewrite Hra_final) in "Hpc".
@@ -306,7 +306,7 @@ Section ProofSysGetpid.
       rewrite /E10 upd_ne; [| vm_compute; discriminate].
       rewrite /E0e upd_ne; [| vm_compute; discriminate].
       rewrite /E0c upd_eq. reflexivity. }
-    iSpecialize ("Hcont" $! CID11 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CID11 with "[%] Hlc"); [wp_next_chain|].
     (* [Hcpu] has sat at [CID6] (myproc's own resumed hart) since the crossing;
        the five leaf steps since then never touched it. *)
     iDestruct (cpu_own_transport CID6 CID11 n eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".

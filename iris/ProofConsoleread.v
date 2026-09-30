@@ -1507,7 +1507,7 @@ Section CrBodies.
     iApply (wp_cret_s_sconf (mword_of_int (CR + 0xe0)) Rra E9 av true
               ltac:(nz) with "Hcg Hpc []").
     { iApply (cnri_0e0 with "Ht"). }
-    iIntros (CIDr Hsr) "Hcg Hpc". iEval (rgne) in "Hpc".
+    iIntros (CIDr Hsr) "Hlc Hcg Hpc". iEval (rgne) in "Hpc".
     iEval (rewrite HE9ra) in "Hpc".
     assert (HE9a0 : E9 !!! Regidx Ra0 = (mword_of_int r : mword 64)).
     { rewrite /E9 upd_ne; [| reg_neq]. rewrite /E8 upd_ne; [| reg_neq].
@@ -1622,7 +1622,7 @@ Section CrBodies.
     iDestruct (cpu_own_transport CID CIDr 0%nat eb pj true ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
     rewrite /cr_ret.
-    iSpecialize ("Hcont" $! CIDr with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CIDr with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! E9 r (pv_upt (us_V U)) (us_M U) hs (pv_ev (us_V U))
               with "[%] [%] [%] Hshotq Hwin [%] Htags Hcg Hcnt Hpc [%] [Hpriv]").
     - exact Hcs.
@@ -1922,13 +1922,13 @@ Section ProofConsoleread.
               (sign_extend' 21 (concat_vec (mword_of_int 2017 : mword 11) ('b"0")))
               X4 (av - 12)%nat true ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
     { iApply (cnri_10c with "Ht"). }
-    iNext. iIntros (CIDj Hsj). iIntros "Hcg Hpc". rgall.
+    iNext. iIntros (CIDj Hsj) "Hlc". iIntros "Hcg Hpc". rgall.
     assert (Hjce : add_vec (mword_of_int (CR + 0x10c) : mword 64)
                      (sign_extend' 64 (sign_extend' 21
                         (concat_vec (mword_of_int 2017 : mword 11) ('b"0"))))
                    = mword_of_int (CR + 0xce)) by pcw.
     iEval (rewrite Hjce) in "Hpc".
-    iSpecialize ("EPI" $! CIDj with "[%]"); [wp_next_chain|].
+    iSpecialize ("EPI" $! CIDj with "[%] Hlc"); [wp_next_chain|].
     iApply ("EPI" $! X4 P' Mo (n - nc) hs kv
               with "Hwin [%] [%] [%] [%] [%] [] Htags Hcg Hpc Hcnt [//] Hpriv Hrest").
     - rewrite /X4 upd_ne; [| reg_neq].
@@ -2114,7 +2114,7 @@ Section ProofConsoleread.
   Proof using fdslotG0.
     intros Hn31 Hav Hbelow. iIntros "#Ht #Hlk #Hpr #Henv HEAD".
     rewrite /cr_have_prop.
-    iIntros (CIDv Hsv M nc cur P' Mo rr ww ee bs ts hs kv)
+    iIntros (CIDv Hsv) "Hlc". iIntros (M nc cur P' Mo rr ww ee bs ts hs kv)
       "Hrn %Hregs %Ha5 %Hnb %Hlen %Hext %Hlent %Hok %Hrow %Hrw #Htags
        EX Hcg Hpc Hcnt Hpay Hlocked Hrc Hwc Hec Hdat Hts Hgh %Hkv Hpriv Hsl7 Hq10 Hq11 Hq12".
     (* the tag column is persistent: move it out of the spatial context so
@@ -2362,7 +2362,7 @@ Section ProofConsoleread.
                        = mword_of_int (CR + 0xfc)) by pcw.
         iEval (rewrite Hjfc) in "Hpc".
         iDestruct "EX" as "[HRETX _]".
-        iSpecialize ("HRETX" $! CIDv with "[%]"); [wp_next_chain|].
+        iSpecialize ("HRETX" $! CIDv with "[%] Hlc"); [wp_next_chain|].
         (* THE SWALLOWED BYTE: the pop stands and nothing was delivered, so
            the cursor is exactly one past the run -- and the byte it took is
            NAMED, with the reason this arm fired: it was [C('D')] and the run
@@ -2483,7 +2483,7 @@ Section ProofConsoleread.
         rewrite /E2 upd_ne; [| congruence]. rewrite /E1 upd_ne; [| congruence].
         apply HthrH; assumption. }
       iDestruct "EX" as "[HRETX _]".
-      iSpecialize ("HRETX" $! CIDv with "[%]"); [wp_next_chain|].
+      iSpecialize ("HRETX" $! CIDv with "[%] Hlc"); [wp_next_chain|].
       (* the push-back UNDID the pop, so the ghost never moved either *)
       iPoseProof (cr_rout_of_racc Rin with "Hacc") as "Hrt".
       (* the push-back UNDID the pop, so B1 is the identity; B4 is vacuous
@@ -2901,7 +2901,7 @@ Section ProofConsoleread.
                         = mword_of_int (CR + 0xfc)) by pcw.
         iEval (rewrite Hjfc3) in "Hpc".
         iDestruct "EX" as "[HRETX _]".
-        iSpecialize ("HRETX" $! CIDv with "[%]"); [wp_next_chain|].
+        iSpecialize ("HRETX" $! CIDv with "[%] Hlc"); [wp_next_chain|].
         iPoseProof (cr_rout_of_racc Rin with "Hacc") as "Hrt".
         iEval (rewrite -Hstep2 -Hhs2) in "Hrt".
         (* the round DELIVERED its byte before the break, so B1 is the
@@ -3040,7 +3040,7 @@ Section ProofConsoleread.
                    = mword_of_int (CR + 0xfc)) by pcw.
     iEval (rewrite Hpfc) in "Hpc".
     iDestruct "EX" as "[HRETX _]".
-    iSpecialize ("HRETX" $! CIDv with "[%]"); [wp_next_chain|].
+    iSpecialize ("HRETX" $! CIDv with "[%] Hlc"); [wp_next_chain|].
     (* THE FAILED COPY: the pop stands, nothing was delivered, so the
        cursor is one past the run and the ledger did not grow. *)
     assert (Hdw0 : dwr = 0%nat) by exact (Hd0 Hrm1).
@@ -3395,13 +3395,13 @@ Section ProofConsoleread.
                 ltac:(nz) ltac:(rdok) ltac:(apply bv_eq; vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (cnri_0cc with "Ht"). }
-      iIntros (CIDz Hsz) "Hcg Hpc". rgall.
+      iIntros (CIDz Hsz) "Hlc Hcg Hpc". rgall.
       set (K4 := <[Regidx Ra0 := regval_into_reg (mword_of_int (-1) : mword 64)]> mrl).
       assert (Hpce : add_vec_int (mword_of_int (CR + 0xcc) : mword 64) 2
                      = mword_of_int (CR + 0xce)) by pcw.
       iEval (rewrite Hpce) in "Hpc".
       iDestruct "EX" as "[_ HEPI]".
-      iSpecialize ("HEPI" $! CIDz with "[%]"); [wp_next_chain|].
+      iSpecialize ("HEPI" $! CIDz with "[%] Hlc"); [wp_next_chain|].
       iApply ("HEPI" $! K4 P' Mo (-1)%Z hs kv
                 with "Hwin [%] [%] [%] [%] [%] [] Htags Hcg Hpc Hcnt [//] Hpriv Hrest").
       - rewrite /K4 upd_ne; [| reg_neq].
@@ -3606,7 +3606,7 @@ Section ProofConsoleread.
               with "Hcg Hcnt Ht Hpc []").
     all: try lkbelow.
     { iEval (rewrite HS7a0). iApply (is_conslock_lock with "Hlk"). }
-    iIntros (CIDq2 Hsq2 ms2 maq) "%Hms2 Hcg Hpc %Hcsaq Hlocked Hres _ Hcnt Hpay". rgall.
+    iIntros (CIDq2 Hsq2) "Hlc". iIntros (ms2 maq) "%Hms2 Hcg Hpc %Hcsaq Hlocked Hres _ Hcnt Hpay". rgall.
     iEval (rewrite HS7ra) in "Hpc".
     assert (Hp68 : ret_pc (add_vec_int (mword_of_int (CR + 0x64) : mword 64) 4)
                    = (mword_of_int (CR + 0x68) : mword 64)) by pcw.
@@ -3718,7 +3718,7 @@ Section ProofConsoleread.
     assert (Hp76 : add_vec_int (mword_of_int (CR + 0x74) : mword 64) 2
                    = mword_of_int (CR + 0x76)) by pcw.
     iEval (rewrite Hp76) in "Hpc".
-    iSpecialize ("HAVE" $! CIDq2 with "[%]"); [wp_next_chain|].
+    iSpecialize ("HAVE" $! CIDq2 with "[%] Hlc"); [wp_next_chain|].
     iPoseProof (cr_runR_intro Rin cn Wd ord (us_M U) Mo (m0 !!! Regidx Ra1) cur n nc
                   bsacc hs Hcur Hmoeq Htagacc with "Hacc") as "Hrn".
     iApply ("HAVE" $! S9 nc cur P' Mo rr2 ww2 ee2 bs2 ts2 hs kv
@@ -3777,7 +3777,7 @@ Section ProofConsoleread.
                   Hjp Hjl Hn31 Hav Hbelow
                   with "Ht Hlk Huinv Hpr Henv Hpinv HAVE") as "WAIT".
     rewrite /cr_head_prop.
-    iIntros (CIDh Hsh M nc cur P' Mo hs kv)
+    iIntros (CIDh Hsh) "Hlc". iIntros (M nc cur P' Mo hs kv)
       "Hrn %Hregs %Hs5 %Hrng %Hfl %Hext #Htags EX Hcg Hpc Hcnt Hpay Hlocked Hres %Hkv Hpriv Hrest".
     iDestruct "Hrn" as (bsacc) "(%Hcur & %Hmoeq & %Htagacc & Hacc)".
     pose proof Hregs as Hregs'.
@@ -3800,7 +3800,7 @@ Section ProofConsoleread.
                      = mword_of_int (CR + 0xfc)) by pcw.
       iEval (rewrite Hjfc) in "Hpc".
       iDestruct "EX" as "[HRETX _]".
-      iSpecialize ("HRETX" $! CIDh with "[%]"); [wp_next_chain|].
+      iSpecialize ("HRETX" $! CIDh with "[%] Hlc"); [wp_next_chain|].
       iPoseProof (cr_rout_of_racc Rin with "Hacc") as "Hrt".
       (* THE LOOP'S OWN EXIT POPS NOTHING EXTRA, which is B1's whole
          content; B4 is vacuous, because reaching this test with [n > 0]
@@ -3927,7 +3927,7 @@ Section ProofConsoleread.
                           (concat_vec (mword_of_int 1985 : mword 11) ('b"0"))))
                      = mword_of_int (CR + 0x76)) by pcw.
       iEval (rewrite Hj76) in "Hpc".
-      iSpecialize ("HAVE" $! CIDh with "[%]"); [wp_next_chain|].
+      iSpecialize ("HAVE" $! CIDh with "[%] Hlc"); [wp_next_chain|].
       iPoseProof (cr_runR_intro Rin cn Wd ord (us_M U) Mo (m0 !!! Regidx Ra1) cur n nc
                     bsacc hs Hcur Hmoeq Htagacc with "Hacc") as "Hrn".
       iApply ("HAVE" $! D2 nc cur P' Mo rr ww ee bs ts hs kv
@@ -4146,8 +4146,8 @@ Section ProofConsoleread.
                j m av true pid U (us_M U) n lks)
       with "[Hcont]" as "Hcont".
     { rewrite /cr_ret /wp_next.
-      iIntros (CIDr) "%Hsr".
-      iSpecialize ("Hcont" $! CIDr with "[%]"); [exact Hsr|].
+      iIntros (CIDr) "%Hsr" Hlc.
+      iSpecialize ("Hcont" $! CIDr with "[%] Hlc"); [exact Hsr|].
       iIntros (mf r P' Mo hs kv)
         "%Hcs %Hext %Hr Hshotq Hwin %Ha0 #Htags Hcg Hcnt Hpc %Hkv Hpriv".
       rewrite /cr_winO.

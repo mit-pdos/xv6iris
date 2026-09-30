@@ -1355,11 +1355,11 @@ Section ProofFilestat.
                 (fst_K10 K HK) eq_refl eq_refl eq_refl eq_refl eq_refl
                 HC3sp HC3a0 HC3thr
                 with "Hcg Htext Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10").
-      iIntros (CIDe Hse mfin) "%Hcsr Hcg Hpc".
+      iIntros (CIDe Hse) "Hlc". iIntros (mfin) "%Hcsr Hcg Hpc".
       destruct Hcsr as [Hcsf Hrv].
       iDestruct (cpu_own_transport CID32 CIDe 0%nat eb pj b ltac:(rewrite Hb; wp_next_chain)
                    with "Hcnt") as "Hcnt".
-      iSpecialize ("Hcont" $! CIDe with "[]"); [iPureIntro; wp_next_chain|].
+      iSpecialize ("Hcont" $! CIDe with "[] Hlc"); [iPureIntro; wp_next_chain|].
       iApply ("Hcont" $! mfin RV P' dwr fbytes kc2
                 with "[%] [%] [%] [%] [%] [%] Hcg Hcnt [Hpc]
                 [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv] [Hpriv]
@@ -1437,11 +1437,11 @@ Section ProofFilestat.
                 (fst_K10 K HK) eq_refl eq_refl eq_refl eq_refl eq_refl
                 HE1sp HE1a0 HE1thr
                 with "Hcg Htext Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10").
-      iIntros (CIDe Hse mfin) "%Hcsr Hcg Hpc".
+      iIntros (CIDe Hse) "Hlc". iIntros (mfin) "%Hcsr Hcg Hpc".
       destruct Hcsr as [Hcsf Hrv].
       iDestruct (cpu_own_transport CID10 CIDe 0%nat eb pj b ltac:(rewrite Hb; wp_next_chain)
                    with "Hcnt") as "Hcnt".
-      iSpecialize ("Hcont" $! CIDe with "[]"); [iPureIntro; wp_next_chain|].
+      iSpecialize ("Hcont" $! CIDe with "[] Hlc"); [iPureIntro; wp_next_chain|].
       (* this arm never reaches copyout, so the window is EMPTY and the
          image is the one it came in at *)
       assert (HVid : upd_usM (us_upt (upd_usV U (upd_ev (us_V U) (pv_ev (us_V U))))

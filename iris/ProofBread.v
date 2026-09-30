@@ -568,7 +568,7 @@ Section BreadBlocks.
     iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.bread + 0xc6)) Rra E7 K eb
               ltac:(vm_compute; discriminate) with "Hcg Hpc []").
     { iApply (bdi_c6 with "Htext"). }
-    iIntros (CIDe8 Hse8) "Hcg Hpc".
+    iIntros (CIDe8 Hse8) "Hlc Hcg Hpc".
     iEval (rgne) in "Hpc".
     iEval (rewrite HE7ra) in "Hpc".
     assert (HE7a0 : E7 !!! Regidx Ra0 = bnode k).
@@ -587,7 +587,7 @@ Section BreadBlocks.
     iDestruct (cpu_claim_ext_transport CID0 CIDe8 eb (proc_addr j)
                  ltac:(wp_next_chain) with "Hextm") as "Hextm".
     rewrite /bd_cont.
-    iSpecialize ("Hcont" $! CIDe8 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CIDe8 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! E7 k bs_out bsd d with "[%] Hcg Hcnt Hextc Hextm Hpc Hppid Hlk").
     split; [| exact HE7a0].
     (* callee_saved m E7 *)

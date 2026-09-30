@@ -563,7 +563,7 @@ Section ProofCopyinstr.
     iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.copyinstr + 0x66)) Rra TA av b
               ltac:(vm_compute; discriminate) with "Hcg Hpc []").
     { iApply (csi_66 with "Htext"). }
-    iIntros (CIDe11 Hse11) "Hcg Hpc".
+    iIntros (CIDe11 Hse11) "Hlc Hcg Hpc".
     iEval (rgne) in "Hpc".
     iEval (rewrite HTAra) in "Hpc".
     (* ---- the postcondition ---- *)
@@ -590,7 +590,7 @@ Section ProofCopyinstr.
     assert (HTA10 : TA !!! Regidx Rs10 = m !!! Regidx Rs10) by lkp.
     assert (HTA11 : TA !!! Regidx Rs11 = m !!! Regidx Rs11) by lkp.
     assert (HTAa0 : TA !!! Regidx Ra0 = res) by lkp.
-    iSpecialize ("Hcont" $! CIDe11 with "[]"); [ iPureIntro; wp_next_chain | ].
+    iSpecialize ("Hcont" $! CIDe11 with "[] Hlc"); [ iPureIntro; wp_next_chain | ].
     iApply ("Hcont" $! TA with "[%] Hcg Hpc").
     split; [| exact HTAa0].
     unfold callee_saved. split_and!;
@@ -645,7 +645,7 @@ Section ProofCopyinstr.
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (csi_4a with "Htext"). }
-    iIntros (CIDr2 Hsr2) "Hcg Hpc".
+    iIntros (CIDr2 Hsr2) "Hlc Hcg Hpc".
     pose (N2 := <[Regidx Ra0 := regval_into_reg
                   (sign_extend' 64 (sub_vec (subrange_vec_dec (rget N1 Rx0) 31 0 : mword 32)
                                             (subrange_vec_dec (rget N1 Ra5) 31 0 : mword 32)))]> N1).
@@ -659,7 +659,7 @@ Section ProofCopyinstr.
     { rewrite /N2 upd_eq. rgne. rgne. rewrite HN1x0 HN1a5 /fl.
       destruct Hcase as [[Hfl ->] | [Hfl ->]]; rewrite Hfl;
         [exact cs_negw_0 | exact cs_negw_1]. }
-    iSpecialize ("Hcont" $! CIDr2 with "[]"); [ iPureIntro; wp_next_chain | ].
+    iSpecialize ("Hcont" $! CIDr2 with "[] Hlc"); [ iPureIntro; wp_next_chain | ].
     iApply ("Hcont" $! N2 with "[%] [%] Hcg Hpc").
     - exact HN2a0.
     - intros r N10 N15.
@@ -2019,14 +2019,14 @@ Section ProofCopyinstr.
                 U1 (K - 12)%nat b ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (csi_3e with "Htext"). }
-      iApply bi.later_intro. iIntros (CIDx2 Hsx2). iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CIDx2 Hsx2) "Hlc". iIntros "Hcg Hpc".
       assert (Htgt4e : add_vec (mword_of_int (KernelSyms.copyinstr + 0x3e) : mword 64)
                 (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 8 : mword 11) ('b"0"))))
                 = mword_of_int (KernelSyms.copyinstr + 0x4e)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgt4e) in "Hpc".
       iDestruct (cpu_own_transport CIDvf CIDx2 lvl eb pcur b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
-      iSpecialize ("Hcont" $! CIDx2 with "[]"); [ iPureIntro; wp_next_chain | ].
+      iSpecialize ("Hcont" $! CIDx2 with "[] Hlc"); [ iPureIntro; wp_next_chain | ].
       iApply ("Hcont" $! U1 (mword_of_int (-1) : mword 64) Pc f
                 with "[%] [%] [%] [%] [%] [%] Hcg Hcnt Hlend Hpc Hpt Hdst").
       { lkp. } { lkp. } { lkp. }
@@ -2186,13 +2186,13 @@ Section ProofCopyinstr.
       iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.copyinstr + 0xd4)) Rra Z3 K b
                 ltac:(vm_compute; discriminate) with "Hcg Hpc []").
       { iApply (csi_d4 with "Htext"). }
-      iIntros (CIDz5 Hsz5) "Hcg Hpc".
+      iIntros (CIDz5 Hsz5) "Hlc Hcg Hpc".
       iEval (rgne) in "Hpc".
       assert (Hretfin : ret_pc (Z3 !!! Regidx Rra) = ret_tgt) by (rewrite HZ3ra; reflexivity).
       iEval (rewrite Hretfin) in "Hpc".
       iDestruct (cpu_own_transport CID CIDz5 lvl eb p b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
-      iSpecialize ("Hcont" $! CIDz5 with "[]"); [ iPureIntro; wp_next_chain | ].
+      iSpecialize ("Hcont" $! CIDz5 with "[] Hlc"); [ iPureIntro; wp_next_chain | ].
       iApply ("Hcont" $! Z3 P dst_olds with "Hcg Hcnt Hlend Hpc Hpt Hdst [%] [%] [%]").
       { unfold callee_saved. split_and!; lkp. }
       { apply uptd_ext_sz_refl. }
@@ -2560,10 +2560,10 @@ Section ProofCopyinstr.
                 eq_refl eq_refl eq_refl eq_refl eq_refl
                 Hjsp Hja0 Hj10 Hj11
                 with "Hcg Htext Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10 Hb11 Hb12").
-      iIntros (CIDf Hsf mf) "[%Hcsf %Hfa0] Hcg Hpc".
+      iIntros (CIDf Hsf) "Hlc". iIntros (mf) "[%Hcsf %Hfa0] Hcg Hpc".
       iDestruct (cpu_own_transport CIDj CIDf lvl eb p b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
-      iSpecialize ("Hcont" $! CIDf with "[]"); [ iPureIntro; wp_next_chain | ].
+      iSpecialize ("Hcont" $! CIDf with "[] Hlc"); [ iPureIntro; wp_next_chain | ].
       iApply ("Hcont" $! mf P' g with "Hcg Hcnt Hlend Hpc Hpt Hdst [%] [%] [%]").
       { exact Hcsf. }
       { exact Hjext. }

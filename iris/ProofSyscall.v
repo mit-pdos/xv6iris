@@ -2288,7 +2288,7 @@ Section SyscallVocab.
               ltac:(vm_compute; discriminate)
               with "Hcg Hpc []").
     { iApply (syci_76 with "Htext"). }
-    iIntros (CID6 Hst6) "Hcg Hpc".
+    iIntros (CID6 Hst6) "Hlc Hcg Hpc".
     assert (Hrafinal : ret_pc (T5 !!! Regidx Rra) = ret_pc (m !!! Regidx Rra)) by (rewrite HT5ra; reflexivity).
     iEval (rewrite Hrafinal) in "Hpc".
     (* the postcondition -- sp/s0/s1/s2 restored to [m]'s own; everything
@@ -2318,7 +2318,7 @@ Section SyscallVocab.
       rewrite /T3 upd_ne; [| congruence].
       rewrite /T2 upd_ne; [| congruence].
       rewrite /T1 upd_ne; [| congruence]. reflexivity. }
-    iSpecialize ("Hcont" $! CID6 with "[%]").
+    iSpecialize ("Hcont" $! CID6 with "[%] Hlc").
     { intro Hd. destruct Hd as [Hbad | Hgood]; [discriminate Hbad|].
       rewrite (Hst6 (or_intror Hgood)) (Hst5 (or_intror Hgood)) (Hst4 (or_intror Hgood))
               (Hst3 (or_intror Hgood)) (Hst2 (or_intror Hgood)) (Hst1 (or_intror Hgood)).

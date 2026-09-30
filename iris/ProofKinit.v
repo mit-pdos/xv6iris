@@ -401,7 +401,7 @@ Section ProofKinit.
               ltac:(vm_compute; discriminate)
               with "Hcg Hpc []").
     { iApply (kii_32 with "Htext"). }
-    iIntros (CID18 Hs18) "Hcg Hpc".
+    iIntros (CID18 Hs18) "Hlc Hcg Hpc".
     assert (Hretf : ret_pc (E3 !!! Regidx (mword_of_int 1 : mword 5)) = ret_tgt)
       by (rewrite HE3ra; reflexivity).
     iEval (rewrite Hretf) in "Hpc".
@@ -410,7 +410,7 @@ Section ProofKinit.
        CID18. *)
     iDestruct (cpu_own_transport CIDfr CID18 ncnt eb pcur b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iSpecialize ("Hcont" $! CID18 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CID18 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! E3 with "Hcg Hcnt Hpc [%] Hkmem Havail").
     (* callee_saved m E3: the two sub-calls preserve s1..s11; the epilogue
        restores sp/s0, and ra (caller-saved) is irrelevant. *)

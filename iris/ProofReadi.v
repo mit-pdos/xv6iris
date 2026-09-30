@@ -591,7 +591,7 @@ Section ReadiRet.
     iApply (wp_cret_s_sconf (mword_of_int (RI + 0xec)) Rra P8 K b ltac:(nz)
               with "Hcg Hpc []").
     { iApply (rdi_0ec with "Htext"). }
-    iIntros (CID9 Hq9) "Hcg Hpc".
+    iIntros (CID9 Hq9) "Hlc Hcg Hpc".
     iEval (rgne) in "Hpc".
     assert (Hretf : ret_pc (P8 !!! Regidx Rra : mword 64)
                     = ret_pc (m !!! Regidx Rra : mword 64))
@@ -652,7 +652,7 @@ Section ReadiRet.
     iDestruct (cpu_claim_ext_transport CID0 CID9 eb (proc_addr j)
                  ltac:(rewrite Heb2b; wp_next_chain) with "Hextm") as "Hextm".
     rewrite /rd_cont.
-    iSpecialize ("Hcont" $! CID9 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CID9 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! P8 tot P' kv
               with "[%] [%] [%] [%] [%] Hcg Hcnt Hextc Hextm Hpc Hidev Hmeta Hmap Hblocks Hdst Hsl").
     { unfold callee_saved. split_and!; assumption. }
@@ -2633,10 +2633,10 @@ Section ReadiMain.
                dst_olds U pidv dq dqd j m K eb b lks)%I with "[Hcont]" as "Hcont".
     { (* the loop's count, packed into the user arm's ∃ (permit sweep L1b) *)
       rewrite /rd_cont.
-      iIntros (CIDq Hq mf tot P' kv) "%Hcs %Hext %Hkv %Htot %Harm Hcg Hcnt Hextc Hextm Hpc
+      iIntros (CIDq Hq) "Hlc". iIntros (mf tot P' kv) "%Hcs %Hext %Hkv %Htot %Harm Hcg Hcnt Hextc Hextm Hpc
                                       Hidev Hmeta Hmap Hblocks Hdst Hsl".
       iApply ("Hcont" $! CIDq Hq mf tot P'
-                with "[%] [%] [%] [%] Hcg Hcnt Hextc Hextm Hpc Hidev Hmeta Hmap Hblocks
+                with "[%] Hlc [%] [%] [%] Hcg Hcnt Hextc Hextm Hpc Hidev Hmeta Hmap Hblocks
                       [Hdst] Hsl").
       { exact Hcs. } { exact Hext. } { exact Htot. } { exact Harm. }
       rewrite /rd_dst /rd_img. destruct user.
@@ -2706,7 +2706,7 @@ Section ReadiMain.
       iApply (wp_cret_s_sconf (mword_of_int (RI + 0xf0)) Rra X1 K b ltac:(nz)
                 with "Hcg Hpc []").
       { iApply (rdi_0f0 with "Htext"). }
-      iIntros (CIDx3 Hqx3) "Hcg Hpc".
+      iIntros (CIDx3 Hqx3) "Hlc Hcg Hpc".
       iEval (rgne) in "Hpc".
       assert (Hretf : ret_pc (X1 !!! Regidx Rra : mword 64)
                       = ret_pc (m !!! Regidx Rra : mword 64))
@@ -2737,7 +2737,7 @@ Section ReadiMain.
       iDestruct (cpu_claim_ext_transport CID CIDx3 eb (proc_addr j)
                    ltac:(rewrite Heb2b; wp_next_chain) with "Hextm") as "Hextm".
       rewrite /rd_cont.
-      iSpecialize ("Hcont" $! CIDx3 with "[%]"); [wp_next_chain|].
+      iSpecialize ("Hcont" $! CIDx3 with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hcont" $! X1 0%nat (pv_upt (us_V U)) (pv_ev (us_V U))
                 with "[%] [%] [%] [%] [%] Hcg Hcnt Hextc Hextm Hpc Hidev Hmeta Hmap Hblocks Hdst Hsl").
       { unfold callee_saved. split_and!; lkp. }

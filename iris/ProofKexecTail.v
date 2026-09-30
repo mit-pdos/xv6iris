@@ -910,7 +910,7 @@ Section KexecA.
               (mword_of_int 3584 : mword 12) T3 (K - 68)%nat v64 b
               with "Hcg Hpc [] Hb64").
     { iApply (kxc_01c with "Htext"). }
-    iIntros (CID9 Hs9c) "Hcg Hpc Hb64".
+    iIntros (CID9 Hs9c) "Hlc Hcg Hpc Hb64".
     iEval (rewrite Hpa64 Hv64) in "Hb64".
     assert (Hp020 : add_vec_int (mword_of_int (KXA + 0x01c) : mword 64) 4
                     = mword_of_int (KXA + 0x020)) by (apply bv_eq; vm_compute; reflexivity).
@@ -923,7 +923,7 @@ Section KexecA.
       rewrite /T2 upd_ne; [| regne].
       rewrite /T1 upd_ne; [| regne].
       reflexivity. }
-    iSpecialize ("Hcont" $! CID9 with "[%]"); [wp_next_chain |].
+    iSpecialize ("Hcont" $! CID9 with "[%] Hlc"); [wp_next_chain |].
     iApply ("Hcont" $! T3 with "[%] Hcg Hpc").
     { split_and!; [exact HT3sp | exact HT3s0 | exact HT3s2 | exact HT3a0
                   | exact HT3a1 | exact HT3thr]. }
@@ -1348,14 +1348,14 @@ Section KexecAExit.
     iApply (kxc_epi_frame m Mt K sp0 ra0 s00 s10 s20 pj b
               HK Hsp Hra Hs0 Hs1 Hs2 Hmtsp Hthr
               with "Hcg Htext Hpc Hframe").
-    iIntros (CIDe Hse mf) "%Hcs %Hpres Hcg Hpc".
+    iIntros (CIDe Hse) "Hlc". iIntros (mf) "%Hcs %Hpres Hcg Hpc".
     iDestruct (cpu_own_transport CID0 CIDe 0%nat eb pj b Hse
                  with "Hcnt") as "Hcnt".
     iDestruct (trap_csrs_ext_transport CID0 CIDe eb pj
                  ltac:(try rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
     iDestruct (cpu_claim_ext_transport CID0 CIDe eb pj
                  ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
-    iSpecialize ("Hcont" $! CIDe with "[%]"); [wp_next_chain |].
+    iSpecialize ("Hcont" $! CIDe with "[%] Hlc"); [wp_next_chain |].
     iApply ("Hcont" $! mf U (mword_of_int 0 : mword 64)
               (mword_of_int 0 : mword 64) (mword_of_int 0 : mword 64)
               with "[%] [%] Hcg Hcnt Hextc Hclmc Hpc Hbm Hins Hka Hpriv Hpath
@@ -1724,9 +1724,9 @@ Section KexecABad.
               Hsp Hra Hs0 Hs1 Hs2 HB5sp HB5a0 HB5thr
               with "Hcg Hcnt Hextc Hclmc Htext Hpc Hfr Hbm Hins Hka Hpriv Hpath Hargv
                     Hargs Hbs Hirs2").
-    iIntros (CIDf Hsf mf U' entry spv szv') "%Hcs2 %Hok Hcg Hcnt Hextc Hclmc Hpc
+    iIntros (CIDf Hsf) "Hlc". iIntros (mf U' entry spv szv') "%Hcs2 %Hok Hcg Hcnt Hextc Hclmc Hpc
              Hbm Hins Hka2 Hpriv Hpath Hargv Hargs Hbs Hirs".
-    iSpecialize ("Hcont" $! CIDf with "[%]"); [wp_next_chain |].
+    iSpecialize ("Hcont" $! CIDf with "[%] Hlc"); [wp_next_chain |].
     iApply ("Hcont" $! mf U' entry spv szv'
               with "[%] [%] Hcg Hcnt Hextc Hclmc Hpc Hbm Hins Hka2 Hpriv Hpath
                     Hargv Hargs Hbs Hirs").

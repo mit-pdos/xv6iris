@@ -462,7 +462,7 @@ Section ProofKilled.
     iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.killed + 0x28)) kl_ra E5 av b
               ltac:(vm_compute; discriminate) with "Hcg Hpc []").
     { iApply (kli_28 with "Htext"). }
-    iIntros (CIDe7 Hse7) "Hcg Hpc".
+    iIntros (CIDe7 Hse7) "Hlc Hcg Hpc".
     iEval (rgne) in "Hpc".
     assert (Hretfin : ret_pc (E5 !!! Regidx kl_ra) = ret_tgt) by (rewrite HE5ra; reflexivity).
     iEval (rewrite Hretfin) in "Hpc".
@@ -517,7 +517,7 @@ Section ProofKilled.
        at the last one, [CIDe7] -- wants it there. *)
     iDestruct (cpu_own_transport CIDrel CIDe7 n eb p b ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
-    iSpecialize ("Hcont" $! CIDe7 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CIDe7 with "[%] Hlc"); [wp_next_chain|].
     (* ...AND WHAT THE ACCESS PRODUCED, beside the value: it was run on the
        row at the same [kl] the answer reports. *)
     iApply ("Hcont" $! E5 kl with "[%] Hout Hcg Hcpu Hpc").

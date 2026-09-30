@@ -592,10 +592,10 @@ Section ProofSysPipe.
       iApply (wp_sd_zero_s_sconf (mword_of_int zd) Ra5
                 (mword_of_int 0 : mword 12) N3 nav old b
                 with "Hcg Hpc Hi8 Hcell").
-      iIntros (CID4 Hcr4) "Hcg Hpc Hcell".
+      iIntros (CID4 Hcr4) "Hlc Hcg Hpc Hcell".
       iEval (rewrite Hadd) in "Hcell".
       iEval (rewrite Hs12) in "Hpc".
-      iSpecialize ("Hcont" $! CID4 with "[%]"); [wp_next_chain|].
+      iSpecialize ("Hcont" $! CID4 with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hcont" $! N3 with "[%] Hcg Hpc Hcell").
       intros c Hc _.
       rewrite /N3 upd_ne; [| congruence].
@@ -619,10 +619,10 @@ Section ProofSysPipe.
       iApply (wp_sd_zero_s_sconf (mword_of_int zd) Rs1
                 (mword_of_int 0 : mword 12) N3 nav old b
                 with "Hcg Hpc Hi8 Hcell").
-      iIntros (CID4 Hcr4) "Hcg Hpc Hcell".
+      iIntros (CID4 Hcr4) "Hlc Hcg Hpc Hcell".
       iEval (rewrite Hadd) in "Hcell".
       iEval (rewrite Hs12) in "Hpc".
-      iSpecialize ("Hcont" $! CID4 with "[%]"); [wp_next_chain|].
+      iSpecialize ("Hcont" $! CID4 with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hcont" $! N3 with "[%] Hcg Hpc Hcell").
       intros c Hc Hd.
       rewrite /N3 upd_ne; [| congruence].
@@ -945,7 +945,7 @@ Section ProofSysPipe.
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(apply bv_eq; vm_compute; reflexivity)
               with "Hcg Hpc Hj10").
-    iIntros (CID11 Hcr11) "Hcg Hpc".
+    iIntros (CID11 Hcr11) "Hlc Hcg Hpc".
     set (G2 := <[Regidx Ra5 := regval_into_reg (mword_of_int (-1) : mword 64)]> G1).
     change (<[Regidx Ra5 := regval_into_reg (mword_of_int (-1) : mword 64)]> G1) with G2.
     iEval (rewrite Hs1618) in "Hpc".
@@ -955,7 +955,7 @@ Section ProofSysPipe.
                  ltac:(rewrite Hb; wp_next_chain) with "Hextc") as "Hextc".
     iDestruct (cpu_claim_ext_transport CID10 CID11 eb p
                  ltac:(rewrite Hb; wp_next_chain) with "Hextm") as "Hextm".
-    iSpecialize ("Hcont" $! CID11 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CID11 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! G2 kb with "[%] [%] Hcg Hcpu Hextc Hextm Hpc Hc6 Hc7 Hunit0 Hunit1 Hiru Hpenv Hfenv [Hpbare]").
     2:{ exact Hkab. }
     2:{ iExact "Hpbare". }
@@ -1121,10 +1121,10 @@ Section ProofSysPipe.
     iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.sys_pipe + 0xe4)) Rra T5 av b
               ltac:(vm_compute; discriminate) with "Hcg Hpc []").
     { iApply (spi_e4 with "Htext"). }
-    iIntros (CID17 Hcr17) "Hcg Hpc".
+    iIntros (CID17 Hcr17) "Hlc Hcg Hpc".
     assert (Hretf : ret_pc (T5 !!! Regidx Rra) = ret_pc ra0) by (rewrite HT5ra; reflexivity).
     iEval (rgne; rewrite Hretf) in "Hpc".
-    iSpecialize ("Hcont" $! CID17 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CID17 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! T5 with "[%] Hcg Hpc").
     split; [| exact HT5a0].
     assert (Hthread : forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
@@ -1344,7 +1344,7 @@ Section ProofSysPipe.
                 (word_of_words lo hi) p b
                 Hav8 eq_refl eq_refl eq_refl eq_refl Hjsp Hja5 Hjthr
                 with "Hcg Htext Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8").
-      iIntros (CID23 Hcr23 mf) "[%Hcsf %Hfa0] Hcg Hpc".
+      iIntros (CID23 Hcr23) "Hlc". iIntros (mf) "[%Hcsf %Hfa0] Hcg Hpc".
       iDestruct (cpu_own_transport CIDE CID23 0%nat eb p b ltac:(wp_next_chain)
                    with "Hcpu") as "Hcpu".
       (* [sp_epi] does not mention the complement, so the hop spans only its
@@ -1353,7 +1353,7 @@ Section ProofSysPipe.
                    ltac:(rewrite Hb; wp_next_chain) with "Hextc") as "Hextc".
       iDestruct (cpu_claim_ext_transport CIDE CID23 eb p
                    ltac:(rewrite Hb; wp_next_chain) with "Hextm") as "Hextm".
-      iSpecialize ("Hcont" $! CID23 with "[%]"); [wp_next_chain|].
+      iSpecialize ("Hcont" $! CID23 with "[%] Hlc"); [wp_next_chain|].
       destruct Hub as (kb & Hkb & ->).
       iApply ("Hcont" $! mf P' d bs kb with "[%] [%] [%] [%] Hcg Hcpu Hextc Hextm Hpc [Hpost] Hiru Hpenv Hfenv");
         [exact Hcsf | exact Hext | exact Hd8 | exact Hkb |].
@@ -2849,7 +2849,7 @@ Section ProofSysPipe.
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (spi_62 with "Htext"). }
-      iApply bi.later_intro. iIntros (CID68 Hcr68) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID68 Hcr68) "Hlc Hcg Hpc".
       assert (Hbt3 : add_vec (mword_of_int (KernelSyms.sys_pipe + 0x62) : mword 64)
                        (sign_extend' 64 (mword_of_int 30 : mword 13))
                      = mword_of_int (KernelSyms.sys_pipe + 0x80))
@@ -2872,7 +2872,7 @@ Section ProofSysPipe.
                    ltac:(rewrite Hb; wp_next_chain) with "Hextc") as "Hextc".
       iDestruct (cpu_claim_ext_transport CID34 CID68 eb p
                    ltac:(rewrite Hb; wp_next_chain) with "Hextm") as "Hextm".
-      iSpecialize ("Ht7c" $! CID68 with "[%]"); [wp_next_chain|].
+      iSpecialize ("Ht7c" $! CID68 with "[%] Hlc"); [wp_next_chain|].
       iApply ("Ht7c" $! B0 Pa d1
                 (fun j => nth_byte (trunc32 (mword_of_int (Z.of_nat fd0) : mword 64)) j) (upd_usV U (upd_ev (us_V U) kc))
                 with "[%] [%] [%] [%] Hcg Hcpu Hextc Hextm Hpc Hiru [Hpenv] Hfenv [Hpriv] Hfrag Hqf Hu0 Hu1 Hb5 Hb6 Hb7 Hlo Hhi").
@@ -3257,7 +3257,7 @@ Section ProofSysPipe.
                 ltac:(rgne; rewrite HD1a0 Hsm1; vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (spi_7c with "Htext"). }
-      iIntros (CID79 Hcr79) "Hcg Hpc".
+      iIntros (CID79 Hcr79) "Hlc Hcg Hpc".
       assert (Hpp80 : add_vec_int (mword_of_int (KernelSyms.sys_pipe + 0x7c) : mword 64) 4
                       = mword_of_int (KernelSyms.sys_pipe + 0x80)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp80) in "Hpc".
@@ -3268,7 +3268,7 @@ Section ProofSysPipe.
                    ltac:(rewrite Hb; wp_next_chain) with "Hextc") as "Hextc".
       iDestruct (cpu_claim_ext_transport CID34 CID79 eb p
                    ltac:(rewrite Hb; wp_next_chain) with "Hextm") as "Hextm".
-      iSpecialize ("Ht7c" $! CID79 with "[%]"); [wp_next_chain|].
+      iSpecialize ("Ht7c" $! CID79 with "[%] Hlc"); [wp_next_chain|].
       iApply ("Ht7c" $! D1 Pb (4 + d2)%nat bsc (upd_usV U (upd_ev (us_V U) kc))
                 with "[%] [%] [%] [%] Hcg Hcpu Hextc Hextm Hpc Hiru [Hpenv] Hfenv [Hpriv] Hfrag Hqf Hu0 Hu1 Hb5 Hb6 Hb7 Hlo Hhi").
       { split; [exact HD1sp|]. split; [exact HD1s0|].

@@ -468,11 +468,11 @@ Section ProofUartPutc.
               with "Hcg Hpc [] Huinv Hown Hlb Hoff [HΨ]").
     { iApply (upi_4e with "Ht"). }
     { by rewrite Hsbb. }
-    iIntros (CID5 Hs5) "Hcg Hpc Hown Hsent HΦ".
+    iIntros (CID5 Hs5) "Hlc Hcg Hpc Hown Hsent HΦ".
     iEval (rewrite Hsbb) in "Hown". iEval (rewrite Hsbb) in "Hsent".
     iEval (rewrite P52) in "Hpc".
     assert (Hchain : b = false \/ p = zero_reg -> (CID5 : CPU) = (CID0 : CPU)) by wp_next_chain.
-    iSpecialize ("Hcont" $! CID5 with "[%]"); [exact Hchain|].
+    iSpecialize ("Hcont" $! CID5 with "[%] Hlc"); [exact Hchain|].
     iApply ("Hcont" $! bt with "Hcg Hpc Hown Hsent HΦ").
   Qed.
 
@@ -1083,14 +1083,14 @@ Section ProofUartPutc.
               ltac:(vm_compute; discriminate)
               with "Hcg Hpc []").
     { iApply (upi_68 with "Ht"). }
-    iIntros (CIDe9 Hse9) "Hcg Hpc".
+    iIntros (CIDe9 Hse9) "Hlc Hcg Hpc".
     iEval (rgne) in "Hpc".
     assert (Hretf : ret_pc (Q66 !!! Regidx (mword_of_int 1 : mword 5)) = ret_tgt)
       by (rewrite HQ66ra; reflexivity).
     iEval (rewrite Hretf) in "Hpc".
     iDestruct (cpu_own_transport CIDrel CIDe9 n eb p b ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
-    iSpecialize ("Hcont" $! CIDe9 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CIDe9 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! Q66 with "Hcg Hcpu Hpc [%] HΦ").
     split; [| exact HQ66ra].
     (* threading: a register untouched by the body threads m0 -> Q66 *)

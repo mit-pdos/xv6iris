@@ -587,7 +587,7 @@ Section ItruncTail.
     iApply (wp_cret_s_sconf (mword_of_int (IT + 0x4e)) Rra P6 K b
               ltac:(nz) with "Hcg Hpc []").
     { iApply (iti_4e with "Htext"). }
-    iIntros (CID11 Hq11) "Hcg Hpc".
+    iIntros (CID11 Hq11) "Hlc Hcg Hpc".
     assert (Hretf : ret_pc (P6 !!! Regidx Rra : mword 64)
                     = ret_pc (m !!! Regidx Rra : mword 64))
       by (rewrite HP6ra; reflexivity).
@@ -600,7 +600,7 @@ Section ItruncTail.
     iDestruct (cpu_claim_ext_transport CID4 CID11 eb (proc_addr j)
                  ltac:(rewrite Hbm; wp_next_chain) with "Hextm") as "Hextm".
     rewrite /it_cont.
-    iSpecialize ("Hcont" $! CID11 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CID11 with "[%] Hlc"); [wp_next_chain|].
     (* the five saved registers are back at the caller's values, sp is
        popped, and everything else rode through on [it_thr] -- including
        s4, which the indirect arm restores at +0x90 BEFORE rejoining here *)
@@ -2890,7 +2890,7 @@ Section ItruncMain.
       (* it_tail's continuation IS itrunc's postcondition, except that the
          budget arrives as a concrete level and the contract states a range *)
       rewrite /it_cont.
-      iIntros (CIDz) "%Hch". iSpecialize ("Hcont" $! CIDz with "[%]");
+      iIntros (CIDz) "%Hch" Hlc. iSpecialize ("Hcont" $! CIDz with "[%] Hlc");
         [exact Hch|].
       iIntros (mf) "%Hcs Hsie Hcnt Hextc Hextm Hpc Hppid Hidev Hinum Hsbb Hsbi
                     Hmeta Hmap Hblks Hdn Hsl Hop".
@@ -2974,7 +2974,7 @@ Section ItruncMain.
                       Hsl Hcru2 Hop [Hcont]").
       { rewrite /it_frame. iFrame "Hf1 Hf2 Hf3 Hf4 Hf5". iExact "Hslot6". }
       rewrite /it_cont.
-      iIntros (CIDw) "%Hchw". iSpecialize ("Hcont" $! CIDw with "[%]");
+      iIntros (CIDw) "%Hchw" Hlc. iSpecialize ("Hcont" $! CIDw with "[%] Hlc");
         [exact Hchw|].
       iIntros (mf) "%Hcsw Hsie Hcnt Hextc Hextm Hpc Hppid Hidev Hinum Hsbb Hsbi
                     Hmeta Hmap Hblks Hdn Hsl Hop".
@@ -3044,10 +3044,10 @@ Section ItruncMain.
                     Hdgeom Hdlock Hsl Hcru Hop [Hcont Htx]").
     all: try lkbelow.
     iEval (rewrite /wp_next).
-    iIntros (CIDf) "%Hchain".
+    iIntros (CIDf) "%Hchain" Hlc.
     iIntros (mf) "%Hcs Hcg Hcnt Hextc Hextm Hpc Hppid Hidev Hinum Hsbb Hsbi
                   Hmeta Hmap Hblks Hdn Hsl Hop".
-    iSpecialize ("Hcont" $! CIDf with "[%]"); [exact Hchain|].
+    iSpecialize ("Hcont" $! CIDf with "[%] Hlc"); [exact Hchain|].
     iDestruct "Hop" as (wf u' Sb') "(_ & _ & _ & _ & %Hbnd & Hop)".
     iApply ("Hcont" $! mf with "[%] Hcg Hcnt Hextc Hextm Hpc Hppid Hidev Hinum
                      Hsbb Hsbi Hmeta Hmap Hblks Hdn Hsl [Hop Htx]");

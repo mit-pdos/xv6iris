@@ -759,11 +759,11 @@ Section ProofFileread.
                 u3 u5 u6 pj b
                 (fr_K6 K HK) eq_refl eq_refl eq_refl eq_refl HA2sp HA2s2 HA2thr
                 with "Hcg Htext Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6").
-      iIntros (CIDe Hse mf) "%Hcsr Hcg Hpc".
+      iIntros (CIDe Hse) "Hlc". iIntros (mf) "%Hcsr Hcg Hpc".
       destruct Hcsr as [Hcsf Hrv].
       iDestruct (cpu_own_transport CID CIDe 0%nat eb pj b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
-      iSpecialize ("Hcont" $! CIDe with "[]"); [iPureIntro; wp_next_chain|].
+      iSpecialize ("Hcont" $! CIDe with "[] Hlc"); [iPureIntro; wp_next_chain|].
       assert (HVid : upd_usM (us_upt (upd_usV U (upd_ev (us_V U) (pv_ev (us_V U)))) (pv_upt (us_V U))) (us_M U) = U)
           by (rewrite upd_ev_id upd_usV_id us_upt_id; apply upd_usM_id).
       iApply ("Hcont" $! mf (mword_of_int (-1)) (pv_upt (us_V U)) 0%nat (fun _ => bv_0 8) (pv_ev (us_V U))
@@ -1076,11 +1076,11 @@ Section ProofFileread.
                   (m !!! Regidx Rs1) (m !!! Regidx Rs3) u6 pj b
                   (fr_K6 K HK) eq_refl eq_refl eq_refl eq_refl HG4sp HG4s2 HG4thr
                   with "Hcg Htext Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6").
-        iIntros (CIDe Hse mf) "%Hcsr Hcg Hpc".
+        iIntros (CIDe Hse) "Hlc". iIntros (mf) "%Hcsr Hcg Hpc".
         destruct Hcsr as [Hcsf Hrv].
         iDestruct (cpu_own_transport CID CIDe 0%nat eb pj b ltac:(wp_next_chain)
                      with "Hcnt") as "Hcnt".
-        iSpecialize ("Hcont" $! CIDe with "[]"); [iPureIntro; wp_next_chain|].
+        iSpecialize ("Hcont" $! CIDe with "[] Hlc"); [iPureIntro; wp_next_chain|].
         assert (HVid : upd_usM (us_upt (upd_usV U (upd_ev (us_V U) (pv_ev (us_V U)))) (pv_upt (us_V U))) (us_M U) = U)
           by (rewrite upd_ev_id upd_usV_id us_upt_id; apply upd_usM_id).
         (* THE PAYLOAD COMES BACK UNDER A BASIC UPDATE: the console arm's
@@ -1389,11 +1389,11 @@ Section ProofFileread.
                   (m !!! Regidx Rs1) (m !!! Regidx Rs3) u6 pj b
                   (fr_K6 K HK) eq_refl eq_refl eq_refl eq_refl Hmrsp HMrs2 HMrthr
                   with "Hcg Htext Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6").
-        iIntros (CIDe Hse mfin) "%Hcsr Hcg Hpc".
+        iIntros (CIDe Hse) "Hlc". iIntros (mfin) "%Hcsr Hcg Hpc".
         destruct Hcsr as [Hcsf Hrv].
         iDestruct (cpu_own_transport CIDpr CIDe 0%nat eb pj b ltac:(wp_next_chain)
                      with "Hcnt") as "Hcnt".
-        iSpecialize ("Hcont" $! CIDe with "[]"); [iPureIntro; wp_next_chain|].
+        iSpecialize ("Hcont" $! CIDe with "[] Hlc"); [iPureIntro; wp_next_chain|].
         iApply ("Hcont" $! mfin (mf !!! Regidx Ra0) P' dpr bspr kpr
                   with "[%] [%] [%] [%] [%] [%] Hcg Hcnt [Hpc]
                         [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hpn Hpref Hiru Hoh Hrlv]
@@ -1808,11 +1808,11 @@ Section ProofFileread.
                           (m !!! Regidx Rs1) (m !!! Regidx Rs3) u6 pj b
                           (fr_K6 K HK) eq_refl eq_refl eq_refl eq_refl Hmrsp Hmrs2 HMrthr
                           with "Hcg Htext Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6").
-                iIntros (CIDe Hse mfin) "%Hcsr Hcg Hpc".
+                iIntros (CIDe Hse) "Hlc". iIntros (mfin) "%Hcsr Hcg Hpc".
                 destruct Hcsr as [Hcsf Hrv].
                 iDestruct (cpu_own_transport CID CIDe 0%nat eb pj b ltac:(wp_next_chain)
                              with "Hcnt") as "Hcnt".
-                iSpecialize ("Hcont" $! CIDe with "[]"); [iPureIntro; wp_next_chain|].
+                iSpecialize ("Hcont" $! CIDe with "[] Hlc"); [iPureIntro; wp_next_chain|].
                 assert (HVid : upd_usM (us_upt (upd_usV U (upd_ev (us_V U) (pv_ev (us_V U)))) (pv_upt (us_V U))) (us_M U) = U)
           by (rewrite upd_ev_id upd_usV_id us_upt_id; apply upd_usM_id).
                 (* THE NULL SLOT IS NOT THE CONSOLE'S (lane KILL-PAY,
@@ -2031,11 +2031,11 @@ Section ProofFileread.
                           (m !!! Regidx Rs1) (m !!! Regidx Rs3) u6 pj b
                           (fr_K6 K HK) eq_refl eq_refl eq_refl eq_refl Hmrsp HMrs2 HMrthr
                           with "Hcg Htext Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6").
-                iIntros (CIDe Hse mfin) "%Hcsr Hcg Hpc".
+                iIntros (CIDe Hse) "Hlc". iIntros (mfin) "%Hcsr Hcg Hpc".
                 destruct Hcsr as [Hcsf Hrv].
                 iDestruct (cpu_own_transport CIDcr CIDe 0%nat eb pj b ltac:(wp_next_chain)
                              with "Hcnt") as "Hcnt".
-                iSpecialize ("Hcont" $! CIDe with "[]"); [iPureIntro; wp_next_chain|].
+                iSpecialize ("Hcont" $! CIDe with "[] Hlc"); [iPureIntro; wp_next_chain|].
                 iApply ("Hcont" $! mfin (mword_of_int r) P' dcr bscr kcr
                           with "[%] [%] [%] [%] [%] [%] Hcg Hcnt [Hpc]
                                 [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv]
@@ -2172,11 +2172,11 @@ Section ProofFileread.
                        (m !!! Regidx Rs1) (m !!! Regidx Rs3) u6 pj b
                        (fr_K6 K HK) eq_refl eq_refl eq_refl eq_refl Hmrsp Hmrs2 HMrthr
                        with "Hcg Htext Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6").
-             iIntros (CIDe Hse mfin) "%Hcsr Hcg Hpc".
+             iIntros (CIDe Hse) "Hlc". iIntros (mfin) "%Hcsr Hcg Hpc".
              destruct Hcsr as [Hcsf Hrv].
              iDestruct (cpu_own_transport CID CIDe 0%nat eb pj b ltac:(wp_next_chain)
                           with "Hcnt") as "Hcnt".
-             iSpecialize ("Hcont" $! CIDe with "[]"); [iPureIntro; wp_next_chain|].
+             iSpecialize ("Hcont" $! CIDe with "[] Hlc"); [iPureIntro; wp_next_chain|].
              assert (HVid : upd_usM (us_upt (upd_usV U (upd_ev (us_V U) (pv_ev (us_V U)))) (pv_upt (us_V U))) (us_M U) = U)
           by (rewrite upd_ev_id upd_usV_id us_upt_id; apply upd_usM_id).
              (* AN OUT-OF-RANGE MAJOR IS NOT THE CONSOLE'S (lane
@@ -3070,11 +3070,11 @@ Section ProofFileread.
                           (m !!! Regidx Rs1) (m !!! Regidx Rs3) u6 pj b
                           (fr_K6 K HK) eq_refl eq_refl eq_refl eq_refl Hmrsp HMrs2 HMrthr
                           with "Hcg Htext Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6").
-                iIntros (CIDe Hse mfin) "%Hcsr Hcg Hpc".
+                iIntros (CIDe Hse) "Hlc". iIntros (mfin) "%Hcsr Hcg Hpc".
                 destruct Hcsr as [Hcsf Hrv].
                 iDestruct (cpu_own_transport CIDiu CIDe 0%nat eb pj b
                              ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-                iSpecialize ("Hcont" $! CIDe with "[]"); [iPureIntro; wp_next_chain|].
+                iSpecialize ("Hcont" $! CIDe with "[] Hlc"); [iPureIntro; wp_next_chain|].
                 iApply ("Hcont" $! mfin (mrd !!! Regidx Ra0) P' tot
                           (rd_bytes data (Z.to_nat (bv_unsigned v))) krd
                           with "[%] [%] [%] [%] [%] [%] Hcg Hcnt [Hpc]
@@ -3429,11 +3429,11 @@ Section ProofFileread.
                           (m !!! Regidx Rs1) (m !!! Regidx Rs3) u6 pj b
                           (fr_K6 K HK) eq_refl eq_refl eq_refl eq_refl Hmrsp HMrs2 HMrthr
                           with "Hcg Htext Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6").
-                iIntros (CIDe Hse mfin) "%Hcsr Hcg Hpc".
+                iIntros (CIDe Hse) "Hlc". iIntros (mfin) "%Hcsr Hcg Hpc".
                 destruct Hcsr as [Hcsf Hrv].
                 iDestruct (cpu_own_transport CIDiu CIDe 0%nat eb pj b
                              ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-                iSpecialize ("Hcont" $! CIDe with "[]"); [iPureIntro; wp_next_chain|].
+                iSpecialize ("Hcont" $! CIDe with "[] Hlc"); [iPureIntro; wp_next_chain|].
                 iApply ("Hcont" $! mfin (mword_of_int (Z.of_nat tot)) P' tot
                           (rd_bytes data (Z.to_nat (bv_unsigned v))) krd
                           with "[%] [%] [%] [%] [%] [%] Hcg Hcnt [Hpc]

@@ -297,7 +297,7 @@ Section ProofProcdumpParts.
               P2 (K - 10)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (pdi_1a with "Htext"). }
-    iIntros (CID13 Hs13) "Hcg Hpc".
+    iIntros (CID13 Hs13) "Hlc Hcg Hpc".
     iEval (rewrite Hrg1a) in "Hcg".
     set (P3 := <[Regidx Ra0 := regval_into_reg
                   (add_vec (P2 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 3180 : mword 12)))]> P2).
@@ -310,7 +310,7 @@ Section ProofProcdumpParts.
     { rewrite /P3 upd_ne; [| reg_neq]. rewrite /P2 upd_ne; [| reg_neq]. exact HP1s0. }
     assert (HP3sp : P3 !!! Regidx csp_rs1 = pa_stk (m !!! Regidx csp_rs1) 10).
     { rewrite /P3 upd_ne; [| reg_neq]. rewrite /P2 upd_ne; [| reg_neq]. exact HP1sp. }
-    iSpecialize ("Hcont" $! CID13 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CID13 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! P3 with "[%] Hcg Hpdf Hpc").
     rewrite /pd_regs_pro /pdR.
     change (Regidx (mword_of_int 2 : mword 5)) with (Regidx csp_rs1).
@@ -508,13 +508,13 @@ Section ProofProcdumpParts.
               Q13 K' b ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (pdi_54 with "Htext"). }
-    iApply bi.later_intro. iIntros (CID14 Hs14). iIntros "Hcg Hpc".
+    iApply bi.later_intro. iIntros (CID14 Hs14) "Hlc". iIntros "Hcg Hpc".
     assert (Hp6e : add_vec (mword_of_int (PD + 0x54) : mword 64)
                      (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 13 : mword 11) ('b"0"))))
                    = mword_of_int (PD + 0x6e)) by pcstep.
     iEval (rewrite Hp6e) in "Hpc".
     (* ---- hand over ---- *)
-    iSpecialize ("Hcont" $! CID14 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CID14 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! Q13 with "[%] Hcg Hpc").
     rewrite /pd_regs_loop /pd_regs_hi /pdR.
     change (Regidx (mword_of_int 2 : mword 5)) with (Regidx csp_rs1).
@@ -784,10 +784,10 @@ Section ProofProcdumpParts.
     iApply (wp_cret_s_sconf (mword_of_int (PD + 0xa2)) Rra E10 K b
               ltac:(vm_compute; discriminate) with "Hcg Hpc []").
     { iApply (pdi_a2 with "Htext"). }
-    iIntros (CIDe11 Hse11) "Hcg Hpc".
+    iIntros (CIDe11 Hse11) "Hlc Hcg Hpc".
     iEval (rgne) in "Hpc".
     iEval (rewrite Hrt) in "Hpc".
-    iSpecialize ("Hcont" $! CIDe11 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CIDe11 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! E10 with "[%] Hcg Hpc").
     split; [| exact HE10ra].
     unfold callee_saved.

@@ -606,10 +606,10 @@ Section ProofFilereadParts.
     iApply (wp_cret_s_sconf (mword_of_int (FR + 0x68)) Rra T4 K b
               ltac:(vm_compute; discriminate) with "Hcg Hpc []").
     { iApply (fri_68 with "Htext"). }
-    iIntros (CID6 Hs6) "Hcg Hpc".
+    iIntros (CID6 Hs6) "Hlc Hcg Hpc".
     iEval (rgne) in "Hpc".
     iEval (rewrite HT4ra) in "Hpc".
-    iSpecialize ("Hcont" $! CID6 with "[]"); [iPureIntro; wp_next_chain|].
+    iSpecialize ("Hcont" $! CID6 with "[] Hlc"); [iPureIntro; wp_next_chain|].
     iApply ("Hcont" $! T4 with "[%] Hcg Hpc").
     assert (Hrest : forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
                       r <> Rs0 -> r <> Rs2 -> r <> Rra -> r <> Ra0 ->
@@ -695,10 +695,10 @@ Section ProofFilereadParts.
     iApply (wp_cldsp_s_sconf (mword_of_int zb) (mword_of_int 1 : mword 6) Rs3
               U1 K v3 b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hib Hb5").
-    iIntros (CID2 Hs2) "Hcg Hpc Hb5". iEval (rewrite Hpa5) in "Hb5".
+    iIntros (CID2 Hs2) "Hlc Hcg Hpc Hb5". iEval (rewrite Hpa5) in "Hb5".
     set (U2 := <[Regidx Rs3 := regval_into_reg v3]> U1).
     iEval (rewrite Hbc) in "Hpc".
-    iSpecialize ("Hcont" $! CID2 with "[]"); [iPureIntro; wp_next_chain|].
+    iSpecialize ("Hcont" $! CID2 with "[] Hlc"); [iPureIntro; wp_next_chain|].
     iApply ("Hcont" $! U2 with "[%] Hcg Hpc Hb3 Hb5").
     assert (HU2sp : U2 !!! Regidx csp_rs1 = pa_stk sp0 6)
       by (rewrite /U2 upd_ne; [exact HU1sp | vm_compute; discriminate]).
@@ -789,9 +789,9 @@ Section ProofFilereadParts.
     iApply (wp_cj_s_sconf (mword_of_int ze) jimm Mr K b
               ltac:(rewrite Hjt; vm_compute; reflexivity)
               with "Hcg Hpc Hie").
-    iApply bi.later_intro. iIntros (CID4 Hs4). iIntros "Hcg Hpc".
+    iApply bi.later_intro. iIntros (CID4 Hs4) "Hlc". iIntros "Hcg Hpc".
     iEval (rewrite Hjt) in "Hpc".
-    iSpecialize ("Hcont" $! CID4 with "[]"); [iPureIntro; wp_next_chain|].
+    iSpecialize ("Hcont" $! CID4 with "[] Hlc"); [iPureIntro; wp_next_chain|].
     iApply ("Hcont" $! Mr with "[%] Hcg Hpc Hb3 Hb5").
     split; [exact Hmrsp|].
     split.

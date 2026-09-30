@@ -535,7 +535,7 @@ Section ProofBpin.
     iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.bpin + 0x32)) Rra P4 K b
               ltac:(vm_compute; discriminate) with "Hcg Hpc []").
     { iApply (bpi_32 with "Htext"). }
-    iIntros (CID16 Hs16) "Hcg Hpc".
+    iIntros (CID16 Hs16) "Hlc Hcg Hpc".
     assert (Hretf : ret_pc (P4 !!! Regidx Rra) = ret_tgt) by (rewrite HP4ra; reflexivity).
     iEval (rewrite Hretf) in "Hpc".
     (* callee_saved m P4 *)
@@ -557,7 +557,7 @@ Section ProofBpin.
       rewrite /R2 upd_ne; [| regne].
       rewrite /R1 upd_ne; [reflexivity | regne]. }
     iDestruct (cpu_own_transport CID11 CID16 n eb p b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iSpecialize ("Hcont" $! CID16 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CID16 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! P4 with "Hcg Hcnt Hpc [%] Href").
     unfold callee_saved.
     assert (Hc2 : P4 !!! Regidx csp_rs1 = m !!! Regidx csp_rs1).

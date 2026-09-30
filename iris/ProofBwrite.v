@@ -600,7 +600,7 @@ Section ProofBwrite.
     iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.bwrite + 0x24)) Rra P4 K b
               ltac:(vm_compute; discriminate) with "Hcg Hpc []").
     { iApply (bwi_24 with "Htext"). }
-    iIntros (CID19 Hs19) "Hcg Hpc".
+    iIntros (CID19 Hs19) "Hlc Hcg Hpc".
     iEval (rgne) in "Hpc".
     assert (Hretf : ret_pc (P4 !!! Regidx Rra) = ret_pc (m !!! Regidx Rra))
       by (rewrite HP4ra; reflexivity).
@@ -652,7 +652,7 @@ Section ProofBwrite.
     (* the crossing bwrite hands its OWN caller is the literal [true] (it
        tail-calls a parker), so this guard is vacuous, unlike the [eb]-guards
        above. *)
-    iSpecialize ("Hcont" $! CID19 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CID19 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! P4 with "[%] Hcg Hcnt Hextc Hextm Hpc Hppid Hlocked HQ").
     unfold callee_saved. repeat split; assumption.
   Qed.

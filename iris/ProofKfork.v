@@ -236,8 +236,8 @@ Section ProofKfork.
               (mword_of_int (-1) : mword 64) p b
               HK Hsp0 Hra0 Hs00 Hs10 Hs50 HT1sp HT1s1 HT1thr
               with "Hcg Htext Hpc Hframe").
-    iIntros (CID3 Hs3 mf) "%Hpost Hcg Hpc".
-    iSpecialize ("Hcont" $! CID3 with "[%]"); [wp_next_chain|].
+    iIntros (CID3 Hs3) "Hlc". iIntros (mf) "%Hpost Hcg Hpc".
+    iSpecialize ("Hcont" $! CID3 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! mf with "[%] Hcg Hpc"). exact Hpost.
   Qed.
 
@@ -357,8 +357,8 @@ Section ProofKfork.
               (m !!! Regidx Rs2) (m !!! Regidx Rs3) (m !!! Regidx Rs4) w8 p b
               HK Hsp0 Hra0 Hs00 Hs10 Hs50 HU3sp HU3s1 HU3thr
               with "Hcg Htext Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8").
-    iIntros (CID4 Hc4 mf) "%Hpost Hcg Hpc".
-    iSpecialize ("Hcont" $! CID4 with "[%]"); [wp_next_chain|].
+    iIntros (CID4 Hc4) "Hlc". iIntros (mf) "%Hpost Hcg Hpc".
+    iSpecialize ("Hcont" $! CID4 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! mf with "[%] Hcg Hpc"). exact Hpost.
   Qed.
 

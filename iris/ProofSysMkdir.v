@@ -520,7 +520,7 @@ Section ProofSysMkdirEpilogue.
     iApply (wp_cret_s_sconf (mword_of_int (MD + 0x3e)) Rra M3 K b
               ltac:(nz) with "Hcg Hpc []").
     { iApply (smdi_3e with "Htext"). }
-    iIntros (CID4 Hq4) "Hcg Hpc".
+    iIntros (CID4 Hq4) "Hlc Hcg Hpc".
     iEval (rgne) in "Hpc".
     assert (Hretf : ret_pc (M3 !!! Regidx Rra : mword 64)
                     = ret_pc (m !!! Regidx Rra : mword 64))
@@ -541,7 +541,7 @@ Section ProofSysMkdirEpilogue.
     assert (Hfin : md_thr m M3).
     { intros c Hc N2 N8. rewrite /M3 upd_ne; [| regne].
       exact (HM2thr c Hc N2 N8). }
-    iSpecialize ("Hcont" $! CID4 with "[%]"); [wp_next_chain |].
+    iSpecialize ("Hcont" $! CID4 with "[%] Hlc"); [wp_next_chain |].
     iApply ("Hcont" $! M3 with "[%] [%] Hcg Hpc").
     { unfold callee_saved. split_and!;
         [ exact Csp | exact Cs0
@@ -713,14 +713,14 @@ Section ProofSysMkdirM1Tail.
               HK18 Kpop Hsp0 HP1sp HP1thr Hal
               with "Hcg Htext Hpc Hf1 Hf2 Hbuf [Hown Htce Hcce Hpid Hcont]").
     iEval (rewrite /wp_next).
-    iIntros (CIDy) "%Hqy". iIntros (mf) "%Hcsf %Ha0f Hcg Hpc".
+    iIntros (CIDy) "%Hqy" Hlc. iIntros (mf) "%Hcsf %Ha0f Hcg Hpc".
     iDestruct (cpu_own_transport CID4 CIDy 0 eb (proc_addr jx) b
                  ltac:(wp_next_chain) with "Hown") as "Hown".
     iDestruct (trap_csrs_ext_transport CID4 CIDy eb (proc_addr jx)
                  ltac:(rewrite Hb; wp_next_chain) with "Htce") as "Htce".
     iDestruct (cpu_claim_ext_transport CID4 CIDy eb (proc_addr jx)
                  ltac:(rewrite Hb; wp_next_chain) with "Hcce") as "Hcce".
-    iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain |].
+    iSpecialize ("Hcont" $! CIDy with "[%] Hlc"); [wp_next_chain |].
     iApply ("Hcont" $! mf with "[%] [%] Hcg Hown Htce Hcce Hpc Hpid").
     { exact Hcsf. }
     { rewrite Ha0f. exact HP1a0. }
@@ -1435,10 +1435,10 @@ Section ProofSysMkdirBody.
                   with "Hcg Htext Hpc Hf1 Hf2 Hbuf
                         [Hown Hbsl Hsbn Hsbi Hsbs Hsbb Hir Hpriv Harms Hcont]").
         iEval (rewrite /wp_next).
-        iIntros (CIDz) "%Hqz". iIntros (mf) "%Hcsf %Ha0f Hcg Hpc".
+        iIntros (CIDz) "%Hqz" Hlc. iIntros (mf) "%Hcsf %Ha0f Hcg Hpc".
         iDestruct (cpu_own_transport CID24 CIDz 0 eb pj b
                      ltac:(wp_next_chain) with "Hown") as "Hown".
-        iSpecialize ("Hcont" $! CIDz with "[%]"); [wp_next_chain |].
+        iSpecialize ("Hcont" $! CIDz with "[%] Hlc"); [wp_next_chain |].
         iApply ("Hcont" $! mf (ns1 + 1)%nat P' kA with "[%] [%] [%] Hcg Hown
                   [] [] Hpc Hbsl Hsbn Hsbi Hsbs Hsbb [%] Hir Hpriv [%]
                   [Harms]").
@@ -1487,9 +1487,9 @@ Section ProofSysMkdirBody.
         { rewrite Heb /cpu_claim_ext. done. }
         { iApply (log_opS_op with "HopS Htx"). }
         iEval (rewrite /wp_next).
-        iIntros (CIDz) "%Hqz". iIntros (mf) "%Hcsf %Ha0f Hcg Hown _ _ Hpc Hpbare".
+        iIntros (CIDz) "%Hqz" Hlc. iIntros (mf) "%Hcsf %Ha0f Hcg Hown _ _ Hpc Hpbare".
         iDestruct ("Hpback" with "Hpbare") as "Hpriv".
-        iSpecialize ("Hcont" $! CIDz with "[%]"); [wp_next_chain |].
+        iSpecialize ("Hcont" $! CIDz with "[%] Hlc"); [wp_next_chain |].
         iApply ("Hcont" $! mf ns1 P' kA with "[%] [%] [%] Hcg Hown
                   [] [] Hpc Hbsl Hsbn Hsbi Hsbs Hsbb [%] Hir Hpriv [%]
                   [Harms]").
@@ -1532,9 +1532,9 @@ Section ProofSysMkdirBody.
       { rewrite Heb /trap_csrs_ext. done. }
       { rewrite Heb /cpu_claim_ext. done. }
       iEval (rewrite /wp_next).
-      iIntros (CIDz) "%Hqz". iIntros (mf) "%Hcsf %Ha0f Hcg Hown _ _ Hpc Hpbare".
+      iIntros (CIDz) "%Hqz" Hlc. iIntros (mf) "%Hcsf %Ha0f Hcg Hown _ _ Hpc Hpbare".
       iDestruct ("Hpback" with "Hpbare") as "Hpriv".
-      iSpecialize ("Hcont" $! CIDz with "[%]"); [wp_next_chain |].
+      iSpecialize ("Hcont" $! CIDz with "[%] Hlc"); [wp_next_chain |].
       iApply ("Hcont" $! mf ns P' kA with "[%] [%] [%] Hcg Hown
                 [] [] Hpc Hbsl Hsbn Hsbi Hsbs Hsbb [%] Hir Hpriv [%]
                 [Hwp Hdlkc Hcre]").

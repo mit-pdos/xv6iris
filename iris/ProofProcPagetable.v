@@ -433,7 +433,7 @@ Section ProofProcPagetable.
       iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.proc_pagetable + 0x58)) (mword_of_int 1 : mword 5) E5 K b
                 ltac:(vm_compute; discriminate) with "Hcg Hpc []").
       { iApply (ppti_58 with "Htext"). }
-      iIntros (CID35 Hs35) "Hcg Hpc".
+      iIntros (CID35 Hs35) "Hlc Hcg Hpc".
       iEval (rgne) in "Hpc".
       iEval (rewrite Hrt) in "Hpc".
       (* a0 = s1 = rv, so [ppt_post] rides through unexamined -- which is
@@ -446,7 +446,7 @@ Section ProofProcPagetable.
       iEval (rewrite -HE5a0) in "Hpost".
       iDestruct (cpu_own_transport CIDe CID35 lvl eb p b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
-      iSpecialize ("Hcont" $! CID35 with "[]"); [ iPureIntro; wp_next_chain | ].
+      iSpecialize ("Hcont" $! CID35 with "[] Hlc"); [ iPureIntro; wp_next_chain | ].
       iApply ("Hcont" $! E5 with "Hcg Hcnt Hlend Hpc Htfcell Hpost [%]").
       { (* callee_saved mm E5 *)
         (* the four frame registers are restored explicitly from the stack;
@@ -592,7 +592,7 @@ Section ProofProcPagetable.
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (ppti_14 with "Htext"). }
-      iApply bi.later_intro. iIntros (CIDd1 Hsd1) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CIDd1 Hsd1) "Hlc Hcg Hpc".
       assert (Htg4c0 : add_vec (mword_of_int (KernelSyms.proc_pagetable + 0x14) : mword 64)
                          (sign_extend' 64 (sign_extend' 13 (concat_vec (mword_of_int 28 : mword 8) ('b"0"))))
                        = mword_of_int (KernelSyms.proc_pagetable + 0x4c)) by (apply bv_eq; vm_compute; reflexivity).
@@ -602,7 +602,7 @@ Section ProofProcPagetable.
       iMod (kalloc_env_at_seal with "Henv") as "#Henv0".
       iDestruct (cpu_own_transport CIDuv CIDd1 lvl eb p b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
-      iSpecialize ("EPI" $! CIDd1 with "[%]"); [wp_next_chain|].
+      iSpecialize ("EPI" $! CIDd1 with "[%] Hlc"); [wp_next_chain|].
       iApply ("EPI" $! M1 (mword_of_int 0 : mword 64) with "[%] Hcg Hcnt Hlend Hpc Htfcell []").
       { split_and!; [exact HM1sp | exact HM1s1 | exact HM1thr]. }
       { iRight. iFrame "Henv0". iPureIntro; split_and!; [reflexivity |].
@@ -865,7 +865,7 @@ Section ProofProcPagetable.
                   U1 (K - 4)%nat b ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc []").
         { iApply (ppti_64 with "Htext"). }
-        iApply bi.later_intro. iIntros (CIDa7 Hsa7). iIntros "Hcg Hpc".
+        iApply bi.later_intro. iIntros (CIDa7 Hsa7) "Hlc". iIntros "Hcg Hpc".
         assert (Htg4c : add_vec (mword_of_int (KernelSyms.proc_pagetable + 0x64) : mword 64)
                           (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 2036 : mword 11) ('b"0"))))
                         = mword_of_int (KernelSyms.proc_pagetable + 0x4c)) by (apply bv_eq; vm_compute; reflexivity).
@@ -880,7 +880,7 @@ Section ProofProcPagetable.
           rewrite (callee_saved_lookup Hcsuf c Hc). apply HT3thr; assumption. }
         iDestruct (cpu_own_transport CIDa5 CIDa7 lvl eb p b ltac:(wp_next_chain)
                      with "Hcnt") as "Hcnt".
-        iSpecialize ("EPI" $! CIDa7 with "[%]"); [wp_next_chain|].
+        iSpecialize ("EPI" $! CIDa7 with "[%] Hlc"); [wp_next_chain|].
         iApply ("EPI" $! U1 (mword_of_int 0 : mword 64) with "[%] Hcg Hcnt Hlend Hpc Htfcell []").
         { split_and!; [exact HU1sp | exact HU1s1 | exact HU1thr]. }
         { iRight. iFrame "Henv0". iPureIntro; split_and!;
@@ -1262,7 +1262,7 @@ Section ProofProcPagetable.
                   W7 (K - 4)%nat b ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc []").
         { iApply (ppti_82 with "Htext"). }
-        iApply bi.later_intro. iIntros (CIDc6 Hsc6). iIntros "Hcg Hpc".
+        iApply bi.later_intro. iIntros (CIDc6 Hsc6) "Hlc". iIntros "Hcg Hpc".
         assert (Htg4c2 : add_vec (mword_of_int (KernelSyms.proc_pagetable + 0x82) : mword 64)
                            (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 2021 : mword 11) ('b"0"))))
                          = mword_of_int (KernelSyms.proc_pagetable + 0x4c)) by (apply bv_eq; vm_compute; reflexivity).
@@ -1277,7 +1277,7 @@ Section ProofProcPagetable.
           rewrite (callee_saved_lookup Hcsuf2 c Hc). apply HW6thr; assumption. }
         iDestruct (cpu_own_transport CIDc4 CIDc6 lvl eb p b ltac:(wp_next_chain)
                      with "Hcnt") as "Hcnt".
-        iSpecialize ("EPI" $! CIDc6 with "[%]"); [wp_next_chain|].
+        iSpecialize ("EPI" $! CIDc6 with "[%] Hlc"); [wp_next_chain|].
         iApply ("EPI" $! W7 (mword_of_int 0 : mword 64) with "[%] Hcg Hcnt Hlend Hpc Htfcell []").
         { split_and!; [exact HW7sp | exact HW7s1 | exact HW7thr]. }
         { iRight. iFrame "Henv0". iPureIntro; split_and!;
@@ -1296,7 +1296,7 @@ Section ProofProcPagetable.
               ltac:(rgne; rewrite Hmr2a0; vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (ppti_48 with "Htext"). }
-    iIntros (CID28 Hs28) "Hcg Hpc".
+    iIntros (CID28 Hs28) "Hlc Hcg Hpc".
     assert (Hp4c : add_vec_int (mword_of_int (KernelSyms.proc_pagetable + 0x48) : mword 64) 4 = mword_of_int (KernelSyms.proc_pagetable + 0x4c)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp4c) in "Hpc".
     (* ---------------- the shared epilogue ---------------- *)
@@ -1311,7 +1311,7 @@ Section ProofProcPagetable.
     { rewrite Hmr2s1. rewrite Hbase2 Hbase1. exact Hroot0r. }
     iDestruct (cpu_own_transport CIDmp2 CID28 lvl eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iSpecialize ("EPI" $! CID28 with "[%]"); [wp_next_chain|].
+    iSpecialize ("EPI" $! CID28 with "[%] Hlc"); [wp_next_chain|].
     iApply ("EPI" $! mr2 (zero_extend' 64 (concat_vec (pt_base t2) (zeros' 12 : mword 12)))
               with "[%] Hcg Hcnt Hlend Hpc Htfcell [Hptree Henv]").
     { split_and!; [exact Hmr2sp | exact Hs1fin | exact Hmr2thr]. }
@@ -1352,12 +1352,12 @@ Section SealProcPagetable.
     iApply (Core.wp_proc_pagetable_core γa γk mm tf dqtf lvl K eb p (Some nb) b lks kl
               Hlvl HK Htfal Htfb with "Hcg Hcnt Htext Hpc Htfcell Henv Hlend [Hcont]").
     all: try lkbelow.
-    iIntros (CIDr Hsr mr) "Hcg Hcnt Hlend Hpc Htfcell Hpost %Hcs".
+    iIntros (CIDr Hsr) "Hlc". iIntros (mr) "Hcg Hcnt Hlend Hpc Htfcell Hpost %Hcs".
     iDestruct "Hpost" as "[(%t & %Hrv & Hptree & %Hrep & %Hnt & Henv)
                            | (_ & %Hfail & _)]";
       [| destruct Hfail as (n & Hn & Hz);
          exfalso; exact (ppt_fail_refute nb n Hnb Hn Hz)].
-    iSpecialize ("Hcont" $! CIDr with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CIDr with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! mr t with "Hcg Hcnt Hlend Hpc Htfcell Hptree [%] [%] [%] Henv [%]").
     { exact Hrv. }
     { exact Hrep. }

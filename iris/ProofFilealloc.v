@@ -539,14 +539,14 @@ Section ProofFilealloc.
       iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.filealloc + 0x5c)) Rra P5 K b
                 ltac:(vm_compute; discriminate) with "Hcg Hpc []").
       { iApply (fai_5c with "Htext"). }
-      iIntros (CIDe6 Hse6) "Hcg Hpc".
+      iIntros (CIDe6 Hse6) "Hlc Hcg Hpc".
       assert (Hretf : ret_pc (P5 !!! Regidx Rra) = ret_tgt) by (rewrite HP5ra; reflexivity).
       iEval (rewrite Hretf) in "Hpc".
       (* [cpu_own] was handed to us at [CID0]; six more plain instructions
          have moved us to [CIDe6]. *)
       iDestruct (cpu_own_transport CID0 CIDe6 n eb p b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
-      iSpecialize ("Kont" $! CIDe6 with "[]"); [ iPureIntro; wp_next_chain | ].
+      iSpecialize ("Kont" $! CIDe6 with "[] Hlc"); [ iPureIntro; wp_next_chain | ].
       iApply ("Kont" $! P5 with "Hcg Hcnt Hpc [%] [Hpost]").
       2:{ rewrite HP5a0. iExact "Hpost". }
       { (* callee_saved m P5 *)
@@ -936,8 +936,8 @@ Section ProofFilealloc.
          CIDr; NOW (with the FULL chain -- Hs1..Hs8, Hsacq, the acquire-to-
          release hop, Hsr, and Hepi's own internal steps -- all in scope) is
          where the real outer [Hcont] gets closed. *)
-      iIntros (CIDfin Hsfin mfin) "Hcg Hcnt Hpc %Hfin Hpost".
-      iSpecialize ("Hcont" $! CIDfin with "[%]"); [wp_next_chain|].
+      iIntros (CIDfin Hsfin) "Hlc". iIntros (mfin) "Hcg Hcnt Hpc %Hfin Hpost".
+      iSpecialize ("Hcont" $! CIDfin with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hcont" $! mfin with "Hcg Hcnt Hpc [%] Hpost").
       exact Hfin. }
     (* ================================================================= *)
@@ -1070,8 +1070,8 @@ Section ProofFilealloc.
         (* the scan created no reference, so the unit the caller supplied is
            still untouched -- it goes straight back out. *)
         iExact "Hfdslot". }
-      iIntros (CIDfin Hsfin mfin) "Hcg Hcnt Hpc %Hfin Hpost".
-      iSpecialize ("Hcont" $! CIDfin with "[%]"); [wp_next_chain|].
+      iIntros (CIDfin Hsfin) "Hlc". iIntros (mfin) "Hcg Hcnt Hpc %Hfin Hpost".
+      iSpecialize ("Hcont" $! CIDfin with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hcont" $! mfin with "Hcg Hcnt Hpc [%] Hpost").
       exact Hfin. }
   Qed.

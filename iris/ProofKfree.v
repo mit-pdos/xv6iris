@@ -729,7 +729,7 @@ Section ProofKfree.
               ltac:(vm_compute; discriminate)
               with "Hcg Hpc []").
     { iApply (kfi_5e with "Htext"). }
-    iIntros (CIDe6 Hse6) "Hcg Hpc".
+    iIntros (CIDe6 Hse6) "Hlc Hcg Hpc".
     assert (Hretf : ret_pc (Q5c !!! Regidx (mword_of_int 1 : mword 5)) = ret_tgt)
       by (rewrite HQ5cra; reflexivity).
     iEval (rewrite Hretf) in "Hpc".
@@ -738,7 +738,7 @@ Section ProofKfree.
        so kfree's own continuation wants it at CIDe6. *)
     iDestruct (cpu_own_transport CIDrel CIDe6 n eb pcur b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iSpecialize ("Hcont" $! CIDe6 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CIDe6 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! Q5c with "Hcg Hcnt Hpc [%] [Havail]"); last first.
     { rewrite /kfree_post_led. iExists hled. iFrame "Hrcpt Havail". }
     { (* callee_saved m Q5c *)

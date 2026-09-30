@@ -984,7 +984,7 @@ Section ProofCreateFound.
         iApply ("Ht" $! G3 u5 nfj with
                   "[%] Hcg Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hnb16").
         { exact (cr_tregs_of_regs m sp0 ipv _ ty major minor G3 HG3regs). }
-        iIntros (CIDf Hsf mf) "%Hcsf %Ha0f Hcg Hpc".
+        iIntros (CIDf Hsf) "Hlc". iIntros (mf) "%Hcsf %Ha0f Hcg Hpc".
         iDestruct (cpu_own_transport CIDup CIDf 0%nat eb (proc_addr j) b
                      ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
         (* the slot ledger comes back whole: nameiparent took two and gave
@@ -998,7 +998,7 @@ Section ProofCreateFound.
                      (bv_unsigned minor) Nm Nd P Pmiss Farm Fdots Fun Fok Fex
                      (bview plen pfun) (bv_unsigned dind)
                      with "HPpar Hdlkc Hcre") as "Hcf".
-        iSpecialize ("Hcont" $! CIDf with "[%]"); [wp_next_chain |].
+        iSpecialize ("Hcont" $! CIDf with "[%] Hlc"); [wp_next_chain |].
         iApply ("Hcont" $! mf false false 0%nat 1%Qp 1%Qp γf
                   (mword_of_int 0 : mword 32) dnl bml n2 Sb2 ns
                   with "[%] Hcg Hcnt Hpc Hsbn Hsbi Hsbs Hsbb Hpriv Hpath
@@ -1722,12 +1722,12 @@ Section ProofCreateFound.
             iApply ("Ht" $! B3 u5 nfjb with
                       "[%] Hcg Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hnb16").
             { exact (cr_tregs_of_regs m sp0 ipv _ ty major minor B3 HB3regs). }
-            iIntros (CIDf Hsf mf) "%Hcsf %Ha0f Hcg Hpc".
+            iIntros (CIDf Hsf) "Hlc". iIntros (mf) "%Hcsf %Ha0f Hcg Hpc".
             iDestruct (cpu_own_transport CIDU2 CIDf 0%nat eb (proc_addr j) b
                          ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
             iDestruct (iref_slots_combine with "Hisl2 Hisl") as "Hisl".
             iDestruct (iref_slots_combine with "Hisl Hislr") as "Hisl".
-            iSpecialize ("Hcontb" $! CIDf with "[%]"); [wp_next_chain |].
+            iSpecialize ("Hcontb" $! CIDf with "[%] Hlc"); [wp_next_chain |].
             iApply ("Hcontb" $! mf false false 0%nat 1%Qp 1%Qp γf
                       (mword_of_int 0 : mword 32) dnc bmc n3 Sb3
                       (1 + (1 + (ns - 2)))%nat
@@ -1997,12 +1997,12 @@ Section ProofCreateFound.
                 iApply ("Ht" $! FB u5 nfj with
                           "[%] Hcg Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hnb16").
                 { exact (cr_tregs_of_regs m sp0 ipv _ ty major minor FB HFBregs). }
-                iIntros (CIDf Hsf mf) "%Hcsf %Ha0f Hcg Hpc".
+                iIntros (CIDf Hsf) "Hlc". iIntros (mf) "%Hcsf %Ha0f Hcg Hpc".
                 iDestruct (cpu_own_transport CIDic CIDf 0%nat eb (proc_addr j) b
                              ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
                 iDestruct (iref_slots_combine with "Hisl Hislr") as "Hisl".
                 iDestruct (ic_tx_dep_intro with "Hcdep Htx") as "Hcdep".
-                iSpecialize ("Hcont" $! CIDf with "[%]"); [wp_next_chain |].
+                iSpecialize ("Hcont" $! CIDf with "[%] Hlc"); [wp_next_chain |].
                 iApply ("Hcont" $! mf true false kslot (qq/2)%Qp (qq/2)%Qp gc
                           cinum dnc bmc n2 Sb2 (1 + (ns - 2))%nat
                           with "[%] Hcg Hcnt Hpc Hsbn Hsbi Hsbs Hsbb Hpriv
@@ -2298,7 +2298,7 @@ Section ProofCreateFound.
         iApply ("Ht" $! J3 u5 nfj with
                   "[%] Hcg Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hnb16").
         { exact (cr_tregs_of_regs m sp0 ipv _ ty major minor J3 HJ3regs). }
-        iIntros (CIDf Hsf mf) "%Hcsf %Ha0f Hcg Hpc".
+        iIntros (CIDf Hsf) "Hlc". iIntros (mf) "%Hcsf %Ha0f Hcg Hpc".
         iDestruct (cpu_own_transport CIDup CIDf 0%nat eb (proc_addr j) b
                      ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
         (* the slot ledger comes back whole: nameiparent took two and gave
@@ -2312,7 +2312,7 @@ Section ProofCreateFound.
                      (bv_unsigned minor) Nm Nd P Pmiss Farm Fdots Fun Fok Fex
                      (bview plen pfun) (bv_unsigned dind)
                      with "HPpar Hdlkc Hcre") as "Hcf".
-        iSpecialize ("Hcont" $! CIDf with "[%]"); [wp_next_chain |].
+        iSpecialize ("Hcont" $! CIDf with "[%] Hlc"); [wp_next_chain |].
         iApply ("Hcont" $! mf false false 0%nat 1%Qp 1%Qp γf
                   (mword_of_int 0 : mword 32) dnl bml n2 Sb2 ns
                   with "[%] Hcg Hcnt Hpc Hsbn Hsbi Hsbs Hsbb Hpriv Hpath
@@ -2449,10 +2449,10 @@ Section ProofCreateFound.
                        ltac:(rewrite Htg08e; vm_compute; reflexivity)
                        with "Hcg Hpc []").
              { iApply (cri_03c with "Htext"). }
-             iIntros (CID25 Hq25). iApply bi.later_intro. iIntros "Hcg Hpc".
+             iIntros (CID25 Hq25) "Hlc". iApply bi.later_intro. iIntros "Hcg Hpc".
              iEval (rewrite Htg08e) in "Hpc".
              iDestruct "Hgate" as "[_ Hg2]".
-             iSpecialize ("Hg2" $! CID25 with "[%]"); [wp_next_chain |].
+             iSpecialize ("Hg2" $! CID25 with "[%] Hlc"); [wp_next_chain |].
              iApply ("Hg2" $! N4 with "[%] Hcg Hpc").
              { exact HN4regs. }
           ** (* ---- not a directory: the gate does not apply ---------- *)
@@ -2463,12 +2463,12 @@ Section ProofCreateFound.
                        ltac:(rgne; rewrite HN4a5; exact (cr_tym1_ne _ Htdirg))
                        with "Hcg Hpc []").
              { iApply (cri_03c with "Htext"). }
-             iIntros (CID25 Hq25) "Hcg Hpc".
+             iIntros (CID25 Hq25) "Hlc Hcg Hpc".
              assert (Hp03e : add_vec_int (mword_of_int (CK + 0x3c) : mword 64) 2
                              = mword_of_int (CK + 0x3e)) by pcw.
              iEval (rewrite Hp03e) in "Hpc".
              iDestruct "Hgate" as "[Hj _]".
-             iSpecialize ("Hj" $! CID25 with "[%]"); [wp_next_chain |].
+             iSpecialize ("Hj" $! CID25 with "[%] Hlc"); [wp_next_chain |].
              iApply ("Hj" $! N4 with "[%] [%] Hcg Hpc").
              { exact HN4regs. }
              { intros Hc. exfalso. exact (Htdirg Hc). }
@@ -2481,10 +2481,10 @@ Section ProofCreateFound.
                     ltac:(rewrite Htg03e; vm_compute; reflexivity)
                     with "Hcg Hpc []").
           { iApply (cri_036 with "Htext"). }
-          iIntros (CID23 Hq23). iApply bi.later_intro. iIntros "Hcg Hpc".
+          iIntros (CID23 Hq23) "Hlc". iApply bi.later_intro. iIntros "Hcg Hpc".
           iEval (rewrite Htg03e) in "Hpc".
           iDestruct "Hgate" as "[Hj _]".
-          iSpecialize ("Hj" $! CID23 with "[%]"); [wp_next_chain |].
+          iSpecialize ("Hj" $! CID23 with "[%] Hlc"); [wp_next_chain |].
           iApply ("Hj" $! N3 with "[%] [%] Hcg Hpc").
           { exact HN3regs. }
           { intros _. exact Hnlm. }
@@ -2557,12 +2557,12 @@ Section ProofCreateFound.
       iApply ("Ht" $! N1 u5 nfj with
                 "[%] Hcg Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hnb16").
       { exact (cr_tregs_of_regs m sp0 _ _ ty major minor N1 HN1regs). }
-      iIntros (CIDf Hsf mf) "%Hcsf %Ha0f Hcg Hpc".
+      iIntros (CIDf Hsf) "Hlc". iIntros (mf) "%Hcsf %Ha0f Hcg Hpc".
       iDestruct (cpu_own_transport CIDnp CIDf 0%nat eb (proc_addr j) b
                    ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
       iDestruct (iref_slots_combine with "Hisl2 Hislr") as "Hisl".
       iEval (rewrite -Hnsplit) in "Hisl".
-      iSpecialize ("Hcont" $! CIDf with "[%]"); [wp_next_chain |].
+      iSpecialize ("Hcont" $! CIDf with "[%] Hlc"); [wp_next_chain |].
       iApply ("Hcont" $! mf false false 0%nat 1%Qp 1%Qp γf
                 (mword_of_int 0 : mword 32)
                 (MkDinode (bv_0 16) (bv_0 16) (bv_0 16) (bv_0 16) (bv_0 32)

@@ -489,13 +489,13 @@ Section ProofFreeDesc.
               with "Hcg Hpc [] [Hfree]").
     { iApply (fdi_46 with "Htext"). }
     { iEval (rewrite (Hfaddr CIDc13)). iExact "Hfree". }
-    iIntros (CIDc14 Hc14) "Hcg Hpc Hfree".
+    iIntros (CIDc14 Hc14) "Hlc Hcg Hpc Hfree".
     iEval (rewrite (Hfaddr CIDc13) (Hsv8 CIDc13)) in "Hfree".
     assert (Hp4a : add_vec_int (mword_of_int (KernelSyms.free_desc + 0x46) : mword 64) 4 = mword_of_int (KernelSyms.free_desc + 0x4a))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp4a) in "Hpc".
     (* ---- hand back, at the hart the fifteenth step delivered ---- *)
-    iSpecialize ("Hcont" $! CIDc14 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CIDc14 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! V9 with "[%] Hcg Hpc Hfree Hva Hvl Hvf Hvn").
     intros r N10 N13 N14 N15.
     rewrite /V9 upd_ne; [| congruence].
@@ -896,7 +896,7 @@ Section ProofFreeDesc.
               ltac:(vm_compute; discriminate)
               with "Hcg Hpc []").
     { iApply (fdi_5c with "Htext"). }
-    iIntros (CIDe4 He4) "Hcg Hpc".
+    iIntros (CIDe4 He4) "Hlc Hcg Hpc".
     iEval (rgne) in "Hpc".
     iEval (rewrite HF2ra) in "Hpc".
     iEval (rewrite Hnk) in "Hcg".
@@ -922,7 +922,7 @@ Section ProofFreeDesc.
       exact (HM9 r N10 N13 N14 N15 Ncsp N8). }
     iDestruct (cpu_own_transport CIDw CIDe4 lvl eb pme b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iSpecialize ("Hcont" $! CIDe4 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CIDe4 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! F2 with "[%] Hcg Hcnt Htext [Hpc] Hfree Hva Hvl Hvf Hvn").
     (* [callee_saved] lost its tp conjunct (13, not 14): the SECOND bullet of
        the old componentwise discharge is gone. *)

@@ -959,7 +959,7 @@ Section KexecB3Incr.
                 Rs11 T4 (K - 68)%nat w13 eb (dqm := DfracOwn 1)
                 ltac:(inz) ltac:(rdok) with "Hcg Hpc [] Hf13").
       { iApply (kxc_1a2 with "Htext"). }
-      iIntros (CID5b Hsq5b) "Hcg Hpc Hf13". iEval (rewrite Hpa13') in "Hf13".
+      iIntros (CID5b Hsq5b) "Hlc Hcg Hpc Hf13". iEval (rewrite Hpa13') in "Hf13".
       set (T5 := <[Regidx Rs11 := regval_into_reg w13]> T4).
       change (<[Regidx Rs11 := regval_into_reg w13]> T4) with T5.
       assert (Hpp1a4 : add_vec_int (mword_of_int (KXB + 0x1a2) : mword 64) 2
@@ -1001,7 +1001,7 @@ Section KexecB3Incr.
                    ltac:(try rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
       iDestruct (cpu_claim_ext_transport CID0 CID5b eb (proc_addr jp)
                    ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
-      iSpecialize ("Hout" $! CID5b with "[%]"); [wp_next_chain |].
+      iSpecialize ("Hout" $! CID5b with "[%] Hlc"); [wp_next_chain |].
       (* ---- THE INVARIANT, CONVERTED (S3d).  This edge is taken exactly
          when [S i >= phnum], and the state's own [i < phnum] closes it to
          [S i = phnum] -- at which index [kxb_walk_ok]'s first conjunct
@@ -1053,7 +1053,7 @@ Section KexecB3Incr.
                 ltac:(inz) ltac:(inz) ltac:(exact Hcmp)
                 with "Hcg Hpc []").
       { iApply (kxc_128 with "Htext"). }
-      iIntros (CID5 Hsq5) "Hcg Hpc".
+      iIntros (CID5 Hsq5) "Hlc Hcg Hpc".
       assert (Hpp12c : add_vec_int (mword_of_int (KXB + 0x128) : mword 64) 4
                        = mword_of_int (KXB + 0x12c)) by ipcw.
       iEval (rewrite Hpp12c) in "Hpc".
@@ -1088,7 +1088,7 @@ Section KexecB3Incr.
       assert (HT4s10' : T4 !!! Regidx Rs10
                         = (mword_of_int (Z.of_nat (S i)) : mword 64))
         by (rewrite HT4s10 Nat2Z.inj_succ; f_equal; lia).
-      iSpecialize ("Hout" $! CID5 with "[%]"); [wp_next_chain |].
+      iSpecialize ("Hout" $! CID5 with "[%] Hlc"); [wp_next_chain |].
       iApply ("Hout" $! T4). iLeft. rewrite /kxc_at_12c.
       iSplitR.
       { iPureIntro. split_and!;
@@ -1747,12 +1747,12 @@ Section KexecB3Body.
           iSplitL "Hargv"; [iExact "Hargv" |].
           iSplitL "Hargs"; [iExact "Hargs" |].
           iSplitL "Helf"; [iExact "Helf" | iExact "Hframe"]. }
-        iIntros (CIDh Hsh M') "Hdisj".
+        iIntros (CIDh Hsh) "Hlc". iIntros (M') "Hdisj".
         assert (Hcrh : true = false \/ proc_addr jp = zero_reg ->
                   (CIDh : CPU) = (CID0 : CPU)) by wp_next_chain.
         iDestruct (wp_next_retarget CID0 CIDh true (proc_addr jp) _ Hcrh
                      with "Hcont") as "Hcont".
-        iSpecialize ("Hout" $! CIDh with "[%]"); [wp_next_chain |].
+        iSpecialize ("Hout" $! CIDh with "[%] Hlc"); [wp_next_chain |].
         iApply ("Hout" $! M' P Mi szv U with "[%] Hdisj Hcont"); first [apply ev_after_refl | idtac].
       + (* ================ PT_LOAD: load the segment ================ *)
         iApply (wp_bne_fall_s_sconf (mword_of_int (KXB + 0x148))
@@ -3273,12 +3273,12 @@ Section KexecB3Body.
                          iSplitL "Hargv"; [iExact "Hargv" |].
                          iSplitL "Hargs"; [iExact "Hargs" |].
                          iSplitL "Helf"; [iExact "Helf" | iExact "Hframe"]. }
-                       iIntros (CIDh Hsh M') "Hdisj".
+                       iIntros (CIDh Hsh) "Hlc". iIntros (M') "Hdisj".
                        assert (Hcrh : true = false \/ proc_addr jp = zero_reg ->
                                  (CIDh : CPU) = (CID0 : CPU)) by wp_next_chain.
                        iDestruct (wp_next_retarget CID0 CIDh true (proc_addr jp)
                                     _ Hcrh with "Hcont") as "Hcont".
-                       iSpecialize ("Hout" $! CIDh with "[%]"); [wp_next_chain |].
+                       iSpecialize ("Hout" $! CIDh with "[%] Hlc"); [wp_next_chain |].
                        iApply ("Hout" $! M' P4 M4i (M4 !!! Regidx Ra0) Uev
                                  with "[%] Hdisj Hcont"); first [exact HUev | idtac].
                    --- (* ---- A NON-EMPTY SEGMENT: run the loadseg loop ---- *)
@@ -3678,14 +3678,14 @@ Section KexecB3Body.
                          iSplitL "Hargv"; [iExact "Hargv" |].
                          iSplitL "Hargs"; [iExact "Hargs" |].
                          iSplitL "Helf"; [iExact "Helf" | iExact "Hframe"]. }
-                       iIntros (CIDh Hsh M') "Hdisj".
+                       iIntros (CIDh Hsh) "Hlc". iIntros (M') "Hdisj".
                        (* [Hcont] is the one [kxc_ls] HANDED BACK, so it is
                           anchored at the loop's exit hart, not at [CID0]. *)
                        assert (Hcrh : true = false \/ proc_addr jp = zero_reg ->
                                  (CIDh : CPU) = (CIDq1 : CPU)) by wp_next_chain.
                        iDestruct (wp_next_retarget CIDq1 CIDh true (proc_addr jp)
                                     _ Hcrh with "Hcont") as "Hcont".
-                       iSpecialize ("Hout" $! CIDh with "[%]"); [wp_next_chain |].
+                       iSpecialize ("Hout" $! CIDh with "[%] Hlc"); [wp_next_chain |].
                        iApply ("Hout" $! M' P4 Mls (M4 !!! Regidx Ra0) Uev
                                  with "[%] Hdisj Hcont"); first [exact HUev | idtac].
     - (* ================ A SHORT READ: [bad:] at +0x320 ============ *)
@@ -4033,7 +4033,7 @@ Section KexecB3Close.
               ltac:(rewrite Htgt1a4; vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (kxc_1f4 with "Htext"). }
-    iApply bi.later_intro. iIntros (CID1b Hsq1b). iIntros "Hcg Hpc".
+    iApply bi.later_intro. iIntros (CID1b Hsq1b) "Hlc". iIntros "Hcg Hpc".
     iEval (rewrite Htgt1a4) in "Hpc".
     iDestruct (cpu_own_transport CID0 CID1b 0%nat eb (proc_addr jp) eb
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
@@ -4041,7 +4041,7 @@ Section KexecB3Close.
                  ltac:(try rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
     iDestruct (cpu_claim_ext_transport CID0 CID1b eb (proc_addr jp)
                  ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
-    iSpecialize ("Hout" $! CID1b with "[%]"); [wp_next_chain |].
+    iSpecialize ("Hout" $! CID1b with "[%] Hlc"); [wp_next_chain |].
     (* the no-segments arm reports [sz = 0], and its two image rows are
        [kxc_at_1a2]'s own -- the fold over an empty table (S3d). *)
     assert (Hu0 : uint (mword_of_int 0 : mword 64) = 0%Z)
@@ -4274,7 +4274,7 @@ Section KexecB3Close.
               with "Hcg Hcnt Hextc Hclmc Htext Hkd Hpc Hpenv Hbio Hlogc Hcrash Hcert
                     Hppid Hprocs Hdevi Hdgeom Hdlock Hlog").
     all: try lkbelow.
-    iIntros (CIDe Hse M2) "%Hcse Hcg Hcnt Hextc Hclmc Hpc Hppid".
+    iIntros (CIDe Hse) "Hlc". iIntros (M2) "%Hcse Hcg Hcnt Hextc Hclmc Hpc Hppid".
     assert (Hpc1ae : ret_pc (B3 !!! Regidx Rra) = mword_of_int (KXB + 0x1ae))
       by (rewrite HB3ra; cpcw).
     iEval (rewrite Hpc1ae) in "Hpc".
@@ -4303,7 +4303,7 @@ Section KexecB3Close.
                  ltac:(try rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
     iDestruct (cpu_claim_ext_transport CIDe CIDe eb (proc_addr jp)
                  ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
-    iSpecialize ("Hout" $! CIDe with "[%]"); [wp_next_chain |].
+    iSpecialize ("Hout" $! CIDe with "[%] Hlc"); [wp_next_chain |].
     iApply ("Hout" $! M2). rewrite /kxc_at_1ae.
     iSplitR.
     { iPureIntro. split_and!;

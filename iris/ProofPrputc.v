@@ -309,9 +309,9 @@ Section ProofPrputc.
     iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.prputc + 0x16)) ra_idx E3 K b
               ltac:(vm_compute; discriminate) with "Hcg Hpc []").
     { iApply (ppc_16 with "Htext"). }
-    iIntros (CID12 Hs12) "Hcg Hpc". iEval (rewrite Hrt) in "Hpc".
+    iIntros (CID12 Hs12) "Hlc Hcg Hpc". iEval (rewrite Hrt) in "Hpc".
     iDestruct (cpu_own_transport CID8 CID12 n eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-    iSpecialize ("Hcont" $! CID12 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CID12 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! E3 with "Hcg Hcpu Hpc [%]").
     split; [| exact HE3ra ].
     assert (HthreadE : forall c : mword 5, is_cs_idx c = true ->
@@ -394,8 +394,8 @@ Section PrputcSealed.
               with "Hcg Hcpu Htext Hpc Huinv Hbase Htxl []").
     { iApply store_chain_of_out_chain.
       iApply (out_chain_triv Uart1 _ _ emp%I eq_refl). done. }
-    iIntros (CID1 Hs1 mf) "Hcg Hcpu Hpc %Hcs _".
-    iSpecialize ("Hcont" $! CID1 with "[%]"); [exact Hs1|].
+    iIntros (CID1 Hs1) "Hlc". iIntros (mf) "Hcg Hcpu Hpc %Hcs _".
+    iSpecialize ("Hcont" $! CID1 with "[%] Hlc"); [exact Hs1|].
     iApply ("Hcont" $! mf with "Hcg Hcpu Hpc [%]"). exact Hcs.
   Qed.
 

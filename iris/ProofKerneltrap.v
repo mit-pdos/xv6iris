@@ -390,7 +390,7 @@ Section ProofKerneltrap.
            there is no arm to take it from, which is exactly why a preempting
            trap must arrive holding it. *)
         { rewrite /cpu_claim_ext -Hpj. iExact "Hclm". }
-        iIntros (CIDy Hsy myd) "%Hcs_yd Hcg Hcpu Hpc Hext Hclm".
+        iIntros (CIDy Hsy) "Hlc". iIntros (myd) "%Hcs_yd Hcg Hcpu Hpc Hext Hclm".
         iEval (rewrite Hpj) in "Hcg". iEval (rewrite Hpj) in "Hcpu".
         (* back, possibly on ANOTHER hart: the trap CSRs are that hart's *)
         rewrite /trap_csrs_ext /trap_csrs.
@@ -442,7 +442,7 @@ Section ProofKerneltrap.
         (* yield handed the bundle back at the literal [∅] (its contract pins
            it); [lks = ∅] at depth 0 makes that kerneltrap's own set. *)
         iEval (rewrite -Hlkempty) in "Hcpu".
-        iSpecialize ("Hcont" $! CIDy with "[%]").
+        iSpecialize ("Hcont" $! CIDy with "[%] Hlc").
         { intros [Hf | Hz]; [ discriminate | exfalso; exact (Hpne Hz) ]. }
         iApply ("Hcont" $! mf ms_f sc' tv' with "[%] [%] [%] [%] Hcgat Hmir Havz Hkptr_y Hcpu
                               Hsepc Hscause Hstval Hpc [Hclm]").

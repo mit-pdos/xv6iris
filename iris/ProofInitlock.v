@@ -296,14 +296,14 @@ Section ProofInitlock.
               ltac:(vm_compute; discriminate)
               with "Hcg Hpc []").
     { iApply (ini_18 with "Htext"). }
-    iIntros (CID11 Hs11) "Hcg Hpc".
+    iIntros (CID11 Hs11) "Hlc Hcg Hpc".
     assert (Hretf : forall (CID' : CpuId), ret_pc (rget (CID := CID') R5 (mword_of_int 1 : mword 5)) = ret_tgt)
       by (intros CID'; rgne; rewrite HR5ra; reflexivity).
     iEval (rewrite Hretf) in "Hpc".
     (* the name field goes back to the caller OWNED, holding the string
        pointer just stored -- sealing it into [lock_name] is the caller's
        call, not ours (SpecInitlock.v). *)
-    iSpecialize ("Hcont" $! CID11 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CID11 with "[%] Hlc"); [wp_next_chain|].
     (* A6.105: bundle the window with its floor certificate; the RIGHT arm is
        what the creator has, and the first acquire's AMO buys the left one. *)
     iAssert (WpLock.lk_cpu_ready lk) with "[Hcpu]" as "Hcpu".

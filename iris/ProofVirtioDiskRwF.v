@@ -1685,7 +1685,7 @@ Section VdrwfP6.
     iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x232) : mword 64) Rra R11 K eb
               ltac:(vm_compute; discriminate) with "Hcg Hpc []").
     { iApply (rwi_232 with "Htext"). }
-    iIntros (CIDp12 Hsp12) "Hcg Hpc". rgall.
+    iIntros (CIDp12 Hsp12) "Hlc Hcg Hpc". rgall.
     iEval (rewrite HR11ra) in "Hpc".
     (* ================= the spec's continuation ======================== *)
     assert (Hthr : forall r : mword 5, is_cs_idx r = true ->
@@ -1805,7 +1805,7 @@ Section VdrwfP6.
                  with "Hextc") as "Hextc".
     iDestruct (cpu_claim_ext_transport CIDx CIDp12 eb (proc_addr j) ltac:(wp_next_chain)
                  with "Hextm") as "Hextm".
-    iSpecialize ("Hcont" $! CIDp12 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CIDp12 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! R11 with
               "[%] Hcg Hown Hextc Hextm Hpc [Hbno Hbdisk Hbufm] [Hdbytes] [HQ]").
     - exact Hcs.
@@ -1935,10 +1935,10 @@ Section ProofVirtioDiskRwF.
               HK Hglen Hlenbuf Hlendisk Hsecval Hbufkd eq_refl
               ltac:(lkbelow)
               with "Htext Hpinv Hqinv Hrcpt Hdinv Hgeom Hlk Hsaved Hbno").
-    iIntros (CIDf Hsf mf) "%Hcsf Hcg Hown Hextc Hextm Hpc Hbufo Hdisko HQ".
+    iIntros (CIDf Hsf) "Hlc". iIntros (mf) "%Hcsf Hcg Hown Hextc Hextm Hpc Hbufo Hdisko HQ".
     iEval (rewrite Hsld) in "Hbufo".
     iEval (rewrite Hsld) in "Hdisko".
-    iSpecialize ("Hcont" $! CIDf with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CIDf with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! mf with
               "[%] Hcg Hown Hextc Hextm Hpc Hbufo Hdisko HQ").
     { exact Hcsf. }

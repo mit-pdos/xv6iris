@@ -836,7 +836,7 @@ Section KvmmakeHouse.
     iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.kvmmake + 0xbc)) (mword_of_int 1 : mword 5) E4 K b
               ltac:(vm_compute; discriminate) with "Hcg Hpc []").
     { iApply (kmki_bc with "Htext"). }
-    iIntros (CID6 Hs6cr) "Hcg Hpc".
+    iIntros (CID6 Hs6cr) "Hlc Hcg Hpc".
     iEval (rgne) in "Hpc".
     iEval (rewrite Hrt) in "Hpc".
     (* a0 = root byte address *)
@@ -847,7 +847,7 @@ Section KvmmakeHouse.
       rewrite /E0 upd_eq. rewrite add_vec_zero_l. exact Hs1. }
     iDestruct (cpu_own_transport CID0 CID6 lvl eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iSpecialize ("Hcont" $! CID6 with "[]"); [ iPureIntro; wp_next_chain | ].
+    iSpecialize ("Hcont" $! CID6 with "[] Hlc"); [ iPureIntro; wp_next_chain | ].
     iApply ("Hcont" $! E4 tf pas with "Hcg Hcnt Hpc Hptree [%] [%] [%] Henv [%] [%] Hpages").
     { exact HE4a0. }
     { exact Hrep. }
@@ -1200,7 +1200,7 @@ Section KvmmakeBody.
               Hc2 ltac:(vm_compute; reflexivity) ltac:(reflexivity) HM4a2
               with "Hcg Htext Hpc [Hpage]").
     { iApply (big_sepL_impl with "Hpage"). iIntros "!>" (k j _) "H". rewrite HM4a0. iExact "H". }
-    iIntros (CID12 Hs12 mfin) "Hcg Hpc Hbytes %Hmcs".
+    iIntros (CID12 Hs12) "Hlc". iIntros (mfin) "Hcg Hpc Hbytes %Hmcs".
     assert (Hret18 : ret_pc (M4 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.kvmmake + 0x18)).
     { rewrite /M4 upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hret18) in "Hpc".
@@ -1246,7 +1246,7 @@ Section KvmmakeBody.
     (* the s2..s11 registers: untouched since [mm] (through kalloc/memset callee-saved) *)
     iDestruct (cpu_own_transport CID7 CID12 0%nat eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iSpecialize ("Hcont" $! CID12 with "[]"); [ iPureIntro; wp_next_chain | ].
+    iSpecialize ("Hcont" $! CID12 with "[] Hlc"); [ iPureIntro; wp_next_chain | ].
     iApply ("Hcont" $! mfin bppn with "Hcg Hcnt Hpc Hptree Henv Hc1 Hc2 Hc3 [Hc4] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%]").
     { iExists v4. iExact "Hc4". }
     { exact Hbase9. }
@@ -1390,7 +1390,7 @@ Section KvmmakeBody.
               Hp0 Hbelow
               with "Hcg Hcnt Htext Hpc Hptree [Henv]").
     { iExact "Henv". }
-    iIntros (CID7 Hs7 mr t' g) "Hcg Hcnt Hpc Hptree %Hnodes' Henv %Hkcs %Hbase' %Hrep' %Hpres %Hgmiss".
+    iIntros (CID7 Hs7) "Hlc". iIntros (mr t' g) "Hcg Hcnt Hpc Hptree %Hnodes' Henv %Hkcs %Hbase' %Hrep' %Hpres %Hgmiss".
     assert (Hret : ret_pc (Wk !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.kvmmake + 0x28)).
     { rewrite /Wk upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hret) in "Hpc".
@@ -1402,7 +1402,7 @@ Section KvmmakeBody.
     { rewrite /Wk /U10 /U11 /U12 /U13 /U14.
       repeat (apply callee_saved_insert_r; [vm_compute; reflexivity |]). apply callee_saved_refl. }
     assert (HcsMmr : callee_saved M mr) by (apply (callee_saved_trans _ Wk _ HcsMWk Hkcs)).
-    iSpecialize ("Hcont" $! CID7 with "[]"); [ iPureIntro; wp_next_chain | ].
+    iSpecialize ("Hcont" $! CID7 with "[] Hlc"); [ iPureIntro; wp_next_chain | ].
     iApply ("Hcont" $! mr t' g with "Hcg Hcnt Hpc Hptree Henv [%] [%] [%] [%] [%] [%] [%]").
     { exact HcsMmr. }
     { rewrite (callee_saved_lookup HcsMmr (mword_of_int 9) ltac:(vm_compute; reflexivity)). exact HM9. }
@@ -1532,7 +1532,7 @@ Section KvmmakeBody.
               Hp0 Hbelow
               with "Hcg Hcnt Htext Hpc Hptree [Henv]").
     { iExact "Henv". }
-    iIntros (CID7 Hs7 mr t' g) "Hcg Hcnt Hpc Hptree %Hnodes' Henv %Hkcs %Hbase' %Hrep' %Hpres %Hgmiss".
+    iIntros (CID7 Hs7) "Hlc". iIntros (mr t' g) "Hcg Hcnt Hpc Hptree %Hnodes' Henv %Hkcs %Hbase' %Hrep' %Hpres %Hgmiss".
     assert (Hret : ret_pc (Wk !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.kvmmake + 0x38)).
     { rewrite /Wk upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hret) in "Hpc".
@@ -1542,7 +1542,7 @@ Section KvmmakeBody.
     { rewrite /Wk /A10 /A11 /A12 /A13 /A14.
       repeat (apply callee_saved_insert_r; [vm_compute; reflexivity |]). apply callee_saved_refl. }
     assert (HcsMmr : callee_saved M mr) by (apply (callee_saved_trans _ Wk _ HcsMWk Hkcs)).
-    iSpecialize ("Hcont" $! CID7 with "[]"); [ iPureIntro; wp_next_chain | ].
+    iSpecialize ("Hcont" $! CID7 with "[] Hlc"); [ iPureIntro; wp_next_chain | ].
     iApply ("Hcont" $! mr t' g with "Hcg Hcnt Hpc Hptree Henv [%] [%] [%] [%] [%] [%] [%]").
     { exact HcsMmr. }
     { rewrite (callee_saved_lookup HcsMmr (mword_of_int 9) ltac:(vm_compute; reflexivity)). exact HM9. }
@@ -1668,7 +1668,7 @@ Section KvmmakeBody.
               Hp0 Hbelow
               with "Hcg Hcnt Htext Hpc Hptree [Henv]").
     { iExact "Henv". }
-    iIntros (CID7 Hs7 mr t' g) "Hcg Hcnt Hpc Hptree %Hnodes' Henv %Hkcs %Hbase' %Hrep' %Hpres %Hgmiss".
+    iIntros (CID7 Hs7) "Hlc". iIntros (mr t' g) "Hcg Hcnt Hpc Hptree %Hnodes' Henv %Hkcs %Hbase' %Hrep' %Hpres %Hgmiss".
     assert (Hret : ret_pc (Wk !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.kvmmake + 0x48)).
     { rewrite /Wk upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hret) in "Hpc".
@@ -1678,7 +1678,7 @@ Section KvmmakeBody.
     { rewrite /Wk /V10 /V11 /V12 /V13 /V14.
       repeat (apply callee_saved_insert_r; [vm_compute; reflexivity |]). apply callee_saved_refl. }
     assert (HcsMmr : callee_saved M mr) by (apply (callee_saved_trans _ Wk _ HcsMWk Hkcs)).
-    iSpecialize ("Hcont" $! CID7 with "[]"); [ iPureIntro; wp_next_chain | ].
+    iSpecialize ("Hcont" $! CID7 with "[] Hlc"); [ iPureIntro; wp_next_chain | ].
     iApply ("Hcont" $! mr t' g with "Hcg Hcnt Hpc Hptree Henv [%] [%] [%] [%] [%] [%] [%]").
     { exact HcsMmr. }
     { rewrite (callee_saved_lookup HcsMmr (mword_of_int 9) ltac:(vm_compute; reflexivity)). exact HM9. }
@@ -1804,7 +1804,7 @@ Section KvmmakeBody.
               Hp0 Hbelow
               with "Hcg Hcnt Htext Hpc Hptree [Henv]").
     { iExact "Henv". }
-    iIntros (CID7 Hs7 mr t' g) "Hcg Hcnt Hpc Hptree %Hnodes' Henv %Hkcs %Hbase' %Hrep' %Hpres %Hgmiss".
+    iIntros (CID7 Hs7) "Hlc". iIntros (mr t' g) "Hcg Hcnt Hpc Hptree %Hnodes' Henv %Hkcs %Hbase' %Hrep' %Hpres %Hgmiss".
     assert (Hret : ret_pc (Wk !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.kvmmake + 0x5a)).
     { rewrite /Wk upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hret) in "Hpc".
@@ -1814,7 +1814,7 @@ Section KvmmakeBody.
     { rewrite /Wk /P10 /P11 /P12 /P13 /P14.
       repeat (apply callee_saved_insert_r; [vm_compute; reflexivity |]). apply callee_saved_refl. }
     assert (HcsMmr : callee_saved M mr) by (apply (callee_saved_trans _ Wk _ HcsMWk Hkcs)).
-    iSpecialize ("Hcont" $! CID7 with "[]"); [ iPureIntro; wp_next_chain | ].
+    iSpecialize ("Hcont" $! CID7 with "[] Hlc"); [ iPureIntro; wp_next_chain | ].
     iApply ("Hcont" $! mr t' g with "Hcg Hcnt Hpc Hptree Henv [%] [%] [%] [%] [%] [%] [%]").
     { exact HcsMmr. }
     { rewrite (callee_saved_lookup HcsMmr (mword_of_int 9) ltac:(vm_compute; reflexivity)). exact HM9. }
@@ -1956,7 +1956,7 @@ Section KvmmakeBody.
               Hp0 Hbelow
               with "Hcg Hcnt Htext Hpc Hptree [Henv]").
     { iExact "Henv". }
-    iIntros (CID9 Hs9 mr t' g) "Hcg Hcnt Hpc Hptree %Hnodes' Henv %Hkcs %Hbase' %Hrep' %Hpres %Hgmiss".
+    iIntros (CID9 Hs9) "Hlc". iIntros (mr t' g) "Hcg Hcnt Hpc Hptree %Hnodes' Henv %Hkcs %Hbase' %Hrep' %Hpres %Hgmiss".
     assert (Hret : ret_pc (Wk !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.kvmmake + 0x70)).
     { rewrite /Wk upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hret) in "Hpc".
@@ -1966,7 +1966,7 @@ Section KvmmakeBody.
     { rewrite /Wk /T10 /T11 /T12 /T13 /T13a /T14.
       repeat (apply callee_saved_insert_r; [vm_compute; reflexivity |]). apply callee_saved_refl. }
     assert (HcsMmr : callee_saved M mr) by (apply (callee_saved_trans _ Wk _ HcsMWk Hkcs)).
-    iSpecialize ("Hcont" $! CID9 with "[]"); [ iPureIntro; wp_next_chain | ].
+    iSpecialize ("Hcont" $! CID9 with "[] Hlc"); [ iPureIntro; wp_next_chain | ].
     iApply ("Hcont" $! mr t' g with "Hcg Hcnt Hpc Hptree Henv [%] [%] [%] [%] [%] [%] [%]").
     { exact HcsMmr. }
     { rewrite (callee_saved_lookup HcsMmr (mword_of_int 9) ltac:(vm_compute; reflexivity)). exact HM9. }
@@ -2134,7 +2134,7 @@ Section KvmmakeBody.
               Hp0 Hbelow
               with "Hcg Hcnt Htext Hpc Hptree [Henv]").
     { iExact "Henv". }
-    iIntros (CID12 Hs12 mr t' g) "Hcg Hcnt Hpc Hptree %Hnodes' Henv %Hkcs %Hbase' %Hrep' %Hpres %Hgmiss".
+    iIntros (CID12 Hs12) "Hlc". iIntros (mr t' g) "Hcg Hcnt Hpc Hptree %Hnodes' Henv %Hkcs %Hbase' %Hrep' %Hpres %Hgmiss".
     assert (Hret : ret_pc (Wk !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.kvmmake + 0x92)).
     { rewrite /Wk upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hret) in "Hpc".
@@ -2144,7 +2144,7 @@ Section KvmmakeBody.
     { rewrite /Wk /D10 /D11 /D12 /D12a /D13 /D15 /D15a /D13b /D13a /D14.
       repeat (apply callee_saved_insert_r; [vm_compute; reflexivity |]). apply callee_saved_refl. }
     assert (HcsMmr : callee_saved M mr) by (apply (callee_saved_trans _ Wk _ HcsMWk Hkcs)).
-    iSpecialize ("Hcont" $! CID12 with "[]"); [ iPureIntro; wp_next_chain | ].
+    iSpecialize ("Hcont" $! CID12 with "[] Hlc"); [ iPureIntro; wp_next_chain | ].
     iApply ("Hcont" $! mr t' g with "Hcg Hcnt Hpc Hptree Henv [%] [%] [%] [%] [%] [%] [%]").
     { exact HcsMmr. }
     { rewrite (callee_saved_lookup HcsMmr (mword_of_int 9) ltac:(vm_compute; reflexivity)). exact HM9. }
@@ -2291,7 +2291,7 @@ Section KvmmakeBody.
               Hp0 Hbelow
               with "Hcg Hcnt Htext Hpc Hptree [Henv]").
     { iExact "Henv". }
-    iIntros (CID10 Hs10 mr t' g) "Hcg Hcnt Hpc Hptree %Hnodes' Henv %Hkcs %Hbase' %Hrep' %Hpres %Hgmiss".
+    iIntros (CID10 Hs10) "Hlc". iIntros (mr t' g) "Hcg Hcnt Hpc Hptree %Hnodes' Henv %Hkcs %Hbase' %Hrep' %Hpres %Hgmiss".
     assert (Hret : ret_pc (Wk !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.kvmmake + 0xac)).
     { rewrite /Wk upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hret) in "Hpc".
@@ -2301,7 +2301,7 @@ Section KvmmakeBody.
     { rewrite /Wk /R10 /R11 /R11b /R11a /R12 /R12a /R13 /R14.
       repeat (apply callee_saved_insert_r; [vm_compute; reflexivity |]). apply callee_saved_refl. }
     assert (HcsMmr : callee_saved M mr) by (apply (callee_saved_trans _ Wk _ HcsMWk Hkcs)).
-    iSpecialize ("Hcont" $! CID10 with "[]"); [ iPureIntro; wp_next_chain | ].
+    iSpecialize ("Hcont" $! CID10 with "[] Hlc"); [ iPureIntro; wp_next_chain | ].
     iApply ("Hcont" $! mr t' g with "Hcg Hcnt Hpc Hptree Henv [%] [%] [%] [%] [%] [%] [%]").
     { exact HcsMmr. }
     { rewrite (callee_saved_lookup HcsMmr (mword_of_int 9) ltac:(vm_compute; reflexivity)). exact HM9. }

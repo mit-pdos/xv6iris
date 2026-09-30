@@ -584,14 +584,14 @@ Section ProofBunpin.
     iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.bunpin + 0x32)) Rra P4 K b
               ltac:(vm_compute; discriminate) with "Hcg Hpc []").
     { iApply (bui_32 with "Htext"). }
-    iIntros (CIDe5 Hse5) "Hcg Hpc".
+    iIntros (CIDe5 Hse5) "Hlc Hcg Hpc".
     assert (Hretf : ret_pc (P4 !!! Regidx Rra) = ret_tgt) by (rewrite HP4ra; reflexivity).
     iEval (rewrite Hretf) in "Hpc".
     (* [cpu_own] was delivered at CIDr by release's own [wp_next]; five more
        plain instructions have moved us to CIDe5. *)
     iDestruct (cpu_own_transport CIDr CIDe5 n eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iSpecialize ("Hcont" $! CIDe5 with "[]"); [ iPureIntro; wp_next_chain | ].
+    iSpecialize ("Hcont" $! CIDe5 with "[] Hlc"); [ iPureIntro; wp_next_chain | ].
     iApply ("Hcont" $! P4 with "Hcg Hcnt Hpc [%] Hbslot").
     (* callee_saved m P4 *)
     assert (Hthread : forall c : mword 5, is_cs_idx c = true ->

@@ -546,7 +546,7 @@ Section ProofVirtioDiskRw.
               with "Hcg Hown Htext Hpc []").
     all: try lkbelow.
     { rgall. iEval (rewrite HR11a0). iExact "Hlk". }
-    iIntros (CIDaq Hsaq ms M) "_ Hcg Hpc %HcsM Htok HR _ Hown Hpay".
+    iIntros (CIDaq Hsaq) "Hlc". iIntros (ms M) "_ Hcg Hpc %HcsM Htok HR _ Hown Hpay".
     (* THE COMPLEMENT RIDES ALONG, UNTOUCHED, THROUGH THE WHOLE PROLOGUE --
        transport it to the acquire-return hart in ONE step, using exactly the
        chain of per-instruction guards [cpu_own_transport] above already
@@ -591,7 +591,7 @@ Section ProofVirtioDiskRw.
        out of [vdrw_saved (KTR := KT1)].  What travels is the frame, not the registers. *)
     assert (HR11hi : vdrw_hi R11 m).
     { vdrw_hi_peel. apply vdrw_hi_refl. }
-    iSpecialize ("Hcont" $! CIDaq with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CIDaq with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! M with "[%] Hcg Hown Hpay Hextc Hextm Hpc Htok HR [Hk1 Hk2 Hk3 Hk4 Hk5 Hk6 Hk7 Hk8 Hk9 Hk10] [Hk11 Hk12] Hbno").
     - split.
       + exact (vdrw_regs_cs R11 M sp0 bp wr (vdrw_sector_raw bno) HcsM HR11).

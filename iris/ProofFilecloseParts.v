@@ -469,10 +469,10 @@ Section ProofFilecloseParts.
     iApply (wp_cret_s_sconf (mword_of_int (FC + 0x96)) Rra T4 K b
               ltac:(vm_compute; discriminate) with "Hcg Hpc []").
     { iApply (fci_96 with "Htext"). }
-    iIntros (CID5 Hs5) "Hcg Hpc".
+    iIntros (CID5 Hs5) "Hlc Hcg Hpc".
     iEval (rgne) in "Hpc".
     iEval (rewrite HT4ra) in "Hpc".
-    iSpecialize ("Hcont" $! CID5 with "[]"); [iPureIntro; wp_next_chain|].
+    iSpecialize ("Hcont" $! CID5 with "[] Hlc"); [iPureIntro; wp_next_chain|].
     iApply ("Hcont" $! T4 with "[%] Hcg Hpc").
     (* callee_saved m T4 : sp and s0/s1 came back off the frame, and the
        nine the epilogue never touches came in already agreeing -- which is
@@ -613,9 +613,9 @@ Section ProofFilecloseParts.
     iApply (wp_cj_s_sconf (mword_of_int ze) jimm U4 K b
               ltac:(rewrite Hjt; vm_compute; reflexivity)
               with "Hcg Hpc Hie").
-    iApply bi.later_intro. iIntros (CID5 Hs5). iIntros "Hcg Hpc".
+    iApply bi.later_intro. iIntros (CID5 Hs5) "Hlc". iIntros "Hcg Hpc".
     iEval (rewrite Hjt) in "Hpc".
-    iSpecialize ("Hcont" $! CID5 with "[]"); [iPureIntro; wp_next_chain|].
+    iSpecialize ("Hcont" $! CID5 with "[] Hlc"); [iPureIntro; wp_next_chain|].
     iApply ("Hcont" $! U4 with "[%] Hcg Hpc Hb4 Hb5 Hb6 Hb7").
     assert (HU4sp : U4 !!! Regidx csp_rs1 = pa_stk sp0 8)
       by (rewrite /U4 upd_ne; [exact HU3sp | vm_compute; discriminate]).

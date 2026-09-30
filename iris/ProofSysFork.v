@@ -292,7 +292,7 @@ Section ProofSysFork.
               ltac:(vm_compute; discriminate)
               with "Hcg Hpc []").
     { iApply (sf_12 with "Htext"). }
-    iIntros (CID11 Hs11) "Hcg Hpc".
+    iIntros (CID11 Hs11) "Hlc Hcg Hpc".
     assert (Hra_final : ret_pc (E10 !!! Regidx (mword_of_int 1 : mword 5)) = ret_tgt)
       by (rewrite HE10ra; reflexivity).
     iEval (rewrite Hra_final) in "Hpc".
@@ -323,7 +323,7 @@ Section ProofSysFork.
     { rewrite /E10 upd_ne; [| vm_compute; discriminate].
       rewrite /E0e upd_ne; [| vm_compute; discriminate].
       rewrite /E0c upd_ne; [reflexivity | vm_compute; discriminate]. }
-    iSpecialize ("Hcont" $! CID11 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CID11 with "[%] Hlc"); [wp_next_chain|].
     (* [Hcpu] has sat at [CID6] (kfork's own resumed hart) since the
        crossing; the four leaf steps since then never touched it. *)
     iDestruct (cpu_own_transport CID6 CID11 lvl eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".

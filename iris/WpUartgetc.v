@@ -286,8 +286,8 @@ Section WpUartgetc.
                 ltac:(rewrite Hlk; exact Hempty)
                 ltac:(rewrite HNo; exact Hal)
                 with "Hcg Hpc HiB [-]").
-      iApply bi.later_intro. iIntros (CID3 Hs3) "Hcg Hpc". iEval (rewrite HNo) in "Hpc".
-      iSpecialize ("Hk" $! CID3 with "[%]"); [wp_next_chain|].
+      iApply bi.later_intro. iIntros (CID3 Hs3) "Hlc Hcg Hpc". iEval (rewrite HNo) in "Hpc".
+      iSpecialize ("Hk" $! CID3 with "[%] Hlc"); [wp_next_chain|].
       iDestruct "Hk" as "[Hno _]".
       iApply ("Hno" $! bt with "[%] Hcg Hpc Htok"). exact Hempty.
     - (* a byte is waiting: [lbu a0,0(rs_rhr)] pops it *)
@@ -317,9 +317,9 @@ Section WpUartgetc.
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 ltac:(rewrite (rget_ne _ Ra0 HR0tp) upd_eq; apply ug_and255)
                 with "Hcg Hpc HiZ [-]").
-      iIntros (CID5 Hs5) "Hcg Hpc". iEval (rewrite HK) in "Hpc".
+      iIntros (CID5 Hs5) "Hlc Hcg Hpc". iEval (rewrite HK) in "Hpc".
       iEval (rewrite upd_upd) in "Hcg".
-      iSpecialize ("Hk" $! CID5 with "[%]"); [wp_next_chain|].
+      iSpecialize ("Hk" $! CID5 with "[%] Hlc"); [wp_next_chain|].
       iDestruct "Hk" as "[_ Hyes]".
       iApply ("Hyes" $! bt c with "[%] Hcg Hpc Hh"). exact Hempty.
   Qed.

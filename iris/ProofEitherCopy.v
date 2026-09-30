@@ -338,7 +338,7 @@ Section EitherCopyEpilogue.
       rewrite /T1 upd_eq. reflexivity. }
     iApply (wp_cret_s_sconf q38 Rra T7 av b ltac:(vm_compute; discriminate)
               with "Hcg Hpc Hi3a").
-    iIntros (CID8 Hs8) "Hcg Hpc".
+    iIntros (CID8 Hs8) "Hlc Hcg Hpc".
     iEval (rewrite (rget_ne (CID := CID7) T7 Rra ltac:(vm_compute; discriminate)) HT7ra) in "Hpc".
     (* ---- the postcondition ---- *)
     assert (HT7sp : T7 !!! Regidx csp_rs1 = m !!! Regidx csp_rs1)
@@ -378,7 +378,7 @@ Section EitherCopyEpilogue.
       rewrite /T2 upd_ne; [| congruence].
       rewrite /T1 upd_ne; [| congruence].
       apply Hthr; assumption. }
-    iSpecialize ("Hcont" $! CID8 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CID8 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! T7 with "[%] Hcg Hpc").
     split; [| exact HT7a0].
     unfold callee_saved.
@@ -955,11 +955,11 @@ Section ProofEitherCopyout.
       { iApply (eco_36 with "Htext"). }
       { iApply (eco_38 with "Htext"). }
       { iApply (eco_3a with "Htext"). }
-      iIntros (CID22 Hs22 mf) "[%Hcsf %Hfa0] Hcg Hpc".
+      iIntros (CID22 Hs22) "Hlc". iIntros (mf) "[%Hcsf %Hfa0] Hcg Hpc".
       (* [Hcpu] rode through [ec_epi] untouched since copyout handed it back
          at [CID21]; re-anchor it at [CID22] before discharging [Hcont]. *)
       iDestruct (cpu_own_transport CID21 CID22 lvl eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-      iSpecialize ("Hcont" $! CID22 with "[%]"); [wp_next_chain|].
+      iSpecialize ("Hcont" $! CID22 with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hcont" $! mf with "[%] Hcg Hcpu Hpc Hsrc [Hres]").
       { exact Hcsf. }
       rewrite /either_copyout_post. rewrite Hfa0.
@@ -1142,12 +1142,12 @@ Section ProofEitherCopyout.
       { iApply (eco_36 with "Htext"). }
       { iApply (eco_38 with "Htext"). }
       { iApply (eco_3a with "Htext"). }
-      iIntros (CID23 Hs23 mf) "[%Hcsf %Hfa0] Hcg Hpc".
+      iIntros (CID23 Hs23) "Hlc". iIntros (mf) "[%Hcsf %Hfa0] Hcg Hpc".
       (* [Hcpu] rode through memmove and [ec_epi] untouched since myproc
          handed it back at [CID14]; re-anchor it at [CID23] before
          discharging [Hcont]. *)
       iDestruct (cpu_own_transport CID14 CID23 lvl eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-      iSpecialize ("Hcont" $! CID23 with "[%]"); [wp_next_chain|].
+      iSpecialize ("Hcont" $! CID23 with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hcont" $! mf with "[%] Hcg Hcpu Hpc Hsrc [Hdst]").
       { exact Hcsf. }
       rewrite /either_copyout_post. rewrite Hfa0.
@@ -1723,11 +1723,11 @@ Section ProofEitherCopyin.
       { iApply (eci_36 with "Htext"). }
       { iApply (eci_38 with "Htext"). }
       { iApply (eci_3a with "Htext"). }
-      iIntros (CID22 Hs22 mf) "[%Hcsf %Hfa0] Hcg Hpc".
+      iIntros (CID22 Hs22) "Hlc". iIntros (mf) "[%Hcsf %Hfa0] Hcg Hpc".
       (* [Hcpu] rode through [ec_epi] untouched since copyin handed it back
          at [CID21]; re-anchor it at [CID22] before discharging [Hcont]. *)
       iDestruct (cpu_own_transport CID21 CID22 lvl eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-      iSpecialize ("Hcont" $! CID22 with "[%]"); [wp_next_chain|].
+      iSpecialize ("Hcont" $! CID22 with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hcont" $! mf with "[%] Hcg Hcpu Hpc [Hres Hdst]").
       { exact Hcsf. }
       rewrite /either_copyin_post. rewrite Hfa0.
@@ -1912,12 +1912,12 @@ Section ProofEitherCopyin.
       { iApply (eci_36 with "Htext"). }
       { iApply (eci_38 with "Htext"). }
       { iApply (eci_3a with "Htext"). }
-      iIntros (CID23 Hs23 mf) "[%Hcsf %Hfa0] Hcg Hpc".
+      iIntros (CID23 Hs23) "Hlc". iIntros (mf) "[%Hcsf %Hfa0] Hcg Hpc".
       (* [Hcpu] rode through memmove and [ec_epi] untouched since myproc
          handed it back at [CID14]; re-anchor it at [CID23] before
          discharging [Hcont]. *)
       iDestruct (cpu_own_transport CID14 CID23 lvl eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-      iSpecialize ("Hcont" $! CID23 with "[%]"); [wp_next_chain|].
+      iSpecialize ("Hcont" $! CID23 with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hcont" $! mf with "[%] Hcg Hcpu Hpc [Hsrc Hdst]").
       { exact Hcsf. }
       rewrite /either_copyin_post. rewrite Hfa0.

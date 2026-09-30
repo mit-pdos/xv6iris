@@ -510,7 +510,7 @@ Section ProofReleasesleep.
               ltac:(vm_compute; discriminate)
               with "Hcg Hpc []").
     { iApply (rsl_36 with "Htext"). }
-    iIntros (CIDe6 Hse6) "Hcg Hpc".
+    iIntros (CIDe6 Hse6) "Hlc Hcg Hpc".
     assert (Hretf : ret_pc (Q34 !!! Regidx (mword_of_int 1 : mword 5)) = ret_tgt)
       by (rewrite HQ34ra; reflexivity).
     iEval (rewrite Hretf) in "Hpc".
@@ -518,7 +518,7 @@ Section ProofReleasesleep.
        to a fresh hart, so releasesleep's continuation wants it at CIDe6. *)
     iDestruct (cpu_own_transport CIDrel CIDe6 0%nat b pme b ltac:(wp_next_chain)
                  with "Hown") as "Hown".
-    iSpecialize ("Hcont" $! CIDe6 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CIDe6 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! Q34 with "[%] Hcg Hown Hpc HHdep").
     (* callee_saved m Q34 *)
     assert (Hthread : forall c : mword 5, is_cs_idx c = true ->
@@ -614,8 +614,8 @@ Section ProofReleasesleep.
     iDestruct "Hslk" as (q) "Hslk".
     iApply (wp_releasesleep_gen_sconf γs γl γsl s R sl_untracked q m pd pme av eb b lks
               Hav Hno with "Hcg Hown Htext Hpc Hslp Hslk HR Hpinv").
-    iIntros (CIDf Hsf mf Hcs) "Hcg Hown Hpc _".
-    iSpecialize ("Hcont" $! CIDf with "[%]"); [ exact Hsf |].
+    iIntros (CIDf Hsf) "Hlc". iIntros (mf Hcs) "Hcg Hown Hpc _".
+    iSpecialize ("Hcont" $! CIDf with "[%] Hlc"); [ exact Hsf |].
     iApply ("Hcont" $! mf with "[%] Hcg Hown Hpc"). exact Hcs.
   Qed.
 

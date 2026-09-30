@@ -833,7 +833,7 @@ Section IupdateTail.
     iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.iupdate + 0x7c)) Rra P5 K b ltac:(nz)
               with "Hcg Hpc []").
     { iApply (iui_7c with "Htext"). }
-    iIntros (CID12 Hq12) "Hcg Hpc".
+    iIntros (CID12 Hq12) "Hlc Hcg Hpc".
     iEval (rgne) in "Hpc".
     assert (Hretf : ret_pc (P5 !!! Regidx Rra : mword 64)
                     = ret_pc (m !!! Regidx Rra : mword 64))
@@ -890,7 +890,7 @@ Section IupdateTail.
     iDestruct (cpu_claim_ext_transport CID0 CID12 eb (proc_addr j)
                  ltac:(rewrite Hbm; wp_next_chain) with "Hclm") as "Hclm".
     rewrite /iu_cont.
-    iSpecialize ("Hcont" $! CID12 with "[%]"); [wp_next_chain |].
+    iSpecialize ("Hcont" $! CID12 with "[%] Hlc"); [wp_next_chain |].
     iApply ("Hcont" $! P5 with "[%] Hcg Hcnt Htc Hclm Hpc Hppid Hidev Hinum
                      Hmeta Hmap Hsb Hdn Hsl Hop Hwit").
     { unfold callee_saved. split_and!; assumption. }
@@ -2033,10 +2033,10 @@ Qed.
                     Hsb Hireg Hdn Hstep Hppid Hprocs Hdevi Hdgeom Hdlock Hsl Hlb0 Hcrd Hop
                     [Hcont]").
     iEval (rewrite /wp_next).
-    iIntros (CIDf) "%Hchain".
+    iIntros (CIDf) "%Hchain" Hlc.
     iIntros (mf) "%Hcs Hcg Hcnt Htc Hclm Hpc Hppid Hidev Hinumc Hmeta Hmap Hsb
                   Hiout Hsl Hop Hwit".
-    iSpecialize ("Hcont" $! CIDf with "[%]"); [exact Hchain|].
+    iSpecialize ("Hcont" $! CIDf with "[%] Hlc"); [exact Hchain|].
     iApply ("Hcont" $! mf with "[%] Hcg Hcnt Htc Hclm Hpc Hppid Hidev Hinumc Hmeta Hmap
                      Hsb Hiout Hsl Hop").
     exact Hcs.
@@ -2077,10 +2077,10 @@ Qed.
                     Hsb Hireg Hdn Hstep Hppid Hprocs Hdevi Hdgeom Hdlock Hsl Hvlb Hcrd Hop
                     [Hcont]").
     iEval (rewrite /wp_next).
-    iIntros (CIDf) "%Hchain".
+    iIntros (CIDf) "%Hchain" Hlc.
     iIntros (mf) "%Hcs Hcg Hcnt Htc Hclm Hpc Hppid Hidev Hinumc Hmeta Hmap Hsb
                   Hiout Hsl Hop Hwit".
-    iSpecialize ("Hcont" $! CIDf with "[%]"); [exact Hchain|].
+    iSpecialize ("Hcont" $! CIDf with "[%] Hlc"); [exact Hchain|].
     iApply ("Hcont" $! mf with "[%] Hcg Hcnt Htc Hclm Hpc Hppid Hidev Hinumc Hmeta Hmap
                      Hsb Hiout Hsl Hop Hwit").
     exact Hcs.
@@ -2130,11 +2130,11 @@ Qed.
     { rewrite /trap_csrs_ext. done. }
     { rewrite /cpu_claim_ext. done. }
     iEval (rewrite /wp_next).
-    iIntros (CIDf) "%Hchain".
+    iIntros (CIDf) "%Hchain" Hlc.
     iIntros (mf) "%Hcs Hcg Hcnt Htc Hclm Hpc Hppid Hidev Hinumc Hmeta Hmap Hsb
                   Hiout Hsl Hop Hwit".
     iClear "Htc Hclm".
-    iSpecialize ("Hcont" $! CIDf with "[%]"); [exact Hchain|].
+    iSpecialize ("Hcont" $! CIDf with "[%] Hlc"); [exact Hchain|].
     iApply ("Hcont" $! mf with "[%] Hcg Hcnt Hpc Hppid Hidev Hinumc Hmeta Hmap
                      Hsb Hiout Hsl Hop").
     exact Hcs.
@@ -2182,10 +2182,10 @@ Qed.
                     Hsb Hireg Hdn Hstep Hppid Hprocs Hdevi Hdgeom Hdlock Hsl Hlb0 Hcrd Hop
                     [Hcont Htx]").
     iEval (rewrite /wp_next).
-    iIntros (CIDf) "%Hchain".
+    iIntros (CIDf) "%Hchain" Hlc.
     iIntros (mf) "%Hcs Hcg Hcnt Htc Hclm Hpc Hppid Hidev Hinumc Hmeta Hmap Hsb
                   Hiout Hsl Hop Hwit".
-    iSpecialize ("Hcont" $! CIDf with "[%]"); [exact Hchain|].
+    iSpecialize ("Hcont" $! CIDf with "[%] Hlc"); [exact Hchain|].
     iApply ("Hcont" $! mf with "[%] Hcg Hcnt Htc Hclm Hpc Hppid Hidev Hinumc Hmeta Hmap
                      Hsb Hiout Hsl [Hop Htx]").
     { exact Hcs. }
@@ -2252,13 +2252,13 @@ Qed.
     { rewrite /trap_csrs_ext. done. }
     { rewrite /cpu_claim_ext. done. }
     iEval (rewrite /wp_next).
-    iIntros (CIDf) "%Hchain".
+    iIntros (CIDf) "%Hchain" Hlc.
     iIntros (mf) "%Hcs Hcg Hcnt Htc Hclm Hpc Hppid Hidev Hinumc Hmeta Hmap Hsb
                   Hiout Hsl Hop Hwit".
     iClear "Htc Hclm".
     (* the payout, taken apart into the contract's two wands *)
     iDestruct "Hiout" as "(Hdnout & Htok & Hpin)".
-    iSpecialize ("Hcont" $! CIDf with "[%]"); [exact Hchain|].
+    iSpecialize ("Hcont" $! CIDf with "[%] Hlc"); [exact Hchain|].
     iApply ("Hcont" $! mf with "[%] Hcg Hcnt Hpc Hppid Hidev Hinumc Hmeta Hmap
                      Hsb Hdnout Htok Hpin Hsl Hop").
     exact Hcs.
@@ -2315,11 +2315,11 @@ Qed.
     { rewrite /trap_csrs_ext. done. }
     { rewrite /cpu_claim_ext. done. }
     iEval (rewrite /wp_next).
-    iIntros (CIDf) "%Hchain".
+    iIntros (CIDf) "%Hchain" Hlc.
     iIntros (mf) "%Hcs Hcg Hcnt Htc Hclm Hpc Hppid Hidev Hinumc Hmeta Hmap Hsb
                   Hiout Hsl Hop Hwit".
     iClear "Htc Hclm".
-    iSpecialize ("Hcont" $! CIDf with "[%]"); [exact Hchain|].
+    iSpecialize ("Hcont" $! CIDf with "[%] Hlc"); [exact Hchain|].
     iApply ("Hcont" $! mf with "[%] Hcg Hcnt Hpc Hppid Hidev Hinumc Hmeta Hmap
                      Hsb Hiout Hsl Hop").
     exact Hcs.

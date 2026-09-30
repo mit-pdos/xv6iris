@@ -500,7 +500,7 @@ Section ProofSysOpenJoin.
                       HbP H23 H24
                       [Hpback Hfds Hfrag Hisl HP Hobs Htc Hcont]").
       iEval (rewrite /wp_next).
-      iIntros (CIDy) "%Hqy". iIntros (mf)
+      iIntros (CIDy) "%Hqy" Hlc. iIntros (mf)
         "%Hcsf %Ha0f Hcg Hown Htce Hcce Hpc Hpbare Hsbb Hsbi
          Hbsl Hislot".
       iDestruct ("Hpback" with "Hpbare") as "Hpriv".
@@ -508,7 +508,7 @@ Section ProofSysOpenJoin.
          the tail's iput released. *)
       iDestruct (iref_slots_combine nsj 1 with "Hisl Hislot") as "Hisl".
       replace (nsj + 1)%nat with (S nsj) by lia.
-      iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain |].
+      iSpecialize ("Hcont" $! CIDy with "[%] Hlc"); [wp_next_chain |].
       (* this arm lends nothing: the count it came in at (permit sweep L1b) *)
       iSpecialize ("Hcont" $! mf (S nsj) (pv_ev (us_V U))).
       iEval (rewrite upd_ev_id upd_usV_id) in "Hcont".

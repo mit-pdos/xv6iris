@@ -851,7 +851,7 @@ Section ProofKforkB5.
               Hlka3 (kfkb5_stack_ok K HK)
               with "Hcg Htext Hpc [Hpinv] Htok2 HR3 Hown Hpay").
     { iApply (SchedCtx.procs_inv_lookup γs j γl Hgl with "Hpinv"). }
-    iIntros (CID10 Hs10 mr10) "Hcg Hpc %Hcs_13_r10 Hown".
+    iIntros (CID10 Hs10) "Hlc". iIntros (mr10) "Hcg Hpc %Hcs_13_r10 Hown".
     iEval (rewrite (_ : ({["proc"]} ∪ lks) ∖ {["proc"]} = lks);
            [| apply locks_add_del_below; lkbelow]) in "Hown".
     assert (Hpc_f6 : ret_pc (M13 !!! Regidx Rra) = mword_of_int (KF + 0xfe)).
@@ -861,7 +861,7 @@ Section ProofKforkB5.
     iEval (rewrite -Hb) in "Hcg".
     iEval (rewrite -Hb) in "Hown".
     rewrite <- Hb in Hs1. rewrite <- Hb in Hs6. rewrite <- Hb in Hs10.
-    iSpecialize ("Hcont" $! CID10 with "[]"); [iPureIntro; wp_next_chain|].
+    iSpecialize ("Hcont" $! CID10 with "[] Hlc"); [iPureIntro; wp_next_chain|].
     iApply ("Hcont" $! mr10 with "[%] Hcg Hown Hpc [%] Hprow");
       [ exact Hcs_0_r10 | exact Hgfresh ].
   Qed.

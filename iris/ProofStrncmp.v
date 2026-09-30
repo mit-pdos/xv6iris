@@ -249,7 +249,7 @@ Section ProofStrncmp.
     iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.strncmp + 0x38)) Rra T3 K b
               ltac:(vm_compute; discriminate) with "Hcg Hpc []").
     { iApply (snci_38 with "Htext"). }
-    iIntros (CID4 Hs4) "Hcg Hpc".
+    iIntros (CID4 Hs4) "Hlc Hcg Hpc".
     iEval (rewrite HT3ra') in "Hpc".
     (* ---- postcondition ---- *)
     assert (HT3a0 : T3 !!! Regidx Ra0 = rv).
@@ -262,7 +262,7 @@ Section ProofStrncmp.
       rewrite /T2 upd_ne; [| intro He; injection He as He'; congruence].
       rewrite /T1 upd_ne; [| apply cs_ne; [vm_compute; reflexivity | exact Hr]].
       apply Hthr; assumption. }
-    iSpecialize ("Hcont" $! CID4 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CID4 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! T3 with "[%] Hcg Hpc").
     split; [| exact HT3a0].
     unfold callee_saved. split_and!.
@@ -413,7 +413,7 @@ Section ProofStrncmp.
                   ltac:(rdok)
                   with "Hcg Hpc []").
         { iApply (snci_30 with "Htext"). }
-        iIntros (CID5 Hs5) "Hcg Hpc".
+        iIntros (CID5 Hs5) "Hlc Hcg Hpc".
         set (M4 := <[Regidx Ra0 := regval_into_reg
                       (sign_extend' 64
                          (sub_vec (subrange_vec_dec (rget M3 Ra0) 31 0 : mword 32)
@@ -438,7 +438,7 @@ Section ProofStrncmp.
           rewrite /M3 upd_ne; [| apply cs_ne; [vm_compute; reflexivity | exact Hr]].
           rewrite /M2 upd_ne; [| apply cs_ne; [vm_compute; reflexivity | exact Hr]].
           rewrite /M1 upd_ne; [apply Hthr; assumption | apply cs_ne; [vm_compute; reflexivity | exact Hr]]. }
-        iSpecialize ("Hcont" $! CID5 with "[%]"); [wp_next_chain|].
+        iSpecialize ("Hcont" $! CID5 with "[%] Hlc"); [wp_next_chain|].
         iApply ("Hcont" $! M4 with "[%] [%] [%] Hcg Hpc Hbuf1 Hbuf2").
         * exact HM4sp.
         * rewrite HM4a0. right. split; [exact Hnpos |]. left.
@@ -633,7 +633,7 @@ Section ProofStrncmp.
                     M6 (K - 2)%nat b ltac:(vm_compute; reflexivity)
                     with "Hcg Hpc []").
           { iApply (snci_22 with "Htext"). }
-          iApply bi.later_intro. iIntros (CID10 Hs10). iIntros "Hcg Hpc".
+          iApply bi.later_intro. iIntros (CID10 Hs10) "Hlc". iIntros "Hcg Hpc".
           assert (Ht32 : add_vec (mword_of_int (KernelSyms.strncmp + 0x22) : mword 64)
                     (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 8 : mword 11) ('b"0"))))
                   = mword_of_int (KernelSyms.strncmp + 0x32))
@@ -654,7 +654,7 @@ Section ProofStrncmp.
             rewrite /M3 upd_ne; [| apply cs_ne; [vm_compute; reflexivity | exact Hr]].
             rewrite /M2 upd_ne; [| apply cs_ne; [vm_compute; reflexivity | exact Hr]].
             rewrite /M1 upd_ne; [apply Hthr; assumption | apply cs_ne; [vm_compute; reflexivity | exact Hr]]. }
-          iSpecialize ("Hcont" $! CID10 with "[%]"); [wp_next_chain|].
+          iSpecialize ("Hcont" $! CID10 with "[%] Hlc"); [wp_next_chain|].
           iApply ("Hcont" $! M6 with "[%] [%] [%] Hcg Hpc Hbuf1 Hbuf2").
           -- exact HM6sp.
           -- rewrite HM6a0. right. split; [exact Hnpos |]. right.
@@ -739,7 +739,7 @@ Section ProofStrncmp.
                     ltac:(rdok)
                     with "Hcg Hpc []").
           { iApply (snci_30 with "Htext"). }
-          iIntros (CID7 Hs7) "Hcg Hpc".
+          iIntros (CID7 Hs7) "Hlc Hcg Hpc".
           set (M5 := <[Regidx Ra0 := regval_into_reg
                         (sign_extend' 64
                            (sub_vec (subrange_vec_dec (rget M4 Ra0) 31 0 : mword 32)
@@ -766,7 +766,7 @@ Section ProofStrncmp.
             rewrite /M3 upd_ne; [| apply cs_ne; [vm_compute; reflexivity | exact Hr]].
             rewrite /M2 upd_ne; [| apply cs_ne; [vm_compute; reflexivity | exact Hr]].
             rewrite /M1 upd_ne; [apply Hthr; assumption | apply cs_ne; [vm_compute; reflexivity | exact Hr]]. }
-          iSpecialize ("Hcont" $! CID7 with "[%]"); [wp_next_chain|].
+          iSpecialize ("Hcont" $! CID7 with "[%] Hlc"); [wp_next_chain|].
           iApply ("Hcont" $! M5 with "[%] [%] [%] Hcg Hpc Hbuf1 Hbuf2").
           -- exact HM5sp.
           -- rewrite HM5a0. right. split; [exact Hnpos |]. left.
@@ -863,7 +863,7 @@ Section ProofStrncmp.
                   ltac:(vm_compute; discriminate) ltac:(rdok)
                   with "Hcg Hpc []").
         { iApply (snci_30 with "Htext"). }
-        iIntros (CID5 Hs5) "Hcg Hpc".
+        iIntros (CID5 Hs5) "Hlc Hcg Hpc".
         set (M4 := <[Regidx Ra0 := regval_into_reg
                       (sign_extend' 64
                          (sub_vec (subrange_vec_dec (rget M3 Ra0) 31 0 : mword 32)
@@ -885,7 +885,7 @@ Section ProofStrncmp.
           rewrite /M3 upd_ne; [| apply cs_ne; [vm_compute; reflexivity | exact Hr]].
           rewrite /M2 upd_ne; [| apply cs_ne; [vm_compute; reflexivity | exact Hr]].
           rewrite /M1 upd_ne; [apply Hthr; assumption | apply cs_ne; [vm_compute; reflexivity | exact Hr]]. }
-        iSpecialize ("Hcont" $! CID5 with "[%]"); [wp_next_chain|].
+        iSpecialize ("Hcont" $! CID5 with "[%] Hlc"); [wp_next_chain|].
         iApply ("Hcont" $! M4 with "[%] [%] [%] Hcg Hpc Hbuf1 Hbuf2").
         -- exact HM4sp.
         -- rewrite HM4a0. right. split; [exact Hnpos |]. left.
@@ -1162,7 +1162,7 @@ Section ProofStrncmp.
                     ltac:(rdok)
                     with "Hcg Hpc []").
           { iApply (snci_30 with "Htext"). }
-          iIntros (CID7 Hs7) "Hcg Hpc".
+          iIntros (CID7 Hs7) "Hlc Hcg Hpc".
           set (M5 := <[Regidx Ra0 := regval_into_reg
                         (sign_extend' 64
                            (sub_vec (subrange_vec_dec (rget M4 Ra0) 31 0 : mword 32)
@@ -1185,7 +1185,7 @@ Section ProofStrncmp.
             rewrite /M3 upd_ne; [| apply cs_ne; [vm_compute; reflexivity | exact Hr]].
             rewrite /M2 upd_ne; [| apply cs_ne; [vm_compute; reflexivity | exact Hr]].
             rewrite /M1 upd_ne; [apply Hthr; assumption | apply cs_ne; [vm_compute; reflexivity | exact Hr]]. }
-          iSpecialize ("Hcont" $! CID7 with "[%]"); [wp_next_chain|].
+          iSpecialize ("Hcont" $! CID7 with "[%] Hlc"); [wp_next_chain|].
           iApply ("Hcont" $! M5 with "[%] [%] [%] Hcg Hpc Hbuf1 Hbuf2").
           -- exact HM5sp.
           -- rewrite HM5a0. right. split; [exact Hnpos |]. left.
@@ -1354,8 +1354,8 @@ Section ProofStrncmp.
                 HK ltac:(reflexivity) ltac:(reflexivity) ltac:(reflexivity)
                 HZ1sp HZ1a0 HZ1thr
                 with "Hcg Htext Hpc Hb1 Hb2").
-      iIntros (CID8 Hs8 mf) "[%Hcs %Hfa0] Hcg Hpc".
-      iSpecialize ("Hcont" $! CID8 with "[%]"); [wp_next_chain|].
+      iIntros (CID8 Hs8) "Hlc". iIntros (mf) "[%Hcs %Hfa0] Hcg Hpc".
+      iSpecialize ("Hcont" $! CID8 with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hcont" $! mf with "Hcg Hpc Hbuf1 Hbuf2 [%] [%]").
       + exact Hcs.
       + rewrite Hfa0. left. split; [exact Hn0 | reflexivity].
@@ -1392,8 +1392,8 @@ Section ProofStrncmp.
                 HK ltac:(reflexivity) ltac:(reflexivity) ltac:(reflexivity)
                 HMtsp ltac:(reflexivity) HMtthr
                 with "Hcg Htext Hpc Hb1 Hb2").
-      iIntros (CID7 Hs7 mf) "[%Hcs %Hfa0] Hcg Hpc".
-      iSpecialize ("Hcont" $! CID7 with "[%]"); [wp_next_chain|].
+      iIntros (CID7 Hs7) "Hlc". iIntros (mf) "[%Hcs %Hfa0] Hcg Hpc".
+      iSpecialize ("Hcont" $! CID7 with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hcont" $! mf with "Hcg Hpc Hbuf1 Hbuf2 [%] [%]").
       + exact Hcs.
       + rewrite Hfa0. exact HMta0.

@@ -109,10 +109,10 @@ Section WpMemsetArray.
     { iApply (minstr_024 with "Htext"). }
     { iEval (rewrite Hsuf_sp). iExact "Hbra". }
     { iEval (rewrite Hsuf_sp). iExact "Hbs0". }
-    iEval (rewrite /wp_next). iIntros (CID3 Hs3 mfin) "Hcg Hpc %Hmeq".
+    iEval (rewrite /wp_next). iIntros (CID3 Hs3) "Hlc". iIntros (mfin) "Hcg Hpc %Hmeq".
     assert (Hnk : ((n - 2) + 2)%nat = n) by lia.
     iEval (rewrite Hnk) in "Hcg".
-    iSpecialize ("Hcont" $! CID3 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CID3 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! mfin with "Hcg Hpc [Hbuf] [%]").
     - (* the buffer is empty at len = 0 *) iExact "Hbuf".
     - (* callee_saved m0 mfin: only sp/s0 moved, and both are restored *)
@@ -270,11 +270,11 @@ Section WpMemsetArray.
     { iApply (minstr_024 with "Htext"). }
     { iEval (rewrite Hsuf_sp). iExact "Hbra". }
     { iEval (rewrite Hsuf_sp). iExact "Hbs0". }
-    iEval (rewrite /wp_next). iIntros (CID4 Hs4 mfin) "Hcg Hpc %Hmeq".
+    iEval (rewrite /wp_next). iIntros (CID4 Hs4) "Hlc". iIntros (mfin) "Hcg Hpc %Hmeq".
     assert (Hnk : ((n - 2) + 2)%nat = n) by lia.
     iEval (rewrite Hnk) in "Hcg".
     (* hand the all-cbyte buffer back directly (KEEP the written bytes) *)
-    iSpecialize ("Hcont" $! CID4 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CID4 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! mfin with "Hcg Hpc [Hbuf] [%]").
     - iApply (big_sepL_impl with "Hbuf"). iIntros "!>" (k j _) "H".
       iEval (rewrite ms_pa_ms_addr) in "H".

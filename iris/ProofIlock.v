@@ -628,7 +628,7 @@ Section IlockEpilogue.
     iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.ilock + 0x26)) Rra P4 K b ltac:(nz)
               with "Hcg Hpc []").
     { iApply (ili_26 with "Htext"). }
-    iIntros (CID5 Hq5) "Hcg Hpc".
+    iIntros (CID5 Hq5) "Hlc Hcg Hpc".
     iEval (rgne) in "Hpc".
     assert (Hretf : ret_pc (P4 !!! Regidx Rra : mword 64)
                     = ret_pc (m !!! Regidx Rra : mword 64))
@@ -681,7 +681,7 @@ Section IlockEpilogue.
     iDestruct (cpu_claim_ext_transport CID0 CID5 eb (proc_addr j)
                  ltac:(rewrite Heb2b; wp_next_chain) with "Hextm") as "Hextm".
     rewrite /il_cont.
-    iSpecialize ("Hcont" $! CID5 with "[%]"); [wp_next_chain |].
+    iSpecialize ("Hcont" $! CID5 with "[%] Hlc"); [wp_next_chain |].
     iApply ("Hcont" $! P4 dn bm filled with "[%] Hcg Hcnt Hextc Hextm Hpc Hppid Hsb
                      Hsl Hstok Hdep Hoffr Hidev Hinumc Hvalid Hlk Hshot Hfoff [%] Hwb [%]").
     { unfold callee_saved. split_and!; assumption. }
@@ -2610,8 +2610,8 @@ Section ProofIlockMain.
     iAssert (il_cont (CID0 := CID11) gisl s g lo d o k ip
  inum pidv dq dqs j m K eb b lks Upr)%I
       with "[Hcont]" as "Hcont".
-    { rewrite /il_cont /wp_next. iIntros (CIDy) "%Hqy". iIntros (mf2 dn2 bm2 fl2) "%Hcs2".
-      iSpecialize ("Hcont" $! CIDy with "[%]"); [exact Hqy|].
+    { rewrite /il_cont /wp_next. iIntros (CIDy) "%Hqy" Hlc. iIntros (mf2 dn2 bm2 fl2) "%Hcs2".
+      iSpecialize ("Hcont" $! CIDy with "[%] Hlc"); [exact Hqy|].
       iApply ("Hcont" $! mf2 dn2 bm2 fl2 with "[%] []"); [exact Hcs2|].
       iExists Kt. iFrame "Hflt". iPureIntro. lia. }
     (* r25 pass 1: the payload has a FOURTH conjunct now -- the inode's

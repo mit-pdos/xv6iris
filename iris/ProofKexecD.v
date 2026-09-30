@@ -1881,7 +1881,7 @@ Section KexecDCommit.
     iApply (kxc_epi_frame m G10 K sp0 ra0 s00 s10 s20 (proc_addr jp) eb
               ltac:(lia) Hmsp Hmra Hms0 Hms1 Hms2 HG10sp HG10thr
               with "Hcg Htext Hpc Hfr").
-    iIntros (CIDe Hse mf) "%Hcs %Hpres Hcg Hpc".
+    iIntros (CIDe Hse) "Hlc". iIntros (mf) "%Hcs %Hpres Hcg Hpc".
     iDestruct (cpu_own_transport CID16 CIDe 0%nat eb (proc_addr jp) eb
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (trap_csrs_ext_transport CID15 CIDe eb (proc_addr jp)
@@ -1901,7 +1901,7 @@ Section KexecDCommit.
                    = kxc_sp_final (uint sz1) alen c).
     { rewrite uint_unsigned moi64_unsigned. unfold bv_wrap. apply Z.mod_small.
       change (bv_modulus 64) with 18446744073709551616%Z. exact Hspfin_range. }
-    iSpecialize ("Hcont" $! CIDe with "[%]"); [wp_next_chain |].
+    iSpecialize ("Hcont" $! CIDe with "[%] Hlc"); [wp_next_chain |].
     iSpecialize ("Hcont" $! mf
               (upd_usV (upd_usM (us_exec U sz1 P
                  (<[kxc_tf_sp_idx

@@ -815,13 +815,13 @@ Section IunlockputOfDep.
                     Hprocs Hdevi Hdgeom Hdlock Hbs Hopb [Ht2 Hcont]").
     { exact Hle. }
     { rewrite /ic_dep_held /=. iExact "Hload". }
-    iIntros (CIDx Hqx mf n') "%Hcs Hcg Hown Hextc Hextm Hpc Hppid Hsbb Hsbi
+    iIntros (CIDx Hqx) "Hlc". iIntros (mf n') "%Hcs Hcg Hown Hextc Hextm Hpc Hppid Hsbb Hsbi
              Hbs %Hbnd Hopb Hslot Ht1".
     rewrite /ic_dep_side.
     iDestruct (log_tx_join icfg_log t with "Ht1 Ht2") as "Htx".
 
     iApply ("Hcont" $! CIDx Hqx mf n' with
-              "[%] Hcg Hown Hextc Hextm Hpc Hppid Hsbb Hsbi Hbs [%]
+              "[%] Hlc Hcg Hown Hextc Hextm Hpc Hppid Hsbb Hsbi Hbs [%]
                [Hopb Htx] Hslot"); [exact Hcs | exact Hbnd |].
     iApply (log_opb_op with "Hopb Htx").
   Qed.
@@ -865,13 +865,13 @@ Section IunlockputOfDep.
                     Hprocs Hdevi Hdgeom Hdlock Hbs Hcr Hops [Ht2 Hcont]").
     { exact Hle. }
     { rewrite /ic_dep_held /=. iExact "Hload". }
-    iIntros (CIDx Hqx mf n' Sb' w) "%Hcs Hcg Hown Hextc Hextm Hpc Hppid Hsbb
+    iIntros (CIDx Hqx) "Hlc". iIntros (mf n' Sb' w) "%Hcs Hcg Hown Hextc Hextm Hpc Hppid Hsbb
              Hsbi Hbs %Hsub %Hw %Hcrb %Hnn Hops Hslot Ht1".
     rewrite /ic_dep_side.
     iDestruct (log_tx_join icfg_log t with "Ht1 Ht2") as "Htx".
 
     iApply ("Hcont" $! CIDx Hqx mf n' Sb' w with
-              "[%] Hcg Hown Hextc Hextm Hpc Hppid Hsbb Hsbi Hbs [%] [%] [%]
+              "[%] Hlc Hcg Hown Hextc Hextm Hpc Hppid Hsbb Hsbi Hbs [%] [%] [%]
                [%] Hops Htx Hslot");
       [exact Hcs | exact Hsub | exact Hw | exact Hcrb | exact Hnn].
   Qed.

@@ -519,14 +519,14 @@ Section ProofCopyin.
     iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.copyin + 0x96)) Rra E13 K b
               ltac:(vm_compute; discriminate) with "Hcg Hpc []").
     { iApply (cii_96 with "Htext"). }
-    iIntros (CIDe13 Hse13) "Hcg Hpc".
+    iIntros (CIDe13 Hse13) "Hlc Hcg Hpc".
     iEval (rgne) in "Hpc".
     assert (Hretf : ret_pc (E13 !!! Regidx Rra) = ret_pc (mm !!! Regidx Rra))
       by (rewrite HE13ra; reflexivity).
     iEval (rewrite Hretf) in "Hpc".
     iDestruct (cpu_own_transport CID0 CIDe13 ncnt eb pcur b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iSpecialize ("Hcont" $! CIDe13 with "[]"); [iPureIntro; wp_next_chain|].
+    iSpecialize ("Hcont" $! CIDe13 with "[] Hlc"); [iPureIntro; wp_next_chain|].
     iApply ("Hcont" $! E13 with "Hcg Hcnt Hpc [%] [%]").
     { unfold callee_saved.
       split_and!; first [ rewrite /E13 upd_eq Hmmsp; exact Hwv | lkp ]. }
@@ -1619,14 +1619,14 @@ Section ProofCopyin.
               V6 (K - 12) b ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (cii_78 with "Htext"). }
-    iApply bi.later_intro. iIntros (CIDu2 Hsu2). iIntros "Hcg Hpc".
+    iApply bi.later_intro. iIntros (CIDu2 Hsu2) "Hlc". iIntros "Hcg Hpc".
     assert (Hjt78 : add_vec (mword_of_int (KernelSyms.copyin + 0x78) : mword 64)
               (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 2 : mword 11) ('b"0"))))
             = mword_of_int (KernelSyms.copyin + 0x7c)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hjt78) in "Hpc".
     iDestruct (cpu_own_transport CIDvf CIDu2 lvl eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iSpecialize ("Hcont" $! CIDu2 with "[]"); [iPureIntro; wp_next_chain|].
+    iSpecialize ("Hcont" $! CIDu2 with "[] Hlc"); [iPureIntro; wp_next_chain|].
     iApply ("Hcont" $! V6 (mword_of_int (-1)) Pc fd
               with "[%] [%] [%] [%] [%] Hcg Hcnt Hlend Hpc Hpt Hdst").
     - lkp.
@@ -1694,11 +1694,11 @@ Section ProofCopyin.
       iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.copyin + 0x9a)) Rra Z1 K b
                 ltac:(vm_compute; discriminate) with "Hcg Hpc []").
       { iApply (cii_9a with "Htext"). }
-      iIntros (CIDz2 Hsz2) "Hcg Hpc".
+      iIntros (CIDz2 Hsz2) "Hlc Hcg Hpc".
       iEval (rgne; rewrite HZ1ra) in "Hpc".
       iDestruct (cpu_own_transport CID CIDz2 lvl eb p b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
-      iSpecialize ("Hcont" $! CIDz2 with "[]"); [iPureIntro; wp_next_chain|].
+      iSpecialize ("Hcont" $! CIDz2 with "[] Hlc"); [iPureIntro; wp_next_chain|].
       iApply ("Hcont" $! Z1 P dst_olds with "Hcg Hcnt Hlend Hpc Hpt Hdst [%] [%] [%]").
       - unfold callee_saved.
         rewrite /Z1. split_and!;
@@ -2033,8 +2033,8 @@ Section ProofCopyin.
               ltac:(lia) ltac:(reflexivity)
               Hjsp Hja0 Hjs11
               with "Hcg Hcnt Htext Hpc Hk1 Hk2 Hk3 Hk4 Hk5 Hk6 Hk7 Hk8 Hk9 Hk10 Hk11 Hk12").
-    iIntros (CIDe Hse mf) "Hcg Hcnt Hpc %Hcs %Hfa0".
-    iSpecialize ("Hcont" $! CIDe with "[]"); [iPureIntro; wp_next_chain|].
+    iIntros (CIDe Hse) "Hlc". iIntros (mf) "Hcg Hcnt Hpc %Hcs %Hfa0".
+    iSpecialize ("Hcont" $! CIDe with "[] Hlc"); [iPureIntro; wp_next_chain|].
     iApply ("Hcont" $! mf P' g with "Hcg Hcnt Hlend Hpc Hpt Hdst [%] [%] [%]").
     - exact Hcs.
     - exact Hjext.

@@ -936,7 +936,7 @@ Section ProofSysLinkEpilogue.
     iApply (wp_cret_s_sconf (mword_of_int (SL + 0x122)) Rra M4 K b
               ltac:(nz) with "Hcg Hpc []").
     { iApply (slki_122 with "Htext"). }
-    iIntros (CID5 Hq5) "Hcg Hpc".
+    iIntros (CID5 Hq5) "Hlc Hcg Hpc".
     iEval (rgne) in "Hpc".
     assert (Hretf : ret_pc (M4 !!! Regidx Rra : mword 64)
                     = ret_pc (m !!! Regidx Rra : mword 64))
@@ -961,7 +961,7 @@ Section ProofSysLinkEpilogue.
     assert (Hfin : sl_thr m M4).
     { intros c Hc N2 N8 N9 N18. rewrite /M4 upd_ne; [| regne].
       exact (HM3thr c Hc N2 N8 N9 N18). }
-    iSpecialize ("Hcont" $! CID5 with "[%]"); [wp_next_chain |].
+    iSpecialize ("Hcont" $! CID5 with "[%] Hlc"); [wp_next_chain |].
     iApply ("Hcont" $! M4 with "[%] [%] Hcg Hpc").
     { unfold callee_saved. split_and!;
         [ exact Csp | exact Cs0 | exact Cs1 | exact Cs2

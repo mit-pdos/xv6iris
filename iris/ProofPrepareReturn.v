@@ -269,7 +269,7 @@ Section ProofPrepareReturn.
        interrupt can be taken ON this very instruction, so the hart may have
        moved.  Every step AFTER this one is at [false] and introduces with
        [wp_next_off_intro]; this one alone rebinds. *)
-    iIntros (CID7 Hk7 ms0) "%Hms0f Hcg Hcpu Hcsrs Hclm Hpc".
+    iIntros (CID7 Hk7) "Hlc". iIntros (ms0) "%Hms0f Hcg Hcpu Hcsrs Hclm Hpc".
     assert (Hpp10 : add_vec_int (mword_of_int (PRR + 0x0c) : mword 64) 4
                     = mword_of_int (PRR + 0x10)) by pcw.
     iEval (rewrite Hpp10) in "Hpc".
@@ -1051,7 +1051,7 @@ Section ProofPrepareReturn.
     iDestruct ("Hclose" $! (prepare_return_tf (pv_tf (us_V U)) ksat
                               (add_vec ks (mword_of_int 4096)) cid_word)
                  with "Htfc Htfp") as "Hpv".
-    iSpecialize ("Hcont" $! CID7 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CID7 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! U19 ksat root vb with "[%] [%] [%] [%] Hkinv Hcg Hcpu Hclm Hsepc
               Hscause Hstval Hsret Hstvec Hq4 Hkptr Hpv Hpc").
     - exact Hcs.

@@ -1542,10 +1542,10 @@ Section ProofSysLinkBody.
              { rewrite Heb /cpu_claim_ext. done. }
              { iApply (log_opS_opb with "HopS"). }
              iEval (rewrite /wp_next).
-             iIntros (CIDy) "%Hqy". iIntros (mf)
+             iIntros (CIDy) "%Hqy" Hlc. iIntros (mf)
                "%Hcsf %Ha0f Hcg Hown Htce Hcce Hpc Hpidq Hsbb Hsbi
                 Hbsl Hislot".
-             iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain |].
+             iSpecialize ("Hcont" $! CIDy with "[%] Hlc"); [wp_next_chain |].
              iDestruct (cwd_ref_at_of_held_at with "Hcwdref") as "Href".
              iCombine "Hpidq Hofiles" as "Hpnc".
              iEval (rewrite -(proc_priv_nocwd_bare _ _ _ _ Hlzq)) in "Hpnc".
@@ -1706,10 +1706,10 @@ Section ProofSysLinkBody.
                 { rewrite Heb /cpu_claim_ext. done. }
                 { iApply (log_opS_opb with "HopS"). }
                 iEval (rewrite /wp_next).
-                iIntros (CIDy) "%Hqy". iIntros (mf)
+                iIntros (CIDy) "%Hqy" Hlc. iIntros (mf)
                   "%Hcsf %Ha0f Hcg Hown Htce Hcce Hpc Hpidq Hsbb Hsbi
                    Hbsl Hislot".
-                iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain |].
+                iSpecialize ("Hcont" $! CIDy with "[%] Hlc"); [wp_next_chain |].
                 iDestruct (cwd_ref_at_of_held_at with "Hcwdref") as "Href".
                 iCombine "Hpidq Hofiles" as "Hpnc".
                 iEval (rewrite -(proc_priv_nocwd_bare _ _ _ _ Hlzq)) in "Hpnc".
@@ -2504,10 +2504,10 @@ Section ProofSysLinkBody.
                                      HbN HbW HbO
                                      [Hsbs Hir1c Hcwdref Hofiles Hftok Htgtr Hlent Hcont]").
                      iEval (rewrite /wp_next).
-                     iIntros (CIDy) "%Hqy". iIntros (mf)
+                     iIntros (CIDy) "%Hqy" Hlc. iIntros (mf)
                        "%Hcsf %Ha0f Hcg Hown Htce Hcce Hpc Hpidq Hsbb
                         Hsbi Hbsl Hislots Huntgt".
-                     iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain |].
+                     iSpecialize ("Hcont" $! CIDy with "[%] Hlc"); [wp_next_chain |].
                      iDestruct (cwd_ref_at_of_held_at with "Hcwdref") as "Href".
                      iCombine "Hpidq Hofiles" as "Hpnc".
                      iEval (rewrite -(proc_priv_nocwd_bare _ _ _ _ Hlzq)) in "Hpnc".
@@ -2922,10 +2922,10 @@ Section ProofSysLinkBody.
                                        HbN HbW HbO
                                        [Hsbs Hir1c Hcwdref Hofiles Hftok Htgtr Hlent Hcont]").
                        iEval (rewrite /wp_next).
-                       iIntros (CIDy) "%Hqy". iIntros (mf)
+                       iIntros (CIDy) "%Hqy" Hlc. iIntros (mf)
                          "%Hcsf %Ha0f Hcg Hown Htce Hcce Hpc Hpidq Hsbb
                           Hsbi Hbsl Hislots Huntgt".
-                       iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain |].
+                       iSpecialize ("Hcont" $! CIDy with "[%] Hlc"); [wp_next_chain |].
                        iDestruct (cwd_ref_at_of_held_at with "Hcwdref") as "Href".
                        iCombine "Hpidq Hofiles" as "Hpnc".
                        iEval (rewrite -(proc_priv_nocwd_bare _ _ _ _ Hlzq)) in "Hpnc".
@@ -3640,9 +3640,9 @@ Section ProofSysLinkBody.
                                              Hpidq Hftok Htgtr Hentr Huntgtc
                                              Hcont]").
                             iEval (rewrite /wp_next).
-                            iIntros (CIDy) "%Hqy". iIntros (mf) "%Hcsf %Ha0f Hcg Hpc".
+                            iIntros (CIDy) "%Hqy" Hlc. iIntros (mf) "%Hcsf %Ha0f Hcg Hpc".
                             sl_own_transport CID73 CIDy eb pj b.
-                            iSpecialize ("Hcont" $! CIDy with "[%]");
+                            iSpecialize ("Hcont" $! CIDy with "[%] Hlc");
                               [wp_next_chain |].
                             iDestruct (cwd_ref_at_of_held_at with "Hcwdref") as "Href".
                             iCombine "Hpidq Hofiles" as "Hpnc".
@@ -3860,10 +3860,10 @@ Section ProofSysLinkBody.
                                             HbN HbW HbO
                                             [Hsbs Hir1c Hcwdref Hofiles Hftok Htgtr Hlent Hcont]").
                             iEval (rewrite /wp_next).
-                            iIntros (CIDy) "%Hqy". iIntros (mf)
+                            iIntros (CIDy) "%Hqy" Hlc. iIntros (mf)
                               "%Hcsf %Ha0f Hcg Hown Htce Hcce Hpc Hpidq
                                Hsbb Hsbi Hbsl Hislots Huntgt".
-                            iSpecialize ("Hcont" $! CIDy with "[%]");
+                            iSpecialize ("Hcont" $! CIDy with "[%] Hlc");
                               [wp_next_chain |].
                             iDestruct (cwd_ref_at_of_held_at with "Hcwdref") as "Href".
                             iCombine "Hpidq Hofiles" as "Hpnc".
@@ -3944,10 +3944,10 @@ Section ProofSysLinkBody.
                                    Hdlk Hbsl HopS Htx Hf1 Hf2 Hf3 Hf4 HbN HbW HbO
                                    [Hsbs Hir2d Hcwdref Hofiles Hftok Htgtr Hlent Hcont]").
                    iEval (rewrite /wp_next).
-                   iIntros (CIDy) "%Hqy". iIntros (mf)
+                   iIntros (CIDy) "%Hqy" Hlc. iIntros (mf)
                      "%Hcsf %Ha0f Hcg Hown Htce Hcce Hpc Hpidq Hsbb Hsbi
                       Hbsl Hislot Huntgt".
-                   iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain |].
+                   iSpecialize ("Hcont" $! CIDy with "[%] Hlc"); [wp_next_chain |].
                    iDestruct (cwd_ref_at_of_held_at with "Hcwdref") as "Href".
                    iCombine "Hpidq Hofiles" as "Hpnc".
                    iEval (rewrite -(proc_priv_nocwd_bare _ _ _ _ Hlzq)) in "Hpnc".
@@ -4000,9 +4000,9 @@ Section ProofSysLinkBody.
           { rewrite Heb /cpu_claim_ext. done. }
           { iApply (log_opS_op with "HopS Htx"). }
           iEval (rewrite /wp_next).
-          iIntros (CIDy) "%Hqy". iIntros (mf) "%Hcsf %Ha0f Hcg Hown Htce Hcce
+          iIntros (CIDy) "%Hqy" Hlc. iIntros (mf) "%Hcsf %Ha0f Hcg Hown Htce Hcce
                                                Hpc Hpidq".
-          iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain |].
+          iSpecialize ("Hcont" $! CIDy with "[%] Hlc"); [wp_next_chain |].
           iDestruct (cwd_ref_at_of_held_at with "Hcwdref") as "Href".
           iCombine "Hpidq Hofiles" as "Hpnc".
           iEval (rewrite -(proc_priv_nocwd_bare _ _ _ _ Hlzq)) in "Hpnc".
@@ -4040,9 +4040,9 @@ Section ProofSysLinkBody.
                   with "Hcg Htext Hpc Hf1 Hf2 Hf3 Hf4 HbN HbW HbO
                         [Hown Hbsl Hsbb Hsbi Hsbs Hir Hpriv Hltgt Hlent Huntgtc Hcont]").
         iEval (rewrite /wp_next).
-        iIntros (CIDy) "%Hqy". iIntros (mf) "%Hcsf %Ha0f Hcg Hpc".
+        iIntros (CIDy) "%Hqy" Hlc. iIntros (mf) "%Hcsf %Ha0f Hcg Hpc".
         sl_own_transport CID16 CIDy eb pj b.
-        iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain |].
+        iSpecialize ("Hcont" $! CIDy with "[%] Hlc"); [wp_next_chain |].
         iApply ("Hcont" $! mf P2 k2 with "[%] [%] [%] Hcg Hown [] [] Hpc Hbsl
                   Hsbb Hsbi Hsbs Hir Hpriv [%] [Hltgt Hlent Huntgtc]").
         { exact Hcsf. }
@@ -4078,9 +4078,9 @@ Section ProofSysLinkBody.
                 with "Hcg Htext Hpc Hf1 Hf2 Hf3 Hf4 HbN HbW HbO
                       [Hown Hbsl Hsbb Hsbi Hsbs Hir Hpriv Hltgt Hlent Huntgtc Hcont]").
       iEval (rewrite /wp_next).
-      iIntros (CIDy) "%Hqy". iIntros (mf) "%Hcsf %Ha0f Hcg Hpc".
+      iIntros (CIDy) "%Hqy" Hlc. iIntros (mf) "%Hcsf %Ha0f Hcg Hpc".
       sl_own_transport CID9 CIDy eb pj b.
-      iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain |].
+      iSpecialize ("Hcont" $! CIDy with "[%] Hlc"); [wp_next_chain |].
       iApply ("Hcont" $! mf P1 k1 with "[%] [%] [%] Hcg Hown [] [] Hpc Hbsl
                 Hsbb Hsbi Hsbs Hir Hpriv [%] [Hltgt Hlent Huntgtc]").
       { exact Hcsf. }

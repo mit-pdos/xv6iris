@@ -1942,14 +1942,14 @@ Section ProofUvmcopy.
       iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.uvmcopy + 0x98)) Rra Y1 K b
                 ltac:(vm_compute; discriminate) with "Hcg Hpc []").
       { iApply (uci_98 with "Htext"). }
-      iIntros (CIDz3 Hsz3) "Hcg Hpc".
+      iIntros (CIDz3 Hsz3) "Hlc Hcg Hpc".
       assert (HY1ra : Y1 !!! Regidx Rra = mm !!! Regidx Rra)
         by (rewrite /Y1; rewrite upd_ne; [reflexivity | reg_neq]).
       assert (Hretf : ret_pc (Y1 !!! Regidx Rra) = ret_tgt) by (rewrite HY1ra; reflexivity).
       iEval (rewrite Hretf) in "Hpc".
       iDestruct (cpu_own_transport CID CIDz3 ilvl eb p b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
-      iSpecialize ("Hcont" $! CIDz3 with "[%]"); [wp_next_chain|].
+      iSpecialize ("Hcont" $! CIDz3 with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hcont" $! Y1 with "Hcg Hcnt Hlend Hpc [%] Hpo [Hpt]").
       { unfold callee_saved. split_and!;
           (rewrite /Y1; rewrite upd_ne; [reflexivity | reg_neq]). }
@@ -2435,12 +2435,12 @@ Section ProofUvmcopy.
       iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.uvmcopy + 0x94)) Rra E10 K b
                 ltac:(vm_compute; discriminate) with "Hcg Hpc []").
       { iApply (uci_94 with "Htext"). }
-      iIntros (CIDf11 Hsf11) "Hcg Hpc".
+      iIntros (CIDf11 Hsf11) "Hlc Hcg Hpc".
       assert (Hretf : ret_pc (E10 !!! Regidx Rra) = ret_tgt) by (rewrite HE10ra; reflexivity).
       iEval (rewrite Hretf) in "Hpc".
       iDestruct (cpu_own_transport CIDep CIDf11 ilvl eb p b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
-      iSpecialize ("Hcont" $! CIDf11 with "[%]"); [wp_next_chain|].
+      iSpecialize ("Hcont" $! CIDf11 with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hcont" $! E10 with "Hcg Hcnt Hlend Hpc [%] Hpo [Hpost]").
       2:{ rewrite /uc_pay. rewrite HE10a0.
           iDestruct "Hpost" as "[(%Hz & Hp) | Hs]".

@@ -661,7 +661,7 @@ Section KexecABody.
                 ltac:(vm_compute; reflexivity) ltac:(nz) Hcmp
                 with "Hcg Hpc []").
       { iApply (kxc_030 with "Htext"). }
-      iIntros (CIDz Hsz1) "Hcg Hpc".
+      iIntros (CIDz Hsz1) "Hlc Hcg Hpc".
       assert (Hpp032 : add_vec_int (mword_of_int (KXA + 0x030) : mword 64) 2
                        = mword_of_int (KXA + 0x032)) by pcw.
       iEval (rewrite Hpp032) in "Hpc".
@@ -674,7 +674,7 @@ Section KexecABody.
                    ltac:(try rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
       iDestruct (cpu_claim_ext_transport CIDn CIDz eb (proc_addr jp)
                    ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
-      iSpecialize ("Hcont32" $! CIDz with "[%]"); [wp_next_chain |].
+      iSpecialize ("Hcont32" $! CIDz with "[%] Hlc"); [wp_next_chain |].
       (* hand the exit back, re-anchored at [CIDz] (the crossing fact by NAME,
          never as an inline [ltac:] in argument position -- durable-notes) *)
       assert (Hcrz : true = false \/ proc_addr jp = zero_reg ->
@@ -819,9 +819,9 @@ Section KexecABody.
                 with "Hcg Hcnt Hextc Hclmc Htext Hpc [Hframe] Hbm Hins Hka Hpriv
                       Hpath Hargv Hargs Hbs Hirs").
       { iApply (kxc_frameA_epi with "Hframe"). }
-      iIntros (CIDf Hsf mf U' entry spv szv') "%Hcs2 %Hok Hcg Hcnt Hextc Hclmc Hpc
+      iIntros (CIDf Hsf) "Hlc". iIntros (mf U' entry spv szv') "%Hcs2 %Hok Hcg Hcnt Hextc Hclmc Hpc
                Hbm Hins Hka2 Hpriv Hpath Hargv Hargs Hbs Hirs".
-      iSpecialize ("Hcont" $! CIDf with "[%]"); [wp_next_chain |].
+      iSpecialize ("Hcont" $! CIDf with "[%] Hlc"); [wp_next_chain |].
       iDestruct ("Hkw" $! CIDf with "Hcont") as "Hcont".
       iApply ("Hcont" $! mf U' entry spv szv'
                 with "[%] [%] Hcg Hcnt Hextc Hclmc Hpc Hbm Hins Hka2 Hpriv

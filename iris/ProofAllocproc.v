@@ -802,7 +802,7 @@ Section ProofAllocprocPid.
               Hn Hav Hbelow with "Hcg Hcpu Htext Hpc [Hislock]").
     all: try lkbelow.
     { iEval (rewrite HA3a0). iExact "Hislock". }
-    iIntros (CIDacq Hsacq ms macq) "%Hmsf Hcg Hpc %Hcsacq Hlocked HR _ Hcpu Hpay".
+    iIntros (CIDacq Hsacq) "Hlc". iIntros (ms macq) "%Hmsf Hcg Hpc %Hcsacq Hlocked HR _ Hcpu Hpay".
     (* ============ THE CRITICAL SECTION: index [false], hart [CIDacq] ============ *)
     assert (Hp44 : ret_pc (A3 !!! Regidx ap_ra) = mword_of_int (KernelSyms.allocproc + 0x44))
       by (rewrite HA3ra; pcstep).
@@ -964,7 +964,7 @@ Section ProofAllocprocPid.
         wp_next (CID0 := CID) false p (fun (CIDc : CpuId) => ap_pid_post (CID := CIDc) m k av n eb p lks tk Q) -∗
         mWP (Loop : expr riscv_lang)))%I with "[]" as "Hloop".
     { iLöb as "IH".
-      iIntros (CIDl Hsl R nv) "%HR %HRa3 %HRtr Hcg Hpc Hnp Hshares Hauth Hled Hsg Hlocked Hcpu Hpay Hpidi Hpidh Hcont".
+      iIntros (CIDl Hsl) "Hlc". iIntros (R nv) "%HR %HRa3 %HRtr Hcg Hpc Hnp Hshares Hauth Hled Hsg Hlocked Hcpu Hpay Hpidi Hpidh Hcont".
       (* +0x62 c.mv a1,a0 : the next counter value defaults to 1 (the wrap) *)
       iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.allocproc + 0x62)) ap_a1 ap_a0 R (trap_res false + av)%nat false
                 ltac:(vm_compute; discriminate) ltac:(rdok) with "Hcg Hpc []").
@@ -1001,7 +1001,7 @@ Section ProofAllocprocPid.
           p_pid (proc_addr k) ↦₄{DfracOwn (1/2)} pidh -∗
           wp_next (CID0 := CID) false p (fun (CIDc : CpuId) => ap_pid_post (CID := CIDc) m k av n eb p lks tk Q) -∗
           mWP (Loop : expr riscv_lang)))%I with "[]" as "Hbody".
-      { iIntros (CIDm Hsm Rm) "(%HRm & %HRma3 & %HRma1) Hcg Hpc Hnp Hshares Hauth Hled Hsg Hlocked Hcpu Hpay Hpidi Hpidh Hcont".
+      { iIntros (CIDm Hsm) "Hlc". iIntros (Rm) "(%HRm & %HRma3 & %HRma1) Hcg Hpc Hnp Hshares Hauth Hled Hsg Hlocked Hcpu Hpay Hpidi Hpidh Hcont".
         (* +0x6c auipc a5,0x11 ; +0x70 addi a5,a5,-916 : q := proc *)
         iApply (wp_auipc_s_sconf (mword_of_int (KernelSyms.allocproc + 0x6c)) ap_a5 (mword_of_int 17 : mword 20) Rm (trap_res false + av)%nat false
                   ltac:(vm_compute; discriminate) ltac:(rdok) with "Hcg Hpc []").
@@ -1059,7 +1059,7 @@ Section ProofAllocprocPid.
             p_pid (proc_addr k) ↦₄{DfracOwn (1/2)} pidh -∗
             wp_next (CID0 := CID) false p (fun (CIDc : CpuId) => ap_pid_post (CID := CIDc) m k av n eb p lks tk Q) -∗
             mWP (Loop : expr riscv_lang)))%I with "[]" as "Hscan".
-        { iIntros (CIDs Hss fuel). iInduction fuel as [|fuel] "IHf".
+        { iIntros (CIDs Hss) "Hlc". iIntros (fuel). iInduction fuel as [|fuel] "IHf".
           { iIntros (j Rj) "%Hfuel %Hj _ _ _ _ _ _ _ _ _ _ _ _ _". exfalso. exact (ap_fuel0 j Hfuel Hj). }
           iIntros (j Rj) "%Hfuel %Hj (%HRj & %HRja3 & %HRja1 & %HRja5) %Hfresh Hcg Hpc Hnp Hshares Hauth Hled Hsg Hlocked Hcpu Hpay Hpidi Hpidh Hcont".
           pose proof HRj as (HRjs1 & _ & _ & HRja2 & _).
@@ -1138,7 +1138,7 @@ Section ProofAllocprocPid.
               { rewrite Hpveq (ap_trunc_val (R !!! Regidx ap_a3) (proj2 HRa3)).
                 exact (HRtr eq_refl). }
               exact (Forall_lookup_1 _ _ _ _ Hall Hpvj Hpv1). }
-            iSpecialize ("IH" $! CIDs with "[%]"); [wp_next_chain |].
+            iSpecialize ("IH" $! CIDs with "[%] Hlc"); [wp_next_chain |].
             iApply ("IH" $! Re nv with "[%] [%] [%] Hcg Hpc Hnp Hshares Hauth Hled Hsg Hlocked Hcpu Hpay Hpidi Hpidh Hcont").
             + exact HRe.
             + exact HRea3.
@@ -1363,7 +1363,7 @@ Section ProofAllocprocPid.
               iApply (Release.wp_release_sconf KT1 γp alp_pid_lock "nextpid"%string nextpid_res_at Rr n eb p av
                         ({["nextpid"]} ∪ lks) (ap_lka Rr HRra0) Hav
                         with "Hcg Htext Hpc Hislock Hlocked HR Hcpu Hpay").
-              iIntros (CIDrel Hsrel mrel) "Hcg Hpc %Hcsrel Hcpu".
+              iIntros (CIDrel Hsrel) "Hlc". iIntros (mrel) "Hcg Hpc %Hcsrel Hcpu".
               rewrite Hbeq in Hsrel.
               iEval (rewrite Hbeq) in "Hcg".
               assert (Hsetback : ({["nextpid"]} ∪ lks) ∖ {["nextpid"]} = lks)
@@ -1373,7 +1373,7 @@ Section ProofAllocprocPid.
                 by (rewrite HRrra; pcstep).
               iEval (rewrite Hp98) in "Hpc".
               (* ---- hand back: the block's whole hart chain is entry -> acquire -> release ---- *)
-              iSpecialize ("Hcont" $! CIDrel with "[%]"); [wp_next_chain |].
+              iSpecialize ("Hcont" $! CIDrel with "[%] Hlc"); [wp_next_chain |].
               iEval (rewrite /ap_pid_post) in "Hcont".
               iApply ("Hcont" $! mrel pidn γg
                         with "[%] [%] [%] Hrcpt Hshot Hcg Hcpu Hpc Hpidi Hpidh Hgen Hpend Hsg Hpr").
@@ -1398,14 +1398,14 @@ Section ProofAllocprocPid.
               * split; [exact HRf | split; [exact HRfa3 | split; [exact HRfa1 | exact HRf_a5]]].
               * exact Hfresh'. }
         (* enter the scan at q = &proc[0] *)
-        iSpecialize ("Hscan" $! CIDm with "[%]"); [wp_next_chain |].
+        iSpecialize ("Hscan" $! CIDm with "[%] Hlc"); [wp_next_chain |].
         iApply ("Hscan" $! NPROC 0%nat Rc with "[%] [%] [%] [%] Hcg Hpc Hnp Hshares Hauth Hled Hsg Hlocked Hcpu Hpay Hpidi Hpidh Hcont").
         - exact ap_fuel_init.
         - exact ap_nproc_pos.
         - split; [exact HRc | split; [exact HRca3 | split; [exact HRca1 | exact HRc_a5]]].
         (* the scan has read nothing yet *)
         - intros i Hi. lia. }
-      iSpecialize ("Hbody" $! CIDl with "[%]"); [wp_next_chain |].
+      iSpecialize ("Hbody" $! CIDl with "[%] Hlc"); [wp_next_chain |].
       (* +0x64 beq a3,a6 -> +0x6c : pid == PIDMAX ? *)
       destruct (eq_vec (rget (CID := CIDl) R1 ap_a3) (rget (CID := CIDl) R1 ap_a6)) eqn:Hmax.
       - (* the counter wraps: next stays 1 *)
@@ -1467,7 +1467,7 @@ Section ProofAllocprocPid.
           | split; [ rewrite /R2 upd_ne; [reflexivity | vm_compute; discriminate] | ]].
         rewrite /R2 upd_eq (ap_addiw_val (R1 !!! Regidx ap_a3) Hpre).
         unfold PIDMAX in Hpre |- *. lia. }
-    iSpecialize ("Hloop" $! CIDacq with "[%]"); [wp_next_chain |].
+    iSpecialize ("Hloop" $! CIDacq with "[%] Hlc"); [wp_next_chain |].
     (* the first candidate IS the counter, at the payload's bound *)
     assert (Hnv31 : (bv_unsigned nv0 < 2 ^ 31)%Z).
     { unfold PIDMAX in Hnv0.
@@ -1705,7 +1705,7 @@ Section ProofAllocproc.
       iApply (wp_cret_s_sconf (CID := CIDe6) (mword_of_int (KernelSyms.allocproc + 0xde)) ap_ra E5 (rsv + K)%nat xb
                 ltac:(vm_compute; discriminate) with "Hcg Hpc []").
       { iApply (api_de with "Htext"). }
-      iIntros (CIDe7 Hse7) "Hcg Hpc".
+      iIntros (CIDe7 Hse7) "Hlc Hcg Hpc".
       assert (Hretfin : ret_pc (rget (CID := CIDe6) E5 ap_ra) = ret_tgt)
         by (rewrite ap_rg_ra HE5ra; reflexivity).
       iEval (rewrite Hretfin) in "Hpc".
@@ -1744,7 +1744,7 @@ Section ProofAllocproc.
         rewrite /E1 upd_ne; [| congruence].
         rewrite /E0 upd_ne; [| congruence].
         exact (Htrest r Hr Ncsp N8 N9 N18). }
-      iSpecialize ("Hk" $! CIDe7 with "[%]"); [wp_next_chain|].
+      iSpecialize ("Hk" $! CIDe7 with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hk" $! E5 with "[%] Hcg Hpc").
       split; [| exact HE5a0].
       unfold callee_saved.
@@ -1807,7 +1807,7 @@ Section ProofAllocproc.
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (api_18 with "Htext"). }
-    iIntros (CID10 Hs10) "Hcg Hpc".
+    iIntros (CID10 Hs10) "Hlc Hcg Hpc".
     iEval (rewrite ap_rg_s2) in "Hcg".
     set (A5 := <[Regidx ap_s2 := regval_into_reg
         (add_vec (A4 !!! Regidx ap_s2) (sign_extend' 64 (mword_of_int 2302 : mword 12)))]> A4).
@@ -1935,7 +1935,7 @@ Section ProofAllocproc.
                 with "Hcg Hcpu Htext Hpc [Hislock]").
       all: try lkbelow.
       { iEval (rewrite HL2a0). iExact "Hislock". }
-      iIntros (CIDf Hsf ms macq) "%Hmsf Hcg Hpc %Hcsacq Hlocked HR _ Hcpu Hpay".
+      iIntros (CIDf Hsf) "Hlc". iIntros (ms macq) "%Hmsf Hcg Hpc %Hcsacq Hlocked HR _ Hcpu Hpay".
       assert (Hp22 : ret_pc (L2 !!! Regidx ap_ra) = mword_of_int (KernelSyms.allocproc + 0x22))
         by (rewrite HL2ra; apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hp22) in "Hpc".
@@ -2458,10 +2458,10 @@ Section ProofAllocproc.
             intros r Hr Ncsp N8 N9 N18.
             rewrite /T5 upd_ne; [| congruence].
             exact (Hrl_rest r Hr Ncsp N8 N9 N18). }
-          iIntros (CIDp Hsp Mf) "[%Hcsf %Ha0f] Hcgf Hpcf".
+          iIntros (CIDp Hsp) "Hlc". iIntros (Mf) "[%Hcsf %Ha0f] Hcgf Hpcf".
           iDestruct (cpu_own_transport CIDg CIDp lvl eb pme b ltac:(wp_next_chain)
                        with "Hcpu") as "Hcpu".
-          iSpecialize ("Hcont" $! CIDp with "[%]"); [wp_next_chain|].
+          iSpecialize ("Hcont" $! CIDp with "[%] Hlc"); [wp_next_chain|].
           iApply ("Hcont" $! Mf with "[%] Hpcf Hlend").
           { exact Hcsf. }
           iEval (rewrite Ha0f).
@@ -2836,10 +2836,10 @@ Section ProofAllocproc.
             intros r Hr Ncsp N8 N9 N18.
             rewrite /U5 upd_ne; [| congruence].
             exact (Hrl_rest r Hr Ncsp N8 N9 N18). }
-          iIntros (CIDp Hsp Mf) "[%Hcsf %Ha0f] Hcgf Hpcf".
+          iIntros (CIDp Hsp) "Hlc". iIntros (Mf) "[%Hcsf %Ha0f] Hcgf Hpcf".
           iDestruct (cpu_own_transport CIDg CIDp lvl eb pme b ltac:(wp_next_chain)
                        with "Hcpu") as "Hcpu".
-          iSpecialize ("Hcont" $! CIDp with "[%]"); [wp_next_chain|].
+          iSpecialize ("Hcont" $! CIDp with "[%] Hlc"); [wp_next_chain|].
           iApply ("Hcont" $! Mf with "[%] Hpcf Hlend").
           { exact Hcsf. }
           iEval (rewrite Ha0f).
@@ -3176,7 +3176,7 @@ Section ProofAllocproc.
         iMod (pav_spent_mint ⊤ op k ltac:(solve_ndisj) with "Hpav") as "[Hpav #Hmkk]".
         iDestruct (pslot_used_at_intro k Hk with "Hmkk") as "#Hmk".
         iModIntro.
-        iSpecialize ("Hcont" $! CIDf with "[%]"); [wp_next_chain|].
+        iSpecialize ("Hcont" $! CIDf with "[%] Hlc"); [wp_next_chain|].
         iApply ("Hcont" $! Mf with "[%] Hpcf Hlend").
         { exact Hcsf. }
         iEval (rewrite Ha0f).
@@ -3387,10 +3387,10 @@ Section ProofAllocproc.
             intros r Hr Ncsp N8 N9 N18.
             rewrite /R4 upd_ne; [| congruence].
             exact (HR3rest r Hr Ncsp N8 N9 N18). }
-          iIntros (CIDp Hsp Mf) "[%Hcsf %Ha0f] Hcgf Hpcf".
+          iIntros (CIDp Hsp) "Hlc". iIntros (Mf) "[%Hcsf %Ha0f] Hcgf Hpcf".
           iDestruct (cpu_own_transport CIDg CIDp lvl eb pme b ltac:(wp_next_chain)
                        with "Hcpu") as "Hcpu".
-          iSpecialize ("Hcont" $! CIDp with "[%]"); [wp_next_chain|].
+          iSpecialize ("Hcont" $! CIDp with "[%] Hlc"); [wp_next_chain|].
           iApply ("Hcont" $! Mf with "[%] Hpcf Hlend").
           { exact Hcsf. }
           iEval (rewrite Ha0f).
@@ -3407,14 +3407,14 @@ Section ProofAllocproc.
                     ltac:(vm_compute; reflexivity)
                     with "Hcg Hpc []").
           { iApply (api_30 with "Htext"). }
-          iApply bi.later_intro. iIntros (CIDi Hsi) "Hcg Hpc".
+          iApply bi.later_intro. iIntros (CIDi Hsi) "Hlc Hcg Hpc".
           assert (Htgt1c : add_vec (mword_of_int (KernelSyms.allocproc + 0x30) : mword 64)
                              (sign_extend' 64 (mword_of_int 8172 : mword 13)) = mword_of_int (KernelSyms.allocproc + 0x1c))
             by (apply bv_eq; vm_compute; reflexivity).
           iEval (rewrite Htgt1c) in "Hpc".
           iDestruct (cpu_own_transport CIDg CIDi lvl eb pme b ltac:(wp_next_chain)
                        with "Hcpu") as "Hcpu".
-          iSpecialize ("IHf" $! CIDi with "[%]"); [wp_next_chain|].
+          iSpecialize ("IHf" $! CIDi with "[%] Hlc"); [wp_next_chain|].
           iApply ("IHf" $! (S k) R3 with "[%] [%] [%] Htl Hcont Hcg Hcpu Henv Hpav Hlend Hacc' Hpc").
           * exact (ap_fuelS k fuel Hfuel).
           * exact HkS.
@@ -3424,7 +3424,7 @@ Section ProofAllocproc.
     iDestruct (cpu_own_transport CID0 CID10 lvl eb pme b ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
     iSpecialize ("Hloop" $! NPROC).
-    iSpecialize ("Hloop" $! CID10 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hloop" $! CID10 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hloop" $! 0%nat A5 with "[%] [%] [%] Htail Hcont Hcg Hcpu [Henv] Hpav Hlend [] Hpc").
     - exact ap_fuel_init.
     - exact ap_zero_lt.
@@ -3449,8 +3449,8 @@ Section ProofAllocproc.
     iApply (wp_allocproc_core_led γa γk γp γf γs m lvl K eb pme on op tk b lks Q kev
               HK Hlvl Hbelow
               with "HKp Hcg Hcpu Htext Hpc Hprocs Hpidlk Henv Hpav Hlend").
-    iIntros (CIDx Hsx mr) "%Hcs Hpc Hlend Hpost".
-    iApply ("Hcont" $! CIDx Hsx mr with "[%] Hpc Hlend [Hpost]"); [exact Hcs|].
+    iIntros (CIDx Hsx) "Hlc". iIntros (mr) "%Hcs Hpc Hlend Hpost".
+    iApply ("Hcont" $! CIDx Hsx mr with "[%] Hlc Hpc Hlend [Hpost]"); [exact Hcs|].
     by iApply allocproc_post_led_post.
   Qed.
 
@@ -3493,8 +3493,8 @@ Section SealAllocproc.
               HK Hlvl Hbelow
               with "HKp Hcg Hcpu Htext Hpc Hprocs Hpidlk Henv Hpav Hlend").
     all: try lkbelow.
-    iIntros (CIDx Hsx mr) "%Hcs Hpc Hlend Hpost".
-    iSpecialize ("Hcont" $! CIDx with "[%]"); [exact Hsx|].
+    iIntros (CIDx Hsx) "Hlc". iIntros (mr) "%Hcs Hpc Hlend Hpost".
+    iSpecialize ("Hcont" $! CIDx with "[%] Hlc"); [exact Hsx|].
     iApply ("Hcont" $! mr with "[%] Hpc Hlend [Hpost]"); [exact Hcs|].
     iDestruct "Hpost" as "[Hnull | [Hfound | Hdead]]".
     - iLeft. iExact "Hnull".
@@ -3518,8 +3518,8 @@ Section SealAllocproc.
     iApply (wp_allocproc_sconf_led γa γk γp γf γs m lvl K eb pme on op tk b lks Q kev
               HK Hlvl Hex Hbelow
               with "HKp Hcg Hcpu Htext Hpc Hprocs Hpidlk Henv Hpav Hlend").
-    iIntros (CIDx Hsx mr) "%Hcs Hpc Hlend Hpost".
-    iApply ("Hcont" $! CIDx Hsx mr with "[%] Hpc Hlend [Hpost]"); [exact Hcs|].
+    iIntros (CIDx Hsx) "Hlc". iIntros (mr) "%Hcs Hpc Hlend Hpost".
+    iApply ("Hcont" $! CIDx Hsx mr with "[%] Hlc Hpc Hlend [Hpost]"); [exact Hcs|].
     by iApply allocproc_post_led_post.
   Qed.
 

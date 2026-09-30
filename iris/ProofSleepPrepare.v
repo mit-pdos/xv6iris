@@ -453,7 +453,7 @@ Section ProofSleepPrepare.
     iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.sleep_prepare + 0x2e)) spr_ra E4 av b
               ltac:(vm_compute; discriminate) with "Hcg Hpc []").
     { iApply (spri_2e with "Htext"). }
-    iIntros (CIDe6 Hse6) "Hcg Hpc".
+    iIntros (CIDe6 Hse6) "Hlc Hcg Hpc".
     iEval (rgne) in "Hpc".
     assert (Hretfin : ret_pc (E4 !!! Regidx spr_ra) = ret_tgt) by (rewrite HE4ra; reflexivity).
     iEval (rewrite Hretfin) in "Hpc".
@@ -498,7 +498,7 @@ Section ProofSleepPrepare.
       rewrite /M1 upd_ne; [| reg_ne_side]. reflexivity. }
     iDestruct (cpu_own_transport CIDrel CIDe6 n eb pj b ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
-    iSpecialize ("Hcont" $! CIDe6 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CIDe6 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! E4 with "[%] Hcg Hcpu Hpc").
     unfold callee_saved.
     split; [exact HE4csp|].

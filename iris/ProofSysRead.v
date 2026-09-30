@@ -276,7 +276,7 @@ Section ProofSysRead.
               Rra T3 av b ltac:(vm_compute; discriminate)
               with "Hcg Hpc []").
     { iApply (sri_46 with "Htext"). }
-    iIntros (CID4 Hs4) "Hcg Hpc".
+    iIntros (CID4 Hs4) "Hlc Hcg Hpc".
     iEval (rgne; rewrite HT3ra) in "Hpc".
     (* ---- the postcondition ---- *)
     assert (HT3sp : T3 !!! Regidx csp_rs1 = m !!! Regidx csp_rs1)
@@ -296,7 +296,7 @@ Section ProofSysRead.
       rewrite /T2 upd_ne; [| congruence].
       rewrite /T1 upd_ne; [| congruence].
       apply Hthr; assumption. }
-    iSpecialize ("Hcont" $! CID4 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CID4 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! T3 with "[%] Hcg Hpc").
     split; [| exact HT3a0].
     unfold callee_saved.
@@ -800,10 +800,10 @@ Section ProofSysRead.
                 sp0 ra0 s00 _ _ _ _ b pj
                 ltac:(lia) eq_refl eq_refl eq_refl HA3sp HA3a0 HthrA
                 with "Hcg Htext Hpc Hs1 Hs2 Hfcell Hs4 Hs5 Hs6").
-      iIntros (CID21 Hs21 mf) "[%Hcsf %Hmfa0] Hcg Hpc".
+      iIntros (CID21 Hs21) "Hlc". iIntros (mf) "[%Hcsf %Hmfa0] Hcg Hpc".
      iDestruct (cpu_own_transport CID17 CID21 0%nat eb pj b 
                    ltac:(rewrite Hb; wp_next_chain) with "Hcpu") as "Hcpu".
-      iSpecialize ("Hcont" $! CID21 with "[%]"); [wp_next_chain|].
+      iSpecialize ("Hcont" $! CID21 with "[%] Hlc"); [wp_next_chain|].
       (* nothing ran, so the page table is its own extension and the window
          is empty: [d := 0], any [bs] closes [umem_wr _ _ 0 _ = M] on the
          nose. *)
@@ -1027,10 +1027,10 @@ Section ProofSysRead.
       iApply (sr_tail (CID0 := CID25) m mf av rv sp0 ra0 s00 _ _ _ _ b pj
                 ltac:(lia) eq_refl eq_refl eq_refl HMfsp Hrva HthrF
                 with "Hcg Htext Hpc Hs1 Hs2 Hfcell Hs4 Hs5 Hs6").
-      iIntros (CID26 Hs26 mg) "[%Hcsg %Hmga0] Hcg Hpc".
+      iIntros (CID26 Hs26) "Hlc". iIntros (mg) "[%Hcsg %Hmga0] Hcg Hpc".
       iDestruct (cpu_own_transport CID25 CID26 0%nat eb pj b
                    ltac:(rewrite Hb; wp_next_chain) with "Hcpu") as "Hcpu".
-      iSpecialize ("Hcont" $! CID26 with "[%]"); [wp_next_chain|].
+      iSpecialize ("Hcont" $! CID26 with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hcont" $! mg rv P' dw bsw kev
                 with "[%] [%] [%] [%] [%] [%] Hcg Hcpu Hpc Hpriv Hufrag Hkenv Henv [Harms]").
       { exact Hcsg. }

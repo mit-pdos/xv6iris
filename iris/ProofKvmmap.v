@@ -338,14 +338,14 @@ Section ProofKvmmap.
               ltac:(vm_compute; discriminate)
               with "Hcg Hpc []").
     { iApply (ki_1a with "Htext"). }
-    iIntros (CIDi Hsi) "Hcg Hpc".
+    iIntros (CIDi Hsi) "Hlc Hcg Hpc".
     iEval (rgne) in "Hpc".
     iEval (rewrite Hrt) in "Hpc".
     (* [cpu_own] again: it was delivered at CID9 by mappages' own [wp_next];
        five more plain instructions have moved the hart to CIDi. *)
     iDestruct (cpu_own_transport CID9 CIDi lvl eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iSpecialize ("Hcont" $! CIDi with "[]"); [ iPureIntro; wp_next_chain | ].
+    iSpecialize ("Hcont" $! CIDi with "[] Hlc"); [ iPureIntro; wp_next_chain | ].
     iApply ("Hcont" $! E3 t' g with "Hcg Hcnt Hpc Hptree [%] Henv [%] [%] [%] [%] [%]").
     { exact Hnodes. }
     { (* callee_saved mm E3 *)

@@ -790,10 +790,10 @@ Section IputTail.
     iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.iput + 0x38)) Rra P4 K eb
               ltac:(nz) with "Hcg Hpc []").
     { iApply (ipi_38 with "Htext"). }
-    iIntros (CIDe5 Hse5) "Hcg Hpc".
+    iIntros (CIDe5 Hse5) "Hlc Hcg Hpc".
     iEval (rgne) in "Hpc".
     iEval (rewrite HP4ra) in "Hpc".
-    iSpecialize ("Hcont" $! CIDe5 with "[]"); [ iPureIntro; wp_next_chain | ].
+    iSpecialize ("Hcont" $! CIDe5 with "[] Hlc"); [ iPureIntro; wp_next_chain | ].
     iApply ("Hcont" $! P4 with "[%] Hcg Hpc").
     assert (Hc2 : P4 !!! Regidx csp_rs1 = sp0).
     { rewrite /P4 upd_eq. rewrite HP3sp. unfold regval_into_reg, spd.
@@ -983,7 +983,7 @@ Section IputTail.
               (m !!! Regidx Rs1) vg4 vg5 vg6
               ltac:(lia) Hmrsp
               with "Htext Hpc Hcg Hr24 Hr16 Hr8 Hg4 Hg5 Hg6").
-    iIntros (CIDe5 Hse5 P4) "%Hep Hcg Hpc".
+    iIntros (CIDe5 Hse5) "Hlc". iIntros (P4) "%Hep Hcg Hpc".
     destruct Hep as (HP4ra & Hc8 & Hc9 & Hc2 & Hthread0).
     assert (Hretf : ret_pc (m !!! Regidx Rra) = ret_tgt) by reflexivity.
     iEval (rewrite Hretf) in "Hpc".
@@ -999,7 +999,7 @@ Section IputTail.
                  ltac:(wp_next_chain) with "Hextc") as "Hextc".
     iDestruct (cpu_claim_ext_transport CID CIDe5 eb pj
                  ltac:(wp_next_chain) with "Hextm") as "Hextm".
-    iSpecialize ("Hcont" $! CIDe5 with "[]"); [ iPureIntro; wp_next_chain | ].
+    iSpecialize ("Hcont" $! CIDe5 with "[] Hlc"); [ iPureIntro; wp_next_chain | ].
     iApply ("Hcont" $! P4 n' Sb' wb
               with "[%] Hcg Hcnt Hextc Hextm Hpc Hppid Hbms Hins Hbslots [%] [%] [%] [%] Hop Htx Hislot Hgreg").
     5:{ split; [exact Hlo | exact Hhi]. }
@@ -2345,7 +2345,7 @@ Section IputFreePath.
               (sign_extend' 21 (concat_vec (mword_of_int 1971 : mword 11) ('b"0")))
               P3 K b ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
     { iApply (ipi_ca with "Htext"). }
-    iApply bi.later_intro. iIntros (CID29 Hst29). iIntros "Hcg Hpc".
+    iApply bi.later_intro. iIntros (CID29 Hst29) "Hlc". iIntros "Hcg Hpc".
     assert (Htgt30 : add_vec (mword_of_int (KernelSyms.iput + 0xca) : mword 64)
                        (sign_extend' 64 (sign_extend' 21
                           (concat_vec (mword_of_int 1971 : mword 11) ('b"0"))))
@@ -2383,7 +2383,7 @@ Section IputFreePath.
                  ltac:(rewrite Hbm; wp_next_chain) with "Hclm") as "Hclm".
     iDestruct (wp_next_shift (b := true) (CIDa := CID24) (CIDb := CID29) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
-    iSpecialize ("Hcont" $! CID29 with "[]"); [iPureIntro; wp_next_chain |].
+    iSpecialize ("Hcont" $! CID29 with "[] Hlc"); [iPureIntro; wp_next_chain |].
     iApply ("Hcont" $! P3 with "[%] Hcg Hcnt Htc Hclm Hpc Hppid Hsb Hsl Hop Hwit
                                 Hgreg Hfpin Htxc Hra Hs0f Hs1f Hs2f Hs3f Hs4f").
     { split_and!; [exact Hthr | exact HP3sp | exact HP3s2 | exact HP3s3 | exact HP3s4]. }
@@ -3969,7 +3969,7 @@ Section IputFreePath.
                     Hins Hbs2
                     Hvlb2 Hcrd2 Hop Hra Hs0f Hs1f Hs2f Hs3f Hs4f [-]").
     (* ---- the continuation: offlock's post at 0x30, re-shaped into ours ---- *)
-    iIntros (CIDf Hstf).
+    iIntros (CIDf Hstf) "Hlc".
     iIntros (mf) "%Hthr Hcg Hcnt Hextc Hclm Hpc Hppid Hins Hbs2 Hop2 Hwit Hgreg Hfpin
                   Htx Hra Hs0f Hs1f Hs2f Hs3f Hs4f".
     (* the whole walk never touched a callee-saved register, so [P5] agrees
@@ -3994,7 +3994,7 @@ Section IputFreePath.
     iEval (rewrite (_ : (1 + 2)%nat = 3%nat); [| reflexivity]) in "Hbslots".
     iDestruct (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CIDf)
                  ltac:(wp_next_chain) with "Hcont") as "Hcont".
-    iSpecialize ("Hcont" $! CIDf with "[]"); [iPureIntro; wp_next_chain |].
+    iSpecialize ("Hcont" $! CIDf with "[] Hlc"); [iPureIntro; wp_next_chain |].
     iApply ("Hcont" $! mf (S uoff)
                        (Sb' ∪ {[IBLOCK inum icfg_ist]}) wbm
               with "[%] Hcg Hcnt Hextc Hclm Hpc Hppid Hbms Hins Hbslots
@@ -5611,7 +5611,7 @@ Section ProofIput.
                 (m !!! Regidx (mword_of_int 20 : mword 5))
                 ltac:(lia) Hmfsp
                 with "Htext Hpc Hcg Hr24 Hr16 Hr8 Hg4 Hg5 Hg6").
-      iIntros (CIDe Hse P4) "%Hep Hcg Hpc".
+      iIntros (CIDe Hse) "Hlc". iIntros (P4) "%Hep Hcg Hpc".
       destruct Hep as (HP4ra & HP4s0 & HP4s1 & HP4sp & HP4thr).
       assert (Hretf : ret_pc (m !!! Regidx Rra) = ret_tgt) by reflexivity.
       iEval (rewrite Hretf) in "Hpc".
@@ -5621,7 +5621,7 @@ Section ProofIput.
                    ltac:(wp_next_chain) with "Hextc") as "Hextc".
       iDestruct (cpu_claim_ext_transport CIDoff CIDe eb pj
                    ltac:(wp_next_chain) with "Hextm") as "Hextm".
-      iSpecialize ("Hcont" $! CIDe with "[]"); [ iPureIntro; wp_next_chain | ].
+      iSpecialize ("Hcont" $! CIDe with "[] Hlc"); [ iPureIntro; wp_next_chain | ].
       iApply ("Hcont" $! P4 n'' Sb'' w
                 with "[%] Hcg Hcnt Hextc Hextm Hpc Hppid Hbms Hins Hbslots
                       [%] [%] [%] [%] Hop Htx Hiu Hgreg").
@@ -5702,10 +5702,10 @@ Section ProofIput.
     { iEval (cbn beta iota). iEmpIntro. }
     { rewrite /log_opSet. iFrame "Hop Htx1". }
     iEval (rewrite /wp_next).
-    iIntros (CIDf) "%Hchain".
+    iIntros (CIDf) "%Hchain" Hlc.
     iIntros (mf n' Sb' wf) "%Hcs Hcg Hcnt Hextc Hextm Hpc Hppid Hbms Hins
                                Hbslots %Hssub %Hwbm %Hwc %Hbnd Hop Htx1 Hislot _".
-    iSpecialize ("Hcont" $! CIDf with "[%]"); [exact Hchain|].
+    iSpecialize ("Hcont" $! CIDf with "[%] Hlc"); [exact Hchain|].
     iApply ("Hcont" $! mf n' with "[%] Hcg Hcnt Hextc Hextm Hpc Hppid Hbms Hins
                      Hbslots [%] [Hop Htx1 Htx2] Hislot").
     { exact Hcs. }

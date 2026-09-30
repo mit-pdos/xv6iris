@@ -838,9 +838,9 @@ Section ProofFilestatParts.
     iApply (wp_cret_s_sconf (mword_of_int (FST + 0x60)) Rra T5 K b
               ltac:(vm_compute; discriminate) with "Hcg Hpc []").
     { iApply (fsti_60 with "Htext"). }
-    iIntros (CID6 Hs6) "Hcg Hpc".
+    iIntros (CID6 Hs6) "Hlc Hcg Hpc".
     iEval (rgne) in "Hpc". iEval (rewrite HT5ra) in "Hpc".
-    iSpecialize ("Hcont" $! CID6 with "[]"); [iPureIntro; wp_next_chain|].
+    iSpecialize ("Hcont" $! CID6 with "[] Hlc"); [iPureIntro; wp_next_chain|].
     iApply ("Hcont" $! T5 with "[%] Hcg Hpc").
     assert (Hrest : forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
                       r <> Rs0 -> r <> Rs1 -> r <> Rs4 -> r <> Rra ->

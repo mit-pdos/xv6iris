@@ -369,7 +369,7 @@ Section ProofAcquire.
               ltac:(lia)
               ltac:(lia)
               with "Hcg Hown Htext Hpc").
-    iIntros (CIDpo Hspo ms mp) "%Hmsf Hcg Hown Hpay Hpc %Hmp".
+    iIntros (CIDpo Hspo) "Hlc". iIntros (ms mp) "%Hmsf Hcg Hown Hpay Hpc %Hmp".
     destruct Hmp as (Hcspp & Hs0p & Hs1p & Hs2p & Hs3p & Hs4p & Hs5p & Hs6p & Hs7p & Hs8p & Hs9p & Hs10p & Hs11p).
     (* ===== from here on b = false LITERALLY (push_off's own flip) and the
        hart is pinned at CIDpo for the rest of the function: every remaining
@@ -692,7 +692,7 @@ Section ProofAcquire.
     (* the payload and the view receipt were produced at the take, above:
        the winner runs the lock's context on this hart from the moment it
        wins the word, so nothing about the hand-off is left for the return. *)
-    iSpecialize ("Hcont" $! CIDpo with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CIDpo with "[%] Hlc"); [wp_next_chain|].
     iAssert (∃ K : nat, hart_view_lb (CID := CIDpo) K)%I as "Hlb".
     { iExists K0. iExact "HK0s". }
     iApply ("Hcont" $! ms E4 with "[%] HTc Hcg Hpc [%] Htok HRes Hpaira Hlb Hown Hpay").
@@ -845,8 +845,8 @@ Section ProofAcquire.
               Hpos Hav Hfresh Href Hrefpre
               with "Hcg Hown Htext Hpc Hlock [] HTc [Hcont]").
     { iApply TsoGhost.llb_0. }
-    iIntros (CID2) "%Hs2".
-    iSpecialize ("Hcont" $! CID2 with "[%]"); [exact Hs2|].
+    iIntros (CID2) "%Hs2" Hlc.
+    iSpecialize ("Hcont" $! CID2 with "[%] Hlc"); [exact Hs2|].
     iIntros (ms mfin) "%Hms HTc Hcg Hpc %Hcs Htok HRes _ Hlb Hown Hpay".
     iApply ("Hcont" $! ms mfin with "[%] HTc Hcg Hpc [%] Htok HRes Hlb Hown Hpay");
       [exact Hms | exact Hcs].
@@ -910,8 +910,8 @@ Section OfGen.
               with "Hcg Hown Htext Hpc [] []").
     { iApply (is_lock_openable with "Hlock"). }
     { done. }
-    iIntros (CIDg Hsg ms mfin) "%Hms _ Hcg Hpc %Hcs Htok HRes Hlb Hown Hpay".
-    iSpecialize ("Hcont" $! CIDg with "[%]"); [wp_next_chain|].
+    iIntros (CIDg Hsg) "Hlc". iIntros (ms mfin) "%Hms _ Hcg Hpc %Hcs Htok HRes Hlb Hown Hpay".
+    iSpecialize ("Hcont" $! CIDg with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! ms mfin with "[//] Hcg Hpc [//] Htok HRes Hlb Hown Hpay").
   Qed.
 
@@ -931,8 +931,8 @@ Section OfGen.
               with "Hcg Hown Htext Hpc [] Hllb []").
     { iApply (is_lock_openable with "Hlock"). }
     { done. }
-    iIntros (CIDg Hsg ms mfin) "%Hms _ Hcg Hpc %Hcs Htok HRes Hfl Hlb Hown Hpay".
-    iSpecialize ("Hcont" $! CIDg with "[%]"); [wp_next_chain|].
+    iIntros (CIDg Hsg) "Hlc". iIntros (ms mfin) "%Hms _ Hcg Hpc %Hcs Htok HRes Hfl Hlb Hown Hpay".
+    iSpecialize ("Hcont" $! CIDg with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! ms mfin with "[//] Hcg Hpc [//] Htok HRes Hfl Hlb Hown Hpay").
   Qed.
 
