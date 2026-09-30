@@ -205,29 +205,33 @@ namespace UshFileRedir
 
 /-- **Rocq `redir_K`**: the redirect child's open receipt on the fd arm, at
 this claim -- `UkFileOpen.redir_K OffHeld`. -/
-def redirK (g : FileGn) (r : FileAppNames) (nm : List (BitVec 8)) (s : Dst) (ty : FdType) : IProp GF :=
-  UkFileOpen.redirK (hlc := hlc) .held g.fgnCl r nm s ty
+def redirK (g : FileGn) (r : FileAppNames) (nm : List (BitVec 8)) (s : Dst) (np : Nat) (ty : FdType) :
+    IProp GF :=
+  UkFileOpen.redirK (hlc := hlc) .held g.fgnCl r nm s np ty
 
 /-- **Rocq `redir_Kf`**: ...and the `-1` arm's, WITH THE TAINT (it is
 `FileOpen.file_open_pay` verbatim). -/
-def redirKf (g : FileGn) (r : FileAppNames) (nm : List (BitVec 8)) (s : Dst) : IProp GF :=
-  iprop(fown r s ∨ (⌜s[nm]? = none⌝ ∗ ∃ i : Nat, fown r (s.insert nm (i, []))) ∨ fileTaint (hlc := hlc) g.fgnCl)
+def redirKf (g : FileGn) (r : FileAppNames) (nm : List (BitVec 8)) (s : Dst) (np : Nat) : IProp GF :=
+  iprop((fown r s ∗ fpos r np)
+    ∨ (⌜s[nm]? = none⌝ ∗ ∃ i : Nat, fown r (s.insert nm (i, [])) ∗ fpos r np)
+    ∨ fileTaint (hlc := hlc) g.fgnCl)
 
-theorem redirKf_eq (g : FileGn) (r : FileAppNames) (nm : List (BitVec 8)) (s : Dst) :
-    redirKf (hlc := hlc) (GF := GF) g r nm s = fileOpenPay (hlc := hlc) g.fgnCl r nm s := rfl
+theorem redirKf_eq (g : FileGn) (r : FileAppNames) (nm : List (BitVec 8)) (s : Dst) (np : Nat) :
+    redirKf (hlc := hlc) (GF := GF) g r nm s np = fileOpenPay (hlc := hlc) g.fgnCl r nm s np := rfl
 
 /-- **Rocq `redir_K_inum`**: WHAT THE OPEN'S RECEIPT SAYS ABOUT THE INODE --
 `f`'s inum is none of the image's, or the taint (deviation 2). -/
 theorem redirK_inum (g : FileGn) (r : FileAppNames) (heq : fileAppIs (hlc := hlc) (GF := GF) g.fgnCl r)
-    (nm : List (BitVec 8)) (s : Dst) (ty : FdType) (E : CoPset) (hE : (↑appN : CoPset) ⊆ E) :
-    ⊢ appInv (hlc := hlc) (GF := GF) fscFs -∗ redirK (hlc := hlc) (GF := GF) g r nm s ty -∗
-      |={E}=> (redirK (hlc := hlc) (GF := GF) g r nm s ty ∗
+    (nm : List (BitVec 8)) (s : Dst) (np : Nat) (ty : FdType) (E : CoPset)
+    (hE : (↑appN : CoPset) ⊆ E) :
+    ⊢ appInv (hlc := hlc) (GF := GF) fscFs -∗ redirK (hlc := hlc) (GF := GF) g r nm s np ty -∗
+      |={E}=> (redirK (hlc := hlc) (GF := GF) g r nm s np ty ∗
         ((∃ (i : Nat) (γo : GName), ⌜ty = .inode i γo .held⌝ ∗
             ⌜i ≠ INIT_INO ∧ i ≠ SH_INO ∧ i ≠ ECHO_INO ∧ i ≠ CAT_INO ∧ i ≠ GREP_INO ∧ i ≠ SECC_INO ∧ i ≠ SYNC_INO⌝)
           ∨ fileTaint (hlc := hlc) g.fgnCl)) := by
   iintro #Hinv HK
   unfold redirK UkFileOpen.redirK fileOpenFdK
-  icases HK with (⟨%i, %γo, %hty, Hown, Hpub⟩ | #HT)
+  icases HK with (⟨%i, %γo, %hty, Hown, Hpos, Hpub⟩ | #HT)
   rotate_left
   · imodintro
     isplitl []
@@ -251,14 +255,14 @@ theorem redirK_inum (g : FileGn) (r : FileAppNames) (heq : fileAppIs (hlc := hlc
     · inext; iexact Hp
     · iframe
   imodintro
-  isplitl [Hd Htk Hpub]
+  isplitl [Hd Htk Hpos Hpub]
   · ileft
     iexists i, γo
     isplitr
     · ipureintro; exact hty
     isplitl [Hd Htk]
     · iframe
-    · iexact Hpub
+    iframe Hpos Hpub
   · icases Hres with (%hne | #Ht)
     · ileft
       iexists i, γo
@@ -272,14 +276,16 @@ corollary at `OffHeld`; the deed is handed AT the call (deviation 3). -/
 theorem hopen_hand (UL : UK_LEAVES) (FO : HfpFileOpenP (hlc := hlc) (GF := GF))
     (g : FileGn) (r : FileAppNames)
     (heq : fileAppIs (hlc := hlc) (GF := GF) g.fgnCl r) (N : UkNames GF) (file : Nat) (l : List FdState)
-    (s0 : Dst) (ls : List Fwline) (ws : Wordline) (jo : Option Nat) (nm : List (BitVec 8))
-    (hu : uname nm) (hin : (nm, ws) ∈ ls) (hok : lineOk ws) :
+    (s0 : Dst) (np : Nat) (ls : List FlLine) (ws : Wordline) (jo : Option Nat) (nm : List (BitVec 8))
+    (hu : uname nm) (hlst : ls.getLast? = some (Uline.LEchoF ws nm)) (hnpl : np = ls.length)
+    (hok : lineOk ws) :
     ⊢ appInv (hlc := hlc) fscFs -∗ fileConsCred (hlc := hlc) g.fgnCl r jo -∗ flLb g.fgnCl ls -∗
-      ushOpenCall2 (hlc := hlc) (A := Unit) N ROOTINO file 1537 nm l (redirK (hlc := hlc) g r nm s0)
-        (fun _ => fown r s0) (fun _ => redirKf (hlc := hlc) g r nm s0) := by
+      ushOpenCall2 (hlc := hlc) (A := Unit) N ROOTINO file 1537 nm l (redirK (hlc := hlc) g r nm s0 np)
+        (fun _ => iprop(fown r s0 ∗ fpos r np)) (fun _ => redirKf (hlc := hlc) g r nm s0 np) := by
   iintro #Hinv #Hmade #Hlb
   unfold ushOpenCall2
   iintro %h %m %av %Img %pl %a %ha0 %ha1 %hpath %hnp %hst %hlast %hfdl Himg Hown Hcode Hcwd Hstd Hrun Hcont
+  icases Hown with ⟨Hown, Hposn⟩
   have hpath' : ∀ Mv, imgAgrees (fun x => get? Img x) Mv → argPathOf Mv file pl :=
     fun Mv hag => hpath _ Mv (fun _ _ hx => hx) hag
   obtain ⟨b, hb⟩ := imgPath_mem (fun x => get? Img x) file pl hpath'
@@ -301,9 +307,9 @@ theorem hopen_hand (UL : UK_LEAVES) (FO : HfpFileOpenP (hlc := hlc) (GF := GF))
   have hwr : omWritable ((ukWr m 17#5 (BitVec.ofInt 64 15)).get 11#5) = true := by rw [ha1r]; decide
   -- 0xca4  ecall: the DEED's create corollary at `OffHeld`
   iapply wp_uk_ecall_open_create_deed_d FO (UkFileOpenSysP.ofLanded UL) N .held h1 (ukWr m 17#5 (BitVec.ofInt 64 15))
-    (BitVec.ofNat 64 (User.Sh.Sym.«open» + 2)) l av g.fgnCl r jo nm s0 ls ws ROOTINO (fun x => get? Img x)
-    file pl hu heq hn (by rw [hpc]; decide) hpath' ha0r hcr htr hnp hst hlast hin hok
-    (uimgView N (fun x => get? Img x)) .rfl $$ Hi Hv Hrun Hcwd Hstd Hinv Hmade Hlb Hown
+    (BitVec.ofNat 64 (User.Sh.Sym.«open» + 2)) l av g.fgnCl r jo nm s0 np ls ws ROOTINO
+    (fun x => get? Img x) file pl hu heq hn (by rw [hpc]; decide) hpath' ha0r hcr htr hnp hst hlast hlst
+    hnpl hok (uimgView N (fun x => get? Img x)) .rfl $$ Hi Hv Hrun Hcwd Hstd Hinv Hmade Hlb Hown Hposn
   rw [hpc, hrd, hwr]
   iintro %h2 %rv Hans Hcwd Hrun
   -- 0xca8  c.jr ra
@@ -330,8 +336,9 @@ theorem hopen_hand (UL : UK_LEAVES) (FO : HfpFileOpenP (hlc := hlc) (GF := GF))
 
 /-- **Rocq `redir_K'`**: THE OPEN'S RECEIPT, READ -- the receipt beside the
 claim's fact that `f`'s inode is none of the image's. -/
-def redirK' (g : FileGn) (r : FileAppNames) (nm : List (BitVec 8)) (s : Dst) (ty : FdType) : IProp GF :=
-  iprop(redirK (hlc := hlc) g r nm s ty ∗
+def redirK' (g : FileGn) (r : FileAppNames) (nm : List (BitVec 8)) (s : Dst) (np : Nat) (ty : FdType) :
+    IProp GF :=
+  iprop(redirK (hlc := hlc) g r nm s np ty ∗
     ((∃ (i : Nat) (γo : GName), ⌜ty = .inode i γo .held⌝ ∗
         ⌜i ≠ INIT_INO ∧ i ≠ SH_INO ∧ i ≠ ECHO_INO ∧ i ≠ CAT_INO ∧ i ≠ GREP_INO ∧ i ≠ SECC_INO ∧ i ≠ SYNC_INO⌝)
       ∨ fileTaint (hlc := hlc) g.fgnCl))
