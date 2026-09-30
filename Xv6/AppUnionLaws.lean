@@ -198,7 +198,7 @@ theorem unionLaws (Hprog : UnionProgLaw (hlc := hlc) (GF := GF)) :
   al_tx := fun c i γ hm hu => union_al_tx c i γ hm hu
   al_rx := fun c i γ hm hu => union_al_rx c i γ hm hu
   al_xfer := union_al_xfer
-  al_programs := fun c htag hkill hcons hwild hrdw hmono _ => Hprog c htag hkill hcons hwild hrdw hmono
+  al_programs := fun c htag hkill hcons hwild hrdw hmono hhk => Hprog c htag hkill hcons hwild hrdw hmono hhk
   al_echo := fun c htag hkill hcons hwild hrdw hmono => union_al_echo c htag hkill hcons hwild hrdw hmono
   -- THE SYNC LAWS AT THE TRIVIAL FIELDS (drift D3-app/S; lanes F/U replace them)
   al_found := fun c k => appTriv_found c k _

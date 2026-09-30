@@ -62,6 +62,11 @@ theorem appUnion_turn_era (ug : UnionGn) :
     fturn (hlc := hlc) (GF := GF) ug.ugnFile = (appUnion (hlc := hlc) (GF := GF)).turn ug :=
   preGS_transport (fun M' : MachGS hlc GF => letI := M'; fturn (hlc := hlc) (GF := GF) ug.ugnFile) M rfl hmono
 
+/-- the era's turn as `<init>` is handed it (Rocq `app_iturn`, SY3-A3bc) -/
+theorem appUnion_iturn_era (ug : UnionGn) :
+    fturn (hlc := hlc) (GF := GF) ug.ugnFile = (appUnion (hlc := hlc) (GF := GF)).iturn ug :=
+  preGS_transport (fun M' : MachGS hlc GF => letI := M'; fturn (hlc := hlc) (GF := GF) ug.ugnFile) M rfl hmono
+
 end
 
 end Xv6

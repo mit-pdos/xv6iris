@@ -116,6 +116,20 @@ theorem usync_ran_pay (ug : UnionGn) (r : FileAppNames) (s0 : Fstate)
   · iright
     iexact HT
 
+/-- **Rocq `image_entry_lend`** (`UShUModSync.v`, local): an entry is
+contravariant in its lend. -/
+theorem imageEntry_lend (f : ElfBytes) (M : Nat → List (BitVec 8)) (av : BitVec 64)
+    (sts : List FdState) (cw : Nat) (secc : BitVec 64) (cs : ExtTreeSet GName compare)
+    (pidv : BitVec 32) (Q : Int → IProp GF) (Pay Pay' : IProp GF) (X : Uvis → IProp GF) :
+    ⊢ □ (Pay' -∗ Pay) -∗ imageEntry f M av sts cw secc cs pidv Q Pay X -∗
+      imageEntry f M av sts cw secc cs pidv Q Pay' X := by
+  unfold imageEntry
+  iintro #Hc #He
+  imodintro
+  iintro %na %alen %afun %W' %h1 %h2 %h3 %h4 %h5 %h6 %h7 Hmy HP
+  iapply He $$ %na %alen %afun %W' %h1 %h2 %h3 %h4 %h5 %h6 %h7 Hmy [HP]
+  iapply Hc $$ HP
+
 /-- **Rocq `usync_exec_sup`**: THE EXEC SUPPLY -- `exec sync` at the union's
 /sync entry, the lend going whole to the program (at any sh-exec record
 `E`). -/
@@ -143,8 +157,19 @@ theorem usync_exec_sup (UL : UK_LEAVES)
     $$ [] Hkt Hslot
   imodintro
   iintro %M %Mv %sa %t %gn %sts %cs %pidv %himg %hag %hbytes %hlen - #Hnp
+  -- the lend at the entry (interim, drift D3-app/U: no hook yet, so the
+  -- split is the unit; Rocq main's `usync_lend` lands with the file side)
+  iapply imageEntry_lend User.Sync.elf Mv _ sts ROOTINO seccAll cs pidv
+    (fun _ => uWcu (hlc := hlc) ug r s0 PT PD I 0)
+    iprop(uWcu (hlc := hlc) ug r s0 PT PD I 3 ∗ hookOpt (hlc := hlc) (genId (hlc := hlc) (GF := GF)) none)
+    (uWcu (hlc := hlc) ug r s0 PT PD I 3) $$ []
+  · imodintro
+    iintro Hc
+    isplitl [Hc]
+    · iexact Hc
+    · simp only [hookOpt]; iempintro
   iapply syncImageEntry_of_leaves UL (ulineWs .LSync) M Mv sa t gn sts ROOTINO cs pidv
-    (fun _ => uWcu (hlc := hlc) ug r s0 PT PD I 0) (uWcu (hlc := hlc) ug r s0 PT PD I 3)
+    (fun _ => uWcu (hlc := hlc) ug r s0 PT PD I 0) (uWcu (hlc := hlc) ug r s0 PT PD I 3) none
     (fun _ _ => rfl) usync_ws_exec_ok himg hag hbytes hlen $$ [] Hnp Hdep
   imodintro
   iapply hpay

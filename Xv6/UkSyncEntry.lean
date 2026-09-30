@@ -10,19 +10,18 @@ kernel's receipt.
 THE ECALL LEAF AT THIS INSTANCE (`ksyncLeaf_xv6`, Rocq sync K4): 22's rows
 are the optional hook and its receipt, readable here and nowhere below, so
 this is where `UkSyncDefs.ksyncLeaf` is discharged -- at EVERY hook, through
-the receipt-keeping quiet leaf.  THE ENTRY DEPOSITS NO HOOK (`none`):
-`imageEntry` is a `□`, so a linear hook can reach the program only through
-the lend, which is lane E's (Rocq A4) to shape.  The union's round lends the round's
-credential and pays PEND at RAN (`UshURoundSync.uHchild_sync`).  The program
+the receipt-keeping quiet leaf.  THE HOOK RIDES THE LEND (Rocq sync SY3-A4,
+a2417c11e): `imageEntry` is a `□`, so the linear hook reaches the program
+inside `Pay := P ∗ hookOpt genId oQ`, and the receipt `qOpt oQ` is what
+`syncPay` is handed.  The union's round lends the round's credential with the
+hook it mints (`UshURoundSync.uHchild_sync`).  The program
 reads neither its argv nor its table, so the entry takes no row about either:
 its ledger, working directory, children and pid are dropped.
 
 ## Deviations from Rocq
 
-1. **The hook form at K4** (`UkSyncDefs` deviation 2): Rocq 6ec6feccd's
-   statement (`none` at the entry).  Rocq main's A4 (the hook riding the lend,
-   `Pay := P ∗ hook_opt gen_id oQ`, `sync_pay P (Q_opt oQ) (Q (-1))`) is lane
-   E's.
+1. (Retired at drift D3-app/U: the entry is at Rocq main's A4 form, the hook
+   riding the lend.)
 2. **Two images** (as `UkSeccEntry` deviation 2): the node at the key image
    `M : ElfMem`, the argument reading at the page view `Mv`, `imgAgrees M Mv`
    between them.
@@ -114,15 +113,16 @@ theorem ksyncLeaf_xv6 (UL : UK_LEAVES) (N : UkNames GF) (oQ : Option (IProp GF))
 def SyncImageEntry : Prop :=
   ∀ (ws : List (List (BitVec 8))) (M : ElfMem) (Mv : Nat → List (BitVec 8)) (sv t : Nat)
     (gn : Nat → BitVec 8) (sts : List FdState) (cw : Nat) (cs : ExtTreeSet GName compare)
-    (pidv : BitVec 32) (Q : Int → IProp GF) (P : IProp GF),
+    (pidv : BitVec 32) (Q : Int → IProp GF) (P : IProp GF) (oQ : Option (IProp GF)),
     (∀ x y : Int, Q x = Q y) → execOk ws →
     echoNodeImg ws M sv t gn → imgAgrees M Mv → ushEchoArgvBytes ws gn → sts.length = NOFILE →
-    ⊢ □ syncPay P (qOpt none) (Q (-1)) -∗ urunNopipe (hlc := hlc) sts -∗ udep (hlc := hlc) -∗
-      imageEntry User.Sync.elf Mv (BitVec.ofNat 64 (t + 8)) sts cw seccAll cs pidv Q P (uslot (hlc := hlc))
+    ⊢ □ syncPay P (qOpt oQ) (Q (-1)) -∗ urunNopipe (hlc := hlc) sts -∗ udep (hlc := hlc) -∗
+      imageEntry User.Sync.elf Mv (BitVec.ofNat 64 (t + 8)) sts cw seccAll cs pidv Q
+        iprop(P ∗ hookOpt (hlc := hlc) (genId (hlc := hlc) (GF := GF)) oQ) (uslot (hlc := hlc))
 
 /-- **Rocq `UkSyncEntry.sync_image_entry`**: THE ENTRY (deviations 3-5). -/
 theorem syncImageEntry_holds (UL : UK_LEAVES) (GS : SYNC_START) : SyncImageEntry (hlc := hlc) (GF := GF) := by
-  intro ws M Mv sv t gn sts cw cs pidv Q P hQc hok himg hag hbytes hfdl
+  intro ws M Mv sv t gn sts cw cs pidv Q P oQ hQc hok himg hag hbytes hfdl
   iintro #Hpay #Hnpw #Hdep
   iapply imageEntry_of_at
   imodintro
@@ -132,7 +132,7 @@ theorem syncImageEntry_holds (UL : UK_LEAVES) (GS : SYNC_START) : SyncImageEntry
   have hroom := syncRoom_of_det_x ws na alen hok hna halen
   unfold imageEntryAt
   imodintro
-  iintro %W' %hokk %hcwv %hlzf %hscf - - Hmp HP
+  iintro %W' %hokk %hcwv %hlzf %hscf - - Hmp ⟨HP, Hhook⟩
   -- the key's geometry
   obtain ⟨hpc, hsub, hx, -, hwr, hrp⟩ := syncKexecPages na alen afun sts W' hokk
   obtain ⟨hroom336, hal8, -, hstkrow, -, -, -, hfdlen, hstop⟩ :=
@@ -149,12 +149,10 @@ theorem syncImageEntry_holds (UL : UK_LEAVES) (GS : SYNC_START) : SyncImageEntry
   rw [hpc]
   iintro %N' %h %hpayeq - - Ht - Hcwf - - Hrun
   ihave Hcode := utextAll_img N'.t W'.M W'.perm User.Sync.code.byte hcode $$ Ht
-  -- the program; NO HOOK at the entry (`none`): the leaf is this instance's
-  iapply GS.wp_syncStart N' none h (tfResumeGpr0 W'.tf) 42 P W'.cwd (ukn_const_of_eq N' Q hpayeq hQc)
-    (by decide) $$ Hcode [] [] Hcwf HP []
-  · iapply ksyncLeaf_xv6 UL N' none
-  · simp only [hookOpt]
-    iempintro
+  -- the program, the hook out of the lend (Rocq A4); the leaf is this instance's
+  iapply GS.wp_syncStart N' oQ h (tfResumeGpr0 W'.tf) 42 P W'.cwd (ukn_const_of_eq N' Q hpayeq hQc)
+    (by decide) $$ Hcode [] Hhook Hcwf HP []
+  · iapply ksyncLeaf_xv6 UL N' oQ
   · rw [hpayeq]; iexact Hpay
   · iexact Hrun
 

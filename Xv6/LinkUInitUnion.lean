@@ -110,7 +110,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGpreS hlc GF] [Xv6G GF] [Cto
 /-- **Rocq `union_Hinit_boot`**: THE LAW, BY ITS NAME -- at the engine `UL`
 (deviations 1-3). -/
 theorem unionHinitBoot (UL : UK_LEAVES) : UnionProgLaw (hlc := hlc) (GF := GF) := by
-  intro F c htag hkill hcons hwild hrdw hmono
+  intro F c htag hkill hcons hwild hrdw hmono _hhk
   intro E gen cP cI _ _ _ _ _ _ r
   letI : MachGS hlc GF := MachGS.ofEra E gen cP cI
   letI : Appcfg GF := ⟨(appUnion (hlc := hlc) (GF := GF)).names, (appUnion (hlc := hlc) (GF := GF)).pred c, r⟩
@@ -127,7 +127,7 @@ theorem unionHinitBoot (UL : UK_LEAVES) : UnionProgLaw (hlc := hlc) (GF := GF) :
   have hlic : letI : UprogSG GF := uprogSGFree
       (⊢ uKillCred (hlc := hlc) (GF := GF) -∗ consLicence (hlc := hlc) (GF := GF)) :=
     BI.entails_wand (consLicence_of_taint ((appUnion (hlc := hlc) (GF := GF)).ifc c) hkill hcons)
-  rw [← appUnion_boot_era hm c, ← appUnion_turn_era hm c]
+  rw [← appUnion_boot_era hm c, ← appUnion_iturn_era hm c]
   exact union_Hinit_boot_at (unionEng_of_leaves UL hlic) (initStart_ofLeaves UL) (shStart_ofLeaves UL)
     c r heq htag' hkill' hcons' hwild' hrdw'
 

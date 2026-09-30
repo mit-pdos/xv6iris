@@ -8,7 +8,8 @@
 ## DEVIATIONS from Rocq
 
 1. The interface equation is the five slot equations and the
-   generation-counter one (AppLaws deviation 2), as the class field states it.
+   generation-counter one (AppLaws deviation 2), as the class field states it;
+   the sync-hook equation (Rocq SY3-A4, a2417c11e) follows them.
 -/
 import Xv6.AppUnionPre
 
@@ -31,8 +32,10 @@ def UnionProgLaw : Prop :=
     MachFixedGS.wild (hlc := hlc) (GF := GF) = ((appUnion (hlc := hlc) (GF := GF)).ifc c).wild →
     MachFixedGS.rdwild (hlc := hlc) (GF := GF) = ((appUnion (hlc := hlc) (GF := GF)).ifc c).rdwild →
     MachFixedGS.mono (hlc := hlc) (GF := GF) = MachGpreS.mono_pre (hlc := hlc) →
+    -- THE SYNC-HOOK EQUATION (Rocq SY3-A4): the record's hook family is the union's
+    MachFixedGS.syncHook (hlc := hlc) (GF := GF) = (appUnion (hlc := hlc) (GF := GF)).hk c →
     EraInitBoot (hlc := hlc) (appUnion (hlc := hlc) (GF := GF)).names (appUnion (hlc := hlc) (GF := GF)).pred
-      (appUnion (hlc := hlc) (GF := GF)).boot (appUnion (hlc := hlc) (GF := GF)).turn c
+      (appUnion (hlc := hlc) (GF := GF)).boot (appUnion (hlc := hlc) (GF := GF)).iturn c
 
 end
 
