@@ -48,9 +48,9 @@ variable {GF : BundledGFunctors} [Xv6G GF] [DiskG GF] [EchoOutG GF] [FileAppG GF
 
 /-- THE TYPED FACT (Rocq `f_typed`). -/
 def fTyped (c : FileFixed) (s : Dst) : IProp GF :=
-  iprop(⌜s = ∅⌝ ∨ ∃ ls : List Fwline, flLb c ls ∗
+  iprop(⌜s = ∅⌝ ∨ ∃ ls : List FlLine, flLb c ls ∗
     ⌜∀ (N : Fname) (p : Nat × List (BitVec 8)), s[N]? = some p →
-      uname N ∧ fBytesTyped ls N p.2⌝)
+      uname N ∧ fBytesTyped (flRedirs ls) N p.2⌝)
 
 instance fTyped_persistent (c : FileFixed) (s : Dst) : Persistent (fTyped (GF := GF) c s) := by
   unfold fTyped; infer_instance
@@ -67,7 +67,7 @@ theorem fTyped_empty (c : FileFixed) : ⊢@{IProp GF} fTyped c ∅ := by
 /-- One entry's witness (Rocq `f_typed_lookup`). -/
 theorem fTyped_lookup (c : FileFixed) (s : Dst) (N : Fname) (i : Nat) (bs : List (BitVec 8))
     (hs : s[N]? = some (i, bs)) :
-    ⊢@{IProp GF} fTyped c s -∗ ∃ ls : List Fwline, flLb c ls ∗ ⌜fBytesTyped ls N bs⌝ := by
+    ⊢@{IProp GF} fTyped c s -∗ ∃ ls : List FlLine, flLb c ls ∗ ⌜fBytesTyped (flRedirs ls) N bs⌝ := by
   unfold fTyped
   iintro H
   icases H with (%he | ⟨%ls, Hlb, %hall⟩)
@@ -82,8 +82,8 @@ theorem fTyped_lookup (c : FileFixed) (s : Dst) (N : Fname) (i : Nat) (bs : List
 entry it wrote, typed at a lower bound of its own, joins the rest -- two
 lower bounds of one list are comparable, and the longer serves both (Rocq
 `f_typed_insert`). -/
-theorem fTyped_insert (c : FileFixed) (s : Dst) (ls : List Fwline) (N : Fname) (i : Nat)
-    (bs : List (BitVec 8)) (hN : uname N) (hbt : fBytesTyped ls N bs) :
+theorem fTyped_insert (c : FileFixed) (s : Dst) (ls : List FlLine) (N : Fname) (i : Nat)
+    (bs : List (BitVec 8)) (hN : uname N) (hbt : fBytesTyped (flRedirs ls) N bs) :
     ⊢@{IProp GF} fTyped c s -∗ flLb c ls -∗ fTyped c (s.insert N (i, bs)) := by
   iintro Hty #Hlb
   unfold fTyped
@@ -93,7 +93,7 @@ theorem fTyped_insert (c : FileFixed) (s : Dst) (ls : List Fwline) (N : Fname) (
     iexists ls
     iframe Hlb
     ipureintro
-    exact dst_forall_insert ∅ N (i, bs) (fun M p => uname M ∧ fBytesTyped ls M p.2)
+    exact dst_forall_insert ∅ N (i, bs) (fun M p => uname M ∧ fBytesTyped (flRedirs ls) M p.2)
       ⟨hN, hbt⟩ (fun M p h => by simp at h)
   · ihave %hp := flLb_lb c ls ls0 $$ Hlb Hlb0
     rcases hp with hp | hp
@@ -101,18 +101,18 @@ theorem fTyped_insert (c : FileFixed) (s : Dst) (ls : List Fwline) (N : Fname) (
       iexists ls0
       iframe Hlb0
       ipureintro
-      exact dst_forall_insert s N (i, bs) (fun M p => uname M ∧ fBytesTyped ls0 M p.2)
-        ⟨hN, fBytesTyped_mono ls ls0 N bs hp hbt⟩ hall
+      exact dst_forall_insert s N (i, bs) (fun M p => uname M ∧ fBytesTyped (flRedirs ls0) M p.2)
+        ⟨hN, fBytesTyped_mono _ _ N bs (flRedirs_prefix ls ls0 hp) hbt⟩ hall
     · iright
       iexists ls
       iframe Hlb
       ipureintro
-      exact dst_forall_insert s N (i, bs) (fun M p => uname M ∧ fBytesTyped ls M p.2)
-        ⟨hN, hbt⟩ (fun M p h => ⟨(hall M p h).1, fBytesTyped_mono ls0 ls M p.2 hp (hall M p h).2⟩)
+      exact dst_forall_insert s N (i, bs) (fun M p => uname M ∧ fBytesTyped (flRedirs ls) M p.2)
+        ⟨hN, hbt⟩ (fun M p h => ⟨(hall M p h).1, fBytesTyped_mono _ _ M p.2 (flRedirs_prefix ls0 ls hp) (hall M p h).2⟩)
 
 /-- ...at a chunk subset of a line the list holds (Rocq `f_typed_some`). -/
-theorem fTyped_some (c : FileFixed) (s : Dst) (ls : List Fwline) (N : Fname) (ws : Wordline)
-    (sel : List Nat) (i : Nat) (hN : uname N) (hin : (N, ws) ∈ ls) (hok : lineOk ws)
+theorem fTyped_some (c : FileFixed) (s : Dst) (ls : List FlLine) (N : Fname) (ws : Wordline)
+    (sel : List Nat) (i : Nat) (hN : uname N) (hin : (N, ws) ∈ flRedirs ls) (hok : lineOk ws)
     (hsel : selOk (echoChunks ws) sel) :
     ⊢@{IProp GF} fTyped c s -∗ flLb c ls -∗
       fTyped c (s.insert N (i, subseq (echoChunks ws) sel)) :=

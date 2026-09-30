@@ -36,7 +36,7 @@ theorem fileDeed_law (c : FileFixed) (r : FileAppNames) :
       ((⌜fOk v s⌝ ∗ fTyped c s) ∨ fileTaint (hlc := hlc) c)) := by
   iintro !> %v %s Hd Hp
   unfold filePred
-  icases Hp with (#Ht | ⟨%hpins, Hc, Hf⟩)
+  icases Hp with (#Ht | ⟨%hpins, Hc, Hf, Hsy⟩)
   · isplitl []
     · ileft; iexact Ht
     · iframe Hd
@@ -44,14 +44,14 @@ theorem fileDeed_law (c : FileFixed) (r : FileAppNames) :
   unfold fState
   icases Hf with (⟨Hw, Hf⟩ | Hf)
   · unfold fCore
-    icases Hf with (⟨%s', Hd', Ht, #Hty, %hok⟩ | ⟨%s0, %s1, Hwh, -, -, -⟩)
+    icases Hf with (⟨%s', Hd', Ht, #Hty, %hok⟩ | ⟨%s0, %s1, %np, Hwh, -, -, -, -⟩)
     · ihave %heq := fdeed_agree r s s' $$ Hd Hd'
       subst heq
-      isplitl [Hc Hw Hd' Ht]
+      isplitl [Hc Hw Hd' Ht Hsy]
       · iright
         isplitr
         · ipureintro; exact hpins
-        iframe Hc
+        iframe Hc Hsy
         ileft
         iframe Hw
         ileft
@@ -83,7 +83,7 @@ theorem fileEscrow_read (c : FileFixed) (r : FileAppNames) :
   · iframe Hp
     iright; iright; iexact Ht0
   unfold filePred
-  icases Hp with (#Ht | ⟨%hpins, Hc, Hf⟩)
+  icases Hp with (#Ht | ⟨%hpins, Hc, Hf, Hsy⟩)
   · isplitl []
     · ileft; iexact Ht
     · iright; iright; iexact Ht
@@ -94,11 +94,11 @@ theorem fileEscrow_read (c : FileFixed) (r : FileAppNames) :
     icases Hwr with ⟨%h, Ha, #Hrec⟩
     ihave %hn := escWit_lookup r h n s g $$ Ha Hwit
     ihave #Hsp := escRecs_at (hlc := hlc) h n s g hn $$ Hrec
-    isplitl [Hc Ha Hf]
+    isplitl [Hc Ha Hf Hsy]
     · iright
       isplitr
       · ipureintro; exact hpins
-      iframe Hc
+      iframe Hc Hsy
       ileft
       iframe Hf
       iexists h
@@ -109,22 +109,22 @@ theorem fileEscrow_read (c : FileFixed) (r : FileAppNames) :
     ihave %hn := escWit_lookup r (h0 ++ [(s0, g0)]) n s g $$ Ha Hwit
     rcases escWit_head h0 n s s0 g g0 hn with ⟨_, hn0⟩ | ⟨e1, e2⟩
     · ihave #Hsp := escRecs_at (hlc := hlc) h0 n s g hn0 $$ Hrec
-      isplitl [Hc Ha Hwh Htk]
+      isplitl [Hc Ha Hwh Htk Hsy]
       · iright
         isplitr
         · ipureintro; exact hpins
-        iframe Hc
+        iframe Hc Hsy
         iright
         iexists h0, s0, g0
         iframe Ha Hrec Hwh Htk Hty
         ipureintro; exact hok
       · iright; ileft; iexact Hsp
     · subst e1 e2
-      isplitl [Hc Ha Hwh Htk]
+      isplitl [Hc Ha Hwh Htk Hsy]
       · iright
         isplitr
         · ipureintro; exact hpins
-        iframe Hc
+        iframe Hc Hsy
         iright
         iexists h0, s0, g0
         iframe Ha Hrec Hwh Htk Hty
