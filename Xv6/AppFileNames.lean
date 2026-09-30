@@ -47,6 +47,7 @@ hence the `[DiskG GF]` binder; the escrow's one-shot `mono_nat` is
 -/
 import Xv6.AppEcho
 import Xv6.AppFilePure
+import Xv6.UnionAdm
 
 namespace Xv6
 
@@ -121,13 +122,16 @@ class FileAppG (GF : BundledGFunctors) where
   [deedG : GhostVarG GF Dst]
   [flG : MonoListG GF FlLine]
   [escG : MonoListG GF EscRec]
+  /-- the per-era SYNC LISTS and the run-long history (Rocq `fa_sync :
+  inG Σ (mono_listR (leibnizO UnionAdm.srec))`) -/
+  [syncG : MonoListG GF Srec]
   /-- the sync REGISTRY's camera (Rocq `fa_reg : ghost_mapG Σ nat gname`) -/
   [regG : GhostMapG GF Nat GName RegMapF]
   /-- the RUN REGISTRY's camera (Rocq `fa_run : ghost_mapG Σ nat (gname *
   gname)`) -/
   [runG : GhostMapG GF Nat (GName × GName) RegMapF]
 
-attribute [reducible, instance] FileAppG.deedG FileAppG.flG FileAppG.escG FileAppG.regG
+attribute [reducible, instance] FileAppG.deedG FileAppG.flG FileAppG.escG FileAppG.syncG FileAppG.regG
   FileAppG.runG
 
 section AppFileNames

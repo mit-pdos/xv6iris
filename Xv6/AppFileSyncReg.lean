@@ -54,22 +54,22 @@ set_option linter.unusedSectionVars false
 
 /-- The instance at a new sync list, era, role and round position (the
 deed, ticket and escrow names kept) (Rocq `fn_with_pos`). -/
-def fnWithPos (r : FileAppNames) (γ : GName) (k : Nat) (b : Bool) (γp : GName) : FileAppNames :=
+abbrev fnWithPos (r : FileAppNames) (γ : GName) (k : Nat) (b : Bool) (γp : GName) : FileAppNames :=
   ⟨r.fnCons, r.fnDeed, r.fnTkt, r.fnEsc, γ, k, b, γp⟩
 
 /-- ...keeping the position's name too (Rocq `fn_with`). -/
-def fnWith (r : FileAppNames) (γ : GName) (k : Nat) (b : Bool) : FileAppNames :=
+abbrev fnWith (r : FileAppNames) (γ : GName) (k : Nat) (b : Bool) : FileAppNames :=
   fnWithPos r γ k b r.fnPos
 
 /-- The era's RUNNING claim founded by the PowerOn transport: the copy's
 console, ticket and escrow names, a fresh deed `d` and position `γp`, the
 era's list (Rocq `fn_run`, sync SY3-A4). -/
-def fnRun (r : FileAppNames) (d γ : GName) (k : Nat) (γp : GName) : FileAppNames :=
+abbrev fnRun (r : FileAppNames) (d γ : GName) (k : Nat) (γp : GName) : FileAppNames :=
   ⟨r.fnCons, d, r.fnTkt, r.fnEsc, γ, k, false, γp⟩
 
 /-- The running claim's instance as the new durable copy's (Rocq
 `to_copy`). -/
-def toCopy (r : FileAppNames) : FileAppNames := fnWith r r.fnSync r.fnEra true
+abbrev toCopy (r : FileAppNames) : FileAppNames := fnWith r r.fnSync r.fnEra true
 
 /-- THE ERA'S RECORD PREDICATE (Rocq `file_ok`; `App.app_ok` for the
 union). -/
@@ -239,6 +239,41 @@ theorem monoNat_auth_lb_le (γ : GName) (q : DFrac) (n m : Nat) :
   ihave %h := MonoNat.auth_lb_own_valid γ q _ _ $$ Ha Hl
   ipureintro
   exact (MaxNat.le_toNat _ _).mp h.2
+
+/-- The commit-era counter's authority bounds its lower bound. -/
+theorem syncCm_le (c : FileFixed) (k k' : Nat) :
+    ⊢@{IProp GF} syncCmAuth c k -∗ syncCmLb c k' -∗ ⌜k' ≤ k⌝ := by
+  unfold syncCmAuth syncCmLb
+  exact monoNat_auth_lb_le c.ffCm _ k k'
+
+/-- The started counter's loan bounds the copy's certificate. -/
+theorem syncSt_le (c : FileFixed) (n k : Nat) :
+    ⊢@{IProp GF} syncStAuth c n -∗ syncStLb c k -∗ ⌜k ≤ n⌝ := by
+  unfold syncStAuth syncStLb
+  exact monoNat_auth_lb_le c.ffSt _ n k
+
+/-- The commit-era counter moves up (Rocq `mono_nat_own_update` at `ff_cm`). -/
+theorem syncCm_update (c : FileFixed) (k k' : Nat) (h : k ≤ k') :
+    ⊢@{IProp GF} syncCmAuth c k ==∗ syncCmAuth c k' ∗ syncCmLb c k' := by
+  unfold syncCmAuth syncCmLb
+  exact MonoNat.own_update c.ffCm _ _ ((MaxNat.le_toNat _ _).mpr h)
+
+/-- The loan's certificate (Rocq `mono_nat_lb_own_get` at `ff_st`). -/
+theorem syncStLb_get (c : FileFixed) (n : Nat) :
+    ⊢@{IProp GF} syncStAuth c n -∗ syncStLb c n := by
+  unfold syncStAuth syncStLb
+  exact MonoNat.lb_own_get c.ffSt _ _
+
+/-- The started certificate at 0 is free (Rocq `mono_nat_lb_own_0`). -/
+theorem syncStLb_0 (c : FileFixed) : ⊢@{IProp GF} |==> syncStLb c 0 := by
+  unfold syncStLb
+  exact MonoNat.lb_own_0 c.ffSt
+
+/-- The registry at two equal eras (the era equation stays pure). -/
+theorem syncReg_agree_at (c : FileFixed) (k k' : Nat) (γ γ' : GName) (hk : k = k') :
+    ⊢@{IProp GF} syncReg c k γ -∗ syncReg c k' γ' -∗ ⌜γ = γ'⌝ := by
+  subst hk
+  exact syncReg_agree c k γ γ'
 
 end AppFileSyncReg
 
