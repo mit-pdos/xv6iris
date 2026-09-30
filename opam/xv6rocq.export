@@ -3405,7 +3405,7 @@ for an instantiation of the program logic to a particular programming language."
   dev-repo: "git+https://gitlab.mpi-sws.org/iris/iris.git"
   url {
     src:
-      "git+file:///work/iris-upstream#ad972179779ed8afe530a70e4ef90f18bed28508"
+      "git+https://gitlab.mpi-sws.org/dongjae/iris.git#ad972179779ed8afe530a70e4ef90f18bed28508"
   }
 }
 package "rocq-iris-transfinite" {
