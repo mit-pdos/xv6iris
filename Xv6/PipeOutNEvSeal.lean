@@ -34,8 +34,8 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG 
 /-- Rocq `popenV_arm`. -/
 theorem popenV_arm (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (sd : M.lmSt)
     (WA : GenWa M G sd) (k : Nat) (ho : List Obs) (CH : ConsHist) :
-    ⊢ popenV g M G.gcPIN WA.gwa sd k ho CH -∗
-      popenV g M G.gcPIN WA.gwa sd k ho CH ∗ ⌜garmEra M k ho CH⌝ := by
+    ⊢ popenV g M G.gcPIN WA.gwa sd WA.gpr k ho CH -∗
+      popenV g M G.gcPIN WA.gwa sd WA.gpr k ho CH ∗ ⌜garmEra M k ho CH⌝ := by
   iintro Hp
   unfold popenV
   icases Hp with ⟨%v, %w, %so, %r, %gb, %pre, %tm, #Hpin, #Hpera, Hwa, Hblk, Hcur, Hrb, Hta, Hcs,
@@ -51,8 +51,8 @@ theorem popenV_close (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (sd : M
     (WA : GenWa M G sd) (k : Nat) (ho : List Obs) (H : ConsHist) (hok : consHistOk H)
     (hev : consEvOk H .evClose)
     (hK3 : ∀ a, H.chArm = some a → caEcho a = [echoOf (caByte a)] → caSent a = 1) :
-    ⊢ popenV g M G.gcPIN WA.gwa sd k ho H -∗
-      popenV g M G.gcPIN WA.gwa sd k ho (consStep H .evClose) := by
+    ⊢ popenV g M G.gcPIN WA.gwa sd WA.gpr k ho H -∗
+      popenV g M G.gcPIN WA.gwa sd WA.gpr k ho (consStep H .evClose) := by
   iintro Hp
   unfold popenV
   icases Hp with ⟨%v, %w, %so, %r, %gb, %pre, %tm, #Hpin, #Hpera, Hwa, Hblk, Hcur, Hrb, Hta, Hcs,
@@ -72,8 +72,8 @@ theorem popenV_open (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (B : LmB
     (hK2 : cs = [] → consDropOk c H.chLog H.chDl)
     (hd : lmDiscInput M (consIns (openSeg h))) (hb : obsBoots h = k) (hdh : lmDisc M h)
     (hsh : traceShape h true) :
-    ⊢ popenV g M G.gcPIN WA.gwa sd k ho H -∗
-      popenV g M G.gcPIN WA.gwa sd k h (consStep H (.evOpen h c cs)) := by
+    ⊢ popenV g M G.gcPIN WA.gwa sd WA.gpr k ho H -∗
+      popenV g M G.gcPIN WA.gwa sd WA.gpr k h (consStep H (.evOpen h c cs)) := by
   iintro Hp
   unfold popenV
   icases Hp with ⟨%v, %w, %so, %r, %gb, %pre, %tm, #Hpin, #Hpera, Hwa, Hblk, Hcur, Hrb, Hta, Hcs,
@@ -85,14 +85,15 @@ theorem popenV_open (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (B : LmB
   exact gclPureO_open M sd B k ho so r pre H h c cs hok hev hK1 hK2 hd hb hdh hsh hall
 
 /-- Rocq `popenV_drain`: THE DRAIN at an unfiled block, its witness the
-round's own code. -/
+round's own code -- the receipt at the resolution the stage names, the open
+round's code appended, its item from the open round's free payload (sync
+SY3-A4). -/
 theorem popenV_drain (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (B : LmByteLaws M)
     (sd : M.lmSt) (WA : GenWa M G sd) (k : Nat) (h ho : List Obs) (CH : ConsHist) (seg : List Obs)
     (hsh : traceShape h true) (hk : obsBoots h = k) (hpre : ho <+: h)
     (hins : consIns seg = consIns (openSeg h)) (hwire : obsWire .uart0 seg <+: CH.chAcc) :
-    ⊢ popenV g M G.gcPIN WA.gwa sd k ho CH -∗
-      popenV g M G.gcPIN WA.gwa sd k ho CH
-      ∗ ∃ s0 : M.lmSt, ⌜lmGoodOut M s0 seg⌝ ∗ ⌜M.lmStOk s0⌝ ∗ WA.gwaTy s0 ∗ G.gcW k s0 := by
+    ⊢ popenV g M G.gcPIN WA.gwa sd WA.gpr k ho CH -∗
+      popenV g M G.gcPIN WA.gwa sd WA.gpr k ho CH ∗ gdrainRet M G sd WA k seg := by
   subst hk
   iintro Hp
   unfold popenV
@@ -112,20 +113,36 @@ theorem popenV_drain (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (B : Lm
       rw [hins]
       exact consIns_prefix _ _ (openSeg_prefix_of_boots _ _ hpre (by rw [hbo]) hsh)
   obtain ⟨_, hwp', _, ao, hb2, _⟩ := hop
-  have hgood : lmGoodOut M (gsState M sd so) seg :=
-    lmGoodOut_of_stage_open M G.gcK B so.gsPs so.gsCs (gsState M sd so) so.gsE so.gsW ao seg hpsb
-      (lmAltsPre_mono M _ _ _ _ hbytes hcs') hbyte hpinf (by rw [hwp']; exact hb2)
+  have hgood : lmGoodOutPad M G.gcK (gsState M sd so) seg (so.gsCs ++ [ao]) :=
+    lmGoodOutPad_of_stage_open M G.gcK B so.gsPs so.gsCs (gsState M sd so) so.gsE so.gsW ao seg
+      hpsb (lmAltsPre_mono M _ _ _ _ hbytes hcs') hbyte hpinf (by rw [hwp']; exact hb2)
       (by rw [← hacc]; exact hwire) hbytes
   ihave ⟨Hwa, #HW, #Hty⟩ := gdrainWa M G sd WA _ _ _ hsome $$ Hwa
+  ihave ⟨Hcs, #Hcsf⟩ := gpcsLb_get (obsBoots h) v so.gsCs tm $$ Hcs
+  ihave ⟨Hcs, #Hst, ⟨%J, #HJ, %hnJ, #HJR⟩⟩ :=
+    gpcs_store_open (R := WA.gpr) (obsBoots h) v so.gsCs tm $$ Hcs
+  ispecialize HJR $$ %ao
+  ihave #Hst2 := gstore_snoc (obsBoots h) v so.gsCs J ao $$ Hst HJR HJ []
+  · ipureintro; exact hnJ
+  ihave ⟨%Is, %hIs, #Hitems⟩ := gstore_items (obsBoots h) v (so.gsCs ++ [ao]) $$ Hst2
+  ihave %hIdl := gitemsInp_prefix v CH.chDl Is
+    (fun i J => gitem WA.gpr (obsBoots h) v i J (so.gsCs ++ [ao])[i]!)
+    (fun i J => gitem_inpLb WA.gpr (obsBoots h) v i J _) $$ Hdll Hitems
+  have hdlE := gclPureO_dl_E M sd _ ho so r pre CH hpo0
   isplitl [Hwa Hblk Hcur Hrb Hta Hcs Hps HE Hdl Hdll]
   · iexists v, w, so, r, gb, pre, tm
     iframe Hpin Hpera Hwa Hblk Hcur Hrb Hta Hcs Hps HE Hdl Hdll
     ipureintro; exact hpo0
-  · iexists gsState M sd so
-    iframe Hty HW
+  · unfold gdrainRet
+    iright
+    iexists gsState M sd so, so.gsCs, [ao], v, Is
+    iframe Hty HW Hpin Hcsf Hitems
     isplitr
     · ipureintro; exact hgood
+    isplitr
     · ipureintro; exact hfok0
+    · ipureintro
+      exact ⟨Nat.le_refl _, hIs, fun I hI => ((hIdl I hI).trans hdlE).trans hbytes⟩
 
 /-- Rocq `peclV_arm`. -/
 theorem peclV_arm (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (sd : M.lmSt)
@@ -188,7 +205,7 @@ theorem peclV_drain (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (B : LmB
   · ihave ⟨Hc, Hd⟩ := popenV_drain g M G B sd WA k h ho CH seg hsh hk hpre hins hwire $$ Hc
     isplitl [Hc]
     · iright; iexact Hc
-    · unfold gdrainRet; iright; iexact Hd
+    · iexact Hd
 
 /-- Rocq `peclV_step_echo`: THE ECHO, refuted while a round is open. -/
 theorem peclV_step_echo (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (B : LmByteLaws M)

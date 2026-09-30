@@ -191,6 +191,7 @@ theorem ucat_execfail_law (UL : UK_LEAVES) (ug : UnionGn) (r : FileAppNames) (s0
       ipureintro
       rw [ufi_wild, hul]
       simp [uwild]
+    · iapply ufi_rnd_free ug s0 I (ualtCode (UR .RCExec)) (ualtCode_R_nsync .RCExec (by decide))
     · iexact Hlk
   exact hx'
 
@@ -243,7 +244,7 @@ theorem ucat_entry_at (UL : UK_LEAVES)
   ihave ⟨%v, #Hpin, Hc⟩ := uWcl_elim ug s0 I 3 $$ Hc
   rw [ufi_lpr3]
   unfold gwcBlk
-  icases Hc with (⟨%ps, %cs0, %sw, %P, %hw, Htn, #Hps, #Hcs, #HE, #HW⟩ | #HT)
+  icases Hc with (⟨%ps, %cs0, %sw, %P, %hw, Htn, #Hps, #Hcs, #HE, #HW, -⟩ | #HT)
   · ihave %hsw := hgw sw $$ HW
     subst sw
     ihave %hv := uera_pin_agree (fgnEcho ug.ugnFile) _ v v' $$ Hpin Hpin'

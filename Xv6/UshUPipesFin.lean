@@ -226,7 +226,8 @@ theorem uWcl3_eq (ug : UnionGn) (s0 : Fstate) (I : List (BitVec 8)) :
     uWcl (hlc := hlc) (GF := GF) ug s0 I 3 = iprop(∃ v : EraPins, eraPin (fgnEcho ug.ugnFile) (genId (hlc := hlc) (GF := GF) + 1) v
       ∗ ((∃ (ps cs : List Nat) (s0' : Fstate) (P : Nat), ⌜lmWrBlkT ulmG ps cs s0' I P⌝ ∗
           turn v P ∗ psLb v ps ∗ csLb v cs ∗ inpLb v I
-          ∗ f0wAt (hlc := hlc) ug.ugnFile s0 (genId (hlc := hlc) (GF := GF) + 1) s0')
+          ∗ f0wAt (hlc := hlc) ug.ugnFile s0 (genId (hlc := hlc) (GF := GF) + 1) s0'
+          ∗ (⌜(0 : Nat) ≠ 0⌝ ∨ unionPrHook (GF := GF) ug (genId (hlc := hlc) (GF := GF) + 1) v I 0))
         ∨ fileTaint (hlc := hlc) ug.ugnFile.fgnCl)) := by
   rfl
 
@@ -249,7 +250,7 @@ theorem uopen (ug : UnionGn) (r : FileAppNames) (s0 : Fstate)
   rotate_left
   · ileft; iexact HT
   icases Hc with ⟨%v, #Hpin, Hc⟩
-  icases Hc with (⟨%ps, %cs, %s0', %P0, %hw, Htn, #Hps, #Hcs, #HE, #HW⟩ | #HT)
+  icases Hc with (⟨%ps, %cs, %s0', %P0, %hw, Htn, #Hps, #Hcs, #HE, #HW, -⟩ | #HT)
   rotate_left
   · ileft; iexact HT
   unfold f0wAt f0w

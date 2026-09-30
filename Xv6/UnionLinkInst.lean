@@ -134,7 +134,16 @@ noncomputable def unionParams (ug : UnionGn) : GenParams hlc GF ulmG where
   gH_cur := ufhead_cur ug
   gH_inp := ufhead_inp ug
   gwild := fun I => uwild (lmLineAt ulmG I) = true
+  -- the round's payload: the claim's (sync SY3-A4), the lane-U hook
+  gR := unionPrHook ug
+  gR_pers := fun _ _ _ _ => inferInstance
+  gR_tl := fun _ _ _ _ => inferInstance
+  gR_0 := unionPrHook_0 ug
+  gR_pan := unionPrHook_pan ug
+  gR_exf := unionPrHook_exf ug
 
+theorem unionParams_gR (ug : UnionGn) :
+    (unionParams (hlc := hlc) (GF := GF) ug).gR = unionPrHook ug := rfl
 theorem unionParams_gT (ug : UnionGn) :
     (unionParams (hlc := hlc) (GF := GF) ug).gT = fileTaint (hlc := hlc) ug.ugnFile.fgnCl := rfl
 theorem unionParams_gPIN (ug : UnionGn) :
@@ -214,8 +223,10 @@ theorem union_links_gl (ug : UnionGn) :
       iexact HT
   isplitr
   · imodintro
+    -- the round's payload `HR` (sync SY3-A4): lane U passes it to
+    -- `union_write_link_blk` once that takes Rocq's `upr` premise
     iintro %k %v %P0 %a %b %ps0 %cs0 %s0 %I0 %Φ %h0 %h1 %h2 %h3 %h4 %h5 %h6 %h7 %h8 #Hpin #Hw Ht
-      #Hps #Hcs #HE HΦ
+      #Hps #Hcs #HE - HΦ
     ihave #Hcw := uf0w_cw ug k s0 $$ Hw
     iapply union_write_link_blk ug hc k v P0 a b ps0 cs0 s0 I0 Φ
       (Bool.eq_false_iff.mpr h0) h1 h2 h3 h4 h5 h6 h7 h8 $$ Hpin Ht Hps Hcs HE Hcw

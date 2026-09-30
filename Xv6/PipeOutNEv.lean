@@ -29,6 +29,8 @@ receipt exactly as `GenOut.gcl_step_read` does, the echo is refuted.
    choice list, cut to the window's line count) and `greadWa` (the witness
    off a filed state) instead of Rocq's inline copies.
 4. `S P` is `P + 1`.
+5. (sync SY3-A4) `pwc_blkV_file_empty` takes the round's payload free at
+   the line (`hfree`), as Rocq's.
 -/
 import Xv6.PipeOutNSteps
 import Xv6.GenOutRead
@@ -96,7 +98,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG 
 
 theorem peclV_gen (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (sd : M.lmSt)
     (WA : GenWa M G sd) (k : Nat) (ho : List Obs) (H : ConsHist) :
-    peclV g M G sd WA k ho H ⊣⊢ iprop(gcl M G sd WA k ho H ∨ popenV g M G.gcPIN WA.gwa sd k ho H) :=
+    peclV g M G sd WA k ho H ⊣⊢ iprop(gcl M G sd WA k ho H ∨ popenV g M G.gcPIN WA.gwa sd WA.gpr k ho H) :=
   .rfl
 
 theorem csLb_weakenV (v : EraPins) (l l' : List Nat) (hp : l' <+: l) :
@@ -126,8 +128,8 @@ def rdRetV (M : LModel) (G : GenCparams hlc GF M) (k : Nat) (v : EraPins) (n : N
 theorem popenV_step_read (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (B : LmByteLaws M)
     (sd : M.lmSt) (WA : GenWa M G sd) (k : Nat) (v : EraPins) (n : Nat) (ho : List Obs)
     (CH : ConsHist) (ws : List (List Obs × BitVec 8)) (hread : readOk CH.chLog CH.chDl ws) :
-    ⊢ G.gcPIN k v -∗ dlCnt v (1 : Qp).half n -∗ popenV g M G.gcPIN WA.gwa sd k ho CH ==∗
-      popenV g M G.gcPIN WA.gwa sd k ho (consStep CH (.evRead ws)) ∗ rdRetV M G k v n CH ws := by
+    ⊢ G.gcPIN k v -∗ dlCnt v (1 : Qp).half n -∗ popenV g M G.gcPIN WA.gwa sd WA.gpr k ho CH ==∗
+      popenV g M G.gcPIN WA.gwa sd WA.gpr k ho (consStep CH (.evRead ws)) ∗ rdRetV M G k v n CH ws := by
   iintro #Hpinr Hdlr Hp
   unfold popenV
   icases Hp with ⟨%v2, %w, %so, %r, %gb, %pre, %tm, #Hpin, #Hpera, Hwa, Hblk, Hcur, Hrb, Hta, Hcs,
@@ -157,7 +159,7 @@ theorem popenV_step_read (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (B 
     greadStage M so.gsPs so.gsCs (gsState M sd so) _ _ hEpre hrd hbnd'
   have hsome := popenV_filed M sd k ho so r pre CH hall0
   ihave ⟨Hwa, #Hf0w⟩ := greadWa M G sd WA k so.gsSt $$ Hwa
-  ihave ⟨Hcs, #Hcslb⟩ := pcs_lb_get v2 so.gsCs tm $$ Hcs
+  ihave ⟨Hcs, #Hcslb⟩ := gpcsLb_get k v2 so.gsCs tm $$ Hcs
   ihave #Hcslbq := gopCsLb_weaken v2 so.gsCs
     (so.gsCs.take (nlines ((CH.chDl ++ ws).map Prod.snd))) (List.take_prefix _ _) $$ Hcslb
   ihave ⟨Hps, #Hpslb⟩ := psLb_get v2 so.gsPs $$ Hps
@@ -235,7 +237,8 @@ round at the view's `PLRun []` by `GenOut.gcl_step_write_blk` (Rocq
 theorem pwcBlkV_file_empty (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (B : LmByteLaws M)
     (sd : M.lmSt) (WA : GenWa M G sd) (V : PView M) (v : EraPins) (I : List (BitVec 8))
     (sR : M.lmSt) (lR : Pline') (k : Nat) (ho : List Obs) (H : ConsHist) (b : BitVec 8)
-    (hlR : V.pvLine (lineV M I) = some lR) (hbv : b = uPrompt[0]!) :
+    (hlR : V.pvLine (lineV M I) = some lR) (hbv : b = uPrompt[0]!)
+    (hfree : ∀ k a, ⊢ WA.gpr k v I a) :
     ⊢ pwcBlkV g M G.gcPIN G.gcW G.gcT v I sR k [] false -∗ peclV g M G sd WA k ho H ==∗
       peclV g M G sd WA k ho (consStep H (.evOut b))
       ∗ ((∃ (ps cs : List Nat) (s0 : M.lmSt) (P : Nat),
@@ -271,7 +274,8 @@ theorem pwcBlkV_file_empty (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (
       rfl
     imod gclStep_write_blk M G B sd WA k v P (V.pvEnc lR (PLAlt.PLRun [])) b ps cs s0 I ho H
       hneI hr (by omega) hpp hP hok (pv_run_term V lR []) hhead
-      $$ Hpin Htn Hps Hcs HE HW Hc with ⟨Hc, Hret⟩
+      $$ Hpin Htn Hps Hcs HE HW [] Hc with ⟨Hc, Hret⟩
+    · iapply hfree k (V.pvEnc lR (PLAlt.PLRun []))
     imodintro
     isplitl [Hc]
     · ileft; iexact Hc
@@ -288,7 +292,7 @@ theorem pwcBlkV_file_empty (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (
     have hst : gsState M sd so = s0 := hsteq
     subst hst
     ihave %hP2 := gopTurn_agree v2 P _ $$ Htn Hta
-    ihave %hcsp := pcsLb_prefix_c v2 _ cs tm $$ Hcs2 Hcs
+    ihave %hcsp := gpcsLb_prefix k v2 _ cs tm $$ Hcs2 Hcs
     ihave %hpsp := gopPsLb_prefix v2 _ ps $$ Hps2 Hps
     ihave %hI0dl := gopInpLb_le v2 _ I $$ Hdll HE
     exact (gclPureO_blkN_open_refute M sd k ho so r pre H P ps cs I hopen hP2 hcsp hpsp hI0dl hr

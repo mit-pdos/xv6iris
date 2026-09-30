@@ -161,13 +161,14 @@ def wildPure (M : LModel) (sd : M.lmSt) (WL : M.lmLine → Bool) (k : Nat) (ho :
   ∧ restOf (so.gsE.map Prod.snd) = []
   ∧ WL (lmLineAt M (so.gsE.map Prod.snd)) = true
 
-/-- THE ARM (Rocq `wildV`). -/
+/-- THE ARM (Rocq `wildV`): the frozen choices WITH THEIR STORE
+(`gcsFrozen`, sync SY3-A4). -/
 def wildV (M : LModel) (G : GenCparams hlc GF M) (sd : M.lmSt) (WA : GenWa M G sd)
     (WL : M.lmLine → Bool) (k : Nat) (ho : List Obs) (H : ConsHist) : IProp GF :=
   iprop(∃ (v : EraPins) (so : GStage M) (u : List (BitVec 8)),
     G.gcPIN k v ∗ seccFlag v 1 ∗ WA.gwa k so.gsSt ∗ (∃ l, WA.gext k l)
     ∗ turnAuth v (lmPcount M so.gsPs so.gsCs (gsState M sd so) so.gsE so.gsW)
-    ∗ csFrozen v so.gsCs ∗ psAuth v so.gsPs ∗ elistAuth v so.gsE
+    ∗ gcsFrozen WA.gpr k v so.gsCs ∗ psAuth v so.gsPs ∗ elistAuth v so.gsE
     ∗ dlCnt v (1 : Qp).half H.chDl.length
     ∗ dlListAuth v H.chDl
     ∗ ⌜wildPure M sd WL k ho so u H⌝)
@@ -324,8 +325,7 @@ theorem wildV_pins (M : LModel) (G : GenCparams hlc GF M) (sd : M.lmSt) (WA : Ge
   ihave %hP := gopTurn_agree v P _ $$ Ht Hta
   ihave %hst := WA.gwa_agree k so.gsSt s0 $$ Hwa HW
   ihave %hpsp := gopPsLb_prefix v _ ps0 $$ Hps Hps0
-  ihave %hcsp := csFrozen_prefix v so.gsCs cs0 $$ [Hcs Hcs0]
-  · iframe Hcs Hcs0
+  ihave %hcsp := gcsFrozen_prefix k v so.gsCs cs0 $$ Hcs Hcs0
   ihave %hIp := gopInpLb_le v _ I0 $$ Hdll HI0
   ipureintro
   have hpc := (wildPure_facts M sd WL HWL k ho so u H hw).2.2.2.2.2.2.2

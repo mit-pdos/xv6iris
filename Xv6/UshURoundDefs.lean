@@ -180,6 +180,21 @@ theorem ufi_blk (ug : UnionGn) (s0 : Fstate) :
 theorem ufi_ab (ug : UnionGn) (s0 : Fstate) :
     (unionLinkInstAt (hlc := hlc) (GF := GF) ug s0).lkAb = lmAb ulmG ulmGHooks := rfl
 
+/-- The record's per-round payload is the union's (the lane-U hook
+`unionPrHook`, Rocq `UnionOut.upr`; sync SY3-A4). -/
+theorem ufi_rnd (ug : UnionGn) (s0 : Fstate) :
+    (unionLinkInstAt (hlc := hlc) (GF := GF) ug s0).lkRnd = unionPrHook ug := rfl
+
+/-- **Rocq `ufi_rnd_free`**: the record's payload is free at every
+alternative but the sync's own. -/
+theorem ufi_rnd_free (ug : UnionGn) (s0 : Fstate) (I : List (BitVec 8)) (a : Nat)
+    (ha : ualtDec a ≠ Ualt.UR .RSyncRan) :
+    ⊢ iprop(∀ v, (unionLinkInstAt (hlc := hlc) (GF := GF) ug s0).lkRnd
+        (genId (hlc := hlc) (GF := GF) + 1) v I a) := by
+  rw [ufi_rnd]
+  iintro %v
+  iapply unionPrHook_free ug _ v I a ha
+
 /-- **Rocq `ush_deed_nw`**: THE DEED SAYS ITS LINE IS NOT WILD (or the taint). -/
 theorem ush_deed_nw (ug : UnionGn) (r : FileAppNames) (s0 : Fstate)
     (tie : List Nat → Fstate → List (BitVec 8) → Fstate → Prop) (sb : Fstate) (I : List (BitVec 8)) :
@@ -418,6 +433,9 @@ theorem uWcl3_close (ug : UnionGn) (s0 : Fstate) (I : List (BitVec 8)) (v : EraP
   isplitr
   · ipureintro; exact hw
   iframe Htn Hps Hcs HE Hf
+  -- the round's payload at the read's own alternative 0 (sync SY3-A4)
+  iright
+  iapply (unionParamsAt (hlc := hlc) (GF := GF) ug s0).gR_0
 
 end UShURoundDefs
 

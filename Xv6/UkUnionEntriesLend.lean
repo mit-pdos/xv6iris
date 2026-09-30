@@ -21,6 +21,10 @@ CONE (this file): `uecho_lend`, `ucat_lend` (and `ucat_alts`, pure, in
    discriminate`).
 2. `cons_short` / `cons_adm` / `cons_cur` are H-io's UkConsOut
    `consShort` / `consAdm` / `consCur`.
+3. (sync SY3-A4) `ucons_rnd_free` reads the union's payload through the
+   lane-U hook's law `unionPrHook_free` (Rocq: `upr_free`); the codes'
+   non-sync facts are `ualtDec_0_nsync` / `ualtCode_R_nsync` (Rocq:
+   `vm_compute`).
 -/
 import Xv6.UkUnionEntriesPure
 import Xv6.UnionLinkInstAt
@@ -43,6 +47,17 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FsTopG
 
 variable (ug : UnionGn)
 
+/-- **Rocq `ucons_rnd_free`** (sync SY3-A4): the device's payload is free at
+codes that are not the sync's run. -/
+theorem ucons_rnd_free (sb : Fstate) (v : EraPins) (I : List (BitVec 8)) (codes : List Nat)
+    (hf : ∀ c ∈ codes, ualtDec c ≠ UR .RSyncRan) :
+    ⊢ consRnd (unionParamsAt (hlc := hlc) (GF := GF) ug sb) v I codes := by
+  unfold consRnd
+  rw [unionParamsAt_gR]
+  imodintro
+  iintro %c %hc
+  iapply unionPrHook_free ug _ v I c (hf c hc)
+
 /-- **Rocq `uecho_lend`**: echo's lend at the console, the block at its
 first byte, code 0 (deviation 1). -/
 theorem uecho_lend (sb : Fstate) (v : EraPins) (I : List (BitVec 8)) (ws : List (List (BitVec 8)))
@@ -59,13 +74,15 @@ theorem uecho_lend (sb : Fstate) (v : EraPins) (I : List (BitVec 8)) (ws : List 
   ihave #Hpin : (unionParamsAt (hlc := hlc) (GF := GF) ug sb).gPIN (genId (hlc := hlc) (GF := GF) + 1) v $$ []
   · rw [unionParamsAt_gPIN]; iexact Hpin0
   unfold gwcBlk
-  icases Hb with (⟨%ps, %cs, %s1, %pos, %hw, Ht, #Hps, #Hcs, #HI, #HW⟩ | #HT)
+  icases Hb with (⟨%ps, %cs, %s1, %pos, %hw, Ht, #Hps, #Hcs, #HI, #HW, -⟩ | #HT)
   · have hbodies : [0].map (lmBody ulmG s1 cs I) = [wlLine (ws.drop 1)] := by
       simp [ulm_echo_body s1 cs I ws hfl]
     rw [← hbodies]
+    ihave #Hrn := ucons_rnd_free ug sb v I [0]
+      (fun c hc => by rw [List.mem_singleton.mp hc]; exact ualtDec_0_nsync)
     iapply consDevAtc_of_blk0 ulmG (unionParamsAt (hlc := hlc) (GF := GF) ug sb) (unionLinks (hlc := hlc) (GF := GF) ug) [0] v I ps cs s1 pos [0]
       hwild hw (List.Subset.refl _) (by intro c hc; simp at hc; subst hc; exact ulm_echo_adm s1 cs I ws hfl)
-      (by rw [hbodies]; exact hs) $$ Hlk Hpin [Ht]
+      (by rw [hbodies]; exact hs) $$ Hlk Hpin [Ht] Hrn
     unfold consCur
     iframe Ht Hps Hcs HI HW
   · iapply consDevAtc_taint ulmG (unionParamsAt (hlc := hlc) (GF := GF) ug sb) (unionLinks (hlc := hlc) (GF := GF) ug) [0] v I _ hs $$ Hlk HT
@@ -96,6 +113,11 @@ theorem ucat_lend (sb : Fstate) (v : EraPins) (ps cs : List Nat) (I : List (BitV
     iintro #Hlk #Hpin0 Hc
     ihave #Hpin : (unionParamsAt (hlc := hlc) (GF := GF) ug sb).gPIN (genId (hlc := hlc) (GF := GF) + 1) v $$ []
     · rw [unionParamsAt_gPIN]; iexact Hpin0
+    ihave #Hrn := ucons_rnd_free ug sb v I [ualtCode (UR .RCRan), ualtCode (UR .RCNoOpen)]
+      (fun c hc => by
+        rcases List.mem_cons.mp hc with rfl | hc
+        · exact ualtCode_R_nsync .RCRan (by decide)
+        · rw [List.mem_singleton.mp hc]; exact ualtCode_R_nsync .RCNoOpen (by decide))
     iapply consDevAtc_of_blk0 ulmG (unionParamsAt (hlc := hlc) (GF := GF) ug sb) (unionLinks (hlc := hlc) (GF := GF) ug)
       [ualtCode (UR .RCRan), ualtCode (UR .RCNoOpen)] v I ps cs sb pos
       [ualtCode (UR .RCRan), ualtCode (UR .RCNoOpen)] hwild hw (List.Subset.refl _)
@@ -104,12 +126,14 @@ theorem ucat_lend (sb : Fstate) (v : EraPins) (ps cs : List Nat) (I : List (BitV
         rcases List.mem_cons.mp hc with rfl | hc
         · exact hadm .RCRan trivial
         · rw [List.mem_singleton.mp hc]; exact hadm .RCNoOpen trivial)
-      (by rw [hbodies]; exact hs) $$ Hlk Hpin Hc
+      (by rw [hbodies]; exact hs) $$ Hlk Hpin Hc Hrn
   | none =>
     have hbodies : [ualtCode (UR .RCRan)].map (lmBody ulmG sb cs I) = [catDgOpen nm] := by
       simp [ulm_cat_body_ran_none sb cs I nm hfl hst]
     rw [show ucatAlts nm none = [catDgOpen nm] from rfl, ← hbodies]
     iintro #Hlk #Hpin0 Hc
+    ihave #Hrn := ucons_rnd_free ug sb v I [ualtCode (UR .RCRan)]
+      (fun c hc => by rw [List.mem_singleton.mp hc]; exact ualtCode_R_nsync .RCRan (by decide))
     ihave #Hpin : (unionParamsAt (hlc := hlc) (GF := GF) ug sb).gPIN (genId (hlc := hlc) (GF := GF) + 1) v $$ []
     · rw [unionParamsAt_gPIN]; iexact Hpin0
     iapply consDevAtc_of_blk0 ulmG (unionParamsAt (hlc := hlc) (GF := GF) ug sb) (unionLinks (hlc := hlc) (GF := GF) ug)
@@ -120,7 +144,7 @@ theorem ucat_lend (sb : Fstate) (v : EraPins) (ps cs : List Nat) (I : List (BitV
         intro c hc
         rw [List.mem_singleton.mp hc]
         exact hadm .RCRan trivial)
-      (by rw [hbodies]; exact hs) $$ Hlk Hpin Hc
+      (by rw [hbodies]; exact hs) $$ Hlk Hpin Hc Hrn
 
 end UkUnionLend
 

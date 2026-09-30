@@ -89,7 +89,7 @@ theorem uredir_fdl (ld : List FdState) (wr0 : Bool) (st1 : FdState)
 theorem uredir_diag_at (UL : UK_LEAVES) (Hold : IProp GF) (I : List (BitVec 8)) (a : Nat)
     (dg : List (BitVec 8)) (n : Nat)
     (hab : (unionLinkInstAt (hlc := hlc) (GF := GF) ug s0).lkAb I a = dg) (hn : dg.length - 2 = n)
-    (hnw : uwild (ul I) = false) :
+    (hnw : uwild (ul I) = false) (hna : ualtDec a ≠ Ualt.UR .RSyncRan) :
     ⊢ unionLinks (hlc := hlc) (GF := GF) ug -∗
       ushExecfailLawAt (hlc := hlc) dg n iprop(uWcl (hlc := hlc) ug s0 I 3 ∗ Hold)
         iprop(∃ v : EraPins, (unionLinkInstAt (hlc := hlc) ug s0).lkPin (genId (hlc := hlc) (GF := GF) + 1) v ∗
@@ -101,11 +101,12 @@ theorem uredir_diag_at (UL : UK_LEAVES) (Hold : IProp GF) (I : List (BitVec 8)) 
         iprop(∃ v : EraPins, (unionLinkInstAt (hlc := hlc) ug s0).lkPin (genId (hlc := hlc) (GF := GF) + 1) v ∗
           lkPost (unionLinkInstAt (hlc := hlc) ug s0) (genId (hlc := hlc) (GF := GF) + 1) v I a ∗ Hold) := by
     iintro #Hlk
-    iapply ushDiagLaw_hold_at_alt UL (unionLinkInstAt (hlc := hlc) (GF := GF) ug s0) Hold I a $$ [] Hlk
-    ileft
-    ipureintro
-    rw [ufi_wild, hnw]
-    simp
+    iapply ushDiagLaw_hold_at_alt UL (unionLinkInstAt (hlc := hlc) (GF := GF) ug s0) Hold I a $$ [] [] Hlk
+    · ileft
+      ipureintro
+      rw [ufi_wild, hnw]
+      simp
+    · iapply ufi_rnd_free ug s0 I a hna
   rw [hab, hn] at h2
   exact h2
 
@@ -150,7 +151,8 @@ theorem uredir_execfail_law (UL : UK_LEAVES) (I : List (BitVec 8)) (ws : Wordlin
     fun i => fTyped_some ug.ugnFile.fgnCl s ls file ws [] i hfile hin hokws (selOk_nil _)
   iintro #Hlk #Hpin' #Hcs #Hty #Hfl %ty
   ihave #Hx := uredir_diag_at ug s0 UL (UshFileRedir.redirK' (hlc := hlc) ug.ugnFile r file s ty) I
-    (ualtCode (.UR .RFExec)) altExecfail 17 hax (by decide) hnw $$ Hlk
+    (ualtCode (.UR .RFExec)) altExecfail 17 hax (by decide) hnw
+      (ualtCode_R_nsync .RFExec (by decide)) $$ Hlk
   iapply uexecfail_law_at_wand altExecfail 17 _ _ _ $$ Hx
   imodintro
   iintro H
@@ -187,7 +189,8 @@ theorem uredir_openfail_law (UL : UK_LEAVES) (I : List (BitVec 8)) (ws : Wordlin
   icases HK with (Hd | ⟨%hsN, %i, Hd⟩ | #HT)
   · -- `f` as the round found it
     ihave #Hx := uredir_diag_at ug s0 UL (fown r s) I (ualtCode (.UR .RFOpenU)) (altOpenfailN file)
-      (13 + file.length) hau (altOpenfailN_nlen file) hnw $$ Hlk
+      (13 + file.length) hau (altOpenfailN_nlen file) hnw
+      (ualtCode_R_nsync .RFOpenU (by decide)) $$ Hlk
     iapply uexecfail_law_at_use N l hfd _ _ _ _ (uWcu (hlc := hlc) ug r s0 PT PD I 0) $$ Hx [] [Hc Hd]
     · imodintro
       iintro ⟨%v, #Hp, Hblk, Hd⟩
@@ -199,7 +202,8 @@ theorem uredir_openfail_law (UL : UK_LEAVES) (I : List (BitVec 8)) (ws : Wordlin
   · -- created empty at an absent `f`
     ihave #Hti := hty0 i $$ Hty Hfl
     ihave #Hx := uredir_diag_at ug s0 UL (fown r (s.insert file (i, []))) I (ualtCode (.UR .RFOpenM))
-      (altOpenfailN file) (13 + file.length) ham (altOpenfailN_nlen file) hnw $$ Hlk
+      (altOpenfailN file) (13 + file.length) ham (altOpenfailN_nlen file) hnw
+      (ualtCode_R_nsync .RFOpenM (by decide)) $$ Hlk
     iapply uexecfail_law_at_use N l hfd _ _ _ _ (uWcu (hlc := hlc) ug r s0 PT PD I 0) $$ Hx [] [Hc Hd]
     · imodintro
       iintro ⟨%v, #Hp, Hblk, Hd⟩
@@ -210,7 +214,8 @@ theorem uredir_openfail_law (UL : UK_LEAVES) (I : List (BitVec 8)) (ws : Wordlin
       · iexact Hd
   · -- the taint
     ihave #Hx := uredir_diag_at ug s0 UL (fileTaint (hlc := hlc) ug.ugnFile.fgnCl) I (ualtCode (.UR .RFOpenU))
-      (altOpenfailN file) (13 + file.length) hau (altOpenfailN_nlen file) hnw $$ Hlk
+      (altOpenfailN file) (13 + file.length) hau (altOpenfailN_nlen file) hnw
+      (ualtCode_R_nsync .RFOpenU (by decide)) $$ Hlk
     iapply uexecfail_law_at_use N l hfd _ _ _ _ (uWcu (hlc := hlc) ug r s0 PT PD I 0) $$ Hx [] [Hc]
     · imodintro
       iintro -

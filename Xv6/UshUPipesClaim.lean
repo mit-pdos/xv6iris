@@ -157,7 +157,7 @@ union's, which pays the N-writer family's obligation at every pipeline line
 (a pipeline line is not the wild one). -/
 theorem ucons_claim (ug : UnionGn) (hcons : MachFixedGS.consRes (hlc := hlc) (GF := GF) = ucl (hlc := hlc) ug) :
     consClaimV (hlc := hlc) (GF := GF) (ugnPipe ug) ulmG pviewUnionU (ucparams ug) (∅ : Fstate) (uwa ug) :=
-  ⟨ucl ug, hcons, fun v I sR _ hlR => pblkU_ecl_holds ug v I sR (uwild_pv _ _ hlR)⟩
+  ⟨ucl ug, hcons, fun v I sR _ hlR => pblkU_ecl_holds ug v I sR _ hlR⟩
 
 /-- **Rocq `usup`**: the application's supply answers out of the taint. -/
 theorem usup (ug : UnionGn) (r : FileAppNames)

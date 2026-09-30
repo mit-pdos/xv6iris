@@ -127,18 +127,19 @@ theorem pwclV_step_write_blk (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M)
     (hhead : (M.lmCont (lmUpto M cs0 s0 (bodiesOf I0) (nlines I0 - 1))
       (M.lmOf ((bodiesOf I0)[nlines I0 - 1]!)) (M.lmDec a))[0]? = some b) :
     ⊢ G.gcPIN k v -∗ turn v P -∗ psLb v ps0 -∗ csLb v cs0 -∗ inpLb v I0 -∗ G.gcW k s0 -∗
+      WA.gpr k v I0 a -∗
       pwclV g M G sd WA WL k ho H ==∗
         pwclV g M G sd WA WL k ho (consStep H (.evOut b)) ∗
         ((turn v (P + 1) ∗ psLb v ps0 ∗ csLb v (cs0 ++ [a]) ∗ inpLb v I0 ∗ G.gcW k s0)
           ∨ G.gcT) := by
-  iintro #Hpin Ht #Hpslb #Hcslb #Hilb #HW Hcl
+  iintro #Hpin Ht #Hpslb #Hcslb #Hilb #HW #Hgpr Hcl
   icases pwclV_unfold g M G sd WA WL k ho H $$ Hcl with (#HT | ⟨%v1, #Hp1, Hf, Hc⟩ | Hw)
   · imodintro
     isplitl []
     · iapply pwclV_taint g M G sd WA WL k ho _ $$ HT
     · iright; iexact HT
   · imod peclV_step_write_blk g M G B sd WA k v P a b ps0 cs0 s0 I0 ho H hne0 hr0 hdiv hpin0
-      hPeq halt hterm hhead $$ Hpin Ht Hpslb Hcslb Hilb HW Hc with ⟨Hc, Hr⟩
+      hPeq halt hterm hhead $$ Hpin Ht Hpslb Hcslb Hilb HW Hgpr Hc with ⟨Hc, Hr⟩
     imodintro
     iframe Hr
     iapply pwclV_mid g M G sd WA WL k ho _ v1 $$ Hp1 Hf Hc
@@ -149,8 +150,7 @@ theorem pwclV_step_write_blk (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M)
     ihave %hP := gopTurn_agree v P _ $$ Ht Hta
     ihave %hst := WA.gwa_agree k so.gsSt s0 $$ Hwa HW
     ihave %hpsp := gopPsLb_prefix v _ ps0 $$ Hps Hpslb
-    ihave %hcsp := csFrozen_prefix v so.gsCs cs0 $$ [Hcs Hcslb]
-    · iframe Hcs Hcslb
+    ihave %hcsp := gcsFrozen_prefix k v so.gsCs cs0 $$ Hcs Hcslb
     ihave %hIp := gopInpLb_le v _ I0 $$ Hdll Hilb
     exfalso
     obtain ⟨hout, _, _, _, _, _, _, hpc⟩ := wildPure_facts M sd WL HWL k ho so u H hw
@@ -261,10 +261,11 @@ theorem wildBlk_refute (M : LModel) (G : GenCparams hlc GF M) (sd : M.lmSt) (WA 
 theorem pwclV_ecl_holds (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (sd : M.lmSt)
     (WA : GenWa M G sd) (hext : ∀ k l, WA.gext k l = pext g k l)
     (WL : M.lmLine → Bool) (HWL : ∀ l, WL l = true → lmWild M l)
-    (v : EraPins) (I : List (BitVec 8)) (sR : M.lmSt) (hnw : WL (lineV M I) = false) :
+    (v : EraPins) (I : List (BitVec 8)) (sR : M.lmSt) (hnw : WL (lineV M I) = false)
+    (hfree : ∀ k a, ⊢ WA.gpr k v I a) :
     ⊢ eclN (pwclV g M G sd WA WL) (pwcBlkV g M G.gcPIN G.gcW G.gcT v I sR) (ptkV G.gcT v I)
         (pwitV M I sR) := by
-  ihave #He := pblkV_ecl_holds g M G sd WA hext v I sR
+  ihave #He := pblkV_ecl_holds g M G sd WA hext v I sR hfree
   unfold eclN
   imodintro
   iintro %k %ho %H %pre %b %tm %tm' %htmt %hwit Hpw Hcl
@@ -348,7 +349,8 @@ theorem pwclV_blk_file_empty (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M)
     (V : PView M) (v : EraPins) (I : List (BitVec 8)) (sR : M.lmSt) (lR : Pline') (k : Nat)
     (ho : List Obs) (H : ConsHist) (b : BitVec 8)
     (hV : ∀ l lR', V.pvLine l = some lR' → WL l = false)
-    (hlR : V.pvLine (lineV M I) = some lR) (hbv : b = uPrompt[0]!) :
+    (hlR : V.pvLine (lineV M I) = some lR) (hbv : b = uPrompt[0]!)
+    (hfree : ∀ k a, ⊢ WA.gpr k v I a) :
     ⊢ pwcBlkV g M G.gcPIN G.gcW G.gcT v I sR k [] false -∗ pwclV g M G sd WA WL k ho H ==∗
       pwclV g M G sd WA WL k ho (consStep H (.evOut b))
       ∗ ((∃ (ps cs : List Nat) (s0 : M.lmSt) (P : Nat),
@@ -362,7 +364,8 @@ theorem pwclV_blk_file_empty (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M)
     isplitl []
     · iapply pwclV_taint g M G sd WA WL k ho _ $$ HT
     · iright; iexact HT
-  · imod pwcBlkV_file_empty g M G B sd WA V v I sR lR k ho H b hlR hbv $$ Hpw Hc with ⟨Hc, Hr⟩
+  · imod pwcBlkV_file_empty g M G B sd WA V v I sR lR k ho H b hlR hbv hfree
+      $$ Hpw Hc with ⟨Hc, Hr⟩
     imodintro
     iframe Hr
     iapply pwclV_mid g M G sd WA WL k ho _ v1 $$ Hp1 Hf Hc

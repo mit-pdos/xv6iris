@@ -14,6 +14,10 @@ Each is a ghost wrapper around its pure half in `Xv6/PipeOutNPure.lean`
 1. Rocq's `Hypothesis Hext : forall k l, gext WA k l = pext g k l` is the
    explicit premise `hext` of each step.
 2. `S P` is `P + 1`; `S (P + length pre0)` is `P + pre0.length + 1`.
+4. (sync SY3-A4) The choice authority is `gpcs` at the payload family
+   `WA.gpr` (`Xv6/PipeOutStore.lean`); the round's first byte takes the
+   round's payload FREE at every alternative (`□ ∀ a', WA.gpr k v I0 a'`),
+   which opens the round's `gopen`; the filing files it (`gpcs_file`).
 3. The curried agreement forms the steps read (`pcsLb_prefix_c`,
    `peraPin_agree_c`, `curHalf_agree_c`, `curHalf_excl_c`,
    `rblkLb_prefix_c`) are stated here once, as `GenOut`'s `gop*` forms are.
@@ -81,6 +85,7 @@ theorem peclV_blkN_open_gen (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) 
       (M.lmOf ((bodiesOf I0)[nlines I0 - 1]!)) (M.lmDec a))[0]? = some b)
     (hfarm : (M.lmTerm (M.lmDec a) = false ∧ nodollar b) ∨ M.lmTerm (M.lmDec a) = true) :
     ⊢ G.gcPIN k v -∗ turn v P -∗ psLb v ps0 -∗ csLb v cs0 -∗ inpLb v I0 -∗ G.gcW k s0 -∗
+      □ (∀ a', WA.gpr k v I0 a') -∗
       peclV g M G sd WA k ho H ==∗
         peclV g M G sd WA k ho (consStep H (.evOut b)) ∗
         ((∃ (w : PipeEra) (gb : GName),
@@ -90,7 +95,8 @@ theorem peclV_blkN_open_gen (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) 
             ∗ (⌜M.lmTerm (M.lmDec a) = false⌝ ∨ csFrozenAt v (nlines I0 - 1))
             ∗ psLb v ps0 ∗ csLb v cs0 ∗ inpLb v I0) ∨ G.gcT) := by
   have hrl0 := ll_nlines_removelast I0 hr0
-  iintro #Hpin Ht #Hpslb #Hcslb #Hilb #HW Hcl
+  have hpos0 := nlines_pos_of_rest_nil I0 hne0 hr0
+  iintro #Hpin Ht #Hpslb #Hcslb #Hilb #HW #Hfree Hcl
   unfold peclV popenV
   icases Hcl with (Hcl | ⟨%v2, %w, %so, %r, %gb, %pre, %tm, #Hpin2, #Hpera, Hwa, Hblk, Hcur, Hrb,
     Hta, Hcs, Hps, HE, Hdl, Hdll, %hopen⟩)
@@ -109,7 +115,7 @@ theorem peclV_blkN_open_gen (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) 
     subst hv
     ihave %hsteq := WA.gwa_agree k so.gsSt s0 $$ Hwa HW
     ihave %hP := gopTurn_agree v2 P _ $$ Ht Hta
-    ihave %hcsp := gopCsLb_prefix v2 _ cs0 $$ Hcs Hcslb
+    ihave %hcsp := gcsLb_prefix k v2 _ cs0 $$ Hcs Hcslb
     ihave %hpsp := gopPsLb_prefix v2 _ ps0 $$ Hps Hpslb
     ihave %hI0dl := gopInpLb_le v2 _ I0 $$ Hdll Hilb
     have hst : gsState M sd so = s0 := hsteq
@@ -123,14 +129,20 @@ theorem peclV_blkN_open_gen (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) 
     imod hgrow $$ Hrb2 with ⟨Hrb2, #Hrlb⟩
     imod cur_retarget w r gb tm (nlines I0 - 1) gb2 (M.lmTerm (M.lmDec a)) $$ Hcur with Hcur
     ihave ⟨Hcur1, Hcur2⟩ := cur_split w (nlines I0 - 1) gb2 (M.lmTerm (M.lmDec a)) $$ Hcur
-    ihave Hcs := pcs_of_auth v2 so.gsCs false rfl $$ Hcs
-    ihave >⟨Hcs, #Hfz⟩ : |==> (pcs v2 so.gsCs (M.lmTerm (M.lmDec a))
+    ihave Hcs := gpcs_of_gcs (R := WA.gpr) k v2 so.gsCs false rfl $$ Hcs [Hfree]
+    · unfold gopen
+      iexists I0
+      iframe Hilb
+      isplitr
+      · ipureintro; omega
+      · imodintro; iexact Hfree
+    ihave >⟨Hcs, #Hfz⟩ : |==> (gpcs WA.gpr k v2 so.gsCs (M.lmTerm (M.lmDec a))
         ∗ (⌜M.lmTerm (M.lmDec a) = false⌝ ∨ csFrozenAt v2 (nlines I0 - 1))) $$ [Hcs]
     · cases hfk2 : M.lmTerm (M.lmDec a)
       · imodintro
         iframe Hcs
         ileft; ipureintro; rfl
-      · imod pcs_freeze v2 so.gsCs false $$ Hcs with ⟨Hcs, #Hf⟩
+      · imod gpcs_freeze k v2 so.gsCs false $$ Hcs with ⟨Hcs, #Hf⟩
         imodintro
         iframe Hcs
         iright
@@ -156,7 +168,7 @@ theorem peclV_blkN_open_gen (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) 
     subst hv
     ihave %hsteq := WA.gwa_agree k so.gsSt s0 $$ Hwa HW
     ihave %hP := gopTurn_agree v2 P _ $$ Ht Hta
-    ihave %hcsp := pcsLb_prefix_c v2 _ cs0 tm $$ Hcs Hcslb
+    ihave %hcsp := gpcsLb_prefix k v2 _ cs0 tm $$ Hcs Hcslb
     ihave %hpsp := gopPsLb_prefix v2 _ ps0 $$ Hps Hpslb
     ihave %hI0dl := gopInpLb_le v2 _ I0 $$ Hdll Hilb
     have hst : gsState M sd so = s0 := hsteq
@@ -215,7 +227,7 @@ theorem peclV_blkN_byte_gen (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) 
   have hst : gsState M sd so = s0 := hsteq
   subst hst
   ihave %hP := gopTurn_agree v2 _ _ $$ Ht Hta
-  ihave %hcsp := pcsLb_prefix_c v2 _ cs0 tm $$ Hcs Hcslb
+  ihave %hcsp := gpcsLb_prefix k v2 _ cs0 tm $$ Hcs Hcslb
   ihave %hpsp := gopPsLb_prefix v2 _ ps0 $$ Hps Hpslb
   ihave %hI0dl := gopInpLb_le v2 _ I0 $$ Hdll Hilb
   ihave %hca := curHalf_agree_c w2 _ _ r2 gb2 tm r gb tmi $$ Hcur Hcw
@@ -229,7 +241,7 @@ theorem peclV_blkN_byte_gen (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) 
   subst hwp
   subst hpre0
   -- THE TERMINAL FIRE: a coverage-ending byte sets the flag and freezes
-  ihave >⟨Hcs, Hcur, Hcw, #Hfz⟩ : |==> (pcs v2 so.gsCs (tm || M.lmTerm (M.lmDec a))
+  ihave >⟨Hcs, Hcur, Hcw, #Hfz⟩ : |==> (gpcs WA.gpr k v2 so.gsCs (tm || M.lmTerm (M.lmDec a))
       ∗ curHalf w2 (1 : Qp).half r2 gb2 (tm || M.lmTerm (M.lmDec a))
       ∗ curHalf w2 (1 : Qp).half r2 gb2 (tm || M.lmTerm (M.lmDec a))
       ∗ (⌜M.lmTerm (M.lmDec a) = false⌝ ∨ csFrozenAt v2 r2)) $$ [Hcs Hcur Hcw]
@@ -239,7 +251,7 @@ theorem peclV_blkN_byte_gen (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) 
       iframe Hcs Hcur Hcw
       ileft; ipureintro; simp
     · simp only [Bool.or_true]
-      imod pcs_freeze v2 so.gsCs tm $$ Hcs with ⟨Hcs, #Hf⟩
+      imod gpcs_freeze k v2 so.gsCs tm $$ Hcs with ⟨Hcs, #Hf⟩
       imod curHalf_update w2 r2 gb2 tm r2 gb2 tm r2 gb2 true $$ [Hcur Hcw] with ⟨Hcur, Hcw⟩
       · iframe Hcur Hcw
       imodintro
@@ -311,7 +323,7 @@ theorem peclV_blkN_file (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (B :
   have hst : gsState M sd so = s0 := hsteq
   subst hst
   ihave %hP := gopTurn_agree v2 _ _ $$ Ht Hta
-  ihave %hcsp := pcsLb_prefix_c v2 _ cs0 tm $$ Hcs Hcslb
+  ihave %hcsp := gpcsLb_prefix k v2 _ cs0 tm $$ Hcs Hcslb
   ihave %hpsp := gopPsLb_prefix v2 _ ps0 $$ Hps Hpslb
   ihave %hI0dl := gopInpLb_le v2 _ I0 $$ Hdll Hilb
   ihave %hca := curHalf_agree_c w2 _ _ r2 gb2 tm r gb false $$ Hcur Hcw
@@ -328,8 +340,7 @@ theorem peclV_blkN_file (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (B :
     with ⟨Ht, Hta⟩
   · iframe Ht Hta
   imod blkAuth_grow w2 (lmStream M sd so) b $$ Hblk with ⟨Hblk, -⟩
-  ihave Hcs := pcs_auth v2 so.gsCs false rfl $$ Hcs
-  imod csAuth_grow v2 so.gsCs a $$ Hcs with ⟨Hcs, #Hcslb2⟩
+  imod gpcs_file (R := WA.gpr) k v2 so.gsCs false a rfl $$ Hcs with ⟨Hcs, #Hcslb2⟩
   ihave Hcur := cur_join w2 r2 gb2 false $$ [Hcur Hcw]
   · iframe Hcur Hcw
   ihave Hx : WA.gext k (lmStream M sd so ++ [b]) $$ [Hblk Hcur Hrb]

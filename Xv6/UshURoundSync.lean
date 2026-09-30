@@ -168,11 +168,12 @@ theorem usync_execfail_law (UL : UK_LEAVES) (ug : UnionGn) (r : FileAppNames) (s
   rw [hab, hn, el] at hx
   unfold ushExecfailLawAt at hx
   iintro #Hlk
-  ihave #Hx := hx $$ [] Hlk
+  ihave #Hx := hx $$ [] [] Hlk
   · ileft
     ipureintro
     rw [ufi_wild, hnw]
     simp
+  · iapply ufi_rnd_free ug s0 I (ualtCode (UR .RSyncExec)) (ualtCode_R_nsync .RSyncExec (by decide))
   unfold ushExecfailLawAt
   imodintro
   iintro %N %l %hfd Hc

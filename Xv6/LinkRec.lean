@@ -54,6 +54,11 @@ statement here.
 3. The record's laws keep Rocq's curried `⊢ A -∗ B -∗ …` form (they are an
    interface consumed by `iapply`); the derived lemmas below are stated
    `⊢ …` the same way.
+5. (sync SY3-A4, cc76f92ab) `lkRnd` with `lkRnd_pers/_0/_pan/_exf`
+   (Rocq `lk_rnd*`); `lkBlk_0` and `lkRead_t` take the payload,
+   `lkLcred_blk_open` the payload at every pin.  Rocq's `lk_wand_emp`,
+   `lk_wand_emp2`, `lk_emp_valid` serve only the echo instance (not ported,
+   item 2).
 4. The ghost classes: the record is stated at `[MachGS hlc GF] [Xv6G GF]
    [DiskG GF] [EchoOutG GF]` (`Xv6/EchoOut.lean`'s camera note; Rocq's
    `echoOutG` + `riscvGS`).
@@ -67,6 +72,11 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode MachCSL
 
 set_option linter.unusedSectionVars false
+
+/-- an instance with no payload (Rocq `lk_emp_valid`, sync SY3-A4): the
+`gR_0/_pan/_exf` of an `emp` family -/
+theorem lkEmp_valid {GF : BundledGFunctors} : ⊢ (emp : IProp GF) := by
+  iempintro
 
 /-- THE NON-UNION ERAS' WILD LINES: none (the value of `LinkRec.lkWild` /
 `GenParams.gwild` at every era but the union's, until K3's `AppIface.wild`
@@ -96,6 +106,10 @@ structure LinkRec (hlc : HasLC) (GF : BundledGFunctors) [MachGS hlc GF] [Xv6G GF
   lkPan : List (BitVec 8) → Nat
   lkExf : List (BitVec 8) → Nat
   lkExfb : List (BitVec 8) → List (BitVec 8)
+  /-- THE PER-ROUND PAYLOAD (sync SY3-A4, `GenLinksLine.gR`): opening a block
+  at an alternative deposits what filing it obliges; free at the read's own
+  alternative `0`, the panic and the exec failure -/
+  lkRnd : Nat → EraPins → List (BitVec 8) → Nat → IProp GF
   -- ---- the credential families ----
   lkBan : Nat → EraPins → List (BitVec 8) → Nat → IProp GF
   lkOwed : Nat → EraPins → List (BitVec 8) → IProp GF
@@ -120,6 +134,10 @@ structure LinkRec (hlc : HasLC) (GF : BundledGFunctors) [MachGS hlc GF] [Xv6G GF
   lkT_pers : Persistent lkT
   lkT_tl : Timeless lkT
   lkLinks_pers : Persistent lkLinks
+  lkRnd_pers : ∀ k v I a, Persistent (lkRnd k v I a)
+  lkRnd_0 : ∀ k v I, ⊢ lkRnd k v I 0
+  lkRnd_pan : ∀ k v I, ⊢ lkRnd k v I (lkPan I)
+  lkRnd_exf : ∀ k v I, ⊢ lkRnd k v I (lkExf I)
   lkPin_pers : ∀ k v, Persistent (lkPin k v)
   lkPin_tl : ∀ k v, Timeless (lkPin k v)
   lkPin_agr : ∀ k v v', ⊢ lkPin k v -∗ lkPin k v' -∗ ⌜v = v'⌝
@@ -165,7 +183,7 @@ structure LinkRec (hlc : HasLC) (GF : BundledGFunctors) [MachGS hlc GF] [Xv6G GF
   lkBlk_owed : ∀ k v I a, ⊢ lkBlk k v I a 0 -∗ lkOwed k v I
   lkSpT_sp : ∀ k v I, ⊢ lkSpT k v I -∗ lkSp k v I
   lkOpenT_open : ∀ k v I, ⊢ lkOpenT k v I -∗ lkOpen k v I
-  lkBlk_0 : ∀ k v I a a', ⊢ lkBlk k v I a 0 -∗ lkBlk k v I a' 0
+  lkBlk_0 : ∀ k v I a a', ⊢ lkBlk k v I a 0 -∗ lkRnd k v I a' -∗ lkBlk k v I a' 0
   lkLine_of_post : ∀ k v I a, lkApr I a →
     ⊢ lkBlk k v I a ((lkAb I a).length - 2) -∗ lkLine k v I
   lkLine_of_pro : ∀ k v I, ⊢ lkPro k v I -∗ lkLine k v I
@@ -223,7 +241,8 @@ structure LinkRec (hlc : HasLC) (GF : BundledGFunctors) [MachGS hlc GF] [Xv6G GF
       (lkSpT k v I -∗ Φ) -∗ outLink .uart0 k b Φ
   lkRead_t : ∀ k v I a (l : List (BitVec 8)),
     wlNl ∉ l →
-    ⊢ inpLb v (I ++ l ++ [wlNl]) -∗ lkOpenT k v I -∗ lkBlk k v (I ++ l ++ [wlNl]) a 0
+    ⊢ inpLb v (I ++ l ++ [wlNl]) -∗ lkOpenT k v I -∗
+      lkRnd k v (I ++ l ++ [wlNl]) a -∗ lkBlk k v (I ++ l ++ [wlNl]) a 0
   -- ---- the two CONSTANT alternatives, and the panic's banner ----
   lkAb_pan : ∀ I, lkAb I (lkPan I) = altPanic
   lkAb_exf : ∀ I, lkAb I (lkExf I) = lkExfb I
@@ -266,6 +285,8 @@ variable (L : LinkRec hlc GF)
 instance LinkRec.lkT_persistent : Persistent L.lkT := L.lkT_pers
 instance LinkRec.lkT_timeless : Timeless L.lkT := L.lkT_tl
 instance LinkRec.lkLinks_persistent : Persistent L.lkLinks := L.lkLinks_pers
+instance LinkRec.lkRnd_persistent (k : Nat) (v : EraPins) (I : List (BitVec 8)) (a : Nat) :
+    Persistent (L.lkRnd k v I a) := L.lkRnd_pers k v I a
 instance LinkRec.lkPin_persistent (k : Nat) (v : EraPins) : Persistent (L.lkPin k v) := L.lkPin_pers k v
 instance LinkRec.lkPin_timeless (k : Nat) (v : EraPins) : Timeless (L.lkPin k v) := L.lkPin_tl k v
 instance LinkRec.lkEpin_persistent (k : Nat) (v : EraPins) : Persistent (L.lkEpin k v) := L.lkEpin_pers k v
@@ -372,7 +393,9 @@ theorem lkLpr_step (k : Nat) (v : EraPins) (I : List (BitVec 8)) (p : Nat) (b : 
 theorem lkLpr_read (v : EraPins) (I l : List (BitVec 8)) (k : Nat) (hl : wlNl ∉ l) :
     ⊢ inpLb v (I ++ l ++ [wlNl]) -∗ L.lkLpr k v I 2 -∗ L.lkLpr k v (I ++ l ++ [wlNl]) 3 := by
   rw [L.lkLpr_2, show (3 : Nat) = 0 + 3 from rfl, L.lkLpr_S3]
-  exact L.lkRead_t k v I 0 l hl
+  iintro #HE' Hc
+  ihave #HR := L.lkRnd_0 k v (I ++ l ++ [wlNl])
+  iapply L.lkRead_t k v I 0 l hl $$ HE' Hc HR
 
 /-- THE READ THAT COMPLETED A LINE, at the echo-side pin (Rocq
 `lk_lcred_read`) -/
@@ -412,15 +435,18 @@ theorem lkLcred_of_post_a (k : Nat) (I : List (BitVec 8)) (a : Nat) (v : EraPins
   unfold lkPost
   iapply L.lkLine_of_post k v I a ha $$ Hc
 
-/-- the block owed opens at ANY alternative (Rocq `lk_lcred_blk_open`) -/
+/-- the block owed opens at ANY alternative, its payload deposited (Rocq
+`lk_lcred_blk_open`, sync SY3-A4) -/
 theorem lkLcred_blk_open (k : Nat) (I : List (BitVec 8)) (a : Nat) :
-    ⊢ lkLcred L k I 3 -∗ ∃ v : EraPins, L.lkPin k v ∗ L.lkBlk k v I a 0 := by
+    ⊢ (∀ v, L.lkRnd k v I a) -∗
+      lkLcred L k I 3 -∗ ∃ v : EraPins, L.lkPin k v ∗ L.lkBlk k v I a 0 := by
   unfold lkLcred
-  iintro ⟨%v, #Hpin, Hc⟩
+  iintro #HR ⟨%v, #Hpin, Hc⟩
   iexists v
   iframe Hpin
   rw [show (3 : Nat) = 0 + 3 from rfl, L.lkLpr_S3]
-  iapply L.lkBlk_0 k v I 0 a $$ Hc
+  ispecialize HR $$ %v
+  iapply L.lkBlk_0 k v I 0 a $$ Hc HR
 
 theorem lkLcred_blk_lend (k : Nat) (I : List (BitVec 8)) :
     ⊢ lkLcred L k I 3 -∗ ∃ v : EraPins, L.lkPin k v ∗ L.lkLend k v I := by
@@ -439,7 +465,8 @@ theorem lkLcred_blk_panic (k : Nat) (I : List (BitVec 8)) :
   iframe Hpin
   rw [show (3 : Nat) = 0 + 3 from rfl, L.lkLpr_S3]
   unfold lkPanic
-  iapply L.lkBlk_0 k v I 0 (L.lkPan I) $$ Hc
+  ihave #HR := L.lkRnd_pan k v I
+  iapply L.lkBlk_0 k v I 0 (L.lkPan I) $$ Hc HR
 
 end linkgen
 

@@ -19,6 +19,11 @@ DEVIATIONS from Rocq:
    argument (Rocq's inline asserts of `gcl_step_echo`) is the pure lemma
    `gclPure_step_echo`; the drain's witness read-back at a filed state is
    `gdrainWa` (Rocq's `iEval (rewrite Hsome)` around `gwa_W`).
+4. (sync SY3-A4) The drain reads the store through `gcsAuth_store` and the
+   items' inputs through `gitemsInp_prefix` (`Xv6/GenOut.lean`), where Rocq
+   destructs `gcs_auth` inline and reads each item with `big_sepL_lookup`
+   under an `iAssert`; `Forall (fun I => I `prefix_of` ins seg) Is` is
+   `∀ I ∈ Is, I <+: consIns seg`.
 -/
 import Xv6.GenOut
 import Xv6.GenOutSealPure
@@ -225,11 +230,17 @@ theorem gclPure_step_echo (M : LModel) (L : LmLaws M) (K : LmHooks M) (B : LmByt
 section genoutSeal
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]
 
-/-- THE DRAIN'S RECEIPT (Rocq `gdrain_ret`). -/
+/-- THE DRAIN'S RECEIPT (Rocq `gdrain_ret`): the cycle's boot state and its
+good output, AT THE RESOLUTION THE STAGE NAMES (the filed choices `csf`,
+padded, `ex` the open or wild round's code, at most one), and -- sync
+SY3-A4 -- every filed round's input (a prefix of the cycle's) and payload. -/
 def gdrainRet (M : LModel) (G : GenCparams hlc GF M) (sd : M.lmSt) (A : GenWa M G sd)
     (k : Nat) (seg : List Obs) : IProp GF :=
-  iprop(G.gcT ∨ ∃ s0 : M.lmSt,
-    ⌜lmGoodOut M s0 seg⌝ ∗ ⌜M.lmStOk s0⌝ ∗ A.gwaTy s0 ∗ G.gcW k s0)
+  iprop(G.gcT ∨ ∃ (s0 : M.lmSt) (csf ex : List Nat) (v : EraPins) (Is : List (List (BitVec 8))),
+    ⌜lmGoodOutPad M G.gcK s0 seg (csf ++ ex)⌝ ∗ ⌜M.lmStOk s0⌝ ∗ A.gwaTy s0
+    ∗ G.gcW k s0 ∗ G.gcPIN k v ∗ csLb v csf
+    ∗ ⌜ex.length ≤ 1 ∧ Is.length = (csf ++ ex).length ∧ ∀ I ∈ Is, I <+: consIns seg⌝
+    ∗ [∗list] i ↦ J ∈ Is, gitem A.gpr k v i J (csf ++ ex)[i]!)
 
 /-- the witness's authority at a FILED state hands the witness out (Rocq's
 `iEval (rewrite Hsome)` around `gwa_W`) -/
@@ -294,7 +305,8 @@ theorem gcl_open (M : LModel) (G : GenCparams hlc GF M) (B : LmByteLaws M) (sd :
     exact gclPure_open M B sd k ho so H h c cs hok hev hK1 hK2 hd hb hdh hsh hall
 
 /-- Rocq `gcl_drain`: THE DRAIN -- the claim below a nonempty wire gives
-the output claim at the stage's filed state. -/
+the output claim at the stage's filed state, at the resolution it names,
+with every filed round's item (sync SY3-A4). -/
 theorem gcl_drain (M : LModel) (G : GenCparams hlc GF M) (B : LmByteLaws M) (sd : M.lmSt)
     (A : GenWa M G sd) (k : Nat) (h ho : List Obs) (CH : ConsHist) (seg : List Obs)
     (hsh : traceShape h true) (hk : obsBoots h = k) (hpre : ho <+: h)
@@ -329,8 +341,8 @@ theorem gcl_drain (M : LModel) (G : GenCparams hlc GF M) (B : LmByteLaws M) (sd 
       refine (List.take_prefix _ _).trans ?_
       rw [hins]
       exact consIns_prefix _ _ (openSeg_prefix_of_boots _ _ hpre (by rw [hbo]) hsh)
-  have hgood : lmGoodOut M (gsState M sd so) seg :=
-    lmGoodOut_of_stage M G.gcK B so.gsPs so.gsCs (gsState M sd so) so.gsE so.gsW seg hpsb
+  have hgood : lmGoodOutPad M G.gcK (gsState M sd so) seg so.gsCs :=
+    lmGoodOutPad_of_stage M G.gcK B so.gsPs so.gsCs (gsState M sd so) so.gsE so.gsW seg hpsb
       (lmAltsPre_mono M _ _ _ _ hbytes hcsb') (gclPure_rd_stage M sd _ ho so CH hall0).2.2.2
       (by
         rcases lmCsLenOk_inv M so hcsl with ⟨⟨hw, _⟩, _⟩ | ⟨_, hq⟩
@@ -338,17 +350,27 @@ theorem gcl_drain (M : LModel) (G : GenCparams hlc GF M) (B : LmByteLaws M) (sd 
         · exact Or.inl (by omega))
       hbyte hpinf hwp (by rw [← hacc]; exact hwire) hbytes
   ihave ⟨Hwa, #HW, #Hty⟩ := gdrainWa M G sd A _ _ _ hsome $$ Hwa
+  ihave ⟨Hcs, #Hcsf⟩ := gcsLb_get (obsBoots h) v so.gsCs $$ Hcs
+  ihave ⟨Hcs, ⟨%Is, %hIs, #Hitems⟩⟩ := gcsAuth_store (R := A.gpr) (obsBoots h) v so.gsCs $$ Hcs
+  ihave %hIdl := gitemsInp_prefix v CH.chDl Is
+    (fun i J => gitem A.gpr (obsBoots h) v i J so.gsCs[i]!)
+    (fun i J => gitem_inpLb A.gpr (obsBoots h) v i J _) $$ Hdll Hitems
+  have hdlE := gclPure_dl_E M sd _ ho so CH hall0
   isplitl [Hwa Hext Hta Hcs Hps HE Hdl Hdll]
   · iright
     iexists v, so
     iframe Hpin Hwa Hext Hta Hcs Hps HE Hdl Hdll
     ipureintro; exact hall0
   · iright
-    iexists gsState M sd so
-    iframe Hty HW
+    iexists gsState M sd so, so.gsCs, [], v, Is
+    rw [List.append_nil]
+    iframe Hty HW Hpin Hcsf Hitems
     isplitr
     · ipureintro; exact hgood
+    isplitr
     · ipureintro; exact hfok0
+    · ipureintro
+      exact ⟨Nat.zero_le _, hIs, fun I hI => ((hIdl I hI).trans hdlE).trans hbytes⟩
 
 /-- Rocq `gcl_step_echo`: THE ECHO -- the claim grows by the echoed entry. -/
 theorem gcl_step_echo (M : LModel) (G : GenCparams hlc GF M) (B : LmByteLaws M) (sd : M.lmSt)

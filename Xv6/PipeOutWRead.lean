@@ -142,7 +142,8 @@ theorem pwclV_step_read (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (B :
     unfold seccFlag
     imod MonoNat.own_update v2.secc (.ofNat 0) (.ofNat 1) (by simp [MaxNat.le_toNat]) $$ Hf
       with ⟨Hf, #Hlb⟩
-    imod csFreeze v2 so.gsCs $$ Hcs with #Hfz
+    imod gcs_freeze (R := WA.gpr) k v2 so.gsCs $$ Hcs with #Hgfz
+    ihave #Hfz := gcsFrozen_cs k v2 so.gsCs $$ Hgfz
     ihave ⟨Hps, #Hpslb⟩ := psLb_get v2 so.gsPs $$ Hps
     ihave ⟨Hta, #Htlb⟩ := greadTurnLb_get v2 _ $$ Hta
     imod dlCnt_update v2 _ n (n + ws.length) $$ [Hdl Hdlr] with ⟨Hdl, Hdlr⟩
@@ -159,7 +160,7 @@ theorem pwclV_step_read (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (B :
       unfold wildV seccFlag
       iexists v2, so, []
       rw [show (consStep CH (.evRead ws)).chDl = CH.chDl ++ ws from rfl, List.length_append, hdleq]
-      iframe Hpin2 Hf Hwa Hta Hfz Hps HE Hdl Hdll
+      iframe Hpin2 Hf Hwa Hta Hgfz Hps HE Hdl Hdll
       isplitl [Hext]
       · iexists lmStream M sd so; iexact Hext
       ipureintro

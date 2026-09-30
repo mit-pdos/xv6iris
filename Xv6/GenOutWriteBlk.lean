@@ -46,7 +46,7 @@ theorem gclPure_write_blk (M : LModel) (K : LmHooks M) (B : LmByteLaws M) (sd : 
     (hterm : M.lmTerm (M.lmDec a) = false)
     (hhead : (M.lmCont (lmUpto M cs0 (gsState M sd so) (bodiesOf I0) (nlines I0 - 1))
       (M.lmOf ((bodiesOf I0)[nlines I0 - 1]!)) (M.lmDec a))[0]? = some b) :
-    cs0 = so.gsCs
+    cs0 = so.gsCs ∧ so.gsCs.length = nlines I0 - 1
     ∧ lmPcount M so.gsPs (so.gsCs ++ [a]) (gsState M sd so) so.gsE [b] = P + 1
     ∧ lmStream M sd ⟨so.gsPs, so.gsCs ++ [a], so.gsE, [b], so.gsSt⟩ = lmStream M sd so ++ [b]
     ∧ gclPure M sd k ho ⟨so.gsPs, so.gsCs ++ [a], so.gsE, [b], so.gsSt⟩ (consStep H (.evOut b)) := by
@@ -86,7 +86,7 @@ theorem gclPure_write_blk (M : LModel) (K : LmHooks M) (B : LmByteLaws M) (sd : 
     · exact absurd ⟨hwnil, by rw [hlenE]; exact hr0⟩ hne
   have hcs0 : cs0 = so.gsCs := hcsp.eq_of_length (by have := hcsp.length_le; omega)
   subst hcs0
-  refine ⟨rfl, ?_, lmStream_blk M sd so a b hpin (by rw [hlenE, hrl0]; omega) hwnil, ?_⟩
+  refine ⟨rfl, hq, ?_, lmStream_blk M sd so a b hpin (by rw [hlenE, hrl0]; omega) hwnil, ?_⟩
   · have hpceq := lmPcount_cs_prefix M so.gsPs so.gsPs so.gsCs (so.gsCs ++ [a]) (gsState M sd so) so.gsE [b]
       List.prefix_rfl (List.prefix_append _ _) hpin (by rw [hlenE, hrl0]; omega)
     rw [← hpceq]
@@ -152,7 +152,8 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG 
 
 /-- (W') THE WRITE AT A BLOCK'S FIRST BYTE (Rocq `gcl_step_write_blk`): the
 alternative `a` is filed; the block is read at the state the writer's
-witness pins. -/
+witness pins.  The round's PAYLOAD (`A.gpr k v I0 a`, sync SY3-A4) joins the
+choice's store. -/
 theorem gclStep_write_blk (M : LModel) (G : GenCparams hlc GF M) (B : LmByteLaws M) (sd : M.lmSt)
     (A : GenWa M G sd) (k : Nat) (v : EraPins) (P a : Nat) (b : BitVec 8) (ps0 cs0 : List Nat)
     (s0 : M.lmSt) (I0 : List (BitVec 8)) (ho : List Obs) (H : ConsHist)
@@ -164,10 +165,11 @@ theorem gclStep_write_blk (M : LModel) (G : GenCparams hlc GF M) (B : LmByteLaws
     (hhead : (M.lmCont (lmUpto M cs0 s0 (bodiesOf I0) (nlines I0 - 1))
       (M.lmOf ((bodiesOf I0)[nlines I0 - 1]!)) (M.lmDec a))[0]? = some b) :
     ⊢ G.gcPIN k v -∗ turn v P -∗ psLb v ps0 -∗ csLb v cs0 -∗ inpLb v I0 -∗ G.gcW k s0 -∗
+      A.gpr k v I0 a -∗
       gcl M G sd A k ho H ==∗
         gcl M G sd A k ho (consStep H (.evOut b)) ∗
         ((turn v (P + 1) ∗ psLb v ps0 ∗ csLb v (cs0 ++ [a]) ∗ inpLb v I0 ∗ G.gcW k s0) ∨ G.gcT) := by
-  iintro #Hpin Ht #Hpslb #Hcslb #Hilb #HW Hcl
+  iintro #Hpin Ht #Hpslb #Hcslb #Hilb #HW #Hgpr Hcl
   unfold gcl
   icases Hcl with (#HT | ⟨%v2, %so, #Hpin2, Hwa, Hext, Hta, Hcs, Hps, HE, Hdl, Hdll, %hall⟩)
   · imodintro
@@ -178,17 +180,19 @@ theorem gclStep_write_blk (M : LModel) (G : GenCparams hlc GF M) (B : LmByteLaws
   subst hv
   ihave %hsteq := A.gwa_agree k so.gsSt s0 $$ Hwa HW
   ihave %hP := gopTurn_agree v2 P _ $$ Ht Hta
-  ihave %hcsp := gopCsLb_prefix v2 _ cs0 $$ Hcs Hcslb
+  ihave %hcsp := gcsLb_prefix k v2 _ cs0 $$ Hcs Hcslb
   ihave %hpsp := gopPsLb_prefix v2 _ ps0 $$ Hps Hpslb
   ihave %hI0dl := gopInpLb_le v2 _ I0 $$ Hdll Hilb
   have hst : gsState M sd so = s0 := hsteq
   subst hst
-  obtain ⟨hcs0, hpc2, hstr, hall'⟩ := gclPure_write_blk M G.gcK B sd k ho so H P a b ps0 cs0 I0
+  obtain ⟨hcs0, hq, hpc2, hstr, hall'⟩ := gclPure_write_blk M G.gcK B sd k ho so H P a b ps0 cs0 I0
     hall hP hcsp hpsp hI0dl hne0 hr0 hdiv hpin0 hPeq halt hterm hhead
   subst hcs0
   imod turn_update v2 P _ (P + 1) (by omega) $$ [Ht Hta] with ⟨Ht, Hta⟩
   · iframe Ht Hta
-  imod csAuth_grow v2 so.gsCs a $$ Hcs with ⟨Hcs, #Hcslb2⟩
+  have hpos0 := nlines_pos_of_rest_nil I0 hne0 hr0
+  imod gcsAuth_grow (R := A.gpr) k v2 so.gsCs a I0 $$ Hcs Hgpr Hilb [] with ⟨Hcs, #Hcslb2⟩
+  · ipureintro; omega
   imod A.gext_grow k _ b $$ Hext with Hext
   imodintro
   isplitr [Ht]

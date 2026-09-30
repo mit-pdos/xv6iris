@@ -49,6 +49,13 @@ Nothing here reads the wild interface itself.
    anyway, and `gl_taint_at`, kept for `UkConsOut`).
 6. The laws keep Rocq's curried `⊢ … -∗ …` form (they are fields of
    `LinkRec`).
+7. (DRIFT sync SY3-A4, Rocq cc76f92ab; drift D3-app/G) `GenParams` gains
+   the per-round payload `gR` with `gR_pers/_tl/_0/_pan/_exf`; `gwcBlk`
+   carries `⌜i ≠ 0⌝ ∨ gR k v I a` and `gwcPost` its instance at the post's
+   position; `glBlk` takes `gR k v I0 a`; `gwcBlk_0` and `gwc_read_t` take
+   the payload; the record's `lkRnd*` fields are `gR*`.  Rocq's
+   `glinks_persistent` rewrite (a Rocq-side search-cost fix) has no Lean
+   counterpart (the instance is `infer_instance`).
 -/
 import Xv6.LinkRec
 import Xv6.LineModelLinks
@@ -93,6 +100,17 @@ structure GenParams (hlc : HasLC) (GF : BundledGFunctors) [MachGS hlc GF] [Xv6G 
   gH_inp : ∀ k v I, ⊢ gH k v I -∗ gH k v I ∗ ⌜I = []⌝ ∗ inpLb v []
   /-- THE WILD LINES (seccomp design 10.7); `lkWildNone` off the union -/
   gwild : List (BitVec 8) → Prop
+  /-- THE PER-ROUND PAYLOAD (sync SY3-A4, `GenOut.gpr`): what filing the
+  alternative `a` after the input `I` obliges the filer to deposit in the
+  claim.  The block credential at its FIRST byte carries it; free at the
+  alternative a read opens with (`0`), the panic and the exec failure.  `emp`
+  at every instance but the union's. -/
+  gR : Nat → EraPins → List (BitVec 8) → Nat → IProp GF
+  gR_pers : ∀ k v I a, Persistent (gR k v I a)
+  gR_tl : ∀ k v I a, Timeless (gR k v I a)
+  gR_0 : ∀ k v I, ⊢ gR k v I 0
+  gR_pan : ∀ k v I, ⊢ gR k v I (gK.lmhPan (lmLineAt M I))
+  gR_exf : ∀ k v I, ⊢ gR k v I (gK.lmhExf (lmLineAt M I))
 
 section genparams
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]
@@ -108,6 +126,10 @@ instance GenParams.gWb_persistent (k : Nat) (s : M.lmSt) : Persistent (G.gWb k s
 instance GenParams.gWb_timeless (k : Nat) (s : M.lmSt) : Timeless (G.gWb k s) := G.gWb_tl k s
 instance GenParams.gH_timeless (k : Nat) (v : EraPins) (I : List (BitVec 8)) :
     Timeless (G.gH k v I) := G.gH_tl k v I
+instance GenParams.gR_persistent (k : Nat) (v : EraPins) (I : List (BitVec 8)) (a : Nat) :
+    Persistent (G.gR k v I a) := G.gR_pers k v I a
+instance GenParams.gR_timeless (k : Nat) (v : EraPins) (I : List (BitVec 8)) (a : Nat) :
+    Timeless (G.gR k v I a) := G.gR_tl k v I a
 
 end genparams
 
@@ -134,9 +156,12 @@ def gwcPro (k : Nat) (v : EraPins) (I : List (BitVec 8)) : IProp GF :=
   iprop((∃ (ps cs : List Nat) (s0 : M.lmSt) (P : Nat), ⌜lmWrPro M ps cs s0 I P⌝ ∗ gcur G v ps cs s0 I P k)
     ∨ G.gH k v I ∨ G.gT)
 
+/-- the block credential; at the block's FIRST byte it carries the round's
+payload (sync SY3-A4) (Rocq `gwc_blk`) -/
 def gwcBlk (k : Nat) (v : EraPins) (I : List (BitVec 8)) (a i : Nat) : IProp GF :=
   iprop((∃ (ps cs : List Nat) (s0 : M.lmSt) (P : Nat), ⌜lmWrBlkT M ps cs s0 I P⌝ ∗
-      turn v (P + i) ∗ psLb v ps ∗ csLb v (lmBlkcs cs a i) ∗ inpLb v I ∗ G.gW k s0)
+      turn v (P + i) ∗ psLb v ps ∗ csLb v (lmBlkcs cs a i) ∗ inpLb v I ∗ G.gW k s0
+      ∗ (⌜i ≠ 0⌝ ∨ G.gR k v I a))
     ∨ G.gT)
 
 def gwcOwed (k : Nat) (v : EraPins) (I : List (BitVec 8)) : IProp GF :=
@@ -169,7 +194,8 @@ def gwcBan (k : Nat) (v : EraPins) (I : List (BitVec 8)) (i : Nat) : IProp GF :=
 def gwcPost (k : Nat) (v : EraPins) (I : List (BitVec 8)) (a : Nat) : IProp GF :=
   iprop((∃ (ps cs : List Nat) (s0 : M.lmSt) (P : Nat), ⌜lmWrBlkT M ps cs s0 I P⌝ ∗
       turn v (P + ((lmAbs M s0 cs I a).length - 2)) ∗ psLb v ps ∗
-      csLb v (lmBlkcs cs a ((lmAbs M s0 cs I a).length - 2)) ∗ inpLb v I ∗ G.gW k s0)
+      csLb v (lmBlkcs cs a ((lmAbs M s0 cs I a).length - 2)) ∗ inpLb v I ∗ G.gW k s0
+      ∗ (⌜(lmAbs M s0 cs I a).length - 2 ≠ 0⌝ ∨ G.gR k v I a))
     ∨ G.gT)
 
 /-- the line credential, with THE PER-SHAPE BLOCK ARM `X` (Rocq
@@ -327,7 +353,7 @@ theorem gwcPro_owed (k : Nat) (v : EraPins) (I : List (BitVec 8)) :
 theorem gwcBlk_owed (k : Nat) (v : EraPins) (I : List (BitVec 8)) (a : Nat) :
     ⊢ gwcBlk G k v I a 0 -∗ gwcOwed G k v I := by
   unfold gwcBlk gwcOwed
-  iintro (⟨%ps, %cs, %s0, %P, %hw, Htn, Hps, Hcs, HE, Hf⟩ | Hc)
+  iintro (⟨%ps, %cs, %s0, %P, %hw, Htn, Hps, Hcs, HE, Hf, -⟩ | Hc)
   · ileft; iexists ps, cs, s0, P
     unfold gcur
     simp only [lmBlkcs, Nat.add_zero]
@@ -349,11 +375,19 @@ theorem gwcOpenT_open (k : Nat) (v : EraPins) (I : List (BitVec 8)) :
   · ileft; iexists ps, cs, s0, P; iframe Hc; ipureintro; exact hw.1
   · iright; iexact Hc
 
+/-- the block owed opens at ANY alternative, its payload deposited (Rocq
+`gwc_blk_0`, sync SY3-A4) -/
 theorem gwcBlk_0 (k : Nat) (v : EraPins) (I : List (BitVec 8)) (a a' : Nat) :
-    ⊢ gwcBlk G k v I a 0 -∗ gwcBlk G k v I a' 0 := by
+    ⊢ gwcBlk G k v I a 0 -∗ G.gR k v I a' -∗ gwcBlk G k v I a' 0 := by
   unfold gwcBlk
   simp only [lmBlkcs]
-  iintro H; iexact H
+  iintro (⟨%ps, %cs, %s0, %P, %hw, Htn, Hps, Hcs, HE, Hf, -⟩ | Hc) #HR
+  · ileft; iexists ps, cs, s0, P
+    iframe Htn Hps Hcs HE Hf
+    isplitr
+    · ipureintro; exact hw
+    · iright; iexact HR
+  · iright; iexact Hc
 
 /-- the landed post shape is the instance at a state-free alternative (Rocq
 `gwc_post_of_blk`) -/
@@ -361,10 +395,10 @@ theorem gwcPost_of_blk (k : Nat) (v : EraPins) (I : List (BitVec 8)) (a : Nat)
     (ha : lmApr M G.gK I a) :
     ⊢ gwcBlk G k v I a ((lmAb M G.gK I a).length - 2) -∗ gwcPost G k v I a := by
   unfold gwcBlk gwcPost
-  iintro (⟨%ps, %cs, %s0, %P, %hw, Htn, Hps, Hcs, HE, Hf⟩ | Hc)
+  iintro (⟨%ps, %cs, %s0, %P, %hw, Htn, Hps, Hcs, HE, Hf, HR⟩ | Hc)
   · ileft; iexists ps, cs, s0, P
     rw [lmAbs_ab M G.gK s0 cs I a ha]
-    iframe Htn Hps Hcs HE Hf
+    iframe Htn Hps Hcs HE Hf HR
     ipureintro; exact hw
   · iright; iexact Hc
 
@@ -397,7 +431,7 @@ theorem gwcLine_of_pro (X : Nat → EraPins → List (BitVec 8) → IProp GF)
 theorem gwcLend_of_blk0 (k : Nat) (v : EraPins) (I : List (BitVec 8)) (a : Nat) :
     ⊢ gwcBlk G k v I a 0 -∗ gwcLend G k v I := by
   unfold gwcBlk gwcLend
-  iintro (⟨%ps, %cs, %s0, %P, %hw, Htn, Hps, Hcs, HE, Hf⟩ | Hc)
+  iintro (⟨%ps, %cs, %s0, %P, %hw, Htn, Hps, Hcs, HE, Hf, -⟩ | Hc)
   · ileft; iexists ps, cs, s0, P
     unfold gcur
     simp only [lmBlkcs, Nat.add_zero]
@@ -413,7 +447,7 @@ theorem gwcBlk_sp (k : Nat) (v : EraPins) (I : List (BitVec 8)) (a : Nat) (ha : 
     obtain ⟨j, hj⟩ : ∃ j, (lmAb M G.gK I a).length - 1 = j + 1 := ⟨_, (Nat.succ_pred_eq_of_pos (by omega)).symm⟩
     rw [hj]; rfl
   unfold gwcBlk gwcSpT
-  iintro (⟨%ps, %cs, %s0, %P, %hw, Htn, Hps, Hcs, HE, Hf⟩ | Hc)
+  iintro (⟨%ps, %cs, %s0, %P, %hw, Htn, Hps, Hcs, HE, Hf, -⟩ | Hc)
   · ileft; iexists ps, cs ++ [a], s0, P + ((lmAb M G.gK I a).length - 1)
     unfold gcur
     rw [hbc cs]
@@ -499,15 +533,18 @@ theorem gwc_read (k : Nat) (v : EraPins) (I l : List (BitVec 8)) (hl : wlNl ∉ 
 
 theorem gwc_read_t (k : Nat) (v : EraPins) (I : List (BitVec 8)) (a : Nat) (l : List (BitVec 8))
     (hl : wlNl ∉ l) :
-    ⊢ inpLb v (I ++ l ++ [wlNl]) -∗ gwcOpenT G k v I -∗ gwcBlk G k v (I ++ l ++ [wlNl]) a 0 := by
+    ⊢ inpLb v (I ++ l ++ [wlNl]) -∗ gwcOpenT G k v I -∗ G.gR k v (I ++ l ++ [wlNl]) a -∗
+      gwcBlk G k v (I ++ l ++ [wlNl]) a 0 := by
   unfold gwcOpenT gwcBlk
-  iintro #HE' (⟨%ps, %cs, %s0, %P, %hw, Hc⟩ | Hc)
+  iintro #HE' (⟨%ps, %cs, %s0, %P, %hw, Hc⟩ | Hc) #HR
   · unfold gcur
     icases Hc with ⟨Htn, Hps, Hcs, -, Hf⟩
     ileft; iexists ps, cs, s0, P
     simp only [lmBlkcs, Nat.add_zero]
     iframe Htn Hps Hcs HE' Hf
-    ipureintro; exact lmWrOpen_read_t M ps cs s0 I P l hw hl
+    isplitr
+    · ipureintro; exact lmWrOpen_read_t M ps cs s0 I P l hw hl
+    · iright; iexact HR
   · iright; iexact Hc
 
 /-! ### The panic's five bytes leave the next round's banner -/
@@ -519,7 +556,7 @@ theorem gwcPanic_done (k : Nat) (v : EraPins) (I : List (BitVec 8)) :
       (lmAb M G.gK I (G.gK.lmhPan (lmLineAt M I))).length = cs ++ [G.gK.lmhPan (lmLineAt M I)] := by
     intro cs; rw [lmAb_pan M G.gL G.gK I, lbPanic_len]; rfl
   unfold gwcBlk gwcBan
-  iintro (⟨%ps, %cs, %s0, %P, %hw, Htn, Hps, Hcs, HE, Hf⟩ | Hc)
+  iintro (⟨%ps, %cs, %s0, %P, %hw, Htn, Hps, Hcs, HE, Hf, -⟩ | Hc)
   · ileft
     iexists ps, cs ++ [G.gK.lmhPan (lmLineAt M I)], s0,
       P + (lmAb M G.gK I (G.gK.lmhPan (lmLineAt M I))).length
@@ -594,7 +631,7 @@ def glW : IProp GF :=
     outLink .uart0 k b Φ)
 
 /-- (B) the block-first byte files the round's alternative, at the round's
-own state (Rocq `gl_blk`) -/
+own state, and the round's payload (sync SY3-A4) (Rocq `gl_blk`) -/
 def glBlk : IProp GF :=
   iprop(□ ∀ (k : Nat) (v : EraPins) (P a : Nat) (b : BitVec 8) (ps0 cs0 : List Nat) (s0 : M.lmSt)
       (I0 : List (BitVec 8)) (Φ : IProp GF),
@@ -609,6 +646,7 @@ def glBlk : IProp GF :=
     ⌜(lmAbs M s0 cs0 I0 a)[0]? = some b⌝ -∗
     G.gPIN k v -∗ G.gW k s0 -∗ turn v P -∗
     psLb v ps0 -∗ csLb v cs0 -∗ inpLb v I0 -∗
+    G.gR k v I0 a -∗
     (((turn v (P + 1) ∗ psLb v ps0 ∗ csLb v (cs0 ++ [a]) ∗ inpLb v I0) ∨ G.gT) -∗ Φ) -∗
     outLink .uart0 k b Φ)
 
@@ -755,7 +793,7 @@ theorem gblkStep (LINKS : IProp GF) [Persistent LINKS] (hgl : ⊢ LINKS -∗ gli
   rotate_left
   · iapply Ht $$ %k %v %b %Φ Hpin HT
     iintro #HT'; iapply HΦ; iright; iexact HT'
-  icases Hc with (⟨%ps, %cs, %s0, %P, %hw, Htn, #Hps, #Hcs, #HE, #Hf⟩ | #HT)
+  icases Hc with (⟨%ps, %cs, %s0, %P, %hw, Htn, #Hps, #Hcs, #HE, #Hf, #HR⟩ | #HT)
   rotate_left
   · iapply Ht $$ %k %v %b %Φ Hpin HT
     iintro #HT'; iapply HΦ; iright; iexact HT'
@@ -768,8 +806,10 @@ theorem gblkStep (LINKS : IProp GF) [Persistent LINKS] (hgl : ⊢ LINKS -∗ gli
     simp only [lmBlkcs, Nat.add_zero]
     have hb0 : (lmAbs M s0 cs I a)[0]? = some b := by
       unfold lmAbs; rw [← lmAb_at M G.gK I a _ hok hfr]; exact hb
+    icases HR with (%hz | #HR)
+    · exact absurd rfl hz
     iapply Hblk $$ %k %v %P %a %b %ps %cs %s0 %I %Φ %hnw %hne %hr %(by omega) %hpin0 %hP
-      %(G.gK.lmhFreeOk _ _ _ _ hfr hok) %(G.gK.lmhFreeTerm _ hfr) %hb0 Hpin Hf Htn Hps Hcs HE
+      %(G.gK.lmhFreeOk _ _ _ _ hfr hok) %(G.gK.lmhFreeTerm _ hfr) %hb0 Hpin Hf Htn Hps Hcs HE HR
     iintro Hres
     iapply HΦ
     icases Hres with (⟨Htn', Hps', Hcs', HE'⟩ | #HT)
@@ -777,7 +817,9 @@ theorem gblkStep (LINKS : IProp GF) [Persistent LINKS] (hgl : ⊢ LINKS -∗ gli
       iexists ps, cs, s0, P
       try simp only [lmBlkcs]
       iframe Htn' Hps' Hcs' HE' Hf
-      ipureintro; exact hw
+      isplitr
+      · ipureintro; exact hw
+      · ileft; ipureintro; omega
     · iright; iexact HT
   | succ i' =>
     -- every byte after it, at the choice list the first one extended
@@ -799,7 +841,9 @@ theorem gblkStep (LINKS : IProp GF) [Persistent LINKS] (hgl : ⊢ LINKS -∗ gli
       try simp only [lmBlkcs]
       rw [show P + (i' + 1 + 1) = P + (i' + 1) + 1 by omega]
       iframe Htn' Hps' Hcs' HE' Hf
-      ipureintro; exact hw
+      isplitr
+      · ipureintro; exact hw
+      · ileft; ipureintro; omega
     · iright; iexact HT
 
 /-- the shell's prompt: the '$' from the era's head (Rocq `ghead_dollar`) -/
@@ -960,7 +1004,7 @@ theorem gpromptDollar_posts (LINKS : IProp GF) [Persistent LINKS] (hgl : ⊢ LIN
   · iapply Ht $$ %k %v %b %Φ Hpin HT
     iintro #HT'; iapply HΦ; iapply gwcSpT_taint G k v I $$ HT'
   unfold gwcPost
-  icases Hc with (⟨%ps, %cs, %s0, %P, %hw, Htn, #Hps, #Hcs, #HE, #Hf⟩ | #HT)
+  icases Hc with (⟨%ps, %cs, %s0, %P, %hw, Htn, #Hps, #Hcs, #HE, #Hf, #HR⟩ | #HT)
   rotate_left
   · iapply Ht $$ %k %v %b %Φ Hpin HT
     iintro #HT'; iapply HΦ; iapply gwcSpT_taint G k v I $$ HT'
@@ -976,8 +1020,10 @@ theorem gpromptDollar_posts (LINKS : IProp GF) [Persistent LINKS] (hgl : ⊢ LIN
   | zero =>
     -- the prompt IS the block's first byte: it files the alternative
     simp only [lmBlkcs, Nat.add_zero]
+    icases HR with (%hz | #HR)
+    · exact absurd rfl hz
     iapply Hblk $$ %k %v %P %a %b %ps %cs %s0 %I %Φ %hnw %hne %hr %(by omega) %hpin0 %hP
-      %(hok _) %hnt %hby Hpin Hf Htn Hps Hcs HE
+      %(hok _) %hnt %hby Hpin Hf Htn Hps Hcs HE HR
     iintro Hres
     iapply HΦ
     unfold gwcSpT gcur
@@ -1322,6 +1368,11 @@ noncomputable def genLinkInst
   lkSpT_sp := gwcSpT_sp G
   lkOpenT_open := gwcOpenT_open G
   lkBlk_0 := gwcBlk_0 G
+  lkRnd := G.gR
+  lkRnd_pers := G.gR_pers
+  lkRnd_0 := G.gR_0
+  lkRnd_pan := G.gR_pan
+  lkRnd_exf := G.gR_exf
   lkLine_of_post := gwcLine_of_post G X
   lkLine_of_pro := gwcLine_of_pro G X
   lkLend_of_blk0 := gwcLend_of_blk0 G

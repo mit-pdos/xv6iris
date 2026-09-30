@@ -35,9 +35,12 @@ pays the N-writer family and the family's laws at a pipeline round in
    the thirteen-conjunct `popenV` / credential (the default 128 is exceeded).
 3. `1/2` is `(1 : Qp).half`; `S P` is `P + 1`; `Forall nodollar pre` is
    `∀ x ∈ pre, nodollar x`.
+5. (sync SY3-A4, cc76f92ab) `popenV` takes the payload family `R` after `sd`
+   and holds `gpcs R` (`Xv6/PipeOutStore.lean`) where it held `pcs`.
 -/
 import Xv6.PipeOutNPure
 import Xv6.PipeOut
+import Xv6.PipeOutStore
 import Xv6.PipesView
 import Xv6.PipeBothNPure
 
@@ -56,16 +59,18 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG 
 /-- THE OPEN ROUND at the model (Rocq `popenV`): its pin `PIN`, the
 witness's authority `X` (`gwa` of the state witness), the era's byte
 ledger, the claim's half of the round ghost, the round's own ledger, and
-the per-era authorities with the resolution flag-indexed (`pcs`). -/
+the per-era authorities with the resolution flag-indexed, beside the
+per-round store (`gpcs` at the payload family `R`, sync SY3-A4). -/
 def popenV (g : PipeGn) (M : LModel) (PIN : Nat → EraPins → IProp GF)
     (X : Nat → Option M.lmSt → IProp GF) (sd : M.lmSt)
+    (R : Nat → EraPins → List (BitVec 8) → Nat → IProp GF)
     (k : Nat) (ho : List Obs) (H : ConsHist) : IProp GF :=
   iprop(∃ (v : EraPins) (w : PipeEra) (so : GStage M) (r : Nat) (gb : GName)
       (pre : List (BitVec 8)) (tm : Bool),
     PIN k v ∗ peraPin g k w ∗ X k so.gsSt ∗ blkAuth w (lmStream M sd so)
     ∗ curHalf w (1 : Qp).half r gb tm ∗ rblkAuth gb pre
     ∗ turnAuth v (lmPcount M so.gsPs so.gsCs (gsState M sd so) so.gsE so.gsW)
-    ∗ pcs v so.gsCs tm
+    ∗ gpcs R k v so.gsCs tm
     ∗ psAuth v so.gsPs
     ∗ elistAuth v so.gsE
     ∗ dlCnt v (1 : Qp).half H.chDl.length
@@ -175,7 +180,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG 
 round of any number of writers. -/
 def peclV (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (sd : M.lmSt) (WA : GenWa M G sd)
     (k : Nat) (ho : List Obs) (H : ConsHist) : IProp GF :=
-  iprop(gcl M G sd WA k ho H ∨ popenV g M G.gcPIN WA.gwa sd k ho H)
+  iprop(gcl M G sd WA k ho H ∨ popenV g M G.gcPIN WA.gwa sd WA.gpr k ho H)
 
 instance peclV_timeless (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (sd : M.lmSt)
     (WA : GenWa M G sd) (k : Nat) (ho : List Obs) (H : ConsHist) :

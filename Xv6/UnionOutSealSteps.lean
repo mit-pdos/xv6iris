@@ -19,6 +19,10 @@ DEVIATIONS from Rocq:
    takes `hK3` and `ucl_open` takes `hK1`/`hK2`, in Rocq's exact shape;
    `consEvOk` carries them (krelax af31d1908) and the caller
    (`UnionLinksSeal.union_happ_echo`) passes its projections.
+3. (sync SY3-A4, drift D3-app/G) `ucl_drain` keeps its pre-drift receipt
+   `udrainRet` (Rocq main's `udrain_ret` is lane U's): it reads the generic
+   receipt's padded resolution back as `lmGoodOut` (`lmGoodOut_of_pad`) and
+   drops the round items; `pwclV_drain`'s `HWfree` is `unionPrHook_wild`.
 -/
 import Xv6.UnionOut
 import Xv6.PipeOutWSeal
@@ -54,20 +58,21 @@ theorem ucl_drain (ug : UnionGn) (k : Nat) (h ho : List Obs) (CH : ConsHist) (se
   iintro Hc
   unfold ucl
   ihave ⟨Hc, Hd⟩ := pwclV_drain (ugnPipe ug) ulmG (ucparams ug) ulmG_laws
-    (ulm_byte_laws admUG admSOn) (∅ : Fstate) (uwa ug) uwild uwild_wild k h ho CH seg hsh hk hpre
+    (ulm_byte_laws admUG admSOn) (∅ : Fstate) (uwa ug) uwild uwild_wild
+    (fun k v I a hw => unionPrHook_wild ug k v I a hw) k h ho CH seg hsh hk hpre
     hins hwire hne $$ Hc
   isplitl [Hc]
   · iexact Hc
   · unfold udrainRet gdrainRet
     rw [ucparams_gcT, ucparams_gcW, uwa_gwaTy]
     unfold f0cw
-    icases Hd with (#HT | ⟨%s0, %hgo, %hok, #Hty, ⟨%vf, #Hfp, #Hlb⟩⟩)
+    icases Hd with (#HT | ⟨%s0, %csf, %ex, %v, %Is, %hgo, %hok, #Hty, ⟨%vf, #Hfp, #Hlb⟩, -⟩)
     · ileft; iexact HT
     · iright
       iexists s0, vf
       iframe Hty Hfp Hlb
       isplitr
-      · ipureintro; exact hgo
+      · ipureintro; exact lmGoodOut_of_pad ulmG _ s0 seg _ hgo
       · ipureintro; exact hok
 
 /-- Rocq `ucl_close`: THE KERNEL'S OWN EVENTS.  `hK3`: DEVIATION 2. -/

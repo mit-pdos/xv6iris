@@ -1654,6 +1654,7 @@ import Xv6.UshMainStubs
 import Xv6.UshSysP
 import Xv6.PipeBothN
 import Xv6.PipeOut
+import Xv6.PipeOutStore
 import Xv6.PipeOutNDefs
 import Xv6.PipeOutNEv
 import Xv6.PipeOutNFam

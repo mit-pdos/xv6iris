@@ -58,7 +58,8 @@ first byte opens the round, every further byte (any writer's) appends to its
 ledger (Rocq `pblkV_ecl_holds`). -/
 theorem pblkV_ecl_holds (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (sd : M.lmSt)
     (WA : GenWa M G sd) (hext : ∀ k l, WA.gext k l = pext g k l)
-    (v : EraPins) (I : List (BitVec 8)) (sR : M.lmSt) :
+    (v : EraPins) (I : List (BitVec 8)) (sR : M.lmSt)
+    (hfree : ∀ k a, ⊢ WA.gpr k v I a) :
     ⊢ eclN (peclV g M G sd WA) (pwcBlkV g M G.gcPIN G.gcW G.gcT v I sR) (ptkV G.gcT v I)
         (pwitV M I sR) := by
   unfold eclN
@@ -95,8 +96,11 @@ theorem pblkV_ecl_holds (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (sd 
       · exact Or.inl ⟨by rw [hterm, htm'], hnd htm' b (by simp)⟩
       · exact Or.inr (by rw [hterm, htm'])
     imod peclV_blkN_open_gen g M G sd WA hext k v P a b ps cs s0 I ho H hne hr (by omega) hpp hP
-      hok hpan hb0 hfarm $$ Hpin [Htn] Hps Hcs HE HW Hcl with ⟨Hcl, Hret⟩
+      hok hpan hb0 hfarm $$ Hpin [Htn] Hps Hcs HE HW [] Hcl with ⟨Hcl, Hret⟩
     · iexact Htn
+    · imodintro
+      iintro %a'
+      iapply hfree k a'
     imodintro
     iframe Hcl
     icases Hret with (⟨%w, %gb, Htn, #Hpera, Hcur, #Hrlb, #Hfz, -, -, -⟩ | #HT)
@@ -269,9 +273,11 @@ def consClaimV (g : PipeGn) (M : LModel) (V : PView M) (G : GenCparams hlc GF M)
 
 theorem consClaimV_peclV (g : PipeGn) (M : LModel) (V : PView M) (G : GenCparams hlc GF M)
     (sd : M.lmSt) (WA : GenWa M G sd) (hext : ∀ k l, WA.gext k l = pext g k l)
+    (hfree : ∀ v I lR k a, V.pvLine (lineV M I) = some lR → ⊢ WA.gpr k v I a)
     (hc : MachFixedGS.consRes (hlc := hlc) (GF := GF) = peclV g M G sd WA) :
     consClaimV g M V G sd WA :=
-  ⟨peclV g M G sd WA, hc, fun v I sR _ _ => pblkV_ecl_holds g M G sd WA hext v I sR⟩
+  ⟨peclV g M G sd WA, hc, fun v I sR lR hlR =>
+    pblkV_ecl_holds g M G sd WA hext v I sR (fun k a => hfree v I lR k a hlR)⟩
 
 /-! ## The family at a pipeline round of any model (section 4a) -/
 

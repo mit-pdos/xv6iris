@@ -139,6 +139,7 @@ theorem uoom_diag (UL : UK_LEAVES) (Hold : IProp GF) (I : List (BitVec 8)) (hnw 
     ipureintro
     rw [ufi_wild, hnw]
     simp
+  · iapply ufi_rnd_free ug s0 I uoom (ualtCode_R_nsync .ROom (by decide))
   · iexact Hlk
 
 /-- **Rocq `uHoom`**: THE CHILD'S OUT-OF-MEMORY DIAGNOSTIC (upstream d66e41c;

@@ -166,7 +166,7 @@ theorem gclStep_write (M : LModel) (G : GenCparams hlc GF M) (sd : M.lmSt) (A : 
   subst hv
   ihave %hsteq := A.gwa_agree k so.gsSt s0 $$ Hwa HW
   ihave %hP := gopTurn_agree v2 P _ $$ Ht Hta
-  ihave %hcsp := gopCsLb_prefix v2 _ cs0 $$ Hcs Hcslb
+  ihave %hcsp := gcsLb_prefix k v2 _ cs0 $$ Hcs Hcslb
   ihave %hpsp := gopPsLb_prefix v2 _ ps0 $$ Hps Hpslb
   ihave %hI0dl := gopInpLb_le v2 _ I0 $$ Hdll Hilb
   have hst : gsState M sd so = s0 := hsteq

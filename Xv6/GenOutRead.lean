@@ -182,7 +182,7 @@ theorem gclStep_read (M : LModel) (G : GenCparams hlc GF M) (B : LmByteLaws M) (
         exact hne hz.2
   -- the ghosts
   ihave ⟨Hwa, #Hf0w⟩ := greadWa M G sd A k so.gsSt $$ Hwa
-  ihave ⟨Hcs, #Hcslb⟩ := csLb_get v2 so.gsCs $$ Hcs
+  ihave ⟨Hcs, #Hcslb⟩ := gcsLb_get k v2 so.gsCs $$ Hcs
   ihave #Hcslbq := gopCsLb_weaken v2 so.gsCs
     (so.gsCs.take (nlines ((CH.chDl ++ ws).map Prod.snd))) (List.take_prefix _ _) $$ Hcslb
   ihave ⟨Hps, #Hpslb⟩ := psLb_get v2 so.gsPs $$ Hps

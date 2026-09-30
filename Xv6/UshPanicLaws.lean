@@ -157,7 +157,11 @@ theorem ushExecfailLaw_hold_at (UL : UK_LEAVES) (L : LinkRec hlc GF) (Hold : Lis
   iintro %N %l %hfd2 ⟨Hc, Hh⟩
   obtain ⟨rb, hl2⟩ := hfd2
   ihave ⟨#Hw, Hh⟩ := Hnw $$ Hh
-  icases lkLcred_blk_open L (genId (hlc := hlc) (GF := GF) + 1) I (L.lkExf I) $$ Hc with ⟨%v, #Hpin, Hc⟩
+  ihave #HR : iprop(∀ v, L.lkRnd (genId (hlc := hlc) (GF := GF) + 1) v I (L.lkExf I)) $$ []
+  · iintro %v'
+    iapply L.lkRnd_exf
+  icases lkLcred_blk_open L (genId (hlc := hlc) (GF := GF) + 1) I (L.lkExf I) $$ HR Hc
+    with ⟨%v, #Hpin, Hc⟩
   iexists (fun p => iprop(L.lkBlk (genId (hlc := hlc) (GF := GF) + 1) v I (L.lkExf I) p ∗ Hold I))
   dsimp only
   isplitl [Hc Hh]
@@ -182,20 +186,23 @@ theorem ushExecfailLaw_hold_at (UL : UK_LEAVES) (L : LinkRec hlc GF) (Hold : Lis
 
 /-- **Rocq `ush_diag_law_hold_at_alt`**: the diagnostic at ANY alternative,
 the alternative left visible at the end (the block written up to its
-prompt). -/
+prompt); the round's payload at the alternative opens the block (sync
+SY3-A4). -/
 theorem ushDiagLaw_hold_at_alt (UL : UK_LEAVES) (L : LinkRec hlc GF) (Hold : IProp GF) (I : List (BitVec 8))
     (a : Nat) :
-    ⊢ (⌜¬ L.lkWild I⌝ ∨ L.lkT) -∗ L.lkLinks -∗
+    ⊢ (⌜¬ L.lkWild I⌝ ∨ L.lkT) -∗
+      (∀ v, L.lkRnd (genId (hlc := hlc) (GF := GF) + 1) v I a) -∗ L.lkLinks -∗
       ushExecfailLawAt (hlc := hlc) (L.lkAb I a) ((L.lkAb I a).length - 2)
         iprop(lkLcred L (genId (hlc := hlc) (GF := GF) + 1) I 3 ∗ Hold)
         iprop(∃ v : EraPins, L.lkPin (genId (hlc := hlc) (GF := GF) + 1) v ∗
           lkPost L (genId (hlc := hlc) (GF := GF) + 1) v I a ∗ Hold) := by
-  iintro #Hw #Hlk
+  iintro #Hw #Hrnd #Hlk
   unfold ushExecfailLawAt
   imodintro
   iintro %N %l %hfd2 ⟨Hc, Hh⟩
   obtain ⟨rb, hl2⟩ := hfd2
-  icases lkLcred_blk_open L (genId (hlc := hlc) (GF := GF) + 1) I a $$ Hc with ⟨%v, #Hpin, Hc⟩
+  icases lkLcred_blk_open L (genId (hlc := hlc) (GF := GF) + 1) I a $$ Hrnd Hc
+    with ⟨%v, #Hpin, Hc⟩
   iexists (fun p => iprop(L.lkBlk (genId (hlc := hlc) (GF := GF) + 1) v I a p ∗ Hold))
   dsimp only
   isplitl [Hc Hh]

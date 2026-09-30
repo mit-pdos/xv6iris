@@ -114,9 +114,11 @@ theorem union_era_split (ug : UnionGn) (k : Nat) (v : EraPins) (vf : FileEra) (w
     · unfold pext
       iexists w, 0, gb, ([] : List (BitVec 8)), false
       iframe Hpera Hblk Hcur1 Hrb
-    unfold turnAuth dlCnt
+    unfold turnAuth dlCnt gcsAuth
     dsimp only [List.length_nil]
     iframe Ht1 Hcs Hps HE Hdl1 Hdll
+    isplitr
+    · iapply gstore_nil
     ipureintro
     refine ⟨lmOutPure_0 ulmG (∅ : Fstate) k [] fstateOk_empty, lmCsLenOk_0 ulmG, lmPsLenOk_0 ulmG (∅ : Fstate),
       ginPure_0 ulmG k, ?_, ?_, lmDlOk_0 ulmG⟩

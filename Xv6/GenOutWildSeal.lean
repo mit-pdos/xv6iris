@@ -7,7 +7,9 @@ Added (Rocq → Lean): `lm_alts_pre_snoc_w` → `Xv6.lmAltsPre_snoc` (Rocq's pur
 copy of `GenOut.lm_alts_pre_snoc`, which Lean has as `lmAltsPre_snoc` in the
 Iris file `Xv6/GenOut.lean`; restated here so this file stays Iris-free, as
 Rocq's does), `lm_good_out_wild` → `lmGoodOut_wild` (takes `L`, `K`, `B`
-explicitly, as in Rocq).
+explicitly, as in Rocq).  (sync SY3-A4, cc76f92ab/38bb72f5b: Rocq main
+replaced `lm_good_out_wild` by `lm_good_out_pad_wild` → `lmGoodOutPad_wild`,
+the padded resolution with the wild line's code.)
 
 Deviations: Rocq's `u' := if decide (u = []) then [wl_nl] else u` is an
 existential witness (`u'`, nonempty, extending `u`); spelling as
@@ -25,15 +27,17 @@ section GenOutWildSeal
 
 variable (M : LModel)
 
-/-- Rocq `lm_good_out_wild`: THE DRAIN AT THE ARM. -/
-theorem lmGoodOut_wild (L : LmLaws M) (K : LmHooks M) (B : LmByteLaws M) (ps cs : List Nat)
+/-- Rocq `lm_good_out_pad_wild`: THE DRAIN AT THE ARM -- the stage's
+transcript followed by ANY tail is good at the resolution the frozen stage
+names, the wild line's code appended. -/
+theorem lmGoodOutPad_wild (L : LmLaws M) (K : LmHooks M) (B : LmByteLaws M) (ps cs : List Nat)
     (s : M.lmSt) (E : List (List Obs × BitVec 8)) (u : List (BitVec 8)) (seg : List Obs)
     (hpsb : ∀ a ∈ ps, a < proAlts.length) (hao : lmAltsPre M s (E.map Prod.snd) cs)
     (hpin : lmProPin M ps cs (E.map Prod.snd)) (hE : lmEDisc M E) (hne : E.map Prod.snd ≠ [])
     (hr : restOf (E.map Prod.snd) = []) (hlen : cs.length = nlines (E.map Prod.snd) - 1)
     (hwild : lmWild M (lmLineAt M (E.map Prod.snd)))
     (hwire : obsWire .uart0 seg <+: lmD M ps cs s E ++ u) (hinp : E.map Prod.snd <+: consIns seg) :
-    lmGoodOut M s seg := by
+    ∃ c, lmGoodOutPad M K s seg (cs ++ [c]) := by
   have hpos := nlines_pos_of_rest_nil _ hne hr
   obtain ⟨u', hu', huu⟩ : ∃ u' : List (BitVec 8), u' ≠ [] ∧ u <+: u' := by
     by_cases hu : u = []
@@ -56,7 +60,8 @@ theorem lmGoodOut_wild (L : LmLaws M) (K : LmHooks M) (B : LmByteLaws M) (ps cs 
     exact hpin q (by rw [Xv6.ll_nstarted_rest_nil _ hr]; exact hq)
   have hrl : nlines (E.map Prod.snd).dropLast ≤ cs.length := by
     rw [ll_nlines_removelast _ hr]; omega
-  apply lmGoodOut_of_stage M K B ps (cs ++ [c]) s E u' seg hpsb
+  refine ⟨c, ?_⟩
+  apply lmGoodOutPad_of_stage M K B ps (cs ++ [c]) s E u' seg hpsb
   · exact lmAltsPre_mono M s _ _ _ hinp
       (Xv6.lmAltsPre_snoc M s _ cs c hao (by omega) (by rw [hlen]; exact hok))
   · rw [List.length_append]; simp only [List.length_singleton]; omega

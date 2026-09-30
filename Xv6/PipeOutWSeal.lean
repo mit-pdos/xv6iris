@@ -15,6 +15,10 @@ DEVIATIONS from Rocq:
 2. THE KERNEL PREMISES (`GenOutHistSeal.lean` DEVIATION 1): `pwclV_close`
    takes `hK3`, `pwclV_open` takes `hK1`/`hK2`, in Rocq's exact shape.
    (`pwclV_open`'s WILD arm spends (K1) itself, as Rocq's does.)
+3. (sync SY3-A4) `pwclV_drain` takes Rocq's `Hypothesis HWfree` (no round
+   at a wild line files a payload) explicitly; its wild arm returns the
+   padded receipt, the frozen store's items reindexed (`bigSepL_mono`, Rocq's
+   `big_sepL_impl`) and the wild round's own item.
 -/
 import Xv6.PipeOutWDefs
 import Xv6.PipeOutNEvSeal
@@ -120,7 +124,9 @@ theorem pwclV_open (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (B : LmBy
 /-- Rocq `pwclV_drain`: THE DRAIN. -/
 theorem pwclV_drain (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (L : LmLaws M)
     (B : LmByteLaws M) (sd : M.lmSt) (WA : GenWa M G sd) (WL : M.lmLine → Bool)
-    (HWL : ∀ l, WL l = true → lmWild M l) (k : Nat) (h ho : List Obs) (CH : ConsHist)
+    (HWL : ∀ l, WL l = true → lmWild M l)
+    (HWfree : ∀ k v I a, WL (lmLineAt M I) = true → ⊢ WA.gpr k v I a)
+    (k : Nat) (h ho : List Obs) (CH : ConsHist)
     (seg : List Obs) (hsh : traceShape h true) (hk : obsBoots h = k) (hpre : ho <+: h)
     (hins : consIns seg = consIns (openSeg h)) (hwire : obsWire .uart0 seg <+: CH.chAcc)
     (hne0 : obsWire .uart0 seg ≠ []) :
@@ -137,9 +143,11 @@ theorem pwclV_drain (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (L : LmL
     · iexact Hd
   · subst hk
     unfold wildV
-    icases Hw with ⟨%v, %so, %u, #Hpn, Hfl, Hwa, Hx, Hta, Hcs, Hps, HE, Hdl, Hdll, %hw⟩
+    icases Hw with ⟨%v, %so, %u, #Hpn, Hfl, Hwa, Hx, Hta, #Hcs, Hps, HE, Hdl, Hdll, %hw⟩
     obtain ⟨hout, hw0, hne, hr, hlen, hwild, hsome, _⟩ := wildPure_facts M sd WL HWL _ ho so u CH hw
     have hacc := hw.2.1
+    have hEd := hw.2.2.2.2.2.1
+    have hwl := hw.2.2.2.2.2.2.2.2
     obtain ⟨_, _, hidx, hbyte, hpsb, hpinf, hcsb, _, hpre1, hpre2, hpre3, _, _, hfok⟩ := hout
     have hbytes : so.gsE.map Prod.snd <+: consIns seg := by
       rcases hpre3 with hEnil | hbo
@@ -156,22 +164,58 @@ theorem pwclV_drain (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (L : LmL
       unfold wildAcc at hwire
       rw [hw0, List.append_nil] at hwire
       exact hwire
-    have hgood : lmGoodOut M (gsState M sd so) seg :=
-      lmGoodOut_wild M L G.gcK B so.gsPs so.gsCs (gsState M sd so) so.gsE u seg hpsb hcsb hpinf
-        hbyte hne hr hlen hwild hwire' hbytes
+    obtain ⟨c, hgc⟩ := lmGoodOutPad_wild M L G.gcK B so.gsPs so.gsCs (gsState M sd so) so.gsE u
+      seg hpsb hcsb hpinf hbyte hne hr hlen hwild hwire' hbytes
+    have hpos := nlines_pos_of_rest_nil _ hne hr
     ihave ⟨Hwa, #HW, #Hty⟩ := gdrainWa M G sd WA _ _ _ hsome $$ Hwa
-    isplitl [Hfl Hwa Hx Hta Hcs Hps HE Hdl Hdll]
+    -- the frozen store's items, and the wild round's own
+    ihave #Hst := gcsFrozen_store (obsBoots h) v so.gsCs $$ Hcs
+    ihave ⟨%Is0, %hIs0, #Hitems0⟩ := gstore_items (obsBoots h) v so.gsCs $$ Hst
+    ihave #Hfz := gcsFrozen_cs (obsBoots h) v so.gsCs $$ Hcs
+    ihave #Hcsf := csFrozen_lb v so.gsCs $$ Hfz
+    ihave ⟨Hdll, #Hdllb⟩ := dlListLb_get v CH.chDl $$ Hdll
+    ihave #HIE := inpLb_of_dlLb v CH.chDl (so.gsE.map Prod.snd) (by rw [hEd]; try exact List.prefix_rfl) $$ Hdllb
+    ihave %hIdl := gitemsInp_prefix v CH.chDl Is0
+      (fun i J => gitem WA.gpr (obsBoots h) v i J so.gsCs[i]!)
+      (fun i J => gitem_inpLb WA.gpr (obsBoots h) v i J _) $$ Hdll Hitems0
+    ihave #Hitems1 := BigSepL.bigSepL_mono (PROP := IProp GF)
+      (Φ := fun i J => gitem WA.gpr (obsBoots h) v i J so.gsCs[i]!)
+      (Ψ := fun i J => gitem WA.gpr (obsBoots h) v i J (so.gsCs ++ [c])[i]!)
+      (l := Is0) (fun {i J} hJ => by
+        have hi : i < so.gsCs.length := hIs0 ▸ (List.getElem?_eq_some_iff.mp hJ).1
+        simp only [gstore_idx_snoc so.gsCs c i hi]
+        exact .rfl) $$ Hitems0
+    ihave #Hlast : gitem WA.gpr (obsBoots h) v Is0.length (so.gsE.map Prod.snd)
+        (so.gsCs ++ [c])[Is0.length]! $$ []
+    · rw [hIs0, gstore_idx_last]
+      unfold gitem
+      iframe HIE
+      isplitl []
+      · iapply HWfree (obsBoots h) v (so.gsE.map Prod.snd) c hwl
+      · ipureintro; omega
+    isplitl [Hfl Hwa Hx Hta Hps HE Hdl Hdll]
     · iright; iright
       iexists v, so, u
       iframe Hpn Hfl Hwa Hx Hta Hcs Hps HE Hdl Hdll
       ipureintro; exact hw
     · unfold gdrainRet
       iright
-      iexists gsState M sd so
-      iframe Hty HW
+      iexists gsState M sd so, so.gsCs, [c], v, Is0 ++ [so.gsE.map Prod.snd]
+      iframe Hty HW Hpn Hcsf
       isplitr
-      · ipureintro; exact hgood
+      · ipureintro; exact hgc
+      isplitr
       · ipureintro; exact hfok
+      isplitr
+      · ipureintro
+        refine ⟨Nat.le_refl _, by simp [hIs0], fun I hI => ?_⟩
+        rcases List.mem_append.mp hI with hI | hI
+        · exact ((hIdl I hI).trans (by rw [hEd]; try exact List.prefix_rfl)).trans hbytes
+        · rw [List.mem_singleton] at hI; subst hI; exact hbytes
+      · iapply BigSepL.bigSepL_snoc.2
+        isplitl []
+        · iexact Hitems1
+        · iexact Hlast
 
 end PipesWildVSeal
 

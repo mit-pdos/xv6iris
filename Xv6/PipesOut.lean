@@ -65,7 +65,7 @@ theorem peclV_step_write (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (sd
   have hst : gsState M sd so = s0 := hsteq
   subst hst
   ihave %hP := gopTurn_agree v2 P _ $$ Ht Hta
-  ihave %hcsp := pcsLb_prefix_c v2 _ cs0 tm $$ Hcs Hcslb
+  ihave %hcsp := gpcsLb_prefix k v2 _ cs0 tm $$ Hcs Hcslb
   ihave %hpsp := gopPsLb_prefix v2 _ ps0 $$ Hps Hpslb
   ihave %hI0dl := gopInpLb_le v2 _ I0 $$ Hdll Hilb
   have hI0 : I0 <+: so.gsE.map Prod.snd :=
@@ -80,7 +80,8 @@ theorem peclV_step_write (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (sd
   omega
 
 /-- (W') THE WRITE AT A BLOCK'S FIRST BYTE, which FILES the alternative: a
-single-writer round (Rocq `peclV_step_write_blk`). -/
+single-writer round (Rocq `peclV_step_write_blk`), the round's payload
+filed with it (sync SY3-A4). -/
 theorem peclV_step_write_blk (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (B : LmByteLaws M)
     (sd : M.lmSt) (WA : GenWa M G sd) (k : Nat) (v : EraPins) (P a : Nat) (b : BitVec 8)
     (ps0 cs0 : List Nat) (s0 : M.lmSt) (I0 : List (BitVec 8)) (ho : List Obs) (H : ConsHist)
@@ -92,16 +93,17 @@ theorem peclV_step_write_blk (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M)
     (hhead : (M.lmCont (lmUpto M cs0 s0 (bodiesOf I0) (nlines I0 - 1))
       (M.lmOf ((bodiesOf I0)[nlines I0 - 1]!)) (M.lmDec a))[0]? = some b) :
     ⊢ G.gcPIN k v -∗ turn v P -∗ psLb v ps0 -∗ csLb v cs0 -∗ inpLb v I0 -∗ G.gcW k s0 -∗
+      WA.gpr k v I0 a -∗
       peclV g M G sd WA k ho H ==∗
         peclV g M G sd WA k ho (consStep H (.evOut b)) ∗
         ((turn v (P + 1) ∗ psLb v ps0 ∗ csLb v (cs0 ++ [a]) ∗ inpLb v I0 ∗ G.gcW k s0)
           ∨ G.gcT) := by
-  iintro #Hpin Ht #Hpslb #Hcslb #Hilb #HW Hcl
+  iintro #Hpin Ht #Hpslb #Hcslb #Hilb #HW #Hgpr Hcl
   unfold peclV popenV
   icases Hcl with (Hc | ⟨%v2, %w, %so, %r, %gb, %pre, %tm, #Hpin2, #Hpera, Hwa, Hblk, Hcur, Hrb,
     Hta, Hcs, Hps, HE, Hdl, Hdll, %hopen⟩)
   · imod gclStep_write_blk M G B sd WA k v P a b ps0 cs0 s0 I0 ho H hne0 hr0 hdiv hpin0 hPeq halt
-      hterm hhead $$ Hpin Ht Hpslb Hcslb Hilb HW Hc with ⟨Hc, Hr⟩
+      hterm hhead $$ Hpin Ht Hpslb Hcslb Hilb HW Hgpr Hc with ⟨Hc, Hr⟩
     imodintro
     isplitl [Hc]
     · ileft; iexact Hc
@@ -112,7 +114,7 @@ theorem peclV_step_write_blk (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M)
   have hst : gsState M sd so = s0 := hsteq
   subst hst
   ihave %hP := gopTurn_agree v2 P _ $$ Ht Hta
-  ihave %hcsp := pcsLb_prefix_c v2 _ cs0 tm $$ Hcs Hcslb
+  ihave %hcsp := gpcsLb_prefix k v2 _ cs0 tm $$ Hcs Hcslb
   ihave %hpsp := gopPsLb_prefix v2 _ ps0 $$ Hps Hpslb
   ihave %hI0dl := gopInpLb_le v2 _ I0 $$ Hdll Hilb
   exact (gclPureO_blkN_open_refute M sd k ho so r pre H P ps0 cs0 I0 hopen hP hcsp hpsp hI0dl hr0
@@ -151,7 +153,7 @@ theorem peclV_step_write_pro (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M)
   have hst : gsState M sd so = s0 := hsteq
   subst hst
   ihave %hP := gopTurn_agree v2 P _ $$ Ht Hta
-  ihave %hcsp := pcsLb_prefix_c v2 _ cs0 tm $$ Hcs Hcslb
+  ihave %hcsp := gpcsLb_prefix k v2 _ cs0 tm $$ Hcs Hcslb
   ihave %hpsp := gopPsLb_prefix v2 _ ps0 $$ Hps Hpslb
   ihave %hI0dl := gopInpLb_le v2 _ I0 $$ Hdll Hilb
   have hI0 : I0 <+: so.gsE.map Prod.snd :=

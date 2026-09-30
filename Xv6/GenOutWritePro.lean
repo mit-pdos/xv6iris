@@ -264,7 +264,7 @@ theorem gclStep_write_pro (M : LModel) (G : GenCparams hlc GF M) (sd : M.lmSt) (
       ipureintro; exact Or.inr (Or.inl (by rw [hs]; simp))
     · ipureintro; exact Or.inr (Or.inr hfree)
   ihave %hP := gopTurn_agree v2 P _ $$ Ht Hta
-  ihave %hcsp := gopCsLb_prefix v2 _ cs0 $$ Hcs Hcslb
+  ihave %hcsp := gcsLb_prefix k v2 _ cs0 $$ Hcs Hcslb
   ihave %hpsp := gopPsLb_prefix v2 _ ps0 $$ Hps Hpslb
   ihave %hI0dl := gopInpLb_le v2 _ I0 $$ Hdll Hilb
   have hst : gsState M sd so = s0 := hsteq

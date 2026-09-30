@@ -221,7 +221,7 @@ theorem uterm_prompt_step (hcons : MachFixedGS.consRes (hlc := hlc) (GF := GF) =
     (pipesV_HWIT ulmG pviewUnionU I sR lR hlR hfc ha hl) pnsN (genId (hlc := hlc) (GF := GF) + 1) γc γm
     (.WSh i) altForkc (5 + p) b (heldN i sw) Φ pnsN_uart hwi (by omega) hb5 hhin
     (cstepOkVh_prompt ulmG pviewUnionU I sR lR hlR ha i sw (5 + p) (by omega) hlt) $$ [] Hfe Hh
-  · iapply pblkU_ecl_holds ug v I sR (uwild_pv _ _ hlR)
+  · iapply pblkU_ecl_holds ug v I sR _ hlR
   iintro Hfe Hh
   iapply HΦ
   iexists v, γc, γm, dep, i, sw, sR, lR

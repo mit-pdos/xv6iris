@@ -9,8 +9,9 @@ Added (Rocq → Lean): `gcl_pure_o_arm` → `gclPureO_arm`, `gcl_pure_o_close`
 → `gclPureO_close`, `gcl_pure_o_open` → `gclPureO_open`,
 `gcl_pure_o_no_echo` → `gclPureO_no_echo` (takes `L`, `K`, `B` explicitly,
 as in Rocq), `lm_out_pure_o_move` → `lmOut_pure_o_move`,
-`lm_pending_filed` → `lmPending_filed`, `lm_good_out_of_stage_open` →
-`lmGoodOut_of_stage_open` (takes `K`, `B`).  Rocq's `K` in this file is a
+`lm_pending_filed` → `lmPending_filed`, `lm_good_out_pad_of_stage_open` →
+`lmGoodOutPad_of_stage_open` (takes `K`, `B`; sync SY3-A4, the padded
+resolution -- Rocq main deleted `lm_good_out_of_stage_open`).  Rocq's `K` in this file is a
 `Local Notation` (`gcK G`), nothing to port.
 
 DEVIATION (as `GenOutHistSeal.lean` DEVIATION 1): `gclPureO_open` /
@@ -165,14 +166,15 @@ theorem gclPureO_open (B : LmByteLaws M) (k : Nat) (ho : List Obs) (so : GStage 
     · rw [hner] at herase; cases herase
   exact ⟨hout', hop, hp, hin, ⟨hd, hb, hdh, hsh, rfl, hcs, hK1'⟩, hE.trans hopen.symm, hdlok⟩
 
-/-- Rocq `lm_good_out_of_stage_open`: THE DRAIN at a block whose code is not
-filed -- the witness is the round's own code, appended. -/
-theorem lmGoodOut_of_stage_open (K : LmHooks M) (B : LmByteLaws M) (ps cs : List Nat) (s : M.lmSt)
+/-- Rocq `lm_good_out_pad_of_stage_open`: THE DRAIN at a block whose code is
+not filed, at the resolution the stage names -- the witness is the round's
+own code, appended. -/
+theorem lmGoodOutPad_of_stage_open (K : LmHooks M) (B : LmByteLaws M) (ps cs : List Nat) (s : M.lmSt)
     (E : List (List Obs × BitVec 8)) (w : List (BitVec 8)) (a : Nat) (seg : List Obs)
     (hps : ∀ x ∈ ps, x < proAlts.length) (hao : lmAltsPre M s (consIns seg) cs) (hE : lmEDisc M E)
     (hpin : lmProPin M ps cs (E.map Prod.snd)) (hblk : lmBlkAt M cs (E.map Prod.snd) s w a)
     (hwire : obsWire .uart0 seg <+: lmD M ps cs s E ++ w) (hinp : E.map Prod.snd <+: consIns seg) :
-    lmGoodOut M s seg := by
+    lmGoodOutPad M K s seg (cs ++ [a]) := by
   obtain ⟨hne, hr, hq, hok0, hpan, hpre⟩ := hblk
   have hpos := nlines_pos_of_rest_nil _ hne hr
   obtain ⟨z, hz⟩ := bodiesOf_prefix _ _ hinp
@@ -194,7 +196,7 @@ theorem lmGoodOut_of_stage_open (K : LmHooks M) (B : LmByteLaws M) (ps cs : List
   have hD : lmD M ps (cs ++ [a]) s E = lmD M ps cs s E :=
     (lmD_cs_prefix M ps ps cs (cs ++ [a]) s E (List.prefix_refl _) (List.prefix_append _ _) hpin
       (by rw [ll_nlines_removelast _ hr]; omega)).symm
-  apply lmGoodOut_of_stage M K B ps (cs ++ [a]) s E w seg hps hao'
+  apply lmGoodOutPad_of_stage M K B ps (cs ++ [a]) s E w seg hps hao'
   · rw [ll_nlines_removelast _ hr, List.length_append]; simp only [List.length_singleton]; omega
   · left; rw [List.length_append]; simp only [List.length_singleton]; omega
   · exact hE

@@ -190,6 +190,9 @@ noncomputable def fileWa (g : FileGn) : GenWa fileLm (fileCparams (hlc := hlc) (
   gext := fun _ _ => iprop(emp)
   gext_tl := fun _ _ => inferInstance
   gext_grow := fun k l b => fileGextGrow k l b
+  gpr := fun _ _ _ _ => iprop(emp)
+  gpr_pers := fun _ _ _ _ => inferInstance
+  gpr_tl := fun _ _ _ _ => inferInstance
 
 /-! ## The claim and the line list -/
 

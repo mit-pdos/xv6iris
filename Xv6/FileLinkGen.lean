@@ -179,6 +179,12 @@ noncomputable def fileParams (g : FileGn) : GenParams hlc GF fileLm where
   gH_cur := fhead_cur g
   gH_inp := fhead_inp g
   gwild := fun _ => False
+  gR := fun _ _ _ _ => iprop(emp)
+  gR_pers := fun _ _ _ _ => inferInstance
+  gR_tl := fun _ _ _ _ => inferInstance
+  gR_0 := fun _ _ _ => lkEmp_valid
+  gR_pan := fun _ _ _ => lkEmp_valid
+  gR_exf := fun _ _ _ => lkEmp_valid
 
 /-! ## 5. The same section at a named boot state -/
 

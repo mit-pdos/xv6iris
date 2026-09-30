@@ -48,6 +48,10 @@ CONE (re-walked on the pinned globs: 36/59 reached; the notations `a0_idx`..
    `l.map f`, `S gen_id` is `genId + 1`, `DfracBoth` is `DFrac.ownDiscard`,
    the run's address is a `Nat` (Rocq `Z`), the no-wrap bound is `< 2^38`
    with no lower bound.
+6. (sync SY3-A4, cc76f92ab) `consRnd` (Rocq `cons_rnd`): the device's
+   unfiled arm carries the round's payload at its codes, the lend takes it,
+   the drained device and `consCur_gwcPost` carry `gwcPost`'s payload
+   disjunct.
 5. **THE IMAGE GUARD** (UexecExecInst deviation 1): the chain the deposit
    hands over is at every page view `Mv` agreeing with the lent image
    (`imgAgrees M Mv`), so `consOut_chain` reads its bytes with `umemByte`
@@ -427,6 +431,26 @@ def consCur {M : LModel} (Pm : GenParams hlc GF M) (v : EraPins) (ps cs : List N
   iprop(turn v (pos + i) ∗ psLb v ps ∗ csLb v (lmBlkcs cs c i) ∗ inpLb v I ∗
     Pm.gW (genId (hlc := hlc) (GF := GF) + 1) s0)
 
+/-- **Rocq `cons_rnd`** (sync SY3-A4): the round's payload at every code
+the device may file (`GenLinksLine.glBlk`'s premise). -/
+def consRnd {M : LModel} (Pm : GenParams hlc GF M) (v : EraPins) (I : List (BitVec 8))
+    (codes : List Nat) : IProp GF :=
+  iprop(□ ∀ c, ⌜c ∈ codes⌝ -∗ Pm.gR (genId (hlc := hlc) (GF := GF) + 1) v I c)
+
+instance consRnd_persistent {M : LModel} (Pm : GenParams hlc GF M) (v : EraPins)
+    (I : List (BitVec 8)) (codes : List Nat) : Persistent (consRnd Pm v I codes) := by
+  unfold consRnd; infer_instance
+
+/-- **Rocq `cons_rnd_sub`**. -/
+theorem consRnd_sub {M : LModel} (Pm : GenParams hlc GF M) (v : EraPins) (I : List (BitVec 8))
+    (codes codes' : List Nat) (hs : codes' ⊆ codes) :
+    ⊢ consRnd Pm v I codes -∗ consRnd Pm v I codes' := by
+  unfold consRnd
+  iintro #H
+  imodintro
+  iintro %c %hc
+  iapply H $$ %c %(hs hc)
+
 /-- **Rocq `cons_dev_atc`**: THE DEVICE REMEMBERING THE CODES IT WAS LENT, at
 a round `(v, I)`, owing one of `alts`, with the links bundle folded in. -/
 def consDevAtc (M : LModel) (Pm : GenParams hlc GF M) (LINKS : IProp GF) (C : List Nat) (v : EraPins)
@@ -436,7 +460,8 @@ def consDevAtc (M : LModel) (Pm : GenParams hlc GF M) (LINKS : IProp GF) (C : Li
         ⌜lmWrBlkT M ps cs s0 I pos⌝ ∗ Pm.gPIN (genId (hlc := hlc) (GF := GF) + 1) v ∗
         ((∃ codes : List Nat,
             ⌜¬ Pm.gwild I⌝ ∗ ⌜codes ⊆ C⌝ ∗ ⌜alts = codes.map (lmBody M s0 cs I)⌝ ∗
-            ⌜∀ c ∈ codes, consAdm M s0 cs I c⌝ ∗ consCur Pm v ps cs s0 I pos 0 0) ∨
+            ⌜∀ c ∈ codes, consAdm M s0 cs I c⌝ ∗
+            (consCur Pm v ps cs s0 I pos 0 0 ∗ consRnd Pm v I codes)) ∨
           (∃ c i : Nat,
             ⌜c ∈ C⌝ ∗ ⌜0 < i⌝ ∗ ⌜i ≤ (lmBody M s0 cs I c).length⌝ ∗ ⌜consAdm M s0 cs I c⌝ ∗
             ⌜alts = [(lmBody M s0 cs I c).drop i]⌝ ∗ consCur Pm v ps cs s0 I pos c i))) ∨
@@ -485,7 +510,10 @@ theorem consDevAtc_sub (M : LModel) (Pm : GenParams hlc GF M) (LINKS : IProp GF)
       subst hal
       obtain ⟨c, hc, rfl⟩ := List.mem_map.mp ha
       iexists [c]
-      iframe Hc
+      icases Hc with ⟨Hc, #Hrn⟩
+      ihave #Hrn1 := consRnd_sub Pm v I codes [c]
+        (fun x hx => by rw [List.mem_singleton] at hx; subst hx; exact hc) $$ Hrn
+      iframe Hc Hrn1
       ipureintro
       refine ⟨hnw, ?_, rfl, ?_⟩
       · intro x hx; rw [List.mem_singleton] at hx; subst hx; exact hsub hc
@@ -549,11 +577,13 @@ theorem consDevAtc_step (M : LModel) (Pm : GenParams hlc GF M) (LINKS : IProp GF
     have hb' := lmBody_lookup_Some M s0 cs I c 0 b hb
     unfold consCur
     simp only [lmBlkcs, Nat.add_zero]
-    icases Hc with ⟨Ht, #Hps, #Hcs, #Hin, #HW⟩
+    icases Hc with ⟨⟨Ht, #Hps, #Hcs, #Hin, #HW⟩, #Hrn⟩
+    unfold consRnd
+    ihave #HR := Hrn $$ %c %(List.mem_singleton_self c)
     unfold glBlk
     iapply Hblk $$ %(genId (hlc := hlc) (GF := GF) + 1) %v %pos %c %b %ps %cs %s0 %I
       %_ %hnw %hne %hr %(by omega)
-      %hpin0 %hP %hok %hterm %hb' Hpin HW Ht Hps Hcs Hin
+      %hpin0 %hP %hok %hterm %hb' Hpin HW Ht Hps Hcs Hin HR
     iintro (⟨Ht, -, #Hcs', -⟩ | #HT)
     · iframe Hlk
       isplitr
@@ -638,8 +668,9 @@ theorem consDevAtc_of_blk0 (M : LModel) (Pm : GenParams hlc GF M) (LINKS : IProp
     (hnw : ¬ Pm.gwild I) (hw : lmWrBlkT M ps cs s0 I pos) (hsub : codes ⊆ C)
     (hadm : ∀ c ∈ codes, consAdm M s0 cs I c) (hs : consShort (codes.map (lmBody M s0 cs I))) :
     ⊢ LINKS -∗ Pm.gPIN (genId (hlc := hlc) (GF := GF) + 1) v -∗ consCur Pm v ps cs s0 I pos 0 0 -∗
+      consRnd Pm v I codes -∗
       consDevAtc M Pm LINKS C v I (codes.map (lmBody M s0 cs I)) := by
-  iintro Hlk Hpin Hc
+  iintro Hlk Hpin Hc #Hrn
   unfold consDevAtc
   iframe Hlk
   isplitr
@@ -651,7 +682,7 @@ theorem consDevAtc_of_blk0 (M : LModel) (Pm : GenParams hlc GF M) (LINKS : IProp
   · ipureintro; exact hw
   ileft
   iexists codes
-  iframe Hc
+  iframe Hc Hrn
   ipureintro
   exact ⟨hnw, hsub, rfl, hadm⟩
 
@@ -663,7 +694,9 @@ theorem consDevAtc_drained (M : LModel) (Pm : GenParams hlc GF M) (LINKS : IProp
       LINKS ∗ (Pm.gT ∨ ∃ (ps cs : List Nat) (s0 : M.lmSt) (pos c : Nat),
         ⌜lmWrBlkT M ps cs s0 I pos⌝ ∗ ⌜c ∈ C⌝ ∗ ⌜consAdm M s0 cs I c⌝ ∗
         Pm.gPIN (genId (hlc := hlc) (GF := GF) + 1) v ∗
-        consCur Pm v ps cs s0 I pos c (lmBody M s0 cs I c).length) := by
+        (consCur Pm v ps cs s0 I pos c (lmBody M s0 cs I c).length
+          ∗ (⌜(lmBody M s0 cs I c).length ≠ 0⌝
+             ∨ Pm.gR (genId (hlc := hlc) (GF := GF) + 1) v I c))) := by
   unfold consDevAtc
   iintro ⟨Hlk, -, Hd⟩
   iframe Hlk
@@ -683,10 +716,14 @@ theorem consDevAtc_drained (M : LModel) (Pm : GenParams hlc GF M) (LINKS : IProp
       · ipureintro; exact hsub (List.mem_singleton_self c)
       isplitr
       · ipureintro; exact hadm c (List.mem_singleton_self c)
+      icases Hc with ⟨Hc, #Hrn⟩
+      unfold consRnd
+      ihave #HR := Hrn $$ %c %(List.mem_singleton_self c)
       rw [← hal]
       unfold consCur
       simp only [lmBlkcs, List.length_nil]
-      iexact Hc
+      iframe Hc
+      iright; iexact HR
     · simp only [List.cons.injEq, _root_.and_true] at hal
       have hlen : (lmBody M s0 cs I c).length = i := by
         have := congrArg List.length hal
@@ -701,19 +738,21 @@ theorem consDevAtc_drained (M : LModel) (Pm : GenParams hlc GF M) (LINKS : IProp
       isplitr
       · ipureintro; exact hadmc
       rw [hlen]
-      iexact Hc
+      iframe Hc
+      ileft; ipureintro; omega
   · ileft; iexact HT
 
 /-- **Rocq `cons_cur_gwc_post`**: the cursor at the body's end IS `gwcPost`,
 the block written up to its prompt. -/
 theorem consCur_gwcPost {M : LModel} (Pm : GenParams hlc GF M) (v : EraPins) (ps cs : List Nat)
     (s0 : M.lmSt) (I : List (BitVec 8)) (pos c : Nat) (hw : lmWrBlkT M ps cs s0 I pos) :
-    consCur Pm v ps cs s0 I pos c (lmBody M s0 cs I c).length ⊢
+    consCur Pm v ps cs s0 I pos c (lmBody M s0 cs I c).length
+      ∗ (⌜(lmBody M s0 cs I c).length ≠ 0⌝ ∨ Pm.gR (genId (hlc := hlc) (GF := GF) + 1) v I c) ⊢
       gwcPost Pm (genId (hlc := hlc) (GF := GF) + 1) v I c := by
   unfold consCur gwcPost
   rw [lmBody_length]
-  iintro Hc
-  ileft; iexists ps, cs, s0, pos; iframe Hc; ipureintro; exact hw
+  iintro ⟨⟨Ht, Hps, Hcs, HE, HW⟩, HR⟩
+  ileft; iexists ps, cs, s0, pos; iframe Ht Hps Hcs HE HW HR; ipureintro; exact hw
 
 end genstep
 

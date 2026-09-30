@@ -10,8 +10,10 @@ Added (Rocq → Lean, the landed camelCase convention): `gstage0`,
 `lmEcho_of_disc`, `lm_E_disc_echo` → `lmEDisc_echo`, `lm_D_pending_sess` →
 `lmD_pending_sess`, `lm_D_stage_prefix` → `lmD_stage_prefix`,
 `lm_E_disc_of_hist` → `lmEDisc_of_hist`, `lm_cs_len_ok_0` → `lmCsLenOk_0`,
-`lm_cs_len_ok_echo` → `lmCsLenOk_echo`, `lm_good_out_of_stage` →
-`lmGoodOut_of_stage`, `lm_good_out_step` → `lmGoodOut_step`,
+`lm_cs_len_ok_echo` → `lmCsLenOk_echo`, (sync SY3-A4, cc76f92ab/38bb72f5b)
+`lm_good_out_pad` → `lmGoodOutPad`, `lm_good_out_of_pad` → `lmGoodOut_of_pad`,
+`lm_good_out_pad_of_stage` → `lmGoodOutPad_of_stage` (Rocq main deleted
+`lm_good_out_of_stage`, which it replaces), `lm_good_out_step` → `lmGoodOut_step`,
 `lm_out_pure_0` → `lmOutPure_0`, `lm_pcount_echo` → `lmPcount_echo`,
 `lm_pending_nil_inv` → `lmPending_nil_inv`, `lm_pending_nonnil` →
 `lmPending_nonnil`, `lm_pending_ps_mono` → `lmPending_ps_mono`,
@@ -280,22 +282,38 @@ theorem lmProOk_pad (ps cs : List Nat) (m d : Nat) (hF : ∀ x ∈ ps, x < proAl
     have := lmProIdx_le M cs m
     omega
 
+/-- THE RESOLUTION A STAGE NAMES (Rocq `lm_good_out_pad`, sync SY3-A4): the
+filed choices, padded with the lines' exec failures -- what the drain hands
+the ledger, so that a per-round payload filed with a choice is read at the
+round the resolution names. -/
+def lmGoodOutPad (s : M.lmSt) (seg : List Obs) (cs : List Nat) : Prop :=
+  ∃ ps : List Nat,
+    lmProOk M ps (lmAltsPad M K (consIns seg) cs) (nlines (consIns seg))
+    ∧ lmAltsOk M s (consIns seg) (lmAltsPad M K (consIns seg) cs)
+    ∧ obsWire .uart0 seg <+: lmSess M ps (lmAltsPad M K (consIns seg) cs) s (consIns seg)
+
+/-- Rocq `lm_good_out_of_pad`. -/
+theorem lmGoodOut_of_pad (s : M.lmSt) (seg : List Obs) (cs : List Nat)
+    (h : lmGoodOutPad M K s seg cs) : lmGoodOut M s seg := by
+  obtain ⟨ps, h1, h2, h3⟩ := h
+  exact ⟨ps, lmAltsPad M K (consIns seg) cs, h1, h2, h3⟩
+
 include K B in
-/-- Rocq `lm_good_out_of_stage`: a stage below the wire gives the output
-claim, with the prologue padded with settled rounds and the choice list with
-silent ones. -/
-theorem lmGoodOut_of_stage (ps cs : List Nat) (s : M.lmSt) (E : List (List Obs × BitVec 8))
+/-- Rocq `lm_good_out_pad_of_stage`: a stage below the wire gives the output
+claim at the resolution the stage names, the prologue padded with settled
+rounds and the choice list with the lines' exec failures. -/
+theorem lmGoodOutPad_of_stage (ps cs : List Nat) (s : M.lmSt) (E : List (List Obs × BitVec 8))
     (w : List (BitVec 8)) (seg : List Obs) (hps : ∀ a ∈ ps, a < proAlts.length)
     (hao : lmAltsPre M s (consIns seg) cs)
     (hrl : nlines (E.map Prod.snd).dropLast ≤ cs.length)
     (hlast : nlines (E.map Prod.snd) ≤ cs.length ∨ w = []) (hE : lmEDisc M E)
     (hpin : lmProPin M ps cs (E.map Prod.snd)) (hw : w <+: lmPending M ps cs s E)
     (hwire : obsWire .uart0 seg <+: lmD M ps cs s E ++ w)
-    (hinp : E.map Prod.snd <+: consIns seg) : lmGoodOut M s seg := by
+    (hinp : E.map Prod.snd <+: consIns seg) : lmGoodOutPad M K s seg cs := by
   have hpp : ps <+: ps ++ List.replicate (nlines (consIns seg) + 1) 0 := List.prefix_append _ _
   have hcc := lmAltsPad_prefix M K (consIns seg) cs
   have hpin' := lmProPin_mono M ps _ cs _ hpp hpin
-  refine ⟨ps ++ List.replicate (nlines (consIns seg) + 1) 0, lmAltsPad M K (consIns seg) cs,
+  refine ⟨ps ++ List.replicate (nlines (consIns seg) + 1) 0,
     lmProOk_pad M ps _ _ _ hps (Nat.le_refl _), lmAltsPad_ok M K s _ cs hao, ?_⟩
   refine hwire.trans ?_
   rw [lmD_ps_ext M ps _ cs s E hpp hpin,
