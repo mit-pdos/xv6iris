@@ -628,7 +628,7 @@ Section KexecAUABody.
                 ltac:(rewrite Htgt88; vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (kxc_030 with "Htext"). }
-      iIntros (CIDz Hsz1) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CIDz Hsz1) "_". iIntros "Hcg Hpc".
       iEval (rewrite Htgt88) in "Hpc".
       (* ---- +0x088: jal ra,end_op ---- *)
       assert (Hteo : add_vec (mword_of_int (KXA + 0x088) : mword 64)

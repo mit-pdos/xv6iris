@@ -988,7 +988,7 @@ Section ProofSysSbrk.
                 ltac:(rgne; rgne; exact Hbeq) ltac:(rewrite Htgt58; vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (ssi_2a with "Htext"). }
-      iIntros (CIDs16 Hq16) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CIDs16 Hq16) "_". iIntros "Hcg Hpc".
       iEval (rewrite Htgt58) in "Hpc".
       iDestruct ("Hpback" $! (pv_upt (us_V U)) (pv_sz (us_V U)) (us_M U)
                    (pv_lazy (us_V U))
@@ -1081,7 +1081,7 @@ Section ProofSysSbrk.
                 ltac:(rewrite Htgt58; vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (ssi_32 with "Htext"). }
-      iIntros (CIDs19 Hq19) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CIDs19 Hq19) "_". iIntros "Hcg Hpc".
       iEval (rewrite Htgt58) in "Hpc".
       iDestruct ("Hpback" $! (pv_upt (us_V U)) (pv_sz (us_V U)) (us_M U)
                    (pv_lazy (us_V U))
@@ -1227,7 +1227,7 @@ Section ProofSysSbrk.
                 ltac:(rgne; rgne; exact Hbltu1) ltac:(rewrite Htgt74; vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (ssi_40 with "Htext"). }
-      iIntros (CIDs25 Hq25) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CIDs25 Hq25) "_". iIntros "Hcg Hpc".
       iEval (rewrite Htgt74) in "Hpc".
       iApply (wp_cli_s_sconf (mword_of_int (KernelSyms.sys_sbrk + 0x74))
                 Rs1 (mword_of_int 63 : mword 6) (mword_of_int (-1) : mword 64) L4 (av - 6)%nat b

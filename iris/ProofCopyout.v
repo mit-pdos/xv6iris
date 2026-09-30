@@ -1654,7 +1654,7 @@ Section ProofCopyout.
                   ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc []").
         { iApply (coi_76 with "Htext"). }
-        iIntros (CIDmf1 Hsmf1) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
+        iApply bi.later_intro. iIntros (CIDmf1 Hsmf1) "_". iIntros "Hcg Hpc".
         assert (Htgtbe : add_vec (mword_of_int (KernelSyms.copyout + 0x76) : mword 64)
                   (sign_extend' 64 (sign_extend' 13 (concat_vec (mword_of_int 36 : mword 8) ('b"0"))))
                 = mword_of_int (KernelSyms.copyout + 0xbe)) by (apply bv_eq; vm_compute; reflexivity).
@@ -1872,7 +1872,7 @@ Section ProofCopyout.
               ltac:(rgne; exact Ha0nz) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (coi_66 with "Htext"). }
-    iIntros (CIDh1 Hsh1) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
+    iApply bi.later_intro. iIntros (CIDh1 Hsh1) "_". iIntros "Hcg Hpc".
     assert (Htgt78 : add_vec (mword_of_int (KernelSyms.copyout + 0x66) : mword 64)
               (sign_extend' 64 (sign_extend' 13 (concat_vec (mword_of_int 9 : mword 8) ('b"0"))))
             = mword_of_int (KernelSyms.copyout + 0x78)) by (apply bv_eq; vm_compute; reflexivity).
@@ -2018,7 +2018,7 @@ Section ProofCopyout.
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (coi_00 with "Htext"). }
-      iIntros (CIDz1 Hsz1) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CIDz1 Hsz1) "_". iIntros "Hcg Hpc".
       assert (Htgt9a : add_vec (pcE : mword 64)
                 (sign_extend' 64 (sign_extend' 13 (concat_vec (mword_of_int 77 : mword 8) ('b"0"))))
               = mword_of_int (KernelSyms.copyout + 0x9a)) by (apply bv_eq; vm_compute; reflexivity).

@@ -1365,7 +1365,7 @@ Section ProofPrintk.
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (pki_36 with "Htext"). }
-      iIntros (CID7 Hst7) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID7 Hst7) "_". iIntros "Hcg Hpc".
       assert (Htgte : add_vec (mword_of_int (KernelSyms.printk + 0x36) : mword 64) (sign_extend' 64 (mword_of_int 542 : mword 13)) = mword_of_int (KernelSyms.printk + 0x254)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgte) in "Hpc".
       iAssert (pk_frame sp0 (m !!! Regidx ra_idx) (m !!! Regidx s0_idx) (m !!! Regidx s2_idx))
@@ -1797,7 +1797,7 @@ Section ProofPrintk.
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
     { iApply (pki_76 with "Htext"). }
-      iIntros (CID5 Hst5) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID5 Hst5) "_". iIntros "Hcg Hpc".
       assert (Htgt : add_vec (mword_of_int (KernelSyms.printk + 0x76) : mword 64) (sign_extend' 64 (mword_of_int 460 : mword 13)) = mword_of_int (KernelSyms.printk + 0x242)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgt) in "Hpc".
       iSpecialize ("Kend" $! CID5 with "[%]"); [wp_next_chain|].
@@ -1870,7 +1870,7 @@ Section ProofPrintk.
               ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (pki_7a with "Htext"). }
-    iIntros (CID1 Hst1) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
+    iApply bi.later_intro. iIntros (CID1 Hst1) "_". iIntros "Hcg Hpc".
     assert (Htgt72 : add_vec (mword_of_int (KernelSyms.printk + 0x7a) : mword 64) (sign_extend' 64 (mword_of_int 8172 : mword 13)) = mword_of_int (KernelSyms.printk + 0x66)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgt72) in "Hpc".
     (* +0x72 jal prputc *)
@@ -4021,7 +4021,7 @@ Section ProofPrintk.
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (pki_228 with "Htext"). }
-      iIntros (CID5 Hst5) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID5 Hst5) "_". iIntros "Hcg Hpc".
       assert (Htgth : add_vec (mword_of_int (KernelSyms.printk + 0x228) : mword 64) (sign_extend' 64 (sign_extend' 13 (concat_vec (mword_of_int 251 : mword 8) ('b"0")))) = mword_of_int (KernelSyms.printk + 0x21e)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgth) in "Hpc".
       assert (Hshift : b = false \/ pcur = zero_reg -> (CID5 : CPU) = (CID0 : CPU)) by wp_next_chain.
@@ -4207,7 +4207,7 @@ Section ProofPrintk.
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (pki_21a with "Htext"). }
-      iIntros (CID4b Hst4b) "Hlc". iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID4b Hst4b) "Hlc". iIntros "Hcg Hpc".
       assert (Htgt78 : add_vec (mword_of_int (KernelSyms.printk + 0x21a) : mword 64) (sign_extend' 64 (mword_of_int 7762 : mword 13)) = mword_of_int (KernelSyms.printk + 0x6c)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgt78) in "Hpc".
       iDestruct (cpu_own_transport CID0 CID4b n eb pcur b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
@@ -4304,7 +4304,7 @@ Section ProofPrintk.
               ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (pki_212 with "Htext"). }
-    iIntros (CID2 Hst2) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
+    iApply bi.later_intro. iIntros (CID2 Hst2) "_". iIntros "Hcg Hpc".
     assert (Htgt238 : add_vec (mword_of_int (KernelSyms.printk + 0x212) : mword 64) (sign_extend' 64 (mword_of_int 26 : mword 13)) = mword_of_int (KernelSyms.printk + 0x22c)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgt238) in "Hpc".
     (* +0x238 auipc s4,0x7 ; +0x23c addi s4,s4,-1836 : &"(null)" *)
@@ -4627,7 +4627,7 @@ Section ProofPrintk.
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (pki_1e6 with "Htext"). }
-      iIntros (CID8b Hst8b) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID8b Hst8b) "_". iIntros "Hcg Hpc".
       assert (Htgth : add_vec (mword_of_int (KernelSyms.printk + 0x1e6) : mword 64) (sign_extend' 64 (mword_of_int 8174 : mword 13)) = mword_of_int (KernelSyms.printk + 0x1d4)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgth) in "Hpc".
       assert (Hshift : b = false \/ pcur = zero_reg -> (CID8b : CPU) = (CID0 : CPU)) by wp_next_chain.
@@ -5211,7 +5211,7 @@ Section ProofPrintk.
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
     { iApply (pki_8c with "Htext"). }
-      iIntros (CID5 Hst5) "Hlc". iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID5 Hst5) "Hlc". iIntros "Hcg Hpc".
       assert (Htgt : add_vec (mword_of_int (KernelSyms.printk + 0x8c) : mword 64) (sign_extend' 64 (mword_of_int 498 : mword 13)) = mword_of_int (KernelSyms.printk + 0x27e)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgt) in "Hpc".
       iSpecialize ("K0" $! CID5 with "[%] Hlc"); [wp_next_chain|].
@@ -5275,7 +5275,7 @@ Section ProofPrintk.
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
     { iApply (pki_94 with "Htext"). }
-      iIntros (CID8 Hst8) "Hlc". iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID8 Hst8) "Hlc". iIntros "Hcg Hpc".
       assert (Htgt : add_vec (mword_of_int (KernelSyms.printk + 0x94) : mword 64) (sign_extend' 64 (mword_of_int 472 : mword 13)) = mword_of_int (KernelSyms.printk + 0x26c)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgt) in "Hpc".
       iSpecialize ("K1" $! CID8 with "[%] Hlc"); [wp_next_chain|].
@@ -5373,7 +5373,7 @@ Section ProofPrintk.
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (pki_2ce with "Htext"). }
-      iIntros (CID1 Hst1) "Hlc". iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID1 Hst1) "Hlc". iIntros "Hcg Hpc".
       assert (Ht : add_vec (mword_of_int (KernelSyms.printk + 0x2ce) : mword 64) (sign_extend' 64 (mword_of_int 7898 : mword 13)) = mword_of_int (KernelSyms.printk + pk_entry c0 c1 c2)).
       { unfold pk_entry. rewrite E1 E2 E3 E4 E5 E6 E7 E8 E9 Hp0.
         apply bv_eq; vm_compute; reflexivity. }
@@ -5417,7 +5417,7 @@ Section ProofPrintk.
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
     { iApply (pki_2d6 with "Htext"). }
-      iIntros (CID4 Hst4) "Hlc". iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID4 Hst4) "Hlc". iIntros "Hcg Hpc".
       assert (Ht : add_vec (mword_of_int (KernelSyms.printk + 0x2d6) : mword 64) (sign_extend' 64 (mword_of_int 7960 : mword 13)) = mword_of_int (KernelSyms.printk + pk_entry c0 c1 c2)).
       { unfold pk_entry. rewrite E1 E2 E3 E4 E5 E6 E7 E8 E9 Hp0 Hc0.
         apply bv_eq; vm_compute; reflexivity. }
@@ -5460,7 +5460,7 @@ Section ProofPrintk.
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
     { iApply (pki_2de with "Htext"). }
-      iIntros (CID7 Hst7) "Hlc". iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID7 Hst7) "Hlc". iIntros "Hcg Hpc".
       assert (Ht : add_vec (mword_of_int (KernelSyms.printk + 0x2de) : mword 64) (sign_extend' 64 (mword_of_int 7972 : mword 13)) = mword_of_int (KernelSyms.printk + pk_entry c0 c1 c2)).
       { unfold pk_entry. rewrite E1 E2 E3 E4 E5 E6 E7 E8 E9 Hp0 Hc0 Hs0.
         apply bv_eq; vm_compute; reflexivity. }
@@ -5503,7 +5503,7 @@ Section ProofPrintk.
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
     { iApply (pki_2e6 with "Htext"). }
-      iIntros (CID10 Hst10) "Hlc". iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID10 Hst10) "Hlc". iIntros "Hcg Hpc".
       assert (Ht : add_vec (mword_of_int (KernelSyms.printk + 0x2e6) : mword 64) (sign_extend' 64 (mword_of_int 8020 : mword 13)) = mword_of_int (KernelSyms.printk + pk_entry c0 c1 c2)).
       { unfold pk_entry. rewrite E1 E2 E3 E4 E5 E6 E7 E8 E9 Hp0 Hc0 Hs0 Hm0.
         apply bv_eq; vm_compute; reflexivity. }
@@ -5530,7 +5530,7 @@ Section ProofPrintk.
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
     { iApply (pki_2ea with "Htext"). }
-      iIntros (CID12 Hst12) "Hlc". iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID12 Hst12) "Hlc". iIntros "Hcg Hpc".
       assert (Ht : add_vec (mword_of_int (KernelSyms.printk + 0x2ea) : mword 64) (sign_extend' 64 (mword_of_int 20 : mword 13)) = mword_of_int (KernelSyms.printk + pk_entry c0 c1 c2)).
       { unfold pk_entry. rewrite E1 E2 E3 E4 E5 E6 E7 E8 E9 Hp0 Hc0 Hs0 Hm0 Hn0.
         apply bv_eq; vm_compute; reflexivity. }
@@ -5626,7 +5626,7 @@ Section ProofPrintk.
                   ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc []").
       { iApply (pki_2ca with "Htext"). }
-        iIntros (CID3 Hst3) "Hlc". iApply bi.later_intro. iIntros "Hcg Hpc".
+        iApply bi.later_intro. iIntros (CID3 Hst3) "Hlc". iIntros "Hcg Hpc".
         assert (Ht : add_vec (mword_of_int (KernelSyms.printk + 0x2ca) : mword 64) (sign_extend' 64 (mword_of_int 7874 : mword 13)) = mword_of_int (KernelSyms.printk + pk_entry c0 c1 c2)).
         { unfold pk_entry. rewrite E1 E2 E3 E4 E5 E6 E7 E8.
           apply andb_true_iff in Hll as [Hl1 Hl0]. rewrite Hl0 Hl1 Hx2.
@@ -5657,7 +5657,7 @@ Section ProofPrintk.
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (pki_2c8 with "Htext"). }
-      iIntros (CID6 Hst6) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID6 Hst6) "_". iIntros "Hcg Hpc".
       assert (Ht : add_vec (mword_of_int (KernelSyms.printk + 0x2c8) : mword 64) (sign_extend' 64 (sign_extend' 13 (concat_vec (mword_of_int 3 : mword 8) ('b"0")))) = mword_of_int (KernelSyms.printk + 0x2ce)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Ht) in "Hpc".
       iApply (wp_printk_chain_2ce D1 K c0 c1 c2 Rest b pcur E1 E2 E3 E4 E5 E6 E7 E8
@@ -5711,7 +5711,7 @@ Section ProofPrintk.
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (pki_2b6 with "Htext"). }
-      iIntros (CID1 Hst1) "Hlc". iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID1 Hst1) "Hlc". iIntros "Hcg Hpc".
       assert (Ht : add_vec (mword_of_int (KernelSyms.printk + 0x2b6) : mword 64) (sign_extend' 64 (mword_of_int 7842 : mword 13)) = mword_of_int (KernelSyms.printk + pk_entry c0 c1 c2)).
       { unfold pk_entry. rewrite E1 E2 E3 E4 E5 E6 Hx0.
         apply bv_eq; vm_compute; reflexivity. }
@@ -5774,7 +5774,7 @@ Section ProofPrintk.
                   ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc []").
     { iApply (pki_2c0 with "Htext"). }
-        iIntros (CID5 Hst5) "Hlc". iApply bi.later_intro. iIntros "Hcg Hpc".
+        iApply bi.later_intro. iIntros (CID5 Hst5) "Hlc". iIntros "Hcg Hpc".
         assert (Ht : add_vec (mword_of_int (KernelSyms.printk + 0x2c0) : mword 64) (sign_extend' 64 (mword_of_int 7858 : mword 13)) = mword_of_int (KernelSyms.printk + pk_entry c0 c1 c2)).
         { unfold pk_entry. rewrite E1 E2 E3 E4 E5 E6 Hx0 Hl0 Hx1.
           apply bv_eq; vm_compute; reflexivity. }
@@ -5803,7 +5803,7 @@ Section ProofPrintk.
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
         { iApply (pki_2be with "Htext"). }
-      iIntros (CID8 Hst8) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID8 Hst8) "_". iIntros "Hcg Hpc".
       assert (Ht : add_vec (mword_of_int (KernelSyms.printk + 0x2be) : mword 64) (sign_extend' 64 (sign_extend' 13 (concat_vec (mword_of_int 3 : mword 8) ('b"0")))) = mword_of_int (KernelSyms.printk + 0x2c4)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Ht) in "Hpc".
       iApply (wp_printk_chain_2c4 D1 K c0 c1 c2 Rest b pcur E1 E2 E3 E4 E5 E6 Hx0
@@ -5894,7 +5894,7 @@ Section ProofPrintk.
                   ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc []").
     { iApply (pki_2b2 with "Htext"). }
-        iIntros (CID3 Hst3) "Hlc". iApply bi.later_intro. iIntros "Hcg Hpc".
+        iApply bi.later_intro. iIntros (CID3 Hst3) "Hlc". iIntros "Hcg Hpc".
         assert (Ht : add_vec (mword_of_int (KernelSyms.printk + 0x2b2) : mword 64) (sign_extend' 64 (mword_of_int 7818 : mword 13)) = mword_of_int (KernelSyms.printk + pk_entry c0 c1 c2)).
         { unfold pk_entry. rewrite E1 E2 E3 E4 E5.
           apply andb_true_iff in Hll as [Hl1 Hl0]. rewrite Hl0 Hl1 Hu2.
@@ -5925,7 +5925,7 @@ Section ProofPrintk.
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
         { iApply (pki_2b0 with "Htext"). }
-      iIntros (CID6 Hst6) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID6 Hst6) "_". iIntros "Hcg Hpc".
       assert (Ht : add_vec (mword_of_int (KernelSyms.printk + 0x2b0) : mword 64) (sign_extend' 64 (sign_extend' 13 (concat_vec (mword_of_int 3 : mword 8) ('b"0")))) = mword_of_int (KernelSyms.printk + 0x2b6)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Ht) in "Hpc".
       iApply (wp_printk_chain_2b6 D1 K c0 c1 c2 Rest b pcur E1 E2 E3 E4 E5
@@ -5979,7 +5979,7 @@ Section ProofPrintk.
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (pki_29e with "Htext"). }
-      iIntros (CID1 Hst1) "Hlc". iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID1 Hst1) "Hlc". iIntros "Hcg Hpc".
       assert (Ht : add_vec (mword_of_int (KernelSyms.printk + 0x29e) : mword 64) (sign_extend' 64 (mword_of_int 7784 : mword 13)) = mword_of_int (KernelSyms.printk + pk_entry c0 c1 c2)).
       { unfold pk_entry. rewrite E1 E2 E3 Hu0. apply bv_eq; vm_compute; reflexivity. }
       iEval (rewrite Ht) in "Hpc".
@@ -6044,7 +6044,7 @@ Section ProofPrintk.
                   ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc []").
     { iApply (pki_2a8 with "Htext"). }
-        iIntros (CID5 Hst5) "Hlc". iApply bi.later_intro. iIntros "Hcg Hpc".
+        iApply bi.later_intro. iIntros (CID5 Hst5) "Hlc". iIntros "Hcg Hpc".
         assert (Ht : add_vec (mword_of_int (KernelSyms.printk + 0x2a8) : mword 64) (sign_extend' 64 (mword_of_int 7800 : mword 13)) = mword_of_int (KernelSyms.printk + pk_entry c0 c1 c2)).
         { unfold pk_entry. rewrite E1 E2 E3 Hu0 Hl0 Hu1. apply bv_eq; vm_compute; reflexivity. }
         iEval (rewrite Ht) in "Hpc".
@@ -6073,7 +6073,7 @@ Section ProofPrintk.
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
         { iApply (pki_2a6 with "Htext"). }
-      iIntros (CID8 Hst8) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID8 Hst8) "_". iIntros "Hcg Hpc".
       assert (Ht : add_vec (mword_of_int (KernelSyms.printk + 0x2a6) : mword 64) (sign_extend' 64 (sign_extend' 13 (concat_vec (mword_of_int 3 : mword 8) ('b"0")))) = mword_of_int (KernelSyms.printk + 0x2ac)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Ht) in "Hpc".
       iApply (wp_printk_chain_2ac D1 K c0 c1 c2 Rest b pcur E1 E2 E3 Hu0
@@ -6217,7 +6217,7 @@ Section ProofPrintk.
                   ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc []").
     { iApply (pki_29a with "Htext"). }
-        iIntros (CID6 Hst6) "Hlc". iApply bi.later_intro. iIntros "Hcg Hpc".
+        iApply bi.later_intro. iIntros (CID6 Hst6) "Hlc". iIntros "Hcg Hpc".
         assert (Ht : add_vec (mword_of_int (KernelSyms.printk + 0x29a) : mword 64) (sign_extend' 64 (mword_of_int 7760 : mword 13)) = mword_of_int (KernelSyms.printk + pk_entry c0 c1 c2)).
         { unfold pk_entry. rewrite E1 E2.
           apply andb_true_iff in Hll as [Hl1 Hl0]. rewrite Hl0 Hl1 Hd2.
@@ -6248,7 +6248,7 @@ Section ProofPrintk.
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
         { iApply (pki_298 with "Htext"). }
-      iIntros (CID9 Hst9) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID9 Hst9) "_". iIntros "Hcg Hpc".
       assert (Ht : add_vec (mword_of_int (KernelSyms.printk + 0x298) : mword 64) (sign_extend' 64 (sign_extend' 13 (concat_vec (mword_of_int 3 : mword 8) ('b"0")))) = mword_of_int (KernelSyms.printk + 0x29e)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Ht) in "Hpc".
       iApply (wp_printk_chain_29e D4 K c0 c1 c2 Rest b pcur E1 E2
@@ -6426,7 +6426,7 @@ Section ProofPrintk.
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
     { iApply (pki_26c with "Htext"). }
-      iIntros (CID1 Hst1) "Hlc". iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID1 Hst1) "Hlc". iIntros "Hcg Hpc".
       assert (Ht : add_vec (mword_of_int (KernelSyms.printk + 0x26c) : mword 64) (sign_extend' 64 (mword_of_int 7772 : mword 13)) = mword_of_int (KernelSyms.printk + pk_entry c0 c1 c2)).
       { unfold pk_entry. rewrite Hd0. apply bv_eq; vm_compute; reflexivity. }
       iEval (rewrite Ht) in "Hpc".
@@ -6714,7 +6714,7 @@ Section ProofPrintk.
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
     { iApply (pki_98 with "Htext"). }
-      iIntros (CID1 Hst1) "Hlc". iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID1 Hst1) "Hlc". iIntros "Hcg Hpc".
       assert (Ht : add_vec (mword_of_int (KernelSyms.printk + 0x98) : mword 64) (sign_extend' 64 (mword_of_int 48 : mword 13)) = mword_of_int (KernelSyms.printk + pk_entry c0 c1 c2)).
       { unfold pk_entry. rewrite Hd0. apply bv_eq; vm_compute; reflexivity. }
       iEval (rewrite Ht) in "Hpc".
@@ -6833,7 +6833,7 @@ Section ProofPrintk.
                   ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc []").
         { iApply (pki_aa with "Htext"). }
-        iIntros (CID8 Hst8) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
+        iApply bi.later_intro. iIntros (CID8 Hst8) "_". iIntros "Hcg Hpc".
         assert (Ht : add_vec (mword_of_int (KernelSyms.printk + 0xaa) : mword 64) (sign_extend' 64 (sign_extend' 13 (concat_vec (mword_of_int 27 : mword 8) ('b"0")))) = mword_of_int (KernelSyms.printk + 0xe0)) by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Ht) in "Hpc".
         iApply (wp_printk_chain_e0 D3 K fmt dqf f i c0 c1 c2 Rest b pcur Hlen Hi31 Hc2 Hd0
@@ -6851,7 +6851,7 @@ Section ProofPrintk.
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
         { iApply (pki_a8 with "Htext"). }
-      iIntros (CID10 Hst10) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID10 Hst10) "_". iIntros "Hcg Hpc".
       assert (Ht : add_vec (mword_of_int (KernelSyms.printk + 0xa8) : mword 64) (sign_extend' 64 (sign_extend' 13 (concat_vec (mword_of_int 28 : mword 8) ('b"0")))) = mword_of_int (KernelSyms.printk + 0xe0)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Ht) in "Hpc".
       iApply (wp_printk_chain_e0 D3 K fmt dqf f i c0 c1 c2 Rest b pcur Hlen Hi31 Hc2 Hd0

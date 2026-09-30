@@ -585,7 +585,7 @@ Section ProofSysOpenStores.
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (soi_0ac with "Htext"). }
-      iIntros (CID10 Hq10) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID10 Hq10) "_". iIntros "Hcg Hpc".
       assert (Htgac : add_vec (mword_of_int (SO + 0xac) : mword 64)
                         (sign_extend' 64
                            (sign_extend' 13 (concat_vec (mword_of_int 6 : mword 8) ('b"0"))))
@@ -743,7 +743,7 @@ Section ProofSysOpenStores.
               ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (soi_0b4 with "Htext"). }
-    iIntros (CID13 Hq13) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
+    iApply bi.later_intro. iIntros (CID13 Hq13) "_". iIntros "Hcg Hpc".
     assert (Htgb4 : add_vec (mword_of_int (SO + 0xb4) : mword 64)
                       (sign_extend' 64 (mword_of_int 154 : mword 13))
                     = mword_of_int (SO + 0x14e)) by pcw.

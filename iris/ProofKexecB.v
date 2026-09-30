@@ -807,7 +807,7 @@ Section KexecBBody.
                   ltac:(rewrite Htgt1f2; vm_compute; reflexivity)
                   with "Hcg Hpc []").
         { iApply (kxc_0ae with "Htext"). }
-        iIntros (CID15 Hsq15) "Hlc". iApply bi.later_intro. iIntros "Hcg Hpc".
+        iApply bi.later_intro. iIntros (CID15 Hsq15) "Hlc". iIntros "Hcg Hpc".
         iEval (rewrite Htgt1f2) in "Hpc".
         iDestruct ("Hpvbk" with "Htfc Hev") as "Hpriv".
         iDestruct (cpu_own_transport CID4 CID15 0%nat eb (proc_addr jp) eb
@@ -1262,7 +1262,7 @@ Section KexecBBody.
                 ltac:(rewrite Htgt316; vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (kxc_09a with "Htext"). }
-      iIntros (CID6 Hsq6) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID6 Hsq6) "_". iIntros "Hcg Hpc".
       iEval (rewrite Htgt316) in "Hpc".
       (* ---- +0x31c: c.ldsp s6,480(sp) -- slot 8 back into s6 ---- *)
       assert (Hpa8' : add_vec (G3 !!! Regidx csp_rs1)

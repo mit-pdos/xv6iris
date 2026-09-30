@@ -496,7 +496,7 @@ Section ProofWalkNoalloc.
               ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (wi_72 with "Htext"). }
-    iIntros (CIDa Hsa) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
+    iApply bi.later_intro. iIntros (CIDa Hsa) "_". iIntros "Hcg Hpc".
     assert (Htgt96 : add_vec (mword_of_int (KernelSyms.walk + 0x72) : mword 64)
                        (sign_extend' 64 (mword_of_int 36 : mword 13))
                      = mword_of_int (KernelSyms.walk + 0x96)) by (apply bv_eq; vm_compute; reflexivity).

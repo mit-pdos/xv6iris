@@ -452,7 +452,7 @@ Section ProofNamexRoot.
               ltac:(rewrite Htgt048; vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (nxi_02a with "Htext"). }
-    iIntros (CID20 Hq20) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
+    iApply bi.later_intro. iIntros (CID20 Hq20) "_". iIntros "Hcg Hpc".
     iEval (rewrite Htgt048) in "Hpc".
     (* ===== +0x048 c.li a1,1 ===== *)
     iApply (wp_cli_s_sconf (mword_of_int (NX + 0x48)) Ra1 (mword_of_int 1 : mword 6)
@@ -772,7 +772,7 @@ Section ProofNamexRoot.
               ltac:(rewrite Htgt140; vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (nxi_106 with "Htext"). }
-    iIntros (CIDW6 HqW6) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
+    iApply bi.later_intro. iIntros (CIDW6 HqW6) "_". iIntros "Hcg Hpc".
     iEval (rewrite Htgt140) in "Hpc".
     (* ---- the register bundle the epilogue wants, at [Q2] ---- *)
     assert (HQ2c : forall c : mword 5, c <> Rs1 -> c <> Ra5 ->
@@ -807,7 +807,7 @@ Section ProofNamexRoot.
               ltac:(rewrite Htgt05c; vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (nxi_140 with "Htext"). }
-    iIntros (CIDW7 HqW7) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
+    iApply bi.later_intro. iIntros (CIDW7 HqW7) "_". iIntros "Hcg Hpc".
     iEval (rewrite Htgt05c) in "Hpc".
     (* ================================================================= *)
     (*  THE EPILOGUE at +0x5c                                             *)

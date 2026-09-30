@@ -1122,7 +1122,7 @@ Section KexecCSetup.
                 ltac:(rewrite Htgt1f6; vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (kxc_1d4 with "Htext"). }
-      iIntros (CID18 Hs18) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID18 Hs18) "_". iIntros "Hcg Hpc".
       iEval (rewrite Htgt1f6) in "Hpc".
       (* ---- the leaf fact [uvmclear] needs, off uvmalloc's own postcond:  *)
       (* the guard page IS the run's first page ([vpn_at vpn0 0 = vpn0]). ---- *)
@@ -1660,7 +1660,7 @@ Section KexecCSetup.
                   ltac:(rewrite Htgt2b6; vm_compute; reflexivity)
                   with "Hcg Hpc []").
         { iApply (kxc_20e with "Htext"). }
-        iIntros (CID32 Hs32) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
+        iApply bi.later_intro. iIntros (CID32 Hs32) "_". iIntros "Hcg Hpc".
         iEval (rewrite Htgt2b6) in "Hpc".
         (* ---- +0x2b6: c.mv s8,s2 (s8 = sz1) ---- *)
         iApply (wp_cmv_s_sconf (mword_of_int (KXC + 0x2b6)) Rs8 Rs2
@@ -2812,7 +2812,7 @@ Section KexecCLoop.
                 ltac:(rewrite Htgt352; vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (kxc_228 with "Htext"). }
-      iIntros (CID6 Hs6) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID6 Hs6) "_". iIntros "Hcg Hpc".
       iEval (rewrite Htgt352) in "Hpc".
       (* [Hargc] is still addressed at [Z0 !!! Ra0] -- the shape the first
          strlen call was handed and returned; put it back on [avf c] before
@@ -3884,7 +3884,7 @@ Section KexecCLoop.
                     ltac:(rewrite Htgt218'; vm_compute; reflexivity)
                     with "Hcg Hpc []").
           { iApply (kxc_266 with "Htext"). }
-          iIntros (CID29 Hs29) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
+          iApply bi.later_intro. iIntros (CID29 Hs29) "_". iIntros "Hcg Hpc".
           iEval (rewrite Htgt218') in "Hpc".
        iDestruct (cpu_own_transport CID19 CID29 0%nat eb (proc_addr jp) eb
                     ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
@@ -3933,7 +3933,7 @@ Section KexecCLoop.
                   ltac:(rewrite Htgt356; vm_compute; reflexivity)
                   with "Hcg Hpc []").
         { iApply (kxc_24a with "Htext"). }
-        iIntros (CID21 Hs21) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
+        iApply bi.later_intro. iIntros (CID21 Hs21) "_". iIntros "Hcg Hpc".
         iEval (rewrite Htgt356) in "Hpc".
         (* [Hargc] is addressed at [Z2 !!! Ra3] (copyout's own source
            argument); back onto [avf c] before [Hargsback] will take it. *)
@@ -4848,7 +4848,7 @@ Section KexecCClose.
                 ltac:(rewrite Htgt1d6a; vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (kxc_286 with "Htext"). }
-      iIntros (CID10 Hs10c) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID10 Hs10c) "_". iIntros "Hcg Hpc".
       iEval (rewrite Htgt1d6a) in "Hpc".
       (* this arm does not care what the ustack holds: forget the names *)
       iAssert ([∗ list] i ∈ seq 0 (S c), ∃ w : mword 64, pa_stk sp0 (46 - i) ↦₈[KT1] w)%I
@@ -5388,7 +5388,7 @@ Section KexecCClose.
                   ltac:(rewrite Htgt1d6b; vm_compute; reflexivity)
                   with "Hcg Hpc []").
         { iApply (kxc_298 with "Htext"). }
-        iIntros (CID17 Hs17c) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
+        iApply bi.later_intro. iIntros (CID17 Hs17c) "_". iIntros "Hcg Hpc".
         iEval (rewrite Htgt1d6b) in "Hpc".
         iDestruct (kxc_frameB_collapse sp0 ra0 s00 s10 s20 pv (pa_add av (8 * c))
                      w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef Hal

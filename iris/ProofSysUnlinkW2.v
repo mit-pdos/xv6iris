@@ -860,7 +860,7 @@ Section ProofSysUnlinkW2.
                 ltac:(rewrite Htgbad1; vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (suli_044 with "Htext"). }
-      iIntros (CID8 Hq8) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID8 Hq8) "_". iIntros "Hcg Hpc".
       iEval (rewrite Htgbad1) in "Hpc".
       iDestruct (cpu_own_transport CID7 CID8 0 eb (proc_addr jx) b
                    ltac:(wp_next_chain) with "Hown") as "Hown".
@@ -1028,7 +1028,7 @@ Section ProofSysUnlinkW2.
                   ltac:(rewrite Htgbad2; vm_compute; reflexivity)
                   with "Hcg Hpc []").
         { iApply (suli_058 with "Htext"). }
-        iIntros (CID14 Hq14) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
+        iApply bi.later_intro. iIntros (CID14 Hq14) "_". iIntros "Hcg Hpc".
         iEval (rewrite Htgbad2) in "Hpc".
         iDestruct (cpu_own_transport CID13 CID14 0 eb (proc_addr jx) b
                      ltac:(wp_next_chain) with "Hown") as "Hown".
@@ -1375,7 +1375,7 @@ Section ProofSysUnlinkW2.
                     ltac:(rewrite Htgargd; vm_compute; reflexivity)
                     with "Hcg Hpc []").
           { iApply (suli_06e with "Htext"). }
-          iIntros (CID22 Hq22) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
+          iApply bi.later_intro. iIntros (CID22 Hq22) "_". iIntros "Hcg Hpc".
           iEval (rewrite Htgargd) in "Hpc".
           (* the buffers and the bundle, put back for the tail *)
           iDestruct (su_nm_join (pa_stk sp0 10) bnm0 nf with "Hnm14 Hnm2")

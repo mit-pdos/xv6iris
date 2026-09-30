@@ -766,7 +766,7 @@ Section ProofCreateAlloc.
                   ltac:(rewrite Htg0f8; vm_compute; reflexivity)
                   with "Hcg Hpc []").
         { iApply (cri_0ca with "Htext"). }
-        iIntros (CIDB8 HqB8) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
+        iApply bi.later_intro. iIntros (CIDB8 HqB8) "_". iIntros "Hcg Hpc".
         iEval (rewrite Htg0f8) in "Hpc".
         iDestruct (cpu_own_transport CIDiu CIDB8 0%nat eb (proc_addr j) b
                      ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
@@ -1682,7 +1682,7 @@ Section ProofCreateAlloc.
                        ltac:(rewrite Htg146; vm_compute; reflexivity)
                        with "Hcg Hpc []").
              { iApply (cri_0dc with "Htext"). }
-             iIntros (CIDE1 HqE1) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
+             iApply bi.later_intro. iIntros (CIDE1 HqE1) "_". iIntros "Hcg Hpc".
              iEval (rewrite Htg146) in "Hpc".
              iDestruct (cpu_own_transport CIDdl CIDE1 0%nat eb (proc_addr j) b
                           ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".

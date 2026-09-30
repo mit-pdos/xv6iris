@@ -374,7 +374,7 @@ Section KexecDName.
                 ltac:(rewrite Htgt2ce; vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (kxc_2c2 with "Htext"). }
-      iIntros (CID3 Hs3) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID3 Hs3) "_". iIntros "Hcg Hpc".
       iEval (rewrite Htgt2ce) in "Hpc".
       iEval (rewrite /kxd_scan_out) in "Hout".
       iSpecialize ("Hout" $! CID3 with "[%]"); [wp_next_chain |].
@@ -509,7 +509,7 @@ Section KexecDName.
                 ltac:(rewrite Htgt2bc; vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (kxc_2c4 with "Htext"). }
-      iIntros (CID1 Hs1) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID1 Hs1) "_". iIntros "Hcg Hpc".
       iEval (rewrite Htgt2bc) in "Hpc".
       iApply (kxd_scan_tail (CID0 := CID1) pj b n plen pfun dqpv sp0 pv
                 vsp v1 v2 v4 v5 v6 v10 v11 M i q
@@ -2339,7 +2339,7 @@ Section KexecDMain.
                 ltac:(rewrite Htgt2d2a; vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (kxc_2ac with "Htext"). }
-      iIntros (CID5 Hs5) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID5 Hs5) "_". iIntros "Hcg Hpc".
       iEval (rewrite Htgt2d2a) in "Hpc".
       iDestruct (kxd_last_at0 with "Hf66") as "Hf66".
       iDestruct ("Hmk" $! (pa_add pv 0) with "Hf66 Hpath") as "Hres".

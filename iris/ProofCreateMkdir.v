@@ -2645,7 +2645,7 @@ Section ProofCreateMkdir.
                     ltac:(rewrite Htg146c; vm_compute; reflexivity)
                     with "Hcg Hpc []").
           { iApply (cri_130 with "Htext"). }
-          iIntros (CIDX3 HqX3) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
+          iApply bi.later_intro. iIntros (CIDX3 HqX3) "_". iIntros "Hcg Hpc".
           iEval (rewrite Htg146c) in "Hpc".
           iDestruct (cpu_own_transport CIDd3 CIDX3 0%nat eb (proc_addr j) b
                        ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
@@ -2814,7 +2814,7 @@ Section ProofCreateMkdir.
                   ltac:(rewrite Htg146b; vm_compute; reflexivity)
                   with "Hcg Hpc []").
         { iApply (cri_11e with "Htext"). }
-        iIntros (CIDX2 HqX2) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
+        iApply bi.later_intro. iIntros (CIDX2 HqX2) "_". iIntros "Hcg Hpc".
         iEval (rewrite Htg146b) in "Hpc".
         iDestruct (cpu_own_transport CIDd2 CIDX2 0%nat eb (proc_addr j) b
                      ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
@@ -2980,7 +2980,7 @@ Section ProofCreateMkdir.
                 ltac:(rewrite Htg146a; vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (cri_10a with "Htext"). }
-      iIntros (CIDX1 HqX1) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CIDX1 HqX1) "_". iIntros "Hcg Hpc".
       iEval (rewrite Htg146a) in "Hpc".
       iDestruct (cpu_own_transport CIDd1 CIDX1 0%nat eb (proc_addr j) b
                    ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".

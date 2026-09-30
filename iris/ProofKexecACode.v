@@ -726,7 +726,7 @@ Section KexecABody.
                 ltac:(rewrite Htgt88; vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (kxc_030 with "Htext"). }
-      iIntros (CIDz Hsz1) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CIDz Hsz1) "_". iIntros "Hcg Hpc".
       iEval (rewrite Htgt88) in "Hpc".
       (* ---- +0x088: jal ra,end_op ---- *)
       assert (Hteo : add_vec (mword_of_int (KXA + 0x088) : mword 64)
@@ -1651,7 +1651,7 @@ Section KexecABody.
                   ltac:(rewrite Htgt90; vm_compute; reflexivity)
                   with "Hcg Hpc []").
         { iApply (kxc_060 with "Htext"). }
-        iIntros (CID15 Hsq15) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
+        iApply bi.later_intro. iIntros (CID15 Hsq15) "_". iIntros "Hcg Hpc".
         iEval (rewrite Htgt90) in "Hpc".
         iDestruct ("Hpvbk" with "Hppid Hcref") as "Hpriv".
         iDestruct (cpu_own_transport CIDrd CID15 0%nat eb (proc_addr jp) eb
@@ -1890,7 +1890,7 @@ Section KexecABody.
                 ltac:(rewrite Htgt64; vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (kxc_050 with "Htext"). }
-      iIntros (CID11 Hsq11) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID11 Hsq11) "_". iIntros "Hcg Hpc".
       iEval (rewrite Htgt64) in "Hpc".
       iDestruct ("Hpvbk" with "Hppid Hcref") as "Hpriv".
       iDestruct (cpu_own_transport CIDrd CID11 0%nat eb (proc_addr jp) eb

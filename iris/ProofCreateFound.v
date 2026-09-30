@@ -845,7 +845,7 @@ Section ProofCreateFound.
                   ltac:(rewrite Htg084; vm_compute; reflexivity)
                   with "Hcg Hpc []").
         { iApply (cri_02e with "Htext"). }
-        iIntros (CID19 Hq19) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
+        iApply bi.later_intro. iIntros (CID19 Hq19) "_". iIntros "Hcg Hpc".
         iEval (rewrite Htg084) in "Hpc".
         (* [ic_loaded]'s tail is [inode_blocks]' 268-element big-op
            ([IcacheEscrow.ic_mk_loaded]'s comment) -- assembled by the
@@ -1954,7 +1954,7 @@ Section ProofCreateFound.
                           ltac:(rewrite Htg098b; vm_compute; reflexivity)
                           with "Hcg Hpc []").
                 { iApply (cri_06c with "Htext"). }
-                iIntros (CID37 Hq37) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
+                iApply bi.later_intro. iIntros (CID37 Hq37) "_". iIntros "Hcg Hpc".
                 iEval (rewrite Htg098b) in "Hpc".
                 iDestruct (cpu_own_transport CIDic CID37 0%nat eb
                              (proc_addr j) b
@@ -2048,7 +2048,7 @@ Section ProofCreateFound.
                        ltac:(rewrite Htg098; vm_compute; reflexivity)
                        with "Hcg Hpc []").
              { iApply (cri_05c with "Htext"). }
-             iIntros (CID31 Hq31) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
+             iApply bi.later_intro. iIntros (CID31 Hq31) "_". iIntros "Hcg Hpc".
              iEval (rewrite Htg098) in "Hpc".
              iDestruct (cpu_own_transport CIDic CID31 0%nat eb
                           (proc_addr j) b
@@ -2108,7 +2108,7 @@ Section ProofCreateFound.
                     ltac:(rewrite Htg0a2; vm_compute; reflexivity)
                     with "Hcg Hpc []").
           { iApply (cri_04c with "Htext"). }
-          iIntros (CID25 Hq25) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
+          iApply bi.later_intro. iIntros (CID25 Hq25) "_". iIntros "Hcg Hpc".
           iEval (rewrite Htg0a2) in "Hpc".
           iDestruct ("Hppback" with "Hppid") as "Hpriv".
           iDestruct (cr_bs3 with "[Hbs1 Hbs2]") as "Hbsl";
@@ -2449,7 +2449,7 @@ Section ProofCreateFound.
                        ltac:(rewrite Htg08e; vm_compute; reflexivity)
                        with "Hcg Hpc []").
              { iApply (cri_03c with "Htext"). }
-             iIntros (CID25 Hq25) "Hlc". iApply bi.later_intro. iIntros "Hcg Hpc".
+             iApply bi.later_intro. iIntros (CID25 Hq25) "Hlc". iIntros "Hcg Hpc".
              iEval (rewrite Htg08e) in "Hpc".
              iDestruct "Hgate" as "[_ Hg2]".
              iSpecialize ("Hg2" $! CID25 with "[%] Hlc"); [wp_next_chain |].
@@ -2481,7 +2481,7 @@ Section ProofCreateFound.
                     ltac:(rewrite Htg03e; vm_compute; reflexivity)
                     with "Hcg Hpc []").
           { iApply (cri_036 with "Htext"). }
-          iIntros (CID23 Hq23) "Hlc". iApply bi.later_intro. iIntros "Hcg Hpc".
+          iApply bi.later_intro. iIntros (CID23 Hq23) "Hlc". iIntros "Hcg Hpc".
           iEval (rewrite Htg03e) in "Hpc".
           iDestruct "Hgate" as "[Hj _]".
           iSpecialize ("Hj" $! CID23 with "[%] Hlc"); [wp_next_chain |].
@@ -2508,7 +2508,7 @@ Section ProofCreateFound.
                 ltac:(rewrite Htg160; vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (cri_022 with "Htext"). }
-      iIntros (CID16 Hq16) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID16 Hq16) "_". iIntros "Hcg Hpc".
       iEval (rewrite Htg160) in "Hpc".
       assert (Hs1v : add_vec (zero_reg : mword 64) (mnp !!! Regidx Ra0)
                      = (mword_of_int 0 : mword 64))

@@ -1435,7 +1435,7 @@ Section SysExecHead.
                 ltac:(rewrite Htgt; vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (sxi_024 with "Htext"). }
-      iIntros (CID16 Hq16) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID16 Hq16) "_". iIntros "Hcg Hpc".
       iEval (rewrite Htgt) in "Hpc".
       (* the frame goes back WHOLE: nothing below slot 2 was written, and
          s1..s7 were never spilled, so the epilogue's seven premises are
@@ -2281,7 +2281,7 @@ Section SysExecFree.
               ltac:(vm_compute; reflexivity) ltac:(nz) Hcmp
               ltac:(rewrite Hbeq; exact Hbeqal) with "Hcg Hpc []").
     { iApply (Hx2 with "Htext"). }
-    iIntros (CID2 Hq2) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
+    iApply bi.later_intro. iIntros (CID2 Hq2) "_". iIntros "Hcg Hpc".
     iEval (rewrite Hbeq) in "Hpc".
     iSpecialize ("Hout" $! CID2 with "[%]"); [wp_next_chain |].
     iDestruct (cpu_own_transport CID0 CID2 0%nat eb pj b
@@ -2515,7 +2515,7 @@ Section SysExecFree.
                 ltac:(nz) ltac:(nz) Hcmpb
                 ltac:(rewrite Hbk; exact Hbkal) with "Hcg Hpc []").
       { iApply (Hx10 with "Htext"). }
-      iIntros (CID6 Hq6) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID6 Hq6) "_". iIntros "Hcg Hpc".
       iEval (rewrite Hbk) in "Hpc".
       iDestruct (cpu_own_transport CID4 CID6 0%nat eb pj b
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
@@ -3309,7 +3309,7 @@ Section SysExecStep.
                 ltac:(nz) Hcmp ltac:(rewrite Ht92; vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (sxi_066 with "Htext"). }
-      iIntros (CID7 Hq7) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID7 Hq7) "_". iIntros "Hcg Hpc".
       iEval (rewrite Ht92) in "Hpc".
       iSpecialize ("Hout" $! CID7 with "[%]"); [wp_next_chain |].
       iDestruct (cpu_own_transport CID6 CID7 0%nat eb (proc_addr jp) b
@@ -3337,7 +3337,7 @@ Section SysExecStep.
                 ltac:(nz) Hcmp ltac:(rewrite Ht92; vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (sxi_066 with "Htext"). }
-      iIntros (CID7 Hq7) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID7 Hq7) "_". iIntros "Hcg Hpc".
       iEval (rewrite Ht92) in "Hpc".
       iSpecialize ("Hout" $! CID7 with "[%]"); [wp_next_chain |].
       iDestruct (cpu_own_transport CID6 CID7 0%nat eb (proc_addr jp) b
@@ -3398,7 +3398,7 @@ Section SysExecStep.
                 ltac:(rewrite Htb6; vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (sxi_06e with "Htext"). }
-      iIntros (CID9 Hq9) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID9 Hq9) "_". iIntros "Hcg Hpc".
       iEval (rewrite Htb6) in "Hpc".
       iSpecialize ("Hout" $! CID9 with "[%]"); [wp_next_chain |].
       iDestruct (cpu_own_transport CID6 CID9 0%nat eb (proc_addr jp) b
@@ -3511,7 +3511,7 @@ Section SysExecStep.
                 ltac:(rewrite Ht92b; vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (sxi_07a with "Htext"). }
-      iIntros (CID14 Hq14) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID14 Hq14) "_". iIntros "Hcg Hpc".
       iEval (rewrite Ht92b) in "Hpc".
       iEval (rewrite Hpz) in "Hcell".
       iDestruct (sx_argv0_shut sp0 i pg ltac:(lia) with "Hcell Hrest") as "Harr".
@@ -3680,7 +3680,7 @@ Section SysExecStep.
                 ltac:(nz) Hcmpf ltac:(rewrite Ht92c; vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (sxi_086 with "Htext"). }
-      iIntros (CID19 Hq19) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID19 Hq19) "_". iIntros "Hcg Hpc".
       iEval (rewrite Ht92c) in "Hpc".
       iSpecialize ("Hout" $! CID19 with "[%]"); [wp_next_chain |].
       iDestruct (cpu_own_transport CID18 CID19 0%nat eb (proc_addr jp) b
@@ -3819,7 +3819,7 @@ Section SysExecStep.
               ltac:(rewrite Htbk; vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (sxi_08e with "Htext"). }
-    iIntros (CID22 Hq22) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
+    iApply bi.later_intro. iIntros (CID22 Hq22) "_". iIntros "Hcg Hpc".
     iEval (rewrite Htbk) in "Hpc".
     iSpecialize ("Hout" $! CID22 with "[%]"); [wp_next_chain |].
     iDestruct (cpu_own_transport CID18 CID22 0%nat eb (proc_addr jp) b

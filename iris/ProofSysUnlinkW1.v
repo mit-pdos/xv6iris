@@ -902,7 +902,7 @@ Section ProofSysUnlinkW1.
                   ltac:(rewrite Htge2; vm_compute; reflexivity)
                   with "Hcg Hpc []").
         { iApply (suli_02e with "Htext"). }
-        iIntros (CID19 Hq19) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
+        iApply bi.later_intro. iIntros (CID19 Hq19) "_". iIntros "Hcg Hpc".
         iEval (rewrite Htge2) in "Hpc".
         (* the buffers, rejoined and renamed for the tail *)
         iDestruct (su_buf_join (pa_stk sp0 26) bp1 pk1 Hpk1

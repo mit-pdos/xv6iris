@@ -1027,7 +1027,7 @@ Section KexecB2Loops.
                 ltac:(rewrite Htgt0ce; vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (kxc_106 with "Htext"). }
-      iIntros (CIDp0 Hsp0) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CIDp0 Hsp0) "_". iIntros "Hcg Hpc".
       iEval (rewrite Htgt0ce) in "Hpc".
       (* +0x0ce auipc a0,0x3 *)
       iApply (wp_auipc_s_sconf (mword_of_int (KXB + 0x0ce)) Ra0
@@ -1599,7 +1599,7 @@ Section KexecB2Loops.
                     ltac:(rewrite Htgt116; vm_compute; reflexivity)
                     with "Hcg Hpc []").
           { iApply (kxc_0f2 with "Htext"). }
-          iIntros (CIDx1 Hsx1) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
+          iApply bi.later_intro. iIntros (CIDx1 Hsx1) "_". iIntros "Hcg Hpc".
           iEval (rewrite Htgt116) in "Hpc".
           iDestruct (cpu_own_transport CIDrd CIDx1 0%nat eb (proc_addr jp)
                        eb ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
@@ -1742,7 +1742,7 @@ Section KexecB2Loops.
                   ltac:(rewrite Htgt31e; vm_compute; reflexivity)
                   with "Hcg Hpc []").
         { iApply (kxc_0ea with "Htext"). }
-        iIntros (CIDb1 Hsb1) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
+        iApply bi.later_intro. iIntros (CIDb1 Hsb1) "_". iIntros "Hcg Hpc".
         iEval (rewrite Htgt31e) in "Hpc".
         iDestruct (cpu_own_transport CIDrd CIDb1 0%nat eb (proc_addr jp)
                      eb ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
@@ -1796,7 +1796,7 @@ Section KexecB2Loops.
                 ltac:(rewrite Htgt0da; vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (kxc_10e with "Htext"). }
-      iIntros (CIDt1 Hst1) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CIDt1 Hst1) "_". iIntros "Hcg Hpc".
       iEval (rewrite Htgt0da) in "Hpc".
       iDestruct (cpu_own_transport CID0 CIDt1 0%nat eb (proc_addr jp) eb
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".

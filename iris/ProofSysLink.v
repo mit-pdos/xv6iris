@@ -1495,7 +1495,7 @@ Section ProofSysLinkBody.
                        ltac:(vm_compute; reflexivity)
                        with "Hcg Hpc []").
              { iApply (slki_4c with "Htext"). }
-             iIntros (CID31 Hq31) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
+             iApply bi.later_intro. iIntros (CID31 Hq31) "_". iIntros "Hcg Hpc".
              iEval (rewrite Htgc6) in "Hpc".
              iAssert (ic_loaded fsc_fs fsc_ireg fsc_cov fsc_logst kk inum dn bm)
                with "[Hdiat Hity Himaj Himin Hinl Hisz Haddrs Hind Hblocks Hdlnk Htopl]"
@@ -1656,7 +1656,7 @@ Section ProofSysLinkBody.
                           ltac:(vm_compute; reflexivity)
                           with "Hcg Hpc []").
                 { iApply (slki_58 with "Htext"). }
-                iIntros (CID35 Hq35) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
+                iApply bi.later_intro. iIntros (CID35 Hq35) "_". iIntros "Hcg Hpc".
                 iEval (rewrite Htgd6) in "Hpc".
                 iAssert (ic_loaded fsc_fs fsc_ireg fsc_cov fsc_logst kk inum dn bm)
                   with "[Hdiat Hity Himaj Himin Hinl Hisz Haddrs Hind Hblocks
@@ -2442,7 +2442,7 @@ Section ProofSysLinkBody.
                                ltac:(rewrite Htge6_88; vm_compute; reflexivity)
                                with "Hcg Hpc []").
                      { iApply (slki_88 with "Htext"). }
-                     iIntros (CIDg1 Hqg1) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
+                     iApply bi.later_intro. iIntros (CIDg1 Hqg1) "_". iIntros "Hcg Hpc".
                      iEval (rewrite Htge6_88) in "Hpc".
                      (* the parent's record, handed back whole: the guard READ
                         the halfword and wrote nothing. *)
@@ -2848,7 +2848,7 @@ Section ProofSysLinkBody.
                                  ltac:(rewrite Htgee_a0; vm_compute; reflexivity)
                                  with "Hcg Hpc []").
                        { iApply (slki_a0 with "Htext"). }
-                       iIntros (CID61 Hq61) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
+                       iApply bi.later_intro. iIntros (CID61 Hq61) "_". iIntros "Hcg Hpc".
                        iEval (rewrite Htgee_a0) in "Hpc".
                        subst bmd' datd' dnd' dnd0'.
                        (* dirlink handed the ledger half back verbatim and
@@ -3680,7 +3680,7 @@ Section ProofSysLinkBody.
                                       ltac:(rewrite Htgee_a0; vm_compute; reflexivity)
                                       with "Hcg Hpc []").
                             { iApply (slki_a0 with "Htext"). }
-                            iIntros (CID61 Hq61) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
+                            iApply bi.later_intro. iIntros (CID61 Hq61) "_". iIntros "Hcg Hpc".
                             iEval (rewrite Htgee_a0) in "Hpc".
                             (* THE ENTRY UNITS RIDE WITH IT:
                                nothing was written, so the entry map does not
@@ -3893,7 +3893,7 @@ Section ProofSysLinkBody.
                              ltac:(vm_compute; reflexivity)
                              with "Hcg Hpc []").
                    { iApply (slki_7e with "Htext"). }
-                   iIntros (CID50 Hq50) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
+                   iApply bi.later_intro. iIntros (CID50 Hq50) "_". iIntros "Hcg Hpc".
                    iEval (rewrite Htgf4) in "Hpc".
                    (* the two buffers, rejoined for the epilogue *)
                    iDestruct (sl_buf_join (pa_stk sp0 22) bw1 pk2 Hpk2
@@ -3975,7 +3975,7 @@ Section ProofSysLinkBody.
                     ltac:(vm_compute; reflexivity)
                     with "Hcg Hpc []").
           { iApply (slki_40 with "Htext"). }
-          iIntros (CID26 Hq26) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
+          iApply bi.later_intro. iIntros (CID26 Hq26) "_". iIntros "Hcg Hpc".
           iEval (rewrite Htgbc) in "Hpc".
           iDestruct (sl_buf_join (pa_stk sp0 38) bo1 pk1 Hpk1
                        with "Hbufk Hbufrest") as "HbO".
@@ -4027,7 +4027,7 @@ Section ProofSysLinkBody.
                   ltac:(rewrite Htg10c2c; vm_compute; reflexivity)
                   with "Hcg Hpc []").
         { iApply (slki_2c with "Htext"). }
-        iIntros (CID18 Hq18) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
+        iApply bi.later_intro. iIntros (CID18 Hq18) "_". iIntros "Hcg Hpc".
         iEval (rewrite Htg10c2c) in "Hpc".
         iDestruct (sl_bytes_name (pa_stk sp0 6) 16 with "HbN") as (bn0) "HbN".
         iDestruct (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CID18)
@@ -4064,7 +4064,7 @@ Section ProofSysLinkBody.
                 ltac:(rewrite Htg10c18; vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (slki_18 with "Htext"). }
-      iIntros (CID11 Hq11) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID11 Hq11) "_". iIntros "Hcg Hpc".
       iEval (rewrite Htg10c18) in "Hpc".
       iDestruct (sl_bytes_name (pa_stk sp0 6) 16 with "HbN") as (bn0) "HbN".
       iDestruct (sl_bytes_name (pa_stk sp0 22) 128 with "HbW") as (bw0) "HbW".

@@ -887,7 +887,7 @@ Section ProofSysOpenBody.
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (soi_036 with "Htext"). }
-      iIntros (CID22 Hq22) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID22 Hq22) "_". iIntros "Hcg Hpc".
       assert (Htg36 : add_vec (mword_of_int (SO + 0x36) : mword 64)
                         (sign_extend' 64
                            (sign_extend' 13 (concat_vec (mword_of_int 83 : mword 8) ('b"0"))))

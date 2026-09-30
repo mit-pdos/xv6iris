@@ -945,7 +945,7 @@ Section KexecB3Incr.
                 ltac:(rewrite Htgt1a2; vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (kxc_128 with "Htext"). }
-      iIntros (CID5 Hsq5) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID5 Hsq5) "_". iIntros "Hcg Hpc".
       iEval (rewrite Htgt1a2) in "Hpc".
       (* ---- +0x1a2: c.ldsp s11,440(sp) -- slot 13 back into s11.  NEW at
          XV6_REV 7d258aa; it used to sit in each of phase C/D's epilogues. *)
@@ -1683,7 +1683,7 @@ Section KexecB3Body.
                   ltac:(rewrite Htgt11a; vm_compute; reflexivity)
                   with "Hcg Hpc []").
         { iApply (kxc_148 with "Htext"). }
-        iIntros (CIDg4 Hsg4) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
+        iApply bi.later_intro. iIntros (CIDg4 Hsg4) "_". iIntros "Hcg Hpc".
         iEval (rewrite Htgt11a) in "Hpc".
         (* the test the loop just failed, as a statement about the FILE *)
         assert (Hnety : ep_type (kxb_phdr (kxc_fb datl dnf) ef i) <> 1%Z).
@@ -1863,7 +1863,7 @@ Section KexecB3Body.
                     ltac:(rewrite Htgt33a; vm_compute; reflexivity)
                     with "Hcg Hpc []").
           { iApply (kxc_154 with "Htext"). }
-          iIntros (CIDx1 Hsx1) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
+          iApply bi.later_intro. iIntros (CIDx1 Hsx1) "_". iIntros "Hcg Hpc".
           iEval (rewrite Htgt33a) in "Hpc".
           (* ---- 0x340: sd s2,-520(s0) ; 0x344: c.j +0x324 ---- *)
           assert (Hbsp : U9 !!! Regidx csp_rs1 = pa_stk sp0 68)
@@ -2046,7 +2046,7 @@ Section KexecB3Body.
                        ltac:(rewrite Htgt340; vm_compute; reflexivity)
                        with "Hcg Hpc []").
           { iApply (kxc_15e with "Htext"). }
-             iIntros (CIDx4 Hsx4) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
+             iApply bi.later_intro. iIntros (CIDx4 Hsx4) "_". iIntros "Hcg Hpc".
              iEval (rewrite Htgt340) in "Hpc".
              (* ---- 0x346: sd s2,-520(s0) ; 0x34a: c.j +0x324 ---- *)
              assert (Hbsp : U11 !!! Regidx csp_rs1 = pa_stk sp0 68)
@@ -2237,7 +2237,7 @@ Section KexecB3Body.
                           ltac:(rewrite Htgt346; vm_compute; reflexivity)
                           with "Hcg Hpc []").
              { iApply (kxc_168 with "Htext"). }
-                iIntros (CIDx7 Hsx7) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
+                iApply bi.later_intro. iIntros (CIDx7 Hsx7) "_". iIntros "Hcg Hpc".
                 iEval (rewrite Htgt346) in "Hpc".
                 (* ---- 0x34c: sd s2,-520(s0) ; 0x350: c.j +0x324 ---- *)
                 assert (Hbsp : U13 !!! Regidx csp_rs1 = pa_stk sp0 68)
@@ -2904,7 +2904,7 @@ Section KexecB3Body.
                              ltac:(rewrite Htgt34c; vm_compute; reflexivity)
                              with "Hcg Hpc []").
                    { iApply (kxc_184 with "Htext"). }
-                   iIntros (CIDw1 Hsw1) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
+                   iApply bi.later_intro. iIntros (CIDw1 Hsw1) "_". iIntros "Hcg Hpc".
                    iEval (rewrite Htgt34c) in "Hpc".
                    assert (Ha00 : bv_unsigned (M4 !!! Regidx Ra0) = 0).
                    { apply eq_vec_true_iff in Eoom.
@@ -3103,7 +3103,7 @@ Section KexecB3Body.
                                  ltac:(rewrite Htgt19c; vm_compute; reflexivity)
                                  with "Hcg Hpc []").
                        { iApply (kxc_18c with "Htext"). }
-                       iIntros (CIDv1 Hsv1) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
+                       iApply bi.later_intro. iIntros (CIDv1 Hsv1) "_". iIntros "Hcg Hpc".
                        iEval (rewrite Htgt19c) in "Hpc".
                        (* the ph buffer goes home: nothing below reads it *)
                        iDestruct (kxc_ph_give sp0 pf Hphal with "Hphb")
@@ -3698,7 +3698,7 @@ Section KexecB3Body.
                 ltac:(rewrite Htgt31a; vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (kxc_13e with "Htext"). }
-      iIntros (CIDb1 Hsb1) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CIDb1 Hsb1) "_". iIntros "Hcg Hpc".
       iEval (rewrite Htgt31a) in "Hpc".
       (* ---- +0x320: sd s2,-520(s0) -- the size the tail frees ---- *)
       assert (Hpa65 : add_vec (rget M2 Rs0)

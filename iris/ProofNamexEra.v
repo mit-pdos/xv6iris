@@ -1465,7 +1465,7 @@ Section ProofNamexTrMain.
                     ltac:(rewrite Htec; vm_compute; reflexivity)
                     with "Hcg Hpc []").
           { iApply (nxi_102 with "Htext"). }
-          iIntros (CIDk3 Hqk3) "Hlc". iApply bi.later_intro. iIntros "Hcg Hpc".
+          iApply bi.later_intro. iIntros (CIDk3 Hqk3) "Hlc". iIntros "Hcg Hpc".
           iEval (rewrite Htec) in "Hpc".
           iSpecialize ("IHs" $! CIDk3 with "[%] Hlc"); [wp_next_chain |].
           iApply ("IHs" $! (S off) Q2
@@ -1580,7 +1580,7 @@ Section ProofNamexTrMain.
                     ltac:(rewrite Htac; vm_compute; reflexivity)
                     with "Hcg Hpc []").
         { iApply (nxi_0bc with "Htext"). }
-          iIntros (CIDt3 Hqt3) "Hlc". iApply bi.later_intro. iIntros "Hcg Hpc".
+          iApply bi.later_intro. iIntros (CIDt3 Hqt3) "Hlc". iIntros "Hcg Hpc".
           iEval (rewrite Htac) in "Hpc".
           iSpecialize ("IHt" $! CIDt3 with "[%] Hlc"); [wp_next_chain |].
           iApply ("IHt" $! (S off) T2
@@ -1717,7 +1717,7 @@ Section ProofNamexTrMain.
                     ltac:(rewrite Ht8c; vm_compute; reflexivity)
                     with "Hcg Hpc []").
           { iApply (nxi_120 with "Htext"). }
-          iIntros (CIDe4 Hqe4) "Hlc". iApply bi.later_intro. iIntros "Hcg Hpc".
+          iApply bi.later_intro. iIntros (CIDe4 Hqe4) "Hlc". iIntros "Hcg Hpc".
           iEval (rewrite Ht8c) in "Hpc".
           iSpecialize ("Hqc" $! CIDe4 with "[%] Hlc"); [wp_next_chain |].
           iApply ("Hqc" $! (S ii) E3
@@ -1789,7 +1789,7 @@ Section ProofNamexTrMain.
                       ltac:(rewrite Ht106; vm_compute; reflexivity)
                       with "Hcg Hpc []").
             { iApply (nxi_122 with "Htext"). }
-            iIntros (CIDe5 Hqe5) "Hlc". iApply bi.later_intro. iIntros "Hcg Hpc".
+            iApply bi.later_intro. iIntros (CIDe5 Hqe5) "Hlc". iIntros "Hcg Hpc".
             iEval (rewrite Ht106) in "Hpc".
             iSpecialize ("IHe" $! CIDe5 with "[%] Hlc"); [wp_next_chain |].
             iApply ("IHe" $! (S ii) E3 with "[%] [%] [%] Hcg Hpc Hpath [Hqc]").
@@ -1835,7 +1835,7 @@ Section ProofNamexTrMain.
                   ltac:(rewrite Ht130; vm_compute; reflexivity)
                   with "Hcg Hpc []").
         { iApply (nxi_106 with "Htext"). }
-        iIntros (CIDm1 Hqm1) "Hlc". iApply bi.later_intro. iIntros "Hcg Hpc".
+        iApply bi.later_intro. iIntros (CIDm1 Hqm1) "Hlc". iIntros "Hcg Hpc".
         iEval (rewrite Ht130) in "Hpc".
         assert (Hap : (a = plen)%nat).
         { destruct (Nat.eq_dec a plen) as [He | Hne]; [exact He |].
@@ -2046,7 +2046,7 @@ Section ProofNamexTrMain.
                   ltac:(rewrite Htf6; vm_compute; reflexivity)
                   with "Hcg Hpc []").
         { iApply (nxi_0f8 with "Htext"). }
-        iIntros (CIDh2 Hqh2) "Hlc". iApply bi.later_intro. iIntros "Hcg Hpc".
+        iApply bi.later_intro. iIntros (CIDh2 Hqh2) "Hlc". iIntros "Hcg Hpc".
         iEval (rewrite Htf6) in "Hpc".
         iSpecialize ("Hmid" $! CIDh2 with "[%] Hlc"); [wp_next_chain |].
         iApply ("Hmid" $! off H1
@@ -2155,7 +2155,7 @@ Section ProofNamexTrMain.
                   ltac:(rewrite Htb6; vm_compute; reflexivity)
                   with "Hcg Hpc []").
           { iApply (nxi_0b2 with "Htext"). }
-        iIntros (CIDr2 Hqr2) "Hlc". iApply bi.later_intro. iIntros "Hcg Hpc".
+        iApply bi.later_intro. iIntros (CIDr2 Hqr2) "Hlc". iIntros "Hcg Hpc".
         iEval (rewrite Htb6) in "Hpc".
         iSpecialize ("Hqc" $! CIDr2 with "[%] Hlc"); [wp_next_chain |].
         iApply ("Hqc" $! off G1
@@ -2265,7 +2265,7 @@ Section ProofNamexTrMain.
                          ltac:(rewrite Htg5c; vm_compute; reflexivity)
                          with "Hcg Hpc []").
                { iApply (nxi_140 with "Htext"). }
-               iIntros (CIDA1 HqA1) "Hlc". iApply bi.later_intro. iIntros "Hcg Hpc".
+               iApply bi.later_intro. iIntros (CIDA1 HqA1) "Hlc". iIntros "Hcg Hpc".
                iEval (rewrite Htg5c) in "Hpc".
                iDestruct (cpu_own_transport CIDl CIDA1 0%nat eb (proc_addr j) b
                             ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
@@ -2776,7 +2776,7 @@ Section ProofNamexTrMain.
                                  ltac:(rewrite Htg07an; vm_compute; reflexivity)
                                  with "Hcg Hpc []").
                        { iApply (nxi_0d2 with "Htext"). }
-                       iIntros (CIDN0 HqN0) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
+                       iApply bi.later_intro. iIntros (CIDN0 HqN0) "_". iIntros "Hcg Hpc".
                        iEval (rewrite Htg07an) in "Hpc".
                      iAssert (ic_loaded fsc_fs fsc_ireg fsc_cov fsc_logst ik iinum dnl bml)
                        with "[Hdiat Hity Himaj Himin Hinl Hisz Haddrs Hind
@@ -3673,7 +3673,7 @@ Section ProofNamexTrMain.
                                            reflexivity)
                                      with "Hcg Hpc []").
                            { iApply (nxi_0ea with "Htext"). }
-                           iIntros (CIDG6 HqG6) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
+                           iApply bi.later_intro. iIntros (CIDG6 HqG6) "_". iIntros "Hcg Hpc".
                            iEval (rewrite Htg082) in "Hpc".
                            (* +0x8c c.mv a0,s4 *)
                            iApply (wp_cmv_s_sconf (mword_of_int (NX + 0x8c))
@@ -3894,7 +3894,7 @@ Section ProofNamexTrMain.
                                           reflexivity)
                                     with "Hcg Hpc []").
                           { iApply (nxi_0d4 with "Htext"). }
-                          iIntros (CIDQ1 HqQ1) "Hlc". iApply bi.later_intro. iIntros "Hcg Hpc".
+                          iApply bi.later_intro. iIntros (CIDQ1 HqQ1) "Hlc". iIntros "Hcg Hpc".
                           iEval (rewrite Htg0ceb) in "Hpc".
                           iDestruct (cpu_own_transport CIDil CIDQ1 0%nat eb
                                        (proc_addr j) b ltac:(wp_next_chain)
@@ -3917,7 +3917,7 @@ Section ProofNamexTrMain.
                                ltac:(rewrite Htg054; vm_compute; reflexivity)
                                with "Hcg Hpc []").
                      { iApply (nxi_0ca with "Htext"). }
-                     iIntros (CIDN0 HqN0) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
+                     iApply bi.later_intro. iIntros (CIDN0 HqN0) "_". iIntros "Hcg Hpc".
                      iEval (rewrite Htg054) in "Hpc".
                      iAssert (ic_loaded fsc_fs fsc_ireg fsc_cov fsc_logst ik iinum dnl bml)
                        with "[Hdiat Hity Himaj Himin Hinl Hisz Haddrs Hind
@@ -4104,7 +4104,7 @@ Section ProofNamexTrMain.
                             ltac:(rewrite Htg11c; vm_compute; reflexivity)
                             with "Hcg Hpc []").
                   { iApply (nxi_09e with "Htext"). }
-                  iIntros (CIDE3 HqE3) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
+                  iApply bi.later_intro. iIntros (CIDE3 HqE3) "_". iIntros "Hcg Hpc".
                   iEval (rewrite Htg11c) in "Hpc".
                   (* +0x12c c.addiw a2,a2,0 *)
                   iApply (wp_caddiw_s_sconf (mword_of_int (NX + 0x12c)) Ra2
@@ -4720,7 +4720,7 @@ Section ProofNamexTrMain.
                 ltac:(rewrite Htgt048; vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (nxi_02a with "Htext"). }
-      iIntros (CID20 Hq20) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID20 Hq20) "_". iIntros "Hcg Hpc".
       iEval (rewrite Htgt048) in "Hpc".
       (* +0x48 c.li a1,1 *)
       iApply (wp_cli_s_sconf (mword_of_int (NX + 0x48)) Ra1 (mword_of_int 1 : mword 6)

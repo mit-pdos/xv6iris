@@ -1393,7 +1393,7 @@ Section ProofFilestat.
                 Hcmp ltac:(rewrite Htgt62; vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (fsti_1a with "Htext"). }
-      iIntros (CID14 Hs14) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID14 Hs14) "_". iIntros "Hcg Hpc".
       iEval (rewrite Htgt62) in "Hpc".
       (* +0x62 c.li a0,-1 *)
       iApply (wp_cli_s_sconf (mword_of_int (FST + 0x62)) Ra0 (mword_of_int 63 : mword 6)

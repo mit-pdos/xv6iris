@@ -360,7 +360,7 @@ Section ProofSysOpenJoin.
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (soi_050 with "Htext"). }
-      iIntros (CID3 Hq3) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID3 Hq3) "_". iIntros "Hcg Hpc".
       assert (Htg50 : add_vec (mword_of_int (SO + 0x50) : mword 64)
                         (sign_extend' 64 (mword_of_int 14 : mword 13))
                       = mword_of_int (SO + 0x5e)) by pcw.
@@ -468,7 +468,7 @@ Section ProofSysOpenJoin.
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (soi_05a with "Htext"). }
-      iIntros (CID6 Hq6) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID6 Hq6) "_". iIntros "Hcg Hpc".
       assert (Htg5a : add_vec (mword_of_int (SO + 0x5a) : mword 64)
                         (sign_extend' 64 (mword_of_int 188 : mword 13))
                       = mword_of_int (SO + 0x116)) by pcw.

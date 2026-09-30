@@ -493,7 +493,7 @@ Section ProofSysOpenWalk.
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (soi_0e6 with "Htext"). }
-      iIntros (CID5 Hq5) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID5 Hq5) "_". iIntros "Hcg Hpc".
       assert (Htge6 : add_vec (mword_of_int (SO + 0xe6) : mword 64)
                         (sign_extend' 64
                            (sign_extend' 13 (concat_vec (mword_of_int 19 : mword 8) ('b"0"))))
@@ -772,7 +772,7 @@ Section ProofSysOpenWalk.
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (soi_0f2 with "Htext"). }
-      iIntros (CID10 Hq10) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID10 Hq10) "_". iIntros "Hcg Hpc".
       assert (Htgf2 : add_vec (mword_of_int (SO + 0xf2) : mword 64)
                         (sign_extend' 64 (mword_of_int 8024 : mword 13))
                       = mword_of_int (SO + 0x4a)) by pcw.
@@ -873,7 +873,7 @@ Section ProofSysOpenWalk.
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (soi_0fa with "Htext"). }
-      iIntros (CID12 Hq12) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID12 Hq12) "_". iIntros "Hcg Hpc".
       assert (Htgfa : add_vec (mword_of_int (SO + 0xfa) : mword 64)
                         (sign_extend' 64
                            (sign_extend' 13 (concat_vec (mword_of_int 178 : mword 8) ('b"0"))))

@@ -1093,7 +1093,7 @@ Section ProofUvmcopy.
                 ltac:(vm_compute; discriminate) Hbz ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (uci_34 with "Htext"). }
-      iIntros (CIDl6 Hsl6) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CIDl6 Hsl6) "_". iIntros "Hcg Hpc".
       iEval (rewrite Htgt24) in "Hpc".
       assert (Holdnone : Pold.(ud_um) !! vpn_at vpn0 j = None)
         by exact (proj2 (proj2 (proj1 (proj1 Hviewo (vpn_at vpn0 j)) Hnone))).
@@ -1205,7 +1205,7 @@ Section ProofUvmcopy.
                 ltac:(vm_compute; discriminate) Hbz ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (uci_3e with "Htext"). }
-      iIntros (CIDl9 Hsl9) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CIDl9 Hsl9) "_". iIntros "Hcg Hpc".
       iEval (rewrite Htgt24') in "Hpc".
       assert (Holdnone : Pold.(ud_um) !! vpn_at vpn0 j = None)
         by exact (proj2 (proj2 (proj1 (proj1 Hviewo (vpn_at vpn0 j)) Hnone))).
@@ -1342,7 +1342,7 @@ Section ProofUvmcopy.
                 ltac:(vm_compute; discriminate) Hbz ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (uci_46 with "Htext"). }
-      iIntros (CIDl14 Hsl14) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CIDl14 Hsl14) "_". iIntros "Hcg Hpc".
       iEval (rewrite Htgt6c) in "Hpc".
       iDestruct (cpu_own_transport CIDl12 CIDl14 ilvl eb p b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
@@ -1781,7 +1781,7 @@ Section ProofUvmcopy.
                 ltac:(vm_compute; discriminate) Hbz ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (uci_64 with "Htext"). }
-      iIntros (CIDl27 Hsl27) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CIDl27 Hsl27) "_". iIntros "Hcg Hpc".
       iEval (rewrite Htgt24'') in "Hpc".
       iDestruct (cpu_own_transport CIDl26 CIDl27 ilvl eb p b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
@@ -1927,7 +1927,7 @@ Section ProofUvmcopy.
                 ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
                 Hz0 ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
       { iApply (uci_00 with "Htext"). }
-      iIntros (CIDz1 Hsz1) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CIDz1 Hsz1) "_". iIntros "Hcg Hpc".
       iEval (rewrite Htgt96) in "Hpc".
       iApply (wp_cli_s_sconf (mword_of_int (KernelSyms.uvmcopy + 0x96)) Ra0
                 (mword_of_int 0 : mword 6) (mword_of_int 0 : mword 64) mm K b
