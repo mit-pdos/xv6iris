@@ -300,7 +300,7 @@ Proof using .
             with "Hcg Hpc Hinstr [HR Hacc Hcont]").
   iApply bi.later_intro.
   rename CID into CID0.
-  iIntros (CID Hs). rewrite /sconf_step_obl. iSplitL "HR Hacc".
+  iIntros (CID Hs) "Hlc". rewrite /sconf_step_obl. iSplitL "HR Hacc".
   - (* ---------------- THE INSTRUCTION ---------------- *)
     iIntros "Hsc Hcap Hfile HPC HnPC Hresv".
     assert (Lpin_rs1 : tp_pin (CID := CID) m !!! Regidx rs1 = rget m rs1)
@@ -497,7 +497,7 @@ Proof using .
     iIntros (npc ms' m' n') "Hcg' Hpc' Hpay".
     iDestruct "Hpay" as (w) "(-> & -> & -> & HS)".
     iDestruct (sie_cap_gpr_at_close (CID := CID) with "Hcg'") as "Hcg'".
-    iSpecialize ("Hcont" $! CID with "[%]"); [ exact Hs | ].
+    iSpecialize ("Hcont" $! CID with "[%] Hlc"); [ exact Hs | ].
     iApply ("Hcont" $! w with "Hcg' Hpc' HS").
 Qed.
 
@@ -837,9 +837,9 @@ Proof using .
     iPureIntro. exact Hrd. }
   (* the callee's continuation shape carries [S w] LAST; ours carries [⌜P w⌝]
      FIRST -- reassemble across the wp_next/forall-w binders explicitly. *)
-  iIntros (CIDx) "%Hcid".
+  iIntros (CIDx) "%Hcid Hlc".
   iIntros (w) "Hcg Hpc %HPw".
-  iSpecialize ("Hcont" $! CIDx with "[]"); [ done | ].
+  iSpecialize ("Hcont" $! CIDx with "[] Hlc"); [ done | ].
   iApply ("Hcont" $! w with "[%] Hcg Hpc"). { exact HPw. }
 Qed.
 
@@ -911,9 +911,9 @@ Proof using .
     iFrame "Hproto". }
   (* the callee's continuation carries a trailing [emp] wand (S := emp) that
      ours does not -- discard it. *)
-  iIntros (CIDx) "%Hcid".
+  iIntros (CIDx) "%Hcid Hlc".
   iIntros "Hcg Hpc _".
-  iSpecialize ("Hcont" $! CIDx with "[]"); [ done | ].
+  iSpecialize ("Hcont" $! CIDx with "[] Hlc"); [ done | ].
   iApply ("Hcont" with "Hcg Hpc").
 Qed.
 

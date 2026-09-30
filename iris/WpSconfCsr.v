@@ -3118,7 +3118,7 @@ Section WpSconfCsr.
        resource below is about the hart the callback binds. *)
     rename CID into CID0.
     iIntros (CID Hs) "Hlc". rewrite /sconf_step_obl.
-    iSplitR "Hcont".
+    iSplitR "Hcont Hlc".
     - (* ---- the instruction: a read-MODIFY-write at x0 ---- *)
       iIntros "Hsc Hcap Hfile HPC HnPC Hresv".
       iDestruct (sconf_to_cells (CID := CID) with "Hsc") as (ms0 mdv0)
