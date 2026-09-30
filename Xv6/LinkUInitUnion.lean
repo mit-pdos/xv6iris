@@ -3,7 +3,12 @@
 Rocq `UInitUnion.v` (`/shared/xv6rocq/iris/UInitUnion.v` @ 1900b8a43):
 `union_Hinit_boot` (`UnionProgLaw` by name, its body
 `UInitUnionBoot.union_Hinit_boot_at` at the record's own equations) and
-**`union_adequacy_closed`**.  A `Link` file: it discharges every engine the
+**`union_adequacy_closed`**, and (drift D3-app, Rocq SY3-A4 f3109fa08 /
+cleanup D 393794335) the corollary **`union_sync_cut_neg`** and the audit's
+term **`union_results`**.  Since Rocq 57ba27441 the conclusion is
+`UnionOutPureSync.unionPhiSync`: each later boot is admissible at the LAST
+COMPLETED SYNC of the earlier cycles, not merely at a redirect typed
+earlier.  A `Link` file: it discharges every engine the
 lower layers take from `UL : UK_LEAVES` through the Proof/Link files
 (tools/check_layering.sh), and `USER` by the landed `userProof`.
 
@@ -34,6 +39,9 @@ Rocq's header, abridged:
 3. The record is read at the era's instance through the transport
    (`AppUnionPre`, AppLaws deviation 8); a dummy `CurCtx` is supplied to the
    lower layers' section binder (`UInitFileLeaves` binds one it never reads).
+   The sync-hook equation is transported the same way (`appUnion_hk_era`).
+4. `union_results` (Rocq a `Definition := conj …`) is a theorem stating the
+   conjunction of the two results' statements.
 -/
 import Xv6.AppUnionProg
 import Xv6.UInitUnionBoot

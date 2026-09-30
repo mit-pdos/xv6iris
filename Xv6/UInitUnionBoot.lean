@@ -34,6 +34,12 @@ Rocq's header, abridged:
    they read are `rfl` here).
 5. Rocq's `▷ boot_at gf s0 s` is `▷ UInitFileLeaves.initBootAt`; the era pin
    off the turn is `fturnCore_pin`.
+6. (sync SY3-A3bc/A4, drift D3-app/U) Rocq main's statement: the boot
+   resource is `UnionOutLed.unionBoot`, the turn `uturnI`, and the record's
+   sync-hook family `hhk : MachFixedGS.syncHook = unionHk filePred …` goes
+   to sh's round (`sh_round_holds_union_closed`); the deed's round position
+   (`urpos []`) and the era's boot fact (`f0Bt`) are read off the boot
+   resource as Rocq's.
 -/
 import Xv6.UInitUnionSup
 import Xv6.UshUPipesBody

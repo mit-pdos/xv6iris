@@ -41,6 +41,13 @@ instances above need them).
 3. `uWcf` is a `match` on `p` (as Rocq's); `uWcf_0/1/2/S3` are `rfl`.
 4. The record's fields at `unionLinkInstAt ug s0` are read by `show`/`rfl`
    (Rocq's `cbn [lk_pin lk_lpr union_link_inst_at gen_link_inst ...]`).
+
+DRIFT (Rocq main, sync SY3-A3bc/A4; drift D3-app/U): the deed carries the
+round position `urpos` (`urpos_mono`); the sync round's record `usyncPay` /
+`usyncRec` (Rocq `usync_pay` / `usync_rec`) rides the position-0 PEND arm of
+`uWcf`, and pays the round's payload at the prompt (`upr_of_rec`).
+`usync_prompt_ran` / `uoom_nsync` / `ucode_nsync` / `ulinesIn_last` are in
+`UshURoundTies`.
 -/
 import Xv6.UshURoundTies
 import Xv6.UnionLinkInstAt

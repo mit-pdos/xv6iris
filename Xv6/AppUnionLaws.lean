@@ -17,6 +17,20 @@ wave; lane header of `Xv6/UnionOutSeal.lean`).
    era's instance through `AppUnionPre`'s transport (AppUnionRec deviation
    1, AppLaws deviation 8).
 2. `al_tx`/`al_rx` carry no `Appcfg` (AppLaws deviation 3).
+3. (drift D3-app/U, Rocq SY3-A3bc) No section hypothesis `Hfa : fa_st =
+   riscv_pre_genGS`: the file application's counters (the started counter's
+   copy `syncStAuth`, the commit-era counter) are read at the ONE `MonoNatG`
+   of the machine instance (AppFileSyncReg deviation 1), which at the record's
+   pre-era instance IS `MachGpreS.mono_pre`, the transport's loan camera --
+   so `union_al_xfer` needs only `born` (`ffSt = γst`).
+4. `union_al_merge` reads `AppFileXfer.fileMerge` (a `[MachGS]` lemma) at
+   `AppUnionPre.atFixedGS F`, the record's fixed layer with every era name
+   `0`, and transports the claim and the token back to the pre-era instance
+   (`appUnion_pred_era`, `appUnion_tk_era`); Rocq's `Hst` is `born` at the
+   machine's `startName`.
+5. `union_al_found` / `union_al_back` are named wrappers of
+   `UnionOutSeal.union_found` / `unionLed_back` at the record's projections
+   (the class instance is elaborated without the pre-era instance).
 -/
 import Xv6.AppUnionProg
 import Xv6.UnionOutSeal

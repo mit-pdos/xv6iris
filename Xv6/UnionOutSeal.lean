@@ -13,6 +13,9 @@ of Rocq `UnionOut.v` §5-§7 reached through the instance `union_laws`:
    `obsBoots h + 1`.
 3. `union_led_tx`'s premise `match i with Uart0 => udrain_ret … | _ =>
    True` is the named `unionTxGo`.
+4. `union_led_pow`'s off-arm conclusion step is the named `unionPhiRes_off`;
+   `pinDom_single` / `unionW_fst_snoc` are the birth's registry domain and
+   Rocq's inline `fmap_app_inv` step.
 -/
 import Xv6.UnionOutLed
 import Xv6.UnionOutSealSteps
