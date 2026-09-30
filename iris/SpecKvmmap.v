@@ -22,7 +22,6 @@ Require Import PtTree.
 Require Import PtBuild KvmSpec.
 Require Import Riscv.riscv_extras.
 From Kernel Require KernelSyms.
-Require Import SlotGen.   (* [wchG]: mappages' lend, the permit sweep L2 *)
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import CtxIdDefs.
 

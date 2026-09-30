@@ -21,7 +21,6 @@ Require Import KallocInv.
 Require Import PtTree.
 Require Import PtBuild KvmMap KvmSpec.
 From Kernel Require KernelSyms.
-Require Import SlotGen.   (* [wchG]: mappages' lend, the permit sweep L2 *)
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import CtxIdDefs.
 
