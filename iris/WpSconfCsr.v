@@ -3447,8 +3447,8 @@ Section WpSconfCsr.
               with "Hcg Hsppc Hpc Hinstr [-]").
     iApply wp_next_off_intro_lc. iIntros "Hlc".
     iIntros (msf) "%Hf_sie %Hf_spp %Hf_spie Hcgat Hsppc Hpc".
-    iSpecialize ("Hcont" $! cpu_id with "[]"); [iPureIntro; done|].
-    iApply ("Hcont" $! msf with "[%] Hlc [%] [%] Hcgat Hsppc Hpc").
+    iSpecialize ("Hcont" $! cpu_id with "[] Hlc"); [iPureIntro; done|].
+    iApply ("Hcont" $! msf with "[%] [%] [%] Hcgat Hsppc Hpc").
     - rewrite Hf_sie Hsie0. reflexivity.
     - rewrite Hf_spp HWspp. reflexivity.
     - rewrite Hf_spie HWspie. reflexivity.
