@@ -102,6 +102,42 @@ theorem syncReg_agree (c : FileFixed) (k : Nat) (γ γ' : GName) :
   · iexact H1
   · iexact H2
 
+/-- The registry's authority (Rocq `ghost_map_auth (ff_reg c) 1 M`), spelled
+once so that every holder reads it at the camera `syncReg` is at. -/
+def syncRegAuth (c : FileFixed) (M : RegMapF GName) : IProp GF :=
+  c.ffReg ↪●MAP M
+
+instance syncRegAuth_timeless (c : FileFixed) (M : RegMapF GName) :
+    Timeless (syncRegAuth (GF := GF) c M) := by
+  unfold syncRegAuth; infer_instance
+
+/-- A fresh registry name, empty (Rocq `ghost_map_alloc_empty` at `ff_reg`). -/
+theorem syncRegAuth_alloc :
+    ⊢@{IProp GF} |==> ∃ γ : GName, ∀ c : FileFixed, ⌜c.ffReg = γ⌝ -∗ syncRegAuth c ∅ := by
+  imod (ghost_map_alloc_empty (GF := GF) (K := Nat) (V := GName) (H := RegMapF)) with ⟨%γ, H⟩
+  imodintro
+  iexists γ
+  iintro %c %hc
+  unfold syncRegAuth
+  rw [hc]
+  iexact H
+
+/-- THE ON-ARM'S REGISTRATION of an era's list (Rocq's `ghost_map_insert_persist`
+at `ff_reg`, in `UnionOut`'s on-arm). -/
+theorem syncRegAuth_insert (c : FileFixed) (M : RegMapF GName) (k : Nat) (γ : GName)
+    (hk : Std.PartialMap.get? M k = none) :
+    syncRegAuth (GF := GF) c M ⊢ |==> (syncRegAuth c (Std.PartialMap.insert M k γ) ∗ syncReg c k γ) := by
+  unfold syncRegAuth syncReg
+  iintro H
+  iapply (ghost_map_insert_persist (γ := c.ffReg) (m := M) k γ hk) $$ H
+
+/-- A registered era is in the authority's map. -/
+theorem syncRegAuth_lookup (c : FileFixed) (M : RegMapF GName) (k : Nat) (γ : GName) :
+    ⊢@{IProp GF} syncRegAuth c M -∗ syncReg c k γ -∗ ⌜Std.PartialMap.get? M k = some γ⌝ := by
+  unfold syncRegAuth syncReg
+  iintro Ha Hl
+  iapply ghost_map_lookup $$ Ha Hl
+
 /-! ## The run registry: era ↦ the running claim's position and deed names -/
 
 /-- PERSISTENT: era `k`'s running claim has position `p` and deed `d` (Rocq
@@ -176,12 +212,18 @@ theorem runAuth_register (c : FileFixed) (k k' : Nat) (p d : GName) (hk : k < k'
       omega
   · iexact Hel
 
-/-- Rocq `run_auth_0`. -/
-theorem runAuth_0 (c : FileFixed) :
-    (c.ffRun ↪●MAP (∅ : RegMapF (GName × GName))) ⊢@{IProp GF} runAuth c 0 := by
+/-- Rocq `run_auth_0`, at a fresh name (`ghost_map_alloc_empty` at `ff_run`,
+and `run_auth_0`). -/
+theorem runAuth_alloc :
+    ⊢@{IProp GF} |==> ∃ γ : GName, ∀ c : FileFixed, ⌜c.ffRun = γ⌝ -∗ runAuth c 0 := by
+  imod (ghost_map_alloc_empty (GF := GF) (K := Nat) (V := GName × GName) (H := RegMapF))
+    with ⟨%γ, H⟩
+  imodintro
+  iexists γ
+  iintro %c %hc
   unfold runAuth
-  iintro H
   iexists ∅
+  rw [hc]
   iframe H
   ipureintro
   exact pinDom_empty 0
