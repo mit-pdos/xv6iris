@@ -57,3 +57,6 @@ Build-time comparison (Sept 30, same VM): Rocq main 702 s wall / 16.4k s CPU; Le
 CI wave: lane A LANDED c0ee74e3b (tools/ci/audit.sh, tcb.sh); lane R LANDED b4f51e104 (lint, check_gen, coverage, profile, dead code/imports, Makefile).
 Lane R follow-up running (same agent a8f14ce73935a53ac): port `spin`, match Rocq on `unreachable`, byte-precise user coverage.
 Lane W (workflow) agent acbdaca0f65f4bde1. Lane V (vtest) a93577c4da3810840 still running.
+CI wave LANDED (Sept 30): V vtest b54ac23e3 (+virtio narrow-access fix), R follow-up 57b4dc386 (spin, byte-precise user coverage),
+W workflow 98a5f98a4 (.github/workflows/lean-ci.yml on coqdev; tools/ci/run_all.sh; dead-import report as a step).
+First real run: gh run 36699549880 (watch result). Open: 937 dead import lines reported (not applied).
