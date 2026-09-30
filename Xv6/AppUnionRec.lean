@@ -161,7 +161,7 @@ noncomputable def unionBoot (ug : UnionGn) (k : Nat) (r : FileAppNames) : IProp 
            fileEraPin ug.ugnFile k vf ∗ fcpPin vf ls ∗ fposh r ls.length
            ∗ flLb ug.ugnFile.fgnCl ls
            ∗ ⌜uadm ls (slast vf.feFloor) (dstContent s)⌝
-           ∗ fTyped (hlc := hlc) ug.ugnFile.fgnCl s
+           ∗ fTyped ug.ugnFile.fgnCl s
            ∗ runReg ug.ugnFile.fgnCl k r.fnPos r.fnDeed))
 
 /-! ## 2. The record -/
@@ -236,7 +236,8 @@ theorem union_Happ_init (g : GState) (sb : FsSb) (nib : Nat) (cov : ExtTreeSet N
       ⌜(appUnion (hlc := hlc) (GF := GF)).okc c r⌝ ∗
       (appUnion (hlc := hlc) (GF := GF)).pred c r
         (absView (imgState (fsBlocks (diskOf g.m.devs)) sb nib).fssInodes) := by
-  show unionCls (hlc := hlc) c ⊢ _
+  show unionCls (hlc := hlc) c ⊢ |==> ∃ r : FileAppNames, ⌜r.fnRole = true⌝ ∗
+    filePred (hlc := hlc) c.ugnFile.fgnCl r (absView (imgState (fsBlocks (diskOf g.m.devs)) sb nib).fssInodes)
   unfold unionCls
   iintro ⟨%γ0, #Hreg, Hh, Hcm, Hhi, Hra, #Hlb⟩
   iapply (fileInit_img (hlc := hlc) c.ugnFile.fgnCl (diskOf g.m.devs) XV6_DISK_BYTES sb nib cov γ0

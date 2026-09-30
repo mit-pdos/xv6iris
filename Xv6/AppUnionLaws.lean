@@ -66,6 +66,8 @@ theorem union_al_xfer (c : (appUnion (hlc := hlc) (GF := GF)).fixed) (gen : Nat)
   subst hn
   unfold uturn unionTn
   icases Htn with ⟨Hft, %γ, %vf, #Hreg, Hγ, #Hpin, Hcp, #Hbase, #HF⟩
+  ihave Hsa : syncStAuth (hlc := hlc) (GF := GF) c.ugnFile.fgnCl (gen + 1) $$ [Hsa]
+  · unfold syncStAuth; iexact Hsa
   imod (fileXferBoot (hlc := hlc) (GF := GF) c.ugnFile.fgnCl gen r av γ vf.feBase vf.feFloor hr)
     $$ Hsa Hγ Hreg Hbase HF Hp with Hx
   iapply bupd_except0_elim
@@ -74,7 +76,8 @@ theorem union_al_xfer (c : (appUnion (hlc := hlc) (GF := GF)).fixed) (gen : Nat)
   imod (fcp_set (GF := GF) vf ls) $$ Hcp with #Hcpp
   imodintro
   imodintro
-  iframe Hsa
+  isplitl [Hsa]
+  · unfold syncStAuth; iexact Hsa
   unfold uturn' unionBoot
   icases Hrest with (#HT | ⟨Hpos, Htk, #Hty, #Hrr, %Ls_c, -, -, %hFb⟩)
   · isplitl [Hft]
@@ -122,7 +125,7 @@ theorem union_al_boot_ok (c : (appUnion (hlc := hlc) (GF := GF)).fixed) (k : Nat
 
 /-- **Rocq `union_al_sync_run`**: THE SYNC RUNNER -- the hook IS the
 runner's body. -/
-theorem union_al_sync_run [MachFixedGS hlc GF] (c : (appUnion (hlc := hlc) (GF := GF)).fixed) (k : Nat) :
+theorem union_al_sync_run [MachFixedGS hlc GF] [FsTopG GF] (c : (appUnion (hlc := hlc) (GF := GF)).fixed) (k : Nat) :
     ⊢@{IProp GF} appSyncRunRaw (hlc := hlc) ((appUnion (hlc := hlc) (GF := GF)).pred c)
       ((appUnion (hlc := hlc) (GF := GF)).ok c (k + 1)) ((appUnion (hlc := hlc) (GF := GF)).okc c)
       ((appUnion (hlc := hlc) (GF := GF)).tk c k) ((appUnion (hlc := hlc) (GF := GF)).hk c k) := by
@@ -132,11 +135,25 @@ theorem union_al_sync_run [MachFixedGS hlc GF] (c : (appUnion (hlc := hlc) (GF :
   unfold appSyncRunRaw unionHk
   iintro !> %Q %gt %I %r %r' %hr %hr' %hrc HQ Hh Hn Hp HT
   iapply fupd_except0
-  imod (HQ $$ %I %r %r' %hr %hr' %hrc Hn Hp HT) with Hx
+  imod HQ $$ %I %r %r' %hr %hr' %hrc Hn Hp HT with Hx
   imodintro
   imod Hx with ⟨Hn, Hp, HT, HQ⟩
   imodintro
   iframe Hh Hn Hp HT HQ
+
+/-- the founding (Rocq `union_laws`' `al_found` field, `union_found`) -/
+theorem union_al_found (c : (appUnion (hlc := hlc) (GF := GF)).fixed) (k : Nat) :
+    ⊢@{IProp GF} (appUnion (hlc := hlc) (GF := GF)).turn'' c (k + 1) -∗
+      |==> ((appUnion (hlc := hlc) (GF := GF)).tk c k ∗ (appUnion (hlc := hlc) (GF := GF)).iturn c (k + 1)) :=
+  BI.entails_wand (union_found (hlc := hlc) (GF := GF) c k)
+
+/-- the return path (Rocq `union_laws`' `al_back` field, `union_led_back`) -/
+theorem union_al_back (c : (appUnion (hlc := hlc) (GF := GF)).fixed) (h : List Obs) :
+    ⊢@{IProp GF} (appUnion (hlc := hlc) (GF := GF)).R c (h ++ [Obs.powerOn]) -∗
+      (appUnion (hlc := hlc) (GF := GF)).turn' c (obsBoots h + 1) ==∗
+      (appUnion (hlc := hlc) (GF := GF)).R c (h ++ [Obs.powerOn]) ∗
+        (appUnion (hlc := hlc) (GF := GF)).turn'' c (obsBoots h + 1) :=
+  unionLed_back (hlc := hlc) (GF := GF) c h
 
 /-- **Rocq `union_al_R0`**. -/
 theorem union_al_R0 (c : (appUnion (hlc := hlc) (GF := GF)).fixed) :
@@ -300,8 +317,8 @@ theorem unionLaws (Hprog : UnionProgLaw (hlc := hlc) (GF := GF)) :
   al_programs := fun c htag hkill hcons hwild hrdw hmono hhk => Hprog c htag hkill hcons hwild hrdw hmono hhk
   al_echo := fun c htag hkill hcons hwild hrdw hmono => union_al_echo c htag hkill hcons hwild hrdw hmono
   -- THE SYNC LAWS (Rocq sync SY3-A3bc/A4)
-  al_found := fun c k => BI.entails_wand (union_found (hlc := hlc) (GF := GF) c k)
-  al_back := fun c h => unionLed_back (hlc := hlc) (GF := GF) c h
+  al_found := union_al_found
+  al_back := union_al_back
   al_boot_ok := union_al_boot_ok
   al_merge := fun c k hm hb => union_al_merge c k hm hb
   al_sync_run := fun c k => union_al_sync_run c k
