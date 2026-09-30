@@ -3,9 +3,10 @@
 that the top theorems reach.
 
 The Lean counterpart of Rocq's tools/proof_coverage.py (main).  The report is
-hierarchical: the kernel by xv6 source file, then one section per user
-program, each listing its functions and, for each, whether the proofs
-establish something about it.
+hierarchical: the kernel by xv6 source file (per function: is there a proved,
+linked, reached contract), then one section per user program (per
+instruction: does any proof in the cone step it, and if not, why that is
+safe).
 
 WHERE THE DATA COMES FROM
 -------------------------
@@ -56,7 +57,37 @@ Weaker evidence gives a weaker status:
 
 `Link` is the Spec/Proof/Link discipline's name for "the instance clients
 import" (tools/check_layering.sh); requiring it keeps this report and that
-discipline saying the same thing.
+discipline saying the same thing.  The discipline is the KERNEL's: Rocq has
+no Link file for any user function, so a user contract that is proved and
+reached counts as proven, and the report notes "(no Link file)".
+
+USER PROGRAMS: INSTRUCTION GRANULARITY
+--------------------------------------
+
+Contracts undercount what is verified of a user program: the union theorem
+covers every instruction the programs execute, whether or not the function
+it sits in has a contract of its own (syscall stubs are laws of the engine;
+printf is proved once and relocated to each image; a walk may run through
+several functions).  So the user sections are about INSTRUCTIONS:
+
+  * STEPPED: the instruction has a fact `uinstrIs γt pc rvc i` in the cone of
+    the top theorems.  A proof can step an instruction only through such a
+    fact, and every one is read off the program's dumped text
+    (`uinstrIs_of_text`, or a relocated table); tools/ci/EnvFacts.lean finds
+    the uses in the proof terms (the `X` facts).
+  * every other byte is EXPLAINED from the program's own control flow
+    (tools/text_coverage.py): a function unreachable from the ELF entry in
+    the call graph; one reachable only through call sites that are never
+    stepped; or, inside an executed function, a range behind a conditional
+    branch / jump-table arm / non-returning call that the proofs step
+    without ever stepping this successor -- so no verified run goes there.
+  * what cannot be explained is a FINDING: stepped code leads into it
+    unconditionally and nothing steps it.  In a sound cone that cannot
+    happen, so a finding means a proof is missing or the fact extraction
+    missed a source; `--check` fails on it either way.
+
+Per function the report says covered / partially covered (with the uncovered
+ranges and the reason for each) / never executed (with the reason).
 
 EXIT STATUS (`--check`)
 -----------------------
@@ -67,8 +98,12 @@ holds it to that:
 
   * every kernel function must be PROVEN, except the rows of
     tools/ci/coverage_allow.txt (each with its reason);
-  * every user function listed PROVEN in tools/ci/coverage_user_baseline.txt
-    must still be PROVEN (the floor: coverage may grow, never shrink);
+  * no user-program byte may be a FINDING (above), and no instruction fact
+    may sit at an address that is not an instruction of the image;
+  * per program, the stepped bytes must not drop below
+    tools/ci/coverage_user_baseline.txt, and every user function it lists
+    must still have a proved, reached contract (the floor: coverage may
+    grow, never shrink);
   * the allowlist and the baseline must not be stale (a row for a symbol
     that is not a function of the image, or an allowlisted function that is
     in fact proven);
@@ -94,6 +129,8 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import text_coverage as tc  # noqa: E402
 
 USER_PROGS = ["Init", "Sh", "Cat", "Grep", "Echo", "Seccomp", "Sync"]
 
@@ -125,6 +162,7 @@ class Func:
     status: str = NONE
     evidence: list = field(default_factory=list)
     callers: int = 0       # instructions of the image that jump to / call its entry
+    nolink: bool = False   # user function: proved and reached, by no Link* module
 
     @property
     def display(self):
@@ -320,6 +358,10 @@ class Facts:
     links: dict = field(default_factory=lambda: defaultdict(list))    # iface -> [(thm, module, reach)]
     direct: list = field(default_factory=list)                # [(thm, module, reach, [Pin])]
     decls: dict = field(default_factory=dict)                 # name -> (module, kind, reach)
+    stepped: dict = field(default_factory=lambda: defaultdict(set))   # prog -> {pc}: facts in the cone
+    unstepped: dict = field(default_factory=lambda: defaultdict(set)) # prog -> {pc}: facts outside it
+    fact_owners: int = 0
+    open_uses: list = field(default_factory=list)             # [(owner, module, reach, source)]
     ndecls: int = 0
     nmodules: int = 0
     cone: int = 0
@@ -347,6 +389,15 @@ def load_facts(path):
                 f.direct.append((p[1], p[2], int(p[3]), parse_pins(p[4])))
             elif k == "N":
                 f.cone = int(p[2])
+            elif k == "X":
+                pcs = {int(x, 16) for x in p[5].split()}
+                if int(p[3]) == 1:
+                    f.stepped[p[4]] |= pcs
+                    f.fact_owners += 1
+                else:
+                    f.unstepped[p[4]] |= pcs
+            elif k == "XU":
+                f.open_uses.append((p[1], p[2], int(p[3]), p[4]))
     return f
 
 
@@ -519,6 +570,20 @@ def classify(images, facts, manifest=None):
                 note(f, PARTIAL, dict(kind="referenced", what=f"{n} lemma(s)",
                                       how="in " + ", ".join(mods[:3]) + (" ..." if len(mods) > 3 else "")))
     errors = apply_manifest(images, facts, manifest or {}, maps)
+    # The Spec/Proof/Link discipline is the KERNEL's (Rocq has no Link file
+    # for any user function either): a user contract that is proved and
+    # reached is proven, and the missing Link file is a note, not a status.
+    for img, fs in images.items():
+        if img == "kernel":
+            continue
+        for f in fs:
+            if f.status == UNLINKED:
+                f.status, f.nolink = PROVEN, True
+                for e in f.evidence:
+                    if e["status"] == UNLINKED:
+                        e["status"] = PROVEN
+                        e["how"] = e["how"].replace(
+                            " and reached, but no Link* module concludes it", ", reached (no Link file)")
     # one line per fact, and only the facts that carry the function's status:
     # a proven function's contract is also "stated" by its body definition,
     # which is not news
@@ -537,6 +602,49 @@ def classify(images, facts, manifest=None):
 # --------------------------------------------------------------------------
 # 4. the floor
 # --------------------------------------------------------------------------
+
+ENTRY_RE = re.compile(r"^def entry : Nat := (0x[0-9a-f]+)", re.M)
+
+
+def user_text(repo, images, facts):
+    """Instruction-level coverage of every user program (tools/text_coverage.py).
+    -> {prog: dict(fns=[FnCov], summary={...}, problems=[...], indirect=n)}"""
+    out = {}
+    for prog, fs in images.items():
+        if prog == "kernel":
+            continue
+        with open(os.path.join(repo, "Xv6", "User", f"{prog}Image.lean"), encoding="utf-8") as fh:
+            src = fh.read()
+        a = src.index(f"namespace Xv6.User.{prog}.Sym")
+        m = ENTRY_RE.search(src)
+        entry = int(m.group(1), 16) if m else 0
+        text = tc.Text(tc.parse_text(src[:a]), [(f.name, f.addr, f.size) for f in fs], entry)
+        fns, problems = tc.analyze(text, facts.stepped.get(prog, set()))
+        out[prog] = dict(fns=fns, summary=tc.summarize(fns), problems=problems,
+                         indirect=len(text.indirect()),
+                         outside=len(facts.unstepped.get(prog, set()) - facts.stepped.get(prog, set())))
+    return out
+
+
+DEAD_ARMS = ("branch", "switch", "noreturn", "unentered", "padding")
+
+
+def text_findings(utext):
+    """-> [error]: bytes a proof steps into but nothing steps, and facts at
+    addresses that are not instructions."""
+    errs = []
+    for prog, u in utext.items():
+        for pr in u["problems"]:
+            errs.append(f"{prog.lower()}: {pr}")
+        for f in u["fns"]:
+            if f.status == "never" and f.why == "FINDING":
+                errs.append(f"{prog.lower()}: `{f.name}` (0x{f.addr:x}, {f.size} bytes) is {f.detail}")
+            for r in f.runs:
+                if r.why == "FINDING":
+                    errs.append(f"{prog.lower()}: `{f.name}` 0x{r.lo:x}..0x{r.hi:x} ({r.nbytes} bytes) "
+                                f"is never stepped although {r.detail}")
+    return errs
+
 
 def read_rows(path):
     """`<image>:<function>  # reason` rows -> {key: reason}."""
@@ -576,9 +684,64 @@ def call_sites(src):
     return out
 
 
-def check_floor(images, facts, allow, baseline):
+PC_NAME_RE = re.compile(r"(?:KA\.«(\w+)»|\b(\w+)Addr) \+ 0x([0-9a-fA-F]+)#64")
+GENERATED = ("KernelImage.lean", "KernelTree.lean", "KernelData.lean", "KernelElf.lean", "FsImgRaw.lean")
+
+
+def _camel(fn):
+    return "".join(w if i == 0 else w.capitalize() for i, w in enumerate(fn.split("_")))
+
+
+def call_site_audit(repo, funcs, callee):
+    """For a kernel function with NO contract: are its call sites ever stepped?
+
+    A kernel proof names the pc of each instruction it steps
+    (`KA.«f» + 0x1c#64`, or `fAddr + 0x1c#64`).  -> (call sites, how many of
+    them -- or of the two argument-setup instructions before each -- a Lean
+    source names, callers, how many of the callers' instruction pcs are named
+    at all, out of how many).  Zero named call sites while the callers are
+    otherwise stepped means every caller's proof refutes the arm that reaches
+    the call instead of stepping into it."""
+    with open(os.path.join(repo, "Xv6", "KernelImage.lean"), encoding="utf-8") as fh:
+        src = fh.read()
+    a = src.index("namespace MachCSL.KernelSyms")
+    text = tc.parse_text(src[:a])
+    amap = AddrMap(funcs)
+    camel = {_camel(f.name): f.name for f in funcs}
+    named = set()
+    for tree in ("Xv6", "MachCSL"):
+        d = os.path.join(repo, tree)
+        for fn in sorted(os.listdir(d)) if os.path.isdir(d) else []:
+            if not fn.endswith(".lean") or fn in GENERATED:
+                continue
+            with open(os.path.join(d, fn), encoding="utf-8") as fh:
+                for k, c, off in PC_NAME_RE.findall(fh.read()):
+                    name = k or camel.get(c)
+                    if name:
+                        named.add((name, int(off, 16)))
+
+    def is_named(addr):
+        r = amap.find(addr)
+        return r is not None and (r[0].name, r[1]) in named
+
+    sites = [i for i in text if i.target == callee.addr and amap.find(i.addr)
+             and amap.find(i.addr)[0] is not callee]
+    addrs = [i.addr for i in text]
+    hit = 0
+    for i in sites:
+        k = addrs.index(i.addr)
+        hit += any(is_named(addrs[j]) for j in (k, k - 1, k - 2) if j >= 0)
+    callers = {amap.find(i.addr)[0].name for i in sites}
+    tot = sum(1 for i in text if amap.find(i.addr) and amap.find(i.addr)[0].name in callers
+              and amap.find(i.addr)[1] != 0)
+    nn = sum(1 for i in text if amap.find(i.addr) and amap.find(i.addr)[0].name in callers
+             and amap.find(i.addr)[1] != 0 and is_named(i.addr))
+    return len(sites), hit, len(callers), nn, tot
+
+
+def check_floor(images, facts, allow, baseline, utext=None):
     """-> [error].  See the module docstring (EXIT STATUS)."""
-    errs = []
+    errs = text_findings(utext or {})
     by_key = {}
     for fs in images.values():
         for f in fs:
@@ -606,12 +769,19 @@ def check_floor(images, facts, allow, baseline):
             errs.append(f"kernel function `{f.display}` is {f.status}, not proven and linked ({ev}); "
                         "prove and link it, or add a row with the reason to tools/ci/coverage_allow.txt")
     for key in baseline:
+        if key.startswith("bytes "):
+            _, prog, n = key.split()
+            have = (utext or {}).get(prog, {}).get("summary", {}).get("covered", 0)
+            if have < int(n):
+                errs.append(f"{prog.lower()}: {have} text bytes are stepped by the proofs, the baseline "
+                            f"has {n} (coverage may grow, never shrink)")
+            continue
         f = by_key.get(key)
         if f is None:
             errs.append(f"coverage_user_baseline.txt: {key} is not a function of the image any more "
                         "(re-dumped image? rerun with --update-baseline and review the diff)")
         elif f.status != PROVEN:
-            errs.append(f"user function `{key}` was proven and linked (baseline) and is now {f.status}")
+            errs.append(f"user function `{key}` had a proved, reached contract (baseline) and is now {f.status}")
     return errs
 
 
@@ -647,25 +817,81 @@ def summarize(images):
     return rows
 
 
+def user_rows(images, utext):
+    """Per program: (prog, functions, contracts proven, without a Link file,
+    total bytes, stepped, unreachable, uncalled, dead arms, findings)."""
+    rows = []
+    for prog, u in utext.items():
+        fs = images[prog]
+        sm = u["summary"]
+        rows.append((prog, len(fs), sum(1 for f in fs if f.status == PROVEN),
+                     sum(1 for f in fs if f.nolink), sm.get("total", 0), sm.get("covered", 0),
+                     sm.get("unreachable", 0), sm.get("uncalled", 0),
+                     sum(sm.get(k, 0) for k in DEAD_ARMS), sm.get("FINDING", 0)))
+    return rows
+
+
+def contract_of(f):
+    if f.status == PROVEN:
+        e = f.evidence[0] if f.evidence else None
+        return (e["what"] if e else "proven") + (" (no Link file)" if f.nolink else "")
+    return "—" if f.status in (NONE, PARTIAL) else f.status
+
+
+def fn_explanation(fc, max_runs=None):
+    """Why the bytes of `fc` that no proof steps are safe."""
+    if fc.status == "covered":
+        pads = sum(r.nbytes for r in fc.runs)
+        return f"{pads} bytes of padding" if pads else ""
+    if fc.status == "never":
+        return f"{fc.why}: {fc.detail}"
+    runs = fc.runs if max_runs is None else fc.runs[:max_runs]
+    parts = [f"0x{r.lo:x}–0x{r.hi:x} ({r.nbytes}) {r.why}: {r.detail}" for r in runs]
+    if max_runs is not None and len(fc.runs) > max_runs:
+        rest = fc.runs[max_runs:]
+        kinds = sorted({r.why for r in rest})
+        parts.append(f"+{len(rest)} more ranges ({sum(r.nbytes for r in rest)} bytes: {', '.join(kinds)})")
+    return "; ".join(parts)
+
+
+USER_INTRO = (
+    "Instruction granularity.  A user proof steps an instruction only through a fact "
+    "`uinstrIs γt pc rvc i` read off the program's dumped text; **stepped** = the instruction "
+    "has such a fact in the cone of the top theorems.  Every other byte is explained from the "
+    "program's control flow: **unreachable** = a function not reachable from the ELF entry in "
+    "the call graph (library code nothing calls); **uncalled** = reachable only through call "
+    "sites that are themselves never stepped; **dead arms** = inside an executed function, "
+    "behind a branch / jump-table arm / non-returning call that the proofs step without ever "
+    "stepping this successor, so no verified run goes there.  A **finding** is a byte that "
+    "stepped code leads into unconditionally and nothing steps; the check fails on any.")
+
+
 def render_md(rep, verbose):
-    images, facts = rep["images"], rep["facts"]
+    images, facts, utext = rep["images"], rep["facts"], rep["utext"]
     L = []
     w = L.append
     w("## Proof coverage (Lean)\n")
-    kn, kb, kpn, kpb = totals(images["kernel"])
-    users = [f for img, fs in images.items() if img != "kernel" for f in fs]
-    un, ub, upn, upb = totals(users)
-    w(f"The pinned kernel image (`Xv6/KernelImage.lean`) and the seven user programs "
-      f"(`Xv6/User/*Image.lean`), against {facts.nmodules} modules / {facts.ndecls} declarations; "
-      f"`proven` = a `Link*` theorem concludes a whole-function contract AND is reached from "
+    w(f"Against {facts.nmodules} modules / {facts.ndecls} declarations; the cone is that of "
       + ", ".join(f"`{short(r)}`" for r, k in facts.roots if k == "top") + ".\n")
-    w("| image | functions | proven | text bytes | proven bytes | other |")
-    w("|---|---|---|---|---|---|")
-    for img, n, b, pn, pb, c in summarize(images):
-        other = ", ".join(f"{v} {s}" for s, v in c.items() if v and s != PROVEN) or "—"
-        name = "**kernel**" if img == "kernel" else f"`{img.lower()}`"
-        w(f"| {name} | {n} | {pn} ({pct(pn, n):.0f}%) | {b} | {pb} ({pct(pb, b):.0f}%) | {other} |")
-    w(f"| all user programs | {un} | {upn} ({pct(upn, un):.0f}%) | {ub} | {upb} ({pct(upb, ub):.0f}%) | |")
+    n, b, pn, pb = totals(images["kernel"])
+    c = {s: sum(1 for f in images["kernel"] if f.status == s) for s in STATUS_ORDER}
+    other = ", ".join(f"{v} {s}" for s, v in c.items() if v and s != PROVEN) or "none"
+    w(f"**Kernel** (`Xv6/KernelImage.lean`): **{pn}/{n} functions, {pb}/{b} text bytes "
+      f"({pct(pb, b):.1f}%)** proven = a `Link*` theorem concludes a whole-function contract and "
+      f"the top theorems reach it.  Not proven: {other} (each a row of "
+      "`tools/ci/coverage_allow.txt`).\n")
+    w("**User programs** (`Xv6/User/*Image.lean`), text bytes the proofs step:\n")
+    w("| program | text bytes | stepped | unreachable | uncalled | dead arms | findings | "
+      "functions | with a proved contract |")
+    w("|---|---|---|---|---|---|---|---|---|")
+    tot = [0] * 9
+    for prog, nf, pn_, nl, tb, cv, unr, unc, dead, fnd in user_rows(images, utext):
+        w(f"| `{prog.lower()}` | {tb} | {cv} ({pct(cv, tb):.0f}%) | {unr} | {unc} | {dead} | "
+          f"{fnd} | {nf} | {pn_}" + (f" ({nl} without a Link file)" if nl else "") + " |")
+        for i, v in enumerate((tb, cv, unr, unc, dead, fnd, nf, pn_, nl)):
+            tot[i] += v
+    w(f"| all | {tot[0]} | {tot[1]} ({pct(tot[1], tot[0]):.0f}%) | {tot[2]} | {tot[3]} | {tot[4]} | "
+      f"{tot[5]} | {tot[6]} | {tot[7]}" + (f" ({tot[8]} without a Link file)" if tot[8] else "") + " |")
     w("")
     if rep["errors"]:
         w("### :x: Coverage check failed\n")
@@ -674,7 +900,12 @@ def render_md(rep, verbose):
         w("")
     allow = rep["allow"]
 
-    def table(fs):
+    w("### Kernel\n")
+    for src, fs in group(images["kernel"]):
+        n, b, pn, pb = totals(fs)
+        full = pn == n
+        w(f"<details{'' if full else ' open'}><summary><code>{src}</code> — {pn}/{n} functions, "
+          f"{pb}/{b} bytes ({pct(pb, b):.0f}%)</summary>\n")
         w("| | function | addr | bytes | status | evidence |")
         w("|---|---|---|---|---|---|")
         for f in fs:
@@ -687,33 +918,37 @@ def render_md(rep, verbose):
                 ev += f" · allowlisted: {allow[f.key]}"
             w(f"| {STATUS_MARK[f.status]} | `{f.display}` | `0x{f.addr:08x}` | {f.size} | "
               f"{f.status} | {ev.replace('|', chr(92) + '|')} |")
-        w("")
-
-    w("### Kernel\n")
-    for src, fs in group(images["kernel"]):
-        n, b, pn, pb = totals(fs)
-        full = pn == n
-        w(f"<details{'' if full else ' open'}><summary><code>{src}</code> — {pn}/{n} functions, "
-          f"{pb}/{b} bytes ({pct(pb, b):.0f}%)</summary>\n")
-        table(fs)
-        w("</details>\n")
+        w("\n</details>\n")
     w("### User programs\n")
-    w("A user program is linked with the whole library; a function no verified program path "
-      "calls is not proved (and is not claimed). The floor is "
-      "`tools/ci/coverage_user_baseline.txt`.\n")
-    for img, fs in images.items():
-        if img == "kernel":
-            continue
-        n, b, pn, pb = totals(fs)
-        w(f"<details><summary><code>{img.lower()}</code> — {pn}/{n} functions, "
-          f"{pb}/{b} bytes ({pct(pb, b):.0f}%)</summary>\n")
-        shown = sorted(fs, key=lambda f: f.addr)
-        if not verbose:
-            rest = [f for f in shown if f.status == NONE]
-            shown = [f for f in shown if f.status != NONE]
-        table(shown)
-        if not verbose and rest:
-            w(f"No proof ({len(rest)}): " + ", ".join(f"`{f.name}`" for f in rest) + "\n")
+    w(USER_INTRO + "\n")
+    for prog, u in utext.items():
+        sm = u["summary"]
+        by_name = {f.name: f for f in images[prog]}
+        dead = sum(sm.get(k, 0) for k in DEAD_ARMS)
+        w(f"<details><summary><code>{prog.lower()}</code> — {sm.get('covered', 0)}/{sm.get('total', 0)} "
+          f"bytes stepped ({pct(sm.get('covered', 0), sm.get('total', 0)):.0f}%); not stepped: "
+          f"{sm.get('unreachable', 0)} unreachable, {sm.get('uncalled', 0)} uncalled, {dead} dead arms, "
+          f"{sm.get('FINDING', 0)} findings</summary>\n")
+        w("| function | addr | bytes | stepped | status | contract | the bytes not stepped |")
+        w("|---|---|---|---|---|---|---|")
+        unreach = []
+        for fc in u["fns"]:
+            if fc.status == "never" and fc.why == "unreachable" and not verbose:
+                unreach.append(fc)
+                continue
+            status = {"covered": "covered", "partial": "partially covered",
+                      "never": "never executed"}[fc.status]
+            why = fn_explanation(fc, None if verbose else 3).replace("|", chr(92) + "|")
+            w(f"| `{fc.name}` | `0x{fc.addr:x}` | {fc.size} | {fc.covered} | {status} | "
+              f"{contract_of(by_name[fc.name])} | {why or '—'} |")
+        w("")
+        if unreach:
+            w(f"Never executed, not reachable from the entry in the call graph "
+              f"({len(unreach)} functions, {sum(f.size for f in unreach)} bytes): "
+              + ", ".join(f"`{f.name}`" for f in unreach) + "\n")
+        if u["indirect"]:
+            w(f"({u['indirect']} indirect jump(s) in the text -- jump tables; their targets stay "
+              "inside the function, so the call graph is exact.)\n")
         w("</details>\n")
     if rep["notes"]:
         w("### Notes\n")
@@ -723,36 +958,58 @@ def render_md(rep, verbose):
 
 
 def render_text(rep, verbose):
-    images, facts = rep["images"], rep["facts"]
+    images, facts, utext = rep["images"], rep["facts"], rep["utext"]
     L = []
     w = L.append
     w("xv6 -- Lean proof coverage")
-    w("=" * 64)
+    w("=" * 72)
     w(f"proofs : {facts.nmodules} modules, {facts.ndecls} declarations, cone {facts.cone}")
     w("roots  : " + ", ".join(short(r) for r, k in facts.roots if k == "top"))
     w("")
-    for img, n, b, pn, pb, c in summarize(images):
-        other = ", ".join(f"{v} {s}" for s, v in c.items() if v and s != PROVEN)
-        w(f"{img.lower():<10} {pn:>3}/{n:<3} functions proven {pct(pn, n):>5.1f}%   "
-          f"{pb:>6}/{b:<6} bytes {pct(pb, b):>5.1f}%" + (f"   ({other})" if other else ""))
+    n, b, pn, pb = totals(images["kernel"])
+    c = {s: sum(1 for f in images["kernel"] if f.status == s) for s in STATUS_ORDER}
+    other = ", ".join(f"{v} {s}" for s, v in c.items() if v and s != PROVEN)
+    w(f"kernel     {pn:>3}/{n:<3} functions proven {pct(pn, n):>5.1f}%   "
+      f"{pb:>6}/{b:<6} bytes {pct(pb, b):>5.1f}%" + (f"   ({other})" if other else ""))
+    w("")
+    w("user text  bytes  stepped        unreachable uncalled dead-arms findings  contracts")
+    for prog, nf, pn_, nl, tb, cv, unr, unc, dead, fnd in user_rows(images, utext):
+        w(f"{prog.lower():<9} {tb:>6} {cv:>6} {pct(cv, tb):>5.1f}%  {unr:>10} {unc:>8} {dead:>9} {fnd:>8}  "
+          f"{pn_}/{nf}" + (f" ({nl} no Link file)" if nl else ""))
     w("")
     w(f"legend : {STATUS_MARK[PROVEN]} proven  ? unreached/unlinked  {STATUS_MARK[ASSUMED]} assumed  "
       f"{STATUS_MARK[PARTIAL]} partial")
     w("")
-    for img, fs in images.items():
-        for src, gfs in (group(fs) if img == "kernel" else [(img.lower(), sorted(fs, key=lambda f: f.addr))]):
-            n, b, pn, pb = totals(gfs)
-            w(f"{src:<18} {pn:>3}/{n:<3} fns  {pb:>6}/{b:<6} bytes {pct(pb, b):>5.1f}%")
-            for f in gfs:
-                if not verbose and f.status in (PROVEN, NONE):
-                    continue
-                w(f"  {STATUS_MARK[f.status]} {f.display:<24} 0x{f.addr:08x} {f.size:>5}B  {f.status}")
-                for e in f.evidence if verbose or f.status != PROVEN else []:
-                    w(f"        {e['kind']}: {e['what']}  {e['how']}")
+    for src, gfs in group(images["kernel"]):
+        n, b, pn, pb = totals(gfs)
+        w(f"{src:<18} {pn:>3}/{n:<3} fns  {pb:>6}/{b:<6} bytes {pct(pb, b):>5.1f}%")
+        for f in gfs:
+            if not verbose and f.status == PROVEN:
+                continue
+            w(f"  {STATUS_MARK[f.status]} {f.display:<24} 0x{f.addr:08x} {f.size:>5}B  {f.status}")
+            for e in f.evidence:
+                w(f"        {e['kind']}: {e['what']}  {e['how']}")
+    w("")
+    for prog, u in utext.items():
+        by_name = {f.name: f for f in images[prog]}
+        sm = u["summary"]
+        w(f"{prog.lower()}: {sm.get('covered', 0)}/{sm.get('total', 0)} bytes stepped")
+        for fc in u["fns"]:
+            if fc.status == "never" and fc.why == "unreachable" and not verbose:
+                continue
+            if fc.status == "covered" and not verbose:
+                continue
+            w(f"  {fc.name:<16} 0x{fc.addr:04x} {fc.covered:>4}/{fc.size:<4} {fc.status:<8} "
+              f"[{contract_of(by_name[fc.name])}]")
+            if fc.status == "never":
+                w(f"        {fc.why}: {fc.detail}")
+            for r in fc.runs:
+                if r.why != "padding" or verbose:
+                    w(f"        0x{r.lo:x}..0x{r.hi:x} ({r.nbytes}) {r.why}: {r.detail}")
     w("")
     if rep["errors"]:
         w("COVERAGE CHECK FAILED")
-        w("-" * 64)
+        w("-" * 72)
         for e in rep["errors"]:
             w(f"  {e}")
         w("")
@@ -762,15 +1019,22 @@ def render_text(rep, verbose):
 
 
 def render_json(rep, verbose):
-    images = rep["images"]
+    images, utext = rep["images"], rep["utext"]
     return json.dumps({
         "roots": rep["facts"].roots,
         "summary": [dict(image=img, functions=n, bytes=b, proven=pn, proven_bytes=pb, by_status=c)
                     for img, n, b, pn, pb, c in summarize(images)],
         "images": {img: [dict(name=f.name, aliases=f.aliases, addr=f"0x{f.addr:x}", bytes=f.size,
                               instructions=f.ninstr, source=f.source, status=f.status,
-                              evidence=f.evidence) for f in sorted(fs, key=lambda f: f.addr)]
+                              no_link_file=f.nolink, evidence=f.evidence)
+                         for f in sorted(fs, key=lambda f: f.addr)]
                    for img, fs in images.items()},
+        "user_text": {prog: dict(summary=u["summary"], problems=u["problems"], functions=[
+            dict(name=fc.name, addr=f"0x{fc.addr:x}", bytes=fc.size, stepped=fc.covered,
+                 status=fc.status, why=fc.why, detail=fc.detail,
+                 uncovered=[dict(lo=f"0x{r.lo:x}", hi=f"0x{r.hi:x}", bytes=r.nbytes, why=r.why,
+                                 detail=r.detail) for r in fc.runs]) for fc in u["fns"]])
+            for prog, u in utext.items()},
         "errors": rep["errors"], "notes": rep["notes"]}, indent=1)
 
 
@@ -810,20 +1074,46 @@ def main(argv=None):
     allow_path = os.path.join(repo, "tools", "ci", "coverage_allow.txt")
     base_path = os.path.join(repo, "tools", "ci", "coverage_user_baseline.txt")
     allow = read_rows(allow_path)
+    for f in images["kernel"]:
+        if f.status == NONE and f.callers:
+            ns, hit, nc, nn, tot = call_site_audit(repo, images["kernel"], f)
+            f.evidence.append(dict(
+                kind="no contract", status=NONE, what="call-site audit",
+                how=(f"{ns} call sites in {nc} functions; the proofs step {hit} of them (a proof "
+                     f"names the pc of each instruction it steps; {nn} of those functions' {tot} "
+                     "other instruction pcs are named)")))
+            if hit:
+                notes.append(f"kernel: {hit} call site(s) of `{f.name}`, which has no contract, "
+                             "are stepped by a proof")
+    utext = user_text(repo, images, facts)
+    for prog, u in utext.items():
+        if u["outside"]:
+            notes.append(f"{prog.lower()}: {u['outside']} more instruction(s) have a fact only in "
+                         "lemmas the top theorems do not reach; they are not counted as stepped")
+    gen = sorted({f"{o} ({m})" for o, m, r, _ in facts.open_uses if r == 1})
+    if gen:
+        notes.append("instruction facts taken at a symbolic pc (the engine's bridge from a relocated "
+                     "table to the program text; the tables' entries are counted where they are "
+                     "instantiated): " + ", ".join(gen))
     if a.update_baseline:
         keys = sorted(f.key for img, fs in images.items() if img != "kernel"
                       for f in fs if f.status == PROVEN)
         with open(base_path, "w", encoding="utf-8") as fh:
-            fh.write("# The user functions that are proven and linked (tools/proof_coverage.py).\n"
-                     "# `--check` fails if one of them stops being so: coverage may grow, never\n"
-                     "# shrink.  Regenerate with `tools/proof_coverage.py --update-baseline`\n"
-                     "# and review the diff -- a removed row is a lost proof.\n")
+            fh.write("# The floor of the user-program coverage (tools/proof_coverage.py --check):\n"
+                     "#   bytes <Prog> <n>   the text bytes of <Prog> the proofs step\n"
+                     "#   <Prog>:<function>  a function with a proved contract the top theorems reach\n"
+                     "# `--check` fails if a byte count drops or a function loses its contract:\n"
+                     "# coverage may grow, never shrink.  Regenerate with\n"
+                     "# `tools/proof_coverage.py --update-baseline` and review the diff -- a\n"
+                     "# removed row or a smaller number is a lost proof.\n")
+            for prog, u in utext.items():
+                fh.write(f"bytes {prog} {u['summary'].get('covered', 0)}\n")
             fh.write("\n".join(keys) + "\n")
         print(f"wrote {base_path} ({len(keys)} functions)", file=sys.stderr)
     baseline = read_rows(base_path)
-    errors = manifest_errors + check_floor(images, facts, allow, baseline)
+    errors = manifest_errors + check_floor(images, facts, allow, baseline, utext)
     rep = dict(images=images, facts=facts, notes=notes, errors=errors if a.check else [],
-               allow=allow)
+               allow=allow, utext=utext)
     text = {"text": render_text, "md": render_md, "json": render_json}[a.format](rep, a.verbose)
     if a.out:
         with open(a.out, "w", encoding="utf-8") as fh:
@@ -832,10 +1122,12 @@ def main(argv=None):
     else:
         print(text)
     kn, kb, kpn, kpb = totals(images["kernel"])
-    users = [f for img, fs in images.items() if img != "kernel" for f in fs]
-    un, ub, upn, upb = totals(users)
+    ub = sum(u["summary"].get("total", 0) for u in utext.values())
+    uc = sum(u["summary"].get("covered", 0) for u in utext.values())
+    uf = sum(u["summary"].get("FINDING", 0) for u in utext.values())
     print(f"coverage: kernel {kpn}/{kn} functions, {kpb}/{kb} bytes proven, linked and reached; "
-          f"user programs {upn}/{un} functions, {upb}/{ub} bytes", file=sys.stderr)
+          f"user programs {uc}/{ub} text bytes stepped, {ub - uc - uf} explained, {uf} findings",
+          file=sys.stderr)
     if a.check and errors:
         for e in errors:
             print(f"proof_coverage: {e}", file=sys.stderr)

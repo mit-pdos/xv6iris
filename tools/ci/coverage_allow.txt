@@ -8,11 +8,15 @@
 # error too, so the list cannot go stale.  The report prints each function's
 # call-site count in the image next to its row.
 #
-# -- linked, but outside the cone: nothing in this kernel calls them, so no
-#    caller's proof (hence no top theorem) uses the contract.  0 call sites.
-kernel:memcmp      # proved and linked (LinkMemcmp); no call site in the image
-kernel:memcpy      # proved and linked (LinkMemcpy); no call site in the image
-kernel:procdump    # proved and linked (LinkProcdump); no call site in the image
-# -- no contract at all
-kernel:spin        # entry.S's 2-byte `j spin` after `jal start`: start's contract continues at main and never returns, so the instruction is never reached; no contract is stated (Rocq proves wp_spin)
-kernel:unreachable # the verified xv6 branch's trap for impossible arms; no contract is stated: the callers' proofs treat the arm that reaches it as dead (e.g. Xv6/BfreeMid.lean, Xv6/BmapParts.lean refute the branch) rather than call it
+# -- proved and linked, but outside the cone: nothing in this kernel image
+#    transfers control to them, so no caller's proof (hence no top theorem)
+#    uses the contract.  Rocq's tools/proof_coverage.py reports all four as
+#    `proven` -- it asks for a Link instance and does not ask whether a top
+#    theorem reaches it; no file of Rocq's iris/ requires LinkMemcmp,
+#    LinkMemcpy, LinkProcdump or LinkSpin either.
+kernel:memcmp      # proved and linked (LinkMemcmp); no call site in the image.  Rocq: proven (LinkMemcmp.v)
+kernel:memcpy      # proved and linked (LinkMemcpy); no call site in the image.  Rocq: proven (LinkMemcpy.v)
+kernel:procdump    # proved and linked (LinkProcdump); no call site in the image.  Rocq: proven (LinkProcdump.v)
+kernel:spin        # proved and linked (LinkSpin, Rocq's SpecSpin/ProofSpin/LinkSpin); its only entry is the fall-through after `_entry`'s `jal start`, and start's contract continues at main and never returns, so no top theorem reaches the park loop.  Rocq: proven (declared, wp_spin), consumed by nothing
+# -- no contract, as in Rocq
+kernel:unreachable # `unreachable(char *)`, the verified xv6 branch's trap for impossible conditions (a byte store to the QEMU test device, then `j .`).  Rocq states no contract for it and its coverage reports it `none`; its note (claude-notes/completed/panic.md): "`unreachable(char *)` IS NOT `panic(char *)` ... All 25 `unreachable()` sites are refuted."  Same here: the report's call-site audit (recomputed on every run) finds that the proofs step none of its call sites -- every caller's proof refutes the guarding branch instead of stepping into the arm

@@ -26,6 +26,11 @@ green either way:
              Also: an `import Xv6.…`/`import MachCSL.…` of a module with no
              file, and a module imported twice by one file.
 
+vtest-lean/ (the device-conformance suite, outside the proof build) gets the
+`sorry`, `axiom` and `options` lints only: a test there passes by compiling,
+so a `sorry` would be a green test that checked nothing; its `native_decide`
+is intentional, and which of its files are built is tools/vtest's business.
+
 Rocq's comment lint (tools/comment_quote_check.py) has no counterpart: Lean
 does not lex string literals inside comments, so a quotation cannot swallow a
 comment terminator.
@@ -41,6 +46,14 @@ import sys
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TREES = ["Xv6", "MachCSL"]
 ROOTS = ["Xv6", "MachCSL"]           # the lake default targets
+# Trees outside the proof build that still must not fake a result.  vtest-lean/
+# (the device-conformance suite, its own `Vtest` lake library) gets the
+# `sorry`, `axiom` and `options` lints only: a test passes by COMPILING, so a
+# `sorry` there would be a green test that checked nothing.  Its
+# `native_decide` is how those tests evaluate the model and is intentional;
+# and which of its files are built is its own manifest's business
+# (tools/vtest), not the drift lint's.
+SIDE_TREES = {"vtest-lean": ("sorry", "axiom", "options")}
 
 
 def blank_comments_and_strings(src):
@@ -244,12 +257,21 @@ def run(repo, only=None):
         if os.path.exists(full):
             sources[p] = open(full, encoding="utf-8").read()
     found = []
+    nside = 0
     for p in files:
         found += lint_text(p, sources[p])
     found += lint_drift(repo, sources, read_allow(os.path.join(repo, "tools/ci/lint_allow.txt")))
+    for tree, lints in SIDE_TREES.items():
+        if not os.path.isdir(os.path.join(repo, tree)):
+            continue
+        side = lean_files(repo, [tree])
+        for p in side:
+            with open(os.path.join(repo, p), encoding="utf-8") as fh:
+                found += [f for f in lint_text(p, fh.read()) if f[0] in lints]
+        nside += len(side)
     if only:
         found = [f for f in found if f[0] in only]
-    return found, len(files)
+    return found, len(files) + nside
 
 
 def main(argv=None):

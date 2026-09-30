@@ -158,6 +158,53 @@ class ClassifyTests(unittest.TestCase):
         self.assertFalse(cov.is_link_module("Xv6.ProofKfree"))
 
 
+class UserContractTests(unittest.TestCase):
+    """The Link discipline is the kernel's: a user contract that is proved and
+    reached is proven, with the missing Link file as a note."""
+
+    def run_user(self, module):
+        imgs = images()
+        imgs["Cat"] = [cov.Func("Cat", "main", 0x7e, size=10)]
+        cov.classify(imgs, facts([
+            "I\tXv6.CAT_MAIN\twp_catMain\turun:Cat:0x7e:e",
+            f"L\tXv6.catMain_holds\t{module}\t1\tXv6.CAT_MAIN"]))
+        return imgs["Cat"][0]
+
+    def test_proved_without_a_link_file_counts_with_a_note(self):
+        f = self.run_user("Xv6.ProofCatMain")
+        self.assertEqual((f.status, f.nolink), (cov.PROVEN, True))
+        self.assertIn("(no Link file)", f.evidence[0]["how"])
+        self.assertIn("(no Link file)", cov.contract_of(f))
+
+    def test_proved_through_a_link_file_has_no_note(self):
+        f = self.run_user("Xv6.LinkCat")
+        self.assertEqual((f.status, f.nolink), (cov.PROVEN, False))
+
+    def test_the_kernel_still_needs_the_link_file(self):
+        imgs = images()
+        cov.classify(imgs, facts([
+            "I\tXv6.START\twp_start\tpcIs:-:0x80000008:e pcIs:-:ret:c",
+            "L\tXv6.start_proof\tXv6.ProofStart\t1\tXv6.START"]))
+        self.assertEqual(status(imgs, "start"), cov.UNLINKED)
+
+
+class FactTests(unittest.TestCase):
+    def test_only_facts_in_the_cone_are_stepped(self):
+        import os, tempfile
+        with tempfile.TemporaryDirectory() as d:
+            p = os.path.join(d, "envfacts.tsv")
+            with open(p, "w", encoding="utf-8") as fh:
+                fh.write("X\tXv6.a\tXv6.M\t1\tCat\t0x0 0x2\n"
+                         "X\tXv6.b\tXv6.M\t0\tCat\t0x2 0x4\n"
+                         "X\tXv6.c\tXv6.M\t1\tSh\t0x10\n"
+                         "XU\tXv6.bridge\tXv6.M\t1\tXv6.uinstrIs_of_text\n")
+            f = cov.load_facts(p)
+        self.assertEqual(f.stepped["Cat"], {0x0, 0x2})
+        self.assertEqual(f.unstepped["Cat"], {0x2, 0x4})
+        self.assertEqual(f.stepped["Sh"], {0x10})
+        self.assertEqual(f.open_uses, [("Xv6.bridge", "Xv6.M", 1, "Xv6.uinstrIs_of_text")])
+
+
 class ManifestTests(unittest.TestCase):
     FACTS = ["I\tXv6.KV\thandler\tpcIs:-:sym:c\t0x80000008",
              "L\tXv6.Kv\tXv6.LinkKv\t1\tXv6.KV",
@@ -220,9 +267,29 @@ class FloorTests(unittest.TestCase):
     def test_a_baselined_user_function_may_not_regress(self):
         imgs = self.proven({"_entry", "start", "helper", "spin"})
         errs = cov.check_floor(imgs, self.fx(), {}, {"Cat:main": ""})
-        self.assertIn("was proven and linked (baseline) and is now none", errs[0])
+        self.assertIn("had a proved, reached contract (baseline) and is now none", errs[0])
         imgs["Cat"][0].status = cov.PROVEN
         self.assertEqual(cov.check_floor(imgs, self.fx(), {}, {"Cat:main": ""}), [])
+
+    def utext(self, covered, finding=False):
+        fc = cov.tc.FnCov("main", 0x7e, 10, covered=covered, status="partial")
+        if finding:
+            fc.runs.append(cov.tc.Run(0x80, 0x84, 4, "FINDING", "0x7e (`li a0,1`) is stepped and "
+                                                                 "falls through to 0x80, which is not"))
+        return {"Cat": dict(fns=[fc], summary=cov.tc.summarize([fc]), problems=[], indirect=0, outside=0)}
+
+    def test_stepped_bytes_may_not_drop_below_the_baseline(self):
+        imgs = self.proven({"_entry", "start", "helper", "spin"})
+        self.assertEqual(cov.check_floor(imgs, self.fx(), {}, {"bytes Cat 6": ""}, self.utext(6)), [])
+        errs = cov.check_floor(imgs, self.fx(), {}, {"bytes Cat 8": ""}, self.utext(6))
+        self.assertEqual(len(errs), 1)
+        self.assertIn("6 text bytes are stepped by the proofs, the baseline has 8", errs[0])
+
+    def test_a_finding_fails_the_check(self):
+        imgs = self.proven({"_entry", "start", "helper", "spin"})
+        errs = cov.check_floor(imgs, self.fx(), {}, {}, self.utext(6, finding=True))
+        self.assertEqual(len(errs), 1)
+        self.assertIn("is never stepped although", errs[0])
 
     def test_empty_facts_fail_instead_of_reporting_nothing(self):
         imgs = self.proven({"_entry", "start", "helper", "spin"})

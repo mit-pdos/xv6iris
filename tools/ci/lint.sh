@@ -5,7 +5,7 @@
 #   layering   tools/check_layering.sh: the Spec/Proof/Link import discipline
 #              (a Spec imports no Code/Proof/Link file, a Proof no other
 #              Proof or Link, and only Link files import Proof files)
-#   sorry      no `sorry`/`admit` in Xv6/ or MachCSL/
+#   sorry      no `sorry`/`admit` in Xv6/, MachCSL/ or vtest-lean/
 #   axiom      no `axiom` declaration there
 #   native     no `native_decide`
 #   options    no file turning `autoImplicit` back on

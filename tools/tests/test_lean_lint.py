@@ -53,6 +53,22 @@ class TokenLintTests(unittest.TestCase):
         self.assertEqual(lints("def «sorry» : Nat := 0\n"), [])
 
 
+class SideTreeTests(unittest.TestCase):
+    def test_vtest_gets_sorry_but_not_native_or_drift(self):
+        import os, tempfile
+        with tempfile.TemporaryDirectory() as d:
+            for rel, text in {
+                    "Xv6.lean": "import Xv6.A\n", "MachCSL.lean": "", "Xv6/A.lean": "",
+                    "vtest-lean/Vtest/Ok.lean": "theorem t : P := by native_decide\n",
+                    "vtest-lean/Vtest/Bad.lean": "theorem t : P := by sorry\n"}.items():
+                os.makedirs(os.path.dirname(os.path.join(d, rel)), exist_ok=True)
+                with open(os.path.join(d, rel), "w", encoding="utf-8") as f:
+                    f.write(text)
+            found, n = lint.run(d)
+        self.assertEqual([(l, p) for l, p, _, _ in found], [("sorry", "vtest-lean/Vtest/Bad.lean")])
+        self.assertEqual(n, 3)
+
+
 class ImportTests(unittest.TestCase):
     def test_header_imports_only(self):
         src = ("/-\nimport Xv6.InAComment\n-/\n"

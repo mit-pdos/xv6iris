@@ -30,6 +30,11 @@ reader, and counted:
     modules or namespaces that are roots in their own right.
   * a `KEEP-UNREFERENCED` marker in the comment right above a declaration.
 
+Only Xv6/ and MachCSL/ are analysed.  vtest-lean/ (the `Vtest` library) is a
+test suite with no top theorem of its own: its modules are not loaded, and a
+declaration of MachCSL that only a vtest uses is reported here as unreached
+-- which is what it is, for the proofs.
+
 Generated declarations (recursors, projections, equation lemmas, matchers,
 `deriving` output) are never listed: they are not removable on their own.
 

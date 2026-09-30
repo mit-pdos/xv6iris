@@ -14,7 +14,8 @@ module MachCSL.URunRWDemo        # the D50 go/no-go spike for runRW
 module Xv6.UserTextSpikeEcho     # the DU3 spike on echo's dumped text
 
 # -- kernel functions that are proved and linked but that nothing in this
-#    kernel image calls (tools/ci/coverage_allow.txt has the same three)
+#    kernel image reaches (tools/ci/coverage_allow.txt has the same four)
 decl Xv6.Memcmp
 decl Xv6.Memcpy
 decl Xv6.Procdump
+decl Xv6.Spin

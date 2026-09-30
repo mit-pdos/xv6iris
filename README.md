@@ -297,11 +297,21 @@ tools/ci/vtest.sh check-ci             # device conformance: the model against t
 ```
 
 Proof coverage (`tools/proof_coverage.py`) joins the pinned images to the
-elaborated environment (`tools/ci/EnvFacts.lean`): a function is *proven*
-when a `Link*` theorem concludes a whole-function contract whose entry pc is
-the function's address and the top theorems (`tools/ci/roots.txt`) reach it.
-Every kernel function must be, except the rows of
-`tools/ci/coverage_allow.txt`.
+elaborated environment (`tools/ci/EnvFacts.lean`).
+
+* Kernel, per function: *proven* when a `Link*` theorem concludes a
+  whole-function contract whose entry pc is the function's address and the
+  top theorems (`tools/ci/roots.txt`) reach it.  Every kernel function must
+  be, except the rows of `tools/ci/coverage_allow.txt` (each with its reason
+  and what Rocq's coverage reports for it).
+* User programs, per instruction: *stepped* when the instruction has a fact
+  `uinstrIs γt pc rvc i` in the cone of the top theorems.  Every byte that is
+  not stepped is explained from the program's call graph and control flow
+  (`tools/text_coverage.py`): library code unreachable from the ELF entry,
+  functions reachable only through call sites no proof steps, and dead arms
+  behind a branch the proofs step one way.  A byte that stepped code runs
+  into and nothing steps is a *finding*, and fails the check.  The floor is
+  `tools/ci/coverage_user_baseline.txt`.
 
 Device conformance (`vtest-lean/`, `tools/vtest/`) re-checks the machine
 model -- the Sail hart as the language runs it, the two UARTs, the PLIC, the

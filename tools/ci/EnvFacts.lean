@@ -34,6 +34,12 @@ Output, tab-separated, one fact per line:
   L    <theorem> <module> <reach> <interface>             (a theorem CONCLUDING that interface)
   T    <theorem> <module> <reach> <pins> <mentions>       (a theorem whose conclusion pins a pc itself)
   U    <interface> <module>                               (an interface NO theorem concludes)
+  X    <owner> <module> <reach> <prog> <pcs>              (user instruction facts `owner`'s proof establishes:
+                                                           the instructions of program <prog> at <pcs>)
+  XU   <owner> <module> <reach> <source>                  (a use of an instruction-fact source whose program
+                                                           or pc is not closed and not a parameter)
+  XW   <wrapper> <module> <n>                             (a lemma that passes its own parameters on as the
+                                                           program / pc: its applications are read as facts)
   N    <`_native` certificates in the cone> <cone size> <local constants>   (informational)
 
 <pins> is `<pred>:<prog>:<addr>:<lvl>` items separated by spaces, in the order
@@ -361,6 +367,146 @@ partial def ifacePins (cfg : PinCfg) (h : Name) (depth : Nat := 4) : Option (Lis
     if nonEmpty ps then some [("-", ps)] else none
   | _ => none
 
+/-! ## user instruction facts
+
+Every instruction a user-program proof steps is an `uinstrIs γt pc rvc i`
+fact, and every such fact comes from the program's dumped text through
+`Xv6.uinstrIs_of_text` (one instruction) or `Xv6.ulibTabCode_of_text` /
+`Xv6.ulibPutcCode_of_text` (a relocated table: the one printf proof at each
+program's own printf.o; every entry of the table is a fact).  The
+uses are found in the proof TERMS: an application whose program and pc
+arguments are closed is a fact about that instruction of that program; one
+whose arguments are the enclosing theorem's own parameters makes that theorem
+a WRAPPER (`cat_uis γt pc …`, `stub_of_text … addr …`), whose applications
+are then read the same way. -/
+
+def paramMark (i : Nat) : Expr := .const (.num (.str .anonymous "_ciParam") i) []
+
+def paramOf? : Expr → Option Nat
+  | .const (.num (.str .anonymous "_ciParam") i) _ => some i
+  | _ => none
+
+/-- A `Nat`/`BitVec` expression as `param + k`, or a closed `k`. -/
+partial def evalLin (env : Environment) (e : Expr) : Option (Option Nat × Nat) :=
+  match paramOf? e with
+  | some i => some (some i, 0)
+  | none =>
+    match evalNat env e with
+    | some v => some (none, v)
+    | none =>
+      match e with
+      | .mdata _ b => evalLin env b
+      | .app .. =>
+        let args := e.getAppArgs
+        match e.getAppFn with
+        | .const ``HAdd.hAdd _ =>
+          if args.size == 6 then
+            match evalLin env args[4]!, evalLin env args[5]! with
+            | some (p1, k1), some (none, k2) => some (p1, k1 + k2)
+            | some (none, k1), some (p2, k2) => some (p2, k1 + k2)
+            | _, _ => none
+          else none
+        | .const ``BitVec.ofNat _ => if args.size == 2 then evalLin env args[1]! else none
+        | .const ``BitVec.toNat _ => if args.size == 2 then evalLin env args[1]! else none
+        | _ => none
+      | _ => none
+
+inductive Src (α : Type) where
+  | fixed (a : α)
+  | param (i : Nat)
+
+/-- One instruction-fact use, possibly still open in the owner's parameters. -/
+structure Tmpl where
+  prog : Src String
+  pc : Option Nat × Nat
+  /-- `none`: one instruction at `pc`; `some`: a table of offsets from `pc` -/
+  tab : Option (Src (Array Nat))
+
+def Tmpl.closed (t : Tmpl) : Option (String × Array Nat) :=
+  match t.prog, t.pc, t.tab with
+  | .fixed p, (none, k), none => some (p, #[k])
+  | .fixed p, (none, k), some (.fixed offs) => some (p, offs.map (k + ·))
+  | _, _, _ => none
+
+def Tmpl.maxParam (t : Tmpl) : Nat :=
+  let a := match t.prog with | .param i => i + 1 | _ => 0
+  let b := match t.pc.1 with | some i => i + 1 | none => 0
+  let c := match t.tab with | some (.param i) => i + 1 | _ => 0
+  max a (max b c)
+
+structure Target where
+  /-- an application is read at exactly this many arguments -/
+  need : Nat
+  tmpls : Array Tmpl
+
+/-- The offsets of a `List UlibIns` table constant. -/
+partial def tabOffs (env : Environment) (e : Expr) : Option (Array Nat) :=
+  match e with
+  | .const c _ =>
+    match env.find? c with
+    | some (.defnInfo d) =>
+      let rec go (e : Expr) (acc : Array Nat) : Array Nat :=
+        if e.isAppOf `Xv6.UlibIns.mk then
+          match evalNat env (e.getAppArgs[0]!) with
+          | some v => acc.push v
+          | none => acc
+        else match e with
+          | .app f a => go a (go f acc)
+          | .mdata _ b => go b acc
+          | .letE _ _ v b _ => go b (go v acc)
+          | _ => acc
+      let offs := go d.value #[]
+      if offs.isEmpty then none else some offs
+    | _ => none
+  | _ => none
+
+def instTmpl (env : Environment) (t : Tmpl) (args : Array Expr) : Option Tmpl := do
+  let prog ← match t.prog with
+    | .fixed p => some (Src.fixed p)
+    | .param j => do
+      let a ← args[j]?
+      match paramOf? a with
+      | some i => some (Src.param i)
+      | none => match progsOf a with
+        | [p] => some (Src.fixed p)
+        | _ => none
+  let pc ← match t.pc with
+    | (none, k) => some (none, k)
+    | (some j, k) => do
+      let a ← args[j]?
+      let (p, k') ← evalLin env a
+      some (p, k + k')
+  let tab ← match t.tab with
+    | none => some none
+    | some (.fixed o) => some (some (Src.fixed o))
+    | some (.param j) => do
+      let a ← args[j]?
+      match paramOf? a with
+      | some i => some (some (Src.param i))
+      | none => (tabOffs env a).map fun o => some (Src.fixed o)
+  some { prog, pc, tab }
+
+/-- The value of a constant with its leading lambdas opened at the markers. -/
+def openParams (v : Expr) : Expr :=
+  let rec count : Expr → Nat
+    | .lam _ _ b _ => count b + 1
+    | .mdata _ b => count b
+    | _ => 0
+  let rec body : Expr → Expr
+    | .lam _ _ b _ => body b
+    | .mdata _ b => body b
+    | e => e
+  let n := count v
+  (body v).instantiateRev ((Array.range n).map paramMark)
+
+def binderIdx (env : Environment) (c : Name) (b : Name) : Option Nat := do
+  let ci ← env.find? c
+  let rec go (e : Expr) (i : Nat) : Option Nat :=
+    match e with
+    | .forallE n _ r _ => if n == b then some i else go r (i + 1)
+    | _ => none
+  go ci.type 0
+
 end CiFacts
 
 open CiFacts in
@@ -508,6 +654,91 @@ open CiFacts in
     if let some fs := ifacePins cfg c then
       for (f, ps) in fs do emit (["I", c.toString, f] ++ fmtPins ps)
       emit ["U", c.toString, (modOf env c).getD .anonymous |>.toString]
+  -- ---- user instruction facts
+  let mut targets : Std.HashMap Name Target := {}
+  for (c, bp, bpc, btab) in [(`Xv6.uinstrIs_of_text, `hok, `pc, none),
+                              (`Xv6.ulibTabCode_of_text, `t, `base, some `tab)] do
+    match binderIdx env c bp, binderIdx env c bpc, btab.map (binderIdx env c) with
+    | some ip, some ipc, none =>
+      targets := targets.insert c
+        { need := max ip ipc + 1, tmpls := #[{ prog := .param ip, pc := (some ipc, 0), tab := none }] }
+    | some ip, some ipc, some (some it) =>
+      targets := targets.insert c
+        { need := max ip (max ipc it) + 1,
+          tmpls := #[{ prog := .param ip, pc := (some ipc, 0), tab := some (.param it) }] }
+    | _, _, _ =>
+      bad := true
+      IO.eprintln s!"EnvFacts: instruction-fact source `{c}` not found (or its binders were renamed)"
+  -- putc's relocation lemma carries its table itself
+  match binderIdx env `Xv6.ulibPutcCode_of_text `t, binderIdx env `Xv6.ulibPutcCode_of_text `base,
+        tabOffs env (.const `Xv6.ulibPutcTab []) with
+  | some ip, some ipc, some offs =>
+    targets := targets.insert `Xv6.ulibPutcCode_of_text
+      { need := max ip ipc + 1,
+        tmpls := #[{ prog := .param ip, pc := (some ipc, 0), tab := some (.fixed offs) }] }
+  | _, _, _ =>
+    bad := true
+    IO.eprintln "EnvFacts: instruction-fact source `Xv6.ulibPutcCode_of_text` / `Xv6.ulibPutcTab` not found"
+  let baseTargets := targets
+  let withVal := locals.filterMap fun (m, c, ci) =>
+    match ci.value? (allowOpaque := true) with
+    | some v => some (m, c, v, v.getUsedConstants)
+    | none => none
+  -- per owner: (closed facts, unresolved targets)
+  let mut owned : Std.HashMap Name (Array (String × Array Nat) × Array Name) := {}
+  let mut fresh : NameSet := targets.fold (fun s k _ => s.insert k) {}
+  let mut rounds := 0
+  while !fresh.isEmpty && rounds < 12 do
+    rounds := rounds + 1
+    let mut nxt : NameSet := {}
+    for (_, c, v, used) in withVal do
+      if baseTargets.contains c then continue
+      unless used.any fresh.contains do continue
+      let T := targets
+      let ref ← IO.mkRef (#[] : Array Expr)
+      (openParams v).forEachWhere
+        (fun e => match e.getAppFn with
+          | .const hd _ => match T[hd]? with
+            | some t => e.getAppNumArgs == t.need
+            | none => false
+          | _ => false)
+        (fun e => ref.modify (·.push e))
+      let mut facts : Array (String × Array Nat) := #[]
+      let mut opens : Array Tmpl := #[]
+      let mut unres : Array Name := #[]
+      for e in (← ref.get) do
+        let .const hd _ := e.getAppFn | continue
+        let some t := T[hd]? | continue
+        let args := e.getAppArgs
+        for tm in t.tmpls do
+          match instTmpl env tm args with
+          | none => unless unres.contains hd do unres := unres.push hd
+          | some r =>
+            match r.closed with
+            | some f => facts := facts.push f
+            | none => opens := opens.push r
+      owned := owned.insert c (facts, unres)
+      let old := (targets[c]?.map (·.tmpls.size)).getD 0
+      if opens.size != old then
+        if opens.isEmpty then
+          targets := targets.erase c
+        else
+          targets := targets.insert c
+            { need := opens.foldl (fun n t => max n t.maxParam) 0, tmpls := opens }
+        nxt := nxt.insert c
+    fresh := nxt
+  for (m, c, _, _) in withVal do
+    let some (facts, unres) := owned[c]? | continue
+    let mut byProg : Std.HashMap String (Array Nat) := {}
+    for (p, pcs) in facts do
+      byProg := byProg.insert p ((byProg.getD p #[]) ++ pcs)
+    for (p, pcs) in byProg.toList do
+      emit ["X", (userName c).toString, m.toString, reach c, p,
+            " ".intercalate (pcs.toList.eraseDups.map hex)]
+    for t in unres do
+      emit ["XU", (userName c).toString, m.toString, reach c, t.toString]
+    if let some t := targets[c]? then
+      emit ["XW", (userName c).toString, m.toString, toString t.tmpls.size]
   let nNative := c1.toList.filter (fun n => (n.toString.splitOn "._native.").length > 1) |>.length
   emit ["N", toString nNative, toString c1.size, toString locals.size]
   h.flush
