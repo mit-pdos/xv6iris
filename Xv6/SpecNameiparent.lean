@@ -1,6 +1,6 @@
 /-
 Specification of `nameiparent` (kernel/fs.c): the public contract.  A port of
-Rocq `SpecNameiparent.v` (`/shared/xv6rocq/iris/SpecNameiparent.v`), its
+Rocq `SpecNameiparent.v` (`iris/SpecNameiparent.v`), its
 `wp_nameiparent_gen`.
 
     struct inode*
@@ -46,7 +46,7 @@ The name buffer is `byteBuf (k.regs 11#5) (DFrac.own 1) (bview 14 nfun)`
 ## Dropped/simplified vs Rocq
 
 * `wp_nameiparent_sconf` (the COUNTED contract) -- uses checked (grep of
-  `/shared/xv6rocq/iris/*.v` outside SpecNameiparent/ProofNameiparent): no
+  `iris/*.v` outside SpecNameiparent/ProofNameiparent): no
   use; ProofSysLink / SysLinkBudget / ProofSysUnlinkW1 / SysUnlinkBudget
   call `wp_nameiparent_gen` -- reason: dead.
 * `ic_escrows`, `dq`, `gf`, `gs`/`gl` -- as SpecNamex.

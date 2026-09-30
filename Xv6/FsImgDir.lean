@@ -1,7 +1,7 @@
 /-
 **W6-W9 -- THE DIRECTORIES, THE DOTS, THE ROOT, AND THE LINK COUNTS** -- a
 port of Rocq `FsImg.v` §10, §10b, §11, §11b, the `fs_links_eq` sweep of
-§11c, and §11d (`/shared/xv6rocq/iris/FsImg.v` :1900-2465, :3325-3440).
+§11c, and §11d (`iris/FsImg.v` :1900-2465, :3325-3440).
 Chain position: `Xv6/FsImgUsed.lean` → this file → `Xv6/FsImgWf.lean`.
 
 * **W6** (`fsDirsWf`): `dirOk` / `dirInumsOk` ride in both icache escrow
@@ -29,7 +29,7 @@ helpers (`filter_all_true/false`, `fmap_seq_split`, `filter_nz_prefix`,
 `fs_slot_det`, `fs_slot_lt`, `NoDup_perm`, `elem_of_perm`, `filter_nz_mid`,
 `filter_nz_upd_perm`).  Rocq's own comment: "The pure durable invariant that
 swept THIS form is deleted (ruling 3)".  Uses checked: grep over
-`/shared/xv6rocq/iris/*.v` finds every one of these names ONLY in
+`iris/*.v` finds every one of these names ONLY in
 `FsImg.v`, and none of them is used by a lemma of `FsImg.v` outside that
 block.
 

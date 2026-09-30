@@ -40,7 +40,7 @@ The cell at `16(sp)` is never written; `0(sp)..15(sp)` is the `de` record
    `Xv6.dirlookupRegs` (DirlookupDefs), read through `calleeSaved`.
 5. Dropped as dead (the granularity premise is gone, fs-icache §15(b)):
    `dlk_rd_clamp_full`, `dlk_off_lt`, `dlk_off_lt31`, `dlk_nrec_pos` --
-   uses checked: `grep -w` over `/shared/xv6rocq/iris/*.v` finds them only
+   uses checked: `grep -w` over `iris/*.v` finds them only
    in ProofDirlookupParts.v, ProofDirlookup.v and ProofDirlink.v (dirlink's
    own copy is its agent's) -- reason: no live use in dirlookup.
 -/

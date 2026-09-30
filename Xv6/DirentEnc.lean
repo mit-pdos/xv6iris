@@ -3,7 +3,7 @@ The DIRECTORY ENTRY: `struct dirent`, its 16-byte encoding, the sixty-four of
 them that fill one block, and the NAME model the directory layer compares
 with.
 
-A port of Rocq `DirentEnc.v` (`/shared/xv6rocq/iris/DirentEnc.v`).  Rocq's
+A port of Rocq `DirentEnc.v` (`iris/DirentEnc.v`).  Rocq's
 header, kept because the reasons are the content:
 
 > The fourth byte vocabulary of the tree, after `BlockWords.v`'s words,

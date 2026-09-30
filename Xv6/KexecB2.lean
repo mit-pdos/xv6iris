@@ -4,7 +4,7 @@ PHASE B of kexec, SECOND CHUNK: the inlined loadseg page loop (+0x0f6 ..
 `bad:` tail six of kexec's eight `bad:` entries fall into (+0x31e ..
 +0x338), and the call sites both loops make.
 
-A port of Rocq `ProofKexecB2.v` (`/shared/xv6rocq/iris/ProofKexecB2.v`:
+A port of Rocq `ProofKexecB2.v` (`iris/ProofKexecB2.v`:
 `kxc_bad324`, `kxc_ls`), a STAGE file (no `Proof` prefix; the one seal is
 `ProofKexec.lean`).  THIS binary's addresses (Rocq's are +6 on the tail):
 

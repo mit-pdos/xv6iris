@@ -1,6 +1,6 @@
 /-
 **THE BLOCK BITMAP'S RESOURCE, AND THE FREE POOL**, ported from
-`/shared/xv6rocq/iris/BitmapInv.v`.  Design: the Rocq tree's
+`iris/BitmapInv.v`.  Design: the Rocq tree's
 `claude-notes/design/fs-bitmap.md`; survey §2.5.2.
 
 **THE GEOMETRY, read off balloc/bfree.**

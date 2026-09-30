@@ -1,6 +1,6 @@
 /-
 Specification of `fsinit` (kernel/fs.c): the public contract.  Mirrors Rocq
-`SpecFsinit.v` (`/shared/xv6rocq/iris/SpecFsinit.v`).
+`SpecFsinit.v` (`iris/SpecFsinit.v`).
 
     void fsinit(int dev) {
       struct buf *bp;

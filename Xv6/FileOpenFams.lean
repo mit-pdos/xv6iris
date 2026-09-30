@@ -1,6 +1,6 @@
 /-
 **THE FILE APPLICATION'S PIECE FAMILIES** -- the definitions of Rocq
-`FileOpen.v` (`/shared/xv6rocq/iris/FileOpen.v`, pinned 1900b8a43) §2-§5, the
+`FileOpen.v` (`iris/FileOpen.v`, pinned 1900b8a43) §2-§5, the
 part the union's cone reaches: what each piece of an open(O_CREATE) /
 read / read-only open bundle carries back to the deed's holder.  The lemmas
 that SUPPLY these pieces are `FileOpenClaim` (the claim read), `FileOpenCreate`

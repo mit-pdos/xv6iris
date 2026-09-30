@@ -1,7 +1,7 @@
 /-
 **THE IN-ERA DIRECTORY MOVES: A CHECKED-OUT DIRECTORY'S LINK TOKENS ACROSS
 `dirlink`, `unlink`, THE COUNT MOVES AND THE BORROWS.**  A port of Rocq
-`FsStateEra.v` (`/shared/xv6rocq/iris/FsStateEra.v`) from "THE DIRLINK
+`FsStateEra.v` (`iris/FsStateEra.v`) from "THE DIRLINK
 MOVE" (`dir_view_dirlink`, line 2084) to the end of the file (3196), i.e.
 the rest of §3 after `ent_toks_era_size0`.  `Xv6/FsStateEraRes.lean` is
 lines 1025--2067 and `Xv6/FsStateEraPure.lean` lines 1--1020 (whose header
@@ -64,7 +64,7 @@ sys_unlink, dirlookup) and IgetLic (`ent_toks_borrow`).
 
 ## Dropped/simplified vs Rocq
 
-Uses checked by `grep -rnw <name> /shared/xv6rocq/iris/*.v` (comments
+Uses checked by `grep -rnw <name> iris/*.v` (comments
 included, so a zero is a hard zero):
 
 * `ent_toks_x_era_dots_only` -- uses checked: none outside its own

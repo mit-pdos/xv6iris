@@ -1,6 +1,6 @@
 /-
 Specification of `namex` (kernel/fs.c), fs.c's path walker: the public
-contract.  A port of Rocq `SpecNamex.v` (`/shared/xv6rocq/iris/SpecNamex.v`).
+contract.  A port of Rocq `SpecNamex.v` (`iris/SpecNamex.v`).
 
     static struct inode*
     namex(char *path, int nameiparent, char *name)
@@ -106,7 +106,7 @@ so the loop is namex's own and `Xv6/PathElems.lean` models it directly.
 ## Dropped/simplified vs Rocq
 
 * `wp_namex_sconf` (the COUNTED contract, `namex_post`) -- uses checked
-  (comment-stripped grep of `/shared/xv6rocq/iris/*.v`): no caller outside
+  (comment-stripped grep of `iris/*.v`): no caller outside
   SpecNamex.v / ProofNamex.v (namei and nameiparent call `wp_namex_gen`;
   ProofNparEra.v's header records it has no twin) -- reason: dead.  The
   budget bridge `walkNeed_counted` / `walkSpend_counted` that the counted

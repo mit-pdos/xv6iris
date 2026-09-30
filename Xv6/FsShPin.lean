@@ -1,6 +1,6 @@
 /-
 **THE ERA-0 /sh PINS: THE /init PAIR REPLAYED FOR THE SHELL** -- the
-reached part of Rocq `FsShPin.v` (`/shared/xv6rocq/iris/FsShPin.v`, pinned
+reached part of Rocq `FsShPin.v` (`iris/FsShPin.v`, pinned
 `1900b8a43`; union cone audit: 19 of 26).
 
 Rocq's header, in short: the same three sentences `FsInitPin` proves for

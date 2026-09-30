@@ -1,7 +1,7 @@
 /-
 The ON-DISK inode: `struct dinode`, its 64-byte encoding, and the sixteen
 of them that fill one block.  A port of Rocq `DinodeEnc.v`
-(`/shared/xv6rocq/iris/DinodeEnc.v`).
+(`iris/DinodeEnc.v`).
 
 The counterpart of `Xv6/BlockWords.lean` one level up: that file reads a
 block as 256 little-endian `uint`s, this one reads it as `IPB = 16`

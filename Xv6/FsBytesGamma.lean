@@ -2,7 +2,7 @@
 **THE ONE BRIDGE** between the block layer's concrete byte map
 (`Xv6/FsBytes.lean`) and the abstract view record every stage-2
 file-system predicate is stated over (`Xv6/FsStateDefs.lean`).  Ported
-from `/shared/xv6rocq/iris/FsBytesGamma.v`.
+from `iris/FsBytesGamma.v`.
 
 `Xv6.FsViewNames`'s only disk-facing field is `phi`, an abstract
 byte-address-keyed points-to.  The file system is instantiated twice over

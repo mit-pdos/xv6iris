@@ -1,6 +1,6 @@
 /-
 **THE CHECK: `fsimgWf`** -- a port of Rocq `FsImg.v` §12
-(`/shared/xv6rocq/iris/FsImg.v` :3440-3634): the mkfs / durable-state
+(`iris/FsImg.v` :3440-3634): the mkfs / durable-state
 check W1-W9 as one boolean, and its readings.  Chain position: the last
 file of the `FsImg*` chain (`Xv6/FsImg.lean` → `FsImgDinode` →
 `FsImgTree` → `FsImgInode` → `FsImgUsed` → `FsImgDir` → this file);

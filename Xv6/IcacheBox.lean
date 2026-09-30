@@ -1,6 +1,6 @@
 /-
 **THE ICACHE INSTANCE OF THE TRANSIT BOX, PART 2: THE BOX ITSELF.**  A port
-of Rocq `IcacheEscrow.v` (`/shared/xv6rocq/iris/IcacheEscrow.v`) lines
+of Rocq `IcacheEscrow.v` (`iris/IcacheEscrow.v`) lines
 4082--4716, the first half of `Section IcacheBox`: the box λs `P_hdr` /
 `P_rest` (and the held / bare / frozen header λs) at an explicit context,
 their `CtxMorph` / `Timeless` obligations, the stitch's residues `Q1` / `Q2`,
@@ -90,7 +90,7 @@ instances (`ic_hdr_morph` → `icHdr_morph`, `ic_rest_morph`,
 ## Dropped/simplified vs Rocq
 
 Uses checked by `grep -rnw <name>` over comment-stripped
-`/shared/xv6rocq/iris/*.v` (all 1533 files, incl. Spec*/Proof*/FsCollect*/
+`iris/*.v` (all 1533 files, incl. Spec*/Proof*/FsCollect*/
 Link*/IcacheBoot/IcacheCover), and by a declaration-reachability pass from
 every other Rocq file (brief §5's method; instances excluded):
 

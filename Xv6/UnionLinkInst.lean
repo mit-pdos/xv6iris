@@ -1,6 +1,6 @@
 /-
 **`LinkRec` AT THE UNION MODEL** -- the cone-reached part of Rocq
-`UnionLinkInst.v` (`/shared/xv6rocq/iris/UnionLinkInst.v`, pinned 1900b8a43;
+`UnionLinkInst.v` (`iris/UnionLinkInst.v`, pinned 1900b8a43;
 cut C9e', design union.md §3 'The link record').
 
 Rocq's header, abridged: `GenLinksLine.gen_link_inst ulmG union_params`:

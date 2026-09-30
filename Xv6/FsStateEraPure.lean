@@ -1,6 +1,6 @@
 /-
 **THE IN-ERA INODE DICTIONARY, PURE HALF.**  A port of Rocq `FsStateEra.v`
-(`/shared/xv6rocq/iris/FsStateEra.v`) lines 1--1020: the file header,
+(`iris/FsStateEra.v`) lines 1--1020: the file header,
 §0 (a sparse map built over a range), §1 (the dictionary `eraNode` /
 `bmOf`), §2 (`InodeLocal` and `inodeOk`, both ways), §2b (the dirent
 readings are extensional below the record count) and §2b' (the payload's

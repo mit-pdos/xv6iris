@@ -8,8 +8,8 @@
 #
 #   lake build Xv6 MachCSL
 #
-# NO LEAN ON THE DEVELOPMENT MACHINE (README: "Build"): targets
-# marked [lean] are for the build VM and CI.
+# Targets marked [lean] need a machine sized for a Lean build (README:
+# "Build"), e.g. a build server or CI.
 
 .DEFAULT_GOAL := help
 

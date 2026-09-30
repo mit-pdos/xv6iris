@@ -31,7 +31,7 @@ spelling -- CC's deferral from `Xv6/FsCrashSector.lean` deviation 3.
    is only the destructuring (Rocq inlines both).
 
 **NOT PORTED (D36), uses checked:** `fs_rec_wf_hist_ne` (no use in
-`/shared/xv6rocq/iris/*.v`), `fs_recovery_of_mirror` (one use, a comment in
+`iris/*.v`), `fs_recovery_of_mirror` (one use, a comment in
 LogDefs.v).
 -/
 import Xv6.FsCrashPure

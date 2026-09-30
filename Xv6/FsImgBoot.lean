@@ -1,7 +1,7 @@
 /-
 **THE DISK AT THE LITERAL mkfs IMAGE** -- what the system theorem's
 literal-image corollary consumes, mirroring how Rocq states union adequacy
-"at the literal mkfs image" (`/shared/xv6rocq/iris/UUnionBootAdequacy.v`
+"at the literal mkfs image" (`iris/UUnionBootAdequacy.v`
 `union_adequacy_unionΣ`, and `SystemAdequacy.xv6_fs_adequacy_xv6Σ`): the
 hardware premise `Hdisk : v_disk (g.(gdev).(dvirtio)) = FsImgDisk.fsimg_dk`
 REPLACES `Himg`, which is derived from it (Rocq's two `assert`s).

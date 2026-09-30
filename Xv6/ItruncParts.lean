@@ -26,7 +26,7 @@ idempotent under bfree (`Xv6.itrunc_paid_use`), at ONE fixed epoch `e0`.
 **Dropped/simplified vs Rocq** (all proof-internal; no Rocq file outside
 ProofItrunc*.v uses any of them -- `grep -n 'it_ent_res\|it_dir_state\|
 it_ent_state\|inode_blocks_take\|inode_blocks_to_ent_res\|it_frame'
-/shared/xv6rocq/iris/*.v`):
+iris/*.v`):
 
 * ONE BLOCKS STATE FOR BOTH LOOPS.  Rocq indexes the direct loop's
   `inode_blocks` at `bm_dir_zeroed bm k` and the indirect loop's remainder

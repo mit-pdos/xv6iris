@@ -1,6 +1,6 @@
 /-
 **THE ECHO APPLICATION'S BIRTH AND ITS BOOT TRANSPORT** -- U4 seal wave: the
-declarations of Rocq `AppEcho.v` (`/shared/xv6rocq/iris/AppEcho.v`, pinned
+declarations of Rocq `AppEcho.v` (`iris/AppEcho.v`, pinned
 1900b8a43) that the union application's birth and transport read
 (`AppFile.file_birth`, `AppFile.file_xfer_boot`) and that the U0-X cone
 audit trimmed from `Xv6/AppEcho.lean` (its deviation 5).

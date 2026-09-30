@@ -1,7 +1,7 @@
 /-
 **THE ABSTRACT FILE-SYSTEM STATE, PURE: `Anode`/`Aview`, `absOf` AS A
 READING, THE WALK `apathAt`/`Arun`, AND THE VIEW `absView`.**  A port of
-Rocq `FsAbsDefs.v` (`/shared/xv6rocq/iris/FsAbsDefs.v`, 679 lines), WHOLE.
+Rocq `FsAbsDefs.v` (`iris/FsAbsDefs.v`, 679 lines), WHOLE.
 
 Rocq's header, kept because the reasons are the content:
 

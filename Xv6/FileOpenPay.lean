@@ -1,6 +1,6 @@
 /-
 **WHAT THE CREATE-OPEN HANDS BACK** -- §3g of Rocq `FileOpen.v`
-(`/shared/xv6rocq/iris/FileOpen.v`, pinned 1900b8a43), the part the union's
+(`iris/FileOpen.v`, pinned 1900b8a43), the part the union's
 cone reaches: the failure folds, paid, and the whole receipt at the
 redirect child's own mode.
 

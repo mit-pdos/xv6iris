@@ -1,6 +1,6 @@
 /-
 **/init's EXEC BUNDLE AT THE UNION RECORD** (lane U4) -- Rocq
-`UInitUnionBoot.v` (`/shared/xv6rocq/iris/UInitUnionBoot.v` @ 1900b8a43):
+`UInitUnionBoot.v` (`iris/UInitUnionBoot.v` @ 1900b8a43):
 `uslot_except_0_u`, `union_Hinit_boot_at`.
 
 Rocq's header, abridged:

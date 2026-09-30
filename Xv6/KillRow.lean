@@ -1,6 +1,6 @@
 /-
 **`p->killed`'s ROW: THE KILL FLAG'S GHOST SIDE** -- a port of the killed-row
-block of Rocq `SchedCtx.v` (`/shared/xv6rocq/iris/SchedCtx.v`, lines
+block of Rocq `SchedCtx.v` (`iris/SchedCtx.v`, lines
 ~180-600: `kill_row`, `kill_free`, `kill_paid` and their lemmas), wave 7
 decision D8 (the definitional layer of the fork/exit generation machinery).
 

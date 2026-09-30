@@ -1,7 +1,7 @@
 /-
 **THE SANITY CHECK, DISK SIDE: the fs.img mkfs built IS a well-formed file
 system** -- a port of Rocq `FsImgCheck.v` §1-§3
-(`/shared/xv6rocq/iris/FsImgCheck.v`), and Rocq's `SystemAdequacy.fsimg_image_wf`
+(`iris/FsImgCheck.v`), and Rocq's `SystemAdequacy.fsimg_image_wf`
 / `fsimg_snap_ok` (which Rocq keeps in the system theorem's file; here they
 close this file, so the system theorem imports ONE image file).
 

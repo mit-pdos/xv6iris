@@ -1,6 +1,6 @@
 /-
 **THE CLAIM'S READING OF THE VIEW UNDER EVERY LEG** -- §3 of Rocq
-`FileDeltas.v` (`/shared/xv6rocq/iris/FileDeltas.v`, pinned `1900b8a43`), the
+`FileDeltas.v` (`iris/FileDeltas.v`, pinned `1900b8a43`), the
 cone-reached part: `fOk` under the arm, the unarm, the create, the truncate
 and the write.
 

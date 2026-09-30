@@ -4,7 +4,7 @@ CONJUNCT `iregBlk`, THE BODY `iregBody`, THE ERA's TOP MAP `ftopInv` (the
 locked registry), THE BUNDLES `iregReg` / `iregInv`, THE RETAGS, AND THE
 BLOCK / SLOT ACCESSORS.**  A port of Rocq `InodeRegion.v`'s
 `Section InodeRegion`, lines 2760-3594
-(`/shared/xv6rocq/iris/InodeRegion.v`).  Lines 1595-2759 (the per-inum
+(`iris/InodeRegion.v`).  Lines 1595-2759 (the per-inum
 slot `iregSlot`) are `Xv6/InodeRegionSlot.lean`'s; lines 3595-5578 are
 wave 0d's `InodeRegionMovers` / `Withdraw` / `Link`.
 
@@ -101,7 +101,7 @@ are `Nat`-keyed.  Block `bi`'s slot `i` is the inum `16 * bi + i : Nat`
 ## Dropped/simplified vs Rocq
 
 * `ireg_reg_app` -- uses checked: `grep -w` over every
-  `/shared/xv6rocq/iris/*.v` (defs, Spec*, Proof*, Link*, FsAbs*, comments
+  `iris/*.v` (defs, Spec*, Proof*, Link*, FsAbs*, comments
   included): none outside its own definition -- dead (the brief's §5 list);
   `iregInv_app` is the live projection.
 * `ireg_top_retag_step`, `ireg_top_retag_armed_step` -- uses checked: same

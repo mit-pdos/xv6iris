@@ -1,7 +1,7 @@
 /-
 **THE INODE CACHE'S DEFINITIONAL LAYER, PART 2: THE `ref`-WORD INVARIANT
 AND THE itable LOCK'S IDENTITY BUDGET.**  A port of Rocq `IcacheInv.v` §5
-(`Section IcacheRefInv`, `/shared/xv6rocq/iris/IcacheInv.v` lines
+(`Section IcacheRefInv`, `iris/IcacheInv.v` lines
 1454–2303) and §6 (`Section IcacheTable`, lines 4171–4326).  §1–§4 are
 `Xv6/IcacheInvAlg.lean` (imported); §5b (2304–4168: the freeze mirror, the
 `*_store_pinw_au` movers) is `Xv6/IcacheInvFrz.lean` /
@@ -118,7 +118,7 @@ itable.lock's payload.
   `Qp.div_2` rewrites).
 
 ## Dropped/simplified vs Rocq (uses grep-checked over ALL of
-## `/shared/xv6rocq/iris/*.v`, comments stripped)
+## `iris/*.v`, comments stripped)
 
 * `iref_cells`, `iref_cells_acc`, `iref_cells_acc_upd`,
   `iref_cells_acc_del` -- uses checked: IcacheInv.v (their own lines) and

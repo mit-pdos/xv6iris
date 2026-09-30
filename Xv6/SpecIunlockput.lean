@@ -1,6 +1,6 @@
 /-
 Specification of `iunlockput` (kernel/fs.c): the public contract.  Mirrors
-Rocq `SpecIunlockput.v` (`/shared/xv6rocq/iris/SpecIunlockput.v`).
+Rocq `SpecIunlockput.v` (`iris/SpecIunlockput.v`).
 
     void iunlockput(struct inode *ip) {
       iunlock(ip);

@@ -1,6 +1,6 @@
 /-
 **THE APPLICATION INTERFACE** -- the RECORD half of Rocq `App.v`
-(`/shared/xv6rocq/iris/App.v` :122-251), and the console interface record it
+(`iris/App.v` :122-251), and the console interface record it
 names, Rocq `RiscvPtsto.app_iface` (:428-477) with `app_iface_triv` (:1002).
 User ruling D49 (w8_5_final.md): the system theorem is stated against ONE
 application record, because the user's real target, union adequacy (Rocq

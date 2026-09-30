@@ -105,7 +105,7 @@ as `Xv6/SpecBread.lean` does, and its crossing is the literal `true`.
    not a structure field.  Rocq keeps it a `Parameter` only "so that
    balloc and every other caller is unchanged"; no Rocq file outside
    SpecBfree/ProofBfree calls it (uses checked:
-   `grep -n wp_bfree_sconf /shared/xv6rocq/iris/*.v`), and it is Rocq's
+   `grep -n wp_bfree_sconf iris/*.v`), and it is Rocq's
    own four-line corollary (ProofBfree.v 1816–1858).
 6. NO `j`/`γl`-style process-list parameters beyond what `bread` takes
    (`Γ`, `j`), and no `Upr`/`proc_priv_bare`: the pid cell is

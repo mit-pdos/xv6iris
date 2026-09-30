@@ -1,7 +1,7 @@
 /-
 **THE FILE SYSTEM'S OWN RUNS: `xrFs`, the footprint as runs both ways, the
 free pool's named bytes, and the boot-side install.**  Section 3 of Rocq
-`/shared/xv6rocq/iris/FsDurXfer.v` (the three-way split's middle file;
+`iris/FsDurXfer.v` (the three-way split's middle file;
 `Xv6/FsDurXferRuns.lean` has the header of the whole).
 
 `fsFootprint` IS a `∗` of byte runs -- one per object -- and `xrFs` names
@@ -42,7 +42,7 @@ and no carve (`fsFootprint_install`).
    deviation 3: home sets are lists).
 
 ## Dropped/simplified vs Rocq (crash brief D36; grepped over ALL of
-`/shared/xv6rocq/iris/*.v`, comments included)
+`iris/*.v`, comments included)
 
 * `fs_footprint_install_nonvac` -- uses checked: none (a non-vacuity
   witness; nothing cites it).

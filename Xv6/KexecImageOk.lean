@@ -1,6 +1,6 @@
 /-
 **kexec's resume key and what kexec built at it** (the rest of Rocq
-`SpecKexec.v` §1b, `/shared/xv6rocq/iris/SpecKexec.v` :403-777): the part of
+`SpecKexec.v` §1b, `iris/SpecKexec.v` :403-777): the part of
 the pure layer `Xv6/KexecLoad.lean` deferred for the resume key `Uvis`
 (decision D17), now over the landed `Xv6/UexecSlot.lean` (`Uvis`, `uvisOf`,
 `umemLazy`, `tfW`, `tfResumePc`), `Xv6/UserPerm.lean` and the image rows of

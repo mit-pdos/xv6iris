@@ -1,7 +1,7 @@
 /-
 **namex AT THE ERA-FRAGMENT TRACE, namei side** (`a1 = 0`): the public
 contract.  A port of Rocq `SpecNamexEra.v`
-(`/shared/xv6rocq/iris/SpecNamexEra.v`, 312 lines).
+(`iris/SpecNamexEra.v`, 312 lines).
 
 ## Rocq's header, in short (the reasons are the content)
 

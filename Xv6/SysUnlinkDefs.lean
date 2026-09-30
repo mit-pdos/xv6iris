@@ -1,7 +1,7 @@
 /-
 **THE UNLINK FAMILY'S STATEMENT LEAF: the fused delta's side conditions,
 its two-instant split, and the THREE commit steps sys_unlink owns.**  A port
-of Rocq `SysUnlinkDefs.v` (`/shared/xv6rocq/iris/SysUnlinkDefs.v`, 355
+of Rocq `SysUnlinkDefs.v` (`iris/SysUnlinkDefs.v`, 355
 lines), WHOLE.  Definitions and small structural lemmas only -- no bundle,
 no arms, no frame.  sys_unlink's ONE contract is `SpecSysUnlink`'s
 `SYSUNLINK` (wave 7b, not yet ported), which states its bundle and arms

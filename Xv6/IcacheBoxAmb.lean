@@ -1,7 +1,7 @@
 /-
 **THE ICACHE INSTANCE OF THE TRANSIT BOX, PART 1: THE BUNDLE AT THE AMBIENT
 CONTEXT.**  A port of Rocq `IcacheEscrow.v`
-(`/shared/xv6rocq/iris/IcacheEscrow.v`) lines 3361--4081: the box-instance
+(`iris/IcacheEscrow.v`) lines 3361--4081: the box-instance
 header (M-1'…F20) and `Section IcacheBoxAmb` -- the header / rest bundle
 `P_hdr` / `P_rest` the icache's box parks, its held / bare / frozen
 variants, and their regroupings.  Parts 1--2 of the Rocq file are
@@ -127,7 +127,7 @@ every Timeless instance (`*_timeless`).
 ## Dropped/simplified vs Rocq
 
 Uses checked by `grep -rnw <name>` over comment-stripped
-`/shared/xv6rocq/iris/*.v` (all 1533 files, incl. Spec*/Proof*/FsCollect*/
+`iris/*.v` (all 1533 files, incl. Spec*/Proof*/FsCollect*/
 Link*/IcacheBoot/IcacheCover; the brief's §5 IcacheEscrow list
 re-verified):
 

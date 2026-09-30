@@ -37,9 +37,9 @@
 # or the harness broke).  A run with NO proof is a FINDING, not a failure: it
 # is absent from Vtest.lean and its row in the table says `no proof`.
 #
-# NO LEAN ON THE DEVELOPMENT MACHINE (README: "Build"): run this on
-# the build VM or in CI, e.g.
-#   /shared/xv6rocq/gcp-rocq/run-on-gcp tools/ci/vtest.sh check-ci
+# Needs a machine sized for a Lean build (README: "Build"): run it on
+# a build server or in CI, e.g.
+#   tools/ci/vtest.sh check-ci
 # Needs only `lake build MachCSL.Lang`'s cone (the model and the device
 # language), not the proof tree.  Measured on the VM: the whole suite, 150
 # run proofs, builds in ~10 s of wall clock (7 min of CPU) once the cone is

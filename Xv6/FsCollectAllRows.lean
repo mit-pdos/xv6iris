@@ -1,6 +1,6 @@
 /-
 **THE ASSEMBLY, PART 1: THE REGION'S CROSSINGS AND THE THREE SUPPLIERS AS
-ROWS.**  Sections 0-1 of Rocq `/shared/xv6rocq/iris/FsCollectAll.v` (crash
+ROWS.**  Sections 0-1 of Rocq `iris/FsCollectAll.v` (crash
 batch C-3, agent CJ).  `Xv6/FsCollectAllHand.lean` has section 2 (the
 hand's footprint), `Xv6/FsCollectAllBodies.lean` the core accessor
 `colBodies_acc`, `Xv6/FsCollectAll.lean` the opening and the law.

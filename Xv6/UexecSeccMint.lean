@@ -1,6 +1,6 @@
 /-
 **THE SECCOMP UNIVERSE, part 2: the bundle, the return and the minter**
--- Rocq `UexecSecc.v` §5–§9 (`/shared/xv6rocq/iris/UexecSecc.v`, pinned
+-- Rocq `UexecSecc.v` §5–§9 (`iris/UexecSecc.v`, pinned
 1900b8a43), the cone-reached declarations; part 1 (the key, the rows, the
 wild pipe) is `UexecSecc.lean`.
 

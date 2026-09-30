@@ -1,6 +1,6 @@
 /-
 **THE FILE APPLICATION'S PARTIAL-ARM NODE** -- Rocq `FileWritePart.v`
-(`/shared/xv6rocq/iris/FileWritePart.v`, pinned 1900b8a43), both
+(`iris/FileWritePart.v`, pinned 1900b8a43), both
 declarations (both cone-reached).
 
 Rocq's header, abridged (the reasons are the content):

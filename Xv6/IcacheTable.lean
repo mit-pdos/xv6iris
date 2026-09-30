@@ -1,7 +1,7 @@
 /-
 **THE INODE CACHE, LAST PART: THE itable LOCK'S RESOURCE, THE SLEEPLOCK
 FAMILY, THE ENVIRONMENT TRANSPORTS AND THE NAME ALLOCATION.**  A port of
-Rocq `IcacheEscrow.v` (`/shared/xv6rocq/iris/IcacheEscrow.v`) lines
+Rocq `IcacheEscrow.v` (`iris/IcacheEscrow.v`) lines
 5517--6376: §6 `Section IcacheTable` (`islot_empty` / `islot2`, the payload
 rows `itable_slot_res(_llb,_bare)`, `itable_res2(_llb,_bare)`, the release
 hook `itable_ctx_hook`, the handle `is_itable2` and its projections), §6b
@@ -148,7 +148,7 @@ functions first and the record assembled at the end.
 * The arm equations of deviation 2.
 
 ## Dropped/simplified vs Rocq (uses grep-checked over ALL of
-## `/shared/xv6rocq/iris/*.v`, comments stripped)
+## `iris/*.v`, comments stripped)
 
 * `itable_rows_to_llb` -- uses checked: none (IcacheEscrow.v only) --
   reason: dead (brief §5; `itableSlotRes_acc_upd_llb` inlines it).

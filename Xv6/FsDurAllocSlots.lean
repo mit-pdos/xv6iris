@@ -1,6 +1,6 @@
 /-
 **THE VALUE-FIRST CARVE, ITS PURE HALF: the footprint slot by slot.**
-Sections 2-2c of Rocq `/shared/xv6rocq/iris/FsDurAlloc.v` (crash batch C-1,
+Sections 2-2c of Rocq `iris/FsDurAlloc.v` (crash batch C-1,
 item CF; the enumeration 2d is `Xv6/FsDurAllocList.lean`, the ledger, the
 cut and the allocator are `Xv6/FsDurAlloc.lean`).
 

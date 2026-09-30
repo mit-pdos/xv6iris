@@ -1,7 +1,7 @@
 /-
 **THE INODE CACHE'S DEFINITIONAL LAYER, PART 1: THE PURE FACTS AND THE
 REFERENCE-COUNT ALGEBRA.**  A port of Rocq `IcacheInv.v` §1–§4
-(`/shared/xv6rocq/iris/IcacheInv.v` lines 1–1453); §5 onward (the `ref`-word
+(`iris/IcacheInv.v` lines 1–1453); §5 onward (the `ref`-word
 invariant `itable_inv`, `pinw_slot`, the `*_pinw_au` accessors, §5b's
 freeze mirror and store movers, §6 `islot`) is `Xv6/IcacheInvRef.lean` /
 `Xv6/IcacheInvFrz.lean` / `Xv6/IcacheInvStore.lean`.
@@ -97,7 +97,7 @@ their own: `NINODE`/`ISLOTSZ`/`ientry` are `Xv6/FsGeom.lean` /
    `ic_incr_upd`, `ic_alloc_upd`, `iref_lookup`, `seq_ninode_lookup`).
 
 ## Dropped/simplified vs Rocq (uses grep-checked over ALL of
-## `/shared/xv6rocq/iris/*.v` -- defs, `Spec*`, `Proof*`, `Link*`, the
+## `iris/*.v` -- defs, `Spec*`, `Proof*`, `Link*`, the
 ## syscall layer, `Ltac`/`Hint` bodies -- with comments stripped)
 
 * **The standalone liveness-pool cluster** (Rocq 390–762 and 820–1000):

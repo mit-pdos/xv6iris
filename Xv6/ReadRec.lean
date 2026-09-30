@@ -1,6 +1,6 @@
 /-
 **THE READ RECORD** -- what the SHELL'S READ takes of an era.  A port of Rocq
-`ReadRec.v` (`/shared/xv6rocq/iris/ReadRec.v`, pinned 1900b8a43).
+`ReadRec.v` (`iris/ReadRec.v`, pinned 1900b8a43).
 
 Rocq's header, abridged: `LinkRec` carries the read's RETURN as the single
 field `lk_rr`, which is right for the two places that only PASS it;

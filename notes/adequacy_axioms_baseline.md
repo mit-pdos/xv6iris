@@ -3,7 +3,7 @@
 **THE TOOLS ARE THE SOURCE OF TRUTH; this note explains them and keeps the history.**
 (CI-parity lane A, Sept 30 2026.  The Lean twins of Rocq's `make audit-all-only` and `tools/tcb/`.)
 
-| what | run (on the build VM / in CI, against a built tree) | checked against | fails when |
+| what | run (on a build machine or in CI, against a built tree) | checked against | fails when |
 |---|---|---|---|
 | assumption audit: what the PROOFS assume | `tools/ci/audit.sh` (`tools/audit/Audit.lean`) | `tools/audit/baseline.json` (hand-kept) | a theorem's axioms outside the `bv_decide` certificate family, or the `opaque` constants in its cone, differ from the baseline in either direction; a certificate-named axiom has the wrong shape; a platform hook is not a definition; any declaration of `MachCSL`/`Xv6` depends on `sorryAx` |
 | trusted base: what a reader must READ | `tools/ci/tcb.sh` (`tools/tcb/Tcb.lean`) | `tools/tcb/expected.json` (`tools/ci/tcb.sh --update`) | for some theorem, the set of this tree's modules its STATEMENT reaches, or the axioms/opaques it reaches, moved |
@@ -172,7 +172,7 @@ hypotheses `hZkr`, `g.gen = 0`, `g.pow = false`, `diskOf g.m.devs = fsImgDisk`.
 `hZkr` covers only the user CSR rows for 0x747/0x757 (mseccfg/mseccfgh): today the model has NO step there
 (the Lean backend's eager `&&` reaches `currentlyEnabled Ext_Zkr`, whose clause is missing because the Zkr
 module isn't compiled). It disappears under either fix: Sail's one-line Zkr clause in regen_sail_model.sh,
-or the backend's short-circuit fix (upstream patch prepared in /shared/sail-upstream). User decision pending.
+or the backend's short-circuit fix (upstream patch prepared). User decision pending.
 BootReset phase 3 (Sept 29 2026): the `MachCSL.resetVal` register reset table is GONE. `bootFacts`' register
 clause is a run of `bootProg` from arbitrary power-on garbage (Rocq `boot_facts`); axioms of the three
 theorems unchanged in kind (propext, Classical.choice, Quot.sound + bv_decide certificates; 958 -> 962 lines).
@@ -180,7 +180,7 @@ theorems unchanged in kind (propext, Classical.choice, Quot.sound + bv_decide ce
 ## `hZkr` gone: the model short-circuits `&`/`|` (Sept 29 2026, lane ZKR-SC)
 
 The model is regenerated with the short-circuit Sail Lean backend (sail 5745ea9e + the
-`lean-short-circuit` commit d0ef9371 of /shared/sail-upstream; see tools/regen_sail_model.sh). The
+`lean-short-circuit` commit d0ef9371 ; see tools/regen_sail_model.sh). The
 hypothesis is discharged, not assumed: the CSR rows for every csr number (0x747/0x757 included) are plain
 walks of the model's `check_CSR_result`.
 

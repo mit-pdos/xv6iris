@@ -1,7 +1,7 @@
 /-
 **THE PARTIAL ARM AT A MAPPED SOURCE, WITHOUT A PURE PREMISE ABOUT EVERY
 VIEW** -- the cone-reached part of Rocq `FsAbsWritePart.v`
-(`/shared/xv6rocq/iris/FsAbsWritePart.v`, pinned 1900b8a43): the one lemma
+(`iris/FsAbsWritePart.v`, pinned 1900b8a43): the one lemma
 `awrite_part_adv_mapped_straddle` (l.95).
 
 Rocq's header, abridged (the reasons are the content):

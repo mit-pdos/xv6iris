@@ -1,7 +1,7 @@
 /-
 **SNAPSHOT COMMITS: the durable file-system instance is ALLOCATED AFRESH at
 every group commit and never updated.**  The resource half (sections 5-8) of
-Rocq `/shared/xv6rocq/iris/FsDurSnap.v` (crash batch C-1, item CE; the pure
+Rocq `iris/FsDurSnap.v` (crash batch C-1, item CE; the pure
 tie `SnapBytes` / `snapOk` is `Xv6/FsDurSnapBytes.lean`).
 
 THE ONE IDEA (Rocq's header).  No durable ghost is ever moved.  At a group
@@ -56,7 +56,7 @@ the one pure conjunct `SnapShape`); the GUEST half `snapGuest`; the pair
    `∗`" lemma) where Rocq rewrites and uses `blk_owned_excl`.
 
 ## Dropped vs Rocq (crash brief D36; each grepped over ALL of
-`/shared/xv6rocq/iris/*.v` outside the D36-skipped files)
+`iris/*.v` outside the D36-skipped files)
 
 * `P_dur`, `P_dur_timeless`, `P_dur_tie`, `P_dur_tie_keep` (the non-`_at`
   registry and its readings) -- uses checked: comments only (BootShared.v,

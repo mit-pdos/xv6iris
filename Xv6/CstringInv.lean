@@ -2,7 +2,7 @@
 The INVERSE of the C-string encoding: a byte buffer that contains a NUL
 DETERMINES the string it holds.
 
-A port of Rocq `CstringInv.v` (`/shared/xv6rocq/iris/CstringInv.v`).  Rocq's
+A port of Rocq `CstringInv.v` (`iris/CstringInv.v`).  Rocq's
 header: `cstring_bytes` goes string -> bytes and the tree had no way back, so
 every reader of a NUL-terminated byte buffer had to ASSUME the split existed
 (`syscall()`'s `printk("%s", p->name)` fallback did, as a module axiom, and

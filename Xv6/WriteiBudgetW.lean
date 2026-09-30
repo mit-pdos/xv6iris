@@ -1,5 +1,5 @@
 /-
-**writei's LOG BUDGET**, ported from `/shared/xv6rocq/iris/WriteiBudget.v`
+**writei's LOG BUDGET**, ported from `iris/WriteiBudget.v`
 sections 1, 4, 5, 8, 9, 10 and 11 -- the sections `Xv6/WriteiBudget.lean`
 (section 6, `logAmort`) and `Xv6/WriteiBudgetBitmap.lean` (section 2,
 `oneBitmapBlock`) deferred to writei's wave because they are stated over
@@ -33,7 +33,7 @@ rests on and that the callers (dirlink, filewrite, create) cite by name
 inside WriteiBudget.v's own section-4 motivation) and section 7 (`wi_fset`,
 `wi_fset_grow`: the reserved set of the parked two-credit `logAmort`
 accounting, referenced by no other Rocq file) -- `grep -w` over
-`/shared/xv6rocq/iris/*.v` finds `wi_logset`/`wi_fset`/`wi_indset` only in
+`iris/*.v` finds `wi_logset`/`wi_fset`/`wi_indset` only in
 WriteiBudget.v.  Both are about the parked "two-credit day"; neither is
 consumed by writei or any caller.
 -/

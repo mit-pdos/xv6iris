@@ -1,7 +1,7 @@
 /-
 **THE ON-DISK DINODE SLOT**: the arithmetic that finds it, the addresses it
 sits at, and the resource it is.  A port of Rocq `DinodeSlot.v`
-(`/shared/xv6rocq/iris/DinodeSlot.v`).
+(`iris/DinodeSlot.v`).
 
 Shared vocabulary of the two functions that move a dinode between the disk
 and the icache -- `iupdate` flushes it out, `ilock` loads it in -- so it

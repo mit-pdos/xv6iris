@@ -1,6 +1,6 @@
 /-
 **THE ERA'S FILE-SYSTEM MINT, READ OFF THE DURABLE SNAPSHOT** -- section 9 of
-Rocq `FsCfgSnap.v` (`/shared/xv6rocq/iris/FsCfgSnap.v` :807-1357,
+Rocq `FsCfgSnap.v` (`iris/FsCfgSnap.v` :807-1357,
 `fs_cfg_alloc_snap`), crash batch C-5 item CL.  The vocabulary (sections
 1-8) is `Xv6/FsCfgSnapVocab.lean`; FirstTok's two snapshot producers are
 `Xv6/FsCfgSnapFirst.lean`.

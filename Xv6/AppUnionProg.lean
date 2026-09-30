@@ -1,6 +1,6 @@
 /-
 **THE ONE LAW THAT IS OWED, NAMED** (lane U4) -- Rocq
-`UUnionBootAdequacy.union_prog_law` (`/shared/xv6rocq/iris/UUnionBootAdequacy.v`
+`UUnionBootAdequacy.union_prog_law` (`iris/UUnionBootAdequacy.v`
 @ 1900b8a43, §1): `App.al_programs` at `app_union`, verbatim from the class
 (`AppLaws.Xv6AppLaws.al_programs` at `appUnion`), so that
 `LinkUInitUnion.unionHinitBoot` discharges it by name.

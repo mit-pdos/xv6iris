@@ -1,7 +1,7 @@
 /-
 **THE THEORY OF THE BYTE FLATTENING `fsDbytes`, AND THE DURABLE INSTANCE'S
 VIEW RECORD `snapGamma`.**  A port of Rocq
-`/shared/xv6rocq/iris/FsDurBytes.v` (durable-disk 2c-img, leaf 1).
+`iris/FsDurBytes.v` (durable-disk 2c-img, leaf 1).
 
 `fsDbytes` flattens a BLOCK view `D : BlockMap` into the BYTE map a durable
 instance's authority is held at: block `b`'s `k`th byte lives at

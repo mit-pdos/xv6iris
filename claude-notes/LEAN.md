@@ -23,7 +23,7 @@ How the Rocq vocabulary in these notes maps to this tree:
 | `model-xv6iris/` (Sail model in Rocq) | `model/Lean_RV64D/` (Sail model in Lean; `tools/regen_sail_model.sh`, patched short-circuit backend) |
 | `kernel-rocq/`, `user-rocq/` (image dumps) | `Xv6/Kernel*.lean`, `MachCSL/KernelElf.lean`, `Xv6/User/*`, `Xv6/FsImg*` |
 | `vtest-rocq/`, `tools/vtest/` | `vtest-lean/`, `tools/vtest/` (`notes/device-conformance.md`) |
-| `make proofs`, `coqc`, `.vo` | `lake build Xv6 MachCSL` on the build VM only (README "Build") |
+| `make proofs`, `coqc`, `.vo` | `lake build Xv6 MachCSL` (README "Build") |
 | `Print Assumptions` audits, `tools/tcb` | `tools/ci/audit.sh`, `tools/ci/tcb.sh` |
 | `tools/proof_coverage.py`, `proof_profile.py`, `iris/find_dead.py` | same names under `tools/` (Lean-native), run by `tools/ci/run_all.sh` |
 | Iris proof mode (`iIntros`, `iApply`, …) | iris-lean's proof mode (`iintro`, `iapply`, …) |

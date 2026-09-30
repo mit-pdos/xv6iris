@@ -1,7 +1,7 @@
 /-
 Proof of `iunlockput`'s specification (`SpecIunlockput.IUNLOCKPUT`), given
 the interfaces of `iunlock` and `iput`.  A port of Rocq `ProofIunlockput.v`
-(`/shared/xv6rocq/iris/ProofIunlockput.v`, `wp_iunlockput_dep_gen`) against
+(`iris/ProofIunlockput.v`, `wp_iunlockput_dep_gen`) against
 the Lean image (`KA.«iunlockput»`).
 
     +0x00  addi sp,sp,-32 ; sd ra,24(sp) ; sd s0,16(sp) ; sd s1,8(sp) ;

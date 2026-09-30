@@ -1,6 +1,6 @@
 /-
 **THE ERA-0 /init PINS** -- the reached, pure part of Rocq `FsInitPin.v`
-(`/shared/xv6rocq/iris/FsInitPin.v`, pinned `1900b8a43`; union cone audit:
+(`iris/FsInitPin.v`, pinned `1900b8a43`; union cone audit:
 31 of 34 declarations).
 
 Rocq's header, in short.  About era 0's durable map `era0D` -- the image's

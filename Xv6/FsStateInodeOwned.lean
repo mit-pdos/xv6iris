@@ -1,6 +1,6 @@
 /-
 **ONE INODE, OVER THE TYPE REGISTER: `entToks`, `inodeGhost`, `inodeOwned`.**
-The REST of Rocq `FsStateInode.v` (`/shared/xv6rocq/iris/FsStateInode.v`,
+The REST of Rocq `FsStateInode.v` (`iris/FsStateInode.v`,
 2097 lines) -- the part `Xv6/FsStateInode.lean` DEFERRED (its header's
 items 1 and 2): everything that reads the link RA (`Xv6/FsStateLink.lean`,
 Rocq `FsStateLink.v`) or the register's value type `Ity`
@@ -32,7 +32,7 @@ Rocq `FsStateLink.v`) or the register's value type `Ity`
 ## Dropped/simplified vs Rocq
 
 Each item was grepped (`grep -lw`, comments INCLUDED, so a zero is a hard
-zero) across ALL of `/shared/xv6rocq/iris/*.v` -- defs, `Spec*`, `Proof*`,
+zero) across ALL of `iris/*.v` -- defs, `Spec*`, `Proof*`,
 `Link*`, `FsCollect*`, `FsCfg*`, `FsDur*`, `FsImg*` -- and has no use
 outside `FsStateInode.v`, nor inside it except as noted:
 

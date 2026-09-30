@@ -1,7 +1,7 @@
 /-
 **THE N-WRITER CLAIM'S EVENTS: the read, and filing an empty block** -- the
 cone-reached part of Rocq `PipeOutNEv.v`
-(`/shared/xv6rocq/iris/PipeOutNEv.v`, pinned 1900b8a43; 17 of 37
+(`iris/PipeOutNEv.v`, pinned 1900b8a43; 17 of 37
 declarations): the open reading's `E`-tie, length law and reader stage
 (`gclPureO_E`, `lmBlkOpen_cs`, `gclPureO_rd_stage`), the read at an open
 round (`gclPureO_read`, `popenV_filed`, `popenV_step_read`), the claim's

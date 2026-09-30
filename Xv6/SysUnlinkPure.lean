@@ -46,7 +46,7 @@ Rocq); the walk is `SysUnlinkW1..W5D` (not yet written).
   They land with SpecSysUnlink (after C0) in the walk agents' first file.
 
 ## Dropped/simplified vs Rocq (uses checked: `grep -n` over
-/shared/xv6rocq/iris/*.v, comments stripped)
+iris/*.v, comments stripped)
 
 * `su_rem8_2`, `su_align_8_2`: Sail's `is_aligned_paddr` premise of the
   `lhu` leaf; the Lean `wp_s_lhu` has no alignment premise (the byte-cell

@@ -1,6 +1,6 @@
 /-
 **open(O_CREATE)'s WHOLE BUNDLE, FROM ONE ESCROWED DEED** -- §3e of Rocq
-`FileOpen.v` (`/shared/xv6rocq/iris/FileOpen.v`, pinned 1900b8a43),
+`FileOpen.v` (`iris/FileOpen.v`, pinned 1900b8a43),
 `file_open_create_au`.
 
 Rocq's note, abridged: `SysOpenDefs.open_au_create_at` at the path `N`,

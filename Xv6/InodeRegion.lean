@@ -1,7 +1,7 @@
 /-
 **THE INODE REGION: THE PER-INUM FRAGMENT, THE MARKER, AND THE SLOT'S PURE
 CLAUSES.**  A port of the part of Rocq `InodeRegion.v`'s
-`Section InodeRegion` (`/shared/xv6rocq/iris/InodeRegion.v`, lines
+`Section InodeRegion` (`iris/InodeRegion.v`, lines
 1281-5578) that could be STATED before wave 0d (the icache) landed.  The
 pure prefix (lines 1-1275) is `Xv6/InodeRegionDefs.lean`'s; the rest of the
 section, deferred at the time, is now ported in InodeRegionSlot /

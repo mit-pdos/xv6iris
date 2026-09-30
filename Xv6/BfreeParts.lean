@@ -16,7 +16,7 @@ a one-screen ghost move; the instruction walks are in
   is stated directly at the register value the Lean rule produces and
   closed by `omega` / `bv_decide`.  Uses checked: no Rocq file but
   ProofBfree.v uses a `bf_` lemma (`grep -ln 'bf_[a-z]'
-  /shared/xv6rocq/iris/*.v`; its other hits, BioFs.v and TsoLitmus.v, are
+  iris/*.v`; its other hits, BioFs.v and TsoLitmus.v, are
   unrelated identifiers).
 * `bf_test_val` / `Xv6.bmBit_clear_64` are `BitmapEnc.bmBit_test_64` /
   `bmBit_clear_64` read at the `and`/`xori` the code performs

@@ -1,6 +1,6 @@
 /-
 Specification of `ireclaim` (kernel/fs.c): the public contract.  Mirrors
-Rocq `SpecIreclaim.v` (`/shared/xv6rocq/iris/SpecIreclaim.v`).
+Rocq `SpecIreclaim.v` (`iris/SpecIreclaim.v`).
 
     void ireclaim(int dev) {
       for(int inum = 1; inum < sb.ninodes; inum++){
@@ -98,7 +98,7 @@ fsinit presents exactly Rocq's premises and receives exactly Rocq's post
 
 * The `ic_escrows fsc_ic …` premise (as `Xv6/SpecIget.lean` /
   `Xv6/SpecIalloc.lean`) -- uses checked (comment-stripped grep of
-  `/shared/xv6rocq/iris/*.v`): ProofIreclaim.v (`irc_esc_acc`, the projection
+  `iris/*.v`): ProofIreclaim.v (`irc_esc_acc`, the projection
   for ilock/iunlock/iput's `ic_escrow k`; `isItable2_escrows` +
   `icEscrows_lookup` give the same projection here), ProofFsinit.v (frames
   it in) -- reason: `isItable2` carries the family (R3 F26), so the premise

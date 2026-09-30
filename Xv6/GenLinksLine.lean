@@ -1,6 +1,6 @@
 /-
 **THE CONSOLE CREDENTIAL FAMILIES OF A LINE MODEL, once** -- a port of Rocq
-`GenLinksLine.v` (`/shared/xv6rocq/iris/GenLinksLine.v`, pinned 1900b8a43;
+`GenLinksLine.v` (`iris/GenLinksLine.v`, pinned 1900b8a43;
 app-both milestone M2b).
 
 Rocq's header, abridged (the reasons are the content):

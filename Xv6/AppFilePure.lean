@@ -1,6 +1,6 @@
 /-
 **THE FILE APPLICATION'S PURE VOCABULARY** -- the Iris-free, cone-reached
-part of Rocq `AppFile.v` (`/shared/xv6rocq/iris/AppFile.v`, pinned
+part of Rocq `AppFile.v` (`iris/AppFile.v`, pinned
 `1900b8a43`): §1's types (l.101-150) and §3's view predicates (l.525-666).
 The ghost half (the deed, the ticket, the escrow, the claim) is
 `Xv6/AppFile*.lean`.

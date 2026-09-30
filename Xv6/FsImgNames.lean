@@ -1,6 +1,6 @@
 /-
 **THE PINNED NAMES OF THE mkfs IMAGE, AND WHERE THEY RESOLVE** -- the rest of
-Rocq `FsImgCheck.v` §3 (`/shared/xv6rocq/iris/FsImgCheck.v`, pinned
+Rocq `FsImgCheck.v` §3 (`iris/FsImgCheck.v`, pinned
 `1900b8a43`): the root-directory names of the union's programs, the root's
 data and record count named, and each name's ONE hop out of the root, read
 off the literal image (xv6 7b2c1b1b's fs.img).

@@ -2,7 +2,7 @@
 The byte-buffer algebra the copy loops and the fs block code run on -- the
 part of it this port does not already have.
 
-A port of Rocq `ByteBuf.v` (`/shared/xv6rocq/iris/ByteBuf.v`).
+A port of Rocq `ByteBuf.v` (`iris/ByteBuf.v`).
 
 ## The one structural deviation, and why almost nothing is left to port
 

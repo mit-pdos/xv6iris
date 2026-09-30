@@ -1,6 +1,6 @@
 /-
 THE FILE APPLICATION'S PURE MODEL, part 2 -- sections 2-7 of Rocq
-`FileDisc.v` (`/shared/xv6rocq/iris/FileDisc.v`, pinned `1900b8a43`), row
+`FileDisc.v` (`iris/FileDisc.v`, pinned `1900b8a43`), row
 U0-2 of `notes/design-rulings.md`.  Pure.  DRIFT SY1 (Rocq 3d74ec49f,
 f31dfba4c; main 456141b5b): no silent alternative (`RFSilent`/`RCSilent`
 deleted, `REcho 2` admitted nowhere), the out-of-memory alternative `ROom`

@@ -1,6 +1,6 @@
 /-
 **THE SYNC PART'S CLOSURE LEMMAS** -- Rocq `AppFile.v` §3b.4
-(`/shared/xv6rocq/iris/AppFile.v` @ origin/main 456141b5b, l.988-1351; sync
+(`iris/AppFile.v` @ origin/main 456141b5b, l.988-1351; sync
 design §4.5 "The merge", "The hook", "The round position", "PowerOn",
 "Birth").  The shares and the claim are `Xv6/AppFileSync.lean`.
 

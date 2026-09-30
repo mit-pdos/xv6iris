@@ -1,6 +1,6 @@
 /-
 **THE O_TRUNC LEG, KEYED TO THE CREATE'S OWN RECEIPT** -- §3f-§3f' of Rocq
-`FileOpen.v` (`/shared/xv6rocq/iris/FileOpen.v`, pinned 1900b8a43), the part
+`FileOpen.v` (`iris/FileOpen.v`, pinned 1900b8a43), the part
 the union's cone reaches.
 
 Rocq's notes, abridged (the reasons are the content):

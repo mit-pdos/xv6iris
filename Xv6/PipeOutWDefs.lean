@@ -1,6 +1,6 @@
 /-
 **THE CLAIM'S TERMINAL (WILD) ARM, OVER ANY LINE MODEL: the definitions** --
-Rocq `PipeOutW.v` (`/shared/xv6rocq/iris/PipeOutW.v`, pinned 1900b8a43;
+Rocq `PipeOutW.v` (`iris/PipeOutW.v`, pinned 1900b8a43;
 seccomp lane S2, design seccomp.md §10), sections 0-2 and the arm's
 readings: an open round never delivers a new byte (`lmRdOpen_nows`), the
 era's wild flag and token (`seccFlag`, `seccTok`, `seccTokAt`), the arm

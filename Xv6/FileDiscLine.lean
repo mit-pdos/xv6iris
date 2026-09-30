@@ -1,6 +1,6 @@
 /-
 THE FILE APPLICATION'S PURE MODEL, part 1: THE LINES THE USER MAY TYPE --
-sections 0-1 of Rocq `FileDisc.v` (`/shared/xv6rocq/iris/FileDisc.v`,
+sections 0-1 of Rocq `FileDisc.v` (`iris/FileDisc.v`,
 pinned `1900b8a43`), row U0-2 of `notes/design-rulings.md`.  Pure.  Part 2
 (contents, alternatives, session, discipline, the line-model instance) is
 `Xv6/FileDisc.lean`, which imports this file.

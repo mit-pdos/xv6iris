@@ -1,6 +1,6 @@
 /-
 **THE INODE ENTRY'S ESCROW, PART 3b: THE POOL'S MOVERS AND THE COMMIT'S
-DOORS.**  A port of Rocq `IcacheEscrow.v` (`/shared/xv6rocq/iris/IcacheEscrow.v`)
+DOORS.**  A port of Rocq `IcacheEscrow.v` (`iris/IcacheEscrow.v`)
 lines 2692--3360: the three movers (`ipool_take_lend`, `ipool_evict_lend`,
 `ipool_put_ord` / `ipool_put_corpse`), the off-lock corpse deposit
 `ipool_deposit_corpse`, and the commit's two doors `ipool_inv_acc` /
@@ -43,7 +43,7 @@ size at Rocq's own "THE THREE MOVERS" boundary.
 ## Dropped/simplified vs Rocq
 
 Uses checked by `grep -rlw <name>` over the comment-stripped
-`/shared/xv6rocq/iris/*.v` (all 1533 files, incl. Spec*/Proof*/FsCollect*/
+`iris/*.v` (all 1533 files, incl. Spec*/Proof*/FsCollect*/
 Link*/IcacheBoot/EscrowDeposit; the brief's §5 list re-verified).
 
 * `ipool_id_lend` (a dead slot's re-tag under the pool's quarter) -- uses

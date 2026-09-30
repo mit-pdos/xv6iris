@@ -3,7 +3,7 @@ PHASE B of kexec, FIRST CHUNK: `kexec+0x090 .. +0x0cc` -- proc_pagetable,
 the seven remaining lazy register spills, the `elf.phnum` test and the phdr
 loop's SETUP -- plus the one `bad:` tail that stretch owns, at +0x316.
 
-A port of Rocq `ProofKexecB.v` (`/shared/xv6rocq/iris/ProofKexecB.v`,
+A port of Rocq `ProofKexecB.v` (`iris/ProofKexecB.v`,
 `kxc_b1`), a STAGE file (no `Proof` prefix; the one seal is
 `ProofKexec.lean`).
 

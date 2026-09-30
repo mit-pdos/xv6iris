@@ -1,6 +1,6 @@
 /-
 **OPTION A (reordered iput) -- THE OFF-LOCK DEPOSIT ACCESSOR (iput +0xb6).**
-A port of Rocq `EscrowDeposit.v` (`/shared/xv6rocq/iris/EscrowDeposit.v`,
+A port of Rocq `EscrowDeposit.v` (`iris/EscrowDeposit.v`,
 387 lines), whole: the one lemma `ireg_free_deposit_au` → `iregFreeDeposit_au`.
 
 A leaf above EscrowInode/InodeRegion: it opens `iregInv`, absorbs the
@@ -89,7 +89,7 @@ Exactly Rocq's nesting, with Rocq's left-nested `E ∖ A ∖ B` written
 ## Dropped/simplified vs Rocq
 
 Nothing: the file's one lemma is live (uses checked, `grep -rw
-ireg_free_deposit_au /shared/xv6rocq/iris/*.v`: ProofIput, comment-stripped; the free
+ireg_free_deposit_au iris/*.v`: ProofIput, comment-stripped; the free
 path).  The Rocq header's pointer to `IcacheInv.live_whole_share_absurd` is
 kept as prose only (see above).
 

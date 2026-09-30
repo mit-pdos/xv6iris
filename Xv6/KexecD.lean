@@ -1,7 +1,7 @@
 /-
 PHASE D of kexec: THE COMMIT (+0x29c .. +0x314 -> +0x072).
 
-A port of Rocq `ProofKexecD.v` (`/shared/xv6rocq/iris/ProofKexecD.v`), a STAGE
+A port of Rocq `ProofKexecD.v` (`iris/ProofKexecD.v`), a STAGE
 file (no `Proof` prefix; the one seal is `ProofKexec.lean`).  Entry is
 `KexecSeam.kxcAt2a6`, phase C's exit: both copyouts done, every `bad:` entry
 behind.  What is left is the commit itself --

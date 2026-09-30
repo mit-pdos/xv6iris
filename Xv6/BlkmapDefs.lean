@@ -1,6 +1,6 @@
 /-
 The pure BLOCK-MAP record.  A port of Rocq `BlkmapDefs.v`
-(`/shared/xv6rocq/iris/BlkmapDefs.v`).
+(`iris/BlkmapDefs.v`).
 
 Split out of the inode invariant so that the camera bundle can name the
 icache box's shape type (`IcLoaded g dn bm`) without importing the inode

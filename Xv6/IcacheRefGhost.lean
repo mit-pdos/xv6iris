@@ -1,7 +1,7 @@
 /-
 **THE ICACHE'S GHOST VOCABULARY: THE AUTHORITY HALF, THE LIVENESS POOL,
 THE FREEZE SELECTOR AND THE REFERENCE TOKEN.**  A port of Rocq
-`IcacheRef.v`'s `Section IcacheRefGhost` (`/shared/xv6rocq/iris/IcacheRef.v`
+`IcacheRef.v`'s `Section IcacheRefGhost` (`iris/IcacheRef.v`
 lines 829–1273).  The file's header prose (THE CANONICAL PAIRING: a
 reference is three fractions that are always the same number -- count
 fragment, liveness slice, identity cells) is the rationale for everything
@@ -50,7 +50,7 @@ in the wave brief's file plan beside this section, is Rocq line 162, in
    the private `liveGenlo_agree_keep` / `liveElem_frac0`.
 
 ## Dropped/simplified vs Rocq (uses grep-checked over
-## `/shared/xv6rocq/iris/*.v`, comments, `Ltac` and `Hint` bodies included)
+## `iris/*.v`, comments, `Ltac` and `Hint` bodies included)
 
 * `live_frac_{split,join,halve,bound,full_excl,bump}` -- uses checked:
   IcacheInv (`live_frac_halve` in `iref_dup_step`, `live_frac_bump` /

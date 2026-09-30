@@ -1,6 +1,6 @@
 /-
 Specification of `iput` (kernel/fs.c): the public contract.  Mirrors Rocq
-`SpecIput.v` (`/shared/xv6rocq/iris/SpecIput.v`).
+`SpecIput.v` (`iris/SpecIput.v`).
 
     void iput(struct inode *ip) {
       acquire(&itable.lock);

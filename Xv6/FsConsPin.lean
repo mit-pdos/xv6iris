@@ -1,6 +1,6 @@
 /-
 **THE CONSOLE NODE'S TWO STATES, AND THE FILE PIN GENERALISED** -- the
-reached part of Rocq `FsConsPin.v` (`/shared/xv6rocq/iris/FsConsPin.v`,
+reached part of Rocq `FsConsPin.v` (`iris/FsConsPin.v`,
 pinned `1900b8a43`; union cone audit: 26 of 45).
 
 Rocq's header, in short.  THERE IS NO INUM HERE, and that is the whole

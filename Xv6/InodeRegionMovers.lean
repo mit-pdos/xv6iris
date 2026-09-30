@@ -2,7 +2,7 @@
 **THE INODE REGION's MOVERS: THE READS, THE OBSERVATION RECEIPT, THE
 ORDINARY FLUSH, ialloc's CLAIM, iput's FREEZE, AND THE TWO FREEZE READS.**
 A port of Rocq `InodeRegion.v`'s `Section InodeRegion`, lines 3595-4670
-(`/shared/xv6rocq/iris/InodeRegion.v`, `ireg_read` ... `ireg_frz_pin_read`).
+(`iris/InodeRegion.v`, `ireg_read` ... `ireg_frz_pin_read`).
 Lines 1595-3594 are `Xv6/InodeRegionSlot.lean` / `Xv6/InodeRegionInv.lean`;
 4671-5039 (`ireg_wd_lic` ... `ireg_withdraw`) are `InodeRegionWithdraw`,
 5040-5578 `InodeRegionLink`.
@@ -80,7 +80,7 @@ is what `InodeRegionDefs.iregBi_lt` takes.
   (proof-internal).
 * `ireg_blk_slot` -- not re-declared: `InodeRegion.iregBlkSlot` is it.
 * Nothing else: every lemma of the range is live (uses checked, `grep -w`
-  over `/shared/xv6rocq/iris/*.v`: `ireg_read` / `ireg_read_blk` /
+  over `iris/*.v`: `ireg_read` / `ireg_read_blk` /
   `ireg_write_au` / `ireg_claim_au` / `ireg_freeze_au` / `ireg_frzm_read` /
   `ireg_frz_pin_read` / `ireg_obs_*` are called from Proof{Ialloc, Iput,
   Iupdate, Ilock, Ireclaim, Namex, NamexEra, ...}, Spec{Ialloc, Iput,

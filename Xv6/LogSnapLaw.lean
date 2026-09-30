@@ -1,6 +1,6 @@
 /-
 **THE FILE SYSTEM'S LAW, AS THE WAL PARKS IT** -- a port of Rocq
-`LogSnapLaw.v` (`/shared/xv6rocq/iris/LogSnapLaw.v`).  Crash batch C-1, agent
+`LogSnapLaw.v` (`iris/LogSnapLaw.v`).  Crash batch C-1, agent
 CG.
 
 The commit RECONSTRUCTS the file-system predicate at the one moment the era's

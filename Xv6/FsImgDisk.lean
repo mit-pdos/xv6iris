@@ -1,6 +1,6 @@
 /-
 **THE MACHINE-FACING HALF OF THE mkfs IMAGE** -- a port of Rocq
-`FsImgDisk.v` (`/shared/xv6rocq/iris/FsImgDisk.v`): the initial disk as a
+`FsImgDisk.v` (`iris/FsImgDisk.v`): the initial disk as a
 byte function, its block view, and the one fact the system theorem consumes
 -- that this image recovers, with no log to replay, to itself.
 

@@ -1,6 +1,6 @@
 /-
 **THE O_RDONLY OPEN AT AN ABSENT `f`** -- section `FileOpenMiss` of Rocq
-`FileOpen.v` (`/shared/xv6rocq/iris/FileOpen.v`, pinned 1900b8a43), the part
+`FileOpen.v` (`iris/FileOpen.v`, pinned 1900b8a43), the part
 the union's cone reaches (`f_pin_misses` is `FileOpenPin.fPin_misses`,
 `file_taint_sup` is `FileOpenClaim.fileTaint_sup`).
 

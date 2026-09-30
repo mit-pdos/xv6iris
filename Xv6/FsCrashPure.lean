@@ -1,6 +1,6 @@
 /-
 **THE PURE LAYER OF THE FILE SYSTEM'S CRASH PREDICATE** -- a port of Rocq
-`FsCrash.v` §1b'-§1c''' (`/shared/xv6rocq/iris/FsCrash.v` :300-1480, minus
+`FsCrash.v` §1b'-§1c''' (`iris/FsCrash.v` :300-1480, minus
 the sector algebra, which is `Xv6/FsCrashSector.lean`), plus the pure
 `fs_extent` (:2040).  No `IProp`, no MachCSL resource: the resource half
 (`fs_rec`, the history, the custody arm, `P_fs_at`, the seam, the permits) is

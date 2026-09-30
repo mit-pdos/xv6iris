@@ -1,6 +1,6 @@
 /-
 **W4/W5 -- THE USED BLOCKS AND THE BITMAP** -- a port of Rocq `FsImg.v` §9
-(`/shared/xv6rocq/iris/FsImg.v` :1305-1900).  Chain position:
+(`iris/FsImg.v` :1305-1900).  Chain position:
 `Xv6/FsImgInode.lean` → this file → `Xv6/FsImgDir.lean`.
 
 * **W4** (`fsUsedSet`): no two inodes name one disk block -- one duplicate-

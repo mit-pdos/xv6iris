@@ -1,6 +1,6 @@
 /-
 **THE OP-WIDE LOG LEDGER OF sys_open, ARM BY ARM** (pure).  A port of Rocq
-`SysOpenBudget.v` (`/shared/xv6rocq/iris/SysOpenBudget.v`, 268 lines),
+`SysOpenBudget.v` (`iris/SysOpenBudget.v`, 268 lines),
 stated at the figures the LANDED Lean contracts state: `MAXOPBLOCKS`
 (LogDefs), `walkNeed` / `walkSpend` (SpecNamex), `iputUnits` / `ipSpendW`
 (SpecIput), `itEntry` / `itBm` / `itIu` / `itSpend` (SpecItrunc).

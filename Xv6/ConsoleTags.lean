@@ -1,7 +1,7 @@
 /-
 THE CONSOLE RING'S SEQUENCE, ITS ORDER AND WHAT IT KNOWS ABOUT THE INPUT LOG
 -- the second stage file of the port of Rocq `ConsoleInv.v`
-(`/shared/xv6rocq/iris/ConsoleInv.v`, lines 180--760 and 1255--1330), step
+(`iris/ConsoleInv.v`, lines 180--760 and 1255--1330), step
 (4) of `notes/design-rulings.md`.  Pure.
 
 THE STORED SEQUENCE IS A SEQUENCE, NOT A BAG.  `ConsoleRing.consStored`

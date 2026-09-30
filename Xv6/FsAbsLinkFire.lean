@@ -1,7 +1,7 @@
 /-
 **THE sys_link CONTRACT'S FIRE POINTS, discharged against the invariant,
 plus the reading bridges its commits owe their prover.**  A port of Rocq
-`FsAbsLinkFire.v` (`/shared/xv6rocq/iris/FsAbsLinkFire.v`, 371 lines),
+`FsAbsLinkFire.v` (`iris/FsAbsLinkFire.v`, 371 lines),
 WHOLE.  The statement it serves is `SysLinkDefs` (the split-off application
 side of Rocq `SpecSysLink.v`, brief fs7b D21).
 

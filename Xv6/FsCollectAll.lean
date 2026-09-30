@@ -1,7 +1,7 @@
 /-
 **THE ASSEMBLY: THE ERA'S INVARIANTS OPENED AT ONE GHOST STEP, THE NEXT
 DURABLE EPOCH MINTED, AND THE LAW THE WAL PARKS.**  Sections 3-5 of Rocq
-`/shared/xv6rocq/iris/FsCollectAll.v` (crash batch C-3, agent CJ); the
+`iris/FsCollectAll.v` (crash batch C-3, agent CJ); the
 earlier sections are `Xv6/FsCollectAllRows.lean`, `FsCollectAllHand.lean`
 and `FsCollectAllBodies.lean`, the arithmetic `Xv6/FsCollect.lean` and
 `FsCollectSlot.lean`.

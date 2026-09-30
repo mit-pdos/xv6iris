@@ -1,6 +1,6 @@
 /-
 **THE ERA-0 /echo PINS: THE /init PAIR REPLAYED FOR THE ECHO PROGRAM** -- the
-reached part of Rocq `FsEchoPin.v` (`/shared/xv6rocq/iris/FsEchoPin.v`, pinned
+reached part of Rocq `FsEchoPin.v` (`iris/FsEchoPin.v`, pinned
 `1900b8a43`; union cone audit: 19 of 26).
 
 Rocq's header, in short: the same three sentences `FsInitPin` proves for

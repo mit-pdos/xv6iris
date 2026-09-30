@@ -1,6 +1,6 @@
 /-
 **THE LINK FAMILY'S VALIDITY, PROVED FROM THE IMAGE CONJUNCTS.**  Sections
-9g-9h of Rocq `/shared/xv6rocq/iris/FsDurImg.v` (crash batch C-1, item CF).
+9g-9h of Rocq `iris/FsDurImg.v` (crash batch C-1, item CF).
 
 `fsBootAlloc_rootSlack`'s premise `✓ (linkElem I f • linkTokElem ROOTINO v)`
 is the tokens-≤-nlink law of the initial map, SLACKED by the region's

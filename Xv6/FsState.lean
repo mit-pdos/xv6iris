@@ -1,7 +1,7 @@
 /-
 **THE FILE SYSTEM AS ONE NESTED SEPARATION-LOGIC PREDICATE: `fsState`, its
 footprint/ghost factoring, and the link family gathered.**  A port of Rocq
-`/shared/xv6rocq/iris/FsState.v` MINUS lines 229-300 (the `top_frag` family,
+`iris/FsState.v` MINUS lines 229-300 (the `top_frag` family,
 already ported as `Xv6/FsStateTop.lean`; crash brief D43).
 
 The pieces (Rocq's header): `FsStateDefs` the view record `Γ` and the block
@@ -62,7 +62,7 @@ maintained.
    declared explicitly.
 
 ## Dropped/simplified vs Rocq (crash brief D36; each grepped over ALL of
-`/shared/xv6rocq/iris/*.v`, comments included)
+`iris/*.v`, comments included)
 
 * `fs_state_gq` -- uses checked: none (a `reflexivity`).
 * `fs_footprint_gname` -- uses checked: comment only (FsStateBitmap.v:73).

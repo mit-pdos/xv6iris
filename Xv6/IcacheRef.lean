@@ -1,6 +1,6 @@
 /-
 **THE IDENTITY CELLS, AND WHAT A REFERENCE IS.**  A port of Rocq
-`IcacheRef.v` §4 (`Section IcacheRef`, `/shared/xv6rocq/iris/IcacheRef.v`
+`IcacheRef.v` §4 (`Section IcacheRef`, `iris/IcacheRef.v`
 lines 1276–2210): `inode_ident`, the credential floor `cred_floor`, the
 floored liveness slice `live_fracc`, the box-stamps fragments `ic_stamps`,
 the reference `inode_ref` / share `inode_shr` and their generation-named
@@ -91,7 +91,7 @@ NEVER parked inside a plain invariant -- the arms keep `liveGenlo`.
    `liveGenlo_le1_keep`, `liveFracc_le1_keep`.  `liveGenlo_le1` is proved
    from `liveGenlo_halve` + `liveGenlo_bound` rather than `own_valid`.
 
-## Dropped/simplified vs Rocq (uses grep-checked over `/shared/xv6rocq/iris/*.v`,
+## Dropped/simplified vs Rocq (uses grep-checked over `iris/*.v`,
 ## comments stripped; the brief's §5 list re-verified)
 
 * `cred_floor_0`, `live_frac0_fracc` -- uses checked: none outside

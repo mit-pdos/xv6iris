@@ -1,7 +1,7 @@
 /-
 THE CONSOLE RING'S RESOURCE, ITS GHOSTS, THE READER LEASE, THE CREDENTIAL
 ESCROW AND THE devsw TABLE -- the Iris layer of the port of Rocq
-`ConsoleInv.v` (`/shared/xv6rocq/iris/ConsoleInv.v`, lines 1330--2663),
+`ConsoleInv.v` (`iris/ConsoleInv.v`, lines 1330--2663),
 step (4) of `notes/design-rulings.md`.  The pure layers are
 `Xv6/ConsoleRing.lean` (the 32-bit/slot algebra) and `Xv6/ConsoleTags.lean`
 (the sequence, its order and the input log); the names are

@@ -1,7 +1,7 @@
 /-
 **THE REDIRECT LINES' MONOTONICITY AND THE BOOT-STATE ADMISSIBILITY AT ITS
 ENDS** -- U4 seal wave: the declarations of Rocq `FileDisc.v`
-(`/shared/xv6rocq/iris/FileDisc.v`, pinned 1900b8a43) that the union
+(`iris/FileDisc.v`, pinned 1900b8a43) that the union
 ledger's steps read (through `FileOut.efl_of_snoc` / `f0_typed_adm`) and that
 the U0-X cone audit trimmed from `Xv6/FileDisc.lean` (its deviation 4).
 Pure.

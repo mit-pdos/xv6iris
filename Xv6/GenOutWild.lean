@@ -1,6 +1,6 @@
 /-
 THE PURE LAYER OF THE CLAIM'S TERMINAL ARM -- a port of Rocq `GenOutWild.v`
-(`/shared/xv6rocq/iris/GenOutWild.v`, 515 lines, pinned `1900b8a43`), row
+(`iris/GenOutWild.v`, 515 lines, pinned `1900b8a43`), row
 U0-1 of `notes/design-rulings.md`.  Pure (it reads `EchoOut`/`ConsoleTags` only
 for the pure `segOf`/`chE`/`consChain`, as Rocq's does).
 

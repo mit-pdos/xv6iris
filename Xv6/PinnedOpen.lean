@@ -1,6 +1,6 @@
 /-
 **A VERIFIED PROGRAM'S OWN open() DEPOSIT, FROM A PIN ON THE ABSTRACT VIEW**
-(Rocq `PinnedOpen.v`, `/shared/xv6rocq/iris/PinnedOpen.v` at `1900b8a43`):
+(Rocq `PinnedOpen.v`, `iris/PinnedOpen.v` at `1900b8a43`):
 `PinnedExec` one syscall over, and the SECOND instantiation of
 `PinnedObs.pinned_obs` -- the walk cursor, the observation and the node
 identification are the same three pieces; what is open's own is its

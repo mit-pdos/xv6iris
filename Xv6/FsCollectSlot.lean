@@ -1,6 +1,6 @@
 /-
 **COLLECTION AT QUIESCENCE: ONE REGION SLOT, LENT AND TAKEN BACK.**  Rocq
-`/shared/xv6rocq/iris/FsCollect.v`'s section 7 and its `FreeSlot` section
+`iris/FsCollect.v`'s section 7 and its `FreeSlot` section
 (crash batch C-3, agent CJ); the arithmetic is `Xv6/FsCollect.lean`.
 
 THE DOOR (Rocq's header).  At a quiescent transaction ledger the commit

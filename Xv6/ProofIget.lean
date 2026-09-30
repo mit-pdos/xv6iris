@@ -1,7 +1,7 @@
 /-
 Proof of `iget`'s specification (`SpecIget.IGET`), given the interfaces of
 `acquire`, the hooked `release` and `panic`.  A port of Rocq `ProofIget.v`
-(`/shared/xv6rocq/iris/ProofIget.v`, `wp_iget_sconf`, 449--2618) against
+(`iris/ProofIget.v`, `wp_iget_sconf`, 449--2618) against
 the Lean image (`KA.«iget»` = `0x80002fa0`).
 
     +0x00  the six-slot prologue (ra, s0..s4)          -- IgetParts.ig_prologue

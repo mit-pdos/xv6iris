@@ -1,7 +1,7 @@
 /-
 **THE FILE APPLICATION'S SYNC NAMES: THE RECORD MOVES, THE REGISTRIES, THE
 COUNTERS** -- the P-free part of Rocq `AppFile.v` §3b.2-3
-(`/shared/xv6rocq/iris/AppFile.v` @ origin/main 456141b5b, l.740-921; sync
+(`iris/AppFile.v` @ origin/main 456141b5b, l.740-921; sync
 design §4.5, lanes SY3-A3a/A3bc/A4).
 
 Rocq's header, abridged (the reasons are the content):

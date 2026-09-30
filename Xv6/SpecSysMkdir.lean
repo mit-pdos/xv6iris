@@ -1,6 +1,6 @@
 /-
 The interface of `sys_mkdir` (kernel/sysfile.c).  A port of Rocq
-`SpecSysMkdir.v` (`/shared/xv6rocq/iris/SpecSysMkdir.v`, 456 lines):
+`SpecSysMkdir.v` (`iris/SpecSysMkdir.v`, 456 lines):
 `K_sys_mkdir`, `sys_mkdir_ret`, the caller's bundle `mkdir_au_pre` and its
 unit, the armed post `mkdir_arms`, the whole-function body and the
 `SYSMKDIR` contract.

@@ -1,6 +1,6 @@
 /-
 **THE ECHO GHOSTS' LINE-MODEL FACTS** -- the reached declarations of Rocq
-`EchoOut.v` (`/shared/xv6rocq/iris/EchoOut.v`, pinned 1900b8a43) that read
+`EchoOut.v` (`iris/EchoOut.v`, pinned 1900b8a43) that read
 the pure line model (`EchoOutPure.echoed` / `lines_bytes`, `LineWords`),
 split off `Xv6/EchoOut.lean` (that file's deviation 2) so the ghost algebra
 does not wait on, or import, the pure layer.

@@ -3,7 +3,7 @@
 SHELTER, THE LEDGER BUNDLE, THE TYPE REGISTER, THE TOP PARK, THE CLAIM
 SHARE, AND `iregSlot`.**  A port of Rocq `InodeRegion.v`'s
 `Section InodeRegion`, lines 1595-2759
-(`/shared/xv6rocq/iris/InodeRegion.v`).  Lines 1-1275 are
+(`iris/InodeRegion.v`).  Lines 1-1275 are
 `Xv6/InodeRegionDefs.lean`'s; the part of 1281-1594 and the pure pieces of
 2127-2600 that could be stated before the icache landed (`dinodeAt`,
 `imark`, `iregOut`, `iregCouple`, `iregIn`, `iregLinkOk`, `iregNl` /

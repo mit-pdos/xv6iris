@@ -78,9 +78,8 @@ tools/ci/run_all.sh        # everything CI does, in order (= make ci)
 
 A clean build of `Xv6` and `MachCSL` is about 5,600 CPU-seconds (under 4 minutes on 96 cores; the
 critical path is about 4 minutes), plus about 2 minutes the first time for the generated model.  A
-Lean process elaborating this tree can use several GB of memory, and a parallel build needs tens of GB:
-on the development machine here, builds run on the shared GCP build VM
-(`/shared/xv6rocq/gcp-rocq/run-on-gcp`, from your worktree), never locally.
+Lean process elaborating this tree can use several GB of memory, and a parallel build needs tens of GB,
+so build on a machine sized for it.
 
 **Toolchain.** Lean `v4.32.2` (`lean-toolchain`), iris-lean and its dependencies pinned in
 `lake-manifest.json`, lean-sail vendored.  `tools/ci/toolchain_check.sh` checks that the three

@@ -1,7 +1,7 @@
 /-
 **THE IN-ERA INODE BUNDLE: THE RESOURCE BRIDGE, THE BUNDLE, THE READER'S
 QUARTER, AND THE LINK TOKENS OF A CHECKED-OUT DIRECTORY.**  A port of Rocq
-`FsStateEra.v` (`/shared/xv6rocq/iris/FsStateEra.v`) from `Section EraRes`
+`FsStateEra.v` (`iris/FsStateEra.v`) from `Section EraRes`
 (line 1025, `big_sepL_seq_map`) to `ent_toks_era_size0` (line 2067), i.e.
 §3 of the file up to, not including, "THE DIRLINK MOVE" (`dir_view_dirlink`,
 line 2084), which begins `Xv6/FsStateEraResB.lean` (wave 0d item D6).  The
@@ -67,7 +67,7 @@ Rocq's file header (WHAT THE BUNDLE IS / THE DICTIONARY / WHAT
 
 ## Dropped/simplified vs Rocq
 
-Every item below: uses checked by `grep -rnw <name> /shared/xv6rocq/iris/*.v`
+Every item below: uses checked by `grep -rnw <name> iris/*.v`
 (comments inspected by hand), including FsStateEra.v's own lines 2069--3175
 (the D6 half); none is named by any other declaration.
 

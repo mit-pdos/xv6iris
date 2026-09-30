@@ -1,6 +1,6 @@
 /-
 **THE FILE'S PIECES OF THE CREDENTIAL FAMILIES** -- the reached part of Rocq
-`FileLinksLine.v` (`/shared/xv6rocq/iris/FileLinksLine.v`, pinned 1900b8a43;
+`FileLinksLine.v` (`iris/FileLinksLine.v`, pinned 1900b8a43;
 §S8 and `alt_panic_len5`).
 
 Rocq's header of §S8, abridged:

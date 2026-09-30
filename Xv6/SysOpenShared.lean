@@ -51,7 +51,7 @@ Rocq's header, kept (the reason is the content):
 2. The final block is `VW` / `MW` (Rocq's `U`), as in `openArmsPlain`.
 
 ## Dropped (Rocq cleanups; uses checked with `grep -w` over
-`/shared/xv6rocq/iris/*.v`)
+`iris/*.v`)
 
 * `so_esc_acc` / `so_slk_acc` -- `FsReady.fsReady_escrow` /
   `icSleeplocks_lookup` (the Lean escrow and sleeplock rows are inside

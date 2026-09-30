@@ -1,6 +1,6 @@
 /-
 The interface of `sys_link` (kernel/sysfile.c).  A port of Rocq
-`SpecSysLink.v` (`/shared/xv6rocq/iris/SpecSysLink.v`, 634 lines): its
+`SpecSysLink.v` (`iris/SpecSysLink.v`, 634 lines): its
 frame, budget constants and the `SYSLINK` contract.  Its application side
 (`sysLinkRet`, `linkTgtOk`, the commits, the receipts, `linkArms`) is the
 split-off `Xv6/SysLinkDefs.lean` (brief fs7b D21).

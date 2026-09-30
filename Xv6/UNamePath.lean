@@ -1,6 +1,6 @@
 /-
 WHAT THE PROGRAM TIER READS OFF A CLASS NAME -- a port of Rocq
-`UNamePath.v` (`/shared/xv6rocq/iris/UNamePath.v`, pinned `1900b8a43`), row
+`UNamePath.v` (`iris/UNamePath.v`, pinned `1900b8a43`), row
 U0-2 of `notes/design-rulings.md`.  No Iris of its own (it imports
 `FsAbsEra` for `npElems`/`umStartOf`, as Rocq's imports `FsAbsEra`).
 

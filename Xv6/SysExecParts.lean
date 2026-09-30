@@ -112,7 +112,7 @@ the prologue); slot `n` is `sp0 - 8 n`:
 
 ## Dropped/simplified vs Rocq
 
-Uses checked: `grep -w` over `/shared/xv6rocq/iris/ProofSysExec*.v`.
+Uses checked: `grep -w` over `iris/ProofSysExec*.v`.
 * deviation 8's lemmas -- no Lean consumer shape.
 * `sx_bytes_name` / `sx_name_bytes` / `sx_buf_split` / `sx_buf_join` -- the
   landed `SysfileCalls.sysfile_buf_split` / `sysfile_buf_join`.

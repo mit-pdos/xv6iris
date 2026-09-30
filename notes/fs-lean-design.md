@@ -1,7 +1,7 @@
 # Porting Rocq's fs block/byte layer + ambient configuration into Lean — design
 
-Read against `/shared/lean-xv6` @ `3e3b745` (branch `main`, the `lean-v2` port) and
-`/shared/xv6rocq/iris/*.v`.  Answers the six questions of the wave-0b brief.
+Read against this repository @ `3e3b745` (branch `main`, the `lean-v2` port) and
+`iris/*.v`.  Answers the six questions of the wave-0b brief.
 Every Rocq snippet is verbatim from the `.v` file named; every Lean snippet is a
 PROPOSED signature unless a `Xv6/…lean:NNN` line number is given, in which case it
 is verbatim from the tree.

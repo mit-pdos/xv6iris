@@ -108,7 +108,7 @@ their lemmas; ProofCreate*/WriteiBudget use them by name.
 
 * `wp_bmap_sconf` (the counted form) -- DROPPED, neither a field nor
   derived -- uses checked: `grep -w wp_bmap_sconf` over
-  `/shared/xv6rocq/iris/*.v` finds it only in `SpecBmap.v` (the Module
+  `iris/*.v` finds it only in `SpecBmap.v` (the Module
   parameter), `ProofBmap.v` (its seal) and comments (ProofIupdate,
   ProofDirlink, ProofWritei); writei calls `BM.wp_bmap_gen`, readi
   `BMN.wp_bmap_noalloc_sconf` -- reason: no consumer.  It is a one-screen

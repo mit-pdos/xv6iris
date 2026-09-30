@@ -1,6 +1,6 @@
 /-
 **THE PIPELINE APPLICATION'S ERA LEDGER** -- the Iris half of Rocq
-`PipeOut.v` (`/shared/xv6rocq/iris/PipeOut.v`, pinned 1900b8a43), the part
+`PipeOut.v` (`iris/PipeOut.v`, pinned 1900b8a43), the part
 the union's cone reaches (45 of 96 declarations: the byte ledger's ghosts,
 the round-in-progress ghost, the frozen resolution and the stream
 extension `pext`; the pipeline's own claim `pecl`/`popen`, its pure stage

@@ -1,8 +1,8 @@
 # tools/vtest -- differential tests of the machine model against QEMU (Lean)
 
 The Lean twin of the Rocq tree's `tools/vtest` + `vtest-rocq/`
-(`/shared/xv6rocq`, which stays the authority for what each case is ABOUT and
-for the register of model-vs-hardware findings).  Same cases, same captures,
+(on the archived `rocq` branch, whose `claude-notes/completed/device-conformance.md`
+records what each case is ABOUT and the register of model-vs-hardware findings).  Same cases, same captures,
 same table, same judgement; what is different is how a capture is checked,
 and it is stated below.
 
@@ -165,7 +165,7 @@ hart-N variant.  Python only: it may be run on the development machine.
 
 The checked-in QEMU captures are the Rocq tree's, imported byte-for-byte:
 
-    python3 tools/vtest/rocq2lean.py --rocq /shared/xv6rocq
+    python3 tools/vtest/rocq2lean.py --rocq <path to a rocq-branch checkout>
 
 reads every `vtest-rocq/<PLAT>/<Case>{Test,Run}.v`, re-emits it through
 `vtest.py`'s emitter, reads the Lean file back and checks that every field
@@ -201,7 +201,7 @@ proof uses and says one of:
 ## Differences from the Rocq suite
 
 - **Evaluation**: `native_decide` (compiled) instead of `vm_compute`.  The
-  whole suite builds in ~10 s of wall clock on the build VM (7 min of CPU)
+  whole suite builds in ~10 s of wall clock on a build machine (7 min of CPU)
   against ~10 min of CPU in Rocq.
 - **One interpreter**.  Rocq has `exec` for a hart, `VSched` for the devices,
   `VConc`/`VTso` for two harts and `VIcache` for the fetch view, each with

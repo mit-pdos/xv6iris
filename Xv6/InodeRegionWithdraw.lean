@@ -2,7 +2,7 @@
 **ILOCK's WITHDRAWAL FROM THE INODE REGION: THE LICENCE `iregWdLic`, THE
 PAYBACK `iregWdBack`, THE CLAIM PACKAGE's ELIM, `iregWithdraw` AND
 `iregClaimNoOut`.**  A port of Rocq `InodeRegion.v`'s `Section InodeRegion`,
-lines 4671-5039 (`/shared/xv6rocq/iris/InodeRegion.v`), the part headed
+lines 4671-5039 (`iris/InodeRegion.v`), the part headed
 "ilock's WITHDRAWAL (§16.4's [icb_withdraw])".  The pure per-index pieces of
 the same range (`iregWdTy`, `ilkFills`, `ilkPost`, `ilkPost_fill`, Rocq
 4724-4755) were stated early and are `Xv6/InodeRegion.lean`'s; the licence
@@ -101,7 +101,7 @@ the `Int` cast `(inum.toNat : Int)`.  The inum-in-region premise is
 
 Nothing.  Every declaration of lines 4671-5039 not already in
 `Xv6/InodeRegion.lean` is ported with Rocq's statement.  Uses checked (all
-live, `grep -w` over `/shared/xv6rocq/iris/*.v`): `ireg_wd_lic` /
+live, `grep -w` over `iris/*.v`): `ireg_wd_lic` /
 `ireg_wd_back` (SpecIlock, ProofIlock, ProofCreateFreshTy),
 `inode_claimed_to_ClaimK` (ProofCreateFreshTy), `ireg_withdraw`
 (ProofIlock), `ireg_claim_no_out` (ProofIlock).  NEW helpers:

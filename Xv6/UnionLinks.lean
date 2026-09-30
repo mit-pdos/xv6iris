@@ -1,6 +1,6 @@
 /-
 **THE UNION APPLICATION'S CONSOLE LINKS** -- the cone-reached part of Rocq
-`UnionLinks.v` (`/shared/xv6rocq/iris/UnionLinks.v`, pinned 1900b8a43; cut
+`UnionLinks.v` (`iris/UnionLinks.v`, pinned 1900b8a43; cut
 C9e', design union.md §3).
 
 Rocq's header, abridged: the links at the union claim `UnionOut.ucl` (three

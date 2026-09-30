@@ -1,6 +1,6 @@
 /-
 The interface of `sys_chdir` (kernel/sysfile.c).  A port of Rocq
-`SpecSysChdir.v` (`/shared/xv6rocq/iris/SpecSysChdir.v`, 547 lines):
+`SpecSysChdir.v` (`iris/SpecSysChdir.v`, 547 lines):
 `K_sys_chdir`, the blanket `sys_chdir_post`, the caller's bundle
 `chdir_au_pre`, the three-way failure fold, the success arm, the armed post
 `chdir_arms`, the receipt and its split, the whole-function frame and the

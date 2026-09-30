@@ -3,7 +3,7 @@ kexec()'s VOCABULARY LEAF (kernel/exec.c): the frame budget, the stack
 geometry and the RESULT RELATION `kexecOk`, stated independently of any
 proof, plus the file-system fabric bundle.
 
-A port of Rocq `KexecDefs.v` (`/shared/xv6rocq/iris/KexecDefs.v`).  Rocq's
+A port of Rocq `KexecDefs.v` (`iris/KexecDefs.v`).  Rocq's
 header, in short (every clause that is about content is kept):
 
 > `int kexec(char *path, char **argv)` -- THE LARGEST FUNCTION IN THE TREE

@@ -1,7 +1,7 @@
 /-
 **OPTION A (reordered iput) -- THE IMARK-FREE ESCROW TOKENS**, keyed on the
 ambient registry gname `icfgReg`.  A port of Rocq `EscrowDefs.v`
-(`/shared/xv6rocq/iris/EscrowDefs.v`, 135 lines), whole.
+(`iris/EscrowDefs.v`, 135 lines), whole.
 
 OPTION A is the LIVE design (the reordered iput's per-inum escrow), not a
 superseded variant.  This file sits BELOW `InodeRegion` so that
@@ -45,7 +45,7 @@ The vocabulary:
 ## Dropped/simplified vs Rocq
 
 * `crp_elem_excl` -- uses checked: none (`grep -w` over every
-  `/shared/xv6rocq/iris/*.v`) -- dead.  The exclusivity it records ("the
+  `iris/*.v`) -- dead.  The exclusivity it records ("the
   ledger is exclusive per key, which is what makes the element a walk's
   private handle") is `ghost_map_elem_ne` at the full fraction, available
   to any later consumer directly.

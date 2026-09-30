@@ -1,6 +1,6 @@
 /-
 Pure inode vocabulary usable without the inode invariant.  A port of Rocq
-`InodeDefs.v` (`/shared/xv6rocq/iris/InodeDefs.v`), whole.
+`InodeDefs.v` (`iris/InodeDefs.v`), whole.
 
 No deviation from Rocq beyond the port's spellings: `file_byte` →
 `fileByte`, stdpp's total lookup `!!!` → `l[i]!`, and `BSIZE` is the

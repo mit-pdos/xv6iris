@@ -1,7 +1,7 @@
 /-
 **THE RESOURCE TRANSPORT: `fsState Γ q S ==∗ … ∗ fsState Γ' 1 S` over a
 FRESH durable family.**  Section 4 of Rocq
-`/shared/xv6rocq/iris/FsDurXfer.v` (the three-way split's top file;
+`iris/FsDurXfer.v` (the three-way split's top file;
 `Xv6/FsDurXferRuns.lean` has the header of the whole, `FsDurXferPool` §3).
 
 `fsState Γ S` in, `fsState Γ S ∗ fsState Γ' S` out.  Three allocations and

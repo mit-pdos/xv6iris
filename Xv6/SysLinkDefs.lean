@@ -1,7 +1,7 @@
 /-
 **sys_link's APPLICATION SIDE: the target test, the two new commits, the
 bundle, the three receipts and the post arms.**  A SPLIT of Rocq
-`SpecSysLink.v` (`/shared/xv6rocq/iris/SpecSysLink.v`, 634 lines; brief
+`SpecSysLink.v` (`iris/SpecSysLink.v`, 634 lines; brief
 fs7b D21): its section "THE APPLICATION'S SIDE OF sys_link" (:218-473) plus
 the return predicate `sys_link_ret` (:219) the arms refine.  The frame, the
 budget constants (`K_sys_link`, `sys_link_slots`) and the `SYSLINK`

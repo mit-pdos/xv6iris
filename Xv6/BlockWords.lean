@@ -1,6 +1,6 @@
 /-
 The WORDS inside a disk block.  A port of Rocq `BlockWords.v`
-(`/shared/xv6rocq/iris/BlockWords.v`).
+(`iris/BlockWords.v`).
 
 A disk block is 1024 raw bytes (`List (BitVec 8)` of length `BSIZE`); an
 INDIRECT block is those same bytes read as 256 little-endian 32-bit

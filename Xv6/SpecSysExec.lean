@@ -2,7 +2,7 @@
 sys_exec()'s ONE CONTRACT `SYSEXEC`: `SpecKexec`'s bundle and arms lifted to
 the syscall boundary, where the arguments are READ OFF THE USER IMAGE rather
 than handed in.  A port of Rocq `SpecSysExec.v`
-(`/shared/xv6rocq/iris/SpecSysExec.v`, 499 lines).  A STATEMENT FILE.
+(`iris/SpecSysExec.v`, 499 lines).  A STATEMENT FILE.
 
     uint64 sys_exec(void) {
       char path[MAXPATH], *argv[MAXARG]; int i; uint64 uargv, uarg;

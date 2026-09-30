@@ -1,7 +1,7 @@
 /-
 **`struct inode`'s GEOMETRY, THE PURE MODEL OF A FILE'S BLOCK MAP, AND THE
 TWO OWNERSHIP BUNDLES fs.c's PROOFS ARE STATED OVER.**  A port of Rocq
-`InodeInv.v` (`/shared/xv6rocq/iris/InodeInv.v`).  Design: the Rocq tree's
+`InodeInv.v` (`iris/InodeInv.v`).  Design: the Rocq tree's
 `claude-notes/design/fs-inode.md`; survey §2.6.
 
 ## THE GEOMETRY IS READ OFF THE CODE, NOT OFF THE HEADER

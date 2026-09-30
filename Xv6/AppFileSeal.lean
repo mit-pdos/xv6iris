@@ -1,7 +1,7 @@
 /-
 **THE FILE APPLICATION'S BIRTH, ITS LINE-LIST READS AND ITS BOOT TRANSPORT**
 -- U4 seal wave: the declarations of Rocq `AppFile.v`
-(`/shared/xv6rocq/iris/AppFile.v`, pinned 1900b8a43) that the union's birth
+(`iris/AppFile.v`, pinned 1900b8a43) that the union's birth
 (`FileOut.file_birth_all`), ledger (`FileOut.fl_auth_grow_pre`,
 `f0_typed_adm`) and transport (`union_al_xfer`) read, and that the U0-X cone
 audit trimmed from `Xv6/AppFile{Names,Steps,Boot}.lean` (their "not ported"

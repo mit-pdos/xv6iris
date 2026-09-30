@@ -1,6 +1,6 @@
 /-
 **WHAT A HOLDER READS OFF THE FILE CLAIM** -- §4a/§4a' of Rocq `AppFile.v`
-(`/shared/xv6rocq/iris/AppFile.v`, pinned 1900b8a43, l.830-957).
+(`iris/AppFile.v`, pinned 1900b8a43, l.830-957).
 
 * `fileDeed_law` (Rocq `file_deed_law`): LINEAR, `AppEcho.echo_cons_abs_law`'s
   shape: the deed goes in and comes back, and the fact is the claim's file

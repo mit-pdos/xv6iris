@@ -1,7 +1,7 @@
 /-
 **THE N-WRITER CLAIM PAYS THE FAMILY, AND THE FAMILY AT A PIPELINE ROUND**
 -- the rest of the cone-reached part of Rocq `PipeOutN.v`
-(`/shared/xv6rocq/iris/PipeOutN.v`, pinned 1900b8a43): the ONE obligation
+(`iris/PipeOutN.v`, pinned 1900b8a43): the ONE obligation
 the N-writer family (`PipeBothN`) asks of the claim, PROVED at `peclV`
 (`pblkV_ecl_holds`); the filing through a view (`pwcBlkV_file`); the silent
 run (`widsFrom_silent`, `sfxRunV_silent`, `runN_silent`); the console claim

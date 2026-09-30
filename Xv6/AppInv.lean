@@ -2,7 +2,7 @@
 **THE APPLICATION'S RUNNING INVARIANT: half of the abstract map's
 authority beside the application's claim about its view, and the one
 ghost move on the map that every retag in the kernel goes through.**  A
-port of Rocq `AppInv.v` (`/shared/xv6rocq/iris/AppInv.v`, 448 lines),
+port of Rocq `AppInv.v` (`iris/AppInv.v`, 448 lines),
 WHOLE.
 
 Rocq's header, kept because the reasons are the content (design of record:

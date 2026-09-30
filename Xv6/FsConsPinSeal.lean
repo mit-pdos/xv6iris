@@ -1,6 +1,6 @@
 /-
 **THE CONSOLE NODE'S INUM LIST** -- U4 seal wave: the declarations of Rocq
-`FsConsPin.v` (`/shared/xv6rocq/iris/FsConsPin.v`, pinned 1900b8a43) that
+`FsConsPin.v` (`iris/FsConsPin.v`, pinned 1900b8a43) that
 the file / echo transports read (`AppEcho.echo_xfer_boot`) and that the U0-X
 cone audit trimmed from `Xv6/FsConsPin.lean` (its deviation 3).
 

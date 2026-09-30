@@ -1,7 +1,7 @@
 /-
 **namei AT THE ERA-FRAGMENT TRACE**: the 26-byte wrapper's contract over
 `SpecNamexEra`.  A port of Rocq `SpecNameiEra.v`
-(`/shared/xv6rocq/iris/SpecNameiEra.v`, 294 lines).
+(`iris/SpecNameiEra.v`, 294 lines).
 
     struct inode* namei(char *path) { char name[DIRSIZ]; return namex(path, 0, name); }
 
@@ -34,7 +34,7 @@ As `SpecNamexEra` (1-3, 5) and `SpecNamei` (2): `nameiSlots` is Rocq's
 * As `SpecNamexEra` (`ic_escrows`, `dq`, `gf`, `gs`/`gl`).
 * **The `NameiEraCursor` section** (`nxe_P`, `nxe_Pmiss`, `nxe_hop_c`,
   `nxe_hops_c`: the ghost-variable cursor instantiation) -- uses checked
-  (grep of `/shared/xv6rocq/iris/*.v`): named only in SpecNameiEra.v itself
+  (grep of `iris/*.v`): named only in SpecNameiEra.v itself
   -- reason: dead (and it would need a `ghost_var (nat * Z)` camera the Lean
   `Xv6G` does not carry).
 

@@ -1,6 +1,6 @@
 /-
 **THE UNION APPLICATION'S `al_programs` AND ITS TOP THEOREM** (lane U4) --
-Rocq `UInitUnion.v` (`/shared/xv6rocq/iris/UInitUnion.v` @ 1900b8a43):
+Rocq `UInitUnion.v` (`iris/UInitUnion.v` @ 1900b8a43):
 `union_Hinit_boot` (`UnionProgLaw` by name, its body
 `UInitUnionBoot.union_Hinit_boot_at` at the record's own equations) and
 **`union_adequacy_closed`**, and (drift D3-app, Rocq SY3-A4 f3109fa08 /

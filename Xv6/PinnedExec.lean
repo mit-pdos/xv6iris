@@ -1,6 +1,6 @@
 /-
 **THE PINNED EXEC: THE PIN, AT A FILE NODE** -- the reached part of Rocq
-`PinnedExec.v` (`/shared/xv6rocq/iris/PinnedExec.v`, pinned `1900b8a43`)
+`PinnedExec.v` (`iris/PinnedExec.v`, pinned `1900b8a43`)
 that does not wait on the seccomp key: `pin_resolves`.
 
 Rocq's header, in short: an application that KNOWS which file its exec

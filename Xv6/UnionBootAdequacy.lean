@@ -1,6 +1,6 @@
 /-
 **THE UNION APPLICATION'S TOP-LEVEL THEOREM** (lane U4) -- Rocq
-`UUnionBootAdequacy.v` (`/shared/xv6rocq/iris/UUnionBootAdequacy.v` @
+`UUnionBootAdequacy.v` (`iris/UUnionBootAdequacy.v` @
 1900b8a43): `App.xv6_app_adequacy` at `AppUnionRec.app_union`, every
 obligation of the record discharged (`AppUnionLaws.unionLaws`), the functor
 list fixed at the concrete `unionGF` (`Xv6/UnionGF.lean`), the disk at the

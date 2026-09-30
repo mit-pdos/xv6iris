@@ -1,7 +1,7 @@
 /-
 **WHAT A WELL-FORMED IN-MEMORY INODE IS**, and the two guard readings
 `ilock`'s and `iunlock`'s dead panics turn on.  A port of Rocq
-`InodeLock.v` (`/shared/xv6rocq/iris/InodeLock.v`).  Design: the Rocq
+`InodeLock.v` (`iris/InodeLock.v`).  Design: the Rocq
 tree's `claude-notes/design/fs-icache.md` §13.
 
 ## WHAT USED TO BE IN Rocq's FILE, AND WHERE IT WENT
@@ -34,7 +34,7 @@ What is left is pure, and shared by both sides of that seam.
 ## DEVIATIONS from Rocq
 
 1. **`dir_ok` IS NOT HERE.**  The wave brief lists it with this file, but
-   `dir_ok` is `DirView.v`'s (`/shared/xv6rocq/iris/DirView.v:855`), not
+   `dir_ok` is `DirView.v`'s (`iris/DirView.v:855`), not
    `InodeLock.v`'s; it lands with wave 0c-3.
 2. **THE BRANCH READINGS ARE STATED OVER `MachCSL.bcond`**, this port's
    branch predicate, rather than over Sail's `eq_vec` / `zopz0zKzJ_s`.

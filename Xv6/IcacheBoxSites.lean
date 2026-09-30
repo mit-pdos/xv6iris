@@ -1,6 +1,6 @@
 /-
 **THE ICACHE INSTANCE OF THE TRANSIT BOX, PART 3: THE SITES.**  A port of
-Rocq `IcacheEscrow.v` (`/shared/xv6rocq/iris/IcacheEscrow.v`) lines
+Rocq `IcacheEscrow.v` (`iris/IcacheEscrow.v`) lines
 4717--5516, the second half of `Section IcacheBox` ("THE SITES (R3's map),
 as statements over CtxBox's six lemmas"): every place iget / ilock /
 iunlock / iput / idup moves the box, as one lemma over `MachCSL/CtxBox.lean`'s
@@ -71,7 +71,7 @@ boot -- `icBoxAllocAt` [`boxAllocAt` per slot].
 ## Dropped/simplified vs Rocq
 
 Uses checked by `grep -rnw <name>` over comment-stripped
-`/shared/xv6rocq/iris/*.v` (all 1533 files) and the declaration-reachability
+`iris/*.v` (all 1533 files) and the declaration-reachability
 pass (brief §5's method):
 
 * `ic_guard_deposit`, `ic_guard_deposit_gen` -- uses checked: none

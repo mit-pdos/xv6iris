@@ -1,7 +1,7 @@
 /-
 **THE FILE CLAIM'S STEPS, ITS SUPPLY, AND ITS TWO HALVES** -- §4b, §4a'',
 §5 and the reached part of §6 of Rocq `AppFile.v`
-(`/shared/xv6rocq/iris/AppFile.v`, pinned 1900b8a43, l.959-1220).
+(`iris/AppFile.v`, pinned 1900b8a43, l.959-1220).
 
 Rocq's header, abridged (the reasons are the content):
 

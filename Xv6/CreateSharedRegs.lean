@@ -1,6 +1,6 @@
 /-
 `create`'s FRAME, REGISTER BUNDLES and PURE ARITHMETIC: the first half of a
-split of Rocq `ProofCreateShared.v` (`/shared/xv6rocq/iris/ProofCreateShared.v`,
+split of Rocq `ProofCreateShared.v` (`iris/ProofCreateShared.v`,
 3229 lines; brief fs7b §4.3: `CreateSharedRegs` + `CreateSharedBody`), its
 §1 / §1b / §1c / (viii) and the pure lemmas of its §2 preamble.  The
 bodies, the registry moves, the arm builders and the epilogue funnel are
@@ -57,7 +57,7 @@ the pinned registers; `createThr` / `createThr3` are `cr_thr` / `cr_thr3`
 
 ## Dropped/simplified vs Rocq
 
-Uses checked: `grep -lw` over `/shared/xv6rocq/iris/*.v` (ProofCreate*.v,
+Uses checked: `grep -lw` over `iris/*.v` (ProofCreate*.v,
 SpecSys*.v, ProofSys*.v), ProofCreateShared.v excluded.
 * `cr_after_ip7`, `cr_u_ge10`, `cr_carve_gen`, `cr_shed_gen`,
   `cr_bytes_slots`, `cr_thr_caller`, `cr_thr_cs`, `cr_thr3_caller`,

@@ -1,6 +1,6 @@
 /-
 **THE FILE APPLICATION'S CONSOLE FAMILIES AS THE GENERIC ONES** -- the
-reached part of Rocq `FileLinkGen.v` (`/shared/xv6rocq/iris/FileLinkGen.v`,
+reached part of Rocq `FileLinkGen.v` (`iris/FileLinkGen.v`,
 pinned 1900b8a43): §0 (the head and the turn AT A NAMED BOOT STATE), §1 (the
 parameters `file_params`) and the named-state witness of §5.
 

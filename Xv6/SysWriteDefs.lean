@@ -1,7 +1,7 @@
 /-
 **THE WRITE DELTA'S PURE VOCABULARY: the chunk constant, the per-chunk side
 conditions, and the instant-count bound.**  A port of Rocq `SysWriteDefs.v`
-(`/shared/xv6rocq/iris/SysWriteDefs.v`, 94 lines), WHOLE, plus the one
+(`iris/SysWriteDefs.v`, 94 lines), WHOLE, plus the one
 content-seam predicate the write chain is stated over (`ubytesAt`, deviation
 3).  A LEAF: pure, no iProp, no contract.
 

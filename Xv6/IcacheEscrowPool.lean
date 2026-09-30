@@ -1,6 +1,6 @@
 /-
 **THE INODE ENTRY'S ESCROW, PART 3: THE POOL, ITS PARTITION AND ITS
-LEDGERS.**  A port of Rocq `IcacheEscrow.v` (`/shared/xv6rocq/iris/IcacheEscrow.v`)
+LEDGERS.**  A port of Rocq `IcacheEscrow.v` (`iris/IcacheEscrow.v`)
 lines 2105--2691: §5 (the cached set `ci_inums`, the region's inums, the
 `ic_ci_wf` clauses), §5b (the pool split by arm: the ordinary rows in an
 invariant, the in-transition rows under the lock), §5c (the partition and its
@@ -86,7 +86,7 @@ doors) are `Xv6/IcacheEscrowPoolMove.lean`, split off for size at Rocq's own
 ## Dropped/simplified vs Rocq
 
 Nothing in lines 2105--2691 (every declaration has a consumer:
-`grep -rlw` over the comment-stripped `/shared/xv6rocq/iris/*.v`).  The
+`grep -rlw` over the comment-stripped `iris/*.v`).  The
 three dead movers of 2692--3360 are recorded in
 `Xv6/IcacheEscrowPoolMove.lean`'s header.
 

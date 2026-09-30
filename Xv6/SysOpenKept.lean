@@ -1,7 +1,7 @@
 /-
 **WHAT A TRUNCATING OPEN KEEPS** (Rocq `SpecSysOpen.v` §2e' "what a
 truncating open keeps of its cursor" and the O_CREATE kept pieces,
-`/shared/xv6rocq/iris/SpecSysOpen.v` at `1900b8a43`, lanes TRUNC-PERMIT and
+`iris/SpecSysOpen.v` at `1900b8a43`, lanes TRUNC-PERMIT and
 F-OPEN-3/6): the part of the family that does not read the keyed
 `open_trunc_piece`.
 

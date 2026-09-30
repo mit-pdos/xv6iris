@@ -5,7 +5,7 @@ the two `bad:` tails reachable from them (the namei-null tail at +0x088 and
 the short-read / bad-magic tail at +0x064, the latter the shared
 `KexecTail.kxc_bad64`).
 
-A port of Rocq `ProofKexecACode.v` (`/shared/xv6rocq/iris/ProofKexecACode.v`),
+A port of Rocq `ProofKexecACode.v` (`iris/ProofKexecACode.v`),
 a STAGE file (no `Proof` prefix; the one seal is `ProofKexec.lean`).  The
 seams it produces are FROZEN in `KexecTail` (`kxcAtA2` at +0x032, `kxcAt90`
 at +0x090; kc_interfaces.txt §3/§5):

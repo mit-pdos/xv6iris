@@ -1,6 +1,6 @@
 /-
 **THE ERA'S TOKEN AND THE SYNC HOOK AT THE FILE CLAIM** -- Rocq `AppFile.v`
-§6 and §6b (`/shared/xv6rocq/iris/AppFile.v` @ origin/main 456141b5b,
+§6 and §6b (`iris/AppFile.v` @ origin/main 456141b5b,
 l.1440-1476 and l.2107-2218; sync design §4.5 "The hook", SY3-A4).
 
 Rocq's notes, abridged (the reasons are the content):

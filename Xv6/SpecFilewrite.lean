@@ -1,6 +1,6 @@
 /-
 Specification of `filewrite` (kernel/file.c): the public contract.  A port of
-Rocq `SpecFilewrite.v` (`/shared/xv6rocq/iris/SpecFilewrite.v`).
+Rocq `SpecFilewrite.v` (`iris/SpecFilewrite.v`).
 
     int filewrite(struct file *f, uint64 addr, int n) {
       int r, ret = 0;
@@ -170,7 +170,7 @@ untouched); the `n < 0` test (+0x1c); the three-way dispatch; FD_PIPE
 ## Dropped/simplified vs Rocq
 
 * `fwrite_names` -- deviation 2 (and 3 for its device fields).  Uses
-  checked (comment-stripped grep of `/shared/xv6rocq/iris/*.v`):
+  checked (comment-stripped grep of `iris/*.v`):
   SpecFilewrite.v, ProofFilewrite*.v (threaded), SpecSysWrite.v /
   ProofSysWrite.v (passed through), ProofSyscall.v (built from fs_ready).
 * `filewrite_dev_caps` is `uartPort .uart0` (deviation 3); `filewrite_devsw`

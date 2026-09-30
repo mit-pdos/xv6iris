@@ -3,7 +3,7 @@ The log layer's lock invariant: `struct log`'s geometry, the reservation
 LEDGER, the batch bundle the committer checks out, and the ghost
 transitions `begin_op` / `log_write` / `end_op` perform.
 
-A port of Rocq `LogInv.v` (`/shared/xv6rocq/iris/LogInv.v`).  The shape in
+A port of Rocq `LogInv.v` (`iris/LogInv.v`).  The shape in
 one paragraph, unchanged from Rocq: the "log" spinlock seals `logRes`.
 Always inside: the outstanding / committing / ncommit cells and the LEDGER
 -- a ghost map op-id ↦ REMAINING BUDGET whose authority ties the

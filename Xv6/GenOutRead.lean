@@ -1,6 +1,6 @@
 /-
 **THE CLAIM'S READ** -- Rocq `GenOut.v`'s `gin_read_pure` and
-`gcl_step_read` (`/shared/xv6rocq/iris/GenOut.v` :1135-1357, pinned
+`gcl_step_read` (`iris/GenOut.v` :1135-1357, pinned
 1900b8a43), split off `Xv6/GenOut.lean` (that file's deviation 1).
 
 The reader's receipt carries the window's facts and, past an empty window,

@@ -1,7 +1,7 @@
 /-
 **OPTION A (reordered iput) -- THE PER-INUM ESCROW BODY, and `poolPending`
 (the pool's pending_free arm).**  A port of Rocq `EscrowInode.v`
-(`/shared/xv6rocq/iris/EscrowInode.v`, 262 lines), whole.
+(`iris/EscrowInode.v`, 262 lines), whole.
 
 Ported (in Rocq) from the validated `EscrowRegionA.v` de-risk, keyed on the
 ambient registry via `Xv6/EscrowDefs.lean`.  The body mentions the freeze
@@ -119,7 +119,7 @@ algebra's `ifreeze*` (`IcacheG`), and `topFrag` (`FsTopG`, `RegMapF`) -- is
 
 ## Dropped/simplified vs Rocq
 
-Nothing.  Uses checked (`grep -lw` over /shared/xv6rocq/iris/*.v): `escA_body`
+Nothing.  Uses checked (`grep -lw` over iris/*.v): `escA_body`
 (AppInv, EscrowDeposit, FsCollect, InodeRegion, IcacheEscrow, Xv6Cameras),
 `escA_inv` / `escA_alloc` / `escA_deposit_acc` (EscrowDeposit, FsCollect,
 IcacheEscrow, ProofIput), `escA_redeem` / `escA_await_peel` (IcacheEscrow),

@@ -1,7 +1,7 @@
 /-
 **THE ABSTRACT WALK'S HOP: `axHop` / `axHopsFrom`, ONE CALLER-SUPPLIED
 ATOMIC STEP PER PATH ELEMENT, WITH THE LENT FRAGMENT ABSTRACTED.**  A
-PARTIAL port of Rocq `FsAbs.v` (`/shared/xv6rocq/iris/FsAbs.v`, 1000 lines)
+PARTIAL port of Rocq `FsAbs.v` (`iris/FsAbs.v`, 1000 lines)
 under a NEW NAME (brief fs7b §3.3, D21): its section 4's two definitions
 `ax_hop` (:398) and `ax_hops_from` (:409), and nothing else.
 

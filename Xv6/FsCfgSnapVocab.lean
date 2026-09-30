@@ -1,6 +1,6 @@
 /-
 **THE ERA MINT'S VOCABULARY, READ OFF THE DURABLE SNAPSHOT** -- sections 1-8
-of Rocq `FsCfgSnap.v` (`/shared/xv6rocq/iris/FsCfgSnap.v` :72-806), crash
+of Rocq `FsCfgSnap.v` (`iris/FsCfgSnap.v` :72-806), crash
 batch C-5 item CL.  The mint itself (section 9, `fs_cfg_alloc_snap`) is
 `Xv6/FsCfgSnap.lean`.
 
@@ -22,7 +22,7 @@ WHAT IS HERE, bottom up (Rocq name → Lean name):
 | `bm_of_slot_fn` | `bmOf_slotFn` |
 | `snap_blk_set`, `elem_of_snap_blk_set` | `snapBlkSet`, `mem_snapBlkSet` |
 | `snap_blk_set_disj` | `snapBlkSet_disj` |
-| `snap_blk_set_home` | not ported (D36: dead, uses checked: none in `/shared/xv6rocq/iris`) |
+| `snap_blk_set_home` | not ported (D36: dead, uses checked: none in the Rocq tree's `iris/`) |
 | `snap_live_blocks`, `elem_of_snap_live_blocks` | `snapLiveBlocks`, `mem_snapLiveBlocks` |
 | `snap_bitmap_spent` | `snapBitmapSpent` (+ `mem_snapBitmapSpent`) |
 | `bitmap_res_of_snap` | `bitmapRes_ofSnap` |

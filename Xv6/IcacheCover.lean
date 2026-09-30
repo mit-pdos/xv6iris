@@ -1,7 +1,7 @@
 /-
 **THE COMMIT'S COLLECTION, PER SLOT, OVER THE BOX'S ARM** (tso-cutover
 endgame plan §5 last row, §9 item 2).  A port of Rocq `IcacheCover.v`
-(`/shared/xv6rocq/iris/IcacheCover.v`, the whole file).
+(`iris/IcacheCover.v`, the whole file).
 
 ## RATIONALE (Rocq's header, kept)
 
@@ -59,7 +59,7 @@ quiescence.
 
 ## Dropped/simplified vs Rocq
 
-Uses checked by `grep -rnw <name>` over `/shared/xv6rocq/iris/*.v` (all
+Uses checked by `grep -rnw <name>` over `iris/*.v` (all
 files, incl. Spec*/Proof*/FsCollect*/Link*), comments excluded (brief §5's
 list re-verified):
 

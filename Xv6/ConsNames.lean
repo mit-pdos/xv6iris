@@ -1,6 +1,6 @@
 /-
 THE CONSOLE RING'S GHOST NAMES (the Rocq `UartNames.cons_names`,
-`/shared/xv6rocq/iris/UartNames.v`), in a file of their own for the reason
+`iris/UartNames.v`), in a file of their own for the reason
 Rocq keeps them beside `uart_names`: the file system's ambient config record
 (Rocq `FsCfg.fsc_cons`, Lean `Xv6.Fscfg`) has to carry them, and it must not
 pull the console's own theory (hence the device model) in front of every

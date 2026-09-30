@@ -1,6 +1,6 @@
 /-
 Proof of `iunlock`'s specification (`SpecIunlock.IUNLOCK`).  A port of Rocq
-`ProofIunlock.v` (`/shared/xv6rocq/iris/ProofIunlock.v`, `wp_iunlock_dep_sconf`).
+`ProofIunlock.v` (`iris/ProofIunlock.v`, `wp_iunlock_dep_sconf`).
 
     800033a6  addi sp,sp,-32 ; sd ra,24(sp) ; sd s0,16(sp) ; sd s1,8(sp) ;
               sd s2,0(sp) ; addi s0,sp,32                  (the prologue)

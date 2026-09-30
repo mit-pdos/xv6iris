@@ -45,7 +45,7 @@ agreement, read the slot-level fact, close the slot UNCHANGED
    the licence-level reading Lean's namex already uses.
 
 **Dropped/simplified vs Rocq.**  Nothing: all five declarations are ported.
-Uses checked (`grep -w` over `/shared/xv6rocq/iris/*.v`): `ireg_toks_agree`
+Uses checked (`grep -w` over `iris/*.v`): `ireg_toks_agree`
 (ProofCreateMkdir, ProofSysUnlinkW5D), `ireg_tok_nz` (ProofCreateMkdir,
 ProofSysLinkTails, ProofSysLink, ProofSysUnlinkW5F/W5D), `ireg_boot_no_claim`
 (no `.v` consumer; kept as the boot-shelter theorem SpecIreclaim's header

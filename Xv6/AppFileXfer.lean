@@ -1,6 +1,6 @@
 /-
 **THE FILE CLAIM'S POWER-ON TRANSPORT AND ITS MERGE** -- Rocq `AppFile.v`
-§6 and §7a (`/shared/xv6rocq/iris/AppFile.v` @ origin/main 456141b5b,
+§6 and §7a (`iris/AppFile.v` @ origin/main 456141b5b,
 l.1852-2031 and l.2221-2338; sync design §4.5 "PowerOn", "The merge").
 
 Rocq's notes, abridged (the reasons are the content):

@@ -2,7 +2,7 @@
 **THE TRANSPORT'S RUN VOCABULARY: shares above a half, runs, their flat
 map, and the two PURE readings (disjointness off exclusivity, inclusion off
 the source's authority).**  Sections 0-2d of Rocq
-`/shared/xv6rocq/iris/FsDurXfer.v` (durable-disk lane H; the file is split
+`iris/FsDurXfer.v` (durable-disk lane H; the file is split
 three ways by the few-seconds rule, crash brief §4 agent CB:
 `FsDurXferRuns` (this), `FsDurXferPool` (§3, the file system's own runs),
 `FsDurXfer` (§4, the transport itself)).
@@ -42,7 +42,7 @@ THE SHAPE, bottom up:
 5. `dfrac_full_pair` is `Xv6.dfracFullNvalid` (landed, `FsStateDefs`).
 
 ## Dropped/simplified vs Rocq (crash brief D36; grepped over ALL of
-`/shared/xv6rocq/iris/*.v`, comments included)
+`iris/*.v`, comments included)
 
 * `xr_disj_app`, `xr_union_app`, `xq_ok_cons` -- uses checked: none.
 * `dfrac_full_pair` -- uses checked: comments only (FsCollect.v:335); it is

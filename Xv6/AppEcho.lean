@@ -1,6 +1,6 @@
 /-
 **THE ECHO APPLICATION'S CLAIM** -- the reached part of Rocq `AppEcho.v`
-(`/shared/xv6rocq/iris/AppEcho.v`, pinned 1900b8a43; union cone: 33 of 88
+(`iris/AppEcho.v`, pinned 1900b8a43; union cone: 33 of 88
 declarations, the console algebra of section 3a in `Xv6/AppEchoCons.lean`).
 
 What is here (Rocq's header, abridged -- the reasons are the content):

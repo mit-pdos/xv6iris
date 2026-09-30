@@ -1,7 +1,7 @@
 /-
 **THE BOOT WIRING OF THE INODE CACHE, PART 2: THE REGION'S INITIAL MAP,
 `iregAlloc`, AND STOCKING THE POOL.**  A port of Rocq `IcacheBoot.v`
-(`/shared/xv6rocq/iris/IcacheBoot.v`) lines 285--1134: §2 (the region's
+(`iris/IcacheBoot.v`) lines 285--1134: §2 (the region's
 initial map and `ireg_alloc`, `Section IcacheBootRegion`) and §3 (stocking
 the pool, `Section IcacheBootPool`).  §1 (lines 1--284, the pure decode and
 the file header) is `Xv6/IcacheBootDecode.lean`; §4 (the fifty entries, the
@@ -95,7 +95,7 @@ witness that the pool premise is satisfiable.
 
 ## Dropped/simplified vs Rocq
 
-* `dummy_reg_key` -- uses checked: `grep -rlw` over `/shared/xv6rocq/iris/*.v`:
+* `dummy_reg_key` -- uses checked: `grep -rlw` over `iris/*.v`:
   none outside `IcacheBoot.v`'s own definition -- dead (brief §5).
 * `ireg_M0_dom`, `mark_inums`, `mark_inums_neg`, `mark_list_nodup` -- uses
   checked: same grep, none outside `IcacheBoot.v` (their only uses are

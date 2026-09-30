@@ -1,6 +1,6 @@
 /-
 THE TYPED LINE'S WITNESS, PURELY -- a port of Rocq `FileLineWit.v`
-(`/shared/xv6rocq/iris/FileLineWit.v`, pinned `1900b8a43`), row U0-2 of
+(`iris/FileLineWit.v`, pinned `1900b8a43`), row U0-2 of
 `notes/design-rulings.md`.  The statements are pure (no `IProp`); the file
 imports `Xv6/EchoOut.lean` for `segOf`, as Rocq's imports `EchoOut`.
 

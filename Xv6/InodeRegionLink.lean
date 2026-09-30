@@ -2,7 +2,7 @@
 **THE INODE REGION's LINK MOVERS: THE FREEZE PIN's PRICE `iregLinkPin`,
 ITS READER, AND THE TWO `nlink`-MOVING FLUSHES `iregWriteLink_reg` /
 `iregWriteUnlink_reg`.**  A port of Rocq `InodeRegion.v`'s
-`Section InodeRegion`, lines 5040-5578 (`/shared/xv6rocq/iris/InodeRegion.v`),
+`Section InodeRegion`, lines 5040-5578 (`iris/InodeRegion.v`),
 to the end of the file.  Lines 2760-3594 are `Xv6/InodeRegionInv.lean`'s,
 1595-2759 `Xv6/InodeRegionSlot.lean`'s; 3595-5039 are wave 0d's
 `InodeRegionMovers` / `InodeRegionWithdraw`.  NOTHING HERE USES A LEMMA OF
@@ -74,7 +74,7 @@ InodeRegionWithdraw / InodeRegionMovers).
   (`ireg_link_grey`) and 5562-5576 (the lend's §L/§LF/§LW) have no
   declarations; their prose is summarised here.
 * Nothing else: all four declarations of the range are live -- uses
-  checked (`grep -lw`, all of /shared/xv6rocq/iris/*.v): `ireg_link_pin`
+  checked (`grep -lw`, all of iris/*.v): `ireg_link_pin`
   (SpecIupdate, ProofIupdate, ProofSysLink, ProofCreateAlloc,
   ProofCreateMkdir), `ireg_write_link_reg` (SpecIupdate, ProofIupdate,
   SpecIlock), `ireg_write_unlink_reg` (SpecIupdate, ProofIupdate),

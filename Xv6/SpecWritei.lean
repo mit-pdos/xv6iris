@@ -123,7 +123,7 @@ running-process bundle; its crossing is the literal `true`.
 
 * `wp_writei_sconf` (the counted form) -- DROPPED, neither a field nor
   derived -- uses checked: `grep -w wp_writei_sconf` over
-  `/shared/xv6rocq/iris/*.v` finds it only in `SpecWritei.v` (the Module
+  `iris/*.v` finds it only in `SpecWritei.v` (the Module
   parameter), `ProofWritei.v` (its seal) and comments (ProofDirlink.v 3505,
   ProofFilewrite.v 134/190/280, SpecIupdate.v 391); every applied use is
   `wp_writei_gen` (ProofDirlink.v 2366, ProofFilewrite.v 2591,

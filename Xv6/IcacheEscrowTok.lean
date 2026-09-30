@@ -1,6 +1,6 @@
 /-
 **THE INODE ENTRY'S ESCROW, PART 1: THE TOKENS AND THE PAYLOADS.**  A port of
-Rocq `IcacheEscrow.v` (`/shared/xv6rocq/iris/IcacheEscrow.v`, 6376 lines),
+Rocq `IcacheEscrow.v` (`iris/IcacheEscrow.v`, 6376 lines),
 lines 1--1284: the file header, §0 (ghost names), §1 (the two tokens and the
 identification agreement) and §2 (the payloads, up to and including the read
 arm and `ic_payload_np`).  The rest of Rocq's file is five later Lean files,
@@ -117,7 +117,7 @@ step; iget / ilock / iunlock / iput are stated over this file.
 ## Dropped/simplified vs Rocq
 
 Uses checked by `grep -rnw <name>` over comment-stripped
-`/shared/xv6rocq/iris/*.v` (all files, incl. Spec*/Proof*/FsCollect*/Link*).
+`iris/*.v` (all files, incl. Spec*/Proof*/FsCollect*/Link*).
 
 * `ic_word4_excl` -- uses checked: none (IcacheEscrow.v only, its own
   definition; the later box parts use `ctx_word4_excl_x`) -- dead.

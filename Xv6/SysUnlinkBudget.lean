@@ -1,7 +1,7 @@
 /-
 **THE OP-WIDE LOG LEDGER OF sys_unlink, ARM BY ARM, MACHINE CHECKED AT
 EVERY CORNER OF THE REPORTED BOOLEANS.**  A port of Rocq `SysUnlinkBudget.v`
-(`/shared/xv6rocq/iris/SysUnlinkBudget.v`, 284 lines), WHOLE.  Pure.
+(`iris/SysUnlinkBudget.v`, 284 lines), WHOLE.  Pure.
 
 CONSUMERS (grep, brief fs7b §5.1): Rocq `ProofSysUnlinkW1/W2/W3/W5F/W5D`
 (`su_u1`, `su_u1_ge9`, `su_walk_need_closes`), `ProofSysUnlinkPure`

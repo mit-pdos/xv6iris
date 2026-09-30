@@ -1,5 +1,5 @@
 import os, re, glob, sys
-ROOT = '/mnt/rocq/trees/_shared_xv6rocq'
+ROOT = os.environ['ROCQ_TREE']
 dirs = {'iris': 'xv6iris', 'model-xv6iris': 'Riscv', 'kernel-rocq': 'Kernel', 'user-rocq': 'User'}
 out = open(sys.argv[1], 'w')
 for d, lib in dirs.items():

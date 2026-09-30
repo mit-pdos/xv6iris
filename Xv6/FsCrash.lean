@@ -36,7 +36,7 @@ where `diskImgG` is the tree's unique source of that instance.
    hooks (`MachCSL.wp_power`'s `Hproj`/`Hswap`) take the `∗`-entailment forms
    and are instantiated at the adequacy site.
 
-## NOT PORTED (crash brief D36; uses checked over `/shared/xv6rocq/iris/*.v`)
+## NOT PORTED (crash brief D36; uses checked over `iris/*.v`)
 
 * `P_fs` and `P_fs_named` (the `gt`-existential forms), `P_fs_named_timeless`,
   `P_fs_rec_named` -- comment-only uses elsewhere (FsBootParams.v, FirstTok.v,

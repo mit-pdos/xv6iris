@@ -1,6 +1,6 @@
 /-
 **THE TYPE REGISTER: LINK COUNTS AND INODE TYPES IN ONE RA.**  A port of
-Rocq `FsStateLink.v` (`/shared/xv6rocq/iris/FsStateLink.v`, 553 lines),
+Rocq `FsStateLink.v` (`iris/FsStateLink.v`, 553 lines),
 together with the fs-state half of Rocq `Xv6Cameras.v` that it states its
 theory over (`fsLinkElemUR`, `fsLinkUR`, `fsLinkG`).
 
@@ -104,7 +104,7 @@ update, so no retype is a frame-preserving one.
 ## Dropped/simplified vs Rocq
 
 Each item was grepped (`grep -w`, comments ignored) across ALL of
-`/shared/xv6rocq/iris/*.v` -- defs, `Spec*`, `Proof*`, `Link*`, the boot
+`iris/*.v` -- defs, `Spec*`, `Proof*`, `Link*`, the boot
 and collect files -- and has no use outside `FsStateLink.v` (the wave-0d
 brief §5 lists the same set; re-checked):
 

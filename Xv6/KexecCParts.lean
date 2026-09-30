@@ -6,7 +6,7 @@ wrappers at kexec's frame context, the `p->sz` cell out of the block, the
 arithmetic of the setup block and of the push loop.
 
 A STAGE file (no `Proof` prefix) of Rocq `ProofKexecC.v`
-(`/shared/xv6rocq/iris/ProofKexecC.v`): its local lemmas (`kxc_um_below_insert`,
+(`iris/ProofKexecC.v`): its local lemmas (`kxc_um_below_insert`,
 `kxc_um_covered_insert`, `kxc_pgu_bridge`, `add_neg8192_eq_sub`,
 `kxc_round16_mono`, `kxc_sp_final_mono`, `kxc_ustack_collapse`,
 `kxc_frameC_collapse`, `kxc_addiw_p1`, `kxc_round16_andi`, `kxc_sp_le_top`,

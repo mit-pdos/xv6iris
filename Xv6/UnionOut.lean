@@ -1,6 +1,6 @@
 /-
 **THE UNION APPLICATION'S CONSOLE CLAIM AND ITS TAG** -- the cone-reached
-part of Rocq `UnionOut.v` (`/shared/xv6rocq/iris/UnionOut.v`, pinned
+part of Rocq `UnionOut.v` (`iris/UnionOut.v`, pinned
 1900b8a43; cut C9e', design union.md §3), sections 0-4.  The model-level head
 (`uwild`, `uwild_wild`, `uwild_pv`) is `Xv6/UnionOutWild.lean`; the ledger
 (§6) is `Xv6/UnionOutLed.lean`.

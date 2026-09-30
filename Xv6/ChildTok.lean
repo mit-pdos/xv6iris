@@ -1,6 +1,6 @@
 /-
 **THE GENERATION, AS A SAVED PREDICATE CARRYING ITS SLOT, ITS PID AND ITS
-EXIT PAYLOAD** -- a port of Rocq `ChildTok.v` (`/shared/xv6rocq/iris/ChildTok.v`,
+EXIT PAYLOAD** -- a port of Rocq `ChildTok.v` (`iris/ChildTok.v`,
 853 lines), wave 7 decision D8 (the fork/exit generation machinery, the
 definitional layer).
 
@@ -68,7 +68,7 @@ duplicated, which is what makes "the payload is paid once" a THEOREM.
 3. **`gen_agree_all` and `gen_agree` are one lemma** (`gen_agree`): Rocq's
    `gen_agree` is `gen_agree_all` re-exported under the older name, with an
    identical statement; `gen_agree_all` has no other caller
-   (`grep -rn gen_agree_all /shared/xv6rocq/iris/*.v` → ChildTok.v only).
+   (`grep -rn gen_agree_all iris/*.v` → ChildTok.v only).
 4. **`gen_new_split` is kept although it is `gen_new` unfolded** (its Rocq
    users, ProofKforkB*.v and ProofUserinit.v, destruct through it; one line).
 5. **`Global Typeclasses Opaque gen_own`**: Lean has no such switch; the

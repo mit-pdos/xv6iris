@@ -1,6 +1,6 @@
 /-
 Specification of `idup` (kernel/fs.c): the public contract.  A port of Rocq
-`SpecIdup.v` (`/shared/xv6rocq/iris/SpecIdup.v`, `wp_idup_sconf_body`).
+`SpecIdup.v` (`iris/SpecIdup.v`, `wp_idup_sconf_body`).
 
     struct inode *idup(struct inode *ip) {
       acquire(&itable.lock);

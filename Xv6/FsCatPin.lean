@@ -1,6 +1,6 @@
 /-
 **THE ERA-0 /cat PINS: THE /init PAIR REPLAYED FOR THE CAT PROGRAM** -- the
-reached part of Rocq `FsCatPin.v` (`/shared/xv6rocq/iris/FsCatPin.v`, pinned
+reached part of Rocq `FsCatPin.v` (`iris/FsCatPin.v`, pinned
 `1900b8a43`; union cone audit: 19 of 26).
 
 Rocq's header, in short: the same three sentences `FsInitPin` proves for

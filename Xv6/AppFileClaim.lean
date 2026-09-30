@@ -1,6 +1,6 @@
 /-
 **THE FILE APPLICATION'S CLAIM** -- §4 of Rocq `AppFile.v`
-(`/shared/xv6rocq/iris/AppFile.v`, pinned 1900b8a43, l.730-835).
+(`iris/AppFile.v`, pinned 1900b8a43, l.730-835).
 
 Rocq's header, abridged (the reasons are the content):
 

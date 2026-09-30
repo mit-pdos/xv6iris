@@ -1,6 +1,6 @@
 /-
 **THE N-WRITER CONSOLE FAMILY** -- the Iris half of Rocq `PipeBothN.v`
-(`/shared/xv6rocq/iris/PipeBothN.v`, pinned 1900b8a43; design
+(`iris/PipeBothN.v`, pinned 1900b8a43; design
 pipes-general.md §2.2, cut C5), the part the union's cone reaches (45 of
 54 declarations, lane U1-P's glob walk).
 

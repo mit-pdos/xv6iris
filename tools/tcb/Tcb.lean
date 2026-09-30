@@ -9,7 +9,7 @@ PROOF assume"; this answers the other half.  Lean's kernel checks the proof,
 so nothing a proof mentions needs trusting -- but the STATEMENT is the thing
 a human agrees to, so every definition it unfolds to is trusted.
 
-Run it (on the build VM, never locally), against an already-built tree:
+Run it (on a machine sized for a Lean build), against an already-built tree:
 
     tools/ci/tcb.sh              # check against tools/tcb/expected.json
     tools/ci/tcb.sh --update     # rewrite tools/tcb/expected.json

@@ -1,6 +1,6 @@
 /-
 **THE BOOT-SIDE FILE-SYSTEM VOCABULARY** -- a PARTIAL port of Rocq
-`FsCfgBoot.v` (`/shared/xv6rocq/iris/FsCfgBoot.v`), batch C-0 item CD of
+`FsCfgBoot.v` (`iris/FsCfgBoot.v`), batch C-0 item CD of
 `notes/design-rulings.md`.
 
 **WHAT IS HERE.**
@@ -25,7 +25,7 @@
    unbundled (fs-lean-design §5), and batch C-4 adds the crash rows to it.
    The Lean shape of the supply is a boot-chain (W8-H / C-4) decision.
 
-**CLEANUPS (Rocq gunk, checked uses in `/shared/xv6rocq/iris`).**
+**CLEANUPS (Rocq gunk, checked uses in the Rocq tree's `iris/`).**
 `region_of_seq` is `Xv6.regionInums_bigSep` (`Xv6/IcacheBootRegion.lean`,
 already ported); `big_sepS_of_elements` is iris-lean's
 `BigSepS.bigSepS_elements`.  Not ported, no users outside this file:

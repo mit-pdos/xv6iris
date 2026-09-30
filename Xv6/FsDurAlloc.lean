@@ -1,6 +1,6 @@
 /-
 **THE VALUE-FIRST SNAPSHOT ALLOCATOR, WHICH IS ERA 0'S AND NOBODY ELSE'S.**
-Sections 3-4 of Rocq `/shared/xv6rocq/iris/FsDurAlloc.v` (crash batch C-1,
+Sections 3-4 of Rocq `iris/FsDurAlloc.v` (crash batch C-1,
 item CF, brief D41; the slots are `Xv6/FsDurAllocSlots.lean`, their
 enumeration `Xv6/FsDurAllocList.lean`).
 
@@ -32,7 +32,7 @@ where nothing is carved.
    at `B = fsDbytes D` by reflexivity exactly as Rocq's `reflexivity`.
 
 ## Dropped vs Rocq (crash brief D36; grepped over ALL of
-`/shared/xv6rocq/iris/*.v`)
+`iris/*.v`)
 
 * `blk_ledger_lookup`, `blk_owned_rec_in` -- uses checked: none (both are
   FsDurAlloc.v-internal and unused there too).

@@ -1,6 +1,6 @@
 /-
 THE CONSOLE CLAIM'S PURE HISTORY LAYER, ONCE OVER A LINE MODEL -- a port of
-Rocq `GenOutHist.v` (`/shared/xv6rocq/iris/GenOutHist.v`, 659 lines, pinned
+Rocq `GenOutHist.v` (`iris/GenOutHist.v`, 659 lines, pinned
 `1900b8a43`), row U0-1 of `notes/design-rulings.md`.  Pure (it reads the
 Iris file `EchoOut` only for the pure `segOf`/`chE`, as Rocq's does).
 

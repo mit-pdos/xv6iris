@@ -1,6 +1,6 @@
 /-
 **THE ECHO APPLICATION'S ERA GHOSTS** -- the Iris half of Rocq `EchoOut.v`
-(`/shared/xv6rocq/iris/EchoOut.v`, pinned 1900b8a43), the part of it the
+(`iris/EchoOut.v`, pinned 1900b8a43), the part of it the
 union's cone reaches (union_cone.md §1.2: 80 of 275 declarations; the rest is
 the echo application's own merged claim `ecl`, its pure stage account and the
 links, none reached from `union_adequacy_closed`).

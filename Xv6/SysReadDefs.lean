@@ -2,7 +2,7 @@
 **THE READ OBSERVATION'S PURE VOCABULARY: the count a transfer answers, the
 slice it delivers, the readi bridges, and the observation's side conditions
 and return tie.**  A port of Rocq `SysReadDefs.v`
-(`/shared/xv6rocq/iris/SysReadDefs.v`, 411 lines).  A LEAF: pure, no iProp,
+(`iris/SysReadDefs.v`, 411 lines).  A LEAF: pure, no iProp,
 no contract.
 
 Rocq's header, kept because the reasons are the content:
@@ -76,7 +76,7 @@ Rocq's header, kept because the reasons are the content:
 
 * `rd_delivered_bytes`, `rd_delivered_file` -- uses checked: no Proof/Spec
   file of fileread/filewrite/sys_read/sys_write names either (grep of
-  /shared/xv6rocq/iris/{Spec,Proof}{Fileread,Filewrite,SysRead,SysWrite}*.v);
+  iris/{Spec,Proof}{Fileread,Filewrite,SysRead,SysWrite}*.v);
   their per-index statement does not exist at SpecReadi's landed list form
   (deviation 1).
 -/

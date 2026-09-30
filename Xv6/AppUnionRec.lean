@@ -1,6 +1,6 @@
 /-
 **THE UNION APPLICATION'S RECORD** (lane U4) -- Rocq `AppUnionRec.v`
-(`/shared/xv6rocq/iris/AppUnionRec.v` @ 1900b8a43) §1-§2: the conclusion
+(`iris/AppUnionRec.v` @ 1900b8a43) §1-§2: the conclusion
 `union_phi`, the four resource fields, the interface `union_ifc` (all seven
 `app_iface` components, seccomp's wild pair included), the turn, the record
 `app_union`, and the laws that read nothing beyond the landed claim files

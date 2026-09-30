@@ -1,6 +1,6 @@
 /-
 **open(O_CREATE)'s LEGS AND OBSERVATIONS AT `f`** -- §3b-§3e' of Rocq
-`FileOpen.v` (`/shared/xv6rocq/iris/FileOpen.v`, pinned 1900b8a43), the
+`FileOpen.v` (`iris/FileOpen.v`, pinned 1900b8a43), the
 part the union's cone reaches.
 
 Rocq's notes, abridged (the reasons are the content):

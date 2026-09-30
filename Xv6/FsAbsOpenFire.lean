@@ -2,7 +2,7 @@
 **sys_open's TWO FIRE POINTS, DISCHARGED AGAINST THE INVARIANT, plus the
 row readings of an era node and the walk-premise bridge** the open family's
 statement leaf (`Xv6/SysOpenDefs.lean`) leaves to a prover.  A port of Rocq
-`FsAbsOpenFire.v` (`/shared/xv6rocq/iris/FsAbsOpenFire.v`, 424 lines),
+`FsAbsOpenFire.v` (`iris/FsAbsOpenFire.v`, 424 lines),
 WHOLE: section 0 (the pure row readings), 1 (the walk premise), 2 (the
 terminal fire), 3 (the trunc fire).
 

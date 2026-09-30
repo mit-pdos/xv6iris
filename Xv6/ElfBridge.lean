@@ -1,7 +1,7 @@
 /-
 The CODE side of the ELF readers meets the FILE side.
 
-A port of Rocq `ElfBridge.v` (`/shared/xv6rocq/iris/ElfBridge.v`).  Rocq's
+A port of Rocq `ElfBridge.v` (`iris/ElfBridge.v`).  Rocq's
 header, in short:
 
 > `ElfEnc` is what kexec's two stack buffers say; `ElfFile` is what the file

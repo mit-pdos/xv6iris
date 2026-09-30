@@ -1,7 +1,7 @@
 /-
 **CREATE'S LEGS AS COMMITS AND FIRES, and the authority-shaped commits of
 the create family.**  A PARTIAL port of Rocq `FsAbsCreateFire.v`
-(`/shared/xv6rocq/iris/FsAbsCreateFire.v`, 924 lines): sections 0-, 0,
+(`iris/FsAbsCreateFire.v`, 924 lines): sections 0-, 0,
 0b, 1, 1a, 1b, 2 and 3 WHOLE; section 1c DEFERRED (D15, below).
 
 Rocq's header, kept because the reasons are the content:
@@ -87,7 +87,7 @@ Rocq's header, kept because the reasons are the content:
 `FsAbs.nview`/`nview_dq` (Rocq `FsAbs.v`'s iProp half, which has no Lean
 port: coordinator decision D15), and `mkf_auth_frag`'s only users are
 `mkf_auth_nview` and the `_pinned` seeds.  Uses checked: no kernel
-Spec/Proof file of /shared/xv6rocq/iris names any of them; their consumers
+Spec/Proof file of the Rocq tree's iris/ names any of them; their consumers
 are the U-tier's stable corollaries (sys_mknod's stable add-on, also D15).
 They land with the `FsAbs` port, APPENDED to this file.
 

@@ -1,6 +1,6 @@
 /-
 **THE CREATE COMMIT AT A NAME PREDICATE, AND THE UNARM AT A NODE
-PREDICATE** (Rocq `FsAbsCreateNm.v`, `/shared/xv6rocq/iris/FsAbsCreateNm.v`,
+PREDICATE** (Rocq `FsAbsCreateNm.v`, `iris/FsAbsCreateNm.v`,
 326 lines at `1900b8a43`; lane INIT-FILE, the §3.4 ruling's bottom layer).
 A PARTIAL port: everything but the four create-side bridges (below).
 

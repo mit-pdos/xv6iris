@@ -1,6 +1,6 @@
 /-
 **THE LEGS, AT THE TWO SHAPES** -- §2 of Rocq `FileDeltas.v`
-(`/shared/xv6rocq/iris/FileDeltas.v`, pinned `1900b8a43`), the cone-reached
+(`iris/FileDeltas.v`, pinned `1900b8a43`), the cone-reached
 part: `nameAbsent` and `nodePin` under the arm, the unarm, the create's parent
 leg at a NON-DIRECTORY child, the truncate and the write.
 

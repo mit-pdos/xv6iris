@@ -1,7 +1,7 @@
 /-
 THE PURE TREE LAYER: an inum-keyed node store, the bytes-to-tree reading of
 a directory, and path lookup.  A port of Rocq `FsTree.v`
-(`/shared/xv6rocq/iris/FsTree.v`), WHOLE (nothing deferred; see "Dropped"
+(`iris/FsTree.v`), WHOLE (nothing deferred; see "Dropped"
 below for the dead lemmas).  Design: the Rocq tree's
 `claude-notes/design/fs-fragments.md` §1 (rulings R1, R2).  Rocq's header,
 kept because the reasons are the content:
@@ -93,7 +93,7 @@ Pure: no proof mode, nothing in `IProp`.
 ## Dropped vs Rocq (dead code)
 
 Each was checked with `grep -rlw <name> --include='*.v'` over ALL of
-`/shared/xv6rocq` (in particular FsStateInode, FsStateEra, FsLookup, FsRep,
+the Rocq tree (`rocq` branch) (in particular FsStateInode, FsStateEra, FsLookup, FsRep,
 IcacheEscrow, FsAbs*, SpecDirlookup, SpecDirlink, SpecNamex, ProofCreate*,
 ProofSysLink, ProofSysUnlink*, ProofNamex*): the ONLY file naming it is
 `FsTree.v`, and inside `FsTree.v` it is used by nothing (only mentioned in

@@ -1,6 +1,6 @@
 /-
 **THE SYNC PART OF THE FILE CLAIM** -- Rocq `AppFile.v` §3b.3-4
-(`/shared/xv6rocq/iris/AppFile.v` @ origin/main 456141b5b, l.765-1330; sync
+(`iris/AppFile.v` @ origin/main 456141b5b, l.765-1330; sync
 design §4.5, lanes SY3-A3a/A3b/A3bc/A4): the sync lists' shares, the claim's
 sync part, the era's token, and the closure lemmas.
 

@@ -1,7 +1,7 @@
 /-
 **THE LINK FAMILY, SPLIT INTO AUTHORITIES AND TOKENS, AND A TICKET LIST AS
 ONE RESOURCE-ALGEBRA ELEMENT.**  Sections 9a-9c of Rocq
-`/shared/xv6rocq/iris/FsDurImg.v` (crash batch C-1, item CF; the image
+`iris/FsDurImg.v` (crash batch C-1, item CF; the image
 readings are `Xv6/FsDurImgView.lean` / `Xv6/FsDurImgLink.lean`, the
 snapshot tie `Xv6/FsDurImgSnap.lean` / `Xv6/FsDurImg.lean`).
 

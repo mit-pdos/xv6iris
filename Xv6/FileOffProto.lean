@@ -2,7 +2,7 @@
 **THE READ LEG OF `f->off`'S LIFE: the three protocol steps fileread and
 filewrite call** -- a port of Rocq `FileOffProtocol.v`'s `proto_read_llb`,
 `proto_read_checkout` and `proto_read_park`
-(`/shared/xv6rocq/iris/FileOffProtocol.v` 157--235), and nothing else of
+(`iris/FileOffProtocol.v` 157--235), and nothing else of
 that file (FileDefs deviation 3, decision D3: "port each step as a lemma
 where a proof calls it").
 

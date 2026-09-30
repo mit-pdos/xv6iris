@@ -2,7 +2,7 @@
 **kexec()'s ONE CONTRACT `KEXEC`**: the walk, ONE observation of the file,
 and -- if what was observed is a program xv6 will load -- the caller's OWN
 WP for running it.  A port of Rocq `SpecKexec.v`
-(`/shared/xv6rocq/iris/SpecKexec.v`, 1368 lines) §2–§4 (the AU bundle, the
+(`iris/SpecKexec.v`, 1368 lines) §2–§4 (the AU bundle, the
 arms, the frame and the seal); its pure §1 is `Xv6/KexecLoad.lean` +
 `Xv6/KexecImageOk.lean` (brief D21, D17).
 

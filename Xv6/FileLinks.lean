@@ -1,6 +1,6 @@
 /-
 **THE FILE APPLICATION'S LINKS BUNDLE** -- the reached part of Rocq
-`FileLinks.v` (`/shared/xv6rocq/iris/FileLinks.v`, pinned 1900b8a43): the
+`FileLinks.v` (`iris/FileLinks.v`, pinned 1900b8a43): the
 bundle `file_links` (1 of 3 declarations reached).
 
 Rocq's note: the file application's links are what the record equation

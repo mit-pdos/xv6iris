@@ -1,6 +1,6 @@
 /-
 **THE UNION ERA'S READ RECORD** -- the cone-reached part of Rocq
-`UnionReadInst.v` (`/shared/xv6rocq/iris/UnionReadInst.v`, pinned 1900b8a43;
+`UnionReadInst.v` (`iris/UnionReadInst.v`, pinned 1900b8a43;
 cut C9e', design union.md §3).
 
 Rocq's header, abridged: `FileReadInst.file_read_inst` at the union: the

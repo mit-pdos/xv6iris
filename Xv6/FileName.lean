@@ -1,6 +1,6 @@
 /-
 THE CLASS OF USER FILE NAMES and the laws every layer above it may use --
-a PARTIAL port of Rocq `FileName.v` (`/shared/xv6rocq/iris/FileName.v`,
+a PARTIAL port of Rocq `FileName.v` (`iris/FileName.v`,
 pinned `1900b8a43`), row U0-2 of `notes/design-rulings.md`.  Pure.
 
 Rocq's header, abridged (cut W0; claude-notes/design/filenames.md section

@@ -1,6 +1,6 @@
 /-
 **`struct proc`'s `parent` field, THE CHILDREN SETS, AND THE RESOURCE THAT
-OWNS THEM** -- a port of Rocq `WaitInv.v` (`/shared/xv6rocq/iris/WaitInv.v`,
+OWNS THEM** -- a port of Rocq `WaitInv.v` (`iris/WaitInv.v`,
 1925 lines), part 1 of 2 (part 2, the writers and the boot, is
 `Xv6/WaitInvTies.lean`), wave 7 decision D8 (the definitional layer of the
 fork/exit generation machinery).
@@ -47,7 +47,7 @@ THE PURE MODEL.  reparent(p) rewrites every cell equal to `p` to
    IS `WaitLock.waitResAt ξ ps` (same body; `rfl` where both are in scope).
 2. **`rp_upto` / `rp_upto_*` are dropped**: their one Rocq user is
    `ProofReparent.v`'s loop invariant (checked: `grep -rn rp_upto
-   /shared/xv6rocq/iris/*.v` → WaitInv.v, ProofReparent.v, SpecReparent.v),
+   iris/*.v` → WaitInv.v, ProofReparent.v, SpecReparent.v),
    and Lean's landed `ProofReparent` has its own.  `rp_map` is kept as
    `rpMap` because the payload's writers are stated at it.
 3. `zero_reg` is `0#64`; `gset gname` is `ExtTreeSet GName compare` with

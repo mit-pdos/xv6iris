@@ -2,7 +2,7 @@
 **THE INDIRECT BLOCK'S WORDS, INSIDE A HELD BUFFER**: the buffer lemmas
 that `bmap`, `itrunc` (and, in wave 3, `readi` / `writei`) share.  A port
 of the SHARED part of Rocq `ProofBmapParts.v`
-(`/shared/xv6rocq/iris/ProofBmapParts.v`), which Rocq's `ProofItrunc.v`,
+(`iris/ProofBmapParts.v`), which Rocq's `ProofItrunc.v`,
 `ProofItruncParts.v`, `ProofReadiParts.v` and `ProofWriteiParts.v` all
 `Require Import`.
 

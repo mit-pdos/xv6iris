@@ -5,7 +5,7 @@ carry unchanged (`kxcResB`), the `ph` buffer out of the frame and back, its
 field windows, the loadseg loop's head and exit states (`kxcAtF6`,
 `kxcAt116`), and the pure arithmetic the two loops' tests read back.
 
-A port of Rocq `SpecKexecB2.v` (`/shared/xv6rocq/iris/SpecKexecB2.v`), a
+A port of Rocq `SpecKexecB2.v` (`iris/SpecKexecB2.v`), a
 STAGE file (no `Proof` prefix; the one seal is `ProofKexec.lean`).  Rocq's
 header, in short:
 

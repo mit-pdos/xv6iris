@@ -1,6 +1,6 @@
 /-
 **THE BYTE VIEW'S POINTS-TO RUN**, ported from the `FsBytes` section of
-Rocq `FsBlocks.v` (`/shared/xv6rocq/iris/FsBlocks.v`, lines 200-570): the
+Rocq `FsBlocks.v` (`iris/FsBlocks.v`, lines 200-570): the
 ghost library, the sub-range splice `blkSplice`, the dfrac-indexed run
 `byteRange{,Q}` / `fsblock{,Q}` and the exclusivity + splitting kit.
 

@@ -1,6 +1,6 @@
 /-
 **THE UNION'S WILD LINES** -- the model-level head of Rocq `UnionOut.v`
-(`/shared/xv6rocq/iris/UnionOut.v`, pinned 1900b8a43): `uwild` (the
+(`iris/UnionOut.v`, pinned 1900b8a43): `uwild` (the
 `seccomp x` line), `uwild_wild` (it is `GenOutWild.lm_wild` at the union
 model: any nonempty tail is its terminal alternative's continuation at every
 state, and its merge set is everything) and `uwild_pv` (a pipeline line is

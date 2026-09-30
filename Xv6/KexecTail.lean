@@ -5,7 +5,7 @@ seams, and the two blocks at the bottom of the function that more than one
 phase branches into (`kxc_bad64` at +0x064, `kxc_bad_1d6` at +0x1d6), with
 the one `-1` exit they both end on (`kxc_exit_m1`).
 
-A port of Rocq `ProofKexecTail.v` (`/shared/xv6rocq/iris/ProofKexecTail.v`),
+A port of Rocq `ProofKexecTail.v` (`iris/ProofKexecTail.v`),
 a STAGE file (no `Proof` prefix, brief rule 2; the one seal is
 `ProofKexec.lean`).  Rocq's header, in short:
 

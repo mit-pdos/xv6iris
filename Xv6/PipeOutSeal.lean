@@ -1,6 +1,6 @@
 /-
 **THE PIPELINE BYTE LEDGER'S ALLOCATION AND ITS ERA MAP'S MOVES** -- U4 seal
-wave: the declarations of Rocq `PipeOut.v` (`/shared/xv6rocq/iris/PipeOut.v`,
+wave: the declarations of Rocq `PipeOut.v` (`iris/PipeOut.v`,
 pinned 1900b8a43) that the union ledger's power / tx / rx steps read, and
 that the U0-X cone audit trimmed from `Xv6/PipeOut.lean` (its deviation 1).
 

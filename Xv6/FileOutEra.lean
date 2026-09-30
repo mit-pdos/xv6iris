@@ -1,6 +1,6 @@
 /-
 **THE FILE APPLICATION'S SECOND PER-ERA RECORD: THE ERA'S BOOT STATE** --
-the ghost algebra of Rocq `FileOut.v` §2 (`/shared/xv6rocq/iris/FileOut.v`,
+the ghost algebra of Rocq `FileOut.v` §2 (`iris/FileOut.v`,
 pinned 1900b8a43), the part the union's cone reaches.  The claim built on
 it (`f0wa`, `fecl`, the turn, the ledger's map) is `Xv6/FileOutClaim.lean`.
 

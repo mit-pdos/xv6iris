@@ -1,6 +1,6 @@
 /-
 **THE DISK PARAMETERS A BOOT IS TAKEN AT** -- a port of Rocq
-`FsBootParams.v` (`/shared/xv6rocq/iris/FsBootParams.v`).
+`FsBootParams.v` (`iris/FsBootParams.v`).
 
 The pure vocabulary the system theorem's statement is parameterised by: the
 boot mint's range, the pure projection of the crash predicate, and the

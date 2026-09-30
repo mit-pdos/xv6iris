@@ -1,6 +1,6 @@
 /-
 **THE SECCOMP UNIVERSE, part 1: the mask facts, the key, the rows and the
-wild pipe's links** -- Rocq `UexecSecc.v` §1–§4 (`/shared/xv6rocq/iris/
+wild pipe's links** -- Rocq `UexecSecc.v` §1–§4 (`iris/
 UexecSecc.v`, pinned 1900b8a43), the cone-reached declarations
 (union_cone.md: 60 of 69 reached; the minter half is `UexecSeccMint.lean`).
 

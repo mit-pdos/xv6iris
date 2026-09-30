@@ -98,7 +98,7 @@ at `+0x90 .. +0x96` (`addi a0,a0,-16; snez a0,a0; negw a0,a0`), i.e.
 
 * `wp_dirlink_sconf` (the counted form) -- DROPPED, neither a field nor
   derived -- uses checked: `grep -w wp_dirlink_sconf` over
-  `/shared/xv6rocq/iris/*.v` finds it only in SpecDirlink.v (the Module
+  `iris/*.v` finds it only in SpecDirlink.v (the Module
   parameter) and ProofDirlink.v (its seal); every applied use is
   `wp_dirlink_gen` (ProofCreateAlloc.v 1029, ProofCreateMkdir.v 579/1047/
   1466, ProofSysLink.v 2729) -- reason: no consumer (the SpecWritei

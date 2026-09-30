@@ -1,6 +1,6 @@
 /-
 **THE iget LICENCE ENUMERATION (increment C'-lite).**  A port of Rocq
-`IgetLic.v` (`/shared/xv6rocq/iris/IgetLic.v`, whole file, 786 lines);
+`IgetLic.v` (`iris/IgetLic.v`, whole file, 786 lines);
 design of record: claude-notes/design/fs-fragments.md §7.1, ratified as
 R13(i) and amended by R14.
 
@@ -86,7 +86,7 @@ Int)` (what `InodeRegionDefs.iregBi_lt` takes).
 ## Dropped/simplified vs Rocq
 
 * `iname_linked_alloc`, `iname_root_alloc`, `iname_buf_alloc` -- uses
-  checked: `grep -w` over every `/shared/xv6rocq/iris/*.v` (defs, Spec*,
+  checked: `grep -w` over every `iris/*.v` (defs, Spec*,
   Proof*, Link*, FsAbs*): `iname_linked_alloc` / `iname_buf_alloc` appear
   only in `IgetLic.v`; `iname_root_alloc` appears elsewhere ONLY in
   comments (ProofNamexRoot.v:524, ProofNamex.v:5181, ProofNamexEra.v:4795,

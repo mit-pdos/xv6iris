@@ -2,7 +2,7 @@
 -- Xv6Extras.lean -- THE LEAN REALISATIONS OF THE SAIL PLATFORM HOOKS.
 --
 -- HAND-WRITTEN.  This is the Lean twin of Rocq's
--- `model-xv6iris/xv6iris_extras.v` (/shared/xv6rocq), and mirrors it
+-- `model-xv6iris/xv6iris_extras.v` (the Rocq tree, `rocq` branch), and mirrors it
 -- definition for definition.  The master copy is `model/Xv6Extras.lean`;
 -- `tools/regen_sail_model.sh` hands it to sail as a SECOND
 -- `--lean-import-file` (after the fork's `handwritten_support/RiscvExtras.lean`),

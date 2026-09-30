@@ -3,7 +3,7 @@
 the reading bridge at the parent-row update and the halfword tie on the
 device numbers, and the era-lend walk predicates of every nameiparent
 syscall with their acceptance test.**  A port of Rocq `FsAbsMknodFire.v`
-(`/shared/xv6rocq/iris/FsAbsMknodFire.v`, 844 lines), WHOLE: sections 1 (a
+(`iris/FsAbsMknodFire.v`, 844 lines), WHOLE: sections 1 (a
 pointer only), 2-7.  Sections 5-6 were deferred at the first landing
 (they read `FsAbsEra`) and APPENDED by worktree W-A of wave 7b (below).
 

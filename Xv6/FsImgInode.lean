@@ -1,6 +1,6 @@
 /-
 **W3 -- EVERY LIVE INODE'S RECORD, AND THE REGION-WIDE SWEEPS** -- a port of
-Rocq `FsImg.v` §5 and §8 (`/shared/xv6rocq/iris/FsImg.v` :770-830,
+Rocq `FsImg.v` §5 and §8 (`iris/FsImg.v` :770-830,
 :940-1305).  Chain position: `Xv6/FsImgTree.lean` → this file →
 `Xv6/FsImgUsed.lean`.
 

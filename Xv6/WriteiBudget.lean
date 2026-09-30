@@ -1,6 +1,6 @@
 /-
 **THE LOG BUDGET'S AMORTISED LEDGER**, ported from section 6
-(`Section LogAmort`) of `/shared/xv6rocq/iris/WriteiBudget.v`.
+(`Section LogAmort`) of `iris/WriteiBudget.v`.
 
 **SCOPE: THE `logAmort` FAMILY AND NOTHING ELSE.**  `WriteiBudget.v` has
 eleven sections; ten of them (`FW_MAX`, `wi_cost*`, `bm_iter_cost`,

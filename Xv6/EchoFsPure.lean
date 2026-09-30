@@ -1,6 +1,6 @@
 /-
 **THE ECHO APPLICATION'S PURE FILE-SYSTEM CLAIM** -- a port of Rocq
-`EchoFsPure.v` (`/shared/xv6rocq/iris/EchoFsPure.v`, pinned `1900b8a43`).
+`EchoFsPure.v` (`iris/EchoFsPure.v`, pinned `1900b8a43`).
 
 Rocq's note: /init, /sh and /echo are the image's, path and content, on the
 abstract state's VIEW.  Per-inum rather than "the map is the image's" on

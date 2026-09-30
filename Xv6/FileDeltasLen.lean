@@ -1,6 +1,6 @@
 /-
 **A TYPED CONTENT IS SHORT; EVERY PINNED BINARY IS LONG** -- §5a-§5c of Rocq
-`FileDeltas.v` (`/shared/xv6rocq/iris/FileDeltas.v`, pinned `1900b8a43`),
+`FileDeltas.v` (`iris/FileDeltas.v`, pinned `1900b8a43`),
 the cone-reached part.
 
 Rocq's header of §5, abridged (the reasons are the content):

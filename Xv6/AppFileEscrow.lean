@@ -1,6 +1,6 @@
 /-
 **THE FILE APPLICATION'S ESCROW** -- §2a of Rocq `AppFile.v`
-(`/shared/xv6rocq/iris/AppFile.v`, pinned 1900b8a43), and `fnames_alloc`.
+(`iris/AppFile.v`, pinned 1900b8a43), and `fnames_alloc`.
 
 Rocq's header, abridged (the reasons are the content):
 

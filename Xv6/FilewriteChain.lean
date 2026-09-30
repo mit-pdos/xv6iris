@@ -1,7 +1,7 @@
 /-
 `filewrite`'s CHUNK LOOP INVARIANT and its five moves (stage file of
 `ProofFilewrite`).  A port of Rocq `ProofFilewriteChain.v`
-(`/shared/xv6rocq/iris/ProofFilewriteChain.v`), whole.
+(`iris/ProofFilewriteChain.v`), whole.
 
 Rocq's header, kept because the reasons are the content:
 

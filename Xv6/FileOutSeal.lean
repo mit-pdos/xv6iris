@@ -1,7 +1,7 @@
 /-
 **THE FILE LEDGER'S MOVES: THE BOOT-STATE ERA MAP, THE HISTORY'S LINE LIST,
 THE ERA'S PIN IN THE LEDGER, AND THE BIRTH** -- U4 seal wave: the
-declarations of Rocq `FileOut.v` (`/shared/xv6rocq/iris/FileOut.v`, pinned
+declarations of Rocq `FileOut.v` (`iris/FileOut.v`, pinned
 1900b8a43) that the union ledger's power / tx / rx steps and birth read, and
 that the U0-X cone audit trimmed from `Xv6/FileOut{Era,Claim}.lean`
 (FileOutEra deviation 1, FileOutClaim deviation 1).

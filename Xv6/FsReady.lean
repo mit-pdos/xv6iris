@@ -1,6 +1,6 @@
 /-
 **THE RUNTIME FILE SYSTEM, AS ONE PERSISTENT ASSERTION** -- a port of Rocq
-`FsReady.v` (`/shared/xv6rocq/iris/FsReady.v`, 660 lines), crash seam and
+`FsReady.v` (`iris/FsReady.v`, 660 lines), crash seam and
 `gen_cert` included (crash batch C-4, D38), minus the boot-side
 establishment (`fs_ready_pre` / `_establish` / `_pre_of`, which wait for the
 fsinit port; see "WHAT IS LEFT" below).

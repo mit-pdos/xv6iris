@@ -1,6 +1,6 @@
 /-
 **THE UNION DISCIPLINE'S THREE LINE READINGS** (lane U4) -- Rocq
-`UInitUnionCC.v` §0 (`/shared/xv6rocq/iris/UInitUnionCC.v` @ 1900b8a43):
+`UInitUnionCC.v` §0 (`iris/UInitUnionCC.v` @ 1900b8a43):
 `union_disc_snoc_ncr`, `union_disc_rest_short`, `union_disc_line`, the pure
 readings sh's loop takes of the input discipline `lm_disc_input ulmG` at the
 line constructor `ush_line_union`.

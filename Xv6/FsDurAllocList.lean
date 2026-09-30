@@ -1,6 +1,6 @@
 /-
 **THE CARVE'S FAMILY, ENUMERATED.**  Section 2d of Rocq
-`/shared/xv6rocq/iris/FsDurAlloc.v` (crash batch C-1, item CF; the slots
+`iris/FsDurAlloc.v` (crash batch C-1, item CF; the slots
 are `Xv6/FsDurAllocSlots.lean`, the cut `Xv6/FsDurAlloc.lean`).
 
 `fpList S` lists every slot of `S`'s footprint exactly once

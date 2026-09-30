@@ -1,6 +1,6 @@
 /-
 Specification of `iunlock` (kernel/fs.c): the public contract.  A port of
-Rocq `SpecIunlock.v` (`/shared/xv6rocq/iris/SpecIunlock.v`).
+Rocq `SpecIunlock.v` (`iris/SpecIunlock.v`).
 
     void iunlock(struct inode *ip) {
       if (ip == 0 || !holdingsleep(&ip->lock) || ip->ref < 1)

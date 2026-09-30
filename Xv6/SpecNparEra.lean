@@ -2,7 +2,7 @@
 **namex AT THE ERA-FRAGMENT TRACE, nameiparent side** (`a1 ≠ 0`): the
 public contract, and the returned parent's pinned typed reference
 `inodeHeldTyAt`.  A port of Rocq `SpecNparEra.v`
-(`/shared/xv6rocq/iris/SpecNparEra.v`, 369 lines).
+(`iris/SpecNparEra.v`, 369 lines).
 
 ## Rocq's header, in short
 

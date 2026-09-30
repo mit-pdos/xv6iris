@@ -1,6 +1,6 @@
 /-
 **THE O_RDONLY OPEN AT `f` (cat's)** -- §5c-§5e of Rocq `FileOpen.v`
-(`/shared/xv6rocq/iris/FileOpen.v`, pinned 1900b8a43), the part the union's
+(`iris/FileOpen.v`, pinned 1900b8a43), the part the union's
 cone reaches.
 
 Rocq's note, abridged (the reasons are the content):

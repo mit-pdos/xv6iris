@@ -136,7 +136,7 @@ current values and the cells hold junk until saved.
 
 ## Dropped/simplified vs Rocq
 
-Uses checked: `grep -lw` over `/shared/xv6rocq/iris/ProofSysOpen*.v`.
+Uses checked: `grep -lw` over `iris/ProofSysOpen*.v`.
 * deviation 8's Sail lemmas -- no Lean consumer shape.
 * `so_kb`'s `(K - 24) + 24 = K` conjunct -- `KCtx.pop_pushed`.
 * `so_bytes_name` / `so_name_bytes` / `so_buf_split` / `so_buf_join` -- the

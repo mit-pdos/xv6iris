@@ -36,7 +36,7 @@ why a fresh era can always swap (`fsArm_swap`).
 3. `fsCustody_started` / `fsArm_le` are Rocq's `Local` lemmas, kept (they are
    the two halves of the squeeze).
 
-## NOT PORTED (crash brief D36; uses checked over `/shared/xv6rocq/iris/*.v`)
+## NOT PORTED (crash brief D36; uses checked over `iris/*.v`)
 
 * The `fs_boot_tok` family (`fs_boot_tok`, `_alloc`, `_excl`, `_timeless`) --
   no use outside FsCrash.v (the brief's named cut).

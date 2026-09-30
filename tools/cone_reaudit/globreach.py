@@ -1,5 +1,5 @@
 import os, re, sys, collections, glob as G
-ROOT='/mnt/rocq/trees/_shared_xv6rocq'
+ROOT=os.environ['ROCQ_TREE']
 dirs={'iris':'xv6iris','model-xv6iris':'Riscv','kernel-rocq':'Kernel','user-rocq':'User'}
 DECLK={'def','prf','thm','lem','inst','abbrev','ind','rec','constr','proj','class','meth','coe','ax','scheme','mod','modtype','not','var','canonstruc','fact','corr','prop','defax','inst'}
 decls={}      # key -> (file, kind)
@@ -52,7 +52,7 @@ roots={'U':('xv6iris.UInitUnion','<>','union_adequacy_closed'),
        'S':('xv6iris.SystemAdequacy','<>','xv6_fs_adequacy_xv6\u03a3'),
        'P':('xv6iris.ProofUser','UserProof','wp_user_exec_closed')}
 import sys
-with open('/mnt/rocq/cone_globreach.txt','w') as f:
+with open(os.path.join(os.environ.get('OUT','.'),'cone_globreach.txt'),'w') as f:
   for r,k in roots.items():
     if k not in decls: print('MISSING',k,file=sys.stderr)
     s=walk([k])

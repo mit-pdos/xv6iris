@@ -2,7 +2,7 @@
 **THE PER-PIPE PROTOCOL** -- one invariant that three processes share, so
 that the bytes a pipe carries are the application's own ghost state and a
 pipeline's round can be READ OFF the two children's exit payloads.  The
-Iris half of Rocq `PipeProto.v` (`/shared/xv6rocq/iris/PipeProto.v`, pinned
+Iris half of Rocq `PipeProto.v` (`iris/PipeProto.v`, pinned
 1900b8a43), sections 0-4: the part of it the union's cone reaches
 (re-run glob walk: 79 of 187 declarations; the reader's half, the round's
 readings and the flow chain are in `Xv6/PipeProtoRead.lean`).

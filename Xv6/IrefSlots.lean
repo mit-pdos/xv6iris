@@ -1,6 +1,6 @@
 /-
 **THE FIXED SUPPLY THAT MAKES `ip->ref++` SAFE.**  A port of Rocq
-`IrefSlots.v` (`/shared/xv6rocq/iris/IrefSlots.v`, 291 lines), whole.
+`IrefSlots.v` (`iris/IrefSlots.v`, 291 lines), whole.
 
 idup increments `ip->ref` with no overflow check, exactly as filedup
 increments `f->ref`.  The icache authority needs every count to stay a

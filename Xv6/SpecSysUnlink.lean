@@ -1,6 +1,6 @@
 /-
 The interface of `sys_unlink` (kernel/sysfile.c).  A port of Rocq
-`SpecSysUnlink.v` (`/shared/xv6rocq/iris/SpecSysUnlink.v`, 681 lines): the
+`SpecSysUnlink.v` (`iris/SpecSysUnlink.v`, 681 lines): the
 bundle (`unlinkAuPre`), the arms (`unlinkPostOk` / `unlinkPostFail` /
 `unlinkArms`, `unlinkArms_ret`), the named return continuation, the frame and
 the `SYSUNLINK` contract.  The delta's side conditions and the four commits

@@ -2,7 +2,7 @@
 **nameiparent AT THE PARENT-PREFIX ERA TRACE**: the 24-byte wrapper's
 contract over `SpecNparEra`, so a create-side caller never reaches past the
 wrapper into namex.  A port of Rocq `SpecNparWrapEra.v`
-(`/shared/xv6rocq/iris/SpecNparWrapEra.v`, 259 lines).
+(`iris/SpecNparWrapEra.v`, 259 lines).
 
     struct inode* nameiparent(char *path, char *name) { return namex(path, 1, name); }
 

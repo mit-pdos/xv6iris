@@ -1,6 +1,6 @@
 /-
 **NODES, THE TREE, AND THE TWO REDUCTION LEMMAS** -- a port of Rocq
-`FsImg.v` §4 (`/shared/xv6rocq/iris/FsImg.v` :462-775).  Chain position:
+`FsImg.v` §4 (`iris/FsImg.v` :462-775).  Chain position:
 `Xv6/FsImgDinode.lean` → this file → `Xv6/FsImgInode.lean`.
 
 What a disk image MEANS as a tree: `nodeAt` reads one record through
@@ -32,7 +32,7 @@ reasons are the content):
    never uses it: `FsImgCheck.v` decides `bool_decide (fsimg_file_bytes i
    = <p>_elf)` on a `list (bv 8)` and rewrites `node_at_file`
    (`Xv6/FsImgCheck.lean` deviation 2).  Uses checked: FsImg.v :767 (the
-   instance itself), nothing else in `/shared/xv6rocq/iris` names it.
+   instance itself), nothing else in the Rocq tree's `iris/` names it.
 -/
 import Xv6.FsImgDinode
 import Xv6.FsTree

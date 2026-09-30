@@ -2,7 +2,7 @@
 The PATH GRAMMAR: skipelem's decomposition of a path into elements, as a pure
 function on byte lists.
 
-A port of Rocq `PathElems.v` (`/shared/xv6rocq/iris/PathElems.v`).  Rocq's
+A port of Rocq `PathElems.v` (`iris/PathElems.v`).  Rocq's
 header, kept because the reasons are the content:
 
 > The `PrintkFmt.v` precedent: a pure model of what a loop CONSUMES is what

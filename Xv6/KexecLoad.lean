@@ -3,7 +3,7 @@ kexec's PURE LAYER: loadability, the size, the stack's addresses, the
 failure causes and the landed success conjuncts at the ELF's entry.
 
 NEW NAME (brief D21): the pure half of Rocq `SpecKexec.v` §1
-(`/shared/xv6rocq/iris/SpecKexec.v` :318-777), split off so the pure
+(`iris/SpecKexec.v` :318-777), split off so the pure
 consumers (KexecImageAlg, the phases' tails) need not wait for the AU
 contract.  Rocq's header on these definitions, in short:
 

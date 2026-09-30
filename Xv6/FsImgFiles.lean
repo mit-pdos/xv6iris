@@ -1,7 +1,7 @@
 /-
 **THE SANITY CHECK, FILE SIDE: the image's program files ARE the tracked
 ELF raws** -- a port of Rocq `FsImgCheck.v` §4
-(`/shared/xv6rocq/iris/FsImgCheck.v` :485-635) for the six programs of the
+(`iris/FsImgCheck.v` :485-635) for the six programs of the
 union and /sync, plus Rocq `FsShPin.v`'s `fsimg_sh_size` / `fsimg_sh_nlink`, stated for
 all six.  `Xv6/FsImgCheck.lean` (§1-§3 and the §4 reduction
 `fsimgFileBytes` / `fsimgNodeFile`) is imported; each program's `…At`

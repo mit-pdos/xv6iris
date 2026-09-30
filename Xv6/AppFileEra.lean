@@ -1,6 +1,6 @@
 /-
 **THE FILE CLAIM AT THE ERA'S RECORD: THE STEP SHAPES, THE RESYNC, THE
-ESCROW** -- §8-§9 of Rocq `AppFile.v` (`/shared/xv6rocq/iris/AppFile.v`,
+ESCROW** -- §8-§9 of Rocq `AppFile.v` (`iris/AppFile.v`,
 pinned 1900b8a43, l.1363-1589).
 
 Rocq's header, abridged (the reasons are the content):

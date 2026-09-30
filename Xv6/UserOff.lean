@@ -1,7 +1,7 @@
 /-
 **THE OFFSET AS THE PROGRAM'S OWN RESOURCE: the third shape the USER half of
 `offGv` takes, and the ONE SUPPLIER through which every fire advances it.**
-A port of Rocq `UserOff.v` (`/shared/xv6rocq/iris/UserOff.v`, 267 lines),
+A port of Rocq `UserOff.v` (`iris/UserOff.v`, 267 lines),
 WHOLE.
 
 Rocq's header, kept because the reasons are the content (design of record:

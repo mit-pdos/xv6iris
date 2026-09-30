@@ -1,7 +1,7 @@
 /-
 **THE BOOT KITS: what the era's ghost allocation hands to each consumption
 site, stated** -- a port of Rocq `FsCfgKits.v`
-(`/shared/xv6rocq/iris/FsCfgKits.v`, 518 lines), wave-8 gap W8-I (a).
+(`iris/FsCfgKits.v`, 518 lines), wave-8 gap W8-I (a).
 
 **WHY THIS IS ITS OWN FILE** (Rocq's header, kept).  A kit is a HAND-OFF
 INVENTORY: the resources that exist after the era fupd has allocated the file

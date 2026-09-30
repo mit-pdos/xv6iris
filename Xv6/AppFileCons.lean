@@ -1,6 +1,6 @@
 /-
 **THE FILE CLAIM'S CONSOLE READINGS** -- the reached part of Rocq
-`AppFileCons.v` (`/shared/xv6rocq/iris/AppFileCons.v`, pinned 1900b8a43).
+`AppFileCons.v` (`iris/AppFileCons.v`, pinned 1900b8a43).
 
 Rocq's header, abridged (the reasons are the content):
 

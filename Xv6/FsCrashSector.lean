@@ -1,6 +1,6 @@
 /-
 **THE BLOCK VIEW OF THE DURABLE DISK AND ITS SECTOR ALGEBRA** -- the first
-third of the pure layer of Rocq `FsCrash.v` (`/shared/xv6rocq/iris/FsCrash.v`
+third of the pure layer of Rocq `FsCrash.v` (`iris/FsCrash.v`
 §1a, §1b'' and the sector half of §1c''' , lines 60-300 and 1285-1455).
 `Xv6/FsCrashPure.lean` (the header invariant, the recovery relation, the
 mirror's meaning and the WAL-step lemmas) imports it.

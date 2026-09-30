@@ -9,7 +9,7 @@ files are one rendering of it and the Lean files another.  This tool reads
 each Test/Run pair back and re-emits it through vtest.py's one emitter, so
 nothing is re-measured and nothing is re-typed.
 
-  rocq2lean.py [--rocq /shared/xv6rocq] [--plat qemu,jh7110,cva6]
+  rocq2lean.py [--rocq <path to a rocq-branch checkout>] [--plat qemu,jh7110,cva6]
 
 It also copies the case sources (tools/vtest/tests/*.S, abi.h, vtest.S,
 trap.S), whose `vtest:` directives carry each case's configuration.
@@ -50,7 +50,7 @@ def parse_capture(tb, rb):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--rocq", default="/shared/xv6rocq",
+    ap.add_argument("--rocq", required=True,
                     help="a checkout of the Rocq tree (its vtest-rocq/ and tools/vtest/)")
     ap.add_argument("--plat", default="qemu,jh7110,cva6")
     a = ap.parse_args()

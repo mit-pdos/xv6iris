@@ -1,6 +1,6 @@
 /-
 **THE LOCK-FREE GUARD READ's OBLIGATION, AND THE LOCK HOLDER's EXACT READ.**
-A port of Rocq `IcachePinwObl.v` (`/shared/xv6rocq/iris/IcachePinwObl.v`,
+A port of Rocq `IcachePinwObl.v` (`iris/IcachePinwObl.v`,
 whole file; A6.145 4b-iii / A6.146), restated per notes/fs0d-pinw-design.md
 §3 ("IcachePinwObl (D5), restated as `readAU` builders") and §7.
 
@@ -83,7 +83,7 @@ explicit `cpu : CPU`.
 ## Dropped/simplified vs Rocq
 
 * `iref_read_locked_obl` -- uses checked (comment-stripped grep of
-  /shared/xv6rocq/iris/*.v): none outside IcachePinwObl.v (its only use is
+  iris/*.v): none outside IcachePinwObl.v (its only use is
   `iref_read_locked_all`'s proof) -- reason: merged into
   `iref_readAU_locked` (deviation 1).
 * KEPT and checked live: `cred_floor_vis` (IcacheRef header prose; ProofIlock

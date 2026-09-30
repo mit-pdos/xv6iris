@@ -1,6 +1,6 @@
 /-
 The RECORD VIEW of a directory's data blocks.  A port of Rocq `DirView.v`
-(`/shared/xv6rocq/iris/DirView.v`).  Rocq's header, kept because the
+(`iris/DirView.v`).  Rocq's header, kept because the
 reasons are the content:
 
 > Layer 3 of the fs-namei campaign.  dirlookup and dirlink both walk a
@@ -56,7 +56,7 @@ Pure: no proof mode, nothing in `IProp`.
 ## Dropped vs Rocq (dead code)
 
 Each of the following was checked with `grep -rlw <name> --include='*.v'`
-over ALL of `/shared/xv6rocq` (every spec, proof and link file, including
+over ALL of the Rocq tree (`rocq` branch) (every spec, proof and link file, including
 SpecDirlookup / SpecDirlink / SpecNamex / ProofDirlookup* / ProofDirlink /
 ProofCreate* / IcacheEscrow / FsTree / FsLookup / FsStateInode); the ONLY
 file naming it is `DirView.v` itself, and within `DirView.v` it is used by

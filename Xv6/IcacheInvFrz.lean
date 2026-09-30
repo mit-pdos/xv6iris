@@ -1,7 +1,7 @@
 /-
 **THE COUNT MOVES' REGION SIDE: THE FREEZE MIRROR AND THE FOUR `icnt`
 ACCESSORS.**  A port of the first half of Rocq `IcacheInv.v` §5b
-(`Section IcacheRefInvReg`, `/shared/xv6rocq/iris/IcacheInv.v` lines
+(`Section IcacheRefInvReg`, `iris/IcacheInv.v` lines
 2304–3080: `ireg_frz_ok_ge2_any` … `ireg_icnt_mir_acc`).  The second half
 (3081–4168, the `*_store_pinw_au` movers) is `Xv6/IcacheInvStore.lean`,
 built on this file; §1–§4 are `Xv6/IcacheInvAlg.lean`, §5 + §6
@@ -93,7 +93,7 @@ Z.of_nat nib` is `(inum.toNat : Int) < 16 * (nib : Int)` (what
 ## Dropped/simplified vs Rocq
 
 * Nothing dropped.  Every declaration of 2304–3080 is live (uses checked,
-  `grep -w` over `/shared/xv6rocq/iris/*.v`, comments stripped):
+  `grep -w` over `iris/*.v`, comments stripped):
   `ireg_frz_ok_ge2_any` / `frz_close_reg` / `ireg_icnt_acc` /
   `ireg_icnt_frz_acc` / `ireg_icnt_lic_acc` / `ireg_icnt_mir_acc` /
   `frz_mir` / `frz_mir_back` / `frz_close` (IcacheInv 3081–4168, i.e.

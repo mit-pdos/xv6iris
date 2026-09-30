@@ -1,6 +1,6 @@
 /-
 **THE FILE SYSTEM'S CANONICAL GHOST NAMES**, ported from
-`/shared/xv6rocq/iris/FsCfg.v` (`Class fscfg`) plus the block-layer half of
+`iris/FsCfg.v` (`Class fscfg`) plus the block-layer half of
 `FsReady.fs_geom_ok`.
 
 **WHY AMBIENT.**  Rocq's header, verbatim:

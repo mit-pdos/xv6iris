@@ -1,7 +1,7 @@
 /-
 **THE LINK RECORD** -- the console-side program tier's view of an era,
 off the application's own links.  A port of Rocq `LinkRec.v`
-(`/shared/xv6rocq/iris/LinkRec.v`, pinned 1900b8a43).  DRIFT SY1 (Rocq
+(`iris/LinkRec.v`, pinned 1900b8a43).  DRIFT SY1 (Rocq
 3d74ec49f): `lk_noc`, `lk_line_of_blk0`, `lk_prompt_dollar` and the
 `lk_lpr_blk_line`/`lk_lcred_blk_line` corollaries are deleted (the settled
 round's silent filing).

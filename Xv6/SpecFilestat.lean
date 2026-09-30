@@ -1,6 +1,6 @@
 /-
 Specification of `filestat` (kernel/file.c): the public contract.  A port of
-Rocq `SpecFilestat.v` (`/shared/xv6rocq/iris/SpecFilestat.v`).
+Rocq `SpecFilestat.v` (`iris/SpecFilestat.v`).
 
     int filestat(struct file *f, uint64 addr) {
       struct proc *p = myproc();
@@ -109,7 +109,7 @@ spilled eagerly, `s2`/`s3` lazily on the inode arm; `struct stat` is the
 ## Dropped/simplified vs Rocq
 
 * `fstat_names` -- uses checked (comment-stripped grep of
-  `/shared/xv6rocq/iris/*.v`): SpecFilestat.v, ProofFilestat.v,
+  `iris/*.v`): SpecFilestat.v, ProofFilestat.v,
   SpecSysFstat.v / ProofSysFstat.v (threaded as `fn`), ProofSyscall.v
   (instantiated from `fs_ready`'s witness) -- reason: deviation 2, every
   field is inside `fsReady`.

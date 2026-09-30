@@ -1,6 +1,6 @@
 /-
 **THE N-WRITER ROUND'S CLAIM OVER ANY LINE MODEL: the definitions** --
-section 1b of Rocq `PipeOutN.v` (`/shared/xv6rocq/iris/PipeOutN.v`, pinned
+section 1b of Rocq `PipeOutN.v` (`iris/PipeOutN.v`, pinned
 1900b8a43; cut C9c', union.md B4), its definitions and one-line laws: the
 open round `popenV`, the family's credential `pwcBlkV` at the ROUND'S
 STATE, what a terminal byte hands its writer (`ptkV`), what the claim asks

@@ -1,6 +1,6 @@
 /-
 **THE UNION ERA'S CONSOLE CREDENTIAL AND ITS NINE LAWS** (lane U4) -- Rocq
-`UInitUnionCC.v` §1-§2 (`/shared/xv6rocq/iris/UInitUnionCC.v` @ 1900b8a43):
+`UInitUnionCC.v` §1-§2 (`iris/UInitUnionCC.v` @ 1900b8a43):
 `union_H`, `union_Wwild`, `union_wild_pay`, `union_cc` (with its two
 timeless facts), `uicc_lcred_of_pban`, `union_wp_line`, `union_wbn_to`,
 `union_wbn_of_wild`, `union_wbn_of`, `union_cc_holds`.  §0 (the three

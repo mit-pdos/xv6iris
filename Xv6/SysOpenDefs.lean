@@ -2,7 +2,7 @@
 **THE OPEN FAMILY'S STATEMENT LEAF (partial): the omode readings, the two
 abstract-state commits sys_open fires, the trunc piece's guard, the era
 walk package and the AU bundles, and the descriptor receipt.**  A PARTIAL
-port of Rocq `SysOpenDefs.v` (`/shared/xv6rocq/iris/SysOpenDefs.v`, 777
+port of Rocq `SysOpenDefs.v` (`iris/SysOpenDefs.v`, 777
 lines).  Definitions and small
 structural lemmas only -- no arms, no frame, no contract.
 
@@ -45,7 +45,7 @@ DEFERRED (appended later by a worktree agent -- rule 1 of the brief; the
 FsAbsOpenFire precedent):
 * `aopen_commit_at_pinned`, `atrunc_commit_at_pinned`: they read FsAbs.v's
   iProp half (`nview`, `mkf_auth_nview`), deferred by D15.  Consumers
-  (grep of /shared/xv6rocq/iris, comments stripped): the stable add-ons
+  (grep of the Rocq tree's iris/, comments stripped): the stable add-ons
   only (`SpecSysMknod` / FsAbsInvFire's pinned families); no kernel proof.
 
 ## Deviations from Rocq

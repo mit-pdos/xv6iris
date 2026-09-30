@@ -100,7 +100,7 @@ each directly from the core.)
 
 * `wp_iupdate_sconf`, `wp_iupdate_gen`, `wp_iupdate_cred` -- DROPPED (not
   fields and not derived) -- uses checked: `grep -w` over
-  `/shared/xv6rocq/iris/*.v` outside the three Iupdate files finds them only
+  `iris/*.v` outside the three Iupdate files finds them only
   in comments (`ProofItrunc.v` 350/2996, `ProofWritei.v` 1204,
   `CreateBudget.v` 82, `SpecIalloc.v` 468/514); the only applied forms are
   `IU.wp_iupdate_credgen` (`ProofItrunc.v` 362, `ProofWritei.v` 1218),

@@ -1,6 +1,6 @@
 /-
 **THE THREE-ARM CLAIM'S WRITES, THE FAMILY'S OBLIGATION, THE FILINGS AND
-THE WILD LICENCE** -- Rocq `PipeOutW.v` (`/shared/xv6rocq/iris/PipeOutW.v`,
+THE WILD LICENCE** -- Rocq `PipeOutW.v` (`iris/PipeOutW.v`,
 pinned 1900b8a43) sections 3, 4 and 7: every write step of `peclV` at
 `pwclV` (the middle arm is the old step; the wild arm is closed by
 REFUTING the presenter off the turn agreement, `GenOutWild`'s pins), the

@@ -1,6 +1,6 @@
 /-
 **THE PINS AND THE CONSOLE UNDER THE LEGS** -- §4 of Rocq `FileDeltas.v`
-(`/shared/xv6rocq/iris/FileDeltas.v`, pinned `1900b8a43`), the cone-reached
+(`iris/FileDeltas.v`, pinned `1900b8a43`), the cone-reached
 part.
 
 Rocq's note: `FileFsPure.file_fs_pure` is five (seven, with seccomp and sync)

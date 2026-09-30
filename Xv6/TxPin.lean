@@ -1,6 +1,6 @@
 /-
 **THE TRANSACTION PIN, one vocabulary for the eight parks.**  A port of
-Rocq `TxPin.v` (`/shared/xv6rocq/iris/TxPin.v`, 167 lines), whole.
+Rocq `TxPin.v` (`iris/TxPin.v`, 167 lines), whole.
 
 Design: claude-notes/design/fs-ghost-state.md, "the pin inventory".
 
@@ -75,7 +75,7 @@ conclusion names `LogInv.log_tx`, which lives above this leaf.
 ## Dropped/simplified vs Rocq
 
 * `tx_pin_split`, `tx_pin_join_q` -- uses checked: none (`grep -w` over
-  every `/shared/xv6rocq/iris/*.v`, including `Ltac` bodies) -- dead; a
+  every `iris/*.v`, including `Ltac` bodies) -- dead; a
   caller that needs the split uses iris-lean's `ghost_map_elem_fractional`
   on `txPin_elem`'s right side, which is what Rocq's one consumer of the
   raw element (`ProofIunlockput`, through `tx_pin_elem`) does.

@@ -1,7 +1,7 @@
 /-
 **THE TYPED FACT: EVERY FILE'S BYTES CAME FROM AN ADMITTED LINE** -- the
 claim's reading of `f_bytes_typed` in Rocq `AppFile.v` §3
-(`/shared/xv6rocq/iris/AppFile.v`, pinned 1900b8a43, l.662-720).
+(`iris/AppFile.v`, pinned 1900b8a43, l.662-720).
 
 Rocq's note, abridged: nothing at the empty map, and ONE lower bound of the
 line list serving every entry otherwise, each entry's name in the class.

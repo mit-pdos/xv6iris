@@ -56,7 +56,7 @@ quotes pre-gate offsets in places; the code is the reference.
 4. `cr_kb` is the family `create_slots_*` (the `namex_slots_*` shape).
 
 **Dropped/simplified vs Rocq** (uses: `grep -lw` over
-`/shared/xv6rocq/iris/*.v`, ProofCreateParts.v excluded):
+`iris/*.v`, ProofCreateParts.v excluded):
 * `cr_frame_bytes`, `cr_frame_slots`, `cr_name_off`, `cr_frame_slots_bytes`,
   `cr_name_in_frame`, `cr_slots_value`, `cr_trange_file_fall`,
   `cr_trange_device_fall`, `cr_trange_file`, `cr_trange_device`,

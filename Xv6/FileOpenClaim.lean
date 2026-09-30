@@ -1,7 +1,7 @@
 /-
 **THE CLAIM READ AT THE ERA'S RECORD, AND THE FREE STEP** -- §1-§2 (and
 §3e', §5b, `FileOpenMiss.file_taint_sup`) of Rocq `FileOpen.v`
-(`/shared/xv6rocq/iris/FileOpen.v`, pinned 1900b8a43), the part the union's
+(`iris/FileOpen.v`, pinned 1900b8a43), the part the union's
 cone reaches.
 
 * `file_deed_law_q`: THE READING LAW AT A FRACTION -- `AppFile.file_deed_law`

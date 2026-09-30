@@ -1,6 +1,6 @@
 /-
 **`f`'s INUM IS NONE OF THE PINNED ONES, AND THE COMPOSITE CREATE** -- §5c's
-use and §5d of Rocq `FileDeltas.v` (`/shared/xv6rocq/iris/FileDeltas.v`,
+use and §5d of Rocq `FileDeltas.v` (`iris/FileDeltas.v`,
 pinned `1900b8a43`), the cone-reached part.
 
 Rocq's notes, abridged:

@@ -1,6 +1,6 @@
 /-
 **THE FILE APPLICATION'S CONSOLE CLAIM, ITS TURN AND ITS LEDGER'S MAPS** --
-the Iris half of Rocq `FileOut.v` §3–§5 (`/shared/xv6rocq/iris/FileOut.v`,
+the Iris half of Rocq `FileOut.v` §3–§5 (`iris/FileOut.v`,
 pinned 1900b8a43), the part the union's cone reaches.  The per-era
 boot-state algebra it reads is `Xv6/FileOutEra.lean`.
 

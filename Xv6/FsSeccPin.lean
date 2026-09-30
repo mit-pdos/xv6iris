@@ -1,6 +1,6 @@
 /-
 **THE ERA-0 /seccomp PINS: THE /init PAIR REPLAYED FOR THE SECCOMP BINARY** -- the
-reached part of Rocq `FsSeccPin.v` (`/shared/xv6rocq/iris/FsSeccPin.v`, pinned
+reached part of Rocq `FsSeccPin.v` (`iris/FsSeccPin.v`, pinned
 `1900b8a43`; union cone audit: 19 of 26).
 
 Rocq's header, in short: the same three sentences `FsInitPin` proves for

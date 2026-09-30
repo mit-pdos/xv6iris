@@ -1,6 +1,6 @@
 /-
 **THE DURABLE FILE SYSTEM, BUILT FROM AN IMAGE: era 0's snapshot.**  Sections
-11d and 12 of Rocq `/shared/xv6rocq/iris/FsDurImg.v` (crash batch C-1,
+11d and 12 of Rocq `iris/FsDurImg.v` (crash batch C-1,
 item CF, brief D41).  The file's other sections are
 `Xv6/FsDurImgToks.lean` (9a-9c), `Xv6/FsDurImgView.lean` (8, 9d-9f),
 `Xv6/FsDurImgLink.lean` (9g-9h) and `Xv6/FsDurImgSnap.lean` (11a-11c').

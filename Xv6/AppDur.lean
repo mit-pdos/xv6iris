@@ -1,6 +1,6 @@
 /-
 **THE APPLICATION'S DURABLE INSTANCE** -- a port of Rocq `AppDur.v`
-(`/shared/xv6rocq/iris/AppDur.v`): the application's claim about the committed
+(`iris/AppDur.v`): the application's claim about the committed
 abstract state, beside the snapshot, tied by HALF an authority.  Crash batch
 C-1, agent CG; user ruling D37 (the generic application slot, as Rocq).
 
@@ -44,7 +44,7 @@ supplies.
    `[MachFixedGS]` (Rocq's `AppDurMerge` over `riscvFixedGS`), since its wand
    names `startAuth`.
 
-## NOT PORTED (crash brief D36; uses checked over `/shared/xv6rocq/iris/*.v`)
+## NOT PORTED (crash brief D36; uses checked over `iris/*.v`)
 
 * `app_dur_raw_clone` -- deleted at Rocq main (the commit takes the merge).
 -/

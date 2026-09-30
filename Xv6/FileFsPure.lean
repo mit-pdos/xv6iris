@@ -1,6 +1,6 @@
 /-
 **THE FILE APPLICATION'S PURE FILE-SYSTEM CLAIM** -- a port of Rocq
-`FileFsPure.v` (`/shared/xv6rocq/iris/FileFsPure.v`, pinned `1900b8a43`).
+`FileFsPure.v` (`iris/FileFsPure.v`, pinned `1900b8a43`).
 
 Rocq's note: /init, /sh, /echo, /cat, /grep, /seccomp and /sync (drift SY2) are the image's,
 path and content, on the abstract state's VIEW (per-inum, as

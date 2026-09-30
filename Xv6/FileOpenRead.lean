@@ -1,6 +1,6 @@
 /-
 **THE READ AT `f`'s INUM** -- §4 of Rocq `FileOpen.v`
-(`/shared/xv6rocq/iris/FileOpen.v`, pinned 1900b8a43), the part the union's
+(`iris/FileOpen.v`, pinned 1900b8a43), the part the union's
 cone reaches: the offset-coupled read piece and its arms, read at the deed.
 
 Rocq's notes, abridged (the reasons are the content):

@@ -38,16 +38,16 @@ the originals by `rfl`-proved `csimp` rules (`Vtest/Compile.lean`).  Trusted
 beyond the kernel: the Lean compiler/interpreter (one `native_decide` axiom
 per capture).
 
-## Commands (on the build VM or in CI; no Lean locally)
+## Commands (on a build machine or in CI)
 
     tools/ci/vtest.sh check-ci      # CI: rebuild every proof; the table is the verdict (~7 s)
     tools/ci/vtest.sh passes        # attempt every proof, classify, rewrite vtest-lean/Vtest.lean (~20 s)
     tools/ci/vtest.sh explain --all # why each red run is red (~30 s)
     tools/ci/vtest.sh gen --all     # re-capture on QEMU (needs qemu + toolchain; never CI; python only)
-    python3 tools/vtest/rocq2lean.py --rocq /shared/xv6rocq   # re-import the Rocq tree's captures
+    python3 tools/vtest/rocq2lean.py --rocq <path to a rocq-branch checkout>   # re-import the Rocq tree's captures
 
-`passes` and `gen` rewrite tracked files under `vtest-lean/`; when run through
-`run-on-gcp`, pull them back (`--pull vtest-lean/`).
+`passes` and `gen` rewrite tracked files under `vtest-lean/`; when run on a remote build machine,
+copy `vtest-lean/` back.
 
 ## What it found
 

@@ -1,6 +1,6 @@
 /-
 **THE ERA-0 /sync PINS: FsSeccPin REPLAYED AT SYNC** -- Rocq `FsSyncPin.v`
-(`/shared/xv6rocq/iris/FsSyncPin.v`, added by b23e6791f, drift SY2), the part
+(`iris/FsSyncPin.v`, added by b23e6791f, drift SY2), the part
 the union reaches (`FsSeccPin`'s reached part, at sync).
 
 Rocq's header, in short: `FsSeccPin` with `seccomp` replaced by `sync`

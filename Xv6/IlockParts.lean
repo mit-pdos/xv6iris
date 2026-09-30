@@ -27,7 +27,7 @@ Deviations from Rocq:
    from Rocq's comments.
 
 Dropped/simplified vs Rocq: `il_payload` / `il_payload_of_payload` -- uses
-checked: `grep -l il_payload /shared/xv6rocq/iris/*.v` finds ProofIlock.v
+checked: `grep -l il_payload iris/*.v` finds ProofIlock.v
 only, where the lemma is never applied -- reason: dead (the checkout's
 `ic_bundle_*_elim_held` readings replaced it).
 -/

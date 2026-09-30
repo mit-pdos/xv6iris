@@ -1,6 +1,6 @@
 /-
 **THE OPEN ROUND'S CHOICE AUTHORITY WITH ITS PER-ROUND STORE** -- the
-section `pipe_store` of Rocq `PipeOut.v` (`/shared/xv6rocq/iris/PipeOut.v`,
+section `pipe_store` of Rocq `PipeOut.v` (`iris/PipeOut.v`,
 main 456141b5b; sync SY3-A4, cc76f92ab): `pcs` beside the store
 (`GenOut.gstore`), so the store rides the pipeline's open round as it rides
 the claim (`GenOut.gcsAuth`); and the frozen choices with their store, for

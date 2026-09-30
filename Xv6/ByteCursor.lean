@@ -2,7 +2,7 @@
 The BYTE cursor a memory fill/copy loop walks, and the pure facts such a
 loop needs about it.
 
-A port of Rocq `ByteCursor.v` (`/shared/xv6rocq/iris/ByteCursor.v`), of the
+A port of Rocq `ByteCursor.v` (`iris/ByteCursor.v`), of the
 part of it this port does not already have.
 
 Every byte-at-a-time loop in the kernel -- memset's fill, memmove's copy,

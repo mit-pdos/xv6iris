@@ -14,7 +14,7 @@
 #   * every git dependency of lakefile.toml is in lake-manifest.json at the
 #     same revision (a manifest left behind after a lakefile bump makes lake
 #     silently build the OLD dependency).
-# With --with-lake (CI and the build VM; NEVER the dev machine, see
+# With --with-lake (CI and build machines; see
 # README: "Build"):
 #   * `lake --version` reports the Lean of lean-toolchain;
 #   * each fetched package under .lake/packages is at its manifest revision.

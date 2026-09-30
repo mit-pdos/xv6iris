@@ -1,7 +1,7 @@
 /-
 **THE SNAPSHOT'S PURE TIE: `SnapBytes` / `snapOk`, and what reads off it.**
 The pure half (sections 1-1c', 1b's injectivity, 9a/9a') of Rocq
-`/shared/xv6rocq/iris/FsDurSnap.v` (crash batch C-1, item CE; the resource
+`iris/FsDurSnap.v` (crash batch C-1, item CE; the resource
 half -- the epoch `fsSnap` / `pDurAt`, the clone, the reading and the commit
 step -- is `Xv6/FsDurSnap.lean`).
 
@@ -44,7 +44,7 @@ producer that has to supply it is era 0's carve (`FsDurAlloc`, batch CF).
    both `fsRecovery` and `SnapBytes`.
 
 ## Dropped vs Rocq (crash brief D36; each grepped over ALL of
-`/shared/xv6rocq/iris/*.v` outside the D36-skipped files)
+`iris/*.v` outside the D36-skipped files)
 
 * `sk_links_plain` -- uses checked: none.
 * `snap_holds_intro` -- uses checked: none.

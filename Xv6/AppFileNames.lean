@@ -1,6 +1,6 @@
 /-
 **THE FILE APPLICATION'S NAMES, ITS CAMERA CLASS, THE TAINT AND THE LINE
-LIST** -- §1 of Rocq `AppFile.v` (`/shared/xv6rocq/iris/AppFile.v` @ origin/main
+LIST** -- §1 of Rocq `AppFile.v` (`iris/AppFile.v` @ origin/main
 456141b5b), the Iris half (the pure types are `Xv6/AppFilePure.lean`).
 
 * `FileFixed` (Rocq `file_fixed`, a record since sync SY3-A3bc/A4): echo's

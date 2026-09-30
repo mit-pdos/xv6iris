@@ -1,6 +1,6 @@
 /-
 **THE NAME LAWS THAT READ THE IMAGE** -- the rest of the reached part of Rocq
-`FileName.v` (`/shared/xv6rocq/iris/FileName.v`, pinned `1900b8a43`), the
+`FileName.v` (`iris/FileName.v`, pinned `1900b8a43`), the
 declarations `Xv6/FileName.lean` left PENDING on the image pins: `sys_names`,
 `name_laws`, `txt_sys_ok`, `txt_img_ok`, `txt_laws`, `nl_ne_sys`,
 `nl_ne_console`, `era0_astep_root`, `era0_class_absent`,

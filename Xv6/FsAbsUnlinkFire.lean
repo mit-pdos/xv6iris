@@ -1,7 +1,7 @@
 /-
 **THE UNLINK AU's FIRE POINTS, discharged against the invariant, plus the
 reading bridges `SysUnlinkDefs`'s header owes its prover.**  A port of Rocq
-`FsAbsUnlinkFire.v` (`/shared/xv6rocq/iris/FsAbsUnlinkFire.v`, 530 lines),
+`FsAbsUnlinkFire.v` (`iris/FsAbsUnlinkFire.v`, 530 lines),
 WHOLE: section 1 (the pure reading bridges) and section 2 (the fire points).
 
 `ufDex_fire` (Rocq's `uf_dex_fire`, the FOUND observation at the

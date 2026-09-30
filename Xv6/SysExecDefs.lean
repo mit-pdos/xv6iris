@@ -1,7 +1,7 @@
 /-
 sys_exec()'s VOCABULARY LEAF: the frame budget.
 
-A PARTIAL port of Rocq `SysExecDefs.v` (`/shared/xv6rocq/iris/SysExecDefs.v`):
+A PARTIAL port of Rocq `SysExecDefs.v` (`iris/SysExecDefs.v`):
 its PURE part (wave-7b brief §6.1, "pure part NOW").  Rocq's header, in
 short:
 

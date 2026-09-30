@@ -34,7 +34,7 @@ record is the two bottom cells (`&de = s0-80 = sp`, `&de.name = s0-78`).
    `dl_rec_hi`/`dl_rec_nm` are `dirlink_snc` + `direntBytes` unfolded.
 4. Dropped as dead (the granularity premise is gone, fs-icache §15(b)):
    Rocq's `dl_nrec_pos` -- uses checked: `grep -w` over
-   `/shared/xv6rocq/iris/*.v` finds it only in ProofDirlink.v, unused there
+   `iris/*.v` finds it only in ProofDirlink.v, unused there
    -- reason: no use.  `dl_wi_cost` (the loose seven) -- uses checked:
    ProofDirlink.v only, in a comment -- reason: writei's contract charges
    `wiCostBmonly` (`Xv6.sys_unlink_wi_cost`).

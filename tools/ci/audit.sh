@@ -17,9 +17,9 @@
 # Output in $XV6_CI_OUT (default .lake/ci): audit.json, audit.md, audit.log.
 # The summary is also appended to $GITHUB_STEP_SUMMARY when that is set.
 #
-# NO LEAN ON THE DEVELOPMENT MACHINE (README: "Build"): run this on
-# the build VM or in CI, e.g.
-#   /shared/xv6rocq/gcp-rocq/run-on-gcp tools/ci/audit.sh
+# Needs a machine sized for a Lean build (README: "Build"): run it on
+# a build server or in CI, e.g.
+#   tools/ci/audit.sh
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/../.."
 command -v lake >/dev/null 2>&1 || export PATH="$HOME/.elan/bin:$PATH"

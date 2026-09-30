@@ -1,7 +1,7 @@
 /-
 **THE ITABLE ENTRY: ITS GEOMETRY, ITS CONSTANTS AND THE ALGEBRA'S
 LITERALS.**  A port of Rocq `IcacheRefDefs.v`
-(`/shared/xv6rocq/iris/IcacheRefDefs.v`, 1296 lines), together with the
+(`iris/IcacheRefDefs.v`, 1296 lines), together with the
 inode-cache half of Rocq `Xv6Cameras.v` (section 11 and the icache box
 instance) that `IcacheRefDefs.v` re-exports.
 
@@ -149,7 +149,7 @@ its class `Xv6.OffboxBoxG`.  See deviation 6.
    `PosNat.one` is `1%positive`.
 
 ## Dropped/simplified vs Rocq (each checked against every use in
-## `/shared/xv6rocq/iris/*.v`)
+## `iris/*.v`)
 
 * `live_seq_lookup_lt` / `live_seq_valid` / `hpn_seq_lookup_lt` /
   `hpn_seq_valid` (all `Local`, used only by `live_boot_map_valid` /

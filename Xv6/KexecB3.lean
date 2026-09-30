@@ -4,7 +4,7 @@ the back edge +0x11a .. +0x128), the two paths that close the inode
 (+0x1f2 → +0x1a4, +0x1a4 → +0x1ae), and the whole of phase B2 as one lemma
 each way (`kxc_b2`: the loop path, `kxc_b2z`: the `elf.phnum = 0` path).
 
-A port of Rocq `ProofKexecB3.v` (`/shared/xv6rocq/iris/ProofKexecB3.v`:
+A port of Rocq `ProofKexecB3.v` (`iris/ProofKexecB3.v`:
 `kxc_incr`, `kxc_ph_step`, `kxc_phdr`, `kxc_seam1a2`, `kxc_close`, `kxc_b2`,
 `kxc_b2z`), a STAGE file (no `Proof` prefix; the one seal is
 `ProofKexec.lean`).

@@ -1,6 +1,6 @@
 /-
 **THE WAIT-LOCK INVARIANT'S WRITERS, WHAT THE REAPER READS, THE PAYLOAD AND
-THE BOOT** -- a port of Rocq `WaitInv.v` (`/shared/xv6rocq/iris/WaitInv.v`),
+THE BOOT** -- a port of Rocq `WaitInv.v` (`iris/WaitInv.v`),
 part 2 of 2 (lines ~1040-1925: `children_inv_no_entry` .. `children_res_alloc`);
 part 1 is `Xv6/WaitInv.lean`, whose header and deviations apply here.
 

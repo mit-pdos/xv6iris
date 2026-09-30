@@ -1,6 +1,6 @@
 /-
 **PHASE A OF kexec, AT ITS CONTRACT** (Rocq `ProofKexecA.v`,
-`/shared/xv6rocq/iris/ProofKexecA.v`).  A STAGE file (no `Proof` prefix).
+`iris/ProofKexecA.v`).  A STAGE file (no `Proof` prefix).
 
 Rocq's header, in short: phase A at the caller's OWN walk premise and the
 caller's OWN observation, which is the whole of what the abstract-state

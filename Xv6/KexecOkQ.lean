@@ -2,7 +2,7 @@
 kexec's RESULT RELATION, GENERIC IN THE ENTRY POINT, and the EXIT
 CONTINUATION every phase of kexec's proof relays.
 
-A port of Rocq `KexecOkQ.v` (`/shared/xv6rocq/iris/KexecOkQ.v`).  Rocq's
+A port of Rocq `KexecOkQ.v` (`iris/KexecOkQ.v`).  Rocq's
 header, in short (every clause that is about content is kept):
 
 > `KexecDefs.kexec_ok` is spelled in thirty-one places across the kexec cone,

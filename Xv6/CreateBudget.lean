@@ -4,7 +4,7 @@
 S5a).  Pure.  Nothing here is a contract: it is the arithmetic create's
 contracts are checked against, landed first and on purpose.
 
-CONSUMERS (grep `-w CreateBudget` over `/shared/xv6rocq/iris/*.v`): no `.v`
+CONSUMERS (grep `-w CreateBudget` over `iris/*.v`): no `.v`
 REQUIRES it; ProofCreate*, SpecCreate, SpecDirlink, SpecWritei, SpecIput,
 SpecItrunc, SpecIupdate, SpecSysMkdir/Mknod and SysLinkBudget cite its
 theorems in their HEADERS (`cr_budget_fail_late`, `cr_budget_mkdir`, ...).

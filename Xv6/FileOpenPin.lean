@@ -1,6 +1,6 @@
 /-
 **THE PIN, AT THE DEED'S OWN INUM** -- §5a of Rocq `FileOpen.v`
-(`/shared/xv6rocq/iris/FileOpen.v`, pinned 1900b8a43) and the first lemma of
+(`iris/FileOpen.v`, pinned 1900b8a43) and the first lemma of
 its section `FileOpenMiss`: the pure pins a read-only open at the line's
 file `N` hands `PinnedObs`' walk.
 

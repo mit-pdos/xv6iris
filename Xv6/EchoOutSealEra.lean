@@ -1,7 +1,7 @@
 /-
 **THE ERA MAP'S STEPS AND THE ERA'S GHOSTS AT FULL OWNERSHIP** -- U4 seal
 wave: the Iris declarations of Rocq `EchoOut.v`
-(`/shared/xv6rocq/iris/EchoOut.v`, pinned 1900b8a43) that the union
+(`iris/EchoOut.v`, pinned 1900b8a43) that the union
 ledger's power / tx / rx steps read, and that the U0-X cone audit trimmed
 from `Xv6/EchoOut.lean` (reached only through the `union_laws` instance).
 

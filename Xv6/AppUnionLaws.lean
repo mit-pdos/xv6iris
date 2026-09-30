@@ -1,6 +1,6 @@
 /-
 **THE UNION RECORD'S LAWS, AS THE CLASS INSTANCE** (lane U4) -- Rocq
-`AppUnionRec.v` §2-§3 (`/shared/xv6rocq/iris/AppUnionRec.v` @ 1900b8a43):
+`AppUnionRec.v` §2-§3 (`iris/AppUnionRec.v` @ 1900b8a43):
 `union_al_birth`, `union_al_R0`, `union_al_pow`, `union_al_tx`,
 `union_al_rx`, `union_al_xfer`, `union_al_merge`, `union_al_sync_run`,
 `union_al_boot_ok`, `union_al_echo`, and `union_laws` (with

@@ -1,6 +1,6 @@
 /-
 **ONE INODE, AS READINGS OF THE NODE RECORD AND AS BYTE OWNERSHIP.**  A
-port of Rocq `FsStateInode.v` (`/shared/xv6rocq/iris/FsStateInode.v`, 2097
+port of Rocq `FsStateInode.v` (`iris/FsStateInode.v`, 2097
 lines): everything in it that does not need the LINK algebra
 (`FsStateLink.v`) or its value type `ity`.  Wave 0c-1 ported the node's
 scalar readings and the bare node; this completion (after `DirView` /
@@ -73,7 +73,7 @@ lemmas it drops (`inode_owned_bare_move`, `ent_toks_insert`, ...).
 ## Dropped/simplified vs Rocq
 
 Each item below was grepped (`grep -w`) across ALL of
-`/shared/xv6rocq/iris/*.v` -- defs, `Spec*`, `Proof*` -- and has no
+`iris/*.v` -- defs, `Spec*`, `Proof*` -- and has no
 consumer outside `FsStateInode.v`, nor inside it except as noted:
 
 * `inode_local_data_owned` -- no use anywhere (the readers go through

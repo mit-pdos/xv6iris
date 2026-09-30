@@ -1,6 +1,6 @@
 /-
 **THE ERA'S HEAD WRITE AT THE N-WRITER CLAIM** -- the cone-reached part of
-Rocq `PipesLinksV.v` (`/shared/xv6rocq/iris/PipesLinksV.v`, pinned
+Rocq `PipesLinksV.v` (`iris/PipesLinksV.v`, pinned
 1900b8a43; 4 of 19 declarations, the section parameters `T`/`PIN`/`PCV`
 among them): `peclV_step_write_first`, the era's first process byte.
 Between rounds it is `GenOut.gcl_step_write_first`; an open round has

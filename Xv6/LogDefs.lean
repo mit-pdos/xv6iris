@@ -4,7 +4,7 @@ header's decoding, the committed/logged views a crash reasons about, the
 five ghost names `initlog` fills, and the two client-side fragments that
 live off the log spinlock.
 
-A port of Rocq `LogDefs.v` (`/shared/xv6rocq/iris/LogDefs.v`).  What is
+A port of Rocq `LogDefs.v` (`iris/LogDefs.v`).  What is
 ported ONE-TO-ONE and what could not be, with the reason, is stated here
 once; `Xv6/LogInv.lean` repeats none of it.
 

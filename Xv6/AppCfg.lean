@@ -1,7 +1,7 @@
 /-
 **THE APPLICATION'S PREDICATE ON THE ABSTRACT FILE-SYSTEM STATE, as a
 class record and nothing else.**  A port of Rocq `AppCfg.v`
-(`/shared/xv6rocq/iris/AppCfg.v`, 74 lines), WHOLE.
+(`iris/AppCfg.v`, 74 lines), WHOLE.
 
 Rocq's header, kept because the reasons are the content (design of record:
 the Rocq tree's `claude-notes/projects/app-instances.md` sections 0-2 and

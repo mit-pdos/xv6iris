@@ -4,7 +4,7 @@ stack-buffer carves, the frame predicates, and the shared prologue and
 epilogue.  No weakest precondition over kexec's body lives here; this file
 is what every phase is written against.
 
-A port of Rocq `ProofKexecParts.v` (`/shared/xv6rocq/iris/ProofKexecParts.v`),
+A port of Rocq `ProofKexecParts.v` (`iris/ProofKexecParts.v`),
 a STAGE file (no `Proof` prefix, brief rule 2).  Rocq's header, in short:
 
 > THE FRAME.  kexec pushes 544 bytes = 68 slots (`addi sp,sp,-544` at +0x00,

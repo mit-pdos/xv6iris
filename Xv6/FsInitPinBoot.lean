@@ -1,6 +1,6 @@
 /-
 **THE ERA-0 /init PINS, AS ONE NAME, AND THE RECOVERY TRANSPORT** -- the
-reached part of Rocq `FsInitPinBoot.v` (`/shared/xv6rocq/iris/FsInitPinBoot.v`,
+reached part of Rocq `FsInitPinBoot.v` (`iris/FsInitPinBoot.v`,
 pinned `1900b8a43`; union cone audit: 5 of 16): `era0_pins`,
 `era0_pins_of_snap`, `era0_recovery_D`, `era0_recovery`,
 `era0_recovery_pins`.

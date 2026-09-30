@@ -1,6 +1,6 @@
 /-
 THE FILE APPLICATION'S STATE VOCABULARY, pure and tiny -- a port of Rocq
-`FileState.v` (`/shared/xv6rocq/iris/FileState.v`, pinned `1900b8a43`), row
+`FileState.v` (`iris/FileState.v`, pinned `1900b8a43`), row
 U0-2 of `notes/design-rulings.md`.  Pure: no Iris, no machine.
 
 Rocq's header, kept because the reasons are the content:

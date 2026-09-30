@@ -1,6 +1,6 @@
 /-
 **THE DEED AT A FRACTION** -- §1 of Rocq `FileOpen.v`
-(`/shared/xv6rocq/iris/FileOpen.v`, pinned 1900b8a43), the part the union's
+(`iris/FileOpen.v`, pinned 1900b8a43), the part the union's
 cone reaches.
 
 Rocq's note, abridged: `AppFile.fdeed` is the holder's HALF; `fdq` is the

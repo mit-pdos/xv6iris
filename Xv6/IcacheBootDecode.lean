@@ -1,6 +1,6 @@
 /-
 **THE PURE DECODE: every 1024-byte block IS sixteen dinodes.**  A port of
-§1 of Rocq `IcacheBoot.v` (`/shared/xv6rocq/iris/IcacheBoot.v`, lines
+§1 of Rocq `IcacheBoot.v` (`iris/IcacheBoot.v`, lines
 1–284: the file header and §1).  The rest of `IcacheBoot.v` (§2 the
 region's initial map and `ireg_alloc`, §3–§4 the table/escrow/lock boot)
 is ported separately (`IcacheBootRegion` / `IcacheBootTable`); this file is
@@ -38,7 +38,7 @@ Dropped/simplified vs Rocq.
 * `list_eta2` / `list_eta4` (Rocq's `l = [l !!! 0; l !!! 1]` helpers) are
   not ported: a Lean `match` on a length-2 list does the same job.  Uses
   checked: only `half_bytes_surj` / `word_bytes_surj` in `IcacheBoot.v`
-  (grep over `/shared/xv6rocq/iris`: no other file).
+  (grep over the Rocq tree's `iris/`: no other file).
 * Every other §1 lemma is ported with Rocq's statement.  Downstream uses
   checked: `image_decode` (IcacheBoot.v:738, `ireg_alloc`) and
   `diblk_bytes_surj` (FsDurImg.v:1139); the rest are internal to §1.

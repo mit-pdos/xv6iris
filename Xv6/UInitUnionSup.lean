@@ -1,6 +1,6 @@
 /-
 **THE UNION ERA'S CONSOLE SUPPLY AND /init's FIRST CREDENTIAL** (lane U4)
--- Rocq `UInitUnionCC.v` §3-§4 (`/shared/xv6rocq/iris/UInitUnionCC.v` @
+-- Rocq `UInitUnionCC.v` §3-§4 (`iris/UInitUnionCC.v` @
 1900b8a43): `union_cons_sup_of_sh_slot`, `union_rres_at_of_boot`,
 `union_Wbf_at_of_boot`.
 

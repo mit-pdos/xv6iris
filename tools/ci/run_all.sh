@@ -61,11 +61,11 @@
 # runs under `pipefail` and every `| tee` below is checked through it.
 #
 # THIS RUNS LEAN (every step from build-deps to vtest, and dead-imports).
-# NEVER on the development machine (README: "Build"); the steps
-# toolchain-check (without lake: tools/ci/toolchain_check.sh), lint, check-gen
-# and test-tools are Python and shell only and run anywhere.  On the GCP VM,
-# from your worktree:
-#   /shared/xv6rocq/gcp-rocq/run-on-gcp tools/ci/run_all.sh
+# The Lean steps need a machine sized for a Lean build (README: "Build"); the
+# steps toolchain-check (without lake: tools/ci/toolchain_check.sh), lint,
+# check-gen and test-tools are Python and shell only and run anywhere.  From
+# the repository root:
+#   tools/ci/run_all.sh
 set -uo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/../.." || exit 1
 

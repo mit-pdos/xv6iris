@@ -1,6 +1,6 @@
 /-
 Specification of `fileread` (kernel/file.c): the public contract.  A port of
-Rocq `SpecFileread.v` (`/shared/xv6rocq/iris/SpecFileread.v`).
+Rocq `SpecFileread.v` (`iris/SpecFileread.v`).
 
     int fileread(struct file *f, uint64 addr, int n) {
       int r = 0;
@@ -135,7 +135,7 @@ joins the shared epilogue (+0x5e) with the answer in `s2`.
   _uart)`, `fileread_devsw`, `fileread_devsw_of_console`,
   `fileread_devsw_acc` -- deviations 2/3 (the column IS `devswTable`, the
   caps ARE `consoleReadyApp`).  Uses checked (comment-stripped grep of
-  `/shared/xv6rocq/iris/*.v`): SpecFileread.v, ProofFileread.v (threaded),
+  `iris/*.v`): SpecFileread.v, ProofFileread.v (threaded),
   SpecSysRead.v / ProofSysRead.v (`read_env_frame`, pinned by two
   `reflexivity` premises), ProofSyscall.v (built from `console_ready_app`).
 * `inode_shr_gen_split2` / `_halve2` / `inode_shr_regen2` /

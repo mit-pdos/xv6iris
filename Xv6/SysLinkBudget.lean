@@ -1,7 +1,7 @@
 /-
 **THE OP-WIDE LOG LEDGER OF sys_link, ARM BY ARM, MACHINE CHECKED AT EVERY
 CORNER OF THE REPORTED BOOLEANS.**  A port of Rocq `SysLinkBudget.v`
-(`/shared/xv6rocq/iris/SysLinkBudget.v`, 228 lines), WHOLE.  Pure.
+(`iris/SysLinkBudget.v`, 228 lines), WHOLE.  Pure.
 
 CONSUMERS (grep, brief fs7b §5.1): Rocq `ProofSysLink.v` (`sl_iu`,
 `sl_u0..u3f`, `sl_corr`, the arm theorems), `ProofSysLinkTails.v`

@@ -1,6 +1,6 @@
 /-
 **THE CLAIM'S WRITE AT A BLOCK'S FIRST BYTE** -- Rocq `GenOut.v`'s
-`gcl_step_write_blk` (`/shared/xv6rocq/iris/GenOut.v` :619-807, pinned
+`gcl_step_write_blk` (`iris/GenOut.v` :619-807, pinned
 1900b8a43), split off `Xv6/GenOut.lean` (that file's deviation 1).
 
 Rocq's comment: the alternative `a` is the program's knowledge and this step

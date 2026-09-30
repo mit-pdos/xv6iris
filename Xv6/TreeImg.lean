@@ -1,6 +1,6 @@
 /-
 **THE ROOT'S ENTRY MAP AT THE LITERAL mkfs IMAGE** -- the reached part of
-Rocq `TreeImg.v` (`/shared/xv6rocq/iris/TreeImg.v`, pinned `1900b8a43`), §2's
+Rocq `TreeImg.v` (`iris/TreeImg.v`, pinned `1900b8a43`), §2's
 head: `img_root_blk`, `img_root_ents`, `img_root_nrec_leb`,
 `img_root_blk_agree`, `img_root_ents_eq` (union cone audit: 5 of 31).
 

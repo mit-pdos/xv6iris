@@ -1,6 +1,6 @@
 # Verifying the virtio disk's DMA in MachCSL (Lean) — design
 
-Read against `/shared/lean-xv6` @ `5a5c3ce62`.  Companion to
+Read against this repository @ `5a5c3ce62`.  Companion to
 `virtio_rocq_summary.md`; section numbers answer the six questions of the brief.
 Every file:line below is from this tree; every quoted statement is verbatim.
 

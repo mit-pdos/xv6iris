@@ -1,6 +1,6 @@
 /-
 Specification of `create` (kernel/sysfile.c): the public contract.  The
-rest of Rocq `SpecCreate.v` (`/shared/xv6rocq/iris/SpecCreate.v`, 1316
+rest of Rocq `SpecCreate.v` (`iris/SpecCreate.v`, 1316
 lines) -- the half that names the era walk's cursor or the slot supplies.
 Its era-free, supply-free half is `Xv6/CreateDefs.lean` (brief fs7b §4.3,
 D21: a split of ONE Rocq file; the constants `createSlots` /

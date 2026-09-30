@@ -1,7 +1,7 @@
 /-
 **sys_read's ONE COMMIT, ITS ARMS, AND ITS ONE FIRE POINT, discharged against
 the invariant, plus the row readings and the count bridge the walk needs.**
-A port of Rocq `FsAbsReadFire.v` (`/shared/xv6rocq/iris/FsAbsReadFire.v`,
+A port of Rocq `FsAbsReadFire.v` (`iris/FsAbsReadFire.v`,
 779 lines), sections 0-2 (section 3, the stable corollary, is deferred:
 see "Deferred" below).
 

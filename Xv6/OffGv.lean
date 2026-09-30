@@ -55,7 +55,7 @@ authority) are `Xv6.OffboxBoxG` in `Xv6/OffBoxCam.lean`, over the generalised
 ## Dropped/simplified vs Rocq
 
 * `off_gv_update` (whole-to-whole update) — uses checked: none in
-  /shared/xv6rocq/iris (only OffGv.v) — dead.
+  the Rocq tree's iris/ (only OffGv.v) — dead.
 * `off_permit` and `off_user_inv_permit` — uses checked: FdSlots.v names
   them only in comments (line 37 import comment, line 665 prose); no
   declaration anywhere reaches them — the permit route was superseded by the

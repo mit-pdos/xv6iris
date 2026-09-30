@@ -1,7 +1,7 @@
 /-
 **THE COUNT MOVES' STORE MOVERS: THE `*_store_pinw_au` ACCESSORS.**  A port
 of the second half of Rocq `IcacheInv.v` §5b (`Section IcacheRefInvReg`,
-`/shared/xv6rocq/iris/IcacheInv.v` lines 3081–4168: `iref_incr_store_pinw_au`
+`iris/IcacheInv.v` lines 3081–4168: `iref_incr_store_pinw_au`
 … `iref_close_last_frz_store_pinw_au`).  The first half (2304–3080, the
 freeze mirror and the four `icnt` accessors these movers nest) is
 `Xv6/IcacheInvFrz.lean`; §1–§4 are `Xv6/IcacheInvAlg.lean`, §5 + §6
@@ -106,7 +106,7 @@ Rocq's text.  The caller does the store, per the design note:
   `frz_bit` side conditions, phase-generic (Rocq inlines them twice).
 
 ## Dropped/simplified vs Rocq (uses grep-checked over ALL of
-## `/shared/xv6rocq/iris/*.v`, comments stripped)
+## `iris/*.v`, comments stripped)
 
 * `iref_dup_store_pinw_au` -- uses checked: its own `Lemma` line only (no
   Spec/Proof/Link file names it; ProofIdup uses

@@ -1,6 +1,6 @@
 /-
 **`astate`: THE γtop AUTHORITY, READ THROUGH `absOf`** (Rocq `FsAbs.v`
-§3a, `/shared/xv6rocq/iris/FsAbs.v` lines 285-339 at `1900b8a43`).
+§3a, `iris/FsAbs.v` lines 285-339 at `1900b8a43`).
 
 Rocq's note: AT A FRACTION.  The running authority is SPLIT between the
 kernel (`InodeRegion.ftop_body`, the half every AU commit shape lends) and

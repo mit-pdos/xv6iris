@@ -1,6 +1,6 @@
 /-
 **THE N-WRITER ROUND'S CLAIM: its three steps** -- Rocq `PipeOutN.v`
-(`/shared/xv6rocq/iris/PipeOutN.v`, pinned 1900b8a43) section 1b's
+(`iris/PipeOutN.v`, pinned 1900b8a43) section 1b's
 `peclV_blkN_open_gen` (W-openN: the round's first byte, at the state the
 writer's witness pins), `peclV_blkN_byte_gen` (W-byteN: a further byte of
 an open round, by ANY of its writers) and `peclV_blkN_file` (W-fileN: the

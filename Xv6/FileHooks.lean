@@ -1,6 +1,6 @@
 /-
 THE FILE MODEL'S HOOKS, PURE (app-both M3b) -- a port of Rocq
-`FileHooks.v` (`/shared/xv6rocq/iris/FileHooks.v`, pinned `1900b8a43`), row
+`FileHooks.v` (`iris/FileHooks.v`, pinned `1900b8a43`), row
 U0-2 of `notes/design-rulings.md`.  Pure.  DRIFT SY1 (Rocq 3d74ec49f,
 f31dfba4c): `lmhNoc` is `none` at every line (`fnoc_none` discharges its four
 laws); `fnoc_of` and its laws are deleted.

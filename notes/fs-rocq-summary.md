@@ -1,11 +1,11 @@
 # fs.c — Rocq verification survey, for the Lean 4 port
 
-Source of truth: `/shared/xv6rocq/iris` (the canonical Rocq/Iris development; the
-`/shared/xv6rocq/.claude/worktrees/*` copies are stale agent clones — ignore them).
-Kernel source: `/shared/xv6rocq/xv6-riscv/kernel/fs.c` (741 lines), `fs.h` (61), `file.h` (40),
+Source of truth: the Rocq tree's `iris/` (the canonical Rocq/Iris development; the
+stale agent clones of it should be ignored).
+Kernel source: `xv6-riscv/kernel/fs.c` (741 lines), `fs.h` (61), `file.h` (40),
 `buf.h` (11), `param.h` (14).
-Design prose the Spec headers cite: `/shared/xv6rocq/claude-notes/design/*.md` and
-`/shared/xv6rocq/claude-notes/completed/*.md`.
+Design prose the Spec headers cite: `claude-notes/design/*.md` and
+`claude-notes/completed/*.md`.
 
 **Bottom line.** Rocq proves **all 24 of fs.c's functions, whole-function, with zero
 `Admitted` and zero `Axiom` anywhere in the fs cone** (`tools/proof_coverage.py`:
@@ -25,7 +25,7 @@ usual MachCSL/iris-lean idiom shifts.
 | definitional / invariant layer (§2) | see §2 |
 
 **The two images agree on fs.** The Lean port's kernel image
-(`/shared/lean-xv6/Xv6/KernelImage.lean`) contains the *same 24 fs.c functions with the same
+(`Xv6/KernelImage.lean`) contains the *same 24 fs.c functions with the same
 byte sizes*, at text addresses exactly **6 bytes lower** than Rocq's (e.g. `balloc`
 Rocq `0x80002e5a` / Lean `0x80002e54`, `fsinit` `0x8000363a` / `0x80003634`), and the fs
 **data** symbols are **byte-identical**:
@@ -98,8 +98,8 @@ the crash layer even though their statements do not — **in Lean, make those tw
 
 **Where did the `§13.1d` / `§14.8` / `§16.4` references in the Spec headers go?** They were
 compacted out of `claude-notes/design/*.md` in Sept 2026. Recover them read-only:
-`git -C /shared/xv6rocq show 1a86ed5f3^:claude-notes/design/fs-icache.md` (5 938 lines),
-`git -C /shared/xv6rocq show bb58e182f^:claude-notes/design/fs-log.md`, same for
+`git show 1a86ed5f3^:claude-notes/design/fs-icache.md` (5 938 lines),
+`git show bb58e182f^:claude-notes/design/fs-log.md`, same for
 `fs-fragments.md`. §2b(A) is a full index of which number means what. (Beware:
 `design/icache.md` is about the *instruction* cache and is unrelated.)
 
@@ -123,7 +123,7 @@ read the surrounding context in the Rocq tree.
 
 # 0. The constants, verbatim from the headers the proofs were read against
 
-`/shared/xv6rocq/xv6-riscv/kernel/fs.h` (61 lines) — note `NLINK_MAX`, which stock xv6 does
+`xv6-riscv/kernel/fs.h` (61 lines) — note `NLINK_MAX`, which stock xv6 does
 not have:
 
 ```c
@@ -169,7 +169,7 @@ struct dirent {
 };
 ```
 
-`/shared/xv6rocq/xv6-riscv/kernel/param.h` (14 lines):
+`xv6-riscv/kernel/param.h` (14 lines):
 
 ```c
 #define NPROC       64                // maximum number of processes
@@ -217,7 +217,7 @@ struct buf {
 
 # 1. Function inventory
 
-All paths are relative to `/shared/xv6rocq/iris/`. "Link statement" is the *whole* content of
+All paths are relative to `iris/`. "Link statement" is the *whole* content of
 the `Link<F>.v` file below its header comment — in this development a Link file is not a
 theorem but a **sealed functor application**: `Spec<F>.v` states a `Module Type <F>`,
 `Proof<F>.v` provides `Module <F>Proof (C1 : CALLEE1) ... : <F>`, and `Link<F>.v` applies it
@@ -1096,8 +1096,8 @@ files themselves and the generic MachCSL/RISC-V framework: **85 files, ~79 800 l
 All Coq below is byte-exact.)*
 
 
-*Source of truth: `/shared/xv6rocq/iris` (the canonical development).
-Kernel source: `/shared/xv6rocq/xv6-riscv/kernel/fs.c`.
+*Source of truth: the Rocq tree's `iris/` (the canonical development).
+Kernel source: `xv6-riscv/kernel/fs.c`.
 All Coq below is VERBATIM (`sed -n 'A,Bp'`), never paraphrased.*
 
 ## 2.0 How this list was computed
@@ -1113,7 +1113,7 @@ LinkNameiRootBoot ProofNameiRoot ProofNamexRoot LinkNamexRoot
 LinkBmapNoalloc`).
 
 Transitive closure over `Require Import/Export`, restricted to modules that
-exist in `/shared/xv6rocq/iris`:
+exist in the Rocq tree's `iris/`:
 
 * **647 modules** total in the closure.
 * **328** of them are not `Spec*/Code*/Proof*/Link*` files.
@@ -1130,7 +1130,7 @@ Scratch artifacts of the computation:
 
 ## 2.0.1 Inventory (absolute path, line count, one-line role)
 
-All paths below are under `/shared/xv6rocq/iris/`.
+All paths below are under `iris/`.
 
 ### (a) Ghost-state capacity, canonical names, configuration
 
@@ -5503,10 +5503,10 @@ past every fs.c function proof.
 
 | file | lines | role |
 |---|---:|---|
-| `/shared/xv6rocq/iris/IcacheBoot.v` | 1704 | Boot wiring of the inode cache: pure decoding of mkfs's inode blocks plus the ghost steps turning boot's `fs_chalf` halves, the 50 raw entry cells, iinit's 50 `sl_fresh`es and the zeroed itable spinlock into the four persistent things every icache contract takes. Home of `ipool_alloc`. |
-| `/shared/xv6rocq/iris/FsCfgBoot.v` | 765 | The boot-side ALLOCATION of the file system's ghosts; `fs_cfg_alloc` mints the era's instance by decoding fs.img, `ipool_alloc_of_image` discharges `IcacheBoot.ipool_alloc`'s allocated arm from image well-formedness. |
-| `/shared/xv6rocq/iris/FsCfgSnap.v` | 1377 | The era's fs mint read off the DURABLE SNAPSHOT (the post-crash counterpart of `FsCfgBoot`). |
-| `/shared/xv6rocq/iris/ArgPath.v` | 176 | The path ARGUMENT of a syscall read off the caller's own image; pure, two definitions and four lemmas. Reached from `SpecNamei`'s *callers* (open/exec/mknod), not from namei itself. |
+| `iris/IcacheBoot.v` | 1704 | Boot wiring of the inode cache: pure decoding of mkfs's inode blocks plus the ghost steps turning boot's `fs_chalf` halves, the 50 raw entry cells, iinit's 50 `sl_fresh`es and the zeroed itable spinlock into the four persistent things every icache contract takes. Home of `ipool_alloc`. |
+| `iris/FsCfgBoot.v` | 765 | The boot-side ALLOCATION of the file system's ghosts; `fs_cfg_alloc` mints the era's instance by decoding fs.img, `ipool_alloc_of_image` discharges `IcacheBoot.ipool_alloc`'s allocated arm from image well-formedness. |
+| `iris/FsCfgSnap.v` | 1377 | The era's fs mint read off the DURABLE SNAPSHOT (the post-crash counterpart of `FsCfgBoot`). |
+| `iris/ArgPath.v` | 176 | The path ARGUMENT of a syscall read off the caller's own image; pure, two definitions and four lemmas. Reached from `SpecNamei`'s *callers* (open/exec/mknod), not from namei itself. |
 
 ---
 
@@ -5557,8 +5557,8 @@ propagate into every one of the 24 function specs.
 > section 4C has the whole table read off the current files.
 
 
-Source corpus: `/shared/xv6rocq/claude-notes/{design,completed}/`, plus the
-Rocq sources in `/shared/xv6rocq/iris/`.  Written to answer "why is the Rocq
+Source corpus: `claude-notes/{design,completed}/`, plus the
+Rocq sources in `iris/`.  Written to answer "why is the Rocq
 `Spec*.v` shaped this way" without re-reading ~20 kLOC of notes.
 
 ---
@@ -6778,7 +6778,7 @@ Two conventions worth porting with the suffixes:
 
 # 3. Spec shapes — verbatim
 
-Everything below is byte-exact Coq from `/shared/xv6rocq/iris/`. Line ranges are given so
+Everything below is byte-exact Coq from `iris/`. Line ranges are given so
 you can re-extract with `sed -n 'A,Bp'`.
 
 ## 3.0 How to read these — the contract-variant suffix decoder
@@ -13713,7 +13713,7 @@ End NAMEIPARENT.
 # 4. Dependency order: history, callee link graph, and the three budgets
 
 
-Source of truth: `/shared/xv6rocq` (git), directory `/shared/xv6rocq/iris`.
+Source of truth: the Rocq tree (`rocq` branch) (git), directory the Rocq tree's `iris/`.
 All dates below come from `git log --diff-filter=A` (the commit that **added**
 the file), and rows are ordered by the commit's position in `git log --reverse`,
 so within one day the order is the real commit order.
@@ -14923,7 +14923,7 @@ Definition wi16_need (crb ind : bool) : nat := (bmap_need crb ind + 2)%nat.
 # 5. Mapping to the Lean port — what exists, what is MISSING, where contracts diverge
 
 
-Survey of `/shared/lean-xv6` (commit `3e3b745`, branch `main`) — what already
+Survey of this repository (commit `3e3b745`, branch `main`) — what already
 exists that an fs.c port would build on.  Every quotation below is byte-exact
 (`sed -n` from the source file); line numbers are the line numbers in the
 named file at the time of the survey.
@@ -14957,7 +14957,7 @@ payload-free half `Xv6.bufHold0`.  The caller must also spend one
 
 ### 1.1 The client view the layer is parametric over (`BioView`)
 
-`/shared/lean-xv6/Xv6/BioPool.lean` lines 72-105:
+`Xv6/BioPool.lean` lines 72-105:
 ```lean
 /-- **THE CLIENT VIEW** the whole bio layer is parametric over (Rocq
 `BioDefs.bio_view`): the disk ghost the covered blocks' fragments live at,
@@ -14995,7 +14995,7 @@ attribute [instance] BioView.cleanTL BioView.dirtyTL
 
 ```
 
-`/shared/lean-xv6/Xv6/BioPool.lean` lines 107-160:
+`Xv6/BioPool.lean` lines 107-160:
 ```lean
 `b` is claimed by some buffer under the blockno assignment `bnos`. -/
 def bcached (bnos : Nat → BitVec 32) (b : Nat) : Bool :=
@@ -15055,7 +15055,7 @@ theorem bioPool_intro (V : BioView GF) (bnos : Nat → BitVec 32) :
 
 ### 1.2 Geometry and the ghost names
 
-`/shared/lean-xv6/Xv6/DiskDefs.lean` lines 50-54:
+`Xv6/DiskDefs.lean` lines 50-54:
 ```lean
 /-- A file-system block (`BSIZE` of fs.h). -/
 def BSIZE : Nat := 1024
@@ -15064,7 +15064,7 @@ def SPB : Nat := BSIZE / 512
 
 ```
 
-`/shared/lean-xv6/Xv6/BcacheInv.lean` lines 108-116:
+`Xv6/BcacheInv.lean` lines 108-116:
 ```lean
 /-! ## Geometry -/
 
@@ -15077,7 +15077,7 @@ theorem bnode_NBUF : bnode NBUF = bhead := by
   unfold bnode bhead bufAddr bcacheHeadAddr NBUF; decide
 ```
 
-`/shared/lean-xv6/Xv6/BcacheInv.lean` lines 194-224:
+`Xv6/BcacheInv.lean` lines 194-224:
 ```lean
 
 /-- The supply of buffer-cache references (Rocq `BioDefs.BSLOTS`). -/
@@ -15115,7 +15115,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Bcache
 The disk image fragment a covered block owns (this is what rides inside a
 handle / the pool, and what `virtio_disk_rw` exchanges):
 
-`/shared/lean-xv6/Xv6/DiskInvDefs.lean` lines 669-675:
+`Xv6/DiskInvDefs.lean` lines 669-675:
 ```lean
 
 instance diskBlockQ_timeless (γ : DiskNames) (bno : Nat) (bs : List (BitVec 8)) :
@@ -15130,7 +15130,7 @@ theorem diskBlock_split (γ : DiskNames) (bno : Nat) (bs : List (BitVec 8)) :
 
 `Xv6/BufDefs.lean` is the whole file (32 lines):
 
-`/shared/lean-xv6/Xv6/BufDefs.lean` lines 1-32:
+`Xv6/BufDefs.lean` lines 1-32:
 ```lean
 /-
 The buffer-cache block a disk request moves (kernel/buf.h `struct buf`),
@@ -15168,7 +15168,7 @@ end Xv6
 
 ### 1.4 References, slots and the two payloads
 
-`/shared/lean-xv6/Xv6/BcacheInv.lean` lines 574-596:
+`Xv6/BcacheInv.lean` lines 574-596:
 ```lean
 /-! ## The reference-count ghost -/
 
@@ -15195,7 +15195,7 @@ instance bref_timeless (γ : BcacheNames) (k : Nat) (dev bno : BitVec 32) :
 
 ```
 
-`/shared/lean-xv6/Xv6/BcacheInv.lean` lines 598-632:
+`Xv6/BcacheInv.lean` lines 598-632:
 ```lean
 
 `Xv6/BioPool.lean` holds the view and the pool bundle; the two payloads live
@@ -15234,7 +15234,7 @@ theorem bioPay_clean (γ : BcacheNames) (V : BioView GF) (k : Nat) (dev bno : Bi
   · ipureintro; trivial
 ```
 
-`/shared/lean-xv6/Xv6/BcacheInv.lean` lines 663-686:
+`Xv6/BcacheInv.lean` lines 663-686:
 ```lean
 
 /-- **THE PAYLOAD A PARKED BUFFER CARRIES** (Rocq's `buf_pay`), keyed on its
@@ -15262,7 +15262,7 @@ instance bufPay_timeless (γ : BcacheNames) (V : BioView GF) (k : Nat) (i : BufI
 /-- An uncovered blockno owes nothing (what `binit`'s thirty buffers, all
 ```
 
-`/shared/lean-xv6/Xv6/BcacheInv.lean` lines 740-750:
+`Xv6/BcacheInv.lean` lines 740-750:
 ```lean
 
 /-! ## The slot supply -/
@@ -15279,7 +15279,7 @@ def bslot (γ : BcacheNames) : IProp GF := bslots γ 1
 
 The pool (uncached covered blocks), in `Xv6/BioPool.lean`:
 
-`/shared/lean-xv6/Xv6/BioPool.lean` lines 136-160:
+`Xv6/BioPool.lean` lines 136-160:
 ```lean
 /-! ## The payloads -/
 
@@ -15314,7 +15314,7 @@ This is the answer to "what resource does a caller hold for a locked
 buffer".  `bufHold0` is Rocq's `bio_hold0`; `bioLocked` is Rocq's
 `bio_locked` (= `bio_held` at `bsl = bs`).
 
-`/shared/lean-xv6/Xv6/BcacheInv.lean` lines 1303-1340:
+`Xv6/BcacheInv.lean` lines 1303-1340:
 ```lean
   iexact Hk
 
@@ -15358,7 +15358,7 @@ theorem bioLocked_split (γ : BcacheNames) (V : BioView GF) (k : Nat)
 
 ### 1.6 The persistent credential a bio caller must carry: `bioCtx`
 
-`/shared/lean-xv6/Xv6/BcacheInv.lean` lines 1264-1282:
+`Xv6/BcacheInv.lean` lines 1264-1282:
 ```lean
 /-- Buffer `k`'s sleeplock (persistent). -/
 def isBufSlk (γ : BcacheNames) (k : Nat) : IProp GF :=
@@ -15381,7 +15381,7 @@ instance bioCtx_persistent (γl : GName) (γ : BcacheNames) (V : BioView GF) :
 
 ```
 
-`/shared/lean-xv6/Xv6/BcacheInv.lean` lines 989-995:
+`Xv6/BcacheInv.lean` lines 989-995:
 ```lean
 /-- **The buffer cache** (persistent): the lock over its resource. -/
 def isBcache (γl : GName) (γ : BcacheNames) (V : BioView GF) : IProp GF :=
@@ -15395,7 +15395,7 @@ instance isBcache_persistent (γl : GName) (γ : BcacheNames) (V : BioView GF) :
 `Xv6.bkeyAt` — the halves of `b->dev` / `b->blockno` that the cache keeps
 forever, which is why a handle only ever holds halves of those two cells:
 
-`/shared/lean-xv6/Xv6/BcacheInv.lean` lines 803-825:
+`Xv6/BcacheInv.lean` lines 803-825:
 ```lean
 This is the resource `bget`'s scan needs.  `bget` walks the whole LRU cycle
 under `bcache.lock` ALONE and reads `b->dev`/`b->blockno` of EVERY buffer,
@@ -15481,14 +15481,14 @@ real and spelled exactly that way:
 This is the single most important passage for anyone porting fs.c, because
 it says exactly which Rocq rows a caller above the log will find missing.
 
-`/shared/lean-xv6/Xv6/LogInv.lean` lines 1-67:
+`Xv6/LogInv.lean` lines 1-67:
 ```lean
 /-
 The log layer's lock invariant: `struct log`'s geometry, the reservation
 LEDGER, the batch bundle the committer checks out, and the ghost
 transitions `begin_op` / `log_write` / `end_op` perform.
 
-A port of Rocq `LogInv.v` (`/shared/xv6rocq/iris/LogInv.v`).  The shape in
+A port of Rocq `LogInv.v` (`iris/LogInv.v`).  The shape in
 one paragraph, unchanged from Rocq: the "log" spinlock seals `logRes`.
 Always inside: the outstanding / committing / ncommit cells and the LEDGER
 -- a ghost map op-id ↦ REMAINING BUDGET whose authority ties the
@@ -15554,7 +15554,7 @@ import Xv6.FsBlocks
 
 ### 2.2 On-disk geometry and the pure vocabulary
 
-`/shared/lean-xv6/Xv6/LogDefs.lean` lines 58-113:
+`Xv6/LogDefs.lean` lines 58-113:
 ```lean
 /-! ## On-disk geometry
 
@@ -15614,7 +15614,7 @@ theorem mem_fsHomeList (cov : Std.ExtTreeSet Nat compare) (ls b : Nat) :
 
 ```
 
-`/shared/lean-xv6/Xv6/LogInv.lean` lines 86-96:
+`Xv6/LogInv.lean` lines 86-96:
 ```lean
 /-- `&log`, which is also `&log.lock`. -/
 def logAddr : BitVec 64 := KA.«log»
@@ -15629,7 +15629,7 @@ def lhBlock (i : Nat) : BitVec 64 := logAddr + BitVec.ofNat 64 (48 + 4 * i)
 
 ```
 
-`/shared/lean-xv6/Xv6/LogInv.lean` lines 100-115:
+`Xv6/LogInv.lean` lines 100-115:
 ```lean
 (Rocq's `cov_ok`): `bread`'s own arithmetic premise is `bno < 2^31`, and
 block 0 is never a client block. -/
@@ -15651,7 +15651,7 @@ def dirtyClear (D : RegMapF Bool) (ws : List Nat) : RegMapF Bool :=
 
 ### 2.3 The ledger entry and the ghost names
 
-`/shared/lean-xv6/Xv6/LogDefs.lean` lines 405-437:
+`Xv6/LogDefs.lean` lines 405-437:
 ```lean
 /-- A LEDGER ENTRY (Rocq's `Xv6Cameras.op_entry`): the op's remaining
 budget, the blocks it has already appended to `lh.block[]` in this batch,
@@ -15688,7 +15688,7 @@ record and this is how the fifth is put in. -/
 def LogNames.withLk (γ : LogNames) (lk : GName) : LogNames :=
 ```
 
-`/shared/lean-xv6/Xv6/LogDefs.lean` lines 452-470:
+`Xv6/LogDefs.lean` lines 452-470:
 ```lean
 class LogG (GF : BundledGFunctors) where
   /-- the reservation ledger: op id ↦ (budget, logged set, birth epoch) -/
@@ -15713,7 +15713,7 @@ stated over nothing but the names record: a layer that PARKS one of them
 
 ### 2.4 The client-side tokens
 
-`/shared/lean-xv6/Xv6/LogDefs.lean` lines 473-481:
+`Xv6/LogDefs.lean` lines 473-481:
 ```lean
 /-- **The client-side epoch lower bound** (Rocq's `log_epoch_lb`): "the
 batch epoch has reached `e`".  Persistent and monotone, so a copy taken
@@ -15726,7 +15726,7 @@ def logEpochAuth (γ : LogNames) (E : Nat) : IProp GF :=
 
 ```
 
-`/shared/lean-xv6/Xv6/LogDefs.lean` lines 515-526:
+`Xv6/LogDefs.lean` lines 515-526:
 ```lean
 def logRegAuth (γ : LogNames) (X : RegMapF (Nat × Nat)) : IProp GF := γ.lg ↪●MAP X
 
@@ -15742,7 +15742,7 @@ instance loggedAt_persistent (γ : LogNames) (e b : Nat) :
 instance loggedAt_timeless (γ : LogNames) (e b : Nat) :
 ```
 
-`/shared/lean-xv6/Xv6/LogDefs.lean` lines 561-577:
+`Xv6/LogDefs.lean` lines 561-577:
 ```lean
 both are in scope picks whichever instance wins, so every statement about the
 transactions goes through this name, which pins `LogG.gmTx`. -/
@@ -15763,7 +15763,7 @@ instance logTx_timeless (γ : LogNames) : Timeless (logTx (GF := GF) γ) := by
 
 ```
 
-`/shared/lean-xv6/Xv6/LogInv.lean` lines 180-206:
+`Xv6/LogInv.lean` lines 180-206:
 ```lean
 be stated without the epoch, and it must not be a separate persistent
 token -- such a token outlives its op, and a stale small `e0` would admit
@@ -15796,7 +15796,7 @@ def logOp (γ : LogNames) (u : Nat) : IProp GF := iprop(logOpb γ u ∗ logTx γ
 
 The append receipt `log_write` returns, and the absorption credit:
 
-`/shared/lean-xv6/Xv6/LogInv.lean` lines 249-264:
+`Xv6/LogInv.lean` lines 249-264:
 ```lean
   iframe H1 H2
 
@@ -15816,7 +15816,7 @@ def logOpSw (γ : LogNames) (u : Nat) (Sb : List Nat) (b v : Nat) : IProp GF :=
 
 ```
 
-`/shared/lean-xv6/Xv6/LogInv.lean` lines 303-315:
+`Xv6/LogInv.lean` lines 303-315:
 ```lean
 /-- What a caller of `log_write` hands over to claim the FREE arm (Rocq's
 `log_credit`): either the block is in MY op's already-logged set, or
@@ -15835,7 +15835,7 @@ instance logCredit_persistent (γ : LogNames) (cr : Bool) (Sb : List Nat) (e0 b 
 
 ### 2.5 The lock invariant and the persistent credential
 
-`/shared/lean-xv6/Xv6/LogInv.lean` lines 380-440:
+`Xv6/LogInv.lean` lines 380-440:
 ```lean
   · rw [hmiss b hb hin]
     exact htie b hb hin
@@ -15900,7 +15900,7 @@ def logResAt (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
 
 ```
 
-`/shared/lean-xv6/Xv6/LogInv.lean` lines 502-530:
+`Xv6/LogInv.lean` lines 502-530:
 ```lean
   infer_instance
 
@@ -15935,7 +15935,7 @@ theorem logCtx_lock (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
 
 The genesis bundle:
 
-`/shared/lean-xv6/Xv6/LogDefs.lean` lines 611-626:
+`Xv6/LogDefs.lean` lines 611-626:
 ```lean
 wants them.  GENESIS IS EPOCH ONE, not zero: the region receipt's "never
 observed" counter value is zero and the two must not collide, so
@@ -15957,7 +15957,7 @@ theorem logGhostAlloc (γlk : GName) :
 
 ### 2.6 FULL VERBATIM: `SpecBeginOp.lean` (whole file, 77 lines)
 
-`/shared/lean-xv6/Xv6/SpecBeginOp.lean` lines 1-77:
+`Xv6/SpecBeginOp.lean` lines 1-77:
 ```lean
 /-
 Specification of `begin_op` (kernel/log.c): the public contract.  Mirrors
@@ -16040,7 +16040,7 @@ end Xv6
 
 ### 2.7 FULL VERBATIM: `SpecEndOp.lean` (whole file, 106 lines)
 
-`/shared/lean-xv6/Xv6/SpecEndOp.lean` lines 1-106:
+`Xv6/SpecEndOp.lean` lines 1-106:
 ```lean
 /-
 Specification of `end_op` (kernel/log.c): the public contract.  Mirrors
@@ -16152,7 +16152,7 @@ end Xv6
 
 ### 2.8 FULL VERBATIM: `SpecLogWrite.lean` (whole file, 143 lines)
 
-`/shared/lean-xv6/Xv6/SpecLogWrite.lean` lines 1-143:
+`Xv6/SpecLogWrite.lean` lines 1-143:
 ```lean
 /-
 Specification of `log_write` (kernel/log.c): the public contract.
@@ -16304,7 +16304,7 @@ end Xv6
 Header notes (they say exactly which Rocq rows were dropped and why the
 recovering arm's shape differs):
 
-`/shared/lean-xv6/Xv6/SpecInstallTrans.lean` lines 1-104:
+`Xv6/SpecInstallTrans.lean` lines 1-104:
 ```lean
 /-
 Specification of `install_trans` (kernel/log.c): the public contract.
@@ -16414,7 +16414,7 @@ open LeanRV64D
 
 The contract itself:
 
-`/shared/lean-xv6/Xv6/SpecInstallTrans.lean` lines 105-111:
+`Xv6/SpecInstallTrans.lean` lines 105-111:
 ```lean
 def installTransAddr : BitVec 64 := KA.«install_trans»
 
@@ -16425,7 +16425,7 @@ def installTransSlots : Nat := 10 + breadSlots
 
 ```
 
-`/shared/lean-xv6/Xv6/SpecInstallTrans.lean` lines 209-278:
+`Xv6/SpecInstallTrans.lean` lines 209-278:
 ```lean
 /-! ## The contract -/
 
@@ -16501,7 +16501,7 @@ end Xv6
 
 ### 2.10 `write_head` — header notes and the contract
 
-`/shared/lean-xv6/Xv6/SpecWriteHead.lean` lines 1-57:
+`Xv6/SpecWriteHead.lean` lines 1-57:
 ```lean
 /-
 Specification of `write_head` (kernel/log.c): the public contract.
@@ -16562,7 +16562,7 @@ Imports only definitional files (never a `Code*` or `Proof*` file).
 import MachCSL.WpSmodeFrame
 ```
 
-`/shared/lean-xv6/Xv6/SpecWriteHead.lean` lines 68-125:
+`Xv6/SpecWriteHead.lean` lines 68-125:
 ```lean
 /-- Address of `write_head`. -/
 def writeHeadAddr : BitVec 64 := KA.«write_head»
@@ -16799,7 +16799,7 @@ the single biggest missing piece for an fs.c port.**
 
 The whole file, verbatim:
 
-`/shared/lean-xv6/Xv6/FsBlocks.lean` lines 1-273:
+`Xv6/FsBlocks.lean` lines 1-273:
 ```lean
 /-
 The two BLOCK-LEVEL authorities the write-ahead log freezes, ported from
@@ -17094,7 +17094,7 @@ Declarations: `SlhRF` (53), `class SleepLockG` (57), the field offsets
 
 ### 4.1 The payload / authority predicates
 
-`/shared/lean-xv6/Xv6/SleepLockDefs.lean` lines 62-82:
+`Xv6/SleepLockDefs.lean` lines 62-82:
 ```lean
 
 /-! ## Geometry, in the exact instruction address forms -/
@@ -17119,7 +17119,7 @@ def slHauth (γ : GName) (q : Qp) : IProp GF := γ ↪VAR{.own (1 : Qp).half} q
 instance slHtok_timeless (γ : GName) (q : Qp) : Timeless (slHtok (GF := GF) γ q) := by
 ```
 
-`/shared/lean-xv6/Xv6/SleepLockDefs.lean` lines 126-200:
+`Xv6/SleepLockDefs.lean` lines 126-200:
 ```lean
   ihave Ht := (show slHtok (GF := GF) γ q ⊢ γ ↪VAR{.own (1 : Qp).half} q from by
     unfold slHtok; iintro H; iexact H) $$ Ht
@@ -17198,7 +17198,7 @@ instance instCtxMorphSleeplockedQAt [CurCtx] (γ : GName) (q : Qp) (slk : BitVec
   @instCtxMorphSep hlc GF _ (fun _ => slHtok γ q) (fun ξ => wordAtN ξ (slPid slk) 4 (DFrac.own 1) pid)
 ```
 
-`/shared/lean-xv6/Xv6/SleepLockDefs.lean` lines 218-232:
+`Xv6/SleepLockDefs.lean` lines 218-232:
 ```lean
   refine @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _) ?_
   exact @instCtxMorphSep hlc GF _ _ _ (instCtxMorphSlFreeHoldAt γ slk) inferInstance
@@ -17223,7 +17223,7 @@ instance isSleeplockGen_persistent [CurCtx] (γl γ : GName) (slk : BitVec 64) (
 144, the store-order variant `bread`'s recycle needs) and a NON-BLOCKING
 form `ACQUIRESLEEP_NB` (line 204).
 
-`/shared/lean-xv6/Xv6/SpecAcquiresleep.lean` lines 40-96:
+`Xv6/SpecAcquiresleep.lean` lines 40-96:
 ```lean
 /-- Address of `acquiresleep`. -/
 def acquiresleepAddr : BitVec 64 := KA.«acquiresleep»
@@ -17286,7 +17286,7 @@ structure ACQUIRESLEEP : Prop where
 
 ### 4.3 `releasesleep`
 
-`/shared/lean-xv6/Xv6/SpecReleasesleep.lean` lines 35-76:
+`Xv6/SpecReleasesleep.lean` lines 35-76:
 ```lean
 
 /-- releasesleep's 4-slot frame over `wakeup`'s 18 (`acquire`/`release` 10). -/
@@ -17337,7 +17337,7 @@ structure RELEASESLEEP : Prop where
 
 ### 4.4 `holdingsleep`
 
-`/shared/lean-xv6/Xv6/SpecHoldingsleep.lean` lines 40-80:
+`Xv6/SpecHoldingsleep.lean` lines 40-80:
 ```lean
 /-- Address of `holdingsleep`. -/
 def holdingsleepAddr : BitVec 64 := KA.«holdingsleep»
@@ -17387,7 +17387,7 @@ def wp_holdingsleep_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
 Directly relevant: `ilock` needs the per-inode sleeplock `initsleeplock`
 already built in `Xv6/ProofIinit.lean`.
 
-`/shared/lean-xv6/Xv6/SpecInitsleeplock.lean` lines 1-59:
+`Xv6/SpecInitsleeplock.lean` lines 1-59:
 ```lean
 /-
 Specification of `initsleeplock` (kernel/sleeplock.c): the public
@@ -17476,7 +17476,7 @@ Files: `Xv6/FileDefs.lean` (338), `Xv6/FileInv.lean` (380),
 
 ### 5.1 `Xv6/FileDefs.lean` header (verbatim) and geometry
 
-`/shared/lean-xv6/Xv6/FileDefs.lean` lines 1-28:
+`Xv6/FileDefs.lean` lines 1-28:
 ```lean
 /-
 The open-file table (`kernel/file.c`'s `ftable`): geometry, the ghost model
@@ -17508,7 +17508,7 @@ invariants the Rocq algebra enforces:
 -/
 ```
 
-`/shared/lean-xv6/Xv6/FileDefs.lean` lines 40-70:
+`Xv6/FileDefs.lean` lines 40-70:
 ```lean
 
 /-! ## Geometry -/
@@ -17545,7 +17545,7 @@ def FD_DEVICE : BitVec 32 := 3#32
 
 ### 5.2 The content, the descriptor state, and `fdstateOk`
 
-`/shared/lean-xv6/Xv6/FileDefs.lean` lines 71-105:
+`Xv6/FileDefs.lean` lines 71-105:
 ```lean
 
 /-- The six immutable-while-referenced fields of `struct file`. -/
@@ -17586,7 +17586,7 @@ def fdTypeCode : FdState → BitVec 32
 
 ### 5.3 The ghost names (`FPNames.inum` / `FPNames.ooff` are placeholders)
 
-`/shared/lean-xv6/Xv6/FileDefs.lean` lines 162-190:
+`Xv6/FileDefs.lean` lines 162-190:
 ```lean
 /-! ## Ghost names -/
 
@@ -17621,7 +17621,7 @@ attribute [reducible, instance] FileG.gmRefG FileG.gmFdG FileG.gvPayG FileG.gvFd
 
 ### 5.4 THE HOLE: `fileCore`, `filePay`, `filePaySt`, `fileRef`
 
-`/shared/lean-xv6/Xv6/FileDefs.lean` lines 229-260:
+`Xv6/FileDefs.lean` lines 229-260:
 ```lean
 
 /-! ## The payload: what a file is a reference TO -/
@@ -17659,7 +17659,7 @@ def fileRef (γ : FileNames) (k : Nat) (q : Qp) (st : FdState) : IProp GF := ipr
 
 ### 5.5 `fileclose`'s exclusion of the inode arm
 
-`/shared/lean-xv6/Xv6/SpecFileclose.lean` lines 1-47:
+`Xv6/SpecFileclose.lean` lines 1-47:
 ```lean
 /-
 The interface of `fileclose` (Rocq SpecFileclose.v), for the file types the
@@ -17727,7 +17727,7 @@ All of these have a `Spec*`, a `Proof*` and a `Link*` file and are green.
 
 Contract prose (verbatim, `SpecBread.lean:16-37`):
 
-`/shared/lean-xv6/Xv6/SpecBread.lean` lines 16-37:
+`Xv6/SpecBread.lean` lines 16-37:
 ```lean
 **The contract.**  One `Xv6.bslot` in, a locked buffer out: the buffer's
 sleeplock held, `valid = 1`, `disk = 0`, `dev`/`blockno` pinned to the
@@ -17753,7 +17753,7 @@ threads the full running-process bundle and its crossing is the literal
 
 ```
 
-`/shared/lean-xv6/Xv6/SpecBread.lean` lines 62-107:
+`Xv6/SpecBread.lean` lines 62-107:
 ```lean
 /-- Address of `bread`. -/
 def breadAddr : BitVec 64 := KA.«bread»
@@ -17805,7 +17805,7 @@ end Xv6
 
 ### 6.2 `brelse` — what it consumes
 
-`/shared/lean-xv6/Xv6/SpecBrelse.lean` lines 24-36:
+`Xv6/SpecBrelse.lean` lines 24-36:
 ```lean
 **The obligation is `Xv6.bioLocked`** (Rocq's `bio_locked`, i.e. its
 `bio_held` at `bsl = bs`), NOT the bare handle: the bytes must be the
@@ -17822,7 +17822,7 @@ keeps them and what makes the first instruction's park available.  The
 credential is `Xv6.bioCtx γl γ V`, which now carries the thirty escrows.
 ```
 
-`/shared/lean-xv6/Xv6/SpecBrelse.lean` lines 58-93:
+`Xv6/SpecBrelse.lean` lines 58-93:
 ```lean
 /-- Address of `brelse`. -/
 def brelseAddr : BitVec 64 := KA.«brelse»
@@ -17864,7 +17864,7 @@ end Xv6
 
 ### 6.3 `bwrite`
 
-`/shared/lean-xv6/Xv6/SpecBwrite.lean` lines 42-86:
+`Xv6/SpecBwrite.lean` lines 42-86:
 ```lean
 /-- Address of `bwrite`. -/
 def bwriteAddr : BitVec 64 := KA.«bwrite»
@@ -17915,7 +17915,7 @@ end Xv6
 
 ### 6.4 `bpin`
 
-`/shared/lean-xv6/Xv6/SpecBpin.lean` lines 54-88:
+`Xv6/SpecBpin.lean` lines 54-88:
 ```lean
 /-- Address of `bpin`. -/
 def bpinAddr : BitVec 64 := KA.«bpin»
@@ -17956,7 +17956,7 @@ end Xv6
 
 ### 6.5 `bunpin`
 
-`/shared/lean-xv6/Xv6/SpecBunpin.lean` lines 35-60:
+`Xv6/SpecBunpin.lean` lines 35-60:
 ```lean
 /-- Address of `bunpin`. -/
 def bunpinAddr : BitVec 64 := KA.«bunpin»
@@ -18001,7 +18001,7 @@ fs.c: `memmove` (`install_trans`, `readi`/`writei`, `dirlookup`), `memset`
 
 ### 7.1 `memmove`
 
-`/shared/lean-xv6/Xv6/SpecMemmove.lean` lines 26-50:
+`Xv6/SpecMemmove.lean` lines 26-50:
 ```lean
 /-- Address of `memmove`. -/
 def memmoveAddr : BitVec 64 := KA.«memmove»
@@ -18032,7 +18032,7 @@ end Xv6
 
 ### 7.2 `memset` (two forms: owned and visibility-free)
 
-`/shared/lean-xv6/Xv6/SpecMemset.lean` lines 25-69:
+`Xv6/SpecMemset.lean` lines 25-69:
 ```lean
 /-- Address of `memset`. -/
 def memsetAddr : BitVec 64 := KA.«memset»
@@ -18083,7 +18083,7 @@ end Xv6
 
 ### 7.3 `memcmp`
 
-`/shared/lean-xv6/Xv6/SpecMemcmp.lean` lines 24-55:
+`Xv6/SpecMemcmp.lean` lines 24-55:
 ```lean
 /-- Address of `memcmp`. -/
 def memcmpAddr : BitVec 64 := KA.«memcmp»
@@ -18121,7 +18121,7 @@ end Xv6
 
 ### 7.4 `strncmp`
 
-`/shared/lean-xv6/Xv6/SpecStrncmp.lean` lines 37-75:
+`Xv6/SpecStrncmp.lean` lines 37-75:
 ```lean
 /-- Address of `strncmp`. -/
 def strncmpAddr : BitVec 64 := KA.«strncmp»
@@ -18166,7 +18166,7 @@ end Xv6
 
 ### 7.5 `strncpy`
 
-`/shared/lean-xv6/Xv6/SpecStrncpy.lean` lines 38-74:
+`Xv6/SpecStrncpy.lean` lines 38-74:
 ```lean
 /-- Address of `strncpy`. -/
 def strncpyAddr : BitVec 64 := KA.«strncpy»
@@ -18213,7 +18213,7 @@ fs.c's `namex`/`skipelem` does not call `safestrcpy`, but `sys_open`'s
 `create` path in file.c does not either; `kfork` is the only caller here.
 If an fs.c function needs a general `n`, this spec must be generalised.
 
-`/shared/lean-xv6/Xv6/SpecSafestrcpy.lean` lines 39-65:
+`Xv6/SpecSafestrcpy.lean` lines 39-65:
 ```lean
 /-- Address of `safestrcpy`. -/
 def safestrcpyAddr : BitVec 64 := KA.«safestrcpy»
@@ -18246,7 +18246,7 @@ end Xv6
 
 ### 7.7 `strlen`
 
-`/shared/lean-xv6/Xv6/SpecStrlen.lean` lines 27-47:
+`Xv6/SpecStrlen.lean` lines 27-47:
 ```lean
 /-- Address of `strlen`. -/
 def strlenAddr : BitVec 64 := KA.«strlen»
@@ -18283,7 +18283,7 @@ DESCRIPTOR-RELATIVE (`P.ext P'`), so a `readi` loop can re-enter.
 
 ### 8.1 `either_copyout` (whole file, 85 lines)
 
-`/shared/lean-xv6/Xv6/SpecEitherCopyout.lean` lines 1-85:
+`Xv6/SpecEitherCopyout.lean` lines 1-85:
 ```lean
 /-
 Specification of `either_copyout` (kernel/proc.c): the kernel writing to a
@@ -18374,7 +18374,7 @@ end Xv6
 
 ### 8.2 `either_copyin` (whole file, 85 lines)
 
-`/shared/lean-xv6/Xv6/SpecEitherCopyin.lean` lines 1-85:
+`Xv6/SpecEitherCopyin.lean` lines 1-85:
 ```lean
 /-
 Specification of `either_copyin` (kernel/proc.c): the kernel reading from a
@@ -18468,7 +18468,7 @@ end Xv6
 ## 9. Kernel symbol addresses — `KA`, `KernelSyms`, `KStr`
 
 Everything lives in ONE auto-generated file:
-**`/shared/lean-xv6/Xv6/KernelImage.lean`** (18665 lines), header line 1:
+**`Xv6/KernelImage.lean`** (18665 lines), header line 1:
 
 ```
 -- AUTO-GENERATED by tools/dump_kernel.py from kernel (xv6-riscv 3e9926ea (branch verified)); do not edit.
@@ -18494,7 +18494,7 @@ prefix is implicit).  A symbol's `Nat` form is `KernelSyms.«sb»`; the
 
 `Xv6/KernelImage.lean` lines 17586-17621 (function entry points):
 
-`/shared/lean-xv6/Xv6/KernelImage.lean` lines 17586-17622:
+`Xv6/KernelImage.lean` lines 17586-17622:
 ```lean
 def «binit» : Nat := 0x80002bda
 def «bread» : Nat := 0x80002c60
@@ -18539,7 +18539,7 @@ Data symbols (`.bss`/`.data`), `Xv6/KernelImage.lean` lines 17690-17705.
 Note `sb`, `itable`, `log`, `bcache`, `ftable` are ALL present, with their
 sizes as comments:
 
-`/shared/lean-xv6/Xv6/KernelImage.lean` lines 17688-17706:
+`Xv6/KernelImage.lean` lines 17688-17706:
 ```lean
 def «stack0» : Nat := 0x8000a350  -- size 0x8000
 def «cons» : Nat := 0x80012350  -- size 0xa8
@@ -18626,7 +18626,7 @@ superblock` layout, no bitmap arithmetic and no `bmap` vocabulary.
 Despite the name, this file is the per-CPU geometry (`cpus[NCPU]`) only.
 The whole file:
 
-`/shared/lean-xv6/Xv6/Geom.lean` lines 1-27:
+`Xv6/Geom.lean` lines 1-27:
 ```lean
 /-
 The xv6 kernel's per-cpu geometry: `cpus[NCPU]` (kernel/proc.c) as the
@@ -18664,7 +18664,7 @@ the fs entry points exist and behave like blocking calls.  **When fs.c is
 actually proved, this class is what gets discharged and deleted.**
 The whole file:
 
-`/shared/lean-xv6/Xv6/FsEnv.lean` lines 1-102:
+`Xv6/FsEnv.lean` lines 1-102:
 ```lean
 /-
 Xv6: the ASSUMED file-system interface.
@@ -18784,7 +18784,7 @@ contract; it is read once out of `sb+20` by `initlog` and then frozen into
 `Xv6/SpecInitlog.lean` is the ONLY place `struct superblock` appears, and
 it appears as a bare fractional word:
 
-`/shared/lean-xv6/Xv6/SpecInitlog.lean` lines 20-30:
+`Xv6/SpecInitlog.lean` lines 20-30:
 ```lean
 
 WHAT IT IS GIVEN.  The `struct superblock` field it reads (`sb->logstart`
@@ -18799,7 +18799,7 @@ blocks.  At a clean image the decode is empty and all three are trivial;
 at a real crash they are what a durable header invariant would deliver.
 ```
 
-`/shared/lean-xv6/Xv6/SpecInitlog.lean` lines 108-111:
+`Xv6/SpecInitlog.lean` lines 108-111:
 ```lean
   -- the four ghost names, at their genesis values
   logFreeTok γ ∗
@@ -18816,7 +18816,7 @@ it is not tied to `KA.«sb»`, and no `readsb`/`fsinit` spec exists.
 
 `Xv6/SpecPanic.lean` (98 lines), whole file:
 
-`/shared/lean-xv6/Xv6/SpecPanic.lean` lines 1-98:
+`Xv6/SpecPanic.lean` lines 1-98:
 ```lean
 /-
 Specification of `panic` (kernel/printf.c): the public contract.  Mirrors
@@ -18959,7 +18959,7 @@ for a `.rodata` literal (every xv6 panic site) it is discharged out of
 
 ### 12.1 A complete small Spec file: `Xv6/SpecBpin.lean` (88 lines)
 
-`/shared/lean-xv6/Xv6/SpecBpin.lean` lines 1-88:
+`Xv6/SpecBpin.lean` lines 1-88:
 ```lean
 /-
 Specification of `bpin` (kernel/bio.c): the public contract.  Mirrors Rocq
@@ -19053,7 +19053,7 @@ end Xv6
 
 ### 12.2 Its Link file: `Xv6/LinkBpin.lean` (13 lines, whole file)
 
-`/shared/lean-xv6/Xv6/LinkBpin.lean` lines 1-13:
+`Xv6/LinkBpin.lean` lines 1-13:
 ```lean
 /-
 `bpin` meets its specification, closed with the proved `acquire` and
@@ -19075,7 +19075,7 @@ end Xv6
 Header and the address lemmas — note the pattern of naming every computed
 branch target as a `by decide` theorem first:
 
-`/shared/lean-xv6/Xv6/ProofBpin.lean` lines 1-41:
+`Xv6/ProofBpin.lean` lines 1-41:
 ```lean
 /-
 Proof of `bpin`'s specification (`SpecBpin.BPIN`), given the interfaces of
@@ -19131,7 +19131,7 @@ theorem bpin_proof (AC : ACQUIRE) (RE : RELEASE) : BPIN := ⟨
 `Xv6/LinkBrelse.lean` (19 lines) — several callees, one of them a HOOKED
 variant:
 
-`/shared/lean-xv6/Xv6/LinkBrelse.lean` lines 1-19:
+`Xv6/LinkBrelse.lean` lines 1-19:
 ```lean
 /-
 `brelse` meets its specification, closed with the proved `holdingsleep`,
@@ -19156,7 +19156,7 @@ end Xv6
 
 `Xv6/LinkLogWrite.lean` (14 lines):
 
-`/shared/lean-xv6/Xv6/LinkLogWrite.lean` lines 1-14:
+`Xv6/LinkLogWrite.lean` lines 1-14:
 ```lean
 /-
 `log_write` meets its specification, closed with the proved `acquire`,
@@ -19299,7 +19299,7 @@ shape of that decision.
 # 6. Pitfalls the Rocq proofs record
 
 
-Source of every quotation below: `/shared/xv6rocq/iris/*.v` (the *live* tree; the
+Source of every quotation below: `iris/*.v` (the *live* tree; the
 `.claude/worktrees/*` copies were deliberately ignored).  Every fenced `coq` block
 below is **byte-exact** — extracted with `sed -n 'A,Bp'` and never retyped.
 

@@ -1,6 +1,6 @@
 /-
 **THE ASSEMBLY, PART 2: THE HAND'S FOOTPRINT, BOTH WAYS.**  Section 2 and
-2b of Rocq `/shared/xv6rocq/iris/FsCollectAll.v` (crash batch C-3, agent
+2b of Rocq `iris/FsCollectAll.v` (crash batch C-3, agent
 CJ); part 1 is `Xv6/FsCollectAllRows.lean`.
 
 WHAT THE MINT TAKES OFF `colHand` AND WHAT IT DOES NOT (Rocq's header).  It

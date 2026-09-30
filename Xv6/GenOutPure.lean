@@ -1,6 +1,6 @@
 /-
 THE CONSOLE CLAIM'S STAGE, ONCE OVER A LINE MODEL -- a port of Rocq
-`GenOutPure.v` (`/shared/xv6rocq/iris/GenOutPure.v`, 1002 lines, pinned
+`GenOutPure.v` (`iris/GenOutPure.v`, 1002 lines, pinned
 `1900b8a43`), row U0-1 of `notes/design-rulings.md`.  Pure.
 
 Rocq's header, abridged: the per-cycle console claim's PURE side -- the

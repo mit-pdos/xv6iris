@@ -1,6 +1,6 @@
 /-
 **THE IMAGE'S INODE RECORDS AND A FILE'S CONTENTS** -- a port of Rocq
-`FsImg.v` §2 and §3 (`/shared/xv6rocq/iris/FsImg.v` :236-462): the dinode
+`FsImg.v` §2 and §3 (`iris/FsImg.v` :236-462): the dinode
 DECODER `fsDinode`, the theorem that it inverts `DinodeEnc`'s encoder
 (`fsDinode_of_diblk`), the indirect block's entries `fsIndEnts`, `bmap`'s
 answer without allocation `fsBlkAddr`, the `data` argument `nodeOf` wants

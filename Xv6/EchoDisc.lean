@@ -1,7 +1,7 @@
 /-
 THE ECHO APPLICATION'S CONSOLE DISCIPLINE, as pure combinatorics over the
 observation trace -- a port of Rocq `EchoDisc.v`
-(`/shared/xv6rocq/iris/EchoDisc.v`, 2822 lines, pinned `1900b8a43`), row
+(`iris/EchoDisc.v`, 2822 lines, pinned `1900b8a43`), row
 U0-1 of `notes/design-rulings.md`.  No Iris, no ghosts.
 
 Rocq's header, abridged: the theorem is about the CONSOLE UART only

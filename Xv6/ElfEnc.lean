@@ -3,7 +3,7 @@ The ELF HEADER and PROGRAM HEADER byte vocabulary: the two stack buffers
 kexec reads its executable through, and the little-endian field projections
 it reads them with.
 
-A port of Rocq `ElfEnc.v` (`/shared/xv6rocq/iris/ElfEnc.v`).  Rocq's header,
+A port of Rocq `ElfEnc.v` (`iris/ElfEnc.v`).  Rocq's header,
 kept because the reasons are the content:
 
 > The FIFTH byte vocabulary of the tree, after `BlockWords.v`'s words,

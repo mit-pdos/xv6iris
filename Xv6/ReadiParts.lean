@@ -22,7 +22,7 @@ arm, and the image algebra of the user arm
 3. THE FUEL IS `N - tot`, not Rocq's `rd_blocks` (the straddled-block
    count): every round moves `m ≥ 1` bytes, which is all the induction
    needs; `rd_blocks`, `rd_blocks_pos`, `rd_blocks_step` are dropped --
-   uses checked: `grep -w rd_blocks` over `/shared/xv6rocq/iris/*.v`
+   uses checked: `grep -w rd_blocks` over `iris/*.v`
    finds them only in ProofReadiParts.v/ProofReadi.v -- reason: a simpler
    measure serves the same induction.
 4. THE USER ARM'S ALGEBRA (`rdImg_zero`, `rdImg_step`) is Rocq's

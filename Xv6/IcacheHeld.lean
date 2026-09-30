@@ -1,7 +1,7 @@
 /-
 **THE SAME REFERENCE, KEYED BY THE POINTER A REGISTER HOLDS, AND THE
 CONTEXT TRANSPORTS.**  A port of Rocq `IcacheHeld.v` (whole file,
-`/shared/xv6rocq/iris/IcacheHeld.v`, 607 lines).
+`iris/IcacheHeld.v`, 607 lines).
 
 `Xv6/IcacheRef.lean` states a reference at the SLOT INDEX `k`; a walk holds
 an `ip` in a register.  `inodeHeld v` is the existential over `k` that ties
@@ -54,7 +54,7 @@ needs the transports -- needs the pointer-keyed forms too.
 7. **The ∃-context wrapper** (`inode_held_short_any`) is GONE in Rocq too
    (the header note at Rocq 403); nothing to port.
 
-## Dropped/simplified vs Rocq (uses grep-checked over `/shared/xv6rocq/iris/*.v`,
+## Dropped/simplified vs Rocq (uses grep-checked over `iris/*.v`,
 ## nested comments stripped; the brief's §5 list re-verified)
 
 * `inode_held_refp` -- uses checked: none -- reason: dead `reflexivity`

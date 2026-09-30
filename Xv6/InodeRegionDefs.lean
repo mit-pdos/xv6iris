@@ -1,6 +1,6 @@
 /-
 **THE INODE REGION, PURE HALF.**  A port of Rocq `InodeRegion.v`
-(`/shared/xv6rocq/iris/InodeRegion.v`, 5578 lines), its three sections that
+(`iris/InodeRegion.v`, 5578 lines), its three sections that
 stand OUTSIDE `Section InodeRegion` -- lines 1-1275:
 
 * §1  (lines 199-365)   THE ENCODING IS INJECTIVE ON WELL-FORMED LISTS
@@ -77,7 +77,7 @@ is a `Nat` (Rocq `Z`), because `InodeLocal` takes the inum as a `Nat`
 ## Dropped/simplified vs Rocq
 
 Nothing.  Every lemma of lines 1-1275 is ported with Rocq's statement;
-the dead-looking ones were grepped across `/shared/xv6rocq/iris/*.v` and
+the dead-looking ones were grepped across `iris/*.v` and
 all have a consumer, either in a later file
 or in `InodeRegion.v`'s own `Section InodeRegion` (ported across the files
 named above).

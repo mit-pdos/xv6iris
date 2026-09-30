@@ -1,6 +1,6 @@
 /-
 THE PURE HALF OF E5's APPLICATION CLAIM -- a port of Rocq `EchoOutPure.v`
-(`/shared/xv6rocq/iris/EchoOutPure.v`, 1854 lines, pinned `1900b8a43`), row
+(`iris/EchoOutPure.v`, 1854 lines, pinned `1900b8a43`), row
 U0-1 of `notes/design-rulings.md`.  Iris-free list algebra over `EchoDisc` and
 `ConsLog`, so that the Iris lane (`EchoOut`, `EchoOutLine`) only APPLIES
 lemmas.

@@ -1,7 +1,7 @@
 /-
 **THE UNION ERA'S READ RECORD AT THE ROUND'S BOOT STATE, AND SH'S READ LEAF
 AT IT** -- the cone-reached part of Rocq `UnionReadInstAt.v`
-(`/shared/xv6rocq/iris/UnionReadInstAt.v`, pinned 1900b8a43; cut C9g, design
+(`iris/UnionReadInstAt.v`, pinned 1900b8a43; cut C9g, design
 union.md §4).
 
 Rocq's header, abridged: `FileReadInst.file_read_inst_at` at the union.  The

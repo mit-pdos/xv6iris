@@ -1,6 +1,6 @@
 /-
 **THE FILE SYSTEM'S BOOT-ERA OUTPUT, AS ONE ROW** -- a port of Rocq
-`FsCfgBoot.fs_boot_supply` (`/shared/xv6rocq/iris/FsCfgBoot.v` :715) and
+`FsCfgBoot.fs_boot_supply` (`iris/FsCfgBoot.v` :715) and
 `fs_boot_supply_app_inv` (:741), the piece `Xv6/FsCfgBoot.lean`'s header
 deferred (blocker 2) until the kits existed (`Xv6/FsCfgKits.lean`).  Kept in
 its own file rather than edited into FsCfgBoot.

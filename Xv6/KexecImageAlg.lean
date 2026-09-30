@@ -9,7 +9,7 @@ kernel-side stages may import, so the twins are DROPPED (coordinator decision
 4): `KexecBuilt` states everything at the contract's names directly.  What
 Rocq's file keeps that genuinely names the contract is here.
 
-## Dropped, with the consumers checked (Rocq grep of `/shared/xv6rocq/iris`)
+## Dropped, with the consumers checked (Rocq grep of the Rocq tree's `iris/`)
 
 * the `kxb_` twins `kxb_ustack`, `kxb_arg_addr`, `kxb_args_at`,
   `kxb_stack_at`, `kxb_ascending`, `kxb_loadable` (KexecBuilt) and their

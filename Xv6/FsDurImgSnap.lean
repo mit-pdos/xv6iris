@@ -1,6 +1,6 @@
 /-
 **THE IMAGE'S SNAPSHOT TIE, ITS PER-NODE READINGS.**  Sections 11a-11c' of
-Rocq `/shared/xv6rocq/iris/FsDurImg.v` (crash batch C-1, item CF; the
+Rocq `iris/FsDurImg.v` (crash batch C-1, item CF; the
 theorem itself, `imgSnapOk`, and era 0's allocation are
 `Xv6/FsDurImg.lean`).
 

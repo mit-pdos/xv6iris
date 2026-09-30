@@ -102,7 +102,7 @@ statements are `A ∗ B ⊢ C`, the port's convention (CtxBox.lean).
 ## Dropped/simplified vs Rocq
 
 * `off_ref_stamps_mass_eq`, `off_rows_insert`, `off_rows_take` — uses
-  checked: `grep -w` over /shared/xv6rocq/iris/*.v finds none outside
+  checked: `grep -w` over iris/*.v finds none outside
   OffBox.v (comments included) — dead (the brief's gunk list; re-verified).
 * `off_hdr_timeless` is proved by `infer_instance` (Rocq's structural proof
   exists to dodge an `apply _` blow-up that Lean's instance search does not

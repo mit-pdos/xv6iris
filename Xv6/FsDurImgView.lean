@@ -1,6 +1,6 @@
 /-
 **THE IMAGE'S ABSTRACT STATE, AND THE ROOT'S ENTRIES AGAINST ITS TICKETS.**
-Sections 8 and 9d-9f of Rocq `/shared/xv6rocq/iris/FsDurImg.v` (crash
+Sections 8 and 9d-9f of Rocq `iris/FsDurImg.v` (crash
 batch C-1, item CF; the generic token algebra is `Xv6/FsDurImgToks.lean`,
 the bridge `Xv6/FsDurImgLink.lean`).
 

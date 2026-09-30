@@ -2,7 +2,7 @@
 ELF64 FILE semantics over a byte list: what an ELF file MEANS, i.e. the
 memory image a loader must establish from it.
 
-A port of Rocq `ElfFile.v` (`/shared/xv6rocq/iris/ElfFile.v`).  Rocq's header,
+A port of Rocq `ElfFile.v` (`iris/ElfFile.v`).  Rocq's header,
 in short (every clause kept):
 
 > THE FILE-SIDE GROUND TRUTH, AND THE OTHER HALF OF `ElfEnc.v`.  `ElfEnc` is

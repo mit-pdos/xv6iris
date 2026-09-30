@@ -1,6 +1,6 @@
 /-
 **THE ERA-0 /grep PINS: THE /init PAIR REPLAYED FOR THE GREP PROGRAM** -- the
-reached part of Rocq `FsGrepPin.v` (`/shared/xv6rocq/iris/FsGrepPin.v`, pinned
+reached part of Rocq `FsGrepPin.v` (`iris/FsGrepPin.v`, pinned
 `1900b8a43`; union cone audit: 19 of 26).
 
 Rocq's header, in short: the same three sentences `FsInitPin` proves for

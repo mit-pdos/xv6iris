@@ -1,6 +1,6 @@
 /-
 **THE ERA LEND READ AGAINST THE AUTHORITY** (Rocq `FsAbsEra.v` §2,
-`/shared/xv6rocq/iris/FsAbsEra.v` lines 348-384 at `1900b8a43`): the three
+`iris/FsAbsEra.v` lines 348-384 at `1900b8a43`): the three
 `astate` laws of `elend` -- `elend_astate_q`, `elend_astate`, `elend_aents`.
 
 Rocq's note: THE READING AGAINST THE AUTHORITY -- the law the era walk

@@ -1,6 +1,6 @@
 /-
 **FROM AN IMAGE'S BYTES TO THE ICACHE'S PURE RECORD** -- a port of Rocq
-`FsImgBridge.v` (`/shared/xv6rocq/iris/FsImgBridge.v`, whole).
+`FsImgBridge.v` (`iris/FsImgBridge.v`, whole).
 
 The `FsImg*` chain reads a disk image: `fsDinode` decodes a record,
 `fsIndEnts` its indirect entries, `fsDataOf` its content, and `fsimgWf`'s

@@ -1,6 +1,6 @@
 /-
 **THE FREE-SPACE STATE, CSL-STYLE**, ported from
-`/shared/xv6rocq/iris/FsStateBitmap.v`.  Design of record: the Rocq tree's
+`iris/FsStateBitmap.v`.  Design of record: the Rocq tree's
 `claude-notes/design/fs-state.md` section 2, "`[free_bitmap]`, CSL-style",
 and `claude-notes/design/fs-bitmap.md`.
 

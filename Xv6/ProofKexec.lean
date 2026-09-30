@@ -1,6 +1,6 @@
 /-
 **THE SEAL: kexec's contract, ASSEMBLED** (Rocq `ProofKexec.v`,
-`/shared/xv6rocq/iris/ProofKexec.v`, `KexecProof`).
+`iris/ProofKexec.v`, `KexecProof`).
 
 Rocq's header, in short: the cone has been generic in the closer's plugs
 since the exit-generic sweep, so phases B / B2 / B3 / C / D and all eight

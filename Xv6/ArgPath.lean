@@ -2,7 +2,7 @@
 THE PATH ARGUMENT OF A SYSCALL, READ OFF THE CALLER'S OWN IMAGE.  A pure
 leaf: two definitions, four small lemmas, and nothing in `IProp`.
 
-A port of Rocq `ArgPath.v` (`/shared/xv6rocq/iris/ArgPath.v`).  Rocq's header,
+A port of Rocq `ArgPath.v` (`iris/ArgPath.v`).  Rocq's header,
 kept because the reasons are the content:
 
 > A path-taking syscall (`exec`, `open`, `mknod`, ...) is handed a POINTER in

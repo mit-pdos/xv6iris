@@ -8,7 +8,7 @@ for each top theorem it collects the axioms the PROOF rests on
 (`Lean.collectAxioms`, what `#print axioms` prints) and CHECKS them against
 the checked-in baseline `tools/audit/baseline.json`.
 
-Run it (on the build VM, never locally), against an already-built tree:
+Run it (on a machine sized for a Lean build), against an already-built tree:
 
     tools/ci/audit.sh            # = lake env lean tools/audit/Audit.lean
 

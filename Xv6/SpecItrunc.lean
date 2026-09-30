@@ -99,7 +99,7 @@ the literal `true`.  NOT ITS BUSINESS: `ip->lock` (iput holds it).
 
 * `bm_paid`, `bm_paid_intro`, `bm_paid_elim` (and ProofItruncParts'
   `bm_paid_use`) -- DROPPED -- uses checked: `grep -n 'bm_paid\b\|bm_paid_'
-  /shared/xv6rocq/iris/*.v` finds them only in SpecItrunc.v /
+  iris/*.v` finds them only in SpecItrunc.v /
   ProofItruncParts.v and a `WriteiBudget.v` comment -- reason: superseded by
   the set-indexed `bmPaidS`, which is what the proof threads.
 * `it_spend` is KEPT (as `itSpend`), although the brief listed it as dead:

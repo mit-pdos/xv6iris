@@ -1,5 +1,5 @@
 /-
-**WHO OWNS BLOCK 1.**  Ported from `/shared/xv6rocq/iris/SbPark.v`.
+**WHO OWNS BLOCK 1.**  Ported from `iris/SbPark.v`.
 
 **NOBODY DID.**  The era hands `fsblock γfs.bytes 1 bsSb` to `fsinit`,
 `fsinit`'s post returns it and `forkret` DROPS it -- so at a commit no

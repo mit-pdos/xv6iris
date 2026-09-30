@@ -1,6 +1,6 @@
 /-
 **THE FILE CLAIM AT BOOT: /init'S RESOURCE AND THE ERA-0 CLAIM** -- §6a
-and §7 of Rocq `AppFile.v` (`/shared/xv6rocq/iris/AppFile.v`, pinned
+and §7 of Rocq `AppFile.v` (`iris/AppFile.v`, pinned
 1900b8a43, l.1250-1353), the reached part.
 
 * `fileBoot` (Rocq `file_boot`): WHAT /init IS HANDED AT THE ERA MINT --

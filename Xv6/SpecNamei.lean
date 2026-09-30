@@ -1,7 +1,7 @@
 /-
 Specification of `namei` (kernel/fs.c), namex's namei-side wrapper: the
 public contracts.  A port of Rocq `SpecNamei.v`
-(`/shared/xv6rocq/iris/SpecNamei.v`) -- its general walk contract
+(`iris/SpecNamei.v`) -- its general walk contract
 (`wp_namei_gen`) and its ROOT CORNER (`wp_namei_root`) -- and of the boot
 form `SpecNameiRootBoot.v`, which collapses onto the root corner here (see
 below).
@@ -90,7 +90,7 @@ cone, so a separate boot spec file would not shorten any import closure.
 ## Dropped/simplified vs Rocq
 
 * `wp_namei_sconf` (the COUNTED contract) -- uses checked (grep of
-  `/shared/xv6rocq/iris/*.v` outside SpecNamei/ProofNamei): only a comment
+  `iris/*.v` outside SpecNamei/ProofNamei): only a comment
   in SysOpenBudget.v (`so_counted_namei_busts`); every caller (ProofSysLink,
   ProofKexecA/KexecDefs, ProofSysOpenWalk, SysExecDefs) uses `wp_namei_gen`
   -- reason: dead (as namex's `wp_namex_sconf`, SpecNamex "Dropped").

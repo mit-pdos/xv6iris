@@ -1,6 +1,6 @@
 /-
 **THE FILE APPLICATION'S TWO SHAPES, AND THEIR READINGS** -- §0-§1 of Rocq
-`FileDeltas.v` (`/shared/xv6rocq/iris/FileDeltas.v`, pinned `1900b8a43`),
+`FileDeltas.v` (`iris/FileDeltas.v`, pinned `1900b8a43`),
 the cone-reached part.
 
 Rocq's header, abridged (the reasons are the content):

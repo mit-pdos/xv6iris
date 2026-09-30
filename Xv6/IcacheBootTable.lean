@@ -1,7 +1,7 @@
 /-
 **THE BOOT WIRING OF THE INODE CACHE, PART 3: THE FIFTY ENTRIES, THE
 ESCROWS, THE TABLE AND THE LOCK.**  A port of Rocq `IcacheBoot.v`
-(`/shared/xv6rocq/iris/IcacheBoot.v`) lines 1135--1704: §4 (`icM_wf_empty`,
+(`iris/IcacheBoot.v`) lines 1135--1704: §4 (`icM_wf_empty`,
 `ic_ci_wf_empty`, `ci_inums_empty`, `Section IcacheBootTable`:
 `ientry_raw(_at)`, `fun_of_big`, `ientry_raw_split`, `ic_id_set`,
 `pinw_slots_boot`, `icache_boot_at`) and §5 (`inode_lock_is_ientry_lock`).
@@ -109,7 +109,7 @@ FsCfgKits / FsCfgSnap / ProofMain).
     those files.
 
 ## Dropped/simplified vs Rocq (uses grep-checked over ALL of
-## `/shared/xv6rocq/iris/*.v`, comments stripped)
+## `iris/*.v`, comments stripped)
 
 * `icache_boot` -- uses checked: BootCarveMain, InodeRegion, IcacheRefDefs,
   LinkFsinit, SpecIreclaim, SpecNameiRootBoot, SpecMain, SpecFsinit -- every

@@ -1,6 +1,6 @@
 /-
 **THE N-WRITER CLAIM'S SINGLE-WRITER STEPS** -- the cone-reached part of
-Rocq `PipesOut.v` (`/shared/xv6rocq/iris/PipesOut.v`, pinned 1900b8a43; 7 of
+Rocq `PipesOut.v` (`iris/PipesOut.v`, pinned 1900b8a43; 7 of
 13 declarations): `peclV_step_write` (W: a write inside a block or a
 prologue round), `peclV_step_write_blk` (W': a single-writer block's first
 byte, which files the alternative) and `peclV_step_write_pro` (W-pro: a

@@ -1,6 +1,6 @@
 /-
 **THE INODE-REFERENCE VOCABULARY, AT THE PROCESS/FILE LAYER.**  A port of
-Rocq `InodeRef.v` (`/shared/xv6rocq/iris/InodeRef.v`, 41 lines), whole.
+Rocq `InodeRef.v` (`iris/InodeRef.v`, 41 lines), whole.
 
 A COMPATIBILITY SHIM, and deliberately a thin one.  The predicate this file
 was created to hold -- "this pointer names a live itable entry and this is

@@ -3,7 +3,7 @@
 the reading bridge and the instant-count arithmetic the write contract's
 prover owes -- with the descriptor's OFFSET SHADOW folded into every
 commit.**  A port of Rocq `FsAbsWriteFire.v`
-(`/shared/xv6rocq/iris/FsAbsWriteFire.v`, 1008 lines), WHOLE.
+(`iris/FsAbsWriteFire.v`, 1008 lines), WHOLE.
 
 Rocq's header, kept because the reasons are the content:
 

@@ -103,7 +103,7 @@ comment (printk is a functor parameter).
 
 * The `ic_escrows fsc_ic …` premise (coordinator decision 4, following
   `Xv6/SpecIget.lean`'s drop) -- uses checked (comment-stripped grep of
-  `/shared/xv6rocq/iris/*.v`): ProofIalloc.v (it only forwards it to
+  `iris/*.v`): ProofIalloc.v (it only forwards it to
   `IG.wp_iget_sconf`, whose Lean contract no longer takes it),
   ProofCreateAlloc.v / ProofCreateFreshTy.v / SpecCreate.v (they hold it
   PERSISTENTLY for their own `cr_esc_acc`/`cft_esc_acc` and merely frame it

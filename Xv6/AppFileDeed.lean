@@ -1,6 +1,6 @@
 /-
 **THE FILE APPLICATION'S DEED AND TICKET** -- §2 of Rocq `AppFile.v`
-(`/shared/xv6rocq/iris/AppFile.v`, pinned 1900b8a43).
+(`iris/AppFile.v`, pinned 1900b8a43).
 
 * `fdeed`/`fdeedWhole` (Rocq `fdeed`/`fdeed_whole`): THE DEED, a
   `ghost_var dst` at half / whole;

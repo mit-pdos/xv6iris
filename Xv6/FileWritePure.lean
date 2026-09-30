@@ -1,6 +1,6 @@
 /-
 **THE WRITE IS INVISIBLE TO THE DIRECTORY STRUCTURE** -- the pure, cone-reached
-part of Rocq `FileWrite.v` (`/shared/xv6rocq/iris/FileWrite.v`, pinned
+part of Rocq `FileWrite.v` (`iris/FileWrite.v`, pinned
 `1900b8a43`), §1-§3: the delta's entry maps, the pins and the console under a
 write at another inum, and the splice at the end.  The Iris half (`file_wq`,
 `file_cur*`, `file_awrite_*`) is not here.

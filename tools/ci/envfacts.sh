@@ -11,10 +11,9 @@
 # tools/ci/roots.txt that no longer exists, a stale allowlist row, or a pc
 # predicate that was renamed.  Each of those would silently empty a report.
 #
-# NEVER run this on the development machine (README: "Build"): on
-# the GCP VM it is
-#   cd <worktree> && /shared/xv6rocq/gcp-rocq/run-on-gcp bash tools/ci/envfacts.sh
-#   /shared/xv6rocq/gcp-rocq/run-on-gcp --no-sync --pull .lake/ci/envfacts.tsv true
+# Needs a machine sized for a Lean build (README: "Build"); from the
+# repository root:
+#   bash tools/ci/envfacts.sh
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/../.."
 command -v lake >/dev/null 2>&1 || export PATH="$HOME/.elan/bin:$PATH"

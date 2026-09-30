@@ -1,6 +1,6 @@
 /-
 **THE CONSOLE FLAG, ITS KEY AND ITS SEAL** -- section 3a of Rocq
-`AppEcho.v` (`/shared/xv6rocq/iris/AppEcho.v`, pinned 1900b8a43): the
+`AppEcho.v` (`iris/AppEcho.v`, pinned 1900b8a43): the
 ghost algebra the echo (and file) application's claim carries the console
 node's state with.
 

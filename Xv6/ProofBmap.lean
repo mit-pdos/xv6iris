@@ -42,7 +42,7 @@ is proved twice:
 
 1. `Printk` is DROPPED from both proofs (and Links): the Rocq functors take
    `PRINTK_GEN`, which bmap never calls -- uses checked: `grep -w Printk`
-   over `/shared/xv6rocq/iris/ProofBmap.v` finds it only in the two
+   over `iris/ProofBmap.v` finds it only in the two
    functor headers (and `bm_prk`, forwarded to balloc, whose Lean contract
    takes the credentials as `panicEnv`) -- reason: unused (brief decision 4).
 2. `BmAlloc.baPr` (printk's lock name, Rocq's `ba_pr`) is unused in Lean

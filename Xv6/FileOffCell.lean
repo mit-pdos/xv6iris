@@ -42,7 +42,7 @@ Rocq import → Lean counterpart: `ArrCursor` (`acur`, for `fnode`) and
 ## Dropped/simplified vs Rocq
 
 * `off_resident_intro` (the checkin with the process's permit) — uses
-  checked: none in /shared/xv6rocq/iris (only FileOffCell.v) — dead with
+  checked: none in the Rocq tree's iris/ (only FileOffCell.v) — dead with
   `OffGv.off_permit` (see Xv6/OffGv.lean).  The live checkin is
   `offResident_of` (ProofFileread.v, ProofFilewrite.v).
 -/

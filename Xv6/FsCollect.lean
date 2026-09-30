@@ -1,6 +1,6 @@
 /-
 **COLLECTION AT QUIESCENCE, THE BYTE SIDE: the arithmetic.**  Sections 1-6
-of Rocq `/shared/xv6rocq/iris/FsCollect.v` (crash batch C-3, agent CJ).  The
+of Rocq `iris/FsCollect.v` (crash batch C-3, agent CJ).  The
 per-slot doors (Rocq's `FreeSlot` section) are `Xv6/FsCollectSlot.lean`;
 the assembly is `Xv6/FsCollectAll*.lean`.
 
@@ -50,7 +50,7 @@ and exactly the map `LogSnapLaw.snapLawOut` names.
 6. Rocq's curried `A -∗ B -∗ ⌜φ⌝` readings are `A ⊢ B -∗ ⌜φ⌝`.
 
 ## NOT PORTED (crash brief D36; uses checked by `grep -rnw` over
-`/shared/xv6rocq/iris/*.v`, D36-skipped files excluded)
+`iris/*.v`, D36-skipped files excluded)
 
 * `col_diblk_split` -- uses checked: none.
 * `dfrac_full_nvalid` (this file's copy) -- uses checked: none in

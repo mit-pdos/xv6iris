@@ -28,8 +28,8 @@ name: CI (Lean)
 #
 # EVERY STEP IS `tools/ci/run_all.sh <step>`.  That script is the one entry
 # point CI and developers share (`tools/ci/run_all.sh` with no argument runs
-# the whole sequence; on the build VM:
-# `/shared/xv6rocq/gcp-rocq/run-on-gcp tools/ci/run_all.sh`), so a step is
+# the whole sequence; on a build machine:
+# `tools/ci/run_all.sh`), so a step is
 # reproduced by running the same command, and the comments here say only what
 # a reader of the run page needs: why the step exists and what makes it fail.
 # The scripts' own headers have the rest.
@@ -62,7 +62,7 @@ permissions:
 jobs:
   build:
     runs-on: coqdev
-    # Measured on the 96-core build VM: the whole job, from nothing, is about
+    # Measured on a 96-core build machine: the whole job, from nothing, is about
     # 9 minutes of wall clock and 2.5 hours of CPU (the README's CI section
     # has the per-step table), so roughly 2.5 h / cores + 5 min elsewhere.
     # Three hours is "something hung" on anything with a handful of cores.
@@ -260,7 +260,7 @@ jobs:
       # holding for the top theorems.  See tools/vtest/README.md.
       #
       # It needs only the cone of MachCSL.Lang, on disk from the proof build
-      # (seconds on the build VM).  After the reports on purpose, as in the
+      # (seconds on a build machine).  After the reports on purpose, as in the
       # Rocq job: a red conformance run still leaves the reports above in the
       # summary, and the failure that stops the run is at the bottom of it.
       - name: Device conformance tests (vtest-lean/, checked-in captures)

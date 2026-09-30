@@ -1,6 +1,6 @@
 /-
 **THE FILE APPLICATION'S ROUND POSITION** -- the `fpos` family of Rocq
-`AppFile.v` §2 (`/shared/xv6rocq/iris/AppFile.v` @ origin/main 456141b5b,
+`AppFile.v` §2 (`iris/AppFile.v` @ origin/main 456141b5b,
 l.424-522; sync design §4.5 "The round position", lanes SY3-A3b/A3bc).
 
 Rocq's note, abridged (the reasons are the content):

@@ -117,7 +117,7 @@ other three are derived from it there, exactly as Rocq derives them:
    then `logOpS_op` recovers `logOp γ u`).
 
 **Cleanups relative to Rocq** (each checked against every Rocq consumer:
-`grep -n 'wp_log_write_' /shared/xv6rocq/iris/*.v` outside the two
+`grep -n 'wp_log_write_' iris/*.v` outside the two
 LogWrite files names `wp_log_write_au` (called by `ProofBfree`,
 `ProofBalloc`, `BitmapInv`; mentioned by `SpecIupdate`, `SpecIalloc`,
 `FsLookup`, `LogInv`),

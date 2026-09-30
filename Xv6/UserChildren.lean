@@ -1,6 +1,6 @@
 /-
 **THE PROCESS'S LIVE CHILDREN, AS A RESOURCE, AND WHAT A WAIT ANSWERS** -- a
-port of Rocq `UserChildren.v` (`/shared/xv6rocq/iris/UserChildren.v`, 510
+port of Rocq `UserChildren.v` (`iris/UserChildren.v`, 510
 lines), wave 7 decision D8 (the definitional layer of the fork/exit
 generation machinery).
 

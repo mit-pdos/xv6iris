@@ -3,7 +3,7 @@
 `exHop`/`exHopsFrom`, `elend_fire_hit`/`_miss`), the NAMEIPARENT prefix
 family (`npElems`, `epHopsFrom`, `npDead`), and the DEFERRED START
 (`umStartOf`, `exStart`, `epStart`).**  A PARTIAL port of Rocq `FsAbsEra.v`
-(`/shared/xv6rocq/iris/FsAbsEra.v`, 1007 lines; the fusion of the old
+(`iris/FsAbsEra.v`, 1007 lines; the fusion of the old
 FsAbsSeam/FsAbsNpar/FsAbsStart leaves).
 
 ## What is ported, what is deferred (coordinator decision D15)

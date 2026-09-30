@@ -1,6 +1,6 @@
 /-
 The interface of `sys_open` (kernel/sysfile.c).  A port of Rocq
-`SpecSysOpen.v` (`/shared/xv6rocq/iris/SpecSysOpen.v`, 1687 lines): the
+`SpecSysOpen.v` (`iris/SpecSysOpen.v`, 1687 lines): the
 budget constants, the mode readings, the landed blanket `sysOpenPost`, the
 two arm families (plain and O_CREATE), the ONE input `openIn` and the ONE
 armed output `openArms` (both keyed on `omCreate vom`), the receipts and

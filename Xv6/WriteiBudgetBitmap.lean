@@ -1,6 +1,6 @@
 /-
 **ONE BITMAP BLOCK**, ported from section 2 of
-`/shared/xv6rocq/iris/WriteiBudget.v` -- the one section of that file that
+`iris/WriteiBudget.v` -- the one section of that file that
 is stated over `BitmapInv.bitmap_geom_ok`, and which the `LogAmort` port
 (`Xv6/WriteiBudget.lean`, section 6) therefore deferred.
 

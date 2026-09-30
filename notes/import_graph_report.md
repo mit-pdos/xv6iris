@@ -257,7 +257,7 @@ compensating import there. The consistent edit set (`edits_dead.txt`) is -2183 l
 and +174 lines over 827 files.
 
 **Verification.** Both edit sets were applied to a worktree at f466ba55c
-(`/shared/lean-xv6-wt-importgraph`) and built from scratch on the GCP VM with `lake
+(a separate worktree) and built from scratch on the build machine with `lake
 build Xv6 MachCSL`:
 
 - the dead set: EXIT=0, all 1703 modules built.
@@ -422,12 +422,8 @@ All the scripts are in `tools/` and none of them edit the repo.
 | `tools/edge_usage.py needs.tsv --path graph.txt` | For each edge of a path, which constants the importer actually uses. |
 | `tools/apply_import_edits.py EDITS TREE` | Applies an edit set to a tree. This is what the verification builds used. |
 
-The worktree `/shared/lean-xv6-wt-importgraph` (detached at f466ba55c) holds the
-**exact** edit set, uncommitted and build-verified. Its remote copy on the GCP VM is
-`/mnt/rocq/trees/_shared_lean-xv6-wt-importgraph`, with logs
-`/mnt/rocq/importgraph-{dead,exact2,exact-clean}.log`. Remove it with
-`git worktree remove --force /shared/lean-xv6-wt-importgraph` once it is no longer
-wanted.
+A separate worktree (detached at f466ba55c) held the **exact** edit set, uncommitted and
+build-verified, at the time of this report.
 
 ## Caveats
 

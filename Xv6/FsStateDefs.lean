@@ -1,7 +1,7 @@
 /-
 **THE VIEW RECORD `Γ`, THE BYTE POINTS-TO, AND THE TWO BLOCK-LEVEL SHAPES**
 every other file-system predicate is built from, ported from
-`/shared/xv6rocq/iris/FsStateDefs.v`.
+`iris/FsStateDefs.v`.
 
 **THE ONE THING THAT MENTIONS A DISK** is the field `phi` of
 `FsViewNames`: a byte-address-keyed points-to, ABSTRACT here.  Rocq

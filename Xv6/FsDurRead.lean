@@ -1,6 +1,6 @@
 /-
 **THE SNAPSHOT'S BYTE IDENTITY `snapAuth`, AND WHAT IT READS.**  A port of
-Rocq `/shared/xv6rocq/iris/FsDurRead.v` (durable-disk lane H3).
+Rocq `iris/FsDurRead.v` (durable-disk lane H3).
 
 A DURABLE SNAPSHOT'S BYTE AUTHORITY STANDS AT THE COMMITTED VIEW'S BYTES.
 `snapAuth g D` is the authority at the snapshot's own map `B` together with

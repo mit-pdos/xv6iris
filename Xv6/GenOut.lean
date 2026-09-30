@@ -1,6 +1,6 @@
 /-
 **THE PER-CYCLE CONSOLE CLAIM, ONCE OVER A LINE MODEL** -- the Iris half of
-Rocq `GenOut.v` (`/shared/xv6rocq/iris/GenOut.v`, pinned 1900b8a43;
+Rocq `GenOut.v` (`iris/GenOut.v`, pinned 1900b8a43;
 app-both M3b), the part the union's cone reaches.  This file holds the
 claim's parameters, the claim `gcl` and the stream it grows; its reached
 steps are in `GenOutWrite` (the head write and the ordinary write),

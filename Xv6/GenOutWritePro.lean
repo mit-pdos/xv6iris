@@ -1,6 +1,6 @@
 /-
 **THE CLAIM'S WRITE AT A PROLOGUE ROUND'S CHOICE BYTE** -- Rocq `GenOut.v`'s
-`gcl_step_write_pro` (`/shared/xv6rocq/iris/GenOut.v` :800-1127, pinned
+`gcl_step_write_pro` (`iris/GenOut.v` :800-1127, pinned
 1900b8a43), split off `Xv6/GenOut.lean` (that file's deviation 1).
 
 Rocq's comment, abridged: init's own knowledge of which alternative its

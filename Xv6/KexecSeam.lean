@@ -6,7 +6,7 @@ and the NAMED states every phase boundary is stated over (`kxcAt1a2`,
 the resource bundles they carry (`kxcFrameB`, `kxcFrameC`, `kxcCRes`,
 `kxcDRes`).
 
-A port of Rocq `ProofKexecSeam.v` (`/shared/xv6rocq/iris/ProofKexecSeam.v`),
+A port of Rocq `ProofKexecSeam.v` (`iris/ProofKexecSeam.v`),
 a STAGE file (no `Proof` prefix).  Rocq's header, in short:
 
 > It is its own file for the reason ProofKexecTail.v is: a DEFINITION does

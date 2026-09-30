@@ -24,8 +24,8 @@ WHAT IS CHECKED (always; pure Python, no toolchain):
                  headers of <P>ElfRaw.lean and <P>Image.lean record
   pins           the revision / md5 pins in the generated headers agree with one another
 
-WITH `riscv64-linux-gnu-objdump` on PATH (the dev machine and the build VM
-have it; a runner without it reports SKIP, or FAIL under --strict):
+WITH `riscv64-linux-gnu-objdump` on PATH (any machine with riscv64 binutils
+has it; a runner without it reports SKIP, or FAIL under --strict):
 
   user-elf:<P>   additionally Xv6/User/<P>{Image,ElfRaw,Tree,Text}.lean
                  = tools/dump_user_elf.py run on the ELF that <P>ElfRaw.lean spells.

@@ -1,6 +1,6 @@
 /-
 Specification of `ilock` (kernel/fs.c): the public contract.  A port of Rocq
-`SpecIlock.v` (`/shared/xv6rocq/iris/SpecIlock.v`).
+`SpecIlock.v` (`iris/SpecIlock.v`).
 
     void ilock(struct inode *ip) {
       struct buf *bp;  struct dinode *dip;

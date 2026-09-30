@@ -1,6 +1,6 @@
 /-
 **THE ECHO LINKS' LITERAL AND CUT FACTS** -- the part of Rocq `EchoLinks.v`
-and `EchoLinksPro.v` (`/shared/xv6rocq/iris/`, pinned 1900b8a43) the union's
+and `EchoLinksPro.v` (`iris/`, pinned 1900b8a43) the union's
 cone reaches (union_cone.md §1.2: 6 of 82 and 1 of 27 declarations).  Pure.
 
 These are what `LinkRec` (the prompt's two bytes, `lkLpr_step`) and

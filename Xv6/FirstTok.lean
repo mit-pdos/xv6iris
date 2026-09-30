@@ -1,6 +1,6 @@
 /-
 **proc.c's `static int first`, AS A RESOURCE A PROCESS CARRIES** -- a port
-of Rocq `FirstTok.v` (`/shared/xv6rocq/iris/FirstTok.v`, 1081 lines): the
+of Rocq `FirstTok.v` (`iris/FirstTok.v`, 1081 lines): the
 definitional layer of wave 7's D8 (the fork/exit generation machinery).
 
 ## Rocq's header, in short (every clause is kept)

@@ -1,7 +1,7 @@
 /-
 **THE LINK LEDGER'S VOCABULARY, THE COUNT COUPLING, THE FREEZE MIRROR AND
 THE LOCK-WINDOW PIN.**  A port of Rocq `IcacheRef.v`'s header and its
-`Section IcacheLink` (`/shared/xv6rocq/iris/IcacheRef.v`, lines 1-827):
+`Section IcacheLink` (`iris/IcacheRef.v`, lines 1-827):
 `iclaim`, `runit*`, `ifreeze*`, the ledger's agreements and movers, `icnt_at`,
 `frzm_at`, `hpn_at`, and the four boot splits.  The rest of `IcacheRef.v`
 is `Xv6/IcacheRefGhost.lean` (`Section IcacheRefGhost`, 829-1273) and
@@ -89,7 +89,7 @@ fragments are `iclaim` (c), `runit_plain` (r), `runit_claim` (rc) and
 
 * `link_lu_id` (the identity local update at a `ucmra`) -- uses checked:
   only `IcacheRef.v` itself (10 occurrences, all inside this section's
-  proofs), 0 in any other `/shared/xv6rocq/iris/*.v` -- is iris-lean's
+  proofs), 0 in any other `iris/*.v` -- is iris-lean's
   `LocalUpdate.id`, which needs no unital structure.  Not restated.
 * Nothing else.  Every other declaration of lines 1-827 is ported with
   Rocq's statement; the ones with no consumer outside `IcacheRef.v`

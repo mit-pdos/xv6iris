@@ -1,6 +1,6 @@
 /-
 **THE SYNC PART'S PURE LAYER: THE LAST RECORD AND THE CHAIN** -- Rocq
-`AppFile.v` §3b.1 (`/shared/xv6rocq/iris/AppFile.v` @ origin/main 456141b5b,
+`AppFile.v` §3b.1 (`iris/AppFile.v` @ origin/main 456141b5b,
 l.581-734; sync design §4.5, lanes SY3-A3a/A3b).
 
 Rocq's header, abridged:

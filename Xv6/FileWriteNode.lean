@@ -1,6 +1,6 @@
 /-
 **ECHO'S APPEND TO A FILE, ONE CHUNK, BOTH PHASES** -- §4-§6 of Rocq
-`FileWrite.v` (`/shared/xv6rocq/iris/FileWrite.v`, pinned 1900b8a43), the
+`FileWrite.v` (`iris/FileWrite.v`, pinned 1900b8a43), the
 cone-reached Iris part: phase 1's read `FileWrite.fileClaimRead`, the
 two-phase move `fileAwritePhases`, and the client-advanced full-arm node
 `fileAwriteNode_adv`.  The cursor is `Xv6/FileWriteCur.lean`, the delta

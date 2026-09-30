@@ -19,10 +19,9 @@
 # the plain tables (`=== TCB <theorem> ===`) go to stdout, so they are in the
 # run log.
 #
-# NO LEAN ON THE DEVELOPMENT MACHINE (README: "Build"): run this on
-# the build VM or in CI, e.g.
-#   /shared/xv6rocq/gcp-rocq/run-on-gcp tools/ci/tcb.sh
-#   /shared/xv6rocq/gcp-rocq/run-on-gcp --pull tools/tcb/expected.json tools/ci/tcb.sh --update
+# Needs a machine sized for a Lean build (README: "Build"): run it on
+# a build server or in CI, e.g.
+#   tools/ci/tcb.sh
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/../.."
 command -v lake >/dev/null 2>&1 || export PATH="$HOME/.elan/bin:$PATH"

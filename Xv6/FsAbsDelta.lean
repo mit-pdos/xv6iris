@@ -1,7 +1,7 @@
 /-
 **THE WRITE DELTAS ON `Aview`: create, write, trunc, unlink, and the LEGS of
 create and link they decompose into.**  A port of Rocq `FsAbsDelta.v`
-(`/shared/xv6rocq/iris/FsAbsDelta.v`, 938 lines).  Pure: no ghost, no iProp.
+(`iris/FsAbsDelta.v`, 938 lines).  Pure: no ghost, no iProp.
 
 Rocq's header, kept because the reasons are the content:
 
@@ -56,7 +56,7 @@ Rocq's header, kept because the reasons are the content:
 ## Dropped/simplified vs Rocq
 
 * `fs_delta` (the union of the write-kind deltas, section 5) -- uses
-  checked: no declaration in /shared/xv6rocq/iris outside FsAbsDelta.v names
+  checked: no declaration in the Rocq tree's iris/ outside FsAbsDelta.v names
   it; its one consumer, `FsAbsInv.fsabs_lic`, is retired (AppInv's header:
   "THERE IS NO BLANKET FORM, AND NO PARKED LICENSE") -- dead.  Its
   `` `{XI : CurCtx} `` binder goes with it.

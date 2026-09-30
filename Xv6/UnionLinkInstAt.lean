@@ -1,6 +1,6 @@
 /-
 **THE UNION LINK RECORD AT A NAMED BOOT STATE** -- the cone-reached part of
-Rocq `UnionLinkInstAt.v` (`/shared/xv6rocq/iris/UnionLinkInstAt.v`, pinned
+Rocq `UnionLinkInstAt.v` (`iris/UnionLinkInstAt.v`, pinned
 1900b8a43; cut C9f1, design union.md §3 'The credential the main loop
 carries').
 

@@ -1,7 +1,7 @@
 /-
 **THE PER-NODE DURABILITY CERTIFICATE: `durNode`, and the snapshot's
 determinism.**
-The reached part of Rocq `/shared/xv6rocq/iris/FsDurSyscall.v` (sections 1
+The reached part of Rocq `iris/FsDurSyscall.v` (sections 1
 and 2 plus `dur_node_of_snap` from section 3): `dur_node` (l.117),
 `snap_sb_det` (l.138), `snap_node_det` (l.151), `dur_node_agree`, and
 `dur_node_of_snap` (l.293).

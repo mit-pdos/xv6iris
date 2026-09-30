@@ -1,6 +1,6 @@
 /-
 **THE ERA'S INODE NODE, AS A TYPE AND NOTHING ELSE.**  A port of Rocq
-`FsNode.v` (`/shared/xv6rocq/iris/FsNode.v`), whole.
+`FsNode.v` (`iris/FsNode.v`), whole.
 
 `FsNode` is fs-state.md §2's inode: the on-disk record, the indirect
 block's entry array, and the contents of every slot the inode owns.  Its

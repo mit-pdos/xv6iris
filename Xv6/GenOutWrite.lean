@@ -1,6 +1,6 @@
 /-
 **THE CLAIM'S HEAD WRITE AND ORDINARY WRITE** -- Rocq `GenOut.v`'s
-`gcl_step_write_first` and `gcl_step_write` (`/shared/xv6rocq/iris/GenOut.v`
+`gcl_step_write_first` and `gcl_step_write` (`iris/GenOut.v`
 :378-618, pinned 1900b8a43), split off `Xv6/GenOut.lean` (that file's
 deviation 1).
 

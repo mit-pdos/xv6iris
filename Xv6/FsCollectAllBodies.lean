@@ -1,6 +1,6 @@
 /-
 **THE ASSEMBLY, PART 3: THE CORE, AS AN ACCESSOR.**  Rocq
-`/shared/xv6rocq/iris/FsCollectAll.v`'s `col_bodies_acc` (crash batch C-3,
+`iris/FsCollectAll.v`'s `col_bodies_acc` (crash batch C-3,
 agent CJ), split by stage per the few-seconds rule.
 
 NOTHING ON THE LEFT IS SPENT (Rocq's header).  The three suppliers hand

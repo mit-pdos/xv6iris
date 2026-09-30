@@ -1,6 +1,6 @@
 /-
 **THE PURE CLOSER OF THE exec CONTRACT** (Rocq `KexecBridge.v`,
-`/shared/xv6rocq/iris/KexecBridge.v`).
+`iris/KexecBridge.v`).
 
 Rocq's header, in short: `ProofKexec`'s composition arrives at the
 syscall's commit point holding the kexec cone's own exit relation

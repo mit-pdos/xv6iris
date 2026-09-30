@@ -2,7 +2,7 @@
 The strided array cursor an initializer loop walks, and the pure facts such
 a loop needs about it.
 
-A port of Rocq `ArrCursor.v` (`/shared/xv6rocq/iris/ArrCursor.v`).
+A port of Rocq `ArrCursor.v` (`iris/ArrCursor.v`).
 
 Every "initialize each element of a global array" loop in the kernel --
 `binit` over `bcache.buf[]`, `iinit` over `itable.inode[]`, `fileinit` over

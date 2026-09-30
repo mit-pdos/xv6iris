@@ -1,6 +1,6 @@
 /-
 **THE N-WRITER ROUND'S OPEN READING, PURE** -- section 1 of Rocq
-`PipeOutN.v` (`/shared/xv6rocq/iris/PipeOutN.v`, pinned 1900b8a43; design
+`PipeOutN.v` (`iris/PipeOutN.v`, pinned 1900b8a43; design
 pipes-general.md §2.2, cut C5), over ANY line model: the claim's pure part
 while a round is open (`gclPureO`), its three out-steps, the filing byte's
 prologue length law at any written block, and the PURE HALVES of the claim's

@@ -1,6 +1,6 @@
 /-
 **ECHO'S APPEND CURSOR** -- §4's `file_wq` and §6's `file_cur` of Rocq
-`FileWrite.v` (`/shared/xv6rocq/iris/FileWrite.v`, pinned 1900b8a43), with
+`FileWrite.v` (`iris/FileWrite.v`, pinned 1900b8a43), with
 the cursor's three introductions/eliminations.  The move itself
 (`FileWrite.fileClaimRead`, `fileAwritePhases`, `fileAwriteNode_adv`) is
 `Xv6/FileWriteNode.lean`; the pure delta algebra is `Xv6/FileWritePure.lean`.

@@ -1,6 +1,6 @@
 # Rocq drift survey (cleanup lane C, 2026-09-29)
 
-Read-only survey. Rocq `/shared/xv6rocq`: pin `1900b8a43`, `origin/main` = `HEAD` = `456141b5b`
+Read-only survey. The Rocq tree (now the archived `rocq` branch): pin `1900b8a43`, `origin/main` = `HEAD` = `456141b5b`
 (`origin/main..HEAD` is empty). 153 commits in `1900b8a43..origin/main` (Sept 26-29), about 80 of them
 non-merge and non-notes. Method: `git log`/`git diff` plus a declaration-level differ (statement text
 up to `Proof`, comments stripped) over the listed files. The numbers and statements below come from

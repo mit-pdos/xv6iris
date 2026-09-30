@@ -1,6 +1,6 @@
 /-
 **THE THREE-ARM CLAIM'S READ, AND THE TRANSITION** -- Rocq `PipeOutW.v`
-(`/shared/xv6rocq/iris/PipeOutW.v`, pinned 1900b8a43) section 6: a read
+(`iris/PipeOutW.v`, pinned 1900b8a43) section 6: a read
 whose window completes a WILD line (`rdWild`) bumps the era's flag, freezes
 the choice list and re-closes the claim at the arm `wildV`; the reader's
 receipt `rdRetW` is the generic one (`PipeOutNEv.rdRetV`) plus, at such a

@@ -30,14 +30,14 @@
 # rems-project/sail 5745ea9e ("Lean: use more generic term for initial
 # state", the sources of the opam switch `lean-xv6`) PLUS the short-circuit
 # fix "Lean: make boolean & and | short-circuit with effectful operands"
-# (/shared/sail-upstream, branch lean-short-circuit, d0ef9371; it
+# (branch lean-short-circuit, commit d0ef9371; it
 # cherry-picks cleanly onto 5745ea9e).  Without the fix the backend hoists an
 # effectful right operand of `&`/`|` out of the condition and ALWAYS runs it
 # (e.g. `check_CSR` reaches `currentlyEnabled Ext_Zkr`, an `assert false`, on
 # a user access to mseccfg); Sail and Rocq short-circuit, and the proofs
 # assume the short-circuit form.  Do NOT use the unpatched opam `sail`.
 # Build the patched sail in a clone and put it first on PATH:
-#   git clone /shared/sail-upstream sail-sc && cd sail-sc
+#   git clone <a sail checkout carrying that commit> sail-sc && cd sail-sc
 #   git checkout -b lean-sc-pin 5745ea9e && git cherry-pick d0ef9371
 #   opam exec --switch=lean-xv6 -- dune build --release
 #   opam exec --switch=lean-xv6 -- dune install --prefix "$PWD/_inst"

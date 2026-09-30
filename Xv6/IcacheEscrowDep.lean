@@ -1,7 +1,7 @@
 /-
 **THE INODE ENTRY'S ESCROW, PART 2: THE FREEZE TOKEN ON THE PAYLOAD, THE
 DEPOSIT DESCRIPTOR'S READINGS, AND THE LOADED BUNDLE'S FLAT SHAPE.**  A port
-of Rocq `IcacheEscrow.v` (`/shared/xv6rocq/iris/IcacheEscrow.v`) lines
+of Rocq `IcacheEscrow.v` (`iris/IcacheEscrow.v`) lines
 1285--2104: `ic_payload` (the payload as an arm holds it: `ic_payload_np`
 beside the freeze token), the lock-window pin `ic_pin_rest` / `ic_pin_tx`
 and its two movers, the descriptor readings `ic_dep_shr` / `ic_dep_side_tx`
@@ -51,7 +51,7 @@ parts 3--6 are `IcacheEscrowPool` (2105--3360), `IcacheBoxAmb`
 ## Dropped/simplified vs Rocq
 
 Uses checked by `grep -rnw <name>` over comment-stripped
-`/shared/xv6rocq/iris/*.v` (all 1533 files, incl. Spec*/Proof*/FsCollect*/
+`iris/*.v` (all 1533 files, incl. Spec*/Proof*/FsCollect*/
 Link*/IcacheBoot/IcacheCover; the brief's §5 IcacheEscrow list re-verified).
 
 * `ic_payload_split`, `ic_payload_join` -- uses checked: none (definition

@@ -1,6 +1,6 @@
 /-
 **THE UNION'S ECHO SHIFT** (lane U4, the U4 seal wave) -- the declarations
-of Rocq `UnionLinks.v` (`/shared/xv6rocq/iris/UnionLinks.v` @ 1900b8a43)
+of Rocq `UnionLinks.v` (`iris/UnionLinks.v` @ 1900b8a43)
 reached only through `union_laws_at`'s `al_echo`: `union_byte_link`,
 `union_close_link`, `union_cons_run`, `union_happ_echo`.
 

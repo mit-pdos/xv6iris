@@ -1,5 +1,5 @@
 /-
-**THE PURE ON-DISK SUPERBLOCK**, ported from `/shared/xv6rocq/iris/FsImg.v`
+**THE PURE ON-DISK SUPERBLOCK**, ported from `iris/FsImg.v`
 (sections 0, 1, 6 and 7: the little-endian reader, `fs_sb` / `fs_parse_sb`,
 `fs_sb_wf` / `fs_sb_ok`, and W2's "the log is clean").  Survey §2.14.
 

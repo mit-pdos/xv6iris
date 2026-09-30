@@ -2,7 +2,7 @@
 **THE mknod/create FAMILY'S PURE VOCABULARY LEAF: the device-number reading
 of a syscall argument, the abstract child `FsAbsCreateFire.createMade`
 leaves behind, and nameiparent's hop-name family.**  A port of Rocq
-`SysMknodDefs.v` (`/shared/xv6rocq/iris/SysMknodDefs.v`, 187 lines at
+`SysMknodDefs.v` (`iris/SysMknodDefs.v`, 187 lines at
 `1900b8a43`), WHOLE: sections 1-2 from the 116-line revision, section 3
 (TL-3K's `npar_cur` family) appended by lane K5.
 

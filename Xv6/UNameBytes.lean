@@ -1,6 +1,6 @@
 /-
 THE BYTE LAYOUTS AROUND A CLASS NAME OF ANY LENGTH -- a port of Rocq
-`UNameBytes.v` (`/shared/xv6rocq/iris/UNameBytes.v`, pinned `1900b8a43`),
+`UNameBytes.v` (`iris/UNameBytes.v`, pinned `1900b8a43`),
 row U0-2 of `notes/design-rulings.md`.  Pure.
 
 Rocq's header: (cut W3; claude-notes/design/filenames.md section 4.)  Pure

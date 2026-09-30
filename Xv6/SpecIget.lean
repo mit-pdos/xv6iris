@@ -1,6 +1,6 @@
 /-
 Specification of `iget` (kernel/fs.c): the public contract, stated once.
-A port of Rocq `SpecIget.v` (`/shared/xv6rocq/iris/SpecIget.v`).
+A port of Rocq `SpecIget.v` (`iris/SpecIget.v`).
 
     static struct inode* iget(uint dev, uint inum) {
       struct inode *ip, *empty;
@@ -100,7 +100,7 @@ may rewrite (`KCtx.withSpie`, as `SpecFilealloc`).
 
 * The separate `ic_escrows fsc_ic …` premise -- uses checked (every
   `wp_iget_sconf` call site, comment-stripped grep of
-  `/shared/xv6rocq/iris/*.v`): ProofIget.v (its only reader,
+  `iris/*.v`): ProofIget.v (its only reader,
   `big_sepL_lookup … "Hescs"` / `ic_escrows_lookup`), and the callers
   ProofIalloc.v, ProofDirlookup.v, ProofIreclaim.v, ProofNamex.v,
   ProofNamexRoot.v, ProofNamexEra.v, ProofNparEra.v, which only FRAME it

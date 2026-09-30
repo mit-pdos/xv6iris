@@ -1,6 +1,6 @@
 /-
 The BITS inside a disk block.  A port of Rocq `BitmapEnc.v`
-(`/shared/xv6rocq/iris/BitmapEnc.v`).
+(`iris/BitmapEnc.v`).
 
 A disk block is 1024 raw bytes (`List (BitVec 8)`); the BLOCK BITMAP reads
 those same bytes as 8192 one-bit allocation flags, bit `bi` living in byte

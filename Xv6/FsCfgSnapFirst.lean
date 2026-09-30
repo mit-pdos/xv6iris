@@ -1,6 +1,6 @@
 /-
 **FIRSTTOK'S TWO SNAPSHOT PRODUCERS** -- the part of Rocq `FirstTok.v` §0/§5
-(`/shared/xv6rocq/iris/FirstTok.v` :139-205, :802-1030) that reads the
+(`iris/FirstTok.v` :139-205, :802-1030) that reads the
 DURABLE SNAPSHOT, moved beside its consumer, the era mint (crash batch C-5,
 item CL; `Xv6/FirstTok.lean` deviation 8).
 

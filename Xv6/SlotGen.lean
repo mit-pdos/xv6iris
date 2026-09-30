@@ -1,6 +1,6 @@
 /-
 **WHICH INCARNATION IS THE CURRENT ONE, AND WHICH INCARNATION A PID BELONGS
-TO** -- a port of Rocq `SlotGen.v` (`/shared/xv6rocq/iris/SlotGen.v`, 877
+TO** -- a port of Rocq `SlotGen.v` (`iris/SlotGen.v`, 877
 lines) together with the camera class it is stated on (Rocq
 `Xv6Cameras.v`'s `sgen_map` / `sgenUR` / `orph_map` / `ipidUR` /
 `wchGpreS` / `wchG`), wave 7 decision D8 (the fork/exit generation

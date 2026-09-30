@@ -1,6 +1,6 @@
 /-
 **THE ONE-SHOT PIECE'S FAMILY PAIR: a receipt beside a refund, in one
-record.**  A port of Rocq `PieceFam.v` (`/shared/xv6rocq/iris/PieceFam.v`,
+record.**  A port of Rocq `PieceFam.v` (`iris/PieceFam.v`,
 193 lines), WHOLE.
 
 Rocq's header, kept because the reasons are the content (design of record:

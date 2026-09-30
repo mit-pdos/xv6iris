@@ -1,6 +1,6 @@
 /-
 The interface of `sys_mknod` (kernel/sysfile.c).  A port of Rocq
-`SpecSysMknod.v` (`/shared/xv6rocq/iris/SpecSysMknod.v`, 856 lines) LESS
+`SpecSysMknod.v` (`iris/SpecSysMknod.v`, 856 lines) LESS
 its stable add-on (below): `K_sys_mknod`, the blanket `sys_mknod_ret`, the
 caller's bundle `mknod_au_pre` / `mknod_au_at` (+ `_inst`, `_of_all`), the
 two arms `mknod_post_ok` / `mknod_post_fail`, the armed post `mknod_arms`
