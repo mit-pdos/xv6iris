@@ -180,7 +180,8 @@ theorems unchanged in kind (propext, Classical.choice, Quot.sound + bv_decide ce
 ## `hZkr` gone: the model short-circuits `&`/`|` (Sept 29 2026, lane ZKR-SC)
 
 The model is regenerated with the short-circuit Sail Lean backend (sail 5745ea9e + the
-`lean-short-circuit` commit d0ef9371 ; see tools/regen_sail_model.sh). The
+`lean-short-circuit` fix from github.com/zeldovich/sail, commit d0ef9371 = 3c03fced; see
+tools/regen_sail_model.sh). The
 hypothesis is discharged, not assumed: the CSR rows for every csr number (0x747/0x757 included) are plain
 walks of the model's `check_CSR_result`.
 

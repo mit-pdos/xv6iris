@@ -105,9 +105,13 @@ page-table walks at the concurrency interface).
 tools/regen_sail_model.sh [SAIL_RISCV_DIR]    # then: git diff --exit-code model/
 ```
 
-It needs a `sail` with the Lean backend **and** the short-circuit fix for effectful `&&`/`||` operands
-(the script's header says how to build it; the unpatched backend evaluates both operands, which changes
-the model's semantics).  Three files decide what comes out: `model/sail-config-rv64d.json` (the xv6
+It needs a `sail` with the Lean backend **and** the fix that makes `&&`/`||` short-circuit when an
+operand has effects: the unpatched backend always evaluates both operands, which changes the model's
+semantics (Sail's own semantics short-circuits).  Until upstream Sail accepts the fix and releases it,
+build `sail` from rems-project/sail `5745ea9e` (the version the vendored lean-sail matches) with the
+fix from [`zeldovich/sail`, branch `lean-short-circuit`](https://github.com/zeldovich/sail/tree/lean-short-circuit)
+cherry-picked onto it; the script's header has the commands.  With a Sail release that contains the
+fix, this step goes away.  Three files decide what comes out: `model/sail-config-rv64d.json` (the xv6
 platform configuration), `model/sail-modules.txt` (the module subset) and `model/Xv6Extras.lean`, the one
 hand-written file: the realisation of the Sail platform hooks (the reservation hooks, terminal writes,
 the experimental-extensions flag), passed to sail as a second import file and never overwritten.

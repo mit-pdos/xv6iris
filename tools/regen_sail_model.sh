@@ -30,15 +30,20 @@
 # rems-project/sail 5745ea9e ("Lean: use more generic term for initial
 # state", the sources of the opam switch `lean-xv6`) PLUS the short-circuit
 # fix "Lean: make boolean & and | short-circuit with effectful operands"
-# (branch lean-short-circuit, commit d0ef9371; it
-# cherry-picks cleanly onto 5745ea9e).  Without the fix the backend hoists an
+# from https://github.com/zeldovich/sail/tree/lean-short-circuit (the tip
+# commit, 3c03fced; same patch as d0ef9371).  That branch sits on a NEWER sail
+# whose Lean backend targets lean-sail v6, so do not build the branch as is:
+# cherry-pick its tip onto 5745ea9e, the sail our vendored lean-sail matches.
+# Once upstream sail accepts the fix and releases a version with it, build
+# that release instead (and drop this paragraph).  Without the fix the backend hoists an
 # effectful right operand of `&`/`|` out of the condition and ALWAYS runs it
 # (e.g. `check_CSR` reaches `currentlyEnabled Ext_Zkr`, an `assert false`, on
 # a user access to mseccfg); Sail and Rocq short-circuit, and the proofs
 # assume the short-circuit form.  Do NOT use the unpatched opam `sail`.
 # Build the patched sail in a clone and put it first on PATH:
-#   git clone <a sail checkout carrying that commit> sail-sc && cd sail-sc
-#   git checkout -b lean-sc-pin 5745ea9e && git cherry-pick d0ef9371
+#   git clone https://github.com/rems-project/sail sail-sc && cd sail-sc
+#   git fetch https://github.com/zeldovich/sail lean-short-circuit
+#   git checkout -b lean-sc-pin 5745ea9e && git cherry-pick FETCH_HEAD
 #   opam exec --switch=lean-xv6 -- dune build --release
 #   opam exec --switch=lean-xv6 -- dune install --prefix "$PWD/_inst"
 # then (opam env first, so that the patched sail wins on PATH):

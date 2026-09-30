@@ -10,7 +10,9 @@ originals are in git history: `git show 5c27ea7e4:notes/briefs/<file>` / `git sh
 ## Later rulings (Sept 26–30 2026)
 
 - **Zkr / eager `&&`**: regenerate the Sail model with the short-circuit-patched Lean backend
-  (branch lean-short-circuit, commit d0ef9371) rather than adding a Zkr clause; `hZkr` is gone.
+  (https://github.com/zeldovich/sail/tree/lean-short-circuit, cherry-picked onto sail 5745ea9e)
+  rather than adding a Zkr clause; `hZkr` is gone.  The patch is proposed upstream; once a Sail release
+  contains it, regenerate with that release and drop the cherry-pick.
 - **Rocq drift** (Sept 29): the Lean proofs were brought in step with Rocq's latest proofs (drift waves
   A–F, Rocq 456141b5b), EXCEPT the noninterference work (drift themes I+J), which is not ported.
 - **The Rocq development is retired** (Sept 30): it is archived on the `rocq` branch and no longer
