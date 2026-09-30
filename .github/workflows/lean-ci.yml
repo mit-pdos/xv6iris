@@ -34,8 +34,8 @@ name: CI (Lean)
 # a reader of the run page needs: why the step exists and what makes it fail.
 # The scripts' own headers have the rest.
 #
-# THIS FILE LIVES ON THE `lean` BRANCH ONLY, at the same path as the Rocq
-# workflow on `main`.  GitHub runs the workflow file of the commit being
+# THIS FILE LIVES ON THE `lean` BRANCH ONLY; the archived Rocq tree's
+# workflow lives on the `rocq` branch.  GitHub runs the workflow file of the commit being
 # built, so a push to `lean` (or a pull request whose merge base is `lean`)
 # gets this one and never the Rocq one, and vice versa.
 

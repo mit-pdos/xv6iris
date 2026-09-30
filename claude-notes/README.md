@@ -1,5 +1,9 @@
 # claude-notes — xv6iris development notes
 
+> **Lean tree:** these notes were written for the original Rocq development and are maintained here as
+> the design documentation of the Lean port; read [`LEAN.md`](LEAN.md) first for how their Rocq
+> vocabulary maps to this tree.
+
 Durable, forward-looking guidance for the Rocq/Iris proofs under `iris/`
 (weakest-precondition proofs for a RISC-V rv64 xv6 kernel). Split into small,
 topic-scoped files so an agent can read only what its task needs.

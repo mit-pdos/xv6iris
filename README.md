@@ -13,12 +13,12 @@ separation-logic points-to assertions for registers, memory and devices.
 
 A paper about this project: <https://arxiv.org/abs/2609.04043>.
 
-This is a port of the original Rocq/Iris development, which lives on the
-[`main` branch](https://github.com/mit-pdos/xv6iris/tree/main) of this repository.  The Rocq tree
-is the authority for the design: its design and project notes are imported under
-[`claude-notes/`](claude-notes/) (start with [`claude-notes/LEAN.md`](claude-notes/LEAN.md), which maps
-Rocq names and paths to this tree), and the port tracks Rocq's latest proofs
-([`notes/rocq_drift.md`](notes/rocq_drift.md)).
+This development is a port of the original Rocq/Iris development, which is archived (no longer
+maintained) on the [`rocq` branch](https://github.com/mit-pdos/xv6iris/tree/rocq) of this repository;
+the port covers everything the Rocq tree proved as of its final state, except its unfinished
+noninterference groundwork.  The design and project notes came over with it and are maintained here,
+under [`claude-notes/`](claude-notes/) — they are the design documentation of this tree (start with
+[`claude-notes/LEAN.md`](claude-notes/LEAN.md), which explains how their Rocq vocabulary maps to Lean).
 
 ## What is proved
 
@@ -59,8 +59,8 @@ vendor/lean-sail/   lean-sail with a free-monad concurrency interface (see its R
 vtest-lean/     device conformance: the machine model re-checked against captured QEMU/board/RTL behaviours
 tools/          image dumpers and generators, the CI scripts (tools/ci/), coverage/profile/dead-code reports,
                 the assumption audit and trusted-base report
-claude-notes/   the Rocq development's design and project notes (imported verbatim)
-notes/          Lean-side notes: status, design rulings, the Rocq drift survey, the axiom baseline history
+claude-notes/   the design and project notes (from the Rocq development; maintained here)
+notes/          status, design rulings, the axiom baseline history, the final Rocq-to-Lean drift survey
 xv6-riscv/      the xv6 sources (.gitignored; only needed to rebuild or re-dump the images)
 ```
 
@@ -117,9 +117,10 @@ empty — that separates an intended change from drift in the checkout.
 
 ## Design
 
-The development follows the MachCSL paper and the Rocq tree's architecture
-([`claude-notes/design/`](claude-notes/design/)); decisions the port made differently are in
-[`notes/design-rulings.md`](notes/design-rulings.md) and in each file's "Deviations from Rocq" header.
+The development follows the MachCSL paper and the design documented in
+[`claude-notes/design/`](claude-notes/design/) (written for the Rocq development, whose architecture this
+port keeps); decisions the port made differently are in [`notes/design-rulings.md`](notes/design-rulings.md)
+and in each file's "Deviations from Rocq" header.
 
 * **The model as a free monad.**  Sail's Lean backend targets lean-sail, whose monad is a
   deterministic state monad.  The vendored lean-sail redefines it as a free monad over an event type,
@@ -176,12 +177,12 @@ Each script's header says what it guarantees and when it fails.
 ## Documentation
 
 - **[`claude-notes/LEAN.md`](claude-notes/LEAN.md)**, then
-  **[`claude-notes/README.md`](claude-notes/README.md)** — the design and project notes of the Rocq
-  development (execution model, devices, page tables, interrupts, TSO, the file system, crash
+  **[`claude-notes/README.md`](claude-notes/README.md)** — the design and project notes (originally
+  written for the Rocq development) (execution model, devices, page tables, interrupts, TSO, the file system, crash
   durability, the user and application layers, proof engineering), which this port follows.
 - **[`notes/STATUS.md`](notes/STATUS.md)** — the current state in a few lines.
 - **[`notes/design-rulings.md`](notes/design-rulings.md)** — the decisions source comments cite.
-- **[`notes/rocq_drift.md`](notes/rocq_drift.md)** — what changed in the Rocq tree since the port's
-  base, and what was ported.
+- **[`notes/rocq_drift.md`](notes/rocq_drift.md)** — the final survey of what the Rocq tree changed during
+  the port, and what was ported.
 - **[`tools/vtest/README.md`](tools/vtest/README.md)**, **`notes/device-conformance.md`** — the
   conformance suite.

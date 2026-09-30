@@ -11,12 +11,15 @@ originals are in git history: `git show 5c27ea7e4:notes/briefs/<file>` / `git sh
 
 - **Zkr / eager `&&`**: regenerate the Sail model with the short-circuit-patched Lean backend
   (`/shared/sail-upstream`, branch lean-short-circuit) rather than adding a Zkr clause; `hZkr` is gone.
-- **Track Rocq main**: keep the Lean proofs in step with Rocq's latest proofs (drift waves A–F ported
-  Sept 29, Rocq 456141b5b), EXCEPT the noninterference work (drift themes I+J), which is not ported.
+- **Rocq drift** (Sept 29): the Lean proofs were brought in step with Rocq's latest proofs (drift waves
+  A–F, Rocq 456141b5b), EXCEPT the noninterference work (drift themes I+J), which is not ported.
+- **The Rocq development is retired** (Sept 30): it is archived on the `rocq` branch and no longer
+  maintained or tracked.  This tree is the development; `claude-notes/` (imported from Rocq) is its design
+  documentation and is maintained here.
 - **No Lean on the development machine**: all elaboration runs on the build VM or in CI (README,
   "Build").
-- **Standing rules**: Rocq is the authority (port its big ideas, clean up its gunk only with the full
-  picture); one function per Spec/Proof/Link triple; one capacity instance per camera; full root build
+- **Standing rules**: the design in `claude-notes/` is the authority (it came from Rocq; follow its big
+  ideas, change them deliberately and update the notes); one function per Spec/Proof/Link triple; one capacity instance per camera; full root build
   before every push; eb-generic contracts.
 
 ## From `notes/briefs/crash_layer.md`
