@@ -3429,7 +3429,7 @@ package "rocq-iris-transfinite" {
   dev-repo: "git+https://github.com/dongjaelee1/transfinite-iris.git"
   url {
     src:
-      "git+file:///work/transfinite-iris#57dcd56503f695944761375cf949960274792089"
+      "git+https://github.com/dongjaelee1/transfinite-iris.git#57dcd56503f695944761375cf949960274792089"
   }
 }
 package "rocq-prover" {

@@ -20,7 +20,7 @@ means changing this file** (build the new switch, export it, replace the file, r
 | coq / rocq-prover | 9.0.1 / 9.0.0 (`coq` is the compatibility package; the binaries are `rocq` and `coqc`) | rocq-released |
 | rocq-stdpp, rocq-stdpp-bitvector | dev.2026-09-17.0.d510b616 (stdpp master) | git rocq-iris/stdpp @ `d510b616` |
 | rocq-iris | dev.2026-09-24.0.8e490959+transfinite.ad972179 (Iris master `8e4909593a` + the 4 commits of Iris branch `robbert/transfinite` + 1 local fix) | pinned git commit `ad972179` of the patched branch (`transfinite` branch only; see "The transfinite pins") |
-| rocq-iris-transfinite | dev.2026-09-29.0.57dcd565 (the Transfinite Iris core: ordinal step indices, transfinite `uPred`/`iProp`, base-logic libraries, program logic) | pinned git commit `57dcd565` of github.com/dongjaelee1/transfinite-iris (`transfinite` branch only) |
+| rocq-iris-transfinite | dev.2026-09-29.0.57dcd565 (the Transfinite Iris core: ordinal step indices, transfinite `uPred`/`iProp`, base-logic libraries, program logic) | git github.com/dongjaelee1/transfinite-iris @ `57dcd565` (`transfinite` branch only) |
 | rocq-elpi, elpi | 3.5.1, 3.7.3 (Iris master needs rocq-elpi) | release tarballs |
 | rocq-sail-stdpp | 0.20.3 | git rems-project/coq-sail @ `e7b914cd` |
 | coq-lsp | 0.2.5+9.0 (`pet`, `fcc`: editor and agent tooling; harmless if unused) | release tarball |
@@ -35,12 +35,12 @@ On the `transfinite` branch the export differs from `main`'s in exactly two pack
 is the SAME upstream commit with Iris's unmerged branch `robbert/transfinite` applied (it changes
 the BI interface so that a transfinite `uPred` can be a `bi`: `later_exist_false` and `later_sep_1`
 become conditional on `SIdxFinite`, `Timeless P := <only0> P ⊢ P`), and `rocq-iris-transfinite`
-is the Transfinite Iris core built on it. Both are pinned by commit. Until the two repositories
-are reachable from CI the pins in this file are `git+file://` paths of the development machine
-(`/work/iris-upstream#ad972179…`, `/work/transfinite-iris#57dcd565…`): replace them by the hosted
-URLs (github.com/dongjaelee1/transfinite-iris for the core; a fork of Iris carrying the patched
-branch) before this export can be imported elsewhere. The day upstream merges `robbert/transfinite`,
-`rocq-iris` goes back to a stock pin and only `rocq-iris-transfinite` remains.
+is the Transfinite Iris core built on it. Both are pinned by commit. The core is pinned from its
+repository, `git+https://github.com/dongjaelee1/transfinite-iris.git#57dcd565…`. The patched Iris
+is still a `git+file://` path of the development machine (`/work/iris-upstream#ad972179…`) until a
+fork of Iris carrying the branch is hosted; until then this export cannot be imported elsewhere.
+The day upstream merges `robbert/transfinite`, `rocq-iris` goes back to a stock pin and only
+`rocq-iris-transfinite` remains.
 
 Reproducing the switch here: `/work/opam/build-logs/build-transfinite.sh` (import `main`'s export,
 re-pin `rocq-iris`) and `build-transfinite-stage2.sh` (pin the core), root `/work/opam`, switch
