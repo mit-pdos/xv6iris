@@ -86,7 +86,7 @@ instance fturnPreAt_timeless (g : FileGn) (s0 : Fstate) (k : Nat) :
 /-- The reader's witness at an era: the boot-ledger entry beside the era's
 file pin, with no index pin (Rocq `f0bwk`). -/
 def f0bwk (g : FileGn) (k : Nat) (s0 : Fstate) : IProp GF :=
-  iprop(∃ vf : FileEra, fileEraPin g k vf ∗ f0Bl vf s0)
+  iprop(∃ vf : FileEra, fileEraPin g k vf ∗ f0Bl (hlc := hlc) g vf s0)
 
 instance f0bwk_persistent (g : FileGn) (k : Nat) (s : Fstate) :
     Persistent (f0bwk (GF := GF) g k s) := by
@@ -105,7 +105,7 @@ theorem f0bwk_agree (g : FileGn) (k : Nat) (s s' : Fstate) :
     · iexact Hp
     · iexact Hp'
   subst he
-  iapply f0Bl_agree
+  iapply f0Bl_agree g
   isplitl [Hl]
   · iexact Hl
   · iexact Hl'
@@ -117,7 +117,7 @@ theorem f0w_bwk (g : FileGn) (k : Nat) (s : Fstate) :
   iintro ⟨-, %vf, #Hp, #Hl⟩
   iexists vf
   iframe Hp
-  iapply f0Lb_bl $$ Hl
+  iapply f0Lb_bl g $$ Hl
 
 /-- Rocq `f0w_bwk0`. -/
 theorem f0w_bwk0 (g : FileGn) (k : Nat) (s : Fstate) :
@@ -127,7 +127,7 @@ theorem f0w_bwk0 (g : FileGn) (k : Nat) (s : Fstate) :
   subst hk
   iexists vf
   iframe Hp
-  iapply f0Lb_bl $$ Hl
+  iapply f0Lb_bl g $$ Hl
 
 /-- The head's first reading (Rocq `fhead_cur`). -/
 theorem fhead_cur (g : FileGn) (k : Nat) (v : EraPins) (I : List (BitVec 8)) :

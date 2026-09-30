@@ -232,7 +232,7 @@ structure HfpFileOpenP : Prop where
         fileTaint (hlc := hlc) c)
   /-- Rocq `FileOpen.file_open_create_recv` (U1-F `fileOpenCreate_recv`) -/
   fileOpenCreateRecv : ∀ (γfs : FsNames) (c : FileFixed) (omo : OffMode) (r : FileAppNames)
-      (jo : Option Nat) (n : Nat) (N : Fname) (s : Dst) (g : GName) (cw : Nat)
+      (jo : Option Nat) (n : Nat) (N : Fname) (s : Dst) (g : GName) (np : Nat) (cw : Nat)
       (M : Nat → List (BitVec 8)) (pv : Nat) (vom : BitVec 64) (pl : List (BitVec 8))
       (sts : List FdState) (rv : BitVec 64) (fdv' : List FdState) (E : CoPset),
     (↑appN : CoPset) ⊆ E → omTrunc vom = true → uname N →
@@ -240,14 +240,14 @@ structure HfpFileOpenP : Prop where
     ⊢@{IProp GF} appInv (hlc := hlc) γfs -∗ escKey (hlc := hlc) c r n s g -∗
       openReceiptCreate (hlc := hlc) omo (fsGammaL γfs) γfs cw M pv vom
         (fun (_ : Nat) (d : Nat) => iprop(⌜d = ROOTINO⌝)) (fun _ _ => iprop(True))
-        (fileArmFam (hlc := hlc) c r jo s g) (fileUnarmFam (hlc := hlc) c r s g)
-        (fileCreFam (hlc := hlc) c r jo N s g) (fileDlkFam (hlc := hlc) c r n s g)
-        (fileOdlkFam (hlc := hlc) c r n s g) (fileTruncFam (hlc := hlc) c r N s) sts rv fdv'
+        (fileArmFam (hlc := hlc) c r jo s g np) (fileUnarmFam (hlc := hlc) c r s g np)
+        (fileCreFam (hlc := hlc) c r jo N s g np) (fileDlkFam (hlc := hlc) c r n s g)
+        (fileOdlkFam (hlc := hlc) c r n s g) (fileTruncFam (hlc := hlc) c r N s np) sts rv fdv'
       ={E}=∗
-      iprop((⌜rv = 0xFFFFFFFFFFFFFFFF#64⌝ ∗ ⌜fdv' = sts⌝ ∗ fileOpenPay (hlc := hlc) c r N s) ∨
+      iprop((⌜rv = 0xFFFFFFFFFFFFFFFF#64⌝ ∗ ⌜fdv' = sts⌝ ∗ fileOpenPay (hlc := hlc) c r N s np) ∨
         (∃ ty : FdType,
           ⌜openFdRcpt (omReadable vom) (omWritable vom) ty sts rv fdv'⌝ ∗
-          fileOpenFdK (hlc := hlc) omo c r N s ty))
+          fileOpenFdK (hlc := hlc) omo c r N s np ty))
 
 end Params
 

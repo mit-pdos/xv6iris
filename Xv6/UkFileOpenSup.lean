@@ -39,14 +39,15 @@ def fileMissFam (c : FileFixed) (r : FileAppNames) (q : Qp) (s : Dst) (Q : Int �
 
 /-- **Rocq `file_create_fam`**: the 0x601 open's family, from one escrow. -/
 def fileCreateFam (omo : OffMode) (c : FileFixed) (r : FileAppNames) (jo : Option Nat) (Nf : Fname) (n : Nat)
-    (s : Dst) (g : GName) (Q : Int → IProp GF) : Xfam GF :=
-  xfamFcreate omo (fun _ d => iprop(⌜d = ROOTINO⌝)) (fileArmFam (hlc := hlc) c r jo s g)
-    (fileUnarmFam (hlc := hlc) c r s g) (fileCreFam (hlc := hlc) c r jo Nf s g) (fileDlkFam (hlc := hlc) c r n s g) (fileOdlkFam (hlc := hlc) c r n s g)
-    (fileTruncFam (hlc := hlc) c r Nf s) Q
+    (s : Dst) (g : GName) (np : Nat) (Q : Int → IProp GF) : Xfam GF :=
+  xfamFcreate omo (fun _ d => iprop(⌜d = ROOTINO⌝)) (fileArmFam (hlc := hlc) c r jo s g np)
+    (fileUnarmFam (hlc := hlc) c r s g np) (fileCreFam (hlc := hlc) c r jo Nf s g np) (fileDlkFam (hlc := hlc) c r n s g) (fileOdlkFam (hlc := hlc) c r n s g)
+    (fileTruncFam (hlc := hlc) c r Nf s np) Q
 
 /-- **Rocq `redir_K`**: what the 0x601 call's descriptor arm hands the round. -/
-def redirK (omo : OffMode) (c : FileFixed) (r : FileAppNames) (Nf : Fname) (s : Dst) (ty : FdType) : IProp GF :=
-  fileOpenFdK (hlc := hlc) omo c r Nf s ty
+def redirK (omo : OffMode) (c : FileFixed) (r : FileAppNames) (Nf : Fname) (s : Dst) (np : Nat)
+    (ty : FdType) : IProp GF :=
+  fileOpenFdK (hlc := hlc) omo c r Nf s np ty
 
 /-- **Rocq `uimg_view_sub`**, keeping the heap. -/
 theorem uimgView_sub_keep (N : UkNames GF) (Img M : ElfMem) (pm : Nat → Option UPerm) (sz : Nat) :
@@ -125,15 +126,15 @@ theorem fileMissSup_v (N : UkNames GF) (c : FileFixed) (r : FileAppNames) (q : Q
 
 /-- **Rocq `file_create_sup_v`**: the 0x601 bundle, from one escrow. -/
 theorem fileCreateSup_v (N : UkNames GF) (omo : OffMode) (c : FileFixed) (r : FileAppNames) (jo : Option Nat)
-    (Nf : Fname) (n : Nat) (s : Dst) (g : GName) (ls : List Fwline) (ws : Wordline) (cw : Nat) (Img : ElfMem)
+    (Nf : Fname) (n : Nat) (s : Dst) (g : GName) (np : Nat) (ls : List FlLine) (ws : Wordline) (cw : Nat) (Img : ElfMem)
     (pv : Nat) (m : RegMap) (pc : BitVec 64) (pl : List (BitVec 8))
     (hNf : uname Nf) (heq : fileAppIs (hlc := hlc) (GF := GF) c r) (hpath : ∀ Mv, imgAgrees Img Mv → argPathOf Mv pv pl)
     (ha0 : (m.get 10#5).toNat = pv) (hcr : omCreate (m.get 11#5) = true) (hnp : npElems pl = [])
-    (hst : umStartOf cw pl = ROOTINO) (hlast : (pathElems pl).getLast? = some Nf) (hin : (Nf, ws) ∈ ls)
-    (hok : lineOk ws) :
+    (hst : umStartOf cw pl = ROOTINO) (hlast : (pathElems pl).getLast? = some Nf)
+    (hlst : ls.getLast? = some (Uline.LEchoF ws Nf)) (hnpl : np = ls.length) (hok : lineOk ws) :
     ⊢ appInv (hlc := hlc) fscFs -∗ uimgView N Img -∗ fileConsCred (hlc := hlc) c r jo -∗ flLb c ls -∗
-      escKey (hlc := hlc) c r n s g -∗ fescRes (hlc := hlc) r s g -∗
-      udepwfAt (hlc := hlc) N m pc USYS_open (fileCreateFam omo c r jo Nf n s g N.pay) cw := by
+      escKey (hlc := hlc) c r n s g -∗ fescRes (hlc := hlc) r s g np -∗
+      udepwfAt (hlc := hlc) N m pc USYS_open (fileCreateFam omo c r jo Nf n s g np N.pay) cw := by
   unfold udepwfAt
   iintro #Hinv #Hro #Hm #Hlb #Hwit Hres
   isplitr
@@ -150,8 +151,8 @@ theorem fileCreateSup_v (N : UkNames GF) (omo : OffMode) (c : FileFixed) (r : Fi
   rw [xkA_run0, xkA_run1, ha0]
   simp only [openIn, hcr, ↓reduceIte]
   dsimp only [fileCreateFam, xfamFcreate, xfamPt, uvisOfRun]
-  iapply fileOpenCreate_au fscFs c r jo n Nf s g ls ws cw Mv pv (m.get 11#5) pl heq hNf
-    (hpath Mv (fun a b h => hag a b (hsro a b h))) hnp hst hlast hin hok $$ Hinv Hm Hlb Hwit Hres
+  iapply fileOpenCreate_au fscFs c r jo n Nf s g np ls ws cw Mv pv (m.get 11#5) pl heq hNf
+    (hpath Mv (fun a b h => hag a b (hsro a b h))) hnp hst hlast hlst hnpl hok $$ Hinv Hm Hlb Hwit Hres
 
 end UkFileOpen
 
