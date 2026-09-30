@@ -7889,9 +7889,9 @@ Section SyscallArms.
                       Hfd0 Hpriv Hufrag [Hxin]").
       { iApply (sysc_dep_open U sts gn cs pid fdep v0 v1
                   ltac:(rewrite Hnum; reflexivity) Hv0 Hv1 with "Hxin"). }
-      iIntros (CIDy Hsy) "_"; iIntros (mf ns' P' k')
+      iIntros (CIDy Hsy) "Hlc"; iIntros (mf ns' P' k')
         "%Hcs %Hextz %Hk' Hcg Hcpu Htcx2 Hccx2 Hpc Hbs _ _ _ _ %Hns Hir Harms".
-      iSpecialize ("Hcont'" $! CIDy with "[//]").
+      iSpecialize ("Hcont'" $! CIDy with "[//] Hlc").
       iApply ("Hcont'" $! mf ns' P' k' with "[//] [//] [//] Hcg Hcpu Htcx2 Hccx2 Hpc Hbs
                 Hsbn Hisp Hsbs Hbmp [//] Hir [Harms]").
       iApply (open_arms_split with "Harms"). }

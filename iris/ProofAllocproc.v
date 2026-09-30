@@ -1392,7 +1392,7 @@ Section ProofAllocprocPid.
               assert (Htgt74 : add_vec (mword_of_int (KernelSyms.allocproc + 0x7e) : mword 64) (sign_extend' 64 (mword_of_int 8182 : mword 13))
                                = mword_of_int (KernelSyms.allocproc + 0x74)) by pcstep.
               iEval (rewrite Htgt74) in "Hpc".
-              iApply ("IHf" $! (S j) Rf with "[%] [%] [%] [%] Hcg Hpc Hnp Hshares Hauth Hled Hsg Hlocked Hcpu Hpay Hpidi Hpidh Hcont").
+              iSpecialize ("IHf" with "Hlc"). iApply ("IHf" $! (S j) Rf with "[%] [%] [%] [%] Hcg Hpc Hnp Hshares Hauth Hled Hsg Hlocked Hcpu Hpay Hpidi Hpidh Hcont").
               * exact (ap_fuelS j fuel Hfuel).
               * exact HjS.
               * split; [exact HRf | split; [exact HRfa3 | split; [exact HRfa1 | exact HRf_a5]]].
@@ -2836,7 +2836,7 @@ Section ProofAllocproc.
             intros r Hr Ncsp N8 N9 N18.
             rewrite /U5 upd_ne; [| congruence].
             exact (Hrl_rest r Hr Ncsp N8 N9 N18). }
-          iIntros (CIDp Hsp) "Hlc"; iIntros (Mf) "[%Hcsf %Ha0f] Hcgf Hpcf".
+          iIntros (CIDp Hsp) "_"; iIntros (Mf) "[%Hcsf %Ha0f] Hcgf Hpcf".
           iDestruct (cpu_own_transport CIDg CIDp lvl eb pme b ltac:(wp_next_chain)
                        with "Hcpu") as "Hcpu".
           iSpecialize ("Hcont" $! CIDp with "[%] Hlc"); [wp_next_chain|].

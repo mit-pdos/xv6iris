@@ -1461,10 +1461,10 @@ Section SysExecHead.
                 (HM13thr Rs6 ltac:(vm_compute; reflexivity) ltac:(nz) ltac:(nz))
                 (HM13thr Rs7 ltac:(vm_compute; reflexivity) ltac:(nz) ltac:(nz))
                 Halp Hala with "Hcg Htext Hpc F1 F2 Hrest [Hcnt Hpriv Hout]").
-      iIntros (CID17) "%Hq17 _". iIntros (mf) "%Hcsf %Hfa0 Hcg Hpc".
+      iIntros (CID17) "%Hq17 Hlc". iIntros (mf) "%Hcsf %Hfa0 Hcg Hpc".
       iDestruct (cpu_own_transport CID13 CID17 0%nat eb (proc_addr jp) b
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-      iSpecialize ("Hout" $! CID17 with "[%]"); [wp_next_chain |].
+      iSpecialize ("Hout" $! CID17 with "[%] Hlc"); [wp_next_chain |].
       iApply ("Hout" $! mf P' 0%nat bnew bnew u60 kev). iLeft.
       iSplitR; [iPureIntro; split_and!;
         [ exact Hcsf | exact Hext | rewrite Hfa0; exact HM13a0 | exact Hkev ] |].
@@ -2525,8 +2525,8 @@ Section SysExecFree.
       iApply (IH CID6 M3 (S k) ltac:(lia) ltac:(lia) ltac:(lia) HM3s1 HM3s4
                 with "Htext [] Hpc Hcg Hcnt Harr Hpgs [Hout]").
       { iExists γk. iFrame "Hlk Hav". }
-      { rewrite /wp_next. iIntros (CIDx) "%Hcx _".
-        iSpecialize ("Hout" $! CIDx with "[%]"); [exact Hcx |].
+      { rewrite /wp_next. iIntros (CIDx) "%Hcx Hlc".
+        iSpecialize ("Hout" $! CIDx with "[%] Hlc"); [exact Hcx |].
         iIntros (M' pcx) "%Hpcx %Hthr Hpc' Hcg' Hcnt' Harr'".
         iApply ("Hout" $! M' pcx with "[%] [%] Hpc' Hcg' Hcnt' Harr'").
         { exact Hpcx. }
@@ -3337,9 +3337,9 @@ Section SysExecStep.
                 ltac:(nz) Hcmp ltac:(rewrite Ht92; vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (sxi_066 with "Htext"). }
-      iApply bi.later_intro. iIntros (CID7 Hq7) "_". iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID7 Hq7) "Hlc". iIntros "Hcg Hpc".
       iEval (rewrite Ht92) in "Hpc".
-      iSpecialize ("Hout" $! CID7 with "[%]"); [wp_next_chain |].
+      iSpecialize ("Hout" $! CID7 with "[%] Hlc"); [wp_next_chain |].
       iDestruct (cpu_own_transport CID6 CID7 0%nat eb (proc_addr jp) b
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       iApply ("Hout" $! mf Pa ka i pg alen afun uvf). iRight. iRight.
@@ -3896,7 +3896,7 @@ Section SysExecStep.
     - iSpecialize ("Hout" $! CIDn with "[%] Hlc"); [wp_next_chain |].
       iApply ("Hout" $! M' P' k' i' pg' alen' afun' uvf'). iLeft.
       iSplitR; [iPureIntro; exact Hnul | iExact "Hbrk"].
-    - iSpecialize ("Hout" $! CIDn with "[%]"); [wp_next_chain |].
+    - iSpecialize ("Hout" $! CIDn with "[%] Hlc"); [wp_next_chain |].
       iApply ("Hout" $! M' P' k' i' pg' alen' afun' uvf'). iRight. iExact "Hbad".
   Qed.
 
@@ -4471,8 +4471,8 @@ Section SysExecBadTail.
       iApply (sx_epilogue (CID0 := CID5) m M4 sp0 K b (proc_addr jp)
                 K60 Kpop Hsp0 HM4sp HM4thr E1 E2 E3 E4 E5 E6 E7 Halp Hala
                 with "Hcg Htext Hpc Hf1 Hf2 Hrest [Hout Hcnt Hpriv]").
-      iIntros (CID6) "%Hq6 _". iIntros (mf) "%Hcsf %Hfa0 Hcg Hpc".
-      iSpecialize ("Hout" $! CID6 with "[%]"); [wp_next_chain |].
+      iIntros (CID6) "%Hq6 Hlc". iIntros (mf) "%Hcsf %Hfa0 Hcg Hpc".
+      iSpecialize ("Hout" $! CID6 with "[%] Hlc"); [wp_next_chain |].
       iDestruct (cpu_own_transport CID2 CID6 0%nat eb (proc_addr jp) b
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       iApply ("Hout" $! mf with "[%] [%] [%] [%] Hcg Hcnt Hpc Hpriv").

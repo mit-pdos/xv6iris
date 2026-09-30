@@ -2965,7 +2965,7 @@ Section ProofConsoleread.
                 G10 (trap_res true + (av - 12))%nat false
                 ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
       { iApply (cnri_0be with "Ht"). }
-      iApply bi.later_intro. iApply wp_next_off_intro_lc. iIntros "Hlc Hcg Hpc". rgall.
+      iApply bi.later_intro. iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
       assert (Hj38 : add_vec (mword_of_int (CR + 0xbe) : mword 64)
                        (sign_extend' 64 (sign_extend' 21
                           (concat_vec (mword_of_int 1981 : mword 11) ('b"0"))))

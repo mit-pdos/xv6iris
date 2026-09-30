@@ -2006,7 +2006,7 @@ Section ProofPiperead.
                   X6 (av - 12)%nat vs8 true ltac:(nz) ltac:(rdok) with "Hcg Hpc [] [Hc10]").
         { iApply (pri_e6 with "Htext"). }
         { rgall. iEval (rewrite HX6csp -Hb10). iExact "Hc10". }
-        iIntros (CIDp29 Hsp29) "_ Hcg Hpc Hc10". rgall. iEval (rewrite HX6csp -Hb10) in "Hc10".
+        iIntros (CIDp29 Hsp29) "Hlc Hcg Hpc Hc10". rgall. iEval (rewrite HX6csp -Hb10) in "Hc10".
         pose (X7 := <[Regidx Rs8 := regval_into_reg vs8]> X6).
         change (<[Regidx Rs8 := regval_into_reg vs8]> X6) with X7.
         assert (Hpe4 : add_vec_int (mword_of_int (KernelSyms.piperead + 0xe6) : mword 64) 2 = mword_of_int (KernelSyms.piperead + 0xe8))
@@ -2023,7 +2023,7 @@ Section ProofPiperead.
         { intros r Hr N22 N23 N24.
           rewrite /X7 upd_ne; [| congruence]. rewrite /X6 upd_ne; [| congruence].
           rewrite /X5 upd_ne; [| congruence]. apply HthrX; exact Hr. }
-        iSpecialize ("EPI" $! CIDp29 with "[%]"); [wp_next_chain|].
+        iSpecialize ("EPI" $! CIDp29 with "[%] Hlc"); [wp_next_chain|].
         iEval (rewrite Hlkempty) in "EPI".
         iEval (rewrite Hlkempty locks_union_empty locks_self_del) in "Hown".
         iApply ("EPI" $! X7 P' dw bsw rv k' with "[%] [%] [%] [%] [%] [%] Hcg Hpc Hown Href HRP Hpriv

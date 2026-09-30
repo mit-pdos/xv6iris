@@ -1095,7 +1095,7 @@ Section ProofVirtioDiskRwB.
               A5 (trap_res eb + (K - 12))%nat false ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (rwi_044 with "Htext"). }
-    iApply bi.later_intro. iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
+    iApply bi.later_intro. iApply wp_next_off_intro_lc. iIntros "Hlc Hcg Hpc". rgall.
     assert (Hj0a8 : add_vec (mword_of_int (KernelSyms.virtio_disk_rw + 0x044) : mword 64)
                       (sign_extend' 64 (sign_extend' 21
                          (concat_vec (mword_of_int 60 : mword 11) ('b"0"))))
@@ -1103,7 +1103,7 @@ Section ProofVirtioDiskRwB.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hj0a8) in "Hpc".
     rewrite /vdrw_p2_loop.
-    iSpecialize ("Hloop" $! CID with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hloop" $! CID with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hloop" $! A5 with "[%] Hcg Hown Htc Hclm Hpc Htok HR Hscr Hexit").
     split_and!; [ exact HA5regs | exact HA5s1 | exact HA5s4 | exact HA5s5
                 | vdrw_hi_peel; exact Hhi0 ].

@@ -1334,12 +1334,12 @@ Section PwGuard.
                 Rs4 Rs2 M (trap_res true + (av - 14))%nat false ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
                 Hgf with "Hcg Hpc []").
       { iApply (pwi_88 with "Htext"). }
-      iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
+      iApply wp_next_off_intro_lc. iIntros "Hlc Hcg Hpc". rgall.
       assert (Hpp8c : add_vec_int (mword_of_int (KernelSyms.pipewrite + 0x88) : mword 64) 4 = mword_of_int (KernelSyms.pipewrite + 0x8c))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp8c) in "Hpc".
       rewrite /pw_loop.
-      iSpecialize ("HLP" $! CID with "[%]"); [wp_next_chain|].
+      iSpecialize ("HLP" $! CID with "[%] Hlc"); [wp_next_chain|].
       iApply ("HLP" $! i M Pc kc with "[%] [%] [%] [%] HF7 HF5 HCH Hcg Hown Hpay Hlocked Hres Hpc Href Hpriv Henv HW HEX").
       + lia.
       + exact Hext.

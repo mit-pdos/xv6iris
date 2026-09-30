@@ -1190,8 +1190,8 @@ Section KexecExitQ.
            dqs fsc_bmapstart na alen plen pv dqpv pfun av dqa avf
            aslen dqas afun).
   Proof using .
-    rewrite /wp_next. iIntros "H" (CID Hcr).
-    iSpecialize ("H" $! CID with "[%]"); [exact Hcr |].
+    rewrite /wp_next. iIntros "H" (CID Hcr) "Hlc".
+    iSpecialize ("H" $! CID with "[%] Hlc"); [exact Hcr |].
     iIntros (mf U' entry spv szv')
             "%Hcs %Hok Hsie Hcnt Htc Hcl Hpc Hbm Hin Hka Hpriv Hpath Hargv
              Hargs Hbs Hirs".
@@ -1212,8 +1212,8 @@ Section KexecExitQ.
     wp_next (CID0 := CIDx) true pj KEX -∗
     wp_next (CID0 := CIDx) true pj E.
   Proof using .
-    rewrite /wp_next. iIntros "#Hw H" (CID Hcr).
-    iSpecialize ("H" $! CID with "[%]"); [exact Hcr |]. by iApply "Hw".
+    rewrite /wp_next. iIntros "#Hw H" (CID Hcr) "Hlc".
+    iSpecialize ("H" $! CID with "[%] Hlc"); [exact Hcr |]. by iApply "Hw".
   Qed.
 
 End KexecExitQ.

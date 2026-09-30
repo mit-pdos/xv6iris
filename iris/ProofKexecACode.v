@@ -924,8 +924,8 @@ Section KexecABody.
     wp_next (CID0 := CIDx) true pj KEX -∗
     wp_next (CID0 := CIDx) true pj E.
   Proof using .
-    rewrite /wp_next. iIntros "#Hw HR H" (CID Hcr).
-    iSpecialize ("H" $! CID with "[%]"); [exact Hcr |].
+    rewrite /wp_next. iIntros "#Hw HR H" (CID Hcr) "Hlc".
+    iSpecialize ("H" $! CID with "[%] Hlc"); [exact Hcr |].
     iApply ("Hw" with "H HR").
   Qed.
 

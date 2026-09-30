@@ -1173,7 +1173,7 @@ Section ItruncDLoop.
                   ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc []").
       { iApply (iti_1c with "Htext"). }
-        iApply bi.later_intro. iIntros (CID8 Hq8) "_ Hcg Hpc".
+        iApply bi.later_intro. iIntros (CID8 Hq8) "Hlc Hcg Hpc".
         assert (Htgt32' : add_vec (mword_of_int (IT + 0x1c) : mword 64)
                             (sign_extend' 64 (mword_of_int 22 : mword 13))
                           = mword_of_int (IT + 0x32)) by pcw.
@@ -1187,7 +1187,7 @@ Section ItruncDLoop.
                      ltac:(rewrite Hbm; wp_next_chain) with "Hextm") as "Hextm".
         iDestruct (wp_next_shift (b := true) (CIDa := CID3) (CIDb := CID8)
                      ltac:(wp_next_chain) with "Hexit") as "Hexit".
-        iSpecialize ("Hexit" $! CID8 with "[%]"); [wp_next_chain|].
+        iSpecialize ("Hexit" $! CID8 with "[%] Hlc"); [wp_next_chain|].
         rewrite Hlast.
         iApply ("Hexit" $! N1 with "[%] [%] [%] Hcg Hcnt Hextc Hextm Hpc Hppid
                                     Hidev Hsbb Hsl Hst");
@@ -1701,7 +1701,7 @@ Section ItruncELoop.
                   ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc []").
       { iApply (iti_68 with "Htext"). }
-        iApply bi.later_intro. iIntros (CIDr Hqr) "_ Hcg Hpc".
+        iApply bi.later_intro. iIntros (CIDr Hqr) "Hlc Hcg Hpc".
         assert (Htgt7af : add_vec (mword_of_int (IT + 0x68) : mword 64)
                            (sign_extend' 64 (mword_of_int 18 : mword 13))
                          = mword_of_int (IT + 0x7a)) by pcw.
@@ -1715,7 +1715,7 @@ Section ItruncELoop.
                      ltac:(rewrite Hbm; wp_next_chain) with "Hextm") as "Hextm".
         iDestruct (wp_next_shift (b := true) (CIDa := CIDz) (CIDb := CIDr)
                      ltac:(wp_next_chain) with "Hexit") as "Hexit".
-        iSpecialize ("Hexit" $! CIDr with "[%]"); [wp_next_chain|].
+        iSpecialize ("Hexit" $! CIDr with "[%] Hlc"); [wp_next_chain|].
         rewrite Hlastf.
         iApply ("Hexit" $! F1 with "[%] [%] [%] [%] Hcg Hcnt Hextc Hextm Hpc
                                     Hppid Hidev Hsbb Hsl Hbuf Hst");

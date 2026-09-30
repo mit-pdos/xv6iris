@@ -1087,7 +1087,7 @@ Section SpBodies.
                 (dqm := DfracOwn 1) ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc [] Hy5").
       { iApply (spi_7e with "Htext"). }
-      iApply wp_next_off_intro. iIntros "Hcg Hpc Hy5".
+      iApply wp_next_off_intro_lc. iIntros "Hlc Hcg Hpc Hy5".
       iEval (rewrite He5) in "Hy5".
       set (L10 := <[Regidx (mword_of_int 19 : mword 5) := regval_into_reg (m !!! Regidx (mword_of_int 19 : mword 5))]> L9).
       change (<[Regidx (mword_of_int 19 : mword 5) := regval_into_reg (m !!! Regidx (mword_of_int 19 : mword 5))]> L9) with L10.
@@ -1100,7 +1100,7 @@ Section SpBodies.
         rewrite /L10 upd_ne; [| congruence]. rewrite /L9 upd_ne; [| congruence].
         rewrite /L8 upd_ne; [reflexivity | congruence]. }
       rewrite /sp_exit0.
-      iSpecialize ("Hex0" $! CID with "[%]"); [wp_next_chain|].
+      iSpecialize ("Hex0" $! CID with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hex0" $! L10 with "[%] Hy1 Hy2 [Hy3 Hy4 Hy5 Hy6 Hy8] Hy7 Htok HR Hcg Hown Hpay Hpc Htl").
       { split.
         { unfold sp_base. split; [| split].

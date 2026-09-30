@@ -1389,7 +1389,7 @@ Section ProofDirlookupMain.
                       Q2 (K - 12)%nat b
                       ltac:(nz) ltac:(rdok) ltac:(pcw) with "Hcg Hpc []").
             { iApply (dli_94 with "Htext"). }
-            iIntros (CIDP4 HqP4) "_ Hcg Hpc".
+            iIntros (CIDP4 HqP4) "Hlc Hcg Hpc".
             set (Q3 := <[Regidx Ra0 := regval_into_reg
                           (mword_of_int 0 : mword 64)]> Q2).
             assert (Hcsa0' : is_cs_idx Ra0 = false) by (vm_compute; reflexivity).
@@ -1420,7 +1420,7 @@ Section ProofDirlookupMain.
             iDestruct (cpu_claim_ext_transport CIDp CIDP4 eb pj
                          ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
             iPoseProof ("Htail" $! CIDP4) as "Ht".
-            iSpecialize ("Ht" with "[%]"); [wp_next_chain |].
+            iSpecialize ("Ht" with "[%] Hlc"); [wp_next_chain |].
             iApply ("Ht" $! Q3 mt10' dol' with
                       "[%] Hcg Hcnt Hextc Hclmc Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10
                        Hde").

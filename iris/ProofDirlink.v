@@ -2554,7 +2554,7 @@ Section ProofDirlinkMain.
                   Rs1 V9 (K - 10)%nat (m !!! Regidx Rs1 : mword 64) b
                   ltac:(nz) ltac:(rdok) with "Hcg Hpc [] Hb3").
         { iApply (dki_9a with "Htext"). }
-        iIntros (CIDA15 HqA15) "_ Hcg Hpc Hb3".
+        iIntros (CIDA15 HqA15) "Hlc Hcg Hpc Hb3".
         iEval (rewrite HfT3) in "Hb3".
         pose (V10 := <[Regidx Rs1 := regval_into_reg
                        (m !!! Regidx Rs1 : mword 64)]> V9).
@@ -2570,7 +2570,7 @@ Section ProofDirlinkMain.
         iEval (rewrite Hqq9c) in "Hpc".
         (* ---- into the shared epilogue ---- *)
         iPoseProof ("Htail" $! CIDA15) as "Ht".
-        iSpecialize ("Ht" with "[%]"); [wp_next_chain |].
+        iSpecialize ("Ht" with "[%] Hlc"); [wp_next_chain |].
         iApply ("Ht" $! V10 (m !!! Regidx Rs1 : mword 64) w5 w6
                   (fun jj => dirent_bytes (de_of_name inum s) !!! jj) with
                   "[%] Hcg Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hsrc").

@@ -1080,7 +1080,7 @@ Section ProofWalk.
               P3 (K - 8)%nat b ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (wi_94 with "Htext"). }
-    iNext. iIntros (CIDa14 Hsa14) "_". iIntros "Hcg Hpc".
+    iNext. iIntros (CIDa14 Hsa14) "Hlc". iIntros "Hcg Hpc".
     assert (Htgt40 : add_vec (mword_of_int (KernelSyms.walk + 0x94) : mword 64)
               (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 2006 : mword 11) ('b"0"))))
             = mword_of_int (KernelSyms.walk + 0x40)) by (apply bv_eq; vm_compute; reflexivity).
@@ -1093,7 +1093,7 @@ Section ProofWalk.
     iDestruct (wp_next_shift HcntCA2 with "Hok") as "Hok".
     assert (HcntCA2' : b = false \/ p = zero_reg -> (CIDa14 : CPU) = (CIDa3 : CPU)) by wp_next_chain.
     iDestruct (cpu_own_transport CIDa3 CIDa14 lvl eb p b HcntCA2' with "Hcnt") as "Hcnt".
-    iSpecialize ("Hok" $! CIDa14 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hok" $! CIDa14 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hok" $! P3 bppn with "[%] [%] Hcg Hcnt Hpc
             Hc56 Hc48 Hc40 Hc32 Hc24 Hc16 Hc08 Hc00 Hptree Henv HF").
     { intros c Hcs Hc9.

@@ -780,7 +780,7 @@ Section ProofPipealloc.
                   ltac:(apply bv_eq; vm_compute; reflexivity)
                   with "Hcg Hpc []").
         { iApply (pai_b6 with "Htext"). }
-        iIntros (CIDt7 Hst7) "_ Hcg Hpc".
+        iIntros (CIDt7 Hst7) "Hlc Hcg Hpc".
         set (U5 := <[Regidx Ra0 := regval_into_reg (mword_of_int (-1) : mword 64)]> mr).
         assert (Hpab8 : add_vec_int (mword_of_int (KernelSyms.pipealloc + 0xb6) : mword 64) 2 = mword_of_int (KernelSyms.pipealloc + 0xb8))
           by (apply bv_eq; vm_compute; reflexivity).
@@ -793,7 +793,7 @@ Section ProofPipealloc.
                      with "Hextc") as "Hextc".
         iDestruct (cpu_claim_ext_transport CIDt6 CIDt7 eb p ltac:(ext_chain Hbf)
                      with "Hextm") as "Hextm".
-        iSpecialize ("Hepi" $! CIDt7 with "[%]"); [wp_next_chain|].
+        iSpecialize ("Hepi" $! CIDt7 with "[%] Hlc"); [wp_next_chain|].
         iApply ("Hepi" $! U5 (mword_of_int (-1) : mword 64) with "[%] Hcg Hpc Hcnt Hextc Hextm Hslots Hpbare Hiru [Hav Hunit0 Hunit1 Hcell0 Hcell1]").
         { split.
           { rewrite /U5 upd_ne; [| vm_compute; discriminate].

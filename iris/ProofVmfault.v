@@ -541,14 +541,14 @@ Section ProofVmfault.
                 ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate) Hcmp
                 with "Hcg Hpc []").
       { iApply (vfi_0c with "Htext"). }
-      iIntros (C10 Hs10) "_ Hcg Hpc".
+      iIntros (C10 Hs10) "Hlc Hcg Hpc".
       assert (Hpp10 : add_vec_int (mword_of_int (KernelSyms.vmfault + 0x0c) : mword 64) 4
                       = mword_of_int (KernelSyms.vmfault + 0x10))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp10) in "Hpc".
       iDestruct (cpu_own_transport CID C10 lvl eb p b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
-      iSpecialize ("Hepi" $! C10 with "[%]"); [wp_next_chain|].
+      iSpecialize ("Hepi" $! C10 with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hepi" $! R3 (mword_of_int 0) with "[%] Hcg Hcnt Hlend Hpc [Hk3 Hk4 Hk5] [Hpt]").
       { split_and!.
         - exact HR3sp.

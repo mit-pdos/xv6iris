@@ -3203,13 +3203,13 @@ Section ProofConsoleintr.
               mcp (trap_res b + (K - 6))%nat false
               ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
     { iApply (cnti_12c with "Ht"). }
-    iApply bi.later_intro. iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
+    iApply bi.later_intro. iApply wp_next_off_intro_lc. iIntros "Hlc Hcg Hpc". rgall.
     assert (Hj104 : add_vec (mword_of_int (CT + 0x12c) : mword 64)
                       (sign_extend' 64 (sign_extend' 21
                          (concat_vec (mword_of_int 2028 : mword 11) ('b"0"))))
                     = mword_of_int (CT + 0x104)) by pcw.
     iEval (rewrite Hj104) in "Hpc".
-    iSpecialize ("EXIT" $! CIDq with "[%]"); [exact Hchain|].
+    iSpecialize ("EXIT" $! CIDq with "[%] Hlc"); [exact Hchain|].
     (* ...AND IT IS PAID once the glyph has gone out. *)
     iApply fupd_wp.
     iMod (ct_gh_pay_owed cn γu rr ww ee1 bs ts hb cb Hcnu Hends
@@ -3908,13 +3908,13 @@ Section ProofConsoleintr.
                 ltac:(rgall; rewrite HF11s1; exact Heof)
                 ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
       { iApply (cnti_07c with "Ht"). }
-      iApply bi.later_intro. iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
+      iApply bi.later_intro. iApply wp_next_off_intro_lc. iIntros "Hlc Hcg Hpc". rgall.
       assert (Hj156 : add_vec (mword_of_int (CT + 0x7c) : mword 64)
                         (sign_extend' 64 (sign_extend' 13
                            (concat_vec (mword_of_int 109 : mword 8) ('b"0"))))
                       = mword_of_int (CT + 0x156)) by pcw.
       iEval (rewrite Hj156) in "Hpc".
-      iSpecialize ("WAKE" $! CIDq with "[%]"); [exact Hchain|].
+      iSpecialize ("WAKE" $! CIDq with "[%] Hlc"); [exact Hchain|].
       iApply ("WAKE" $! F11 rr ww ee1 (<[idx := cons_xlate c]> bs)
                 (<[idx := Some h]> ts) with "[%] [%] [%] [%] [%] [%] [%]
                 Hcg Hpc Hcnt Hpay Hlocked Hrc Hwc Hec Hdat Hts Hgh Hrest
@@ -4269,12 +4269,12 @@ Section ProofConsoleintr.
                 ltac:(rgall; rewrite HG6a4 HG6a5; exact Hgd)
                 ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
       { iApply (cnti_044 with "Ht"). }
-      iApply bi.later_intro. iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
+      iApply bi.later_intro. iApply wp_next_off_intro_lc. iIntros "Hlc Hcg Hpc". rgall.
       assert (Hj104 : add_vec (mword_of_int (CT + 0x44) : mword 64)
                         (sign_extend' 64 (mword_of_int 192 : mword 13))
                       = mword_of_int (CT + 0x104)) by pcw.
       iEval (rewrite Hj104) in "Hpc".
-      iSpecialize ("EXIT" $! CIDq with "[%]"); [exact Hchain|].
+      iSpecialize ("EXIT" $! CIDq with "[%] Hlc"); [exact Hchain|].
       (* A FULL RING DROPS THE BYTE, AND LOGS THE DROP (lane CONS-IO,
          milestone B): this is the arm that fired nothing at all before
          milestone A, and it now files [cs = []] itself. *)

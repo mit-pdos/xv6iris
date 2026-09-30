@@ -766,7 +766,7 @@ Section ProofCreateAlloc.
                   ltac:(rewrite Htg0f8; vm_compute; reflexivity)
                   with "Hcg Hpc []").
         { iApply (cri_0ca with "Htext"). }
-        iApply bi.later_intro. iIntros (CIDB8 HqB8) "_". iIntros "Hcg Hpc".
+        iApply bi.later_intro. iIntros (CIDB8 HqB8) "Hlc". iIntros "Hcg Hpc".
         iEval (rewrite Htg0f8) in "Hpc".
         iDestruct (cpu_own_transport CIDiu CIDB8 0%nat eb (proc_addr j) b
                      ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
@@ -774,7 +774,7 @@ Section ProofCreateAlloc.
            where its dot entries land and the row comes back (lane A) *)
         iSpecialize ("Hmk" $! kd qd gd γil γisl dind dn bm data nf nsl t).
         iPoseProof ("Hmk" $! CIDB8) as "Hm".
-        iSpecialize ("Hm" with "[%]"); [wp_next_chain |].
+        iSpecialize ("Hm" with "[%] Hlc"); [wp_next_chain |].
         iAssert (∃ lo tl : nat,
             ⌜(lo <= tl)%nat⌝ ∗ IcacheRef.cred_floor lo tl ∗
             IcacheRef.inode_ref_short_genlo kd (qd/2 + qd/2)%Qp (qd/2)%Qp

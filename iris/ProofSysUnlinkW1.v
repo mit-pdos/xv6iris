@@ -297,8 +297,8 @@ Section ProofSysUnlinkW1.
       sys_unlink_closer (CID := CIDx) gf pj pid (upd_usV U (upd_ev (us_V U) k))
         m rt K eb b lks dqb dqs dqbs ARMS).
   Proof using .
-    iIntros (Hk) "H". iIntros (CIDx Hs) "_"; iIntros (mf P' k') "%Hcs %Hext %Hk'".
-    iApply ("H" $! CIDx Hs mf P' k' with "[%] [%] [%]");
+    iIntros (Hk) "H". iIntros (CIDx Hs) "Hlc"; iIntros (mf P' k') "%Hcs %Hext %Hk'".
+    iSpecialize ("H" $! CIDx Hs with "Hlc"). iApply ("H" $! mf P' k' with "[%] [%] [%]");
       [exact Hcs | exact Hext | cbn in Hk'; lia].
   Qed.
 

@@ -909,13 +909,13 @@ Section ProofCopyinstr.
                   I4 Kv b ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc []").
         { iApply (csi_bc with "Htext"). }
-        iApply bi.later_intro. iIntros (CIDn8 Hsn8) "_". iIntros "Hcg Hpc".
+        iApply bi.later_intro. iIntros (CIDn8 Hsn8) "Hlc". iIntros "Hcg Hpc".
         assert (Htgt68 : add_vec (mword_of_int (KernelSyms.copyinstr + 0xbc) : mword 64)
                   (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 2006 : mword 11) ('b"0"))))
                   = mword_of_int (KernelSyms.copyinstr + 0x68)) by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Htgt68) in "Hpc".
         assert (Hi1 : i = (n - 1)%nat) by lia.
-        iSpecialize ("HK" $! CIDn8 with "[]"); [ iPureIntro; wp_next_chain | ].
+        iSpecialize ("HK" $! CIDn8 with "[] Hlc"); [ iPureIntro; wp_next_chain | ].
         iDestruct "HK" as "[_ HDONE]".
         iApply ("HDONE" $! I4 (bb_upd f (done + i)%nat (fsrc i))
                   with "[%] [%] [%] [%] [%] [%] Hcg Hpc Hsrc Hdst").
@@ -1612,10 +1612,10 @@ Section ProofCopyinstr.
                       ltac:(rewrite /E1 upd_eq; reflexivity)
                       ltac:(right; split; [exact cs_xor_0 | reflexivity])
                       with "Hcg Htext Hpc").
-            iIntros (CIDd8 Hsd8) "_"; iIntros (Mo) "%Hoa0 %Hothr Hcg Hpc".
+            iIntros (CIDd8 Hsd8) "Hlc"; iIntros (Mo) "%Hoa0 %Hothr Hcg Hpc".
             iDestruct (cpu_own_transport CIDc CIDd8 lvl eb pcur b ltac:(wp_next_chain)
                          with "Hcnt") as "Hcnt".
-            iSpecialize ("HEXIT" $! CIDd8 with "[]"); [ iPureIntro; wp_next_chain | ].
+            iSpecialize ("HEXIT" $! CIDd8 with "[] Hlc"); [ iPureIntro; wp_next_chain | ].
             iApply ("HEXIT" $! Mo (mword_of_int (-1) : mword 64) Pd g
                       with "[%] [%] [%] [%] [%] [%] Hcg Hcnt Hlend Hpc Hpt Hdst").
             { rewrite (Hothr csp_rs1 ltac:(reg_neq) ltac:(reg_neq)). lkp. }

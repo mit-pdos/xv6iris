@@ -458,7 +458,7 @@ Section ProofKerneltrap.
                 ltac:(apply not_true_iff_false; exact Htim)
                 with "Hcg Hpc []").
       { iApply (kti_32 with "Htext"). }
-      iApply wp_next_off_intro. iIntros "Hcg Hpc".
+      iApply wp_next_off_intro_lc. iIntros "Hlc Hcg Hpc".
       assert (Hpc36 : add_vec_int (mword_of_int (KernelSyms.kerneltrap + 0x32) : mword 64) 4
                       = mword_of_int (KernelSyms.kerneltrap + 0x36)) by pcw.
       iEval (rewrite Hpc36) in "Hpc".
@@ -476,7 +476,7 @@ Section ProofKerneltrap.
         iEval (rewrite Hav6) in "Hcgat".
       (* NO RE-SEAL NEEDED -- see the twin above. *)
       iRename "Havail" into "Havz".
-      iSpecialize ("Hcont" $! CID with "[]"); [iPureIntro; intros _; reflexivity|].
+      iSpecialize ("Hcont" $! CID with "[] Hlc"); [iPureIntro; intros _; reflexivity|].
       iApply ("Hcont" $! mf ms_f sc tv with "[%] [%] [%] [%] Hcgat Hmir Havz Hkptr Hcpu
                             Hsepc Hscause Hstval Hpc Hclm").
       { exact Hcsf. }

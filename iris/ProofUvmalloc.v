@@ -1477,10 +1477,10 @@ Section ProofUvmalloc.
                 X4 (K - 10)%nat b ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (uai_64 with "Htext"). }
-      iApply bi.later_intro. iIntros (CIDu34 Hsu34) "_". iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CIDu34 Hsu34) "Hlc". iIntros "Hcg Hpc".
       iEval (rewrite Hjt64) in "Hpc".
       iEval (rewrite /ua_exit) in "Hexit".
-      iSpecialize ("Hexit" $! CIDu34 with "[%]"); [wp_next_chain|].
+      iSpecialize ("Hexit" $! CIDu34 with "[%] Hlc"); [wp_next_chain|].
       iDestruct (cpu_own_transport CIDu25 CIDu34 0%nat eb p b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
       iApply ("Hexit" $! X4 newsz with "[%] Hcg Hcnt Hlend Hpc [Hk3 Hk5 Hk8] [Hpt]").

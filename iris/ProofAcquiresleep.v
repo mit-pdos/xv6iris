@@ -905,12 +905,12 @@ Section AslBodies.
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc [] [Hr24 Hr16 Hr8 Hr0 Htok Hpid Hown Htc Hclm IH Hexit Hheldw Hdep HHq]").
       { iApply (asl_34 with "Htext"). }
-      iNext. iApply wp_next_off_intro. iIntros "Hcg Hpc".
+      iNext. iApply wp_next_off_intro_lc. iIntros "Hlc Hcg Hpc".
       assert (Hbk : add_vec (mword_of_int (KernelSyms.acquiresleep + 0x34) : mword 64) (sign_extend' 64 (sign_extend' 13 (concat_vec (mword_of_int 244 : mword 8) ('b"0")))) = mword_of_int (KernelSyms.acquiresleep + 0x1c))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hbk) in "Hpc".
       rewrite /asl_loop.
-      iSpecialize ("IH" $! CID with "[%]"); [wp_next_chain|].
+      iSpecialize ("IH" $! CID with "[%] Hlc"); [wp_next_chain|].
       iApply ("IH" $! La5 with "[%] Hr24 Hr16 Hr8 Hr0 Htok Hheldw Hdep HHq Hpid Hown Htc Hclm Hcg Hpc Hexit").
       exact HaslLa5.
   Qed.
@@ -1481,7 +1481,7 @@ Section ProofAcquiresleep.
       iAssert (∃ v : mword 32, slk ↦₄ v ∗ ⌜neq_vec (sign_extend' 64 v) zero_reg = true⌝)%I with "[Hw0]" as "Hheldw".
       { iExists v0. iFrame "Hw0". iPureIntro. exact Hv0h. }
       rewrite /asl_loop.
-      iSpecialize ("Hloop" $! CID11 with "[%]"); [wp_next_chain|].
+      iSpecialize ("Hloop" $! CID11 with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hloop" $! Me with "[%] Hr24 Hr16 Hr8 Hr0 Htok Hheldw Hdep HHq Hpid Hown Htc Hclm Hcg Hpc Hexit").
       exact HaslMe.
   Qed.

@@ -8129,9 +8129,9 @@ Section ProofPrintk.
           iApply (@IH CIDh mk k' p' Hhk ltac:(lia) Hplen' Hinv' Hksp Hks0 Hks2 Hks1 Hks9 Hkconsts
                     with "Hcg Htext Hkdata Hpc Hfmt Hdescs Hcnt Hlk Hheld Hpre Hfr [Hfin]").
           rewrite /pk_loop_post.
-          iIntros (CIDp Hstp) "_"; iIntros (mz) "Hcg Hpc %Hfin2 Hfmt Hdescs Hcnt".
+          iIntros (CIDp Hstp) "Hlc"; iIntros (mz) "Hcg Hpc %Hfin2 Hfmt Hdescs Hcnt".
           iEval (rewrite /pk_loop_post) in "Hfin".
-          iSpecialize ("Hfin" $! CIDp with "[%]");
+          iSpecialize ("Hfin" $! CIDp with "[%] Hlc");
             [ intros Hdx; etransitivity;
               [ exact (Hstp Hdx)
               | etransitivity; [ exact (Hsth (or_introl eq_refl)) | exact (Hcca (or_introl eq_refl)) ] ] | ].
