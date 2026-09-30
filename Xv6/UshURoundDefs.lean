@@ -181,9 +181,9 @@ theorem ufi_ab (ug : UnionGn) (s0 : Fstate) :
     (unionLinkInstAt (hlc := hlc) (GF := GF) ug s0).lkAb = lmAb ulmG ulmGHooks := rfl
 
 /-- The record's per-round payload is the union's (the lane-U hook
-`unionPrHook`, Rocq `UnionOut.upr`; sync SY3-A4). -/
+`upr`, Rocq `UnionOut.upr`; sync SY3-A4). -/
 theorem ufi_rnd (ug : UnionGn) (s0 : Fstate) :
-    (unionLinkInstAt (hlc := hlc) (GF := GF) ug s0).lkRnd = unionPrHook ug := rfl
+    (unionLinkInstAt (hlc := hlc) (GF := GF) ug s0).lkRnd = upr ug := rfl
 
 /-- **Rocq `ufi_rnd_free`**: the record's payload is free at every
 alternative but the sync's own. -/
@@ -193,7 +193,7 @@ theorem ufi_rnd_free (ug : UnionGn) (s0 : Fstate) (I : List (BitVec 8)) (a : Nat
         (genId (hlc := hlc) (GF := GF) + 1) v I a) := by
   rw [ufi_rnd]
   iintro %v
-  iapply unionPrHook_free ug _ v I a ha
+  iapply upr_free ug _ v I a ha
 
 /-- **Rocq `ush_deed_nw`**: THE DEED SAYS ITS LINE IS NOT WILD (or the taint). -/
 theorem ush_deed_nw (ug : UnionGn) (r : FileAppNames) (s0 : Fstate)

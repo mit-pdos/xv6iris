@@ -22,7 +22,7 @@ CONE (this file): `uecho_lend`, `ucat_lend` (and `ucat_alts`, pure, in
 2. `cons_short` / `cons_adm` / `cons_cur` are H-io's UkConsOut
    `consShort` / `consAdm` / `consCur`.
 3. (sync SY3-A4) `ucons_rnd_free` reads the union's payload through the
-   lane-U hook's law `unionPrHook_free` (Rocq: `upr_free`); the codes'
+   lane-U hook's law `upr_free` (Rocq: `upr_free`); the codes'
    non-sync facts are `ualtDec_0_nsync` / `ualtCode_R_nsync` (Rocq:
    `vm_compute`).
 -/
@@ -56,7 +56,7 @@ theorem ucons_rnd_free (sb : Fstate) (v : EraPins) (I : List (BitVec 8)) (codes 
   rw [unionParamsAt_gR]
   imodintro
   iintro %c %hc
-  iapply unionPrHook_free ug _ v I c (hf c hc)
+  iapply upr_free ug _ v I c (hf c hc)
 
 /-- **Rocq `uecho_lend`**: echo's lend at the console, the block at its
 first byte, code 0 (deviation 1). -/

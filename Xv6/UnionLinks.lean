@@ -172,15 +172,17 @@ theorem union_write_link_blk (ug : UnionGn)
       (ulmG.lmOf ((bodiesOf I0)[nlines I0 - 1]!)) (ulmG.lmDec a))[0]? = some b) :
     ⊢ eraPin (fgnEcho ug.ugnFile) k v -∗ turn v P -∗ psLb v ps0 -∗ csLb v cs0 -∗ inpLb v I0 -∗
       f0cw ug.ugnFile k s0 -∗
+      -- ...and the round's payload (sync SY3-A4)
+      upr (hlc := hlc) ug k v I0 a -∗
       (((turn v (P + 1) ∗ psLb v ps0 ∗ csLb v (cs0 ++ [a]) ∗ inpLb v I0 ∗ f0cw ug.ugnFile k s0)
         ∨ fileTaint (hlc := hlc) ug.ugnFile.fgnCl) -∗ Φ) -∗
       outLink .uart0 k b Φ := by
-  iintro #Hpin Ht #Hpslb #Hcslb #Hilb #HW HΦ
+  iintro #Hpin Ht #Hpslb #Hcslb #Hilb #HW #HR HΦ
   unfold outLink
   iintro %o %H #Hlb Hres
   simp only [chistAt, hcons]
   imod ucl_step_write_blk ug k v P a b ps0 cs0 s0 I0 (o.getD []) H hnw hne0 hr0 hdiv hpin0 hPeq
-    halt hterm hhead $$ Hpin Ht Hpslb Hcslb Hilb HW Hres with ⟨Hres, Hret⟩
+    halt hterm hhead $$ Hpin Ht Hpslb Hcslb Hilb HW HR Hres with ⟨Hres, Hret⟩
   imodintro
   iexists o
   iframe Hlb Hres

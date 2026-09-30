@@ -227,7 +227,7 @@ theorem uWcl3_eq (ug : UnionGn) (s0 : Fstate) (I : List (BitVec 8)) :
       ∗ ((∃ (ps cs : List Nat) (s0' : Fstate) (P : Nat), ⌜lmWrBlkT ulmG ps cs s0' I P⌝ ∗
           turn v P ∗ psLb v ps ∗ csLb v cs ∗ inpLb v I
           ∗ f0wAt (hlc := hlc) ug.ugnFile s0 (genId (hlc := hlc) (GF := GF) + 1) s0'
-          ∗ (⌜(0 : Nat) ≠ 0⌝ ∨ unionPrHook (GF := GF) ug (genId (hlc := hlc) (GF := GF) + 1) v I 0))
+          ∗ (⌜(0 : Nat) ≠ 0⌝ ∨ upr (hlc := hlc) (GF := GF) ug (genId (hlc := hlc) (GF := GF) + 1) v I 0))
         ∨ fileTaint (hlc := hlc) ug.ugnFile.fgnCl)) := by
   rfl
 

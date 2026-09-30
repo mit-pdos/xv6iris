@@ -53,17 +53,10 @@ Rocq's header, abridged:
    `l !!! i` is `l[i]!`.
 5. `pwc_blkU_timeless` / `ptkU_persistent` are instances over
    `PipeOutNDefs.pwcBlkV_timeless` / `ptkV_persistent` (theorems there).
-6. (DRIFT sync SY3-A4, Rocq cc76f92ab; drift D3-app/G, the generic sweep)
-   The union's per-round payload `upr` is lane U's: here it is the HOOK
-   `unionPrHook` (`emp`), with Rocq's seven laws `upr_free`, `upr_free_line`,
-   `upr_0`, `upr_pan`, `upr_exf`, `upr_wild`, `upr_pv` stated at their Rocq
-   shapes as `unionPrHook_*` (every consumer reads the family through them).
-   `uwa.gpr` and `UnionLinkInst(At).unionParams(At).gR` are the hook.
-   `pblkU_ecl_holds` and `pwcBlkU_file_empty` take Rocq main's statements
-   (the view's line, `upr_pv`).  `ucl_step_write_blk` keeps its pre-drift
-   statement, paying the payload from `unionPrHook_emp` (valid only while
-   the hook is `emp`; lane U deletes it and adds Rocq's `upr` premise there,
-   in `UnionLinks.union_write_link_blk` and `UShURoundLaws.upfam_step`).
+6. (DRIFT sync SY3-A4, Rocq cc76f92ab; drift D3-app/G+U) The union's
+   per-round payload is Rocq's `upr` (`uwa.gpr`, and
+   `UnionLinkInst(At).unionParams(At).gR`), with its seven laws `upr_free`,
+   `upr_free_line`, `upr_0`, `upr_pan`, `upr_exf`, `upr_wild`, `upr_pv`.
    `ualtCode_R_nsync` / `ualtDec_0_nsync` are the codes' non-sync facts
    (Rocq: `vm_compute`).
 -/
@@ -72,6 +65,8 @@ import Xv6.UnionDiscDec
 import Xv6.PipeOutWRead
 import Xv6.PipeOutWSteps
 import Xv6.FileOutClaim
+import Xv6.AppFileSync
+import Xv6.UnionOutSyncPure
 
 namespace Xv6
 
@@ -131,21 +126,10 @@ theorem uwaGextGrow (ug : UnionGn) (k : Nat) (l : List (BitVec 8)) (b : BitVec 8
   iintro H
   iapply pext_grow (ugnPipe ug) k l b $$ H
 
-/-! ### The round's payload: LANE-U HOOK
-
-Rocq `UnionOut.upr` (sync SY3-A4, cc76f92ab) is the union's per-round
-payload family: nothing, except when the alternative filed is /sync's run at
-a `sync` line, where it is the completed sync's RECORD.  It is the union
-instance's `gpr` (`uwa`) and `gR` (`UnionLinkInst.unionParams` /
-`UnionLinkInstAt.unionParamsAt`).  The generic sweep (drift D3-app/G) lands
-the family's plumbing with the union's member `emp`; lane U replaces the body
-of `unionPrHook` with Rocq's `upr` and re-proves the seven laws below (Rocq
-`upr_free`, `upr_free_line`, `upr_0`, `upr_pan`, `upr_exf`, `upr_wild`,
-`upr_pv`) at their stated shapes -- every consumer reads the family through
-these laws only. -/
+/-! ### The round's payload (Rocq `upr`, sync SY3-A4) -/
 
 /-- a file-line code other than /sync's run is not it (the premise of
-`unionPrHook_free` at the codes the file lines file) -/
+`upr_free` at the codes the file lines file) -/
 theorem ualtCode_R_nsync (a : Ralt) (ha : a ≠ .RSyncRan) :
     ualtDec (ualtCode (Ualt.UR a)) ≠ Ualt.UR .RSyncRan := by
   rw [ualtDec_code]; intro h; injection h with h; exact ha h
@@ -153,56 +137,79 @@ theorem ualtCode_R_nsync (a : Ralt) (ha : a ≠ .RSyncRan) :
 theorem ualtDec_0_nsync : ualtDec 0 ≠ Ualt.UR .RSyncRan := by
   rw [ualtDec_0]; intro h; injection h with h; exact absurd h (by decide)
 
-/-- LANE-U HOOK: the union's per-round payload (Rocq `UnionOut.upr`); `emp`
-until lane U instantiates it. -/
-def unionPrHook (_ug : UnionGn) (_k : Nat) (_v : EraPins) (_I : List (BitVec 8)) (_a : Nat) :
-    IProp GF := iprop(emp)
+/-- THE ROUND'S PAYLOAD (Rocq `upr`, sync SY3-A4, `GenOut.gpr`): nothing,
+except when the alternative filed is /sync's run at a `sync` line, where it
+is the completed sync's RECORD -- the choices before the round, the era's
+boot state and record, and a lower bound of the RUN-LONG sync history ending
+at `(position of the line + 1, the state before the round)`. -/
+noncomputable def upr (ug : UnionGn) (k : Nat) (v : EraPins) (I : List (BitVec 8)) (a : Nat) :
+    IProp GF :=
+  iprop(⌜¬ (lmLineAt ulmG I = Uline.LSync ∧ ualtDec a = Ualt.UR .RSyncRan)⌝
+    ∨ fileTaint (hlc := hlc) ug.ugnFile.fgnCl
+    ∨ ∃ (cs : List Nat) (s0 : Fstate) (vf : FileEra) (L : List Srec),
+        csLb v cs ∗ ⌜cs.length = nlines I - 1⌝ ∗ f0cw ug.ugnFile k s0
+        ∗ fileEraPin ug.ugnFile k vf
+        ∗ slLb ug.ugnFile.fgnCl.ffHist
+            (L ++ [(((vf.feBase ++ ulinesIn I).length,
+                    lmUpto ulmG cs s0 (bodiesOf I) (nlines I - 1)) : Srec)]))
 
-instance unionPrHook_persistent (ug : UnionGn) (k : Nat) (v : EraPins) (I : List (BitVec 8))
-    (a : Nat) : Persistent (unionPrHook (GF := GF) ug k v I a) := by
-  unfold unionPrHook; infer_instance
-instance unionPrHook_timeless (ug : UnionGn) (k : Nat) (v : EraPins) (I : List (BitVec 8))
-    (a : Nat) : Timeless (unionPrHook (GF := GF) ug k v I a) := by
-  unfold unionPrHook; infer_instance
+instance upr_persistent (ug : UnionGn) (k : Nat) (v : EraPins) (I : List (BitVec 8))
+    (a : Nat) : Persistent (upr (hlc := hlc) (GF := GF) ug k v I a) := by
+  unfold upr; infer_instance
+instance upr_timeless (ug : UnionGn) (k : Nat) (v : EraPins) (I : List (BitVec 8))
+    (a : Nat) : Timeless (upr (hlc := hlc) (GF := GF) ug k v I a) := by
+  unfold upr; infer_instance
 
 /-- Rocq `upr_free`: free at every alternative but the sync's run. -/
-theorem unionPrHook_free (ug : UnionGn) (k : Nat) (v : EraPins) (I : List (BitVec 8)) (a : Nat)
-    (_ha : ualtDec a ≠ Ualt.UR Ralt.RSyncRan) : ⊢ unionPrHook (GF := GF) ug k v I a := by
-  unfold unionPrHook; iempintro
+theorem upr_free (ug : UnionGn) (k : Nat) (v : EraPins) (I : List (BitVec 8)) (a : Nat)
+    (ha : ualtDec a ≠ Ualt.UR Ralt.RSyncRan) : ⊢ upr (hlc := hlc) (GF := GF) ug k v I a := by
+  unfold upr
+  ileft; ipureintro; exact fun h => ha h.2
 
 /-- Rocq `upr_free_line`: free at every line but `sync`. -/
-theorem unionPrHook_free_line (ug : UnionGn) (k : Nat) (v : EraPins) (I : List (BitVec 8))
-    (a : Nat) (_hl : lmLineAt ulmG I ≠ Uline.LSync) : ⊢ unionPrHook (GF := GF) ug k v I a := by
-  unfold unionPrHook; iempintro
+theorem upr_free_line (ug : UnionGn) (k : Nat) (v : EraPins) (I : List (BitVec 8))
+    (a : Nat) (hl : lmLineAt ulmG I ≠ Uline.LSync) : ⊢ upr (hlc := hlc) (GF := GF) ug k v I a := by
+  unfold upr
+  ileft; ipureintro; exact fun h => hl h.1
 
 /-- Rocq `upr_0`. -/
-theorem unionPrHook_0 (ug : UnionGn) (k : Nat) (v : EraPins) (I : List (BitVec 8)) :
-    ⊢ unionPrHook (GF := GF) ug k v I 0 := by
-  unfold unionPrHook; iempintro
+theorem upr_0 (ug : UnionGn) (k : Nat) (v : EraPins) (I : List (BitVec 8)) :
+    ⊢ upr (hlc := hlc) (GF := GF) ug k v I 0 :=
+  upr_free ug k v I 0 ualtDec_0_nsync
 
 /-- Rocq `upr_pan`. -/
-theorem unionPrHook_pan (ug : UnionGn) (k : Nat) (v : EraPins) (I : List (BitVec 8)) :
-    ⊢ unionPrHook (GF := GF) ug k v I (ulmGHooks.lmhPan (lmLineAt ulmG I)) := by
-  unfold unionPrHook; iempintro
+theorem upr_pan (ug : UnionGn) (k : Nat) (v : EraPins) (I : List (BitVec 8)) :
+    ⊢ upr (hlc := hlc) (GF := GF) ug k v I (ulmGHooks.lmhPan (lmLineAt ulmG I)) := by
+  by_cases hl : lmLineAt ulmG I = Uline.LSync
+  · apply upr_free
+    rw [hl]
+    show ualtDec (4 * raltEnc .RCFork) ≠ _
+    rw [ualtDec_R, raltDec_enc]; intro h; injection h with h; cases h
+  · exact upr_free_line ug k v I _ hl
 
 /-- Rocq `upr_exf`. -/
-theorem unionPrHook_exf (ug : UnionGn) (k : Nat) (v : EraPins) (I : List (BitVec 8)) :
-    ⊢ unionPrHook (GF := GF) ug k v I (ulmGHooks.lmhExf (lmLineAt ulmG I)) := by
-  unfold unionPrHook; iempintro
+theorem upr_exf (ug : UnionGn) (k : Nat) (v : EraPins) (I : List (BitVec 8)) :
+    ⊢ upr (hlc := hlc) (GF := GF) ug k v I (ulmGHooks.lmhExf (lmLineAt ulmG I)) := by
+  by_cases hl : lmLineAt ulmG I = Uline.LSync
+  · apply upr_free
+    rw [hl]
+    show ualtDec (4 * raltEnc .RSyncExec) ≠ _
+    rw [ualtDec_R, raltDec_enc]; intro h; injection h with h; cases h
+  · exact upr_free_line ug k v I _ hl
 
 /-- Rocq `upr_wild`: free at the wild line. -/
-theorem unionPrHook_wild (ug : UnionGn) (k : Nat) (v : EraPins) (I : List (BitVec 8)) (a : Nat)
-    (_hw : uwild (lmLineAt ulmG I) = true) : ⊢ unionPrHook (GF := GF) ug k v I a := by
-  unfold unionPrHook; iempintro
+theorem upr_wild (ug : UnionGn) (k : Nat) (v : EraPins) (I : List (BitVec 8)) (a : Nat)
+    (hw : uwild (lmLineAt ulmG I) = true) : ⊢ upr (hlc := hlc) (GF := GF) ug k v I a :=
+  upr_free_line ug k v I a (uwild_nsync _ hw)
 
 /-- Rocq `upr_pv`: free at a pipeline's line. -/
-theorem unionPrHook_pv (ug : UnionGn) (k : Nat) (v : EraPins) (I : List (BitVec 8)) (lR : Pline')
-    (a : Nat) (_hl : pviewUnionU.pvLine (lineV ulmG I) = some lR) :
-    ⊢ unionPrHook (GF := GF) ug k v I a := by
-  unfold unionPrHook; iempintro
+theorem upr_pv (ug : UnionGn) (k : Nat) (v : EraPins) (I : List (BitVec 8)) (lR : Pline')
+    (a : Nat) (hl : pviewUnionU.pvLine (lineV ulmG I) = some lR) :
+    ⊢ upr (hlc := hlc) (GF := GF) ug k v I a :=
+  upr_free_line ug k v I a (upv_nsync _ lR hl)
 
 /-- The file's witness authority, the pipeline's byte ledger beside it (Rocq
-`uwa`), the round's payload the lane-U hook (sync SY3-A4). -/
+`uwa`), the round's payload `upr` (sync SY3-A4). -/
 noncomputable def uwa (ug : UnionGn) :
     GenWa ulmG (ucparams (hlc := hlc) (GF := GF) ug) (∅ : Fstate) where
   gwa := f0wa ug.ugnFile
@@ -220,23 +227,14 @@ noncomputable def uwa (ug : UnionGn) :
   gext := pext (ugnPipe ug)
   gext_tl := fun _ _ => inferInstance
   gext_grow := uwaGextGrow ug
-  gpr := unionPrHook ug
+  gpr := upr ug
   gpr_pers := fun _ _ _ _ => inferInstance
   gpr_tl := fun _ _ _ _ => inferInstance
 
 /-- the payload's projection, by name (Iris's tactics match up to reducible
 unfolding only) -/
 theorem uwa_gpr (ug : UnionGn) :
-    (uwa (hlc := hlc) (GF := GF) ug).gpr = unionPrHook ug := rfl
-
-/-- LANE-U HOOK, TEMPORARY: while the hook is `emp` the payload is free
-everywhere.  Its one use is `ucl_step_write_blk`, which Rocq states with the
-premise `upr k v I0 a -∗` (and `UnionLinks.union_write_link_blk` /
-`UShURoundLaws.upfam_step` with it, the PEND prompt paying it from
-`upr_of_rec`): lane U deletes this lemma and adds those premises. -/
-theorem unionPrHook_emp (ug : UnionGn) (k : Nat) (v : EraPins) (I : List (BitVec 8)) (a : Nat) :
-    ⊢ unionPrHook (GF := GF) ug k v I a := by
-  unfold unionPrHook; iempintro
+    (uwa (hlc := hlc) (GF := GF) ug).gpr = upr ug := rfl
 
 /-- Rocq `uwa_ext`. -/
 theorem uwa_ext (ug : UnionGn) (k : Nat) (l : List (BitVec 8)) :
@@ -358,6 +356,8 @@ theorem ucl_step_write_blk (ug : UnionGn) (k : Nat) (v : EraPins) (P a : Nat) (b
       (ulmG.lmOf ((bodiesOf I0)[nlines I0 - 1]!)) (ulmG.lmDec a))[0]? = some b) :
     ⊢ eraPin (GF := GF) (fgnEcho ug.ugnFile) k v -∗ turn v P -∗ psLb v ps0 -∗ csLb v cs0 -∗
       inpLb v I0 -∗ f0cw ug.ugnFile k s0 -∗
+      -- ...and the round's payload (sync SY3-A4)
+      upr (hlc := hlc) ug k v I0 a -∗
       ucl (hlc := hlc) ug k ho H ==∗
         ucl ug k ho (consStep H (.evOut b)) ∗
         ((turn v (P + 1) ∗ psLb v ps0 ∗ csLb v (cs0 ++ [a]) ∗ inpLb v I0 ∗ f0cw ug.ugnFile k s0)
@@ -367,8 +367,7 @@ theorem ucl_step_write_blk (ug : UnionGn) (k : Nat) (v : EraPins) (P a : Nat) (b
     hPeq halt hterm hhead
   rw [uwa_gpr, ucparams_gcPIN, ucparams_gcW, ucparams_gcT] at h
   unfold ucl
-  iintro #Hpin Ht #Hps #Hcs #HE #HW Hcl
-  ihave #Hgpr := unionPrHook_emp (GF := GF) ug k v I0 a
+  iintro #Hpin Ht #Hps #Hcs #HE #HW #Hgpr Hcl
   iapply h $$ Hpin Ht Hps Hcs HE HW Hgpr Hcl
 
 /-- (P) A PROLOGUE ROUND'S CHOICE BYTE: the file's witness is STRICT, so no
@@ -446,7 +445,7 @@ theorem pblkU_ecl_holds (ug : UnionGn) (v : EraPins) (I : List (BitVec 8)) (sR :
     (lR : Pline') (hlR : pviewUnionU.pvLine (lineV ulmG I) = some lR) :
     ⊢ eclN (ucl (hlc := hlc) (GF := GF) ug) (pwcBlkU ug v I sR) (ptkU ug v I) (pwitU I sR) :=
   pwclV_ecl_holds (ugnPipe ug) ulmG (ucparams ug) (∅ : Fstate) (uwa ug) (uwa_ext ug) uwild
-    uwild_wild v I sR (uwild_pv _ _ hlR) (fun k a => unionPrHook_pv ug k v I lR a hlR)
+    uwild_wild v I sR (uwild_pv _ _ hlR) (fun k a => upr_pv ug k v I lR a hlR)
 
 /-- THE FILING at the credential: the prompt's first byte files the block
 the family handed back, as the view's `PLRun pre` (Rocq `pwc_blkU_file`). -/
@@ -479,16 +478,20 @@ theorem pwcBlkU_file_empty (ug : UnionGn) (v : EraPins) (I : List (BitVec 8)) (s
           ∨ fileTaint (hlc := hlc) ug.ugnFile.fgnCl) :=
   pwclV_blk_file_empty (ugnPipe ug) ulmG (ucparams ug) (ulm_byte_laws admUG admSOn)
     (∅ : Fstate) (uwa ug) uwild uwild_wild pviewUnionU v I sR lR k ho H b uwild_pv hlR hbv
-    (fun k a => unionPrHook_pv ug k v I lR a hlR)
+    (fun k a => upr_pv ug k v I lR a hlR)
 
 /-! ## 4. The tag -/
 
 /-- `FileOut.ftag` at the union's discipline: the trace's shape, the
-discipline or the taint, and a lower bound of the ledger's typed line list
-(Rocq `utag`). -/
+discipline or the taint, and a lower bound of the ledger's line list (EVERY
+complete line, `UnionAdm.ulinesOf`) -- AND THE ERA'S BASE (sync SY3-A3bc):
+the list is the era's pinned base followed by the cycle's own lines (Rocq
+`utag`). -/
 noncomputable def utag (ug : UnionGn) (h : List Obs) : IProp GF :=
   iprop(⌜traceShape h true⌝ ∗ (⌜lmDisc ulmG h⌝ ∨ fileTaint (hlc := hlc) ug.ugnFile.fgnCl)
-    ∗ flLb ug.ugnFile.fgnCl (eflOf h))
+    ∗ flLb ug.ugnFile.fgnCl (ulinesOf h)
+    ∗ ∃ vf : FileEra, fileEraPin ug.ugnFile (obsBoots h) vf
+        ∗ ⌜ulinesOf h = vf.feBase ++ ulastCyc h⌝)
 
 instance utag_persistent (ug : UnionGn) (h : List Obs) :
     Persistent (utag (hlc := hlc) (GF := GF) ug h) := by
