@@ -50,3 +50,7 @@ Lean now matches Rocq main 456141b5b except themes I+J (NI ledgers / permit swee
 Open small items: union_residuals.md still describes pre-hook SY2 shape.
 Small cleanup Sept 29: 236 landed agent worktrees removed (branches kept); lane B's duplicate finder saved in tools/dups/; stale sync notes fixed.
 USER RULING Sept 29: do NOT port the NI work (themes I+J). Old coordinator checkpoint_0926.md deleted.
+Sept 30: branch renamed lean-v2 -> lean. CI-PARITY WAVE (user: port everything Rocq's main CI does + a Lean CI job); brief notes/coord/ci_prompt.txt.
+Agents (worktrees): V vtest a93577c4da3810840; A audits+TCB a5ee8f5813b3bae75; R coverage/profile/dead-code/check-gen a8f14ce73935a53ac.
+Then: lane W = .github/workflows/ci.yml for `lean` (runs-on coqdev like Rocq's; elan + lake; calls tools/ci/*).
+Build-time comparison (Sept 30, same VM): Rocq main 702 s wall / 16.4k s CPU; Lean 225 s / 5.6k s (logs /mnt/rocq/buildcmp).
