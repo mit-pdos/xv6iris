@@ -51,7 +51,33 @@ Lean-specific "what remains" list of §7.4L. Three gated sub-lanes, in dependenc
 
 - [x] PJ-L3a  - [x] PJ-L3b  - [x] PJ-L3c
 
-Then **T**: the rows and the theorem (`ut_round` gains `ev ev'`, `ev' = ev` on the non-ecall rows; `ut_round_quiet`).
+**T as designed for the Lean tree (2026-10-01, Fable; awaiting the owner's word).** L3 established by
+construction (§7.7L of the design note) that a slot's counter moves only through `actCnt_step`, once per
+actor-labelled append, and only in code running as that slot's process. T turns that into a statement about
+the trap loop:
+
+1. **The row.** `usertrapPost` gains one pure premise beside `utGenKept`, in the kept-row style:
+   `utEvQuiet sc V V' : Prop := sc ≠ uecallScause → V.pvLazy = false → V'.ev = V.ev`. No other landed
+   statement moves: `utRound`/`uroundOk` stay as they are (Rocq planned `ev ev'` inside `uround_ok`; the
+   Lean rows are separate pure conjuncts, so the separate row is the faithful spelling).
+2. **The discharges, per row.** Timer/device/unexpected-cause rows: the block is framed (no lend taken),
+   so `V' = V` on `ev` by the existing closes. Ecall row: vacuous. Page-fault row: the arm lends the block's
+   counter to `vmfault` and closes at `V.updEv kv` (L2); at `lazy = false` it needs `kv = V.ev`, which needs
+   **a tightening of `wp_vmfault_body`'s post**: its continuation gains `⌜(¬ (va < sz ∧ page absent)) → k' = ke⌝`
+   (the quiet arms append nothing: `va ≥ sz` and `page present` return before any `kalloc`; the allocating
+   arm is exactly `va < sz ∧ absent`, which `VmfaultQuiet.vmfaultQuiet` refutes at `lazyFree`). That is the
+   one Spec that moves, and only by a pure conjunct; `ProofVmfault` proves it (the quiet arms frame the
+   lend, `actLend_cont_frame`). Kill row: the exception — a killed quiet process exits through kexit
+   (`UT_KEXIT`, no resume row), so nothing to discharge in `usertrapPost`; the statement is for a quiet
+   process that is not killed.
+3. **The theorem.** Pure corollary `utRoundQuiet`: over a run of rounds whose causes are all `≠ uecallScause`
+   at `pvLazy = false`, `ev` is constant (induction on the run using the row); and, as the in-logic reading,
+   `actCnt`'s exclusivity (`actCnt_excl`) gives that no append labelled with that slot's process happened in
+   the run — stated as the design note's §7.8L invariant, since the ledgers' contents are M2's business.
+4. **Gate:** full `tools/ci/run_all.sh`; no TCB move expected (a pure conjunct and theorems).
+
+- [ ] PJ-T
+
 
 Not ported: 42666b2b7 (`tools/intr_cone.py`, a Rocq-module cone audit; the Lean counterpart is a
 `tools/` item for when T lands).  Rocq's L3 and T were never landed; they stay future work.
