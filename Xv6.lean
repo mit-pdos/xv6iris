@@ -101,6 +101,7 @@ import Xv6.LinkKerneltrap
 import Xv6.SpecMemset
 import Xv6.ProofMemset
 import Xv6.LinkMemset
+import Xv6.KallocEv
 import Xv6.KallocDefs
 import Xv6.PipeNames
 import Xv6.PipeQueue

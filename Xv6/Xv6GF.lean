@@ -186,6 +186,9 @@ def xv6GF : BundledGFunctors :=
   -- LogG: the helping slot's map (Rocq `loghelp_inG`, sync K3-2); slot 120, clear of
   -- the union's own slots (95..)
   |>.set 120 ⟨xgfGm Nat (GName × BitVec 32) RegMapF, inferInstance⟩
+  -- Xv6G: the page allocator's event ledger (Rocq `kallocG`'s `mono_listR (leibnizO kev)`,
+  -- NI-LEDGER-KALLOC); slot 121, clear of the union's (95..108)
+  |>.set 121 ⟨xgfMl Kev, inferInstance⟩
 
 /-! ## One instance per camera -/
 
@@ -312,6 +315,8 @@ instance xgfRegistry : GhostMapG xv6GF Nat EraGS RegMapF := ⟨xgf_slot 93⟩
 instance xgfPipeq : ElemG xv6GF (constOF (ExclAuth.ExclAuthR (A := PipeSt))) := xgf_slot 94
 -- LogG: the helping slot's map
 instance xgfHelp : GhostMapG xv6GF Nat (GName × BitVec 32) RegMapF := ⟨xgf_slot 120⟩
+-- Xv6G: the page allocator's event ledger
+instance xgfMlKev : MonoListG xv6GF Kev := ⟨xgf_slot 121⟩
 
 end cameras
 

@@ -12,8 +12,47 @@ gets a page or `0`.
 The payload is a function of the context (`CtxId`), as every lock
 payload is, so the chain is written over the context-parametric
 `wordAtN`/`pageRestAt` (`wordPointsTo`/`byteBuf` at the ambient context).
+
+THE EVENT LEDGER (NI-LEDGER-KALLOC, Rocq bed7ee0dd;
+`claude-notes/design/ni-kalloc-ledger.md`).  In BOTH epochs `kmemAuth`
+also carries `kmemLedger`: the authoritative actor-labelled history `h` of
+every allocator call (`KallocEv.Kev`, a mono-list) with the tie
+`npages + allocs h = frees h`.  The LIST is the count: the seal forgets
+the number but not the list.  The ghost steps (`kmemAuth_dec`,
+`kmemAuth_null`, `kmemAuth_inc`) take the actor and hand back a
+`ledReceipt`: a lower bound of the ledger ending in the call's event.
+
+## Deviations from Rocq (the ledger)
+
+1. **The ledger's name is a FUNCTION of the pair, not an agree ghost.**
+   Rocq pins the name persistently in the second component of the
+   oneshot's camera at `γk.2` (`kalloc_ledname γk γe`, with
+   `kalloc_ledname_agree`), because `fsc_kpages : gname * gname` must not
+   change type.  Lean's seal is a `ghost_var ()` at `γk.pend` (no oneshot
+   camera to extend), and adding a field to `KmemNames` would move
+   `Fscfg.fscKpages` and `FsCfgSnap.fsCfgMkOk` (landed statements; FsReady
+   deviation 6).  Ghost names are per camera in iris-lean, so the ledger is
+   instead allocated at a name that `γk.pend` DETERMINES:
+   `kmemLedName γk := γk.pend - sqrt γk.pend * sqrt γk.pend`, and the birth
+   (`KmemGhost.kmemGhost_alloc`) allocates the pend token at a name in that
+   function's (infinite) fiber over the ledger's.  Rocq's
+   `∃ γe, kalloc_ledname γk γe ∗ led_lb γe …` is therefore
+   `ledLb (kmemLedName γk) …`, and `kalloc_ledname_agree` is `rfl`.
+2. **The count's half and the ledger are split into `kmemCnt` and
+   `kmemLedger`**, and `kmemAuth γk n := kmemCnt γk n ∗ kmemLedger γk n`
+   (Rocq: the disjunction inlined beside `kmem_ledger`).  The count steps
+   (`kmemCnt_inc` / `_dec` / `_agree`) are the former `kmemAuth_*` proofs
+   verbatim.
+3. Names: `led_auth`/`led_lb`/`led_receipt`/`kmem_ledger` are
+   `ledAuth`/`ledLb`/`ledReceipt`/`kmemLedger`; `kmem_avail_dec/null/inc`
+   are `kmemAuth_dec`/`kmemAuth_null`/`kmemAuth_inc` (the tree's existing
+   names, which now take the actor `act` last and return the receipt).
+   Rocq's `kmem_res_push` has no Lean counterpart (ProofKfree's
+   `kf_kmemRes_intro` refolds at `kmemAuth` unchanged; the receipt comes
+   from `kmemAuth_inc` before it).
 -/
 import Xv6.UartTrace
+import Xv6.KallocEv
 import MachCSL.BytesFree
 
 namespace Xv6
@@ -41,6 +80,11 @@ the pending token (owned while the count is tracked, discarded once sealed). -/
 structure KmemNames where
   cnt : GName
   pend : GName
+
+/-- THE LEDGER'S NAME (Rocq `kalloc_ledname`, deviation 1): a function of the
+seal's name, `γk.pend` minus the largest square below it.  The birth
+allocates `γk.pend` in this function's fiber over the ledger's name. -/
+def kmemLedName (γk : KmemNames) : GName := γk.pend - Nat.sqrt γk.pend * Nat.sqrt γk.pend
 
 /-- The client's knowledge of the number of free pages after an operation. -/
 def availInc (on : Option Nat) : Option Nat := on.map (· + 1)
@@ -141,11 +185,6 @@ instance instCtxMorphChainAt [CurCtx] (ps : List (BitVec 64)) (head : BitVec 64)
 
 /-! ## The availability ghost -/
 
-/-- The allocator's side of the count: its half while the count is
-tracked, or the knowledge that it has been sealed. -/
-def kmemAuth (γk : KmemNames) (n : Nat) : IProp GF := iprop%
-  (γk.cnt ↪VAR{.own (1 : Qp).half} n) ∨ (γk.pend ↪VAR{.discard} ())
-
 /-- The client's knowledge of the free count. -/
 def kallocAvail (γk : KmemNames) : Option Nat → IProp GF
   | some n => iprop((γk.pend ↪VAR ()) ∗ (γk.cnt ↪VAR{.own (1 : Qp).half} n))
@@ -166,6 +205,123 @@ theorem kallocAvail_seal (γk : KmemNames) (n : Nat) :
   iintro ⟨Hp, _⟩
   iapply ghost_var_persist $$ Hp
 
+/-! ## The event ledger (NI-LEDGER-KALLOC; deviation 1 for its name) -/
+
+/-- The ledger's authoritative history (Rocq `led_auth`). -/
+def ledAuth (γe : GName) (h : List Kev) : IProp GF := γe ↪●ML h
+/-- A lower bound of the ledger (Rocq `led_lb`). -/
+def ledLb (γe : GName) (h : List Kev) : IProp GF := γe ↪◯ML h
+
+instance ledLb_persistent (γe : GName) (h : List Kev) : Persistent (ledLb (GF := GF) γe h) := by
+  unfold ledLb; infer_instance
+
+theorem ledAuth_lb (γe : GName) (h : List Kev) :
+    ledAuth (GF := GF) γe h ⊢ ledAuth γe h ∗ ledLb γe h := by
+  unfold ledAuth ledLb
+  iintro Ha
+  ihave #Hb := MonoList.lb_own_get γe _ h $$ Ha
+  isplitl [Ha]
+  · iexact Ha
+  · iexact Hb
+
+theorem ledLb_prefix (γe : GName) (h h' : List Kev) :
+    ledAuth (GF := GF) γe h ⊢ ledLb γe h' -∗ ⌜h' <+: h⌝ := by
+  unfold ledAuth ledLb
+  iintro Ha Hb
+  ihave %hv := MonoList.auth_lb_own_valid γe _ h h' $$ Ha Hb
+  ipureintro; exact hv.2
+
+/-- Two lower bounds of one ledger are comparable (Rocq `led_lb_lb`). -/
+theorem ledLb_lb (γe : GName) (h h' : List Kev) :
+    ledLb (GF := GF) γe h ⊢ ledLb γe h' -∗ ⌜h <+: h' ∨ h' <+: h⌝ := by
+  unfold ledLb
+  iintro Ha Hb
+  iapply MonoList.lb_own_valid γe h h' $$ Ha Hb
+
+theorem ledAuth_grow (γe : GName) (h : List Kev) (e : Kev) :
+    ledAuth (GF := GF) γe h ⊢ |==> (ledAuth γe (h ++ [e]) ∗ ledLb γe (h ++ [e])) := by
+  unfold ledAuth ledLb
+  iintro Ha
+  iapply MonoList.auth_own_update_app γe [e] $$ Ha
+
+/-- The receipt a call hands back: a lower bound of the allocator's ledger
+ending in the call's own event `e`, appended at history `h` (Rocq
+`led_receipt`, whose `∃ γe, kalloc_ledname γk γe ∗ …` is the name
+`kmemLedName γk`, deviation 1). -/
+def ledReceipt (γk : KmemNames) (h : List Kev) (e : Kev) : IProp GF :=
+  ledLb (kmemLedName γk) (h ++ [e])
+
+instance ledReceipt_persistent (γk : KmemNames) (h : List Kev) (e : Kev) :
+    Persistent (ledReceipt (GF := GF) γk h e) := by
+  unfold ledReceipt; infer_instance
+
+/-- The ledger, as the lock payload holds it (Rocq `kmem_ledger`): the
+authoritative history and the tie. -/
+def kmemLedger (γk : KmemNames) (npages : Nat) : IProp GF := iprop%
+  ∃ h : List Kev, ledAuth (kmemLedName γk) h ∗ ⌜npages + allocs h = frees h⌝
+
+/-- `kalloc`'s append: the history at the call was NONEMPTY. -/
+theorem kmemLedger_alloc (γk : KmemNames) (n : Nat) (act : BitVec 64) :
+    kmemLedger (GF := GF) γk (n + 1) ⊢
+      |==> (kmemLedger γk n ∗ ∃ h, ledReceipt γk h (.KAlloc act) ∗ ⌜¬ poolEmpty h⌝) := by
+  unfold kmemLedger ledReceipt
+  iintro ⟨%h, Ha, %ht⟩
+  imod ledAuth_grow (kmemLedName γk) h (.KAlloc act) $$ Ha with ⟨Ha, #Hb⟩
+  imodintro
+  isplitl [Ha]
+  · iexists h ++ [.KAlloc act]
+    iframe
+    ipureintro; exact tie_alloc n h act ht
+  · iexists h
+    isplitl []
+    · iexact Hb
+    · ipureintro; exact tie_nonempty n h ht
+
+/-- `kalloc`'s null arm: the count stays at `0`, the history was EMPTY. -/
+theorem kmemLedger_null (γk : KmemNames) (act : BitVec 64) :
+    kmemLedger (GF := GF) γk 0 ⊢
+      |==> (kmemLedger γk 0 ∗ ∃ h, ledReceipt γk h (.KNull act) ∗ ⌜poolEmpty h⌝) := by
+  unfold kmemLedger ledReceipt
+  iintro ⟨%h, Ha, %ht⟩
+  imod ledAuth_grow (kmemLedName γk) h (.KNull act) $$ Ha with ⟨Ha, #Hb⟩
+  imodintro
+  isplitl [Ha]
+  · iexists h ++ [.KNull act]
+    iframe
+    ipureintro; exact tie_null h act ht
+  · iexists h
+    isplitl []
+    · iexact Hb
+    · ipureintro; exact tie_empty h ht
+
+/-- `kfree`'s append. -/
+theorem kmemLedger_free (γk : KmemNames) (n : Nat) (act : BitVec 64) :
+    kmemLedger (GF := GF) γk n ⊢
+      |==> (kmemLedger γk (n + 1) ∗ ∃ h, ledReceipt γk h (.KFree act)) := by
+  unfold kmemLedger ledReceipt
+  iintro ⟨%h, Ha, %ht⟩
+  imod ledAuth_grow (kmemLedName γk) h (.KFree act) $$ Ha with ⟨Ha, #Hb⟩
+  imodintro
+  isplitl [Ha]
+  · iexists h ++ [.KFree act]
+    iframe
+    ipureintro; exact tie_free n h act ht
+  · iexists h
+    iexact Hb
+
+/-! ## The allocator's authority -/
+
+/-- The allocator's side of the count: its half while the count is
+tracked, or the knowledge that it has been sealed (deviation 2: the former
+body of `kmemAuth`). -/
+def kmemCnt (γk : KmemNames) (n : Nat) : IProp GF := iprop%
+  (γk.cnt ↪VAR{.own (1 : Qp).half} n) ∨ (γk.pend ↪VAR{.discard} ())
+
+/-- The allocator's authority: the count's side and, in BOTH epochs, the
+event ledger with the tie (Rocq `kmem_avail_auth`). -/
+def kmemAuth (γk : KmemNames) (n : Nat) : IProp GF := iprop%
+  kmemCnt γk n ∗ kmemLedger γk n
+
 /-- The allocator's payload: the freelist word heads a chain of `pages`, and
 the count is their number. -/
 def kmemRes [CurCtx] (γk : KmemNames) (ξ : CtxId) : IProp GF := iprop%
@@ -181,12 +337,12 @@ instance instCtxMorphKmemRes [CurCtx] (γk : KmemNames) : CtxMorph (GF := GF) (k
         (@instCtxMorphSep hlc GF _ _ _ inferInstance (instCtxMorphConst _))))
 
 /-- The client's count agrees with the allocator's, and the pair steps together. -/
-theorem kmemAuth_inc (γk : KmemNames) (n : Nat) (on : Option Nat) :
-    kallocAvail (GF := GF) γk on ∗ kmemAuth γk n ⊢
-      |==> (⌜∀ m, on = some m → m = n⌝ ∗ kallocAvail γk (availInc on) ∗ kmemAuth γk (n + 1)) := by
+theorem kmemCnt_inc (γk : KmemNames) (n : Nat) (on : Option Nat) :
+    kallocAvail (GF := GF) γk on ∗ kmemCnt γk n ⊢
+      |==> (⌜∀ m, on = some m → m = n⌝ ∗ kallocAvail γk (availInc on) ∗ kmemCnt γk (n + 1)) := by
   cases on with
   | none =>
-    simp only [availInc, Option.map, kallocAvail_none, kmemAuth]
+    simp only [availInc, Option.map, kallocAvail_none, kmemCnt]
     iintro ⟨#Hs, _⟩
     imodintro
     isplitl []
@@ -195,7 +351,7 @@ theorem kmemAuth_inc (γk : KmemNames) (n : Nat) (on : Option Nat) :
     · iexact Hs
     iright; iexact Hs
   | some m =>
-    simp only [availInc, Option.map, kallocAvail_some, kmemAuth]
+    simp only [availInc, Option.map, kallocAvail_some, kmemCnt]
     iintro ⟨⟨Hp, Hc⟩, Ha⟩
     icases Ha with ⟨Hc' | #Hs⟩
     · ihave %hmn := ghost_var_agree _ _ _ _ _ $$ Hc Hc'
@@ -210,12 +366,12 @@ theorem kmemAuth_inc (γk : KmemNames) (n : Nat) (on : Option Nat) :
     · ihave %hv := ghost_var_valid_2 _ _ _ _ _ $$ Hp Hs
       exact absurd hv.1 (by simp [DFrac.valid_own_op_discard])
 
-theorem kmemAuth_dec (γk : KmemNames) (n : Nat) (on : Option Nat) :
-    kallocAvail (GF := GF) γk on ∗ kmemAuth γk (n + 1) ⊢
-      |==> (⌜∀ m, on = some m → m = n + 1⌝ ∗ kallocAvail γk (availDec on) ∗ kmemAuth γk n) := by
+theorem kmemCnt_dec (γk : KmemNames) (n : Nat) (on : Option Nat) :
+    kallocAvail (GF := GF) γk on ∗ kmemCnt γk (n + 1) ⊢
+      |==> (⌜∀ m, on = some m → m = n + 1⌝ ∗ kallocAvail γk (availDec on) ∗ kmemCnt γk n) := by
   cases on with
   | none =>
-    simp only [availDec, Option.map, kallocAvail_none, kmemAuth]
+    simp only [availDec, Option.map, kallocAvail_none, kmemCnt]
     iintro ⟨#Hs, _⟩
     imodintro
     isplitl []
@@ -224,7 +380,7 @@ theorem kmemAuth_dec (γk : KmemNames) (n : Nat) (on : Option Nat) :
     · iexact Hs
     iright; iexact Hs
   | some m =>
-    simp only [availDec, Option.map, kallocAvail_some, kmemAuth]
+    simp only [availDec, Option.map, kallocAvail_some, kmemCnt]
     iintro ⟨⟨Hp, Hc⟩, Ha⟩
     icases Ha with ⟨Hc' | #Hs⟩
     · ihave %hmn := ghost_var_agree _ _ _ _ _ $$ Hc Hc'
@@ -240,9 +396,9 @@ theorem kmemAuth_dec (γk : KmemNames) (n : Nat) (on : Option Nat) :
       exact absurd hv.1 (by simp [DFrac.valid_own_op_discard])
 
 /-- The client's count, if tracked, is the allocator's. -/
-theorem kmemAuth_agree (γk : KmemNames) (n : Nat) (on : Option Nat) :
-    kallocAvail (GF := GF) γk on ∗ kmemAuth γk n ⊢
-      ⌜∀ m, on = some m → m = n⌝ ∗ kallocAvail γk on ∗ kmemAuth γk n := by
+theorem kmemCnt_agree (γk : KmemNames) (n : Nat) (on : Option Nat) :
+    kallocAvail (GF := GF) γk on ∗ kmemCnt γk n ⊢
+      ⌜∀ m, on = some m → m = n⌝ ∗ kallocAvail γk on ∗ kmemCnt γk n := by
   cases on with
   | none =>
     iintro ⟨Hs, Ha⟩
@@ -250,7 +406,7 @@ theorem kmemAuth_agree (γk : KmemNames) (n : Nat) (on : Option Nat) :
     · ipureintro; intro m h; cases h
     iframe
   | some m =>
-    simp only [kallocAvail_some, kmemAuth]
+    simp only [kallocAvail_some, kmemCnt]
     iintro ⟨⟨Hp, Hc⟩, Ha⟩
     icases Ha with ⟨Hc' | #Hs⟩
     · ihave %hmn := ghost_var_agree _ _ _ _ _ $$ Hc Hc'
@@ -263,6 +419,62 @@ theorem kmemAuth_agree (γk : KmemNames) (n : Nat) (on : Option Nat) :
     · ihave %hv := ghost_var_valid_2 _ _ _ _ _ $$ Hp Hs
       exact absurd hv.1 (by simp [DFrac.valid_own_op_discard])
 
+
+/-- `kfree`'s ghost step (Rocq `kmem_avail_inc`): the client's count agrees
+with the allocator's, the pair steps up, and the actor's `KFree` is
+appended to the ledger. -/
+theorem kmemAuth_inc (γk : KmemNames) (n : Nat) (on : Option Nat) (act : BitVec 64) :
+    kallocAvail (GF := GF) γk on ∗ kmemAuth γk n ⊢
+      |==> (⌜∀ m, on = some m → m = n⌝ ∗ kallocAvail γk (availInc on) ∗ kmemAuth γk (n + 1) ∗
+        ∃ h, ledReceipt γk h (.KFree act)) := by
+  unfold kmemAuth
+  iintro ⟨Hav, Hc, Hl⟩
+  imod kmemCnt_inc γk n on $$ [$Hav $Hc] with ⟨%hag, Hav, Hc⟩
+  imod kmemLedger_free γk n act $$ Hl with ⟨Hl, Hr⟩
+  imodintro
+  isplitl []
+  · ipureintro; exact hag
+  iframe
+
+/-- `kalloc`'s ghost step (Rocq `kmem_avail_dec`): pop one page off the
+count and append the actor's `KAlloc`; the history at the call was
+nonempty. -/
+theorem kmemAuth_dec (γk : KmemNames) (n : Nat) (on : Option Nat) (act : BitVec 64) :
+    kallocAvail (GF := GF) γk on ∗ kmemAuth γk (n + 1) ⊢
+      |==> (⌜∀ m, on = some m → m = n + 1⌝ ∗ kallocAvail γk (availDec on) ∗ kmemAuth γk n ∗
+        ∃ h, ledReceipt γk h (.KAlloc act) ∗ ⌜¬ poolEmpty h⌝) := by
+  unfold kmemAuth
+  iintro ⟨Hav, Hc, Hl⟩
+  imod kmemCnt_dec γk n on $$ [$Hav $Hc] with ⟨%hag, Hav, Hc⟩
+  imod kmemLedger_alloc γk n act $$ Hl with ⟨Hl, Hr⟩
+  imodintro
+  isplitl []
+  · ipureintro; exact hag
+  iframe
+
+/-- `kalloc`'s null arm (Rocq `kmem_avail_null`, new with the ledger): the
+count stays at `0`, the actor's `KNull` is appended, and the history at
+the call was empty. -/
+theorem kmemAuth_null (γk : KmemNames) (on : Option Nat) (act : BitVec 64) :
+    kallocAvail (GF := GF) γk on ∗ kmemAuth γk 0 ⊢
+      |==> (kallocAvail γk on ∗ kmemAuth γk 0 ∗
+        ∃ h, ledReceipt γk h (.KNull act) ∗ ⌜poolEmpty h⌝) := by
+  unfold kmemAuth
+  iintro ⟨Hav, Hc, Hl⟩
+  imod kmemLedger_null γk act $$ Hl with ⟨Hl, Hr⟩
+  imodintro
+  iframe
+
+/-- The client's count, if tracked, is the allocator's. -/
+theorem kmemAuth_agree (γk : KmemNames) (n : Nat) (on : Option Nat) :
+    kallocAvail (GF := GF) γk on ∗ kmemAuth γk n ⊢
+      ⌜∀ m, on = some m → m = n⌝ ∗ kallocAvail γk on ∗ kmemAuth γk n := by
+  unfold kmemAuth
+  iintro ⟨Hav, Hc, Hl⟩
+  icases kmemCnt_agree γk n on $$ [$Hav $Hc] with ⟨%hag, Hav, Hc⟩
+  isplitl []
+  · ipureintro; exact hag
+  iframe
 end
 
 /-- The lock list after `release` drops `kmem` (shared by `kalloc` and `kfree`). -/

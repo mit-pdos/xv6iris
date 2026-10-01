@@ -298,3 +298,30 @@ Expected total: ~350 lines in, nothing out, no consumer touched.
   Hpost)`; `Hpost` is the old post verbatim.  Nobody does yet: the first
   consumer is NI-STRONG-INSTANCE (D6), then M2's export.
 
+
+## 8. Lean port as landed (2026-10-01)
+
+NI port lane PI-1, on `lane/pi1`.  New pure `Xv6/KallocEv.lean` (`Kev` with
+Rocq's constructors, `allocs`/`frees`/`poolEmpty`/`kevOf`, the counting and
+tie lemmas; no `Countable` needed).  The camera is a new `Xv6G` field
+`mlKevG : MonoListG GF Kev` (`UartTrace.lean`; slot 121 in `Xv6GF`, restated
+in `UnionGF`).  `Xv6/KallocDefs.lean`: `ledAuth`/`ledLb` with
+`ledAuth_lb`/`ledLb_prefix`/`ledLb_lb`/`ledAuth_grow`, `ledReceipt`,
+`kmemLedger`, and `kmemAuth γk n := kmemCnt γk n ∗ kmemLedger γk n` (the
+former body is `kmemCnt`); `kmemAuth_dec`/`kmemAuth_null` (new)/`kmemAuth_inc`
+take the actor last and return the receipt.  `Xv6/KmemGhost.lean` births the
+ledger at `[]` (statement unchanged).  `SpecKalloc`/`SpecKfree` gain
+`kallocPostLed`/`kfreePostLed`, `wp_kalloc_led_body`/`wp_kfree_led_body`
+(actor `k.proc`) and a second field of `KALLOC`/`KFREE`; `ProofKalloc`/
+`ProofKfree` prove the led forms (`kalloc_led_proof`, `kfree_led_proof`) and
+derive the landed fields.  Landed statements byte-identical: `kallocAvail`,
+`kallocPost`, `kmemRes`, `kallocAvail_seal`, `kmemGhost_alloc`,
+`wp_kalloc_body`, `wp_kfree_body`, `wp_kfree_free_body`; no call site
+touched.  **Deviation:** the ledger's name is not an agree ghost but a
+FUNCTION of the seal's name, `kmemLedName γk := γk.pend - sqrt γk.pend ^ 2`
+(the birth allocates the pend token in that function's infinite fiber over
+the ledger's name, `ghost_var_alloc_strong`), because Lean's seal is a
+`ghost_var ()` (no oneshot camera to extend) and a new `KmemNames` field
+would move `Fscfg.fscKpages` / `fsCfgMkOk` (KallocDefs header, deviation 1).
+`wp_kfree_free_body` (Lean-only) gets no led form; it drops the receipt the
+shared `kfree_tail` now returns.

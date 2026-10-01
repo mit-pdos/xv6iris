@@ -13,6 +13,7 @@ import MachCSL.Lock
 import Xv6.Geom
 import Iris.Instances.Lib.CInvariants
 import Xv6.PipeNames
+import Xv6.KallocEv
 
 namespace Xv6
 
@@ -80,12 +81,17 @@ class Xv6G (GF : BundledGFunctors) where
   exact fragment its user holds (`PipeQueue.pipeQauth`/`pipeQfrag`), one
   ghost name per pipe (`PipeNames.pnQueue`) -/
   [pipeqG : ElemG GF (constOF (ExclAuth.ExclAuthR (A := PipeSt)))]
+  /-- THE PAGE ALLOCATOR'S EVENT LEDGER (Rocq `kallocG`'s `inG Σ (mono_listR
+  (leibnizO kev))`, NI-LEDGER-KALLOC): the actor-labelled history of every
+  `kalloc`/`kfree` call, its authority inside `kmemAuth`
+  (`KallocDefs.kmemLedger`) -/
+  [mlKevG : MonoListG GF Kev]
 
 attribute [instance] Xv6G.monoListG Xv6G.gvListG
 attribute [reducible, instance] Xv6G.gvNatG Xv6G.gvUnitG Xv6G.gvCpuG Xv6G.gvW32G Xv6G.gvBoolG
 attribute [reducible, instance] Xv6G.gmUnitG Xv6G.gmBlkG Xv6G.authUfracG Xv6G.cinvG
 attribute [reducible, instance] Xv6G.gvPopG Xv6G.gvOHistG Xv6G.gvDelivG Xv6G.gvLogG Xv6G.gvArmG Xv6G.mlLogG
-attribute [reducible, instance] Xv6G.mlStoredG Xv6G.mlHistG Xv6G.pipeqG
+attribute [reducible, instance] Xv6G.mlStoredG Xv6G.mlHistG Xv6G.pipeqG Xv6G.mlKevG
 
 /-- The names of one port's ghosts (the Rocq `UartNames.uart_names`, the
 subset the Lean port carries): the accepted trace (`mono_list` over

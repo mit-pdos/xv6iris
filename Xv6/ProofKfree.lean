@@ -7,6 +7,12 @@ The shape follows the Rocq `ProofKfree.v`: the four-slot prologue
 `pageValid`), `memset(pa, 1, 4096)`, `acquire(&kmem.lock)`, the two stores
 that thread the page onto the free list, `release(&kmem.lock)` and the
 epilogue.
+
+THE LED FORM IS THE PROOF (NI-LEDGER-KALLOC, Rocq bed7ee0dd): the shared
+`kfree_tail` appends `KFree k.proc` to the allocator's ledger at the push
+(`kmemAuth_inc`) and returns `kfreePostLed`; `kfree_led_proof` is the
+contract, `kfree_proof`'s landed field and `kfree_free_proof` drop the
+receipt (`kfree_cont_led`).
 -/
 import MachCSL.WpSmodeSltu
 import Xv6.SpecKfree
@@ -198,6 +204,26 @@ theorem kfree_br_1c2 : KA.«kfree» + 0x1c2#64 = KA.«acquire» := by decide
 
 theorem kfree_br_119aa : KA.«kfree» + 0x119aa#64 = KA.«kmem» := by decide
 
+/-- A landed continuation (`kallocAvail γk (availInc on)`) serves as a led
+one (`kfreePostLed`): the receipt is dropped. -/
+theorem kfree_cont_led {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+    (cpu : CPU) (k : KCtx) (γk : KmemNames) (on : Option Nat) :
+    wpNext (GF := GF) k.sie k.proc cpu (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
+      ⌜k.sie = false → spie = k.spie ∧ spp = k.spp⌝ -∗
+      kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
+      kallocAvail γk (availInc on) -∗ ⌜calleeSaved k.regs R'⌝ -∗ wpLoop cpu')) ⊢
+    wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
+      ⌜k.sie = false → spie = k.spie ∧ spp = k.spp⌝ -∗
+      kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
+      kfreePostLed γk on k.proc -∗ ⌜calleeSaved k.regs R'⌝ -∗ wpLoop cpu')) := by
+  iintro Hnext
+  iapply wpNext_mono _ _ _ _ _ $$ Hnext
+  iintro %c H %spie %spp %R' %hs Hk Hpc Hpost %hcs
+  ihave Hav := kfreePostLed_avail γk on k.proc $$ Hpost
+  iapply H $$ %spie %spp %R' %hs Hk Hpc Hav
+  ipureintro
+  exact hcs
+
 theorem kfree_tail (AC : ACQUIRE) (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors}
     [MachGS hlc GF] [Xv6G GF] [CurCtx]
     (cpu c : CPU) (k : KCtx) (γl : GName) (γk : KmemNames) (on : Option Nat)
@@ -215,7 +241,7 @@ theorem kfree_tail (AC : ACQUIRE) (RE : RELEASE) {hlc : HasLC} {GF : BundledGFun
     wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
       ⌜k.sie = false → spie = k.spie ∧ spp = k.spp⌝ -∗
       kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
-      kallocAvail γk (availInc on) -∗ ⌜calleeSaved k.regs R'⌝ -∗ wpLoop cpu'))
+      kfreePostLed γk on k.proc -∗ ⌜calleeSaved k.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   simp only [kmemLockAddr]
   iintro ⟨Hk, Hpc, #Hlk, Hbuf, Hav, Hframe, Hnext⟩
@@ -270,7 +296,7 @@ theorem kfree_tail (AC : ACQUIRE) (RE : RELEASE) {hlc : HasLC} {GF : BundledGFun
   subst e85
   -- the page is on the list: the count goes up
   iapply wpLoop_bupd
-  imod (kmemAuth_inc γk pages.length on) $$ [Hav Hauth] with ⟨%hagree, Hav, Hauth⟩
+  imod (kmemAuth_inc γk pages.length on k.proc) $$ [Hav Hauth] with ⟨%hagree, Hav, Hauth, %hled, #Hrcpt⟩
   case' _ => iframe
   imodintro
   ihave HR := kf_kmemRes_intro γk (k.regs 10#5) head pages hp $$ [Hfl Hw Hrest Hchain Hauth]
@@ -326,7 +352,14 @@ theorem kfree_tail (AC : ACQUIRE) (RE : RELEASE) {hlc : HasLC} {GF : BundledGFun
   k_norm_g
   iapply wpNext_mono _ _ _ _ _ $$ Hnext
   iintro %c12 HΦ Hk Hpc
-  iapply HΦ $$ %spie %spp %_ %hsp Hk Hpc Hav
+  ihave Hpost : kfreePostLed (GF := GF) γk on k.proc $$ [Hav]
+  case' _ =>
+    unfold kfreePostLed
+    iexists hled
+    isplitl []
+    · iexact Hrcpt
+    iexact Hav
+  iapply HΦ $$ %spie %spp %_ %hsp Hk Hpc Hpost
   ipureintro
   unfold calleeSaved
   simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
@@ -348,9 +381,14 @@ theorem kfree_br_282 : KA.«kfree» + 0x282#64 = KA.«memset» := by decide
 theorem kfree_br_22dda : KA.«kfree» + 0x22dda#64 = KA.«end» := by decide
 
 set_option maxHeartbeats 4000000 in
-theorem kfree_proof (AC : ACQUIRE) (RE : RELEASE) (MS : MEMSET) : KFREE :=
-  ⟨fun {hlc GF} _ _ _ cpu k γl γk on hnoff hK hlk hp => by
-  unfold wp_kfree_body
+/-- THE LED FORM is the proof (Rocq `wp_kfree_led_sconf`); the landed
+`wp_kfree` follows as a corollary in `kfree_proof`.  The actor of the
+ledger's event is `k.proc`, the `cpu_own` proc word (design D3). -/
+theorem kfree_led_proof (AC : ACQUIRE) (RE : RELEASE) (MS : MEMSET)
+    {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx] (cpu : CPU) (k : KCtx)
+    (γl : GName) (γk : KmemNames) (on : Option Nat) hnoff hK hlk hp :
+    wp_kfree_led_body (hlc := hlc) (GF := GF) cpu k γl γk on hnoff hK hlk hp := by
+  unfold wp_kfree_led_body
   simp only [kfreeAddr]
   iintro ⟨Hk, Hpc, #Hlk, Hpage, Hav, Hnext⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -441,7 +479,26 @@ theorem kfree_proof (AC : ACQUIRE) (RE : RELEASE) (MS : MEMSET) : KFREE :=
   iapply (kfree_tail AC RE cpu c17 k γl γk on hwf hnoff hK hlk hp hpin
     R2 h2_2 h2_9 ⟨h2_19, h2_20, h2_21, h2_22, h2_23, h2_24, h2_25, h2_26, h2_27⟩)
   iframe #
-  iframe⟩
+  iframe
+
+/-- The proved `kfree` interface: the led form, and the landed contract as
+its corollary (the receipt dropped, `kfree_cont_led`). -/
+theorem kfree_proof (AC : ACQUIRE) (RE : RELEASE) (MS : MEMSET) : KFREE :=
+  ⟨fun {hlc GF} _ _ _ cpu k γl γk on hnoff hK hlk hp => by
+    have h := kfree_led_proof AC RE MS (hlc := hlc) (GF := GF) cpu k γl γk on hnoff hK hlk hp
+    unfold wp_kfree_led_body at h
+    unfold wp_kfree_body
+    iintro ⟨Hk, Hpc, #Hlk, Hpage, Hav, Hnext⟩
+    ihave Hnext := kfree_cont_led cpu k γk on $$ Hnext
+    iapply h
+    isplitl [Hk]; · iexact Hk
+    isplitl [Hpc]; · iexact Hpc
+    isplitl []; · iexact Hlk
+    isplitl [Hpage]; · iexact Hpage
+    isplitl [Hav]; · iexact Hav
+    iexact Hnext,
+   fun {hlc GF} _ _ _ cpu k γl γk on hnoff hK hlk hp =>
+    kfree_led_proof AC RE MS (hlc := hlc) (GF := GF) cpu k γl γk on hnoff hK hlk hp⟩
 
 set_option maxHeartbeats 4000000 in
 theorem kfree_free_proof (AC : ACQUIRE) (RE : RELEASE) (MS : MEMSET_FREE) : KFREE_FREE :=
@@ -449,6 +506,8 @@ theorem kfree_free_proof (AC : ACQUIRE) (RE : RELEASE) (MS : MEMSET_FREE) : KFRE
   unfold wp_kfree_free_body
   simp only [kfreeAddr]
   iintro ⟨Hk, Hpc, #Hlk, Hpage, Hav, Hnext⟩
+  -- the shared tail proves the led post; this contract drops the receipt
+  ihave Hnext := kfree_cont_led cpu k γk on $$ Hnext
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩
   -- prologue

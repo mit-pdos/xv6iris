@@ -314,6 +314,7 @@
     "Xv6.InodeDefs",
     "Xv6.InodeRegion",
     "Xv6.KallocDefs",
+    "Xv6.KallocEv",
     "Xv6.KernelImage",
     "Xv6.KernelMap",
     "Xv6.LogDefs",
