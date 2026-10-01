@@ -16,6 +16,9 @@ Hard-won rules for working on this tree.  Design notes are in `notes/design/` an
   28 GB.  State such resources as quantifiers (`∀ k v, get? m k = some v → …`) behind lookup lemmas;
   never `show`/`decide` through the literal.  Bound such compiles (`timeout`; `ulimit -v` ≥ 40 GB,
   smaller caps abort Lean spuriously).
+- **One `lake` per tree at a time.**  Concurrent `lake env lean`/`lake build` in one tree race to rebuild
+  shared dependencies; one looped printing `Task.get … (sync := true)` backtraces into a 729 GB log and
+  filled the build disk.  Build first, then run profiles/probes, and cap their output (`| head -c`).
 
 ## Proof structure
 
@@ -43,7 +46,7 @@ Hard-won rules for working on this tree.  Design notes are in `notes/design/` an
   `/tmp` (it syncs the whole directory); `--sync-only` after writing new files; seed a new remote tree
   with `cp -a /mnt/rocq/lean-seed/.lake .`.  Each synced tree keeps a full `.lake` (several GB) under
   `/mnt/rocq/trees/`: when a worktree is removed, delete its remote tree too (stale agent trees once
-  filled the disk, ~600 GB).
+  held ~500 GB).
 - Agents: one private worktree each (`.claude/worktrees/lane-<L>`); landing helper
   `.claude/coord/land.sh` (outside the repo).  `/shared/xv6iris-lean` is a stale wrong-design attempt:
   ignore it.
