@@ -47,7 +47,7 @@ theorem echoStrlen_epi (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) 
   have hs16 : (m.get 2#5).toNat = sp0.toNat - 16 := by rw [hsp]; exact uv_avi_neg sp0 16 hlo
   iintro #Hc Hra Hs0 Hrun Hcont
   -- 0xfc  c.ldsp ra,8(sp)
-  ihave Hi := echo_uis N.t 0xfc true (.LOAD (8#12, .Regidx 2#5, .Regidx 1#5, false, 8)) ⟨_, _, _, rfl⟩
+  ihave Hi := echo_uis N.t 0xfc true (.LOAD (8#12, .Regidx 2#5, .Regidx 1#5, false, 8)) udec%
     (by decide) $$ Hc
   have ha1 : ((m.get 2#5).toNat : Int) + (8#12 : BitVec 12).toInt = ((sp0.toNat - 8 : Nat) : Int) := by
     rw [hs16, show (8#12 : BitVec 12).toInt = 8 from by decide]; omega
@@ -58,7 +58,7 @@ theorem echoStrlen_epi (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) 
   rw [ukPc 0xfc 0xfe true rfl]
   -- 0xfe  c.ldsp s0,0(sp)
   have hsp1 : (ukWr m 1#5 vra).get 2#5 = m.get 2#5 := by simp [ukWr_get]
-  ihave Hi := echo_uis N.t 0xfe true (.LOAD (0#12, .Regidx 2#5, .Regidx 8#5, false, 8)) ⟨_, _, _, rfl⟩
+  ihave Hi := echo_uis N.t 0xfe true (.LOAD (0#12, .Regidx 2#5, .Regidx 8#5, false, 8)) udec%
     (by decide) $$ Hc
   have ha2 : (((ukWr m 1#5 vra).get 2#5).toNat : Int) + (0#12 : BitVec 12).toInt = ((sp0.toNat - 16 : Nat) : Int) := by
     rw [hsp1, hs16, show (0#12 : BitVec 12).toInt = 0 from by decide]; omega
@@ -77,7 +77,7 @@ theorem echoStrlen_epi (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) 
     apply BitVec.eq_of_toNat_eq
     rw [Xv6.paAddToNat' _ _ (by rw [uv_avi_neg sp0 16 hlo]; have := sp0.isLt; omega), uv_avi_neg sp0 16 hlo]
     omega
-  ihave Hi := echo_uis N.t 0x100 true (.ITYPE (16#12, .Regidx spIdx, .Regidx spIdx, .ADDI)) ⟨_, _, _, rfl⟩
+  ihave Hi := echo_uis N.t 0x100 true (.ITYPE (16#12, .Regidx spIdx, .Regidx spIdx, .ADDI)) udec%
     (by decide) $$ Hc
   ihave Hfr : ustack N.d (m2.get spIdx + BitVec.ofNat 64 (8 * 2)) 2 $$ [Hra Hs0]
   · rw [hsp2]
@@ -92,7 +92,7 @@ theorem echoStrlen_epi (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) 
   iintro %h3 Hrun
   rw [ukPc 0x100 0x102 true rfl, hsp2]
   -- 0x102  ret
-  ihave Hi := echo_uis N.t 0x102 true (.JALR (0#12, .Regidx 1#5, .Regidx 0#5)) ⟨_, _, _, rfl⟩
+  ihave Hi := echo_uis N.t 0x102 true (.JALR (0#12, .Regidx 1#5, .Regidx 0#5)) udec%
     (by decide) $$ Hc
   iapply wp_uk_ret UL N h3 _ (BitVec.ofNat 64 0x102) true 1#5 (2 + n) $$ Hi Hrun
   inext
@@ -124,7 +124,7 @@ theorem echoStrlen_step (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (mc : RegMap
       wpLoop h := by
   iintro #Hc Hb Hrun Hcont
   -- 0xee  c.mv a3,a5
-  ihave Hi := echo_uis N.t 0xee true (.RTYPE (.Regidx 15#5, .Regidx 0#5, .Regidx 13#5, .ADD)) ⟨_, _, _, rfl⟩
+  ihave Hi := echo_uis N.t 0xee true (.RTYPE (.Regidx 15#5, .Regidx 0#5, .Regidx 13#5, .ADD)) udec%
     (by decide) $$ Hc
   iapply wp_uk_rtype UL N h mc (BitVec.ofNat 64 0xee) true 15#5 0#5 13#5 .ADD n (by unfold unotSp spIdx; decide)
     $$ Hi Hrun
@@ -132,7 +132,7 @@ theorem echoStrlen_step (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (mc : RegMap
   iintro %h1 Hrun
   rw [ukPc 0xee 0xf0 true rfl]
   -- 0xf0  c.addi a5,a5,1
-  ihave Hi := echo_uis N.t 0xf0 true (.ITYPE (1#12, .Regidx 15#5, .Regidx 15#5, .ADDI)) ⟨_, _, _, rfl⟩
+  ihave Hi := echo_uis N.t 0xf0 true (.ITYPE (1#12, .Regidx 15#5, .Regidx 15#5, .ADDI)) udec%
     (by decide) $$ Hc
   iapply wp_uk_itype UL N h1 _ (BitVec.ofNat 64 0xf0) true 1#12 15#5 15#5 .ADDI n (by unfold unotSp spIdx; decide)
     $$ Hi Hrun
@@ -150,7 +150,7 @@ theorem echoStrlen_step (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (mc : RegMap
   have hadr : ((m2.get 15#5).toNat : Int) + (0xfff#12 : BitVec 12).toInt = (p : Int) := by
     rw [h15, show (0xfff#12 : BitVec 12).toInt = -1 from by decide, BitVec.toNat_ofNat, Nat.mod_eq_of_lt hp]
     omega
-  ihave Hi := echo_uis N.t 0xf2 false (.LOAD (0xfff#12, .Regidx 15#5, .Regidx 14#5, true, 1)) ⟨_, _, _, rfl⟩
+  ihave Hi := echo_uis N.t 0xf2 false (.LOAD (0xfff#12, .Regidx 15#5, .Regidx 14#5, true, 1)) udec%
     (by decide) $$ Hc
   iapply wp_uk_lbu UL N h2 m2 (BitVec.ofNat 64 0xf2) false 0xfff#12 15#5 14#5 dq p b n
     (by unfold unotSp spIdx; decide) hadr $$ Hi Hb Hrun
@@ -160,7 +160,7 @@ theorem echoStrlen_step (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (mc : RegMap
   -- 0xf6  c.bnez a4,0xee
   let m3 := ukWr m2 14#5 (BitVec.setWidth 64 b)
   have h14 : m3.get 14#5 = BitVec.setWidth 64 b := by show (ukWr _ 14#5 _).get 14#5 = _; ureg
-  ihave Hi := echo_uis N.t 0xf6 true (.BTYPE (0x1ff8#13, .Regidx 0#5, .Regidx 14#5, .BNE)) ⟨_, _, _, rfl⟩
+  ihave Hi := echo_uis N.t 0xf6 true (.BTYPE (0x1ff8#13, .Regidx 0#5, .Regidx 14#5, .BNE)) udec%
     (by decide) $$ Hc
   iapply wp_uk_btype0 UL N h3 m3 (BitVec.ofNat 64 0xf6) true 0x1ff8#13 14#5 .BNE n (fun _ => by decide) $$ Hi Hrun
   inext
@@ -251,7 +251,7 @@ theorem wp_echoStrlen (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (
   obtain ⟨hal8, hroom⟩ := hstk
   have hlo : 16 ≤ (m.get spIdx).toNat := by omega
   -- 0xdc  c.addi sp,sp,-16 : THE PUSH
-  ihave Hi := echo_uis N.t 0xdc true (.ITYPE (0xff0#12, .Regidx spIdx, .Regidx spIdx, .ADDI)) ⟨_, _, _, rfl⟩
+  ihave Hi := echo_uis N.t 0xdc true (.ITYPE (0xff0#12, .Regidx spIdx, .Regidx spIdx, .ADDI)) udec%
     (by decide) $$ Hc
   iapply wp_uk_addi_sp_dn UL N h m (BitVec.ofNat 64 0xdc) true 0xff0#12 2 n (by decide) $$ Hi Hrun
   inext
@@ -263,7 +263,7 @@ theorem wp_echoStrlen (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (
     have : m1.get 2#5 = m.get spIdx + BitVec.ofInt 64 (-((8 * 2 : Nat) : Int)) := by ureg <;> rfl
     rw [this]; exact uv_avi_neg _ 16 hlo
   -- 0xde  c.sdsp ra,8(sp)
-  ihave Hi := echo_uis N.t 0xde true (.STORE (8#12, .Regidx 1#5, .Regidx 2#5, 8)) ⟨_, _, _, rfl⟩
+  ihave Hi := echo_uis N.t 0xde true (.STORE (8#12, .Regidx 1#5, .Regidx 2#5, 8)) udec%
     (by decide) $$ Hc
   have hA : ((m1.get 2#5).toNat : Int) + (8#12 : BitVec 12).toInt = (((m.get spIdx).toNat - 8 : Nat) : Int) := by
     rw [hs16, show (8#12 : BitVec 12).toInt = 8 from by decide]; omega
@@ -272,7 +272,7 @@ theorem wp_echoStrlen (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (
   iintro Hw8 %h2 Hrun
   rw [ukPc 0xde 0xe0 true rfl]
   -- 0xe0  c.sdsp s0,0(sp)
-  ihave Hi := echo_uis N.t 0xe0 true (.STORE (0#12, .Regidx 8#5, .Regidx 2#5, 8)) ⟨_, _, _, rfl⟩
+  ihave Hi := echo_uis N.t 0xe0 true (.STORE (0#12, .Regidx 8#5, .Regidx 2#5, 8)) udec%
     (by decide) $$ Hc
   have hB : ((m1.get 2#5).toNat : Int) + (0#12 : BitVec 12).toInt = (((m.get spIdx).toNat - 16 : Nat) : Int) := by
     rw [hs16, show (0#12 : BitVec 12).toInt = 0 from by decide]; omega
@@ -281,7 +281,7 @@ theorem wp_echoStrlen (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (
   iintro Hw0 %h3 Hrun
   rw [ukPc 0xe0 0xe2 true rfl]
   -- 0xe2  c.addi4spn s0,sp,16
-  ihave Hi := echo_uis N.t 0xe2 true (.ITYPE (16#12, .Regidx 2#5, .Regidx 8#5, .ADDI)) ⟨_, _, _, rfl⟩
+  ihave Hi := echo_uis N.t 0xe2 true (.ITYPE (16#12, .Regidx 2#5, .Regidx 8#5, .ADDI)) udec%
     (by decide) $$ Hc
   iapply wp_uk_itype UL N h3 m1 (BitVec.ofNat 64 0xe2) true 16#12 2#5 8#5 .ADDI n
     (by unfold unotSp spIdx; decide) $$ Hi Hrun
@@ -321,7 +321,7 @@ theorem wp_echoStrlen (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (
   · -- the empty string: 0xe4 reads the NUL, 0xe8 branches to 0x104
     subst hl0
     icases ustr_nul N.d dq a 0 f $$ Hs with ⟨Hb, Hcl⟩
-    ihave Hi := echo_uis N.t 0xe4 false (.LOAD (0#12, .Regidx 10#5, .Regidx 15#5, true, 1)) ⟨_, _, _, rfl⟩
+    ihave Hi := echo_uis N.t 0xe4 false (.LOAD (0#12, .Regidx 10#5, .Regidx 15#5, true, 1)) udec%
       (by decide) $$ Hc
     have hC : ((m4.get 10#5).toNat : Int) + (0#12 : BitVec 12).toInt = ((a + 0 : Nat) : Int) := by
       rw [h4a0, show (0#12 : BitVec 12).toInt = 0 from by decide, BitVec.toNat_ofNat,
@@ -332,7 +332,7 @@ theorem wp_echoStrlen (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (
     iintro Hb %h5 Hrun
     ispecialize Hcl $$ Hb
     rw [ukPc 0xe4 0xe8 false rfl]
-    ihave Hi := echo_uis N.t 0xe8 true (.BTYPE (28#13, .Regidx 0#5, .Regidx 15#5, .BEQ)) ⟨_, _, _, rfl⟩
+    ihave Hi := echo_uis N.t 0xe8 true (.BTYPE (28#13, .Regidx 0#5, .Regidx 15#5, .BEQ)) udec%
       (by decide) $$ Hc
     iapply wp_uk_btype0 UL N h5 _ (BitVec.ofNat 64 0xe8) true 28#13 15#5 .BEQ n (fun _ => by decide) $$ Hi Hrun
     inext
@@ -344,7 +344,7 @@ theorem wp_echoStrlen (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (
       rw [this]; decide
     rw [htk]
     -- 0x104  li a0,0
-    ihave Hi := echo_uis N.t 0x104 true (.ITYPE (0#12, .Regidx 0#5, .Regidx 10#5, .ADDI)) ⟨_, _, _, rfl⟩
+    ihave Hi := echo_uis N.t 0x104 true (.ITYPE (0#12, .Regidx 0#5, .Regidx 10#5, .ADDI)) udec%
       (by decide) $$ Hc
     iapply wp_uk_itype UL N h6 m5 (BitVec.ofNat 64 0x104) true 0#12 0#5 10#5 .ADDI n
       (by unfold unotSp spIdx; decide) $$ Hi Hrun
@@ -352,7 +352,7 @@ theorem wp_echoStrlen (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (
     iintro %h7 Hrun
     rw [ukPc 0x104 0x106 true rfl]
     -- 0x106  j 0xfc
-    ihave Hi := echo_uis N.t 0x106 true (.JAL (0x1ffff6#21, .Regidx 0#5)) ⟨_, _, _, rfl⟩
+    ihave Hi := echo_uis N.t 0x106 true (.JAL (0x1ffff6#21, .Regidx 0#5)) udec%
       (by decide) $$ Hc
     iapply wp_uk_jal UL N h7 _ (BitVec.ofNat 64 0x106) true 0x1ffff6#21 0#5 n (by unfold unotSp spIdx; decide)
       (by decide) $$ Hi Hrun
@@ -378,7 +378,7 @@ theorem wp_echoStrlen (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (
     ihave %hne := ustr_nonul N.d dq a len f $$ Hs
     have hj : 0 < len := Nat.pos_of_ne_zero hl0
     icases ustr_byte N.d dq a len f 0 hj $$ Hs with ⟨Hb, Hcl⟩
-    ihave Hi := echo_uis N.t 0xe4 false (.LOAD (0#12, .Regidx 10#5, .Regidx 15#5, true, 1)) ⟨_, _, _, rfl⟩
+    ihave Hi := echo_uis N.t 0xe4 false (.LOAD (0#12, .Regidx 10#5, .Regidx 15#5, true, 1)) udec%
       (by decide) $$ Hc
     have hC : ((m4.get 10#5).toNat : Int) + (0#12 : BitVec 12).toInt = ((a + 0 : Nat) : Int) := by
       rw [h4a0, show (0#12 : BitVec 12).toInt = 0 from by decide, BitVec.toNat_ofNat,
@@ -389,7 +389,7 @@ theorem wp_echoStrlen (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (
     iintro Hb %h5 Hrun
     ispecialize Hcl $$ Hb
     rw [ukPc 0xe4 0xe8 false rfl]
-    ihave Hi := echo_uis N.t 0xe8 true (.BTYPE (28#13, .Regidx 0#5, .Regidx 15#5, .BEQ)) ⟨_, _, _, rfl⟩
+    ihave Hi := echo_uis N.t 0xe8 true (.BTYPE (28#13, .Regidx 0#5, .Regidx 15#5, .BEQ)) udec%
       (by decide) $$ Hc
     iapply wp_uk_btype0 UL N h5 _ (BitVec.ofNat 64 0xe8) true 28#13 15#5 .BEQ n (fun _ => by decide) $$ Hi Hrun
     inext
@@ -409,7 +409,7 @@ theorem wp_echoStrlen (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (
       decide
     rw [htk]
     -- 0xea  addi a5,a0,1
-    ihave Hi := echo_uis N.t 0xea false (.ITYPE (1#12, .Regidx 10#5, .Regidx 15#5, .ADDI)) ⟨_, _, _, rfl⟩
+    ihave Hi := echo_uis N.t 0xea false (.ITYPE (1#12, .Regidx 10#5, .Regidx 15#5, .ADDI)) udec%
       (by decide) $$ Hc
     iapply wp_uk_itype UL N h6 m5 (BitVec.ofNat 64 0xea) false 1#12 10#5 15#5 .ADDI n
       (by unfold unotSp spIdx; decide) $$ Hi Hrun
@@ -426,7 +426,7 @@ theorem wp_echoStrlen (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (
     -- 0xf8  subw a0,a3,a0
     have h10 : mc.get 10#5 = BitVec.ofNat 64 a := by
       rw [hr 10#5 (by decide) (by decide) (by decide)]; ureg; exact ha0
-    ihave Hi := echo_uis N.t 0xf8 false (.RTYPEW (.Regidx 10#5, .Regidx 13#5, .Regidx 10#5, .SUBW)) ⟨_, _, _, rfl⟩
+    ihave Hi := echo_uis N.t 0xf8 false (.RTYPEW (.Regidx 10#5, .Regidx 13#5, .Regidx 10#5, .SUBW)) udec%
       (by decide) $$ Hc
     iapply wp_uk_rtypew UL N h8 mc (BitVec.ofNat 64 0xf8) false 10#5 13#5 10#5 .SUBW n
       (by unfold unotSp spIdx; decide) $$ Hi Hrun

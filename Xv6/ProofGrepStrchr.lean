@@ -173,11 +173,11 @@ theorem wp_grepStrchr (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (
   ihave Hbs := Hcl $$ Hb
   -- 0x318 .. 0x31e  THE FRAME
   gfetch 0x318 true (.ITYPE (4080#12, .Regidx spIdx, .Regidx spIdx, .ADDI))
-  ihave I1 := grep_uis N.t 0x31a true (.STORE (8#12, .Regidx 1#5, .Regidx 2#5, 8)) ⟨_, _, _, rfl⟩
+  ihave I1 := grep_uis N.t 0x31a true (.STORE (8#12, .Regidx 1#5, .Regidx 2#5, 8)) udec%
     (by decide) $$ Hc
-  ihave I2 := grep_uis N.t 0x31c true (.STORE (0#12, .Regidx 8#5, .Regidx 2#5, 8)) ⟨_, _, _, rfl⟩
+  ihave I2 := grep_uis N.t 0x31c true (.STORE (0#12, .Regidx 8#5, .Regidx 2#5, 8)) udec%
     (by decide) $$ Hc
-  ihave I3 := grep_uis N.t 0x31e true (.ITYPE (16#12, .Regidx 2#5, .Regidx 8#5, .ADDI)) ⟨_, _, _, rfl⟩
+  ihave I3 := grep_uis N.t 0x31e true (.ITYPE (16#12, .Regidx 2#5, .Regidx 8#5, .ADDI)) udec%
     (by decide) $$ Hc
   iapply kgrep_pro2 UL N h m 0x318 n $$ Hi I1 I2 I3 Hrun
   iintro %h1 %m1 %hal8 %hlo %hsp1 %hk1 Hwra Hws0 Hrun
@@ -196,11 +196,11 @@ theorem wp_grepStrchr (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (
     intro h5 mc hmc10 hkc hspc
     iintro #Hc Hwra Hws0 Hrun Hk
     gfetch 0x334 true (.LOAD (8#12, .Regidx 2#5, .Regidx 1#5, false, 8))
-    ihave I1 := grep_uis N.t 0x336 true (.LOAD (0#12, .Regidx 2#5, .Regidx 8#5, false, 8)) ⟨_, _, _, rfl⟩
+    ihave I1 := grep_uis N.t 0x336 true (.LOAD (0#12, .Regidx 2#5, .Regidx 8#5, false, 8)) udec%
       (by decide) $$ Hc
-    ihave I2 := grep_uis N.t 0x338 true (.ITYPE (16#12, .Regidx spIdx, .Regidx spIdx, .ADDI)) ⟨_, _, _, rfl⟩
+    ihave I2 := grep_uis N.t 0x338 true (.ITYPE (16#12, .Regidx spIdx, .Regidx spIdx, .ADDI)) udec%
       (by decide) $$ Hc
-    ihave I3 := grep_uis N.t 0x33a true (.JALR (0#12, .Regidx 1#5, .Regidx 0#5)) ⟨_, _, _, rfl⟩
+    ihave I3 := grep_uis N.t 0x33a true (.JALR (0#12, .Regidx 1#5, .Regidx 0#5)) udec%
       (by decide) $$ Hc
     iapply kgrep_epi2 UL N h5 mc (m.get spIdx) (m.get 1#5) (m.get 8#5) 0x334 n hspc hal8 hlo
       $$ Hi I1 I2 I3 Hwra Hws0 Hrun
