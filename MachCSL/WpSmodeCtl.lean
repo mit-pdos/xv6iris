@@ -25,14 +25,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 
 -- `jumpPc` lives in `MachCSL.AluFacts`.
 
-/-- The branch condition of `op` on the two source values. -/
-def bcond : bop → BitVec 64 → BitVec 64 → Bool
-  | bop.BEQ, v1, v2 => v1 == v2
-  | bop.BNE, v1, v2 => v1 != v2
-  | bop.BLT, v1, v2 => v1.slt v2
-  | bop.BGE, v1, v2 => !(v1.slt v2)
-  | bop.BLTU, v1, v2 => v1.ult v2
-  | bop.BGEU, v1, v2 => !(v1.ult v2)
+-- `bcond` lives in `MachCSL.AluFacts`.
 
 @[sail_facts] theorem zopz0zI_s_eq (x y : BitVec 64) : zopz0zI_s x y = x.slt y := by
   simp [zopz0zI_s, BitVec.slt]

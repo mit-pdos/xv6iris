@@ -40,4 +40,13 @@ theorem ofBool_bit0_and_mask (v : BitVec 64) :
 as `execute_JALR` clears it (both `ret` and a computed `jalr`). -/
 def jumpPc (v : BitVec 64) : BitVec 64 := v &&& 0xFFFFFFFFFFFFFFFE#64
 
+/-- The branch condition of `op` on the two source values. -/
+def bcond : bop → BitVec 64 → BitVec 64 → Bool
+  | bop.BEQ, v1, v2 => v1 == v2
+  | bop.BNE, v1, v2 => v1 != v2
+  | bop.BLT, v1, v2 => v1.slt v2
+  | bop.BGE, v1, v2 => !(v1.slt v2)
+  | bop.BLTU, v1, v2 => v1.ult v2
+  | bop.BGEU, v1, v2 => !(v1.ult v2)
+
 end MachCSL
