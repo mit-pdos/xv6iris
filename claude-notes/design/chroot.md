@@ -296,7 +296,17 @@ cores `parkBootBlock`, `utBlock`, `ecRest`, `sysPipeCoreRest`), while the
 root CELL is the last conjunct of every `procFields*`; and there are no
 `us_*` updaters — record updates `{ V with root := v, rti := z }` do that
 job, and the `noctx` accessors' keep-premise names the two fields.  The
-cells-level `CtxMorph` instances grow with the cells.  `SpecDirlookup`: `dlSelf s dinum rti`, the
+cells-level `CtxMorph` instances grow with the cells.  The Lean walker
+contracts carry no process block: the ERA walkers take the whole core
+(`procPrivCoreNoctxAt`, which after the block change already owns the root
+cell and `rootRefAt`, so they gain NO row), while the SET-FORM walkers
+(`SpecNamex`, `SpecNamei`, `SpecNameiparent`) take the cells and references
+as separate rows and gain `rootv rti dqr` with `wordPointsTo (pRoot k.proc)
+8 dqr rootv ∗ inodeHeldAt rootv rti` beside the cwd's (dirlookup likewise,
+beside its share row); their callers (sys_chroot, sys_chdir, sys_link) lend
+the cell and the reference out of the block.  sys_chroot's plain contract is
+over `wp_namei_gen_eb`; `ic_escrows` rides inside `isItable2` in Lean.
+`SpecDirlookup`: `dlSelf s dinum rti`, the
 share row `inodeShr kd sd icfgDev dinum ∗ runitAny dinum.toNat`, the whole
 root row, the `self` binder last; `SpecIdup.wp_idup_shr` is the share form;
 `IcacheShortCarve.lean`, `IregClaimPlain.lean`.  `FsAbsEra.umStartOf rt cw
