@@ -416,7 +416,7 @@ Section ProofCreateAlloc.
                     Hesc Hslks Hiregi Hiopen Hprocs Hdevi Hgeom Hdlk Hsbn Hsbi
                     Hppid Hbsl Hisl1 Hidev Htp Htcl Hop").
     all: try lkbelow.
-    iIntros (CIDo Hso) "_"; iIntros (Mo alloc kslot q g cinum gil gisl dnc bmc)
+    iIntros (CIDo Hso) "Hlc"; iIntros (Mo alloc kslot q g cinum gil gisl dnc bmc)
       "%Hcs3 Hcg Hcnt Hsbn Hsbi Hppid Hbsl Hidev Hres".
     destruct alloc.
     - (* ============================================================== *)
@@ -492,7 +492,7 @@ Section ProofCreateAlloc.
               (era_node dnc bmc datc)
               (era_node (cr_setf dnc major minor (mword_of_int 1 : mword 16))
                         bmc datc)
-              ltac:(solve_ndisj) Hrow0 Hrowc with "[] [] Htx Harm Hctop")
+              ltac:(solve_ndisj) Hrow0 Hrowc with "[] [] Htx Harm Hctop Hlc")
         as "(Hdirty & Hctop & Harmr)";
         [iApply (ireg_inv_ftop with "Hiregi") | iApply (ireg_inv_app with "Hiregi") |].
       iModIntro.
@@ -852,7 +852,7 @@ Section ProofCreateAlloc.
                         exact (cr_tdir_ne ty Htdir))
                   with "Hcg Hpc []").
         { iApply (cri_0ca with "Htext"). }
-        iIntros (CIDB8 HqB8) "_ Hcg Hpc".
+        iIntros (CIDB8 HqB8) "Hlc Hcg Hpc".
         assert (Htdirz : bv_unsigned (di_type dnc) <> T_DIR_z).
         { rewrite Htyc. intro Hc. apply Htdir.
           apply bv_eq. rewrite Hc. vm_compute. reflexivity. }
@@ -880,7 +880,7 @@ Section ProofCreateAlloc.
                           bmc datc)
                 (era_node (cr_setf dnc major minor (mword_of_int 1 : mword 16))
                           bmc datc)
-                ltac:(solve_ndisj) eq_refl Hlocfile with "[] [] Hdirty Hctop")
+                ltac:(solve_ndisj) eq_refl Hlocfile with "[] [] Hdirty Hctop Hlc")
           as "[Htx Hctop]";
           [iApply (ireg_inv_ftop with "Hiregi") | iApply (ireg_inv_app with "Hiregi") |].
         iModIntro.
@@ -1163,7 +1163,7 @@ Section ProofCreateAlloc.
                        ltac:(rgne; rewrite Ha0z; exact cr_bltz_zero)
                        with "Hcg Hpc []").
              { iApply (cri_0dc with "Htext"). }
-             iIntros (CIDD1 HqD1) "_ Hcg Hpc".
+             iIntros (CIDD1 HqD1) "Hlc Hcg Hpc".
              assert (Hq0e0 : add_vec_int (mword_of_int (CK + 0xdc) : mword 64) 4
                              = mword_of_int (CK + 0xe0)) by pcw.
              iEval (rewrite Hq0e0) in "Hpc".
@@ -1364,7 +1364,7 @@ Section ProofCreateAlloc.
                      (mkf_era_is_dir dn bm data Hdz)
                      (mkf_era_live dn bm data (cr_nl0z dn Hnl0))
                      Hnonep (conj Hnfd' Hnfdd') Habsp' Habsc
-                     with "[] [] Hacre Harmr HPpar Htop Hctop") as "(Htop & Hctop & HPpar & Hokr)";
+                     with "[] [] Hacre Harmr HPpar Htop Hctop Hlc") as "(Htop & Hctop & HPpar & Hokr)";
                [iApply (ireg_inv_ftop with "Hiregi") | iApply (ireg_inv_app with "Hiregi") |].
              iEval (rewrite -top_frag_1) in "Hctop".
              iModIntro.
@@ -1792,6 +1792,8 @@ Section ProofCreateAlloc.
     - (* ============================================================== *)
       (*  ARM A-FAIL (+0xec): ialloc returned 0, nothing was claimed     *)
       (* ============================================================== *)
+      (* ialloc's return credit pays the claimed arm's fire; nothing fires here *)
+      iClear "Hlc".
       iDestruct "Hres" as "(%Hs3z & Hpc & Hislg & Htp & Htcl & Hop)".
       (* the claim box's quarter is home, unspent (durable-disk C-5) *)
       iDestruct (log_tx_join_q icfg_log t (1/2) (1/4) (1/4)

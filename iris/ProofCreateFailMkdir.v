@@ -251,7 +251,12 @@ Section ProofCreateFailMkdir.
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
     is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res_at fsc_disk pd pav pu) -∗
-    wp_next (CID0 := CID) true (proc_addr j) (fun CIDf : CpuId =>
+    (* [wp_next]'s hart guard WITHOUT its step credit (AppInv credit cascade,
+       owner 2026-10-01): this half never spent the credit, and its three
+       callers ([ProofCreateMkdir]'s fail entries) need theirs for the fires
+       they make just before handing over. *)
+    (∀ CIDf : CpuId,
+       ⌜true = false \/ proc_addr j = zero_reg -> (CIDf : CPU) = (CID : CPU)⌝ -∗
       cr_fail_mkdir_body (CID := CID) γs j γl pd pav pu γf
 
                    plen pfun pv ty major minor U u Sb ns pidv
@@ -269,7 +274,7 @@ Section ProofCreateFailMkdir.
              #Hprocs #Hdevi #Hgeom #Hdlk".
     iDestruct (cr_tail_half j m sp0 ret_tgt K b lks HKsum Hal10 Hal9 Hspm Hrt
                  with "Htext") as "#Htail".
-    iIntros (CIDf Hsf) "_";
+    iIntros (CIDf Hsf);
     iIntros (Mx kslot q g gil gisl lo tl cinum dp bmp datap dc bmc datc
              n4 Sb4).
     iIntros "%HXregs %Htdir %Hkdlt %Hdib %Htydir %Hnl0 %Hiok %Hdok %Hddix %Hduq %Hrl %Hkslt
@@ -478,7 +483,7 @@ Section ProofCreateFailMkdir.
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (cri_152 with "Htext"). }
-    iIntros (CIDG6 HqG6) "_ Hcg Hpc".
+    iIntros (CIDG6 HqG6) "Hlc Hcg Hpc".
     iEval (rewrite Htgu1) in "Hpc".
     pose (G4 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (CK + 0x152) : mword 64) 4)]> G3).
@@ -533,7 +538,7 @@ Section ProofCreateFailMkdir.
                       bmc datc)
             ltac:(solve_ndisj) Hlocorph Hrow1 Hnone0
             (HNdD Htdir (abs_node (era_node dc bmc datc)))
-            with "[] [] Hdirty Hun Hctop")
+            with "[] [] Hdirty Hun Hctop Hlc")
       as "(Htx & Hctop & Hunr)";
       [iApply (ireg_inv_ftop with "Hiregi") | iApply (ireg_inv_app with "Hiregi") |].
     iModIntro.

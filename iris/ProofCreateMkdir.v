@@ -1507,7 +1507,11 @@ Section ProofCreateMkdir.
                         Hbmr Hiregi Hiopen Hdiat Hppid Hprocs Hdevi Hgeom Hdlk Hbsl
                         Hitb2 Hitbl Hesc Hslks Hislk Hdlnk Hop Htxs").
         all: try lkbelow.
-        iIntros (CIDd3 Hsd3) "_"; iIntros (md3 found3 bm3 dat3 dp3 dp03 n6 Sb6 tot3)
+        (* [Hlc0], this dirlink's return credit, pays the SECOND fire of the
+           one window on each arm below that holds two: ARM C-OK-DIR's +0x144
+           [c.j] window (the parent leg) and FAIL ENTRY 3's +0x130 window (the
+           dots).  Each window's first fire takes that window's own credit. *)
+        iIntros (CIDd3 Hsd3) "Hlc0"; iIntros (md3 found3 bm3 dat3 dp3 dp03 n6 Sb6 tot3)
           "%Hcsd3 Hcg Hcnt Hpc Hidev Hiinum Hmeta Hmap Hblocks Hnb14 Hsbi
            Hsbs Hsbb Hdiat Hppid Hbsl Hislk Hdlnk %Hn6c %Hsb6 %Hdlp3 %Hfd3
            Hop Htxs %Hcap3 %Hsizedp3 %Harm3".
@@ -2137,7 +2141,7 @@ Section ProofCreateMkdir.
                     ltac:(rewrite Htg0e0; vm_compute; reflexivity)
                     with "Hcg Hpc []").
           { iApply (cri_144 with "Htext"). }
-          iApply bi.later_intro. iIntros (CIDh8 Hqh8) "_". iIntros "Hcg Hpc".
+          iApply bi.later_intro. iIntros (CIDh8 Hqh8) "Hlc". iIntros "Hcg Hpc".
           iEval (rewrite Htg0e0) in "Hpc".
           (* ============================================================ *)
           (*  ARM C-OK, RE-WALKED (+0xe0..+0xea).  The join is BELOW      *)
@@ -2213,7 +2217,7 @@ Section ProofCreateMkdir.
                   (inode_local_of_ok_rec (bv_unsigned cinum) fsc_cov fsc_logst
                      dc2 bm2 dat2 Hc2iok Hc2rl Hc2duq (Hc2ddix Ht162))
                   Hrowc0 Hrowc2
-                  with "[] [] Hdirty Hdots Hctop") as "(Htx & Hctop & Hdotsr)";
+                  with "[] [] Hdirty Hdots Hctop Hlc") as "(Htx & Hctop & Hdotsr)";
             [iApply (ireg_inv_ftop with "Hiregi") | iApply (ireg_inv_app with "Hiregi") |].
           iModIntro.
           (* ============================================================ *)
@@ -2304,7 +2308,7 @@ Section ProofCreateMkdir.
                   (mkf_era_is_dir dn bm data Hdntdir)
                   (mkf_era_live dn bm data Hdnnlnz)
                   Hnonep (conj Hnfd'm Hnfdd'm) Habsp' Habsc
-                  with "[] [] Hacre Harmr HPpar Htop Hctop") as "(Htop & Hctop & HPpar & Hokr)";
+                  with "[] [] Hacre Harmr HPpar Htop Hctop Hlc0") as "(Htop & Hctop & HPpar & Hokr)";
             [iApply (ireg_inv_ftop with "Hiregi") | iApply (ireg_inv_app with "Hiregi") |].
           iEval (rewrite -top_frag_1) in "Hctop".
           iModIntro.
@@ -2689,7 +2693,7 @@ Section ProofCreateMkdir.
                   ltac:(solve_ndisj) Habsp
                   (inode_local_of_ok_rec (bv_unsigned dind) fsc_cov fsc_logst dp3
                      bm3 dat3 Hp3iok Hp3rl Hp3duq Hp3ddix)
-                  with "[] [] Htop") as "Htop";
+                  with "[] [] Htop Hlc") as "Htop";
             [iApply (ireg_inv_ftop with "Hiregi") | iApply (ireg_inv_app with "Hiregi") |].
           (* ...and the ERA's abstract value at that same record
              (durable-disk 2b-inode-3). *)
@@ -2699,7 +2703,7 @@ Section ProofCreateMkdir.
                   (era_node (cr_setf dnc major minor
                                (mword_of_int 1 : mword 16)) bmc datc)
                   (era_node dc2 bm2 dat2)
-                  ltac:(solve_ndisj) Hrowc0 Hrowc2 with "[] [] Hdirty Hdots Hctop")
+                  ltac:(solve_ndisj) Hrowc0 Hrowc2 with "[] [] Hdirty Hdots Hctop Hlc0")
             as "(Hdirty & Hctop & Hdotsr)";
             [iApply (ireg_inv_ftop with "Hiregi") | iApply (ireg_inv_app with "Hiregi") |].
           iModIntro.
@@ -2744,7 +2748,7 @@ Section ProofCreateMkdir.
                         with "Htext Hkd Hpenv Hbio Hlogc Hitb2 Hitbl Hesc Hiregi Hiopen
                               Hprocs Hdevi Hgeom Hdlk") as "Hfl".
           iPoseProof ("Hfl" $! CIDX3) as "Hf".
-          iSpecialize ("Hf" with "[%] Hlc"); [wp_next_chain |].
+          iSpecialize ("Hf" with "[%]"); [wp_next_chain |].
           iAssert (∃ lo tl : nat,
               ⌜(lo <= tl)%nat⌝ ∗ IcacheRef.cred_floor lo tl ∗
               IcacheRef.inode_ref_short_genlo kd (qd/2 + qd/2)%Qp (qd/2)%Qp
@@ -2869,7 +2873,7 @@ Section ProofCreateMkdir.
                 (era_node (cr_setf dnc major minor
                              (mword_of_int 1 : mword 16)) bmc datc)
                 (era_node dc2 bm2 dat2)
-                ltac:(solve_ndisj) Hrowc0 Hrowc2f with "[] [] Hdirty Hdots Hctop")
+                ltac:(solve_ndisj) Hrowc0 Hrowc2f with "[] [] Hdirty Hdots Hctop Hlc")
           as "(Hdirty & Hctop & Hdotsr)";
           [iApply (ireg_inv_ftop with "Hiregi") | iApply (ireg_inv_app with "Hiregi") |].
         iModIntro.
@@ -2914,7 +2918,7 @@ Section ProofCreateMkdir.
                       with "Htext Hkd Hpenv Hbio Hlogc Hitb2 Hitbl Hesc Hiregi Hiopen
                             Hprocs Hdevi Hgeom Hdlk") as "Hfl".
         iPoseProof ("Hfl" $! CIDX2) as "Hf".
-        iSpecialize ("Hf" with "[%] Hlc"); [wp_next_chain |].
+        iSpecialize ("Hf" with "[%]"); [wp_next_chain |].
         iAssert (∃ lo tl : nat,
             ⌜(lo <= tl)%nat⌝ ∗ IcacheRef.cred_floor lo tl ∗
             IcacheRef.inode_ref_short_genlo kd (qd/2 + qd/2)%Qp (qd/2)%Qp
@@ -3024,7 +3028,7 @@ Section ProofCreateMkdir.
               (era_node (cr_setf dnc major minor
                            (mword_of_int 1 : mword 16)) bmc datc)
               (era_node dc1 bm1 dat1)
-              ltac:(solve_ndisj) Habs1 with "[] [] Hdirty Hctop") as "[Hdirty Hctop]";
+              ltac:(solve_ndisj) Habs1 with "[] [] Hdirty Hctop Hlc") as "[Hdirty Hctop]";
         [iApply (ireg_inv_ftop with "Hiregi") | iApply (ireg_inv_app with "Hiregi") |].
       iModIntro.
       (* no dot landed: the dots commit comes home unfired (round E2) *)
@@ -3043,7 +3047,7 @@ Section ProofCreateMkdir.
                     with "Htext Hkd Hpenv Hbio Hlogc Hitb2 Hitbl Hesc Hiregi Hiopen
                           Hprocs Hdevi Hgeom Hdlk") as "Hfl".
       iPoseProof ("Hfl" $! CIDX1) as "Hf".
-      iSpecialize ("Hf" with "[%] Hlc"); [wp_next_chain |].
+      iSpecialize ("Hf" with "[%]"); [wp_next_chain |].
       iAssert (∃ lo tl : nat,
           ⌜(lo <= tl)%nat⌝ ∗ IcacheRef.cred_floor lo tl ∗
           IcacheRef.inode_ref_short_genlo kd (qd/2 + qd/2)%Qp (qd/2)%Qp

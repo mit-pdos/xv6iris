@@ -1656,15 +1656,15 @@ Section ProofCreateMain.
     abs_of n' = Some (MkAnode c 1%nat) ->
     ftop_inv fsc_fs -∗ app_inv fsc_fs -∗ t ↪[ln_tx icfg_log]{#(1/2)} tt -∗
     pf_at (aarm_commit_at (fs_gamma_L fsc_fs) appE c) Farm -∗
-    top_frag (fs_gamma_L fsc_fs) i n ={E}=∗
+    top_frag (fs_gamma_L fsc_fs) i n -∗ £ 1 ={E}=∗
       cr_dirty t i ∗ top_frag (fs_gamma_L fsc_fs) i n' ∗ cre_arm_fired Farm i.
   Proof using .
-    iIntros (HE Hnone Hrow) "#Hi #Hai Htx Hcm Hf".
+    iIntros (HE Hnone Hrow) "#Hi #Hai Htx Hcm Hf Hlc".
     iMod (ireg_arm E fsc_fs i t (1/2)%Qp (ftopN_sub_app E HE) with "Hi Htx")
       as (k) "Harm".
     iMod (caf_arm_fire fsc_fs E k t (1/2)%Qp {[i]} i c Farm n n' HE
             ltac:(apply elem_of_singleton, eq_refl) Hnone Hrow
-            with "Hi Hai Harm Hcm Hf") as "(Harm & Hf & Hr)".
+            with "Hi Hai Harm Hcm Hf Hlc") as "(Harm & Hf & Hr)".
     iModIntro. iFrame "Hf Hr". rewrite /cr_dirty. iExists k. iExact "Harm".
   Qed.
 
@@ -1675,15 +1675,15 @@ Section ProofCreateMain.
     abs_of n' = Some (MkAnode (ADir (dots_ents full i d)) 1%nat) ->
     ftop_inv fsc_fs -∗ app_inv fsc_fs -∗ cr_dirty t i -∗
     pf_at (adots_commit_at (fs_gamma_L fsc_fs) appE) Fdots -∗
-    top_frag (fs_gamma_L fsc_fs) i n ={E}=∗
+    top_frag (fs_gamma_L fsc_fs) i n -∗ £ 1 ={E}=∗
       cr_dirty t i ∗ top_frag (fs_gamma_L fsc_fs) i n'
       ∗ cre_dots_fired Fdots i d full.
   Proof using .
-    iIntros (HE Hrow Hrow') "#Hi #Hai Hd Hcm Hf". rewrite /cr_dirty.
+    iIntros (HE Hrow Hrow') "#Hi #Hai Hd Hcm Hf Hlc". rewrite /cr_dirty.
     iDestruct "Hd" as (k) "Harm".
     iMod (caf_dots_fire fsc_fs E k t (1/2)%Qp {[i]} i d full Fdots n n' HE
             ltac:(apply elem_of_singleton, eq_refl) Hrow Hrow'
-            with "Hi Hai Harm Hcm Hf") as "(Harm & Hf & Hr)".
+            with "Hi Hai Harm Hcm Hf Hlc") as "(Harm & Hf & Hr)".
     iModIntro. iFrame "Hf Hr". iExists k. iExact "Harm".
   Qed.
 
@@ -1695,15 +1695,15 @@ Section ProofCreateMain.
     abs_of n' = Some (MkAnode (ADir (dots_ents full i d)) 1%nat) ->
     ftop_inv fsc_fs -∗ app_inv fsc_fs -∗ cr_dirty t i -∗
     pf_at (adots_commit_at (fs_gamma_L fsc_fs) appE) Fdots -∗
-    top_frag (fs_gamma_L fsc_fs) i n ={E}=∗
+    top_frag (fs_gamma_L fsc_fs) i n -∗ £ 1 ={E}=∗
       t ↪[ln_tx icfg_log]{#(1/2)} tt ∗ top_frag (fs_gamma_L fsc_fs) i n'
       ∗ cre_dots_fired Fdots i d full.
   Proof using .
-    iIntros (HE Hloc Hrow Hrow') "#Hi #Hai Hd Hcm Hf". rewrite /cr_dirty.
+    iIntros (HE Hloc Hrow Hrow') "#Hi #Hai Hd Hcm Hf Hlc". rewrite /cr_dirty.
     iDestruct "Hd" as (k) "Harm".
     iMod (caf_dots_fire fsc_fs E k t (1/2)%Qp {[i]} i d full Fdots n n' HE
             ltac:(apply elem_of_singleton, eq_refl) Hrow Hrow'
-            with "Hi Hai Harm Hcm Hf") as "(Harm & Hf & Hr)".
+            with "Hi Hai Harm Hcm Hf Hlc") as "(Harm & Hf & Hr)".
     iMod (ireg_disarm E fsc_fs k t (1/2)%Qp {[i]} i n' (ftopN_sub_app E HE) Hloc
             with "Hi Harm Hf") as "[Harm Hf]".
     iEval (rewrite difference_diag_L) in "Harm".
@@ -1720,15 +1720,15 @@ Section ProofCreateMain.
     abs_of n' = None ->
     ftop_inv fsc_fs -∗ app_inv fsc_fs -∗ cr_dirty t i -∗
     aunarm_commit_at (fs_gamma_L fsc_fs) appE i Fun.(pf_recv) -∗
-    top_frag (fs_gamma_L fsc_fs) i n ={E}=∗
+    top_frag (fs_gamma_L fsc_fs) i n -∗ £ 1 ={E}=∗
       t ↪[ln_tx icfg_log]{#(1/2)} tt ∗ top_frag (fs_gamma_L fsc_fs) i n'
       ∗ cre_unarm_fired Fun i.
   Proof using .
-    iIntros (HE Hloc Hrow Hnone) "#Hi #Hai Hd Hcm Hf". rewrite /cr_dirty.
+    iIntros (HE Hloc Hrow Hnone) "#Hi #Hai Hd Hcm Hf Hlc". rewrite /cr_dirty.
     iDestruct "Hd" as (k) "Harm".
     iMod (caf_unarm_fire_armed fsc_fs E k t (1/2)%Qp {[i]} i c Fun n n' HE
             ltac:(apply elem_of_singleton, eq_refl) Hrow Hnone
-            with "Hi Hai Harm Hcm Hf") as "(Harm & Hf & Hr)".
+            with "Hi Hai Harm Hcm Hf Hlc") as "(Harm & Hf & Hr)".
     iMod (ireg_disarm E fsc_fs k t (1/2)%Qp {[i]} i n' (ftopN_sub_app E HE) Hloc
             with "Hi Harm Hf") as "[Harm Hf]".
     iEval (rewrite difference_diag_L) in "Harm".
@@ -1761,11 +1761,11 @@ Section ProofCreateMain.
     Nd c ->
     ftop_inv γfs -∗ app_inv γfs -∗
     aunarm_commit_at_nd (fs_gamma_L γfs) appE i Nd Fun.(pf_recv) -∗
-    top_frag (fs_gamma_L γfs) i n ={E}=∗
+    top_frag (fs_gamma_L γfs) i n -∗ £ 1 ={E}=∗
       top_frag (fs_gamma_L γfs) i n' ∗ cre_unarm_fired Fun i.
   Proof using .
-    iIntros (HE Hloc Hrow Hnone HNd) "#Hi #Hai Hcm Hf".
-    iApply (caf_retag γfs E i n n' _ HE Hloc with "Hi Hai [Hcm] Hf").
+    iIntros (HE Hloc Hrow Hnone HNd) "#Hi #Hai Hcm Hf Hlc".
+    iApply (caf_retag γfs E i n n' _ HE Hloc with "Hi Hai [Hcm] Hf Hlc").
     iIntros (I Hlk) "Hta".
     assert (Hav : abs_view I !! i = Some (MkAnode c 1%nat))
       by (rewrite (abs_view_lookup_of I i n Hlk); exact Hrow).
@@ -1790,13 +1790,13 @@ Section ProofCreateMain.
     Nd c ->
     ftop_inv γfs -∗ app_inv γfs -∗ ireg_armed k t q S -∗
     aunarm_commit_at_nd (fs_gamma_L γfs) appE i Nd Fun.(pf_recv) -∗
-    top_frag (fs_gamma_L γfs) i n ={E}=∗
+    top_frag (fs_gamma_L γfs) i n -∗ £ 1 ={E}=∗
       ireg_armed k t q S ∗ top_frag (fs_gamma_L γfs) i n'
       ∗ cre_unarm_fired Fun i.
   Proof using .
-    iIntros (HE Hin Hrow Hnone HNd) "#Hi #Hai Hrec Hcm Hf".
+    iIntros (HE Hin Hrow Hnone HNd) "#Hi #Hai Hrec Hcm Hf Hlc".
     iApply (caf_armed_retag γfs E k t q S i n n' _ HE Hin
-              with "Hi Hai Hrec [Hcm] Hf").
+              with "Hi Hai Hrec [Hcm] Hf Hlc").
     iIntros (I Hlk) "Hta".
     assert (Hav : abs_view I !! i = Some (MkAnode c 1%nat))
       by (rewrite (abs_view_lookup_of I i n Hlk); exact Hrow).
@@ -1820,15 +1820,15 @@ Section ProofCreateMain.
     Nd c ->
     ftop_inv fsc_fs -∗ app_inv fsc_fs -∗ cr_dirty t i -∗
     aunarm_commit_at_nd (fs_gamma_L fsc_fs) appE i Nd Fun.(pf_recv) -∗
-    top_frag (fs_gamma_L fsc_fs) i n ={E}=∗
+    top_frag (fs_gamma_L fsc_fs) i n -∗ £ 1 ={E}=∗
       t ↪[ln_tx icfg_log]{#(1/2)} tt ∗ top_frag (fs_gamma_L fsc_fs) i n'
       ∗ cre_unarm_fired Fun i.
   Proof using .
-    iIntros (HE Hloc Hrow Hnone HNd) "#Hi #Hai Hd Hcm Hf". rewrite /cr_dirty.
+    iIntros (HE Hloc Hrow Hnone HNd) "#Hi #Hai Hd Hcm Hf Hlc". rewrite /cr_dirty.
     iDestruct "Hd" as (k) "Harm".
     iMod (caf_unarm_fire_armed_nd fsc_fs E k t (1/2)%Qp {[i]} i c Nd Fun n n' HE
             ltac:(apply elem_of_singleton, eq_refl) Hrow Hnone HNd
-            with "Hi Hai Harm Hcm Hf") as "(Harm & Hf & Hr)".
+            with "Hi Hai Harm Hcm Hf Hlc") as "(Harm & Hf & Hr)".
     iMod (ireg_disarm E fsc_fs k t (1/2)%Qp {[i]} i n' (ftopN_sub_app E HE) Hloc
             with "Hi Harm Hf") as "[Harm Hf]".
     iEval (rewrite difference_diag_L) in "Harm".
@@ -1850,13 +1850,13 @@ Section ProofCreateMain.
     ↑ftopN ∪ ↑appN ⊆ E ->
     FsAbsDefs.abs_of n = FsAbsDefs.abs_of n' ->
     ftop_inv fsc_fs -∗ app_inv fsc_fs -∗ cr_dirty t i -∗
-    top_frag (fs_gamma_L fsc_fs) i n ={E}=∗
+    top_frag (fs_gamma_L fsc_fs) i n -∗ £ 1 ={E}=∗
       cr_dirty t i ∗ top_frag (fs_gamma_L fsc_fs) i n'.
   Proof using .
-    iIntros (HE Habs) "#Hi #Hai Hd Hf". rewrite /cr_dirty.
+    iIntros (HE Habs) "#Hi #Hai Hd Hf Hlc". rewrite /cr_dirty.
     iDestruct "Hd" as (k) "Harm".
     iMod (ireg_top_retag_armed_same E fsc_fs k t (1/2)%Qp {[i]} i n n' HE
-            ltac:(apply elem_of_singleton, eq_refl) Habs with "Hi Hai Harm Hf")
+            ltac:(apply elem_of_singleton, eq_refl) Habs with "Hi Hai Harm Hf Hlc")
       as "[Harm Hf]".
     iModIntro. iFrame "Hf". iExists k. iExact "Harm".
   Qed.
@@ -1867,13 +1867,13 @@ Section ProofCreateMain.
     FsAbsDefs.abs_of n = FsAbsDefs.abs_of n' ->
     inode_local i n' ->
     ftop_inv fsc_fs -∗ app_inv fsc_fs -∗ cr_dirty t i -∗
-    top_frag (fs_gamma_L fsc_fs) i n ={E}=∗
+    top_frag (fs_gamma_L fsc_fs) i n -∗ £ 1 ={E}=∗
       t ↪[ln_tx icfg_log]{#(1/2)} tt ∗ top_frag (fs_gamma_L fsc_fs) i n'.
   Proof using .
-    iIntros (HE Habs Hloc) "#Hi #Hai Hd Hf". rewrite /cr_dirty.
+    iIntros (HE Habs Hloc) "#Hi #Hai Hd Hf Hlc". rewrite /cr_dirty.
     iDestruct "Hd" as (k) "Harm".
     iMod (ireg_top_retag_armed_same E fsc_fs k t (1/2)%Qp {[i]} i n n' HE
-            ltac:(apply elem_of_singleton, eq_refl) Habs with "Hi Hai Harm Hf")
+            ltac:(apply elem_of_singleton, eq_refl) Habs with "Hi Hai Harm Hf Hlc")
       as "[Harm Hf]".
     iMod (ireg_disarm E fsc_fs k t (1/2)%Qp {[i]} i n' (ftopN_sub_app E HE) Hloc
             with "Hi Harm Hf") as "[Harm Hf]".
