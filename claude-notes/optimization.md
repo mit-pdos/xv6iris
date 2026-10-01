@@ -875,6 +875,19 @@ ProofConsolewrite 11.5 → 10.0, KexecD 6.6 → 5.6, a dozen others −0.2 to
 24 sites need the hypotheses), so it is converted only where it measured;
 use it for new sites inside big proofs.
 
+### Lean: the image's root scans, through `fsimg_decide`
+
+`FsImgNames`' path pins and `FsConsPin.fsimgConsolePath` closed `rw
+[fsimgPathRoot, fsimgP_eq]` with a bare `decide +kernel`: one `dirFirst`
+over the root's records, every name byte a `fileByte` = a list read into a
+1024-byte block from its front (the walk the `FsImgEval` header prices).
+Both files are on the critical path.  `fsimg_decide [fsFileData, fsDataOf,
+dirFirst, dirMatchb, dirLiveb, dirFreeb, dirName, dirInum, fsDinode,
+fsDinodeBytes]` (FsImgEval is already in their import closure) turns each
+read into a shift of the block literal: FsConsPin 5.5 s → 0.9 s (kernel
+4.8 → 0.1), FsImgNames 3.1 s → 1.0 s.  Any `decide +kernel` that reads the
+image through `fsimgP`/`fsImgBlock` should go through `fsimg_decide`.
+
 ## Build shape
 
 The build is critical-path bound and core-saturated in the middle: the path is a

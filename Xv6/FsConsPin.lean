@@ -55,7 +55,8 @@ def consDev : Anode := ⟨.ADev CONSOLE 0, 1⟩
 
 /-- Rocq `fsimg_console_path`: one root scan, which finds nothing. -/
 theorem fsimgConsolePath : pathAt (treeOfDisk fsimgP fsimgSb) ROOTINO [fnameConsole] = none := by
-  rw [fsimgPathRoot, fsimgP_eq]; decide +kernel
+  rw [fsimgPathRoot, fsimgP_eq]
+  fsimg_decide [fsFileData, fsDataOf, dirFirst, dirMatchb, dirLiveb, dirFreeb, dirName, dirInum, fsDinode, fsDinodeBytes]
 
 /-! ## 3.  THE TWO STATES -/
 

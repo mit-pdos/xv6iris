@@ -74,32 +74,39 @@ theorem fsimgPathRoot_named (f : Fname) :
 
 /-- Rocq `fsimg_echo_path`. -/
 theorem fsimgEchoPath : pathAt (treeOfDisk fsimgP fsimgSb) ROOTINO [fnameEcho] = some 4 := by
-  rw [fsimgPathRoot, fsimgP_eq]; decide +kernel
+  rw [fsimgPathRoot, fsimgP_eq]
+  fsimg_decide [fsFileData, fsDataOf, dirFirst, dirMatchb, dirLiveb, dirFreeb, dirName, dirInum, fsDinode, fsDinodeBytes]
 
 /-- Rocq `fsimg_init_path`. -/
 theorem fsimgInitPath : pathAt (treeOfDisk fsimgP fsimgSb) ROOTINO [fnameInit] = some 7 := by
-  rw [fsimgPathRoot, fsimgP_eq]; decide +kernel
+  rw [fsimgPathRoot, fsimgP_eq]
+  fsimg_decide [fsFileData, fsDataOf, dirFirst, dirMatchb, dirLiveb, dirFreeb, dirName, dirInum, fsDinode, fsDinodeBytes]
 
 /-- Rocq `fsimg_sh_path`. -/
 theorem fsimgShPath : pathAt (treeOfDisk fsimgP fsimgSb) ROOTINO [fnameSh] = some 13 := by
-  rw [fsimgPathRoot, fsimgP_eq]; decide +kernel
+  rw [fsimgPathRoot, fsimgP_eq]
+  fsimg_decide [fsFileData, fsDataOf, dirFirst, dirMatchb, dirLiveb, dirFreeb, dirName, dirInum, fsDinode, fsDinodeBytes]
 
 /-- Rocq `fsimg_cat_path`. -/
 theorem fsimgCatPath : pathAt (treeOfDisk fsimgP fsimgSb) ROOTINO [fnameCat] = some 3 := by
-  rw [fsimgPathRoot, fsimgP_eq]; decide +kernel
+  rw [fsimgPathRoot, fsimgP_eq]
+  fsimg_decide [fsFileData, fsDataOf, dirFirst, dirMatchb, dirLiveb, dirFreeb, dirName, dirInum, fsDinode, fsDinodeBytes]
 
 /-- Rocq `fsimg_grep_path`. -/
 theorem fsimgGrepPath : pathAt (treeOfDisk fsimgP fsimgSb) ROOTINO [fnameGrep] = some 6 := by
-  rw [fsimgPathRoot, fsimgP_eq]; decide +kernel
+  rw [fsimgPathRoot, fsimgP_eq]
+  fsimg_decide [fsFileData, fsDataOf, dirFirst, dirMatchb, dirLiveb, dirFreeb, dirName, dirInum, fsDinode, fsDinodeBytes]
 
 /-- Rocq `fsimg_seccomp_path`. -/
 theorem fsimgSeccompPath :
     pathAt (treeOfDisk fsimgP fsimgSb) ROOTINO [fnameSeccomp] = some 23 := by
-  rw [fsimgPathRoot, fsimgP_eq]; decide +kernel
+  rw [fsimgPathRoot, fsimgP_eq]
+  fsimg_decide [fsFileData, fsDataOf, dirFirst, dirMatchb, dirLiveb, dirFreeb, dirName, dirInum, fsDinode, fsDinodeBytes]
 
 /-- Rocq `fsimg_sync_path` (drift SY2). -/
 theorem fsimgSyncPath :
     pathAt (treeOfDisk fsimgP fsimgSb) ROOTINO [fnameSync] = some 22 := by
-  rw [fsimgPathRoot, fsimgP_eq]; decide +kernel
+  rw [fsimgPathRoot, fsimgP_eq]
+  fsimg_decide [fsFileData, fsDataOf, dirFirst, dirMatchb, dirLiveb, dirFreeb, dirName, dirInum, fsDinode, fsDinodeBytes]
 
 end Xv6
