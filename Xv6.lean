@@ -606,6 +606,7 @@ import Xv6.FsStateInodeOwned
 import Xv6.IcacheInvAlg
 import Xv6.EscrowInode
 import Xv6.FsStateEraPure
+import Xv6.FsStateEraNode
 import Xv6.FsStateEraRes
 import Xv6.InodeRegionInv
 import Xv6.IcacheRef

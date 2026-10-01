@@ -53,10 +53,9 @@ header, in short (every clause that is about content is kept):
    end_op 80, ilock 66, uvmalloc 42, proc_pagetable 40, begin_op 24), as in
    Rocq; stated as the literal (Rocq's own form) so this leaf imports no
    callee Spec.
-2. **`tfEpcIdx` / `tfSpIdx` are defined HERE** (Rocq `ProcGeom.tf_epc_idx` /
-   `tf_sp_idx`): the Lean tree has no trapframe-index file; `tfArgIdx` is
-   `Xv6/SpecArgraw.lean`'s.  `kxcTfSpIdx` is Rocq's name for word 6 and is
-   kept (`= tfSpIdx`).
+2. **`tfEpcIdx` / `tfSpIdx` are `Xv6/ProcGeom.lean`'s**, beside
+   `tfArgIdx` (Rocq `ProcGeom.tf_epc_idx` / `tf_sp_idx`).  `kxcTfSpIdx` is
+   Rocq's name for word 6 and is kept here (`= tfSpIdx`).
 3. **The stack algebra is at `Int`** (Rocq `Z`), because the C's
    `sp -= len + 1` can in principle go below the page and the fit condition
    is exactly the statement that it does not.  The success arm reads the
@@ -230,11 +229,7 @@ theorem kxc_len_bound (top base : Int) (len : Nat → Nat) (argc i : Nat)
 The three indices are distinct, so the order the C writes them in does not
 matter and the result is one simultaneous update. -/
 
-/-- Rocq `ProcGeom.tf_epc_idx` (deviation 2). -/
-def tfEpcIdx : Nat := 3
-/-- Rocq `ProcGeom.tf_sp_idx`: the USER sp (a saved register, not a syscall
-argument). -/
-def tfSpIdx : Nat := 6
+-- `tfEpcIdx` / `tfSpIdx` live in `Xv6/ProcGeom.lean` (deviation 2).
 /-- Rocq `kxc_tf_sp_idx`. -/
 def kxcTfSpIdx : Nat := tfSpIdx
 

@@ -179,6 +179,7 @@ Uses checked by `grep -rnw <name>` over comment-stripped
 -/
 import Xv6.FsStateEraRes
 import Xv6.EscrowInode
+import Xv6.InodeLock
 
 namespace Xv6
 

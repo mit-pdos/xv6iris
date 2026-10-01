@@ -122,6 +122,7 @@ the box files, where the live rows restate it.
 -/
 import Xv6.IcacheEscrowTok
 import Xv6.TxPin
+import Xv6.FsStateEraPure
 
 namespace Xv6
 

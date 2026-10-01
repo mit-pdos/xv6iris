@@ -47,6 +47,7 @@ shift `slli a4,a3,3` of the sign-extended number is slot `num`'s offset
    Rocq's chain of `bv_swrap` lemmas collapses to one `bv_decide`.
 -/
 import Xv6.UsysMemOk
+import Xv6.KernelData
 
 namespace Xv6
 

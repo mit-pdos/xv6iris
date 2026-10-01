@@ -119,7 +119,7 @@ Every item below: uses checked by `grep -rnw <name> iris/*.v`
 (Xv6/FsStateInodeOwned.lean); `eraNode`, `bmOf`, `bmOf_get`, `bmOf_eraNode`,
 `fnData_eraNode`, `nodeShapeOk` (Xv6/FsStateEraPure.lean).
 -/
-import Xv6.FsStateEraPure
+import Xv6.FsStateEraNode
 import Xv6.FsStateInodeOwned
 import Xv6.FsStateTop
 import Xv6.InodeRegion

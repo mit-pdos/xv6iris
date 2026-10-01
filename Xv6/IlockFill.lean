@@ -38,6 +38,7 @@ Rocq's names (`il_bmcells_empty`, `il_ind_res_empty` → `il_indRes_empty`,
 import Xv6.InodeRegionMovers
 import Xv6.IcacheEscrowTok
 import Xv6.InodeRegionWithdraw
+import Xv6.FsStateEraPure
 
 namespace Xv6
 

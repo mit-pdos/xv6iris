@@ -98,7 +98,7 @@ Nothing.
 import Xv6.FsAbsDelta
 import Xv6.PieceFam
 import Xv6.InodeRegionInv
-import Xv6.FsStateEraPure
+import Xv6.FsStateEraNode
 
 namespace Xv6
 

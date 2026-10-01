@@ -95,6 +95,12 @@ def xstateOf (v : BitVec 64) : Int := xstateVal (v.setWidth 32)
 `struct trapframe` offset `112 + 8 i`; Rocq `tf_arg_idx`). -/
 def tfArgIdx (i : Nat) : Nat := 14 + i
 
+/-- Rocq `ProcGeom.tf_epc_idx`: the trapframe word holding the user pc. -/
+def tfEpcIdx : Nat := 3
+/-- Rocq `ProcGeom.tf_sp_idx`: the USER sp (a saved register, not a syscall
+argument). -/
+def tfSpIdx : Nat := 6
+
 /-- **Rocq `ProcGeom.exit_xs`**: the exit status a trapframe carries --
 argument 0 read through the store `kexit` makes (`xstateOf`, Rocq
 `xstate_of (tf !!! tf_arg_idx 0)`). -/

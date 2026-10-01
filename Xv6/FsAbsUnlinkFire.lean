@@ -80,6 +80,7 @@ Nothing.
 -/
 import Xv6.SysUnlinkDefs
 import Xv6.FsAbsCreateFire
+import Xv6.FsStateEraPure
 
 namespace Xv6
 

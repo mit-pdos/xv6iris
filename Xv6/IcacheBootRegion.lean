@@ -138,6 +138,7 @@ deviation 6 does not touch this file.
 import Xv6.IcacheBootDecode
 import Xv6.IcacheEscrowPool
 import Xv6.InodeRegionInv
+import Xv6.FsStateEraPure
 
 namespace Xv6
 
