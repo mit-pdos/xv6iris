@@ -221,8 +221,8 @@ Section ProofRelease.
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate) ltac:(rgne; exact Ha0mh)
               with "Hcg Hpc []").
     { iApply (rli_10 with "Htext"). }
-    iApply wp_next_off_intro.
-    iIntros "Hcg Hpc".
+    iApply wp_next_off_intro_lc.
+    iIntros "Hlc Hcg Hpc".
     assert (Hpc12 : add_vec_int (mword_of_int (KernelSyms.release + 0x10) : mword 64) 2 = mword_of_int (KernelSyms.release + 0x12)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc12) in "Hpc".
     (* ---- 0x12: sd zero,16(s1) : lk->cpu := 0 ---- *)
@@ -249,7 +249,7 @@ Section ProofRelease.
     iApply (wp_sd_zero_lkcpu_lockopen_s_sconf (CID:=CID) γl lka s R Dc (mword_of_int (KernelSyms.release + 0x12))
               (mword_of_int 9 : mword 5) (mword_of_int 16 : mword 12) mh (trap_res outb + (av - 4))%nat false lks
               ltac:(rgne; exact Hacpu) ltac:(left; reflexivity) Href
-              with "Hcg Hpc [] Hlock Htoken Hlks").
+              with "Hcg Hpc [] Hlock Htoken Hlks Hlc").
     { iApply (rli_12 with "Htext"). }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc Htoken Hheld Hlks %Hin".
@@ -280,15 +280,15 @@ Section ProofRelease.
     iApply (wp_fence_s_sconf (mword_of_int (KernelSyms.release + 0x16)) mh (trap_res outb + (av - 4))%nat false
               with "Hcg Hpc []").
     { iApply (rli_16 with "Htext"). }
-    iApply wp_next_off_intro.
-    iIntros "Hcg Hpc".
+    iApply wp_next_off_intro_lc.
+    iIntros "Hlc Hcg Hpc".
     assert (Hpc1a : add_vec_int (mword_of_int (KernelSyms.release + 0x16) : mword 64) 4 = mword_of_int (KernelSyms.release + 0x1a)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc1a) in "Hpc".
     (* ---- 0x1a: sw zero,0(s1) : the lock word clears ---- *)
     iApply (wp_sw_zero_lockfin_s_sconf (CID:=CID) γl lka s R Dc Out (mword_of_int (KernelSyms.release + 0x1a)) (mword_of_int 9 : mword 5)
               (mword_of_int 0 : mword 12) mh (trap_res outb + (av - 4))%nat false Pay
               ltac:(rgne; rewrite Hs1mh; exact Hlka) Hrefpre
-              with "Hcg Hpc [] Hlock Htoken HR Hfin").
+              with "Hcg Hpc [] Hlock Htoken HR Hfin Hlc").
     { iApply (rli_1a with "Htext"). }
     iApply wp_next_off_intro.
     iIntros "HOut Hcg Hpc".

@@ -148,8 +148,8 @@ Section ProofAcquire.
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (aqi_1a with "Htext"). }
-    iApply wp_next_off_intro.
-    iIntros "Hcg Hpc".
+    iApply wp_next_off_intro_lc.
+    iIntros "Hlc Hcg Hpc".
     iEval (rgne) in "Hcg".
     iEval (rewrite (Ha4any a5v) upd_upd) in "Hcg".
     assert (Hpp1c : add_vec_int (mword_of_int (KernelSyms.acquire + 0x1a) : mword 64) 2 = mword_of_int (KernelSyms.acquire + 0x1c)) by (apply bv_eq; vm_compute; reflexivity).
@@ -174,7 +174,7 @@ Section ProofAcquire.
               (<[Regidx (mword_of_int 15 : mword 5) := regval_into_reg v1]> M0) n false Tl
               HPAlk (Hrs2one _) HSTZ
               ltac:(vm_compute; discriminate) ltac:(rdok) Href
-              with "Hcg Hpc [] Hlock Hllb HTc").
+              with "Hcg Hpc [] Hlock Hllb HTc Hlc").
     { iApply (aqi_1c with "Htext"). }
     iIntros (w). iApply wp_next_off_intro.
     iIntros "HTc Hcg Hpc #Hpaira Hpay".
@@ -479,8 +479,8 @@ Section ProofAcquire.
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate) ltac:(rgne; exact Ha0B3)
               with "Hcg Hpc []").
     { iApply (aqi_18 with "Htext"). }
-    iApply wp_next_off_intro.
-    iIntros "Hcg Hpc".
+    iApply wp_next_off_intro_lc.
+    iIntros "Hlc1 Hcg Hpc".
     assert (Hpc1a : add_vec_int (mword_of_int (KernelSyms.acquire + 0x18) : mword 64) 2 = mword_of_int (KernelSyms.acquire + 0x1a)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc1a) in "Hpc".
     (* ---- 0x1a..0x22: the test-and-set loop ---- *)
@@ -570,7 +570,7 @@ Section ProofAcquire.
               (mword_of_int 10 : mword 5) (mword_of_int 9 : mword 5)
               (mword_of_int 16 : mword 12) Cm (trap_res b + (av - 4))%nat false lks
               Hpacpu Ha0C Hfresh ltac:(left; reflexivity) (Hrefpre cpu_id)
-              with "Hcg Hpc [] Hlock Htokp Hheld Hlks").
+              with "Hcg Hpc [] Hlock Htokp Hheld Hlks Hlc1").
     { iApply (aqi_28 with "Htext"). }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc Htok Hlks".

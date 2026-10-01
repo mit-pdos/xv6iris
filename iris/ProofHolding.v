@@ -261,8 +261,8 @@ Section ProofHolding.
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (his_10 with "Htext"). }
-    iApply wp_next_off_intro.
-    iIntros "Hcg Hpc".
+    iApply wp_next_off_intro_lc.
+    iIntros "Hlc Hcg Hpc".
     set (S2 := <[Regidx (mword_of_int 8 : mword 5) := regval_into_reg
         (add_vec (S0 !!! Regidx csp_rs1) (sign_extend' 64 (caddi4spn_imm (mword_of_int 8 : mword 8))))]> S0).
     change (<[Regidx (mword_of_int 8 : mword 5) := regval_into_reg
@@ -288,7 +288,7 @@ Section ProofHolding.
               (* A6.119: the no-migration side condition, discharged literally
                  -- this leaf runs at [b = false]. *)
               ltac:(left; reflexivity) Href
-              with "Hcg Hpc [] Hlock HTc Hlks").
+              with "Hcg Hpc [] Hlock HTc Hlks Hlc").
     { iApply (his_12 with "Htext"). }
     iIntros (cpuv). iApply wp_next_off_intro.
     iIntros "%Hcpuv HTc Hlks Hcg Hpc".
@@ -631,8 +631,8 @@ Section ProofHolding.
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (his_10 with "Htext"). }
-    iApply wp_next_off_intro.
-    iIntros "Hcg Hpc".
+    iApply wp_next_off_intro_lc.
+    iIntros "Hlc Hcg Hpc".
     set (S2 := <[Regidx (mword_of_int 8 : mword 5) := regval_into_reg
         (add_vec (S0 !!! Regidx csp_rs1) (sign_extend' 64 (caddi4spn_imm (mword_of_int 8 : mword 8))))]> S0).
     change (<[Regidx (mword_of_int 8 : mword 5) := regval_into_reg
@@ -652,7 +652,7 @@ Section ProofHolding.
               (mword_of_int 16 : mword 12) S2 (n - 4)%nat false
               Hacpu ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(left; reflexivity) Href
-              with "Hcg Hpc [] Hlock Htok").
+              with "Hcg Hpc [] Hlock Htok Hlc").
     { iApply (his_12 with "Htext"). }
     iApply wp_next_off_intro.
     iIntros "Htok Hcg Hpc".
