@@ -722,7 +722,9 @@ uexecSGXv6) … n …` (the deposit post, whose head unfolds to `xv6Spost`'s
 `xpostWrite …` / `xpostOpen …` / `xpostRead …` is free.  Eleven proofs on
 the build's critical path paid it (UkFileOpenRead, the three UkFileOpenCalls*
 corollaries, UkFileDevWrite, UkFileDevNil x2, UkPipesIfaceK, UkPipeDevXv6 x2,
-UkConsOut); other modules still do (grep `Hpost` after a leaf's `iapply`).
+UkConsOut); off the path, UkFileIfaceWriteCons and UkSyncEntry (row 22:
+`spostAt_xv6_sync`) did too.  A kernel-time sweep (`[Kernel]` ≥ 1 s) of every
+module over 4.5 s that calls a U-tier leaf found no others.
 Two fixes: rewrite the continuation's premise first (`rw [spostAt_xv6_write]`,
 `spostAt_xv6_read`, `UkFileOpen.spostAt_open_eq`) and read it with an elim
 lemma stated at the unfolded post (`UkFileDev.xpostWrite_elim`,

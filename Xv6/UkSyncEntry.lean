@@ -72,13 +72,22 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FsTopG
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
+/-- Row 22's post at the xv6 instance IS the hook's `qOpt` (`rfl`).
+`ksyncLeaf_xv6` rewrites its continuation's `spostAt … 22 …` premise with it
+BEFORE `iintro`ing it: the proof mode files a spatial hypothesis `P` as
+`□?false P`, and the kernel's `□?false P = P` check at `P = spostAt …` (whose
+head unfolds to `xv6Spost`'s if-chain on the number) costs ~6 s. -/
+theorem spostAt_xv6_sync (X : Uvis → IProp GF) (f : Xfam GF) (W : Uvis) (r : BitVec 64) (M' : ElfMem)
+    (fdv' : List FdState) (cw' : Nat) (cs' : ExtTreeSet GName compare) :
+    @UexecSG.spostAt GF _ (uexecSGXv6 (hlc := hlc)) X 22 f W r M' fdv' cw' cs' = qOpt f.syOQ := rfl
+
 unseal LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled in
 /-- **Rocq `ksync_leaf_xv6`** (sync K4): THE ECALL LEAF, AT EVERY HOOK.  22
 passes every number guard of the receipt-keeping quiet leaf
 (`wp_uk_ecall_quiet_recv_img`); the deposit is the point family at the
 record's payload WITH the hook (`xfamSy`), supplied at the cwd the fragment
 names (`udepwfAt`) out of the hook alone (`sbundleAt_sync_intro_xv6`), and
-the receipt is read back off the post (`spostAt_sync_elim_xv6`) -- the mould
+the receipt is read back off the post (`spostAt_xv6_sync`) -- the mould
 is `UInitConsK.mknod_call_any`. -/
 theorem ksyncLeaf_xv6 (UL : UK_LEAVES) (N : UkNames GF) (oQ : Option (IProp GF)) :
     ⊢ ksyncLeaf (hlc := hlc) N oQ := by
@@ -103,8 +112,9 @@ theorem ksyncLeaf_xv6 (UL : UK_LEAVES) (N : UkNames GF) (oQ : Option (IProp GF))
     iapply sbundleAt_sync_intro_xv6 (hlc := hlc) (uslot (hlc := hlc))
     dsimp only [xfamSy]
     iexact Hhook
-  iintro %h' %r %W %cs' - - - - - Hpost Hcwd Hrun
-  ihave HQ := spostAt_sync_elim_xv6 (hlc := hlc) (uslot (hlc := hlc)) _ W $$ Hpost
+  iintro %h' %r %W %cs' - - - - -
+  rw [spostAt_xv6_sync]
+  iintro HQ Hcwd Hrun
   dsimp only [xfamSy]
   rw [show BitVec.ofNat 64 0x36a + 4#64 = BitVec.ofNat 64 0x36e from by decide]
   iapply Hcont $$ %h' %r HQ Hcwd Hrun

@@ -104,8 +104,12 @@ theorem fif_cons_nil (UL : UK_LEAVES) [Persistent X.P.code]
       rw [g12, hcz, show (0 : Int).toNat = 0 from rfl, consOutChain_0]
       iexact Hd
   · rw [g11]; iexact Hsrc
-  iintro %h' %ret %Wv %cw' %cs' %hk0 %hk1 %hk2 %htk %hlz %hnf Hstd Hs1 Hpost Hrun
-  ihave ⟨%hret, Hd, -⟩ := uwrite_no_short (fun _ => iprop(D ∗ emp)) X.N.pay Wv ret Wv.M Wv.fd cw' cs' l fd rb 0
+  -- the post read at its unfolded form (`xpostWrite_no_short`: an `iintro`ed
+  -- `spostAt …` costs the kernel ~6 s)
+  iintro %h' %ret %Wv %cw' %cs' %hk0 %hk1 %hk2 %htk %hlz %hnf Hstd Hs1
+  rw [spostAt_xv6_write]
+  iintro Hpost Hrun
+  ihave ⟨%hret, Hd, -⟩ := xpostWrite_no_short (fun _ => iprop(D ∗ emp)) X.N.pay Wv ret l fd rb 0
     (by rw [hk0, g10]; exact ha0) hfd htk hl (by rw [hk2, g12, hcz]; rfl) hlz
     (by intro P j _ _ _ hj; omega) $$ Hpost
   rw [hpc]
