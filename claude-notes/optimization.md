@@ -711,6 +711,26 @@ lever. Do not expect a spelled-out Sail term to be why a `Qed` is slow.
   opacity**: sealing sends the file to tens of gigabytes at *tactic* time. The fix
   is one inversion lemma with the displacement opaque.
 
+### Lean: never `iintro` a hypothesis whose head unfolds to an if-chain
+
+iris-lean files a spatial hypothesis `P` as `□?false P`, and the kernel
+checks `□?false P = P` by lazy delta.  At `P = UexecSG.spostAt (self :=
+uexecSGXv6) … n …` (the deposit post, whose head unfolds to `xv6Spost`'s
+`if n = USYS_exec … else if n = 5 …` chain) that check took ~6.5 s per proof
+(the elaborator's time is unaffected, so only `[Kernel]` in a
+`trace.profiler` run shows it); the same hypothesis at the unfolded
+`xpostWrite …` / `xpostOpen …` / `xpostRead …` is free.  Seven declarations on
+the build's critical path paid it (UkFileOpenRead, the three UkFileOpenCalls*
+corollaries, UkFileDevWrite, UkFileDevNil x2, UkPipesIfaceK, UkPipeDevXv6 x2).
+Two fixes: rewrite the continuation's premise first (`rw [spostAt_xv6_write]`,
+`spostAt_xv6_read`, `UkFileOpen.spostAt_open_eq`) and read it with an elim
+lemma stated at the unfolded post (`UkFileDev.xpostWrite_elim`,
+`UkFileOpen.xpostOpen_elim` / `xpostRead_elimR`); or, when the goal is
+`⊢ spostAt … -∗ R`, consume the post with `wand_intro (emp_sep.1.trans
+(L.trans ?_))` so it never enters the context.  Bisect with prefixes of the
+proof ending in `all_goals sorry` under `-Dtrace.profiler=true`: the kernel
+still checks the partial term.
+
 ## Build shape
 
 The build is critical-path bound and core-saturated in the middle: the path is a

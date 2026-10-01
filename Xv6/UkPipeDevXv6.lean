@@ -102,8 +102,12 @@ def pipeDevK_xv6 (UL : UK_LEAVES) : PipeDevK hlc GF (SG := SGX) where
     iapply H $$ %Mv %hag
   wpElim := by
     intro Q Qe Xp W rb γp nb r M' fdv' cw' cs' hst hc
-    iintro Hpost
-    ihave H := ukPostRows_holds.wr (uslot (hlc := hlc) (SG := SGX)) (writePipeFam Q Qe Xp) W r M' fdv' cw' cs' $$ Hpost
+    -- the post is consumed by `trans`, never `iintro`ed: the kernel's check of
+    -- the proof mode's `□?false P = P` at `P = spostAt …` costs ~6 s
+    -- (`UkFileDev.xpostWrite_elim`)
+    refine wand_intro (emp_sep.1.trans ((ukPostRows_holds.wr (uslot (hlc := hlc) (SG := SGX))
+      (writePipeFam Q Qe Xp) W r M' fdv' cw' cs').trans ?_))
+    iintro H
     icases H with ⟨-, %P, %Mv, %hpm, %hwf, %hlz, %hag, H⟩
     have e : (argZ (xkA W 2)).toNat = nb := by rw [hc]; simp
     have hx : filewriteExtra (hlc := hlc) W.gen P (fdStOfKey (xkA W 0) W.fd) (argZ (xkA W 2)) Mv (xkA W 1)
@@ -134,8 +138,10 @@ def pipeDevK_xv6 (UL : UK_LEAVES) : PipeDevK hlc GF (SG := SGX) where
     iexact Hpay
   rpElim := by
     intro Q Rp Rpe W wb γp cap r M' fdv' cw' cs' hst hc
-    iintro Hpost
-    ihave H := ukPostRows_holds.rd (uslot (hlc := hlc) (SG := SGX)) (readPipeFam Q Rp Rpe) W r M' fdv' cw' cs' $$ Hpost
+    -- (the post consumed by `trans`, as in `wpElim`)
+    refine wand_intro (emp_sep.1.trans ((ukPostRows_holds.rd (uslot (hlc := hlc) (SG := SGX))
+      (readPipeFam Q Rp Rpe) W r M' fdv' cw' cs').trans ?_))
+    iintro H
     icases H with ⟨%hret, %P, %Pr, %Mv, -, %hag, -, %hpr, %hwf, %hlz, H⟩
     have e : (argZ (xkA W 2)).toNat = cap := by rw [hc]; simp
     have hx : filereadExtraCore (hlc := hlc) W.gen Pr (fdStOfKey (xkA W 0) W.fd) (argZ (xkA W 2))
