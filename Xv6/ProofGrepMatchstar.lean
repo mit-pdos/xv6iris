@@ -377,6 +377,7 @@ theorem grepMatchstar_ofMh (UL : UK_LEAVES) (lr : Nat) (IH : grepMhSpec (hlc := 
   let c1 := ukWr mc 1#5 (m.get 1#5)
   have hspc1 : (c1.get 2#5).toNat = (m.get spIdx).toNat - 48 := by
     rw [ukWr_get_other _ _ _ _ (by decide)]; exact hspc
+  clear hspc
   gfetch 0x3e true (.LOAD (32#12, .Regidx 2#5, .Regidx 8#5, false, 8))
   iapply wp_uk_ld UL N h15 c1 (BitVec.ofNat 64 0x3e) true 32#12 2#5 8#5 (DFrac.own 1)
     ((m.get spIdx).toNat - 16) (m.get 8#5) n1 (by unfold unotSp spIdx; decide)
@@ -387,6 +388,7 @@ theorem grepMatchstar_ofMh (UL : UK_LEAVES) (lr : Nat) (IH : grepMhSpec (hlc := 
   let c2 := ukWr c1 8#5 (m.get 8#5)
   have hspc2 : (c2.get 2#5).toNat = (m.get spIdx).toNat - 48 := by
     rw [ukWr_get_other _ _ _ _ (by decide)]; exact hspc1
+  clear hspc1
   gfetch 0x40 true (.LOAD (24#12, .Regidx 2#5, .Regidx 9#5, false, 8))
   iapply wp_uk_ld UL N h16 c2 (BitVec.ofNat 64 0x40) true 24#12 2#5 9#5 (DFrac.own 1)
     ((m.get spIdx).toNat - 24) (m.get 9#5) n1 (by unfold unotSp spIdx; decide)
@@ -397,6 +399,7 @@ theorem grepMatchstar_ofMh (UL : UK_LEAVES) (lr : Nat) (IH : grepMhSpec (hlc := 
   let c3 := ukWr c2 9#5 (m.get 9#5)
   have hspc3 : (c3.get 2#5).toNat = (m.get spIdx).toNat - 48 := by
     rw [ukWr_get_other _ _ _ _ (by decide)]; exact hspc2
+  clear hspc2
   gfetch 0x42 true (.LOAD (16#12, .Regidx 2#5, .Regidx 18#5, false, 8))
   iapply wp_uk_ld UL N h17 c3 (BitVec.ofNat 64 0x42) true 16#12 2#5 18#5 (DFrac.own 1)
     ((m.get spIdx).toNat - 32) (m.get 18#5) n1 (by unfold unotSp spIdx; decide)
@@ -407,6 +410,7 @@ theorem grepMatchstar_ofMh (UL : UK_LEAVES) (lr : Nat) (IH : grepMhSpec (hlc := 
   let c4 := ukWr c3 18#5 (m.get 18#5)
   have hspc4 : (c4.get 2#5).toNat = (m.get spIdx).toNat - 48 := by
     rw [ukWr_get_other _ _ _ _ (by decide)]; exact hspc3
+  clear hspc3
   gfetch 0x44 true (.LOAD (8#12, .Regidx 2#5, .Regidx 19#5, false, 8))
   iapply wp_uk_ld UL N h18 c4 (BitVec.ofNat 64 0x44) true 8#12 2#5 19#5 (DFrac.own 1)
     ((m.get spIdx).toNat - 40) (m.get 19#5) n1 (by unfold unotSp spIdx; decide)
@@ -417,6 +421,7 @@ theorem grepMatchstar_ofMh (UL : UK_LEAVES) (lr : Nat) (IH : grepMhSpec (hlc := 
   let c5 := ukWr c4 19#5 (m.get 19#5)
   have hspc5 : (c5.get 2#5).toNat = (m.get spIdx).toNat - 48 := by
     rw [ukWr_get_other _ _ _ _ (by decide)]; exact hspc4
+  clear hspc4
   gfetch 0x46 true (.LOAD (0#12, .Regidx 2#5, .Regidx 20#5, false, 8))
   iapply wp_uk_ld UL N h19 c5 (BitVec.ofNat 64 0x46) true 0#12 2#5 20#5 (DFrac.own 1)
     ((m.get spIdx).toNat - 48) (m.get 20#5) n1 (by unfold unotSp spIdx; decide)

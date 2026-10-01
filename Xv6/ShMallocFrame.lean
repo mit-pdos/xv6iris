@@ -165,6 +165,7 @@ theorem shMalloc_epi (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (mm : RegMap) (
   rw [ukPc 0x124c 0x124e true rfl]
   let q1 := ukWr mm 1#5 vra
   have hq1 : (q1.get 2#5).toNat = sp0.toNat - 64 := by rw [← hs64]; ureg
+  clear hs64
   -- 0x124e  ld s0,48(sp)
   ihave Hi := ushm_uis N.t 0x124e true (.LOAD (48#12, .Regidx 2#5, .Regidx 8#5, false, 8)) udec%
     (by decide) $$ Hc
@@ -176,6 +177,7 @@ theorem shMalloc_epi (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (mm : RegMap) (
   rw [ukPc 0x124e 0x1250 true rfl]
   let q2 := ukWr q1 8#5 vs0
   have hq2 : (q2.get 2#5).toNat = sp0.toNat - 64 := by rw [← hq1]; ureg
+  clear hq1
   -- 0x1250  ld s2,32(sp)
   ihave Hi := ushm_uis N.t 0x1250 true (.LOAD (32#12, .Regidx 2#5, .Regidx 18#5, false, 8)) udec%
     (by decide) $$ Hc
@@ -187,6 +189,7 @@ theorem shMalloc_epi (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (mm : RegMap) (
   rw [ukPc 0x1250 0x1252 true rfl]
   let q3 := ukWr q2 18#5 vs2
   have hq3 : (q3.get 2#5).toNat = sp0.toNat - 64 := by rw [← hq2]; ureg
+  clear hq2
   -- 0x1252  ld s3,24(sp)
   ihave Hi := ushm_uis N.t 0x1252 true (.LOAD (24#12, .Regidx 2#5, .Regidx 19#5, false, 8)) udec%
     (by decide) $$ Hc

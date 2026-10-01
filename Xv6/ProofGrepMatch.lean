@@ -310,6 +310,7 @@ theorem wp_grepMatch (UL : UK_LEAVES) (MH : GREP_MATCHHERE) : wpGrepMatchBody (h
     let c1 := ukWr mc 1#5 (m.get 1#5)
     have hspc1 : (c1.get 2#5).toNat = (m.get spIdx).toNat - 32 := by
       rw [ukWr_get_other _ _ _ _ (by decide)]; exact hspc
+    clear hspc
     gfetch 0xee true (.LOAD (16#12, .Regidx 2#5, .Regidx 8#5, false, 8))
     iapply wp_uk_ld UL N h11 c1 (BitVec.ofNat 64 0xee) true 16#12 2#5 8#5 (DFrac.own 1)
       ((m.get spIdx).toNat - 16) (m.get 8#5) n1 (by unfold unotSp spIdx; decide)
@@ -320,6 +321,7 @@ theorem wp_grepMatch (UL : UK_LEAVES) (MH : GREP_MATCHHERE) : wpGrepMatchBody (h
     let c2 := ukWr c1 8#5 (m.get 8#5)
     have hspc2 : (c2.get 2#5).toNat = (m.get spIdx).toNat - 32 := by
       rw [ukWr_get_other _ _ _ _ (by decide)]; exact hspc1
+    clear hspc1
     gfetch 0xf0 true (.LOAD (8#12, .Regidx 2#5, .Regidx 9#5, false, 8))
     iapply wp_uk_ld UL N h12 c2 (BitVec.ofNat 64 0xf0) true 8#12 2#5 9#5 (DFrac.own 1)
       ((m.get spIdx).toNat - 24) (m.get 9#5) n1 (by unfold unotSp spIdx; decide)
@@ -330,6 +332,7 @@ theorem wp_grepMatch (UL : UK_LEAVES) (MH : GREP_MATCHHERE) : wpGrepMatchBody (h
     let c3 := ukWr c2 9#5 (m.get 9#5)
     have hspc3 : (c3.get 2#5).toNat = (m.get spIdx).toNat - 32 := by
       rw [ukWr_get_other _ _ _ _ (by decide)]; exact hspc2
+    clear hspc2
     gfetch 0xf2 true (.LOAD (0#12, .Regidx 2#5, .Regidx 18#5, false, 8))
     iapply wp_uk_ld UL N h13 c3 (BitVec.ofNat 64 0xf2) true 0#12 2#5 18#5 (DFrac.own 1)
       ((m.get spIdx).toNat - 32) (m.get 18#5) n1 (by unfold unotSp spIdx; decide)
