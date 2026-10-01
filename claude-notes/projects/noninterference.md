@@ -79,6 +79,28 @@ the trap loop:
 - [x] PJ-T (landed 985e7f2d2; the run's chaining -- each round starting at the record the last ended at -- is a hypothesis of utRoundQuiet, not proved from the loop, which re-opens the parked block at an existential record: M2's first item)
 
 
+**M2 as designed for the Lean tree (2026-10-01, Fable; owner: "go ahead with M2").** §6's M2, re-read against
+this tree. The machine layer (`MachCSL`) already has the trace machinery `uart-trace.md` built: `Obs` (power,
+device), `obsInterp` in `stateInterp` with the past `h`, `obsWf` as the pure step invariant, `obsAuth`/`obsFrag`
+halves, the client's `MachFixedGS.obsPred`, the non-silent device rule `wpDev_lift_obs` with its step permit
+(`uartObsPermit`), and `xv6PowerAdequacyGen`'s trace-aware `phi`/`Hphi`. The hart arm of `primStep` is silent
+(`obs = []`, `primStep_hart_inv`, `wpHart_lift` via `obsInterp_silent_nil`). Four waves, one or two Opus lanes
+each, integrated on `lean-m2`:
+
+| Wave | Content | Depends on |
+|---|---|---|
+| **M2-W1 machine layer** | `Obs.uEnter cpu satp epc gprs` and `Obs.uExit cpu satp scause epc gprs` (the 31 GPRs as a list; `satp` is the address space's pid-free identity); emitted by the hart arm EXACTLY at the `regWrite .cur_privilege` event whose old and new values differ and one of them is `User` (the model writes `cur_privilege` LAST in `trap_handler` -- after scause/stval/sepc -- and in `sret` after mstatus, so everything the event names is in `σ.regs cpu` at that write); every other hart event stays silent. `primStep`'s hart arm becomes `obs = hartObs cpu o v σ`; `primStep_hart_inv` and `primStep_obsWf` extended (`isIo` true for the two, `obsStep`/`openSeg`/`obsBoots` arms, `obsWire`/`obsIns` ignore them); `wpHart_lift` splits into the silent lifting (all events but a privilege-crossing write) and `swp_writeReg_priv`, a permit-taking rule shaped like the UART's: the caller's `hartObsPermit`-style assumption receives `obsAuth h ∗ ⌜obsWf h g⌝ ∗ ⌜the event⌝` and returns `obsAuth (h ++ [e])`. The two towers (`UTrap`'s U→S write, `WpSmodeSretU`'s S→U write) take the permit; `WpSmodeSret` (S→S), `WpTrap`, M-mode writes stay silent (same value or no User). CI: the device-conformance suite and `check-gen` must stay green; no TCB move expected beyond `Lang.lean`'s own lines. | — |
+| **M2-W2 the client ledger** | the xv6 `obsPred` (`Pt`): at every `uExit`/`uEnter` of this address space the event's registers ARE the trapped/resumed key's trapframe and `satp` the slot's root (the residue owns both: `UsertrapRes`, `UserKernelBridge.userInv_of_sret`, `userTrapFrame_open`), and the per-space subsequence of `h` is in step with the residue's `uhist` rounds (PI-5). The permits are discharged where the towers run: `UserStepTrap`/`UkLand` (the user tier's trap), `UserKernelBridge.wpLoop_userret_sret` (the kernel's sret). Deliverable: `utrace s h` (pure), the invariant, and the two boundary permits as the client's instances. | W1 |
+| **M2-W3 = M0 functional rows** | `usysDet n W ι : Uvis` for the private class (§4's list: sbrk, fork's parent, wait, exit, getpid, uptime, console write; the transparent arm is already functional) and the loop's `round_det` discharge at `UexecApply.uexecRet_roundSlot` from the kernel's `SyscRows` plus the ledger RECEIPTS (`ledReceipt`, `pidReceipt`, `zombReceipt`, `tickLb`): the round's actual `(r, M', …)` equals `usysDet` at the round's ι-prefix. `uexecRetF`'s ecall arm is re-cut on it for those `n` (the program proves the functional arm; the kernel instantiates it). | — (parallel with W1) |
+| **M2-W4 the theorem** | `events h` (the actor-labelled event history read off the boundary trace: each round's number and arguments at `uExit`, its result at `uEnter`, the fault cause for lazy allocations), `canon k ι` (the abstract process machine: `usysDet` folded over ι), `phi g h := ∀ s, utrace s h ⊑ canon (firstKey s h) (events h)`, `xv6NiAdequacy` := `xv6PowerAdequacyGen` at that `phi` (a new root in `tools/ci/roots.txt` and `tools/audit/baseline.json`), and the PURE two-run corollaries: general (equal ι ⇒ equal traces) and the strong instance (a process with no rounds before its first ecall generates no events: T's `utRoundQuiet` lifted to the trace). | W2, W3 |
+
+- [ ] M2-W1  - [ ] M2-W2  - [ ] M2-W3 (M0)  - [ ] M2-W4
+
+Risk register (honest): W1 changes the language and every lifting lemma -- mechanical but wide, and the device
+suite must not notice; W3 is the proof's content and may find a row that cannot be made functional in `(key,
+ι-prefix)` -- that is a channel not yet named (§2), to be reported, not papered over; W4's `events h` must be a
+PURE function of the trace or the two-run corollary dies (§6's reason for exporting events).
+
 Not ported: 42666b2b7 (`tools/intr_cone.py`, a Rocq-module cone audit; the Lean counterpart is a
 `tools/` item for when T lands).  Rocq's L3 and T were never landed; they stay future work.
 
