@@ -14,6 +14,39 @@ record until a lane's as-landed note contradicts them; the LANES section
 is the live worklist.  The build host exists again: the proofs build on this EC2 machine
 (durable-notes, Build), so nothing here is gated on a box any more.
 
+## PORT TO LEAN (opened 2026-10-01; owner: "port I+J to Lean main")
+
+The Lean port (this tree) deliberately left out the NI groundwork: drift themes **I** (M1's four
+ledgers, uhist, VmfaultQuiet) and **J** (the permit sweep G/L1a/L1b/L2) of `notes/rocq_drift.md`.
+The Rocq commits are the specification; the design notes below (identical to Rocq's) are the
+design of record; the Lean twins' "Deviations from Rocq" headers rule where the two disagree.
+Base: `origin/lean` deb2995ee, branch `lean-ni`.  Order = Rocq's landing order (each lane's
+Rocq commit was gated green on its predecessor), one Opus lane per Rocq commit, worktree per
+lane, `lake build Xv6 MachCSL` + `tools/ci/lint.sh` + no `sorry` before a lane lands; baselines
+(`tools/audit/baseline.json`, `tools/tcb/expected.json`, coverage) in the same commit when they
+move.  Rocq sources: `git show <sha>:iris/<File>.v` (the shared `.git` holds the `rocq` history).
+
+| Lane | Rocq commit(s) | Design of record | Lean homes (twins) | Depends on |
+|---|---|---|---|---|
+| **PI-1 kalloc ledger** | b5e67a96b (KallocEv.v), bed7ee0dd | `design/ni-kalloc-ledger.md` | new `Xv6/KallocEv.lean`; `KallocDefs`, `KmemGhost`, `SpecKalloc`/`SpecKfree`, `ProofKalloc`/`ProofKfree`, `FsCfgKits`, `ProofMain` | — |
+| **PI-2 pid ledger** | d66e99d0d (PidEv.v), 8043e4cdd | `design/ni-pid-ledger.md` | new `Xv6/PidEv.lean`; `PidLock`, `SlotGen` (WchG name), `SpecAllocproc`/`ProofAllocproc`, `SpecFreeproc`/`ProofFreeproc`, `ProofKexit`, `ProofKwait`, `ProofUserinit` | PI-1 (shared `wchG`-style name plumbing) |
+| **PI-3 ticks ledger** | dd1843b7a | `design/ni-ticks-ledger.md` | `TicksDefs` (Rocq TicksInv), `SpecSysUptime`/`ProofSysUptime`, `ProofClockintr`, `ProofSysPause` | — (parallel with PI-1) |
+| **PI-4 zombie ledger** | 2107981b4 (ZombEv.v) | `design/ni-zombie-ledger.md` | new `Xv6/ZombEv.lean`; `WaitInv`, `UserChildren`, `ProofKexit`, `ProofKwait`, `ProofFreeproc` | PI-2 |
+| **PI-5 uhist** | 5634a3874 (UhistDefs.v) | `design/ni-uhist.md` | new `Xv6/UhistDefs.lean`; `ProcDefs` (ProcPriv), `UsertrapRes`, `UtResFits`, `ProofUsertrap*`, `ProofUserret*`, `ProofForkret*` | PI-4 |
+| **PI-6 VmfaultQuiet** | 7cec90c7b | `design/ni-strong-instance.md` R4 | new `Xv6/VmfaultQuiet.lean` (pure) | — |
+| **PJ-G ground** | 9fb1d089c | `design/ni-strong-instance.md` §7, §7.1 | `ProcDefs` (`ProcPriv.ev`), `SlotGen` (`actCnt` at a new `WchG` name, `SgenUR`'s shape over `Nat`), `ProcInv`/`ProcPrivAcc`/`FdTable`, `SpecProcinit`, `SpecFreeproc`, `WaitInv`, `ProofKfork*`, `ProofForkret`, `ProofKexit`, `ProofAllocproc`/`ProofFreeproc` | PI-5 |
+| **PJ-L1a** | f344a089a | §7.2 | ring one + block-holders (48 Rocq files; 39 have twins, kexec/kfork parts restructured) | PJ-G |
+| **PJ-L1b** | b69bd0fab | §7.3 | copy ring + every block-holding chain (84 Rocq files; 68 twins; sys_open/unlink parts restructured) | PJ-L1a |
+| **PJ-L2** | 78f9234b8 | §7.4 | inner VM ring (32 Rocq files; 30 twins) | PJ-L1b |
+
+Not ported: 42666b2b7 (`tools/intr_cone.py`, a Rocq-module cone audit; the Lean counterpart is a
+`tools/` item for when T lands).  Rocq's L3 and T were never landed; they stay future work.
+
+Each lane's as-landed line goes under its row's design note (the Rocq notes' rule), and this table's
+checkbox below flips when the lane is on `lean-ni`:
+
+- [ ] PI-1  - [ ] PI-2  - [ ] PI-3  - [ ] PI-4  - [ ] PI-5  - [ ] PI-6  - [ ] PJ-G  - [ ] PJ-L1a  - [ ] PJ-L1b  - [ ] PJ-L2
+
 ## Lanes (opened 2026-09-15)
 
 Execution order is §6's, adjusted for one territory fact: upstream's
