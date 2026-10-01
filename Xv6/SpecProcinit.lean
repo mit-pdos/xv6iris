@@ -43,7 +43,9 @@ Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
 import Xv6.ProcDefs
 import Xv6.Image
-import MachCSL.WpSmodeFrame
+import MachCSL.AluFacts
+import MachCSL.Lock
+import MachCSL.CallConv
 
 namespace Xv6
 

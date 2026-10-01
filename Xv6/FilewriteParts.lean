@@ -22,6 +22,7 @@ epilogue `+0xf4 .. +0x100` restores the eager five and pops.
    shape).
 3. Names carry the `fwr` prefix (`fw_` is FsWords' / freewalk's).
 -/
+import MachCSL.WpSmodeFrame12
 import Xv6.UMemImg
 import Xv6.FilePay
 import Xv6.FsAbsWriteFire

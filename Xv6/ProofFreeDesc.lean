@@ -21,6 +21,8 @@ The descriptor's four fields are written through the four cells of
 `Xv6.descCells`; the address the code computes, `disk.desc + (i << 4)`, is
 `Xv6.descAt pd i` (`fd_descAt`).
 -/
+import MachCSL.WpSmodeFrame12b
+import MachCSL.WpLock
 import Xv6.SpecFreeDesc
 import Xv6.CodeTactics
 import Xv6.VirtioDiskRwDefs2

@@ -15,6 +15,7 @@ both of its arms (`dirlink_snc`, Rocq's `snc_bview` step), and the `sh`
 stores exactly the inum (`dirlink_trunc16`), so the record IS
 `direntBytes (deOfName inum s)` (Rocq's `dl_rec_hi` / `dl_rec_nm`).
 -/
+import MachCSL.WpSmodeFrame12b
 import Xv6.DirlinkWrite
 
 namespace Xv6

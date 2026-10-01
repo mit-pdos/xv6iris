@@ -22,6 +22,7 @@ iget returns the licence at the SAME `l`, and the wand puts the borrow back.
 (`dirlookup_found`) in front of `dirlookup_found_iget`, which takes the
 poff cell at either arm (Rocq's `iAssert` at 1954 does the same inline).
 -/
+import MachCSL.WpSmodeFrame12b
 import Xv6.DirlookupTail
 import Xv6.FsStateEraResB
 import Xv6.DinodeSlot

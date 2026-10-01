@@ -36,4 +36,8 @@ theorem ofBool_bit0_and_mask (v : BitVec 64) :
     rw [BitVec.getElem_eq_testBit_toNat, BitVec.toNat_and]; simp
   simp [h0]
 
+/-- The pc an indirect jump lands on: the register value with bit 0 cleared,
+as `execute_JALR` clears it (both `ret` and a computed `jalr`). -/
+def jumpPc (v : BitVec 64) : BitVec 64 := v &&& 0xFFFFFFFFFFFFFFFE#64
+
 end MachCSL

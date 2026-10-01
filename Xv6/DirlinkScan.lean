@@ -28,6 +28,7 @@ copies of `Xv6.dirlookup_rec_bytes` / `dirlookup_delivered`
 (DirlookupParts), promotion candidates (Rocq's shared
 `ProofDirlookupParts.dlk_de_view` / `dlk_rd_delivered`).
 -/
+import MachCSL.WpSmodeFrame12b
 import Xv6.DirlinkRec
 import Xv6.DirlookupParts
 

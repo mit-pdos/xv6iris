@@ -44,6 +44,7 @@ The cell at `16(sp)` is never written; `0(sp)..15(sp)` is the `de` record
    in ProofDirlookupParts.v, ProofDirlookup.v and ProofDirlink.v (dirlink's
    own copy is its agent's) -- reason: no live use in dirlookup.
 -/
+import MachCSL.WpSmodeFrame12
 import Xv6.SpecDirlookup
 import Xv6.FsWords
 import Xv6.DinodeSlot

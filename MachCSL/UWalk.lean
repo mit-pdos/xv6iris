@@ -19,6 +19,7 @@ The configuration the walk reads (`misa`, `menvcfg`, the PMP and PMA tables,
 the HTIF base) is xv6's frozen user-time configuration, stated as file
 values of the walker state (`UwkPins`), never as register rules (D52).
 -/
+import MachCSL.PteClass
 import MachCSL.UWalkRun
 import MachCSL.UTranslate
 import MachCSL.WpPtWalkOwn
@@ -63,22 +64,7 @@ macro "uwk_pins" hp:term:max : tactic => `(tactic| (
 
 /-! ## §1 The entry word's class -/
 
-/-- The flag byte and the extension bits the model reads off an entry. -/
-abbrev uwkFl (w : BitVec 64) : BitVec 8 := Mk_PTE_Flags (Sail.BitVec.extractLsb w 7 0)
-abbrev uwkExt (w : BitVec 64) : BitVec 10 := ext_bits_of_PTE w
-
-/-- The page number of an entry (Rocq `ProcPtOwn.pte_ppn`). -/
-def ptePpn (w : BitVec 64) : BitVec 44 := BitVec.extractLsb' 10 44 w
-
-/-- **Rocq `pte_invalid`/`pte_valid`**: the verdict of `pte_is_invalid` at
-xv6's configuration (`menvcfg.SSE = 0`, `PBMTE = 0`; Svnapot, Svpbmt and
-Svrsw60t59b enabled). -/
-def uwkInv (w : BitVec 64) : Bool :=
-  _get_PTE_Flags_V (uwkFl w) == 0#1 ||
-  (_get_PTE_Flags_R (uwkFl w) == 0#1 && _get_PTE_Flags_W (uwkFl w) == 1#1) ||
-  (pte_is_non_leaf (uwkFl w) && (_get_PTE_Flags_A (uwkFl w) == 1#1 || _get_PTE_Flags_D (uwkFl w) == 1#1 ||
-    _get_PTE_Flags_U (uwkFl w) == 1#1 || uwkExt w != 0#10)) ||
-  _get_PTE_Ext_PBMT (uwkExt w) != 0#2 || _get_PTE_Ext_reserved (uwkExt w) != 0#5
+-- `uwkFl`, `uwkExt`, `ptePpn`, `uwkInv` live in `MachCSL.PteClass`.
 
 /-- The PBMT encodings the model accepts. -/
 theorem uwk_pbmt_matches (x : BitVec 2) : page_based_mem_type_forwards_matches x = (x != 3#2) := by

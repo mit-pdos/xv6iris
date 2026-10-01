@@ -13,6 +13,7 @@ Both callers hold `p->lock`, so interrupts are off on this hart anyway
 
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
+import MachCSL.WpSmodeIntr
 import Xv6.SchedCtx
 import Xv6.PidLock
 import Xv6.SpecProcinit

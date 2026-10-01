@@ -13,6 +13,7 @@ head `+0x82` to the `BODY` assertion) and the induction:
 * `writei_loop`        THE INDUCTION on the fuel (the straddled-block
   count), continuation fixed before the induction.
 -/
+import MachCSL.WpSmodeFrame12b
 import Xv6.WriteiBody
 import Xv6.BlkmapBuf
 

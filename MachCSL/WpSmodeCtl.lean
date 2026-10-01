@@ -23,9 +23,7 @@ open LeanRV64D LeanRV64D.Functions
 
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 
-/-- The pc an indirect jump lands on: the register value with bit 0 cleared,
-as `execute_JALR` clears it (both `ret` and a computed `jalr`). -/
-def jumpPc (v : BitVec 64) : BitVec 64 := v &&& 0xFFFFFFFFFFFFFFFE#64
+-- `jumpPc` lives in `MachCSL.AluFacts`.
 
 /-- The branch condition of `op` on the two source values. -/
 def bcond : bop → BitVec 64 → BitVec 64 → Bool

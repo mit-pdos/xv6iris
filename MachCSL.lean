@@ -57,6 +57,7 @@ import MachCSL.WpSmodeFrame8
 import MachCSL.WpSmodeFrame8b
 import MachCSL.WpSmodeFrame6
 import MachCSL.WpSmodeFrame12
+import MachCSL.Frame12Defs
 import MachCSL.WpSmodeFrame16
 import MachCSL.WpStagesM
 import MachCSL.WpTick
@@ -178,6 +179,7 @@ import MachCSL.UExecCsrCnt
 import MachCSL.UExecCsr
 import MachCSL.UWalkRun
 import MachCSL.UWalk
+import MachCSL.PteClass
 import MachCSL.UTlb
 import MachCSL.UMemPhys
 import MachCSL.UMemRam

@@ -55,6 +55,7 @@ with the transaction's half (`create_dirty_clear_unarm`).  The two
   `cr_bs3` -- `bslots_uncons` / `bslots_cons`; `cr_join14` / `cr_frm5` --
   inside `create_tail` / the `ld`'s address equation.
 -/
+import MachCSL.WpSmodeFrame12b
 import Xv6.CreateCalls
 import Xv6.FsStateEraResB
 

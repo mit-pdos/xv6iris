@@ -28,6 +28,7 @@ Deviations from Rocq: the register threading and the packed receipt as
 `Xv6/IallocDefs.lean` deviations 1–2; the four-stage cut (Rocq has one
 lemma for `+0x88 .. +0xba`) is for elaboration speed only.
 -/
+import MachCSL.WpSmodeFrame12b
 import Xv6.IallocTail
 
 namespace Xv6

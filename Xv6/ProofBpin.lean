@@ -10,6 +10,8 @@ incremented; the caller's `bslot` joins the slot's supply (`bslots_cons`),
 which is what bounds the count and makes the unchecked `++` faithful.  The
 shape is `filedup`'s, minus the `blez` panic arm and the `mv a0,s1` return.
 -/
+import MachCSL.WpSmodeRegOps
+import MachCSL.WpSmodeFrame
 import Xv6.SpecBpin
 import Xv6.BufEscrow
 import Xv6.BcacheLock

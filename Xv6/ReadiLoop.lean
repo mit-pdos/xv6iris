@@ -18,6 +18,7 @@ bio handle's payload pins the buffer's bytes to `data (off / BSIZE)`
 
 The fuel is `N - tot` (ReadiParts deviation 3).
 -/
+import MachCSL.WpSmodeFrame12b
 import Xv6.ReadiCopy
 
 namespace Xv6

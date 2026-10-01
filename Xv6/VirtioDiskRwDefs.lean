@@ -21,7 +21,9 @@ of `Xv6.kmapClass` by `decide` (the symbol is static); for the three
 takes it as a premise (`virtio_disk_init` establishes it: its pages come
 from `kalloc`).
 -/
-import MachCSL.WpSmodeFrame12b
+import MachCSL.Frame12Defs
+import MachCSL.WpSmodeFrame
+import MachCSL.WpSmodeCtl
 import Xv6.DiskInvDefs
 import Xv6.SchedCtx
 import Xv6.BufDefs

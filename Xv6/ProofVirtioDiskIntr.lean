@@ -37,6 +37,7 @@ passed the context's floor -- or the position is its own store, which the
 fence drains).  `Xv6.vdis_payWm_mk` puts one back at the new watermark when the
 handler releases.
 -/
+import MachCSL.WpSmodeFrame12b
 import MachCSL.WpSmodeDev4
 import MachCSL.WpSmodeFenceFloor2
 import MachCSL.WpSmodeFencePub

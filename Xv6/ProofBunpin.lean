@@ -11,6 +11,8 @@ underflow -- and the ghost step (`bref_free_step`) deletes it while `refcnt`
 goes down by one; the slot unit it was holding comes back out
 (`bslots_uncons`).  `bpin`'s proof with the two steps reversed.
 -/
+import MachCSL.WpSmodeRegOps
+import MachCSL.WpSmodeFrame
 import Xv6.SpecBunpin
 import Xv6.BufEscrow
 import Xv6.BcacheLock

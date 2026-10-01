@@ -12,6 +12,7 @@ closed only where a lemma needs them: the prologue hands them out under an
 `∃`, the epilogue takes them at any value), so a caller can step `sd`/`ld`
 through the scratch cells with the ordinary rules.
 -/
+import MachCSL.Frame12Defs
 import MachCSL.WpSmodeFrame
 
 namespace MachCSL
@@ -22,20 +23,7 @@ open LeanRV64D
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 variable {lent : Bool}
 
-/-- The twelve cells of a 96-byte frame, from `sp-8` down to `sp-96`. -/
-def frame12 [CurCtx] (sp v0 v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 : BitVec 64) : IProp GF := iprop%
-  wordPointsTo (sp + 0xFFFFFFFFFFFFFFF8#64) 8 (DFrac.own 1) v0 ∗
-  wordPointsTo (sp + 0xFFFFFFFFFFFFFFF0#64) 8 (DFrac.own 1) v1 ∗
-  wordPointsTo (sp + 0xFFFFFFFFFFFFFFE8#64) 8 (DFrac.own 1) v2 ∗
-  wordPointsTo (sp + 0xFFFFFFFFFFFFFFE0#64) 8 (DFrac.own 1) v3 ∗
-  wordPointsTo (sp + 0xFFFFFFFFFFFFFFD8#64) 8 (DFrac.own 1) v4 ∗
-  wordPointsTo (sp + 0xFFFFFFFFFFFFFFD0#64) 8 (DFrac.own 1) v5 ∗
-  wordPointsTo (sp + 0xFFFFFFFFFFFFFFC8#64) 8 (DFrac.own 1) v6 ∗
-  wordPointsTo (sp + 0xFFFFFFFFFFFFFFC0#64) 8 (DFrac.own 1) v7 ∗
-  wordPointsTo (sp + 0xFFFFFFFFFFFFFFB8#64) 8 (DFrac.own 1) v8 ∗
-  wordPointsTo (sp + 0xFFFFFFFFFFFFFFB0#64) 8 (DFrac.own 1) v9 ∗
-  wordPointsTo (sp + 0xFFFFFFFFFFFFFFA8#64) 8 (DFrac.own 1) v10 ∗
-  wordPointsTo (sp + 0xFFFFFFFFFFFFFFA0#64) 8 (DFrac.own 1) v11
+-- `frame12` lives in `MachCSL.Frame12Defs`.
 
 theorem frame12_elim [CurCtx] (sp v0 v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 : BitVec 64) :
     frame12 (GF := GF) sp v0 v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 ⊢
