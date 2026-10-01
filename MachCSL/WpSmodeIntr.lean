@@ -31,15 +31,13 @@ theorem smFacts_clear (ms : BitVec 64) (sie : Bool) (h : smFacts ms sie) :
   unfold smFacts at h ⊢
   obtain ⟨-, h2, h3, h4, h5, h6, h7, h8, h9, h10, h11⟩ := h
   simp only [Bool.false_eq_true, ite_false]
-  refine ⟨by bv_decide, by bv_decide, by bv_decide, by bv_decide, by bv_decide, by bv_decide, by bv_decide,
-    by bv_decide, by bv_decide, by bv_decide, by bv_decide⟩
+  bv_decide
 
 theorem smFacts_set (ms : BitVec 64) (sie : Bool) (h : smFacts ms sie) : smFacts (ms ||| 2#64) true := by
   unfold smFacts at h ⊢
   obtain ⟨-, h2, h3, h4, h5, h6, h7, h8, h9, h10, h11⟩ := h
   simp only [ite_true]
-  refine ⟨by bv_decide, by bv_decide, by bv_decide, by bv_decide, by bv_decide, by bv_decide, by bv_decide,
-    by bv_decide, by bv_decide, by bv_decide, by bv_decide⟩
+  bv_decide
 
 /-- Setting an already-set `SIE` is the identity. -/
 theorem ms_or_sie_self (ms : BitVec 64) (h : BitVec.extractLsb' 1 1 ms = 1#1) : ms ||| 2#64 = ms := by

@@ -338,11 +338,11 @@ theorem trapMs_spp (ms : BitVec 64) : BitVec.extractLsb' 8 1 (trapMs ms) = 1#1 :
 
 theorem smFacts_trapMs (ms : BitVec 64) (sie : Bool) (h : smFacts ms sie) : smFacts (trapMs ms) false := by
   obtain ⟨_, h17, h34, h19, h22, h20, h13, h15, h9, h63, h11⟩ := h
-  refine ⟨trapMs_sie ms, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
-  all_goals
-    unfold trapMs Functions._get_Mstatus_SIE
-    simp only [Sail.BitVec.updateSubrange, Sail.BitVec.updateSubrange', Sail.BitVec.extractLsb, BitVec.extractLsb]
-    bv_decide
+  refine ⟨trapMs_sie ms, ?_⟩
+  -- one bit-blast of the ten remaining conjuncts (not one each)
+  unfold trapMs Functions._get_Mstatus_SIE
+  simp only [Sail.BitVec.updateSubrange, Sail.BitVec.updateSubrange', Sail.BitVec.extractLsb, BitVec.extractLsb]
+  bv_decide
 
 /-- The trapped configuration has the pinned `SPIE`/`SPP` of a trap from
 `SIE = 1`. -/
