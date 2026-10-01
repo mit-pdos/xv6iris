@@ -35,6 +35,7 @@ Rocq's header, abridged (the reasons are the content):
    (U4).  `file_xfer` is unreached (kernel-term re-audit, notes/cone_reaudit.md).
 -/
 import Xv6.AppFileClaim
+import Xv6.AppFileSyncClose
 
 namespace Xv6
 

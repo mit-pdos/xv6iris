@@ -33,18 +33,7 @@ them).  The entries are `UkPipesEntries`.
 import Xv6.UkPipesIfaceRec
 import Xv6.UkCatTree
 import Xv6.UkGrepTreeDefs
-import Xv6.GrepFilt
-import Xv6.UkStub
-import Xv6.ExecEntry
-import Xv6.ExecWords
-import Xv6.UexecRet
-import Xv6.HfpProgP
 import Xv6.UkEchoTree
-import Xv6.ElfUser
-import Xv6.UshEchoPure
-import Xv6.UkTreeEntryStmt
-import Xv6.UkFileEntries
-import Xv6.UshFileRedir
 
 namespace Xv6
 

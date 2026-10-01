@@ -14,6 +14,7 @@ Deviations from Rocq: `UkCatDefs` deviations 1–3; the argv bound is read off
 the run (Rocq's `urun_uword_bnd`, here echo's landed copy).
 -/
 import Xv6.UkCatDefs
+import Xv6.UkRunMem
 
 namespace Xv6
 

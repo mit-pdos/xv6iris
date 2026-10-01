@@ -14,6 +14,8 @@ import Xv6.UkFileDevDefs
 import Xv6.UkFileOpenCallsRead
 import Xv6.UkFileOpenCallsMiss
 import Xv6.UkFreeHandler
+import Xv6.UNamePath
+import Xv6.UStrImg
 
 namespace Xv6
 

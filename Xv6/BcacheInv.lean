@@ -94,8 +94,6 @@ import Xv6.BufDefs
 import Xv6.SleepLockDefs
 import MachCSL.CtxBox
 import Xv6.StepLemmas
-import MachCSL.Lock
-import MachCSL.AluFacts
 
 namespace Xv6
 

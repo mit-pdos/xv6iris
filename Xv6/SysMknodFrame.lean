@@ -50,6 +50,7 @@ import Xv6.SpecSysMknod
 import Xv6.ProcPrivAcc
 import Xv6.KstackMap
 import Xv6.CopyLemmas
+import Xv6.KexecParts
 
 namespace Xv6
 

@@ -23,10 +23,8 @@ producer's loan `Rd`; `ufin` hands the deed back at its PRE tie
 3. Rocq's `fown r s = fdq r (1/2) s ∗ ftkt r s` split is `fown`'s own
    (`fdeed r s ∗ ftkt r s`, `fdeed r s` being `fdq r (1/2) s` by `.rfl`).
 -/
-import Xv6.UshOomPaid
 import Xv6.UshUPipesEcho
 import Xv6.UshCatFStageSup
-import Xv6.HfpFileOpenHolds
 
 namespace Xv6
 

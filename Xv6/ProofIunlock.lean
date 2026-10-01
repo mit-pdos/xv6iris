@@ -65,6 +65,7 @@ import Xv6.IcachePinwLw
 import Xv6.CodeTactics
 import MachCSL.WpLock
 import Xv6.SpecHoldingsleep
+import MachCSL.WpSmodeFrame
 
 
 namespace Xv6

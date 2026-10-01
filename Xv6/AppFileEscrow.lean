@@ -40,6 +40,7 @@ Rocq's header, abridged (the reasons are the content):
 3. Rocq's curried `A -∗ B -∗ C` lemmas are stated `⊢ A -∗ B -∗ C`.
 -/
 import Xv6.AppFilePos
+import Xv6.AppFileDeed
 
 namespace Xv6
 

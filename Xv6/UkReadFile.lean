@@ -19,6 +19,7 @@ ported): `a1_idx`, `udepwf_st_read_file` (the PARKED row), `wp_uk_ecall_read_fil
    instance's `sfam`, definitionally).
 -/
 import Xv6.UkReadRows
+import Xv6.UkRunSysDefs
 
 namespace Xv6
 

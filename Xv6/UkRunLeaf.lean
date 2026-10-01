@@ -56,8 +56,6 @@ All leaves are proved from ONE step lemma, `urun_step` (the destructuring of
    `ukLi`, `ukAddi`, `ukSubw` (Rocq `moi_subw` at the leaf's value).
 -/
 import Xv6.UkRun
-import Xv6.UmodeArith
-import Xv6.ByteCursor
 
 namespace Xv6
 

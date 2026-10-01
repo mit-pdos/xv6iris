@@ -25,7 +25,6 @@ accessor at the access, since the client's update may need it (a receipt to
 absorb); the slot and, for a store, the cleared reservation come back
 separately and the client re-forms the token.
 -/
-import MachCSL.KCtxGpr
 import MachCSL.WpSmodeAu
 import MachCSL.WpSmodeCtl
 import MachCSL.SmodeMemFacts

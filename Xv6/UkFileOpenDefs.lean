@@ -69,16 +69,11 @@ CONE (re-walked on the pinned globs: 19/31 reached).  Ported:
    `uptWf`/`lazyFree` and whose image guard reaches the page view.)
 -/
 import Xv6.HfpFileClaimsP
-import Xv6.HfpSysDefs
-import Xv6.UConsOpen
-import Xv6.UkTreeRead
 import Xv6.PinnedObs
-import Xv6.UserCwd
-import Xv6.FileDisc
-import Xv6.SpecSysOpen
-import Xv6.FsAbsEra
-import Xv6.FileOpenCreateAu
-import Xv6.FileOpenRead
+import Xv6.UexecExecInst
+import Xv6.UkSysP
+import Xv6.FileOpenFams
+import Xv6.UkRunSysOpenImg
 
 namespace Xv6
 

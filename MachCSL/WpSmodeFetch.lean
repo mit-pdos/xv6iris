@@ -7,6 +7,7 @@ carries it).
 -/
 import MachCSL.WpSmodeCycleBase
 import MachCSL.Translate
+import MachCSL.Instr
 
 namespace MachCSL
 

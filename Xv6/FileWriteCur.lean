@@ -35,6 +35,7 @@ Rocq's notes, abridged (the reasons are the content):
 -/
 import Xv6.AppFilePos
 import Xv6.UserOff
+import Xv6.AppFileDeed
 
 namespace Xv6
 

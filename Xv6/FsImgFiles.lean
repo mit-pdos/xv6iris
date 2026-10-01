@@ -46,13 +46,6 @@ Xv6.User.<P>.elf` (`Xv6/User/<P>ElfRaw.lean`).
    leaf and may not be imported).
 -/
 import Xv6.FsImgCheck
-import Xv6.User.CatElfRaw
-import Xv6.User.EchoElfRaw
-import Xv6.User.GrepElfRaw
-import Xv6.User.InitElfRaw
-import Xv6.User.ShElfRaw
-import Xv6.User.SeccompElfRaw
-import Xv6.User.SyncElfRaw
 import Xv6.ElfUser
 
 namespace Xv6

@@ -40,8 +40,7 @@ THE ADDRESS IS A NUMBER: `(m.get rs1).toNat + imm.toInt = a` (Rocq `a = uint
 5. A one-byte run is the byte (`ubytesq_one`, `utextRun_one`), with
    `MachCSL.nthByte_one` reused.
 -/
-import Xv6.UkRunLeaf
-import MachCSL.ByteWord
+import Xv6.UkRun
 
 namespace Xv6
 

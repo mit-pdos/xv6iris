@@ -34,3 +34,4 @@ import Xv6.UkEchoTree
 import Xv6.UshEchoPure
 import Xv6.User.EchoImage
 import Xv6.UshEchoImg
+import Xv6.UkRunMem

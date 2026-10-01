@@ -41,7 +41,7 @@ Rocq's note, abridged (the reasons are the content):
    dummy record to reuse `fposf_whole`; here the lemma is stated on the raw
    name, as Rocq's statement is).
 -/
-import Xv6.AppFileDeed
+import Xv6.AppFileNames
 
 namespace Xv6
 

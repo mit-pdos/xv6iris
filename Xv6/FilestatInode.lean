@@ -27,6 +27,7 @@ import Xv6.FilestatCalls
 import Xv6.FilestatTail
 import Xv6.FileRwShared
 import Xv6.SysPipeParts
+import MachCSL.WpSmodeFrame12b
 
 namespace Xv6
 

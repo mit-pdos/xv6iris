@@ -152,7 +152,6 @@ Everything else in lines 1--1020 is ported with Rocq's statement.
 `dirView_lookup`, `dirView_live`, `dirNamesUnique`, `dirUniq`
 (Xv6/FsTree.lean).
 -/
-import Xv6.FsStateInode
 import Xv6.InodeLock
 
 namespace Xv6

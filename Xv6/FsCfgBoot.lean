@@ -55,7 +55,6 @@ their own `Local` copies), the empty `FsCfgBootBitmap` section.
 -/
 import Xv6.IcacheBootRegion
 import Xv6.FsImgBridge
-import Xv6.FsDurSnapBytes
 import Xv6.FsImgWf
 
 namespace Xv6

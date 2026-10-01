@@ -34,10 +34,10 @@ wave; lane header of `Xv6/UnionOutSeal.lean`).
 -/
 import Xv6.AppUnionProg
 import Xv6.UnionOutSeal
-import Xv6.AppFileSeal
-import Xv6.UnionOutSealSteps
 import Xv6.UnionLinksSeal
 import Xv6.AppFileXfer
+import Xv6.AppLaws
+import Xv6.AppUnionPre
 
 namespace Xv6
 

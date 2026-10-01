@@ -10,7 +10,6 @@ the Bare path by the model's short cut, the page-table path by the walk
 kernel context lends for it: nothing at Bare beyond the `stvec` cell, the
 installed table and the hart's TLB at the kernel page table.
 -/
-import MachCSL.SConfAtDefs
 import MachCSL.WpPtWalk
 import MachCSL.WpSmode
 import MachCSL.WpStagesM

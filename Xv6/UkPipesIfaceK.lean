@@ -21,12 +21,9 @@ leaf `consLeaf` with the deposit `uwrite_chain_sup_ret` and the post
 2. Words as `UkTree`/`UkSysP`: the descriptor argument is
    `(setWidth 32 a0).toInt`; the count `argZ a2`.
 -/
-import Xv6.UkPipesIfaceDevU
 import Xv6.UkConsOut
-import Xv6.UkWriteLeaf
-import Xv6.UkFileDevClose
-import Xv6.UkFileDevNil
-import Xv6.UkFileDevSysHolds
+import Xv6.PipeOut
+import Xv6.PipeProto
 
 namespace Xv6
 

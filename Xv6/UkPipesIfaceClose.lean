@@ -24,6 +24,9 @@ CONE (reached): `pns_close_row`, `pns_fds_after_close`, `pns_close`,
    `fdDelete fdm fd`; `<[k := FdClosed]> l` is `l.set k .closed`.
 -/
 import Xv6.UkPipesIfaceRead
+import Xv6.UkFileDevClose
+import Xv6.UkFileDevSysHolds
+import Xv6.UkPipesIfaceLend
 
 namespace Xv6
 

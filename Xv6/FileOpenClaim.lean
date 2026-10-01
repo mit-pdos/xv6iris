@@ -34,7 +34,6 @@ cone reaches.
 4. Inums `Nat`, `jo : Option Nat`; curried wands stated `⊢ A -∗ B -∗ C`.
 -/
 import Xv6.FileOpenFams
-import Xv6.AppFileEra
 
 namespace Xv6
 

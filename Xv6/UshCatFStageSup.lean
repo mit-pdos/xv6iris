@@ -37,7 +37,7 @@ rpipes-b) `stage_catf_law_holds_at`: `stage_catf_law_holds` AT THE INSTANCE
 import Xv6.UshCatFStage
 import Xv6.UshPipesStageCatF
 import Xv6.UshExecPinHolds
-import Xv6.UkTreeEntryCat
+import Xv6.UkCatFEntries
 
 namespace Xv6
 

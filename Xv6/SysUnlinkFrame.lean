@@ -57,6 +57,7 @@ import Xv6.SpecNamecmp
 import Xv6.SpecNamexEra
 import Xv6.ReadiDefs
 import Xv6.KernelTac
+import Xv6.KexecParts
 
 namespace Xv6
 

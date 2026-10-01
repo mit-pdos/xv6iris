@@ -13,6 +13,7 @@ exactly what the Rocq prototype uses (`valid_context_pre_contractive`).
 -/
 import MachCSL.WpSmodeCtl
 import MachCSL.KCtxMove
+import MachCSL.Instr
 
 namespace MachCSL
 

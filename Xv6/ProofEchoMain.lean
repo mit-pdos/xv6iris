@@ -17,6 +17,7 @@ are the caller's), as Rocq does.
 import Xv6.SpecEchoStrlen
 import Xv6.SpecEchoMain
 import Xv6.UkProgAbi
+import Xv6.UkRunMem
 
 namespace Xv6
 

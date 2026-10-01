@@ -33,7 +33,6 @@ argument's write, then the separator's (or, after the last, the newline's).
 6. Rocq's `ucs_ne` is `UkProgAbi.ucs_ne` (landed).
 -/
 import Xv6.UkStub
-import Xv6.UkRunMem
 
 namespace Xv6
 

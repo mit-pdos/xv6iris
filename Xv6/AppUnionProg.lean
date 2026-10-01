@@ -11,7 +11,8 @@
    generation-counter one (AppLaws deviation 2), as the class field states it;
    the sync-hook equation (Rocq SY3-A4, a2417c11e) follows them.
 -/
-import Xv6.AppUnionPre
+import Xv6.SystemBootEra
+import Xv6.AppUnionRec
 
 namespace Xv6
 

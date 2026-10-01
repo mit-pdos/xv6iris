@@ -38,8 +38,6 @@ the file's byte literal is never entered by conversion.
 import Xv6.FsImgNames
 import Xv6.FsImgFiles
 import Xv6.FsDurNode
-import Xv6.FsAbsDefs
-import Xv6.FsStateEraPure
 import Xv6.ReadiParts
 
 namespace Xv6

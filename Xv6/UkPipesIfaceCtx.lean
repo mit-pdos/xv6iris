@@ -21,10 +21,8 @@ repeats in every law.
    `Hsup` hypothesis (`□ (T -∗ app_sup)`) is the field `hsup`, and
    `HPc : Persistent (up_code P)` the field `hpc`.
 -/
-import Xv6.UkPipesIfaceK
-import Xv6.UkPipesIfaceLend
 import Xv6.UkPipeDevXv6
-import Xv6.UkSysIOHolds
+import Xv6.UkPipesIfaceDev
 
 namespace Xv6
 

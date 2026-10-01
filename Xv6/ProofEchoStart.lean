@@ -4,6 +4,7 @@
 -/
 import Xv6.SpecEchoMain
 import Xv6.SpecEchoStart
+import Xv6.UkRunMem
 
 namespace Xv6
 

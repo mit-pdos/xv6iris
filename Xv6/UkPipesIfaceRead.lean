@@ -20,7 +20,7 @@ CONE (reached): the six laws above.
    body; Lean's `pnsPkInv` splits on the sink (UkPipesIfaceReg), so the
    input half is read by `pns_pk_copy_in` at either sink.
 -/
-import Xv6.UkPipesIfaceWrite
+import Xv6.UkPipesIfaceCtx
 
 namespace Xv6
 

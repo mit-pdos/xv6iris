@@ -34,6 +34,8 @@ arm's exit, split out of the proof).
    `wpLoop_fupd`.
 -/
 import Xv6.UshPipesStageCtx
+import Xv6.UshExecPinHolds
+import Xv6.UshPipesStageW
 
 namespace Xv6
 

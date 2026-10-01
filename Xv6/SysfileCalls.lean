@@ -44,10 +44,6 @@ import Xv6.SpecArgfd
 import Xv6.SpecBeginOp
 import Xv6.SpecEndOp
 import Xv6.SpecIunlockput
-import Xv6.CopyLemmas
-import Xv6.DirlookupParts
-import Xv6.KexecParts
-import MachCSL.BvLemmas
 
 namespace Xv6
 

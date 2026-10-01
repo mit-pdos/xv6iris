@@ -49,16 +49,7 @@ import Xv6.UkCatFIfaceLend
 import Xv6.UkCatFIfaceBridge
 import Xv6.UkFileDevSysHolds
 import Xv6.UkPipeDevXv6
-import Xv6.UkSysPHolds
-import Xv6.UkSysFHHolds
-import Xv6.UkCatTree
-import Xv6.UkStub
-import Xv6.ExecEntry
-import Xv6.UexecRet
-import Xv6.HfpProgP
-import Xv6.ElfUser
 import Xv6.UkTreeEntryCat
-import Xv6.UkTreeEntryStmt
 
 namespace Xv6
 

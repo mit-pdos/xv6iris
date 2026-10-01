@@ -38,8 +38,8 @@ Rocq's header, abridged (the reasons are the content):
 -/
 import Xv6.AppFileTyped
 import Xv6.AppFileEscrow
-import Xv6.AppFileSyncClose
 import Xv6.FileFsPure
+import Xv6.AppFileSync
 
 namespace Xv6
 

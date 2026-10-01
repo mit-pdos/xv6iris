@@ -36,6 +36,7 @@ Rocq's notes, abridged (the reasons are the content):
    `file_read_arms_learn_mapped`.
 -/
 import Xv6.FileOpenClaim
+import Xv6.FsAbsReadFire
 
 namespace Xv6
 

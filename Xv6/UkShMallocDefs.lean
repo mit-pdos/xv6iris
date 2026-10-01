@@ -53,10 +53,8 @@ runs on (`ushmOne`), and `sbrk`'s failure arm is carried, not assumed away.
    `ushm_malloc_le_redir`; `ushm_code_shp`/`ushp_code_shm` (deviation 1).
 -/
 import Xv6.UkEchoDefs
-import Xv6.UkProgAbi
-import Xv6.UsysMemOk
 import Xv6.User.ShText
-import Xv6.ByteCursor
+import Xv6.UkRunMem
 
 namespace Xv6
 

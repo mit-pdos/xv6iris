@@ -26,7 +26,9 @@ Rocq's notes, abridged (the reasons are the content):
    (AFile [])`, which is Rocq's spelled-out `∃ av0 ents nl0, …` by
    definition.
 -/
-import Xv6.FileOpenCreate
+import Xv6.SysOpenDefs
+import Xv6.AppFileEra
+import Xv6.FileOpenClaim
 
 namespace Xv6
 

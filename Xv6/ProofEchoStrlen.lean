@@ -17,6 +17,7 @@ caller's") rather than as an explicit update chain.
 import Xv6.SpecEchoStrlen
 import Xv6.UkRunBr
 import Xv6.UkProgAbi
+import Xv6.UkRunMem
 
 namespace Xv6
 

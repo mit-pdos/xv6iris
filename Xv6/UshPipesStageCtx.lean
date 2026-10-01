@@ -46,15 +46,11 @@ records), and the program entries `UkTreeEntryEcho.echoImageEntryEnvC_of_leaves`
    `echoNodeImg`, the page view `Mv` for `imageEntry`, `imgAgrees Me Mv`.
 3. Rocq's `udep_free` premise is `StgOk.hudep`.
 -/
-import Xv6.UshPipesStageW
 import Xv6.UkPipesEntries
-import Xv6.UshExecPin
 import Xv6.UshExecEnvRun
 import Xv6.SpecShRuncmdExec
-import Xv6.UshExecPinHolds
-import Xv6.UkTreeEntryEcho
-import Xv6.UkTreeEntryCat
-import Xv6.UkTreeEntryGrep
+import Xv6.UshExecPinPure
+import Xv6.UshPipesStageDefs
 
 namespace Xv6
 

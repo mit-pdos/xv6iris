@@ -78,16 +78,14 @@ reached -- `fdev_signed_small`, `fdev_m1`, `fdev_cint_lt`,
    are proved inline for the string's image (`fdev_cells_img`): each cell of
    `strImg` is owned, and `uheap_text` / `uheap_ubyte` read it.
 -/
-import Xv6.UkFileOpenSup
-import Xv6.UkFileOpenRead
 import Xv6.UEchoFile
-import Xv6.UkEchoDefs
-import Xv6.UStrImg
-import Xv6.UNamePath
-import Xv6.UkHandler
 import Xv6.UshMainBytes
-import Xv6.UkGrepTreeDefs
-import MachCSL.BvLemmas
+import Xv6.UkSysP
+import Xv6.UkTree
+import Xv6.UkReadRows
+import Xv6.FileOpenDeed
+import Xv6.HfpFileClaimsP
+import Xv6.UkFileOpenDefs
 
 namespace Xv6
 

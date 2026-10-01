@@ -22,8 +22,7 @@ CONE (reached, this file): `cif_ans_ok`, `cif_fresh_fd`, `cif_open_taint`,
    `omCreate` at `BitVec.ofInt 64 m` (lane hfp-F2's `fif_om_create`, the
    same statement and proof).
 -/
-import Xv6.UkCatFIfaceRead
-import Xv6.UkFileIfaceReg
+import Xv6.UkCatFIfaceEnv
 
 namespace Xv6
 

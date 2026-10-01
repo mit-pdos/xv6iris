@@ -5,6 +5,7 @@
 Deviations from Rocq: as `SpecCatStart`.
 -/
 import Xv6.SpecCatStart
+import Xv6.UkRunMem
 
 namespace Xv6
 

@@ -10,6 +10,7 @@ device is at `p + count`; the TAINT arm is the second continuation.  See
 -/
 import Xv6.UkFileDevDefs
 import Xv6.UkFreeHandler
+import Xv6.UkFileOpenRead
 
 namespace Xv6
 

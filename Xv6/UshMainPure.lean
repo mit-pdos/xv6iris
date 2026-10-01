@@ -24,10 +24,9 @@ are in `UshMainLine`; the Iris vocabulary is `UshMainDefs`.
    `BitVec 5` itself.
 -/
 import Xv6.UkShLineDefs
-import Xv6.UshStep
-import Xv6.UserFd
 import Xv6.ConsoleInvDefs
 import Xv6.User.ShImage
+import Xv6.UkRunLeaf
 
 namespace Xv6
 

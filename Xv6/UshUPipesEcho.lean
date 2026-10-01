@@ -20,9 +20,11 @@ the loan `True`.
 3. The casts between the node law's projections (`D.FAM`, `D.T`, …) and the
    union's names are `.rfl` lemmas (`UshUPipesKit`), applied as `ihave`s.
 -/
-import Xv6.UshOomPaid
 import Xv6.UshUPipesKit
 import Xv6.PipesCutMain
+import Xv6.UshURoundCat
+import Xv6.UshUPipesPure
+import Xv6.UshPipesNodeLaw
 
 namespace Xv6
 

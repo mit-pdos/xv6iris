@@ -17,6 +17,7 @@ statement (the proof takes `UL` and `SH_STRCHR`).
 -/
 import Xv6.UshParseDefs
 import Xv6.RefParseSym
+import Xv6.UshCode
 
 namespace Xv6
 

@@ -57,6 +57,7 @@ import Xv6.IgetTail
 import Xv6.IcacheBoxSites
 import Xv6.IcacheInvStore
 import Xv6.IputOfflockParts
+import MachCSL.WpSmodeMint
 
 namespace Xv6
 

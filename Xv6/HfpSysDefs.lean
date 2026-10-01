@@ -30,10 +30,16 @@ are now the run-sys port's (`Xv6/UkRunSysOpenImg.lean`, lane gaps), with
 `wp_uk_ecall_open_recv_gimg` that reads them; this file is only the import
 hub.
 -/
-import Xv6.UkRunSysWrite
 import Xv6.UkReadFile
 import Xv6.UkReadPipe
 import Xv6.UkWriteFile
 import Xv6.UkWritePipe
 import Xv6.UkRunSysOpenImg
+import Xv6.PipesCut
+import Xv6.EchoOutPure
+import Xv6.UkRunBr
+import Xv6.UshStep
+import Xv6.UshMainPure
+import Xv6.UshMainLine
+import Xv6.UkIoSysP
 

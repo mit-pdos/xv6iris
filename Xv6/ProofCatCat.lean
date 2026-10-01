@@ -24,6 +24,7 @@ fprintf is `CAT_FPRINTF`).
 import Xv6.SpecCatCat
 import Xv6.CatCatDie
 import Xv6.UkRunBr
+import Xv6.UkRunMem
 
 namespace Xv6
 

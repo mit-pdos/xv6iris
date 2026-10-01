@@ -24,6 +24,8 @@ slot.
    (`spostAt … W r W.M W.fd`), as Rocq.
 -/
 import Xv6.UkPipeDevDefs
+import Xv6.UkRunSysWin
+import Xv6.UkReadRows
 
 namespace Xv6
 

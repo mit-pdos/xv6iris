@@ -19,7 +19,8 @@ CONE (reached, this file): `cif_close_row`, `cif_fds_after_close`,
    caller moves them by `hdls_delete` (a tail handle) or `hdls_ext` with
    `cifHf_delete` (a standard slot, whose kind names no handle).
 -/
-import Xv6.UkCatFIfaceOpenLaw
+import Xv6.UkCatFIfaceRead
+import Xv6.UkCatFIfaceOpen
 
 namespace Xv6
 

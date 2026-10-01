@@ -34,6 +34,8 @@ import Xv6.UkPipesEntriesDefs
 import Xv6.UkTreeEntryEcho
 import Xv6.UkTreeEntryCat
 import Xv6.UkTreeEntryGrep
+import Xv6.UkFileEntries
+import Xv6.UshFileRedir
 
 namespace Xv6
 

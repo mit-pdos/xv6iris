@@ -46,10 +46,7 @@ import Xv6.UshUPipesBody
 import Xv6.UshURoundLawsPrompt
 import Xv6.UInitBoot
 import Xv6.UInitKernelSlot
-import Xv6.UInitConsFile
-import Xv6.UexecExecMintW
-import Xv6.AppUnionRec
-import Xv6.AppFileBoot
+import Xv6.UnionOutLed
 
 namespace Xv6
 

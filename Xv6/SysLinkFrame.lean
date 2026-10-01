@@ -37,6 +37,7 @@ import Xv6.SysfileCalls
 import Xv6.SpecIlock
 import Xv6.SpecNameiparent
 import Xv6.SpecDirlink
+import Xv6.KexecParts
 
 namespace Xv6
 

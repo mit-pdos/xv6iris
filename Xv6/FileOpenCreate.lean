@@ -31,8 +31,8 @@ Rocq's notes, abridged (the reasons are the content):
 3. Inums `Nat`; curried wands stated `⊢ A -∗ B -∗ C`.
 -/
 import Xv6.FileOpenClaim
-import Xv6.FileDeltasStep
-import Xv6.FsAbsCreateNm
+import Xv6.SysOpenDefs
+import Xv6.AppFileEra
 
 namespace Xv6
 

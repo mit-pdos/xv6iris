@@ -7,13 +7,10 @@ arithmetic `subw`/`addw`.  Execute stages only; the `kctx` rules are in
 -/
 import MachCSL.KCtxGpr
 import MachCSL.AluFacts
-import MachCSL.Instr
 import MachCSL.WpCycleDefs
-import MachCSL.WpGpr
 import MachCSL.PlatformFacts
 import MachCSL.ModelFacts
 import MachCSL.SConfPhysDefs
-import MachCSL.KCtx
 
 namespace MachCSL
 

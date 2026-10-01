@@ -21,7 +21,7 @@ CONE (reached): `pns_dev_final`, `pns_finals`, `pns_exit`.
    devices taken one by one out of the drained set (`bigSepS_delete`),
    by induction on the list.
 -/
-import Xv6.UkPipesIfaceClose
+import Xv6.UkPipesIfaceRead
 
 namespace Xv6
 

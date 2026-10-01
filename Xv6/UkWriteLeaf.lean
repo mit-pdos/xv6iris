@@ -43,6 +43,8 @@ CONE (re-walked on the pinned globs: 12/21 reached): `a0_idx`..`a2_idx`
    `mword_of_int (Z.of_nat nb)`).
 -/
 import Xv6.UkReadRows
+import Xv6.UshSysP
+import Xv6.UkRunSysDefs
 
 namespace Xv6
 

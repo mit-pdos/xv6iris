@@ -39,6 +39,7 @@ import Xv6.SysfileCalls
 import Xv6.SpecSysMkdir
 import Xv6.ProcPrivAcc
 import Xv6.KstackMap
+import Xv6.KexecParts
 
 namespace Xv6
 

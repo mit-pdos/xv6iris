@@ -28,7 +28,10 @@
 4. The close's stub law is the hypothesis `Hsc`, the read's is not needed
    (`pdev_ecall_read` is the ecall, below the stub).
 -/
-import Xv6.UkPipeDevWrite
+import Xv6.UkFreeHandler
+import Xv6.UkRunSysRead
+import Xv6.UkReadPipe
+import Xv6.UkPipeDevDefs
 
 namespace Xv6
 

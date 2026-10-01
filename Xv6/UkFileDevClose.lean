@@ -7,7 +7,8 @@ offset's half goes with the descriptor, the deed's fraction comes home),
 goes to `closed` and the ledger comes back with it).  See `UkFileDevDefs`
 for the cone, the parameters and the deviations.
 -/
-import Xv6.UkFileDevWrite
+import Xv6.UkFreeHandler
+import Xv6.UkFileDevDefs
 
 namespace Xv6
 

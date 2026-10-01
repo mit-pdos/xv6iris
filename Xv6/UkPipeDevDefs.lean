@@ -80,10 +80,12 @@ DROPPED (unreached): `pdev_rd_ans_m1`, `pipe_out_payL`, `pipe_halt_payL`,
 7. `rpElim`'s image row is `W.lazy = false → imgAgrees M' Mv` (the shape
    H-io's `ukPostRd` hands out; the walk has `W.lazy = false`).
 -/
-import Xv6.HfpPipeClaimsP
-import Xv6.HfpSysDefs
-import Xv6.UkFreeHandler
-import Xv6.UkRunSysRead
+import MachCSL.BvLemmas
+import Xv6.UexecExecInst
+import Xv6.UkSysP
+import Xv6.UkTree
+import Xv6.PipeProto
+import Xv6.UkRunSysWrite
 
 namespace Xv6
 

@@ -17,6 +17,7 @@ Deviations from Rocq: as in `SpecShStrchr`; the loop's register file is
 stated by its facts (a0, a5 written, every other register the entry's).
 -/
 import Xv6.SpecShStrchr
+import Xv6.UkGrepDefs
 
 namespace Xv6
 

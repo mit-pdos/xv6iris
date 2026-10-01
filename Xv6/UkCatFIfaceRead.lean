@@ -20,6 +20,7 @@ CONE (reached, this file): `cif_dev_tok`, `cif_cons_nil` (= lane hfp-P2's
    (`Int.eq_ofNat_of_zero_le`, Rocq `Z_of_nat_complete`).
 -/
 import Xv6.UkCatFIfaceProd
+import Xv6.UkPipesIfaceK
 
 namespace Xv6
 

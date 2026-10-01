@@ -25,6 +25,9 @@ CONE (reached): `pns_repack` (Ltac: `pns_fds_back`), `pns_write`,
    `pns_fds_back` and `pns_nil_arms`.
 -/
 import Xv6.UkPipesIfaceCtx
+import Xv6.UkFileDevNil
+import Xv6.UkFileDevSysHolds
+import Xv6.UkPipesIfaceK
 
 namespace Xv6
 

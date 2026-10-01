@@ -44,7 +44,8 @@ Rocq's header, kept because the reasons are the content:
    is lent out of the core for the rest of the walk (`sys_unlink_core_open`).
 -/
 import Xv6.SysUnlinkTails
-import Xv6.ArgPath
+import Xv6.DirlookupParts
+import Xv6.ReadiDefs
 
 namespace Xv6
 

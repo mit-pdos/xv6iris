@@ -43,7 +43,6 @@ Rocq's header, kept because the reasons are the content:
 -/
 import Xv6.SysUnlinkW2
 import MachCSL.WpSmodeLh
-import Xv6.DirlookupParts
 
 namespace Xv6
 

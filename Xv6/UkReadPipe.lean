@@ -33,6 +33,7 @@ CONE (re-walked on the pinned globs: 10/14 reached): `a0_idx`, `a2_idx`
 -/
 import Xv6.UkReadRows
 import Xv6.UkRunSysPipe
+import Xv6.UshSysP
 
 namespace Xv6
 

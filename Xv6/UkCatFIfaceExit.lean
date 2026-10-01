@@ -35,6 +35,8 @@ ported: `cif_catf_paid`.
    `devSel` at the record's fields); `cif_ei_fds` / `cif_ei_files` are `rfl`.
 -/
 import Xv6.UkCatFIfaceClose
+import Xv6.UkPipesIfaceDev
+import Xv6.UkCatFIfaceOpenLaw
 
 namespace Xv6
 

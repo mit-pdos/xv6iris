@@ -17,6 +17,9 @@ the resume IMAGE reach the receipt's PAGE VIEW through the post's image guard
 import Xv6.UkFileOpenDefs
 import Xv6.UkRunSysRead
 import Xv6.UkReadFile
+import Xv6.UkSysP
+import Xv6.FileOpenRead
+import Xv6.HfpFileClaimsP
 
 namespace Xv6
 

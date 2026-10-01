@@ -23,6 +23,7 @@ view (`umemByte Mv (ua + j) = bs[j]!`, Rocq `M !! uint (ua + j) = bs !! j`).
 -/
 import Xv6.UkPipeDevWalk
 import Xv6.UEchoOut
+import Xv6.UkFreeHandler
 
 namespace Xv6
 

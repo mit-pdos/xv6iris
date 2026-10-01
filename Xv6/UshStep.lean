@@ -44,9 +44,9 @@ spills are a contiguous run from the top slot (Rocq `wp_kshp_frame_pro`/
    `ushp_frame_cs` are `ushWrs_get_mem`/`ushWrs_get_nmem` (the restored
    values are the entry values, so no duplicate-freeness is needed).
 -/
-import Xv6.UkRunBr
 import Xv6.UkRunMem
 import Xv6.UkProgAbi
+import Xv6.UkRunLeaf
 
 namespace Xv6
 

@@ -37,13 +37,9 @@ Rocq's header, abridged:
    record's projections (`union_al_Rt` is also the instance
    `unionR_timeless`).
 -/
-import Xv6.AppLaws
 import Xv6.AppPreGS
 import Xv6.UnionOutLed
-import Xv6.AppFileBoot
-import Xv6.AppFileSteps
 import Xv6.AppFileHook
-import Xv6.AppFilePos
 
 namespace Xv6
 

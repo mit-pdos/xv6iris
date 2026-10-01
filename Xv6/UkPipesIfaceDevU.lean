@@ -24,6 +24,9 @@ CONE (reached): `γd`, `γfd`, the `aN_idx` (notations), `pns_writeU`,
 -/
 import Xv6.UkPipeDevRead
 import Xv6.UkFileDevDefs
+import Xv6.PipeOut
+import Xv6.PipeProtoRead
+import Xv6.UkPipeDevWrite
 
 namespace Xv6
 

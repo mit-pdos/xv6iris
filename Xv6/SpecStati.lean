@@ -74,6 +74,7 @@ Imports only definitional files (never a `Code*` or `Proof*` file).
 import Xv6.Image
 import Xv6.IcacheRefDefs
 import Xv6.InodeInv
+import MachCSL.AluFacts
 
 namespace Xv6
 

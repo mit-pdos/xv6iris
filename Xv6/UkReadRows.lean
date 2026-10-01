@@ -43,9 +43,8 @@ CONE (re-walked on the pinned globs: 10/11 reached): `xfam_rd`, `xfam_rdf`,
 4. `udepwfSt` is stated over `UkRun.udepwf`'s Lean spelling (`ElfMem`
    image, `Nat → Option UPerm` permission view, `Nat` break and cwd).
 -/
-import Xv6.UkIoSysP
 import Xv6.UexecExecInst
-import Xv6.UshMainLine
+import Xv6.UkRun
 
 namespace Xv6
 

@@ -71,6 +71,7 @@ Rocq's header, kept point for point:
 import Xv6.UexecWp
 import Xv6.UexecSG
 import Xv6.TfUser
+import MachCSL.WpSmodeSret
 
 namespace Xv6
 

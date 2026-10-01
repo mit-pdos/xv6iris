@@ -29,17 +29,11 @@ SH_SYS_WAIT` (`ProofShSysWait.shSysWait_holds UL HS`, a Proof file) and
 at `PS := uprogSGFree` only).
 -/
 import Xv6.UshUPipesFin
-import Xv6.UshPipesNodeLaw
 import Xv6.UkUnionEntriesDefs
-import Xv6.UshURoundBody
-import Xv6.UshURoundEcho
-import Xv6.UshURoundCat
-import Xv6.UshURoundRedir
-import Xv6.UshURoundSecc
-import Xv6.UshURoundSync
-import Xv6.LinkShRun
-import Xv6.LinkShParse
 import Xv6.LinkShExec
+import Xv6.SpecUser
+import Xv6.UshPipesStageCtx
+import Xv6.UshUPipesClaim
 
 namespace Xv6
 

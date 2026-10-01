@@ -28,7 +28,6 @@ Rocq's header, abridged:
 -/
 import Xv6.AppUnionLaws
 import Xv6.UnionGF
-import Xv6.FsImgBoot
 
 namespace Xv6
 

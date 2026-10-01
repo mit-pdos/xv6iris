@@ -28,6 +28,8 @@ and the record forms of `pns_copy_env_res`, `pns_copy_env_res_m`,
 -/
 import Xv6.UkPipesIfaceCopyW
 import Xv6.UkPipesIfaceExit
+import Xv6.UkPipesIfaceWrite
+import Xv6.UkPipesIfaceClose
 
 namespace Xv6
 

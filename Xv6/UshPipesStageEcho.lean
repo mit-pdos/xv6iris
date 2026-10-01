@@ -35,8 +35,8 @@ the law's index `13 + 4 = 17` read off `lineOk_head`), as
 at sh's concrete rows (`ushJtab`, `ushCmd`, `ushFd2p`, `ushDg`, which ARE
 `S.E`'s fields by `rfl`), fd 1 R-prog's `ushFd1pipe`.
 -/
-import Xv6.UshPipesStageLast
 import Xv6.UshPipesStageLaw
+import Xv6.UshPipesStageMid
 
 namespace Xv6
 

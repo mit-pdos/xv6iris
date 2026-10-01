@@ -105,13 +105,8 @@ reads it.
     `Timeless` instance declared explicitly" -- exactly the rule
     `Xv6/FsStateBitmap.lean`'s header states for the free pool.
 -/
-import Xv6.FsGeom
-import Xv6.InodeDefs
 import Xv6.BlkmapDefs
-import Xv6.DinodeEnc
 import Xv6.FsBytesGamma
-import MachCSL.WpSmodeFrame
-import Xv6.FsStateBitmap
 import Xv6.FsStateInode
 
 namespace Xv6

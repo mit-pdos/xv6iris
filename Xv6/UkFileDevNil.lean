@@ -13,6 +13,7 @@ BLANKET (`filewriteRet`, the post's first conjunct); Rocq's
 `file_write_nil` reads it off the arm (`write_arms_at_ret`), the same fact.
 -/
 import Xv6.UkFileDevWrite
+import Xv6.UkFileDevRead
 
 namespace Xv6
 

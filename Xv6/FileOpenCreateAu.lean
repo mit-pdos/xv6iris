@@ -18,6 +18,7 @@ one-shot token and the ledger witness.
    ported (the bundle is supplied at every mode).
 -/
 import Xv6.FileOpenTrunc
+import Xv6.FileOpenCreate
 
 namespace Xv6
 

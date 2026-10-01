@@ -42,9 +42,8 @@ Rocq's notes, abridged (the reasons are the content):
 -/
 import Xv6.FileOpenDeed
 import Xv6.AppFileCons
-import Xv6.SysOpenKept
-import Xv6.FsAbsReadFire
 import Xv6.UserOff
+import Xv6.PieceFam
 
 namespace Xv6
 

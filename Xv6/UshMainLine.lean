@@ -21,9 +21,8 @@ byte is not a blank.
 3. `ush_narrow_count_le`'s `Z.to_nat (bv_signed (subrange_vec_dec w 31 0))`
    is `(BitVec.setWidth 32 w).toInt.toNat`.
 -/
-import Xv6.UshMainPure
-import Xv6.EchoOutPure
-import Xv6.PipesCut
+import Xv6.UmodeAbi
+import Xv6.FileDiscLine
 
 namespace Xv6
 

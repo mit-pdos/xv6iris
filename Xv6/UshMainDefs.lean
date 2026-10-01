@@ -61,12 +61,8 @@ abstract continuation `ushRestLAt` that takes the loop head as a premise.
 import Xv6.UshMainPure
 import Xv6.UshCode
 import Xv6.UshParseDefs
-import Xv6.UkStub
 import Xv6.UkSysP
 import Xv6.UserConsole
-import Xv6.UkShMallocDefs
-import Xv6.UkShRedirLine
-import Xv6.FsGeom
 
 namespace Xv6
 

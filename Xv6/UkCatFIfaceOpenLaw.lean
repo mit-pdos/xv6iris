@@ -19,6 +19,7 @@ CONE (reached, this file): `cif_open`, `cif_open_absent`.
    handed to the law's continuation at `((fd : Nat) : Int)`.
 -/
 import Xv6.UkCatFIfaceOpen
+import Xv6.UkFileIfaceReg
 
 namespace Xv6
 

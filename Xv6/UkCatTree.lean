@@ -32,6 +32,7 @@ spends:
 import Xv6.SpecCatStart
 import Xv6.UkCatTreePure
 import Xv6.UkHandler
+import Xv6.UkRunMem
 
 namespace Xv6
 

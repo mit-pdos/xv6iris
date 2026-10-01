@@ -35,6 +35,10 @@ law at a lend with the loan** (Rocq `UShCatFStage.v` §§1-2, pinned
    `mWP Loop` is `wpLoop`, `q szv av` are `Nat`.
 -/
 import Xv6.UshCatFStageDefs
+import Xv6.SpecShRuncmdExec
+import Xv6.AppFileNames
+import Xv6.UkCatFIfaceReg
+import Xv6.UshExecPin
 
 namespace Xv6
 

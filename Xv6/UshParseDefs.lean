@@ -24,9 +24,8 @@ Rocq `UkShParse.v` §2/§2c, `UkShParseTok.ushp_cell`, `UkShParseLex`'s
 3. `ushp_sstr_data`/`_text` are `ushSstr_false`/`_true` (`rfl`).
 -/
 import Xv6.UshStep
-import Xv6.UshCode
 import Xv6.UkShParsePure
-import Xv6.UkGrepDefs
+import Xv6.User.ShImage
 
 namespace Xv6
 

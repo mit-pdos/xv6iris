@@ -32,9 +32,6 @@ arm, and the image algebra of the user arm
 import Xv6.SpecReadi
 import Xv6.UMemWindow
 import Xv6.FsWords
-import Xv6.ByteCursor
-import Xv6.DinodeSlot
-import Xv6.VirtioDiskRwDefs3
 
 namespace Xv6
 

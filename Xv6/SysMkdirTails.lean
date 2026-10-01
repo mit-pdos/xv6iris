@@ -33,6 +33,7 @@ Rocq's header points, kept:
    instead of Rocq's `proc_priv_bare_acc`.
 -/
 import Xv6.SysMkdirFrame
+import Xv6.CopyLemmas
 
 namespace Xv6
 
