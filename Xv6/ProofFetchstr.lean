@@ -105,10 +105,10 @@ theorem fetchstr_priv_close [X : CurCtx] (ξ : CtxId) (hX : X = ⟨ξ, KTier.kpt
   show _ ⊢ iprop(⌜V.sz.toNat ≤ uvmMaxsz ∧ umBelow V.sz P' ∧ V.pagetable = pageAddr P'.root ∧
       V.trapframe = pageAddr P'.tfp⌝ ∗ wordPointsTo (pPid pa) 4 pidPriv pid ∗
     procFieldsNoOfile pa (DFrac.own 1) V ∗ procPtAt P' M' ∗ tfPageAt P'.tfp V.tf ∗
-    ⌜V.pvLazy = false → lazyFree P'.um V.sz⌝)
+    ⌜V.pvLazy = false → lazyFree P'.um V.sz⌝ ∗ actCnt pa V.ev)
   unfold ecRest procFieldsNoOfile
   rw [hext.1.1, hext.1.2.1]
-  iintro ⟨Hsz, Hpg, Hpt, Hpid, Hks, Htf, Hcwd, Hnm, Hsc, Htfp, %hlz⟩
+  iintro ⟨Hsz, Hpg, Hpt, Hpid, Hks, Htf, Hcwd, Hnm, Hsc, Htfp, %hlz, Hev⟩
   isplitl []
   · ipureintro; exact ⟨hf.1, UMemL.umBelow_extSz hf.2.1 hext, hf.2.2.1, hf.2.2.2⟩
   · iframe

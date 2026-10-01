@@ -519,10 +519,10 @@ theorem sys_mknod_pid (hct : curTier = KTier.kpt) (γ : FileNames) (pa : BitVec 
     simp only at hX
     subst hX
     unfold procPrivFd procPrivCoreNoctxAt procPrivBareAt
-    iintro ⟨⟨⟨%h, Hpid, Hf, Hpt, Htfp, %hlz⟩, Hc⟩, Ho⟩
+    iintro ⟨⟨⟨%h, Hpid, Hf, Hpt, Htfp, %hlz, Hev⟩, Hc⟩, Ho⟩
     iframe Hpid
     iintro Hpid
-    iframe Hpid Hf Hpt Htfp Hc Ho
+    iframe Hpid Hf Hpt Htfp Hc Ho Hev
     isplitl []
     · ipureintro; exact h
     · ipureintro; exact hlz

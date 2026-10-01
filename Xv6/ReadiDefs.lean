@@ -79,10 +79,10 @@ theorem rdDst_pid (user : Bool) (dst : BitVec 64) (j : Nat) (pidv : BitVec 32) (
     iframe Hb Hp
   · simp only [rdDst, rdQ, if_true]
     unfold procPrivExt
-    iintro ⟨%h1, Hp, Hf, Hpt, Htf, %h2⟩
+    iintro ⟨%h1, Hp, Hf, Hpt, Htf, %h2, Hev⟩
     iframe Hp
     iintro Hp
-    iframe Hp Hf Hpt Htf
+    iframe Hp Hf Hpt Htf Hev
     isplitl []
     · ipureintro; exact h1
     · ipureintro; exact h2

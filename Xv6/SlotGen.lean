@@ -106,6 +106,18 @@ party that threads a lock's gname.
    reason of deviation 7 (`<wait_lock>`'s payload is stated over `[WchG
    GF]`).  The ghost itself (`zombLedAuth` / `zombLedLb` / `zombReceipt`)
    lives in `UserChildren`, as Rocq's `Section ZombLedger` does.
+9. **The event counter (permit sweep G+G', Rocq 9fb1d089c + f344a089a's
+   G', design ni-strong-instance.md §7) has NO camera of its own.**  Rocq
+   adds `wact_pre_inG : inG Σ actUR` with `actUR := gmapUR (mword 64)
+   (dfrac_agreeR natO)`; in Lean `GName = Nat`, so that type IS `SgenUR`
+   (`ActUR` is an `abbrev` of it), and a second `ElemG GF (constOF SgenUR)`
+   field would be a second instance of one camera.  So `WchGpre` is
+   unchanged, `WchG` gains only the name `wactName` (Rocq `wact_name`), and
+   `actCnt pa k` owns `sgOne pa (own 1) k` at it; the boot mint is
+   `slotGen_rows_alloc 0` at a fresh name (Rocq `act_rows_alloc`), and no
+   `xv6GF` / `unionGF` slot is added.  `actLend` and its four lemmas are
+   Rocq's (L1a, `act_lend_*`); Rocq's `act_lend_cont_frame` (a `wp_next`
+   lemma, L1a's ring) is not part of this layer.
 
 Imports only definitional files.
 -/
@@ -132,6 +144,12 @@ abbrev IntMapF := fun V => Std.ExtTreeMap Int V compare
 /-- Rocq `sgen_map` / `sgenUR`: THE SLOT'S CURRENT GENERATION, keyed by the
 slot's ADDRESS. -/
 abbrev SgenUR : Type := AddrMapF (DFracAgree.DFracAgreeR (DiscreteO GName))
+
+/-- Rocq `act_map` / `actUR` (permit sweep G, design ni-strong-instance.md
+§7): THE PER-SLOT EVENT COUNTERS.  Rocq's `gmapUR (mword 64) (dfrac_agreeR
+natO)` is, at `GName = Nat`, `SgenUR` itself -- so it is the SAME camera
+and gets no instance of its own (one instance per camera, deviation 9). -/
+abbrev ActUR : Type := SgenUR
 
 /-- Rocq `orph_map`: the orphan column, keyed by the ADDRESS a reparent
 handed a generation to. -/
@@ -199,6 +217,11 @@ class WchG (GF : BundledGFunctors) extends WchGpre GF where
   (`UserChildren.zombLedAuth` / `zombLedLb`), born empty in
   `WaitInvTies.childrenRes_alloc`. -/
   wzlName : GName
+  /-- THE PER-SLOT EVENT COUNTERS' NAME (Rocq `wact_name`, design
+  ni-strong-instance.md §7): the slot-generation camera at this second name
+  holds every slot's `actCnt`, born at 0 in
+  `WaitInvTies.childrenRes_alloc`.  No camera rides with it (deviation 9). -/
+  wactName : GName
 
 /-- AN EIGHTH (Rocq `qeighth`, deviation 2). -/
 abbrev qeighth : Qp := Qp.quarter.half
@@ -361,6 +384,105 @@ theorem slotGen_persist (pa : BitVec 64) (dq : DFrac) (g : GName) :
     slotGen (GF := GF) pa dq g ⊢ |==> slotGen pa .discard g := by
   unfold slotGen sgOne
   exact iOwn_update (Heap.singleton_update DFracAgree.persist)
+
+/-! ## The slot's event counter (Rocq `act_cnt`, design ni-strong-instance.md §7) -/
+
+/-- one slot at count `k`, owned whole (Rocq `act_one`): the slot-generation
+element at the count -- `ActUR` IS `SgenUR` (deviation 9). -/
+def actOne (pa : BitVec 64) (k : Nat) : ActUR := sgOne pa (.own 1) k
+
+/-- **THE SLOT'S EVENT COUNTER** (Rocq `act_cnt`, permit sweep G, design
+ni-strong-instance.md §7).  An exclusive `Nat` per slot, with no authority
+and no tie: the permit an actor-labelled ledger append consumes, stepped by
+its holder.  Born at 0 for every slot (`WaitInvTies.childrenRes_alloc`),
+parked in the dormant block (`ProcDefs.procDormant`) and carried by the
+running process's BARE block (`ProcPrivBare.procPrivBareAt`, Rocq G') at
+`V.ev`.  At the canonical name `wactName`, over the slot-generation camera
+(deviation 9). -/
+def actCnt (pa : BitVec 64) (k : Nat) : IProp GF :=
+  iOwn (F := constOF SgenUR) (WchG.wactName GF) (actOne pa k)
+
+instance actCnt_timeless (pa : BitVec 64) (k : Nat) : Timeless (actCnt (GF := GF) pa k) := by
+  unfold actCnt; infer_instance
+
+/-- Rocq `act_cnt_excl`. -/
+theorem actCnt_excl (pa : BitVec 64) (k k' : Nat) :
+    actCnt (GF := GF) pa k ∗ actCnt pa k' ⊢ False := by
+  unfold actCnt actOne sgOne
+  iintro ⟨H1, H2⟩
+  icombine H1 H2 gives %Hv
+  rw [Heap.singleton_op_singleton, Heap.singleton_valid_iff] at Hv
+  obtain ⟨hd, -⟩ := DFracAgree.op_valid.mp Hv
+  exact absurd hd (by
+    intro hv
+    have := DFrac.valid_own_op hv
+    simp at this)
+
+/-- Rocq `act_cnt_update`: the holder moves the count anywhere. -/
+theorem actCnt_update (pa : BitVec 64) (k k' : Nat) :
+    actCnt (GF := GF) pa k ⊢ |==> actCnt pa k' := by
+  unfold actCnt actOne sgOne
+  exact iOwn_update (Heap.singleton_update
+    (Update.exclusive (sg_el_valid _ _ DFrac.valid_own_one)))
+
+/-- Rocq `act_cnt_step`. -/
+theorem actCnt_step (pa : BitVec 64) (k : Nat) :
+    actCnt (GF := GF) pa k ⊢ |==> actCnt pa (k + 1) :=
+  actCnt_update pa k (k + 1)
+
+/-- **THE LEND** (Rocq `act_lend`, design ni-strong-instance.md §7): what a
+contract on the permit cone takes from its caller, keyed by the running
+proc word `p`: the actor's counter, OR the fact that there is no actor (the
+boot's hart runs at `p = 0` and lends nothing). -/
+def actLend (p : BitVec 64) (k : Nat) : IProp GF := iprop(⌜p = 0#64⌝ ∨ actCnt p k)
+
+/-- Rocq `act_lend_zero`. -/
+theorem actLend_zero (k : Nat) : ⊢@{IProp GF} actLend 0#64 k := by
+  unfold actLend
+  ileft
+  ipureintro; rfl
+
+/-- Rocq `act_lend_of_cnt`. -/
+theorem actLend_of_cnt (p : BitVec 64) (k : Nat) : actCnt (GF := GF) p k ⊢ actLend p k := by
+  unfold actLend
+  iintro H
+  iright
+  iexact H
+
+/-- Rocq `act_lend_back`: at `p ≠ 0` the lend IS the counter. -/
+theorem actLend_back (p : BitVec 64) (k : Nat) (hp : p ≠ 0#64) :
+    actLend (GF := GF) p k ⊢ actCnt p k := by
+  unfold actLend
+  iintro (%hz | H)
+  · exact absurd hz hp
+  · iexact H
+
+/-- Rocq `act_lend_borrow`: THE BORROW A BLOCK-HOLDER MAKES, with no fact
+about `p` needed.  At `p = 0` it lends the left disjunct and KEEPS its
+counter; otherwise it lends the counter and takes it back at the returned
+count.  Either way the counter comes home at a count at least the one it
+left at. -/
+theorem actLend_borrow (p : BitVec 64) (k : Nat) :
+    actCnt (GF := GF) p k ⊢ actLend p k ∗
+      (∀ k' : Nat, ⌜k ≤ k'⌝ -∗ actLend p k' -∗ ∃ k'' : Nat, ⌜k ≤ k''⌝ ∗ actCnt p k'') := by
+  by_cases hz : p = 0#64
+  · iintro Hc
+    isplitr [Hc]
+    · unfold actLend
+      ileft
+      ipureintro; exact hz
+    · iintro %k' %_ -
+      iexists k
+      iframe Hc
+      ipureintro; exact Nat.le_refl k
+  · iintro Hc
+    isplitl [Hc]
+    · iapply actLend_of_cnt p k $$ Hc
+    · iintro %k' %hk' Hl
+      iexists k'
+      ihave Hc := actLend_back p k' hz $$ Hl
+      iframe Hc
+      ipureintro; exact hk'
 
 /-! ## The pid register -/
 

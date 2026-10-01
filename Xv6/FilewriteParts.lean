@@ -387,15 +387,15 @@ theorem fwr_cs_epi (k : KCtx) (fk : Nat) (n : Int) (R : RegMap)
 `procPtAt_congr`) -- shared with consolewrite's chain. -/
 
 section Block
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [WchG GF] [CurCtx]
 
 theorem fwr_priv_congr (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P : UPtd)
     (M M' : Nat → List (BitVec 8))
     (h : ∀ kp w, Iris.Std.PartialMap.get? P.um kp = some w → M kp = M' kp) :
     procPrivExt (GF := GF) pa pid V P M ⊢ procPrivExt pa pid V P M' := by
   unfold procPrivExt
-  iintro ⟨%hf, Hpid, Hf, Hpt, Htf, %hlz⟩
-  iframe Hpid Hf Htf
+  iintro ⟨%hf, Hpid, Hf, Hpt, Htf, %hlz, Hev⟩
+  iframe Hpid Hf Htf Hev
   isplitr
   · ipureintro; exact hf
   isplitl [Hpt]

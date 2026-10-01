@@ -248,12 +248,12 @@ theorem pw_priv_pid (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat �
       (@wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPid pa) 4 pidPriv pid -∗
         procPrivBareAt curCtx pa pid V M) := by
   unfold procPrivBareAt
-  iintro ⟨%h, Hp, Hf, Ht, Htf, %hl⟩
+  iintro ⟨%h, Hp, Hf, Ht, Htf, %hl, Hev⟩
   iframe Hp
   iintro Hp
   isplitr
   · ipureintro; exact h
-  iframe Hp Hf Ht Htf
+  iframe Hp Hf Ht Htf Hev
   ipureintro; exact hl
 
 /-- THE WRITE END IS OPEN, with the two pieces kept (`PipeQstep.pwWo_open`). -/

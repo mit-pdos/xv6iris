@@ -32,6 +32,11 @@ core -- fileread, filewrite, filestat -- frame the rest around the call,
 `FileRwShared.filerw_core_conv`), because the core names inode and
 generation ghosts this layer cannot see.
 
+THE EVENT COUNTER (permit sweep G+G', design ni-strong-instance.md §7.2):
+both twins end, as the bare block does, in `SlotGen.actCnt pa V.ev`, so the
+two `rfl` bridges (`procPrivRun_eq`, `procPrivExt_eq`) keep their
+statements; the section takes `[WchG GF]` for it.
+
 Imports only definitional and Spec files (never a `Code*`, `Proof*` or
 `Link*` file).
 -/
@@ -57,7 +62,7 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 set_option maxRecDepth 8000
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx] [WchG GF]
 
 /-- **The block of the CURRENTLY RUNNING thread** (`FdTable.procPrivBareAt`
 at the ambient context, Rocq `proc_priv_bare` + the lazy claim): no context
@@ -74,12 +79,13 @@ def procPrivRun (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
   procFieldsNoOfile pa (DFrac.own 1) V ∗
   procPtAt V.upt M ∗
   tfPageAt V.upt.tfp V.tf ∗
-  ⌜V.pvLazy = false → lazyFree V.upt.um V.sz⌝
+  ⌜V.pvLazy = false → lazyFree V.upt.um V.sz⌝ ∗
+  actCnt pa V.ev
 
 /-- `procPrivRun` is `procPrivBareAt` at the kernel-page-table context. -/
 theorem procPrivRun_eq (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) :
-    @procPrivRun hlc GF _ ⟨ξ, KTier.kpt⟩ pa pid V M = procPrivBareAt (GF := GF) ξ pa pid V M := rfl
+    @procPrivRun hlc GF _ ⟨ξ, KTier.kpt⟩ _ pa pid V M = procPrivBareAt (GF := GF) ξ pa pid V M := rfl
 
 /-- The private block of a running process at the descriptor `P'` (the
 table the lazy pages `vmfault` filled in under `copyout`/`copyin` grew
@@ -92,7 +98,8 @@ def procPrivExt (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P' : UPtd)
   procFieldsNoOfile pa (DFrac.own 1) V ∗
   procPtAt P' M' ∗
   tfPageAt P'.tfp V.tf ∗
-  ⌜V.pvLazy = false → lazyFree P'.um V.sz⌝
+  ⌜V.pvLazy = false → lazyFree P'.um V.sz⌝ ∗
+  actCnt pa V.ev
 
 /-- ... which IS the running block at the new descriptor. -/
 theorem procPrivExt_eq_run (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P' : UPtd)
@@ -102,7 +109,7 @@ theorem procPrivExt_eq_run (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P'
 /-- ... and, at the kernel-page-table context, `procPrivBareAt` there. -/
 theorem procPrivExt_eq (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P' : UPtd)
     (M' : Nat → List (BitVec 8)) :
-    @procPrivExt hlc GF _ ⟨ξ, KTier.kpt⟩ pa pid V P' M' =
+    @procPrivExt hlc GF _ ⟨ξ, KTier.kpt⟩ _ pa pid V P' M' =
       procPrivBareAt (GF := GF) ξ pa pid { V with upt := P' } M' := rfl
 
 /-- The block, at its own descriptor. -/
@@ -120,9 +127,9 @@ theorem procPrivExt_wf (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P' : U
     (M' : Nat → List (BitVec 8)) :
     procPrivExt (GF := GF) pa pid V P' M' ⊢ procPrivExt pa pid V P' M' ∗ ⌜uptWf P'⌝ := by
   unfold procPrivExt
-  iintro ⟨%hf, Hpid, Hfl, Hpt, Htf, %hl⟩
+  iintro ⟨%hf, Hpid, Hfl, Hpt, Htf, %hl, Hev⟩
   icases UMemL.procPtAt_wf _ _ $$ Hpt with ⟨Hpt, %hwf⟩
-  isplitl [Hpid Hfl Hpt Htf]
+  isplitl [Hpid Hfl Hpt Htf Hev]
   · iframe
     isplitr []
     · ipureintro; exact hf
@@ -139,7 +146,7 @@ end
 /-- At the kernel-page-table tier the contracts' bare block
 (`procPrivBareAt curCtx`, Rocq `proc_priv_bare` + the lazy claim) IS the
 ambient `procPrivExt` (by `rfl` once the ambient context is taken apart). -/
-theorem procPrivExt_conv {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [X : CurCtx] (h : curTier = KTier.kpt) (pa : BitVec 64) (pid : BitVec 32)
+theorem procPrivExt_conv {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [WchG GF] [X : CurCtx] (h : curTier = KTier.kpt) (pa : BitVec 64) (pid : BitVec 32)
     (V : ProcPriv) (P : UPtd) (M : Nat → List (BitVec 8)) :
     procPrivBareAt (GF := GF) curCtx pa pid { V with upt := P } M ⊣⊢ procPrivExt pa pid V P M := by
   obtain ⟨ξ, t⟩ := X
@@ -148,7 +155,7 @@ theorem procPrivExt_conv {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
   exact .rfl
 
 /-- ... at the block's own descriptor. -/
-theorem procPrivExt_conv0 {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [X : CurCtx] (h : curTier = KTier.kpt) (pa : BitVec 64) (pid : BitVec 32)
+theorem procPrivExt_conv0 {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [WchG GF] [X : CurCtx] (h : curTier = KTier.kpt) (pa : BitVec 64) (pid : BitVec 32)
     (V : ProcPriv) (M : Nat → List (BitVec 8)) :
     procPrivBareAt (GF := GF) curCtx pa pid V M ⊣⊢ procPrivExt pa pid V V.upt M := by
   obtain ⟨ξ, t⟩ := X
@@ -413,7 +420,8 @@ def ecRest [CurCtx] (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P : UPtd)
   pnameCells pa (DFrac.own 1) V.name ∗
   wordPointsTo (pSecc pa) 8 (DFrac.own 1) V.pvSecc ∗
   tfPageAt P.tfp V.tf ∗
-  ⌜V.pvLazy = false → lazyFree P.um V.sz⌝
+  ⌜V.pvLazy = false → lazyFree P.um V.sz⌝ ∗
+  actCnt pa V.ev
 
 theorem ec_priv_split [CurCtx] (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P : UPtd)
     (M : Nat → List (BitVec 8)) :
@@ -438,7 +446,7 @@ theorem ec_priv_close [CurCtx] (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
     procPtAt P' M' ∗ ecRest pa pid V P ⊢ procPrivExt (GF := GF) pa pid V P' M' := by
   unfold procPrivExt ecRest procFieldsNoOfile
   rw [hext.1.1, hext.1.2.1]
-  iintro ⟨Hszc, Hpgc, Hspace, Hpid, Hks, Htfc, Hcwd, Hnm, Hsc, Htfp, %hlz⟩
+  iintro ⟨Hszc, Hpgc, Hspace, Hpid, Hks, Htfc, Hcwd, Hnm, Hsc, Htfp, %hlz, Hev⟩
   isplitl []
   · ipureintro; exact ⟨hf.1, UMemL.umBelow_extSz hf.2.2.2 hext, hf.2.1, hf.2.2.1⟩
   · iframe

@@ -141,7 +141,7 @@ theorem ut_priv_pid [X : CurCtx] (hct : curTier = KTier.kpt) (γ : FileNames) (p
   simp only at hct
   subst hct
   unfold procPrivFd procPrivCoreNoctxAt procPrivBareAt procGenAt
-  iintro ⟨⟨⟨%h, Hpid, Hf, Hpt, Htfp, %hlz⟩, Hc, Hft, Hq, Hxs, Hgh⟩, Ho⟩
+  iintro ⟨⟨⟨%h, Hpid, Hf, Hpt, Htfp, %hlz, Hev⟩, Hc, Hft, Hq, Hxs, Hgh⟩, Ho⟩
   ihave %hnz := genHalvesPriv_nz pa pid V.gen $$ Hgh
   icases genHalvesPriv_reg pa pid V.gen $$ Hgh with ⟨Hr, Hgb⟩
   isplitl []
@@ -149,7 +149,7 @@ theorem ut_priv_pid [X : CurCtx] (hct : curTier = KTier.kpt) (γ : FileNames) (p
   iframe Hpid Hr
   iintro Hpid Hr
   ihave Hgh := Hgb $$ Hr
-  iframe Hpid Hf Hpt Htfp Hc Hft Hq Hxs Hgh Ho
+  iframe Hpid Hf Hpt Htfp Hc Hft Hq Hxs Hgh Ho Hev
   isplitl []
   · ipureintro; exact h
   · ipureintro; exact hlz
@@ -166,7 +166,7 @@ theorem ut_privNm_pid [X : CurCtx] (hct : curTier = KTier.kpt) (γ : FileNames) 
   simp only at hct
   subst hct
   unfold procPrivUnmarked procPrivCoreUnmarkedAt procPrivBareAt procGenUnmarkedAt
-  iintro ⟨⟨⟨%h, Hpid, Hf, Hpt, Htfp, %hlz⟩, Hc, Hft, Hq, Hxs, Hgh⟩, Ho⟩
+  iintro ⟨⟨⟨%h, Hpid, Hf, Hpt, Htfp, %hlz, Hev⟩, Hc, Hft, Hq, Hxs, Hgh⟩, Ho⟩
   ihave %hnz := genHalvesAt_nz pa pid V.gen $$ Hgh
   icases genHalvesAt_reg pa pid V.gen $$ Hgh with ⟨Hr, Hgb⟩
   isplitl []
@@ -174,7 +174,7 @@ theorem ut_privNm_pid [X : CurCtx] (hct : curTier = KTier.kpt) (γ : FileNames) 
   iframe Hpid Hr
   iintro Hpid Hr
   ihave Hgh := Hgb $$ Hr
-  iframe Hpid Hf Hpt Htfp Hc Hft Hq Hxs Hgh Ho
+  iframe Hpid Hf Hpt Htfp Hc Hft Hq Hxs Hgh Ho Hev
   isplitl []
   · ipureintro; exact h
   · ipureintro; exact hlz

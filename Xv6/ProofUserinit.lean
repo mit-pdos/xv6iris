@@ -178,7 +178,7 @@ theorem ui_block [X : CurCtx] (hct : curTier = KTier.kpt) (γ : FileNames) (γd 
   subst hct
   letI : CurCtx := ⟨ξ0, KTier.kpt⟩
   unfold procPriv procFields ofileCells
-  iintro ⟨⟨%hV, Hpid, ⟨Hks, Hsz, Hpg, Htf, Hctx, ⟨%hlen, Hof⟩, Hcwd, Hnm, Hsc⟩, Hpt, Htfp, %hlz⟩,
+  iintro ⟨⟨%hV, Hpid, ⟨Hks, Hsz, Hpg, Htf, Hctx, ⟨%hlen, Hof⟩, Hcwd, Hnm, Hsc⟩, Hpt, Htfp, %hlz, Hev⟩,
     Hcref, Hfds, Hkeys⟩
   rw [hof]
   icases procOfiles_null_close γ γd pa $$ [Hof Hfds Hkeys] with ⟨Hofs, Hfr⟩
@@ -186,7 +186,7 @@ theorem ui_block [X : CurCtx] (hct : curTier = KTier.kpt) (γ : FileNames) (γd 
   iframe Hctx Hfr
   unfold procPrivBareAt procFieldsNoOfile cwdRefAt
   dsimp only
-  iframe Hofs Hpid Hks Hsz Hpg Htf Hcwd Hnm Hsc Hpt Htfp Hcref
+  iframe Hofs Hpid Hks Hsz Hpg Htf Hcwd Hnm Hsc Hpt Htfp Hcref Hev
   isplitl []
   · ipureintro; exact hV
   · ipureintro; exact hlz

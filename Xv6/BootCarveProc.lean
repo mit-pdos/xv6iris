@@ -130,7 +130,8 @@ the ghost names junk (deviation 4). -/
 def bcpBootPriv : ProcPriv :=
   { kstack := 0#64, sz := 0#64, pagetable := 0#64, trapframe := 0#64, upt := UPtd.mk 0#44 0#44 ∅,
     tf := [], context := List.replicate 14 0#64, ofile := List.replicate NOFILE 0#64, fdg := 0,
-    cwd := 0#64, name := List.replicate PNAMELEN 0#8, cwi := 0, gen := 0, chg := 0, pvLazy := true, pvSecc := 0#64 }
+    cwd := 0#64, name := List.replicate PNAMELEN 0#8, cwi := 0, gen := 0, chg := 0, pvLazy := true, pvSecc := 0#64,
+    ev := 0 }
 
 theorem bcp_pnameWf_zero : pnameWf (List.replicate PNAMELEN 0#8) :=
   ⟨by simp [PNAMELEN], 0, by decide, rfl⟩

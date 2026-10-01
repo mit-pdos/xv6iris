@@ -109,10 +109,10 @@ theorem sc_core_pid (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat �
       (@wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPid pa) 4 pidPriv pid -∗
         procPrivCoreNoctxAt curCtx pa pid V M) := by
   unfold procPrivCoreNoctxAt procPrivBareAt
-  iintro ⟨⟨%hf, Hpid, Hf, Hpt, Htfp, %hlz⟩, Hcw⟩
+  iintro ⟨⟨%hf, Hpid, Hf, Hpt, Htfp, %hlz, Hev⟩, Hcw⟩
   iframe Hpid
   iintro Hpid
-  iframe Hpid Hf Hpt Htfp Hcw
+  iframe Hpid Hf Hpt Htfp Hcw Hev
   isplitl []
   · ipureintro; exact hf
   · ipureintro; exact hlz

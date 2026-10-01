@@ -82,7 +82,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 14 cells and everything else. -/
 theorem procPriv_split (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) :
-    @procPriv hlc GF _ ⟨ξ, KTier.kpt⟩ pa pid V M ⊣⊢
+    @procPriv hlc GF _ ⟨ξ, KTier.kpt⟩ _ pa pid V M ⊣⊢
       procPrivNoctxAt ξ pa pid V M ∗ @ctxCells hlc GF _ ⟨ξ, KTier.kpt⟩ (pContext pa 0) V.context := by
   letI : CurCtx := ⟨ξ, KTier.kpt⟩
   constructor

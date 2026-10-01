@@ -309,10 +309,10 @@ theorem sbrkArm_pageLen (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V :
     (M : Nat → List (BitVec 8)) :
     procPrivFd (GF := GF) γ pa pid V M ⊢ procPrivFd γ pa pid V M ∗ ⌜umPageLen V.upt M⌝ := by
   unfold procPrivFd procPrivCoreNoctxAt procPrivBareAt
-  iintro ⟨⟨⟨%h, Hpid, Hf, Hpt, Htfp, %hlz⟩, Hc⟩, Ho⟩
+  iintro ⟨⟨⟨%h, Hpid, Hf, Hpt, Htfp, %hlz, Hev⟩, Hc⟩, Ho⟩
   icases @UMemL.procPtAt_pageLen hlc GF _ ⟨curCtx, KTier.kpt⟩ V.upt M $$ Hpt with ⟨%hpl, Hpt⟩
-  isplitl [Hpid Hf Hpt Htfp Hc Ho]
-  · iframe Hpid Hf Hpt Htfp Hc Ho
+  isplitl [Hpid Hf Hpt Htfp Hc Ho Hev]
+  · iframe Hpid Hf Hpt Htfp Hc Ho Hev
     isplitl []
     · ipureintro; exact h
     · ipureintro; exact hlz

@@ -311,6 +311,62 @@ slot.  The four files outside the plan's list that destructure the
 changed shapes: `ProofKforkParts`, `ProofForkret`, `PipeKillMark`,
 `ProofKexit`.  Gate 882 files, 0 errors; audits 13/13/14.  Next: L1.
 
+### 7.1L G as landed in Lean (2026-10-01)
+
+Lean lane PJ-G, ported in G's FINAL shape (G and G' together: the
+counter in the bare block from the start, so L1a need not re-thread it).
+59 files.  What landed:
+
+- `ProcDefs.ProcPriv.ev : Nat` (last field, Rocq `pv_ev`) and
+  `ProcPriv.updEv` (Rocq `upd_ev`, a record update; `updEv_id`).  Lean's
+  `{ V with … }` carries the field, so only 4 sites spell `ev`: the three
+  full literal records (`BootCarveProc.bcpBootPriv`,
+  `FsCallSitesI.readiKVp`, `DirlookupDefs.dirlookupVp`, all `ev := 0`) and the
+  seal (`ev := 0`); allocproc's two opaque records gain an `= V0.ev`
+  fact each.  No `∃ V', …` quiet arm needed one.
+- The counter (`SlotGen`): `actCnt pa k`, `actCnt_excl/update/step`,
+  `actLend` with `actLend_zero/of_cnt/back/borrow`.  **No new camera**:
+  Rocq's `actUR = gmapUR (mword 64) (dfrac_agreeR natO)` is, at
+  `GName = Nat`, `SgenUR` itself, so `ActUR` is an abbrev of it and the
+  counter is the slot-generation camera at a second canonical name
+  `WchG.wactName` (one instance per camera; `WchGpre`, `xv6GF` and
+  `unionGF` unchanged, `xv6GF_wchG` gains the name).  The 64 counters are
+  minted at 0 by `slotGen_rows_alloc 0` in `childrenRes_alloc` and ride
+  `childrenBootRows`' per-slot row.
+- Homes: `procPrivBareAt` (the bare block, last conjunct) and, so their
+  `rfl`/split bridges keep their statements, its cells-level twins
+  `ProcDefs.procPriv`, `SchedCtx.procPrivNoctxAt`, `EitherDefs.procPrivRun`
+  / `procPrivExt` / `ecRest` and the trap residue's `utBlock` (Rocq
+  `proc_priv_nopt`); `procDormant` / `procDormantNoctx` after the
+  children row.  Accessors `procPrivBareAt_evAcc`,
+  `procPrivCoreNoctxAt_evAcc`, `procPrivFd_evAcc` (Rocq
+  `proc_priv_bare_ev_acc` / `proc_priv_core_ev_acc` / `proc_priv_ev_acc`).
+- Conversions: procinit's seal `procDormantPrestk_seal` takes `actCnt pa
+  0`; allocproc's `ap_dormant_unused_elim` hands it out and the found arm
+  puts it into `procPriv`; freeproc's `fpKeep` carries it back; kexit's
+  park (`kx_dormant_build`, `kx_rest`) and kwait's reap
+  (`kw_dormant_freeprocIn`) move it; kfork's frame `kfOfileΨ` carries the
+  parent's and the child's.
+- **The two sanctioned moves**: the boot big-sep (`ProcsInvAlloc.procsInvSlot`,
+  `MainKvm.mnSlotIn` / `mn_slots_zip`, Rocq `SpecProcinit.procs_inv_alloc`)
+  and `SpecFreeproc.freeprocIn` (Rocq `fp_rest`) gain the counter.  No
+  `wp_*` contract statement moved.
+- **Forced binder moves** (Rocq's `SpecHoldingsleep` analogue): the bare
+  block names `actCnt`, so `[WchG GF]` joins `procPrivBareAt`, `procPriv`,
+  the `EitherDefs` block section and `procPrivExt_conv/_conv0`, and the
+  block sections of `FileRwShared`, `FilereadParts`, `FilewriteParts`,
+  `CreateCalls`; five `@`-spellings gain a `_` for the new instance
+  argument (`procPrivRun_eq`, `procPrivExt_eq`, `ForkretRecord.procPriv_split`,
+  `PipeRw`'s two `ecRest` lemmas, one `SysPipeParts` site).
+- **Deviation: the bare block is unfolded in 35 files, not one** (Rocq G':
+  exactly one).  Each destructuring site names the counter (`…, %hlz,
+  Hev⟩`) and frames it back.  Folding those sites behind accessors is
+  left for a cleanup lane.
+
+Full `lake build Xv6 MachCSL` 2684 jobs, 0 errors; lint passes (no
+`sorry`); `tcb.sh` matches the baseline (no module entered); `audit.sh`
+PASS.
+
 ### 7.2 L1a as landed (2026-09-29, f344a089a) — and the sweep's real footprint
 
 The attempt found the sweep smaller than §3 counted, for one reason:

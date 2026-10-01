@@ -984,10 +984,10 @@ theorem sysOpen_pid_core (hct : curTier = KTier.kpt) (pa : BitVec 64)
       (wordPointsTo (pPid pa) 4 pidPriv pid -∗ procPrivCoreNoctxAt curCtx pa pid V M) := by
   unfold procPrivCoreNoctxAt procPrivBareAt
   rw [Xv6.sysfile_cur_kpt hct]
-  iintro ⟨⟨%h, Hpid, Hf, Hpt, Htfp, %hlz⟩, Hc⟩
+  iintro ⟨⟨%h, Hpid, Hf, Hpt, Htfp, %hlz, Hev⟩, Hc⟩
   iframe Hpid
   iintro Hpid
-  iframe Hpid Hf Hpt Htfp Hc
+  iframe Hpid Hf Hpt Htfp Hc Hev
   isplitl []
   · ipureintro; exact h
   · ipureintro; exact hlz

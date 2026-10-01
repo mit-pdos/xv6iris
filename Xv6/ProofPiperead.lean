@@ -891,12 +891,12 @@ theorem pr_bare_pid (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat �
       (@wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPid pa) 4 pidPriv pid -∗
         procPrivBareAt curCtx pa pid V M) := by
   unfold procPrivBareAt
-  iintro ⟨%hf, Hpid, Hf, Hpt, Htf, %hl⟩
+  iintro ⟨%hf, Hpid, Hf, Hpt, Htf, %hl, Hev⟩
   iframe Hpid
   iintro Hpid
   isplitl []
   · ipureintro; exact hf
-  iframe Hpid Hf Hpt Htf
+  iframe Hpid Hf Hpt Htf Hev
   ipureintro; exact hl
 
 /-- THE PAYLOAD AT ROUND `m` (Rocq `pr_res_i`): the lock's payload, beside

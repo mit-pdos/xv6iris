@@ -251,7 +251,8 @@ def mnSlotIn [CurCtx] (Γ : SchedNames) (pas : Nat → BitVec 44) (i : Nat) : IP
     (∃ kl xs pid : BitVec 32, procPubRest (procAddr i) kl xs pid)) ∗
   hartFull Γ i startedPrimary ∗ pstateFull Γ i UNUSED ∗ slotFree Γ (procAddr i) ∗
   lockFreeTok (Γ.lock i) ∗ byteBuf (pageAddr (pas i)) (DFrac.own 1) (List.replicate 4096 5#8) ∗
-  (∃ γ0 g : GName, chFrag γ0 (procAddr i) ∅ ∗ slotGen (procAddr i) (DFrac.own 1) g)
+  (∃ γ0 g : GName, chFrag γ0 (procAddr i) ∅ ∗ slotGen (procAddr i) (DFrac.own 1) g ∗
+    actCnt (procAddr i) 0)
 
 theorem mn_unused_isUnused : isUnused UNUSED := by decide
 
@@ -287,7 +288,7 @@ theorem mn_slots_zip [CurCtx] (Γ : SchedNames) (pas : Nat → BitVec 44) :
     ([∗list] i ∈ List.range NPROC, lockFreeTok (Γ.lock i)) ∗
     kstackPages pas ∗
     ([∗list] i ∈ List.range NPROC, ∃ γ0 g : GName,
-      chFrag γ0 (procAddr i) ∅ ∗ slotGen (procAddr i) (DFrac.own 1) g)
+      chFrag γ0 (procAddr i) ∅ ∗ slotGen (procAddr i) (DFrac.own 1) g ∗ actCnt (procAddr i) 0)
     ⊢ [∗list] i ∈ List.range NPROC, mnSlotIn (GF := GF) Γ pas i := by
   unfold kstackPages mnSlotIn
   rw [show List.range 64 = List.range NPROC from rfl]
@@ -295,7 +296,7 @@ theorem mn_slots_zip [CurCtx] (Γ : SchedNames) (pas : Nat → BitVec 44) :
   ihave H := (BigSepL.bigSepL_sep_eqv (l := List.range NPROC)
     (Φ := fun _ i => iprop(byteBuf (GF := GF) (pageAddr (pas i)) (DFrac.own 1) (List.replicate 4096 5#8)))
     (Ψ := fun _ i => iprop(∃ γ0 g : GName, chFrag (GF := GF) γ0 (procAddr i) ∅ ∗
-      slotGen (procAddr i) (DFrac.own 1) g))).2 $$ [$H7 $H8]
+      slotGen (procAddr i) (DFrac.own 1) g ∗ actCnt (procAddr i) 0))).2 $$ [$H7 $H8]
   ihave H := (BigSepL.bigSepL_sep_eqv (l := List.range NPROC)
     (Φ := fun _ i => iprop(lockFreeTok (GF := GF) (Γ.lock i))) (Ψ := fun _ _ => _)).2 $$ [$H6 $H]
   ihave H := (BigSepL.bigSepL_sep_eqv (l := List.range NPROC)

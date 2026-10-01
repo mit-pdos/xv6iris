@@ -500,7 +500,7 @@ def procDormantNoctx (pa : BitVec 64) (st : BitVec 32) : IProp GF := iprop%
       V.pvLazy = true⌝ ∗
     wordPointsTo (pPid pa) 4 pidPriv pid ∗
     procFieldsNoctx pa (DFrac.own 1) V ∗
-    dormantAllow ∗ chFrag V.chg pa ∅ ∗
+    dormantAllow ∗ chFrag V.chg pa ∅ ∗ actCnt pa V.ev ∗
     genHalvesDorm pa pid V.gen st ∗
     (∃ xsv : BitVec 32, wordPointsTo (pXstate pa) 4 xsHalf xsv ∗
       (if st = ZOMBIE then exitTok V.gen pid (xstateVal xsv) else iprop(emp))) ∗
@@ -748,7 +748,7 @@ instance instCtxMorphProcDormantNoctx (tier : KTier) (pa : BitVec 64) (st : BitV
       V.pvLazy = true⌝ ∗
         @wordPointsTo hlc GF _ ⟨ξ, tier⟩ (pPid pa) 4 pidPriv pid ∗
         @procFieldsNoctx hlc GF _ ⟨ξ, tier⟩ pa (DFrac.own 1) V ∗
-        dormantAllow ∗ chFrag V.chg pa ∅ ∗ genHalvesDorm pa pid V.gen st ∗
+        dormantAllow ∗ chFrag V.chg pa ∅ ∗ actCnt pa V.ev ∗ genHalvesDorm pa pid V.gen st ∗
         (∃ xsv : BitVec 32, @wordPointsTo hlc GF _ ⟨ξ, tier⟩ (pXstate pa) 4 xsHalf xsv ∗
           (if st = ZOMBIE then exitTok V.gen pid (xstateVal xsv) else iprop(emp))) ∗
         @dormantSpace hlc GF _ ⟨ξ, tier⟩ st V pid))
@@ -759,18 +759,21 @@ instance instCtxMorphProcDormantNoctx (tier : KTier) (pa : BitVec 64) (st : BitV
               (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _)
                 (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _)
                   (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _)
+                   (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _)
                     (@instCtxMorphSep hlc GF _ _ _
                       (@instCtxMorphExists hlc GF _ _ _ (fun _ =>
                         @instCtxMorphSep hlc GF _ _ _ (instCtxMorphWordAt _ _ _ _ _) (instCtxMorphConst _)))
-                      (instCtxMorphDormantSpace _ _ _ _))))))))))
+                      (instCtxMorphDormantSpace _ _ _ _)))))))))))
 
 /-- **`procPriv` minus the 14 context words** (Rocq's `proc_priv`: the
 running process's block, whose save area lives in the lock's RUNNING arm,
 not here).  The four current-process syscalls take THIS, never the full
 `procPriv` -- the save area is owned by `runSlotAt` and read out of
-`p->lock` only where a `swtch` needs it (`kexit`; cf. `yield`).  Its last
-conjunct is what the lazy bit claims (`ProcPriv.pvLazy`, at Rocq
-`proc_priv_core`'s place). -/
+`p->lock` only where a `swtch` needs it (`kexit`; cf. `yield`).  Its
+second-last conjunct is what the lazy bit claims (`ProcPriv.pvLazy`, at Rocq
+`proc_priv_core`'s place), its last the slot's event counter at the
+record's `ev` (`SlotGen.actCnt`, the bare block's, Rocq G', design
+ni-strong-instance.md §7.2). -/
 def procPrivNoctxAt (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) : IProp GF := iprop%
   ⌜V.sz.toNat ≤ uvmMaxsz ∧ umBelow V.sz V.upt ∧
@@ -779,7 +782,8 @@ def procPrivNoctxAt (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPri
   @procFieldsNoctx hlc GF _ ⟨ξ, KTier.kpt⟩ pa (DFrac.own 1) V ∗
   @procPtAt hlc GF _ ⟨ξ, KTier.kpt⟩ V.upt M ∗
   @tfPageAt hlc GF _ ⟨ξ, KTier.kpt⟩ V.upt.tfp V.tf ∗
-  ⌜V.pvLazy = false → lazyFree V.upt.um V.sz⌝
+  ⌜V.pvLazy = false → lazyFree V.upt.um V.sz⌝ ∗
+  actCnt pa V.ev
 
 instance instCtxMorphProcPrivNoctxAt (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) :
@@ -789,7 +793,8 @@ instance instCtxMorphProcPrivNoctxAt (pa : BitVec 64) (pid : BitVec 32) (V : Pro
     (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphWordAt _ _ _ _ _)
       (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphProcFieldsNoctx _ _ _ _)
         (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphProcPtAt _ _ _)
-          (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphTfPageAt _ _ _) (instCtxMorphConst _)))))
+          (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphTfPageAt _ _ _)
+            (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _) (instCtxMorphConst _))))))
 
 instance instCtxMorphContextCells (tier : KTier) (pa : BitVec 64) (dq : DFrac) (ws : List (BitVec 64)) :
     CtxMorph (GF := GF) (fun ξ => @contextCells hlc GF _ ⟨ξ, tier⟩ pa dq ws) :=
@@ -818,7 +823,7 @@ instance instCtxMorphProcDormant (tier : KTier) (pa : BitVec 64) (st : BitVec 32
       V.pvLazy = true⌝ ∗
         @wordPointsTo hlc GF _ ⟨ξ, tier⟩ (pPid pa) 4 pidPriv pid ∗
         @procFields hlc GF _ ⟨ξ, tier⟩ pa (DFrac.own 1) V ∗
-        dormantAllow ∗ chFrag V.chg pa ∅ ∗ genHalvesDorm pa pid V.gen st ∗
+        dormantAllow ∗ chFrag V.chg pa ∅ ∗ actCnt pa V.ev ∗ genHalvesDorm pa pid V.gen st ∗
         (∃ xsv : BitVec 32, @wordPointsTo hlc GF _ ⟨ξ, tier⟩ (pXstate pa) 4 xsHalf xsv ∗
           (if st = ZOMBIE then exitTok V.gen pid (xstateVal xsv) else iprop(emp))) ∗
         @dormantSpace hlc GF _ ⟨ξ, tier⟩ st V pid))
@@ -829,10 +834,11 @@ instance instCtxMorphProcDormant (tier : KTier) (pa : BitVec 64) (st : BitVec 32
               (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _)
                 (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _)
                   (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _)
+                   (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _)
                     (@instCtxMorphSep hlc GF _ _ _
                       (@instCtxMorphExists hlc GF _ _ _ (fun _ =>
                         @instCtxMorphSep hlc GF _ _ _ (instCtxMorphWordAt _ _ _ _ _) (instCtxMorphConst _)))
-                      (instCtxMorphDormantSpace _ _ _ _))))))))))
+                      (instCtxMorphDormantSpace _ _ _ _)))))))))))
 
 instance instCtxMorphParkPay (pa : BitVec 64) (st : BitVec 32) :
     CtxMorph (GF := GF) (fun ξ => parkPayAt (hlc := hlc) ξ pa st) := by

@@ -387,7 +387,7 @@ def fpKeep [CurCtx] (pa : BitVec 64) (V : ProcPriv) (nm : List (BitVec 8)) : IPr
   wordPointsTo (pCwd pa) 8 (DFrac.own 1) V.cwd ∗
   byteBuf (pName pa) (DFrac.own 1) nm ∗
   wordPointsTo (pSecc pa) 8 (DFrac.own 1) V.pvSecc ∗
-  dormantAllow ∗ chFrag V.chg pa ∅ ∗
+  dormantAllow ∗ chFrag V.chg pa ∅ ∗ actCnt pa V.ev ∗
   stackOwn (V.kstack + 4096#64) 512
 
 /-- The lock-protected cells other than `pid` (`procPub` minus its pid
@@ -432,7 +432,7 @@ theorem fp_dormant_intro [CurCtx] (pa : BitVec 64) (V : ProcPriv) (nm : List (Bi
     ⊢ procDormant pa UNUSED := by
   have hUZ : ¬ (UNUSED = ZOMBIE) := by decide
   unfold fpKeep procDormant procFields pnameCells dormantSpace
-  iintro ⟨Hpid, Hsz, Hpt, Htf, ⟨Hks, Hctx, Hof, Hcwd, Hnm, Hsc, Hal, Hch, Hst⟩, Hsg, Hxs⟩
+  iintro ⟨Hpid, Hsz, Hpt, Htf, ⟨Hks, Hctx, Hof, Hcwd, Hnm, Hsc, Hal, Hch, Hev, Hst⟩, Hsg, Hxs⟩
   isplitl []
   · ipureintro; exact Or.inl rfl
   -- the zeroed block is at the lazy bit SET (Rocq freeproc's dormant block:
@@ -447,7 +447,7 @@ theorem fp_dormant_intro [CurCtx] (pa : BitVec 64) (V : ProcPriv) (nm : List (Bi
     refine ⟨hof, hcwd, ?_, rfl⟩
     simp only [uvmMaxsz]
     decide
-  iframe Hpid Hks Hsz Hpt Htf Hctx Hof Hcwd Hsc Hal Hch Hst Hsg
+  iframe Hpid Hks Hsz Hpt Htf Hctx Hof Hcwd Hsc Hal Hch Hev Hst Hsg
   isplitl [Hnm]
   · isplitl []
     · ipureintro; exact hnm
@@ -1046,7 +1046,7 @@ theorem freeproc_led_proof (KF : KFREE) (PFP : PROC_FREEPAGETABLE) (AC : ACQUIRE
     simp only [freeprocAddr]
     unfold freeprocIn freeprocGen procFields pnameCells
     iintro ⟨Hk, Hpc, #Hlkk, Hav, #Hlkp, Hheld,
-      ⟨%hpure, Hpriv, ⟨Hks, Hsz, Hpt, Htf, Hctx, Hof, Hcwd, ⟨%hpnwf, Hnamebuf⟩, Hsc⟩, Hal, Hch, Hstack, Htfarm,
+      ⟨%hpure, Hpriv, ⟨Hks, Hsz, Hpt, Htf, Hctx, Hof, Hcwd, ⟨%hpnwf, Hnamebuf⟩, Hsc⟩, Hal, Hch, Hev, Hstack, Htfarm,
         Hptarm⟩, ⟨Hsg, Hrr, %xsv, Hxsb⟩, HPhi0⟩
     obtain ⟨hof, hcwd⟩ := hpure
     have hnm : V.name.length = PNAMELEN := hpnwf.1
@@ -1078,7 +1078,7 @@ theorem freeproc_led_proof (KF : KFREE) (PFP : PROC_FREEPAGETABLE) (AC : ACQUIRE
     case' _ => unfold fpGhost; iframe
     ihave Hpub : fpPub (procAddr j) st ch kl xs $$ [Hstate Hchan Hkilled Hxstate]
     case' _ => unfold fpPub; iframe
-    ihave Hkeep : fpKeep (procAddr j) V V.name $$ [Hks Hctx Hof Hcwd Hnamebuf Hsc Hal Hch Hstack]
+    ihave Hkeep : fpKeep (procAddr j) V V.name $$ [Hks Hctx Hof Hcwd Hnamebuf Hsc Hal Hch Hev Hstack]
     case' _ => unfold fpKeep; iframe
     ihave HPhi := wpNext_at k.sie k.proc cpu cpu _ (fun _ => rfl) $$ HPhi0
     -- the prologue

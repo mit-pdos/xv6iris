@@ -258,10 +258,10 @@ theorem wiSrc_pid (A : WiArgs) (src : BitVec 64) (P : UPtd) :
     iframe Hb Hp
   · simp only [if_true]
     unfold procPrivExt
-    iintro ⟨%h, Hp, Hf, Ht, Htf, %hl⟩
+    iintro ⟨%h, Hp, Hf, Ht, Htf, %hl, Hev⟩
     iframe Hp
     iintro Hp
-    iframe Hp Hf Ht Htf
+    iframe Hp Hf Ht Htf Hev
     ipureintro; exact ⟨h, hl⟩
 
 /-- ...at the running proc's address as the caller names it. -/

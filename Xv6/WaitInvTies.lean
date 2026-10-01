@@ -55,6 +55,11 @@ part 1 is `Xv6/WaitInv.lean`, whose header and deviations apply here.
    instance re-derived over the new body; `waitRes_alloc` (one caller, main)
    takes the empty authority -- its statement moved, as Rocq's
    `wait_res_alloc`'s did.
+8. **The event counters** (permit sweep G, Rocq 9fb1d089c, design
+   ni-strong-instance.md §7): `childrenBootRows`' per-slot row gains
+   `actCnt (procAddr i) 0` after the slot generation (Rocq's position);
+   `childrenRes_alloc` mints the 64 counters with `slotGen_rows_alloc 0` at
+   the new name `wactName` (SlotGen deviation 9), its statement unchanged.
 
 Imports only definitional files.
 -/
@@ -579,11 +584,12 @@ counter's mirror at 0 (design ni-ticks-ledger.md D1: main raises it to the
 cell's boot value before sealing `<tickslock>`), the zombie ledger at the
 empty history (design ni-zombie-ledger.md D2: main seals it into
 `<wait_lock>`'s payload), and the NPROC
-slot-generation wholes (Rocq `children_boot_rows`). -/
+slot-generation wholes, each beside its event counter at 0 (design
+ni-strong-instance.md §7; Rocq `children_boot_rows`). -/
 def childrenBootRows : IProp GF :=
   iprop(childrenResBoot ∗ orphansOwn ∅ ∗ pidRegAuth ∅ ∗ pidLedAuth [] ∗ tickCnt 0 ∗ zombLedAuth [] ∗
     [∗list] i ∈ List.range NPROC, ∃ γ0 g : GName,
-      chFrag γ0 (procAddr i) ∅ ∗ slotGen (procAddr i) (.own 1) g)
+      chFrag γ0 (procAddr i) ∅ ∗ slotGen (procAddr i) (.own 1) g ∗ actCnt (procAddr i) 0)
 
 /-- ...and init's saved pid, minted WHOLE at a junk value (Rocq
 `children_boot`) -/
@@ -803,6 +809,13 @@ theorem childrenRes_alloc {hlc : HasLC} [MachGS hlc GF]
     (waitInv_procAddr_nodup hinj)
   simp only [BigSepL.bigSepL_map] at hsg
   imod hsg with ⟨%γsg, Hsg⟩
+  -- ...and the NPROC event counters, each at 0 (design ni-strong-instance.md
+  -- §7): the slot-generation camera's boot map at a second name (SlotGen
+  -- deviation 9)
+  have hact := slotGen_rows_alloc (GF := GF) 0 ((List.range NPROC).map procAddr)
+    (waitInv_procAddr_nodup hinj)
+  simp only [BigSepL.bigSepL_map] at hact
+  imod hact with ⟨%γact, Hact⟩
   imod ghost_map_alloc_empty (GF := GF) (K := Int) (V := GName) (H := IntMapF) with ⟨%γpr, Hpr⟩
   imod iOwn_alloc (GF := GF) (F := constOF IpidUR)
     (some (DFracAgree.mk (.own 1) (⟨0#32⟩ : DiscreteO (BitVec 32)))) (ipid_one_valid 0#32)
@@ -820,7 +833,8 @@ theorem childrenRes_alloc {hlc : HasLC} [MachGS hlc GF]
   imod MonoList.own_alloc (GF := GF) ([] : List Zev) with ⟨%γzl, Hzl, -⟩
   imodintro
   iexists ({ wchName := γ, worphName := γo, wsgName := γsg, wprName := γpr, wipName := γip,
-             npidName := γnp, wtkName := γtk, wplName := γpl, wzlName := γzl } : WchG GF)
+             npidName := γnp, wtkName := γtk, wplName := γpl, wzlName := γzl,
+             wactName := γact } : WchG GF)
   unfold childrenBoot childrenBootRows childrenResBoot childrenOwnAt orphansOwn pidRegAuth
     pidLedAuth zombLedAuth initPidTok nextpidPend tickCnt
   isplitr [Hnp]
@@ -842,18 +856,24 @@ theorem childrenRes_alloc {hlc : HasLC} [MachGS hlc GF]
     · iexact Htk
     isplitl [Hzl]
     · iexact Hzl
+    ihave Hsg := BigSepL.bigSepL_sep_eqv.mpr $$ [Hsg Hact]
+    · isplitl [Hsg]
+      · iexact Hsg
+      · iexact Hact
     ihave H := BigSepL.bigSepL_sep_eqv.mpr $$ [Hrows Hsg]
     · isplitl [Hrows]
       · iexact Hrows
       · iexact Hsg
     iapply BigSepL.bigSepL_mono _ $$ H
     intro k i _
-    unfold chFrag slotGen
-    iintro ⟨Hr, Hs⟩
+    unfold chFrag slotGen actCnt actOne
+    iintro ⟨Hr, Hs, Ha⟩
     iexists i, 0
     isplitl [Hr]
     · iexact Hr
+    isplitl [Hs]
     · iexact Hs
+    · iexact Ha
   · iexact Hnp
 
 end WaitInvBoot

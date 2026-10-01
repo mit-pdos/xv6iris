@@ -403,7 +403,7 @@ theorem pw_privExt_split (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P : 
         V.trapframe = pageAddr P.tfp⌝ ∗
       @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pSz pa) 8 (DFrac.own 1) V.sz ∗
       @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPagetable pa) 8 (DFrac.own 1) V.pagetable ∗
-      @procPtAt hlc GF _ ⟨curCtx, KTier.kpt⟩ P M' ∗ @ecRest hlc GF _ ⟨curCtx, KTier.kpt⟩ pa pid V P := by
+      @procPtAt hlc GF _ ⟨curCtx, KTier.kpt⟩ P M' ∗ @ecRest hlc GF _ _ ⟨curCtx, KTier.kpt⟩ pa pid V P := by
   unfold procPrivBareAt ecRest procFieldsNoOfile
   iintro ⟨%hf, Hpid, ⟨Hks, Hszc, Hpgc, Htfc, Hcwd, Hnm, Hsc⟩, Hspace, Htfp⟩
   isplitl []
@@ -416,11 +416,11 @@ theorem pw_privExt_close (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P P'
       V.trapframe = pageAddr P.tfp) :
     @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pSz pa) 8 (DFrac.own 1) V.sz ∗
     @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPagetable pa) 8 (DFrac.own 1) V.pagetable ∗
-    @procPtAt hlc GF _ ⟨curCtx, KTier.kpt⟩ P' M'' ∗ @ecRest hlc GF _ ⟨curCtx, KTier.kpt⟩ pa pid V P ⊢
+    @procPtAt hlc GF _ ⟨curCtx, KTier.kpt⟩ P' M'' ∗ @ecRest hlc GF _ _ ⟨curCtx, KTier.kpt⟩ pa pid V P ⊢
       procPrivBareAt (GF := GF) curCtx pa pid { V with upt := P' } M'' := by
   unfold procPrivBareAt ecRest procFieldsNoOfile
   rw [hext.1.1, hext.1.2.1]
-  iintro ⟨Hszc, Hpgc, Hspace, Hpid, Hks, Htfc, Hcwd, Hnm, Hsc, Htfp, %hlz⟩
+  iintro ⟨Hszc, Hpgc, Hspace, Hpid, Hks, Htfc, Hcwd, Hnm, Hsc, Htfp, %hlz, Hev⟩
   isplitl []
   · ipureintro; exact ⟨hf.1, UMemL.umBelow_extSz hf.2.1 hext, hf.2.2.1, hf.2.2.2⟩
   · iframe

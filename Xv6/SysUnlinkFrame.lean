@@ -574,10 +574,10 @@ theorem sys_unlink_bare_pid (hct : curTier = KTier.kpt) (pa : BitVec 64) (pid : 
       (wordPointsTo (pPid pa) 4 pidPriv pid -∗ procPrivBareAt curCtx pa pid V M) := by
   unfold procPrivBareAt
   rw [sysfile_cur_kpt hct]
-  iintro ⟨%h, Hpid, Hflds, Hpt, Htfp, %hlz⟩
+  iintro ⟨%h, Hpid, Hflds, Hpt, Htfp, %hlz, Hev⟩
   iframe Hpid
   iintro Hpid
-  iframe Hpid Hflds Hpt Htfp
+  iframe Hpid Hflds Hpt Htfp Hev
   isplitl []
   · ipureintro; exact h
   · ipureintro; exact hlz

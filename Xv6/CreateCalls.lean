@@ -55,7 +55,7 @@ theorem create_tx_join [Icfg] (t : Nat) (q q1 q2 : Qp) (hq : q = q1 + q2) :
 end Tx
 
 section Bare
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [WchG GF]
 
 /-- **The bare block's pid cell** (Rocq's `Hppid` / `proc_priv_bare_acc`,
 the `namexEra_core_rows` shape at the bare block): at the ambient context
@@ -69,10 +69,10 @@ theorem create_bare_pid [X : CurCtx] (hct : X.curTier = KTier.kpt) (pa : BitVec 
   simp only at hct
   subst hct
   unfold procPrivBareAt
-  iintro ⟨%h, Hpid, Hf, Hpt, Htfp, %hlz⟩
+  iintro ⟨%h, Hpid, Hf, Hpt, Htfp, %hlz, Hev⟩
   iframe Hpid
   iintro Hpid
-  iframe Hpid Hf Hpt Htfp
+  iframe Hpid Hf Hpt Htfp Hev
   isplitl []
   · ipureintro; exact h
   · ipureintro; exact hlz

@@ -625,8 +625,8 @@ theorem cw_priv_back (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPr
     procPrivBareAt (GF := GF) ξ pa pid { V with upt := P' } (writerImg V.upt M) ⊢
       procPrivBareAt ξ pa pid { V with upt := P' } (viewFaulted V.upt P' M) := by
   unfold procPrivBareAt
-  iintro ⟨%hf, Hpid, Hf, Hpt, Htf, %hlz⟩
-  iframe Hpid Hf Htf
+  iintro ⟨%hf, Hpid, Hf, Hpt, Htf, %hlz, Hev⟩
+  iframe Hpid Hf Htf Hev
   isplitr
   · ipureintro; exact hf
   isplitl [Hpt]
@@ -640,8 +640,8 @@ theorem cw_priv_img (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPri
     procPrivBareAt (GF := GF) ξ pa pid { V with upt := V.upt } M ⊢
       procPrivBareAt ξ pa pid { V with upt := V.upt } (writerImg V.upt M) := by
   unfold procPrivBareAt
-  iintro ⟨%hf, Hpid, Hf, Hpt, Htf, %hlz⟩
-  iframe Hpid Hf Htf
+  iintro ⟨%hf, Hpid, Hf, Hpt, Htf, %hlz, Hev⟩
+  iframe Hpid Hf Htf Hev
   isplitr
   · ipureintro; exact hf
   isplitl [Hpt]

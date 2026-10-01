@@ -646,13 +646,13 @@ theorem procPrivNoctxAt_split (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (V
       procPrivBareAt ξ pa pid V M ∗ @ofileCells hlc GF _ ⟨ξ, KTier.kpt⟩ pa (DFrac.own 1) V.ofile := by
   unfold procPrivNoctxAt procPrivBareAt procFieldsNoctx procFieldsNoOfile
   constructor
-  · iintro ⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hof, Hcwd, Hnm, Hsc⟩, Hpt, Htfp, %hlz⟩
-    iframe Hpid Hk Hs Hpg Htf Hof Hcwd Hnm Hsc Hpt Htfp
+  · iintro ⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hof, Hcwd, Hnm, Hsc⟩, Hpt, Htfp, %hlz, Hev⟩
+    iframe Hpid Hk Hs Hpg Htf Hof Hcwd Hnm Hsc Hpt Htfp Hev
     isplitl []
     · ipureintro; exact h
     · ipureintro; exact hlz
-  · iintro ⟨⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hcwd, Hnm, Hsc⟩, Hpt, Htfp, %hlz⟩, Hof⟩
-    iframe Hpid Hk Hs Hpg Htf Hof Hcwd Hnm Hsc Hpt Htfp
+  · iintro ⟨⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hcwd, Hnm, Hsc⟩, Hpt, Htfp, %hlz, Hev⟩, Hof⟩
+    iframe Hpid Hk Hs Hpg Htf Hof Hcwd Hnm Hsc Hpt Htfp Hev
     isplitl []
     · ipureintro; exact h
     · ipureintro; exact hlz
@@ -701,6 +701,22 @@ theorem procPrivCoreNoctxAt_bare (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32)
     procPrivCoreNoctxAt (GF := GF) ξ pa pid V M ⊣⊢
       procPrivBareAt ξ pa pid V M ∗ @cwdRefAt hlc GF _ _ _ _ _ ⟨ξ, KTier.kpt⟩ V.cwd V.cwi ∗
         procGenAt ξ pa pid V.gen := .rfl
+
+/-- **The event counter, lent out of the core and taken back at any count**
+(Rocq `proc_priv_core_ev_acc`, permit sweep G, design ni-strong-instance.md
+§7): the counter is the bare block's (`procPrivBareAt_evAcc`); the cwd
+reference and the generation row do not mention `ev`. -/
+theorem procPrivCoreNoctxAt_evAcc (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
+    (M : Nat → List (BitVec 8)) :
+    procPrivCoreNoctxAt (GF := GF) ξ pa pid V M ⊢
+      actCnt pa V.ev ∗ (∀ k : Nat, actCnt pa k -∗ procPrivCoreNoctxAt ξ pa pid (V.updEv k) M) := by
+  unfold procPrivCoreNoctxAt
+  iintro ⟨Hb, Hc, Hg⟩
+  icases procPrivBareAt_evAcc ξ pa pid V M $$ Hb with ⟨Hev, Hw⟩
+  iframe Hev
+  iintro %k Hev
+  ihave Hb := Hw $$ %k Hev
+  iframe Hb Hc Hg
 
 /-- The core does not mention the array, so it survives any store into it. -/
 theorem procPrivCoreNoctxAt_ofile (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
@@ -1003,14 +1019,14 @@ theorem procPriv_bare_split [X : CurCtx] (h : curTier = KTier.kpt) (pa : BitVec 
   subst h
   unfold procPriv procPrivBareAt procFields procFieldsNoOfile
   constructor
-  · iintro ⟨%hf, Hpid, ⟨Hk, Hs, Hpg, Htf, Hctx, Hof, Hcwd, Hnm, Hsc⟩, Hpt, Htfp, %hlz⟩
+  · iintro ⟨%hf, Hpid, ⟨Hk, Hs, Hpg, Htf, Hctx, Hof, Hcwd, Hnm, Hsc⟩, Hpt, Htfp, %hlz, Hev⟩
     iframe Hctx Hof
-    iframe Hpid Hk Hs Hpg Htf Hcwd Hnm Hsc Hpt Htfp
+    iframe Hpid Hk Hs Hpg Htf Hcwd Hnm Hsc Hpt Htfp Hev
     isplitl []
     · ipureintro; exact hf
     · ipureintro; exact hlz
-  · iintro ⟨⟨%hf, Hpid, ⟨Hk, Hs, Hpg, Htf, Hcwd, Hnm, Hsc⟩, Hpt, Htfp, %hlz⟩, Hctx, Hof⟩
-    iframe Hpid Hk Hs Hpg Htf Hctx Hof Hcwd Hnm Hsc Hpt Htfp
+  · iintro ⟨⟨%hf, Hpid, ⟨Hk, Hs, Hpg, Htf, Hcwd, Hnm, Hsc⟩, Hpt, Htfp, %hlz, Hev⟩, Hctx, Hof⟩
+    iframe Hpid Hk Hs Hpg Htf Hctx Hof Hcwd Hnm Hsc Hpt Htfp Hev
     isplitl []
     · ipureintro; exact hf
     · ipureintro; exact hlz

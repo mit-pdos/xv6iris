@@ -20,6 +20,12 @@ being the hart's proc word.  `FREEPROC` carries both; the led form is the
 proof (`ProofFreeproc.freeproc_led_proof`) and the landed contract its
 corollary, so no caller changes.
 
+## The event counter (permit sweep G, Rocq 9fb1d089c)
+
+`freeprocIn` (Rocq `fp_rest`) gains `actCnt pa V.ev` after the children
+row, Rocq's sanctioned move: freeproc carries the slot's counter back into
+the UNUSED block untouched.  No contract body changed.
+
 ## Deviations from Rocq (the led form)
 
 1. The actor is `k.proc` (Rocq `pme`); `FREEPROC`'s second `Parameter`
@@ -57,11 +63,13 @@ records of `ofile`/`cwd` has to arrive here.  The trapframe page carries
 its `pageValid` (Rocq `fp_tf`), which is what `kfree` demands of the
 pointer it is handed and which the pagetable arm, when absent, cannot
 supply.  The slot's children row (`chFrag V.chg pa ∅`, Rocq `fp_rest`'s
-`ch_frag`) passes through into the UNUSED block, at `∅`. -/
+`ch_frag`) passes through into the UNUSED block, at `∅`, and so does the
+slot's event counter at the block's `ev` (`actCnt pa V.ev`, Rocq G's
+`fp_rest`, design ni-strong-instance.md §7). -/
 def freeprocIn (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) : IProp GF := iprop%
   ⌜V.ofile = List.replicate NOFILE 0#64 ∧ V.cwd = 0#64⌝ ∗
   wordPointsTo (pPid pa) 4 pidPriv pid ∗ procFields pa (DFrac.own 1) V ∗
-  dormantAllow ∗ chFrag V.chg pa ∅ ∗ stackOwn (V.kstack + 4096#64) 512 ∗
+  dormantAllow ∗ chFrag V.chg pa ∅ ∗ actCnt pa V.ev ∗ stackOwn (V.kstack + 4096#64) 512 ∗
   (if V.trapframe = 0#64 then emp else
     ⌜V.trapframe = pageAddr V.upt.tfp ∧ pageValid V.trapframe⌝ ∗ tfPageAt V.upt.tfp V.tf) ∗
   (if V.pagetable = 0#64 then emp else

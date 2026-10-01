@@ -1678,7 +1678,7 @@ theorem cr_empty_body (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) (KL : KILLED)
   icases Hpriv with ⟨Hpriv, Hgen⟩
   ihave HprivE := (procPrivExt_conv htc (procAddr j) pid V P Mi).1 $$ Hpriv
   unfold procPrivExt
-  icases HprivE with ⟨%hpf, Hqp, Hpfl, Hppt, Hptf, %hplz⟩
+  icases HprivE with ⟨%hpf, Hqp, Hpfl, Hppt, Hptf, %hplz, Hev⟩
   ihave %hpnz := genHalvesPriv_nz (procAddr j) pid V.gen $$ Hgen
   icases genHalvesPriv_reg (procAddr j) pid V.gen $$ Hgen with ⟨Hrg, Hgb⟩
   k_step (wp_s_jal c _ (KA.«consoleread» + 0x4c#64) false 8300#21 1#5 (by decide))
@@ -1696,9 +1696,9 @@ theorem cr_empty_body (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) (KL : KILLED)
   iapply wpNext_off_intro
   iintro %spieK %sppK %RK %kl %hspK Hk Hpc %⟨hcsK, hkl⟩ Hkr Hqp Hrg
   ihave Hgen := Hgb $$ Hrg
-  ihave HprivE : procPrivExt (procAddr j) pid V P Mi $$ [Hqp Hpfl Hppt Hptf]
+  ihave HprivE : procPrivExt (procAddr j) pid V P Mi $$ [Hqp Hpfl Hppt Hptf Hev]
   · unfold procPrivExt
-    iframe Hqp Hpfl Hppt Hptf
+    iframe Hqp Hpfl Hppt Hptf Hev
     isplitl []
     · ipureintro; exact hpf
     · ipureintro; exact hplz

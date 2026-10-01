@@ -425,13 +425,16 @@ theorem utCaps_kalloc (N : UtNames) :
 /-- **The block minus the address space and the trapframe page** (Rocq
 `proc_priv_nopt` with the trapframe opened): what parks across user
 execution.  At the kernel tier of the ambient context, as `procPrivFd`
-states it. -/
+states it.  It keeps the slot's event counter (`actCnt pa V.ev`, after the
+lazy claim -- the bare block's, Rocq G's `proc_priv_nopt` conjunct, design
+ni-strong-instance.md §7): the residue parks with the permit. -/
 def utBlock (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) : IProp GF := iprop%
   ⌜V.sz.toNat ≤ uvmMaxsz ∧ umBelow V.sz V.upt ∧
     V.pagetable = pageAddr V.upt.root ∧ V.trapframe = pageAddr V.upt.tfp⌝ ∗
   @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPid pa) 4 pidPriv pid ∗
   @procFieldsNoOfile hlc GF _ ⟨curCtx, KTier.kpt⟩ pa (DFrac.own 1) V ∗
   ⌜V.pvLazy = false → lazyFree V.upt.um V.sz⌝ ∗
+  actCnt pa V.ev ∗
   @cwdRefAt hlc GF _ _ _ _ _ ⟨curCtx, KTier.kpt⟩ V.cwd V.cwi ∗
   procGenAt curCtx pa pid V.gen ∗
   procOfiles γ V.fdg pa V.ofile
@@ -448,13 +451,13 @@ theorem utBlock_join (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : Pr
       @tfPageAt hlc GF _ ⟨curCtx, KTier.kpt⟩ V.upt.tfp V.tf ⊣⊢ procPrivFd γ pa pid V M := by
   unfold utBlock procPrivFd procPrivCoreNoctxAt procPrivBareAt
   constructor
-  · iintro ⟨⟨%h, Hpid, Hf, %hlz, Hc, Hg, Ho⟩, Hpt, Htf⟩
-    iframe Hpid Hf Hc Hg Ho Hpt Htf
+  · iintro ⟨⟨%h, Hpid, Hf, %hlz, Hev, Hc, Hg, Ho⟩, Hpt, Htf⟩
+    iframe Hpid Hf Hc Hg Ho Hpt Htf Hev
     isplitl []
     · ipureintro; exact h
     · ipureintro; exact hlz
-  · iintro ⟨⟨⟨%h, Hpid, Hf, Hpt, Htf, %hlz⟩, Hc, Hg⟩, Ho⟩
-    iframe Hpid Hf Hc Hg Ho Hpt Htf
+  · iintro ⟨⟨⟨%h, Hpid, Hf, Hpt, Htf, %hlz, Hev⟩, Hc, Hg⟩, Ho⟩
+    iframe Hpid Hf Hc Hg Ho Hpt Htf Hev
     isplitl []
     · ipureintro; exact h
     · ipureintro; exact hlz
@@ -568,8 +571,8 @@ theorem utOwn_tfLen (Rsys : UtNames → BitVec 32 → IProp GF) (N : UtNames) (V
     (M : Nat → List (BitVec 8)) (sts : List FdState) (cs : ExtTreeSet GName compare) (pid : BitVec 32) :
     utOwn (GF := GF) Rsys N V M sts cs pid ⊢ utOwn Rsys N V M sts cs pid ∗ ⌜V.tf.length = 36⌝ := by
   unfold utOwn procPrivFd procPrivCoreNoctxAt procPrivBareAt tfPageAt
-  iintro ⟨Hb, Hfd, Hir, ⟨⟨⟨%h, Hpid, Hf, Hpt, ⟨%hl, Hw, Hbs⟩, %hlz⟩, Hc, Hg⟩, Ho⟩, Hfr, Hch, Hsy, Huh⟩
-  iframe Hb Hfd Hir Hpid Hf Hpt Hw Hbs Hc Hg Ho Hfr Hch Hsy Huh
+  iintro ⟨Hb, Hfd, Hir, ⟨⟨⟨%h, Hpid, Hf, Hpt, ⟨%hl, Hw, Hbs⟩, %hlz, Hev⟩, Hc, Hg⟩, Ho⟩, Hfr, Hch, Hsy, Huh⟩
+  iframe Hb Hfd Hir Hpid Hf Hpt Hw Hbs Hc Hg Ho Hfr Hch Hsy Huh Hev
   ipureintro
   exact ⟨⟨h, hl, hlz⟩, hl⟩
 

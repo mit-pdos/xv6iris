@@ -126,7 +126,7 @@ theorem filerw_offadd (v : BitVec 32) (tot : Nat) (h : v.toNat + tot < 2 ^ 31) :
 /-! ## The block -/
 
 section Block
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [WchG GF] [CurCtx]
 
 /-- The pid cell out of the block and back (Rocq's
 `proc_priv_core_bare_acc`, lent around each of begin_op, ilock, iunlock,

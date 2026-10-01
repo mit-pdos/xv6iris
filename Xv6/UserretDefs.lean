@@ -339,10 +339,10 @@ theorem userret_priv_acc (htc : curTier = KTier.kpt) (γ : FileNames) (pa : BitV
   simp only at htc
   subst htc
   simp only [procPrivFd, procPrivCoreNoctxAt, procPrivBareAt]
-  iintro ⟨⟨⟨%hf, Hpid, Hfields, Hppt, Hpage, %hlz⟩, Hc⟩, Ho⟩
+  iintro ⟨⟨⟨%hf, Hpid, Hfields, Hppt, Hpage, %hlz, Hev⟩, Hc⟩, Ho⟩
   iframe Hppt Hpage
   iintro Hppt Hpage
-  iframe Hpid Hfields Hppt Hpage Hc Ho
+  iframe Hpid Hfields Hppt Hpage Hc Ho Hev
   isplit
   · ipureintro; exact hf
   · ipureintro; exact hlz

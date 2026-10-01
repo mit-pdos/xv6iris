@@ -417,7 +417,7 @@ theorem frd_st_inode (inum : BitVec 32) (γo : GName) (om : OffMode) (γp : Pipe
 /-! ## 6.  The block, at the ambient form -/
 
 section Block
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [WchG GF] [CurCtx]
 
 /-- EVERY MAPPED PAGE OF THE BLOCK'S VIEW IS FULL (deviation 2; Rocq's
 `proc_pt_dom`): `UMemL.procPtAt_pageLen`, read through the block. -/
@@ -425,11 +425,11 @@ theorem frd_pageLen (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P : UPtd)
     (M : Nat → List (BitVec 8)) :
     procPrivExt (GF := GF) pa pid V P M ⊢ ⌜umPageLen P M⌝ ∗ procPrivExt pa pid V P M := by
   unfold procPrivExt
-  iintro ⟨%hf, Hpid, Hfl, Hpt, Htf, %hlz⟩
+  iintro ⟨%hf, Hpid, Hfl, Hpt, Htf, %hlz, Hev⟩
   icases UMemL.procPtAt_pageLen P M $$ Hpt with ⟨%h, Hpt⟩
   isplitr
   · ipureintro; exact h
-  iframe Hpid Hfl Htf
+  iframe Hpid Hfl Htf Hev
   isplitr
   · ipureintro; exact hf
   isplitl [Hpt]

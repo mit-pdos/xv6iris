@@ -806,10 +806,10 @@ theorem kxc_priv_pid [X : CurCtx] (hct : X.curTier = KTier.kpt) (γ : FileNames)
   simp only at hct
   subst hct
   unfold procPrivFd procPrivCoreNoctxAt procPrivBareAt
-  iintro ⟨⟨⟨%hf, Hpid, Hf, Hpt, Htfp, %hlz⟩, Hcw⟩, Hof⟩
+  iintro ⟨⟨⟨%hf, Hpid, Hf, Hpt, Htfp, %hlz, Hev⟩, Hcw⟩, Hof⟩
   iframe Hpid
   iintro Hpid
-  iframe Hpid Hf Hpt Htfp Hcw Hof
+  iframe Hpid Hf Hpt Htfp Hcw Hof Hev
   isplitl []
   · ipureintro; exact hf
   · ipureintro; exact hlz
