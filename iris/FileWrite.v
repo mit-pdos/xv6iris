@@ -352,11 +352,14 @@ Section FileWrite.
     intros Heq. iIntros "#Hinv Hd Hka".
     iDestruct (file_deed_law c r) as "#Hlaw".
     iMod (inv_acc appE appN with "Hinv") as "[Hbody Hclose]"; [ set_solver | ].
-    iEval (rewrite /app_body) in "Hbody".
-    iDestruct "Hbody" as (I') "(>Hh & Hp & >%Hdom)".
+    (* CREDIT-FREE at every step index (port-ordinal): at this instance the
+       claim is TIMELESS ([AppFile.file_pred_timeless]), so the whole body
+       is, and its later strips as one ([exist_timeless] needs no finite
+       index; only splitting a later does). *)
+    iEval (rewrite /app_body Heq; cbn [app_pred app_run app_names]) in "Hbody".
+    iDestruct "Hbody" as ">Hbody".
+    iDestruct "Hbody" as (I') "(Hh & Hp & %Hdom)".
     iDestruct (ghost_map_auth_agree with "Hka Hh") as %<-.
-    iEval (rewrite Heq; cbn [app_pred app_run app_names]) in "Hp".
-    iDestruct "Hp" as ">Hp".
     iDestruct ("Hlaw" $! (abs_view I) s with "Hd Hp") as "(Hp & Hd & Hfact)".
     iMod ("Hclose" with "[Hh Hp]") as "_".
     { iNext. rewrite /app_body. iExists I. iFrame "Hh".

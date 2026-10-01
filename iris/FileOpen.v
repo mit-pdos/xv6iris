@@ -215,20 +215,23 @@ Section FileOpen.
     iDestruct (file_deed_law_q c r q) as "#Hlaw".
     iDestruct (file_cons_cred_law c r jo with "Hm") as "#Hcl".
     iMod (inv_acc appE appN with "Hinv") as "[Hbody Hclose]"; [ set_solver | ].
-    iEval (rewrite /app_body) in "Hbody".
-    iDestruct "Hbody" as (I') "(>Hh & Hp & >%Hdom)".
+    (* CREDIT-FREE at every step index (port-ordinal): at this instance the
+       claim is TIMELESS ([AppFile.file_pred_timeless]), so the whole body
+       is, and its later strips as one ([exist_timeless] needs no finite
+       index; only splitting a later does) -- and both laws then run on
+       the claim itself. *)
+    iEval (rewrite /app_body Heq; cbn [app_pred app_run app_names]) in "Hbody".
+    iDestruct "Hbody" as ">Hbody".
+    iDestruct "Hbody" as (I') "(Hh & Hp & %Hdom)".
     iDestruct (ghost_map_auth_agree with "Hka Hh") as %<-.
-    iEval (rewrite Heq; cbn [app_pred app_run app_names]) in "Hp".
-    iAssert (▷ (file_pred c r (abs_view I) ∗ fdq r q s
-                ∗ (⌜f_ok (abs_view I) s /\ file_fs_pure (abs_view I)⌝
-                   ∨ file_taint c)))%I with "[Hp Hd]" as "Hpc".
-    { iNext. iApply ("Hlaw" with "Hd Hp"). }
-    iDestruct "Hpc" as "[Hp [Hd Hc1]]". iMod "Hc1". iMod "Hd".
-    iAssert (▷ (file_pred c r (abs_view I)
-                ∗ (⌜cons_fact jo (abs_view I)⌝ ∨ file_taint c)))%I
-      with "[Hp]" as "Hpd".
-    { iNext. iApply ("Hcl" with "Hp"). }
-    iDestruct "Hpd" as "[Hp Hc2]". iMod "Hc2".
+    iAssert (file_pred c r (abs_view I) ∗ fdq r q s
+             ∗ (⌜f_ok (abs_view I) s /\ file_fs_pure (abs_view I)⌝
+                ∨ file_taint c))%I with "[Hp Hd]" as "[Hp [Hd Hc1]]".
+    { iApply ("Hlaw" with "Hd Hp"). }
+    iAssert (file_pred c r (abs_view I)
+             ∗ (⌜cons_fact jo (abs_view I)⌝ ∨ file_taint c))%I
+      with "[Hp]" as "[Hp Hc2]".
+    { iApply ("Hcl" with "Hp"). }
     iMod ("Hclose" with "[Hh Hp]") as "_".
     { iNext. rewrite /app_body. iExists I. iFrame "Hh".
       iSplitL; [| by iPureIntro ].
@@ -261,21 +264,20 @@ Section FileOpen.
     iDestruct (file_escrow_law c r) as "#Hlaw".
     iDestruct (file_cons_cred_law c r jo with "Hm") as "#Hcl".
     iMod (inv_acc appE appN with "Hinv") as "[Hbody Hclose]"; [ set_solver | ].
-    iEval (rewrite /app_body) in "Hbody".
-    iDestruct "Hbody" as (I') "(>Hh & Hp & >%Hdom)".
+    (* CREDIT-FREE at every step index: [file_claim_read]'s form *)
+    iEval (rewrite /app_body Heq; cbn [app_pred app_run app_names]) in "Hbody".
+    iDestruct "Hbody" as ">Hbody".
+    iDestruct "Hbody" as (I') "(Hh & Hp & %Hdom)".
     iDestruct (ghost_map_auth_agree with "Hka Hh") as %<-.
-    iEval (rewrite Heq; cbn [app_pred app_run app_names]) in "Hp".
-    iAssert (▷ (file_pred c r (abs_view I) ∗ esc_tok g
-                ∗ ((⌜f_ok (abs_view I) s /\ file_fs_pure (abs_view I)⌝
-                    ∗ f_typed c s) ∨ file_taint c)))%I
-      with "[Hp Htok]" as "Hpc".
-    { iNext. iApply ("Hlaw" with "Hwit Htok Hp"). }
-    iDestruct "Hpc" as "[Hp [Htok Hc1]]". iMod "Hc1". iMod "Htok".
-    iAssert (▷ (file_pred c r (abs_view I)
-                ∗ (⌜cons_fact jo (abs_view I)⌝ ∨ file_taint c)))%I
-      with "[Hp]" as "Hpd".
-    { iNext. iApply ("Hcl" with "Hp"). }
-    iDestruct "Hpd" as "[Hp Hc2]". iMod "Hc2".
+    iAssert (file_pred c r (abs_view I) ∗ esc_tok g
+             ∗ ((⌜f_ok (abs_view I) s /\ file_fs_pure (abs_view I)⌝
+                 ∗ f_typed c s) ∨ file_taint c))%I
+      with "[Hp Htok]" as "[Hp [Htok Hc1]]".
+    { iApply ("Hlaw" with "Hwit Htok Hp"). }
+    iAssert (file_pred c r (abs_view I)
+             ∗ (⌜cons_fact jo (abs_view I)⌝ ∨ file_taint c))%I
+      with "[Hp]" as "[Hp Hc2]".
+    { iApply ("Hcl" with "Hp"). }
     iMod ("Hclose" with "[Hh Hp]") as "_".
     { iNext. rewrite /app_body. iExists I. iFrame "Hh".
       iSplitL; [| by iPureIntro ].
@@ -302,16 +304,16 @@ Section FileOpen.
     intros Heq. iIntros "#Hinv #Hwit Hka".
     iDestruct (file_escrow_read c r) as "#Hlaw".
     iMod (inv_acc appE appN with "Hinv") as "[Hbody Hclose]"; [ set_solver | ].
-    iEval (rewrite /app_body) in "Hbody".
-    iDestruct "Hbody" as (I') "(>Hh & Hp & >%Hdom)".
+    (* CREDIT-FREE at every step index: [file_claim_read]'s form *)
+    iEval (rewrite /app_body Heq; cbn [app_pred app_run app_names]) in "Hbody".
+    iDestruct "Hbody" as ">Hbody".
+    iDestruct "Hbody" as (I') "(Hh & Hp & %Hdom)".
     iDestruct (ghost_map_auth_agree with "Hka Hh") as %<-.
-    iEval (rewrite Heq; cbn [app_pred app_run app_names]) in "Hp".
-    iAssert (▷ (file_pred c r (abs_view I)
-                ∗ ((⌜f_ok (abs_view I) s /\ file_fs_pure (abs_view I)⌝
-                    ∗ f_typed c s) ∨ esc_spent g ∨ file_taint c)))%I
-      with "[Hp]" as "Hpc".
-    { iNext. iApply ("Hlaw" with "Hwit Hp"). }
-    iDestruct "Hpc" as "[Hp Hc]". iMod "Hc".
+    iAssert (file_pred c r (abs_view I)
+             ∗ ((⌜f_ok (abs_view I) s /\ file_fs_pure (abs_view I)⌝
+                 ∗ f_typed c s) ∨ esc_spent g ∨ file_taint c))%I
+      with "[Hp]" as "[Hp Hc]".
+    { iApply ("Hlaw" with "Hwit Hp"). }
     iMod ("Hclose" with "[Hh Hp]") as "_".
     { iNext. rewrite /app_body. iExists I. iFrame "Hh".
       iSplitL; [| by iPureIntro ].
@@ -634,11 +636,14 @@ Section FileOpen.
   Proof using .
     intros Heq. iIntros "#Hinv Hka".
     iMod (inv_acc appE appN with "Hinv") as "[Hbody Hclose]"; [ set_solver | ].
-    iEval (rewrite /app_body) in "Hbody".
-    iDestruct "Hbody" as (I') "(>Hh & Hp & >%Hdom)".
+    (* CREDIT-FREE at every step index (port-ordinal): at this instance the
+       claim is TIMELESS ([AppFile.file_pred_timeless]), so the whole body
+       is, and its later strips as one ([exist_timeless] needs no finite
+       index; only splitting a later does). *)
+    iEval (rewrite /app_body Heq; cbn [app_pred app_run app_names]) in "Hbody".
+    iDestruct "Hbody" as ">Hbody".
+    iDestruct "Hbody" as (I') "(Hh & Hp & %Hdom)".
     iDestruct (ghost_map_auth_agree with "Hka Hh") as %<-.
-    iEval (rewrite Heq; cbn [app_pred app_run app_names]) in "Hp".
-    iDestruct "Hp" as ">Hp".
     iAssert (file_pred c r (abs_view I)
              ∗ (⌜fclaim_free (abs_view I)⌝ ∨ file_taint c))%I
       with "[Hp]" as "[Hp Hres]".
@@ -2059,15 +2064,15 @@ Section FileOpen.
     rewrite /pf_at. cbn [pf_recv pf_refund]. iSplit; [| iExact "Hd" ].
     rewrite /aopen_commit_at. iIntros (I i a) "%Hrow Hka".
     iMod (inv_acc appE appN with "Hinv") as "[Hbody Hclose]"; [ set_solver | ].
-    iEval (rewrite /app_body) in "Hbody".
-    iDestruct "Hbody" as (I') "(>Hh & Hp & >%Hdom)".
+    (* CREDIT-FREE at every step index: [file_claim_read]'s form *)
+    iEval (rewrite /app_body Heq; cbn [app_pred app_run app_names]) in "Hbody".
+    iDestruct "Hbody" as ">Hbody".
+    iDestruct "Hbody" as (I') "(Hh & Hp & %Hdom)".
     iDestruct (ghost_map_auth_agree with "Hka Hh") as %<-.
-    iEval (rewrite Heq; cbn [app_pred app_run app_names]) in "Hp".
-    iAssert (▷ (file_pred c r (abs_view I) ∗ fdq r q s
-                ∗ (⌜f_ok (abs_view I) s /\ file_fs_pure (abs_view I)⌝
-                   ∨ file_taint c)))%I with "[Hp Hd]" as "Hpc".
-    { iNext. iApply ("Hlaw" with "Hd Hp"). }
-    iDestruct "Hpc" as "[Hp [Hd Hc]]". iMod "Hc". iMod "Hd".
+    iAssert (file_pred c r (abs_view I) ∗ fdq r q s
+             ∗ (⌜f_ok (abs_view I) s /\ file_fs_pure (abs_view I)⌝
+                ∨ file_taint c))%I with "[Hp Hd]" as "[Hp [Hd Hc]]".
+    { iApply ("Hlaw" with "Hd Hp"). }
     iMod ("Hclose" with "[Hh Hp]") as "_".
     { iNext. rewrite /app_body. iExists I. iFrame "Hh".
       iSplitL; [| by iPureIntro ].

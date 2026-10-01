@@ -253,20 +253,19 @@ Section TreeMove.
     intros Heq. iIntros "#Hinv Hown Hka".
     iDestruct (tree_own_claim_law c r Heq) as "#Hlaw".
     iMod (inv_acc appE appN with "Hinv") as "[Hbody Hclose]"; [ set_solver | ].
-    iEval (rewrite /app_body) in "Hbody".
-    iDestruct "Hbody" as (I') "(>Hh & Hp & >%Hdom)".
-    iDestruct (ghost_map_auth_agree with "Hka Hh") as %<-.
-    iAssert (▷ (app_pred app_run (abs_view I)
-                ∗ (tree_own r g root t
-                   ∗ (⌜subtree (abs_view I) root = Some t⌝ ∨ tree_taint c))))%I
-      with "[Hp Hown]" as "[Hp Hrest]".
-    { iNext.
-      iDestruct ("Hlaw" $! (abs_view I) g root t with "Hown Hp") as "(A & B & C)".
-      iFrame "A B C". }
-    iMod "Hrest" as "[Hown Hfact]".
-    iMod ("Hclose" with "[Hh Hp]") as "_".
-    { iNext. rewrite /app_body. iExists I. iFrame "Hh Hp".
-      iPureIntro. exact Hdom. }
+    (* CREDIT-FREE at every step index (port-ordinal): only the pure-or-taint
+       reading leaves the body's later -- a persistent assertion sees the
+       deed and the body and consumes neither -- and the body goes back
+       exactly as it was opened. *)
+    iAssert (▷ (⌜subtree (abs_view I) root = Some t⌝ ∨ tree_taint c))%I
+      as "#>Hfact".
+    { iNext. iEval (rewrite /app_body) in "Hbody".
+      iDestruct "Hbody" as (I') "(Hh & Hp & _)".
+      iDestruct (ghost_map_auth_agree with "Hka Hh") as %<-.
+      iDestruct ("Hlaw" $! (abs_view I) g root t with "Hown Hp")
+        as "(_ & _ & C)".
+      iExact "C". }
+    iMod ("Hclose" with "Hbody") as "_".
     iModIntro. iFrame "Hka Hown Hfact".
   Qed.
 
@@ -283,11 +282,14 @@ Section TreeMove.
   Proof using .
     intros Heq Hsub Hne. iIntros "#Hinv Htk Hka".
     iMod (inv_acc appE appN with "Hinv") as "[Hbody Hclose]"; [ set_solver | ].
-    iEval (rewrite /app_body) in "Hbody".
-    iDestruct "Hbody" as (I0) "(>Hh & Hp & >%Hdom)".
+    (* CREDIT-FREE at every step index (port-ordinal): at this instance the
+       claim is TIMELESS ([AppTree.tree_pred_timeless]), so the whole body
+       is, and its later strips as one ([exist_timeless] needs no finite
+       index; only splitting a later does). *)
+    iEval (rewrite /app_body Heq; cbn [app_pred app_run app_names]) in "Hbody".
+    iDestruct "Hbody" as ">Hbody".
+    iDestruct "Hbody" as (I0) "(Hh & Hp & %Hdom)".
     iDestruct (ghost_map_auth_agree with "Hka Hh") as %<-.
-    iEval (rewrite Heq; cbn [app_pred app_run app_names]) in "Hp".
-    iDestruct "Hp" as ">Hp".
     iMod (tree_resync c r g root t t' (abs_view I') Hsub Hne with "Htk Hp")
       as "[Hp Hout]".
     iMod ("Hclose" with "[Hh Hp]") as "_".
@@ -792,20 +794,19 @@ Section TreeMove.
     { rewrite Heq. cbn [app_pred app_run app_names]. iIntros "!>" (v) "Hp".
       iApply (tree_pred_facts c r v with "Hp"). }
     iMod (inv_acc appE appN with "Hinv") as "[Hbody Hclose]"; [ set_solver | ].
-    iEval (rewrite /app_body) in "Hbody".
-    iDestruct "Hbody" as (I') "(>Hh & Hp & >%Hdom)".
-    iDestruct (ghost_map_auth_agree with "Hka Hh") as %<-.
-    iAssert (▷ (app_pred app_run (abs_view I)
-                ∗ (⌜aview_tree_wf (abs_view I)
-                    /\ adir_at (abs_view I) FsImg.ROOTINO
-                    /\ aview_rooted (abs_view I)⌝ ∨ tree_taint c)))%I
-      with "[Hp]" as "[Hp Hrest]".
-    { iNext. iDestruct ("Hlaw" $! (abs_view I) with "Hp") as "[A B]".
-      iFrame "A B". }
-    iMod "Hrest" as "Hfact".
-    iMod ("Hclose" with "[Hh Hp]") as "_".
-    { iNext. rewrite /app_body. iExists I. iFrame "Hh Hp".
-      iPureIntro. exact Hdom. }
+    (* CREDIT-FREE at every step index (port-ordinal): only the pure-or-taint
+       reading leaves the body's later -- a persistent assertion consumes
+       nothing -- and the body goes back exactly as it was opened. *)
+    iAssert (▷ (⌜aview_tree_wf (abs_view I)
+                 /\ adir_at (abs_view I) FsImg.ROOTINO
+                 /\ aview_rooted (abs_view I)⌝ ∨ tree_taint c))%I
+      as "#>Hfact".
+    { iNext. iEval (rewrite /app_body) in "Hbody".
+      iDestruct "Hbody" as (I') "(Hh & Hp & _)".
+      iDestruct (ghost_map_auth_agree with "Hka Hh") as %<-.
+      iDestruct ("Hlaw" $! (abs_view I) with "Hp") as "[_ B]".
+      iExact "B". }
+    iMod ("Hclose" with "Hbody") as "_".
     iModIntro. iFrame "Hka Hfact".
   Qed.
 

@@ -279,17 +279,16 @@ Section PinnedObs.
     iIntros "#Hcl #Hinv". rewrite /pobs_Fo. iApply pf_at_triv.
     rewrite /aopen_commit_at /pobs_recv. iIntros (I i a) "%Hrow Hka".
     iMod (inv_acc appE appN with "Hinv") as "[Hbody Hclose]"; [ set_solver | ].
-    iEval (rewrite /app_body) in "Hbody".
-    iDestruct "Hbody" as (I') "(>Hh & Hp & >%Hdom)".
-    iDestruct (ghost_map_auth_agree with "Hka Hh") as %<-.
-    iAssert (▷ (app_pred app_run (abs_view I) ∗ (⌜Pin (abs_view I)⌝ ∨ T)))%I
-      with "[Hp]" as "Hpc".
-    { iNext. iApply ("Hcl" with "Hp"). }
-    iDestruct "Hpc" as "[Hp Hc]".
-    iMod "Hc".
-    iMod ("Hclose" with "[Hh Hp]") as "_".
-    { iNext. rewrite /app_body. iExists I. iFrame "Hh Hp".
-      iPureIntro. exact Hdom. }
+    (* CREDIT-FREE at every step index (port-ordinal): only the pure-or-[T]
+       claim leaves the body's later, agreed against the caller's half
+       inside it; a persistent assertion consumes nothing, and the body
+       goes back exactly as it was opened. *)
+    iAssert (▷ (⌜Pin (abs_view I)⌝ ∨ T))%I as "#>Hc".
+    { iNext. iEval (rewrite /app_body) in "Hbody".
+      iDestruct "Hbody" as (I') "(Hh & Hp & _)".
+      iDestruct (ghost_map_auth_agree with "Hka Hh") as %<-.
+      iDestruct ("Hcl" with "Hp") as "[_ Hc]". iExact "Hc". }
+    iMod ("Hclose" with "Hbody") as "_".
     iModIntro. iFrame "Hka".
     iSplitR; [ by iPureIntro | ]. iExact "Hc".
   Qed.
@@ -325,23 +324,26 @@ Section PinnedObs.
       destruct (ents !! s) as [c |]; [ by iRight | iApply ("Hmt" with "HT") ]. }
     subst d.
     iMod (inv_acc ⊤ appN with "Hinv") as "[Hbody Hclose]"; [ set_solver | ].
-    iEval (rewrite /app_body) in "Hbody".
-    iDestruct "Hbody" as (I) "(>Hh & Hp & >%Hdom)".
-    iAssert (▷ (app_pred app_run (abs_view I) ∗ (⌜Pin (abs_view I)⌝ ∨ T)))%I
-      with "[Hp]" as "Hpc".
-    { iNext. iApply ("Hcl" with "Hp"). }
-    iDestruct "Hpc" as "[Hp Hc]".
-    iMod "Hc".
-    iDestruct (pobs_elend_astep γfs (1/2)%Qp I (hops !!! k) dqv ents s
-                 with "Hh HF") as %Hae.
-    iMod ("Hclose" with "[Hh Hp]") as "_".
-    { iNext. rewrite /app_body. iExists I. iFrame "Hh Hp".
-      iPureIntro. exact Hdom. }
+    (* CREDIT-FREE at every step index (port-ordinal): what leaves the
+       body's later is a PURE reading or the persistent, timeless [T] -- a
+       persistent assertion sees the whole context and consumes none of it
+       -- and the body goes back exactly as it was opened. *)
+    iAssert (▷ (⌜∃ v, Pin v ∧ astep v (hops !!! k) s = ents !! s⌝ ∨ T))%I
+      as "#>Hc".
+    { iNext. iEval (rewrite /app_body) in "Hbody".
+      iDestruct "Hbody" as (I) "(Hh & Hp & _)".
+      iDestruct ("Hcl" with "Hp") as "[_ [%HP | #HT]]";
+        [ | iRight; iExact "HT" ].
+      iDestruct (pobs_elend_astep γfs (1/2)%Qp I (hops !!! k) dqv ents s
+                   with "Hh HF") as %Hae.
+      iLeft. iPureIntro. exists (abs_view I). split; [ exact HP | exact Hae ]. }
+    iMod ("Hclose" with "Hbody") as "_".
     iModIntro. iFrame "HF".
-    iDestruct "Hc" as "[%HP | #HT]"; last first.
+    iDestruct "Hc" as "[%Hv | #HT]"; last first.
     { destruct (ents !! s) as [c |]; [ by iRight | iApply ("Hmt" with "HT") ]. }
-    destruct (Hpin (abs_view I) HP) as [Hrun _].
-    pose proof (arun_step_tot (abs_view I) (hops !!! 0%nat) (path_elems pl)
+    destruct Hv as (v & HP & Hae).
+    destruct (Hpin v HP) as [Hrun _].
+    pose proof (arun_step_tot v (hops !!! 0%nat) (path_elems pl)
                   hops k s Hrun Hk) as Hst.
     rewrite Hae in Hst. rewrite Hst. by iLeft.
   Qed.
@@ -517,23 +519,26 @@ Section PinnedObs.
       destruct (ents !! s) as [c |]; [ by iRight | iApply "Hfree" ]. }
     destruct Hpd as [_ Hd]. subst d.
     iMod (inv_acc ⊤ appN with "Hinv") as "[Hbody Hclose]"; [ set_solver | ].
-    iEval (rewrite /app_body) in "Hbody".
-    iDestruct "Hbody" as (I) "(>Hh & Hp & >%Hdom)".
-    iAssert (▷ (app_pred app_run (abs_view I) ∗ K ∗ (⌜Pin (abs_view I)⌝ ∨ T)))%I
-      with "[Hp HK]" as "Hpc".
-    { iNext. iApply ("Hcl" with "HK Hp"). }
-    iDestruct "Hpc" as "[Hp [HK Hc]]".
-    iMod "Hc".
-    iDestruct (pobs_elend_astep γfs (1/2)%Qp I d0 dqv ents s
-                 with "Hh HF") as %Hae.
-    iMod ("Hclose" with "[Hh Hp]") as "_".
-    { iNext. rewrite /app_body. iExists I. iFrame "Hh Hp".
-      iPureIntro. exact Hdom. }
+    (* CREDIT-FREE at every step index (port-ordinal): what leaves the
+       body's later is a PURE reading or the persistent, timeless [T] -- a
+       persistent assertion sees the whole context and consumes none of it
+       -- and the body goes back exactly as it was opened. *)
+    iAssert (▷ (⌜∃ v, Pin v ∧ astep v d0 s = ents !! s⌝ ∨ T))%I
+      as "#>Hc".
+    { iNext. iEval (rewrite /app_body) in "Hbody".
+      iDestruct "Hbody" as (I) "(Hh & Hp & _)".
+      iDestruct ("Hcl" with "HK Hp") as "(_ & _ & [%HP | #HT])";
+        [ | iRight; iExact "HT" ].
+      iDestruct (pobs_elend_astep γfs (1/2)%Qp I d0 dqv ents s
+                   with "Hh HF") as %Hae.
+      iLeft. iPureIntro. exists (abs_view I). split; [ exact HP | exact Hae ]. }
+    iMod ("Hclose" with "Hbody") as "_".
     iModIntro. iFrame "HF".
-    iDestruct "Hc" as "[%HP | #HT]"; last first.
+    iDestruct "Hc" as "[%Hv | #HT]"; last first.
     { destruct (ents !! s) as [c |]; [ by iRight | iApply "Hfree" ]. }
+    destruct Hv as (v & HP & Hae).
     assert (Hn : ents !! s = None)
-      by (rewrite -Hae; exact (Hmiss (abs_view I) s HP Hs)).
+      by (rewrite -Hae; exact (Hmiss v s HP Hs)).
     rewrite Hn. iApply "Hfree".
   Qed.
 
@@ -681,23 +686,26 @@ Section PinnedObs.
       destruct (ents !! s) as [c |]; [ by iRight | iApply ("Hmt" with "HT") ]. }
     destruct Hpd as [_ Hd]. subst d.
     iMod (inv_acc ⊤ appN with "Hinv") as "[Hbody Hclose]"; [ set_solver | ].
-    iEval (rewrite /app_body) in "Hbody".
-    iDestruct "Hbody" as (I) "(>Hh & Hp & >%Hdom)".
-    iAssert (▷ (app_pred app_run (abs_view I) ∗ K ∗ (⌜Pin (abs_view I)⌝ ∨ T)))%I
-      with "[Hp HK]" as "Hpc".
-    { iNext. iApply ("Hcl" with "HK Hp"). }
-    iDestruct "Hpc" as "[Hp [HK Hc]]".
-    iMod "Hc". iMod "HK".
-    iDestruct (pobs_elend_astep γfs (1/2)%Qp I d0 dqv ents s
-                 with "Hh HF") as %Hae.
-    iMod ("Hclose" with "[Hh Hp]") as "_".
-    { iNext. rewrite /app_body. iExists I. iFrame "Hh Hp".
-      iPureIntro. exact Hdom. }
+    (* CREDIT-FREE at every step index (port-ordinal): what leaves the
+       body's later is a PURE reading or the persistent, timeless [T] -- a
+       persistent assertion sees the whole context and consumes none of it
+       -- and the body goes back exactly as it was opened. *)
+    iAssert (▷ (⌜∃ v, Pin v ∧ astep v d0 s = ents !! s⌝ ∨ T))%I
+      as "#>Hc".
+    { iNext. iEval (rewrite /app_body) in "Hbody".
+      iDestruct "Hbody" as (I) "(Hh & Hp & _)".
+      iDestruct ("Hcl" with "HK Hp") as "(_ & _ & [%HP | #HT])";
+        [ | iRight; iExact "HT" ].
+      iDestruct (pobs_elend_astep γfs (1/2)%Qp I d0 dqv ents s
+                   with "Hh HF") as %Hae.
+      iLeft. iPureIntro. exists (abs_view I). split; [ exact HP | exact Hae ]. }
+    iMod ("Hclose" with "Hbody") as "_".
     iModIntro. iFrame "HF".
-    iDestruct "Hc" as "[%HP | #HT]"; last first.
+    iDestruct "Hc" as "[%Hv | #HT]"; last first.
     { destruct (ents !! s) as [c |]; [ by iRight | iApply ("Hmt" with "HT") ]. }
+    destruct Hv as (v & HP & Hae).
     assert (Hn : ents !! s = None)
-      by (rewrite -Hae; exact (Hmiss (abs_view I) s HP Hs)).
+      by (rewrite -Hae; exact (Hmiss v s HP Hs)).
     rewrite Hn. iApply ("Hmh" with "HK").
   Qed.
 
@@ -891,23 +899,26 @@ Section PinnedObsAbs.
       destruct (ents !! s) as [c |]; [ by iRight | iApply ("Hmt" with "HT") ]. }
     subst d.
     iMod (inv_acc ⊤ appN with "Hinv") as "[Hbody Hclose]"; [ set_solver | ].
-    iEval (rewrite /app_body) in "Hbody".
-    iDestruct "Hbody" as (I) "(>Hh & Hp & >%Hdom)".
-    iAssert (▷ (app_pred app_run (abs_view I) ∗ (⌜Pin (abs_view I)⌝ ∨ T)))%I
-      with "[Hp]" as "Hpc".
-    { iNext. iApply ("Hcl" with "Hp"). }
-    iDestruct "Hpc" as "[Hp Hc]".
-    iMod "Hc".
-    iDestruct (pobs_elend_astep γfs (1/2)%Qp I (hops !!! k) dqv ents s
-                 with "Hh HF") as %Hae.
-    iMod ("Hclose" with "[Hh Hp]") as "_".
-    { iNext. rewrite /app_body. iExists I. iFrame "Hh Hp".
-      iPureIntro. exact Hdom. }
+    (* CREDIT-FREE at every step index (port-ordinal): what leaves the
+       body's later is a PURE reading or the persistent, timeless [T] -- a
+       persistent assertion sees the whole context and consumes none of it
+       -- and the body goes back exactly as it was opened. *)
+    iAssert (▷ (⌜∃ v, Pin v ∧ astep v (hops !!! k) s = ents !! s⌝ ∨ T))%I
+      as "#>Hc".
+    { iNext. iEval (rewrite /app_body) in "Hbody".
+      iDestruct "Hbody" as (I) "(Hh & Hp & _)".
+      iDestruct ("Hcl" with "Hp") as "[_ [%HP | #HT]]";
+        [ | iRight; iExact "HT" ].
+      iDestruct (pobs_elend_astep γfs (1/2)%Qp I (hops !!! k) dqv ents s
+                   with "Hh HF") as %Hae.
+      iLeft. iPureIntro. exists (abs_view I). split; [ exact HP | exact Hae ]. }
+    iMod ("Hclose" with "Hbody") as "_".
     iModIntro. iFrame "HF".
-    iDestruct "Hc" as "[%HP | #HT]"; last first.
+    iDestruct "Hc" as "[%Hv | #HT]"; last first.
     { destruct (ents !! s) as [c |]; [ by iRight | iApply ("Hmt" with "HT") ]. }
-    pose proof (arun_step_tot (abs_view I) (hops !!! 0%nat) (path_elems pl)
-                  hops k s (Hpin (abs_view I) HP) Hk) as Hst.
+    destruct Hv as (v & HP & Hae).
+    pose proof (arun_step_tot v (hops !!! 0%nat) (path_elems pl)
+                  hops k s (Hpin v HP) Hk) as Hst.
     rewrite Hae in Hst. rewrite Hst. by iLeft.
   Qed.
 
@@ -1090,23 +1101,26 @@ Section PinnedObsPar.
       destruct (ents !! s) as [c |]; [ by iRight | iApply ("Hmt" with "HT") ]. }
     subst d0.
     iMod (inv_acc ⊤ appN with "Hinv") as "[Hbody Hclose]"; [ set_solver | ].
-    iEval (rewrite /app_body) in "Hbody".
-    iDestruct "Hbody" as (I) "(>Hh & Hp & >%Hdom)".
-    iAssert (▷ (app_pred app_run (abs_view I) ∗ (⌜Pin (abs_view I)⌝ ∨ T)))%I
-      with "[Hp]" as "Hpc".
-    { iNext. iApply ("Hcl" with "Hp"). }
-    iDestruct "Hpc" as "[Hp Hc]".
-    iMod "Hc".
-    iDestruct (pobs_elend_astep γfs (1/2)%Qp I (hops !!! k) dqv ents s
-                 with "Hh HF") as %Hae.
-    iMod ("Hclose" with "[Hh Hp]") as "_".
-    { iNext. rewrite /app_body. iExists I. iFrame "Hh Hp".
-      iPureIntro. exact Hdom. }
+    (* CREDIT-FREE at every step index (port-ordinal): what leaves the
+       body's later is a PURE reading or the persistent, timeless [T] -- a
+       persistent assertion sees the whole context and consumes none of it
+       -- and the body goes back exactly as it was opened. *)
+    iAssert (▷ (⌜∃ v, Pin v ∧ astep v (hops !!! k) s = ents !! s⌝ ∨ T))%I
+      as "#>Hc".
+    { iNext. iEval (rewrite /app_body) in "Hbody".
+      iDestruct "Hbody" as (I) "(Hh & Hp & _)".
+      iDestruct ("Hcl" with "Hp") as "[_ [%HP | #HT]]";
+        [ | iRight; iExact "HT" ].
+      iDestruct (pobs_elend_astep γfs (1/2)%Qp I (hops !!! k) dqv ents s
+                   with "Hh HF") as %Hae.
+      iLeft. iPureIntro. exists (abs_view I). split; [ exact HP | exact Hae ]. }
+    iMod ("Hclose" with "Hbody") as "_".
     iModIntro. iFrame "HF".
-    iDestruct "Hc" as "[%HP | #HT]"; last first.
+    iDestruct "Hc" as "[%Hv | #HT]"; last first.
     { destruct (ents !! s) as [c |]; [ by iRight | iApply ("Hmt" with "HT") ]. }
-    pose proof (arun_step_tot (abs_view I) (hops !!! 0%nat) (np_elems pl)
-                  hops k s (Hpin (abs_view I) HP) Hk) as Hst.
+    destruct Hv as (v & HP & Hae).
+    pose proof (arun_step_tot v (hops !!! 0%nat) (np_elems pl)
+                  hops k s (Hpin v HP) Hk) as Hst.
     rewrite Hae in Hst. rewrite Hst. by iLeft.
   Qed.
 
@@ -1232,23 +1246,26 @@ Section PinnedObsPar.
       destruct (ents !! s) as [c |]; [ by iRight | iApply ("Hmt" with "HT") ]. }
     subst d0.
     iMod (inv_acc ⊤ appN with "Hinv") as "[Hbody Hclose]"; [ set_solver | ].
-    iEval (rewrite /app_body) in "Hbody".
-    iDestruct "Hbody" as (I) "(>Hh & Hp & >%Hdom)".
-    iAssert (▷ (app_pred app_run (abs_view I) ∗ K ∗ (⌜Pin (abs_view I)⌝ ∨ T)))%I
-      with "[Hp HK]" as "Hpc".
-    { iNext. iApply ("Hcl" with "HK Hp"). }
-    iDestruct "Hpc" as "[Hp [HK Hc]]".
-    iMod "Hc". iMod "HK".
-    iDestruct (pobs_elend_astep γfs (1/2)%Qp I (hops !!! k) dqv ents s
-                 with "Hh HF") as %Hae.
-    iMod ("Hclose" with "[Hh Hp]") as "_".
-    { iNext. rewrite /app_body. iExists I. iFrame "Hh Hp".
-      iPureIntro. exact Hdom. }
+    (* CREDIT-FREE at every step index (port-ordinal): what leaves the
+       body's later is a PURE reading or the persistent, timeless [T] -- a
+       persistent assertion sees the whole context and consumes none of it
+       -- and the body goes back exactly as it was opened. *)
+    iAssert (▷ (⌜∃ v, Pin v ∧ astep v (hops !!! k) s = ents !! s⌝ ∨ T))%I
+      as "#>Hc".
+    { iNext. iEval (rewrite /app_body) in "Hbody".
+      iDestruct "Hbody" as (I) "(Hh & Hp & _)".
+      iDestruct ("Hcl" with "HK Hp") as "(_ & _ & [%HP | #HT])";
+        [ | iRight; iExact "HT" ].
+      iDestruct (pobs_elend_astep γfs (1/2)%Qp I (hops !!! k) dqv ents s
+                   with "Hh HF") as %Hae.
+      iLeft. iPureIntro. exists (abs_view I). split; [ exact HP | exact Hae ]. }
+    iMod ("Hclose" with "Hbody") as "_".
     iModIntro. iFrame "HF".
-    iDestruct "Hc" as "[%HP | #HT]"; last first.
+    iDestruct "Hc" as "[%Hv | #HT]"; last first.
     { destruct (ents !! s) as [c |]; [ by iRight | iApply ("Hmt" with "HT") ]. }
-    pose proof (arun_step_tot (abs_view I) (hops !!! 0%nat) (np_elems pl)
-                  hops k s (Hpin (abs_view I) HP) Hk) as Hst.
+    destruct Hv as (v & HP & Hae).
+    pose proof (arun_step_tot v (hops !!! 0%nat) (np_elems pl)
+                  hops k s (Hpin v HP) Hk) as Hst.
     rewrite Hae in Hst. rewrite Hst. iLeft. iFrame "HK". by iPureIntro.
   Qed.
 
@@ -1344,23 +1361,26 @@ Section PinnedObsAbsLin.
       destruct (ents !! s) as [c |]; [ by iRight | iApply ("Hmt" with "HT") ]. }
     subst d0.
     iMod (inv_acc ⊤ appN with "Hinv") as "[Hbody Hclose]"; [ set_solver | ].
-    iEval (rewrite /app_body) in "Hbody".
-    iDestruct "Hbody" as (I) "(>Hh & Hp & >%Hdom)".
-    iAssert (▷ (app_pred app_run (abs_view I) ∗ K ∗ (⌜Pin (abs_view I)⌝ ∨ T)))%I
-      with "[Hp HK]" as "Hpc".
-    { iNext. iApply ("Hcl" with "HK Hp"). }
-    iDestruct "Hpc" as "[Hp [HK Hc]]".
-    iMod "Hc". iMod "HK".
-    iDestruct (pobs_elend_astep γfs (1/2)%Qp I (hops !!! k) dqv ents s
-                 with "Hh HF") as %Hae.
-    iMod ("Hclose" with "[Hh Hp]") as "_".
-    { iNext. rewrite /app_body. iExists I. iFrame "Hh Hp".
-      iPureIntro. exact Hdom. }
+    (* CREDIT-FREE at every step index (port-ordinal): what leaves the
+       body's later is a PURE reading or the persistent, timeless [T] -- a
+       persistent assertion sees the whole context and consumes none of it
+       -- and the body goes back exactly as it was opened. *)
+    iAssert (▷ (⌜∃ v, Pin v ∧ astep v (hops !!! k) s = ents !! s⌝ ∨ T))%I
+      as "#>Hc".
+    { iNext. iEval (rewrite /app_body) in "Hbody".
+      iDestruct "Hbody" as (I) "(Hh & Hp & _)".
+      iDestruct ("Hcl" with "HK Hp") as "(_ & _ & [%HP | #HT])";
+        [ | iRight; iExact "HT" ].
+      iDestruct (pobs_elend_astep γfs (1/2)%Qp I (hops !!! k) dqv ents s
+                   with "Hh HF") as %Hae.
+      iLeft. iPureIntro. exists (abs_view I). split; [ exact HP | exact Hae ]. }
+    iMod ("Hclose" with "Hbody") as "_".
     iModIntro. iFrame "HF".
-    iDestruct "Hc" as "[%HP | #HT]"; last first.
+    iDestruct "Hc" as "[%Hv | #HT]"; last first.
     { destruct (ents !! s) as [c |]; [ by iRight | iApply ("Hmt" with "HT") ]. }
-    pose proof (arun_step_tot (abs_view I) (hops !!! 0%nat) (path_elems pl)
-                  hops k s (Hpin (abs_view I) HP) Hk) as Hst.
+    destruct Hv as (v & HP & Hae).
+    pose proof (arun_step_tot v (hops !!! 0%nat) (path_elems pl)
+                  hops k s (Hpin v HP) Hk) as Hst.
     rewrite Hae in Hst. rewrite Hst. iLeft. iFrame "HK". by iPureIntro.
   Qed.
 
@@ -1434,17 +1454,16 @@ Section PinnedObsAbsLin.
     iSplit; [| iExact "HK" ].
     rewrite /aopen_commit_at /pobs_recv. iIntros (I i a) "%Hrow Hka".
     iMod (inv_acc appE appN with "Hinv") as "[Hbody Hclose]"; [ set_solver | ].
-    iEval (rewrite /app_body) in "Hbody".
-    iDestruct "Hbody" as (I') "(>Hh & Hp & >%Hdom)".
-    iDestruct (ghost_map_auth_agree with "Hka Hh") as %<-.
-    iAssert (▷ (app_pred app_run (abs_view I) ∗ K ∗ (⌜Pin (abs_view I)⌝ ∨ T)))%I
-      with "[Hp HK]" as "Hpc".
-    { iNext. iApply ("Hcl" with "HK Hp"). }
-    iDestruct "Hpc" as "[Hp [_ Hc]]".
-    iMod "Hc".
-    iMod ("Hclose" with "[Hh Hp]") as "_".
-    { iNext. rewrite /app_body. iExists I. iFrame "Hh Hp".
-      iPureIntro. exact Hdom. }
+    (* CREDIT-FREE at every step index (port-ordinal): only the pure-or-[T]
+       claim leaves the body's later, agreed against the caller's half
+       inside it; a persistent assertion consumes nothing, and the body
+       goes back exactly as it was opened. *)
+    iAssert (▷ (⌜Pin (abs_view I)⌝ ∨ T))%I as "#>Hc".
+    { iNext. iEval (rewrite /app_body) in "Hbody".
+      iDestruct "Hbody" as (I') "(Hh & Hp & _)".
+      iDestruct (ghost_map_auth_agree with "Hka Hh") as %<-.
+      iDestruct ("Hcl" with "HK Hp") as "(_ & _ & Hc)". iExact "Hc". }
+    iMod ("Hclose" with "Hbody") as "_".
     iModIntro. iFrame "Hka".
     iSplitR; [ by iPureIntro | ]. iExact "Hc".
   Qed.

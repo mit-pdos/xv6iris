@@ -627,10 +627,13 @@ Section UInitCons.
           { rewrite Heq'. exact (cons_state_mknod ents nl i (abs_view I) Hpre). }
           iMod (inv_acc appE appN with "Hinv") as "[Hbody Hclose]";
             [ set_solver | ].
+          (* CREDIT-FREE at every step index (port-ordinal): the claim is
+             TIMELESS here ([HTL]), so the whole body is, and its later
+             strips as one ([exist_timeless] needs no finite index) *)
           iEval (rewrite /app_body) in "Hbody".
-          iDestruct "Hbody" as (I0) "(>Hh & Hp & >%Hdom)".
+          iDestruct "Hbody" as ">Hbody".
+          iDestruct "Hbody" as (I0) "(Hh & Hp & %Hdom)".
           iDestruct (ghost_map_auth_agree with "Hka Hh") as %<-.
-          iDestruct "Hp" as ">Hp".
           iMod ("Hshoot" $! (abs_view I') i with "[%] Hp") as "[Hp Hm]";
             [ exact Hpr | ].
           iMod ("Hclose" with "[Hh Hp]") as "_".
@@ -670,20 +673,24 @@ Section UInitCons.
       rewrite /aarm_commit_at.
       iIntros (I i) "%Hnone %Hsome Hka".
       iMod (inv_acc appE appN with "Hinv") as "[Hbody Hclose]"; [ set_solver | ].
+      (* CREDIT-FREE at every step index (port-ordinal): the claim is
+         TIMELESS here ([HTL]), so the whole body is, and its later strips
+         as one ([exist_timeless] needs no finite index); both laws then
+         run on the claim itself *)
       iEval (rewrite /app_body) in "Hbody".
-      iDestruct "Hbody" as (I0) "(>Hh & Hp & >%Hdom)".
+      iDestruct "Hbody" as ">Hbody".
+      iDestruct "Hbody" as (I0) "(Hh & Hp & %Hdom)".
       iDestruct (ghost_map_auth_agree with "Hka Hh") as %<-.
-      iAssert (▷ (app_pred app_run (abs_view I)
-                  ∗ (⌜Pure (abs_view I)⌝ ∨ T)))%I
-        with "[Hp]" as "Hpc".
-      { iNext. iApply ("Hpure" with "Hp"). }
-      iDestruct "Hpc" as "[Hp Hc]". iMod "Hc".
+      iAssert (app_pred app_run (abs_view I)
+               ∗ (⌜Pure (abs_view I)⌝ ∨ T))%I
+        with "[Hp]" as "[Hp Hc]".
+      { iApply ("Hpure" with "Hp"). }
       (* ...and the credential's own reading of the arm's view, which is
          what the UNARM leg needs at [av0] *)
-      iAssert (▷ (app_pred app_run (abs_view I) ∗ K
-                  ∗ (⌜Pv (abs_view I)⌝ ∨ T)))%I with "[Hp HK]" as "Hpv".
-      { iNext. iApply ("Habs" with "HK Hp"). }
-      iDestruct "Hpv" as "[Hp [HK Hcv]]". iMod "Hcv". iMod "HK".
+      iAssert (app_pred app_run (abs_view I) ∗ K
+               ∗ (⌜Pv (abs_view I)⌝ ∨ T))%I
+        with "[Hp HK]" as "[Hp [HK Hcv]]".
+      { iApply ("Habs" with "HK Hp"). }
       iMod ("Hclose" with "[Hh Hp]") as "_".
       { iNext. rewrite /app_body. iExists I. iFrame "Hh Hp".
         iPureIntro. exact Hdom. }
@@ -715,14 +722,15 @@ Section UInitCons.
        view the unarm owes no side condition at all
        ([FsConsPin.cons_absent_unarm]). *)
     iMod (inv_acc appE appN with "Hinv") as "[Hbody Hclose]"; [ set_solver | ].
+    (* CREDIT-FREE at every step index: the arm leg's form ([HTL]) *)
     iEval (rewrite /app_body) in "Hbody".
-    iDestruct "Hbody" as (I0) "(>Hh & Hp & >%Hdom)".
+    iDestruct "Hbody" as ">Hbody".
+    iDestruct "Hbody" as (I0) "(Hh & Hp & %Hdom)".
     iDestruct (ghost_map_auth_agree with "Hka Hh") as %<-.
-    iAssert (▷ (app_pred app_run (abs_view I) ∗ K
-                ∗ (⌜Pv (abs_view I)⌝ ∨ T)))%I
-      with "[Hp HK0]" as "Hpc".
-    { iNext. iApply ("Habs" with "HK0 Hp"). }
-    iDestruct "Hpc" as "[Hp [HK0 Hc]]". iMod "Hc". iMod "HK0".
+    iAssert (app_pred app_run (abs_view I) ∗ K
+             ∗ (⌜Pv (abs_view I)⌝ ∨ T))%I
+      with "[Hp HK0]" as "[Hp [HK0 Hc]]".
+    { iApply ("Habs" with "HK0 Hp"). }
     iMod ("Hclose" with "[Hh Hp]") as "_".
     { iNext. rewrite /app_body. iExists I. iFrame "Hh Hp".
       iPureIntro. exact Hdom. }

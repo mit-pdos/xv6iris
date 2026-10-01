@@ -426,17 +426,16 @@ Section UkTreeRead.
     iIntros "#Hcl #Hinv". rewrite /tree_read_recv. iApply pf_at_triv.
     rewrite /aread_commit_at. iIntros (I off a d) "%Hpre Hka Hoff".
     iMod (inv_acc appE appN with "Hinv") as "[Hbody Hclose]"; [ set_solver | ].
-    iEval (rewrite /app_body) in "Hbody".
-    iDestruct "Hbody" as (I') "(>Hh & Hp & >%Hdom)".
-    iDestruct (ghost_map_auth_agree with "Hka Hh") as %<-.
-    iAssert (▷ (app_pred app_run (abs_view I) ∗ (⌜Pin (abs_view I)⌝ ∨ T)))%I
-      with "[Hp]" as "Hpc".
-    { iNext. iApply ("Hcl" with "Hp"). }
-    iDestruct "Hpc" as "[Hp Hc]".
-    iMod "Hc".
-    iMod ("Hclose" with "[Hh Hp]") as "_".
-    { iNext. rewrite /app_body. iExists I. iFrame "Hh Hp".
-      iPureIntro. exact Hdom. }
+    (* CREDIT-FREE at every step index (port-ordinal; [PinnedObs.pobs_aopen]'s
+       form): only the pure-or-[T] claim leaves the body's later, agreed
+       against the kernel's half inside it; a persistent assertion consumes
+       nothing, and the body goes back exactly as it was opened. *)
+    iAssert (▷ (⌜Pin (abs_view I)⌝ ∨ T))%I as "#>Hc".
+    { iNext. iEval (rewrite /app_body) in "Hbody".
+      iDestruct "Hbody" as (I') "(Hh & Hp & _)".
+      iDestruct (ghost_map_auth_agree with "Hka Hh") as %<-.
+      iDestruct ("Hcl" with "Hp") as "[_ Hc]". iExact "Hc". }
+    iMod ("Hclose" with "Hbody") as "_".
     iModIntro. iFrame "Hka".
     iSplitL "Hoff"; [iApply (off_ret_of_link with "Hoff") |]. iExact "Hc".
   Qed.

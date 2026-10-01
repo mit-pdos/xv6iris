@@ -2930,11 +2930,15 @@ Section FileClaimEra.
   Proof using .
     intros HE Heq Hcont Hne. iIntros "#Hinv Htk Hkq Hka".
     iMod (inv_acc E appN with "Hinv") as "[Hbody Hclose]"; [ exact HE |].
-    iEval (rewrite /app_body) in "Hbody".
-    iDestruct "Hbody" as (I0) "(>Hh & Hp & >%Hdom)".
+    (* CREDIT-FREE at every step index (port-ordinal): at this instance the
+       claim is TIMELESS ([file_pred_timeless]), so the whole body is, and
+       its later strips as one ([exist_timeless] needs no finite index;
+       only splitting a later does). *)
+    iEval (rewrite /app_body Heq; cbn [app_pred app_run app_names]) in "Hbody".
+    iDestruct "Hbody" as ">Hbody".
+    iDestruct "Hbody" as (I0) "(Hh & Hp & %Hdom)".
     iDestruct (ghost_map_auth_agree with "Hka Hh") as %<-.
-    iEval (rewrite Heq; cbn [app_pred app_run app_names]) in "Hp".
-    iDestruct "Hp" as ">Hp". rewrite /file_pred.
+    rewrite /file_pred.
     iDestruct "Hp" as "[#Ht | (%Hpins & Hc & Hf & Hsy)]".
     { (* TAINTED: the ticket comes back beside the taint *)
       iMod ("Hclose" with "[Hh]") as "_".
@@ -2997,10 +3001,14 @@ Section FileClaimEra.
   Proof using .
     intros HE Heq. iIntros "#Hinv [Hd Htk]".
     iMod (inv_acc E appN with "Hinv") as "[Hbody Hclose]"; [ exact HE |].
-    iEval (rewrite /app_body) in "Hbody".
-    iDestruct "Hbody" as (I0) "(>Hka & Hp & >%Hdom)".
-    iEval (rewrite Heq; cbn [app_pred app_run app_names]) in "Hp".
-    iDestruct "Hp" as ">Hp". rewrite /file_pred.
+    (* CREDIT-FREE at every step index (port-ordinal): at this instance the
+       claim is TIMELESS ([file_pred_timeless]), so the whole body is, and
+       its later strips as one ([exist_timeless] needs no finite index;
+       only splitting a later does). *)
+    iEval (rewrite /app_body Heq; cbn [app_pred app_run app_names]) in "Hbody".
+    iDestruct "Hbody" as ">Hbody".
+    iDestruct "Hbody" as (I0) "(Hka & Hp & %Hdom)".
+    rewrite /file_pred.
     iDestruct "Hp" as "[#Ht | (%Hpins & Hc & Hf & Hsy)]".
     { iMod ("Hclose" with "[Hka]") as "_".
       { iNext. rewrite /app_body. iExists I0. iFrame "Hka".
@@ -3052,10 +3060,14 @@ Section FileClaimEra.
     iDestruct "Hkey" as "[#Hwit | #Ht0]"; last first.
     { iModIntro. by iRight. }
     iMod (inv_acc E appN with "Hinv") as "[Hbody Hclose]"; [ exact HE |].
-    iEval (rewrite /app_body) in "Hbody".
-    iDestruct "Hbody" as (I0) "(>Hka & Hp & >%Hdom)".
-    iEval (rewrite Heq; cbn [app_pred app_run app_names]) in "Hp".
-    iDestruct "Hp" as ">Hp". rewrite /file_pred.
+    (* CREDIT-FREE at every step index (port-ordinal): at this instance the
+       claim is TIMELESS ([file_pred_timeless]), so the whole body is, and
+       its later strips as one ([exist_timeless] needs no finite index;
+       only splitting a later does). *)
+    iEval (rewrite /app_body Heq; cbn [app_pred app_run app_names]) in "Hbody".
+    iDestruct "Hbody" as ">Hbody".
+    iDestruct "Hbody" as (I0) "(Hka & Hp & %Hdom)".
+    rewrite /file_pred.
     iDestruct "Hp" as "[#Ht | (%Hpins & Hc & Hf & Hsy)]".
     { iMod ("Hclose" with "[Hka]") as "_".
       { iNext. rewrite /app_body. iExists I0. iFrame "Hka".
@@ -3121,10 +3133,14 @@ Section FileClaimEra.
   Proof using .
     intros HE Heq Hle. iIntros "#Hinv Hpos".
     iMod (inv_acc E appN with "Hinv") as "[Hbody Hclose]"; [ exact HE |].
-    iEval (rewrite /app_body) in "Hbody".
-    iDestruct "Hbody" as (I0) "(>Hka & Hp & >%Hdom)".
-    iEval (rewrite Heq; cbn [app_pred app_run app_names]) in "Hp".
-    iDestruct "Hp" as ">Hp". rewrite /file_pred.
+    (* CREDIT-FREE at every step index (port-ordinal): at this instance the
+       claim is TIMELESS ([file_pred_timeless]), so the whole body is, and
+       its later strips as one ([exist_timeless] needs no finite index;
+       only splitting a later does). *)
+    iEval (rewrite /app_body Heq; cbn [app_pred app_run app_names]) in "Hbody".
+    iDestruct "Hbody" as ">Hbody".
+    iDestruct "Hbody" as (I0) "(Hka & Hp & %Hdom)".
+    rewrite /file_pred.
     iDestruct "Hp" as "[#Ht | (%Hpins & Hc & Hf & Hsy)]".
     { iMod ("Hclose" with "[Hka]") as "_".
       { iNext. rewrite /app_body. iExists I0. iFrame "Hka".
