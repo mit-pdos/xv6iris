@@ -14,7 +14,8 @@ import MachCSL.WpCsrS
 import MachCSL.SConfPhysDefs
 import MachCSL.WpCsr
 import MachCSL.KCtx
-import MachCSL.WpMmodeAlu
+import MachCSL.AluFacts
+import MachCSL.WpCycleDefs
 
 namespace MachCSL
 
