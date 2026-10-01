@@ -30,7 +30,7 @@ The `fence rw,rw` of the publication needs no new rule:
 kctx-level one.
 -/
 import MachCSL.WpSmodeFrame12
-import MachCSL.WpSmodeAuRules
+import MachCSL.SmodeMemFacts
 import MachCSL.WpDmaCtx2
 
 namespace MachCSL

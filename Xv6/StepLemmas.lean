@@ -1,11 +1,11 @@
 /-
-Xv6: small arithmetic, branch and context facts shared by several proofs --
-bytes compared as the code compares them (`setWidth64_inj`,
-`ite_beq_byte`, ...), the `addiw` counters, and `MachCSL.KCtx.withSpie_twice`.
-One home for lemmas that `printk`, `strlen`, `memcmp`, `pop_off`,
+Xv6: small arithmetic and branch facts shared by several proofs -- bytes
+compared as the code compares them (`setWidth64_inj`, `ite_beq_byte`, ...)
+and the `addiw` counters.  It imports no S-mode rule module, so the
+invariants that name a branch fact do not wait for the rules.  One home for lemmas that `printk`, `strlen`, `memcmp`, `pop_off`,
 `kerneltrap` and `freerange` had each declared for themselves.
 -/
-import MachCSL.WpSmodeIntr
+import MachCSL.AluFacts
 import Xv6.ByteCursor
 
 namespace Xv6
@@ -70,7 +70,15 @@ theorem addiw_add (n m : Nat) (hn : n + m < 2 ^ 31) :
     BitVec.signExtend 64 (BitVec.extractLsb' 0 32 (BitVec.ofNat 64 n + BitVec.ofNat 64 m)) = BitVec.ofNat 64 (n + m) := by
   rw [← BitVec.ofNat_add]
   rw [extractLsb'_ofNat64 _ (by omega)]
-  exact signExtend_ofNat32 _ (by omega)
+  -- `MachCSL.signExtend_ofNat32`, inline: this file does not import the S-mode rules
+  apply BitVec.eq_of_toNat_eq
+  rw [BitVec.toNat_signExtend]
+  have hmsb : (BitVec.ofNat 32 (n + m)).msb = false := by
+    rw [BitVec.msb_eq_decide]; simp only [BitVec.toNat_ofNat, Nat.reducePow]; rw [Nat.mod_eq_of_lt (by omega)]
+    simp; omega
+  rw [hmsb]
+  simp only [Bool.false_eq_true, ite_false, BitVec.toNat_setWidth, BitVec.toNat_ofNat, Nat.reducePow, Nat.add_zero]
+  rw [Nat.mod_eq_of_lt (by omega : (n + m) < 4294967296), Nat.mod_eq_of_lt (by omega : (n + m) < 18446744073709551616)]
 
 theorem addiw_succ (n : Nat) (hn : n + 1 < 2 ^ 31) :
     BitVec.signExtend 64 (BitVec.extractLsb' 0 32 (BitVec.ofNat 64 n + 1#64)) = BitVec.ofNat 64 (n + 1) :=
@@ -95,7 +103,14 @@ theorem addiw_pred (n : Nat) (h1 : 1 ≤ n) (hn : n < 2 ^ 31) :
     BitVec.signExtend 64 (BitVec.extractLsb' 0 32 (BitVec.ofNat 64 n + 0xFFFFFFFFFFFFFFFF#64)) =
       BitVec.ofNat 64 (n - 1) := by
   rw [ofNat_add_neg1' n h1 (by omega), extractLsb'_ofNat64 _ (by omega)]
-  exact signExtend_ofNat32 _ (by omega)
+  apply BitVec.eq_of_toNat_eq
+  rw [BitVec.toNat_signExtend]
+  have hmsb : (BitVec.ofNat 32 (n - 1)).msb = false := by
+    rw [BitVec.msb_eq_decide]; simp only [BitVec.toNat_ofNat, Nat.reducePow]; rw [Nat.mod_eq_of_lt (by omega)]
+    simp; omega
+  rw [hmsb]
+  simp only [Bool.false_eq_true, ite_false, BitVec.toNat_setWidth, BitVec.toNat_ofNat, Nat.reducePow, Nat.add_zero]
+  rw [Nat.mod_eq_of_lt (by omega : (n - 1) < 4294967296), Nat.mod_eq_of_lt (by omega : (n - 1) < 18446744073709551616)]
 
 /-! ## Contexts -/
 

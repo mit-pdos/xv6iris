@@ -78,7 +78,7 @@ handler's own fence -- `DiskInvDefs.diskPayFl`.)
    `cpu ≠ startedPrimary`.
 -/
 import MachCSL.CtxBox
-import MachCSL.WpSmodeFenceFloor
+import MachCSL.ReadAUr
 import Xv6.UartTrace
 import MachCSL.WpStoreOrd
 

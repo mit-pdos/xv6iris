@@ -60,6 +60,7 @@ Imports only definitional files and callee `Spec*` files.
 import Xv6.IcacheTable
 import Xv6.InodeRegionInv
 import Xv6.FsCfgDefs
+import MachCSL.WpSmodeIntr
 
 namespace Xv6
 

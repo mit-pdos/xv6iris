@@ -50,7 +50,7 @@ sleeper the chain's cells, the status byte, the buffer and the block's
 image fragment back.
 -/
 import Xv6.DiskInv
-import MachCSL.WpSmodeFenceFloor
+import MachCSL.ReadAUr
 import Xv6.PtOwnLemmas
 import Xv6.DiskTier
 import MachCSL.SmodeDevDefs

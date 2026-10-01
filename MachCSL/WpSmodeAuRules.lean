@@ -46,30 +46,7 @@ open LeanRV64D LeanRV64D.Functions
 
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 
-/-! ## A two-byte access never straddles a page -/
-
-/-- The page mask keeps a 2-aligned halfword's two bytes together. -/
-theorem page_mask_same2 (va : BitVec 64) (h1 : BitVec.extractLsb' 0 1 va = 0#1) :
-    (va &&& (~~~4095#64 &&& ~~~0#64) == (va + 2#64 - 1#64) &&& (~~~4095#64 &&& ~~~0#64)) = true := by
-  bv_decide
-
-/-- A 2-aligned 2-byte access never straddles a page. -/
-theorem split_on_page_boundary_2 (va : BitVec 64) (h : va.toNat % 2 = 0) :
-    split_on_page_boundary va 2 = pure (2, 0) := by
-  have h1 : BitVec.extractLsb' 0 1 va = 0#1 := by
-    apply BitVec.eq_of_toNat_eq
-    simp only [BitVec.extractLsb'_toNat, Nat.shiftRight_zero, BitVec.toNat_ofNat, Nat.reducePow]
-    omega
-  unfold split_on_page_boundary
-  dsimp only
-  rw [if_pos]
-  · rfl
-  · simp only [Functions.pagesize_bits, Functions.ones, Functions.zeros, Sail.BitVec.updateSubrange,
-      Sail.BitVec.subInt, Sail.BitVec.updateSubrange', Sail.BitVec.length, sail_ones, Sail.BitVec.addInt,
-      Int.cast_ofNat_Int, Int.reduceSub, Int.reduceToNat, Nat.reduceSub, Nat.reduceAdd, BitVec.reduceOfInt,
-      BitVec.zero_eq, BitVec.reduceAllOnes, BitVec.reduceSetWidth, BitVec.reduceZeroExtend,
-      BitVec.setWidth_eq, BitVec.shiftLeft_zero, BitVec.and_allOnes, BitVec.or_zero]
-    exact page_mask_same2 va h1
+-- `page_mask_same2` / `split_on_page_boundary_2` live in `MachCSL.SmodeMemFacts`.
 
 /-! ## The missing physical leaves (widths 1 and 2) -/
 

@@ -42,6 +42,7 @@ import Xv6.SpecCpuid
 import Xv6.SpecTrapinithart
 import Xv6.SpecPlicinithart
 import MachCSL.LockFacts
+import MachCSL.WpSmodeFenceFloor
 
 namespace Xv6
 
