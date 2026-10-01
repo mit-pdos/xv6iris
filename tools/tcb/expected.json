@@ -331,7 +331,8 @@
     "Xv6.UPtDefs",
     "Xv6.UartTrace",
     "Xv6.UserExec",
-    "Xv6.VirtioQueue"],
+    "Xv6.VirtioQueue",
+    "Xv6.ZombEv"],
    "axioms": ["Quot.sound"]},
   {"opaques":
    ["Iris.COFE.OFunctor.Fix.Impl.Tower.iso",

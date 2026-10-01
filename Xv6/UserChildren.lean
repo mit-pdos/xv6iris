@@ -39,6 +39,17 @@ Then the two answers a wait gives, relayed from kwait to the program:
    `cs \ {γ'}`; `sign_extend' 64 w` is `BitVec.signExtend 64 w` (the form
    `SpecKwait` states a0 at); `mword_of_int (-1)` is `-1#32` / `-1#64`;
    `PIDMAX` is `SlotGen.genPidMax` (SlotGen deviation 3); `Z` is `Int`.
+3. **The zombie ledger** (NI-LEDGER-REST, Rocq 2107981b4, design
+   ni-zombie-ledger.md D2/D4): Rocq's `Section ZombLedger` is the section
+   of that name here (`zombLedAuth`/`zombLedLb`/`zombReceipt`, the four
+   lemmas, `zombExit`/`zombReap`), over iris-lean's `MonoList` at
+   `WchG.wzlName` (the camera is `WchGpre.zlG`, SlotGen deviation 8);
+   `_prefix`/`_lb` read `<+:` (Rocq `prefix_of`), and no `Timeless`
+   instances are stated (no Lean caller needs them).  `waitAnsLed` (Rocq
+   `wait_ans_led`) sits in `WaitAnsGen` (it needs `[WchG GF]`), with
+   `waitAnsLed_post` (drop) and `waitAnsLed_of` (build; the `-1` case of
+   the reaping arm refuted because `2^32 - 1 > genPidMax`).  `waitAns` is
+   untouched.
 
 Imports only definitional files.
 -/
@@ -295,6 +306,82 @@ theorem waitWhy_shot (cs : ExtTreeSet GName compare) (gn : GName) (nullst : Bool
 
 end WaitAns
 
+/-! ## The zombie ledger's ghost (Rocq `Section ZombLedger`, NI-LEDGER-REST,
+design ni-zombie-ledger.md D2)
+
+A mono-list of `ZombEv.Zev` at the canonical `WchG.wzlName`.  The authority
+rides `<wait_lock>`'s payload (`WaitInvTies.waitInvResAt`'s last conjunct);
+kexit appends `ZExit` at its ZOMBIE store and kwait `ZReap` at its reap,
+both under the lock.  No tie (ruling R2): the zombie state lives in the
+per-slot locks, so `zombiesOf h` is the zombie set by construction of the
+two proofs.  HERE and not in `WaitInv` because the reap's receipt is part of
+`waitAnsLed` below, and `WaitInv` imports this file (as Rocq). -/
+
+section ZombLedger
+variable {GF : BundledGFunctors} [WchG GF]
+
+/-- The ledger's authoritative history (Rocq `zomb_led_auth`). -/
+def zombLedAuth (h : List Zev) : IProp GF := WchG.wzlName GF ↪●ML h
+/-- A lower bound of the ledger (Rocq `zomb_led_lb`). -/
+def zombLedLb (h : List Zev) : IProp GF := WchG.wzlName GF ↪◯ML h
+
+instance zombLedLb_persistent (h : List Zev) : Persistent (zombLedLb (GF := GF) h) := by
+  unfold zombLedLb; infer_instance
+
+theorem zombLedAuth_lb (h : List Zev) :
+    zombLedAuth (GF := GF) h ⊢ zombLedAuth h ∗ zombLedLb h := by
+  unfold zombLedAuth zombLedLb
+  iintro Ha
+  ihave #Hb := MonoList.lb_own_get (WchG.wzlName GF) _ h $$ Ha
+  isplitl [Ha]
+  · iexact Ha
+  · iexact Hb
+
+theorem zombLedLb_prefix (h h' : List Zev) :
+    zombLedAuth (GF := GF) h ⊢ zombLedLb h' -∗ ⌜h' <+: h⌝ := by
+  unfold zombLedAuth zombLedLb
+  iintro Ha Hb
+  ihave %hv := MonoList.auth_lb_own_valid (WchG.wzlName GF) _ h h' $$ Ha Hb
+  ipureintro; exact hv.2
+
+/-- Two lower bounds of the one ledger are comparable (Rocq `zomb_led_lb_lb`). -/
+theorem zombLedLb_lb (h h' : List Zev) :
+    zombLedLb (GF := GF) h ⊢ zombLedLb h' -∗ ⌜h <+: h' ∨ h' <+: h⌝ := by
+  unfold zombLedLb
+  iintro Ha Hb
+  iapply MonoList.lb_own_valid (WchG.wzlName GF) h h' $$ Ha Hb
+
+theorem zombLedAuth_grow (h : List Zev) (e : Zev) :
+    zombLedAuth (GF := GF) h ⊢ |==> (zombLedAuth (h ++ [e]) ∗ zombLedLb (h ++ [e])) := by
+  unfold zombLedAuth zombLedLb
+  iintro Ha
+  iapply MonoList.auth_own_update_app (WchG.wzlName GF) [e] $$ Ha
+
+/-- The receipt an exit or a reap hands back: event `e` was appended right
+after history `h` (Rocq `zomb_receipt`).  The name is canonical, so it
+carries none. -/
+def zombReceipt (h : List Zev) (e : Zev) : IProp GF := zombLedLb (h ++ [e])
+
+instance zombReceipt_persistent (h : List Zev) (e : Zev) :
+    Persistent (zombReceipt (GF := GF) h e) := by
+  unfold zombReceipt; infer_instance
+
+/-- THE EXIT'S GHOST STEP, kexit's at its ZOMBIE store (actor: the exiting
+process's own proc word; the status it exits with) (Rocq `zomb_exit`). -/
+theorem zombExit (h : List Zev) (act : BitVec 64) (pid : BitVec 32) (xs : Int) :
+    zombLedAuth (GF := GF) h ⊢
+      |==> (zombLedAuth (h ++ [.ZExit act pid xs]) ∗ zombReceipt h (.ZExit act pid xs)) :=
+  zombLedAuth_grow h _
+
+/-- THE REAP'S GHOST STEP, kwait's at its reap (actor: the reaper; the
+reaped child's pid) (Rocq `zomb_reap`). -/
+theorem zombReap (h : List Zev) (act : BitVec 64) (pid : BitVec 32) :
+    zombLedAuth (GF := GF) h ⊢
+      |==> (zombLedAuth (h ++ [.ZReap act pid]) ∗ zombReceipt h (.ZReap act pid)) :=
+  zombLedAuth_grow h _
+
+end ZombLedger
+
 /-! ## The same answer, at the generation -- kwait's own form
 (Rocq `Section WaitAnsGen`) -/
 
@@ -309,6 +396,55 @@ def waitAnsGen (rv : BitVec 32) (xs : Int) (cs cs' : ExtTreeSet GName compare) (
       ⌜cs' = cs \ {γ'} ∧ 1 ≤ rv.toNat ∧ rv.toNat ≤ genPidMax⌝ ∗
       (⌜γ' ∈ cs⌝ ∨ genIsInit gn) ∗
       exitTok γ' rv xs ∗ genUniq cs rv γ')
+
+/-- THE ANSWER WITH THE REAP'S RECEIPT (Rocq `wait_ans_led`, design
+ni-zombie-ledger.md D4): `waitAns` verbatim, with the zombie ledger's
+receipt of the reap -- `ZReap act rv`, appended by the reaper `act` -- as
+the reaping arm's first conjunct.  kwait's led twin
+(`SpecKwait.wp_kwait_led_eb_body`) answers this; `waitAnsLed_post` is the
+step back to the landed row. -/
+def waitAnsLed (rv : BitVec 32) (xs : Int) (cs cs' : ExtTreeSet GName compare) (gn : GName)
+    (nullst : Bool) (pidv : BitVec 32) (act : BitVec 64) : IProp GF :=
+  iprop((⌜rv = -1#32 ∧ cs' = cs⌝ ∗ waitWhy cs gn nullst) ∨
+    ((∃ h : List Zev, zombReceipt h (.ZReap act rv)) ∗
+     ∃ γ' : GName,
+      ⌜cs' = cs \ {γ'} ∧ 1 ≤ rv.toNat ∧ rv.toNat ≤ genPidMax⌝ ∗
+      ⌜γ' ∈ cs ∨ pidv = 1#32⌝ ∗
+      exitTok γ' rv xs ∗ genUniq cs rv γ'))
+
+/-- The landed row is the led one with the receipt dropped (Rocq
+`wait_ans_led_post`). -/
+theorem waitAnsLed_post (rv : BitVec 32) (xs : Int) (cs cs' : ExtTreeSet GName compare) (gn : GName)
+    (nullst : Bool) (pidv : BitVec 32) (act : BitVec 64) :
+    waitAnsLed (GF := GF) rv xs cs cs' gn nullst pidv act ⊢ waitAns rv xs cs cs' gn nullst pidv := by
+  unfold waitAnsLed waitAns
+  iintro (Hneg | ⟨-, Hr⟩)
+  · ileft; iexact Hneg
+  · iright; iexact Hr
+
+/-- ...and the way in: the landed row, plus the receipt wherever a pid came
+back (Rocq `wait_ans_led_of`).  The `-1` answer is never in `[1, PIDMAX]`,
+so the reaping arm of `waitAns` always finds the receipt's arm of the side
+row. -/
+theorem waitAnsLed_of (rv : BitVec 32) (xs : Int) (cs cs' : ExtTreeSet GName compare) (gn : GName)
+    (nullst : Bool) (pidv : BitVec 32) (act : BitVec 64) :
+    waitAns (GF := GF) rv xs cs cs' gn nullst pidv ⊢
+      (⌜rv = -1#32⌝ ∨ ∃ h : List Zev, zombReceipt h (.ZReap act rv)) -∗
+      waitAnsLed rv xs cs cs' gn nullst pidv act := by
+  unfold waitAns waitAnsLed
+  iintro (Hneg | ⟨%γ', %hc, Hr⟩) Hz
+  · ileft; iexact Hneg
+  · icases Hz with (%hm1 | Hz)
+    · subst hm1
+      have h2 := hc.2.2
+      simp [genPidMax] at h2
+    · iright
+      isplitl [Hz]
+      · iexact Hz
+      · iexists γ'
+        isplitr
+        · ipureintro; exact hc
+        · iexact Hr
 
 theorem waitAnsGen_neg (xs : Int) (cs : ExtTreeSet GName compare) (gn : GName) (nullst : Bool) :
     waitWhy (GF := GF) cs gn nullst ⊢ waitAnsGen (-1#32) xs cs cs gn nullst := by

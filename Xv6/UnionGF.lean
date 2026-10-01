@@ -214,6 +214,8 @@ instance ugfHelp : GhostMapG unionGF Nat (GName × BitVec 32) RegMapF := ⟨ugf_
 instance ugfMlKev : MonoListG unionGF Kev := ⟨ugf_slot 121⟩
 -- WchGpre: the pid ledger (inherited from `xv6GF`'s slot 122)
 instance ugfMlPev : MonoListG unionGF Pev := ⟨ugf_slot 122⟩
+-- WchGpre: the zombie ledger (inherited from `xv6GF`'s slot 123)
+instance ugfMlZev : MonoListG unionGF Zev := ⟨ugf_slot 123⟩
 
 -- the union's new cameras
 instance ugfEraPins : GhostMapG unionGF Nat EraPins RegMapF := ⟨ugf_slot 95⟩

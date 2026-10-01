@@ -162,3 +162,34 @@ parent learns.
   the status off the receipt; the dispatcher's wait row then carries
   `ZReap parent rv` to the U tier.  Nobody does yet.
 
+
+## Lean port as landed (2026-10-01)
+
+NI port PI-4 (Rocq 2107981b4).  `Xv6/ZombEv.lean` is the pure vocabulary
+(`Zev` with `ZExit act pid xs | ZReap act pid`, `zombiesOf` as a predicate
+`Int → Prop`, `statusOf` as a function `Int → Option Int`, its domain
+`statusDom`, the snoc lemmas, `statusOf_dom : statusDom (statusOf h) =
+zombiesOf h` by a forward fold induction).  The camera `MonoListG GF Zev` is
+the field `zlG` of `SlotGen.WchGpre` (Rocq `wzl_pre_inG`; xv6GF/unionGF slot
+123) and its name `wzlName` a field of `WchG` (`xv6GF_wchG` gains `γzl`), as
+the pid ledger's.  The ghost (`zombLedAuth`/`zombLedLb`/`zombReceipt`, the
+four lemmas, `zombExit`/`zombReap`) is `UserChildren`'s `section
+ZombLedger`, as Rocq's; `waitAnsLed` (+ `waitAnsLed_post`, `waitAnsLed_of`)
+sits in its `WaitAnsGen` section.  `WaitInvTies`: `childrenBootRows` gains
+`zombLedAuth []` after `tickCnt 0`, `childrenRes_alloc` mints it (statement
+unchanged), `waitInvResAt`'s body gains the trailing `∃ h, zombLedAuth h`
+(statement and `waitLockPay` unchanged; the morph instance re-derived), and
+`waitRes_alloc` takes the empty authority (its statement moved, one caller:
+`MainKvm.mn_pidWait_born`, whose premises gain `zombLedAuth []`;
+`ProofMain.mn_phaseB` threads it, statement unchanged).  kexit appends
+`ZExit (procAddr j) pid (xstateOf status)` in the ghost update of the ZOMBIE
+store's state mirror, both locks held, receipt dropped; kfork frames.
+kwait: `kwWRest` carries the authority packed; `kw_reap_ghost` appends `ZReap
+(procAddr j) pid` and builds the led answer itself (Lean crosses
+`waitAns_of_gen` there already), so `kwAns`/`kwPost` are stated at
+`waitAnsLed … (procAddr j)` and Rocq's side premise `kw_zr` is not needed.
+`SpecKwait`: `wp_kwait_led_eb_body` / `wp_kwait_led_body`, field
+`KWAIT.wp_kwait_led_eb` (Rocq's `Parameter wp_kwait_led_sconf`) and the
+derived `KWAIT.wp_kwait_led`; `ProofKwait.kwait_led_proof` is the proof,
+`kwait_eb_of_led` derives the landed field.  Actor: `procAddr j` (= `k.proc`
+by `hproc`).  No consumer touched.

@@ -100,12 +100,19 @@ party that threads a lock's gname.
    payload (`PidLock.pidLockResAt`) and this file are stated over `[WchG
    GF]` alone, and a camera in `Xv6G` would add an `[Xv6G GF]` binder to
    both.
+8. **The zombie ledger (NI-LEDGER-REST, Rocq 2107981b4).**  Its camera
+   `MonoListG GF Zev` is a field of `WchGpre` (`zlG`, Rocq `wzl_pre_inG`)
+   and its name `wzlName` a field of `WchG` (Rocq `wzl_name`), for the
+   reason of deviation 7 (`<wait_lock>`'s payload is stated over `[WchG
+   GF]`).  The ghost itself (`zombLedAuth` / `zombLedLb` / `zombReceipt`)
+   lives in `UserChildren`, as Rocq's `Section ZombLedger` does.
 
 Imports only definitional files.
 -/
 import Xv6.ChildTok
 import Xv6.ProcGeom
 import Xv6.PidEv
+import Xv6.ZombEv
 
 namespace Xv6
 
@@ -147,9 +154,17 @@ class WchGpre (GF : BundledGFunctors) where
   register (`PidLock.pidLedger`), at the canonical name `wplName`
   (deviation 7). -/
   [plG : MonoListG GF Pev]
+  /-- THE ZOMBIE LEDGER'S CAMERA (Rocq `wzl_pre_inG : inG Σ (mono_listR
+  (leibnizO zev))`, NI-LEDGER-REST, design ni-zombie-ledger.md D2): a
+  mono-list of `ZombEv.Zev`, the actor-labelled history of every exit (with
+  its status) and every reap, whose authority lives in `<wait_lock>`'s
+  payload (`WaitInvTies.waitInvResAt`), at the canonical name `wzlName`
+  (deviation 8). -/
+  [zlG : MonoListG GF Zev]
 
 attribute [reducible, instance] WchGpre.chG WchGpre.orphG WchGpre.sgenG WchGpre.prG WchGpre.ipidG
 attribute [reducible, instance] WchGpre.plG
+attribute [reducible, instance] WchGpre.zlG
 
 /-- Rocq `wchG`: the cameras and their CANONICAL names (the capacity may be
 assumed by adequacy, the NAMES are minted in the boot fupd and the instance
@@ -179,6 +194,11 @@ class WchG (GF : BundledGFunctors) extends WchGpre GF where
   (`pidLedAuth` / `pidLedLb`), born empty in
   `WaitInvTies.childrenRes_alloc`. -/
   wplName : GName
+  /-- THE ZOMBIE LEDGER'S NAME (Rocq `wzl_name`, design ni-zombie-ledger.md
+  D2): the `MonoListG GF Zev` ghost at this name is the zombie ledger
+  (`UserChildren.zombLedAuth` / `zombLedLb`), born empty in
+  `WaitInvTies.childrenRes_alloc`. -/
+  wzlName : GName
 
 /-- AN EIGHTH (Rocq `qeighth`, deviation 2). -/
 abbrev qeighth : Qp := Qp.quarter.half

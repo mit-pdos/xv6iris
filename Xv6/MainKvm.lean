@@ -388,16 +388,18 @@ set_option maxHeartbeats 4000000 in
 after procinit): over `nextpid_res` (the `.data` word at its pinned `1`,
 `pid_lock`'s quarter of every pid cell, the empty registration map, the
 empty pid ledger) and
-over `wait_res` (the parent cells, the children map, no orphans). -/
+over `wait_res` (the parent cells, the children map, no orphans, the zombie
+ledger at the empty history). -/
 theorem mn_pidWait_born [CurCtx] (cpu : CPU) (k : KCtx) :
     kctx cpu k ∗ lockInited pidLockAddr nextpidNameAddr ∗ lockInited waitLockAddr waitLockNameAddr ∗
     wordPointsTo nextpidAddr 4 (DFrac.own 1) 1#32 ∗
     ([∗list] i ∈ List.range NPROC, wordPointsTo (pPid (procAddr i)) 4 pidLockQ 0#32) ∗
-    pidRegAuth ∅ ∗ pidLedAuth [] ∗ parentsResAt curCtx ∗ childrenResBoot ∗ orphansOwn ∅
+    pidRegAuth ∅ ∗ pidLedAuth [] ∗ parentsResAt curCtx ∗ childrenResBoot ∗ orphansOwn ∅ ∗
+    zombLedAuth []
     ⊢ |={⊤}=> (kctx (GF := GF) cpu k ∗
       (∃ γp : GName, isLock γp pidLockAddr "nextpid" pidLockPay) ∗
       (∃ γw : GName, isLock γw waitLockAddr "wait_lock" waitLockPay)) := by
-  iintro ⟨Hk, Hpl, Hwl, Hn, Hp, Ha, Hled, Hpar, Hch, Ho⟩
+  iintro ⟨Hk, Hpl, Hwl, Hn, Hp, Ha, Hled, Hpar, Hch, Ho, Hzl⟩
   icases kctx_kmapStatic _ _ $$ Hk with ⟨#HS, Hk⟩
   icases mn_pidLock_kmap $$ HS with ⟨#Hp0, #Hp16⟩
   icases mn_waitLock_kmap $$ HS with ⟨#Hw0, #Hw16⟩
@@ -406,7 +408,7 @@ theorem mn_pidWait_born [CurCtx] (cpu : CPU) (k : KCtx) :
   icases Hwl with ⟨-, Hwf⟩
   ihave HR := mn_pidRes_boot $$ [$Hn $Hp $Ha $Hled]
   imod kctx_newlock cpu k pidLockAddr "nextpid" pidLockPay $$ [$Hk $HR $Hpf $Hp0 $Hp16] with ⟨Hk, Hpid⟩
-  ihave HW := waitRes_alloc curCtx $$ [$Hpar $Hch $Ho]
+  ihave HW := waitRes_alloc curCtx $$ [$Hpar $Hch $Ho $Hzl]
   ihave HW : iprop(waitLockPay (GF := GF) curCtx) $$ [HW]
   · unfold waitLockPay; iexact HW
   imod kctx_newlock cpu k waitLockAddr "wait_lock" waitLockPay $$ [$Hk $HW $Hwf $Hw0 $Hw16] with ⟨Hk, Hwait⟩

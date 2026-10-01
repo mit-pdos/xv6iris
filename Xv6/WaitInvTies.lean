@@ -46,6 +46,15 @@ part 1 is `Xv6/WaitInv.lean`, whose header and deviations apply here.
    gains `pidLedAuth []` after the register (Rocq's position), and
    `childrenRes_alloc` mints it with `MonoList.own_alloc []` at the new
    `wplName` (its statement unchanged).
+7. **The zombie ledger** (NI-LEDGER-REST, Rocq 2107981b4, design
+   ni-zombie-ledger.md D2): `childrenBootRows` gains `zombLedAuth []` after
+   the tick mirror (Rocq's position), `childrenRes_alloc` mints it with
+   `MonoList.own_alloc []` at the new `wzlName` (its statement unchanged);
+   `waitInvResAt`'s BODY gains the trailing `∃ h, zombLedAuth h`, untied
+   (ruling R2), its statement and `waitLockPay`'s unchanged, the morph
+   instance re-derived over the new body; `waitRes_alloc` (one caller, main)
+   takes the empty authority -- its statement moved, as Rocq's
+   `wait_res_alloc`'s did.
 
 Imports only definitional files.
 -/
@@ -567,10 +576,12 @@ theorem childrenInv_empty [CurCtx] (ξ : CtxId) (ps : Nat → BitVec 64) (gs : N
 ledger at the empty history (design ni-pid-ledger.md D2: main seals it into
 `pid_lock`'s payload beside the register), the tick
 counter's mirror at 0 (design ni-ticks-ledger.md D1: main raises it to the
-cell's boot value before sealing `<tickslock>`), and the NPROC
+cell's boot value before sealing `<tickslock>`), the zombie ledger at the
+empty history (design ni-zombie-ledger.md D2: main seals it into
+`<wait_lock>`'s payload), and the NPROC
 slot-generation wholes (Rocq `children_boot_rows`). -/
 def childrenBootRows : IProp GF :=
-  iprop(childrenResBoot ∗ orphansOwn ∅ ∗ pidRegAuth ∅ ∗ pidLedAuth [] ∗ tickCnt 0 ∗
+  iprop(childrenResBoot ∗ orphansOwn ∅ ∗ pidRegAuth ∅ ∗ pidLedAuth [] ∗ tickCnt 0 ∗ zombLedAuth [] ∗
     [∗list] i ∈ List.range NPROC, ∃ γ0 g : GName,
       chFrag γ0 (procAddr i) ∅ ∗ slotGen (procAddr i) (.own 1) g)
 
@@ -584,27 +595,41 @@ theorem childrenBoot_split : childrenBoot (GF := GF) ⊢ initPidTok 0#32 ∗ chi
 /-- WHAT `wait_lock` PROTECTS, IN ONE EXISTENTIAL (Rocq `wait_res_at`): the
 parent cells, the children rows, the orphan rows, and the invariant tying
 the four columns together.  It is what replaces `WaitLock.waitResAt` as the
-lock's payload (W7-C). -/
+lock's payload (W7-C).  ...AND THE ZOMBIE LEDGER'S AUTHORITY, LAST (design
+ni-zombie-ledger.md D2): every exit and every reap is appended here, under
+this lock.  Untied (ruling R2): nothing in this payload knows which slots are
+ZOMBIE. -/
 def waitInvResAt [CurCtx] (ξ : CtxId) : IProp GF :=
   iprop(∃ (ps : Nat → BitVec 64) (gs : Nat → GName) (m : ChMap) (O : OrphMap),
-    parentsOwnAt ξ ps ∗ childrenOwnAt m ∗ orphansOwn O ∗ childrenInvAt ξ ps gs m O)
+    parentsOwnAt ξ ps ∗ childrenOwnAt m ∗ orphansOwn O ∗ childrenInvAt ξ ps gs m O ∗
+      ∃ h : List Zev, zombLedAuth h)
 
 instance waitInvResAt_morph [CurCtx] : CtxMorph (GF := GF) (waitInvResAt (GF := GF)) :=
   @instCtxMorphExists hlc GF _ _ (fun ps ξ => iprop(∃ (gs : Nat → GName) (m : ChMap) (O : OrphMap),
-      parentsOwnAt ξ ps ∗ childrenOwnAt m ∗ orphansOwn O ∗ childrenInvAt ξ ps gs m O))
+      parentsOwnAt ξ ps ∗ childrenOwnAt m ∗ orphansOwn O ∗ childrenInvAt ξ ps gs m O ∗
+        ∃ h : List Zev, zombLedAuth h))
     (fun ps => @instCtxMorphExists hlc GF _ _ (fun gs ξ => iprop(∃ (m : ChMap) (O : OrphMap),
-        parentsOwnAt ξ ps ∗ childrenOwnAt m ∗ orphansOwn O ∗ childrenInvAt ξ ps gs m O))
+        parentsOwnAt ξ ps ∗ childrenOwnAt m ∗ orphansOwn O ∗ childrenInvAt ξ ps gs m O ∗
+          ∃ h : List Zev, zombLedAuth h))
       (fun gs => @instCtxMorphExists hlc GF _ _ (fun m ξ => iprop(∃ (O : OrphMap),
-          parentsOwnAt ξ ps ∗ childrenOwnAt m ∗ orphansOwn O ∗ childrenInvAt ξ ps gs m O))
+          parentsOwnAt ξ ps ∗ childrenOwnAt m ∗ orphansOwn O ∗ childrenInvAt ξ ps gs m O ∗
+            ∃ h : List Zev, zombLedAuth h))
         (fun m => @instCtxMorphExists hlc GF _ _ (fun O ξ => iprop(
-            parentsOwnAt ξ ps ∗ childrenOwnAt m ∗ orphansOwn O ∗ childrenInvAt ξ ps gs m O))
+            parentsOwnAt ξ ps ∗ childrenOwnAt m ∗ orphansOwn O ∗ childrenInvAt ξ ps gs m O ∗
+              ∃ h : List Zev, zombLedAuth h))
           (fun O => @instCtxMorphSep hlc GF _ (fun ξ => parentsOwnAt ξ ps)
-            (fun ξ => iprop(childrenOwnAt m ∗ orphansOwn O ∗ childrenInvAt ξ ps gs m O))
+            (fun ξ => iprop(childrenOwnAt m ∗ orphansOwn O ∗ childrenInvAt ξ ps gs m O ∗
+              ∃ h : List Zev, zombLedAuth h))
             (parentsOwnAt_morph ps)
             (@instCtxMorphSep hlc GF _ (fun _ => childrenOwnAt m)
-              (fun ξ => iprop(orphansOwn O ∗ childrenInvAt ξ ps gs m O)) (instCtxMorphConst _)
-              (@instCtxMorphSep hlc GF _ (fun _ => orphansOwn O) (fun ξ => childrenInvAt ξ ps gs m O)
-                (instCtxMorphConst _) (childrenInvAt_morph ps gs m O)))))))
+              (fun ξ => iprop(orphansOwn O ∗ childrenInvAt ξ ps gs m O ∗ ∃ h : List Zev, zombLedAuth h))
+              (instCtxMorphConst _)
+              (@instCtxMorphSep hlc GF _ (fun _ => orphansOwn O)
+                (fun ξ => iprop(childrenInvAt ξ ps gs m O ∗ ∃ h : List Zev, zombLedAuth h))
+                (instCtxMorphConst _)
+                (@instCtxMorphSep hlc GF _ (fun ξ => childrenInvAt ξ ps gs m O)
+                  (fun _ => iprop(∃ h : List Zev, zombLedAuth h))
+                  (childrenInvAt_morph ps gs m O) (instCtxMorphConst _))))))))
 
 /-- what the boot chain hands main: the parent half, out of the NPROC
 parent cells the image owns, pinned at zero (Rocq `parents_res_of_cells`,
@@ -621,11 +646,12 @@ theorem parentsRes_of_cells [CurCtx] (ξ : CtxId) :
 
 /-- THE PAIRING, in main's own update: EVERY TIE IS VACUOUS HERE (no cell
 written, every row empty, no orphans); the generation column is arbitrary
-(Rocq `wait_res_alloc`). -/
+(Rocq `wait_res_alloc`).  ...and the zombie ledger's authority, at the
+empty history (design ni-zombie-ledger.md D2), off `childrenBootRows`. -/
 theorem waitRes_alloc [CurCtx] (ξ : CtxId) :
-    parentsResAt (GF := GF) ξ ∗ childrenResBoot ∗ orphansOwn ∅ ⊢ waitInvResAt ξ := by
+    parentsResAt (GF := GF) ξ ∗ childrenResBoot ∗ orphansOwn ∅ ∗ zombLedAuth [] ⊢ waitInvResAt ξ := by
   unfold parentsResAt childrenResBoot waitInvResAt childrenInvAt
-  iintro ⟨⟨%ps, Hps, %hz⟩, ⟨%m, Hm, %hm0⟩, Ho⟩
+  iintro ⟨⟨%ps, Hps, %hz⟩, ⟨%m, Hm, %hm0⟩, Ho, Hzl⟩
   iexists ps, (fun _ => 0), m, ∅
   isplitl [Hps]
   · iexact Hps
@@ -633,6 +659,9 @@ theorem waitRes_alloc [CurCtx] (ξ : CtxId) :
   · iexact Hm
   isplitl [Ho]
   · iexact Ho
+  isplitr [Hzl]
+  rotate_left 1
+  · iexists []; iexact Hzl
   isplitr
   · iapply genHalves_zeros ps _ hz
   isplitr
@@ -786,11 +815,14 @@ theorem childrenRes_alloc {hlc : HasLC} [MachGS hlc GF]
   -- ...and the pid ledger, at the empty history (design ni-pid-ledger.md
   -- D2): no pid has been handed out
   imod MonoList.own_alloc (GF := GF) ([] : List Pev) with ⟨%γpl, Hpl, -⟩
+  -- ...and the zombie ledger, at the empty history (design
+  -- ni-zombie-ledger.md D2): nothing has exited
+  imod MonoList.own_alloc (GF := GF) ([] : List Zev) with ⟨%γzl, Hzl, -⟩
   imodintro
   iexists ({ wchName := γ, worphName := γo, wsgName := γsg, wprName := γpr, wipName := γip,
-             npidName := γnp, wtkName := γtk, wplName := γpl } : WchG GF)
+             npidName := γnp, wtkName := γtk, wplName := γpl, wzlName := γzl } : WchG GF)
   unfold childrenBoot childrenBootRows childrenResBoot childrenOwnAt orphansOwn pidRegAuth
-    pidLedAuth initPidTok nextpidPend tickCnt
+    pidLedAuth zombLedAuth initPidTok nextpidPend tickCnt
   isplitr [Hnp]
   · isplitl [Hip]
     · iexact Hip
@@ -808,6 +840,8 @@ theorem childrenRes_alloc {hlc : HasLC} [MachGS hlc GF]
     · iexact Hpl
     isplitl [Htk]
     · iexact Htk
+    isplitl [Hzl]
+    · iexact Hzl
     ihave H := BigSepL.bigSepL_sep_eqv.mpr $$ [Hrows Hsg]
     · isplitl [Hrows]
       · iexact Hrows

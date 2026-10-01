@@ -73,6 +73,19 @@ quarter to `kw_reap` as a premise; here the ghost lemma borrows it from
 `exitTok_pid` + `genPid_agree` (Rocq destructs the escrow and uses
 `gen_pid_kq_agree`).
 
+THE ZOMBIE LEDGER (NI-LEDGER-REST, Rocq 2107981b4, design
+ni-zombie-ledger.md D4).  `kwWRest` carries `<wait_lock>`'s trailing `∃ h,
+zombLedAuth h` packed (Rocq's `kw_pay`), so the six acquires and the scan do
+not change.  `kw_reap_ghost` appends `ZReap (procAddr j) pid` beside the two
+column moves and folds the receipt into the answer (`waitAnsLed_of`).
+Deviation (placement, as the crossing above): Rocq keeps `wait_ans_gen`
+inside and threads a side premise `kw_zr` to the contract's exit; here the
+answer is built inside `kw_reap_ghost`, so `kwAns` and `kwPost` are stated at
+`waitAnsLed … (procAddr j)` directly (the three `-1` arms build its left arm,
+`kw_ans_neg_ghost`) and no `kw_zr` exists.  The led contract is the proof
+(`kwait_led_proof`, field `wp_kwait_led_eb`), the landed `wp_kwait_eb` its
+corollary (`kwait_eb_of_led`, `waitAnsLed_post`).
+
 EITHER ENTRY SIE (Rocq `cpu_own 0 eb`; `KWAIT.wp_kwait_eb`).  The caller
 brings the complement `trapCsrsExt`/`cpuClaimExt`; the prologue, `myproc`
 and the entry `acquire(&wait_lock)` run at the caller's index (the pair
@@ -397,30 +410,31 @@ section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 /-- `wait_lock`'s payload beside the parent cells: the children map, the
-orphan column, and the invariant tying the four columns (Rocq `kw_pay ps`
-without `parents_own_at`). -/
+orphan column, the invariant tying the four columns, and the zombie ledger's
+authority (Rocq `kw_pay ps` without `parents_own_at`; the ledger carried
+existentially, as Rocq's, so the six acquires do not change). -/
 def kwWRest (ξ : CtxId) (ps : Nat → BitVec 64) : IProp GF :=
   iprop(∃ (gs : Nat → GName) (m : ChMap) (O : OrphMap),
-    childrenOwnAt m ∗ orphansOwn O ∗ childrenInvAt ξ ps gs m O)
+    childrenOwnAt m ∗ orphansOwn O ∗ childrenInvAt ξ ps gs m O ∗ ∃ h : List Zev, zombLedAuth h)
 
 theorem kw_wait_pay_elim (ξ : CtxId) :
     waitLockPay (GF := GF) ξ ⊢ ∃ parents, waitResAt ξ parents ∗ kwWRest ξ parents := by
   unfold waitLockPay waitInvResAt kwWRest waitResAt parentsOwnAt
-  iintro ⟨%ps, %gs, %m, %O, Hps, Hch, Ho, Hci⟩
+  iintro ⟨%ps, %gs, %m, %O, Hps, Hch, Ho, Hci, Hzl⟩
   iexists ps
   isplitl [Hps]
   · iexact Hps
   iexists gs, m, O
-  iframe Hch Ho Hci
+  iframe Hch Ho Hci Hzl
 
 theorem kw_wait_pay_intro (ξ : CtxId) (parents : Nat → BitVec 64) :
     waitResAt (GF := GF) ξ parents ∗ kwWRest ξ parents ⊢ waitLockPay ξ := by
   unfold waitLockPay waitInvResAt kwWRest waitResAt parentsOwnAt
-  iintro ⟨Hps, %gs, %m, %O, Hch, Ho, Hci⟩
+  iintro ⟨Hps, %gs, %m, %O, Hch, Ho, Hci, Hzl⟩
   iexists parents, gs, m, O
   isplitl [Hps]
   · iexact Hps
-  iframe Hch Ho Hci
+  iframe Hch Ho Hci Hzl
 
 /-- The proc-lock payload as a λ. -/
 theorem kw_proc_pay_elim (Γ : SchedNames) (ξ : CtxId) (j : Nat) :
@@ -442,7 +456,9 @@ sealed pid -/
 def kwG (j : Nat) (pid : BitVec 32) (V : ProcPriv) (cs : ExtTreeSet GName compare) : IProp GF :=
   iprop(kwaitGen (procAddr j) pid V.gen ∗ chFrag V.chg (procAddr j) cs ∗ initPidIs 1#32)
 
-/-- the cells-level post (`kwCellsEbBody`'s `wpNext`) -/
+/-- the cells-level post (`kwCellsEbBody`'s `wpNext`), at the LED answer
+(`waitAnsLed … (procAddr j)`, design ni-zombie-ledger.md D4): the cells-level
+contract is the led one, and `kwait_proof` derives the landed field. -/
 def kwPost (cpu : CPU) (k : KCtx) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (cs : ExtTreeSet GName compare) : IProp GF :=
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd)
@@ -450,7 +466,7 @@ def kwPost (cpu : CPU) (k : KCtx) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
     ⌜calleeSaved k.regs R' ∧ R' 10#5 = BitVec.signExtend 64 rv ∧ V.upt.extSz V.sz P' ∧ d ≤ 4 ∧
       kwaitAns rv (k.regs 10#5) d ∧
       umMapped P' (k.regs 10#5).toNat d⌝ -∗
-    waitAns rv (xstateVal xw) cs cs' V.gen (decide (k.regs 10#5 = 0#64)) pid -∗
+    waitAnsLed rv (xstateVal xw) cs cs' V.gen (decide (k.regs 10#5 = 0#64)) pid (procAddr j) -∗
     kwaitGen (procAddr j) pid V.gen -∗ chFrag V.chg (procAddr j) cs' -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
@@ -476,11 +492,12 @@ def kwCellsEbBody (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
   kwPost cpu k j pid V M cs
   ⊢ wpLoop (GF := GF) cpu
 
-/-- the answer the post receives, bundled with the rows it hands back -/
+/-- the answer the post receives (led: the reap's receipt rides the reaping
+arm), bundled with the rows it hands back -/
 def kwAns (j : Nat) (pid : BitVec 32) (V : ProcPriv) (cs : ExtTreeSet GName compare)
     (rv xw : BitVec 32) (nullst : Bool) : IProp GF :=
   iprop(∃ cs' : ExtTreeSet GName compare,
-    waitAns rv (xstateVal xw) cs cs' V.gen nullst pid ∗
+    waitAnsLed rv (xstateVal xw) cs cs' V.gen nullst pid (procAddr j) ∗
     kwaitGen (procAddr j) pid V.gen ∗ chFrag V.chg (procAddr j) cs')
 
 /-- The three `-1` exits: the row does not move, the reason is `waitWhy`. -/
@@ -491,7 +508,9 @@ theorem kw_ans_neg_ghost (j : Nat) (pid : BitVec 32) (V : ProcPriv) (cs : ExtTre
   iintro ⟨#Hwhy, Hkg, Hrow, -⟩
   iexists cs
   iframe Hkg Hrow
-  iapply waitAns_neg (xstateVal xw) cs V.gen nullst pid $$ Hwhy
+  ihave Hn := waitAns_neg (xstateVal xw) cs V.gen nullst pid $$ Hwhy
+  iapply waitAnsLed_of (-1#32) (xstateVal xw) cs cs V.gen nullst pid (procAddr j) $$ Hn
+  ileft; ipureintro; rfl
 
 /-- A `keep` form of `genPid_kq_agree` against an escrow. -/
 theorem kw_genPid_exitTok (g : GName) (pide pid0 : BitVec 32) (xs : Int) :
@@ -536,7 +555,7 @@ theorem kw_reap_ghost (j n : Nat) (hj : j < NPROC) (hn : n < NPROC)
   have hpj : procAddr j ≠ 0#64 := procAddr_nonzero hj
   iintro ⟨Hw, Hg, Hxs, Hq, Hdorm⟩
   unfold kwWRest kwG kwaitGen
-  icases Hw with ⟨%gs, %m, %O, Hch, Ho, Hci⟩
+  icases Hw with ⟨%gs, %m, %O, Hch, Ho, Hci, %hz, Hzl⟩
   icases Hg with ⟨⟨⟨%Q, Hkq, #Hmy⟩, Hpriv⟩, Hrow, #Hipis⟩
   icases kw_dormant_freeprocIn (procAddr n) pid0 $$ [Hq Hdorm] with
     ⟨Hq, %Vf, %Mf, Hfin, Hgha, %xsv, Hxb, Hesc⟩
@@ -596,11 +615,19 @@ theorem kw_reap_ghost (j n : Nat) (hj : j < NPROC) (hn : n < NPROC)
   imod childrenOwn_upd m V.chg (procAddr j) cs (cs \ {Vf.gen}) $$ [Hch Hrow] with ⟨Hch, Hrow⟩
   · iframe Hch Hrow
   imod orphans_del O (procAddr j) Vf.gen $$ Ho with Ho
+  -- ...AND THE ZOMBIE LEDGER RECORDS THE REAP (design ni-zombie-ledger.md
+  -- D4): the reaper `procAddr j` took pid `pide`; the receipt joins the answer
+  imod zombReap hz (procAddr j) pide $$ Hzl with ⟨Hzl, #Hzr⟩
+  ihave Hans := waitAnsLed_of pide (xstateVal xs) cs (cs \ {Vf.gen}) V.gen nullst pid (procAddr j)
+    $$ Hans [Hzr]
+  · iright; iexists hz; iexact Hzr
   imodintro
-  isplitl [Hch Ho Hci]
+  isplitl [Hch Ho Hci Hzl]
   · iexists gs, (PartialMap.insert m V.chg (procAddr j, cs \ {Vf.gen})),
       (PartialMap.insert O (procAddr j) (orphRow O (procAddr j) \ {Vf.gen}))
     iframe Hch Ho Hci
+    iexists _
+    iexact Hzl
   isplitl [Hans Hkq Hpriv Hrow]
   · unfold kwAns kwaitGen
     iexists (cs \ {Vf.gen})
@@ -671,16 +698,16 @@ theorem kw_nokids_ghost (j : Nat) (hj : j < NPROC) (parents : Nat → BitVec 64)
       ⌜cs = ∅⌝ ∗ kwWRest curCtx parents ∗ kwG j pid V cs := by
   have hpj : procAddr j ≠ 0#64 := procAddr_nonzero hj
   unfold kwWRest kwG
-  iintro ⟨⟨%gs, %m, %O, Hch, Ho, Hci⟩, Hkg, Hrow, #Hipis⟩
+  iintro ⟨⟨%gs, %m, %O, Hch, Ho, Hci, Hzl⟩, Hkg, Hrow, #Hipis⟩
   icases waitInv_keep (childrenOwn_lookup m V.chg (procAddr j) cs) $$ [Hch Hrow] with ⟨%hm, Hch, Hrow⟩
   · iframe Hch Hrow
   icases waitInv_keep (childrenInv_empty curCtx parents gs m O V.chg (procAddr j) cs hpj hscan hm)
     $$ Hci with ⟨%hce, Hci⟩
   isplitr
   · ipureintro; exact hce.1
-  isplitl [Hch Ho Hci]
+  isplitl [Hch Ho Hci Hzl]
   · iexists gs, m, O
-    iframe Hch Ho Hci
+    iframe Hch Ho Hci Hzl
   iframe Hkg Hrow Hipis
 
 end
@@ -2940,14 +2967,28 @@ theorem kw_procGen_split (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (g : GN
 
 end
 
-theorem kwait_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (CO : COPYOUT)
-    (FP : FREEPROC) (KL : KILLED) (SP : SLEEP_PREPARE) (SL : SLEEP) : KWAIT :=
-  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ X Γ _ cpu k γw γp γl γk γ j pid V M cs
-      hj hproc hK hnoff htier => by
+section
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+  [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
+  [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+  [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [X : CurCtx]
+
+/-- **THE LED FORM, the proof of record** (Rocq `wp_kwait_led_sconf`, design
+ni-zombie-ledger.md D4): the cells-level body (whose post is already led) with
+the whole block lent around it. -/
+theorem kwait_led_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (CO : COPYOUT)
+    (FP : FREEPROC) (KL : KILLED) (SP : SLEEP_PREPARE) (SL : SLEEP)
+    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (cpu : CPU) (k : KCtx) (γw γp γl : GName) (γk : KmemNames) (γ : FileNames) (j : Nat) (pid : BitVec 32)
+    (V : ProcPriv) (M : Nat → List (BitVec 8)) (cs : ExtTreeSet GName compare)
+    (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : kwaitSlots ≤ k.avail)
+    (hnoff : k.noff = 0) (htier : k.tier = KTier.kpt) :
+    wp_kwait_led_eb_body (hlc := hlc) (GF := GF) Γ cpu k γw γp γl γk γ j pid V M cs
+      hj hproc hK hnoff htier := by
   have h := kwait_cells MP AC RE CO FP KL SP SL (hlc := hlc) (GF := GF) Γ cpu k γw γp γl γk j pid V M cs
     hj hproc hK hnoff htier
   unfold kwCellsEbBody kwPost at h
-  unfold wp_kwait_eb_body
+  unfold wp_kwait_led_eb_body
   iintro ⟨Hk, Hpc, #Hpinv, Hte, Hce, #Hlw, #Hlp, #Hlk, Hav, Hblk, Hrow, #Hipis, HΦ⟩
   icases kctx_tier cpu k $$ Hk with ⟨%hct, Hk⟩
   have hkpt : curTier = KTier.kpt := hct.symm.trans htier
@@ -2961,6 +3002,43 @@ theorem kwait_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (CO : COPYOUT)
   ihave Hgen := Hgw $$ Hkg
   ihave Hblk := Hback $$ %{ V with upt := P' } %_ [] Hn Hgen
   · ipureintro; exact ⟨rfl, rfl, rfl, rfl⟩
-  iapply HK $$ %spie %spp %R' %P' %rv %xw %d %cs' %hp Hans Hrow Hk Hpc Hte Hce Hblk⟩
+  iapply HK $$ %spie %spp %R' %P' %rv %xw %d %cs' %hp Hans Hrow Hk Hpc Hte Hce Hblk
+
+/-- **THE LANDED CONTRACT, a corollary of the led form** (Rocq
+`wp_kwait_sconf` from `wp_kwait_led_sconf`): the receipt is dropped
+(`UserChildren.waitAnsLed_post`). -/
+theorem kwait_eb_of_led
+    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (cpu : CPU) (k : KCtx) (γw γp γl : GName) (γk : KmemNames) (γ : FileNames) (j : Nat) (pid : BitVec 32)
+    (V : ProcPriv) (M : Nat → List (BitVec 8)) (cs : ExtTreeSet GName compare)
+    (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : kwaitSlots ≤ k.avail)
+    (hnoff : k.noff = 0) (htier : k.tier = KTier.kpt)
+    (h : wp_kwait_led_eb_body (hlc := hlc) (GF := GF) Γ cpu k γw γp γl γk γ j pid V M cs
+      hj hproc hK hnoff htier) :
+    wp_kwait_eb_body (hlc := hlc) (GF := GF) Γ cpu k γw γp γl γk γ j pid V M cs
+      hj hproc hK hnoff htier := by
+  unfold wp_kwait_led_eb_body at h
+  unfold wp_kwait_eb_body
+  iintro ⟨H0, H1, H2, H3, H4, H5, H6, H7, H8, H9, H10, H11, HΦ⟩
+  iapply h
+  iframe H0 H1 H2 H3 H4 H5 H6 H7 H8 H9 H10 H11
+  iapply wpNext_mono $$ HΦ
+  iintro %cpu' HK %spie %spp %R' %P' %rv %xw %d %cs' %hp Hans Hrow Hk Hpc Hte Hce Hblk
+  ihave Hans := waitAnsLed_post rv (xstateVal xw) cs cs' V.gen _ pid (procAddr j) $$ Hans
+  iapply HK $$ %spie %spp %R' %P' %rv %xw %d %cs' %hp Hans Hrow Hk Hpc Hte Hce Hblk
+
+end
+
+/-- `kwait`'s interface: the led field is the proof (`kwait_led_proof`), the
+landed one its corollary (`kwait_eb_of_led`). -/
+theorem kwait_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (CO : COPYOUT)
+    (FP : FREEPROC) (KL : KILLED) (SP : SLEEP_PREPARE) (SL : SLEEP) : KWAIT :=
+  ⟨fun {_ _} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Γ _ cpu k γw γp γl γk γ j pid V M cs
+      hj hproc hK hnoff htier =>
+    kwait_eb_of_led Γ cpu k γw γp γl γk γ j pid V M cs hj hproc hK hnoff htier
+      (kwait_led_proof MP AC RE CO FP KL SP SL Γ cpu k γw γp γl γk γ j pid V M cs hj hproc hK hnoff htier),
+   fun {_ _} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Γ _ cpu k γw γp γl γk γ j pid V M cs
+      hj hproc hK hnoff htier =>
+    kwait_led_proof MP AC RE CO FP KL SP SL Γ cpu k γw γp γl γk γ j pid V M cs hj hproc hK hnoff htier⟩
 
 end Xv6

@@ -1601,7 +1601,7 @@ theorem kf_wait_fork [CurCtx] (i : Nat) (hi : i < NPROC) (pa : BitVec 64) (g γp
         (wordAtN curCtx (pParent (procAddr i)) 8 (DFrac.own 1) pa -∗ waitInvResAt curCtx) ∗
         chFrag γp pa (cs ∪ {g})) := by
   unfold waitInvResAt
-  iintro ⟨⟨%ps, %gs, %m, %O, Hpo, Hch, Ho, Hci⟩, Hsg, Hpr, #Hgs, #Hgp, Hrow⟩
+  iintro ⟨⟨%ps, %gs, %m, %O, Hpo, Hch, Ho, Hci, Hzl⟩, Hsg, Hpr, #Hgs, #Hgp, Hrow⟩
   icases waitInv_keep (childrenInv_no_entry curCtx ps gs m O i g hi) $$ [Hci Hsg] with ⟨%hno, Hci, Hsg⟩
   · isplitl [Hci]
     · iexact Hci
@@ -1637,7 +1637,7 @@ theorem kf_wait_fork [CurCtx] (i : Nat) (hi : i < NPROC) (pa : BitVec 64) (g γp
   · ipureintro; exact hfresh
   isplitl [Hcell]
   · iexists (ps i); iexact Hcell
-  isplitl [Hpoback Hch Ho Hci]
+  isplitl [Hpoback Hch Ho Hci Hzl]
   · iintro Hc
     ihave Hpo := Hpoback $$ %pa Hc
     iexists (fun x => if x = i then pa else ps x), (fun x => if x = i then g else gs x),
@@ -1648,7 +1648,9 @@ theorem kf_wait_fork [CurCtx] (i : Nat) (hi : i < NPROC) (pa : BitVec 64) (g γp
     · iexact Hch
     isplitl [Ho]
     · iexact Ho
+    isplitl [Hci]
     · iexact Hci
+    · iexact Hzl
   · iexact Hrow
 
 /-- `p->cwd`'s reference, opened to its slot (idup's `a0`). -/

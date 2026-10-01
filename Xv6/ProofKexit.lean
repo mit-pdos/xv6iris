@@ -84,6 +84,14 @@ Deviations from Rocq ProofKexit.v: (the pid cell lent to the fs callees is
 a quarter, as Rocq's `proc_priv_cwd_pid` lends -- batch 8-P); the ghost steps under
 `wait_lock` sit after the acquire's register bookkeeping rather than at the
 exact Rocq instruction (they are pure ghost updates, order-insensitive).
+
+THE ZOMBIE LEDGER (NI-LEDGER-REST, Rocq 2107981b4, design
+ni-zombie-ledger.md D2/R1): `<wait_lock>`'s payload carries `∃ h,
+zombLedAuth h` last; at the ZOMBIE store, with both locks held, the exit
+appends `ZExit (procAddr j) pid (xstateOf status)` (`UserChildren.zombExit`
+-- the actor is Rocq's `pj`, the status the escrow's own argument) in the
+same ghost update as the state mirror's step; kexit has no post, so the
+receipt is dropped.  No contract moved.
 -/
 import Xv6.SpecKexit
 import Xv6.SpecMyproc
@@ -968,9 +976,10 @@ theorem kx_rest (AC : ACQUIRE) (RE : RELEASE) (RP : REPARENT) (WU : WAKEUP) (SC 
   ihave Hpc := (kx_pcIs_jump cpu _ _ (KA.«kexit» + 0x6c#64) (by decide)) $$ Hpc
   ihave HW := (show waitLockPay (GF := GF) curCtx ⊢
       ∃ (ps : Nat → BitVec 64) (gs : Nat → GName) (m : ChMap) (O : OrphMap),
-        parentsOwnAt curCtx ps ∗ childrenOwnAt m ∗ orphansOwn O ∗ childrenInvAt curCtx ps gs m O from by
+        parentsOwnAt curCtx ps ∗ childrenOwnAt m ∗ orphansOwn O ∗ childrenInvAt curCtx ps gs m O ∗
+          ∃ h : List Zev, zombLedAuth h from by
     unfold waitLockPay waitInvResAt; exact .rfl) $$ HR
-  icases HW with ⟨%parents, %gs, %mc, %O, HW, Hchm, Ho, Hci⟩
+  icases HW with ⟨%parents, %gs, %mc, %O, HW, Hchm, Ho, Hci, %hz, Hzl⟩
   ihave HW := (show parentsOwnAt (GF := GF) curCtx parents ⊢ waitResAt curCtx parents from by
     unfold parentsOwnAt waitResAt; exact .rfl) $$ HW
   -- THE CHILDREN MOVE (Rocq `kx_park`): the dying process's row is emptied
@@ -1153,6 +1162,11 @@ theorem kx_rest (AC : ACQUIRE) (RE : RELEASE) (RP : REPARENT) (WU : WAKEUP) (SC 
   -- the mirror follows the cell: RUNNING → ZOMBIE
   iapply wpLoop_bupd
   imod (pstateWhole_update Γ (procAddr j) RUNNING ZOMBIE) $$ Hwhole with Hwhole
+  -- THE ZOMBIE LEDGER RECORDS THE EXIT (design ni-zombie-ledger.md D2,
+  -- ruling R1), here, at the ZOMBIE store, with BOTH locks held: actor
+  -- `procAddr j`, this process's pid, and the status the escrow is keyed at.
+  -- kexit has no post, so the receipt is dropped.
+  imod zombExit hz (procAddr j) pid (xstateOf status) $$ Hzl with ⟨Hzl, -⟩
   imodintro
   -- the held p->lock at ZOMBIE, kept aside through the release
   ihave Hrest := kx_procPubRest_join (procAddr j) kl _ pid $$ [$Hkilled $Hxstate $Hpidpub $Hkrow]
@@ -1196,12 +1210,16 @@ theorem kx_rest (AC : ACQUIRE) (RE : RELEASE) (RP : REPARENT) (WU : WAKEUP) (SC 
     iapply wpNext_off_intro
     iintro %R' Hk Hp %hcs
     iapply Hcont $$ %R' Hk Hp %hcs
-  ihave HWpay : waitLockPay (GF := GF) curCtx $$ [HWrep Hchm Ho Hci]
+  ihave HWpay : waitLockPay (GF := GF) curCtx $$ [HWrep Hchm Ho Hci Hzl]
   case' _ =>
     unfold waitLockPay waitInvResAt
     iexists (rpMap (procAddr j) ip parents), gs, PartialMap.insert mc V.chg (procAddr j, ∅),
       opMap (procAddr j) ip O cs
-    iframe Hchm Ho Hci
+    isplitr [Hchm Ho Hci Hzl]
+    rotate_left 1
+    · iframe Hchm Ho Hci
+      iexists _
+      iexact Hzl
     have hfe : (fun i => if i = j then reparented parents (procAddr j) ip j
         else reparented parents (procAddr j) ip i) = rpMap (procAddr j) ip parents := by
       funext i; by_cases h : i = j
