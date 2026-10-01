@@ -1554,7 +1554,9 @@ Section EndOpBlocks.
               with "Hcg Hcnt Htext Hpc [Hlock]").
     all: try lkbelow.
     { iEval (rewrite HE4a0). iExact "Hlock". }
-    iIntros (CIDb1 Hsb1) "_"; iIntros (ms macq) "%Hmsfacts Hcg Hpc %Hacq Htok HRres _ Hcnt Hpay".
+    (* acquire's credit is kept: the ghost commit below spends it on the crash
+       invariant's later ([LogGhostCommit.log_ghost_commit_loop]) *)
+    iIntros (CIDb1 Hsb1) "Hlc"; iIntros (ms macq) "%Hmsfacts Hcg Hpc %Hacq Htok HRres _ Hcnt Hpay".
     assert (Hpc50 : ret_pc (E4 !!! Regidx Rra : mword 64) = mword_of_int (KernelSyms.end_op + 0x50)).
     { rewrite HE4ra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpc50) in "Hpc".
@@ -1613,7 +1615,7 @@ Section EndOpBlocks.
       as (Lq Mq) "[Hq Hqclose]".
     iDestruct (log_help_extract with "Hhelp") as (Qs) "[Hhooks Hflip]".
     iApply (log_ghost_commit_loop _ Qs γ bn γfs cov logstart dev Lq Mq
-              with "Hlctx Hq Hstok Hhooks").
+              with "Hlctx Hlc Hq Hstok Hhooks").
     iIntros "Hq Hstok HQs".
     iDestruct ("Hqclose" with "Hq") as "[Htxa Hbatch]".
     (* ===== +0x50 sw zero,32(s1) : committing := 0 ===== *)
@@ -2167,11 +2169,13 @@ Section EndOpBlocks.
                                  ltac:(apply lookup_lt_Some in Hv; lia));
                       exact (HLw i v Hv))
                 with "Hseamg Hregc Hswlb Hmirc Hepoch"). }
-    iIntros (CIDb1 Hsb1) "_"; iIntros (mf1 bs1) "%Hcs1 Hcg Hcnt Hextc Hextm Hpc Hppid
+    iIntros (CIDb1 Hsb1) "Hlc"; iIntros (mf1 bs1) "%Hcs1 Hcg Hcnt Hextc Hextm Hpc Hppid
                                   Hncell HW HauthL Hhdr %Hhdrn1 %Hhdec1 Hu1 HQ1".
-    (* the mirror half back, and the era's token, still under the write's
-       later: it is stripped at the [c.j] into [eo_tail] below (sync K3-3) *)
-    iDestruct "HQ1" as "(>Hmirc & Hstok)".
+    (* the mirror half back, and the era's token, under the write's later.
+       The token is opaque (not timeless), so at ordinal step indices the
+       later does not split over the pair ([later_sep_1] is finite-index
+       only): the write's continuation credit strips it whole (port-ordinal) *)
+    iMod (lc_fupd_elim_later with "Hlc HQ1") as "[Hmirc Hstok]".
     (* ---- THE COMMIT'S PICTURE, NAMED.  The header row is the image
        write_head just laid down; every slot is untouched, so the copy
        loop's row survives the commit verbatim. ---- *)
@@ -2725,7 +2729,6 @@ Section EndOpBlocks.
               B3 (K - 8)%nat eb ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (eoi_120 with "Htext"). }
-    (* the jump's later strips the token's (sync K3-3) *)
     iNext. iIntros (CIDa10 Hsa10) "_". iIntros "Hcg Hpc".
     assert (Htgt120 : add_vec (mword_of_int (KernelSyms.end_op + 0x120) : mword 64)
                         (sign_extend' 64 (sign_extend' 21

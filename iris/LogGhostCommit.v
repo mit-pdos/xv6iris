@@ -104,12 +104,15 @@ Section LogGhostCommit.
   (* A [mWP e -∗ mWP e] rule: at ANY expression of this generation, with the
      batch quiescent (the loan in hand) and the era's token, fire the
      waiters' hooks at a fresh durable pair at the unchanged committed map.
-     The loan and the token come back unchanged, beside each hook's [Q]. *)
+     The loan and the token come back unchanged, beside each hook's [Q].
+     The credit pays the crash invariant's later ([HartCustody.wp_crash_fupd]):
+     the composite it guards is not timeless at ordinal step indices. *)
   Lemma log_ghost_commit (e : mexpr) (Qs : list (iProp Σ))
       (γ : log_names) (bn : bio_names) (γfs : fs_names) (cov : gset Z) (ls : Z)
       (dev : mword 32) (L : gmap Z (list (bv 8))) (M : log_mirror) :
     thread_gen e = Some gen_id ->
     log_ctx γ bn γfs cov ls dev -∗
+    £ 1 -∗
     log_quiet γ γfs cov ls L M -∗
     riscv_sync_tok gen_id -∗
     ([∗ list] Q ∈ Qs, riscv_sync_hook gen_id Q) -∗
@@ -117,7 +120,7 @@ Section LogGhostCommit.
        ([∗ list] Q ∈ Qs, Q) -∗ mWP e) -∗
     mWP e.
   Proof using .
-    intros Hg. iIntros "#Hctx Hq HT HQs Hk".
+    intros Hg. iIntros "#Hctx Hlc Hq HT HQs Hk".
     iPoseProof (log_ctx_gen_cert with "Hctx") as "#Hcert".
     iPoseProof (log_ctx_crash_inv with "Hctx") as "#Hcinv".
     iPoseProof (log_ctx_swap with "Hctx") as "#Hswlb".
@@ -130,19 +133,20 @@ Section LogGhostCommit.
     iApply (wp_crash_fupd e
               (log_quiet γ γfs cov ls L M ∗ riscv_sync_tok gen_id ∗
                ([∗ list] Q ∈ Qs, Q))%I Hg
-              with "Hcert Hcinv [Hq HT HQs] [Hk]");
+              with "Hcert Hcinv Hlc [Hq HT HQs] [Hk]");
       last first.
     { iIntros "(Hq & HT & HQs)". iApply ("Hk" with "Hq HT HQs"). }
     iIntros (n Hn) "Hsa Hc".
     (* ---- 1. the crash slot, through the seam, into the record and the
        old guest ---- *)
     iDestruct "Hseam" as "[Hto Hfrom]".
-    iAssert (▷ P_fs_comp G cov ls)%I with "[Hc]" as "Hc".
-    { iNext. iApply ("Hto" with "Hc"). }
+    (* the predicate arrives unlatered (the custody fupd's credit stripped
+       the crash invariant's later), so the composite opens here, guest
+       included: its guest name [gt_o] is not pinned by anything timeless,
+       so this could not happen under the later at ordinal step indices *)
+    iDestruct ("Hto" with "Hc") as "Hc".
     rewrite {1}/P_fs_comp.
-    iMod (bi.later_exist_except_0 with "Hc") as (gt_o) "Hc".
-    iDestruct "Hc" as "[Hany HG]".
-    iMod "Hany".
+    iDestruct "Hc" as (gt_o) "[Hany HG]".
     rewrite /P_fs_any_at /P_fs_named_at.
     iDestruct "Hany" as (dk) "(Himg & %Hext & Hrec)".
     (* ---- 2. the record's snapshot slot at the quiescent picture ---- *)
@@ -189,6 +193,7 @@ Section LogGhostCommit.
       (γ : log_names) (bn : bio_names) (γfs : fs_names) (cov : gset Z) (ls : Z)
       (dev : mword 32) (L : gmap Z (list (bv 8))) (M : log_mirror) :
     log_ctx γ bn γfs cov ls dev -∗
+    £ 1 -∗
     log_quiet γ γfs cov ls L M -∗
     riscv_sync_tok gen_id -∗
     ([∗ list] Q ∈ Qs, riscv_sync_hook gen_id Q) -∗
