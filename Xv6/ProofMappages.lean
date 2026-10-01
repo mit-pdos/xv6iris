@@ -7,6 +7,11 @@ under `mappagesArgs`), the cursor set-up, then the body as a loop by
 induction on the pages left: one `walk(pagetable, a, 1)` per page, the
 level-0 entry read (zero, by `mappagesArgs`) and written with the leaf.
 Stated at either interrupt index, as `walk` is.
+
+THE LEND (permit sweep L2, Rocq 78f9234b8): `walk` does not take it yet,
+so the general contract frames it through the continuation once, at entry
+(`SlotGen.actLend_cont_frame_x`), and returns it at `ke`; the counted
+corollary passes it to the general one.
 -/
 import Xv6.SpecMappages
 import Xv6.SpecWalk
@@ -858,12 +863,15 @@ theorem mappages_epi [CurCtx] (cpu cur : CPU) (k : KCtx) (γk : KmemNames)
 
 set_option maxHeartbeats 4000000 in
 theorem mappages_any_proof (W : WALK) : MAPPAGES_ANY :=
-  ⟨fun {hlc GF} _ _ _ cpu k γl γk on t n perm hnoff hK hlk hroot hargs hperm hmask hrwx hwf hnd
+  ⟨fun {hlc GF} _ _ _ _ cpu k γl γk on t n perm ke hnoff hK hlk hroot hargs hperm hmask hrwx hwf hnd
       hpgt => by
   obtain ⟨hvaal, hpaal, hsize, hn1, hvr, hpr, hblk⟩ := hargs
   unfold wp_mappages_any_body
   simp only [mappagesAddr]
-  iintro ⟨Hk, Hpc, #Hlk, Htree, Hav, HΦ⟩
+  iintro ⟨Hk, Hpc, #Hlk, Htree, Hav, Hlend, HΦ⟩
+  -- the lend (permit sweep L2): `walk` does not take it yet, so it is
+  -- framed through the continuation once, here
+  ihave HΦ := actLend_cont_frame_x _ _ _ _ _ _ _ _ _ $$ HΦ Hlend
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   have hK10 : 10 ≤ k.avail := by omega
   have hvash : k.regs 11#5 <<< 52 = 0#64 := MachCSL.va_aligned _ hvaal
@@ -1060,18 +1068,18 @@ theorem mappages_any_proof (W : WALK) : MAPPAGES_ANY :=
 failed would have emptied the allocator, and a run consumes at most the
 nodes `missingRun` counts. -/
 theorem mappages_of_any (MA : MAPPAGES_ANY) : MAPPAGES :=
-  ⟨fun {hlc GF} _ _ _ cpu k γl γk nb t n perm hnoff hK hlk hroot hargs hperm hmask hrwx hwf hnd
+  ⟨fun {hlc GF} _ _ _ _ cpu k γl γk nb t n perm ke hnoff hK hlk hroot hargs hperm hmask hrwx hwf hnd
       hpgt hcount => by
   unfold wp_mappages_body
-  have hany := MA.wp_mappages_any (hlc := hlc) (GF := GF) cpu k γl γk (some nb) t n perm hnoff hK
+  have hany := MA.wp_mappages_any (hlc := hlc) (GF := GF) cpu k γl γk (some nb) t n perm ke hnoff hK
     hlk hroot hargs hperm hmask hrwx hwf hnd hpgt
   unfold wp_mappages_any_body at hany
-  iintro ⟨Hk, Hpc, #Hlk, Htree, Hav, HΦ⟩
+  iintro ⟨Hk, Hpc, #Hlk, Htree, Hav, Hlend, HΦ⟩
   iapply hany
   iframe #
-  iframe Hk Hpc Htree Hav
+  iframe Hk Hpc Htree Hav Hlend
   iapply wpNext_mono _ _ _ _ _ $$ HΦ
-  iintro %c' HΦ %spie %spp %R' %fresh %hsp Hk Hpc Htree Hav %hpost
+  iintro %c' HΦ %spie %spp %R' %fresh %hsp Hk Hpc Hlend Htree Hav %hpost
   obtain ⟨hcs, hsup, hnd2, hpg2, harm⟩ := hpost
   rcases harm with ⟨h0, hfull⟩ | ⟨-, -, hz⟩
   · have hrun : (t.mapRun (vpnOf (k.regs 11#5)) (BitVec.extractLsb' 12 44 (k.regs 13#5))
@@ -1081,7 +1089,7 @@ theorem mappages_of_any (MA : MAPPAGES_ANY) : MAPPAGES :=
     have hlen : fresh.length = t.missingRun (vpnOf (k.regs 11#5)) n :=
       PtRun.mapRun_len_full n t _ _ perm fresh hrun
     rw [show availSub (some nb) fresh.length = some (nb - fresh.length) from rfl] at *
-    iapply HΦ $$ %spie %spp %R' %fresh %hsp Hk Hpc Htree Hav
+    iapply HΦ $$ %spie %spp %R' %fresh %hsp Hk Hpc Hlend Htree Hav
     ipureintro
     exact ⟨hcs, h0, hlen, hrun, hnd2, hpg2⟩
   · exfalso

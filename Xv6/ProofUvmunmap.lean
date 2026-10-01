@@ -15,6 +15,10 @@ Boolean `df` deciding whether `do_free` is set: at `df = false` the page
 resources (`umMap`) and the allocator (`unFree`) are `emp` and the
 interrupt state is untouched, so the raw contract's exit context is the
 caller's.
+
+THE LEND (permit sweep L2, Rocq 78f9234b8): `walk`/`kfree` do not take it
+yet, so each contract frames it through the continuation once, at entry
+(`SlotGen.actLend_cont_frame` / `_r`), and returns it at `ke`.
 -/
 import Xv6.SpecUvmunmap
 import Xv6.SpecWalk
@@ -1002,9 +1006,10 @@ end
 
 set_option maxHeartbeats 4000000 in
 theorem uvmunmap_proof (W : WALK_NOALLOC) (KF : KFREE) : UVMUNMAP where
-  wp_uvmunmap_raw := fun {hlc GF} _ _ _ cpu k root L n hK hroot hal hn hrange hfree => by
+  wp_uvmunmap_raw := fun {hlc GF} _ _ _ _ cpu k root L n ke hK hroot hal hn hrange hfree => by
     unfold wp_uvmunmap_raw_body
-    iintro ⟨Hk, Hpc, Htree, HΦ⟩
+    iintro ⟨Hk, Hpc, Htree, Hlend, HΦ⟩
+    ihave HΦ := actLend_cont_frame_r _ _ _ _ _ _ _ _ $$ HΦ Hlend
     ihave Hum : umMap (∅ : RegMapF (BitVec 64)) (fun _ => ([] : List (BitVec 8))) $$ []
     case' _ => iapply (umMap_empty _).2; iempintro
     ihave Hfree : unFree false 0 ⟨0, 0⟩ $$ []
@@ -1025,10 +1030,11 @@ theorem uvmunmap_proof (W : WALK_NOALLOC) (KF : KFREE) : UVMUNMAP where
       intro j _ w hw
       rw [get?_empty] at hw
       exact absurd hw (by simp)
-  wp_uvmunmap_free := fun {hlc GF} _ _ _ cpu k γl γk P M n hnoff hK hlk hroot hal hn hrange
+  wp_uvmunmap_free := fun {hlc GF} _ _ _ _ cpu k γl γk P M n ke hnoff hK hlk hroot hal hn hrange
       hfree => by
     unfold wp_uvmunmap_free_body
-    iintro ⟨Hk, Hpc, #Hlk, Hav, Hproc, HΦ⟩
+    iintro ⟨Hk, Hpc, #Hlk, Hav, Hproc, Hlend, HΦ⟩
+    ihave HΦ := actLend_cont_frame _ _ _ _ _ _ _ _ _ $$ HΦ Hlend
     icases procPtAt_elim P M $$ Hproc with ⟨%hwf, Htree, Hum⟩
     ihave Hum := umPages_to_umMap P M $$ Hum
     ihave Hfree : unFree true γl γk $$ [Hav]
@@ -1075,10 +1081,11 @@ set_option maxHeartbeats 4000000 in
 altitude): the generic body at `df = true` with the leaf map and the page
 map both `P.um`, so no trampoline or trapframe leaf is owned. -/
 theorem uvmunmap_bare_proof (W : WALK_NOALLOC) (KF : KFREE) : UVMUNMAP_BARE where
-  wp_uvmunmap_bare := fun {hlc GF} _ _ _ cpu k γl γk P M n hnoff hK hlk hwf hroot hal hn hrange
+  wp_uvmunmap_bare := fun {hlc GF} _ _ _ _ cpu k γl γk P M n ke hnoff hK hlk hwf hroot hal hn hrange
       hfree => by
     unfold wp_uvmunmap_bare_body
-    iintro ⟨Hk, Hpc, #Hlk, Hav, Htree, Hum, HΦ⟩
+    iintro ⟨Hk, Hpc, #Hlk, Hav, Htree, Hum, Hlend, HΦ⟩
+    ihave HΦ := actLend_cont_frame _ _ _ _ _ _ _ _ _ $$ HΦ Hlend
     ihave Hum := umPages_to_umMap P M $$ Hum
     ihave Hfree : unFree true γl γk $$ [Hav]
     case' _ =>

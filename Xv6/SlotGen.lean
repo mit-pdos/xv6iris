@@ -123,6 +123,10 @@ party that threads a lock's gname.
    returned lend, then the tail -- Lean's ring-one contracts take the lend
    back right after the return pc (Rocq: as the third premise, after
    `sie_cap_gpr` and `cpu_own`, which Lean's `kctx` bundles).
+   Two more shapes (permit sweep L2): `actLend_cont_frame_x`, the same
+   with a fourth bound value after `R'` (`mappages`' `fresh`), and
+   `actLend_cont_frame_r`, `∀ R'` with two premises (`uvmunmap`'s raw
+   form, which keeps the interrupt bits).
 
 Imports only definitional files.
 -/
@@ -447,6 +451,11 @@ theorem actLend_zero (k : Nat) : ⊢@{IProp GF} actLend 0#64 k := by
   ileft
   ipureintro; rfl
 
+/-- `actLend_zero` at a proc word KNOWN to be zero (the boot chain's `hp0`,
+permit sweep L2). -/
+theorem actLend_of_zero (p : BitVec 64) (hp : p = 0#64) (k : Nat) : ⊢@{IProp GF} actLend p k := by
+  subst hp; exact actLend_zero k
+
 /-- Rocq `act_lend_of_cnt`. -/
 theorem actLend_of_cnt (p : BitVec 64) (k : Nat) : actCnt (GF := GF) p k ⊢ actLend p k := by
   unfold actLend
@@ -508,6 +517,72 @@ theorem actLend_cont_frame (sie : Bool) (p : BitVec 64) (cpu : CPU) (p' : BitVec
   unfold wpNext
   iintro H Hl %cpu' %h %spie %spp %R' HA HB HC
   iapply H $$ %cpu' %h %spie %spp %R' HA HB HC
+  iexists ke
+  iframe Hl
+  ipureintro; exact Nat.le_refl ke
+
+/-- The lend in the shape a contract on the cone hands back, at its own
+count (permit sweep L2: what a ring member holds between its calls). -/
+theorem actLend_ret_intro (p : BitVec 64) (ke : Nat) :
+    actLend (GF := GF) p ke ⊢ ∃ k' : Nat, ⌜ke ≤ k'⌝ ∗ actLend p k' := by
+  iintro Hl
+  iexists ke
+  iframe Hl
+  ipureintro; exact Nat.le_refl ke
+
+/-- ...and the bounds composed (`ke ≤ k1 ≤ k'`): a lend returned by a
+callee that was handed it at `k1 ≥ ke` (permit sweep L2). -/
+theorem actLend_ret_weaken (p : BitVec 64) {ke k1 : Nat} (h : ke ≤ k1) :
+    (∃ k' : Nat, ⌜k1 ≤ k'⌝ ∗ actLend (GF := GF) p k') ⊢ ∃ k' : Nat, ⌜ke ≤ k'⌝ ∗ actLend p k' := by
+  iintro ⟨%k', %hk', Hl⟩
+  iexists k'
+  iframe Hl
+  ipureintro; exact Nat.le_trans h hk'
+
+/-- `actLend_cont_frame` for a lend ALREADY in the returned shape (`∃ k' ≥
+ke`, what a ring member holds after a callee that took it; permit sweep
+L2): framed into the continuation of a callee that does not take it. -/
+theorem actLend_cont_frame_ret (sie : Bool) (p : BitVec 64) (cpu : CPU) (p' : BitVec 64) (ke : Nat)
+    (A B C T : CPU → Bool → Bool → RegMap → IProp GF) :
+    wpNext sie p cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
+      A cpu' spie spp R' -∗ B cpu' spie spp R' -∗ C cpu' spie spp R' -∗
+      (∃ k' : Nat, ⌜ke ≤ k'⌝ ∗ actLend p' k') -∗ T cpu' spie spp R')) ⊢
+    (∃ k' : Nat, ⌜ke ≤ k'⌝ ∗ actLend p' k') -∗
+    wpNext sie p cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
+      A cpu' spie spp R' -∗ B cpu' spie spp R' -∗ C cpu' spie spp R' -∗ T cpu' spie spp R')) := by
+  unfold wpNext
+  iintro H Hl %cpu' %h %spie %spp %R' HA HB HC
+  iapply H $$ %cpu' %h %spie %spp %R' HA HB HC Hl
+
+/-- `actLend_cont_frame` at a continuation that binds one more value after
+`R'` (`mappages`' freshly allocated pages, permit sweep L2). -/
+theorem actLend_cont_frame_x {α : Type} (sie : Bool) (p : BitVec 64) (cpu : CPU) (p' : BitVec 64)
+    (ke : Nat) (A B C T : CPU → Bool → Bool → RegMap → α → IProp GF) :
+    wpNext sie p cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (x : α),
+      A cpu' spie spp R' x -∗ B cpu' spie spp R' x -∗ C cpu' spie spp R' x -∗
+      (∃ k' : Nat, ⌜ke ≤ k'⌝ ∗ actLend p' k') -∗ T cpu' spie spp R' x)) ⊢
+    actLend p' ke -∗
+    wpNext sie p cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (x : α),
+      A cpu' spie spp R' x -∗ B cpu' spie spp R' x -∗ C cpu' spie spp R' x -∗
+      T cpu' spie spp R' x)) := by
+  unfold wpNext
+  iintro H Hl %cpu' %h %spie %spp %R' %x HA HB HC
+  iapply H $$ %cpu' %h %spie %spp %R' %x HA HB HC
+  iexists ke
+  iframe Hl
+  ipureintro; exact Nat.le_refl ke
+
+/-- `actLend_cont_frame` at a continuation `∀ R'` with two premises (the
+context and the return pc; `uvmunmap`'s raw form, permit sweep L2). -/
+theorem actLend_cont_frame_r (sie : Bool) (p : BitVec 64) (cpu : CPU) (p' : BitVec 64) (ke : Nat)
+    (A B T : CPU → RegMap → IProp GF) :
+    wpNext sie p cpu (fun cpu' => iprop(∀ (R' : RegMap),
+      A cpu' R' -∗ B cpu' R' -∗ (∃ k' : Nat, ⌜ke ≤ k'⌝ ∗ actLend p' k') -∗ T cpu' R')) ⊢
+    actLend p' ke -∗
+    wpNext sie p cpu (fun cpu' => iprop(∀ (R' : RegMap), A cpu' R' -∗ B cpu' R' -∗ T cpu' R')) := by
+  unfold wpNext
+  iintro H Hl %cpu' %h %R' HA HB
+  iapply H $$ %cpu' %h %R' HA HB
   iexists ke
   iframe Hl
   ipureintro; exact Nat.le_refl ke

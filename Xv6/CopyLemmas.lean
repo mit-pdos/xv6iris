@@ -4,6 +4,8 @@ kernel/vm.c): the small arithmetic / branch-folding / sign-extension facts,
 the callee-call rules (`walkaddr`, `vmfault`, `memmove`) and the register /
 `withSpie` bookkeeping that all three proofs share.  A lemma file: it imports
 only Spec and definitional files, and is imported by the `Proof*` files.
+The `vmfault` rule carries the callee's lend (permit sweep L2, Rocq
+78f9234b8).
 -/
 
 import Xv6.SpecWalkaddr
@@ -112,15 +114,16 @@ theorem co_walkaddr_call (WA : WALKADDR) [Xv6G GF] [CurCtx]
   simp only [walkaddrAddr] at h
   exact h
 
-theorem co_vmfault_call (VF : VMFAULT) [Xv6G GF] [CurCtx]
+theorem co_vmfault_call (VF : VMFAULT) [Xv6G GF] [WchG GF] [CurCtx]
     (c : CPU) (k' : KCtx) (γl : GName) (γk : KmemNames) (P : UPtd) (M : Nat → List (BitVec 8))
     (hnoff' : k'.noff + 1 < 2 ^ 31) (hK' : vmfaultSlots ≤ k'.avail) (hlk' : "kmem" ∉ k'.locks)
-    (hroot' : k'.regs 10#5 = pageAddr P.root) (hsz' : (k'.regs 11#5).toNat ≤ 2 ^ 38) :
+    (hroot' : k'.regs 10#5 = pageAddr P.root) (hsz' : (k'.regs 11#5).toNat ≤ 2 ^ 38) (ke : Nat) :
     kctx c k' ∗ pcIs c KA.«vmfault» ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
-    kallocAvail γk none ∗ procPtAt P M ∗
+    kallocAvail γk none ∗ procPtAt P M ∗ actLend k'.proc ke ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
       ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
+      (∃ k1 : Nat, ⌜ke ≤ k1⌝ ∗ actLend k'.proc k1) -∗
       ((⌜R' 10#5 = 0#64⌝ ∗ procPtAt P M) ∨
        (∃ r : BitVec 64,
           ⌜R' 10#5 = r ∧ pageValid r ∧ (k'.regs 12#5).toNat < (k'.regs 11#5).toNat ∧
@@ -129,7 +132,7 @@ theorem co_vmfault_call (VF : VMFAULT) [Xv6G GF] [CurCtx]
             (viewZero M (vpnOf (k'.regs 12#5)).toNat))) -∗
       ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := VF.wp_vmfault (hlc := hlc) (GF := GF) c k' γl γk P M hnoff' hK' hlk' hroot' hsz'
+  have h := VF.wp_vmfault (hlc := hlc) (GF := GF) c k' γl γk P M ke hnoff' hK' hlk' hroot' hsz'
   unfold wp_vmfault_body at h
   simp only [vmfaultAddr] at h
   exact h

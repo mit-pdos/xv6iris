@@ -162,6 +162,14 @@ structure UtRows0 (A : UtArgs GF) (V2 : ProcPriv) (M2 : Nat → List (BitVec 8))
   tfp : V2.upt.tfp = A.P.tfp
   ks : V2.kstack = A.V.kstack
 
+/-- **The rows do not read the event counter** (permit sweep L2): a record
+raised by `updEv` carries the rows of the one it was raised from (Rocq's
+`ut_round_same` at `upd_ev`; the round does not name `pv_ev`). -/
+theorem UtRows0.updEv {A : UtArgs GF} {V2 : ProcPriv} {M2 : Nat → List (BitVec 8)}
+    {sts2 : List FdState} {cs2 : ExtTreeSet GName compare} (h : UtRows0 A V2 M2 sts2 cs2)
+    (k : Nat) : UtRows0 A (V2.updEv k) M2 sts2 cs2 :=
+  ⟨h.round, h.fdk, h.chk, h.gen, h.fde, h.pipe, h.rpid, h.tfp, h.ks⟩
+
 /-- The live row at the parked record. -/
 abbrev utLive (A : UtArgs GF) (V2 : ProcPriv) (cs2 : ExtTreeSet GName compare) : Prop :=
   utLiveOut A.sc A.V.pvSecc (utProTf A.sep A.V) A.sts (tfW V2.tf (tfArgIdx 0)) cs2

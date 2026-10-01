@@ -22,12 +22,23 @@ The tree's pages are required to be valid allocator pages (`hpg`), as
 The function needs 32 of the caller's stack slots (its frame of 10, then
 `walk`'s 22) and returns them; the callee-saved registers are preserved.
 
+THE LEND (permit sweep L2, Rocq 78f9234b8; design ni-strong-instance.md
+§7): both contracts take the running proc's event-counter lend `actLend
+k.proc ke` and hand it back at a count no lower (`∃ k' ≥ ke`) right after
+the return pc; `walk`/`kalloc` do not take it yet, so the proof frames it.
+`[WchG GF]` joins the binders (Rocq's `!wchG Σ`).
+
+Deviations from Rocq: Rocq states ONE contract (`wp_mappages_sconf`, at an
+arbitrary `on`); Lean keeps its two (the uncounted `MAPPAGES_ANY` and the
+counted corollary `MAPPAGES`), both take the lend.
+
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
 import MachCSL.WpSmodeFrame
 import Xv6.PtOwn
 import Xv6.Image
 import Xv6.KallocDefs
+import Xv6.SlotGen
 
 namespace Xv6
 
@@ -48,9 +59,9 @@ def mappagesArgs (t : PTree) (va size pa : BitVec 64) (n : Nat) : Prop :=
 /-- The general specification of `mappages` (uncounted): the run stops at
 the first page whose path `walk` could not complete, and the function then
 returns `-1` with the allocator empty. -/
-def wp_mappages_any_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+def wp_mappages_any_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γl : GName) (γk : KmemNames) (on : Option Nat) (t : PTree) (n : Nat)
-    (perm : BitVec 64)
+    (perm : BitVec 64) (ke : Nat)
     (hnoff : k.noff + 1 < 2 ^ 31) (hK : 32 ≤ k.avail) (hlk : "kmem" ∉ k.locks)
     (hroot : k.regs 10#5 = pageAddr t.base)
     (hargs : mappagesArgs t (k.regs 11#5) (k.regs 12#5) (k.regs 13#5) n)
@@ -59,10 +70,11 @@ def wp_mappages_any_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
     (hwf : t.wfU 2) (hnd : t.pagesNodup 2)
     (hpg : ∀ b ∈ t.pages 2, pageValid (pageAddr b)) : Prop :=
   kctx cpu k ∗ pcIs cpu mappagesAddr ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
-  ptreeOwn 2 (DFrac.own 1) t ∗ kallocAvail γk on ∗
+  ptreeOwn 2 (DFrac.own 1) t ∗ kallocAvail γk on ∗ actLend k.proc ke ∗
   wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ (R' : RegMap) (fresh : List (BitVec 44)),
     ⌜k.sie = false → spie = k.spie ∧ spp = k.spp⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
+    (∃ k' : Nat, ⌜ke ≤ k'⌝ ∗ actLend k.proc k') -∗
     ptreeOwn 2 (DFrac.own 1)
       (t.mapRun (vpnOf (k.regs 11#5)) (BitVec.extractLsb' 12 44 (k.regs 13#5)) perm n fresh).1 -∗
     kallocAvail γk (availSub on fresh.length) -∗
@@ -79,16 +91,16 @@ def wp_mappages_any_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
 
 /-- The general interface of `mappages`. -/
 structure MAPPAGES_ANY : Prop where
-  wp_mappages_any : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx] (cpu : CPU) (k : KCtx)
+  wp_mappages_any : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx] (cpu : CPU) (k : KCtx)
     (γl : GName) (γk : KmemNames) (on : Option Nat) (t : PTree) (n : Nat) (perm : BitVec 64)
-    hnoff hK hlk hroot hargs hperm hmask hrwx hwf hnd hpg,
-    wp_mappages_any_body (hlc := hlc) (GF := GF) cpu k γl γk on t n perm hnoff hK hlk hroot hargs
+    (ke : Nat) hnoff hK hlk hroot hargs hperm hmask hrwx hwf hnd hpg,
+    wp_mappages_any_body (hlc := hlc) (GF := GF) cpu k γl γk on t n perm ke hnoff hK hlk hroot hargs
       hperm hmask hrwx hwf hnd hpg
 
 /-- The specification of `mappages` (counted mode). -/
-def wp_mappages_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+def wp_mappages_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γl : GName) (γk : KmemNames) (nb : Nat) (t : PTree) (n : Nat)
-    (perm : BitVec 64)
+    (perm : BitVec 64) (ke : Nat)
     (hnoff : k.noff + 1 < 2 ^ 31) (hK : 32 ≤ k.avail) (hlk : "kmem" ∉ k.locks)
     (hroot : k.regs 10#5 = pageAddr t.base)
     (hargs : mappagesArgs t (k.regs 11#5) (k.regs 12#5) (k.regs 13#5) n)
@@ -98,10 +110,11 @@ def wp_mappages_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
     (hpg : ∀ b ∈ t.pages 2, pageValid (pageAddr b))
     (hcount : t.missingRun (vpnOf (k.regs 11#5)) n < nb) : Prop :=
   kctx cpu k ∗ pcIs cpu mappagesAddr ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
-  ptreeOwn 2 (DFrac.own 1) t ∗ kallocAvail γk (some nb) ∗
+  ptreeOwn 2 (DFrac.own 1) t ∗ kallocAvail γk (some nb) ∗ actLend k.proc ke ∗
   wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ (R' : RegMap) (fresh : List (BitVec 44)),
     ⌜k.sie = false → spie = k.spie ∧ spp = k.spp⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
+    (∃ k' : Nat, ⌜ke ≤ k'⌝ ∗ actLend k.proc k') -∗
     ptreeOwn 2 (DFrac.own 1)
       (t.mapRun (vpnOf (k.regs 11#5)) (BitVec.extractLsb' 12 44 (k.regs 13#5)) perm n fresh).1 -∗
     kallocAvail γk (some (nb - fresh.length)) -∗
@@ -114,10 +127,10 @@ def wp_mappages_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
 
 /-- The interface of `mappages`. -/
 structure MAPPAGES : Prop where
-  wp_mappages : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx] (cpu : CPU) (k : KCtx)
+  wp_mappages : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx] (cpu : CPU) (k : KCtx)
     (γl : GName) (γk : KmemNames) (nb : Nat) (t : PTree) (n : Nat) (perm : BitVec 64)
-    hnoff hK hlk hroot hargs hperm hmask hrwx hwf hnd hpg hcount,
-    wp_mappages_body (hlc := hlc) (GF := GF) cpu k γl γk nb t n perm hnoff hK hlk hroot hargs
+    (ke : Nat) hnoff hK hlk hroot hargs hperm hmask hrwx hwf hnd hpg hcount,
+    wp_mappages_body (hlc := hlc) (GF := GF) cpu k γl γk nb t n perm ke hnoff hK hlk hroot hargs
       hperm hmask hrwx hwf hnd hpg hcount
 
 end Xv6

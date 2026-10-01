@@ -5,6 +5,9 @@ frame and its exit, and the call rules of the callees (`ismapped`,
 `kalloc`, `kfree`, `memset`, the uncounted `mappages`, and the
 non-allocating `walk`).
 
+`vf_mappages_call` carries `mappages`' lend (permit sweep L2, Rocq
+78f9234b8).
+
 Imports only definitional and Spec files (never a `Code*`, `Proof*` or
 `Link*` file).
 -/
@@ -281,20 +284,21 @@ theorem vf_memset_call (MS : MEMSET) [CurCtx] (c : CPU) (k' : KCtx) (olds : List
 
 set_option maxHeartbeats 1000000 in
 /-- the general `mappages` contract at its entry address. -/
-theorem vf_mappages_call (MA : MAPPAGES_ANY) [CurCtx] (c : CPU) (k' : KCtx) (γl : GName)
+theorem vf_mappages_call [WchG GF] (MA : MAPPAGES_ANY) [CurCtx] (c : CPU) (k' : KCtx) (γl : GName)
     (γk : KmemNames) (on : Option Nat) (t : PTree) (n : Nat) (perm : BitVec 64)
     (hnoff : k'.noff + 1 < 2 ^ 31) (hK : 32 ≤ k'.avail) (hlk : "kmem" ∉ k'.locks)
     (hroot : k'.regs 10#5 = pageAddr t.base)
     (hargs : mappagesArgs t (k'.regs 11#5) (k'.regs 12#5) (k'.regs 13#5) n)
     (hperm : k'.regs 14#5 = perm) (hmask : perm &&& ~~~0x3FF#64 = 0#64)
     (hrwx : perm &&& 0xE#64 ≠ 0#64) (hwf : t.wfU 2) (hnd : t.pagesNodup 2)
-    (hpg : ∀ b ∈ t.pages 2, pageValid (pageAddr b)) :
+    (hpg : ∀ b ∈ t.pages 2, pageValid (pageAddr b)) (ke : Nat) :
     kctx c k' ∗ pcIs c KA.«mappages» ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
-    ptreeOwn 2 (DFrac.own 1) t ∗ kallocAvail γk on ∗
+    ptreeOwn 2 (DFrac.own 1) t ∗ kallocAvail γk on ∗ actLend k'.proc ke ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool,
       ∀ (R' : RegMap) (fresh : List (BitVec 44)),
       ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
+      (∃ k1 : Nat, ⌜ke ≤ k1⌝ ∗ actLend k'.proc k1) -∗
       ptreeOwn 2 (DFrac.own 1)
         (t.mapRun (vpnOf (k'.regs 11#5)) (BitVec.extractLsb' 12 44 (k'.regs 13#5)) perm n fresh).1 -∗
       kallocAvail γk (availSub on fresh.length) -∗
@@ -310,7 +314,7 @@ theorem vf_mappages_call (MA : MAPPAGES_ANY) [CurCtx] (c : CPU) (k' : KCtx) (γl
               fresh).2.2 < n ∧ availZero (availSub on fresh.length)))⌝ -∗
       wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := MA.wp_mappages_any (hlc := hlc) (GF := GF) c k' γl γk on t n perm hnoff hK hlk hroot
+  have h := MA.wp_mappages_any (hlc := hlc) (GF := GF) c k' γl γk on t n perm ke hnoff hK hlk hroot
     hargs hperm hmask hrwx hwf hnd hpg
   unfold wp_mappages_any_body at h
   simp only [mappagesAddr] at h

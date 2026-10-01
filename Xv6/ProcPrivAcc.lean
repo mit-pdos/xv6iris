@@ -231,6 +231,35 @@ theorem procPrivFd_trapframe (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32)
   · ipureintro; exact h
   · ipureintro; exact hlz
 
+/-- **The trapframe-pointer quarter AND the event counter** (Rocq
+`kxc_priv_tf_ev`, permit sweep L2): kexec's proc_pagetable reads the cell
+and takes the lend, so both come out of the block at once; the block
+closes at `V.updEv k`, whatever count the callee handed back. -/
+theorem procPrivFd_trapframeEv (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
+    (M : Nat → List (BitVec 8)) :
+    procPrivFd (GF := GF) γ pa pid V M ⊢
+      @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pTrapframe pa) 8 (DFrac.own (1 : Qp).half.half)
+        (pageAddr V.upt.tfp) ∗ actCnt pa V.ev ∗
+      (∀ k : Nat, @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pTrapframe pa) 8
+          (DFrac.own (1 : Qp).half.half) (pageAddr V.upt.tfp) -∗ actCnt pa k -∗
+        procPrivFd γ pa pid (V.updEv k) M) := by
+  unfold procPrivFd procPrivCoreNoctxAt procPrivBareAt procFieldsNoOfile
+  iintro ⟨⟨⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hcwd, Hnm, Hsc⟩, Hpt, Htfp, %hlz, Hev⟩, Hc⟩, Ho⟩
+  ihave Htf := procPrivAcc_eq curCtx _ 8 _ _ _ h.2.2.2 $$ Htf
+  icases procPrivAcc_split curCtx _ 8 1 _ $$ Htf with ⟨Htf, Htf2⟩
+  icases procPrivAcc_split curCtx _ 8 (1 : Qp).half _ $$ Htf with ⟨Htf, Htf1⟩
+  iframe Htf Hev
+  iintro %k Htf Hev
+  ihave Htf := procPrivAcc_join curCtx _ 8 (1 : Qp).half _ $$ [Htf Htf1]
+  · iframe
+  ihave Htf := procPrivAcc_join curCtx _ 8 1 _ $$ [Htf Htf2]
+  · iframe
+  ihave Htf := procPrivAcc_eq curCtx _ 8 _ _ _ h.2.2.2.symm $$ Htf
+  iframe Hpid Hk Hs Hpg Htf Hcwd Hnm Hsc Hpt Htfp Hc Ho Hev
+  isplitl []
+  · ipureintro; exact h
+  · ipureintro; exact hlz
+
 /-- **The pointer quarter AND the page it names** (Rocq `proc_priv_tf`):
 a syscall-argument read's premise to argint. -/
 theorem procPrivFd_tf (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
@@ -388,6 +417,37 @@ theorem procPrivFd_copy (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V :
   iintro %P' %M' %hx Hs Hpg Hpt
   iapply Hw $$ %P' %V.sz %M' %V.pvLazy %hx.1.1 %hx.1.2.1 %hf.1 %(UMemL.umBelow_extSz hf.2.1 hx)
     %(fun hl => LazyFree.lazyFree_ext hx.1 (hf.2.2.1 hl)) Hs Hpg Hpt
+
+/-- **The copy instance with the event counter** (Rocq `proc_priv_copy_ev`,
+permit sweep L2): `procPrivFd_copy`, the counter lent out beside the copy
+pieces and taken back at any count -- what usertrap's fault arm lends to
+`vmfault`; the block closes at `{ V.updEv k with upt := P' }`. -/
+theorem procPrivFd_copyEv (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
+    (M : Nat → List (BitVec 8)) :
+    procPrivFd (GF := GF) γ pa pid V M ⊢
+      @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pSz pa) 8 (DFrac.own 1) V.sz ∗
+      @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPagetable pa) 8 (DFrac.own 1) (pageAddr V.upt.root) ∗
+      @procPtAt hlc GF _ ⟨curCtx, KTier.kpt⟩ V.upt M ∗ actCnt pa V.ev ∗
+      (∀ (P' : UPtd) (M' : Nat → List (BitVec 8)) (k : Nat),
+        ⌜V.upt.extSz V.sz P'⌝ -∗
+        @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pSz pa) 8 (DFrac.own 1) V.sz -∗
+        @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPagetable pa) 8 (DFrac.own 1) (pageAddr V.upt.root) -∗
+        @procPtAt hlc GF _ ⟨curCtx, KTier.kpt⟩ P' M' -∗ actCnt pa k -∗
+        procPrivFd γ pa pid { V.updEv k with upt := P' } M') := by
+  unfold procPrivFd procPrivCoreNoctxAt procPrivBareAt procFieldsNoOfile
+  iintro ⟨⟨⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hcwd, Hnm, Hsc⟩, Hpt, Htfp, %hlz, Hev⟩, Hc⟩, Ho⟩
+  ihave Hpg := procPrivAcc_eq curCtx _ 8 _ _ _ h.2.2.1 $$ Hpg
+  iframe Hs Hpg Hpt Hev
+  iintro %P' %M' %k %hx Hs Hpg Hpt Hev
+  ihave Hpg := procPrivAcc_eq curCtx _ 8 _ _ _ h.2.2.1.symm $$ Hpg
+  ihave Htfp := (show @tfPageAt hlc GF _ ⟨curCtx, KTier.kpt⟩ V.upt.tfp V.tf ⊢
+      @tfPageAt hlc GF _ ⟨curCtx, KTier.kpt⟩ P'.tfp V.tf from by rw [hx.1.2.1]) $$ Htfp
+  iframe Hpid Hk Hs Hpg Htf Hcwd Hnm Hsc Hpt Htfp Hc Ho Hev
+  isplitl []
+  · ipureintro
+    exact ⟨h.1, UMemL.umBelow_extSz h.2.1 hx, by rw [hx.1.1]; exact h.2.2.1,
+      by rw [hx.1.2.1]; exact h.2.2.2⟩
+  · ipureintro; exact fun hl => LazyFree.lazyFree_ext hx.1 (hlz hl)
 
 /-- **The address-space swap** (Rocq `proc_priv_newspace`), kexec's and only
 kexec's: the size, BOTH table cells, the table and the trapframe page out

@@ -240,6 +240,24 @@ theorem ut_priv_copy [X : CurCtx] (hct : curTier = KTier.kpt) (γ : FileNames) (
   subst hct
   exact hacc
 
+/-- **...with the event counter** (Rocq `proc_priv_copy_ev`, permit sweep
+L2), at the ambient context: what the fault arm lends to `vmfault`. -/
+theorem ut_priv_copyEv [X : CurCtx] (hct : curTier = KTier.kpt) (γ : FileNames) (pa : BitVec 64)
+    (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) :
+    procPrivFd (GF := GF) γ pa pid V M ⊢
+      wordPointsTo (pSz pa) 8 (DFrac.own 1) V.sz ∗
+      wordPointsTo (pPagetable pa) 8 (DFrac.own 1) (pageAddr V.upt.root) ∗ procPtAt V.upt M ∗
+      actCnt pa V.ev ∗
+      (∀ (P' : UPtd) (M' : Nat → List (BitVec 8)) (k : Nat), ⌜V.upt.extSz V.sz P'⌝ -∗
+        wordPointsTo (pSz pa) 8 (DFrac.own 1) V.sz -∗
+        wordPointsTo (pPagetable pa) 8 (DFrac.own 1) (pageAddr V.upt.root) -∗
+        procPtAt P' M' -∗ actCnt pa k -∗ procPrivFd γ pa pid { V.updEv k with upt := P' } M') := by
+  have hacc := procPrivFd_copyEv (GF := GF) γ pa pid V M
+  obtain ⟨ξ, t⟩ := X
+  simp only at hct
+  subst hct
+  exact hacc
+
 /-- The block's trapframe has its 36 words. -/
 theorem ut_priv_len [X : CurCtx] (hct : curTier = KTier.kpt) (γ : FileNames) (pa : BitVec 64)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) :
@@ -430,13 +448,16 @@ def UT_EA : Prop :=
       ⊢ wpLoop (GF := GF) cpu)
 
 /-- **Rocq `ut_56`** (+0x56: the two printks, `setkilled(p)`, then +0xa6),
-at the prologue's record, paid by the process's kill row. -/
+at the prologue's record RAISED to an event count `kv` (permit sweep L2: the
+fault arm's failure route arrives with the count `vmfault` handed back --
+Rocq's `ut_56` is general in the current state `U`; the dispatch enters at
+`kv := A.V.ev`, the record itself), paid by the process's kill row. -/
 def UT_56 : Prop :=
-  ∀ (A : UtArgs GF) (cpu : CPU) (R : RegMap),
+  ∀ (A : UtArgs GF) (cpu : CPU) (R : RegMap) (kv : Nat),
     UtOk Γ A → utPins A R → ukillSc A.sc → A.Wk.fd = A.sts →
     (kctx cpu ((A.k.pushed 4).withRegs R) ∗ pcIs cpu (utPc 0x56#64) ∗ utFrame A ∗
       trapCsrsExt cpu false ∗ cpuClaimExt cpu false A.k.proc ∗ utCaps A.N ∗
-      utOwn (utRsys PT Γ A) A.N (utV1 A) A.M A.sts A.cs A.pid ∗
+      utOwn (utRsys PT Γ A) A.N ((utV1 A).updEv kv) A.M A.sts A.cs A.pid ∗
       ukillCredAt (hlc := hlc) uslot A.gn A.sc A.Wk A.f ∗ utPay A ∗ utKont PT Γ A
       ⊢ wpLoop (GF := GF) cpu)
 

@@ -563,3 +563,80 @@ a lend or runs at `p = 0`: `kinit`, `freerange`, `virtio_disk_init` take
 the boot premise), `wp_ap_pidsec`, freeproc's and kwait's appends, and
 kexit's exit append from its own block; then T.
 
+
+### 7.4L L2 as landed in Lean (2026-10-01)
+
+Lean lane PJ-L2, Rocq 78f9234b8.  43 files (42 Lean + this note).  The ten
+Spec files that moved are Rocq's ten (`SpecMappages`, `SpecUvmunmap`,
+`SpecVmfault`, `SpecUvmfree`, `SpecUvmdealloc`, `SpecProcPagetable`,
+`SpecKvmmap`, `SpecKvmmake`, `SpecProcMapstacks`, `SpecKvminit`).
+
+- **The inner ring takes the lend** (`(ke : Nat)`, `actLend k.proc ke`
+  before the `wpNext`, `∃ k' ≥ ke` right after the return pc, `[WchG GF]`
+  where missing): `wp_mappages_any_body` and its counted corollary
+  `wp_mappages_body`; the three `uvmunmap` forms (`_raw` = Rocq `_fixed`,
+  `_free` = Rocq `_mem`, `_bare`; Rocq's `_live` has no Lean twin);
+  `wp_uvmfree_body`, `wp_uvmdealloc_body`, `wp_vmfault_body`,
+  `wp_proc_pagetable_body` (Lean's one form, Rocq's `_core`/`_sconf`).
+- **Ring members pass it and compose the bounds** (`SlotGen.actLend_ret_intro`
+  / `actLend_ret_weaken`, `k ≤ k' ≤ k''` by `Nat.le_trans`): uvmfree →
+  uvmunmap (bare); uvmdealloc → uvmunmap (free); vmfault → mappages;
+  proc_pagetable → mappages ×2, uvmunmap (raw), uvmfree; the counted
+  mappages → the general one.  The leaves frame it (`walk`/`kalloc`/`kfree`
+  do not take it): `actLend_cont_frame_x` (mappages' `∀ fresh` shape),
+  `actLend_cont_frame_r` (uvmunmap raw's `∀ R'` shape), `_ret` (a lend
+  already in the returned shape, framed round `freewalk`).
+- **Real threading in the lend-aware callers** (the L1a/L1b entry frames
+  removed): uvmalloc (`uvma_iter` / `uvma_loop` / `uvma_rollA` / `_rollB`
+  carry `∃ k1 ≥ ke`, Rocq `ua_loop`'s `kl`), uvmcopy (`uvmcopy_iter` /
+  `_loop` / `_err`), proc_freepagetable (`ke ≤ k1 ≤ k2 ≤ k'`), allocproc
+  (`ap_pp_call`), growproc (the shrink arm borrows the block's counter into
+  uvmdealloc, as the grow arm does into uvmalloc), copyout / copyin /
+  copyinstr (the page loop `*_page` / `*_iter` / `*_loop` carries the lend to
+  vmfault).
+- **The fault arm** lends the block's counter to vmfault
+  (`ProcPrivAcc.procPrivFd_copyEv` / `UsertrapBlocks.ut_priv_copyEv`, Rocq
+  `proc_priv_copy_ev`) and closes at `{ (utV1 A).updEv kv with upt := _ }`:
+  the success route enters `UT_A6` through `UsertrapParts.UtRows0.updEv`
+  (the rows do not read the counter -- Rocq's `ut_round_same`); the failure
+  route enters `UT_56` at `kv`.  `SpecUsertrap` unchanged (its post
+  quantifies the record).
+- **Boot**: kvmmap / kvmmake / proc_mapstacks / kvminit gain `(hp0 :
+  k.proc = 0#64)` (last hypothesis) and `[WchG GF]`; kvmmap's call rule
+  hands mappages `SlotGen.actLend_of_zero` and drops the returned lend;
+  main's `mn_kvminit` takes the landed `hproc` (Rocq's `Hp0`).
+- **kexec's phase B at evAfter**: `KexecB.kxcB_priv_tfEv` (Rocq
+  `kxc_priv_tf_ev`, over the new `ProcPrivAcc.procPrivFd_trapframeEv`) lends
+  the trapframe quarter and the counter together; `kxc_b1`'s two outputs
+  quantify `∀ V1, ⌜evAfter A.V V1⌝` at `{ A with V := V1 }`, the closer moved
+  by `kexecCloser_after`; `KexecCore.kxc_from90` instantiates b2z / b2 /
+  cd at the raised record(s).
+- **Deviations**: (1) Lean's three uvmunmap forms and two mappages
+  contracts all take the lend; (2) the boot premise is `hp0` on the
+  context, and kvmmap absorbs the lend inside its call rule; (3) **`UT_56`
+  gains a binder `kv`** and is stated at `(utV1 A).updEv kv` (the one stage
+  statement moved beyond Rocq's list: Rocq's `ut_56` is already general in
+  the current state `U`, Lean's was pinned at the prologue's record; the
+  dispatch enters at `kv := (utV1 A).ev`, `ProcPriv.updEv_id`); (4) kexec
+  lends the trapframe QUARTER (Rocq lends the cell whole); (5) the lend sits
+  right after the return pc in every Lean continuation (as L1a/L1b).
+- **Unchanged**: `SpecUsertrap`, `SpecKexec`, `SpecSyscall`, every L1a/L1b
+  Spec (`SpecUvmalloc`, `SpecUvmcopy`, `SpecProcFreepagetable`,
+  `SpecAllocproc`, `SpecCopy*`, `SpecGrowproc` ...), `SpecWalk`,
+  `SpecKalloc`, `SpecKfree`, `SpecUvmcreate`, `SpecFreewalk`, all Link files.
+
+What remains (L3, T).  In the Lean tree the following contracts still frame
+the lend rather than take it: `walk` (`WALK`, the allocating form mappages
+calls; `WALK_NOALLOC` takes no allocator and needs nothing), `freewalk`
+(framed round it in uvmfree), `uvmcreate` (framed round it in
+proc_pagetable), `kalloc` / `kfree` (`wp_kalloc_body` / `_led_body`,
+`wp_kfree_body` / `_led_body` / `wp_kfree_free_body`: no form takes or steps
+the permit; every ring member frames it round them), and the four ledger
+appends -- allocproc's pid section (Rocq `wp_ap_pidsec`, inside
+`ProofAllocproc`), freeproc's (`wp_freeproc_led_body`) and kwait's
+(`wp_kwait_led_body` / `_led_eb_body`) zombie appends, and kexit's exit
+append from its own block -- none of which consumes the counter yet.  L3:
+those REQUIRE the permit and step it, the token-free led forms go, and the
+remaining boot contracts that reach kalloc (`kinit`, `freerange`,
+`virtio_disk_init`) take the `p = 0` premise; then T (the rows' `ev' = ev`
+and `ut_round_quiet`).

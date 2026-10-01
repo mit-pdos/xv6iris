@@ -16,6 +16,13 @@ image already read it as zeros).  Interrupts are off throughout.
 
 The kill deposit is the additive pair: the failure route to +0x56 takes its
 kill row (`ukillCredAt`), the success route to +0xa6 its resume slot.
+
+THE LEND (permit sweep L2, Rocq 78f9234b8): the block's event counter goes
+to vmfault with the copy pieces (`ut_priv_copyEv`, Rocq
+`proc_priv_copy_ev`) and comes home at the count vmfault hands back, the
+block closing at `{ (utV1 A).updEv kv with upt := _ }` on both routes
+(`UT_56` at `kv`, `UT_A6` through `UtRows0.updEv`: the rows do not read the
+counter).  `SpecUsertrap` is unchanged: its post quantifies the record.
 -/
 import MachCSL.WpSmodeTrapCsr
 import Xv6.SpecVmfault
@@ -72,13 +79,14 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx
 
 set_option maxHeartbeats 1000000 in
 /-- `vmfault(pt, sz, va, read)` at interrupts off. -/
-theorem utD0_vmfault (VM : VMFAULT) (c : CPU) (k' : KCtx) (γl : GName) (γk : KmemNames) (P : UPtd)
+theorem utD0_vmfault [WchG GF] (VM : VMFAULT) (c : CPU) (k' : KCtx) (γl : GName) (γk : KmemNames) (P : UPtd)
     (M : Nat → List (BitVec 8)) (hsie : k'.sie = false) (hnoff : k'.noff + 1 < 2 ^ 31)
     (hK : vmfaultSlots ≤ k'.avail) (hlk : "kmem" ∉ k'.locks)
-    (hroot : k'.regs 10#5 = pageAddr P.root) (hsz : (k'.regs 11#5).toNat ≤ 2 ^ 38) :
+    (hroot : k'.regs 10#5 = pageAddr P.root) (hsz : (k'.regs 11#5).toNat ≤ 2 ^ 38) (ke : Nat) :
     kctx c k' ∗ pcIs c KA.«vmfault» ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
-    procPtAt P M ∗
+    procPtAt P M ∗ actLend k'.proc ke ∗
     (∀ R' : RegMap, kctx c (k'.withRegs R') -∗ pcIs c (jumpPc (k'.regs 1#5)) -∗
+      (∃ k1 : Nat, ⌜ke ≤ k1⌝ ∗ actLend k'.proc k1) -∗
       ((⌜R' 10#5 = 0#64⌝ ∗ procPtAt P M) ∨
        (∃ r : BitVec 64,
           ⌜R' 10#5 = r ∧ pageValid r ∧ (k'.regs 12#5).toNat < (k'.regs 11#5).toNat ∧
@@ -87,18 +95,18 @@ theorem utD0_vmfault (VM : VMFAULT) (c : CPU) (k' : KCtx) (γl : GName) (γk : K
             (viewZero M (vpnOf (k'.regs 12#5)).toNat))) -∗
       ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop c)
     ⊢ wpLoop (GF := GF) c := by
-  have h := VM.wp_vmfault (hlc := hlc) (GF := GF) c k' γl γk P M hnoff hK hlk hroot hsz
+  have h := VM.wp_vmfault (hlc := hlc) (GF := GF) c k' γl γk P M ke hnoff hK hlk hroot hsz
   unfold wp_vmfault_body at h
   simp only [vmfaultAddr] at h
-  iintro ⟨Hk, Hpc, Hl, Ha, Hpt, HPhi⟩
+  iintro ⟨Hk, Hpc, Hl, Ha, Hpt, Hlend, HPhi⟩
   iapply h
-  iframe Hk Hpc Hl Ha Hpt
+  iframe Hk Hpc Hl Ha Hpt Hlend
   rw [hsie]
   iapply wpNext_off_intro
-  iintro %spie %spp %R' %hsp Hk Hpc Hres %hcs
+  iintro %spie %spp %R' %hsp Hk Hpc Hlend Hres %hcs
   obtain ⟨rfl, rfl⟩ := hsp rfl
   rw [KCtx.withSpie_self' k' _ _ rfl rfl]
-  iapply HPhi $$ %R' Hk Hpc Hres %hcs
+  iapply HPhi $$ %R' Hk Hpc Hlend Hres %hcs
 
 end Calls
 
@@ -148,7 +156,11 @@ theorem usertrap_d0_proof (VM : VMFAULT) (HA : UT_A6 PT Γ) (H56 : UT_56 PT Γ) 
   icases utCaps_kalloc _ $$ Hcaps with ⟨#Hkl, #Hka⟩
   icases utA_own_open _ _ (procAddr A.j) _ _ _ _ _ hok.pj $$ Hown with ⟨Hpv, Hfr, Hch, Hsy, Hownback⟩
   icases procPrivFd_facts _ _ _ _ _ $$ Hpv with ⟨Hpv, %hfacts⟩
-  icases ut_priv_copy hct _ _ _ _ _ $$ Hpv with ⟨Hsz, Hpg, Hpt, Hpvback⟩
+  -- THE LEND (permit sweep L2): the block's counter goes to vmfault with
+  -- its copy pieces, and comes home at the count vmfault returns
+  icases ut_priv_copyEv hct _ _ _ _ _ $$ Hpv with ⟨Hsz, Hpg, Hpt, Hev, Hpvback⟩
+  ihave Hlend : actLend (GF := GF) A.k.proc (utV1 A).ev $$ [Hev]
+  · rw [hok.hproc]; iapply actLend_of_cnt $$ Hev
   icases utA_killIn_arm2 _ _ _ _ _ hne $$ Hkill with ⟨%⟨hWg, hWfd⟩, Harm⟩
   ihave Hte := (show trapCsrsExt (GF := GF) cpu false ⊢ trapCsrs cpu ∗ intrRes cpu from .rfl) $$ Hte
   icases Hte with ⟨Hcsrs, Hir⟩
@@ -187,8 +199,8 @@ theorem usertrap_d0_proof (VM : VMFAULT) (HA : UT_A6 PT Γ) (H56 : UT_56 PT Γ) 
   k_step (wp_s_jal cpu _ (KA.«usertrap» + 0xe2#64) false 0x1fedc8#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [utD0_vmfault_tgt]
   iintro Hk Hpc
-  iapply (utD0_vmfault VM cpu _ fscKalloc fsReadyKmem (utV1 A).upt A.M ?hs1 ?hn1 ?hK1 ?hl1 ?hr1 ?hz1)
-    $$ [- $Hk $Hpc $Hpt]
+  iapply (utD0_vmfault VM cpu _ fscKalloc fsReadyKmem (utV1 A).upt A.M ?hs1 ?hn1 ?hK1 ?hl1 ?hr1 ?hz1
+    (utV1 A).ev) $$ [- $Hk $Hpc $Hpt]
   rotate_right 1
   case hs1 => k_norm
   case hn1 => k_norm; rw [hok.hnoff]; decide
@@ -196,8 +208,14 @@ theorem usertrap_d0_proof (VM : VMFAULT) (HA : UT_A6 PT Γ) (H56 : UT_56 PT Γ) 
   case hl1 => k_norm; rw [hok.hlocks]; simp
   case hr1 => k_norm
   case hz1 => k_norm; have := hfacts.1; unfold uvmMaxsz at this; exact Nat.le_trans this (by omega)
+  k_norm
+  iframe Hlend
   iframe #
-  iintro %R1 Hk Hpc Hres %hcs1
+  iintro %R1 Hk Hpc ⟨%kv, %hkv, Hlend⟩ Hres %hcs1
+  have hpa0 : A.k.proc ≠ 0#64 := by rw [hok.hproc]; exact procAddr_nonzero hok.hj
+  ihave Hev := actLend_back _ _ hpa0 $$ Hlend
+  ihave Hev : actCnt (GF := GF) (procAddr A.j) kv $$ [Hev]
+  · rw [← hok.hproc]; iexact Hev
   have hp1 : utPins A R1 := utPins_calleeSaved A _ R1 (by ut_pins) hcs1
   k_norm [utD0_ret]
   -- the block, re-assembled at whatever table vmfault left
@@ -212,8 +230,8 @@ theorem usertrap_d0_proof (VM : VMFAULT) (HA : UT_A6 PT Γ) (H56 : UT_56 PT Γ) 
   · rw [trapCsrsExt_false]; iframe Hcsrs Hir
   icases Hres with (⟨%h0, Hpt⟩ | ⟨%r, %⟨hr, hval, hlt, hnone⟩, Hpt⟩)
   · -- vmfault failed: bnez falls through, j +0x56
-    ihave Hpv := Hpvback $$ %(utV1 A).upt %A.M %(UMemL.extSz_refl _ _) Hsz Hpg Hpt
-    ihave Hown := Hownback $$ %(utV1 A) %A.M %A.sts %A.cs Hpv Hfr Hch Hsy
+    ihave Hpv := Hpvback $$ %(utV1 A).upt %A.M %kv %(UMemL.extSz_refl _ _) Hsz Hpg Hpt Hev
+    ihave Hown := Hownback $$ %((utV1 A).updEv kv) %A.M %A.sts %A.cs Hpv Hfr Hch Hsy
     k_step (wp_s_branch cpu _ (KA.«usertrap» + 0xe6#64) true 8128#13 10#5 0#5 (by decide) bop.BNE)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h0, MachCSL.bcond_bne_zero]
     iintro Hk Hpc
@@ -223,7 +241,7 @@ theorem usertrap_d0_proof (VM : VMFAULT) (HA : UT_A6 PT Γ) (H56 : UT_56 PT Γ) 
     ihave Hcred := uexecKillArm_cred _ _ _ $$ Harm
     ihave Hcred := (show ukillCredAt (hlc := hlc) (GF := GF) uslot A.Wk.gen A.sc A.Wk A.f ⊢
         ukillCredAt uslot A.gn A.sc A.Wk A.f from by rw [hWg]) $$ Hcred
-    iapply (H56 A cpu R1 hok hp1 hks hWfd) $$ [- $Hk $Hpc $Hframe $Hte $Hce $Hown $Hcred $Hkont]
+    iapply (H56 A cpu R1 kv hok hp1 hks hWfd) $$ [- $Hk $Hpc $Hframe $Hte $Hce $Hown $Hcred $Hkont]
     iframe #
   · -- the fill: bnez taken, +0xa6
     have hr0 : r ≠ 0#64 := PtRun.pageValid_ne_zero r hval
@@ -233,19 +251,23 @@ theorem usertrap_d0_proof (VM : VMFAULT) (HA : UT_A6 PT Γ) (H56 : UT_56 PT Γ) 
     have hvpn := utD0_vpn_le t
     have hlt' : (vpnOf t).toNat * 4096 < A.V.sz.toNat := by omega
     have hext := UMemL.extSz_insertLeaf A.V.sz A.V.upt _ r hnone hlt'
-    ihave Hpv := Hpvback $$ %_ %_ %hext Hsz Hpg Hpt
+    ihave Hpv := Hpvback $$ %_ %_ %kv %hext Hsz Hpg Hpt Hev
     ihave Hown := Hownback $$ %_ %_ %A.sts %A.cs Hpv Hfr Hch Hsy
     ihave Hslot := uexecKillArm_slot _ _ _ $$ Harm
     ihave Hko := utA_killOut_slot A.sc A.Wk hne $$ Hslot
     ihave Hres : utLiveRes (hlc := hlc) A
-        { utV1 A with upt := A.V.upt.insertLeaf (vpnOf t).toNat r (PTE_W ||| PTE_U ||| PTE_R) } A.cs $$ [Hko]
+        { (utV1 A).updEv kv with upt := A.V.upt.insertLeaf (vpnOf t).toNat r (PTE_W ||| PTE_U ||| PTE_R) }
+        A.cs $$ [Hko]
     · unfold utLiveRes; ileft; iframe Hko; ipureintro; exact utA_live_ne A _ _ hne
     ihave Hte := (show trapCsrsExt (GF := GF) cpu false ⊢ trapCsrsExt cpu A.k.sie from by rw [hsie]) $$ Hte
     ihave Hce := (show cpuClaimExt (GF := GF) cpu false A.k.proc ⊢ cpuClaimExt cpu A.k.sie A.k.proc from by
       rw [hsie]) $$ Hce
     ihave Hown := ut_a6_res_left _ _ _ _ _ _ _ A.gn $$ Hown
-    iapply (HA A cpu A.k R1 _ _ A.sts A.cs hok (utBase_refl _) hp1
-      (utD0_rows A hok hne (vpnOf t).toNat r hnone hlt'))
+    have hrows : UtRows0 A
+        { (utV1 A).updEv kv with upt := A.V.upt.insertLeaf (vpnOf t).toNat r (PTE_W ||| PTE_U ||| PTE_R) }
+        (viewZero A.M (vpnOf t).toNat) A.sts A.cs :=
+      (utD0_rows A hok hne (vpnOf t).toNat r hnone hlt').updEv kv
+    iapply (HA A cpu A.k R1 _ _ A.sts A.cs hok (utBase_refl _) hp1 hrows)
       $$ [- $Hk $Hpc $Hframe $Hte $Hce $Hown $Hres $Hkont]
     iframe #
     iapply utOuts_quiet _ _ _ _ _ hne

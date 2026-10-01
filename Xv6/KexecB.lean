@@ -70,9 +70,10 @@ Rocq's header, in short:
    states carry that `M` as `Mi` -- they quantify `Mi` anyway, and the
    no-segments rows hold at any view.  The non-null test reads
    `UPt.procPtAt_root_valid` (Rocq `proc_pt_root_valid`).
-4. **The trapframe cell** is `ProcPrivAcc.procPrivFd_trapframe`'s quarter
-   (Rocq `proc_priv_trapframe`) at the context whose tier `kctx_tier` pins
-   (`kxcB_priv_tf`, the `kxc_priv_pid` shape); its validity is
+4. **The trapframe cell** is `ProcPrivAcc.procPrivFd_trapframeEv`'s quarter
+   (since L2 lent with the event counter, deviation 8; Rocq
+   `kxc_priv_tf_ev`) at the context whose tier `kctx_tier` pins
+   (`kxcB_priv_tfEv`, the `kxc_priv_pid` shape); its validity is
    `procPrivFd_tfpValid` (Rocq `ProofKforkParts.proc_priv_tfp_valid`).
 5. **The field windows** are `KexecTail.kxc_win2` / `kxc_win4` rebased at
    the `k_addr` normal form (`kxcB_win_phnum` / `kxcB_win_phoff`, through
@@ -85,6 +86,16 @@ Rocq's header, in short:
    the frame `kxcBFrame8` = `kxcFrameA6x` with slot 8 pinned) → `kxcB_lhu`
    (+0x0aa) → `kxcB_skip` (phnum = 0) | `kxcB_setup` (+0x0ae..+0x0b4) →
    `kxcB_loopregs` (+0x0b8..+0x0c2) → `kxcB_mask` (+0x0c6..+0x0cc).
+8. **THE LEND (permit sweep L2, Rocq 78f9234b8)**: proc_pagetable takes the
+   block's event counter.  `kxcB_priv_tfEv` (Rocq `kxc_priv_tf_ev`) lends the
+   trapframe QUARTER and the counter together (Rocq lends the cell whole,
+   since `proc_pagetable` is generic in the fraction; Lean keeps the
+   quarter), and the block closes at `A.V.updEv kb`, the count
+   proc_pagetable handed back.  `kxc_b1`'s two outputs therefore quantify
+   `∀ V1, ⌜evAfter A.V V1⌝` and run at `{ A with V := V1 }` (Rocq: `∀ U',
+   ⌜ev_after U U'⌝`), the closer moved by `kexecCloser_after`; the stage
+   lemmas below the call (`kxcB_ok` / `kxcB_fail` ...) are generic in `A`
+   and are instantiated at the moved record unchanged.
 -/
 import Xv6.KexecSeam
 import Xv6.ProcPrivAcc
@@ -222,26 +233,28 @@ section Tf
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [BcacheG GF] [DiskG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg]
 
-/-- **Rocq `proc_priv_trapframe` + `proc_priv_tfp_valid`, at the pinned
-tier** (deviation 4): the trapframe-pointer quarter, LENT out of the whole
-block, and the validity of the page it names. -/
-theorem kxcB_priv_tf [X : CurCtx] (hct : X.curTier = KTier.kpt) (γ : FileNames) (pa : BitVec 64)
+/-- **Rocq `kxc_priv_tf_ev`, at the pinned tier** (deviation 8): the
+trapframe-pointer quarter and the event counter, LENT out of the whole block
+together, and the validity of the page; the block comes back at the count
+proc_pagetable returned. -/
+theorem kxcB_priv_tfEv [X : CurCtx] (hct : X.curTier = KTier.kpt) (γ : FileNames) (pa : BitVec 64)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) :
     procPrivFd (GF := GF) γ pa pid V M ⊢
       ⌜pageValid (pageAddr V.upt.tfp)⌝ ∗
       wordPointsTo (pTrapframe pa) 8 (DFrac.own (1 : Qp).half.half) (pageAddr V.upt.tfp) ∗
-      (wordPointsTo (pTrapframe pa) 8 (DFrac.own (1 : Qp).half.half) (pageAddr V.upt.tfp) -∗
-        procPrivFd γ pa pid V M) := by
+      actCnt pa V.ev ∗
+      (∀ kb : Nat, wordPointsTo (pTrapframe pa) 8 (DFrac.own (1 : Qp).half.half) (pageAddr V.upt.tfp) -∗
+        actCnt pa kb -∗ procPrivFd γ pa pid (V.updEv kb) M) := by
   obtain ⟨ξ, t⟩ := X
   simp only at hct
   subst hct
   letI : CurCtx := ⟨ξ, KTier.kpt⟩
   iintro H
   icases procPrivFd_tfpValid γ pa pid V M $$ H with ⟨H, %hv⟩
-  icases procPrivFd_trapframe γ pa pid V M $$ H with ⟨Ht, Hb⟩
+  icases procPrivFd_trapframeEv γ pa pid V M $$ H with ⟨Ht, Hev, Hb⟩
   isplitr
   · ipureintro; exact hv
-  iframe Ht Hb
+  iframe Ht Hev Hb
 
 end Tf
 
@@ -262,14 +275,16 @@ theorem kxcB_call_ppt (PPT : PROC_PAGETABLE) (Γ : SchedNames) (cpu : CPU) (k : 
     (X : BitVec 64) (imm : BitVec 21) (hX : X + BitVec.signExtend 64 imm = KA.«proc_pagetable»)
     (hret : jumpPc (X + 4#64) = X + 4#64) (pa tf : BitVec 64) (dq : DFrac)
     (hK : kexecSlots ≤ k.avail) (hnoff : k.noff = 0) (ha0 : R 10#5 = pa)
-    (htf : tf &&& 0xfff#64 = 0#64) (htfv : pageValid tf) :
+    (htf : tf &&& 0xfff#64 = 0#64) (htfv : pageValid tf) (ke : Nat) :
     instr X false (instruction.JAL (imm, regidx.Regidx 1#5)) ∗
     kctx cpu (((k.withSpie spie spp).pushed 68).withRegs R) ∗ pcIs cpu X ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     fsFabric (hlc := hlc) Γ A.pd A.pav A.pu ∗ wordPointsTo (pTrapframe pa) 8 dq tf ∗
+    actLend k.proc ke ∗
     (∀ (c : CPU) (spie' spp' : Bool) (R' : RegMap),
       ⌜calleeSaved (R.set 1#5 (X + 4#64)) R'⌝ -∗
       kctx c (((k.withSpie spie' spp').pushed 68).withRegs R') -∗ pcIs c (X + 4#64) -∗
+      (∃ kb : Nat, ⌜ke ≤ kb⌝ ∗ actLend k.proc kb) -∗
       trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗
       wordPointsTo (pTrapframe pa) 8 dq tf -∗
       pptPost fsReadyKmem none (BitVec.extractLsb' 12 44 tf) (R' 10#5) -∗ wpLoop c)
@@ -277,7 +292,7 @@ theorem kxcB_call_ppt (PPT : PROC_PAGETABLE) (Γ : SchedNames) (cpu : CPU) (k : 
   have hK' : procPagetableSlots ≤ k.avail - 68 := by
     have : procPagetableSlots = 40 := rfl
     rw [kxc_slots_val] at hK; omega
-  iintro ⟨#Hi, Hk, Hpc, Hte, Hce, #Hfab, Htf, HK⟩
+  iintro ⟨#Hi, Hk, Hpc, Hte, Hce, #Hfab, Htf, Hlend, HK⟩
   icases fsFabric_all Γ A.pd A.pav A.pu $$ Hfab with
     ⟨⟨-, -, -, -, -, -, -, -, #Hkl, #Hav, -, -, -⟩, -, -, -, -⟩
   icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩
@@ -289,7 +304,7 @@ theorem kxcB_call_ppt (PPT : PROC_PAGETABLE) (Γ : SchedNames) (cpu : CPU) (k : 
   iintro Hk Hpc
   have h := PPT.wp_proc_pagetable (hlc := hlc) (GF := GF) cpu
     ((((k.withSpie spie spp).pushed 68).withRegs R).setReg 1#5 (X + 4#64)) fscKalloc fsReadyKmem none
-    tf dq (by k_norm_g; omega) (by k_norm_g; exact hK') (by k_norm_g; simp [hlocks]) htf htfv
+    tf dq ke (by k_norm_g; omega) (by k_norm_g; exact hK') (by k_norm_g; simp [hlocks]) htf htfv
   unfold wp_proc_pagetable_body at h
   simp only [procPagetableAddr] at h
   iapply h
@@ -299,7 +314,7 @@ theorem kxcB_call_ppt (PPT : PROC_PAGETABLE) (Γ : SchedNames) (cpu : CPU) (k : 
   isplitl [Htf]
   · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ha0]; iexact Htf
   iapply wpNext_intro_pin
-  iintro %c %hpin %spie' %spp' %R' %_ Hk Hpc Htf Hppt %hcs
+  iintro %c %hpin %spie' %spp' %R' %_ Hk Hpc Hlend Htf Hppt %hcs
   have hpin' : k.sie = false → c = cpu := fun h => hpin (Or.inl (by k_norm_g; exact h))
   ihave Hte := trapCsrsExt_move _ _ _ hpin' $$ Hte
   ihave Hce := cpuClaimExt_move _ _ _ _ hpin' $$ Hce
@@ -307,7 +322,7 @@ theorem kxcB_call_ppt (PPT : PROC_PAGETABLE) (Γ : SchedNames) (cpu : CPU) (k : 
   ihave Hk := kctx_eq_mono c _ (((k.withSpie spie' spp').pushed 68).withRegs R')
     (kxc_ctx_ret k spie spp spie' spp' R') $$ Hk
   simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ha0]
-  iapply HK $$ %c %spie' %spp' %R' [] Hk Hpc Hte Hce Htf Hppt
+  iapply HK $$ %c %spie' %spp' %R' [] Hk Hpc Hlend Hte Hce Htf Hppt
   ipureintro
   simpa using hcs
 
@@ -894,17 +909,21 @@ theorem kxc_b1 (IUP : IUNLOCKPUT) (EO : END_OP) (PPT : PROC_PAGETABLE) (Γ : Sch
     kxcAt90 k A cpu spie spp R kf qf sf gyf loyf tlyf inumf dnf bmf data gilf gislf n2 ef ∗
     fsFabric (hlc := hlc) Γ A.pd A.pav A.pu ∗
     (∀ c' : CPU, kexecCloser Q QF k A c') ∗
-    (∀ (c : CPU) (spie' spp' : Bool) (R' : RegMap) (P : UPtd) (Mi : Nat → List (BitVec 8))
+    -- proc_pagetable took the block's counter (permit sweep L2): both
+    -- outputs run at the record it came back at
+    (∀ (V1 : ProcPriv), ⌜evAfter A.V V1⌝ -∗
+      ∀ (c : CPU) (spie' spp' : Bool) (R' : RegMap) (P : UPtd) (Mi : Nat → List (BitVec 8))
         (w13 w67 : BitVec 64),
-      kxcAt1a2 k A c spie' spp' R' kf qf sf gyf loyf tlyf inumf dnf bmf data gilf gislf n2
-        (k.regs 19#5) (k.regs 20#5) (k.regs 21#5) (k.regs 22#5) (k.regs 23#5) (k.regs 24#5)
+      kxcAt1a2 k { A with V := V1 } c spie' spp' R' kf qf sf gyf loyf tlyf inumf dnf bmf data gilf
+        gislf n2 (k.regs 19#5) (k.regs 20#5) (k.regs 21#5) (k.regs 22#5) (k.regs 23#5) (k.regs 24#5)
         (k.regs 25#5) (k.regs 26#5) w13 w67 ef P Mi -∗
-      (∀ c' : CPU, kexecCloser Q QF k A c') -∗ wpLoop c) ∗
-    (∀ (c : CPU) (spie' spp' : Bool) (R' : RegMap) (P : UPtd) (Mi : Nat → List (BitVec 8)),
-      kxcAt12c k A c spie' spp' R' kf qf sf gyf loyf tlyf inumf dnf bmf data gilf gislf n2
-        (k.regs 19#5) (k.regs 20#5) (k.regs 21#5) (k.regs 22#5) (k.regs 23#5) (k.regs 24#5)
+      (∀ c' : CPU, kexecCloser Q QF k { A with V := V1 } c') -∗ wpLoop c) ∗
+    (∀ (V1 : ProcPriv), ⌜evAfter A.V V1⌝ -∗
+      ∀ (c : CPU) (spie' spp' : Bool) (R' : RegMap) (P : UPtd) (Mi : Nat → List (BitVec 8)),
+      kxcAt12c k { A with V := V1 } c spie' spp' R' kf qf sf gyf loyf tlyf inumf dnf bmf data gilf
+        gislf n2 (k.regs 19#5) (k.regs 20#5) (k.regs 21#5) (k.regs 22#5) (k.regs 23#5) (k.regs 24#5)
         (k.regs 25#5) (k.regs 26#5) (k.regs 27#5) 4095#64 ef P Mi 0 0#64 -∗
-      (∀ c' : CPU, kexecCloser Q QF k A c') -∗ wpLoop c)
+      (∀ c' : CPU, kexecCloser Q QF k { A with V := V1 } c') -∗ wpLoop c)
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hs, #Hfab, Hcl, H1a2, H12c⟩
   unfold kxcAt90
@@ -920,8 +939,10 @@ theorem kxc_b1 (IUP : IUNLOCKPUT) (EO : END_OP) (PPT : PROC_PAGETABLE) (Γ : Sch
   have h27 : R 27#5 = k.regs 27#5 := hkeep _ (by decide)
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   icases kctx_tier _ _ $$ Hk with ⟨%hct, Hk⟩
-  icases kxcB_priv_tf (hct.symm.trans (by k_norm_g; exact htier)) A.γ k.proc A.pidv A.V A.M $$ Hpriv
-    with ⟨%htfv, Htf, Hpriv⟩
+  -- the trapframe quarter AND the counter, lent together (deviation 8)
+  icases kxcB_priv_tfEv (hct.symm.trans (by k_norm_g; exact htier)) A.γ k.proc A.pidv A.V A.M $$ Hpriv
+    with ⟨%htfv, Htf, Hev, Hpriv⟩
+  ihave Hlend := actLend_of_cnt _ _ $$ Hev
   unfold kxcFrameA6x
   icases Hfr with ⟨%⟨hal, hl⟩, F1, F2, F3, F4, F5, F6, F7, ⟨%v8, F8⟩, F9, F10, F11, F12, F13, Fu, Fe,
     Fp, F64, F65, F66, F67, F68⟩
@@ -936,14 +957,24 @@ theorem kxc_b1 (IUP : IUNLOCKPUT) (EO : END_OP) (PPT : PROC_PAGETABLE) (Γ : Sch
   -- +0x094  jal proc_pagetable
   iapply (kxcB_call_ppt PPT Γ cpu k A spie spp _ (KA.«kexec» + 0x94#64) 2085056#21 kxcB_br_ppt
       kxcB_ret_94 k.proc (pageAddr A.V.upt.tfp) _ hK hnoff (by simp [RegMap.set_apply])
-      (kxc_tf_align _) htfv)
-    $$ [- $Hk $Hpc $Hte $Hce $Hfab $Htf]
+      (kxc_tf_align _) htfv A.V.ev)
+    $$ [- $Hk $Hpc $Hte $Hce $Hfab $Htf $Hlend]
   isplitr
   · iapply (text_instr _ _ _ _ rfl rfl); iexact Htext
-  iintro %c1 %spie1 %spp1 %R1 %hcs1 Hk Hpc Hte Hce Htf Hppt
+  iintro %c1 %spie1 %spp1 %R1 %hcs1 Hk Hpc ⟨%kb, %hkb, Hlend⟩ Hte Hce Htf Hppt
   let cpu := c1
   k_norm_g
-  ihave Hpriv := Hpriv $$ Htf
+  -- the counter comes home at `kb`: the block closes at `A.V.updEv kb`, and
+  -- the rest of phase B runs at `{ A with V := A.V.updEv kb }`
+  have hp0 : k.proc ≠ 0#64 := by rw [hproc]; exact procAddr_nonzero hj
+  ihave Hev := actLend_back _ _ hp0 $$ Hlend
+  ihave Hpriv := Hpriv $$ %kb Htf Hev
+  have hUb : evAfter A.V (A.V.updEv kb) := ⟨kb, hkb, rfl⟩
+  ihave Hcl := kexecCloser_after Q QF k A (A.V.updEv kb) hUb $$ Hcl
+  ihave H1a2 := H1a2 $$ %(A.V.updEv kb) %hUb
+  ihave H12c := H12c $$ %(A.V.updEv kb) %hUb
+  ihave Hbufs := (show kxcBufs (GF := GF) k A ⊢ kxcBufs k { A with V := A.V.updEv kb } from .rfl)
+    $$ Hbufs
   obtain ⟨a2, a8, a9, a18, a19, a20, a21, a22, a23, a24, a25, a26, a27⟩ := hcs1
   simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] at a2 a8 a9 a18 a19 a20 a21 a22 a23 a24 a25 a26 a27
   rw [h2] at a2
@@ -967,10 +998,12 @@ theorem kxc_b1 (IUP : IUNLOCKPUT) (EO : END_OP) (PPT : PROC_PAGETABLE) (Γ : Sch
     ipureintro; exact ⟨hal, hl⟩
   unfold pptPost
   icases Hppt with ⟨⟨%root, %Mi, %hroot, Hpt, -⟩ | ⟨%⟨hr0, -⟩, -⟩⟩
-  · iapply (kxcB_ok Q QF cpu k A spie1 spp1 R1 kf qf sf gyf loyf tlyf inumf dnf bmf data gilf gislf n2
+  · iapply (kxcB_ok Q QF cpu k { A with V := A.V.updEv kb } spie1 spp1 R1 kf qf sf gyf loyf tlyf
+        inumf dnf bmf data gilf gislf n2
         ef root Mi a2 a8 a9 a18 a20 a19 a21 a23 a24 a25 a26 a27 hkf hnib hn2 hal hl a22 hroot)
       $$ [$Hk $Hpc $Hte $Hce $Hop $Hlog $Hirs $Hbs $Hpt $Hpriv $Hbufs $Hfr $Hcl $H1a2 $H12c]
-  · iapply (kxcB_fail IUP EO Γ Q QF cpu k A spie1 spp1 R1 kf qf sf gyf loyf tlyf inumf dnf bmf data
+  · iapply (kxcB_fail IUP EO Γ Q QF cpu k { A with V := A.V.updEv kb } spie1 spp1 R1 kf qf sf gyf
+        loyf tlyf inumf dnf bmf data
         gilf gislf n2 ef a2 a8 a9 a18 a20 a19 a21 a23 a24 a25 a26 a27 hkf hnib hn2 hal hl a22 hr0
         hqf hK hnoff htier hj hproc)
       $$ [$Hk $Hpc $Hte $Hce $Hfab $Hop $Hlog $Hirs $Hbs $Hpriv $Hbufs $Hfr $Hcl]

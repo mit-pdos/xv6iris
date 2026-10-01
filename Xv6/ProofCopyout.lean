@@ -9,6 +9,10 @@ chunk.  The shape here: the fourteen-slot frame, the `len = 0` early
 return (before the frame), then the page loop by induction on the bytes
 left, each iteration one `copyout_iter`.  Stated at either interrupt
 index, as the callees are.
+
+THE LEND (permit sweep L1b, Rocq b69bd0fab; threaded by L2, Rocq
+78f9234b8): the page loop (`copyout_page` / `_iter` / `_loop`) carries `∃
+k1 ≥ ke` and passes it to `vmfault`, the bound composed back to `ke`.
 -/
 import Xv6.SpecCopyout
 import Xv6.SpecWalk
@@ -334,7 +338,7 @@ theorem copyout_br_ffffffffffffff84 : KA.«copyout» + 0xffffffffffffff84#64 = K
 
 theorem copyout_br_fffffffffffffa86 : KA.«copyout» + 0xfffffffffffffa86#64 = KA.«walkaddr» := by decide
 
-theorem copyout_page (WA : WALKADDR) (VF : VMFAULT) [Xv6G GF] [CurCtx]
+theorem copyout_page (WA : WALKADDR) (VF : VMFAULT) [Xv6G GF] [WchG GF] [CurCtx]
     (k : KCtx) (γl : GName) (γk : KmemNames)
     (P : UPtd) (M : Nat → List (BitVec 8)) (bs : List (BitVec 8)) (A : Nat) (psz : BitVec 64)
     (hnoff : k.noff + 1 < 2 ^ 31) (hK : 52 ≤ k.avail) (hlk : "kmem" ∉ k.locks)
@@ -346,14 +350,15 @@ theorem copyout_page (WA : WALKADDR) (VF : VMFAULT) [Xv6G GF] [CurCtx]
     (h23 : R 23#5 = pageAddr P.root) (h27 : R 27#5 = psz)
     (h20 : R 20#5 = BitVec.ofNat 64 (A + d)) (h26 : R 26#5 = 0xFFFFFFFFFFFFF000#64)
     (h25 : R 25#5 = 0x3FFFFFFFFF#64)
-    (cur : CPU) (Res : IProp GF) :
+    (cur : CPU) (Res : IProp GF) (ke : Nat) :
     kctx cur (((k.pushed 14).withSpie spie spp).withRegs R) ∗ pcIs cur (KA.«copyout» + 0x54#64) ∗
     isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
-    procPtAt P1 (umemWrite (viewFaulted P P1 M) A (bs.take d)) ∗ Res ∗
+    procPtAt P1 (umemWrite (viewFaulted P P1 M) A (bs.take d)) ∗ Res ∗ (∃ k1 : Nat, ⌜ke ≤ k1⌝ ∗ actLend k.proc k1) ∗
     wpNext k.sie k.proc cur (fun cpu' => iprop(∀ (spie2 spp2 : Bool) (R2 : RegMap)
       (P2 : UPtd) (w : BitVec 64) (pcv : BitVec 64),
       ⌜k.sie = false → spie2 = spie ∧ spp2 = spp⌝ -∗
       kctx cpu' (((k.pushed 14).withSpie spie2 spp2).withRegs R2) -∗ pcIs cpu' pcv -∗
+      (∃ k1 : Nat, ⌜ke ≤ k1⌝ ∗ actLend k.proc k1) -∗
       procPtAt P2 (umemWrite (viewFaulted P P2 M) A (bs.take d)) -∗ Res -∗
       ⌜coKeep R R2 ∧ P.extSz psz P2 ∧ umMapped P2 A d ∧
         ((pcv = (KA.«copyout» + 0xa0#64) ∧ R2 10#5 = -1#64 ∧ ¬ uvaWmapped P (A + d)) ∨
@@ -369,7 +374,7 @@ theorem copyout_page (WA : WALKADDR) (VF : VMFAULT) [Xv6G GF] [CurCtx]
     apply BitVec.eq_of_toNat_eq
     rw [co_pgdown_toNat, BitVec.toNat_ofNat, BitVec.toNat_ofNat, Nat.mod_eq_of_lt hA64]
     omega
-  iintro ⟨Hk, Hpc, #Hlk, #Hav, HP, HRes, HΦ⟩
+  iintro ⟨Hk, Hpc, #Hlk, #Hav, HP, HRes, Hlend, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- and s1,s4,s10
   k_step_gen (wp_s_and cur _ (KA.«copyout» + 0x54#64) false 9#5 20#5 26#5 (by decide))
@@ -438,19 +443,21 @@ theorem copyout_page (WA : WALKADDR) (VF : VMFAULT) [Xv6G GF] [CurCtx]
       k_step_gen (wp_s_jal c12 _ (KA.«copyout» + 0x70#64) false 2096916#21 1#5 (by decide))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [copyout_br_ffffffffffffff84] next c13 hp13
       iintro Hk Hpc
+      icases Hlend with ⟨%k1, %hk1, Hlend⟩
       iapply (co_vmfault_call VF c13 _ γl γk P1 (umemWrite (viewFaulted P P1 M) A (bs.take d))
-        ?hn2 ?hK2 ?hl2 ?hro2 ?hsz2) $$ [- $Hk $Hpc]
+        ?hn2 ?hK2 ?hl2 ?hro2 ?hsz2 k1) $$ [- $Hk $Hpc]
       rotate_right 1
       k_norm_g
       iframe #
-      iframe HP
+      iframe HP Hlend
       case hn2 => k_norm_g; omega
       case hK2 => k_norm_g; simp only [vmfaultSlots]; omega
       case hl2 => k_norm_g; exact hlk
       case hro2 => k_norm_g; rw [hext1.1.1]
       case hsz2 => k_norm_g; exact hsz
       iapply wpNext_intro_pin
-      iintro %c14 %hp14 %spie2 %spp2 %R3 %hsp3 Hk Hpc HPost %hcs3
+      iintro %c14 %hp14 %spie2 %spp2 %R3 %hsp3 Hk Hpc Hlend HPost %hcs3
+      ihave Hlend := actLend_ret_weaken _ hk1 $$ Hlend
       have hpinB : k.sie = false ∨ k.proc = 0#64 → c14 = cur := fun h =>
         (hp14 h).trans ((hp13 h).trans ((hp12 h).trans ((hp11 h).trans ((hp10 h).trans
           ((hp9 h).trans ((hp8 h).trans ((hp7 h).trans (hpinA h))))))))
@@ -476,7 +483,7 @@ theorem copyout_page (WA : WALKADDR) (VF : VMFAULT) [Xv6G GF] [CurCtx]
         iintro Hk Hpc
         ihave HΦ' := wpNext_at _ _ _ c18 _ (fun h => (hp18 h).trans ((hp17 h).trans
           ((hp16 h).trans ((hp15 h).trans (hpinB h))))) $$ HΦ
-        iapply HΦ' $$ %spie2 %spp2 %_ %P1 %0#64 %_ %hsp3' Hk Hpc HP HRes
+        iapply HΦ' $$ %spie2 %spp2 %_ %P1 %0#64 %_ %hsp3' Hk Hpc Hlend HP HRes
         ipureintro
         refine ⟨?_, hext1, hmap1, Or.inl ⟨rfl, ?_, ?_⟩⟩
         · unfold coKeep
@@ -524,7 +531,7 @@ theorem copyout_page (WA : WALKADDR) (VF : VMFAULT) [Xv6G GF] [CurCtx]
         ihave HΦ' := wpNext_at _ _ _ c16 _ (fun h => (hp16 h).trans
           ((hp15 h).trans (hpinB h))) $$ HΦ
         iapply HΦ' $$ %spie2 %spp2 %_ %(P1.insertLeaf ((A + d) / 4096) r (PTE_W ||| PTE_U ||| PTE_R))
-          %(leafOf (BitVec.extractLsb' 12 44 r) (PTE_W ||| PTE_U ||| PTE_R)) %_ %hsp3' Hk Hpc HP HRes
+          %(leafOf (BitVec.extractLsb' 12 44 r) (PTE_W ||| PTE_U ||| PTE_R)) %_ %hsp3' Hk Hpc Hlend HP HRes
         ipureintro
         refine ⟨?_, hext2, UMemL.umMapped_ext (UMemL.ext_insertLeaf P1 _ r _ hnone) hmap1,
           Or.inr ⟨rfl, UMemL.insertLeaf_get _ _ _ _, ?_, ?_, hmax⟩⟩
@@ -545,7 +552,7 @@ theorem copyout_page (WA : WALKADDR) (VF : VMFAULT) [Xv6G GF] [CurCtx]
       have hum : get? P1.um ((A + d) / 4096) = some w := UMemL.um_of_leaves_vu P1 _ w hw hvu
       ihave HΦ' := wpNext_at _ _ _ c8 _
         (fun h => (hp8 h).trans ((hp7 h).trans (hpinA h))) $$ HΦ
-      iapply HΦ' $$ %spie %spp %_ %P1 %w %_ %(fun _ => ⟨rfl, rfl⟩) Hk Hpc HP HRes
+      iapply HΦ' $$ %spie %spp %_ %P1 %w %_ %(fun _ => ⟨rfl, rfl⟩) Hk Hpc Hlend HP HRes
       ipureintro
       refine ⟨?_, hext1, hmap1, Or.inr ⟨rfl, hum, ?_, ?_, hmax⟩⟩
       · simp only [coKeep, RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
@@ -565,7 +572,7 @@ theorem copyout_page (WA : WALKADDR) (VF : VMFAULT) [Xv6G GF] [CurCtx]
     ihave HΦ' := wpNext_at _ _ _ c3 _
       (fun h => (hp3 h).trans ((hp2 h).trans (hp1 h))) $$ HΦ
     icases UMemL.procPtAt_wf _ _ $$ HP with ⟨HP, %hwf1⟩
-    iapply HΦ' $$ %spie %spp %_ %P1 %0#64 %_ %(fun _ => ⟨rfl, rfl⟩) Hk Hpc HP HRes
+    iapply HΦ' $$ %spie %spp %_ %P1 %0#64 %_ %(fun _ => ⟨rfl, rfl⟩) Hk Hpc Hlend HP HRes
     ipureintro
     refine ⟨?_, hext1, hmap1, Or.inl ⟨rfl, ?_, co_fault_maxva P P1 (A + d) hext1.1 hwf1 hmax⟩⟩
     · simp [coKeep, RegMap.set_apply]
@@ -1014,7 +1021,7 @@ theorem copyout_check (W : WALK_NOALLOC) (MM : MEMMOVE) [Xv6G GF] [CurCtx]
 set_option maxHeartbeats 1000000 in
 /-- One turn of the page loop, from `0x80001616`. -/
 theorem copyout_iter (WA : WALKADDR) (VF : VMFAULT) (W : WALK_NOALLOC) (MM : MEMMOVE)
-    [Xv6G GF] [CurCtx]
+    [Xv6G GF] [WchG GF] [CurCtx]
     (k : KCtx) (γl : GName) (γk : KmemNames)
     (P : UPtd) (M : Nat → List (BitVec 8)) (bs : List (BitVec 8)) (A : Nat)
     (src0 : BitVec 64) (dqs : DFrac) (psz : BitVec 64) (sp : BitVec 64)
@@ -1029,14 +1036,15 @@ theorem copyout_iter (WA : WALKADDR) (VF : VMFAULT) (W : WALK_NOALLOC) (MM : MEM
     (h23 : R 23#5 = pageAddr P.root) (h24 : R 24#5 = 4096#64)
     (h25 : R 25#5 = 0x3FFFFFFFFF#64) (h26 : R 26#5 = 0xFFFFFFFFFFFFF000#64)
     (h27 : R 27#5 = psz)
-    (cur : CPU) :
+    (cur : CPU) (ke : Nat) :
     kctx cur (((k.pushed 14).withSpie spie spp).withRegs R) ∗ pcIs cur (KA.«copyout» + 0x54#64) ∗
     isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
-    procPtAt P1 (umemWrite (viewFaulted P P1 M) A (bs.take d)) ∗ byteBuf src0 dqs bs ∗
+    procPtAt P1 (umemWrite (viewFaulted P P1 M) A (bs.take d)) ∗ byteBuf src0 dqs bs ∗ (∃ k1 : Nat, ⌜ke ≤ k1⌝ ∗ actLend k.proc k1) ∗
     wpNext k.sie k.proc cur (fun cpu' => iprop(∀ (spie2 spp2 : Bool) (R2 : RegMap)
       (P3 : UPtd) (M3 : Nat → List (BitVec 8)) (d2 : Nat) (pcv : BitVec 64),
       ⌜k.sie = false → spie2 = spie ∧ spp2 = spp⌝ -∗
       kctx cpu' (((k.pushed 14).withSpie spie2 spp2).withRegs R2) -∗ pcIs cpu' pcv -∗
+      (∃ k1 : Nat, ⌜ke ≤ k1⌝ ∗ actLend k.proc k1) -∗
       procPtAt P3 M3 -∗ byteBuf src0 dqs bs -∗
       ⌜R2 2#5 = sp ∧
         ((pcv = (KA.«copyout» + 0xa0#64) ∧ coPost psz P M A bs P3 M3 (R2 10#5)) ∨
@@ -1049,20 +1057,20 @@ theorem copyout_iter (WA : WALKADDR) (VF : VMFAULT) (W : WALK_NOALLOC) (MM : MEM
           R2 26#5 = 0xFFFFFFFFFFFFF000#64 ∧ R2 25#5 = 0x3FFFFFFFFF#64 ∧
           R2 24#5 = 4096#64))⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) cur := by
-  iintro ⟨Hk, Hpc, #Hlk, #Hav, HP, Hsrc, HΦ⟩
+  iintro ⟨Hk, Hpc, #Hlk, #Hav, HP, Hsrc, Hlend, HΦ⟩
   iapply (copyout_page WA VF k γl γk P M bs A psz hnoff hK hlk hsz d (by omega) hA64 hcur P1
-    hext1 hmap1 spie spp R h23 h27 h20 h26 h25 cur (byteBuf src0 dqs bs)) $$ [- $Hk $Hpc]
+    hext1 hmap1 spie spp R h23 h27 h20 h26 h25 cur (byteBuf src0 dqs bs) ke) $$ [- $Hk $Hpc]
   rotate_right 1
   iframe #
-  iframe HP Hsrc
+  iframe HP Hsrc Hlend
   iapply wpNext_intro_pin
-  iintro %c %hp %spie2 %spp2 %R2 %P2 %w %pcv %hsp2 Hk Hpc HP Hsrc %hpost
+  iintro %c %hp %spie2 %spp2 %R2 %P2 %w %pcv %hsp2 Hk Hpc Hlend HP Hsrc %hpost
   obtain ⟨hkeep, hext2, hmap2, hcase⟩ := hpost
   obtain ⟨j2, j18, j20, j21, j22, j23, j24, j25, j26, j27⟩ := hkeep
   rcases hcase with ⟨hpcv, hm1⟩ | ⟨hpcv, hum, h19', h9', hmax⟩
   · subst hpcv
     ihave HΦ' := wpNext_at _ _ _ c _ hp $$ HΦ
-    iapply HΦ' $$ %spie2 %spp2 %R2 %P2 %_ %d %_ %hsp2 Hk Hpc HP Hsrc
+    iapply HΦ' $$ %spie2 %spp2 %R2 %P2 %_ %d %_ %hsp2 Hk Hpc Hlend HP Hsrc
     ipureintro
     exact ⟨j2.trans hsp, Or.inl ⟨rfl, hext2, Or.inr ⟨hm1.1, d, by omega, rfl, hmap2, hA64, hm1.2⟩⟩⟩
   · subst hpcv
@@ -1078,19 +1086,19 @@ theorem copyout_iter (WA : WALKADDR) (VF : VMFAULT) (W : WALK_NOALLOC) (MM : MEM
     ihave HΦ' := wpNext_at _ _ _ c2 _ hp2 $$ HΦ
     iapply HΦ' $$ %spie3 %spp3 %R3 %P3 %M3 %d2 %pcv2
       %(fun hh => ⟨((hsp3 hh).1.trans (hsp2 hh).1), ((hsp3 hh).2.trans (hsp2 hh).2)⟩)
-      Hk Hpc HP Hsrc
+      Hk Hpc Hlend HP Hsrc
     ipureintro
     exact hpost3
 
 set_option maxHeartbeats 1000000 in
 /-- The page loop: from `0x80001616` to the epilogue. -/
 theorem copyout_loop (WA : WALKADDR) (VF : VMFAULT) (W : WALK_NOALLOC) (MM : MEMMOVE)
-    [Xv6G GF] [CurCtx]
+    [Xv6G GF] [WchG GF] [CurCtx]
     (k : KCtx) (γl : GName) (γk : KmemNames)
     (P : UPtd) (M : Nat → List (BitVec 8)) (bs : List (BitVec 8)) (A : Nat)
     (src0 : BitVec 64) (dqs : DFrac) (psz : BitVec 64) (sp : BitVec 64)
     (hnoff : k.noff + 1 < 2 ^ 31) (hK : 52 ≤ k.avail) (hlk : "kmem" ∉ k.locks)
-    (hsz : psz.toNat ≤ 2 ^ 38) (hlen' : bs.length < 2 ^ 63) (fuel : Nat) :
+    (hsz : psz.toNat ≤ 2 ^ 38) (hlen' : bs.length < 2 ^ 63) (ke : Nat) (fuel : Nat) :
     ∀ (d : Nat) (_ : bs.length - d ≤ fuel) (_ : d < bs.length) (_ : A + d < 2 ^ 64)
       (_ : d = 0 ∨ (A + d) % 4096 = 0)
       (P1 : UPtd) (_ : P.extSz psz P1) (_ : umMapped P1 A d)
@@ -1102,12 +1110,13 @@ theorem copyout_loop (WA : WALKADDR) (VF : VMFAULT) (W : WALK_NOALLOC) (MM : MEM
       (_ : R 27#5 = psz) (cur : CPU),
     kctx cur (((k.pushed 14).withSpie spie spp).withRegs R) ∗ pcIs cur (KA.«copyout» + 0x54#64) ∗
     isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
-    procPtAt P1 (umemWrite (viewFaulted P P1 M) A (bs.take d)) ∗ byteBuf src0 dqs bs ∗
+    procPtAt P1 (umemWrite (viewFaulted P P1 M) A (bs.take d)) ∗ byteBuf src0 dqs bs ∗ (∃ k1 : Nat, ⌜ke ≤ k1⌝ ∗ actLend k.proc k1) ∗
     wpNext k.sie k.proc cur (fun cpu' => iprop(∀ (spie2 spp2 : Bool) (R2 : RegMap)
       (P3 : UPtd) (M3 : Nat → List (BitVec 8)),
       ⌜k.sie = false → spie2 = spie ∧ spp2 = spp⌝ -∗
       kctx cpu' (((k.pushed 14).withSpie spie2 spp2).withRegs R2) -∗
       pcIs cpu' (KA.«copyout» + 0xa0#64) -∗
+      (∃ k1 : Nat, ⌜ke ≤ k1⌝ ∗ actLend k.proc k1) -∗
       procPtAt P3 M3 -∗ byteBuf src0 dqs bs -∗
       ⌜R2 2#5 = sp ∧ coPost psz P M A bs P3 M3 (R2 10#5)⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) cur := by
@@ -1117,21 +1126,21 @@ theorem copyout_loop (WA : WALKADDR) (VF : VMFAULT) (W : WALK_NOALLOC) (MM : MEM
     exact absurd hf (by omega)
   | succ fuel ih =>
     intro d hf hd hA64 hcur P1 hext1 hmap1 spie spp R hsp h20 h21 h22 h23 h24 h25 h26 h27 cur
-    iintro ⟨Hk, Hpc, #Hlk, #Hav, HP, Hsrc, HΦ⟩
+    iintro ⟨Hk, Hpc, #Hlk, #Hav, HP, Hsrc, Hlend, HΦ⟩
     iapply (copyout_iter WA VF W MM k γl γk P M bs A src0 dqs psz sp hnoff hK hlk hsz hlen'
-      d hd hA64 hcur P1 hext1 hmap1 spie spp R hsp h20 h21 h22 h23 h24 h25 h26 h27 cur)
+      d hd hA64 hcur P1 hext1 hmap1 spie spp R hsp h20 h21 h22 h23 h24 h25 h26 h27 cur ke)
       $$ [- $Hk $Hpc $HP $Hsrc]
     rotate_right 1
     iframe #
     iframe
     iapply wpNext_intro_pin
-    iintro %c %hp %spie2 %spp2 %R2 %P2 %M2 %d2 %pcv %hsp2 Hk Hpc HP Hsrc %hpost
+    iintro %c %hp %spie2 %spp2 %R2 %P2 %M2 %d2 %pcv %hsp2 Hk Hpc Hlend HP Hsrc %hpost
     obtain ⟨hs2, hcase⟩ := hpost
     rcases hcase with ⟨hpcv, hres⟩ | ⟨hpcv, hlt2, hd2, hext2, hM2, hmap2, hle2, hmod2, e23, e27, e20,
       e22, e21, e26, e25, e24⟩
     · subst hpcv
       ihave HΦ' := wpNext_at _ _ _ c _ hp $$ HΦ
-      iapply HΦ' $$ %spie2 %spp2 %R2 %P2 %M2 %hsp2 Hk Hpc HP Hsrc
+      iapply HΦ' $$ %spie2 %spp2 %R2 %P2 %M2 %hsp2 Hk Hpc Hlend HP Hsrc
       ipureintro
       exact ⟨hs2, hres⟩
     · subst hpcv
@@ -1143,11 +1152,11 @@ theorem copyout_loop (WA : WALKADDR) (VF : VMFAULT) (W : WALK_NOALLOC) (MM : MEM
       iframe #
       iframe
       iapply wpNext_intro_pin
-      iintro %c2 %hp2 %spie3 %spp3 %R3 %P3 %M3 %hsp3 Hk Hpc HP Hsrc %hpost3
+      iintro %c2 %hp2 %spie3 %spp3 %R3 %P3 %M3 %hsp3 Hk Hpc Hlend HP Hsrc %hpost3
       ihave HΦ' := wpNext_at _ _ _ c2 _ hp2 $$ HΦ
       iapply HΦ' $$ %spie3 %spp3 %R3 %P3 %M3
         %(fun hh => ⟨((hsp3 hh).1.trans (hsp2 hh).1), ((hsp3 hh).2.trans (hsp2 hh).2)⟩)
-        Hk Hpc HP Hsrc
+        Hk Hpc Hlend HP Hsrc
       ipureintro
       exact hpost3
 
@@ -1162,9 +1171,9 @@ theorem copyout_proof (WA : WALKADDR) (VF : VMFAULT) (W : WALK_NOALLOC) (MM : ME
   unfold wp_copyout_body
   simp only [copyoutAddr]
   iintro ⟨Hk, Hpc, #Hlk, #Hav, HP, Hsrc, Hlend, HΦ⟩
-  -- the lend (permit sweep L1b): no callee takes it yet, so it is framed
-  -- through the continuation once, here
-  ihave HΦ := actLend_cont_frame _ _ _ _ _ _ _ _ _ $$ HΦ Hlend
+  -- the lend (permit sweep L2), in the shape every arm hands back; the page
+  -- loop passes it to `vmfault`
+  ihave Hlend := actLend_ret_intro _ _ $$ Hlend
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   by_cases hnil : bs.length = 0
   · -- nothing to copy
@@ -1183,7 +1192,7 @@ theorem copyout_proof (WA : WALKADDR) (VF : VMFAULT) (W : WALK_NOALLOC) (MM : ME
     iintro Hk Hpc
     ihave Hk := MachCSL.kctx_self c3 k _ $$ Hk
     ihave HΦ' := wpNext_at _ _ _ c3 _ (fun h => (hp3 h).trans ((hp2 h).trans (hp1 h))) $$ HΦ
-    iapply HΦ' $$ %k.spie %k.spp %_ %(fun _ => ⟨rfl, rfl⟩) Hk Hpc Hsrc [HP]
+    iapply HΦ' $$ %k.spie %k.spp %_ %(fun _ => ⟨rfl, rfl⟩) Hk Hpc Hlend Hsrc [HP]
     · iexists P, M
       isplitr [HP]
       · ipureintro
@@ -1255,7 +1264,7 @@ theorem copyout_proof (WA : WALKADDR) (VF : VMFAULT) (W : WALK_NOALLOC) (MM : ME
         kctx c11 (((k.pushed 14).withSpie k.spie k.spp).withRegs _) from
       MachCSL.kctx_self c11 (k.pushed 14) _) $$ Hk
     iapply (copyout_loop WA VF W MM k γl γk P M bs (k.regs 12#5).toNat (k.regs 13#5) dqs
-      (k.regs 11#5) (k.regs 2#5 + 0xFFFFFFFFFFFFFF90#64) hnoff hK hlk hsz hlen' bs.length
+      (k.regs 11#5) (k.regs 2#5 + 0xFFFFFFFFFFFFFF90#64) hnoff hK hlk hsz hlen' ke bs.length
       0 (by omega) (by omega) (by simpa using (k.regs 12#5).isLt)
       (Or.inl rfl) P (UMemL.extSz_refl _ P) (UMemL.umMapped_zero P _) k.spie k.spp _
       ?hsp0 ?h20' ?h21' ?h22' ?h23' ?h24' ?h25' ?h26' ?h27' c11) $$ [- $Hk $Hpc $Hsrc]
@@ -1275,7 +1284,7 @@ theorem copyout_proof (WA : WALKADDR) (VF : VMFAULT) (W : WALK_NOALLOC) (MM : ME
     case h26' => simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
     case h27' => simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
     iapply wpNext_intro_pin
-    iintro %c12 %hp12 %spie2 %spp2 %R2 %P3 %M3 %hsp2 Hk Hpc HP Hsrc %hpost
+    iintro %c12 %hp12 %spie2 %spp2 %R2 %P3 %M3 %hsp2 Hk Hpc Hlend HP Hsrc %hpost
     obtain ⟨hs2, hres⟩ := hpost
     rw [MachCSL.KCtx.withSpie_pushed] at *
     iapply (wp_epilogue14_gen c12 (k.withSpie spie2 spp2) (KA.«copyout» + 0xa0#64)
@@ -1292,7 +1301,7 @@ theorem copyout_proof (WA : WALKADDR) (VF : VMFAULT) (W : WALK_NOALLOC) (MM : ME
     iintro %c13 %hp13 Hk Hpc
     k_norm_g
     ihave HΦ' := wpNext_at _ _ _ c13 _ (fun h => (hp13 h).trans ((hp12 h).trans (hpinA h))) $$ HΦ
-    iapply HΦ' $$ %spie2 %spp2 %_ %hsp2 Hk Hpc Hsrc [HP]
+    iapply HΦ' $$ %spie2 %spp2 %_ %hsp2 Hk Hpc Hlend Hsrc [HP]
     · iexists P3, M3
       isplitr [HP]
       · ipureintro

@@ -11,6 +11,11 @@ address space, which both fixed pages share.  A failure of either
 `mappages` frees what was built (`uvmunmap` of the trampoline leaf, then
 `uvmfree`) and returns `0`.  The call rules it shares with
 `proc_freepagetable` are in `Xv6/ProcPagetableDefs.lean`.
+
+THE LEND (permit sweep L2, Rocq 78f9234b8): passed to each `mappages`,
+`uvmunmap` and `uvmfree` in turn, each taking it at the count the previous
+one returned, the bounds composed back to `ke`; `uvmcreate` does not take
+it yet (it stays in the frame across that call).
 -/
 import Xv6.SpecProcPagetable
 import Xv6.ProcPagetableDefs
@@ -98,10 +103,10 @@ set_option maxHeartbeats 4000000 in
 set_option maxRecDepth 100000 in
 theorem proc_pagetable_proof (UC : UVMCREATE) (MP : MAPPAGES_ANY) (UM : UVMUNMAP) (UF : UVMFREE) :
     PROC_PAGETABLE :=
-  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ cpu k γl γk on tf dq hnoff hK hlk htf htfv => by
+  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ cpu k γl γk on tf dq ke hnoff hK hlk htf htfv => by
   unfold wp_proc_pagetable_body
   simp only [procPagetableAddr]
-  iintro ⟨Hk, Hpc, #Hlk, Hav, Htf, HΦ⟩
+  iintro ⟨Hk, Hpc, #Hlk, Hav, Htf, Hlend, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   have hK4 : 4 ≤ k.avail := by unfold procPagetableSlots at hK; omega
   have htfa : pageAddr (BitVec.extractLsb' 12 44 tf) = tf := Xv6.Kvm.pageAddr_of_valid tf htfv
@@ -159,7 +164,8 @@ theorem proc_pagetable_proof (UC : UVMCREATE) (MP : MAPPAGES_ANY) (UM : UVMUNMAP
     · ihave HΦ := wpNext_shift _ _ _ _ _ hpin $$ HΦ
       iapply wpNext_mono _ _ _ _ _ $$ HΦ
       iintro %c' HΦ %R'' Hk Hpc %hpost
-      iapply HΦ $$ %spie1 %spp1 %R'' %hsp1 Hk Hpc Htf [Hav]
+      ihave Hlend := actLend_ret_intro _ _ $$ Hlend
+      iapply HΦ $$ %spie1 %spp1 %R'' %hsp1 Hk Hpc Hlend Htf [Hav]
       · unfold pptPost
         iright
         isplitl []
@@ -218,11 +224,11 @@ theorem proc_pagetable_proof (UC : UVMCREATE) (MP : MAPPAGES_ANY) (UM : UVMUNMAP
       intro i hi
       exact MachCSL.PTree.zeroNode_walk b 2 _
     iapply (pp_mappages_call MP c14 _ γl γk (availDec on) (PTree.zeroNode b) 1 10#64
-      ?hn2 ?hK2 ?hl2 ?hr2 ?hg2 ?hpm2 ?hmk2 ?hrw2 ?hwf2 ?hnd2 ?hpg2) $$ [- $Hk $Hpc]
+      ?hn2 ?hK2 ?hl2 ?hr2 ?hg2 ?hpm2 ?hmk2 ?hrw2 ?hwf2 ?hnd2 ?hpg2 ke) $$ [- $Hk $Hpc]
     rotate_right 1
     k_norm_g
     iframe #
-    iframe Htree Hav
+    iframe Htree Hav Hlend
     case hn2 => k_norm_g; omega
     case hK2 => k_norm_g; unfold procPagetableSlots at hK; omega
     case hl2 => k_norm_g; exact hlk
@@ -235,7 +241,7 @@ theorem proc_pagetable_proof (UC : UVMCREATE) (MP : MAPPAGES_ANY) (UM : UVMUNMAP
     case hnd2 => exact hrep0.2.1
     case hpg2 => exact hrep0.2.2.1
     iapply wpNext_intro_pin
-    iintro %c15 %hp15 %spie2 %spp2 %R2 %fresh1 %hsp2 Hk Hpc Htree Hav %hres2
+    iintro %c15 %hp15 %spie2 %spp2 %R2 %fresh1 %hsp2 Hk Hpc ⟨%k1, %hk1, Hlend⟩ Htree Hav %hres2
     k_norm_g [pp_ret_19e0, vpnOf_tramp, trampPpn_eq, MachCSL.KCtx.withSpie_twice]
     k_norm_g [vpnOf_tramp, trampPpn_eq] at hres2
     obtain ⟨hcs2, hsup2, hnd1, hfr1, hr2⟩ := hres2
@@ -302,11 +308,11 @@ theorem proc_pagetable_proof (UC : UVMCREATE) (MP : MAPPAGES_ANY) (UM : UVMUNMAP
       iintro Hk Hpc
       iapply (pp_mappages_call MP c24 _ γl γk (availSub (availDec on) 2)
         ((PTree.zeroNode b).mapRun trampVpn trampPpn 10#64 1 fresh1).1 1 6#64
-        ?hn5 ?hK5 ?hl5 ?hr5 ?hg5 ?hpm5 ?hmk5 ?hrw5 ?hwf5 ?hnd5 ?hpg5) $$ [- $Hk $Hpc]
+        ?hn5 ?hK5 ?hl5 ?hr5 ?hg5 ?hpm5 ?hmk5 ?hrw5 ?hwf5 ?hnd5 ?hpg5 k1) $$ [- $Hk $Hpc]
       rotate_right 1
       k_norm_g
       iframe #
-      iframe Htree Hav
+      iframe Htree Hav Hlend
       case hn5 => k_norm_g; omega
       case hK5 => k_norm_g; unfold procPagetableSlots at hK; omega
       case hl5 => k_norm_g; exact hlk
@@ -319,7 +325,7 @@ theorem proc_pagetable_proof (UC : UVMCREATE) (MP : MAPPAGES_ANY) (UM : UVMUNMAP
       case hnd5 => exact hrep1.2.1
       case hpg5 => exact hrep1.2.2.1
       iapply wpNext_intro_pin
-      iintro %c25 %hp25 %spie3 %spp3 %R3 %fresh2 %hsp3 Hk Hpc Htree Hav %hres3
+      iintro %c25 %hp25 %spie3 %spp3 %R3 %fresh2 %hsp3 Hk Hpc ⟨%k2, %hk2, Hlend⟩ Htree Hav %hres3
       k_norm_g [pp_ret_19fa, vpnOf_tf, MachCSL.KCtx.withSpie_twice]
       k_norm_g [vpnOf_tf] at hres3
       obtain ⟨hcs3, hsup3, hnd2, hfr2, hr3⟩ := hres3
@@ -360,7 +366,9 @@ theorem proc_pagetable_proof (UC : UVMCREATE) (MP : MAPPAGES_ANY) (UM : UVMUNMAP
         · ihave HΦ := wpNext_shift _ _ _ _ _ hpin $$ HΦ
           iapply wpNext_mono _ _ _ _ _ $$ HΦ
           iintro %c' HΦ %R'' Hk Hpc %hpost
-          iapply HΦ $$ %spie3 %spp3 %R'' %hspB Hk Hpc Htf [HT HU Hav]
+          ihave Hlend := actLend_ret_intro _ _ $$ Hlend
+          ihave Hlend := actLend_ret_weaken _ (Nat.le_trans hk1 hk2) $$ Hlend
+          iapply HΦ $$ %spie3 %spp3 %R'' %hspB Hk Hpc Hlend Htf [HT HU Hav]
           · unfold pptPost procPagetableNodes
             ileft
             iexists b
@@ -427,10 +435,10 @@ theorem proc_pagetable_proof (UC : UVMCREATE) (MP : MAPPAGES_ANY) (UM : UVMUNMAP
           from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [proc_pagetable_br_fffffffffffff810] next c33 hp33
         iintro Hk Hpc
         iapply (pp_uvmunmap_call UM c33 _ b (insert ∅ trampVpn.toNat trampLeaf) 1
-          ?hK7 ?hr7 ?ha7 ?hn7 ?hg7 ?hf7) $$ [- $Hk $Hpc]
+          ?hK7 ?hr7 ?ha7 ?hn7 ?hg7 ?hf7 k2) $$ [- $Hk $Hpc]
         rotate_right 1
         k_norm_g
-        iframe HT
+        iframe HT Hlend
         case hK7 =>
           k_norm_g; unfold uvmunmapSlots; unfold procPagetableSlots at hK; omega
         case hr7 => k_norm_g; rw [d9, b9]; exact hb0
@@ -439,7 +447,7 @@ theorem proc_pagetable_proof (UC : UVMCREATE) (MP : MAPPAGES_ANY) (UM : UVMUNMAP
         case hg7 => k_norm_g; decide
         case hf7 => k_norm_g
         iapply wpNext_intro_pin
-        iintro %c34 %hp34 %R4 Hk Hpc HT %hcs4
+        iintro %c34 %hp34 %R4 Hk Hpc ⟨%k3, %hk3, Hlend⟩ HT %hcs4
         k_norm_g [pp_ret_1a2a, vpnOf_tramp_toNat, delRunL_one, delete_tramp_empty]
         unfold calleeSaved at hcs4
         k_norm_g at hcs4
@@ -463,11 +471,11 @@ theorem proc_pagetable_proof (UC : UVMCREATE) (MP : MAPPAGES_ANY) (UM : UVMUNMAP
           from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [proc_pagetable_br_fffffffffffff9e4] next c37 hp37
         iintro Hk Hpc
         iapply (pp_uvmfree_call UF c37 _ γl γk (UPtd.mk b (BitVec.extractLsb' 12 44 tf) ∅)
-          (fun _ => []) ?hn8 ?hKu8 ?hl8 ?hr8 ?hs8 ?hw8 ?hb8) $$ [- $Hk $Hpc]
+          (fun _ => []) ?hn8 ?hKu8 ?hl8 ?hr8 ?hs8 ?hw8 ?hb8 k3) $$ [- $Hk $Hpc]
         rotate_right 1
         k_norm_g
         iframe #
-        iframe HT HU
+        iframe HT HU Hlend
         case hn8 => k_norm_g; omega
         case hKu8 => k_norm_g; unfold uvmfreeSlots; unfold procPagetableSlots at hK; omega
         case hl8 => k_norm_g; exact hlk
@@ -476,7 +484,8 @@ theorem proc_pagetable_proof (UC : UVMCREATE) (MP : MAPPAGES_ANY) (UM : UVMUNMAP
         case hw8 => exact uptWf_empty b _ (by rw [htfa]; exact htfv)
         case hb8 => exact umBelow_empty _ b _
         iapply wpNext_intro_pin
-        iintro %c38 %hp38 %spie4 %spp4 %R5 %hsp4 Hk Hpc %hcs5
+        iintro %c38 %hp38 %spie4 %spp4 %R5 %hsp4 Hk Hpc Hlend %hcs5
+        ihave Hlend := actLend_ret_weaken _ (Nat.le_trans hk1 (Nat.le_trans hk2 hk3)) $$ Hlend
         k_norm_g [pp_ret_1a32, MachCSL.KCtx.withSpie_twice]
         unfold calleeSaved at hcs5
         k_norm_g at hcs5
@@ -501,7 +510,7 @@ theorem proc_pagetable_proof (UC : UVMCREATE) (MP : MAPPAGES_ANY) (UM : UVMUNMAP
         · ihave HΦ := wpNext_shift _ _ _ _ _ hpin $$ HΦ
           iapply wpNext_mono _ _ _ _ _ $$ HΦ
           iintro %c' HΦ %R'' Hk Hpc %hpost
-          iapply HΦ $$ %spie4 %spp4 %R'' %hspC Hk Hpc Htf []
+          iapply HΦ $$ %spie4 %spp4 %R'' %hspC Hk Hpc Hlend Htf []
           · unfold pptPost procPagetableNodes
             iright
             isplitl []
@@ -560,11 +569,11 @@ theorem proc_pagetable_proof (UC : UVMCREATE) (MP : MAPPAGES_ANY) (UM : UVMUNMAP
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [proc_pagetable_br_fffffffffffff9e4] next c19 hp19
       iintro Hk Hpc
       iapply (pp_uvmfree_call UF c19 _ γl γk (UPtd.mk b (BitVec.extractLsb' 12 44 tf) ∅)
-        (fun _ => []) ?hn6 ?hKu6 ?hl6 ?hr6 ?hs6 ?hw6 ?hb6) $$ [- $Hk $Hpc]
+        (fun _ => []) ?hn6 ?hKu6 ?hl6 ?hr6 ?hs6 ?hw6 ?hb6 k1) $$ [- $Hk $Hpc]
       rotate_right 1
       k_norm_g
       iframe #
-      iframe HT HU
+      iframe HT HU Hlend
       case hn6 => k_norm_g; omega
       case hKu6 => k_norm_g; unfold uvmfreeSlots; unfold procPagetableSlots at hK; omega
       case hl6 => k_norm_g; exact hlk
@@ -573,7 +582,8 @@ theorem proc_pagetable_proof (UC : UVMCREATE) (MP : MAPPAGES_ANY) (UM : UVMUNMAP
       case hw6 => exact uptWf_empty b _ (by rw [htfa]; exact htfv)
       case hb6 => exact umBelow_empty _ b _
       iapply wpNext_intro_pin
-      iintro %c20 %hp20 %spie3 %spp3 %R3 %hsp3 Hk Hpc %hcs3
+      iintro %c20 %hp20 %spie3 %spp3 %R3 %hsp3 Hk Hpc Hlend %hcs3
+      ihave Hlend := actLend_ret_weaken _ hk1 $$ Hlend
       k_norm_g [pp_ret_1a14, MachCSL.KCtx.withSpie_twice]
       unfold calleeSaved at hcs3
       k_norm_g at hcs3
@@ -597,7 +607,7 @@ theorem proc_pagetable_proof (UC : UVMCREATE) (MP : MAPPAGES_ANY) (UM : UVMUNMAP
       · ihave HΦ := wpNext_shift _ _ _ _ _ hpin $$ HΦ
         iapply wpNext_mono _ _ _ _ _ $$ HΦ
         iintro %c' HΦ %R'' Hk Hpc %hpost
-        iapply HΦ $$ %spie3 %spp3 %R'' %hspB Hk Hpc Htf []
+        iapply HΦ $$ %spie3 %spp3 %R'' %hspB Hk Hpc Hlend Htf []
         · unfold pptPost
           iright
           isplitl []

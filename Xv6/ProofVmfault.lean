@@ -8,6 +8,10 @@ unmapped (`ismapped`), then `kalloc`s a page, `memset`s it to zero and
 `mappages` it at `PGROUNDDOWN(va)`; every failure returns `0` after
 freeing what it took.  The arithmetic facts, the frame and the call rules
 are in `Xv6/VmfaultDefs.lean`.
+
+THE LEND (permit sweep L2, Rocq 78f9234b8): passed to `mappages` (its
+returned bound is the contract's on the two arms past it); the arms that
+fail before it hand the lend back at `ke`.
 -/
 import Xv6.SpecVmfault
 import Xv6.VmfaultDefs
@@ -25,7 +29,7 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 set_option maxRecDepth 8000
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF]
 
 /-! ## `vmfault` -/
 
@@ -44,10 +48,10 @@ set_option maxHeartbeats 4000000 in
 at `(KernelSyms.«vmfault» + 0x1c)` with the three spare slots still free. -/
 theorem vmfault_proof (IM : ISMAPPED) (KAL : KALLOC) (KF : KFREE) (MS : MEMSET)
     (MA : MAPPAGES_ANY) : VMFAULT :=
-  ⟨fun {hlc GF} _ _ _ cpu k γl γk P M hnoff hK hlk hroot hsz => by
+  ⟨fun {hlc GF} _ _ _ _ cpu k γl γk P M ke hnoff hK hlk hroot hsz => by
   unfold wp_vmfault_body
   simp only [vmfaultAddr]
-  iintro ⟨Hk, Hpc, #Hlk, #Hav, Hpt, HΦ⟩
+  iintro ⟨Hk, Hpc, #Hlk, #Hav, Hpt, Hlend, HΦ⟩
   have hK38 : 38 ≤ k.avail := hK
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   k_norm_g
@@ -217,7 +221,8 @@ theorem vmfault_proof (IM : ISMAPPED) (KAL : KALLOC) (KF : KFREE) (MS : MEMSET)
         iapply wpNext_mono _ _ _ _ _ $$ HΦ
         iintro %c27 HΦ %R' Hk Hpc %hfacts
         obtain ⟨h10, h1, h2, h8, h20, hrest⟩ := hfacts
-        iapply HΦ $$ %spie %spp %R' %hsp Hk Hpc [Hpt]
+        ihave Hlend := actLend_ret_intro _ _ $$ Hlend
+        iapply HΦ $$ %spie %spp %R' %hsp Hk Hpc Hlend [Hpt]
         · ileft
           isplitl []
           · ipureintro
@@ -294,11 +299,11 @@ theorem vmfault_proof (IM : ISMAPPED) (KAL : KALLOC) (KF : KFREE) (MS : MEMSET)
           subst this
           simpa using hrep.2.2.2.2 _ hnone
         iapply (vf_mappages_call MA c33 _ γl γk none t 1 22#64 ?hn2 ?hK2 ?hl2 ?hro2 ?hag2 ?hpm2
-          vf_perm_mask vf_perm_rwx hrep.1 hrep.2.1 hrep.2.2.1) $$ [- $Hk $Hpc]
+          vf_perm_mask vf_perm_rwx hrep.1 hrep.2.1 hrep.2.2.1 ke) $$ [- $Hk $Hpc]
         rotate_right 1
         k_norm_g
         iframe #
-        iframe Htree
+        iframe Htree Hlend
         case hn2 => k_norm_g; omega
         case hK2 => k_norm_g; omega
         case hl2 => k_norm_g; exact hlk
@@ -315,7 +320,7 @@ theorem vmfault_proof (IM : ISMAPPED) (KAL : KALLOC) (KF : KFREE) (MS : MEMSET)
           · rw [m18]; exact vf_page_lt _ hvalid
           · rw [e19]; exact hblock
         iapply wpNext_intro_pin
-        iintro %c34 %hp34 %spie2 %spp2 %R5 %fresh %hsp2 Hk Hpc Htree _ %hpost5
+        iintro %c34 %hp34 %spie2 %spp2 %R5 %fresh %hsp2 Hk Hpc Hlend Htree _ %hpost5
         k_norm_g [vf_ret_14f2, MachCSL.KCtx.withSpie_pushed, MachCSL.KCtx.withSpie_twice]
         obtain ⟨hcs5, hsup, hfrnd, hfrpg, hres⟩ := hpost5
         unfold calleeSaved at hcs5
@@ -441,7 +446,7 @@ theorem vmfault_proof (IM : ISMAPPED) (KAL : KALLOC) (KF : KFREE) (MS : MEMSET)
           iapply wpNext_mono _ _ _ _ _ $$ HΦ
           iintro %c40 HΦ %R' Hk Hpc %hfacts
           obtain ⟨h10, h1, h2, h8, h20, hrest⟩ := hfacts
-          iapply HΦ $$ %spie2 %spp2 %R' %hsp' Hk Hpc [Hpt]
+          iapply HΦ $$ %spie2 %spp2 %R' %hsp' Hk Hpc Hlend [Hpt]
           · iright
             iexists (R3 10#5)
             isplitl []
@@ -575,7 +580,7 @@ theorem vmfault_proof (IM : ISMAPPED) (KAL : KALLOC) (KF : KFREE) (MS : MEMSET)
           iapply wpNext_mono _ _ _ _ _ $$ HΦ
           iintro %c44 HΦ %R' Hk Hpc %hfacts
           obtain ⟨h10, h1, h2, h8, h20, hrest⟩ := hfacts
-          iapply HΦ $$ %spie3 %spp3 %R' %hsp'' Hk Hpc [Hpt]
+          iapply HΦ $$ %spie3 %spp3 %R' %hsp'' Hk Hpc Hlend [Hpt]
           · ileft
             isplitl []
             · ipureintro
@@ -623,7 +628,8 @@ theorem vmfault_proof (IM : ISMAPPED) (KAL : KALLOC) (KF : KFREE) (MS : MEMSET)
       iintro %c21 HΦ %R' Hk Hpc %hfacts
       obtain ⟨h10, h1, h2, h8, h20, hrest⟩ := hfacts
       ihave Hk := vf_kctx_withSpie_self c21 k R' $$ Hk
-      iapply HΦ $$ %k.spie %k.spp %R' %(fun _ => ⟨rfl, rfl⟩) Hk Hpc [Hpt]
+      ihave Hlend := actLend_ret_intro _ _ $$ Hlend
+      iapply HΦ $$ %k.spie %k.spp %R' %(fun _ => ⟨rfl, rfl⟩) Hk Hpc Hlend [Hpt]
       · ileft
         isplitl []
         · ipureintro
@@ -658,7 +664,8 @@ theorem vmfault_proof (IM : ISMAPPED) (KAL : KALLOC) (KF : KFREE) (MS : MEMSET)
     iintro %c8 HΦ %R' Hk Hpc %hfacts
     obtain ⟨h10, h1, h2, h8, h20, hrest⟩ := hfacts
     ihave Hk := vf_kctx_withSpie_self c8 k R' $$ Hk
-    iapply HΦ $$ %k.spie %k.spp %R' %(fun _ => ⟨rfl, rfl⟩) Hk Hpc [Hpt]
+    ihave Hlend := actLend_ret_intro _ _ $$ Hlend
+    iapply HΦ $$ %k.spie %k.spp %R' %(fun _ => ⟨rfl, rfl⟩) Hk Hpc Hlend [Hpt]
     · ileft
       isplitl []
       · ipureintro

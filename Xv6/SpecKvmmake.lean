@@ -14,6 +14,12 @@ it; the stack pages come back owned.  Stated at either interrupt index
 slots (its frame of 4, then `proc_mapstacks`'s 44) and returns them;
 the callee-saved registers are preserved.
 
+THE BOOT HART HAS NO CURRENT PROC (permit sweep L2, Rocq 78f9234b8; design
+ni-strong-instance.md §7): the kernel page table is built at `k.proc = 0`
+(`hp0`, which main supplies), so `mappages`' lend is the left disjunct
+(`SlotGen.actLend_zero`) -- the boot lends nothing.  `[WchG GF]` joins the
+binders (Rocq's `!wchG Σ`).
+
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
 import Xv6.SpecProcMapstacks
@@ -36,10 +42,11 @@ def kvmTableOk (t : PTree) (pas : Nat → BitVec 44) : Prop :=
   (∀ i, i < 64 → pageValid (pageAddr (pas i)) ∧ pas i ∉ t.pages 2)
 
 /-- The specification of `kvmmake` (counted mode). -/
-def wp_kvmmake_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+def wp_kvmmake_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γl : GName) (γk : KmemNames) (nb : Nat)
     (hnoff : k.noff + 1 < 2 ^ 31) (hK : 48 ≤ k.avail) (hlk : "kmem" ∉ k.locks)
-    (hcount : kvmmakeCount < nb) : Prop :=
+    (hcount : kvmmakeCount < nb)
+    (hp0 : k.proc = 0#64) : Prop :=
   kctx cpu k ∗ pcIs cpu kvmmakeAddr ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
   kallocAvail γk (some nb) ∗
   wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ (R' : RegMap)
@@ -54,8 +61,8 @@ def wp_kvmmake_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G 
 
 /-- The interface of `kvmmake`. -/
 structure KVMMAKE : Prop where
-  wp_kvmmake : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx] (cpu : CPU) (k : KCtx)
-    (γl : GName) (γk : KmemNames) (nb : Nat) hnoff hK hlk hcount,
-    wp_kvmmake_body (hlc := hlc) (GF := GF) cpu k γl γk nb hnoff hK hlk hcount
+  wp_kvmmake : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx] (cpu : CPU) (k : KCtx)
+    (γl : GName) (γk : KmemNames) (nb : Nat) hnoff hK hlk hcount hp0,
+    wp_kvmmake_body (hlc := hlc) (GF := GF) cpu k γl γk nb hnoff hK hlk hcount hp0
 
 end Xv6

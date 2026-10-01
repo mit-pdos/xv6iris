@@ -6,6 +6,10 @@ The shape: the two-slot frame, the three-register shuffle that swaps `pa`
 and `sz` into `mappages`' argument order, the call, the `bnez a0` that the
 counted mode never takes (`mappages` returned `0`), and the epilogue.
 Stated at either interrupt index, as `mappages` is.
+
+THE BOOT LENDS NOTHING (permit sweep L2, Rocq 78f9234b8): `kvmmap` runs at
+`k.proc = 0` (`hp0`), so `mappages`' lend is `SlotGen.actLend_of_zero` and
+the lend it hands back is dropped (`kvm_mappages_call`).
 -/
 import Xv6.SpecKvmmap
 import Xv6.CodeTactics
@@ -27,7 +31,7 @@ theorem kvm_ret_10ac : jumpPc (KA.«kvmmap» + 0x12#64) = (KA.«kvmmap» + 0x12#
   decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF]
 
 /-! ## The callee, at its entry address -/
 
@@ -42,7 +46,7 @@ theorem kvm_mappages_call (MP : MAPPAGES) [CurCtx] (c : CPU) (k' : KCtx)
     (hrwx : perm &&& 0xE#64 ≠ 0#64)
     (hwf : t.wfU 2) (hnd : t.pagesNodup 2)
     (hpgt : ∀ b ∈ t.pages 2, pageValid (pageAddr b))
-    (hcount : t.missingRun (vpnOf (k'.regs 11#5)) n < nb) :
+    (hcount : t.missingRun (vpnOf (k'.regs 11#5)) n < nb) (hp0 : k'.proc = 0#64) :
     kctx c k' ∗ pcIs c KA.«mappages» ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
     ptreeOwn 2 (DFrac.own 1) t ∗ kallocAvail γk (some nb) ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool,
@@ -58,11 +62,20 @@ theorem kvm_mappages_call (MP : MAPPAGES) [CurCtx] (c : CPU) (k' : KCtx)
           = ([], n) ∧
         fresh.Nodup ∧ (∀ b ∈ fresh, pageValid (pageAddr b) ∧ b ∉ t.pages 2)⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := MP.wp_mappages (hlc := hlc) (GF := GF) c k' γl γk nb t n perm hnoff hK hlk hroot
+  have h := MP.wp_mappages (hlc := hlc) (GF := GF) c k' γl γk nb t n perm 0 hnoff hK hlk hroot
     hargs hperm hmask hrwx hwf hnd hpgt hcount
   unfold wp_mappages_body at h
   simp only [mappagesAddr] at h
-  exact h
+  -- the boot lends nothing: the left disjunct in, the returned lend dropped
+  iintro ⟨Hk, Hpc, #Hlk, Htree, Hav, HΦ⟩
+  iapply h
+  iframe #
+  iframe Hk Hpc Htree Hav
+  isplitr [HΦ]
+  · iapply actLend_of_zero (GF := GF) k'.proc hp0 0
+  iapply wpNext_mono _ _ _ _ _ $$ HΦ
+  iintro %c' HΦ %spie %spp %R' %fresh %hsp Hk Hpc - Htree Hav %hpost
+  iapply HΦ $$ %spie %spp %R' %fresh %hsp Hk Hpc Htree Hav %hpost
 
 /-! ## The function -/
 
@@ -70,8 +83,8 @@ theorem kvmmap_br_ffffffffffffff4a : KA.«kvmmap» + 0xffffffffffffff4a#64 = KA.
 
 set_option maxHeartbeats 4000000 in
 theorem kvmmap_proof (MP : MAPPAGES) : KVMMAP :=
-  ⟨fun {hlc GF} _ _ _ cpu k γl γk nb t n perm hnoff hK hlk hroot hargs hperm hmask hrwx hwf hnd
-      hpgt hcount => by
+  ⟨fun {hlc GF} _ _ _ _ cpu k γl γk nb t n perm hnoff hK hlk hroot hargs hperm hmask hrwx hwf hnd
+      hpgt hcount hp0 => by
   unfold wp_kvmmap_body
   simp only [kvmmapAddr]
   iintro ⟨Hk, Hpc, #Hlk, Htree, Hav, HΦ⟩
@@ -102,7 +115,7 @@ theorem kvmmap_proof (MP : MAPPAGES) : KVMMAP :=
   have hpin5 : k.sie = false ∨ k.proc = 0#64 → c5 = cpu := fun h =>
     (hp5 h).trans ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h))))
   iapply (kvm_mappages_call MP c5 _ γl γk nb t n perm ?hn ?hKm ?hl ?hro ?hag ?hpm hmask hrwx hwf
-    hnd hpgt ?hct) $$ [- $Hk $Hpc]
+    hnd hpgt ?hct ?hpz) $$ [- $Hk $Hpc]
   rotate_right 1
   k_norm_g
   iframe #
@@ -114,6 +127,7 @@ theorem kvmmap_proof (MP : MAPPAGES) : KVMMAP :=
   case hag => k_norm_g; exact hargs
   case hpm => k_norm_g; exact hperm
   case hct => k_norm_g; exact hcount
+  case hpz => k_norm_g; exact hp0
   -- past mappages
   iapply wpNext_intro_pin
   iintro %c6 %hp6 %spie %spp %R %fresh %hsp Hk Hpc Htree Hav %hpost

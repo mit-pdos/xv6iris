@@ -30,7 +30,8 @@ The shape follows the C (kernel/proc.c) and the disassembly:
 THE LEND (permit sweep L1a, Rocq f344a089a): the cells-level continuation
 `apCont` takes the lend back right after the return pc, and the scan
 (`ap_scan` / `ap_found`) carries `∃ k' ≥ ke, actLend k.proc k'` beside it
-to the two freeproc tails (`ap_fp_call` takes it) and the four exits.
+to the two freeproc tails (`ap_fp_call` takes it) and the four exits;
+since L2 (Rocq 78f9234b8) `proc_pagetable` takes it too (`ap_pp_call`).
 -/
 import Xv6.SpecAllocproc
 import Xv6.SpecAcquire
@@ -1448,17 +1449,18 @@ theorem ap_kalloc_call (KAL : KALLOC) (c : CPU) (k' : KCtx) (γl : GName) (γk :
 theorem ap_pp_call (PP : PROC_PAGETABLE) (c : CPU) (k' : KCtx) (γl : GName) (γk : KmemNames)
     (on : Option Nat) (tf : BitVec 64) (dq : DFrac) (hnoff' : k'.noff + 1 < 2 ^ 31)
     (hK' : procPagetableSlots ≤ k'.avail) (hlk' : "kmem" ∉ k'.locks) (htf : tf &&& 0xfff#64 = 0#64)
-    (htfv : pageValid tf) :
+    (htfv : pageValid tf) (ke : Nat) :
     kctx c k' ∗ pcIs c KA.«proc_pagetable» ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
-    kallocAvail γk on ∗ wordPointsTo (pTrapframe (k'.regs 10#5)) 8 dq tf ∗
+    kallocAvail γk on ∗ wordPointsTo (pTrapframe (k'.regs 10#5)) 8 dq tf ∗ actLend k'.proc ke ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
       ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
+      (∃ k2 : Nat, ⌜ke ≤ k2⌝ ∗ actLend k'.proc k2) -∗
       wordPointsTo (pTrapframe (k'.regs 10#5)) 8 dq tf -∗
       pptPost γk on (BitVec.extractLsb' 12 44 tf) (R' 10#5) -∗
       ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := PP.wp_proc_pagetable (hlc := hlc) (GF := GF) c k' γl γk on tf dq hnoff' hK' hlk' htf htfv
+  have h := PP.wp_proc_pagetable (hlc := hlc) (GF := GF) c k' γl γk on tf dq ke hnoff' hK' hlk' htf htfv
   unfold wp_proc_pagetable_body at h
   simp only [procPagetableAddr] at h
   exact h
@@ -2405,11 +2407,13 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
     k_step (wp_s_jal c _ (KA.«allocproc» + 0xa8#64) false 2096682#21 1#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [allocproc_br_fffffffffffffed2]
     iintro Hk Hpc
-    iapply (ap_pp_call PP c _ γl γk (availDec on) (Rk 10#5) (DFrac.own 1) ?hnp ?hKp ?hlkp htf0 hpv)
+    -- the lend (permit sweep L2): `proc_pagetable` takes it
+    icases Hlend with ⟨%k1, %hk1, Hlend⟩
+    iapply (ap_pp_call PP c _ γl γk (availDec on) (Rk 10#5) (DFrac.own 1) ?hnp ?hKp ?hlkp htf0 hpv k1)
       $$ [- $Hk $Hpc $Hlk $Hav]
     rotate_right 1
     k_norm
-    iframe Htrapframe
+    iframe Htrapframe Hlend
     case hnp => k_norm; omega
     case hKp => k_norm; unfold procPagetableSlots; omega
     case hlkp =>
@@ -2422,7 +2426,8 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
       · exact hlk h2
     -- past proc_pagetable
     iapply wpNext_off_intro
-    iintro %spie6 %spp6 %Rpp %hsp6 Hk Hpc Htrapframe Hpppost %hcspp
+    iintro %spie6 %spp6 %Rpp %hsp6 Hk Hpc Hlend Htrapframe Hpppost %hcspp
+    ihave Hlend := actLend_ret_weaken _ hk1 $$ Hlend
     k_norm [ap_ret_b8c]
     have hRpp9 : Rpp 9#5 = procAddr n := by
       have h := hcspp.2.2.1

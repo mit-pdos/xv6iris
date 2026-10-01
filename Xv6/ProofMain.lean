@@ -545,7 +545,7 @@ theorem main_proof (CI : CPUID) (CN : CONSOLEINIT) (PI : PRINTKINIT) (PK : PRINT
   iframe Hk Hpc Hkm0 Hkm16 Hkw Hkn Hkc Hfl Hpages Hklf Hkav0 Hkauth
   iintro %R7 Hk Hpc #Hkml Hkav
   -- +0x72  kvminit
-  iapply (mn_kvminit KV startedPrimary (k.pushed 2) R7 hs2 (by simp; omega) hn2 hl2 fscKalloc fsReadyKmem
+  iapply (mn_kvminit KV startedPrimary (k.pushed 2) R7 hs2 (by simp; omega) hn2 hl2 (by simp [hproc]) fscKalloc fsReadyKmem
     kpt0)
   iframe Hk Hpc Hkml Hkav Hkpt0
   iintro %R8 %t %pas %hok Hk Hpc Htree Hstk Hkav Hrootw

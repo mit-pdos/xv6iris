@@ -6,6 +6,10 @@ the interface of `uvmunmap`.
 `PGROUNDUP(newsz)` with one `uvmunmap` (`do_free = 1`) and returns the new
 size; when `newsz >= oldsz` it returns `oldsz` without touching the space.
 Both exits go through the shared tail `uvmd_tail`.
+
+THE LEND (permit sweep L2, Rocq 78f9234b8): passed to `uvmunmap` on the
+shrinking arm (its returned bound is the contract's); the two arms that
+unmap nothing hand it back at `ke`.
 -/
 import Xv6.SpecUvmdealloc
 import Xv6.SpecUvmunmap
@@ -30,7 +34,7 @@ theorem ua_ret_127e : jumpPc (KA.«uvmdealloc» + 0x42#64) = (KA.«uvmdealloc» 
 
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF]
 
 /-! ## `uvmdealloc`: the shared tail at `(KernelSyms.«uvmdealloc» + 0x26)` -/
 
@@ -82,10 +86,10 @@ theorem uvmdealloc_br_ffffffffffffff76 : KA.«uvmdealloc» + 0xffffffffffffff76#
 
 set_option maxHeartbeats 4000000 in
 theorem uvmdealloc_proof (UM : UVMUNMAP) : UVMDEALLOC :=
-  ⟨fun {hlc GF} _ _ _ cpu k γl γk P M hnoff hK hlk hroot hold => by
+  ⟨fun {hlc GF} _ _ _ _ cpu k γl γk P M ke hnoff hK hlk hroot hold => by
   unfold wp_uvmdealloc_body
   simp only [uvmdeallocAddr]
-  iintro ⟨Hk, Hpc, #Hlk, Hav, HP, HΦ⟩
+  iintro ⟨Hk, Hpc, #Hlk, Hav, HP, Hlend, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   have hK4 : 4 ≤ k.avail := by unfold uvmdeallocSlots at hK; omega
   -- the prologue
@@ -121,7 +125,8 @@ theorem uvmdealloc_proof (UM : UVMUNMAP) : UVMDEALLOC :=
       rw [hnp, Xv6.delRun_zero]
       have hrsz : uvmdRsz (k.regs 11#5) (k.regs 12#5) = k.regs 11#5 := by
         unfold uvmdRsz; rw [if_neg hge]
-      iapply HΦ $$ %k.spie %k.spp %R'' %(fun _ => ⟨rfl, rfl⟩) Hk Hpc HP
+      ihave Hlend := actLend_ret_intro _ _ $$ Hlend
+      iapply HΦ $$ %k.spie %k.spp %R'' %(fun _ => ⟨rfl, rfl⟩) Hk Hpc Hlend HP
       ipureintro
       exact ⟨hpost.2, by rw [hrsz]; exact hpost.1⟩
     case hR2 => simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
@@ -208,7 +213,8 @@ theorem uvmdealloc_proof (UM : UVMUNMAP) : UVMDEALLOC :=
         iapply wpNext_mono _ _ _ _ _ $$ HΦ
         iintro %c' HΦ %R'' Hk Hpc %hpost
         rw [hnp0, Xv6.delRun_zero]
-        iapply HΦ $$ %k.spie %k.spp %R'' %(fun _ => ⟨rfl, rfl⟩) Hk Hpc HP
+        ihave Hlend := actLend_ret_intro _ _ $$ Hlend
+        iapply HΦ $$ %k.spie %k.spp %R'' %(fun _ => ⟨rfl, rfl⟩) Hk Hpc Hlend HP
         ipureintro
         exact ⟨hpost.2, by rw [hrsz]; exact hpost.1⟩
       case hR2b => simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
@@ -248,15 +254,16 @@ theorem uvmdealloc_proof (UM : UVMUNMAP) : UVMDEALLOC :=
           (hal' : k'.regs 11#5 &&& 0xfff#64 = 0#64) (hn' : k'.regs 12#5 = BitVec.ofNat 64 n)
           (hrange' : (k'.regs 11#5).toNat + 4096 * n ≤ uvmMaxsz) (hfree' : k'.regs 13#5 ≠ 0#64),
           kctx cc k' ∗ pcIs cc KA.«uvmunmap» ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
-          kallocAvail γk none ∗ procPtAt P' M' ∗
+          kallocAvail γk none ∗ procPtAt P' M' ∗ actLend k'.proc ke ∗
           wpNext k'.sie k'.proc cc (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
             ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
             kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
+            (∃ k1 : Nat, ⌜ke ≤ k1⌝ ∗ actLend k'.proc k1) -∗
             procPtAt (P'.delRun (vpnOf (k'.regs 11#5)).toNat n) M' -∗
             ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
           ⊢ wpLoop (GF := GF) cc := by
         intro cc k' P' M' n hnoff' hK' hlk' hroot' hal' hn' hrange' hfree'
-        have h := UM.wp_uvmunmap_free (hlc := hlc) (GF := GF) cc k' γl γk P' M' n hnoff' hK'
+        have h := UM.wp_uvmunmap_free (hlc := hlc) (GF := GF) cc k' γl γk P' M' n ke hnoff' hK'
           hlk' hroot' hal' hn' hrange' hfree'
         unfold wp_uvmunmap_free_body at h
         simp only [uvmunmapAddr] at h
@@ -285,7 +292,7 @@ theorem uvmdealloc_proof (UM : UVMUNMAP) : UVMDEALLOC :=
       rotate_right 1
       k_norm_g
       iframe #
-      iframe Hav HP
+      iframe Hav HP Hlend
       case hn1 => k_norm_g; omega
       case hK1 =>
         k_norm_g
@@ -309,7 +316,7 @@ theorem uvmdealloc_proof (UM : UVMUNMAP) : UVMDEALLOC :=
         omega
       case hf1 => k_norm_g; decide
       iapply wpNext_intro_pin
-      iintro %c19 %hp19 %spie %spp %R' %hsp Hk Hpc HP %hcs
+      iintro %c19 %hp19 %spie %spp %R' %hsp Hk Hpc Hlend HP %hcs
       k_norm_g [ua_ret_127e]
       rw [hvpn]
       k_step_gen (wp_s_j c19 _ (KA.«uvmdealloc» + 0x42#64) true 2097124#21)
@@ -326,7 +333,7 @@ theorem uvmdealloc_proof (UM : UVMUNMAP) : UVMDEALLOC :=
       · ihave HΦ := wpNext_shift _ _ _ _ _ hpin $$ HΦ
         iapply wpNext_mono _ _ _ _ _ $$ HΦ
         iintro %c' HΦ %R'' Hk Hpc %hpost
-        iapply HΦ $$ %spie %spp %R'' %hsp Hk Hpc HP
+        iapply HΦ $$ %spie %spp %R'' %hsp Hk Hpc Hlend HP
         ipureintro
         exact ⟨hpost.2, by rw [hrsz]; exact hpost.1⟩
       case hR2c => rw [e2]

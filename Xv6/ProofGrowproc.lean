@@ -28,7 +28,8 @@ context; `gp_priv_elim` reads it at the ambient one, which `kctx_tier` +
 THE EVENT COUNTER (permit sweep L1a, Rocq f344a089a): `gp_priv_elim`
 lends the block's counter out with the cells and its closer takes it back
 at any count (Rocq's `proc_priv_addrspace_ev`, folded into this file's own
-opener); the grow arm borrows it into uvmalloc's lend
+opener); the grow arm borrows it into uvmalloc's lend and (permit sweep
+L2, Rocq 78f9234b8) the shrink arm into uvmdealloc's
 (`SlotGen.actLend_borrow`), every arm hands the block back at
 `{ V with sz, upt, ev := kc }` with `V.ev ≤ kc` (`gp_priv_same` at the
 count).
@@ -438,21 +439,22 @@ theorem growproc_proof (MP : MYPROC) (UA : UVMALLOC) (UD : UVMDEALLOC) : GROWPRO
     unfold wp_uvmalloc_body at h
     simp only [uvmallocAddr] at h
     exact h
-  have hud : ∀ (cc : CPU) (k' : KCtx) (P : UPtd) (M' : Nat → List (BitVec 8))
+  have hud : ∀ (cc : CPU) (k' : KCtx) (P : UPtd) (M' : Nat → List (BitVec 8)) (ke : Nat)
       (hnoff' : k'.noff + 1 < 2 ^ 31) (hK' : uvmdeallocSlots ≤ k'.avail) (hlk' : "kmem" ∉ k'.locks)
       (hroot' : k'.regs 10#5 = pageAddr P.root) (hold' : (k'.regs 11#5).toNat ≤ uvmMaxsz),
       kctx cc k' ∗ pcIs cc KA.«uvmdealloc» ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
-      kallocAvail γk none ∗ procPtAt P M' ∗
+      kallocAvail γk none ∗ procPtAt P M' ∗ actLend k'.proc ke ∗
       wpNext k'.sie k'.proc cc (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
         ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
         kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
+        (∃ k2 : Nat, ⌜ke ≤ k2⌝ ∗ actLend k'.proc k2) -∗
         procPtAt (P.delRun (pgRoundUpN (k'.regs 12#5).toNat / 4096)
           (uvmdNp (k'.regs 11#5) (k'.regs 12#5))) M' -∗
         ⌜calleeSaved k'.regs R' ∧ R' 10#5 = uvmdRsz (k'.regs 11#5) (k'.regs 12#5)⌝ -∗
         wpLoop cpu'))
       ⊢ wpLoop (GF := GF) cc := by
-    intro cc k' P M' hnoff' hK' hlk' hroot' hold'
-    have h := UD.wp_uvmdealloc (hlc := hlc) (GF := GF) cc k' γl γk P M' hnoff' hK' hlk' hroot' hold'
+    intro cc k' P M' ke hnoff' hK' hlk' hroot' hold'
+    have h := UD.wp_uvmdealloc (hlc := hlc) (GF := GF) cc k' γl γk P M' ke hnoff' hK' hlk' hroot' hold'
     unfold wp_uvmdealloc_body at h
     simp only [uvmdeallocAddr] at h
     exact h
@@ -795,19 +797,30 @@ theorem growproc_proof (MP : MYPROC) (UA : UVMALLOC) (UD : UVMDEALLOC) : GROWPRO
       k_step_gen (wp_s_jal c10 _ (KA.«growproc» + 0x52#64) false 2094552#21 1#5 (by decide))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [growproc_br_fffffffffffff62a] next c11 hp11
       iintro Hk Hpc
-      iapply (hud c11 _ V.upt M ?hnD ?hKD ?hlD ?hrD ?hoD) $$ [- $Hk $Hpc]
+      -- the lend (permit sweep L2): the block's counter, borrowed
+      icases Hcnt with ⟨%kc0, %hkc0, Hcnt⟩
+      ihave Hcnt : actCnt (GF := GF) k.proc kc0 $$ [Hcnt]
+      · rw [hproc]; iexact Hcnt
+      icases actLend_borrow k.proc kc0 $$ Hcnt with ⟨Hlend, Hlback⟩
+      iapply (hud c11 _ V.upt M kc0 ?hnD ?hKD ?hlD ?hrD ?hoD) $$ [- $Hk $Hpc]
       rotate_right 1
       k_norm_g
       iframe #
-      iframe Hav HP
+      iframe Hav HP Hlend
       case hnD => k_norm_g; omega
       case hKD => k_norm_g; unfold growprocSlots at hK; unfold uvmdeallocSlots; omega
       case hlD => k_norm_g; exact hlk
       case hrD => k_norm_g; exact hroot
       case hoD => k_norm_g; exact hszb
       iapply wpNext_intro_pin
-      iintro %c12 %hp12 %spie2 %spp2 %R2 %hsp2 Hk Hpc HP %hpostD
+      iintro %c12 %hp12 %spie2 %spp2 %R2 %hsp2 Hk Hpc ⟨%kc1, %hkc1, Hlend⟩ HP %hpostD
       k_norm_g [gp_ret_c72, MachCSL.KCtx.withSpie_twice]
+      icases Hlback $$ %kc1 %hkc1 Hlend with ⟨%kc2, %hkc2, Hcnt⟩
+      ihave Hcnt : iprop(∃ kc : Nat, ⌜V.ev ≤ kc⌝ ∗ actCnt (GF := GF) (procAddr j) kc) $$ [Hcnt]
+      · iexists kc2
+        rw [← hproc]
+        iframe Hcnt
+        ipureintro; omega
       have hspf : k.sie = false → spie2 = k.spie ∧ spp2 = k.spp := fun h =>
         ⟨(hsp2 h).1.trans (hsp h).1, (hsp2 h).2.trans (hsp h).2⟩
       obtain ⟨hcs2, hr10⟩ := hpostD

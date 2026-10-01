@@ -10,6 +10,9 @@ tree, with its node count read off the dummy tree of `Xv6/KvmCounts.lean`),
 `proc_mapstacks` for the 64 kernel stacks (whose paths the trampoline's
 mapping already completed, so they cost no nodes), and the epilogue.
 Stated at either interrupt index, as its callees are.
+
+THE BOOT LENDS NOTHING (permit sweep L2, Rocq 78f9234b8): `hp0 : k.proc =
+0` is carried to every `kvmmap` and to `proc_mapstacks`.
 -/
 import Xv6.SpecKalloc
 import Xv6.SpecMemset
@@ -106,7 +109,7 @@ theorem km_cnt6 {nb : Nat} (h : 166 < nb) : 2 < nb - 1 - 2 - 0 - 0 - 32 - 2 - 63
 
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF]
 
 /-! ## The callees, at their entry addresses -/
 
@@ -137,7 +140,7 @@ theorem km_kvmmap_call (KM : KVMMAP) [CurCtx] (c : CPU) (k' : KCtx)
     (hperm : k'.regs 14#5 = permBits perm)
     (hwf : t.wf 2) (hnd : t.pagesNodup 2)
     (hpgt : ∀ z ∈ t.pages 2, pageValid (pageAddr z))
-    (hcount : t.missingRun (vpnOf (k'.regs 11#5)) n < nb) :
+    (hcount : t.missingRun (vpnOf (k'.regs 11#5)) n < nb) (hp0 : k'.proc = 0#64) :
     kctx c k' ∗ pcIs c KA.«kvmmap» ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
     ptreeOwn 2 (DFrac.own 1) t ∗ kallocAvail γk (some nb) ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool,
@@ -155,7 +158,7 @@ theorem km_kvmmap_call (KM : KVMMAP) [CurCtx] (c : CPU) (k' : KCtx)
     ⊢ wpLoop (GF := GF) c := by
   have h := KM.wp_kvmmap (hlc := hlc) (GF := GF) c k' γl γk nb t n (permBits perm) hnoff hK hlk
     hroot hargs hperm (by cases perm <;> decide) (by cases perm <;> decide) (PTree.wf_wfU 2 t hwf) hnd hpgt
-    hcount
+    hcount hp0
   unfold wp_kvmmap_body at h
   simp only [kvmmapAddr] at h
   exact h
@@ -168,7 +171,7 @@ theorem km_mapstacks_call (PM : PROC_MAPSTACKS) [CurCtx] (c : CPU) (k' : KCtx)
     (hroot : k'.regs 10#5 = pageAddr t.base) (hwf : t.wf 2) (hnd : t.pagesNodup 2)
     (hpgt : ∀ z ∈ t.pages 2, pageValid (pageAddr z))
     (hunm : ∀ i, i < 64 → t.walk 2 (kstackVpn i) = none)
-    (hcount : 64 + t.missingStacks 64 < nb) :
+    (hcount : 64 + t.missingStacks 64 < nb) (hp0 : k'.proc = 0#64) :
     kctx c k' ∗ pcIs c KA.«proc_mapstacks» ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
     ptreeOwn 2 (DFrac.own 1) t ∗ kallocAvail γk (some nb) ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ (R' : RegMap)
@@ -185,7 +188,7 @@ theorem km_mapstacks_call (PM : PROC_MAPSTACKS) [CurCtx] (c : CPU) (k' : KCtx)
       wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   have h := PM.wp_proc_mapstacks (hlc := hlc) (GF := GF) c k' γl γk nb t hnoff hK hlk hroot
-    (PTree.wf_wfU 2 t hwf) hnd hpgt hunm hcount
+    (PTree.wf_wfU 2 t hwf) hnd hpgt hunm hcount hp0
   unfold wp_proc_mapstacks_body at h
   simp only [procMapstacksAddr] at h
   exact h
@@ -217,7 +220,7 @@ theorem kvmmake_br_ffffffffffffffd8 : KA.«kvmmake» + 0xffffffffffffffd8#64 = K
 
 theorem km_regions (KM : KVMMAP) [CurCtx] (c : CPU) (kb : KCtx) (γl : GName) (γk : KmemNames)
     (nb : Nat) (b : BitVec 44) (R : RegMap) (hnoff : kb.noff + 1 < 2 ^ 31)
-    (hK : 34 ≤ kb.avail) (hlk : "kmem" ∉ kb.locks) (hnb : 166 < nb)
+    (hK : 34 ≤ kb.avail) (hlk : "kmem" ∉ kb.locks) (hp0 : kb.proc = 0#64) (hnb : 166 < nb)
     (h9 : R 9#5 = pageAddr b) (hbv : pageValid (pageAddr b)) (Res1 Res2 : IProp GF) :
     kctx c (kb.withRegs R) ∗ pcIs c (KA.«kvmmake» + 0x18#64) ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
     ptreeOwn 2 (DFrac.own 1) (PTree.zeroNode b) ∗ kallocAvail γk (some (nb - 1)) ∗ Res1 ∗ Res2 ∗
@@ -247,7 +250,7 @@ theorem km_regions (KM : KVMMAP) [CurCtx] (c : CPU) (kb : KCtx) (γl : GName) (�
   iintro Hk Hpc
   icases (ptreeOwn_pagesNodup' 2 _) $$ Htree with ⟨%hnd1, Htree⟩
   iapply (km_kvmmap_call KM c6 _ γl γk (nb - 1) _ 1 KPerm.rw
-    ?hnr1 ?hKr1 ?hlr1 ?hror1 ?hagr1 ?hpmr1 ?hwfr1 hnd1 hs0.2.2.2.2 ?hctr1) $$ [- $Hk $Hpc]
+    ?hnr1 ?hKr1 ?hlr1 ?hror1 ?hagr1 ?hpmr1 ?hwfr1 hnd1 hs0.2.2.2.2 ?hctr1 ?hpzr1) $$ [- $Hk $Hpc]
   rotate_right 1
   k_norm_g
   iframe #
@@ -255,6 +258,7 @@ theorem km_regions (KM : KVMMAP) [CurCtx] (c : CPU) (kb : KCtx) (γl : GName) (�
   case hnr1 => k_norm_g; omega
   case hKr1 => k_norm_g; omega
   case hlr1 => k_norm_g; exact hlk
+  case hpzr1 => k_norm_g; exact hp0
   case hror1 =>
     k_norm_g [h9]
     exact (congrArg pageAddr hs0.2.1).symm
@@ -309,7 +313,7 @@ theorem km_regions (KM : KVMMAP) [CurCtx] (c : CPU) (kb : KCtx) (γl : GName) (�
   iintro Hk Hpc
   icases (ptreeOwn_pagesNodup' 2 _) $$ Htree with ⟨%hnd1a, Htree⟩
   iapply (km_kvmmap_call KM c13 _ γl γk (nb - 1 - 2) _ 1 KPerm.rw
-    ?hnr1a ?hKr1a ?hlr1a ?hror1a ?hagr1a ?hpmr1a ?hwfr1a hnd1a hs1.2.2.2.2 ?hctr1a) $$ [- $Hk $Hpc]
+    ?hnr1a ?hKr1a ?hlr1a ?hror1a ?hagr1a ?hpmr1a ?hwfr1a hnd1a hs1.2.2.2.2 ?hctr1a ?hpzr1a) $$ [- $Hk $Hpc]
   rotate_right 1
   k_norm_g
   iframe #
@@ -317,6 +321,7 @@ theorem km_regions (KM : KVMMAP) [CurCtx] (c : CPU) (kb : KCtx) (γl : GName) (�
   case hnr1a => k_norm_g; omega
   case hKr1a => k_norm_g; omega
   case hlr1a => k_norm_g; exact hlk
+  case hpzr1a => k_norm_g; exact hp0
   case hror1a =>
     k_norm_g [m1_9, h9]
     exact (congrArg pageAddr hs1.2.1).symm
@@ -371,7 +376,7 @@ theorem km_regions (KM : KVMMAP) [CurCtx] (c : CPU) (kb : KCtx) (γl : GName) (�
   iintro Hk Hpc
   icases (ptreeOwn_pagesNodup' 2 _) $$ Htree with ⟨%hnd2, Htree⟩
   iapply (km_kvmmap_call KM c20 _ γl γk (nb - 1 - 2 - 0) _ 1 KPerm.rw
-    ?hnr2 ?hKr2 ?hlr2 ?hror2 ?hagr2 ?hpmr2 ?hwfr2 hnd2 hs1a.2.2.2.2 ?hctr2) $$ [- $Hk $Hpc]
+    ?hnr2 ?hKr2 ?hlr2 ?hror2 ?hagr2 ?hpmr2 ?hwfr2 hnd2 hs1a.2.2.2.2 ?hctr2 ?hpzr2) $$ [- $Hk $Hpc]
   rotate_right 1
   k_norm_g
   iframe #
@@ -379,6 +384,7 @@ theorem km_regions (KM : KVMMAP) [CurCtx] (c : CPU) (kb : KCtx) (γl : GName) (�
   case hnr2 => k_norm_g; omega
   case hKr2 => k_norm_g; omega
   case hlr2 => k_norm_g; exact hlk
+  case hpzr2 => k_norm_g; exact hp0
   case hror2 =>
     k_norm_g [m1a_9, m1_9, h9]
     exact (congrArg pageAddr hs1a.2.1).symm
@@ -433,7 +439,7 @@ theorem km_regions (KM : KVMMAP) [CurCtx] (c : CPU) (kb : KCtx) (γl : GName) (�
   iintro Hk Hpc
   icases (ptreeOwn_pagesNodup' 2 _) $$ Htree with ⟨%hnd3, Htree⟩
   iapply (km_kvmmap_call KM c27 _ γl γk (nb - 1 - 2 - 0 - 0) _ 16384 KPerm.rw
-    ?hnr3 ?hKr3 ?hlr3 ?hror3 ?hagr3 ?hpmr3 ?hwfr3 hnd3 hs2.2.2.2.2 ?hctr3) $$ [- $Hk $Hpc]
+    ?hnr3 ?hKr3 ?hlr3 ?hror3 ?hagr3 ?hpmr3 ?hwfr3 hnd3 hs2.2.2.2.2 ?hctr3 ?hpzr3) $$ [- $Hk $Hpc]
   rotate_right 1
   k_norm_g
   iframe #
@@ -441,6 +447,7 @@ theorem km_regions (KM : KVMMAP) [CurCtx] (c : CPU) (kb : KCtx) (γl : GName) (�
   case hnr3 => k_norm_g; omega
   case hKr3 => k_norm_g; omega
   case hlr3 => k_norm_g; exact hlk
+  case hpzr3 => k_norm_g; exact hp0
   case hror3 =>
     k_norm_g [m2_9, m1a_9, m1_9, h9]
     exact (congrArg pageAddr hs2.2.1).symm
@@ -501,7 +508,7 @@ theorem km_regions (KM : KVMMAP) [CurCtx] (c : CPU) (kb : KCtx) (γl : GName) (�
   iintro Hk Hpc
   icases (ptreeOwn_pagesNodup' 2 _) $$ Htree with ⟨%hnd4, Htree⟩
   iapply (km_kvmmap_call KM c36 _ γl γk (nb - 1 - 2 - 0 - 0 - 32) _ 7 KPerm.rx
-    ?hnr4 ?hKr4 ?hlr4 ?hror4 ?hagr4 ?hpmr4 ?hwfr4 hnd4 hs3.2.2.2.2 ?hctr4) $$ [- $Hk $Hpc]
+    ?hnr4 ?hKr4 ?hlr4 ?hror4 ?hagr4 ?hpmr4 ?hwfr4 hnd4 hs3.2.2.2.2 ?hctr4 ?hpzr4) $$ [- $Hk $Hpc]
   rotate_right 1
   k_norm_g
   iframe #
@@ -509,6 +516,7 @@ theorem km_regions (KM : KVMMAP) [CurCtx] (c : CPU) (kb : KCtx) (γl : GName) (�
   case hnr4 => k_norm_g; omega
   case hKr4 => k_norm_g; omega
   case hlr4 => k_norm_g; exact hlk
+  case hpzr4 => k_norm_g; exact hp0
   case hror4 =>
     k_norm_g [m3_9, m2_9, m1a_9, m1_9, h9]
     exact (congrArg pageAddr hs3.2.1).symm
@@ -578,7 +586,7 @@ theorem km_regions (KM : KVMMAP) [CurCtx] (c : CPU) (kb : KCtx) (γl : GName) (�
   iintro Hk Hpc
   icases (ptreeOwn_pagesNodup' 2 _) $$ Htree with ⟨%hnd5, Htree⟩
   iapply (km_kvmmap_call KM c48 _ γl γk (nb - 1 - 2 - 0 - 0 - 32 - 2) _ 32761 KPerm.rw
-    ?hnr5 ?hKr5 ?hlr5 ?hror5 ?hagr5 ?hpmr5 ?hwfr5 hnd5 hs4.2.2.2.2 ?hctr5) $$ [- $Hk $Hpc]
+    ?hnr5 ?hKr5 ?hlr5 ?hror5 ?hagr5 ?hpmr5 ?hwfr5 hnd5 hs4.2.2.2.2 ?hctr5 ?hpzr5) $$ [- $Hk $Hpc]
   rotate_right 1
   k_norm_g
   iframe #
@@ -586,6 +594,7 @@ theorem km_regions (KM : KVMMAP) [CurCtx] (c : CPU) (kb : KCtx) (γl : GName) (�
   case hnr5 => k_norm_g; omega
   case hKr5 => k_norm_g; omega
   case hlr5 => k_norm_g; exact hlk
+  case hpzr5 => k_norm_g; exact hp0
   case hror5 =>
     k_norm_g [m4_9, m3_9, m2_9, m1a_9, m1_9, h9]
     exact (congrArg pageAddr hs4.2.1).symm
@@ -649,7 +658,7 @@ theorem km_regions (KM : KVMMAP) [CurCtx] (c : CPU) (kb : KCtx) (γl : GName) (�
   iintro Hk Hpc
   icases (ptreeOwn_pagesNodup' 2 _) $$ Htree with ⟨%hnd6, Htree⟩
   iapply (km_kvmmap_call KM c58 _ γl γk (nb - 1 - 2 - 0 - 0 - 32 - 2 - 63) _ 1 KPerm.rx
-    ?hnr6 ?hKr6 ?hlr6 ?hror6 ?hagr6 ?hpmr6 ?hwfr6 hnd6 hs5.2.2.2.2 ?hctr6) $$ [- $Hk $Hpc]
+    ?hnr6 ?hKr6 ?hlr6 ?hror6 ?hagr6 ?hpmr6 ?hwfr6 hnd6 hs5.2.2.2.2 ?hctr6 ?hpzr6) $$ [- $Hk $Hpc]
   rotate_right 1
   k_norm_g
   iframe #
@@ -657,6 +666,7 @@ theorem km_regions (KM : KVMMAP) [CurCtx] (c : CPU) (kb : KCtx) (γl : GName) (�
   case hnr6 => k_norm_g; omega
   case hKr6 => k_norm_g; omega
   case hlr6 => k_norm_g; exact hlk
+  case hpzr6 => k_norm_g; exact hp0
   case hror6 =>
     k_norm_g [m5_9, m4_9, m3_9, m2_9, m1a_9, m1_9, h9]
     exact (congrArg pageAddr hs5.2.1).symm
@@ -722,7 +732,7 @@ end
 /-! ## kvmmake itself: the root, the seven regions, the stacks, the epilogue -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF]
 
 /-! ## The caller's continuation, named -/
 
@@ -749,7 +759,7 @@ theorem kvmmake_br_fffffffffffffa1e : KA.«kvmmake» + 0xfffffffffffffa1e#64 = K
 set_option maxHeartbeats 4000000 in
 set_option maxRecDepth 100000 in
 theorem kvmmake_proof (KAL : KALLOC) (MS : MEMSET) (KM : KVMMAP) (PM : PROC_MAPSTACKS) : KVMMAKE :=
-  ⟨fun {hlc GF} _ _ _ cpu k γl γk nb hnoff hK hlk hcount => by
+  ⟨fun {hlc GF} _ _ _ _ cpu k γl γk nb hnoff hK hlk hcount hp0 => by
   unfold wp_kvmmake_body
   simp only [kvmmakeAddr]
   iintro ⟨Hk, Hpc, #Hlk, Hav, HΦ⟩
@@ -839,7 +849,7 @@ theorem kvmmake_proof (KAL : KALLOC) (MS : MEMSET) (KM : KVMMAP) (PM : PROC_MAPS
     (hp8 h).trans ((hp7 h).trans ((hp6 h).trans ((hp5 h).trans ((hp4 h).trans
       ((hp3 h).trans ((hp2 h).trans (hp1 h)))))))
   iapply (km_regions KM c8 _ γl γk nb (BitVec.extractLsb' 12 44 (R1 10#5)) _
-    ?hnR ?hKR ?hlR hnb ?h9R ?hbvR
+    ?hnR ?hKR ?hlR ?hpzR hnb ?h9R ?hbvR
     iprop(frame4s1 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5))
     iprop(wpNext k.sie k.proc cpu (kvmmakeCont k γk nb))) $$ [- $Hk $Hpc]
   rotate_right 1
@@ -852,6 +862,7 @@ theorem kvmmake_proof (KAL : KALLOC) (MS : MEMSET) (KM : KVMMAP) (PM : PROC_MAPS
   case hnR => k_norm_g; omega
   case hKR => k_norm_g; omega
   case hlR => k_norm_g; exact hlk
+  case hpzR => k_norm_g; exact hp0
   case h9R => k_norm_g; exact (b9.trans hpb.symm)
   case hbvR => rw [hpb]; exact hvalid
   unfold kvmRegionsCont
@@ -870,7 +881,7 @@ theorem kvmmake_proof (KAL : KALLOC) (MS : MEMSET) (KM : KVMMAP) (PM : PROC_MAPS
   iintro Hk Hpc
   icases (ptreeOwn_pagesNodup' 2 _) $$ Htree with ⟨%hndS, Htree⟩
   iapply (km_mapstacks_call PM c11 _ γl γk (nb - 102) _ ?hnS ?hKS ?hlS ?hroS ?hwfS hndS
-    hsix.2.2.1 ?hunmS ?hctS) $$ [- $Hk $Hpc]
+    hsix.2.2.1 ?hunmS ?hctS ?hpzS) $$ [- $Hk $Hpc]
   rotate_right 1
   k_norm_g
   iframe #
@@ -878,6 +889,7 @@ theorem kvmmake_proof (KAL : KALLOC) (MS : MEMSET) (KM : KVMMAP) (PM : PROC_MAPS
   case hnS => k_norm_g; omega
   case hKS => k_norm_g; omega
   case hlS => k_norm_g; exact hlk
+  case hpzS => k_norm_g; exact hp0
   case hroS => k_norm_g; exact (congrArg pageAddr hsix.2.1).symm
   case hwfS => exact hsix.1
   case hunmS => exact hsix.2.2.2.2.2.2

@@ -11,7 +11,8 @@
 
   * `mn_kinit`      +0x6e → +0x72: `kinit()` at kit 1's allocator names
                     (`fscKalloc` / `fsReadyKmem`, Rocq debt (E));
-  * `mn_kvminit`    +0x72 → +0x76: `kvminit()`;
+  * `mn_kvminit`    +0x72 → +0x76: `kvminit()`, at `k.proc = 0` (the boot
+                    lends nothing, permit sweep L2: Rocq main's `Hp0`);
   * `mn_publish`    (ghost) THE TABLE PUBLICATION (Rocq's one-way door):
                     `KptBoot.kctx_kptOn_publish` seals the tree into `kptOn`
                     for the published map and hands back the 64 stack claims
@@ -94,13 +95,13 @@ theorem mn_ret_76 : jumpPc (KA.«main» + 118#64) = KA.«main» + 118#64 := by d
 theorem mn_kvmCount : kvmmakeCount < kinitPages := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF]
 
 set_option maxHeartbeats 4000000 in
 /-- **+0x72 → +0x76**: `kvminit()`: the kernel table, built, owned
 exclusively, with the 64 stack pages. -/
 theorem mn_kvminit (KV : KVMINIT) [CurCtx] (cpu : CPU) (k : KCtx) (R0 : RegMap) (hsie : k.sie = false)
-    (hK : 50 ≤ k.avail) (hnoff : k.noff = 0) (hlocks : k.locks = [])
+    (hK : 50 ≤ k.avail) (hnoff : k.noff = 0) (hlocks : k.locks = []) (hproc : k.proc = 0#64)
     (γl : GName) (γk : KmemNames) (v0 : BitVec 64) :
     kctx cpu (k.withRegs R0) ∗ pcIs cpu (KA.«main» + 114#64) ∗
     isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk (some kinitPages) ∗
@@ -118,6 +119,7 @@ theorem mn_kvminit (KV : KVMINIT) [CurCtx] (cpu : CPU) (k : KCtx) (R0 : RegMap) 
   iintro Hk Hpc
   have hkv := KV.wp_kvminit (hlc := hlc) (GF := GF) cpu (k.withRegs (R0.set 1#5 (KA.«main» + 118#64)))
     γl γk kinitPages v0 (by simp [hnoff]) (by simp; omega) (by simp [hlocks]) mn_kvmCount
+    (by simp [hproc])
   unfold wp_kvminit_body at hkv
   simp only [kvminitAddr] at hkv
   iapply hkv

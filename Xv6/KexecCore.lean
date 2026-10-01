@@ -38,7 +38,10 @@ conversion.  A STAGE file (no `Proof` prefix).
    their outputs hand the next phase a later record (`∀ V1, ⌜evAfter A.V
    V1⌝`); the next phase is instantiated at `{ A with V := V1 }` (Rocq: at
    `upd_usV U (upd_ev (us_V U) k)`), every premise about the call's
-   parameters carried by definition.
+   parameters carried by definition.  Since L2 (Rocq 78f9234b8) phase B's
+   first chunk does too: proc_pagetable takes the counter, so `kxc_b1`'s two
+   outputs run at `{ A with V := A.V.updEv kb }` and the loop path's phases
+   C and D at the record raised twice.
 4. **NEW: `kxc_core`**, the landed whole (brief §6.3): `kxc_phaseA` over the
    plain `NAMEI` ∘ `kxc_from90`, at plugs that hold of every file (Rocq has
    no such lemma: its only whole is the AU one).  Its instance at
@@ -123,27 +126,33 @@ theorem kxc_from90 (IUP : IUNLOCKPUT) (EO : END_OP) (PPT : PROC_PAGETABLE) (RD :
     gilf gislf n2 ef hqfm hK hnoff htier hj hproc)
   iframe Hst Hfab Hcl
   isplitl []
-  · -- OUTPUT 1: `elf.phnum = 0`, the phdr loop skipped
-    iintro %c %spie' %spp' %R' %P %Mi %w13 %w67 Hs Hcl
-    iapply (kxc_b2z IUP EO Γ Q QF c k A spie' spp' R' kf qf sf gyf loyf tlyf inumf dnf bmf data
-      gilf gislf n2 w13 w67 ef P Mi hK hnoff htier hj hproc)
+  · -- OUTPUT 1: `elf.phnum = 0`, the phdr loop skipped -- at the record
+    -- proc_pagetable's lend came back at (permit sweep L2)
+    iintro %V1 %hV1 %c %spie' %spp' %R' %P %Mi %w13 %w67 Hs Hcl
+    obtain ⟨kb, -, rfl⟩ := hV1
+    iapply (kxc_b2z IUP EO Γ Q QF c k { A with V := A.V.updEv kb } spie' spp' R' kf qf sf gyf loyf
+      tlyf inumf dnf bmf data gilf gislf n2 w13 w67 ef P Mi hK hnoff htier hj hproc)
     iframe Hs Hfab Hcl
     iintro %c2 %spie2 %spp2 %R2 Hs Hcl
-    iapply (kxc_cd MP UA UC SL CO PFP SS Γ Q QF c2 k A spie2 spp2 R2 w13 w67 (kxcFb data dnf) ef P
-      Mi 0#64 hQ hqfm hqfa hK hnoff htier hargs hna havf
+    iapply (kxc_cd MP UA UC SL CO PFP SS Γ Q QF c2 k { A with V := A.V.updEv kb } spie2 spp2 R2 w13
+      w67 (kxcFb data dnf) ef P Mi 0#64 hQ hqfm hqfa hK hnoff htier hargs hna havf
       havfnz hterm)
     iframe Hs Hfab Hcl
-  · -- OUTPUT 2: the phdr loop's body, entered at `i = 0`, `sz = 0`
-    iintro %c %spie' %spp' %R' %P %Mi Hs Hcl
-    iapply (kxc_b2 RD WA PA IUP EO PFP F2P UA Γ Q QF c k A spie' spp' R' kf qf sf gyf loyf tlyf
-      inumf dnf bmf data gilf gislf n2 4095#64 ef P Mi 0 0#64 hqfl hqfm hK hnoff htier hj hproc)
+  · -- OUTPUT 2: the phdr loop's body, entered at `i = 0`, `sz = 0` -- at
+    -- the record proc_pagetable's lend came back at (permit sweep L2)
+    iintro %V1 %hV1 %c %spie' %spp' %R' %P %Mi Hs Hcl
+    obtain ⟨kb, -, rfl⟩ := hV1
+    iapply (kxc_b2 RD WA PA IUP EO PFP F2P UA Γ Q QF c k { A with V := A.V.updEv kb } spie' spp' R'
+      kf qf sf gyf loyf tlyf inumf dnf bmf data gilf gislf n2 4095#64 ef P Mi 0 0#64 hqfl hqfm hK
+      hnoff htier hj hproc)
     iframe Hs Hfab Hcl
     -- the segments' uvmallocs moved the block's event count (permit sweep
     -- L1a): phases C and D run at the record they came back at
-    iintro %V1 %hV1 %c2 %spie2 %spp2 %R2 %P2 %Mo %szv Hs Hcl
-    obtain ⟨kv, -, rfl⟩ := hV1
-    iapply (kxc_cd MP UA UC SL CO PFP SS Γ Q QF c2 k { A with V := A.V.updEv kv } spie2 spp2 R2 (k.regs 27#5) 4095#64
-      (kxcFb data dnf) ef P2 Mo szv hQ hqfm hqfa hK hnoff htier hargs hna havf
+    iintro %V2 %hV2 %c2 %spie2 %spp2 %R2 %P2 %Mo %szv Hs Hcl
+    obtain ⟨kv, -, rfl⟩ := hV2
+    iapply (kxc_cd MP UA UC SL CO PFP SS Γ Q QF c2 k
+      { ({ A with V := A.V.updEv kb } : KexecArgs) with V := (A.V.updEv kb).updEv kv } spie2 spp2 R2
+      (k.regs 27#5) 4095#64 (kxcFb data dnf) ef P2 Mo szv hQ hqfm hqfa hK hnoff htier hargs hna havf
       havfnz hterm)
     iframe Hs Hfab Hcl
 

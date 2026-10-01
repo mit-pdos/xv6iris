@@ -14,6 +14,11 @@ The shape: the four-slot frame, the `sz = 0` test (both arms join at the
 call, then `freewalk` at level 2 -- legal because `umBelow` says every leaf
 lay in the run just unmapped, so the table maps nothing (`delRunL_eq_empty`,
 `noLeaves_of_ptRep_empty`), and the user pages are gone with it.
+
+THE LEND (permit sweep L2, Rocq 78f9234b8): passed to `uvmunmap` on the
+`sz > 0` arm (its returned bound composes, `ke ≤ k'`); `freewalk` does not
+take it yet, so before the tail it is framed into the continuation
+(`SlotGen.actLend_cont_frame` / `_ret`).
 -/
 import Xv6.SpecUvmfree
 import Xv6.SpecUvmunmap
@@ -70,7 +75,7 @@ theorem uf_calleeSaved_mk (KR R : RegMap)
       | assumption
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF]
 
 /-! ## The two calls -/
 
@@ -102,17 +107,19 @@ theorem uf_uvmunmap_call (UB : UVMUNMAP_BARE) [CurCtx] (c : CPU) (k' : KCtx)
     (hnoff' : k'.noff + 1 < 2 ^ 31) (hK' : uvmunmapSlots ≤ k'.avail)
     (hlk' : "kmem" ∉ k'.locks) (hwf' : uptWf P) (hroot' : k'.regs 10#5 = pageAddr P.root)
     (hal' : k'.regs 11#5 &&& 0xfff#64 = 0#64) (hn' : k'.regs 12#5 = BitVec.ofNat 64 n)
-    (hrange' : (k'.regs 11#5).toNat + 4096 * n ≤ uvmMaxsz) (hfree' : k'.regs 13#5 ≠ 0#64) :
+    (hrange' : (k'.regs 11#5).toNat + 4096 * n ≤ uvmMaxsz) (hfree' : k'.regs 13#5 ≠ 0#64)
+    (ke : Nat) :
     kctx c k' ∗ pcIs c KA.«uvmunmap» ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
-    kallocAvail γk none ∗ ptOwnRep P.root P.um ∗ umPages P M ∗
+    kallocAvail γk none ∗ ptOwnRep P.root P.um ∗ umPages P M ∗ actLend k'.proc ke ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie' : Bool, ∀ spp' : Bool, ∀ R' : RegMap,
       ⌜k'.sie = false → spie' = k'.spie ∧ spp' = k'.spp⌝ -∗
       kctx cpu' ((k'.withSpie spie' spp').withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
+      (∃ k1 : Nat, ⌜ke ≤ k1⌝ ∗ actLend k'.proc k1) -∗
       ptOwnRep P.root (delRunL P.um (vpnOf (k'.regs 11#5)).toNat n) -∗
       umPages (P.delRun (vpnOf (k'.regs 11#5)).toNat n) M -∗
       ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := UB.wp_uvmunmap_bare (hlc := hlc) (GF := GF) c k' γl γk P M n hnoff' hK' hlk' hwf'
+  have h := UB.wp_uvmunmap_bare (hlc := hlc) (GF := GF) c k' γl γk P M n ke hnoff' hK' hlk' hwf'
     hroot' hal' hn' hrange' hfree'
   unfold wp_uvmunmap_bare_body at h
   simp only [uvmunmapAddr] at h
@@ -257,10 +264,10 @@ theorem uvmfree_br_fffffffffffffe2c : KA.«uvmfree» + 0xfffffffffffffe2c#64 = K
 
 set_option maxHeartbeats 4000000 in
 theorem uvmfree_proof (UB : UVMUNMAP_BARE) (FW : FREEWALK) : UVMFREE :=
-  ⟨fun {hlc GF} _ _ _ cpu k γl γk P M hnoff hK hlk hroot hsz hwf hbelow => by
+  ⟨fun {hlc GF} _ _ _ _ cpu k γl γk P M ke hnoff hK hlk hroot hsz hwf hbelow => by
   unfold wp_uvmfree_body
   simp only [uvmfreeAddr]
-  iintro ⟨Hk, Hpc, #Hlk, #Hav, Htree, Hpages, HΦ⟩
+  iintro ⟨Hk, Hpc, #Hlk, #Hav, Htree, Hpages, Hlend, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   have hK4 : 4 ≤ k.avail := by simp only [uvmfreeSlots] at hK; omega
   -- the frame
@@ -292,6 +299,8 @@ theorem uvmfree_proof (UB : UVMUNMAP_BARE) (FW : FREEWALK) : UVMFREE :=
       exact h
     ihave He := umPages_empty P M hempty $$ Hpages
     iclear He
+    -- the lend: `freewalk` does not take it, framed through
+    ihave HΦ := actLend_cont_frame _ _ _ _ _ _ _ _ _ $$ HΦ Hlend
     rw [Xv6.ua_pushed_spie_self k 4]
     iapply (uvmfree_tail FW cpu c3 k γl γk P.root P.um hpin3 hnoff hK hlk hempty
       k.spie k.spp (fun _ => ⟨rfl, rfl⟩) _ ?e2 ?e9 ?e18 ?e19 ?e20 ?e21 ?e22 ?e23 ?e24 ?e25
@@ -336,11 +345,11 @@ theorem uvmfree_proof (UB : UVMUNMAP_BARE) (FW : FREEWALK) : UVMFREE :=
     iintro Hk Hpc
     -- uvmunmap(pagetable, 0, PGROUNDUP(sz)/PGSIZE, 1)
     iapply (uf_uvmunmap_call UB c10 _ γl γk P M (uvmNp (k.regs 11#5)) ?hn ?hKa ?hl hwf
-      ?hrt ?hal ?hnn ?hrg ?hfr) $$ [- $Hk $Hpc]
+      ?hrt ?hal ?hnn ?hrg ?hfr ke) $$ [- $Hk $Hpc]
     rotate_right 1
     k_norm_g
     iframe #
-    iframe Htree Hpages
+    iframe Htree Hpages Hlend
     case hn => k_norm_g; omega
     case hKa => k_norm_g; simp only [uvmunmapSlots, uvmfreeSlots] at hK ⊢; omega
     case hl => k_norm_g; exact hlk
@@ -352,7 +361,7 @@ theorem uvmfree_proof (UB : UVMUNMAP_BARE) (FW : FREEWALK) : UVMFREE :=
                 exact uvmNp_range (k.regs 11#5) hsz
     case hfr => k_norm_g; exact uf_one_ne_zero
     iapply wpNext_intro_pin
-    iintro %c11 %hp11 %spie1 %spp1 %R1 %hsp1 Hk Hpc Htree Hpages %hcs1
+    iintro %c11 %hp11 %spie1 %spp1 %R1 %hsp1 Hk Hpc Hlend Htree Hpages %hcs1
     k_norm_g [MachCSL.KCtx.withSpie_twice, uf_ret_13b6, uf_vpn0]
     unfold calleeSaved at hcs1
     k_norm_g [hroot] at hcs1
@@ -365,6 +374,8 @@ theorem uvmfree_proof (UB : UVMUNMAP_BARE) (FW : FREEWALK) : UVMFREE :=
       delRunL_eq_empty P.um _ (umBelow_lt_np P (k.regs 11#5) hbelow)
     ihave He := umPages_empty (P.delRun 0 (uvmNp (k.regs 11#5))) M hempty $$ Hpages
     iclear He
+    -- the lend `uvmunmap` handed back: `freewalk` does not take it, framed through
+    ihave HΦ := actLend_cont_frame_ret _ _ _ _ _ _ _ _ _ $$ HΦ Hlend
     iapply (uvmfree_tail FW cpu c12 k γl γk P.root (delRunL P.um 0 (uvmNp (k.regs 11#5)))
       (fun h => (hp12 h).trans ((hp11 h).trans ((hp10 h).trans ((hp9 h).trans ((hp8 h).trans
         ((hp7 h).trans ((hp6 h).trans ((hp5 h).trans ((hp4 h).trans (hpin3 h))))))))))
