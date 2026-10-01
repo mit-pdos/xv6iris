@@ -1013,13 +1013,13 @@ Section WriteFire.
     ftop_inv γfs -∗ app_inv γfs -∗ off_supply γo E off (length bs) ROff -∗
     awrite_full_at (fs_gamma_L γfs) appE i γo M ua cnt k REST -∗
     top_frag (fs_gamma_L γfs) i n -∗
-    off_link γo (Z.of_nat off) ={E}=∗
+    off_link γo (Z.of_nat off) -∗ £ 1 ={E}=∗
       top_frag (fs_gamma_L γfs) i n'
       ∗ off_link γo (Z.of_nat (off + length bs))
       ∗ ROff ∗ REST.
   Proof using .
     intros HE Hloc Hpos Hoff Hcap Hnz Habs Hnz' Habs' Hby Hlen.
-    iIntros "#Hi #Hai Hsup Hcm Hf Hg".
+    iIntros "#Hi #Hai Hsup Hcm Hf Hg Hlc".
     (* the re-spelling is needed because the unifier cannot solve
        [γtop ?Γ =?= fs_top γfs]. *)
     rewrite /top_frag /fs_gamma_L /=.
@@ -1050,7 +1050,7 @@ Section WriteFire.
        of [appN] beside its claim, which the caller's step re-establishes
        under the later ([AppInv.app_top_update]) *)
     iMod (app_top_update appE γfs I i n n' ltac:(rewrite /appE; done)
-            with "Hai [Hstep] Hta Hf") as "[Hta Hf]".
+            with "Hai [Hstep] Hta Hf Hlc") as "[Hta Hf]".
     { iIntros (_) "Hp". iApply (app_step_at i I _ n' Hdelta with "Hstep Hp"). }
     iMod ("Hph2" $! (<[i := n']> I) with "[//] Hta") as "(Hta & Hg & Hrest)".
     iMod "Hcl2".
@@ -1093,13 +1093,13 @@ Section WriteFire.
     ftop_inv γfs -∗ app_inv γfs -∗
     awrite_full_adv (fs_gamma_L γfs) appE i γo M ua cnt k REST -∗
     top_frag (fs_gamma_L γfs) i n -∗
-    off_link γo (Z.of_nat off) ={E}=∗
+    off_link γo (Z.of_nat off) -∗ £ 1 ={E}=∗
       top_frag (fs_gamma_L γfs) i n'
       ∗ off_link γo (Z.of_nat (off + length bs))
       ∗ REST.
   Proof using .
     intros HE Hloc Hpos Hoff Hcap Hnz Habs Hnz' Habs' Hby Hlen.
-    iIntros "#Hi #Hai Hcm Hf Hg".
+    iIntros "#Hi #Hai Hcm Hf Hg Hlc".
     (* the re-spelling is needed because the unifier cannot solve
        [γtop ?Γ =?= fs_top γfs]. *)
     rewrite /top_frag /fs_gamma_L /=.
@@ -1131,7 +1131,7 @@ Section WriteFire.
        of [appN] beside its claim, which the caller's step re-establishes
        under the later ([AppInv.app_top_update]) *)
     iMod (app_top_update appE γfs I i n n' ltac:(rewrite /appE; done)
-            with "Hai [Hstep] Hta Hf") as "[Hta Hf]".
+            with "Hai [Hstep] Hta Hf Hlc") as "[Hta Hf]".
     { iIntros (_) "Hp". iApply (app_step_at i I _ n' Hdelta with "Hstep Hp"). }
     iMod ("Hph2" $! (<[i := n']> I) with "[//] Hta") as "(Hta & Hg & Hrest)".
     iMod "Hcl2".
@@ -1168,18 +1168,18 @@ Section WriteFire.
     ftop_inv γfs -∗ app_inv γfs -∗ off_user_inv γo -∗
     awrite_full_at (fs_gamma_L γfs) appE i γo M ua cnt k REST -∗
     top_frag (fs_gamma_L γfs) i n -∗
-    off_link γo (Z.of_nat off) ={E}=∗
+    off_link γo (Z.of_nat off) -∗ £ 1 ={E}=∗
       top_frag (fs_gamma_L γfs) i n'
       ∗ off_link γo (Z.of_nat (off + length bs))
       ∗ REST.
   Proof using .
     intros HE Hloc Hpos Hoff Hcap Hnz Habs Hnz' Habs' Hby Hlen.
-    iIntros "#Hi #Hai #Hoinv Hcm Hf Hg".
+    iIntros "#Hi #Hai #Hoinv Hcm Hf Hg Hlc".
     assert (Hfoff : ↑foffN ⊆ E).
     { etrans; [| exact HE]. rewrite /foffN /appN. solve_ndisj. }
     iMod (wrf_awrite_fire_gen γfs E i γo M ua cnt k REST True off bs bs0 nl n n'
             HE Hloc Hpos Hoff Hcap Hnz Habs Hnz' Habs' Hby Hlen
-            with "Hi Hai [] Hcm Hf Hg") as "(Hf & Hg & _ & Hrest)".
+            with "Hi Hai [] Hcm Hf Hg Hlc") as "(Hf & Hg & _ & Hrest)".
     { iApply (off_supply_parked E γo off (length bs) Hfoff with "Hoinv"). }
     iModIntro. iFrame "Hf Hg Hrest".
   Qed.
@@ -1207,18 +1207,18 @@ Section WriteFire.
     ftop_inv γfs -∗ app_inv γfs -∗ uoff γo off -∗
     awrite_full_at (fs_gamma_L γfs) appE i γo M ua cnt k REST -∗
     top_frag (fs_gamma_L γfs) i n -∗
-    off_link γo (Z.of_nat off) ={E}=∗
+    off_link γo (Z.of_nat off) -∗ £ 1 ={E}=∗
       top_frag (fs_gamma_L γfs) i n'
       ∗ off_link γo (Z.of_nat (off + length bs))
       ∗ (uoff γo (off + length bs)
          ∨ (uoff γo off ∗ app_taint)) ∗ REST.
   Proof using .
     intros HE Hloc Hpos Hoff Hcap Hnz Habs Hnz' Habs' Hby Hlen.
-    iIntros "#Hi #Hai Hu Hcm Hf Hg".
+    iIntros "#Hi #Hai Hu Hcm Hf Hg Hlc".
     iApply (wrf_awrite_fire_gen γfs E i γo M ua cnt k REST (uoff γo (off + length bs) ∨ (uoff γo off ∗ app_taint))%I
               off bs bs0 nl n n'
               HE Hloc Hpos Hoff Hcap Hnz Habs Hnz' Habs' Hby Hlen
-              with "Hi Hai [Hu] Hcm Hf Hg").
+              with "Hi Hai [Hu] Hcm Hf Hg Hlc").
     iApply (off_supply_held E γo off (length bs) with "Hu").
   Qed.
 
@@ -1250,13 +1250,13 @@ Section WriteFire.
     ftop_inv γfs -∗ app_inv γfs -∗ off_supply γo E off r ROff -∗
     awrite_part_at (fs_gamma_L γfs) appE i γo M ua P cnt k REST -∗
     top_frag (fs_gamma_L γfs) i n -∗
-    off_link γo (Z.of_nat off) ={E}=∗
+    off_link γo (Z.of_nat off) -∗ £ 1 ={E}=∗
       top_frag (fs_gamma_L γfs) i n'
       ∗ off_link γo (Z.of_nat (off + r))
       ∗ ROff ∗ REST.
   Proof using .
     intros HE Hloc Hpos Hoff Hcap Hr Hgap Hnz Habs Hnz' Habs' Hby Hshort Hwhy Hsb1.
-    iIntros "#Hi #Hai Hsup Hcm Hf Hg".
+    iIntros "#Hi #Hai Hsup Hcm Hf Hg Hlc".
     rewrite /top_frag /fs_gamma_L /=.
     iMod (inv_acc E ftopN with "Hi") as "[Hbody Hclose]"; [solve_ndisj |].
     iDestruct "Hbody" as ">Hb".
@@ -1280,7 +1280,7 @@ Section WriteFire.
             with "[//] [//] [//] [//] [//] [//] [//] Hta Hg")
       as "(Hta & Hstep & Hph2)".
     iMod (app_top_update appE γfs I i n n' ltac:(rewrite /appE; done)
-            with "Hai [Hstep] Hta Hf") as "[Hta Hf]".
+            with "Hai [Hstep] Hta Hf Hlc") as "[Hta Hf]".
     { iIntros (_) "Hp". iApply (app_step_at i I _ n' Hdelta with "Hstep Hp"). }
     iMod ("Hph2" $! (<[i := n']> I) with "[//] Hta") as "(Hta & Hg & Hrest)".
     iMod "Hcl2".
@@ -1322,13 +1322,13 @@ Section WriteFire.
     ftop_inv γfs -∗ app_inv γfs -∗
     awrite_part_adv (fs_gamma_L γfs) appE i γo M ua P cnt k REST -∗
     top_frag (fs_gamma_L γfs) i n -∗
-    off_link γo (Z.of_nat off) ={E}=∗
+    off_link γo (Z.of_nat off) -∗ £ 1 ={E}=∗
       top_frag (fs_gamma_L γfs) i n'
       ∗ off_link γo (Z.of_nat (off + r))
       ∗ REST.
   Proof using .
     intros HE Hloc Hpos Hoff Hcap Hr Hgap Hnz Habs Hnz' Habs' Hby Hshort Hwhy Hsb1.
-    iIntros "#Hi #Hai Hcm Hf Hg".
+    iIntros "#Hi #Hai Hcm Hf Hg Hlc".
     rewrite /top_frag /fs_gamma_L /=.
     iMod (inv_acc E ftopN with "Hi") as "[Hbody Hclose]"; [solve_ndisj |].
     iDestruct "Hbody" as ">Hb".
@@ -1352,7 +1352,7 @@ Section WriteFire.
             with "[//] [//] [//] [//] [//] [//] [//] Hta Hg")
       as "(Hta & Hstep & Hph2)".
     iMod (app_top_update appE γfs I i n n' ltac:(rewrite /appE; done)
-            with "Hai [Hstep] Hta Hf") as "[Hta Hf]".
+            with "Hai [Hstep] Hta Hf Hlc") as "[Hta Hf]".
     { iIntros (_) "Hp". iApply (app_step_at i I _ n' Hdelta with "Hstep Hp"). }
     iMod ("Hph2" $! (<[i := n']> I) with "[//] Hta") as "(Hta & Hg & Hrest)".
     iMod "Hcl2".
@@ -1390,18 +1390,18 @@ Section WriteFire.
     ftop_inv γfs -∗ app_inv γfs -∗ off_user_inv γo -∗
     awrite_part_at (fs_gamma_L γfs) appE i γo M ua P cnt k REST -∗
     top_frag (fs_gamma_L γfs) i n -∗
-    off_link γo (Z.of_nat off) ={E}=∗
+    off_link γo (Z.of_nat off) -∗ £ 1 ={E}=∗
       top_frag (fs_gamma_L γfs) i n'
       ∗ off_link γo (Z.of_nat (off + r))
       ∗ REST.
   Proof using .
     intros HE Hloc Hpos Hoff Hcap Hr Hgap Hnz Habs Hnz' Habs' Hby Hshort Hwhy Hsb1.
-    iIntros "#Hi #Hai #Hoinv Hcm Hf Hg".
+    iIntros "#Hi #Hai #Hoinv Hcm Hf Hg Hlc".
     assert (Hfoff : ↑foffN ⊆ E).
     { etrans; [| exact HE]. rewrite /foffN /appN. solve_ndisj. }
     iMod (wrf_apart_fire_gen γfs E i γo M ua P cnt k REST True off r bs bs0 nl n n'
             HE Hloc Hpos Hoff Hcap Hr Hgap Hnz Habs Hnz' Habs' Hby Hshort Hwhy Hsb1
-            with "Hi Hai [] Hcm Hf Hg") as "(Hf & Hg & _ & Hrest)".
+            with "Hi Hai [] Hcm Hf Hg Hlc") as "(Hf & Hg & _ & Hrest)".
     { iApply (off_supply_parked E γo off r Hfoff with "Hoinv"). }
     iModIntro. iFrame "Hf Hg Hrest".
   Qed.
@@ -1431,17 +1431,17 @@ Section WriteFire.
     ftop_inv γfs -∗ app_inv γfs -∗ uoff γo off -∗
     awrite_part_at (fs_gamma_L γfs) appE i γo M ua P cnt k REST -∗
     top_frag (fs_gamma_L γfs) i n -∗
-    off_link γo (Z.of_nat off) ={E}=∗
+    off_link γo (Z.of_nat off) -∗ £ 1 ={E}=∗
       top_frag (fs_gamma_L γfs) i n'
       ∗ off_link γo (Z.of_nat (off + r))
       ∗ (uoff γo (off + r) ∨ (uoff γo off ∗ app_taint)) ∗ REST.
   Proof using .
     intros HE Hloc Hpos Hoff Hcap Hr Hgap Hnz Habs Hnz' Habs' Hby Hshort Hwhy Hsb1.
-    iIntros "#Hi #Hai Hu Hcm Hf Hg".
+    iIntros "#Hi #Hai Hu Hcm Hf Hg Hlc".
     iApply (wrf_apart_fire_gen γfs E i γo M ua P cnt k REST (uoff γo (off + r) ∨ (uoff γo off ∗ app_taint))%I
               off r bs bs0 nl n n'
               HE Hloc Hpos Hoff Hcap Hr Hgap Hnz Habs Hnz' Habs' Hby Hshort Hwhy Hsb1
-              with "Hi Hai [Hu] Hcm Hf Hg").
+              with "Hi Hai [Hu] Hcm Hf Hg Hlc").
     iApply (off_supply_held E γo off r with "Hu").
   Qed.
 

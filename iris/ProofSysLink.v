@@ -1912,7 +1912,9 @@ Section ProofSysLinkBody.
                                 Hmeta Hmap Hsbi Hireg Hdiat [Hfrz] Hpidq Hprocs
                                 Hdev Hgeo Hdlk Hbs2 HopS").
                 { rewrite /InodeRegion.ireg_link_pin. iExact "Hfrz". }
-                iIntros (CID41 Hq41) "_"; iIntros (miu)
+                (* iupdate's return credit pays INSTANT 1's opener
+                   ([lf_tgt_fire]'s [£ 1], spent at [AppInv.app_top_update]) *)
+                iIntros (CID41 Hq41) "Hlc"; iIntros (miu)
                   "%Hcsiu Hcg Hown Hpc Hpidq Hidev Hiinum Hmeta Hmap Hsbi Hdiat
                    (%vtok & [%Hvok _] & Htoken) Hpin Hbs2 HopS".
                 (* the minted fragment's VALUE, read off [ip]'s own record:
@@ -2022,7 +2024,7 @@ Section ProofSysLinkBody.
                         uf_nd_top Hlocnl Htynz0 Hokt
                         (lf_nlink_row dn (sl_incnl dn) bm dat Htynz
                            Hityi Hiszi Himaji Himini Hnlinc)
-                        with "[] [] Hltgt Htop") as "[Htop Htgtr0]";
+                        with "[] [] Hltgt Htop Hlc") as "[Htop Htgtr0]";
                   [iApply (ireg_inv_ftop with "Hireg") | iApply (ireg_inv_app with "Hireg") |].
                 iAssert (ltgt_fired Ftgt (bv_unsigned inum)) with "[Htgtr0]"
                   as "Htgtr".
@@ -3066,7 +3068,9 @@ Section ProofSysLinkBody.
                                       ltac:(rgne; rewrite Ha0z; exact sl_zero_nonneg)
                                       with "Hcg Hpc []").
                             { iApply (slki_a0 with "Htext"). }
-                            iIntros (CID61 Hq61) "_ Hcg Hpc".
+                            (* the blt's credit pays INSTANT 2's opener
+                               ([lf_ent_fire]'s [£ 1]) *)
+                            iIntros (CID61 Hq61) "Hlc Hcg Hpc".
                             assert (Hppa4 : add_vec_int
                                       (mword_of_int (SL + 0xa0) : mword 64) 4
                                       = mword_of_int (SL + 0xa4)) by pcw.
@@ -3261,7 +3265,7 @@ Section ProofSysLinkBody.
                                        fsc_cov fsc_logst dnd' bmd' datd'
                                        Hdiok' Hrl_datd' Hduq' Hddix')
                                     Hdirp Hnlp0 Hentnone Hparentrow
-                                    with "[] [] Hlent Htopd")
+                                    with "[] [] Hlent Htopd Hlc")
                               as "[Htopd Hentr0]";
                               [iApply (ireg_inv_ftop with "Hireg") | iApply (ireg_inv_app with "Hireg") |].
                             iAssert (lent_fired Fent (bv_unsigned dinum)
@@ -3680,7 +3684,9 @@ Section ProofSysLinkBody.
                                       ltac:(rewrite Htgee_a0; vm_compute; reflexivity)
                                       with "Hcg Hpc []").
                             { iApply (slki_a0 with "Htext"). }
-                            iApply bi.later_intro. iIntros (CID61 Hq61) "_". iIntros "Hcg Hpc".
+                            (* the blt's credit pays the parent's retag
+                               ([InodeRegion.ireg_top_retag_same]'s [£ 1]) *)
+                            iApply bi.later_intro. iIntros (CID61 Hq61) "Hlc". iIntros "Hcg Hpc".
                             iEval (rewrite Htgee_a0) in "Hpc".
                             (* THE ENTRY UNITS RIDE WITH IT:
                                nothing was written, so the entry map does not
@@ -3779,7 +3785,7 @@ Section ProofSysLinkBody.
                                     (inode_local_of_ok_rec (bv_unsigned dinum)
                                        fsc_cov fsc_logst dnd' bmd' datd'
                                        Hdiok' Hrl_datd' Hduq' Hddix')
-                                    with "[] [] Htopd")
+                                    with "[] [] Htopd Hlc")
                               as "Htopd";
                               [iApply (ireg_inv_ftop with "Hireg") | iApply (ireg_inv_app with "Hireg") |].
                             iModIntro.

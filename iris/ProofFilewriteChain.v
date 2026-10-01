@@ -500,7 +500,7 @@ Section FilewriteChain.
     ftop_inv γfs -∗ app_inv γfs -∗
     fw_au_st om (fs_gamma_L γfs) i γo P n M ua Q t p 0%nat -∗
     top_frag (fs_gamma_L γfs) i nd -∗
-    off_link γo (Z.of_nat off) ={E}=∗
+    off_link γo (Z.of_nat off) -∗ £ 1 ={E}=∗
       top_frag (fs_gamma_L γfs) i nd'
       ∗ off_link γo (Z.of_nat (off + length bs))
       ∗ fw_au_st om (fs_gamma_L γfs) i γo P n M ua Q
@@ -511,7 +511,7 @@ Section FilewriteChain.
     { etrans; [| exact HE]. rewrite /foffN /appN. solve_ndisj. }
     assert (Hbyk : ubytes_at M (add_vec_int ua (FW_MAX * Z.of_nat p)) bs)
       by (rewrite -Htie; exact Hby).
-    iIntros "#Hi #Hai Hst Hf Hg".
+    iIntros "#Hi #Hai Hst Hf Hg Hlc".
     rewrite /fw_au_st.
     destruct om.
     - iDestruct "Hst" as "[#Hsup Hau]".
@@ -519,7 +519,7 @@ Section FilewriteChain.
         as "[Hcm Hback]".
       iMod (wrf_awrite_fire_gen γfs E i γo M ua n p _ True off bs bs0 nl nd nd'
               HE Hloc Hpos Hoff Hcap Hnz Habs Hnz' Habs' Hbyk Hlen
-              with "Hi Hai [] Hcm Hf Hg") as "(Hf & Hg & _ & Htail)".
+              with "Hi Hai [] Hcm Hf Hg Hlc") as "(Hf & Hg & _ & Htail)".
       { iApply (fw_supply_off E γo off (length bs) Hfoff with "Hsup"). }
       iModIntro. iFrame "Hf Hg". iSplitR; [iExact "Hsup" |].
       iApply ("Hback" $! bs with "[//] Htail").
@@ -528,14 +528,14 @@ Section FilewriteChain.
           as "[Hcm Hback]".
         iMod (wrf_awrite_fire_adv γfs E i γo M ua n p _ off bs bs0 nl nd nd'
                 HE Hloc Hpos Hoff Hcap Hnz Habs Hnz' Habs' Hbyk Hlen
-                with "Hi Hai Hcm Hf Hg") as "(Hf & Hg & Htail)".
+                with "Hi Hai Hcm Hf Hg Hlc") as "(Hf & Hg & Htail)".
         iModIntro. iFrame "Hf Hg". iLeft.
         iApply ("Hback" $! bs with "[//] Htail").
       + iDestruct (fw_au_raw_take (fs_gamma_L γfs) i γo P n M ua Q t p Ht Htn Htie with "Hau")
           as "[Hcm Hback]".
         iMod (wrf_awrite_fire_gen γfs E i γo M ua n p _ True off bs bs0 nl nd nd'
                 HE Hloc Hpos Hoff Hcap Hnz Habs Hnz' Habs' Hbyk Hlen
-                with "Hi Hai [] Hcm Hf Hg") as "(Hf & Hg & _ & Htail)".
+                with "Hi Hai [] Hcm Hf Hg Hlc") as "(Hf & Hg & _ & Htail)".
         { iApply (fw_supply_off E γo off (length bs) Hfoff with "Hsup"). }
         iModIntro. iFrame "Hf Hg". iRight. iSplitR; [iExact "Hsup" |].
         iApply ("Hback" $! bs with "[//] Htail").
@@ -567,7 +567,7 @@ Section FilewriteChain.
     ftop_inv γfs -∗ app_inv γfs -∗
     fw_au_st om (fs_gamma_L γfs) i γo P n M ua Q t p 0%nat -∗
     top_frag (fs_gamma_L γfs) i nd -∗
-    off_link γo (Z.of_nat off) ={E}=∗
+    off_link γo (Z.of_nat off) -∗ £ 1 ={E}=∗
       top_frag (fs_gamma_L γfs) i nd'
       ∗ off_link γo (Z.of_nat (off + r))
       ∗ fw_au_st om (fs_gamma_L γfs) i γo P n M ua Q t p 1%nat.
@@ -576,7 +576,7 @@ Section FilewriteChain.
            Hsb1 Ht Htn Htie.
     assert (Hfoff : ↑foffN ⊆ E).
     { etrans; [| exact HE]. rewrite /foffN /appN. solve_ndisj. }
-    iIntros "#Hi #Hai Hst Hf Hg".
+    iIntros "#Hi #Hai Hst Hf Hg Hlc".
     rewrite /fw_au_st.
     destruct om.
     - iDestruct "Hst" as "[#Hsup Hau]".
@@ -585,7 +585,7 @@ Section FilewriteChain.
       iMod (wrf_apart_fire_gen γfs E i γo M ua P n p _ True off r bs bs0 nl nd nd'
               HE Hloc Hpos Hoff Hcap Hr Hgap Hnz Habs Hnz' Habs' Hby Hshort
               Hwhy Hsb1
-              with "Hi Hai [] Hcm Hf Hg") as "(Hf & Hg & _ & Htail)".
+              with "Hi Hai [] Hcm Hf Hg Hlc") as "(Hf & Hg & _ & Htail)".
       { iApply (fw_supply_off E γo off r Hfoff with "Hsup"). }
       iModIntro. iFrame "Hf Hg". iSplitR; [iExact "Hsup" |].
       iApply ("Hback" with "Htail").
@@ -595,7 +595,7 @@ Section FilewriteChain.
         iMod (wrf_apart_fire_adv γfs E i γo M ua P n p _ off r bs bs0 nl nd nd'
                 HE Hloc Hpos Hoff Hcap Hr Hgap Hnz Habs Hnz' Habs' Hby Hshort
                 Hwhy Hsb1
-                with "Hi Hai Hcm Hf Hg") as "(Hf & Hg & Htail)".
+                with "Hi Hai Hcm Hf Hg Hlc") as "(Hf & Hg & Htail)".
         iModIntro. iFrame "Hf Hg". iLeft.
         iApply ("Hback" with "Htail").
       + iDestruct (fw_au_raw_spend_part (fs_gamma_L γfs) i γo P n M ua Q t p Ht Htn Htie
@@ -603,7 +603,7 @@ Section FilewriteChain.
         iMod (wrf_apart_fire_gen γfs E i γo M ua P n p _ True off r bs bs0 nl nd nd'
                 HE Hloc Hpos Hoff Hcap Hr Hgap Hnz Habs Hnz' Habs' Hby Hshort
                 Hwhy Hsb1
-                with "Hi Hai [] Hcm Hf Hg") as "(Hf & Hg & _ & Htail)".
+                with "Hi Hai [] Hcm Hf Hg Hlc") as "(Hf & Hg & _ & Htail)".
         { iApply (fw_supply_off E γo off r Hfoff with "Hsup"). }
         iModIntro. iFrame "Hf Hg". iRight. iSplitR; [iExact "Hsup" |].
         iApply ("Hback" with "Htail").

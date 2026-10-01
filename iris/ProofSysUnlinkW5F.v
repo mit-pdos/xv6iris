@@ -869,7 +869,9 @@ Section ProofSysUnlinkW5F.
                     apply (proj2 (eq_vec_true_iff _ _)); reflexivity)
               with "Hcg Hpc []").
     { iApply (suli_0aa with "Htext"). }
-    iIntros (D15 Hd15) "_ Hcg Hpc".
+    (* the bne's credit pays INSTANT 1's opener ([uf_uent_fire]'s [£ 1],
+       spent at [AppInv.app_top_update]) *)
+    iIntros (D15 Hd15) "Hlc Hcg Hpc".
     assert (Hppae : add_vec_int (mword_of_int (SU + 0xaa) : mword 64) 4
                     = mword_of_int (SU + 0xae)) by pcw.
     iEval (rewrite Hppae) in "Hpc".
@@ -1096,7 +1098,7 @@ Section ProofSysUnlinkW5F.
                ltac:(rewrite Nat.sub_0_r; exact (mkf_era_live dnd bmd datd Hdplive))
                Hentsd)
             Htynz0
-            with "[] [] Hcent HP Htop Htopi")
+            with "[] [] Hcent HP Htop Htopi Hlc")
       as "(Htop & Htopi & HP & Hfire1)";
       [iApply (ireg_inv_ftop with "Hireg") | iApply (ireg_inv_app with "Hireg") |].
     iDestruct "Hfire1" as (av0) "(%Hpre0 & Hent)".
@@ -1430,7 +1432,8 @@ Section ProofSysUnlinkW5F.
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (suli_0d0 with "Htext"). }
-    iIntros (D29 Hd29) "_ Hcg Hpc".
+    (* the jal's credit pays INSTANT 2's opener ([uf_utgt_fire]'s [£ 1]) *)
+    iIntros (D29 Hd29) "Hlc Hcg Hpc".
     set (E2 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (SU + 0xd0) : mword 64) 4)]> E1).
     assert (Hjup2 : add_vec (mword_of_int (SU + 0xd0) : mword 64)
@@ -1527,7 +1530,7 @@ Section ProofSysUnlinkW5F.
                       : mword 64)) 31 0)))) bmi bmi dati dati Hnlzi
                   HdnlI))
             Htynz2
-            with "[] [] Hctgt Htopi") as "(Htopi & Hfire2)";
+            with "[] [] Hctgt Htopi Hlc") as "(Htopi & Hfire2)";
       [iApply (ireg_inv_ftop with "Hireg") | iApply (ireg_inv_app with "Hireg") |].
     iDestruct "Hfire2" as (av1) "(%Hrow1 & Htgt)".
     iModIntro.

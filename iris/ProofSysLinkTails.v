@@ -1411,7 +1411,9 @@ Section ProofSysLinkTails.
         by (rewrite /dn' sl_setnl_type; exact Hnotdir).
       rewrite (InodeRegion.ireg_dot_delta_not_dir _ _ Hdn'ty)
         FsStateLink.link_reps_1. iExact "Htoken". }
-    iIntros (CID9 Hq9) "_"; iIntros (miu)
+    (* iupdate's return credit pays the undo's opener ([uf_utgt_fire]'s
+       [£ 1], spent at [AppInv.app_top_update]) *)
+    iIntros (CID9 Hq9) "Hlc"; iIntros (miu)
       "%Hcsiu Hcg Hown Hpc Hpid Hidev Hiinum Hmeta Hmap Hsbi Hdiat Hbs2 Hop".
     assert (Hpc10a : ret_pc (P4 !!! Regidx Rra : mword 64)
                     = mword_of_int (SL + 0x10a)) by (rewrite HP4ra; pcw).
@@ -1483,7 +1485,7 @@ Section ProofSysLinkTails.
     iMod (uf_utgt_fire fsc_fs ⊤ Funtgt (bv_unsigned inum)
             (era_node dn bm dat) (era_node dn' bm dat)
             uf_nd_top Hloc' Hnl1 Hrow' Htynz0
-            with "[] [] Hcmun Htop") as "[Htop Huntgt]";
+            with "[] [] Hcmun Htop Hlc") as "[Htop Huntgt]";
       [iApply (ireg_inv_ftop with "Hireg") | iApply (ireg_inv_app with "Hireg") |].
     iAssert (luntgt_fired Funtgt (bv_unsigned inum)) with "[Huntgt]"
       as "Huntgt".

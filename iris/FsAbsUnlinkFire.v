@@ -397,7 +397,7 @@ Section UnlinkFire.
        straight back ([SysUnlinkDefs.uent_commit_at]'s note at [Pd]). *)
     Pd d -∗
     top_frag (fs_gamma_L γfs) d np -∗
-    top_frag_q (fs_gamma_L γfs) dqt t nt ={E}=∗
+    top_frag_q (fs_gamma_L γfs) dqt t nt -∗ £ 1 ={E}=∗
       top_frag (fs_gamma_L γfs) d np'
       ∗ top_frag_q (fs_gamma_L γfs) dqt t nt
       ∗ Pd d
@@ -406,7 +406,7 @@ Section UnlinkFire.
           ∗ Fent.(pf_recv) av d nm t.
   Proof using .
     intros HE Hloc Hdir Hnm HnD HnDD Hnlp Hnlt Hdots Hdec Habsp' Hnzt.
-    iIntros "#Hi #Hai Hcm HPd Hfp Hft".
+    iIntros "#Hi #Hai Hcm HPd Hfp Hft Hlc".
     iDestruct (pf_at_au with "Hcm") as "Hcm".
     rewrite /top_frag /top_frag_q /fs_gamma_L /=.
     iMod (inv_acc E ftopN with "Hi") as "[Hbody Hclose]"; [solve_ndisj |].
@@ -444,7 +444,7 @@ Section UnlinkFire.
        of [appN] beside its claim, which the caller's step re-establishes
        under the later ([AppInv.app_top_update]) *)
     iMod (app_top_update appE γfs I d np np' ltac:(rewrite /appE; done)
-            with "Hai [Hstep] Hta Hfp") as "[Hta Hfp]".
+            with "Hai [Hstep] Hta Hfp Hlc") as "[Hta Hfp]".
     { iIntros (_) "Hp". iApply (app_step_at d I _ np' with "Hstep Hp").
       by rewrite Hdelta Hdec. }
     iMod ("Hph2" $! (<[d := np']> I) with "[%] Hta") as "[Hta HΦ]".
@@ -490,11 +490,11 @@ Section UnlinkFire.
     fn_type nt <> 0 ->
     ftop_inv γfs -∗ app_inv γfs -∗
     pf_at (utgt_commit_at (fs_gamma_L γfs) appE) Ftgt -∗
-    top_frag (fs_gamma_L γfs) t nt ={E}=∗
+    top_frag (fs_gamma_L γfs) t nt -∗ £ 1 ={E}=∗
       top_frag (fs_gamma_L γfs) t nt'
       ∗ ∃ av : aview, ⌜av !! t = Some (abs_row nt)⌝ ∗ Ftgt.(pf_recv) av t.
   Proof using .
-    intros HE Hloc Hnl Habs' Hnzt. iIntros "#Hi #Hai Hcm Hf".
+    intros HE Hloc Hnl Habs' Hnzt. iIntros "#Hi #Hai Hcm Hf Hlc".
     iDestruct (pf_at_au with "Hcm") as "Hcm".
     rewrite /top_frag /fs_gamma_L /=.
     iMod (inv_acc E ftopN with "Hi") as "[Hbody Hclose]"; [solve_ndisj |].
@@ -518,7 +518,7 @@ Section UnlinkFire.
        of [appN] beside its claim, which the caller's step re-establishes
        under the later ([AppInv.app_top_update]) *)
     iMod (app_top_update appE γfs I t nt nt' ltac:(rewrite /appE; done)
-            with "Hai [Hstep] Hta Hf") as "[Hta Hf]".
+            with "Hai [Hstep] Hta Hf Hlc") as "[Hta Hf]".
     { iIntros (_) "Hp". iApply (app_step_at t I _ nt' Hdelta with "Hstep Hp"). }
     iMod ("Hph2" $! (<[t := nt']> I) with "[//] Hta") as "[Hta HΦ]".
     iMod "Hcl2".

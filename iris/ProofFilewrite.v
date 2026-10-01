@@ -2808,7 +2808,10 @@ Section ProofFilewrite.
     iApply (fw_offupd (CID0 := CIDb1) W1 (K - 12)%nat kx v rz (proc_addr jx) b
               HW1a0 HW1s2 ltac:(lia) Hwf Hrzadv
               with "Hcg Htext Hpc Hcell").
-    iIntros (CIDb2 Hsb2) "_"; iIntros (X0 v2) "%Hx Hcg Hpc Hcell".
+    (* the offset store's credit pays the fire's opener below (every arm:
+       [fw_st_fire_full]/[fw_st_fire_part]/[ireg_top_retag_same]'s [£ 1],
+       spent at [AppInv.app_top_update]) *)
+    iIntros (CIDb2 Hsb2) "Hlc"; iIntros (X0 v2) "%Hx Hcg Hpc Hcell".
     destruct Hx as (Hwf2 & Hv2 & Hxcs).
     assert (HX0s1 : X0 !!! Regidx Rs1 = (mword_of_int rz : mword 64))
       by (rewrite (Hxcs Rs1 ltac:(vm_compute; reflexivity)); exact HW1s1).
@@ -2877,7 +2880,7 @@ Section ProofFilewrite.
                   \/ (tf = t /\ pf = p /\ xf = 1%nat /\ (rz < c)%Z)
                   \/ (tf = (t + c)%Z /\ pf = S p /\ xf = 0%nat /\ rz = c)⌝
                  ∗ fw_au_st omx (fs_gamma_L fsc_fs) nx γx (pv_upt (us_V U)) n (us_M U) (m !!! Regidx Ra1) Q tf pf xf)%I
-      with "[Htop Hau Hgv]" as ">(Htop & Hgv & Hst)".
+      with "[Htop Hau Hgv Hlc]" as ">(Htop & Hgv & Hst)".
     { rewrite Hnum.
       (* RELAY 3 (lane WRITE-RELAY): THE COUNT THIS NODE WAS CALLED WITH.
          The chunk the test picked is [SysWriteDefs.wchunk_at n p] and not
@@ -3006,7 +3009,7 @@ Section ProofFilewrite.
                 (era_node dnl bml datal) (era_node dn' bm' data')
                 ltac:(solve_ndisj) Hlocw Hposbs Hoffbs Hcapbs Hnzl Hrow Hnz' Hrow'
                 Hchunkb Hlenw Htge0 Htltn Hmul
-                with "[] [] Hau Htop [Hgv]") as "(Htop & Hgv & Htail)";
+                with "[] [] Hau Htop [Hgv] Hlc") as "(Htop & Hgv & Htail)";
           [iApply (ireg_inv_ftop with "Hireg") | iApply (ireg_inv_app with "Hireg") | rewrite Hgxo Hoffz; iExact "Hgv" |].
         iModIntro. iFrame "Htop".
         iSplitL "Hgv".
@@ -3186,7 +3189,7 @@ Section ProofFilewrite.
                     ltac:(solve_ndisj) Hlocw Hbspos Hoffbs Hcapbs Hrle Hgap
                     Hnzl Hrowl Hnz' Hrow' Htakep Hshort Hwhyn Hsb1n
                     Htge0 Htltn Hmul
-                    with "[] [] Hau Htop [Hgv]")
+                    with "[] [] Hau Htop [Hgv] Hlc")
               as "(Htop & Hgv & Htail)";
               [iApply (ireg_inv_ftop with "Hireg")
               | iApply (ireg_inv_app with "Hireg")
@@ -3232,7 +3235,7 @@ Section ProofFilewrite.
                       Hnlq' Hrowl Hrow' Hnil blk_splice_nil //. }
             iMod (ireg_top_retag_same ⊤ fsc_fs (bv_unsigned inum)
                     (era_node dnl bml datal) (era_node dn' bm' data')
-                    ltac:(solve_ndisj) Hsame Hlocw with "[] [] Htop") as "Htop";
+                    ltac:(solve_ndisj) Hsame Hlocw with "[] [] Htop Hlc") as "Htop";
               [iApply (ireg_inv_ftop with "Hireg")
               | iApply (ireg_inv_app with "Hireg") |].
             assert (Hrz0 : (rz <= 0)%Z) by (zlia Hrztot Hbslen Hlen0).
@@ -3252,7 +3255,7 @@ Section ProofFilewrite.
             by (rewrite Hbmq Hdataq Hdnq; reflexivity).
           iMod (ireg_top_retag_same ⊤ fsc_fs (bv_unsigned inum)
                   (era_node dnl bml datal) (era_node dn' bm' data')
-                  ltac:(solve_ndisj) Hsame Hlocw with "[] [] Htop") as "Htop";
+                  ltac:(solve_ndisj) Hsame Hlocw with "[] [] Htop Hlc") as "Htop";
             [iApply (ireg_inv_ftop with "Hireg")
             | iApply (ireg_inv_app with "Hireg") |].
           iModIntro. iFrame "Htop".
