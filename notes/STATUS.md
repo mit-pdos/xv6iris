@@ -17,7 +17,8 @@ this (`tools/ci/audit.sh`, baseline `tools/audit/baseline.json`).
   (`make ci`); see README "Checks, reports and CI".
 - **Design and project notes** (written for the Rocq development, maintained here):
   `claude-notes/` — start with `claude-notes/LEAN.md`, then `claude-notes/README.md`.
-- **Design rulings** cited in source comments: `notes/design-rulings.md`.
+- **Design rulings** cited in source comments: `notes/design-rulings.md`; Lean-port design notes:
+  `notes/design/`; workflow rules: `notes/development.md`.
 - **Final Rocq drift survey** (what moved 1900b8a43 → the Rocq tree's final state, what was ported): `notes/rocq_drift.md`.
 - **Axiom baseline history**: `notes/adequacy_axioms_baseline.md`; cone re-audit: `notes/cone_reaudit.md`;
   device conformance: `notes/device-conformance.md`.

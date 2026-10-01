@@ -184,7 +184,9 @@ Each script's header says what it guarantees and when it fails.
   written for the Rocq development) (execution model, devices, page tables, interrupts, TSO, the file system, crash
   durability, the user and application layers, proof engineering), which this port follows.
 - **[`notes/STATUS.md`](notes/STATUS.md)** — the current state in a few lines.
-- **[`notes/design-rulings.md`](notes/design-rulings.md)** — the decisions source comments cite.
+- **[`notes/design-rulings.md`](notes/design-rulings.md)** — the decisions source comments cite;
+  **[`notes/design/`](notes/design/)** — the Lean port's own design notes;
+  **[`notes/development.md`](notes/development.md)** — workflow rules for working on this tree.
 - **[`notes/rocq_drift.md`](notes/rocq_drift.md)** — the final survey of what the Rocq tree changed during
   the port, and what was ported.
 - **[`tools/vtest/README.md`](tools/vtest/README.md)**, **`notes/device-conformance.md`** — the
