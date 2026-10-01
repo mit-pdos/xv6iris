@@ -49,10 +49,8 @@ macro "cycle_retire_su" : tactic =>
                all_goals
                  swp_run 10
                  conf_intro HmConf
-                 ihave Hclock := clockCells_intro _ _ _ _ _ _ $$ [Hminstret_increment Hminstret Hmcycle Hmtime Hmip]
-                 case' _ => iframe
-                 ihave Hpc := pcIs_intro _ _ $$ [HPC HnextPC]
-                 case' _ => iframe
+                 ihave Hclock := clockCells_introW _ _ _ _ _ _ $$ Hminstret_increment Hminstret Hmcycle Hmtime Hmip
+                 ihave Hpc := pcIs_introW _ _ $$ HPC HnextPC
                  iapply HΦ $$ HmConf Hclock Hpc HR HQ
              · swp_run 40
                (try split)
@@ -63,10 +61,8 @@ macro "cycle_retire_su" : tactic =>
                  iframe
                  inext
                  iintro %mcycle' %mtime' %mip' HmConf Hmcycle Hmtime Hmip
-                 ihave Hclock := clockCells_intro _ _ _ _ _ _ $$ [Hminstret_increment Hminstret Hmcycle Hmtime Hmip]
-                 case' _ => iframe
-                 ihave Hpc := pcIs_intro _ _ $$ [HPC HnextPC]
-                 case' _ => iframe
+                 ihave Hclock := clockCells_introW _ _ _ _ _ _ $$ Hminstret_increment Hminstret Hmcycle Hmtime Hmip
+                 ihave Hpc := pcIs_introW _ _ $$ HPC HnextPC
                  iapply HΦ $$ HmConf Hclock Hpc HR HQ))
 
 set_option maxHeartbeats 4000000 in

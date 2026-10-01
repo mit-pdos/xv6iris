@@ -75,6 +75,7 @@ import MachCSL.WpAtomic
 import MachCSL.WordHist
 import MachCSL.Lock
 import MachCSL.WpSmodeAu
+import MachCSL.WpSmodeAuDefs
 import MachCSL.WpSmodeAtomic
 import MachCSL.WpLock
 import MachCSL.WpSmodeMem2

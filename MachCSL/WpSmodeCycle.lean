@@ -417,10 +417,8 @@ macro "cycle_retire_t" : tactic =>
                all_goals
                  swp_run 10
                  conf_intro HmConf
-                 ihave Hclock := clockCells_intro _ _ _ _ _ _ $$ [Hminstret_increment Hminstret Hmcycle Hmtime Hmip]
-                 case' _ => iframe
-                 ihave Hpc := pcIs_intro _ _ $$ [HPC HnextPC]
-                 case' _ => iframe
+                 ihave Hclock := clockCells_introW _ _ _ _ _ _ $$ Hminstret_increment Hminstret Hmcycle Hmtime Hmip
+                 ihave Hpc := pcIs_introW _ _ $$ HPC HnextPC
                  iapply HΦ $$ HmConf Hclock Hpc HT HR HQ
              · swp_run 40
                (try split)
@@ -431,10 +429,8 @@ macro "cycle_retire_t" : tactic =>
                  iframe
                  inext
                  iintro %mcycle' %mtime' %mip' HmConf Hmcycle Hmtime Hmip
-                 ihave Hclock := clockCells_intro _ _ _ _ _ _ $$ [Hminstret_increment Hminstret Hmcycle Hmtime Hmip]
-                 case' _ => iframe
-                 ihave Hpc := pcIs_intro _ _ $$ [HPC HnextPC]
-                 case' _ => iframe
+                 ihave Hclock := clockCells_introW _ _ _ _ _ _ $$ Hminstret_increment Hminstret Hmcycle Hmtime Hmip
+                 ihave Hpc := pcIs_introW _ _ $$ HPC HnextPC
                  iapply HΦ $$ HmConf Hclock Hpc HT HR HQ))
 
 set_option hygiene false in
@@ -447,10 +443,8 @@ macro "cycle_retire_trap" : tactic =>
                all_goals
                  swp_run 10
                  conf_intro HmConf
-                 ihave Hclock := clockCells_intro _ _ _ _ _ _ $$ [Hminstret_increment Hminstret Hmcycle Hmtime Hmip]
-                 case' _ => iframe
-                 ihave Hpc := pcIs_intro _ _ $$ [HPC HnextPC]
-                 case' _ => iframe
+                 ihave Hclock := clockCells_introW _ _ _ _ _ _ $$ Hminstret_increment Hminstret Hmcycle Hmtime Hmip
+                 ihave Hpc := pcIs_introW _ _ $$ HPC HnextPC
                  iapply HK $$ %_ %hsc HmConf Hclock Hpc HT HP Hcsrs Hstv
              · swp_run 40
                (try split)
@@ -461,10 +455,8 @@ macro "cycle_retire_trap" : tactic =>
                  iframe
                  inext
                  iintro %mcycle' %mtime' %mip' HmConf Hmcycle Hmtime Hmip
-                 ihave Hclock := clockCells_intro _ _ _ _ _ _ $$ [Hminstret_increment Hminstret Hmcycle Hmtime Hmip]
-                 case' _ => iframe
-                 ihave Hpc := pcIs_intro _ _ $$ [HPC HnextPC]
-                 case' _ => iframe
+                 ihave Hclock := clockCells_introW _ _ _ _ _ _ $$ Hminstret_increment Hminstret Hmcycle Hmtime Hmip
+                 ihave Hpc := pcIs_introW _ _ $$ HPC HnextPC
                  iapply HK $$ %_ %hsc HmConf Hclock Hpc HT HP Hcsrs Hstv))
 
 set_option hygiene false in

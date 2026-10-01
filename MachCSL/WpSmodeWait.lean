@@ -121,10 +121,8 @@ theorem wpLoop_wait_wfi (cpu : CPU) (p : Privilege)
       cases tick
       · swp_run 10
         conf_intro HmConf
-        ihave Hclock := clockCells_intro _ _ _ _ _ _ $$ [Hminstret_increment Hminstret Hmcycle Hmtime Hmip]
-        case' _ => iframe
-        ihave Hpc := pcIs_intro _ _ $$ [HPC HnextPC]
-        case' _ => iframe
+        ihave Hclock := clockCells_introW _ _ _ _ _ _ $$ Hminstret_increment Hminstret Hmcycle Hmtime Hmip
+        ihave Hpc := pcIs_introW _ _ $$ HPC HnextPC
         iapply HΦ $$ HmConf Hclock Hpc HF
       · swp_run 5
         conf_intro HmConf
@@ -132,18 +130,15 @@ theorem wpLoop_wait_wfi (cpu : CPU) (p : Privilege)
         iframe
         inext
         iintro %mcycle' %mtime' %mip' HmConf Hmcycle Hmtime Hmip
-        ihave Hclock := clockCells_intro _ _ _ _ _ _ $$ [Hminstret_increment Hminstret Hmcycle Hmtime Hmip]
-        case' _ => iframe
-        ihave Hpc := pcIs_intro _ _ $$ [HPC HnextPC]
-        case' _ => iframe
+        ihave Hclock := clockCells_introW _ _ _ _ _ _ $$ Hminstret_increment Hminstret Hmcycle Hmtime Hmip
+        ihave Hpc := pcIs_introW _ _ $$ HPC HnextPC
         iapply HΦ $$ HmConf Hclock Hpc HF
   · -- still parked: a no-op step, the pc does not move; Löb
     swp_run 60
     cases tick
     · swp_run 10
       confhs_intro HmConf
-      ihave Hclock := clockCells_intro _ _ _ _ _ _ $$ [Hminstret_increment Hminstret Hmcycle Hmtime Hmip]
-      case' _ => iframe
+      ihave Hclock := clockCells_introW _ _ _ _ _ _ $$ Hminstret_increment Hminstret Hmcycle Hmtime Hmip
       iapply IH $$ HmConf Hclock HPC HnextPC HF HΦ
     · swp_run 5
       confhs_intro HmConf
@@ -151,8 +146,7 @@ theorem wpLoop_wait_wfi (cpu : CPU) (p : Privilege)
       iframe
       inext
       iintro %mcycle' %mtime' %mip' HmConf Hmcycle Hmtime Hmip
-      ihave Hclock := clockCells_intro _ _ _ _ _ _ $$ [Hminstret_increment Hminstret Hmcycle Hmtime Hmip]
-      case' _ => iframe
+      ihave Hclock := clockCells_introW _ _ _ _ _ _ $$ Hminstret_increment Hminstret Hmcycle Hmtime Hmip
       iapply IH $$ HmConf Hclock HPC HnextPC HF HΦ
 
 /-! ## The `wfi` cycle -/
@@ -232,8 +226,7 @@ theorem wpLoop_s_wfi_cycle [CurCtx] (cpu : CPU) (c : MConf) (tier : KTier) (root
   cases tick
   · swp_run 10
     confhs_intro HmConf
-    ihave Hclock := clockCells_intro _ _ _ _ _ _ $$ [Hminstret_increment Hminstret Hmcycle Hmtime Hmip]
-    case' _ => iframe
+    ihave Hclock := clockCells_introW _ _ _ _ _ _ $$ Hminstret_increment Hminstret Hmcycle Hmtime Hmip
     iapply (wpLoop_wait_wfi cpu Privilege.Supervisor hp' c w pc (pc + 4#64)
       iprop(transTok cpu tier root ∗ R))
     iframe HmConf Hclock HPC HnextPC HT HR Hcont
@@ -243,8 +236,7 @@ theorem wpLoop_s_wfi_cycle [CurCtx] (cpu : CPU) (c : MConf) (tier : KTier) (root
     iframe
     inext
     iintro %mcycle' %mtime' %mip' HmConf Hmcycle Hmtime Hmip
-    ihave Hclock := clockCells_intro _ _ _ _ _ _ $$ [Hminstret_increment Hminstret Hmcycle Hmtime Hmip]
-    case' _ => iframe
+    ihave Hclock := clockCells_introW _ _ _ _ _ _ $$ Hminstret_increment Hminstret Hmcycle Hmtime Hmip
     iapply (wpLoop_wait_wfi cpu Privilege.Supervisor hp' c w pc (pc + 4#64)
       iprop(transTok cpu tier root ∗ R))
     iframe HmConf Hclock HPC HnextPC HT HR Hcont

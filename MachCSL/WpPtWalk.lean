@@ -7,7 +7,11 @@ exclusive pair `read_pte_exclusive`/`write_pte_conditional`.  All three
 are the physical accesses of `WpSmodeAtomic` at another access kind, over
 the accessors the shared table's invariant provides (`MachCSL.KptInv`).
 -/
-import MachCSL.WpSmodeAu
+import MachCSL.WpAtomic
+import MachCSL.SConfPhysDefs
+import MachCSL.WpPmpXv6
+import MachCSL.WpSmodeAuDefs
+import MachCSL.ModelFacts
 import MachCSL.KptInv
 
 

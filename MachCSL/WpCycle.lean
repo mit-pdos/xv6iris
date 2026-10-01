@@ -150,6 +150,18 @@ theorem clockCells_intro (cpu : CPU) (mi : Bool) (minstret mcycle mtime mip : Bi
   iexists mi, minstret, mcycle, mtime, mip
   iexact H
 
+/-- `clockCells_intro` curried: reassembly by name, no `iframe` search. -/
+theorem clockCells_introW (cpu : CPU) (mi : Bool) (minstret mcycle mtime mip : BitVec 64) :
+    ⊢ Register.minstret_increment ↦ᵣ[cpu] mi -∗
+    Register.minstret ↦ᵣ[cpu] minstret -∗
+    Register.mcycle ↦ᵣ[cpu] mcycle -∗
+    Register.mtime ↦ᵣ[cpu] mtime -∗
+    Register.mip ↦ᵣ[cpu] mip -∗ clockCells (GF := GF) cpu := by
+  iintro H1 H2 H3 H4 H5
+  unfold clockCells
+  iexists mi, minstret, mcycle, mtime, mip
+  iframe
+
 theorem pcIs_cases (cpu : CPU) (pc : BitVec 64) :
     pcIs (GF := GF) cpu pc ⊢ Register.PC ↦ᵣ[cpu] pc ∗ Register.nextPC ↦ᵣ[cpu] pc := by
   unfold pcIs; exact .rfl
@@ -157,6 +169,13 @@ theorem pcIs_cases (cpu : CPU) (pc : BitVec 64) :
 theorem pcIs_intro (cpu : CPU) (pc : BitVec 64) :
     Register.PC ↦ᵣ[cpu] pc ∗ Register.nextPC ↦ᵣ[cpu] pc ⊢ pcIs (GF := GF) cpu pc := by
   unfold pcIs; exact .rfl
+
+/-- `pcIs_intro` curried. -/
+theorem pcIs_introW (cpu : CPU) (pc : BitVec 64) :
+    ⊢ Register.PC ↦ᵣ[cpu] pc -∗ Register.nextPC ↦ᵣ[cpu] pc -∗ pcIs (GF := GF) cpu pc := by
+  iintro H1 H2
+  unfold pcIs
+  iframe
 
 set_option hygiene false in
 /-- The retire part of the cycle, shared by both cycle lemmas: from the point
@@ -168,10 +187,8 @@ macro "cycle_retire" : tactic =>
                all_goals
                  swp_run 10
                  conf_intro HmConf
-                 ihave Hclock := clockCells_intro _ _ _ _ _ _ $$ [Hminstret_increment Hminstret Hmcycle Hmtime Hmip]
-                 case' _ => iframe
-                 ihave Hpc := pcIs_intro _ _ $$ [HPC HnextPC]
-                 case' _ => iframe
+                 ihave Hclock := clockCells_introW _ _ _ _ _ _ $$ Hminstret_increment Hminstret Hmcycle Hmtime Hmip
+                 ihave Hpc := pcIs_introW _ _ $$ HPC HnextPC
                  iapply HΦ $$ HmConf Hclock Hpc HR HQ
              · swp_run 40
                (try split)
@@ -182,10 +199,8 @@ macro "cycle_retire" : tactic =>
                  iframe
                  inext
                  iintro %mcycle' %mtime' %mip' HmConf Hmcycle Hmtime Hmip
-                 ihave Hclock := clockCells_intro _ _ _ _ _ _ $$ [Hminstret_increment Hminstret Hmcycle Hmtime Hmip]
-                 case' _ => iframe
-                 ihave Hpc := pcIs_intro _ _ $$ [HPC HnextPC]
-                 case' _ => iframe
+                 ihave Hclock := clockCells_introW _ _ _ _ _ _ $$ Hminstret_increment Hminstret Hmcycle Hmtime Hmip
+                 ihave Hpc := pcIs_introW _ _ $$ HPC HnextPC
                  iapply HΦ $$ HmConf Hclock Hpc HR HQ))
 
 set_option maxHeartbeats 4000000 in
