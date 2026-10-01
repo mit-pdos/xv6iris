@@ -1069,7 +1069,10 @@ Section IlockLoad.
               with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hppid Hprocs
                     Hdevi Hdgeom Hdlock Hsl").
     all: try lkbelow.
-    iIntros (CID9 Hq9) "_"; iIntros (mB kk bs0 bsd0 d0b) "%Hfacts Hcg Hcnt Hextc Hextm Hpc Hppid Hheld".
+    (* bread's return credit pays the claim-box fill's retag below
+       ([InodeRegion.ireg_top_retag_same]'s [£ 1], spent at
+       [AppInv.app_top_update]) *)
+    iIntros (CID9 Hq9) "Hlc"; iIntros (mB kk bs0 bsd0 d0b) "%Hfacts Hcg Hcnt Hextc Hextm Hpc Hppid Hheld".
     destruct Hfacts as [Hcs1 HmBa0].
     assert (Hpc4e : ret_pc (L7 !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.ilock + 0x4e)) by (rewrite HL7ra; pcw).
@@ -1151,7 +1154,7 @@ Section IlockLoad.
                     top_frag (fs_gamma_L fsc_fs) (bv_unsigned inum)
                              (era_node dn bm data)))
                 ∨ ⌜bv_unsigned (di_type dn) = 0⌝))%I
-      with "[Hpool HL Hcl]" as ">[HL Hrest]".
+      with "[Hpool HL Hcl Hlc]" as ">[HL Hrest]".
     { (* NO PEEL HERE ANY MORE (iclaim-ledger.md §3.5 item 7).  OPTION A
          (b)(ii)'s redeem -- [ipool_shape_to_np] -- happened once, at the
          RECYCLE that cached this entry, and what the unloaded payload holds
@@ -1288,7 +1291,7 @@ Section IlockLoad.
           iMod (ireg_top_retag_same ⊤ fsc_fs (bv_unsigned inum) n0
                   (era_node dn bm_empty (fun _ => replicate BSIZE (bv_0 8)))
                   ltac:(solve_ndisj) Habsbox Hlocbox
-                  with "[Hireg] [Hireg] Htop") as "Htop".
+                  with "[Hireg] [Hireg] Htop Hlc") as "Htop".
           { iApply (ireg_inv_ftop with "Hireg"). }
           { iApply (ireg_inv_app with "Hireg"). }
           iModIntro. iFrame "HL". iLeft. iFrame "Hdn Hwb".

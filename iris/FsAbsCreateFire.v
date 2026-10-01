@@ -794,10 +794,10 @@ Section CreateFire.
        app_step i I (abs_view (<[i := n']> I)) ∗
        (ghost_map_auth_frac (γtop (fs_gamma_L γfs)) (1/2) (<[i := n']> I) ={appE}=∗
         ghost_map_auth_frac (γtop (fs_gamma_L γfs)) (1/2) (<[i := n']> I) ∗ R)) -∗
-    top_frag (fs_gamma_L γfs) i n ={E}=∗
+    top_frag (fs_gamma_L γfs) i n -∗ £ 1 ={E}=∗
       ireg_armed k t q S ∗ top_frag (fs_gamma_L γfs) i n' ∗ R.
   Proof using .
-    iIntros (HE Hin) "#Hi #Hai Hrec Hcm Hf". rewrite /ireg_armed.
+    iIntros (HE Hin) "#Hi #Hai Hrec Hcm Hf Hlc". rewrite /ireg_armed.
     (* [γtop (fs_gamma_L γfs)] IS [fs_top γfs] ([FsAbs.ftop_gamma_top], by
        reflexivity), spelled the body's way before the invariant is opened
        -- exactly what [InodeRegion.ireg_top_retag_*] does *)
@@ -811,7 +811,7 @@ Section CreateFire.
     iMod ("Hcm" $! I with "[//] Hta") as "(Hta & Hstep & Hph2)".
     (* THE MOVE, at the whole authority ([AppInv.app_top_update]) *)
     iMod (app_top_update appE γfs I i n n' ltac:(rewrite /appE; done)
-            with "Hai [Hstep] Hta Hf") as "[Hta Hf]".
+            with "Hai [Hstep] Hta Hf Hlc") as "[Hta Hf]".
     { iIntros (_) "Hp". iApply (app_step_at i I _ n' eq_refl with "Hstep Hp"). }
     iMod ("Hph2" with "Hta") as "[Hta HR]".
     iMod "Hcl2".
@@ -839,9 +839,9 @@ Section CreateFire.
        app_step i I (abs_view (<[i := n']> I)) ∗
        (ghost_map_auth_frac (γtop (fs_gamma_L γfs)) (1/2) (<[i := n']> I) ={appE}=∗
         ghost_map_auth_frac (γtop (fs_gamma_L γfs)) (1/2) (<[i := n']> I) ∗ R)) -∗
-    top_frag (fs_gamma_L γfs) i n ={E}=∗ top_frag (fs_gamma_L γfs) i n' ∗ R.
+    top_frag (fs_gamma_L γfs) i n -∗ £ 1 ={E}=∗ top_frag (fs_gamma_L γfs) i n' ∗ R.
   Proof using .
-    iIntros (HE Hloc) "#Hi #Hai Hcm Hf".
+    iIntros (HE Hloc) "#Hi #Hai Hcm Hf Hlc".
     rewrite /top_frag /fs_gamma_L /=.
     iMod (inv_acc E ftopN with "Hi") as "[Hbody Hclose]"; [solve_ndisj |].
     iDestruct "Hbody" as ">Hb".
@@ -850,7 +850,7 @@ Section CreateFire.
     iMod (fupd_mask_subseteq appE) as "Hcl2"; [rewrite /appE; solve_ndisj |].
     iMod ("Hcm" $! I with "[//] Hta") as "(Hta & Hstep & Hph2)".
     iMod (app_top_update appE γfs I i n n' ltac:(rewrite /appE; done)
-            with "Hai [Hstep] Hta Hf") as "[Hta Hf]".
+            with "Hai [Hstep] Hta Hf Hlc") as "[Hta Hf]".
     { iIntros (_) "Hp". iApply (app_step_at i I _ n' eq_refl with "Hstep Hp"). }
     iMod ("Hph2" with "Hta") as "[Hta HR]".
     iMod "Hcl2".
@@ -881,15 +881,15 @@ Section CreateFire.
     abs_of n' = Some (MkAnode c 1%nat) ->
     ftop_inv γfs -∗ app_inv γfs -∗ ireg_armed k t q S -∗
     pf_at (aarm_commit_at (fs_gamma_L γfs) appE c) Farm -∗
-    top_frag (fs_gamma_L γfs) i n ={E}=∗
+    top_frag (fs_gamma_L γfs) i n -∗ £ 1 ={E}=∗
       ireg_armed k t q S ∗ top_frag (fs_gamma_L γfs) i n' ∗ cre_arm_fired Farm i.
   Proof using .
-    iIntros (HE Hin Hnone Hrow) "#Hi #Hai Hrec Hcm Hf".
+    iIntros (HE Hin Hnone Hrow) "#Hi #Hai Hrec Hcm Hf Hlc".
     (* THE PIECE IS SPENT: the fire eliminates to the AU side and the
        refund goes with the arm that did not happen. *)
     iDestruct (pf_at_au with "Hcm") as "Hcm".
     iApply (caf_armed_retag γfs E k t q S i n n' _ HE Hin
-              with "Hi Hai Hrec [Hcm] Hf").
+              with "Hi Hai Hrec [Hcm] Hf Hlc").
     iIntros (I Hlk) "Hta".
     assert (Hav : abs_view I !! i = None)
       by (rewrite (abs_view_lookup_of I i n Hlk); exact Hnone).
@@ -916,14 +916,14 @@ Section CreateFire.
     abs_of n' = Some (MkAnode (ADir (dots_ents full i d)) 1%nat) ->
     ftop_inv γfs -∗ app_inv γfs -∗ ireg_armed k t q S -∗
     pf_at (adots_commit_at (fs_gamma_L γfs) appE) Fdots -∗
-    top_frag (fs_gamma_L γfs) i n ={E}=∗
+    top_frag (fs_gamma_L γfs) i n -∗ £ 1 ={E}=∗
       ireg_armed k t q S ∗ top_frag (fs_gamma_L γfs) i n'
       ∗ cre_dots_fired Fdots i d full.
   Proof using .
-    iIntros (HE Hin Hrow Hrow') "#Hi #Hai Hrec Hcm Hf".
+    iIntros (HE Hin Hrow Hrow') "#Hi #Hai Hrec Hcm Hf Hlc".
     iDestruct (pf_at_au with "Hcm") as "Hcm".
     iApply (caf_armed_retag γfs E k t q S i n n' _ HE Hin
-              with "Hi Hai Hrec [Hcm] Hf").
+              with "Hi Hai Hrec [Hcm] Hf Hlc").
     iIntros (I Hlk) "Hta".
     assert (Hav : abs_view I !! i = Some (MkAnode (ADir ∅) 1%nat))
       by (rewrite (abs_view_lookup_of I i n Hlk); exact Hrow).
@@ -950,12 +950,12 @@ Section CreateFire.
     abs_of n' = None ->
     ftop_inv γfs -∗ app_inv γfs -∗ ireg_armed k t q S -∗
     aunarm_commit_at (fs_gamma_L γfs) appE i Fun.(pf_recv) -∗
-    top_frag (fs_gamma_L γfs) i n ={E}=∗
+    top_frag (fs_gamma_L γfs) i n -∗ £ 1 ={E}=∗
       ireg_armed k t q S ∗ top_frag (fs_gamma_L γfs) i n' ∗ cre_unarm_fired Fun i.
   Proof using .
-    iIntros (HE Hin Hrow Hnone) "#Hi #Hai Hrec Hcm Hf".
+    iIntros (HE Hin Hrow Hnone) "#Hi #Hai Hrec Hcm Hf Hlc".
     iApply (caf_armed_retag γfs E k t q S i n n' _ HE Hin
-              with "Hi Hai Hrec [Hcm] Hf").
+              with "Hi Hai Hrec [Hcm] Hf Hlc").
     iIntros (I Hlk) "Hta".
     assert (Hav : abs_view I !! i = Some (MkAnode c 1%nat))
       by (rewrite (abs_view_lookup_of I i n Hlk); exact Hrow).
@@ -980,11 +980,11 @@ Section CreateFire.
     abs_of n' = None ->
     ftop_inv γfs -∗ app_inv γfs -∗
     aunarm_commit_at (fs_gamma_L γfs) appE i Fun.(pf_recv) -∗
-    top_frag (fs_gamma_L γfs) i n ={E}=∗
+    top_frag (fs_gamma_L γfs) i n -∗ £ 1 ={E}=∗
       top_frag (fs_gamma_L γfs) i n' ∗ cre_unarm_fired Fun i.
   Proof using .
-    iIntros (HE Hloc Hrow Hnone) "#Hi #Hai Hcm Hf".
-    iApply (caf_retag γfs E i n n' _ HE Hloc with "Hi Hai [Hcm] Hf").
+    iIntros (HE Hloc Hrow Hnone) "#Hi #Hai Hcm Hf Hlc".
+    iApply (caf_retag γfs E i n n' _ HE Hloc with "Hi Hai [Hcm] Hf Hlc").
     iIntros (I Hlk) "Hta".
     assert (Hav : abs_view I !! i = Some (MkAnode c 1%nat))
       by (rewrite (abs_view_lookup_of I i n Hlk); exact Hrow).

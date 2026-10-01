@@ -3376,14 +3376,14 @@ Section InodeRegion.
     (∀ I : gmap Z fs_node, ⌜I !! i = Some n⌝ -∗
        ▷ app_pred app_run (FsAbsDefs.abs_view I) -∗
        ▷ app_pred app_run (FsAbsDefs.abs_view (<[i := n']> I))) -∗
-    top_frag (fs_gamma_L γfs) i n ={E}=∗ top_frag (fs_gamma_L γfs) i n'.
+    top_frag (fs_gamma_L γfs) i n -∗ £ 1 ={E}=∗ top_frag (fs_gamma_L γfs) i n'.
   Proof using .
-    iIntros (HE Hloc) "#Hi #Hai Hstep Hf".
+    iIntros (HE Hloc) "#Hi #Hai Hstep Hf Hlc".
     iMod (inv_acc E ftopN with "Hi") as "[Hbody Hclose]"; [solve_ndisj |].
     iDestruct "Hbody" as ">Hb". iDestruct "Hb" as (I A) "(Ha & Hla & Hpark & %Hcl)".
     rewrite /top_frag /fs_gamma_L /=.
     iMod (app_top_update (E ∖ ↑ftopN) γfs I i n n' (appN_sub_ftop E HE)
-            with "Hai [Hstep] Ha Hf") as "[Ha Hf]".
+            with "Hai [Hstep] Ha Hf Hlc") as "[Ha Hf]".
     { iIntros (Hlk) "Hp". iModIntro. iApply ("Hstep" $! I with "[//] Hp"). }
     iMod ("Hclose" with "[Ha Hla Hpark]") as "_".
     { iNext. rewrite /ftop_body. iExists (<[i := n']> I), A.
@@ -3401,10 +3401,10 @@ Section InodeRegion.
     FsAbsDefs.abs_of n = FsAbsDefs.abs_of n' ->
     inode_local i n' ->
     ftop_inv γfs -∗ app_inv γfs -∗
-    top_frag (fs_gamma_L γfs) i n ={E}=∗ top_frag (fs_gamma_L γfs) i n'.
+    top_frag (fs_gamma_L γfs) i n -∗ £ 1 ={E}=∗ top_frag (fs_gamma_L γfs) i n'.
   Proof using .
-    iIntros (HE Habs Hloc) "#Hi #Hai Hf".
-    iApply (ireg_top_retag_gen E γfs i n n' HE Hloc with "Hi Hai [] Hf").
+    iIntros (HE Habs Hloc) "#Hi #Hai Hf Hlc".
+    iApply (ireg_top_retag_gen E γfs i n n' HE Hloc with "Hi Hai [] Hf Hlc").
     iIntros (I Hin) "Hp". rewrite (FsAbsDefs.abs_view_insert_same I i n n' Hin Habs). iExact "Hp".
   Qed.
 
@@ -3416,10 +3416,10 @@ Section InodeRegion.
     (∀ I : gmap Z fs_node, ⌜I !! i = Some n⌝ -∗
        app_pred app_run (FsAbsDefs.abs_view I) -∗
        app_pred app_run (FsAbsDefs.abs_view (<[i := n']> I))) -∗
-    top_frag (fs_gamma_L γfs) i n ={E}=∗ top_frag (fs_gamma_L γfs) i n'.
+    top_frag (fs_gamma_L γfs) i n -∗ £ 1 ={E}=∗ top_frag (fs_gamma_L γfs) i n'.
   Proof using .
-    iIntros (HE Hloc) "#Hi #Hai Hstep Hf".
-    iApply (ireg_top_retag_gen E γfs i n n' HE Hloc with "Hi Hai [Hstep] Hf").
+    iIntros (HE Hloc) "#Hi #Hai Hstep Hf Hlc".
+    iApply (ireg_top_retag_gen E γfs i n n' HE Hloc with "Hi Hai [Hstep] Hf Hlc").
     iIntros (I Hin) "Hp". iNext. iApply ("Hstep" $! I with "[//] Hp").
   Qed.
 
@@ -3435,16 +3435,16 @@ Section InodeRegion.
     (∀ I : gmap Z fs_node, ⌜I !! i = Some n⌝ -∗
        ▷ app_pred app_run (FsAbsDefs.abs_view I) -∗
        ▷ app_pred app_run (FsAbsDefs.abs_view (<[i := n']> I))) -∗
-    top_frag (fs_gamma_L γfs) i n ={E}=∗
+    top_frag (fs_gamma_L γfs) i n -∗ £ 1 ={E}=∗
       ireg_armed k t q S ∗ top_frag (fs_gamma_L γfs) i n'.
   Proof using .
-    iIntros (HE Hin) "#Hi #Hai Hrec Hstep Hf". rewrite /ireg_armed.
+    iIntros (HE Hin) "#Hi #Hai Hrec Hstep Hf Hlc". rewrite /ireg_armed.
     iMod (inv_acc E ftopN with "Hi") as "[Hbody Hclose]"; [solve_ndisj |].
     iDestruct "Hbody" as ">Hb". iDestruct "Hb" as (I A) "(Ha & Hla & Hpark & %Hcl)".
     iDestruct (ghost_map_lookup with "Hla Hrec") as %HAt.
     rewrite /top_frag /fs_gamma_L /=.
     iMod (app_top_update (E ∖ ↑ftopN) γfs I i n n' (appN_sub_ftop E HE)
-            with "Hai [Hstep] Ha Hf") as "[Ha Hf]".
+            with "Hai [Hstep] Ha Hf Hlc") as "[Ha Hf]".
     { iIntros (Hlk) "Hp". iModIntro. iApply ("Hstep" $! I with "[//] Hp"). }
     iMod ("Hclose" with "[Ha Hla Hpark]") as "_".
     { iNext. rewrite /ftop_body. iExists (<[i := n']> I), A.
@@ -3463,12 +3463,12 @@ Section InodeRegion.
     i ∈ S ->
     FsAbsDefs.abs_of n = FsAbsDefs.abs_of n' ->
     ftop_inv γfs -∗ app_inv γfs -∗ ireg_armed k t q S -∗
-    top_frag (fs_gamma_L γfs) i n ={E}=∗
+    top_frag (fs_gamma_L γfs) i n -∗ £ 1 ={E}=∗
       ireg_armed k t q S ∗ top_frag (fs_gamma_L γfs) i n'.
   Proof using .
-    iIntros (HE Hin Habs) "#Hi #Hai Hrec Hf".
+    iIntros (HE Hin Habs) "#Hi #Hai Hrec Hf Hlc".
     iApply (ireg_top_retag_armed_gen E γfs k t q S i n n' HE Hin
-              with "Hi Hai Hrec [] Hf").
+              with "Hi Hai Hrec [] Hf Hlc").
     iIntros (I Hlk) "Hp". rewrite (FsAbsDefs.abs_view_insert_same I i n n' Hlk Habs). iExact "Hp".
   Qed.
 
@@ -3480,12 +3480,12 @@ Section InodeRegion.
     (∀ I : gmap Z fs_node, ⌜I !! i = Some n⌝ -∗
        app_pred app_run (FsAbsDefs.abs_view I) -∗
        app_pred app_run (FsAbsDefs.abs_view (<[i := n']> I))) -∗
-    top_frag (fs_gamma_L γfs) i n ={E}=∗
+    top_frag (fs_gamma_L γfs) i n -∗ £ 1 ={E}=∗
       ireg_armed k t q S ∗ top_frag (fs_gamma_L γfs) i n'.
   Proof using .
-    iIntros (HE Hin) "#Hi #Hai Hrec Hstep Hf".
+    iIntros (HE Hin) "#Hi #Hai Hrec Hstep Hf Hlc".
     iApply (ireg_top_retag_armed_gen E γfs k t q S i n n' HE Hin
-              with "Hi Hai Hrec [Hstep] Hf").
+              with "Hi Hai Hrec [Hstep] Hf Hlc").
     iIntros (I Hlk) "Hp". iNext. iApply ("Hstep" $! I with "[//] Hp").
   Qed.
 

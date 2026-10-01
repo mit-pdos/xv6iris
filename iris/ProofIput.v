@@ -2146,7 +2146,9 @@ Section IputFreePath.
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (ipi_ba with "Htext"). }
-    iIntros (CID21 Hq21) "_ Hcg Hpc".
+    (* the jal's credit pays the deposit's retag ([EscrowDeposit.
+       ireg_free_deposit_au]'s [£ 1], spent at [AppInv.app_top_update]) *)
+    iIntros (CID21 Hq21) "Hlc Hcg Hpc".
     set (R5 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KernelSyms.iput + 0xba) : mword 64) 4)]> R4).
     assert (Htgtlw : add_vec (mword_of_int (KernelSyms.iput + 0xba) : mword 64)
@@ -2166,7 +2168,7 @@ Section IputFreePath.
                   ltac:(solve_ndisj) ltac:(solve_ndisj) ltac:(solve_ndisj)
                   ltac:(solve_ndisj)
                   Hnib Hdn'wf Hdn'ty Hdn'bare Hnlst
-                  with "Hireg Hesc Hpinv Hcel Hdn Hdep") as "Hau0".
+                  with "Hireg Hesc Hpinv Hcel Hdn Hdep Hlc") as "Hau0".
     iEval (rewrite -Hbno) in "Hau0".
     (* THE PAYLOAD'S INDEX FUNCTION, NAMED (durable-disk 1d'): [log_write]'s
        atomic-update contract is stated over the Psi-NAMED context, because
