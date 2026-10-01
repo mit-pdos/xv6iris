@@ -145,6 +145,7 @@ instance fkp_parkBlock_morph (steady : Bool) (N : UtNames) (V : ProcPriv) (M : N
     refine @instCtxMorphSep hlc GF _ _ _ (procPrivBareAt_morph _ _ _ _) ?_
     refine @instCtxMorphSep hlc GF _ _ _ (procOfiles_morph KTier.kpt _ _ _ _) ?_
     refine @instCtxMorphSep hlc GF _ _ _ (cwdRefAt_morph KTier.kpt _ _) ?_
+    refine @instCtxMorphSep hlc GF _ _ _ (rootRefAt_morph KTier.kpt _ _) ?_
     refine @instCtxMorphSep hlc GF _ _ _ firstBoot_morph ?_
     refine @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _) ?_
     refine @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _) ?_

@@ -53,7 +53,21 @@ payloads (P2).  This file is the layer above them.
    structure eta (`rfl`).
 4. **The inum is a `Nat`** (IcacheHeld deviation 3), as `ProcPriv.cwi`.
 5. **`cwdRefAt_nonzero`/`procPrivCwd_nonzero` keep their hypothesis** (Lean
-   iris has no persistent-conclusion `iDestruct` that leaves it in place).
+   iris has no persistent-conclusion `iDestruct` that leaves it in place);
+   so do their root twins.
+
+## THE ROOT (upstream b72cbac, chroot; design chroot.md §1)
+`p->root` is the cwd's twin: a cell in `procFields` (`ProcGeom.pRoot`, +344)
+and a ghost inum (`ProcPriv.rti`), tied by `rootRefAt V.root V.rti :=
+inodeHeldAt …`, which rides every cwd-bearing shape RIGHT AFTER the cwd's
+reference (`procPrivCwd` here, `FdTable.procPrivCoreNoctxAt` /
+`procPrivCoreUnmarkedAt`).  No null arm either: the deficit block lacks BOTH
+references (`procPrivNoctxAt`), and every dormant shape pins `V.root = 0`
+beside `V.cwd = 0`.  The lemma family is the cwd's at the other cell:
+`rootRefAt_heldAt` / `_ofHeldAt` / `_held` / `_nonzero`,
+`procPrivNoctx_rti` / `procPrivNoctx_root`, `procPrivCwd_root`,
+`procPrivCwd_rootNonzero`; `procPrivCwd_split` keeps its name and its RHS
+gains the root's reference.
 
 Imports only definitional files.
 -/
@@ -125,24 +139,50 @@ theorem cwdRef_nonzero (v : BitVec 64) :
   · iexists z; iexact H
   · ipureintro; exact hv
 
+/-! ## The root's reference (Rocq `root_ref_at`, chroot) -/
+
+/-- `p->root`'s reference, AT its inum (Rocq `root_ref_at`): `cwdRefAt`'s
+twin at the other cell. -/
+def rootRefAt (v : BitVec 64) (z : Nat) : IProp GF := inodeHeldAt v z
+
+/-- Rocq `root_ref_at_held_at`. -/
+theorem rootRefAt_heldAt (v : BitVec 64) (z : Nat) :
+    rootRefAt (GF := GF) v z ⊢ inodeHeldAt v z := .rfl
+
+/-- Rocq `root_ref_at_of_held_at`. -/
+theorem rootRefAt_ofHeldAt (v : BitVec 64) (z : Nat) :
+    inodeHeldAt (GF := GF) v z ⊢ rootRefAt v z := .rfl
+
+/-- Rocq `root_ref_at_held`. -/
+theorem rootRefAt_held (v : BitVec 64) (z : Nat) :
+    rootRefAt (GF := GF) v z ⊢ inodeHeld v := inodeHeldAt_held v z
+
+/-- The projection the missing null arm buys (Rocq `root_ref_at_nonzero`). -/
+theorem rootRefAt_nonzero (v : BitVec 64) (z : Nat) :
+    rootRefAt (GF := GF) v z ⊢ rootRefAt v z ∗ ⌜v ≠ 0#64⌝ :=
+  cwdRefAt_nonzero v z
+
 /-! ## The cwd-bearing running block (Rocq `proc_priv_core`'s cwd seam) -/
 
 /-- **The running process's block WITH its working directory**: the
 ctx-free running block (`SchedCtx.procPrivNoctxAt`, Rocq `proc_priv_nocwd`
 minus the fd payloads) and `cwdRefAt V.cwd V.cwi` (Rocq `proc_priv_core`'s
-cwd conjunct; its D8 conjuncts are deviation 2).  What kfork, kexit,
-userinit's install, sys_chdir and the path walks hold. -/
+cwd conjunct; its D8 conjuncts are deviation 2), and -- right after it --
+`rootRefAt V.root V.rti` (Rocq's root conjunct, chroot).  What kfork, kexit,
+userinit's install, sys_chdir, sys_chroot and the path walks hold. -/
 def procPrivCwd (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) : IProp GF := iprop%
-  procPrivNoctxAt curCtx pa pid V M ∗ cwdRefAt V.cwd V.cwi
+  procPrivNoctxAt curCtx pa pid V M ∗ cwdRefAt V.cwd V.cwi ∗ rootRefAt V.root V.rti
 
 /-- **The construction-window seam** (Rocq `proc_priv_split_cwd`, its P1
-part): the block is the deficit block plus the reference.  An `⊣⊢` by `rfl`,
-so a caller splits and rejoins with a rewrite -- no borrow, no closer. -/
+part): the block is the deficit block plus the two references (the
+cwd's, then the root's -- Rocq's same lemma splits both off).  An `⊣⊢` by
+`rfl`, so a caller splits and rejoins with a rewrite -- no borrow, no
+closer. -/
 theorem procPrivCwd_split (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) :
     procPrivCwd (GF := GF) pa pid V M ⊣⊢
-      procPrivNoctxAt curCtx pa pid V M ∗ cwdRefAt V.cwd V.cwi := .rfl
+      procPrivNoctxAt curCtx pa pid V M ∗ cwdRefAt V.cwd V.cwi ∗ rootRefAt V.root V.rti := .rfl
 
 /-- **A live process has a non-null working directory**, as a projection of
 the block (Rocq `proc_priv_cwd_nonzero`): what kexit / kfork / sys_fork /
@@ -151,9 +191,21 @@ theorem procPrivCwd_nonzero (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) :
     procPrivCwd (GF := GF) pa pid V M ⊢ procPrivCwd pa pid V M ∗ ⌜V.cwd ≠ 0#64⌝ := by
   unfold procPrivCwd
-  iintro ⟨Hb, Hc⟩
+  iintro ⟨Hb, Hc, Hr⟩
   icases cwdRefAt_nonzero V.cwd V.cwi $$ Hc with ⟨Hc, %hv⟩
-  isplitl [Hb Hc]
+  isplitl [Hb Hc Hr]
+  · iframe
+  · ipureintro; exact hv
+
+/-- **A live process has a non-null root**, as a projection of the block
+(Rocq `proc_priv_root_nonzero`). -/
+theorem procPrivCwd_rootNonzero (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
+    (M : Nat → List (BitVec 8)) :
+    procPrivCwd (GF := GF) pa pid V M ⊢ procPrivCwd pa pid V M ∗ ⌜V.root ≠ 0#64⌝ := by
+  unfold procPrivCwd
+  iintro ⟨Hb, Hc, Hr⟩
+  icases rootRefAt_nonzero V.root V.rti $$ Hr with ⟨Hr, %hv⟩
+  isplitl [Hb Hc Hr]
   · iframe
   · ipureintro; exact hv
 
@@ -166,6 +218,14 @@ theorem procPrivNoctx_cwi (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (V : P
     procPrivNoctxAt (GF := GF) ξ pa pid { V with cwi := z } M = procPrivNoctxAt ξ pa pid V M :=
   rfl
 
+/-- **...nor the root's** (Rocq `proc_priv_nocwd_rti`): the installer
+(userinit, kfork's child) picks the inum the root reference it installs
+carries. -/
+theorem procPrivNoctx_rti (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
+    (M : Nat → List (BitVec 8)) (z : Nat) :
+    procPrivNoctxAt (GF := GF) ξ pa pid { V with rti := z } M = procPrivNoctxAt ξ pa pid V M :=
+  rfl
+
 /-- **The deficit block's `p->cwd` CELL, borrowed and replaced** (Rocq
 `proc_priv_nocwd_cwd`): what the `sd` that installs a working directory
 needs, and kexit's `sd x0,336(s3)` after its `iput`. -/
@@ -176,10 +236,28 @@ theorem procPrivNoctx_cwd (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (V : P
       (∀ v' : BitVec 64, @wordPointsTo hlc GF _ ⟨ξ, KTier.kpt⟩ (pCwd pa) 8 (DFrac.own 1) v' -∗
         procPrivNoctxAt ξ pa pid { V with cwd := v' } M) := by
   unfold procPrivNoctxAt procFieldsNoctx
-  iintro ⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hof, Hcwd, Hnm, Hsc⟩, Hpt, Htfp, %hlz, Hev⟩
+  iintro ⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hof, Hcwd, Hnm, Hsc, Hrt⟩, Hpt, Htfp, %hlz, Hev⟩
   iframe Hcwd
   iintro %v' Hcwd
-  iframe Hpid Hk Hs Hpg Htf Hof Hcwd Hnm Hsc Hpt Htfp Hev
+  iframe Hpid Hk Hs Hpg Htf Hof Hcwd Hnm Hsc Hrt Hpt Htfp Hev
+  isplitl []
+  · ipureintro; exact h
+  · ipureintro; exact hlz
+
+/-- **The deficit block's `p->root` CELL, borrowed and replaced** (Rocq
+`proc_priv_nocwd_root`), `procPrivNoctx_cwd`'s twin: the installers' `sd`
+of the root pointer, and kexit's `sd x0,344(…)` after its `iput`. -/
+theorem procPrivNoctx_root (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
+    (M : Nat → List (BitVec 8)) :
+    procPrivNoctxAt (GF := GF) ξ pa pid V M ⊢
+      @wordPointsTo hlc GF _ ⟨ξ, KTier.kpt⟩ (pRoot pa) 8 (DFrac.own 1) V.root ∗
+      (∀ v' : BitVec 64, @wordPointsTo hlc GF _ ⟨ξ, KTier.kpt⟩ (pRoot pa) 8 (DFrac.own 1) v' -∗
+        procPrivNoctxAt ξ pa pid { V with root := v' } M) := by
+  unfold procPrivNoctxAt procFieldsNoctx
+  iintro ⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hof, Hcwd, Hnm, Hsc, Hrt⟩, Hpt, Htfp, %hlz, Hev⟩
+  iframe Hrt
+  iintro %v' Hrt
+  iframe Hpid Hk Hs Hpg Htf Hof Hcwd Hnm Hsc Hrt Hpt Htfp Hev
   isplitl []
   · ipureintro; exact h
   · ipureintro; exact hlz
@@ -197,14 +275,36 @@ theorem procPrivCwd_cwd (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
         @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pCwd pa) 8 (DFrac.own 1) v' -∗
         cwdRefAt v' z' -∗ procPrivCwd pa pid { V with cwd := v', cwi := z' } M) := by
   unfold procPrivCwd
-  iintro ⟨Hb, Hc⟩
+  iintro ⟨Hb, Hc, Hr⟩
   icases procPrivNoctx_cwd curCtx pa pid V M $$ Hb with ⟨Hcwd, Hw⟩
   iframe Hcwd Hc
   iintro %v' %z' Hcwd Hc
-  iframe Hc
+  iframe Hc Hr
   rw [show procPrivNoctxAt (GF := GF) curCtx pa pid { V with cwd := v', cwi := z' } M =
       procPrivNoctxAt curCtx pa pid { V with cwd := v' } M from rfl]
   iapply Hw $$ %v' Hcwd
+
+/-- **The root, borrowed and replaced** (Rocq `proc_priv_root`),
+`procPrivCwd_cwd`'s twin: sys_chroot and kexit hand the reference the cell
+names to `iput`, then store a new pointer; the cell AND the reference out, a
+matching pair back at any `(v', z')`. -/
+theorem procPrivCwd_root (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
+    (M : Nat → List (BitVec 8)) :
+    procPrivCwd (GF := GF) pa pid V M ⊢
+      @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pRoot pa) 8 (DFrac.own 1) V.root ∗
+      rootRefAt V.root V.rti ∗
+      (∀ (v' : BitVec 64) (z' : Nat),
+        @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pRoot pa) 8 (DFrac.own 1) v' -∗
+        rootRefAt v' z' -∗ procPrivCwd pa pid { V with root := v', rti := z' } M) := by
+  unfold procPrivCwd
+  iintro ⟨Hb, Hc, Hr⟩
+  icases procPrivNoctx_root curCtx pa pid V M $$ Hb with ⟨Hrt, Hw⟩
+  iframe Hrt Hr
+  iintro %v' %z' Hrt Hr
+  iframe Hc Hr
+  rw [show procPrivNoctxAt (GF := GF) curCtx pa pid { V with root := v', rti := z' } M =
+      procPrivNoctxAt curCtx pa pid { V with root := v' } M from rfl]
+  iapply Hw $$ %v' Hrt
 
 end
 

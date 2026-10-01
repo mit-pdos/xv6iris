@@ -463,6 +463,7 @@ def ecRest [CurCtx] (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P : UPtd)
   wordPointsTo (pCwd pa) 8 (DFrac.own 1) V.cwd ∗
   pnameCells pa (DFrac.own 1) V.name ∗
   wordPointsTo (pSecc pa) 8 (DFrac.own 1) V.pvSecc ∗
+  wordPointsTo (pRoot pa) 8 (DFrac.own 1) V.root ∗
   tfPageAt P.tfp V.tf ∗
   ⌜V.pvLazy = false → lazyFree P.um V.sz⌝ ∗
   actCnt pa V.ev
@@ -476,7 +477,7 @@ theorem ec_priv_split [CurCtx] (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
       wordPointsTo (pPagetable pa) 8 (DFrac.own 1) V.pagetable ∗
       procPtAt P M ∗ ecRest pa pid V P := by
   unfold procPrivExt ecRest procFieldsNoOfile
-  iintro ⟨%hf, Hpid, ⟨Hks, Hszc, Hpgc, Htfc, Hcwd, Hnm, Hsc⟩, Hspace, Htfp⟩
+  iintro ⟨%hf, Hpid, ⟨Hks, Hszc, Hpgc, Htfc, Hcwd, Hnm, Hsc, Hrt⟩, Hspace, Htfp⟩
   isplitl []
   · ipureintro; exact ⟨hf.1, hf.2.2.1, hf.2.2.2, hf.2.1⟩
   · iframe
@@ -490,7 +491,7 @@ theorem ec_priv_close [CurCtx] (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
     procPtAt P' M' ∗ ecRest pa pid V P ⊢ procPrivExt (GF := GF) pa pid V P' M' := by
   unfold procPrivExt ecRest procFieldsNoOfile
   rw [hext.1.1, hext.1.2.1]
-  iintro ⟨Hszc, Hpgc, Hspace, Hpid, Hks, Htfc, Hcwd, Hnm, Hsc, Htfp, %hlz, Hev⟩
+  iintro ⟨Hszc, Hpgc, Hspace, Hpid, Hks, Htfc, Hcwd, Hnm, Hsc, Hrt, Htfp, %hlz, Hev⟩
   isplitl []
   · ipureintro; exact ⟨hf.1, UMemL.umBelow_extSz hf.2.2.2 hext, hf.2.1, hf.2.2.1⟩
   · iframe
@@ -509,7 +510,7 @@ theorem ecRest_lend [CurCtx] (p pa : BitVec 64) (hp : p = pa) (pid : BitVec 32) 
         ∃ k2 : Nat, ⌜V.ev ≤ k2⌝ ∗ ecRest pa pid (V.updEv k2) P) := by
   subst p
   unfold ecRest
-  iintro ⟨Hpid, Hks, Htfc, Hcwd, Hnm, Hsc, Htfp, %hlz, Hev⟩
+  iintro ⟨Hpid, Hks, Htfc, Hcwd, Hnm, Hsc, Hrt, Htfp, %hlz, Hev⟩
   icases actLend_borrow pa V.ev $$ Hev with ⟨Hl, Hlb⟩
   iframe Hl
   iintro ⟨%k1, %hk1, Hl⟩

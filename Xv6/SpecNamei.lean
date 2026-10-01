@@ -286,10 +286,10 @@ theorem namei_procPrivCwd_rows (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
         @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pCwd pa) 8 (DFrac.own 1) V.cwd -∗
         inodeHeldAt V.cwd V.cwi -∗ procPrivCwd pa pid V M) := by
   unfold procPrivCwd procPrivNoctxAt procFieldsNoctx cwdRefAt
-  iintro ⟨⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hof, Hcwd, Hnm, Hsc⟩, Hpt, Htfp, %hlz, Hev⟩, Hc⟩
+  iintro ⟨⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hof, Hcwd, Hnm, Hsc, Hrt⟩, Hpt, Htfp, %hlz, Hev⟩, Hc, Hr⟩
   iframe Hpid Hcwd Hc Hev
   iintro Hpid Hcwd Hc
-  iframe Hpid Hk Hs Hpg Htf Hof Hcwd Hnm Hsc Hpt Htfp Hc
+  iframe Hpid Hk Hs Hpg Htf Hof Hcwd Hnm Hsc Hrt Hpt Htfp Hc Hr
   isplitl []
   · ipureintro; exact h
   · ipureintro; exact hlz

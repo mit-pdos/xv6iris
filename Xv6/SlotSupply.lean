@@ -8,7 +8,7 @@ bounded by (`NPROC`/`NOFILE` of Rocq `ProcGeom.v`, `NFILE`/`FDSPARE`/
 
 WHY A LIGHT FILE BELOW `ProcDefs`.  Rocq's `proc_dormant` (ProcDefs.v:623)
 parks `[∗ list] _ ∈ pv_ofile V, fd_slot`, `fd_slots FDSPARE`,
-`iref_slots (1 + IREFSPARE)` and `bslots 3`, and it can name them with no
+`iref_slots (IREFHOME + IREFSPARE)` and `bslots 3`, and it can name them with no
 ghost-name parameter because all three supplies live at CANONICAL names
 (the class carries the name).  The Lean supplies used to live at fields of
 the file table's `FileNames` (`fdSlots γ n` over `γ.fd`, FileDefs) and of

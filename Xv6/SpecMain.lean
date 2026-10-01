@@ -239,7 +239,7 @@ def mainGlobalsRaw (cn : ConsNames) : IProp GF := iprop%
   ([∗list] i ∈ List.range NPROC, wordPointsTo (pPid (procAddr i)) 4 pidLockQ 0#32) ∗
   parentsResAt curCtx ∗
   fdSlots (NPROC * (NOFILE + FDSPARE)) ∗
-  irefSlots (NPROC * (1 + IREFSPARE)) ∗
+  irefSlots (NPROC * (IREFHOME + IREFSPARE)) ∗
   ([∗list] k ∈ List.range NFILE, fentryRaw curCtx k) ∗
   irefSlots NFILE ∗
   bslots (NPROC * 3) ∗

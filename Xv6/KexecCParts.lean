@@ -203,12 +203,12 @@ theorem kxcC_priv_sz [X : CurCtx] (hct : X.curTier = KTier.kpt) (γ : FileNames)
   simp only at hct
   subst hct
   unfold procPrivFd procPrivCoreNoctxAt procPrivBareAt procFieldsNoOfile
-  iintro ⟨⟨⟨%hf, Hpid, ⟨Hk, Hs, Hpg, Htf, Hcwd, Hnm, Hsc⟩, Hpt, Htfp, %hlz, Hev⟩, Hcw⟩, Hof⟩
+  iintro ⟨⟨⟨%hf, Hpid, ⟨Hk, Hs, Hpg, Htf, Hcwd, Hnm, Hsc, Hrt⟩, Hpt, Htfp, %hlz, Hev⟩, Hcw⟩, Hof⟩
   isplitl []
   · ipureintro; exact hf.1
   iframe Hs
   iintro Hs
-  iframe Hpid Hk Hs Hpg Htf Hcwd Hnm Hsc Hpt Htfp Hcw Hof Hev
+  iframe Hpid Hk Hs Hpg Htf Hcwd Hnm Hsc Hrt Hpt Htfp Hcw Hof Hev
   isplitl []
   · ipureintro; exact hf
   · ipureintro; exact hlz

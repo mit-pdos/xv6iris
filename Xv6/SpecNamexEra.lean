@@ -230,10 +230,10 @@ theorem namexEra_core_rows [X : CurCtx] (hct : X.curTier = KTier.kpt) (pa : BitV
   simp only at hct
   subst hct
   unfold procPrivCoreNoctxAt procPrivBareAt procFieldsNoOfile cwdRefAt
-  iintro ⟨⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hcwd, Hnm, Hsc⟩, Hpt, Htfp, %hlz, Hev⟩, Hc, Hg⟩
+  iintro ⟨⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hcwd, Hnm, Hsc, Hrt⟩, Hpt, Htfp, %hlz, Hev⟩, Hc, Hg⟩
   iframe Hpid Hcwd Hc Hev
   iintro Hpid Hcwd Hc
-  iframe Hpid Hk Hs Hpg Htf Hcwd Hnm Hsc Hpt Htfp Hc Hg
+  iframe Hpid Hk Hs Hpg Htf Hcwd Hnm Hsc Hrt Hpt Htfp Hc Hg
   isplitl []
   · ipureintro; exact h
   · ipureintro; exact hlz

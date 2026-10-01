@@ -174,6 +174,11 @@ instance cwdRefAt_morph (t : KTier) (v : BitVec 64) (z : Nat) :
     CtxMorph (GF := GF) (fun ξ => letI : CurCtx := ⟨ξ, t⟩; cwdRefAt (GF := GF) v z) :=
   inodeHeldAt_morph t v z
 
+/-- Rocq `root_ref_at_morph` (chroot): the cwd's twin. -/
+instance rootRefAt_morph (t : KTier) (v : BitVec 64) (z : Nat) :
+    CtxMorph (GF := GF) (fun ξ => letI : CurCtx := ⟨ξ, t⟩; rootRefAt (GF := GF) v z) :=
+  inodeHeldAt_morph t v z
+
 
 end
 end Xv6

@@ -128,12 +128,12 @@ theorem ui_priv_cwd_acc [CurCtx] (pa : BitVec 64) (pid : BitVec 32) (V : ProcPri
       (∀ w : BitVec 64, wordPointsTo (pCwd pa) 8 (DFrac.own 1) w -∗
         procPriv pa pid { V with cwd := w } M) := by
   unfold procPriv procFields
-  iintro ⟨%hV, Hpid, ⟨Hks, Hsz, Hpg, Htf, Hctx, Hof, Hcwd, Hnm, Hsc⟩, Hpt, Htfp⟩
+  iintro ⟨%hV, Hpid, ⟨Hks, Hsz, Hpg, Htf, Hctx, Hof, Hcwd, Hnm, Hsc, Hrt⟩, Hpt, Htfp⟩
   iframe Hcwd
   iintro %w Hcwd
   isplitl []
   · ipureintro; exact hV
-  iframe Hpid Hks Hsz Hpg Htf Hctx Hof Hcwd Hnm Hsc Hpt Htfp
+  iframe Hpid Hks Hsz Hpg Htf Hctx Hof Hcwd Hnm Hsc Hrt Hpt Htfp
 
 /-- `p->seccomp` comes out of the private block and goes back with a new value
 (xv6 7b2c1b1b: userinit's `p->seccomp = ~0ULL`). -/
@@ -144,12 +144,12 @@ theorem ui_priv_secc_acc [CurCtx] (pa : BitVec 64) (pid : BitVec 32) (V : ProcPr
       (∀ w : BitVec 64, wordPointsTo (pSecc pa) 8 (DFrac.own 1) w -∗
         procPriv pa pid { V with pvSecc := w } M) := by
   unfold procPriv procFields
-  iintro ⟨%hV, Hpid, ⟨Hks, Hsz, Hpg, Htf, Hctx, Hof, Hcwd, Hnm, Hsc⟩, Hpt, Htfp⟩
+  iintro ⟨%hV, Hpid, ⟨Hks, Hsz, Hpg, Htf, Hctx, Hof, Hcwd, Hnm, Hsc, Hrt⟩, Hpt, Htfp⟩
   iframe Hsc
   iintro %w Hsc
   isplitl []
   · ipureintro; exact hV
-  iframe Hpid Hks Hsz Hpg Htf Hctx Hof Hcwd Hnm Hsc Hpt Htfp
+  iframe Hpid Hks Hsz Hpg Htf Hctx Hof Hcwd Hnm Hsc Hrt Hpt Htfp
 
 /-- The mask userinit stores: `c.li a5,-1` is `seccAll`. -/
 theorem ui_seccAll : (0xFFFFFFFFFFFFFFFF#64 : BitVec 64) = seccAll := by decide
@@ -183,7 +183,7 @@ theorem ui_block [X : CurCtx] (hct : curTier = KTier.kpt) (γ : FileNames) (γd 
   subst hct
   letI : CurCtx := ⟨ξ0, KTier.kpt⟩
   unfold procPriv procFields ofileCells
-  iintro ⟨⟨%hV, Hpid, ⟨Hks, Hsz, Hpg, Htf, Hctx, ⟨%hlen, Hof⟩, Hcwd, Hnm, Hsc⟩, Hpt, Htfp, %hlz, Hev⟩,
+  iintro ⟨⟨%hV, Hpid, ⟨Hks, Hsz, Hpg, Htf, Hctx, ⟨%hlen, Hof⟩, Hcwd, Hnm, Hsc, Hrt⟩, Hpt, Htfp, %hlz, Hev⟩,
     Hcref, Hfds, Hkeys⟩
   rw [hof]
   icases procOfiles_null_close γ γd pa $$ [Hof Hfds Hkeys] with ⟨Hofs, Hfr⟩
@@ -191,7 +191,7 @@ theorem ui_block [X : CurCtx] (hct : curTier = KTier.kpt) (γ : FileNames) (γd 
   iframe Hctx Hfr
   unfold procPrivBareAt procFieldsNoOfile cwdRefAt
   dsimp only
-  iframe Hofs Hpid Hks Hsz Hpg Htf Hcwd Hnm Hsc Hpt Htfp Hcref Hev
+  iframe Hofs Hpid Hks Hsz Hpg Htf Hcwd Hnm Hsc Hrt Hpt Htfp Hcref Hev
   isplitl []
   · ipureintro; exact hV
   · ipureintro; exact hlz
@@ -860,9 +860,9 @@ theorem userinit_proof (AP : ALLOCPROC) (RE : RELEASE) (NR : NAMEI_ROOT) (FP : F
   -- descriptor table (`ui_block`)
   icases (show dormantAllow (GF := GF) ⊢
       ([∗list] _f ∈ List.replicate NOFILE (0#64 : BitVec 64), fdSlot) ∗ fdSlots FDSPARE ∗
-      irefSlots (1 + IREFSPARE) ∗ bslots 3 from by unfold dormantAllow; exact .rfl) $$ Hal
+      irefSlots (IREFHOME + IREFSPARE) ∗ bslots 3 from by unfold dormantAllow; exact .rfl) $$ Hal
     with ⟨Hfds, Hfsp, Hirs, Hbs⟩
-  icases (show irefSlots (GF := GF) (1 + IREFSPARE) ⊢ irefSlot ∗ irefSlots IREFSPARE from
+  icases (show irefSlots (GF := GF) (IREFHOME + IREFSPARE) ⊢ irefSlot ∗ irefSlots IREFSPARE from
     irefSlots_split 1 IREFSPARE) $$ Hirs with ⟨Hir, Hirs⟩
   ihave Hal : liveAllow (GF := GF) $$ [Hfsp Hirs Hbs]
   · unfold liveAllow; iframe Hfsp Hirs Hbs

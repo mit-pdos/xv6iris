@@ -357,7 +357,7 @@ theorem kw_dormant_freeprocIn (pa : BitVec 64) (pid0 : BitVec 32) :
         ∃ xsv : BitVec 32, wordPointsTo (pXstate pa) 4 xsHalf xsv ∗
           exitTok V.gen pid0 (xstateVal xsv) := by
   unfold procDormant
-  iintro ⟨Hq, %_, %V, %pid, %⟨hof, hcwd, hsz, -⟩, Hpid, Hfields, Hal, Hch, Hev, Hgh, Hxs, Hspace⟩
+  iintro ⟨Hq, %_, %V, %pid, %⟨hof, hcwd, hroot, hsz, -⟩, Hpid, Hfields, Hal, Hch, Hev, Hgh, Hxs, Hspace⟩
   icases (show wordPointsTo (GF := GF) (pPid pa) 4 pidPub pid0 ∗ wordPointsTo (pPid pa) 4 pidPriv pid ⊢
       ⌜pid0 = pid⌝ ∗ wordPointsTo (pPid pa) 4 pidPub pid0 ∗ wordPointsTo (pPid pa) 4 pidPriv pid from by
     unfold pidPub pidPriv; exact wordPointsTo_agree_keep _ _ _ _ _ _) $$ [Hq Hpid] with ⟨%hpe, Hq, Hpid⟩
@@ -383,7 +383,7 @@ theorem kw_dormant_freeprocIn (pa : BitVec 64) (pid0 : BitVec 32) :
   · unfold freeprocIn
     rw [if_neg htfne, if_neg hptne]
     isplitl []
-    · ipureintro; exact ⟨hof, hcwd⟩
+    · ipureintro; exact ⟨hof, hcwd, hroot⟩
     iframe Hpid Hfields Hal Hch Hev Hstack
     isplitl [Htf]
     · isplitl []
@@ -759,7 +759,7 @@ theorem kw_priv_copy_ev (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
         actCnt pa k' -∗
         procPrivNoctxAt curCtx pa pid { V.updEv k' with upt := P' } M') := by
   unfold procPrivNoctxAt procFieldsNoctx
-  iintro ⟨%hf, Hpid, ⟨Hks, Hszc, Hpgc, Htfc, Hof, Hcwd, Hnm, Hsc⟩, Hspace, Htfp, %hlz, Hev⟩
+  iintro ⟨%hf, Hpid, ⟨Hks, Hszc, Hpgc, Htfc, Hof, Hcwd, Hnm, Hsc, Hrt⟩, Hspace, Htfp, %hlz, Hev⟩
   isplitl []
   · ipureintro; exact hf
   iframe Hszc Hpgc Hspace Hev
@@ -767,7 +767,7 @@ theorem kw_priv_copy_ev (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
   have htfp : P'.tfp = V.upt.tfp := hext.1.2.1
   ihave Htfp := (show @tfPageAt hlc GF _ ⟨curCtx, KTier.kpt⟩ V.upt.tfp V.tf ⊢
       @tfPageAt hlc GF _ ⟨curCtx, KTier.kpt⟩ P'.tfp V.tf from by rw [htfp]) $$ Htfp
-  iframe Hpid Hks Hszc Hpgc Htfc Hof Hcwd Hnm Hsc Hspace Htfp Hev
+  iframe Hpid Hks Hszc Hpgc Htfc Hof Hcwd Hnm Hsc Hrt Hspace Htfp Hev
   isplitl []
   · ipureintro
     exact ⟨hf.1, UMemL.umBelow_extSz hf.2.1 hext, by rw [hext.1.1]; exact hf.2.2.1,
@@ -3050,7 +3050,7 @@ theorem kwait_led_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (CO : COPYOU
   iintro %cpu' HK %spie %spp %R' %P' %rv %xw %d %cs' %k' %hp Hans Hkg Hrow Hk Hpc Hte Hce %hk' Hn
   ihave Hgen := Hgw $$ Hkg
   ihave Hblk := Hback $$ %{ V.updEv k' with upt := P' } %_ [] Hn Hgen
-  · ipureintro; exact ⟨rfl, rfl, rfl, rfl⟩
+  · ipureintro; exact ⟨rfl, rfl, rfl, rfl, rfl, rfl⟩
   iapply HK $$ %spie %spp %R' %P' %rv %xw %d %cs' %k' %hp Hans Hrow Hk Hpc Hte Hce %hk' Hblk
 
 /-- **THE LANDED CONTRACT, a corollary of the led form** (Rocq

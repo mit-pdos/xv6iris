@@ -163,8 +163,8 @@ theorem filerw_priv_pidEv (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P :
 end Block
 
 /-- **The contracts' block** (the core, Rocq `proc_priv_core`) at the
-kernel-page-table tier IS the ambient bare `procPrivExt` and the cwd
-reference with the generation row (by `rfl` once the ambient context is
+kernel-page-table tier IS the ambient bare `procPrivExt` and the cwd and
+root references with the generation row (by `rfl` once the ambient context is
 taken apart).  fileread / filewrite / filestat never touch `p->cwd` or the
 generation row: the two are parked in the continuation at entry and handed
 back with the block at exit (Rocq carries them inside `proc_priv_core`
@@ -176,7 +176,8 @@ theorem filerw_core_conv {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
     (h : curTier = KTier.kpt) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P : UPtd)
     (M : Nat → List (BitVec 8)) :
     procPrivCoreNoctxAt (GF := GF) curCtx pa pid { V with upt := P } M ⊣⊢
-      procPrivExt pa pid V P M ∗ (cwdRefAt V.cwd V.cwi ∗ procGenAt curCtx pa pid V.gen) := by
+      procPrivExt pa pid V P M ∗
+        (cwdRefAt V.cwd V.cwi ∗ rootRefAt V.root V.rti ∗ procGenAt curCtx pa pid V.gen) := by
   obtain ⟨ξ, t⟩ := X
   simp only at h
   subst h

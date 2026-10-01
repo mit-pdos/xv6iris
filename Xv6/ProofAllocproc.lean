@@ -1289,7 +1289,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 (`dormantAllow`), and the kernel stack. -/
 theorem ap_dormant_unused_elim [CurCtx] (pa : BitVec 64) :
     procDormant (GF := GF) pa UNUSED ⊢
-      ∃ (V : ProcPriv), ⌜V.ofile = List.replicate NOFILE 0#64 ∧ V.cwd = 0#64 ∧
+      ∃ (V : ProcPriv), ⌜V.ofile = List.replicate NOFILE 0#64 ∧ V.cwd = 0#64 ∧ V.root = 0#64 ∧
         V.pagetable = 0#64 ∧ V.trapframe = 0#64 ∧ V.sz = 0#64 ∧ V.pvLazy = true⌝ ∗
       wordPointsTo (pPid pa) 4 pidPriv 0#32 ∗ procFields pa (DFrac.own 1) V ∗
       dormantAllow ∗ chFrag V.chg pa ∅ ∗ actCnt pa V.ev ∗ slotGen pa (.own 1) V.gen ∗
@@ -1298,12 +1298,12 @@ theorem ap_dormant_unused_elim [CurCtx] (pa : BitVec 64) :
   have hz : ¬ ((UNUSED : BitVec 32) = ZOMBIE) := by decide
   unfold procDormant dormantSpace genHalvesDorm
   simp only [if_neg hz, if_pos (rfl : (UNUSED : BitVec 32) = UNUSED), ite_true]
-  iintro ⟨_, %V, %pidd, %⟨hof, hcwd, _, hlz⟩, Hpid, Hfields, Hal, Hch, Hev, ⟨_, Hsg⟩, ⟨%xsv, Hxs, _⟩,
+  iintro ⟨_, %V, %pidd, %⟨hof, hcwd, hroot, _, hlz⟩, Hpid, Hfields, Hal, Hch, Hev, ⟨_, Hsg⟩, ⟨%xsv, Hxs, _⟩,
     ⟨%⟨hpt, htf, hsz, hpd⟩, Hstack⟩⟩
   subst hpd
   iexists V
   isplitl []
-  · ipureintro; exact ⟨hof, hcwd, hpt, htf, hsz, hlz⟩
+  · ipureintro; exact ⟨hof, hcwd, hroot, hpt, htf, hsz, hlz⟩
   iframe Hpid Hfields Hal Hch Hev Hsg Hstack
   iexists xsv
   iexact Hxs
@@ -1948,7 +1948,7 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
   -- open the dormant block and the pid word's three fractions
   icases ap_slots_unused_elim Γ ξ0 (procAddr n) $$ Hslots with ⟨Hdorm, Hhart, Hpavarm⟩
   icases ap_dormant_unused_elim (procAddr n) $$ Hdorm with
-    ⟨%V0, %⟨hV0of, hV0cwd, hV0pt, hV0tf, hV0sz, hV0lz⟩, Hpriv, Hfields, Hal, Hch, Hev, Hsg0, Hxs, Hstack⟩
+    ⟨%V0, %⟨hV0of, hV0cwd, hV0rt, hV0pt, hV0tf, hV0sz, hV0lz⟩, Hpriv, Hfields, Hal, Hch, Hev, Hsg0, Hxs, Hstack⟩
   icases (show procPubRest (GF := GF) (procAddr n) kl xs pid0 ⊢
       wordPointsTo (pKilled (procAddr n)) 4 (DFrac.own 1) kl ∗
         wordPointsTo (pXstate (procAddr n)) 4 xsHalf xs ∗
@@ -2117,9 +2117,10 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
       ofileCells (procAddr n) (DFrac.own 1) V0.ofile ∗
       wordPointsTo (pCwd (procAddr n)) 8 (DFrac.own 1) V0.cwd ∗
       pnameCells (procAddr n) (DFrac.own 1) V0.name ∗
-      wordPointsTo (pSecc (procAddr n)) 8 (DFrac.own 1) V0.pvSecc
+      wordPointsTo (pSecc (procAddr n)) 8 (DFrac.own 1) V0.pvSecc ∗
+      wordPointsTo (pRoot (procAddr n)) 8 (DFrac.own 1) V0.root
       from by unfold procFields; iintro H; iexact H) $$ Hfields with
-    ⟨Hkstack, Hsz, Hpagetable, Htrapframe, Hcontext, Hofile, Hcwd, Hname, Hsecc⟩
+    ⟨Hkstack, Hsz, Hpagetable, Htrapframe, Hcontext, Hofile, Hcwd, Hname, Hsecc, Hroot⟩
   -- 0x80001c12 c.mv s2,a0
   k_step (wp_s_add c _ (KA.«allocproc» + 0xa0#64) true 18#5 0#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
@@ -2153,8 +2154,8 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
         (Rk 10#5) ⊢ wordPointsTo (GF := GF) (pTrapframe (procAddr n)) 8 (DFrac.own 1) V0.trapframe
         from by rw [hr0, hV0tf]) $$ Htrapframe
     ihave Hfields : procFields (GF := GF) (procAddr n) (DFrac.own 1) V0
-      $$ [Hkstack Hsz Hpagetable Htrapframe Hcontext Hofile Hcwd Hname Hsecc]
-    case _ => unfold procFields; iframe Hkstack Hsz Hpagetable Htrapframe Hcontext Hofile Hcwd Hname Hsecc
+      $$ [Hkstack Hsz Hpagetable Htrapframe Hcontext Hofile Hcwd Hname Hsecc Hroot]
+    case _ => unfold procFields; iframe Hkstack Hsz Hpagetable Htrapframe Hcontext Hofile Hcwd Hname Hsecc Hroot
     -- procHeld at USED
     ihave Hheld : procHeld Γ c n USED ch $$ [Hlocked Hpstw Hstate Hchan Hkilled Hxstate HpidPub Hkp]
     case _ =>
@@ -2168,7 +2169,7 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
       unfold freeprocIn
       rw [if_pos hV0tf, if_pos hV0pt]
       isplitl []
-      · ipureintro; exact ⟨hV0of, hV0cwd⟩
+      · ipureintro; exact ⟨hV0of, hV0cwd, hV0rt⟩
       iframe HpidPriv Hfields Hal Hch Hev Hstack
       isplitl [] <;> iempintro
     -- freeproc takes the minted generation's wholes and the dormant block's
@@ -2626,6 +2627,7 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
         have hVcw : V.cwd = V0.cwd := by rw [hVdef]
         have hVnm : V.name = V0.name := by rw [hVdef]
         have hVsc : V.pvSecc = V0.pvSecc := by rw [hVdef]
+        have hVrt : V.root = V0.root := by rw [hVdef]
         have hVroot : V.upt.root = root := by rw [hVdef]
         have hVtfp : V.upt.tfp = BitVec.extractLsb' 12 44 (Rk 10#5) := by rw [hVdef]
         have hVum : V.upt.um = ∅ := by rw [hVdef]
@@ -2635,11 +2637,11 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
         have hVev : V.ev = V0.ev := by rw [hVdef]
         -- procFields V
         ihave Hfields : procFields (GF := GF) (procAddr n) (DFrac.own 1) V
-          $$ [Hkstack Hsz Hpagetable Htrapframe Hctx Hofile Hcwd Hname Hsecc]
+          $$ [Hkstack Hsz Hpagetable Htrapframe Hctx Hofile Hcwd Hname Hsecc Hroot]
         case _ =>
           unfold procFields
-          rw [hVks, hVsz, hVpt, hVtf, hVctx, hVofl, hVcw, hVnm, hVsc]
-          iframe Hkstack Hsz Hpagetable Htrapframe Hctx Hofile Hcwd Hname Hsecc
+          rw [hVks, hVsz, hVpt, hVtf, hVctx, hVofl, hVcw, hVnm, hVsc, hVrt]
+          iframe Hkstack Hsz Hpagetable Htrapframe Hctx Hofile Hcwd Hname Hsecc Hroot
         -- procHeld at USED
         ihave Hheld : procHeld Γ c n USED ch $$ [Hlocked Hpstw Hstate Hchan Hkilled Hxstate HpidPub Hkp]
         case _ =>
@@ -2747,9 +2749,10 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
             · iexact Hrcpt
             isplitl []
             · ipureintro
-              refine ⟨h10, hn, hpidlo, hpidhi, ⟨?_, ?_, ?_, ?_, ?_⟩, ?_, hside⟩
+              refine ⟨h10, hn, hpidlo, hpidhi, ⟨?_, ?_, ?_, ?_, ?_, ?_⟩, ?_, hside⟩
               · rw [hVofl, hV0of]
               · rw [hVcw, hV0cwd]
+              · rw [hVrt, hV0rt]
               · rw [hVsz, hV0sz]
               · intro vpn; rw [hVum]; exact get?_empty vpn
               · rw [hVctx, hVks]
@@ -2839,6 +2842,7 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
       have hV1tfp : V1.upt.tfp = BitVec.extractLsb' 12 44 (Rk 10#5) := by rw [hV1def]
       have hV1of : V1.ofile = List.replicate NOFILE 0#64 := by rw [hV1def]; exact hV0of
       have hV1cwd : V1.cwd = 0#64 := by rw [hV1def]; exact hV0cwd
+      have hV1rt0 : V1.root = 0#64 := by rw [hV1def]; exact hV0rt
       have hV1ks : V1.kstack = V0.kstack := by rw [hV1def]
       have hV1chg : V1.chg = V0.chg := by rw [hV1def]
       have hV1sz : V1.sz = V0.sz := by rw [hV1def]
@@ -2847,15 +2851,16 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
       have hV1cw : V1.cwd = V0.cwd := by rw [hV1def]
       have hV1nm : V1.name = V0.name := by rw [hV1def]
       have hV1sc : V1.pvSecc = V0.pvSecc := by rw [hV1def]
+      have hV1rt : V1.root = V0.root := by rw [hV1def]
       have hV1tfw : V1.tf = ws := by rw [hV1def]
       have hV1ev : V1.ev = V0.ev := by rw [hV1def]
       -- private fields at V1
       ihave Hfields : procFields (GF := GF) (procAddr n) (DFrac.own 1) V1
-        $$ [Hkstack Hsz Hpagetable Htrapframe Hcontext Hofile Hcwd Hname Hsecc]
+        $$ [Hkstack Hsz Hpagetable Htrapframe Hcontext Hofile Hcwd Hname Hsecc Hroot]
       case _ =>
         unfold procFields
-        rw [hV1ks, hV1sz, hV1pt, hV1tf, hV1ctx, hV1ofl, hV1cw, hV1nm, hV1sc]
-        iframe Hkstack Hsz Hpagetable Htrapframe Hcontext Hofile Hcwd Hname Hsecc
+        rw [hV1ks, hV1sz, hV1pt, hV1tf, hV1ctx, hV1ofl, hV1cw, hV1nm, hV1sc, hV1rt]
+        iframe Hkstack Hsz Hpagetable Htrapframe Hcontext Hofile Hcwd Hname Hsecc Hroot
       -- procHeld at USED
       ihave Hheld : procHeld Γ c n USED ch $$ [Hlocked Hpstw Hstate Hchan Hkilled Hxstate HpidPub Hkp]
       case _ =>
@@ -2870,7 +2875,7 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
         rw [if_neg (show ¬ (V1.trapframe = 0#64) from by rw [hV1tf]; exact hRk10ne),
           if_pos (show V1.pagetable = 0#64 from by rw [hV1pt]; exact hr0pp)]
         isplitl []
-        · ipureintro; exact ⟨hV1of, hV1cwd⟩
+        · ipureintro; exact ⟨hV1of, hV1cwd, hV1rt0⟩
         rw [hV1ks, hV1chg, hV1ev]
         iframe HpidPriv Hfields Hal Hch Hev Hstack
         isplitl [Htfpage]

@@ -131,7 +131,7 @@ def bcpBootPriv : ProcPriv :=
   { kstack := 0#64, sz := 0#64, pagetable := 0#64, trapframe := 0#64, upt := UPtd.mk 0#44 0#44 ∅,
     tf := [], context := List.replicate 14 0#64, ofile := List.replicate NOFILE 0#64, fdg := 0,
     cwd := 0#64, name := List.replicate PNAMELEN 0#8, cwi := 0, gen := 0, chg := 0, pvLazy := true, pvSecc := 0#64,
-    ev := 0 }
+    ev := 0, root := 0#64, rti := 0 }
 
 theorem bcp_pnameWf_zero : pnameWf (List.replicate PNAMELEN 0#8) :=
   ⟨by simp [PNAMELEN], 0, by decide, rfl⟩
@@ -194,7 +194,7 @@ theorem bootCarveProc_slot [CurCtx] (i : Nat) (hi : i < NPROC) :
   icases (bootRan_split (GF := GF) (imgFlat bootImage) (P + 208 + 8 * NOFILE) (P + 352) (P + 376) (by omega) (by omega)).1 $$ H with ⟨Hcwd, Hnm⟩
   icases (bootRan_split (GF := GF) (imgFlat bootImage) (P + 352) (P + 368) (P + 376) (by omega) (by omega)).1 $$ Hnm with ⟨Hnm, Hsc⟩
   icases (bootRan_split (GF := GF) (imgFlat bootImage) (P + 208 + 8 * NOFILE) (P + 336) (P + 352) (by omega) (by omega)).1 $$ Hcwd with ⟨-, Hcwd⟩
-  icases (bootRan_split (GF := GF) (imgFlat bootImage) (P + 336) (P + 344) (P + 352) (by omega) (by omega)).1 $$ Hcwd with ⟨Hcwd, -⟩
+  icases (bootRan_split (GF := GF) (imgFlat bootImage) (P + 336) (P + 344) (P + 352) (by omega) (by omega)).1 $$ Hcwd with ⟨Hcwd, Hrt⟩
   ihave Hlk := bootCarve_lockWords (GF := GF) pa P hP hlo (by omega) hal $$ Hk Hlk
   ihave Hst := bootBss_wordAt (GF := GF) (pa + 24#64) 4 (P + 24) (P + 28) (o 24 (by omega)) rfl (by omega) (by omega) (by omega) $$ Hk Hst
   ihave Hch := bootBss_wordAt (GF := GF) (pChan pa) 8 (P + 32) (P + 40) (o 32 (by omega)) rfl (by omega) (by omega) (by omega) $$ Hk Hch
@@ -208,6 +208,7 @@ theorem bootCarveProc_slot [CurCtx] (i : Nat) (hi : i < NPROC) :
   ihave Htf := bootBss_wordAt (GF := GF) (pTrapframe pa) 8 (P + 88) (P + 96) (o 88 (by omega)) rfl (by omega) (by omega) (by omega) $$ Hk Htf
   ihave Hcwd := bootBss_wordAt (GF := GF) (pCwd pa) 8 (P + 336) (P + 344) (o 336 (by omega)) rfl (by omega) (by omega) (by omega) $$ Hk Hcwd
   ihave Hsc := bootBss_wordAt (GF := GF) (pSecc pa) 8 (P + 368) (P + 376) (o 368 (by omega)) rfl (by omega) (by omega) (by omega) $$ Hk Hsc
+  ihave Hrt := bootBss_wordAt (GF := GF) (pRoot pa) 8 (P + 344) (P + 352) (o 344 (by omega)) rfl (by omega) (by omega) (by omega) $$ Hk Hrt
   ihave Hctx := bcpZeroRun (GF := GF) 8 (by omega) (pContext pa) (P + 96) (by omega) (by omega) 14 hctx (by omega) $$ Hk Hctx
   ihave Hof := bcpZeroRun (GF := GF) 8 (by omega) (pOfile pa) (P + 208) (by omega) (by omega) NOFILE hof (by omega) $$ Hk
     [Hof]
@@ -219,7 +220,7 @@ theorem bootCarveProc_slot [CurCtx] (i : Nat) (hi : i < NPROC) :
   icases hq $$ Hpid with ⟨Hpid2, Hpid3⟩
   icases wordPointsTo_halves_split (GF := GF) (pXstate pa) 4 0#32 $$ Hxs with ⟨Hxs1, Hxs2⟩
   ihave Hkp := hkill
-  isplitl [Hlk Hst Hks Hpid1 Hsz Hpg Htf Hctx Hof Hcwd Hnm Hsc Hxs1]
+  isplitl [Hlk Hst Hks Hpid1 Hsz Hpg Htf Hctx Hof Hcwd Hnm Hsc Hrt Hxs1]
   · isplitl [Hlk Hst Hks]
     · iexists 0#32, 0#64, 0#64, 0#32, 0#64
       iframe Hlk Hst Hks
@@ -228,7 +229,7 @@ theorem bootCarveProc_slot [CurCtx] (i : Nat) (hi : i < NPROC) :
       isplitr
       · ipureintro; trivial
       iframe Hpid1 Hsz Hpg Htf Hcwd
-      isplitl [Hctx Hof Hnm Hsc]
+      isplitl [Hctx Hof Hnm Hsc Hrt]
       · isplitl [Hctx]
         · isplitr
           · ipureintro; rfl
@@ -241,7 +242,7 @@ theorem bootCarveProc_slot [CurCtx] (i : Nat) (hi : i < NPROC) :
           · isplitr
             · ipureintro; exact bcp_pnameWf_zero
             · iexact Hnm
-          · iexact Hsc
+          · iframe Hsc Hrt
       · iexists 0#32
         iexact Hxs1
   isplitl [Hch Hkl Hxs2 Hpid2 Hkp]
@@ -813,7 +814,7 @@ file table's entries (FileBoot) and the bcache / itable rows
 theorem bootCarveProc_mainGlobalsRaw [CurCtx] (cn : ConsNames) :
     bcpProcRows (GF := GF) cn ⊢
       fdSlots (NPROC * (NOFILE + FDSPARE)) -∗
-      irefSlots (NPROC * (1 + IREFSPARE)) -∗
+      irefSlots (NPROC * (IREFHOME + IREFSPARE)) -∗
       ([∗list] k ∈ List.range NFILE, fentryRaw curCtx k) -∗
       irefSlots NFILE -∗
       bslots (NPROC * 3) -∗

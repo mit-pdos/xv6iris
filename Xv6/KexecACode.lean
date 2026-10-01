@@ -145,10 +145,10 @@ theorem kxcA_priv_rows [X : CurCtx] (hct : X.curTier = KTier.kpt) (γ : FileName
   simp only at hct
   subst hct
   unfold procPrivFd procPrivCoreNoctxAt procPrivBareAt procFieldsNoOfile cwdRefAt
-  iintro ⟨⟨⟨%hf, Hpid, ⟨Hk, Hs, Hpg, Htf, Hcwd, Hnm, Hsc⟩, Hpt, Htfp, %hlz, Hev⟩, Hc, Hg⟩, Hof⟩
+  iintro ⟨⟨⟨%hf, Hpid, ⟨Hk, Hs, Hpg, Htf, Hcwd, Hnm, Hsc, Hrt⟩, Hpt, Htfp, %hlz, Hev⟩, Hc, Hg⟩, Hof⟩
   iframe Hpid Hcwd Hc Hev
   iintro Hpid Hcwd Hc
-  iframe Hpid Hk Hs Hpg Htf Hcwd Hnm Hsc Hpt Htfp Hc Hg Hof
+  iframe Hpid Hk Hs Hpg Htf Hcwd Hnm Hsc Hrt Hpt Htfp Hc Hg Hof
   isplitl []
   · ipureintro; exact hf
   · ipureintro; exact hlz

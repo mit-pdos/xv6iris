@@ -66,7 +66,7 @@ their own: `NINODE`/`ISLOTSZ`/`ientry` are `Xv6/FsGeom.lean` /
    `nat -> bv 8` because Rocq's TSO ledger pins bytes; Lean's racy-word
    discipline (`MachCSL.wordCell`) records whole `BitVec 32` entries, so
    `irefSet w := 1 ≤ w.toNat ≤ IREFSLOTS`.  Rocq's own comment says the set
-   is word-level on purpose (the per-byte box of `[1..422]` would readmit
+   is word-level on purpose (the per-byte box of `[1..486]` would readmit
    the all-zero word).  `iref_set_count` keeps its statement at the word;
    `iref_set_read` loses its byte-equality premise (`nth_byte v j = f j`),
    which only existed to rebuild the word from its bytes.
@@ -236,7 +236,7 @@ def icMWf (M : RegMapF (Qp × PosNat)) : Prop :=
 theorem icMWf_count (M : RegMapF (Qp × PosNat)) (k : Nat) (q : Qp) (n : PosNat)
     (hwf : icMWf M) (hM : PartialMap.get? M k = some (q, n)) : n.val < 2 ^ 31 := by
   have h := hwf.2 k q n hM
-  have EI : IREFSLOTS = 422 := rfl
+  have EI : IREFSLOTS = 486 := rfl
   omega
 
 /-- The count component's `•` IS `+`; naming it lets `omega` see the
@@ -301,7 +301,7 @@ theorem seq_ninode_lookup (k : Nat) (hk : k < NINODE) : (List.range NINODE)[k]? 
 The word-set pin's member set for `ip->ref` (Rocq's `pw_S`).  The set is
 the counts the CREDIT POOL can back: `1 .. IREFSLOTS` -- never zero, which
 is what kills ilock's and iunlock's `ref < 1` panic at a RACY read (TsoMemPa
-§12f: the per-byte box of `[1..422]` would readmit the all-zero word; the
+§12f: the per-byte box of `[1..486]` would readmit the all-zero word; the
 WORD set does not).  Word-level in Lean (deviation 2). -/
 
 def irefSet (w : BitVec 32) : Prop := 1 ≤ w.toNat ∧ w.toNat ≤ IREFSLOTS
@@ -309,7 +309,7 @@ def irefSet (w : BitVec 32) : Prop := 1 ≤ w.toNat ∧ w.toNat ≤ IREFSLOTS
 /-- The store side: a credit-backed count is a member. -/
 theorem irefSet_count (n : PosNat) (hn : n.val ≤ IREFSLOTS) :
     irefSet (BitVec.ofNat 32 n.val) := by
-  have EI : IREFSLOTS = 422 := rfl
+  have EI : IREFSLOTS = 486 := rfl
   have hp := n.pos
   unfold irefSet
   rw [BitVec.toNat_ofNat, Nat.mod_eq_of_lt (by omega)]
@@ -318,7 +318,7 @@ theorem irefSet_count (n : PosNat) (hn : n.val ≤ IREFSLOTS) :
 /-- The read side: any member word is positive and below `2^31` -- the two
 bounds `InodeLock.inode_ref_spos` turns into "the panic is dead". -/
 theorem irefSet_read (w : BitVec 32) (h : irefSet w) : 0 < w.toNat ∧ w.toNat < 2 ^ 31 := by
-  have EI : IREFSLOTS = 422 := rfl
+  have EI : IREFSLOTS = 486 := rfl
   obtain ⟨h1, h2⟩ := h
   omega
 
