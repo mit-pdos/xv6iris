@@ -25,7 +25,7 @@ open Std (ExtTreeSet)
 set_option linter.unusedSectionVars false
 
 /-- The block's literals at 0x54, decided. -/
-theorem shdDieLits_54 : shdDieLits 0x54 1#20 556#12 4144#21 3070#21 0x1280 3 0 := by decide
+theorem shdDieLits_54 : shdDieLits 0x54 1#20 556#12 4152#21 3070#21 0x1280 3 0 := by decide
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
@@ -43,7 +43,7 @@ theorem wp_shPanicChain (UL : UK_LEAVES) (HS : UK_SYS_P) (HF : USH_FPRINTF) :
   -- 0x52  c.mv a2,a0
   iapply ushS_mv UL N (ushMI_052 N.t) 0x54 h1 _ _ (m.get 10#5) (by ureg) $$ Hc Hrun
   iintro %h2 Hrun
-  iapply wp_kshd_die_chain UL HS HF N tx dqs 0x54 1#20 556#12 4144#21 3070#21 1#12 0x1280 3 0 sa slen sf
+  iapply wp_kshd_die_chain UL HS HF N tx dqs 0x54 1#20 556#12 4152#21 3070#21 1#12 0x1280 3 0 sa slen sf
     C1 C2 C3 h2 _ n shdDieLits_54 hsa (by ureg; exact ha0) e1 e2 (ushMI_054 N.t) (ushMI_058 N.t) (ushMI_05c N.t)
     (ushMI_05e N.t) (ushMI_062 N.t) (ushMI_064 N.t) $$ Hb1 Hb2 Hb3 HC Hc Hsstr Hpay Hrun
 

@@ -75,8 +75,8 @@ theorem grepCode_rows (M : ElfMem) (π : Nat → Option UPerm) (hsub : uimgSub U
     ∀ a b, User.Grep.code.byte a = some b → M a = some b ∧ uxAddr π a ∧ ¬ uwAddr π a ∧ a < uCap := by
   intro a b hab
   have hv : User.Grep.code.vaddr = 0 := rfl
-  have hs : User.Grep.code.size = 0x10cc := rfl
-  have ha : a < 0x10cc := by
+  have hs : User.Grep.code.size = 0x10dc := rfl
+  have ha : a < 0x10dc := by
     unfold User.USeg.byte at hab
     split at hab
     · omega

@@ -4,10 +4,10 @@ seccomp's four string LITERALS and its MASK LITERAL (Rocq `UkSeccLit.v`).
 The strings are cut out of the read-only image at a concrete base and length
 (`Xv6/UserLit.lean`'s kit at `Seccomp.code.byte`, Rocq `seccomp_ro`); their
 addresses are the ones main's auipc/addi pairs compute:
-  0x950  "usage: seccomp prog [args...]\n"   30 bytes
-  0x978  "seccomp: fork failed\n"            21 bytes
-  0x990  "seccomp: seccomp failed\n"         24 bytes
-  0x9b0  "seccomp: exec %s failed\n"         24 bytes (a '%s' at 14..15)
+  0x960  "usage: seccomp prog [args...]\n"   30 bytes
+  0x988  "seccomp: fork failed\n"            21 bytes
+  0x9a0  "seccomp: seccomp failed\n"         24 bytes
+  0x9c0  "seccomp: exec %s failed\n"         24 bytes (a '%s' at 14..15)
 
 THE MASK is the value `lui a0,0xffe18 ; addi a0,a0,-65` at main+0x1c/0x20
 builds, spelled at the very immediates (Rocq `secc_mask_lit`, over
@@ -38,35 +38,35 @@ abbrev seccLitOk (base len : Nat) : Bool := litOk code.byte base len
 /-! ## The four literals -/
 
 /-- Rocq `secc_lit_usage_ok`. -/
-theorem seccLit_usage_ok : seccLitOk 0x950 30 = true := by decide +kernel
+theorem seccLit_usage_ok : seccLitOk 0x960 30 = true := by decide +kernel
 theorem seccLit_usage_codes :
-    litCodes code.byte 0x950 30 = "usage: seccomp prog [args...]\n".toList.map Char.toNat := by
+    litCodes code.byte 0x960 30 = "usage: seccomp prog [args...]\n".toList.map Char.toNat := by
   decide +kernel
 
 /-- Rocq `secc_lit_fork_ok`. -/
-theorem seccLit_fork_ok : seccLitOk 0x978 21 = true := by decide +kernel
+theorem seccLit_fork_ok : seccLitOk 0x988 21 = true := by decide +kernel
 theorem seccLit_fork_codes :
-    litCodes code.byte 0x978 21 = "seccomp: fork failed\n".toList.map Char.toNat := by decide +kernel
+    litCodes code.byte 0x988 21 = "seccomp: fork failed\n".toList.map Char.toNat := by decide +kernel
 
 /-- Rocq `secc_lit_secc_ok`. -/
-theorem seccLit_secc_ok : seccLitOk 0x990 24 = true := by decide +kernel
+theorem seccLit_secc_ok : seccLitOk 0x9a0 24 = true := by decide +kernel
 theorem seccLit_secc_codes :
-    litCodes code.byte 0x990 24 = "seccomp: seccomp failed\n".toList.map Char.toNat := by
+    litCodes code.byte 0x9a0 24 = "seccomp: seccomp failed\n".toList.map Char.toNat := by
   decide +kernel
 
 /-- Rocq `secc_lit_exec_pre`: the prefix before the `%s`. -/
-theorem seccLit_exec_pre : litCodes code.byte 0x9b0 14 = "seccomp: exec ".toList.map Char.toNat := by
+theorem seccLit_exec_pre : litCodes code.byte 0x9c0 14 = "seccomp: exec ".toList.map Char.toNat := by
   decide +kernel
 /-- Rocq `secc_lit_exec_pct`: `%` then `s`. -/
-theorem seccLit_exec_pct : (seccLit 0x9b0 14).toNat = 37 ∧ (seccLit 0x9b0 15).toNat = 115 := by
+theorem seccLit_exec_pct : (seccLit 0x9c0 14).toNat = 37 ∧ (seccLit 0x9c0 15).toNat = 115 := by
   decide +kernel
 /-- Rocq `secc_lit_exec_post`. -/
-theorem seccLit_exec_post : litCodes code.byte (0x9b0 + 16) 7 = " failed".toList.map Char.toNat := by
+theorem seccLit_exec_post : litCodes code.byte (0x9c0 + 16) 7 = " failed".toList.map Char.toNat := by
   decide +kernel
 /-- Rocq `secc_lit_exec_nl`. -/
-theorem seccLit_exec_nl : (seccLit 0x9b0 23).toNat = 10 := by decide +kernel
+theorem seccLit_exec_nl : (seccLit 0x9c0 23).toNat = 10 := by decide +kernel
 /-- Rocq `secc_lit_exec_nul`. -/
-theorem seccLit_exec_nul : code.byte (0x9b0 + 24) = some 0#8 := by decide +kernel
+theorem seccLit_exec_nul : code.byte (0x9c0 + 24) = some 0#8 := by decide +kernel
 
 /-! ## The mask -/
 

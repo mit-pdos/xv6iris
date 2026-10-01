@@ -129,7 +129,7 @@ theorem wp_kinit_main_die_df (UL : UK_LEAVES) (HS : UK_SYS_P) (HP : INIT_PRINTF)
         iapply kinitW1_of_law UL HS N' 1#64 _ $$ Hwr
       · iempintro
   icases Hfam with ⟨%Ch, #Hw, HCh⟩
-  iapply kinit_die_tail UL HS HP N' 0x84 0x9a0 18 0x91c#12 0x73c#21 0x2e0#21 Ch h m n User.Init.lit_fork_ok
+  iapply kinit_die_tail UL HS HP N' 0x84 0x9a0 18 0x91c#12 0x744#21 0x2e0#21 Ch h m n User.Init.lit_fork_ok
     (by decide) (by decide) (by decide) (by decide) udec% udec% udec%
     udec% udec% (by decide) (by decide) (by decide) $$ Hw HCh [Hpay] Hc Hrun
   iintro -
@@ -202,7 +202,7 @@ theorem wp_kinit_main_die_de (UL : UK_LEAVES) (HS : UK_SYS_P) (HP : INIT_PRINTF)
         rw [hpeq]
         iapply uconsPay_taint (hlc := hlc) cn γ T _ (-1) $$ HT
   icases Hfam with ⟨%Ch, #Hw, HCh, Hfin⟩
-  iapply kinit_die_tail UL HS HP N' 0xaa 0x9c0 21 0x916#12 0x716#21 0x2ba#21 Ch h m n User.Init.lit_exec_ok
+  iapply kinit_die_tail UL HS HP N' 0xaa 0x9c0 21 0x916#12 0x71e#21 0x2ba#21 Ch h m n User.Init.lit_exec_ok
     (by decide) (by decide) (by decide) (by decide) udec% udec% udec%
     udec% udec% (by decide) (by decide) (by decide) $$ Hw HCh Hfin Hc Hrun
 

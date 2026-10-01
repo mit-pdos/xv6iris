@@ -111,7 +111,7 @@ theorem ulibFprintf_i396 (L : UlibRun GF) (base : BitVec 64) :
     ulibFprintfCode L base ⊢ L.uinstrIs (base + 0x396#64) false (.STORE (4072#12, .Regidx 8#5, .Regidx 8#5, 8)) :=
   ulibTabCode_instr L ulibFprintfTab base 11 ⟨0x396, 4, 0xfe843423, false, .STORE (4072#12, .Regidx 8#5, .Regidx 8#5, 8)⟩ rfl
 
-/-- `+0x39a  jal 518 <vprintf>` -/
+/-- `+0x39a  jal 520 <vprintf>` -/
 theorem ulibFprintf_i39a (L : UlibRun GF) (base : BitVec 64) :
     ulibFprintfCode L base ⊢ L.uinstrIs (base + 0x39a#64) false (.JAL (2096418#21, .Regidx 1#5)) :=
   ulibTabCode_instr L ulibFprintfTab base 12 ⟨0x39a, 4, 0xd23ff0ef, false, .JAL (2096418#21, .Regidx 1#5)⟩ rfl

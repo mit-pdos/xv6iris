@@ -47,15 +47,15 @@ theorem wp_ksecc_usage (UL : UK_LEAVES) (HS : UK_SYS_P) (HF : SECC_FPRINTF)
   iintro %h1 Hrun
   rw [ukPc 0x4e 0x52 false rfl,
     show ukUtypeVal .AUIPC (BitVec.ofNat 64 0x4e) 1#20 = BitVec.ofNat 64 0x104e from by decide]
-  -- 0x52  addi a1,a1,-1790
-  ihave Hi := secc_uis N.t 0x52 false (.ITYPE (0x902#12, .Regidx 11#5, .Regidx 11#5, .ADDI)) udec%
+  -- 0x52  addi a1,a1,-1774
+  ihave Hi := secc_uis N.t 0x52 false (.ITYPE (0x912#12, .Regidx 11#5, .Regidx 11#5, .ADDI)) udec%
     (by decide) $$ Hc
-  iapply wp_uk_itype UL N h1 _ (BitVec.ofNat 64 0x52) false 0x902#12 11#5 11#5 .ADDI _
+  iapply wp_uk_itype UL N h1 _ (BitVec.ofNat 64 0x52) false 0x912#12 11#5 11#5 .ADDI _
     (by unfold unotSp spIdx; decide) $$ Hi Hrun
   inext
   iintro %h2 Hrun
-  rw [ukPc 0x52 0x56 false rfl, show ukItypeVal .ADDI ((ukWr m 11#5 (BitVec.ofNat 64 0x104e)).get 11#5) 0x902#12 =
-    BitVec.ofNat 64 0x950 from by rw [ukWr_get_same _ _ _ (by decide)]; decide]
+  rw [ukPc 0x52 0x56 false rfl, show ukItypeVal .ADDI ((ukWr m 11#5 (BitVec.ofNat 64 0x104e)).get 11#5) 0x912#12 =
+    BitVec.ofNat 64 0x960 from by rw [ukWr_get_same _ _ _ (by decide)]; decide]
   -- 0x56  c.li a0,2
   ihave Hi := secc_uis N.t 0x56 true (.ITYPE (2#12, .Regidx 0#5, .Regidx 10#5, .ADDI)) udec%
     (by decide) $$ Hc
@@ -65,22 +65,22 @@ theorem wp_ksecc_usage (UL : UK_LEAVES) (HS : UK_SYS_P) (HF : SECC_FPRINTF)
   iintro %h3 Hrun
   rw [ukPc 0x56 0x58 true rfl, ukLi _ 2#12 2 (by decide)]
   -- 0x58  jal fprintf
-  ihave Hi := secc_uis N.t 0x58 false (.JAL (0x720#21, .Regidx 1#5)) udec%
+  ihave Hi := secc_uis N.t 0x58 false (.JAL (0x728#21, .Regidx 1#5)) udec%
     (by decide) $$ Hc
-  iapply wp_uk_jal UL N h3 _ (BitVec.ofNat 64 0x58) false 0x720#21 1#5 _ (by unfold unotSp spIdx; decide)
+  iapply wp_uk_jal UL N h3 _ (BitVec.ofNat 64 0x58) false 0x728#21 1#5 _ (by unfold unotSp spIdx; decide)
     (by decide) $$ Hi Hrun
   inext
   iintro %h4 Hrun
-  rw [show BitVec.ofNat 64 0x58 + BitVec.signExtend 64 0x720#21 = BitVec.ofNat 64 User.Seccomp.Sym.«fprintf»
+  rw [show BitVec.ofNat 64 0x58 + BitVec.signExtend 64 0x728#21 = BitVec.ofNat 64 User.Seccomp.Sym.«fprintf»
     from by decide]
-  let m4 := ukWr (ukWr (ukWr (ukWr m 11#5 (BitVec.ofNat 64 0x104e)) 11#5 (BitVec.ofNat 64 0x950)) 10#5
+  let m4 := ukWr (ukWr (ukWr (ukWr m 11#5 (BitVec.ofNat 64 0x104e)) 11#5 (BitVec.ofNat 64 0x960)) 10#5
     (BitVec.ofNat 64 2)) 1#5 (BitVec.ofNat 64 0x58 + instrLen false)
-  have h4a1 : m4.get 11#5 = BitVec.ofNat 64 0x950 := by ureg
+  have h4a1 : m4.get 11#5 = BitVec.ofNat 64 0x960 := by ureg
   have h4fd : (BitVec.setWidth 32 (m4.get 10#5)).toInt = 2 := by ureg <;> decide
   have h4ra : retPc (m4.get 1#5) = BitVec.ofNat 64 0x5c := by ureg <;> decide
-  ihave Hseq := ksecc_pay_seq_cons N l (m4.get 10#5) (User.Seccomp.seccLit 0x950) h4fd 30 0 $$ Hwd
-  ihave Hstr := secc_lit_str N.t 0x950 30 User.Seccomp.seccLit_usage_ok (by decide) $$ Hc
-  iapply HF.wp_seccFprintf N 0x950 30 (User.Seccomp.seccLit 0x950) h4 m4 n _ _ (by decide) (by decide)
+  ihave Hseq := ksecc_pay_seq_cons N l (m4.get 10#5) (User.Seccomp.seccLit 0x960) h4fd 30 0 $$ Hwd
+  ihave Hstr := secc_lit_str N.t 0x960 30 User.Seccomp.seccLit_usage_ok (by decide) $$ Hc
+  iapply HF.wp_seccFprintf N 0x960 30 (User.Seccomp.seccLit 0x960) h4 m4 n _ _ (by decide) (by decide)
     (fun j hj => User.litOk_nopct _ _ _ j User.Seccomp.seccLit_usage_ok hj) h4a1 $$ Hseq Hc Hstr Hstd Hrun
   iintro %h5 %m5 %_ - Hrun
   rw [h4ra]
@@ -118,15 +118,15 @@ theorem wp_ksecc_forkfail (UL : UK_LEAVES) (HS : UK_SYS_P) (HF : SECC_FPRINTF)
   iintro %h1 Hrun
   rw [ukPc 0x62 0x66 false rfl,
     show ukUtypeVal .AUIPC (BitVec.ofNat 64 0x62) 1#20 = BitVec.ofNat 64 0x1062 from by decide]
-  -- 0x66  addi a1,a1,-1770
-  ihave Hi := secc_uis N.t 0x66 false (.ITYPE (0x916#12, .Regidx 11#5, .Regidx 11#5, .ADDI)) udec%
+  -- 0x66  addi a1,a1,-1754
+  ihave Hi := secc_uis N.t 0x66 false (.ITYPE (0x926#12, .Regidx 11#5, .Regidx 11#5, .ADDI)) udec%
     (by decide) $$ Hc
-  iapply wp_uk_itype UL N h1 _ (BitVec.ofNat 64 0x66) false 0x916#12 11#5 11#5 .ADDI _
+  iapply wp_uk_itype UL N h1 _ (BitVec.ofNat 64 0x66) false 0x926#12 11#5 11#5 .ADDI _
     (by unfold unotSp spIdx; decide) $$ Hi Hrun
   inext
   iintro %h2 Hrun
-  rw [ukPc 0x66 0x6a false rfl, show ukItypeVal .ADDI ((ukWr m 11#5 (BitVec.ofNat 64 0x1062)).get 11#5) 0x916#12 =
-    BitVec.ofNat 64 0x978 from by rw [ukWr_get_same _ _ _ (by decide)]; decide]
+  rw [ukPc 0x66 0x6a false rfl, show ukItypeVal .ADDI ((ukWr m 11#5 (BitVec.ofNat 64 0x1062)).get 11#5) 0x926#12 =
+    BitVec.ofNat 64 0x988 from by rw [ukWr_get_same _ _ _ (by decide)]; decide]
   -- 0x6a  c.li a0,2
   ihave Hi := secc_uis N.t 0x6a true (.ITYPE (2#12, .Regidx 0#5, .Regidx 10#5, .ADDI)) udec%
     (by decide) $$ Hc
@@ -136,22 +136,22 @@ theorem wp_ksecc_forkfail (UL : UK_LEAVES) (HS : UK_SYS_P) (HF : SECC_FPRINTF)
   iintro %h3 Hrun
   rw [ukPc 0x6a 0x6c true rfl, ukLi _ 2#12 2 (by decide)]
   -- 0x6c  jal fprintf
-  ihave Hi := secc_uis N.t 0x6c false (.JAL (0x70c#21, .Regidx 1#5)) udec%
+  ihave Hi := secc_uis N.t 0x6c false (.JAL (0x714#21, .Regidx 1#5)) udec%
     (by decide) $$ Hc
-  iapply wp_uk_jal UL N h3 _ (BitVec.ofNat 64 0x6c) false 0x70c#21 1#5 _ (by unfold unotSp spIdx; decide)
+  iapply wp_uk_jal UL N h3 _ (BitVec.ofNat 64 0x6c) false 0x714#21 1#5 _ (by unfold unotSp spIdx; decide)
     (by decide) $$ Hi Hrun
   inext
   iintro %h4 Hrun
-  rw [show BitVec.ofNat 64 0x6c + BitVec.signExtend 64 0x70c#21 = BitVec.ofNat 64 User.Seccomp.Sym.«fprintf»
+  rw [show BitVec.ofNat 64 0x6c + BitVec.signExtend 64 0x714#21 = BitVec.ofNat 64 User.Seccomp.Sym.«fprintf»
     from by decide]
-  let m4 := ukWr (ukWr (ukWr (ukWr m 11#5 (BitVec.ofNat 64 0x1062)) 11#5 (BitVec.ofNat 64 0x978)) 10#5
+  let m4 := ukWr (ukWr (ukWr (ukWr m 11#5 (BitVec.ofNat 64 0x1062)) 11#5 (BitVec.ofNat 64 0x988)) 10#5
     (BitVec.ofNat 64 2)) 1#5 (BitVec.ofNat 64 0x6c + instrLen false)
-  have h4a1 : m4.get 11#5 = BitVec.ofNat 64 0x978 := by ureg
+  have h4a1 : m4.get 11#5 = BitVec.ofNat 64 0x988 := by ureg
   have h4fd : (BitVec.setWidth 32 (m4.get 10#5)).toInt = 2 := by ureg <;> decide
   have h4ra : retPc (m4.get 1#5) = BitVec.ofNat 64 0x70 := by ureg <;> decide
-  ihave Hseq := ksecc_pay_seq_cons N l (m4.get 10#5) (User.Seccomp.seccLit 0x978) h4fd 21 0 $$ Hwd
-  ihave Hstr := secc_lit_str N.t 0x978 21 User.Seccomp.seccLit_fork_ok (by decide) $$ Hc
-  iapply HF.wp_seccFprintf N 0x978 21 (User.Seccomp.seccLit 0x978) h4 m4 n _ _ (by decide) (by decide)
+  ihave Hseq := ksecc_pay_seq_cons N l (m4.get 10#5) (User.Seccomp.seccLit 0x988) h4fd 21 0 $$ Hwd
+  ihave Hstr := secc_lit_str N.t 0x988 21 User.Seccomp.seccLit_fork_ok (by decide) $$ Hc
+  iapply HF.wp_seccFprintf N 0x988 21 (User.Seccomp.seccLit 0x988) h4 m4 n _ _ (by decide) (by decide)
     (fun j hj => User.litOk_nopct _ _ _ j User.Seccomp.seccLit_fork_ok hj) h4a1 $$ Hseq Hc Hstr Hstd Hrun
   iintro %h5 %m5 %_ - Hrun
   rw [h4ra]

@@ -15,17 +15,17 @@ contains the same thirty bytes, at a program-dependent `base`:
     +0x08  feb407a3  sb         a1,-17(s0)
     +0x0c  4605      c.li       a2,1
     +0x0e  fef40593  addi       a1,s0,-17
-    +0x12  f5fff0ef  jal        ra,<write>        (pc-relative: -0xa2)
+    +0x12  f57ff0ef  jal        ra,<write>        (pc-relative: -0xaa)
     +0x16  60e2      c.ldsp     ra,24(sp)
     +0x18  6442      c.ldsp     s0,16(sp)
     +0x1a  6105      c.addi16sp sp,sp,32
     +0x1c  8082      c.jr       ra
 
-The one call is pc-relative and `write` (usys.o) sits 0x90 below `putc`
-(printf.o) in every link, so the call target is `base - 0x90` for every
+The one call is pc-relative and `write` (usys.o) sits 0x98 below `putc`
+(printf.o) in every link, so the call target is `base - 0x98` for every
 program: nothing in the code depends on `base`.  (Rocq proves this function
 four times, `UkCatPutc`/`UkGrepPutc`/`UkInitPutc`/`UkSeccPutc`, at the four
-concrete addresses 0x45c/0x5cc/0x422/0x3fc.)
+concrete addresses 0x464/0x5d4/0x42a/0x404.)
 
 This file holds the table (`ulibPutcTab`: offset, width, encoding,
 compressed?, expanded AST), the model's decode of every entry checked ONCE
@@ -61,7 +61,7 @@ def ulibPutcTab : List UlibIns := [
   ⟨0x08, 4, 0xfeb407a3, false, .STORE (4079#12, .Regidx 11#5, .Regidx 8#5, 1)⟩,
   ⟨0x0c, 2, 0x4605, true, .ITYPE (1#12, .Regidx 0#5, .Regidx 12#5, .ADDI)⟩,
   ⟨0x0e, 4, 0xfef40593, false, .ITYPE (4079#12, .Regidx 8#5, .Regidx 11#5, .ADDI)⟩,
-  ⟨0x12, 4, 0xf5fff0ef, false, .JAL (2096990#21, .Regidx 1#5)⟩,
+  ⟨0x12, 4, 0xf57ff0ef, false, .JAL (2096982#21, .Regidx 1#5)⟩,
   ⟨0x16, 2, 0x60e2, true, .LOAD (24#12, .Regidx 2#5, .Regidx 1#5, false, 8)⟩,
   ⟨0x18, 2, 0x6442, true, .LOAD (16#12, .Regidx 2#5, .Regidx 8#5, false, 8)⟩,
   ⟨0x1a, 2, 0x6105, true, .ITYPE (32#12, .Regidx 2#5, .Regidx 2#5, .ADDI)⟩,
@@ -70,8 +70,8 @@ def ulibPutcTab : List UlibIns := [
 /-- The size of `putc` in bytes. -/
 def ulibPutcSize : Nat := 0x1e
 
-/-- The `write` stub `putc` calls: 0x90 below it in every ulib link. -/
-def ulibWriteAt (base : BitVec 64) : BitVec 64 := base - 0x90#64
+/-- The `write` stub `putc` calls: 0x98 below it in every ulib link. -/
+def ulibWriteAt (base : BitVec 64) : BitVec 64 := base - 0x98#64
 
 /-- **The model decodes every entry of the table to its AST** -- ONCE, for
 every program (the encodings do not depend on the load address). -/

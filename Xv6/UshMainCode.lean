@@ -83,7 +83,7 @@ theorem ushMI_012 (γt : GName) :
     ushCode (GF := GF) γt ⊢ uinstrIs γt (BitVec.ofNat 64 0x12) false (.UTYPE (1#20, .Regidx 11#5, .AUIPC)) :=
   ushm_uis γt 0x12 _ _ udec% (by decide)
 
-/-- `0x16  addi a1,a1,606 # 1270 <malloc+0x100>` -/
+/-- `0x16  addi a1,a1,606 # 1270 <malloc+0xf8>` -/
 theorem ushMI_016 (γt : GName) :
     ushCode (GF := GF) γt ⊢ uinstrIs γt (BitVec.ofNat 64 0x16) false (.ITYPE (606#12, .Regidx 11#5, .Regidx 11#5, .ADDI)) :=
   ushm_uis γt 0x16 _ _ udec% (by decide)
@@ -211,7 +211,7 @@ theorem ushMI_054 (γt : GName) :
     ushCode (GF := GF) γt ⊢ uinstrIs γt (BitVec.ofNat 64 0x54) false (.UTYPE (1#20, .Regidx 11#5, .AUIPC)) :=
   ushm_uis γt 0x54 _ _ udec% (by decide)
 
-/-- `0x58  addi a1,a1,556 # 1280 <malloc+0x110>` -/
+/-- `0x58  addi a1,a1,556 # 1280 <malloc+0x108>` -/
 theorem ushMI_058 (γt : GName) :
     ushCode (GF := GF) γt ⊢ uinstrIs γt (BitVec.ofNat 64 0x58) false (.ITYPE (556#12, .Regidx 11#5, .Regidx 11#5, .ADDI)) :=
   ushm_uis γt 0x58 _ _ udec% (by decide)
@@ -221,9 +221,9 @@ theorem ushMI_05c (γt : GName) :
     ushCode (GF := GF) γt ⊢ uinstrIs γt (BitVec.ofNat 64 0x5c) true (.ITYPE (2#12, .Regidx 0#5, .Regidx 10#5, .ADDI)) :=
   ushm_uis γt 0x5c _ _ udec% (by decide)
 
-/-- `0x5e  jal 108e <fprintf>` -/
+/-- `0x5e  jal 1096 <fprintf>` -/
 theorem ushMI_05e (γt : GName) :
-    ushCode (GF := GF) γt ⊢ uinstrIs γt (BitVec.ofNat 64 0x5e) false (.JAL (4144#21, .Regidx 1#5)) :=
+    ushCode (GF := GF) γt ⊢ uinstrIs γt (BitVec.ofNat 64 0x5e) false (.JAL (4152#21, .Regidx 1#5)) :=
   ushm_uis γt 0x5e _ _ udec% (by decide)
 
 /-- `0x62  li a0,1` -/
@@ -299,7 +299,7 @@ theorem ushMI_8d4 (γt : GName) :
     ushCode (GF := GF) γt ⊢ uinstrIs γt (BitVec.ofNat 64 0x8d4) false (.UTYPE (1#20, .Regidx 18#5, .AUIPC)) :=
   ushm_uis γt 0x8d4 _ _ udec% (by decide)
 
-/-- `0x8d8  addi s2,s2,-1372 # 1378 <malloc+0x208>` -/
+/-- `0x8d8  addi s2,s2,-1372 # 1378 <malloc+0x200>` -/
 theorem ushMI_8d8 (γt : GName) :
     ushCode (GF := GF) γt ⊢ uinstrIs γt (BitVec.ofNat 64 0x8d8) false (.ITYPE (2724#12, .Regidx 18#5, .Regidx 18#5, .ADDI)) :=
   ushm_uis γt 0x8d8 _ _ udec% (by decide)
@@ -579,7 +579,7 @@ theorem ushMI_98c (γt : GName) :
     ushCode (GF := GF) γt ⊢ uinstrIs γt (BitVec.ofNat 64 0x98c) false (.UTYPE (1#20, .Regidx 11#5, .AUIPC)) :=
   ushm_uis γt 0x98c _ _ udec% (by decide)
 
-/-- `0x990  addi a1,a1,-1548 # 1380 <malloc+0x210>` -/
+/-- `0x990  addi a1,a1,-1548 # 1380 <malloc+0x208>` -/
 theorem ushMI_990 (γt : GName) :
     ushCode (GF := GF) γt ⊢ uinstrIs γt (BitVec.ofNat 64 0x990) false (.ITYPE (2548#12, .Regidx 11#5, .Regidx 11#5, .ADDI)) :=
   ushm_uis γt 0x990 _ _ udec% (by decide)
@@ -589,9 +589,9 @@ theorem ushMI_994 (γt : GName) :
     ushCode (GF := GF) γt ⊢ uinstrIs γt (BitVec.ofNat 64 0x994) true (.ITYPE (2#12, .Regidx 0#5, .Regidx 10#5, .ADDI)) :=
   ushm_uis γt 0x994 _ _ udec% (by decide)
 
-/-- `0x996  jal 108e <fprintf>` -/
+/-- `0x996  jal 1096 <fprintf>` -/
 theorem ushMI_996 (γt : GName) :
-    ushCode (GF := GF) γt ⊢ uinstrIs γt (BitVec.ofNat 64 0x996) false (.JAL (1784#21, .Regidx 1#5)) :=
+    ushCode (GF := GF) γt ⊢ uinstrIs γt (BitVec.ofNat 64 0x996) false (.JAL (1792#21, .Regidx 1#5)) :=
   ushm_uis γt 0x996 _ _ udec% (by decide)
 
 /-- `0x99a  j 914 <main+0x56>` -/

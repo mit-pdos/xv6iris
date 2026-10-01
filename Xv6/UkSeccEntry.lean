@@ -45,7 +45,7 @@ CONE (re-walked on the pinned glob, 4/4 reached): `secc_rows_tab_le`,
 4. **DU3**: `seccomp_code_of_text`/`seccomp_rodata_of_text` are ONE
    `ukCode γt User.Seccomp.code.byte`, read off `utextAll` by
    `UserHeap.utextAll_img` at the code segment's rows (`seccCode_rows`, NEW,
-   `UkTreeEntryEcho.echoCode_rows`' twin at `0xe5c` bytes).
+   `UkTreeEntryEcho.echoCode_rows`' twin at `0xe6c` bytes).
 5. `image_entry_of_at`'s two stages are introduced as in
    `UkTreeEntryEcho`; the argc register fact is `BitVec.ofNat_toNat` (Rocq
    `moi_of_uint`) and its bound `UkArgs.argc_lt` (Rocq `uka_argc`).
@@ -78,8 +78,8 @@ theorem seccCode_rows (M : ElfMem) (π : Nat → Option UPerm) (hsub : uimgSub U
     ∀ a b, User.Seccomp.code.byte a = some b → M a = some b ∧ uxAddr π a ∧ ¬ uwAddr π a ∧ a < uCap := by
   intro a b hab
   have hv : User.Seccomp.code.vaddr = 0 := rfl
-  have hs : User.Seccomp.code.size = 0xe5c := rfl
-  have ha : a < 0xe5c := by
+  have hs : User.Seccomp.code.size = 0xe6c := rfl
+  have ha : a < 0xe6c := by
     unfold User.USeg.byte at hab
     split at hab
     · omega

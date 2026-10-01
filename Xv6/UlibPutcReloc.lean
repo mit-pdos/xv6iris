@@ -9,7 +9,7 @@ Per program, three kernel-evaluated facts about its dumped image
 
 * `putcAt`: the image's text tree holds `putc`'s twelve encodings at the
   program's `putc` symbol (`ulibPutcAt`, `decide +kernel`);
-* `write`: the `write` stub is 0x90 below `putc` (so the pc-relative `jal`
+* `write`: the `write` stub is 0x98 below `putc` (so the pc-relative `jal`
   reaches it);
 * `even`: `putc` is 2-aligned;
 
@@ -34,7 +34,7 @@ open Iris Iris.BI Iris.ProofMode Std MachCSL LeanRV64D
 /-! ## `cat` -/
 
 theorem ulibPutc_cat_putcAt : ulibPutcAt User.Cat.tree User.Cat.Sym.«putc» = true := by decide +kernel
-theorem ulibPutc_cat_write : User.Cat.Sym.«write» + 0x90 = User.Cat.Sym.«putc» := by decide
+theorem ulibPutc_cat_write : User.Cat.Sym.«write» + 0x98 = User.Cat.Sym.«putc» := by decide
 theorem ulibPutc_cat_even : (BitVec.ofNat 64 User.Cat.Sym.«putc»).toNat % 2 = 0 := by decide
 
 /-- The `write` stub `cat`'s `putc` calls is `cat`'s own. -/
@@ -55,7 +55,7 @@ theorem wp_ulibPutc_cat {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] (P
 /-! ## `grep` -/
 
 theorem ulibPutc_grep_putcAt : ulibPutcAt User.Grep.tree User.Grep.Sym.«putc» = true := by decide +kernel
-theorem ulibPutc_grep_write : User.Grep.Sym.«write» + 0x90 = User.Grep.Sym.«putc» := by decide
+theorem ulibPutc_grep_write : User.Grep.Sym.«write» + 0x98 = User.Grep.Sym.«putc» := by decide
 theorem ulibPutc_grep_even : (BitVec.ofNat 64 User.Grep.Sym.«putc»).toNat % 2 = 0 := by decide
 
 /-- The `write` stub `grep`'s `putc` calls is `grep`'s own. -/
@@ -76,7 +76,7 @@ theorem wp_ulibPutc_grep {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] (
 /-! ## `init` -/
 
 theorem ulibPutc_init_putcAt : ulibPutcAt User.Init.tree User.Init.Sym.«putc» = true := by decide +kernel
-theorem ulibPutc_init_write : User.Init.Sym.«write» + 0x90 = User.Init.Sym.«putc» := by decide
+theorem ulibPutc_init_write : User.Init.Sym.«write» + 0x98 = User.Init.Sym.«putc» := by decide
 theorem ulibPutc_init_even : (BitVec.ofNat 64 User.Init.Sym.«putc»).toNat % 2 = 0 := by decide
 
 /-- The `write` stub `init`'s `putc` calls is `init`'s own. -/
@@ -97,7 +97,7 @@ theorem wp_ulibPutc_init {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] (
 /-! ## `seccomp` -/
 
 theorem ulibPutc_seccomp_putcAt : ulibPutcAt User.Seccomp.tree User.Seccomp.Sym.«putc» = true := by decide +kernel
-theorem ulibPutc_seccomp_write : User.Seccomp.Sym.«write» + 0x90 = User.Seccomp.Sym.«putc» := by decide
+theorem ulibPutc_seccomp_write : User.Seccomp.Sym.«write» + 0x98 = User.Seccomp.Sym.«putc» := by decide
 theorem ulibPutc_seccomp_even : (BitVec.ofNat 64 User.Seccomp.Sym.«putc»).toNat % 2 = 0 := by decide
 
 /-- The `write` stub `seccomp`'s `putc` calls is `seccomp`'s own. -/

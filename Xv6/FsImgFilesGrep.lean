@@ -9,13 +9,13 @@ namespace Xv6
 
 open Xv6.User
 
-/-! ### grep, inum 6, 44496 bytes -/
+/-! ### grep, inum 6, 44544 bytes -/
 
 /-- Rocq `fsimg_grep_type`. -/
 theorem fsimgGrepType : (fsDinode fsimgP fsimgSb 6).diType.toNat = T_FILE := by
   rw [fsimgP_eq]; decide +kernel
 
-theorem fsimgGrepSize : (fsDinode fsimgP fsimgSb 6).diSize.toNat = 44496 := by
+theorem fsimgGrepSize : (fsDinode fsimgP fsimgSb 6).diSize.toNat = 44544 := by
   rw [fsimgP_eq]; decide +kernel
 
 theorem fsimgGrepNlink : (fsDinode fsimgP fsimgSb 6).diNlink.toNat = 1 := by

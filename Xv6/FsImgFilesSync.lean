@@ -9,13 +9,13 @@ namespace Xv6
 
 open Xv6.User
 
-/-! ### sync, inum 22, 34992 bytes (drift SY2) -/
+/-! ### sync, inum 22, 35048 bytes (drift SY2) -/
 
 /-- Rocq `fsimg_sync_type`. -/
 theorem fsimgSyncType : (fsDinode fsimgP fsimgSb 22).diType.toNat = T_FILE := by
   rw [fsimgP_eq]; decide +kernel
 
-theorem fsimgSyncSize : (fsDinode fsimgP fsimgSb 22).diSize.toNat = 34992 := by
+theorem fsimgSyncSize : (fsDinode fsimgP fsimgSb 22).diSize.toNat = 35048 := by
   rw [fsimgP_eq]; decide +kernel
 
 theorem fsimgSyncNlink : (fsDinode fsimgP fsimgSb 22).diNlink.toNat = 1 := by
