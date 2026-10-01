@@ -14,6 +14,7 @@ Deviations from Rocq: as in `SpecShRedircmd`.
 -/
 import Xv6.SpecShRedircmd
 import Xv6.UshNodes
+import Xv6.UshCode
 
 namespace Xv6
 

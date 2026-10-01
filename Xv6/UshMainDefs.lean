@@ -59,10 +59,11 @@ abstract continuation `ushRestLAt` that takes the loop head as a premise.
    is `UkShRedirLine.ushsLineIs_redir` (re-exported below).
 -/
 import Xv6.UshMainPure
-import Xv6.UshCode
+import Xv6.UshCodeDefs
 import Xv6.UshParseDefs
 import Xv6.UkSysP
 import Xv6.UserConsole
+import Xv6.UkShMallocDefs
 
 namespace Xv6
 

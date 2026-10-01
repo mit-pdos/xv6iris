@@ -20,7 +20,7 @@ engine and strchr are not named by the statement (the proof takes
 -/
 import Xv6.UshParseDefs
 import Xv6.RefParseSym
-import Xv6.UshCode
+import Xv6.UshCodeDefs
 
 namespace Xv6
 

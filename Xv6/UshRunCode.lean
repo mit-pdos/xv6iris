@@ -13,7 +13,8 @@ keeps these apart from sh-parse's `ushI_` (parser ranges) and sh-main's.
 
 Deviation from Rocq (DU3): the catalog is not ported (see `UshCode`).
 -/
-import Xv6.UshCode
+import Xv6.UshCodeDefs
+import Xv6.UkShMallocDefs
 
 namespace Xv6
 

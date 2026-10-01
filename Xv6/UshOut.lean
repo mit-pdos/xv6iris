@@ -36,7 +36,7 @@ DROPPED (unreached): `sh_dollar_pro`, `pro_alts_len3`, `sh_pro_stage`,
    `sfam` at the xv6 instance).
 -/
 import Xv6.UshMainPure
-import Xv6.UshCode
+import Xv6.UshCodeDefs
 import Xv6.UkWriteLeaf
 import Xv6.ByteCursor
 

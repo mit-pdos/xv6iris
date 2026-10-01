@@ -33,6 +33,7 @@ and `UkShParser.v` (5) -- `ushp_nul_row(_exec/_redir/_pipe)`,
 import Xv6.UshTreeDefs
 import Xv6.UshParserPure
 import Xv6.ByteCursor
+import Xv6.UshCode
 
 namespace Xv6
 

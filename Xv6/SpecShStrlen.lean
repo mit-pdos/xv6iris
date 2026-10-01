@@ -18,7 +18,7 @@ by the statement (the proof takes `UL : UK_LEAVES`, DU2).  The walk is
 echo's `strlen` (`ProofEchoStrlen`) at sh's addresses: the same eighteen
 encodings, every pc 0x954 further on.
 -/
-import Xv6.UshCode
+import Xv6.UshCodeDefs
 import Xv6.UkRun
 
 namespace Xv6

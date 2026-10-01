@@ -25,6 +25,7 @@ Rocq; `wp_kshp_gtk_ws2`/`_eqst` are folded into `shGtk_390`/`shGtk_388`.
 -/
 import Xv6.SpecShStrchr
 import Xv6.UkGrepDefs
+import Xv6.UshCode
 
 namespace Xv6
 

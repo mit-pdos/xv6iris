@@ -1554,6 +1554,7 @@ import Xv6.LinkShCmdalloc
 import Xv6.UshOomPaid
 import Xv6.UshArgsWalk
 import Xv6.UshCode
+import Xv6.UshCodeDefs
 import Xv6.UshGettokArms
 import Xv6.UshGettokScan
 import Xv6.UshLits

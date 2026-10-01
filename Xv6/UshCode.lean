@@ -23,6 +23,7 @@ through sh-malloc's one catalog lemma `UkShMallocDefs.ushm_uis`
 (its witness-free form `ushm_uisK`).
 -/
 import Xv6.UkShMallocDefs
+import Xv6.UshCodeDefs
 
 namespace Xv6
 
@@ -34,9 +35,7 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 section
 variable {GF : BundledGFunctors} [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat]
 
-/-- **Rocq `shp_code γt`** (= `shk_code γt`): sh's whole text (and
-`.rodata`, which shares the R-X segment), as the text heap holds it. -/
-abbrev ushCode (γt : GName) : IProp GF := ukCode γt User.Sh.code.byte
+-- `ushCode` lives in `Xv6.UshCodeDefs`.
 
 /-! ## cmdalloc/execcmd/redircmd/pipecmd -/
 

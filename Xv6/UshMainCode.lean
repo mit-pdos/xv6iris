@@ -17,7 +17,8 @@ Deviation from Rocq (DU3): the catalog is not ported; `shk_code γt` (and
 `shk_rodata γt`) is `UshCode.ushCode γt = ukCode γt User.Sh.code.byte`.  The
 prefix `ushMI_` keeps these apart from sh-parse's `ushI_` facts.
 -/
-import Xv6.UshCode
+import Xv6.UshCodeDefs
+import Xv6.UkShMallocDefs
 
 namespace Xv6
 

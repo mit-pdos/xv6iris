@@ -16,7 +16,7 @@ in the same segment); the literal check reads `User.Sh.code.byte`.
 -/
 import Xv6.UshParseDefs
 import Xv6.RefParse
-import Xv6.UshCode
+import Xv6.UshCodeDefs
 
 namespace Xv6
 

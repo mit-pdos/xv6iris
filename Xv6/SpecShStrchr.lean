@@ -18,7 +18,7 @@ dropped); `a1 = BitVec.setWidth 64 c` (Rocq `mword_of_int (bv_unsigned c)`,
 the same word); the engine is not named by the statement (DU2).
 -/
 import Xv6.UshParseDefs
-import Xv6.UshCode
+import Xv6.UshCodeDefs
 
 namespace Xv6
 

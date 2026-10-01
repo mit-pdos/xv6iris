@@ -16,6 +16,7 @@ Deviations from Rocq: as in `SpecShExeccmd`.
 -/
 import Xv6.SpecShExeccmd
 import Xv6.UshNodes
+import Xv6.UshCode
 
 namespace Xv6
 

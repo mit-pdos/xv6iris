@@ -45,7 +45,7 @@ here it is the interface `USH_MEMSET` (Rocq `wp_ksh_memset` and
 import Xv6.UshParseDefs
 import Xv6.UkShMallocDefs
 import Xv6.RefParse
-import Xv6.UshCode
+import Xv6.UshCodeDefs
 
 namespace Xv6
 
