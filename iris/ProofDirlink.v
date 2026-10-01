@@ -3233,7 +3233,7 @@ Section ProofDirlinkMain.
                       (m !!! Regidx Rs4 : mword 64) b
                       ltac:(nz) ltac:(rdok) with "Hcg Hpc [] Hb6").
             { iApply (dki_6e with "Htext"). }
-            iIntros (CIDB11 HqB11) "_ Hcg Hpc Hb6".
+            iIntros (CIDB11 HqB11) "Hlc Hcg Hpc Hb6".
             iEval (rewrite Hg6) in "Hb6".
             assert (HN3p : dl_pregs m sp0 ip nb
                              (zero_extend' 64 (inum : mword 16) : mword 64)
@@ -3253,7 +3253,7 @@ Section ProofDirlinkMain.
             iDestruct (cpu_own_transport CIDrd CIDB11 0%nat eb (proc_addr j) b
                          ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
             iPoseProof ("Hafter" $! CIDB11) as "Ha".
-            iSpecialize ("Ha" with "[%]"); [wp_next_chain |].
+            iSpecialize ("Ha" with "[%] Hlc"); [wp_next_chain |].
             iApply ("Ha" $! _ (fun jj => file_byte data (16 * i + jj)%nat)
                       (m !!! Regidx Rs3 : mword 64) (m !!! Regidx Rs4 : mword 64)
                       with

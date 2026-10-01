@@ -398,12 +398,12 @@ Section KexecDName.
                       rewrite Heq; apply bv_eq; vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (kxc_2c2 with "Htext"). }
-      iIntros (CID3 Hs3) "_ Hcg Hpc".
+      iIntros (CID3 Hs3) "Hlc Hcg Hpc".
       assert (Hpp2c4 : add_vec_int (mword_of_int (KXD + 0x2c2) : mword 64) 2
                        = mword_of_int (KXD + 0x2c4)) by pcw.
       iEval (rewrite Hpp2c4) in "Hpc".
       iEval (rewrite /kxd_scan_out) in "Hout".
-      iSpecialize ("Hout" $! CID3 with "[%]"); [wp_next_chain |].
+      iSpecialize ("Hout" $! CID3 with "[%] Hlc"); [wp_next_chain |].
       iApply ("Hout" $! N2 q with "[%] [Hpc] Hcg Hpath Hlast").
       { split_and!; [exact Hq | exact HN2sp | exact HN2s0 | exact HN2s1
                     | exact HN2s2 | exact HN2s4 | exact HN2s5 | exact HN2s6

@@ -2645,7 +2645,7 @@ Section ProofCreateMkdir.
                     ltac:(rewrite Htg146c; vm_compute; reflexivity)
                     with "Hcg Hpc []").
           { iApply (cri_130 with "Htext"). }
-          iApply bi.later_intro. iIntros (CIDX3 HqX3) "_". iIntros "Hcg Hpc".
+          iApply bi.later_intro. iIntros (CIDX3 HqX3) "Hlc". iIntros "Hcg Hpc".
           iEval (rewrite Htg146c) in "Hpc".
           iDestruct (cpu_own_transport CIDd3 CIDX3 0%nat eb (proc_addr j) b
                        ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
@@ -2744,7 +2744,7 @@ Section ProofCreateMkdir.
                         with "Htext Hkd Hpenv Hbio Hlogc Hitb2 Hitbl Hesc Hiregi Hiopen
                               Hprocs Hdevi Hgeom Hdlk") as "Hfl".
           iPoseProof ("Hfl" $! CIDX3) as "Hf".
-          iSpecialize ("Hf" with "[%]"); [wp_next_chain |].
+          iSpecialize ("Hf" with "[%] Hlc"); [wp_next_chain |].
           iAssert (∃ lo tl : nat,
               ⌜(lo <= tl)%nat⌝ ∗ IcacheRef.cred_floor lo tl ∗
               IcacheRef.inode_ref_short_genlo kd (qd/2 + qd/2)%Qp (qd/2)%Qp

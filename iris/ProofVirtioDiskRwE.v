@@ -970,7 +970,7 @@ Section ProofVirtioDiskRwE.
       iEval (rewrite Hp1a0) in "Hpc".
       iDestruct (vdrw_body_close γd pd pav pu with "Hbody") as "HR".
       rewrite /vdrw_p5_loop.
-      iSpecialize ("Hloop" $! CIDx with "[%]"); [wp_next_chain|].
+      iSpecialize ("Hloop" $! CIDx with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hloop" $! N5 with
                 "[%] Hcg Hown Htc Hclm Hpc Htok HR Hact Hfm Hft Hrm Hrt Hidx
                  [%] [%] [%] Hexit").

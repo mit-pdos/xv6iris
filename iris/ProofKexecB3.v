@@ -3906,8 +3906,8 @@ Section KexecB3Loop.
                       lia)
                 with "Htext Hfab [Hrest] Hcont [Hc1a4]").
       2:{ (* the exit, at the later count: [ev_after] composes *)
-          iIntros (CIDq Hsq) "_"; iIntros (M'' P'' Mo'' szv'' U'') "%HU'' Hst Hc".
-          iApply ("Hc1a4" $! CIDq Hsq M'' P'' Mo'' szv'' U'' with "[%] Hst Hc").
+          iIntros (CIDq Hsq) "Hlc"; iIntros (M'' P'' Mo'' szv'' U'') "%HU'' Hst Hc".
+          iSpecialize ("Hc1a4" $! CIDq Hsq with "Hlc"). iApply ("Hc1a4" $! M'' P'' Mo'' szv'' U'' with "[%] Hst Hc").
           exact (ev_after_trans _ _ _ HU' HU''). }
       rewrite /kxc_at_12c.
       iSplitR; [iPureIntro; exact Hp1 |].

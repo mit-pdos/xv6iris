@@ -1397,7 +1397,7 @@ Section ProofVmfault.
                   S3 (K - 6)%nat b ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc []").
         { iApply (vfi_62 with "Htext"). }
-        iApply bi.later_intro. iIntros (C10B Hs10B) "_". iIntros "Hcg Hpc".
+        iApply bi.later_intro. iIntros (C10B Hs10B) "Hlc". iIntros "Hcg Hpc".
         assert (Hjt62 : add_vec (mword_of_int (KernelSyms.vmfault + 0x62) : mword 64)
                   (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 2007 : mword 11) ('b"0"))))
                 = mword_of_int (KernelSyms.vmfault + 0x10)) by (apply bv_eq; vm_compute; reflexivity).
@@ -1439,7 +1439,7 @@ Section ProofVmfault.
           by (exact (proj2 (proj2 (proj1 (proj1 Hview (svpn_of va0)) Hnone)))).
         iDestruct (cpu_own_transport Cgr C10B lvl eb p b ltac:(wp_next_chain)
                      with "Hcnt") as "Hcnt".
-        iSpecialize ("Hepi" $! C10B with "[%]"); [wp_next_chain|].
+        iSpecialize ("Hepi" $! C10B with "[%] Hlc"); [wp_next_chain|].
         iApply ("Hepi" $! S3 r with "[%] Hcg Hcnt Hlend Hpc [Hk3 Hk4 Hk5] [Hpt]").
         { split_and!.
           - rewrite /S3. rewrite upd_ne; [exact HS2sp | reg_neq].
@@ -1619,7 +1619,7 @@ Section ProofVmfault.
                 F6 (K - 6)%nat b ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (vfi_72 with "Htext"). }
-      iApply bi.later_intro. iIntros (C10C Hs10C) "_". iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (C10C Hs10C) "Hlc". iIntros "Hcg Hpc".
       assert (Hjt72 : add_vec (mword_of_int (KernelSyms.vmfault + 0x72) : mword 64)
                 (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 1999 : mword 11) ('b"0"))))
               = mword_of_int (KernelSyms.vmfault + 0x10)) by (apply bv_eq; vm_compute; reflexivity).
@@ -1627,7 +1627,7 @@ Section ProofVmfault.
       iDestruct (proc_ptm_rebuild P (uint szv) M t' m_ad Hwf Hview Hrep' Hbase'' with "Hptree Hown") as "Hpt".
       iDestruct (cpu_own_transport Cfr C10C lvl eb p b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
-      iSpecialize ("Hepi" $! C10C with "[%]"); [wp_next_chain|].
+      iSpecialize ("Hepi" $! C10C with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hepi" $! F6 (mword_of_int 0) with "[%] Hcg Hcnt Hlend Hpc [Hk3 Hk4 Hk5] [Hpt]").
       { split_and!.
         - rewrite /F6. rewrite upd_ne; [exact HF5sp | reg_neq].
@@ -1702,7 +1702,7 @@ Section ProofVmfault.
               D2 (K - 6)%nat b ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (vfi_36 with "Htext"). }
-    iApply bi.later_intro. iIntros (C10D Hs10D) "_". iIntros "Hcg Hpc".
+    iApply bi.later_intro. iIntros (C10D Hs10D) "Hlc". iIntros "Hcg Hpc".
     assert (Hjt36 : add_vec (mword_of_int (KernelSyms.vmfault + 0x36) : mword 64)
               (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 2029 : mword 11) ('b"0"))))
             = mword_of_int (KernelSyms.vmfault + 0x10)) by (apply bv_eq; vm_compute; reflexivity).
@@ -1710,7 +1710,7 @@ Section ProofVmfault.
     iDestruct (proc_ptm_rebuild P (uint szv) M t m_ad Hwf Hview Hrep Hbase with "Hptree Hown") as "Hpt".
     iDestruct (cpu_own_transport CID C10D lvl eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iSpecialize ("Hepi" $! C10D with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hepi" $! C10D with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hepi" $! D2 (mword_of_int 0) with "[%] Hcg Hcnt Hlend Hpc [Hk3 Hk4 Hk5] [Hpt]").
     { split_and!.
       - rewrite /D2. rewrite upd_ne; [exact HD1sp | reg_neq].

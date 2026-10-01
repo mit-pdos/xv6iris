@@ -4043,13 +4043,13 @@ Section ProofConsoleintr.
               F15 (trap_res b + (K - 6))%nat false
               ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
     { iApply (cnti_090 with "Ht"). }
-    iApply bi.later_intro. iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
+    iApply bi.later_intro. iApply wp_next_off_intro_lc. iIntros "Hlc Hcg Hpc". rgall.
     assert (Hj156 : add_vec (mword_of_int (CT + 0x90) : mword 64)
                       (sign_extend' 64 (sign_extend' 21
                          (concat_vec (mword_of_int 99 : mword 11) ('b"0"))))
                     = mword_of_int (CT + 0x156)) by pcw.
     iEval (rewrite Hj156) in "Hpc".
-    iSpecialize ("WAKE" $! CIDq with "[%]"); [exact Hchain|].
+    iSpecialize ("WAKE" $! CIDq with "[%] Hlc"); [exact Hchain|].
     iApply ("WAKE" $! F15 rr ww ee1 (<[idx := cons_xlate c]> bs)
               (<[idx := Some h]> ts) with "[%] [%] [%] [%] [%] [%] [%]
               Hcg Hpc Hcnt Hpay Hlocked Hrc Hwc Hec Hdat Hts Hgh Hrest

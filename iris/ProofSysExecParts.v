@@ -3511,11 +3511,11 @@ Section SysExecStep.
                 ltac:(rewrite Ht92b; vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (sxi_07a with "Htext"). }
-      iApply bi.later_intro. iIntros (CID14 Hq14) "_". iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID14 Hq14) "Hlc". iIntros "Hcg Hpc".
       iEval (rewrite Ht92b) in "Hpc".
       iEval (rewrite Hpz) in "Hcell".
       iDestruct (sx_argv0_shut sp0 i pg ltac:(lia) with "Hcell Hrest") as "Harr".
-      iSpecialize ("Hout" $! CID14 with "[%]"); [wp_next_chain |].
+      iSpecialize ("Hout" $! CID14 with "[%] Hlc"); [wp_next_chain |].
       iDestruct (cpu_own_transport CID11 CID14 0%nat eb (proc_addr jp) b
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       iApply ("Hout" $! Q3 Pa ka i pg alen afun uvf). iRight. iRight.
@@ -3680,9 +3680,9 @@ Section SysExecStep.
                 ltac:(nz) Hcmpf ltac:(rewrite Ht92c; vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (sxi_086 with "Htext"). }
-      iApply bi.later_intro. iIntros (CID19 Hq19) "_". iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID19 Hq19) "Hlc". iIntros "Hcg Hpc".
       iEval (rewrite Ht92c) in "Hpc".
-      iSpecialize ("Hout" $! CID19 with "[%]"); [wp_next_chain |].
+      iSpecialize ("Hout" $! CID19 with "[%] Hlc"); [wp_next_chain |].
       iDestruct (cpu_own_transport CID18 CID19 0%nat eb (proc_addr jp) b
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       iApply ("Hout" $! mg Ps ks (S i) pg' alen afun' uvf). iRight. iRight.
@@ -3792,11 +3792,11 @@ Section SysExecStep.
                 (mword_of_int 8136 : mword 13) Rs7 Rs2 R2 (K - 60)%nat b
                 ltac:(nz) ltac:(nz) Hcmpn with "Hcg Hpc []").
       { iApply (sxi_08e with "Htext"). }
-      iIntros (CID22 Hq22) "_ Hcg Hpc".
+      iIntros (CID22 Hq22) "Hlc Hcg Hpc".
       assert (Hp92 : add_vec_int (mword_of_int (SX + 0x8e) : mword 64) 4
                      = mword_of_int (SX + 0x92)) by pcw.
       iEval (rewrite Hp92) in "Hpc".
-      iSpecialize ("Hout" $! CID22 with "[%]"); [wp_next_chain |].
+      iSpecialize ("Hout" $! CID22 with "[%] Hlc"); [wp_next_chain |].
       iDestruct (cpu_own_transport CID18 CID22 0%nat eb (proc_addr jp) b
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       iApply ("Hout" $! R2 Ps ks (S i) pg' (sx_upd alen i kk) afun' (sx_upd uvf i u1)).
@@ -3819,9 +3819,9 @@ Section SysExecStep.
               ltac:(rewrite Htbk; vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (sxi_08e with "Htext"). }
-    iApply bi.later_intro. iIntros (CID22 Hq22) "_". iIntros "Hcg Hpc".
+    iApply bi.later_intro. iIntros (CID22 Hq22) "Hlc". iIntros "Hcg Hpc".
     iEval (rewrite Htbk) in "Hpc".
-    iSpecialize ("Hout" $! CID22 with "[%]"); [wp_next_chain |].
+    iSpecialize ("Hout" $! CID22 with "[%] Hlc"); [wp_next_chain |].
     iDestruct (cpu_own_transport CID18 CID22 0%nat eb (proc_addr jp) b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iApply ("Hout" $! R2 Ps ks (S i) pg' (sx_upd alen i kk) afun' (sx_upd uvf i u1)).

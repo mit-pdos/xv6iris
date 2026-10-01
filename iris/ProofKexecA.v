@@ -1226,8 +1226,8 @@ Section KexecAUAMain.
                 cs pidv (bview plen pfun) dn bm data ef ltac:(reflexivity) Hbad
                 with "HR"). }
     (* ---- and the +0x090 exit: [kxc_phaseA]'s rows, plus the receipt ---- *)
-    { iEval (rewrite /wp_next). iIntros (CIDx) "%Hqx _".
-      iSpecialize ("Hcont90" $! CIDx with "[%]"); [exact Hqx |].
+    { iEval (rewrite /wp_next). iIntros (CIDx) "%Hqx Hlc".
+      iSpecialize ("Hcont90" $! CIDx with "[%] Hlc"); [exact Hqx |].
       rewrite /LA.kxc_a2_exit1_r.
       iIntros (M90 kf qf sf inumf dnf bmf gilf gislf gyf loyf tlyf n2 ef datl).
       iIntros "%Hregs %Hn2 %Hgb Hpc Hcg Hcnt Hextc Hclmc Hslk Hslkd %Hly Hfly

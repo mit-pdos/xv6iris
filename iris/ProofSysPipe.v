@@ -2790,7 +2790,7 @@ Section ProofSysPipe.
                 Mr (av - 8)%nat b ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (spi_b2 with "Htext"). }
-      iApply bi.later_intro. iIntros (CID67 Hcr67) "_". iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID67 Hcr67) "Hlc". iIntros "Hcg Hpc".
       assert (Htgtj : add_vec (mword_of_int (KernelSyms.sys_pipe + 0xb2) : mword 64)
                         (sign_extend' 64 (sign_extend' 21
                            (concat_vec (mword_of_int 20 : mword 11) ('b"0"))))
@@ -2803,7 +2803,7 @@ Section ProofSysPipe.
                    ltac:(rewrite Hb; wp_next_chain) with "Hextc") as "Hextc".
       iDestruct (cpu_claim_ext_transport CID66 CID67 eb p
                    ltac:(rewrite Hb; wp_next_chain) with "Hextm") as "Hextm".
-      iSpecialize ("Hepi" $! CID67 with "[%]"); [wp_next_chain|].
+      iSpecialize ("Hepi" $! CID67 with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hepi" $! Mr P' d bs (mword_of_int (-1) : mword 64) (upd_usV U2 (upd_ev (us_V U2) k2))
                 with "[%] [%] [%] [%] Hcg Hcpu Hextc Hextm Hpc Hiru [Hpenv] Hfenv [Hb5 Hb6 Hb7] [Hlo Hhi] [Hpriv Hfrag Hua Hub]").
       { split.
@@ -3194,7 +3194,7 @@ Section ProofSysPipe.
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (spi_7c with "Htext"). }
-      iApply bi.later_intro. iIntros (CID78 Hcr78) "_ Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID78 Hcr78) "Hlc Hcg Hpc".
       assert (Hbt4 : add_vec (mword_of_int (KernelSyms.sys_pipe + 0x7c) : mword 64)
                        (sign_extend' 64 (mword_of_int 94 : mword 13))
                      = mword_of_int (KernelSyms.sys_pipe + 0xda))
@@ -3207,7 +3207,7 @@ Section ProofSysPipe.
                    ltac:(rewrite Hb; wp_next_chain) with "Hextc") as "Hextc".
       iDestruct (cpu_claim_ext_transport CID34 CID78 eb p
                    ltac:(rewrite Hb; wp_next_chain) with "Hextm") as "Hextm".
-      iSpecialize ("Hepi" $! CID78 with "[%]"); [wp_next_chain|].
+      iSpecialize ("Hepi" $! CID78 with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hepi" $! D1 Pb (4 + 4)%nat bsc (zero_reg : mword 64) (upd_usV U (upd_ev (us_V U) kc))
                 with "[%] [%] [%] [%] Hcg Hcpu Hextc Hextm Hpc Hiru [Hpenv] Hfenv [Hb5 Hb6 Hb7] [Hlo Hhi] [Hpriv Hfrag Hu0 Hu1 Hqf]").
       { split; [exact HD1sp|]. split; [exact HD1a5 | exact HthrD1]. }

@@ -1855,7 +1855,7 @@ Section KexecCSetup.
                   (mword_of_int 3728 : mword 12) W6 (K - 68)%nat eb
                   ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
         { iApply (kxc_214 with "Htext"). }
-        iIntros (CID30 Hs30) "_ Hcg Hpc". iEval (rgne) in "Hcg".
+        iIntros (CID30 Hs30) "Hlc Hcg Hpc". iEval (rgne) in "Hcg".
         pose (W7 := <[Regidx Rs7 := regval_into_reg
                       (add_vec (W6 !!! Regidx Rs0)
                          (sign_extend' 64 (mword_of_int 3728 : mword 12)))]> W6).
@@ -1892,7 +1892,7 @@ Section KexecCSetup.
                      ltac:(try rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
         iDestruct (cpu_claim_ext_transport CID22 CID30 eb (proc_addr jp)
                      ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
-        iSpecialize ("Hout" $! CID30 with "[%]"); [wp_next_chain |].
+        iSpecialize ("Hout" $! CID30 with "[%] Hlc"); [wp_next_chain |].
         iDestruct (wp_next_retarget CID0 CID30 true (proc_addr jp) _
                      ltac:(wp_next_chain) with "Hcont") as "Hcont".
         iApply ("Hout" $! W7 Pfinal (umem_grow Mi (uint sz1)) sz1 Uev
@@ -3884,7 +3884,7 @@ Section KexecCLoop.
                     ltac:(rewrite Htgt218'; vm_compute; reflexivity)
                     with "Hcg Hpc []").
           { iApply (kxc_266 with "Htext"). }
-          iApply bi.later_intro. iIntros (CID29 Hs29) "_". iIntros "Hcg Hpc".
+          iApply bi.later_intro. iIntros (CID29 Hs29) "Hlc". iIntros "Hcg Hpc".
           iEval (rewrite Htgt218') in "Hpc".
        iDestruct (cpu_own_transport CID19 CID29 0%nat eb (proc_addr jp) eb
                     ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
@@ -3896,7 +3896,7 @@ Section KexecCLoop.
                         (CID29 : CPU) = (CID0 : CPU)) by wp_next_chain.
        iDestruct (wp_next_retarget CID0 CID29 true (proc_addr jp) _ Hcr30
                     with "Hcont") as "Hcont".
-       iSpecialize ("Hout" $! CID29 with "[%]"); [wp_next_chain |].
+       iSpecialize ("Hout" $! CID29 with "[%] Hlc"); [wp_next_chain |].
        iApply ("Hout" $! U4 Pfinal2 M0' Uev with "[%] [Hpc Hcg Hcnt Hextc Hclmc Hres] Hcont");
             [exact HUev|].
        iLeft. rewrite /kxc_at_21a.
@@ -4104,7 +4104,7 @@ Section KexecCArgvLoop.
               Hmsp Hmra Hms0 Hms1 Hms2 Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11
               Hmw12
               with "Htext Hst Hcont [Hout]").
-    iIntros (CIDn Hsn) "_"; iIntros (M' P' Mo U1) "%HU1 [Hnext | Hexit] Hcont".
+    iIntros (CIDn Hsn) "Hlc"; iIntros (M' P' Mo U1) "%HU1 [Hnext | Hexit] Hcont".
     - (* another argument: the BACK EDGE, re-entered at [S c] and at the hart
          this iteration ended on. *)
       iEval (rewrite /kxc_at_21a) in "Hnext".
@@ -4132,7 +4132,7 @@ Section KexecCArgvLoop.
       iSplitR; [iPureIntro; exact Hp4 |].
       iExact "Hrest".
     - (* the loop is over *)
-      iSpecialize ("Hout" $! CIDn with "[%]"); [wp_next_chain |].
+      iSpecialize ("Hout" $! CIDn with "[%] Hlc"); [wp_next_chain |].
       iApply ("Hout" $! M' P' Mo (S c) U1 with "[%] Hexit Hcont"). exact HU1.
   Qed.
 

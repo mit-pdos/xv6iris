@@ -2480,7 +2480,7 @@ Section ProofNamexMain.
           * (* exit A is impossible *)
             iIntros (CIDa Hsa) "_"; iIntros (Ma) "%HA1 %HA2 %HA3 Hcg Hpc Hpath".
             exfalso. exact (Hfa3 (HA1 afst Hfa1 Hfa2)).
-          * iIntros (CIDb Hsb) "_"; iIntros (a Mb) "%B1 %B2 %B3 %B4 %B5 %B6 %B7 %B8
+          * iIntros (CIDb Hsb) "Hlc"; iIntros (a Mb) "%B1 %B2 %B3 %B4 %B5 %B6 %B7 %B8
                                      Hcg Hpc Hpath".
             (* the register bundle, carried across the loop head *)
             assert (HBregs : nx_regs m sp0 (pa_add pv a) ipv nb
@@ -2509,7 +2509,7 @@ Section ProofNamexMain.
                 rewrite (B8 c N9 (HnsA5 c Hc) (HnsA4 c Hc) N18).
                 exact (Gthr c Hc N2 N8 N9 N18 N19 N20 N21 N22 N23 N24
                          N25 N26). }
-            iSpecialize ("Hscn" $! plen CIDb with "[%]"); [wp_next_chain |].
+            iSpecialize ("Hscn" $! plen CIDb with "[%] Hlc"); [wp_next_chain |].
             iApply ("Hscn" $! a Mb with "[%] [%] [%] Hcg Hpc Hpath").
             -- lia.
             -- exact B2.
