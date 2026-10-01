@@ -387,6 +387,15 @@ in `durable-notes.md` for what belongs where and what gets deleted.
   register-selected arms, the seven hooked transitions, the accessors, the
   free-tier exit, the tripwires and checklist lines, the three instances.
   Read before touching `CtxBox.v`, `IcacheEscrow.v`, `OffBox.v` or `BioInv.v`.
+- **[`chroot.md`](design/chroot.md)** — THE PER-PROCESS ROOT (upstream
+  `b72cbac`): `p->root` as the cwd's twin in the process block (not in the
+  user-visible key, and why), namex's absolute arm as an `idup`,
+  dirlookup's SELF ARM (`..` at the process's root) and who refutes or pays
+  it, the trace vocabulary at the root (`um_start_of`/`ax_hop` take `rt`,
+  the program tier supplies `∀ rt`), `sys_chroot`'s one plain contract,
+  `igetroot` replacing the `namei("/")` boot corner, the ledger's second
+  home, and what the landing settled (the share-form dp row, `IregClaimPlain`,
+  `path_nodot` pins).
 
 ## `projects/` — ongoing worklists & plans (one per effort)
 

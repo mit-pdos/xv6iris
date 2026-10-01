@@ -2,7 +2,7 @@
 
 What exists today (`ProcGeom.v`, `SchedCtx.v`) models exactly the five fields
 the yield/sched/sleeplock effort needed: `lock`, `state`, `chan`, `pid`,
-`context`. Everything else in the 360-byte structure is unowned. This note
+`context`. Everything else in the 376-byte structure is unowned. This note
 analyses how the *whole* structure is shared and fixes the resources that
 should carry it, so that syscall-level proofs (`sys_getpid`, `sys_sbrk`,
 `sys_dup`, `sys_open`, `fork`, `exit`, `wait`, `kill`) have something to
@@ -17,7 +17,8 @@ reuses verbatim), `completed/yield-sched.md` (how `proc_lock_res` came to be).
 All offsets corroborated by disassembly (`addi a5,a0,208` + stride 8 × 16 in
 `fdalloc`; `ld a1,72(a0)` / `ld a0,80(a0)` in `growproc`; `ld a0,336(s2)` /
 `sd s1,336(s2)` in `sys_chdir`; `lw a5,48(a0)` in `acquiresleep`).
-`sizeof(struct proc)` = 360 = `ProcGeom.proc_size`. ✓
+`sizeof(struct proc)` = 376 = `ProcGeom.proc_size` (upstream `b72cbac`: `root` at
++344 pushed `name` to +352 and `seccomp` to +368). ✓
 
 > **Caveat on where to read instructions.** `xv6-riscv/kernel/kernel.asm` is
 > *stale* relative to `kernel-rocq/KernelInstrs.v` — function symbols are
@@ -41,8 +42,10 @@ All offsets corroborated by disassembly (`addi a5,a0,208` + stride 8 × 16 in
 | `trapframe` | 88 | 8 | `proc_priv` / `proc_dormant` (pointer only) |
 | `context` | 96 | 112 | `own_ctx` / `proc_ctx` |
 | `ofile[16]` | 208 | 128 | `proc_ofiles` (a `file_ref` per non-null slot) |
-| `cwd` | 336 | 8 | `proc_priv`, incl. `cwd_ref` (an inode reference) |
-| `name[16]` | 344 | 16 | `proc_priv` |
+| `cwd` | 336 | 8 | `proc_priv`, incl. `cwd_ref_at` (an inode reference at the inum `pv_cwi`) |
+| `root` | 344 | 8 | `proc_priv`, incl. `root_ref_at` (an inode reference at `pv_rti`; [`chroot.md`](chroot.md)) |
+| `name[16]` | 352 | 16 | `proc_priv` |
+| `seccomp` | 368 | 8 | `proc_priv` (the syscall mask; [`seccomp.md`](seccomp.md)) |
 
 `NOFILE = 16`, `NPROC = 64` (`param.h`).
 
@@ -250,7 +253,9 @@ Definition p_sz        (pa : mword 64) : mword 64 := add_vec pa (mword_of_int 72
 Definition p_pagetable (pa : mword 64) : mword 64 := add_vec pa (mword_of_int 80).
 Definition p_trapframe (pa : mword 64) : mword 64 := add_vec pa (mword_of_int 88).
 Definition p_cwd       (pa : mword 64) : mword 64 := add_vec pa (mword_of_int 336).
-Definition p_name      (pa : mword 64) : mword 64 := add_vec pa (mword_of_int 344).
+Definition p_root      (pa : mword 64) : mword 64 := add_vec pa (sign_extend' 64 (mword_of_int 344 : mword 12)).
+Definition p_name      (pa : mword 64) (i : nat) : mword 64 := add_vec pa (mword_of_int (352 + Z.of_nat i)).
+Definition p_secc      (pa : mword 64) : mword 64 := add_vec pa (sign_extend' 64 (mword_of_int 368 : mword 12)).
 ```
 
 `ofile` is an array, indexed by fd:
@@ -279,9 +284,9 @@ Also add the two missing state codes (`UNUSED := 0`, `USED := 1`,
 `inv_dormant` beside `needs_ctx`.
 
 Each address must be stated in the *exact* form the instruction computes —
-`sign_extend' 64 (… : mword 12)` for offsets that fit in 12 bits (all of them
-except 336 and 344, which gcc materialises differently; check the disassembly
-per access site, as `p_pid`/`p_lkcpu` already do).
+`sign_extend' 64 (… : mword 12)` for offsets that fit in 12 bits; check the
+disassembly per access site, as `p_pid`/`p_lkcpu` already do (`p_cwd`'s sites
+are materialised differently, every `p_root` site is a 12-bit displacement).
 
 ### Layer 1 — `ProcInv.v`: the private bundle
 
@@ -295,6 +300,9 @@ Record pprivate := MkPPriv {
   pv_ofile     : list (mword 64);   (* length NOFILE *)
   pv_cwd       : mword 64;
   pv_name      : list (bv 8);       (* length 16 *)
+  (* ... then, appended in the order they arrived: pv_cwi (the cwd's inum, a
+     ghost, not a cell), pv_gen, pv_chg, pv_lazy, pv_secc (the mask cell),
+     pv_root (the cell at +344) and pv_rti (the root's inum, a ghost) *)
 }.
 
 Definition proc_fields (pa : mword 64) (dq : dfrac) (V : pprivate) : iProp Σ :=
@@ -350,7 +358,12 @@ Definition proc_priv (γf : gname) (pa : mword 64) (pid : mword 32) (V : pprivat
    proc_pt_at pa (pv_upt V) ∗
    tf_page (ud_tfp (pv_upt V)) (pv_tf V) ∗
    proc_ofiles γf pa (pv_ofile V) ∗
-   cwd_ref (pv_cwd V))%I.
+   cwd_ref_at (pv_cwd V) (pv_cwi V) ∗
+   (* ... and, last, root_ref_at (pv_root V) (pv_rti V): the root is the
+      cwd's twin at every seam -- proc_priv_split_cwd splits BOTH references
+      off the deficit block, proc_priv_nocwd holds neither, and every
+      dormant shape pins pv_root = 0 beside pv_cwd = 0 (chroot.md section 1) *)
+   ...)%I.
 ```
 
 **`cwd_ref` HAS NO NULL ARM.** `cwd_ref v := IcacheHeld.inode_held v`, so

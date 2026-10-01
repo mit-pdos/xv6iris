@@ -445,3 +445,14 @@ more.
   an era invariant; only the two fixed-layer slots are nameable
   (adequacy.md).  The durable claim in the composite slot is what is
   exported.
+
+## The root
+
+An application's boot bundle (`InitBoot.init_boot_bundle`) is at
+`(rt, cw) = (ROOTINO, ROOTINO)`: the first process's root and working
+directory are both the root inode (`userinit`'s `igetroot` and its
+`idup`).  Every deposit a program makes for a walking syscall is stated
+`∀ rt` and every post it reads back `∃ rt` — the program tier has no
+root in its key ([`chroot.md`](chroot.md) §1, §3), which is free for the
+`..`-free relative paths the verified programs use and is the one thing
+a program reasoning about absolute paths would have to add.

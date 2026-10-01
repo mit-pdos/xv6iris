@@ -346,6 +346,20 @@ python3 tools/fix_proof_imms.py --old-image /tmp/old --update   # apply
   whole class of splice bugs.
 - A large `unresolvable alias:` count is a parse failure in the tool, not a
   property of the tree.
+- **Name every reshaped function with `--reshape-from Code<F>.v:+0xNN`**
+  (repeatable, comma-separated; `<sym>:+0xNN` for a Code file covering two
+  functions). Every site at or past that offset is refused under `past a
+  reshape point: pc is stale, shift it first`: its pc still names the OLD
+  offset, and a same-shape instruction there (a `jal` to a different callee)
+  passes the shape guard. Shift those pcs by the reshape's delta, then rerun.
+- **`--window-back N` also searches the N lines BEFORE the anchor**, for an
+  `assert` stated ahead of its `iApply`. Off by default; it runs only after the
+  forward window found nothing, takes only a literal that IS the pre-bump
+  immediate (so it needs `--old-image`), and marks each hit `[BEFORE the
+  anchor, line L]` with a separate count. A backward hit is a neighbour's
+  literal more often than a forward one: check it against its own lemma.
+- The refusal lists print every site (each pc once, with its multiplicity).
+  Read them whole; they are the proof-work list.
 
 ### Pair by ANCHOR, not by import
 
@@ -386,6 +400,10 @@ Anything not anchored on a `KernelSyms.<sym> + off`:
   `-0x10`) and both `jal`s were unchanged, caller and callee having shifted
   together — which is exactly the pattern that makes an arithmetic guess look
   right and be wrong.
+- **A block lemma taking a VARIABLE pc or an immediate ARGUMENT LIST**
+  (ProofIreclaim, ProofSysPipe): no `<sym> + off` sits next to the
+  immediates, so neither `fix_proof_imms` nor `residue` sees them. Re-derive
+  each argument from the image at the call's pc.
 - **A block lemma inside one proof with the same shape**, where the two
   spellings sit a hundred lines apart: the tool fixes the `assert`s (they spell
   the pc) and cannot see the argument list. The file then fails at the `iApply`
@@ -409,6 +427,17 @@ Anything not anchored on a `KernelSyms.<sym> + off`:
   collect every `0x8…` literal in the merged tree and flag those equal to a
   MOVED symbol's OLD address. Against the OLD table, not the new one, which
   attributes correct addresses to whatever symbol precedes them.
+
+### A `--skip`ped reshaped function keeps OLD pcs past its reshape point
+
+`--skip=Code<F>.v` drops the function's map entirely, so every
+`KernelSyms.f + off` in its proof at or past the first inserted
+instruction still names the OLD offset — and `fix_proof_imms` then reads
+the NEW image at that stale pc.  Where a `jal` sits there, the report says
+the callee CHANGED (kexit+0x68 "acquire -> iput", kfork+0xd8/+0xfa
+"acquire/release swapped" at b72cbac); it did not.  Shift the pcs by the
+reshape's delta first, then re-read the immediates; a callee swap is
+real only when the pc is already right.
 
 ### A return address that lands on an inserted instruction
 
