@@ -105,6 +105,15 @@ the reaper's counter, lent out of the caller's cells
 (`actLend_back`); the cells-level post `kwPost` and the exit `kw_epi` take
 the block at `{ V.updEv k' with upt := P' }` with `V.ev ≤ k'` (the `-1`
 exits at `V.ev`).
+
+THE REAP COSTS ONE COUNT (permit sweep L3c; deviation: no Rocq counterpart,
+Rocq never landed L3): in `kw_reap`'s common tail, in the same ghost update
+as `kw_reap_ghost`'s `ZReap (procAddr j) pide` append, the reaper's counter
+is taken out of its cells (`procPrivNoctxAt_evAcc`) and stepped
+(`actCnt_step`, `kc` to `kc + 1`); freeproc is then lent `kc + 1` (and steps
+it again at its own `PFree`), and the block returns at freeproc's count, `V.ev
+< k'`.  The contract (`SpecKwait`, `kwPost`) is unchanged: it was stated at
+`V.ev ≤ k'` already.
 -/
 import Xv6.KvmLemmas
 import Xv6.SpecKwait
@@ -1292,6 +1301,11 @@ theorem kw_reap (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE)
     imod kw_reap_ghost j n hj hn parents hmatch pid pid0 xs V cs (decide (k.regs 10#5 = 0#64))
       $$ [Hwrest Hg Hxs Hpid Hdorm] with ⟨Hwrest, Hans, Hxs, Hpid, %Vf, %Mf, %gf, Hfin, Hfgen⟩
     · iframe Hwrest Hg Hxs Hpid Hdorm
+    -- THE REAP COSTS ONE COUNT of the reaper's permit (permit sweep L3c, no
+    -- Rocq counterpart): beside `ZReap (procAddr j) pide`, the reaper's
+    -- counter, taken out of its cells, is stepped here
+    icases procPrivNoctxAt_evAcc (GF := GF) curCtx (procAddr j) pid _ _ $$ Hpriv with ⟨Hcnt, Hpback⟩
+    imod actCnt_step (GF := GF) (procAddr j) kc $$ Hcnt with Hcnt
     imodintro
     ihave Hpay := kw_wait_pay_intro curCtx (fun i => if i = n then 0#64 else parents i) $$ [Hwr Hwrest]
     · iframe Hwr Hwrest
@@ -1308,12 +1322,12 @@ theorem kw_reap (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE)
     k_step (wp_s_jal cur _ (KA.«kwait» + 0x66#64) false 2095192#21 1#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kwait_br_fffffffffffff8be]
     iintro Hk Hpc
-    -- THE REAPER'S EVENT COUNTER, lent to freeproc (permit sweep L1a): the
-    -- reaper is the actor of the slot's release
-    icases procPrivNoctxAt_evAcc (GF := GF) curCtx (procAddr j) pid _ _ $$ Hpriv with ⟨Hcnt, Hpback⟩
-    ihave Hlend := actLend_of_cnt (GF := GF) (procAddr j) kc $$ Hcnt
+    -- THE REAPER'S EVENT COUNTER, lent to freeproc (permit sweep L1a) at the
+    -- count the reap stepped it to (L3c): the reaper is the actor of the
+    -- slot's release too
+    ihave Hlend := actLend_of_cnt (GF := GF) (procAddr j) (kc + 1) $$ Hcnt
     iapply (kw_freeproc FP Γ cur _ γl γp γk n ZOMBIE ch pid0 Vf Mf gf hn ?hfp (Or.inr rfl)
-      ?hfnoff ?hfK ?hfsie ?hflk ?hflp ?hftier kc (procAddr j) ?hfpa)
+      ?hfnoff ?hfK ?hfsie ?hflk ?hflp ?hftier (kc + 1) (procAddr j) ?hfpa)
       $$ [- $Hk $Hpc $Hlk $Hav $Hlp $Hheld $Hfin $Hfgen $Hlend]
     rotate_right 1
     · k_norm_g
@@ -1426,7 +1440,7 @@ theorem kw_reap (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE)
             MachCSL.strip_locks (k.withSpie spie3 spp3) (by simp only [KCtx.withSpie_locks, hklocks0])]
           iapply (kw_epi Γ cpu cur k γw γp γl γk j pid V M cs hj hkproc (by omega) spie3 spp3 R5
               pid0 xs d P' w9 hR5_2 hR5_19 hR5_24 hR5_25 hR5_26 hR5_27 hext hd hans hmap k2
-              (Nat.le_trans hkc hk2))
+              (by omega))
             $$ [- $Hk $Hpc $Hframe $Hpriv $Hte $Hce $Hans $HΦ]
         case haddrw => k_norm_g
         case hsw => k_norm_g

@@ -34,6 +34,14 @@ to the two freeproc tails (`ap_fp_call` takes it) and the four exits;
 since L2 (Rocq 78f9234b8) `proc_pagetable` takes it too (`ap_pp_call`), and
 since L3b (no Rocq counterpart) `kalloc` (`ap_kalloc_call`, the led form)
 takes the count in hand and steps it.
+
+THE PID APPEND COSTS ONE COUNT (permit sweep L3c; deviation: no Rocq
+counterpart, Rocq never landed L3): in `ap_found`, right after
+`pidLedger_alloc` appends `PAlloc k.proc pid`, the lend in hand is stepped
+(`actLend_step`) and re-shaped at `∃ k' ≥ ke` (`actLend_ret_step`); the
+found arm then lends the stepped count to `kalloc`, which steps it again.
+The scan-failure arm appends nothing and steps nothing.  The contract
+(`SpecAllocproc`) is unchanged: its post was `∃ k' ≥ ke` already.
 -/
 import Xv6.SpecAllocproc
 import Xv6.SpecAcquire
@@ -1992,6 +2000,12 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
   -- ...AND THE LEDGER RECORDS IT, beside the register it mirrors (Rocq
   -- `pid_ledger_alloc`): `PAlloc k.proc pid`, whose receipt the found arm gets
   imod pidLedger_alloc PR k.proc pid γ $$ Hled with ⟨Hled, #Hrcpt⟩
+  -- ...AND THE APPEND COSTS ONE COUNT of the actor's permit (permit sweep
+  -- L3c, no Rocq counterpart): the lend in hand is stepped here, at the
+  -- `PAlloc` append, and carried on at a count no lower than `ke`
+  icases Hlend with ⟨%kp, %hkp, Hlend⟩
+  imod actLend_step k.proc kp $$ Hlend with Hlend
+  ihave Hlend := actLend_ret_step k.proc hkp $$ Hlend
   imodintro
   ihave HRpay : pidLockPay (GF := GF) curCtx $$ [Hnp Hpids Hauth Hled]
   case _ =>

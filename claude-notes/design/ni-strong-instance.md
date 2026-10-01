@@ -779,3 +779,101 @@ What remains (L3c, T).  **L3c**: the four ledger appends require and step
 the lend -- allocproc's pid section (`PAlloc`), freeproc's (`PFree`),
 kwait's (`ZReap`), kexit's exit append (`ZExit`, from its own block).
 **T**: the rows' `ev' = ev` on the non-ecall rows and `ut_round_quiet`.
+
+### 7.7L L3c as landed in Lean (2026-10-01)
+
+Lean lane PJ-L3c, no Rocq counterpart (Rocq never landed L3).  **The four
+ledger appends step the permit: every actor-labelled event in the kernel now
+costs one count of the acting process's counter.**  4 Lean files (all
+`Proof*`) + this note; no Spec, no Link file, no `SlotGen` lemma moved.
+
+- **allocproc** (`ProofAllocproc.ap_found`): right after `pidLedger_alloc`
+  appends `PAlloc k.proc pid`, in the same ghost update, the lend in hand
+  (`∃ k0 ≥ ke`) is stepped (`actLend_step`) and re-shaped
+  (`actLend_ret_step`); `kalloc` is then lent the stepped count and steps it
+  again.  The scan-failure arm appends nothing and steps nothing.
+- **freeproc** (`ProofFreeproc.fp_pid`): the lend no longer fills the led
+  continuation after proc_freepagetable; `fp_after_tf` passes `∃ k' ≥ ke,
+  actLend k.proc k'` beside `fpContLedL` to `fp_after_pt` and `fp_pid`
+  (both gain `(ke : Nat)` and take the pair instead of `fpContLed`), and at
+  the `p->pid = 0` close, in the ghost update of `fp_pidRes_acc`'s `PFree
+  k.proc pid`, the lend is stepped and only then fills the continuation
+  (`fpContLedL_fill`, then `fpContLed_fill` with the receipt).
+- **kwait** (`ProofKwait.kw_reap`, common tail): in the ghost update of
+  `kw_reap_ghost`'s `ZReap (procAddr j) pide`, the reaper's counter is taken
+  out of its cells (`procPrivNoctxAt_evAcc`, moved up from the freeproc
+  call) and stepped (`actCnt_step`, `kc` to `kc + 1`); freeproc is lent `kc
+  + 1` (its `PFree` steps it again) and the block returns at freeproc's
+  count (`V.ev ≤ k'` by `omega` now that `kc + 1 ≤ k2`).
+- **kexit** (`ProofKexit.kx_rest`): kexit steps ITS OWN counter, the block's
+  `actCnt (procAddr j) V.ev` in hand since PJ-G, in the ghost update of the
+  `ZExit` append (`actCnt_step`); the ZOMBIE park builds the zeroed block at
+  `{ V with ofile, cwd, ev := V.ev + 1 }`.  The park is stated at an
+  abstract record (`parkPay` / `procDormantNoctx` quantify it), so
+  `SpecKexit` and `SpecSched` did not move.
+- **All four steps are at the append site** (not at entry, unlike L3b's
+  kalloc/kfree): the lend or counter was in scope there in each proof.
+- **Moved** (proof-internal only): `fp_pid`, `fp_after_pt` (+ `ke`, the lend
+  pair in place of `fpContLed`).  **Unchanged**: every Spec (in particular
+  `SpecAllocproc`, `SpecFreeproc`, `SpecKwait`, `SpecKexit`: their posts were
+  `∃ k' ≥ ke` / `V.ev ≤ k'` already, so the raised counts are absorbed and
+  no consumer changed), `SlotGen`, all Link files.
+
+Full `lake build Xv6 MachCSL` 2732 jobs, exit 0; `lint.sh` all lints passed
+(layering ok, no `sorry`); `tcb.sh` exit 0 (no module entered); `audit.sh`
+PASS (0 `sorryAx`, baseline unchanged).
+
+**The invariant now established by construction (the input to T).**
+
+1. *Homes.*  Each of the 64 slots has one exclusive counter `actCnt pa k`
+   (`WchG.wactName`), minted at 0 at boot (`childrenRes_alloc`, ridden by
+   `childrenBootRows`, sealed by procinit); it lives in the slot's bare block
+   (`procPrivBareAt`'s last conjunct, at `V.ev`, and its cells-level twins)
+   while the slot is in use, and in the dormant block (`procDormant` /
+   `procDormantNoctx`) otherwise.  Moving it between homes never changes
+   its value: allocproc's `ap_dormant_unused_elim` → `procPriv`, freeproc's
+   `freeprocIn` / `fpKeep` back, kexit's park (`kx_dormant_build`), kwait's
+   reap (`kw_dormant_freeprocIn`), kfork's frame for parent and child.
+2. *The only move of the value* is `actCnt_update`, used only by
+   `actCnt_step` (`k` to `k + 1`), used at exactly three places:
+   `actLend_step` (SlotGen), kwait's reap (`kw_reap`) and kexit's exit
+   (`kx_rest`).  `actLend_step` is used at exactly five: `kalloc_led_proof`
+   (entry; the event is `KAlloc` or `KNull`), `kfree_led_proof` and the
+   `KFREE_FREE` proof (entry; `KFree`), `ap_found` (`PAlloc`), `fp_pid`
+   (`PFree`).  So **each step is paired one-for-one with an actor-labelled
+   ledger append in the same proof, and every actor-labelled append in the
+   kernel (`KAlloc`, `KNull`, `KFree`, `PAlloc`, `PFree`, `ZReap`, `ZExit`:
+   the allocator's appends inside `kalloc_led_proof` / `kfree_tail`, and the
+   `pidLedger_alloc`, `pidLedger_free`, `zombReap` and `zombExit` call sites)
+   is paired with one step of
+   the counter of the append's actor** -- `k.proc` (the cpu's running proc
+   word) for the allocator and pid appends, `procAddr j` (= `k.proc`) for
+   `ZReap` and `ZExit`.  At `k.proc = 0` (the boot chain: kinit, freerange,
+   kvmmake, proc_mapstacks, virtio_disk_init, userinit's allocproc) the lend
+   is the left disjunct `⌜p = 0⌝` and no counter moves; those appends carry
+   the boot actor 0, which no slot owns.
+3. *Who can touch a slot's counter.*  Only code running with `k.proc = pa`,
+   i.e. slot `pa`'s own kernel thread: usertrap's arms lend its block's
+   counter to the syscall dispatcher (and down the sixteen `sys_*` entries
+   and their ring: fork/kfork, exec/kexec, sbrk/growproc, wait/kwait,
+   close/fileclose, pipe, open, ... to kalloc/kfree), to `vmfault`, and
+   `kexit` takes it from its own block.  Nothing steps another slot's
+   counter: allocproc steps the CALLER's (the new child's is moved from the
+   dormant block untouched), kwait steps the REAPER's (the zombie's is
+   moved, untouched, into the freed dormant block), freeproc steps its
+   caller's lend.  Every contract on the cone returns `∃ k' ≥ ke` (or the
+   block at `V.updEv k'`, `V.ev ≤ k'`), never a lower count.
+
+What remains: T.  For the Lean tree: `uroundOk` / the usertrap round
+(`SpecUsertrap.utRound_*`, the `UsertrapSysRows` / `UsertrapArms` rows) gain
+the block's count before and after, `ev' = ev` on every non-ecall row, and
+the in-logic strong instance (Rocq's planned `ut_round_quiet`) follows from
+item 2 by exclusivity of the counter.  The discharges: the timer/device rows
+frame the block (no lend taken); the fault row is quiet when `vmfault`
+appends nothing (`lazy = false`, Rocq's planned `vmfault_quiet`; a lazy fault
+calls `kalloc` and steps); the kill row is the statement's exception -- a
+killed quiet process exits in its own context, and kexit steps its counter
+at `ZExit` (and may step it again through `fileclose` → `pipeclose`'s
+`kfree`), so T is stated for a quiet process that is not killed (the `Kill`
+event left to M3's no-kill corollary).  The ecall rows already expose the
+raised count (`∀ k' ≥ V.ev`, L1b) and are not constrained by T.

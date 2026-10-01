@@ -92,6 +92,16 @@ appends `ZExit (procAddr j) pid (xstateOf status)` (`UserChildren.zombExit`
 -- the actor is Rocq's `pj`, the status the escrow's own argument) in the
 same ghost update as the state mirror's step; kexit has no post, so the
 receipt is dropped.  No contract moved.
+
+THE EXIT COSTS ONE COUNT (permit sweep L3c; deviation: no Rocq counterpart,
+Rocq never landed L3): kexit steps ITS OWN counter -- the block's
+`actCnt (procAddr j) V.ev`, which `kx_rest` holds since PJ-G -- in the same
+ghost update as the `ZExit` append (`actCnt_step`), and the ZOMBIE park
+takes the zeroed block at `ev := V.ev + 1`.  The park is stated at an
+abstract record (`parkPay` / `procDormantNoctx` quantify it), so neither
+`SpecKexit` nor `SpecSched` moved.  This is the statement's exception
+(design ni-strong-instance.md §7): a killed quiet process exits in its own
+context and so spends one count of its own permit.
 -/
 import Xv6.SpecKexit
 import Xv6.SpecMyproc
@@ -1184,6 +1194,11 @@ theorem kx_rest (AC : ACQUIRE) (RE : RELEASE) (RP : REPARENT) (WU : WAKEUP) (SC 
   -- `procAddr j`, this process's pid, and the status the escrow is keyed at.
   -- kexit has no post, so the receipt is dropped.
   imod zombExit hz (procAddr j) pid (xstateOf status) $$ Hzl with ⟨Hzl, -⟩
+  -- ...AND THE EXIT COSTS ONE COUNT of this process's own permit (permit
+  -- sweep L3c, no Rocq counterpart): the block's counter, in hand since
+  -- `kx_rest`'s entry, is stepped here; the ZOMBIE park takes the block at
+  -- `ev := V.ev + 1`
+  imod actCnt_step (GF := GF) (procAddr j) V.ev $$ Hev with Hev
   imodintro
   -- the held p->lock at ZOMBIE, kept aside through the release
   ihave Hrest := kx_procPubRest_join (procAddr j) kl _ pid $$ [$Hkilled $Hxstate $Hpidpub $Hkrow]
@@ -1297,9 +1312,9 @@ theorem kx_rest (AC : ACQUIRE) (RE : RELEASE) (RP : REPARENT) (WU : WAKEUP) (SC 
       pnameCells (procAddr j) (DFrac.own 1) V.name ∗
       wordPointsTo (pSecc (procAddr j)) 8 (DFrac.own 1) V.pvSecc ∗
       ofileCells (procAddr j) (DFrac.own 1) (List.replicate NOFILE 0#64) ∗
-      procPtAt V.upt M ∗ tfPageAt V.upt.tfp V.tf ∗ actCnt (procAddr j) V.ev ⊢
+      procPtAt V.upt M ∗ tfPageAt V.upt.tfp V.tf ∗ actCnt (procAddr j) (V.ev + 1) ⊢
       procPrivNoctxAt (GF := GF) ξ0 (procAddr j) pid
-        { V with ofile := List.replicate NOFILE 0#64, cwd := 0#64 } M from by
+        { V with ofile := List.replicate NOFILE 0#64, cwd := 0#64, ev := V.ev + 1 } M from by
     unfold procPrivNoctxAt procFieldsNoctx
     iintro ⟨Hpid, Hks, Hsz, Hpg, Htf, Hcwd, Hname, Hsc, Hofile, HPt, HTf, Hev⟩
     isplitl []
@@ -1319,7 +1334,7 @@ theorem kx_rest (AC : ACQUIRE) (RE : RELEASE) (RP : REPARENT) (WU : WAKEUP) (SC 
       · rw [hsub]; iexact Hstk
     ihave Hstack512 := Hcloser $$ [$Hbig]
     ihave Hdorm := kx_dormant_build ξ0 (procAddr j) pid
-      { V with ofile := List.replicate NOFILE 0#64, cwd := 0#64 } M rfl rfl $$ [$Hpriv $Hal $Hch $Hstack512 $Hgh $Hxpark]
+      { V with ofile := List.replicate NOFILE 0#64, cwd := 0#64, ev := V.ev + 1 } M rfl rfl $$ [$Hpriv $Hal $Hch $Hstack512 $Hgh $Hxpark]
     unfold parkPay parkPayAt
     rw [if_pos kx_invDormant_zombie]
     iexact Hdorm
