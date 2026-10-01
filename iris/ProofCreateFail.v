@@ -446,7 +446,7 @@ Section ProofCreateFail.
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (cri_152 with "Htext"). }
-    iIntros (CIDG6 HqG6) "_ Hcg Hpc".
+    iIntros (CIDG6 HqG6) "Hlc Hcg Hpc".
     iEval (rewrite Htgu1) in "Hpc".
     pose (G4 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (CK + 0x152) : mword 64) 4)]> G3).
@@ -534,7 +534,7 @@ Section ProofCreateFail.
             (era_node (cr_setf dnc major minor (mword_of_int 0 : mword 16))
                       bmc datc)
             ltac:(solve_ndisj) Hlocz Hrowc1 Hnone0 (HNdF Htdir)
-            with "[] [] Hun Hctop") as "(Hctop & Hunr)";
+            with "[] [] Hun Hctop Hlc") as "(Hctop & Hunr)";
       [iApply (ireg_inv_ftop with "Hiregi") | iApply (ireg_inv_app with "Hiregi") |].
     iModIntro.
     iDestruct (ic_mk_loaded fsc_fs fsc_ireg fsc_cov fsc_logst kslot cinum
@@ -643,7 +643,7 @@ Section ProofCreateFail.
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (cri_158 with "Htext"). }
-    iIntros (CIDG9 HqG9) "_ Hcg Hpc".
+    iIntros (CIDG9 HqG9) "Hlc Hcg Hpc".
     iEval (rewrite Htgu2) in "Hpc".
     pose (G6 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (CK + 0x158) : mword 64) 4)]> G5).
@@ -792,7 +792,7 @@ Section ProofCreateFail.
             ltac:(solve_ndisj) Habs0
             (inode_local_of_ok_rec (bv_unsigned dind) fsc_cov fsc_logst dn' bm'
                data' Hiok' Hrl' Hduq' Hddix')
-            with "[] [] Htop") as "Htop";
+            with "[] [] Htop Hlc") as "Htop";
       [iApply (ireg_inv_ftop with "Hiregi") | iApply (ireg_inv_app with "Hiregi") |].
     iModIntro.
     iDestruct (ic_mk_loaded fsc_fs fsc_ireg fsc_cov fsc_logst kd dind dn' bm' data'
