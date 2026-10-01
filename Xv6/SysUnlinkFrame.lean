@@ -56,7 +56,7 @@ import Xv6.SpecIlock
 import Xv6.SpecNamecmp
 import Xv6.SpecNamexEra
 import Xv6.ReadiDefs
-import Xv6.BvOmegaGoal
+import Xv6.KernelTac
 
 namespace Xv6
 

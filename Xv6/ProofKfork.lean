@@ -102,7 +102,7 @@ import Xv6.SpecIdup
 import Xv6.SpecFiledup
 import Xv6.ConsoleintrParts
 import Xv6.CopyLemmas
-import Xv6.BvOmegaGoal
+import Xv6.KernelTac
 
 namespace Xv6
 

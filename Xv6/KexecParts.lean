@@ -79,7 +79,7 @@ The eb question: every rule here is at either `SIE` (`kctxL lent`,
 import Xv6.CodeTactics
 import Xv6.KstackMap
 import MachCSL.WpSmodeFrame12b
-import Xv6.BvOmegaGoal
+import Xv6.KernelTac
 
 namespace Xv6
 

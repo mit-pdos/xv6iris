@@ -22,7 +22,7 @@ import MachCSL.WpSmodeFrame6
 import Xv6.ByteCursor
 import Xv6.UvmallocDefs
 import Xv6.WalkaddrDefs
-import Xv6.BvOmegaGoal
+import Xv6.KernelTac
 
 namespace Xv6
 

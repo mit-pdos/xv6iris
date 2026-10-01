@@ -27,7 +27,7 @@ import Xv6.CodeTactics
 import MachCSL.WpSmodeFrame6
 import Xv6.ByteCursor
 import Xv6.UPtPptLemmas
-import Xv6.BvOmegaGoal
+import Xv6.KernelTac
 
 namespace Xv6
 

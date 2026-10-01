@@ -12,7 +12,7 @@ Proof of `printf` at ANY load address (`Xv6/SpecUlibPrintf.lean`; Rocq
 -/
 import Xv6.SpecUlibPrintf
 import Xv6.UlibVprintfInv
-import Xv6.BvOmegaGoal
+import Xv6.KernelTac
 
 namespace Xv6
 

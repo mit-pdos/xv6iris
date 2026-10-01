@@ -128,7 +128,7 @@ import Xv6.SpecFetchaddr
 import Xv6.SysfileCalls
 import Xv6.KstackMap
 import Xv6.SysMknodFrame
-import Xv6.BvOmegaGoal
+import Xv6.KernelTac
 
 namespace Xv6
 

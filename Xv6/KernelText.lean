@@ -12,6 +12,7 @@ instruction up by address in the search-tree form of the same list
 -/
 import Xv6.KernelTree
 import Xv6.KernelMap
+import Xv6.KernelTac
 
 namespace Xv6
 
@@ -86,7 +87,7 @@ theorem TextTree.find?_addr : ∀ (t : Kernel.TextTree) (a : Nat) (k : Kernel.KI
 set_option maxRecDepth 100000 in
 /-- The search tree is the kernel text.  Checked by the kernel alone: `rfl`
 also unifies the two 8700-element lists in the elaborator (22 s vs 13 s). -/
-theorem textTree_toList : Kernel.textTree.toList = Kernel.text := by decide +kernel
+theorem textTree_toList : Kernel.textTree.toList = Kernel.text := by kernel_eq_refl
 
 /-- The bytes of the instruction the tree finds at `a` (`instrBytes k`, unfolded). -/
 theorem kernelText_find (a : Nat) (k : Kernel.KInstr) (h : Kernel.textTree.find? a = some k) :
