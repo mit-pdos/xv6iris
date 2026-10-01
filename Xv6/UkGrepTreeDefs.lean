@@ -17,10 +17,8 @@
    `kgrep_nth_zero`, `kgrep_nth_nl`; `b01 b` is `kgrepB01 b`).
 3. Rocq's `args !! 1 = Some g` is `args[1]? = some g`.
 -/
-import Xv6.UkGrepLoopFrame
 import Xv6.UkTree
-import Xv6.UkCatDefs
-import Xv6.UkCatTreePure
+import Xv6.UkGrepLoopDefs
 
 namespace Xv6
 

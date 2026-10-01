@@ -12,6 +12,7 @@ Deviations from Rocq: as in `SpecGrepMemmove`; each loop turn is its own
 lemma (`grepMemmove_fstep`/`_bstep`, Rocq's shared `all:` body).
 -/
 import Xv6.SpecGrepMemmove
+import Xv6.UkRunBr
 
 namespace Xv6
 

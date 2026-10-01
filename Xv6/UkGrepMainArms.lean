@@ -17,6 +17,7 @@ Deviations from Rocq: `UkGrepMainDefs`'s.
 import Xv6.UkGrepMainDefs
 import Xv6.SpecGrepGrep
 import Xv6.GrepPrintfLink
+import Xv6.UkCatTreePure
 
 namespace Xv6
 

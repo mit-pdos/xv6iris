@@ -7,7 +7,6 @@ needs these and not the dispatch/fetch stage lemmas.
 -/
 import MachCSL.SConfAtDefs
 import MachCSL.WpPmpXv6
-import MachCSL.WpStages
 
 
 namespace MachCSL

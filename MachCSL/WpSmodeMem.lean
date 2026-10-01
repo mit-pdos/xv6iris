@@ -16,3 +16,4 @@ import MachCSL.WpSmodeMemLw
 import MachCSL.WpSmodeMemSb
 import MachCSL.WpSmodeMemSd
 import MachCSL.WpSmodeMemSw
+import MachCSL.WpStages

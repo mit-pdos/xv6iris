@@ -19,7 +19,7 @@ pays grep's tree holes (`UkTree`) and is H-tree's to unblock.
    `vm_compute`).
 2. Unreached (union cone): `gl_regs_call`, `a7_idx`.
 -/
-import Xv6.UkGrepLoopDefs
+import Xv6.UkGrepDefs
 
 namespace Xv6
 

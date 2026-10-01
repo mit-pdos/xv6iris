@@ -8,6 +8,8 @@ Deviations from Rocq: `UkGrepTreeDefs`'s.
 -/
 import Xv6.UkGrepTreeDefs
 import Xv6.SpecGrepMemmove
+import Xv6.UkRunBr
+import Xv6.UkGrepLoopFrame
 
 namespace Xv6
 

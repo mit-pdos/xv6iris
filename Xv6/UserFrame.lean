@@ -59,6 +59,7 @@ import MachCSL.UExecCtlBase
 import MachCSL.UTranslate
 import MachCSL.UDecode
 import MachCSL.URunRWMono
+import MachCSL.WpSmodeSret
 
 namespace Xv6
 

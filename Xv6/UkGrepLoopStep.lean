@@ -12,6 +12,8 @@ the layering, a stage file imports no Proof file).  Deviations from Rocq:
 import Xv6.UkGrepTreeDefs
 import Xv6.SpecGrepStrchr
 import Xv6.SpecGrepMatch
+import Xv6.UkRunBr
+import Xv6.UkGrepLoopFrame
 
 namespace Xv6
 

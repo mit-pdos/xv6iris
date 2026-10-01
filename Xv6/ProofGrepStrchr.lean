@@ -11,6 +11,7 @@ after `li a0,0` at the NUL) -- and the epilogue at 0x334 (`kgrep_epi2`).
 Deviations from Rocq: as in `SpecGrepStrchr`.
 -/
 import Xv6.SpecGrepStrchr
+import Xv6.UkRunBr
 
 namespace Xv6
 

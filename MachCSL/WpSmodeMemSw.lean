@@ -6,6 +6,10 @@ MachCSL: `execSpecF_sw`, the supervisor-mode `sw` over the register file (script
 -/
 import MachCSL.WpSmodeMemTac
 import MachCSL.Translate
+import MachCSL.WpCycleDefs
+import MachCSL.KCtxGpr
+import MachCSL.SmodeMemFacts
+import MachCSL.WpSmodeMemPhys
 
 
 namespace MachCSL

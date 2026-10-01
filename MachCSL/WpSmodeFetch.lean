@@ -6,8 +6,6 @@ MachCSL: the supervisor-mode fetch at either translation tier
 carries it).
 -/
 import MachCSL.WpSmodeCycleBase
-import MachCSL.TranslateAddr
-import MachCSL.Instr
 import MachCSL.WpSmodeFetch4
 import MachCSL.WpSmodeFetch2
 import MachCSL.WpSmodeFetchRvc

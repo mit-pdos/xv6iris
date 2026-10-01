@@ -13,7 +13,6 @@ import MachCSL.KCtxGpr
 import MachCSL.WpCsrS
 import MachCSL.SConfPhysDefs
 import MachCSL.WpCsr
-import MachCSL.KCtx
 import MachCSL.AluFacts
 import MachCSL.WpCycleDefs
 

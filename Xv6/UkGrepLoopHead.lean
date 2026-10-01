@@ -9,6 +9,9 @@ Deviations from Rocq: `UkGrepTreeDefs`'s; the two continuations are Rocq's
 additive conjunction.
 -/
 import Xv6.UkGrepTreeDefs
+import Xv6.UkRunBr
+import Xv6.UkGrepLoopFrame
+import Xv6.UkCatDefs
 
 namespace Xv6
 
