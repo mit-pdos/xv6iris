@@ -46,6 +46,7 @@ the tail is `SyscallRet`'s).
 -/
 import Xv6.SpecSyscall
 import Xv6.SpecSysExec
+import Xv6.SpecSysChroot
 
 namespace Xv6
 
@@ -126,6 +127,7 @@ theorem syscTarget_mkdir : syscTarget 20 = sysMkdirAddr := rfl
 theorem syscTarget_close : syscTarget 21 = sysCloseAddr := rfl
 theorem syscTarget_sync : syscTarget 22 = sysSyncAddr := rfl
 theorem syscTarget_seccomp : syscTarget 23 = sysSeccompAddr := rfl
+theorem syscTarget_chroot : syscTarget 24 = sysChrootAddr := rfl
 
 /-! ## §2 The number -/
 
@@ -136,7 +138,7 @@ theorem syscall_num_ne (V : ProcPriv) (n : Nat) (m : Int) (hnum : syscNum V = (n
   rw [hnum]; exact h
 
 /-- **The fall-through fixes the RAW number**: the dispatch reached slot `n`
-of the table (`1 ≤ n ≤ 23`) iff the low word of `a7` read as an `int` is `n`
+of the table (`1 ≤ n ≤ 24`) iff the low word of `a7` read as an `int` is `n`
 (`syscall_bltu` + `syscall_idx`), which is `syscRaw V`. -/
 theorem syscall_num_of_idx (V : ProcPriv) (n : Nat)
     (hn : (BitVec.extractLsb' 0 32 (tfW V.tf (tfArgIdx 7))).toInt.toNat = n)
@@ -145,7 +147,7 @@ theorem syscall_num_of_idx (V : ProcPriv) (n : Nat)
   rw [syscRaw_eq, ← hn]; omega
 
 /-- **The mask's check fixes the EFFECTIVE number** (xv6 7b2c1b1b): at a raw
-number `n` in `[1, 23]`, the bit set means the effective number is `n` (the
+number `n` in `[1, 24]`, the bit set means the effective number is `n` (the
 call runs), the bit clear means it is `0` (the blocked call, which IS the
 unknown-number call). -/
 theorem syscall_eff_allowed (V : ProcPriv) (n : Nat) (hraw : syscRaw V = (n : Int))
@@ -161,8 +163,8 @@ theorem syscall_eff_blocked (V : ProcPriv) (n : Nat) (hraw : syscRaw V = (n : In
 
 /-- Out of the table's range the effective number is out of range too (the
 raw one, or 0). -/
-theorem syscall_eff_range (V : ProcPriv) (h : syscRaw V < 1 ∨ 23 < syscRaw V) :
-    syscNum V < 1 ∨ 23 < syscNum V := by
+theorem syscall_eff_range (V : ProcPriv) (h : syscRaw V < 1 ∨ 24 < syscRaw V) :
+    syscNum V < 1 ∨ 24 < syscNum V := by
   unfold syscNum
   rcases usysEff_cases V.pvSecc V.tf with e | e
   · rw [e]; exact h
@@ -210,13 +212,13 @@ theorem syscall_beqz_bit (b : Bool) :
 
 
 /-- The sign-extended number `a3`, in range, is the number as a word. -/
-theorem syscall_sext_small (x : BitVec 32) (h1 : 1 ≤ x.toInt) (h2 : x.toInt ≤ 23) :
+theorem syscall_sext_small (x : BitVec 32) (h1 : 1 ≤ x.toInt) (h2 : x.toInt ≤ 24) :
     BitVec.signExtend 64 x = BitVec.ofNat 64 x.toInt.toNat := by
   have hlt := x.isLt
-  have hsmall : x.toNat ≤ 23 := by
+  have hsmall : x.toNat ≤ 24 := by
     rw [BitVec.toInt_eq_toNat_cond] at h1 h2
     split at h2 <;> split at h1 <;> omega
-  have hle : x ≤ 23#32 := by rw [BitVec.le_def]; simpa using hsmall
+  have hle : x ≤ 24#32 := by rw [BitVec.le_def]; simpa using hsmall
   have hti : x.toInt.toNat = x.toNat := by
     rw [BitVec.toInt_eq_toNat_cond, if_pos (by omega)]; simp
   rw [hti]
@@ -228,7 +230,7 @@ theorem syscall_sext_small (x : BitVec 32) (h1 : 1 ≤ x.toInt) (h2 : x.toInt �
 
 /-- **The fallback's number is out of range** (the `bltu` taken): no entry's
 row applies, and in particular `syscNumNofs`. -/
-theorem syscall_nofs_of_range (V : ProcPriv) (h : syscNum V < 1 ∨ 23 < syscNum V) :
+theorem syscall_nofs_of_range (V : ProcPriv) (h : syscNum V < 1 ∨ 24 < syscNum V) :
     syscNumNofs (syscNum V) := by
   unfold syscNumNofs; omega
 
@@ -366,7 +368,7 @@ def syscArmBody (n : Nat) (PT : SchedNames → IProp GF) (Γ : SchedNames) [Clai
 
 /-- **WHAT THE PRINTK FALLBACK PROVES** (Rocq `sysc_fallback`'s statement):
 entered at `+0x40` when the `bltu` is taken (the number is out of range --
-`syscNum V < 1 ∨ 23 < syscNum V`; the `beqz` is dead, `syscTarget_ne_zero`),
+`syscNum V < 1 ∨ 24 < syscNum V`; the `beqz` is dead, `syscTarget_ne_zero`),
 with the same resources as an arm, it prints, stores `-1` to
 `p->trapframe->a0` and leaves through the shared epilogue
 (`SyscallRet.syscall_epilogue_tail`).  `ra` is not pinned (myproc's link). -/
@@ -377,7 +379,7 @@ def syscFallbackBody (PT : SchedNames → IProp GF) (Γ : SchedNames) [ClaimIs (
     (_hE : SyscSpostEmp (GF := GF))
     (_hj : j < NPROC) (_hproc : k.proc = procAddr j) (_hK : syscallSlots ≤ k.avail)
     (_hnoff : k.noff = 0) (_htier : k.tier = KTier.kpt) (_hgn : gn = V.gen)
-    (_hrange : syscNum V < 1 ∨ 23 < syscNum V) (_hpins : syscPins k R) (_hs1 : R 9#5 = procAddr j)
+    (_hrange : syscNum V < 1 ∨ 24 < syscNum V) (_hpins : syscPins k R) (_hs1 : R 9#5 = procAddr j)
     (_hs2 : R 18#5 = pageAddr V.upt.tfp) : Prop :=
   kctx cpu (((k.withSpie spie spp).pushed 4).withRegs R) ∗ pcIs cpu syscallFallback ∗
   frame4s2 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) ∗
@@ -401,7 +403,7 @@ the diagnostic.  Same resources as an arm.
 
 The fallback's own doc, for comparison: **WHAT THE PRINTK FALLBACK PROVES** (Rocq `sysc_fallback`'s statement):
 entered at `+0x40` when the `bltu` is taken (the number is out of range --
-`syscNum V < 1 ∨ 23 < syscNum V`; the `beqz` is dead, `syscTarget_ne_zero`),
+`syscNum V < 1 ∨ 24 < syscNum V`; the `beqz` is dead, `syscTarget_ne_zero`),
 with the same resources as an arm, it prints, stores `-1` to
 `p->trapframe->a0` and leaves through the shared epilogue
 (`SyscallRet.syscall_epilogue_tail`).  `ra` is not pinned (myproc's link). -/

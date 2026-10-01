@@ -1,7 +1,8 @@
 /-
 `namei`'s 4-slot frame (Rocq `ProofNamei.v`'s `nam_frm*` / `nam_slots_bytes`
-/ `nam_bytes_slots` / `nam_buf_split` / `nam_buf_join`), shared by the walk's
-proof (`Xv6/ProofNamei.lean`) and the root corner's (`Xv6/ProofNameiRoot.lean`).
+/ `nam_bytes_slots` / `nam_buf_split` / `nam_buf_join`), the walk's proof's
+(`Xv6/ProofNamei.lean`; the root corner that shared it is gone with the
+chroot bump).
 
     +0x00  c.addi sp,sp,-32 ; c.sdsp ra,24(sp) ; c.sdsp s0,16(sp) ;
            c.addi4spn s0,sp,32                          (wp_prologue_namei)

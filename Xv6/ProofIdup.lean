@@ -30,7 +30,8 @@ so nothing moves `M` between the `lw` and the `sw`.
   closes the section (Rocq 670--729); the hooked release (Rocq 795--803:
   `Rin := itableRes2Llb`, hook `itableCtxHook`); `id_exit`.
 * `idup_proof` (Rocq `wp_idup_sconf`): the wrapper -- `inodeRef_shed` →
-  core → `inodeRef_gather`, around `inodeHeldAt`.
+  core → `inodeRef_gather`, around `inodeHeldAt`; and the share form
+  `wp_idup_shr` (Rocq `wp_idup_shr_sconf`), the core verbatim.
 
 ## DEVIATIONS from Rocq
 
@@ -246,7 +247,7 @@ theorem idup_core [Fscfg] [Icfg] [CurCtx] (AC : ACQUIRE) (RE : RELEASE_HOOK)
     (hlk : "itable" ∉ k.locks) (ha0 : k.regs 10#5 = ientry kk) :
     kctx cpu k ∗ pcIs cpu KA.«idup» ∗
     isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
-    itableInv (hlc := hlc) ∗ iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗
+    itableInv (hlc := hlc) ∗ iregReg (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗
     irefSlot ∗ inodeShr kk s icfgDev inum ∗ runitAny inum.toNat ∗
     wpNext k.sie k.proc cpu (idCoreCont k kk s inum)
     ⊢ wpLoop (GF := GF) cpu := by
@@ -438,6 +439,11 @@ theorem idup_proof (AC : ACQUIRE) (RE : RELEASE_HOOK) : IDUP := ⟨
     isplitr; · ipureintro; exact hinb
     isplitr; · ipureintro; exact hipos
     isplitr; · ipureintro; exact hz
-    iframe Hnew Hru2⟩
+    iframe Hnew Hru2,
+  -- THE SHARE FORM, PUBLIC (chroot.md §2.2): the core, verbatim
+  fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ cpu k kk s inum hnoff hK hkk hlk ha0 => by
+  unfold wp_idup_shr_body
+  simp only [idupAddr]
+  exact idup_core AC RE cpu k kk s inum hnoff hK hkk hlk ha0⟩
 
 end Xv6

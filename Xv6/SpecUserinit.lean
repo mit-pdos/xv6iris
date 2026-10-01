@@ -4,23 +4,24 @@ Specification of `userinit` (kernel/proc.c), the first process:
     void userinit(void) {
       struct proc *p = allocproc();
       initproc = p;
-      p->cwd = namei("/");
+      p->root = igetroot();
+      p->cwd = idup(p->root);
       p->state = RUNNABLE;
       release(&p->lock);
     }
 
 BOOT CODE: it runs on the boot hart before any scheduler does, so there
-is no process on this hart (`k.proc = 0`), no claim and no parking.  Both
+is no process on this hart (`k.proc = 0`), no claim and no parking.  All
 of its callees are fine with that -- `allocproc` never calls `myproc` and
-is generic in the interrupt index, and `namei("/")` is the REAL root corner
-(`SpecNamei.NAMEI_ROOT`, Rocq `NAMEI_ROOT_BOOT`, wave 7 W7-C retired the
-assumed `FsEnv.nameiBoot`): a path of one separator never walks, so the only
-callee is `iget(ROOTDEV, ROOTINO)` -- no process, no transaction, nothing to
-sleep on.  Its demand is Rocq's four inode-cache rows (`isItable2`,
-`itableInv`, `iregReg`; Rocq's `ic_escrows` rides `isItable2`, SpecNamex's
-"Dropped") and `panicEnv` (iget's live "no inodes" panic), plus the two
-configuration ties `icfgDev = ROOTDEV` and `0 < icfgNib`.  The path "/" is a
-`.rodata` literal, read off `kernelData`.
+is generic in the interrupt index; `igetroot` (`SpecIgetroot`, upstream
+b72cbac1, which replaced the `namei("/")` root corner, chroot.md §5) is
+`iget(ROOTDEV, ROOTINO)` behind a frame -- no process, no transaction,
+nothing to sleep on; `idup` is the inode cache's `ref++` under its spinlock.
+Their demand is Rocq's four inode-cache rows (`isItable2`, `itableInv`, the
+UNSEALED region `iregReg` -- idup's mover opens only the region, never the
+sealed bytes, which do not exist before fsinit; Rocq's `ic_escrows` rides
+`isItable2`) and `panicEnv` (iget's live "no inodes" panic), plus the two
+configuration ties `icfgDev = ROOTDEV` and `0 < icfgNib`.
 
 INTERRUPTS ARE OFF (`hsie : k.sie = false`): `main` runs the whole of boot
 at `SIE = 0` (it is `scheduler` that first enables them).  The hypothesis is
@@ -33,15 +34,16 @@ this hypothesis only together with an `allocproc` post that hands
 `sieArm cpu' k.sie k.proc` back on the success arm.
 
 THE NEW PROCESS'S SUPPLY ALLOWANCES (`dormantAllow`, wave 7 P3) come out
-of `allocproc`, and are spent as Rocq's are (SpecUserinit.v: "THE ONE
-[iref_slot] namei's [iget] spends is NOT a premise"): the cwd's unit pays
-the root's `iget`, and the rest (`liveAllow`) is parked with the process
-with the process's block at THE BOOT MODE's shape (`ParkCap.parkBootBlock`):
-its null descriptor table at the descriptor ghost allocproc minted (the
-per-descriptor units parked in the null slots), stated at the file table's
-names `γ` (Rocq's `is_ftable γft γf` premise), its cwd reference
-(`inodeHeldAt ipv ROOTINO`, namei's result), and the generation pair at the
-trivial payload beside `firstBoot`'s rows.
+of `allocproc`, and are spent as Rocq's are (the two units igetroot's
+`iget` and the `idup` spend are NOT premises): the two home units
+(`IREFHOME`, chroot.md §6) pay igetroot's `iget` and the `idup`, and the
+rest (`liveAllow`) is parked with the process with the process's block at
+THE BOOT MODE's shape (`ParkCap.parkBootBlock`): its null descriptor table
+at the descriptor ghost allocproc minted (the per-descriptor units parked
+in the null slots), stated at the file table's names `γ` (Rocq's
+`is_ftable γft γf` premise), its cwd and root references (both
+`inodeHeldAt ipv ROOTINO`: igetroot's result and idup's copy of it), and
+the generation pair at the trivial payload beside `firstBoot`'s rows.
 
 THE BOOT-TOKEN DEPOSIT (Rocq's `first_addr ↦₄ 1 ∗ first_boot_persist ∗
 first_fsinit`, three premises): userinit is the COURIER -- it reads none of
@@ -101,6 +103,7 @@ RUNNABLE for the first scheduler that looks.
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
 import Xv6.UexecExecInst
+import Xv6.SpecIgetroot
 
 namespace Xv6
 
@@ -111,9 +114,9 @@ open LeanRV64D
 def userinitAddr : BitVec 64 := KA.«userinit»
 
 /-- The stack `userinit`'s cone needs (Rocq `K_userinit = 4 +
-K_namei_root_boot`): its own 4-slot frame over `namei`'s root corner
-(`allocproc` needs 48, `release` 10). -/
-def userinitSlots : Nat := 4 + nameiRootSlots
+K_igetroot`): its own 4-slot frame (`addi sp,sp,-32`) over igetroot's 64
+(`allocproc` needs 48, `idup` 14, `release` 10). -/
+def userinitSlots : Nat := 4 + igetrootSlots
 
 /-- **THE PARK ROWS** userinit is the courier of (Rocq SpecUserinit's six
 park rows, the exec bundle and the reader token): the wait lock, the ticks
@@ -151,7 +154,7 @@ def wp_userinit_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
   -- `firstBoot` itself
   wordPointsTo firstAddr 4 (DFrac.own 1) 1#32 ∗ firstBootPersist (hlc := hlc) ∗ firstFsinit (hlc := hlc) ∗
   initPidTok 0#32 ∗
-  -- namei("/")'s four inode-cache rows and iget's live panic
+  -- igetroot's / idup's inode-cache rows and iget's live panic
   isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
   itableInv (hlc := hlc) ∗ iregReg (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗ panicEnv ∗
   isFtable γft γ ∗

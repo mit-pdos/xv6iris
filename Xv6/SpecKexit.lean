@@ -7,6 +7,7 @@ Specification of `kexit` (kernel/proc.c), the thread's last call:
       for (fd = 0; fd < NOFILE; fd++)
         if (p->ofile[fd]) { fileclose(p->ofile[fd]); p->ofile[fd] = 0; }
       begin_op(); iput(p->cwd); end_op(); p->cwd = 0;
+      begin_op(); iput(p->root); end_op(); p->root = 0;
       acquire(&wait_lock);
       reparent(p);
       wakeup(p->parent);
@@ -40,7 +41,8 @@ Rocq `proc_dormant`'s supply rows to the slot.  Rocq's pre carries only
 `fd_slots FDSPARE ∗ iref_slots IREFSPARE ∗ bslots 3`, and so does this one:
 the per-descriptor `fd_slot`s come back from the real `fileclose` (every
 closed descriptor's slot owns its unit, `FdTable.ofileSlot`'s null arm), the
-cwd's `iref_slot` from the real `iput` at `ld a0,336(s3)`; the `bslots 3`
+cwd's and the root's `iref_slot`s (`IREFHOME`) from the real `iput`s at `ld
+a0,336(s3)` and `ld a0,344(s3)`; the `bslots 3`
 ride fileclose's FS environment and iput and come back from both.
 
 THE BLOCK, WHOLE BUT FOR THE INCARNATION'S MARKER (wave 7 W7-C; Rocq
