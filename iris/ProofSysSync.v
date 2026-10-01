@@ -364,6 +364,7 @@ Section SsProps.
       (γ : log_names) (bn : bio_names) (γfs : fs_names) (cov : gset Z) (ls : Z)
       (dev : mword 32) (L : gmap Z (list (bv 8))) (M : log_mirror) :
     log_ctx γ bn γfs cov ls dev -∗
+    £ 1 -∗
     log_quiet γ γfs cov ls L M -∗
     riscv_sync_tok gen_id -∗
     hook_opt gen_id oQ -∗
@@ -371,14 +372,14 @@ Section SsProps.
        mWP (LoopE gen_id c)) -∗
     mWP (LoopE gen_id c).
   Proof using .
-    iIntros "#Hctx Hq Htk Hhook Hk". destruct oQ as [Q|]; rewrite /hook_opt /Q_opt.
+    iIntros "#Hctx Hlc Hq Htk Hhook Hk". destruct oQ as [Q|]; rewrite /hook_opt /Q_opt.
     - iApply (log_ghost_commit_loop c [Q] γ bn γfs cov ls dev L M
-                with "Hctx Hq Htk [Hhook]").
+                with "Hctx Hlc Hq Htk [Hhook]").
       { rewrite big_sepL_singleton. iExact "Hhook". }
       iIntros "Hq Htk HQ". rewrite big_sepL_singleton.
       iApply ("Hk" with "Hq Htk HQ").
     - iApply (log_ghost_commit_loop c [] γ bn γfs cov ls dev L M
-                with "Hctx Hq Htk []").
+                with "Hctx Hlc Hq Htk []").
       { by rewrite big_sepL_nil. }
       iIntros "Hq Htk _". iApply ("Hk" with "Hq Htk []"). done.
   Qed.
@@ -1609,8 +1610,10 @@ Section ProofSysSync.
         iDestruct "Hclose" as "[_ Hquiet]".
         iDestruct ("Hquiet" with "[%] [%]") as (Lq Mq) "(Hq & Hstok & Hqclose)";
           [exact Hout0 | reflexivity |].
+        (* acquire's credit pays the ghost commit (the crash invariant's
+           later); the branch below pays the exit with its own *)
         iApply (ss_ghost_commit _ oQ γ bn γfs cov logstart dev Lq Mq
-                  with "Hlog Hq Hstok Hhook").
+                  with "Hlog Hlc Hq Hstok Hhook").
         iIntros "Hq Hstok HQ".
         iDestruct ("Hqclose" with "Hq Hstok Hout Hcmt Hnc Hhelp") as "Hres".
         iApply (wp_bge_x0_taken_s_sconf (mword_of_int (SS + 0x26)) (mword_of_int 56 : mword 13)
@@ -1620,7 +1623,7 @@ Section ProofSysSync.
                   ltac:(rewrite Htgt5e; vm_compute; reflexivity)
                   with "Hcg Hpc []").
         { iApply (ssi_26 with "Htext"). }
-        iApply bi.later_intro. iApply wp_next_off_intro. iIntros "Hcg Hpc".
+        iApply bi.later_intro. iApply wp_next_off_intro_lc. iIntros "Hlc Hcg Hpc".
         iEval (rewrite Htgt5e) in "Hpc".
         rewrite /ss_exit.
         iSpecialize ("Hexit" $! CIDa with "[%] Hlc"); [wp_next_chain|].
