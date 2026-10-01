@@ -182,7 +182,7 @@ def sysOpenCreateK (k' : KCtx) (se : Bool) (pj : BitVec 64) (plen : Nat) (pfun :
           Fok Fex (bview plen pfun) made inum.toNat)
      else
       iprop(⌜R' 10#5 = 0#64⌝ ∗ logTx icfgLog ∗
-        creFailArms (hlc := hlc) (fsGammaL fscFs) fscFs ty.toNat major.toNat minor.toNat Nm Nd P Pmiss
+        creFailArms (hlc := hlc) (fsGammaL fscFs) fscFs V.rti ty.toNat major.toNat minor.toNat Nm Nd P Pmiss
           Farm Fdots Fun Fok Fex (bview plen pfun))) -∗
     wpLoop c)
 
@@ -215,7 +215,7 @@ theorem sys_open_ec_create (CR : CREATE) (Γ : SchedNames) [ClaimIs (hlc := hlc)
     procPrivFd γ pj pid V M ∗
     byteBuf (k'.regs 10#5) (DFrac.own 1) (bview (plen + 1) pfun) ∗
     bslots 3 ∗ irefSlots ns ∗ logOpS icfgLog u Sb ∗ logTx icfgLog ∗
-    epStart fscFs V.cwi P Pmiss (bview plen pfun) ∗
+    epStart fscFs V.rti V.cwi P Pmiss (bview plen pfun) ∗
     pfAt (dlookupCommitAt (fsGammaL fscFs) appE) Fex ∗
     creCommits (hlc := hlc) (fsGammaL fscFs) ty.toNat major.toNat minor.toNat
       Nm Nd (P (nparElems (bview plen pfun)).length) Farm Fdots Fun Fok ∗
@@ -277,7 +277,7 @@ theorem sys_open_ec_fail (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (k : KCt
     sysOpenAny (sysOpenPath (k.regs 2#5)) 128 ∗
     procPrivFd A.γ (procAddr A.j) A.pid (sysOpenV2 A P2) (sysOpenM2 A P2) ∗
     logOp icfgLog u ∗ bslots 3 ∗ irefSlots A.ns ∗ fdSlot ∗ fdFrags A.V.fdg A.sts ∗
-    creFailArms (hlc := hlc) (fsGammaL fscFs) fscFs T_FILE_w.toNat 0 0 (nparNm (sysOpenIm A) A.v.toNat) (fun _ => True) A.P A.Pmiss Farm
+    creFailArms (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti T_FILE_w.toNat 0 0 (nparNm (sysOpenIm A) A.v.toNat) (fun _ => True) A.P A.Pmiss Farm
       (pfamTriv (fun _ _ _ _ => iprop(True))) Fun Fok Fex pl ∗
     pfAt (aopenCommitAt (hlc := hlc) (fsGammaL fscFs) appE) A.Fo ∗
     openTruncPiece (hlc := hlc) (fsGammaL fscFs) A.vom (crePermit (hlc := hlc) (fsGammaL fscFs) pl A.P Farm Fok Fex)
@@ -314,7 +314,7 @@ theorem sys_open_ec_fail (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (k : KCt
   iframe Hblk Hfr
   isplitr
   · ipureintro; exact hr
-  iapply (creFailToOpen (hlc := hlc) (fsGammaL fscFs) fscFs A.V.cwi (sysOpenIm A) A.v.toNat A.vom 0 0
+  iapply (creFailToOpen (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti A.V.cwi (sysOpenIm A) A.v.toNat A.vom 0 0
     A.P A.Pmiss Farm (pfamTriv (fun _ _ _ _ => iprop(True))) Fun Fok Fex A.Fo A.Ft pl hpl)
     $$ Hcf Hoc Htc
 

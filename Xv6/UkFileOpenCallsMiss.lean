@@ -33,7 +33,7 @@ theorem wp_uk_ecall_open_miss_deed_v (N : UkNames GF) (h : CPU) (m : RegMap) (pc
     (hNf : uname Nf) (hs : s[Nf]? = none) (heq : fileAppIs (hlc := hlc) (GF := GF) c r) (hn : UkSysP.usysno m = USYS_open)
     (hal : (pc + 4#64) &&& 1#64 = 0#64) (hpath : ∀ Mv, imgAgrees Img Mv → argPathOf Mv pv pl)
     (ha0 : (m.get 10#5).toNat = pv) (hcr : omCreate (m.get 11#5) = false)
-    (hel : pathElems pl = [Nf]) (hst : umStartOf cw pl = ROOTINO) :
+    (hel : pathElems pl = [Nf]) (hst : ∀ rt, umStartOf rt cw pl = ROOTINO) :
     ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ uimgView N Img -∗ urun (hlc := hlc) N h m pc avail -∗
       ucwd N.cwd cw -∗ ustd N.fd l -∗ appInv (hlc := hlc) fscFs -∗ fdq r q s -∗
       (∀ (h' : CPU) (rv : BitVec 64),
@@ -48,7 +48,7 @@ theorem wp_uk_ecall_open_miss_deed_v (N : UkNames GF) (h : CPU) (m : RegMap) (pc
   rw [spostAt_open_eq]
   iintro Hpost Hcwd Hrun
   ihave Hrc := xpostOpen_elim _ W rv fdv' $$ Hpost
-  icases Hrc with ⟨%Mv, %hag, Hrc⟩
+  icases Hrc with ⟨%Mv, %hag, %rt, Hrc⟩
   have e0 : xkA W 0 = m.get 10#5 := hk0
   have e1 : xkA W 1 = m.get 11#5 := hk1
   rw [e0, e1, ha0, hcw]
@@ -56,7 +56,7 @@ theorem wp_uk_ecall_open_miss_deed_v (N : UkNames GF) (h : CPU) (m : RegMap) (pc
   dsimp only [fileMissFam, xfamOpen]
   have hpv : argPathOf Mv pv pl := hpath Mv (fun a b hb => hag a b (himg a b hb))
   iapply wpLoop_fupd
-  ihave Hans := FO.fileOpenMissRecv fscFs c r .parked q Nf s cw Mv pv (m.get 11#5) pl _ W.fd rv fdv' hpv hel
+  ihave Hans := FO.fileOpenMissRecv fscFs c r .parked q Nf s rt cw Mv pv (m.get 11#5) pl _ W.fd rv fdv' hpv hel
     $$ Hrc
   imod Hans
   imodintro

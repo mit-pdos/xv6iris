@@ -443,7 +443,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [FsTopG GF] [FsBy
 
 /-- ARMS G / A-FAIL: the walk reached the parent and nothing else moved
 (Rocq's `cr_fail_of_cursor`). -/
-theorem create_fail_of_cursor (Γ : FsViewNames GF) (γfs : FsNames) (tyz ma mi : Nat)
+theorem create_fail_of_cursor (Γ : FsViewNames GF) (γfs : FsNames) (rt : Nat) (tyz ma mi : Nat)
     (Nm : Fname → Prop) (Nd : Absnode → Prop) (P Pmiss : Nat → Nat → IProp GF)
     (Farm : Pfam GF (Aview → Nat → IProp GF))
     (Fdots : Pfam GF (Aview → Nat → Nat → Bool → IProp GF))
@@ -452,7 +452,7 @@ theorem create_fail_of_cursor (Γ : FsViewNames GF) (γfs : FsNames) (tyz ma mi 
     P (nparElems pl).length d ⊢
       pfAt (dlookupCommitAt Γ appE) Fex -∗
       creCommits (hlc := hlc) Γ tyz ma mi Nm Nd (P (nparElems pl).length) Farm Fdots Fun Fok -∗
-      creFailArms (hlc := hlc) Γ γfs tyz ma mi Nm Nd P Pmiss Farm Fdots Fun Fok Fex pl := by
+      creFailArms (hlc := hlc) Γ γfs rt tyz ma mi Nm Nd P Pmiss Farm Fdots Fun Fok Fex pl := by
   unfold creFailArms creCommits
   iintro HP Hdl ⟨Ha, Hd, Hu, Hac⟩
   iright
@@ -465,27 +465,27 @@ theorem create_fail_of_cursor (Γ : FsViewNames GF) (γfs : FsNames) (tyz ma mi 
 /-- ARM N: the walk died (Rocq's `cr_fail_of_dead`); `npDead_to_mknod`
 splits a death strictly inside the parent prefix from one at the parent's
 own level, which hands the cursor back instead. -/
-theorem create_fail_of_dead (Γ : FsViewNames GF) (γfs : FsNames) (tyz ma mi : Nat)
+theorem create_fail_of_dead (Γ : FsViewNames GF) (γfs : FsNames) (rt : Nat) (tyz ma mi : Nat)
     (Nm : Fname → Prop) (Nd : Absnode → Prop) (P Pmiss : Nat → Nat → IProp GF)
     (Farm : Pfam GF (Aview → Nat → IProp GF))
     (Fdots : Pfam GF (Aview → Nat → Nat → Bool → IProp GF))
     (Fun : Pfam GF (Aview → Nat → IProp GF))
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) (pl : List (BitVec 8)) :
-    npDead (hlc := hlc) γfs P Pmiss pl ⊢
+    npDead (hlc := hlc) rt γfs P Pmiss pl ⊢
       pfAt (dlookupCommitAt Γ appE) Fex -∗
       creCommits (hlc := hlc) Γ tyz ma mi Nm Nd (P (nparElems pl).length) Farm Fdots Fun Fok -∗
-      creFailArms (hlc := hlc) Γ γfs tyz ma mi Nm Nd P Pmiss Farm Fdots Fun Fok Fex pl := by
+      creFailArms (hlc := hlc) Γ γfs rt tyz ma mi Nm Nd P Pmiss Farm Fdots Fun Fok Fex pl := by
   iintro Hdead Hdl Hcre
-  icases npDead_to_mknod (hlc := hlc) γfs P Pmiss pl $$ Hdead with (Hd | ⟨%dpar, HPd⟩)
+  icases npDead_to_mknod (hlc := hlc) rt γfs P Pmiss pl $$ Hdead with (Hd | ⟨%dpar, HPd⟩)
   · unfold creFailArms
     ileft
     iframe Hd Hdl Hcre
-  · iapply (create_fail_of_cursor Γ γfs tyz ma mi Nm Nd P Pmiss Farm Fdots Fun Fok Fex pl dpar)
+  · iapply (create_fail_of_cursor Γ γfs rt tyz ma mi Nm Nd P Pmiss Farm Fdots Fun Fok Fex pl dpar)
       $$ HPd Hdl Hcre
 
 /-- ARM F-BAD: the name WAS there, so the observation fired and nothing
 else did (Rocq's `cr_fail_of_seen`). -/
-theorem create_fail_of_seen (Γ : FsViewNames GF) (γfs : FsNames) (tyz ma mi : Nat)
+theorem create_fail_of_seen (Γ : FsViewNames GF) (γfs : FsNames) (rt : Nat) (tyz ma mi : Nat)
     (Nm : Fname → Prop) (Nd : Absnode → Prop) (P Pmiss : Nat → Nat → IProp GF)
     (Farm : Pfam GF (Aview → Nat → IProp GF))
     (Fdots : Pfam GF (Aview → Nat → Nat → Bool → IProp GF))
@@ -495,7 +495,7 @@ theorem create_fail_of_seen (Γ : FsViewNames GF) (γfs : FsNames) (tyz ma mi : 
     P (nparElems pl).length d ⊢
       creExFired Fex d nm i -∗
       creCommits (hlc := hlc) Γ tyz ma mi Nm Nd (P (nparElems pl).length) Farm Fdots Fun Fok -∗
-      creFailArms (hlc := hlc) Γ γfs tyz ma mi Nm Nd P Pmiss Farm Fdots Fun Fok Fex pl := by
+      creFailArms (hlc := hlc) Γ γfs rt tyz ma mi Nm Nd P Pmiss Farm Fdots Fun Fok Fex pl := by
   unfold creFailArms creCommits
   iintro HP Hex ⟨Ha, Hd, Hu, Hac⟩
   iright
@@ -511,7 +511,7 @@ theorem create_fail_of_seen (Γ : FsViewNames GF) (γfs : FsNames) (tyz ma mi : 
 /-- ARM FAIL and mkdir's three `fail:` entries: the row appeared and
 disappeared, the parent leg never fired (Rocq's `cr_fail_of_pair`, ruling
 Q-h). -/
-theorem create_fail_of_pair (Γ : FsViewNames GF) (γfs : FsNames) (tyz ma mi : Nat)
+theorem create_fail_of_pair (Γ : FsViewNames GF) (γfs : FsNames) (rt : Nat) (tyz ma mi : Nat)
     (Nm : Fname → Prop) (Nd : Absnode → Prop) (P Pmiss : Nat → Nat → IProp GF)
     (Farm : Pfam GF (Aview → Nat → IProp GF))
     (Fdots : Pfam GF (Aview → Nat → Nat → Bool → IProp GF))
@@ -523,7 +523,7 @@ theorem create_fail_of_pair (Γ : FsViewNames GF) (γfs : FsNames) (tyz ma mi : 
       pfAt (acreCommitAtGenNm (hlc := hlc) Γ appE (creChild tyz ma mi) Nm (P (nparElems pl).length) Farm) Fok -∗
       ((∃ full : Bool, creDotsFired Fdots i d full) ∨ creDotsLeg (hlc := hlc) Γ tyz Fdots) -∗
       creUnarmFired Fun i -∗
-      creFailArms (hlc := hlc) Γ γfs tyz ma mi Nm Nd P Pmiss Farm Fdots Fun Fok Fex pl := by
+      creFailArms (hlc := hlc) Γ γfs rt tyz ma mi Nm Nd P Pmiss Farm Fdots Fun Fok Fex pl := by
   unfold creFailArms
   iintro HP Hdl Hac Hd Hu
   iright

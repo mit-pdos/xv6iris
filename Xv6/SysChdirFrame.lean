@@ -426,7 +426,7 @@ allowances whole and the armed post on the block the call leaves. -/
 def sysChdirOut (A : SysChdirArgs GF) (r : BitVec 64) : IProp GF := iprop%
   bslots 3 ∗ irefSlots 2 ∗
   (∃ P' : UPtd, ⌜A.V.upt.extSz A.V.sz P'⌝ ∗
-    chdirArms (hlc := hlc) (fsGammaL fscFs) fscFs A.γ (procAddr A.j) A.pid A.V.cwi A.P A.Pmiss A.Fo
+    chdirArms (hlc := hlc) (fsGammaL fscFs) fscFs A.γ (procAddr A.j) A.pid A.V.rti A.V.cwi A.P A.Pmiss A.Fo
       { A.V with upt := P' } (viewFaulted A.V.upt P' A.M) r)
 
 set_option maxHeartbeats 8000000 in

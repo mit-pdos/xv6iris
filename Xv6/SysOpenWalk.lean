@@ -99,11 +99,11 @@ theorem sys_open_walk_ce (c : CPU) (se : Bool) (p q : BitVec 64) (h : p = q) :
   rw [h]
 
 /-- the era walk's death receipt IS `nameiWalkDeadEra`. -/
-theorem sys_open_walk_dead_rcpt (P Pmiss : Nat → Nat → IProp GF) (pl : List (BitVec 8)) :
+theorem sys_open_walk_dead_rcpt (rt : Nat) (P Pmiss : Nat → Nat → IProp GF) (pl : List (BitVec 8)) :
     (∃ (kd d : Nat), ⌜kd < (pathElems pl).length⌝ ∗
-      ((P kd d ∗ exHopsFrom fscFs P Pmiss pl kd) ∨
-       (Pmiss kd d ∗ exHopsFrom fscFs P Pmiss pl (kd + 1)))) ⊢
-    nameiWalkDeadEra (hlc := hlc) fscFs P Pmiss pl := by
+      ((P kd d ∗ exHopsFrom rt fscFs P Pmiss pl kd) ∨
+       (Pmiss kd d ∗ exHopsFrom rt fscFs P Pmiss pl (kd + 1)))) ⊢
+    nameiWalkDeadEra (hlc := hlc) fscFs rt P Pmiss pl := by
   unfold nameiWalkDeadEra
   simp only [exHops_is_axHops]
   exact .rfl
@@ -248,7 +248,7 @@ theorem sys_open_walk_dead (Γ : SchedNames) (k : KCtx) (A : SysOpenArgs GF)
     procPrivFd A.γ (procAddr A.j) A.pid (sysOpenV2 A P2) (sysOpenM2 A P2) ∗
     logOpS icfgLog n' Sb' ∗ logTx icfgLog ∗ bslots 3 ∗ irefSlots 2 ∗ irefSlots (A.ns - 2) ∗
     fdSlot ∗ fdFrags A.V.fdg A.sts ∗
-    nameiWalkDeadEra (hlc := hlc) fscFs A.P A.Pmiss pl ∗
+    nameiWalkDeadEra (hlc := hlc) fscFs A.V.rti A.P A.Pmiss pl ∗
     pfAt (aopenCommitAt (hlc := hlc) (fsGammaL fscFs) appE) A.Fo ∗
     openTruncPiece (hlc := hlc) (fsGammaL fscFs) A.vom (truncTermAt pl A.P) A.Ft ∗
     (∀ c' : CPU, sysOpenPostP (hlc := hlc) k A c')
@@ -283,7 +283,7 @@ theorem sys_open_walk_dead (Γ : SchedNames) (k : KCtx) (A : SysOpenArgs GF)
   ispecialize Hpost $$ %c'
   unfold sysOpenPostP sysOpenK
   iapply Hpost $$ %spie' %spp' %R' %P2 %A.V.ev %hcs %hP2 %(Nat.le_refl _) Hk Hpc Hte Hce Hbs Hisl
-  iapply (sys_open_arm_dead (hlc := hlc) A.omo (fsGammaL fscFs) fscFs A.V.cwi A.γ (procAddr A.j) A.pid
+  iapply (sys_open_arm_dead (hlc := hlc) A.omo (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.γ (procAddr A.j) A.pid
       (sysOpenIm A) A.v.toNat A.vom A.P A.Pmiss A.Fo A.Ft A.sts (sysOpenV2 A P2) (sysOpenM2 A P2) (R' 10#5)
       pl hpl hr)
     $$ Hpriv Hfrags Hfds Hdead Hoc Htc
@@ -487,7 +487,7 @@ theorem sys_open_entry_n (NI : NAMEI_ERA) (IL : ILOCK) (Γ : SchedNames)
   · -- ===== the walk DIED: ARM B-FAIL =====
     ihave Harm := Xv6.kxcA_ite_f _ _ $$ Harm
     icases Harm with ⟨%h10, Hir2, Hdead⟩
-    ihave Hdead := sys_open_walk_dead_rcpt A.P A.Pmiss _ $$ Hdead
+    ihave Hdead := sys_open_walk_dead_rcpt _ A.P A.Pmiss _ $$ Hdead
     iapply (sys_open_walk_dead Γ k A hS hTB cpu spie1 spp1 R1 s1v w4 w5 w6 lo w24 P2 n' Sb'
         (bview plen bp) hp1 h10 hal hP2 (by omega) hpl)
       $$ [$Hk $Hpc $Hte $Hce $Henv $Hcells $Hbuf $Hpriv $HopS $Htx $Hbs $Hir2 $Hirr $Hfds $Hfrags

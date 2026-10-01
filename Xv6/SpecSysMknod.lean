@@ -39,7 +39,7 @@ leaves a0, so no callee-saved register beyond ra and s0 is touched.
   a0); the blanket `sysMknodRet` is a CONSEQUENCE (`mknodArms_ret`).
 * WHAT THE CALLER HANDS IN (`mknodAuPre`, at the commit mask `appE`):
   `epStart` AT THE PATH -- nameiparent's PARENT PREFIX (`nparElems`), the
-  last element being the created NAME -- whose start is `umStartOf cw pl`
+  last element being the created NAME -- whose start is `umStartOf rt cw pl`
   (ROOTINO on an absolute fetch, the process's cwd inum on a relative one);
   `acreCommitAt` (the success commit, fired around the parent-row retag at
   dirlink's entry write); `dlookupCommitAt` (the exists observation); and
@@ -190,12 +190,12 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [FsTopG GF] [FsBy
 
 /-- EVERYTHING THE CALLER HANDS IN, AT ONE PATH, at the commit mask `appE`
 (Rocq's `mknod_au_pre`). -/
-def mknodAuPre (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat) (pl : List (BitVec 8))
+def mknodAuPre (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat) (pl : List (BitVec 8))
     (Nm : Fname → Prop) (ma mi : Nat)
     (P Pmiss : Nat → Nat → IProp GF)
     (Farm Fun : Pfam GF (Aview → Nat → IProp GF))
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) : IProp GF :=
-  iprop(epStart (hlc := hlc) γfs cw P Pmiss pl ∗
+  iprop(epStart (hlc := hlc) γfs rt cw P Pmiss pl ∗
     -- THE PARENT CURSOR rides the commit (TL-3K): at THIS path the walk's
     -- terminal cursor is `P (nparElems pl).length`; THE NAME PREDICATE, at
     -- THIS path's last element (INIT-FILE)
@@ -208,12 +208,12 @@ def mknodAuPre (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat) (pl : List (Bit
 of trapframe argument 0 in the image `M` (Rocq's `mknod_au_at`; the
 contract reads it at the entry image, deviation 5).  THE COMMITS STAY
 OUTSIDE THE WAND. -/
-def mknodAuAt (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat)
+def mknodAuAt (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat)
     (M : Nat → List (BitVec 8)) (pv : Nat) (ma mi : Nat)
     (P Pmiss : Nat → Nat → IProp GF)
     (Farm Fun : Pfam GF (Aview → Nat → IProp GF))
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) : IProp GF :=
-  iprop((∀ pl : List (BitVec 8), ⌜argPathOf M pv pl⌝ -∗ epStart (hlc := hlc) γfs cw P Pmiss pl) ∗
+  iprop((∀ pl : List (BitVec 8), ⌜argPathOf M pv pl⌝ -∗ epStart (hlc := hlc) γfs rt cw P Pmiss pl) ∗
     -- the cursor UNDER THE SAME GUARD the walk carries -- a bare resource,
     -- so the failure fold still hands the commit back on the nose
     -- (`SysMknodDefs.nparCur`, TL-3K); ...AND THE NAME, under the SAME guard
@@ -250,14 +250,14 @@ theorem mknodAcre_inst (Γ : FsViewNames GF) (M : Nat → List (BitVec 8)) (pv :
 
 /-- THE INSTANCE, the step the proof takes once argstr has answered: at the
 path it read, the walk wand fires (Rocq's `mknod_au_at_inst`). -/
-theorem mknodAuAt_inst (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat)
+theorem mknodAuAt_inst (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat)
     (M : Nat → List (BitVec 8)) (pv : Nat) (pl : List (BitVec 8)) (ma mi : Nat)
     (P Pmiss : Nat → Nat → IProp GF)
     (Farm Fun : Pfam GF (Aview → Nat → IProp GF))
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
     (hpl : argPathOf M pv pl) :
-    mknodAuAt Γ γfs cw M pv ma mi P Pmiss Farm Fun Fok Fex ⊢
-      mknodAuPre Γ γfs cw pl (nparNm M pv) ma mi P Pmiss Farm Fun Fok Fex := by
+    mknodAuAt Γ γfs rt cw M pv ma mi P Pmiss Farm Fun Fok Fex ⊢
+      mknodAuPre Γ γfs rt cw pl (nparNm M pv) ma mi P Pmiss Farm Fun Fok Fex := by
   unfold mknodAuAt mknodAuPre
   iintro ⟨Hw, Hok, Hex, Hch⟩
   ihave Hok := mknodAcre_inst Γ M pv pl ma mi P Farm Fok hpl $$ Hok
@@ -267,16 +267,16 @@ theorem mknodAuAt_inst (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat)
 /-- THE GENERIC SUPPLIER'S ONE LINE: a family that tracks nothing owes the
 walk at EVERY string (`nparWalkPreEra`), and that form instantiates to the
 one-path bundle (Rocq's `mknod_au_at_of_all`). -/
-theorem mknodAuAt_of_all (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat)
+theorem mknodAuAt_of_all (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat)
     (M : Nat → List (BitVec 8)) (pv : Nat) (ma mi : Nat)
     (P Pmiss : Nat → Nat → IProp GF)
     (Farm Fun : Pfam GF (Aview → Nat → IProp GF))
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) :
-    nparWalkPreEra (hlc := hlc) γfs cw P Pmiss ⊢
+    nparWalkPreEra (hlc := hlc) γfs rt cw P Pmiss ⊢
       pfAt (acreCommitAt (hlc := hlc) Γ appE (.ADev ma mi) (nparCur M pv P) Farm) Fok -∗
       pfAt (dlookupCommitAt (hlc := hlc) Γ appE) Fex -∗
       creChildUnfired (hlc := hlc) Γ (.ADev ma mi) Farm Fun -∗
-      mknodAuAt Γ γfs cw M pv ma mi P Pmiss Farm Fun Fok Fex := by
+      mknodAuAt Γ γfs rt cw M pv ma mi P Pmiss Farm Fun Fok Fex := by
   unfold mknodAuAt
   iintro Hw Hok Hex Hch
   -- the unarm at the node the arm places, and the commit at the guarded
@@ -290,18 +290,18 @@ theorem mknodAuAt_of_all (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat)
       Farm Fok.pfRecv) $$ H
   iframe Hok Hex Hch
   iintro %pl %_
-  iapply (npStart_of_mknod (hlc := hlc) γfs cw P Pmiss pl) $$ Hw
+  iapply (npStart_of_mknod (hlc := hlc) γfs rt cw P Pmiss pl) $$ Hw
 
 /-- Rocq's `mknod_au_pre_of_all`. -/
-theorem mknodAuPre_of_all (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat) (pl : List (BitVec 8))
+theorem mknodAuPre_of_all (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat) (pl : List (BitVec 8))
     (Nm : Fname → Prop) (ma mi : Nat) (P Pmiss : Nat → Nat → IProp GF)
     (Farm Fun : Pfam GF (Aview → Nat → IProp GF))
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) :
-    nparWalkPreEra (hlc := hlc) γfs cw P Pmiss ⊢
+    nparWalkPreEra (hlc := hlc) γfs rt cw P Pmiss ⊢
       pfAt (acreCommitAt (hlc := hlc) Γ appE (.ADev ma mi) (P (nparElems pl).length) Farm) Fok -∗
       pfAt (dlookupCommitAt (hlc := hlc) Γ appE) Fex -∗
       creChildUnfired (hlc := hlc) Γ (.ADev ma mi) Farm Fun -∗
-      mknodAuPre Γ γfs cw pl Nm ma mi P Pmiss Farm Fun Fok Fex := by
+      mknodAuPre Γ γfs rt cw pl Nm ma mi P Pmiss Farm Fun Fok Fex := by
   unfold mknodAuPre
   iintro Hw Hok Hex Hch
   ihave Hch := creChildUnfiredNd_of (hlc := hlc) Γ (.ADev ma mi) Farm Fun $$ Hch
@@ -313,7 +313,7 @@ theorem mknodAuPre_of_all (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat) (pl 
     iapply (acreCommitAtNm_of (hlc := hlc) Γ appE (.ADev ma mi) Nm (P (nparElems pl).length)
       Farm Fok.pfRecv) $$ H
   iframe Hok Hex Hch
-  iapply (npStart_of_mknod (hlc := hlc) γfs cw P Pmiss pl) $$ Hw
+  iapply (npStart_of_mknod (hlc := hlc) γfs rt cw P Pmiss pl) $$ Hw
 
 /-- ret 0's real arm (Rocq's `mknod_post_ok`): create's ARM C-OK read at
 `T_DEVICE` at the fetched path -- `pl` IS the caller's own argument 0, read
@@ -336,15 +336,15 @@ def mknodPostOk [Icfg] (Γ : FsViewNames GF) (M : Nat → List (BitVec 8)) (pv :
 /-- ret -1's two-way fold (Rocq's `mknod_post_fail`): nothing fs-visible
 happened (argstr failed) and the whole bundle comes back, or create's own
 failure fold read at `T_DEVICE` (`creFailArms_dev`) at the fetched path. -/
-def mknodPostFail (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat)
+def mknodPostFail (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat)
     (M : Nat → List (BitVec 8)) (pv : Nat) (ma mi : Nat)
     (P Pmiss : Nat → Nat → IProp GF)
     (Farm Fun : Pfam GF (Aview → Nat → IProp GF))
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) : IProp GF :=
-  iprop(mknodAuAt Γ γfs cw M pv ma mi P Pmiss Farm Fun Fok Fex ∨
+  iprop(mknodAuAt Γ γfs rt cw M pv ma mi P Pmiss Farm Fun Fok Fex ∨
     (∃ pl : List (BitVec 8),
       ⌜argPathOf M pv pl⌝ ∗
-      ((nparWalkDeadEra (hlc := hlc) γfs P Pmiss pl ∗
+      ((nparWalkDeadEra (hlc := hlc) γfs rt P Pmiss pl ∗
           pfAt (acreCommitAtNm (hlc := hlc) Γ appE (.ADev ma mi) (nparNm M pv) (P (nparElems pl).length)
             Farm) Fok ∗
           pfAt (dlookupCommitAt (hlc := hlc) Γ appE) Fex ∗
@@ -365,21 +365,21 @@ def mknodPostFail (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat)
 
 /-- THE ARMED DISJUNCTION the continuation receives, keyed on a0 (Rocq's
 `mknod_arms`).  NO ESCAPE on the `ret = 0` arm. -/
-def mknodArms [Icfg] (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat)
+def mknodArms [Icfg] (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat)
     (M : Nat → List (BitVec 8)) (pv : Nat) (ma mi : Nat)
     (P Pmiss : Nat → Nat → IProp GF)
     (Farm Fun : Pfam GF (Aview → Nat → IProp GF))
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) (r : BitVec 64) : IProp GF :=
   iprop((⌜r = 0#64⌝ ∗ mknodPostOk Γ M pv ma mi P Farm Fun Fok Fex) ∨
     (⌜r = 0xFFFFFFFFFFFFFFFF#64⌝ ∗
-      mknodPostFail Γ γfs cw M pv ma mi P Pmiss Farm Fun Fok Fex))
+      mknodPostFail Γ γfs rt cw M pv ma mi P Pmiss Farm Fun Fok Fex))
 
 /-- THE RETURN BLANKET, READ OFF THE ARMS (Rocq's `mknod_arms_ret`). -/
-theorem mknodArms_ret [Icfg] (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat)
+theorem mknodArms_ret [Icfg] (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat)
     (M : Nat → List (BitVec 8)) (pv : Nat) (ma mi : Nat) (P Pmiss : Nat → Nat → IProp GF)
     (Farm Fun : Pfam GF (Aview → Nat → IProp GF))
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) (r : BitVec 64) :
-    mknodArms Γ γfs cw M pv ma mi P Pmiss Farm Fun Fok Fex r ⊢ ⌜sysMknodRet r⌝ := by
+    mknodArms Γ γfs rt cw M pv ma mi P Pmiss Farm Fun Fok Fex r ⊢ ⌜sysMknodRet r⌝ := by
   unfold mknodArms sysMknodRet
   iintro (⟨%hr, -⟩ | ⟨%hr, -⟩)
   · ipureintro; exact Or.inl hr
@@ -418,7 +418,7 @@ def sysMknodK (k : KCtx) (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V 
     irefSlots ns -∗
     procPrivFd γ pa pid { V.updEv k' with upt := P' } (viewFaulted V.upt P' M) -∗
     -- the armed post (implies `sysMknodRet`, through `mknodArms_ret`)
-    mknodArms (hlc := hlc) (fsGammaL fscFs) fscFs V.cwi (viewLazy V.upt V.sz M) pv
+    mknodArms (hlc := hlc) (fsGammaL fscFs) fscFs V.rti V.cwi (viewLazy V.upt V.sz M) pv
       ma mi P Pmiss Farm Fun Fok Fex (R' 10#5) -∗
     wpLoop cpu')
 
@@ -452,7 +452,7 @@ def wp_sys_mknod_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
   irefSlots ns ∗
   procPrivFd γ (procAddr j) pid V M ∗
   -- THE CALLER'S BUNDLE (the one addition to the premise list)
-  mknodAuAt (hlc := hlc) (fsGammaL fscFs) fscFs V.cwi (viewLazy V.upt V.sz M) v0.toNat
+  mknodAuAt (hlc := hlc) (fsGammaL fscFs) fscFs V.rti V.cwi (viewLazy V.upt V.sz M) v0.toNat
     (devArg v1) (devArg v2) P Pmiss Farm Fun Fok Fex ∗
   -- THE CROSSING IS THE LITERAL `true`: sys_mknod parks
   wpNext true k.proc cpu (sysMknodK k γ (procAddr j) pid V M ns v0.toNat (devArg v1) (devArg v2)

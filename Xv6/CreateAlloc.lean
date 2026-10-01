@@ -1614,7 +1614,7 @@ theorem create_alloc_half (IL : ILOCK) (IUP : IUNLOCKPUT) (IA : IALLOC) (IU : IU
     · ipureintro
       rw [ha0f]; simp [RegMap.set_apply, f19, s19]
     iframe Hlt
-    iapply (create_fail_of_cursor (hlc := hlc) (fsGammaL fscFs) fscFs ty.toNat major.toNat
+    iapply (create_fail_of_cursor (hlc := hlc) (fsGammaL fscFs) fscFs V.rti ty.toNat major.toNat
       minor.toNat Nm Nd P Pmiss Farm Fdots Fun Fok Fex (bview plen pfun) dind.toNat) $$ HP Hdlk Hcre
   | true =>
     -- ===== THE INODE WAS CLAIMED, LOCKED AND FILLED -- control at +0xb4 =====

@@ -201,9 +201,9 @@ omit [IcacheG GF] [Xv6G GF] in
 there -- same quantifier over the start, same start rule, same family over
 `pathElems pl` -- so this is a rename.  The namei-side twin of
 `FsAbsMknodFire.npStart_of_mknod`. -/
-theorem opfStart_of_open (γfs : FsNames) (cw : Nat) (P Pmiss : Nat → Nat → IProp GF)
+theorem opfStart_of_open (γfs : FsNames) (rt cw : Nat) (P Pmiss : Nat → Nat → IProp GF)
     (pl : List (BitVec 8)) :
-    nameiWalkPreEra (hlc := hlc) γfs cw P Pmiss ⊢ exStart (hlc := hlc) γfs cw P Pmiss pl := by
+    nameiWalkPreEra (hlc := hlc) γfs rt cw P Pmiss ⊢ exStart (hlc := hlc) γfs rt cw P Pmiss pl := by
   unfold nameiWalkPreEra exStart
   rw [exHops_is_axHops]
   iintro Hpre %r %hr

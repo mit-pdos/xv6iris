@@ -191,7 +191,7 @@ theorem ush_open_call_g_of_call2 {A : Type} (N : UkNames GF) (file : UArg) (nm :
   unfold ushOpenCall2 ushOpenCallG
   iintro Hc %h %m %av %ha0 %ha1 #Hstr Hd #Hcode Hcwd Hstd Hrun Hcont
   icases ushr_fname_img N.d file nm hu hlen hb $$ Hstr with ⟨%Img, %hpath, #Himg⟩
-  iapply Hc $$ %h %m %av %Img %nm %a %ha0 %ha1 %hpath %(uname_npElems nm hu) %(uname_start nm hu ROOTINO)
+  iapply Hc $$ %h %m %av %Img %nm %a %ha0 %ha1 %hpath %(uname_npElems nm hu) %(fun rt => uname_start nm hu rt ROOTINO)
     %(uname_last nm hu) %hfdl Himg Hd Hcode Hcwd Hstd Hrun
   iintro %h' %m' %r %hcs %hr Hcwd Hans Hrun
   iapply Hcont $$ %h' %m' %r %hcs %hr Hcwd [Hans] Hrun

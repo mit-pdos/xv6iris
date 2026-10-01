@@ -72,10 +72,10 @@ fractions (deviation 2: the path at every page view agreeing with `Img`). -/
 theorem fileOpenSup_v (N : UkNames GF) (omo : OffMode) (c : FileFixed) (r : FileAppNames) (q1 q2 : Qp) (i : Nat)
     (bs : List (BitVec 8)) (Nf : Fname) (s : Dst) (Img : ElfMem) (pv : Nat) (m : RegMap) (pc : BitVec 64)
     (pl : List (BitVec 8)) (cw : Nat)
-    (hs : s[Nf]? = some (i, bs)) (heq : fileAppIs (hlc := hlc) (GF := GF) c r)
+    (hNf : uname Nf) (hs : s[Nf]? = some (i, bs)) (heq : fileAppIs (hlc := hlc) (GF := GF) c r)
     (hpath : ∀ Mv, imgAgrees Img Mv → argPathOf Mv pv pl) (ha0 : (m.get 10#5).toNat = pv)
     (hcr : omCreate (m.get 11#5) = false) (htr : omTrunc (m.get 11#5) = false) (hel : pathElems pl = [Nf])
-    (hst : umStartOf cw pl = ROOTINO) :
+    (hst : ∀ rt, umStartOf rt cw pl = ROOTINO) :
     ⊢ appInv (hlc := hlc) fscFs -∗ uimgView N Img -∗ fdq r q1 s -∗ fdq r q2 s -∗
       udepwfAt (hlc := hlc) N m pc USYS_open (fileOpenFam omo c r q1 q2 i bs Nf s N.pay) cw := by
   unfold udepwfAt
@@ -90,12 +90,12 @@ theorem fileOpenSup_v (N : UkNames GF) (omo : OffMode) (c : FileFixed) (r : File
   isplitl [Hufd]
   · iexact Hufd
   iapply sbundleAt_open_intro
-  iintro %Mv %hag
+  iintro %Mv %hag %rt
   rw [xkA_run0, xkA_run1, ha0]
   simp only [openIn, hcr, Bool.false_eq_true, ↓reduceIte]
   dsimp only [fileOpenFam, xfamOpen, uvisOfRun]
-  iapply FO.fileOpenPlainAu fscFs c r q1 q2 i bs Nf s cw Mv pv (m.get 11#5) pl _ hs heq
-    (hpath Mv (fun a b h => hag a b (hsro a b h))) hel hst htr $$ Hinv Hd1 Hd2
+  iapply FO.fileOpenPlainAu fscFs c r q1 q2 i bs Nf s rt cw Mv pv (m.get 11#5) pl _ hNf hs heq
+    (hpath Mv (fun a b h => hag a b (hsro a b h))) hel (hst rt) htr $$ Hinv Hd1 Hd2
 
 include FO in
 /-- **Rocq `file_miss_sup_v`**: the absent deed's deposit, from one
@@ -104,7 +104,7 @@ theorem fileMissSup_v (N : UkNames GF) (c : FileFixed) (r : FileAppNames) (q : Q
     (Img : ElfMem) (pv : Nat) (m : RegMap) (pc : BitVec 64) (pl : List (BitVec 8)) (cw : Nat)
     (hNf : uname Nf) (hs : s[Nf]? = none) (heq : fileAppIs (hlc := hlc) (GF := GF) c r)
     (hpath : ∀ Mv, imgAgrees Img Mv → argPathOf Mv pv pl) (ha0 : (m.get 10#5).toNat = pv)
-    (hcr : omCreate (m.get 11#5) = false) (hel : pathElems pl = [Nf]) (hst : umStartOf cw pl = ROOTINO) :
+    (hcr : omCreate (m.get 11#5) = false) (hel : pathElems pl = [Nf]) (hst : ∀ rt, umStartOf rt cw pl = ROOTINO) :
     ⊢ appInv (hlc := hlc) fscFs -∗ uimgView N Img -∗ fdq r q s -∗
       udepwfAt (hlc := hlc) N m pc USYS_open (fileMissFam c r q s N.pay) cw := by
   unfold udepwfAt
@@ -119,11 +119,11 @@ theorem fileMissSup_v (N : UkNames GF) (c : FileFixed) (r : FileAppNames) (q : Q
   isplitl [Hufd]
   · iexact Hufd
   iapply sbundleAt_open_intro
-  iintro %Mv %hag
+  iintro %Mv %hag %rt
   rw [xkA_run0, xkA_run1, ha0]
   dsimp only [fileMissFam, xfamOpen, uvisOfRun]
-  iapply FO.fileOpenMissAu fscFs c r q Nf s cw Mv pv (m.get 11#5) pl _ _ _ _ heq hNf hs
-    (hpath Mv (fun a b h => hag a b (hsro a b h))) hel hst hcr $$ Hinv Hd
+  iapply FO.fileOpenMissAu fscFs c r q Nf s rt cw Mv pv (m.get 11#5) pl _ _ _ _ heq hNf hs
+    (hpath Mv (fun a b h => hag a b (hsro a b h))) hel (hst rt) hcr $$ Hinv Hd
 
 /-- **Rocq `file_create_sup_v`**: the 0x601 bundle, from one escrow. -/
 theorem fileCreateSup_v (N : UkNames GF) (omo : OffMode) (c : FileFixed) (r : FileAppNames) (jo : Option Nat)
@@ -131,7 +131,7 @@ theorem fileCreateSup_v (N : UkNames GF) (omo : OffMode) (c : FileFixed) (r : Fi
     (pv : Nat) (m : RegMap) (pc : BitVec 64) (pl : List (BitVec 8))
     (hNf : uname Nf) (heq : fileAppIs (hlc := hlc) (GF := GF) c r) (hpath : ∀ Mv, imgAgrees Img Mv → argPathOf Mv pv pl)
     (ha0 : (m.get 10#5).toNat = pv) (hcr : omCreate (m.get 11#5) = true) (hnp : npElems pl = [])
-    (hst : umStartOf cw pl = ROOTINO) (hlast : (pathElems pl).getLast? = some Nf)
+    (hst : ∀ rt, umStartOf rt cw pl = ROOTINO) (hlast : (pathElems pl).getLast? = some Nf)
     (hlst : ls.getLast? = some (Uline.LEchoF ws Nf)) (hnpl : np = ls.length) (hok : lineOk ws) :
     ⊢ appInv (hlc := hlc) fscFs -∗ uimgView N Img -∗ fileConsCred (hlc := hlc) c r jo -∗ flLb c ls -∗
       escKey (hlc := hlc) c r n s g -∗ fescRes (hlc := hlc) r s g np -∗
@@ -148,12 +148,12 @@ theorem fileCreateSup_v (N : UkNames GF) (omo : OffMode) (c : FileFixed) (r : Fi
   isplitl [Hufd]
   · iexact Hufd
   iapply sbundleAt_open_intro
-  iintro %Mv %hag
+  iintro %Mv %hag %rt
   rw [xkA_run0, xkA_run1, ha0]
   simp only [openIn, hcr, ↓reduceIte]
   dsimp only [fileCreateFam, xfamFcreate, xfamPt, uvisOfRun]
-  iapply fileOpenCreate_au fscFs c r jo n Nf s g np ls ws cw Mv pv (m.get 11#5) pl heq hNf
-    (hpath Mv (fun a b h => hag a b (hsro a b h))) hnp hst hlast hlst hnpl hok $$ Hinv Hm Hlb Hwit Hres
+  iapply fileOpenCreate_au fscFs c r jo n Nf s g np ls ws rt cw Mv pv (m.get 11#5) pl heq hNf
+    (hpath Mv (fun a b h => hag a b (hsro a b h))) hnp (hst rt) hlast hlst hnpl hok $$ Hinv Hm Hlb Hwit Hres
 
 end UkFileOpen
 

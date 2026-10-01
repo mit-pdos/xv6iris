@@ -39,7 +39,7 @@ the landed shapes: `inodeHeldTyAt_ty` (→ `inodeHeldTy`), `inodeHeldTyAt_held`
 
 As `SpecNamexEra` (its header): Rocq's `proc_priv_bare ∗ inode_held_at
 (pv_cwd) (pv_cwi)` is the core `procPrivCoreNoctxAt curCtx k.proc pid V M`,
-in and out unchanged; `ep_start fsc_fs (pv_cwi ..)` is `epStart fscFs V.cwi`.
+in and out unchanged; `ep_start fsc_fs (pv_cwi ..)` is `epStart fscFs V.rti V.cwi`.
 
 ## DEVIATIONS from Rocq
 
@@ -164,7 +164,7 @@ def nparEraPost (k : KCtx) (plen : Nat) (pfun : Nat → BitVec 8) (n : Nat) (Sb 
         P (npElems (bview plen pfun)).length iL ∗ irefSlots 1)
      else
       -- the death index, the receipt, and the UNFIRED suffix (`npDead`)
-      iprop(⌜R' 10#5 = 0#64⌝ ∗ irefSlots 2 ∗ npDead fscFs P Pmiss (bview plen pfun))) -∗
+      iprop(⌜R' 10#5 = 0#64⌝ ∗ irefSlots 2 ∗ npDead V.rti fscFs P Pmiss (bview plen pfun))) -∗
     wpLoop cpu')
 
 end Post
@@ -216,7 +216,7 @@ def wp_npar_era_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [X
   irefSlots 2 ∗
   logOpS icfgLog n Sb ∗ logTx icfgLog ∗
   -- ---- THE TRACE, OVER THE PARENT PREFIX, DEFERRED IN THE START ----
-  epStart fscFs V.cwi P Pmiss (bview plen pfun) ∗
+  epStart fscFs V.rti V.cwi P Pmiss (bview plen pfun) ∗
   wpNext true k.proc cpu (nparEraPost k plen pfun n Sb P Pmiss pid V M dqb dqs dqpv)
   ⊢ wpLoop (GF := GF) cpu
 

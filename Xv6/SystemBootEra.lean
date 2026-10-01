@@ -219,7 +219,7 @@ theorem xv6Era_run (σ : MState) (ξ0 : CtxId) (Γ : SchedNames) [ClaimIs (hlc :
     (hperm : ∀ (i : UartId) (γ : UartNames), (i = .uart0 → fscUart = γ) →
       obsInv ⊢@{IProp GF} uartObsPermit (hlc := hlc) i γ) (B : IProp GF)
     (hinit : ⊢@{IProp GF} appInv (hlc := hlc) fscFs -∗ B ==∗
-        initBootBundle (hlc := hlc) (SG := uexecSGXv6) ROOTINO seccAll (List.replicate NOFILE FdState.closed)) :
+        initBootBundle (hlc := hlc) (SG := uexecSGXv6) ROOTINO ROOTINO seccAll (List.replicate NOFILE FdState.closed)) :
     obsInv ⊢@{IProp GF} consEchoShift (hlc := hlc) -∗ B -∗
       bootSharedOut σ ξ0 Γ γ0 γ1 γc γl0 γl1 γt cn γd ξd dk sb nib cov Pb Rspent -∗
       |={⊤}=> ([∗list] c ∈ cpus, wpLoop c) ∗
@@ -360,7 +360,7 @@ def EraInitBoot {CT : Type} (N : Type) (appFs : CT → N → Aview → IProp GF)
     letI : MachGS hlc GF := MachGS.ofEra E gen cP cI
     letI : Appcfg GF := ⟨N, appFs c, r⟩
     (⊢@{IProp GF} appInv (hlc := hlc) fscFs -∗ appBoot c (gen + 1) r -∗ Tn c (gen + 1) ==∗
-      initBootBundle (hlc := hlc) (SG := uexecSGXv6) ROOTINO seccAll (List.replicate NOFILE FdState.closed))
+      initBootBundle (hlc := hlc) (SG := uexecSGXv6) ROOTINO ROOTINO seccAll (List.replicate NOFILE FdState.closed))
 
 end inst
 

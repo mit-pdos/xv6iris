@@ -484,7 +484,7 @@ theorem create_fail_mkdir_half (IUP : IUNLOCKPUT) (IU : IUPDATE) (Γ : SchedName
   ihave Hsl := irefSlots_combine (1 + 1) (ns - 2) $$ [Hsl Hislr]
   · iframe
   -- mkdir's `fail:` payout: the do-then-undo PAIR, the dots as the entry brought them
-  ihave Hcf := create_fail_of_pair (hlc := hlc) (fsGammaL fscFs) fscFs ty.toNat major.toNat
+  ihave Hcf := create_fail_of_pair (hlc := hlc) (fsGammaL fscFs) fscFs V.rti ty.toNat major.toNat
     minor.toNat Nm Nd P Pmiss Farm Fdots Fun Fok Fex (bview plen pfun) dind.toNat cinum.toNat
     $$ HP Hdlk Hacre Hdots Hunr
   have hns' : (if false = true then 1 + 1 + (ns - 2) + 1 = ns else 1 + 1 + (ns - 2) = ns) := by

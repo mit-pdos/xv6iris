@@ -373,7 +373,7 @@ theorem sys_unlink_w1_walk (BO : BEGIN_OP) (NP : NPAR_WRAP_ERA) (EO : END_OP) (Î
         bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, Xv6.dirlookup_beqz, decide_true]
     iintro Hk Hpc
-    ihave Harms := unlinkArms_npdead (hlc := hlc) (fsGammaL fscFs) fscFs A.V.cwi (viewLazy A.V.upt A.V.sz A.M)
+    ihave Harms := unlinkArms_npdead (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti A.V.cwi (viewLazy A.V.upt A.V.sz A.M)
       A.v0.toNat A.P A.Pmiss
       A.Fent A.Ftgt A.Fex A.Fmiss (bview plen pfun) $$ [$Hdead $Hcent $Hctgt $Hcex $Hcmiss]
     ihave Hop := logOpS_op icfgLog n' Sb' $$ Hop Htx
@@ -521,7 +521,7 @@ theorem sys_unlink_w1_args (AS : ARGSTR_W) (BO : BEGIN_OP) (NP : NPAR_WRAP_ERA) 
         bop.BLT)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hr, MachCSL.bltz_m1]
     iintro Hk Hpc
-    ihave Harms := unlinkArms_whole (hlc := hlc) (fsGammaL fscFs) fscFs A.V.cwi (viewLazy A.V.upt A.V.sz A.M)
+    ihave Harms := unlinkArms_whole (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti A.V.cwi (viewLazy A.V.upt A.V.sz A.M)
       A.v0.toNat A.P A.Pmiss A.Fent
       A.Ftgt A.Fex A.Fmiss $$ Hau
     ihave Hout : sysUnlinkOut (A.raise kv) 0xFFFFFFFFFFFFFFFF#64 $$ [Hbs Hir Hcore Howe Harms]

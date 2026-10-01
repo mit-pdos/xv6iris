@@ -100,7 +100,8 @@ theorem uname_npElems (nm : List (BitVec 8)) (hu : uname nm) : npElems nm = [] :
 theorem uname_last (nm : List (BitVec 8)) (hu : uname nm) : (pathElems nm).getLast? = some nm := by
   rw [uname_pathElems nm hu]; rfl
 
-theorem uname_start (nm : List (BitVec 8)) (hu : uname nm) (cw : Nat) : umStartOf cw nm = cw := by
+theorem uname_start (nm : List (BitVec 8)) (hu : uname nm) (rt cw : Nat) :
+    umStartOf rt cw nm = cw := by
   unfold umStartOf
   rw [if_neg]
   intro hs

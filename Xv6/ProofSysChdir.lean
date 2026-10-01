@@ -117,11 +117,11 @@ theorem sys_chdir_blk_close (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) 
 
 /-- the era walk's death receipt IS `nameiWalkDeadEra` (`exHopsFrom` is
 `axHopsFrom` at `pathElems`, `FsAbsEra.exHops_is_axHops`). -/
-theorem sys_chdir_dead (P Pmiss : Nat → Nat → IProp GF) (pl : List (BitVec 8)) :
+theorem sys_chdir_dead (rt : Nat) (P Pmiss : Nat → Nat → IProp GF) (pl : List (BitVec 8)) :
     (∃ (kd d : Nat), ⌜kd < (pathElems pl).length⌝ ∗
-      ((P kd d ∗ exHopsFrom fscFs P Pmiss pl kd) ∨
-       (Pmiss kd d ∗ exHopsFrom fscFs P Pmiss pl (kd + 1)))) ⊢
-    nameiWalkDeadEra (hlc := hlc) fscFs P Pmiss pl := by
+      ((P kd d ∗ exHopsFrom rt fscFs P Pmiss pl kd) ∨
+       (Pmiss kd d ∗ exHopsFrom rt fscFs P Pmiss pl (kd + 1)))) ⊢
+    nameiWalkDeadEra (hlc := hlc) fscFs rt P Pmiss pl := by
   unfold nameiWalkDeadEra
   simp only [exHops_is_axHops]
   exact .rfl
@@ -203,7 +203,7 @@ theorem sys_chdir_tested (IU : IUNLOCK) (IP : IPUT) (IUP : IUNLOCKPUT) (EO : END
     k_step_e (wp_s_branch cpu _ (KA.«sys_chdir» + 0x3e#64) false 50#13 14#5 15#5 (by decide) bop.BNE)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hbt, hbt1, hd]
     iintro Hk Hpc
-    ihave Hfail : chdirPostFail (hlc := hlc) (fsGammaL fscFs) fscFs A.V.cwi A.P A.Pmiss A.Fo $$ [HP HFo]
+    ihave Hfail : chdirPostFail (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.P A.Pmiss A.Fo $$ [HP HFo]
     · unfold chdirPostFail
       iright
       iexists bview pl.length (sysfilePfun pl)
@@ -261,7 +261,7 @@ theorem sys_chdir_miss (EO : END_OP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF 
     procPrivFd A.γ (procAddr A.j) A.pid (sysChdirV1 A P2) (sysChdirM1 A P2) ∗
     (∀ c : CPU, sysChdirPostA k A c) ∗ bslots 3 ∗ irefSlots 2 ∗
     logOpS icfgLog n Sb ∗ logTx icfgLog ∗
-    nameiWalkDeadEra (hlc := hlc) fscFs A.P A.Pmiss (bview pl.length (sysfilePfun pl)) ∗
+    nameiWalkDeadEra (hlc := hlc) fscFs A.V.rti A.P A.Pmiss (bview pl.length (sysfilePfun pl)) ∗
     pfAt (aopenCommitAt (hlc := hlc) (fsGammaL fscFs) appE) A.Fo
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hcells, Hp, Hrest, Hte, Hce, #Henv, Hblk, HΦ, Hbs, Hir, Hop, Htx, Hdead, Hoc⟩
@@ -288,7 +288,7 @@ theorem sys_chdir_miss (EO : END_OP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF 
   · unfold sysChdirCells; iframe
   icases sys_chdir_cwdpid hct _ _ _ _ _ $$ Hblk with ⟨Hrows, Hhole⟩
   ihave Hop := logOpS_op icfgLog n Sb $$ Hop Htx
-  ihave Hfail : chdirPostFail (hlc := hlc) (fsGammaL fscFs) fscFs A.V.cwi A.P A.Pmiss A.Fo
+  ihave Hfail : chdirPostFail (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.P A.Pmiss A.Fo
     $$ [Hdead Hoc]
   · unfold chdirPostFail
     iright
@@ -410,7 +410,7 @@ theorem sys_chdir_fetched (NI : NAMEI_ERA) (IL : ILOCK) (IU : IUNLOCK) (IP : IPU
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie (procAddr A.j) ∗ sysfileEnv (hlc := hlc) Γ ∗
     procPrivFd A.γ (procAddr A.j) A.pid (sysChdirV1 A P2) (sysChdirM1 A P2) ∗
     (∀ c : CPU, sysChdirPostA k A c) ∗ bslots 3 ∗ irefSlots 2 ∗ logOp icfgLog MAXOPBLOCKS ∗
-    chdirAuPre (hlc := hlc) (fsGammaL fscFs) fscFs A.V.cwi A.P A.Pmiss A.Fo
+    chdirAuPre (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.P A.Pmiss A.Fo
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hcells, Hbuf, Hte, Hce, #Henv, Hblk, HΦ, Hbs, Hir, Hop, Hau⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -450,7 +450,7 @@ theorem sys_chdir_fetched (NI : NAMEI_ERA) (IL : ILOCK) (IU : IUNLOCK) (IP : IPU
     unfold chdirAuPre
     icases Hau with ⟨Hwp, Hoc⟩
     -- THE ONE-SHOT, HANDED DOWN UNFIRED: the walk picks the start
-    ihave Hst := opfStart_of_open (hlc := hlc) fscFs A.V.cwi A.P A.Pmiss
+    ihave Hst := opfStart_of_open (hlc := hlc) fscFs A.V.rti A.V.cwi A.P A.Pmiss
       (bview pl'.length (sysfilePfun pl')) $$ Hwp
     icases logOp_openS icfgLog MAXOPBLOCKS $$ Hop with ⟨%Sb, HopS, Htx⟩
     ihave Hp := (show byteBuf (GF := GF) (sysChdirBuf (k.regs 2#5)) (DFrac.own 1)
@@ -488,7 +488,7 @@ theorem sys_chdir_fetched (NI : NAMEI_ERA) (IL : ILOCK) (IU : IUNLOCK) (IP : IPU
     · -- ===== the walk DIED: ARM B =====
       ihave Harm := Xv6.kxcA_ite_f _ _ $$ Harm
       icases Harm with ⟨%h10, Hir, Hdead⟩
-      ihave Hdead := sys_chdir_dead A.P A.Pmiss _ $$ Hdead
+      ihave Hdead := sys_chdir_dead _ A.P A.Pmiss _ $$ Hdead
       iapply (sys_chdir_miss EO Γ cpu k A P2 spie1 spp1 R1 pl' _ n' Sb' hj hproc hK hnoff htier hct
           hp1 h10 hal hP2 hlen)
         $$ [$Hk $Hpc $Hcells $Hp $Hrest $Hte $Hce $Henv $Hblk $HΦ $Hbs $Hir $HopS $Htx $Hdead $Hoc]
@@ -506,7 +506,7 @@ theorem sys_chdir_fetched (NI : NAMEI_ERA) (IL : ILOCK) (IU : IUNLOCK) (IP : IPU
     ihave Hbuf : sysfileAny (sysChdirBuf (k.regs 2#5)) 128 $$ [Hbuf]
     · unfold sysfileAny; iexists bs; iframe; ipureintro; omega
     icases sys_chdir_cwdpid hct _ _ _ _ _ $$ Hblk with ⟨Hrows, Hhole⟩
-    ihave Hfail : chdirPostFail (hlc := hlc) (fsGammaL fscFs) fscFs A.V.cwi A.P A.Pmiss A.Fo
+    ihave Hfail : chdirPostFail (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.P A.Pmiss A.Fo
       $$ [Hau]
     · unfold chdirPostFail; ileft; iexact Hau
     iapply (sys_chdir_tail_68 EO Γ cpu k A P2 spie spp R w₃ MAXOPBLOCKS hj hproc hK hnoff htier hpins
@@ -533,7 +533,7 @@ theorem sys_chdir_args (AS : ARGSTR) (NI : NAMEI_ERA) (IL : ILOCK) (IU : IUNLOCK
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie (procAddr A.j) ∗ sysfileEnv (hlc := hlc) Γ ∗
     procPrivFd A.γ (procAddr A.j) A.pid A.V A.M ∗
     (∀ c : CPU, sysChdirPostA k A c) ∗ bslots 3 ∗ irefSlots 2 ∗ logOp icfgLog MAXOPBLOCKS ∗
-    chdirAuPre (hlc := hlc) (fsGammaL fscFs) fscFs A.V.cwi A.P A.Pmiss A.Fo
+    chdirAuPre (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.P A.Pmiss A.Fo
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hcells, Hbuf, Hte, Hce, #Henv, Hblk, HΦ, Hbs, Hir, Hop, Hau⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -586,8 +586,8 @@ theorem sys_chdir_args (AS : ARGSTR) (NI : NAMEI_ERA) (IL : ILOCK) (IU : IUNLOCK
   · iintro %c
     ispecialize HΦ $$ %c
     iapply (sysChdirK_raise k A.γ (procAddr A.j) A.pid A.V A.M A.P A.Pmiss A.Fo c kv hkv) $$ HΦ
-  ihave Hau := (show chdirAuPre (hlc := hlc) (GF := GF) (fsGammaL fscFs) fscFs A.V.cwi A.P A.Pmiss A.Fo ⊢
-    chdirAuPre (hlc := hlc) (fsGammaL fscFs) fscFs (A.raise kv).V.cwi (A.raise kv).P (A.raise kv).Pmiss
+  ihave Hau := (show chdirAuPre (hlc := hlc) (GF := GF) (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.P A.Pmiss A.Fo ⊢
+    chdirAuPre (hlc := hlc) (fsGammaL fscFs) fscFs (A.raise kv).V.rti (A.raise kv).V.cwi (A.raise kv).P (A.raise kv).Pmiss
       (A.raise kv).Fo from .rfl) $$ Hau
   have hp1 : sysChdirPins k R1 (k.regs 9#5) (procAddr A.j) := by
     refine sysChdirPins_cs k _ R1 _ _ ?_ hcs1

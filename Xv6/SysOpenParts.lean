@@ -955,7 +955,7 @@ instance sysOpenEnv_persistent (Γ : SchedNames) (A : SysOpenArgs GF) :
 `openArmsPlain`; deviation 3). -/
 abbrev sysOpenPostP (k : KCtx) (A : SysOpenArgs GF) (c : CPU) : IProp GF :=
   sysOpenK (hlc := hlc) k A.ns A.V A.M
-    (openArmsPlain (hlc := hlc) A.omo (fsGammaL fscFs) fscFs A.V.cwi A.γ (procAddr A.j) A.pid
+    (openArmsPlain (hlc := hlc) A.omo (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.γ (procAddr A.j) A.pid
       (sysOpenIm A) A.v.toNat A.vom A.P A.Pmiss A.Fo A.Ft A.sts) c
 
 /-- ...and at the CREATE arms (Rocq's `so_cont0_au_create`). -/
@@ -963,7 +963,7 @@ abbrev sysOpenPostC (k : KCtx) (A : SysOpenArgs GF)
     (Farm Fun : Pfam GF (Aview → Nat → IProp GF))
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) (c : CPU) : IProp GF :=
   sysOpenK (hlc := hlc) k A.ns A.V A.M
-    (openArmsCreate (hlc := hlc) A.omo (fsGammaL fscFs) fscFs A.V.cwi A.γ (procAddr A.j) A.pid
+    (openArmsCreate (hlc := hlc) A.omo (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.γ (procAddr A.j) A.pid
       (sysOpenIm A) A.v.toNat A.vom A.P A.Pmiss Farm Fun Fok Fex A.Fo A.Ft A.sts) c
 
 /-- The contract's `wpNext` continuation, HART-FREE (a `true` crossing at a
@@ -1588,7 +1588,7 @@ def sysOpenEntryNBody (Γ : SchedNames) (k : KCtx) (A : SysOpenArgs GF) : IProp 
     logOpS icfgLog MAXOPBLOCKS Sb -∗ logTx icfgLog -∗
     bslots 3 -∗ irefSlots A.ns -∗ fdSlot -∗ fdFrags A.V.fdg A.sts -∗
     -- THE AU BUNDLE, at the string argstr fetched
-    exStart (hlc := hlc) fscFs A.V.cwi A.P A.Pmiss (bview plen bp) -∗
+    exStart (hlc := hlc) fscFs A.V.rti A.V.cwi A.P A.Pmiss (bview plen bp) -∗
     pfAt (aopenCommitAt (hlc := hlc) (fsGammaL fscFs) appE) A.Fo -∗
     -- the truncate's permit is the walk's terminal cursor (Rocq TRUNC-PERMIT)
     openTruncPiece (hlc := hlc) (fsGammaL fscFs) A.vom (truncTermAt (bview plen bp) A.P) A.Ft -∗
@@ -1617,7 +1617,7 @@ def sysOpenEntryCBody (Γ : SchedNames) (k : KCtx) (A : SysOpenArgs GF)
     logOpS icfgLog MAXOPBLOCKS Sb -∗ logTx icfgLog -∗
     bslots 3 -∗ irefSlots A.ns -∗ fdSlot -∗ fdFrags A.V.fdg A.sts -∗
     -- THE AU BUNDLE (the contract's O_CREATE side), at the fetched string
-    epStart (hlc := hlc) fscFs A.V.cwi A.P A.Pmiss (bview plen bp) -∗
+    epStart (hlc := hlc) fscFs A.V.rti A.V.cwi A.P A.Pmiss (bview plen bp) -∗
     pfAt (acreCommitAtNm (hlc := hlc) (fsGammaL fscFs) appE (.AFile []) (nparNm (sysOpenIm A) A.v.toNat)
       (A.P (nparElems (bview plen bp)).length) Farm) Fok -∗
     pfAt (dlookupCommitAt (hlc := hlc) (fsGammaL fscFs) appE) Fex -∗

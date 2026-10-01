@@ -66,12 +66,12 @@ theorem execSlotPre_ne (n : Nat) (S S' : Uvis → IProp GF) (Q : Int → IProp G
 /-- **Rocq `exec_au_pre_ne`**: ...and the bundle, at the pair `⟨S, Rs⟩` (the
 refund does not move with the fixpoint, so it is an ordinary binder). -/
 theorem execAuPre_ne (n : Nat) (S S' : Uvis → IProp GF) (Rs : IProp GF) (Γ : FsViewNames GF)
-    (γfs : FsNames) (cw : Nat) (secc : BitVec 64) (Q : Int → IProp GF) (P Pmiss : Nat → Nat → IProp GF)
+    (γfs : FsNames) (rt cw : Nat) (secc : BitVec 64) (Q : Int → IProp GF) (P Pmiss : Nat → Nat → IProp GF)
     (Fo : Pfam GF (Aview → Nat → Anode → IProp GF)) (pl : List (BitVec 8)) (na : Nat)
     (alen : Nat → Nat) (afun : Nat → Nat → BitVec 8) (sts : List FdState)
     (cs : Std.ExtTreeSet GName compare) (pidv : BitVec 32) (HS : ∀ W, S W ≡{n}≡ S' W) :
-    execAuPre (hlc := hlc) ⟨S, Rs⟩ Γ γfs cw secc Q P Pmiss Fo pl na alen afun sts cs pidv ≡{n}≡
-      execAuPre (hlc := hlc) ⟨S', Rs⟩ Γ γfs cw secc Q P Pmiss Fo pl na alen afun sts cs pidv := by
+    execAuPre (hlc := hlc) ⟨S, Rs⟩ Γ γfs rt cw secc Q P Pmiss Fo pl na alen afun sts cs pidv ≡{n}≡
+      execAuPre (hlc := hlc) ⟨S', Rs⟩ Γ γfs rt cw secc Q P Pmiss Fo pl na alen afun sts cs pidv := by
   unfold execAuPre pfAt
   refine BI.sep_ne.ne .rfl (BI.sep_ne.ne .rfl (BI.and_ne.ne ?_ .rfl))
   exact execSlotPre_ne n S S' Q _ Fo.pfRecv cw secc na alen afun sts cs pidv HS

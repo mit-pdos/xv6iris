@@ -84,14 +84,14 @@ theorem fileAopen_piece (γfs : FsNames) (c : FileFixed) (r : FileAppNames) (q :
 /-- THE BUNDLE (Rocq `file_open_plain_au`): the half split in two, one
 fraction on the walk's cursor, one in the observation. -/
 theorem fileOpenPlain_au (γfs : FsNames) (c : FileFixed) (r : FileAppNames) (q1 q2 : Qp)
-    (i : Nat) (bs : List (BitVec 8)) (N : Fname) (s : Dst) (cw : Nat) (M : Nat → List (BitVec 8))
+    (i : Nat) (bs : List (BitVec 8)) (N : Fname) (s : Dst) (rt cw : Nat) (M : Nat → List (BitVec 8))
     (pv : Nat) (vom : BitVec 64) (pl : List (BitVec 8))
-    (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)) (hsN : s[N]? = some (i, bs))
+    (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)) (hN : uname N) (hsN : s[N]? = some (i, bs))
     (heq : ‹Appcfg GF› = { appNames := FileAppNames, appPred := filePred (hlc := hlc) c, appRun := r })
-    (hpath : argPathOf M pv pl) (hel : pathElems pl = [N]) (hst : umStartOf cw pl = ROOTINO)
+    (hpath : argPathOf M pv pl) (hel : pathElems pl = [N]) (hst : umStartOf rt cw pl = ROOTINO)
     (htr : omTrunc vom = false) :
     ⊢@{IProp GF} appInv (hlc := hlc) γfs -∗ fdq r q1 s -∗ fdq r q2 s -∗
-      openAuPlainAt (hlc := hlc) (fsGammaL γfs) γfs cw M pv vom
+      openAuPlainAt (hlc := hlc) (fsGammaL γfs) γfs rt cw M pv vom
         (pobsPLin (fileTaint (hlc := hlc) c) [ROOTINO, i] (fdq r q1 s))
         (pobsPmiss (fileTaint (hlc := hlc) c)) (fileOpenRecv (hlc := hlc) c r q2 s) Ft := by
   unfold openAuPlainAt
@@ -101,8 +101,8 @@ theorem fileOpenPlain_au (γfs : FsNames) (c : FileFixed) (r : FileAppNames) (q1
   · iintro %pl0 %hpath0
     rw [argPathOf_uniq M pv pl0 pl hpath0 hpath]
     iapply (pobs_walk_w_lin (hlc := hlc) γfs (fun v : Aview => fOk v s) (fileTaint (hlc := hlc) c)
-      (fdq r q1 s) (pobsPmiss (fileTaint (hlc := hlc) c)) cw pl [ROOTINO, i] i
-      (fPin_walks i bs N s cw pl hsN hel hst)) $$ [] Hcl1 Hinv Hd1
+      (fdq r q1 s) (pobsPmiss (fileTaint (hlc := hlc) c)) rt cw pl [ROOTINO, i] i
+      (fPin_walks i bs N s rt cw pl hN hsN hel hst)) $$ [] Hcl1 Hinv Hd1
     iapply pobsMissTaint_Pmiss
   isplitl [Hd2]
   · iapply (fileAopen_piece γfs c r q2 s heq) $$ Hinv Hd2
@@ -110,13 +110,13 @@ theorem fileOpenPlain_au (γfs : FsNames) (c : FileFixed) (r : FileAppNames) (q1
 
 /-- THE RECEIPT, READ AT THE DEED (Rocq `file_open_recv_file`). -/
 theorem fileOpenRecv_file (γfs : FsNames) (c : FileFixed) (r : FileAppNames) (omo : OffMode)
-    (q1 q2 : Qp) (i : Nat) (bs : List (BitVec 8)) (N : Fname) (s : Dst) (cw : Nat)
+    (q1 q2 : Qp) (i : Nat) (bs : List (BitVec 8)) (N : Fname) (s : Dst) (rt cw : Nat)
     (M : Nat → List (BitVec 8)) (pv : Nat) (vom : BitVec 64) (pl : List (BitVec 8))
     (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)) (sts : List FdState)
-    (rv : BitVec 64) (fdv' : List FdState) (hsN : s[N]? = some (i, bs))
-    (hpath : argPathOf M pv pl) (hel : pathElems pl = [N]) (hst : umStartOf cw pl = ROOTINO)
+    (rv : BitVec 64) (fdv' : List FdState) (hN : uname N) (hsN : s[N]? = some (i, bs))
+    (hpath : argPathOf M pv pl) (hel : pathElems pl = [N]) (hst : umStartOf rt cw pl = ROOTINO)
     (htr : omTrunc vom = false) :
-    ⊢@{IProp GF} openReceiptPlain (hlc := hlc) omo (fsGammaL γfs) γfs cw M pv vom
+    ⊢@{IProp GF} openReceiptPlain (hlc := hlc) omo (fsGammaL γfs) γfs rt cw M pv vom
         (pobsPLin (fileTaint (hlc := hlc) c) [ROOTINO, i] (fdq r q1 s))
         (pobsPmiss (fileTaint (hlc := hlc) c)) (fileOpenRecv (hlc := hlc) c r q2 s) Ft sts rv fdv'
       ={⊤}=∗
@@ -125,7 +125,7 @@ theorem fileOpenRecv_file (γfs : FsNames) (c : FileFixed) (r : FileAppNames) (o
           ⌜openFdRcpt (omReadable vom) (omWritable vom) (.inode i γo omo) sts rv fdv'⌝ ∗
           foffPub omo γo ∗ fdq r q1 s ∗ fdq r q2 s) ∨
         fileTaint (hlc := hlc) c) := by
-  have _hres := fPin_resolves i bs N s cw pl hsN hel hst
+  have _hres := fPin_resolves i bs N s rt cw pl hN hsN hel hst
   unfold openReceiptPlain curKept
   simp only [htr, Bool.false_eq_true, ↓reduceIte]
   iintro (⟨%hr, %hfd, Hfail⟩ | ⟨%pl', %av, %j, %hpath', HP, Harm⟩)
@@ -136,7 +136,7 @@ theorem fileOpenRecv_file (γfs : FsNames) (c : FileFixed) (r : FileAppNames) (o
         -- observation piece's refund
         unfold openAuPlainAt exStart
         icases Hpre with ⟨Hw, Hpf, -⟩
-        imod Hw $$ %pl %hpath %(umStartOf cw pl) %rfl with ⟨HP, -⟩
+        imod Hw $$ %pl %hpath %(umStartOf rt cw pl) %rfl with ⟨HP, -⟩
         imodintro
         unfold pobsPLin
         icases HP with (⟨-, Hd1⟩ | #HT)

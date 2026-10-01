@@ -226,7 +226,7 @@ def sysUnlinkNpK (k' : KCtx) (se : Bool) (pj pa pv nb : BitVec 64) (plen : Nat) 
         inodeHeldTyAt ipv T_DIR iL ∗
         P (npElems (bview plen pfun)).length iL ∗ irefSlots 1)
      else
-      iprop(⌜R' 10#5 = 0#64⌝ ∗ irefSlots 2 ∗ npDead fscFs P Pmiss (bview plen pfun))) -∗
+      iprop(⌜R' 10#5 = 0#64⌝ ∗ irefSlots 2 ∗ npDead V.rti fscFs P Pmiss (bview plen pfun))) -∗
     wpLoop c)
 
 set_option maxHeartbeats 8000000 in
@@ -248,7 +248,7 @@ theorem sys_unlink_nameiparent (NP : NPAR_WRAP_ERA) (Γ : SchedNames) [ClaimIs (
     byteBuf pv (DFrac.own 1) (bview (plen + 1) pfun) ∗
     byteBuf nb (DFrac.own 1) (bview 14 nfun) ∗
     bslots 3 ∗ irefSlots 2 ∗ logOpS icfgLog n Sb ∗ logTx icfgLog ∗
-    epStart fscFs V.cwi P Pmiss (bview plen pfun) ∗
+    epStart fscFs V.rti V.cwi P Pmiss (bview plen pfun) ∗
     sysUnlinkNpK k' se pj pa pv nb plen pfun n Sb P Pmiss pid V M
     ⊢ wpLoop (GF := GF) cpu := by
   subst hs hpj hpa hpv hnb

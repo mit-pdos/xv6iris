@@ -22,8 +22,8 @@ import Xv6.ElfFile
 namespace Xv6
 
 /-- Rocq `pin_resolves`: `pinResolvesAt` at a file node holding `f`. -/
-def pinResolves (Pin : Aview → Prop) (cw : Nat) (pl : List (BitVec 8)) (hops : List Nat)
+def pinResolves (Pin : Aview → Prop) (rt cw : Nat) (pl : List (BitVec 8)) (hops : List Nat)
     (ino : Nat) (f : ElfBytes) (nl : Nat) : Prop :=
-  pinResolvesAt Pin cw pl hops ino ⟨.AFile f, nl⟩
+  pinResolvesAt Pin rt cw pl hops ino ⟨.AFile f, nl⟩
 
 end Xv6
