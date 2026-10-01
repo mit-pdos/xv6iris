@@ -49,7 +49,7 @@ Lean-specific "what remains" list of §7.4L. Three gated sub-lanes, in dependenc
 | **PJ-L3b** | `kalloc`/`kfree` led forms take the lend and STEP it (`actLend p (ke+1)` out: the append IS the step; `actLend_step` on the right disjunct, nothing at `p = 0`); the token-free led forms are deleted; the plain `wp_kalloc`/`wp_kfree` survive only with the premise `k.proc = 0` for the boot contracts (`kinit`, `freerange`, `virtio_disk_init`, the kvm chain already at `p = 0`, …); every non-boot allocator call site switches to the led+lend form and drops the receipt; the block-holders' `V.updEv k'` closes absorb the raised counts | L3a |
 | **PJ-L3c** | the four ledger appends require and step the lend: allocproc's pid section (`PAlloc`), freeproc's led form (`PFree`), kwait's led forms (`ZReap`), kexit's exit append (`ZExit`, from its own block: the ZOMBIE park rides the deficit block) | L3b |
 
-- [ ] PJ-L3a  - [ ] PJ-L3b  - [ ] PJ-L3c
+- [x] PJ-L3a  - [ ] PJ-L3b  - [ ] PJ-L3c
 
 Then **T**: the rows and the theorem (`ut_round` gains `ev ev'`, `ev' = ev` on the non-ecall rows; `ut_round_quiet`).
 
