@@ -20,7 +20,7 @@ through lock handles (`MachCSL.isLock`, whose floors transport) and the
 read-only `uarts[i]` words (`MachCSL.wordPointsTo`, whose bytes transport)
 -- hence `instCtxMorphEnvFam`, which discharges the re-homing witness
 (`envMorph_envFam`).  A lock handle transports only because its PAYLOAD is
-a genuine function of the holder's context (`procLockPay`, `ticksResAt`,
+a genuine function of the holder's context (`procLockPay`, `ticksLedAt`,
 `diskRes`, and -- since this file demanded it -- `consResAt`); the
 instances below say so at the kernel tier, where a handler always runs.
 
@@ -88,9 +88,9 @@ instance instCtxMorphUartRxCaps (i : UartId) (γc γl : GName) (γ : UartNames) 
 
 /-- The ticks lock. -/
 instance instCtxMorphIsTickslock (γt : GName) :
-    CtxMorph (GF := GF) (fun ξ => @isTickslock hlc GF _ ⟨ξ, KTier.kpt⟩ γt) :=
+    CtxMorph (GF := GF) (fun ξ => @isTickslock hlc GF _ _ ⟨ξ, KTier.kpt⟩ γt) :=
   show CtxMorph (GF := GF) (fun ξ => @isLock hlc GF _ _ ⟨ξ, KTier.kpt⟩ γt tickslockAddr "time"
-      (fun ζ => @ticksResAt hlc GF _ ⟨ζ, KTier.kpt⟩ ζ)) from
+      (fun ζ => @ticksLedAt hlc GF _ _ ⟨ζ, KTier.kpt⟩ ζ)) from
     instCtxMorphIsLock _ _ _ _ _
 
 section

@@ -11,7 +11,9 @@
 
   * `mn_trapinit`   +0x7e → +0x82: `trapinit()`, then the ticks lock is born
                     at the handler environment's `γt` over the tick counter
-                    (`TicksDefs.isTickslock`);
+                    and its mirror, raised from 0 (off `childrenBootRows`)
+                    to the cell's boot value (`TicksDefs.ticksLed_boot`,
+                    design ni-ticks-ledger.md D2; `TicksDefs.isTickslock`);
   * `mn_trapinithart` +0x82 → +0x86: `stvec := kernelvec`;
   * `mn_plic`       +0x86 → +0x8e: `plicinit()`, `plicinithart()`.
 
@@ -59,17 +61,17 @@ theorem mn_ticksLock_kmap [CurCtx] :
 set_option maxHeartbeats 4000000 in
 /-- **+0x7e → +0x82**: `trapinit()` (`initlock(&tickslock, "time")`), then
 the ticks lock is born at `γt` over `ticks`. -/
-theorem mn_trapinit (TI : TRAPINIT) [CurCtx] (cpu : CPU) (k : KCtx) (R0 : RegMap) (hsie : k.sie = false)
+theorem mn_trapinit [WchG GF] (TI : TRAPINIT) [CurCtx] (cpu : CPU) (k : KCtx) (R0 : RegMap) (hsie : k.sie = false)
     (hK : 4 ≤ k.avail) (γt : GName) (vl : BitVec 32) (vn vc : BitVec 64) :
     kctx cpu (k.withRegs R0) ∗ pcIs cpu (KA.«main» + 126#64) ∗
     kmapId tickslockAddr ∗ kmapId (tickslockAddr + 16#64) ∗
     wordPointsTo tickslockAddr 4 (DFrac.own 1) vl ∗
     wordPointsTo (tickslockAddr + 8#64) 8 (DFrac.own 1) vn ∗
     wordPointsTo (tickslockAddr + 16#64) 8 (DFrac.own 1) vc ∗
-    lockFreeTok γt ∗ ticksResAt curCtx ∗
+    lockFreeTok γt ∗ ticksResAt curCtx ∗ tickCnt 0 ∗
     (∀ R : RegMap, kctx cpu (k.withRegs R) -∗ pcIs cpu (KA.«main» + 130#64) -∗ isTickslock γt -∗ wpLoop cpu)
     ⊢ wpLoop (GF := GF) cpu := by
-  iintro ⟨Hk, Hpc, #H0, #H16, Hw, Hn, Hc, Hlf, Hres, HΦ⟩
+  iintro ⟨Hk, Hpc, #H0, #H16, Hw, Hn, Hc, Hlf, Hres, Htk, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   k_step (wp_s_jal cpu _ (KA.«main» + 126#64) false 5568#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [mn_br_7e]
@@ -85,7 +87,10 @@ theorem mn_trapinit (TI : TRAPINIT) [CurCtx] (cpu : CPU) (k : KCtx) (R0 : RegMap
   iintro %R' Hk Hpc _ Hfr %_
   simp only [KCtx.withRegs_withRegs, KCtx.withRegs_regs, RegMap.set_apply, if_pos, mn_ret_82]
   iapply wpLoop_fupd
-  imod (kctx_newlockAt cpu _ γt tickslockAddr "time" ticksResAt) $$ [Hk Hlf Hres Hfr] with ⟨Hk, #Htl⟩
+  -- THE MIRROR IS RAISED TO THE CELL'S BOOT VALUE (design ni-ticks-ledger.md
+  -- D2, Rocq `mn_grp_trap`): the payload's tie founded before the seal
+  imod ticksLed_boot $$ Hres Htk with Hres
+  imod (kctx_newlockAt cpu _ γt tickslockAddr "time" ticksLedAt) $$ [Hk Hlf Hres Hfr] with ⟨Hk, #Htl⟩
   · iframe Hk Hlf Hres Hfr H0 H16
   imodintro
   iapply HΦ $$ %R' Hk Hpc

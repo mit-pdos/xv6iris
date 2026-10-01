@@ -296,10 +296,10 @@ theorem sp_acquire (AC : ACQUIRE) (c : CPU) (k' : KCtx) (γt : GName)
       ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
       kctx cpu' (((k'.pushOffAt spie spp).withRegs R').withLocks ("time" :: k'.locks)) -∗
       pcIs cpu' (jumpPc (k'.regs 1#5)) -∗ ⌜calleeSaved k'.regs R'⌝ -∗
-      locked γt cpu' -∗ ticksResAt curCtx -∗ (∃ K : Nat, viewLb cpu' K) -∗
+      locked γt cpu' -∗ ticksLedAt curCtx -∗ (∃ K : Nat, viewLb cpu' K) -∗
       sieArm cpu' k'.sie k'.proc -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := AC.wp_acquire (hlc := hlc) (GF := GF) c k' γt "time" ticksResAt hnoff hK hs
+  have h := AC.wp_acquire (hlc := hlc) (GF := GF) c k' γt "time" ticksLedAt hnoff hK hs
   unfold wp_acquire_body at h
   simp only [acquireAddr] at h
   rw [ha0] at h
@@ -313,13 +313,13 @@ theorem sp_release (RE : RELEASE) (c : CPU) (k' : KCtx) (γt : GName)
     (hreen : reen = (decide (k'.noff = 1) && k'.intena))
     (hon : reen = true → k'.tier = .kpt ∧ trapRes true + 6 ≤ k'.avail) :
     kctx c k' ∗ pcIs c KA.«release» ∗ isTickslock γt ∗
-    locked γt c ∗ ticksResAt curCtx ∗ sieArm c reen p ∗
+    locked γt c ∗ ticksLedAt curCtx ∗ sieArm c reen p ∗
     wpNext (k'.popExit reen).sie k'.proc c (fun cpu' => iprop(∀ R' : RegMap,
       kctx cpu' (((k'.popExit reen).withRegs R').withLocks
         (k'.locks.filter (fun x => x ≠ "time"))) -∗
       pcIs cpu' (jumpPc (k'.regs 1#5)) -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := RE.wp_release (hlc := hlc) (GF := GF) c k' γt "time" ticksResAt hsie hnoff hK reen
+  have h := RE.wp_release (hlc := hlc) (GF := GF) c k' γt "time" ticksLedAt hsie hnoff hK reen
     hreen hon
   unfold wp_release_body at h
   simp only [releaseAddr] at h
@@ -477,7 +477,7 @@ theorem sp_ret0 (RE : RELEASE) (cpu : CPU) (k kb : KCtx) (hb : SpBase k kb) (γt
     (hK : sysPauseSlots ≤ k.avail)
     (a b : Bool) (R : RegMap) (hpre : spPre k R) (hsv : spSaved k R) :
     kctx cpu (((kb.pushOffAt a b).withLocks ["time"]).withRegs R) ∗ pcIs cpu (KA.«sys_pause» + 0x80#64) ∗
-    isTickslock γt ∗ locked γt cpu ∗ ticksResAt curCtx ∗
+    isTickslock γt ∗ locked γt cpu ∗ ticksLedAt curCtx ∗
     frame8s0 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) ∗
     trapCsrs cpu ∗ cpuClaim cpu k.proc ∗ intrRes cpu ∗
     wordPointsTo (pTrapframe k.proc) 8 dqt (pageAddr tfp) ∗ tfPageAt tfp ws ∗
@@ -549,7 +549,7 @@ theorem sp_retm1 (RE : RELEASE) (cpu : CPU) (k kb : KCtx) (hb : SpBase k kb) (γ
     (nn lo : BitVec 32) (v4 v6 : BitVec 64)
     (hal : (k.regs 2#5 + 0xFFFFFFFFFFFFFFC8#64).toNat % 8 = 0) :
     kctx cpu (((kb.pushOffAt a b).withLocks ["time"]).withRegs R) ∗ pcIs cpu (KA.«sys_pause» + 0x9c#64) ∗
-    isTickslock γt ∗ locked γt cpu ∗ ticksResAt curCtx ∗
+    isTickslock γt ∗ locked γt cpu ∗ ticksLedAt curCtx ∗
     spFrame (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)
       v4 v6 lo nn ∗
     trapCsrs cpu ∗ cpuClaim cpu k.proc ∗ intrRes cpu ∗
@@ -657,7 +657,7 @@ def spLoop (k kb : KCtx) (γt : GName) (j : Nat) (tfp : BitVec 44)
     kctx curL (((kb.pushOffAt a b).withLocks ["time"]).withRegs Rl) -∗
     pcIs curL (KA.«sys_pause» + 0x4a#64) -∗
     trapCsrs curL -∗ cpuClaim curL k.proc -∗ intrRes curL -∗
-    locked γt curL -∗ ticksResAt curCtx -∗
+    locked γt curL -∗ ticksLedAt curCtx -∗
     spFrame (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)
       v4 v6 lo nn -∗
     wordPointsTo (pTrapframe k.proc) 8 dqt (pageAddr tfp) -∗ tfPageAt tfp ws -∗
@@ -672,7 +672,7 @@ theorem spLoop_elim (k kb : KCtx) (γt : GName) (j : Nat) (tfp : BitVec 44)
       kctx curL (((kb.pushOffAt a b).withLocks ["time"]).withRegs Rl) -∗
       pcIs curL (KA.«sys_pause» + 0x4a#64) -∗
       trapCsrs curL -∗ cpuClaim curL k.proc -∗ intrRes curL -∗
-      locked γt curL -∗ ticksResAt curCtx -∗
+      locked γt curL -∗ ticksLedAt curCtx -∗
       spFrame (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)
         v4 v6 lo nn -∗
       wordPointsTo (pTrapframe k.proc) 8 dqt (pageAddr tfp) -∗ tfPageAt tfp ws -∗
@@ -687,7 +687,7 @@ theorem spLoop_intro (k kb : KCtx) (γt : GName) (j : Nat) (tfp : BitVec 44)
       kctx curL (((kb.pushOffAt a b).withLocks ["time"]).withRegs Rl) -∗
       pcIs curL (KA.«sys_pause» + 0x4a#64) -∗
       trapCsrs curL -∗ cpuClaim curL k.proc -∗ intrRes curL -∗
-      locked γt curL -∗ ticksResAt curCtx -∗
+      locked γt curL -∗ ticksLedAt curCtx -∗
       spFrame (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)
         v4 v6 lo nn -∗
       wordPointsTo (pTrapframe k.proc) 8 dqt (pageAddr tfp) -∗ tfPageAt tfp ws -∗
@@ -716,7 +716,7 @@ theorem sp_round (AC : ACQUIRE) (RE : RELEASE) (SP : SLEEP_PREPARE) (SL : SLEEP)
     (a b : Bool) (R : RegMap) (hpre : spPre k R) (h9 : R 9#5 = tickslockAddr)
     (h18 : R 18#5 = ticksAddr) (h19 : R 19#5 = BitVec.signExtend 64 t0) :
     kctx cpu (((kb.pushOffAt a b).withLocks ["time"]).withRegs R) ∗ pcIs cpu (KA.«sys_pause» + 0x54#64) ∗
-    procsInv Γ ∗ isTickslock γt ∗ locked γt cpu ∗ ticksResAt curCtx ∗
+    procsInv Γ ∗ isTickslock γt ∗ locked γt cpu ∗ ticksLedAt curCtx ∗
     spFrame (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)
       v4 v6 lo nn ∗
     trapCsrs cpu ∗ cpuClaim cpu k.proc ∗ intrRes cpu ∗
@@ -857,14 +857,14 @@ theorem sp_round (AC : ACQUIRE) (RE : RELEASE) (SP : SLEEP_PREPARE) (SL : SLEEP)
             exact h.trans hS19
           obtain ⟨w2, w8, w20, w21, w22, w23, w24, w25, w26, w27⟩ := id hpreW
           -- lw a5,0(s2) : the counter, out of the payload
-          icases ticksRes_elim $$ Hpay with ⟨%t1, Hticks⟩
+          icases ticksLed_elim $$ Hpay with ⟨%t1, %m1, Hticks, Htk1, %hti1⟩
           icases spFrame_elim _ _ _ _ _ _ _ _ _ _ $$ Hframe
             with ⟨F0, F1, F2, F3, F4, F5, Flo, Fnn, F6⟩
           k_step (wp_s_lw cpu _ (KA.«sys_pause» + 0x6a#64) false 0#12 15#5 18#5 (by decide) (by decide)
               (DFrac.own 1) t1)
             from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hW18, sp_add0]
           iintro Hk Hpc Hticks
-          ihave Hpay := ticksRes_intro t1 $$ Hticks
+          ihave Hpay := ticksLed_intro t1 m1 hti1 $$ Hticks Htk1
           -- subw a5,a5,s3 ; lw a4,-52(s0)
           obtain ⟨dv, hdv⟩ : ∃ d : BitVec 32, t1 + -t0 = d := ⟨_, rfl⟩
           have hdv' : t1 - t0 = dv := by rw [BitVec.sub_eq_add_neg]; exact hdv
@@ -978,7 +978,7 @@ theorem sp_loop_body (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) (KL : KILLED)
     (a b : Bool) (R : RegMap) (hpre : spPre k R) (h9 : R 9#5 = tickslockAddr)
     (h18 : R 18#5 = ticksAddr) (h19 : R 19#5 = BitVec.signExtend 64 t0) :
     kctx cpu (((kb.pushOffAt a b).withLocks ["time"]).withRegs R) ∗ pcIs cpu (KA.«sys_pause» + 0x4a#64) ∗
-    procsInv Γ ∗ isTickslock γt ∗ locked γt cpu ∗ ticksResAt curCtx ∗
+    procsInv Γ ∗ isTickslock γt ∗ locked γt cpu ∗ ticksLedAt curCtx ∗
     spFrame (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)
       v4 v6 lo nn ∗
     trapCsrs cpu ∗ cpuClaim cpu k.proc ∗ intrRes cpu ∗
@@ -1205,7 +1205,7 @@ theorem sp_from_a26 (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) (KL : KILLED)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [a2, b19]
       iintro Hk Hpc F4
       -- auipc s3,0x8 ; lw s3,-1974(s3)  (ticks0, out of the payload)
-      icases ticksRes_elim $$ Hpay with ⟨%t0, Hticks⟩
+      icases ticksLed_elim $$ Hpay with ⟨%t0, %m0, Hticks, Htk0, %hti0⟩
       k_step (wp_s_auipc cpu _ (KA.«sys_pause» + 0x32#64) false 0x8#20 19#5 (by decide))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       iintro Hk Hpc
@@ -1213,7 +1213,7 @@ theorem sp_from_a26 (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) (KL : KILLED)
           (DFrac.own 1) t0)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_pause_br_7896, sp_tk_2a42]
       iintro Hk Hpc Hticks
-      ihave Hpay := ticksRes_intro t0 $$ Hticks
+      ihave Hpay := ticksLed_intro t0 m0 hti0 $$ Hticks Htk0
       -- auipc s2,0x8 ; addi s2,s2,-1982  (s2 = &ticks)
       k_step (wp_s_auipc cpu _ (KA.«sys_pause» + 0x3a#64) false 0x8#20 18#5 (by decide))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]

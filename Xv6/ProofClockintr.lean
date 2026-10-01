@@ -161,10 +161,10 @@ theorem cki_acquire (AC : ACQUIRE) (c : CPU) (k' : KCtx) (γt : GName)
       ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
       kctx cpu' (((k'.pushOffAt spie spp).withRegs R').withLocks ("time" :: k'.locks)) -∗
       pcIs cpu' (jumpPc (k'.regs 1#5)) -∗ ⌜calleeSaved k'.regs R'⌝ -∗
-      locked γt cpu' -∗ ticksResAt curCtx -∗ (∃ K : Nat, viewLb cpu' K) -∗
+      locked γt cpu' -∗ ticksLedAt curCtx -∗ (∃ K : Nat, viewLb cpu' K) -∗
       sieArm cpu' k'.sie k'.proc -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := AC.wp_acquire (hlc := hlc) (GF := GF) c k' γt "time" ticksResAt hnoff hK hs
+  have h := AC.wp_acquire (hlc := hlc) (GF := GF) c k' γt "time" ticksLedAt hnoff hK hs
   unfold wp_acquire_body at h
   simp only [acquireAddr] at h
   rw [ha0] at h
@@ -177,13 +177,13 @@ theorem cki_release (RE : RELEASE) (c : CPU) (k' : KCtx) (γt : GName)
     (reen : Bool) (hreen : reen = (decide (k'.noff = 1) && k'.intena))
     (hon : reen = true → k'.tier = .kpt ∧ trapRes true + 6 ≤ k'.avail) :
     kctx c k' ∗ pcIs c KA.«release» ∗ isTickslock γt ∗
-    locked γt c ∗ ticksResAt curCtx ∗ popArm c k' reen ∗
+    locked γt c ∗ ticksLedAt curCtx ∗ popArm c k' reen ∗
     wpNext (k'.popExit reen).sie k'.proc c (fun cpu' => iprop(∀ R' : RegMap,
       kctx cpu' (((k'.popExit reen).withRegs R').withLocks
         (k'.locks.filter (fun x => x ≠ "time"))) -∗
       pcIs cpu' (jumpPc (k'.regs 1#5)) -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := RE.wp_release (hlc := hlc) (GF := GF) c k' γt "time" ticksResAt hsie hnoff hK reen
+  have h := RE.wp_release (hlc := hlc) (GF := GF) c k' γt "time" ticksLedAt hsie hnoff hK reen
     hreen hon
   unfold wp_release_body at h
   simp only [releaseAddr] at h
@@ -268,7 +268,7 @@ theorem clockintr_crit (RE : RELEASE) (WK : WAKEUP) (Γ : SchedNames)
     (htier : k.tier = KTier.kpt)
     (R : RegMap) (hR2 : R 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFF0#64) (hsv : ckSaved k.regs R) :
     kctx cpu ((ckK k).withRegs R) ∗ pcIs cpu (KA.«clockintr» + 0x34#64) ∗
-    procsInv Γ ∗ isTickslock γt ∗ locked γt cpu ∗ ticksResAt curCtx ∗
+    procsInv Γ ∗ isTickslock γt ∗ locked γt cpu ∗ ticksLedAt curCtx ∗
     frame2 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) ∗ ckPost cpu k
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, #Hpi, #Hlk, Hlocked, Hpay, Hframe, HΦ⟩
@@ -289,7 +289,7 @@ theorem clockintr_crit (RE : RELEASE) (WK : WAKEUP) (Γ : SchedNames)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [cki_ticks_addr]
   iintro Hk Hpc
   -- lw a5,0(a4) ; addiw a5,a5,1 ; sw a5,0(a4)
-  icases ticksRes_elim $$ Hpay with ⟨%t0, Hticks⟩
+  icases ticksLed_elim $$ Hpay with ⟨%t0, %n0, Hticks, Htk, %htie⟩
   k_step (wp_s_lw cpu _ (KA.«clockintr» + 0x3c#64) true 0#12 15#5 14#5 (by decide) (by decide)
       (DFrac.own 1) t0)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
@@ -300,7 +300,13 @@ theorem clockintr_crit (RE : RELEASE) (WK : WAKEUP) (Γ : SchedNames)
   k_step (wp_s_sw cpu _ (KA.«clockintr» + 0x40#64) true 0#12 14#5 15#5 (by decide) t0)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc Hticks
-  ihave Hpay := ticksRes_intro _ $$ Hticks
+  -- THE MIRROR STEPS WITH THE CELL (design ni-ticks-ledger.md D2): the word
+  -- the `sw` committed is `t0 + 1` at 32 bits, so the tie holds at `n0 + 1`
+  -- (`ticksTie_step`, stated on exactly this word)
+  iapply wpLoop_fupd
+  imod tickCnt_step n0 $$ Htk with ⟨Htk, -⟩
+  ihave Hpay := ticksLed_intro _ (n0 + 1) (ticksTie_step t0 n0 htie) $$ Hticks Htk
+  imodintro
   -- mv a0,a4 ; jal wakeup
   k_step (wp_s_add cpu _ (KA.«clockintr» + 0x42#64) true 10#5 0#5 14#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [KCtx.rget_zero]

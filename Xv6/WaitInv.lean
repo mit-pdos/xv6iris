@@ -64,6 +64,12 @@ THE PURE MODEL.  reparent(p) rewrites every cell equal to `p` to
    the geometry must sit below this file, as Rocq's `ProcGeom.v` does.
    `procAddr_inj` (SchedCtx, above) is taken as a HYPOTHESIS where the
    writers need it.
+6. **The tick mirror (`tickCnt` / `tickLb`, Rocq dd1843b7a) has its OWN
+   section** binding only `[MachGS hlc GF] [WchG GF]`: this file's main
+   section binds the slot classes too, which Lean 4 would pull into every
+   definition stated there, and `TicksDefs.isTickslock` must gain the
+   `WchG` binder and nothing else.  Rocq states it in `WaitInv`'s section
+   for the same reason it lives here at all (the ambient `mono_natG`).
 
 Imports only definitional files.
 -/
@@ -732,5 +738,66 @@ instance parentsResAt_morph [CurCtx] : CtxMorph (GF := GF) (parentsResAt (GF := 
       (fun _ => iprop(⌜∀ k, k < NPROC → ps k = 0#64⌝)) (parentsOwnAt_morph ps) (instCtxMorphConst _))
 
 end WaitInv
+
+/-! ## The tick counter's mirror (Rocq `tick_cnt` / `tick_lb`)
+
+NI-LEDGER-REST, design ni-ticks-ledger.md D1: a `MonoNat` at the canonical
+name `WchG.wtkName`, counting the clock interrupt's increments of `ticks`.
+The authority lives in `<tickslock>`'s payload (`TicksDefs.ticksLedAt`, tied
+to the 32-bit cell modulo 2^32); a lower bound is a persistent receipt, and
+any two are comparable because the name is pinned.  It is born at 0 in
+`WaitInvTies.childrenRes_alloc` (`childrenBootRows`).  Its own section
+(deviation 6): only `MachGS` (the ambient `MonoNatG`) and `WchG` (the
+name) are bound, so `TicksDefs.isTickslock` gains `[WchG GF]` and nothing
+else. -/
+
+section TickLedger
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [WchG GF]
+
+/-- the mirror's whole authority at count `n` (Rocq `tick_cnt`). -/
+def tickCnt (n : Nat) : IProp GF := MonoNat.auth_own (WchG.wtkName GF) (DFrac.own 1) (.ofNat n)
+/-- a receipt: the count has reached `n` (Rocq `tick_lb`). -/
+def tickLb (n : Nat) : IProp GF := MonoNat.lb_own (WchG.wtkName GF) (.ofNat n)
+
+instance tickLb_persistent (n : Nat) : Persistent (tickLb (GF := GF) n) := by
+  unfold tickLb; infer_instance
+instance tickLb_timeless (n : Nat) : Timeless (tickLb (GF := GF) n) := by
+  unfold tickLb; infer_instance
+instance tickCnt_timeless (n : Nat) : Timeless (tickCnt (GF := GF) n) := by
+  unfold tickCnt; infer_instance
+
+/-- the authority hands out a receipt for its own count (Rocq `tick_cnt_lb`). -/
+theorem tickCnt_lb (n : Nat) : tickCnt (GF := GF) n ⊢ tickCnt n ∗ tickLb n := by
+  unfold tickCnt tickLb
+  iintro Ha
+  ihave #Hb := MonoNat.lb_own_get _ _ _ $$ Ha
+  iframe Ha Hb
+
+/-- every receipt is below the count (Rocq `tick_lb_le`). -/
+theorem tickLb_le (n m : Nat) : tickCnt (GF := GF) n ⊢ tickLb m -∗ ⌜m ≤ n⌝ := by
+  unfold tickCnt tickLb
+  iintro Ha Hb
+  ihave %h := MonoNat.auth_lb_own_valid _ _ _ _ $$ Ha Hb
+  ipureintro
+  exact (MaxNat.le_toNat _ _).mp h.2
+
+/-- the count only grows (Rocq `tick_cnt_raise`). -/
+theorem tickCnt_raise (n m : Nat) (h : n ≤ m) : tickCnt (GF := GF) n ⊢ |==> tickCnt m := by
+  unfold tickCnt
+  iintro Ha
+  imod MonoNat.own_update _ (.ofNat n) (.ofNat m) ((MaxNat.le_toNat _ _).mpr h) $$ Ha with ⟨Ha, -⟩
+  imodintro
+  iexact Ha
+
+/-- one tick (Rocq `tick_cnt_step`). -/
+theorem tickCnt_step (n : Nat) : tickCnt (GF := GF) n ⊢ |==> (tickCnt (n + 1) ∗ tickLb (n + 1)) := by
+  unfold tickCnt tickLb
+  iintro Ha
+  imod MonoNat.own_update _ (.ofNat n) (.ofNat (n + 1)) ((MaxNat.le_toNat _ _).mpr (by simp)) $$ Ha
+    with ⟨Ha, Hb⟩
+  imodintro
+  iframe Ha Hb
+
+end TickLedger
 
 end Xv6

@@ -137,3 +137,26 @@ lower bounds as receipts.  No event vocabulary file is needed.
   dispatcher's row; pause's row (M0) reads two receipts of the one
   counter, comparable by `tick_lb_le`.  Nobody does yet.
 
+
+## Lean port as landed (2026-10-01)
+
+PI-3, port of dd1843b7a.  The mirror is `WaitInv.tickCnt` / `tickLb`
+(iris-lean's `MonoNat` over the machine's ambient `MonoNatG`, own section
+binding only `MachGS` + `WchG`) at the new `WchG.wtkName` (`SlotGen`), born
+at 0 in `WaitInvTies.childrenBootRows` / `childrenRes_alloc`; laws
+`tickCnt_lb`, `tickLb_le`, `tickCnt_raise`, `tickCnt_step`.  `TicksDefs`
+has `ticksTie` (`t.toNat = n % 2^32`), `ticksTie_step` (on the exact word
+the clock interrupt's `sw` commits), `ticksTie_ofNat`, and main's raise
+`ticksLed_boot`.  ONE DEVIATION OF SHAPE: Lean's main precondition
+(`SpecMain.mainGlobalsRaw`, carved by `BootCarveProc`) already holds
+`ticksResAt curCtx`, so `ticksResAt` stays the bare cell and the lock's
+payload is the new `ticksLedAt` (`isTickslock`'s body names it and gains
+`[WchG GF]`); main's contract and the carve are untouched.  The raise
+happens in `MainTrap.mn_trapinit` (gains `[WchG GF]` and a `tickCnt 0`
+premise, threaded by `ProofMain.mn_phaseB`).  Clockintr steps at its store
+(`wpLoop_fupd` + `tickCnt_step`), pause frames at its two reads, uptime's
+led twin `wp_sys_uptime_led_body` (receipt as the continuation's LAST
+premise) is the proof (`ProofSysUptime.sys_uptime_led`), the landed body
+its corollary.  Moved: `wp_sys_uptime_body` and `SYSUPTIME.wp_sys_uptime`
+gain `[WchG GF]` (R1); `SYSUPTIME` gains the field `wp_sys_uptime_led`
+(Rocq's second `Parameter`).  No other Spec statement's text moved.

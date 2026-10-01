@@ -19,6 +19,12 @@ at either `SIE` (`k_step_gen` / `wpNext_intro_pin`), exactly the shape of
 `Xv6/ProofKfree.lean`: `acquire` pushes `push_off`'s depth and hands the
 arm out, `release` pops it with `reen = k.sie` (`KCtx.reen_of_wf`), and
 the pair is balanced (`KCtx.pushOffAt_popExit`).
+
+THE TICKS LEDGER (design ni-ticks-ledger.md D4, Rocq dd1843b7a): the led
+twin is the proof (`sys_uptime_led`): the payload's mirror hands out a lower
+bound at the read (`WaitInv.tickCnt_lb`), and the tie turns it into the
+returned word (`TicksDefs.ticksTie_ofNat`).  The landed contract is its
+corollary (`sys_uptime_landed`).
 -/
 import Xv6.SpecSysUptime
 import Xv6.SpecAcquire
@@ -71,7 +77,7 @@ theorem su_filter_time (l : List String) (h : "time" ∉ l) :
   exact List.filter_eq_self.2 (fun x hx => by simp; intro e; subst e; exact h hx)
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx]
 
 /-! ## The callees, at their entry addresses -/
 
@@ -85,10 +91,10 @@ theorem su_acquire (AC : ACQUIRE) (c : CPU) (k' : KCtx) (γt : GName)
       ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
       kctx cpu' (((k'.pushOffAt spie spp).withRegs R').withLocks ("time" :: k'.locks)) -∗
       pcIs cpu' (jumpPc (k'.regs 1#5)) -∗ ⌜calleeSaved k'.regs R'⌝ -∗
-      locked γt cpu' -∗ ticksResAt curCtx -∗ (∃ K : Nat, viewLb cpu' K) -∗
+      locked γt cpu' -∗ ticksLedAt curCtx -∗ (∃ K : Nat, viewLb cpu' K) -∗
       sieArm cpu' k'.sie k'.proc -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := AC.wp_acquire (hlc := hlc) (GF := GF) c k' γt "time" ticksResAt hnoff hK hs
+  have h := AC.wp_acquire (hlc := hlc) (GF := GF) c k' γt "time" ticksLedAt hnoff hK hs
   unfold wp_acquire_body at h
   simp only [acquireAddr] at h
   rw [ha0] at h
@@ -103,13 +109,13 @@ theorem su_release (RE : RELEASE) (c : CPU) (k' : KCtx) (γt : GName)
     (reen : Bool) (hreen : reen = (decide (k'.noff = 1) && k'.intena))
     (hon : reen = true → k'.tier = .kpt ∧ trapRes true + 6 ≤ k'.avail) :
     kctx c k' ∗ pcIs c KA.«release» ∗ isTickslock γt ∗
-    locked γt c ∗ ticksResAt curCtx ∗ popArm c k' reen ∗
+    locked γt c ∗ ticksLedAt curCtx ∗ popArm c k' reen ∗
     wpNext (k'.popExit reen).sie k'.proc c (fun cpu' => iprop(∀ R' : RegMap,
       kctx cpu' (((k'.popExit reen).withRegs R').withLocks
         (k'.locks.filter (fun x => x ≠ "time"))) -∗
       pcIs cpu' (jumpPc (k'.regs 1#5)) -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := RE.wp_release (hlc := hlc) (GF := GF) c k' γt "time" ticksResAt hsie hnoff hK reen
+  have h := RE.wp_release (hlc := hlc) (GF := GF) c k' γt "time" ticksLedAt hsie hnoff hK reen
     hreen hon
   unfold wp_release_body at h
   simp only [releaseAddr] at h
@@ -122,9 +128,11 @@ end
 /-! ## The function -/
 
 set_option maxHeartbeats 4000000 in
-theorem sys_uptime_proof (AC : ACQUIRE) (RE : RELEASE) : SYSUPTIME :=
-  ⟨fun {hlc GF} _ _ _ cpu k γt hnoff hK hlk => by
-  unfold wp_sys_uptime_body
+/-- **The led twin** (Rocq `wp_sys_uptime_led_sconf`): the proof. -/
+theorem sys_uptime_led (AC : ACQUIRE) (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors}
+    [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx] (cpu : CPU) (k : KCtx) (γt : GName) hnoff hK hlk :
+    wp_sys_uptime_led_body (hlc := hlc) (GF := GF) cpu k γt hnoff hK hlk := by
+  unfold wp_sys_uptime_led_body
   simp only [sysUptimeAddr]
   iintro ⟨Hk, Hpc, #Hlk, Hnext⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -164,7 +172,8 @@ theorem sys_uptime_proof (AC : ACQUIRE) (RE : RELEASE) : SYSUPTIME :=
   unfold calleeSaved at hcs1
   k_norm_g at hcs1
   obtain ⟨g2, g8, g9, g18, g19, g20, g21, g22, g23, g24, g25, g26, g27⟩ := hcs1
-  icases ticksRes_elim $$ Hpay with ⟨%t0, Hticks⟩
+  icases ticksLed_elim $$ Hpay with ⟨%t0, %n0, Hticks, Htk, %htie⟩
+  icases tickCnt_lb n0 $$ Htk with ⟨Htk, #Htklb⟩
   -- auipc a5,0x7 ; lw a5,1940(a5) ; mv s1,a5
   k_step_gen (wp_s_auipc c5 _ (KA.«sys_uptime» + 0x16#64) false 7#20 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [su_u_7] next c6 hp6
@@ -173,7 +182,7 @@ theorem sys_uptime_proof (AC : ACQUIRE) (RE : RELEASE) : SYSUPTIME :=
       (by decide) (by decide) (DFrac.own 1) t0)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [su_ticks_addr] next c7 hp7
   iintro Hk Hpc Hticks
-  ihave Hpay := ticksRes_intro t0 $$ Hticks
+  ihave Hpay := ticksLed_intro t0 n0 htie $$ Hticks Htk
   k_step_gen (wp_s_add c7 _ (KA.«sys_uptime» + 0x1e#64) true 9#5 0#5 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [KCtx.rget_zero] next c8 hp8
   iintro Hk Hpc
@@ -247,13 +256,35 @@ theorem sys_uptime_proof (AC : ACQUIRE) (RE : RELEASE) : SYSUPTIME :=
   iapply wpNext_mono _ _ _ _ _ $$ Hnext
   iintro %c15 HΦ Hk Hpc
   iapply HΦ $$ %spie %spp %_ %t0 %hsp Hk Hpc
-  ipureintro
-  constructor
-  · unfold calleeSaved
-    simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
-    exact ⟨trivial, trivial, trivial, d18.trans g18, d19.trans g19, d20.trans g20,
-      d21.trans g21, d22.trans g22, d23.trans g23, d24.trans g24, d25.trans g25,
-      d26.trans g26, d27.trans g27⟩
-  · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]⟩
+  · ipureintro
+    constructor
+    · unfold calleeSaved
+      simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
+      exact ⟨trivial, trivial, trivial, d18.trans g18, d19.trans g19, d20.trans g20,
+        d21.trans g21, d22.trans g22, d23.trans g23, d24.trans g24, d25.trans g25,
+        d26.trans g26, d27.trans g27⟩
+    · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
+  · iexists n0
+    iframe Htklb
+    ipureintro
+    exact ticksTie_ofNat t0 n0 htie
+
+/-- **The landed contract**: the led twin with the receipt dropped. -/
+theorem sys_uptime_landed (AC : ACQUIRE) (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors}
+    [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx] (cpu : CPU) (k : KCtx) (γt : GName) hnoff hK hlk :
+    wp_sys_uptime_body (hlc := hlc) (GF := GF) cpu k γt hnoff hK hlk := by
+  have h := sys_uptime_led AC RE (hlc := hlc) (GF := GF) cpu k γt hnoff hK hlk
+  unfold wp_sys_uptime_led_body at h
+  unfold wp_sys_uptime_body
+  iintro ⟨Hk, Hpc, #Hlk, Hnext⟩
+  iapply h
+  iframe Hk Hpc Hlk
+  iapply wpNext_mono _ _ _ _ _ $$ Hnext
+  iintro %c HΦ %spie %spp %R' %t %hsp Hk Hpc %hpost _
+  iapply HΦ $$ %spie %spp %R' %t %hsp Hk Hpc %hpost
+
+theorem sys_uptime_proof (AC : ACQUIRE) (RE : RELEASE) : SYSUPTIME :=
+  ⟨fun {hlc GF} _ _ _ _ cpu k γt hnoff hK hlk => sys_uptime_landed AC RE cpu k γt hnoff hK hlk,
+   fun {hlc GF} _ _ _ _ cpu k γt hnoff hK hlk => sys_uptime_led AC RE cpu k γt hnoff hK hlk⟩
 
 end Xv6

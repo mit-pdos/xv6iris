@@ -559,10 +559,12 @@ theorem childrenInv_empty [CurCtx] (ξ : CtxId) (ps : Nat → BitVec 64) (gs : N
 
 /-! ## What the boot fupd hands main, and the payload -/
 
-/-- the NPROC rows, the orphan column, the empty pid register, and the NPROC
+/-- the NPROC rows, the orphan column, the empty pid register, the tick
+counter's mirror at 0 (design ni-ticks-ledger.md D1: main raises it to the
+cell's boot value before sealing `<tickslock>`), and the NPROC
 slot-generation wholes (Rocq `children_boot_rows`). -/
 def childrenBootRows : IProp GF :=
-  iprop(childrenResBoot ∗ orphansOwn ∅ ∗ pidRegAuth ∅ ∗
+  iprop(childrenResBoot ∗ orphansOwn ∅ ∗ pidRegAuth ∅ ∗ tickCnt 0 ∗
     [∗list] i ∈ List.range NPROC, ∃ γ0 g : GName,
       chFrag γ0 (procAddr i) ∅ ∗ slotGen (procAddr i) (.own 1) g)
 
@@ -750,12 +752,13 @@ theorem waitInv_procAddr_nodup
     hne (hinj _ _ (List.mem_range.mp ha) (List.mem_range.mp hb) e)
 
 /-- BOOT: the children map and its NPROC rows, the orphan column (EMPTY:
-nothing has exited), the NPROC slot-generation wholes (all at one arbitrary
+nothing has exited), the tick counter's mirror (at 0), the NPROC slot-generation wholes (all at one arbitrary
 name -- nothing reads it), the pid register (EMPTY), init's pid cell (WHOLE,
 at junk) and the pid counter's boot-era token (WHOLE) -- and the INSTANCE
 that names them (deviation 4). -/
-theorem childrenRes_alloc (hinj : ∀ a b, a < NPROC → b < NPROC → procAddr a = procAddr b → a = b) :
-    ⊢@{IProp GF} |==> ∃ W : WchG GF, @childrenBoot GF W ∗ @nextpidPend GF W := by
+theorem childrenRes_alloc {hlc : HasLC} [MachGS hlc GF]
+    (hinj : ∀ a b, a < NPROC → b < NPROC → procAddr a = procAddr b → a = b) :
+    ⊢@{IProp GF} |==> ∃ W : WchG GF, @childrenBoot hlc GF _ W ∗ @nextpidPend GF W := by
   imod ghost_map_alloc_empty (GF := GF) (K := GName) (V := BitVec 64 × ExtTreeSet GName compare)
     (H := RegMapF) with ⟨%γ, Ha⟩
   imod chRows_alloc γ NPROC $$ Ha with ⟨%m, Ha, %hm, Hrows⟩
@@ -771,11 +774,13 @@ theorem childrenRes_alloc (hinj : ∀ a b, a < NPROC → b < NPROC → procAddr 
   imod iOwn_alloc (GF := GF) (F := constOF IpidUR)
     (some (DFracAgree.mk (.own 1) (⟨0#32⟩ : DiscreteO (BitVec 32)))) (ipid_one_valid 0#32)
     with ⟨%γnp, Hnp⟩
+  -- ...and the tick counter's mirror, at 0 (design ni-ticks-ledger.md D1)
+  imod MonoNat.own_alloc (GF := GF) 0 with ⟨%γtk, Htk, -⟩
   imodintro
   iexists ({ wchName := γ, worphName := γo, wsgName := γsg, wprName := γpr, wipName := γip,
-             npidName := γnp } : WchG GF)
+             npidName := γnp, wtkName := γtk } : WchG GF)
   unfold childrenBoot childrenBootRows childrenResBoot childrenOwnAt orphansOwn pidRegAuth
-    initPidTok nextpidPend
+    initPidTok nextpidPend tickCnt
   isplitr [Hnp]
   · isplitl [Hip]
     · iexact Hip
@@ -789,6 +794,8 @@ theorem childrenRes_alloc (hinj : ∀ a b, a < NPROC → b < NPROC → procAddr 
     · iexact Ho
     isplitl [Hpr]
     · iexact Hpr
+    isplitl [Htk]
+    · iexact Htk
     ihave H := BigSepL.bigSepL_sep_eqv.mpr $$ [Hrows Hsg]
     · isplitl [Hrows]
       · iexact Hrows

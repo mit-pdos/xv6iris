@@ -149,6 +149,12 @@ class WchG (GF : BundledGFunctors) extends WchGpre GF where
   /-- THE PID COUNTER'S BOOT-ERA TOKEN: a SECOND name at `IpidUR` and no new
   functor (`nextpidPend` / `nextpidShot`) -/
   npidName : GName
+  /-- THE TICK COUNTER'S MIRROR NAME (Rocq `wtk_name`, design
+  ni-ticks-ledger.md D1): a `MonoNat` at this name counts the clock
+  interrupt's increments of `ticks`; `<tickslock>`'s payload ties the cell
+  to it modulo 2^32 (`TicksDefs.ticksTie`).  No camera rides with it: the
+  counter uses the machine's ambient `MonoNatG` (`MachFixedGS.mono`). -/
+  wtkName : GName
 
 /-- AN EIGHTH (Rocq `qeighth`, deviation 2). -/
 abbrev qeighth : Qp := Qp.quarter.half

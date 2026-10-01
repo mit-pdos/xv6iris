@@ -381,7 +381,7 @@ theorem mn_phaseB (PR : PROCINIT) (TI : TRAPINIT) (TIH : TRAPINITHART) (PLI : PL
   unfold mnProcBoot
   icases Hpb with ⟨Hhart, Hps, Hsf, Hlk, Hrows⟩
   unfold childrenBootRows
-  icases Hrows with ⟨Hchb, Horph, Hpra, Hslots⟩
+  icases Hrows with ⟨Hchb, Horph, Hpra, Htk, Hslots⟩
   unfold mnWorldB
   icases Hw with ⟨#Htbl, #Hp0, #Hp1, #Hr0, #Hr1, #Hecho, #Hi0, #Hi1, #Hplic, #Hpe, #Hkml, #Htr, #Hwire,
     #Hcert, #Hseam, #Hcinv⟩
@@ -403,7 +403,7 @@ theorem mn_phaseB (PR : PROCINIT) (TI : TRAPINIT) (TIH : TRAPINITHART) (PLI : PL
   imodintro
   -- +0x7e  trapinit, and the ticks lock
   iapply (mn_trapinit TI startedPrimary k R1 hsie hsl.2.1 γt tvl tvn tvc)
-  iframe Hk Hpc Ht0 Ht16 Htw Htn Htc Htlf Htres
+  iframe Hk Hpc Ht0 Ht16 Htw Htn Htc Htlf Htres Htk
   iintro %R2 Hk Hpc #Htl
   -- +0x82  trapinithart
   iapply (mn_trapinithart TIH startedPrimary k R2 hsie hsl.2.2)
