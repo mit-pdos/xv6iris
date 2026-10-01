@@ -18,7 +18,7 @@ WHERE THE DATA COMES FROM
    the instruction bytes from its entry up to the next function entry.
 
 2. The PROOFS, read from the ELABORATED ENVIRONMENT -- `envfacts.tsv`, which
-   tools/ci/EnvFacts.lean dumps from the built tree (tools/ci/envfacts.sh).
+   tools/ci/envfacts/EnvFacts.lean dumps from the built tree (tools/ci/envfacts.sh).
    Rocq's tool scrapes `.v` text for `pc_is (… KernelSyms.f)`; here the
    metaprogram reads the address argument of `pcIs` / `urun` out of the
    statement TERMS and evaluates it, so the join is on the ADDRESS and no
@@ -73,7 +73,7 @@ several functions).  So the user sections are about INSTRUCTIONS:
   * STEPPED: the instruction has a fact `uinstrIs γt pc rvc i` in the cone of
     the top theorems.  A proof can step an instruction only through such a
     fact, and every one is read off the program's dumped text
-    (`uinstrIs_of_text`, or a relocated table); tools/ci/EnvFacts.lean finds
+    (`uinstrIs_of_text`, or a relocated table); tools/ci/envfacts/EnvFacts.lean finds
     the uses in the proof terms (the `X` facts).
   * every other byte is EXPLAINED from the program's own control flow
     (tools/text_coverage.py): a function unreachable from the ELF entry in
@@ -118,6 +118,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import bisect
 import glob
 import json
 import os
@@ -208,14 +209,15 @@ def build_functions(image, syms, instrs):
             by_addr[addr].append(name)
     funcs = []
     bounds = sorted(by_addr)
+    ins = sorted(instrs)
+    addrs = [a for a, _ in ins]
     for i, addr in enumerate(bounds):
         names = sorted(by_addr[addr], key=lambda n: (n.startswith("_"), n))
         f = Func(image=image, name=names[0], addr=addr, aliases=names[1:])
         end = bounds[i + 1] if i + 1 < len(bounds) else 1 << 64
-        for a, w in instrs:
-            if addr <= a < end:
-                f.size += w
-                f.ninstr += 1
+        lo, hi = bisect.bisect_left(addrs, addr), bisect.bisect_left(addrs, end)
+        f.size = sum(w for _, w in ins[lo:hi])
+        f.ninstr = hi - lo
         funcs.append(f)
     return funcs
 
@@ -256,7 +258,6 @@ class AddrMap:
     def find(self, a):
         if self.tramp is not None and TRAMPOLINE <= a < TRAMPOLINE + PGSIZE:
             a = self.tramp + (a - TRAMPOLINE)
-        import bisect
         i = bisect.bisect_right(self.addrs, a) - 1
         if i < 0:
             return None
@@ -686,6 +687,31 @@ def call_sites(src):
 
 PC_NAME_RE = re.compile(r"(?:KA\.«(\w+)»|\b(\w+)Addr) \+ 0x([0-9a-fA-F]+)#64")
 GENERATED = ("KernelImage.lean", "KernelTree.lean", "KernelData.lean", "KernelElf.lean", "FsImgRaw.lean")
+_PC_TAIL_RE = re.compile(r" \+ 0x([0-9a-fA-F]+)#64")
+_KA_END_RE = re.compile(r"KA\.«(\w+)»$")
+_WORD_END_RE = re.compile(r"\w+$")
+
+
+def pc_names(text):
+    """`PC_NAME_RE.findall(text)`, fast: anchored on the literal ` + 0x…#64`
+    and reading the name backwards from there.  (`\\b(\\w+)Addr` as a leading
+    alternative makes the regex engine try every word of the file, ~25x
+    slower over the tree.)"""
+    out = []
+    for m in _PC_TAIL_RE.finditer(text):
+        s = m.start()
+        head = text[text.rfind("\n", 0, s) + 1:s]
+        k = _KA_END_RE.search(head)
+        if k:
+            out.append((k.group(1), "", m.group(1)))
+        elif head.endswith("Addr"):
+            w = _WORD_END_RE.search(head[:-4])
+            if w:
+                out.append(("", w.group(0), m.group(1)))
+    return out
+
+
+_NAMED_CACHE = {}
 
 
 def _camel(fn):
@@ -708,17 +734,21 @@ def call_site_audit(repo, funcs, callee):
     text = tc.parse_text(src[:a])
     amap = AddrMap(funcs)
     camel = {_camel(f.name): f.name for f in funcs}
-    named = set()
-    for tree in ("Xv6", "MachCSL"):
-        d = os.path.join(repo, tree)
-        for fn in sorted(os.listdir(d)) if os.path.isdir(d) else []:
-            if not fn.endswith(".lean") or fn in GENERATED:
-                continue
-            with open(os.path.join(d, fn), encoding="utf-8") as fh:
-                for k, c, off in PC_NAME_RE.findall(fh.read()):
-                    name = k or camel.get(c)
-                    if name:
-                        named.add((name, int(off, 16)))
+    key = (repo, tuple(sorted(camel.items())))
+    named = _NAMED_CACHE.get(key)
+    if named is None:
+        named = set()
+        for tree in ("Xv6", "MachCSL"):
+            d = os.path.join(repo, tree)
+            for fn in sorted(os.listdir(d)) if os.path.isdir(d) else []:
+                if not fn.endswith(".lean") or fn in GENERATED:
+                    continue
+                with open(os.path.join(d, fn), encoding="utf-8") as fh:
+                    for k, c, off in pc_names(fh.read()):
+                        name = k or camel.get(c)
+                        if name:
+                            named.add((name, int(off, 16)))
+        _NAMED_CACHE[key] = named
 
     def is_named(addr):
         r = amap.find(addr)
@@ -1047,6 +1077,9 @@ def main(argv=None):
                     help="envfacts.tsv from tools/ci/envfacts.sh (default: .lake/ci/envfacts.tsv)")
     ap.add_argument("--format", default="text", choices=("text", "md", "json"))
     ap.add_argument("--out")
+    ap.add_argument("--text-out", metavar="PATH",
+                    help="also write the text report (as `--format text` without --check prints "
+                         "it) to PATH: one run for CI's markdown summary and its log")
     ap.add_argument("--xv6", help="an xv6-riscv checkout for source-file attribution "
                                   "(default: <repo>/xv6-riscv; optional)")
     ap.add_argument("-v", "--verbose", action="store_true",
@@ -1121,6 +1154,9 @@ def main(argv=None):
         print(f"wrote {a.out}", file=sys.stderr)
     else:
         print(text)
+    if a.text_out:
+        with open(a.text_out, "w", encoding="utf-8") as fh:
+            fh.write(render_text(dict(rep, errors=[]), a.verbose) + "\n")
     kn, kb, kpn, kpb = totals(images["kernel"])
     ub = sum(u["summary"].get("total", 0) for u in utext.values())
     uc = sum(u["summary"].get("covered", 0) for u in utext.values())

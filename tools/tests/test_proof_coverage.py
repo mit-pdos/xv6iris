@@ -299,5 +299,24 @@ class FloorTests(unittest.TestCase):
         self.assertTrue(any("looks empty" in e for e in errs))
 
 
+
+class PcNameTests(unittest.TestCase):
+    TEXT = ("  -- KA.«kfree» + 0x1c#64 and kallocAddr + 0x8#64, (fooAddr + 0x2#64)\n"
+            "  KA.«x» + 0x10#64 Addr + 0x4#64 a.bAddr + 0xA#64 KA.«y»  + 0x1#64\n"
+            "  zAddr + 0x3#32 émileAddr + 0x5#64 x_1Addr + 0xff#64")
+
+    def test_pc_names_is_the_regex(self):
+        # the fast scan finds exactly what PC_NAME_RE.findall finds
+        self.assertEqual(cov.pc_names(self.TEXT), cov.PC_NAME_RE.findall(self.TEXT))
+        self.assertEqual([(k or c, o) for k, c, o in cov.pc_names(self.TEXT)],
+                         [("kfree", "1c"), ("kalloc", "8"), ("foo", "2"), ("x", "10"),
+                          ("b", "A"), ("émile", "5"), ("x_1", "ff")])
+
+    def test_sizes_by_extent(self):
+        # unsorted instructions, a gap, and the last function running to the end
+        syms = {"a": 0x10, "b": 0x14}
+        fs = {f.name: f for f in cov.build_functions("kernel", syms, [(0x18, 2), (0x10, 4), (0x14, 2)])}
+        self.assertEqual((fs["a"].size, fs["a"].ninstr, fs["b"].size, fs["b"].ninstr), (4, 1, 4, 2))
+
 if __name__ == "__main__":
     unittest.main()

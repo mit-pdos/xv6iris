@@ -45,13 +45,14 @@ else
 fi
 
 rc=0
+# one run each: the markdown for the summary and the text for the log
+rm -f "$OUT/coverage.txt" "$OUT/dead.md"
 python3 tools/proof_coverage.py --facts "$OUT/envfacts.tsv" --format md \
-  --out "$OUT/coverage.md" --check || rc=$?
+  --out "$OUT/coverage.md" --text-out "$OUT/coverage.txt" --check || rc=$?
 cat "$OUT/coverage.md" >> "$SUMMARY"
-python3 tools/proof_coverage.py --facts "$OUT/envfacts.tsv" | sed -n '1,/^legend/p'
+[ -f "$OUT/coverage.txt" ] && sed -n '1,/^legend/p' "$OUT/coverage.txt"
 
-python3 tools/find_dead.py --facts "$OUT/envfacts.tsv" --triage --top 40 || true
-python3 tools/find_dead.py --facts "$OUT/envfacts.tsv" --format md --out "$OUT/dead.md" > /dev/null || true
+python3 tools/find_dead.py --facts "$OUT/envfacts.tsv" --triage --top 40 --md-out "$OUT/dead.md" || true
 [ -f "$OUT/dead.md" ] && cat "$OUT/dead.md" >> "$SUMMARY"
 
 if [ "$rc" -ne 0 ]; then

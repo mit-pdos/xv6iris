@@ -135,6 +135,29 @@ class FindDeadTests(unittest.TestCase):
         self.assertEqual(rc, 0)
         self.assertIn("NOTHING was analysed", buf.getvalue())
 
+    def test_md_out_is_the_md_run(self):
+        # one run writes the triage to stdout and, with --md-out, exactly the
+        # report a separate `--format md` run (without --top) writes
+        with Tree() as t:
+            md = os.path.join(t.d.name, "a.md")
+            out = os.path.join(t.d.name, "b.md")
+            buf1, buf2 = io.StringIO(), io.StringIO()
+            with redirect_stdout(buf1):
+                fd.main(["--repo", t.d.name, "--facts", t.facts, "--triage", "--top", "1",
+                         "--md-out", md])
+            with redirect_stdout(buf2):
+                fd.main(["--repo", t.d.name, "--facts", t.facts, "--format", "md", "--out", out])
+            buf3 = io.StringIO()
+            with redirect_stdout(buf3):
+                fd.main(["--repo", t.d.name, "--facts", t.facts, "--triage", "--top", "1"])
+            self.assertEqual(open(md).read(), open(out).read())
+            self.assertEqual(buf1.getvalue(), buf3.getvalue())
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            rc = fd.main(["--facts", "/nonexistent/envfacts.tsv"])
+        self.assertEqual(rc, 0)
+        self.assertIn("NOTHING was analysed", buf.getvalue())
+
 
 if __name__ == "__main__":
     unittest.main()

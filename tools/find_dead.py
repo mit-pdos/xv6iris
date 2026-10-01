@@ -3,7 +3,7 @@
 
 The Lean counterpart of Rocq's iris/find_dead.py (main).  That tool reads
 `.glob` files and reports definitions whose NAME no file references.  This
-one reads `envfacts.tsv` -- the output of tools/ci/EnvFacts.lean, a
+one reads `envfacts.tsv` -- the output of tools/ci/envfacts/EnvFacts.lean, a
 metaprogram over the elaborated environment -- and reports declarations that
 are not in the CONE of the top theorems (tools/ci/roots.txt): reachable
 through no chain of types and proof terms from a theorem the project claims.
@@ -74,7 +74,7 @@ import argparse
 import os
 import re
 import sys
-from collections import defaultdict
+from collections import Counter, defaultdict
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -166,12 +166,11 @@ class Sources:
         `modules`} -- generated files excluded (they are megabytes of data and
         name nothing but themselves).  A declaration's own statement is one."""
         if getattr(self, "_mentions", None) is None:
-            cnt = defaultdict(int)
+            cnt = Counter()
             for m in modules:
                 if self.generated(m):
                     continue
-                for tok in self.IDENT_RE.findall("\n".join(self.lines(m))):
-                    cnt[tok] += 1
+                cnt.update(self.IDENT_RE.findall("\n".join(self.lines(m))))
             self._mentions = cnt
         return self._mentions
 
@@ -367,6 +366,9 @@ def main(argv=None):
     ap.add_argument("--format", choices=("text", "md"), default="text")
     ap.add_argument("--top", type=int, default=0, help="cap each triage category at N rows")
     ap.add_argument("--out", help="write the report here as well as to stdout")
+    ap.add_argument("--md-out", metavar="PATH",
+                    help="also write the markdown report (as `--format md` renders it) to PATH: "
+                         "one run for CI's log and its step summary")
     a = ap.parse_args(argv)
     repo = os.path.abspath(a.repo)
     facts = a.facts or os.path.join(repo, ".lake", "ci", "envfacts.tsv")
@@ -389,6 +391,11 @@ def main(argv=None):
     if a.out:
         with open(a.out, "w", encoding="utf-8") as f:
             f.write(text + "\n")
+    if a.md_out:
+        with open(a.md_out, "w", encoding="utf-8") as f:
+            # as a separate `--format md` run (no --top) renders it
+            md_args = argparse.Namespace(**dict(vars(a), top=0))
+            f.write(render_md(res, imports, roots, cone, md_args, src) + "\n")
     return 0
 
 
