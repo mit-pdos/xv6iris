@@ -119,6 +119,11 @@ Section EscrowDeposit.
        out at [FrzPost], the column steps to [FrzOff], and the token goes back
        in at [FrzOff] for whoever peels the pool entry next. *)
     redeem_ticketA gd -∗
+    (* THE RETAG'S CREDIT (port-ordinal guardrail (5), owner 2026-10-01): the
+       [_same] retag below opens [appN] through [AppInv.app_top_update], which
+       spends one later credit on the application body's later; iput's
+       preceding instruction continuation hands it in. *)
+    £ 1 -∗
     (* RECORD-GRANULAR since durable-disk 2b-inode-1, exactly as
        [InodeRegion.ireg_write_au] is: the deposit surrenders the corpse's
        OWN 64-byte run and takes it back at the type-0 record.  [bsl] is
@@ -160,7 +165,7 @@ Section EscrowDeposit.
                           ∗ t ↪[ln_tx icfg_log]{#q} tt).
   Proof using .
     iIntros (HE Hesc_mask Hpool_mask Hftop_mask Hin Hdn' Hz Hbare Hnl)
-      "#Hinv #Hesc #Hpinv Hel Hdn Hdep".
+      "#Hinv #Hesc #Hpinv Hel Hdn Hdep Hlc".
     pose proof (islot_lt inum) as Hsl.
     assert (Hkey : (16 * Z.of_nat (ireg_bi inum) + Z.of_nat (islot inum))%Z
                    = bv_unsigned inum) by (symmetry; apply ireg_key_split).
@@ -253,7 +258,7 @@ Section EscrowDeposit.
     iMod (ireg_top_retag_same (E ∖ ↑iregN ∖ ↑escAN (bv_unsigned inum)) γfs
             (bv_unsigned inum) ntop (free_node dn') Hftop_mask Habs
             (inode_local_free_node (bv_unsigned inum) dn' Hbare Hnl0' Hz)
-            with "Hftopi Happi Htop") as "Htop".
+            with "Hftopi Happi Htop Hlc") as "Htop".
     iDestruct (ireg_top_park_free γfs (bv_unsigned inum) dn' Hbare with "Htop")
       as "Hpark".
     iDestruct (ireg_rcol_freeze_agree with "Hla Hfz") as %->.
