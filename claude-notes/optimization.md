@@ -719,7 +719,7 @@ uexecSGXv6) … n …` (the deposit post, whose head unfolds to `xv6Spost`'s
 `if n = USYS_exec … else if n = 5 …` chain) that check took ~6.5 s per proof
 (the elaborator's time is unaffected, so only `[Kernel]` in a
 `trace.profiler` run shows it); the same hypothesis at the unfolded
-`xpostWrite …` / `xpostOpen …` / `xpostRead …` is free.  Seven declarations on
+`xpostWrite …` / `xpostOpen …` / `xpostRead …` is free.  Ten proofs on
 the build's critical path paid it (UkFileOpenRead, the three UkFileOpenCalls*
 corollaries, UkFileDevWrite, UkFileDevNil x2, UkPipesIfaceK, UkPipeDevXv6 x2).
 Two fixes: rewrite the continuation's premise first (`rw [spostAt_xv6_write]`,
