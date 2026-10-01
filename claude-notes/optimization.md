@@ -779,6 +779,29 @@ per-file TIMED `real`, never from per-file time sums.
   MINIMAL form is free, since it declares what Rocq already computes; it is the
   non-minimal forms that change a lemma's ARGUMENT LIST. `vm_cast_no_check` in the generated decode band only moves cost from
   `Qed` to elaboration.
+- **Lean: precompiling the tactics does not pay — do not redo this.** The
+  profiler's `interpretation` category (~220 s over the 56 slowest modules)
+  is INCLUSIVE: it is the time spent under an interpreted elaborator,
+  including the native `isDefEq`/`whnf`/instance-search calls it makes that
+  carry no category of their own. Compiling the elaborator moves that time to
+  `tactic execution`; the interpreter's own overhead was 1-5 % of a module.
+  Measured (Sept 30 2026, quiet 96-core VM, clean `lake build Xv6 MachCSL`,
+  deps cached): (a) the MachCSL tactic implementations (`swp_run`, `uwk_run`,
+  `kernel_walk`) moved to Lean-only modules (`fwd%` forward names checked in
+  the model-side module) in a `precompileModules` library: wall 310 → 309 s,
+  ΣCPU 8109 → 7999 s, critical path 304 → 303 s; `MachCSL.UWalk`'s 11 s of
+  interpretation became 10.2 s of tactic execution (−0.6 s). Inside noise, so
+  not landed (branch `precompile-tactics-experiment`, unpushed). (b) iris-lean's
+  proof mode, natively, via `dynlibs = ["batteries/Batteries:shared",
+  "Qq/Qq:shared", "iris/Iris:shared"]` on both libraries (no vendoring needed;
+  the three must be listed in dependency order, lake does not load a
+  dynlib's own dependencies): interpretation in `Xv6.ProofKfork` 8.3 s →
+  0.2 s, but its category sum fell only 35.0 → 33.2 s, and every module now
+  loads ~25 MB of shared libraries and depends on the whole of Batteries: a
+  clean build went 353 → 408 s wall, ΣCPU 7950 → 8424 s. Never run several
+  `lake lean`s on one tree at once: concurrent lakes rebuilding the same
+  libraries looped on "`Task.get` called from a `(sync := true)` task" and
+  wrote a 729 GB log.
 - **The generated decode band's cost is the PROOFMODE, not the `vm_compute`s.**
   State the whole `instr` introduction as ONE lemma so the proofmode work happens
   once. This is what an `XV6_REV` bump re-pays.
