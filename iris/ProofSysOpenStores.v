@@ -841,7 +841,9 @@ Section ProofSysOpenStores.
                     Hdev Hgeo Hdlk Hbsl [] Hop").
     { iApply (log_credit_own icfg_log false Sb2 e2 (IBLOCK inum icfg_ist)
                 ltac:(discriminate)). }
-    iIntros (CID16 Hq16) "_"; iIntros (mit) "%Hcsit Hcg Hown Htce Hcce Hpc Hpbare Hidev Hiinum
+    (* itrunc's return credit pays the trunc fire's opener
+       ([opf_atrunc_fire]'s [£ 1], spent at [AppInv.app_top_update]) *)
+    iIntros (CID16 Hq16) "Hlc"; iIntros (mit) "%Hcsit Hcg Hown Htce Hcce Hpc Hpbare Hidev Hiinum
                               Hsbb Hsbi Hmeta Hmap Hblk Hat Hbsl Hop".
     iDestruct "Hop" as (wit u3 Sb3)
       "(%Hsb3 & %Hib3 & %Hwit & %Hcrb3 & %Hu3g & Hop)".
@@ -922,7 +924,7 @@ Section ProofSysOpenStores.
                (fun _ => replicate BSIZE (bv_0 8)) Htyfz)
             (opf_trunc_row dn bm bm_empty data
                (fun _ => replicate BSIZE (bv_0 8)) Htyfz)
-            with "[] [] Htc Htop") as "[Htop Htr2]";
+            with "[] [] Htc Htop Hlc") as "[Htop Htr2]";
       [iApply (ireg_inv_ftop with "Hireg") | iApply (ireg_inv_app with "Hireg") |].
     iModIntro.
     (* the kept family's receipt IS the caller's ([SysOpenDefs.cre_ft_kept]) *)
