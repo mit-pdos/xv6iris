@@ -17,7 +17,7 @@ interface `USH_MEMSET` (UshTreeDefs deviation 2).
 -/
 import Xv6.SpecShCmdalloc
 import Xv6.UshNodes
-import Xv6.UshCode
+import Xv6.UshCodeAlloc
 
 namespace Xv6
 

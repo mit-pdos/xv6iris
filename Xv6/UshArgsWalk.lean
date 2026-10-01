@@ -37,6 +37,7 @@ import Xv6.UshNodes
 import Xv6.UshRedirsWalk
 import Xv6.UlibVprintfInv
 import Xv6.UshParserPure
+import Xv6.UshCodeExec
 
 namespace Xv6
 

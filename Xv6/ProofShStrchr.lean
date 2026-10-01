@@ -18,7 +18,7 @@ stated by its facts (a0, a5 written, every other register the entry's).
 -/
 import Xv6.SpecShStrchr
 import Xv6.UkGrepDefs
-import Xv6.UshCode
+import Xv6.UshCodeUlib
 
 namespace Xv6
 

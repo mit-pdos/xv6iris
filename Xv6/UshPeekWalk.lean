@@ -23,7 +23,7 @@ interface `SH_STRCHR`.
 -/
 import Xv6.SpecShStrchr
 import Xv6.UkGrepDefs
-import Xv6.UshCode
+import Xv6.UshCodePeek
 
 namespace Xv6
 

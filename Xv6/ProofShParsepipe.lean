@@ -20,6 +20,7 @@ import Xv6.SpecShParsepipe
 import Xv6.SpecShGettoken
 import Xv6.SpecShPipecmd
 import Xv6.UshPipeWalk
+import Xv6.UshCodePipe
 
 namespace Xv6
 

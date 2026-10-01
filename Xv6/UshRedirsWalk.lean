@@ -23,7 +23,7 @@ import Xv6.SpecShPeek
 import Xv6.SpecShGettoken
 import Xv6.SpecShRedircmd
 import Xv6.UshLits
-import Xv6.UshCode
+import Xv6.UshCodeRedirs
 
 namespace Xv6
 

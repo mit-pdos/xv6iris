@@ -47,6 +47,7 @@ spills are a contiguous run from the top slot (Rocq `wp_kshp_frame_pro`/
 import Xv6.UkRunMem
 import Xv6.UkProgAbi
 import Xv6.UkRunLeaf
+import Xv6.UshCodeGettoken
 
 namespace Xv6
 

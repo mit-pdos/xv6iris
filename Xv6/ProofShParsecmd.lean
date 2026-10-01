@@ -28,6 +28,7 @@ import Xv6.SpecShPeek
 import Xv6.SpecShNulterminate
 import Xv6.UshRedirsWalk
 import Xv6.UshATree
+import Xv6.UshCodeParsecmd
 
 namespace Xv6
 

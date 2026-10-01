@@ -18,7 +18,7 @@ import Xv6.SpecShStrlen
 import Xv6.UkEchoDefs
 import Xv6.UkRunBr
 import Xv6.UkProgAbi
-import Xv6.UshCode
+import Xv6.UshCodeUlib
 
 namespace Xv6
 
