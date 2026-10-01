@@ -1,0 +1,13 @@
+# tools/ci/envfacts/EnvFacts.lean as a NATIVE executable (see its header).
+# Its own package so that the proofs' lakefile is untouched: it imports only
+# `Lean` (the toolchain's, picked by the repository's lean-toolchain), and
+# finds Xv6/MachCSL at run time through `lake env`'s LEAN_PATH.
+#   lake -d tools/ci/envfacts build envfacts     (tools/ci/envfacts.sh does it)
+name = "envfacts"
+
+[[lean_exe]]
+name = "envfacts"
+root = "EnvFacts"
+# `importModules (loadExts := true)` runs the imported modules' extension
+# initializers, which needs the interpreter.
+supportInterpreter = true

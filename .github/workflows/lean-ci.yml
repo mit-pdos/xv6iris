@@ -221,7 +221,8 @@ jobs:
 
       # ---- 7. Reports: profile, coverage, dead code ----
       # One step because all three read the same dump of the elaborated
-      # environment (tools/ci/EnvFacts.lean, ~1-2 min).  BLOCKING: that dump
+      # environment (tools/ci/envfacts/EnvFacts.lean, a native executable the
+      # build step compiles alongside the proofs).  BLOCKING: that dump
       # (a top theorem of tools/ci/roots.txt that no longer exists would
       # silently empty the reports) and the coverage check (a kernel function
       # that is not proven, linked and reached and has no allowlist row; a

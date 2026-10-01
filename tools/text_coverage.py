@@ -4,7 +4,7 @@ tools/proof_coverage.py; the theory is here so that it can be tested alone).
 
 A user-program proof steps an instruction only through an instruction fact
 `uinstrIs γt pc rvc i`, and every such fact is read off the program's dumped
-text (tools/ci/EnvFacts.lean, the `X` facts).  So the set of pcs that have a
+text (tools/ci/envfacts/EnvFacts.lean, the `X` facts).  So the set of pcs that have a
 fact INSIDE THE CONE OF THE TOP THEOREMS is exactly the set of instructions
 some verified run can execute: a byte outside it is a byte no proof ever
 steps.

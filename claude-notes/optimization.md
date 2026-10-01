@@ -861,6 +861,40 @@ metric for whole-tree proof-term size** — treat a jump as a tripwire.
 - The lever, if anyone wants it, is per-lemma binders instead of `Section` +
   `Context` in the hot cone. That is a campaign, not a fix.
 
+### Lean: a CI metaprogram over the environment is a native executable
+
+`tools/ci/envfacts/EnvFacts.lean` (the cone, pc pins and instruction facts the
+coverage and dead-code reports read) ran as `lake env lean File.lean` with an
+`#eval`: 58 s on the 96-core VM, ~170 s on the 24-core CI runner, 94 % of the
+`reports` step. Measured (Sept 30 2026, VM, same built tree, outputs
+byte-identical at every stage):
+
+- **Importing is not the cost**: `import Xv6 MachCSL` is 0.8 s. Compiling the
+  `#eval`'s do-block is 3.1 s (`compilation (LCNF base)` in `-Dprofiler`), every
+  run. The rest was the walks, INTERPRETED.
+- **Walk each proof term once.** The cone walk and the instruction-fact pass
+  each ran `getUsedConstants` over all ~80k values (12.7 s + 8.5 s); one shared
+  walk (`Used`) feeding both: 9.4 s. A per-statement pin walk with a memo on
+  repeated `.deep` subterms (instance arguments, frames): 13.3 → ~10 s.
+- **Interpreted code does not scale over threads.** `Task.spawn` over chunks
+  (results kept in order): 1 thread 38.6 s, 8 threads 20.4 s, 24 → 16.8 s,
+  96 → 15.7 s, with CPU 38 → 80 → 120 → 217 s: every interpreted access to a
+  shared object is an atomic RC update.
+- **Native: 58 s → 3.1 s** (2.0 s of passes, 1 s import/startup; 3.6 s on 24
+  cores; 16 s on one). It is its own lake package (`lean_exe`,
+  `supportInterpreter = true`, `import Lean` only, `importModules (loadExts :=
+  true)` after `enableInitializersExecution` at run time, LEAN_PATH from `lake
+  env`), so the proofs' lakefile is untouched. Without `loadExts` the instance
+  attribute is not loaded and every `instFoo` reads as a `def` — diff the
+  output. Building it is ~10 s of one core; CI builds it in the `build` step
+  alongside the proofs, so the `reports` step only runs it.
+- Python side, same step: a regex `(?:KA\.«(\w+)»|\b(\w+)Addr) \+ 0x…` over all
+  sources was 2.5 of coverage's 3.3 s (a `\b(\w+)` leading alternative is tried
+  at every word); anchoring on the literal tail: 0.11 s. Run each report tool
+  ONCE and write both formats (`--text-out`, `--md-out`).
+- The same treatment would apply to `tools/audit/Audit.lean` and
+  `tools/tcb/Tcb.lean` (83 s + 57 s on CI, also interpreted `#eval`s), not done.
+
 ## Smaller traps
 
 - **A `big_sepM` submap step inlined at syscall altitude does not terminate.**

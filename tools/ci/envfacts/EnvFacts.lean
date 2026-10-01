@@ -11,11 +11,28 @@ EnvFacts: the facts the CI report tools read off the ELABORATED ENVIRONMENT
     which is what joins a proof to the function of the image it is about.
 
 Run ON THE BUILD MACHINE, from the repo root, against a built tree (it only
-reads .olean files; ~1 min):
+reads .olean files): `tools/ci/envfacts.sh`, which builds this file as a
+NATIVE executable (its own tiny lake package, tools/ci/envfacts/: it imports
+only `Lean`, and loads Xv6 and MachCSL at run time through the `LEAN_PATH`
+that `lake env` sets) and runs it:
 
-    XV6_ENVFACTS_OUT=envfacts.tsv lake env lean tools/ci/EnvFacts.lean
+    lake -d tools/ci/envfacts build envfacts
+    XV6_ENVFACTS_OUT=envfacts.tsv lake env tools/ci/envfacts/.lake/build/bin/envfacts
 
-(`tools/ci/envfacts.sh` is the documented entry point.)  Inputs:
+Why native, and why parallel.  The work is walks over ~80k proof terms and
+~3.5k statements; interpreted (`lake env lean` on a file with an `#eval`, as
+this used to run) it took ~60 s on one core, plus 3 s to compile the `#eval`
+each time.  Compiled, every pass below is also spread over all cores
+(`parMap`: pure maps over independent constants, results kept in order), and
+the whole run is ~3 s on a 24- or 96-core machine; building the executable
+is ~10 s and CI does it alongside the proof build (tools/ci/run_all.sh).
+(Interpreted code does not scale over threads: every access to a shared
+object is an atomic reference-count update, so 8 threads ran 2x faster, not
+8x.)  The walks are also shared: every proof term is walked ONCE for the
+constants it names (`Used`), and the cones, the meta/instance tests, the pin
+unfolding and the instruction-fact pass all read that.
+
+Inputs:
 `tools/ci/roots.txt` (the top theorems) and `tools/ci/dead_allow.txt` (extra
 liveness roots: demos, tools).  A root that does not exist is an ERROR (exit
 1): a renamed top theorem must not silently empty the cone.
@@ -56,9 +73,8 @@ they occur in the statement:
 (space-separated 0x...): what ties a contract that is not entered through a
 pc premise (a trap vector's handler contract) to its function.
 -/
-import Xv6
-import MachCSL
-open Lean Elab Command
+import Lean
+open Lean
 
 namespace CiFacts
 
@@ -69,14 +85,29 @@ def modOf (env : Environment) (n : Name) : Option Name :=
 
 def isLocalMod (m : Name) : Bool := localRoots.contains m.getRoot
 
-def isLocal (env : Environment) (n : Name) : Bool :=
-  match modOf env n with
-  | some m => isLocalMod m
-  | none => false
+/-- The constants a local constant's type and value name, computed ONCE per
+constant (`Expr.getUsedConstants`, native) and shared by every pass below:
+walking the ~80k proof terms is the bulk of this program's work, so no pass
+may walk them again. -/
+structure Used where
+  ty : Array Name
+  val : Array Name
+  deriving Inhabited
+
+/-- The out-edges of a constant in the term graph: what its type and value
+name, plus an inductive's constructors / a constructor's inductive. -/
+def edges (ci : ConstantInfo) (u : Used) : Array Name :=
+  let es := u.ty ++ u.val
+  match ci with
+  | .inductInfo v => es ++ v.ctors.toArray
+  | .ctorInfo v => es.push v.induct
+  | _ => es
 
 /-- The cone of `roots`: every constant reachable through types and values
-(proof terms included).  Only local (Xv6/MachCSL) constants are expanded. -/
-def cone (env : Environment) (roots : Array Name) (seen0 : NameSet := {}) : NameSet := Id.run do
+(proof terms included).  Only local (Xv6/MachCSL) constants are expanded;
+`deps` holds their out-edges (`edges`). -/
+def cone (deps : Std.HashMap Name (Array Name)) (roots : Array Name) (seen0 : NameSet := {}) :
+    NameSet := Id.run do
   let mut seen := seen0
   let mut stack := roots
   while !stack.isEmpty do
@@ -84,16 +115,9 @@ def cone (env : Environment) (roots : Array Name) (seen0 : NameSet := {}) : Name
     stack := stack.pop
     if seen.contains n then continue
     seen := seen.insert n
-    let some ci := env.find? n | continue
-    unless isLocal env n do continue
-    let push (e : Expr) (st : Array Name) : Array Name :=
-      e.foldConsts st fun c st => if seen.contains c then st else st.push c
-    stack := push ci.type stack
-    match ci with
-    | .inductInfo v => for c in v.ctors do stack := stack.push c
-    | .ctorInfo v => stack := stack.push v.induct
-    | _ =>
-      if let some v := ci.value? (allowOpaque := true) then stack := push v stack
+    let some es := deps[n]? | continue
+    for c in es do
+      unless seen.contains c do stack := stack.push c
   return seen
 
 /-- Name components the elaborator generates (not user-written declarations). -/
@@ -124,10 +148,10 @@ def declKind (env : Environment) (n : Name) (ci : ConstantInfo) : Option String 
 
 /-- Syntax, macros, elaborators, simprocs: used at elaboration time, so they
 leave no edge in any term. -/
-def isMeta (ci : ConstantInfo) : Bool :=
-  (ci.type.getUsedConstants.any fun c => c.getRoot == `Lean) ||
+def isMeta (ci : ConstantInfo) (u : Used) : Bool :=
+  (u.ty.any fun c => c.getRoot == `Lean) ||
   (match ci with
-   | .defnInfo d => d.value.getUsedConstants.any fun c =>
+   | .defnInfo _ => u.val.any fun c =>
        c == ``Lean.ParserDescr.node || c == ``Lean.Macro || c == ``Lean.ParserDescr.trailingNode
    | _ => false)
 
@@ -197,11 +221,20 @@ def progOf (c : Name) : Option String :=
 def progsOf (e : Expr) : List String :=
   (e.getUsedConstants.filterMap progOf).toList.eraseDups
 
+/-- What walking one subterm yields: its pins, the addresses it mentions
+(first occurrences, in order) and the walk steps it took. -/
+abbrev PinMemo := Std.HashMap Expr (Array String × Array Nat × Nat)
+
 structure PinSt where
   pins : Array String := #[]
   /-- closed address constants the statement names anywhere (not only as a pc) -/
   mentions : Array Nat := #[]
   budget : Nat := 400000
+  /-- the `.deep` application nodes already walked (see `walk`) -/
+  memo : PinMemo := {}
+
+def addMentions (acc ms : Array Nat) : Array Nat :=
+  ms.foldl (fun acc v => if acc.contains v then acc else acc.push v) acc
 
 structure PinCfg where
   env : Environment
@@ -236,13 +269,39 @@ inductive Mode | spine | prem | deep
 
 def biName (s : String) : Name := .str (.str (.str (.str .anonymous "Iris") "BI") "BIBase") s
 
+mutual
 /-- The pins of `e`, in order, each tagged `e` (ENTRY: a pc predicate that is
 itself a top-level premise -- the statement starts running there) or `c`
 (anything nested: continuations, callee contracts).  Binder types are
 skipped; definitions in `cfg.unfold` are unfolded at their arguments, so a
 pin factored into a frame is read at the address the frame is applied to. -/
 partial def walk (cfg : PinCfg) (mode : Mode) (e : Expr) : StateM PinSt Unit := do
-  if (← get).budget == 0 then return
+  let s ← get
+  if s.budget == 0 then return
+  -- MEMO.  A statement repeats the same `.deep` subterms (instance arguments,
+  -- types, frames) many times, and so do the statements of one module; the
+  -- walk of one depends on nothing but the term (and the budget), so it is
+  -- replayed: its pins appended, its mentions merged (first occurrences
+  -- stay first), its steps charged.  Exactly what walking it again does,
+  -- as long as the budget does not run out inside it -- so a replay needs
+  -- more budget than the walk took, and a walk that ran out is not stored.
+  if mode == .deep && e.isApp then
+    if let some (ps, ms, used) := s.memo[e]? then
+      if used < s.budget then
+        set { s with pins := s.pins ++ ps, mentions := addMentions s.mentions ms,
+                     budget := s.budget - used }
+        return
+    set { s with pins := #[], mentions := #[] }
+    walkStep cfg mode e
+    let s' ← get
+    let used := s.budget - s'.budget
+    let memo := if s'.budget > 0 then s'.memo.insert e (s'.pins, s'.mentions, used) else s'.memo
+    set { s' with pins := s.pins ++ s'.pins, mentions := addMentions s.mentions s'.mentions, memo }
+  else
+    walkStep cfg mode e
+
+/-- One step of `walk`: charge it, and walk the subterms. -/
+partial def walkStep (cfg : PinCfg) (mode : Mode) (e : Expr) : StateM PinSt Unit := do
   modify fun s => { s with budget := s.budget - 1 }
   match e with
   | .forallE _ _ b _ => walk cfg mode b
@@ -302,10 +361,17 @@ partial def walk (cfg : PinCfg) (mode : Mode) (e : Expr) : StateM PinSt Unit := 
       for a in args do walk cfg .deep a
   | _ => pure ()
 
+end
+
+/-- (pins, mentioned addresses) of a statement; `memo` carries the walks of
+earlier statements (`walk`). -/
+def pinsOfMemo (cfg : PinCfg) (e : Expr) (memo : PinMemo) : (Array String × Array Nat) × PinMemo :=
+  let s := ((walk cfg .spine e).run { memo }).2
+  ((s.pins, s.mentions), s.memo)
+
 /-- (pins, mentioned addresses) of a statement. -/
 def pinsOf (cfg : PinCfg) (e : Expr) : Array String × Array Nat :=
-  let s := ((walk cfg .spine e).run {}).2
-  (s.pins, s.mentions)
+  (pinsOfMemo cfg e {}).1
 
 def hex (v : Nat) : String := s!"0x{String.ofList (Nat.toDigits 16 (v % 2 ^ 64))}"
 
@@ -507,10 +573,70 @@ def binderIdx (env : Environment) (c : Name) (b : Name) : Option Nat := do
     | _ => none
   go ci.type 0
 
+/-- The applications of a target in `v`'s body (its leading lambdas opened at
+the parameter markers), read into (closed facts, templates still open in the
+owner's parameters, targets applied to an argument nothing can read). -/
+def xStep (env : Environment) (T : Std.HashMap Name Target) (v : Expr) :
+    Array (String × Array Nat) × Array Tmpl × Array Name :=
+  let apps : Array Expr := runST fun σ => do
+    let r : ST.Ref σ (Array Expr) ← ST.Prim.mkRef #[]
+    (openParams v).forEachWhere (m := ST σ)
+      (fun e => match e.getAppFn with
+        | .const hd _ => match T[hd]? with
+          | some t => e.getAppNumArgs == t.need
+          | none => false
+        | _ => false)
+      (fun e => r.modify (·.push e))
+    r.get
+  Id.run do
+    let mut facts : Array (String × Array Nat) := #[]
+    let mut opens : Array Tmpl := #[]
+    let mut unres : Array Name := #[]
+    for e in apps do
+      let .const hd _ := e.getAppFn | continue
+      let some t := T[hd]? | continue
+      let args := e.getAppArgs
+      for tm in t.tmpls do
+        match instTmpl env tm args with
+        | none => unless unres.contains hd do unres := unres.push hd
+        | some r =>
+          match r.closed with
+          | some f => facts := facts.push f
+          | none => opens := opens.push r
+    return (facts, opens, unres)
+
+/-! ## parallelism
+
+Every pass below is a map over independent constants: pure functions of
+persistent terms (the imported environment is shared, read-only).  `parMap`
+runs one on all cores and keeps the order, so the output is byte-for-byte
+what a sequential run writes. -/
+
+/-- `xs` in chunks of `chunk` items, `g` on each in a task of its own (`g`
+maps a chunk to one result per item); the results in order. -/
+def parChunks {α β : Type} (xs : Array α) (g : Array α → Array β) (chunk : Nat := 64) :
+    Array β := Id.run do
+  let mut ts : Array (Task (Array β)) := #[]
+  let mut i := 0
+  while i < xs.size do
+    let part := xs.extract i (i + chunk)
+    ts := ts.push (Task.spawn fun _ => g part)
+    i := i + chunk
+  let mut out : Array β := #[]
+  for t in ts do out := out ++ t.get
+  return out
+
+/-- `xs.map f`, in parallel (`parChunks`). -/
+def parMap {α β : Type} (xs : Array α) (f : α → β) (chunk : Nat := 64) : Array β :=
+  parChunks xs (·.map f) chunk
+
 end CiFacts
 
 open CiFacts in
-#eval show CommandElabM Unit from do
+/-- Everything above, against the imported environment; writes the facts
+file.  Throws (after writing what it could) on a missing root, a stale
+allowlist row or a renamed pc predicate / instruction-fact source. -/
+def run : CoreM Unit := do
   let env ← getEnv
   let outPath := (← IO.getEnv "XV6_ENVFACTS_OUT").getD "envfacts.tsv"
   let rootsPath := (← IO.getEnv "XV6_ENVFACTS_ROOTS").getD "tools/ci/roots.txt"
@@ -526,6 +652,13 @@ open CiFacts in
       | [k, a] => out := out.push (k, a)
       | _ => throw <| IO.userError s!"{p}: cannot read line `{l}`"
     return out
+  let t0 ← IO.monoMsNow
+  let tLast ← IO.mkRef t0
+  let phases ← IO.mkRef (#[] : Array String)
+  let tick (what : String) : IO Unit := do
+    let t ← IO.monoMsNow
+    phases.modify (·.push s!"{what} {t - (← tLast.get)}")
+    tLast.set t
   let h ← IO.FS.Handle.mk outPath .write
   let emit (fs : List String) : IO Unit := h.putStrLn ("\t".intercalate fs)
   -- ---- local modules and their constants
@@ -538,6 +671,21 @@ open CiFacts in
     emit ["G", m.toString, ",".intercalate (md.imports.map (·.module.toString)).toList]
     for c in md.constNames do
       if let some ci := env.find? c then locals := locals.push (m, c, ci)
+  -- the ONE walk of every local type and proof term; every pass below reads it
+  let us := parMap locals (chunk := 256) fun (_, _, ci) =>
+    ({ ty := ci.type.getUsedConstants,
+       val := match ci.value? (allowOpaque := true) with
+         | some v => v.getUsedConstants
+         | none => #[] } : Used)
+  let mut usedMap : Std.HashMap Name Used := Std.HashMap.emptyWithCapacity locals.size
+  let mut deps : Std.HashMap Name (Array Name) := Std.HashMap.emptyWithCapacity locals.size
+  for i in [0:locals.size] do
+    let (_, c, ci) := locals[i]!
+    let u := us[i]!
+    usedMap := usedMap.insert c u
+    deps := deps.insert c (edges ci u)
+  let usedOf (c : Name) : Used := usedMap.getD c { ty := #[], val := #[] }
+  tick "walk"
   -- ---- roots
   let mut bad := false
   let mut tops : Array Name := #[]
@@ -567,14 +715,19 @@ open CiFacts in
       emit ["ROOT", s!"{k} {a}", "allow"]
     allow := allow ++ hit
   -- ---- the cones
-  let c1 := cone env tops
-  let c2 := cone env allow c1
-  let insts := locals.filterMap fun (_, c, ci) =>
-    if !c2.contains c && (declKind env c ci == some "inst") then some c else none
-  let c3 := cone env insts c2
-  let metas := locals.filterMap fun (_, c, ci) =>
-    if !c3.contains c && (declKind env c ci).isSome && isMeta ci then some c else none
-  let c4 := cone env metas c3
+  let kinds := parMap locals (chunk := 512) fun (_, c, ci) => declKind env c ci
+  let c1 := cone deps tops
+  let c2 := cone deps allow c1
+  let mut insts : Array Name := #[]
+  for i in [0:locals.size] do
+    let (_, c, _) := locals[i]!
+    if !c2.contains c && kinds[i]! == some "inst" then insts := insts.push c
+  let c3 := cone deps insts c2
+  let mut metas : Array Name := #[]
+  for i in [0:locals.size] do
+    let (_, c, ci) := locals[i]!
+    if !c3.contains c && kinds[i]!.isSome && isMeta ci (usedOf c) then metas := metas.push c
+  let c4 := cone deps metas c3
   let reach (c : Name) : String :=
     if c1.contains c then "1" else if c2.contains c then "2" else if c3.contains c then "3"
     else if c4.contains c then "4" else "0"
@@ -585,16 +738,19 @@ open CiFacts in
       let rs := (c :: v.ctors).map reach |>.filter (· != "0")
       rs.foldl (fun a b => if a == "0" || b < a then b else a) "0"
     | _ => reach c
-  for (m, c, ci) in locals do
-    let some k := declKind env c ci | continue
+  tick "cones"
+  for i in [0:locals.size] do
+    let (m, c, ci) := locals[i]!
+    let some k := kinds[i]! | continue
     let line := match (← findDeclarationRanges? c) with
       | some r => r.range.pos.line
       | none => 0
     let flags := (if (privateToUserName? c).isSome then ["priv"] else []) ++
-      (if isMeta ci then ["meta"] else []) ++
+      (if isMeta ci (usedOf c) then ["meta"] else []) ++
       (if (ci matches .defnInfo _) && ci.type.getForallBody.isProp then ["prop"] else []) ++
       (if isRflProof ci then ["rfl"] else [])
     emit ["C", m.toString, (userName c).toString, k, toString line, reachDecl c ci, ",".intercalate flags]
+  tick "declarations"
   -- ---- pc pins
   let predNames : List (Name × String) := [(`MachCSL.pcIs, "pcIs"), (`Xv6.urun, "urun")]
   let mut preds : Std.HashMap Name (String × Nat) := {}
@@ -604,56 +760,109 @@ open CiFacts in
     | none =>
       bad := true
       IO.eprintln s!"EnvFacts: pc predicate `{p}` not found (or it has no binder named `pc`)"
-  -- definitions that (transitively) pin a pc; fixpoint over the local definitions
+  -- definitions that (transitively) pin a pc: the least fixpoint over the
+  -- local definitions, by a worklist over the reverse edges among them
   let defs := locals.filterMap fun (_, c, ci) => match ci with
-    | .defnInfo d => if preds.contains c then none else some (c, d.value.getUsedConstants)
+    | .defnInfo _ => if preds.contains c then none else some c
     | _ => none
+  let defSet : NameSet := defs.foldl (·.insert ·) {}
+  let defEdges := parMap defs (chunk := 256) fun c =>
+    let us := (usedOf c).val
+    (us.any preds.contains, us.filter defSet.contains)
+  let mut users : Std.HashMap Name (Array Name) := {}
   let mut unfold : NameSet := {}
-  let mut changed := true
-  while changed do
-    changed := false
-    for (c, used) in defs do
-      if unfold.contains c then continue
-      if used.any (fun u => preds.contains u || unfold.contains u) then
+  let mut work : Array Name := #[]
+  for i in [0:defs.size] do
+    let c := defs[i]!
+    let (direct, ds) := defEdges[i]!
+    for u in ds do users := users.alter u fun | none => some #[c] | some a => some (a.push c)
+    if direct then
+      unfold := unfold.insert c
+      work := work.push c
+  while !work.isEmpty do
+    let u := work.back!
+    work := work.pop
+    for c in users.getD u #[] do
+      unless unfold.contains c do
         unfold := unfold.insert c
-        changed := true
+        work := work.push c
+  tick "unfold"
   let cfg : PinCfg := { env, preds, unfold, jump := `MachCSL.jumpPc }
+  -- the conjuncts of every theorem's conclusion; their heads' interfaces and
+  -- the pins of the rest are computed in parallel, then emitted in order
+  let thms := locals.filter fun (_, c, ci) => (ci matches .thmInfo _) && !env.isProjectionFn c
+  let parts := parMap thms (chunk := 256) fun (_, _, ci) => (conjuncts (concl ci.type)).toArray
+  let headOf (part : Expr) : Option Name :=
+    match part.getAppFn with
+    | .const hd _ => if preds.contains hd then none else some hd
+    | _ => none
+  let mut heads : Array Name := #[]
+  let mut seenHd : NameSet := {}
+  for ps in parts do
+    for part in ps do
+      if let some hd := headOf part then
+        unless seenHd.contains hd do
+          seenHd := seenHd.insert hd
+          heads := heads.push hd
+  let hres := parMap heads (chunk := 4) fun hd => ifacePins cfg hd
   let mut ifaces : Std.HashMap Name (Option (List (String × Pins))) := {}
-  for (m, c, ci) in locals do
-    unless ci matches .thmInfo _ do continue
-    -- a structure's projections are not proofs of its fields
-    if env.isProjectionFn c then continue
+  for i in [0:heads.size] do ifaces := ifaces.insert heads[i]! hres[i]!
+  -- (a statement that names no pc predicate and nothing that unfolds to one
+  -- has no pin: it is not walked)
+  let mut jobs : Array Expr := #[]
+  for i in [0:thms.size] do
+    let (_, c, _) := thms[i]!
+    let mayPin := (usedOf c).ty.any fun x => preds.contains x || unfold.contains x
+    for part in parts[i]! do
+      let isIface := match headOf part with
+        | some hd => (ifaces.getD hd none).isSome
+        | none => false
+      if !isIface && mayPin then jobs := jobs.push part
+  -- (one walk memo per chunk: neighbouring statements share their subterms)
+  let jres := parChunks jobs (chunk := 32) fun part => Id.run do
+    let mut memo : PinMemo := {}
+    let mut out := #[]
+    for e in part do
+      let (r, m) := pinsOfMemo cfg e memo
+      memo := m
+      out := out.push r
+    return out
+  let mut j := 0
+  let mut shown : NameSet := {}
+  for i in [0:thms.size] do
+    let (m, c, _) := thms[i]!
     let u := (userName c).toString
-    for part in conjuncts (concl ci.type) do
-      let head := part.getAppFn
+    let mayPin := (usedOf c).ty.any fun x => preds.contains x || unfold.contains x
+    for part in parts[i]! do
       let mut done := false
-      if let .const hd _ := head then
-        if !preds.contains hd then
-          let r ← match ifaces[hd]? with
-            | some r => pure r
-            | none =>
-              let r := ifacePins cfg hd
-              ifaces := ifaces.insert hd r
-              if let some fs := r then
-                for (f, ps) in fs do emit (["I", hd.toString, f] ++ fmtPins ps)
-              pure r
-          if r.isSome then
-            emit ["L", u, m.toString, reach c, hd.toString]
-            done := true
-      unless done do
-        let ps := pinsOf cfg part
+      if let some hd := headOf part then
+        let r := ifaces.getD hd none
+        unless shown.contains hd do
+          shown := shown.insert hd
+          if let some fs := r then
+            for (f, ps) in fs do emit (["I", hd.toString, f] ++ fmtPins ps)
+        if r.isSome then
+          emit ["L", u, m.toString, reach c, hd.toString]
+          done := true
+      if !done && mayPin then
+        let ps := jres[j]!
+        j := j + 1
         unless ps.1.isEmpty do emit (["T", u, m.toString, reach c] ++ fmtPins ps)
+  tick "pins"
   -- interfaces nobody concludes (stated, never proved): every local structure / Prop def with pins
-  for (_, c, ci) in locals do
-    if ifaces.contains c then continue
-    let isIface := match ci with
-      | .inductInfo _ => isStructure env c
-      | .defnInfo _ => unfold.contains c && ci.type.getForallBody.isProp
-      | _ => false
-    unless isIface do continue
-    if let some fs := ifacePins cfg c then
+  let lone := locals.filter fun (_, c, ci) =>
+    !ifaces.contains c &&
+    (match ci with
+     | .inductInfo _ => isStructure env c
+     | .defnInfo _ => unfold.contains c && ci.type.getForallBody.isProp
+     | _ => false)
+  let lres := parMap lone (chunk := 4) fun (_, c, _) => ifacePins cfg c
+  for i in [0:lone.size] do
+    let (_, c, _) := lone[i]!
+    if let some fs := lres[i]! then
       for (f, ps) in fs do emit (["I", c.toString, f] ++ fmtPins ps)
       emit ["U", c.toString, (modOf env c).getD .anonymous |>.toString]
+  tick "interfaces"
   -- ---- user instruction facts
   let mut targets : Std.HashMap Name Target := {}
   for (c, bp, bpc, btab) in [(`Xv6.uinstrIs_of_text, `hok, `pc, none),
@@ -682,41 +891,30 @@ open CiFacts in
   let baseTargets := targets
   let withVal := locals.filterMap fun (m, c, ci) =>
     match ci.value? (allowOpaque := true) with
-    | some v => some (m, c, v, v.getUsedConstants)
+    | some v => some (m, c, v)
     | none => none
-  -- per owner: (closed facts, unresolved targets)
+  -- per owner: (closed facts, unresolved targets).  Rounds to the fixpoint:
+  -- each round reads every owner that uses a target changed in the round
+  -- before, against that round's targets.
   let mut owned : Std.HashMap Name (Array (String × Array Nat) × Array Name) := {}
   let mut fresh : NameSet := targets.fold (fun s k _ => s.insert k) {}
   let mut rounds := 0
   while !fresh.isEmpty && rounds < 12 do
     rounds := rounds + 1
+    let fr := fresh
+    let hit := parMap withVal (chunk := 512) fun (_, c, _) =>
+      !baseTargets.contains c && (usedOf c).val.any fr.contains
+    let mut todo : Array (Name × Expr) := #[]
+    for i in [0:withVal.size] do
+      if hit[i]! then
+        let (_, c, v) := withVal[i]!
+        todo := todo.push (c, v)
+    let T := targets
+    let res := parMap todo (chunk := 1) fun (_, v) => xStep env T v
     let mut nxt : NameSet := {}
-    for (_, c, v, used) in withVal do
-      if baseTargets.contains c then continue
-      unless used.any fresh.contains do continue
-      let T := targets
-      let ref ← IO.mkRef (#[] : Array Expr)
-      (openParams v).forEachWhere
-        (fun e => match e.getAppFn with
-          | .const hd _ => match T[hd]? with
-            | some t => e.getAppNumArgs == t.need
-            | none => false
-          | _ => false)
-        (fun e => ref.modify (·.push e))
-      let mut facts : Array (String × Array Nat) := #[]
-      let mut opens : Array Tmpl := #[]
-      let mut unres : Array Name := #[]
-      for e in (← ref.get) do
-        let .const hd _ := e.getAppFn | continue
-        let some t := T[hd]? | continue
-        let args := e.getAppArgs
-        for tm in t.tmpls do
-          match instTmpl env tm args with
-          | none => unless unres.contains hd do unres := unres.push hd
-          | some r =>
-            match r.closed with
-            | some f => facts := facts.push f
-            | none => opens := opens.push r
+    for i in [0:todo.size] do
+      let (c, _) := todo[i]!
+      let (facts, opens, unres) := res[i]!
       owned := owned.insert c (facts, unres)
       let old := (targets[c]?.map (·.tmpls.size)).getD 0
       if opens.size != old then
@@ -727,7 +925,10 @@ open CiFacts in
             { need := opens.foldl (fun n t => max n t.maxParam) 0, tmpls := opens }
         nxt := nxt.insert c
     fresh := nxt
-  for (m, c, _, _) in withVal do
+  if !fresh.isEmpty then
+    IO.eprintln s!"EnvFacts: warning: the instruction-fact wrappers did not settle in {rounds} rounds"
+  tick s!"instructions({rounds} rounds)"
+  for (m, c, _) in withVal do
     let some (facts, unres) := owned[c]? | continue
     let mut byProg : Std.HashMap String (Array Nat) := {}
     for (p, pcs) in facts do
@@ -742,5 +943,24 @@ open CiFacts in
   let nNative := c1.toList.filter (fun n => (n.toString.splitOn "._native.").length > 1) |>.length
   emit ["N", toString nNative, toString c1.size, toString locals.size]
   h.flush
-  IO.eprintln s!"EnvFacts: wrote {outPath} ({locals.size} local constants, cone {c1.size})"
+  tick "write"
+  IO.eprintln s!"EnvFacts: wrote {outPath} ({locals.size} local constants, cone {c1.size}) in {(← IO.monoMsNow) - t0} ms ({", ".intercalate (← phases.get).toList} ms)"
   if bad then throwError "EnvFacts: errors above"
+
+/-- The executable: import the built tree (the `LEAN_PATH` of `lake env`),
+with the extensions' imported state (instances, classes, structures,
+declaration ranges) loaded as an `import` in a file would, then `run`. -/
+unsafe def main : IO UInt32 := do
+  initSearchPath (← findSysroot)
+  enableInitializersExecution
+  let t0 ← IO.monoMsNow
+  let env ← importModules #[{ module := `Xv6 }, { module := `MachCSL }] {}
+    (loadExts := true) (leakEnv := true)
+  IO.eprintln s!"EnvFacts: imported Xv6 and MachCSL in {(← IO.monoMsNow) - t0} ms"
+  let ctx : Core.Context := { fileName := "<envfacts>", fileMap := default, maxHeartbeats := 0 }
+  try
+    discard <| run.toIO ctx { env }
+    return 0
+  catch e =>
+    IO.eprintln s!"{e}"
+    return 1

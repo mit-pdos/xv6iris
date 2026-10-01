@@ -149,9 +149,16 @@ step_build() {
   # No --clean: a fresh checkout has no proof build to clean, and --clean
   # would also throw away the model build the previous step made (or the
   # cache restored).  Locally, `make timed-build` is the clean variant.
+  # Alongside: the reports step's native executable (tools/ci/envfacts.sh;
+  # ~10 s of one core, its own lake package, so it shares nothing with this
+  # build).  Not this step's business if it fails: the reports step builds it
+  # again and fails there, with the error.
+  mkdir -p "$XV6_CI_OUT"
+  tools/ci/envfacts.sh --build-only > "$XV6_CI_OUT/envfacts-build.log" 2>&1 & local efpid=$!
   tools/ci/timed_build.sh "$BUILD_LOG" & local pid=$!
   tail -n +1 -f --pid="$pid" "$BUILD_LOG" | sed -u -E 's/^@[0-9.]+ //' || true
   local rc=0; wait "$pid" || rc=$?
+  wait "$efpid" || echo "build: the envfacts executable did not build (see $XV6_CI_OUT/envfacts-build.log); the reports step retries"
   # Belt and braces, as in Rocq's ci.yml: read the log as well as the status.
   if [ "$rc" -eq 0 ]; then
     if ! tail -1 "$BUILD_LOG" | grep -qE '^@end [0-9.]+ rc=0$'; then
