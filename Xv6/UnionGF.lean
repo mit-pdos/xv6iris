@@ -235,7 +235,7 @@ end cameras
 
 instance unionGF_invGpreS : InvGpreS unionGF := ⟨⟨inferInstance, inferInstance, inferInstance⟩, ⟨inferInstance⟩⟩
 instance unionGF_crashPermG : CrashPermG unionGF := {}
-instance unionGF_xv6G : Xv6G unionGF := {}
+instance unionGF_xv6G : Xv6G unionGF := { kallocLedSlot := by decide }
 instance unionGF_icacheG : IcacheG unionGF := {}
 instance unionGF_icboxG : IcboxG unionGF := {}
 instance unionGF_logG : LogG unionGF := {}

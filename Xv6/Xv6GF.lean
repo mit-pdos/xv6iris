@@ -324,7 +324,7 @@ end cameras
 
 instance xv6GF_invGpreS : InvGpreS xv6GF := ⟨⟨inferInstance, inferInstance, inferInstance⟩, ⟨inferInstance⟩⟩
 instance xv6GF_crashPermG : CrashPermG xv6GF := {}
-instance xv6GF_xv6G : Xv6G xv6GF := {}
+instance xv6GF_xv6G : Xv6G xv6GF := { kallocLedSlot := by decide }
 instance xv6GF_icacheG : IcacheG xv6GF := {}
 instance xv6GF_icboxG : IcboxG xv6GF := {}
 instance xv6GF_logG : LogG xv6GF := {}

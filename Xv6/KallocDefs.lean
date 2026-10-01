@@ -24,20 +24,21 @@ the number but not the list.  The ghost steps (`kmemAuth_dec`,
 
 ## Deviations from Rocq (the ledger)
 
-1. **The ledger's name is a FUNCTION of the pair, not an agree ghost.**
-   Rocq pins the name persistently in the second component of the
+1. **The ledger lives AT THE SEAL'S NAME `γk.pend`, in its own camera.**
+   Rocq pins the ledger's name persistently in the second component of the
    oneshot's camera at `γk.2` (`kalloc_ledname γk γe`, with
    `kalloc_ledname_agree`), because `fsc_kpages : gname * gname` must not
-   change type.  Lean's seal is a `ghost_var ()` at `γk.pend` (no oneshot
-   camera to extend), and adding a field to `KmemNames` would move
-   `Fscfg.fscKpages` and `FsCfgSnap.fsCfgMkOk` (landed statements; FsReady
-   deviation 6).  Ghost names are per camera in iris-lean, so the ledger is
-   instead allocated at a name that `γk.pend` DETERMINES:
-   `kmemLedName γk := γk.pend - sqrt γk.pend * sqrt γk.pend`, and the birth
-   (`KmemGhost.kmemGhost_alloc`) allocates the pend token at a name in that
-   function's (infinite) fiber over the ledger's.  Rocq's
-   `∃ γe, kalloc_ledname γk γe ∗ led_lb γe …` is therefore
-   `ledLb (kmemLedName γk) …`, and `kalloc_ledname_agree` is `rfl`.
+   change type.  Lean's seal is a `ghost_var ()` at `γk.pend` whose camera
+   is spelled by landed statements (`kallocAvail`, `kallocAvail_some` /
+   `_none`), and a new `KmemNames` field would move `Fscfg.fscKpages` and
+   `FsCfgSnap.fsCfgMkOk`.  iris-lean keys ghost names per camera, so the
+   ledger's mono-list is allocated at the SAME name `γk.pend` in the `Kev`
+   mono-list camera (`MachCSL.iOwn_alloc_same_name`, in
+   `KmemGhost.kmemGhost_alloc`; `Xv6G.kallocLedSlot` records that the two
+   slots differ): the same name in a second camera does the product's job.
+   Rocq's `∃ γe, kalloc_ledname γk γe ∗ led_lb γe …` is therefore
+   `ledLb γk.pend …`, and `kalloc_ledname_agree` holds by `rfl`.  No landed
+   statement moves.
 2. **The count's half and the ledger are split into `kmemCnt` and
    `kmemLedger`**, and `kmemAuth γk n := kmemCnt γk n ∗ kmemLedger γk n`
    (Rocq: the disjunction inlined beside `kmem_ledger`).  The count steps
@@ -80,11 +81,6 @@ the pending token (owned while the count is tracked, discarded once sealed). -/
 structure KmemNames where
   cnt : GName
   pend : GName
-
-/-- THE LEDGER'S NAME (Rocq `kalloc_ledname`, deviation 1): a function of the
-seal's name, `γk.pend` minus the largest square below it.  The birth
-allocates `γk.pend` in this function's fiber over the ledger's name. -/
-def kmemLedName (γk : KmemNames) : GName := γk.pend - Nat.sqrt γk.pend * Nat.sqrt γk.pend
 
 /-- The client's knowledge of the number of free pages after an operation. -/
 def availInc (on : Option Nat) : Option Nat := on.map (· + 1)
@@ -246,10 +242,10 @@ theorem ledAuth_grow (γe : GName) (h : List Kev) (e : Kev) :
 
 /-- The receipt a call hands back: a lower bound of the allocator's ledger
 ending in the call's own event `e`, appended at history `h` (Rocq
-`led_receipt`, whose `∃ γe, kalloc_ledname γk γe ∗ …` is the name
-`kmemLedName γk`, deviation 1). -/
+`led_receipt`, whose `∃ γe, kalloc_ledname γk γe ∗ …` is the seal's own
+name `γk.pend` in the ledger's camera, deviation 1). -/
 def ledReceipt (γk : KmemNames) (h : List Kev) (e : Kev) : IProp GF :=
-  ledLb (kmemLedName γk) (h ++ [e])
+  ledLb γk.pend (h ++ [e])
 
 instance ledReceipt_persistent (γk : KmemNames) (h : List Kev) (e : Kev) :
     Persistent (ledReceipt (GF := GF) γk h e) := by
@@ -258,7 +254,7 @@ instance ledReceipt_persistent (γk : KmemNames) (h : List Kev) (e : Kev) :
 /-- The ledger, as the lock payload holds it (Rocq `kmem_ledger`): the
 authoritative history and the tie. -/
 def kmemLedger (γk : KmemNames) (npages : Nat) : IProp GF := iprop%
-  ∃ h : List Kev, ledAuth (kmemLedName γk) h ∗ ⌜npages + allocs h = frees h⌝
+  ∃ h : List Kev, ledAuth γk.pend h ∗ ⌜npages + allocs h = frees h⌝
 
 /-- `kalloc`'s append: the history at the call was NONEMPTY. -/
 theorem kmemLedger_alloc (γk : KmemNames) (n : Nat) (act : BitVec 64) :
@@ -266,7 +262,7 @@ theorem kmemLedger_alloc (γk : KmemNames) (n : Nat) (act : BitVec 64) :
       |==> (kmemLedger γk n ∗ ∃ h, ledReceipt γk h (.KAlloc act) ∗ ⌜¬ poolEmpty h⌝) := by
   unfold kmemLedger ledReceipt
   iintro ⟨%h, Ha, %ht⟩
-  imod ledAuth_grow (kmemLedName γk) h (.KAlloc act) $$ Ha with ⟨Ha, #Hb⟩
+  imod ledAuth_grow γk.pend h (.KAlloc act) $$ Ha with ⟨Ha, #Hb⟩
   imodintro
   isplitl [Ha]
   · iexists h ++ [.KAlloc act]
@@ -283,7 +279,7 @@ theorem kmemLedger_null (γk : KmemNames) (act : BitVec 64) :
       |==> (kmemLedger γk 0 ∗ ∃ h, ledReceipt γk h (.KNull act) ∗ ⌜poolEmpty h⌝) := by
   unfold kmemLedger ledReceipt
   iintro ⟨%h, Ha, %ht⟩
-  imod ledAuth_grow (kmemLedName γk) h (.KNull act) $$ Ha with ⟨Ha, #Hb⟩
+  imod ledAuth_grow γk.pend h (.KNull act) $$ Ha with ⟨Ha, #Hb⟩
   imodintro
   isplitl [Ha]
   · iexists h ++ [.KNull act]
@@ -300,7 +296,7 @@ theorem kmemLedger_free (γk : KmemNames) (n : Nat) (act : BitVec 64) :
       |==> (kmemLedger γk (n + 1) ∗ ∃ h, ledReceipt γk h (.KFree act)) := by
   unfold kmemLedger ledReceipt
   iintro ⟨%h, Ha, %ht⟩
-  imod ledAuth_grow (kmemLedName γk) h (.KFree act) $$ Ha with ⟨Ha, #Hb⟩
+  imod ledAuth_grow γk.pend h (.KFree act) $$ Ha with ⟨Ha, #Hb⟩
   imodintro
   isplitl [Ha]
   · iexists h ++ [.KFree act]

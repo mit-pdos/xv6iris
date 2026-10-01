@@ -317,11 +317,14 @@ ledger at `[]` (statement unchanged).  `SpecKalloc`/`SpecKfree` gain
 derive the landed fields.  Landed statements byte-identical: `kallocAvail`,
 `kallocPost`, `kmemRes`, `kallocAvail_seal`, `kmemGhost_alloc`,
 `wp_kalloc_body`, `wp_kfree_body`, `wp_kfree_free_body`; no call site
-touched.  **Deviation:** the ledger's name is not an agree ghost but a
-FUNCTION of the seal's name, `kmemLedName γk := γk.pend - sqrt γk.pend ^ 2`
-(the birth allocates the pend token in that function's infinite fiber over
-the ledger's name, `ghost_var_alloc_strong`), because Lean's seal is a
-`ghost_var ()` (no oneshot camera to extend) and a new `KmemNames` field
-would move `Fscfg.fscKpages` / `fsCfgMkOk` (KallocDefs header, deviation 1).
+touched.  **Deviation:** Rocq pins the ledger's name in a product camera
+beside the oneshot; Lean's seal is a `ghost_var ()` at `γk.pend` whose
+camera landed statements spell, so the ledger's mono-list lives AT THE SAME
+NAME `γk.pend` in its own camera (iris-lean keys names per camera).  The
+birth allocates both at one name fresh in both cameras
+(`MachCSL/OwnAllocSame.lean`, `iOwn_alloc_same_name`; the new `Xv6G` field
+`kallocLedSlot` records that the two slots differ, `decide` at `xv6GF` /
+`unionGF`).  The receipt is `ledLb γk.pend (h ++ [e])` and
+`kalloc_ledname_agree` is `rfl` (KallocDefs header, deviation 1).
 `wp_kfree_free_body` (Lean-only) gets no led form; it drops the receipt the
 shared `kfree_tail` now returns.

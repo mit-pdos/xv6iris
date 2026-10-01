@@ -86,6 +86,11 @@ class Xv6G (GF : BundledGFunctors) where
   `kalloc`/`kfree` call, its authority inside `kmemAuth`
   (`KallocDefs.kmemLedger`) -/
   [mlKevG : MonoListG GF Kev]
+  /-- the ledger's camera is not the seal token's: the ledger lives at the
+  seal's own name `γk.pend` (KallocDefs deviation 1), which needs the two
+  slots apart (`MachCSL.iOwn_alloc_same_name`).  `decide` at a concrete
+  functor list. -/
+  kallocLedSlot : ElemG.τ GF (GhostVarF Unit) ≠ ElemG.τ GF (constOF (MonoList (DiscreteO Kev)))
 
 attribute [instance] Xv6G.monoListG Xv6G.gvListG
 attribute [reducible, instance] Xv6G.gvNatG Xv6G.gvUnitG Xv6G.gvCpuG Xv6G.gvW32G Xv6G.gvBoolG
