@@ -59,6 +59,9 @@ import Xv6.HfpReg
 import Xv6.EchoOut
 import Xv6.SysOpenDefs
 import Xv6.ConsoleInvDefs
+import Xv6.UserFd
+import Xv6.UkHandler
+import Xv6.ProgTree
 
 namespace Xv6
 

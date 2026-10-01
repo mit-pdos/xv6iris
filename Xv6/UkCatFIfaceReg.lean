@@ -45,6 +45,8 @@ import Xv6.PipeBothNPure
 import Xv6.FileDiscLine
 import Xv6.SysOpenDefs
 import Xv6.ConsoleInvDefs
+import Xv6.UserFd
+import Xv6.UkHandler
 
 namespace Xv6
 

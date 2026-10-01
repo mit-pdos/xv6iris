@@ -31,7 +31,7 @@ is the fragment of number `d` at fraction `q`.
 4. The ghost-map family (`[∗ map] d ↦ x ∈ vs, tok d (1/2) x`) is over
    `vs : RegMapF X` (Rocq `gmap nat X`); `dom vs` is `PartialMap.dom vs`.
 -/
-import Xv6.UkHandler
+import MachCSL.WpSmodeFrame
 
 namespace Xv6
 

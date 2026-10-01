@@ -25,9 +25,9 @@ the two bits).  A retiring read (`uxr_doCSR_cnt`) reads the counter
 (`uxr_readCSR_cnt`: `mcycle`/`mtime`/`minstret`/`mhpmcounter[i]`, as data)
 and writes `rd`.
 -/
-import MachCSL.UExecCsrDflt
 import MachCSL.UExecAluGpr
 import MachCSL.UWalkRun
+import MachCSL.UExecCsrBase
 
 namespace MachCSL
 

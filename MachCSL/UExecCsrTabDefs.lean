@@ -6,6 +6,7 @@ one module per access type, so they are checked in parallel processes (a
 one after another).
 -/
 import MachCSL.UExecCsrCnt
+import MachCSL.UExecCsrDflt
 
 namespace MachCSL
 

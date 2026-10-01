@@ -10,7 +10,8 @@ returns the configuration with the one field updated; reads run through
 directly.  `wp_m_csrw_*` / `wp_m_csrr_*` are the `wpLoop` rules over `instr`.
 -/
 import MachCSL.WpCsr
-import MachCSL.WpMmodeAlu
+import MachCSL.AluFacts
+import MachCSL.WpCycle
 
 namespace MachCSL
 

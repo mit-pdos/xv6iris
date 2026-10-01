@@ -5,10 +5,10 @@ MachCSL: the supervisor-mode cycle lemmas over an ABSTRACT fetch
 file does not wait for `Translate`.
 -/
 import MachCSL.SConfAtDefs
-import MachCSL.WpTrap
 import MachCSL.WpCycleDefs
-import MachCSL.WpTick
-import MachCSL.Instr
+import MachCSL.KCtx
+import MachCSL.Tactics
+import MachCSL.MConf
 
 namespace MachCSL
 

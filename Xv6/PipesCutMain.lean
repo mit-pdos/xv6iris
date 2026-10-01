@@ -14,8 +14,8 @@ of the six here uses them.
 Deviations from Rocq: `Forall P l` is `∀ x ∈ l, P x`; `l !!! j` is `l[j]!`;
 `bv_unsigned b = z` is `b.toNat = z`.
 -/
-import Xv6.PipesCutSh
 import Xv6.UkShLineDefs
+import Xv6.PipesCut
 
 namespace Xv6
 
