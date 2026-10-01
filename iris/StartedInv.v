@@ -319,14 +319,17 @@ Section StartedInv.
       (P : nat -> CtxId -> iProp Σ)
       `{!∀ pos ξ, Persistent (P pos ξ)} :
     ↑startedN ⊆ Em ->
-    started_inv γi ξd P -∗ £ 1 -∗
-    (|={Em, Em ∖ ↑startedN}=> started_res γi ξd P ∗
-       (started_res γi ξd P ={Em ∖ ↑startedN, Em}=∗ True)).
+    started_inv γi ξd P -∗
+    (|={Em, Em ∖ ↑startedN}=> ▷ |==> (started_res γi ξd P ∗
+       (started_res γi ξd P ={Em ∖ ↑startedN, Em}=∗ True))).
   Proof using .
-    iIntros (HE) "#Hinv Hlc".
+    iIntros (HE) "#Hinv".
     iMod (inv_acc Em startedN with "Hinv") as "[Hbody Hclose]"; [exact HE|].
-    (* the opener spends the step's credit on the body's later (port-ordinal guardrail (5)) *)
-    iMod (lc_fupd_elim_later with "Hlc Hbody") as "Hbody".
+    (* at an ordinal step index the body cannot be destructed under its later
+       (an [∨] and an [∃] whose witness nothing outside pins), and the load
+       needs nothing from it before its own: hand it over under the later
+       ([WpSconfMem.wp_load_s_sconf_au_relr_lat]), the registration behind it. *)
+    iModIntro. iNext.
     iDestruct "Hbody" as "(#Hcl & %Himg & [Hl | Hr])".
     - iDestruct "Hl" as "(Hw & Ha & Hpk)".
       iEval (rewrite -(Qp.quarter_quarter) dset_auth_split) in "Ha".
@@ -504,26 +507,35 @@ Section StartedInv.
       `{!∀ pos, CtxMorph (P pos)} `{!∀ pos ξ, Persistent (P pos ξ)} (i V0 : nat) :
     ↑startedN ⊆ E -> (S i <= V0)%nat ->
     started_inv γi ξd P -∗ started_idx γi i -∗ hart_view_lb V0 -∗
-    own_context cur_ctx -∗ P (S i) ξd -∗ £ 1 ={E}=∗
+    own_context cur_ctx -∗ P (S i) ξd ={E}=∗
     own_context cur_ctx ∗ P (S i) cur_ctx.
   Proof using .
-    iIntros (HE HiV) "#Hinv #Hidx #HK Hrun HP Hlc".
+    iIntros (HE HiV) "#Hinv #Hidx #HK Hrun #HP".
     iMod (inv_acc E startedN with "Hinv") as "[Hbody Hclose]"; [exact HE|].
-    (* the opener spends the step's credit on the body's later (port-ordinal guardrail (5)) *)
-    iMod (lc_fupd_elim_later with "Hlc Hbody") as "Hbody".
-    iDestruct "Hbody" as "(#Hcl & %Himg & [Hl | Hr])".
+    iDestruct "Hbody" as "(>#Hcl & >%Himg & Harms)".
+    (* the armed arm's one non-timeless part is the payload, which is
+       PERSISTENT and which the caller holds a copy of: drop it under the
+       later, take the timeless rest out, and close with the caller's copy *)
+    iAssert (▷ ((started_win_plain ∗ dset_auth γi (1/2) ∅ ∗ ctx_stamped ξd 0)
+              ∨ ∃ i' T : nat, started_win_rel i' ∗
+                  dset_auth γi 1 {[(S i', started_addr)]} ∗
+                  ctx_stamped ξd T ∗ ⌜(T ≤ S i')%nat⌝))%I
+      with "[Harms]" as ">[Hl | Hr]".
+    { iNext. iDestruct "Harms" as "[Hl | Hr]"; [by iLeft | iRight].
+      iDestruct "Hr" as (i' T) "(Hw & Ha & Hpk & %HT & _)".
+      iExists i', T. iFrame "Hw Ha Hpk". by iPureIntro. }
     - iDestruct "Hl" as "(_ & Ha & _)".
       iDestruct (dset_lookup with "Ha Hidx") as %Hin. set_solver.
-    - iDestruct "Hr" as (i' T) "(Hw & Ha & Hpk & %HT & #HPd)".
+    - iDestruct "Hr" as (i' T) "(Hw & Ha & Hpk & %HT)".
       iDestruct (dset_lookup with "Ha Hidx") as %Hin.
       apply elem_of_singleton in Hin. injection Hin as Hii. subst i'.
       iMod (ctx_absorb_lb (P (S i)) ξd cur_ctx T V0 ltac:(lia)
               with "Hrun HK Hpk HP")
-        as "(Hrun & Hpk & HP)".
+        as "(Hrun & Hpk & HP')".
       iMod ("Hclose" with "[Hw Ha Hpk]") as "_".
       { iNext. rewrite /started_body. iFrame "Hcl". iSplitR; [by iPureIntro|].
-        iRight. iExists i, T. iFrame "Hw Ha Hpk HPd". by iPureIntro. }
-      iModIntro. iFrame "Hrun HP".
+        iRight. iExists i, T. iFrame "Hw Ha Hpk HP". by iPureIntro. }
+      iModIntro. iFrame "Hrun HP'".
   Qed.
 
   (* ------------------------------------------------------------------- *)
