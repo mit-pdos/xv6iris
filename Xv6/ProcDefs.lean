@@ -147,6 +147,27 @@ abbrev ProcPriv.updEv (V : ProcPriv) (k : Nat) : ProcPriv := { V with ev := k }
 /-- Rocq `upd_ev_id`. -/
 theorem ProcPriv.updEv_id (V : ProcPriv) : V.updEv V.ev = V := rfl
 
+omit [CurCtx] in
+/-- **THE EVENT COUNT ONLY ROSE** (Rocq `ProcInv.ev_after`, permit sweep L1a,
+design ni-strong-instance.md §7): `V'` is `V` with its `ev` moved to a count
+at least `V`'s and nothing else touched -- what a block-holder's post says of
+a block that was lent out on the permit cone and came back.  Over the
+record alone (Rocq's `ustate` pairs it with the image, which the Lean block
+keeps beside it). -/
+def evAfter (V V' : ProcPriv) : Prop := ∃ k : Nat, V.ev ≤ k ∧ V' = V.updEv k
+
+omit [CurCtx] in
+/-- Rocq `ev_after_refl`. -/
+theorem evAfter_refl (V : ProcPriv) : evAfter V V := ⟨V.ev, Nat.le_refl _, rfl⟩
+
+omit [CurCtx] in
+/-- Rocq `ev_after_trans`. -/
+theorem evAfter_trans {V V' V'' : ProcPriv} (h1 : evAfter V V') (h2 : evAfter V' V'') :
+    evAfter V V'' := by
+  obtain ⟨k1, hk1, rfl⟩ := h1
+  obtain ⟨k2, hk2, rfl⟩ := h2
+  exact ⟨k2, Nat.le_trans hk1 hk2, rfl⟩
+
 /-- The mask that allows everything: userinit's `p->seccomp = ~0ULL` (Rocq
 `secc_all`). -/
 def seccAll : BitVec 64 := -1#64

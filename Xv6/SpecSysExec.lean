@@ -86,7 +86,9 @@ than handed in.  A port of Rocq `SpecSysExec.v`
    fetchstr's own post; the `SpecSysOpen` reading), and the arms' `∃ U'` is
    `∃ V' M'`.  So the arms take the IMAGE the arguments are read in (`Mim`)
    apart from the block they return (`VW`, `MW`), and the failure equation
-   `us_V U' = V ∧ us_M U' = M` is `V' = VW ∧ M' = MW`.  `j < NPROC` /
+   `us_V U' = V ∧ us_M U' = M` is `V' = VW ∧ M' = MW` -- after the permit
+   sweep L1a (Rocq f344a089a) `evAfter VW V' ∧ M' = MW` (the event count
+   only rose: Rocq's `exists k', pv_ev V <= k' /\ us_V U' = upd_ev V k'`).  `j < NPROC` /
    `gs !! j = Some gl` are `hj` / `hproc : k.proc = procAddr j` and the
    fabric's `procsInv Γ`; the two syscall arguments are read through `V.tf`.
    `pv_cwi (us_V U)` is `V.cwi`.  The pay fact `my_pay gn Q` rides in with
@@ -256,7 +258,7 @@ def sysExecArms (Fs : Pfam GF (Uvis → IProp GF)) (Γ : FsViewNames GF) (γfs :
     (cs : Std.ExtTreeSet GName compare) (VW : ProcPriv) (MW : Nat → List (BitVec 8))
     (r : BitVec 64) : IProp GF :=
   iprop(∃ (V' : ProcPriv) (M' : Nat → List (BitVec 8)), procPrivFd γ pa pid V' M' ∗
-    ((⌜r = 0xFFFFFFFFFFFFFFFF#64 ∧ V' = VW ∧ M' = MW⌝ ∗
+    ((⌜r = 0xFFFFFFFFFFFFFFFF#64 ∧ evAfter VW V' ∧ M' = MW⌝ ∗
         sysExecPostFail (hlc := hlc) Fs Γ γfs cw secc Q P Pmiss Fo Mim pv av sts cs pid) ∨
      (∃ (pl : List (BitVec 8)) (na : Nat) (alen : Nat → Nat) (afun : Nat → Nat → BitVec 8),
         ⌜argPathOf Mim pv.toNat pl⌝ ∗ ⌜execArgsOf Mim av na alen afun⌝ ∗

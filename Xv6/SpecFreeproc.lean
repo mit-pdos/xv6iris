@@ -26,6 +26,14 @@ corollary, so no caller changes.
 row, Rocq's sanctioned move: freeproc carries the slot's counter back into
 the UNUSED block untouched.  No contract body changed.
 
+## The lend (permit sweep L1a, Rocq f344a089a)
+
+Both forms take the CALLER's event-counter lend `actLend k.proc ke` (the
+reaper / the undoing creator is the actor of the slot's release) and hand
+it back at a count no lower right after the return pc (Rocq: after
+`cpu_own`, which Lean's `kctx` bundles); framed through for now.  The
+dying slot's own counter rides `freeprocIn` as before.
+
 ## Deviations from Rocq (the led form)
 
 1. The actor is `k.proc` (Rocq `pme`); `FREEPROC`'s second `Parameter`
@@ -92,16 +100,18 @@ end
 
 def wp_freeproc_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
     (Γ : SchedNames) (cpu : CPU) (k : KCtx) (γl γp : GName) (γk : KmemNames) (j : Nat) (st : BitVec 32) (ch : BitVec 64)
-    (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (g : GName)
+    (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (g : GName) (ke : Nat)
     (hj : j < NPROC) (hp : k.regs 10#5 = procAddr j) (hst : st = USED ∨ st = ZOMBIE)
     (hnoff : k.noff + 1 < 2 ^ 31) (hK : freeprocSlots ≤ k.avail) (hsie : k.sie = false)
     (hlk : "kmem" ∉ k.locks) (hlp : "nextpid" ∉ k.locks) (htier : k.tier = KTier.kpt) : Prop :=
   kctx cpu k ∗ pcIs cpu freeprocAddr ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
   isLock γp pidLockAddr "nextpid" pidLockPay ∗
   procHeld Γ cpu j st ch ∗ freeprocIn (procAddr j) pid V M ∗ freeprocGen (procAddr j) pid g ∗
+  actLend k.proc ke ∗
   wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
     ⌜k.sie = false → spie = k.spie ∧ spp = k.spp⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
+    (∃ k' : Nat, ⌜ke ≤ k'⌝ ∗ actLend k.proc k') -∗
     procHeld Γ cpu' j UNUSED 0#64 -∗ procDormant (procAddr j) UNUSED -∗
     ⌜calleeSaved k.regs R'⌝ -∗ wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
@@ -112,16 +122,18 @@ continuation also receiving the receipt `∃ h, pidReceipt h (.PFree k.proc
 pid)` of the release at `p->pid = 0`. -/
 def wp_freeproc_led_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
     (Γ : SchedNames) (cpu : CPU) (k : KCtx) (γl γp : GName) (γk : KmemNames) (j : Nat) (st : BitVec 32) (ch : BitVec 64)
-    (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (g : GName)
+    (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (g : GName) (ke : Nat)
     (hj : j < NPROC) (hp : k.regs 10#5 = procAddr j) (hst : st = USED ∨ st = ZOMBIE)
     (hnoff : k.noff + 1 < 2 ^ 31) (hK : freeprocSlots ≤ k.avail) (hsie : k.sie = false)
     (hlk : "kmem" ∉ k.locks) (hlp : "nextpid" ∉ k.locks) (htier : k.tier = KTier.kpt) : Prop :=
   kctx cpu k ∗ pcIs cpu freeprocAddr ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
   isLock γp pidLockAddr "nextpid" pidLockPay ∗
   procHeld Γ cpu j st ch ∗ freeprocIn (procAddr j) pid V M ∗ freeprocGen (procAddr j) pid g ∗
+  actLend k.proc ke ∗
   wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
     ⌜k.sie = false → spie = k.spie ∧ spp = k.spp⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
+    (∃ k' : Nat, ⌜ke ≤ k'⌝ ∗ actLend k.proc k') -∗
     (∃ h : List Pev, pidReceipt h (.PFree k.proc pid)) -∗
     procHeld Γ cpu' j UNUSED 0#64 -∗ procDormant (procAddr j) UNUSED -∗
     ⌜calleeSaved k.regs R'⌝ -∗ wpLoop cpu'))
@@ -132,11 +144,11 @@ def wp_freeproc_led_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
 structure FREEPROC : Prop where
   wp_freeproc : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx] (Γ : SchedNames) (cpu : CPU) (k : KCtx)
     (γl γp : GName) (γk : KmemNames) (j : Nat) (st : BitVec 32) (ch : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
-    (M : Nat → List (BitVec 8)) (g : GName) hj hp hst hnoff hK hsie hlk hlp htier,
-    wp_freeproc_body (hlc := hlc) (GF := GF) Γ cpu k γl γp γk j st ch pid V M g hj hp hst hnoff hK hsie hlk hlp htier
+    (M : Nat → List (BitVec 8)) (g : GName) (ke : Nat) hj hp hst hnoff hK hsie hlk hlp htier,
+    wp_freeproc_body (hlc := hlc) (GF := GF) Γ cpu k γl γp γk j st ch pid V M g ke hj hp hst hnoff hK hsie hlk hlp htier
   wp_freeproc_led : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx] (Γ : SchedNames) (cpu : CPU) (k : KCtx)
     (γl γp : GName) (γk : KmemNames) (j : Nat) (st : BitVec 32) (ch : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
-    (M : Nat → List (BitVec 8)) (g : GName) hj hp hst hnoff hK hsie hlk hlp htier,
-    wp_freeproc_led_body (hlc := hlc) (GF := GF) Γ cpu k γl γp γk j st ch pid V M g hj hp hst hnoff hK hsie hlk hlp htier
+    (M : Nat → List (BitVec 8)) (g : GName) (ke : Nat) hj hp hst hnoff hK hsie hlk hlp htier,
+    wp_freeproc_led_body (hlc := hlc) (GF := GF) Γ cpu k γl γp γk j st ch pid V M g ke hj hp hst hnoff hK hsie hlk hlp htier
 
 end Xv6

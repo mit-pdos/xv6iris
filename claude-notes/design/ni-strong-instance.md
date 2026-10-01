@@ -404,6 +404,66 @@ inner VM ring (`vmfault`, `uvmdealloc`, `proc_pagetable`, `uvmfree`,
 `uvmunmap`, `mappages`); L3 `walk`, `freewalk`, `uvmcreate`, `kalloc`,
 `kfree` and the appends; T.
 
+### 7.2L L1a as landed in Lean (2026-10-01)
+
+Lean lane PJ-L1a, Rocq f344a089a minus its G' (PJ-G landed the counter in
+the bare block and `actLend` with its four lemmas).  45 files (44 Lean + this note), +1192 / -399.
+
+- **Ring one takes the lend** (`actLend k.proc ke` in, `∃ k' ≥ ke,
+  actLend k.proc k'` out, right after the continuation's return pc):
+  `wp_uvmalloc_body`, `wp_uvmcopy_body` (both gain `[WchG GF]`, Rocq's
+  `!wchG`), `wp_proc_freepagetable_body` (Lean has ONE form; Rocq's `_mem`
+  corollary has no twin), `wp_allocproc_body` / `_led_body`,
+  `wp_freeproc_body` / `_led_body`; each Spec structure field gains
+  `(ke : Nat)`.  uvmalloc / uvmcopy / proc_freepagetable frame it at entry
+  (`SlotGen.actLend_cont_frame`, Rocq `act_lend_cont_frame`, stated over
+  Lean's `∀ spie spp R'` + three premises); freeproc threads it to
+  proc_freepagetable (`fpContLedL`), allocproc through the scan to its two
+  freeproc tails (`apCont`).
+- **The block-holders' posts expose the raised count**: growproc and
+  sys_sbrk (`∃ V' M' k', ⌜…Ok⌝ ∗ ⌜V.ev ≤ k'⌝ ∗ procPrivFd … (V'.updEv k')`;
+  Rocq's continuation-side `∀ k'`), kfork's `kforkRet` (hence `kforkPost`
+  and sys_fork's post: `∃ k' ≥ V.ev, procPrivFd … (V.updEv k')`), kwait's
+  four bodies and sys_wait's two (`∀ … k', … ⌜V.ev ≤ k'⌝ -∗ procPrivFd …
+  { V.updEv k' with upt := P' }`), and kexec's failure arm: `kexecOk` /
+  `kexecOkQ` / `kexecOkQf`, `execArms`, `sysExecArms` at `evAfter V V'`
+  (`ProcDefs.evAfter` = Rocq `ev_after` over the record, with `_refl` /
+  `_trans`; it unfolds to Rocq's `∃ k', pv_ev V ≤ k' ∧ V' = upd_ev V k'`).
+  `SpecSyscall` untouched (its post is ∀-general); the three arms relay
+  through `SyscallRet.SyscRows.updEv` (the rows do not read `ev`).
+- **Boot**: `SpecUserinit` already had `hproc : k.proc = 0`, so no
+  statement moved; `ProofUserinit` supplies `actLend_zero` (Rocq's new `pj
+  = zero_reg` premise, which main supplies).
+- **New accessors**: `ProcPrivAcc.procPrivFd_evLend` (Rocq
+  `proc_priv_ev_lend`), `SchedCtx.procPrivNoctxAt_evAcc` (the cells form's
+  counter, what kwait's reap and kfork's parent lend; Rocq's
+  `proc_priv_slot_gen_ev_acc` has no twin, kwait runs on the cells);
+  growproc's own opener `gp_priv_elim` lends the counter (Rocq
+  `proc_priv_addrspace_ev`, folded in).  `KexecOkQ.kexecOkQf_after` (Rocq
+  `kexec_ok_qf_ev`) and ONE closer conversion `kexecCloser_after` (Rocq's
+  three `kexec_closer_ev*`).
+- **kexec's phases at a moved record**: the Lean phases are stated over
+  `A : KexecArgs`, so a phase that lent the counter goes on at
+  `{ A with V := V1 }` (every other parameter `A`'s by definition): the B3
+  loop's continuations `kxcK1a4` / `kxcKB` quantify `∀ V1, ⌜evAfter A.V
+  V1⌝` (`_after` / `_here` conversions), `kxc_phdr` is proved at every
+  record, `kxc_b2`, `kxc_c_setup` and `kxc_phaseC` hand their successor a
+  later record, `KexecCore` instantiates the next phase there.  The two
+  `-1` tails with a free (`kxc_bad_1d6`, `kxc_bad31e`) and the commit
+  (`kxd_commit2`, `kxd_ok` at `.updEv kc`) lend and convert internally.
+- **Deviations**: (1) kfork keeps its arms at `V` and closes the parent's
+  block at `V.updEv kc` (no `kfork_post_ev` / `kfork_cont_ev` twins
+  needed); (2) the failure arms are spelled with `evAfter`; (3) one
+  `kexecCloser_after` for Rocq's three closer conversions; (4) the lend
+  sits right after the return pc in every Lean continuation.
+- **Unchanged**: every other `wp_*` contract and Spec structure;
+  `SpecSyscall`, `SpecUserinit`, `SpecSysFork`'s text (its post is
+  `kforkPost`), all Link files.
+
+Full `lake build Xv6 MachCSL` 2684 jobs, 0 errors; `lint.sh` all lints
+passed (layering ok, no `sorry`); `tcb.sh` exit 0 against the unchanged
+baseline (no module entered); `audit.sh` PASS (baseline unchanged).
+
 ### 7.3 L1b as landed (2026-09-29, b69bd0fab)
 
 The copy ring and every block-holding chain above it: 84 files, +1958

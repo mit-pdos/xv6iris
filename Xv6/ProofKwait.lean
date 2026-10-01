@@ -97,6 +97,14 @@ the entry SIE): the three return arms run the epilogue `kw_epi` at level 0
 with the complement, and the park calls `sleep` at its eb contract and
 re-joins after the re-acquire.  The nested `pp->lock` pairs stay at
 `sie = false`.
+
+THE LEND (permit sweep L1a, Rocq f344a089a): the reap's freeproc takes
+the reaper's counter, lent out of the caller's cells
+(`SchedCtx.procPrivNoctxAt_evAcc`; Rocq lends it off the whole block,
+`proc_priv_slot_gen_ev_acc`) and taken back at freeproc's count
+(`actLend_back`); the cells-level post `kwPost` and the exit `kw_epi` take
+the block at `{ V.updEv k' with upt := P' }` with `V.ev ≤ k'` (the `-1`
+exits at `V.ev`).
 -/
 import Xv6.KvmLemmas
 import Xv6.SpecKwait
@@ -462,7 +470,7 @@ contract is the led one, and `kwait_proof` derives the landed field. -/
 def kwPost (cpu : CPU) (k : KCtx) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (cs : ExtTreeSet GName compare) : IProp GF :=
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd)
-    (rv xw : BitVec 32) (d : Nat) (cs' : ExtTreeSet GName compare),
+    (rv xw : BitVec 32) (d : Nat) (cs' : ExtTreeSet GName compare) (k' : Nat),
     ⌜calleeSaved k.regs R' ∧ R' 10#5 = BitVec.signExtend 64 rv ∧ V.upt.extSz V.sz P' ∧ d ≤ 4 ∧
       kwaitAns rv (k.regs 10#5) d ∧
       umMapped P' (k.regs 10#5).toNat d⌝ -∗
@@ -470,7 +478,8 @@ def kwPost (cpu : CPU) (k : KCtx) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
     kwaitGen (procAddr j) pid V.gen -∗ chFrag V.chg (procAddr j) cs' -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
-    procPrivNoctxAt curCtx (procAddr j) pid { V with upt := P' }
+    ⌜V.ev ≤ k'⌝ -∗
+    procPrivNoctxAt curCtx (procAddr j) pid { V.updEv k' with upt := P' }
       (umemWrite (viewFaulted V.upt P' M) (k.regs 10#5).toNat ((xstateBytes xw).take d)) -∗
     wpLoop cpu'))
 
@@ -875,17 +884,20 @@ theorem kw_freeproc (FP : FREEPROC) (Γ : SchedNames) (c : CPU) (k' : KCtx) (γl
     (M : Nat → List (BitVec 8)) (g : GName) (hj : j < NPROC) (hp : k'.regs 10#5 = procAddr j)
     (hst : st = USED ∨ st = ZOMBIE) (hnoff : k'.noff + 1 < 2 ^ 31) (hK : freeprocSlots ≤ k'.avail)
     (hsie : k'.sie = false) (hlk : "kmem" ∉ k'.locks) (hlp : "nextpid" ∉ k'.locks)
-    (htier : k'.tier = KTier.kpt) :
+    (htier : k'.tier = KTier.kpt) (ke : Nat) (pa : BitVec 64) (hpa : k'.proc = pa) :
     kctx c k' ∗ pcIs c KA.«freeproc» ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
     kallocAvail γk none ∗ isLock γp pidLockAddr "nextpid" pidLockPay ∗
     procHeld Γ c j st ch ∗ freeprocIn (procAddr j) pid V M ∗ freeprocGen (procAddr j) pid g ∗
+    actLend pa ke ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
       ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
+      (∃ k2 : Nat, ⌜ke ≤ k2⌝ ∗ actLend pa k2) -∗
       procHeld Γ cpu' j UNUSED 0#64 -∗ procDormant (procAddr j) UNUSED -∗
       ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := FP.wp_freeproc (hlc := hlc) (GF := GF) Γ c k' γl γp γk j st ch pid V M g hj hp hst hnoff hK hsie hlk hlp htier
+  subst hpa
+  have h := FP.wp_freeproc (hlc := hlc) (GF := GF) Γ c k' γl γp γk j st ch pid V M g ke hj hp hst hnoff hK hsie hlk hlp htier
   unfold wp_freeproc_body at h
   simp only [freeprocAddr] at h
   exact h
@@ -977,11 +989,11 @@ theorem kw_epi (Γ : SchedNames) (cpu cur : CPU) (k : KCtx) (γw γp γl : GName
     (h24 : R 24#5 = k.regs 24#5) (h25 : R 25#5 = k.regs 25#5) (h26 : R 26#5 = k.regs 26#5)
     (h27 : R 27#5 = k.regs 27#5)
     (hext : V.upt.extSz V.sz P') (hd : d ≤ 4) (hans : kwaitAns rv (k.regs 10#5) d)
-    (hmap : umMapped P' (k.regs 10#5).toNat d) :
+    (hmap : umMapped P' (k.regs 10#5).toNat d) (k' : Nat) (hk' : V.ev ≤ k') :
     kctx cur (((k.withSpie spie spp).pushed 10).withRegs R) ∗ pcIs cur (KA.«kwait» + 0x7c#64) ∗
     kwFrame (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)
       (k.regs 20#5) (k.regs 21#5) (k.regs 22#5) (k.regs 23#5) w9 ∗
-    procPrivNoctxAt curCtx (procAddr j) pid { V with upt := P' }
+    procPrivNoctxAt curCtx (procAddr j) pid { V.updEv k' with upt := P' }
       (umemWrite (viewFaulted V.upt P' M) (k.regs 10#5).toNat ((xstateBytes xw).take d)) ∗
     trapCsrsExt cur k.sie ∗ cpuClaimExt cur k.sie k.proc ∗
     kwAns j pid V cs rv xw (decide (k.regs 10#5 = 0#64)) ∗
@@ -1056,7 +1068,7 @@ theorem kw_epi (Γ : SchedNames) (cpu cur : CPU) (k : KCtx) (γw γp γl : GName
     (fun hc => hc.elim (fun h => absurd h (by decide))
       (fun h => absurd h (by rw [hproc]; exact procAddr_nonzero hj))) $$ HΦ
   k_norm_g
-  iapply HΦ $$ %spie %spp %_ %P' %rv %xw %d %cs' [] Hans Hkg Hrow Hk Hpc Hte Hce Hpriv
+  iapply HΦ $$ %spie %spp %_ %P' %rv %xw %d %cs' %k' [] Hans Hkg Hrow Hk Hpc Hte Hce %hk' Hpriv
   ipureintro
   refine ⟨?cs, ?r10, hext, hd, hans, hmap⟩
   case r10 =>
@@ -1289,12 +1301,19 @@ theorem kw_reap (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE)
     k_step (wp_s_jal cur _ (KA.«kwait» + 0x66#64) false 2095192#21 1#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kwait_br_fffffffffffff8be]
     iintro Hk Hpc
+    -- THE REAPER'S EVENT COUNTER, lent to freeproc (permit sweep L1a): the
+    -- reaper is the actor of the slot's release
+    icases procPrivNoctxAt_evAcc (GF := GF) curCtx (procAddr j) pid _ _ $$ Hpriv with ⟨Hcnt, Hpback⟩
+    ihave Hlend := actLend_of_cnt (GF := GF) (procAddr j) V.ev $$ Hcnt
     iapply (kw_freeproc FP Γ cur _ γl γp γk n ZOMBIE ch pid0 Vf Mf gf hn ?hfp (Or.inr rfl)
-      ?hfnoff ?hfK ?hfsie ?hflk ?hflp ?hftier) $$ [- $Hk $Hpc $Hlk $Hav $Hlp $Hheld $Hfin $Hfgen]
+      ?hfnoff ?hfK ?hfsie ?hflk ?hflp ?hftier V.ev (procAddr j) ?hfpa)
+      $$ [- $Hk $Hpc $Hlk $Hav $Hlp $Hheld $Hfin $Hfgen $Hlend]
     rotate_right 1
     · k_norm_g
       iapply wpNext_off_intro
-      iintro %spie3 %spp3 %R3 %hsp3 Hk Hpc Hheld2 Hdormu %hcs3
+      iintro %spie3 %spp3 %R3 %hsp3 Hk Hpc ⟨%k2, %hk2, Hlend⟩ Hheld2 Hdormu %hcs3
+      ihave Hcnt := actLend_back (GF := GF) (procAddr j) k2 (procAddr_nonzero hj) $$ Hlend
+      ihave Hpriv := Hpback $$ %k2 Hcnt
       ihave Hunused : iprop(locked (Γ.lock n) cur ∗ procLockResAt Γ ξ0 (procAddr n))
         $$ [Hheld2 Hdormu Hhart]
       case' _ => iapply kw_pay_unused Γ ξ0 n cur; iframe Hused Hheld2 Hdormu Hhart
@@ -1399,7 +1418,7 @@ theorem kw_reap (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE)
           k_norm_g [hpe2, hkbws, kwj_2226, kw_filter_wait,
             MachCSL.strip_locks (k.withSpie spie3 spp3) (by simp only [KCtx.withSpie_locks, hklocks0])]
           iapply (kw_epi Γ cpu cur k γw γp γl γk j pid V M cs hj hkproc (by omega) spie3 spp3 R5
-              pid0 xs d P' w9 hR5_2 hR5_19 hR5_24 hR5_25 hR5_26 hR5_27 hext hd hans hmap)
+              pid0 xs d P' w9 hR5_2 hR5_19 hR5_24 hR5_25 hR5_26 hR5_27 hext hd hans hmap k2 hk2)
             $$ [- $Hk $Hpc $Hframe $Hpriv $Hte $Hce $Hans $HΦ]
         case haddrw => k_norm_g
         case hsw => k_norm_g
@@ -1420,6 +1439,7 @@ theorem kw_reap (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE)
     case hflk => k_norm_g; simp only [List.mem_cons, not_or]; refine ⟨by decide, by rw [hkhlocks]; simp⟩
     case hflp => k_norm_g; simp only [List.mem_cons, not_or]; refine ⟨by decide, by rw [hkhlocks]; simp⟩
     case hftier => k_norm_g; first | rfl | exact hkhtier
+    case hfpa => k_norm_g; first | rfl | exact hkhproc
   -- Back at the branch: split on addr == 0.
   by_cases haddr : k.regs 10#5 = 0#64
   · -- addr == 0: skip copyout, funnel to Hcommon with P' = V.upt, d = 0.
@@ -1681,7 +1701,7 @@ theorem kw_reap (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE)
               · iexact Hg
             iapply (kw_epi Γ cpu c7 k γw γp γl γk j pid V M cs hj hkproc (by omega) spie2 spp2
                 (R5.set 19#5 18446744073709551615#64) (-1#32) xs dd P' w9 ?heR2 ?heS3 ?heH24 ?heH25 ?heH26 ?heH27
-                hext' ?heD ?heAns hmapC) $$ [- $Hk $Hpc $Hframe $HprivE $Hte $Hce $Hans $HΦ]
+                hext' ?heD ?heAns hmapC V.ev (Nat.le_refl _)) $$ [- $Hk $Hpc $Hframe $HprivE $Hte $Hce $Hans $HΦ]
             case heR2 =>
               simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact hR5_2
             case heS3 =>
@@ -2349,7 +2369,8 @@ theorem kw_noKids (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE) (AC : ACQUIRE) (
         · iexact Hg
       iapply (kw_epi Γ cpu c7 k γw γp γl γk j pid V M cs hj hkproc (by omega) spieW sppW
           (R5.set 19#5 18446744073709551615#64) (-1#32) 0#32 0 V.upt w9 ?heR2 ?heS3 ?heH24 ?heH25
-          ?heH26 ?heH27 (extSz_refl _ V.upt) (by omega) (kw_ans_neg (k.regs 10#5) 0 (fun _ => rfl)) (Xv6.UMemL.umMapped_zero _ _))
+          ?heH26 ?heH27 (extSz_refl _ V.upt) (by omega) (kw_ans_neg (k.regs 10#5) 0 (fun _ => rfl)) (Xv6.UMemL.umMapped_zero _ _)
+          V.ev (Nat.le_refl _))
         $$ [- $Hk $Hpc $Hframe $HprivE $Hte $Hce $Hans $HΦ]
       case heR2 => simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact hR5_2
       case heS3 => simp only [RegMap.set_apply, ite_true]; exact kw_neg1_ext
@@ -2998,11 +3019,11 @@ theorem kwait_led_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (CO : COPYOU
   iframe Hk Hpc Hte Hce Hav Hn Hkg Hrow
   iframe #
   iapply wpNext_mono $$ HΦ
-  iintro %cpu' HK %spie %spp %R' %P' %rv %xw %d %cs' %hp Hans Hkg Hrow Hk Hpc Hte Hce Hn
+  iintro %cpu' HK %spie %spp %R' %P' %rv %xw %d %cs' %k' %hp Hans Hkg Hrow Hk Hpc Hte Hce %hk' Hn
   ihave Hgen := Hgw $$ Hkg
-  ihave Hblk := Hback $$ %{ V with upt := P' } %_ [] Hn Hgen
+  ihave Hblk := Hback $$ %{ V.updEv k' with upt := P' } %_ [] Hn Hgen
   · ipureintro; exact ⟨rfl, rfl, rfl, rfl⟩
-  iapply HK $$ %spie %spp %R' %P' %rv %xw %d %cs' %hp Hans Hrow Hk Hpc Hte Hce Hblk
+  iapply HK $$ %spie %spp %R' %P' %rv %xw %d %cs' %k' %hp Hans Hrow Hk Hpc Hte Hce %hk' Hblk
 
 /-- **THE LANDED CONTRACT, a corollary of the led form** (Rocq
 `wp_kwait_sconf` from `wp_kwait_led_sconf`): the receipt is dropped
@@ -3023,9 +3044,9 @@ theorem kwait_eb_of_led
   iapply h
   iframe H0 H1 H2 H3 H4 H5 H6 H7 H8 H9 H10 H11
   iapply wpNext_mono $$ HΦ
-  iintro %cpu' HK %spie %spp %R' %P' %rv %xw %d %cs' %hp Hans Hrow Hk Hpc Hte Hce Hblk
+  iintro %cpu' HK %spie %spp %R' %P' %rv %xw %d %cs' %k' %hp Hans Hrow Hk Hpc Hte Hce %hk' Hblk
   ihave Hans := waitAnsLed_post rv (xstateVal xw) cs cs' V.gen _ pid (procAddr j) $$ Hans
-  iapply HK $$ %spie %spp %R' %P' %rv %xw %d %cs' %hp Hans Hrow Hk Hpc Hte Hce Hblk
+  iapply HK $$ %spie %spp %R' %P' %rv %xw %d %cs' %k' %hp Hans Hrow Hk Hpc Hte Hce %hk' Hblk
 
 end
 

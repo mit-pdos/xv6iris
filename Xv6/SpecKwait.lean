@@ -97,6 +97,12 @@ own proc word under `<wait_lock>`.  `KWAIT` carries the led field
    word; here `k.proc = procAddr j` by `hproc`), the address the caller's
    children row is stated at.
 
+THE CALLER'S EVENT COUNT ONLY ROSE (permit sweep L1a, Rocq f344a089a; design
+ni-strong-instance.md §7): the reap's freeproc takes the reaper's counter --
+the reaper is the actor of the slot's release -- so all four bodies hand the
+block back at `{ V.updEv k' with upt := P' }` with `V.ev ≤ k'` (Rocq
+`upd_usM (us_upt (upd_usV U (upd_ev (us_V U) k')) P')`).
+
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
 import Xv6.WaitLock
@@ -154,7 +160,7 @@ def wp_kwait_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF
   isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
   procPrivFd γ (procAddr j) pid V M ∗ chFrag V.chg (procAddr j) cs ∗ initPidIs 1#32 ∗
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd)
-    (rv xw : BitVec 32) (d : Nat) (cs' : ExtTreeSet GName compare),
+    (rv xw : BitVec 32) (d : Nat) (cs' : ExtTreeSet GName compare) (k' : Nat),
     ⌜calleeSaved k.regs R' ∧ R' 10#5 = BitVec.signExtend 64 rv ∧ V.upt.extSz V.sz P' ∧ d ≤ 4 ∧
       kwaitAns rv (k.regs 10#5) d ∧
       umMapped P' (k.regs 10#5).toNat d⌝ -∗
@@ -162,7 +168,8 @@ def wp_kwait_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF
     chFrag V.chg (procAddr j) cs' -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     trapCsrs cpu' -∗ cpuClaim cpu' k.proc -∗ intrRes cpu' -∗
-    procPrivFd γ (procAddr j) pid { V with upt := P' }
+    ⌜V.ev ≤ k'⌝ -∗
+    procPrivFd γ (procAddr j) pid { V.updEv k' with upt := P' }
       (umemWrite (viewFaulted V.upt P' M) (k.regs 10#5).toNat ((xstateBytes xw).take d)) -∗
     wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
@@ -192,7 +199,7 @@ def wp_kwait_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
   isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
   procPrivFd γ (procAddr j) pid V M ∗ chFrag V.chg (procAddr j) cs ∗ initPidIs 1#32 ∗
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd)
-    (rv xw : BitVec 32) (d : Nat) (cs' : ExtTreeSet GName compare),
+    (rv xw : BitVec 32) (d : Nat) (cs' : ExtTreeSet GName compare) (k' : Nat),
     ⌜calleeSaved k.regs R' ∧ R' 10#5 = BitVec.signExtend 64 rv ∧ V.upt.extSz V.sz P' ∧ d ≤ 4 ∧
       kwaitAns rv (k.regs 10#5) d ∧
       umMapped P' (k.regs 10#5).toNat d⌝ -∗
@@ -200,7 +207,8 @@ def wp_kwait_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
     chFrag V.chg (procAddr j) cs' -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
-    procPrivFd γ (procAddr j) pid { V with upt := P' }
+    ⌜V.ev ≤ k'⌝ -∗
+    procPrivFd γ (procAddr j) pid { V.updEv k' with upt := P' }
       (umemWrite (viewFaulted V.upt P' M) (k.regs 10#5).toNat ((xstateBytes xw).take d)) -∗
     wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
@@ -226,7 +234,7 @@ def wp_kwait_led_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6
   isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
   procPrivFd γ (procAddr j) pid V M ∗ chFrag V.chg (procAddr j) cs ∗ initPidIs 1#32 ∗
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd)
-    (rv xw : BitVec 32) (d : Nat) (cs' : ExtTreeSet GName compare),
+    (rv xw : BitVec 32) (d : Nat) (cs' : ExtTreeSet GName compare) (k' : Nat),
     ⌜calleeSaved k.regs R' ∧ R' 10#5 = BitVec.signExtend 64 rv ∧ V.upt.extSz V.sz P' ∧ d ≤ 4 ∧
       kwaitAns rv (k.regs 10#5) d ∧
       umMapped P' (k.regs 10#5).toNat d⌝ -∗
@@ -234,7 +242,8 @@ def wp_kwait_led_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6
     chFrag V.chg (procAddr j) cs' -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     trapCsrs cpu' -∗ cpuClaim cpu' k.proc -∗ intrRes cpu' -∗
-    procPrivFd γ (procAddr j) pid { V with upt := P' }
+    ⌜V.ev ≤ k'⌝ -∗
+    procPrivFd γ (procAddr j) pid { V.updEv k' with upt := P' }
       (umemWrite (viewFaulted V.upt P' M) (k.regs 10#5).toNat ((xstateBytes xw).take d)) -∗
     wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
@@ -260,7 +269,7 @@ def wp_kwait_led_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
   isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
   procPrivFd γ (procAddr j) pid V M ∗ chFrag V.chg (procAddr j) cs ∗ initPidIs 1#32 ∗
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd)
-    (rv xw : BitVec 32) (d : Nat) (cs' : ExtTreeSet GName compare),
+    (rv xw : BitVec 32) (d : Nat) (cs' : ExtTreeSet GName compare) (k' : Nat),
     ⌜calleeSaved k.regs R' ∧ R' 10#5 = BitVec.signExtend 64 rv ∧ V.upt.extSz V.sz P' ∧ d ≤ 4 ∧
       kwaitAns rv (k.regs 10#5) d ∧
       umMapped P' (k.regs 10#5).toNat d⌝ -∗
@@ -268,7 +277,8 @@ def wp_kwait_led_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
     chFrag V.chg (procAddr j) cs' -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
-    procPrivFd γ (procAddr j) pid { V with upt := P' }
+    ⌜V.ev ≤ k'⌝ -∗
+    procPrivFd γ (procAddr j) pid { V.updEv k' with upt := P' }
       (umemWrite (viewFaulted V.upt P' M) (k.regs 10#5).toNat ((xstateBytes xw).take d)) -∗
     wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
@@ -315,8 +325,8 @@ theorem KWAIT.wp_kwait (A : KWAIT) {hlc : HasLC} {GF : BundledGFunctors} [MachGS
   iapply h
   iframe H0 H1 H2 Htc Hcl Hir H6 H7 H8 H9 H10 H11 H12
   iapply wpNext_mono $$ Hnext
-  iintro %cpu' HK %spie %spp %R' %P' %rv %xw %d %cs' %p0 Ha Hc H1 H2 ⟨Htc, Hir⟩ Hcl H6
-  iapply HK $$ %spie %spp %R' %P' %rv %xw %d %cs' %p0 Ha Hc H1 H2 Htc Hcl Hir H6
+  iintro %cpu' HK %spie %spp %R' %P' %rv %xw %d %cs' %k' %p0 Ha Hc H1 H2 ⟨Htc, Hir⟩ Hcl %hk' H6
+  iapply HK $$ %spie %spp %R' %P' %rv %xw %d %cs' %k' %p0 Ha Hc H1 H2 Htc Hcl Hir %hk' H6
 
 /-- The interrupts-off instance of `wp_kwait_led_eb` (the led twin of
 `KWAIT.wp_kwait`, the same derivation). -/
@@ -337,7 +347,7 @@ theorem KWAIT.wp_kwait_led (A : KWAIT) {hlc : HasLC} {GF : BundledGFunctors} [Ma
   iapply h
   iframe H0 H1 H2 Htc Hcl Hir H6 H7 H8 H9 H10 H11 H12
   iapply wpNext_mono $$ Hnext
-  iintro %cpu' HK %spie %spp %R' %P' %rv %xw %d %cs' %p0 Ha Hc H1 H2 ⟨Htc, Hir⟩ Hcl H6
-  iapply HK $$ %spie %spp %R' %P' %rv %xw %d %cs' %p0 Ha Hc H1 H2 Htc Hcl Hir H6
+  iintro %cpu' HK %spie %spp %R' %P' %rv %xw %d %cs' %k' %p0 Ha Hc H1 H2 ⟨Htc, Hir⟩ Hcl %hk' H6
+  iapply HK $$ %spie %spp %R' %P' %rv %xw %d %cs' %k' %p0 Ha Hc H1 H2 Htc Hcl Hir %hk' H6
 
 end Xv6

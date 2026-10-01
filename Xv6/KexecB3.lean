@@ -75,6 +75,15 @@ Rocq's header, in short:
    (the 56-byte buffer IS the file at `kxbPhoff`), so Rocq's
    `kxc_type_read(_ne)` / `kxc_and4095_*` / `kxc_w32_bit` / `kxc_wrap_sum`
    / `kxc_le8_unsigned` are `Nat` / `BitVec` rows here (`kxcB3_*`).
+6. **The permit sweep L1a (Rocq f344a089a, `ProofKexecB3.v`).**  uvmalloc
+   takes the block's counter (`ProcPrivAcc.procPrivFd_evLend`), so after a
+   segment the rest of the run is at a later record: the two downstream
+   continuations `kxcK1a4` / `kxcKB` quantify it (`∀ V1, ⌜evAfter A.V
+   V1⌝ -∗ …` at `{ A with V := V1 }`, Rocq's `∀ U', ⌜ev_after U U'⌝`), the
+   loop (`kxc_phdr`) is proved at every record `{ A with V := V0 }`, and the
+   lemmas after uvmalloc (`kxcB3_load`, the `0`-return stub) run at the
+   moved record with the closer and the two continuations converted
+   (`KexecOkQ.kexecCloser_after`, `kxcK1a4_after`, `kxcKB_after`).
 -/
 import Xv6.KexecB2
 import Xv6.BallocParts
@@ -387,11 +396,12 @@ def kxcK1a4 (Q : BitVec 64 → ProcPriv → (Nat → List (BitVec 8)) → Prop) 
     (kf : Nat) (qf sf : Qp) (gyf : GName) (loyf tlyf : Nat) (inumf : BitVec 32) (dnf : Dinode)
     (bmf : Blkmap) (data : Nat → List (BitVec 8)) (gilf gislf : GName) (n2 : Nat)
     (w67 : BitVec 64) (ef : List (BitVec 8)) : IProp GF := iprop%
+  ∀ V1 : ProcPriv, ⌜evAfter A.V V1⌝ -∗
   ∀ (c : CPU) (spie spp : Bool) (R : RegMap) (P : UPtd) (Mi : Nat → List (BitVec 8)) (szv : BitVec 64),
-    kxcAt1a4 k A c spie spp R kf qf sf gyf loyf tlyf inumf dnf bmf data gilf gislf n2
+    kxcAt1a4 k { A with V := V1 } c spie spp R kf qf sf gyf loyf tlyf inumf dnf bmf data gilf gislf n2
       (k.regs 19#5) (k.regs 20#5) (k.regs 21#5) (k.regs 22#5) (k.regs 23#5) (k.regs 24#5)
       (k.regs 25#5) (k.regs 26#5) (k.regs 27#5) w67 ef P Mi szv (k.regs 27#5) -∗
-    (∀ c' : CPU, kexecCloser Q QF k A c') -∗ wpLoop c
+    (∀ c' : CPU, kexecCloser Q QF k { A with V := V1 } c') -∗ wpLoop c
 
 /-- The back edge into the body at header `j`, handed the closer and the
 exit back. -/
@@ -400,12 +410,77 @@ def kxcKB (Q : BitVec 64 → ProcPriv → (Nat → List (BitVec 8)) → Prop) (Q
     (kf : Nat) (qf sf : Qp) (gyf : GName) (loyf tlyf : Nat) (inumf : BitVec 32) (dnf : Dinode)
     (bmf : Blkmap) (data : Nat → List (BitVec 8)) (gilf gislf : GName) (n2 : Nat)
     (w67 : BitVec 64) (ef : List (BitVec 8)) (j : Nat) : IProp GF := iprop%
+  ∀ V1 : ProcPriv, ⌜evAfter A.V V1⌝ -∗
   ∀ (c : CPU) (spie spp : Bool) (R : RegMap) (P : UPtd) (Mi : Nat → List (BitVec 8)) (szv : BitVec 64),
-    kxcAt12c k A c spie spp R kf qf sf gyf loyf tlyf inumf dnf bmf data gilf gislf n2
+    kxcAt12c k { A with V := V1 } c spie spp R kf qf sf gyf loyf tlyf inumf dnf bmf data gilf gislf n2
       (k.regs 19#5) (k.regs 20#5) (k.regs 21#5) (k.regs 22#5) (k.regs 23#5) (k.regs 24#5)
       (k.regs 25#5) (k.regs 26#5) (k.regs 27#5) w67 ef P Mi j szv -∗
-    (∀ c' : CPU, kexecCloser Q QF k A c') -∗
-    kxcK1a4 Q QF k A kf qf sf gyf loyf tlyf inumf dnf bmf data gilf gislf n2 w67 ef -∗ wpLoop c
+    (∀ c' : CPU, kexecCloser Q QF k { A with V := V1 } c') -∗
+    kxcK1a4 Q QF k { A with V := V1 } kf qf sf gyf loyf tlyf inumf dnf bmf data gilf gislf n2 w67 ef -∗
+    wpLoop c
+
+/-- **The +0x1a4 exit at a later record** (permit sweep L1a, Rocq's
+`ev_after_trans` under the exit): an exit that takes every record after
+`A.V` takes every record after a later one. -/
+theorem kxcK1a4_after (Q : BitVec 64 → ProcPriv → (Nat → List (BitVec 8)) → Prop) (QF : KxfCause → Prop)
+    (k : KCtx) (A : KexecArgs)
+    (kf : Nat) (qf sf : Qp) (gyf : GName) (loyf tlyf : Nat) (inumf : BitVec 32) (dnf : Dinode)
+    (bmf : Blkmap) (data : Nat → List (BitVec 8)) (gilf gislf : GName) (n2 : Nat)
+    (w67 : BitVec 64) (ef : List (BitVec 8)) (V1 : ProcPriv) (h : evAfter A.V V1) :
+    kxcK1a4 (GF := GF) Q QF k A kf qf sf gyf loyf tlyf inumf dnf bmf data gilf gislf n2 w67 ef ⊢
+      kxcK1a4 Q QF k { A with V := V1 } kf qf sf gyf loyf tlyf inumf dnf bmf data gilf gislf n2 w67 ef := by
+  unfold kxcK1a4
+  iintro H %V2 %h2
+  iapply H $$ %V2 %(evAfter_trans h h2)
+
+/-- The +0x1a4 exit at the record itself (`evAfter_refl`). -/
+theorem kxcK1a4_here (Q : BitVec 64 → ProcPriv → (Nat → List (BitVec 8)) → Prop) (QF : KxfCause → Prop)
+    (k : KCtx) (A : KexecArgs)
+    (kf : Nat) (qf sf : Qp) (gyf : GName) (loyf tlyf : Nat) (inumf : BitVec 32) (dnf : Dinode)
+    (bmf : Blkmap) (data : Nat → List (BitVec 8)) (gilf gislf : GName) (n2 : Nat)
+    (w67 : BitVec 64) (ef : List (BitVec 8)) :
+    kxcK1a4 (GF := GF) Q QF k A kf qf sf gyf loyf tlyf inumf dnf bmf data gilf gislf n2 w67 ef ⊢
+      ∀ (c : CPU) (spie spp : Bool) (R : RegMap) (P : UPtd) (Mi : Nat → List (BitVec 8)) (szv : BitVec 64),
+        kxcAt1a4 k A c spie spp R kf qf sf gyf loyf tlyf inumf dnf bmf data gilf gislf n2
+          (k.regs 19#5) (k.regs 20#5) (k.regs 21#5) (k.regs 22#5) (k.regs 23#5) (k.regs 24#5)
+          (k.regs 25#5) (k.regs 26#5) (k.regs 27#5) w67 ef P Mi szv (k.regs 27#5) -∗
+        (∀ c' : CPU, kexecCloser Q QF k A c') -∗ wpLoop c := by
+  unfold kxcK1a4
+  iintro H
+  ihave H := H $$ %A.V %(evAfter_refl A.V)
+  rw [show ({ A with V := A.V } : KexecArgs) = A from rfl]
+  iexact H
+
+/-- The back edge at the record itself (`evAfter_refl`). -/
+theorem kxcKB_here (Q : BitVec 64 → ProcPriv → (Nat → List (BitVec 8)) → Prop) (QF : KxfCause → Prop)
+    (k : KCtx) (A : KexecArgs)
+    (kf : Nat) (qf sf : Qp) (gyf : GName) (loyf tlyf : Nat) (inumf : BitVec 32) (dnf : Dinode)
+    (bmf : Blkmap) (data : Nat → List (BitVec 8)) (gilf gislf : GName) (n2 : Nat)
+    (w67 : BitVec 64) (ef : List (BitVec 8)) (j : Nat) :
+    kxcKB (GF := GF) Q QF k A kf qf sf gyf loyf tlyf inumf dnf bmf data gilf gislf n2 w67 ef j ⊢
+      ∀ (c : CPU) (spie spp : Bool) (R : RegMap) (P : UPtd) (Mi : Nat → List (BitVec 8)) (szv : BitVec 64),
+        kxcAt12c k A c spie spp R kf qf sf gyf loyf tlyf inumf dnf bmf data gilf gislf n2
+          (k.regs 19#5) (k.regs 20#5) (k.regs 21#5) (k.regs 22#5) (k.regs 23#5) (k.regs 24#5)
+          (k.regs 25#5) (k.regs 26#5) (k.regs 27#5) w67 ef P Mi j szv -∗
+        (∀ c' : CPU, kexecCloser Q QF k A c') -∗
+        kxcK1a4 Q QF k A kf qf sf gyf loyf tlyf inumf dnf bmf data gilf gislf n2 w67 ef -∗ wpLoop c := by
+  unfold kxcKB
+  iintro H
+  ihave H := H $$ %A.V %(evAfter_refl A.V)
+  rw [show ({ A with V := A.V } : KexecArgs) = A from rfl]
+  iexact H
+
+/-- **The back edge at a later record** (permit sweep L1a). -/
+theorem kxcKB_after (Q : BitVec 64 → ProcPriv → (Nat → List (BitVec 8)) → Prop) (QF : KxfCause → Prop)
+    (k : KCtx) (A : KexecArgs)
+    (kf : Nat) (qf sf : Qp) (gyf : GName) (loyf tlyf : Nat) (inumf : BitVec 32) (dnf : Dinode)
+    (bmf : Blkmap) (data : Nat → List (BitVec 8)) (gilf gislf : GName) (n2 : Nat)
+    (w67 : BitVec 64) (ef : List (BitVec 8)) (j : Nat) (V1 : ProcPriv) (h : evAfter A.V V1) :
+    kxcKB (GF := GF) Q QF k A kf qf sf gyf loyf tlyf inumf dnf bmf data gilf gislf n2 w67 ef j ⊢
+      kxcKB Q QF k { A with V := V1 } kf qf sf gyf loyf tlyf inumf dnf bmf data gilf gislf n2 w67 ef j := by
+  unfold kxcKB
+  iintro H %V2 %h2
+  iapply H $$ %V2 %(evAfter_trans h h2)
 
 /-! ## +0x11a: THE BACK EDGE -/
 
@@ -499,7 +574,8 @@ theorem kxc_incr (Q : BitVec 64 → ProcPriv → (Nat → List (BitVec 8)) → P
         (k.regs 23#5) (k.regs 24#5) (k.regs 25#5) (k.regs 26#5) (k.regs 27#5) _ w65 w67
       $$ [F1 F2 F3 F4 F5 F6 F7 F8 F9 F10 F11 F12 F13 Fu Fp F63 F64 F65 F66 F67 F68]
     · unfold kxcFrameBp; iframe
-    unfold kxcK1a4
+    ihave H1a4 := kxcK1a4_here Q QF k A kf qf sf gyf loyf tlyf inumf dnf bmf data gilf gislf n2 w67 ef
+      $$ H1a4
     iapply H1a4 $$ %cpu %spie %spp %_ %P %Mi %szv [- Hcl] Hcl
     unfold kxcAt1a4 kxcFrameBk
     iframe Hk Hpc Hte Hce Hop Hlog Hirs Hbs Hpt Hpriv Hbufs He Hfr
@@ -525,7 +601,8 @@ theorem kxc_incr (Q : BitVec 64 → ProcPriv → (Nat → List (BitVec 8)) → P
         (k.regs 23#5) (k.regs 24#5) (k.regs 25#5) (k.regs 26#5) (k.regs 27#5) _ w65 w67
       $$ [F1 F2 F3 F4 F5 F6 F7 F8 F9 F10 F11 F12 F13 Fu Fp F63 F64 F65 F66 F67 F68]
     · unfold kxcFrameBp; iframe
-    unfold kxcKB
+    ihave HB := kxcKB_here Q QF k A kf qf sf gyf loyf tlyf inumf dnf bmf data gilf gislf n2 w67 ef (i + 1)
+      $$ HB
     iapply HB $$ %cpu %spie %spp %_ %P %Mi %szv [- Hcl H1a4] Hcl H1a4
     unfold kxcAt12c kxcFrameBk
     iframe Hk Hpc Hte Hce Hop Hlog Hirs Hbs Hpt Hpriv Hbufs He Hfr
@@ -1038,16 +1115,29 @@ theorem kxcB3_checks (RD : READI) (WA : WALKADDR) (PA : PANIC) (IUP : IUNLOCKPUT
   k_step_e (wp_s_add cpu _ (KA.«kexec» + 0x17a#64) true 10#5 0#5 22#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  -- +0x17c  jal uvmalloc
+  -- +0x17c  jal uvmalloc, the block's event counter lent to it (permit
+  -- sweep L1a, Rocq `proc_priv_ev_lend`)
+  icases procPrivFd_evLend A.γ k.proc A.pidv A.V A.M $$ Hpriv with ⟨Hlend, Hpback⟩
   iapply (kxcB2_call_uvmalloc UV Γ cpu k A spie spp _ (KA.«kexec» + 0x17c#64) 2082998#21 kxcB3_br_uvma
-      kxcB3_ret_17c P Mi hK hnoff (by simp [RegMap.set_apply, a22])
+      kxcB3_ret_17c P Mi A.V.ev hK hnoff (by simp [RegMap.set_apply, a22])
       (by simpa [RegMap.set_apply, a18] using hbelow) (by simpa [RegMap.set_apply, a18] using hcov)
       (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hf2p];
           exact flags2permRet_permOk _))
-    $$ [- $Hk $Hpc $Hte $Hce $Hfab $Hpt]
+    $$ [- $Hk $Hpc $Hte $Hce $Hfab $Hpt $Hlend]
   isplitr
   · iapply (text_instr _ _ _ _ rfl rfl); iexact Htext
-  iintro %c2 %spie2 %spp2 %R2 %hcs2 Hk Hpc Hte Hce Hres
+  iintro %c2 %spie2 %spp2 %R2 %hcs2 Hk Hpc Hte Hce ⟨%kl, %hkl, Hlend⟩ Hres
+  -- the block back at a later count: the rest of the run is at that record,
+  -- the closer and the two continuations converted to it
+  icases Hpback $$ %kl %hkl Hlend with ⟨%V1, %hV1, Hpriv⟩
+  obtain ⟨kv, hkv, rfl⟩ := hV1
+  ihave Hcl := kexecCloser_after Q QF k A (A.V.updEv kv) ⟨kv, hkv, rfl⟩ $$ Hcl
+  ihave H1a4 := kxcK1a4_after Q QF k A kf qf sf gyf loyf tlyf inumf dnf bmf data gilf gislf n2 4095#64 ef
+    (A.V.updEv kv) ⟨kv, hkv, rfl⟩ $$ H1a4
+  ihave HB := kxcKB_after Q QF k A kf qf sf gyf loyf tlyf inumf dnf bmf data gilf gislf n2 4095#64 ef
+    (i + 1) (A.V.updEv kv) ⟨kv, hkv, rfl⟩ $$ HB
+  ihave Hbufs := (show kxcBufs (GF := GF) k A ⊢ kxcBufs k { A with V := A.V.updEv kv } from .rfl)
+    $$ Hbufs
   let cpu := c2
   k_norm_g
   obtain ⟨b2, b8, b9, b18, b19, b20, b21, b22, b23, b24, b25, b26, b27⟩ := hcs2
@@ -1064,7 +1154,8 @@ theorem kxcB3_checks (RD : READI) (WA : WALKADDR) (PA : PANIC) (IUP : IUNLOCKPUT
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hr0, MachCSL.beqz_zero]
     iintro Hk Hpc
     ihave Hfr := Hfb $$ %(0#64) Hg F65 F67
-    iapply (kxcB3_stub IUP EO PFP Γ Q QF cpu k A spie2 spp2 _ kf qf sf gyf loyf tlyf inumf dnf bmf data
+    iapply (kxcB3_stub IUP EO PFP Γ Q QF cpu k { A with V := A.V.updEv kv } spie2 spp2 _ kf qf sf gyf
+      loyf tlyf inumf dnf bmf data
       gilf gislf n2 (kxcOff ef i) 0#64 4095#64 ef P Mi szv g (KA.«kexec» + 0x34c#64) 2097102#21
       (by decide) ⟨_, hqfm⟩ hK hnoff htier hj hproc hkf hnib hn2 hal hlen hbelow hcov)
     isplitr
@@ -1103,7 +1194,8 @@ theorem kxcB3_checks (RD : READI) (WA : WALKADDR) (PA : PANIC) (IUP : IUNLOCKPUT
     iintro Hk Hpc
     rw [hsz0] at hbelow' hcov'
     ihave Hfr := Hfb $$ %(0#64) Hg F65 F67
-    iapply (kxcB3_stub IUP EO PFP Γ Q QF cpu k A spie2 spp2 _ kf qf sf gyf loyf tlyf inumf dnf bmf data
+    iapply (kxcB3_stub IUP EO PFP Γ Q QF cpu k { A with V := A.V.updEv kv } spie2 spp2 _ kf qf sf gyf
+      loyf tlyf inumf dnf bmf data
       gilf gislf n2 (kxcOff ef i) 0#64 4095#64 ef P' M' szv g (KA.«kexec» + 0x34c#64) 2097102#21
       (by decide) ⟨_, hqfm⟩ hK hnoff htier hj hproc hkf hnib hn2 hal hlen hbelow' hcov')
     isplitr
@@ -1125,7 +1217,8 @@ theorem kxcB3_checks (RD : READI) (WA : WALKADDR) (PA : PANIC) (IUP : IUNLOCKPUT
     · rw [hret, if_pos hlt]; omega
     · rw [hret, if_neg hlt]; omega
   ihave Hfr := Hfb $$ %(R2 10#5) Hg F65 F67
-  iapply (kxcB3_load RD WA PA IUP EO PFP Γ Q QF cpu k A spie2 spp2 _ kf qf sf gyf loyf tlyf inumf dnf bmf
+  iapply (kxcB3_load RD WA PA IUP EO PFP Γ Q QF cpu k { A with V := A.V.updEv kv } spie2 spp2 _ kf qf sf
+      gyf loyf tlyf inumf dnf bmf
       data gilf gislf n2 ef P' M' i (R2 10#5) g hqfm hK hnoff htier hj hproc
       ⟨b2, b8, b20, b21, by rw [b22, hroot'], b25, b26, b27⟩
       ⟨hkf, hnib, hn2, hal, hlen⟩ hi htfp' hbelow' hcov' (by omega) hnew1 hva
@@ -1384,30 +1477,35 @@ theorem kxc_phdr (RD : READI) (WA : WALKADDR) (PA : PANIC) (IUP : IUNLOCKPUT) (E
     (∀ c' : CPU, kexecCloser Q QF k A c') ∗
     kxcK1a4 Q QF k A kf qf sf gyf loyf tlyf inumf dnf bmf data gilf gislf n2 w67 ef
     ⊢ wpLoop (GF := GF) cpu := by
-  suffices H : ∀ n i (cpu : CPU) (spie spp : Bool) (R : RegMap) (P : UPtd) (Mi : Nat → List (BitVec 8))
-      (szv : BitVec 64), ehPhnum ef - i = n →
-      (kxcAt12c k A cpu spie spp R kf qf sf gyf loyf tlyf inumf dnf bmf data gilf gislf n2
+  -- THE LOOP AT EVERY RECORD (permit sweep L1a): a segment's uvmalloc moves
+  -- the block's event count, so the back edge hands the next round a later
+  -- record (Rocq's `induction W` generalized over `U`)
+  suffices H : ∀ n (V0 : ProcPriv) i (cpu : CPU) (spie spp : Bool) (R : RegMap) (P : UPtd)
+      (Mi : Nat → List (BitVec 8)) (szv : BitVec 64), ehPhnum ef - i = n →
+      (kxcAt12c k { A with V := V0 } cpu spie spp R kf qf sf gyf loyf tlyf inumf dnf bmf data gilf
+        gislf n2
         (k.regs 19#5) (k.regs 20#5) (k.regs 21#5) (k.regs 22#5) (k.regs 23#5) (k.regs 24#5)
         (k.regs 25#5) (k.regs 26#5) (k.regs 27#5) w67 ef P Mi i szv ∗
       fsFabric (hlc := hlc) Γ A.pd A.pav A.pu ∗
-      (∀ c' : CPU, kexecCloser Q QF k A c') ∗
-      kxcK1a4 Q QF k A kf qf sf gyf loyf tlyf inumf dnf bmf data gilf gislf n2 w67 ef
+      (∀ c' : CPU, kexecCloser Q QF k { A with V := V0 } c') ∗
+      kxcK1a4 Q QF k { A with V := V0 } kf qf sf gyf loyf tlyf inumf dnf bmf data gilf gislf n2 w67 ef
       ⊢ wpLoop (GF := GF) cpu) from
-    fun i cpu spie spp R P Mi szv => H _ i cpu spie spp R P Mi szv rfl
+    fun i cpu spie spp R P Mi szv => H _ A.V i cpu spie spp R P Mi szv rfl
   intro n
   refine Nat.strongRecOn n ?_
   intro n ih
-  intro i cpu spie spp R P Mi szv hn
+  intro V0 i cpu spie spp R P Mi szv hn
   iintro ⟨Hs, #Hfab, Hcl, H1a4⟩
-  iapply (kxc_ph_step RD WA PA IUP EO PFP F2P UV Γ Q QF cpu k A spie spp R kf qf sf gyf loyf tlyf inumf
-      dnf bmf data gilf gislf n2 w67 ef P Mi i szv hqfl hqfm hK hnoff htier hj hproc)
+  iapply (kxc_ph_step RD WA PA IUP EO PFP F2P UV Γ Q QF cpu k { A with V := V0 } spie spp R kf qf sf gyf
+      loyf tlyf inumf dnf bmf data gilf gislf n2 w67 ef P Mi i szv hqfl hqfm hK hnoff htier hj hproc)
     $$ [$Hs $Hfab $Hcl $H1a4]
   unfold kxcKB
-  iintro %c %spie' %spp' %R' %P' %Mi' %szv' Hs' Hcl' H1a4'
-  icases kxcAt12c_lt k A c spie' spp' R' kf qf sf gyf loyf tlyf inumf dnf bmf data gilf gislf n2
+  iintro %V1 %hV1 %c %spie' %spp' %R' %P' %Mi' %szv' Hs' Hcl' H1a4'
+  icases kxcAt12c_lt k { A with V := V1 } c spie' spp' R' kf qf sf gyf loyf tlyf inumf dnf bmf data
+      gilf gislf n2
       (k.regs 19#5) (k.regs 20#5) (k.regs 21#5) (k.regs 22#5) (k.regs 23#5) (k.regs 24#5)
       (k.regs 25#5) (k.regs 26#5) (k.regs 27#5) w67 ef P' Mi' (i + 1) szv' $$ Hs' with ⟨%hlt, Hs'⟩
-  iapply (ih (ehPhnum ef - (i + 1)) (by omega) (i + 1) c spie' spp' R' P' Mi' szv' rfl)
+  iapply (ih (ehPhnum ef - (i + 1)) (by omega) V1 (i + 1) c spie' spp' R' P' Mi' szv' rfl)
     $$ [$Hs' $Hfab $Hcl' $H1a4']
 
 /-! ## THE TWO PATHS THAT CLOSE THE INODE, AND PHASE B2 WHOLE -/
@@ -1555,25 +1653,27 @@ theorem kxc_b2 (RD : READI) (WA : WALKADDR) (PA : PANIC) (IUP : IUNLOCKPUT) (EO 
       (k.regs 25#5) (k.regs 26#5) (k.regs 27#5) w67 ef P Mi i szv ∗
     fsFabric (hlc := hlc) Γ A.pd A.pav A.pu ∗
     (∀ c' : CPU, kexecCloser Q QF k A c') ∗
-    (∀ (c : CPU) (spie' spp' : Bool) (R' : RegMap) (P' : UPtd) (Mo : Nat → List (BitVec 8))
+    (∀ V1 : ProcPriv, ⌜evAfter A.V V1⌝ -∗
+      ∀ (c : CPU) (spie' spp' : Bool) (R' : RegMap) (P' : UPtd) (Mo : Nat → List (BitVec 8))
         (szv' : BitVec 64),
-      kxcAt1ae k A c spie' spp' R' (k.regs 19#5) (k.regs 20#5) (k.regs 21#5) (k.regs 22#5)
-        (k.regs 23#5) (k.regs 24#5) (k.regs 25#5) (k.regs 26#5) (k.regs 27#5) w67 (kxcFb data dnf) ef
-        P' Mo szv' (k.regs 27#5) -∗
-      (∀ c' : CPU, kexecCloser Q QF k A c') -∗ wpLoop c)
+      kxcAt1ae k { A with V := V1 } c spie' spp' R' (k.regs 19#5) (k.regs 20#5) (k.regs 21#5)
+        (k.regs 22#5) (k.regs 23#5) (k.regs 24#5) (k.regs 25#5) (k.regs 26#5) (k.regs 27#5) w67
+        (kxcFb data dnf) ef P' Mo szv' (k.regs 27#5) -∗
+      (∀ c' : CPU, kexecCloser Q QF k { A with V := V1 } c') -∗ wpLoop c)
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hs, #Hfab, Hcl, HK⟩
   iapply (kxc_phdr RD WA PA IUP EO PFP F2P UV Γ Q QF k A kf qf sf gyf loyf tlyf inumf dnf bmf data gilf
       gislf n2 w67 ef hqfl hqfm hK hnoff htier hj hproc i cpu spie spp R P Mi szv)
     $$ [- $Hs $Hfab $Hcl]
   unfold kxcK1a4
-  iintro %c %spie' %spp' %R' %P' %Mi' %szv' Hs Hcl
-  iapply (kxc_close IUP EO Γ Q QF c k A spie' spp' R' kf qf sf gyf loyf tlyf inumf dnf bmf data gilf gislf n2
+  iintro %V1 %hV1 %c %spie' %spp' %R' %P' %Mi' %szv' Hs Hcl
+  iapply (kxc_close IUP EO Γ Q QF c k { A with V := V1 } spie' spp' R' kf qf sf gyf loyf tlyf inumf dnf
+      bmf data gilf gislf n2
       (k.regs 19#5) (k.regs 20#5) (k.regs 21#5) (k.regs 22#5) (k.regs 23#5) (k.regs 24#5)
       (k.regs 25#5) (k.regs 26#5) (k.regs 27#5) w67 ef P' Mi' szv' (k.regs 27#5) hK hnoff htier hj hproc)
     $$ [- $Hs $Hfab $Hcl]
   iintro %c2 %spie2 %spp2 %R2 Hs Hcl
-  iapply HK $$ %c2 %spie2 %spp2 %R2 %P' %Mi' %szv' Hs Hcl
+  iapply HK $$ %V1 %hV1 %c2 %spie2 %spp2 %R2 %P' %Mi' %szv' Hs Hcl
 
 set_option maxHeartbeats 4000000 in
 /-- **Rocq `kxc_b2z`: PHASE B2 WHOLE, THE `elf.phnum = 0` PATH** -- from

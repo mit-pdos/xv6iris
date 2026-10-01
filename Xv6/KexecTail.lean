@@ -94,6 +94,15 @@ a STAGE file (no `Proof` prefix, brief rule 2; the one seal is
     `UmCovered.lazyFree_maxsz` (Rocq `proc_pt_covered_maxsz`), the table's
     `uptWf` read off `procPtAt_wf`; the new table is `procPtAt P Mi` (Rocq
     `proc_pt_any P`).
+14. **The permit sweep L1a (Rocq f344a089a, `ProofKexecTail.v`).**
+    `kxc_call_pfp` takes the lend `actLend k.proc ke` and hands back `∃ k2 ≥
+    ke` (proc_freepagetable's L1a contract).  `kxc_bad_1d6` lends the
+    BLOCK's counter (`ProcPrivAcc.procPrivFd_evLend`, Rocq
+    `proc_priv_ev_lend`) and goes on to `kxc_exit_m1` at the moved record
+    `{ A with V := V1 }`, the closer converted by `KexecOkQ.kexecCloser_after`
+    (Rocq `kexec_closer_after_next`); its own statement is unchanged.
+    `kxc_exit_m1` itself pays the failure arm at its own record
+    (`kexecOkQf_fail`, `evAfter_refl`, Rocq `ev_rose_refl`).
 -/
 import Xv6.KexecOkQ
 import Xv6.KexecParts
@@ -102,6 +111,7 @@ import Xv6.SpecEndOp
 import Xv6.SpecProcFreepagetable
 import Xv6.DinodeSlot
 import Xv6.UmCovered
+import Xv6.ProcPrivAcc
 
 namespace Xv6
 
@@ -937,23 +947,24 @@ OLD table at the commit). -/
 theorem kxc_call_pfp (PFP : PROC_FREEPAGETABLE) (Γ : SchedNames) (cpu : CPU) (k : KCtx)
     (A : KexecArgs) (spie spp : Bool) (R : RegMap)
     (X : BitVec 64) (imm : BitVec 21) (hX : X + BitVec.signExtend 64 imm = KA.«proc_freepagetable»)
-    (hret : jumpPc (X + 4#64) = X + 4#64) (P : UPtd) (Mi : Nat → List (BitVec 8))
+    (hret : jumpPc (X + 4#64) = X + 4#64) (P : UPtd) (Mi : Nat → List (BitVec 8)) (ke : Nat)
     (hK : kexecSlots ≤ k.avail) (hnoff : k.noff = 0)
     (hroot : R 10#5 = pageAddr P.root) (hsz : (R 11#5).toNat ≤ uvmMaxsz)
     (hbelow : umBelow (R 11#5) P) :
     instr X false (instruction.JAL (imm, regidx.Regidx 1#5)) ∗
     kctx cpu (((k.withSpie spie spp).pushed 68).withRegs R) ∗ pcIs cpu X ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    fsFabric (hlc := hlc) Γ A.pd A.pav A.pu ∗ procPtAt P Mi ∗
+    fsFabric (hlc := hlc) Γ A.pd A.pav A.pu ∗ procPtAt P Mi ∗ actLend k.proc ke ∗
     (∀ (c : CPU) (spie' spp' : Bool) (R' : RegMap),
       ⌜calleeSaved (R.set 1#5 (X + 4#64)) R'⌝ -∗
       kctx c (((k.withSpie spie' spp').pushed 68).withRegs R') -∗ pcIs c (X + 4#64) -∗
-      trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗ wpLoop c)
+      trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗
+      (∃ k2 : Nat, ⌜ke ≤ k2⌝ ∗ actLend k.proc k2) -∗ wpLoop c)
     ⊢ wpLoop (GF := GF) cpu := by
   have hK' : procPagetableSlots ≤ k.avail - 68 := by
     have : procPagetableSlots = 40 := rfl
     rw [kxc_slots_val] at hK; omega
-  iintro ⟨#Hi, Hk, Hpc, Hte, Hce, #Hfab, Hpt, HK⟩
+  iintro ⟨#Hi, Hk, Hpc, Hte, Hce, #Hfab, Hpt, Hlend, HK⟩
   icases fsFabric_all Γ A.pd A.pav A.pu $$ Hfab with
     ⟨⟨-, -, -, -, -, -, -, -, #Hkl, #Hav, -, -, -⟩, -, -, -, -⟩
   icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩
@@ -964,7 +975,7 @@ theorem kxc_call_pfp (PFP : PROC_FREEPAGETABLE) (Γ : SchedNames) (cpu : CPU) (k
   k_step_e (wp_s_jal cpu _ X false imm 1#5 (by decide)) $$ [- $Hk $Hpc $Hi] with [hX]
   iintro Hk Hpc
   have h := PFP.wp_proc_freepagetable (hlc := hlc) (GF := GF) cpu
-    ((((k.withSpie spie spp).pushed 68).withRegs R).setReg 1#5 (X + 4#64)) fscKalloc fsReadyKmem P Mi
+    ((((k.withSpie spie spp).pushed 68).withRegs R).setReg 1#5 (X + 4#64)) fscKalloc fsReadyKmem P Mi ke
     (by k_norm_g; omega) (by k_norm_g; exact hK') (by k_norm_g; simp [hlocks])
     (by k_norm_g; simp [RegMap.set_apply, hroot]) (by k_norm_g; simpa [RegMap.set_apply] using hsz)
     (by k_norm_g; simpa [RegMap.set_apply] using hbelow)
@@ -975,14 +986,14 @@ theorem kxc_call_pfp (PFP : PROC_FREEPAGETABLE) (Γ : SchedNames) (cpu : CPU) (k
   iframe
   iframe #
   iapply wpNext_intro_pin
-  iintro %c %hpin %spie' %spp' %R' %_ Hk Hpc %hcs
+  iintro %c %hpin %spie' %spp' %R' %_ Hk Hpc Hlend %hcs
   have hpin' : k.sie = false → c = cpu := fun h => hpin (Or.inl (by k_norm_g; exact h))
   ihave Hte := trapCsrsExt_move _ _ _ hpin' $$ Hte
   ihave Hce := cpuClaimExt_move _ _ _ _ hpin' $$ Hce
   k_norm_g [hret]
   ihave Hk := kctx_eq_mono c _ (((k.withSpie spie' spp').pushed 68).withRegs R')
     (kxc_ctx_ret k spie spp spie' spp' R') $$ Hk
-  iapply HK $$ %c %spie' %spp' %R' [] Hk Hpc Hte Hce
+  iapply HK $$ %c %spie' %spp' %R' [] Hk Hpc Hte Hce Hlend
   ipureintro
   simpa using hcs
 
@@ -1030,14 +1041,20 @@ theorem kxc_bad_1d6 (PFP : PROC_FREEPAGETABLE) (Γ : SchedNames)
   k_step_e (wp_s_add cpu _ (KA.«kexec» + 0x1d8#64) true 10#5 0#5 22#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h22]
   iintro Hk Hpc
-  -- +0x1da  jal proc_freepagetable
+  -- +0x1da  jal proc_freepagetable, the block's event counter lent to the
+  -- frees (permit sweep L1a, Rocq `proc_priv_ev_lend`)
+  icases procPrivFd_evLend A.γ k.proc A.pidv A.V A.M $$ Hpriv with ⟨Hlend, Hpback⟩
   iapply (kxc_call_pfp PFP Γ cpu k A spie spp _ (KA.«kexec» + 0x1da#64) 2084862#21 kxc_br_pfp_1da
-      kxc_ret_1da P Mi hK hnoff (by simp [RegMap.set_apply, h22]) (by simpa [RegMap.set_apply, h24] using hsz)
+      kxc_ret_1da P Mi A.V.ev hK hnoff (by simp [RegMap.set_apply, h22]) (by simpa [RegMap.set_apply, h24] using hsz)
       (by simpa [RegMap.set_apply, h24] using hbelow))
-    $$ [- $Hk $Hpc $Hte $Hce $Hfab $Hpt]
+    $$ [- $Hk $Hpc $Hte $Hce $Hfab $Hpt $Hlend]
   isplitr
   · iapply (text_instr _ _ _ _ rfl rfl); iexact Htext
-  iintro %c1 %spie1 %spp1 %R1 %hcs1 Hk Hpc Hte Hce
+  iintro %c1 %spie1 %spp1 %R1 %hcs1 Hk Hpc Hte Hce ⟨%kl, %hkl, Hlend⟩
+  -- the block back at a later count, and the exit converted to it
+  icases Hpback $$ %kl %hkl Hlend with ⟨%V1, %hV1, Hpriv⟩
+  ihave Hcl := kexecCloser_after Q QF k A V1 hV1 $$ Hcl
+  ihave Hbufs := (show kxcBufs (GF := GF) k A ⊢ kxcBufs k { A with V := V1 } from .rfl) $$ Hbufs
   let cpu := c1
   k_norm_g
   obtain ⟨a2, -, -, -, -, -, -, -, -, -, -, -, a27⟩ := hcs1
@@ -1090,7 +1107,7 @@ theorem kxc_bad_1d6 (PFP : PROC_FREEPAGETABLE) (Γ : SchedNames)
       (k.regs 19#5) (k.regs 20#5) (k.regs 21#5) (k.regs 22#5) (k.regs 23#5) (k.regs 24#5)
       (k.regs 25#5) (k.regs 26#5) w13 $$ [F1 F2 F3 F4 F5 F6 F7 F8 F9 F10 F11 F12 F13 Fr]
   · unfold kxcFrameAt; iframe
-  iapply (kxc_exit_m1 Q QF cpu k A spie1 spp1 _ hqf hK68 ?x2 ?x10 ?xk)
+  iapply (kxc_exit_m1 Q QF cpu k { A with V := V1 } spie1 spp1 _ hqf hK68 ?x2 ?x10 ?xk)
     $$ [$Hk $Hpc $Hte $Hce $Hfr $Hpriv $Hbufs $Hbs $Hirs $Hcl]
   case x2 => simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact e2
   case x10 => simp [RegMap.set_apply]

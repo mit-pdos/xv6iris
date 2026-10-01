@@ -73,6 +73,10 @@ a STAGE file (no `Proof` prefix).  Rocq's header, in short:
    here verbatim) and phase B2's segment call
    (`KexecB2.kxcB2_call_uvmalloc`, now its instance at the covered break)
    share it.  Rocq transcribes the call inline at both sites.
+11. **The permit sweep L1a (Rocq f344a089a)**: `kxc_call_uvmalloc` takes the
+   lend `actLend k.proc ke` and hands back `∃ k2 ≥ ke` (uvmalloc's L1a
+   contract); the two callers lend the block's counter
+   (`ProcPrivAcc.procPrivFd_evLend`).
 -/
 import Xv6.KexecTail
 import Xv6.LazyFree
@@ -595,7 +599,7 @@ covered break (deviation 10). -/
 theorem kxc_call_uvmalloc (UA : UVMALLOC) (Γ : SchedNames) (cpu : CPU) (k : KCtx) (A : KexecArgs)
     (spie spp : Bool) (R : RegMap)
     (X : BitVec 64) (imm : BitVec 21) (hX : X + BitVec.signExtend 64 imm = KA.«uvmalloc»)
-    (hret : jumpPc (X + 4#64) = X + 4#64) (P : UPtd) (M : Nat → List (BitVec 8))
+    (hret : jumpPc (X + 4#64) = X + 4#64) (P : UPtd) (M : Nat → List (BitVec 8)) (ke : Nat)
     (hK : kexecSlots ≤ k.avail) (hnoff : k.noff = 0)
     (hroot : R 10#5 = pageAddr P.root) (hold : (R 11#5).toNat ≤ uvmMaxsz)
     (hnew : (R 12#5).toNat ≤ uvmMaxsz ∨ lazyFree P.um (R 11#5))
@@ -605,11 +609,12 @@ theorem kxc_call_uvmalloc (UA : UVMALLOC) (Γ : SchedNames) (cpu : CPU) (k : KCt
     instr X false (instruction.JAL (imm, regidx.Regidx 1#5)) ∗
     kctx cpu (((k.withSpie spie spp).pushed 68).withRegs R) ∗ pcIs cpu X ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    fsFabric (hlc := hlc) Γ A.pd A.pav A.pu ∗ procPtAt P M ∗
+    fsFabric (hlc := hlc) Γ A.pd A.pav A.pu ∗ procPtAt P M ∗ actLend k.proc ke ∗
     (∀ (c : CPU) (spie' spp' : Bool) (R' : RegMap),
       ⌜calleeSaved (R.set 1#5 (X + 4#64)) R'⌝ -∗
       kctx c (((k.withSpie spie' spp').pushed 68).withRegs R') -∗ pcIs c (X + 4#64) -∗
       trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗
+      (∃ k2 : Nat, ⌜ke ≤ k2⌝ ∗ actLend k.proc k2) -∗
       ((⌜R' 10#5 = 0#64⌝ ∗ procPtAt P M) ∨
        (∃ (P' : UPtd) (M' : Nat → List (BitVec 8)),
           ⌜uvmallocOk P P' M M' (R 11#5) (R 12#5) (R 13#5) ∧
@@ -619,7 +624,7 @@ theorem kxc_call_uvmalloc (UA : UVMALLOC) (Γ : SchedNames) (cpu : CPU) (k : KCt
   have hK' : uvmallocSlots ≤ k.avail - 68 := by
     have : uvmallocSlots = 42 := rfl
     rw [kxc_slots_val] at hK; omega
-  iintro ⟨#Hi, Hk, Hpc, Hte, Hce, #Hfab, Hpt, HK⟩
+  iintro ⟨#Hi, Hk, Hpc, Hte, Hce, #Hfab, Hpt, Hlend, HK⟩
   icases fsFabric_all Γ A.pd A.pav A.pu $$ Hfab with
     ⟨⟨-, -, -, -, -, -, -, -, #Hkl, #Hav, -, -, -⟩, -, -, -, -⟩
   icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩
@@ -630,7 +635,7 @@ theorem kxc_call_uvmalloc (UA : UVMALLOC) (Γ : SchedNames) (cpu : CPU) (k : KCt
   k_step_e (wp_s_jal cpu _ X false imm 1#5 (by decide)) $$ [- $Hk $Hpc $Hi] with [hX]
   iintro Hk Hpc
   have h := UA.wp_uvmalloc (hlc := hlc) (GF := GF) cpu
-    ((((k.withSpie spie spp).pushed 68).withRegs R).setReg 1#5 (X + 4#64)) fscKalloc fsReadyKmem P M
+    ((((k.withSpie spie spp).pushed 68).withRegs R).setReg 1#5 (X + 4#64)) fscKalloc fsReadyKmem P M ke
     (by k_norm_g; omega) (by k_norm_g; exact hK') (by k_norm_g; simp [hlocks])
     (by k_norm_g; simp [RegMap.set_apply, hroot]) (by k_norm_g; simpa [RegMap.set_apply] using hold)
     (by k_norm_g; simpa [RegMap.set_apply] using hnew) (by k_norm_g; simpa [RegMap.set_apply] using hperm)
@@ -642,14 +647,14 @@ theorem kxc_call_uvmalloc (UA : UVMALLOC) (Γ : SchedNames) (cpu : CPU) (k : KCt
   iframe
   iframe #
   iapply wpNext_intro_pin
-  iintro %c %hpin %spie' %spp' %R' %_ Hk Hpc Hres %hcs
+  iintro %c %hpin %spie' %spp' %R' %_ Hk Hpc Hlend Hres %hcs
   have hpin' : k.sie = false → c = cpu := fun h => hpin (Or.inl (by k_norm_g; exact h))
   ihave Hte := trapCsrsExt_move _ _ _ hpin' $$ Hte
   ihave Hce := cpuClaimExt_move _ _ _ _ hpin' $$ Hce
   k_norm_g [hret]
   ihave Hk := kctx_eq_mono c _ (((k.withSpie spie' spp').pushed 68).withRegs R')
     (kxc_ctx_ret k spie spp spie' spp' R') $$ Hk
-  iapply HK $$ %c %spie' %spp' %R' [] Hk Hpc Hte Hce
+  iapply HK $$ %c %spie' %spp' %R' [] Hk Hpc Hte Hce Hlend
   · ipureintro
     simpa using hcs
   try simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]

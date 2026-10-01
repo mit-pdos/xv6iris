@@ -14,6 +14,9 @@ dispatch's rows, per the frozen recipe (notes/design-rulings.md).
   post's `extSz`; the children set moves (wait's own row).
 * The answer: `syscWaitOut` via `syscWaitOut_of` from kwait's `waitAns` and
   the window (`syscUwaitWr`, Rocq `uwait_wr`) from `kwaitAns`'s two guards.
+
+The wait post's raised event count (permit sweep L1a) reaches the
+dispatcher's ∀-general post through `SyscallRet.SyscRows.updEv`.
 -/
 import Xv6.SyscallArmsSbrk
 
@@ -125,8 +128,8 @@ theorem syscall_arm_wait (SW : SYSWAIT)
   iframe Hk Hpi Hte Hce Hwl Hnp Hkl Hka Hpriv Hch Hinit Hpc
   iapply wpNext_intro_pin
   iintro %cpu %-
-  iintro %spie2 %spp2 %R2 %P' %rv %xw %d %cs' %⟨hcs, ha0, hext, hd, hans, hmap⟩ Hwa Hch Hk Hpc Hte Hce
-    Hpriv
+  iintro %spie2 %spp2 %R2 %P' %rv %xw %d %cs' %k' %⟨hcs, ha0, hext, hd, hans, hmap⟩ Hwa Hch Hk Hpc Hte Hce
+    %hk' Hpriv
   -- the returned block's page facts
   icases procPrivFd_facts γ (procAddr j) pid _ _ $$ Hpriv with ⟨Hpriv, %⟨-, -, -, hwf⟩⟩
   icases sbrkArm_pageLen γ (procAddr j) pid _ _ $$ Hpriv with ⟨Hpriv, %hlen⟩
@@ -145,11 +148,13 @@ theorem syscall_arm_wait (SW : SYSWAIT)
     subst this; rfl
   have hrows := syscRows_wait V M _ P' sts cs cs' pid (R2 10#5) ((xstateBytes xw).take d) v hw0 hn3 hext
     (by rw [hbl]; exact hd) hz himg
-  have hsa0 : syscA0 (syscStore { V with upt := P' } (R2 10#5)) = R2 10#5 :=
+  have hsa0 : syscA0 (syscStore { V.updEv k' with upt := P' } (R2 10#5)) = R2 10#5 :=
     syscStore_a0 _ _ (by show tfArgIdx 0 < V.tf.length; rw [hl]; decide)
   unfold syscallRet syscallAddr at *
-  iapply (syscall_ret_tail PT Γ c0 cpu k spie2 spp2 R2 γ j pid V M sts gn cs ip f { V with upt := P' } _
-    sts cs' hj hproc hK htier hpins2 hs2' hrows)
+  -- the block at the reap's raised event count (permit sweep L1a): the rows
+  -- do not read it (`SyscRows.updEv`)
+  iapply (syscall_ret_tail PT Γ c0 cpu k spie2 spp2 R2 γ j pid V M sts gn cs ip f
+    { V.updEv k' with upt := P' } _ sts cs' hj hproc hK htier hpins2 hs2' (hrows.updEv k'))
   iframe Hk Hpc Hframe Hte Hce Hbs Hip Hfd Hir Henv Hpriv Hfr Hch Hnext
   isplitr
   · iapply syscExecOut_ne; rw [hn3]; decide

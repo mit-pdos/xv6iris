@@ -53,6 +53,11 @@ registration a forking parent would hold are DISCARDED (there is none), and
 `childTok` is dropped; the post's `initIdentAt` is the discarded `initproc`
 cell with those readings, and the ledger is sealed with `initReg`
 (`procsAvail_seal_spent`).
+
+THE BOOT LEND (permit sweep L1a, Rocq f344a089a, `ProofUserinit.v`): the
+boot hart has no current proc (`hproc : k.proc = 0`, landed before L1a),
+so allocproc's lend is `actLend_zero` and the one it hands back is
+dropped (`ui_allocproc`).
 -/
 import Xv6.SpecUserinit
 import Xv6.SpecRelease
@@ -248,7 +253,7 @@ theorem ui_allocproc (AP : ALLOCPROC) (Γ : SchedNames) (γ : FileNames) (c : CP
     (γl γp : GName) (γk : KmemNames) (on pav : Option Nat) (tk : Bool) (Q : Int → IProp GF)
     (hnoff : k'.noff + 2 < 2 ^ 31) (hK : allocprocSlots ≤ k'.avail)
     (hlk : "kmem" ∉ k'.locks) (hlp : "nextpid" ∉ k'.locks) (hlq : "proc" ∉ k'.locks)
-    (htier : k'.tier = KTier.kpt) :
+    (htier : k'.tier = KTier.kpt) (hp0 : k'.proc = 0#64) :
     kctx c k' ∗ pcIs c KA.«allocproc» ∗ procsInv Γ ∗
     isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗ isLock γp pidLockAddr "nextpid" pidLockPay ∗
     kallocAvail γk on ∗ procsAvailAt Γ pav tk ∗
@@ -262,14 +267,19 @@ theorem ui_allocproc (AP : ALLOCPROC) (Γ : SchedNames) (γ : FileNames) (c : CP
       allocprocPost Γ γ cpu' γk on pav tk Q (R' 10#5) -∗
       ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := AP.wp_allocproc (hlc := hlc) (GF := GF) Γ γ c k' γl γp γk on pav tk Q hnoff hK hlk hlp hlq htier
+  have h := AP.wp_allocproc (hlc := hlc) (GF := GF) Γ γ c k' γl γp γk on pav tk Q 0 hnoff hK hlk hlp hlq htier
   unfold wp_allocproc_body at h
   simp only [allocprocAddr] at h
   iintro ⟨Hk, Hpc, #Hpi, #Hkm, #Hpl, Hav, Hpav, #HKw, Hnext⟩
   iapply h
   iframe Hk Hpc Hpi Hkm Hpl Hav Hpav HKw
+  -- THE BOOT HART HAS NO CURRENT PROC (permit sweep L1a, Rocq's `pj =
+  -- zero_reg` premise): allocproc's lend is the left disjunct, and the one
+  -- it hands back is dropped
+  isplitr
+  · rw [hp0]; iapply actLend_zero
   iapply wpNext_mono $$ Hnext
-  iintro %cpu' HK %spie %spp %R' %hsp Hd Hpc Hpost %hcs
+  iintro %cpu' HK %spie %spp %R' %hsp Hd Hpc - Hpost %hcs
   -- the success arm's `sieArm` (the acquire's pay) is not needed here
   icases Hd with (⟨%h0, Hk⟩ | ⟨%h1, Hk, _⟩)
   · iapply HK $$ %spie %spp %R' %hsp [Hk] Hpc Hpost %hcs
@@ -757,7 +767,7 @@ theorem userinit_proof (AP : ALLOCPROC) (RE : RELEASE) (NR : NAMEI_ROOT) (FP : F
   -- killer pays for it (Rocq: `Q := fun _ => True`, the wand by `done`)
   ihave #HKw := ui_killw (hlc := hlc) (GF := GF)
   iapply (ui_allocproc AP Γ γ cpu _ fscKalloc γp fsReadyKmem (some nb) (some (np + 1)) true (fun _ => iprop(True))
-      ?hna ?hKa ?hlka ?hlpa ?hlqa ?hta) $$ [- $Hk $Hpc]
+      ?hna ?hKa ?hlka ?hlpa ?hlqa ?hta ?hp0a) $$ [- $Hk $Hpc]
   rotate_right 1
   k_norm
   iframe Hkav Hpav HKw
@@ -768,6 +778,7 @@ theorem userinit_proof (AP : ALLOCPROC) (RE : RELEASE) (NR : NAMEI_ROOT) (FP : F
   case hlpa => k_norm_g; exact hlp
   case hlqa => k_norm_g; exact hlq
   case hta => k_norm_g; exact htier
+  case hp0a => k_norm_g; exact hproc
   k_norm
   iapply wpNext_off_intro
   iintro %spie %spp %R2 %hsp Hkd Hpc Hpost %hcs2

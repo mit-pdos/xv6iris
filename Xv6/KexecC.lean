@@ -40,6 +40,11 @@ a STAGE file (no `Proof` prefix).
    `ProofKexec.v`): the three lemmas chained, from `kxcAt1ae` to
    `kxcAt2a6`, with the facts phase D takes as premises published in the
    continuation's pure row.
+
+THE PERMIT SWEEP L1a (Rocq f344a089a, `ProofKexecC.v`): `kxc_phaseC`'s
+continuation takes phase D's state at any record `evAfter` the entry's
+(setup's uvmalloc lends the block's counter); the argv loop and the close
+run at that record.
 -/
 import Xv6.KexecCSetup
 import Xv6.KexecCArgv
@@ -515,18 +520,22 @@ theorem kxc_phaseC (MP : MYPROC) (UA : UVMALLOC) (UC : UVMCLEAR) (SL : STRLEN) (
       (k.regs 23#5) (k.regs 24#5) (k.regs 25#5) (k.regs 26#5) w13 w67 fb ef P Mi szv (k.regs 27#5) ∗
     fsFabric (hlc := hlc) Γ A.pd A.pav A.pu ∗
     (∀ c' : CPU, kexecCloser Q QF k A c') ∗
-    (∀ (c : CPU) (spie' spp' : Bool) (R' : RegMap) (P' : UPtd) (Mo : Nat → List (BitVec 8))
+    (∀ V1 : ProcPriv, ⌜evAfter A.V V1⌝ -∗
+      ∀ (c : CPU) (spie' spp' : Bool) (R' : RegMap) (P' : UPtd) (Mo : Nat → List (BitVec 8))
         (sz1 : BitVec 64) (ci : Nat),
       ⌜8192 ≤ sz1.toNat ∧ (kxcElfBuf (k.regs 2#5)).toNat % 8 = 0 ∧ ef.length = 64⌝ -∗
-      kxcAt2a6 k A c spie' spp' R' (k.regs 19#5) (k.regs 20#5) (k.regs 21#5) (k.regs 22#5)
-          (k.regs 23#5) (k.regs 24#5) (k.regs 25#5) (k.regs 26#5) w13 w67 fb ef P' Mo A.V.sz sz1
-          (k.regs 27#5) ci -∗
-      (∀ c' : CPU, kexecCloser Q QF k A c') -∗ wpLoop c)
+      kxcAt2a6 k { A with V := V1 } c spie' spp' R' (k.regs 19#5) (k.regs 20#5) (k.regs 21#5)
+          (k.regs 22#5) (k.regs 23#5) (k.regs 24#5) (k.regs 25#5) (k.regs 26#5) w13 w67 fb ef P' Mo
+          A.V.sz sz1 (k.regs 27#5) ci -∗
+      (∀ c' : CPU, kexecCloser Q QF k { A with V := V1 } c') -∗ wpLoop c)
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hst, #Hfab, Hcl, HK⟩
   iapply (kxc_c_setup MP UA UC PFP Γ Q QF cpu k A spie spp R w13 w67 fb ef P Mi szv hqf hK hnoff htier)
   iframe Hst Hfab Hcl
-  iintro %c %spie' %spp' %R' %P' %Mo %sz1 %⟨h8192, h38, -, hal, hl⟩ Hs Hcl
+  -- phase C's uvmalloc moved the block's event count (permit sweep L1a): the
+  -- rest of the phase runs at the record it came back at
+  iintro %V1 %hV1 %c %spie' %spp' %R' %P' %Mo %sz1 %⟨h8192, h38, -, hal, hl⟩ Hs Hcl
+  ihave HK := HK $$ %V1 %hV1
   have hsz1 : 8192 ≤ sz1.toNat ∧ sz1.toNat ≤ 2 ^ 38 := ⟨h8192, h38⟩
   -- the close, as the continuation both entries share
   ihave #Hclose : (□ ∀ (c : CPU) (spie' spp' : Bool) (R' : RegMap) (P' : UPtd) (Mo : Nat → List (BitVec 8))
@@ -534,31 +543,31 @@ theorem kxc_phaseC (MP : MYPROC) (UA : UVMALLOC) (UC : UVMCLEAR) (SL : STRLEN) (
       (∀ (c : CPU) (spie' spp' : Bool) (R' : RegMap) (P' : UPtd) (Mo : Nat → List (BitVec 8))
           (sz1 : BitVec 64) (ci : Nat),
         ⌜8192 ≤ sz1.toNat ∧ (kxcElfBuf (k.regs 2#5)).toNat % 8 = 0 ∧ ef.length = 64⌝ -∗
-        kxcAt2a6 k A c spie' spp' R' (k.regs 19#5) (k.regs 20#5) (k.regs 21#5) (k.regs 22#5)
+        kxcAt2a6 k { A with V := V1 } c spie' spp' R' (k.regs 19#5) (k.regs 20#5) (k.regs 21#5) (k.regs 22#5)
             (k.regs 23#5) (k.regs 24#5) (k.regs 25#5) (k.regs 26#5) w13 w67 fb ef P' Mo A.V.sz sz1
             (k.regs 27#5) ci -∗
-        (∀ c' : CPU, kexecCloser Q QF k A c') -∗ wpLoop c) -∗
-      kxcAt272 k A c spie' spp' R' (k.regs 19#5) (k.regs 20#5) (k.regs 21#5) (k.regs 22#5)
+        (∀ c' : CPU, kexecCloser Q QF k { A with V := V1 } c') -∗ wpLoop c) -∗
+      kxcAt272 k { A with V := V1 } c spie' spp' R' (k.regs 19#5) (k.regs 20#5) (k.regs 21#5) (k.regs 22#5)
           (k.regs 23#5) (k.regs 24#5) (k.regs 25#5) (k.regs 26#5) w13 w67 fb ef P' Mo A.V.sz sz1
           (k.regs 27#5) ci -∗
-      (∀ c' : CPU, kexecCloser Q QF k A c') -∗ wpLoop c) $$ []
+      (∀ c' : CPU, kexecCloser Q QF k { A with V := V1 } c') -∗ wpLoop c) $$ []
   · imodintro
     iintro %c2 %spie2 %spp2 %R2 %P2 %Mo2 %ci2 HK H272 Hcl
-    iapply (kxc_c_close CO PFP Γ Q QF c2 k A spie2 spp2 R2 w13 w67 fb ef P2 Mo2 A.V.sz sz1 ci2 hqf hqfa hK
+    iapply (kxc_c_close CO PFP Γ Q QF c2 k { A with V := V1 } spie2 spp2 R2 w13 w67 fb ef P2 Mo2 A.V.sz sz1 ci2 hqf hqfa hK
         hnoff hsz1 hal hl)
     iframe H272 Hfab Hcl
     iintro %c3 %spie3 %spp3 %R3 %P3 %Mo3 H2a6 Hcl
     iapply HK $$ %c3 %spie3 %spp3 %R3 %P3 %Mo3 %sz1 %ci2 [] H2a6 Hcl
     ipureintro; exact ⟨h8192, hal, hl⟩
   icases Hs with (H21a | H272)
-  · icases kxcC_at21a_pure k A c spie' spp' R' _ _ _ _ _ _ _ _ w13 w67 fb ef P' Mo A.V.sz sz1 _ 0
+  · icases kxcC_at21a_pure k { A with V := V1 } c spie' spp' R' _ _ _ _ _ _ _ _ w13 w67 fb ef P' Mo A.V.sz sz1 _ 0
       $$ H21a with ⟨%⟨h1, h2⟩, H21a⟩
     have hlt : 0 < A.na := by
       rcases Nat.eq_zero_or_pos A.na with h | h
       · rw [h] at havf; exact absurd havf h2
       · exact h
-    iapply (kxc_argv_loop SL CO PFP Γ Q QF k A w13 w67 fb ef A.V.sz sz1 hqf hqfa hK hnoff hargs hna havf
-        hsz1 hal hl A.na 0 c spie' spp' R' P' Mo (by omega) hlt)
+    iapply (kxc_argv_loop SL CO PFP Γ Q QF k { A with V := V1 } w13 w67 fb ef A.V.sz sz1 hqf hqfa hK hnoff hargs hna havf
+        hsz1 hal hl A.na 0 c spie' spp' R' P' Mo (by dsimp only; omega) hlt)
     iframe H21a Hfab Hcl
     iintro %c2 %spie2 %spp2 %R2 %P2 %Mo2 %ci2 H272 Hcl
     iapply Hclose $$ %c2 %spie2 %spp2 %R2 %P2 %Mo2 %ci2 HK H272 Hcl

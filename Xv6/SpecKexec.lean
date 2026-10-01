@@ -61,7 +61,11 @@ arms, the frame and the seal); its pure §1 is `Xv6/KexecLoad.lean` +
 2. **PROCESS LAYER (flagged).**  Rocq's `U : ustate` is the Lean pair
    `(A.V, A.M)` and the exit's `U'` is `(V', M')` (KexecOkQ deviation 2):
    the arms take `V M V' M'` and the failure arm's `us_V U' = us_V U ∧ us_M
-   U' = us_M U` is `V' = V ∧ M' = M`.  `execPostOk` takes the entry block
+   U' = us_M U` is `V' = V ∧ M' = M` -- after the permit sweep L1a (Rocq
+   f344a089a) Rocq's `(∃ k', pv_ev (us_V U) ≤ k' ∧ us_V U' = upd_ev (us_V U)
+   k') ∧ us_M U' = us_M U`, spelled `evAfter V V' ∧ M' = M` (the failed
+   exec's block at a later event count: it lent the counter to the frees of
+   the half-built image).  `execPostOk` takes the entry block
    `V` only (Rocq's `U` is read only through `us_V U`).  Rocq's
    `proc_priv gf pj pidv U` is the ONE block `procPrivFd A.γ k.proc A.pidv
    A.V A.M` (D16); its D8 conjuncts (`first_tok`, the `GenId` binder) are
@@ -250,7 +254,7 @@ def execArms (Fs : Pfam GF (Uvis → IProp GF)) (Γ : FsViewNames GF) (γfs : Fs
     (cs : Std.ExtTreeSet GName compare) (pidv : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (V' : ProcPriv) (M' : Nat → List (BitVec 8)) (r : BitVec 64) :
     IProp GF :=
-  iprop((⌜r = 0xFFFFFFFFFFFFFFFF#64 ∧ V' = V ∧ M' = M⌝ ∗
+  iprop((⌜r = 0xFFFFFFFFFFFFFFFF#64 ∧ evAfter V V' ∧ M' = M⌝ ∗
       execPostFail (hlc := hlc) Fs Γ γfs cw secc Q P Pmiss Fo pl na alen afun sts cs pidv) ∨
     execPostOk Fs na alen afun sts gn cs pidv V V' M' r)
 

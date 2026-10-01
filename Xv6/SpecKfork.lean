@@ -21,7 +21,12 @@ Specification of `kfork` (kernel/proc.c):
       return pid;
     }
 
-THE PARENT'S BLOCK COMES BACK UNCHANGED: `uvmcopy` reads the parent's
+THE PARENT'S BLOCK COMES BACK UNCHANGED BUT FOR ITS EVENT COUNT (permit
+sweep L1a, Rocq f344a089a's `kfork_post`; design ni-strong-instance.md §7):
+allocproc, uvmcopy and the failure path's freeproc take the PARENT's
+counter -- the forking process is the actor of every allocation and
+release made on the child's behalf -- so `kforkRet` hands the block back at
+`V.updEv k'` with `V.ev ≤ k'`, otherwise verbatim.  `uvmcopy` reads the parent's
 address space and hands it back (`Xv6/SpecUvmcopy.lean` returns
 `procPtAt Pold Mold`), the trapframe and `p->name` are only read, and the
 parent's `sz`, files and cwd are not touched.  Everything the child gets
@@ -149,7 +154,7 @@ def kforkRet {hlc : HasLC} {GF : BundledGFunctors}
     (γ : FileNames) (j : Nat) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
     (stsP : List FdState) (Q : Int → IProp GF) (csP : ExtTreeSet GName compare) (Rc : IProp GF)
     (rv : BitVec 32) : IProp GF := iprop%
-  procPrivFd γ (procAddr j) pid V M ∗ fdFrags V.fdg stsP ∗
+  (∃ k' : Nat, ⌜V.ev ≤ k'⌝ ∗ procPrivFd γ (procAddr j) pid (V.updEv k') M) ∗ fdFrags V.fdg stsP ∗
   ((⌜rv = -1#32⌝ ∗ chFrag V.chg (procAddr j) csP ∗ Rc) ∨
    (∃ γc : GName, ⌜1 ≤ rv.toNat ∧ rv.toNat ≤ PIDMAX⌝ ∗ ⌜γc ∉ csP⌝ ∗ childTok γc rv Q ∗
       chFrag V.chg (procAddr j) (csP ∪ {γc})))

@@ -68,6 +68,11 @@ Rocq's header, in short:
    `KfNoMem`, its note kept: the window fact is stated on the TRUNCATED ABI
    words, and relating them to `phdr_ok`'s is the phdr loop's step under
    the walk guard, which this block does not carry).
+
+THE PERMIT SWEEP L1a (Rocq f344a089a, `ProofKexecB2.v`): `kxc_bad31e` lends
+the block's counter to proc_freepagetable (`ProcPrivAcc.procPrivFd_evLend`)
+and goes on to `kxc_bad64` at the moved record, the closer converted
+(`KexecOkQ.kexecCloser_after`); `kxcB2_call_uvmalloc` takes the lend.
 -/
 import Xv6.KexecB2Spec
 import Xv6.KexecPtImage
@@ -215,30 +220,31 @@ break bounding the loop's cursor), the old break's own bound by
 theorem kxcB2_call_uvmalloc (UV : UVMALLOC) (Γ : SchedNames) (cpu : CPU) (k : KCtx) (A : KexecArgs)
     (spie spp : Bool) (R : RegMap)
     (X : BitVec 64) (imm : BitVec 21) (hX : X + BitVec.signExtend 64 imm = KA.«uvmalloc»)
-    (hret : jumpPc (X + 4#64) = X + 4#64) (P : UPtd) (Mi : Nat → List (BitVec 8))
+    (hret : jumpPc (X + 4#64) = X + 4#64) (P : UPtd) (Mi : Nat → List (BitVec 8)) (ke : Nat)
     (hK : kexecSlots ≤ k.avail) (hnoff : k.noff = 0)
     (hroot : R 10#5 = pageAddr P.root) (hbelow : umBelow (R 11#5) P) (hcov : lazyFree P.um (R 11#5))
     (hperm : R 13#5 &&& ~~~0x3CE#64 = 0#64) :
     instr X false (instruction.JAL (imm, regidx.Regidx 1#5)) ∗
     kctx cpu (((k.withSpie spie spp).pushed 68).withRegs R) ∗ pcIs cpu X ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    fsFabric (hlc := hlc) Γ A.pd A.pav A.pu ∗ procPtAt P Mi ∗
+    fsFabric (hlc := hlc) Γ A.pd A.pav A.pu ∗ procPtAt P Mi ∗ actLend k.proc ke ∗
     (∀ (c : CPU) (spie' spp' : Bool) (R' : RegMap),
       ⌜calleeSaved (R.set 1#5 (X + 4#64)) R'⌝ -∗
       kctx c (((k.withSpie spie' spp').pushed 68).withRegs R') -∗ pcIs c (X + 4#64) -∗
       trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗
+      (∃ k2 : Nat, ⌜ke ≤ k2⌝ ∗ actLend k.proc k2) -∗
       ((⌜R' 10#5 = 0#64⌝ ∗ procPtAt P Mi) ∨
        (∃ (P' : UPtd) (M' : Nat → List (BitVec 8)),
           ⌜uvmallocOk P P' Mi M' (R 11#5) (R 12#5) (R 13#5) ∧
             R' 10#5 = (if (R 12#5).toNat < (R 11#5).toNat then R 11#5 else R 12#5)⌝ ∗
           procPtAt P' M')) -∗ wpLoop c)
     ⊢ wpLoop (GF := GF) cpu := by
-  iintro ⟨#Hi, Hk, Hpc, Hte, Hce, #Hfab, Hpt, HK⟩
+  iintro ⟨#Hi, Hk, Hpc, Hte, Hce, #Hfab, Hpt, Hlend, HK⟩
   icases UMemL.procPtAt_wf P Mi $$ Hpt with ⟨Hpt, %hwf⟩
-  iapply (kxc_call_uvmalloc UV Γ cpu k A spie spp R X imm hX hret P Mi hK hnoff hroot
+  iapply (kxc_call_uvmalloc UV Γ cpu k A spie spp R X imm hX hret P Mi ke hK hnoff hroot
     (UmCovered.lazyFree_maxsz P _ hwf hcov) (Or.inr hcov) hperm
     (fun i hi _ => kxc_um_free_above _ _ P hbelow i hi))
-    $$ [$Hi $Hk $Hpc $Hte $Hce $Hfab $Hpt $HK]
+    $$ [$Hi $Hk $Hpc $Hte $Hce $Hfab $Hpt $Hlend $HK]
 
 set_option maxHeartbeats 8000000 in
 /-- **`jal readi` at `X`** (+0x0e6 / +0x13a; deviation 4): `KexecACode`'s
@@ -379,14 +385,20 @@ theorem kxc_bad31e (IUP : IUNLOCKPUT) (EO : END_OP) (PFP : PROC_FREEPAGETABLE) (
   k_step_e (wp_s_add cpu _ (KA.«kexec» + 0x322#64) true 10#5 0#5 22#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h22]
   iintro Hk Hpc
-  -- +0x324  jal proc_freepagetable
+  -- +0x324  jal proc_freepagetable, the block's event counter lent to the
+  -- frees (permit sweep L1a, Rocq `proc_priv_ev_lend`)
+  icases procPrivFd_evLend A.γ k.proc A.pidv A.V A.M $$ Hpriv with ⟨Hlend, Hpback⟩
   iapply (kxc_call_pfp PFP Γ cpu k A spie spp _ (KA.«kexec» + 0x324#64) 2084532#21 kxcB2_br_pfp
-      kxcB2_ret_324 P Mi hK hnoff (by simp [RegMap.set_apply, h22]) (by simpa [RegMap.set_apply] using hsz)
+      kxcB2_ret_324 P Mi A.V.ev hK hnoff (by simp [RegMap.set_apply, h22]) (by simpa [RegMap.set_apply] using hsz)
       (by simpa [RegMap.set_apply] using hbelow))
-    $$ [- $Hk $Hpc $Hte $Hce $Hfab $Hpt]
+    $$ [- $Hk $Hpc $Hte $Hce $Hfab $Hpt $Hlend]
   isplitr
   · iapply (text_instr _ _ _ _ rfl rfl); iexact Htext
-  iintro %c1 %spie1 %spp1 %R1 %hcs1 Hk Hpc Hte Hce
+  iintro %c1 %spie1 %spp1 %R1 %hcs1 Hk Hpc Hte Hce ⟨%kl, %hkl, Hlend⟩
+  -- the block back at a later count, and the exit converted to it
+  icases Hpback $$ %kl %hkl Hlend with ⟨%V1, %hV1, Hpriv⟩
+  ihave Hcl := kexecCloser_after Q QF k A V1 hV1 $$ Hcl
+  ihave Hbufs := (show kxcBufs (GF := GF) k A ⊢ kxcBufs k { A with V := V1 } from .rfl) $$ Hbufs
   let cpu := c1
   k_norm_g
   obtain ⟨a2, -, -, -, -, a20, -, -, -, -, -, -, -⟩ := hcs1
@@ -434,8 +446,8 @@ theorem kxc_bad31e (IUP : IUNLOCKPUT) (EO : END_OP) (PFP : PROC_FREEPAGETABLE) (
       (k.regs 23#5) (k.regs 24#5) (k.regs 25#5) (k.regs 26#5) (k.regs 27#5) w63 szf w67 ef hal hl
     $$ [F1 F2 F3 F4 F5 F6 F7 F8 F9 F10 F11 F12 F13 Fu Fp F63 F64 F65 F66 F67 F68 He]
   · unfold kxcFrameBp; iframe
-  iapply (kxc_bad64 IUP EO Γ Q QF cpu k A spie1 spp1 _ kf qf sf gyf loyf tlyf inumf dnf bmf data
-      gilf gislf n2 hqf hK hnoff htier hj hproc hkf hnib hn2 ?x2 ?x20 ?xk)
+  iapply (kxc_bad64 IUP EO Γ Q QF cpu k { A with V := V1 } spie1 spp1 _ kf qf sf gyf loyf tlyf inumf
+      dnf bmf data gilf gislf n2 hqf hK hnoff htier hj hproc hkf hnib hn2 ?x2 ?x20 ?xk)
     $$ [$Hk $Hpc $Hte $Hce $Hfab $Hop $Hlog $Hirs $Hbs $Hpriv $Hbufs $Hfr $Hcl]
   case x2 => simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact e2
   case x20 => simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; rw [a20, h20]

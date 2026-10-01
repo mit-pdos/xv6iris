@@ -27,6 +27,10 @@ contract, crossing `k.sie`) from the dispatch's rows, per the frozen recipe
    environment's token is the abstract `PT` of `SpecSyscall.SYSCALL`; the
    seal is at `PT := parkToken` (`SpecSyscallXv6`), where `hPTk` is
    `fun _ => .rfl`.
+
+2. The fork post's raised event count (permit sweep L1a, `kforkRet`'s `∃ k'
+   ≥ V.ev`) reaches the dispatcher's ∀-general post through
+   `SyscallRet.SyscRows.updEv`.
 -/
 import Xv6.SyscallRet
 
@@ -189,7 +193,7 @@ theorem syscall_arm_fork (SF : SYSFORK)
   iframe Hk Hpi Hwl Hnp Hkl Hka Hpav Hft Hit2 Hiti Hreg Hkw Hdone Hpk Hpriv Hfr Hch Hpc
   k_next_e
   unfold kforkPost kforkPostB kforkRet
-  iintro %spie2 %spp2 %R2 %rv %⟨hcs, ha0, hans⟩ Hk Hpc ⟨Hpriv, Hfr, Hret⟩
+  iintro %spie2 %spp2 %R2 %rv %⟨hcs, ha0, hans⟩ Hk Hpc ⟨⟨%k', %hk', Hpriv⟩, Hfr, Hret⟩
   k_norm_g [hra, syscallRet_jumpPc, hww, hpsw]
   k_norm_g at hcs
   have hpins2 := syscPins_calleeSaved k R R2 hpins hcs
@@ -199,15 +203,16 @@ theorem syscall_arm_fork (SF : SYSFORK)
   · have hrows := syscRows_fork V M sts cs cs pid (R2 10#5) hn1 (by rw [hl]; decide)
       (by rw [ha0]; exact syscArmFork_ans rv hans)
     unfold syscallRet syscallAddr at *
-    iapply (syscall_ret_tail PT Γ c0 cpu k spie2 spp2 R2 γ j pid V M sts gn cs ip f V M sts cs hj hproc
-      hK htier hpins2 hs2' hrows)
+    -- the parent at fork's raised event count (permit sweep L1a)
+    iapply (syscall_ret_tail PT Γ c0 cpu k spie2 spp2 R2 γ j pid V M sts gn cs ip f (V.updEv k') M sts cs
+      hj hproc hK htier hpins2 hs2' (hrows.updEv k'))
     iframe Hk Hpc Hframe Hte Hce Hbs Hip Hfd Hir Henv Hpriv Hfr Hch Hnext
     isplitr
     · iapply syscExecOut_ne; rw [hn1]; decide
     isplitr
     · iapply syscSysOut_fork f V M sts gn cs pid _ _ sts _ cs hn1
     isplitl [Hlend]
-    · rw [syscStore_a0 V _ (by rw [hl]; decide), ha0]
+    · rw [syscStore_a0 (V.updEv k') _ (by show tfArgIdx 0 < V.tf.length; rw [hl]; decide), ha0]
       iapply syscArmFork_out f V j cs cs rv
       ileft
       iframe Hlend
@@ -216,15 +221,15 @@ theorem syscall_arm_fork (SF : SYSFORK)
   · have hrows := syscRows_fork V M sts cs (cs ∪ {γc}) pid (R2 10#5) hn1 (by rw [hl]; decide)
       (by rw [ha0]; exact syscArmFork_ans rv hans)
     unfold syscallRet syscallAddr at *
-    iapply (syscall_ret_tail PT Γ c0 cpu k spie2 spp2 R2 γ j pid V M sts gn cs ip f V M sts
-      (cs ∪ {γc}) hj hproc hK htier hpins2 hs2' hrows)
+    iapply (syscall_ret_tail PT Γ c0 cpu k spie2 spp2 R2 γ j pid V M sts gn cs ip f (V.updEv k') M sts
+      (cs ∪ {γc}) hj hproc hK htier hpins2 hs2' (hrows.updEv k'))
     iframe Hk Hpc Hframe Hte Hce Hbs Hip Hfd Hir Henv Hpriv Hfr Hch Hnext
     isplitr
     · iapply syscExecOut_ne; rw [hn1]; decide
     isplitr
     · iapply syscSysOut_fork f V M sts gn cs pid _ _ sts _ _ hn1
     isplitl [Htok]
-    · rw [syscStore_a0 V _ (by rw [hl]; decide), ha0]
+    · rw [syscStore_a0 (V.updEv k') _ (by show tfArgIdx 0 < V.tf.length; rw [hl]; decide), ha0]
       iapply syscArmFork_out f V j cs (cs ∪ {γc}) rv
       iright
       iexists γc

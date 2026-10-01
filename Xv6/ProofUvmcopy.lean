@@ -14,6 +14,9 @@ child's prefix `[0, i)` -- exactly the pages the loop had mapped -- and
 returns `-1`.
 
 Every premise of the contract is discharged here.
+
+THE LEND (permit sweep L1a, Rocq f344a089a): framed through at entry
+(`SlotGen.actLend_cont_frame`), returned at `ke`.
 -/
 import Xv6.SpecUvmcopy
 import Xv6.SpecWalk
@@ -1333,10 +1336,13 @@ theorem uvmcopy_loop (W : WALK_NOALLOC) (KAL : KALLOC) (KF : KFREE) (MM : MEMMOV
 set_option maxHeartbeats 4000000 in
 theorem uvmcopy_proof (W : WALK_NOALLOC) (KAL : KALLOC) (KF : KFREE) (MM : MEMMOVE)
     (MA : MAPPAGES_ANY) (UM : UVMUNMAP) : UVMCOPY :=
-  ⟨fun {hlc GF} _ _ _ cpu k γl γk Pold Pnew Mold Mnew hnoff hK hlk hold hnew hsz hfree => by
+  ⟨fun {hlc GF} _ _ _ _ cpu k γl γk Pold Pnew Mold Mnew ke hnoff hK hlk hold hnew hsz hfree => by
   unfold wp_uvmcopy_body
   simp only [uvmcopyAddr]
-  iintro ⟨Hk, Hpc, #Hlk, Hav, Hold, Hchild, HΦ⟩
+  iintro ⟨Hk, Hpc, #Hlk, Hav, Hold, Hchild, Hlend, HΦ⟩
+  -- the lend (permit sweep L1a): no callee takes it yet, so it is framed
+  -- through the continuation once, here
+  ihave HΦ := actLend_cont_frame _ _ _ _ _ _ _ _ _ $$ HΦ Hlend
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   have hK10 : 10 ≤ k.avail := by omega
   have hmaxv : uvmMaxsz = 274877898752 := uc_uvmMaxsz

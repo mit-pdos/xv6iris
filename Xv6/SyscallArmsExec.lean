@@ -49,6 +49,10 @@ W8-S4; Rocq `ProofSyscall.v` §SyscallArms `sysc_exec_in_open` /
 4. `syscall_arms_all` takes the arms as hypotheses (the other three arm
    files are written in parallel); Rocq's `sysc_arm_dispatch` calls them
    directly.
+
+The failed exec's block is the caller's at a later event count (permit
+sweep L1a, the arms' `evAfter`); `syscExec_arms_read` destructs it, no row
+reading the count.
 -/
 import Xv6.SyscallRet
 import Xv6.UsysMemOkSpec
@@ -114,7 +118,7 @@ theorem syscExec_arms_read (f : UexecSG.sfam GF) (V : ProcPriv) (M : Nat → Lis
     (sts : List FdState) (gn : GName) (cs : ExtTreeSet GName compare) (pid : BitVec 32)
     (P' : UPtd) (hext : V.upt.extSz V.sz P') (V' : ProcPriv) (M' : Nat → List (BitVec 8))
     (r : BitVec 64) (P Pmiss : Nat → Nat → IProp GF) (Fo : Pfam GF (Aview → Nat → Anode → IProp GF)) :
-    ((⌜r = 0xFFFFFFFFFFFFFFFF#64 ∧ V' = { V with upt := P' } ∧ M' = viewFaulted V.upt P' M⌝ ∗
+    ((⌜r = 0xFFFFFFFFFFFFFFFF#64 ∧ evAfter { V with upt := P' } V' ∧ M' = viewFaulted V.upt P' M⌝ ∗
         sysExecPostFail (hlc := hlc) ⟨uslot (hlc := hlc), UexecSG.sexecRefund f⟩ (fsGammaL fscFs) fscFs
           V.cwi V.pvSecc (UexecSG.sexitPay f) P Pmiss Fo (viewLazy V.upt V.sz M)
           (tfW V.tf (tfArgIdx 0)) (tfW V.tf (tfArgIdx 1)) sts cs pid) ∨
@@ -130,7 +134,10 @@ theorem syscExec_arms_read (f : UexecSG.sfam GF) (V : ProcPriv) (M : Nat → Lis
   have hm1 : BitVec.ofInt 64 (-1) = 0xFFFFFFFFFFFFFFFF#64 := by decide
   iintro (⟨%hf, Hfail⟩ | ⟨%pl, %na, %alen, %afun, -, -, Hok⟩)
   · obtain ⟨hr, hV, hM⟩ := hf
-    subst hV hM hr
+    -- the failed exec's block is the caller's at a later event count
+    -- (permit sweep L1a): no row reads the count
+    obtain ⟨kx, -, rfl⟩ := hV
+    subst hM hr
     ihave Hrf := sysExecPostFail_refund (hlc := hlc) _ _ _ _ _ _ _ _ _ _ _ _ _ _ $$ Hfail
     isplitr
     · ipureintro; exact ⟨htfp0, rfl, rfl, rfl, rfl, rfl, rfl⟩

@@ -25,7 +25,10 @@ syscall's argument 0 -- in place of kwait's `a0`: `-1` with nothing
 moved, or the reaped child's pid with the four-byte status word at `v`
 (nothing when `v = 0`), and kwait's D8 answer (`waitAns`: the escrow, the
 caller's children row moved by the reap), with the row (`chFrag`) and
-init's saved pid (`initPidIs 1`) forwarded.
+init's saved pid (`initPidIs 1`) forwarded -- AT A LATER EVENT COUNT
+(permit sweep L1a, Rocq f344a089a): the reap's freeproc takes the caller's
+counter, kwait's own row relayed (`{ V.updEv k' with upt := P' }`, `V.ev ≤
+k'`).
 
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
@@ -62,14 +65,15 @@ def wp_sys_wait_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
   isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
   procPrivFd γ (procAddr j) pid V M ∗ chFrag V.chg (procAddr j) cs ∗ initPidIs 1#32 ∗
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd)
-    (rv xw : BitVec 32) (d : Nat) (cs' : ExtTreeSet GName compare),
+    (rv xw : BitVec 32) (d : Nat) (cs' : ExtTreeSet GName compare) (k' : Nat),
     ⌜calleeSaved k.regs R' ∧ R' 10#5 = BitVec.signExtend 64 rv ∧ V.upt.extSz V.sz P' ∧ d ≤ 4 ∧
       kwaitAns rv v d ∧ umMapped P' v.toNat d⌝ -∗
     waitAns rv (xstateVal xw) cs cs' V.gen (decide (v = 0#64)) pid -∗
     chFrag V.chg (procAddr j) cs' -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     trapCsrs cpu' -∗ cpuClaim cpu' k.proc -∗ intrRes cpu' -∗
-    procPrivFd γ (procAddr j) pid { V with upt := P' }
+    ⌜V.ev ≤ k'⌝ -∗
+    procPrivFd γ (procAddr j) pid { V.updEv k' with upt := P' }
       (umemWrite (viewFaulted V.upt P' M) v.toNat ((xstateBytes xw).take d)) -∗
     wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
@@ -96,14 +100,15 @@ def wp_sys_wait_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [X
   isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
   procPrivFd γ (procAddr j) pid V M ∗ chFrag V.chg (procAddr j) cs ∗ initPidIs 1#32 ∗
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd)
-    (rv xw : BitVec 32) (d : Nat) (cs' : ExtTreeSet GName compare),
+    (rv xw : BitVec 32) (d : Nat) (cs' : ExtTreeSet GName compare) (k' : Nat),
     ⌜calleeSaved k.regs R' ∧ R' 10#5 = BitVec.signExtend 64 rv ∧ V.upt.extSz V.sz P' ∧ d ≤ 4 ∧
       kwaitAns rv v d ∧ umMapped P' v.toNat d⌝ -∗
     waitAns rv (xstateVal xw) cs cs' V.gen (decide (v = 0#64)) pid -∗
     chFrag V.chg (procAddr j) cs' -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
-    procPrivFd γ (procAddr j) pid { V with upt := P' }
+    ⌜V.ev ≤ k'⌝ -∗
+    procPrivFd γ (procAddr j) pid { V.updEv k' with upt := P' }
       (umemWrite (viewFaulted V.upt P' M) v.toNat ((xstateBytes xw).take d)) -∗
     wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
@@ -143,7 +148,7 @@ theorem SYSWAIT.wp_sys_wait (A : SYSWAIT) {hlc : HasLC} {GF : BundledGFunctors} 
   iapply h
   iframe H0 H1 H2 Htc Hcl Hir H6 H7 H8 H9 H10 H11 H12
   iapply wpNext_mono $$ Hnext
-  iintro %cpu' HK %spie %spp %R' %P' %rv %xw %d %cs' %p0 Ha Hc H1 H2 ⟨Htc, Hir⟩ Hcl H6
-  iapply HK $$ %spie %spp %R' %P' %rv %xw %d %cs' %p0 Ha Hc H1 H2 Htc Hcl Hir H6
+  iintro %cpu' HK %spie %spp %R' %P' %rv %xw %d %cs' %k' %p0 Ha Hc H1 H2 ⟨Htc, Hir⟩ Hcl %hk' H6
+  iapply HK $$ %spie %spp %R' %P' %rv %xw %d %cs' %k' %p0 Ha Hc H1 H2 Htc Hcl Hir %hk' H6
 
 end Xv6

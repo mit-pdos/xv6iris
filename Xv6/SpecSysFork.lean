@@ -19,7 +19,10 @@ allocator and the proc table at their sealed regimes (`kallocAvail`,
 printk, the park world, THE PARK TOKEN, the lend `Rc` and the child's slot
 deposit; W8-P2), and the caller's own private block
 (Rocq's whole `proc_priv`, `procPrivFd`) with its fragment bundle, both
-handed back verbatim (`kfork` only READS the parent).
+handed back verbatim (`kfork` only READS the parent) but for the block's
+event count, which only rose (permit sweep L1a, Rocq f344a089a: allocproc,
+uvmcopy and the failure path's freeproc take the caller's counter;
+`kforkRet`'s `∃ k' ≥ V.ev`, the post being `kforkPost` itself).
 
 THE RETURN VALUE is kfork's, unchanged: `-1` on either failure arm, or the
 child's pid in `[1, PIDMAX]`, sign-extended exactly as kfork left it

@@ -32,6 +32,11 @@ calls) and the closing wand `sysSbrkBack` (Rocq's `proc_priv_tf` /
 `proc_priv_addrspace` backs); it is closed whole before `growproc`, which
 takes it whole.  All five exits join at
 `+0x64` (`sys_sbrk_exit`), with `s1` holding the result.
+
+THE EVENT COUNTER (permit sweep L1a, Rocq f344a089a): the post
+`sysSbrkPost` and the join `sys_sbrk_exit` carry the block at `V'.updEv kc`
+with `V.ev ≤ kc` -- growproc's on the eager path, `V.ev` on the lazy and
+failing ones.
 -/
 import MachCSL.WpSmodeFrame6
 import Xv6.SpecSysSbrk
@@ -252,8 +257,9 @@ def sysSbrkPost (γ : FileNames) (k : KCtx) (j : Nat) (pid : BitVec 32) (V : Pro
   ∀ R' : RegMap,
   ⌜k.sie = false → spie = k.spie ∧ spp = k.spp⌝ -∗
   kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
-  (∃ (V' : ProcPriv) (M' : Nat → List (BitVec 8)),
-    ⌜sysSbrkOk V V' M M' v0 v1 (R' 10#5)⌝ ∗ procPrivFd γ (procAddr j) pid V' M') -∗
+  (∃ (V' : ProcPriv) (M' : Nat → List (BitVec 8)) (k' : Nat),
+    ⌜sysSbrkOk V V' M M' v0 v1 (R' 10#5)⌝ ∗ ⌜V.ev ≤ k'⌝ ∗
+    procPrivFd γ (procAddr j) pid (V'.updEv k') M') -∗
   ⌜calleeSaved k.regs R'⌝ -∗ wpLoop cpu')
 
 /-- `s0`/`s2..s11` and the frame pointer, pinned to the entry map
@@ -278,10 +284,11 @@ specification's post with the result `s1`. -/
 theorem sys_sbrk_exit (c : CPU) (k : KCtx) (hK : 6 ≤ k.avail) (γ : FileNames) (j : Nat) (pid : BitVec 32)
     (V V' : ProcPriv) (M M' : Nat → List (BitVec 8)) (v0 v1 : BitVec 64)
     (spie spp : Bool) (hsp : k.sie = false → spie = k.spie ∧ spp = k.spp)
-    (R : RegMap) (hpins : sysSbrkPins k R) (hok : sysSbrkOk V V' M M' v0 v1 (R 9#5)) :
+    (R : RegMap) (hpins : sysSbrkPins k R) (hok : sysSbrkOk V V' M M' v0 v1 (R 9#5))
+    (kc : Nat) (hkc : V.ev ≤ kc) :
     kctx c (((k.withSpie spie spp).pushed 6).withRegs R) ∗ pcIs c (KA.«sys_sbrk» + 0x64#64) ∗
     frame6s1 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) ∗
-    procPrivFd γ (procAddr j) pid V' M' ∗
+    procPrivFd γ (procAddr j) pid (V'.updEv kc) M' ∗
     wpNext k.sie k.proc c (sysSbrkPost γ k j pid V M v0 v1)
     ⊢ wpLoop (GF := GF) c := by
   iintro ⟨Hk, Hpc, Hframe, Hpv, HΦ⟩
@@ -307,11 +314,13 @@ theorem sys_sbrk_exit (c : CPU) (k : KCtx) (hK : 6 ≤ k.avail) (γ : FileNames)
   iintro %c' HΦ Hk Hpc
   unfold sysSbrkPost
   iapply HΦ $$ %spie %spp %_ %hsp Hk Hpc [Hpv]
-  · iexists V', M'
+  · iexists V', M', kc
     iframe Hpv
-    ipureintro
-    simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
-    exact hok
+    isplitl []
+    · ipureintro
+      simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
+      exact hok
+    · ipureintro; exact hkc
   · ipureintro
     unfold calleeSaved
     simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
@@ -363,8 +372,9 @@ theorem sys_sbrk_growproc (GP : GROWPROC) (c : CPU) (k' : KCtx) (γl : GName) (�
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
       ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
-      (∃ (V' : ProcPriv) (M' : Nat → List (BitVec 8)),
-        ⌜growprocOk V V' M M' (k'.regs 10#5) (R' 10#5)⌝ ∗ procPrivFd γ (procAddr j) pid V' M') -∗
+      (∃ (V' : ProcPriv) (M' : Nat → List (BitVec 8)) (k2 : Nat),
+        ⌜growprocOk V V' M M' (k'.regs 10#5) (R' 10#5)⌝ ∗ ⌜V.ev ≤ k2⌝ ∗
+        procPrivFd γ (procAddr j) pid (V'.updEv k2) M') -∗
       ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   have h := GP.wp_growproc (hlc := hlc) (GF := GF) c k' γl γk γ j pid V M hj hproc hnoff hK hlk htier
@@ -428,7 +438,7 @@ theorem sys_sbrk_eager (GP : GROWPROC) (c : CPU) (k : KCtx) (γl : GName) (γk :
   unfold calleeSaved at hcs2
   k_norm_g at hcs2
   obtain ⟨e2, e8, e9, e18, e19, e20, e21, e22, e23, e24, e25, e26, e27⟩ := hcs2
-  icases Hres with ⟨%V', %M', %hgp, Hpv⟩
+  icases Hres with ⟨%V', %M', %kc, %hgp, %hkc, Hpv⟩
   have hpins2 : sysSbrkPins k R2 := ⟨e2.trans a2, e8.trans a8, e18.trans a18, e19.trans a19,
     e20.trans a20, e21.trans a21, e22.trans a22, e23.trans a23, e24.trans a24, e25.trans a25,
     e26.trans a26, e27.trans a27⟩
@@ -459,7 +469,7 @@ theorem sys_sbrk_eager (GP : GROWPROC) (c : CPU) (k : KCtx) (γl : GName) (γk :
       refine ⟨?_, hV, hM⟩
       simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
       decide
-    iapply (sys_sbrk_exit c6 k hK6 γ j pid V V' M M' v0 v1 spie2 spp2 hspf _ hpe hoke)
+    iapply (sys_sbrk_exit c6 k hK6 γ j pid V V' M M' v0 v1 spie2 spp2 hspf _ hpe hoke kc hkc)
 
     iframe
   case neg =>
@@ -471,7 +481,7 @@ theorem sys_sbrk_eager (GP : GROWPROC) (c : CPU) (k : KCtx) (γl : GName) (γk :
     ihave HΦ := wpNext_shift _ _ _ _ _ hp4 $$ HΦ
     have hoko : sysSbrkOk V V' M M' v0 v1 (R2 9#5) :=
       Or.inr ⟨e9.trans h9, Or.inl ⟨hpath, sys_sbrk_gp_ok V V' M M' _ _ hgp hneg⟩⟩
-    iapply (sys_sbrk_exit c4 k hK6 γ j pid V V' M M' v0 v1 spie2 spp2 hspf R2 hpins2 hoko)
+    iapply (sys_sbrk_exit c4 k hK6 γ j pid V V' M M' v0 v1 spie2 spp2 hspf R2 hpins2 hoko kc hkc)
 
     iframe
 
@@ -581,7 +591,7 @@ theorem sys_sbrk_lazy (MP : MYPROC) (GP : GROWPROC) (c : CPU) (k : KCtx) (γl : 
       ihave Hframe := sys_sbrk_frame_close (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) w32 w48
         (BitVec.extractLsb' 0 32 v0) (BitVec.extractLsb' 0 32 v1) hal $$ [F0 F1 F2 F3 Fn Ft F5]
       case' _ => unfold sysSbrkFrame; iframe
-      iapply (sys_sbrk_exit c9 k hK6 γ j pid V V M M v0 v1 spie spp hsp _ ?hpe ?hoke)
+      iapply (sys_sbrk_exit c9 k hK6 γ j pid V V M M v0 v1 spie spp hsp _ ?hpe ?hoke V.ev (Nat.le_refl _))
       all_goals first | (iframe; done) | skip
       case hpe =>
         refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
@@ -663,7 +673,7 @@ theorem sys_sbrk_lazy (MP : MYPROC) (GP : GROWPROC) (c : CPU) (k : KCtx) (γl : 
       have hoko : sysSbrkOk V { V with sz := V.sz + sysSbrkArg v0, pvLazy := true } M M v0 v1 V.sz :=
         Or.inr ⟨rfl, Or.inr ⟨hnot, by omega, by omega, rfl, hle, rfl⟩⟩
       iapply (sys_sbrk_exit c15 k hK6 γ j pid V { V with sz := V.sz + sysSbrkArg v0, pvLazy := true } M M v0 v1 spie2 spp2 hspf
-        _ ?hpo ?hko)
+        _ ?hpo ?hko V.ev (Nat.le_refl _))
       all_goals first | (iframe; done) | skip
       case hpo =>
         refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
@@ -681,8 +691,9 @@ theorem sysSbrkPost_of_spec (γ : FileNames) (cpu : CPU) (k : KCtx) (j : Nat) (p
     wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
       ⌜k.sie = false → spie = k.spie ∧ spp = k.spp⌝ -∗
       kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
-      (∃ (V' : ProcPriv) (M' : Nat → List (BitVec 8)),
-        ⌜sysSbrkOk V V' M M' v0 v1 (R' 10#5)⌝ ∗ procPrivFd γ (procAddr j) pid V' M') -∗
+      (∃ (V' : ProcPriv) (M' : Nat → List (BitVec 8)) (k' : Nat),
+        ⌜sysSbrkOk V V' M M' v0 v1 (R' 10#5)⌝ ∗ ⌜V.ev ≤ k'⌝ ∗
+        procPrivFd γ (procAddr j) pid (V'.updEv k') M') -∗
       ⌜calleeSaved k.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpNext (GF := GF) k.sie k.proc cpu (sysSbrkPost γ k j pid V M v0 v1) := by
   unfold sysSbrkPost; iintro H; iexact H

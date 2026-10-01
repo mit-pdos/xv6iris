@@ -6,6 +6,9 @@ Proof of `proc_freepagetable` (kernel/proc.c), given the interfaces of
 with `do_free = 0`, so the two pages themselves are the caller's) and
 frees the address space with `uvmfree`.  The call rules it shares with
 `proc_pagetable` are in `Xv6/ProcPagetableDefs.lean`.
+
+THE LEND (permit sweep L1a, Rocq f344a089a): framed through at entry
+(`SlotGen.actLend_cont_frame`), returned at `ke`.
 -/
 import Xv6.SpecProcFreepagetable
 import Xv6.ProcPagetableDefs
@@ -35,10 +38,13 @@ theorem proc_freepagetable_br_fffffffffffff78c : KA.«proc_freepagetable» + 0xf
 set_option maxHeartbeats 4000000 in
 set_option maxRecDepth 100000 in
 theorem proc_freepagetable_proof (UM : UVMUNMAP) (UF : UVMFREE) : PROC_FREEPAGETABLE :=
-  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ cpu k γl γk P M hnoff hK hlk hroot hsz hbelow => by
+  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ cpu k γl γk P M ke hnoff hK hlk hroot hsz hbelow => by
   unfold wp_proc_freepagetable_body
   simp only [procFreepagetableAddr]
-  iintro ⟨Hk, Hpc, #Hlk, Hav, HP, HΦ⟩
+  iintro ⟨Hk, Hpc, #Hlk, Hav, HP, Hlend, HΦ⟩
+  -- the lend (permit sweep L1a): no callee takes it yet, so it is framed
+  -- through the continuation once, here
+  ihave HΦ := actLend_cont_frame _ _ _ _ _ _ _ _ _ $$ HΦ Hlend
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   have hK4 : 4 ≤ k.avail := by unfold procPagetableSlots at hK; omega
   icases procPtAt_cases P M $$ HP with ⟨%hwf, HT, HU⟩

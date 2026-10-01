@@ -9,6 +9,12 @@ THE LED FORM IS THE PROOF (NI-LEDGER-REST W2, Rocq 8043e4cdd): the
 the client's led continuation (`fpContLed`, `fpContLed_fill`);
 `freeproc_led_proof` is `wp_freeproc_led_body`, and `freeproc_proof`'s
 landed field drops the receipt (`fp_cont_led`).
+
+THE LEND (permit sweep L1a, Rocq f344a089a): the caller's lend is carried at
+a count at least `ke` beside the led continuation (`fpContLedL`, the
+contract's shape, filled by `fpContLedL_fill` once the lend is back) and
+handed to proc_freepagetable on the pagetable arm (`fp_after_tf`); the
+restated call `fp_freepagetable` takes it.
 -/
 import Xv6.SpecFreeproc
 import Xv6.SpecKfree
@@ -502,6 +508,30 @@ def fpContLed [CurCtx] (Γ : SchedNames) (cpu : CPU) (k : KCtx) (j : Nat) (pid :
     procHeld Γ cpu j UNUSED 0#64 -∗ procDormant (procAddr j) UNUSED -∗
     ⌜calleeSaved k.regs R'⌝ -∗ wpLoop cpu
 
+/-- THE LED CONTINUATION WITH THE LEND (permit sweep L1a): the contract's own
+shape, `fpContLed` taking the caller's lend back right after the return pc
+(`SpecFreeproc.wp_freeproc_led_body`).  The body carries it beside the lend
+until `proc_freepagetable` has had the lend (`fp_after_tf`), then fills it
+(`fpContLedL_fill`). -/
+def fpContLedL [CurCtx] (Γ : SchedNames) (cpu : CPU) (k : KCtx) (j : Nat) (pid : BitVec 32) (ke : Nat) :
+    IProp GF := iprop%
+  ∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
+    ⌜k.sie = false → spie = k.spie ∧ spp = k.spp⌝ -∗
+    kctx cpu ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu (jumpPc (k.regs 1#5)) -∗
+    (∃ k' : Nat, ⌜ke ≤ k'⌝ ∗ actLend k.proc k') -∗
+    (∃ h : List Pev, pidReceipt h (.PFree k.proc pid)) -∗
+    procHeld Γ cpu j UNUSED 0#64 -∗ procDormant (procAddr j) UNUSED -∗
+    ⌜calleeSaved k.regs R'⌝ -∗ wpLoop cpu
+
+/-- The lend back in hand, the continuation is the plain led one. -/
+theorem fpContLedL_fill [CurCtx] (Γ : SchedNames) (cpu : CPU) (k : KCtx) (j : Nat) (pid : BitVec 32)
+    (ke : Nat) :
+    (∃ k' : Nat, ⌜ke ≤ k'⌝ ∗ actLend (GF := GF) k.proc k') ⊢
+      fpContLedL Γ cpu k j pid ke -∗ fpContLed Γ cpu k j pid := by
+  unfold fpContLedL fpContLed
+  iintro Hl H %spie %spp %R' %hs Hk Hpc
+  iapply H $$ %spie %spp %R' %hs Hk Hpc Hl
+
 /-- The receipt in hand, the led continuation is a plain one. -/
 theorem fpContLed_fill [CurCtx] (Γ : SchedNames) (cpu : CPU) (k : KCtx) (j : Nat) (pid : BitVec 32) :
     (∃ h : List Pev, pidReceipt (GF := GF) h (.PFree k.proc pid)) ⊢
@@ -831,18 +861,19 @@ theorem fp_avail_reduce [CurCtx] (γk : KmemNames) :
 
 /-- `proc_freepagetable`'s contract at its call site (address folded). -/
 theorem fp_freepagetable (PFP : PROC_FREEPAGETABLE) [CurCtx]
-    (c : CPU) (k' : KCtx) (γl : GName) (γk : KmemNames) (P : UPtd) (M : Nat → List (BitVec 8))
+    (c : CPU) (k' : KCtx) (γl : GName) (γk : KmemNames) (P : UPtd) (M : Nat → List (BitVec 8)) (ke : Nat)
     (hnoff' : k'.noff + 1 < 2 ^ 31) (hK' : procPagetableSlots ≤ k'.avail) (hlk' : "kmem" ∉ k'.locks)
     (hroot' : k'.regs 10#5 = pageAddr P.root) (hsz' : (k'.regs 11#5).toNat ≤ uvmMaxsz)
     (hbelow' : umBelow (k'.regs 11#5) P) :
     kctx c k' ∗ pcIs c KA.«proc_freepagetable» ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
-    kallocAvail γk none ∗ procPtAt P M ∗
+    kallocAvail γk none ∗ procPtAt P M ∗ actLend k'.proc ke ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
       ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
+      (∃ k2 : Nat, ⌜ke ≤ k2⌝ ∗ actLend k'.proc k2) -∗
       ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := PFP.wp_proc_freepagetable (hlc := hlc) (GF := GF) c k' γl γk P M hnoff' hK' hlk' hroot' hsz' hbelow'
+  have h := PFP.wp_proc_freepagetable (hlc := hlc) (GF := GF) c k' γl γk P M ke hnoff' hK' hlk' hroot' hsz' hbelow'
   unfold wp_proc_freepagetable_body at h
   simp only [procFreepagetableAddr] at h
   exact h
@@ -929,7 +960,7 @@ theorem fp_after_tf (KF : KFREE) (PFP : PROC_FREEPAGETABLE) (AC : ACQUIRE) (RE :
     (hnm : nm.length = PNAMELEN)
     (hwf : k.wf) (hsie : k.sie = false) (hnoff : k.noff + 1 < 2 ^ 31)
     (hK : freeprocSlots ≤ k.avail) (hlk : "kmem" ∉ k.locks) (hlp : "nextpid" ∉ k.locks)
-    (htier : k.tier = KTier.kpt)
+    (htier : k.tier = KTier.kpt) (ke : Nat)
     (R : RegMap) (hR9 : R 9#5 = procAddr j) (hkept : fpKept k.regs R) :
     kctx cpu ((k.pushed 4).withRegs R) ∗ pcIs cpu (KA.«freeproc» + 0x14#64) ∗
     frame4s1 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) ∗
@@ -945,10 +976,11 @@ theorem fp_after_tf (KF : KFREE) (PFP : PROC_FREEPAGETABLE) (AC : ACQUIRE) (RE :
     (if V.pagetable = 0#64 then emp else
       ⌜V.pagetable = pageAddr V.upt.root ∧ V.sz.toNat ≤ uvmMaxsz ∧ umBelow V.sz V.upt⌝ ∗
         procPtAt V.upt M) ∗
-    fpKeep (procAddr j) V nm ∗ fpGhost (procAddr j) pidb kl pid g ∗ fpContLed Γ cpu k j pid
+    fpKeep (procAddr j) V nm ∗ fpGhost (procAddr j) pidb kl pid g ∗
+    (∃ k' : Nat, ⌜ke ≤ k'⌝ ∗ actLend k.proc k') ∗ fpContLedL Γ cpu k j pid ke
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hframe, #Hlkk, Hav, #Hlkp, Hlocked, Hpg, Hpub, Hpub4, Hpriv, Hsz, Hpt, Htf,
-    Hptarm, Hkeep, Hgh, HPhi⟩
+    Hptarm, Hkeep, Hgh, Hlend, HPhi⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   have hK4 : 4 ≤ k.avail := by unfold freeprocSlots at hK; omega
   -- sd zero,88(s1) : p->trapframe = 0
@@ -968,6 +1000,8 @@ theorem fp_after_tf (KF : KFREE) (PFP : PROC_FREEPAGETABLE) (AC : ACQUIRE) (RE :
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [fp_beq_taken V.pagetable hpt0]
     iintro Hk Hpc
+    -- nothing was lent on this arm: the lend fills the continuation as it came
+    ihave HPhi := fpContLedL_fill Γ cpu k j pid ke $$ Hlend HPhi
     iapply (fp_after_pt AC RE Γ cpu k γp j hj st ch kl xs pid pidb V.pagetable V.sz V nm g hof hcwd
       hnm hwf hsie hnoff hK hlp htier (R.set 10#5 V.pagetable)
       (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact hR9)
@@ -994,11 +1028,14 @@ theorem fp_after_tf (KF : KFREE) (PFP : PROC_FREEPAGETABLE) (AC : ACQUIRE) (RE :
       with [freeproc_br_ffffffffffffffba, fp_fpt_jal]
     iintro Hk Hpc
     icases fp_ptarm_neg V M hpt0 $$ Hptarm with ⟨%hpta, Hprocpt⟩
-    iapply (fp_freepagetable PFP cpu _ γl γk V.upt M ?hn ?hKp ?hlkp ?hroot ?hszb ?hbel)
+    -- the caller's lend, handed to proc_freepagetable (permit sweep L1a)
+    icases Hlend with ⟨%k1, %hk1, Hlend⟩
+    iapply (fp_freepagetable PFP cpu _ γl γk V.upt M k1 ?hn ?hKp ?hlkp ?hroot ?hszb ?hbel)
       $$ [- $Hk $Hpc $Hlkk $Hav $Hprocpt]
     rotate_right 1
     k_norm
     iframe #
+    iframe Hlend
     case hn => k_norm; omega
     case hKp => k_norm; unfold freeprocSlots at hK; unfold procPagetableSlots; omega
     case hlkp => k_norm; exact hlk
@@ -1007,12 +1044,17 @@ theorem fp_after_tf (KF : KFREE) (PFP : PROC_FREEPAGETABLE) (AC : ACQUIRE) (RE :
     case hbel => k_norm; exact hpta.2.2
     -- past proc_freepagetable
     iapply wpNext_off_intro
-    iintro %spie %spp %R' %hsp Hk Hpc %hcs
+    iintro %spie %spp %R' %hsp Hk Hpc ⟨%k2, %hk2, Hlend⟩ %hcs
     obtain ⟨rfl, rfl⟩ := hsp trivial
     have hself : (k.pushed 4).withSpie k.spie k.spp = k.pushed 4 :=
       KCtx.withSpie_self' (k.pushed 4) k.spie k.spp rfl rfl
     have hret : jumpPc (KA.«freeproc» + 0x22#64) = (KA.«freeproc» + 0x22#64) := fp_ret_a9e
     k_norm [hself, hret]
+    -- the lend back, at a count no lower: it fills the continuation
+    ihave HPhi := fpContLedL_fill Γ cpu k j pid ke $$ [Hlend] HPhi
+    · iexists k2
+      iframe Hlend
+      ipureintro; omega
     iapply (fp_after_pt AC RE Γ cpu k γp j hj st ch kl xs pid pidb V.pagetable V.sz V nm g hof hcwd
       hnm hwf hsie hnoff hK hlp htier R'
       (by
@@ -1039,15 +1081,15 @@ theorem freeproc_led_proof (KF : KFREE) (PFP : PROC_FREEPAGETABLE) (AC : ACQUIRE
     {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [IrefslotG GF] [CtokG GF] [WchG GF] [X : CurCtx] (Γ : SchedNames) (cpu : CPU) (k : KCtx)
     (γl γp : GName) (γk : KmemNames) (j : Nat) (st : BitVec 32) (ch : BitVec 64) (pid : BitVec 32)
-    (V : ProcPriv) (M : Nat → List (BitVec 8)) (g : GName) hj hp hst hnoff hK hsie hlk hlp htier :
-    wp_freeproc_led_body (hlc := hlc) (GF := GF) Γ cpu k γl γp γk j st ch pid V M g
+    (V : ProcPriv) (M : Nat → List (BitVec 8)) (g : GName) (ke : Nat) hj hp hst hnoff hK hsie hlk hlp htier :
+    wp_freeproc_led_body (hlc := hlc) (GF := GF) Γ cpu k γl γp γk j st ch pid V M g ke
       hj hp hst hnoff hK hsie hlk hlp htier := by
     unfold wp_freeproc_led_body
     simp only [freeprocAddr]
     unfold freeprocIn freeprocGen procFields pnameCells
     iintro ⟨Hk, Hpc, #Hlkk, Hav, #Hlkp, Hheld,
       ⟨%hpure, Hpriv, ⟨Hks, Hsz, Hpt, Htf, Hctx, Hof, Hcwd, ⟨%hpnwf, Hnamebuf⟩, Hsc⟩, Hal, Hch, Hev, Hstack, Htfarm,
-        Hptarm⟩, ⟨Hsg, Hrr, %xsv, Hxsb⟩, HPhi0⟩
+        Hptarm⟩, ⟨Hsg, Hrr, %xsv, Hxsb⟩, Hlend, HPhi0⟩
     obtain ⟨hof, hcwd⟩ := hpure
     have hnm : V.name.length = PNAMELEN := hpnwf.1
     icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩
@@ -1107,7 +1149,7 @@ theorem freeproc_led_proof (KF : KFREE) (PFP : PROC_FREEPAGETABLE) (AC : ACQUIRE
       iintro Hk Hpc
       iclear Htfarm
       iapply (fp_after_tf KF PFP AC RE Γ cpu k γl γp γk j hj st ch kl xs pid pidb V.trapframe V M
-        V.name g hof hcwd hnm hwf hsie hnoff hK hlk hlp htier
+        V.name g hof hcwd hnm hwf hsie hnoff hK hlk hlp htier ke
         ((((k.regs.set 2#5 (k.regs 2#5 + 0xFFFFFFFFFFFFFFE0#64)).set 8#5 (k.regs 2#5)).set 9#5
             (procAddr j)).set 10#5 V.trapframe)
         (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true])
@@ -1115,7 +1157,11 @@ theorem freeproc_led_proof (KF : KFREE) (PFP : PROC_FREEPAGETABLE) (AC : ACQUIRE
           refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
             simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]))
       iframe Hk Hpc Hframe Hlkk Hav Hlkp Hlocked Hpg Hpub Hpub4 Hpriv Hsz Hpt Htf Hptarm Hkeep Hgh
-      unfold fpContLed
+      isplitl [Hlend]
+      · iexists ke
+        iframe Hlend
+        ipureintro; exact Nat.le_refl ke
+      unfold fpContLedL
       k_norm
       iexact HPhi
     · -- not taken: kfree(p->trapframe)
@@ -1152,7 +1198,7 @@ theorem freeproc_led_proof (KF : KFREE) (PFP : PROC_FREEPAGETABLE) (AC : ACQUIRE
       have hret : jumpPc (KA.«freeproc» + 0x14#64) = (KA.«freeproc» + 0x14#64) := fp_ret_a90
       k_norm [hself, hret]
       iapply (fp_after_tf KF PFP AC RE Γ cpu k γl γp γk j hj st ch kl xs pid pidb V.trapframe V M
-        V.name g hof hcwd hnm hwf hsie hnoff hK hlk hlp htier R'
+        V.name g hof hcwd hnm hwf hsie hnoff hK hlk hlp htier ke R'
         (by
           have h := hcs.2.2.1
           simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] at h
@@ -1162,29 +1208,35 @@ theorem freeproc_led_proof (KF : KFREE) (PFP : PROC_FREEPAGETABLE) (AC : ACQUIRE
           refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
             simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]))
       iframe Hk Hpc Hframe Hlkk Hav Hlkp Hlocked Hpg Hpub Hpub4 Hpriv Hsz Hpt Htf Hptarm Hkeep Hgh
-      unfold fpContLed
+      isplitl [Hlend]
+      · iexists ke
+        iframe Hlend
+        ipureintro; exact Nat.le_refl ke
+      unfold fpContLedL
       k_norm
       iexact HPhi
 
 /-- A landed continuation serves as a led one: the receipt is dropped. -/
 theorem fp_cont_led {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
     [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
-    (Γ : SchedNames) (cpu : CPU) (k : KCtx) (j : Nat) (pid : BitVec 32) :
+    (Γ : SchedNames) (cpu : CPU) (k : KCtx) (j : Nat) (pid : BitVec 32) (ke : Nat) :
     wpNext (GF := GF) k.sie k.proc cpu (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
       ⌜k.sie = false → spie = k.spie ∧ spp = k.spp⌝ -∗
       kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
+      (∃ k' : Nat, ⌜ke ≤ k'⌝ ∗ actLend k.proc k') -∗
       procHeld Γ cpu' j UNUSED 0#64 -∗ procDormant (procAddr j) UNUSED -∗
       ⌜calleeSaved k.regs R'⌝ -∗ wpLoop cpu')) ⊢
     wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
       ⌜k.sie = false → spie = k.spie ∧ spp = k.spp⌝ -∗
       kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
+      (∃ k' : Nat, ⌜ke ≤ k'⌝ ∗ actLend k.proc k') -∗
       (∃ h : List Pev, pidReceipt h (.PFree k.proc pid)) -∗
       procHeld Γ cpu' j UNUSED 0#64 -∗ procDormant (procAddr j) UNUSED -∗
       ⌜calleeSaved k.regs R'⌝ -∗ wpLoop cpu')) := by
   iintro Hnext
   iapply wpNext_mono _ _ _ _ _ $$ Hnext
-  iintro %c H %spie %spp %R' %hs Hk Hpc _ Hheld Hdorm %hcs
-  iapply H $$ %spie %spp %R' %hs Hk Hpc Hheld Hdorm
+  iintro %c H %spie %spp %R' %hs Hk Hpc Hl _ Hheld Hdorm %hcs
+  iapply H $$ %spie %spp %R' %hs Hk Hpc Hl Hheld Hdorm
   ipureintro
   exact hcs
 
@@ -1193,17 +1245,17 @@ of record, Rocq `wp_freeproc_led_sconf`), and the landed contract as its
 corollary (the receipt dropped, `fp_cont_led`). -/
 theorem freeproc_proof (KF : KFREE) (PFP : PROC_FREEPAGETABLE) (AC : ACQUIRE) (RE : RELEASE) :
     FREEPROC :=
-  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ Γ cpu k γl γp γk j st ch pid V M g hj hp hst hnoff hK hsie hlk hlp htier => by
-    have h := freeproc_led_proof KF PFP AC RE (hlc := hlc) (GF := GF) Γ cpu k γl γp γk j st ch pid V M g
+  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ Γ cpu k γl γp γk j st ch pid V M g ke hj hp hst hnoff hK hsie hlk hlp htier => by
+    have h := freeproc_led_proof KF PFP AC RE (hlc := hlc) (GF := GF) Γ cpu k γl γp γk j st ch pid V M g ke
       hj hp hst hnoff hK hsie hlk hlp htier
     unfold wp_freeproc_led_body at h
     unfold wp_freeproc_body
-    iintro ⟨Hk, Hpc, #Hlkk, Hav, #Hlkp, Hheld, Hin, Hgen, Hnext⟩
-    ihave Hnext := fp_cont_led Γ cpu k j pid $$ Hnext
+    iintro ⟨Hk, Hpc, #Hlkk, Hav, #Hlkp, Hheld, Hin, Hgen, Hlend, Hnext⟩
+    ihave Hnext := fp_cont_led Γ cpu k j pid ke $$ Hnext
     iapply h
-    iframe Hk Hpc Hlkk Hav Hlkp Hheld Hin Hgen Hnext,
-   fun {hlc GF} _ _ _ _ _ _ _ _ Γ cpu k γl γp γk j st ch pid V M g hj hp hst hnoff hK hsie hlk hlp htier =>
-    freeproc_led_proof KF PFP AC RE (hlc := hlc) (GF := GF) Γ cpu k γl γp γk j st ch pid V M g
+    iframe Hk Hpc Hlkk Hav Hlkp Hheld Hin Hgen Hlend Hnext,
+   fun {hlc GF} _ _ _ _ _ _ _ _ Γ cpu k γl γp γk j st ch pid V M g ke hj hp hst hnoff hK hsie hlk hlp htier =>
+    freeproc_led_proof KF PFP AC RE (hlc := hlc) (GF := GF) Γ cpu k γl γp γk j st ch pid V M g ke
       hj hp hst hnoff hK hsie hlk hlp htier⟩
 
 end Xv6

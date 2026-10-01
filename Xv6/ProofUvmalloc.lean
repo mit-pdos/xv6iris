@@ -7,6 +7,11 @@ contract) and `uvmdealloc` (for the rollback).
 `kalloc`, `memset` to zero, then `mappages` of the single page.  A failure
 of either frees what the turn allocated (`kfree`) and rolls the run back
 with `uvmdealloc`, returning `0`.
+
+THE LEND (permit sweep L1a, Rocq f344a089a): no callee takes it yet, so it
+is framed through the continuation once, at entry
+(`SlotGen.actLend_cont_frame`, Rocq `act_lend_cont_frame`) and returns at
+`ke`.
 -/
 import Xv6.SpecUvmalloc
 import Xv6.SpecUvmdealloc
@@ -1253,10 +1258,13 @@ theorem uvma_loop (KAL : KALLOC) (KF : KFREE) (MS : MEMSET) (MA : MAPPAGES_ANY)
 set_option maxHeartbeats 4000000 in
 theorem uvmalloc_proof (KAL : KALLOC) (KF : KFREE) (MS : MEMSET) (MA : MAPPAGES_ANY)
     (UD : UVMDEALLOC) : UVMALLOC :=
-  ⟨fun {hlc GF} _ _ _ cpu k γl γk P M hnoff hK hlk hroot hold hnew hperm hfree0 => by
+  ⟨fun {hlc GF} _ _ _ _ cpu k γl γk P M ke hnoff hK hlk hroot hold hnew hperm hfree0 => by
   unfold wp_uvmalloc_body
   simp only [uvmallocAddr]
-  iintro ⟨Hk, Hpc, #Hlk, Hav, HP, HΦ⟩
+  iintro ⟨Hk, Hpc, #Hlk, Hav, HP, Hlend, HΦ⟩
+  -- the lend (permit sweep L1a): no callee takes it yet, so it is framed
+  -- through the continuation once, here
+  ihave HΦ := actLend_cont_frame _ _ _ _ _ _ _ _ _ $$ HΦ Hlend
   icases procPtAt_split P M $$ HP with ⟨%hwfP, Htree0, Hpages0⟩
   ihave HP := ua_mkProcPtAt P M hwfP $$ [Htree0 Hpages0]
   case' _ => iframe

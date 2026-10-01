@@ -58,6 +58,11 @@ a STAGE file (no `Proof` prefix).
    (Rocq `pv_sz (us_V U)`).
 3. **The failure plug.**  Rocq takes `QF KfNoMem`; so does this lemma.
    The frozen `kxc_bad_1d6` relays `∃ c, QF c`.
+   **Permit sweep L1a (Rocq f344a089a, `ProofKexecC.v`)**: uvmalloc takes
+   the block's event counter (`ProcPrivAcc.procPrivFd_evLend`); the rest of
+   phase C runs at the moved record `{ A with V := V1 }`, so `kxc_c_setup`'s
+   continuation quantifies it (`∀ V1, ⌜evAfter A.V V1⌝ -∗ …`, Rocq's `∀ U',
+   ⌜ev_after U U'⌝`), the closer converted (`kexecCloser_after`).
 4. **uvmalloc's `hnew`** is Rocq's coverage disjunct (`lazyFree P.um oldsz`,
    landed `SpecUvmalloc` re-spec), read off the seam's `lazyFree P.um szv`
    at `PGROUNDUP(szv)`.
@@ -423,17 +428,18 @@ theorem kxc_c_setup (MP : MYPROC) (UA : UVMALLOC) (UC : UVMCLEAR) (PFP : PROC_FR
       (k.regs 23#5) (k.regs 24#5) (k.regs 25#5) (k.regs 26#5) w13 w67 fb ef P Mi szv (k.regs 27#5) ∗
     fsFabric (hlc := hlc) Γ A.pd A.pav A.pu ∗
     (∀ c' : CPU, kexecCloser Q QF k A c') ∗
-    (∀ (c : CPU) (spie' spp' : Bool) (R' : RegMap) (P' : UPtd) (Mo : Nat → List (BitVec 8))
+    (∀ V1 : ProcPriv, ⌜evAfter A.V V1⌝ -∗
+      ∀ (c : CPU) (spie' spp' : Bool) (R' : RegMap) (P' : UPtd) (Mo : Nat → List (BitVec 8))
         (sz1 : BitVec 64),
       ⌜8192 ≤ sz1.toNat ∧ sz1.toNat ≤ 2 ^ 38 ∧ sz1.toNat % 4096 = 0 ∧
         (kxcElfBuf (k.regs 2#5)).toNat % 8 = 0 ∧ ef.length = 64⌝ -∗
-      (kxcAt21a k A c spie' spp' R' (k.regs 19#5) (k.regs 20#5) (k.regs 21#5) (k.regs 22#5)
-          (k.regs 23#5) (k.regs 24#5) (k.regs 25#5) (k.regs 26#5) w13 w67 fb ef P' Mo A.V.sz sz1
-          (k.regs 27#5) 0 ∨
-        kxcAt272 k A c spie' spp' R' (k.regs 19#5) (k.regs 20#5) (k.regs 21#5) (k.regs 22#5)
-          (k.regs 23#5) (k.regs 24#5) (k.regs 25#5) (k.regs 26#5) w13 w67 fb ef P' Mo A.V.sz sz1
-          (k.regs 27#5) 0) -∗
-      (∀ c' : CPU, kexecCloser Q QF k A c') -∗ wpLoop c)
+      (kxcAt21a k { A with V := V1 } c spie' spp' R' (k.regs 19#5) (k.regs 20#5) (k.regs 21#5)
+          (k.regs 22#5) (k.regs 23#5) (k.regs 24#5) (k.regs 25#5) (k.regs 26#5) w13 w67 fb ef P' Mo
+          A.V.sz sz1 (k.regs 27#5) 0 ∨
+        kxcAt272 k { A with V := V1 } c spie' spp' R' (k.regs 19#5) (k.regs 20#5) (k.regs 21#5)
+          (k.regs 22#5) (k.regs 23#5) (k.regs 24#5) (k.regs 25#5) (k.regs 26#5) w13 w67 fb ef P' Mo
+          A.V.sz sz1 (k.regs 27#5) 0) -∗
+      (∀ c' : CPU, kexecCloser Q QF k { A with V := V1 } c') -∗ wpLoop c)
     ⊢ wpLoop (GF := GF) cpu := by
   unfold kxcAt1ae
   iintro ⟨⟨%hR, %hA, %hI, Hk, Hpc, Hte, Hce, Hirs, Hbs, Hpt, Hpriv, Hbufs, Helf, Hfr⟩, #Hfab, Hcl, HK⟩
@@ -515,10 +521,12 @@ theorem kxc_c_setup (MP : MYPROC) (UA : UVMALLOC) (UC : UVMCLEAR) (PFP : PROC_FR
   have hb8 : umBelow (BitVec.ofNat 64 (pgRoundUpN szv.toNat)) P := kxcC_umBelow_pgru hbelow hs8n
   have hc8 : lazyFree P.um (BitVec.ofNat 64 (pgRoundUpN szv.toNat)) := by
     intro j hj; rw [hs8n, hpgi] at hj; exact hcov j hj
-  -- +0x1ce  jal uvmalloc
+  -- +0x1ce  jal uvmalloc, the block's event counter lent to it (permit
+  -- sweep L1a, Rocq `proc_priv_ev_lend`)
+  icases procPrivFd_evLend A.γ k.proc A.pidv A.V A.M $$ Hpriv with ⟨Hlend, Hpback⟩
   iapply (kxc_call_uvmalloc UA Γ cpu k A spie1 spp1 _ (KA.«kexec» + 0x1ce#64) 2082916#21
-      kxcC_br_uvmalloc kxcC_ret_1ce P Mi hK hnoff ?ur ?uo ?un ?up ?uf)
-    $$ [- $Hk $Hpc $Hte $Hce $Hfab $Hpt]
+      kxcC_br_uvmalloc kxcC_ret_1ce P Mi A.V.ev hK hnoff ?ur ?uo ?un ?up ?uf)
+    $$ [- $Hk $Hpc $Hte $Hce $Hfab $Hpt $Hlend]
   case ur => simp [RegMap.set_apply]
   case uo => simp only [RegMap.set_apply]; simp [hs8n, hpg]
   case un => right; simpa [RegMap.set_apply] using hc8
@@ -531,7 +539,15 @@ theorem kxc_c_setup (MP : MYPROC) (UA : UVMALLOC) (UC : UVMCLEAR) (PFP : PROC_FR
 
   · isplitr
     · iapply (text_instr _ _ _ _ rfl rfl); iexact Htext
-    iintro %c2 %spie2 %spp2 %R2 %hcs2 Hk Hpc Hte Hce Hres
+    iintro %c2 %spie2 %spp2 %R2 %hcs2 Hk Hpc Hte Hce ⟨%kl, %hkl, Hlend⟩ Hres
+    -- the block back at a later count: the rest of phase C is at that record,
+    -- the closer converted to it
+    icases Hpback $$ %kl %hkl Hlend with ⟨%V1, %hV1, Hpriv⟩
+    obtain ⟨kv, hkv, rfl⟩ := hV1
+    ihave Hcl := kexecCloser_after Q QF k A (A.V.updEv kv) ⟨kv, hkv, rfl⟩ $$ Hcl
+    ihave Hbufs := (show kxcBufs (GF := GF) k A ⊢ kxcBufs k { A with V := A.V.updEv kv } from .rfl)
+      $$ Hbufs
+    ihave HK := HK $$ %(A.V.updEv kv) %⟨kv, hkv, rfl⟩
     let cpu := c2
     k_norm_g
     obtain ⟨b2, b8, b9, b18, b19, b20, b21, b22, b23, b24, b25, b26, b27⟩ := hcs2
@@ -554,8 +570,8 @@ theorem kxc_c_setup (MP : MYPROC) (UA : UVMALLOC) (UC : UVMCLEAR) (PFP : PROC_FR
         (k.regs 10#5) (k.regs 11#5) (k.regs 19#5) (k.regs 20#5) (k.regs 21#5) (k.regs 22#5)
         (k.regs 23#5) (k.regs 24#5) (k.regs 25#5) (k.regs 26#5) w13 w67 ef hal hl $$ [Hfr Helf]
       · iframe
-      iapply (kxc_bad_1d6 PFP Γ Q QF cpu k A spie2 spp2 _ P Mi _ w13 ⟨.noMem, hqf⟩ hK hnoff ?f2 ?f24
-          ?f22 ?f27 hb8 hc8)
+      iapply (kxc_bad_1d6 PFP Γ Q QF cpu k { A with V := A.V.updEv kv } spie2 spp2 _ P Mi _ w13
+          ⟨.noMem, hqf⟩ hK hnoff ?f2 ?f24 ?f22 ?f27 hb8 hc8)
         $$ [$Hk $Hpc $Hte $Hce $Hfab $Hpt $Hpriv $Hbufs $Hbs $Hirs $Hfr $Hcl]
       case f2 => simp [RegMap.set_apply, b2]
       case f24 => simp [RegMap.set_apply, b24]
@@ -572,7 +588,8 @@ theorem kxc_c_setup (MP : MYPROC) (UA : UVMALLOC) (UC : UVMCLEAR) (PFP : PROC_FR
       k_step_e (wp_s_branch cpu _ (KA.«kexec» + 0x1d4#64) true 34#13 10#5 0#5 (by decide) bop.BNE)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, kxcC_sz1_bne _ hpg]
       iintro Hk Hpc
-      iapply (kxcC_setup_ok UC Q QF cpu k A spie2 spp2 _ w13 w67 fb ef P P' Mi M' szv hK ?g2 ?g8 ?g10
+      iapply (kxcC_setup_ok UC Q QF cpu k { A with V := A.V.updEv kv } spie2 spp2 _ w13 w67 fb ef P P' Mi
+          M' szv hK ?g2 ?g8 ?g10
           ?g18 ?g19 ?g21 ?g22 ?g27 hpg hok hal hl htfp hbelow hcov himg hszr hperm)
         $$ [$Hk $Hpc $Hte $Hce $Hirs $Hbs $Hpt $Hpriv $Hbufs $Helf $Hfr $Hcl $HK]
       case g2 => simp [RegMap.set_apply, b2]

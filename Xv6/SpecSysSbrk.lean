@@ -51,6 +51,11 @@ lazy arm leaves `M` equal (Rocq's `umem_grow` exposes the same zeros).
 Interrupts may be on (`wpNext`, as `growproc`); `kmem` must not be held
 (growproc's uvmalloc takes it).
 
+THE EVENT COUNTER (permit sweep L1a, Rocq f344a089a): the eager path's
+growproc lends the block's counter to uvmalloc, so the block comes back at
+`V'.updEv k'` with `V.ev ≤ k'` (the lazy and failing paths at `k' = V.ev`);
+`sysSbrkOk` is unchanged.
+
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
 import Xv6.SpecGrowproc
@@ -106,8 +111,9 @@ def wp_sys_sbrk_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
   wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
     ⌜k.sie = false → spie = k.spie ∧ spp = k.spp⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
-    (∃ (V' : ProcPriv) (M' : Nat → List (BitVec 8)),
-      ⌜sysSbrkOk V V' M M' v0 v1 (R' 10#5)⌝ ∗ procPrivFd γ (procAddr j) pid V' M') -∗
+    (∃ (V' : ProcPriv) (M' : Nat → List (BitVec 8)) (k' : Nat),
+      ⌜sysSbrkOk V V' M M' v0 v1 (R' 10#5)⌝ ∗ ⌜V.ev ≤ k'⌝ ∗
+      procPrivFd γ (procAddr j) pid (V'.updEv k') M') -∗
     ⌜calleeSaved k.regs R'⌝ -∗ wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
 

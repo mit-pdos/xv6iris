@@ -12,6 +12,9 @@ The trapframe pointer and page are split out of the private block for the
 duration of `argaddr` and put back before `kwait`, which takes the whole
 block.  `kwait` parks (`wpNext true`), so from its return on the hart is
 arbitrary and the spec's own `wpNext true` post is reached with `wpNext_at`.
+
+THE EVENT COUNT (permit sweep L1a, Rocq f344a089a): kwait's raised count
+`k'` (`V.ev ≤ k'`) is relayed to the post verbatim (`sw_exit`).
 -/
 import Xv6.SpecSysWait
 import Xv6.SysfileCalls
@@ -64,14 +67,15 @@ theorem sw_kwait (KW : KWAIT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
     procPrivFd γ (procAddr j) pid V M ∗ chFrag V.chg (procAddr j) cs ∗ initPidIs 1#32 ∗
     wpNext true k'.proc c (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd)
-      (rv xw : BitVec 32) (d : Nat) (cs' : ExtTreeSet GName compare),
+      (rv xw : BitVec 32) (d : Nat) (cs' : ExtTreeSet GName compare) (ke' : Nat),
       ⌜calleeSaved k'.regs R' ∧ R' 10#5 = BitVec.signExtend 64 rv ∧ V.upt.extSz V.sz P' ∧ d ≤ 4 ∧
         kwaitAns rv a d ∧ umMapped P' a.toNat d⌝ -∗
       waitAns rv (xstateVal xw) cs cs' V.gen (decide (a = 0#64)) pid -∗
       chFrag V.chg (procAddr j) cs' -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       trapCsrsExt cpu' s -∗ cpuClaimExt cpu' s p -∗
-      procPrivFd γ (procAddr j) pid { V with upt := P' }
+      ⌜V.ev ≤ ke'⌝ -∗
+      procPrivFd γ (procAddr j) pid { V.updEv ke' with upt := P' }
         (umemWrite (viewFaulted V.upt P' M) a.toNat ((xstateBytes xw).take d)) -∗
       wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
@@ -135,7 +139,7 @@ set_option maxHeartbeats 4000000 in
 post -- itself a `wpNext true` -- the hart we are on. -/
 theorem sw_exit (cpu cr : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (v : BitVec 64) (P' : UPtd) (rv xw : BitVec 32) (d : Nat)
-    (cs cs' : ExtTreeSet GName compare)
+    (cs cs' : ExtTreeSet GName compare) (k' : Nat) (hk' : V.ev ≤ k')
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : 4 ≤ k.avail)
     (spie spp : Bool) (R : RegMap) (hR2 : R 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFE0#64)
     (hpins : swPins k R) (h10 : R 10#5 = BitVec.signExtend 64 rv)
@@ -144,19 +148,20 @@ theorem sw_exit (cpu cr : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : BitV
     kctx cr (((k.withSpie spie spp).pushed 4).withRegs R) ∗ pcIs cr (KA.«sys_wait» + 0x1a#64) ∗
     frame4s0 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) ∗
     trapCsrsExt cr k.sie ∗ cpuClaimExt cr k.sie k.proc ∗
-    procPrivFd γ (procAddr j) pid { V with upt := P' }
+    procPrivFd γ (procAddr j) pid { V.updEv k' with upt := P' }
       (umemWrite (viewFaulted V.upt P' M) v.toNat ((xstateBytes xw).take d)) ∗
     waitAns rv (xstateVal xw) cs cs' V.gen (decide (v = 0#64)) pid ∗
     chFrag V.chg (procAddr j) cs' ∗
     wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd)
-      (rv xw : BitVec 32) (d : Nat) (cs' : ExtTreeSet GName compare),
+      (rv xw : BitVec 32) (d : Nat) (cs' : ExtTreeSet GName compare) (k' : Nat),
       ⌜calleeSaved k.regs R' ∧ R' 10#5 = BitVec.signExtend 64 rv ∧ V.upt.extSz V.sz P' ∧ d ≤ 4 ∧
         kwaitAns rv v d ∧ umMapped P' v.toNat d⌝ -∗
       waitAns rv (xstateVal xw) cs cs' V.gen (decide (v = 0#64)) pid -∗
       chFrag V.chg (procAddr j) cs' -∗
       kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
       trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
-      procPrivFd γ (procAddr j) pid { V with upt := P' }
+      ⌜V.ev ≤ k'⌝ -∗
+      procPrivFd γ (procAddr j) pid { V.updEv k' with upt := P' }
         (umemWrite (viewFaulted V.upt P' M) v.toNat ((xstateBytes xw).take d)) -∗
       wpLoop cpu'))
     ⊢ wpLoop (GF := GF) cr := by
@@ -165,7 +170,7 @@ theorem sw_exit (cpu cr : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : BitV
   iapply (sw_tail cr (k.withSpie spie spp) (by simp only [KCtx.withSpie_avail]; exact hK)
       k.regs rfl R hR2
       iprop(trapCsrsExt cr k.sie ∗ cpuClaimExt cr k.sie k.proc ∗
-        procPrivFd γ (procAddr j) pid { V with upt := P' }
+        procPrivFd γ (procAddr j) pid { V.updEv k' with upt := P' }
           (umemWrite (viewFaulted V.upt P' M) v.toNat ((xstateBytes xw).take d)) ∗
         waitAns rv (xstateVal xw) cs cs' V.gen (decide (v = 0#64)) pid ∗
         chFrag V.chg (procAddr j) cs'))
@@ -182,7 +187,7 @@ theorem sw_exit (cpu cr : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : BitV
   ihave Hnext := wpNext_at true k.proc cpu cz _
     (fun h => h.elim (fun h => absurd h (by decide))
       (fun h => absurd h (by rw [hproc]; exact procAddr_nonzero hj))) $$ Hnext
-  iapply Hnext $$ %spie %spp %_ %P' %rv %xw %d %cs' [] Hans Hch Hk Hpc Hte Hce Hblk
+  iapply Hnext $$ %spie %spp %_ %P' %rv %xw %d %cs' %k' [] Hans Hch Hk Hpc Hte Hce %hk' Hblk
   ipureintro
   refine ⟨MachCSL.calleeSaved_mk _ _ p9 p18 p19 p20 p21 p22 p23 p24 p25 p26 p27, ?_, hext, hd, hans, hmap⟩
   simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]
@@ -306,13 +311,13 @@ theorem sys_wait_proof (AA : ARGADDR) (KW : KWAIT) : SYSWAIT := ⟨
   case ha => k_norm_g
   -- past kwait, on some hart: the epilogue
   iapply wpNext_intro_pin
-  iintro %cf %hpf %spie2 %spp2 %R2 %P' %rv %xw %d %cs' %hfacts Hans Hch Hk Hpc Hte Hce Hblk
+  iintro %cf %hpf %spie2 %spp2 %R2 %P' %rv %xw %d %cs' %k' %hfacts Hans Hch Hk Hpc Hte Hce %hk' Hblk
   k_norm_g [MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed, MachCSL.KCtx.withSpie_withRegs]
   obtain ⟨hcs2, h10, hext, hd, hans, hmap⟩ := hfacts
   unfold calleeSaved at hcs2
   k_norm_g at hcs2
   obtain ⟨d2, d8, d9, d18, d19, d20, d21, d22, d23, d24, d25, d26, d27⟩ := hcs2
-  iapply (sw_exit cpu cf k γ j pid V M v P' rv xw d cs cs' hj hproc hK4 spie2 spp2 R2
+  iapply (sw_exit cpu cf k γ j pid V M v P' rv xw d cs cs' k' hk' hj hproc hK4 spie2 spp2 R2
       (d2.trans b2)
       ⟨d9.trans b9, d18.trans b18, d19.trans b19, d20.trans b20, d21.trans b21, d22.trans b22,
         d23.trans b23, d24.trans b24, d25.trans b25, d26.trans b26, d27.trans b27⟩

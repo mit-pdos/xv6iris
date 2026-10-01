@@ -15,6 +15,13 @@ became live and the shrink unmaps only above the new break, so the block's
 `V.pvLazy = false → lazyFree` claim is re-established on every arm (Rocq
 `ProofGrowproc`: `lazy_free_of_covered`, `lazy_free_del_run`).
 
+THE EVENT COUNTER (permit sweep L1a, Rocq f344a089a; design
+ni-strong-instance.md §7): growproc lends the block's counter to uvmalloc,
+which may step it, so the block comes back at a count at least the one it
+left at -- the post's record is `V'.updEv k'` with `V.ev ≤ k'` (Rocq: `∀ k',
+⌜pv_ev ≤ k'⌝ -∗ proc_priv (upd_ev … k')`, the continuation's premise; here
+the post's existential).  `growprocOk` itself is unchanged.
+
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
 import Xv6.FdTable
@@ -54,8 +61,9 @@ def wp_growproc_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
   wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
     ⌜k.sie = false → spie = k.spie ∧ spp = k.spp⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
-    (∃ (V' : ProcPriv) (M' : Nat → List (BitVec 8)),
-      ⌜growprocOk V V' M M' (k.regs 10#5) (R' 10#5)⌝ ∗ procPrivFd γ (procAddr j) pid V' M') -∗
+    (∃ (V' : ProcPriv) (M' : Nat → List (BitVec 8)) (k' : Nat),
+      ⌜growprocOk V V' M M' (k.regs 10#5) (R' 10#5)⌝ ∗ ⌜V.ev ≤ k'⌝ ∗
+      procPrivFd γ (procAddr j) pid (V'.updEv k') M') -∗
     ⌜calleeSaved k.regs R'⌝ -∗ wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
 

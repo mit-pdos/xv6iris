@@ -81,6 +81,12 @@ around the commit's stores; the closed record is Rocq's `upd_exec`.
    `kxd_sp_final_le_top` (= `KexecDefs.kxcSpFinal_range`),
    `kxd_last_at0`, `kxd_add_one`, `kxd_add_zero`, the `hw_config` /
    `pt_node_claim` plumbing (Lean's tf page is at the kernel tier).
+
+THE PERMIT SWEEP L1a (Rocq f344a089a, `ProofKexecD.v`): the commit lends the
+NEW block's counter to the old space's proc_freepagetable; `kxd_commit2`'s
+continuation takes the block at any record `evAfter` the swap's, and
+`kxd_ok` is stated at `(kxdVf …).updEv kc` (Rocq `kxd_kexec_ok`'s `kev`):
+the success arm does not read the count.
 -/
 import Xv6.KexecSeam
 import Xv6.ProcPrivAcc
@@ -543,9 +549,10 @@ theorem kxd_commit2 (PFP : PROC_FREEPAGETABLE) (Γ : SchedNames) (cpu : CPU) (k 
     (∀ (c : CPU) (spie' spp' : Bool) (R' : RegMap), ⌜calleeSaved R R'⌝ -∗
       kctx c (((k.withSpie spie' spp').pushed 68).withRegs R') -∗ pcIs c (KA.«kexec» + 0x300#64) -∗
       trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗
-      procPrivFd A.γ k.proc A.pidv
-        (kxdV3 V P sz1 ((V.tf.set tfEpcIdx (kxqEntry ef)).set kxcTfSpIdx spv)) Mi -∗
-      byteBuf (kxcElfBuf (k.regs 2#5)) (DFrac.own 1) ef -∗ wpLoop c)
+      (∀ V3 : ProcPriv,
+        ⌜evAfter (kxdV3 V P sz1 ((V.tf.set tfEpcIdx (kxqEntry ef)).set kxcTfSpIdx spv)) V3⌝ -∗
+        procPrivFd A.γ k.proc A.pidv V3 Mi -∗
+        byteBuf (kxcElfBuf (k.regs 2#5)) (DFrac.own 1) ef -∗ wpLoop c))
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hte, Hce, #Hfab, Hpriv, Hpt, Helf, HK⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -621,16 +628,23 @@ theorem kxd_commit2 (PFP : PROC_FREEPAGETABLE) (Γ : SchedNames) (cpu : CPU) (k 
   k_step_e (wp_s_add cpu _ (KA.«kexec» + 0x2fa#64) true 11#5 0#5 21#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [RegMap.set_apply, h21]
   iintro Hk Hpc
-  -- +0x2fc  jal proc_freepagetable(old table, oldsz)
+  -- +0x2fc  jal proc_freepagetable(old table, oldsz), the NEW block's event
+  -- counter lent to the frees of the old space (permit sweep L1a, Rocq
+  -- `proc_priv_ev_lend` at the swap's record)
+  icases procPrivFd_evLend A.γ k.proc A.pidv
+      (kxdV3 V P sz1 ((V.tf.set tfEpcIdx (kxqEntry ef)).set kxcTfSpIdx spv)) Mi $$ Hpriv
+    with ⟨Hlend, Hpback⟩
   iapply (kxc_call_pfp PFP Γ cpu k A spie spp _ (KA.«kexec» + 0x2fc#64) 2084572#21 kxd_br_pfp
-      kxd_ret_pfp V.upt A.M hK hnoff (by simp [RegMap.set_apply]) (by simpa [RegMap.set_apply] using hszo)
+      kxd_ret_pfp V.upt A.M (kxdV3 V P sz1 ((V.tf.set tfEpcIdx (kxqEntry ef)).set kxcTfSpIdx spv)).ev
+      hK hnoff (by simp [RegMap.set_apply]) (by simpa [RegMap.set_apply] using hszo)
       (by simpa [RegMap.set_apply] using hbo))
-    $$ [- $Hk $Hpc $Hte $Hce $Hfab $Hpto]
+    $$ [- $Hk $Hpc $Hte $Hce $Hfab $Hpto $Hlend]
   isplitr
   · iapply (text_instr _ _ _ _ rfl rfl); iexact Htext
-  iintro %c %spie' %spp' %R' %hcs Hk Hpc Hte Hce
+  iintro %c %spie' %spp' %R' %hcs Hk Hpc Hte Hce ⟨%kl, %hkl, Hlend⟩
+  icases Hpback $$ %kl %hkl Hlend with ⟨%V3, %hV3, Hpriv⟩
   k_norm_g
-  iapply HK $$ %c %spie' %spp' %R' [] Hk Hpc Hte Hce Hpriv Helf
+  iapply HK $$ %c %spie' %spp' %R' [] Hk Hpc Hte Hce %V3 %hV3 Hpriv Helf
   ipureintro
   obtain ⟨a2, a8, a9, a18, a19, a20, a21, a22, a23, a24, a25, a26, a27⟩ := hcs
   simp only [RegMap.set_apply, BitVec.reduceEq, ite_false] at a2 a8 a9 a18 a19 a20 a21 a22 a23 a24 a25 a26 a27
@@ -809,9 +823,9 @@ theorem kxd_ok (Q : BitVec 64 → ProcPriv → (Nat → List (BitVec 8)) → Pro
     (hPtfp : P.tfp = A.V.upt.tfp) (hbelow : umBelow sz1 P) (hcov : lazyFree P.um sz1)
     (hargs : kexecArgsAt (sz1.toNat : Int) A.alen A.na A.afun (umemGet P Mi))
     (hzero : kxZeroExcept (sz1.toNat : Int) (kexecArgAddr (sz1.toNat : Int) A.alen A.na) (umemGet P Mi))
-    (himg : kxcImgRows fb ef P sz1 (umemGet P Mi)) :
-    kexecOkQf (fun e => Q e (kxdVf A.V P sz1 (kxdSpv sz1 A.alen A.na) (kxqEntry ef) ns) Mi)
-      (fun c => QF c ∧ Mi = A.M) A.V (kxdVf A.V P sz1 (kxdSpv sz1 A.alen A.na) (kxqEntry ef) ns)
+    (himg : kxcImgRows fb ef P sz1 (umemGet P Mi)) (kc : Nat) :
+    kexecOkQf (fun e => Q e ((kxdVf A.V P sz1 (kxdSpv sz1 A.alen A.na) (kxqEntry ef) ns).updEv kc) Mi)
+      (fun c => QF c ∧ Mi = A.M) A.V ((kxdVf A.V P sz1 (kxdSpv sz1 A.alen A.na) (kxqEntry ef) ns).updEv kc)
       (BitVec.ofNat 64 A.na) (kxqEntry ef) (kxdSpv sz1 A.alen A.na) sz1 A.na A.alen := by
   have hspv : ((kxdSpv sz1 A.alen A.na).toNat : Int) = kxcSpFinal (sz1.toNat : Int) A.alen A.na :=
     kxd_spv_toNat sz1 A.alen A.na hstk hsz1
@@ -874,14 +888,18 @@ theorem kxd_commit (SS : SAFESTRCPY_SRC) (PFP : PROC_FREEPAGETABLE) (Γ : SchedN
     ef P Mi sz1 (kxdSpv sz1 A.alen A.na) hK hnoff htier (a8.trans h8) (a19.trans h19)
     (a22.trans h22) (a18.trans h18) (a23.trans h23) (a21.trans h21) hal hl hPtfp hbelow hcov)
     $$ [- $Hk $Hpc $Hte $Hce $Hfab $Hpriv $Hpt $Helf]
-  iintro %c2 %spie2 %spp2 %R2 %hcs2 Hk Hpc Hte Hce Hpriv Helf
+  iintro %c2 %spie2 %spp2 %R2 %hcs2 Hk Hpc Hte Hce %V3 %hV3 Hpriv Helf
+  -- the new block at the count the old space's frees left it (permit sweep
+  -- L1a): the success arm does not read `ev`
+  obtain ⟨kc, -, rfl⟩ := hV3
   obtain ⟨b2, b8, b9, b18, b19, b20, b21, b22, b23, b24, b25, b26, b27⟩ := hcs2
   -- +0x300 .. +0x314  return argc, through the epilogue into the closer
-  iapply (kxd_commit3 Q QF c2 k A spie2 spp2 R2 (kxdVf A.V P sz1 (kxdSpv sz1 A.alen A.na) (kxqEntry ef) ns)
+  iapply (kxd_commit3 Q QF c2 k A spie2 spp2 R2
+    ((kxdVf A.V P sz1 (kxdSpv sz1 A.alen A.na) (kxqEntry ef) ns).updEv kc)
     Mi (kxqEntry ef) (kxdSpv sz1 A.alen A.na) sz1 ef (k.regs 10#5 + BitVec.ofNat 64 q)
     (k.regs 11#5 + BitVec.ofNat 64 (8 * A.na)) w13 w67 A.na hK (b2.trans (a2.trans h2))
     (b9.trans (a9.trans h9)) (by unfold MAXARG at hmax; omega) (b27.trans (a27.trans h27)) hal hl
-    (kxd_ok Q QF A fb ef P Mi sz1 ns hQ hsz1 hns hmax hstk hPtfp hbelow hcov hargs hzero himg))
+    (kxd_ok Q QF A fb ef P Mi sz1 ns hQ hsz1 hns hmax hstk hPtfp hbelow hcov hargs hzero himg kc))
     $$ [$Hk $Hpc $Hte $Hce F1 F2 F3 F4 F5 F6 F7 F8 F9 F10 F11 F12 F13 Fu Fp F64 F65 F66 F67 F68 $Helf
       $Hpriv Hpath Hargv Hargs $Hbs $Hirs $Hcl]
   · unfold kxcFrameB; iframe

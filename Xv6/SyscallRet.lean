@@ -74,6 +74,22 @@ theorem syscStore_a0 (V : ProcPriv) (r : BitVec 64) (hl : tfArgIdx 0 < V.tf.leng
   simp only
   rw [List.getD_eq_getElem?_getD, List.getElem?_set_self hl, Option.getD_some]
 
+/-- **THE ROWS DO NOT READ THE EVENT COUNT** (permit sweep L1a): a block
+handed back at a later count (`updEv`) satisfies the rows its record did --
+how the sbrk / fork / wait arms relay their callee's raised count to the
+dispatcher's ∀-general post (Rocq: `sysc_ret_tail` at `upd_ev`, by
+conversion). -/
+theorem SyscRows.updEv {V : ProcPriv} {M : Nat → List (BitVec 8)} {V' : ProcPriv}
+    {M' : Nat → List (BitVec 8)} {sts sts' : List FdState} {cs cs' : ExtTreeSet GName compare}
+    {pid : BitVec 32} (k : Nat) (h : SyscRows V M V' M' sts sts' cs cs' pid) :
+    SyscRows V M (V'.updEv k) M' sts sts' cs cs' pid :=
+  ⟨h.mem, h.fd, h.pipe, h.ch, h.ret, h.tf, h.upt, h.sz, h.lazy, h.tfp, h.fdg, h.chg, h.gen, h.cwi,
+    h.sbrk, h.fork, h.read, h.pid, h.ks, h.secc⟩
+
+/-- The store and the count commute (both are record updates). -/
+theorem syscStore_updEv (V : ProcPriv) (r : BitVec 64) (k : Nat) :
+    syscStore (V.updEv k) r = (syscStore V r).updEv k := rfl
+
 /-- **The rows of an entry that moved nothing but a0** (Rocq's
 `sysc_mem_ok_quiet` / `sysc_fd_ok_refl_at` / `sysc_pipe_ok_quiet` /
 `sysc_ch_ok_refl` / `sysc_*_ne` at one arm): kill, getpid, pause, uptime,

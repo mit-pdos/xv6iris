@@ -796,6 +796,24 @@ instance instCtxMorphProcPrivNoctxAt (pa : BitVec 64) (pid : BitVec 32) (V : Pro
           (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphTfPageAt _ _ _)
             (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _) (instCtxMorphConst _))))))
 
+/-- **The event counter, lent out of the cells form** (permit sweep L1a; the
+cells twin of `procPrivBareAt_evAcc`, `SchedCtx.procPrivNoctxAt`'s last
+conjunct): kwait's reap lends it to freeproc.  No Rocq twin (Rocq's kwait
+borrows it off the whole block, `proc_priv_slot_gen_ev_acc`). -/
+theorem procPrivNoctxAt_evAcc (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
+    (M : Nat → List (BitVec 8)) :
+    procPrivNoctxAt (GF := GF) ξ pa pid V M ⊢
+      actCnt pa V.ev ∗ (∀ k : Nat, actCnt pa k -∗ procPrivNoctxAt ξ pa pid (V.updEv k) M) := by
+  have hf : ∀ k : Nat, @procFieldsNoctx hlc GF _ ⟨ξ, KTier.kpt⟩ pa (DFrac.own 1) (V.updEv k) =
+      @procFieldsNoctx hlc GF _ ⟨ξ, KTier.kpt⟩ pa (DFrac.own 1) V := fun _ => rfl
+  unfold procPrivNoctxAt
+  simp only [hf]
+  iintro ⟨%h, Hpid, Hf, Hpt, Htfp, %hlz, Hev⟩
+  iframe Hev
+  iintro %k Hev
+  iframe Hpid Hf Hpt Htfp Hev
+  ipureintro; exact ⟨h, hlz⟩
+
 instance instCtxMorphContextCells (tier : KTier) (pa : BitVec 64) (dq : DFrac) (ws : List (BitVec 64)) :
     CtxMorph (GF := GF) (fun ξ => @contextCells hlc GF _ ⟨ξ, tier⟩ pa dq ws) :=
   @instCtxMorphSep hlc GF _ (fun _ => iprop(⌜ws.length = 14⌝)) _ (instCtxMorphConst _)

@@ -116,8 +116,13 @@ party that threads a lock's gname.
    `actCnt pa k` owns `sgOne pa (own 1) k` at it; the boot mint is
    `slotGen_rows_alloc 0` at a fresh name (Rocq `act_rows_alloc`), and no
    `xv6GF` / `unionGF` slot is added.  `actLend` and its four lemmas are
-   Rocq's (L1a, `act_lend_*`); Rocq's `act_lend_cont_frame` (a `wp_next`
-   lemma, L1a's ring) is not part of this layer.
+   Rocq's (L1a, `act_lend_*`).
+10. **`actLend_cont_frame` (Rocq `act_lend_cont_frame`, permit sweep L1a)**
+   is stated over Lean's continuation shape: `∀ spie spp R'`, three
+   premises (the hart-pinning fact, the context, the return pc), THEN the
+   returned lend, then the tail -- Lean's ring-one contracts take the lend
+   back right after the return pc (Rocq: as the third premise, after
+   `sie_cap_gpr` and `cpu_own`, which Lean's `kctx` bundles).
 
 Imports only definitional files.
 -/
@@ -483,6 +488,29 @@ theorem actLend_borrow (p : BitVec 64) (k : Nat) :
       ihave Hc := actLend_back p k' hz $$ Hl
       iframe Hc
       ipureintro; exact hk'
+
+/-- **Rocq `act_lend_cont_frame`: THE LEND, FRAMED THROUGH** (permit sweep
+L1a).  A contract on the cone takes `actLend p ke` and hands back `∃ k', ⌜ke
+≤ k'⌝ ∗ actLend p k'` right after its continuation's return pc; a body
+whose callees do not take the lend yet frames it here, once, at entry, and
+is then left with the continuation it had before the premise existed (the
+lend comes back at `k' := ke`).  Stated over the continuation's first three
+premises and its tail as higher-order patterns, so one lemma serves every
+shape (deviation 10). -/
+theorem actLend_cont_frame (sie : Bool) (p : BitVec 64) (cpu : CPU) (p' : BitVec 64) (ke : Nat)
+    (A B C T : CPU → Bool → Bool → RegMap → IProp GF) :
+    wpNext sie p cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
+      A cpu' spie spp R' -∗ B cpu' spie spp R' -∗ C cpu' spie spp R' -∗
+      (∃ k' : Nat, ⌜ke ≤ k'⌝ ∗ actLend p' k') -∗ T cpu' spie spp R')) ⊢
+    actLend p' ke -∗
+    wpNext sie p cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
+      A cpu' spie spp R' -∗ B cpu' spie spp R' -∗ C cpu' spie spp R' -∗ T cpu' spie spp R')) := by
+  unfold wpNext
+  iintro H Hl %cpu' %h %spie %spp %R' HA HB HC
+  iapply H $$ %cpu' %h %spie %spp %R' HA HB HC
+  iexists ke
+  iframe Hl
+  ipureintro; exact Nat.le_refl ke
 
 /-! ## The pid register -/
 

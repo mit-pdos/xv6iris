@@ -33,7 +33,13 @@ conversion.  A STAGE file (no `Proof` prefix).
 2. **`kxc_d_tail` is not restated**: Lean's phase C already ends at the
    +0x29c state (`kxc_phaseC` composes setup, loop and close; KexecC
    deviation 3), so `kxc_cd` is `kxc_phaseC` ∘ `kxd_phaseD`.
-3. **NEW: `kxc_core`**, the landed whole (brief §6.3): `kxc_phaseA` over the
+3. **The permit sweep L1a (Rocq f344a089a, `ProofKexec.v`)**: phase B's
+   loop and phase C's setup lend the block's event counter to uvmalloc, so
+   their outputs hand the next phase a later record (`∀ V1, ⌜evAfter A.V
+   V1⌝`); the next phase is instantiated at `{ A with V := V1 }` (Rocq: at
+   `upd_usV U (upd_ev (us_V U) k)`), every premise about the call's
+   parameters carried by definition.
+4. **NEW: `kxc_core`**, the landed whole (brief §6.3): `kxc_phaseA` over the
    plain `NAMEI` ∘ `kxc_from90`, at plugs that hold of every file (Rocq has
    no such lemma: its only whole is the AU one).  Its instance at
    `Q := True`, `QF := True` is kexec at the landed `kexecOk`.
@@ -80,9 +86,12 @@ theorem kxc_cd (MP : MYPROC) (UA : UVMALLOC) (UC : UVMCLEAR) (SL : STRLEN) (CO :
   iapply (kxc_phaseC MP UA UC SL CO PFP Γ Q QF cpu k A spie spp R w13 w67 fb ef P Mi szv hqf hqfa
     hK hnoff htier hargs hna havf)
   iframe Hst Hfab Hcl
-  iintro %c %spie' %spp' %R' %P' %Mo %sz1 %ci %⟨h8192, hal, hl⟩ Hs Hcl
-  iapply (kxd_phaseD SS PFP Γ Q QF c k A spie' spp' R' w13 w67 fb ef P' Mo sz1 ci (hQ sz1) hK hnoff
-    htier h8192 havfnz hal hl hterm)
+  -- phase C's uvmalloc moved the block's event count (permit sweep L1a):
+  -- phase D runs at the record it came back at
+  iintro %V1 %hV1 %c %spie' %spp' %R' %P' %Mo %sz1 %ci %⟨h8192, hal, hl⟩ Hs Hcl
+  obtain ⟨kv, -, rfl⟩ := hV1
+  iapply (kxd_phaseD SS PFP Γ Q QF c k { A with V := A.V.updEv kv } spie' spp' R' w13 w67 fb ef P' Mo sz1 ci (hQ sz1)
+    hK hnoff htier h8192 havfnz hal hl hterm)
   iframe Hs Hfab Hcl
 
 /-- **PHASES B .. D, from the +0x090 seam** (the phase-B dispatch of Rocq
@@ -129,8 +138,11 @@ theorem kxc_from90 (IUP : IUNLOCKPUT) (EO : END_OP) (PPT : PROC_PAGETABLE) (RD :
     iapply (kxc_b2 RD WA PA IUP EO PFP F2P UA Γ Q QF c k A spie' spp' R' kf qf sf gyf loyf tlyf
       inumf dnf bmf data gilf gislf n2 4095#64 ef P Mi 0 0#64 hqfl hqfm hK hnoff htier hj hproc)
     iframe Hs Hfab Hcl
-    iintro %c2 %spie2 %spp2 %R2 %P2 %Mo %szv Hs Hcl
-    iapply (kxc_cd MP UA UC SL CO PFP SS Γ Q QF c2 k A spie2 spp2 R2 (k.regs 27#5) 4095#64
+    -- the segments' uvmallocs moved the block's event count (permit sweep
+    -- L1a): phases C and D run at the record they came back at
+    iintro %V1 %hV1 %c2 %spie2 %spp2 %R2 %P2 %Mo %szv Hs Hcl
+    obtain ⟨kv, -, rfl⟩ := hV1
+    iapply (kxc_cd MP UA UC SL CO PFP SS Γ Q QF c2 k { A with V := A.V.updEv kv } spie2 spp2 R2 (k.regs 27#5) 4095#64
       (kxcFb data dnf) ef P2 Mo szv hQ hqfm hqfa hK hnoff htier hargs hna havf
       havfnz hterm)
     iframe Hs Hfab Hcl

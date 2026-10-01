@@ -24,6 +24,14 @@ address space `uvmalloc`/`uvmdealloc` want, and the closing wand
 Rocq's whole `proc_priv`, `procPrivFd γ`, stated at the kernel-page-table
 context; `gp_priv_elim` reads it at the ambient one, which `kctx_tier` +
 `htier` show is that context (`curTier = kpt`).
+
+THE EVENT COUNTER (permit sweep L1a, Rocq f344a089a): `gp_priv_elim`
+lends the block's counter out with the cells and its closer takes it back
+at any count (Rocq's `proc_priv_addrspace_ev`, folded into this file's own
+opener); the grow arm borrows it into uvmalloc's lend
+(`SlotGen.actLend_borrow`), every arm hands the block back at
+`{ V with sz, upt, ev := kc }` with `V.ev ≤ kc` (`gp_priv_same` at the
+count).
 -/
 import Xv6.LazyFree
 import Xv6.SpecGrowproc
@@ -96,13 +104,14 @@ theorem gp_priv_elim (htc : curTier = KTier.kpt) (γ : FileNames) (pa : BitVec 6
       ⌜V.pvLazy = false → lazyFree V.upt.um V.sz⌝ ∗
       wordPointsTo (pSz pa) 8 (DFrac.own 1) V.sz ∗
       wordPointsTo (pPagetable pa) 8 (DFrac.own 1) V.pagetable ∗
-      procPtAt V.upt M ∗
-      (∀ (v : BitVec 64) (P' : UPtd) (M' : Nat → List (BitVec 8)),
+      procPtAt V.upt M ∗ actCnt pa V.ev ∗
+      (∀ (v : BitVec 64) (P' : UPtd) (M' : Nat → List (BitVec 8)) (kc : Nat),
         ⌜v.toNat ≤ uvmMaxsz ∧ umBelow v P' ∧ P'.root = V.upt.root ∧ P'.tfp = V.upt.tfp ∧
           (V.pvLazy = false → lazyFree P'.um v)⌝ -∗
         (wordPointsTo (pSz pa) 8 (DFrac.own 1) v ∗
           wordPointsTo (pPagetable pa) 8 (DFrac.own 1) V.pagetable ∗ procPtAt P' M') -∗
-        procPrivFd γ pa pid { V with sz := v, upt := P' } M') := by
+        actCnt pa kc -∗
+        procPrivFd γ pa pid { V with sz := v, upt := P', ev := kc } M') := by
   obtain ⟨ξ, t⟩ := X
   simp only at htc
   subst htc
@@ -112,8 +121,8 @@ theorem gp_priv_elim (htc : curTier = KTier.kpt) (γ : FileNames) (pa : BitVec 6
   · ipureintro; exact h
   isplitl []
   · ipureintro; exact hlz
-  iframe Hs Hpg Hpt
-  iintro %v %P' %M' %hv ⟨Hs, Hpg, Hpt⟩
+  iframe Hs Hpg Hpt Hev
+  iintro %v %P' %M' %kc %hv ⟨Hs, Hpg, Hpt⟩ Hev
   obtain ⟨hsz, hb, hr, ht, hl⟩ := hv
   ihave Htfp := (show @tfPageAt hlc GF _ ⟨ξ, KTier.kpt⟩ V.upt.tfp V.tf ⊢
       @tfPageAt hlc GF _ ⟨ξ, KTier.kpt⟩ P'.tfp V.tf from by rw [ht]) $$ Htfp
@@ -122,14 +131,17 @@ theorem gp_priv_elim (htc : curTier = KTier.kpt) (γ : FileNames) (pa : BitVec 6
   · ipureintro; exact ⟨hsz, hb, by rw [hr]; exact h.2.2.1, by rw [ht]; exact h.2.2.2⟩
   · ipureintro; exact hl
 
-/-- The record with the two fields `growproc` may change put back as they were. -/
-theorem gp_priv_eta (V : ProcPriv) : { V with sz := V.sz, upt := V.upt } = V := by
+/-- The record with the two fields `growproc` may change put back as they were
+(at the count the counter came back at, permit sweep L1a). -/
+theorem gp_priv_eta (V : ProcPriv) (kc : Nat) :
+    { V with sz := V.sz, upt := V.upt, ev := kc } = V.updEv kc := by
   cases V; rfl
 
 theorem gp_priv_same (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
-    (M : Nat → List (BitVec 8)) :
-    procPrivFd (GF := GF) γ pa pid { V with sz := V.sz, upt := V.upt } M ⊢ procPrivFd γ pa pid V M := by
-  rw [gp_priv_eta V]
+    (M : Nat → List (BitVec 8)) (kc : Nat) :
+    procPrivFd (GF := GF) γ pa pid { V with sz := V.sz, upt := V.upt, ev := kc } M ⊢
+      procPrivFd γ pa pid (V.updEv kc) M := by
+  rw [gp_priv_eta V kc]
 
 end
 
@@ -379,7 +391,13 @@ theorem growproc_proof (MP : MYPROC) (UA : UVMALLOC) (UD : UVMDEALLOC) : GROWPRO
   icases kctx_tier _ _ $$ Hk with ⟨%hct, Hk⟩
   have htc : curTier = KTier.kpt := by rw [← hct]; exact htier
   icases gp_priv_elim htc γ (procAddr j) pid V M $$ Hpv with
-    ⟨%⟨hszb, hbelow, hroot, htfb⟩, %hlz0, Hsz, Hpt, HP, Hback⟩
+    ⟨%⟨hszb, hbelow, hroot, htfb⟩, %hlz0, Hsz, Hpt, HP, Hcnt, Hback⟩
+  -- THE EVENT COUNTER (permit sweep L1a), carried at a count at least
+  -- `V.ev`: the grow arm lends it to uvmalloc, every arm hands it to the exit
+  ihave Hcnt : iprop(∃ kc : Nat, ⌜V.ev ≤ kc⌝ ∗ actCnt (GF := GF) (procAddr j) kc) $$ [Hcnt]
+  · iexists V.ev
+    iframe Hcnt
+    ipureintro; exact Nat.le_refl _
   have hK4 : 4 ≤ k.avail := by unfold growprocSlots at hK; omega
   -- the callees, as rules
   have hmp : ∀ (cc : CPU) (k' : KCtx) (hnoff' : k'.noff + 1 < 2 ^ 31) (hK' : 10 ≤ k'.avail),
@@ -394,17 +412,18 @@ theorem growproc_proof (MP : MYPROC) (UA : UVMALLOC) (UD : UVMDEALLOC) : GROWPRO
     unfold wp_myproc_body at h
     simp only [myprocAddr] at h
     exact h
-  have hua : ∀ (cc : CPU) (k' : KCtx) (P : UPtd) (M' : Nat → List (BitVec 8))
+  have hua : ∀ (cc : CPU) (k' : KCtx) (P : UPtd) (M' : Nat → List (BitVec 8)) (ke : Nat)
       (hnoff' : k'.noff + 1 < 2 ^ 31) (hK' : uvmallocSlots ≤ k'.avail) (hlk' : "kmem" ∉ k'.locks)
       (hroot' : k'.regs 10#5 = pageAddr P.root) (hold' : (k'.regs 11#5).toNat ≤ uvmMaxsz)
       (hnew' : (k'.regs 12#5).toNat ≤ uvmMaxsz) (hperm' : k'.regs 13#5 &&& ~~~0x3CE#64 = 0#64)
       (hfree' : ∀ i, i < uvmaNp (k'.regs 11#5) (k'.regs 12#5) →
         Iris.Std.PartialMap.get? P.um (uvmaVpn0 (k'.regs 11#5) + i) = none),
       kctx cc k' ∗ pcIs cc KA.«uvmalloc» ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
-      kallocAvail γk none ∗ procPtAt P M' ∗
+      kallocAvail γk none ∗ procPtAt P M' ∗ actLend k'.proc ke ∗
       wpNext k'.sie k'.proc cc (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
         ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
         kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
+        (∃ k2 : Nat, ⌜ke ≤ k2⌝ ∗ actLend k'.proc k2) -∗
         ((⌜R' 10#5 = 0#64⌝ ∗ procPtAt P M') ∨
          (∃ (P' : UPtd) (M'' : Nat → List (BitVec 8)),
             ⌜uvmallocOk P P' M' M'' (k'.regs 11#5) (k'.regs 12#5) (k'.regs 13#5) ∧
@@ -413,8 +432,8 @@ theorem growproc_proof (MP : MYPROC) (UA : UVMALLOC) (UD : UVMDEALLOC) : GROWPRO
             procPtAt P' M'')) -∗
         ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
       ⊢ wpLoop (GF := GF) cc := by
-    intro cc k' P M' hnoff' hK' hlk' hroot' hold' hnew' hperm' hfree'
-    have h := UA.wp_uvmalloc (hlc := hlc) (GF := GF) cc k' γl γk P M' hnoff' hK' hlk' hroot'
+    intro cc k' P M' ke hnoff' hK' hlk' hroot' hold' hnew' hperm' hfree'
+    have h := UA.wp_uvmalloc (hlc := hlc) (GF := GF) cc k' γl γk P M' ke hnoff' hK' hlk' hroot'
       hold' (Or.inl hnew') hperm' (fun i hi _ => hfree' i hi)
     unfold wp_uvmalloc_body at h
     simp only [uvmallocAddr] at h
@@ -525,9 +544,11 @@ theorem growproc_proof (MP : MYPROC) (UA : UVMALLOC) (UD : UVMDEALLOC) : GROWPRO
       · ihave HΦ := wpNext_shift _ _ _ _ _ hpinA $$ HΦ
         iapply wpNext_mono _ _ _ _ _ $$ HΦ
         iintro %c' HΦ %R'' Hk Hpc %hposta
-        iapply HΦ $$ %spie %spp %R'' %hsp Hk Hpc [Hsz Hpt HP Hback]
-        · iexists V
+        iapply HΦ $$ %spie %spp %R'' %hsp Hk Hpc [Hsz Hpt HP Hback Hcnt]
+        · icases Hcnt with ⟨%kc, %hkc, Hcnt⟩
+          iexists V
           iexists M
+          iexists kc
           isplitl []
           · ipureintro
             refine gp_ok_same V M (k.regs 10#5) (R'' 10#5) (fun h => absurd h (by omega)) ?_
@@ -536,8 +557,10 @@ theorem growproc_proof (MP : MYPROC) (UA : UVMALLOC) (UD : UVMDEALLOC) : GROWPRO
             rw [hposta.1]
             simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
             decide
-          · iapply gp_priv_same γ (procAddr j) pid V M
-            iapply Hback $$ %V.sz %V.upt %M %⟨hszb, hbelow, rfl, rfl, hlz0⟩ [Hsz Hpt HP]
+          isplitl []
+          · ipureintro; exact hkc
+          · iapply gp_priv_same γ (procAddr j) pid V M kc
+            iapply Hback $$ %V.sz %V.upt %M %kc %⟨hszb, hbelow, rfl, rfl, hlz0⟩ [Hsz Hpt HP] Hcnt
             iframe
         · ipureintro; exact hposta.2
       case hR2a => simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact d2
@@ -567,11 +590,16 @@ theorem growproc_proof (MP : MYPROC) (UA : UVMALLOC) (UD : UVMDEALLOC) : GROWPRO
       k_step_gen (wp_s_jal c14 _ (KA.«growproc» + 0x2e#64) false 2094656#21 1#5 (by decide))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [growproc_br_fffffffffffff66e] next c15 hp15
       iintro Hk Hpc
-      iapply (hua c15 _ V.upt M ?hnU ?hKU ?hlU ?hrU ?hoU ?hwU ?hpU ?hfU) $$ [- $Hk $Hpc]
+      -- the lend (permit sweep L1a): the block's counter, borrowed
+      icases Hcnt with ⟨%kc0, %hkc0, Hcnt⟩
+      ihave Hcnt : actCnt (GF := GF) k.proc kc0 $$ [Hcnt]
+      · rw [hproc]; iexact Hcnt
+      icases actLend_borrow k.proc kc0 $$ Hcnt with ⟨Hlend, Hlback⟩
+      iapply (hua c15 _ V.upt M kc0 ?hnU ?hKU ?hlU ?hrU ?hoU ?hwU ?hpU ?hfU) $$ [- $Hk $Hpc]
       rotate_right 1
       k_norm_g
       iframe #
-      iframe Hav HP
+      iframe Hav HP Hlend
       case hnU => k_norm_g; omega
       case hKU => k_norm_g; unfold growprocSlots at hK; unfold uvmallocSlots; omega
       case hlU => k_norm_g; exact hlk
@@ -583,8 +611,14 @@ theorem growproc_proof (MP : MYPROC) (UA : UVMALLOC) (UD : UVMDEALLOC) : GROWPRO
         k_norm_g
         exact fun i hi => GrowProc.um_free_above V.sz (k.regs 10#5 + V.sz) V.upt hbelow i hi
       iapply wpNext_intro_pin
-      iintro %c16 %hp16 %spie2 %spp2 %R2 %hsp2 Hk Hpc Hres %hcs2
+      iintro %c16 %hp16 %spie2 %spp2 %R2 %hsp2 Hk Hpc ⟨%kc1, %hkc1, Hlend⟩ Hres %hcs2
       k_norm_g [gp_ret_c4e, MachCSL.KCtx.withSpie_twice]
+      icases Hlback $$ %kc1 %hkc1 Hlend with ⟨%kc2, %hkc2, Hcnt⟩
+      ihave Hcnt : iprop(∃ kc : Nat, ⌜V.ev ≤ kc⌝ ∗ actCnt (GF := GF) (procAddr j) kc) $$ [Hcnt]
+      · iexists kc2
+        rw [← hproc]
+        iframe Hcnt
+        ipureintro; omega
       have hspf : k.sie = false → spie2 = k.spie ∧ spp2 = k.spp := fun h =>
         ⟨(hsp2 h).1.trans (hsp h).1, (hsp2 h).2.trans (hsp h).2⟩
       unfold calleeSaved at hcs2
@@ -620,9 +654,11 @@ theorem growproc_proof (MP : MYPROC) (UA : UVMALLOC) (UD : UVMDEALLOC) : GROWPRO
         · ihave HΦ := wpNext_shift _ _ _ _ _ hpinC $$ HΦ
           iapply wpNext_mono _ _ _ _ _ $$ HΦ
           iintro %c' HΦ %R'' Hk Hpc %hpostb
-          iapply HΦ $$ %spie2 %spp2 %R'' %hspf Hk Hpc [Hsz Hpt HP Hback]
-          · iexists V
+          iapply HΦ $$ %spie2 %spp2 %R'' %hspf Hk Hpc [Hsz Hpt HP Hback Hcnt]
+          · icases Hcnt with ⟨%kc, %hkc, Hcnt⟩
+            iexists V
             iexists M
+            iexists kc
             isplitl []
             · ipureintro
               refine gp_ok_same V M (k.regs 10#5) (R'' 10#5) (fun h => absurd h (by omega)) ?_
@@ -631,8 +667,10 @@ theorem growproc_proof (MP : MYPROC) (UA : UVMALLOC) (UD : UVMDEALLOC) : GROWPRO
               rw [hpostb.1]
               simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
               decide
-            · iapply gp_priv_same γ (procAddr j) pid V M
-              iapply Hback $$ %V.sz %V.upt %M %⟨hszb, hbelow, rfl, rfl, hlz0⟩ [Hsz Hpt HP]
+            isplitl []
+            · ipureintro; exact hkc
+            · iapply gp_priv_same γ (procAddr j) pid V M kc
+              iapply Hback $$ %V.sz %V.upt %M %kc %⟨hszb, hbelow, rfl, rfl, hlz0⟩ [Hsz Hpt HP] Hcnt
               iframe
           · ipureintro; exact hpostb.2
         case hR2b => simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact e2
@@ -663,18 +701,22 @@ theorem growproc_proof (MP : MYPROC) (UA : UVMALLOC) (UD : UVMDEALLOC) : GROWPRO
         · ihave HΦ := wpNext_shift _ _ _ _ _ hpinD $$ HΦ
           iapply wpNext_mono _ _ _ _ _ $$ HΦ
           iintro %c' HΦ %R'' Hk Hpc Hsz %hpostc
-          iapply HΦ $$ %spie2 %spp2 %R'' %hspf Hk Hpc [Hsz Hpt HP Hback]
-          · iexists { V with sz := k.regs 10#5 + V.sz, upt := P' }
+          iapply HΦ $$ %spie2 %spp2 %R'' %hspf Hk Hpc [Hsz Hpt HP Hback Hcnt]
+          · icases Hcnt with ⟨%kc, %hkc, Hcnt⟩
+            iexists { V with sz := k.regs 10#5 + V.sz, upt := P' }
             iexists M'
+            iexists kc
             isplitl []
             · ipureintro
               rw [hpostc.1, BitVec.add_comm (k.regs 10#5) V.sz]
               rw [BitVec.add_comm (k.regs 10#5) V.sz] at hok
               exact gp_ok_grow V P' M M' (k.regs 10#5) hnpos (by omega) hok
-            · iapply Hback $$ %(k.regs 10#5 + V.sz) %P' %M'
+            isplitl []
+            · ipureintro; exact hkc
+            · iapply Hback $$ %(k.regs 10#5 + V.sz) %P' %M' %kc
                 %⟨by omega, GrowProc.umBelow_grow V.sz (k.regs 10#5 + V.sz) 4#64 V.upt P' M M'
                     hbelow (by omega) hok, hok.1.1, hok.1.2.1,
-                  fun h => LazyFree.lazyFree_uvmalloc hok (hlz0 h)⟩ [Hsz Hpt HP]
+                  fun h => LazyFree.lazyFree_uvmalloc hok (hlz0 h)⟩ [Hsz Hpt HP] Hcnt
               iframe
           · ipureintro; exact hpostc.2
         case hR2c => simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact e2
@@ -710,15 +752,19 @@ theorem growproc_proof (MP : MYPROC) (UA : UVMALLOC) (UD : UVMDEALLOC) : GROWPRO
       · ihave HΦ := wpNext_shift _ _ _ _ _ hpinE $$ HΦ
         iapply wpNext_mono _ _ _ _ _ $$ HΦ
         iintro %c' HΦ %R'' Hk Hpc Hsz %hpostd
-        iapply HΦ $$ %spie %spp %R'' %hsp Hk Hpc [Hsz Hpt HP Hback]
-        · iexists V
+        iapply HΦ $$ %spie %spp %R'' %hsp Hk Hpc [Hsz Hpt HP Hback Hcnt]
+        · icases Hcnt with ⟨%kc, %hkc, Hcnt⟩
+          iexists V
           iexists M
+          iexists kc
           isplitl []
           · ipureintro
             exact gp_ok_same V M (k.regs 10#5) (R'' 10#5) (fun _ => hpostd.1)
               (fun h => absurd h (by omega)) hnneg
-          · iapply gp_priv_same γ (procAddr j) pid V M
-            iapply Hback $$ %V.sz %V.upt %M %⟨hszb, hbelow, rfl, rfl, hlz0⟩ [Hsz Hpt HP]
+          isplitl []
+          · ipureintro; exact hkc
+          · iapply gp_priv_same γ (procAddr j) pid V M kc
+            iapply Hback $$ %V.sz %V.upt %M %kc %⟨hszb, hbelow, rfl, rfl, hlz0⟩ [Hsz Hpt HP] Hcnt
             iframe
         · ipureintro; exact hpostd.2
       case hR2d => simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact d2
@@ -788,21 +834,25 @@ theorem growproc_proof (MP : MYPROC) (UA : UVMALLOC) (UD : UVMDEALLOC) : GROWPRO
       · ihave HΦ := wpNext_shift _ _ _ _ _ hpinF $$ HΦ
         iapply wpNext_mono _ _ _ _ _ $$ HΦ
         iintro %c' HΦ %R'' Hk Hpc Hsz %hposte
-        iapply HΦ $$ %spie2 %spp2 %R'' %hspf Hk Hpc [Hsz Hpt HP Hback]
-        · iexists { V with sz := uvmdRsz V.sz (k.regs 10#5 + V.sz),
+        iapply HΦ $$ %spie2 %spp2 %R'' %hspf Hk Hpc [Hsz Hpt HP Hback Hcnt]
+        · icases Hcnt with ⟨%kc, %hkc, Hcnt⟩
+          iexists { V with sz := uvmdRsz V.sz (k.regs 10#5 + V.sz),
                            upt := V.upt.delRun (pgRoundUpN (k.regs 10#5 + V.sz).toNat / 4096)
                              (uvmdNp V.sz (k.regs 10#5 + V.sz)) }
           iexists M
+          iexists kc
           isplitl []
           · ipureintro
             rw [hposte.1, BitVec.add_comm (k.regs 10#5) V.sz]
             exact gp_ok_shrink V M (k.regs 10#5) hnneg
+          isplitl []
+          · ipureintro; exact hkc
           · iapply Hback $$ %(uvmdRsz V.sz (k.regs 10#5 + V.sz))
               %(V.upt.delRun (pgRoundUpN (k.regs 10#5 + V.sz).toNat / 4096)
-                (uvmdNp V.sz (k.regs 10#5 + V.sz))) %M
+                (uvmdNp V.sz (k.regs 10#5 + V.sz))) %M %kc
               %⟨by unfold uvmdRsz; split <;> omega,
                 GrowProc.umBelow_shrink V.sz (k.regs 10#5 + V.sz) V.upt hbelow, rfl, rfl,
-                fun h => gp_lazy_shrink V.upt V.sz (k.regs 10#5 + V.sz) (hlz0 h)⟩ [Hsz Hpt HP]
+                fun h => gp_lazy_shrink V.upt V.sz (k.regs 10#5 + V.sz) (hlz0 h)⟩ [Hsz Hpt HP] Hcnt
             iframe
         · ipureintro; exact hposte.2
       case hR2e => simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact e2

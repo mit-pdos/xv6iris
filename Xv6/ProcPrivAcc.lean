@@ -20,6 +20,7 @@ and sys_exec consume, over the ONE block `FdTable.procPrivFd` = Rocq
 | `proc_priv_name` :2861 | `procPrivFd_name` |
 | `proc_priv_settle` :3001 | `procPrivFd_settle` |
 | `proc_priv_ev_acc` (permit sweep G) | `procPrivFd_evAcc` (the core's: `FdTable.procPrivCoreNoctxAt_evAcc`, the bare block's: `ProcPrivBare.procPrivBareAt_evAcc`) |
+| `proc_priv_ev_lend` (permit sweep L1a) | `procPrivFd_evLend` (at `ProcDefs.evAfter`, Rocq `ev_after`) |
 
 ## Where this sits
 `ProcInv` is imported BY `FdTable` (the block's cwd reference), so the
@@ -166,6 +167,28 @@ theorem procPrivFd_evAcc (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V 
   iintro %k Hev
   ihave Hc := Hw $$ %k Hev
   iframe Hc Ho
+
+/-- **THE BLOCK'S LEND** (Rocq `proc_priv_ev_lend`, permit sweep L1a, design
+ni-strong-instance.md §7): the counter goes out as `SlotGen.actLend` and the
+block comes back at whatever count the callee returned -- at least the one
+it left at, which is `evAfter`.  What every block-holder on the permit cone
+does around a callee that takes the lend (kexec's phases). -/
+theorem procPrivFd_evLend (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
+    (M : Nat → List (BitVec 8)) :
+    procPrivFd (GF := GF) γ pa pid V M ⊢
+      actLend pa V.ev ∗
+      (∀ k1 : Nat, ⌜V.ev ≤ k1⌝ -∗ actLend pa k1 -∗
+        ∃ V' : ProcPriv, ⌜evAfter V V'⌝ ∗ procPrivFd γ pa pid V' M) := by
+  iintro H
+  icases procPrivFd_evAcc γ pa pid V M $$ H with ⟨Hc, Hb⟩
+  icases actLend_borrow pa V.ev $$ Hc with ⟨Hl, Hlb⟩
+  iframe Hl
+  iintro %k1 %hk1 Hl
+  icases Hlb $$ %k1 %hk1 Hl with ⟨%k2, %hk2, Hc⟩
+  iexists V.updEv k2
+  isplitl []
+  · ipureintro; exact ⟨k2, hk2, rfl⟩
+  · iapply Hb $$ %k2 Hc
 
 /-! ## The trapframe -/
 

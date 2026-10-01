@@ -20,6 +20,9 @@
    (SpecSyscall deviation 1), so the "nothing moved" arms read `umemGrow`
    off `umPageLen` + `umBelow` (the block's `procPtAt` and pure facts)
    rather than Rocq's domain law `proc_ptm_dom`.
+
+The sbrk post's raised event count (permit sweep L1a) reaches the
+dispatcher's ∀-general post through `SyscallRet.SyscRows.updEv`.
 -/
 import Xv6.SyscallRet
 
@@ -380,7 +383,7 @@ theorem syscall_arm_sbrk (SS : SYSSBRK)
   iapply hU
   iframe Hk Hkl Hka Hpriv Hpc
   k_next_e
-  iintro %spie2 %spp2 %R2 %- Hk Hpc ⟨%V', %M', %hok, Hpriv⟩ %hcs
+  iintro %spie2 %spp2 %R2 %- Hk Hpc ⟨%V', %M', %k', %hok, %hk', Hpriv⟩ %hcs
   obtain ⟨-, -, -, -, -, -, -, htfp, -⟩ := sbrkArm_shape V V' M M' v0 v1 _ hok
   k_norm_g [hra, syscallRet_jumpPc, hww, hpsw]
   k_norm_g at hcs
@@ -389,8 +392,10 @@ theorem syscall_arm_sbrk (SS : SYSSBRK)
   have hrows := syscRows_sbrk V V' M M' sts cs pid v0 v1 (R2 10#5) hn12 (by rw [hl]; decide) hw0 hw1
     hok hlen hbelow
   unfold syscallRet syscallAddr at *
-  iapply (syscall_ret_tail PT Γ c0 cpu k spie2 spp2 R2 γ j pid V M sts gn cs ip f V' M' sts cs hj hproc
-    hK htier hpins2 hs2' hrows)
+  -- the block at sbrk's raised event count (permit sweep L1a): the rows do
+  -- not read it (`SyscRows.updEv`)
+  iapply (syscall_ret_tail PT Γ c0 cpu k spie2 spp2 R2 γ j pid V M sts gn cs ip f (V'.updEv k') M' sts cs
+    hj hproc hK htier hpins2 hs2' (hrows.updEv k'))
   iframe Hk Hpc Hframe Hte Hce Hbs Hip Hfd Hir Henv Hpriv Hfr Hch Hnext
   isplitr
   · iapply syscExecOut_ne; rw [hn12]; decide

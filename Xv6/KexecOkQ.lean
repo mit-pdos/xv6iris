@@ -77,6 +77,16 @@ header, in short (every clause that is about content is kept):
 7. `kxq_entry` is `BitVec.ofNat 64 (leAt ef 24 8)` over the header LIST
    (ElfEnc deviation 1; `ElfBridge.kxqEntry_of_ehdr` is stated at this
    spelling); `kxq_hdr_ok` / `kxq_entry_ext` compare with `[j]!`.
+8. **The permit sweep L1a (Rocq f344a089a §1c).**  The failure arms of
+   `kexecOkQ` / `kexecOkQf` are `evAfter V V'` (Rocq `exists k', pv_ev V <=
+   k' /\ V' = upd_ev V k'`).  Rocq's three closer conversions
+   (`kexec_closer_ev` / `_ev_next` / `_after_next`, over the abstract `U`
+   every phase lemma then quantifies) are ONE lemma here,
+   `kexecCloser_after`, at the record `{ A with V := V1 }`: the Lean phases
+   are stated over `A : KexecArgs`, so a phase that lent the counter goes
+   on at the moved record by instantiating the downstream lemmas there
+   (every other parameter is `A`'s, by definition).  `kexecOkQf_after` is
+   Rocq's `kexec_ok_qf_ev` at `evAfter`.
 
 Definitional: imports only definitional files.
 -/
@@ -119,14 +129,20 @@ def kexecOkWin (V V' : ProcPriv) (r entry spv szv' : BitVec 64) (na : Nat) (alen
 /-- The landed relation IS `fail ∨ win` (definitional). -/
 theorem kexecOk_iff (V V' : ProcPriv) (r entry spv szv' : BitVec 64) (na : Nat) (alen : Nat → Nat) :
     kexecOk V V' r entry spv szv' na alen ↔
-      ((r = 0xFFFFFFFFFFFFFFFF#64 ∧ V' = V) ∨ kexecOkWin V V' r entry spv szv' na alen) :=
+      ((r = 0xFFFFFFFFFFFFFFFF#64 ∧ evAfter V V') ∨ kexecOkWin V V' r entry spv szv' na alen) :=
+  Iff.rfl
+
+/-- The success arm does not read the event count (permit sweep L1a). -/
+theorem kexecOkWin_updEv (V V' : ProcPriv) (k : Nat) (r entry spv szv' : BitVec 64) (na : Nat)
+    (alen : Nat → Nat) :
+    kexecOkWin (V.updEv k) V' r entry spv szv' na alen ↔ kexecOkWin V V' r entry spv szv' na alen :=
   Iff.rfl
 
 /-- **Rocq `kexec_ok_q`**: `kexecOk` with the caller's claim `Q entry` added to
 the success arm. -/
 def kexecOkQ (Q : BitVec 64 → Prop) (V V' : ProcPriv) (r entry spv szv' : BitVec 64) (na : Nat)
     (alen : Nat → Nat) : Prop :=
-  (r = 0xFFFFFFFFFFFFFFFF#64 ∧ V' = V) ∨ (Q entry ∧ kexecOkWin V V' r entry spv szv' na alen)
+  (r = 0xFFFFFFFFFFFFFFFF#64 ∧ evAfter V V') ∨ (Q entry ∧ kexecOkWin V V' r entry spv szv' na alen)
 
 /-- **Rocq `kexec_ok_q_True`**: at a vacuous `Q` the two are the same claim. -/
 theorem kexecOkQ_True (V V' : ProcPriv) (r entry spv szv' : BitVec 64) (na : Nat)
@@ -174,7 +190,7 @@ inductive KxfCause where
 plug accepts. -/
 def kexecOkQf (Q : BitVec 64 → Prop) (QF : KxfCause → Prop) (V V' : ProcPriv)
     (r entry spv szv' : BitVec 64) (na : Nat) (alen : Nat → Nat) : Prop :=
-  (r = 0xFFFFFFFFFFFFFFFF#64 ∧ V' = V ∧ ∃ c, QF c) ∨
+  (r = 0xFFFFFFFFFFFFFFFF#64 ∧ evAfter V V' ∧ ∃ c, QF c) ∨
   (Q entry ∧ kexecOkWin V V' r entry spv szv' na alen)
 
 /-- Rocq `kexec_ok_qf_weaken`: the landed reading, dropping both holes. -/
@@ -224,7 +240,23 @@ step, named): nothing moved, and the tail's cause pays the plug. -/
 theorem kexecOkQf_fail (Q : BitVec 64 → Prop) (QF : KxfCause → Prop) (V : ProcPriv)
     (entry spv szv' : BitVec 64) (na : Nat) (alen : Nat → Nat) (hc : ∃ c, QF c) :
     kexecOkQf Q QF V V 0xFFFFFFFFFFFFFFFF#64 entry spv szv' na alen :=
-  Or.inl ⟨rfl, rfl, hc⟩
+  Or.inl ⟨rfl, evAfter_refl V, hc⟩
+
+/-! ## 1c. THE RELATION AT A LATER COUNT (permit sweep L1a, Rocq `KexecOkQ` §1c) -/
+
+/-- **Rocq `kexec_ok_qf_ev`** (at `evAfter`): the kexec cone lends the block's
+event counter to proc_freepagetable and uvmalloc, so a phase that ran one of
+them holds the block at a later record `V1`; a relation proved against the
+LATER record is one against the earlier (the failure arm's count only rose
+further; the success arm does not read `ev`). -/
+theorem kexecOkQf_after (Q : BitVec 64 → Prop) (QF : KxfCause → Prop) (V V1 V' : ProcPriv)
+    (r entry spv szv' : BitVec 64) (na : Nat) (alen : Nat → Nat) (h : evAfter V V1)
+    (hok : kexecOkQf Q QF V1 V' r entry spv szv' na alen) :
+    kexecOkQf Q QF V V' r entry spv szv' na alen := by
+  rcases hok with ⟨hr, hV, hc⟩ | ⟨hq, hw⟩
+  · exact Or.inl ⟨hr, evAfter_trans h hV, hc⟩
+  · obtain ⟨k1, -, rfl⟩ := h
+    exact Or.inr ⟨hq, hw⟩
 
 /-! ## 1a. THE CALL'S PARAMETERS, AND THE EXIT CONTINUATION, NAMED ONCE -/
 
@@ -332,6 +364,22 @@ theorem kexecCloser_of_ok (Q : BitVec 64 → ProcPriv → (Nat → List (BitVec 
   iapply H $$ %spie %spp %R' %V' %M' %entry %spv %szv' %hcs
   ipureintro
   exact kexecOkQf_weaken _ _ _ _ _ _ _ _ _ _ hok
+
+/-- **Rocq `kexec_closer_after_next`: THE CLOSER AT A LATER COUNT** (permit
+sweep L1a).  A phase that lent the block's counter holds the block at a
+later record `V1` (`evAfter A.V V1`); the exit it was handed is at `A`, and
+this is the one conversion it needs to go on at `{ A with V := V1 }` -- the
+record the rest of the run is instantiated at (deviation 8).  The buffers,
+the plugs' image and every other parameter are `A`'s. -/
+theorem kexecCloser_after (Q : BitVec 64 → ProcPriv → (Nat → List (BitVec 8)) → Prop)
+    (QF : KxfCause → Prop) (k : KCtx) (A : KexecArgs) (V1 : ProcPriv) (h : evAfter A.V V1) :
+    (∀ c' : CPU, kexecCloser (GF := GF) Q QF k A c') ⊢
+      ∀ c' : CPU, kexecCloser Q QF k { A with V := V1 } c' := by
+  unfold kexecCloser
+  iintro H %c' %spie %spp %R' %V' %M' %entry %spv %szv' %hcs %hok Hk Hpc Hte Hce Hpv Hbufs Hbs Hirs
+  ihave Hbufs := (show kxcBufs (GF := GF) k { A with V := V1 } ⊢ kxcBufs k A from .rfl) $$ Hbufs
+  iapply H $$ %c' %spie %spp %R' %V' %M' %entry %spv %szv' %hcs
+    %(kexecOkQf_after _ _ A.V V1 V' _ _ _ _ _ _ h hok) Hk Hpc Hte Hce Hpv Hbufs Hbs Hirs
 
 end
 

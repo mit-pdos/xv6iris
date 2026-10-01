@@ -1238,7 +1238,7 @@ theorem sys_exec_compose (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu : C
     iframe Hblk
     ileft
     isplitr
-    · ipureintro; exact ⟨ha0, rfl, rfl⟩
+    · ipureintro; exact ⟨ha0, evAfter_refl _, rfl⟩
     unfold sysExecPostFail
     ileft
     iexact Hau
@@ -1293,7 +1293,7 @@ theorem sys_exec_compose (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu : C
       iframe Hblk
       ileft
       isplitr
-      · ipureintro; exact ⟨ha0, rfl, rfl⟩
+      · ipureintro; exact ⟨ha0, evAfter_refl _, rfl⟩
       unfold sysExecPostFail
       ileft
       iexact Hau

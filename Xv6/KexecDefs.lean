@@ -72,7 +72,10 @@ header, in short (every clause that is about content is kept):
    by anything, so the success arm adds `V'.kstack = V.kstack ∧
    V'.context = V.context` (exec writes neither: `p->kstack` is
    write-once and `p->context` is only written by `swtch`).  Stronger than
-   Rocq; the failure arm (`V' = V`) is unchanged.
+   Rocq.  The failure arm is Rocq's after the permit sweep L1a (f344a089a,
+   design ni-strong-instance.md §7): the block comes back at its own record
+   with the event count only raised, spelled `ProcDefs.evAfter V V'` (Rocq
+   `exists k', pv_ev V <= k' /\ V' = upd_ev V k'`, which it unfolds to).
 5. **`fs_fabric` is `fsReady ∗ panicEnv ∗ procsInv Γ ∗ diskCaps …`**: Rocq's
    `printk_env` is `panicEnv` (the port's standing spelling), and
    `disk_geom` + `is_lock … disk_res_at` (+ `dev_inv`) is `diskCaps`
@@ -240,11 +243,15 @@ def kxcTf (ws ws' : List (BitVec 64)) (entry spv : BitVec 64) : Prop :=
 /-! ## The result relation -/
 
 /-- **Rocq `kexec_ok`**: `V` is the private block on entry, `V'` the one on
-exit and `r` the returned `a0`.  Two arms, and the failure arm is an
-EQUALITY on the whole block. -/
+exit and `r` the returned `a0`.  Two arms, and the failure arm is the whole
+block back but for its event count, which only rose (`evAfter`). -/
 def kexecOk (V V' : ProcPriv) (r entry spv szv' : BitVec 64) (na : Nat) (alen : Nat → Nat) : Prop :=
-  -- FAILED: nothing moved.  Eight `bad:` entries, all before the commit.
-  (r = 0xFFFFFFFFFFFFFFFF#64 ∧ V' = V) ∨
+  -- FAILED: nothing moved.  Eight `bad:` entries, all before the commit
+  -- ...AND THE EVENT COUNT ONLY ROSE (permit sweep L1a, design
+  -- ni-strong-instance.md §7): a failed exec may have freed the pages it had
+  -- built, each an actor-labelled event, so the block comes back at its own
+  -- record with `ev` at least where it was.
+  (r = 0xFFFFFFFFFFFFFFFF#64 ∧ evAfter V V') ∨
   -- SUCCEEDED: a new address space, a new size, the three trapframe words,
   -- an existential name at the right length, and `argc` in a0.  The
   -- descriptor array and the working directory are untouched (xv6's exec
