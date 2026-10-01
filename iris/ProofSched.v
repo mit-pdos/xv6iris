@@ -1246,8 +1246,8 @@ Section ProofSched.
               D13 (av - 6)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (sdi_6a with "Htext"). }
-    iApply wp_next_off_intro.
-    iIntros "Hcg Hpc".
+    iApply wp_next_off_intro_lc.
+    iIntros "Hlc6a Hcg Hpc".
     iEval (repeat rgne) in "Hcg".
     set (D14 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg (add_vec (D13 !!! Regidx (mword_of_int 9 : mword 5)) (sign_extend' 64 (mword_of_int 0x60 : mword 12)))]> D13).
     change (<[Regidx (mword_of_int 10 : mword 5) := regval_into_reg (add_vec (D13 !!! Regidx (mword_of_int 9 : mword 5)) (sign_extend' 64 (mword_of_int 0x60 : mword 12)))]> D13) with D14.
@@ -1351,7 +1351,7 @@ Section ProofSched.
       { rewrite /proc_held. iFrame "Hlocked Hstate Hchan Hpub". }
       iEval (rewrite Hnc) in "HP".
       iApply fupd_wp.
-      iMod (sched_vc_at_tok γs ⊤ cpu_id with "Hvc") as (XIs) "[Hown Hrec]".
+      iMod (sched_vc_at_tok γs ⊤ cpu_id with "Hvc Hlc6a") as (XIs) "[Hown Hrec]".
       iModIntro.
       iApply (Swtch.wp_swtch_sconf (p_sched γs) (Some cpu_id) None
                 (p_context (proc_addr j)) (a_cpu_ctx cid_word)
@@ -1378,7 +1378,7 @@ Section ProofSched.
        ([Ao = None]) -- which is what makes the whole post-resume half below
        ∀-hart, and what lets [procs_inv] be hart-free. *)
     iApply fupd_wp.
-    iMod (sched_vc_at_tok γs ⊤ cpu_id with "Hvc") as (XIs) "[Hown Hrec]".
+    iMod (sched_vc_at_tok γs ⊤ cpu_id with "Hvc Hlc6a") as (XIs) "[Hown Hrec]".
     iModIntro.
     iApply (Swtch.wp_swtch_sconf (p_sched γs) (Some cpu_id) None
               (p_context (proc_addr j)) (a_cpu_ctx cid_word)
