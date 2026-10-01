@@ -76,7 +76,7 @@ the trap loop:
    the run — stated as the design note's §7.8L invariant, since the ledgers' contents are M2's business.
 4. **Gate:** full `tools/ci/run_all.sh`; no TCB move expected (a pure conjunct and theorems).
 
-- [ ] PJ-T
+- [x] PJ-T (landed 985e7f2d2; the run's chaining -- each round starting at the record the last ended at -- is a hypothesis of utRoundQuiet, not proved from the loop, which re-opens the parked block at an existential record: M2's first item)
 
 
 Not ported: 42666b2b7 (`tools/intr_cone.py`, a Rocq-module cone audit; the Lean counterpart is a
