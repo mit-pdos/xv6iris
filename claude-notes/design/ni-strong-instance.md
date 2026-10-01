@@ -11,6 +11,7 @@ spinlock family, sched and swtch) and fails if any module in it
 implements KALLOC or KFREE; it passes, and it fails as it should on the
 `Vmfault` and `Usertrap` cones.  A check of the proof tree's shape, not a
 theorem in the logic.  The permit sweep (P) waits for NI-LEDGER-REST.
+Lean port: `Xv6/VmfaultQuiet.lean` (2026-10-01)
 Below: the design pass as written.  The
 lane the campaign note ([`../projects/noninterference.md`](../projects/noninterference.md)
 §3.1, §6 M1) promised as "provable in-logic once NI-LEDGER-KALLOC lands".

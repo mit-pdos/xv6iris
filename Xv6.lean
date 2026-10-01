@@ -211,6 +211,7 @@ import Xv6.SpecUvmalloc
 import Xv6.SpecUvmdealloc
 import Xv6.UvmallocDefs
 import Xv6.SpecVmfault
+import Xv6.VmfaultQuiet
 import Xv6.SpecUvmclear
 import Xv6.VmfaultDefs
 import Xv6.UMem
