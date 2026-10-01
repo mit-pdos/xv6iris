@@ -5,6 +5,7 @@ width facts and the PMA/PMP prefix script.  Split from `WpSmodeAu` so the
 walk does not wait for that file's proofs.
 -/
 import MachCSL.MConf
+import MachCSL.Tactics
 
 namespace MachCSL
 

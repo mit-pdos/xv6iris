@@ -13,7 +13,7 @@ the machine-mode stage lemmas need of `c`: interrupts globally disabled
 (`mstatus.MIE = 0`), no modified privilege for data accesses (`MPRV = 0`), and
 the PMP check passing for RAM accesses.
 -/
-import MachCSL.WpPmp
+import MachCSL.WpPmpDefs
 
 namespace MachCSL
 
@@ -359,16 +359,6 @@ theorem MConf.ok_same {c c' : MConf} (h : MConf.ok (GF := GF) c) (hms : c'.mstat
   · intro cpu dq addr width acc Φ hacc hram
     rw [hcfg, haddr]
     exact h.2 cpu dq addr width acc Φ hacc hram
-
-theorem bootConf_ok : MConf.ok (GF := GF) bootConf := by
-  refine ⟨⟨by decide, by decide⟩, ?_⟩
-  intro cpu dq addr width acc Φ _ _
-  exact swp_pmpCheck_off cpu dq addr width acc Φ
-
-theorem bootConfOf_ok (z : BootGarb) : MConf.ok (GF := GF) (bootConfOf z) := by
-  refine ⟨(bootConf_ok (GF := GF)).1, ?_⟩
-  intro cpu dq addr width acc Φ _ _
-  exact swp_pmpCheck_allOff cpu dq addr width acc Φ z.pmpcfg z.pmpaddr z.pmpOff
 
 /-! ### Decoding -/
 

@@ -10,6 +10,7 @@ import MachCSL.MConf
 import MachCSL.PlatformFacts
 import MachCSL.ModelFacts
 import MachCSL.FetchedDefs
+import MachCSL.Tactics
 
 namespace MachCSL
 

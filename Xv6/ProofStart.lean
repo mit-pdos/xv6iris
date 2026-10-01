@@ -12,6 +12,7 @@ import MachCSL.GprLit
 import Xv6.SpecStart
 import Xv6.CodeTactics
 import Xv6.SpecTimerinit
+import MachCSL.MConfBoot
 
 namespace Xv6
 

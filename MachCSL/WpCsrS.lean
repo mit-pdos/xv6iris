@@ -7,6 +7,7 @@ walk of `DecodeBridge` (`runRead`), evaluated by `rfl` once per nominal
 -/
 import MachCSL.DecodeBridge
 import MachCSL.PlatformFacts
+import MachCSL.Tactics
 
 namespace MachCSL
 

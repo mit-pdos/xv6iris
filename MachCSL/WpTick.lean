@@ -16,6 +16,7 @@ corollaries of `swp_tick_clock_hs`.
 import MachCSL.MConf
 import MachCSL.PlatformFacts
 import MachCSL.ModelFacts
+import MachCSL.Tactics
 
 namespace MachCSL
 

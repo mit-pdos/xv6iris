@@ -34,8 +34,10 @@ import MachCSL.Platform
 import MachCSL.PlatformFacts
 import MachCSL.Boot
 import MachCSL.WpPmp
+import MachCSL.WpPmpDefs
 import MachCSL.WpStages
 import MachCSL.MConf
+import MachCSL.MConfBoot
 import MachCSL.DecodeBridge
 import MachCSL.KCtx
 import MachCSL.KCtxGpr
@@ -75,6 +77,7 @@ import MachCSL.WpStagesM
 import MachCSL.WpTick
 import MachCSL.WpGpr
 import MachCSL.WpGprDefs
+import MachCSL.Gpr
 import MachCSL.GprLit
 import MachCSL.Instr
 import MachCSL.WpCycle
@@ -121,6 +124,7 @@ import MachCSL.WpSmodeRegOps
 import MachCSL.WpSmodeTrapCsr
 import MachCSL.WpSmodeSltu
 import MachCSL.ByteWord
+import MachCSL.ByteWordDefs
 import MachCSL.WpSmodeMint
 import MachCSL.CtxKeyMint
 import MachCSL.WpStoreFree
