@@ -3,6 +3,13 @@ Proof of `allocproc`'s specification (`SpecAllocproc.ALLOCPROC`), given the
 interfaces of `acquire`, `release`, `kalloc`, `memset`, `proc_pagetable`
 and `freeproc`.
 
+THE LED FORM IS THE PROOF (NI-LEDGER-REST W2, Rocq 8043e4cdd): `ap_found`
+appends `PAlloc k.proc pid` to the pid ledger at the register's insert
+(`PidLock.pidLedger_alloc`, beside `ap_pid_mint`) and the cells-level post
+`apPostCells` (now taking the actor) carries the receipt in its found arm;
+`allocproc_led_proof` is `wp_allocproc_led_body`, and `allocproc_proof`'s
+landed field drops the receipt (`allocproc_cont_led`).
+
 The shape follows the C (kernel/proc.c) and the disassembly:
 
 * the four-slot frame (`ra`, `s0`, `s1`, `s2`), `s1` the cursor over
@@ -622,16 +629,20 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 
 /-- **The cells-level post** the body is proved against (the landed pre-8-P
 `apPostCells`): the raw block `procPriv` (null descriptor cells) and the
-slot's allowances `dormantAllow`.  `allocproc_proof` mints the descriptor
+slot's allowances `dormantAllow`.  The FOUND arm carries the pid ledger's
+receipt of the allocation (`PAlloc act pid`, NI-LEDGER-REST; the caller's
+`apCont` instantiates `act` at `k.proc`).  `allocproc_proof` mints the descriptor
 ghost out of them (`FdTable.procPriv_null_mint`, Rocq
 `proc_dormant_unused`). -/
 def apPostCells [CurCtx] (Γ : SchedNames) (cpu : CPU) (γk : KmemNames) (on : Option Nat)
-    (pav : Option Nat) (tk : Bool) (Q : Int → IProp GF) (r : BitVec 64) : IProp GF := iprop%
+    (pav : Option Nat) (tk : Bool) (Q : Int → IProp GF) (act : BitVec 64) (r : BitVec 64) :
+    IProp GF := iprop%
   (⌜r = 0#64 ∧ ((pav = none ∨ pav = some 0) ∨
       ∃ g : Nat, g ≤ procPagetableNodes + 1 ∧ availZero (availSub on g))⌝ ∗
     (procsAvailAt Γ pav tk ∨ pavSpent Γ pav) ∗
     ∃ on' : Option Nat, ⌜on' = on ∨ on' = none⌝ ∗ kallocAvail γk on') ∨
   (∃ (j : Nat) (ch : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (g : Nat),
+    (∃ h : List Pev, pidReceipt h (.PAlloc act pid)) ∗
     ⌜r = procAddr j ∧ j < NPROC ∧ 1 ≤ pid.toNat ∧ pid.toNat ≤ PIDMAX ∧ allocprocPriv V ∧ g ≤ procPagetableNodes + 1 ∧
       (if pavBoot pav tk then pid.toNat = 1 else pid.toNat ≠ 1)⌝ ∗
     procHeld Γ cpu j USED ch ∗ hartAtAny Γ (procAddr j) ∗ slotUsed Γ (procAddr j) ∗ pavSpent Γ (pavDec pav) ∗
@@ -650,7 +661,7 @@ def apCont [CurCtx] (Γ : SchedNames) (k : KCtx) (γk : KmemNames) (on : Option 
    (⌜R' 10#5 ≠ 0#64⌝ ∗ kctx cpu' (((k.pushOffAt spie spp).withLocks ("proc" :: k.locks)).withRegs R') ∗
     sieArm cpu' k.sie k.proc)) -∗
   pcIs cpu' (jumpPc (k.regs 1#5)) -∗
-  apPostCells Γ cpu' γk on pav tk Q (R' 10#5) -∗
+  apPostCells Γ cpu' γk on pav tk Q k.proc (R' 10#5) -∗
   ⌜calleeSaved k.regs R'⌝ -∗ wpLoop cpu')
 
 end Body
@@ -1837,10 +1848,10 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
       wordAtN curCtx nextpidAddr 4 (DFrac.own 1) np ∗
       ([∗list] j ∈ List.range NPROC, wordAtN curCtx (pPid (procAddr j)) 4 pidLockQ (pids j)) ∗
       (⌜np.toNat = 1⌝ ∨ nextpidShot) ∗
-      ∃ PR : IntMapF GName, ⌜pidRegDom PR pids⌝ ∗ pidRegAuth PR ∗
+      ∃ PR : IntMapF GName, ⌜pidRegDom PR pids⌝ ∗ pidRegAuth PR ∗ pidLedger PR ∗
         (⌜∀ j, j < NPROC → (pids j).toNat ≠ 1⌝ ∨ nextpidShot)
       from by unfold pidLockPay pidLockResAt; iintro H; iexact H) $$ HRpay with
-    ⟨%np, %pids, %⟨hnplo, hnphi, hpidsok⟩, Hnp, Hpids, Hm1, %PR, %hdom, Hauth, Hm2⟩
+    ⟨%np, %pids, %⟨hnplo, hnphi, hpidsok⟩, Hnp, Hpids, Hm1, %PR, %hdom, Hauth, Hled, Hm2⟩
   -- THE BOOT ERA'S TWO MARKS, READ ONCE (Rocq `wp_ap_pidsec`): the token is
   -- shot here; in the boot era the counter is 1 and no slot holds pid 1
   iapply MachCSL.wpLoop_bupd
@@ -1964,8 +1975,11 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
     isplitr
     · iexact Hir
     · iexact Hkw
+  -- ...AND THE LEDGER RECORDS IT, beside the register it mirrors (Rocq
+  -- `pid_ledger_alloc`): `PAlloc k.proc pid`, whose receipt the found arm gets
+  imod pidLedger_alloc PR k.proc pid γ $$ Hled with ⟨Hled, #Hrcpt⟩
   imodintro
-  ihave HRpay : pidLockPay (GF := GF) curCtx $$ [Hnp Hpids Hauth]
+  ihave HRpay : pidLockPay (GF := GF) curCtx $$ [Hnp Hpids Hauth Hled]
   case _ =>
     unfold pidLockPay pidLockResAt
     iexists (apNewPid pid), (apPidsSet pids n pid)
@@ -1985,6 +1999,8 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
       exact pidRegDom_insert PR pids n pid γ hdom hn (by rw [hpidsn0]; rfl) hpnz'
     isplitl [Hauth]
     · iexact Hauth
+    isplitl [Hled]
+    · iexact Hled
     · iright; iexact Hshot
   -- 0x80001c0a auipc a0 ; 0x80001c0e addi a0 ; 0x80001c12 jal release
   k_step (wp_s_auipc c _ (KA.«allocproc» + 0x8c#64) false 0x11#20 10#5 (by decide))
@@ -2287,7 +2303,7 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
         ileft; isplitl []
         · ipureintro; exact h10
         · iexact Hk
-      ihave Hpost : apPostCells (GF := GF) Γ c8 γk on pav tk Q (R'' 10#5) $$ [Havn Hpav]
+      ihave Hpost : apPostCells (GF := GF) Γ c8 γk on pav tk Q k.proc (R'' 10#5) $$ [Havn Hpav]
       case' _ =>
         unfold apPostCells
         ileft
@@ -2675,13 +2691,16 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
             · ipureintro; rw [h10]; exact procAddr_nonzero hn
             · iframe Hk
               rw [hgc]; iexact Harm
-          ihave Hpost : apPostCells (GF := GF) Γ cg γk on pav tk Q (R'' 10#5)
+          ihave Hpost : apPostCells (GF := GF) Γ cg γk on pav tk Q k.proc (R'' 10#5)
             $$ [Hheld Hhart Hused Hpav Hpriv Hal Hch Hgen Hsg Hprr Hxs Hstack Hav4]
           case' _ =>
             unfold apPostCells
             rw [hgc]
             iright
             iexists n, ch, pid, V, Mpp, 4
+            -- the pid ledger's receipt, out of the pid section
+            isplitl []
+            · iexact Hrcpt
             isplitl []
             · ipureintro
               refine ⟨h10, hn, hpidlo, hpidhi, ⟨?_, ?_, ?_, ?_, ?_⟩, ?_, hside⟩
@@ -2700,7 +2719,7 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
                  (⌜R' 10#5 ≠ 0#64⌝ ∗ kctx cg (((k.pushOffAt spie spp).withLocks
                     ("proc" :: k.locks)).withRegs R') ∗ sieArm cg k.sie k.proc)) -∗
                 pcIs cg (jumpPc (k.regs 1#5)) -∗
-                apPostCells Γ cg γk on pav tk Q (R' 10#5) -∗
+                apPostCells Γ cg γk on pav tk Q k.proc (R' 10#5) -∗
                 ⌜calleeSaved k.regs R'⌝ -∗ wpLoop cg)
               from by unfold apCont; iintro H; iexact H) $$ HΦ
           iapply HΦ $$ %spie6 %spp6 %R'' %hspc6 Hdisj Hpc Hpost
@@ -2980,7 +2999,7 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
           ileft; isplitl []
           · ipureintro; exact h10
           · iexact Hk
-        ihave Hpost : apPostCells (GF := GF) Γ c8 γk on pav tk Q (R'' 10#5) $$ [Havn Hpav]
+        ihave Hpost : apPostCells (GF := GF) Γ c8 γk on pav tk Q k.proc (R'' 10#5) $$ [Havn Hpav]
         case' _ =>
           unfold apPostCells
           ileft
@@ -3163,7 +3182,7 @@ theorem ap_scan (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
           isplitl []
           · ipureintro; exact h10
           · iexact Hk
-        ihave Hpost : apPostCells (GF := GF) Γ c8 γk on pav tk Q (R'' 10#5)
+        ihave Hpost : apPostCells (GF := GF) Γ c8 γk on pav tk Q k.proc (R'' 10#5)
           $$ [Hav Hpav Hmarks]
         case' _ =>
           unfold apPostCells
@@ -3411,17 +3430,24 @@ theorem allocproc_cells (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSE
 /-! ## The descriptor ghost, minted (Rocq `proc_dormant_unused`) -/
 
 set_option maxHeartbeats 4000000 in
-/-- **`allocproc` meets its specification** (Rocq `allocproc_post`): the
-cells-level body, and in the found arm the raw block and the slot's
-allowances become Rocq's `proc_priv_nocwd` under a FRESH descriptor ghost,
-the save area, the fragment bundle at all-`closed` and the three
-allowances (`FdTable.procPriv_null_mint`). -/
-theorem allocproc_proof (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
-    (PP : PROC_PAGETABLE) (FP : FREEPROC) : ALLOCPROC :=
-  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ X Γ γ cpu k γl γp γk on pav tk Q hnoff hK hlk hlp hlq htier => by
+/-- **`allocproc` meets its LED specification** (Rocq `allocproc_post_led`,
+`wp_allocproc_core_led`, the proof of record): the cells-level body, and in
+the found arm the raw block and the slot's allowances become Rocq's
+`proc_priv_nocwd` under a FRESH descriptor ghost, the save area, the
+fragment bundle at all-`closed` and the three allowances
+(`FdTable.procPriv_null_mint`); the pid ledger's receipt passes through. -/
+theorem allocproc_led_proof (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
+    (PP : PROC_PAGETABLE) (FP : FREEPROC)
+    {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF]
+    [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF]
+    [OffboxBoxG GF] [Icfg] [X : CurCtx] (Γ : SchedNames) (γ : FileNames) (cpu : CPU) (k : KCtx)
+    (γl γp : GName) (γk : KmemNames) (on : Option Nat) (pav : Option Nat) (tk : Bool)
+    (Q : Int → IProp GF) hnoff hK hlk hlp hlq htier :
+    wp_allocproc_led_body (hlc := hlc) (GF := GF) Γ γ cpu k γl γp γk on pav tk Q
+      hnoff hK hlk hlp hlq htier := by
   have h := allocproc_cells AC RE KAL MS PP FP (hlc := hlc) (GF := GF) Γ cpu k γl γp γk on pav tk Q
     hnoff hK hlk hlp hlq htier
-  unfold wp_allocproc_body
+  unfold wp_allocproc_led_body
   iintro ⟨Hk, Hpc, #Hpinv, #Hlk, #Hlp, Hav, Hpav, #Hkw, HΦ⟩
   icases kctx_tier cpu k $$ Hk with ⟨%hct, Hk⟩
   have hkpt : curTier = KTier.kpt := hct.symm.trans htier
@@ -3438,22 +3464,72 @@ theorem allocproc_proof (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSE
       (⌜R' 10#5 ≠ 0#64⌝ ∗ kctx cpu' (((k.pushOffAt spie spp).withRegs R').withLocks ("proc" :: k.locks)) ∗
         sieArm cpu' k.sie k.proc)) from .rfl) $$ Hk
   iapply wpLoop_bupd
-  icases Hpost with (Hnull | ⟨%j, %ch, %pid, %V, %M, %g, %hpure, Hheld, Hhart, #Hused, Hsp, Hpriv, Hal,
+  icases Hpost with (Hnull | ⟨%j, %ch, %pid, %V, %M, %g, #Hrcpt, %hpure, Hheld, Hhart, #Hused, Hsp, Hpriv, Hal,
     Hrow, Hgn, Hsg, Hpr, Hxs, Hstk, Hkav⟩)
   · imodintro
     iapply HK $$ %spie %spp %R' %hs Hk Hpc [Hnull] %hcs
-    unfold allocprocPost
+    unfold allocprocPostLed
     ileft
     iexact Hnull
   · imod procPriv_null_mint hkpt γ (procAddr j) pid V M hpure.2.2.2.2.1.1 $$ [$Hpriv $Hal]
       with ⟨%γd, Hnc, Hctx, Hfr, Hfs, Hir, Hbs⟩
     imodintro
     iapply HK $$ %spie %spp %R' %hs Hk Hpc [-] %hcs
-    unfold allocprocPost
+    unfold allocprocPostLed
     iright
     iexists j, ch, pid, { V with fdg := γd }, M, g
-    iframe Hheld Hhart Hused Hsp Hnc Hctx Hfr Hfs Hir Hbs Hrow Hgn Hsg Hpr Hxs Hstk Hkav
+    iframe Hrcpt Hheld Hhart Hused Hsp Hnc Hctx Hfr Hfs Hir Hbs Hrow Hgn Hsg Hpr Hxs Hstk Hkav
     ipureintro
-    exact hpure⟩
+    exact hpure
+
+/-- A landed continuation serves as a led one: the found arm's receipt is
+dropped (`allocprocPostLed_post`). -/
+theorem allocproc_cont_led {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
+    [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF]
+    [WchG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
+    (Γ : SchedNames) (γ : FileNames) (cpu : CPU) (k : KCtx) (γk : KmemNames) (on : Option Nat)
+    (pav : Option Nat) (tk : Bool) (Q : Int → IProp GF) :
+    wpNext (GF := GF) k.sie k.proc cpu (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
+      ⌜k.sie = false → spie = k.spie ∧ spp = k.spp⌝ -∗
+      ((⌜R' 10#5 = 0#64⌝ ∗ kctx cpu' ((k.withSpie spie spp).withRegs R')) ∨
+       (⌜R' 10#5 ≠ 0#64⌝ ∗ kctx cpu' (((k.pushOffAt spie spp).withRegs R').withLocks ("proc" :: k.locks)) ∗
+        sieArm cpu' k.sie k.proc)) -∗
+      pcIs cpu' (jumpPc (k.regs 1#5)) -∗
+      allocprocPost Γ γ cpu' γk on pav tk Q (R' 10#5) -∗
+      ⌜calleeSaved k.regs R'⌝ -∗ wpLoop cpu')) ⊢
+    wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
+      ⌜k.sie = false → spie = k.spie ∧ spp = k.spp⌝ -∗
+      ((⌜R' 10#5 = 0#64⌝ ∗ kctx cpu' ((k.withSpie spie spp).withRegs R')) ∨
+       (⌜R' 10#5 ≠ 0#64⌝ ∗ kctx cpu' (((k.pushOffAt spie spp).withRegs R').withLocks ("proc" :: k.locks)) ∗
+        sieArm cpu' k.sie k.proc)) -∗
+      pcIs cpu' (jumpPc (k.regs 1#5)) -∗
+      allocprocPostLed Γ γ cpu' γk on pav tk Q k.proc (R' 10#5) -∗
+      ⌜calleeSaved k.regs R'⌝ -∗ wpLoop cpu')) := by
+  iintro Hnext
+  iapply wpNext_mono _ _ _ _ _ $$ Hnext
+  iintro %c H %spie %spp %R' %hs Hk Hpc Hpost %hcs
+  ihave Hpost := allocprocPostLed_post Γ γ c γk on pav tk Q k.proc (R' 10#5) $$ Hpost
+  iapply H $$ %spie %spp %R' %hs Hk Hpc Hpost
+  ipureintro
+  exact hcs
+
+/-- **`allocproc`'s interface** (Rocq `allocproc_post` / `allocproc_post_led`):
+the led form (`allocproc_led_proof`), and the landed contract as its
+corollary (the receipt dropped, `allocproc_cont_led`). -/
+theorem allocproc_proof (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
+    (PP : PROC_PAGETABLE) (FP : FREEPROC) : ALLOCPROC :=
+  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Γ γ cpu k γl γp γk on pav tk Q hnoff hK hlk hlp hlq htier => by
+    have h := allocproc_led_proof AC RE KAL MS PP FP (hlc := hlc) (GF := GF) Γ γ cpu k γl γp γk on pav tk Q
+      hnoff hK hlk hlp hlq htier
+    unfold wp_allocproc_led_body at h
+    unfold wp_allocproc_body
+    iintro ⟨Hk, Hpc, #Hpinv, #Hlk, #Hlp, Hav, Hpav, #Hkw, HΦ⟩
+    ihave HΦ := allocproc_cont_led Γ γ cpu k γk on pav tk Q $$ HΦ
+    iapply h
+    iframe Hk Hpc Hav Hpav HΦ
+    iframe #,
+   fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Γ γ cpu k γl γp γk on pav tk Q hnoff hK hlk hlp hlq htier =>
+    allocproc_led_proof AC RE KAL MS PP FP (hlc := hlc) (GF := GF) Γ γ cpu k γl γp γk on pav tk Q
+      hnoff hK hlk hlp hlq htier⟩
 
 end Xv6

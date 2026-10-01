@@ -354,13 +354,15 @@ theorem mn_waitLock_kmap [CurCtx] :
   · iapply kmapStatic_rw (waitLockAddr + 16#64) (by decide) $$ HS
 
 /-- The `nextpid` lock's payload at boot: `nextpid = 1`, every pid cell at
-`0`, the registration map empty. -/
+`0`, the registration map empty, and the pid ledger at the empty history
+(`PidLock.pidLedger_empty`, NI-LEDGER-REST). -/
 theorem mn_pidRes_boot [CurCtx] :
     wordPointsTo (GF := GF) nextpidAddr 4 (DFrac.own 1) 1#32 ∗
     ([∗list] i ∈ List.range NPROC, wordPointsTo (pPid (procAddr i)) 4 pidLockQ 0#32) ∗
-    pidRegAuth ∅ ⊢ pidLockPay curCtx := by
+    pidRegAuth ∅ ∗ pidLedAuth [] ⊢ pidLockPay curCtx := by
   unfold pidLockPay pidLockResAt
-  iintro ⟨Hn, Hp, Ha⟩
+  iintro ⟨Hn, Hp, Ha, Hl⟩
+  ihave Hl := pidLedger_empty $$ Hl
   iexists 1#32, (fun _ => 0#32)
   isplitr
   · ipureintro
@@ -375,7 +377,7 @@ theorem mn_pidRes_boot [CurCtx] :
   iexists ∅
   isplitr
   · ipureintro; exact pidRegDom_empty _
-  iframe Ha
+  iframe Ha Hl
   ileft
   ipureintro
   intro j _
@@ -384,24 +386,25 @@ theorem mn_pidRes_boot [CurCtx] :
 set_option maxHeartbeats 4000000 in
 /-- **The `nextpid` and `wait_lock` locks, born** (Rocq's two `newlock`s
 after procinit): over `nextpid_res` (the `.data` word at its pinned `1`,
-`pid_lock`'s quarter of every pid cell, the empty registration map) and
+`pid_lock`'s quarter of every pid cell, the empty registration map, the
+empty pid ledger) and
 over `wait_res` (the parent cells, the children map, no orphans). -/
 theorem mn_pidWait_born [CurCtx] (cpu : CPU) (k : KCtx) :
     kctx cpu k ∗ lockInited pidLockAddr nextpidNameAddr ∗ lockInited waitLockAddr waitLockNameAddr ∗
     wordPointsTo nextpidAddr 4 (DFrac.own 1) 1#32 ∗
     ([∗list] i ∈ List.range NPROC, wordPointsTo (pPid (procAddr i)) 4 pidLockQ 0#32) ∗
-    pidRegAuth ∅ ∗ parentsResAt curCtx ∗ childrenResBoot ∗ orphansOwn ∅
+    pidRegAuth ∅ ∗ pidLedAuth [] ∗ parentsResAt curCtx ∗ childrenResBoot ∗ orphansOwn ∅
     ⊢ |={⊤}=> (kctx (GF := GF) cpu k ∗
       (∃ γp : GName, isLock γp pidLockAddr "nextpid" pidLockPay) ∗
       (∃ γw : GName, isLock γw waitLockAddr "wait_lock" waitLockPay)) := by
-  iintro ⟨Hk, Hpl, Hwl, Hn, Hp, Ha, Hpar, Hch, Ho⟩
+  iintro ⟨Hk, Hpl, Hwl, Hn, Hp, Ha, Hled, Hpar, Hch, Ho⟩
   icases kctx_kmapStatic _ _ $$ Hk with ⟨#HS, Hk⟩
   icases mn_pidLock_kmap $$ HS with ⟨#Hp0, #Hp16⟩
   icases mn_waitLock_kmap $$ HS with ⟨#Hw0, #Hw16⟩
   unfold lockInited
   icases Hpl with ⟨-, Hpf⟩
   icases Hwl with ⟨-, Hwf⟩
-  ihave HR := mn_pidRes_boot $$ [$Hn $Hp $Ha]
+  ihave HR := mn_pidRes_boot $$ [$Hn $Hp $Ha $Hled]
   imod kctx_newlock cpu k pidLockAddr "nextpid" pidLockPay $$ [$Hk $HR $Hpf $Hp0 $Hp16] with ⟨Hk, Hpid⟩
   ihave HW := waitRes_alloc curCtx $$ [$Hpar $Hch $Ho]
   ihave HW : iprop(waitLockPay (GF := GF) curCtx) $$ [HW]

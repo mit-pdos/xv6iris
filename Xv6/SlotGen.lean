@@ -90,11 +90,22 @@ party that threads a lock's gname.
    `procAddr`, `ZOMBIE`.  When the process block starts carrying these
    halves (`procDormant`, W7-C), the geometry has to move below this file
    (a `ProcGeom.lean` split of ProcDefs), exactly as Rocq has it.  Reported.
+7. **The pid ledger (NI-LEDGER-REST W2, Rocq 8043e4cdd).**  Its camera
+   `MonoListG GF Pev` is a field of `WchGpre` (Rocq `wpl_pre_inG` in
+   `wchGpreS`) and its name `wplName` a field of `WchG` (Rocq `wpl_name`);
+   `pidLedAuth`/`pidLedLb`/`pidReceipt` and the four lemmas are Rocq's
+   `pid_led_*` over iris-lean's `MonoList` (`↪●ML` / `↪◯ML`), whose
+   `_prefix`/`_lb` read `<+:` (Rocq `prefix_of`).  The camera is NOT in
+   `Xv6G` (where the allocator's `Kev` ledger lives): the pid lock's
+   payload (`PidLock.pidLockResAt`) and this file are stated over `[WchG
+   GF]` alone, and a camera in `Xv6G` would add an `[Xv6G GF]` binder to
+   both.
 
 Imports only definitional files.
 -/
 import Xv6.ChildTok
 import Xv6.ProcGeom
+import Xv6.PidEv
 
 namespace Xv6
 
@@ -129,8 +140,16 @@ class WchGpre (GF : BundledGFunctors) where
   [sgenG : ElemG GF (constOF SgenUR)]
   [prG : GhostMapG GF Int GName IntMapF]
   [ipidG : ElemG GF (constOF IpidUR)]
+  /-- THE PID LEDGER'S CAMERA (Rocq `wpl_pre_inG : inG Σ (mono_listR (leibnizO
+  pev))`, NI-LEDGER-REST, design ni-pid-ledger.md D2): a mono-list of
+  `PidEv.Pev`, the actor-labelled history of every pid allocation and
+  release, whose authority lives in `pid_lock`'s payload beside the pid
+  register (`PidLock.pidLedger`), at the canonical name `wplName`
+  (deviation 7). -/
+  [plG : MonoListG GF Pev]
 
 attribute [reducible, instance] WchGpre.chG WchGpre.orphG WchGpre.sgenG WchGpre.prG WchGpre.ipidG
+attribute [reducible, instance] WchGpre.plG
 
 /-- Rocq `wchG`: the cameras and their CANONICAL names (the capacity may be
 assumed by adequacy, the NAMES are minted in the boot fupd and the instance
@@ -155,6 +174,11 @@ class WchG (GF : BundledGFunctors) extends WchGpre GF where
   to it modulo 2^32 (`TicksDefs.ticksTie`).  No camera rides with it: the
   counter uses the machine's ambient `MonoNatG` (`MachFixedGS.mono`). -/
   wtkName : GName
+  /-- THE PID LEDGER'S NAME (Rocq `wpl_name`, design ni-pid-ledger.md D2):
+  the `MonoListG GF Pev` ghost at this name is the pid ledger
+  (`pidLedAuth` / `pidLedLb`), born empty in
+  `WaitInvTies.childrenRes_alloc`. -/
+  wplName : GName
 
 /-- AN EIGHTH (Rocq `qeighth`, deviation 2). -/
 abbrev qeighth : Qp := Qp.quarter.half
@@ -612,6 +636,61 @@ theorem initReg_ne (R : IntMapF GName) (pidc : BitVec 32) (hfree : get? R (pidc.
   have h1 : ((1#32).toNat : Int) = (pidc.toNat : Int) := by rw [he]; rfl
   rw [h1, hfree] at hl
   cases hl
+
+/-! ## The pid ledger's ghost (NI-LEDGER-REST W2, design ni-pid-ledger.md D2)
+
+A mono-list of `PidEv.Pev` at the canonical `wplName`.  The authority rides
+`pid_lock`'s payload (`PidLock.pidLedger`, whose live set is the register's
+domain); a lower bound is what a call hands back.  HERE and not in
+`PidLock` because the boot's row bundle (`WaitInvTies.childrenBootRows`)
+mints the authority, and the wait-invariant files do not import `PidLock`;
+this file is the earliest both import (as Rocq's). -/
+
+/-- The ledger's authoritative history (Rocq `pid_led_auth`). -/
+def pidLedAuth (h : List Pev) : IProp GF := WchG.wplName GF ↪●ML h
+/-- A lower bound of the ledger (Rocq `pid_led_lb`). -/
+def pidLedLb (h : List Pev) : IProp GF := WchG.wplName GF ↪◯ML h
+
+instance pidLedLb_persistent (h : List Pev) : Persistent (pidLedLb (GF := GF) h) := by
+  unfold pidLedLb; infer_instance
+
+theorem pidLedAuth_lb (h : List Pev) :
+    pidLedAuth (GF := GF) h ⊢ pidLedAuth h ∗ pidLedLb h := by
+  unfold pidLedAuth pidLedLb
+  iintro Ha
+  ihave #Hb := MonoList.lb_own_get (WchG.wplName GF) _ h $$ Ha
+  isplitl [Ha]
+  · iexact Ha
+  · iexact Hb
+
+theorem pidLedLb_prefix (h h' : List Pev) :
+    pidLedAuth (GF := GF) h ⊢ pidLedLb h' -∗ ⌜h' <+: h⌝ := by
+  unfold pidLedAuth pidLedLb
+  iintro Ha Hb
+  ihave %hv := MonoList.auth_lb_own_valid (WchG.wplName GF) _ h h' $$ Ha Hb
+  ipureintro; exact hv.2
+
+/-- Two lower bounds of the one ledger are comparable (Rocq `pid_led_lb_lb`). -/
+theorem pidLedLb_lb (h h' : List Pev) :
+    pidLedLb (GF := GF) h ⊢ pidLedLb h' -∗ ⌜h <+: h' ∨ h' <+: h⌝ := by
+  unfold pidLedLb
+  iintro Ha Hb
+  iapply MonoList.lb_own_valid (WchG.wplName GF) h h' $$ Ha Hb
+
+theorem pidLedAuth_grow (h : List Pev) (e : Pev) :
+    pidLedAuth (GF := GF) h ⊢ |==> (pidLedAuth (h ++ [e]) ∗ pidLedLb (h ++ [e])) := by
+  unfold pidLedAuth pidLedLb
+  iintro Ha
+  iapply MonoList.auth_own_update_app (WchG.wplName GF) [e] $$ Ha
+
+/-- The receipt a pid call hands back: event `e` was appended right after
+history `h` (Rocq `pid_receipt`).  The ledger's name is canonical, so unlike
+`KallocDefs.ledReceipt` it carries no name. -/
+def pidReceipt (h : List Pev) (e : Pev) : IProp GF := pidLedLb (h ++ [e])
+
+instance pidReceipt_persistent (h : List Pev) (e : Pev) :
+    Persistent (pidReceipt (GF := GF) h e) := by
+  unfold pidReceipt; infer_instance
 
 end SlotGen
 

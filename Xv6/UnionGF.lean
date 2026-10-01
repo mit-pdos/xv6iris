@@ -212,6 +212,8 @@ instance ugfPipeq : ElemG unionGF (constOF (ExclAuth.ExclAuthR (A := PipeSt))) :
 instance ugfHelp : GhostMapG unionGF Nat (GName × BitVec 32) RegMapF := ⟨ugf_slot 120⟩
 -- Xv6G: the page allocator's event ledger (inherited from `xv6GF`'s slot 121)
 instance ugfMlKev : MonoListG unionGF Kev := ⟨ugf_slot 121⟩
+-- WchGpre: the pid ledger (inherited from `xv6GF`'s slot 122)
+instance ugfMlPev : MonoListG unionGF Pev := ⟨ugf_slot 122⟩
 
 -- the union's new cameras
 instance ugfEraPins : GhostMapG unionGF Nat EraPins RegMapF := ⟨ugf_slot 95⟩

@@ -168,3 +168,30 @@ value, and the outcome IS the event.
   conjunct as `(%h & #Hrcpt & …)`; the fork row can then carry `PAlloc
   parent pid` to the U tier.  Nobody does yet.
 
+
+## Lean port as landed (2026-10-01)
+
+NI port PI-2 (Rocq d66e99d0d/8043e4cdd).  `Xv6/PidEv.lean` is the pure
+vocabulary (`Pev`, `liveOf`, `nextOf`, the snoc lemmas, `nextOf_bound`);
+the live set is a predicate `Int → Prop`, compared with the register's
+`PartialMap.dom R` (the register is keyed at `(pid.toNat : Int)`), so the tie
+is `liveOf h = PartialMap.dom R` (`PidLock.pidDom_empty/insert/delete` are
+the three `dom` rewrites).  The camera `MonoListG GF Pev` is a field of
+`SlotGen.WchGpre` (Rocq `wpl_pre_inG`; xv6GF/unionGF slot 122) and its name
+`wplName` a field of `WchG` (`xv6GF_wchG` gains `γpl`) -- NOT of `Xv6G`,
+because `pidLockResAt` and `SlotGen` are stated over `[WchG GF]` alone.
+`pidLedAuth`/`pidLedLb`/`pidReceipt` and the four lemmas are in `SlotGen`;
+`pidLedger` and `pidLedger_empty/alloc/free` in `PidLock`; the payload
+`pidLockResAt` changes in place (body only; every statement naming it
+byte-identical).  Born in `childrenBootRows`/`childrenRes_alloc`; sealed by
+`MainKvm.mn_pidRes_boot`/`mn_pidWait_born` (their statements gain
+`pidLedAuth []`, proof-side helpers; `ProofMain.mn_phaseB` threads it).  Lean
+has one allocproc contract (Rocq's general core), so ONE led twin:
+`SpecAllocproc.allocprocPostLed` (+ `_post`), `wp_allocproc_led_body`, field
+`ALLOCPROC.wp_allocproc_led`; freeproc's `wp_freeproc_led_body`, field
+`FREEPROC.wp_freeproc_led` (the receipt right before `procHeld`).  Proofs:
+`ProofAllocproc.allocproc_led_proof` (the append in `ap_found` beside
+`ap_pid_mint`; `apPostCells` takes the actor and its found arm the receipt)
+and `ProofFreeproc.freeproc_led_proof` (`fp_pidRes_acc` appends and returns
+the receipt; `fpContLed`); the landed fields are corollaries.  Actor:
+`k.proc`.  No consumer touched.

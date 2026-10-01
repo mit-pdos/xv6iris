@@ -189,6 +189,9 @@ def xv6GF : BundledGFunctors :=
   -- Xv6G: the page allocator's event ledger (Rocq `kallocG`'s `mono_listR (leibnizO kev)`,
   -- NI-LEDGER-KALLOC); slot 121, clear of the union's (95..108)
   |>.set 121 ⟨xgfMl Kev, inferInstance⟩
+  -- WchGpre: the pid ledger (Rocq `wpl_pre_inG`'s `mono_listR (leibnizO pev)`,
+  -- NI-LEDGER-REST); slot 122, clear of the union's (95..108)
+  |>.set 122 ⟨xgfMl Pev, inferInstance⟩
 
 /-! ## One instance per camera -/
 
@@ -317,6 +320,8 @@ instance xgfPipeq : ElemG xv6GF (constOF (ExclAuth.ExclAuthR (A := PipeSt))) := 
 instance xgfHelp : GhostMapG xv6GF Nat (GName × BitVec 32) RegMapF := ⟨xgf_slot 120⟩
 -- Xv6G: the page allocator's event ledger
 instance xgfMlKev : MonoListG xv6GF Kev := ⟨xgf_slot 121⟩
+-- WchGpre: the pid ledger
+instance xgfMlPev : MonoListG xv6GF Pev := ⟨xgf_slot 122⟩
 
 end cameras
 
@@ -383,9 +388,9 @@ rest are the single-camera instances above, the era registry included. -/
 the final theorem; here at arbitrary names, to show they add no camera) -/
 
 /-- `WchG` at given names, over the one `WchGpre` instance. -/
-@[reducible] def xv6GF_wchG (γch γor γsg γpr γip γnp γtk : GName) : WchG xv6GF :=
+@[reducible] def xv6GF_wchG (γch γor γsg γpr γip γnp γtk γpl : GName) : WchG xv6GF :=
   { toWchGpre := xv6GF_wchGpre, wchName := γch, worphName := γor, wsgName := γsg,
-    wprName := γpr, wipName := γip, npidName := γnp, wtkName := γtk }
+    wprName := γpr, wipName := γip, npidName := γnp, wtkName := γtk, wplName := γpl }
 
 /-- The slot supplies' names. -/
 @[reducible] def xv6GF_fdslotG (γ : GName) : FdslotG xv6GF := ⟨γ⟩

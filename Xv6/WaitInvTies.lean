@@ -42,6 +42,10 @@ part 1 is `Xv6/WaitInv.lean`, whose header and deviations apply here.
 5. **`p_parent_sext`** (the `sd rd,56(rs)` displacement bridge) is not here:
    it is instruction-level, and Lean's proofs have their own
    (`ProofReparent`, `ProofKexit`).
+6. **The pid ledger** (NI-LEDGER-REST W2, Rocq 8043e4cdd): `childrenBootRows`
+   gains `pidLedAuth []` after the register (Rocq's position), and
+   `childrenRes_alloc` mints it with `MonoList.own_alloc []` at the new
+   `wplName` (its statement unchanged).
 
 Imports only definitional files.
 -/
@@ -559,12 +563,14 @@ theorem childrenInv_empty [CurCtx] (ξ : CtxId) (ps : Nat → BitVec 64) (gs : N
 
 /-! ## What the boot fupd hands main, and the payload -/
 
-/-- the NPROC rows, the orphan column, the empty pid register, the tick
+/-- the NPROC rows, the orphan column, the empty pid register, the pid
+ledger at the empty history (design ni-pid-ledger.md D2: main seals it into
+`pid_lock`'s payload beside the register), the tick
 counter's mirror at 0 (design ni-ticks-ledger.md D1: main raises it to the
 cell's boot value before sealing `<tickslock>`), and the NPROC
 slot-generation wholes (Rocq `children_boot_rows`). -/
 def childrenBootRows : IProp GF :=
-  iprop(childrenResBoot ∗ orphansOwn ∅ ∗ pidRegAuth ∅ ∗ tickCnt 0 ∗
+  iprop(childrenResBoot ∗ orphansOwn ∅ ∗ pidRegAuth ∅ ∗ pidLedAuth [] ∗ tickCnt 0 ∗
     [∗list] i ∈ List.range NPROC, ∃ γ0 g : GName,
       chFrag γ0 (procAddr i) ∅ ∗ slotGen (procAddr i) (.own 1) g)
 
@@ -752,7 +758,8 @@ theorem waitInv_procAddr_nodup
     hne (hinj _ _ (List.mem_range.mp ha) (List.mem_range.mp hb) e)
 
 /-- BOOT: the children map and its NPROC rows, the orphan column (EMPTY:
-nothing has exited), the tick counter's mirror (at 0), the NPROC slot-generation wholes (all at one arbitrary
+nothing has exited), the tick counter's mirror (at 0), the pid ledger (at
+the empty history), the NPROC slot-generation wholes (all at one arbitrary
 name -- nothing reads it), the pid register (EMPTY), init's pid cell (WHOLE,
 at junk) and the pid counter's boot-era token (WHOLE) -- and the INSTANCE
 that names them (deviation 4). -/
@@ -776,11 +783,14 @@ theorem childrenRes_alloc {hlc : HasLC} [MachGS hlc GF]
     with ⟨%γnp, Hnp⟩
   -- ...and the tick counter's mirror, at 0 (design ni-ticks-ledger.md D1)
   imod MonoNat.own_alloc (GF := GF) 0 with ⟨%γtk, Htk, -⟩
+  -- ...and the pid ledger, at the empty history (design ni-pid-ledger.md
+  -- D2): no pid has been handed out
+  imod MonoList.own_alloc (GF := GF) ([] : List Pev) with ⟨%γpl, Hpl, -⟩
   imodintro
   iexists ({ wchName := γ, worphName := γo, wsgName := γsg, wprName := γpr, wipName := γip,
-             npidName := γnp, wtkName := γtk } : WchG GF)
+             npidName := γnp, wtkName := γtk, wplName := γpl } : WchG GF)
   unfold childrenBoot childrenBootRows childrenResBoot childrenOwnAt orphansOwn pidRegAuth
-    initPidTok nextpidPend tickCnt
+    pidLedAuth initPidTok nextpidPend tickCnt
   isplitr [Hnp]
   · isplitl [Hip]
     · iexact Hip
@@ -794,6 +804,8 @@ theorem childrenRes_alloc {hlc : HasLC} [MachGS hlc GF]
     · iexact Ho
     isplitl [Hpr]
     · iexact Hpr
+    isplitl [Hpl]
+    · iexact Hpl
     isplitl [Htk]
     · iexact Htk
     ihave H := BigSepL.bigSepL_sep_eqv.mpr $$ [Hrows Hsg]

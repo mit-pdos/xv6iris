@@ -320,6 +320,7 @@
     "Xv6.LogDefs",
     "Xv6.OffBoxCam",
     "Xv6.OffGv",
+    "Xv6.PidEv",
     "Xv6.PipeNames",
     "Xv6.PtOwn",
     "Xv6.SleepLockGhost",

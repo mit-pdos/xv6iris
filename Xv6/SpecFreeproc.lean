@@ -11,6 +11,22 @@ PINNED AT INTERRUPTS OFF (`hsie`), and it has to be: the post hands
 Both callers hold `p->lock`, so interrupts are off on this hart anyway
 (the Rocq contract pins the same way).
 
+THE LED FORM (NI-LEDGER-REST W2, Rocq 8043e4cdd; design
+`claude-notes/design/ni-pid-ledger.md` D4/R4): `wp_freeproc_led_body` is
+the landed body verbatim, except that the continuation also receives the
+pid ledger's RECEIPT of the release this call made -- `PFree k.proc pid`
+appended right after some history `h` (`SlotGen.pidReceipt`), the actor
+being the hart's proc word.  `FREEPROC` carries both; the led form is the
+proof (`ProofFreeproc.freeproc_led_proof`) and the landed contract its
+corollary, so no caller changes.
+
+## Deviations from Rocq (the led form)
+
+1. The actor is `k.proc` (Rocq `pme`); `FREEPROC`'s second `Parameter`
+   (`wp_freeproc_led_sconf`) is a second structure field `wp_freeproc_led`.
+2. The receipt premise sits right before `procHeld`, as Rocq's sits right
+   before `proc_held` (Lean's continuation carries `⌜calleeSaved⌝` last).
+
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
 import MachCSL.WpSmodeIntr
@@ -82,10 +98,37 @@ def wp_freeproc_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
     ⌜calleeSaved k.regs R'⌝ -∗ wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
 
+/-- THE LED FORM of `freeproc`'s specification (Rocq
+`wp_freeproc_led_sconf_body`): `wp_freeproc_body` verbatim, the
+continuation also receiving the receipt `∃ h, pidReceipt h (.PFree k.proc
+pid)` of the release at `p->pid = 0`. -/
+def wp_freeproc_led_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+    (Γ : SchedNames) (cpu : CPU) (k : KCtx) (γl γp : GName) (γk : KmemNames) (j : Nat) (st : BitVec 32) (ch : BitVec 64)
+    (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (g : GName)
+    (hj : j < NPROC) (hp : k.regs 10#5 = procAddr j) (hst : st = USED ∨ st = ZOMBIE)
+    (hnoff : k.noff + 1 < 2 ^ 31) (hK : freeprocSlots ≤ k.avail) (hsie : k.sie = false)
+    (hlk : "kmem" ∉ k.locks) (hlp : "nextpid" ∉ k.locks) (htier : k.tier = KTier.kpt) : Prop :=
+  kctx cpu k ∗ pcIs cpu freeprocAddr ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
+  isLock γp pidLockAddr "nextpid" pidLockPay ∗
+  procHeld Γ cpu j st ch ∗ freeprocIn (procAddr j) pid V M ∗ freeprocGen (procAddr j) pid g ∗
+  wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
+    ⌜k.sie = false → spie = k.spie ∧ spp = k.spp⌝ -∗
+    kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
+    (∃ h : List Pev, pidReceipt h (.PFree k.proc pid)) -∗
+    procHeld Γ cpu' j UNUSED 0#64 -∗ procDormant (procAddr j) UNUSED -∗
+    ⌜calleeSaved k.regs R'⌝ -∗ wpLoop cpu'))
+  ⊢ wpLoop (GF := GF) cpu
+
+/-- The interface of `freeproc`: the landed contract and (Rocq's second
+`Parameter`) its led form. -/
 structure FREEPROC : Prop where
   wp_freeproc : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx] (Γ : SchedNames) (cpu : CPU) (k : KCtx)
     (γl γp : GName) (γk : KmemNames) (j : Nat) (st : BitVec 32) (ch : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (g : GName) hj hp hst hnoff hK hsie hlk hlp htier,
     wp_freeproc_body (hlc := hlc) (GF := GF) Γ cpu k γl γp γk j st ch pid V M g hj hp hst hnoff hK hsie hlk hlp htier
+  wp_freeproc_led : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx] (Γ : SchedNames) (cpu : CPU) (k : KCtx)
+    (γl γp : GName) (γk : KmemNames) (j : Nat) (st : BitVec 32) (ch : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
+    (M : Nat → List (BitVec 8)) (g : GName) hj hp hst hnoff hK hsie hlk hlp htier,
+    wp_freeproc_led_body (hlc := hlc) (GF := GF) Γ cpu k γl γp γk j st ch pid V M g hj hp hst hnoff hK hsie hlk hlp htier
 
 end Xv6

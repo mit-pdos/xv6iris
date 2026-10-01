@@ -7,6 +7,27 @@ with `ra = forkret` and `sp = kstack + PGSIZE`; the failure tails run
 `freeproc` and return `0` with the lock released.  Uncounted (`on`);
 needs 48 slots.
 
+THE LED FORM (NI-LEDGER-REST W2, Rocq 8043e4cdd; design
+`claude-notes/design/ni-pid-ledger.md` D4, ruling R4): `wp_allocproc_led_body`
+is the same contract with the post `allocprocPostLed`, a COPY of
+`allocprocPost` whose FOUND arm also carries the pid ledger's RECEIPT of the
+allocation the inlined allocpid made (`PAlloc k.proc pid`, appended at the
+register's insert, `SlotGen.pidReceipt`); `ALLOCPROC` carries both, and the
+led form is the proof (`ProofAllocproc.allocproc_led_proof`), the landed
+contract its corollary (`allocprocPostLed_post`).
+
+## Deviations from Rocq (the led form)
+
+1. Rocq has two landed contracts (`wp_allocproc_core` in `ALLOCPROC_GEN`,
+   the counted `wp_allocproc_sconf` in `ALLOCPROC`) and so two led twins;
+   Lean's one contract `wp_allocproc_body` is Rocq's general core (the
+   counted premise is the caller's), so there is ONE led twin,
+   `wp_allocproc_led_body`, a second field `wp_allocproc_led` of
+   `ALLOCPROC` (Rocq's `Parameter wp_allocproc_core_led`).
+2. The actor is `k.proc` (Rocq: the body's `pme`, the `cpu_own` proc word),
+   an explicit parameter `act` of `allocprocPostLed` (Rocq's
+   `allocproc_post_led` takes `pme` anyway).
+
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
 import Xv6.ProcAvail
@@ -107,6 +128,48 @@ def allocprocPost {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF
     stackOwn (V.kstack + 4096#64) 512 ∗
     kallocAvail γk (availSub on g))
 
+/-- THE LED TWIN OF `allocprocPost` (Rocq `allocproc_post_led`, design
+ni-pid-ledger.md D4, ruling R4): a COPY, comments stripped (read them on the
+original above), whose FOUND arm also carries the pid ledger's RECEIPT of
+the allocation -- `PAlloc act pid` appended right after some history `h`,
+the actor `act` being the hart's proc word.  The null arm is unchanged: it
+never reached a registration.  `allocprocPostLed_post` drops the receipt. -/
+def allocprocPostLed {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF]
+    [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
+    (Γ : SchedNames) (γ : FileNames) (cpu : CPU) (γk : KmemNames) (on : Option Nat) (pav : Option Nat)
+    (tk : Bool) (Q : Int → IProp GF) (act : BitVec 64) (r : BitVec 64) :
+    IProp GF := iprop%
+  (⌜r = 0#64 ∧ ((pav = none ∨ pav = some 0) ∨
+      ∃ g : Nat, g ≤ procPagetableNodes + 1 ∧ availZero (availSub on g))⌝ ∗
+    (procsAvailAt Γ pav tk ∨ pavSpent Γ pav) ∗
+    ∃ on' : Option Nat, ⌜on' = on ∨ on' = none⌝ ∗ kallocAvail γk on') ∨
+  (∃ (j : Nat) (ch : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (g : Nat),
+    (∃ h : List Pev, pidReceipt h (.PAlloc act pid)) ∗
+    ⌜r = procAddr j ∧ j < NPROC ∧ 1 ≤ pid.toNat ∧ pid.toNat ≤ PIDMAX ∧ allocprocPriv V ∧ g ≤ procPagetableNodes + 1 ∧
+      (if pavBoot pav tk then pid.toNat = 1 else pid.toNat ≠ 1)⌝ ∗
+    procHeld Γ cpu j USED ch ∗ hartAtAny Γ (procAddr j) ∗ slotUsed Γ (procAddr j) ∗ pavSpent Γ (pavDec pav) ∗
+    procPrivNocwd γ (procAddr j) pid V M ∗ contextCells (procAddr j) (DFrac.own 1) V.context ∗
+    fdFrags V.fdg (List.replicate NOFILE .closed) ∗
+    fdSlots FDSPARE ∗ irefSlots (1 + IREFSPARE) ∗ bslots 3 ∗ chFrag V.chg (procAddr j) ∅ ∗
+    genNew V.gen (procAddr j) pid Q ∗ slotGen (procAddr j) (.own 1) V.gen ∗ pidRegRest pid V.gen ∗
+    (∃ xsv : BitVec 32, wordPointsTo (pXstate (procAddr j)) 4 xsHalf xsv) ∗
+    stackOwn (V.kstack + 4096#64) 512 ∗
+    kallocAvail γk (availSub on g))
+
+/-- The landed post is the led one with the receipt dropped (Rocq
+`allocproc_post_led_post`). -/
+theorem allocprocPostLed_post {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF]
+    [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
+    (Γ : SchedNames) (γ : FileNames) (cpu : CPU) (γk : KmemNames) (on : Option Nat) (pav : Option Nat)
+    (tk : Bool) (Q : Int → IProp GF) (act : BitVec 64) (r : BitVec 64) :
+    allocprocPostLed (GF := GF) Γ γ cpu γk on pav tk Q act r ⊢ allocprocPost Γ γ cpu γk on pav tk Q r := by
+  unfold allocprocPostLed allocprocPost
+  iintro (Hnull | ⟨%j, %ch, %pid, %V, %M, %g, -, Hfound⟩)
+  · ileft; iexact Hnull
+  · iright
+    iexists j, ch, pid, V, M, g
+    iexact Hfound
+
 /-- **WP of `allocproc`**, at either entry `SIE`.  On success it returns
 holding `p->lock`, and with it the arm its `acquire` paid out
 (`sieArm cpu' k.sie k.proc`: the trap bundle at `sie = true`, `True` at
@@ -132,11 +195,41 @@ def wp_allocproc_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6
     ⌜calleeSaved k.regs R'⌝ -∗ wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
 
+/-- THE LED FORM of `allocproc`'s specification (Rocq
+`wp_allocproc_core_led_body`, design D4): `wp_allocproc_body` verbatim, at
+the post `allocprocPostLed` with the actor `k.proc`.  The led form is the
+proof; the landed `wp_allocproc_body` is its corollary. -/
+def wp_allocproc_led_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF]
+    [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
+    (Γ : SchedNames) (γ : FileNames) (cpu : CPU) (k : KCtx) (γl γp : GName) (γk : KmemNames) (on : Option Nat)
+    (pav : Option Nat) (tk : Bool) (Q : Int → IProp GF)
+    (hnoff : k.noff + 2 < 2 ^ 31) (hK : allocprocSlots ≤ k.avail)
+    (hlk : "kmem" ∉ k.locks) (hlp : "nextpid" ∉ k.locks) (hlq : "proc" ∉ k.locks) (htier : k.tier = KTier.kpt) : Prop :=
+  kctx cpu k ∗ pcIs cpu allocprocAddr ∗ procsInv Γ ∗
+  isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗ isLock γp pidLockAddr "nextpid" pidLockPay ∗ kallocAvail γk on ∗
+  procsAvailAt Γ pav tk ∗ □ (MachFixedGS.killCred (hlc := hlc) (GF := GF) -∗ Q (-1)) ∗
+  wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
+    ⌜k.sie = false → spie = k.spie ∧ spp = k.spp⌝ -∗
+    ((⌜R' 10#5 = 0#64⌝ ∗ kctx cpu' ((k.withSpie spie spp).withRegs R')) ∨
+     (⌜R' 10#5 ≠ 0#64⌝ ∗ kctx cpu' (((k.pushOffAt spie spp).withRegs R').withLocks ("proc" :: k.locks)) ∗
+      sieArm cpu' k.sie k.proc)) -∗
+    pcIs cpu' (jumpPc (k.regs 1#5)) -∗
+    allocprocPostLed Γ γ cpu' γk on pav tk Q k.proc (R' 10#5) -∗
+    ⌜calleeSaved k.regs R'⌝ -∗ wpLoop cpu'))
+  ⊢ wpLoop (GF := GF) cpu
+
+/-- The interface of `allocproc`: the landed contract and (Rocq's
+`Parameter wp_allocproc_core_led`) its led form. -/
 structure ALLOCPROC : Prop where
   wp_allocproc : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF]
     [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx] (Γ : SchedNames) (γ : FileNames) (cpu : CPU) (k : KCtx)
     (γl γp : GName) (γk : KmemNames) (on : Option Nat) (pav : Option Nat) (tk : Bool) (Q : Int → IProp GF)
     hnoff hK hlk hlp hlq htier,
     wp_allocproc_body (hlc := hlc) (GF := GF) Γ γ cpu k γl γp γk on pav tk Q hnoff hK hlk hlp hlq htier
+  wp_allocproc_led : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF]
+    [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx] (Γ : SchedNames) (γ : FileNames) (cpu : CPU) (k : KCtx)
+    (γl γp : GName) (γk : KmemNames) (on : Option Nat) (pav : Option Nat) (tk : Bool) (Q : Int → IProp GF)
+    hnoff hK hlk hlp hlq htier,
+    wp_allocproc_led_body (hlc := hlc) (GF := GF) Γ γ cpu k γl γp γk on pav tk Q hnoff hK hlk hlp hlq htier
 
 end Xv6
