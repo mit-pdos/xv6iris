@@ -188,7 +188,7 @@ theorem sys_sbrk_priv_elim (htc : curTier = KTier.kpt) (γ : FileNames) (pa : Bi
   subst htc
   letI : CurCtx := ⟨ξ, KTier.kpt⟩
   unfold sysSbrkBack procPrivFd procPrivCoreNoctxAt procPrivBareAt procFieldsNoOfile
-  iintro ⟨⟨⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hcwd, Hnm, Hsc⟩, Hpt, Htfp, %hlz, Hev⟩, Hc⟩, Ho⟩
+  iintro ⟨⟨⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hcwd, Hnm, Hsc, Hrt⟩, Hpt, Htfp, %hlz, Hev⟩, Hc⟩, Ho⟩
   ihave Htf := procPrivAcc_eq ξ _ 8 _ _ _ h.2.2.2 $$ Htf
   isplitl []
   · ipureintro; exact h
@@ -197,7 +197,7 @@ theorem sys_sbrk_priv_elim (htc : curTier = KTier.kpt) (γ : FileNames) (pa : Bi
   iframe Hs Htf Htfp
   iintro %v %b %hv ⟨Hs, Htf, Htfp⟩
   ihave Htf := procPrivAcc_eq ξ _ 8 _ _ _ h.2.2.2.symm $$ Htf
-  iframe Hpid Hk Hs Hpg Htf Hcwd Hnm Hsc Hpt Htfp Hc Ho Hev
+  iframe Hpid Hk Hs Hpg Htf Hcwd Hnm Hsc Hrt Hpt Htfp Hc Ho Hev
   isplitl []
   · ipureintro; exact ⟨hv.1, hv.2.1, h.2.2.1, h.2.2.2⟩
   · ipureintro; exact hv.2.2

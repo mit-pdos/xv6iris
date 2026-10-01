@@ -31,8 +31,9 @@ the loan can span a call.
 THE ONE BLOCK (wave 7 P2, Rocq-literal).  `procPrivFd γ pa pid V M` is Rocq's
 `proc_priv γf pa pid U = proc_priv_core ∗ proc_ofiles γf (pv_fdg) pa
 (pv_ofile)`: the core `procPrivCoreNoctxAt` is the bare block
-(`procPrivBareAt`, Rocq `proc_priv_bare` + the lazy claim) and `p->cwd`'s
-reference (`ProcInv.cwdRefAt V.cwd V.cwi`), and the descriptor states are
+(`procPrivBareAt`, Rocq `proc_priv_bare` + the lazy claim), `p->cwd`'s
+reference (`ProcInv.cwdRefAt V.cwd V.cwi`) and `p->root`'s right after it
+(`ProcInv.rootRefAt V.root V.rti`, chroot), and the descriptor states are
 named by the block's own `V.fdg` (Rocq `pv_fdg`) -- one ghost name, the map
 camera `FileDefs.FdstUR` keyed by descriptor (Rocq `fdstUR`, no authority:
 a key's two halves update together, `fdSt_update`), minted by `fdSt_alloc`
@@ -41,7 +42,8 @@ per descriptor) is gone; `argfd`/`sys_close`/`sys_dup`/`sys_pipe` read
 `V.fdg`, `fdalloc` (which sees only the array) keeps a `γd : GName`.
 Rocq's `proc_priv_core` D8 conjuncts (`first_tok`, `∃ Q, gen_kq ∗ my_pay`,
 the `p->xstate` half, `gen_halves_priv`) ride the core as ONE named row,
-`procGenAt` (D8 wiring), the core's third conjunct.
+`procGenAt` (D8 wiring), the core's LAST conjunct (after the two
+references).
 -/
 import Xv6.FileInv
 import Xv6.ProcInv
@@ -646,13 +648,13 @@ theorem procPrivNoctxAt_split (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (V
       procPrivBareAt ξ pa pid V M ∗ @ofileCells hlc GF _ ⟨ξ, KTier.kpt⟩ pa (DFrac.own 1) V.ofile := by
   unfold procPrivNoctxAt procPrivBareAt procFieldsNoctx procFieldsNoOfile
   constructor
-  · iintro ⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hof, Hcwd, Hnm, Hsc⟩, Hpt, Htfp, %hlz, Hev⟩
-    iframe Hpid Hk Hs Hpg Htf Hof Hcwd Hnm Hsc Hpt Htfp Hev
+  · iintro ⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hof, Hcwd, Hnm, Hsc, Hrt⟩, Hpt, Htfp, %hlz, Hev⟩
+    iframe Hpid Hk Hs Hpg Htf Hof Hcwd Hnm Hsc Hrt Hpt Htfp Hev
     isplitl []
     · ipureintro; exact h
     · ipureintro; exact hlz
-  · iintro ⟨⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hcwd, Hnm, Hsc⟩, Hpt, Htfp, %hlz, Hev⟩, Hof⟩
-    iframe Hpid Hk Hs Hpg Htf Hof Hcwd Hnm Hsc Hpt Htfp Hev
+  · iintro ⟨⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hcwd, Hnm, Hsc, Hrt⟩, Hpt, Htfp, %hlz, Hev⟩, Hof⟩
+    iframe Hpid Hk Hs Hpg Htf Hof Hcwd Hnm Hsc Hrt Hpt Htfp Hev
     isplitl []
     · ipureintro; exact h
     · ipureintro; exact hlz
@@ -682,41 +684,45 @@ def procGenAt (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (g : GName) : IPro
     (∃ xsv : BitVec 32, wordPointsTo (pXstate pa) 4 xsHalf xsv) ∗
     genHalvesPriv pa pid g)
 
-/-- **The block's core** (Rocq `proc_priv_core`, ProcInv.v:1331): the bare
-block, `p->cwd`'s reference AT the block's inum (`ProcInv.cwdRefAt V.cwd
-V.cwi`, wave 7 P1/P2: the reference joins the block here, where the file
-layer is in scope -- `ProcDefs` / `SchedCtx` cannot name an inode,
-`ProcInv`'s header), and the generation row (`procGenAt`, D8).  No null
-arm: a process whose `p->cwd` is not installed yet holds the deficit block
+/-- **The block's core** (Rocq `proc_priv_core`, ProcInv.v:1331), in this
+ORDER: the bare block, `p->cwd`'s reference AT the block's inum
+(`ProcInv.cwdRefAt V.cwd V.cwi`, wave 7 P1/P2: the reference joins the block
+here, where the file layer is in scope -- `ProcDefs` / `SchedCtx` cannot
+name an inode, `ProcInv`'s header), `p->root`'s reference AT its inum right
+after it (`ProcInv.rootRefAt V.root V.rti`, chroot.md §1: the cwd's twin),
+and LAST the generation row (`procGenAt`, D8).  No null arm: a process whose
+`p->cwd` / `p->root` are not installed yet holds the deficit block
 (`procPrivBareAt`), exactly as Rocq's `proc_priv_nocwd`. -/
 def procPrivCoreNoctxAt (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) : IProp GF := iprop%
   procPrivBareAt ξ pa pid V M ∗ @cwdRefAt hlc GF _ _ _ _ _ ⟨ξ, KTier.kpt⟩ V.cwd V.cwi ∗
+  @rootRefAt hlc GF _ _ _ _ _ ⟨ξ, KTier.kpt⟩ V.root V.rti ∗
   procGenAt ξ pa pid V.gen
 
-/-- The core is the bare block, the cwd reference and the generation row
-(`rfl`; Rocq `proc_priv_core_bare`). -/
+/-- The core is the bare block, the cwd reference, the root reference and
+the generation row (`rfl`; Rocq `proc_priv_core_bare`). -/
 theorem procPrivCoreNoctxAt_bare (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) :
     procPrivCoreNoctxAt (GF := GF) ξ pa pid V M ⊣⊢
       procPrivBareAt ξ pa pid V M ∗ @cwdRefAt hlc GF _ _ _ _ _ ⟨ξ, KTier.kpt⟩ V.cwd V.cwi ∗
+        @rootRefAt hlc GF _ _ _ _ _ ⟨ξ, KTier.kpt⟩ V.root V.rti ∗
         procGenAt ξ pa pid V.gen := .rfl
 
 /-- **The event counter, lent out of the core and taken back at any count**
 (Rocq `proc_priv_core_ev_acc`, permit sweep G, design ni-strong-instance.md
-§7): the counter is the bare block's (`procPrivBareAt_evAcc`); the cwd
-reference and the generation row do not mention `ev`. -/
+§7): the counter is the bare block's (`procPrivBareAt_evAcc`); the two
+references and the generation row do not mention `ev`. -/
 theorem procPrivCoreNoctxAt_evAcc (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) :
     procPrivCoreNoctxAt (GF := GF) ξ pa pid V M ⊢
       actCnt pa V.ev ∗ (∀ k : Nat, actCnt pa k -∗ procPrivCoreNoctxAt ξ pa pid (V.updEv k) M) := by
   unfold procPrivCoreNoctxAt
-  iintro ⟨Hb, Hc, Hg⟩
+  iintro ⟨Hb, Hc, Hr, Hg⟩
   icases procPrivBareAt_evAcc ξ pa pid V M $$ Hb with ⟨Hev, Hw⟩
   iframe Hev
   iintro %k Hev
   ihave Hb := Hw $$ %k Hev
-  iframe Hb Hc Hg
+  iframe Hb Hc Hr Hg
 
 /-- **The pid cell and the event counter, lent out of the core around a
 callee that takes the lend** (permit sweep L1b, Rocq
@@ -734,13 +740,13 @@ theorem procPrivCoreNoctxAt_pidLend (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 
         ∃ k2 : Nat, ⌜V.ev ≤ k2⌝ ∗ procPrivCoreNoctxAt ξ pa pid (V.updEv k2) M) := by
   unfold procPrivCoreNoctxAt procPrivBareAt
   simp only [ProcPriv.updEv, procFieldsNoOfile_updEv]
-  iintro ⟨⟨%hf, Hpid, Hf, Hpt, Htfp, %hlz, Hev⟩, Hcw, Hg⟩
+  iintro ⟨⟨%hf, Hpid, Hf, Hpt, Htfp, %hlz, Hev⟩, Hcw, Hrt, Hg⟩
   icases actLend_borrow pa V.ev $$ Hev with ⟨Hl, Hlb⟩
   iframe Hpid Hl
   iintro Hpid ⟨%k1, %hk1, Hl⟩
   icases Hlb $$ %k1 %hk1 Hl with ⟨%k2, %hk2, Hev⟩
   iexists k2
-  iframe Hpid Hf Hpt Htfp Hev Hcw Hg
+  iframe Hpid Hf Hpt Htfp Hev Hcw Hrt Hg
   isplitl []
   · ipureintro; exact hk2
   isplitl []
@@ -787,10 +793,12 @@ theorem procGenAt_unmark (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (g : GN
   · iintro ⟨⟨Hf, Hq, Hx, Hg⟩, Ht⟩
     iframe Hf Hq Hx Hg Ht
 
-/-- The core with the marker-less generation row. -/
+/-- The core with the marker-less generation row (the same order: the bare
+block, the cwd's reference, the root's, the generation row). -/
 def procPrivCoreUnmarkedAt (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) : IProp GF := iprop%
   procPrivBareAt ξ pa pid V M ∗ @cwdRefAt hlc GF _ _ _ _ _ ⟨ξ, KTier.kpt⟩ V.cwd V.cwi ∗
+  @rootRefAt hlc GF _ _ _ _ _ ⟨ξ, KTier.kpt⟩ V.root V.rti ∗
   procGenUnmarkedAt ξ pa pid V.gen
 
 /-- **THE BLOCK WITHOUT THE INCARNATION'S MARKER** (Rocq
@@ -816,11 +824,11 @@ theorem procPrivFd_unmark (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V
     procPrivFd (GF := GF) γ pa pid V M ⊣⊢ procPrivUnmarked γ pa pid V M ∗ takenAt V.gen := by
   unfold procPrivFd procPrivCoreNoctxAt procPrivUnmarked procPrivCoreUnmarkedAt
   constructor
-  · iintro ⟨⟨Hb, Hc, Hg⟩, Ho⟩
+  · iintro ⟨⟨Hb, Hc, Hr, Hg⟩, Ho⟩
     icases (procGenAt_unmark curCtx pa pid V.gen).1 $$ Hg with ⟨Hg, Ht⟩
-    iframe Hb Hc Hg Ho Ht
-  · iintro ⟨⟨⟨Hb, Hc, Hg⟩, Ho⟩, Ht⟩
-    iframe Hb Hc Ho
+    iframe Hb Hc Hr Hg Ho Ht
+  · iintro ⟨⟨⟨Hb, Hc, Hr, Hg⟩, Ho⟩, Ht⟩
+    iframe Hb Hc Hr Ho
     iapply (procGenAt_unmark curCtx pa pid V.gen).2
     iframe Hg Ht
 
@@ -1048,14 +1056,14 @@ theorem procPriv_bare_split [X : CurCtx] (h : curTier = KTier.kpt) (pa : BitVec 
   subst h
   unfold procPriv procPrivBareAt procFields procFieldsNoOfile
   constructor
-  · iintro ⟨%hf, Hpid, ⟨Hk, Hs, Hpg, Htf, Hctx, Hof, Hcwd, Hnm, Hsc⟩, Hpt, Htfp, %hlz, Hev⟩
+  · iintro ⟨%hf, Hpid, ⟨Hk, Hs, Hpg, Htf, Hctx, Hof, Hcwd, Hnm, Hsc, Hrt⟩, Hpt, Htfp, %hlz, Hev⟩
     iframe Hctx Hof
-    iframe Hpid Hk Hs Hpg Htf Hcwd Hnm Hsc Hpt Htfp Hev
+    iframe Hpid Hk Hs Hpg Htf Hcwd Hnm Hsc Hrt Hpt Htfp Hev
     isplitl []
     · ipureintro; exact hf
     · ipureintro; exact hlz
-  · iintro ⟨⟨%hf, Hpid, ⟨Hk, Hs, Hpg, Htf, Hcwd, Hnm, Hsc⟩, Hpt, Htfp, %hlz, Hev⟩, Hctx, Hof⟩
-    iframe Hpid Hk Hs Hpg Htf Hctx Hof Hcwd Hnm Hsc Hpt Htfp Hev
+  · iintro ⟨⟨%hf, Hpid, ⟨Hk, Hs, Hpg, Htf, Hcwd, Hnm, Hsc, Hrt⟩, Hpt, Htfp, %hlz, Hev⟩, Hctx, Hof⟩
+    iframe Hpid Hk Hs Hpg Htf Hctx Hof Hcwd Hnm Hsc Hrt Hpt Htfp Hev
     isplitl []
     · ipureintro; exact hf
     · ipureintro; exact hlz
@@ -1072,7 +1080,7 @@ theorem procPriv_null_mint [X : CurCtx] (h : curTier = KTier.kpt) (γ : FileName
     procPriv (GF := GF) pa pid V M ∗ dormantAllow ⊢
       |==> ∃ γd : GName, procPrivNocwd γ pa pid { V with fdg := γd } M ∗
         contextCells pa (DFrac.own 1) V.context ∗ fdFrags γd (List.replicate NOFILE .closed) ∗
-        fdSlots FDSPARE ∗ irefSlots (1 + IREFSPARE) ∗ bslots 3 := by
+        fdSlots FDSPARE ∗ irefSlots (IREFHOME + IREFSPARE) ∗ bslots 3 := by
   iintro ⟨Hp, Ha⟩
   icases (procPriv_bare_split h pa pid V M).1 $$ Hp with ⟨Hb, Hc, Ho⟩
   ihave Ho := (show ofileCells (GF := GF) pa (DFrac.own 1) V.ofile ⊢
@@ -1080,7 +1088,7 @@ theorem procPriv_null_mint [X : CurCtx] (h : curTier = KTier.kpt) (γ : FileName
     from by rw [hof]; unfold ofileCells; iintro ⟨-, H⟩; iexact H) $$ Ho
   icases (show dormantAllow (GF := GF) ⊢
       ([∗list] _f ∈ List.replicate NOFILE (0#64 : BitVec 64), fdSlot) ∗ fdSlots FDSPARE ∗
-        irefSlots (1 + IREFSPARE) ∗ bslots 3 from by unfold dormantAllow; exact .rfl) $$ Ha
+        irefSlots (IREFHOME + IREFSPARE) ∗ bslots 3 from by unfold dormantAllow; exact .rfl) $$ Ha
     with ⟨Hs, Hfs, Hir, Hbs⟩
   imod procOfiles_null_mint γ pa $$ [$Ho $Hs] with ⟨%γd, Hot, Hfr⟩
   imodintro
@@ -1101,7 +1109,7 @@ theorem procPrivNocwd_null_open [X : CurCtx] (h : curTier = KTier.kpt) (γ : Fil
     (hof : V.ofile = List.replicate NOFILE 0#64) :
     procPrivNocwd (GF := GF) γ pa pid V M ∗ contextCells pa (DFrac.own 1) V.context ∗
       fdFrags V.fdg (List.replicate NOFILE .closed) ∗
-      fdSlots FDSPARE ∗ irefSlots (1 + IREFSPARE) ∗ bslots 3 ⊢
+      fdSlots FDSPARE ∗ irefSlots (IREFHOME + IREFSPARE) ∗ bslots 3 ⊢
       procPriv pa pid V M ∗ dormantAllow ∗
         [∗list] i ∈ List.range NOFILE, fdStAt V.fdg i (.own 1) .closed := by
   unfold procPrivNocwd

@@ -210,7 +210,7 @@ theorem mn_procinit (PR : PROCINIT) [CurCtx] (cpu : CPU) (k : KCtx) (R0 : RegMap
     kctx cpu (k.withRegs R0) ∗ pcIs cpu (KA.«main» + 122#64) ∗
     mainLkRaw pidLockAddr ∗ mainLkRaw waitLockAddr ∗
     ([∗list] i ∈ List.range NPROC, procRaw i) ∗
-    fdSlots (NPROC * (NOFILE + FDSPARE)) ∗ irefSlots (NPROC * (1 + IREFSPARE)) ∗ bslots (NPROC * 3) ∗
+    fdSlots (NPROC * (NOFILE + FDSPARE)) ∗ irefSlots (NPROC * (IREFHOME + IREFSPARE)) ∗ bslots (NPROC * 3) ∗
     (∀ R : RegMap, kctx cpu (k.withRegs R) -∗ pcIs cpu (KA.«main» + 126#64) -∗
       lockInited pidLockAddr nextpidNameAddr -∗ lockInited waitLockAddr waitLockNameAddr -∗
       ([∗list] i ∈ List.range NPROC, procReady i) -∗ wpLoop cpu)

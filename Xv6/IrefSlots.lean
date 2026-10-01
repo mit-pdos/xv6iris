@@ -23,7 +23,7 @@ arithmetic -- is what bounds the count.
 
 THE SUPPLY.  Where can an inode reference actually live?
 
-  - each process's `p->cwd`                                    NPROC
+  - each process's two homes, `p->cwd` and `p->root`   NPROC * IREFHOME
   - each ftable entry holding an FD_INODE / FD_DEVICE file     NFILE
   - a per-process allowance for references a syscall holds in
     LOCALS before they reach either home            NPROC * IREFSPARE
@@ -35,7 +35,8 @@ room, matching `FdSlots.FDSPARE`'s reasoning.
 
 Note this supply is NOT `FDSLOTS` and the two must not be shared: an fd
 slot bounds descriptors, an iref slot bounds inode references, and a
-process holds NOFILE of the first but at most one cwd of the second.
+process holds NOFILE of the first but at most IREFHOME homes (its cwd and
+its root) of the second.
 
 Routing mirrors the fd units exactly: the AUTHORITY lives in the itable
 lock's resource (`IcacheEscrow.itable_res2`) beside the per-slot counts, so
@@ -83,7 +84,7 @@ Nothing.
 `NPROC` and `NFILE` come from the light `Xv6/SlotSupply.lean` (Rocq's
 `ProcGeom.v`/`FdSlots.v` role), so this file sits BELOW `Xv6/ProcDefs.lean`:
 the dormant block (`ProcDefs.procDormant`, Rocq `proc_dormant`) parks
-`irefSlots (1 + IREFSPARE)`, and `FileDefs` imports this file (Rocq's
+`irefSlots (IREFHOME + IREFSPARE)`, and `FileDefs` imports this file (Rocq's
 `file_core` names `iref_frac`) -- neither may be a cycle.
 -/
 import Xv6.SlotSupply
@@ -98,6 +99,14 @@ set_option linter.unusedSectionVars false
 header. -/
 def IREFSPARE : Nat := 4
 
+/-- **The references a live process keeps at HOME** in its `struct proc`
+(Rocq `IREFHOME`, design chroot.md §6): two, `p->cwd` and `p->root` (upstream
+b72cbac's per-process root directory).  Both are parked in the process
+block, so every per-process figure -- allocproc's and freeproc's posts, the
+ZOMBIE park, `ProcDefs.dormantAllow`, `procDormantPrestk`, the boot carve's
+provisioning -- is `IREFHOME + IREFSPARE`. -/
+def IREFHOME : Nat := 2
+
 /-- THE BOOT CHAIN'S OWN TWO UNITS, and they are NOT part of the table's
 provisioning.  `SpecFsinit` takes one for ireclaim's iget/iput pair and
 `KexecDefs` -- which forkret's boot arm calls next off the same token --
@@ -107,9 +116,9 @@ could not start with all `NFILE` slots FREE, and a free slot owns one whole
 unit (`FileInvDefs.file_core`'s untyped arm).  So they are their own row. -/
 def IREFBOOT : Nat := 2
 
-/-- One cwd per process, one per open file, plus the per-process allowance,
-plus the boot chain's two. -/
-def IREFSLOTS : Nat := NPROC * (1 + IREFSPARE) + NFILE + IREFBOOT
+/-- A cwd and a root per process, one per open file, plus the per-process
+allowance, plus the boot chain's two. -/
+def IREFSLOTS : Nat := NPROC * (IREFHOME + IREFSPARE) + NFILE + IREFBOOT
 
 /-- THE CMRA IS FRACTIONAL, and it has to be.  A unit is evidence that the
 system has somewhere to put a reference, and for the `NFILE` units that
@@ -275,7 +284,7 @@ theorem irefSlots_no_overflow (n : Nat) :
   iintro H
   ihave %hle := irefSlots_bound n $$ H
   ipureintro
-  have EI : IREFSLOTS = 422 := rfl
+  have EI : IREFSLOTS = 486 := rfl
   omega
 
 /-! ### The boot-time distribution

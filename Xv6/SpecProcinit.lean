@@ -24,7 +24,7 @@ PROCINIT IS WHERE THE SLOT SUPPLIES ARE ROUTED (Rocq, batch 8-P, pending
 (`ProcDefs.procDormantNofd`, Rocq `proc_dormant_nofd`; `procRaw` is Rocq's
 `proc_raw`), and the caller hands over the WHOLE per-process shares of the
 three supplies -- `fdSlots (NPROC * (NOFILE + FDSPARE))`, `irefSlots (NPROC
-* (1 + IREFSPARE))`, `bslots (NPROC * 3)` -- which procinit routes, one
+* (IREFHOME + IREFSPARE))`, `bslots (NPROC * 3)` -- which procinit routes, one
 share per slot, into the PRE-STACK block (`ProcDefs.procDormantPrestk`,
 Rocq `proc_dormant_prestk`).  What comes back per slot (`procReady`, Rocq
 `proc_ready`) is the lock's fresh words, `state = UNUSED`, `p->kstack =
@@ -120,7 +120,7 @@ def wp_procinit_body (cpu : CPU) (k : KCtx) (hK : 10 ≤ k.avail) : Prop :=
   (∃ vlock vname vcpu, lockWords waitLockAddr vlock vname vcpu) ∗
   ([∗list] i ∈ List.range NPROC, procRaw i) ∗
   fdSlots (NPROC * (NOFILE + FDSPARE)) ∗
-  irefSlots (NPROC * (1 + IREFSPARE)) ∗
+  irefSlots (NPROC * (IREFHOME + IREFSPARE)) ∗
   bslots (NPROC * 3) ∗
   wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ R' : RegMap,
     kctx cpu' (k.withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗

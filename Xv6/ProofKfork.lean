@@ -1929,7 +1929,7 @@ def kfOfileΨ [CurCtx] (cpu : CPU) (k : KCtx) (Γ : SchedNames) [ClaimIs (hlc :=
   procPtAt Pnew' Mnew' ∗ tfPageAt V_c.upt.tfp (V.tf.set 14 0#64) ∗ actCnt (procAddr i) V_c.ev ∗
   stackOwn (V_c.kstack + 4096#64) 512 ∗
   procHeld Γ cpu i USED ch ∗ hartAtAny Γ (procAddr i) ∗ slotUsed Γ (procAddr i) ∗
-  cwdRefAt V.cwd V.cwi ∗ fdSlots FDSPARE ∗ irefSlots (1 + IREFSPARE) ∗ bslots 3 ∗
+  cwdRefAt V.cwd V.cwi ∗ fdSlots FDSPARE ∗ irefSlots (IREFHOME + IREFSPARE) ∗ bslots 3 ∗
   chFrag V_c.chg (procAddr i) ∅ ∗
   procGenAt curCtx (procAddr j) pid V.gen ∗ chFrag V.chg (procAddr j) csP ∗
   childTok V_c.gen pid_c Q ∗ procGenAt curCtx (procAddr i) pid_c V_c.gen ∗
@@ -2206,7 +2206,7 @@ theorem kf_publish [X : CurCtx] (AC : ACQUIRE) (RE : RELEASE) (SS : SAFESTRCPY) 
       procPtAt Pnew' Mnew' ∗ tfPageAt V_c.upt.tfp (V.tf.set 14 0#64) ∗ actCnt (procAddr i) V_c.ev ∗
       stackOwn (V_c.kstack + 4096#64) 512 ∗
       procHeld Γ cpu i USED ch ∗ hartAtAny Γ (procAddr i) ∗ slotUsed Γ (procAddr i) ∗
-      cwdRefAt V.cwd V.cwi ∗ fdSlots FDSPARE ∗ irefSlots (1 + IREFSPARE) ∗ bslots 3 ∗
+      cwdRefAt V.cwd V.cwi ∗ fdSlots FDSPARE ∗ irefSlots (IREFHOME + IREFSPARE) ∗ bslots 3 ∗
       chFrag V_c.chg (procAddr i) ∅ ∗
       procGenAt curCtx (procAddr j) pid V.gen ∗ chFrag V.chg (procAddr j) csP ∗
       childTok V_c.gen pid_c Q ∗ procGenAt curCtx (procAddr i) pid_c V_c.gen ∗
@@ -2220,7 +2220,7 @@ theorem kf_publish [X : CurCtx] (AC : ACQUIRE) (RE : RELEASE) (SS : SAFESTRCPY) 
       Hcstack, Hheld, Hhart, #Hused, Hcwr, Hfsp, Hirs, Hbs, Hcch,
       HgP, Hrowp, Htok, HgC, Hsg34, Hpr34, #Hgs, #Hgp, #Hfd, #Hmp, Hpark⟩
   -- the cwd's iref unit, out of the child's allowances (spent on idup)
-  icases (show irefSlots (GF := GF) (1 + IREFSPARE) ⊢ irefSlot ∗ irefSlots IREFSPARE from
+  icases (show irefSlots (GF := GF) (IREFHOME + IREFSPARE) ⊢ irefSlot ∗ irefSlots IREFSPARE from
     irefSlots_split 1 IREFSPARE) $$ Hirs with ⟨Hir1, Hirs⟩
   -- the parent's cwd reference, opened to its slot
   icases kf_cwd_open V.cwd V.cwi $$ Hcwr with ⟨%kkc, %⟨hcwdv, hkkc⟩, Hcwr⟩
@@ -3110,7 +3110,7 @@ theorem kfork_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (AL : ALLOCPROC)
             pavSpent Γ (pavDec none) ∗
             procPrivNocwd γ (procAddr i) pid_c V_c M_c ∗ contextCells (procAddr i) (DFrac.own 1) V_c.context ∗
             fdFrags V_c.fdg (List.replicate NOFILE .closed) ∗
-            fdSlots FDSPARE ∗ irefSlots (1 + IREFSPARE) ∗ bslots 3 ∗ chFrag V_c.chg (procAddr i) ∅ ∗
+            fdSlots FDSPARE ∗ irefSlots (IREFHOME + IREFSPARE) ∗ bslots 3 ∗ chFrag V_c.chg (procAddr i) ∅ ∗
             genNew V_c.gen (procAddr i) pid_c Q ∗ slotGen (procAddr i) (.own 1) V_c.gen ∗
             pidRegRest pid_c V_c.gen ∗
             (∃ xsv : BitVec 32, wordPointsTo (pXstate (procAddr i)) 4 xsHalf xsv) ∗
@@ -3630,7 +3630,7 @@ theorem kfork_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (AL : ALLOCPROC)
           -- the frame to the publish (idup's unit, then the park)
           icases (show dormantAllow (GF := GF) ⊢
               ([∗list] _f ∈ List.replicate NOFILE (0#64 : BitVec 64), fdSlot) ∗ fdSlots FDSPARE ∗
-              irefSlots (1 + IREFSPARE) ∗ bslots 3 from by unfold dormantAllow; exact .rfl) $$ Hcal
+              irefSlots (IREFHOME + IREFSPARE) ∗ bslots 3 from by unfold dormantAllow; exact .rfl) $$ Hcal
             with ⟨Hfds, Hfsp, Hirs, Hbs⟩
           -- FORK'S CUT OF THE GENERATION allocproc minted (Rocq `ProofKforkMain`)
           icases kf_gen_split (procAddr i) pid_c V_c.gen Q rfl ⟨hpid1, hpid2⟩ $$ [Hgn Hsgw Hprr Hxs]

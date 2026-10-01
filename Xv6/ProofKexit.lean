@@ -963,7 +963,7 @@ theorem kx_rest (AC : ACQUIRE) (RE : RELEASE) (RP : REPARENT) (WU : WAKEUP) (SC 
   case' _ =>
     unfold dormantAllow
     iframe Hfds Hfsp Hbs
-    iapply (show irefSlot (GF := GF) ∗ irefSlots IREFSPARE ⊢ irefSlots (1 + IREFSPARE) from
+    iapply (show irefSlot (GF := GF) ∗ irefSlots IREFSPARE ⊢ irefSlots (IREFHOME + IREFSPARE) from
       irefSlots_combine 1 IREFSPARE)
     iframe Hir2 Hirs
   -- ==== the lock section (0x80002170 → 0x800021a6) ====

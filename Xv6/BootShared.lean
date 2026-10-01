@@ -306,7 +306,7 @@ theorem bootShared_kptRows [CurCtx] (cn : ConsNames) :
       bootRan (imgFlat bootImage) MachCSL.KernelSyms.«ftable» (MachCSL.KernelSyms.«ftable» + 0xfb8) -∗
       bootRan (imgFlat bootImage) MachCSL.KernelSyms.«disk» (MachCSL.KernelSyms.«disk» + 0x140) -∗
       consGhostsBoot cn -∗
-      fdSlots (NPROC * (NOFILE + FDSPARE)) -∗ irefSlots (NPROC * (1 + IREFSPARE)) -∗
+      fdSlots (NPROC * (NOFILE + FDSPARE)) -∗ irefSlots (NPROC * (IREFHOME + IREFSPARE)) -∗
       irefSlots NFILE -∗ bslots (NPROC * 3) -∗
       mainLocksRaw ∗ mainGlobalsRaw cn ∗ mainSbRaw ∗ mainLogRaw ∗
       wordPointsTo firstAddr 4 (DFrac.own 1) 1#32 ∗ wordPointsTo nextpidAddr 4 (DFrac.own 1) 1#32 ∗

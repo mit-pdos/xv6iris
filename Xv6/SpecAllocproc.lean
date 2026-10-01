@@ -51,10 +51,11 @@ def allocprocAddr : BitVec 64 := KA.«allocproc»
 def forkretAddr : BitVec 64 := KA.«forkret»
 def allocprocSlots : Nat := 48
 
-/-- The private block `allocproc` builds: no files, no cwd, size 0, an
-empty space, the context `[forkret, kstack + PGSIZE, 0 × 12]`. -/
+/-- The private block `allocproc` builds: no files, no cwd, no root
+(chroot: `p->root` is the cwd's twin), size 0, an empty space, the context
+`[forkret, kstack + PGSIZE, 0 × 12]`. -/
 def allocprocPriv (V : ProcPriv) : Prop :=
-  V.ofile = List.replicate NOFILE 0#64 ∧ V.cwd = 0#64 ∧ V.sz = 0#64 ∧
+  V.ofile = List.replicate NOFILE 0#64 ∧ V.cwd = 0#64 ∧ V.root = 0#64 ∧ V.sz = 0#64 ∧
   (∀ vpn, Iris.Std.PartialMap.get? V.upt.um vpn = none) ∧
   V.context = [forkretAddr, V.kstack + 4096#64] ++ List.replicate 12 0#64
 
@@ -83,7 +84,7 @@ owning its `fd_slot` unit and its closed authority), the save area
 (`contextCells`, what the caller's park takes), and the fragment bundle at
 all-`closed` (`fdFrags V.fdg (replicate NOFILE .closed)`, Rocq `fd_frags
 (pv_fdg) fdt0`).  THE SLOT'S OTHER ALLOWANCES come out beside it, as in
-Rocq's post: `fdSlots FDSPARE ∗ irefSlots (1 + IREFSPARE) ∗ bslots 3`.
+Rocq's post: `fdSlots FDSPARE ∗ irefSlots (IREFHOME + IREFSPARE) ∗ bslots 3`.
 allocproc never spends them: the caller hands them to the new process, and
 a failure tail gives them straight back to `freeproc` (the descriptor
 ghost simply dies with the incarnation that never started).
@@ -129,7 +130,7 @@ def allocprocPost {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF
     procHeld Γ cpu j USED ch ∗ hartAtAny Γ (procAddr j) ∗ slotUsed Γ (procAddr j) ∗ pavSpent Γ (pavDec pav) ∗
     procPrivNocwd γ (procAddr j) pid V M ∗ contextCells (procAddr j) (DFrac.own 1) V.context ∗
     fdFrags V.fdg (List.replicate NOFILE .closed) ∗
-    fdSlots FDSPARE ∗ irefSlots (1 + IREFSPARE) ∗ bslots 3 ∗ chFrag V.chg (procAddr j) ∅ ∗
+    fdSlots FDSPARE ∗ irefSlots (IREFHOME + IREFSPARE) ∗ bslots 3 ∗ chFrag V.chg (procAddr j) ∅ ∗
     genNew V.gen (procAddr j) pid Q ∗ slotGen (procAddr j) (.own 1) V.gen ∗ pidRegRest pid V.gen ∗
     (∃ xsv : BitVec 32, wordPointsTo (pXstate (procAddr j)) 4 xsHalf xsv) ∗
     stackOwn (V.kstack + 4096#64) 512 ∗
@@ -157,7 +158,7 @@ def allocprocPostLed {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
     procHeld Γ cpu j USED ch ∗ hartAtAny Γ (procAddr j) ∗ slotUsed Γ (procAddr j) ∗ pavSpent Γ (pavDec pav) ∗
     procPrivNocwd γ (procAddr j) pid V M ∗ contextCells (procAddr j) (DFrac.own 1) V.context ∗
     fdFrags V.fdg (List.replicate NOFILE .closed) ∗
-    fdSlots FDSPARE ∗ irefSlots (1 + IREFSPARE) ∗ bslots 3 ∗ chFrag V.chg (procAddr j) ∅ ∗
+    fdSlots FDSPARE ∗ irefSlots (IREFHOME + IREFSPARE) ∗ bslots 3 ∗ chFrag V.chg (procAddr j) ∅ ∗
     genNew V.gen (procAddr j) pid Q ∗ slotGen (procAddr j) (.own 1) V.gen ∗ pidRegRest pid V.gen ∗
     (∃ xsv : BitVec 32, wordPointsTo (pXstate (procAddr j)) 4 xsHalf xsv) ∗
     stackOwn (V.kstack + 4096#64) 512 ∗

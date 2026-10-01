@@ -61,13 +61,13 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 
 /-- What `freeproc` takes of the block: the private fields, the slot's
 allowances (`dormantAllow`, Rocq `fp_rest`'s `[∗ list] _ ∈ pv_ofile V,
-fd_slot ∗ fd_slots FDSPARE ∗ iref_slots (1 + IREFSPARE) ∗ bslots 3`:
+fd_slot ∗ fd_slots FDSPARE ∗ iref_slots (IREFHOME + IREFSPARE) ∗ bslots 3`:
 freeproc moves none of them, which is what makes its ZOMBIE → UNUSED step a
 pass-through for the supplies), the trapframe
 page if `trapframe ≠ 0`, the address space if `pagetable ≠ 0`.  The files
-are already closed and the cwd dropped (the Rocq `fp_rest`'s two pure
-rows): `freeproc` only zeroes cells, so what the UNUSED block it rebuilds
-records of `ofile`/`cwd` has to arrive here.  The trapframe page carries
+are already closed and the cwd and the root dropped (the Rocq `fp_rest`'s
+pure rows): `freeproc` only zeroes cells, so what the UNUSED block it
+rebuilds records of `ofile`/`cwd`/`root` has to arrive here.  The trapframe page carries
 its `pageValid` (Rocq `fp_tf`), which is what `kfree` demands of the
 pointer it is handed and which the pagetable arm, when absent, cannot
 supply.  The slot's children row (`chFrag V.chg pa ∅`, Rocq `fp_rest`'s
@@ -75,7 +75,7 @@ supply.  The slot's children row (`chFrag V.chg pa ∅`, Rocq `fp_rest`'s
 slot's event counter at the block's `ev` (`actCnt pa V.ev`, Rocq G's
 `fp_rest`, design ni-strong-instance.md §7). -/
 def freeprocIn (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) : IProp GF := iprop%
-  ⌜V.ofile = List.replicate NOFILE 0#64 ∧ V.cwd = 0#64⌝ ∗
+  ⌜V.ofile = List.replicate NOFILE 0#64 ∧ V.cwd = 0#64 ∧ V.root = 0#64⌝ ∗
   wordPointsTo (pPid pa) 4 pidPriv pid ∗ procFields pa (DFrac.own 1) V ∗
   dormantAllow ∗ chFrag V.chg pa ∅ ∗ actCnt pa V.ev ∗ stackOwn (V.kstack + 4096#64) 512 ∗
   (if V.trapframe = 0#64 then emp else

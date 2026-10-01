@@ -310,7 +310,7 @@ def mnKptB [Y : CurCtx] (cn : ConsNames) : IProp GF := iprop%
     (∃ kl xs pid : BitVec 32, procPubRest (procAddr i) kl xs pid)) ∗
   ([∗list] i ∈ List.range NPROC, wordPointsTo (pPid (procAddr i)) 4 pidLockQ 0#32) ∗
   parentsResAt curCtx ∗
-  fdSlots (NPROC * (NOFILE + FDSPARE)) ∗ irefSlots (NPROC * (1 + IREFSPARE)) ∗ bslots (NPROC * 3) ∗
+  fdSlots (NPROC * (NOFILE + FDSPARE)) ∗ irefSlots (NPROC * (IREFHOME + IREFSPARE)) ∗ bslots (NPROC * 3) ∗
   ticksResAt curCtx ∗ consResAt cn curCtx ∗ consCleanTok cn ∗
   wordPointsTo nextpidAddr 4 (DFrac.own 1) 1#32
 

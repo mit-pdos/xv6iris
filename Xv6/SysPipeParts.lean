@@ -605,10 +605,11 @@ theorem sys_pipe_fd1_bytes (sp : BitVec 64) (hal : (sp + 0xFFFFFFFFFFFFFFC0#64).
 
 /-- The core minus the two fields `copyout` reads and its address space: the
 one bare rest (`EitherDefs.ecRest`, at the block's own context) beside the
-cwd reference and the generation row. -/
+cwd reference, the root reference and the generation row. -/
 def sysPipeCoreRest (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) : IProp GF := iprop%
   @ecRest hlc GF _ _ ⟨curCtx, KTier.kpt⟩ pa pid V V.upt ∗
-  @cwdRefAt hlc GF _ _ _ _ _ ⟨curCtx, KTier.kpt⟩ V.cwd V.cwi ∗ procGenAt curCtx pa pid V.gen
+  @cwdRefAt hlc GF _ _ _ _ _ ⟨curCtx, KTier.kpt⟩ V.cwd V.cwi ∗
+  @rootRefAt hlc GF _ _ _ _ _ ⟨curCtx, KTier.kpt⟩ V.root V.rti ∗ procGenAt curCtx pa pid V.gen
 
 /-- The rest's event counter, LENT (permit sweep L1b, Rocq
 `proc_priv_core_copy_ev`): for a copyout, the rest comes back at whatever
@@ -619,13 +620,13 @@ theorem sysPipeCoreRest_lend (p pa : BitVec 64) (hp : p = pa) (pid : BitVec 32) 
       ((∃ k1 : Nat, ⌜V.ev ≤ k1⌝ ∗ actLend p k1) -∗
         ∃ k2 : Nat, ⌜V.ev ≤ k2⌝ ∗ sysPipeCoreRest pa pid (V.updEv k2)) := by
   unfold sysPipeCoreRest
-  iintro ⟨Hr, Hcw, Hg⟩
+  iintro ⟨Hr, Hcw, Hrr, Hg⟩
   icases @ecRest_lend hlc GF _ _ _ _ _ _ _ ⟨curCtx, KTier.kpt⟩ p pa hp pid V V.upt $$ Hr with ⟨Hl, Hrb⟩
   iframe Hl
   iintro Hl
   icases Hrb $$ Hl with ⟨%k2, %hk2, Hr⟩
   iexists k2
-  iframe Hr Hcw Hg
+  iframe Hr Hcw Hrr Hg
   ipureintro; exact hk2
 
 /-- The trapframe cell and page `argaddr` reads, out and back. -/
@@ -637,12 +638,12 @@ theorem sys_pipe_core_tf (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : 
       (@wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pTrapframe pa) 8 (DFrac.own 1) V.trapframe -∗
         @tfPageAt hlc GF _ ⟨curCtx, KTier.kpt⟩ V.upt.tfp V.tf -∗ procPrivCoreNoctxAt curCtx pa pid V M) := by
   unfold procPrivCoreNoctxAt procPrivBareAt procFieldsNoOfile
-  iintro ⟨⟨%hf, Hpid, ⟨Hks, Hsz, Hpg, Htf, Hcwd, Hnm, Hsc⟩, Hpt, Htfp, %hlz, Hev⟩, Hcw⟩
+  iintro ⟨⟨%hf, Hpid, ⟨Hks, Hsz, Hpg, Htf, Hcwd, Hnm, Hsc, Hrt⟩, Hpt, Htfp, %hlz, Hev⟩, Hcw⟩
   iframe Htf Htfp
   isplitl []
   · ipureintro; exact hf.2.2.2
   iintro Htf Htfp
-  iframe Hpid Hks Hsz Hpg Htf Hcwd Hnm Hsc Hpt Htfp Hcw Hev
+  iframe Hpid Hks Hsz Hpg Htf Hcwd Hnm Hsc Hrt Hpt Htfp Hcw Hev
   isplitl []
   · ipureintro; exact hf
   · ipureintro; exact hlz
@@ -655,8 +656,8 @@ theorem sys_pipe_core_split (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M
       @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPagetable pa) 8 (DFrac.own 1) V.pagetable ∗
       @procPtAt hlc GF _ ⟨curCtx, KTier.kpt⟩ V.upt M ∗ sysPipeCoreRest pa pid V := by
   unfold procPrivCoreNoctxAt procPrivBareAt procFieldsNoOfile sysPipeCoreRest ecRest
-  iintro ⟨⟨%hf, Hpid, ⟨Hks, Hsz, Hpg, Htf, Hcwd, Hnm, Hsc⟩, Hpt, Htfp, %hlz, Hev⟩, Hcw⟩
-  iframe Hpid Hks Hsz Hpg Htf Hcwd Hnm Hsc Hpt Htfp Hcw Hev
+  iintro ⟨⟨%hf, Hpid, ⟨Hks, Hsz, Hpg, Htf, Hcwd, Hnm, Hsc, Hrt⟩, Hpt, Htfp, %hlz, Hev⟩, Hcw⟩
+  iframe Hpid Hks Hsz Hpg Htf Hcwd Hnm Hsc Hrt Hpt Htfp Hcw Hev
   isplitl []
   · ipureintro; exact hf
   · ipureintro; exact hlz
@@ -672,8 +673,8 @@ theorem sys_pipe_core_ext (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P' 
       procPrivCoreNoctxAt curCtx pa pid { V with upt := P' } M' := by
   unfold procPrivCoreNoctxAt procPrivBareAt sysPipeCoreRest ecRest procFieldsNoOfile
   rw [hext.1.1, hext.1.2.1]
-  iintro ⟨Hsz, Hpg, Hpt, ⟨Hpid, Hks, Htf, Hcwd, Hnm, Hsc, Htfp, %hlz, Hev⟩, Hcw⟩
-  iframe Hsz Hpg Hpt Hpid Hks Htf Hcwd Hnm Hsc Htfp Hcw Hev
+  iintro ⟨Hsz, Hpg, Hpt, ⟨Hpid, Hks, Htf, Hcwd, Hnm, Hsc, Hrt, Htfp, %hlz, Hev⟩, Hcw⟩
+  iframe Hsz Hpg Hpt Hpid Hks Htf Hcwd Hnm Hsc Hrt Htfp Hcw Hev
   isplitl []
   · ipureintro; exact ⟨hf.1, UMemL.umBelow_extSz hf.2.1 hext, hf.2.2.1, hf.2.2.2⟩
   · ipureintro; exact fun h => LazyFree.lazyFree_extSz hext (hlz h)
@@ -687,8 +688,8 @@ theorem sys_pipe_core_join (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M 
     @procPtAt hlc GF _ ⟨curCtx, KTier.kpt⟩ V.upt M ∗ sysPipeCoreRest pa pid V ⊢
       procPrivCoreNoctxAt curCtx pa pid V M := by
   unfold procPrivCoreNoctxAt procPrivBareAt sysPipeCoreRest ecRest procFieldsNoOfile
-  iintro ⟨Hsz, Hpg, Hpt, ⟨Hpid, Hks, Htf, Hcwd, Hnm, Hsc, Htfp, %hlz, Hev⟩, Hcw⟩
-  iframe Hsz Hpg Hpt Hpid Hks Htf Hcwd Hnm Hsc Htfp Hcw Hev
+  iintro ⟨Hsz, Hpg, Hpt, ⟨Hpid, Hks, Htf, Hcwd, Hnm, Hsc, Hrt, Htfp, %hlz, Hev⟩, Hcw⟩
+  iframe Hsz Hpg Hpt Hpid Hks Htf Hcwd Hnm Hsc Hrt Htfp Hcw Hev
   isplitl []
   · ipureintro; exact hf
   · ipureintro; exact hlz

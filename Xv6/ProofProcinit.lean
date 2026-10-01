@@ -827,14 +827,14 @@ theorem pi_route :
     ([∗list] i ∈ List.range NPROC, kmapId (GF := GF) (procAddr i) ∗ kmapId (procAddr i + 16#64)) ∗
     ([∗list] i ∈ List.range NPROC, procDormantNofd (GF := GF) (procAddr i)) ∗
     fdSlots (GF := GF) (NPROC * (NOFILE + FDSPARE)) ∗
-    irefSlots (GF := GF) (NPROC * (1 + IREFSPARE)) ∗
+    irefSlots (GF := GF) (NPROC * (IREFHOME + IREFSPARE)) ∗
     bslots (GF := GF) (NPROC * 3) ⊢
     [∗list] i ∈ List.range NPROC, procReady (GF := GF) i := by
   iintro ⟨Ho, Hc, Hd, Hf, Hr, Hb⟩
   ihave Hf := pi_supply_split (fun n => fdSlots (GF := GF) n) (fun a b => fdSlots_split a b)
     (NOFILE + FDSPARE) NPROC $$ Hf
   ihave Hr := pi_supply_split (fun n => irefSlots (GF := GF) n) (fun a b => (irefSlots_op a b).1)
-    (1 + IREFSPARE) NPROC $$ Hr
+    (IREFHOME + IREFSPARE) NPROC $$ Hr
   ihave Hb := pi_supply_split (fun n => bslots (GF := GF) n) (fun a b => bslots_split a b)
     3 NPROC $$ Hb
   ihave H := BigSepL.bigSepL_sep_eqv.2 $$ [$Hr $Hb]

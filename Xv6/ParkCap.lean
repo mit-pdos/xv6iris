@@ -42,8 +42,8 @@ Both occurrences of the token inside its own definition are under `▷`
   space, so no key captured at the park survives: the package carries the
   EXEC BUNDLE that arm spends (`InitBoot.initBootBundle` + the console's
   reader token) and the closer owes no slot.  The block is handed SPLIT
-  (`parkBootBlock`: the deficit block, the cwd reference and `firstBoot`'s
-  rows beside the generation pair at the trivial payload), so "this record is
+  (`parkBootBlock`: the deficit block, the cwd and root references and
+  `firstBoot`'s rows beside the generation pair at the trivial payload), so "this record is
   the first process" is a row of the park.
 * `some Wk` -- THE STEADY MODE (kfork's child).  The parker holds
   `FirstTok.firstDone`, so the boot arm is dead for this record (its
@@ -123,13 +123,14 @@ instance utSysParkRows_persistent [CurCtx] (Γ : SchedNames) :
 /-! ## §1 The pieces -/
 
 /-- THE BOOT MODE'S BLOCK (Rocq `park_child`'s `false` arm): the deficit
-block with its descriptor array, the cwd reference, `firstBoot`'s rows,
+block with its descriptor array, the cwd reference and the root reference
+(chroot, right after it, as in the core), `firstBoot`'s rows,
 the incarnation's pair at the trivial payload (`<init>` has no parent),
 the two quarters and the slot's half of `p->xstate` -- `procGenAt` minus its
 token, split, at the parker-chosen context. -/
 def parkBootBlock [CurCtx] (N : UtNames) (V : ProcPriv) (M : Nat → List (BitVec 8)) : IProp GF :=
   iprop(procPrivBareAt curCtx N.pj N.pid V M ∗ procOfiles N.f V.fdg N.pj V.ofile ∗
-    cwdRefAt V.cwd V.cwi ∗ firstBoot (hlc := hlc) ∗
+    cwdRefAt V.cwd V.cwi ∗ rootRefAt V.root V.rti ∗ firstBoot (hlc := hlc) ∗
     genKq V.gen N.pj N.pid (fun _ => iprop(True)) ∗ myPay V.gen (fun _ => iprop(True)) ∗
     genHalvesPriv N.pj N.pid V.gen ∗ (∃ xsv : BitVec 32, wordPointsTo (pXstate N.pj) 4 xsHalf xsv))
 
