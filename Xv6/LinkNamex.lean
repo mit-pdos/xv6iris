@@ -30,9 +30,4 @@ theorem Namex (CO : COPYOUT) : NAMEX :=
   namex_proof Myproc (Idup Acquire ReleaseHook) Iget Memmove Ilock Iunlock Iunlockput
     (Dirlookup CO) Iput
 
-/-- The proved ROOT CORNER (Rocq `LinkNamexRoot.v`: `Module NamexRoot :=
-NamexRootProof Iget`): its one callee is iget, and none of the walk's other
-eight is in its cone. -/
-theorem NamexRoot : NAMEX_ROOT := namex_root_proof Iget
-
 end Xv6

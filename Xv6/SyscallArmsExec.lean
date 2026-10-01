@@ -481,8 +481,8 @@ theorem syscFb_tf [X : CurCtx] (hct : curTier = KTier.kpt) (γ : FileNames) (pa 
   exact hacc
 
 /-- The number is out of range: every arm's number is refuted. -/
-theorem syscFb_ne (V : ProcPriv) (h : syscNum V < 1 ∨ 23 < syscNum V) (m : Int) (h1 : 1 ≤ m)
-    (h22 : m ≤ 23) : syscNum V ≠ m := by omega
+theorem syscFb_ne (V : ProcPriv) (h : syscNum V < 1 ∨ 24 < syscNum V) (m : Int) (h1 : 1 ≤ m)
+    (h22 : m ≤ 24) : syscNum V ≠ m := by omega
 
 set_option maxHeartbeats 4000000 in
 /-- **THE PRINTK FALLBACK** (Rocq `sysc_fallback`). -/
@@ -495,7 +495,7 @@ theorem syscall_fallback (PK : PRINTK)
     (hE : SyscSpostEmp (GF := GF))
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : syscallSlots ≤ k.avail)
     (hnoff : k.noff = 0) (htier : k.tier = KTier.kpt) (hgn : gn = V.gen)
-    (hrange : syscNum V < 1 ∨ 23 < syscNum V) (hpins : syscPins k R) (hs1 : R 9#5 = procAddr j)
+    (hrange : syscNum V < 1 ∨ 24 < syscNum V) (hpins : syscPins k R) (hs1 : R 9#5 = procAddr j)
     (hs2 : R 18#5 = pageAddr V.upt.tfp) :
     syscFallbackBody PT Γ c0 cpu k spie spp R γw γ j pid V M sts gn cs ip f hE hj hproc hK hnoff htier
       hgn hrange hpins hs1 hs2 := by
@@ -688,7 +688,7 @@ theorem syscall_blocked
 
 end
 
-/-! ## §4 The 22-way split (Rocq `sysc_arm_dispatch`) -/
+/-! ## §4 The 24-way split (Rocq `sysc_arm_dispatch`) -/
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
@@ -715,8 +715,8 @@ def SyscArmAt (n : Nat)
     syscArmBody n PT Γ c0 cpu k spie spp R γw γ j pid V M sts gn cs ip f hE hj hproc hK hnoff htier hgn
       hnum hpins hs1 hs2 hra
 
-/-- **Rocq `sysc_arm_dispatch`'s case split**: every table index `1 ≤ n ≤ 23`
-has its arm -- the 21 others as hypotheses (deviation 4), exec discharged
+/-- **Rocq `sysc_arm_dispatch`'s case split**: every table index `1 ≤ n ≤ 24`
+has its arm -- the 23 others as hypotheses (deviation 4), exec discharged
 here from `SYSEXEC` and its deposit law. -/
 theorem syscall_arms_all (SE : SYSEXEC) (hD : SyscDepExec (hlc := hlc) (GF := GF))
     (PT : SchedNames → IProp GF) [hPT : ∀ Γ, Persistent (PT Γ)] (Γ : SchedNames)
@@ -751,7 +751,8 @@ theorem syscall_arms_all (SE : SYSEXEC) (hD : SyscDepExec (hlc := hlc) (GF := GF
     (h21 : SyscArmAt 21 PT Γ c0 cpu k spie spp R γw γ j pid V M sts gn cs ip f hE hj hproc hK hnoff htier hgn hpins hs1 hs2 hra) -- close
     (h22 : SyscArmAt 22 PT Γ c0 cpu k spie spp R γw γ j pid V M sts gn cs ip f hE hj hproc hK hnoff htier hgn hpins hs1 hs2 hra) -- sync
     (h23 : SyscArmAt 23 PT Γ c0 cpu k spie spp R γw γ j pid V M sts gn cs ip f hE hj hproc hK hnoff htier hgn hpins hs1 hs2 hra) -- seccomp
-    (n : Nat) (hn1 : 1 ≤ n) (hn22 : n ≤ 23) (hnum : syscNum V = ((n : Nat) : Int)) :
+    (h24 : SyscArmAt 24 PT Γ c0 cpu k spie spp R γw γ j pid V M sts gn cs ip f hE hj hproc hK hnoff htier hgn hpins hs1 hs2 hra) -- chroot
+    (n : Nat) (hn1 : 1 ≤ n) (hn22 : n ≤ 24) (hnum : syscNum V = ((n : Nat) : Int)) :
     syscArmBody n PT Γ c0 cpu k spie spp R γw γ j pid V M sts gn cs ip f hE hj hproc hK hnoff htier hgn
       hnum hpins hs1 hs2 hra := by
   match n, hn1, hn22, hnum with
@@ -781,7 +782,8 @@ theorem syscall_arms_all (SE : SYSEXEC) (hD : SyscDepExec (hlc := hlc) (GF := GF
   | 21, _, _, hnum => exact h21 hnum
   | 22, _, _, hnum => exact h22 hnum
   | 23, _, _, hnum => exact h23 hnum
-  | _ + 24, _, h, _ => exact absurd h (by omega)
+  | 24, _, _, hnum => exact h24 hnum
+  | _ + 25, _, h, _ => exact absurd h (by omega)
 
 end
 
