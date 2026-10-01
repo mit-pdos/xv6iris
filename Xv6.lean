@@ -686,6 +686,9 @@ import Xv6.IgetHit
 import Xv6.IgetScan
 import Xv6.ProofIget
 import Xv6.LinkIget
+import Xv6.SpecIgetroot
+import Xv6.ProofIgetroot
+import Xv6.LinkIgetroot
 import Xv6.SpecBalloc
 import Xv6.BallocParts
 import Xv6.BallocDefs
@@ -831,7 +834,6 @@ import Xv6.NamexLevel
 import Xv6.NamexElem
 import Xv6.NamexLoop
 import Xv6.NamexStart
-import Xv6.NamexRoot
 import Xv6.ProofNamex
 import Xv6.LinkNamex
 import Xv6.FsReady
@@ -847,7 +849,6 @@ import Xv6.FsAbsWriteFire
 import Xv6.SpecNamei
 import Xv6.NameiFrame
 import Xv6.ProofNamei
-import Xv6.ProofNameiRoot
 import Xv6.LinkNamei
 import Xv6.SpecNameiparent
 import Xv6.ProofNameiparent
@@ -947,6 +948,10 @@ import Xv6.SysChdirCalls
 import Xv6.SysChdirTails
 import Xv6.ProofSysChdir
 import Xv6.LinkSysChdir
+import Xv6.SpecSysChroot
+import Xv6.SysChrootParts
+import Xv6.ProofSysChroot
+import Xv6.LinkSysChroot
 import Xv6.CreateFound
 import Xv6.CreateAlloc
 import Xv6.SpecFilewrite
@@ -1172,6 +1177,7 @@ import Xv6.UtResFits
 import Xv6.SpecUsertrap
 import Xv6.UtRoundQuiet
 import Xv6.SyscallArmsPath
+import Xv6.SyscallArmsChroot
 import Xv6.SyscallArmsExec
 import Xv6.SyscallArmsFdDefs
 import Xv6.SyscallArmsFd

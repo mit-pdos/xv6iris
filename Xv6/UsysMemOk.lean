@@ -657,6 +657,10 @@ def usysEff (secc : BitVec 64) (tf : List (BitVec 64)) : Int :=
 /-- kernel/syscall.h (Rocq `USYS_seccomp`). -/
 def USYS_seccomp : Int := 23
 
+/-- kernel/syscall.h (Rocq `USYS_chroot`, upstream b72cbac1).  No row of the
+program tier's contract reads it: every row is quiet at 24 (chroot.md §4). -/
+def USYS_chroot : Int := 24
+
 /-- Rocq `usys_eff_num_cong`. -/
 theorem usysEff_numCong (secc : BitVec 64) (tf1 tf2 : List (BitVec 64)) (h : usysNum tf1 = usysNum tf2) :
     usysEff secc tf1 = usysEff secc tf2 := by

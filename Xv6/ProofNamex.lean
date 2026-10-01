@@ -51,7 +51,6 @@ which is what is ported.  SpecNamex says the path is taken "at FULL
 ownership"; the premise is at the caller's `dqpv`.
 -/
 import Xv6.NamexStart
-import Xv6.NamexRoot
 
 namespace Xv6
 
@@ -147,11 +146,5 @@ theorem namex_proof (MP : MYPROC) (ID : IDUP) (IG : IGET) (MM : MEMMOVE) (IL : I
   namex_main MP ID IG MM IL IU IUP DL IP Γ cpu k γl pd pav pu j γkl γk plen pfun nfun npar n Sb
     pidv cwdv cwi dqp dqc dqb dqs dqpv hj hproc hK hnoff htier hroot hnib0 hgeom hbg hbel hireg hnn
     hterm hplen hbud hnpar hpd⟩
-
-/-- THE ROOT CORNER's proof, from `iget` alone (Rocq's `NamexRootProof`
-functor over `Iget`). -/
-theorem namex_root_proof (IG : IGET) : NAMEX_ROOT :=
-  ⟨fun cpu k dqp hK hnoff hroot hnib0 ha1 hit hpr huart =>
-    namex_root_main IG cpu k dqp hK hnoff hroot hnib0 ha1 hit hpr huart⟩
 
 end Xv6
