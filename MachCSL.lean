@@ -107,6 +107,8 @@ import MachCSL.TranslateAddr
 import MachCSL.SConfAtDefs
 import MachCSL.WpSmodeCycle
 import MachCSL.WpSmodeCycleBase
+import MachCSL.WpSmodeCycleB32
+import MachCSL.WpSmodeCycleRvc
 import MachCSL.WpSmodeFetch
 import MachCSL.WpSmodeFetch4
 import MachCSL.WpSmodeFetch2

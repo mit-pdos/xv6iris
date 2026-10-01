@@ -8,6 +8,8 @@ kernel execution context.  The register-only instruction rules are
 `WpSmodeRegOps`.
 -/
 import MachCSL.WpSmodeFetch
+import MachCSL.WpSmodeCycleB32
+import MachCSL.WpSmodeCycleRvc
 
 namespace MachCSL
 

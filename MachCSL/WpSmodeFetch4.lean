@@ -3,7 +3,6 @@ MachCSL: `swp_fetch_s4_tier` (split out of `MachCSL.WpSmodeFetch`, whose header
 describes the fetch): one fetch rule per module, so the three build in
 parallel.
 -/
-import MachCSL.WpSmodeCycleBase
 import MachCSL.TranslateAddr
 import MachCSL.WpSmode
 import MachCSL.FetchedDefs
