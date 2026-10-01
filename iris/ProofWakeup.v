@@ -239,14 +239,14 @@ Section ProofWakeup.
        iterations [NPROC - k] -- no Löb needed.  The body is a [wp_next b]
        so the induction hypothesis is re-enterable at a migrated hart. *)
     iAssert (∀ (fuel : nat),
-               wp_next (CID0 := CID0) b pme (fun (CID : CpuId) =>
+               (∀ (CID : CpuId), ⌜ b = false \/ pme = zero_reg -> (CID : CPU) = (CID0 : CPU) ⌝ -∗
                  wk_loop_body pme spF chan vra vs0 vs1 vs2 vs3 vs4 vs5
                    vs6 vs7 vs8 vs9 vs10 vs11 av lvl eb b lks CID0 fuel CID))%I
       with "[]" as "Hloop".
     { iIntros (fuel). iInduction fuel as [|fuel IHf] "IHf".
-      { iIntros (CIDk Hsk) "_"; iIntros (k M) "%Hfuel %Hk %Hregs Hqx Hcg Hown Htext Hpc Hframe".
+      { iIntros (CIDk Hsk); iIntros (k M) "%Hfuel %Hk %Hregs Hqx Hcg Hown Htext Hpc Hframe".
         exfalso. lia. }
-      iIntros (CIDk Hsk) "_"; iIntros (k M) "%Hfuel %Hk %Hregs Hqx Hcg Hown #Htext Hpc Hframe".
+      iIntros (CIDk Hsk); iIntros (k M) "%Hfuel %Hk %Hregs Hqx Hcg Hown #Htext Hpc Hframe".
       destruct Hregs as (Hs1 & Hsp & Hs2 & Hs3 & Hs4 & Hs5 & Hs6 & Hs7 & Hs8 & Hs9 & Hs10 & Hs11 & Hdom).
       iDestruct (cpu_own_eb_agree with "Hcg Hown") as %Hbmatch. symmetry in Hbmatch.
       (* ---- shared tail [pc = wakeup+0x30]: p++ (0x30 addi s1,s1,360), then the
@@ -342,7 +342,7 @@ Section ProofWakeup.
           iEval (rewrite Hpp38) in "Hpc".
           iDestruct (cpu_own_transport CIDt CIDt2 lvl eb pme b ltac:(wp_next_chain)
                        with "Hown") as "Hown".
-          iSpecialize ("IHf" $! CIDt2 with "[%] Hlc"); [wp_next_chain|].
+          iSpecialize ("IHf" $! CIDt2 with "[%]"); [wp_next_chain|].
           iApply ("IHf" $! (S k) Mt30 with "[%] [%] [%] Hqx Hcg Hown Htext Hpc Hframe").
           * lia.
           * exact HkS.

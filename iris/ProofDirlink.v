@@ -3475,14 +3475,14 @@ Section ProofDirlinkMain.
                          ltac:(rewrite Htgt70b; vm_compute; reflexivity)
                          with "Hcg Hpc []").
                { iApply (dki_56 with "Htext"). }
-               iApply bi.later_intro. iIntros (CIDB15 HqB15) "_". iIntros "Hcg Hpc".
+               iApply bi.later_intro. iIntros (CIDB15 HqB15) "Hlc". iIntros "Hcg Hpc".
                iEval (rewrite Htgt70b) in "Hpc".
                iDestruct (dl_bs3 with "[Hbs1 Hbs2]") as "Hbsl";
                  [iSplitL "Hbs1"; [iExact "Hbs1" | iExact "Hbs2"] |].
                iDestruct (cpu_own_transport CIDrd CIDB15 0%nat eb (proc_addr j) b
                             ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
                iPoseProof ("Hafter" $! CIDB15) as "Ha".
-               iSpecialize ("Ha" with "[%]"); [wp_next_chain |].
+               iSpecialize ("Ha" with "[%] Hlc"); [wp_next_chain |].
                iApply ("Ha" $! _ (fun jj => file_byte data (16 * i + jj)%nat)
                          (m !!! Regidx Rs3 : mword 64)
                          (m !!! Regidx Rs4 : mword 64) with

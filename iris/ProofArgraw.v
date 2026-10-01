@@ -468,15 +468,16 @@ Section ProofArgraw.
     (k < NARG)%nat ->
     kernel_text -∗ sie_cap_gpr KT1 M av' b p -∗
     pc_is (mword_of_int (KernelSyms.argraw + ar_ld_off k + 2) : mword 64) -∗
+    £ 1 -∗
     wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr KT1 M av' b p -∗ pc_is (mword_of_int (KernelSyms.argraw + 0x2c) : mword 64) -∗
       mWP (Loop : expr riscv_lang)) -∗
     mWP (Loop : expr riscv_lang).
   Proof using .
-    intro Hk. iIntros "#Htext Hcg Hpc Hcont".
+    intro Hk. iIntros "#Htext Hcg Hpc Hlc0 Hcont".
     destruct (decide (k = 0%nat)) as [->|Hne].
     { iEval (rewrite ar_fall0) in "Hpc".
-      iSpecialize ("Hcont" $! CID0 with "[%]"); [wp_next_chain|].
+      iSpecialize ("Hcont" $! CID0 with "[%] Hlc0"); [wp_next_chain|].
       iApply ("Hcont" with "Hcg Hpc"). }
     assert (Hk1 : (1 <= k < NARG)%nat) by lia.
     iApply (wp_cj_s_sconf (mword_of_int (KernelSyms.argraw + ar_ld_off k + 2))
@@ -632,7 +633,7 @@ Section ProofArgraw.
               with "Hcg Hpc [] [Hw]").
     { iApply (ar_i_ld 0%nat Hk with "Htext"). }
     { iEval (rewrite Harga). iExact "Hw". }
-    iIntros (CID5 Hs5) "_ Hcg Hpc Hw". iEval (rewrite Harga) in "Hw".
+    iIntros (CID5 Hs5) "Hlc Hcg Hpc Hw". iEval (rewrite Harga) in "Hw".
     iDestruct ("Hwback" with "Hw") as "Htf".
     set (C1 := <[Regidx ar_a0 := regval_into_reg v]> C0).
     change (<[Regidx ar_a0 := regval_into_reg v]> C0) with C1.
@@ -640,7 +641,7 @@ Section ProofArgraw.
                   = mword_of_int (KernelSyms.argraw + ar_ld_off 0%nat + 2)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpj) in "Hpc".
     (* re-join at +0x2c, then the shared epilogue *)
-    iApply (ar_join C1 0%nat av' b p Hk with "Htext Hcg Hpc").
+    iApply (ar_join C1 0%nat av' b p Hk with "Htext Hcg Hpc Hlc").
     iIntros (CID6 Hs6) "_ Hcg Hpc".
     assert (HC1sp : C1 !!! Regidx csp_rs1 = pa_stk sp0 4).
     { rewrite /C1 upd_ne; [| vm_compute; discriminate].
@@ -752,7 +753,7 @@ Section ProofArgraw.
               with "Hcg Hpc [] [Hw]").
     { iApply (ar_i_ld 1%nat Hk with "Htext"). }
     { iEval (rewrite Harga). iExact "Hw". }
-    iIntros (CID5 Hs5) "_ Hcg Hpc Hw". iEval (rewrite Harga) in "Hw".
+    iIntros (CID5 Hs5) "Hlc Hcg Hpc Hw". iEval (rewrite Harga) in "Hw".
     iDestruct ("Hwback" with "Hw") as "Htf".
     set (C1 := <[Regidx ar_a0 := regval_into_reg v]> C0).
     change (<[Regidx ar_a0 := regval_into_reg v]> C0) with C1.
@@ -760,7 +761,7 @@ Section ProofArgraw.
                   = mword_of_int (KernelSyms.argraw + ar_ld_off 1%nat + 2)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpj) in "Hpc".
     (* re-join at +0x2c, then the shared epilogue *)
-    iApply (ar_join C1 1%nat av' b p Hk with "Htext Hcg Hpc").
+    iApply (ar_join C1 1%nat av' b p Hk with "Htext Hcg Hpc Hlc").
     iIntros (CID6 Hs6) "_ Hcg Hpc".
     assert (HC1sp : C1 !!! Regidx csp_rs1 = pa_stk sp0 4).
     { rewrite /C1 upd_ne; [| vm_compute; discriminate].
@@ -872,7 +873,7 @@ Section ProofArgraw.
               with "Hcg Hpc [] [Hw]").
     { iApply (ar_i_ld 2%nat Hk with "Htext"). }
     { iEval (rewrite Harga). iExact "Hw". }
-    iIntros (CID5 Hs5) "_ Hcg Hpc Hw". iEval (rewrite Harga) in "Hw".
+    iIntros (CID5 Hs5) "Hlc Hcg Hpc Hw". iEval (rewrite Harga) in "Hw".
     iDestruct ("Hwback" with "Hw") as "Htf".
     set (C1 := <[Regidx ar_a0 := regval_into_reg v]> C0).
     change (<[Regidx ar_a0 := regval_into_reg v]> C0) with C1.
@@ -880,7 +881,7 @@ Section ProofArgraw.
                   = mword_of_int (KernelSyms.argraw + ar_ld_off 2%nat + 2)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpj) in "Hpc".
     (* re-join at +0x2c, then the shared epilogue *)
-    iApply (ar_join C1 2%nat av' b p Hk with "Htext Hcg Hpc").
+    iApply (ar_join C1 2%nat av' b p Hk with "Htext Hcg Hpc Hlc").
     iIntros (CID6 Hs6) "_ Hcg Hpc".
     assert (HC1sp : C1 !!! Regidx csp_rs1 = pa_stk sp0 4).
     { rewrite /C1 upd_ne; [| vm_compute; discriminate].
@@ -992,7 +993,7 @@ Section ProofArgraw.
               with "Hcg Hpc [] [Hw]").
     { iApply (ar_i_ld 3%nat Hk with "Htext"). }
     { iEval (rewrite Harga). iExact "Hw". }
-    iIntros (CID5 Hs5) "_ Hcg Hpc Hw". iEval (rewrite Harga) in "Hw".
+    iIntros (CID5 Hs5) "Hlc Hcg Hpc Hw". iEval (rewrite Harga) in "Hw".
     iDestruct ("Hwback" with "Hw") as "Htf".
     set (C1 := <[Regidx ar_a0 := regval_into_reg v]> C0).
     change (<[Regidx ar_a0 := regval_into_reg v]> C0) with C1.
@@ -1000,7 +1001,7 @@ Section ProofArgraw.
                   = mword_of_int (KernelSyms.argraw + ar_ld_off 3%nat + 2)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpj) in "Hpc".
     (* re-join at +0x2c, then the shared epilogue *)
-    iApply (ar_join C1 3%nat av' b p Hk with "Htext Hcg Hpc").
+    iApply (ar_join C1 3%nat av' b p Hk with "Htext Hcg Hpc Hlc").
     iIntros (CID6 Hs6) "_ Hcg Hpc".
     assert (HC1sp : C1 !!! Regidx csp_rs1 = pa_stk sp0 4).
     { rewrite /C1 upd_ne; [| vm_compute; discriminate].
@@ -1112,7 +1113,7 @@ Section ProofArgraw.
               with "Hcg Hpc [] [Hw]").
     { iApply (ar_i_ld 4%nat Hk with "Htext"). }
     { iEval (rewrite Harga). iExact "Hw". }
-    iIntros (CID5 Hs5) "_ Hcg Hpc Hw". iEval (rewrite Harga) in "Hw".
+    iIntros (CID5 Hs5) "Hlc Hcg Hpc Hw". iEval (rewrite Harga) in "Hw".
     iDestruct ("Hwback" with "Hw") as "Htf".
     set (C1 := <[Regidx ar_a0 := regval_into_reg v]> C0).
     change (<[Regidx ar_a0 := regval_into_reg v]> C0) with C1.
@@ -1120,7 +1121,7 @@ Section ProofArgraw.
                   = mword_of_int (KernelSyms.argraw + ar_ld_off 4%nat + 2)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpj) in "Hpc".
     (* re-join at +0x2c, then the shared epilogue *)
-    iApply (ar_join C1 4%nat av' b p Hk with "Htext Hcg Hpc").
+    iApply (ar_join C1 4%nat av' b p Hk with "Htext Hcg Hpc Hlc").
     iIntros (CID6 Hs6) "_ Hcg Hpc".
     assert (HC1sp : C1 !!! Regidx csp_rs1 = pa_stk sp0 4).
     { rewrite /C1 upd_ne; [| vm_compute; discriminate].
@@ -1232,7 +1233,7 @@ Section ProofArgraw.
               with "Hcg Hpc [] [Hw]").
     { iApply (ar_i_ld 5%nat Hk with "Htext"). }
     { iEval (rewrite Harga). iExact "Hw". }
-    iIntros (CID5 Hs5) "_ Hcg Hpc Hw". iEval (rewrite Harga) in "Hw".
+    iIntros (CID5 Hs5) "Hlc Hcg Hpc Hw". iEval (rewrite Harga) in "Hw".
     iDestruct ("Hwback" with "Hw") as "Htf".
     set (C1 := <[Regidx ar_a0 := regval_into_reg v]> C0).
     change (<[Regidx ar_a0 := regval_into_reg v]> C0) with C1.
@@ -1240,7 +1241,7 @@ Section ProofArgraw.
                   = mword_of_int (KernelSyms.argraw + ar_ld_off 5%nat + 2)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpj) in "Hpc".
     (* re-join at +0x2c, then the shared epilogue *)
-    iApply (ar_join C1 5%nat av' b p Hk with "Htext Hcg Hpc").
+    iApply (ar_join C1 5%nat av' b p Hk with "Htext Hcg Hpc Hlc").
     iIntros (CID6 Hs6) "_ Hcg Hpc".
     assert (HC1sp : C1 !!! Regidx csp_rs1 = pa_stk sp0 4).
     { rewrite /C1 upd_ne; [| vm_compute; discriminate].

@@ -969,7 +969,7 @@ Section UwBodies.
     (* ================================================================= *)
     (*  THE TURN: +0x48 .. back to +0x48 (park) or on to +0x44's two exits *)
     (* ================================================================= *)
-    iAssert (wp_next (CID0 := CID) true pj (fun (CIDh : CpuId) =>
+    iAssert ((∀ (CIDh : CpuId), ⌜ true = false \/ pj = zero_reg -> (CIDh : CPU) = (CID : CPU) ⌝ -∗
       ∀ M1 : regfile,
       ⌜ uw_loop_regs prt m0 M1 (pa_stk sp0 8) buf n i ⌝ -∗
       sie_cap_gpr KT1 M1 (av - 8)%nat true pj -∗
@@ -986,7 +986,7 @@ Section UwBodies.
         ∧ uw_exit_cont (CID0 := CID0) prt γu j m0 av true sp0 buf n f dq pidv dqp Φ lks ) -∗
       mWP (Loop : expr riscv_lang)))%I with "[]" as "Turn".
     { iLöb as "IH".
-      iIntros (CIDh Hsh) "_"; iIntros (M1) "%Hregs1 Hcg Hcnt Hpc Hpid Hch Hfull Hbuf Hcont".
+      iIntros (CIDh Hsh); iIntros (M1) "%Hregs1 Hcg Hcnt Hpc Hpid Hch Hfull Hbuf Hcont".
       pose proof Hregs1 as Hregs1'.
       destruct Hregs1' as (Hsp & Hs1 & Hs2 & Hs3 & Hs4 & Hs5 & Hs6 & Hs7 & W24 & W25 & W26 & W27).
       (* --- +0x48  c.mv a0,s5 --- *)
@@ -1238,7 +1238,7 @@ Section UwBodies.
         { iApply (uwi_44 with "Ht"). }
         iIntros (CIDb Hsb) "Hlc Hcg Hpc".
         iEval (rewrite P48) in "Hpc".
-        iSpecialize ("IH" $! CIDb with "[%] Hlc"); [wp_next_chain|].
+        iSpecialize ("IH" $! CIDb with "[%]"); [wp_next_chain|].
         iApply ("IH" $! MS with "[%] Hcg Hcnt Hpc Hpid Hch Hfull Hbuf Hcont").
         exact HregsS.
       - (* THRE set: push the byte, release, bump the index *)

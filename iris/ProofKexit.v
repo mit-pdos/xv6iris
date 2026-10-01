@@ -658,7 +658,7 @@ Section KexitLoop.
     intros pj Hj Hfnj Hfndq Hfnpid Hav Hfresh.
     iIntros "#Htext #Hkd #Hft #Hpe Hqexit".
     iAssert (∀ (fuel : nat),
-               wp_next (CID0 := CID0) true pj (fun (CID : CpuId) =>
+               (∀ (CID : CpuId), ⌜ true = false \/ pj = zero_reg -> (CID : CPU) = (CID0 : CPU) ⌝ -∗
                  ∀ (fd : nat) (M : regfile) (U : ustate),
                    ⌜(NOFILE - fd <= fuel)%nat⌝ -∗ ⌜(fd < NOFILE)%nat⌝ -∗
                    ⌜kxl_regs M pj sv spF fd⌝ -∗ ⌜kx_nulled gch ggen tfv cwdv fd (us_V U)⌝ -∗
@@ -693,9 +693,9 @@ Section KexitLoop.
                     iref_slot -∗
                    mWP (Loop : expr riscv_lang)))%I with "[]" as "Hloop".
     { iIntros (fuel). iInduction fuel as [|fuel IHf] "IHf".
-      { iIntros (CIDk Hsk) "_"; iIntros (fd M U) "%Hfuel %Hfd %Hregs %Hnul Hqx Hcg Hown Htce Hcce Hpc Hpriv Hfrag Hpenv Hfenv Hiru".
+      { iIntros (CIDk Hsk); iIntros (fd M U) "%Hfuel %Hfd %Hregs %Hnul Hqx Hcg Hown Htce Hcce Hpc Hpriv Hfrag Hpenv Hfenv Hiru".
         exfalso. lia. }
-      iIntros (CIDk Hsk) "_"; iIntros (fd M U) "%Hfuel %Hfd %Hregs %Hnul Hqx Hcg Hown Htce Hcce Hpc Hpriv Hfrag Hpenv Hfenv Hiru".
+      iIntros (CIDk Hsk); iIntros (fd M U) "%Hfuel %Hfd %Hregs %Hnul Hqx Hcg Hown Htce Hcce Hpc Hpriv Hfrag Hpenv Hfenv Hiru".
       destruct Hregs as (Hs1 & Hs2 & Hs3 & Hs4 & Hsp & Hdom).
       (* [eb = b] at level 0, for the COMPLEMENT's transport guards only --
          [trap_csrs_ext_transport] / [cpu_claim_ext_transport] are indexed by
@@ -824,7 +824,7 @@ Section KexitLoop.
                        ltac:(rewrite Hbt; wp_next_chain) with "Htce") as "Htce".
           iDestruct (cpu_claim_ext_transport CIDt CIDt2 eb pj
                        ltac:(rewrite Hbt; wp_next_chain) with "Hcce") as "Hcce".
-          iSpecialize ("IHf" $! CIDt2 with "[%] Hlc"); [wp_next_chain|].
+          iSpecialize ("IHf" $! CIDt2 with "[%]"); [wp_next_chain|].
           iApply ("IHf" $! (S fd) Mt38 Ut with "[%] [%] [%] [%] Hqx Hcg Hown Htce Hcce Hpc Hpriv Hfrag Hpenv Hfenv Hiru").
           * unfold NOFILE in *; lia.
           * exact HkS.

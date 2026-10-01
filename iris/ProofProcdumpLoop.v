@@ -484,13 +484,13 @@ Section ProofProcdumpLoop.
     intros HK Hfresh.
     iIntros "#Hkt #Hkd #Hpenv Hqexit".
     iAssert (∀ (fuel : nat),
-      wp_next (CID0 := CID0) b p (fun (CIDf : CpuId) =>
+      (∀ (CIDf : CpuId), ⌜ b = false \/ p = zero_reg -> (CIDf : CPU) = (CID0 : CPU) ⌝ -∗
         pdl_loop_body CID0 spv p m0 K' eb b lks fuel CIDf))%I
       with "[]" as "Hloop".
     { iIntros (fuel). iInduction fuel as [|fuel IHf] "IHf".
-      { iIntros (CIDf Hsf) "_"; iIntros (j M) "%Hfuel %Hj %Hregs Hqx Hcg Hown Hpc Hpre Hsuf".
+      { iIntros (CIDf Hsf); iIntros (j M) "%Hfuel %Hj %Hregs Hqx Hcg Hown Hpc Hpre Hsuf".
         exfalso. exact (pdl_no_fuel j Hfuel Hj). }
-      iIntros (CIDf Hsf) "_"; iIntros (j M) "%Hfuel %Hj %Hregs Hqx Hcg Hown Hpc Hpre Hsuf".
+      iIntros (CIDf Hsf); iIntros (j M) "%Hfuel %Hj %Hregs Hqx Hcg Hown Hpc Hpre Hsuf".
       destruct Hregs as [Hrl Hrh].
       pose proof (pdl_j_le j Hj) as HjLe.
       (* ---- the slot at [j], out of the head of the remaining suffix ---- *)
@@ -595,7 +595,7 @@ Section ProofProcdumpLoop.
           iEval (rewrite Hpp6e) in "Hpc".
           iDestruct (cpu_own_transport CIDa CIDc 0%nat eb p b 
                        ltac:(wp_next_chain) with "Hown") as "Hown".
-          iSpecialize ("IHf" $! CIDc with "[%] Hlc"); [wp_next_chain|].
+          iSpecialize ("IHf" $! CIDc with "[%]"); [wp_next_chain|].
           iApply ("IHf" $! (S j) Ma66 with "[%] [%] [%] Hqx2 Hcg Hown Hpc Hpre2 Hsuf2").
           + exact (pdl_fuel_le j fuel Hfuel).
           + exact HSjLt.

@@ -240,7 +240,7 @@ Section ProofKkill.
        PREMISE of the statement (fdalloc's rule), so the IH keeps its
        leading [∀ k M]. *)
     iAssert (∀ (fuel : nat),
-               wp_next (CID0 := CID0) b pme (fun (CID : CpuId) =>
+               (∀ (CID : CpuId), ⌜ b = false \/ pme = zero_reg -> (CID : CPU) = (CID0 : CPU) ⌝ -∗
                  ∀ (k : nat) (M : regfile),
                    ⌜(NPROC - k <= fuel)%nat⌝ -∗ ⌜(k < NPROC)%nat⌝ -∗
                    ⌜kkl_regs M mb spd pidv k⌝ -∗
@@ -256,9 +256,9 @@ Section ProofKkill.
                    kernel_text -∗ pc_is (mword_of_int (KernelSyms.kkill + 0x22)) -∗
                    mWP (Loop : expr riscv_lang)))%I with "[]" as "Hloop".
     { iIntros (fuel). iInduction fuel as [|fuel IHf] "IHf".
-      { iIntros (CIDk Hsk) "_"; iIntros (k M) "%Hfuel %Hk %Hregs Hqx Hcg Hown Htext Hpc".
+      { iIntros (CIDk Hsk); iIntros (k M) "%Hfuel %Hk %Hregs Hqx Hcg Hown Htext Hpc".
         exfalso. lia. }
-      iIntros (CIDk Hsk) "_"; iIntros (k M) "%Hfuel %Hk %Hregs Hqx Hcg Hown #Htext Hpc".
+      iIntros (CIDk Hsk); iIntros (k M) "%Hfuel %Hk %Hregs Hqx Hcg Hown #Htext Hpc".
       destruct Hregs as (Hm9 & Hmsp & Hm18 & Hm19 & Hmcs).
       iDestruct (cpu_own_eb_agree with "Hcg Hown") as %Hbmatch. symmetry in Hbmatch.
       destruct (lookup_lt_is_Some_2 γs k ltac:(rewrite Hlen; exact Hk)) as [γk Hγk].
@@ -839,7 +839,7 @@ Section ProofKkill.
             rewrite Hcmp38 in Hbad. discriminate. }
           iDestruct (cpu_own_transport CIDg CIDj lvl eb pme b ltac:(wp_next_chain)
                        with "Hown") as "Hown".
-          iSpecialize ("IHf" $! CIDj with "[%] Hlc"); [wp_next_chain|].
+          iSpecialize ("IHf" $! CIDj with "[%]"); [wp_next_chain|].
           iApply ("IHf" $! (S k) M34 with "[%] [%] [%] Hqx Hcg Hown Htext Hpc").
           * lia.
           * exact HkS.

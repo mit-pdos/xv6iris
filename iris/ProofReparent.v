@@ -642,7 +642,7 @@ Section ProofReparentLoop.
     intros Hlen Hpslen Hlvl Hav Hno.
     iIntros "#Hpinv Hqexit".
     iAssert (∀ (fuel : nat),
-               wp_next (CID0 := CID0) b pme (fun (CID : CpuId) =>
+               (∀ (CID : CpuId), ⌜ b = false \/ pme = zero_reg -> (CID : CPU) = (CID0 : CPU) ⌝ -∗
                  ∀ (k : nat) (M : regfile),
                    ⌜(NPROC - k <= fuel)%nat⌝ -∗ ⌜(k < NPROC)%nat⌝ -∗
                    ⌜rpl_regs M spF pv vs5 vs6 vs7 vs8 vs9 vs10 vs11 k⌝ -∗
@@ -664,9 +664,9 @@ Section ProofReparentLoop.
                    parents_own (rp_upto pv ip k ps) -∗
                    mWP (Loop : expr riscv_lang)))%I with "[]" as "Hloop".
     { iIntros (fuel). iInduction fuel as [|fuel IHf] "IHf".
-      { iIntros (CIDk Hsk) "_"; iIntros (k M) "%Hfuel %Hk %Hregs Hqx Hcg Hown Htext Hpc Hframe Hinit Hpar".
+      { iIntros (CIDk Hsk); iIntros (k M) "%Hfuel %Hk %Hregs Hqx Hcg Hown Htext Hpc Hframe Hinit Hpar".
         exfalso. lia. }
-      iIntros (CIDk Hsk) "_"; iIntros (k M) "%Hfuel %Hk %Hregs Hqx Hcg Hown #Htext Hpc Hframe Hinit Hpar".
+      iIntros (CIDk Hsk); iIntros (k M) "%Hfuel %Hk %Hregs Hqx Hcg Hown #Htext Hpc Hframe Hinit Hpar".
       destruct Hregs as (Hs1 & Hsp & Hs2 & Hs3 & Hs4 & H21 & H22 & H23 & H24 & H25 & H26 & H27 & Hdom).
       (* ---- the shared p++/test tail at +0x2c, reached from BOTH arms of the
          [bne] -- and from different harts, hence the [wp_next] wrapper.  Both
@@ -770,7 +770,7 @@ Section ProofReparentLoop.
           iEval (rewrite Hpp34) in "Hpc".
           iDestruct (cpu_own_transport CIDt CIDt2 lvl eb pme b ltac:(wp_next_chain)
                        with "Hown") as "Hown".
-          iSpecialize ("IHf" $! CIDt2 with "[%] Hlc"); [wp_next_chain|].
+          iSpecialize ("IHf" $! CIDt2 with "[%]"); [wp_next_chain|].
           iApply ("IHf" $! (S k) Mt2c with "[%] [%] [%] Hqx Hcg Hown Htext Hpc Hframe Hinit Hpar").
           * lia.
           * exact HkS.

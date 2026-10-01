@@ -339,7 +339,7 @@ Section KforkB3Proof.
     (*  THE FUEL-INDUCTED BODY, entered at +0x96 with [fuel] turns left.  *)
     (* ================================================================= *)
     iAssert (∀ (fuel : nat),
-      wp_next (CID0 := CID0) b pme (fun (CID : CpuId) =>
+      (∀ (CID : CpuId), ⌜ b = false \/ pme = zero_reg -> (CID : CPU) = (CID0 : CPU) ⌝ -∗
         ∀ (i : nat) (M : regfile),
           ⌜(NOFILE - i <= fuel)%nat⌝ -∗
           ⌜(i < NOFILE)%nat⌝ -∗
@@ -370,9 +370,9 @@ Section KforkB3Proof.
           mWP (Loop : expr riscv_lang)))%I
       with "[]" as "Hloop".
     { iIntros (fuel). iInduction fuel as [|fuel IHf] "IHf".
-      { iIntros (CIDk Hsk) "_"; iIntros (i M) "%Hfuel %Hi %Hregs Hqx Hcg Hown Hpc Hpv Hpv2 Hpfrag Hcfrag".
+      { iIntros (CIDk Hsk); iIntros (i M) "%Hfuel %Hi %Hregs Hqx Hcg Hown Hpc Hpv Hpv2 Hpfrag Hcfrag".
         exfalso. lia. }
-      iIntros (CIDk Hsk) "_"; iIntros (i M) "%Hfuel %Hi %Hregs Hqx Hcg Hown Hpc Hpv Hpv2 Hpfrag Hcfrag".
+      iIntros (CIDk Hsk); iIntros (i M) "%Hfuel %Hi %Hregs Hqx Hcg Hown Hpc Hpv Hpv2 Hpfrag Hcfrag".
       destruct Hregs as (Hcsp & Hs0 & Hs1 & Hs2 & Hs3 & Hs4 & Hs5 & Hthr).
       (* --------------------------------------------------------------- *)
       (*  Htail: the increment+test at +0x8e..+0x92, shared by both arms *)
@@ -508,7 +508,7 @@ Section KforkB3Proof.
           iEval (rewrite Hpp96) in "Hpc".
           iDestruct (cpu_own_transport CIDta CID3 n eb pme b ltac:(wp_next_chain) with "Hown")
             as "Hown".
-          iSpecialize ("IHf" $! CID3 with "[%] Hlc"); [wp_next_chain|].
+          iSpecialize ("IHf" $! CID3 with "[%]"); [wp_next_chain|].
           iApply ("IHf" $! (S i) T2 with "[%] [%] [%] Hqx Hcg Hown Hpc Hpv Hpv2 Hpfrag Hcfrag").
           + unfold NOFILE in Hfuel |- *. lia.
           + unfold NOFILE in Hne, Hi |- *. lia.
