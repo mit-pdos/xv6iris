@@ -38,6 +38,7 @@ The close splits on the count, which is what lets its entries share it:
 3. `Xv6.ig_ciwf_update` restates iget's `ig_ciwf_update` (a stage file may
    not import another function's): promotion candidate.
 -/
+import MachCSL.WpDmaCtx
 import Xv6.IputStages
 import Xv6.IcacheInvStore
 import Xv6.IcacheBoxSites

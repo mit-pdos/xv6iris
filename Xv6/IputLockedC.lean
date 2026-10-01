@@ -21,6 +21,7 @@ hand-off to the off-lock free at `+0x98`.  A stage file of iput's proof
 * `iput_lk_c` -- the walk: `lw`, `addiw`, `sw`, `auipc/addi/jal release`,
   then `HO`.
 -/
+import MachCSL.WpDmaCtx
 import Xv6.IputStages
 import Xv6.IcacheInvStore
 import Xv6.IcachePinwLw

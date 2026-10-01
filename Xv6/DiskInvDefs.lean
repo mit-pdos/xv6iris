@@ -159,7 +159,7 @@ import Xv6.VirtioQueue
 import Xv6.KallocDefs
 import Xv6.KernelMap
 import MachCSL.WpDevDma
-import MachCSL.WpDmaCtx
+import MachCSL.DmaCtxSplit
 import MachCSL.CrashPermInv
 
 namespace Xv6

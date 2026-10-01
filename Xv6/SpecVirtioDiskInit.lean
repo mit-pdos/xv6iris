@@ -29,6 +29,7 @@ move (`SIE` false; `main` on hart 0, before the scheduler).  Stack: its
 
 Imports only definitional files.
 -/
+import MachCSL.WpSmodeCtl
 import Xv6.Image
 import Xv6.DiskInvDefs
 
