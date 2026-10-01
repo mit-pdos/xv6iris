@@ -744,7 +744,7 @@ Section SysExecWhole.
                 eq_refl eq_refl Hnul3 Halp Hroot Hnib0
                 Hlg Hsize Hbm0 Hbmc Hbml Hist0 Hcb Hireg Hjp Hgl eq_refl eq_refl
                 with "Htext Hfab Hka Hbmp Hisp Hbmr Hbs Hir Hmp Hau Hbrk").
-      iIntros (CID4 Hq4) "Hlc"; iIntros (mf Ubk)
+      iIntros (CID4 Hq4) "_"; iIntros (mf Ubk)
         "%Hcs Harms %Hargs %Hext3 %Hk3 Hcg Hcnt Hpc Hbmp Hisp Hbs Hir Hpriv".
       iSpecialize ("Hcont" $! CID4 with "[%] Hlc"); [wp_next_chain |].
       iApply ("Hcont" $! mf P3 (us_M Ubk) k3
@@ -781,7 +781,7 @@ Section SysExecWhole.
       iApply (sx_bad_tail (CID0 := CID3) γf j pid U K true true ∅ sp0 m
                 plen pfun rst v1 M3 P3 k3 i3 pg3 af3
                 HK Hlb eq_refl Hplen Halp with "Htext Hka Hbad").
-      iIntros (CID4 Hq4) "Hlc"; iIntros (mf) "%Hcs %Ha0 %Hext3 %Hk3 Hcg Hcnt Hpc Hpriv".
+      iIntros (CID4 Hq4) "_"; iIntros (mf) "%Hcs %Ha0 %Hext3 %Hk3 Hcg Hcnt Hpc Hpriv".
       iSpecialize ("Hcont" $! CID4 with "[%] Hlc"); [wp_next_chain |].
       iApply ("Hcont" $! mf P3 (us_M U) k3
                with "[%] [%] [%] Hcg Hcnt Htcx Hccx Hpc Hbmp Hisp Hbs Hka

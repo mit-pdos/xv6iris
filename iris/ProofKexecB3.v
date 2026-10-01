@@ -3917,7 +3917,7 @@ Section KexecB3Loop.
                 | exact Hp3e | exact Hp3f] |].
       iExact "Hrest".
     - (* the loop is over *)
-      iSpecialize ("Hc1a4" $! CIDn with "[%]"); [wp_next_chain |].
+      iSpecialize ("Hc1a4" $! CIDn with "[%] Hlc"); [wp_next_chain |].
       iApply ("Hc1a4" $! M' P' Mo szv' U' with "[%] Hexit Hcont");
         first [exact HU' | idtac].
   Qed.

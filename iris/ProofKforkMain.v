@@ -1160,7 +1160,7 @@ Section KforkMain.
       iApply (kfk_reanchor CID0 CID1 b pme _ Hx1 with "HR").
     - (* ---- arm 2: uvmcopy failed, +0x7c ---- *)
       (* the child's image, as uvmcopy left it -- [kfk_pro_exit2]'s own ∀ *)
-      iIntros (CIDh Hxh) "_"; iIntros (CID2 Hx2) "_". iIntros (Mt npa j γl2 pid_c ch Uc kp).
+      iIntros (CIDh Hxh); iIntros (CID2 Hx2) "_". iIntros (Mt npa j γl2 pid_c ch Uc kp).
       destruct Uc as [Vc Mc].
       iIntros "%Hkp %HMtsp %HMts4 %HMts5 %HMta0 %HMtthr %Hpures".
       iIntros "Hcg #Ht Hpc Hframe Hpv Hpfrag HCp Hcrow Hcsg Hcpr Hcxb Hheld Hhart Hfd Hir Hbslp Hctx Hkstk Hpay Hcpu Hke HR".
@@ -1184,7 +1184,7 @@ Section KforkMain.
       { intro Hd. rewrite (Hx2 (or_introl eq_refl)). exact (Hxh Hd). }
       iApply (kfk_reanchor CID0 CID2 b pme _ Hcr2 with "HR").
     - (* ---- arm 3: uvmcopy succeeded, the copy loop's head at +0x4a ---- *)
-      iIntros (CIDh Hxh) "_"; iIntros (CID3 Hx3) "_". iIntros (Mt npa j γl2 pid_c ch Uc' tfsrc tfdst kp).
+      iIntros (CIDh Hxh); iIntros (CID3 Hx3) "_". iIntros (Mt npa j γl2 pid_c ch Uc' tfsrc tfdst kp).
       destruct Uc' as [Vc' Mc].
       iIntros "%Hkp %HMtsp %HMts4 %HMts5 %HMta5 %HMta4 %HMta3 %Htfs %HMtthr %Hpures %Hshare".
       iIntros "Hcg #Ht Hpc Hframe Hpv Hpfrag HCp Hcgen Hcsg Hcpr Hcfrag Hcrow Hcxb #Hmk Hheld Hhart Hfd Hirs Hbsl Hkst Hctx Hpay Hcpu
