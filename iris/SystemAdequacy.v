@@ -794,9 +794,13 @@ Section SystemBoot.
          beside the boot resource and produced by the same transport: the
          claim holds the application's authority, so it is minted per era
          and the mint founds the console port's invariant clause from it. *)
+      (* no later on the claim's package (port-ordinal): [app_dur_at] carries
+         its own on the claim only, so the guest half agrees with the
+         clone's kernel half credit-free -- the lend [xv6_power_adequacy_gen]
+         hands down has this shape *)
       (fun dk => ∃ (gt : gname) (r : N),
          P_fs_lend_at gt cov (FsImg.sb_logstart sb) dk ∗
-         ▷ app_dur_at A gt r ∗ B (Datatypes.S gen_id) r)%I Tn g
+         app_dur_at A gt r ∗ B (Datatypes.S gen_id) r)%I Tn g
     ={⊤}=∗
       ([∗ list] c ∈ enum CPU,
          mWP (LoopE gen_id c : expr riscv_lang) @ ⊤) ∗
