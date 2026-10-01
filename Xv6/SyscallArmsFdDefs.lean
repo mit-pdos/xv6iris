@@ -49,6 +49,7 @@ The arms themselves are `SyscallArmsFd` (dup, fstat, close) and
 -/
 import Xv6.SyscallRet
 import MachCSL.StackOwnBounds
+import Xv6.SpecFdalloc
 
 namespace Xv6
 

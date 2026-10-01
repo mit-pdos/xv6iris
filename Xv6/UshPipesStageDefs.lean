@@ -55,7 +55,7 @@ resolution instead; `prod_stage_law_persistent` is ported in `UshPipesStageLaw`.
 -/
 import Xv6.UshPipesDefsPay
 import Xv6.UshPipesDefsFam
-import Xv6.UkConsOut
+import Xv6.ConsNames
 
 namespace Xv6
 

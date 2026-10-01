@@ -180,8 +180,7 @@ theorem fsReadyView [Fscfg] [Icfg] :
     (fsView (GF := GF) fscFs fscDisk icfgDev fscCov).dirty = fsMdirty fscFs :=
   ⟨rfl, rfl, rfl, rfl, rfl⟩
 
-/-- The allocator's names at the ambient pair (deviation 6). -/
-def fsReadyKmem [Fscfg] : KmemNames := ⟨fscKpages.1, fscKpages.2⟩
+-- `fsReadyKmem` (deviation 6) lives in `Xv6/FsCfgDefs.lean`.
 
 /-! ## 0b.  THE SUPERBLOCK'S FOUR CELLS (Rocq `fs_sb_cells`)
 

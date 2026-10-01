@@ -77,7 +77,8 @@ DEVIATIONS FROM ROCQ:
     persistent rows here).
 -/
 import Xv6.SpecPipealloc
-import Xv6.SpecFdalloc
+import Xv6.SlotSupply
+import Xv6.FdTable
 
 namespace Xv6
 

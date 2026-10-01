@@ -163,6 +163,7 @@ import Xv6.SysChdirFrame
 import Xv6.SysMknodFrame
 import Xv6.SysfileCalls
 import MachCSL.BvLemmas
+import Xv6.SpecFdalloc
 
 namespace Xv6
 

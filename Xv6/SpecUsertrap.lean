@@ -102,6 +102,7 @@ instance, deviation 10).
 -/
 import Xv6.UexecRound
 import Xv6.UexecExecInst
+import Xv6.UtResFits
 
 namespace Xv6
 

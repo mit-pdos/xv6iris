@@ -152,10 +152,7 @@ end Res
 
 /-! ## §2 The park's channel (Rocq `usertrap_res_bare_park`) -/
 
-/-- The resumer's syscall-side rows (deviation 3): `syscParkExtra` at some
-ticks lock and the park world, at its context. -/
-def utSysParkRows [Xc : CurCtx] (Γ : SchedNames) : IProp GF :=
-  iprop(∃ γtk : GName, syscParkExtra Γ γtk ∗ parkWorld Γ)
+-- `utSysParkRows` (deviation 3) lives in `Xv6/SyscallEnv.lean`.
 
 /-- The resumer's handler environment row, out of its globals' table and
 its park world's devintr credentials, at the kernel tier (Rocq: the

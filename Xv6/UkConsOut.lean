@@ -85,10 +85,7 @@ theorem dqHalf_op (dq : DFrac) : dqHalf dq • dqHalf dq = dq := by
   | discard => rfl
   | ownDiscard q => show DFrac.ownDiscard (q.half + q.half) = _; rw [Qp.half_add_half]
 
-/-- **Rocq `cons_short`**: every alternative a console write can answer the
-length of. -/
-def consShort (alts : List (List (BitVec 8))) : Prop :=
-  ∀ x ∈ alts, (x.length : Int) < 2 ^ 31
+-- `consShort` (Rocq `cons_short`) lives in `Xv6/ConsNames.lean`.
 
 /-- **Rocq `cons_adm`**: a code the line typed admits at the round's state,
 and after which coverage goes on. -/

@@ -27,12 +27,7 @@ def fdallocAddr : BitVec 64 := KA.«fdalloc»
 /-- fdalloc's 4-slot frame over `myproc`'s 10. -/
 def fdallocSlots : Nat := 14
 
-/-- The null entries of `fs`, numbering the first `i` (the loop counter). -/
-def fdFreesFrom : Nat → List (BitVec 64) → List Nat
-  | _, [] => []
-  | i, v :: fs => if v = 0#64 then i :: fdFreesFrom (i + 1) fs else fdFreesFrom (i + 1) fs
-
-def fdFrees (fs : List (BitVec 64)) : List Nat := fdFreesFrom 0 fs
+-- `fdFreesFrom` / `fdFrees` live in `Xv6/SlotSupply.lean`.
 
 theorem fdFreesFrom_head : ∀ (fs : List (BitVec 64)) (i j : Nat) (l : List Nat),
     fdFreesFrom i fs = j :: l → i ≤ j ∧ fs[j - i]? = some 0#64 := by

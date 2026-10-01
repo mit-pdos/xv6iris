@@ -183,4 +183,8 @@ theorem FsGeomOk.covOk [Fscfg] [Icfg] (h : FsGeomOk) : covOk fscCov := h.fgoLog.
 theorem FsGeomOk.logCov [Fscfg] [Icfg] (h : FsGeomOk) :
     ∀ b, logRegion fscLogst b = true → b ∈ fscCov := h.fgoLog.2
 
+/-- The allocator's names at the ambient pair (`Xv6/FsReady.lean` deviation 6; here so
+`FsCfgKits` does not wait for `FsReady`). -/
+def fsReadyKmem [Fscfg] : KmemNames := ⟨fscKpages.1, fscKpages.2⟩
+
 end Xv6

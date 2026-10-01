@@ -54,6 +54,7 @@ Imports only `SyscallRet` (which re-exports the dispatch files and every
 entry Spec).
 -/
 import Xv6.SyscallRet
+import Xv6.SpecFdalloc
 
 namespace Xv6
 

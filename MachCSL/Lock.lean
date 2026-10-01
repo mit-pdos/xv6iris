@@ -30,7 +30,7 @@ at acquire (`lock_pay_take`) and back at release (`lock_pay_intro`).  The
 holder's token `locked` carries the lock's context parked under its own
 (`lockCtxHeld`).
 -/
-import MachCSL.Power
+import MachCSL.CtxBoot
 import MachCSL.KCtx
 
 namespace MachCSL

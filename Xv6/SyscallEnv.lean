@@ -381,6 +381,12 @@ theorem syscallEnv_fsFabric : syscallEnv (hlc := hlc) PT Γ γ ⊢ procsInv Γ -
   iexists pd, pav, pu
   iframe Hrdy Hpe Hpi Hd
 
+/-- The resumer's syscall-side rows (`Xv6/UtResFits.lean` deviation 3; here so
+`ParkCap` does not wait for `UtResFits`): `syscParkExtra` at some
+ticks lock and the park world, at its context. -/
+def utSysParkRows [Xc : CurCtx] (Γ : SchedNames) : IProp GF :=
+  iprop(∃ γtk : GName, syscParkExtra Γ γtk ∗ parkWorld Γ)
+
 end
 
 end Xv6

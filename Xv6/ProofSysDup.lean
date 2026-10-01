@@ -30,6 +30,7 @@ import MachCSL.WpSmodeFrame6
 import Xv6.CopyLemmas
 import Xv6.DinodeSlot
 import MachCSL.BvLemmas
+import Xv6.SpecFdalloc
 
 namespace Xv6
 

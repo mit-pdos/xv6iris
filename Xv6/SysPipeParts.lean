@@ -22,6 +22,7 @@ import Xv6.SysFstatParts
 import Xv6.SysfileCalls
 import Xv6.VirtioDiskRwDefs2
 import MachCSL.BvLemmas
+import Xv6.SpecFdalloc
 
 namespace Xv6
 

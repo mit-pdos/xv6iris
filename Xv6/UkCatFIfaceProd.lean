@@ -20,6 +20,7 @@ CONE (reached, this file): `cif_prod_row_out`, `cif_prod_row_err`,
    `((2 : Nat) : Int)` (ProgTree's `prodOut`/`prodErr`, `rfl`).
 -/
 import Xv6.UkCatFIfaceEnv
+import Xv6.UkConsOut
 
 namespace Xv6
 

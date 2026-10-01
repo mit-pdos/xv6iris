@@ -80,6 +80,7 @@ record's own key: `uslot (uvisOf V M sts gn cs pid)`.  The sret lands at
 Imports only definitional and Spec files.
 -/
 import Xv6.UexecExecInst
+import Xv6.UtResFits
 
 namespace Xv6
 

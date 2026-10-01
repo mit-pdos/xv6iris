@@ -83,9 +83,10 @@ Both occurrences of the token inside its own definition are under `▷`
 
 Imports only definitional files.
 -/
-import Xv6.UtResFits
+import Xv6.SyscallEnv
 import Xv6.InitBoot
 import Xv6.SpecAllocproc
+import Xv6.UsertrapRes
 
 namespace Xv6
 

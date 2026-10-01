@@ -82,9 +82,13 @@ the arity-free `fsCrashSeam` ride `SpecMain`/`firstBootPersist`, not a kit.
    deviations 3/7 retired, crash batch C-4) and `FirstTok.firstFsinit`
    holds this kit.
 -/
-import Xv6.FsReady
+import Xv6.FsCfgDefs
 import Xv6.AppDur
 import Xv6.BioInit
+import Xv6.IcacheEscrowPool
+import Xv6.IcacheInvRef
+import Xv6.InodeRegionInv
+import Xv6.OffGv
 
 namespace Xv6
 

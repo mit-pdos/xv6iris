@@ -22,6 +22,7 @@ CONE (reached): the eight laws above.
    the `Nat` `1`, cast.
 -/
 import Xv6.UkPipesIfaceRead
+import Xv6.UkConsOut
 
 namespace Xv6
 

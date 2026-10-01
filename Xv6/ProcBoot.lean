@@ -41,6 +41,7 @@ Imports only definitional files.
 import MachCSL.CtxBox
 import MachCSL.LockBornHook
 import Xv6.ProcAvail
+import MachCSL.Power
 
 namespace Xv6
 

@@ -49,6 +49,7 @@ import Xv6.UkSysPHolds
 import Xv6.UkSysFHHolds
 import Xv6.UkHandler
 import Xv6.PipeProtoRead
+import Xv6.UexecExecInst
 
 namespace Xv6
 

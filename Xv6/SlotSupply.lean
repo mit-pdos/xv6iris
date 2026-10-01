@@ -62,6 +62,16 @@ def BSLOTS : Nat := 1024
 
 /-! ## The generic keyed-token supply -/
 
+/-! ## The null entries of a file table (`fdalloc`'s scan; here so `sys_open`'s
+definitions do not wait for `SpecFdalloc`) -/
+
+/-- The null entries of `fs`, numbering the first `i` (the loop counter). -/
+def fdFreesFrom : Nat → List (BitVec 64) → List Nat
+  | _, [] => []
+  | i, v :: fs => if v = 0#64 then i :: fdFreesFrom (i + 1) fs else fdFreesFrom (i + 1) fs
+
+def fdFrees (fs : List (BitVec 64)) : List Nat := fdFreesFrom 0 fs
+
 section Keyed
 variable {GF : BundledGFunctors} [Xv6G GF]
 

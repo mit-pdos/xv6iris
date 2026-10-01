@@ -83,6 +83,7 @@ import Xv6.ElfFile
 import Xv6.KernelMap
 import MachCSL.CtxX
 import MachCSL.WpSmodeSret
+import MachCSL.WireInv
 
 namespace Xv6
 

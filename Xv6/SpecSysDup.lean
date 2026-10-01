@@ -30,7 +30,7 @@ wants that address non-null, which the kernel stack's placement makes
 true; the kernel context carries no bound on `sp`, so the caller says it.
 -/
 import Xv6.SpecArgfd
-import Xv6.SpecFdalloc
+import Xv6.SlotSupply
 
 namespace Xv6
 

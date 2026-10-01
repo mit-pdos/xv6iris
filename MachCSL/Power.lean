@@ -28,6 +28,7 @@ import MachCSL.WpDev
 import MachCSL.KMap
 import MachCSL.WireInv
 import MachCSL.BootReset
+import MachCSL.CtxBoot
 
 namespace MachCSL
 
@@ -237,35 +238,7 @@ theorem bigSepM_cpus {V : Type} (Φ : Nat → V → IProp GF) (f : CPU → V) :
       rw [LawfulPartialMap.get?_delete_ne hne]
       exact hm c' (List.mem_cons_of_mem _ hc'))) $$ Hrest
 
-/-- A fresh running context for hart `cpu` at boot: bound 0, empty dirty set,
-tied to the hart by its view receipt at 0 (the prototype's
-`own_context_boot`). -/
-theorem ownCtx_boot (E : EraGS) (cpu : CPU) :
-    MonoNat.lb_own (E.viewName cpu) (.ofNat 0) ⊢@{IProp GF} |==> ∃ ξ : CtxId, ownCtxAt E cpu ξ := by
-  iintro HK
-  imod (MonoNat.own_alloc (.ofNat 0)) with ⟨%γb, Hb, _⟩
-  imod (ghost_map_alloc_empty (K := Nat) (V := CPU) (H := RegMapF)) with ⟨%γd, Hd⟩
-  imodintro
-  iexists ⟨γb, γd⟩
-  unfold ownCtxAt ctxAt viewLbAt
-  iexists 0, 0, 0, ∅
-  iframe Hb Hd HK
-  isplit
-  · iapply topLbAt_0
-  isplit
-  · ipureintro; exact Nat.le_refl _
-  isplit
-  · iapply topLbAt_0
-  isplit
-  · ipureintro
-    intro k h hk
-    rw [LawfulPartialMap.get?_empty] at hk
-    simp at hk
-  · unfold dirtyElems
-    imodintro
-    iintro %k %h %hk
-    rw [LawfulPartialMap.get?_empty] at hk
-    simp at hk
+-- `ownCtx_boot` lives in `MachCSL.CtxBoot`.
 
 theorem ctxs_boot (E : EraGS) :
     ([∗list] c ∈ cpus, MonoNat.lb_own (E.viewName c) (.ofNat 0)) ⊢@{IProp GF}

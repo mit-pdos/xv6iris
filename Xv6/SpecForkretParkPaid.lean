@@ -37,6 +37,7 @@ package's `firstDone`.
 Imports only definitional files and Spec files.
 -/
 import Xv6.UexecExecInst
+import Xv6.UtResFits
 
 namespace Xv6
 

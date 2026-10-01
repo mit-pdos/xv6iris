@@ -47,6 +47,7 @@ view) and the third is the on-disk header's write set.
    `FsCrash.hdr_wset (FsCrash.fs_blocks dk) (sb_logstart sb)`.
 -/
 import Xv6.FsCfgKits
+import Xv6.OffBox
 
 namespace Xv6
 

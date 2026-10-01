@@ -42,4 +42,9 @@ structure ConsNames where
   `cn.era = genId + 1`. -/
   era : Nat
 
+/-- **Rocq `cons_short`**: every alternative a console write can answer the
+length of. -/
+def consShort (alts : List (List (BitVec 8))) : Prop :=
+  ∀ x ∈ alts, (x.length : Int) < 2 ^ 31
+
 end Xv6

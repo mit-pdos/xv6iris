@@ -94,6 +94,7 @@ the CLOSED trap loop.
 Imports only definitional files.
 -/
 import Xv6.UexecExecInst
+import Xv6.UtResFits
 
 namespace Xv6
 
