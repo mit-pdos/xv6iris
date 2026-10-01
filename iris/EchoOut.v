@@ -2716,7 +2716,7 @@ Section echo_out.
      ∗ (⌜Forall good_out (cycles_of h)⌝ ∨ T))%I.
 
   Global Instance echo_led_timeless h : Timeless (echo_led h).
-  Proof. rewrite /echo_led. apply _. Qed.
+  Proof using Timeless0. rewrite /echo_led. apply _. Qed.
 
   (* WHAT THE BIRTH STEP YIELDS, i.e. what [AppEcho.echo_cl] becomes:
      [AppEcho.echo_birth] is two [own_alloc]s and this. *)
@@ -3205,7 +3205,7 @@ Section echo_out.
       ecl k ho (ConsLog.cons_step H (ConsLog.EvOut b))
       ∗ ((turn v (S P) ∗ ps_lb v ps0 ∗ cs_lb v (cs0 ++ [a]) ∗ inp_lb v I0)
          ∨ T).
-  Proof.
+  Proof using Persistent0.
     intros Hne0 Hr0 Hdiv Hpin0 HPeq Halt Hhead.
     pose proof (nlines_pos_of_rest_nil I0 Hne0 Hr0) as Hpos0.
     pose proof (nlines_removelast I0 Hr0) as Hrl0.
@@ -3364,7 +3364,7 @@ Section echo_out.
       ecl k ho (ConsLog.cons_step CH (ConsLog.EvOut b))
       ∗ ((turn v (S P) ∗ ps_lb v (ps0 ++ [a]) ∗ cs_lb v cs0 ∗ inp_lb v I0)
          ∨ T).
-  Proof.
+  Proof using Persistent0.
     intros Hr0 Hopen Hdiv Hpin0 Hnd HPeq Halt Hhead.
     pose proof (nlines_removelast I0 Hr0) as Hrl0.
     iIntros "#Hpin Ht #Hpslb #Hcslb #Hilb Hcl".

@@ -756,7 +756,7 @@ Section UCodeSync.
   Global Typeclasses Opaque sync_rodata.
 
   Lemma sync_rodata_of_text : utext_all gt M pm -∗ sync_rodata gt.
-  Proof.
+  Proof using Hsub2 Hx.
     assert (Hin : forall (a : Z) (b : bv 8),
                sync_ro !! a = Some b -> M !! a = Some b).
     { intros a b Hb. apply map_lookup_filter_Some in Hb as [Hb _].
@@ -772,7 +772,7 @@ Section UCodeSync.
   Qed.
 
   Lemma sync_code_of_text : utext_all gt M pm -∗ sync_code gt.
-  Proof.
+  Proof using Hsub Hx.
     assert (Hin : forall (a : Z) (b : bv 8),
                SyncInstrs.sync_bytes !! a = Some b -> M !! a = Some b)
       by exact Hsub.

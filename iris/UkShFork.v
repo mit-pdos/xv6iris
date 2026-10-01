@@ -289,7 +289,7 @@ Section UkShFork.
   Definition ushf_wq (I : list (bv 8)) : iProp Σ := Wc I 0%nat.
 
   Global Instance ushf_wq_timeless I : Timeless (ushf_wq I).
-  Proof. rewrite /ushf_wq. apply _. Qed.
+  Proof using HWct. rewrite /ushf_wq. apply _. Qed.
 
   Definition ushf_kill_law : iProp Σ :=
     (□ (∀ I : list (bv 8), app_taint -∗ Wc I 0%nat))%I.

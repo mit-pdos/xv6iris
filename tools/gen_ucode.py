@@ -1409,7 +1409,7 @@ def emit(dump, prog, pcs, groups, dropped, skipfuncs, skipdefault, notes, asts,
     a('  Global Typeclasses Opaque %s_rodata.' % P)
     a('')
     a('  Lemma %s_rodata_of_text : utext_all gt M pm -∗ %s_rodata gt.' % (P, P))
-    a('  Proof.')  # captures section hypotheses; let Rocq compute the set
+    a('  Proof using Hsub2 Hx.')  # exactly the hypotheses the body names
     a('    assert (Hin : forall (a : Z) (b : bv 8),')
     a('               %s_ro !! a = Some b -> M !! a = Some b).' % P)
     a('    { intros a b Hb. apply map_lookup_filter_Some in Hb as [Hb _].')
@@ -1425,7 +1425,7 @@ def emit(dump, prog, pcs, groups, dropped, skipfuncs, skipdefault, notes, asts,
     a('  Qed.')
     a('')
     a('  Lemma %s_code_of_text : utext_all gt M pm -∗ %s_code gt.' % (P, P))
-    a('  Proof.')  # captures section hypotheses; let Rocq compute the set
+    a('  Proof using Hsub Hx.')  # exactly the hypotheses the body names
     a('    assert (Hin : forall (a : Z) (b : bv 8),')
     a('               %sInstrs.%s_bytes !! a = Some b -> M !! a = Some b)' % (M, D))
     a('      by exact Hsub.')

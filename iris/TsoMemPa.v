@@ -1176,7 +1176,7 @@ Section window.
             tso_read img log h tv (pa_add a j) = log_byte img log T (pa_add a j))
       /\ (T = t \/ exists i m, T = S i /\ log !! i = Some m /\ pm_tid m <> h
                             /\ is_Some (msg_byte m (pa_add a 0))).
-  Proof.
+  Proof using Hn.
     move => Hw Hlen Hvis Hsome Ho.
     have [T [HT Hge]] := find_top_max h tv (length log) t Hlen Hvis (Hsome 0%nat ltac:(lia)).
     exists T. split; first done.
@@ -1222,7 +1222,7 @@ Section window.
           /\ Wf h' (fun j => msg_byte m (pa_add a j))
           /\ forall j, (j < n)%nat ->
                tso_read img log h tv (pa_add a j) = msg_byte m (pa_add a j)).
-  Proof.
+  Proof using Hn.
     move => Hw Hp Hlen Hvis Hsome Ho.
     have [T [Hge [Hrd Harm]]] := racy_read_window h tv t Hw Hlen Hvis Hsome Ho.
     destruct Harm as [->|(i & m & Heq & El & Htid & Hb0)]; first by left.
@@ -1511,7 +1511,7 @@ Section floor_window.
       | Some T => log_byte img log T (pa_add a j)
       | None => None
       end.
-  Proof.
+  Proof using Hn.
     move => Hw Hj Htv. elim: t => [|t IH] Hge Hfl.
     - (* t = 0, so the floor is 0 and the image writes the window *)
       have HB : Bm = 0%nat by lia.
@@ -1570,7 +1570,7 @@ Section floor_window.
       /\ (T = t \/ exists i m, T = S i /\ log !! i = Some m /\ pm_tid m <> h
                             /\ (Bm <= S i)%nat
                             /\ is_Some (msg_byte m (pa_add a 0))).
-  Proof.
+  Proof using Hn.
     move => Hw Htv Hcov Hfl Hlen Hvis Hsome Ho.
     have [T [HT Hge]] :=
       find_top_max img log a n Hn h tv (length log) t Hlen Hvis (Hsome 0%nat ltac:(lia)).
@@ -1612,7 +1612,7 @@ Section floor_window.
             tso_read img log h tv (pa_add a j) = log_byte img log T (pa_add a j))
       /\ (T = Bm \/ exists i m, T = S i /\ log !! i = Some m /\ (Bm <= S i)%nat
                              /\ is_Some (msg_byte m (pa_add a 0))).
-  Proof.
+  Proof using Hn.
     move => Hw Htv Hlen Hcov.
     have [T [HT Hge]] :=
       find_top_max img log a n Hn h tv (length log) Bm Hlen Htv (Hcov 0%nat Hn).
@@ -1654,7 +1654,7 @@ Section floor_window.
           /\ Wf h' (fun j => msg_byte m (pa_add a j))
           /\ forall j, (j < n)%nat ->
                tso_read img log h tv (pa_add a j) = msg_byte m (pa_add a j)).
-  Proof.
+  Proof using Hn.
     move => Hw Hp Htv Hge Hlen Hvis Hcov Hsome Ho.
     have [T [HgeT [Hrd Harm]]] :=
       racy_read_window_fl h tv Bm t Hw Htv Hcov Hge Hlen Hvis Hsome Ho.
@@ -1685,7 +1685,7 @@ Section floor_window.
     (exists k, (k < n)%nat /\ z k <> cp h k) ->
     (forall h', h' <> h -> exists k, (k < n)%nat /\ cp h' k <> cp h k) ->
     exists k, (k < n)%nat /\ tso_read img log h tv (pa_add a k) <> Some (cp h k).
-  Proof.
+  Proof using Hn.
     move => Hw Hp Htv Hge Hlen Hvis Hcov Hz Ho [k0 [Hk0 Hzk]] Hinj.
     have Hsome : forall j, (j < n)%nat -> is_Some (log_byte img log t (pa_add a j))
       by move => j Hj; rewrite (Hz j Hj); by eexists.
@@ -1724,7 +1724,7 @@ Section floor_window.
       /\ (T = Bm \/ exists i m, T = S i /\ log !! i = Some m /\ pm_tid m <> h
                              /\ (Bm <= S i)%nat
                              /\ is_Some (msg_byte m (pa_add a 0))).
-  Proof.
+  Proof using Hn.
     move => Hw Htv Hlen Hsome Hno.
     apply (racy_read_window_fl h tv Bm Bm Hw
              ltac:(apply visibleb_below; lia) Hsome ltac:(lia) Hlen
@@ -1761,7 +1761,7 @@ Section floor_window.
           /\ Wf h' (fun j => msg_byte m (pa_add a j))
           /\ forall j, (j < n)%nat ->
                tso_read img log h tv (pa_add a j) = msg_byte m (pa_add a j)).
-  Proof.
+  Proof using Hn.
     move => Hw Hp Htv Hlen Hsome Hno.
     have [T [Hge [Hrd Harm]]] :=
       racy_read_window_floor h tv Bm Hw Htv Hlen Hsome Hno.
@@ -1801,7 +1801,7 @@ Section floor_window.
     (exists k, (k < n)%nat /\ z k <> cp h k) ->
     (forall h', h' <> h -> exists k, (k < n)%nat /\ cp h' k <> cp h k) ->
     exists k, (k < n)%nat /\ tso_read img log h tv (pa_add a k) <> Some (cp h k).
-  Proof.
+  Proof using Hn.
     move => Hw Hp Htv Hlen Hz Hno [k0 [Hk0 Hzk]] Hinj.
     have Hsome : forall j, (j < n)%nat -> is_Some (log_byte img log Bm (pa_add a j))
       by move => j Hj; rewrite (Hz j Hj); by eexists.

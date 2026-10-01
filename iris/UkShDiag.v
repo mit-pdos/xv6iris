@@ -8018,7 +8018,7 @@ Section UkShDiagRun.
     (C3 flen -∗ ukn_pay N (-1)) -∗
     urun N h m (mword_of_int p0) (10 + (12 + (4 + n))) -∗
     mWP (Loop : expr riscv_lang).
-  Proof.
+  Proof using Hpay.
     intros (Hok & Hnp & Hfa0 & Hfahi & Hq2 & Hpq & Hps & Hc1d & Hc1u & Hc1x
             & Hc2set & E0 & E1 & E2 & E3 & E4 & Efa & Ejf & Eje & Eret)
            Hsanz Ha2 Heq1 Heq2.
@@ -8216,7 +8216,7 @@ Section UkShDiagRun.
     urun N h m (mword_of_int ShSyms.panic)
       (2 + (10 + (12 + (4 + n)))) -∗
     mWP (Loop : expr riscv_lang).
-  Proof.
+  Proof using Hpay.
     intros Hsanz Ha0 Heq1 Heq2.
     iIntros "#Hb1 #Hb2 #Hb3 HC #Hcode #Hro Hsstr Hpay Hrun".
     rewrite shd_pin_panic.
@@ -8640,7 +8640,7 @@ Section UkShDiagLeaf.
       urun N h m (mword_of_int ShSyms.runcmd)
         (6 * ush_ht c + (2 + (ush_Dg + n))) -∗
       mWP (Loop : expr riscv_lang).
-  Proof. exact (wp_kshr_runcmd ush_Dg Hpsok_free ush_diag_leaf_holds c). Qed.
+  Proof using Hpsok_free. exact (wp_kshr_runcmd ush_Dg Hpsok_free ush_diag_leaf_holds c). Qed.
 
   (* CWD-INDEXED (lane E4): [UkShRun.wp_kshr_fork1]'s value-preserving
      form at sh's own diagnostic leaf.  ([wp_kshr_fork1_final_any], the

@@ -2463,7 +2463,7 @@ Section ProofMain.
       `{!∀ pos ξ, Persistent (P pos ξ)} `{!∀ pos, CtxMorph (P pos)}
     : wp_main_boot_sconf_body m K p0 ps s1entry phystop
         γd γv cn l0 b0 c0 γd1 l1 b1 dk sb nib cov ndisk S Pb Rspent tlbvec0 γi ξd P.
-  Proof.
+  Proof using ufdG0.
     cbv beta delta [wp_main_boot_sconf_body].
     intros pcE Hcid HK Hl0 Hl1 Hphystop Hs1 Hprun Hlen Hlive Hcnu Hcne Hsnap Hp0.
     (* THE SNAPSHOT HYPOTHESIS, READ HERE (fs-cfg-boot.md stage (f);

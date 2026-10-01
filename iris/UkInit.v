@@ -880,7 +880,7 @@ Section UkInit.
          (ret_pc (m !!! Regidx ra_idx)) avail -∗
        mWP (Loop : expr riscv_lang)) -∗
     mWP (Loop : expr riscv_lang).
-  Proof.
+  Proof using Hpsok_free.
     intros Harg Hne Hlt Hrow.
     iIntros "#Hcode Hrun Hstd Hcont".
     destruct init_syms_pins as (Hstart & Hmain & Hprintf & Hvprintf & Hputc & Hopen & Hmknod & Hdup & Hfork & Hwait & Hexec & Hwrite & Hexit). rewrite Hdup.
@@ -984,7 +984,7 @@ Section UkInit.
          (ret_pc (m !!! Regidx ra_idx)) avail -∗
        mWP (Loop : expr riscv_lang)) -∗
     mWP (Loop : expr riscv_lang).
-  Proof.
+  Proof using Hpsok_free.
     intros Harg Hne Hlt Hrow.
     iIntros "#Hcode Hrun Hstd Hcont".
     destruct init_syms_pins as (Hstart & Hmain & Hprintf & Hvprintf & Hputc & Hopen & Hmknod & Hdup & Hfork & Hwait & Hexec & Hwrite & Hexit). rewrite Hdup.
@@ -1090,7 +1090,7 @@ Section UkInit.
          (ret_pc (m !!! Regidx ra_idx)) avail -∗
        mWP (Loop : expr riscv_lang)) -∗
     mWP (Loop : expr riscv_lang).
-  Proof.
+  Proof using Hpsok_free.
     intros Harg Hlt Hrow.
     iIntros "#Hcode Hrun Hstd Hcont".
     destruct init_syms_pins as (Hstart & Hmain & Hprintf & Hvprintf & Hputc & Hopen & Hmknod & Hdup & Hfork & Hwait & Hexec & Hwrite & Hexit). rewrite Hdup.
@@ -1171,7 +1171,7 @@ Section UkInit.
          (ret_pc (m !!! Regidx ra_idx)) avail -∗
        mWP (Loop : expr riscv_lang)) -∗
     mWP (Loop : expr riscv_lang).
-  Proof.
+  Proof using Hpsok_free.
     intros Harg Hlt Hrow.
     iIntros "#Hcode Hrun Hstd Hcont".
     destruct init_syms_pins as (Hstart & Hmain & Hprintf & Hvprintf & Hputc & Hopen & Hmknod & Hdup & Hfork & Hwait & Hexec & Hwrite & Hexit). rewrite Hdup.
@@ -1342,7 +1342,7 @@ Section UkInit.
          (ret_pc (m !!! Regidx ra_idx)) avail -∗
        mWP (Loop : expr riscv_lang)) -∗
     mWP (Loop : expr riscv_lang).
-  Proof.
+  Proof using Hpsok_free.
     intros Hne Hrow Hk Harg.
     iIntros "#Hcode Hrun Hhd Hcont".
     rewrite /ufd_headL.

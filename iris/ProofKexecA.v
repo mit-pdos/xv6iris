@@ -904,7 +904,7 @@ Section KexecAUAMain.
                  (fn_nlink (FsStateEra.era_node dn bm data))) ->
     LA.kxc_bad_cause dn ef data ->
     ~ SpecKexec.anode_loadable (abs_row (FsStateEra.era_node dn bm data)).
-  Proof.
+  Proof using XI.
     intros Hrow Hbad (f & nl & Heq & Hload).
     (* first: the row IS a file row, or [Heq] is already absurd *)
     assert (Hf : f = FsTree.file_bytes data

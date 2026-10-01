@@ -1781,7 +1781,7 @@ Section UCodeEcho.
   Global Typeclasses Opaque echo_rodata.
 
   Lemma echo_rodata_of_text : utext_all gt M pm -∗ echo_rodata gt.
-  Proof.
+  Proof using Hsub2 Hx.
     assert (Hin : forall (a : Z) (b : bv 8),
                echo_ro !! a = Some b -> M !! a = Some b).
     { intros a b Hb. apply map_lookup_filter_Some in Hb as [Hb _].
@@ -1797,7 +1797,7 @@ Section UCodeEcho.
   Qed.
 
   Lemma echo_code_of_text : utext_all gt M pm -∗ echo_code gt.
-  Proof.
+  Proof using Hsub Hx.
     assert (Hin : forall (a : Z) (b : bv 8),
                EchoInstrs.echo_bytes !! a = Some b -> M !! a = Some b)
       by exact Hsub.

@@ -50,7 +50,11 @@ def parse_log(path):
             while 'should start with one of the following' not in buf and j + 1 < len(lines):
                 j += 1; buf += ' ' + lines[j]
             name = buf.split('should start with one of the following')[0].strip()
-            opts, k = [], j + 1
+            # A lone suggestion is printed on the SAME line as the header
+            # ("...commands: Proof using Hn."), several one per line below it.
+            head = buf.split('commands:', 1)[1].strip() if 'commands:' in buf else ''
+            opts = [' '.join(head.split())] if head.startswith('Proof using') else []
+            k = j + 1
             while k < len(lines) and lines[k].strip().startswith('Proof using'):
                 opts.append(' '.join(lines[k].split())); k += 1
             if cur and name and opts:

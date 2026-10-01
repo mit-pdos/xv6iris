@@ -863,7 +863,7 @@ Section MemWriteEaSplit.
             (Phys_Mem_Access_Info_splittable plan)) s = Some ((n, bytes), s) ->
     exec (write_kind_of_flags false false false) s = Some (wk, s) ->
     exec (mem_write_ea (Physaddr pa) width acc pbmt false false false) s = Some (Ok tt, s).
-  Proof.
+  Proof using HN Hpmp.
     intros Heff Hpac Hsplit Hwkf.
     unfold mem_write_ea. rewrite exec_catch_early_return.
     rewrite (execR_liftR_seq _ _ _ _ _ (exec_read_reg mstatus s)). cbn beta.

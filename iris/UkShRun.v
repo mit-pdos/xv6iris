@@ -919,7 +919,7 @@ Section UkShRun.
        UserChildren.uch (ukn_ch N) Sc' -∗
        mWP (Loop : expr riscv_lang)) -∗
     mWP (Loop : expr riscv_lang).
-  Proof.
+  Proof using Hpsok_free.
     intros Ha0. iIntros "#Hcode Hrun Hch Hpid Hcont".
     rewrite shr_wait.
     (* ---- 0xc6a  c.li a7,3 ---- *)
@@ -2308,7 +2308,7 @@ Section UkShRun.
         urun N' h' m' (ret_pc (m !!! Regidx ra_idx)) (2 + (Dg + n)) -∗
         mWP (Loop : expr riscv_lang))) -∗
     mWP (Loop : expr riscv_lang).
-  Proof.
+  Proof using ush_diag_leaf.
     iIntros "#Hdp #Hcode #Hro HP Hsz Hstd Hcwd Hch HD #Hkw Hpayv Hrun [Hpar Hchi]".
     iDestruct "Hcwd" as (cw) "Hcwd".
     (* both index-free fragments are opened here and closed on both arms;

@@ -298,7 +298,7 @@ Section UShOut.
       (mword_of_int sh_prompt_pv) 2%nat
       (UserFd.ustd_at (ukn_fd N) l vw ∗ ushpr v I 0%nat)
       (UserFd.ustd_at (ukn_fd N) l vw ∗ ushpr v I 2%nat).
-  Proof.
+  Proof using Persistent0.
     intros Hl2.
     iIntros "#Hpin #Hlk #Hro" (h m avail)
       "%Ha0 %Ha1 %Ha2 #Hcode [Hstd Hc] Hrun Hcont".
@@ -425,7 +425,7 @@ Section UShOut.
       (mword_of_int sh_prompt_pv) 2%nat
       (UserFd.ustd_at (ukn_fd N) l vw ∗ EchoLinks.ewc_cred T γ (S gen_id) I 0%nat)
       (UserFd.ustd_at (ukn_fd N) l vw ∗ EchoLinks.ewc_cred T γ (S gen_id) I 2%nat).
-  Proof.
+  Proof using Persistent0.
     intros Hl2. iIntros "#Hlk #Hro" (h m avail)
       "%Ha0 %Ha1 %Ha2 #Hcode [Hstd Hc] Hrun Hcont".
     rewrite /EchoLinks.ewc_cred. iDestruct "Hc" as (v) "[#Hpin Hc]".
@@ -443,7 +443,7 @@ Section UShOut.
   Lemma sh_prompt_law_holds :
     echo_links T γ -∗
     UShKernel.sh_prompt_law (EchoLinks.ewc_cred T γ (S gen_id)).
-  Proof.
+  Proof using Persistent0.
     iIntros "#Hlk". rewrite /UShKernel.sh_prompt_law.
     iIntros "!>" (N) "#Hro". rewrite /UkSh.ush_prompt_law.
     iModIntro. iSplitL "".

@@ -234,7 +234,7 @@ Section ProofConsputc.
       (m : regfile) (K : nat) (Φ : iProp Σ) (n : nat) (eb : bool)
       (b : bool) (p : mword 64) (lks : gset string)
     : wp_consputc_sconf_body kt γl γd γv m K Φ n eb b p lks.
-  Proof.
+  Proof using wp_uartputc.
     cbv beta delta [wp_consputc_sconf_body].
     intros ra_i a0_i pcE ra0 a00 ret_tgt HK Hn Hbelow.
     assert (HK20 : (20 <= K)%nat) by (exact HK).

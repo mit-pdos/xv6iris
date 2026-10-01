@@ -4203,7 +4203,7 @@ Section SmodeCorePt.
       eq_vec (_get_Mstatus_SIE mst0) ('b"1") = false ->
       and_vec mie0 (not_vec mdv0) = zeros' 64 ->
       gen_cert -∗ spt_disp_obl_D tv W Qi.
-    Proof.
+    Proof using HSD.
       intros Hmisa HSIE Hmm.
       assert (Lmisa : register_lookup misa
                         (MState (srs tv) ∅ dev0_state).(sregs) = MISA_C).
@@ -4253,7 +4253,7 @@ Section SmodeCorePt.
       spt_tr_obl_D -∗
       spt_ex_obl_D is_rvc i Q Rr W -∗
       swp (run_hart_active 0) (spt_run_post_D Q Rr Qi).
-    Proof.
+    Proof using HSD.
       intros Hmisa Hmenv Help Hpallow HA Hord HX Hcov.
       iIntros "#Hcert Hinstr HW Hfrag0 HRes Hrw Hro Hdisp #Htr Hex".
       (* [spt_disp_obl_D]'s three extras, re-associated into the ONE rider
@@ -6015,7 +6015,7 @@ Section SmodeCorePt.
       S σf.(mem) ∗
       mstate_interp σf ∗
       tlb_res_pt root_ppn.
-  Proof.
+  Proof using GEN.
     (* the shared-kernel-table regime's witness is [emp] at EVERY tier
        ([sr_ktier_wit_kpt_share]), so this restatement stays a one-liner and
        is itself tier-generic. *)

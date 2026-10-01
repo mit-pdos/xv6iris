@@ -2320,7 +2320,7 @@ Section ProofPrintk.
       Rest -∗
       mWP (Loop : expr riscv_lang)) -∗
     mWP (Loop : expr riscv_lang).
-  Proof.
+  Proof using wp_printint.
     intros sp0 s0v HK Hk Hi31 Hn31 Hs0 Hs6 Hs4 Hbelow.
     assert (HK14 : (28 <= K)%nat) by lia.
     iIntros "Hcg #Htext #Hkdata Hpc Hap Hva Hcnt #Hpre HR Hcont".
@@ -2482,7 +2482,7 @@ Section ProofPrintk.
       Rest -∗
       mWP (Loop : expr riscv_lang)) -∗
     mWP (Loop : expr riscv_lang).
-  Proof.
+  Proof using wp_printint.
     intros sp0 s0v HK Hk Hi31 Hn31 Hs0 Hs6 Hs4 Hbelow.
     assert (HK14 : (28 <= K)%nat) by lia.
     iIntros "Hcg #Htext #Hkdata Hpc Hap Hva Hcnt #Hpre HR Hcont".
@@ -2642,7 +2642,7 @@ Section ProofPrintk.
       Rest -∗
       mWP (Loop : expr riscv_lang)) -∗
     mWP (Loop : expr riscv_lang).
-  Proof.
+  Proof using wp_printint.
     intros sp0 s0v HK Hk Hi31 Hn31 Hs0 Hs6 Hs4 Hbelow.
     assert (HK14 : (28 <= K)%nat) by lia.
     iIntros "Hcg #Htext #Hkdata Hpc Hap Hva Hcnt #Hpre HR Hcont".
@@ -2804,7 +2804,7 @@ Section ProofPrintk.
       Rest -∗
       mWP (Loop : expr riscv_lang)) -∗
     mWP (Loop : expr riscv_lang).
-  Proof.
+  Proof using wp_printint.
     intros sp0 s0v HK Hk Hi31 Hn31 Hs0 Hs6 Hs4 Hbelow.
     assert (HK14 : (28 <= K)%nat) by lia.
     iIntros "Hcg #Htext #Hkdata Hpc Hap Hva Hcnt #Hpre HR Hcont".
@@ -2964,7 +2964,7 @@ Section ProofPrintk.
       Rest -∗
       mWP (Loop : expr riscv_lang)) -∗
     mWP (Loop : expr riscv_lang).
-  Proof.
+  Proof using wp_printint.
     intros sp0 s0v HK Hk Hi31 Hn31 Hs0 Hs6 Hs4 Hbelow.
     assert (HK14 : (28 <= K)%nat) by lia.
     iIntros "Hcg #Htext #Hkdata Hpc Hap Hva Hcnt #Hpre HR Hcont".
@@ -3116,7 +3116,7 @@ Section ProofPrintk.
       Rest -∗
       mWP (Loop : expr riscv_lang)) -∗
     mWP (Loop : expr riscv_lang).
-  Proof.
+  Proof using wp_printint.
     intros sp0 s0v HK Hk Hi31 Hn31 Hs0 Hs6 Hs4 Hbelow.
     assert (HK14 : (28 <= K)%nat) by lia.
     iIntros "Hcg #Htext #Hkdata Hpc Hap Hva Hcnt #Hpre HR Hcont".
@@ -3665,7 +3665,7 @@ Section ProofPrintk.
       Rest -∗
       mWP (Loop : expr riscv_lang)) -∗
     mWP (Loop : expr riscv_lang).
-  Proof.
+  Proof using wp_prputc.
     intros HK Hn31 Hbelow.
     assert (HK6 : (20 <= K)%nat) by lia.
     iIntros "Hcg #Htext Hpc Hcnt #Hpre HR Hcont".
@@ -3736,7 +3736,7 @@ Section ProofPrintk.
       Rest -∗
       mWP (Loop : expr riscv_lang)) -∗
     mWP (Loop : expr riscv_lang).
-  Proof.
+  Proof using wp_prputc.
     intros HK Hn31 Hbelow.
     assert (HK6 : (20 <= K)%nat) by lia.
     iIntros "Hcg #Htext Hpc Hcnt #Hpre HR Hcont".
@@ -3929,7 +3929,7 @@ Section ProofPrintk.
       Rest -∗
       mWP (Loop : expr riscv_lang)) -∗
     mWP (Loop : expr riscv_lang).
-  Proof.
+  Proof using wp_prputc.
     intros HK Hn31 Hnonul.
     assert (HK6 : (20 <= K)%nat) by lia.
     intro fuel. induction fuel as [|fuel IH]; intros i CID0 mc Rest Hf Hi Hs4 Hbelow; [lia | ].
@@ -4263,7 +4263,7 @@ Section ProofPrintk.
       Rest -∗
       mWP (Loop : expr riscv_lang)) -∗
     mWP (Loop : expr riscv_lang).
-  Proof.
+  Proof using wp_prputc.
     intros sp0 s0v HK Hk Hn31 Hnull Hs0 Hbelow.
     iIntros "Hcg #Htext #Hdata Hpc Hap Hva Hcnt #Hpre HR Hcont".
     iPoseProof (pk_null_data with "Hdata") as "#Hnull".
@@ -4464,7 +4464,7 @@ Section ProofPrintk.
       Rest -∗
       mWP (Loop : expr riscv_lang)) -∗
     mWP (Loop : expr riscv_lang).
-  Proof.
+  Proof using wp_prputc.
     intros HK Hn31.
     assert (HK6 : (20 <= K)%nat) by lia.
     induction q as [|q IH]; intros CID0 mc Rest Hn Hs4 Hs9 Hbelow; [lia | ].
@@ -7342,7 +7342,7 @@ Section ProofPrintk.
       Rest -∗
       mWP (Loop : expr riscv_lang)) -∗
     mWP (Loop : expr riscv_lang).
-  Proof.
+  Proof using wp_prputc.
     intros sp0 s0v HK Hk Hn31 Hstr Hkind Hs0 Hs1 Hbelow.
     (* only c0 = 's' yields PkStr *)
     assert (Hs0c : Ascii.eqb c0 "s"%char = true).
@@ -7440,7 +7440,7 @@ Section ProofPrintk.
       Rest -∗
       mWP (Loop : expr riscv_lang)) -∗
     mWP (Loop : expr riscv_lang).
-  Proof.
+  Proof using wp_prputc.
     intros HK Hn31 Hnone Hnn Hs1 Hbelow.
     iIntros "Hcg #Htext Hpc Hcnt #Hpre HR Hcont".
     (* [fst = None] rules out every consuming form, so [pk_entry] is either

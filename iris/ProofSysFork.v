@@ -114,7 +114,7 @@ Section ProofSysFork.
       (lks : gset string)
     : wp_sys_fork_sconf_body γp γw γl γf γs
  m lvl av eb p b pid U sts csP Q Rc lks.
-  Proof.
+  Proof using ufdG0.
     cbv beta delta [wp_sys_fork_sconf_body].
     intros pcE ret_tgt Hav Hlvl Hpnz Hbelow.
     

@@ -680,7 +680,7 @@ Section ProofPrintint.
       bytes_own (KTR := kt) (DfracOwn 1) buf 24 -∗
       mWP (Loop : expr riscv_lang)) -∗
     mWP (Loop : expr riscv_lang).
-  Proof.
+  Proof using wp_prputc.
     intros HK Hn31.
     assert (HK16 : (prputc_stack <= K - 8)%nat) by (lia).
     assert (Hz0 : sign_extend' 64 (mword_of_int 0 : mword 12) = (mword_of_int 0 : mword 64))
@@ -848,7 +848,7 @@ Section ProofPrintint.
       ⌜ callee_saved m mf /\ mf !!! Regidx ra_idx = m !!! Regidx ra_idx ⌝ -∗
       mWP (Loop : expr riscv_lang)) -∗
     mWP (Loop : expr riscv_lang).
-  Proof.
+  Proof using wp_prputc.
     intros sp0 spd buf HK Hn31 Hn1 Hn22 Ha4 Hsp Hs2 Hkept Hal7 Hal6 Hal5 Hlkbelow.
     iIntros "Hcg Hcnt #Htext Hpc Hbuf Hc1 Hc2 Hc3 Hc4 Hc8 #Hpre Hcont".
     assert (Hn63 : 0 <= Z.of_nat nd < 2^63) by (change (2^63) with 9223372036854775808; lia).
@@ -1081,7 +1081,7 @@ Section ProofPrintint.
       ⌜ callee_saved m mf /\ mf !!! Regidx ra_idx = m !!! Regidx ra_idx ⌝ -∗
       mWP (Loop : expr riscv_lang)) -∗
     mWP (Loop : expr riscv_lang).
-  Proof.
+  Proof using wp_prputc.
     intros sp0 spd buf HK Hn31 Hbase Ha0 Hsp Hs0 Hkept Hal7 Hal6 Hal5 Hlkbelow.
     iIntros "Hcg Hcnt #Htext #Hdig Hpc Hbuf Hc1 Hc2 Hc3 Hc4 Hc8 #Hpre Hcont".
     (* +0x12 addi s2,s0,-56 : s2 := buf *)
@@ -1367,7 +1367,7 @@ Section ProofPrintint.
       (m : regfile) (K : nat)
       (n : nat) (eb : bool) (b : bool) (pcur : mword 64) (lks : gset string)
     : wp_printint_sconf_body kt m K n eb b pcur lks.
-  Proof.
+  Proof using wp_prputc.
     cbv beta delta [wp_printint_sconf_body].
     intros ra_i a1_i pcE ra0 ret_tgt HK Hbase Hn31 Hlkbelow.
     pose proof (pi_cap_bounds K HK) as (HK8 & HK16).

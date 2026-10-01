@@ -1535,7 +1535,7 @@ Section UkShEcho.
       (ws : list (list (bv 8)))
       (dg : list (bv 8)) (Q : Z -> iProp Σ) (Cr Cd : iProp Σ) :
     wp_kshm_child_x Fd1 ws dg Q Cr Cd.
-  Proof.
+  Proof using Hpsok_free.
     intros N Hc h m dw dv s0 len f sz ld n
       Hpeq Hs1 Hline Hdgb Hs0 Hs64 Hs38 Hszlo Hszal Hszok Hfd1 Hfd2.
     (* the line the discipline admits, as the parser's own premises *)
@@ -1628,7 +1628,7 @@ Section UkShEcho.
       (ws : list (list (bv 8)))
       (dg : list (bv 8)) (Q : Z -> iProp Σ) (Cr Cd : iProp Σ) :
     wp_kshm_child_x_v Fd1 ws dg Q Cr Cd.
-  Proof.
+  Proof using Hpsok_free.
     intros N Hc h m dw dv s0 len f sz ld v n
       Hpeq Hs1 Hline Hdgb Hs0 Hs64 Hs38 Hszlo Hszal Hszok Hfd1 Hfd2.
     (* the line the discipline admits, as the parser's own premises *)
@@ -1726,7 +1726,7 @@ Section UkShEcho.
       (Q : Z -> iProp Σ) (Cr Cd : iProp Σ) :
     wp_kshm_child_echo ws Q Cr Cd.
   (* THE GENERAL WALK, at echo's alternative -- by conversion, as the arm. *)
-  Proof.
+  Proof using Hpsok_free.
     intros N Hc h m dw dv s0 len f sz ld n
       Hpeq Hs1 Hline Hs0 Hs64 Hs38 Hszlo Hszal Hszok Hfd1 Hfd2.
     pose proof (proj1 Hline) as Hok.
@@ -2017,7 +2017,7 @@ Section UkShEcho.
     ush_execfail_law_wq Wc -∗
     sh_exec_sup_echo_wq Wc -∗
     ush_oom_law_wq Wc -∗ UkShFork.ushf_child_law T Wc.
-  Proof.
+  Proof using Hpsok_free.
     iIntros "#Hxl #Hsup #Hoomw".
     iApply (ushf_child_law_holds_at (fun I => line_ok (last_ws I))
               (fun _ => alt_execfail) (fun _ => 17%nat) T Wc

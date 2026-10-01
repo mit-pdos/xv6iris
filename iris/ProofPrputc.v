@@ -115,7 +115,7 @@ Section ProofPrputc.
       (m : regfile) (K : nat) (n : nat) (eb : bool) (b : bool) (p : mword 64)
       (lks : gset string)
     : wp_prputc_sconf_body kt m K n eb b p lks.
-  Proof.
+  Proof using wp_uartputc.
     cbv beta delta [wp_prputc_sconf_body].
     intros ra_i pcE ra0 ret_tgt HK Hn Hbelow.
     assert (HK20 : (20 <= K)%nat) by (exact HK).

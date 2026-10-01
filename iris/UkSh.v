@@ -2671,7 +2671,7 @@ Section UkSh.
       (f : nat -> bv 8) :
     ush_gets_line_at Dsc l I0 J f -∗
     ush_lease (I0 ++ J) ∗ (⌜ush_gline_p_at Dsc l I0 J f⌝ ∨ T).
-  Proof.
+  Proof using HT.
     rewrite /ush_gets_line_at /ush_lease.
     iIntros "[[%Hp H] | [#HT H]]".
     - iSplitL "H"; [ by iLeft | iLeft; by iPureIntro ].
@@ -2722,7 +2722,7 @@ Section UkSh.
     ush_posb l 2%nat -∗
     ∃ I0 : list (bv 8),
       ush_gets_line_at Dsc l I0 [] f ∗ (ush_wcp l I0 2%nat ∨ T).
-  Proof.
+  Proof using HT.
     iIntros "H". rewrite /ush_posb.
     iDestruct "H" as "[H | [#HT H]]"; last first.
     { iExists []. rewrite /ush_gets_line_at.
@@ -2975,7 +2975,7 @@ Section UkSh.
       (l : list fdstate) (i : nat) (f : nat -> bv 8)
       (b : bv 8) :
     ush_gets_done_at Dl l i f -∗ ush_gets_done_at Dl l i (ush_set f i b).
-  Proof.
+  Proof using HT.
     rewrite /ush_gets_done_at. iIntros "[[#Hi H] | [Hl | [#HT H]]]";
       [ iLeft; iFrame "Hi H" | | iRight; iRight; iFrame "HT H" ].
     iDestruct "Hl" as (lu) "[#Hl H]".
@@ -7230,7 +7230,7 @@ Section UkSh.
     (⌜ush_fd0p l⌝ ∨ T)%I.
 
   Global Instance ush_fd0_persistent l : Persistent (ush_fd0 l).
-  Proof. rewrite /ush_fd0. apply _. Qed.
+  Proof using HT. rewrite /ush_fd0. apply _. Qed.
 
   (* ===================================================================== *)
   (* THE ROW IS A LOOP INVARIANT OF THE CONSOLE PREAMBLE (lane SH-OPEN).    *)
@@ -8221,7 +8221,7 @@ Section UkSh.
     ubytes γd sh_buf sh_nbuf g -∗
     urun N h mc (mword_of_int 0x938) (16 + n) -∗
     mWP (Loop : expr riscv_lang).
-  Proof.
+  Proof using HT.
     intros Hregs Hi20 Hi2lt Hnul. iIntros "#Hcode #HTb Htail Hbs Hrun".
     iApply (wp_uk_auipc N h mc (mword_of_int 0x938)
               (mword_of_int 1 : mword 20) s1_idx

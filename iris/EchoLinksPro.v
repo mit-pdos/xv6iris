@@ -298,7 +298,7 @@ Section echo_links_pro.
     end.
 
   Global Instance ewc_pro_timeless v I : Timeless (ewc_pro v I).
-  Proof. rewrite /ewc_pro. tl_leaf. Qed.
+  Proof using Timeless0. rewrite /ewc_pro. tl_leaf. Qed.
 
   Lemma ewc_pro_taint v I : T -∗ ewc_pro v I.
   Proof using . iIntros "HT". rewrite /ewc_pro. by iRight. Qed.
@@ -318,7 +318,7 @@ Section echo_links_pro.
      ([EchoLinks.ewc_ban_done] is this followed by [ewc_owed_of_pro]). *)
   Lemma ewc_ban_done_pro (v : era_pins) (I : list (bv 8)) :
     ewc_ban T v I (length u_banner) -∗ ewc_pro v I.
-  Proof.
+  Proof using Persistent0.
     rewrite /EchoLinks.ewc_ban /ewc_pro.
     iIntros "[Hl | #HT]"; last by iRight.
     iDestruct "Hl" as (ps cs P) "(%Hw & Htn & #Hps & #Hcs & #HE)".
@@ -347,9 +347,9 @@ Section echo_links_pro.
     end.
 
   Global Instance ewc_pdg_timeless v I a i : Timeless (ewc_pdg v I a i).
-  Proof. rewrite /ewc_pdg. tl_leaf. Qed.
+  Proof using Timeless0. rewrite /ewc_pdg. tl_leaf. Qed.
   Global Instance ewc_pdiag_timeless v I a i : Timeless (ewc_pdiag v I a i).
-  Proof.
+  Proof using Timeless0.
     rewrite /ewc_pdiag. destruct i;
       [apply ewc_pro_timeless | apply ewc_pdg_timeless].
   Qed.
@@ -428,7 +428,7 @@ Section echo_links_pro.
      shape: the round is terminal and the credential is dropped (affine). *)
   Lemma ewc_pdiag_done_1 (v : era_pins) (I : list (bv 8)) :
     ewc_pdiag v I 1%nat (length (pro_alts !!! 1%nat)) -∗ ewc_ban T v I 0%nat.
-  Proof.
+  Proof using Persistent0.
     rewrite pro_alts_1_length /ewc_pdiag /ewc_pdg /EchoLinks.ewc_ban.
     iIntros "[Hl | #HT]"; last by iRight.
     iDestruct "Hl" as (ps cs P) "(%Hw & Htn & #Hps & #Hcs & #HE)".
