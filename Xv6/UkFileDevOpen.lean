@@ -11,6 +11,8 @@ deviations (deviation 5: `fdev_path_view` proves Rocq's `uimg_view_text` /
 `uimg_view_data` inline at the string's image, `fdev_cells_img`).
 -/
 import Xv6.UkFileDevDefs
+import Xv6.UkFileOpenCallsRead
+import Xv6.UkFileOpenCallsMiss
 import Xv6.UkFreeHandler
 
 namespace Xv6

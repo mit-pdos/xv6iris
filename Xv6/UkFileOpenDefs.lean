@@ -7,8 +7,10 @@ Rocq's header, in short: `UkTreeRead`/`UkTreeCreate` at `AppFile`'s DEED,
 through `FileOpen`'s suppliers -- every lemma is a U-tier leaf plus one of
 `FileOpen`'s bundles and one of its receipt readers.  Files:
 `UkFileOpenDefs` (this: the families, the ledger's taint arm, the fd tie,
-the parameters), `UkFileOpenSup` (the three deposits), `UkFileOpenCalls`
-(the three open corollaries), `UkFileOpenRead` (the held read).
+the parameters), `UkFileOpenSup` (the three deposits), `UkFileOpenCallsKit`
+(their vocabulary) and `UkFileOpenCallsRead` / `UkFileOpenCallsMiss` /
+`UkFileOpenCallsCreate` (the three open corollaries, one per module),
+`UkFileOpenRead` (the held read).
 
 CONE (re-walked on the pinned globs: 19/31 reached).  Ported:
 `uk_open_taint_fd`, `uk_open_taint_fd_of_arm`, `file_open_fam`,

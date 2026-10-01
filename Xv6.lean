@@ -1802,7 +1802,10 @@ import Xv6.HfpReg
 import Xv6.UkPipeDevDefs
 import Xv6.UkCatFIfaceDeps
 import Xv6.UkFileOpenSup
-import Xv6.UkFileOpenCalls
+import Xv6.UkFileOpenCallsKit
+import Xv6.UkFileOpenCallsRead
+import Xv6.UkFileOpenCallsMiss
+import Xv6.UkFileOpenCallsCreate
 import Xv6.UkFileOpenRead
 import Xv6.UkFileDevDefs
 import Xv6.UkFileDevRead
