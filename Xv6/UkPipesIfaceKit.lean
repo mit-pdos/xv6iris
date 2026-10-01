@@ -49,6 +49,7 @@ them); nothing else in these sections is unreached.
    instance, no pin needed.
 -/
 import Xv6.UkPipesIfaceDefs
+import Xv6.PipeOutNFam
 
 namespace Xv6
 

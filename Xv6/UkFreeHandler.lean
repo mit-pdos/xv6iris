@@ -54,9 +54,9 @@ The four free leaves are the application-generic ones: the QUIET write
    `-1#64`, `uint r = 0` is `r.toNat = 0`, registers are written with
    `ukWr`.  `fh_m1` is `(-1#64).toInt = -1`.
 -/
-import Xv6.UkHandler
 import Xv6.UkSysP
 import MachCSL.BvLemmas
+import Xv6.UkTree
 
 namespace Xv6
 

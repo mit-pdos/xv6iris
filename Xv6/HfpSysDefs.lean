@@ -42,4 +42,5 @@ import Xv6.UshStep
 import Xv6.UshMainPure
 import Xv6.UshMainLine
 import Xv6.UkIoSysP
+import Xv6.SpecPipewrite
 

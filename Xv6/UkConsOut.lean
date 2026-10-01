@@ -59,11 +59,9 @@ CONE (re-walked on the pinned globs: 36/59 reached; the notations `a0_idx`..
 -/
 import Xv6.UkWriteLeaf
 import Xv6.UkSysIOHolds
-import Xv6.UkTree
 import Xv6.GenLinksLine
 import Xv6.UEchoOut
 import Xv6.UkFreeHandler
-import MachCSL.BvLemmas
 
 namespace Xv6
 

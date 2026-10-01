@@ -29,6 +29,7 @@ bfree and back (`Xv6.itrunc_bfree_eb`).
 import Xv6.ItruncParts
 import Xv6.CodeTactics
 import Xv6.BlkmapBuf
+import MachCSL.WpSmodeRegOps
 
 namespace Xv6
 

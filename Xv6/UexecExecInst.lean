@@ -98,9 +98,7 @@ Rocq's header, point for point:
 import Xv6.FsAbsInvFire
 import Xv6.SysExecNe
 import Xv6.SpecSyscall
-import Xv6.SpecFileclose
 import Xv6.PipeReg
-import Xv6.SyncHook
 
 namespace Xv6
 

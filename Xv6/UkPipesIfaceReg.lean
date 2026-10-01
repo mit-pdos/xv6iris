@@ -45,9 +45,10 @@ predicates, which read `UkPipeDev`'s devices, are in `UkPipesIfaceDev`.)
    `l.set k st`; `l !! k` is `l[k]?`.
 -/
 import Xv6.UkPipesIfaceKit
-import Xv6.UkFreeHandler
 import Xv6.UkSysPHolds
 import Xv6.UkSysFHHolds
+import Xv6.UkHandler
+import Xv6.PipeProtoRead
 
 namespace Xv6
 

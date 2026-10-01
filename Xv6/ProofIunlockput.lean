@@ -46,6 +46,7 @@ Dropped/simplified vs Rocq: none.
 import Xv6.SpecIunlockput
 import Xv6.CodeTactics
 import Xv6.SpecIunlock
+import MachCSL.WpSmodeRegOps
 
 namespace Xv6
 

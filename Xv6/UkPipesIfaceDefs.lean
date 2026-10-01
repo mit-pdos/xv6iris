@@ -46,9 +46,10 @@ the end of §1) `pns_short`, `pns_admV`.
 5. `cons_short` is H-io's `UkConsOut.consShort`.
 -/
 import Xv6.HfpReg
-import Xv6.PipeProtoRead
-import Xv6.PipeOutNFam
 import Xv6.UkConsOut
+import Xv6.PipesView
+import Xv6.PipeBothNPure
+import Xv6.PipeProto
 
 namespace Xv6
 

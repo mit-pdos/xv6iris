@@ -123,7 +123,6 @@ Nothing.  (`Global Typeclasses Opaque awrite_chain` -- the chain's SEAL --
 has no Lean analogue to port: a Lean `def` is not unfolded by `iframe`.)
 -/
 import Xv6.FsAbsOpenFire
-import Xv6.FsAbsReadFire
 import Xv6.SpecWritei
 import Xv6.FsAbsUnlinkFire
 

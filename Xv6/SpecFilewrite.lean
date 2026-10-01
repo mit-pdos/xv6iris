@@ -183,7 +183,6 @@ untouched); the `n < 0` test (+0x1c); the three-way dispatch; FD_PIPE
 
 Imports only definitional files and callee `Spec*` files.
 -/
-import Xv6.SpecPipewrite
 import Xv6.SpecConsolewrite
 import Xv6.ConsoleInvDefs
 import Xv6.FsAbsWriteFire

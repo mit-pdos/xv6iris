@@ -13,9 +13,9 @@ pages below `TRAPFRAME` the loop can reach (Rocq's guarded premise).
 
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
-import MachCSL.WpSmodeFrame
 import Xv6.UPtDefs
 import Xv6.Image
+import MachCSL.WpSmodeIntr
 
 namespace Xv6
 

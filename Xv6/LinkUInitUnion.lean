@@ -43,20 +43,16 @@ Rocq's header, abridged:
 4. `union_results` (Rocq a `Definition := conj …`) is a theorem stating the
    conjunction of the two results' statements.
 -/
-import Xv6.AppUnionProg
 import Xv6.UInitUnionBoot
 import Xv6.LinkShFprintf
 import Xv6.LinkShMain
 import Xv6.LinkShMalloc
 import Xv6.UshmSbrkHolds
-import Xv6.UshSysPHolds
-import Xv6.ProofShSysWait
 import Xv6.InitPrintfLink
-import Xv6.UkSysPHolds
-import Xv6.LinkSystemAdequacyClosed
 import Xv6.UnionBootAdequacy
 import Xv6.LinkUkLeaves
 import Xv6.UnionAdmDemo
+import Xv6.ProofUser
 
 namespace Xv6
 

@@ -7,9 +7,9 @@ Needs 42 slots.
 
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
-import MachCSL.WpSmodeFrame
 import Xv6.Image
 import Xv6.UPtDefs
+import MachCSL.WpSmodeIntr
 
 namespace Xv6
 

@@ -103,7 +103,6 @@ FsAbsOpenFire precedent):
 Nothing dropped; everything not listed as ported is DEFERRED above.
 -/
 import Xv6.FsAbsMknodFire
-import Xv6.ArgPath
 import Xv6.SpecFdalloc
 
 namespace Xv6

@@ -26,6 +26,7 @@ hypothesis quantifies over the hart and over `SPIE`/`SPP`.
 -/
 import Xv6.VirtioDiskRwDefs4
 import Xv6.CodeTactics
+import MachCSL.WpSmodeRegOps
 
 namespace Xv6
 

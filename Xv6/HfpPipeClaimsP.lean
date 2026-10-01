@@ -29,6 +29,7 @@ import Xv6.PipeOutNFam
 import Xv6.GenLinksLine
 import Xv6.UnionDisc
 import Xv6.FileState
+import MachCSL.WpSmodeFrame
 
 namespace Xv6
 

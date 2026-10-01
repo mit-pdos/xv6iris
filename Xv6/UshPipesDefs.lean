@@ -58,6 +58,7 @@ Dropped (unreached): `pdep_sh_shots`, `pflow_cat`.
 -/
 import Xv6.UkPipesIfaceKit
 import Xv6.PipesFire
+import Xv6.PipeProtoRead
 
 namespace Xv6
 

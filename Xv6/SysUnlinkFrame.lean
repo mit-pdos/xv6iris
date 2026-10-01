@@ -49,14 +49,11 @@ slots 9..10 `name[DIRSIZ]` (`s0-80`, fourteen bytes and two spare), slots
 import Xv6.SpecSysUnlink
 import MachCSL.StackOwnBounds
 import Xv6.SysUnlinkArgs
-import Xv6.KstackMap
 import Xv6.SpecIupdate
 import Xv6.SysfileCalls
 import Xv6.SpecIlock
 import Xv6.SpecNamecmp
 import Xv6.SpecNamexEra
-import Xv6.ReadiDefs
-import Xv6.KernelTac
 import Xv6.KexecParts
 
 namespace Xv6
