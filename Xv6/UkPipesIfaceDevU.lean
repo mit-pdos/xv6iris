@@ -27,6 +27,7 @@ import Xv6.UkFileDevDefs
 import Xv6.PipeOut
 import Xv6.PipeProtoRead
 import Xv6.UkPipeDevWrite
+import Xv6.PnsKeep
 
 namespace Xv6
 
@@ -35,17 +36,6 @@ open Std (ExtTreeSet)
 open UexecSG
 
 set_option linter.unusedSectionVars false
-
-/-- A pure conclusion of two resources keeps them. -/
-theorem pns_keep2 {GF : BundledGFunctors} {P Q : IProp GF} {φ : Prop} (h : ⊢ P -∗ Q -∗ ⌜φ⌝) :
-    P ∗ Q ⊢ ⌜φ⌝ ∗ (P ∗ Q) := by
-  refine BI.pure_elim φ ?_ (fun hφ => ?_)
-  · iintro ⟨HP, HQ⟩
-    iapply h $$ HP HQ
-  · iintro H
-    isplitr
-    · ipureintro; exact hφ
-    · iexact H
 
 section DevU
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [IcacheG GF] [PipeProtoG GF] [PipeOutG GF] [CtokG GF] [SG : UexecSG GF]

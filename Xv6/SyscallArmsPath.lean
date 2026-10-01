@@ -60,6 +60,7 @@ entry Spec).
 -/
 import Xv6.SyscallRet
 import Xv6.SpecFdalloc
+import Xv6.UkPipeDevDefs
 
 namespace Xv6
 

@@ -21,6 +21,7 @@ CONE (reached): the six laws above.
    input half is read by `pns_pk_copy_in` at either sink.
 -/
 import Xv6.UkPipesIfaceCtx
+import Xv6.UkPipesIfaceDevU
 
 namespace Xv6
 

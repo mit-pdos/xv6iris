@@ -52,6 +52,10 @@ updone_shape ug`). -/
 noncomputable abbrev Xu (ug : UnionGn) (r : FileAppNames) (s0 : Fstate) (γp : GName) : UshCtx GF :=
   ushURoundCtx (hlc := hlc) ug r s0 (uptermShape ug) (updoneShape ug) γp
 
+/-- The union's credential family, read off the record. -/
+theorem Xu_Wc (ug : UnionGn) (r : FileAppNames) (s0 : Fstate) (γp : GName) :
+    (Xu (hlc := hlc) (GF := GF) ug r s0 γp).Wc = uWcu ug r s0 (uptermShape ug) (updoneShape ug) := rfl
+
 /-- THE ROUND the branch runs: `UShPipesDefs`'s section variables at the
 union (`pg := ugn_pipe ug`, `U`, `pview_unionU`, `CPU := ucparams ug`, `∅`,
 `WAU := uwa ug`). -/

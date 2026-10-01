@@ -28,6 +28,7 @@ import Xv6.UkPipesIfaceCtx
 import Xv6.UkFileDevNil
 import Xv6.UkFileDevSysHolds
 import Xv6.UkPipesIfaceK
+import Xv6.UkPipeDevWrite
 
 namespace Xv6
 

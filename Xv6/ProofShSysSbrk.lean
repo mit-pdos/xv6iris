@@ -12,6 +12,7 @@ Deviations from Rocq: as in `SpecShSysSbrk`; the three instructions are
 `stub_run`'s, not walked inline.
 -/
 import Xv6.SpecShSysSbrk
+import Xv6.UkPipeDevDefs
 
 namespace Xv6
 

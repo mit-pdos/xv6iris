@@ -45,10 +45,6 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Icache
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
   [DiskG GF] [EchoOutG GF] [FileAppG GF] [FileOutG GF] [PnsRegG GF] [PipesNG GF] [FifRegG GF]
 
-/-- The union's credential family, read off the record. -/
-theorem Xu_Wc (ug : UnionGn) (r : FileAppNames) (s0 : Fstate) (γp : GName) :
-    (Xu (hlc := hlc) (GF := GF) ug r s0 γp).Wc = uWcu ug r s0 (uptermShape ug) (updoneShape ug) := rfl
-
 /-- The loan `True` (echo). -/
 theorem uD_Rd_true (ug : UnionGn) (v : EraPins) (I : List (BitVec 8)) (sR : Fstate) (lR : Pline')
     (L : List (BitVec 8)) (pr : Producer) (γc γm : Wid → GName) (P : Nat → PNames) (gF gG : Nat → GName) :

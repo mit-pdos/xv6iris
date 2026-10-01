@@ -1851,6 +1851,7 @@ import Xv6.UkPipesIfaceDefs
 import Xv6.UkPipesIfaceKit
 import Xv6.UkCatFIfaceCon
 import Xv6.UkPipesIfaceDevU
+import Xv6.PnsKeep
 import Xv6.UkPipesIfaceReg
 import Xv6.UkPipesIfaceDev
 import Xv6.UkFileDevSysHolds
