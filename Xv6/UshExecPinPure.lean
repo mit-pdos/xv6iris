@@ -54,7 +54,8 @@ namespace Xv6
 declaration. -/
 structure UshExecPinProg : Prop where
   /-- Rocq `UShCatPay.sh_cat_pin_resolves` (at `cat_pl = fname_cat`). -/
-  shCatPinResolves : pinResolves era0CatPins ROOTINO fnameCat [ROOTINO, CAT_INO] CAT_INO User.Cat.elf 1
+  shCatPinResolves : ∀ rt : Nat,
+    pinResolves era0CatPins rt ROOTINO fnameCat [ROOTINO, CAT_INO] CAT_INO User.Cat.elf 1
   /-- Rocq `UShCat.cat_elf_loadable`. -/
   catElfLoadable : kexecLoadable User.Cat.elf
   /-- Rocq `UShGrep.grep_elf_loadable`. -/
@@ -69,14 +70,17 @@ def grepPl : List (BitVec 8) := fnameGrep
 theorem grepPathElems : pathElems grepPl = grepPath := by decide
 
 /-- **Rocq `sh_grep_pin_resolves`**. -/
-theorem shGrepPinResolves :
-    pinResolves era0GrepPins ROOTINO grepPl [ROOTINO, GREP_INO] GREP_INO User.Grep.elf 1 := by
-  refine ⟨?_, ?_, ?_⟩
-  · unfold umStartOf; split <;> rfl
+theorem shGrepPinResolves (rt : Nat) :
+    pinResolves era0GrepPins rt ROOTINO grepPl [ROOTINO, GREP_INO] GREP_INO User.Grep.elf 1 := by
+  refine ⟨?_, ?_, ?_, ?_⟩
+  · rw [umStartOf_rel rt _ _ (by decide)]; rfl
   · rw [grepPathElems]; rfl
   · intro v ⟨_, hnode, hrun⟩
     rw [grepPathElems]
     exact ⟨hrun, hnode⟩
+  · -- no element is `..`: the root-aware hop is the record one
+    show ∀ s ∈ pathElems grepPl, s ≠ DOTDOT
+    rw [grepPathElems]; decide
 
 /-- **Rocq `secc_pl`**: /seccomp's path is its command word, resolved at the
 root. -/
@@ -86,14 +90,17 @@ def seccPl : List (BitVec 8) := cmdSeccomp
 theorem seccPathElems : pathElems seccPl = seccPath := by decide
 
 /-- **Rocq `sh_secc_pin_resolves`**. -/
-theorem shSeccPinResolves :
-    pinResolves era0SeccPins ROOTINO seccPl [ROOTINO, SECC_INO] SECC_INO User.Seccomp.elf 1 := by
-  refine ⟨?_, ?_, ?_⟩
-  · unfold umStartOf; split <;> rfl
+theorem shSeccPinResolves (rt : Nat) :
+    pinResolves era0SeccPins rt ROOTINO seccPl [ROOTINO, SECC_INO] SECC_INO User.Seccomp.elf 1 := by
+  refine ⟨?_, ?_, ?_, ?_⟩
+  · rw [umStartOf_rel rt _ _ (by decide)]; rfl
   · rw [seccPathElems]; rfl
   · intro v ⟨_, hnode, hrun⟩
     rw [seccPathElems]
     exact ⟨hrun, hnode⟩
+  · -- no element is `..`: the root-aware hop is the record one
+    show ∀ s ∈ pathElems seccPl, s ≠ DOTDOT
+    rw [seccPathElems]; decide
 
 /-- **Rocq `sync_pl`** (drift SY2): /sync's path is its command word. -/
 def syncPl : List (BitVec 8) := cmdSync
@@ -102,14 +109,17 @@ def syncPl : List (BitVec 8) := cmdSync
 theorem syncPathElems : pathElems syncPl = syncPath := by decide
 
 /-- **Rocq `sh_sync_pin_resolves`**. -/
-theorem shSyncPinResolves :
-    pinResolves era0SyncPins ROOTINO syncPl [ROOTINO, SYNC_INO] SYNC_INO User.Sync.elf 1 := by
-  refine ⟨?_, ?_, ?_⟩
-  · unfold umStartOf; split <;> rfl
+theorem shSyncPinResolves (rt : Nat) :
+    pinResolves era0SyncPins rt ROOTINO syncPl [ROOTINO, SYNC_INO] SYNC_INO User.Sync.elf 1 := by
+  refine ⟨?_, ?_, ?_, ?_⟩
+  · rw [umStartOf_rel rt _ _ (by decide)]; rfl
   · rw [syncPathElems]; rfl
   · intro v ⟨_, hnode, hrun⟩
     rw [syncPathElems]
     exact ⟨hrun, hnode⟩
+  · -- no element is `..`: the root-aware hop is the record one
+    show ∀ s ∈ pathElems syncPl, s ≠ DOTDOT
+    rw [syncPathElems]; decide
 
 /-- **Rocq `filt_elf`**: a stage's program image. -/
 def filtElf : Filt → List (BitVec 8)
@@ -132,11 +142,11 @@ def filtPins : Filt → Aview → Prop
   | .FGrep _ => era0GrepPins
 
 /-- **Rocq `filt_pin_resolves`**. -/
-theorem filtPinResolves (P : UshExecPinProg) (F : Filt) :
-    pinResolves (filtPins F) ROOTINO (filtPl F) [ROOTINO, filtIno F] (filtIno F) (filtElf F) 1 := by
+theorem filtPinResolves (P : UshExecPinProg) (F : Filt) (rt : Nat) :
+    pinResolves (filtPins F) rt ROOTINO (filtPl F) [ROOTINO, filtIno F] (filtIno F) (filtElf F) 1 := by
   cases F
-  · exact P.shCatPinResolves
-  · exact shGrepPinResolves
+  · exact P.shCatPinResolves rt
+  · exact shGrepPinResolves rt
 
 /-- **Rocq `filt_elf_loadable`**. -/
 theorem filtElfLoadable (P : UshExecPinProg) (F : Filt) : kexecLoadable (filtElf F) := by

@@ -976,14 +976,14 @@ ONE path argstr fetched, the slot piece at that path and argument vector
 (its refund untouched, `pfAt_mono`). -/
 theorem sysExecAuPre_at {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [FsTopG GF]
     [FsBytesG GF] [Appcfg GF] [CtokG GF]
-    (Fs : Pfam GF (Uvis → IProp GF)) (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat) (secc : BitVec 64)
+    (Fs : Pfam GF (Uvis → IProp GF)) (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat) (secc : BitVec 64)
     (Q : Int → IProp GF) (P Pmiss : Nat → Nat → IProp GF)
     (Fo : Pfam GF (Aview → Nat → Anode → IProp GF)) (M : Nat → List (BitVec 8)) (pv av : BitVec 64)
     (sts : List FdState) (cs : Std.ExtTreeSet GName compare) (pidv : BitVec 32)
     (pl : List (BitVec 8)) (na : Nat) (alen : Nat → Nat) (afun : Nat → Nat → BitVec 8)
     (hpl : argPathOf M pv.toNat pl) (hargs : execArgsOf M av na alen afun) :
-    sysExecAuPre (hlc := hlc) Fs Γ γfs cw secc Q P Pmiss Fo M pv av sts cs pidv ⊢
-      execAuPre (hlc := hlc) Fs Γ γfs cw secc Q P Pmiss Fo pl na alen afun sts cs pidv := by
+    sysExecAuPre (hlc := hlc) Fs Γ γfs rt cw secc Q P Pmiss Fo M pv av sts cs pidv ⊢
+      execAuPre (hlc := hlc) Fs Γ γfs rt cw secc Q P Pmiss Fo pl na alen afun sts cs pidv := by
   unfold sysExecAuPre execAuPre
   iintro ⟨Hera, Hcom, Hslot⟩
   isplitl [Hera]
@@ -1217,7 +1217,7 @@ def sysExecBreakBody (Γ : SchedNames) (k : KCtx) (A : SysExecArgs) (U : SysExec
       c -∗
     sysExecEnv (hlc := hlc) Γ A -∗ bslots 3 -∗ irefSlots 2 -∗
     myPay U.gn U.Q -∗
-    sysExecAuPre (hlc := hlc) U.Fs (fsGammaL fscFs) fscFs A.V.cwi A.V.pvSecc U.Q U.P U.Pmiss U.Fo (sysExecIm A)
+    sysExecAuPre (hlc := hlc) U.Fs (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.V.pvSecc U.Q U.P U.Pmiss U.Fo (sysExecIm A)
       A.v0 A.v1 U.sts U.cs A.pid -∗
     (∀ (c' : CPU) (spie' spp' : Bool) (R' : RegMap) (V' : ProcPriv) (M' : Nat → List (BitVec 8)),
       ⌜calleeSaved k.regs R'⌝ -∗ ⌜execArgsOf (sysExecIm A) A.v1 i alen afun⌝ -∗
@@ -1225,7 +1225,7 @@ def sysExecBreakBody (Γ : SchedNames) (k : KCtx) (A : SysExecArgs) (U : SysExec
       -- the count the argument fetches left the block at (deviation 9);
       -- kexec was handed the block there
       ⌜A.V.ev ≤ kv⌝ -∗
-      execArms (hlc := hlc) U.Fs (fsGammaL fscFs) fscFs A.V.cwi A.V.pvSecc U.Q U.P U.Pmiss U.Fo pl i alen afun
+      execArms (hlc := hlc) U.Fs (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.V.pvSecc U.Q U.P U.Pmiss U.Fo pl i alen afun
         U.sts U.gn U.cs A.pid (sysExecV2 A P kv) (sysExecM2 A P) V' M' (R' 10#5) -∗
       kctx c' ((k.withSpie spie' spp').withRegs R') -∗ pcIs c' (jumpPc (k.regs 1#5)) -∗
       trapCsrsExt c' k.sie -∗ cpuClaimExt c' k.sie k.proc -∗ bslots 3 -∗ irefSlots 2 -∗

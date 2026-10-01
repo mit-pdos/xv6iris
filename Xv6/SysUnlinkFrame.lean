@@ -538,12 +538,12 @@ theorem sysUnlinkPost_raise (k : KCtx) (γ : FileNames) (pa : BitVec 64) (pid : 
 
 /-- The armed post, at the record. -/
 abbrev sysUnlinkArmsA (A : SysUnlinkArgs GF) (r : BitVec 64) : IProp GF :=
-  unlinkArms (hlc := hlc) (fsGammaL fscFs) fscFs A.V.cwi (viewLazy A.V.upt A.V.sz A.M) A.v0.toNat
+  unlinkArms (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti A.V.cwi (viewLazy A.V.upt A.V.sz A.M) A.v0.toNat
     A.P A.Pmiss A.Fent A.Ftgt A.Fex A.Fmiss r
 
 /-- The caller's bundle, at the record. -/
 abbrev sysUnlinkAuA (A : SysUnlinkArgs GF) : IProp GF :=
-  unlinkAuAt (hlc := hlc) (fsGammaL fscFs) fscFs A.V.cwi (viewLazy A.V.upt A.V.sz A.M) A.v0.toNat
+  unlinkAuAt (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti A.V.cwi (viewLazy A.V.upt A.V.sz A.M) A.v0.toNat
     A.P A.Pmiss A.Fent A.Ftgt A.Fex A.Fmiss
 
 /-- What every exit hands the epilogue beside the machine state: the two

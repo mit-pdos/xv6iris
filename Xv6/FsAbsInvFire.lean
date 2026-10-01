@@ -74,24 +74,24 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [FsTopG GF] [FsBy
 /-! ## 1.  The walk premises: every hop says yes, every cursor is `True` -/
 
 /-- Rocq `fsabs_open_walk`. -/
-theorem fsabsOpenWalk (γfs : FsNames) (cw : Nat) :
-    ⊢ nameiWalkPreEra (hlc := hlc) (GF := GF) γfs cw (fun _ _ => iprop(True)) (fun _ _ => iprop(True)) := by
+theorem fsabsOpenWalk (γfs : FsNames) (rt cw : Nat) :
+    ⊢ nameiWalkPreEra (hlc := hlc) (GF := GF) γfs rt cw (fun _ _ => iprop(True)) (fun _ _ => iprop(True)) := by
   unfold nameiWalkPreEra
   iintro %pl %r _
   imodintro
   isplitr
   · ipureintro; trivial
-  · iapply (axHops_triv (hlc := hlc) (GF := GF) (elend (fsGammaL γfs)) (pathElems pl) 0)
+  · iapply (axHops_triv (hlc := hlc) (GF := GF) rt (elend (fsGammaL γfs)) (pathElems pl) 0)
 
 /-- Rocq `fsabs_mknod_walk`. -/
-theorem fsabsMknodWalk (γfs : FsNames) (cw : Nat) :
-    ⊢ nparWalkPreEra (hlc := hlc) (GF := GF) γfs cw (fun _ _ => iprop(True)) (fun _ _ => iprop(True)) := by
+theorem fsabsMknodWalk (γfs : FsNames) (rt cw : Nat) :
+    ⊢ nparWalkPreEra (hlc := hlc) (GF := GF) γfs rt cw (fun _ _ => iprop(True)) (fun _ _ => iprop(True)) := by
   unfold nparWalkPreEra
   iintro %pl %r _
   imodintro
   isplitr
   · ipureintro; trivial
-  · iapply (axHops_triv (hlc := hlc) (GF := GF) (elend (fsGammaL γfs)) (nparElems pl) 0)
+  · iapply (axHops_triv (hlc := hlc) (GF := GF) rt (elend (fsGammaL γfs)) (nparElems pl) 0)
 
 /-! ## 2.  The commits, one lemma per shape -/
 
@@ -257,8 +257,8 @@ theorem fsabsFilewriteIn [Xv6G GF] [OffboxG GF] [Fscfg] (st : FdState) (n : Int)
 /-! ## 4.  The bundles the sealed contracts take, at the live Γ -/
 
 /-- **Rocq `fsabs_exec_half`**: open's walk and open's commit at `True`. -/
-theorem fsabsExecHalf (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat) :
-    ⊢ nameiWalkPreEra (hlc := hlc) γfs cw (fun _ _ => iprop(True)) (fun _ _ => iprop(True)) ∗
+theorem fsabsExecHalf (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat) :
+    ⊢ nameiWalkPreEra (hlc := hlc) γfs rt cw (fun _ _ => iprop(True)) (fun _ _ => iprop(True)) ∗
       pfAt (aopenCommitAt (hlc := hlc) Γ appE) (pfamTriv (fun _ _ _ => iprop(True))) := by
   isplitl []
   · iapply fsabsOpenWalk
@@ -266,10 +266,10 @@ theorem fsabsExecHalf (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat) :
 
 /-- **Rocq `fsabs_open_in`**: sys_open's one input at the reading of
 argument 0, at whichever O_CREATE bit the omode carries. -/
-theorem fsabsOpenIn (γfs : FsNames) (cw : Nat) (M : Nat → List (BitVec 8)) (pv : Nat)
+theorem fsabsOpenIn (γfs : FsNames) (rt cw : Nat) (M : Nat → List (BitVec 8)) (pv : Nat)
     (vom : BitVec 64) :
     appSup (GF := GF) ⊢
-      openIn (hlc := hlc) (fsGammaL γfs) γfs cw M pv vom (fun _ _ => iprop(True))
+      openIn (hlc := hlc) (fsGammaL γfs) γfs rt cw M pv vom (fun _ _ => iprop(True))
         (fun _ _ => iprop(True)) (pfamTriv (fun _ _ => iprop(True)))
         (pfamTriv (fun _ _ => iprop(True))) (pfamTriv (fun _ _ _ _ => iprop(True)))
         (pfamTriv (fun _ _ _ _ => iprop(True))) (pfamTriv (fun _ _ _ => iprop(True)))
@@ -277,35 +277,35 @@ theorem fsabsOpenIn (γfs : FsNames) (cw : Nat) (M : Nat → List (BitVec 8)) (p
   iintro #Hsup
   unfold openIn
   split
-  · iapply (openAuCreateAt_of_all (hlc := hlc) (fsGammaL γfs) γfs cw M pv vom)
+  · iapply (openAuCreateAt_of_all (hlc := hlc) (fsGammaL γfs) γfs rt cw M pv vom)
     · iapply fsabsMknodWalk
     · iapply (fsabsAcre (hlc := hlc) γfs) $$ Hsup
     · iapply fsabsDlookup
     · iapply fsabsAopen
     · iapply (fsabsTruncPiece (hlc := hlc) γfs vom _) $$ Hsup
     · iapply (fsabsChild (hlc := hlc) γfs) $$ Hsup
-  · iapply (openAuPlainAt_of_all (hlc := hlc) (fsGammaL γfs) γfs cw M pv vom)
+  · iapply (openAuPlainAt_of_all (hlc := hlc) (fsGammaL γfs) γfs rt cw M pv vom)
     · iapply fsabsOpenWalk
     · iapply fsabsAopen
     · iapply (fsabsTruncPiece (hlc := hlc) γfs vom _) $$ Hsup
 
 /-- **Rocq `fsabs_mknod_pre`**. -/
-theorem fsabsMknodPre (γfs : FsNames) (cw : Nat) (M : Nat → List (BitVec 8)) (pv ma mi : Nat) :
+theorem fsabsMknodPre (γfs : FsNames) (rt cw : Nat) (M : Nat → List (BitVec 8)) (pv ma mi : Nat) :
     appSup (GF := GF) ⊢
-      mknodAuAt (hlc := hlc) (fsGammaL γfs) γfs cw M pv ma mi (fun _ _ => iprop(True))
+      mknodAuAt (hlc := hlc) (fsGammaL γfs) γfs rt cw M pv ma mi (fun _ _ => iprop(True))
         (fun _ _ => iprop(True)) (pfamTriv (fun _ _ => iprop(True)))
         (pfamTriv (fun _ _ => iprop(True))) (pfamTriv (fun _ _ _ _ => iprop(True)))
         (pfamTriv (fun _ _ _ _ => iprop(True))) := by
   iintro #Hsup
-  iapply (mknodAuAt_of_all (hlc := hlc) (fsGammaL γfs) γfs cw M pv ma mi)
+  iapply (mknodAuAt_of_all (hlc := hlc) (fsGammaL γfs) γfs rt cw M pv ma mi)
   · iapply fsabsMknodWalk
   · iapply (fsabsAcre (hlc := hlc) γfs) $$ Hsup
   · iapply fsabsDlookup
   · iapply (fsabsChild (hlc := hlc) γfs) $$ Hsup
 
 /-- **Rocq `fsabs_chdir_pre`**: open's walk beside open's plain commit. -/
-theorem fsabsChdirPre (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat) :
-    ⊢ chdirAuPre (hlc := hlc) Γ γfs cw (fun _ _ => iprop(True)) (fun _ _ => iprop(True))
+theorem fsabsChdirPre (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat) :
+    ⊢ chdirAuPre (hlc := hlc) Γ γfs rt cw (fun _ _ => iprop(True)) (fun _ _ => iprop(True))
       (pfamTriv (fun _ _ _ => iprop(True))) := by
   unfold chdirAuPre
   iapply fsabsExecHalf
@@ -320,9 +320,9 @@ theorem fsabsLinkPre (γfs : FsNames) :
 /-- **Rocq `fsabs_unlink_pre`**, AT THE SYSCALL TIER (TL-3C item (M)):
 unlink's bundle is path-fixed under the reading of argument 0, and the
 generic family owes the walk at EVERY string (`unlinkAuAt_of_all`). -/
-theorem fsabsUnlinkPre (γfs : FsNames) (cw : Nat) (M : Nat → List (BitVec 8)) (pv : Nat) :
+theorem fsabsUnlinkPre (γfs : FsNames) (rt cw : Nat) (M : Nat → List (BitVec 8)) (pv : Nat) :
     appSup (GF := GF) ⊢
-      unlinkAuAt (hlc := hlc) (fsGammaL γfs) γfs cw M pv (fun _ _ => iprop(True))
+      unlinkAuAt (hlc := hlc) (fsGammaL γfs) γfs rt cw M pv (fun _ _ => iprop(True))
         (fun _ _ => iprop(True)) (pfamTriv (fun _ _ _ _ => iprop(True)))
         (pfamTriv (fun _ _ => iprop(True))) (pfamTriv (fun _ _ _ _ => iprop(True)))
         (pfamTriv (fun _ _ _ => iprop(True))) := by
@@ -330,7 +330,7 @@ theorem fsabsUnlinkPre (γfs : FsNames) (cw : Nat) (M : Nat → List (BitVec 8))
   iintro #Hsup
   isplitl []
   · iintro %pl %_
-    iapply (npStart_of_mknod (hlc := hlc) γfs cw (fun _ _ => iprop(True)) (fun _ _ => iprop(True))
+    iapply (npStart_of_mknod (hlc := hlc) γfs rt cw (fun _ _ => iprop(True)) (fun _ _ => iprop(True))
       pl)
     iapply fsabsMknodWalk
   isplitl []
@@ -348,11 +348,11 @@ says yes at a `True` cursor, the observation hands the lent half back, and
 BOTH slot wands answer from the persistent family `HS` at the payload `Q`
 the bundle carries. -/
 theorem sysExecAuPre_triv_at [CtokG GF] (S : Uvis → IProp GF) (Q : Int → IProp GF)
-    (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat) (secc : BitVec 64) (M : Nat → List (BitVec 8))
+    (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat) (secc : BitVec 64) (M : Nat → List (BitVec 8))
     (pv av : BitVec 64)
     (sts : List FdState) (cs : Std.ExtTreeSet GName compare) (pidv : BitVec 32) :
     ⊢ □ (∀ W : Uvis, myPay W.gen Q -∗ S W) -∗
-      sysExecAuPre (hlc := hlc) ⟨S, iprop(True)⟩ Γ γfs cw secc Q (fun _ _ => iprop(True))
+      sysExecAuPre (hlc := hlc) ⟨S, iprop(True)⟩ Γ γfs rt cw secc Q (fun _ _ => iprop(True))
         (fun _ _ => iprop(True)) (pfamTriv (fun _ _ _ => iprop(True))) M pv av sts cs pidv := by
   iintro #HS
   unfold sysExecAuPre
@@ -363,8 +363,8 @@ theorem sysExecAuPre_triv_at [CtokG GF] (S : Uvis → IProp GF) (Q : Int → IPr
     imodintro
     isplitr
     · ipureintro; trivial
-    · iapply (show ⊢@{IProp GF} exHopsFrom γfs (fun _ _ => iprop(True)) (fun _ _ => iprop(True)) pl 0
-        from by rw [exHops_is_axHops]; exact axHops_triv _ _ _)
+    · iapply (show ⊢@{IProp GF} exHopsFrom rt γfs (fun _ _ => iprop(True)) (fun _ _ => iprop(True)) pl 0
+        from by rw [exHops_is_axHops]; exact axHops_triv _ _ _ _)
   isplitl []
   · iapply fsabsAopen
   · unfold pfAt sysExecSlotPre execSlotPre

@@ -172,8 +172,8 @@ theorem init_rodata_img (γ : GName) : initCode (GF := GF) γ ⊢ ukCode γ User
 
 /-- **Rocq `sbundle_at_mknod_intro_at`** (deviation 3). -/
 theorem sbundleAt_mknod_intro_at (X : Uvis → IProp GF) (f : Xfam GF) (W : Uvis) :
-    ⊢ (∀ Mv : Nat → List (BitVec 8), ⌜imgAgrees W.M Mv⌝ -∗
-        mknodAuAt (hlc := hlc) (fsGammaL (hlc := hlc) fscFs) fscFs W.cwd Mv (xkA W 0).toNat (devArg (xkA W 1))
+    ⊢ (∀ Mv : Nat → List (BitVec 8), ⌜imgAgrees W.M Mv⌝ -∗ ∀ rt : Nat,
+        mknodAuAt (hlc := hlc) (fsGammaL (hlc := hlc) fscFs) fscFs rt W.cwd Mv (xkA W 0).toNat (devArg (xkA W 1))
           (devArg (xkA W 2)) f.nP f.nPmiss f.nFarm f.nFun f.nFok f.nFex) -∗
       UexecSG.sbundleAt (self := uexecSGXv6 (hlc := hlc)) X 17 f W := by
   show ⊢ _ -∗ xv6Sbundle (hlc := hlc) X 17 f W
@@ -186,8 +186,8 @@ theorem sbundleAt_mknod_intro_at (X : Uvis → IProp GF) (f : Xfam GF) (W : Uvis
 theorem spostAt_mknod_elim_at (X : Uvis → IProp GF) (f : Xfam GF) (W : Uvis) (r : BitVec 64) (M' : ElfMem)
     (fdv' : List FdState) (cw' : Nat) (cs' : ExtTreeSet GName compare) :
     ⊢ UexecSG.spostAt (self := uexecSGXv6 (hlc := hlc)) X 17 f W r M' fdv' cw' cs' -∗
-      ∃ Mv : Nat → List (BitVec 8), ⌜imgAgrees W.M Mv⌝ ∗
-        mknodArms (hlc := hlc) (fsGammaL (hlc := hlc) fscFs) fscFs W.cwd Mv (xkA W 0).toNat (devArg (xkA W 1))
+      ∃ Mv : Nat → List (BitVec 8), ⌜imgAgrees W.M Mv⌝ ∗ ∃ rt : Nat,
+        mknodArms (hlc := hlc) (fsGammaL (hlc := hlc) fscFs) fscFs rt W.cwd Mv (xkA W 0).toNat (devArg (xkA W 1))
           (devArg (xkA W 2)) f.nP f.nPmiss f.nFarm f.nFun f.nFok f.nFex r := by
   show ⊢ xv6Spost (hlc := hlc) X 17 f W r M' fdv' cw' cs' -∗ _
   unfold xv6Spost xpostMknod
@@ -261,13 +261,13 @@ theorem cons_sup_mknod_gen (N : UkNames GF) (Pv : Aview → Prop) (T K : IProp G
   isplitl [Hufd]
   · iexact Hufd
   iapply sbundleAt_mknod_intro_at
-  iintro %Mv %hag
+  iintro %Mv %hag %rt
   rw [UkFileOpen.xkA_run0, UkFileOpen.xkA_run1, initConsK_xkA_run2, ha0, ha1, ha2, init_cons_dev_major,
     init_cons_dev_minor]
   dsimp only [uvisOfRun]
   obtain ⟨f1, f2, f3, f4, f5, f6⟩ := initConsMknodFam_fields Pv T K r N.pay
   rw [f1, f2, f3, f4, f5, f6, show (0x980#64 : BitVec 64).toNat = 0x980 from rfl]
-  iapply (init_cons_laws_mknod_bundle fscFs echoFsPure (consMade r) Pv T K Mv 0x980
+  iapply (init_cons_laws_mknod_bundle fscFs rt echoFsPure (consMade r) Pv T K Mv 0x980
     (hpath M Mv hsro hag)) $$ Hlaws Hinv HK
 
 /-- **Rocq `init_cons_sup_mknod`**: THE MKNOD's supplier at /init's own
@@ -389,14 +389,14 @@ theorem init_mknod_ok_out (UL : UK_LEAVES) (N : UkNames GF) (Pv : Aview → Prop
 /-- The mknod's FAILURE post, read: what the credential becomes is the
 caller's `Hfl`; or the taint. -/
 theorem init_mknod_fail_out (N : UkNames GF) (Pv : Aview → Prop) (T K : IProp GF) [Persistent T]
-    (r : EchoNames) (Mv : Nat → List (BitVec 8)) :
+    (r : EchoNames) (rt : Nat) (Mv : Nat → List (BitVec 8)) :
     ⊢ □ (K ={⊤}=∗ ukiMknodOut (hlc := hlc) N T (initConsCred T r) initConsFd) -∗
-      mknodPostFail (hlc := hlc) (fsGammaL (hlc := hlc) fscFs) fscFs ROOTINO Mv 0x980 CONSOLE 0 (initMkP T)
+      mknodPostFail (hlc := hlc) (fsGammaL (hlc := hlc) fscFs) fscFs rt ROOTINO Mv 0x980 CONSOLE 0 (initMkP T)
         (fun _ _ => iprop(True)) (initMkFarm echoFsPure Pv T K) (initMkFun T K) (initMkFok (consMade r) T K)
         initMkFex -∗
       |={⊤}=> ukiMknodOut (hlc := hlc) N T (initConsCred T r) initConsFd := by
   iintro #Hfl Hfail
-  ihave Hk := init_cons_mknod_fail_recv fscFs echoFsPure (consMade r) Pv T K (fun _ _ => iprop(True)) Mv
+  ihave Hk := init_cons_mknod_fail_recv fscFs rt echoFsPure (consMade r) Pv T K (fun _ _ => iprop(True)) Mv
     0x980 $$ Hfail
   icases Hk with (HK | #HT)
   · iapply Hfl $$ HK
@@ -406,12 +406,12 @@ theorem init_mknod_fail_out (N : UkNames GF) (Pv : Aview → Prop) (T K : IProp 
 
 /-- The mknod's ARMS, read (Rocq's inline block of `init_mknod_leaf_holds`). -/
 theorem init_mknod_arms_out (UL : UK_LEAVES) (N : UkNames GF) (Pv : Aview → Prop) (T K : IProp GF)
-    [Persistent T] [Timeless T] (r : EchoNames) (Mv : Nat → List (BitVec 8)) (ret : BitVec 64)
+    [Persistent T] [Timeless T] (r : EchoNames) (rt : Nat) (Mv : Nat → List (BitVec 8)) (ret : BitVec 64)
     (hpath : argPathOf Mv 0x980 initConsPl) :
     ⊢ initConsLawsAt echoFsPure (consMade r) Pv T K -∗
       □ (K ={⊤}=∗ ukiMknodOut (hlc := hlc) N T (initConsCred T r) initConsFd) -∗
       appInv (hlc := hlc) fscFs -∗
-      mknodArms (hlc := hlc) (fsGammaL (hlc := hlc) fscFs) fscFs ROOTINO Mv 0x980 CONSOLE 0 (initMkP T)
+      mknodArms (hlc := hlc) (fsGammaL (hlc := hlc) fscFs) fscFs rt ROOTINO Mv 0x980 CONSOLE 0 (initMkP T)
         (fun _ _ => iprop(True)) (initMkFarm echoFsPure Pv T K) (initMkFun T K) (initMkFok (consMade r) T K)
         initMkFex ret -∗
       |={⊤}=> ukiMknodOut (hlc := hlc) N T (initConsCred T r) initConsFd := by
@@ -420,7 +420,7 @@ theorem init_mknod_arms_out (UL : UK_LEAVES) (N : UkNames GF) (Pv : Aview → Pr
   icases Harms with (⟨-, Hok⟩ | ⟨-, Hfail⟩)
   · imodintro
     iapply (init_mknod_ok_out UL N Pv T K r Mv hpath) $$ Hlaws Hinv Hok
-  · iapply (init_mknod_fail_out N Pv T K r Mv) $$ Hfl Hfail
+  · iapply (init_mknod_fail_out N Pv T K r rt Mv) $$ Hfl Hfail
 
 /-- The mknod's post, read at the instance's families (the R-sh perf
 pattern: the post at the key is unfolded in its own lemma). -/
@@ -428,8 +428,8 @@ theorem init_mknod_post_fams (Pv : Aview → Prop) (T K : IProp GF) (r : EchoNam
     (W : Uvis) (ret : BitVec 64) (cs' : ExtTreeSet GName compare) :
     ⊢ UexecSG.spostAt (self := uexecSGXv6 (hlc := hlc)) (uslot (hlc := hlc)) 17 (initConsMknodFam Pv T K r Q)
         W ret W.M W.fd ROOTINO cs' -∗
-      ∃ Mv : Nat → List (BitVec 8), ⌜imgAgrees W.M Mv⌝ ∗
-        mknodArms (hlc := hlc) (fsGammaL (hlc := hlc) fscFs) fscFs W.cwd Mv (xkA W 0).toNat (devArg (xkA W 1))
+      ∃ Mv : Nat → List (BitVec 8), ⌜imgAgrees W.M Mv⌝ ∗ ∃ rt : Nat,
+        mknodArms (hlc := hlc) (fsGammaL (hlc := hlc) fscFs) fscFs rt W.cwd Mv (xkA W 0).toNat (devArg (xkA W 1))
           (devArg (xkA W 2)) (initMkP T) (fun _ _ => iprop(True)) (initMkFarm echoFsPure Pv T K) (initMkFun T K)
           (initMkFok (consMade r) T K) initMkFex ret := by
   obtain ⟨f1, f2, f3, f4, f5, f6⟩ := initConsMknodFam_fields Pv T K r Q
@@ -440,14 +440,14 @@ theorem init_mknod_post_fams (Pv : Aview → Prop) (T K : IProp GF) (r : EchoNam
 
 /-- ...and at the key's words: "console", `CONSOLE`, minor 0, the root. -/
 theorem init_mknod_post_words (Pv : Aview → Prop) (T K : IProp GF) (r : EchoNames) (m : RegMap) (W : Uvis)
-    (ret : BitVec 64) (Mv : Nat → List (BitVec 8))
+    (ret : BitVec 64) (rt : Nat) (Mv : Nat → List (BitVec 8))
     (hk0 : tfW W.tf (tfArgIdx 0) = m.get 10#5) (hk1 : tfW W.tf (tfArgIdx 1) = m.get 11#5)
     (hk2 : tfW W.tf (tfArgIdx 2) = m.get 12#5) (hcw : W.cwd = ROOTINO)
     (ha0 : m.get 10#5 = 0x980#64) (ha1 : m.get 11#5 = 1#64) (ha2 : m.get 12#5 = 0#64) :
-    mknodArms (hlc := hlc) (fsGammaL (hlc := hlc) fscFs) fscFs W.cwd Mv (xkA W 0).toNat (devArg (xkA W 1))
+    mknodArms (hlc := hlc) (fsGammaL (hlc := hlc) fscFs) fscFs rt W.cwd Mv (xkA W 0).toNat (devArg (xkA W 1))
         (devArg (xkA W 2)) (initMkP T) (fun _ _ => iprop(True)) (initMkFarm echoFsPure Pv T K) (initMkFun T K)
         (initMkFok (consMade r) T K) initMkFex ret ⊢
-      mknodArms (hlc := hlc) (fsGammaL (hlc := hlc) fscFs) fscFs ROOTINO Mv 0x980 CONSOLE 0 (initMkP T)
+      mknodArms (hlc := hlc) (fsGammaL (hlc := hlc) fscFs) fscFs rt ROOTINO Mv 0x980 CONSOLE 0 (initMkP T)
         (fun _ _ => iprop(True)) (initMkFarm echoFsPure Pv T K) (initMkFun T K) (initMkFok (consMade r) T K)
         initMkFex ret := by
   have e0 : (xkA W 0).toNat = 0x980 := by
@@ -471,12 +471,13 @@ theorem init_mknod_post_ent (Pv : Aview → Prop) (T K : IProp GF) (r : EchoName
     (ha0 : m.get 10#5 = 0x980#64) (ha1 : m.get 11#5 = 1#64) (ha2 : m.get 12#5 = 0#64) :
     UexecSG.spostAt (self := uexecSGXv6 (hlc := hlc)) (uslot (hlc := hlc)) 17 (initConsMknodFam Pv T K r Q)
         W ret W.M W.fd ROOTINO cs' ⊢
-      ∃ Mv : Nat → List (BitVec 8), ⌜imgAgrees W.M Mv⌝ ∗
-        mknodArms (hlc := hlc) (fsGammaL (hlc := hlc) fscFs) fscFs ROOTINO Mv 0x980 CONSOLE 0 (initMkP T)
+      ∃ Mv : Nat → List (BitVec 8), ⌜imgAgrees W.M Mv⌝ ∗ ∃ rt : Nat,
+        mknodArms (hlc := hlc) (fsGammaL (hlc := hlc) fscFs) fscFs rt ROOTINO Mv 0x980 CONSOLE 0 (initMkP T)
           (fun _ _ => iprop(True)) (initMkFarm echoFsPure Pv T K) (initMkFun T K) (initMkFok (consMade r) T K)
           initMkFex ret :=
   (wand_entails (init_mknod_post_fams (hlc := hlc) Pv T K r Q W ret cs')).trans
-    (exists_mono fun Mv => sep_mono_right (init_mknod_post_words Pv T K r m W ret Mv hk0 hk1 hk2 hcw ha0 ha1 ha2))
+    (exists_mono fun Mv => sep_mono_right (exists_mono fun rt =>
+      init_mknod_post_words Pv T K r m W ret rt Mv hk0 hk1 hk2 hcw ha0 ha1 ha2))
 
 /-- ...as the move on the continuation's premise. -/
 theorem init_mknod_post_pre (Pv : Aview → Prop) (T K : IProp GF) (r : EchoNames) (Q : Int → IProp GF)
@@ -484,8 +485,8 @@ theorem init_mknod_post_pre (Pv : Aview → Prop) (T K : IProp GF) (r : EchoName
     (hk0 : tfW W.tf (tfArgIdx 0) = m.get 10#5) (hk1 : tfW W.tf (tfArgIdx 1) = m.get 11#5)
     (hk2 : tfW W.tf (tfArgIdx 2) = m.get 12#5) (hcw : W.cwd = ROOTINO)
     (ha0 : m.get 10#5 = 0x980#64) (ha1 : m.get 11#5 = 1#64) (ha2 : m.get 12#5 = 0#64) :
-    iprop((∃ Mv : Nat → List (BitVec 8), ⌜imgAgrees W.M Mv⌝ ∗
-        mknodArms (hlc := hlc) (fsGammaL (hlc := hlc) fscFs) fscFs ROOTINO Mv 0x980 CONSOLE 0 (initMkP T)
+    iprop((∃ Mv : Nat → List (BitVec 8), ⌜imgAgrees W.M Mv⌝ ∗ ∃ rt : Nat,
+        mknodArms (hlc := hlc) (fsGammaL (hlc := hlc) fscFs) fscFs rt ROOTINO Mv 0x980 CONSOLE 0 (initMkP T)
           (fun _ _ => iprop(True)) (initMkFarm echoFsPure Pv T K) (initMkFun T K) (initMkFok (consMade r) T K)
           initMkFex ret) -∗ R) ⊢
       iprop(UexecSG.spostAt (self := uexecSGXv6 (hlc := hlc)) (uslot (hlc := hlc)) 17 (initConsMknodFam Pv T K r Q)
@@ -517,10 +518,10 @@ theorem mknod_call_any (UL : UK_LEAVES) (N : UkNames GF) (Pv : Aview → Prop) (
     (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) hal) $$ Hi Hc Hrun Hcwd Hsb
   iintro %h' %ret %W %cs' %himg %hk0 %hk1 %hk2 %hcw
   iapply (init_mknod_post_pre Pv T K r N.pay m W ret cs' _ hk0 hk1 hk2 hcw ha0 ha1 ha2)
-  iintro ⟨%Mv, %hag, Harms⟩ Hcwd Hrun
+  iintro ⟨%Mv, %hag, %rt, Harms⟩ Hcwd Hrun
   have hpv : argPathOf Mv 0x980 initConsPl := hpath W.M Mv (fun a b hb => himg a b hb) hag
   iapply wpLoop_fupd
-  imod (init_mknod_arms_out UL N Pv T K r Mv ret hpv) $$ Hlaws Hfl Hinv Harms with Hout
+  imod (init_mknod_arms_out UL N Pv T K r rt Mv ret hpv) $$ Hlaws Hfl Hinv Harms with Hout
   imodintro
   iapply Hcont $$ %h' %ret Hout Hcwd Hrun
 

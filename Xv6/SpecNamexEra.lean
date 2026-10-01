@@ -39,7 +39,7 @@ argument.  Lean states Rocq's two conjuncts as the block's core
 `procPrivCoreNoctxAt curCtx k.proc pid V M` (`Xv6/FdTable.lean`, C0), which
 IS `procPrivBareAt curCtx … ∗ cwdRefAt V.cwd V.cwi` and `cwdRefAt =
 inodeHeldAt` (`procPrivCoreNoctxAt_bare`, `.rfl`), in and out unchanged, and
-`exStart fscFs V.cwi P Pmiss (bview plen pfun)`.  The landed argfd contract
+`exStart fscFs V.rti V.cwi P Pmiss (bview plen pfun)`.  The landed argfd contract
 states the same core (`SpecArgfd`).  A caller holding the whole block
 `procPrivFd γ pa pid V M` (Rocq `proc_priv`) splits it by `procPrivFd_split`
 (`.rfl`) and frames the fd array, which is Rocq's `proc_priv_bare_cref`.
@@ -128,8 +128,8 @@ def namexEraPost (k : KCtx) (plen : Nat) (pfun : Nat → BitVec 8) (n : Nat) (Sb
       -- the death index, the receipt, and the UNFIRED suffix
       iprop(⌜R' 10#5 = 0#64⌝ ∗ irefSlots 2 ∗
         ∃ (kd d : Nat), ⌜kd < (pathElems (bview plen pfun)).length⌝ ∗
-          ((P kd d ∗ exHopsFrom fscFs P Pmiss (bview plen pfun) kd) ∨
-           (Pmiss kd d ∗ exHopsFrom fscFs P Pmiss (bview plen pfun) (kd + 1))))) -∗
+          ((P kd d ∗ exHopsFrom V.rti fscFs P Pmiss (bview plen pfun) kd) ∨
+           (Pmiss kd d ∗ exHopsFrom V.rti fscFs P Pmiss (bview plen pfun) (kd + 1))))) -∗
     wpLoop cpu')
 
 end Post
@@ -181,7 +181,7 @@ def wp_namex_era_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
   irefSlots 2 ∗
   logOpS icfgLog n Sb ∗ logTx icfgLog ∗
   -- ---- THE TRACE (ONE premise, DEFERRED IN THE START) ----
-  exStart fscFs V.cwi P Pmiss (bview plen pfun) ∗
+  exStart fscFs V.rti V.cwi P Pmiss (bview plen pfun) ∗
   -- THE CROSSING IS THE LITERAL `true`: namex parks
   wpNext true k.proc cpu (namexEraPost k plen pfun n Sb P Pmiss pid V M dqb dqs dqpv)
   ⊢ wpLoop (GF := GF) cpu

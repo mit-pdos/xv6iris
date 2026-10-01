@@ -22,7 +22,7 @@ it is ported.
 
 As `SpecNamexEra`: Rocq's `proc_priv_bare ∗ inode_held_at (pv_cwd) (pv_cwi)`
 is the core `procPrivCoreNoctxAt curCtx k.proc pid V M`, in and out; the
-trace is `exStart fscFs V.cwi P Pmiss (bview plen pfun)`.
+trace is `exStart fscFs V.rti V.cwi P Pmiss (bview plen pfun)`.
 
 ## DEVIATIONS from Rocq
 
@@ -88,8 +88,8 @@ def nameiEraPost (k : KCtx) (plen : Nat) (pfun : Nat → BitVec 8) (n : Nat) (Sb
       -- the death index, the receipt, and the UNFIRED suffix
       iprop(⌜R' 10#5 = 0#64⌝ ∗ irefSlots 2 ∗
         ∃ (kd d : Nat), ⌜kd < (pathElems (bview plen pfun)).length⌝ ∗
-          ((P kd d ∗ exHopsFrom fscFs P Pmiss (bview plen pfun) kd) ∨
-           (Pmiss kd d ∗ exHopsFrom fscFs P Pmiss (bview plen pfun) (kd + 1))))) -∗
+          ((P kd d ∗ exHopsFrom V.rti fscFs P Pmiss (bview plen pfun) kd) ∨
+           (Pmiss kd d ∗ exHopsFrom V.rti fscFs P Pmiss (bview plen pfun) (kd + 1))))) -∗
     wpLoop cpu')
 
 end Post
@@ -136,7 +136,7 @@ def wp_namei_era_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
   irefSlots 2 ∗
   logOpS icfgLog n Sb ∗ logTx icfgLog ∗
   -- ---- THE TRACE (ONE premise, DEFERRED IN THE START) ----
-  exStart fscFs V.cwi P Pmiss (bview plen pfun) ∗
+  exStart fscFs V.rti V.cwi P Pmiss (bview plen pfun) ∗
   -- THE CROSSING IS THE LITERAL `true`: namei parks (through namex)
   wpNext true k.proc cpu (nameiEraPost k plen pfun n Sb P Pmiss pid V M dqb dqs dqpv)
   ⊢ wpLoop (GF := GF) cpu

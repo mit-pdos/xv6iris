@@ -363,14 +363,14 @@ DISJUNCT IS THE UNINSTANTIATED BUNDLE (argstr can fail, and then no `pl`
 satisfies the reading); the other two ran the walk, so they name the path
 AND tie it to argument 0.  The third's observation is FIRED: every
 post-walk failure sits inside the child's lock window. -/
-def openPostFailPlain (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat)
+def openPostFailPlain (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat)
     (Mim : Nat → List (BitVec 8)) (pv : Nat) (vom : BitVec 64) (P Pmiss : Nat → Nat → IProp GF)
     (Fo : Pfam GF (Aview → Nat → Anode → IProp GF))
     (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)) : IProp GF :=
-  iprop(openAuPlainAt (hlc := hlc) Γ γfs cw Mim pv vom P Pmiss Fo Ft ∨
+  iprop(openAuPlainAt (hlc := hlc) Γ γfs rt cw Mim pv vom P Pmiss Fo Ft ∨
     (∃ pl : List (BitVec 8),
       ⌜argPathOf Mim pv pl⌝ ∗
-      ((nameiWalkDeadEra (hlc := hlc) γfs P Pmiss pl ∗
+      ((nameiWalkDeadEra (hlc := hlc) γfs rt P Pmiss pl ∗
           pfAt (aopenCommitAt (hlc := hlc) Γ appE) Fo ∗
           openTruncPiece (hlc := hlc) Γ vom (truncTermAt pl P) Ft) ∨
         (∃ i : Nat,
@@ -384,7 +384,7 @@ def openPostFailPlain (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat)
 /-- THE ARMED DISJUNCTION the continuation receives on the plain side,
 keyed on a0 (Rocq's `open_arms_plain`), with the landed post's fd-side
 bundle folded in per arm and `fdSlot` back on every arm. -/
-def openArmsPlain (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat) (γ : FileNames)
+def openArmsPlain (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat) (γ : FileNames)
     (pa : BitVec 64) (pid : BitVec 32) (Mim : Nat → List (BitVec 8)) (pv : Nat) (vom : BitVec 64)
     (P Pmiss : Nat → Nat → IProp GF)
     (Fo : Pfam GF (Aview → Nat → Anode → IProp GF))
@@ -392,7 +392,7 @@ def openArmsPlain (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsNames) (cw : N
     (sts : List FdState) (VW : ProcPriv) (MW : Nat → List (BitVec 8)) (r : BitVec 64) :
     IProp GF :=
   iprop(((⌜r = 0xFFFFFFFFFFFFFFFF#64⌝ ∗ procPrivFd γ pa pid VW MW ∗ fdFrags VW.fdg sts ∗
-        openPostFailPlain Γ γfs cw Mim pv vom P Pmiss Fo Ft) ∨
+        openPostFailPlain Γ γfs rt cw Mim pv vom P Pmiss Fo Ft) ∨
       openPostOkPlain omo Γ γ pa pid Mim pv vom P Fo Ft sts VW MW r) ∗
     fdSlot)
 
@@ -465,16 +465,16 @@ def openPostOkCreate (omo : OffMode) (Γ : FsViewNames GF) (γ : FileNames) (pa 
 /-- ret -1 on the create side (Rocq's `open_post_fail_create`).  Note arm
 (a): a FRESH create that succeeded before open's table-full failure leaves
 its delta STANDING, and the receipt is delivered. -/
-def openPostFailCreate (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat)
+def openPostFailCreate (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat)
     (Mim : Nat → List (BitVec 8)) (pv : Nat) (vom : BitVec 64) (P Pmiss : Nat → Nat → IProp GF)
     (Farm Fun : Pfam GF (Aview → Nat → IProp GF))
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
     (Fo : Pfam GF (Aview → Nat → Anode → IProp GF))
     (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)) : IProp GF :=
-  iprop(openAuCreateAt (hlc := hlc) Γ γfs cw Mim pv vom P Pmiss Farm Fun Fok Fex Fo Ft ∨
+  iprop(openAuCreateAt (hlc := hlc) Γ γfs rt cw Mim pv vom P Pmiss Farm Fun Fok Fex Fo Ft ∨
     (∃ pl : List (BitVec 8),
       ⌜argPathOf Mim pv pl⌝ ∗
-      ((nparWalkDeadEra (hlc := hlc) γfs P Pmiss pl ∗
+      ((nparWalkDeadEra (hlc := hlc) γfs rt P Pmiss pl ∗
           pfAt (acreCommitAtNm (hlc := hlc) Γ appE (.AFile []) (nparNm Mim pv)
           (P (nparElems pl).length) Farm) Fok ∗
           pfAt (dlookupCommitAt (hlc := hlc) Γ appE) Fex ∗
@@ -522,7 +522,7 @@ def openPostFailCreate (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat)
                ∃ ic : Nat, creChildPair Farm Fun ic)))))))
 
 /-- Rocq's `open_arms_create`. -/
-def openArmsCreate (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat) (γ : FileNames)
+def openArmsCreate (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat) (γ : FileNames)
     (pa : BitVec 64) (pid : BitVec 32) (Mim : Nat → List (BitVec 8)) (pv : Nat) (vom : BitVec 64)
     (P Pmiss : Nat → Nat → IProp GF)
     (Farm Fun : Pfam GF (Aview → Nat → IProp GF))
@@ -532,7 +532,7 @@ def openArmsCreate (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsNames) (cw : 
     (sts : List FdState) (VW : ProcPriv) (MW : Nat → List (BitVec 8)) (r : BitVec 64) :
     IProp GF :=
   iprop(((⌜r = 0xFFFFFFFFFFFFFFFF#64⌝ ∗ procPrivFd γ pa pid VW MW ∗ fdFrags VW.fdg sts ∗
-        openPostFailCreate Γ γfs cw Mim pv vom P Pmiss Farm Fun Fok Fex Fo Ft) ∨
+        openPostFailCreate Γ γfs rt cw Mim pv vom P Pmiss Farm Fun Fok Fex Fo Ft) ∨
       openPostOkCreate omo Γ γ pa pid Mim pv vom P Farm Fun Fok Fex Fo Ft sts VW MW r) ∗
     fdSlot)
 
@@ -572,13 +572,13 @@ private theorem openFdOk_post (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32
   iapply openFdOk_landed γ pa pid V M rb wb t sts _ r (hr.trans hrb) (hw.trans hwb) $$ H
 
 /-- THE PLAIN ARMS IMPLY THE LANDED POST (Rocq's `open_arms_plain_landed`). -/
-theorem openArmsPlain_landed (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat) (γ : FileNames)
+theorem openArmsPlain_landed (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat) (γ : FileNames)
     (pa : BitVec 64) (pid : BitVec 32) (Mim : Nat → List (BitVec 8)) (pv : Nat) (vom : BitVec 64)
     (P Pmiss : Nat → Nat → IProp GF)
     (Fo : Pfam GF (Aview → Nat → Anode → IProp GF))
     (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF))
     (sts : List FdState) (VW : ProcPriv) (MW : Nat → List (BitVec 8)) (r : BitVec 64) :
-    openArmsPlain omo Γ γfs cw γ pa pid Mim pv vom P Pmiss Fo Ft sts VW MW r ⊢
+    openArmsPlain omo Γ γfs rt cw γ pa pid Mim pv vom P Pmiss Fo Ft sts VW MW r ⊢
       sysOpenPost γ pa pid VW MW sts (BitVec.extractLsb' 0 32 vom) r := by
   unfold openArmsPlain openPostOkPlain sysOpenPost
   iintro ⟨(⟨%hr, Hp, Hb, -⟩ | ⟨%pl, %av, %i, -, -, Hc⟩), Hfd⟩
@@ -595,7 +595,7 @@ theorem openArmsPlain_landed (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsNam
       iapply openFdOk_post γ pa pid VW MW _ _ _ sts vom r h1 h2 $$ H
 
 /-- Rocq's `open_arms_create_landed`. -/
-theorem openArmsCreate_landed (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat) (γ : FileNames)
+theorem openArmsCreate_landed (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat) (γ : FileNames)
     (pa : BitVec 64) (pid : BitVec 32) (Mim : Nat → List (BitVec 8)) (pv : Nat) (vom : BitVec 64)
     (P Pmiss : Nat → Nat → IProp GF)
     (Farm Fun : Pfam GF (Aview → Nat → IProp GF))
@@ -603,7 +603,7 @@ theorem openArmsCreate_landed (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsNa
     (Fo : Pfam GF (Aview → Nat → Anode → IProp GF))
     (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF))
     (sts : List FdState) (VW : ProcPriv) (MW : Nat → List (BitVec 8)) (r : BitVec 64) :
-    openArmsCreate omo Γ γfs cw γ pa pid Mim pv vom P Pmiss Farm Fun Fok Fex Fo Ft sts VW MW r ⊢
+    openArmsCreate omo Γ γfs rt cw γ pa pid Mim pv vom P Pmiss Farm Fun Fok Fex Fo Ft sts VW MW r ⊢
       sysOpenPost γ pa pid VW MW sts (BitVec.extractLsb' 0 32 vom) r := by
   unfold openArmsCreate openPostOkCreate sysOpenPost
   iintro ⟨(⟨%hr, Hp, Hb, -⟩ | ⟨%pl, %d, %i, %nm, -, -, -, Hc⟩), Hfd⟩
@@ -624,17 +624,17 @@ theorem openArmsCreate_landed (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsNa
 /-- THE ONE INPUT (Rocq's `open_in`): at the O_CREATE bit of the caller's
 own omode, the guarded bundle at whatever string the image holds at the
 argument-0 pointer. -/
-def openIn (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat) (Mim : Nat → List (BitVec 8))
+def openIn (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat) (Mim : Nat → List (BitVec 8))
     (pv : Nat) (vom : BitVec 64) (P Pmiss : Nat → Nat → IProp GF)
     (Farm Fun : Pfam GF (Aview → Nat → IProp GF))
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
     (Fo : Pfam GF (Aview → Nat → Anode → IProp GF))
     (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)) : IProp GF :=
-  if omCreate vom then openAuCreateAt (hlc := hlc) Γ γfs cw Mim pv vom P Pmiss Farm Fun Fok Fex Fo Ft
-  else openAuPlainAt (hlc := hlc) Γ γfs cw Mim pv vom P Pmiss Fo Ft
+  if omCreate vom then openAuCreateAt (hlc := hlc) Γ γfs rt cw Mim pv vom P Pmiss Farm Fun Fok Fex Fo Ft
+  else openAuPlainAt (hlc := hlc) Γ γfs rt cw Mim pv vom P Pmiss Fo Ft
 
 /-- THE ONE ARMED OUTPUT (Rocq's `open_arms`). -/
-def openArms (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat) (γ : FileNames)
+def openArms (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat) (γ : FileNames)
     (pa : BitVec 64) (pid : BitVec 32) (Mim : Nat → List (BitVec 8)) (pv : Nat) (vom : BitVec 64)
     (P Pmiss : Nat → Nat → IProp GF)
     (Farm Fun : Pfam GF (Aview → Nat → IProp GF))
@@ -644,8 +644,8 @@ def openArms (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat) (
     (sts : List FdState) (VW : ProcPriv) (MW : Nat → List (BitVec 8)) (r : BitVec 64) :
     IProp GF :=
   if omCreate vom then
-    openArmsCreate omo Γ γfs cw γ pa pid Mim pv vom P Pmiss Farm Fun Fok Fex Fo Ft sts VW MW r
-  else openArmsPlain omo Γ γfs cw γ pa pid Mim pv vom P Pmiss Fo Ft sts VW MW r
+    openArmsCreate omo Γ γfs rt cw γ pa pid Mim pv vom P Pmiss Farm Fun Fok Fex Fo Ft sts VW MW r
+  else openArmsPlain omo Γ γfs rt cw γ pa pid Mim pv vom P Pmiss Fo Ft sts VW MW r
 
 /-! ### 2i.  THE RECEIPTS: the process-nameable half of the two arm families
 
@@ -654,13 +654,13 @@ trunc leg kept verbatim, and `openFdOk` replaced by its PURE half
 (`openFdRcpt`) read at the descriptor view the call RESUMES at. -/
 
 /-- Rocq's `open_receipt_plain`. -/
-def openReceiptPlain (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat)
+def openReceiptPlain (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat)
     (Mim : Nat → List (BitVec 8)) (pv : Nat) (vom : BitVec 64) (P Pmiss : Nat → Nat → IProp GF)
     (Fo : Pfam GF (Aview → Nat → Anode → IProp GF))
     (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF))
     (sts : List FdState) (r : BitVec 64) (fdv' : List FdState) : IProp GF :=
   iprop((⌜r = 0xFFFFFFFFFFFFFFFF#64⌝ ∗ ⌜fdv' = sts⌝ ∗
-      openPostFailPlain Γ γfs cw Mim pv vom P Pmiss Fo Ft) ∨
+      openPostFailPlain Γ γfs rt cw Mim pv vom P Pmiss Fo Ft) ∨
     (∃ (pl : List (BitVec 8)) (av : Aview) (i : Nat),
       ⌜argPathOf Mim pv pl⌝ ∗
       curKept vom P (pathElems pl).length i ∗
@@ -688,7 +688,7 @@ def openReceiptPlain (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsNames) (cw 
             foffPub omo γo))))
 
 /-- Rocq's `open_receipt_create`. -/
-def openReceiptCreate (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat)
+def openReceiptCreate (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat)
     (Mim : Nat → List (BitVec 8)) (pv : Nat) (vom : BitVec 64) (P Pmiss : Nat → Nat → IProp GF)
     (Farm Fun : Pfam GF (Aview → Nat → IProp GF))
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
@@ -696,7 +696,7 @@ def openReceiptCreate (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsNames) (cw
     (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF))
     (sts : List FdState) (r : BitVec 64) (fdv' : List FdState) : IProp GF :=
   iprop((⌜r = 0xFFFFFFFFFFFFFFFF#64⌝ ∗ ⌜fdv' = sts⌝ ∗
-      openPostFailCreate Γ γfs cw Mim pv vom P Pmiss Farm Fun Fok Fex Fo Ft) ∨
+      openPostFailCreate Γ γfs rt cw Mim pv vom P Pmiss Farm Fun Fok Fex Fo Ft) ∨
     (∃ (pl : List (BitVec 8)) (d i : Nat) (nm : Fname),
       ⌜argPathOf Mim pv pl⌝ ∗ ⌜(pathElems pl).getLast? = some nm⌝ ∗
       curKept vom P (nparElems pl).length d ∗
@@ -739,7 +739,7 @@ def openReceiptCreate (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsNames) (cw
 
 /-- ...and the one receipt, keyed on the O_CREATE bit (Rocq's
 `open_receipt`). -/
-def openReceipt (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat)
+def openReceipt (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat)
     (Mim : Nat → List (BitVec 8)) (pv : Nat) (vom : BitVec 64) (P Pmiss : Nat → Nat → IProp GF)
     (Farm Fun : Pfam GF (Aview → Nat → IProp GF))
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
@@ -747,8 +747,8 @@ def openReceipt (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat
     (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF))
     (sts : List FdState) (r : BitVec 64) (fdv' : List FdState) : IProp GF :=
   if omCreate vom then
-    openReceiptCreate omo Γ γfs cw Mim pv vom P Pmiss Farm Fun Fok Fex Fo Ft sts r fdv'
-  else openReceiptPlain omo Γ γfs cw Mim pv vom P Pmiss Fo Ft sts r fdv'
+    openReceiptCreate omo Γ γfs rt cw Mim pv vom P Pmiss Farm Fun Fok Fex Fo Ft sts r fdv'
+  else openReceiptPlain omo Γ γfs rt cw Mim pv vom P Pmiss Fo Ft sts r fdv'
 
 /-! ### 2j.  THE SPLIT: the arms as the kernel's half beside the receipt -/
 
@@ -769,17 +769,17 @@ def openSplitRow (r : BitVec 64) (V V' : ProcPriv) (sts sts' : List FdState) : P
     fdstNopipe (.open rb wb t))
 
 /-- Rocq's `open_arms_plain_split`. -/
-theorem openArmsPlain_split (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat) (γ : FileNames)
+theorem openArmsPlain_split (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat) (γ : FileNames)
     (pa : BitVec 64) (pid : BitVec 32) (Mim : Nat → List (BitVec 8)) (pv : Nat) (vom : BitVec 64)
     (P Pmiss : Nat → Nat → IProp GF)
     (Fo : Pfam GF (Aview → Nat → Anode → IProp GF))
     (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF))
     (sts : List FdState) (VW : ProcPriv) (MW : Nat → List (BitVec 8)) (r : BitVec 64) :
-    openArmsPlain omo Γ γfs cw γ pa pid Mim pv vom P Pmiss Fo Ft sts VW MW r ⊢
+    openArmsPlain omo Γ γfs rt cw γ pa pid Mim pv vom P Pmiss Fo Ft sts VW MW r ⊢
       ∃ (V' : ProcPriv) (sts' : List FdState),
         ⌜openSplitRow r VW V' sts sts'⌝ ∗
         procPrivFd γ pa pid V' MW ∗ fdFrags VW.fdg sts' ∗ fdSlot ∗
-        openReceiptPlain omo Γ γfs cw Mim pv vom P Pmiss Fo Ft sts r sts' := by
+        openReceiptPlain omo Γ γfs rt cw Mim pv vom P Pmiss Fo Ft sts r sts' := by
   unfold openArmsPlain openPostOkPlain openReceiptPlain
   iintro ⟨(⟨%hr, Hpriv, Hb, Hfail⟩ | ⟨%pl, %av, %i, %hpl, HP, Hc⟩), Hslot⟩
   · iexists VW, sts
@@ -857,7 +857,7 @@ theorem openArmsPlain_split (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsName
       ipureintro; exact hrc
 
 /-- Rocq's `open_arms_create_split`. -/
-theorem openArmsCreate_split (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat) (γ : FileNames)
+theorem openArmsCreate_split (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat) (γ : FileNames)
     (pa : BitVec 64) (pid : BitVec 32) (Mim : Nat → List (BitVec 8)) (pv : Nat) (vom : BitVec 64)
     (P Pmiss : Nat → Nat → IProp GF)
     (Farm Fun : Pfam GF (Aview → Nat → IProp GF))
@@ -865,11 +865,11 @@ theorem openArmsCreate_split (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsNam
     (Fo : Pfam GF (Aview → Nat → Anode → IProp GF))
     (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF))
     (sts : List FdState) (VW : ProcPriv) (MW : Nat → List (BitVec 8)) (r : BitVec 64) :
-    openArmsCreate omo Γ γfs cw γ pa pid Mim pv vom P Pmiss Farm Fun Fok Fex Fo Ft sts VW MW r ⊢
+    openArmsCreate omo Γ γfs rt cw γ pa pid Mim pv vom P Pmiss Farm Fun Fok Fex Fo Ft sts VW MW r ⊢
       ∃ (V' : ProcPriv) (sts' : List FdState),
         ⌜openSplitRow r VW V' sts sts'⌝ ∗
         procPrivFd γ pa pid V' MW ∗ fdFrags VW.fdg sts' ∗ fdSlot ∗
-        openReceiptCreate omo Γ γfs cw Mim pv vom P Pmiss Farm Fun Fok Fex Fo Ft sts r sts' := by
+        openReceiptCreate omo Γ γfs rt cw Mim pv vom P Pmiss Farm Fun Fok Fex Fo Ft sts r sts' := by
   unfold openArmsCreate openPostOkCreate openReceiptCreate
   iintro ⟨(⟨%hr, Hpriv, Hb, Hfail⟩ | ⟨%pl, %d, %i, %nm, %hpl, %hlast, HP, Hc⟩), Hslot⟩
   · iexists VW, sts
@@ -971,7 +971,7 @@ theorem openArmsCreate_split (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsNam
 
 /-- ...and the one split, keyed on the O_CREATE bit (Rocq's
 `open_arms_split`). -/
-theorem openArms_split (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat) (γ : FileNames)
+theorem openArms_split (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat) (γ : FileNames)
     (pa : BitVec 64) (pid : BitVec 32) (Mim : Nat → List (BitVec 8)) (pv : Nat) (vom : BitVec 64)
     (P Pmiss : Nat → Nat → IProp GF)
     (Farm Fun : Pfam GF (Aview → Nat → IProp GF))
@@ -979,19 +979,19 @@ theorem openArms_split (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsNames) (c
     (Fo : Pfam GF (Aview → Nat → Anode → IProp GF))
     (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF))
     (sts : List FdState) (VW : ProcPriv) (MW : Nat → List (BitVec 8)) (r : BitVec 64) :
-    openArms omo Γ γfs cw γ pa pid Mim pv vom P Pmiss Farm Fun Fok Fex Fo Ft sts VW MW r ⊢
+    openArms omo Γ γfs rt cw γ pa pid Mim pv vom P Pmiss Farm Fun Fok Fex Fo Ft sts VW MW r ⊢
       ∃ (V' : ProcPriv) (sts' : List FdState),
         ⌜openSplitRow r VW V' sts sts'⌝ ∗
         procPrivFd γ pa pid V' MW ∗ fdFrags VW.fdg sts' ∗ fdSlot ∗
-        openReceipt omo Γ γfs cw Mim pv vom P Pmiss Farm Fun Fok Fex Fo Ft sts r sts' := by
+        openReceipt omo Γ γfs rt cw Mim pv vom P Pmiss Farm Fun Fok Fex Fo Ft sts r sts' := by
   unfold openArms openReceipt
   cases omCreate vom
-  · exact openArmsPlain_split omo Γ γfs cw γ pa pid Mim pv vom P Pmiss Fo Ft sts VW MW r
-  · exact openArmsCreate_split omo Γ γfs cw γ pa pid Mim pv vom P Pmiss Farm Fun Fok Fex Fo Ft sts
+  · exact openArmsPlain_split omo Γ γfs rt cw γ pa pid Mim pv vom P Pmiss Fo Ft sts VW MW r
+  · exact openArmsCreate_split omo Γ γfs rt cw γ pa pid Mim pv vom P Pmiss Farm Fun Fok Fex Fo Ft sts
       VW MW r
 
 /-- THE RETURN BLANKET, READ OFF THE ARMS (Rocq's `open_arms_landed`). -/
-theorem openArms_landed (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat) (γ : FileNames)
+theorem openArms_landed (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat) (γ : FileNames)
     (pa : BitVec 64) (pid : BitVec 32) (Mim : Nat → List (BitVec 8)) (pv : Nat) (vom : BitVec 64)
     (P Pmiss : Nat → Nat → IProp GF)
     (Farm Fun : Pfam GF (Aview → Nat → IProp GF))
@@ -999,12 +999,12 @@ theorem openArms_landed (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsNames) (
     (Fo : Pfam GF (Aview → Nat → Anode → IProp GF))
     (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF))
     (sts : List FdState) (VW : ProcPriv) (MW : Nat → List (BitVec 8)) (r : BitVec 64) :
-    openArms omo Γ γfs cw γ pa pid Mim pv vom P Pmiss Farm Fun Fok Fex Fo Ft sts VW MW r ⊢
+    openArms omo Γ γfs rt cw γ pa pid Mim pv vom P Pmiss Farm Fun Fok Fex Fo Ft sts VW MW r ⊢
       sysOpenPost γ pa pid VW MW sts (BitVec.extractLsb' 0 32 vom) r := by
   unfold openArms
   cases omCreate vom
-  · exact openArmsPlain_landed omo Γ γfs cw γ pa pid Mim pv vom P Pmiss Fo Ft sts VW MW r
-  · exact openArmsCreate_landed omo Γ γfs cw γ pa pid Mim pv vom P Pmiss Farm Fun Fok Fex Fo Ft sts
+  · exact openArmsPlain_landed omo Γ γfs rt cw γ pa pid Mim pv vom P Pmiss Fo Ft sts VW MW r
+  · exact openArmsCreate_landed omo Γ γfs rt cw γ pa pid Mim pv vom P Pmiss Farm Fun Fok Fex Fo Ft sts
       VW MW r
 
 /-! ### create's FAILURE FOLD, READ INTO THIS FILE'S OWN ARMS
@@ -1021,7 +1021,7 @@ does; a narrowed predicate cannot be widened back, so the refunded leg keeps
 the guarded reading (Rocq's `open_acre_file_of_triv` is retired). -/
 
 /-- Rocq's `cre_fail_to_open`. -/
-theorem creFailToOpen (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat)
+theorem creFailToOpen (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat)
     (Mim : Nat → List (BitVec 8)) (pv : Nat) (vom : BitVec 64) (ma mi : Nat)
     (P Pmiss : Nat → Nat → IProp GF)
     (Farm : Pfam GF (Aview → Nat → IProp GF))
@@ -1031,15 +1031,15 @@ theorem creFailToOpen (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat)
     (Fo : Pfam GF (Aview → Nat → Anode → IProp GF))
     (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF))
     (pl : List (BitVec 8)) (hpl : argPathOf Mim pv pl) :
-    creFailArms (hlc := hlc) Γ γfs T_FILE_w.toNat ma mi (nparNm Mim pv) (fun _ => True) P Pmiss Farm
+    creFailArms (hlc := hlc) Γ γfs rt T_FILE_w.toNat ma mi (nparNm Mim pv) (fun _ => True) P Pmiss Farm
       Fdots Fun Fok Fex pl ⊢
       pfAt (aopenCommitAt (hlc := hlc) Γ appE) Fo -∗
       -- the piece at the ONE-PATH permit, which is how the create entry holds
       -- it once argstr has answered (`openAuCreateAt_inst`)
       openTruncPiece (hlc := hlc) Γ vom (crePermit (hlc := hlc) Γ pl P Farm Fok Fex) Ft -∗
-      openPostFailCreate Γ γfs cw Mim pv vom P Pmiss Farm Fun Fok Fex Fo Ft := by
+      openPostFailCreate Γ γfs rt cw Mim pv vom P Pmiss Farm Fun Fok Fex Fo Ft := by
   iintro Hcf Ho Ht
-  ihave Hcf := creFailArms_file Γ γfs ma mi (nparNm Mim pv) (fun _ => True) P Pmiss Farm Fdots Fun Fok
+  ihave Hcf := creFailArms_file Γ γfs rt ma mi (nparNm Mim pv) (fun _ => True) P Pmiss Farm Fdots Fun Fok
     Fex pl $$ Hcf
   unfold openPostFailCreate
   iright
@@ -1164,9 +1164,9 @@ def wp_sys_open_eb_body (omo : OffMode) (Γ : SchedNames) [ClaimIs (hlc := hlc) 
     (hnoff : k.noff = 0) (hK : sysOpenSlots ≤ k.avail) (hns : sysOpenIrefs ≤ ns)
     (hv0 : V.tf[tfArgIdx 0]? = some v) (hv1 : V.tf[tfArgIdx 1]? = some vom) : Prop :=
   wp_sys_open_frame Γ cpu k γl γ j ns v vom pid V M sts
-    (openIn (hlc := hlc) (fsGammaL fscFs) fscFs V.cwi (viewLazy V.upt V.sz M) v.toNat vom
+    (openIn (hlc := hlc) (fsGammaL fscFs) fscFs V.rti V.cwi (viewLazy V.upt V.sz M) v.toNat vom
       P Pmiss Farm Fun Fok Fex Fo Ft)
-    (openArms (hlc := hlc) omo (fsGammaL fscFs) fscFs V.cwi γ (procAddr j) pid
+    (openArms (hlc := hlc) omo (fsGammaL fscFs) fscFs V.rti V.cwi γ (procAddr j) pid
       (viewLazy V.upt V.sz M) v.toNat vom
       P Pmiss Farm Fun Fok Fex Fo Ft sts)
     hj hproc htier hnoff hK hns hv0 hv1
@@ -1184,9 +1184,9 @@ def wp_sys_open_plain_eb_body (omo : OffMode) (Γ : SchedNames) [ClaimIs (hlc :=
     (hv0 : V.tf[tfArgIdx 0]? = some v) (hv1 : V.tf[tfArgIdx 1]? = some vom)
     (hc : omCreate vom = false) : Prop :=
   wp_sys_open_frame Γ cpu k γl γ j ns v vom pid V M sts
-    (openAuPlainAt (hlc := hlc) (fsGammaL fscFs) fscFs V.cwi (viewLazy V.upt V.sz M) v.toNat vom
+    (openAuPlainAt (hlc := hlc) (fsGammaL fscFs) fscFs V.rti V.cwi (viewLazy V.upt V.sz M) v.toNat vom
       P Pmiss Fo Ft)
-    (openArmsPlain (hlc := hlc) omo (fsGammaL fscFs) fscFs V.cwi γ (procAddr j) pid
+    (openArmsPlain (hlc := hlc) omo (fsGammaL fscFs) fscFs V.rti V.cwi γ (procAddr j) pid
       (viewLazy V.upt V.sz M) v.toNat vom
       P Pmiss Fo Ft sts)
     hj hproc htier hnoff hK hns hv0 hv1
@@ -1206,9 +1206,9 @@ def wp_sys_open_create_eb_body (omo : OffMode) (Γ : SchedNames) [ClaimIs (hlc :
     (hv0 : V.tf[tfArgIdx 0]? = some v) (hv1 : V.tf[tfArgIdx 1]? = some vom)
     (hc : omCreate vom = true) : Prop :=
   wp_sys_open_frame Γ cpu k γl γ j ns v vom pid V M sts
-    (openAuCreateAt (hlc := hlc) (fsGammaL fscFs) fscFs V.cwi (viewLazy V.upt V.sz M) v.toNat vom
+    (openAuCreateAt (hlc := hlc) (fsGammaL fscFs) fscFs V.rti V.cwi (viewLazy V.upt V.sz M) v.toNat vom
       P Pmiss Farm Fun Fok Fex Fo Ft)
-    (openArmsCreate (hlc := hlc) omo (fsGammaL fscFs) fscFs V.cwi γ (procAddr j) pid
+    (openArmsCreate (hlc := hlc) omo (fsGammaL fscFs) fscFs V.rti V.cwi γ (procAddr j) pid
       (viewLazy V.upt V.sz M) v.toNat vom
       P Pmiss Farm Fun Fok Fex Fo Ft sts)
     hj hproc htier hnoff hK hns hv0 hv1

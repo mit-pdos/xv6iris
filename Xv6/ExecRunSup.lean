@@ -63,10 +63,12 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FsTopG
 /-! ## 1.  (W) AS ONE RESOURCE -/
 
 /-- **Rocq `exec_walk_of`**: the three walk premises of `execBundle_of`,
-the supplier's families inside. -/
+the supplier's families inside -- the walk AT EVERY ROOT (the process does
+not know its own, design/chroot.md section 3; the families do not depend on
+it). -/
 def execWalkOf (cw : Nat) (T : IProp GF) (pl : List (BitVec 8)) (a : Anode) : IProp GF :=
   iprop(∃ (P Pmiss : Nat → Nat → IProp GF) (Fo : Pfam GF (Aview → Nat → Anode → IProp GF)),
-    exStart (hlc := hlc) fscFs cw P Pmiss pl ∗
+    (∀ rt : Nat, exStart (hlc := hlc) fscFs rt cw P Pmiss pl) ∗
     pfAt (aopenCommitAt (hlc := hlc) (fsGammaL (hlc := hlc) fscFs) appE) Fo ∗
     exNodeId T (P (pathElems pl).length) Fo.pfRecv a)
 
@@ -74,19 +76,20 @@ def execWalkOf (cw : Nat) (T : IProp GF) (pl : List (BitVec 8)) (a : Anode) : IP
 three lemmas at `pinResolvesAt`'s one hypothesis. -/
 theorem execWalkOf_pin (Pin : Aview → Prop) (T : IProp GF) [Persistent T] [Timeless T] (cw : Nat)
     (pl : List (BitVec 8)) (hops : List Nat) (ino : Nat) (a : Anode)
-    (hres : pinResolvesAt Pin cw pl hops ino a) :
+    (hres : ∀ rt : Nat, pinResolvesAt Pin rt cw pl hops ino a) :
     ⊢ iprop(□ ∀ v : Aview, appPred appRun v -∗ appPred appRun v ∗ (⌜Pin v⌝ ∨ T)) -∗
       appInv (hlc := hlc) fscFs -∗ execWalkOf (hlc := hlc) cw T pl a := by
   iintro #Hcl #Hinv
   unfold execWalkOf
   iexists (pobsP T hops), (pobsPmiss T), (pobsFo Pin T)
   isplitl []
-  · iapply pobs_walk fscFs Pin T (pobsPmiss T) cw pl hops ino a hres $$ [] Hcl Hinv
+  · iintro %rt
+    iapply pobs_walk fscFs Pin T (pobsPmiss T) rt cw pl hops ino a (hres rt) $$ [] Hcl Hinv
     iapply pobsMissTaint_Pmiss
   isplitl []
   · iapply pobs_aopen fscFs Pin T $$ Hcl Hinv
   · dsimp only [pobsFo, pfamTriv]
-    iapply pobsNode_id Pin T cw pl hops ino a hres
+    iapply pobsNode_id Pin T 0 cw pl hops ino a (hres 0)
 
 /-! ## 2.  THE BUNDLE AT THE TRAPPING KEY -/
 
@@ -126,10 +129,11 @@ theorem sbundlePayRefR_of_exec (X : Uvis → IProp GF) (T : IProp GF) (N : UkNam
     N.pay R P Pmiss Fo Pay
   dsimp only [uvisOfRun] at key e0 e1 ⊢
   iapply key $$ Hrf Hmp
-  iintro %Mv %hag
+  iintro %Mv %hag %rt
   rw [e0, e1]
   ihave #He := Hcon $$ %Mv %hag
-  iapply execBundle_of fscFs X T P Pmiss Fo c seccAll pl f nl Pay N.pay Mv pv av fdv cs pidv hload
+  ispecialize Hst $$ %rt
+  iapply execBundle_of fscFs X T P Pmiss Fo rt c seccAll pl f nl Pay N.pay Mv pv av fdv cs pidv hload
     (hpath Mv hag) $$ Hst Hobs Hid He Hgen HPay
 
 /-! ## 3.  THE SUPPLY: THE BUNDLE AT EVERY KEY THE RUN MAY BE AT -/

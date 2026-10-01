@@ -497,7 +497,7 @@ abbrev sysMknodPostA (k : KCtx) (A : SysMknodArgs GF) (c : CPU) : IProp GF :=
 
 /-- The caller's bundle at the record. -/
 abbrev sysMknodAu (A : SysMknodArgs GF) : IProp GF :=
-  mknodAuAt (hlc := hlc) (fsGammaL fscFs) fscFs A.V.cwi (viewLazy A.V.upt A.V.sz A.M) A.v0.toNat
+  mknodAuAt (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti A.V.cwi (viewLazy A.V.upt A.V.sz A.M) A.v0.toNat
     (devArg A.v1) (devArg A.v2) A.P A.Pmiss A.Farm A.Fun A.Fok A.Fex
 
 /-- THE RECORD AT A RAISED COUNT (permit sweep L1b, deviation 5): argstr
@@ -568,7 +568,7 @@ def sysMknodOut (A : SysMknodArgs GF) (r : BitVec 64) : IProp GF := iprop%
   bslots 3 ∗ irefSlots A.ns ∗
   (∃ P' : UPtd, ⌜A.V.upt.extSz A.V.sz P'⌝ ∗
     procPrivFd A.γ (procAddr A.j) A.pid { A.V with upt := P' } (viewFaulted A.V.upt P' A.M) ∗
-    mknodArms (hlc := hlc) (fsGammaL fscFs) fscFs A.V.cwi (viewLazy A.V.upt A.V.sz A.M) A.v0.toNat
+    mknodArms (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti A.V.cwi (viewLazy A.V.upt A.V.sz A.M) A.v0.toNat
       (devArg A.v1) (devArg A.v2) A.P A.Pmiss A.Farm A.Fun A.Fok A.Fex r)
 
 set_option maxHeartbeats 8000000 in

@@ -47,13 +47,13 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [FsTopG GF] [FsBy
 /-- **Rocq `pobs_node_id`**: THE PIN AS A SUPPLIER OF (W)'s THIRD PIECE --
 `pobs_node` proves it from the pin and says one thing more (the INUM is the
 pin's) that exec never reads, so the step down is the projection. -/
-theorem pobsNode_id (Pin : Aview → Prop) (T : IProp GF) (cw : Nat) (pl : List (BitVec 8))
-    (hops : List Nat) (ino : Nat) (a : Anode) (hres : pinResolvesAt Pin cw pl hops ino a) :
+theorem pobsNode_id (Pin : Aview → Prop) (T : IProp GF) (rt cw : Nat) (pl : List (BitVec 8))
+    (hops : List Nat) (ino : Nat) (a : Anode) (hres : pinResolvesAt Pin rt cw pl hops ino a) :
     ⊢ exNodeId T (pobsP T hops (pathElems pl).length) (pobsRecv Pin T) a := by
   unfold exNodeId
   imodintro
   iintro %v %i %b HP Hr
-  icases pobs_node Pin T cw pl hops ino a v i b hres $$ HP Hr with (%hid | HT)
+  icases pobs_node Pin T rt cw pl hops ino a v i b hres $$ HP Hr with (%hid | HT)
   · ileft
     ipureintro
     exact hid.2
@@ -66,26 +66,26 @@ bundle at the pin's supplier, `execBundle_of_at` at the cursor family
 at `imageEntryAt`, the two identity rows the boot constructor does not read
 dropped where it is built. -/
 theorem pinnedExecBundle_boot_at (γfs : FsNames) (X : Uvis → IProp GF) (Pin : Aview → Prop)
-    (T : IProp GF) [Persistent T] [Timeless T] (cw : Nat) (secc : BitVec 64) (pl : List (BitVec 8))
+    (T : IProp GF) [Persistent T] [Timeless T] (rt cw : Nat) (secc : BitVec 64) (pl : List (BitVec 8))
     (hops : List Nat) (ino : Nat) (f : ElfBytes) (nl : Nat) (Pay : IProp GF) (Q : Int → IProp GF)
     (na : Nat) (alen : Nat → Nat) (afun : Nat → Nat → BitVec 8) (sts : List FdState)
     (cs : ExtTreeSet GName compare) (pidv : BitVec 32)
-    (hres : pinResolves Pin cw pl hops ino f nl) (hload : kexecLoadable f) :
+    (hres : pinResolves Pin rt cw pl hops ino f nl) (hload : kexecLoadable f) :
     ⊢ iprop(□ ∀ v : Aview, appPred appRun v -∗ appPred appRun v ∗ (⌜Pin v⌝ ∨ T)) -∗
       appInv (hlc := hlc) γfs -∗
       iprop(□ ∀ W' : Uvis, ⌜kexecImageOk f na alen afun sts W'⌝ -∗ ⌜W'.cwd = cw⌝ -∗
         ⌜W'.lazy = false⌝ -∗ ⌜W'.secc = secc⌝ -∗ myPay W'.gen Q -∗ Pay -∗ X W') -∗
       iprop(□ ∀ W' : Uvis, T -∗ myPay W'.gen Q -∗ X W') -∗ Pay -∗
-      execAuPre (hlc := hlc) ⟨X, Pay⟩ (fsGammaL (hlc := hlc) γfs) γfs cw secc Q (pobsP T hops)
+      execAuPre (hlc := hlc) ⟨X, Pay⟩ (fsGammaL (hlc := hlc) γfs) γfs rt cw secc Q (pobsP T hops)
         (pobsPmiss T) (pobsFo Pin T) pl na alen afun sts cs pidv := by
   iintro #Hcl #Hinv #Hcon #Hgen HPay
-  iapply execBundle_of_at γfs X T (pobsP T hops) (pobsPmiss T) (pobsFo Pin T) cw secc pl f nl Pay Q
+  iapply execBundle_of_at γfs X T (pobsP T hops) (pobsPmiss T) (pobsFo Pin T) rt cw secc pl f nl Pay Q
     na alen afun sts cs pidv hload $$ [] [] [] [] [] HPay
-  · iapply pobs_walk γfs Pin T (pobsPmiss T) cw pl hops ino _ hres $$ [] Hcl Hinv
+  · iapply pobs_walk γfs Pin T (pobsPmiss T) rt cw pl hops ino _ hres $$ [] Hcl Hinv
     iapply pobsMissTaint_Pmiss
   · iapply pobs_aopen γfs Pin T $$ Hcl Hinv
   · dsimp only [pobsFo, pfamTriv]
-    iapply pobsNode_id Pin T cw pl hops ino _ hres
+    iapply pobsNode_id Pin T rt cw pl hops ino _ hres
   · unfold imageEntryAt
     imodintro
     iintro %W' %hok %hcwq %hlzq %hscw - - Hp HPay
@@ -96,10 +96,10 @@ theorem pinnedExecBundle_boot_at (γfs : FsNames) (X : Uvis → IProp GF) (Pin :
 `InitBoot.init_boot_bundle` takes it at -- the families leave
 existentially, at EVERY `cs`/`pidv` (lane EXEC-SEAM). -/
 theorem pinnedExecBundle_boot (γfs : FsNames) (X : Uvis → IProp GF) (Pin : Aview → Prop)
-    (T : IProp GF) [Persistent T] [Timeless T] (cw : Nat) (secc : BitVec 64) (pl : List (BitVec 8))
+    (T : IProp GF) [Persistent T] [Timeless T] (rt cw : Nat) (secc : BitVec 64) (pl : List (BitVec 8))
     (hops : List Nat) (ino : Nat) (f : ElfBytes) (nl : Nat) (Pay : IProp GF) (Q : Int → IProp GF)
     (na : Nat) (alen : Nat → Nat) (afun : Nat → Nat → BitVec 8) (sts : List FdState)
-    (hres : pinResolves Pin cw pl hops ino f nl) (hload : kexecLoadable f) :
+    (hres : pinResolves Pin rt cw pl hops ino f nl) (hload : kexecLoadable f) :
     ⊢ iprop(□ ∀ v : Aview, appPred appRun v -∗ appPred appRun v ∗ (⌜Pin v⌝ ∨ T)) -∗
       appInv (hlc := hlc) γfs -∗
       iprop(□ ∀ W' : Uvis, ⌜kexecImageOk f na alen afun sts W'⌝ -∗ ⌜W'.cwd = cw⌝ -∗
@@ -107,12 +107,12 @@ theorem pinnedExecBundle_boot (γfs : FsNames) (X : Uvis → IProp GF) (Pin : Av
       iprop(□ ∀ W' : Uvis, T -∗ myPay W'.gen Q -∗ X W') -∗ Pay -∗
       ∃ (P Pmiss : Nat → Nat → IProp GF) (Fo : Pfam GF (Aview → Nat → Anode → IProp GF)) (R : IProp GF),
         ∀ (cs : ExtTreeSet GName compare) (pidv : BitVec 32),
-          execAuPre (hlc := hlc) ⟨X, R⟩ (fsGammaL (hlc := hlc) γfs) γfs cw secc Q P Pmiss Fo
+          execAuPre (hlc := hlc) ⟨X, R⟩ (fsGammaL (hlc := hlc) γfs) γfs rt cw secc Q P Pmiss Fo
             pl na alen afun sts cs pidv := by
   iintro #Hcl #Hinv #Hcon #Hgen HPay
   iexists (pobsP T hops), (pobsPmiss T), (pobsFo Pin T), Pay
   iintro %cs %pidv
-  iapply pinnedExecBundle_boot_at γfs X Pin T cw secc pl hops ino f nl Pay Q na alen afun sts cs pidv
+  iapply pinnedExecBundle_boot_at γfs X Pin T rt cw secc pl hops ino f nl Pay Q na alen afun sts cs pidv
     hres hload $$ Hcl Hinv Hcon Hgen HPay
 
 end PinnedExecBundle

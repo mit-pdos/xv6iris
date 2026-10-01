@@ -482,7 +482,7 @@ theorem sys_unlink_w3_e (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
   rw [← topFrag_1, ← topFrag_1]
   ihave HP := (show A.P (npElems pl).length dinum.toNat ⊢ A.P (nparElems pl).length dinum.toNat
     from .rfl) $$ HP
-  ihave Harms := unlinkArms_dex (hlc := hlc) (fsGammaL fscFs) fscFs A.V.cwi (viewLazy A.V.upt A.V.sz A.M)
+  ihave Harms := unlinkArms_dex (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti A.V.cwi (viewLazy A.V.upt A.V.sz A.M)
       A.v0.toNat A.P A.Pmiss A.Fent
     A.Ftgt A.Fex A.Fmiss pl dinum.toNat av _ (bname 14 nf) _ _ _ _
     (sys_unlink_last_of_npar pl nf hname) hrowd hnm' hrowt hne' $$ [$HP $He $Ht $Hrecv $Hm]

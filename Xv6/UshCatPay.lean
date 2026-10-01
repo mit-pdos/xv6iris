@@ -69,14 +69,17 @@ theorem catPathElems : pathElems catPl = catPath := by decide
 
 /-- **Rocq `sh_cat_pin_resolves`**: "cat" is RELATIVE, so the walk starts at
 the cwd -- the root. -/
-theorem shCatPinResolves :
-    pinResolves era0CatPins ROOTINO catPl [ROOTINO, CAT_INO] CAT_INO User.Cat.elf 1 := by
-  refine ⟨?_, ?_, ?_⟩
-  · unfold umStartOf; split <;> rfl
+theorem shCatPinResolves (rt : Nat) :
+    pinResolves era0CatPins rt ROOTINO catPl [ROOTINO, CAT_INO] CAT_INO User.Cat.elf 1 := by
+  refine ⟨?_, ?_, ?_, ?_⟩
+  · rw [umStartOf_rel rt _ _ (by decide)]; rfl
   · rw [catPathElems]; rfl
   · intro v ⟨_, hnode, hrun⟩
     rw [catPathElems]
     exact ⟨hrun, hnode⟩
+  · -- no element is `..`: the root-aware hop is the record one
+    show ∀ s ∈ pathElems catPl, s ≠ DOTDOT
+    rw [catPathElems]; decide
 
 /-- The landed parameter record `UshExecPinProg` (UshExecPinPure), its two
 cat fields discharged here; grep's is sibling grep's `grep_elf_loadable`. -/

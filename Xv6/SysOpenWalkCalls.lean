@@ -149,8 +149,8 @@ def sysOpenNameiK (k' : KCtx) (se : Bool) (pj : BitVec 64) (plen : Nat) (pfun : 
      else
       iprop(⌜R' 10#5 = 0#64⌝ ∗ irefSlots 2 ∗
         ∃ (kd d : Nat), ⌜kd < (pathElems (bview plen pfun)).length⌝ ∗
-          ((P kd d ∗ exHopsFrom fscFs P Pmiss (bview plen pfun) kd) ∨
-           (Pmiss kd d ∗ exHopsFrom fscFs P Pmiss (bview plen pfun) (kd + 1))))) -∗
+          ((P kd d ∗ exHopsFrom V.rti fscFs P Pmiss (bview plen pfun) kd) ∨
+           (Pmiss kd d ∗ exHopsFrom V.rti fscFs P Pmiss (bview plen pfun) (kd + 1))))) -∗
     wpLoop c)
 
 set_option maxHeartbeats 8000000 in
@@ -170,7 +170,7 @@ theorem sys_open_namei_era (NI : NAMEI_ERA) (Γ : SchedNames) [ClaimIs (hlc := h
     procPrivCoreNoctxAt curCtx pj pid V M ∗
     byteBuf (k'.regs 10#5) (DFrac.own 1) (bview (plen + 1) pfun) ∗
     bslots 3 ∗ irefSlots 2 ∗ logOpS icfgLog n Sb ∗ logTx icfgLog ∗
-    exStart fscFs V.cwi P Pmiss (bview plen pfun) ∗
+    exStart fscFs V.rti V.cwi P Pmiss (bview plen pfun) ∗
     sysOpenNameiK k' se pj plen pfun n Sb P Pmiss pid V M
     ⊢ wpLoop (GF := GF) cpu := by
   subst hs hpj

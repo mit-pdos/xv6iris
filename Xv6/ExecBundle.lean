@@ -7,7 +7,7 @@ Rocq's header, in short.  `PinnedExec`'s bundle turned a program's knowledge
 into `SpecSysExec.sysExecAuPre`'s three conjuncts from ONE supplier (a pin);
 the three obligations are separable:
 
-* (W) THE RESOLUTION, as three PREMISES: `FsAbsEra.exStart γfs cw P Pmiss pl`
+* (W) THE RESOLUTION, as three PREMISES: `FsAbsEra.exStart γfs rt cw P Pmiss pl`
   (the walk at the one path the caller's argument names), `pfAt
   (aopenCommitAt …) Fo` (the terminal observation), and `exNodeId` (the node
   the observation reports at the walk's last hop IS the one the caller says,
@@ -134,16 +134,16 @@ theorem sysExecSlot_of_entry (X : Uvis → IProp GF) (T : IProp GF) (P : Nat →
 and nothing else.  `P`, `Pmiss`, `Fo` are the SUPPLIER's families. -/
 theorem execBundle_of (γfs : FsNames) (X : Uvis → IProp GF) (T : IProp GF)
     (P Pmiss : Nat → Nat → IProp GF) (Fo : Pfam GF (Aview → Nat → Anode → IProp GF))
-    (cw : Nat) (secc : BitVec 64) (pl : List (BitVec 8)) (f : ElfBytes) (nl : Nat)
+    (rt cw : Nat) (secc : BitVec 64) (pl : List (BitVec 8)) (f : ElfBytes) (nl : Nat)
     (Pay : IProp GF) (Q : Int → IProp GF) (M : Nat → List (BitVec 8)) (pv av : BitVec 64)
     (sts : List FdState) (cs : ExtTreeSet GName compare) (pidv : BitVec 32)
     (hload : kexecLoadable f) (hpath : argPathOf M pv.toNat pl) :
-    ⊢ exStart (hlc := hlc) γfs cw P Pmiss pl -∗
+    ⊢ exStart (hlc := hlc) γfs rt cw P Pmiss pl -∗
       pfAt (aopenCommitAt (hlc := hlc) (fsGammaL (hlc := hlc) γfs) appE) Fo -∗
       exNodeId T (P (pathElems pl).length) Fo.pfRecv ⟨.AFile f, nl⟩ -∗
       imageEntry f M av sts cw secc cs pidv Q Pay X -∗
       imageEntryTaint T sts secc Q X -∗ Pay -∗
-      sysExecAuPre (hlc := hlc) ⟨X, Pay⟩ (fsGammaL (hlc := hlc) γfs) γfs cw secc Q P Pmiss Fo
+      sysExecAuPre (hlc := hlc) ⟨X, Pay⟩ (fsGammaL (hlc := hlc) γfs) γfs rt cw secc Q P Pmiss Fo
         M pv av sts cs pidv := by
   iintro Hwalk Hobs #Hid #Hcon #Hgen HPay
   unfold sysExecAuPre
@@ -162,16 +162,16 @@ path and a literal vector, so the walk is owed at THE path and the slot
 piece at THE argument shape. -/
 theorem execBundle_of_at (γfs : FsNames) (X : Uvis → IProp GF) (T : IProp GF)
     (P Pmiss : Nat → Nat → IProp GF) (Fo : Pfam GF (Aview → Nat → Anode → IProp GF))
-    (cw : Nat) (secc : BitVec 64) (pl : List (BitVec 8)) (f : ElfBytes) (nl : Nat)
+    (rt cw : Nat) (secc : BitVec 64) (pl : List (BitVec 8)) (f : ElfBytes) (nl : Nat)
     (Pay : IProp GF) (Q : Int → IProp GF) (na : Nat) (alen : Nat → Nat)
     (afun : Nat → Nat → BitVec 8) (sts : List FdState) (cs : ExtTreeSet GName compare)
     (pidv : BitVec 32) (hload : kexecLoadable f) :
-    ⊢ exStart (hlc := hlc) γfs cw P Pmiss pl -∗
+    ⊢ exStart (hlc := hlc) γfs rt cw P Pmiss pl -∗
       pfAt (aopenCommitAt (hlc := hlc) (fsGammaL (hlc := hlc) γfs) appE) Fo -∗
       exNodeId T (P (pathElems pl).length) Fo.pfRecv ⟨.AFile f, nl⟩ -∗
       imageEntryAt f na alen afun sts cw secc cs pidv Q Pay X -∗
       imageEntryTaint T sts secc Q X -∗ Pay -∗
-      execAuPre (hlc := hlc) ⟨X, Pay⟩ (fsGammaL (hlc := hlc) γfs) γfs cw secc Q P Pmiss Fo
+      execAuPre (hlc := hlc) ⟨X, Pay⟩ (fsGammaL (hlc := hlc) γfs) γfs rt cw secc Q P Pmiss Fo
         pl na alen afun sts cs pidv := by
   iintro Hwalk Hobs #Hid #Hcon #Hgen HPay
   unfold execAuPre

@@ -82,7 +82,7 @@ def sysMkdirCreateK (k' : KCtx) (se : Bool) (pj : BitVec 64) (plen : Nat) (pfun 
           Fok Fex (bview plen pfun) made inum.toNat)
      else
       iprop(⌜R' 10#5 = 0#64⌝ ∗ logTx icfgLog ∗
-        creFailArms (hlc := hlc) (fsGammaL fscFs) fscFs ty.toNat major.toNat minor.toNat Nm Nd P Pmiss
+        creFailArms (hlc := hlc) (fsGammaL fscFs) fscFs V.rti ty.toNat major.toNat minor.toNat Nm Nd P Pmiss
           Farm Fdots Fun Fok Fex (bview plen pfun))) -∗
     wpLoop c)
 
@@ -115,7 +115,7 @@ theorem sys_mkdir_create (CR : CREATE) (Γ : SchedNames) [ClaimIs (hlc := hlc) G
     procPrivFd γ pj pid V M ∗
     byteBuf (k'.regs 10#5) (DFrac.own 1) (bview (plen + 1) pfun) ∗
     bslots 3 ∗ irefSlots ns ∗ logOpS icfgLog u Sb ∗ logTx icfgLog ∗
-    epStart fscFs V.cwi P Pmiss (bview plen pfun) ∗
+    epStart fscFs V.rti V.cwi P Pmiss (bview plen pfun) ∗
     pfAt (dlookupCommitAt (fsGammaL fscFs) appE) Fex ∗
     creCommits (hlc := hlc) (fsGammaL fscFs) ty.toNat major.toNat minor.toNat
       Nm Nd (P (nparElems (bview plen pfun)).length) Farm Fdots Fun Fok ∗

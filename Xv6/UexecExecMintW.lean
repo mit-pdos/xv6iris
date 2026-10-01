@@ -179,12 +179,12 @@ theorem udepw_of_sup (PSx : UprogSG GF) (N : UkNames GF) (m : RegMap) (pc : BitV
   · unfold xv6Sbundle xv6SbundleRest USYS_exec xrowOpen
     simp only [Int.reduceEq, if_false, if_true]
     dsimp only [xfamAt, xfamPt]
-    iintro #Hsup %Mv %_
+    iintro #Hsup %Mv %_ %rt
     iapply (fsabsOpenIn (hlc := hlc) fscFs) $$ Hsup
   · unfold xv6Sbundle xv6SbundleRest USYS_exec xrowMknod
     simp only [Int.reduceEq, if_false, if_true]
     dsimp only [xfamAt, xfamPt]
-    iintro #Hsup %Mv %_
+    iintro #Hsup %Mv %_ %rt
     iapply (fsabsMknodPre (hlc := hlc) fscFs) $$ Hsup
 
 /-- **Rocq `udepw_law_of_sup`**. -/
