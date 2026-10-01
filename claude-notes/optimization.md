@@ -789,6 +789,63 @@ elaborates to `utextDecodeWith_ex (by kernel_rfl)`, whose conclusion is the
 catalogs' existential, so no catalog lemma changes; the conclusion unifies
 with the expected type syntactically (no evaluation) and the tactic runs
 once the pc and AST are known.
+### Lean: a symbolic run multiplies its branches -- prove the pieces
+
+`swp_run` over a whole model function walks every path, and the model's
+`do`-notation join points COPY the tail into each arm: `tick_clock` (privilege
+x two counter gates x `menvcfg.STCE` x "did `mip` change", the last copied
+into both STCE arms and each copy reaching `csr_name_write_callback`) was ~24
+leaves and 13 s, proved three times (M/S, S/U, parked hart).  Prove each
+sub-function as its own lemma (`swp_should_inc_mcycle`,
+`swp_clint_dispatch_off`) and `generalize` it out of the caller so the stepper
+stops in front of it (`generalize hcd : clint_dispatch false = cd`, then
+`subst` and `iapply`).  And state the lemma over the parameters the code
+never reads (privilege, `hart_state`): one general lemma, the variants are
+one-line corollaries.  `MachCSL.WpTick`: 33 s of proofs -> ~2 s.
+
+The same shape at a pure walk (`runRW`): when a check is a function of a few
+bits, decide the bits that cannot matter from the hypotheses once
+(`uwk_perm_assert`, `uwk_perm_noss`), name the rest (`obtain ⟨U, hU⟩ : ∃ U,
+bit = U := ⟨_, rfl⟩; simp only [hU]` -- `generalize`/`cases h : e` fail
+"not type correct" on these model terms) and close each closed program by
+`rfl`: `uwk_check_perm` 168 stepper runs, 6.5 s -> 32 `rfl`s, 0.5 s.
+
+### Lean: reassemble a bundle by a curried intro, never by `iframe`
+
+`conf_intro` built `confCells` with `ihave H := confCells_intro … $$ [names]`
+plus `case' _ => (iframe; iexact Hhw)`: a bare `iframe` of a 15-conjunct goal,
+~60 ms per use and executed at every `all_goals` leaf (24 times in
+`swp_transform_effective_address_S`, 1.45 s of its 4.5 s).  State the intro
+CURRIED (`confCells_introW : ⊢ A₁ -∗ … -∗ A₁₅ -∗ confCells …`) and specialise
+it by name (`$$ H₁ … H₁₅`): each premise is one hypothesis lookup.  Same for
+`clockCells`/`pcIs` in the retire macros.
+
+### Lean: one bit-blast of a conjunction, not one per conjunct
+
+`refine ⟨?_, …⟩ <;> bv_decide` re-runs the unfolding `simp` and the SAT
+problem per conjunct; `bv_decide` takes the conjunction whole.
+`smFacts_sstatusWrite` (11 conjuncts) 3.5 s -> 0.4 s.
+
+### Lean: in-process parallelism is ~2x; module splits are the real lever
+
+Lean elaborates a module's theorem bodies in parallel (`Elab.async`), but
+the threads contend: WpGpr's 62 register cases split into eight chunk
+theorems ran 1.7 s each alone and 4-6 s each together (module 14 s sync ->
+6.5 s async), while eight separate `lean` PROCESSES of the same module ran
+in the time of one.  And `kernel_rfl` (`mkAuxTheorem`) is added on the
+elaborating thread, so a module of twelve kernel evaluations runs them in
+sequence (`UExecCsrTab`, 12 x 1 s).  So: to take time off a chain, split by
+what the next module NAMES -- a `*Defs` vocabulary file (definitions,
+macros, `sail_facts`) the consumers import, and the proofs beside it --
+rather than expecting a big module's proofs to overlap.  Done here:
+`WpGprDefs` (KCtx no longer waits for WpGpr's proofs), `WpCycleDefs`,
+`AluFacts`, `SConfAtDefs`, `WpSmodeAuDefs`, `WpSmodeCycleBase` (the cycle
+over an abstract fetch does not wait for `Translate`), `WpSmodeMemPhys`,
+`UExecCsrTabR/W/RW`.  Two traps: a `sail_facts` lemma reaches `swp_run`
+through the import graph, so a module that loses a transitive import can
+fail a step far from any missing NAME (`WpSmodeTime` needed `AluFacts`);
+and an Xv6 module may reach a MachCSL name only transitively (`ProofSpin`
+used `wpLoop_m_instr` through `WpSmodeCtl`), so finish with the full build.
 
 ## Build shape
 

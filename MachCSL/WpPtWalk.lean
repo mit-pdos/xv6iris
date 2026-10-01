@@ -247,9 +247,18 @@ theorem swp_pte_is_invalid_kPtr (cpu : CPU) (dq : DFrac) (c : MConf)
   conf_intro HmConf
   iapply HΦ $$ HmConf
 
+/-- The permission bits of a kernel leaf's flags do not see `A`/`D`. -/
+theorem kLeaf_flags_perm_bits (perm : KPerm) (a d : BitVec 1) :
+    let f := Mk_PTE_Flags (_update_PTE_Flags_D (_update_PTE_Flags_A perm.flags a) d)
+    _get_PTE_Flags_U f = _get_PTE_Flags_U perm.flags ∧ _get_PTE_Flags_R f = _get_PTE_Flags_R perm.flags ∧
+    _get_PTE_Flags_W f = _get_PTE_Flags_W perm.flags ∧ _get_PTE_Flags_X f = _get_PTE_Flags_X perm.flags := by
+  cases perm <;> revert a d <;> decide
+
 set_option maxHeartbeats 4000000 in
 /-- The permission check passes on a kernel leaf that allows the access, in
-supervisor mode, at any `A`/`D`, `MXR` and `SUM`. -/
+supervisor mode, at any `A`/`D`, `MXR` and `SUM`.  The check reads only the
+`U`/`R`/`W`/`X` bits, so `A`/`D` are rewritten away first (casing them as
+well ran the check four times per access: 3.1 s -> 0.7 s). -/
 theorem swp_check_PTE_permission_kLeaf (cpu : CPU) (acc : MemoryAccessType mem_payload)
     (hacc : kernelAccess acc) (mxr do_sum : Bool) (ppn : BitVec 44) (perm : KPerm) (a d : BitVec 1)
     (hperm : perm.allows acc = true) (e : BitVec 10) (u : Unit) (Φ : PTE_Check → IProp GF) :
@@ -258,12 +267,13 @@ theorem swp_check_PTE_permission_kLeaf (cpu : CPU) (acc : MemoryAccessType mem_p
         (Mk_PTE_Flags (BitVec.extractLsb' 0 8 (kLeaf ppn perm a d))) e u) Φ := by
   iintro HΦ
   rw [flags_of_kLeaf']
+  obtain ⟨hU, hR, hW, hX⟩ := kLeaf_flags_perm_bits perm a d
+  unfold check_PTE_permission
+  simp only [hU, hR, hW, hX]
   rcases hacc with rfl | rfl | rfl | rfl | rfl | rfl <;> cases perm <;>
-    simp only [KPerm.allows, Bool.false_eq_true] at hperm <;>
-    rcases bv1_cases a with rfl | rfl <;> rcases bv1_cases d with rfl | rfl
+    simp only [KPerm.allows, Bool.false_eq_true] at hperm
   all_goals
     simp only [KPerm.flags]
-    unfold check_PTE_permission
     swp_run 80
     iexact HΦ
 
