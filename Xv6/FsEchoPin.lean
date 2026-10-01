@@ -25,6 +25,7 @@ file is still at inum 4 after any write: every sentence is about
    §5's resource forms are unreached and not ported.
 -/
 import Xv6.FsInitPinBoot
+import Xv6.FsImgFilesEcho
 
 namespace Xv6
 

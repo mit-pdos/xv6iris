@@ -34,7 +34,13 @@ The use (`row_flen`, `f_inum_not_pinned`) is `Xv6/FileDeltasStep.lean`.
    `subperm_of_subset` for stdpp's `NoDup_submseteq`.
 -/
 import Xv6.AppFilePure
-import Xv6.ElfUser
+import Xv6.ElfUserCat
+import Xv6.ElfUserEcho
+import Xv6.ElfUserGrep
+import Xv6.ElfUserInit
+import Xv6.ElfUserSeccomp
+import Xv6.ElfUserSh
+import Xv6.ElfUserSync
 import Xv6.FsInitPin
 import Xv6.FsShPin
 import Xv6.FsEchoPin

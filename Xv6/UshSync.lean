@@ -27,6 +27,7 @@ Rocq `SyncData.sync_entry`; the code segment is `0xd54` bytes).
 -/
 import Xv6.UshGeom
 import Xv6.ElfLoadable
+import Xv6.ElfUserSync
 
 namespace Xv6
 

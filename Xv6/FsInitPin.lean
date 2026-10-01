@@ -36,7 +36,7 @@ the file's byte literal is never entered by conversion.
    (`astate_era0_init_path`, `nview_era0_init`) are unreached.
 -/
 import Xv6.FsImgNames
-import Xv6.FsImgFiles
+import Xv6.FsImgFilesInit
 import Xv6.FsDurNode
 import Xv6.ReadiParts
 

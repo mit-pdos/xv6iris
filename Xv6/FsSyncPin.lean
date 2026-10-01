@@ -19,6 +19,7 @@ route (a) (`era0_boot_sync_pins`), the reboot corollary and the resource forms
 are unreached and not ported.
 -/
 import Xv6.FsInitPinBoot
+import Xv6.FsImgFilesSync
 
 namespace Xv6
 

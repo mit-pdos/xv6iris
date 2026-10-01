@@ -60,7 +60,7 @@ payload is applied at (`shPayKey`).
    directly, the kernel's Nat-literal defeq evaluates the file (6-7 s
    each); Rocq's header gives the same reason for `elf_segments_loads`.
 -/
-import Xv6.ElfUser
+import Xv6.ElfUserSh
 import Xv6.KexecImageOk
 import Xv6.UkRun
 import Xv6.UshMainPure

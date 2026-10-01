@@ -52,6 +52,7 @@ entry geometry (`uimgSub_union_l`, `shPagePerm`, `udataLo_isSome`,
 -/
 import Xv6.UshKernel
 import Xv6.UInitArgv
+import Xv6.ElfUserInit
 
 namespace Xv6
 

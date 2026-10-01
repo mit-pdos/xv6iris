@@ -45,6 +45,7 @@ the room's `8 * 42` read as Rocq's literal `336`.
 -/
 import Xv6.UshGeom
 import Xv6.ElfLoadable
+import Xv6.ElfUserSeccomp
 
 namespace Xv6
 

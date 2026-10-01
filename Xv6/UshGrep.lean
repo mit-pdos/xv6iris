@@ -75,6 +75,7 @@ import Xv6.UshGeom
 import Xv6.ElfLoadable
 import Xv6.SpecGrepStart
 import Xv6.UEchoOut
+import Xv6.ElfUserGrep
 
 namespace Xv6
 

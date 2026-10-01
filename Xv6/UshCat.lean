@@ -64,6 +64,7 @@ and the differences are ALL of them:
 -/
 import Xv6.UshGeom
 import Xv6.ElfLoadable
+import Xv6.ElfUserCat
 
 namespace Xv6
 
