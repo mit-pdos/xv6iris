@@ -22,6 +22,7 @@ import MachCSL.WpSmodeFrame6
 import Xv6.ByteCursor
 import Xv6.UvmallocDefs
 import Xv6.WalkaddrDefs
+import Xv6.BvOmegaGoal
 
 namespace Xv6
 
@@ -812,7 +813,7 @@ theorem kk_epi {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
   · unfold calleeSaved
     simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
     refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
-    all_goals first | trivial | assumption | (rw [hR2]; bv_omega)
+    all_goals first | trivial | assumption | (rw [hR2]; bv_omega_g)
   · simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
     exact hret
 

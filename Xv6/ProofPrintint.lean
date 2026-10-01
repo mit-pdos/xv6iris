@@ -46,6 +46,7 @@ import MachCSL.ByteWord
 import Xv6.SpecPrintint
 import Xv6.SpecPrputc
 import Xv6.CodeTactics
+import Xv6.BvOmegaGoal
 
 namespace Xv6
 
@@ -258,7 +259,7 @@ theorem wp_pi_prologue (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
     · iexists w₃; iexact Hf24
     · iexists w₈; iexact Hf64
   · iapply (piBuf_intro (k.regs 2#5 + 0xFFFFFFFFFFFFFFC8#64) (k.regs 2#5 + 0xFFFFFFFFFFFFFFD0#64)
-      (k.regs 2#5 + 0xFFFFFFFFFFFFFFD8#64) (by bv_omega) (by bv_omega) w₇ w₆ w₅)
+      (k.regs 2#5 + 0xFFFFFFFFFFFFFFD8#64) (by bv_omega_g) (by bv_omega_g) w₇ w₆ w₅)
     iframe Hf56 Hf48 Hf40
 
 set_option maxHeartbeats 4000000 in
@@ -281,7 +282,7 @@ theorem wp_pi_epilogue (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
   iintro ⟨#Hi0, #Hi2, #Hi4, #Hi6, #Hi8, Hk, Hpc, ⟨Hf8, Hf16, ⟨%w₃, Hf24⟩, Hf32, ⟨%w₈, Hf64⟩⟩,
     Hbuf, HΦ⟩
   icases piBuf_elim (k.regs 2#5 + 0xFFFFFFFFFFFFFFC8#64) (k.regs 2#5 + 0xFFFFFFFFFFFFFFD0#64)
-    (k.regs 2#5 + 0xFFFFFFFFFFFFFFD8#64) (by bv_omega) (by bv_omega) $$ Hbuf
+    (k.regs 2#5 + 0xFFFFFFFFFFFFFFD8#64) (by bv_omega_g) (by bv_omega_g) $$ Hbuf
     with ⟨%w₇, %w₆, %w₅, Hf56, Hf48, Hf40⟩
   k_step (wp_s_ld cpu _ pc true 56#12 1#5 2#5 (by decide) (by decide) (DFrac.own 1) ra)
     $$ [- $Hk $Hpc] with [hR2]
@@ -317,26 +318,26 @@ theorem pi_sext_id (n : Nat) (h : n < 2 ^ 31) :
 theorem pi_addiw_succ (n : Nat) (h : n + 1 < 2 ^ 31) :
     BitVec.signExtend 64 (BitVec.extractLsb' 0 32 (BitVec.ofNat 64 n + 1#64)) =
       BitVec.ofNat 64 (n + 1) := by
-  rw [show BitVec.ofNat 64 n + 1#64 = BitVec.ofNat 64 (n + 1) from by bv_omega]
+  rw [show BitVec.ofNat 64 n + 1#64 = BitVec.ofNat 64 (n + 1) from by bv_omega_g]
   exact pi_sext_id (n + 1) h
 
 /-- `addiw t,s,2` on a small count. -/
 theorem pi_addiw_succ2 (n : Nat) (h : n + 2 < 2 ^ 31) :
     BitVec.signExtend 64 (BitVec.extractLsb' 0 32 (BitVec.ofNat 64 n + 2#64)) =
       BitVec.ofNat 64 (n + 2) := by
-  rw [show BitVec.ofNat 64 n + 2#64 = BitVec.ofNat 64 (n + 2) from by bv_omega]
+  rw [show BitVec.ofNat 64 n + 2#64 = BitVec.ofNat 64 (n + 2) from by bv_omega_g]
   exact pi_sext_id (n + 2) h
 
 /-- `addiw t,s,-1` on a positive count. -/
 theorem pi_addiw_pred (n : Nat) (h1 : 1 ≤ n) (h : n < 2 ^ 31) :
     BitVec.signExtend 64 (BitVec.extractLsb' 0 32
       (BitVec.ofNat 64 n + 0xFFFFFFFFFFFFFFFF#64)) = BitVec.ofNat 64 (n - 1) := by
-  rw [show BitVec.ofNat 64 n + 0xFFFFFFFFFFFFFFFF#64 = BitVec.ofNat 64 (n - 1) from by bv_omega]
+  rw [show BitVec.ofNat 64 n + 0xFFFFFFFFFFFFFFFF#64 = BitVec.ofNat 64 (n - 1) from by bv_omega_g]
   exact pi_sext_id (n - 1) (by omega)
 
 /-- The cursor bump `addi a3,a3,1`, in the form `k_norm` leaves it. -/
 theorem pi_succ' (b : BitVec 64) (n : Nat) :
-    b + (BitVec.ofNat 64 n + 1#64) = b + BitVec.ofNat 64 (n + 1) := by bv_omega
+    b + (BitVec.ofNat 64 n + 1#64) = b + BitVec.ofNat 64 (n + 1) := by bv_omega_g
 
 /-- The low byte of a zero-extended byte is the byte. -/
 theorem pi_extract_setWidth (b : BitVec 8) :
@@ -560,7 +561,7 @@ theorem plKept_of_calleeSaved {R R' : RegMap} (h : calleeSaved R R') : plKept R 
 
 /-- The descending cursor, in the form `k_norm` leaves it. -/
 theorem pi_pred' (b : BitVec 64) (n : Nat) :
-    b + (BitVec.ofNat 64 (n + 1) + 0xFFFFFFFFFFFFFFFF#64) = b + BitVec.ofNat 64 n := by bv_omega
+    b + (BitVec.ofNat 64 (n + 1) + 0xFFFFFFFFFFFFFFFF#64) = b + BitVec.ofNat 64 n := by bv_omega_g
 
 /-- A small count is never the all-ones word. -/
 theorem pi_ofNat_ne_max (m : Nat) (hm : m < 24) : BitVec.ofNat 64 m ≠ 0xFFFFFFFFFFFFFFFF#64 := by
@@ -760,7 +761,7 @@ theorem pi_zext32 (m : Nat) (h : m < 2 ^ 32) :
   bv_decide
 
 /-- The sentinel's `sub s2,s2,a4` cancels the offset it just added. -/
-theorem pi_self_neg (v : BitVec 64) : v + -v = 0#64 := by bv_omega
+theorem pi_self_neg (v : BitVec 64) : v + -v = 0#64 := by bv_omega_g
 
 /-- `beqz` on a value. -/
 theorem pi_beq0_ite {α : Type} (v : BitVec 64) (p q : α) :
@@ -846,10 +847,10 @@ theorem pi_out (PP : PRPUTC) [Xv6G GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = fa
   case hj => omega
   case h9 =>
     simp only [RegMap.set_apply, BitVec.reduceEq, if_true, if_false, reduceIte]
-    try bv_omega
+    try bv_omega_g
   case h18 =>
     simp only [RegMap.set_apply, BitVec.reduceEq, if_true, if_false, reduceIte]
-    try bv_omega
+    try bv_omega_g
   iintro %R2 %cs Hk Hpc Hbuf Hsent %hpk
   obtain ⟨p2, p8, p18, p19, p20, p21, p22, p23, p24, p25, p26, p27⟩ := hpk
   have hR2' : R2 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFC0#64 := by
@@ -894,7 +895,7 @@ theorem pi_out (PP : PRPUTC) [Xv6G GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = fa
 /-- The `'-'` store's address: `a2 - 24` is `buf + i`. -/
 theorem pi_minus_addr (sp0 : BitVec 64) (i : Nat) :
     BitVec.ofNat 64 i + (0xFFFFFFFFFFFFFFE0#64 + (sp0 + 0xFFFFFFFFFFFFFFE8#64)) =
-      sp0 + 0xFFFFFFFFFFFFFFC8#64 + BitVec.ofNat 64 i := by bv_omega
+      sp0 + 0xFFFFFFFFFFFFFFC8#64 + BitVec.ofNat 64 i := by bv_omega_g
 
 /-! ## The body from `+0x12`: the digit loop, the sign, the join -/
 
@@ -964,19 +965,19 @@ theorem pi_setup (PP : PRPUTC) [Xv6G GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = 
   case hs => k_norm
   case d10 =>
     try simp only [RegMap.set_apply, BitVec.reduceEq, if_true, if_false, reduceIte]
-    try bv_omega
+    try bv_omega_g
   case d11 =>
     try simp only [RegMap.set_apply, BitVec.reduceEq, if_true, if_false, reduceIte]
-    try bv_omega
+    try bv_omega_g
   case d13 =>
     try simp only [RegMap.set_apply, BitVec.reduceEq, if_true, if_false, reduceIte]
-    try bv_omega
+    try bv_omega_g
   case d14 =>
     try simp only [RegMap.set_apply, BitVec.reduceEq, if_true, if_false, reduceIte]
-    try bv_omega
+    try bv_omega_g
   case d16 =>
     try simp only [RegMap.set_apply, BitVec.reduceEq, if_true, if_false, reduceIte]
-    try bv_omega
+    try bv_omega_g
   iintro %R1 %i' Hk Hpc Hbuf Hdig %⟨hi1, hi21, hd12, hd14, hd17, hdk⟩
   have h6' : R1 6#5 = R 6#5 := hdk 6#5 (by decide) (by decide) (by decide) (by decide) (by decide) (by decide)
   have h8' : R1 8#5 = k.regs 2#5 :=
@@ -1061,7 +1062,7 @@ theorem pi_setup (PP : PRPUTC) [Xv6G GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = 
     case e14 =>
       simp only [RegMap.set_apply, BitVec.reduceEq, if_true, if_false, reduceIte]
       rw [show i' + 1 = (i' - 1) + 2 from by omega]
-      bv_omega
+      bv_omega_g
     case e18 =>
       simp only [RegMap.set_apply, BitVec.reduceEq, if_true, if_false, reduceIte]; exact h18'
     case esv =>

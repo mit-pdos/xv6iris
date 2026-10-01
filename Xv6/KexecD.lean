@@ -86,6 +86,7 @@ import Xv6.KexecSeam
 import Xv6.ProcPrivAcc
 import Xv6.SpecSafestrcpySrc
 import Xv6.PrepareReturnStores
+import Xv6.BvOmegaGoal
 
 namespace Xv6
 
@@ -112,10 +113,10 @@ theorem kxdKept_set (Rb R : RegMap) (r : BitVec 5) (v : BitVec 64) (h : kxdKept 
   rw [RegMap.set_other _ _ _ _ hx]; exact h x a b c
 
 theorem kxd_succ (b : BitVec 64) (n : Nat) :
-    b + (BitVec.ofNat 64 n + 1#64) = b + BitVec.ofNat 64 (n + 1) := by bv_omega
+    b + (BitVec.ofNat 64 n + 1#64) = b + BitVec.ofNat 64 (n + 1) := by bv_omega_g
 
 theorem kxd_pred (b : BitVec 64) (n : Nat) :
-    b + (BitVec.ofNat 64 (n + 1) + 18446744073709551615#64) = b + BitVec.ofNat 64 n := by bv_omega
+    b + (BitVec.ofNat 64 (n + 1) + 18446744073709551615#64) = b + BitVec.ofNat 64 n := by bv_omega_g
 
 theorem kxd_bne_t (b : BitVec 8) (h : b ≠ 47#8) : bcond bop.BNE (BitVec.setWidth 64 b) 47#64 = true := by
   have : BitVec.setWidth 64 b ≠ 47#64 := by intro e; apply h; bv_decide

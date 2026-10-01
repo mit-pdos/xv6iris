@@ -79,6 +79,7 @@ The eb question: every rule here is at either `SIE` (`kctxL lent`,
 import Xv6.CodeTactics
 import Xv6.KstackMap
 import MachCSL.WpSmodeFrame12b
+import Xv6.BvOmegaGoal
 
 namespace Xv6
 
@@ -123,7 +124,7 @@ theorem kxc_ustack_base (sp0 : BitVec 64) : sp0 + BitVec.signExtend 64 3728#12 =
 /-- The 55 low slots' top: slot 13's address, `sp0 - 104`. -/
 theorem kxc_rest_addr (sp0 : BitVec 64) :
     sp0 - 8#64 * BitVec.ofNat 64 13 = sp0 + 0xFFFFFFFFFFFFFF98#64 := by
-  bv_omega
+  bv_omega_g
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
@@ -133,7 +134,7 @@ variable {lent : Bool}
 
 theorem kxc_split_addr (a : BitVec 64) (m : Nat) (c : BitVec 64) (h : c = 8#64 * BitVec.ofNat 64 m) :
     a - 8#64 * BitVec.ofNat 64 m = a + -c := by
-  subst h; bv_omega
+  subst h; bv_omega_g
 
 /-- The 55 low slots are the four regions: `ustack` (33), `elf` (8), `ph`
 (7) and the spilled locals (7) (deviation 3). -/
@@ -142,11 +143,11 @@ theorem kxc_rest_split [CurCtx] (sp0 : BitVec 64) :
       stackOwn (sp0 + 0xFFFFFFFFFFFFFF98#64) 33 ∗ stackOwn (kxcUstackBuf sp0) 8 ∗
         stackOwn (kxcElfBuf sp0) 7 ∗ stackOwn (kxcPhBuf sp0) 7 := by
   have e1 : sp0 + 0xFFFFFFFFFFFFFF98#64 - 8#64 * BitVec.ofNat 64 33 = kxcUstackBuf sp0 := by
-    unfold kxcUstackBuf; bv_omega
+    unfold kxcUstackBuf; bv_omega_g
   have e2 : kxcUstackBuf sp0 - 8#64 * BitVec.ofNat 64 8 = kxcElfBuf sp0 := by
-    unfold kxcUstackBuf kxcElfBuf; bv_omega
+    unfold kxcUstackBuf kxcElfBuf; bv_omega_g
   have e3 : kxcElfBuf sp0 - 8#64 * BitVec.ofNat 64 7 = kxcPhBuf sp0 := by
-    unfold kxcElfBuf kxcPhBuf; bv_omega
+    unfold kxcElfBuf kxcPhBuf; bv_omega_g
   constructor
   · refine (stackOwn_split (sp0 + 0xFFFFFFFFFFFFFF98#64) 33 22).trans ?_
     rw [e1]
@@ -169,12 +170,12 @@ theorem kxc_stackOwn_byteBuf [CurCtx] (a : BitVec 64) (n : Nat) :
         byteBuf a (DFrac.own 1) bs := by
   induction n generalizing a with
   | zero =>
-    have ha : a + BitVec.ofNat 64 (8 * (0 + 1)) - 8#64 * BitVec.ofNat 64 (0 + 1) = a := by bv_omega
+    have ha : a + BitVec.ofNat 64 (8 * (0 + 1)) - 8#64 * BitVec.ofNat 64 (0 + 1) = a := by bv_omega_g
     unfold stackOwn
     simp only [Nat.zero_add, List.range_one]
     iintro H
     icases BigSepL.bigSepL_singleton.1 $$ H with ⟨%w, H⟩
-    have ha' : a + BitVec.ofNat 64 (8 * 1) - 8#64 * BitVec.ofNat 64 (0 + 1) = a := by bv_omega
+    have ha' : a + BitVec.ofNat 64 (8 * 1) - 8#64 * BitVec.ofNat 64 (0 + 1) = a := by bv_omega_g
     rw [ha']
     ihave %hal := wordPointsTo_align _ 8 _ _ $$ H
     ihave B := wordPointsTo_to_bytes _ (DFrac.own 1) w hal $$ H
@@ -184,9 +185,9 @@ theorem kxc_stackOwn_byteBuf [CurCtx] (a : BitVec 64) (n : Nat) :
     · iexact B
   | succ n ih =>
     have e1 : a + BitVec.ofNat 64 (8 * (n + 1 + 1)) - 8#64 * BitVec.ofNat 64 (n + 1) = a + 8#64 := by
-      bv_omega
+      bv_omega_g
     have e0 : a + BitVec.ofNat 64 (8 * (n + 1 + 1)) = (a + 8#64) + BitVec.ofNat 64 (8 * (n + 1)) := by
-      bv_omega
+      bv_omega_g
     iintro H
     icases stackOwn_split (a + BitVec.ofNat 64 (8 * (n + 1 + 1))) (n + 1) 1 $$ H with ⟨Ht, Hb⟩
     rw [e1, e0]
@@ -194,7 +195,7 @@ theorem kxc_stackOwn_byteBuf [CurCtx] (a : BitVec 64) (n : Nat) :
     unfold stackOwn
     simp only [List.range_one]
     icases BigSepL.bigSepL_singleton.1 $$ Hb with ⟨%w, Hb⟩
-    have e2 : a + 8#64 - 8#64 * BitVec.ofNat 64 (0 + 1) = a := by bv_omega
+    have e2 : a + 8#64 - 8#64 * BitVec.ofNat 64 (0 + 1) = a := by bv_omega_g
     rw [e2]
     ihave %hal2 := wordPointsTo_align _ 8 _ _ $$ Hb
     ihave Bb := wordPointsTo_to_bytes _ (DFrac.own 1) w hal2 $$ Hb
@@ -215,7 +216,7 @@ theorem kxc_slots_elf [CurCtx] (sp0 : BitVec 64) :
       ∃ bs : List (BitVec 8), ⌜bs.length = 64 ∧ (kxcElfBuf sp0).toNat % 8 = 0⌝ ∗
         byteBuf (kxcElfBuf sp0) (DFrac.own 1) bs := by
   have e : kxcElfBuf sp0 + BitVec.ofNat 64 (8 * (7 + 1)) = kxcUstackBuf sp0 := by
-    unfold kxcElfBuf kxcUstackBuf; bv_omega
+    unfold kxcElfBuf kxcUstackBuf; bv_omega_g
   rw [← e]
   exact kxc_stackOwn_byteBuf (kxcElfBuf sp0) 7
 
@@ -224,7 +225,7 @@ theorem kxc_bytes_elf [CurCtx] (sp0 : BitVec 64) (bs : List (BitVec 8))
     (hal : (kxcElfBuf sp0).toNat % 8 = 0) (hl : bs.length = 64) :
     byteBuf (GF := GF) (kxcElfBuf sp0) (DFrac.own 1) bs ⊢ stackOwn (kxcUstackBuf sp0) 8 := by
   have e : kxcElfBuf sp0 + BitVec.ofNat 64 (8 * 8) = kxcUstackBuf sp0 := by
-    unfold kxcElfBuf kxcUstackBuf; bv_omega
+    unfold kxcElfBuf kxcUstackBuf; bv_omega_g
   rw [← e]
   exact byteBuf_stackOwn (kxcElfBuf sp0) hal 8 bs hl
 
@@ -235,7 +236,7 @@ theorem kxc_slots_ph [CurCtx] (sp0 : BitVec 64) :
       ∃ bs : List (BitVec 8), ⌜bs.length = 56 ∧ (kxcPhBuf sp0).toNat % 8 = 0⌝ ∗
         byteBuf (kxcPhBuf sp0) (DFrac.own 1) bs := by
   have e : kxcPhBuf sp0 + BitVec.ofNat 64 (8 * (6 + 1)) = kxcElfBuf sp0 := by
-    unfold kxcPhBuf kxcElfBuf; bv_omega
+    unfold kxcPhBuf kxcElfBuf; bv_omega_g
   rw [← e]
   exact kxc_stackOwn_byteBuf (kxcPhBuf sp0) 6
 
@@ -244,7 +245,7 @@ theorem kxc_bytes_ph [CurCtx] (sp0 : BitVec 64) (bs : List (BitVec 8))
     (hal : (kxcPhBuf sp0).toNat % 8 = 0) (hl : bs.length = 56) :
     byteBuf (GF := GF) (kxcPhBuf sp0) (DFrac.own 1) bs ⊢ stackOwn (kxcElfBuf sp0) 7 := by
   have e : kxcPhBuf sp0 + BitVec.ofNat 64 (8 * 7) = kxcElfBuf sp0 := by
-    unfold kxcPhBuf kxcElfBuf; bv_omega
+    unfold kxcPhBuf kxcElfBuf; bv_omega_g
   rw [← e]
   exact byteBuf_stackOwn (kxcPhBuf sp0) hal 7 bs hl
 
@@ -255,7 +256,7 @@ theorem kxc_slots_ustack [CurCtx] (sp0 : BitVec 64) :
       ∃ bs : List (BitVec 8), ⌜bs.length = 264 ∧ (kxcUstackBuf sp0).toNat % 8 = 0⌝ ∗
         byteBuf (kxcUstackBuf sp0) (DFrac.own 1) bs := by
   have e : kxcUstackBuf sp0 + BitVec.ofNat 64 (8 * (32 + 1)) = sp0 + 0xFFFFFFFFFFFFFF98#64 := by
-    unfold kxcUstackBuf; bv_omega
+    unfold kxcUstackBuf; bv_omega_g
   rw [← e]
   exact kxc_stackOwn_byteBuf (kxcUstackBuf sp0) 32
 
@@ -265,7 +266,7 @@ theorem kxc_bytes_ustack [CurCtx] (sp0 : BitVec 64) (bs : List (BitVec 8))
     byteBuf (GF := GF) (kxcUstackBuf sp0) (DFrac.own 1) bs ⊢
       stackOwn (sp0 + 0xFFFFFFFFFFFFFF98#64) 33 := by
   have e : kxcUstackBuf sp0 + BitVec.ofNat 64 (8 * 33) = sp0 + 0xFFFFFFFFFFFFFF98#64 := by
-    unfold kxcUstackBuf; bv_omega
+    unfold kxcUstackBuf; bv_omega_g
   rw [← e]
   exact byteBuf_stackOwn (kxcUstackBuf sp0) hal 33 bs hl
 

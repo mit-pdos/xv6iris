@@ -98,6 +98,7 @@ import Xv6.CodeTactics
 import MachCSL.WpSmodeFrame6
 import Xv6.CopyLemmas
 import Xv6.DinodeSlot
+import Xv6.BvOmegaGoal
 
 namespace Xv6
 
@@ -112,7 +113,7 @@ set_option linter.unusedSectionVars false
 
 /-- `&p->ofile[0]` from the base pointer. -/
 theorem kx_pOfile0 (pa : BitVec 64) : pOfile pa 0 = pa + 208#64 := by
-  unfold pOfile; simp only [Nat.mul_zero]; bv_omega
+  unfold pOfile; simp only [Nat.mul_zero]; bv_omega_g
 
 /-- `&p->cwd` from the base pointer (what `addi s2,a0,336` computes). -/
 theorem kx_pCwd (pa : BitVec 64) : pa + 336#64 = pCwd pa := rfl
@@ -121,12 +122,12 @@ theorem kx_pCwd (pa : BitVec 64) : pa + 336#64 = pCwd pa := rfl
 theorem kx_pOfile_succ (pa : BitVec 64) (fd : Nat) : pOfile pa fd + 8#64 = pOfile pa (fd + 1) := by
   unfold pOfile
   rw [show 8 * (fd + 1) = 8 * fd + 8 from by omega, BitVec.ofNat_add]
-  bv_omega
+  bv_omega_g
 
 /-- The scan's exit address IS `&p->cwd`. -/
 theorem kx_pOfile_end (pa : BitVec 64) : pOfile pa NOFILE = pCwd pa := by
   unfold pOfile pCwd NOFILE
-  bv_omega
+  bv_omega_g
 
 /-- Before the end, an ofile slot address is not `&p->cwd`. -/
 theorem kx_pOfile_ne_cwd (pa : BitVec 64) (m : Nat) (hm : m < NOFILE) : pOfile pa m ≠ pCwd pa := by
@@ -1250,7 +1251,7 @@ theorem kx_rest (AC : ACQUIRE) (RE : RELEASE) (RP : REPARENT) (WU : WAKEUP) (SC 
     iapply h
     iframe Hk Hpc Hpinv Hheld Hwand Htc Hres Hcells Htag Hvc
   -- the park wand: the zeroed private block + the whole kernel stack → procDormantNoctx
-  have hsub : (spval + 48#64) - 8#64 * BitVec.ofNat 64 6 = spval := by bv_omega
+  have hsub : (spval + 48#64) - 8#64 * BitVec.ofNat 64 6 = spval := by bv_omega_g
   ihave Hpriv := (show
       wordPointsTo (pPid (procAddr j)) 4 pidPriv pid ∗
       wordPointsTo (pKstack (procAddr j)) 8 (DFrac.own 1) V.kstack ∗
@@ -1389,7 +1390,7 @@ theorem kx_initprocIs_wp (ip : BitVec 64) :
   unfold initIdentAt initIdentCell initprocAddr; iintro ⟨H, -⟩; rw [wordAtN_cur]; iexact H
 
 /-- The immediate `-48` folds, `spval + 48 = sp`. -/
-theorem kx_sp48 (sp : BitVec 64) : (sp - 8#64 * BitVec.ofNat 64 6) + 48#64 = sp := by bv_omega
+theorem kx_sp48 (sp : BitVec 64) : (sp - 8#64 * BitVec.ofNat 64 6) + 48#64 = sp := by bv_omega_g
 
 end
 

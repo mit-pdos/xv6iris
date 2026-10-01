@@ -860,6 +860,21 @@ nests in the trace are the tell).  `clear hsK` right after deriving
 in a straight-line walk, a chain of `Nat`-subtraction facts keeps only its
 live link.
 
+### Lean: `bv_omega` converts the whole context
+
+Core's `bv_omega` is `simp only [bitvec_to_nat] at *; omega`: every `BitVec`
+hypothesis in scope becomes `toNat` facts with a `% 2^64` per addition, and
+`omega` and then the kernel (checking its certificate) pay for all of them.
+In a whole-function proof an address fold like `a + c1 + c2 = a + c3` cost
+~0.8 s a call, half of it `[Kernel]` on the `omega` aux proof (`kfork_proof`
+had three).  `Xv6.BvOmegaGoal.bv_omega_g` converts the goal only and works
+whenever the goal is closed by its own arithmetic.  Measured per module
+(A/B, isolated): ProofKfork 26.9 → 24.2 s CPU (wall 14.9 → 13.4),
+ProofConsolewrite 11.5 → 10.0, KexecD 6.6 → 5.6, a dozen others −0.2 to
+−0.4.  A blind sweep of all 315 sites gained nothing in small contexts (and
+24 sites need the hypotheses), so it is converted only where it measured;
+use it for new sites inside big proofs.
+
 ## Build shape
 
 The build is critical-path bound and core-saturated in the middle: the path is a

@@ -48,6 +48,7 @@ import Xv6.SpecUartwrite
 import Xv6.FsWords
 import Xv6.UmodeArith
 import MachCSL.BvLemmas
+import Xv6.BvOmegaGoal
 
 namespace Xv6
 
@@ -211,13 +212,13 @@ theorem cw_buf_open (a : BitVec 64) :
   icases pw_word8_align _ _ _ $$ H0 with ⟨%hal, H0⟩
   have h1 : (a + 8#64).toNat % 8 = 0 := cw_align8 a hal
   have h2 : (a + 16#64).toNat % 8 = 0 := by
-    rw [show a + 16#64 = (a + 8#64) + 8#64 from by bv_omega]; exact cw_align8 _ h1
+    rw [show a + 16#64 = (a + 8#64) + 8#64 from by bv_omega_g]; exact cw_align8 _ h1
   have h3 : (a + 24#64).toNat % 8 = 0 := by
-    rw [show a + 24#64 = (a + 16#64) + 8#64 from by bv_omega]; exact cw_align8 _ h2
+    rw [show a + 24#64 = (a + 16#64) + 8#64 from by bv_omega_g]; exact cw_align8 _ h2
   ihave G3 := wordPointsTo_to_bytes (a + 24#64) (DFrac.own 1) w3 h3 $$ H3
-  ihave G2 := cw_join8 (a + 16#64) (a + 24#64) (by bv_omega) w2 (wordToBytes w3) h2 $$ [H2 G3]
+  ihave G2 := cw_join8 (a + 16#64) (a + 24#64) (by bv_omega_g) w2 (wordToBytes w3) h2 $$ [H2 G3]
   case' _ => iframe
-  ihave G1 := cw_join8 (a + 8#64) (a + 16#64) (by bv_omega) w1
+  ihave G1 := cw_join8 (a + 8#64) (a + 16#64) (by bv_omega_g) w1
     (wordToBytes w2 ++ wordToBytes w3) h1 $$ [H1 G2]
   case' _ => iframe
   ihave G0 := cw_join8 a (a + 8#64) rfl w0
@@ -240,16 +241,16 @@ theorem cw_buf_close (a : BitVec 64) (buf : List (BitVec 8)) (hl : buf.length = 
       (∃ w : BitVec 64, wordPointsTo (a + 24#64) 8 (DFrac.own 1) w) := by
   have h1 : (a + 8#64).toNat % 8 = 0 := cw_align8 a hal
   have h2 : (a + 16#64).toNat % 8 = 0 := by
-    rw [show a + 16#64 = (a + 8#64) + 8#64 from by bv_omega]; exact cw_align8 _ h1
+    rw [show a + 16#64 = (a + 8#64) + 8#64 from by bv_omega_g]; exact cw_align8 _ h1
   have h3 : (a + 24#64).toNat % 8 = 0 := by
-    rw [show a + 24#64 = (a + 16#64) + 8#64 from by bv_omega]; exact cw_align8 _ h2
+    rw [show a + 24#64 = (a + 16#64) + 8#64 from by bv_omega_g]; exact cw_align8 _ h2
   iintro H
   icases cw_split8 a (a + 8#64) rfl buf (by omega) hal $$ H with ⟨Hw0, H⟩
-  icases cw_split8 (a + 8#64) (a + 16#64) (by bv_omega) (buf.drop 8)
+  icases cw_split8 (a + 8#64) (a + 16#64) (by bv_omega_g) (buf.drop 8)
     (by simp only [List.length_drop]; omega) h1 $$ H with ⟨Hw1, H⟩
-  icases cw_split8 (a + 16#64) (a + 24#64) (by bv_omega) ((buf.drop 8).drop 8)
+  icases cw_split8 (a + 16#64) (a + 24#64) (by bv_omega_g) ((buf.drop 8).drop 8)
     (by simp only [List.length_drop]; omega) h2 $$ H with ⟨Hw2, H⟩
-  icases cw_split8 (a + 24#64) (a + 32#64) (by bv_omega) (((buf.drop 8).drop 8).drop 8)
+  icases cw_split8 (a + 24#64) (a + 32#64) (by bv_omega_g) (((buf.drop 8).drop 8).drop 8)
     (by simp only [List.length_drop]; omega) h3 $$ H with ⟨Hw3, H⟩
   iclear H
   iframe Hw0 Hw1 Hw2 Hw3
@@ -718,9 +719,9 @@ theorem cw_frame_elim (sp ra s0 s1 : BitVec 64) :
       (∃ w : BitVec 64, wordPointsTo (sp + 0xFFFFFFFFFFFFFF80#64 + 16#64) 8 (DFrac.own 1) w) ∗
       (∃ w : BitVec 64, wordPointsTo (sp + 0xFFFFFFFFFFFFFF80#64 + 24#64) 8 (DFrac.own 1) w) := by
   unfold frame16s1 frame16rest cwSpare9
-  rw [show sp + 0xFFFFFFFFFFFFFF80#64 + 8#64 = sp + 0xFFFFFFFFFFFFFF88#64 from by bv_omega,
-      show sp + 0xFFFFFFFFFFFFFF80#64 + 16#64 = sp + 0xFFFFFFFFFFFFFF90#64 from by bv_omega,
-      show sp + 0xFFFFFFFFFFFFFF80#64 + 24#64 = sp + 0xFFFFFFFFFFFFFF98#64 from by bv_omega]
+  rw [show sp + 0xFFFFFFFFFFFFFF80#64 + 8#64 = sp + 0xFFFFFFFFFFFFFF88#64 from by bv_omega_g,
+      show sp + 0xFFFFFFFFFFFFFF80#64 + 16#64 = sp + 0xFFFFFFFFFFFFFF90#64 from by bv_omega_g,
+      show sp + 0xFFFFFFFFFFFFFF80#64 + 24#64 = sp + 0xFFFFFFFFFFFFFF98#64 from by bv_omega_g]
   iintro ⟨Hra, Hs0, Hs1, H2, H3, H4, H5, H6, H7, H8, H9, H10, H11, H12, H13, H14⟩
   iframe
 
@@ -735,9 +736,9 @@ theorem cw_frame_intro (sp ra s0 s1 : BitVec 64) :
     (∃ w : BitVec 64, wordPointsTo (sp + 0xFFFFFFFFFFFFFF80#64 + 24#64) 8 (DFrac.own 1) w) ⊢
       frame16s1 sp ra s0 s1 := by
   unfold frame16s1 frame16rest cwSpare9
-  rw [show sp + 0xFFFFFFFFFFFFFF80#64 + 8#64 = sp + 0xFFFFFFFFFFFFFF88#64 from by bv_omega,
-      show sp + 0xFFFFFFFFFFFFFF80#64 + 16#64 = sp + 0xFFFFFFFFFFFFFF90#64 from by bv_omega,
-      show sp + 0xFFFFFFFFFFFFFF80#64 + 24#64 = sp + 0xFFFFFFFFFFFFFF98#64 from by bv_omega]
+  rw [show sp + 0xFFFFFFFFFFFFFF80#64 + 8#64 = sp + 0xFFFFFFFFFFFFFF88#64 from by bv_omega_g,
+      show sp + 0xFFFFFFFFFFFFFF80#64 + 16#64 = sp + 0xFFFFFFFFFFFFFF90#64 from by bv_omega_g,
+      show sp + 0xFFFFFFFFFFFFFF80#64 + 24#64 = sp + 0xFFFFFFFFFFFFFF98#64 from by bv_omega_g]
   iintro ⟨Hra, Hs0, Hs1, ⟨H2, H3, H4, H5, H6, H7, H8, H9, H10⟩, H11, H12, H13, H14⟩
   iframe
 

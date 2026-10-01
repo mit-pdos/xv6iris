@@ -15,6 +15,7 @@ with `vprintf`'s contract `ULIB_VPRINTF` (a parameter).
 -/
 import Xv6.SpecUlibFprintf
 import Xv6.UlibVprintfInv
+import Xv6.BvOmegaGoal
 
 namespace Xv6
 
@@ -79,40 +80,40 @@ theorem wp_ulibFprintf_gen {hlc : HasLC} [MachGS hlc GF] (L : UlibRunP GF) (base
   icases ulibWords_open10 _ _ $$ Hws with ⟨W1, W2, W3, W4, W5, W6, W7, W8, W9, W10⟩
   -- +0x37e  sd ra,24(sp) ; +0x380  sd s0,16(sp)
   iapply (ulibS_sdV L _ (ulibFprintf_i37e L.toUlibRun base) 0x380 rfl _ _ ((m 2#5).toNat - 56)
-    (by ulib_regs; bv_omega) (by omega) (m 1#5) (by ulib_regs)) $$ Hc W7 Hrun
+    (by ulib_regs; bv_omega_g) (by omega) (m 1#5) (by ulib_regs)) $$ Hc W7 Hrun
   iintro W7 Hrun
   iapply (ulibS_sdV L _ (ulibFprintf_i380 L.toUlibRun base) 0x382 rfl _ _ ((m 2#5).toNat - 64)
-    (by ulib_regs; bv_omega) (by omega) (m 8#5) (by ulib_regs)) $$ Hc W8 Hrun
+    (by ulib_regs; bv_omega_g) (by omega) (m 8#5) (by ulib_regs)) $$ Hc W8 Hrun
   iintro W8 Hrun
   -- +0x382  addi s0,sp,32
   iapply (ulibS_addiV L _ (ulibFprintf_i382 L.toUlibRun base) 0x384 rfl _ _ (by decide) (by decide)
-    (m 2#5 - 48#64) (by ulib_regs; bv_omega)) $$ Hc Hrun
+    (m 2#5 - 48#64) (by ulib_regs; bv_omega_g)) $$ Hc Hrun
   iintro Hrun
   -- +0x384 .. +0x390  sd a2..a7 into the spill area
   iapply (ulibS_sdV L _ (ulibFprintf_i384 L.toUlibRun base) 0x386 rfl _ _ ((m 2#5).toNat - 48)
-    (by ulib_regs; bv_omega) (by omega) (m 12#5) (by ulib_regs)) $$ Hc W6 Hrun
+    (by ulib_regs; bv_omega_g) (by omega) (m 12#5) (by ulib_regs)) $$ Hc W6 Hrun
   iintro W6 Hrun
   iapply (ulibS_sdV L _ (ulibFprintf_i386 L.toUlibRun base) 0x388 rfl _ _ ((m 2#5).toNat - 40)
-    (by ulib_regs; bv_omega) (by omega) (m 13#5) (by ulib_regs)) $$ Hc W5 Hrun
+    (by ulib_regs; bv_omega_g) (by omega) (m 13#5) (by ulib_regs)) $$ Hc W5 Hrun
   iintro W5 Hrun
   iapply (ulibS_sdV L _ (ulibFprintf_i388 L.toUlibRun base) 0x38a rfl _ _ ((m 2#5).toNat - 32)
-    (by ulib_regs; bv_omega) (by omega) (m 14#5) (by ulib_regs)) $$ Hc W4 Hrun
+    (by ulib_regs; bv_omega_g) (by omega) (m 14#5) (by ulib_regs)) $$ Hc W4 Hrun
   iintro W4 Hrun
   iapply (ulibS_sdV L _ (ulibFprintf_i38a L.toUlibRun base) 0x38c rfl _ _ ((m 2#5).toNat - 24)
-    (by ulib_regs; bv_omega) (by omega) (m 15#5) (by ulib_regs)) $$ Hc W3 Hrun
+    (by ulib_regs; bv_omega_g) (by omega) (m 15#5) (by ulib_regs)) $$ Hc W3 Hrun
   iintro W3 Hrun
   iapply (ulibS_sdV L _ (ulibFprintf_i38c L.toUlibRun base) 0x390 rfl _ _ ((m 2#5).toNat - 16)
-    (by ulib_regs; bv_omega) (by omega) (m 16#5) (by ulib_regs)) $$ Hc W2 Hrun
+    (by ulib_regs; bv_omega_g) (by omega) (m 16#5) (by ulib_regs)) $$ Hc W2 Hrun
   iintro W2 Hrun
   iapply (ulibS_sdV L _ (ulibFprintf_i390 L.toUlibRun base) 0x394 rfl _ _ ((m 2#5).toNat - 8)
-    (by ulib_regs; bv_omega) (by omega) (m 17#5) (by ulib_regs)) $$ Hc W1 Hrun
+    (by ulib_regs; bv_omega_g) (by omega) (m 17#5) (by ulib_regs)) $$ Hc W1 Hrun
   iintro W1 Hrun
   -- +0x394  mv a2,s0 ; +0x396  sd s0,-24(s0)
   iapply (ulibS_rtypeV L _ (ulibFprintf_i394 L.toUlibRun base) 0x396 rfl _ _ (by decide) (by decide)
     (m 2#5 - 48#64) (by ulib_regs)) $$ Hc Hrun
   iintro Hrun
   iapply (ulibS_sdV L _ (ulibFprintf_i396 L.toUlibRun base) 0x39a rfl _ _ ((m 2#5).toNat - 72)
-    (by ulib_regs; bv_omega) (by omega) (m 2#5 - 48#64) (by ulib_regs)) $$ Hc W9 Hrun
+    (by ulib_regs; bv_omega_g) (by omega) (m 2#5 - 48#64) (by ulib_regs)) $$ Hc W9 Hrun
   iintro W9 Hrun
   -- +0x39a  jal vprintf : the caller's premise
   iapply (ulibS_call L _ (ulibFprintf_i39a L.toUlibRun base) 0x39e rfl (ulibVprintfAt base)
@@ -120,17 +121,17 @@ theorem wp_ulibFprintf_gen {hlc : HasLC} [MachGS hlc GF] (L : UlibRunP GF) (base
   iintro Hrun
   iapply Hvp $$ %_ %?h11 %?h12 %?h1 %?h10 W6 Hrun
   case h11 => ulib_regs; exact ha
-  case h12 => ulib_regs; bv_omega
+  case h12 => ulib_regs; bv_omega_g
   case h1 => ulib_regs
   case h10 => ulib_regs
   iintro %m5 %hcs W6 HR Hrun
   have h2 : m5 2#5 = m 2#5 - BitVec.ofNat 64 (8 * 10) := by rw [hcs 2#5 (by decide)]; ulib_regs
   -- +0x39e  ld ra,24(sp) ; +0x3a0  ld s0,16(sp)
   iapply (ulibS_ld L _ (ulibFprintf_i39e L.toUlibRun base) 0x3a0 rfl _ _ ((m 2#5).toNat - 56) (m 1#5)
-    (by decide) (by decide) (by ulib_regs; rw [h2]; bv_omega) (by omega)) $$ Hc W7 Hrun
+    (by decide) (by decide) (by ulib_regs; rw [h2]; bv_omega_g) (by omega)) $$ Hc W7 Hrun
   iintro W7 Hrun
   iapply (ulibS_ld L _ (ulibFprintf_i3a0 L.toUlibRun base) 0x3a2 rfl _ _ ((m 2#5).toNat - 64) (m 8#5)
-    (by decide) (by decide) (by ulib_regs; rw [h2]; bv_omega) (by omega)) $$ Hc W8 Hrun
+    (by decide) (by decide) (by ulib_regs; rw [h2]; bv_omega_g) (by omega)) $$ Hc W8 Hrun
   iintro W8 Hrun
   -- +0x3a2  addi sp,sp,80 : the pop
   ihave Hstk : L.ustack (m 2#5) 10 $$ [W1 W2 W3 W4 W5 W6 W7 W8 W9 W10]
@@ -147,7 +148,7 @@ theorem wp_ulibFprintf_gen {hlc : HasLC} [MachGS hlc GF] (L : UlibRunP GF) (base
     isplitl [W9]; · iexists _; iexact W9
     iframe
   iapply (ulibS_pop L _ 10 (12 + (4 + n)) (ulibFprintf_i3a2 L.toUlibRun base) (by decide) 0x3a4 rfl _ (m 2#5)
-    (by ulib_regs; rw [h2]; bv_omega)) $$ Hc Hstk Hrun
+    (by ulib_regs; rw [h2]; bv_omega_g)) $$ Hc Hstk Hrun
   iintro Hrun
   -- +0x3a4  ret
   iapply (ulibS_retTo L _ (ulibFprintf_i3a4 L.toUlibRun base) _ _ (retPc (m 1#5)) (by ulib_regs))

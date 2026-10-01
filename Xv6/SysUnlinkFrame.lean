@@ -56,6 +56,7 @@ import Xv6.SpecIlock
 import Xv6.SpecNamecmp
 import Xv6.SpecNamexEra
 import Xv6.ReadiDefs
+import Xv6.BvOmegaGoal
 
 namespace Xv6
 
@@ -187,19 +188,19 @@ theorem sys_unlink_low_split [CurCtx] (sp0 : BitVec 64) :
       stackOwn (sysUnlinkLo27 sp0 + BitVec.ofNat 64 (8 * (0 + 1))) (0 + 1) ∗
       stackOwn (sysUnlinkDel sp0 + BitVec.ofNat 64 (8 * (1 + 1))) (1 + 1) ∗
       stackOwn (sysUnlinkDel sp0) 1 := by
-  have e0 : sp0 - 8#64 * BitVec.ofNat 64 5 = sp0 + 0xFFFFFFFFFFFFFFD8#64 := by bv_omega
+  have e0 : sp0 - 8#64 * BitVec.ofNat 64 5 = sp0 + 0xFFFFFFFFFFFFFFD8#64 := by bv_omega_g
   have e1 : sp0 + 0xFFFFFFFFFFFFFFD8#64 - 8#64 * BitVec.ofNat 64 1 =
-      sysUnlinkDe sp0 + BitVec.ofNat 64 (8 * (1 + 1)) := by bv_omega
+      sysUnlinkDe sp0 + BitVec.ofNat 64 (8 * (1 + 1)) := by bv_omega_g
   have e2 : sysUnlinkDe sp0 + BitVec.ofNat 64 (8 * (1 + 1)) - 8#64 * BitVec.ofNat 64 2 =
-      sysUnlinkName sp0 + BitVec.ofNat 64 (8 * (1 + 1)) := by bv_omega
+      sysUnlinkName sp0 + BitVec.ofNat 64 (8 * (1 + 1)) := by bv_omega_g
   have e3 : sysUnlinkName sp0 + BitVec.ofNat 64 (8 * (1 + 1)) - 8#64 * BitVec.ofNat 64 2 =
-      sysUnlinkPath sp0 + BitVec.ofNat 64 (8 * (15 + 1)) := by bv_omega
+      sysUnlinkPath sp0 + BitVec.ofNat 64 (8 * (15 + 1)) := by bv_omega_g
   have e4 : sysUnlinkPath sp0 + BitVec.ofNat 64 (8 * (15 + 1)) - 8#64 * BitVec.ofNat 64 16 =
-      sysUnlinkLo27 sp0 + BitVec.ofNat 64 (8 * (0 + 1)) := by bv_omega
+      sysUnlinkLo27 sp0 + BitVec.ofNat 64 (8 * (0 + 1)) := by bv_omega_g
   have e5 : sysUnlinkLo27 sp0 + BitVec.ofNat 64 (8 * (0 + 1)) - 8#64 * BitVec.ofNat 64 1 =
-      sysUnlinkDel sp0 + BitVec.ofNat 64 (8 * (1 + 1)) := by bv_omega
+      sysUnlinkDel sp0 + BitVec.ofNat 64 (8 * (1 + 1)) := by bv_omega_g
   have e6 : sysUnlinkDel sp0 + BitVec.ofNat 64 (8 * (1 + 1)) - 8#64 * BitVec.ofNat 64 2 =
-      sysUnlinkDel sp0 := by bv_omega
+      sysUnlinkDel sp0 := by bv_omega_g
   rw [e0]
   constructor
   · refine (stackOwn_split _ 1 24).trans ?_
@@ -229,7 +230,7 @@ theorem sys_unlink_low_split [CurCtx] (sp0 : BitVec 64) :
 
 theorem sys_unlink_off_eq (sp0 : BitVec 64) :
     sysUnlinkLo27 sp0 + BitVec.ofNat 64 4 = sysUnlinkOff sp0 := by
-  simp only [sysUnlinkLo27, sysUnlinkOff]; bv_omega
+  simp only [sysUnlinkLo27, sysUnlinkOff]; bv_omega_g
 
 /-- Slot 27 as its two words: the dead lower one and `off`. -/
 theorem sys_unlink_slot27_open [CurCtx] (sp0 : BitVec 64) (bs : List (BitVec 8))
@@ -300,16 +301,16 @@ theorem sys_unlink_align_of_del (sp0 : BitVec 64) (hal : (sysUnlinkDel sp0).toNa
   rw [BitVec.toNat_add]; simp only [BitVec.toNat_ofNat]; omega
 
 theorem sys_unlink_de_del (sp0 : BitVec 64) : sysUnlinkDe sp0 = sysUnlinkDel sp0 + BitVec.ofNat 64 168 := by
-  simp only [sysUnlinkDe, sysUnlinkDel]; bv_omega
+  simp only [sysUnlinkDe, sysUnlinkDel]; bv_omega_g
 theorem sys_unlink_name_del (sp0 : BitVec 64) :
     sysUnlinkName sp0 = sysUnlinkDel sp0 + BitVec.ofNat 64 152 := by
-  simp only [sysUnlinkName, sysUnlinkDel]; bv_omega
+  simp only [sysUnlinkName, sysUnlinkDel]; bv_omega_g
 theorem sys_unlink_path_del (sp0 : BitVec 64) :
     sysUnlinkPath sp0 = sysUnlinkDel sp0 + BitVec.ofNat 64 24 := by
-  simp only [sysUnlinkPath, sysUnlinkDel]; bv_omega
+  simp only [sysUnlinkPath, sysUnlinkDel]; bv_omega_g
 theorem sys_unlink_lo27_del (sp0 : BitVec 64) :
     sysUnlinkLo27 sp0 = sysUnlinkDel sp0 + BitVec.ofNat 64 16 := by
-  simp only [sysUnlinkLo27, sysUnlinkDel]; bv_omega
+  simp only [sysUnlinkLo27, sysUnlinkDel]; bv_omega_g
 
 /-- The alignment every buffer inherits from the carve's base. -/
 theorem sys_unlink_aligns (sp0 : BitVec 64) (hal : (sysUnlinkDel sp0).toNat % 8 = 0) :

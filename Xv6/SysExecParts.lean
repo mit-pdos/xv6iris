@@ -128,6 +128,7 @@ import Xv6.SpecFetchaddr
 import Xv6.SysfileCalls
 import Xv6.KstackMap
 import Xv6.SysMknodFrame
+import Xv6.BvOmegaGoal
 
 namespace Xv6
 
@@ -165,7 +166,7 @@ def sysExecUarg (sp0 : BitVec 64) : BitVec 64 := sp0 + 0xFFFFFFFFFFFFFE20#64
 /-- The array's end is the path's base (Rocq `sx_argv_end`: `argv + 256` is
 slot 26). -/
 theorem sysExecArgvAt_32 (sp0 : BitVec 64) : sysExecArgvAt sp0 32 = sysExecPath sp0 := by
-  unfold sysExecArgvAt sysExecArgv sysExecPath; bv_omega
+  unfold sysExecArgvAt sysExecArgv sysExecPath; bv_omega_g
 
 /-- `K_sys_exec`'s single premise, turned into every bound the callees want
 (Rocq `sx_kb`): sixty own slots over kexec's 188, the deepest callee. -/
@@ -266,11 +267,11 @@ theorem sys_exec_words_stack [CurCtx] :
   | w :: ws, a => by
     have ih := sys_exec_words_stack ws (a + 8#64)
     have e0 : ∀ i : Nat, a + BitVec.ofNat 64 (8 * (i + 1)) = (a + 8#64) + BitVec.ofNat 64 (8 * i) := by
-      intro i; bv_omega
+      intro i; bv_omega_g
     have e1 : a + BitVec.ofNat 64 (8 * (ws.length + 1)) = (a + 8#64) + BitVec.ofNat 64 (8 * ws.length) := e0 _
     have e2 : (a + 8#64) + BitVec.ofNat 64 (8 * ws.length) - 8#64 * BitVec.ofNat 64 ws.length = a + 8#64 := by
-      bv_omega
-    have e3 : a + 8#64 - 8#64 * BitVec.ofNat 64 (0 + 1) = a := by bv_omega
+      bv_omega_g
+    have e3 : a + 8#64 - 8#64 * BitVec.ofNat 64 (0 + 1) = a := by bv_omega_g
     simp only [List.length_cons]
     rw [e1]
     iintro H
@@ -287,7 +288,7 @@ theorem sys_exec_words_stack [CurCtx] :
     iapply BigSepL.bigSepL_singleton.2
     iexists w
     rw [e3]
-    have e4 : a + BitVec.ofNat 64 (8 * 0) = a := by bv_omega
+    have e4 : a + BitVec.ofNat 64 (8 * 0) = a := by bv_omega_g
     rw [e4]
     iexact H0
 
@@ -298,7 +299,7 @@ theorem sysExecArgvFree_stack [CurCtx] (sp0 : BitVec 64) :
   iintro ⟨%ws, %hl, H⟩
   ihave H := sys_exec_words_stack ws (sysExecArgv sp0) $$ H
   rw [hl, show sysExecArgv sp0 + BitVec.ofNat 64 (8 * 32) = sysExecPath sp0 by
-    unfold sysExecArgv sysExecPath; bv_omega]
+    unfold sysExecArgv sysExecPath; bv_omega_g]
   iexact H
 
 /-- ...and so is memset's input (the head's -1 exit returns it unwritten). -/
@@ -308,7 +309,7 @@ theorem sysExecArgvAny_stack [CurCtx] (sp0 : BitVec 64) (hal : sp0.toNat % 8 = 0
   iintro ⟨%bs, %hl, B⟩
   ihave H := byteBuf_stackOwn (sysExecArgv sp0) (sys_exec_argv_al sp0 hal) 32 bs (by omega) $$ B
   rw [show sysExecArgv sp0 + BitVec.ofNat 64 (8 * 32) = sysExecPath sp0 by
-    unfold sysExecArgv sysExecPath; bv_omega]
+    unfold sysExecArgv sysExecPath; bv_omega_g]
   iexact H
 
 /-- **EVERYTHING IN THE FRAME THE EPILOGUE DOES NOT TOUCH** (Rocq `sx_rest`):
@@ -335,13 +336,13 @@ theorem sys_exec_carve [CurCtx] (sp0 : BitVec 64) :
         (∃ w : BitVec 64, wordPointsTo (sysExecUargv sp0) 8 (DFrac.own 1) w) ∗
         (∃ w : BitVec 64, wordPointsTo (sysExecUarg sp0) 8 (DFrac.own 1) w) := by
   have e16 : sp0 - 8#64 * BitVec.ofNat 64 10 = sysExecPath sp0 + BitVec.ofNat 64 (8 * (15 + 1)) := by
-    unfold sysExecPath; bv_omega
+    unfold sysExecPath; bv_omega_g
   have e32 : sysExecPath sp0 + BitVec.ofNat 64 (8 * (15 + 1)) - 8#64 * BitVec.ofNat 64 16 =
       sysExecArgv sp0 + BitVec.ofNat 64 (8 * (31 + 1)) := by
-    unfold sysExecArgv sysExecPath; bv_omega
+    unfold sysExecArgv sysExecPath; bv_omega_g
   have e2 : sysExecArgv sp0 + BitVec.ofNat 64 (8 * (31 + 1)) - 8#64 * BitVec.ofNat 64 32 =
       sysExecUargv sp0 + 8#64 := by
-    unfold sysExecUargv sysExecArgv; bv_omega
+    unfold sysExecUargv sysExecArgv; bv_omega_g
   iintro H
   icases stackOwn_split sp0 10 50 $$ H with ⟨H10, H50⟩
   rw [e16]
@@ -355,12 +356,12 @@ theorem sys_exec_carve [CurCtx] (sp0 : BitVec 64) :
   stack_cells
   iintro ⟨⟨%w1, H1⟩, ⟨%w2, H2⟩, ⟨%w3, H3⟩, ⟨%w4, H4⟩, ⟨%w5, H5⟩, ⟨%w6, H6⟩, ⟨%w7, H7⟩, ⟨%w8, H8⟩,
     ⟨%w9, H9⟩, ⟨%w10, H10⟩, _⟩ ⟨⟨%w59, H59⟩, ⟨%w60, H60⟩, _⟩
-  ihave H59 := sys_exec_cell_eq _ (sysExecUargv sp0) 8 _ _ (by bv_omega) $$ H59
-  ihave H60 := sys_exec_cell_eq _ (sysExecUarg sp0) 8 _ _ (by unfold sysExecUargv sysExecUarg; bv_omega) $$ H60
+  ihave H59 := sys_exec_cell_eq _ (sysExecUargv sp0) 8 _ _ (by bv_omega_g) $$ H59
+  ihave H60 := sys_exec_cell_eq _ (sysExecUarg sp0) 8 _ _ (by unfold sysExecUargv sysExecUarg; bv_omega_g) $$ H60
   iexists w1, w2
   isplitr
   · ipureintro
-    have : sp0 = sysExecPath sp0 + 208#64 := by unfold sysExecPath; bv_omega
+    have : sp0 = sysExecPath sp0 + 208#64 := by unfold sysExecPath; bv_omega_g
     rw [this, BitVec.toNat_add]; simp only [BitVec.toNat_ofNat]; omega
   unfold sysExecRaS0 sysExecSpillsFree sysExecSpills sysExecSlot10 sysfileAny
   iframe H1 H2 H59 H60
@@ -377,18 +378,18 @@ theorem sys_exec_carve [CurCtx] (sp0 : BitVec 64) :
 theorem sys_exec_fold [CurCtx] (sp0 : BitVec 64) (hal : sp0.toNat % 8 = 0) (w1 w2 : BitVec 64) :
     sysExecRaS0 (GF := GF) sp0 w1 w2 ∗ sysExecRest sp0 ⊢ stackOwn sp0 60 := by
   have e16 : sysExecPath sp0 + BitVec.ofNat 64 (8 * 16) = sp0 - 8#64 * BitVec.ofNat 64 10 := by
-    unfold sysExecPath; bv_omega
+    unfold sysExecPath; bv_omega_g
   have e32 : sysExecPath sp0 = sp0 - 8#64 * BitVec.ofNat 64 10 - 8#64 * BitVec.ofNat 64 16 := by
-    unfold sysExecPath; bv_omega
+    unfold sysExecPath; bv_omega_g
   have e2 : sysExecPath sp0 - 8#64 * BitVec.ofNat 64 32 = sysExecUargv sp0 + 8#64 := by
-    unfold sysExecUargv sysExecPath; bv_omega
+    unfold sysExecUargv sysExecPath; bv_omega_g
   unfold sysExecRaS0 sysExecRest sysExecSpillsFree sysExecSpills sysExecSlot10 sysfileAny
   iintro ⟨⟨H1, H2⟩, ⟨%w3, %w4, %w5, %w6, %w7, %w8, %w9, H3, H4, H5, H6, H7, H8, H9⟩, ⟨%w10, H10⟩,
     ⟨%bp, %hlp, Bp⟩, Ha, ⟨%w59, H59⟩, ⟨%w60, H60⟩⟩
   ihave Hp := byteBuf_stackOwn (sysExecPath sp0) (sys_exec_path_al sp0 hal) 16 bp (by omega) $$ Bp
-  ihave H59 := sys_exec_cell_eq _ (sysExecUargv sp0 + 8#64 + 0xFFFFFFFFFFFFFFF8#64) 8 _ _ (by bv_omega) $$ H59
+  ihave H59 := sys_exec_cell_eq _ (sysExecUargv sp0 + 8#64 + 0xFFFFFFFFFFFFFFF8#64) 8 _ _ (by bv_omega_g) $$ H59
   ihave H60 := sys_exec_cell_eq _ (sysExecUargv sp0 + 8#64 + 0xFFFFFFFFFFFFFFF0#64) 8 _ _
-    (by unfold sysExecUargv sysExecUarg; bv_omega) $$ H60
+    (by unfold sysExecUargv sysExecUarg; bv_omega_g) $$ H60
   ihave H2s : stackOwn (GF := GF) (sysExecUargv sp0 + 8#64) 2 $$ [H59 H60]
   case' _ => stack_cells; iframe
   ihave H2s := (show stackOwn (GF := GF) (sysExecUargv sp0 + 8#64) 2 ⊢

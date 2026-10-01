@@ -102,6 +102,7 @@ import Xv6.SpecIdup
 import Xv6.SpecFiledup
 import Xv6.ConsoleintrParts
 import Xv6.CopyLemmas
+import Xv6.BvOmegaGoal
 
 namespace Xv6
 
@@ -234,18 +235,18 @@ theorem kf_tf_word_addr (base : BitVec 64) (i m : Nat) (hm : m < 4) :
   have hse : BitVec.signExtend 64 (BitVec.ofNat 12 (8 * m)) = BitVec.ofNat 64 (8 * m) := by
     have : m = 0 ∨ m = 1 ∨ m = 2 ∨ m = 3 := by omega
     rcases this with h | h | h | h <;> subst h <;> decide
-  rw [hse]; bv_omega
+  rw [hse]; bv_omega_g
 
 /-- After `addi a5,a5,32` the cursor advances one chunk. -/
 theorem kf_tf_cursor_step (base : BitVec 64) (i : Nat) :
     base + BitVec.ofNat 64 (32 * i) + BitVec.signExtend 64 (BitVec.ofNat 12 32)
       = base + BitVec.ofNat 64 (32 * (i + 1)) := by
   have hse : BitVec.signExtend 64 (BitVec.ofNat 12 32) = BitVec.ofNat 64 32 := by decide
-  rw [hse]; bv_omega
+  rw [hse]; bv_omega_g
 
 /-- The cursor after the ninth chunk IS the end pointer. -/
 theorem kf_tf_cursor_end (base : BitVec 64) :
-    base + BitVec.ofNat 64 (32 * (8 + 1)) = base + 288#64 := by bv_omega
+    base + BitVec.ofNat 64 (32 * (8 + 1)) = base + 288#64 := by bv_omega_g
 
 /-- Before the last chunk the cursor has not reached the end pointer. -/
 theorem kf_tf_cursor_ne (base : BitVec 64) (i : Nat) (hi : i < 8) :
@@ -791,7 +792,7 @@ theorem kf_ofile_succ (pa : BitVec 64) (fd : Nat) :
     pOfile pa fd + BitVec.signExtend 64 8#12 = pOfile pa (fd + 1) := by
   unfold pOfile
   rw [show BitVec.signExtend 64 8#12 = BitVec.ofNat 64 8 from by decide]
-  bv_omega
+  bv_omega_g
 
 /-- Before the end, the cursor is not the end pointer. -/
 theorem kf_ofile_ne (pa : BitVec 64) (m : Nat) (hm : m < 16) : pOfile pa m ≠ pOfile pa 16 := by
@@ -3308,7 +3309,7 @@ theorem kfork_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (AL : ALLOCPROC)
             -- collapse the s3 slot's address (`hR2sp`-form) to the epilogue's literal
             have haddrD0 : (k.regs 2#5 + 0xFFFFFFFFFFFFFFC0#64 + BitVec.signExtend 64 24#12 : BitVec 64)
                 = k.regs 2#5 + 0xFFFFFFFFFFFFFFD8#64 := by
-              rw [show (BitVec.signExtend 64 24#12 : BitVec 64) = 24#64 from by decide]; bv_omega
+              rw [show (BitVec.signExtend 64 24#12 : BitVec 64) = 24#64 from by decide]; bv_omega_g
             ihave Fs4 : wordPointsTo (GF := GF) (k.regs 2#5 + 0xFFFFFFFFFFFFFFD8#64) 8 (DFrac.own 1) (R2 19#5) $$ [Fs4]
             case' _ => rw [← haddrD0]; iexact Fs4
             -- c.li s1,-1 (0x80001daa)
@@ -3609,7 +3610,7 @@ theorem kfork_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (AL : ALLOCPROC)
             · simp only [KCtx.setReg_avail]; exact hkfavail
             · simp only [KCtx.setReg_regs, RegMap.set_apply, KCtx.rget_setReg', KCtx.rget_eq,
                 BitVec.reduceEq, ite_false, ite_true, if_false, if_true, hkf21r, hkf21]
-              unfold pOfile; bv_omega
+              unfold pOfile; bv_omega_g
             · simp only [KCtx.setReg_regs, RegMap.set_apply, BitVec.reduceEq, ite_false]; exact hkf20r
             · simp only [KCtx.setReg_regs, RegMap.set_apply, BitVec.reduceEq, ite_false]; exact hkf21r
             · simp only [KCtx.setReg_regs, RegMap.set_apply, BitVec.reduceEq, ite_false]; exact hkf2r
@@ -3628,11 +3629,11 @@ theorem kfork_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (AL : ALLOCPROC)
           case hr9 =>
             simp only [KCtx.setReg_regs, RegMap.set_apply, KCtx.rget_setReg', KCtx.rget_eq,
               BitVec.reduceEq, ite_false, ite_true, if_false, if_true, hkf21r, hkf21]
-            unfold pOfile; bv_omega
+            unfold pOfile; bv_omega_g
           case hr18 =>
             simp only [KCtx.setReg_regs, RegMap.set_apply, KCtx.rget_setReg', KCtx.rget_eq,
               BitVec.reduceEq, ite_false, ite_true, if_false, if_true, hkf20r, hkf19]
-            unfold pOfile; bv_omega
+            unfold pOfile; bv_omega_g
         case hlsie => k_norm_g
         case hla5 =>
           k_norm_g [KCtx.rget_eq]

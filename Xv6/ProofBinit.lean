@@ -27,6 +27,7 @@ import Xv6.CodeTactics
 import MachCSL.WpSmodeFrame6
 import Xv6.ByteCursor
 import Xv6.UPtPptLemmas
+import Xv6.BvOmegaGoal
 
 namespace Xv6
 
@@ -526,7 +527,7 @@ theorem bi_epi [CurCtx] (cpu cur : CPU) (k : KCtx)
   unfold calleeSaved
   simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
   refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
-  all_goals first | trivial | assumption | (rw [hR2]; bv_omega)
+  all_goals first | trivial | assumption | (rw [hR2]; bv_omega_g)
 
 
 /-! ## Entering and leaving the loop -/
