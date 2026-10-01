@@ -451,10 +451,13 @@ def UT_EA : Prop :=
 at the prologue's record RAISED to an event count `kv` (permit sweep L2: the
 fault arm's failure route arrives with the count `vmfault` handed back --
 Rocq's `ut_56` is general in the current state `U`; the dispatch enters at
-`kv := A.V.ev`, the record itself), paid by the process's kill row. -/
+`kv := A.V.ev`, the record itself), paid by the process's kill row.  The
+raised count carries the quiet row (permit sweep T: at `pvLazy = false` it
+is the entry's -- the fault arm's quiet `vmfault` returned it untouched),
+which +0xa6's rows need. -/
 def UT_56 : Prop :=
   ∀ (A : UtArgs GF) (cpu : CPU) (R : RegMap) (kv : Nat),
-    UtOk Γ A → utPins A R → ukillSc A.sc → A.Wk.fd = A.sts →
+    UtOk Γ A → utPins A R → ukillSc A.sc → A.Wk.fd = A.sts → utEvQuiet A.sc A.V ((utV1 A).updEv kv) →
     (kctx cpu ((A.k.pushed 4).withRegs R) ∗ pcIs cpu (utPc 0x56#64) ∗ utFrame A ∗
       trapCsrsExt cpu false ∗ cpuClaimExt cpu false A.k.proc ∗ utCaps A.N ∗
       utOwn (utRsys PT Γ A) A.N ((utV1 A).updEv kv) A.M A.sts A.cs A.pid ∗

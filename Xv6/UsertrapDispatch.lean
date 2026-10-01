@@ -292,7 +292,7 @@ theorem ut_disp_fault (HD0 : UT_D0 (hlc := hlc) PT Γ) (H56 : UT_56 (hlc := hlc)
       ihave Hown := (show utOwn (GF := GF) (utRsys PT Γ A) A.N (utV1 A) A.M A.sts A.cs A.pid ⊢
           utOwn (utRsys PT Γ A) A.N ((utV1 A).updEv (utV1 A).ev) A.M A.sts A.cs A.pid
         from by rw [ProcPriv.updEv_id]) $$ Hown
-      iapply (H56 A cpu _ (utV1 A).ev hok ?hp3 (utd_ukill A.sc h8 hsc) hWfd)
+      iapply (H56 A cpu _ (utV1 A).ev hok ?hp3 (utd_ukill A.sc h8 hsc) hWfd (utEvQuiet_of_ev _ _ _ rfl))
       rotate_left 1
       iframe Hk Hpc Hfr Hte Hce Hcaps Hown Hcred Hpay Hkont
       case hp3 => ut_pins

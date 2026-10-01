@@ -86,7 +86,7 @@ theorem ut_close (A : UtArgs GF) (c : CPU) (R' : RegMap) (V2 : ProcPriv) (M2 : N
   ihave HK := Hkont $$ %c
   unfold usertrapPost
   iapply HK $$ %R' %V2.upt %(utPrep V2 A.k.root c) %M2 %sts2 %cs2 %(tfW V2.tf 3 &&& 0xFFFFFFFFFFFFFFFE#64)
-    %⟨hcs, ha0⟩ %⟨rfl, hrows.tfp⟩ %hrows'.round %hrows'.fdk %hrows'.chk %hrows'.gen %hrows'.fde
+    %⟨hcs, ha0⟩ %⟨rfl, hrows.tfp⟩ %hrows'.round %hrows'.fdk %hrows'.chk %hrows'.gen %hrows'.evq %hrows'.fde
     %hrows'.pipe %hrows'.rpid %hepc %hlive' Hk Hpc Hsepc Hsc Htv Hstv Hpt Htf Hres Hxo Hfo Hwo Hko Hso
 
 end Close

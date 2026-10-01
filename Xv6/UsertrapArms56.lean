@@ -23,7 +23,8 @@ closes of the table (the exit row, `UtExitElim`) and the payload.
 THE RECORD (permit sweep L2, Rocq 78f9234b8): entered at the prologue's
 record raised to an event count `kv` (`UT_56`'s new binder; the fault arm's
 failure route arrives at vmfault's returned count), parked at +0xa6 there
-(`UtRows0.updEv`: the rows do not read the counter).
+(`UtRows0.updEv`: the rows do not read the counter; the quiet row, permit
+sweep T, is `UT_56`'s premise at `kv`).
 -/
 import Xv6.UsertrapAux
 import MachCSL.WpSmodeTrapCsr
@@ -60,7 +61,7 @@ set_option maxHeartbeats 8000000 in
 /-- **Rocq `ut_56`**: the unexpected-scause arm. -/
 theorem usertrap_56_proof (PK : PRINTK) (SK : SETKILLED) (hEX : UtExitElim (hlc := hlc) (GF := GF))
     (HA : UT_A6 PT Γ) : UT_56 PT Γ := by
-  intro A cpu R kv hok hpins hks hWfd
+  intro A cpu R kv hok hpins hks hWfd hevq
   have hsie : A.k.sie = false := hok.hctx.1
   have hne : A.sc ≠ uecallScause := ukillSc_ne_ecall hks
   have p9 := hpins.2.1
@@ -243,7 +244,7 @@ theorem usertrap_56_proof (PK : PRINTK) (SK : SETKILLED) (hEX : UtExitElim (hlc 
     rw [hsie]) $$ Hce
   ihave Hlive : utLiveRes (hlc := hlc) A ((utV1 A).updEv kv) A.cs $$ [Hshot]
   · unfold utLiveRes; iright; iexact Hshot
-  iapply (HA A cpu A.k R3 ((utV1 A).updEv kv) A.M A.sts A.cs hok (utBase_refl _) hp3 ((utA_rows_entry A hok hne).updEv kv))
+  iapply (HA A cpu A.k R3 ((utV1 A).updEv kv) A.M A.sts A.cs hok (utBase_refl _) hp3 ((utA_rows_entry A hok hne).updEv kv hevq))
     $$ [- $Hk $Hpc $Hframe $Hte $Hce $Hres $Hlive $Hkont]
   iframe #
   iapply utOuts_quiet _ _ _ _ _ hne

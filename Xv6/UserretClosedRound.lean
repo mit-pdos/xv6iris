@@ -103,7 +103,7 @@ theorem urc_exit (UR : USERRET) (PT : SchedNames → IProp GF) (Γ : SchedNames)
         (uvisRun W) cpu' := by
   unfold usertrapPost
   iintro ⟨#Hwire, #Hcl, #Hloop, Harm⟩ %R' %P' %V' %M' %sts' %cs' %uepc %⟨hcs, ha0⟩ %⟨hupt', htfp'⟩ %hround
-    %hfdk %hchk %hgk %hfde %hpipe %hrp %hpc' %hlive Hk Hpc Hsep ⟨%sc2, Hsc⟩ ⟨%tv2, Hstv⟩ Hstvec Hppt Htf Hres
+    %hfdk %hchk %hgk %hevq %hfde %hpipe %hrp %hpc' %hlive Hk Hpc Hsep ⟨%sc2, Hsc⟩ ⟨%tv2, Hstv⟩ Hstvec Hppt Htf Hres
     Hxo Hfo Hwo Hko Hso
   -- steps A/B: the next slot
   ihave Hslot := urc_post W V Mp gn cs pid sc f V' M' sts' cs' hl hlw hM hpi hsz hcw hgn hch hpid hlz hsc hround

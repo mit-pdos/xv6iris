@@ -44,7 +44,7 @@ theorem utA_sCause_nokill (sc : BitVec 64) (h : sCauseOk sc) : ¬ ukillSc sc := 
 theorem utA_rows_entry {Γ : SchedNames} (A : UtArgs GF) (hok : UtOk Γ A) (hne : A.sc ≠ uecallScause) :
     UtRows0 A (utV1 A) A.M A.sts A.cs :=
   ⟨utRound_entry A.sep A.sc A.V A.M (utV1 A) A.M hne ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩,
-    utFdKept_refl _ _, utChKept_refl _ _ _ _, rfl, utFdEcall_quiet _ _ _ _ _ _ hne,
+    utFdKept_refl _ _, utChKept_refl _ _ _ _, rfl, utEvQuiet_of_ev _ _ _ rfl, utFdEcall_quiet _ _ _ _ _ _ hne,
     utPipeEcall_quiet _ _ _ _ _ _ _ _ hne, fun hc => absurd hc hne, by rw [← hok.hP], rfl⟩
 
 theorem utA_live_ne (A : UtArgs GF) (V2 : ProcPriv) (cs2 : ExtTreeSet GName compare)

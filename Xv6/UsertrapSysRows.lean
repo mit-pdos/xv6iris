@@ -50,7 +50,7 @@ theorem ut_rows_of_sysc (A : UtArgs GF) (V2 : ProcPriv) (M2 : Nat → List (BitV
     unfold utProTf; rw [usysEff_epc]
   have hl1 : tfArgIdx 0 < (utSysTf A.sep A.V).length := by
     unfold utSysTf; rw [List.length_set, hl]; decide
-  refine ⟨?_, fun h => absurd hsc h, ?_, ?_, ?_, ?_, ?_, ?_, hr.ks⟩
+  refine ⟨?_, fun h => absurd hsc h, ?_, ?_, by rw [hsc]; exact utEvQuiet_ecall _ _, ?_, ?_, ?_, ?_, hr.ks⟩
   · -- the round
     unfold utRound uroundOk
     rw [if_pos hsc]

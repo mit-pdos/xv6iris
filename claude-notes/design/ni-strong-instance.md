@@ -877,3 +877,76 @@ at `ZExit` (and may step it again through `fileclose` → `pipeclose`'s
 `kfree`), so T is stated for a quiet process that is not killed (the `Kill`
 event left to M3's no-kill corollary).  The ecall rows already expose the
 raised count (`∀ k' ≥ V.ev`, L1b) and are not constrained by T.
+
+### 7.8L T as landed in Lean (2026-10-01)
+
+Lean lane PJ-T, no Rocq counterpart (Rocq never landed T; it planned `ev
+ev'` inside `uround_ok`, this tree states a separate kept row).  **The
+in-logic strong instance for a quiet, unkilled process: off the ecall, at
+`pvLazy = false`, a trap round leaves the event counter where it found it,
+and over a run of such rounds the counter never moves.**
+
+- **The row** (`SpecUsertrap`, deviation 11): `def utEvQuiet (sc : BitVec
+  64) (V V' : ProcPriv) : Prop := sc ≠ uecallScause → V.pvLazy = false →
+  V'.ev = V.ev`, with `utEvQuiet_refl`, `utEvQuiet_of_ev`, `utEvQuiet_ecall`
+  (vacuous at the ecall), `utEvQuiet_lazy` (vacuous at `pvLazy = true`).
+  `usertrapPost` gains `⌜utEvQuiet sc V V'⌝ -∗` right after `⌜utGenKept V
+  V'⌝ -∗` (so `wp_usertrap_body` / `USERTRAP` move by unfolding).
+  `utRound` / `uroundOk` do not move.
+- **The vmfault tightening** (`SpecVmfault`): `def vmfaultQuietArm (P :
+  UPtd) (sz va : BitVec 64) : Prop := ¬ (va.toNat < sz.toNat ∧ get? P.um
+  (vpnOf va).toNat = none)`; the continuation's lend becomes `∃ k', ⌜ke ≤
+  k'⌝ ∗ ⌜vmfaultQuietArm P (k.regs 11#5) (k.regs 12#5) → k' = ke⌝ ∗ actLend
+  k.proc k'`.  `ProofVmfault`: the `va ≥ sz` and already-mapped arms return
+  the lend at `ke` (`vf_lend_quiet`); the three arms past `kalloc` are the
+  allocating fault (`hnq`), where the conjunct is vacuous (`vf_lend_alloc`).
+  `CopyLemmas.co_vmfault_call` keeps its statement (it drops the conjunct
+  through `wpNext_mono`), so the copy loops did not change.
+- **The discharges.**  The rows travel as a new `UtRows0` field `evq :
+  utEvQuiet A.sc A.V V2` (`UsertrapParts`; `UtRows0.updEv` now takes the
+  row at the raised record, `retf` keeps it, `ut_close` hands it to the
+  post).  Device/timer/unexpected-cause: the prologue's record
+  (`utA_rows_entry`, `utEvQuiet_of_ev _ _ _ rfl`).  Ecall:
+  `ut_rows_of_sysc`, `utEvQuiet_ecall`.  Unexpected cause at +0x56:
+  `UT_56` gains the premise `utEvQuiet A.sc A.V ((utV1 A).updEv kv)`; the
+  dispatch passes it at `kv := ev` (`rfl`).  Page fault
+  (`UsertrapArmsD0`): the block's `lazyFree` (`procPrivFd_facts`) at
+  `pvLazy = false` refutes the allocating fault (`VmfaultQuiet.vmfaultQuiet`),
+  so on the failure route vmfault's conjunct gives `kv = ev` (passed to
+  `UT_56`), and the fill route is contradictory (`.elim`); at `pvLazy =
+  true` the row is vacuous.
+- **The exception: the kill row.**  `UT_KEXIT` has no resume row and never
+  reaches `usertrapPost`: a killed quiet process exits in its own context
+  and kexit steps its counter at `ZExit` (and possibly again through
+  `fileclose` → `pipeclose`'s `kfree`).  The theorem is for a process that
+  is not killed.
+- **The theorem** (`Xv6/UtRoundQuiet.lean`, pure, imports only
+  `SpecUsertrap`).  A run is `V₀` and a list of rounds `(scᵢ, Vᵢ₊₁)`;
+  `utRunRows` (every round carries the row), `utRunQuiet` (no ecall cause,
+  lazy off at every entry), `utRunEnd`, `utRunRecs`:
+
+      theorem utRoundQuiet (V₀ : ProcPriv) (rs : List (BitVec 64 × ProcPriv)) (hrows : utRunRows V₀ rs)
+          (hq : utRunQuiet V₀ rs) : (utRunEnd V₀ rs).ev = V₀.ev
+
+      theorem utRoundQuiet_noAppend (V₀ : ProcPriv) (rs : List (BitVec 64 × ProcPriv))
+          (hrows : utRunRows V₀ rs) (hq : utRunQuiet V₀ rs) : ∀ V ∈ utRunRecs V₀ rs, V.ev = V₀.ev
+
+  `utRoundQuiet_noAppend`'s docstring is the §7.7L reading: the count at a
+  record is the number of `pa`-labelled appends since the slot was minted,
+  so a quiet unkilled run saw none.  That round `i + 1` is entered at round
+  `i`'s exit record is the run's hypothesis; the closed loop
+  (`UserretClosedRound.urc_exit`) introduces the row and drops it (the key
+  history's `uhistWf` did not move).
+- **Moved**: `usertrapPost` (one premise; `wp_usertrap_body` / `USERTRAP` by
+  unfolding), `wp_vmfault_body` (one pure conjunct; `VMFAULT` by
+  unfolding); proof-internal: `UtRows0` (+`evq`), `UtRows0.updEv` (+the
+  row), `UT_56` (+the row), `utD0_vmfault`.  Consumers' intro patterns:
+  `ut_close`, `urc_exit`.  **Unchanged**: every other Spec, `SlotGen`, the
+  copy proofs, every Link file.
+
+Full `lake build Xv6 MachCSL` 2733 jobs, exit 0; `lint.sh` all lints passed
+(layering ok, no `sorry`); `tcb.sh` exit 0 (no module entered); `audit.sh`
+PASS (0 `sorryAx`, baseline unchanged).
+
+What remains: M2 (the ledgers' contents) and M3 (the Kill event, the
+no-kill corollary).

@@ -23,9 +23,16 @@ to vmfault with the copy pieces (`ut_priv_copyEv`, Rocq
 block closing at `{ (utV1 A).updEv kv with upt := _ }` on both routes
 (`UT_56` at `kv`, `UT_A6` through `UtRows0.updEv`: the rows do not read the
 counter).  `SpecUsertrap` is unchanged: its post quantifies the record.
+
+THE QUIET ROW (permit sweep T, no Rocq counterpart; design
+ni-strong-instance.md §7.8L): at `pvLazy = false` the block's `lazyFree`
+refutes the allocating fault (`VmfaultQuiet.vmfaultQuiet`), so vmfault's
+quiet conjunct gives `kv = ev` on the failure route, and the fill route is
+impossible; at `pvLazy = true` the row is vacuous.
 -/
 import MachCSL.WpSmodeTrapCsr
 import Xv6.SpecVmfault
+import Xv6.VmfaultQuiet
 import Xv6.UsysMemOkSpec
 import Xv6.UsertrapArms
 import Xv6.UsertrapDispatch
@@ -86,7 +93,8 @@ theorem utD0_vmfault [WchG GF] (VM : VMFAULT) (c : CPU) (k' : KCtx) (γl : GName
     kctx c k' ∗ pcIs c KA.«vmfault» ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
     procPtAt P M ∗ actLend k'.proc ke ∗
     (∀ R' : RegMap, kctx c (k'.withRegs R') -∗ pcIs c (jumpPc (k'.regs 1#5)) -∗
-      (∃ k1 : Nat, ⌜ke ≤ k1⌝ ∗ actLend k'.proc k1) -∗
+      (∃ k1 : Nat, ⌜ke ≤ k1⌝ ∗ ⌜vmfaultQuietArm P (k'.regs 11#5) (k'.regs 12#5) → k1 = ke⌝ ∗
+        actLend k'.proc k1) -∗
       ((⌜R' 10#5 = 0#64⌝ ∗ procPtAt P M) ∨
        (∃ r : BitVec 64,
           ⌜R' 10#5 = r ∧ pageValid r ∧ (k'.regs 12#5).toNat < (k'.regs 11#5).toNat ∧
@@ -134,7 +142,8 @@ theorem utD0_rows {Γ : SchedNames} (A : UtArgs GF) (hok : UtOk Γ A) (hne : A.s
     UtRows0 A { utV1 A with upt := A.V.upt.insertLeaf vpn r (PTE_W ||| PTE_U ||| PTE_R) }
       (viewZero A.M vpn) A.sts A.cs := by
   have hext := UMemL.extSz_insertLeaf A.V.sz A.V.upt vpn r hn hlt
-  refine ⟨?_, utFdKept_refl _ _, utChKept_refl _ _ _ _, rfl, utFdEcall_quiet _ _ _ _ _ _ hne,
+  refine ⟨?_, utFdKept_refl _ _, utChKept_refl _ _ _ _, rfl, utEvQuiet_of_ev _ _ _ rfl,
+    utFdEcall_quiet _ _ _ _ _ _ hne,
     utPipeEcall_quiet _ _ _ _ _ _ _ _ hne, fun hc => absurd hc hne, by rw [← hok.hP]; rfl, rfl⟩
   unfold utRound uroundOk
   rw [if_neg hne]
@@ -211,7 +220,11 @@ theorem usertrap_d0_proof (VM : VMFAULT) (HA : UT_A6 PT Γ) (H56 : UT_56 PT Γ) 
   k_norm
   iframe Hlend
   iframe #
-  iintro %R1 Hk Hpc ⟨%kv, %hkv, Hlend⟩ Hres %hcs1
+  iintro %R1 Hk Hpc ⟨%kv, %hkv, %hkq, Hlend⟩ Hres %hcs1
+  -- THE QUIET ROW (permit sweep T): at `pvLazy = false` the block carries
+  -- `lazyFree`, so the fault is not the allocating one (`vmfaultQuiet`) and
+  -- vmfault returned the count it was lent
+  have hlf : A.V.pvLazy = false → lazyFree A.V.upt.um A.V.sz := hfacts.2.2.1
   have hpa0 : A.k.proc ≠ 0#64 := by rw [hok.hproc]; exact procAddr_nonzero hok.hj
   ihave Hev := actLend_back _ _ hpa0 $$ Hlend
   ihave Hev : actCnt (GF := GF) (procAddr A.j) kv $$ [Hev]
@@ -241,7 +254,9 @@ theorem usertrap_d0_proof (VM : VMFAULT) (HA : UT_A6 PT Γ) (H56 : UT_56 PT Γ) 
     ihave Hcred := uexecKillArm_cred _ _ _ $$ Harm
     ihave Hcred := (show ukillCredAt (hlc := hlc) (GF := GF) uslot A.Wk.gen A.sc A.Wk A.f ⊢
         ukillCredAt uslot A.gn A.sc A.Wk A.f from by rw [hWg]) $$ Hcred
-    iapply (H56 A cpu R1 kv hok hp1 hks hWfd) $$ [- $Hk $Hpc $Hframe $Hte $Hce $Hown $Hcred $Hkont]
+    have hevq : utEvQuiet A.sc A.V ((utV1 A).updEv kv) := fun _ hlz =>
+      hkq (fun h => vmfaultQuiet _ _ _ (hlf hlz) h.1 h.2)
+    iapply (H56 A cpu R1 kv hok hp1 hks hWfd hevq) $$ [- $Hk $Hpc $Hframe $Hte $Hce $Hown $Hcred $Hkont]
     iframe #
   · -- the fill: bnez taken, +0xa6
     have hr0 : r ≠ 0#64 := PtRun.pageValid_ne_zero r hval
@@ -267,6 +282,7 @@ theorem usertrap_d0_proof (VM : VMFAULT) (HA : UT_A6 PT Γ) (H56 : UT_56 PT Γ) 
         { (utV1 A).updEv kv with upt := A.V.upt.insertLeaf (vpnOf t).toNat r (PTE_W ||| PTE_U ||| PTE_R) }
         (viewZero A.M (vpnOf t).toNat) A.sts A.cs :=
       (utD0_rows A hok hne (vpnOf t).toNat r hnone hlt').updEv kv
+        (fun _ hlz => (vmfaultQuiet _ _ _ (hlf hlz) hlt hnone).elim)
     iapply (HA A cpu A.k R1 _ _ A.sts A.cs hok (utBase_refl _) hp1 hrows)
       $$ [- $Hk $Hpc $Hframe $Hte $Hce $Hown $Hres $Hkont]
     iframe #

@@ -15,6 +15,12 @@ fail before it hand the lend back at `ke`.  Since L3b (no Rocq counterpart)
 `kalloc` takes it first and steps it (`uc_kalloc_lend_call`), `mappages` is
 lent the stepped count, and the mappages-failure arm's `kfree` steps it
 again (`vf_kfree_call`, the led form).
+
+THE QUIET ARMS (permit sweep T, no Rocq counterpart): the two arms that
+return before `kalloc` (`va >= psz`, page already mapped) hand the lend back
+at `ke` (`vf_lend_quiet`), which proves the post's `vmfaultQuietArm … →
+k' = ke`; the three arms past `kalloc` are the allocating fault (`hnq`),
+where that conjunct is vacuous (`vf_lend_alloc`).
 -/
 import Xv6.SpecVmfault
 import Xv6.VmfaultDefs
@@ -45,6 +51,27 @@ theorem vmfault_br_fffffffffffff7d2 : KA.«vmfault» + 0xfffffffffffff7d2#64 = K
 theorem vmfault_br_fffffffffffff638 : KA.«vmfault» + 0xfffffffffffff638#64 = KA.«kalloc» := by decide
 
 theorem vmfault_br_ffffffffffffffe4 : KA.«vmfault» + 0xffffffffffffffe4#64 = KA.«ismapped» := by decide
+
+/-- **A quiet arm returns the lend untouched** (permit sweep T): at `k' = ke`
+the quiet conjunct holds whatever the arm. -/
+theorem vf_lend_quiet (p : BitVec 64) (q : Prop) (ke : Nat) :
+    actLend (GF := GF) p ke ⊢ ∃ k' : Nat, ⌜ke ≤ k'⌝ ∗ ⌜q → k' = ke⌝ ∗ actLend p k' := by
+  iintro Hl
+  iexists ke
+  iframe Hl
+  ipureintro
+  exact ⟨Nat.le_refl ke, fun _ => rfl⟩
+
+/-- **The allocating arm owes no quiet conjunct** (permit sweep T): its
+condition refutes the quiet one. -/
+theorem vf_lend_alloc (p : BitVec 64) {q : Prop} (hq : ¬ q) (ke : Nat) :
+    (∃ k' : Nat, ⌜ke ≤ k'⌝ ∗ actLend (GF := GF) p k') ⊢
+      ∃ k' : Nat, ⌜ke ≤ k'⌝ ∗ ⌜q → k' = ke⌝ ∗ actLend p k' := by
+  iintro ⟨%k', %hk', Hl⟩
+  iexists k'
+  iframe Hl
+  ipureintro
+  exact ⟨hk', fun h => absurd h hq⟩
 
 set_option maxHeartbeats 4000000 in
 /-- The prologue and the `va >= psz` exit; the rest of the function starts
@@ -143,6 +170,12 @@ theorem vmfault_proof (IM : ISMAPPED) (KAL : KALLOC) (KF : KFREE) (MS : MEMSET)
     iintro Hk Hpc
     rcases hmapped with ⟨hz, hnone⟩ | ⟨ho, wsome, hsome⟩
     · -- unmapped: allocate
+      -- the allocating arm (permit sweep T): not a quiet one
+      have hnq : ¬ vmfaultQuietArm P (k.regs 11#5) (k.regs 12#5) := by
+        have hlt26 : (vpnOf (k.regs 12#5)).toNat < 67108864 := MachCSL.vpnOf_toNat_lt _ hva12
+        have hnone' : Iris.Std.PartialMap.get? P.leaves (vpnOf (k.regs 12#5)).toNat = none := by
+          rw [← vf_vpn_round (k.regs 12#5)]; exact hnone
+        exact fun h => h ⟨hlt, UPtFault.um_none_of_leaves_none P _ hlt26 hnone'⟩
       k_step_gen (wp_s_branch c16 _ (KA.«vmfault» + 0x30#64) true 8#13 10#5 0#5 (by decide) bop.BEQ)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
         with [MachCSL.beq_zero _ hz] next c17 hp17
@@ -227,6 +260,7 @@ theorem vmfault_proof (IM : ISMAPPED) (KAL : KALLOC) (KF : KFREE) (MS : MEMSET)
         iapply wpNext_mono _ _ _ _ _ $$ HΦ
         iintro %c27 HΦ %R' Hk Hpc %hfacts
         obtain ⟨h10, h1, h2, h8, h20, hrest⟩ := hfacts
+        ihave Hlend := vf_lend_alloc _ hnq _ $$ Hlend
         iapply HΦ $$ %spie %spp %R' %hsp Hk Hpc Hlend [Hpt]
         · ileft
           isplitl []
@@ -453,6 +487,7 @@ theorem vmfault_proof (IM : ISMAPPED) (KAL : KALLOC) (KF : KFREE) (MS : MEMSET)
           iapply wpNext_mono _ _ _ _ _ $$ HΦ
           iintro %c40 HΦ %R' Hk Hpc %hfacts
           obtain ⟨h10, h1, h2, h8, h20, hrest⟩ := hfacts
+          ihave Hlend := vf_lend_alloc _ hnq _ $$ Hlend
           iapply HΦ $$ %spie2 %spp2 %R' %hsp' Hk Hpc Hlend [Hpt]
           · iright
             iexists (R3 10#5)
@@ -589,6 +624,7 @@ theorem vmfault_proof (IM : ISMAPPED) (KAL : KALLOC) (KF : KFREE) (MS : MEMSET)
           iapply wpNext_mono _ _ _ _ _ $$ HΦ
           iintro %c44 HΦ %R' Hk Hpc %hfacts
           obtain ⟨h10, h1, h2, h8, h20, hrest⟩ := hfacts
+          ihave Hlend := vf_lend_alloc _ hnq _ $$ Hlend
           iapply HΦ $$ %spie3 %spp3 %R' %hsp'' Hk Hpc Hlend [Hpt]
           · ileft
             isplitl []
@@ -637,7 +673,7 @@ theorem vmfault_proof (IM : ISMAPPED) (KAL : KALLOC) (KF : KFREE) (MS : MEMSET)
       iintro %c21 HΦ %R' Hk Hpc %hfacts
       obtain ⟨h10, h1, h2, h8, h20, hrest⟩ := hfacts
       ihave Hk := vf_kctx_withSpie_self c21 k R' $$ Hk
-      ihave Hlend := actLend_ret_intro _ _ $$ Hlend
+      ihave Hlend := vf_lend_quiet _ (vmfaultQuietArm P (k.regs 11#5) (k.regs 12#5)) _ $$ Hlend
       iapply HΦ $$ %k.spie %k.spp %R' %(fun _ => ⟨rfl, rfl⟩) Hk Hpc Hlend [Hpt]
       · ileft
         isplitl []
@@ -673,7 +709,7 @@ theorem vmfault_proof (IM : ISMAPPED) (KAL : KALLOC) (KF : KFREE) (MS : MEMSET)
     iintro %c8 HΦ %R' Hk Hpc %hfacts
     obtain ⟨h10, h1, h2, h8, h20, hrest⟩ := hfacts
     ihave Hk := vf_kctx_withSpie_self c8 k R' $$ Hk
-    ihave Hlend := actLend_ret_intro _ _ $$ Hlend
+    ihave Hlend := vf_lend_quiet _ (vmfaultQuietArm P (k.regs 11#5) (k.regs 12#5)) _ $$ Hlend
     iapply HΦ $$ %k.spie %k.spp %R' %(fun _ => ⟨rfl, rfl⟩) Hk Hpc Hlend [Hpt]
     · ileft
       isplitl []

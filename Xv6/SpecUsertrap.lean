@@ -45,7 +45,8 @@ moved record and the resuming hart, the round's pure rows and the channels'
 answers.
 
 THE ROWS: the pure ones are Rocq's (`utRound`, `utFdKept`, `utChKept`,
-`utGenKept`, `utFdEcall`, `utPipeEcall`, `utRetPid`, `utLiveOut`, `utPro`);
+`utGenKept`, `utFdEcall`, `utPipeEcall`, `utRetPid`, `utLiveOut`, `utPro`)
+and the quiet row `utEvQuiet` (deviation 11);
 the deposit / answer channels are SpecSyscall's `sysc*` rows guarded by the
 cause and keyed at the record `syscall()` is called with (`utSysRec`: the
 prologue's `epc` store plus the `+= 4`); the payment and the kill pair are
@@ -96,6 +97,11 @@ Rocq's (`utPayIn`, `utKillIn`, `utKillOut`, `utResumeIn`).
    no `[UexecSG GF]` binder; the instance resolves to
    `UexecExecInst.uexecSGXv6`), because its syscall arm consumes
    `SpecSyscallXv6.SYSCALL_XV6` -- Rocq's single global `uexecSG_xv6`.
+
+11. **The quiet row `utEvQuiet`** (permit sweep T, no Rocq counterpart;
+   Rocq planned `ev ev'` inside `uround_ok`, this tree states a separate kept
+   row): off the ecall, at `pvLazy = false`, `V'.ev = V.ev`.  `utRound` does
+   not move.  Design: `claude-notes/design/ni-strong-instance.md` §7.8L.
 
 Imports only definitional files and Spec files (`UexecExecInst` for the
 instance, deviation 10).
@@ -155,6 +161,14 @@ def utChKept (sc secc : BitVec 64) (tf : List (BitVec 64)) (cs cs' : ExtTreeSet 
 /-- **Rocq `ut_gen_kept`**: a round never re-incarnates. -/
 def utGenKept (V V' : ProcPriv) : Prop := V'.gen = V.gen
 
+/-- **The quiet row** (permit sweep T; no Rocq counterpart -- deviation 11):
+off the ecall, a process whose lazy flag is off leaves the round with its
+event counter unmoved.  The ecall rows raise it (`∀ k' ≥ V.ev`, L1b) and a
+lazy fault may `kalloc`, so both are outside the row; the kill route never
+reaches the post (`UT_KEXIT`), the statement's one exception. -/
+def utEvQuiet (sc : BitVec 64) (V V' : ProcPriv) : Prop :=
+  sc ≠ uecallScause → V.pvLazy = false → V'.ev = V.ev
+
 /-- **Rocq `ut_fd_ecall`**: the ecall's descriptor half (the number and
 argument off the entry frame, the answer off the exit frame's a0). -/
 def utFdEcall (sc secc : BitVec 64) (tf tf' : List (BitVec 64)) (sts sts' : List FdState) : Prop :=
@@ -188,6 +202,19 @@ theorem utFdKept_refl (sc : BitVec 64) (sts : List FdState) : utFdKept sc sts st
 
 theorem utChKept_refl (sc secc : BitVec 64) (tf : List (BitVec 64)) (cs : ExtTreeSet GName compare) :
     utChKept sc secc tf cs cs := fun _ => rfl
+
+theorem utEvQuiet_refl (sc : BitVec 64) (V : ProcPriv) : utEvQuiet sc V V := fun _ _ => rfl
+
+/-- A record whose counter equals the entry's carries the quiet row. -/
+theorem utEvQuiet_of_ev (sc : BitVec 64) (V V' : ProcPriv) (h : V'.ev = V.ev) : utEvQuiet sc V V' :=
+  fun _ _ => h
+
+/-- The quiet row is vacuous at the ecall cause. -/
+theorem utEvQuiet_ecall (V V' : ProcPriv) : utEvQuiet uecallScause V V' := fun hc => absurd rfl hc
+
+/-- The quiet row is vacuous for a lazy process. -/
+theorem utEvQuiet_lazy (sc : BitVec 64) (V V' : ProcPriv) (h : V.pvLazy = true) : utEvQuiet sc V V' :=
+  fun _ hl => absurd (h.symm.trans hl) (by decide)
 
 theorem utFdEcall_quiet (sc secc : BitVec 64) (tf tf' : List (BitVec 64)) (sts sts' : List FdState)
     (h : sc ≠ uecallScause) : utFdEcall sc secc tf tf' sts sts' := fun hc => absurd hc h
@@ -385,7 +412,7 @@ def usertrapPost (R : CPU → UPtd → BitVec 64 → ProcPriv → List FdState �
     ⌜calleeSaved k.regs R' ∧ R' 10#5 = satpOf KTier.kpt P'.root⌝ -∗
     ⌜V'.upt = P' ∧ P'.tfp = P.tfp⌝ -∗
     ⌜utRound sep sc V M V' M'⌝ -∗ ⌜utFdKept sc sts sts'⌝ -∗ ⌜utChKept sc V.pvSecc V.tf cs cs'⌝ -∗
-    ⌜utGenKept V V'⌝ -∗ ⌜utFdEcall sc V.pvSecc V.tf V'.tf sts sts'⌝ -∗
+    ⌜utGenKept V V'⌝ -∗ ⌜utEvQuiet sc V V'⌝ -∗ ⌜utFdEcall sc V.pvSecc V.tf V'.tf sts sts'⌝ -∗
     ⌜utPipeEcall sc V.pvSecc V.tf V'.tf (syscImg V M) (syscImg V' M') sts sts'⌝ -∗
     ⌜utRetPid sc V.pvSecc V.tf V'.tf pid⌝ -∗ ⌜retPc uepc = tfResumePc V'.tf⌝ -∗
     ⌜utLiveOut sc V.pvSecc (utProTf sep V) sts (tfW V'.tf (tfArgIdx 0)) cs'⌝ -∗

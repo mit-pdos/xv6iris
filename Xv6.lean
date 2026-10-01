@@ -1170,6 +1170,7 @@ import Xv6.SyscallTable
 import Xv6.SyscallRet
 import Xv6.UtResFits
 import Xv6.SpecUsertrap
+import Xv6.UtRoundQuiet
 import Xv6.SyscallArmsPath
 import Xv6.SyscallArmsExec
 import Xv6.SyscallArmsFdDefs

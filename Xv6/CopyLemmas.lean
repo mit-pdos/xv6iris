@@ -135,7 +135,16 @@ theorem co_vmfault_call (VF : VMFAULT) [Xv6G GF] [WchG GF] [CurCtx]
   have h := VF.wp_vmfault (hlc := hlc) (GF := GF) c k' γl γk P M ke hnoff' hK' hlk' hroot' hsz'
   unfold wp_vmfault_body at h
   simp only [vmfaultAddr] at h
-  exact h
+  -- the copy loops do not read the quiet conjunct (permit sweep T): dropped
+  refine .trans ?_ h
+  iintro ⟨Hk, Hpc, Hl, Ha, Hpt, Hlend, HPhi⟩
+  iframe Hk Hpc Hl Ha Hpt Hlend
+  iapply wpNext_mono _ _ _ _ _ $$ HPhi
+  iintro %cpu' HPhi %spie %spp %R' %hsp Hk Hpc ⟨%k1, %hk1, %-, Hlend⟩
+  iapply HPhi $$ %spie %spp %R' %hsp Hk Hpc
+  iexists k1
+  iframe Hlend
+  ipureintro; exact hk1
 
 theorem co_memmove_call (MM : MEMMOVE) [CurCtx]
     (c : CPU) (k' : KCtx) (cs olds : List (BitVec 8)) (n : Nat) (dqs : DFrac)

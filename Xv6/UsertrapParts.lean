@@ -156,6 +156,7 @@ structure UtRows0 (A : UtArgs GF) (V2 : ProcPriv) (M2 : Nat → List (BitVec 8))
   fdk : utFdKept A.sc A.sts sts2
   chk : utChKept A.sc A.V.pvSecc A.V.tf A.cs cs2
   gen : utGenKept A.V V2
+  evq : utEvQuiet A.sc A.V V2
   fde : utFdEcall A.sc A.V.pvSecc A.V.tf V2.tf A.sts sts2
   pipe : utPipeEcall A.sc A.V.pvSecc A.V.tf V2.tf (syscImg A.V A.M) (syscImg V2 M2) A.sts sts2
   rpid : utRetPid A.sc A.V.pvSecc A.V.tf V2.tf A.pid
@@ -164,11 +165,13 @@ structure UtRows0 (A : UtArgs GF) (V2 : ProcPriv) (M2 : Nat → List (BitVec 8))
 
 /-- **The rows do not read the event counter** (permit sweep L2): a record
 raised by `updEv` carries the rows of the one it was raised from (Rocq's
-`ut_round_same` at `upd_ev`; the round does not name `pv_ev`). -/
+`ut_round_same` at `upd_ev`; the round does not name `pv_ev`) -- all but the
+quiet row (permit sweep T), which is exactly about the counter and is
+supplied at the raised record. -/
 theorem UtRows0.updEv {A : UtArgs GF} {V2 : ProcPriv} {M2 : Nat → List (BitVec 8)}
     {sts2 : List FdState} {cs2 : ExtTreeSet GName compare} (h : UtRows0 A V2 M2 sts2 cs2)
-    (k : Nat) : UtRows0 A (V2.updEv k) M2 sts2 cs2 :=
-  ⟨h.round, h.fdk, h.chk, h.gen, h.fde, h.pipe, h.rpid, h.tfp, h.ks⟩
+    (k : Nat) (hq : utEvQuiet A.sc A.V (V2.updEv k)) : UtRows0 A (V2.updEv k) M2 sts2 cs2 :=
+  ⟨h.round, h.fdk, h.chk, h.gen, hq, h.fde, h.pipe, h.rpid, h.tfp, h.ks⟩
 
 /-- The live row at the parked record. -/
 abbrev utLive (A : UtArgs GF) (V2 : ProcPriv) (cs2 : ExtTreeSet GName compare) : Prop :=
@@ -189,8 +192,8 @@ theorem UtRows0.retf {A : UtArgs GF} {V2 : ProcPriv} {M2 : Nat → List (BitVec 
     {cs2 : ExtTreeSet GName compare} (h : UtRows0 A V2 M2 sts2 cs2) (ws : List (BitVec 64))
     (hu : tfUeq V2.tf ws) : UtRows0 A { V2 with tf := ws } M2 sts2 cs2 := by
   have ha : tfW ws (tfArgIdx 0) = tfW V2.tf (tfArgIdx 0) := (tfUeq_arg 0 (by decide) hu).symm
-  obtain ⟨hr, hfk, hck, hg, hfe, hp, hrp, htf, hks⟩ := h
-  refine ⟨?_, hfk, hck, hg, ?_, ?_, ?_, htf, hks⟩
+  obtain ⟨hr, hfk, hck, hg, hq, hfe, hp, hrp, htf, hks⟩ := h
+  refine ⟨?_, hfk, hck, hg, hq, ?_, ?_, ?_, htf, hks⟩
   · unfold utRound at hr ⊢; exact uroundOk_ueq_r hu hr
   · intro hc; have := hfe hc; simp only at this ⊢; rw [ha]; exact this
   · intro hc; have := hp hc; simp only at this ⊢; rw [ha]; exact this
