@@ -41,6 +41,13 @@ import MachCSL.StackOwnBounds
 import MachCSL.WpAluFile
 import MachCSL.WpSmode
 import MachCSL.WpSmodeMem
+import MachCSL.WpSmodeMemTac
+import MachCSL.WpSmodeMemLbu
+import MachCSL.WpSmodeMemLd
+import MachCSL.WpSmodeMemLw
+import MachCSL.WpSmodeMemSb
+import MachCSL.WpSmodeMemSd
+import MachCSL.WpSmodeMemSw
 import MachCSL.WpSmodeMemPhys
 import MachCSL.WpSmodeCtl
 import MachCSL.WpSmodeRules
