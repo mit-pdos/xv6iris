@@ -41,7 +41,9 @@ Hard-won rules for working on this tree.  Design notes are in `notes/design/` an
 - Build VM: `/shared/xv6rocq/gcp-rocq/run-on-gcp` mirrors `$PWD` to the VM and runs there (96 cores,
   365 GB, shared with a collaborator: kill by PID, never `pkill -f`).  Run it from a worktree, never from
   `/tmp` (it syncs the whole directory); `--sync-only` after writing new files; seed a new remote tree
-  with `cp -a /mnt/rocq/lean-seed/.lake .`.
+  with `cp -a /mnt/rocq/lean-seed/.lake .`.  Each synced tree keeps a full `.lake` (several GB) under
+  `/mnt/rocq/trees/`: when a worktree is removed, delete its remote tree too (stale agent trees once
+  filled the disk, ~600 GB).
 - Agents: one private worktree each (`.claude/worktrees/lane-<L>`); landing helper
   `.claude/coord/land.sh` (outside the repo).  `/shared/xv6iris-lean` is a stale wrong-design attempt:
   ignore it.
