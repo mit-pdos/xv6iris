@@ -148,6 +148,16 @@ theorem uwk_pte_is_invalid (D : UFoot) (orc : UOrc) (s : UWSt) (hp : UwkPins D s
       Mk_PTE_Flags, Sail.BitVec.extractLsb] at *
     bv_decide
 
+/-- The permission check's assertion holds on a word that is not `W` without `R`. -/
+theorem uwk_perm_assert (R W X : Bool) (h : (R || !W) = true) :
+    zopz0zJzJzK W (R || Functions.not X) = true := by
+  revert h; cases R <;> cases W <;> cases X <;> decide
+
+/-- ... and the shadow-stack arm (`!R && W && !X`) is not taken. -/
+theorem uwk_perm_noss (R W X : Bool) (h : (R || !W) = true) :
+    (Functions.not R && (W && Functions.not X)) = false := by
+  revert h; cases R <;> cases W <;> cases X <;> decide
+
 set_option maxHeartbeats 4000000 in
 set_option maxRecDepth 100000 in
 /-- **Rocq `pte_check_ok`**: the permission check at User answers `uwkPerm`,
@@ -162,12 +172,21 @@ theorem uwk_check_perm (D : UFoot) (orc : UOrc) (s : UWSt) (hp : UwkPins D s.fil
   unfold uwkPerm uwkPermOk uwkAccOk
   rcases acc with p | p | ⟨_, _, p⟩ | ⟨_, _, p⟩ | ⟨_, _, _, p, q⟩ | _ | c <;>
     (try cases p) <;> (try cases q) <;> simp [utrAcc] at hacc
+  -- the check is a function of the four flag bits and `mxr`: decide the
+  -- assertion and the shadow-stack arm once from `hrw`, name the bits, and
+  -- evaluate each of the 32 closed programs by `rfl` (no stepper)
   all_goals
-    cases hU : uwkU w <;> cases hR : uwkR w <;> cases hW : uwkW w <;> cases hX : uwkX w <;>
-      cases mxr <;> simp only [hR, hW, Bool.not_true, Bool.not_false, Bool.or_false, Bool.or_true,
-        Bool.false_eq_true] at hrw <;>
-      uwk_run -bv
-  all_goals simp_all
+    unfold check_PTE_permission
+    simp only [uwkU, uwkR, uwkW, uwkX] at *
+    simp only [uwk_perm_assert _ _ (bit_to_bool (_get_PTE_Flags_X (uwkFl w))) hrw,
+      uwk_perm_noss _ _ (bit_to_bool (_get_PTE_Flags_X (uwkFl w))) hrw, Bool.false_eq_true, if_false]
+    obtain ⟨U, hU⟩ : ∃ U, bit_to_bool (_get_PTE_Flags_U (uwkFl w)) = U := ⟨_, rfl⟩
+    obtain ⟨R, hR⟩ : ∃ R, bit_to_bool (_get_PTE_Flags_R (uwkFl w)) = R := ⟨_, rfl⟩
+    obtain ⟨W, hW⟩ : ∃ W, bit_to_bool (_get_PTE_Flags_W (uwkFl w)) = W := ⟨_, rfl⟩
+    obtain ⟨X, hX⟩ : ∃ X, bit_to_bool (_get_PTE_Flags_X (uwkFl w)) = X := ⟨_, rfl⟩
+    simp only [hU, hR, hW, hX]
+    clear hU hR hW hX hrw
+    cases U <;> cases R <;> cases W <;> cases X <;> cases mxr <;> rfl
 
 /-! ## §2 The entry reads and the conditional write (Rocq `PtTreeAdue`
 `exec_pmpCheck_supervisor_grant_wpte`, `exec_write_pte_conditional_ram`,

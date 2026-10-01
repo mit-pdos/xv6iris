@@ -7,7 +7,8 @@ fetch; the clock tick is `MachCSL.WpTick`), stated over `mConf cpu dq c` for any
 (mstatus.MPP, mepc, delegation, PMP entry 0, menvcfg, ...) are covered.
 -/
 import MachCSL.MConf
-import MachCSL.WpStages
+import MachCSL.PlatformFacts
+import MachCSL.ModelFacts
 import MachCSL.FetchedDefs
 
 namespace MachCSL
