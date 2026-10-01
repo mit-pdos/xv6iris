@@ -48,6 +48,14 @@ with the credential `K` riding the cursor so it comes home.
    `pobs_aopen_lin`.
 5. `pobs_P_persistent` / `pobs_recv_persistent` take `[Persistent T]` as an
    instance argument (Rocq's explicit premise).
+6. **The chroot bump** (design/chroot.md section 3): every pin takes the
+   walking process's root `rt` and carries `pathNodot pl` (Rocq's
+   `path_nodot`, `Forall (≠ DOTDOT)` read as `∀ s ∈ pathElems pl, s ≠
+   DOTDOT`), so each hop answers by the record at every root
+   (`FsAbsWalk.axHopAns_rec`); a later hop of the dead walk, where no
+   element is in hand, cases on the self rule and answers the taint.
+   `path_nodot_len` / `path_nodot_of_proper` / `path_nodot_np_lookup` are
+   not ported (no reached consumer).
 -/
 import Xv6.SysOpenDefs
 
@@ -57,37 +65,55 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
 set_option linter.unusedSectionVars false
 
+/-! ## 0.  NO ELEMENT IS `..`
+
+The hop answers `..` at the walking process's root with the root itself
+(`FsAbsWalk.axHop`'s self rule), and a program does not know its root.  A
+pin therefore carries that no element of its path is `..`: then every hop is
+the record's at every root. -/
+
+/-- **Rocq `path_nodot`**. -/
+def pathNodot (pl : List (BitVec 8)) : Prop := ∀ s ∈ pathElems pl, s ≠ DOTDOT
+
+/-- **Rocq `path_nodot_lookup`**. -/
+theorem pathNodot_lookup (pl : List (BitVec 8)) (k : Nat) (s : Fname) (hnd : pathNodot pl)
+    (hk : (pathElems pl)[k]? = some s) : s ≠ DOTDOT :=
+  hnd s (List.mem_of_getElem? hk)
+
 /-! ## 1.  THE PIN, AS THE PURE INPUT -/
 
 /-- **Rocq `pin_resolves_at`**: the walk's START inum is the run's head (the
 start rule at this path), the run's LAST inum is `ino`, and at every view
 the claim admits the run is a run and `ino` holds the NODE `a`. -/
-def pinResolvesAt (Pin : Aview → Prop) (cw : Nat) (pl : List (BitVec 8)) (hops : List Nat)
+def pinResolvesAt (Pin : Aview → Prop) (rt cw : Nat) (pl : List (BitVec 8)) (hops : List Nat)
     (ino : Nat) (a : Anode) : Prop :=
-  umStartOf cw pl = hops[0]! ∧
+  umStartOf rt cw pl = hops[0]! ∧
   hops[(pathElems pl).length]! = ino ∧
-  ∀ v : Aview, Pin v → Arun v hops[0]! (pathElems pl) hops ∧ PartialMap.get? v ino = some a
+  (∀ v : Aview, Pin v → Arun v hops[0]! (pathElems pl) hops ∧ PartialMap.get? v ino = some a) ∧
+  pathNodot pl
 
 /-- **Rocq `pin_misses_at`**: THE OTHER KIND OF PIN -- the walk starts at
 `d0`, and at every view the claim admits, the FIRST element of the path is
 not an entry of `d0`. -/
-def pinMissesAt (Pin : Aview → Prop) (cw : Nat) (pl : List (BitVec 8)) (d0 : Nat) : Prop :=
-  umStartOf cw pl = d0 ∧
-  ∀ (v : Aview) (s : Fname), Pin v → (pathElems pl)[0]? = some s → astep v d0 s = none
+def pinMissesAt (Pin : Aview → Prop) (rt cw : Nat) (pl : List (BitVec 8)) (d0 : Nat) : Prop :=
+  umStartOf rt cw pl = d0 ∧
+  (∀ (v : Aview) (s : Fname), Pin v → (pathElems pl)[0]? = some s → astep v d0 s = none) ∧
+  pathNodot pl
 
 /-- **Rocq `pin_walks_at`**: the walk alone -- the start rule, the terminal
 inum, and the run, with NOTHING said about the row at the end of it. -/
-def pinWalksAt (Pin : Aview → Prop) (cw : Nat) (pl : List (BitVec 8)) (hops : List Nat)
+def pinWalksAt (Pin : Aview → Prop) (rt cw : Nat) (pl : List (BitVec 8)) (hops : List Nat)
     (ino : Nat) : Prop :=
-  umStartOf cw pl = hops[0]! ∧
+  umStartOf rt cw pl = hops[0]! ∧
   hops[(pathElems pl).length]! = ino ∧
-  ∀ v : Aview, Pin v → Arun v hops[0]! (pathElems pl) hops
+  (∀ v : Aview, Pin v → Arun v hops[0]! (pathElems pl) hops) ∧
+  pathNodot pl
 
 /-- **Rocq `pin_resolves_abs`**: the pin at the CONTENT -- the same walk, and
 at every view the claim admits the terminal row is `nd` at SOME link count. -/
-def pinResolvesAbs (Pin : Aview → Prop) (cw : Nat) (pl : List (BitVec 8)) (hops : List Nat)
+def pinResolvesAbs (Pin : Aview → Prop) (rt cw : Nat) (pl : List (BitVec 8)) (hops : List Nat)
     (ino : Nat) (nd : Absnode) : Prop :=
-  pinWalksAt Pin cw pl hops ino ∧
+  pinWalksAt Pin rt cw pl hops ino ∧
   ∀ v : Aview, Pin v → ∃ k : Nat, PartialMap.get? v ino = some ⟨nd, k⟩
 
 section PinnedObs
@@ -216,18 +242,19 @@ theorem pobs_aopen (γfs : FsNames) (Pin : Aview → Prop) (T : IProp GF) [Persi
 hop's own fupd, reads the claim, reads the lent entry map against the
 invariant's authority, and steps the run; the tainted arm opens nothing. -/
 theorem pobs_hop (γfs : FsNames) (Pin : Aview → Prop) (T : IProp GF) [Persistent T] [Timeless T]
-    (Pmiss : Nat → Nat → IProp GF) (cw : Nat) (pl : List (BitVec 8)) (hops : List Nat)
-    (ino : Nat) (a : Anode) (k : Nat) (s : Fname) (hres : pinResolvesAt Pin cw pl hops ino a)
+    (Pmiss : Nat → Nat → IProp GF) (rt cw : Nat) (pl : List (BitVec 8)) (hops : List Nat)
+    (ino : Nat) (a : Anode) (k : Nat) (s : Fname) (hres : pinResolvesAt Pin rt cw pl hops ino a)
     (hk : (pathElems pl)[k]? = some s) :
     ⊢ pobsMissTaint T Pmiss -∗
       iprop(□ ∀ v : Aview, appPred appRun v -∗ appPred appRun v ∗ (⌜Pin v⌝ ∨ T)) -∗
       appInv (hlc := hlc) γfs -∗
-      exHop (hlc := hlc) γfs (pobsP T hops) Pmiss k s := by
-  obtain ⟨-, -, hpin⟩ := hres
+      exHop (hlc := hlc) rt γfs (pobsP T hops) Pmiss k s := by
+  obtain ⟨-, -, hpin, hnd⟩ := hres
   unfold pobsMissTaint
   iintro #Hmt #Hcl #Hinv
   unfold exHop axHop
   iintro %d %ents %dqv HP HF
+  rw [axHopAns_rec rt _ _ k d s ents (fun h => pathNodot_lookup pl k s hnd hk h.1)]
   unfold pobsP
   icases HP with (%hd | #HT)
   · subst hd
@@ -266,12 +293,12 @@ theorem pobs_hop (γfs : FsNames) (Pin : Aview → Prop) (T : IProp GF) [Persist
 
 /-- **Rocq `pobs_walk`**: THE WHOLE WALK, at the ONE path the pin is about. -/
 theorem pobs_walk (γfs : FsNames) (Pin : Aview → Prop) (T : IProp GF) [Persistent T]
-    [Timeless T] (Pmiss : Nat → Nat → IProp GF) (cw : Nat) (pl : List (BitVec 8))
-    (hops : List Nat) (ino : Nat) (a : Anode) (hres : pinResolvesAt Pin cw pl hops ino a) :
+    [Timeless T] (Pmiss : Nat → Nat → IProp GF) (rt cw : Nat) (pl : List (BitVec 8))
+    (hops : List Nat) (ino : Nat) (a : Anode) (hres : pinResolvesAt Pin rt cw pl hops ino a) :
     ⊢ pobsMissTaint T Pmiss -∗
       iprop(□ ∀ v : Aview, appPred appRun v -∗ appPred appRun v ∗ (⌜Pin v⌝ ∨ T)) -∗
       appInv (hlc := hlc) γfs -∗
-      exStart (hlc := hlc) γfs cw (pobsP T hops) Pmiss pl := by
+      exStart (hlc := hlc) γfs rt cw (pobsP T hops) Pmiss pl := by
   have hstart := hres.1
   iintro #Hmt #Hcl #Hinv
   unfold exStart
@@ -292,7 +319,7 @@ theorem pobs_walk (γfs : FsNames) (Pin : Aview → Prop) (T : IProp GF) [Persis
           rw [Nat.zero_add]; simpa using hj
         rw [← exHop_is_axHop]
         iintro #⟨H1, H2, H3⟩
-        iapply (pobs_hop γfs Pin T Pmiss cw pl hops ino a (0 + j) s hres hj') $$ H1 H2 H3))
+        iapply (pobs_hop γfs Pin T Pmiss rt cw pl hops ino a (0 + j) s hres hj') $$ H1 H2 H3))
     imodintro
     isplitr
     · iexact Hmt
@@ -305,12 +332,12 @@ theorem pobs_walk (γfs : FsNames) (Pin : Aview → Prop) (T : IProp GF) [Persis
 /-- **Rocq `pobs_node`**: THE IDENTIFICATION -- the terminal cursor says the
 observed inum is the pin's, the receipt's row is a row of a view the pin
 holds of, and the pin says what that row is. -/
-theorem pobs_node (Pin : Aview → Prop) (T : IProp GF) (cw : Nat) (pl : List (BitVec 8))
+theorem pobs_node (Pin : Aview → Prop) (T : IProp GF) (rt cw : Nat) (pl : List (BitVec 8))
     (hops : List Nat) (ino : Nat) (a : Anode) (v : Aview) (i : Nat) (b : Anode)
-    (hres : pinResolvesAt Pin cw pl hops ino a) :
+    (hres : pinResolvesAt Pin rt cw pl hops ino a) :
     ⊢ pobsP T hops (pathElems pl).length i -∗ pobsRecv Pin T v i b -∗
       iprop(⌜i = ino ∧ b = a⌝ ∨ T) := by
-  obtain ⟨-, hfin, hpin⟩ := hres
+  obtain ⟨-, hfin, hpin, -⟩ := hres
   unfold pobsP pobsRecv
   iintro HP ⟨%hrow, Hc⟩
   icases HP with (%hi | HT)
@@ -334,24 +361,24 @@ theorem pobs_node (Pin : Aview → Prop) (T : IProp GF) (cw : Nat) (pl : List (B
 invariant, a walk-shaped syscall's cursor family, observation piece and node
 identification, at the pin. -/
 theorem pinned_obs (γfs : FsNames) (Pin : Aview → Prop) (T : IProp GF) [Persistent T]
-    [Timeless T] (Pmiss : Nat → Nat → IProp GF) (cw : Nat) (pl : List (BitVec 8))
-    (hops : List Nat) (ino : Nat) (a : Anode) (hres : pinResolvesAt Pin cw pl hops ino a) :
+    [Timeless T] (Pmiss : Nat → Nat → IProp GF) (rt cw : Nat) (pl : List (BitVec 8))
+    (hops : List Nat) (ino : Nat) (a : Anode) (hres : pinResolvesAt Pin rt cw pl hops ino a) :
     ⊢ pobsMissTaint T Pmiss -∗
       iprop(□ ∀ v : Aview, appPred appRun v -∗ appPred appRun v ∗ (⌜Pin v⌝ ∨ T)) -∗
       appInv (hlc := hlc) γfs -∗
-      (exStart (hlc := hlc) γfs cw (pobsP T hops) Pmiss pl ∗
+      (exStart (hlc := hlc) γfs rt cw (pobsP T hops) Pmiss pl ∗
        pfAt (aopenCommitAt (hlc := hlc) (fsGammaL γfs) appE) (pobsFo Pin T) ∗
        iprop(□ ∀ (v : Aview) (i : Nat) (b : Anode),
          pobsP T hops (pathElems pl).length i -∗ pobsRecv Pin T v i b -∗
            iprop(⌜i = ino ∧ b = a⌝ ∨ T))) := by
   iintro #Hmt #Hcl #Hinv
   isplitl []
-  · iapply (pobs_walk γfs Pin T Pmiss cw pl hops ino a hres) $$ Hmt Hcl Hinv
+  · iapply (pobs_walk γfs Pin T Pmiss rt cw pl hops ino a hres) $$ Hmt Hcl Hinv
   isplitl []
   · iapply (pobs_aopen γfs Pin T) $$ Hcl Hinv
   imodintro
   iintro %v %i %b HP Hr
-  iapply (pobs_node Pin T cw pl hops ino a v i b hres) $$ HP Hr
+  iapply (pobs_node Pin T rt cw pl hops ino a v i b hres) $$ HP Hr
 
 /-! ## 8a.  THE DEAD WALK THAT REFUNDS ITS CREDENTIAL -/
 
@@ -399,17 +426,18 @@ theorem pobs_dead_term_lin (T K : IProp GF) (d0 n d : Nat) (hn : n ≠ 0) :
 there, so the hop takes the MISS branch and pays it out of the `K` its own
 cursor handed in. -/
 theorem pobs_hop_dead_lin (γfs : FsNames) (Pin : Aview → Prop) (T : IProp GF) [Persistent T]
-    [Timeless T] (K : IProp GF) [Timeless K] (Pmiss : Nat → Nat → IProp GF) (cw : Nat)
-    (pl : List (BitVec 8)) (d0 : Nat) (s : Fname) (hres : pinMissesAt Pin cw pl d0)
+    [Timeless T] (K : IProp GF) [Timeless K] (Pmiss : Nat → Nat → IProp GF) (rt cw : Nat)
+    (pl : List (BitVec 8)) (d0 : Nat) (s : Fname) (hres : pinMissesAt Pin rt cw pl d0)
     (hs : (pathElems pl)[0]? = some s) :
     ⊢ iprop(□ ∀ v : Aview, K -∗ appPred appRun v -∗ appPred appRun v ∗ K ∗ (⌜Pin v⌝ ∨ T)) -∗
       pobsMissTaint T Pmiss -∗ pobsMissHold K Pmiss -∗ appInv (hlc := hlc) γfs -∗
-      exHop (hlc := hlc) γfs (pobsPDeadLin T K d0) Pmiss 0 s := by
-  obtain ⟨-, hmiss⟩ := hres
+      exHop (hlc := hlc) rt γfs (pobsPDeadLin T K d0) Pmiss 0 s := by
+  obtain ⟨-, hmiss, hnd⟩ := hres
   unfold pobsMissTaint pobsMissHold
   iintro #Hcl #Hmt #Hmh #Hinv
   unfold exHop axHop
   iintro %d %ents %dqv HP HF
+  rw [axHopAns_rec rt _ _ 0 d s ents (fun h => pathNodot_lookup pl 0 s hnd hs h.1)]
   unfold pobsPDeadLin
   icases HP with (⟨%hpd, HK⟩ | #HT)
   · obtain ⟨-, hd⟩ := hpd
@@ -447,9 +475,9 @@ theorem pobs_hop_dead_lin (γfs : FsNames) (Pin : Aview → Prop) (T : IProp GF)
 
 /-- **Rocq `pobs_hop_dead_hi_lin`**: EVERY LATER HOP, reached only under the
 taint. -/
-theorem pobs_hop_dead_hi_lin (γfs : FsNames) (T K : IProp GF) (Pmiss : Nat → Nat → IProp GF)
-    (d0 k : Nat) (s : Fname) (hk : k ≠ 0) :
-    ⊢ pobsMissTaint T Pmiss -∗ exHop (hlc := hlc) γfs (pobsPDeadLin T K d0) Pmiss k s := by
+theorem pobs_hop_dead_hi_lin (γfs : FsNames) (rt : Nat) (T K : IProp GF)
+    (Pmiss : Nat → Nat → IProp GF) (d0 k : Nat) (s : Fname) (hk : k ≠ 0) :
+    ⊢ pobsMissTaint T Pmiss -∗ exHop (hlc := hlc) rt γfs (pobsPDeadLin T K d0) Pmiss k s := by
   unfold pobsMissTaint
   iintro #Hmt
   unfold exHop axHop
@@ -459,6 +487,10 @@ theorem pobs_hop_dead_hi_lin (γfs : FsNames) (T K : IProp GF) (Pmiss : Nat → 
   · exact absurd hpd.1 hk
   · imodintro
     iframe HF
+    by_cases hsr : s = DOTDOT ∧ d = rt
+    · rw [axHopAns_self rt _ _ k d s ents hsr.1 hsr.2]
+      iright; iexact HT
+    rw [axHopAns_rec rt _ _ k d s ents hsr]
     cases ents[s]? with
     | some c => simp only [axHopNext]; iright; iexact HT
     | none => simp only [axHopNext]; iapply Hmt $$ HT
@@ -467,11 +499,11 @@ theorem pobs_hop_dead_hi_lin (γfs : FsNames) (T K : IProp GF) (Pmiss : Nat → 
 START cursor and comes back out of whichever arm the receipt hands the
 caller. -/
 theorem pobs_walk_dead_lin (γfs : FsNames) (Pin : Aview → Prop) (T : IProp GF) [Persistent T]
-    [Timeless T] (K : IProp GF) [Timeless K] (Pmiss : Nat → Nat → IProp GF) (cw : Nat)
-    (pl : List (BitVec 8)) (d0 : Nat) (hres : pinMissesAt Pin cw pl d0) :
+    [Timeless T] (K : IProp GF) [Timeless K] (Pmiss : Nat → Nat → IProp GF) (rt cw : Nat)
+    (pl : List (BitVec 8)) (d0 : Nat) (hres : pinMissesAt Pin rt cw pl d0) :
     ⊢ iprop(□ ∀ v : Aview, K -∗ appPred appRun v -∗ appPred appRun v ∗ K ∗ (⌜Pin v⌝ ∨ T)) -∗
       pobsMissTaint T Pmiss -∗ pobsMissHold K Pmiss -∗ appInv (hlc := hlc) γfs -∗ K -∗
-      exStart (hlc := hlc) γfs cw (pobsPDeadLin T K d0) Pmiss pl := by
+      exStart (hlc := hlc) γfs rt cw (pobsPDeadLin T K d0) Pmiss pl := by
   have hstart := hres.1
   iintro #Hcl #Hmt #Hmh #Hinv HK
   unfold exStart
@@ -493,13 +525,13 @@ theorem pobs_walk_dead_lin (γfs : FsNames) (Pin : Aview → Prop) (T : IProp GF
       iapply BigSepL.bigSepL_cons.2
       isplitl []
       · rw [← exHop_is_axHop]
-        iapply (pobs_hop_dead_lin γfs Pin T K Pmiss cw pl d0 s0 hres (by rw [hpe]; rfl))
+        iapply (pobs_hop_dead_lin γfs Pin T K Pmiss rt cw pl d0 s0 hres (by rw [hpe]; rfl))
           $$ Hcl Hmt Hmh Hinv
       · iapply (BigSepL.bigSepL_intro (P := iprop(□ pobsMissTaint T Pmiss))
           (fun j s _ => by
             rw [← exHop_is_axHop]
             iintro #H
-            iapply (pobs_hop_dead_hi_lin γfs T K Pmiss d0 (0 + (j + 1)) s (by omega)) $$ H))
+            iapply (pobs_hop_dead_hi_lin γfs rt T K Pmiss d0 (0 + (j + 1)) s (by omega)) $$ H))
         imodintro
         iexact Hmt
 
@@ -522,13 +554,13 @@ theorem pobs_dead_miss_refund (T K : IProp GF) (k d : Nat) :
 /-- **Rocq `pobs_dead_start_refund`**: off the UNINSTANTIATED walk -- one
 `={⊤}=>` fires the one-shot at its own start inum. -/
 theorem pobs_dead_start_refund (γfs : FsNames) (T K : IProp GF) (Pmiss : Nat → Nat → IProp GF)
-    (cw : Nat) (pl : List (BitVec 8)) (d0 : Nat) :
-    ⊢ exStart (hlc := hlc) γfs cw (pobsPDeadLin T K d0) Pmiss pl ={⊤}=∗ iprop(K ∨ T) := by
+    (rt cw : Nat) (pl : List (BitVec 8)) (d0 : Nat) :
+    ⊢ exStart (hlc := hlc) γfs rt cw (pobsPDeadLin T K d0) Pmiss pl ={⊤}=∗ iprop(K ∨ T) := by
   iintro Hst
   unfold exStart
-  imod Hst $$ %(umStartOf cw pl) %rfl with ⟨HP, -⟩
+  imod Hst $$ %(umStartOf rt cw pl) %rfl with ⟨HP, -⟩
   imodintro
-  iapply (pobs_dead_cursor_refund T K d0 0 (umStartOf cw pl)) $$ HP
+  iapply (pobs_dead_cursor_refund T K d0 0 (umStartOf rt cw pl)) $$ HP
 
 /-- **Rocq `pobs_aopen_triv`**: the trivial observation piece
 (`FsAbsInvFire.fsabsAopen` at the live Γ). -/
@@ -547,18 +579,19 @@ def pobsPLin (T : IProp GF) (hops : List Nat) (K : IProp GF) (k d : Nat) : IProp
 /-- **Rocq `pobs_hop_w_lin`**: ONE HOP, `K` in through the cursor and out
 through it. -/
 theorem pobs_hop_w_lin (γfs : FsNames) (Pin : Aview → Prop) (T : IProp GF) [Persistent T]
-    [Timeless T] (K : IProp GF) [Timeless K] (Pmiss : Nat → Nat → IProp GF) (cw : Nat)
+    [Timeless T] (K : IProp GF) [Timeless K] (Pmiss : Nat → Nat → IProp GF) (rt cw : Nat)
     (pl : List (BitVec 8)) (hops : List Nat) (ino k : Nat) (s : Fname)
-    (hres : pinWalksAt Pin cw pl hops ino) (hk : (pathElems pl)[k]? = some s) :
+    (hres : pinWalksAt Pin rt cw pl hops ino) (hk : (pathElems pl)[k]? = some s) :
     ⊢ pobsMissTaint T Pmiss -∗
       iprop(□ ∀ v : Aview, K -∗ appPred appRun v -∗ appPred appRun v ∗ K ∗ (⌜Pin v⌝ ∨ T)) -∗
       appInv (hlc := hlc) γfs -∗
-      exHop (hlc := hlc) γfs (pobsPLin T hops K) Pmiss k s := by
-  obtain ⟨-, -, hpin⟩ := hres
+      exHop (hlc := hlc) rt γfs (pobsPLin T hops K) Pmiss k s := by
+  obtain ⟨-, -, hpin, hnd⟩ := hres
   unfold pobsMissTaint
   iintro #Hmt #Hcl #Hinv
   unfold exHop axHop
   iintro %d %ents %dqv HP HF
+  rw [axHopAns_rec rt _ _ k d s ents (fun h => pathNodot_lookup pl k s hnd hk h.1)]
   unfold pobsPLin
   icases HP with (⟨%hd, HK⟩ | #HT)
   · subst hd
@@ -597,12 +630,12 @@ theorem pobs_hop_w_lin (γfs : FsNames) (Pin : Aview → Prop) (T : IProp GF) [P
 
 /-- **Rocq `pobs_walk_w_lin`**: THE WHOLE WALK OUT OF A LIVE CLAIM. -/
 theorem pobs_walk_w_lin (γfs : FsNames) (Pin : Aview → Prop) (T : IProp GF) [Persistent T]
-    [Timeless T] (K : IProp GF) [Timeless K] (Pmiss : Nat → Nat → IProp GF) (cw : Nat)
-    (pl : List (BitVec 8)) (hops : List Nat) (ino : Nat) (hres : pinWalksAt Pin cw pl hops ino) :
+    [Timeless T] (K : IProp GF) [Timeless K] (Pmiss : Nat → Nat → IProp GF) (rt cw : Nat)
+    (pl : List (BitVec 8)) (hops : List Nat) (ino : Nat) (hres : pinWalksAt Pin rt cw pl hops ino) :
     ⊢ pobsMissTaint T Pmiss -∗
       iprop(□ ∀ v : Aview, K -∗ appPred appRun v -∗ appPred appRun v ∗ K ∗ (⌜Pin v⌝ ∨ T)) -∗
       appInv (hlc := hlc) γfs -∗ K -∗
-      exStart (hlc := hlc) γfs cw (pobsPLin T hops K) Pmiss pl := by
+      exStart (hlc := hlc) γfs rt cw (pobsPLin T hops K) Pmiss pl := by
   have hstart := hres.1
   iintro #Hmt #Hcl #Hinv HK
   unfold exStart
@@ -624,7 +657,7 @@ theorem pobs_walk_w_lin (γfs : FsNames) (Pin : Aview → Prop) (T : IProp GF) [
           rw [Nat.zero_add]; simpa using hj
         rw [← exHop_is_axHop]
         iintro #⟨H1, H2, H3⟩
-        iapply (pobs_hop_w_lin γfs Pin T K Pmiss cw pl hops ino (0 + j) s hres hj') $$ H1 H2 H3))
+        iapply (pobs_hop_w_lin γfs Pin T K Pmiss rt cw pl hops ino (0 + j) s hres hj') $$ H1 H2 H3))
     imodintro
     isplitr
     · iexact Hmt

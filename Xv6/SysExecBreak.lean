@@ -240,11 +240,11 @@ theorem sys_exec_kexec (KX : KEXEC) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF �
     byteBuf (sysExecPath sp0) (DFrac.own 1) (bview (pl.length + 1) (sysfilePfun pl)) ∗
     kxcArgv (sysExecArgv sp0) (sysExecKA A P kv pl i pg alen afun) ∗
     sysExecPages pg afun 0 i ∗ bslots 3 ∗ irefSlots 2 ∗ myPay U.gn U.Q ∗
-    execAuPre (hlc := hlc) U.Fs (fsGammaL fscFs) fscFs A.V.cwi A.V.pvSecc U.Q U.P U.Pmiss U.Fo pl i alen afun
+    execAuPre (hlc := hlc) U.Fs (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.V.pvSecc U.Q U.P U.Pmiss U.Fo pl i alen afun
       U.sts U.cs A.pid ∗
     (∀ (c : CPU) (spie spp : Bool) (R' : RegMap) (V' : ProcPriv) (M' : Nat → List (BitVec 8)),
       ⌜calleeSaved k'.regs R'⌝ -∗
-      execArms (hlc := hlc) U.Fs (fsGammaL fscFs) fscFs A.V.cwi A.V.pvSecc U.Q U.P U.Pmiss U.Fo pl i alen afun
+      execArms (hlc := hlc) U.Fs (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.V.pvSecc U.Q U.P U.Pmiss U.Fo pl i alen afun
         U.sts U.gn U.cs A.pid (sysExecV2 A P kv) (sysExecM2 A P) V' M' (R' 10#5) -∗
       kctx c ((k'.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k'.regs 1#5)) -∗
       trapCsrsExt c se -∗ cpuClaimExt c se (procAddr A.j) -∗
@@ -293,14 +293,14 @@ sweep L3b): the failure arm's `evAfter` composes, the success arm does not
 read the count.  What the break needs once the success tail's free loop has
 stepped the counter of the block kexec returned. -/
 theorem execArms_evAfter {Fs : Pfam GF (Uvis → IProp GF)} {Γ : FsViewNames GF} {γfs : FsNames}
-    {cw : Nat} {secc : BitVec 64} {Q : Int → IProp GF} {P Pmiss : Nat → Nat → IProp GF}
+    {rt cw : Nat} {secc : BitVec 64} {Q : Int → IProp GF} {P Pmiss : Nat → Nat → IProp GF}
     {Fo : Pfam GF (Aview → Nat → Anode → IProp GF)} {pl : List (BitVec 8)} {na : Nat}
     {alen : Nat → Nat} {afun : Nat → Nat → BitVec 8} {sts : List FdState} {gn : GName}
     {cs : Std.ExtTreeSet GName compare} {pidv : BitVec 32} {V : ProcPriv}
     {M : Nat → List (BitVec 8)} {V' : ProcPriv} {M' : Nat → List (BitVec 8)} {r : BitVec 64}
     {V'' : ProcPriv} (h : evAfter V' V'') :
-    execArms (hlc := hlc) Fs Γ γfs cw secc Q P Pmiss Fo pl na alen afun sts gn cs pidv V M V' M' r ⊢
-      execArms (hlc := hlc) Fs Γ γfs cw secc Q P Pmiss Fo pl na alen afun sts gn cs pidv V M V'' M' r := by
+    execArms (hlc := hlc) Fs Γ γfs rt cw secc Q P Pmiss Fo pl na alen afun sts gn cs pidv V M V' M' r ⊢
+      execArms (hlc := hlc) Fs Γ γfs rt cw secc Q P Pmiss Fo pl na alen afun sts gn cs pidv V M V'' M' r := by
   obtain ⟨k, hk, rfl⟩ := h
   unfold execArms execPostOk
   iintro (⟨%hf, Hf⟩ | ⟨%i, %av, %a, %harow, Hok⟩)
@@ -355,7 +355,7 @@ theorem sys_exec_break (KX : KEXEC) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF �
   obtain ⟨hK60, hKx, -, -, -, -, -, -⟩ := sys_exec_K _ hS.hK
   -- THE BUNDLE'S INSTANTIATION, at the vector the loop built
   have hargs := sysExec_argsOf (sysExecIm A) A.v1 uvf pg alen afun i hi hok havok hnul
-  ihave Hau := sysExecAuPre_at (hlc := hlc) U.Fs (fsGammaL fscFs) fscFs A.V.cwi A.V.pvSecc U.Q U.P U.Pmiss U.Fo
+  ihave Hau := sysExecAuPre_at (hlc := hlc) U.Fs (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.V.pvSecc U.Q U.P U.Pmiss U.Fo
     (sysExecIm A) A.v0 A.v1 U.sts U.cs A.pid pl i alen afun hpath hargs $$ Hau
   obtain ⟨a2, a8, a9, a18, a19, a20, a21, a22, a23, a24, a25, a26, a27⟩ := hpins
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩

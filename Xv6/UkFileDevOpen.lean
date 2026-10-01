@@ -163,14 +163,14 @@ theorem file_open_present (c : FileFixed) (r : FileAppNames) (sf : Dst) (nm : Fn
   have hpath : ∀ Mv, imgAgrees (strImg pv nm.length f) Mv → argPathOf Mv pv nm :=
     fun Mv hag => strImg_path (strImg pv nm.length f) Mv pv nm f (uname_path_shape nm hu) hf
       (fun _ _ hb => hb) hag
-  have hst : umStartOf cw nm = ROOTINO := by rw [uname_start nm hu cw]; exact hcw
+  have hst : ∀ rt, umStartOf rt cw nm = ROOTINO := fun rt => by rw [uname_start nm hu rt cw]; exact hcw
   ihave Hs := STB.so
   unfold stubLaw
   iapply Hs $$ %h %m %avail Hcode Hrun
   iintro %h1 %hpc %hal #Hi Hrun Hret
   have hal4 : (BitVec.ofNat 64 (Pr.open + 2) + 4#64) &&& 1#64 = 0#64 := by rw [hpc]; exact fh_align _ hal
   iapply wp_uk_ecall_open_read_deed_v FO SYSO N .held h1 (ukWr m 17#5 (BitVec.ofInt 64 15))
-    (BitVec.ofNat 64 (Pr.open + 2)) l avail c r q1 q2 i content nm sf cw (strImg pv nm.length f) pv nm hsN heq
+    (BitVec.ofNat 64 (Pr.open + 2)) l avail c r q1 q2 i content nm sf cw (strImg pv nm.length f) pv nm hu hsN heq
     hnum hal4 hpath ha0r hcr htr (uname_pathElems nm hu) hst $$ Hi Hv Hrun Hcwd Hstd Hinv Hd1 Hd2
   rw [hrd, hwr, hpc]
   iintro %h2 %rv Hans Hcwd Hrun
@@ -235,7 +235,7 @@ theorem file_open_absent (c : FileFixed) (r : FileAppNames) (sf : Dst) (nm : Fna
   have hpath : ∀ Mv, imgAgrees (strImg pv nm.length f) Mv → argPathOf Mv pv nm :=
     fun Mv hag => strImg_path (strImg pv nm.length f) Mv pv nm f (uname_path_shape nm hu) hf
       (fun _ _ hb => hb) hag
-  have hst : umStartOf cw nm = ROOTINO := by rw [uname_start nm hu cw]; exact hcw
+  have hst : ∀ rt, umStartOf rt cw nm = ROOTINO := fun rt => by rw [uname_start nm hu rt cw]; exact hcw
   ihave Hs := STB.so
   unfold stubLaw
   iapply Hs $$ %h %m %avail Hcode Hrun

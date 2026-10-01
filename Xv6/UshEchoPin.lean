@@ -96,14 +96,17 @@ theorem echoPlShape : argPathShape echoPl := by
 /-! ## 2. The pin resolves, at the child's cwd -/
 
 /-- **Rocq `sh_echo_pin_resolves`**. -/
-theorem shEchoPinResolves :
-    pinResolves era0EchoPins ROOTINO echoPl [ROOTINO, ECHO_INO] ECHO_INO User.Echo.elf 1 := by
-  refine ⟨?_, ?_, ?_⟩
-  · unfold umStartOf; split <;> rfl
+theorem shEchoPinResolves (rt : Nat) :
+    pinResolves era0EchoPins rt ROOTINO echoPl [ROOTINO, ECHO_INO] ECHO_INO User.Echo.elf 1 := by
+  refine ⟨?_, ?_, ?_, ?_⟩
+  · rw [umStartOf_rel rt _ _ (by decide)]; rfl
   · rw [echoPathElems]; rfl
   · intro v ⟨_, hnode, hrun⟩
     rw [echoPathElems]
     exact ⟨hrun, hnode⟩
+  · -- no element is `..`: the root-aware hop is the record one
+    show ∀ s ∈ pathElems echoPl, s ≠ DOTDOT
+    rw [echoPathElems]; decide
 
 /-! ## 3. /echo is a file xv6's exec loads, and the image it builds -/
 

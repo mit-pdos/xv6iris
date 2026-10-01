@@ -461,11 +461,11 @@ node) and the trunc piece keyed at `i0`: the two arms above the join carry
 it unkeyed at the tag permit, which costs nothing to pay, and the arm below
 it carries it at the plain surface's kept family, whose refund the tag rides
 (Rocq's `socr_res_of_fail`). -/
-theorem sys_open_cr_res_of_fail (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat) (i0 : Nat)
+theorem sys_open_cr_res_of_fail (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat) (i0 : Nat)
     (Mim : Nat → List (BitVec 8)) (pv : Nat) (vom : BitVec 64)
     (Fo : Pfam GF (Aview → Nat → Anode → IProp GF))
     (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)) :
-    openPostFailPlain (hlc := hlc) Γ γfs cw Mim pv vom (sysOpenCrP i0) sysOpenCrPm Fo Ft ⊢
+    openPostFailPlain (hlc := hlc) Γ γfs rt cw Mim pv vom (sysOpenCrP i0) sysOpenCrPm Fo Ft ⊢
       (pfAt (aopenCommitAt (hlc := hlc) Γ appE) Fo ∨
           ∃ (i : Nat) (av : Aview) (a : Anode), ⌜arowAt av i a⌝ ∗ Fo.pfRecv av i a) ∗
         openTruncAt (hlc := hlc) Γ vom i0 Ft := by
@@ -603,7 +603,7 @@ theorem sys_open_cr_ok_exists (omo : OffMode) (Γ : FsViewNames GF) (i0 : Nat) (
 
 /-- Rocq's `socr_arms_fresh`: the residue, out of the continuation's
 closure. -/
-theorem sys_open_cr_arms_fresh (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat)
+theorem sys_open_cr_arms_fresh (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat)
     (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (Mim : Nat → List (BitVec 8)) (pv : Nat)
     (vom : BitVec 64) (P Pmiss : Nat → Nat → IProp GF)
     (Farm Fun : Pfam GF (Aview → Nat → IProp GF))
@@ -613,16 +613,16 @@ theorem sys_open_cr_arms_fresh (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsN
     (sts : List FdState) (VW : ProcPriv) (MW : Nat → List (BitVec 8)) (r : BitVec 64)
     (pl : List (BitVec 8)) (i0 nl0 : Nat) (hpl : argPathOf Mim pv pl) :
     ⊢ sysOpenCrFresh (hlc := hlc) Γ vom P Farm Fun Fok Fex Fo pl i0 -∗
-      openArmsPlain (hlc := hlc) omo Γ γfs cw γ pa pid Mim pv vom (sysOpenCrP i0) sysOpenCrPm
+      openArmsPlain (hlc := hlc) omo Γ γfs rt cw γ pa pid Mim pv vom (sysOpenCrP i0) sysOpenCrPm
         (sysOpenCrFoPure i0 ⟨.AFile [], nl0⟩) (sysOpenCrFt (hlc := hlc) Γ pl P Farm Fok Fex i0 Ft)
         sts VW MW r -∗
-      |={⊤}=> openArmsCreate (hlc := hlc) omo Γ γfs cw γ pa pid Mim pv vom P Pmiss Farm Fun Fok Fex Fo
+      |={⊤}=> openArmsCreate (hlc := hlc) omo Γ γfs rt cw γ pa pid Mim pv vom P Pmiss Farm Fun Fok Fex Fo
         Ft sts VW MW r := by
   unfold openArmsPlain openArmsCreate
   iintro HR ⟨(⟨%hr, Hpriv, Hfrag, Hf⟩ | Hok), Hslot⟩
   · -- every post-walk failure sits BEFORE the itrunc, so the caller's piece
     -- comes home unfired, keyed at the created child (arm (a))
-    icases sys_open_cr_res_of_fail (hlc := hlc) Γ γfs cw i0 Mim pv vom _ _ $$ Hf with ⟨-, Htc⟩
+    icases sys_open_cr_res_of_fail (hlc := hlc) Γ γfs rt cw i0 Mim pv vom _ _ $$ Hf with ⟨-, Htc⟩
     ihave Htc := (show openTruncAt (hlc := hlc) (GF := GF) Γ vom i0
         (sysOpenCrFt (hlc := hlc) Γ pl P Farm Fok Fex i0 Ft) ⊢
       creTruncKept (hlc := hlc) Γ vom pl P Farm Fok Fex i0 Ft from .rfl) $$ Htc
@@ -666,7 +666,7 @@ theorem sys_open_cr_arms_fresh (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsN
     ipureintro; exact ⟨hpre, hib⟩
 
 /-- Rocq's `socr_arms_exists`. -/
-theorem sys_open_cr_arms_exists (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat)
+theorem sys_open_cr_arms_exists (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat)
     (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (Mim : Nat → List (BitVec 8)) (pv : Nat)
     (vom : BitVec 64) (P Pmiss : Nat → Nat → IProp GF)
     (Farm Fun : Pfam GF (Aview → Nat → IProp GF))
@@ -677,13 +677,13 @@ theorem sys_open_cr_arms_exists (omo : OffMode) (Γ : FsViewNames GF) (γfs : Fs
     (pl : List (BitVec 8)) (i0 : Nat) (a0 : Anode) (hpl : argPathOf Mim pv pl)
     (hnd : ∀ (ents : Std.ExtTreeMap Fname Nat compare) (nl : Nat), a0 ≠ ⟨.ADir ents, nl⟩) :
     ⊢ sysOpenCrExists (hlc := hlc) Γ vom (nparNm Mim pv) P Farm Fun Fok Fex pl i0 -∗
-      openArmsPlain (hlc := hlc) omo Γ γfs cw γ pa pid Mim pv vom (sysOpenCrP i0) sysOpenCrPm
+      openArmsPlain (hlc := hlc) omo Γ γfs rt cw γ pa pid Mim pv vom (sysOpenCrP i0) sysOpenCrPm
         (sysOpenCrFoTag i0 a0 Fo) (sysOpenCrFtEx (hlc := hlc) Γ pl P Farm Fex i0 Ft) sts VW MW r -∗
-      |={⊤}=> openArmsCreate (hlc := hlc) omo Γ γfs cw γ pa pid Mim pv vom P Pmiss Farm Fun Fok Fex Fo
+      |={⊤}=> openArmsCreate (hlc := hlc) omo Γ γfs rt cw γ pa pid Mim pv vom P Pmiss Farm Fun Fok Fex Fo
         Ft sts VW MW r := by
   unfold openArmsPlain openArmsCreate
   iintro HR ⟨(⟨%hr, Hpriv, Hfrag, Hf⟩ | Hok), Hslot⟩
-  · icases sys_open_cr_res_of_fail (hlc := hlc) Γ γfs cw i0 Mim pv vom _ _ $$ Hf with ⟨Hob, Htc⟩
+  · icases sys_open_cr_res_of_fail (hlc := hlc) Γ γfs rt cw i0 Mim pv vom _ _ $$ Hf with ⟨Hob, Htc⟩
     ihave Htc := (show openTruncAt (hlc := hlc) (GF := GF) Γ vom i0
         (sysOpenCrFtEx (hlc := hlc) Γ pl P Farm Fex i0 Ft) ⊢
       creTruncKeptEx (hlc := hlc) Γ vom pl P Farm Fex i0 Ft from .rfl) $$ Htc
@@ -791,7 +791,7 @@ theorem sys_open_cr_post_fresh (k : KCtx) (A : SysOpenArgs GF)
   ispecialize HΦ $$ %c
   iapply (sysOpenK_mono_fupd k A.ns A.V A.M _ _ c) $$ HΦ
   iintro %VW %MW %r H
-  iapply (sys_open_cr_arms_fresh (hlc := hlc) A.omo (fsGammaL fscFs) fscFs A.V.cwi A.γ (procAddr A.j)
+  iapply (sys_open_cr_arms_fresh (hlc := hlc) A.omo (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.γ (procAddr A.j)
     A.pid (sysOpenIm A) A.v.toNat A.vom A.P A.Pmiss Farm Fun Fok Fex A.Fo A.Ft A.sts VW MW r pl i0 nl0
     hpl) $$ HR H
 
@@ -811,7 +811,7 @@ theorem sys_open_cr_post_exists (k : KCtx) (A : SysOpenArgs GF)
   ispecialize HΦ $$ %c
   iapply (sysOpenK_mono_fupd k A.ns A.V A.M _ _ c) $$ HΦ
   iintro %VW %MW %r H
-  iapply (sys_open_cr_arms_exists (hlc := hlc) A.omo (fsGammaL fscFs) fscFs A.V.cwi A.γ (procAddr A.j)
+  iapply (sys_open_cr_arms_exists (hlc := hlc) A.omo (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.γ (procAddr A.j)
     A.pid (sysOpenIm A) A.v.toNat A.vom A.P A.Pmiss Farm Fun Fok Fex A.Fo A.Ft A.sts VW MW r pl i0 a0
     hpl hnd) $$ HR H
 

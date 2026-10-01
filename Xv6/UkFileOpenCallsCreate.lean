@@ -36,7 +36,7 @@ theorem wp_uk_ecall_open_create_deed_v (N : UkNames GF) (omo : OffMode) (h : CPU
     (hNf : uname Nf) (heq : fileAppIs (hlc := hlc) (GF := GF) c r) (hn : UkSysP.usysno m = USYS_open)
     (hal : (pc + 4#64) &&& 1#64 = 0#64) (hpath : ∀ Mv, imgAgrees Img Mv → argPathOf Mv pv pl)
     (ha0 : (m.get 10#5).toNat = pv) (hcr : omCreate (m.get 11#5) = true) (htr : omTrunc (m.get 11#5) = true)
-    (hnp : npElems pl = []) (hst : umStartOf cw pl = ROOTINO) (hlast : (pathElems pl).getLast? = some Nf)
+    (hnp : npElems pl = []) (hst : ∀ rt, umStartOf rt cw pl = ROOTINO) (hlast : (pathElems pl).getLast? = some Nf)
     (hlst : ls.getLast? = some (Uline.LEchoF ws Nf)) (hnpl : np = ls.length) (hok : lineOk ws) :
     ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ uimgView N Img -∗ urun (hlc := hlc) N h m pc avail -∗
       ucwd N.cwd cw -∗ ustd N.fd l -∗ appInv (hlc := hlc) fscFs -∗ fileConsCred (hlc := hlc) c r jo -∗ flLb c ls -∗
@@ -62,7 +62,7 @@ theorem wp_uk_ecall_open_create_deed_v (N : UkNames GF) (omo : OffMode) (h : CPU
   rw [spostAt_open_eq]
   iintro Hpost Hcwd Hrun
   ihave Hrc := xpostOpen_elim _ W rv fdv' $$ Hpost
-  icases Hrc with ⟨%Mv, %hag, Hrc⟩
+  icases Hrc with ⟨%Mv, %hag, %rt, Hrc⟩
   have e0 : xkA W 0 = m.get 10#5 := hk0
   have e1 : xkA W 1 = m.get 11#5 := hk1
   rw [e0, e1, ha0, hcw]
@@ -70,7 +70,7 @@ theorem wp_uk_ecall_open_create_deed_v (N : UkNames GF) (omo : OffMode) (h : CPU
   dsimp only [fileCreateFam, xfamFcreate, xfamPt]
   have hpv : argPathOf Mv pv pl := hpath Mv (fun a b hb => hag a b (himg a b hb))
   iapply wpLoop_fupd
-  ihave Hans := FO.fileOpenCreateRecv fscFs c omo r jo n Nf s g np cw Mv pv (m.get 11#5) pl W.fd rv fdv' ⊤
+  ihave Hans := FO.fileOpenCreateRecv fscFs c omo r jo n Nf s g np rt cw Mv pv (m.get 11#5) pl W.fd rv fdv' ⊤
     CoPset.subseteq_top htr hNf hpv hlast heq $$ Hinv Hkey Hrc
   imod Hans
   imodintro
@@ -103,7 +103,7 @@ theorem wp_uk_ecall_open_create_deed_d (N : UkNames GF) (omo : OffMode) (h : CPU
     (hNf : uname Nf) (heq : fileAppIs (hlc := hlc) (GF := GF) c r) (hn : UkSysP.usysno m = USYS_open)
     (hal : (pc + 4#64) &&& 1#64 = 0#64) (hpath : ∀ Mv, imgAgrees Img Mv → argPathOf Mv pv pl)
     (ha0 : (m.get 10#5).toNat = pv) (hcr : omCreate (m.get 11#5) = true) (htr : omTrunc (m.get 11#5) = true)
-    (hnp : npElems pl = []) (hst : umStartOf cw pl = ROOTINO) (hlast : (pathElems pl).getLast? = some Nf)
+    (hnp : npElems pl = []) (hst : ∀ rt, umStartOf rt cw pl = ROOTINO) (hlast : (pathElems pl).getLast? = some Nf)
     (hlst : ls.getLast? = some (Uline.LEchoF ws Nf)) (hnpl : np = ls.length) (hok : lineOk ws)
     (R : IProp GF) (hdata : R ⊢ uimgView N Img) :
     ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ R -∗ urun (hlc := hlc) N h m pc avail -∗

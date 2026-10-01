@@ -154,7 +154,7 @@ theorem union_Hinit_boot_at (E : UPipesEng (hlc := hlc) (GF := GF) (PS := uprogS
       = unionHk (hlc := hlc) (filePred (hlc := hlc)) ug.ugnFile.fgnCl) :
     ⊢ appInv (hlc := hlc) fscFs -∗ unionBoot (hlc := hlc) ug (genId (hlc := hlc) (GF := GF) + 1) r -∗
       uturnI (GF := GF) ug (genId (hlc := hlc) (GF := GF) + 1) ==∗
-      initBootBundle (hlc := hlc) (SG := uexecSGXv6) ROOTINO seccAll fdt0 := by
+      initBootBundle (hlc := hlc) (SG := uexecSGXv6) ROOTINO ROOTINO seccAll fdt0 := by
   letI : UprogSG GF := uprogSGFree
   have UL := E.UL
   have hrdws := ush_rdwild_of_shape_holds (hlc := hlc) (GF := GF) ug hrdw

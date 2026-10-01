@@ -306,7 +306,7 @@ theorem sys_unlink_w5_spine (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ 
       (k.regs 18#5) (k.regs 19#5) $$ [Hra Hs0 H3 H4 H5]
   · unfold sysUnlinkCells; iframe
   -- ret 0: BOTH receipts, and the instant-2 pin on the target
-  ihave Harms := unlinkArms_ok (hlc := hlc) (fsGammaL fscFs) fscFs A.V.cwi (viewLazy A.V.upt A.V.sz A.M)
+  ihave Harms := unlinkArms_ok (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti A.V.cwi (viewLazy A.V.upt A.V.sz A.M)
       A.v0.toNat A.P A.Pmiss A.Fent A.Ftgt
     A.Fex A.Fmiss pl av0 av1 dinum.toNat iinum.toNat nm ents nl (absRow (eraNode dni bmi dati)) hlast
     hpre ⟨hpos, hnibi⟩ hav1 $$ [$HP $Hx $Hm $He $Hrcv]

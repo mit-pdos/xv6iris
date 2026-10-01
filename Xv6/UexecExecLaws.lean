@@ -108,9 +108,8 @@ theorem syscDepExec_holds : SyscDepExec (hlc := hlc) (GF := GF) := by
   iintro ⟨#Hp, H⟩
   iframe Hp
   iexists (Xfam.xP f), (Xfam.xPmiss f), (Xfam.xFo f)
-  iapply H
-  ipureintro
-  exact imgAgrees_viewLazy V.upt V.sz M
+  ispecialize H $$ %(viewLazy V.upt V.sz M) %(imgAgrees_viewLazy V.upt V.sz M) %V.rti
+  iexact H
 
 /-- **`SyscDepRead`** at the instance: the payload `True`, and the receipt
 at the page view the returned block is at (`permOf_extSz` for the table

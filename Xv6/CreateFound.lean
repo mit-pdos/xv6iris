@@ -491,7 +491,7 @@ theorem createFound_npar (NP : NPAR_WRAP_ERA) (Γ : SchedNames) [ClaimIs (hlc :=
     byteBuf (k'.regs 10#5) dqpv (bview (plen + 1) pfun) ∗
     byteBuf (k'.regs 11#5) (DFrac.own 1) (bview 14 nfun) ∗
     bslots 3 ∗ irefSlots 2 ∗ logOpS icfgLog n Sb ∗ logTx icfgLog ∗
-    epStart fscFs V.cwi P Pmiss (bview plen pfun) ∗
+    epStart fscFs V.rti V.cwi P Pmiss (bview plen pfun) ∗
     (∀ c : CPU, nparWrapEraPost (hlc := hlc) k' plen pfun n Sb P Pmiss pid V M dqb dqs dqpv c)
     ⊢ wpLoop (GF := GF) cpu := by
   have h := NP.wp_npar_wrap_era_eb (hlc := hlc) (GF := GF) Γ cpu k' γl pd pav pu j γkl γk plen
@@ -625,7 +625,7 @@ theorem createFound_exit_fail (cpu : CPU) (k : KCtx) (A : CreateFoundArgs)
     wordPointsTo sbBmapstartAddr 4 A.dqb (BitVec.ofNat 32 fscBmapstart) ∗
     createFoundOwe k A ∗ wordPointsTo (pPid k.proc) 4 pidPriv A.pid ∗ bslots 3 ∗
     irefSlots m ∗ logOpS icfgLog u' Sb' ∗ logTx icfgLog ∗
-    creFailArms (hlc := hlc) (fsGammaL fscFs) fscFs A.ty.toNat A.major.toNat A.minor.toNat F.Nm F.Nd F.P
+    creFailArms (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti A.ty.toNat A.major.toNat A.minor.toNat F.Nm F.Nd F.P
       F.Pmiss F.Farm F.Fdots F.Fun F.Fok F.Fex (bview A.plen A.pfun) ∗
     createFoundK k A F
     ⊢ wpLoop (GF := GF) cpu := by
@@ -784,7 +784,7 @@ theorem createFound_armG (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := h
     (by kctx_ext) $$ Hk
   ihave Hsl := irefSlots_combine 1 1 $$ [$Hs1 Hslot]
   · iapply (show irefSlot (GF := GF) ⊢ irefSlots 1 from .rfl); iexact Hslot
-  ihave Hcf := create_fail_of_cursor (hlc := hlc) (fsGammaL fscFs) fscFs A.ty.toNat A.major.toNat
+  ihave Hcf := create_fail_of_cursor (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti A.ty.toNat A.major.toNat
     A.minor.toNat F.Nm F.Nd F.P F.Pmiss F.Farm F.Fdots F.Fun F.Fok F.Fex (bview A.plen A.pfun) dind.toNat
     $$ HP Hdl Hcre
   have hns := hS.hns
@@ -874,7 +874,7 @@ theorem createFound_armG2 (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := 
     (by kctx_ext) $$ Hk
   ihave Hsl := irefSlots_combine 1 1 $$ [$Hs1 Hslot]
   · iapply (show irefSlot (GF := GF) ⊢ irefSlots 1 from .rfl); iexact Hslot
-  ihave Hcf := create_fail_of_cursor (hlc := hlc) (fsGammaL fscFs) fscFs A.ty.toNat A.major.toNat
+  ihave Hcf := create_fail_of_cursor (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti A.ty.toNat A.major.toNat
     A.minor.toNat F.Nm F.Nd F.P F.Pmiss F.Farm F.Fdots F.Fun F.Fok F.Fex (bview A.plen A.pfun) dind.toNat
     $$ HP Hdl Hcre
   have hns := hS.hns
@@ -901,7 +901,7 @@ theorem createFound_armN (cpu : CPU) (k : KCtx) (A : CreateFoundArgs) (F : Creat
     wordPointsTo sbBmapstartAddr 4 A.dqb (BitVec.ofNat 32 fscBmapstart) ∗
     createFoundOwe k A ∗ wordPointsTo (pPid k.proc) 4 pidPriv A.pid ∗ bslots 3 ∗
     irefSlots 2 ∗ logOpS icfgLog n1 Sb1 ∗ logTx icfgLog ∗
-    npDead (hlc := hlc) fscFs F.P F.Pmiss (bview A.plen A.pfun) ∗
+    npDead (hlc := hlc) A.V.rti fscFs F.P F.Pmiss (bview A.plen A.pfun) ∗
     pfAt (dlookupCommitAt (fsGammaL fscFs) appE) F.Fex ∗
     creCommits (hlc := hlc) (fsGammaL fscFs) A.ty.toNat A.major.toNat A.minor.toNat
       F.Nm F.Nd (F.P (nparElems (bview A.plen A.pfun)).length) F.Farm F.Fdots F.Fun F.Fok ∗
@@ -913,7 +913,7 @@ theorem createFound_armN (cpu : CPU) (k : KCtx) (A : CreateFoundArgs) (F : Creat
   iintro ⟨Hk, Hpc, Hfr, Hte, Hce, Hsi, Hsb, Howe, Hpid, Hbs, Hs2, Hop, Htx, Hdead, Hdl, Hcre,
     Hpost⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
-  ihave Hcf := create_fail_of_dead (hlc := hlc) (fsGammaL fscFs) fscFs A.ty.toNat A.major.toNat
+  ihave Hcf := create_fail_of_dead (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti A.ty.toNat A.major.toNat
     A.minor.toNat F.Nm F.Nd F.P F.Pmiss F.Farm F.Fdots F.Fun F.Fok F.Fex (bview A.plen A.pfun)
     $$ Hdead Hdl Hcre
   -- +0x22  beqz a0 TAKEN
@@ -962,7 +962,7 @@ theorem createFound_fbad (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := h
     wordPointsTo sbBmapstartAddr 4 A.dqb (BitVec.ofNat 32 fscBmapstart) ∗
     createFoundOwe k A ∗ wordPointsTo (pPid k.proc) 4 pidPriv A.pid ∗ bslots 3 ∗
     irefSlots 1 ∗ logOpS icfgLog n2 Sb2 ∗
-    creFailArms (hlc := hlc) (fsGammaL fscFs) fscFs A.ty.toNat A.major.toNat A.minor.toNat F.Nm F.Nd F.P
+    creFailArms (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti A.ty.toNat A.major.toNat A.minor.toNat F.Nm F.Nd F.P
       F.Pmiss F.Farm F.Fdots F.Fun F.Fok F.Fex (bview A.plen A.pfun) ∗
     createFoundK k A F
     ⊢ wpLoop (GF := GF) cpu := by
@@ -1138,7 +1138,7 @@ theorem createFound_tests (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := 
       have hb : (dnc.diType == 2#16 || dnc.diType == 3#16) = false := by
         simp only [not_or] at hin; simp [hin.1, hin.2]
       simp only [hb, Bool.not_false, if_true]
-      ihave Hcf := create_fail_of_seen (hlc := hlc) (fsGammaL fscFs) fscFs A.ty.toNat
+      ihave Hcf := create_fail_of_seen (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti A.ty.toNat
         A.major.toNat A.minor.toNat F.Nm F.Nd F.P F.Pmiss F.Farm F.Fdots F.Fun F.Fok F.Fex
         (bview A.plen A.pfun) dind.toNat (bname 14 nf) cinum.toNat hlast $$ HP Hex Hcre
       iapply (createFound_fbad IUP Γ cpu k A F hS spie spp _ v3 dpv nf tl kc qc gc loc tlc cinum
@@ -1150,7 +1150,7 @@ theorem createFound_tests (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := 
   · -- ===== ARM F-BAD, first entry: the requested type is not T_FILE =====
     have hb : decide (A.ty.toNat ≠ T_FILE) = true := decide_eq_true hf
     simp only [hb, if_true]
-    ihave Hcf := create_fail_of_seen (hlc := hlc) (fsGammaL fscFs) fscFs A.ty.toNat
+    ihave Hcf := create_fail_of_seen (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti A.ty.toNat
       A.major.toNat A.minor.toNat F.Nm F.Nd F.P F.Pmiss F.Farm F.Fdots F.Fun F.Fok F.Fex
       (bview A.plen A.pfun) dind.toNat (bname 14 nf) cinum.toNat hlast $$ HP Hex Hcre
     iapply (createFound_fbad IUP Γ cpu k A F hS spie spp _ v3 dpv nf tl kc qc gc loc tlc cinum
@@ -1701,7 +1701,7 @@ theorem createFound_entry (NP : NPAR_WRAP_ERA) (IL : ILOCK) (IUP : IUNLOCKPUT) (
     procPrivFd A.γ k.proc A.pid A.V A.M ∗
     byteBuf (k.regs 10#5) A.dqpv (bview (A.plen + 1) A.pfun) ∗
     bslots 3 ∗ irefSlots A.ns ∗ logOpS icfgLog A.u A.Sb ∗ logTx icfgLog ∗
-    epStart fscFs A.V.cwi F.P F.Pmiss (bview A.plen A.pfun) ∗
+    epStart fscFs A.V.rti A.V.cwi F.P F.Pmiss (bview A.plen A.pfun) ∗
     pfAt (dlookupCommitAt (fsGammaL fscFs) appE) F.Fex ∗
     creCommits (hlc := hlc) (fsGammaL fscFs) A.ty.toNat A.major.toNat A.minor.toNat
       F.Nm F.Nd (F.P (nparElems (bview A.plen A.pfun)).length) F.Farm F.Fdots F.Fun F.Fok ∗

@@ -151,7 +151,7 @@ theorem seccSbundleExec (W : Uvis) :
   iintro #Hk #Hpay #IH
   isplitr
   · iexact Hpay
-  iintro %Mv %_
+  iintro %Mv %_ %rt
   unfold sysExecAuPre
   isplitl []
   · iintro %pl %_
@@ -160,8 +160,8 @@ theorem seccSbundleExec (W : Uvis) :
     imodintro
     isplitr
     · ipureintro; trivial
-    · iapply (show ⊢@{IProp GF} exHopsFrom fscFs (fun _ _ => iprop(True)) (fun _ _ => iprop(True)) pl 0
-        from by rw [exHops_is_axHops]; exact axHops_triv _ _ _)
+    · iapply (show ⊢@{IProp GF} exHopsFrom rt fscFs (fun _ _ => iprop(True)) (fun _ _ => iprop(True)) pl 0
+        from by rw [exHops_is_axHops]; exact axHops_triv _ _ _ _)
   isplitl []
   · iapply fsabsAopen
   · unfold pfAt sysExecSlotPre execSlotPre
@@ -201,6 +201,7 @@ theorem seccSbundleRows (n : Int) (W : Uvis) (hnb : n ∉ seccB.map Int.ofNat) :
   · rw [if_pos h9]
     unfold xrowChdir
     dsimp only [seccFam, xfamAt, xfamPt]
+    iintro %rt
     iapply fsabsChdirPre
   rw [if_neg h9, if_neg h15]
   by_cases h16 : n = 16
