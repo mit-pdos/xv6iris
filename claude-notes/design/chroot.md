@@ -288,7 +288,15 @@ The Lean tree keeps every shape above; the spellings follow its conventions
 Nat` (named fields, appended after `ev`), `updRoot`/`updRti`; `procFields`
 owns the root cell; `ProcInv.rootRefAt v z := inodeHeldAt v z` beside
 `cwdRefAt`, the last conjunct of the core; `procDormant*` pin `root = 0`;
-`IrefSlots.IREFHOME = 2`.  `SpecDirlookup`: `dlSelf s dinum rti`, the
+`IrefSlots.IREFHOME = 2`.  Two things the Lean shapes decided differently
+from §1's "LAST": the root REFERENCE sits right after the cwd reference
+and before the generation row in every core shape (`procPrivCwd`,
+`procPrivCoreNoctxAt`, `procPrivCoreUnmarkedAt`, and the hand-restated
+cores `parkBootBlock`, `utBlock`, `ecRest`, `sysPipeCoreRest`), while the
+root CELL is the last conjunct of every `procFields*`; and there are no
+`us_*` updaters — record updates `{ V with root := v, rti := z }` do that
+job, and the `noctx` accessors' keep-premise names the two fields.  The
+cells-level `CtxMorph` instances grow with the cells.  `SpecDirlookup`: `dlSelf s dinum rti`, the
 share row `inodeShr kd sd icfgDev dinum ∗ runitAny dinum.toNat`, the whole
 root row, the `self` binder last; `SpecIdup.wp_idup_shr` is the share form;
 `IcacheShortCarve.lean`, `IregClaimPlain.lean`.  `FsAbsEra.umStartOf rt cw
