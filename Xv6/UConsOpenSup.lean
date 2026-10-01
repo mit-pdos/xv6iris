@@ -106,65 +106,65 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 /-- **Rocq `cons_hop_dead`**: HOP 0 -- the claim says `console` is not an
 entry of the root, so the hop takes the MISS branch and pays it with the
 very credential the cursor handed it. -/
-theorem cons_hop_dead (γfs : FsNames) (T K : IProp GF) [Persistent T] [Timeless T] [Timeless K] :
+theorem cons_hop_dead (γfs : FsNames) (rt : Nat) (T K : IProp GF) [Persistent T] [Timeless T] [Timeless K] :
     ⊢ initConsAbsLaw T K -∗ appInv (hlc := hlc) γfs -∗
-      exHop (hlc := hlc) γfs (consPDead T K ROOTINO) (consPmiss T K) 0 fnameConsole := by
+      exHop (hlc := hlc) rt γfs (consPDead T K ROOTINO) (consPmiss T K) 0 fnameConsole := by
   iintro #Hcl #Hinv
   rw [consPDead_eq]
   unfold initConsAbsLaw initConsPinLaw
-  iapply (pobs_hop_dead_lin γfs consAbsent T K (consPmiss T K) ROOTINO initConsPl ROOTINO fnameConsole
-    cons_pin_misses_at init_cons_elems_hd) $$ Hcl [] [] Hinv
+  iapply (pobs_hop_dead_lin γfs consAbsent T K (consPmiss T K) rt ROOTINO initConsPl ROOTINO fnameConsole
+    (cons_pin_misses_at rt) init_cons_elems_hd) $$ Hcl [] [] Hinv
   · iapply consPmiss_taint
   · iapply consPmiss_hold
 
 /-- **Rocq `cons_walk_dead`**: the whole walk, the credential riding the
 cursor. -/
-theorem cons_walk_dead (γfs : FsNames) (T K : IProp GF) [Persistent T] [Timeless T] [Timeless K] :
+theorem cons_walk_dead (γfs : FsNames) (rt : Nat) (T K : IProp GF) [Persistent T] [Timeless T] [Timeless K] :
     ⊢ initConsAbsLaw T K -∗ appInv (hlc := hlc) γfs -∗ K -∗
-      exStart (hlc := hlc) γfs ROOTINO (consPDead T K ROOTINO) (consPmiss T K) initConsPl := by
+      exStart (hlc := hlc) γfs rt ROOTINO (consPDead T K ROOTINO) (consPmiss T K) initConsPl := by
   iintro #Hcl #Hinv HK
   rw [consPDead_eq]
   unfold initConsAbsLaw initConsPinLaw
-  iapply (pobs_walk_dead_lin γfs consAbsent T K (consPmiss T K) ROOTINO initConsPl ROOTINO
-    cons_pin_misses_at) $$ Hcl [] [] Hinv HK
+  iapply (pobs_walk_dead_lin γfs consAbsent T K (consPmiss T K) rt ROOTINO initConsPl ROOTINO
+    (cons_pin_misses_at rt)) $$ Hcl [] [] Hinv HK
   · iapply consPmiss_taint
   · iapply consPmiss_hold
 
 /-- **Rocq `cons_open_bundle_dead`**: /init's own bundle for an open it
 expects to fail, the credential inside the walk's families. -/
-theorem cons_open_bundle_dead (γfs : FsNames) (T K : IProp GF) [Persistent T] [Timeless T] [Timeless K]
+theorem cons_open_bundle_dead (γfs : FsNames) (rt : Nat) (T K : IProp GF) [Persistent T] [Timeless T] [Timeless K]
     (M : Nat → List (BitVec 8)) (pv : Nat) (vom : BitVec 64)
     (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF))
     (Farm Fun : Pfam GF (Aview → Nat → IProp GF))
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
     (hom : omArg vom = 2) (hpath : argPathOf M pv initConsPl) :
     ⊢ initConsAbsLaw T K -∗ appInv (hlc := hlc) γfs -∗ K -∗
-      openIn (hlc := hlc) (fsGammaL γfs) γfs ROOTINO M pv vom (consPDead T K ROOTINO) (consPmiss T K) Farm
+      openIn (hlc := hlc) (fsGammaL γfs) γfs rt ROOTINO M pv vom (consPDead T K ROOTINO) (consPmiss T K) Farm
         Fun Fok Fex (pfamTriv (fun (_ : Aview) (_ : Nat) (_ : Anode) => iprop(True))) Ft := by
   obtain ⟨hcr, htr⟩ := omRdwr_plain vom hom
   iintro #Hcl #Hinv HK
   rw [consPDead_eq]
   unfold initConsAbsLaw initConsPinLaw
-  iapply (pinned_open_bundle_dead_lin_notrunc γfs consAbsent T K (consPmiss T K) ROOTINO initConsPl ROOTINO
-    M pv vom Ft Farm Fun Fok Fex hcr htr cons_pin_misses_at hpath) $$ Hcl [] [] Hinv HK
+  iapply (pinned_open_bundle_dead_lin_notrunc γfs consAbsent T K (consPmiss T K) rt ROOTINO initConsPl ROOTINO
+    M pv vom Ft Farm Fun Fok Fex hcr htr (cons_pin_misses_at rt) hpath) $$ Hcl [] [] Hinv HK
   · iapply consPmiss_taint
   · iapply consPmiss_hold
 
 /-- **Rocq `cons_open_dead_recv`**: THE RECEIPT -- the call failed, the
 table did not move, and the credential is back (or the taint); or the
 application is tainted.  No third arm. -/
-theorem cons_open_dead_recv (γfs : FsNames) (T K : IProp GF) [Persistent T]
+theorem cons_open_dead_recv (γfs : FsNames) (rt : Nat) (T K : IProp GF) [Persistent T]
     (M : Nat → List (BitVec 8)) (pv : Nat) (vom : BitVec 64)
     (Fo : Pfam GF (Aview → Nat → Anode → IProp GF))
     (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF))
     (sts : List FdState) (r : BitVec 64) (fdv' : List FdState)
     (htr : omTrunc vom = false) (hpath : argPathOf M pv initConsPl) :
-    ⊢ openReceiptPlain (hlc := hlc) .parked (fsGammaL γfs) γfs ROOTINO M pv vom (consPDead T K ROOTINO)
+    ⊢ openReceiptPlain (hlc := hlc) .parked (fsGammaL γfs) γfs rt ROOTINO M pv vom (consPDead T K ROOTINO)
         (consPmiss T K) Fo Ft sts r fdv' ={⊤}=∗
       iprop((⌜r = 0xFFFFFFFFFFFFFFFF#64⌝ ∗ ⌜fdv' = sts⌝ ∗ (K ∨ T)) ∨ T) := by
   rw [consPDead_eq, consPmiss_eq]
   iintro Hrc
-  imod (pinned_open_dead_lin γfs T K .parked ROOTINO initConsPl ROOTINO M pv vom Fo Ft sts r fdv' hpath
+  imod (pinned_open_dead_lin γfs T K .parked rt ROOTINO initConsPl ROOTINO M pv vom Fo Ft sts r fdv' hpath
     init_cons_path_elems_ne (fun h => absurd (htr ▸ h) (by simp))) $$ Hrc with Hans
   imodintro
   icases Hans with (⟨%hr, %hfd, HK⟩ | HT)
@@ -227,10 +227,10 @@ theorem cons_sup_absent (N : UkNames GF) (T K : IProp GF) [Persistent T] [Timele
   isplitl [Hufd]
   · iexact Hufd
   iapply UkFileOpen.sbundleAt_open_intro
-  iintro %Mv %hag
+  iintro %Mv %hag %rt
   rw [UkFileOpen.xkA_run0, UkFileOpen.xkA_run1, ha0, ha1]
   dsimp only [initConsAbsentFam, UkFileOpen.xfamOpen, uvisOfRun]
-  iapply (cons_open_bundle_dead fscFs T K Mv pv (2#64) _ _ _ _ _ initCons_om2_arg
+  iapply (cons_open_bundle_dead fscFs rt T K Mv pv (2#64) _ _ _ _ _ initCons_om2_arg
     (hpath Mv (fun a b h => hag a b (hsro a b h)))) $$ Habs Hinv HK
 
 /-- **Rocq `init_cons_console_fam`**: the SECOND open, at the pin that
@@ -259,10 +259,10 @@ theorem cons_sup_console (N : UkNames GF) (Pure : Aview → Prop) (Made : Nat �
   isplitl [Hufd]
   · iexact Hufd
   iapply UkFileOpen.sbundleAt_open_intro
-  iintro %Mv %hag
+  iintro %Mv %hag %rt
   rw [UkFileOpen.xkA_run0, UkFileOpen.xkA_run1, ha0, ha1]
   dsimp only [initConsConsoleFam, UkFileOpen.xfamOpen, uvisOfRun]
-  iapply (init_cons_laws_open_console fscFs Pure Made Pv T K i Mv pv (2#64) _ _ _ _ _ initCons_om2_arg
+  iapply (init_cons_laws_open_console fscFs rt Pure Made Pv T K i Mv pv (2#64) _ _ _ _ _ initCons_om2_arg
     (hpath Mv (fun a b h => hag a b (hsro a b h)))) $$ Hlaws Hmade Hinv
 
 end Sup

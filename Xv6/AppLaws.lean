@@ -30,7 +30,7 @@ Rocq's header on the laws, kept because the reasons are the content:
   `al_programs` (`EraInitBoot` at `A.turn`) takes `A.turn c (gen + 1)`
   (Rocq `app_turn A c (S gen_id) -∗`).
 * (Done, K3.) `al_programs` yields Rocq's `init_boot_bundle … secc_all fdt0`:
-  `EraInitBoot` states `initBootBundle ROOTINO seccAll fdt0` (the exec's mask
+  `EraInitBoot` states `initBootBundle ROOTINO ROOTINO seccAll fdt0` (the exec's mask
   pin, `SpecKexec.execSlotPre`'s `secc`), and this field follows it by name.
 
 ## DEVIATIONS from Rocq
@@ -396,7 +396,7 @@ theorem appTriv_initBoot (US : USER) (c : Unit)
   ihave #Hl := hlic
   ihave #Hg := hgen
   imodintro
-  iapply initBootBundle_of_mint (hlc := hlc) (GF := GF) ROOTINO seccAll (List.replicate NOFILE FdState.closed)
+  iapply initBootBundle_of_mint (hlc := hlc) (GF := GF) ROOTINO ROOTINO seccAll (List.replicate NOFILE FdState.closed)
     $$ Hs Hk Hl Hg
 
 end trivBoot

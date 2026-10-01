@@ -101,14 +101,17 @@ theorem init_sh_pl_len : initShPl.length = 2 := rfl
 /-! ## 2.  THE PIN RESOLVES, at init's cwd -/
 
 /-- **Rocq `init_sh_pin_resolves`**. -/
-theorem init_sh_pin_resolves :
-    pinResolves era0ShPins ROOTINO initShPl [ROOTINO, SH_INO] SH_INO User.Sh.elf 1 := by
-  refine ⟨?_, ?_, ?_⟩
-  · unfold umStartOf; split <;> rfl
+theorem init_sh_pin_resolves (rt : Nat) :
+    pinResolves era0ShPins rt ROOTINO initShPl [ROOTINO, SH_INO] SH_INO User.Sh.elf 1 := by
+  refine ⟨?_, ?_, ?_, ?_⟩
+  · rw [umStartOf_rel rt _ _ (by decide)]; rfl
   · rw [init_sh_path_elems]; rfl
   · intro v ⟨_, hnode, hrun⟩
     rw [init_sh_path_elems]
     exact ⟨hrun, hnode⟩
+  · -- no element is `..`: the root-aware hop is the record one
+    show ∀ s ∈ pathElems initShPl, s ≠ DOTDOT
+    rw [init_sh_path_elems]; decide
 
 /-! ## 3.  INIT'S IMAGE, READ (deviation 1) -/
 

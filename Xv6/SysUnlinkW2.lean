@@ -163,7 +163,7 @@ theorem sys_unlink_w2_dot (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
   icases Hcm with ⟨He, Ht, Hx, Hm⟩
   ihave HP := (show A.P (npElems pl).length dinum.toNat ⊢ A.P (nparElems pl).length dinum.toNat
     from .rfl) $$ HP
-  ihave Harms := unlinkArms_dot (hlc := hlc) (fsGammaL fscFs) fscFs A.V.cwi (viewLazy A.V.upt A.V.sz A.M)
+  ihave Harms := unlinkArms_dot (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti A.V.cwi (viewLazy A.V.upt A.V.sz A.M)
       A.v0.toNat A.P A.Pmiss A.Fent
     A.Ftgt A.Fex A.Fmiss pl dinum.toNat (bname 14 nf) (sys_unlink_last_of_npar pl nf hname) hdot
     $$ [$HP $He $Ht $Hx $Hm]
@@ -311,7 +311,7 @@ theorem sys_unlink_w2_look (DL : DIRLOOKUP) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ
       $$ Hftop Hm Htop with ⟨Htop, ⟨%av, %hrow, %hnone, Hrecv⟩⟩
     imodintro
     rw [← topFrag_1]
-    ihave Harms := unlinkArms_miss (hlc := hlc) (fsGammaL fscFs) fscFs A.V.cwi (viewLazy A.V.upt A.V.sz A.M)
+    ihave Harms := unlinkArms_miss (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti A.V.cwi (viewLazy A.V.upt A.V.sz A.M)
       A.v0.toNat A.P A.Pmiss A.Fent
       A.Ftgt A.Fex A.Fmiss pl dinum.toNat av (bname 14 nf) _ _
       (sys_unlink_last_of_npar pl nf hname) hrow hnone $$ [$HP $He $Ht $Hrecv $Hx]

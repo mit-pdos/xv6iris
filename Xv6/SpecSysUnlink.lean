@@ -183,13 +183,13 @@ the parent-prefix walk one-shot there (`FsAbsEra.epStart`, what
 `nparWalkPreEra` instantiates to) and `SysUnlinkDefs`' four commits, the
 entry leg at the walk's terminal cursor `P (nparElems pl).length`.  The
 other three commits are keyed by an inum and a view, never by a string. -/
-def unlinkAuPre (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat) (pl : List (BitVec 8))
+def unlinkAuPre (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat) (pl : List (BitVec 8))
     (P Pmiss : Nat → Nat → IProp GF)
     (Fent : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
     (Ftgt : Pfam GF (Aview → Nat → IProp GF))
     (Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
     (Fmiss : Pfam GF (Aview → Nat → Fname → IProp GF)) : IProp GF :=
-  iprop(epStart (hlc := hlc) γfs cw P Pmiss pl ∗
+  iprop(epStart (hlc := hlc) γfs rt cw P Pmiss pl ∗
     pfAt (uentCommitAt (hlc := hlc) Γ appE (P (nparElems pl).length)) Fent ∗
     pfAt (utgtCommitAt (hlc := hlc) Γ appE) Ftgt ∗
     pfAt (dlookupCommitAt (hlc := hlc) Γ appE) Fex ∗
@@ -199,14 +199,14 @@ def unlinkAuPre (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat) (pl : List (Bi
 the reading of trapframe argument 0.  THE COMMITS STAY OUTSIDE THE WALK'S
 WAND (argstr can fail, and then no `pl` satisfies the reading); the cursor
 rides under the SAME guard (`SysMknodDefs.nparCur`), a bare resource. -/
-def unlinkAuAt (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat)
+def unlinkAuAt (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat)
     (M : Nat → List (BitVec 8)) (pv : Nat)
     (P Pmiss : Nat → Nat → IProp GF)
     (Fent : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
     (Ftgt : Pfam GF (Aview → Nat → IProp GF))
     (Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
     (Fmiss : Pfam GF (Aview → Nat → Fname → IProp GF)) : IProp GF :=
-  iprop((∀ pl : List (BitVec 8), ⌜argPathOf M pv pl⌝ -∗ epStart (hlc := hlc) γfs cw P Pmiss pl) ∗
+  iprop((∀ pl : List (BitVec 8), ⌜argPathOf M pv pl⌝ -∗ epStart (hlc := hlc) γfs rt cw P Pmiss pl) ∗
     pfAt (uentCommitAt (hlc := hlc) Γ appE (nparCur M pv P)) Fent ∗
     pfAt (utgtCommitAt (hlc := hlc) Γ appE) Ftgt ∗
     pfAt (dlookupCommitAt (hlc := hlc) Γ appE) Fex ∗
@@ -229,15 +229,15 @@ theorem unlinkUent_inst (Γ : FsViewNames GF) (M : Nat → List (BitVec 8)) (pv 
   · iapply (nparCur_in M pv pl P hpl)
 
 /-- Rocq's `unlink_au_at_inst`. -/
-theorem unlinkAuAt_inst (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat)
+theorem unlinkAuAt_inst (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat)
     (M : Nat → List (BitVec 8)) (pv : Nat) (pl : List (BitVec 8))
     (P Pmiss : Nat → Nat → IProp GF)
     (Fent : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
     (Ftgt : Pfam GF (Aview → Nat → IProp GF))
     (Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
     (Fmiss : Pfam GF (Aview → Nat → Fname → IProp GF)) (hpl : argPathOf M pv pl) :
-    unlinkAuAt (hlc := hlc) Γ γfs cw M pv P Pmiss Fent Ftgt Fex Fmiss ⊢
-      unlinkAuPre (hlc := hlc) Γ γfs cw pl P Pmiss Fent Ftgt Fex Fmiss := by
+    unlinkAuAt (hlc := hlc) Γ γfs rt cw M pv P Pmiss Fent Ftgt Fex Fmiss ⊢
+      unlinkAuPre (hlc := hlc) Γ γfs rt cw pl P Pmiss Fent Ftgt Fex Fmiss := by
   unfold unlinkAuAt unlinkAuPre
   iintro ⟨Hw, Hent, Htgt, Hex, Hmiss⟩
   ihave Hent := unlinkUent_inst Γ M pv pl P Fent hpl $$ Hent
@@ -245,23 +245,23 @@ theorem unlinkAuAt_inst (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat)
   iapply Hw $$ %pl %hpl
 
 /-- THE GENERIC SUPPLIER'S ONE LINE (Rocq's `unlink_au_at_of_all`). -/
-theorem unlinkAuAt_of_all (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat)
+theorem unlinkAuAt_of_all (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat)
     (M : Nat → List (BitVec 8)) (pv : Nat) (P Pmiss : Nat → Nat → IProp GF)
     (Fent : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
     (Ftgt : Pfam GF (Aview → Nat → IProp GF))
     (Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
     (Fmiss : Pfam GF (Aview → Nat → Fname → IProp GF)) :
-    nparWalkPreEra (hlc := hlc) γfs cw P Pmiss ⊢
+    nparWalkPreEra (hlc := hlc) γfs rt cw P Pmiss ⊢
       pfAt (uentCommitAt (hlc := hlc) Γ appE (nparCur M pv P)) Fent -∗
       pfAt (utgtCommitAt (hlc := hlc) Γ appE) Ftgt -∗
       pfAt (dlookupCommitAt (hlc := hlc) Γ appE) Fex -∗
       pfAt (dmissCommitAt (hlc := hlc) Γ appE) Fmiss -∗
-      unlinkAuAt (hlc := hlc) Γ γfs cw M pv P Pmiss Fent Ftgt Fex Fmiss := by
+      unlinkAuAt (hlc := hlc) Γ γfs rt cw M pv P Pmiss Fent Ftgt Fex Fmiss := by
   unfold unlinkAuAt
   iintro Hw Hent Htgt Hex Hmiss
   iframe Hent Htgt Hex Hmiss
   iintro %pl %_
-  iapply (npStart_of_mknod (hlc := hlc) γfs cw P Pmiss pl) $$ Hw
+  iapply (npStart_of_mknod (hlc := hlc) γfs rt cw P Pmiss pl) $$ Hw
 
 /-- ret 0 (Rocq's `unlink_post_ok`): the fetched path, the cursor at the
 parent, `unlPre` restated purely at instant 1, BOTH fired receipts, the
@@ -286,15 +286,15 @@ def unlinkPostOk (Γ : FsViewNames GF) (P : Nat → Nat → IProp GF)
 
 /-- ret -1 (Rocq's `unlink_post_fail`): (i) bundle back, (ii) walk dead,
 (iii) refused at the parent with the observation each refusal IS. -/
-def unlinkPostFail (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat)
+def unlinkPostFail (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat)
     (M : Nat → List (BitVec 8)) (pv : Nat) (P Pmiss : Nat → Nat → IProp GF)
     (Fent : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
     (Ftgt : Pfam GF (Aview → Nat → IProp GF))
     (Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
     (Fmiss : Pfam GF (Aview → Nat → Fname → IProp GF)) : IProp GF :=
-  iprop(unlinkAuAt (hlc := hlc) Γ γfs cw M pv P Pmiss Fent Ftgt Fex Fmiss ∨
+  iprop(unlinkAuAt (hlc := hlc) Γ γfs rt cw M pv P Pmiss Fent Ftgt Fex Fmiss ∨
     (∃ pl : List (BitVec 8),
-      (nparWalkDeadEra (hlc := hlc) γfs P Pmiss pl ∗
+      (nparWalkDeadEra (hlc := hlc) γfs rt P Pmiss pl ∗
           pfAt (uentCommitAt (hlc := hlc) Γ appE (P (nparElems pl).length)) Fent ∗
           pfAt (utgtCommitAt (hlc := hlc) Γ appE) Ftgt ∗
           pfAt (dlookupCommitAt (hlc := hlc) Γ appE) Fex ∗
@@ -332,7 +332,7 @@ def unlinkPostFail (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat)
 
 /-- The armed disjunction the continuation receives, keyed on a0 (Rocq's
 `unlink_arms`). -/
-def unlinkArms (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat)
+def unlinkArms (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat)
     (M : Nat → List (BitVec 8)) (pv : Nat) (P Pmiss : Nat → Nat → IProp GF)
     (Fent : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
     (Ftgt : Pfam GF (Aview → Nat → IProp GF))
@@ -340,16 +340,16 @@ def unlinkArms (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat)
     (Fmiss : Pfam GF (Aview → Nat → Fname → IProp GF)) (r : BitVec 64) : IProp GF :=
   iprop((⌜r = 0#64⌝ ∗ unlinkPostOk (hlc := hlc) Γ P Fent Ftgt Fex Fmiss) ∨
     (⌜r = 0xFFFFFFFFFFFFFFFF#64⌝ ∗
-      unlinkPostFail (hlc := hlc) Γ γfs cw M pv P Pmiss Fent Ftgt Fex Fmiss))
+      unlinkPostFail (hlc := hlc) Γ γfs rt cw M pv P Pmiss Fent Ftgt Fex Fmiss))
 
 /-- The return blanket, read off the arms (Rocq's `unlink_arms_ret`). -/
-theorem unlinkArms_ret (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat)
+theorem unlinkArms_ret (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat)
     (M : Nat → List (BitVec 8)) (pv : Nat) (P Pmiss : Nat → Nat → IProp GF)
     (Fent : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
     (Ftgt : Pfam GF (Aview → Nat → IProp GF))
     (Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
     (Fmiss : Pfam GF (Aview → Nat → Fname → IProp GF)) (r : BitVec 64) :
-    unlinkArms (hlc := hlc) Γ γfs cw M pv P Pmiss Fent Ftgt Fex Fmiss r ⊢ ⌜sysUnlinkRet r⌝ := by
+    unlinkArms (hlc := hlc) Γ γfs rt cw M pv P Pmiss Fent Ftgt Fex Fmiss r ⊢ ⌜sysUnlinkRet r⌝ := by
   unfold unlinkArms sysUnlinkRet
   iintro (⟨%hr, -⟩ | ⟨%hr, -⟩)
   · ipureintro; exact Or.inr hr
@@ -393,7 +393,7 @@ def sysUnlinkPost (k : KCtx) (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32)
     -- the process block, at the same everything but the page table
     procPrivFd γ pa pid { V.updEv k' with upt := P' } (viewFaulted V.upt P' M) -∗
     -- the armed post on the returned a0
-    unlinkArms (hlc := hlc) (fsGammaL fscFs) fscFs V.cwi (viewLazy V.upt V.sz M) pv
+    unlinkArms (hlc := hlc) (fsGammaL fscFs) fscFs V.rti V.cwi (viewLazy V.upt V.sz M) pv
       P Pmiss Fent Ftgt Fex Fmiss (R' 10#5) -∗
     wpLoop cpu')
 
@@ -431,7 +431,7 @@ def wp_sys_unlink_eb_body (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu : 
   procPrivFd γ (procAddr j) pid V M ∗
   -- THE CALLER'S BUNDLE
   -- (at the PATH ARGUMENT 0 NAMES, read at the entry image: TL-3C)
-  unlinkAuAt (hlc := hlc) (fsGammaL fscFs) fscFs V.cwi (viewLazy V.upt V.sz M) v0.toNat
+  unlinkAuAt (hlc := hlc) (fsGammaL fscFs) fscFs V.rti V.cwi (viewLazy V.upt V.sz M) v0.toNat
     P Pmiss Fent Ftgt Fex Fmiss ∗
   sysUnlinkCont cpu k γ (procAddr j) pid V M v0.toNat P Pmiss Fent Ftgt Fex Fmiss
   ⊢ wpLoop (GF := GF) cpu

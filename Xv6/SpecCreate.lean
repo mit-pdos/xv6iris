@@ -153,14 +153,14 @@ rest: the walk REACHED the parent, so the cursor comes home; the exists
 observation fired (F-BAD read the name) or comes home; and the child's legs
 are whole, or the do-then-undo PAIR fired -- the arm, [the dots, both or
 the first alone,] the unarm -- with the parent leg always coming home. -/
-def creFailArms (Γ : FsViewNames GF) (γfs : FsNames) (tyz ma mi : Nat)
+def creFailArms (Γ : FsViewNames GF) (γfs : FsNames) (rt : Nat) (tyz ma mi : Nat)
     (Nm : Fname → Prop) (Nd : Absnode → Prop) (P Pmiss : Nat → Nat → IProp GF)
     (Farm : Pfam GF (Aview → Nat → IProp GF))
     (Fdots : Pfam GF (Aview → Nat → Nat → Bool → IProp GF))
     (Fun : Pfam GF (Aview → Nat → IProp GF))
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
     (pl : List (BitVec 8)) : IProp GF :=
-  iprop((nparWalkDeadEra (hlc := hlc) γfs P Pmiss pl ∗
+  iprop((nparWalkDeadEra (hlc := hlc) γfs rt P Pmiss pl ∗
       pfAt (dlookupCommitAt Γ appE) Fex ∗
       creCommits (hlc := hlc) Γ tyz ma mi Nm Nd (P (nparElems pl).length) Farm Fdots Fun Fok) ∨
     (∃ d : Nat,
@@ -180,9 +180,9 @@ def creFailArms (Γ : FsViewNames GF) (γfs : FsNames) (tyz ma mi : Nat)
 /-- The whole of what a caller hands create's walk, for a caller that tracks
 nothing: every hop says yes, every cursor is `True` (Rocq's
 `cre_start_unit`). -/
-theorem creStart_unit (γfs : FsNames) (cw : Nat) (pl : List (BitVec 8)) :
-    ⊢ epStart (hlc := hlc) (GF := GF) γfs cw (fun _ _ => iprop(True)) (fun _ _ => iprop(True)) pl :=
-  epStart_triv γfs cw pl
+theorem creStart_unit (γfs : FsNames) (rt cw : Nat) (pl : List (BitVec 8)) :
+    ⊢ epStart (hlc := hlc) (GF := GF) γfs rt cw (fun _ _ => iprop(True)) (fun _ _ => iprop(True)) pl :=
+  epStart_triv γfs rt cw pl
 
 /-! ### The two pinned readings of the arms (Rocq :812–1028)
 
@@ -219,15 +219,15 @@ theorem creOkArms_dev (Γ : FsViewNames GF) (ma mi : Nat) (Nm : Fname → Prop) 
   exact ⟨hlast, hpre⟩
 
 /-- ...and its failure fold (Rocq's `cre_fail_arms_dev`). -/
-theorem creFailArms_dev (Γ : FsViewNames GF) (γfs : FsNames) (ma mi : Nat)
+theorem creFailArms_dev (Γ : FsViewNames GF) (γfs : FsNames) (rt : Nat) (ma mi : Nat)
     (Nm : Fname → Prop) (Nd : Absnode → Prop) (P Pmiss : Nat → Nat → IProp GF)
     (Farm : Pfam GF (Aview → Nat → IProp GF))
     (Fdots : Pfam GF (Aview → Nat → Nat → Bool → IProp GF))
     (Fun : Pfam GF (Aview → Nat → IProp GF))
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
     (pl : List (BitVec 8)) :
-    creFailArms (hlc := hlc) Γ γfs T_DEVICE_w.toNat ma mi Nm Nd P Pmiss Farm Fdots Fun Fok Fex pl ⊢
-      (nparWalkDeadEra (hlc := hlc) γfs P Pmiss pl ∗
+    creFailArms (hlc := hlc) Γ γfs rt T_DEVICE_w.toNat ma mi Nm Nd P Pmiss Farm Fdots Fun Fok Fex pl ⊢
+      (nparWalkDeadEra (hlc := hlc) γfs rt P Pmiss pl ∗
           pfAt (acreCommitAtNm (hlc := hlc) Γ appE (.ADev ma mi) Nm (P (nparElems pl).length) Farm) Fok ∗
           pfAt (dlookupCommitAt Γ appE) Fex ∗
           creChildUnfiredNdp (hlc := hlc) Γ (.ADev ma mi) Nd Farm Fun) ∨
@@ -373,15 +373,15 @@ theorem creOkFile_exists (Γ : FsViewNames GF) (ma mi : Nat) (Nm : Fname → Pro
 
 /-- ...and its failure fold, which sys_open folds into its own create arms
 (Rocq's `cre_fail_arms_file`). -/
-theorem creFailArms_file (Γ : FsViewNames GF) (γfs : FsNames) (ma mi : Nat)
+theorem creFailArms_file (Γ : FsViewNames GF) (γfs : FsNames) (rt : Nat) (ma mi : Nat)
     (Nm : Fname → Prop) (Nd : Absnode → Prop) (P Pmiss : Nat → Nat → IProp GF)
     (Farm : Pfam GF (Aview → Nat → IProp GF))
     (Fdots : Pfam GF (Aview → Nat → Nat → Bool → IProp GF))
     (Fun : Pfam GF (Aview → Nat → IProp GF))
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
     (pl : List (BitVec 8)) :
-    creFailArms (hlc := hlc) Γ γfs T_FILE_w.toNat ma mi Nm Nd P Pmiss Farm Fdots Fun Fok Fex pl ⊢
-      (nparWalkDeadEra (hlc := hlc) γfs P Pmiss pl ∗
+    creFailArms (hlc := hlc) Γ γfs rt T_FILE_w.toNat ma mi Nm Nd P Pmiss Farm Fdots Fun Fok Fex pl ⊢
+      (nparWalkDeadEra (hlc := hlc) γfs rt P Pmiss pl ∗
           pfAt (acreCommitAtNm (hlc := hlc) Γ appE (.AFile []) Nm (P (nparElems pl).length) Farm) Fok ∗
           pfAt (dlookupCommitAt Γ appE) Fex ∗
           creChildUnfiredNdp (hlc := hlc) Γ (.AFile []) Nd Farm Fun) ∨
@@ -485,7 +485,7 @@ def createPost (k : KCtx) (plen : Nat) (pfun : Nat → BitVec 8) (ty major minor
      else
       -- ARMS N / G / the NLINK_MAX gate / F-BAD / A-FAIL / FAIL: a0 = 0, nothing held
       iprop(⌜R' 10#5 = 0#64⌝ ∗ logTx icfgLog ∗
-        creFailArms (hlc := hlc) (fsGammaL fscFs) fscFs ty.toNat major.toNat minor.toNat Nm Nd P Pmiss
+        creFailArms (hlc := hlc) (fsGammaL fscFs) fscFs V.rti ty.toNat major.toNat minor.toNat Nm Nd P Pmiss
           Farm Fdots Fun Fok Fex (bview plen pfun))) -∗
     wpLoop cpu')
 
@@ -572,7 +572,7 @@ def wp_create_sconf_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF
   logTx icfgLog ∗
   -- ---- THE APPLICATION'S SIDE: the walk's deferred start, the exists
   -- observation, and the four commits at the child's type-indexed content
-  epStart fscFs V.cwi P Pmiss (bview plen pfun) ∗
+  epStart fscFs V.rti V.cwi P Pmiss (bview plen pfun) ∗
   pfAt (dlookupCommitAt (fsGammaL fscFs) appE) Fex ∗
   creCommits (hlc := hlc) (fsGammaL fscFs) ty.toNat major.toNat minor.toNat
     Nm Nd (P (nparElems (bview plen pfun)).length) Farm Fdots Fun Fok ∗

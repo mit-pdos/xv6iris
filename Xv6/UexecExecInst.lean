@@ -376,8 +376,8 @@ the slot piece at `X` with refund `Rs`. -/
 def xrowExec (X : Uvis → IProp GF) (Q : Int → IProp GF) (P Pmiss : Nat → Nat → IProp GF)
     (Fo : Pfam GF (Aview → Nat → Anode → IProp GF)) (Rs : IProp GF) (W : Uvis) : IProp GF :=
   iprop(myPay W.gen Q ∗
-    ∀ Mv : Nat → List (BitVec 8), ⌜imgAgrees W.M Mv⌝ -∗
-      sysExecAuPre (hlc := hlc) ⟨X, Rs⟩ (fsGammaL fscFs) fscFs W.cwd W.secc Q P Pmiss Fo Mv
+    ∀ Mv : Nat → List (BitVec 8), ⌜imgAgrees W.M Mv⌝ -∗ ∀ rt : Nat,
+      sysExecAuPre (hlc := hlc) ⟨X, Rs⟩ (fsGammaL fscFs) fscFs rt W.cwd W.secc Q P Pmiss Fo Mv
         (xkA W 0) (xkA W 1) W.fd W.ch W.pid)
 
 /-- row 5: fileread's input at the key's descriptor and count, payload
@@ -388,18 +388,20 @@ def xrowRead (F : Pfam GF (Aview → Nat → Anode → Nat → IProp GF)) (Rd : 
     IProp GF :=
   filereadIn (hlc := hlc) (fdStOfKey (xkA W 0) W.fd) (argZ (xkA W 2)) F Rd Rin Rp Rpe iprop(True)
 
-/-- row 9: chdir's bundle at the key's cwd. -/
+/-- row 9: chdir's bundle at the key's cwd, AT EVERY ROOT (the key carries
+none, design/chroot.md section 3; the dispatcher instantiates its block's
+`rti`). -/
 def xrowChdir (P Pmiss : Nat → Nat → IProp GF) (Fo : Pfam GF (Aview → Nat → Anode → IProp GF))
     (W : Uvis) : IProp GF :=
-  chdirAuPre (hlc := hlc) (fsGammaL fscFs) fscFs W.cwd P Pmiss Fo
+  iprop(∀ rt : Nat, chdirAuPre (hlc := hlc) (fsGammaL fscFs) fscFs rt W.cwd P Pmiss Fo)
 
 /-- row 15: open's one input at argument 0 (the path) and 1 (the omode). -/
 def xrowOpen (P Pmiss : Nat → Nat → IProp GF) (Farm Fun : Pfam GF (Aview → Nat → IProp GF))
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
     (Fo : Pfam GF (Aview → Nat → Anode → IProp GF))
     (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)) (W : Uvis) : IProp GF :=
-  iprop(∀ Mv : Nat → List (BitVec 8), ⌜imgAgrees W.M Mv⌝ -∗
-    openIn (hlc := hlc) (fsGammaL fscFs) fscFs W.cwd Mv (xkA W 0).toNat (xkA W 1)
+  iprop(∀ Mv : Nat → List (BitVec 8), ⌜imgAgrees W.M Mv⌝ -∗ ∀ rt : Nat,
+    openIn (hlc := hlc) (fsGammaL fscFs) fscFs rt W.cwd Mv (xkA W 0).toNat (xkA W 1)
       P Pmiss Farm Fun Fok Fex Fo Ft)
 
 /-- row 16: write's chains at the key's descriptor, count and buffer. -/
@@ -410,8 +412,8 @@ def xrowWrite (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF) (W : Uvi
 /-- row 17: mknod's bundle at argument 0 (the path) and the two devices. -/
 def xrowMknod (P Pmiss : Nat → Nat → IProp GF) (Farm Fun : Pfam GF (Aview → Nat → IProp GF))
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) (W : Uvis) : IProp GF :=
-  iprop(∀ Mv : Nat → List (BitVec 8), ⌜imgAgrees W.M Mv⌝ -∗
-    mknodAuAt (hlc := hlc) (fsGammaL fscFs) fscFs W.cwd Mv (xkA W 0).toNat (devArg (xkA W 1))
+  iprop(∀ Mv : Nat → List (BitVec 8), ⌜imgAgrees W.M Mv⌝ -∗ ∀ rt : Nat,
+    mknodAuAt (hlc := hlc) (fsGammaL fscFs) fscFs rt W.cwd Mv (xkA W 0).toNat (devArg (xkA W 1))
       (devArg (xkA W 2)) P Pmiss Farm Fun Fok Fex)
 
 /-- row 18: unlink's bundle AT ITS PATH ARGUMENT (Rocq TL-3C item (M),
@@ -419,8 +421,8 @@ def xrowMknod (P Pmiss : Nat → Nat → IProp GF) (Farm Fun : Pfam GF (Aview �
 def xrowUnlink (P Pmiss : Nat → Nat → IProp GF) (Fent : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
     (Ftgt : Pfam GF (Aview → Nat → IProp GF)) (Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
     (Fmiss : Pfam GF (Aview → Nat → Fname → IProp GF)) (W : Uvis) : IProp GF :=
-  iprop(∀ Mv : Nat → List (BitVec 8), ⌜imgAgrees W.M Mv⌝ -∗
-    unlinkAuAt (hlc := hlc) (fsGammaL fscFs) fscFs W.cwd Mv (xkA W 0).toNat
+  iprop(∀ Mv : Nat → List (BitVec 8), ⌜imgAgrees W.M Mv⌝ -∗ ∀ rt : Nat,
+    unlinkAuAt (hlc := hlc) (fsGammaL fscFs) fscFs rt W.cwd Mv (xkA W 0).toNat
       P Pmiss Fent Ftgt Fex Fmiss)
 
 /-- row 19. -/
@@ -434,8 +436,8 @@ at every page view agreeing with the key's image (deviation 1). -/
 def xrowMkdir (P Pmiss : Nat → Nat → IProp GF) (Farm : Pfam GF (Aview → Nat → IProp GF))
     (Fdots : Pfam GF (Aview → Nat → Nat → Bool → IProp GF)) (Fun : Pfam GF (Aview → Nat → IProp GF))
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) (W : Uvis) : IProp GF :=
-  iprop(∀ Mv : Nat → List (BitVec 8), ⌜imgAgrees W.M Mv⌝ -∗
-    mkdirAuAt (hlc := hlc) (fsGammaL fscFs) fscFs W.cwd Mv (xkA W 0).toNat
+  iprop(∀ Mv : Nat → List (BitVec 8), ⌜imgAgrees W.M Mv⌝ -∗ ∀ rt : Nat,
+    mkdirAuAt (hlc := hlc) (fsGammaL fscFs) fscFs rt W.cwd Mv (xkA W 0).toNat
       P Pmiss Farm Fdots Fun Fok Fex)
 
 /-! ### The posts -/
@@ -455,10 +457,11 @@ def xpostRead (F : Pfam GF (Aview → Nat → Anode → Nat → IProp GF)) (Rd :
       filereadExtraCore (hlc := hlc) W.gen Pr (fdStOfKey (xkA W 0) W.fd) (argZ (xkA W 2)) F Rd Rin
         Rp Rpe r Mv (xkA W 1))
 
-/-- post 9: chdir's RECEIPT at the cwd the call resumes at. -/
+/-- post 9: chdir's RECEIPT at the cwd the call resumes at, at SOME root
+(the block's, which the key does not carry). -/
 def xpostChdir (P Pmiss : Nat → Nat → IProp GF) (Fo : Pfam GF (Aview → Nat → Anode → IProp GF))
     (W : Uvis) (r : BitVec 64) (cw' : Nat) : IProp GF :=
-  chdirReceipt (hlc := hlc) (fsGammaL fscFs) fscFs W.cwd P Pmiss Fo r cw'
+  iprop(∃ rt : Nat, chdirReceipt (hlc := hlc) (fsGammaL fscFs) fscFs rt W.cwd P Pmiss Fo r cw')
 
 /-- post 15: open's RECEIPT at the descriptor view the call resumes at. -/
 def xpostOpen (omo : OffMode) (P Pmiss : Nat → Nat → IProp GF) (Farm Fun : Pfam GF (Aview → Nat → IProp GF))
@@ -466,8 +469,8 @@ def xpostOpen (omo : OffMode) (P Pmiss : Nat → Nat → IProp GF) (Farm Fun : P
     (Fo : Pfam GF (Aview → Nat → Anode → IProp GF))
     (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)) (W : Uvis) (r : BitVec 64)
     (fdv' : List FdState) : IProp GF :=
-  iprop(∃ Mv : Nat → List (BitVec 8), ⌜imgAgrees W.M Mv⌝ ∗
-    openReceipt (hlc := hlc) omo (fsGammaL fscFs) fscFs W.cwd Mv (xkA W 0).toNat (xkA W 1)
+  iprop(∃ Mv : Nat → List (BitVec 8), ⌜imgAgrees W.M Mv⌝ ∗ ∃ rt : Nat,
+    openReceipt (hlc := hlc) omo (fsGammaL fscFs) fscFs rt W.cwd Mv (xkA W 0).toNat (xkA W 1)
       P Pmiss Farm Fun Fok Fex Fo Ft W.fd r fdv')
 
 /-- post 16 (deviation 2): write's answer in range, and filewrite's extra at
@@ -495,16 +498,16 @@ def xpostPipe (W : Uvis) (r : BitVec 64) (fdv' : List FdState) : IProp GF :=
 def xpostMknod (P Pmiss : Nat → Nat → IProp GF) (Farm Fun : Pfam GF (Aview → Nat → IProp GF))
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) (W : Uvis) (r : BitVec 64) :
     IProp GF :=
-  iprop(∃ Mv : Nat → List (BitVec 8), ⌜imgAgrees W.M Mv⌝ ∗
-    mknodArms (hlc := hlc) (fsGammaL fscFs) fscFs W.cwd Mv (xkA W 0).toNat (devArg (xkA W 1))
+  iprop(∃ Mv : Nat → List (BitVec 8), ⌜imgAgrees W.M Mv⌝ ∗ ∃ rt : Nat,
+    mknodArms (hlc := hlc) (fsGammaL fscFs) fscFs rt W.cwd Mv (xkA W 0).toNat (devArg (xkA W 1))
       (devArg (xkA W 2)) P Pmiss Farm Fun Fok Fex r)
 
 /-- post 18. -/
 def xpostUnlink (P Pmiss : Nat → Nat → IProp GF) (Fent : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
     (Ftgt : Pfam GF (Aview → Nat → IProp GF)) (Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
     (Fmiss : Pfam GF (Aview → Nat → Fname → IProp GF)) (W : Uvis) (r : BitVec 64) : IProp GF :=
-  iprop(∃ Mv : Nat → List (BitVec 8), ⌜imgAgrees W.M Mv⌝ ∗
-    unlinkArms (hlc := hlc) (fsGammaL fscFs) fscFs W.cwd Mv (xkA W 0).toNat
+  iprop(∃ Mv : Nat → List (BitVec 8), ⌜imgAgrees W.M Mv⌝ ∗ ∃ rt : Nat,
+    unlinkArms (hlc := hlc) (fsGammaL fscFs) fscFs rt W.cwd Mv (xkA W 0).toNat
       P Pmiss Fent Ftgt Fex Fmiss r)
 
 /-- post 19. -/
@@ -518,8 +521,8 @@ def xpostMkdir (P Pmiss : Nat → Nat → IProp GF) (Farm : Pfam GF (Aview → N
     (Fdots : Pfam GF (Aview → Nat → Nat → Bool → IProp GF)) (Fun : Pfam GF (Aview → Nat → IProp GF))
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) (W : Uvis) (r : BitVec 64) :
     IProp GF :=
-  iprop(∃ Mv : Nat → List (BitVec 8), ⌜imgAgrees W.M Mv⌝ ∗
-    mkdirArms (hlc := hlc) (fsGammaL fscFs) fscFs W.cwd Mv (xkA W 0).toNat
+  iprop(∃ Mv : Nat → List (BitVec 8), ⌜imgAgrees W.M Mv⌝ ∗ ∃ rt : Nat,
+    mkdirArms (hlc := hlc) (fsGammaL fscFs) fscFs rt W.cwd Mv (xkA W 0).toNat
       P Pmiss Farm Fdots Fun Fok Fex r)
 
 /-! ## §3 THE TWO FAMILIES OF THE CLASS -/
@@ -576,9 +579,9 @@ theorem xrowExec_ne (k : Nat) (X Y : Uvis → IProp GF) (h : ∀ W, X W ≡{k}�
     (W : Uvis) :
     xrowExec (hlc := hlc) X Q P Pmiss Fo Rs W ≡{k}≡ xrowExec (hlc := hlc) Y Q P Pmiss Fo Rs W := by
   unfold xrowExec
-  exact BI.sep_ne.ne .rfl (BI.forall_ne (fun Mv => BI.wand_ne.ne .rfl
-    (sysExecAuPre_ne (hlc := hlc) k X Y Rs (fsGammaL fscFs) fscFs W.cwd W.secc Q P Pmiss Fo Mv (xkA W 0)
-      (xkA W 1) W.fd W.ch W.pid h)))
+  exact BI.sep_ne.ne .rfl (BI.forall_ne (fun Mv => BI.wand_ne.ne .rfl (BI.forall_ne (fun rt =>
+    sysExecAuPre_ne (hlc := hlc) k X Y Rs (fsGammaL fscFs) fscFs rt W.cwd W.secc Q P Pmiss Fo Mv
+      (xkA W 0) (xkA W 1) W.fd W.ch W.pid h))))
 
 /-- **Rocq `xv6_sbundle_ne`**: exec's branch, and the identity elsewhere. -/
 theorem xv6Sbundle_ne (k : Nat) (X Y : Uvis → IProp GF) (h : ∀ W, X W ≡{k}≡ Y W) (n : Int)
@@ -634,8 +637,8 @@ theorem xv6Sbundle_mono (X Y : Uvis → IProp GF) (n : Int) (f : Xfam GF) (W : U
   · unfold xrowExec sysExecAuPre pfAt sysExecSlotPre execSlotPre
     iintro #Hup ⟨#Hmp, Hb⟩
     iframe Hmp
-    iintro %Mv %hag
-    ihave Hb := Hb $$ %Mv %hag
+    iintro %Mv %hag %rt
+    ihave Hb := Hb $$ %Mv %hag %rt
     icases Hb with ⟨Hw, Ho, Hs⟩
     iframe Hw Ho
     isplit
@@ -693,7 +696,7 @@ theorem xrowRead_supply (W : Uvis) :
 theorem xrowChdir_supply (W : Uvis) :
     □ xv6Ssupply (hlc := hlc) (GF := GF) ⊢ xrowChdir (hlc := hlc) (xfamPt (GF := GF)).cP xfamPt.cPmiss xfamPt.cFo W := by
   dsimp only [xrowChdir, xfamPt]
-  iintro -
+  iintro - %rt
   iapply fsabsChdirPre
 
 theorem xrowOpen_supply (W : Uvis) :
@@ -701,7 +704,7 @@ theorem xrowOpen_supply (W : Uvis) :
       xrowOpen (hlc := hlc) (xfamPt (GF := GF)).oP xfamPt.oPmiss xfamPt.oFarm xfamPt.oFun xfamPt.oFok
         xfamPt.oFex xfamPt.oFo xfamPt.oFt W := by
   dsimp only [xrowOpen, xfamPt, xv6Ssupply]
-  iintro #⟨Hsup, -, -⟩ %Mv %_
+  iintro #⟨Hsup, -, -⟩ %Mv %_ %rt
   iapply (fsabsOpenIn (hlc := hlc) fscFs) $$ Hsup
 
 theorem xrowWrite_supply (W : Uvis) :
@@ -715,7 +718,7 @@ theorem xrowMknod_supply (W : Uvis) :
       xrowMknod (hlc := hlc) (xfamPt (GF := GF)).nP xfamPt.nPmiss xfamPt.nFarm xfamPt.nFun xfamPt.nFok
         xfamPt.nFex W := by
   dsimp only [xrowMknod, xfamPt, xv6Ssupply]
-  iintro #⟨Hsup, -, -⟩ %Mv %_
+  iintro #⟨Hsup, -, -⟩ %Mv %_ %rt
   iapply (fsabsMknodPre (hlc := hlc) fscFs) $$ Hsup
 
 theorem xrowUnlink_supply (W : Uvis) :
@@ -723,7 +726,7 @@ theorem xrowUnlink_supply (W : Uvis) :
       xrowUnlink (hlc := hlc) (xfamPt (GF := GF)).uP xfamPt.uPmiss xfamPt.uFent xfamPt.uFtgt xfamPt.uFex
         xfamPt.uFmiss W := by
   dsimp only [xrowUnlink, xfamPt, xv6Ssupply]
-  iintro #⟨Hsup, -, -⟩ %Mv %_
+  iintro #⟨Hsup, -, -⟩ %Mv %_ %rt
   iapply (fsabsUnlinkPre (hlc := hlc) fscFs) $$ Hsup
 
 theorem xrowLink_supply :
@@ -738,7 +741,7 @@ theorem xrowMkdir_supply (W : Uvis) :
       xrowMkdir (hlc := hlc) (xfamPt (GF := GF)).dP xfamPt.dPmiss xfamPt.dFarm xfamPt.dFdots xfamPt.dFun
         xfamPt.dFok xfamPt.dFex W := by
   dsimp only [xrowMkdir, xfamPt, xv6Ssupply]
-  iintro #⟨Hsup, -, -⟩ %Mv %_
+  iintro #⟨Hsup, -, -⟩ %Mv %_ %rt
   iapply (Xv6.mkdirAuAt_unit (hlc := hlc) fscFs) $$ Hsup
 
 /-- every number but exec, at the point (Rocq's branch-by-branch discharge). -/
@@ -837,7 +840,7 @@ theorem xv6SbundleOfSupply (X : Uvis → IProp GF) (n : Int) (W : Uvis) (R : IPr
     dsimp only [xfamAt, xfamPt]
     isplitr
     · iexact Hpay
-    iintro %Mv %_
+    iintro %Mv %_ %rt
     iapply (sysExecAuPre_triv_at (hlc := hlc) X (fun _ => R))
     imodintro
     iintro %W' Hp
@@ -914,7 +917,7 @@ theorem xv6Sbundle_free (X : Uvis → IProp GF) (n : Int) (W : Uvis) (Q : Int �
   dsimp only [xfamAt, xfamPt]
   rw [if_neg hx, if_neg h5]
   by_cases h9 : n = 9
-  · rw [if_pos h9]; unfold xrowChdir; iapply fsabsChdirPre
+  · rw [if_pos h9]; unfold xrowChdir; iintro %rt; iapply fsabsChdirPre
   rw [if_neg h9, if_neg h15, if_neg h16, if_neg h17, if_neg h18, if_neg h19, if_neg h20, if_neg h6,
     if_neg h21, if_neg h2]
   by_cases h22 : n = 22
@@ -1049,8 +1052,8 @@ family's refund (what `syscSysOut_exec` pays back). -/
 theorem syscDepExec_xv6 (X : Uvis → IProp GF) (f : Xfam GF) (W : Uvis) :
     @UexecSG.sbundleAt GF _ uexecSGXv6 X USYS_exec f W ⊢
       myPay W.gen (@UexecSG.sexitPay GF _ uexecSGXv6 f) ∗
-      ∀ Mv : Nat → List (BitVec 8), ⌜imgAgrees W.M Mv⌝ -∗
-        sysExecAuPre (hlc := hlc) ⟨X, @UexecSG.sexecRefund GF _ uexecSGXv6 f⟩ (fsGammaL fscFs) fscFs W.cwd W.secc
+      ∀ Mv : Nat → List (BitVec 8), ⌜imgAgrees W.M Mv⌝ -∗ ∀ rt : Nat,
+        sysExecAuPre (hlc := hlc) ⟨X, @UexecSG.sexecRefund GF _ uexecSGXv6 f⟩ (fsGammaL fscFs) fscFs rt W.cwd W.secc
           (@UexecSG.sexitPay GF _ uexecSGXv6 f) f.xP f.xPmiss f.xFo Mv (xkA W 0) (xkA W 1) W.fd W.ch W.pid := by
   show xv6Sbundle (hlc := hlc) X USYS_exec f W ⊢ _
   unfold xv6Sbundle
@@ -1147,31 +1150,34 @@ theorem syscDepRead_xv6 (f : Xfam GF) (W : Uvis) :
 /-- **`SyscDepChdir`** (Rocq `sbundle_at_chdir_elim` + `spost_at_chdir_intro`). -/
 theorem syscDepChdir_xv6 (f : Xfam GF) (W : Uvis) :
     @UexecSG.sbundleAt GF _ uexecSGXv6 (uslot (hlc := hlc)) 9 f W ⊢
-      chdirAuPre (hlc := hlc) (fsGammaL fscFs) fscFs W.cwd f.cP f.cPmiss f.cFo ∗
-      (∀ (r : BitVec 64) (M' : ElfMem) (fdv' : List FdState) (cw' : Nat) (cs' : ExtTreeSet GName compare),
-        chdirReceipt (hlc := hlc) (fsGammaL fscFs) fscFs W.cwd f.cP f.cPmiss f.cFo r cw' -∗
+      (∀ rt : Nat, chdirAuPre (hlc := hlc) (fsGammaL fscFs) fscFs rt W.cwd f.cP f.cPmiss f.cFo) ∗
+      (∀ (rt : Nat) (r : BitVec 64) (M' : ElfMem) (fdv' : List FdState) (cw' : Nat)
+          (cs' : ExtTreeSet GName compare),
+        chdirReceipt (hlc := hlc) (fsGammaL fscFs) fscFs rt W.cwd f.cP f.cPmiss f.cFo r cw' -∗
           @UexecSG.spostAt GF _ uexecSGXv6 (uslot (hlc := hlc)) 9 f W r M' fdv' cw' cs') := by
   rw [sbundleAt_xv6_chdir]
   unfold xrowChdir
   iintro H
   isplitl [H]
   · iexact H
-  · iintro %r %M' %fdv' %cw' %cs' Hp
+  · iintro %rt %r %M' %fdv' %cw' %cs' Hp
     rw [spostAt_xv6_chdir]
     unfold xpostChdir
+    iexists rt
     iexact Hp
 
 /-- **`SyscDepOpen`** (Rocq `sbundle_at_open_elim` + `spost_at_open_intro`):
 the input at every agreeing view, the receipt at the one it fired at. -/
 theorem syscDepOpen_xv6 (f : Xfam GF) (W : Uvis) :
     @UexecSG.sbundleAt GF _ uexecSGXv6 (uslot (hlc := hlc)) 15 f W ⊢
-      (∀ Mv : Nat → List (BitVec 8), ⌜imgAgrees W.M Mv⌝ -∗
-        openIn (hlc := hlc) (fsGammaL fscFs) fscFs W.cwd Mv (xkA W 0).toNat (xkA W 1)
+      (∀ Mv : Nat → List (BitVec 8), ⌜imgAgrees W.M Mv⌝ -∗ ∀ rt : Nat,
+        openIn (hlc := hlc) (fsGammaL fscFs) fscFs rt W.cwd Mv (xkA W 0).toNat (xkA W 1)
           f.oP f.oPmiss f.oFarm f.oFun f.oFok f.oFex f.oFo f.oFt) ∗
-      (∀ (Mv : Nat → List (BitVec 8)) (r : BitVec 64) (M' : ElfMem) (fdv' : List FdState) (cw' : Nat)
+      (∀ (Mv : Nat → List (BitVec 8)) (rt : Nat) (r : BitVec 64) (M' : ElfMem) (fdv' : List FdState)
+          (cw' : Nat)
           (cs' : ExtTreeSet GName compare),
         ⌜imgAgrees W.M Mv⌝ -∗
-        openReceipt (hlc := hlc) f.oOm (fsGammaL fscFs) fscFs W.cwd Mv (xkA W 0).toNat (xkA W 1)
+        openReceipt (hlc := hlc) f.oOm (fsGammaL fscFs) fscFs rt W.cwd Mv (xkA W 0).toNat (xkA W 1)
           f.oP f.oPmiss f.oFarm f.oFun f.oFok f.oFex f.oFo f.oFt W.fd r fdv' -∗
           @UexecSG.spostAt GF _ uexecSGXv6 (uslot (hlc := hlc)) 15 f W r M' fdv' cw' cs') := by
   rw [sbundleAt_xv6_open]
@@ -1179,12 +1185,14 @@ theorem syscDepOpen_xv6 (f : Xfam GF) (W : Uvis) :
   iintro H
   isplitl [H]
   · iexact H
-  · iintro %Mv %r %M' %fdv' %cw' %cs' %hag Hp
+  · iintro %Mv %rt %r %M' %fdv' %cw' %cs' %hag Hp
     rw [spostAt_xv6_open]
     unfold xpostOpen
     iexists Mv
-    iframe Hp
-    ipureintro; exact hag
+    isplitr
+    · ipureintro; exact hag
+    · iexists rt
+      iexact Hp
 
 /-- **`SyscDepWrite`** (Rocq `sbundle_at_write_elim` + `spost_at_write_intro`;
 deviations 1, 2). -/
@@ -1208,13 +1216,14 @@ theorem syscDepWrite_xv6 (f : Xfam GF) (W : Uvis) :
 /-- **`SyscDepMknod`** (Rocq `sbundle_at_mknod_elim` + `spost_at_mknod_intro`). -/
 theorem syscDepMknod_xv6 (f : Xfam GF) (W : Uvis) :
     @UexecSG.sbundleAt GF _ uexecSGXv6 (uslot (hlc := hlc)) 17 f W ⊢
-      (∀ Mv : Nat → List (BitVec 8), ⌜imgAgrees W.M Mv⌝ -∗
-        mknodAuAt (hlc := hlc) (fsGammaL fscFs) fscFs W.cwd Mv (xkA W 0).toNat (devArg (xkA W 1))
+      (∀ Mv : Nat → List (BitVec 8), ⌜imgAgrees W.M Mv⌝ -∗ ∀ rt : Nat,
+        mknodAuAt (hlc := hlc) (fsGammaL fscFs) fscFs rt W.cwd Mv (xkA W 0).toNat (devArg (xkA W 1))
           (devArg (xkA W 2)) f.nP f.nPmiss f.nFarm f.nFun f.nFok f.nFex) ∗
-      (∀ (Mv : Nat → List (BitVec 8)) (r : BitVec 64) (M' : ElfMem) (fdv' : List FdState) (cw' : Nat)
+      (∀ (Mv : Nat → List (BitVec 8)) (rt : Nat) (r : BitVec 64) (M' : ElfMem) (fdv' : List FdState)
+          (cw' : Nat)
           (cs' : ExtTreeSet GName compare),
         ⌜imgAgrees W.M Mv⌝ -∗
-        mknodArms (hlc := hlc) (fsGammaL fscFs) fscFs W.cwd Mv (xkA W 0).toNat (devArg (xkA W 1))
+        mknodArms (hlc := hlc) (fsGammaL fscFs) fscFs rt W.cwd Mv (xkA W 0).toNat (devArg (xkA W 1))
           (devArg (xkA W 2)) f.nP f.nPmiss f.nFarm f.nFun f.nFok f.nFex r -∗
           @UexecSG.spostAt GF _ uexecSGXv6 (uslot (hlc := hlc)) 17 f W r M' fdv' cw' cs') := by
   rw [sbundleAt_xv6_mknod]
@@ -1222,23 +1231,26 @@ theorem syscDepMknod_xv6 (f : Xfam GF) (W : Uvis) :
   iintro H
   isplitl [H]
   · iexact H
-  · iintro %Mv %r %M' %fdv' %cw' %cs' %hag Hp
+  · iintro %Mv %rt %r %M' %fdv' %cw' %cs' %hag Hp
     rw [spostAt_xv6_mknod]
     unfold xpostMknod
     iexists Mv
-    iframe Hp
-    ipureintro; exact hag
+    isplitr
+    · ipureintro; exact hag
+    · iexists rt
+      iexact Hp
 
 /-- **`SyscDepUnlink`** (Rocq `sbundle_at_unlink_elim` + `spost_at_unlink_intro`). -/
 theorem syscDepUnlink_xv6 (f : Xfam GF) (W : Uvis) :
     @UexecSG.sbundleAt GF _ uexecSGXv6 (uslot (hlc := hlc)) 18 f W ⊢
-      (∀ Mv : Nat → List (BitVec 8), ⌜imgAgrees W.M Mv⌝ -∗
-        unlinkAuAt (hlc := hlc) (fsGammaL fscFs) fscFs W.cwd Mv (xkA W 0).toNat f.uP f.uPmiss
+      (∀ Mv : Nat → List (BitVec 8), ⌜imgAgrees W.M Mv⌝ -∗ ∀ rt : Nat,
+        unlinkAuAt (hlc := hlc) (fsGammaL fscFs) fscFs rt W.cwd Mv (xkA W 0).toNat f.uP f.uPmiss
           f.uFent f.uFtgt f.uFex f.uFmiss) ∗
-      (∀ (Mv : Nat → List (BitVec 8)) (r : BitVec 64) (M' : ElfMem) (fdv' : List FdState) (cw' : Nat)
+      (∀ (Mv : Nat → List (BitVec 8)) (rt : Nat) (r : BitVec 64) (M' : ElfMem) (fdv' : List FdState)
+          (cw' : Nat)
           (cs' : ExtTreeSet GName compare),
         ⌜imgAgrees W.M Mv⌝ -∗
-        unlinkArms (hlc := hlc) (fsGammaL fscFs) fscFs W.cwd Mv (xkA W 0).toNat f.uP f.uPmiss
+        unlinkArms (hlc := hlc) (fsGammaL fscFs) fscFs rt W.cwd Mv (xkA W 0).toNat f.uP f.uPmiss
           f.uFent f.uFtgt f.uFex f.uFmiss r -∗
           @UexecSG.spostAt GF _ uexecSGXv6 (uslot (hlc := hlc)) 18 f W r M' fdv' cw' cs') := by
   rw [sbundleAt_xv6_unlink]
@@ -1246,12 +1258,14 @@ theorem syscDepUnlink_xv6 (f : Xfam GF) (W : Uvis) :
   iintro H
   isplitl [H]
   · iexact H
-  · iintro %Mv %r %M' %fdv' %cw' %cs' %hag Hp
+  · iintro %Mv %rt %r %M' %fdv' %cw' %cs' %hag Hp
     rw [spostAt_xv6_unlink]
     unfold xpostUnlink
     iexists Mv
-    iframe Hp
-    ipureintro; exact hag
+    isplitr
+    · ipureintro; exact hag
+    · iexists rt
+      iexact Hp
 
 /-- **`SyscDepLink`** (Rocq `sbundle_at_link_elim` + `spost_at_link_intro`). -/
 theorem syscDepLink_xv6 (f : Xfam GF) (W : Uvis) :
@@ -1273,13 +1287,14 @@ theorem syscDepLink_xv6 (f : Xfam GF) (W : Uvis) :
 /-- **`SyscDepMkdir`** (Rocq `sbundle_at_mkdir_elim` + `spost_at_mkdir_intro`). -/
 theorem syscDepMkdir_xv6 (f : Xfam GF) (W : Uvis) :
     @UexecSG.sbundleAt GF _ uexecSGXv6 (uslot (hlc := hlc)) 20 f W ⊢
-      (∀ Mv : Nat → List (BitVec 8), ⌜imgAgrees W.M Mv⌝ -∗
-        mkdirAuAt (hlc := hlc) (fsGammaL fscFs) fscFs W.cwd Mv (xkA W 0).toNat f.dP f.dPmiss f.dFarm
+      (∀ Mv : Nat → List (BitVec 8), ⌜imgAgrees W.M Mv⌝ -∗ ∀ rt : Nat,
+        mkdirAuAt (hlc := hlc) (fsGammaL fscFs) fscFs rt W.cwd Mv (xkA W 0).toNat f.dP f.dPmiss f.dFarm
           f.dFdots f.dFun f.dFok f.dFex) ∗
-      (∀ (Mv : Nat → List (BitVec 8)) (r : BitVec 64) (M' : ElfMem) (fdv' : List FdState) (cw' : Nat)
+      (∀ (Mv : Nat → List (BitVec 8)) (rt : Nat) (r : BitVec 64) (M' : ElfMem) (fdv' : List FdState)
+          (cw' : Nat)
           (cs' : ExtTreeSet GName compare),
         ⌜imgAgrees W.M Mv⌝ -∗
-        mkdirArms (hlc := hlc) (fsGammaL fscFs) fscFs W.cwd Mv (xkA W 0).toNat f.dP f.dPmiss f.dFarm
+        mkdirArms (hlc := hlc) (fsGammaL fscFs) fscFs rt W.cwd Mv (xkA W 0).toNat f.dP f.dPmiss f.dFarm
           f.dFdots f.dFun f.dFok f.dFex r -∗
           @UexecSG.spostAt GF _ uexecSGXv6 (uslot (hlc := hlc)) 20 f W r M' fdv' cw' cs') := by
   rw [sbundleAt_xv6_mkdir]
@@ -1287,12 +1302,14 @@ theorem syscDepMkdir_xv6 (f : Xfam GF) (W : Uvis) :
   iintro H
   isplitl [H]
   · iexact H
-  · iintro %Mv %r %M' %fdv' %cw' %cs' %hag Hp
+  · iintro %Mv %rt %r %M' %fdv' %cw' %cs' %hag Hp
     rw [spostAt_xv6_mkdir]
     unfold xpostMkdir
     iexists Mv
-    iframe Hp
-    ipureintro; exact hag
+    isplitr
+    · ipureintro; exact hag
+    · iexists rt
+      iexact Hp
 
 end Inst
 

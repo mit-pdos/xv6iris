@@ -135,12 +135,12 @@ def execSlotPre (S : Uvis → IProp GF) (Q : Int → IProp GF) (Pfin : Nat → I
 /-- **Rocq `exec_au_pre`: EVERYTHING THE CALLER HANDS IN** -- the walk
 premise at the path in the buffer, the observation commit, and the slot
 piece, both one-shot pieces as `pfAt` pairs (receipt beside refund). -/
-def execAuPre (Fs : Pfam GF (Uvis → IProp GF)) (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat) (secc : BitVec 64)
+def execAuPre (Fs : Pfam GF (Uvis → IProp GF)) (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat) (secc : BitVec 64)
     (Q : Int → IProp GF) (P Pmiss : Nat → Nat → IProp GF)
     (Fo : Pfam GF (Aview → Nat → Anode → IProp GF)) (pl : List (BitVec 8)) (na : Nat)
     (alen : Nat → Nat) (afun : Nat → Nat → BitVec 8) (sts : List FdState)
     (cs : Std.ExtTreeSet GName compare) (pidv : BitVec 32) : IProp GF :=
-  iprop(exStart (hlc := hlc) γfs cw P Pmiss pl ∗
+  iprop(exStart (hlc := hlc) γfs rt cw P Pmiss pl ∗
     pfAt (aopenCommitAt (hlc := hlc) Γ appE) Fo ∗
     pfAt (fun S => execSlotPre S Q (P (pathElems pl).length) Fo.pfRecv cw secc na alen afun sts cs pidv)
       Fs)
@@ -150,11 +150,11 @@ HANDS IN, free wherever it has a slot at every key given the trivial
 payload: every hop says yes at a `True` cursor, the observation hands the
 lent half straight back with a `True` receipt, and BOTH slot wands answer
 from the (persistent) family. -/
-theorem execAuPre_triv_at (S : Uvis → IProp GF) (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat) (secc : BitVec 64)
+theorem execAuPre_triv_at (S : Uvis → IProp GF) (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat) (secc : BitVec 64)
     (pl : List (BitVec 8)) (na : Nat) (alen : Nat → Nat) (afun : Nat → Nat → BitVec 8)
     (sts : List FdState) (cs : Std.ExtTreeSet GName compare) (pidv : BitVec 32) :
     ⊢ □ (∀ W : Uvis, myPay W.gen (fun _ => iprop(True)) -∗ S W) -∗
-      execAuPre (hlc := hlc) ⟨S, iprop(True)⟩ Γ γfs cw secc (fun _ => iprop(True))
+      execAuPre (hlc := hlc) ⟨S, iprop(True)⟩ Γ γfs rt cw secc (fun _ => iprop(True))
         (fun _ _ => iprop(True)) (fun _ _ => iprop(True)) (pfamTriv (fun _ _ _ => iprop(True)))
         pl na alen afun sts cs pidv := by
   iintro #HS
@@ -165,8 +165,8 @@ theorem execAuPre_triv_at (S : Uvis → IProp GF) (Γ : FsViewNames GF) (γfs : 
     imodintro
     isplitr
     · itrivial
-    · iapply (show ⊢@{IProp GF} exHopsFrom γfs (fun _ _ => iprop(True)) (fun _ _ => iprop(True)) pl 0
-        from by rw [exHops_is_axHops]; exact axHops_triv _ _ _)
+    · iapply (show ⊢@{IProp GF} exHopsFrom rt γfs (fun _ _ => iprop(True)) (fun _ _ => iprop(True)) pl 0
+        from by rw [exHops_is_axHops]; exact axHops_triv _ _ _ _)
   isplitr
   · iapply pfAt_triv
     unfold aopenCommitAt
@@ -184,13 +184,13 @@ theorem execAuPre_triv_at (S : Uvis → IProp GF) (Γ : FsViewNames GF) (γfs : 
 
 /-- **Rocq `exec_au_pre_triv`**: the one a caller that wants nothing back
 hands in -- the slot predicate at `emp`. -/
-theorem execAuPre_triv (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat) (secc : BitVec 64) (pl : List (BitVec 8))
+theorem execAuPre_triv (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat) (secc : BitVec 64) (pl : List (BitVec 8))
     (na : Nat) (alen : Nat → Nat) (afun : Nat → Nat → BitVec 8) (sts : List FdState)
     (cs : Std.ExtTreeSet GName compare) (pidv : BitVec 32) :
-    ⊢ execAuPre (hlc := hlc) ⟨fun _ => iprop(emp), iprop(True)⟩ Γ γfs cw secc (fun _ => iprop(True))
+    ⊢ execAuPre (hlc := hlc) ⟨fun _ => iprop(emp), iprop(True)⟩ Γ γfs rt cw secc (fun _ => iprop(True))
         (fun _ _ => iprop(True)) (fun _ _ => iprop(True)) (pfamTriv (fun _ _ _ => iprop(True)))
         pl na alen afun sts cs pidv := by
-  iapply (execAuPre_triv_at (hlc := hlc) (fun _ => iprop(emp)) Γ γfs cw secc pl na alen afun sts cs pidv)
+  iapply (execAuPre_triv_at (hlc := hlc) (fun _ => iprop(emp)) Γ γfs rt cw secc pl na alen afun sts cs pidv)
   imodintro
   iintro %W -
   iempintro
@@ -216,13 +216,13 @@ def execPostOk (Fs : Pfam GF (Uvis → IProp GF)) (na : Nat) (alen : Nat → Nat
 (i) nothing fs-visible happened, (ii) the walk died (the era refund shape),
 (iii) the walk completed, the node was observed, and exec failed past the
 lock for a CAUSE. -/
-def execPostFail (Fs : Pfam GF (Uvis → IProp GF)) (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat) (secc : BitVec 64)
+def execPostFail (Fs : Pfam GF (Uvis → IProp GF)) (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat) (secc : BitVec 64)
     (Q : Int → IProp GF) (P Pmiss : Nat → Nat → IProp GF)
     (Fo : Pfam GF (Aview → Nat → Anode → IProp GF)) (pl : List (BitVec 8)) (na : Nat)
     (alen : Nat → Nat) (afun : Nat → Nat → BitVec 8) (sts : List FdState)
     (cs : Std.ExtTreeSet GName compare) (pidv : BitVec 32) : IProp GF :=
-  iprop(execAuPre (hlc := hlc) Fs Γ γfs cw secc Q P Pmiss Fo pl na alen afun sts cs pidv ∨
-    ((nameiWalkDeadEra (hlc := hlc) γfs P Pmiss pl ∗ pfAt (aopenCommitAt (hlc := hlc) Γ appE) Fo ∗
+  iprop(execAuPre (hlc := hlc) Fs Γ γfs rt cw secc Q P Pmiss Fo pl na alen afun sts cs pidv ∨
+    ((nameiWalkDeadEra (hlc := hlc) γfs rt P Pmiss pl ∗ pfAt (aopenCommitAt (hlc := hlc) Γ appE) Fo ∗
         pfAt (fun S => execSlotPre S Q (P (pathElems pl).length) Fo.pfRecv cw secc na alen afun sts cs pidv)
           Fs) ∨
      (∃ (i : Nat) (av : Aview) (a : Anode) (c : ExecFailCause),
@@ -234,11 +234,11 @@ def execPostFail (Fs : Pfam GF (Uvis → IProp GF)) (Γ : FsViewNames GF) (γfs 
 all three arms carry the slot piece as a `pfAt`, and a piece that never
 fired hands back what was put into it. -/
 theorem execPostFail_refund (Fs : Pfam GF (Uvis → IProp GF)) (Γ : FsViewNames GF) (γfs : FsNames)
-    (cw : Nat) (secc : BitVec 64) (Q : Int → IProp GF) (P Pmiss : Nat → Nat → IProp GF)
+    (rt cw : Nat) (secc : BitVec 64) (Q : Int → IProp GF) (P Pmiss : Nat → Nat → IProp GF)
     (Fo : Pfam GF (Aview → Nat → Anode → IProp GF)) (pl : List (BitVec 8)) (na : Nat)
     (alen : Nat → Nat) (afun : Nat → Nat → BitVec 8) (sts : List FdState)
     (cs : Std.ExtTreeSet GName compare) (pidv : BitVec 32) :
-    execPostFail (hlc := hlc) Fs Γ γfs cw secc Q P Pmiss Fo pl na alen afun sts cs pidv ⊢ Fs.pfRefund := by
+    execPostFail (hlc := hlc) Fs Γ γfs rt cw secc Q P Pmiss Fo pl na alen afun sts cs pidv ⊢ Fs.pfRefund := by
   unfold execPostFail execAuPre
   iintro (⟨-, -, Hs⟩ | (⟨-, -, Hs⟩ | ⟨%i, %av, %a, %c, -, -, -, -, Hs⟩))
   · iapply (pfAt_refund _ Fs) $$ Hs
@@ -247,7 +247,7 @@ theorem execPostFail_refund (Fs : Pfam GF (Uvis → IProp GF)) (Γ : FsViewNames
 
 /-- **Rocq `exec_arms`**: the armed disjunction the continuation receives,
 keyed on a0, beside the landed failure equation. -/
-def execArms (Fs : Pfam GF (Uvis → IProp GF)) (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat) (secc : BitVec 64)
+def execArms (Fs : Pfam GF (Uvis → IProp GF)) (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat) (secc : BitVec 64)
     (Q : Int → IProp GF) (P Pmiss : Nat → Nat → IProp GF)
     (Fo : Pfam GF (Aview → Nat → Anode → IProp GF)) (pl : List (BitVec 8)) (na : Nat)
     (alen : Nat → Nat) (afun : Nat → Nat → BitVec 8) (sts : List FdState) (gn : GName)
@@ -255,18 +255,18 @@ def execArms (Fs : Pfam GF (Uvis → IProp GF)) (Γ : FsViewNames GF) (γfs : Fs
     (M : Nat → List (BitVec 8)) (V' : ProcPriv) (M' : Nat → List (BitVec 8)) (r : BitVec 64) :
     IProp GF :=
   iprop((⌜r = 0xFFFFFFFFFFFFFFFF#64 ∧ evAfter V V' ∧ M' = M⌝ ∗
-      execPostFail (hlc := hlc) Fs Γ γfs cw secc Q P Pmiss Fo pl na alen afun sts cs pidv) ∨
+      execPostFail (hlc := hlc) Fs Γ γfs rt cw secc Q P Pmiss Fo pl na alen afun sts cs pidv) ∨
     execPostOk Fs na alen afun sts gn cs pidv V V' M' r)
 
 /-- **Rocq `exec_arms_landed`: SANITY** -- the arms imply the landed result
 relation. -/
 theorem execArms_landed (Fs : Pfam GF (Uvis → IProp GF)) (Γ : FsViewNames GF) (γfs : FsNames)
-    (cw : Nat) (secc : BitVec 64) (Q : Int → IProp GF) (P Pmiss : Nat → Nat → IProp GF)
+    (rt cw : Nat) (secc : BitVec 64) (Q : Int → IProp GF) (P Pmiss : Nat → Nat → IProp GF)
     (Fo : Pfam GF (Aview → Nat → Anode → IProp GF)) (pl : List (BitVec 8)) (na : Nat)
     (alen : Nat → Nat) (afun : Nat → Nat → BitVec 8) (sts : List FdState) (gn : GName)
     (cs : Std.ExtTreeSet GName compare) (pidv : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (V' : ProcPriv) (M' : Nat → List (BitVec 8)) (r : BitVec 64) :
-    execArms (hlc := hlc) Fs Γ γfs cw secc Q P Pmiss Fo pl na alen afun sts gn cs pidv V M V' M' r ⊢
+    execArms (hlc := hlc) Fs Γ γfs rt cw secc Q P Pmiss Fo pl na alen afun sts gn cs pidv V M V' M' r ⊢
       ⌜∃ entry spv szv' : BitVec 64, kexecOk V V' r entry spv szv' na alen⌝ := by
   unfold execArms execPostOk
   iintro (⟨%h, -⟩ | ⟨%i, %av, %a, -, (⟨%f, %nl, -, -, %hok, -, -⟩ | ⟨-, %hok, -⟩)⟩)
@@ -281,14 +281,14 @@ theorem execArms_landed (Fs : Pfam GF (Uvis → IProp GF)) (Γ : FsViewNames GF)
 /-- **Rocq `exec_arms_landed_keep`**: the same reading without spending the
 arms. -/
 theorem execArms_landed_keep (Fs : Pfam GF (Uvis → IProp GF)) (Γ : FsViewNames GF) (γfs : FsNames)
-    (cw : Nat) (secc : BitVec 64) (Q : Int → IProp GF) (P Pmiss : Nat → Nat → IProp GF)
+    (rt cw : Nat) (secc : BitVec 64) (Q : Int → IProp GF) (P Pmiss : Nat → Nat → IProp GF)
     (Fo : Pfam GF (Aview → Nat → Anode → IProp GF)) (pl : List (BitVec 8)) (na : Nat)
     (alen : Nat → Nat) (afun : Nat → Nat → BitVec 8) (sts : List FdState) (gn : GName)
     (cs : Std.ExtTreeSet GName compare) (pidv : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (V' : ProcPriv) (M' : Nat → List (BitVec 8)) (r : BitVec 64) :
-    execArms (hlc := hlc) Fs Γ γfs cw secc Q P Pmiss Fo pl na alen afun sts gn cs pidv V M V' M' r ⊢
+    execArms (hlc := hlc) Fs Γ γfs rt cw secc Q P Pmiss Fo pl na alen afun sts gn cs pidv V M V' M' r ⊢
       iprop(⌜∃ entry spv szv' : BitVec 64, kexecOk V V' r entry spv szv' na alen⌝ ∧
-        execArms (hlc := hlc) Fs Γ γfs cw secc Q P Pmiss Fo pl na alen afun sts gn cs pidv V M V' M' r) := by
+        execArms (hlc := hlc) Fs Γ γfs rt cw secc Q P Pmiss Fo pl na alen afun sts gn cs pidv V M V' M' r) := by
   iintro H
   isplit
   · iapply (execArms_landed (hlc := hlc)) $$ H
@@ -334,7 +334,7 @@ def kexecK (k : KCtx) (A : KexecArgs) (Fs : Pfam GF (Uvis → IProp GF)) (sts : 
     (cpu' : CPU) : IProp GF :=
   iprop(∀ (spie spp : Bool) (R' : RegMap) (V' : ProcPriv) (M' : Nat → List (BitVec 8)),
     ⌜calleeSaved k.regs R'⌝ -∗
-    execArms (hlc := hlc) Fs (fsGammaL fscFs) fscFs A.V.cwi A.V.pvSecc Q P Pmiss Fo (bview A.plen A.pfun) A.na
+    execArms (hlc := hlc) Fs (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.V.pvSecc Q P Pmiss Fo (bview A.plen A.pfun) A.na
       A.alen A.afun sts gn cs A.pidv A.V A.M V' M' (R' 10#5) -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
@@ -372,7 +372,7 @@ def wp_kexec_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
   -- ---- THE BUNDLE (the one addition to the premise list): the pay fact
   -- and the AU ----
   myPay gn Q ∗
-  execAuPre (hlc := hlc) Fs (fsGammaL fscFs) fscFs A.V.cwi A.V.pvSecc Q P Pmiss Fo (bview A.plen A.pfun) A.na
+  execAuPre (hlc := hlc) Fs (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.V.pvSecc Q P Pmiss Fo (bview A.plen A.pfun) A.na
     A.alen A.afun sts cs A.pidv ∗
   -- THE CROSSING IS THE LITERAL `true`: kexec parks (namei, ilock, readi, …)
   wpNext true k.proc cpu (kexecK (hlc := hlc) k A Fs sts gn cs Q P Pmiss Fo)

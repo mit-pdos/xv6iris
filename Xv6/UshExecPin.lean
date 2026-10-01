@@ -303,7 +303,7 @@ theorem shExecSupXOfEntryGen (TabF : GName → List FdState → IProp GF) (Xt : 
     (hops : List Nat) (ino : Nat) (elf : List (BitVec 8)) (T : IProp GF) [Persistent T] [Timeless T]
     (Qv Cr : IProp GF)
     (hok : execOk ws) (hhead : ws[0]! = pl) (hload : kexecLoadable elf)
-    (hres : pinResolves pins ROOTINO pl hops ino elf 1) :
+    (hres : ∀ rt : Nat, pinResolves pins rt ROOTINO pl hops ino elf 1) :
     ⊢ iprop(□ ∀ (M : ElfMem) (Mv : Nat → List (BitVec 8)) (s0 t : Nat) (gn : Nat → BitVec 8)
           (sts : List FdState) (cs : ExtTreeSet GName compare) (pidv : BitVec 32),
         ⌜P.echo_node_img ws M s0 t gn⌝ -∗ ⌜imgAgrees M Mv⌝ -∗ ⌜ushEchoArgvBytes ws gn⌝ -∗
@@ -359,7 +359,7 @@ theorem shExecSupXOfEntry (Fd : List FdState → Prop) (ws : List (List (BitVec 
     (pins : Aview → Prop) (hops : List Nat) (ino : Nat) (elf : List (BitVec 8)) (T : IProp GF) [Persistent T]
     [Timeless T] (Qv Cr : IProp GF)
     (hok : execOk ws) (hhead : ws[0]! = pl) (hload : kexecLoadable elf)
-    (hres : pinResolves pins ROOTINO pl hops ino elf 1) :
+    (hres : ∀ rt : Nat, pinResolves pins rt ROOTINO pl hops ino elf 1) :
     ⊢ iprop(□ ∀ (M : ElfMem) (Mv : Nat → List (BitVec 8)) (s0 t : Nat) (gn : Nat → BitVec 8)
           (sts : List FdState) (cs : ExtTreeSet GName compare) (pidv : BitVec 32),
         ⌜P.echo_node_img ws M s0 t gn⌝ -∗ ⌜imgAgrees M Mv⌝ -∗ ⌜ushEchoArgvBytes ws gn⌝ -∗
@@ -385,7 +385,7 @@ theorem shExecSupXOfEntryV (Fd : List FdState → Prop) (ws : List (List (BitVec
     (pins : Aview → Prop) (hops : List Nat) (ino : Nat) (elf : List (BitVec 8)) (T : IProp GF) [Persistent T]
     [Timeless T] (Qv Cr : IProp GF) (v : List FdState)
     (hok : execOk ws) (hhead : ws[0]! = pl) (hload : kexecLoadable elf)
-    (hres : pinResolves pins ROOTINO pl hops ino elf 1) :
+    (hres : ∀ rt : Nat, pinResolves pins rt ROOTINO pl hops ino elf 1) :
     ⊢ iprop(□ ∀ (M : ElfMem) (Mv : Nat → List (BitVec 8)) (s0 t : Nat) (gn : Nat → BitVec 8)
           (sts : List FdState) (cs : ExtTreeSet GName compare) (pidv : BitVec 32),
         ⌜P.echo_node_img ws M s0 t gn⌝ -∗ ⌜imgAgrees M Mv⌝ -∗ ⌜ushEchoArgvBytes ws gn⌝ -∗

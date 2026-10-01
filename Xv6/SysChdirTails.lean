@@ -108,7 +108,7 @@ theorem sys_chdir_ir_11 : irefSlot (GF := GF) ∗ irefSlots 1 ⊢ irefSlots 2 :=
 theorem sys_chdir_out_fail (A : SysChdirArgs GF) (P2 : UPtd) (hP2 : A.V.upt.extSz A.V.sz P2) :
     sysChdirHole (GF := GF) A.γ (procAddr A.j) A.pid (sysChdirV1 A P2) (sysChdirM1 A P2) ∗
       sysChdirRows (procAddr A.j) A.pid A.V.cwd A.V.cwi ∗ bslots 3 ∗ irefSlots 2 ∗
-      chdirPostFail (hlc := hlc) (fsGammaL fscFs) fscFs A.V.cwi A.P A.Pmiss A.Fo ⊢
+      chdirPostFail (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.P A.Pmiss A.Fo ⊢
     sysChdirOut A 0xFFFFFFFFFFFFFFFF#64 := by
   iintro ⟨Hh, Hr, Hbs, Hir, Hf⟩
   unfold sysChdirOut
@@ -172,7 +172,7 @@ theorem sys_chdir_tail_68 (EO : END_OP) (Γ : SchedNames) [ClaimIs (hlc := hlc) 
     sysChdirRows (procAddr A.j) A.pid A.V.cwd A.V.cwi ∗
     sysChdirHole A.γ (procAddr A.j) A.pid (sysChdirV1 A P2) (sysChdirM1 A P2) ∗
     (∀ c : CPU, sysChdirPostA k A c) ∗ bslots 3 ∗ irefSlots 2 ∗ logOp icfgLog u ∗
-    chdirPostFail (hlc := hlc) (fsGammaL fscFs) fscFs A.V.cwi A.P A.Pmiss A.Fo
+    chdirPostFail (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.P A.Pmiss A.Fo
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hcells, Hbuf, Hte, Hce, #Henv, Hrows, Hhole, HΦ, Hbs, Hir, Hop, Hfail⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -254,7 +254,7 @@ theorem sys_chdir_tail_70 (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames) [Cl
     (∀ c : CPU, sysChdirPostA k A c) ∗
     sysChdirLocked kk q g lo tl γil γisl inum A.pid dn bm ∗
     bslots 3 ∗ irefSlots 1 ∗ logOpS icfgLog n Sb ∗
-    chdirPostFail (hlc := hlc) (fsGammaL fscFs) fscFs A.V.cwi A.P A.Pmiss A.Fo
+    chdirPostFail (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.P A.Pmiss A.Fo
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hcells, Hbuf, Hte, Hce, #Henv, Hrows, Hhole, HΦ, Hlk, Hbs, Hir, Hop, Hfail⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩

@@ -193,9 +193,9 @@ theorem fileLegs_pay (c : FileFixed) (r : FileAppNames) (jo : Option Nat) (n : N
 
 /-- THE FAILURE FOLD, PAID (Rocq `file_open_create_fail_pay`). -/
 theorem fileOpenCreateFail_pay (γfs : FsNames) (c : FileFixed) (r : FileAppNames)
-    (jo : Option Nat) (n : Nat) (N : Fname) (s : Dst) (g : GName) (np : Nat) (cw : Nat)
+    (jo : Option Nat) (n : Nat) (N : Fname) (s : Dst) (g : GName) (np : Nat) (rt cw : Nat)
     (M : Nat → List (BitVec 8)) (pv : Nat) (vom : BitVec 64) (htr : omTrunc vom = true) :
-    ⊢@{IProp GF} openPostFailCreate (hlc := hlc) (fsGammaL γfs) γfs cw M pv vom
+    ⊢@{IProp GF} openPostFailCreate (hlc := hlc) (fsGammaL γfs) γfs rt cw M pv vom
         (fun (_ : Nat) (d : Nat) => iprop(⌜d = ROOTINO⌝)) (fun _ _ => iprop(True))
         (fileArmFam (hlc := hlc) c r jo s g np) (fileUnarmFam (hlc := hlc) c r s g np)
         (fileCreFam (hlc := hlc) c r jo N s g np) (fileDlkFam (hlc := hlc) c r n s g)
@@ -221,14 +221,14 @@ theorem fileOpenCreateFail_pay (γfs : FsNames) (c : FileFixed) (r : FileAppName
 /-- THE WHOLE RECEIPT, at the redirect child's own mode (Rocq
 `file_open_create_recv`). -/
 theorem fileOpenCreate_recv (γfs : FsNames) (c : FileFixed) (omo : OffMode) (r : FileAppNames)
-    (jo : Option Nat) (n : Nat) (N : Fname) (s : Dst) (g : GName) (np : Nat) (cw : Nat)
+    (jo : Option Nat) (n : Nat) (N : Fname) (s : Dst) (g : GName) (np : Nat) (rt cw : Nat)
     (M : Nat → List (BitVec 8)) (pv : Nat) (vom : BitVec 64) (pl : List (BitVec 8))
     (sts : List FdState) (rv : BitVec 64) (fdv' : List FdState) (E : CoPset)
     (hE : (↑appN : CoPset) ⊆ E) (htr : omTrunc vom = true) (hN : uname N)
     (hpath : argPathOf M pv pl) (hlast : (pathElems pl).getLast? = some N)
     (heq : ‹Appcfg GF› = { appNames := FileAppNames, appPred := filePred (hlc := hlc) c, appRun := r }) :
     ⊢@{IProp GF} appInv (hlc := hlc) γfs -∗ escKey (hlc := hlc) c r n s g -∗
-      openReceiptCreate (hlc := hlc) omo (fsGammaL γfs) γfs cw M pv vom
+      openReceiptCreate (hlc := hlc) omo (fsGammaL γfs) γfs rt cw M pv vom
         (fun (_ : Nat) (d : Nat) => iprop(⌜d = ROOTINO⌝)) (fun _ _ => iprop(True))
         (fileArmFam (hlc := hlc) c r jo s g np) (fileUnarmFam (hlc := hlc) c r s g np)
         (fileCreFam (hlc := hlc) c r jo N s g np) (fileDlkFam (hlc := hlc) c r n s g)
@@ -242,7 +242,7 @@ theorem fileOpenCreate_recv (γfs : FsNames) (c : FileFixed) (omo : OffMode) (r 
   simp only [htr, ↓reduceIte]
   iintro #Hinv #Hwit (⟨%hr, %hfd, Hf⟩ | ⟨%pl0, %d, %i, %nm, %hpath0, %_hl0, -, Hrest⟩)
   · imod (fileEscPay_home (hlc := hlc) γfs c r n N s g np E hE heq) $$ Hinv Hwit [Hf] with Hpay
-    · iapply (fileOpenCreateFail_pay (hlc := hlc) γfs c r jo n N s g np cw M pv vom htr) $$ Hf
+    · iapply (fileOpenCreateFail_pay (hlc := hlc) γfs c r jo n N s g np rt cw M pv vom htr) $$ Hf
     imodintro
     ileft
     iframe Hpay
