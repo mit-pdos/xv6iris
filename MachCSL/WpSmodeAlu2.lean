@@ -7,6 +7,7 @@ as the immediate `srli`.  Same shape as `wp_s_or`: the execute stage over
 the whole register file (`WpAluFile`), lifted by `wpLoop_k_setReg`.
 -/
 import MachCSL.WpSmodeCycle
+import MachCSL.WpSmodeRegOps
 
 namespace MachCSL
 

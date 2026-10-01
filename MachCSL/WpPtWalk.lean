@@ -9,6 +9,7 @@ the accessors the shared table's invariant provides (`MachCSL.KptInv`).
 -/
 import MachCSL.WpAtomic
 import MachCSL.SConfPhysDefs
+import MachCSL.SConfAtDefs
 import MachCSL.WpPmpXv6
 import MachCSL.WpSmodeAuDefs
 import MachCSL.ModelFacts
@@ -653,19 +654,7 @@ theorem swp_write_TLB (cpu : CPU) (tlb : Tlb) (i : Nat) (ent : TLB_Entry) (Φ : 
 
 /-! ## The configuration at the kernel page table -/
 
-/-- What the supervisor-mode stage lemmas that TRANSLATE need of a
-configuration at the kernel-page-table tier: everything the physical leaves
-need, `satp` at Sv39 / ASID 0 / root `root`, and `menvcfg.ADUE` set (the
-hardware writes the `A`/`D` bits back). -/
-def SConfKpt (c : MConf) (root : BitVec 44) (sie : Bool) : Prop :=
-  SConfPhys (GF := GF) c sie ∧
-  BitVec.extractLsb' 60 4 c.satp = 8#4 ∧ BitVec.extractLsb' 44 16 c.satp = 0#16 ∧
-  BitVec.extractLsb' 0 44 c.satp = root ∧ BitVec.extractLsb' 61 1 c.menvcfg = 1#1
-
-theorem SConfKpt.phys {c : MConf} {root : BitVec 44} {sie : Bool} (h : SConfKpt (GF := GF) c root sie) :
-    SConfPhys (GF := GF) c sie := h.1
-
-
+-- `SConfKpt` lives in `MachCSL.SConfAtDefs`.
 
 /-! ## Translation at the kernel page table -/
 

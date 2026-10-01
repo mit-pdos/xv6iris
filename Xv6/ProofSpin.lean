@@ -16,6 +16,7 @@ and that later strips the induction hypothesis.
 Rocq's `exec_execute_JAL_zreg_zca` and `swp_execute_JAL_zreg` play that role.
 -/
 import MachCSL.WpSmodeCtl
+import MachCSL.WpCycle
 import Xv6.SpecSpin
 import Xv6.CodeTactics
 

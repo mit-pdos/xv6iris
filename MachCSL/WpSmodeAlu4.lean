@@ -8,6 +8,7 @@ the logical `srli`.  Same shape as `wp_s_srli`: the execute stage over the
 whole register file (`WpAluFile`), lifted by `wpLoop_k_setReg`.
 -/
 import MachCSL.WpSmodeCycle
+import MachCSL.WpSmodeRegOps
 
 namespace MachCSL
 

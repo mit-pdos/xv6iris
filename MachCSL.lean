@@ -41,6 +41,7 @@ import MachCSL.StackOwnBounds
 import MachCSL.WpAluFile
 import MachCSL.WpSmode
 import MachCSL.WpSmodeMem
+import MachCSL.WpSmodeMemPhys
 import MachCSL.WpSmodeCtl
 import MachCSL.WpSmodeRules
 import MachCSL.WpSmodeJalr
@@ -90,7 +91,11 @@ import MachCSL.PtTree
 import MachCSL.KptInv
 import MachCSL.WpPtWalk
 import MachCSL.Translate
+import MachCSL.SConfAtDefs
 import MachCSL.WpSmodeCycle
+import MachCSL.WpSmodeCycleBase
+import MachCSL.WpSmodeFetch
+import MachCSL.WpSmodeRegOps
 import MachCSL.WpSmodeTrapCsr
 import MachCSL.WpSmodeSltu
 import MachCSL.ByteWord

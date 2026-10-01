@@ -6,6 +6,7 @@ it) sends the kernel into deep recursion, so the conjunction form is the
 rule's contract instead.
 -/
 import MachCSL.WpSmodeCycle
+import MachCSL.WpSmodeRegOps
 
 namespace MachCSL
 

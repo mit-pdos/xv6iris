@@ -10,6 +10,7 @@ bridged to the value form `if _ then 1 else 0` by `setWidth_bool_to_bit`,
 and the rule is `wpLoop_k_setReg` over it.
 -/
 import MachCSL.WpSmodeCycle
+import MachCSL.WpSmodeRegOps
 import MachCSL.WpSmodeCtl
 
 namespace MachCSL

@@ -13,6 +13,7 @@ import MachCSL.WpSmodeMem
 import MachCSL.WpSmodeCtl
 import MachCSL.WpSmodeCsr
 import MachCSL.WpSmodeCycle
+import MachCSL.WpAluFile
 
 
 namespace MachCSL

@@ -11,6 +11,7 @@ interrupts disabled -- the regime of early boot (`main` before
 * fetch at `satp = 0` is physical.
 -/
 import MachCSL.SConfPhysDefs
+import MachCSL.SConfAtDefs
 import MachCSL.WpPmpXv6
 import MachCSL.WpStages
 
@@ -96,15 +97,7 @@ theorem pmpPassesS_xv6 (cpu : CPU) (dq : DFrac) (c : MConf) (hcfg : c.pmpcfg = x
   rw [hcfg, haddr]
   exact swp_pmpCheck_xv6_S cpu dq addr width acc Φ hacc hram
 
-/-- What the supervisor-mode stage lemmas that TRANSLATE need of a
-configuration at the Bare tier: everything the physical leaves need, plus
-`satp.MODE = Bare` (the tier at which `translateAddr` short-circuits). -/
-def SConfBare (c : MConf) (sie : Bool) : Prop :=
-  SConfPhys (GF := GF) c sie ∧ BitVec.extractLsb' 60 4 c.satp = 0#4
-
-/-- The physical part of a Bare-tier configuration. -/
-theorem SConfBare.phys {c : MConf} {sie : Bool} (h : SConfBare (GF := GF) c sie) :
-    SConfPhys (GF := GF) c sie := h.1
+-- `SConfBare` lives in `MachCSL.SConfAtDefs`.
 
 set_option hygiene false in
 /-- The shared script of the supervisor-mode physical reads. -/

@@ -10,6 +10,7 @@ the Bare path by the model's short cut, the page-table path by the walk
 kernel context lends for it: nothing at Bare beyond the `stvec` cell, the
 installed table and the hart's TLB at the kernel page table.
 -/
+import MachCSL.SConfAtDefs
 import MachCSL.WpPtWalk
 import MachCSL.WpSmode
 import MachCSL.WpStagesM
@@ -23,17 +24,6 @@ open LeanRV64D LeanRV64D.Functions
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 
 /-! ## The configuration at a tier -/
-
-/-- What the translating stage lemmas need of a configuration at each tier. -/
-def SConfAt : KTier → MConf → BitVec 44 → Bool → Prop
-  | .bare, c, _, sie => SConfBare (GF := GF) c sie
-  | .kpt, c, root, sie => SConfKpt (GF := GF) c root sie
-
-theorem SConfAt.phys {tier : KTier} {c : MConf} {root : BitVec 44} {sie : Bool}
-    (h : SConfAt (GF := GF) tier c root sie) : SConfPhys (GF := GF) c sie := by
-  cases tier
-  · exact h.1
-  · exact h.1
 
 /-- A kernel address below `2^38` is Sv39-canonical. -/
 theorem canonical_of_lt38 (va : BitVec 64) (h : va.toNat < 2 ^ 38) :
@@ -53,23 +43,7 @@ theorem SConfAt_sConfOf (tier : KTier) (root : BitVec 44) (ms mdl mepc stc : Bit
       by simp only [sConfOf]; decide⟩, ?_, ?_, ?_, by simp only [sConfOf]; decide⟩ <;>
       simp only [sConfOf, satpOf] <;> bv_decide
 
-/-- What a translating instruction is lent by the kernel context: the
-translation slot and the memory token. -/
-def transTok [CurCtx] (cpu : CPU) (tier : KTier) (root : BitVec 44) : IProp GF := iprop%
-  transSlotAt cpu tier root ∗ ctxTok cpu curCtx
-
-theorem transTok_cases [CurCtx] (cpu : CPU) (tier : KTier) (root : BitVec 44) :
-    transTok (GF := GF) cpu tier root ⊢ transSlotAt cpu tier root ∗ ctxTok cpu curCtx := by
-  unfold transTok; iintro H; iexact H
-
-theorem transTok_intro [CurCtx] (cpu : CPU) (tier : KTier) (root : BitVec 44) :
-    transSlotAt cpu tier root ∗ ctxTok cpu curCtx ⊢ transTok (GF := GF) cpu tier root := by
-  unfold transTok; iintro H; iexact H
-
-/-- The translation mode at each tier. -/
-def satpModeOf : KTier → SATPMode
-  | .bare => SATPMode.Bare
-  | .kpt => SATPMode.Sv39
+-- `SConfAt`, `transTok` and `satpModeOf` live in `MachCSL.SConfAtDefs`.
 
 /-- The translation mode in supervisor mode at either tier. -/
 theorem swp_translationMode_tier (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Bool) (tier : KTier)

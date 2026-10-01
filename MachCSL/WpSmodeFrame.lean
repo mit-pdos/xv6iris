@@ -10,6 +10,7 @@ caller's context, `R` the current map), which is what the tactics
 normalise to; reads become map applications, decided on literal indices.
 -/
 import MachCSL.WpSmodeIntr
+import MachCSL.WpSmodeRegOps
 
 
 namespace MachCSL

@@ -35,6 +35,7 @@ with the clock cells lent to the stage.
 import MachCSL.KCtxGpr
 import MachCSL.WpCsr
 import MachCSL.WpSmodeCycle
+import MachCSL.AluFacts
 
 namespace MachCSL
 
