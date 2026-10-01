@@ -18,6 +18,7 @@ back unchanged (`sstatusWrite`).  Those bits live in `kConf`'s pure part,
 not in `SConfAt`, so the two `sstatus` rules are proved directly from
 `wpLoop_s_instr` rather than through a schema.
 -/
+import MachCSL.KCtxGpr
 import MachCSL.WpSmodeIntr
 
 namespace MachCSL

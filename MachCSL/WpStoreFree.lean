@@ -13,6 +13,7 @@ The store is stated at an arbitrary pinned page (`ppn`, `tierPin curTier`),
 exactly like the valued byte store `execSpecF_sb`, so a client may forget a
 valued byte into a visibility-free one at any tier and store it back.
 -/
+import MachCSL.KCtxGpr
 import MachCSL.WpSmodeAu
 import MachCSL.WpSmodeMint
 

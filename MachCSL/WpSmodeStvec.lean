@@ -8,6 +8,7 @@ interrupt arm owns it (with the handler contract) afterwards; in between
 it rides client-side.  So the rule takes and returns the cell explicitly.
 With a direct-mode value the model's legalization is the identity.
 -/
+import MachCSL.KCtxGpr
 import MachCSL.WpSmodeRules
 
 namespace MachCSL

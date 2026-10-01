@@ -15,6 +15,7 @@ uses inline).
 * the trapframe word store, the private block's accessor, and the flip's
   resource merge (`prepareReturnExt` / the arm the `csrci` pays out).
 -/
+import MachCSL.KCtxGpr
 import MachCSL.WpSmodeTrapCsr
 import Xv6.SpecPrepareReturn
 

@@ -36,6 +36,7 @@ import MachCSL.WpStages
 import MachCSL.MConf
 import MachCSL.DecodeBridge
 import MachCSL.KCtx
+import MachCSL.KCtxGpr
 import MachCSL.StackOwnBounds
 import MachCSL.WpAluFile
 import MachCSL.WpSmode
@@ -59,6 +60,7 @@ import MachCSL.WpSmodeFrame16
 import MachCSL.WpStagesM
 import MachCSL.WpTick
 import MachCSL.WpGpr
+import MachCSL.WpGprDefs
 import MachCSL.GprLit
 import MachCSL.Instr
 import MachCSL.WpCycle

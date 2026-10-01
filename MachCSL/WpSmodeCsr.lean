@@ -9,6 +9,7 @@ lifted value; `mstatusLegalize` is that function with the platform's
 answers filled in (what the executor produces), and
 `sstatus_clear_sie_id` is the identity.
 -/
+import MachCSL.KCtxGpr
 import MachCSL.WpCsrS
 import MachCSL.SConfPhysDefs
 import MachCSL.WpCsr

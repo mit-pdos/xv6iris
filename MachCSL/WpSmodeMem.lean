@@ -5,6 +5,7 @@ over the register file (`execSpecF_lbu`, `execSpecF_ld`, `execSpecF_sb`,
 `execSpecF_sd`).  Under xv6's PMP tables every kernel access inside RAM
 passes; at `satp = Bare` virtual = physical.
 -/
+import MachCSL.KCtxGpr
 import MachCSL.SmodeMemFacts
 import MachCSL.KCtx
 import MachCSL.WpCycle

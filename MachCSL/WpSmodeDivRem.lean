@@ -10,6 +10,7 @@ take `rs2 ≠ 0` as a premise and state the result in the plain `BitVec`
 vocabulary: `x / y` and `x % y`, which are `Nat` division and modulus on
 `toNat` (`BitVec.udiv`/`BitVec.umod`).
 -/
+import MachCSL.KCtxGpr
 import MachCSL.WpSmodeCycle
 
 namespace MachCSL

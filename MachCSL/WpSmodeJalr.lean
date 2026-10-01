@@ -10,6 +10,7 @@ while the pc ends at `jumpPc (R.get rs1)`.  (It belongs beside
 `execSpecF_ret` in `WpSmodeCtl.lean`; it lives here so that adding the rule
 does not invalidate every file below `WpSmodeCtl`.)
 -/
+import MachCSL.KCtxGpr
 import MachCSL.WpSmodeCtl
 import MachCSL.WpSmodeCycle
 

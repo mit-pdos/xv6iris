@@ -29,6 +29,7 @@ What this file provides:
 * `execSpecF_csrw_satp_sv39` (`WpSmodeSatp`) is root-generic already: the
   switch to a user root is that execute stage at the user root.
 -/
+import MachCSL.KCtxGpr
 import MachCSL.WpSmodeCycleT
 import MachCSL.WpSmodeFrame
 
