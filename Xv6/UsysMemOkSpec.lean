@@ -41,13 +41,15 @@ theorem syscNum_usys (V : ProcPriv) : syscNum V = usysEff V.pvSecc V.tf := rfl
 
 /-- **Every entry but exec and sbrk**: the kernel's table implies the
 user's, given the permission view, the break and the lazy bit did not move
-and what fork and read answered (Rocq `sysc_mem_ok_usys`). -/
+and what fork, read and uptime answered (Rocq `sysc_mem_ok_usys`; the uptime
+premise is NI M0's, Lean-only). -/
 theorem syscMemOk_usys (V V' : ProcPriv) (M M' : ElfMem) (r : BitVec 64)
     (π π' : Nat → Option UPerm) (szv szv' : Nat) (lz lz' : Bool)
     (h7 : syscNum V ≠ USYS_exec) (h12 : syscNum V ≠ USYS_sbrk)
     (hp : π' = π) (hs : szv' = szv) (hlz : lz' = lz)
     (hfk : syscNum V = USYS_fork → r = -1#64 ∨ (1 ≤ r.toInt ∧ r.toInt ≤ PIDMAX))
     (hrd : syscNum V = USYS_read → usysReadRet V.tf r)
+    (hup : syscNum V = USYS_uptime → usysUptimeRet r)
     (H : syscMemOk V V' M M') : usysMemOk (syscNum V) V.tf r M π szv lz M' π' szv' lz' := by
   unfold syscMemOk at H
   unfold usysMemOk
@@ -68,7 +70,10 @@ theorem syscMemOk_usys (V V' : ProcPriv) (M M' : ElfMem) (r : BitVec 64)
   rw [if_neg h8] at H ⊢
   by_cases hf : syscNum V = USYS_fork
   · rw [if_pos hf]; exact ⟨hfk hf, H, hp, hs, hlz⟩
-  · rw [if_neg hf]; exact ⟨H, hp, hs, hlz⟩
+  rw [if_neg hf]
+  by_cases hu : syscNum V = USYS_uptime
+  · rw [if_pos hu]; exact ⟨hup hu, H, hp, hs, hlz⟩
+  · rw [if_neg hu]; exact ⟨H, hp, hs, hlz⟩
 
 /-- THE DESCRIPTOR BRIDGE, an identity -- which is the point: if either side
 grows a row the other cannot express, this stops compiling (Rocq

@@ -101,6 +101,54 @@ suite must not notice; W3 is the proof's content and may find a row that cannot 
 ι-prefix)` -- that is a channel not yet named (§2), to be reported, not papered over; W4's `events h` must be a
 PURE function of the trace or the two-run corollary dies (§6's reason for exporting events).
 
+### M2-W3 (M0) as landed (2026-10-01)
+
+Lane `lane/m2w3`.  **The class is {exit, getpid, uptime}**; sbrk, fork's parent, wait and console write were
+examined and are NOT functional in (key, ι-prefix) today (below).  New pure `Xv6/UsysDet.lean`: `UIota` (the four
+ledgers at the round: the allocator's `Kev` list, the pid ledger's `Pev` list, the zombie ledger's `Zev` list,
+the tick count; readings `poolEmpty`/`nextPid`/`zombies`/`status`), `usysDetClass`, and `usysDet n W ι` = for
+getpid / uptime the bumped key `bump W (usysDetRet n W ι) W.M W.perm W.sz W.fd W.cwd W.gen W.ch W.lazy W.secc`
+with `usysDetRet` = `signExtend 64 W.pid` (getpid) or `usysUptimeWord ι.ticks` = the count truncated to 32 bits
+and zero-extended (uptime); `W` itself at exit (never resumed: `uroundOk_exit`).  `usysDet_mem`/`usysDet_rows`:
+the functional row satisfies every landed row; `usysDet_of_rows`: at a class number the landed rows at a
+fitting ι (`usysIotaFits`: uptime's answer is `ι`'s count) PIN the bumped key to `usysDet` on the nose.
+
+Discharges.  getpid: already functional in the key (`usysRetPid`, no ledger).  exit: no resume.  uptime: the
+one row the kernel had to strengthen -- the arm (`SyscallArmsProc.syscall_arm_uptime`) now runs
+`SYSUPTIME.wp_sys_uptime_led` and records the receipt's count as the new LAST `SyscRows` field `uptime :
+syscNum V ≠ USYS_uptime ∨ usysUptimeRet (syscA0 V')`; `UsysMemOkSpec.syscMemOk_usys` (one premise more) and
+`UsertrapSysRows` carry it into `usysMemOk`'s new uptime branch (`usysUptimeRet r ∧ identity`), so the round
+relation `uroundOk` (unchanged text) carries it to the loop.  `UexecApply.uexecRet_roundDet` is `round_det`:
+from `uexecRet_roundSlot`'s own premises and `hfit`, `ukeyEq (usysDet n (uvisRun W) ι) W'` (KEY equality: the
+round pins the resume trapframe through its restored file and pc only); `_exists` supplies ι from the row.  The
+engine's arm: `uexecRetF`'s TEXT is unchanged; with the uptime row in `usysMemOk` the relational arm's ∀ ranges
+over exactly `usysDet`'s image, and `uexecRetContF_det` proves `uexecRetContF X n f W ⊣⊢ uexecRetDetF X n f W :=
+∀ ι, spostAt … (usysDetRet n W ι) … -∗ X (usysDet n W ι)` at getpid/uptime.  A literal `if usysDetClass` branch in
+`uexecRetF` would add nothing and break the generic program proofs (`UkRunSysDefs.uexecRet_retK`,
+`UkRunSysQuiet`), so it was not cut; no `Uk*`/`Ush*`/`User*` file changed.
+
+Rows NOT functional, and what they depend on (each a finding; details in `UsysDet`'s header):
+- **sbrk** -- `SpecSysSbrk.sysSbrkOk`'s -1 disjunct is unconditional (spurious failure licensed even on the lazy
+  grow and the shrink, which are key-functional in the code); the eager grow's kalloc COUNT depends on the page
+  table's interior pages (not in the key) and its outcome on the positions of several interleaved `Kev`s, not one
+  snapshot; and no receipt reaches the arm (L3b drops them; `growprocOk`/`sysSbrkOk` carry none).
+- **fork (parent)** -- the pid ledger ties only the live set (R2(a)); the counter tie and first-ness (R2(b)/(c))
+  are not stated, so the pid is not a function of the history; -1 depends on proc-slot exhaustion (no ledger) and
+  on several kallocs (allocproc, uvmcopy -- page-table pages again); `SpecKfork`/`SpecSysFork` carry no receipt.
+- **wait** -- kwait reaps the zombie child in the LOWEST PROC SLOT, and slots are allocproc's global
+  first-UNUSED choice, which no ledger records (zombie ledger D3): with two zombie children WHICH pid wait
+  answers depends on global slot placement -- **a channel not yet named (§2): proc-slot placement**.  Also -1 on
+  `killed` (the kill channel) and on a status copyout that faults a lazy page (`vmfault` → `kalloc`).
+- **console write** -- the trap contract has no write row (identity, `r` free); the kernel's answer
+  (`writeConsArms`) has an EXISTENTIAL short count (`writeConsShort`: some byte in the faulting chunk) read off
+  the page table `P`, not the key's `π` (untouched lazy pages are live in `π`, unmapped in `P`, and copyin does
+  not fault them).
+
+Statements moved: `SyscRows` (+`uptime`, last), `usysMemOk` (+ the uptime branch, after fork),
+`syscMemOk_usys` (+`hup`), `syscRows_keep` (+`h14`, defaulted), the `SyscallArmsFdDefs`/`Path` row builders
+(+`h14 : n ≠ 14`, defaulted).  Byte-identical: `uexecRetF`, `uexecRetContGen`, `uroundOk`, `uexecRet_roundSlot(_of)`,
+every Spec but `SpecSyscall`, every `Uk*`/`User*` file.
+
 Not ported: 42666b2b7 (`tools/intr_cone.py`, a Rocq-module cone audit; the Lean counterpart is a
 `tools/` item for when T lands).  Rocq's L3 and T were never landed; they stay future work.
 

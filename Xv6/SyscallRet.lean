@@ -84,7 +84,7 @@ theorem SyscRows.updEv {V : ProcPriv} {M : Nat → List (BitVec 8)} {V' : ProcPr
     {pid : BitVec 32} (k : Nat) (h : SyscRows V M V' M' sts sts' cs cs' pid) :
     SyscRows V M (V'.updEv k) M' sts sts' cs cs' pid :=
   ⟨h.mem, h.fd, h.pipe, h.ch, h.ret, h.tf, h.upt, h.sz, h.lazy, h.tfp, h.fdg, h.chg, h.gen, h.cwi,
-    h.sbrk, h.fork, h.read, h.pid, h.ks, h.secc⟩
+    h.sbrk, h.fork, h.read, h.pid, h.ks, h.secc, h.uptime⟩
 
 /-- The store and the count commute (both are record updates). -/
 theorem syscStore_updEv (V : ProcPriv) (r : BitVec 64) (k : Nat) :
@@ -95,25 +95,30 @@ theorem syscStore_updEv (V : ProcPriv) (r : BitVec 64) (k : Nat) :
 `sysc_ch_ok_refl` / `sysc_*_ne` at one arm): kill, getpid, pause, uptime,
 sync hand the block back at the entry record with only the answer stored;
 getpid supplies its pid row (`syscRetPid_of`), the others refute it
-(`syscRetPid_ne`). -/
+(`syscRetPid_ne`); uptime supplies its answer row (`h14`, NI M0, off the
+tick ledger's receipt), the others refute it by default. -/
 theorem syscRows_keep (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState)
     (cs : ExtTreeSet GName compare) (pid : BitVec 32) (r : BitVec 64) (n : Int)
     (hnum : syscNum V = n) (h1 : n ≠ 1) (h2 : n ≠ 2) (h3 : n ≠ 3) (h4 : n ≠ 4) (h5 : n ≠ 5)
     (h7 : n ≠ 7) (h8 : n ≠ 8) (h10 : n ≠ 10) (h12 : n ≠ 12) (h15 : n ≠ 15) (h21 : n ≠ 21)
-    (hl : tfArgIdx 0 < V.tf.length) (hpid : syscRetPid V r pid) (h23 : n ≠ 23 := by decide) :
+    (hl : tfArgIdx 0 < V.tf.length) (hpid : syscRetPid V r pid) (h23 : n ≠ 23 := by decide)
+    (h14 : n ≠ 14 ∨ usysUptimeRet r := by exact Or.inl (by decide)) :
     SyscRows V M (syscStore V r) M sts sts cs cs pid := by
   have hn : ∀ m : Int, n ≠ m → syscNum V ≠ m := fun m h => by rw [hnum]; exact h
   rw [← syscStore_a0 V r hl] at hpid
   refine ⟨?_, ?_, ?_, syscChOk_refl V cs, hn 2 h2, Or.inr ⟨r, rfl⟩,
     Or.inr (Or.inr (UMemL.extSz_refl _ _)), Or.inr (Or.inr rfl), Or.inr (Or.inr rfl), rfl, rfl, rfl,
     rfl, Or.inr rfl, Or.inl (hn 12 h12), Or.inl (hn 1 h1), Or.inl (hn 5 h5), hpid, rfl,
-    usysSeccOk_refl _ _ _ _ (hn 23 h23)⟩
+    usysSeccOk_refl _ _ _ _ (hn 23 h23), ?_⟩
   · unfold syscMemOk
     rw [if_neg (hn USYS_exec h7), if_neg (hn USYS_sbrk h12), if_neg (hn USYS_wait h3),
       if_neg (hn USYS_pipe h4), if_neg (hn USYS_read h5), if_neg (hn USYS_fstat h8)]
     rfl
   · exact syscFdOk_refl_at V _ sts n hnum h21 h10 h15 h4
   · exact syscPipeOk_quiet V _ _ _ sts sts (hn 4 h4)
+  · rcases h14 with h | h
+    · exact Or.inl (hn 14 h)
+    · exact Or.inr (by rw [syscStore_a0 V r hl]; exact h)
 
 /-- **The rows of sys_seccomp's arm** (xv6 7b2c1b1b; Rocq `sysc_arm_seccomp`):
 the block back with the mask ANDed with argument 0 and `a0 := 0`; every
@@ -129,7 +134,7 @@ theorem syscRows_secc (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List F
   refine ⟨?_, ?_, ?_, syscChOk_refl V cs, hn 2 (by decide), Or.inr ⟨r, rfl⟩,
     Or.inr (Or.inr (UMemL.extSz_refl _ _)), Or.inr (Or.inr rfl), Or.inr (Or.inr rfl), rfl, rfl, rfl,
     rfl, Or.inr rfl, Or.inl (hn 12 (by decide)), Or.inl (hn 1 (by decide)), Or.inl (hn 5 (by decide)),
-    syscRetPid_ne _ _ _ 23 hnum (by decide), rfl, ?_⟩
+    syscRetPid_ne _ _ _ 23 hnum (by decide), rfl, ?_, Or.inl (hn 14 (by decide))⟩
   · unfold syscMemOk
     rw [if_neg (hn USYS_exec (by decide)), if_neg (hn USYS_sbrk (by decide)),
       if_neg (hn USYS_wait (by decide)), if_neg (hn USYS_pipe (by decide)),

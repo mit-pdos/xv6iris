@@ -96,7 +96,7 @@ theorem syscPath_rows (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts sts' : L
     (hks : V1.kstack = V.kstack)
     (hcwi : (n = USYS_chdir ∧ r.toNat = 0) ∨ V1.cwi = V.cwi)
     (hfd : syscFdOk V r sts sts') (h23 : n ≠ 23 := by decide)
-    (hsc : V1.pvSecc = V.pvSecc := by first | rfl | assumption) :
+    (hsc : V1.pvSecc = V.pvSecc := by first | rfl | assumption) (h14 : n ≠ 14 := by decide) :
     SyscRows V M (syscStore V1 r) (viewFaulted V.upt P' M) sts sts' cs cs pid := by
   have hn : ∀ m : Int, n ≠ m → syscNum V ≠ m := fun m h => by rw [hnum]; exact h
   have hl1 : tfArgIdx 0 < V1.tf.length := by rw [htf, hl]; decide
@@ -105,7 +105,8 @@ theorem syscPath_rows (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts sts' : L
     Or.inr (Or.inr ?_), Or.inr (Or.inr ?_), Or.inr (Or.inr ?_), ?_, hfdg, hchg, hgen,
     ?_, Or.inl (hn 12 h12), Or.inl (hn 1 h1), Or.inl (hn 5 h5),
     syscRetPid_ne _ _ _ n hnum h11, hks,
-    by rw [show (syscStore V1 r).pvSecc = V.pvSecc from hsc]; exact usysSeccOk_refl _ _ _ _ (hn 23 h23)⟩
+    by rw [show (syscStore V1 r).pvSecc = V.pvSecc from hsc]; exact usysSeccOk_refl _ _ _ _ (hn 23 h23),
+    Or.inl (hn 14 h14)⟩
   · unfold syscMemOk
     rw [if_neg (hn USYS_exec h7), if_neg (hn USYS_sbrk h12), if_neg (hn USYS_wait h3),
       if_neg (hn USYS_pipe h4), if_neg (hn USYS_read h5), if_neg (hn USYS_fstat h8)]

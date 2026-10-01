@@ -76,7 +76,10 @@ fallback (+0x40..+0x56) and the shared epilogue (+0x58..+0x62).
    answer is stated as `UsysMemOk.usysSbrkRet` (Rocq spells its body out;
    `r = pv_sz` is `r = BitVec.ofNat 64 sz.toNat`).  read's answer is
    `syscReadRet` (Rocq `UsysMemOk.usys_read_ret`, not in the landed Lean
-   UsysMemOk -- defined here; recommended move: UsysMemOk).
+   UsysMemOk -- defined here; recommended move: UsysMemOk).  NI M0 / M2-W3
+   (M0 as designed for Lean; Rocq never landed it) adds one more Lean-only
+   row LAST, `uptime`: the answer is a tick count's word
+   (`UsysMemOk.usysUptimeRet`), the count the tick ledger's receipt names.
 5. **`kfork_child` is `syscForkChild`** (Rocq `KforkChild.v`, not ported;
    `{ V with tf := V.tf.set (tfArgIdx 0) 0 }`), and **`uwait_wr` /
    `uwait_ans_at_m` are `syscUwaitWr` / `syscUwaitAnsAtM`** (Rocq
@@ -274,6 +277,11 @@ structure SyscRows (V : ProcPriv) (M : Nat → List (BitVec 8)) (V' : ProcPriv)
   included, `kexecOk` keeps it -- hands the block back at the mask it came
   in with (`UsysMemOk.usysSeccOk`, at the outgoing a0 word). -/
   secc : usysSeccOk (syscNum V) V.tf V.pvSecc V'.pvSecc (syscA0 V')
+  /-- **uptime's answer** (NI M0 / M2-W3, Lean-only, after the mask): the
+  tick count at the call as a word (`UsysMemOk.usysUptimeRet`) -- the count
+  the tick ledger's receipt names (`SpecSysUptime.wp_sys_uptime_led`'s
+  `tickLb n ∗ ⌜t = ofNat 32 n⌝`; the arm reads it off the receipt). -/
+  uptime : syscNum V ≠ USYS_uptime ∨ usysUptimeRet (syscA0 V')
 
 /-! ## §2 The deposit channels (Rocq `Section SyscExec`, deviation 2) -/
 

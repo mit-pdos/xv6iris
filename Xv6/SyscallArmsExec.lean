@@ -209,7 +209,8 @@ theorem syscRows_exec (V : ProcPriv) (M : Nat → List (BitVec 8)) (V' : ProcPri
     hne 2 (by decide), Or.inl hn, Or.inl hn, Or.inl hn, Or.inl hn, htfp, hfdg, hchg, hgen,
     Or.inr hcwi, Or.inl (hne 12 (by decide)), Or.inl (hne 1 (by decide)), Or.inl (hne 5 (by decide)),
     syscRetPid_ne _ _ _ 7 hn (by decide), hks,
-    by rw [show (syscStore V' r).pvSecc = V.pvSecc from hsc]; exact usysSeccOk_refl _ _ _ _ (hne 23 (by decide))⟩
+    by rw [show (syscStore V' r).pvSecc = V.pvSecc from hsc]; exact usysSeccOk_refl _ _ _ _ (hne 23 (by decide)),
+    Or.inl (hne 14 (by decide))⟩
 
 /-- The trapframe's word `i < 36` is its `tfW` reading. -/
 theorem syscTf_get (tf : List (BitVec 64)) (hl : tf.length = 36) (i : Nat) (hi : i < 36) :
@@ -604,6 +605,7 @@ theorem syscall_fallback (PK : PRINTK)
     (hne 8 (by decide) (by decide)) (hne 10 (by decide) (by decide)) (hne 12 (by decide) (by decide))
     (hne 15 (by decide) (by decide)) (hne 21 (by decide) (by decide)) (by rw [hl]; decide)
     (syscRetPid_ne _ _ _ _ rfl (hne 11 (by decide) (by decide))) (hne 23 (by decide) (by decide))
+    (Or.inl (hne 14 (by decide) (by decide)))
   -- +0x58: the shared epilogue
   iapply (syscall_epilogue_tail PT Γ c0 cpu k spie1 spp1 _ γ j pid V M sts gn cs ip f
     (syscStore V 0xFFFFFFFFFFFFFFFF#64) M sts cs hj hproc hK hpinsF hrows)

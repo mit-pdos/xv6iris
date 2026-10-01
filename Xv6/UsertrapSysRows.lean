@@ -114,8 +114,13 @@ theorem ut_rows_of_sysc (A : UtArgs GF) (V2 : ProcPriv) (M2 : Nat → List (BitV
             rcases hr.read with h | h
             · exact absurd hrd h
             · rw [ha0] at h; exact h
+          have hut : syscNum (utSysRec A.sep A.V) = USYS_uptime → usysUptimeRet w := by
+            intro hu
+            rcases hr.uptime with h | h
+            · exact absurd hu h
+            · rw [ha0] at h; exact h
           exact syscMemOk_usys (utSysRec A.sep A.V) V2 _ _ w _ _ _ _ _ _ hx hs
-            (by rw [hsz]; exact permOf_extSz hup) (by rw [hsz]) hlz hfk hrd hr.mem
+            (by rw [hsz]; exact permOf_extSz hup) (by rw [hsz]) hlz hfk hrd hut hr.mem
       · -- the cwd
         rw [hnp]
         unfold usysCwdOk

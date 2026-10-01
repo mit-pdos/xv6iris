@@ -23,6 +23,10 @@ THE ROWS, one for one with `syscMemOk`:
 * fstat (8)  -- at most one 24-byte `struct stat`, at argument 1.
 * fork (1)   -- no byte moves, but the RETURN VALUE is pinned: -1 or a pid in
   `[1, PIDMAX]`, both nonzero (the trap loop's parent arm).
+* uptime (14) -- no byte moves, and the RETURN VALUE is the tick count at the
+  call, truncated to xv6's 32-bit `uint` and zero-extended (`usysUptimeRet`;
+  NI M0 / M2-W3: the tick ledger's receipt, `SpecSysUptime.wp_sys_uptime_led`,
+  is what the kernel's arm reads it off).
 * every other entry -- nothing moves.
 
 Beside it: the descriptor rows (`usysFdOk`), pipe's two rows joined
@@ -88,6 +92,7 @@ def USYS_chdir : Int := 9
 def USYS_dup : Int := 10
 def USYS_getpid : Int := 11
 def USYS_sbrk : Int := 12
+def USYS_uptime : Int := 14
 def USYS_open : Int := 15
 def USYS_close : Int := 21
 
@@ -210,6 +215,15 @@ is the kernel's spelling, the same body). -/
 def usysReadRet (tf : List (BitVec 64)) (r : BitVec 64) : Prop :=
   r.toInt = -1 ∨ (0 ≤ r.toInt ∧ r.toInt ≤ max 0 (usysRdcount tf))
 
+/-- **What uptime answered, as a word** (NI M0, Lean-only): the count `t`
+truncated to xv6's 32-bit `uint xticks` and zero-extended into `a0` (the
+`SpecSysUptime` post's `R' 10 = setWidth 64 t`, `t = ofNat 32 n`). -/
+def usysUptimeWord (t : Nat) : BitVec 64 := BitVec.setWidth 64 (BitVec.ofNat 32 t)
+
+/-- **uptime's row** (NI M0, Lean-only): the answer IS some tick count's word
+-- the count the tick ledger's receipt names (`WaitInv.tickLb`). -/
+def usysUptimeRet (r : BitVec 64) : Prop := ∃ t : Nat, r = usysUptimeWord t
+
 /-- **THE TABLE** (Rocq `usys_mem_ok`): syscall `n`, entered with trapframe
 words `tf`, returned `r`, may take the image from `M` to `M'`, the permission
 view from `π` to `π'`, the break from `szv` to `szv'` and the lazy bit from
@@ -236,6 +250,8 @@ def usysMemOk (n : Int) (tf : List (BitVec 64)) (r : BitVec 64)
       π' = π ∧ szv' = szv ∧ lz' = lz
   else if n = USYS_fork then
     (r = -1#64 ∨ (1 ≤ r.toInt ∧ r.toInt ≤ PIDMAX)) ∧ M' = M ∧ π' = π ∧ szv' = szv ∧ lz' = lz
+  else if n = USYS_uptime then
+    usysUptimeRet r ∧ M' = M ∧ π' = π ∧ szv' = szv ∧ lz' = lz
   else M' = M ∧ π' = π ∧ szv' = szv ∧ lz' = lz
 
 /-! ### Reading the table -/
@@ -250,7 +266,10 @@ theorem usysMemOk_quiet {n : Int} {tf : List (BitVec 64)} {r : BitVec 64} {M M' 
   rw [if_neg h7, if_neg h12, if_neg h3, if_neg h4, if_neg h5, if_neg h8] at H
   by_cases hf : n = USYS_fork
   · rw [if_pos hf] at H; exact ⟨H.2.1, H.2.2.1, H.2.2.2.1⟩
-  · rw [if_neg hf] at H; exact ⟨H.1, H.2.1, H.2.2.1⟩
+  rw [if_neg hf] at H
+  by_cases hu : n = USYS_uptime
+  · rw [if_pos hu] at H; exact ⟨H.2.1, H.2.2.1, H.2.2.2.1⟩
+  · rw [if_neg hu] at H; exact ⟨H.1, H.2.1, H.2.2.1⟩
 
 /-- The lazy bit at every entry but sbrk (Rocq `usys_mem_ok_lazy`). -/
 theorem usysMemOk_lazy {n : Int} {tf : List (BitVec 64)} {r : BitVec 64} {M M' : ElfMem}
@@ -274,7 +293,10 @@ theorem usysMemOk_lazy {n : Int} {tf : List (BitVec 64)} {r : BitVec 64} {M M' :
   rw [if_neg h8] at H
   by_cases hf : n = USYS_fork
   · rw [if_pos hf] at H; exact H.2.2.2.2
-  · rw [if_neg hf] at H; exact H.2.2.2
+  rw [if_neg hf] at H
+  by_cases hu : n = USYS_uptime
+  · rw [if_pos hu] at H; exact H.2.2.2.2
+  · rw [if_neg hu] at H; exact H.2.2.2
 
 /-- Read's answer (Rocq `usys_mem_ok_read_ret`). -/
 theorem usysMemOk_readRet {tf : List (BitVec 64)} {r : BitVec 64} {M M' : ElfMem}
@@ -324,6 +346,15 @@ theorem usysMemOk_forkNz {tf : List (BitVec 64)} {r : BitVec 64} {M M' : ElfMem}
   · exact absurd h (by decide)
   · simp at h
 
+/-- uptime's answer (NI M0, Lean-only): a tick count's word. -/
+theorem usysMemOk_uptimeRet {tf : List (BitVec 64)} {r : BitVec 64} {M M' : ElfMem}
+    {π π' : Nat → Option UPerm} {szv szv' : Nat} {lz lz' : Bool}
+    (H : usysMemOk USYS_uptime tf r M π szv lz M' π' szv' lz') : usysUptimeRet r := by
+  unfold usysMemOk at H
+  rw [if_neg (by decide), if_neg (by decide), if_neg (by decide), if_neg (by decide),
+    if_neg (by decide), if_neg (by decide), if_neg (by decide), if_pos rfl] at H
+  exact H.1
+
 /-- The permission view moves only at sbrk (Rocq `usys_mem_ok_perm`). -/
 theorem usysMemOk_perm {n : Int} {tf : List (BitVec 64)} {r : BitVec 64} {M M' : ElfMem}
     {π π' : Nat → Option UPerm} {szv szv' : Nat} {lz lz' : Bool}
@@ -346,7 +377,10 @@ theorem usysMemOk_perm {n : Int} {tf : List (BitVec 64)} {r : BitVec 64} {M M' :
   rw [if_neg h8] at H
   by_cases hf : n = USYS_fork
   · rw [if_pos hf] at H; exact H.2.2.1
-  · rw [if_neg hf] at H; exact H.2.1
+  rw [if_neg hf] at H
+  by_cases hu : n = USYS_uptime
+  · rw [if_pos hu] at H; exact H.2.2.1
+  · rw [if_neg hu] at H; exact H.2.1
 
 /-! ## §2b The descriptor table's rows -/
 

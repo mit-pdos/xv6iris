@@ -6,7 +6,9 @@ the callee's landed interface, per the frozen recipe
 (notes/design-rulings.md §2, §6).
 
 These five arms hand the block back at the entry record with only `a0`
-stored (`SyscallRet.syscRows_keep`).
+stored (`SyscallRet.syscRows_keep`).  uptime's arm runs the tick ledger's
+LED TWIN (`SYSUPTIME.wp_sys_uptime_led`) and records its receipt's count as
+the `uptime` row (NI M0 / M2-W3).
 -/
 import Xv6.SyscallRet
 
@@ -93,7 +95,9 @@ theorem syscall_arm_uptime (SU : SYSUPTIME)
   icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩
   have hct : curTier = KTier.kpt := by rw [← hti]; exact htier
   icases syscall_tf_len hct γ (procAddr j) pid V M $$ Hpriv with ⟨%hl, Hpriv⟩
-  have hU := SU.wp_sys_uptime (hlc := hlc) (GF := GF) cpu (((k.withSpie spie spp).pushed 4).withRegs R) γt
+  -- NI M0 / M2-W3: THE LED TWIN, so the answer is read off the tick ledger's
+  -- receipt (`tickLb n ∗ ⌜t = ofNat 32 n⌝`): the `uptime` row of `SyscRows`
+  have hU := SU.wp_sys_uptime_led (hlc := hlc) (GF := GF) cpu (((k.withSpie spie spp).pushed 4).withRegs R) γt
     ?hn ?hK ?hlk
   case hn => simp only [KCtx.withRegs_noff, KCtx.pushed_noff, KCtx.withSpie_noff]; rw [hnoff]; decide
   case hK => k_norm_g; have := syscallSlots_val; unfold sysUptimeSlots; omega
@@ -104,12 +108,13 @@ theorem syscall_arm_uptime (SU : SYSUPTIME)
       k_norm_g at h
       exact List.eq_nil_of_length_eq_zero (by omega)
     rw [hl0]; simp
-  unfold wp_sys_uptime_body at hU
+  unfold wp_sys_uptime_led_body at hU
   rw [syscTarget_uptime]
   iapply hU
   iframe Hk Ht Hpc
   k_next_e
-  iintro %spie2 %spp2 %R2 %t %- Hk Hpc %⟨hcs, ha0⟩
+  iintro %spie2 %spp2 %R2 %t %- Hk Hpc %⟨hcs, ha0⟩ ⟨%nt, -, %htn⟩
+  have hup : usysUptimeRet (R2 10#5) := ⟨nt, by rw [ha0, htn]; rfl⟩
   have hww : ∀ (K : KCtx) (a b c d : Bool), (K.withSpie a b).withSpie c d = K.withSpie c d :=
     fun _ _ _ _ _ => rfl
   have hpsw : ∀ (K : KCtx) (m : Nat) (a b : Bool),
@@ -121,7 +126,7 @@ theorem syscall_arm_uptime (SU : SYSUPTIME)
   have hn14 : syscNum V = (14 : Int) := hnum
   have hrows := syscRows_keep V M sts cs pid (R2 10#5) 14 hn14 (by decide) (by decide) (by decide)
     (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide)
-    (by rw [hl]; decide) (syscRetPid_ne _ _ _ 14 hn14 (by decide))
+    (by rw [hl]; decide) (syscRetPid_ne _ _ _ 14 hn14 (by decide)) (by decide) (Or.inr hup)
   unfold syscallRet syscallAddr at *
   iapply (syscall_ret_tail PT Γ c0 cpu k spie2 spp2 R2 γ j pid V M sts gn cs ip f V M sts cs hj hproc hK
     htier hpins2 hs2' hrows)
