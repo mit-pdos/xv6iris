@@ -81,6 +81,7 @@ import MachCSL.WpMmode
 import MachCSL.WpMmodeAlu
 import MachCSL.WpStore
 import MachCSL.WpCsr
+import MachCSL.WpCsrFacts
 import MachCSL.WpMmodeCtl
 import MachCSL.WpPmpXv6
 import MachCSL.WpMmodeMret

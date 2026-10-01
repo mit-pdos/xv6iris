@@ -20,6 +20,7 @@ not in `SConfAt`, so the two `sstatus` rules are proved directly from
 -/
 import MachCSL.KCtxGpr
 import MachCSL.WpSmodeIntr
+import MachCSL.WpCsr
 
 namespace MachCSL
 

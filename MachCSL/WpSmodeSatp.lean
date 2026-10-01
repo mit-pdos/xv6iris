@@ -5,6 +5,7 @@ transport of points-to resources from the ambient Bare tier to the Kpt tier.
 -/
 import MachCSL.KCtxGpr
 import MachCSL.WpSmodeFrame
+import MachCSL.WpCsr
 
 namespace MachCSL
 

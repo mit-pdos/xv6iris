@@ -10,6 +10,7 @@ With a direct-mode value the model's legalization is the identity.
 -/
 import MachCSL.KCtxGpr
 import MachCSL.WpSmodeRules
+import MachCSL.WpCsr
 
 namespace MachCSL
 

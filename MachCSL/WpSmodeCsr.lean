@@ -12,7 +12,7 @@ answers filled in (what the executor produces), and
 import MachCSL.KCtxGpr
 import MachCSL.WpCsrS
 import MachCSL.SConfPhysDefs
-import MachCSL.WpCsr
+import MachCSL.WpCsrFacts
 import MachCSL.AluFacts
 import MachCSL.WpCycleDefs
 
