@@ -88,13 +88,15 @@ Rocq's header, kept because the reasons are the content:
    predicates' `S k` is `k + 1`, inums `Nat`.  Rocq seals them
    (`Typeclasses Opaque`); Lean definitions are not unfolded by the proof
    mode unless asked, so no seal is needed.
+7. **The chroot bump** (design/chroot.md section 3): `nparWalkPreEra γfs
+   rt cw`, `nparWalkDeadEra γfs rt`, and the section-6 lemmas take the
+   process's root `rt`; `npPre_of_mknod` fires the absolute one-shot at
+   `rt`, so Rocq's `np_rootino_agree` has nothing left to do.
 
 ## Dropped/simplified vs Rocq
 
-`np_rootino_agree` (section 6): Lean has one `ROOTINO : Nat`
-(`Xv6/FsAbsEra.lean` deviation 2), so `np_pre_of_mknod`'s
-`P 0 (bv_unsigned InodeInv.ROOTINO)` is `P 0 ROOTINO` and the rewrite
-vanishes.  Nothing else.
+`np_rootino_agree` (section 6): the absolute fetch starts at `rt`
+(deviation 7) and Lean has one `ROOTINO : Nat` anyway.  Nothing else.
 -/
 import Xv6.SysMknodDefs
 import Xv6.FsAbsEra
@@ -222,9 +224,10 @@ mknod, unlink, open's create arm, create itself -- so the `npar` prefix
 names the family's mold, not one caller.  They ride the ERA LEND
 (`FsAbsEra.elend`): the lent fragment and the carrier are the same ghost,
 which is what makes the fire points reachable.  The START is namex's rule
-(`FsAbsEra.umStartOf cw pl`): ROOTINO on an absolute fetch, the calling
-process's cwd inum `cw` on a relative one (the syscall contract passes its
-block's `cwi`). -/
+(`FsAbsEra.umStartOf rt cw pl`): the calling process's root inum `rt` on an
+absolute fetch, its cwd inum `cw` on a relative one (the syscall contract
+passes its block's `rti` and `cwi`); the hops are at `rt` too
+(`FsAbsWalk.axHop`'s self rule). -/
 
 section EraMknod
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [FsTopG GF] [FsBytesG GF]
@@ -232,18 +235,19 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [FsTopG GF] [FsBy
 /-- THE PARENT-PREFIX ONE-SHOT (Rocq's `npar_walk_pre_era`): one fupd,
 universally quantified over the fetched string, yielding the cursor at the
 start and one `axHop` per parent element. -/
-def nparWalkPreEra (γfs : FsNames) (cw : Nat) (P Pmiss : Nat → Nat → IProp GF) : IProp GF :=
-  iprop(∀ (pl : List (BitVec 8)) (r : Nat), ⌜r = umStartOf cw pl⌝ ={⊤}=∗
-    P 0 r ∗ axHopsFrom (elend (fsGammaL γfs)) P Pmiss (nparElems pl) 0)
+def nparWalkPreEra (γfs : FsNames) (rt cw : Nat) (P Pmiss : Nat → Nat → IProp GF) :
+    IProp GF :=
+  iprop(∀ (pl : List (BitVec 8)) (r : Nat), ⌜r = umStartOf rt cw pl⌝ ={⊤}=∗
+    P 0 r ∗ axHopsFrom rt (elend (fsGammaL γfs)) P Pmiss (nparElems pl) 0)
 
 /-- the walk's death receipt, strict at both disjuncts (Rocq's
 `npar_walk_dead_era`; section 6's `npDead_to_mknod` records why it does not
 cover every walk failure alone). -/
-def nparWalkDeadEra (γfs : FsNames) (P Pmiss : Nat → Nat → IProp GF) (pl : List (BitVec 8)) :
-    IProp GF :=
+def nparWalkDeadEra (γfs : FsNames) (rt : Nat) (P Pmiss : Nat → Nat → IProp GF)
+    (pl : List (BitVec 8)) : IProp GF :=
   iprop(∃ (k d : Nat), ⌜k < (nparElems pl).length⌝ ∗
-    ((P k d ∗ axHopsFrom (elend (fsGammaL γfs)) P Pmiss (nparElems pl) k) ∨
-     (Pmiss k d ∗ axHopsFrom (elend (fsGammaL γfs)) P Pmiss (nparElems pl) (k + 1))))
+    ((P k d ∗ axHopsFrom rt (elend (fsGammaL γfs)) P Pmiss (nparElems pl) k) ∨
+     (Pmiss k d ∗ axHopsFrom rt (elend (fsGammaL γfs)) P Pmiss (nparElems pl) (k + 1))))
 
 end EraMknod
 
@@ -258,7 +262,7 @@ contract (`SpecNparEra`) consumes and produces.  Rocq's reading, kept:
 >
 > (2) THE PRE.  `np_start_of_mknod` is the general form the walk actually
 > takes: the START INUM is the walk's to choose, so no firing happens at
-> all.  `np_pre_of_mknod` fires the one-shot at ROOTINO, where an absolute
+> all.  `np_pre_of_mknod` fires the one-shot at `rt`, where an absolute
 > fetch starts.
 >
 > (3) THE DEAD.  This one is NOT an identity.  `npar_walk_dead_era` bounds
@@ -269,9 +273,7 @@ contract (`SpecNparEra`) consumes and produces.  Rocq's reading, kept:
 > predicate, or the cursor at the parent index -- exactly what
 > `SpecCreate.cre_fail_arms`'s walk-death arm carries.
 
-Rocq's `np_rootino_agree` is DROPPED: Lean has one `ROOTINO : Nat`
-(`Xv6/FsAbsEra.lean` deviation 2), so `np_pre_of_mknod`'s
-`P 0 (bv_unsigned InodeInv.ROOTINO)` is `P 0 ROOTINO`. -/
+Rocq's `np_rootino_agree` is DROPPED (header deviation 7). -/
 
 section NparMknod
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [FsTopG GF] [FsBytesG GF]
@@ -280,39 +282,40 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [FsTopG GF] [FsBy
 theorem npElems_is_nparElems (pl : List (BitVec 8)) : npElems pl = nparElems pl := rfl
 
 /-- Rocq's `ep_hops_is_mknod_hops`. -/
-theorem epHops_is_mknodHops (γfs : FsNames) (P Pmiss : Nat → Nat → IProp GF)
+theorem epHops_is_mknodHops (rt : Nat) (γfs : FsNames) (P Pmiss : Nat → Nat → IProp GF)
     (pl : List (BitVec 8)) (n : Nat) :
-    epHopsFrom γfs P Pmiss pl n = axHopsFrom (elend (fsGammaL γfs)) P Pmiss (nparElems pl) n :=
+    epHopsFrom rt γfs P Pmiss pl n
+      = axHopsFrom rt (elend (fsGammaL γfs)) P Pmiss (nparElems pl) n :=
   rfl
 
 /-- THE FORM THE WALK TAKES (Rocq's `np_start_of_mknod`): `epStart` at a
 fixed `pl` IS `nparWalkPreEra` specialised there -- a rename. -/
-theorem npStart_of_mknod (γfs : FsNames) (cw : Nat) (P Pmiss : Nat → Nat → IProp GF)
+theorem npStart_of_mknod (γfs : FsNames) (rt cw : Nat) (P Pmiss : Nat → Nat → IProp GF)
     (pl : List (BitVec 8)) :
-    nparWalkPreEra (hlc := hlc) γfs cw P Pmiss ⊢ epStart (hlc := hlc) γfs cw P Pmiss pl := by
+    nparWalkPreEra (hlc := hlc) γfs rt cw P Pmiss ⊢ epStart (hlc := hlc) γfs rt cw P Pmiss pl := by
   unfold nparWalkPreEra epStart
   rw [epHops_is_mknodHops]
   iintro Hpre %r %hr
   iapply Hpre $$ %pl %r %hr
 
-/-- the absolute fetch: fire the one-shot at ROOTINO (Rocq's
-`np_pre_of_mknod`, minus the root-agreement rewrite). -/
-theorem npPre_of_mknod (γfs : FsNames) (cw : Nat) (P Pmiss : Nat → Nat → IProp GF)
+/-- the absolute fetch: fire the one-shot at the process's root `rt`
+(Rocq's `np_pre_of_mknod`). -/
+theorem npPre_of_mknod (γfs : FsNames) (rt cw : Nat) (P Pmiss : Nat → Nat → IProp GF)
     (pl : List (BitVec 8)) (hsl : pl[0]? = some SLASH) :
-    ⊢@{IProp GF} nparWalkPreEra (hlc := hlc) γfs cw P Pmiss ={⊤}=∗
-      P 0 ROOTINO ∗ epHopsFrom γfs P Pmiss pl 0 := by
+    ⊢@{IProp GF} nparWalkPreEra (hlc := hlc) γfs rt cw P Pmiss ={⊤}=∗
+      P 0 rt ∗ epHopsFrom rt γfs P Pmiss pl 0 := by
   unfold nparWalkPreEra
   rw [epHops_is_mknodHops]
   iintro Hpre
-  iapply Hpre $$ %pl %ROOTINO %(umStartOf_slash cw pl hsl).symm
+  iapply Hpre $$ %pl %rt %(umStartOf_slash rt cw pl hsl).symm
 
 /-- THE DEATH ARM, FOLDED (Rocq's `np_dead_to_mknod`): the strict
 predicate, or the cursor at the parent index (the parent's own level died;
 the family from there is empty). -/
-theorem npDead_to_mknod (γfs : FsNames) (P Pmiss : Nat → Nat → IProp GF)
+theorem npDead_to_mknod (rt : Nat) (γfs : FsNames) (P Pmiss : Nat → Nat → IProp GF)
     (pl : List (BitVec 8)) :
-    npDead γfs P Pmiss pl ⊢
-      nparWalkDeadEra γfs P Pmiss pl ∨ ∃ d : Nat, P (nparElems pl).length d := by
+    npDead rt γfs P Pmiss pl ⊢
+      nparWalkDeadEra γfs rt P Pmiss pl ∨ ∃ d : Nat, P (nparElems pl).length d := by
   unfold npDead nparWalkDeadEra
   simp only [epHops_is_mknodHops]
   iintro (⟨%k, %d, %hk, HP, Hh⟩ | ⟨%k, %d, %hk, HP, Hh⟩)
