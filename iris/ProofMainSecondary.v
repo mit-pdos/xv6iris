@@ -446,8 +446,8 @@ Section ProofMainSecondary.
                 creg_c7 ltac:(vm_compute; discriminate) Hbz
                 with "Hcg Hpc []").
       { iApply (mni_1e with "Htext"). }
-      iApply wp_next_off_intro.
-      iIntros "Hcg Hpc".
+      iApply wp_next_off_intro_lc.
+      iIntros "Hlc Hcg Hpc".
       assert (Hp20 : add_vec_int (mword_of_int (KernelSyms.main + 0x1e) : mword 64) 2
                      = mword_of_int (KernelSyms.main + 0x20)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hp20) in "Hpc".
@@ -463,7 +463,7 @@ Section ProofMainSecondary.
         iApply fupd_wp.
         iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hctx Hcg]".
         iMod (started_absorb ⊤ γi ξd P i V0 ltac:(solve_ndisj) Hle
-                with "Hsinv Hidx Hlb Hctx HPd") as "[Hctx #HP]".
+                with "Hsinv Hidx Hlb Hctx HPd Hlc") as "[Hctx #HP]".
         iDestruct ("Hcg" with "Hctx") as "Hcg".
         (* A6.138: the read receipt, weakened to the flag's own position *)
         iEval (rewrite hart_view_lb_unseal /hart_view_lb_def) in "Hlb".

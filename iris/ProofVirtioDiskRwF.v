@@ -822,7 +822,7 @@ Section VdrwfP6.
     intros HK Hglen Hlenbuf Hlendisk Hsec Hbufkd Hsp0m Hbelow.
     iIntros "#Htext #Hpinv #Hqinv #Hrcpt #Hdinv #Hgeom #Hlk Hsaved Hbno Hcont".
     rewrite /P5.vdrw_p5_exit.
-    iIntros (CIDx Hsx) "_"; iIntros (M q np nr cm fr h m2 t pin)
+    iIntros (CIDx Hsx) "Hlc"; iIntros (M q np nr cm fr h m2 t pin)
             "%Hrh %Hok %Hpinr %Hal Hcg Hown Htc Hclm Hpc Htok
              Hbody Hact Hinfob Hhcm Hbdisk Hu Hfm Hft Hrm Hrt Hidx".
     (* SPLIT AT THE INDEX, ONCE, RIGHT HERE: [Hpay] rides UNCHANGED through
@@ -896,7 +896,7 @@ Section VdrwfP6.
     iApply fupd_wp.
     iEval (rewrite /slot_perms_done) in "Hperm".
     iMod (perm_collect gen_id (dn_perm γd) kq.1 kq.2 _ Q ⊤ ltac:(solve_ndisj)
-            with "Hqinv Hrcpt Hperm") as "HQ".
+            with "Hqinv Hrcpt Hperm Hlc") as "HQ".
     iModIntro.
     assert (Hvsts : vr_status (vs_req (vdrwd_slot kq b h wr sector (vdrwd_sldata wr bs_buf bs_disk))) = d_info_status h)
       by reflexivity.
@@ -1864,8 +1864,9 @@ Section ProofVirtioDiskRwF.
     (* Before any of the request is formatted: the channel chooses the key
        [kq], which then travels INSIDE the published slot ([vs_perm]) so the
        DMA completion can find the view shift and this proof can find its
-       receipt after the wake.  A plain fupd -- no program step is needed,
-       because a deposit only ADDS under the invariant's later. *)
+       receipt after the wake.  A plain fupd, but under ordinal step indices
+       the permits' map sits under the invariant's later, so the deposit
+       spends a credit: it runs after P1, on P1's (port-ordinal guardrail (5)). *)
     iDestruct (dev_inv_perm with "Hdinv") as "#Hqinv".
     (* the permits' INDEX, restated in the pin layer's vocabulary: the spec
        states it as "this call's own block", the publish needs it as the
@@ -1876,11 +1877,6 @@ Section ProofVirtioDiskRwF.
       = vdrwd_wr (m !!! Regidx Ra1) (1024 * uint bno)%Z bs_buf).
     { unfold vdrwd_wr. rewrite (vdrwf_out_iff (m !!! Regidx Ra1)). reflexivity. }
     iEval (rewrite Hpermidx) in "Hperm".
-    iApply fupd_wp.
-    iMod (perm_deposit_kq gen_id (dn_perm γd)
-            (vdrwd_wr (m !!! Regidx Ra1) (1024 * uint bno)%Z bs_buf) Q ⊤
-            ltac:(solve_ndisj) with "Hqinv Hperm") as (kq) "[Hpend #Hrcpt]".
-    iModIntro.
     assert (Hsecval : (bv_unsigned (vdrw_sector_raw bno) * 512)%Z
                       = (1024 * uint bno)%Z).
     { rewrite (vdrwd_sector_raw_val bno Hbnolt). apply vdrwf_sec512. }
@@ -1897,7 +1893,15 @@ Section ProofVirtioDiskRwF.
     (* ---- P1: prologue + acquire ---- *)
     iApply (P1.wp_vdrw_p1 γd γk pd pav pu m K eb (proc_addr j) bno lks HK Hbelow
               with "Hcg Hown Hextc Hextm Htext Hpc Hlk Hbno").
-    iIntros (CIDa Hsa) "_"; iIntros (M) "%Hrh Hcg Hown Hpay Hextc Hextm Hpc Htok HR Hsaved Hscr Hbno".
+    iIntros (CIDa Hsa) "Hlc0"; iIntros (M) "%Hrh Hcg Hown Hpay Hextc Hextm Hpc Htok HR Hsaved Hscr Hbno".
+    (* the deposit (above) runs HERE, on P1's credit: it opens the permits'
+       invariant, whose map sits under a later (port-ordinal guardrail (5));
+       still before any of the request is formatted. *)
+    iApply fupd_wp.
+    iMod (perm_deposit_kq gen_id (dn_perm γd)
+            (vdrwd_wr (m !!! Regidx Ra1) (1024 * uint bno)%Z bs_buf) Q ⊤
+            ltac:(solve_ndisj) with "Hqinv Hperm Hlc0") as (kq) "[Hpend #Hrcpt]".
+    iModIntro.
     destruct Hrh as (Hregs & Hhi).
     (* JOIN AT THE INDEX: P1's own acquire freed the pair at [eb = true] and
        nothing at [eb = false], where the caller (our own precondition)
