@@ -856,7 +856,7 @@ newest is used.  `UkGrepLoopFrame.grepLoop_epi` threaded such a chain
 (`hs0` … `hs13`, one per reload) and its per-step `omega` doubled down the
 walk: 0.05 s, 0.09, 0.16, 0.29, 0.59, 1.22, 2.51 s (`[omega] Assuming fact`
 nests in the trace are the tell).  `clear hsK` right after deriving
-`hs(K+1)`: the declaration 6.9 s → 0.7 s, module wall 6.2 s → 4.0 s.  Rule:
+`hs(K+1)`: the declaration 7.2 s → 2.1 s (trace, `Elab.async=false`), module wall 6.2 s → 4.0 s.  Rule:
 in a straight-line walk, a chain of `Nat`-subtraction facts keeps only its
 live link.
 
