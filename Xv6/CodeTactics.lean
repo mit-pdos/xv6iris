@@ -274,6 +274,44 @@ register_option xv6.textInstrCheck : Bool := {
     instruction) instead of leaving them to the kernel"
 }
 
+/-- One code conjunct from a persistent hypothesis: `hdup` is the proof mode's
+"keep it and copy it" view of the context (`Hyps.remove` of an intuitionistic
+hypothesis), `hk` the code fact. -/
+theorem code_frame {PROP : Type _} [BI PROP] {e K P Q : PROP} (hdup : e ⊣⊢ e ∗ □ K)
+    (hk : K ⊢ P) (h : e ⊢ Q) : e ⊢ P ∗ Q :=
+  hdup.mp.trans ((sep_mono h (intuitionistically_elim.trans hk)).trans sep_comm.mp)
+
+open Lean Elab Tactic Meta Qq in
+/-- Close the leading conjunct `a` of the main goal `Entails' tm (a ∗ q)` by the
+code fact `hk : K ⊢ a` from the persistent hypothesis `ht : K` without the proof
+mode's `isplitr; iapply; iexact` (no `IntoWand`/`AsEmpValid` search, no context
+split): `code_frame`, at the plain context (see `MachCSL.plainCtx`).  The new goal
+is `Entails' tm q`.  `false` (and nothing done) when `ht` is not a persistent
+hypothesis of the goal. -/
+def codeFrameDirect (ht : Name) (hk : Lean.Expr) : TacticM Bool := withMainContext do
+  let g ← getMainGoal
+  let tgt := (← instantiateMVars (← g.getType)).consumeMData
+  let some ig := parseIrisGoal? tgt | return false
+  let some (ivar, _) := ig.hyps.find? ht | return false
+  unless ivar.persistent? do return false
+  let some (_, _, _, K) := ig.hyps.getDecl? ivar | return false
+  -- the fact is about this hypothesis (the kernel checks the rest)
+  let some (_, _, K', _) := parseEntails? (← instantiateMVars (← inferType hk)) | return false
+  unless K'.getAppFn.constName? == K.getAppFn.constName? do return false
+  let r := ig.hyps.remove false ivar
+  -- the intuitionistic hypothesis stays: `e ⊣⊢ e ∗ □ K`
+  unless r.e' == ig.e do return false
+  let q := ig.goal
+  unless q.isAppOfArity ``Iris.BI.BIBase.sep 4 do return false
+  let a := q.getArg! 2
+  let rest := q.getArg! 3
+  let newG ← mkFreshExprSyntheticOpaqueMVar
+    (mkAppN tgt.getAppFn (tgt.getAppArgs.set! 3 rest)) (← g.getTag)
+  g.assign (mkAppN (mkConst ``Xv6.code_frame [ig.u])
+    #[ig.prop, ig.bi, ig.e, K, a, rest, r.pf, hk, newG])
+  replaceMainGoal [newG.mvarId!]
+  return true
+
 open Lean Elab Tactic Meta in
 /-- `k_code_text HT`: the leading `instr pc rvc i` conjuncts of the goal (with
 `pc`, `rvc`, `i` known), each by `text_instrK` from the persistent text
@@ -292,7 +330,6 @@ elab "k_code_text " ht:ident : tactic => do
     let args := a.getAppArgs
     let (pc, rvc, i) := (args[3]!, args[4]!, args[5]!)
     if pc.hasMVar || rvc.hasMVar || i.hasMVar then break
-    evalTactic (← `(tactic| isplitr))
     let pf ← withMainContext do
       let rhs ← mkAppM ``Option.some
         #[← mkAppM ``Prod.mk #[rvc, ← mkAppM ``Prod.mk #[i, ← mkAppM ``textI0 #[pc, i]]]]
@@ -306,10 +343,13 @@ elab "k_code_text " ht:ident : tactic => do
           instantiateMVars m
         else
           mkExpectedTypeHint (← mkEqRefl lhs) ty
-      Term.exprToSyntax <| ← mkAppOptM ``text_instrK
+      mkAppOptM ``text_instrK
         #[some args[0]!, some args[1]!, some args[2]!, some pc, some rvc, some i,
           some (← eqn ``drefM), some (← eqn ``drefS)]
-    evalTactic (← `(tactic| focus (iapply $pf:term; iexact $ht; done)))
+    if ← codeFrameDirect ht.getId pf then continue
+    evalTactic (← `(tactic| isplitr))
+    let pfStx ← withMainContext <| Term.exprToSyntax pf
+    evalTactic (← `(tactic| focus (iapply $pfStx:term; iexact $ht; done)))
 
 macro_rules
   | `(tactic| k_code (text_instr _ _ _ _ rfl rfl) $ht:ident) => `(tactic| k_code_text $ht)

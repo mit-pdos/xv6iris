@@ -120,7 +120,7 @@ macro_rules
   | `(tactic| k_step_au $rule:term from $code:term $ht:ident $$ $pat:specPat) =>
     `(tactic| k_step_au $rule:term from $code:term $ht:ident $$ $pat:specPat with [])
   | `(tactic| k_step_au $rule:term from $code:term $ht:ident $$ $pat:specPat with [$extra,*]) =>
-    `(tactic| (iapply $rule:term $$ $pat:specPat
+    `(tactic| (k_iapply $rule:term $$ $pat:specPat
                rotate_right 1
                k_code $code:term $ht:ident
                iframe #

@@ -62,6 +62,8 @@ import MachCSL.WpSmodeSfence
 import MachCSL.WpSmodeSatp
 import MachCSL.WpSmodeKpt
 import MachCSL.CallConv
+import MachCSL.KNormCache
+import MachCSL.KApply
 import MachCSL.WpSmodeFrame
 import MachCSL.WpSmodeFrame8
 import MachCSL.WpSmodeFrame8b

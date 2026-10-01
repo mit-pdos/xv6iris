@@ -443,7 +443,7 @@ macro_rules
   | `(tactic| bm_step $rule:term from $code:term $ht:ident $$ $pat:specPat) =>
     `(tactic| bm_step $rule:term from $code:term $ht:ident $$ $pat:specPat with [])
   | `(tactic| bm_step $rule:term from $code:term $ht:ident $$ $pat:specPat with [$extra,*]) =>
-    `(tactic| (iapply $rule:term $$ $pat:specPat
+    `(tactic| (k_iapply $rule:term $$ $pat:specPat
                rotate_right 1
                k_code $code:term $ht:ident
                iframe #

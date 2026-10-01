@@ -953,7 +953,8 @@ kernel's share unchanged (now ~30 % of a big declaration).
   match* (prio above `frameSep`): fires, buys nothing. A failed `Frame R
   P1` is cheap; the cost is the SUCCESSFUL frame (`frame_here_absorbing`
   + two `QuickAbsorbing` + `MakeSep` searches, ~1.5 ms per framed
-  hypothesis), i.e. the per-frame floor of the proof mode.
+  hypothesis), i.e. the per-frame floor of the proof mode.  (Lane K: not so against a
+  multi-conjunct premise -- see "five cuts (lane K)" below.)
 - *A simproc dropping shadowed register writes* (`(C.set i v).set .. .set
   i w`, chains of 23 `set`s for 8 registers after 30 straight-line steps):
   −13 % on `ProofVirtioDiskRwC`, noise on `ProofKfork`, and it breaks proofs
@@ -1121,6 +1122,99 @@ times are sequential CPU).  Eight causes; each is a rule.
   the model's `check_CSR_result` run for the 339 non-default numbers.
   `FsImgCheckSweeps.fsimgRegionBareB` (1.8 s) reads ~10k bytes one at a
   time; a whole-record `Nat` test needs a byte-vs-`Nat` equivalence lemma.
+
+### Lean: what a step still cost after lane P, and five cuts (lane K)
+
+Measured Oct 1 2026 on origin/lean 06ca39eef.  Kernel time was located with a
+probe that re-runs `Environment.addDeclCore` on a finished theorem's value
+(warm it up once: the first `addDecl` of a file pays ~1.7 s of loading) and,
+for each application node, `Kernel.isDefEq` of the argument's inferred type
+against the binder's domain whenever the two are not syntactically equal
+(kernel diagnostics through `Kernel.enableDiag` give the unfold counts).
+Elaboration was located with `trace.profiler` at threshold 1 ms on a scratch
+copy of the module, aggregated per tactic name.
+
+1. **The kernel converted every step's context from the displayed form to
+   the plain one.**  A proof-mode goal `Entails' tm Q` shows each hypothesis
+   as `IrisHyp P` under name metadata, but iris-lean's lemmas are instantiated
+   at the UNWRAPPED context (the `Hyps` index).  A proof made by refining the
+   goal directly (`refine lemma ?_`, simp's `Eq.mpr`, `change`'s `id` hint)
+   states the wrapped `tm`, and where it meets an iris-lean term the kernel
+   must prove `tm ≡ e`.  `IrisHyp` is a `@[reducible] def` -- to the kernel a
+   regular definition of height ~0 -- so lazy delta unfolds the TALLER side,
+   the hypothesis `P`, first, down to `UPred.holds` (42,888 unfolds in
+   `vdrw_P3`): ~50 µs a hypothesis, 2-3 ms a conversion, ~3 conversions a
+   step.  The head mismatch `Entails'`/`Entails` itself costs 0.07 ms; the
+   context costs 2 ms; stripping every `IrisHyp`/metadata from the finished
+   term halves the kernel (`vdrw_P3` 1134 → 616 ms).  The step tactics
+   (`inext_goal`, `k_next_off`, `k_next_pin`, `k_norm_goal`, `betaConcl`) now
+   state their proofs at the plain context (`MachCSL.plainCtx` /
+   `withPlainCtx`); the goals they create keep the wrapped form, which the
+   proof mode parses.  Kernel time of the 30 slowest proof modules (probe):
+   59.1 → 46.5 s; the all-stripped floor is 43.5 s.  The remaining ~3 s
+   comes from plain Lean tactics on proof-mode goals (`k_norm` over the whole
+   goal, `obtain`/`cases` motives, `iintro %x`): a generic fix would strip the
+   finished term, which needs a wrapper around each `by` block -- not done.
+   **Rule: a tactic that builds a proof-mode proof term itself must state it
+   at `parseIrisGoal?`'s `e`, never at the goal's displayed context.**
+2. **A failing `Frame` search is NOT cheap when the goal is a conjunction**
+   (correcting lane P's note): `frameSep` walks the premise, ~2 ms per
+   hypothesis, and a memory step's bare `iframe` tried every `wordPointsTo`
+   cell (they all pass the head filter): 25-40 ms.  `FrameFilter` now also
+   requires a hypothesis whose head is a non-`Iris` constant keying no
+   `Frame` instance (checked in the instance discrimination tree) to UNIFY
+   with a goal atom of that head (the proof mode's own configuration,
+   instance transparency, rolled back); atoms found under a binder disable
+   the test.  Exact for the same reason as the head filter: such a
+   hypothesis can only frame by a leaf instance.  Memory-step `iframe` ~5 ms.
+3. **`RegMap.reduceApply`** replaces `RegMap.set_apply` in `k_norm_simps`: a
+   read `(m.set i v) j` with literal indices becomes `v` or `m j` by one
+   `set_apply_of_eq`/`set_other` with a `decide` side condition, instead of
+   building an `ite`, deciding the condition and collapsing it through
+   `ite_congr` -- 23k `ite_congr` nodes in `vdrw_P3`'s term.  It must stay a
+   POST-procedure that does ONE level per call: a pre-order version walking
+   the whole chain at once broke `KexecD` and `SysOpenTails`, whose extra
+   lemmas rewrite an inner read (`(R.set 10#5 v) 2#5 = …`) that the walk
+   skipped past.  Simp in `ProofVirtioDiskRwC` 1.2 → 0.3 s.
+4. **`k_code_text` frames the code fact directly** (`Xv6.code_frame` on
+   `Hyps.remove` of the persistent text hypothesis) instead of
+   `isplitr; iapply; iexact`: ~4 ms → <1 ms a step.
+5. **`k_iapply`** (`MachCSL.KApply`): `iapply rule $$ [- $Hk $Hpc]` without
+   `AsEmpValid`, `IntoWand`, two `Frame` searches and `TCOr` (~14 ms → ~4 ms,
+   most of it elaborating the rule term).  When the two framed hypotheses
+   unify with two CONSECUTIVE premise conjuncts and no earlier conjunct
+   unifies with either, both leave the context by `Hyps.remove`, the premise
+   goal is the remaining conjuncts in order (what the `Frame` search leaves),
+   and `kapply_gen` with a `kperm_base`/`kperm_step` reassociation closes it;
+   goals come out in `iapply`'s order.  Anything else falls back to
+   `iapply`.  Used by the shared step macros and the proofs' own (`PrintkDefs`,
+   `ProofPiperead`/`Pipewrite`, `BmapDefs`, `NamexRoot`, `IputParts`,
+   `PlicPlanExtra`).
+6. Small: `k_norm`'s simp keeps simp's own cache (`Simp.State`) across the
+   calls of a declaration with the same extra lemmas (`MachCSL.KNormCache`; a
+   result mentioning a local that left the context is recomputed).  A
+   whole-context `k_norm` after a step 6 → 1.3 ms; `k_norm_goal` barely moves
+   (its conclusion is new each step).  simp's cost is its traversal: an EMPTY
+   lemma set takes 3.6 ms over a 40-hypothesis context.
+
+Result (one isolated run of each module, base 06ca39eef vs after, back to
+back under the lock): the 30 slowest kernel-proof modules **340.6 → 279.0 s
+CPU (−18 %)**; Kfork 28.7 → 23.2, Printk 27.3 → 22.0, InstallTrans 19.2 →
+15.3, Allocproc 16.9 → 15.0, VirtioDiskRwC 6.0 → 3.1, Kernelvec 6.2 → 3.9.
+Declarations: `kfork_proof` 9.4 → 6.3 s (kernel 2.96 → 0.95), `kf_publish`
+6.6 → 4.7 (2.21 → 0.92), `ap_found` 7.6 → 6.4, `initlog_proof` 6.3 → 5.4
+(1.06 → 0.53), `vdrw_P3` 5.1 → 2.3, `vmfault_proof` 5.3 → 3.8,
+`printk_proof` 4.3 → 2.5, `it_body` 5.1 → 4.0.  Per register step in
+`vdrw_P3`: ~70 → ~25 ms of elaboration.
+
+Not improved, and why:
+- The kernel's decode of each instruction (`text_instrK`, ~7.5 ms, now 2/3
+  of `vdrw_P3`'s kernel time): only per-encoding facts remove it (lane D).
+- Glue-heavy declarations (`kfork_proof`, `printk_pct`, `strncmp_loop`):
+  their time is in `ihave`/`icases`/`simp`/`omega` on proof-specific
+  shapes, not in the step machinery.
+- `k_norm_goal` (~6 ms a step): the conclusion's register chain is new each
+  step, so neither simp's cache nor a chain-at-once simproc helps.
 
 ## Build shape
 

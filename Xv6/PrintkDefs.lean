@@ -6,6 +6,7 @@ constants, and pure facts about the format language.  Definitional only
 import Xv6.SpecPrintk
 import Xv6.StepLemmas
 import MachCSL.WpSmodeBits
+import MachCSL.KApply
 
 namespace Xv6
 
@@ -1055,7 +1056,7 @@ set_option hygiene false in
 macro_rules
   | `(tactic| k_step_noite $rule:term $$ $pat:specPat) => `(tactic| k_step_noite $rule:term $$ $pat:specPat with [])
   | `(tactic| k_step_noite $rule:term $$ $pat:specPat with [$extra,*]) =>
-    `(tactic| (iapply $rule:term $$ $pat:specPat
+    `(tactic| (k_iapply $rule:term $$ $pat:specPat
                rotate_right 1
                iframe #
                k_norm_noite [$extra,*]
@@ -1073,7 +1074,7 @@ macro_rules
   | `(tactic| k_step_noite $rule:term from $code:term $ht:ident $$ $pat:specPat) =>
     `(tactic| k_step_noite $rule:term from $code:term $ht:ident $$ $pat:specPat with [])
   | `(tactic| k_step_noite $rule:term from $code:term $ht:ident $$ $pat:specPat with [$extra,*]) =>
-    `(tactic| (iapply $rule:term $$ $pat:specPat
+    `(tactic| (k_iapply $rule:term $$ $pat:specPat
                rotate_right 1
                isplitr
                · iapply $code:term
