@@ -477,11 +477,11 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : 
 /-- **Rocq `kcat_dg_cw`**: the `cat: write error` run at fd 2, ending in
 the exit hole at status 1. -/
 def kcatDgCw (N : UkNames GF) : IProp GF :=
-  kcatPaySeq (hlc := hlc) N (BitVec.ofNat 64 2) (User.Cat.catLit 0x9b0) 0 17 iprop(emp) (kcatExit (hlc := hlc) N 1)
+  kcatPaySeq (hlc := hlc) N (BitVec.ofNat 64 2) (User.Cat.catLit 0x9c0) 0 17 iprop(emp) (kcatExit (hlc := hlc) N 1)
 
 /-- **Rocq `kcat_dg_cr`**: the `cat: read error` run. -/
 def kcatDgCr (N : UkNames GF) : IProp GF :=
-  kcatPaySeq (hlc := hlc) N (BitVec.ofNat 64 2) (User.Cat.catLit 0x9c8) 0 16 iprop(emp) (kcatExit (hlc := hlc) N 1)
+  kcatPaySeq (hlc := hlc) N (BitVec.ofNat 64 2) (User.Cat.catLit 0x9d8) 0 16 iprop(emp) (kcatExit (hlc := hlc) N 1)
 
 /-- **Rocq `kcat_wpost`**: after the write of `nb` bytes, at the returned
 word: the invariant at the full count, the `write error` tail otherwise. -/
@@ -508,7 +508,7 @@ end Round
 /-! ## §7 main: the literal, the invariant, the payment (Rocq `UkCatMain.v`) -/
 
 /-- **Rocq `cm_msg`**: `"cat: cannot open %s\n"`. -/
-def cmMsg : Nat := 0x9e0
+def cmMsg : Nat := 0x9f0
 /-- **Rocq `cm_msg_len`**. -/
 def cmMsgLen : Nat := 20
 /-- **Rocq `cm_msg_q`**: where the `%` is. -/

@@ -82,7 +82,7 @@ theorem ushI_6d8 (γt : GName) :
     ushCode (GF := GF) γt ⊢ uinstrIs γt (BitVec.ofNat 64 0x6d8) false (.UTYPE (1#20, .Regidx 20#5, .AUIPC)) :=
   ushm_uisK γt 0x6d8 _ _ (by kernel_rfl) (by decide)
 
-/-- `0x6dc  addi s4,s4,-944 # 1328 <malloc+0x1b8>` -/
+/-- `0x6dc  addi s4,s4,-944 # 1328 <malloc+0x1b0>` -/
 theorem ushI_6dc (γt : GName) :
     ushCode (GF := GF) γt ⊢ uinstrIs γt (BitVec.ofNat 64 0x6dc) false (.ITYPE (3152#12, .Regidx 20#5, .Regidx 20#5, .ADDI)) :=
   ushm_uisK γt 0x6dc _ _ (by kernel_rfl) (by decide)
@@ -162,7 +162,7 @@ theorem ushI_702 (γt : GName) :
     ushCode (GF := GF) γt ⊢ uinstrIs γt (BitVec.ofNat 64 0x702) false (.UTYPE (1#20, .Regidx 12#5, .AUIPC)) :=
   ushm_uisK γt 0x702 _ _ (by kernel_rfl) (by decide)
 
-/-- `0x706  addi a2,a2,-978 # 1330 <malloc+0x1c0>` -/
+/-- `0x706  addi a2,a2,-978 # 1330 <malloc+0x1b8>` -/
 theorem ushI_706 (γt : GName) :
     ushCode (GF := GF) γt ⊢ uinstrIs γt (BitVec.ofNat 64 0x706) false (.ITYPE (3118#12, .Regidx 12#5, .Regidx 12#5, .ADDI)) :=
   ushm_uisK γt 0x706 _ _ (by kernel_rfl) (by decide)

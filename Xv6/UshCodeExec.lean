@@ -67,7 +67,7 @@ theorem ushI_57e (γt : GName) :
     ushCode (GF := GF) γt ⊢ uinstrIs γt (BitVec.ofNat 64 0x57e) false (.UTYPE (1#20, .Regidx 12#5, .AUIPC)) :=
   ushm_uisK γt 0x57e _ _ (by kernel_rfl) (by decide)
 
-/-- `0x582  addi a2,a2,-646 # 12f8 <malloc+0x188>` -/
+/-- `0x582  addi a2,a2,-646 # 12f8 <malloc+0x180>` -/
 theorem ushI_582 (γt : GName) :
     ushCode (GF := GF) γt ⊢ uinstrIs γt (BitVec.ofNat 64 0x582) false (.ITYPE (3450#12, .Regidx 12#5, .Regidx 12#5, .ADDI)) :=
   ushm_uisK γt 0x582 _ _ (by kernel_rfl) (by decide)
@@ -172,7 +172,7 @@ theorem ushI_5b2 (γt : GName) :
     ushCode (GF := GF) γt ⊢ uinstrIs γt (BitVec.ofNat 64 0x5b2) false (.UTYPE (1#20, .Regidx 22#5, .AUIPC)) :=
   ushm_uisK γt 0x5b2 _ _ (by kernel_rfl) (by decide)
 
-/-- `0x5b6  addi s6,s6,-666 # 1318 <malloc+0x1a8>` -/
+/-- `0x5b6  addi s6,s6,-666 # 1318 <malloc+0x1a0>` -/
 theorem ushI_5b6 (γt : GName) :
     ushCode (GF := GF) γt ⊢ uinstrIs γt (BitVec.ofNat 64 0x5b6) false (.ITYPE (3430#12, .Regidx 22#5, .Regidx 22#5, .ADDI)) :=
   ushm_uisK γt 0x5b6 _ _ (by kernel_rfl) (by decide)
@@ -267,7 +267,7 @@ theorem ushI_5e4 (γt : GName) :
     ushCode (GF := GF) γt ⊢ uinstrIs γt (BitVec.ofNat 64 0x5e4) false (.UTYPE (1#20, .Regidx 10#5, .AUIPC)) :=
   ushm_uisK γt 0x5e4 _ _ (by kernel_rfl) (by decide)
 
-/-- `0x5e8  addi a0,a0,-740 # 1300 <malloc+0x190>` -/
+/-- `0x5e8  addi a0,a0,-740 # 1300 <malloc+0x188>` -/
 theorem ushI_5e8 (γt : GName) :
     ushCode (GF := GF) γt ⊢ uinstrIs γt (BitVec.ofNat 64 0x5e8) false (.ITYPE (3356#12, .Regidx 10#5, .Regidx 10#5, .ADDI)) :=
   ushm_uisK γt 0x5e8 _ _ (by kernel_rfl) (by decide)
@@ -402,7 +402,7 @@ theorem ushI_632 (γt : GName) :
     ushCode (GF := GF) γt ⊢ uinstrIs γt (BitVec.ofNat 64 0x632) false (.UTYPE (1#20, .Regidx 10#5, .AUIPC)) :=
   ushm_uisK γt 0x632 _ _ (by kernel_rfl) (by decide)
 
-/-- `0x636  addi a0,a0,-810 # 1308 <malloc+0x198>` -/
+/-- `0x636  addi a0,a0,-810 # 1308 <malloc+0x190>` -/
 theorem ushI_636 (γt : GName) :
     ushCode (GF := GF) γt ⊢ uinstrIs γt (BitVec.ofNat 64 0x636) false (.ITYPE (3286#12, .Regidx 10#5, .Regidx 10#5, .ADDI)) :=
   ushm_uisK γt 0x636 _ _ (by kernel_rfl) (by decide)

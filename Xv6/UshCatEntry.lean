@@ -81,8 +81,8 @@ theorem catCode_rows (M : ElfMem) (π : Nat → Option UPerm) (hsub : uimgSub Us
     ∀ a b, User.Cat.code.byte a = some b → M a = some b ∧ uxAddr π a ∧ ¬ uwAddr π a ∧ a < uCap := by
   intro a b hab
   have hv : User.Cat.code.vaddr = 0 := rfl
-  have hs : User.Cat.code.size = 0xecc := rfl
-  have ha : a < 0xecc := by
+  have hs : User.Cat.code.size = 0xedc := rfl
+  have ha : a < 0xedc := by
     unfold User.USeg.byte at hab
     split at hab
     · omega

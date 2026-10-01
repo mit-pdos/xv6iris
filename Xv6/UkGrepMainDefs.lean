@@ -3,7 +3,7 @@
 `UkGrepPutc.kgrep_w`/`kgrep_wb`/`kgrep_pay_seq`, pinned `1900b8a43`).
 
 * the two literals of grep's `.rodata` (`"usage: grep pattern [file ...]\n"`
-  at 0xb20, `"grep: cannot open %s\n"` at 0xb40), decided off grep's text;
+  at 0xb30, `"grep: cannot open %s\n"` at 0xb50), decided off grep's text;
 * the putc chain `kgrepPaySeq` fprintf/printf spend (IS the image's
   `UlibUkProg.ulibUkPaySeq`, `kgrepPaySeq_ulibUk`), and how the TREE pays it
   (`kgrepWb_tree`, `kgrepPaySeq_tree`: one `EWrite fd [b]` node per putc);
@@ -42,14 +42,14 @@ set_option linter.unusedSimpArgs false
 /-- **Rocq `grep_lit base`**: byte `j` of grep's literal at `base`. -/
 abbrev grepLit (base : Nat) : Nat → BitVec 8 := User.litByte User.Grep.code.byte base
 
-/-- The usage line at 0xb20: 31 printable bytes, then a NUL. -/
-theorem grepUsage_litOk : User.litOk User.Grep.code.byte 0xb20 31 = true := by decide +kernel
+/-- The usage line at 0xb30: 31 printable bytes, then a NUL. -/
+theorem grepUsage_litOk : User.litOk User.Grep.code.byte 0xb30 31 = true := by decide +kernel
 
 /-- **Rocq `grep_usage_lit`**. -/
-theorem grepUsage_lit : (List.range 31).map (grepLit 0xb20) = grepUsage := by decide +kernel
+theorem grepUsage_lit : (List.range 31).map (grepLit 0xb30) = grepUsage := by decide +kernel
 
 /-- **Rocq `gm_msg`**: `"grep: cannot open %s\n"`, 21 bytes, the `%` at 18. -/
-def gmMsg : Nat := 0xb40
+def gmMsg : Nat := 0xb50
 def gmMsgLen : Nat := 21
 def gmMsgQ : Nat := 18
 
@@ -99,14 +99,14 @@ section Str
 variable {GF : BundledGFunctors} [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat]
 
 /-- **Rocq `grep_lit_str` at the usage line**. -/
-theorem grepUsage_str (γt : GName) : grepCode (GF := GF) γt ⊢ utextStr γt 0xb20 31 (grepLit 0xb20) := by
-  refine utextStr_of_img γt User.Grep.code.byte 0xb20 31 _ ?hne (by decide) ?hbs ?hnul
-  case hbs => intro j hj; exact (User.litOk_body _ 0xb20 31 j grepUsage_litOk hj).1
-  case hnul => exact User.litOk_nul _ 0xb20 31 grepUsage_litOk
+theorem grepUsage_str (γt : GName) : grepCode (GF := GF) γt ⊢ utextStr γt 0xb30 31 (grepLit 0xb30) := by
+  refine utextStr_of_img γt User.Grep.code.byte 0xb30 31 _ ?hne (by decide) ?hbs ?hnul
+  case hbs => intro j hj; exact (User.litOk_body _ 0xb30 31 j grepUsage_litOk hj).1
+  case hnul => exact User.litOk_nul _ 0xb30 31 grepUsage_litOk
   case hne =>
     intro j hj he
-    have := (User.litOk_body _ 0xb20 31 j grepUsage_litOk hj).2.1
-    exact this (by rw [show User.litByte User.Grep.code.byte 0xb20 j = ubyte0 from he]; rfl)
+    have := (User.litOk_body _ 0xb30 31 j grepUsage_litOk hj).2.1
+    exact this (by rw [show User.litByte User.Grep.code.byte 0xb30 j = ubyte0 from he]; rfl)
 
 /-- **Rocq `gm_str`**: the diagnostic as the text string printf reads. -/
 theorem gm_str (γt : GName) : grepCode (GF := GF) γt ⊢ utextStr γt gmMsg gmMsgLen (grepLit gmMsg) := by

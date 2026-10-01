@@ -39,10 +39,10 @@ theorem writeBytes_app (fd : Int) (a b : Bytes) (rest : Proc) :
 
 /-- **Rocq `cat_dg_read_lit`**: `"cat: read error\n"` as cat's `.rodata`
 spells it. -/
-theorem catDgRead_lit : (List.range 16).map (User.Cat.catLit 0x9c8) = catDgRead := by decide +kernel
+theorem catDgRead_lit : (List.range 16).map (User.Cat.catLit 0x9d8) = catDgRead := by decide +kernel
 
 /-- **Rocq `cat_dg_write_lit`**. -/
-theorem catDgWrite_lit : (List.range 17).map (User.Cat.catLit 0x9b0) = catDgWrite := by decide +kernel
+theorem catDgWrite_lit : (List.range 17).map (User.Cat.catLit 0x9c0) = catDgWrite := by decide +kernel
 
 /-- **Rocq `cat_dg_open_pre_lit`** (deviation 2). -/
 theorem catDgOpen_lit (p : Bytes) : (List.range cmMsgQ).map cmLit ++ p ++ [wlNl] = catDgOpen p := by

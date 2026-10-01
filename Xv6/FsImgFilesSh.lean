@@ -9,14 +9,14 @@ namespace Xv6
 
 open Xv6.User
 
-/-! ### sh, inum 13, 58632 bytes -/
+/-! ### sh, inum 13, 58680 bytes -/
 
 /-- Rocq `fsimg_sh_type`. -/
 theorem fsimgShType : (fsDinode fsimgP fsimgSb 13).diType.toNat = T_FILE := by
   rw [fsimgP_eq]; decide +kernel
 
 /-- Rocq `FsShPin.fsimg_sh_size`. -/
-theorem fsimgShSize : (fsDinode fsimgP fsimgSb 13).diSize.toNat = 58632 := by
+theorem fsimgShSize : (fsDinode fsimgP fsimgSb 13).diSize.toNat = 58680 := by
   rw [fsimgP_eq]; decide +kernel
 
 /-- Rocq `FsShPin.fsimg_sh_nlink`. -/

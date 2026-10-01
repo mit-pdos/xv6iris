@@ -107,7 +107,7 @@ theorem wp_kshd_openfail_paid (UL : UK_LEAVES) (HS : UK_SYS_P) (HF : USH_FPRINTF
       (fun p => iprop(ustd N.fd l ∗ Pf (p - 2 + nm.length))) (5 + 2) := by
     simp only []
     rw [show 5 + x.len = 5 + 2 - 2 + nm.length by omega]
-  iapply wp_kshd_die_chain UL HS HF N false .discard 0x110 1#20 408#12 3956#21 2882#21 1#12 0x12a8 15 5 x.ptr x.len
+  iapply wp_kshd_die_chain UL HS HF N false .discard 0x110 1#20 408#12 3964#21 2882#21 1#12 0x12a8 15 5 x.ptr x.len
     x.bytes (fun p => iprop(ustd N.fd l ∗ Pf p)) (fun p => iprop(ustd N.fd l ∗ Pf (5 + p)))
     (fun p => iprop(ustd N.fd l ∗ Pf (p - 2 + nm.length))) h1 (ukWr m 12#5 (BitVec.ofNat 64 x.ptr)) (n + 2)
     shdDieLits_110 (by omega) (by ureg) rfl e2

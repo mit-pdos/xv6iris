@@ -15,8 +15,8 @@ The table holds exactly the instructions the proofs walk (Rocq
 `UkCatVprintf`/`UkCatVprintfS`, at every load address): the prologue, the
 plain-character round, the `%` round, the `%s` dispatch (the `d`/`l`/`u`/
 `x`/`p`/`c` tests falling through), the `%s` arm (non-null pointer) and the
-epilogue.  Rocq proves these four times (cat 0x518, grep 0x688, init 0x4de,
-seccomp 0x4b8).  Per-instruction facts `ulibVprintf_iXXX` are Rocq's
+epilogue.  Rocq proves these four times (cat 0x520, grep 0x690, init 0x4e6,
+seccomp 0x4c0).  Per-instruction facts `ulibVprintf_iXXX` are Rocq's
 `uis_cat_XXX` at `base + off`.
 -/
 import Xv6.UlibCode
@@ -179,7 +179,7 @@ theorem ulibVprintf_i0c6 (L : UlibRun GF) (base : BitVec 64) :
     ulibVprintfCode L base ⊢ L.uinstrIs (base + 0xc6#64) false (.LOAD (0#12, .Regidx 11#5, .Regidx 9#5, true, 1)) :=
   ulibTabCode_instr L ulibVprintfTab base 5 ⟨0xc6, 4, 0x5c483, false, .LOAD (0#12, .Regidx 11#5, .Regidx 9#5, true, 1)⟩ rfl
 
-/-- `+0xca  beqz s1,74c <vprintf+0x234>` -/
+/-- `+0xca  beqz s1,754 <vprintf+0x234>` -/
 theorem ulibVprintf_i0ca (L : UlibRun GF) (base : BitVec 64) :
     ulibVprintfCode L base ⊢ L.uinstrIs (base + 0xca#64) false (.BTYPE (550#13, .Regidx 0#5, .Regidx 9#5, .BEQ)) :=
   ulibTabCode_instr L ulibVprintfTab base 6 ⟨0xca, 4, 0x22048363, false, .BTYPE (550#13, .Regidx 0#5, .Regidx 9#5, .BEQ)⟩ rfl
@@ -259,7 +259,7 @@ theorem ulibVprintf_i0ec (L : UlibRun GF) (base : BitVec 64) :
     ulibVprintfCode L base ⊢ L.uinstrIs (base + 0xec#64) false (.ITYPE (100#12, .Regidx 0#5, .Regidx 24#5, .ADDI)) :=
   ulibTabCode_instr L ulibVprintfTab base 21 ⟨0xec, 4, 0x6400c13, false, .ITYPE (100#12, .Regidx 0#5, .Regidx 24#5, .ADDI)⟩ rfl
 
-/-- `+0xf0  j 56e <vprintf+0x56>` -/
+/-- `+0xf0  j 576 <vprintf+0x56>` -/
 theorem ulibVprintf_i0f0 (L : UlibRun GF) (base : BitVec 64) :
     ulibVprintfCode L base ⊢ L.uinstrIs (base + 0xf0#64) true (.JAL (34#21, .Regidx 0#5)) :=
   ulibTabCode_instr L ulibVprintfTab base 22 ⟨0xf0, 2, 0xa00d, true, .JAL (34#21, .Regidx 0#5)⟩ rfl
@@ -274,17 +274,17 @@ theorem ulibVprintf_i0f4 (L : UlibRun GF) (base : BitVec 64) :
     ulibVprintfCode L base ⊢ L.uinstrIs (base + 0xf4#64) true (.RTYPE (.Regidx 22#5, .Regidx 0#5, .Regidx 10#5, .ADD)) :=
   ulibTabCode_instr L ulibVprintfTab base 24 ⟨0xf4, 2, 0x855a, true, .RTYPE (.Regidx 22#5, .Regidx 0#5, .Regidx 10#5, .ADD)⟩ rfl
 
-/-- `+0xf6  jal 45c <putc>` -/
+/-- `+0xf6  jal 464 <putc>` -/
 theorem ulibVprintf_i0f6 (L : UlibRun GF) (base : BitVec 64) :
     ulibVprintfCode L base ⊢ L.uinstrIs (base + 0xf6#64) false (.JAL (2096906#21, .Regidx 1#5)) :=
   ulibTabCode_instr L ulibVprintfTab base 25 ⟨0xf6, 4, 0xf0bff0ef, false, .JAL (2096906#21, .Regidx 1#5)⟩ rfl
 
-/-- `+0xfa  j 55c <vprintf+0x44>` -/
+/-- `+0xfa  j 564 <vprintf+0x44>` -/
 theorem ulibVprintf_i0fa (L : UlibRun GF) (base : BitVec 64) :
     ulibVprintfCode L base ⊢ L.uinstrIs (base + 0xfa#64) true (.JAL (6#21, .Regidx 0#5)) :=
   ulibTabCode_instr L ulibVprintfTab base 26 ⟨0xfa, 2, 0xa019, true, .JAL (6#21, .Regidx 0#5)⟩ rfl
 
-/-- `+0xfc  beq s3,s5,57e <vprintf+0x66>` -/
+/-- `+0xfc  beq s3,s5,586 <vprintf+0x66>` -/
 theorem ulibVprintf_i0fc (L : UlibRun GF) (base : BitVec 64) :
     ulibVprintfCode L base ⊢ L.uinstrIs (base + 0xfc#64) false (.BTYPE (38#13, .Regidx 21#5, .Regidx 19#5, .BEQ)) :=
   ulibTabCode_instr L ulibVprintfTab base 27 ⟨0xfc, 4, 0x3598363, false, .BTYPE (38#13, .Regidx 21#5, .Regidx 19#5, .BEQ)⟩ rfl
@@ -314,7 +314,7 @@ theorem ulibVprintf_i10a (L : UlibRun GF) (base : BitVec 64) :
     ulibVprintfCode L base ⊢ L.uinstrIs (base + 0x10a#64) false (.LOAD (0#12, .Regidx 15#5, .Regidx 9#5, true, 1)) :=
   ulibTabCode_instr L ulibVprintfTab base 32 ⟨0x10a, 4, 0x7c483, false, .LOAD (0#12, .Regidx 15#5, .Regidx 9#5, true, 1)⟩ rfl
 
-/-- `+0x10e  beqz s1,73e <vprintf+0x226>` -/
+/-- `+0x10e  beqz s1,746 <vprintf+0x226>` -/
 theorem ulibVprintf_i10e (L : UlibRun GF) (base : BitVec 64) :
     ulibVprintfCode L base ⊢ L.uinstrIs (base + 0x10e#64) false (.BTYPE (468#13, .Regidx 0#5, .Regidx 9#5, .BEQ)) :=
   ulibTabCode_instr L ulibVprintfTab base 33 ⟨0x10e, 4, 0x1c048a63, false, .BTYPE (468#13, .Regidx 0#5, .Regidx 9#5, .BEQ)⟩ rfl
@@ -324,12 +324,12 @@ theorem ulibVprintf_i112 (L : UlibRun GF) (base : BitVec 64) :
     ulibVprintfCode L base ⊢ L.uinstrIs (base + 0x112#64) false (.ADDIW (0#12, .Regidx 9#5, .Regidx 15#5)) :=
   ulibTabCode_instr L ulibVprintfTab base 34 ⟨0x112, 4, 0x4879b, false, .ADDIW (0#12, .Regidx 9#5, .Regidx 15#5)⟩ rfl
 
-/-- `+0x116  bnez s3,558 <vprintf+0x40>` -/
+/-- `+0x116  bnez s3,560 <vprintf+0x40>` -/
 theorem ulibVprintf_i116 (L : UlibRun GF) (base : BitVec 64) :
     ulibVprintfCode L base ⊢ L.uinstrIs (base + 0x116#64) false (.BTYPE (8166#13, .Regidx 0#5, .Regidx 19#5, .BNE)) :=
   ulibTabCode_instr L ulibVprintfTab base 35 ⟨0x116, 4, 0xfe0993e3, false, .BTYPE (8166#13, .Regidx 0#5, .Regidx 19#5, .BNE)⟩ rfl
 
-/-- `+0x11a  bne a5,s5,54e <vprintf+0x36>` -/
+/-- `+0x11a  bne a5,s5,556 <vprintf+0x36>` -/
 theorem ulibVprintf_i11a (L : UlibRun GF) (base : BitVec 64) :
     ulibVprintfCode L base ⊢ L.uinstrIs (base + 0x11a#64) false (.BTYPE (8152#13, .Regidx 21#5, .Regidx 15#5, .BNE)) :=
   ulibTabCode_instr L ulibVprintfTab base 36 ⟨0x11a, 4, 0xfd579ce3, false, .BTYPE (8152#13, .Regidx 21#5, .Regidx 15#5, .BNE)⟩ rfl
@@ -339,7 +339,7 @@ theorem ulibVprintf_i11e (L : UlibRun GF) (base : BitVec 64) :
     ulibVprintfCode L base ⊢ L.uinstrIs (base + 0x11e#64) true (.RTYPE (.Regidx 15#5, .Regidx 0#5, .Regidx 19#5, .ADD)) :=
   ulibTabCode_instr L ulibVprintfTab base 37 ⟨0x11e, 2, 0x89be, true, .RTYPE (.Regidx 15#5, .Regidx 0#5, .Regidx 19#5, .ADD)⟩ rfl
 
-/-- `+0x120  j 55c <vprintf+0x44>` -/
+/-- `+0x120  j 564 <vprintf+0x44>` -/
 theorem ulibVprintf_i120 (L : UlibRun GF) (base : BitVec 64) :
     ulibVprintfCode L base ⊢ L.uinstrIs (base + 0x120#64) true (.JAL (2097120#21, .Regidx 0#5)) :=
   ulibTabCode_instr L ulibVprintfTab base 38 ⟨0x120, 2, 0xb7c5, true, .JAL (2097120#21, .Regidx 0#5)⟩ rfl
@@ -354,12 +354,12 @@ theorem ulibVprintf_i126 (L : UlibRun GF) (base : BitVec 64) :
     ulibVprintfCode L base ⊢ L.uinstrIs (base + 0x126#64) false (.LOAD (1#12, .Regidx 13#5, .Regidx 12#5, true, 1)) :=
   ulibTabCode_instr L ulibVprintfTab base 40 ⟨0x126, 4, 0x16c603, false, .LOAD (1#12, .Regidx 13#5, .Regidx 12#5, true, 1)⟩ rfl
 
-/-- `+0x12a  beqz a2,756 <vprintf+0x23e>` -/
+/-- `+0x12a  beqz a2,75e <vprintf+0x23e>` -/
 theorem ulibVprintf_i12a (L : UlibRun GF) (base : BitVec 64) :
     ulibVprintfCode L base ⊢ L.uinstrIs (base + 0x12a#64) false (.BTYPE (464#13, .Regidx 0#5, .Regidx 12#5, .BEQ)) :=
   ulibTabCode_instr L ulibVprintfTab base 41 ⟨0x12a, 4, 0x1c060863, false, .BTYPE (464#13, .Regidx 0#5, .Regidx 12#5, .BEQ)⟩ rfl
 
-/-- `+0x12e  beq a5,s8,5b8 <vprintf+0xa0>` -/
+/-- `+0x12e  beq a5,s8,5c0 <vprintf+0xa0>` -/
 theorem ulibVprintf_i12e (L : UlibRun GF) (base : BitVec 64) :
     ulibVprintfCode L base ⊢ L.uinstrIs (base + 0x12e#64) false (.BTYPE (46#13, .Regidx 24#5, .Regidx 15#5, .BEQ)) :=
   ulibTabCode_instr L ulibVprintfTab base 42 ⟨0x12e, 4, 0x3878763, false, .BTYPE (46#13, .Regidx 24#5, .Regidx 15#5, .BEQ)⟩ rfl
@@ -379,7 +379,7 @@ theorem ulibVprintf_i13a (L : UlibRun GF) (base : BitVec 64) :
     ulibVprintfCode L base ⊢ L.uinstrIs (base + 0x13a#64) false (.ITYPE (3996#12, .Regidx 12#5, .Regidx 11#5, .ADDI)) :=
   ulibTabCode_instr L ulibVprintfTab base 45 ⟨0x13a, 4, 0xf9c60593, false, .ITYPE (3996#12, .Regidx 12#5, .Regidx 11#5, .ADDI)⟩ rfl
 
-/-- `+0x13e  bnez a1,5d0 <vprintf+0xb8>` -/
+/-- `+0x13e  bnez a1,5d8 <vprintf+0xb8>` -/
 theorem ulibVprintf_i13e (L : UlibRun GF) (base : BitVec 64) :
     ulibVprintfCode L base ⊢ L.uinstrIs (base + 0x13e#64) true (.BTYPE (54#13, .Regidx 0#5, .Regidx 11#5, .BNE)) :=
   ulibTabCode_instr L ulibVprintfTab base 46 ⟨0x13e, 2, 0xe99d, true, .BTYPE (54#13, .Regidx 0#5, .Regidx 11#5, .BNE)⟩ rfl
@@ -414,7 +414,7 @@ theorem ulibVprintf_i184 (L : UlibRun GF) (base : BitVec 64) :
     ulibVprintfCode L base ⊢ L.uinstrIs (base + 0x184#64) false (.ITYPE (3996#12, .Regidx 11#5, .Regidx 10#5, .ADDI)) :=
   ulibTabCode_instr L ulibVprintfTab base 52 ⟨0x184, 4, 0xf9c58513, false, .ITYPE (3996#12, .Regidx 11#5, .Regidx 10#5, .ADDI)⟩ rfl
 
-/-- `+0x188  bnez a0,76a <vprintf+0x252>` -/
+/-- `+0x188  bnez a0,772 <vprintf+0x252>` -/
 theorem ulibVprintf_i188 (L : UlibRun GF) (base : BitVec 64) :
     ulibVprintfCode L base ⊢ L.uinstrIs (base + 0x188#64) false (.BTYPE (390#13, .Regidx 0#5, .Regidx 10#5, .BNE)) :=
   ulibTabCode_instr L ulibVprintfTab base 53 ⟨0x188, 4, 0x18051363, false, .BTYPE (390#13, .Regidx 0#5, .Regidx 10#5, .BNE)⟩ rfl
@@ -429,7 +429,7 @@ theorem ulibVprintf_i2a2 (L : UlibRun GF) (base : BitVec 64) :
     ulibVprintfCode L base ⊢ L.uinstrIs (base + 0x2a2#64) false (.LOAD (0#12, .Regidx 23#5, .Regidx 9#5, false, 8)) :=
   ulibTabCode_instr L ulibVprintfTab base 55 ⟨0x2a2, 4, 0xbb483, false, .LOAD (0#12, .Regidx 23#5, .Regidx 9#5, false, 8)⟩ rfl
 
-/-- `+0x2a6  beqz s1,71e <vprintf+0x206>` -/
+/-- `+0x2a6  beqz s1,726 <vprintf+0x206>` -/
 theorem ulibVprintf_i2a6 (L : UlibRun GF) (base : BitVec 64) :
     ulibVprintfCode L base ⊢ L.uinstrIs (base + 0x2a6#64) true (.BTYPE (28#13, .Regidx 0#5, .Regidx 9#5, .BEQ)) :=
   ulibTabCode_instr L ulibVprintfTab base 56 ⟨0x2a6, 2, 0xcc91, true, .BTYPE (28#13, .Regidx 0#5, .Regidx 9#5, .BEQ)⟩ rfl
@@ -439,7 +439,7 @@ theorem ulibVprintf_i2a8 (L : UlibRun GF) (base : BitVec 64) :
     ulibVprintfCode L base ⊢ L.uinstrIs (base + 0x2a8#64) false (.LOAD (0#12, .Regidx 9#5, .Regidx 11#5, true, 1)) :=
   ulibTabCode_instr L ulibVprintfTab base 57 ⟨0x2a8, 4, 0x4c583, false, .LOAD (0#12, .Regidx 9#5, .Regidx 11#5, true, 1)⟩ rfl
 
-/-- `+0x2ac  beqz a1,738 <vprintf+0x220>` -/
+/-- `+0x2ac  beqz a1,740 <vprintf+0x220>` -/
 theorem ulibVprintf_i2ac (L : UlibRun GF) (base : BitVec 64) :
     ulibVprintfCode L base ⊢ L.uinstrIs (base + 0x2ac#64) true (.BTYPE (48#13, .Regidx 0#5, .Regidx 11#5, .BEQ)) :=
   ulibTabCode_instr L ulibVprintfTab base 58 ⟨0x2ac, 2, 0xc985, true, .BTYPE (48#13, .Regidx 0#5, .Regidx 11#5, .BEQ)⟩ rfl
@@ -449,7 +449,7 @@ theorem ulibVprintf_i2ae (L : UlibRun GF) (base : BitVec 64) :
     ulibVprintfCode L base ⊢ L.uinstrIs (base + 0x2ae#64) true (.RTYPE (.Regidx 22#5, .Regidx 0#5, .Regidx 10#5, .ADD)) :=
   ulibTabCode_instr L ulibVprintfTab base 59 ⟨0x2ae, 2, 0x855a, true, .RTYPE (.Regidx 22#5, .Regidx 0#5, .Regidx 10#5, .ADD)⟩ rfl
 
-/-- `+0x2b0  jal 45c <putc>` -/
+/-- `+0x2b0  jal 464 <putc>` -/
 theorem ulibVprintf_i2b0 (L : UlibRun GF) (base : BitVec 64) :
     ulibVprintfCode L base ⊢ L.uinstrIs (base + 0x2b0#64) false (.JAL (2096464#21, .Regidx 1#5)) :=
   ulibTabCode_instr L ulibVprintfTab base 60 ⟨0x2b0, 4, 0xd51ff0ef, false, .JAL (2096464#21, .Regidx 1#5)⟩ rfl
@@ -464,7 +464,7 @@ theorem ulibVprintf_i2b6 (L : UlibRun GF) (base : BitVec 64) :
     ulibVprintfCode L base ⊢ L.uinstrIs (base + 0x2b6#64) false (.LOAD (0#12, .Regidx 9#5, .Regidx 11#5, true, 1)) :=
   ulibTabCode_instr L ulibVprintfTab base 62 ⟨0x2b6, 4, 0x4c583, false, .LOAD (0#12, .Regidx 9#5, .Regidx 11#5, true, 1)⟩ rfl
 
-/-- `+0x2ba  bnez a1,70a <vprintf+0x1f2>` -/
+/-- `+0x2ba  bnez a1,712 <vprintf+0x1f2>` -/
 theorem ulibVprintf_i2ba (L : UlibRun GF) (base : BitVec 64) :
     ulibVprintfCode L base ⊢ L.uinstrIs (base + 0x2ba#64) true (.BTYPE (8180#13, .Regidx 0#5, .Regidx 11#5, .BNE)) :=
   ulibTabCode_instr L ulibVprintfTab base 63 ⟨0x2ba, 2, 0xf9f5, true, .BTYPE (8180#13, .Regidx 0#5, .Regidx 11#5, .BNE)⟩ rfl
@@ -479,7 +479,7 @@ theorem ulibVprintf_i2be (L : UlibRun GF) (base : BitVec 64) :
     ulibVprintfCode L base ⊢ L.uinstrIs (base + 0x2be#64) true (.ITYPE (0#12, .Regidx 0#5, .Regidx 19#5, .ADDI)) :=
   ulibTabCode_instr L ulibVprintfTab base 65 ⟨0x2be, 2, 0x4981, true, .ITYPE (0#12, .Regidx 0#5, .Regidx 19#5, .ADDI)⟩ rfl
 
-/-- `+0x2c0  j 55c <vprintf+0x44>` -/
+/-- `+0x2c0  j 564 <vprintf+0x44>` -/
 theorem ulibVprintf_i2c0 (L : UlibRun GF) (base : BitVec 64) :
     ulibVprintfCode L base ⊢ L.uinstrIs (base + 0x2c0#64) true (.JAL (2096704#21, .Regidx 0#5)) :=
   ulibTabCode_instr L ulibVprintfTab base 66 ⟨0x2c0, 2, 0xb581, true, .JAL (2096704#21, .Regidx 0#5)⟩ rfl
@@ -494,7 +494,7 @@ theorem ulibVprintf_i2de (L : UlibRun GF) (base : BitVec 64) :
     ulibVprintfCode L base ⊢ L.uinstrIs (base + 0x2de#64) true (.ITYPE (0#12, .Regidx 0#5, .Regidx 19#5, .ADDI)) :=
   ulibTabCode_instr L ulibVprintfTab base 68 ⟨0x2de, 2, 0x4981, true, .ITYPE (0#12, .Regidx 0#5, .Regidx 19#5, .ADDI)⟩ rfl
 
-/-- `+0x2e0  j 55c <vprintf+0x44>` -/
+/-- `+0x2e0  j 564 <vprintf+0x44>` -/
 theorem ulibVprintf_i2e0 (L : UlibRun GF) (base : BitVec 64) :
     ulibVprintfCode L base ⊢ L.uinstrIs (base + 0x2e0#64) true (.JAL (2096672#21, .Regidx 0#5)) :=
   ulibTabCode_instr L ulibVprintfTab base 69 ⟨0x2e0, 2, 0xb505, true, .JAL (2096672#21, .Regidx 0#5)⟩ rfl
@@ -564,7 +564,7 @@ theorem ulibVprintf_i30e (L : UlibRun GF) (base : BitVec 64) :
     ulibVprintfCode L base ⊢ L.uinstrIs (base + 0x30e#64) false (.ITYPE (117#12, .Regidx 0#5, .Regidx 10#5, .ADDI)) :=
   ulibTabCode_instr L ulibVprintfTab base 82 ⟨0x30e, 4, 0x7500513, false, .ITYPE (117#12, .Regidx 0#5, .Regidx 10#5, .ADDI)⟩ rfl
 
-/-- `+0x312  beq a5,a0,606 <vprintf+0xee>` -/
+/-- `+0x312  beq a5,a0,60e <vprintf+0xee>` -/
 theorem ulibVprintf_i312 (L : UlibRun GF) (base : BitVec 64) :
     ulibVprintfCode L base ⊢ L.uinstrIs (base + 0x312#64) false (.BTYPE (7832#13, .Regidx 10#5, .Regidx 15#5, .BEQ)) :=
   ulibTabCode_instr L ulibVprintfTab base 83 ⟨0x312, 4, 0xe8a78ce3, false, .BTYPE (7832#13, .Regidx 10#5, .Regidx 15#5, .BEQ)⟩ rfl
@@ -574,7 +574,7 @@ theorem ulibVprintf_i316 (L : UlibRun GF) (base : BitVec 64) :
     ulibVprintfCode L base ⊢ L.uinstrIs (base + 0x316#64) false (.ITYPE (3979#12, .Regidx 12#5, .Regidx 10#5, .ADDI)) :=
   ulibTabCode_instr L ulibVprintfTab base 84 ⟨0x316, 4, 0xf8b60513, false, .ITYPE (3979#12, .Regidx 12#5, .Regidx 10#5, .ADDI)⟩ rfl
 
-/-- `+0x31a  bnez a0,77c <vprintf+0x264>` -/
+/-- `+0x31a  bnez a0,784 <vprintf+0x264>` -/
 theorem ulibVprintf_i31a (L : UlibRun GF) (base : BitVec 64) :
     ulibVprintfCode L base ⊢ L.uinstrIs (base + 0x31a#64) true (.BTYPE (6#13, .Regidx 0#5, .Regidx 10#5, .BNE)) :=
   ulibTabCode_instr L ulibVprintfTab base 85 ⟨0x31a, 2, 0xe119, true, .BTYPE (6#13, .Regidx 0#5, .Regidx 10#5, .BNE)⟩ rfl
@@ -584,7 +584,7 @@ theorem ulibVprintf_i320 (L : UlibRun GF) (base : BitVec 64) :
     ulibVprintfCode L base ⊢ L.uinstrIs (base + 0x320#64) false (.ITYPE (3979#12, .Regidx 11#5, .Regidx 10#5, .ADDI)) :=
   ulibTabCode_instr L ulibVprintfTab base 86 ⟨0x320, 4, 0xf8b58513, false, .ITYPE (3979#12, .Regidx 11#5, .Regidx 10#5, .ADDI)⟩ rfl
 
-/-- `+0x324  bnez a0,786 <vprintf+0x26e>` -/
+/-- `+0x324  bnez a0,78e <vprintf+0x26e>` -/
 theorem ulibVprintf_i324 (L : UlibRun GF) (base : BitVec 64) :
     ulibVprintfCode L base ⊢ L.uinstrIs (base + 0x324#64) true (.BTYPE (6#13, .Regidx 0#5, .Regidx 10#5, .BNE)) :=
   ulibTabCode_instr L ulibVprintfTab base 87 ⟨0x324, 2, 0xe119, true, .BTYPE (6#13, .Regidx 0#5, .Regidx 10#5, .BNE)⟩ rfl
@@ -594,7 +594,7 @@ theorem ulibVprintf_i32a (L : UlibRun GF) (base : BitVec 64) :
     ulibVprintfCode L base ⊢ L.uinstrIs (base + 0x32a#64) false (.ITYPE (120#12, .Regidx 0#5, .Regidx 10#5, .ADDI)) :=
   ulibTabCode_instr L ulibVprintfTab base 88 ⟨0x32a, 4, 0x7800513, false, .ITYPE (120#12, .Regidx 0#5, .Regidx 10#5, .ADDI)⟩ rfl
 
-/-- `+0x32e  beq a5,a0,652 <vprintf+0x13a>` -/
+/-- `+0x32e  beq a5,a0,65a <vprintf+0x13a>` -/
 theorem ulibVprintf_i32e (L : UlibRun GF) (base : BitVec 64) :
     ulibVprintfCode L base ⊢ L.uinstrIs (base + 0x32e#64) false (.BTYPE (7880#13, .Regidx 10#5, .Regidx 15#5, .BEQ)) :=
   ulibTabCode_instr L ulibVprintfTab base 89 ⟨0x32e, 4, 0xeca784e3, false, .BTYPE (7880#13, .Regidx 10#5, .Regidx 15#5, .BEQ)⟩ rfl
@@ -604,7 +604,7 @@ theorem ulibVprintf_i332 (L : UlibRun GF) (base : BitVec 64) :
     ulibVprintfCode L base ⊢ L.uinstrIs (base + 0x332#64) false (.ITYPE (3976#12, .Regidx 12#5, .Regidx 12#5, .ADDI)) :=
   ulibTabCode_instr L ulibVprintfTab base 90 ⟨0x332, 4, 0xf8860613, false, .ITYPE (3976#12, .Regidx 12#5, .Regidx 12#5, .ADDI)⟩ rfl
 
-/-- `+0x336  bnez a2,798 <vprintf+0x280>` -/
+/-- `+0x336  bnez a2,7a0 <vprintf+0x280>` -/
 theorem ulibVprintf_i336 (L : UlibRun GF) (base : BitVec 64) :
     ulibVprintfCode L base ⊢ L.uinstrIs (base + 0x336#64) true (.BTYPE (6#13, .Regidx 0#5, .Regidx 12#5, .BNE)) :=
   ulibTabCode_instr L ulibVprintfTab base 91 ⟨0x336, 2, 0xe219, true, .BTYPE (6#13, .Regidx 0#5, .Regidx 12#5, .BNE)⟩ rfl
@@ -614,7 +614,7 @@ theorem ulibVprintf_i33c (L : UlibRun GF) (base : BitVec 64) :
     ulibVprintfCode L base ⊢ L.uinstrIs (base + 0x33c#64) false (.ITYPE (3976#12, .Regidx 11#5, .Regidx 11#5, .ADDI)) :=
   ulibTabCode_instr L ulibVprintfTab base 92 ⟨0x33c, 4, 0xf8858593, false, .ITYPE (3976#12, .Regidx 11#5, .Regidx 11#5, .ADDI)⟩ rfl
 
-/-- `+0x340  bnez a1,7a2 <vprintf+0x28a>` -/
+/-- `+0x340  bnez a1,7aa <vprintf+0x28a>` -/
 theorem ulibVprintf_i340 (L : UlibRun GF) (base : BitVec 64) :
     ulibVprintfCode L base ⊢ L.uinstrIs (base + 0x340#64) true (.BTYPE (6#13, .Regidx 0#5, .Regidx 11#5, .BNE)) :=
   ulibTabCode_instr L ulibVprintfTab base 93 ⟨0x340, 2, 0xe199, true, .BTYPE (6#13, .Regidx 0#5, .Regidx 11#5, .BNE)⟩ rfl
@@ -624,7 +624,7 @@ theorem ulibVprintf_i346 (L : UlibRun GF) (base : BitVec 64) :
     ulibVprintfCode L base ⊢ L.uinstrIs (base + 0x346#64) false (.ITYPE (112#12, .Regidx 0#5, .Regidx 14#5, .ADDI)) :=
   ulibTabCode_instr L ulibVprintfTab base 94 ⟨0x346, 4, 0x7000713, false, .ITYPE (112#12, .Regidx 0#5, .Regidx 14#5, .ADDI)⟩ rfl
 
-/-- `+0x34a  beq a5,a4,69e <vprintf+0x186>` -/
+/-- `+0x34a  beq a5,a4,6a6 <vprintf+0x186>` -/
 theorem ulibVprintf_i34a (L : UlibRun GF) (base : BitVec 64) :
     ulibVprintfCode L base ⊢ L.uinstrIs (base + 0x34a#64) false (.BTYPE (7928#13, .Regidx 14#5, .Regidx 15#5, .BEQ)) :=
   ulibTabCode_instr L ulibVprintfTab base 95 ⟨0x34a, 4, 0xeee78ce3, false, .BTYPE (7928#13, .Regidx 14#5, .Regidx 15#5, .BEQ)⟩ rfl
@@ -634,7 +634,7 @@ theorem ulibVprintf_i34e (L : UlibRun GF) (base : BitVec 64) :
     ulibVprintfCode L base ⊢ L.uinstrIs (base + 0x34e#64) false (.ITYPE (99#12, .Regidx 0#5, .Regidx 14#5, .ADDI)) :=
   ulibTabCode_instr L ulibVprintfTab base 96 ⟨0x34e, 4, 0x6300713, false, .ITYPE (99#12, .Regidx 0#5, .Regidx 14#5, .ADDI)⟩ rfl
 
-/-- `+0x352  beq a5,a4,6e6 <vprintf+0x1ce>` -/
+/-- `+0x352  beq a5,a4,6ee <vprintf+0x1ce>` -/
 theorem ulibVprintf_i352 (L : UlibRun GF) (base : BitVec 64) :
     ulibVprintfCode L base ⊢ L.uinstrIs (base + 0x352#64) false (.BTYPE (7992#13, .Regidx 14#5, .Regidx 15#5, .BEQ)) :=
   ulibTabCode_instr L ulibVprintfTab base 97 ⟨0x352, 4, 0xf2e78ce3, false, .BTYPE (7992#13, .Regidx 14#5, .Regidx 15#5, .BEQ)⟩ rfl
@@ -644,7 +644,7 @@ theorem ulibVprintf_i356 (L : UlibRun GF) (base : BitVec 64) :
     ulibVprintfCode L base ⊢ L.uinstrIs (base + 0x356#64) false (.ITYPE (115#12, .Regidx 0#5, .Regidx 14#5, .ADDI)) :=
   ulibTabCode_instr L ulibVprintfTab base 98 ⟨0x356, 4, 0x7300713, false, .ITYPE (115#12, .Regidx 0#5, .Regidx 14#5, .ADDI)⟩ rfl
 
-/-- `+0x35a  beq a5,a4,6fa <vprintf+0x1e2>` -/
+/-- `+0x35a  beq a5,a4,702 <vprintf+0x1e2>` -/
 theorem ulibVprintf_i35a (L : UlibRun GF) (base : BitVec 64) :
     ulibVprintfCode L base ⊢ L.uinstrIs (base + 0x35a#64) false (.BTYPE (8004#13, .Regidx 14#5, .Regidx 15#5, .BEQ)) :=
   ulibTabCode_instr L ulibVprintfTab base 99 ⟨0x35a, 4, 0xf4e782e3, false, .BTYPE (8004#13, .Regidx 14#5, .Regidx 15#5, .BEQ)⟩ rfl

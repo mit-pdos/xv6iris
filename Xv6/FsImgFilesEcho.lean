@@ -9,13 +9,13 @@ namespace Xv6
 
 open Xv6.User
 
-/-! ### echo, inum 4, 35640 bytes -/
+/-! ### echo, inum 4, 35688 bytes -/
 
 /-- Rocq `fsimg_echo_type`. -/
 theorem fsimgEchoType : (fsDinode fsimgP fsimgSb 4).diType.toNat = T_FILE := by
   rw [fsimgP_eq]; decide +kernel
 
-theorem fsimgEchoSize : (fsDinode fsimgP fsimgSb 4).diSize.toNat = 35640 := by
+theorem fsimgEchoSize : (fsDinode fsimgP fsimgSb 4).diSize.toNat = 35688 := by
   rw [fsimgP_eq]; decide +kernel
 
 theorem fsimgEchoNlink : (fsDinode fsimgP fsimgSb 4).diNlink.toNat = 1 := by

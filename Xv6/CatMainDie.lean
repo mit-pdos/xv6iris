@@ -3,7 +3,7 @@
 `1900b8a43`): a stage of `ProofCatMain`.
 
     0xde  ld a2,0(s2)                     -- argv[i]
-    0xe2  auipc a1,0x1 ; addi a1,a1,-1794 -- "cat: cannot open %s\n" at 0x9e0
+    0xe2  auipc a1,0x1 ; addi a1,a1,-1778 -- "cat: cannot open %s\n" at 0x9f0
     0xea  li a0,2 ; jal fprintf ; li a0,1 ; jal exit
 
 `fprintf`'s `%s` contract (`CAT_FPRINTF.wp_catFprintfS`) prints the three
@@ -63,16 +63,16 @@ theorem catMain_die (UL : UK_LEAVES) (HF : CAT_FPRINTF) (N : UkNames GF) (h : CP
   iintro %h2 Hrun
   rw [ukPc 0xe2 0xe6 false rfl, show ukUtypeVal .AUIPC (BitVec.ofNat 64 0xe2) 1#20 = BitVec.ofNat 64 0x10e2
     from by decide]
-  -- 0xe6  addi a1,a1,-1794
-  ihave Hi := cat_uis N.t 0xe6 false (.ITYPE (0x8fe#12, .Regidx 11#5, .Regidx 11#5, .ADDI)) udec%
+  -- 0xe6  addi a1,a1,-1778
+  ihave Hi := cat_uis N.t 0xe6 false (.ITYPE (0x90e#12, .Regidx 11#5, .Regidx 11#5, .ADDI)) udec%
     (by decide) $$ Hc
-  iapply wp_uk_itype UL N h2 _ (BitVec.ofNat 64 0xe6) false 0x8fe#12 11#5 11#5 .ADDI _
+  iapply wp_uk_itype UL N h2 _ (BitVec.ofNat 64 0xe6) false 0x90e#12 11#5 11#5 .ADDI _
     (by unfold unotSp spIdx; decide) $$ Hi Hrun
   inext
   iintro %h3 Hrun
   rw [ukPc 0xe6 0xea false rfl, show (ukWr (ukWr m 12#5 (BitVec.ofNat 64 g.ptr)) 11#5
       (BitVec.ofNat 64 0x10e2)).get 11#5 = BitVec.ofNat 64 0x10e2 from by ureg,
-    show ukItypeVal .ADDI (BitVec.ofNat 64 0x10e2) 0x8fe#12 = BitVec.ofNat 64 cmMsg from by decide]
+    show ukItypeVal .ADDI (BitVec.ofNat 64 0x10e2) 0x90e#12 = BitVec.ofNat 64 cmMsg from by decide]
   -- 0xea  li a0,2
   ihave Hi := cat_uis N.t 0xea true (.ITYPE (2#12, .Regidx 0#5, .Regidx 10#5, .ADDI)) udec%
     (by decide) $$ Hc
@@ -82,13 +82,13 @@ theorem catMain_die (UL : UK_LEAVES) (HF : CAT_FPRINTF) (N : UkNames GF) (h : CP
   iintro %h4 Hrun
   rw [ukPc 0xea 0xec true rfl, ukLi _ _ 2 (by decide)]
   -- 0xec  jal fprintf
-  ihave Hi := cat_uis N.t 0xec false (.JAL (0x6ec#21, .Regidx 1#5)) udec%
+  ihave Hi := cat_uis N.t 0xec false (.JAL (0x6f4#21, .Regidx 1#5)) udec%
     (by decide) $$ Hc
-  iapply wp_uk_jal UL N h4 _ (BitVec.ofNat 64 0xec) false 0x6ec#21 1#5 _ (by unfold unotSp spIdx; decide)
+  iapply wp_uk_jal UL N h4 _ (BitVec.ofNat 64 0xec) false 0x6f4#21 1#5 _ (by unfold unotSp spIdx; decide)
     (by decide) $$ Hi Hrun
   inext
   iintro %h5 Hrun
-  rw [show BitVec.ofNat 64 0xec + BitVec.signExtend 64 0x6ec#21 = BitVec.ofNat 64 User.Cat.Sym.«fprintf»
+  rw [show BitVec.ofNat 64 0xec + BitVec.signExtend 64 0x6f4#21 = BitVec.ofNat 64 User.Cat.Sym.«fprintf»
     from by decide]
   let m5 := ukWr (ukWr (ukWr (ukWr (ukWr m 12#5 (BitVec.ofNat 64 g.ptr)) 11#5 (BitVec.ofNat 64 0x10e2)) 11#5
     (BitVec.ofNat 64 cmMsg)) 10#5 (BitVec.ofNat 64 2)) 1#5 (BitVec.ofNat 64 0xec + instrLen false)

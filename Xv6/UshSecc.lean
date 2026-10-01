@@ -93,7 +93,7 @@ theorem seccArgvFits_of_ok_x (ws : List (List (BitVec 8))) (hok : execOk ws) :
 /-- **Rocq `secc_loads`** (deviation 3). -/
 theorem seccLoads :
     ∃ p0 p1 : ElfPhdr, elfLoads User.Seccomp.elf = [p0, p1] ∧
-      p0.vaddr = 0 ∧ p0.memsz = 0xe5c ∧ p0.flags = 5 ∧
+      p0.vaddr = 0 ∧ p0.memsz = 0xe6c ∧ p0.flags = 5 ∧
       p1.vaddr = 0x1000 ∧ p1.memsz = 0x20 ∧ p1.flags = 6 :=
   ⟨_, _, User.Seccomp.elf_loads, rfl, rfl, rfl, rfl, rfl, rfl⟩
 

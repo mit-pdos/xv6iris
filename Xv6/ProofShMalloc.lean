@@ -79,7 +79,7 @@ theorem wp_shMallocFirst (UL : UK_LEAVES) (HS : SH_SBRK) (HF : SH_FREE)
   have hnu : ushmNu nbytes = (nbytes + 15) / 16 + 1 := rfl
   have hsz16 : sz % 16 = 0 := by unfold pgRoundUpN at hszal; omega
   have hB : ushmBase = 0x2088 := rfl
-  rw [show User.Sh.Sym.«malloc» = 0x1170 from rfl, show 10 + avail = 8 + (2 + avail) by omega]
+  rw [show User.Sh.Sym.«malloc» = 0x1178 from rfl, show 10 + avail = 8 + (2 + avail) by omega]
   iintro #Hc Hfp Hbase Hsz Hrun Hcont
   iapply shMalloc_pro UL N h m (2 + avail) $$ Hc Hrun
   iintro %h1 %m1 %hal %hlo %hsp1 %k1 W0 W1 W2 W3 W4 W5 W6 W7 Hrun
@@ -237,7 +237,7 @@ theorem wp_shMallocOne (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) 
       wpLoop h := by
   have hB : ushmBase = 0x2088 := rfl
   have hnu : ushmNu nbytes = (nbytes + 15) / 16 + 1 := rfl
-  rw [show User.Sh.Sym.«malloc» = 0x1170 from rfl, show 10 + avail = 8 + (2 + avail) by omega]
+  rw [show User.Sh.Sym.«malloc» = 0x1178 from rfl, show 10 + avail = 8 + (2 + avail) by omega]
   unfold ushmOne ushmHdr
   iintro #Hc ⟨%c, %hpure, Hfp, ⟨Hbn, Hbsz, Hbpad⟩, ⟨Hcn, Hcsz, Hcpad⟩, ⟨%gb, Hbody⟩, Hsz⟩ Hrun Hcont
   obtain ⟨hclo, hc16, hR0, hR31, hRhi, hszhi⟩ := hpure

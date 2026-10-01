@@ -2,9 +2,9 @@
 **`cat(fd)`'s two diagnostic tails** (Rocq `UkCatCat.wp_kcat_cat_die_cw`,
 `wp_kcat_cat_die_cr`, pinned `1900b8a43`): a stage of `ProofCatCat`.
 
-    0x40  auipc a1,0x1 ; addi a1,a1,-1680   -- "cat: write error\n" at 0x9b0
+    0x40  auipc a1,0x1 ; addi a1,a1,-1664   -- "cat: write error\n" at 0x9c0
     0x48  li a0,2 ; jal fprintf ; li a0,1 ; jal exit
-    0x6a  auipc a1,0x1 ; addi a1,a1,-1698   -- "cat: read error\n" at 0x9c8
+    0x6a  auipc a1,0x1 ; addi a1,a1,-1682   -- "cat: read error\n" at 0x9d8
     0x72  li a0,2 ; jal fprintf ; li a0,1 ; jal exit
 
 Each pays its literal through `fprintf` (the run `kcatDgCw`/`kcatDgCr`) and
@@ -115,17 +115,17 @@ theorem catCat_dieCw (UL : UK_LEAVES) (HF : CAT_FPRINTF) (N : UkNames GF) (h : C
   iintro Hdg #Hc Hrun
   ihave Hi0 := cat_uis N.t 0x40 false (.UTYPE (1#20, .Regidx 11#5, .AUIPC)) udec%
     (by decide) $$ Hc
-  ihave Hi1 := cat_uis N.t 0x44 false (.ITYPE (0x970#12, .Regidx 11#5, .Regidx 11#5, .ADDI)) udec%
+  ihave Hi1 := cat_uis N.t 0x44 false (.ITYPE (0x980#12, .Regidx 11#5, .Regidx 11#5, .ADDI)) udec%
     (by decide) $$ Hc
   ihave Hi2 := cat_uis N.t 0x48 true (.ITYPE (2#12, .Regidx 0#5, .Regidx 10#5, .ADDI)) udec%
     (by decide) $$ Hc
-  ihave Hi3 := cat_uis N.t 0x4a false (.JAL (0x78e#21, .Regidx 1#5)) udec%
+  ihave Hi3 := cat_uis N.t 0x4a false (.JAL (0x796#21, .Regidx 1#5)) udec%
     (by decide) $$ Hc
   ihave Hi4 := cat_uis N.t 0x4e true (.ITYPE (1#12, .Regidx 0#5, .Regidx 10#5, .ADDI)) udec%
     (by decide) $$ Hc
   ihave Hi5 := cat_uis N.t 0x50 false (.JAL (0x35c#21, .Regidx 1#5)) udec%
     (by decide) $$ Hc
-  iapply catCat_dieAt UL HF N h m n 0x40 0x9b0 17 0x970#12 0x78e#21 0x35c#21 User.Cat.lit_write_ok
+  iapply catCat_dieAt UL HF N h m n 0x40 0x9c0 17 0x980#12 0x796#21 0x35c#21 User.Cat.lit_write_ok
     (by decide) (by decide) (by decide) (by decide) (by decide) (by decide)
     $$ Hi0 Hi1 Hi2 Hi3 Hi4 Hi5 Hdg Hc Hrun
 
@@ -137,17 +137,17 @@ theorem catCat_dieCr (UL : UK_LEAVES) (HF : CAT_FPRINTF) (N : UkNames GF) (h : C
   iintro Hdg #Hc Hrun
   ihave Hi0 := cat_uis N.t 0x6a false (.UTYPE (1#20, .Regidx 11#5, .AUIPC)) udec%
     (by decide) $$ Hc
-  ihave Hi1 := cat_uis N.t 0x6e false (.ITYPE (0x95e#12, .Regidx 11#5, .Regidx 11#5, .ADDI)) udec%
+  ihave Hi1 := cat_uis N.t 0x6e false (.ITYPE (0x96e#12, .Regidx 11#5, .Regidx 11#5, .ADDI)) udec%
     (by decide) $$ Hc
   ihave Hi2 := cat_uis N.t 0x72 true (.ITYPE (2#12, .Regidx 0#5, .Regidx 10#5, .ADDI)) udec%
     (by decide) $$ Hc
-  ihave Hi3 := cat_uis N.t 0x74 false (.JAL (0x764#21, .Regidx 1#5)) udec%
+  ihave Hi3 := cat_uis N.t 0x74 false (.JAL (0x76c#21, .Regidx 1#5)) udec%
     (by decide) $$ Hc
   ihave Hi4 := cat_uis N.t 0x78 true (.ITYPE (1#12, .Regidx 0#5, .Regidx 10#5, .ADDI)) udec%
     (by decide) $$ Hc
   ihave Hi5 := cat_uis N.t 0x7a false (.JAL (0x332#21, .Regidx 1#5)) udec%
     (by decide) $$ Hc
-  iapply catCat_dieAt UL HF N h m n 0x6a 0x9c8 16 0x95e#12 0x764#21 0x332#21 User.Cat.lit_read_ok
+  iapply catCat_dieAt UL HF N h m n 0x6a 0x9d8 16 0x96e#12 0x76c#21 0x332#21 User.Cat.lit_read_ok
     (by decide) (by decide) (by decide) (by decide) (by decide) (by decide)
     $$ Hi0 Hi1 Hi2 Hi3 Hi4 Hi5 Hdg Hc Hrun
 

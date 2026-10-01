@@ -11,8 +11,8 @@ Rocq `UkCatPutc.wp_kcat_putc` (and its three twins `UkGrepPutc`,
 * the code is `ulibPutcCode L base` (Rocq `cat_code γt`), which every
   program's text supplies at its own `putc` symbol by the relocation lemma
   (`UlibPutcCode.ulibPutcCode_of_text`, instances in `UlibPutcReloc`);
-* the ONE call is to the `write` stub at `ulibWriteAt base = base - 0x90`
-  (pc-relative `jal`; usys.o sits 0x90 below printf.o's `putc` in every
+* the ONE call is to the `write` stub at `ulibWriteAt base = base - 0x98`
+  (pc-relative `jal`; usys.o sits 0x98 below printf.o's `putc` in every
   link), and what it costs is the per-call obligation `ulibPutcWb` -- Rocq
   `UkCat.kcat_wb` = `kcat_w fd ua 1 (Ci ∗ ubyte ua b) (Co ∗ ubyte ua b)`,
   at the byte `putc` stores into its own frame, with the frame address
