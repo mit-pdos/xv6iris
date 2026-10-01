@@ -187,7 +187,7 @@ theorem iput_ofl_tail (LW : LOG_WRITE) (BL : BRELSE)
   ihave #Henv' := Henv
   unfold iputEnv
   icases Henv' with ⟨-, -, #Hbc, #Hlc, -⟩
-  k_step_c (wp_s_jal c _ (KA.«iput» + 0xba#64) false 2524#21 1#5 (by decide))
+  k_step_c (wp_s_jal c _ (KA.«iput» + 0xba#64) false 2620#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [iput_br_log_write]
   iintro Hk Hpc
   obtain ⟨hbnoN, -⟩ := Xv6.iu_bno inum hgeom hcov

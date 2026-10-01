@@ -221,7 +221,7 @@ theorem iput_lk_b (RH : RELEASE_HOOK) (AC : ACQUIRE_LLB) (RSH : RELEASESLEEP_HOO
   k_step_c (wp_s_add c _ (KA.«iput» + 0x74#64) true 10#5 0#5 19#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h19]
   iintro Hk Hpc
-  k_step_c (wp_s_jal c _ (KA.«iput» + 0x76#64) false 3042#21 1#5 (by decide))
+  k_step_c (wp_s_jal c _ (KA.«iput» + 0x76#64) false 3138#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [iput_br_releasesleep]
   iintro Hk Hpc
   iapply (iput_lk_releasesleep RSH Γ c _ fscIc γil γisl kk q pidv Tc ?ra ?rn ?rK ?rs ?rp ?rt)
@@ -243,13 +243,13 @@ theorem iput_lk_b (RH : RELEASE_HOOK) (AC : ACQUIRE_LLB) (RSH : RELEASESLEEP_HOO
   obtain ⟨c2', c8, c9, c18, c19, c20, c21, c22, c23, c24, c25, c26, c27⟩ := hcs2
   simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] at c2' c9 c18 c19 c20 c21 c22 c23 c24 c25 c26 c27
   -- +0x7a auipc a0 ; +0x7e addi a0 ; +0x82 jal acquire
-  k_step_c (wp_s_auipc c _ (KA.«iput» + 0x7a#64) false 0x1d#20 10#5 (by decide))
+  k_step_c (wp_s_auipc c _ (KA.«iput» + 0x7a#64) false 0x1e#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_c (wp_s_addi c _ (KA.«iput» + 0x7e#64) false 1614#12 10#5 10#5 (by decide))
+  k_step_c (wp_s_addi c _ (KA.«iput» + 0x7e#64) false 2266#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [iput_lock]
   iintro Hk Hpc
-  k_step_c (wp_s_jal c _ (KA.«iput» + 0x82#64) false 2086678#21 1#5 (by decide))
+  k_step_c (wp_s_jal c _ (KA.«iput» + 0x82#64) false 2086658#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [iput_br_acquire]
   iintro Hk Hpc
   ihave Hte := iput_lk_te_ws c k s' p' $$ Hte

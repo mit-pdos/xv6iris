@@ -443,7 +443,7 @@ theorem sys_mknod_args (AS : ARGSTR) (CR : CREATE) (IUP : IUNLOCKPUT) (EO : END_
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x2a  jal argstr
-  k_step_e (wp_s_jal cpu _ (KA.«sys_mknod» + 0x2a#64) false 2086208#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_mknod» + 0x2a#64) false 2086112#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_mknod_br_argstr]
   iintro Hk Hpc
   icases sysfile_blk_bare_ev _ _ _ _ _ $$ Hblk with ⟨Hbare, Hclose⟩
@@ -572,7 +572,7 @@ theorem sys_mknod_main (BO : BEGIN_OP) (AI : ARGINT) (AS : ARGSTR) (CR : CREATE)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x12  jal argint
-  k_step_e (wp_s_jal cpu _ (KA.«sys_mknod» + 0x12#64) false 2086176#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_mknod» + 0x12#64) false 2086080#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_mknod_br_argint]
   iintro Hk Hpc
   icases sys_mknod_tf hct _ _ _ _ _ $$ Hblk with ⟨Htf, Hpg, Htfb⟩
@@ -603,7 +603,7 @@ theorem sys_mknod_main (BO : BEGIN_OP) (AI : ARGINT) (AS : ARGSTR) (CR : CREATE)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x1c  jal argint
-  k_step_e (wp_s_jal cpu _ (KA.«sys_mknod» + 0x1c#64) false 2086166#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_mknod» + 0x1c#64) false 2086070#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_mknod_br_argint]
   iintro Hk Hpc
   icases sys_mknod_tf hct _ _ _ _ _ $$ Hblk with ⟨Htf, Hpg, Htfb⟩

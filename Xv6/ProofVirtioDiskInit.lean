@@ -1139,11 +1139,11 @@ theorem vdiKept_of_pres2 {R R' : RegMap}
 
 /-! ## The addresses of `struct disk` the code computes -/
 
-theorem vdi_disk_ptr : KA.«virtio_disk_init» + 0x1def4#64 = KA.«disk» := by decide
-theorem vdi_avail_ptr : KA.«virtio_disk_init» + 0x1defc#64 = KA.«disk» + 8#64 := by decide
-theorem vdi_jal_kalloc : KA.«virtio_disk_init» + 0xffffffffffffb342#64 = KA.«kalloc» := by decide
-theorem vdi_jal_memset : KA.«virtio_disk_init» + 0xffffffffffffb4dc#64 = KA.«memset» := by decide
-theorem vdi_jal_initlock : KA.«virtio_disk_init» + 0xffffffffffffb39c#64 = KA.«initlock» := by
+theorem vdi_disk_ptr : KA.«virtio_disk_init» + 0x1e0a4#64 = KA.«disk» := by decide
+theorem vdi_avail_ptr : KA.«virtio_disk_init» + 0x1e0ac#64 = KA.«disk» + 8#64 := by decide
+theorem vdi_jal_kalloc : KA.«virtio_disk_init» + 0xffffffffffffb252#64 = KA.«kalloc» := by decide
+theorem vdi_jal_memset : KA.«virtio_disk_init» + 0xffffffffffffb3ec#64 = KA.«memset» := by decide
+theorem vdi_jal_initlock : KA.«virtio_disk_init» + 0xffffffffffffb2ac#64 = KA.«initlock» := by
   decide
 
 theorem vdi_ret_c2 : jumpPc (KA.«virtio_disk_init» + 0xc2#64) = KA.«virtio_disk_init» + 0xc2#64 := by
@@ -1207,7 +1207,7 @@ theorem vdi_alloc [WchG GF] (KAL : KALLOC) (cpu : CPU) (k : KCtx) (R : RegMap)
   iintro ⟨Hk, Hpc, #Hlock, Hav, Hd, Ha, Hu, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- +0xbe  jal ra, kalloc
-  k_step (wp_s_jal cpu _ (KA.«virtio_disk_init» + 0xbe#64) false 2077316#21 1#5 (by decide))
+  k_step (wp_s_jal cpu _ (KA.«virtio_disk_init» + 0xbe#64) false 2077076#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [vdi_jal_kalloc]
   iintro Hk Hpc
   iapply (vdi_kalloc_call KAL cpu _ ?hs1 γkl γk (some nb) ?hn1 ?hK1 ?hl1 ?hz1) $$ [- $Hk $Hpc]
@@ -1234,7 +1234,7 @@ theorem vdi_alloc [WchG GF] (KAL : KALLOC) (cpu : CPU) (k : KCtx) (R : RegMap)
   k_step (wp_s_auipc cpu _ (KA.«virtio_disk_init» + 0xc2#64) false 0x1e#20 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_addi cpu _ (KA.«virtio_disk_init» + 0xc6#64) false 3634#12 9#5 9#5 (by decide))
+  k_step (wp_s_addi cpu _ (KA.«virtio_disk_init» + 0xc6#64) false 4066#12 9#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0xca  sd a0,0(s1)   disk.desc = p1
@@ -1242,7 +1242,7 @@ theorem vdi_alloc [WchG GF] (KAL : KALLOC) (cpu : CPU) (k : KCtx) (R : RegMap)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [vdi_disk_ptr]
   iintro Hk Hpc Hd
   -- +0xcc  jal ra, kalloc
-  k_step (wp_s_jal cpu _ (KA.«virtio_disk_init» + 0xcc#64) false 2077302#21 1#5 (by decide))
+  k_step (wp_s_jal cpu _ (KA.«virtio_disk_init» + 0xcc#64) false 2077062#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [vdi_jal_kalloc]
   iintro Hk Hpc
   iapply (vdi_kalloc_call KAL cpu _ ?hs2 γkl γk (some (nb - 1)) ?hn2 ?hK2 ?hl2 ?hz2) $$ [- $Hk $Hpc]
@@ -1270,7 +1270,7 @@ theorem vdi_alloc [WchG GF] (KAL : KALLOC) (cpu : CPU) (k : KCtx) (R : RegMap)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [c2_9, vdi_disk_ptr]
   iintro Hk Hpc Ha
   -- +0xd2  jal ra, kalloc
-  k_step (wp_s_jal cpu _ (KA.«virtio_disk_init» + 0xd2#64) false 2077296#21 1#5 (by decide))
+  k_step (wp_s_jal cpu _ (KA.«virtio_disk_init» + 0xd2#64) false 2077056#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [vdi_jal_kalloc]
   iintro Hk Hpc
   iapply (vdi_kalloc_call KAL cpu _ ?hs3 γkl γk (some (nb - 1 - 1)) ?hn3 ?hK3 ?hl3 ?hz3)
@@ -1318,7 +1318,7 @@ theorem vdi_alloc [WchG GF] (KAL : KALLOC) (cpu : CPU) (k : KCtx) (R : RegMap)
   k_step (wp_s_auipc cpu _ (KA.«virtio_disk_init» + 0xe0#64) false 0x1e#20 14#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_ld cpu _ (KA.«virtio_disk_init» + 0xe4#64) false 3612#12 14#5 14#5 (by decide)
+  k_step (wp_s_ld cpu _ (KA.«virtio_disk_init» + 0xe4#64) false 4044#12 14#5 14#5 (by decide)
       (by decide) (DFrac.own 1) (R2 10#5))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [vdi_avail_ptr]
   iintro Hk Hpc Ha
@@ -1383,7 +1383,7 @@ theorem vdi_zero (MS : MEMSET) (cpu : CPU) (k : KCtx) (R : RegMap) (pd pav pu : 
   k_step (wp_s_addi cpu _ (KA.«virtio_disk_init» + 0xee#64) true 0#12 11#5 0#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_jal cpu _ (KA.«virtio_disk_init» + 0xf0#64) false 2077676#21 1#5 (by decide))
+  k_step (wp_s_jal cpu _ (KA.«virtio_disk_init» + 0xf0#64) false 2077436#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [vdi_jal_memset]
   iintro Hk Hpc
   iapply (vdi_memset_call MS cpu _ ?hs1 (List.replicate 4096 5#8) ?hK1 ?hn1
@@ -1405,7 +1405,7 @@ theorem vdi_zero (MS : MEMSET) (cpu : CPU) (k : KCtx) (R : RegMap) (pd pav pu : 
   k_step (wp_s_auipc cpu _ (KA.«virtio_disk_init» + 0xf4#64) false 0x1e#20 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_addi cpu _ (KA.«virtio_disk_init» + 0xf8#64) false 3584#12 9#5 9#5 (by decide))
+  k_step (wp_s_addi cpu _ (KA.«virtio_disk_init» + 0xf8#64) false 4016#12 9#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0xfc  lui a2,0x1 ; +0xfe  li a1,0 ; +0x100  ld a0,8(s1) ; +0x102  jal ra, memset
@@ -1419,7 +1419,7 @@ theorem vdi_zero (MS : MEMSET) (cpu : CPU) (k : KCtx) (R : RegMap) (pd pav pu : 
       (by decide) (DFrac.own 1) pav)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [vdi_disk_ptr]
   iintro Hk Hpc Ha
-  k_step (wp_s_jal cpu _ (KA.«virtio_disk_init» + 0x102#64) false 2077658#21 1#5 (by decide))
+  k_step (wp_s_jal cpu _ (KA.«virtio_disk_init» + 0x102#64) false 2077418#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [vdi_jal_memset]
   iintro Hk Hpc
   iapply (vdi_memset_call MS cpu _ ?hs2 (List.replicate 4096 5#8) ?hK2 ?hn2
@@ -1448,7 +1448,7 @@ theorem vdi_zero (MS : MEMSET) (cpu : CPU) (k : KCtx) (R : RegMap) (pd pav pu : 
       (by decide) (DFrac.own 1) pu)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [c2_9, vdi_disk_ptr]
   iintro Hk Hpc Hu
-  k_step (wp_s_jal cpu _ (KA.«virtio_disk_init» + 0x10c#64) false 2077648#21 1#5 (by decide))
+  k_step (wp_s_jal cpu _ (KA.«virtio_disk_init» + 0x10c#64) false 2077408#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [vdi_jal_memset]
   iintro Hk Hpc
   iapply (vdi_memset_call MS cpu _ ?hs3 (List.replicate 4096 5#8) ?hK3 ?hn3
@@ -1918,8 +1918,8 @@ theorem vdi_fa5 : aFree 0 + BitVec.ofNat 64 5 = KA.«disk» + 29#64 := by decide
 theorem vdi_fa6 : aFree 0 + BitVec.ofNat 64 6 = KA.«disk» + 30#64 := by decide
 theorem vdi_fa7 : aFree 0 + BitVec.ofNat 64 7 = KA.«disk» + 31#64 := by decide
 
-theorem vdi_str_addr : KA.«virtio_disk_init» + 0x1e1c#64 = KStr.«virtio_disk» := by decide
-theorem vdi_lock_addr : KA.«virtio_disk_init» + 0x1e01c#64 = aVdiskLock := by decide
+theorem vdi_str_addr : KA.«virtio_disk_init» + 0x1d24#64 = KStr.«virtio_disk» := by decide
+theorem vdi_lock_addr : KA.«virtio_disk_init» + 0x1e1cc#64 = aVdiskLock := by decide
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
@@ -1980,17 +1980,17 @@ theorem virtio_disk_init_proof (IL : INITLOCK) (KAL : KALLOC)
   k_step (wp_s_auipc cpu _ (KA.«virtio_disk_init» + 0xc#64) false 2#20 11#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_addi cpu _ (KA.«virtio_disk_init» + 0x10#64) false 3600#12 11#5 11#5 (by decide))
+  k_step (wp_s_addi cpu _ (KA.«virtio_disk_init» + 0x10#64) false 3352#12 11#5 11#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   k_step (wp_s_auipc cpu _ (KA.«virtio_disk_init» + 0x14#64) false 0x1e#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_addi cpu _ (KA.«virtio_disk_init» + 0x18#64) false 8#12 10#5 10#5 (by decide))
+  k_step (wp_s_addi cpu _ (KA.«virtio_disk_init» + 0x18#64) false 440#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x1c  jal ra, initlock
-  k_step (wp_s_jal cpu _ (KA.«virtio_disk_init» + 0x1c#64) false 2077568#21 1#5 (by decide))
+  k_step (wp_s_jal cpu _ (KA.«virtio_disk_init» + 0x1c#64) false 2077328#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [vdi_jal_initlock]
   iintro Hk Hpc
   iapply (vdi_initlock_call IL cpu _ ?hs0 vlock vname vcpu ?hKi aVdiskLock

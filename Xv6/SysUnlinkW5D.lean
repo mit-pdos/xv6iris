@@ -413,7 +413,7 @@ theorem sys_unlink_w5_dir (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : 
   k_step_e (wp_s_add cpu _ (KA.«sys_unlink» + 0x150#64) true 10#5 0#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hpins.2.2.1]
   iintro Hk Hpc
-  k_step_e (wp_s_jal cpu _ (KA.«sys_unlink» + 0x152#64) false 2089062#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_unlink» + 0x152#64) false 2088966#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_unlink_br_iupdate]
   iintro Hk Hpc
   obtain ⟨u, rfl⟩ : ∃ u, nw = u + 1 := ⟨nw - 1, by omega⟩

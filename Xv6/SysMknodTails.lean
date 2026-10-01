@@ -50,10 +50,10 @@ set_option linter.unusedVariables false
 /-! ## Constants -/
 
 theorem sys_mknod_br_begin_op : KA.«sys_mknod» + 0xffffffffffffe9b8#64 = KA.«begin_op» := by decide
-theorem sys_mknod_br_argint : KA.«sys_mknod» + 0xffffffffffffd532#64 = KA.«argint» := by decide
-theorem sys_mknod_br_argstr : KA.«sys_mknod» + 0xffffffffffffd56a#64 = KA.«argstr» := by decide
+theorem sys_mknod_br_argint : KA.«sys_mknod» + 0xffffffffffffd4d2#64 = KA.«argint» := by decide
+theorem sys_mknod_br_argstr : KA.«sys_mknod» + 0xffffffffffffd50a#64 = KA.«argstr» := by decide
 theorem sys_mknod_br_create : KA.«sys_mknod» + 0xfffffffffffff900#64 = KA.«create» := by decide
-theorem sys_mknod_br_iunlockput : KA.«sys_mknod» + 0xffffffffffffe1a2#64 = KA.«iunlockput» := by
+theorem sys_mknod_br_iunlockput : KA.«sys_mknod» + 0xffffffffffffe142#64 = KA.«iunlockput» := by
   decide
 theorem sys_mknod_br_end_op : KA.«sys_mknod» + 0xffffffffffffea44#64 = KA.«end_op» := by decide
 
@@ -210,7 +210,7 @@ theorem sys_mknod_tail_46 (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
   ihave Hop := logOpS_opb icfgLog n Sb $$ Hop
   icases sys_mknod_pid hct _ _ _ _ _ $$ Hblk with ⟨Hpid, Hback⟩
   -- +0x46  jal iunlockput
-  k_step_e (wp_s_jal cpu _ (KA.«sys_mknod» + 0x46#64) false 2089308#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_mknod» + 0x46#64) false 2089212#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_mknod_br_iunlockput]
   iintro Hk Hpc
   iapply (sysfile_iunlockput IUP Γ cpu _ k.sie (by k_norm_g) (procAddr A.j)

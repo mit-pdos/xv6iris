@@ -114,7 +114,7 @@ theorem namex_root_after (cpu : CPU) (k : KCtx) (dqp : DFrac) (spie spp : Bool) 
     (b22 : R2 22#5 = k.regs 11#5) (b27 : R2 27#5 = k.regs 27#5) (ha0 : R2 10#5 = ientry kk)
     (hsp : k.sie = false → spie = k.spie ∧ spp = k.spp) (Φ : CPU → IProp GF)
     (hΦ : ∀ c, Φ c ⊢ namexRootPost k dqp c) :
-    kctx cpu (((k.withSpie spie spp).pushed 12).withRegs R2) ∗ pcIs cpu (KA.«namex» + 0x50#64) ∗
+    kctx cpu (((k.withSpie spie spp).pushed 12).withRegs R2) ∗ pcIs cpu (KA.«namex» + 0x54#64) ∗
     frame12 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)
       (k.regs 20#5) (k.regs 21#5) (k.regs 22#5) (k.regs 23#5) (k.regs 24#5) (k.regs 25#5)
       (k.regs 26#5) ∗
@@ -124,10 +124,10 @@ theorem namex_root_after (cpu : CPU) (k : KCtx) (dqp : DFrac) (spie spp : Bool) 
   iintro ⟨Hk, Hpc, Hframe, Hpath, Hheld, Hnext⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- +0x50  c.mv s4,a0 ; +0x52  c.j +0x3c
-  k_step_r (wp_s_add cpu _ (KA.«namex» + 0x50#64) true 20#5 0#5 10#5 (by decide))
+  k_step_r (wp_s_add cpu _ (KA.«namex» + 0x54#64) true 20#5 0#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ha0]
   iintro Hk Hpc
-  k_step_r (wp_s_j cpu _ (KA.«namex» + 0x52#64) true 2097130#21)
+  k_step_r (wp_s_j cpu _ (KA.«namex» + 0x56#64) true 2097126#21)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x3c .. +0x46  the constants, and the jump into the walk
@@ -143,50 +143,50 @@ theorem namex_root_after (cpu : CPU) (k : KCtx) (dqp : DFrac) (spie spp : Bool) 
   k_step_r (wp_s_addi cpu _ (KA.«namex» + 0x44#64) true 1#12 23#5 0#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_r (wp_s_j cpu _ (KA.«namex» + 0x46#64) true 174#21)
+  k_step_r (wp_s_j cpu _ (KA.«namex» + 0x46#64) true 178#21)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0xf4  lbu a5,0(s1) : '/' again ; +0xf8  bne a5,s3 (FALLS)
   icases byteBuf_acc (k.regs 10#5) dqp [SLASH, 0#8] 0 SLASH rfl $$ Hpath with ⟨Hb, Hbk⟩
   isimp only [BitVec.reduceOfNat, BitVec.add_zero] at Hb Hbk
-  k_step_r (wp_s_lbu cpu _ (KA.«namex» + 0xf4#64) false 0#12 15#5 9#5 (by decide) (by decide) dqp
+  k_step_r (wp_s_lbu cpu _ (KA.«namex» + 0xf8#64) false 0#12 15#5 9#5 (by decide) (by decide) dqp
       SLASH)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [b9]
   iintro Hk Hpc Hb
   ihave Hpath := Hbk $$ Hb
-  k_step_r (wp_s_branch cpu _ (KA.«namex» + 0xf8#64) false 14#13 15#5 19#5 (by decide) bop.BNE)
+  k_step_r (wp_s_branch cpu _ (KA.«namex» + 0xfc#64) false 14#13 15#5 19#5 (by decide) bop.BNE)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [namex_slash_ofNat, (show bcond bop.BNE 47#64 47#64 = false by decide)]
   iintro Hk Hpc
   -- +0xfc  c.addi s1,s1,1 ; +0xfe  lbu a5,0(s1) : NUL ; +0x102  beq a5,s3 (FALLS)
-  k_step_r (wp_s_addi cpu _ (KA.«namex» + 0xfc#64) true 1#12 9#5 9#5 (by decide))
+  k_step_r (wp_s_addi cpu _ (KA.«namex» + 0x100#64) true 1#12 9#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [b9]
   iintro Hk Hpc
   icases byteBuf_acc (k.regs 10#5) dqp [SLASH, 0#8] 1 0#8 rfl $$ Hpath with ⟨Hb, Hbk⟩
   try isimp only [BitVec.reduceOfNat] at Hb Hbk
-  k_step_r (wp_s_lbu cpu _ (KA.«namex» + 0xfe#64) false 0#12 15#5 9#5 (by decide) (by decide) dqp
+  k_step_r (wp_s_lbu cpu _ (KA.«namex» + 0x102#64) false 0#12 15#5 9#5 (by decide) (by decide) dqp
       0#8)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc Hb
   ihave Hpath := Hbk $$ Hb
-  k_step_r (wp_s_branch cpu _ (KA.«namex» + 0x102#64) false 8186#13 15#5 19#5 (by decide) bop.BEQ)
+  k_step_r (wp_s_branch cpu _ (KA.«namex» + 0x106#64) false 8186#13 15#5 19#5 (by decide) bop.BEQ)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [(show bcond bop.BEQ 0#64 47#64 = false by decide)]
   iintro Hk Hpc
   -- +0x106  c.beqz a5,+0x140 (TAKEN) ; +0x140  beqz s6,+0x5c (TAKEN: a1 = 0)
-  k_step_r (wp_s_branch cpu _ (KA.«namex» + 0x106#64) true 58#13 15#5 0#5 (by decide) bop.BEQ)
+  k_step_r (wp_s_branch cpu _ (KA.«namex» + 0x10a#64) true 58#13 15#5 0#5 (by decide) bop.BEQ)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [(show bcond bop.BEQ 0#64 0#64 = true by decide)]
   iintro Hk Hpc
-  k_step_r (wp_s_branch cpu _ (KA.«namex» + 0x140#64) false 7964#13 22#5 0#5 (by decide) bop.BEQ)
+  k_step_r (wp_s_branch cpu _ (KA.«namex» + 0x144#64) false 7964#13 22#5 0#5 (by decide) bop.BEQ)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [b22, ha1, (show bcond bop.BEQ 0#64 0#64 = true by decide)]
   iintro Hk Hpc
   -- +0x5c  c.mv a0,s4 ; the epilogue
-  k_step_r (wp_s_add cpu _ (KA.«namex» + 0x5c#64) true 10#5 0#5 20#5 (by decide))
+  k_step_r (wp_s_add cpu _ (KA.«namex» + 0x60#64) true 10#5 0#5 20#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  iapply (wp_epilogue_namex cpu (k.withSpie spie spp) (KA.«namex» + 0x5e#64) hK12 _ ?hr2
+  iapply (wp_epilogue_namex cpu (k.withSpie spie spp) (KA.«namex» + 0x62#64) hK12 _ ?hr2
       (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5) (k.regs 20#5)
       (k.regs 21#5) (k.regs 22#5) (k.regs 23#5) (k.regs 24#5) (k.regs 25#5) (k.regs 26#5))
   rotate_left
@@ -275,7 +275,7 @@ theorem namex_root_main (IG : IGET) (cpu : CPU) (k : KCtx) (dqp : DFrac)
   k_step_r (wp_s_add cpu _ (KA.«namex» + 0x4a#64) true 10#5 0#5 11#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_r (wp_s_jal cpu _ (KA.«namex» + 0x4c#64) false 2094466#21 1#5 (by decide))
+  k_step_r (wp_s_jal cpu _ (KA.«namex» + 0x50#64) false 2095266#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [namex_br_iget]
   iintro Hk Hpc
   ihave Hlic : iname fscIreg fscFs icfgIst (BitVec.ofNat 32 ROOTINO) .rootL $$ []

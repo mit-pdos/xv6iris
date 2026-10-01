@@ -62,9 +62,9 @@ theorem kctx_withSpie_of {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
     kctxL (GF := GF) lent cpu (k.withRegs R) ⊢ kctxL lent cpu ((k.withSpie a b).withRegs R) := by
   rw [KCtx.withSpie_self' k a b ha hb]
 
-theorem kerneltrap_br_fffffffffffff804 : KA.«kerneltrap» + 0xfffffffffffff804#64 = KA.«yield» := by decide
+theorem kerneltrap_br_fffffffffffff7f0 : KA.«kerneltrap» + 0xfffffffffffff7f0#64 = KA.«yield» := by decide
 
-theorem kerneltrap_br_fffffffffffff1e4 : KA.«kerneltrap» + 0xfffffffffffff1e4#64 = KA.«myproc» := by decide
+theorem kerneltrap_br_fffffffffffff1c4 : KA.«kerneltrap» + 0xfffffffffffff1c4#64 = KA.«myproc» := by decide
 
 theorem kerneltrap_br_fffffffffffffe72 : KA.«kerneltrap» + 0xfffffffffffffe72#64 = KA.«devintr» := by decide
 
@@ -82,7 +82,7 @@ theorem kerneltrap_proof (DI : DEVINTR) (MP : MYPROC) (YI : YIELD) : KERNELTRAP 
   have hK' : 58 ≤ k.avail := by unfold ktSlots kvFrameSlots at hK; omega
   simp only [kerneltrapAddr]
   k_norm
-  -- the tail from 0x800027da: write sepc and sstatus back, the epilogue, at any hart the pinning allows
+  -- the tail from 0x800027ee: write sepc and sstatus back, the epilogue, at any hart the pinning allows
   have htail : ∀ (c : CPU) (_ : k.proc = 0#64 → c = cpu) (a b : Bool) (R : RegMap) (e' sc' tv' w5 : BitVec 64)
       (v : BitVec 64) (_ : sstatusFull false true true v)
       (_ : R 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFD0#64) (_ : R 9#5 = v) (_ : R 18#5 = epc)
@@ -254,7 +254,7 @@ theorem kerneltrap_proof (DI : DEVINTR) (MP : MYPROC) (YI : YIELD) : KERNELTRAP 
       $$ [- $Hk $Hpc] with [h10, devintrRet_timer sc hsc hext, bcond_beq_22]
     iintro Hk Hpc
     -- jal myproc
-    k_step (wp_s_jal cpu _ (KA.«kerneltrap» + 0x86#64) false 2093406#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kerneltrap_br_fffffffffffff1e4]
+    k_step (wp_s_jal cpu _ (KA.«kerneltrap» + 0x86#64) false 2093374#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kerneltrap_br_fffffffffffff1c4]
     iintro Hk Hpc
     have hmp : ∀ (k' : KCtx) (hsie' : k'.sie = false) (hnoff' : k'.noff + 1 < 2 ^ 31) (hK' : 10 ≤ k'.avail),
         kctx cpu k' ∗ pcIs cpu KA.«myproc» ∗
@@ -316,7 +316,7 @@ theorem kerneltrap_proof (DI : DEVINTR) (MP : MYPROC) (YI : YIELD) : KERNELTRAP 
       k_step (wp_s_branch cpu _ (KA.«kerneltrap» + 0x8a#64) true 8108#13 10#5 0#5 (by decide) bop.BEQ) from (text_instr _ _ _ _ rfl rfl) Htext
         $$ [- $Hk $Hpc] with [h10', MachCSL.beq_ne k.proc hp0]
       iintro Hk Hpc
-      k_step (wp_s_jal cpu _ (KA.«kerneltrap» + 0x8c#64) false 2094968#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kerneltrap_br_fffffffffffff804]
+      k_step (wp_s_jal cpu _ (KA.«kerneltrap» + 0x8c#64) false 2094948#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kerneltrap_br_fffffffffffff7f0]
       iintro Hk Hpc
       -- THE CLAIM names the running slot: no proc-shape premise is needed
       icases cpuClaim_proc_shape Γ cpu k.proc hp0 $$ Hclaim with ⟨%jp, %⟨hjN, hpj⟩, Hclaim⟩
@@ -359,7 +359,7 @@ theorem kerneltrap_proof (DI : DEVINTR) (MP : MYPROC) (YI : YIELD) : KERNELTRAP 
       obtain ⟨c3_2, c3_8, c3_9, c3_18, c3_19, c3_20, c3_21, c3_22, c3_23, c3_24, c3_25, c3_26, c3_27⟩ := hcs3
       icases trapCsrs_cases c1 $$ Hcsrs with ⟨%e', %sc', %tv', Hcsrs⟩
       icases trapCsrsAt_cases c1 _ _ _ $$ Hcsrs with ⟨Hsepc, Hscause, Hstval⟩
-      -- j 0x800027da
+      -- j 0x800027ee
       have hsie3 : (((k.pushed 6).withSpie a b).withRegs R3).sie = false := hsie
       k_step (wp_s_j c1 _ (KA.«kerneltrap» + 0x90#64) true 2097062#21) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       iintro Hk Pc

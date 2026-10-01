@@ -242,7 +242,7 @@ theorem dirlink_main (DL : DIRLOOKUP) (RD : READI) (IP : IPUT) (SN : STRNCPY) (W
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x16  jal dirlookup
-  k_step_e (wp_s_jal cpu _ (KA.«dirlink» + 0x16#64) false 2096624#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«dirlink» + 0x16#64) false 2096552#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [dirlink_br_dirlookup]
   iintro Hk Hpc
   icases bslots_uncons 2 $$ Hbs with ⟨Hb1, Hb2⟩

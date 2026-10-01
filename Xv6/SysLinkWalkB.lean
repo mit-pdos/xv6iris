@@ -208,7 +208,7 @@ theorem sys_link_tail_g (IUP : IUNLOCKPUT) (IP : IPUT) (EO : END_OP)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hpins.2.2.2.1]
   iintro Hk Hpc
   -- +0xa6  jal iunlockput (dp)
-  k_step_e (wp_s_jal cpu _ (KA.«sys_link» + 0xa6#64) false 2090302#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_link» + 0xa6#64) false 2090206#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_link_br_iunlockput]
   iintro Hk Hpc
   iapply (sys_link_iunlockput_gen IUP Γ cpu _ k.sie (by k_norm_g) k.proc (by k_norm_g) A.j γild γisld
@@ -239,7 +239,7 @@ theorem sys_link_tail_g (IUP : IUNLOCKPUT) (IP : IPUT) (EO : END_OP)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hp1.2.2.1]
   iintro Hk Hpc
   -- +0xac  jal iput (ip): the short parent and the share, gathered
-  k_step_e (wp_s_jal cpu _ (KA.«sys_link» + 0xac#64) false 2090086#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_link» + 0xac#64) false 2089990#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_link_br_iput]
   iintro Hk Hpc
   unfold sysLinkIpHeld
@@ -419,7 +419,7 @@ theorem sys_link_walk_dp (IL : ILOCK) (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : EN
   icases icSleeplocks_lookup fscIc kd hkd $$ Hslks with ⟨%γild, %γisld, #Hslkd⟩
   icases bslots_uncons 2 $$ Hbs with ⟨Hb1, Hb2⟩
   -- +0x80  jal ilock (dp)
-  k_step_e (wp_s_jal cpu _ (KA.«sys_link» + 0x80#64) false 2089744#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_link» + 0x80#64) false 2089648#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_link_br_ilock]
   iintro Hk Hpc
   iapply (sys_link_ilock IL Γ cpu _ k.sie (by k_norm_g) k.proc (by k_norm_g) A.j γild γisld kd qd.half
@@ -523,7 +523,7 @@ theorem sys_link_walk_dp (IL : ILOCK) (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : EN
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hp1.2.1, sys_link_bufname]
   iintro Hk Hpc
   -- +0x9c  jal dirlink
-  k_step_e (wp_s_jal cpu _ (KA.«sys_link» + 0x9c#64) false 2091734#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_link» + 0x9c#64) false 2091710#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_link_br_dirlink]
   iintro Hk Hpc
   -- the transaction's half, lent to dirlink whole (deviation 2)

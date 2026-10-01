@@ -33,7 +33,7 @@ theorem filter_pr_cons (l : List String) (h : "pr" ∉ l) :
   simp only [List.filter_cons, ne_eq, not_true_eq_false, decide_false]
   exact List.filter_eq_self.2 (fun x hx => by simp; intro e; subst e; exact h hx)
 
-theorem pr_addr : KA.«printk» + 0x11f02#64 =
+theorem pr_addr : KA.«printk» + 0x11fa2#64 =
     KA.«pr» := by decide
 
 theorem sp_restore (sp0 : BitVec 64) : sp0 + 0xFFFFFFFFFFFFFF40#64 + 8#64 * BitVec.ofNat 64 24 = sp0 := by
@@ -60,7 +60,7 @@ past it interrupts may be on again and the thread may resume at another
 hart, so the rest runs at whichever hart each step lands on. -/
 theorem printk_br_7ba : KA.«printk» + 0x7ba#64 = KA.«release» := by decide
 
-theorem printk_br_11f02 : KA.«printk» + 0x11f02#64 = KA.«pr» := by decide
+theorem printk_br_11fa2 : KA.«printk» + 0x11fa2#64 = KA.«pr» := by decide
 
 theorem printk_release_tail (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γpr : GName) (γd : UartNames) (bs cs0 : List (BitVec 8)) (dqf : DFrac)
@@ -86,8 +86,8 @@ theorem printk_release_tail (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors}
   -- auipc a0,18 ; addi a0,a0,3042
   k_step (wp_s_auipc cpu _ (KA.«printk» + 0x254#64) false 18#20 10#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_addi cpu _ (KA.«printk» + 0x258#64) false 3246#12 10#5 10#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
-    with [printk_br_11f02, pr_addr]
+  k_step (wp_s_addi cpu _ (KA.«printk» + 0x258#64) false 3406#12 10#5 10#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
+    with [printk_br_11fa2, pr_addr]
   iintro Hk Hpc
   -- jal release
   k_step (wp_s_jal cpu _ (KA.«printk» + 0x25c#64) false 1374#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [printk_br_7ba]
@@ -1946,7 +1946,7 @@ theorem printk_dispatch_7a0 {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF
   ipureintro
   refine ⟨h''.1, ?_, ?_, ?_⟩ <;> simp only [h''.2.1, h''.2.2.1, h''.2.2.2, RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, h21]
 
-theorem printk_br_7212 : KA.«printk» + 0x7212#64 = KA.«digits» := by decide
+theorem printk_br_720a : KA.«printk» + 0x720a#64 = KA.«digits» := by decide
 
 set_option maxHeartbeats 4000000 in
 /-- The `%p` arm at `0x800006ce`: `0x` and sixteen hex digits of the next vararg. -/
@@ -2038,8 +2038,8 @@ theorem printk_arm_p (PP : PRPUTC) {hlc : HasLC} {GF : BundledGFunctors} [MachGS
   -- auipc s9,7 ; addi s9,s9,98
   k_step (wp_s_auipc cpu _ (KA.«printk» + 0x1cc#64) false 7#20 25#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_addi cpu _ (KA.«printk» + 0x1d0#64) false 70#12 25#5 25#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
-    with [printk_br_7212, digits_addr]
+  k_step (wp_s_addi cpu _ (KA.«printk» + 0x1d0#64) false 62#12 25#5 25#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
+    with [printk_br_720a, digits_addr]
   iintro Hk Hpc
   -- the sixteen digits
   iapply (printk_hex_loop PP cpu k γl γd hsie hK hnoff huart 15 _ _ ?hN ?h25 ?h20 (by omega))
@@ -2943,8 +2943,8 @@ theorem printk_proof (AC : ACQUIRE) (RE : RELEASE) (PP : PRPUTC) (PI : PRINTINT)
   -- a0 = &pr.lock ; jal acquire
   k_step_gen (wp_s_auipc c13 _ (KA.«printk» + 0x1e#64) false 18#20 10#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c14 hp14
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c14 _ (KA.«printk» + 0x22#64) false 3812#12 10#5 10#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [printk_br_11f02, pr_addr_520] next c15 hp15
+  k_step_gen (wp_s_addi c14 _ (KA.«printk» + 0x22#64) false 3972#12 10#5 10#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+    with [printk_br_11fa2, pr_addr_520] next c15 hp15
   iintro Hk Hpc
   k_step_gen (wp_s_jal c15 _ (KA.«printk» + 0x26#64) false 1804#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [printk_br_732] next c16 hp16
   iintro Hk Hpc

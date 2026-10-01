@@ -172,16 +172,16 @@ theorem eo_entry (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE)
   k_next_e
   iintro Hk Hpc Hfr Hjk
   -- ===== +0x0c auipc s1 ; addi s1 ; mv a0,s1 ; jal acquire =====
-  k_step_e (wp_s_auipc cpu _ (KA.«end_op» + 0xc#64) false 0x1e#20 9#5 (by decide))
+  k_step_e (wp_s_auipc cpu _ (KA.«end_op» + 0xc#64) false 0x1f#20 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_addi cpu _ (KA.«end_op» + 0x10#64) false 2032#12 9#5 9#5 (by decide))
+  k_step_e (wp_s_addi cpu _ (KA.«end_op» + 0x10#64) false 2588#12 9#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eo_log]
   iintro Hk Hpc
   k_step_e (wp_s_add cpu _ (KA.«end_op» + 0x14#64) true 10#5 0#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [KCtx.rget_zero]
   iintro Hk Hpc
-  k_step_e (wp_s_jal cpu _ (KA.«end_op» + 0x16#64) false 2084366#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«end_op» + 0x16#64) false 2084250#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eo_br_acq]
   iintro Hk Hpc
   iapply (eo_ac AC cpu _ γ γb γfs V.cov ls dev ?ha0 ?hna ?hKa ?hla) $$ [- $Hk $Hpc]
@@ -309,10 +309,10 @@ theorem eo_entry (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE)
       with [eoK_sie, KCtx.rget_zero, eo_bnez_zero, eo_bnez_zero']
     iintro Hk Hpc
     -- +0x2a auipc s1 ; addi s1 ; li a5,1 ; sw a5,32(s1)
-    k_step (wp_s_auipc cpu _ (KA.«end_op» + 0x2a#64) false 0x1e#20 9#5 (by decide))
+    k_step (wp_s_auipc cpu _ (KA.«end_op» + 0x2a#64) false 0x1f#20 9#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eoK_sie]
     iintro Hk Hpc
-    k_step (wp_s_addi cpu _ (KA.«end_op» + 0x2e#64) false 2002#12 9#5 9#5 (by decide))
+    k_step (wp_s_addi cpu _ (KA.«end_op» + 0x2e#64) false 2558#12 9#5 9#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eoK_sie, eo_log]
     iintro Hk Hpc
     k_step (wp_s_addi cpu _ (KA.«end_op» + 0x32#64) true 1#12 15#5 0#5 (by decide))
@@ -369,7 +369,7 @@ theorem eo_entry (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [eoK_sie, KCtx.rget_zero]
     iintro Hk Hpc
-    k_step (wp_s_jal cpu _ (KA.«end_op» + 0x38#64) false 2084468#21 1#5 (by decide))
+    k_step (wp_s_jal cpu _ (KA.«end_op» + 0x38#64) false 2084352#21 1#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eoK_sie, eo_br_rel]
     iintro Hk Hpc
     iapply (eo_re RE cpu _ γ γb γfs V.cov ls dev ?ha0r ?hsr ?hnr ?hKr k.sie ?hrr ?hor)
@@ -462,16 +462,16 @@ theorem eo_entry (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE)
         unfold eoFrameS; iintro H; iexact H) $$ [Hj3 Hj4 Hj5 Hj8]
       case' _ => iframe Hj3 Hj4 Hj5 Hj8
       -- +0xa4 auipc s5 ; addi s5 ; +0xac auipc s4 ; addi s4
-      k_step_e (wp_s_auipc cpu _ (KA.«end_op» + 0xa4#64) false 0x1e#20 21#5 (by decide))
+      k_step_e (wp_s_auipc cpu _ (KA.«end_op» + 0xa4#64) false 0x1f#20 21#5 (by decide))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       iintro Hk Hpc
-      k_step_e (wp_s_addi cpu _ (KA.«end_op» + 0xa8#64) false 1928#12 21#5 21#5 (by decide))
+      k_step_e (wp_s_addi cpu _ (KA.«end_op» + 0xa8#64) false 2484#12 21#5 21#5 (by decide))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eo_lhb0]
       iintro Hk Hpc
-      k_step_e (wp_s_auipc cpu _ (KA.«end_op» + 0xac#64) false 0x1e#20 20#5 (by decide))
+      k_step_e (wp_s_auipc cpu _ (KA.«end_op» + 0xac#64) false 0x1f#20 20#5 (by decide))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       iintro Hk Hpc
-      k_step_e (wp_s_addi cpu _ (KA.«end_op» + 0xb0#64) false 1872#12 20#5 20#5 (by decide))
+      k_step_e (wp_s_addi cpu _ (KA.«end_op» + 0xb0#64) false 2428#12 20#5 20#5 (by decide))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eo_log]
       iintro Hk Hpc
       -- into the loop, with the cursor at zero

@@ -744,7 +744,7 @@ theorem createFound_armG (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := h
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x86  jal iunlockput
-  k_step_e (wp_s_jal cpu _ (KA.«create» + 0x86#64) false 2091036#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«create» + 0x86#64) false 2090940#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [create_br_iunlockput]
   iintro Hk Hpc
   iapply (createFound_iunlockput IUP Γ cpu _ A.j A.γl A.pd A.pav A.pu A.γkl A.γk A.pid pidPriv
@@ -834,7 +834,7 @@ theorem createFound_armG2 (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := 
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x90  jal iunlockput
-  k_step_e (wp_s_jal cpu _ (KA.«create» + 0x90#64) false 2091026#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«create» + 0x90#64) false 2090930#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [create_br_iunlockput]
   iintro Hk Hpc
   iapply (createFound_iunlockput IUP Γ cpu _ A.j A.γl A.pd A.pav A.pu A.γkl A.γk A.pid pidPriv
@@ -977,7 +977,7 @@ theorem createFound_fbad (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := h
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x9a  jal iunlockput
-  k_step_e (wp_s_jal cpu _ (KA.«create» + 0x9a#64) false 2091016#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«create» + 0x9a#64) false 2090920#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [create_br_iunlockput]
   iintro Hk Hpc
   iapply (createFound_iunlockput IUP Γ cpu _ A.j A.γl A.pd A.pav A.pu A.γkl A.γk A.pid pidPriv
@@ -1205,7 +1205,7 @@ theorem createFound_found (IL : ILOCK) (IUP : IUNLOCKPUT) (Γ : SchedNames)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x50  jal iunlockput (the parent)
-  k_step_e (wp_s_jal cpu _ (KA.«create» + 0x50#64) false 2091090#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«create» + 0x50#64) false 2090994#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [create_br_iunlockput]
   iintro Hk Hpc
   iapply (createFound_iunlockput IUP Γ cpu _ A.j A.γl A.pd A.pav A.pu A.γkl A.γk A.pid pidPriv
@@ -1238,7 +1238,7 @@ theorem createFound_found (IL : ILOCK) (IUP : IUNLOCKPUT) (Γ : SchedNames)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x56  jal ilock (the child)
-  k_step_e (wp_s_jal cpu _ (KA.«create» + 0x56#64) false 2090488#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«create» + 0x56#64) false 2090392#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [create_br_ilock]
   iintro Hk Hpc
   icases (inodeRef_gen_intro kslot qq icfgDev cinum).1 $$ Href with ⟨%gc, %loc, %tlc, %hlec,
@@ -1335,7 +1335,7 @@ theorem createFound_join (IL : ILOCK) (IUP : IUNLOCKPUT) (DL : DIRLOOKUP) (Γ : 
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x46  jal dirlookup
-  k_step_e (wp_s_jal cpu _ (KA.«create» + 0x46#64) false 2092016#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«create» + 0x46#64) false 2091920#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [create_br_dirlookup]
   iintro Hk Hpc
   icases createFound_loaded_open kd dind dn bm $$ Hload with
@@ -1612,7 +1612,7 @@ theorem createFound_parent (IL : ILOCK) (IUP : IUNLOCKPUT) (DL : DIRLOOKUP) (Γ 
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, create_beqz_ientry kd hkd]
   iintro Hk Hpc
   -- +0x26  jal ilock (a0 is still dp)
-  k_step_e (wp_s_jal cpu _ (KA.«create» + 0x26#64) false 2090536#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«create» + 0x26#64) false 2090440#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [create_br_ilock]
   iintro Hk Hpc
   icases bslots_uncons 2 $$ Hbs with ⟨Hb1, Hb2⟩
@@ -1739,7 +1739,7 @@ theorem createFound_entry (NP : NPAR_WRAP_ERA) (IL : ILOCK) (IUP : IUNLOCKPUT) (
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x1c  jal nameiparent
-  k_step_e (wp_s_jal cpu _ (KA.«create» + 0x1c#64) false 2092760#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«create» + 0x1c#64) false 2092736#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [create_br_nameiparent]
   iintro Hk Hpc
   icases (procPrivFd_split A.γ k.proc A.pid A.V A.M).1 $$ Hpriv with ⟨Hcore, Hofs⟩

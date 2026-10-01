@@ -1577,7 +1577,7 @@ theorem create_mkdir_name (DLK : DIRLINK) (Γ : SchedNames) [ClaimIs (hlc := hlc
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [r9]
   iintro Hk Hpc
   -- ===== +0x12c  jal dirlink(dp, name, ip->inum) =====
-  k_step_e (wp_s_jal cpu _ (KA.«create» + 0x12c#64) false 2092292#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«create» + 0x12c#64) false 2092268#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [create_br_dirlink]
   iintro Hk Hpc
   -- THE SHARE THE CALL'S OWN `iput` MAY NEED: an eighth off the CHILD's arm
@@ -1953,7 +1953,7 @@ theorem create_mkdir_dotdot (DLK : DIRLINK) (Γ : SchedNames) [ClaimIs (hlc := h
   k_step_e (wp_s_auipc cpu _ (KA.«create» + 0x110#64) false 2#20 11#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_addi cpu _ (KA.«create» + 0x114#64) false 2032#12 11#5 11#5 (by decide))
+  k_step_e (wp_s_addi cpu _ (KA.«create» + 0x114#64) false 1636#12 11#5 11#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- ===== +0x118  c.mv a0,s3 : the CHILD =====
@@ -1961,7 +1961,7 @@ theorem create_mkdir_dotdot (DLK : DIRLINK) (Γ : SchedNames) [ClaimIs (hlc := h
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [r19]
   iintro Hk Hpc
   -- ===== +0x11a  jal dirlink(ip, "..", dp->inum) =====
-  k_step_e (wp_s_jal cpu _ (KA.«create» + 0x11a#64) false 2092310#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«create» + 0x11a#64) false 2092286#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [create_br_dirlink]
   iintro Hk Hpc
   -- the eighth off the PARENT's arm
@@ -2221,7 +2221,7 @@ theorem create_mkdir_dot (DLK : DIRLINK) (Γ : SchedNames) [ClaimIs (hlc := hlc)
   k_step_e (wp_s_auipc cpu _ (KA.«create» + 0xfc#64) false 2#20 11#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_addi cpu _ (KA.«create» + 0x100#64) false 2044#12 11#5 11#5 (by decide))
+  k_step_e (wp_s_addi cpu _ (KA.«create» + 0x100#64) false 1928#12 11#5 11#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- ===== +0x104  c.mv a0,s3 : the CHILD =====
@@ -2229,7 +2229,7 @@ theorem create_mkdir_dot (DLK : DIRLINK) (Γ : SchedNames) [ClaimIs (hlc := hlc)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [r19]
   iintro Hk Hpc
   -- ===== +0x106  jal dirlink(ip, ".", ip->inum) =====
-  k_step_e (wp_s_jal cpu _ (KA.«create» + 0x106#64) false 2092330#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«create» + 0x106#64) false 2092306#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [create_br_dirlink]
   iintro Hk Hpc
   -- the fresh child's licence (deviation 6), and an eighth off the PARENT's arm
@@ -2419,7 +2419,7 @@ theorem create_mkdir_cok (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := h
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [r9]
   iintro Hk Hpc
   -- ===== +0xe2  jal iunlockput(dp) =====
-  k_step_e (wp_s_jal cpu _ (KA.«create» + 0xe2#64) false 2090944#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«create» + 0xe2#64) false 2090848#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [create_br_iunlockput]
   iintro Hk Hpc
   ihave Hshotp : ityShot gd dp4.diType $$ [Hshot]
@@ -2616,7 +2616,7 @@ theorem create_mkdir_bump (IU : IUPDATE) (Γ : SchedNames) [ClaimIs (hlc := hlc)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [r9]
   iintro Hk Hpc
   -- ===== +0x140  jal iupdate(dp) : THE SECOND MINT =====
-  k_step_e (wp_s_jal cpu _ (KA.«create» + 0x140#64) false 2090074#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«create» + 0x140#64) false 2089978#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [create_br_iupdate]
   iintro Hk Hpc
   have htz : dn.diType.toNat = T_DIR_z := by rw [hpar.hty]; rfl

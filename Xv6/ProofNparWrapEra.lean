@@ -33,7 +33,7 @@ set_option linter.unusedVariables false
 
 /-! ## Constants the code computes -/
 
-theorem nparWrapEra_br_namex : KA.«nameiparent» + 0xfffffffffffffdee#64 = KA.«namex» := by
+theorem nparWrapEra_br_namex : KA.«nameiparent» + 0xfffffffffffffdea#64 = KA.«namex» := by
   decide
 theorem nparWrapEra_ret_10 :
     jumpPc (KA.«nameiparent» + 0x10#64) = (KA.«nameiparent» + 0x10#64) := by decide
@@ -101,7 +101,7 @@ theorem nparWrapEra_main (NE : NPAR_ERA)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x0c  jal namex
-  k_step_e (wp_s_jal cpu _ (KA.«nameiparent» + 0xc#64) false 2096610#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«nameiparent» + 0xc#64) false 2096606#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [nparWrapEra_br_namex]
   iintro Hk Hpc
   -- THE CALL: namex(path, 1, name) at its era contract

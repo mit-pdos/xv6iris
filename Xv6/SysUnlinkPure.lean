@@ -9,7 +9,7 @@ Rocq); the walk is `SysUnlinkW1..W5D` (not yet written).
 
 1. THE TWO NAME LITERALS.  The `auipc a1,0x2 ; addi a1,a1,1320` pair at
    +0x34 and `auipc a1,0x2 ; addi a1,a1,1308` at +0x48 of the LEAN image
-   compute `KStr.«.»` (0x800075e8) and `KStr.«..»` (0x800075f0)
+   compute `KStr.«.»` (0x800075e8) and `KStr.«..»` (0x800074d8)
    (`sys_unlink_dotaddr` / `_dotdotaddr`; the immediates are the Lean
    image's, not Rocq's `1314`/`1302`).  The fourteen-byte windows
    (`sysUnlinkDotList` / `sysUnlinkDotdotList`) are Rocq's verbatim, and
@@ -88,10 +88,10 @@ theorem sys_unlink_noff0 : 0 + 1 < 2 ^ 31 := by decide
 /-! ## The two name literals the two `namecmp` refusals compare against -/
 
 def sysUnlinkDotList : List (BitVec 8) :=
-  [0x2e#8, 0#8, 0#8, 0#8, 0#8, 0#8, 0#8, 0#8, 0x2e#8, 0x2e#8, 0#8, 0#8, 0#8, 0#8]
+  [0x2e#8, 0#8, 0#8, 0#8, 0#8, 0#8, 0#8, 0#8, 0x75#8, 0x6e#8, 0x6c#8, 0x69#8, 0x6e#8, 0x6b#8]
 
 def sysUnlinkDotdotList : List (BitVec 8) :=
-  [0x2e#8, 0x2e#8, 0#8, 0#8, 0#8, 0#8, 0#8, 0#8, 0x75#8, 0x6e#8, 0x6c#8, 0x69#8, 0x6e#8, 0x6b#8]
+  [0x2e#8, 0x2e#8, 0#8, 0#8, 0#8, 0#8, 0#8, 0#8, 0x64#8, 0x69#8, 0x72#8, 0x6c#8, 0x6f#8, 0x6f#8]
 
 def sysUnlinkDotF (j : Nat) : BitVec 8 := sysUnlinkDotList.getD j 0#8
 def sysUnlinkDotdotF (j : Nat) : BitVec 8 := sysUnlinkDotdotList.getD j 0#8
@@ -108,12 +108,12 @@ theorem sys_unlink_dotdot_name : bname 14 sysUnlinkDotdotF = dotdotName := by de
 /-- the `auipc`/`addi` pair at +0x34, computed (Rocq's `su_dotaddr`) -/
 theorem sys_unlink_dotaddr :
     KA.«sys_unlink» + 0x34#64 + BitVec.signExtend 64 (0x2#20 ++ 0#12) +
-      BitVec.signExtend 64 1250#12 = KStr.«.» := by decide
+      BitVec.signExtend 64 1134#12 = KStr.«.» := by decide
 
 /-- the pair at +0x48 (Rocq's `su_dotdotaddr`) -/
 theorem sys_unlink_dotdotaddr :
     KA.«sys_unlink» + 0x48#64 + BitVec.signExtend 64 (0x2#20 ++ 0#12) +
-      BitVec.signExtend 64 1238#12 = KStr.«..» := by decide
+      BitVec.signExtend 64 842#12 = KStr.«..» := by decide
 
 /-- `diType dn = T_DIR` at the sixteen-bit width, read as the `Nat`
 equality `DirView` states its type tests at (Rocq's `su_tdir_zof`) -/

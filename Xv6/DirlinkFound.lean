@@ -156,7 +156,7 @@ theorem dirlink_found (IP : IPUT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     with [ha0, Xv6.dirlookup_bnez, decide_eq_true hne]
   iintro Hk Hpc
   -- +0x58  jal iput
-  k_step_e (wp_s_jal cpu _ (KA.«dirlink» + 0x58#64) false 2095432#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«dirlink» + 0x58#64) false 2095360#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [dirlink_br_iput]
   iintro Hk Hpc
   unfold dirlinkKeep

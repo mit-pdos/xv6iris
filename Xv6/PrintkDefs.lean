@@ -728,7 +728,7 @@ theorem nullBody_nonul : nonul nullBody := by
 theorem null_addr : KA.«printk» + 0x6ae2#64 = KStr.«(null)» := by
   decide
 
-theorem digits_addr : KA.«printk» + 0x7212#64 = KA.«digits» := by
+theorem digits_addr : KA.«printk» + 0x720a#64 = KA.«digits» := by
   decide
 
 theorem ite_decide_ne {α : Type} (n : Nat) (x y : α) :
@@ -938,7 +938,7 @@ theorem pkKinds_at_none (f : List (BitVec 8)) (i : Nat) (hi : i < f.length) (hp 
   rw [pkKinds_at f i hi hp, h]
   rfl
 
-theorem pr_addr_520 : KA.«printk» + 0x11f02#64 = KA.«pr» := by
+theorem pr_addr_520 : KA.«printk» + 0x11fa2#64 = KA.«pr» := by
   decide
 
 theorem ret_52c : jumpPc (KA.«printk» + 0x2a#64) = (KA.«printk» + 0x2a#64) := by decide

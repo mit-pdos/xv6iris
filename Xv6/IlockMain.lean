@@ -263,7 +263,7 @@ theorem il_main (AS : ACQUIRESLEEP_LLB) (LD : IlLoadEb)
   k_step_e (wp_s_addi cpu _ (KA.«ilock» + 0x14#64) true 16#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ha0]
   iintro Hk Hpc
-  k_step_e (wp_s_jal cpu _ (KA.«ilock» + 0x16#64) false 3440#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«ilock» + 0x16#64) false 3536#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [il_br_acq]
   iintro Hk Hpc
   -- the share's stamps join the caller's `Tl`: ONE receipt, ONE floor

@@ -182,7 +182,7 @@ theorem bm_ind_alloc_ok (LW : LOG_WRITE) (BE : BRELSE) (Γ : SchedNames) (c cpu 
   bm_step (wp_s_add c _ (KA.«bmap» + 0xaa#64) true 10#5 0#5 20#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h20]
   iintro Hk Hpc
-  bm_step (wp_s_jal c _ (KA.«bmap» + 0xac#64) false 3572#21 1#5 (by decide))
+  bm_step (wp_s_jal c _ (KA.«bmap» + 0xac#64) false 3668#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [bm_br_logwrite]
   iintro Hk Hpc
   ihave Hfsbi := fsblockQ_1_of γfs.bytes (DFrac.own 1) _ _ rfl $$ Hind

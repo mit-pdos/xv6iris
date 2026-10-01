@@ -103,7 +103,7 @@ theorem ireclaim_orphan_b (BO : BEGIN_OP) (IL : ILOCK) (IU : IUNLOCK) (IP : IPUT
   ihave Hlic : iregWdLic .plainK g inum.toNat $$ [Hru]
   · unfold iregWdLic; iexact Hru
   -- +0x54  jal begin_op
-  k_step_e (wp_s_jal cpu _ (KA.«ireclaim» + 0x54#64) false 1954#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«ireclaim» + 0x54#64) false 2050#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ireclaim_br_begin_op]
   iintro Hk Hpc
   iapply (ireclaim_begin_op BO Γ cpu _ j pidv dqp k.proc (by k_norm_g) k.sie (by k_norm_g) hj

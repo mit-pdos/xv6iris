@@ -36,7 +36,7 @@ set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
 set_option linter.unusedVariables false
 
-theorem namei_root_br_namex : KA.«namei» + 0xfffffffffffffe08#64 = KA.«namex» := by decide
+theorem namei_root_br_namex : KA.«namei» + 0xfffffffffffffe04#64 = KA.«namex» := by decide
 theorem namei_root_ret_12 : jumpPc (KA.«namei» + 0x12#64) = (KA.«namei» + 0x12#64) := by decide
 
 theorem namei_root_slots_4 (a : Nat) (h : nameiRootSlots ≤ a) : 4 ≤ a := by
@@ -83,7 +83,7 @@ theorem namei_root_main (NXR : NAMEX_ROOT) (cpu : CPU) (k : KCtx) (dqp : DFrac)
   k_step_r (wp_s_addi cpu _ (KA.«namei» + 0xc#64) true 0#12 11#5 0#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_r (wp_s_jal cpu _ (KA.«namei» + 0xe#64) false 2096634#21 1#5 (by decide))
+  k_step_r (wp_s_jal cpu _ (KA.«namei» + 0xe#64) false 2096630#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [namei_root_br_namex]
   iintro Hk Hpc
   -- THE CALL: namex's root corner

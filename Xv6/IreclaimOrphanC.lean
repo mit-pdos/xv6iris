@@ -128,7 +128,7 @@ theorem ireclaim_orphan_c (IP : IPUT) (EO : END_OP) [Fscfg] [Icfg] [CurCtx]
       | exact h9
       | (simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact h9)
   -- +0x6a  jal end_op
-  k_step_e (wp_s_jal cpu _ (KA.«ireclaim» + 0x6a#64) false 2072#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«ireclaim» + 0x6a#64) false 2168#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ireclaim_br_end_op]
   iintro Hk Hpc
   iapply (ireclaim_end_op EO Γ cpu _ γl pd pav pu j n' pidv dqp k.proc (by k_norm_g) k.sie

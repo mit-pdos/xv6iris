@@ -25,7 +25,7 @@ set_option linter.unusedVariables false
 
 /-! ## Constants and register bookkeeping -/
 
-/-- `argraw` returns to `0x8000294e`. -/
+/-- `argraw` returns to `0x80002962`. -/
 theorem aa_ret_288c : jumpPc (KA.«argaddr» + 0x10#64) = (KA.«argaddr» + 0x10#64) := by
   decide
 

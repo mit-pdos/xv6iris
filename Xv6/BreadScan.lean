@@ -678,13 +678,13 @@ theorem bd_hit (RE : RELEASE_HOOK) (AS : ACQUIRESLEEP_LLB) (VR : VIRTIO_DISK_RW)
     (updAtB Ls kk (nx :: Ls kk)) ord devs bnos
     (bpin_fresh M nx kk hfresh) (bpin_bcacheOk M Ls nx kk hkk hok) hord hinj hdevp $$ Hsc0
   -- auipc a0,0x15 ; addi a0,a0,1482 ; jal release
-  k_step (wp_s_auipc c _ (KA.«bread» + 0x4e#64) false 0x15#20 10#5 (by decide))
+  k_step (wp_s_auipc c _ (KA.«bread» + 0x4e#64) false 0x16#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_addi c _ (KA.«bread» + 0x52#64) false 1972#12 10#5 10#5 (by decide))
+  k_step (wp_s_addi c _ (KA.«bread» + 0x52#64) false 2624#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [bd_lock]
   iintro Hk Hpc
-  k_step (wp_s_jal c _ (KA.«bread» + 0x56#64) false 2088932#21 1#5 (by decide))
+  k_step (wp_s_jal c _ (KA.«bread» + 0x56#64) false 2088912#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [bd_br_rel]
   iintro Hk Hpc
   -- the release takes back the arm the entry acquire paid out; the complement stays
@@ -719,7 +719,7 @@ theorem bd_hit (RE : RELEASE_HOOK) (AS : ACQUIRESLEEP_LLB) (VR : VIRTIO_DISK_RW)
   k_step_e (wp_s_addi cpu _ (KA.«bread» + 0x5a#64) false 16#12 10#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [g9, aBufLock_sext]
   iintro Hk Hpc
-  k_step_e (wp_s_jal cpu _ (KA.«bread» + 0x5e#64) false 5056#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«bread» + 0x5e#64) false 5152#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [bd_br_aslp]
   iintro Hk Hpc
   iapply (bd_aslp AS Γ cpu _ γ kk Tb j pidv dqp k0.sie k0.proc (by k_norm_g [MachCSL.KCtx.withSpie_proc])
@@ -1001,13 +1001,13 @@ theorem bd_recyc (RE : RELEASE_HOOK) (AS : ACQUIRESLEEP_LLB) (VR : VIRTIO_DISK_R
     hord (bd_inj_upd V bnos kk bno hinj hmissB)
     (bd_devpin_upd V devs bnos kk dev bno hdevp hdev) $$ Hsc0
   -- auipc a0,0x15 ; addi a0,a0,1400 ; jal release
-  k_step (wp_s_auipc c _ (KA.«bread» + 0xa0#64) false 0x15#20 10#5 (by decide))
+  k_step (wp_s_auipc c _ (KA.«bread» + 0xa0#64) false 0x16#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_addi c _ (KA.«bread» + 0xa4#64) false 1890#12 10#5 10#5 (by decide))
+  k_step (wp_s_addi c _ (KA.«bread» + 0xa4#64) false 2542#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [bd_lock]
   iintro Hk Hpc
-  k_step (wp_s_jal c _ (KA.«bread» + 0xa8#64) false 2088850#21 1#5 (by decide))
+  k_step (wp_s_jal c _ (KA.«bread» + 0xa8#64) false 2088830#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [bd_br_rel]
   iintro Hk Hpc
   -- the release takes back the arm the entry acquire paid out; the complement stays
@@ -1043,7 +1043,7 @@ theorem bd_recyc (RE : RELEASE_HOOK) (AS : ACQUIRESLEEP_LLB) (VR : VIRTIO_DISK_R
   k_step_e (wp_s_addi cpu _ (KA.«bread» + 0xac#64) false 16#12 10#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [g9, aBufLock_sext]
   iintro Hk Hpc
-  k_step_e (wp_s_jal cpu _ (KA.«bread» + 0xb0#64) false 4974#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«bread» + 0xb0#64) false 5070#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [bd_br_aslp]
   iintro Hk Hpc
   iapply (bd_aslp AS Γ cpu _ γ kk T' j pidv dqp k0.sie k0.proc (by k_norm_g [MachCSL.KCtx.withSpie_proc])

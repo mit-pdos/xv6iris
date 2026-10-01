@@ -164,7 +164,7 @@ theorem ialloc_setup (BD : BREAD) (MS : MEMSET) (LW : LOG_WRITE) (BE : BRELSE) (
   k_step_e (wp_s_auipc cpu _ (KA.«ialloc» + 0x28#64) false 0x1e#20 20#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_addi cpu _ (KA.«ialloc» + 0x2c#64) false 2418#12 20#5 20#5 (by decide))
+  k_step_e (wp_s_addi cpu _ (KA.«ialloc» + 0x2c#64) false 3070#12 20#5 20#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ialloc_a_sb]
   iintro Hk Hpc
   -- THE SCAN, at inum = 1
@@ -231,7 +231,7 @@ theorem ialloc_entry (BD : BREAD) (MS : MEMSET) (LW : LOG_WRITE) (BE : BRELSE) (
   k_step_e (wp_s_auipc cpu _ (KA.«ialloc» + 0x8#64) false 0x1e#20 14#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_lw cpu _ (KA.«ialloc» + 0xc#64) false 2462#12 14#5 14#5 (by decide) (by decide)
+  k_step_e (wp_s_lw cpu _ (KA.«ialloc» + 0xc#64) false 3114#12 14#5 14#5 (by decide) (by decide)
       dqn (BitVec.ofNat 32 fscNinodes))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ialloc_a_ninodes]
   iintro Hk Hpc Hsn

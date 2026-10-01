@@ -311,7 +311,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [SG : UexecSG GF] [Fscfg] [Icfg] [CurCtx]
 
-/-- `%d %s: unknown sys call %d\n` at `0x80007398` (Rocq `sysc_fmt`). -/
+/-- `%d %s: unknown sys call %d\n` at `0x80007390` (Rocq `sysc_fmt`). -/
 def syscFbFmt : List (BitVec 8) :=
   [0x25#8, 0x64#8, 0x20#8, 0x25#8, 0x73#8, 0x3a#8, 0x20#8, 0x75#8, 0x6e#8, 0x6b#8, 0x6e#8, 0x6f#8,
    0x77#8, 0x6e#8, 0x20#8, 0x73#8, 0x79#8, 0x73#8, 0x20#8, 0x63#8, 0x61#8, 0x6c#8, 0x6c#8, 0x20#8,
@@ -331,13 +331,13 @@ theorem syscFb_kinds : pkKinds syscFbFmt = [PkKind.num, PkKind.str, PkKind.num] 
   unfold syscFbFmt; decide
 
 /-- `jal ra,printk` at `+0x4e`. -/
-theorem syscFb_jal_tgt : KA.«syscall» + 0x62#64 + BitVec.signExtend 64 (0x1fdb42#21) = KA.«printk» := by
+theorem syscFb_jal_tgt : KA.«syscall» + 0x62#64 + BitVec.signExtend 64 (0x1fdb2e#21) = KA.«printk» := by
   decide
 
 /-- The format string (`auipc`/`addi` at `+0x46`/`+0x4a`), printk (`jal` at
 `+0x4e`) and the return pc, as the normaliser leaves them. -/
-theorem syscFb_fmt_norm : KA.«syscall» + 18966#64 = KStr.«%d %s: unknown sys call %d\n» := by decide
-theorem syscFb_printk_norm : KA.«syscall» + 18446744073709542308#64 = KA.«printk» := by decide
+theorem syscFb_fmt_norm : KA.«syscall» + 18938#64 = KStr.«%d %s: unknown sys call %d\n» := by decide
+theorem syscFb_printk_norm : KA.«syscall» + 18446744073709542288#64 = KA.«printk» := by decide
 theorem syscFb_ret_norm : jumpPc (KA.«syscall» + 102#64) = KA.«syscall» + 102#64 := by decide
 
 /-- The three varargs `p->pid, p->name, num` (Rocq `sysc_descs_mk`). -/
@@ -394,7 +394,7 @@ theorem syscFb_printk (PK : PRINTK) (c : CPU) (k' : KCtx) (γpr γl : GName) (γ
   iapply HPhi $$ %spie %spp %R' %cs %hsp Hk Hpc %hcs Hf Hs Hsent
 
 /-- `&p->name` is not NULL. -/
-theorem syscFb_name_ne (j : Nat) (hj : j < NPROC) : procAddr j + 344#64 ≠ 0#64 := by
+theorem syscFb_name_ne (j : Nat) (hj : j < NPROC) : procAddr j + 352#64 ≠ 0#64 := by
   intro h
   have e := congrArg BitVec.toNat h
   have hp := procAddr_toNat j hj
@@ -442,8 +442,8 @@ theorem syscFb_name0 [X : CurCtx] (hct : curTier = KTier.kpt) (γ : FileNames) (
 theorem syscFb_name (hct : curTier = KTier.kpt) (γ : FileNames) (pa : BitVec 64)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) :
     procPrivFd (GF := GF) γ pa pid V M ⊢
-      cstr (pa + 344#64) (DFrac.own 1) (bytesString V.name) ∗
-      (cstr (pa + 344#64) (DFrac.own 1) (bytesString V.name) -∗ procPrivFd γ pa pid V M) := by
+      cstr (pa + 352#64) (DFrac.own 1) (bytesString V.name) ∗
+      (cstr (pa + 352#64) (DFrac.own 1) (bytesString V.name) -∗ procPrivFd γ pa pid V M) := by
   iintro H
   icases syscFb_name0 hct γ pa pid V M $$ H with ⟨%hlen, Hnm, Hw⟩
   unfold pnameCells
@@ -521,8 +521,8 @@ theorem syscall_fallback (PK : PRINTK)
   icases Hpe with ⟨%γpr, %γl, %γd, #Hlk, #Htx, #Hsent⟩
   icases syscFb_pid hct γ (procAddr j) pid V M $$ Hpriv with ⟨Hpid, Hpback⟩
   unfold syscallFallback syscallAddr
-  -- +0x40  addi a2,s1,344
-  k_step_e (wp_s_addi cpu _ (KA.«syscall» + 0x54#64) false 344#12 12#5 9#5 (by decide))
+  -- +0x40  addi a2,s1,352
+  k_step_e (wp_s_addi cpu _ (KA.«syscall» + 0x54#64) false 352#12 12#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hs1]
   iintro Hk Hpc
   -- +0x44  c.lw a1,48(s1)
@@ -536,11 +536,11 @@ theorem syscall_fallback (PK : PRINTK)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x4a  addi a0,a0,-1570
-  k_step_e (wp_s_addi cpu _ (KA.«syscall» + 0x5e#64) false 0x9bc#12 10#5 10#5 (by decide))
+  k_step_e (wp_s_addi cpu _ (KA.«syscall» + 0x5e#64) false 0x9a0#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x4e  jal ra,printk
-  k_step_e (wp_s_jal cpu _ (KA.«syscall» + 0x62#64) false 0x1fdb42#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«syscall» + 0x62#64) false 0x1fdb2e#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [syscFb_jal_tgt]
   iintro Hk Hpc
   k_norm_g [syscFb_printk_norm]

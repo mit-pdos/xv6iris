@@ -32,7 +32,7 @@ COMPLETENESS: `kwait_proof` is `sorry`-free.  The reap arm rests on:
     (`kw_word4_to_bytes` / `kw_bytes_to_word4`);
   * the ten-slot epilogue `kw_epi` (`(KernelSyms.«kwait» + 0x7c)`), which discharges the
     sleep-shaped post for every return arm; and
-  * **`kw_reap` in full** -- the ZOMBIE reap arm from `0x8000229c`: (i) the
+  * **`kw_reap` in full** -- the ZOMBIE reap arm from `0x800022b0`: (i) the
     balanced wait_lock release + `kw_epi` epilogue (the concrete-`kb`/`kh`
     threading), and (ii) the `addr != 0` `copyout` arm together with its
     copyout-fail sub-arm (release both locks, return -1).  `kw_reap` threads
@@ -164,9 +164,9 @@ theorem kw_ans_full (rv : BitVec 32) (addr : BitVec 64) (haddr : addr ≠ 0#64) 
 
 /-- `&proc[i]` as a number, up to and including the sentinel. -/
 theorem kw_procAddr_toNat (j : Nat) (hj : j ≤ NPROC) :
-    (procAddr j).toNat = KernelSyms.«proc» + 368 * j := by
+    (procAddr j).toNat = KernelSyms.«proc» + 376 * j := by
   have hp := procs_lt
-  have h1 : (BitVec.ofNat 64 (procSize * j)).toNat = 368 * j := by
+  have h1 : (BitVec.ofNat 64 (procSize * j)).toNat = 376 * j := by
     simp only [BitVec.toNat_ofNat, procSize]
     exact Nat.mod_eq_of_lt (by unfold NPROC at hj; omega)
   have h2 : (procsAddr : BitVec 64).toNat = KernelSyms.«proc» := procs_toNat
@@ -174,13 +174,13 @@ theorem kw_procAddr_toNat (j : Nat) (hj : j ≤ NPROC) :
   rw [BitVec.toNat_add, h1, h2]
   exact Nat.mod_eq_of_lt (by unfold NPROC at hj; omega)
 
-/-- The cursor one slot on (`addi s1,s1,368`). -/
-theorem kw_cursor (i : Nat) : procAddr i + 368#64 = procAddr (i + 1) := by
+/-- The cursor one slot on (`addi s1,s1,376`). -/
+theorem kw_cursor (i : Nat) : procAddr i + 376#64 = procAddr (i + 1) := by
   unfold procAddr procSize
-  rw [show 368 * (i + 1) = 368 * i + 368 from by omega, BitVec.ofNat_add,
-    show BitVec.ofNat 64 368 = 368#64 from rfl, BitVec.add_assoc]
+  rw [show 376 * (i + 1) = 376 * i + 376 from by omega, BitVec.ofNat_add,
+    show BitVec.ofNat 64 376 = 376#64 from rfl, BitVec.add_assoc]
 
-/-- The sentinel `&proc[NPROC] = 0x80018490`. -/
+/-- The sentinel `&proc[NPROC] = 0x80018730`. -/
 theorem kw_sentinel : procAddr NPROC = KA.«tickslock» := by
   apply BitVec.eq_of_toNat_eq
   rw [kw_procAddr_toNat NPROC (Nat.le_refl _)]
@@ -195,7 +195,7 @@ theorem kw_cursor_eq (i : Nat) (hi : i < NPROC) :
     have h := congrArg BitVec.toNat he
     rw [kw_procAddr_toNat (i + 1) (by unfold NPROC at hi ⊢; omega)] at h
     have hr : (KA.«tickslock»).toNat = KernelSyms.«tickslock» := by decide
-    have hs : KernelSyms.«tickslock» = KernelSyms.«proc» + 368 * NPROC := by
+    have hs : KernelSyms.«tickslock» = KernelSyms.«proc» + 376 * NPROC := by
       unfold NPROC; first | rfl | decide
     rw [hr, hs] at h
     unfold NPROC at h ⊢
@@ -276,7 +276,7 @@ theorem kw_pXstate_align4 (j : Nat) (hj : j < NPROC) : (pXstate (procAddr j)).to
   unfold pXstate
   have hp := procs_lt
   have hal : KernelSyms.«proc» % 4 = 0 := by decide
-  have h : (procAddr j + 44#64).toNat = KernelSyms.«proc» + 368 * j + 44 := by
+  have h : (procAddr j + 44#64).toNat = KernelSyms.«proc» + 376 * j + 44 := by
     rw [BitVec.toNat_add, kw_procAddr_toNat j (le_of_lt hj)]
     have : (44#64 : BitVec 64).toNat = 44 := by decide
     rw [this]
@@ -892,7 +892,7 @@ theorem kw_copyout (CO : COPYOUT) (c : CPU) (k' : KCtx) (γl : GName) (γk : Kme
   exact h
 
 set_option maxHeartbeats 1000000 in
-/-- `freeproc`'s contract at its entry (folded to `0x80001b1a`). -/
+/-- `freeproc`'s contract at its entry (folded to `0x80001b0e`). -/
 theorem kw_freeproc (FP : FREEPROC) (Γ : SchedNames) (c : CPU) (k' : KCtx) (γl γp : GName)
     (γk : KmemNames) (j : Nat) (st : BitVec 32) (ch : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (g : GName) (hj : j < NPROC) (hp : k'.regs 10#5 = procAddr j)
@@ -990,7 +990,7 @@ theorem kwFrame_split (sp v0 v1 v2 v3 v4 v5 v6 v7 v8 v9 : BitVec 64) :
   unfold kwFrame; iintro H; iexact H
 
 set_option maxHeartbeats 4000000 in
-/-- The epilogue at `0x800022d8`: `mv a0,s3`, restore `ra`,`s0`,`s1`..`s7`,
+/-- The epilogue at `0x800022ec`: `mv a0,s3`, restore `ra`,`s0`,`s1`..`s7`,
 pop the ten-slot frame, `ret`.  Discharges the specification's sleep-shaped
 post directly (the return may be on any hart, since `k.proc ≠ 0`). -/
 theorem kw_epi (Γ : SchedNames) (cpu cur : CPU) (k : KCtx) (γw γp γl : GName) (γk : KmemNames)
@@ -1113,10 +1113,10 @@ theorem kw_ite_bne {α : Type _} (x y : BitVec 64) (p q : α) :
 
 /-! ### Address folds for the reap's `&wait_lock` reloads -/
 theorem kw_wl_reap :
-    KA.«kwait» + 0x1021c#64 = waitLockAddr := by
+    KA.«kwait» + 0x102a8#64 = waitLockAddr := by
   unfold waitLockAddr; decide
 theorem kw_wl_fail :
-    KA.«kwait» + 0x1021c#64 = waitLockAddr := by
+    KA.«kwait» + 0x102a8#64 = waitLockAddr := by
   unfold waitLockAddr; decide
 theorem kw_xstate_src (pa : BitVec 64) :
     pa + BitVec.signExtend 64 44#12 = pXstate pa := by
@@ -1167,13 +1167,13 @@ end
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [X : CurCtx]
 
-theorem kwait_br_fffffffffffff366 : KA.«kwait» + 0xfffffffffffff366#64 = KA.«copyout» := by decide
+theorem kwait_br_fffffffffffff352 : KA.«kwait» + 0xfffffffffffff352#64 = KA.«copyout» := by decide
 
-theorem kwait_br_ffffffffffffea84 : KA.«kwait» + 0xffffffffffffea84#64 = KA.«release» := by decide
+theorem kwait_br_ffffffffffffea70 : KA.«kwait» + 0xffffffffffffea70#64 = KA.«release» := by decide
 
-theorem kwait_br_fffffffffffff8be : KA.«kwait» + 0xfffffffffffff8be#64 = KA.«freeproc» := by decide
+theorem kwait_br_fffffffffffff89e : KA.«kwait» + 0xfffffffffffff89e#64 = KA.«freeproc» := by decide
 
-theorem kwait_br_1021c : KA.«kwait» + 0x1021c#64 = waitLockAddr := by decide
+theorem kwait_br_102a8 : KA.«kwait» + 0x102a8#64 = waitLockAddr := by decide
 
 set_option maxHeartbeats 8000000 in
 theorem kw_reap (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE)
@@ -1249,7 +1249,7 @@ theorem kw_reap (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [Xv6.co_ite_beq, KCtx.rget_eq, KCtx.setReg_regs, RegMap.set_apply, h23, KCtx.rget_zero, KCtx.setReg_sie, KCtx.setReg_proc]
   iintro Hk Hpc
-  -- The common tail from 0x800022bc: pp->parent := 0; freeproc(pp); both releases; epilogue.
+  -- The common tail from 0x800022d0: pp->parent := 0; freeproc(pp); both releases; epilogue.
   -- Parameterised by the caller's (possibly grown) descriptor P', its memory M'', the count d
   -- and `xw` (the status word actually written).
   ihave Hcommon : (∀ (Rc : RegMap) (P' : UPtd) (M'' : Nat → List (BitVec 8))
@@ -1319,8 +1319,8 @@ theorem kw_reap (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE)
     k_step (wp_s_add cur _ (KA.«kwait» + 0x64#64) true 10#5 0#5 9#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hc9]
     iintro Hk Hpc
-    k_step (wp_s_jal cur _ (KA.«kwait» + 0x66#64) false 2095192#21 1#5 (by decide))
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kwait_br_fffffffffffff8be]
+    k_step (wp_s_jal cur _ (KA.«kwait» + 0x66#64) false 2095160#21 1#5 (by decide))
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kwait_br_fffffffffffff89e]
     iintro Hk Hpc
     -- THE REAPER'S EVENT COUNTER, lent to freeproc (permit sweep L1a) at the
     -- count the reap stepped it to (L3c): the reaper is the actor of the
@@ -1350,8 +1350,8 @@ theorem kw_reap (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE)
       k_step (wp_s_add cur _ (KA.«kwait» + 0x6a#64) true 10#5 0#5 9#5 (by decide))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR3_9]
       iintro Hk Hpc
-      k_step (wp_s_jal cur _ (KA.«kwait» + 0x6c#64) false 2091544#21 1#5 (by decide))
-        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kwait_br_ffffffffffffea84]
+      k_step (wp_s_jal cur _ (KA.«kwait» + 0x6c#64) false 2091524#21 1#5 (by decide))
+        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kwait_br_ffffffffffffea70]
       iintro Hk Hpc
       ihave Hlockres := (show procLockResAt Γ ξ0 (procAddr n) ⊢ procLockPay Γ n curCtx
         from by unfold procLockPay; iintro H; iexact H) $$ Hlockres
@@ -1371,7 +1371,7 @@ theorem kw_reap (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE)
         have hfilt : List.filter (fun x => decide (x ≠ "proc")) ("proc" :: kh.locks) = ["wait_lock"] := by
           rw [hkhlocks]; decide
         k_norm_g [MachCSL.withSpie_sec kh spie3 spp3 ("proc" :: kh.locks), hpe, hfilt]
-        -- context now `((kh.withSpie spie3 spp3).withLocks ["wait_lock"]).withRegs R4` at 0x800022cc
+        -- context now `((kh.withSpie spie3 spp3).withLocks ["wait_lock"]).withRegs R4` at 0x800022e0
         -- concretize kh so its `sie` reduces to a literal for the remaining steps
         have hkh2 : kh.withSpie spie3 spp3 = (kb.pushOffAt spie3 spp3).withLocks ["wait_lock"] := by
           rw [hkhstruct, MachCSL.KCtx.withSpie_withLocks, kw_pushOffAt_withSpie]
@@ -1392,11 +1392,11 @@ theorem kw_reap (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE)
         k_step (wp_s_auipc cur _ (KA.«kwait» + 0x70#64) false 0x10#20 10#5 (by decide))
           from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
         iintro Hk Hpc
-        k_step (wp_s_addi cur _ (KA.«kwait» + 0x74#64) false 428#12 10#5 10#5 (by decide))
-          from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kwait_br_1021c, kw_wl_reap]
+        k_step (wp_s_addi cur _ (KA.«kwait» + 0x74#64) false 568#12 10#5 10#5 (by decide))
+          from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kwait_br_102a8, kw_wl_reap]
         iintro Hk Hpc
-        k_step (wp_s_jal cur _ (KA.«kwait» + 0x78#64) false 2091532#21 1#5 (by decide))
-          from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kwait_br_ffffffffffffea84]
+        k_step (wp_s_jal cur _ (KA.«kwait» + 0x78#64) false 2091512#21 1#5 (by decide))
+          from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kwait_br_ffffffffffffea70]
         iintro Hk Hpc
         -- release(&wait_lock)
         -- release(&wait_lock): the arm back to the pop (reen = the entry SIE), the complement kept
@@ -1516,8 +1516,8 @@ theorem kw_reap (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h18, kw_pPagetable]
     iintro Hk Hpc Hpg
     -- jal ra, copyout
-    k_step (wp_s_jal cur _ (KA.«kwait» + 0x58#64) false 2093838#21 1#5 (by decide))
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kwait_br_fffffffffffff366]
+    k_step (wp_s_jal cur _ (KA.«kwait» + 0x58#64) false 2093818#21 1#5 (by decide))
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kwait_br_fffffffffffff352]
     iintro Hk Hpc
     -- copyout(p->pagetable, p->sz, addr, &pp->xstate, 4)
     iapply (kw_copyout CO cur _ γl γk V.upt M xsHalf (xstateBytes xs) V.ev (procAddr j) ?hcp
@@ -1628,7 +1628,7 @@ theorem kw_reap (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE)
           simpa only [KCtx.withLocks_intena, KCtx.pushOffAt_intena] using h
         have hkbav : kh.avail = trapRes kb.sie + kb.avail := by
           rw [hkhstruct]; simp only [KCtx.withLocks_avail, KCtx.pushOffAt_avail]
-        -- blt taken -> the fail block at 0x800022f0
+        -- blt taken -> the fail block at 0x80002304
         k_step (wp_s_branch cur _ (KA.«kwait» + 0x5c#64) false 56#13 10#5 0#5 (by decide) bop.BLT)
           from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
           with [KCtx.rget_eq, KCtx.withRegs_regs, h10, KCtx.rget_zero, kw_blt_neg1_true, MachCSL.bltz_m1, KCtx.withRegs_sie, KCtx.withRegs_proc]
@@ -1638,8 +1638,8 @@ theorem kw_reap (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE)
           from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hRC9]
         iintro Hk Hpc
         -- jal ra, release(&pp->lock)
-        k_step (wp_s_jal cur _ (KA.«kwait» + 0x96#64) false 2091502#21 1#5 (by decide))
-          from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kwait_br_ffffffffffffea84]
+        k_step (wp_s_jal cur _ (KA.«kwait» + 0x96#64) false 2091482#21 1#5 (by decide))
+          from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kwait_br_ffffffffffffea70]
         iintro Hk Hpc
         ihave Hlockres := (show procLockResAt Γ ξ0 (procAddr n) ⊢ procLockPay Γ n curCtx
           from by unfold procLockPay; iintro H; iexact H) $$ Hlockres
@@ -1669,11 +1669,11 @@ theorem kw_reap (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE)
           k_step (wp_s_auipc cur _ (KA.«kwait» + 0x9a#64) false 0x10#20 10#5 (by decide))
             from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
           iintro Hk Hpc
-          k_step (wp_s_addi cur _ (KA.«kwait» + 0x9e#64) false 386#12 10#5 10#5 (by decide))
-            from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kwait_br_1021c, kw_wl_fail]
+          k_step (wp_s_addi cur _ (KA.«kwait» + 0x9e#64) false 526#12 10#5 10#5 (by decide))
+            from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kwait_br_102a8, kw_wl_fail]
           iintro Hk Hpc
-          k_step (wp_s_jal cur _ (KA.«kwait» + 0xa2#64) false 2091490#21 1#5 (by decide))
-            from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kwait_br_ffffffffffffea84]
+          k_step (wp_s_jal cur _ (KA.«kwait» + 0xa2#64) false 2091470#21 1#5 (by decide))
+            from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kwait_br_ffffffffffffea70]
           iintro Hk Hpc
           -- release(&wait_lock)
           -- release(&wait_lock): the arm back to the pop (reen = the entry SIE), the complement kept
@@ -1696,12 +1696,12 @@ theorem kw_reap (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE)
               rw [hkbstruct, KCtx.withSpie_withRegs, MachCSL.KCtx.withSpie_twice, kw_pushed_withSpie]
             k_norm_g [hpe2, hkbws, kw_filter_wait, kwj_2250,
               MachCSL.strip_locks (k.withSpie spie2 spp2) (by simp only [KCtx.withSpie_locks, hklocks0])]
-            -- context now `((k.withSpie spie2 spp2).pushed 10).withRegs R5` at 0x80002302
+            -- context now `((k.withSpie spie2 spp2).pushed 10).withRegs R5` at 0x80002316
             -- c.li s3,-1
             k_step_gen (wp_s_addi cur _ (KA.«kwait» + 0xa6#64) true 4095#12 19#5 0#5 (by decide))
               from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c6 hq6
             iintro Hk Hpc
-            -- c.j 0x800022d8
+            -- c.j 0x800022ec
             k_step_gen (wp_s_j c6 _ (KA.«kwait» + 0xa8#64) true 2097108#21)
               from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c7 hq7
             iintro Hk Hpc
@@ -1771,16 +1771,16 @@ end
 
 /-! ## kwait address / return-target folds (driver) -/
 theorem kwf_wl_a0 :
-    KA.«kwait» + 0x1021c#64 = waitLockAddr := by
+    KA.«kwait» + 0x102a8#64 = waitLockAddr := by
   unfold waitLockAddr; decide
 theorem kwf_sentinel :
-    KA.«kwait» + 0x16234#64 = KA.«tickslock» := by
+    KA.«kwait» + 0x164c0#64 = KA.«tickslock» := by
   decide
 theorem kwf_wl_s6 :
-    KA.«kwait» + 0x1021c#64 = waitLockAddr := by
+    KA.«kwait» + 0x102a8#64 = waitLockAddr := by
   unfold waitLockAddr; decide
 theorem kwf_proc0 :
-    KA.«kwait» + 0x10634#64 = procAddr 0 := by
+    KA.«kwait» + 0x106c0#64 = procAddr 0 := by
   unfold procAddr procsAddr procSize; decide
 theorem kwj_1c6 : jumpPc (KA.«kwait» + 0x1c#64) = (KA.«kwait» + 0x1c#64) := by decide
 theorem kwj_1d4 : jumpPc (KA.«kwait» + 0x2a#64) = (KA.«kwait» + 0x2a#64) := by decide
@@ -1824,7 +1824,7 @@ theorem kwFix_cs [CurCtx] (k : KCtx) (R R' : RegMap) (h : kwFix k R) (hcs : call
 theorem kwj_2254 : jumpPc (KA.«kwait» + 0xaa#64) = (KA.«kwait» + 0xaa#64) := by decide
 
 theorem kwf_wl_pathA :
-    KA.«kwait» + 0x1021c#64 = waitLockAddr := by
+    KA.«kwait» + 0x102a8#64 = waitLockAddr := by
   unfold waitLockAddr; decide
 theorem kwj_2280 : jumpPc (KA.«kwait» + 0xd6#64) = (KA.«kwait» + 0xd6#64) := by decide
 theorem kwj_2288 : jumpPc (KA.«kwait» + 0xde#64) = (KA.«kwait» + 0xde#64) := by decide
@@ -1849,10 +1849,10 @@ theorem kw_cs_trans {A B C : RegMap} (h1 : calleeSaved A B) (h2 : calleeSaved B 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [X : CurCtx]
 
-theorem kwait_br_ffffffffffffe9fc : KA.«kwait» + 0xffffffffffffe9fc#64 = KA.«acquire» := by decide
+theorem kwait_br_ffffffffffffe9e8 : KA.«kwait» + 0xffffffffffffe9e8#64 = KA.«acquire» := by decide
 
 set_option maxHeartbeats 4000000 in
-/-- Acquire `pp->lock` at `0x80002314`, read `pp->state` and branch on ZOMBIE. -/
+/-- Acquire `pp->lock` at `0x80002328`, read `pp->state` and branch on ZOMBIE. -/
 theorem kw_scan_acq (AC : ACQUIRE) (Γ : SchedNames) (cur : CPU) (kh : KCtx) (n : Nat)
     (hn : n < NPROC) (hnoff : kh.noff + 1 < 2 ^ 31) (hK : 10 ≤ kh.avail) (hlq : "proc" ∉ kh.locks)
     (htier : kh.tier = KTier.kpt) (hsie : kh.sie = false) (R : RegMap) (h9 : R 9#5 = procAddr n)
@@ -1884,8 +1884,8 @@ theorem kw_scan_acq (AC : ACQUIRE) (Γ : SchedNames) (cur : CPU) (kh : KCtx) (n 
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9] next c1 hp1
   iintro Hk Hpc
   -- jal acquire
-  k_step_gen (wp_s_jal c1 _ (KA.«kwait» + 0xba#64) false 2091330#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kwait_br_ffffffffffffe9fc] next c2 hp2
+  k_step_gen (wp_s_jal c1 _ (KA.«kwait» + 0xba#64) false 2091310#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kwait_br_ffffffffffffe9e8] next c2 hp2
   iintro Hk Hpc
   have hac : ∀ (k' : KCtx) (hnoff' : k'.noff + 1 < 2 ^ 31) (hK' : 10 ≤ k'.avail)
       (hs' : "proc" ∉ k'.locks),
@@ -1941,7 +1941,7 @@ theorem kw_scan_acq (AC : ACQUIRE) (Γ : SchedNames) (cur : CPU) (kh : KCtx) (n 
   refine ⟨(hsp2 hsie).1, (hsp2 hsie).2, MachCSL.calleeSaved_set R R2 15#5 _ (by decide) hcs2'⟩
 
 set_option maxHeartbeats 8000000 in
-/-- **One slot** of the scan, from `0x8000230e`. -/
+/-- **One slot** of the scan, from `0x80002322`. -/
 theorem kw_slot (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE) (AC : ACQUIRE)
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k kh : KCtx) (γw γp γl : GName) (γk : KmemNames)
@@ -2054,8 +2054,8 @@ theorem kw_slot (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE) (AC : ACQUIRE)
         k_step (wp_s_add cur _ (KA.«kwait» + 0xc4#64) true 10#5 0#5 9#5 (by decide))
           from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9R2]
         iintro Hk Hpc
-        k_step (wp_s_jal cur _ (KA.«kwait» + 0xc6#64) false 2091454#21 1#5 (by decide))
-          from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kwait_br_ffffffffffffea84]
+        k_step (wp_s_jal cur _ (KA.«kwait» + 0xc6#64) false 2091434#21 1#5 (by decide))
+          from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kwait_br_ffffffffffffea70]
         iintro Hk Hpc
         ihave Hlockres : procLockResAt Γ ξ0 (procAddr n) $$ [Hstate Hpl Hchan Hpub Hslots]
         case' _ => iapply procLockRes_intro Γ ξ0 (procAddr n) st ch kl xs pid0
@@ -2100,7 +2100,7 @@ theorem kw_slot (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE) (AC : ACQUIRE)
           k_step (wp_s_add cur _ (KA.«kwait» + 0xca#64) true 14#5 0#5 21#5 (by decide))
             from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR4_21]
           iintro Hk Hpc
-          -- c.j 0x80002306
+          -- c.j 0x8000231a
           k_step (wp_s_j cur _ (KA.«kwait» + 0xcc#64) true 2097118#21)
             from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
           iintro Hk Hpc
@@ -2136,7 +2136,7 @@ theorem kw_slot (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE) (AC : ACQUIRE)
     · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact h9
 
 set_option maxHeartbeats 8000000 in
-/-- **The 64-slot scan** from `0x8000230e`, by induction on the slots left. -/
+/-- **The 64-slot scan** from `0x80002322`, by induction on the slots left. -/
 theorem kw_scan (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE) (AC : ACQUIRE)
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k kh : KCtx) (γw γp γl : GName) (γk : KmemNames)
@@ -2199,7 +2199,7 @@ theorem kw_scan (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE) (AC : ACQUIRE)
     case' _ =>
       iintro %Radv %⟨hfixv, h9v, hscv⟩ Hk Hpc Htc Hcl Hir Hav Hlockw Hwait Hwrest Hg Hpriv Hframe HΦ
       icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
-      k_step (wp_s_addi cur _ (KA.«kwait» + 0xaa#64) false 368#12 9#5 9#5 (by decide))
+      k_step (wp_s_addi cur _ (KA.«kwait» + 0xaa#64) false 376#12 9#5 9#5 (by decide))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9v, kw_cursor]
       iintro Hk Hpc
       k_step (wp_s_branch cur _ (KA.«kwait» + 0xae#64) false 32#13 9#5 19#5 (by decide) bop.BEQ)
@@ -2237,7 +2237,7 @@ theorem kw_scan (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE) (AC : ACQUIRE)
     case' _ =>
       iintro %Radv %⟨hfixv, h9v, hscv⟩ Hk Hpc Htc Hcl Hir Hav Hlockw Hwait Hwrest Hg Hpriv Hframe HΦ
       icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
-      k_step (wp_s_addi cur _ (KA.«kwait» + 0xaa#64) false 368#12 9#5 9#5 (by decide))
+      k_step (wp_s_addi cur _ (KA.«kwait» + 0xaa#64) false 376#12 9#5 9#5 (by decide))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9v, kw_cursor]
       iintro Hk Hpc
       k_step (wp_s_branch cur _ (KA.«kwait» + 0xae#64) false 32#13 9#5 19#5 (by decide) bop.BEQ)
@@ -2261,12 +2261,12 @@ theorem kw_scan (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE) (AC : ACQUIRE)
     iframe Hk Hpc Hpinv Hlw Hlp Hlk Hav Htc Hcl Hir Hlockw Hwait Hwrest Hg Hpriv Hframe HΦ Hadv
 
 set_option maxHeartbeats 8000000 in
-/-- **The no-reap tail** at `0x8000232a`: return `-1` when `!havekids` or
+/-- **The no-reap tail** at `0x8000233e`: return `-1` when `!havekids` or
 `killed(p)`; otherwise `sleep_prepare`, release `wait_lock`, `sleep` (the
 hart migrates), re-acquire `wait_lock`, and re-enter the loop head. -/
-theorem kwait_br_fffffffffffffdb4 : KA.«kwait» + 0xfffffffffffffdb4#64 = KA.«sleep» := by decide
+theorem kwait_br_fffffffffffffda0 : KA.«kwait» + 0xfffffffffffffda0#64 = KA.«sleep» := by decide
 
-theorem kwait_br_fffffffffffffd78 : KA.«kwait» + 0xfffffffffffffd78#64 = KA.«sleep_prepare» := by decide
+theorem kwait_br_fffffffffffffd64 : KA.«kwait» + 0xfffffffffffffd64#64 = KA.«sleep_prepare» := by decide
 
 theorem kwait_br_ffffffffffffffd6 : KA.«kwait» + 0xffffffffffffffd6#64 = KA.«killed» := by decide
 
@@ -2319,7 +2319,7 @@ theorem kw_noKids (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE) (AC : ACQUIRE) (
   have ht0 : t0 = KTier.kpt := hct.symm.trans hkhtier
   subst ht0
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
-  -- ============ Path A: the -1 return (from 0x80002356) ============
+  -- ============ Path A: the -1 return (from 0x8000236a) ============
   ihave HpathA : (∀ (RA : RegMap), ⌜kwFix k RA⌝ -∗
       kctx cur (kh.withRegs RA) -∗ pcIs cur (KA.«kwait» + 0xfa#64) -∗
       trapCsrs cur -∗ cpuClaim cur k.proc -∗ intrRes cur -∗ locked γw cur -∗
@@ -2342,11 +2342,11 @@ theorem kw_noKids (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE) (AC : ACQUIRE) (
     k_step (wp_s_auipc cur _ (KA.«kwait» + 0xfa#64) false 0x10#20 10#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     iintro Hk Hpc
-    k_step (wp_s_addi cur _ (KA.«kwait» + 0xfe#64) false 290#12 10#5 10#5 (by decide))
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kwait_br_1021c, kwf_wl_pathA]
+    k_step (wp_s_addi cur _ (KA.«kwait» + 0xfe#64) false 430#12 10#5 10#5 (by decide))
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kwait_br_102a8, kwf_wl_pathA]
     iintro Hk Hpc
-    k_step (wp_s_jal cur _ (KA.«kwait» + 0x102#64) false 2091394#21 1#5 (by decide))
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kwait_br_ffffffffffffea84]
+    k_step (wp_s_jal cur _ (KA.«kwait» + 0x102#64) false 2091374#21 1#5 (by decide))
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kwait_br_ffffffffffffea70]
     iintro Hk Hpc
     -- release(&wait_lock)
     -- release(&wait_lock): the arm back to the pop (reen = the entry SIE), the complement kept
@@ -2377,7 +2377,7 @@ theorem kw_noKids (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE) (AC : ACQUIRE) (
       k_step_gen (wp_s_addi cur _ (KA.«kwait» + 0x106#64) true 4095#12 19#5 0#5 (by decide))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c6 hq6
       iintro Hk Hpc
-      -- c.j 0x800022d8
+      -- c.j 0x800022ec
       k_step_gen (wp_s_j c6 _ (KA.«kwait» + 0x108#64) true 2097012#21)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c7 hq7
       iintro Hk Hpc
@@ -2477,7 +2477,7 @@ theorem kw_noKids (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE) (AC : ACQUIRE) (
       have hRK18 : RK 18#5 = procAddr j := hcsK.2.2.2.1.trans h18
       have hRK22 : RK 22#5 = waitLockAddr := hcsK.2.2.2.2.2.2.2.1.trans hfixE.2.2.2.2.2.1
       have hfixK : kwFix k RK := kwFix_cs k Rex RK hfixE hcsK
-      -- c.bnez a0,0x80002356
+      -- c.bnez a0,0x8000236a
       k_step (wp_s_branch cur _ (KA.«kwait» + 0xd6#64) true 36#13 10#5 0#5 (by decide) bop.BNE)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
         with [kw_ite_bne, KCtx.rget_eq, KCtx.withRegs_regs, hklk, KCtx.rget_zero, KCtx.withRegs_sie, KCtx.withRegs_proc]
@@ -2492,8 +2492,8 @@ theorem kw_noKids (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE) (AC : ACQUIRE) (
         k_step (wp_s_add cur _ (KA.«kwait» + 0xd8#64) true 10#5 0#5 18#5 (by decide))
           from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hRK18]
         iintro Hk Hpc
-        k_step (wp_s_jal cur _ (KA.«kwait» + 0xda#64) false 2096286#21 1#5 (by decide))
-          from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kwait_br_fffffffffffffd78]
+        k_step (wp_s_jal cur _ (KA.«kwait» + 0xda#64) false 2096266#21 1#5 (by decide))
+          from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kwait_br_fffffffffffffd64]
         iintro Hk Hpc
         iapply (kw_sleep_prepare SP Γ cur _ j hj ?hspp ?hspchan ?hspn ?hspK ?hsplk ?hspt)
           $$ [- $Hk $Hpc $Hpinv]
@@ -2520,8 +2520,8 @@ theorem kw_noKids (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE) (AC : ACQUIRE) (
           k_step (wp_s_add cur _ (KA.«kwait» + 0xde#64) true 10#5 0#5 22#5 (by decide))
             from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hRP22]
           iintro Hk Hpc
-          k_step (wp_s_jal cur _ (KA.«kwait» + 0xe0#64) false 2091428#21 1#5 (by decide))
-            from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kwait_br_ffffffffffffea84]
+          k_step (wp_s_jal cur _ (KA.«kwait» + 0xe0#64) false 2091408#21 1#5 (by decide))
+            from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kwait_br_ffffffffffffea70]
           iintro Hk Hpc
           -- release(&wait_lock): the arm back to the pop (reen = the entry SIE), the complement kept
           icases armExt_split cur k.sie k.proc $$ [$Htc $Hcl $Hir] with ⟨Harm, Hte, Hce⟩
@@ -2545,8 +2545,8 @@ theorem kw_noKids (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE) (AC : ACQUIRE) (
             have hfixR6 : kwFix k R6 := kwFix_cs k RP R6 hfixP hcs6
             have hR6_22 : R6 22#5 = waitLockAddr := hcs6.2.2.2.2.2.2.2.1.trans hRP22
             -- jal sleep()  (level 0, at the entry SIE)
-            k_step_gen (wp_s_jal cur _ (KA.«kwait» + 0xe4#64) false 2096336#21 1#5 (by decide))
-              from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kwait_br_fffffffffffffdb4]
+            k_step_gen (wp_s_jal cur _ (KA.«kwait» + 0xe4#64) false 2096316#21 1#5 (by decide))
+              from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kwait_br_fffffffffffffda0]
               next c8 hq8
             iintro Hk Hpc
             have hc8 : k.sie = false → c8 = cur := fun h => hq8 (Or.inl (by rw [← hkbsie] at h; exact h))
@@ -2570,8 +2570,8 @@ theorem kw_noKids (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE) (AC : ACQUIRE) (
               k_step_gen (wp_s_add cpu2 _ (KA.«kwait» + 0xe8#64) true 10#5 0#5 22#5 (by decide))
                 from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hRS22] next c9 hq9
               iintro Hk Hpc
-              k_step_gen (wp_s_jal c9 _ (KA.«kwait» + 0xea#64) false 2091282#21 1#5 (by decide))
-                from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kwait_br_ffffffffffffe9fc]
+              k_step_gen (wp_s_jal c9 _ (KA.«kwait» + 0xea#64) false 2091262#21 1#5 (by decide))
+                from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kwait_br_ffffffffffffe9e8]
                 next c10 hq10
               iintro Hk Hpc
               have hc10 : k.sie = false → c10 = cpu2 := fun h =>
@@ -2643,10 +2643,10 @@ theorem kw_noKids (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE) (AC : ACQUIRE) (
     case hkl => k_norm_g; rw [hkhlocks]; decide
     case hkt => k_norm_g; first | rfl | exact hkhtier
 
-theorem kwait_br_10634 : KA.«kwait» + 0x10634#64 = procAddr 0 := by decide
+theorem kwait_br_106c0 : KA.«kwait» + 0x106c0#64 = procAddr 0 := by decide
 
 set_option maxHeartbeats 8000000 in
-/-- **The outer `for(;;)` loop** from the head `0x8000234a`, closed by Löb
+/-- **The outer `for(;;)` loop** from the head `0x8000235e`, closed by Löb
 induction. -/
 theorem kw_loop (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE) (AC : ACQUIRE) (KL : KILLED)
     (SP : SLEEP_PREPARE) (SL : SLEEP)
@@ -2700,7 +2700,7 @@ theorem kw_loop (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE) (AC : ACQUIRE) (KL
     simp only [KCtx.withLocks_intena, KCtx.pushOffAt_intena]; exact hkbint
   have hkhav : 52 ≤ ((kb.pushOffAt spieL sppL).withLocks ["wait_lock"]).avail := by
     simp only [KCtx.withLocks_avail, KCtx.pushOffAt_avail]; omega
-  -- 0x8000234a c.li a4,0
+  -- 0x8000235e c.li a4,0
   k_step (wp_s_addi curL _ (KA.«kwait» + 0xee#64) true 0#12 14#5 0#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
@@ -2708,10 +2708,10 @@ theorem kw_loop (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE) (AC : ACQUIRE) (KL
   k_step (wp_s_auipc curL _ (KA.«kwait» + 0xf0#64) false 0x10#20 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_addi curL _ (KA.«kwait» + 0xf4#64) false 1348#12 9#5 9#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kwait_br_10634, kwf_proc0]
+  k_step (wp_s_addi curL _ (KA.«kwait» + 0xf4#64) false 1488#12 9#5 9#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kwait_br_106c0, kwf_proc0]
   iintro Hk Hpc
-  -- c.j 0x8000230e
+  -- c.j 0x80002322
   k_step (wp_s_j curL _ (KA.«kwait» + 0xf8#64) true 2097082#21)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
@@ -2760,9 +2760,9 @@ loop head `(KernelSyms.«kwait» + 0xee)` is handed to `kw_loop` (the `iloeb` ou
 the 64-slot fuel scan `kw_scan`, the ZOMBIE dispatch into `kw_reap`, and the
 no-child/killed/sleep-retry tail `kw_noKids`).  `LinkKwait.lean` keeps every
 callee interface a parameter. -/
-theorem kwait_br_fffffffffffff72c : KA.«kwait» + 0xfffffffffffff72c#64 = KA.«myproc» := by decide
+theorem kwait_br_fffffffffffff70c : KA.«kwait» + 0xfffffffffffff70c#64 = KA.«myproc» := by decide
 
-theorem kwait_br_16234 : KA.«kwait» + 0x16234#64 = KA.«tickslock» := by decide
+theorem kwait_br_164c0 : KA.«kwait» + 0x164c0#64 = KA.«tickslock» := by decide
 
 theorem kwait_cells (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (CO : COPYOUT)
     (FP : FREEPROC) (KL : KILLED) (SP : SLEEP_PREPARE) (SL : SLEEP)
@@ -2826,8 +2826,8 @@ theorem kwait_cells (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (CO : COPYOUT)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c12 hp12
   iintro Hk Hpc
   -- jal ra, myproc
-  k_step_gen (wp_s_jal c12 _ (KA.«kwait» + 0x18#64) false 2094868#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kwait_br_fffffffffffff72c] next c13 hp13
+  k_step_gen (wp_s_jal c12 _ (KA.«kwait» + 0x18#64) false 2094836#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kwait_br_fffffffffffff70c] next c13 hp13
   iintro Hk Hpc
   -- myproc()
   iapply (kw_myproc MP c13 _ (by k_norm_g; omega) (by k_norm_g; unfold kwaitSlots at hK; omega))
@@ -2845,12 +2845,12 @@ theorem kwait_cells (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (CO : COPYOUT)
   k_step_gen (wp_s_auipc c15 _ (KA.«kwait» + 0x1e#64) false 0x10#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c16 hp16
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c16 _ (KA.«kwait» + 0x22#64) false 510#12 10#5 10#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kwait_br_1021c, kwf_wl_a0] next c17 hp17
+  k_step_gen (wp_s_addi c16 _ (KA.«kwait» + 0x22#64) false 650#12 10#5 10#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kwait_br_102a8, kwf_wl_a0] next c17 hp17
   iintro Hk Hpc
   -- jal ra, acquire(&wait_lock)
-  k_step_gen (wp_s_jal c17 _ (KA.«kwait» + 0x26#64) false 2091478#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kwait_br_ffffffffffffe9fc] next c18 hp18
+  k_step_gen (wp_s_jal c17 _ (KA.«kwait» + 0x26#64) false 2091458#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kwait_br_ffffffffffffe9e8] next c18 hp18
   iintro Hk Hpc
   -- acquire(&wait_lock)
   iapply (kw_acquire AC c18 _ γw "wait_lock" waitLockPay ?han ?haK ?hal) $$ [- $Hk $Hpc]
@@ -2873,17 +2873,17 @@ theorem kwait_cells (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (CO : COPYOUT)
     k_step_gen (wp_s_auipc c21 _ (KA.«kwait» + 0x2e#64) false 0x16#20 19#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c22 hp22
     iintro Hk Hpc
-    k_step_gen (wp_s_addi c22 _ (KA.«kwait» + 0x32#64) false 518#12 19#5 19#5 (by decide))
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kwait_br_16234, kwf_sentinel] next c23 hp23
+    k_step_gen (wp_s_addi c22 _ (KA.«kwait» + 0x32#64) false 1170#12 19#5 19#5 (by decide))
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kwait_br_164c0, kwf_sentinel] next c23 hp23
     iintro Hk Hpc
     -- auipc s6,0x10 ; addi s6,s6,448  (wait_lock)
     k_step_gen (wp_s_auipc c23 _ (KA.«kwait» + 0x36#64) false 0x10#20 22#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c24 hp24
     iintro Hk Hpc
-    k_step_gen (wp_s_addi c24 _ (KA.«kwait» + 0x3a#64) false 486#12 22#5 22#5 (by decide))
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kwait_br_1021c, kwf_wl_s6] next c25 hp25
+    k_step_gen (wp_s_addi c24 _ (KA.«kwait» + 0x3a#64) false 626#12 22#5 22#5 (by decide))
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kwait_br_102a8, kwf_wl_s6] next c25 hp25
     iintro Hk Hpc
-    -- c.j 0x8000234a
+    -- c.j 0x8000235e
     k_step_gen (wp_s_j c25 _ (KA.«kwait» + 0x3e#64) true 176#21)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c26 hp26
     iintro Hk Hpc

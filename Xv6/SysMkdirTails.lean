@@ -49,9 +49,9 @@ set_option linter.unusedVariables false
 /-! ## Constants -/
 
 theorem sys_mkdir_br_begin_op : KA.«sys_mkdir» + 0xffffffffffffea00#64 = KA.«begin_op» := by decide
-theorem sys_mkdir_br_argstr : KA.«sys_mkdir» + 0xffffffffffffd5b2#64 = KA.«argstr» := by decide
+theorem sys_mkdir_br_argstr : KA.«sys_mkdir» + 0xffffffffffffd552#64 = KA.«argstr» := by decide
 theorem sys_mkdir_br_create : KA.«sys_mkdir» + 0xfffffffffffff948#64 = KA.«create» := by decide
-theorem sys_mkdir_br_iunlockput : KA.«sys_mkdir» + 0xffffffffffffe1ea#64 = KA.«iunlockput» := by
+theorem sys_mkdir_br_iunlockput : KA.«sys_mkdir» + 0xffffffffffffe18a#64 = KA.«iunlockput» := by
   decide
 theorem sys_mkdir_br_end_op : KA.«sys_mkdir» + 0xffffffffffffea8c#64 = KA.«end_op» := by decide
 
@@ -213,7 +213,7 @@ theorem sys_mkdir_tail_ok (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
   ihave Hop := logOpS_opb icfgLog u' Sb' $$ Hop
   icases sys_mkdir_pid hct _ _ _ _ _ $$ Hblk with ⟨Hpid, Hback⟩
   -- +0x2e  jal iunlockput
-  k_step_e (wp_s_jal cpu _ (KA.«sys_mkdir» + 0x2e#64) false 2089404#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_mkdir» + 0x2e#64) false 2089308#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_mkdir_br_iunlockput]
   iintro Hk Hpc
   iapply (sysfile_iunlockput IUP Γ cpu _ k.sie (by k_norm_g) (procAddr A.j)

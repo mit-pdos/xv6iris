@@ -123,7 +123,7 @@ theorem sys_unlink_w5_spine (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ 
   k_step_e (wp_s_add cpu _ (KA.«sys_unlink» + 0xb8#64) true 10#5 0#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hpins.2.2.1]
   iintro Hk Hpc
-  k_step_e (wp_s_jal cpu _ (KA.«sys_unlink» + 0xba#64) false 2089990#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_unlink» + 0xba#64) false 2089894#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_unlink_br_iunlockput]
   iintro Hk Hpc
   iapply (sys_unlink_iunlockput_dep IUP Γ cpu _ k.sie (by k_norm_g) k.proc (by k_norm_g) A.j A.pid
@@ -169,7 +169,7 @@ theorem sys_unlink_w5_spine (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ 
   k_step_e (wp_s_add cpu _ (KA.«sys_unlink» + 0xc8#64) true 10#5 0#5 18#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hp1.2.2.2.1]
   iintro Hk Hpc
-  k_step_e (wp_s_jal cpu _ (KA.«sys_unlink» + 0xca#64) false 2089198#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_unlink» + 0xca#64) false 2089102#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_unlink_br_iupdate]
   iintro Hk Hpc
   obtain ⟨u, rfl⟩ : ∃ u, n2 = u + 1 := ⟨n2 - 1, by omega⟩
@@ -230,7 +230,7 @@ theorem sys_unlink_w5_spine (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ 
   k_step_e (wp_s_add cpu _ (KA.«sys_unlink» + 0xce#64) true 10#5 0#5 18#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hp2.2.2.2.1]
   iintro Hk Hpc
-  k_step_e (wp_s_jal cpu _ (KA.«sys_unlink» + 0xd0#64) false 2089968#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_unlink» + 0xd0#64) false 2089872#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_unlink_br_iunlockput]
   iintro Hk Hpc
   ihave Hbs := bslots_cons 2 $$ [$Hb1 $Hb2]

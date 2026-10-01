@@ -300,7 +300,7 @@ def namexEraLoop (k : KCtx) (A : NamexArgs) (P Pmiss : Nat → Nat → IProp GF)
     (dcur : Nat),
     ⌜namexEraInv k A R off ipv ncur Scur es0 wc fuel⌝ -∗
     kctx c (((k.withSpie spie spp).pushed 12).withRegs R) -∗
-    pcIs c (KA.«namex» + 0xf4#64) -∗
+    pcIs c (KA.«namex» + 0xf8#64) -∗
     namexFrame k -∗ trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗
     namexEraWalk k A P Pmiss ipv dcur es0.length ncur Scur nf -∗
     (∀ c' : CPU, namexEraPostR k A P Pmiss c') -∗ wpLoop c)
@@ -313,7 +313,7 @@ theorem namexEraLoop_elim (k : KCtx) (A : NamexArgs) (P Pmiss : Nat → Nat → 
         (dcur : Nat),
       ⌜namexEraInv k A R off ipv ncur Scur es0 wc fuel⌝ -∗
       kctx c (((k.withSpie spie spp).pushed 12).withRegs R) -∗
-      pcIs c (KA.«namex» + 0xf4#64) -∗
+      pcIs c (KA.«namex» + 0xf8#64) -∗
       namexFrame k -∗ trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗
       namexEraWalk k A P Pmiss ipv dcur es0.length ncur Scur nf -∗
       (∀ c' : CPU, namexEraPostR k A P Pmiss c') -∗ wpLoop c := by
@@ -326,7 +326,7 @@ theorem namexEraLoop_intro (k : KCtx) (A : NamexArgs) (P Pmiss : Nat → Nat →
         (dcur : Nat),
       ⌜namexEraInv k A R off ipv ncur Scur es0 wc fuel⌝ -∗
       kctx c (((k.withSpie spie spp).pushed 12).withRegs R) -∗
-      pcIs c (KA.«namex» + 0xf4#64) -∗
+      pcIs c (KA.«namex» + 0xf8#64) -∗
       namexFrame k -∗ trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗
       namexEraWalk k A P Pmiss ipv dcur es0.length ncur Scur nf -∗
       (∀ c' : CPU, namexEraPostR k A P Pmiss c') -∗ wpLoop c) ⊢

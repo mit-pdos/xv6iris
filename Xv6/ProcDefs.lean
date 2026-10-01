@@ -14,13 +14,13 @@ and the trapframe words `tf`, and the private block owns them through
 Layout of `struct proc` (kernel/proc.h, spinlock = {locked; name; cpu} =
 24 bytes, NOFILE = 16), corroborated by the compiled image (`myproc`'s
 `ld a5,48(a5)` off `pid_lock` = `cpus` + 48 - 48 ...; `allocproc`'s
-`auipc/addi` pins `proc` at (KernelSyms.«cpus» + 0x3b0); sizeof = 368 = 96 + 14*8 + 16*8
+`auipc/addi` pins `proc` at (KernelSyms.«cpus» + 0x3b0); sizeof = 376 = 96 + 14*8 + 16*8
 + 8 + 16 + 8, the Rocq `proc_size`):
 
   lock@0 (locked@0, name@8, cpu@16), state@24, chan@32, killed@40,
   xstate@44, pid@48, parent@56, kstack@64, sz@72, pagetable@80,
   trapframe@88, context@96..207 (14 words: ra sp s0..s11),
-  ofile@208..335 (16 pointers), cwd@336, name@344..359, seccomp@360
+  ofile@208..335 (16 pointers), cwd@336, root@344, name@352..367, seccomp@368
   (xv6 7b2c1b1b's syscall mask, appended last).
 
 ## Deviations from Rocq (permit sweep G+G', Rocq 9fb1d089c + f344a089a's G')
@@ -125,7 +125,7 @@ structure ProcPriv where
   pvLazy : Bool
   /-- **The syscall mask** (Rocq `ProcDefs.pv_secc`, `p->seccomp`, xv6
   7b2c1b1b): bit `n` set means syscall `n` is allowed.  A CELL, unlike
-  `cwi`/`pvLazy` (the uint64 at +360, `ProcGeom.pSecc`, owned by
+  `cwi`/`pvLazy` (the uint64 at +368, `ProcGeom.pSecc`, owned by
   `procFields`), and process-visible: the dispatcher's blocked arm makes a
   call's effect depend on it, so the key carries it (`Uvis.secc`).
   userinit stores `seccAll`, kfork copies the parent's, sys_seccomp ANDs it

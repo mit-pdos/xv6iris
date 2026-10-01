@@ -282,7 +282,7 @@ theorem sleep_br_fffffffffffffedc : KA.«sleep» + 0xfffffffffffffedc#64 = KA.«
 
 theorem sleep_br_ffffffffffffec48 : KA.«sleep» + 0xffffffffffffec48#64 = KA.«acquire» := by decide
 
-theorem sleep_br_fffffffffffff978 : KA.«sleep» + 0xfffffffffffff978#64 = KA.«myproc» := by decide
+theorem sleep_br_fffffffffffff96c : KA.«sleep» + 0xfffffffffffff96c#64 = KA.«myproc» := by decide
 
 set_option maxHeartbeats 4000000 in
 /-- **`sleep` meets its specification**, at either entry `SIE`: the
@@ -321,8 +321,8 @@ theorem sleep_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (SC : SCHED) : S
   k_next_e
   iintro Hk Hpc Hframe
   -- jal myproc
-  k_step_e (wp_s_jal cpu _ (KA.«sleep» + 0xa#64) false 2095470#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sleep_br_fffffffffffff978]
+  k_step_e (wp_s_jal cpu _ (KA.«sleep» + 0xa#64) false 2095458#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sleep_br_fffffffffffff96c]
   iintro Hk Hpc
   have hmp := MP.wp_myproc (hlc := hlc) (GF := GF)
   unfold wp_myproc_body at hmp

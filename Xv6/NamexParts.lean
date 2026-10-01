@@ -53,24 +53,24 @@ set_option linter.unusedSimpArgs false
 
 /-! ## Call targets and return addresses -/
 
-theorem namex_br_myproc : KA.«namex» + 0xffffffffffffdfb6#64 = KA.«myproc» := by decide
-theorem namex_br_idup : KA.«namex» + 0xfffffffffffff936#64 = KA.«idup» := by decide
-theorem namex_br_iget : KA.«namex» + 0xfffffffffffff5ce#64 = KA.«iget» := by decide
-theorem namex_br_iunlock : KA.«namex» + 0xfffffffffffffa1a#64 = KA.«iunlock» := by decide
-theorem namex_br_memmove : KA.«namex» + 0xffffffffffffd3a6#64 = KA.«memmove» := by decide
-theorem namex_br_ilock : KA.«namex» + 0xfffffffffffff96c#64 = KA.«ilock» := by decide
-theorem namex_br_dirlookup : KA.«namex» + 0xffffffffffffff54#64 = KA.«dirlookup» := by decide
-theorem namex_br_iput : KA.«namex» + 0xfffffffffffffaee#64 = KA.«iput» := by decide
+theorem namex_br_myproc : KA.«namex» + 0xffffffffffffdf52#64 = KA.«myproc» := by decide
+theorem namex_br_idup : KA.«namex» + 0xfffffffffffff8f2#64 = KA.«idup» := by decide
+theorem namex_br_iget : KA.«namex» + 0xfffffffffffff58a#64 = KA.«iget» := by decide
+theorem namex_br_iunlock : KA.«namex» + 0xfffffffffffff9d6#64 = KA.«iunlock» := by decide
+theorem namex_br_memmove : KA.«namex» + 0xffffffffffffd34e#64 = KA.«memmove» := by decide
+theorem namex_br_ilock : KA.«namex» + 0xfffffffffffff928#64 = KA.«ilock» := by decide
+theorem namex_br_dirlookup : KA.«namex» + 0xffffffffffffff10#64 = KA.«dirlookup» := by decide
+theorem namex_br_iput : KA.«namex» + 0xfffffffffffffaaa#64 = KA.«iput» := by decide
 
 theorem namex_ret_32 : jumpPc (KA.«namex» + 0x32#64) = KA.«namex» + 0x32#64 := by decide
 theorem namex_ret_3a : jumpPc (KA.«namex» + 0x3a#64) = KA.«namex» + 0x3a#64 := by decide
-theorem namex_ret_50 : jumpPc (KA.«namex» + 0x50#64) = KA.«namex» + 0x50#64 := by decide
-theorem namex_ret_8a : jumpPc (KA.«namex» + 0x8a#64) = KA.«namex» + 0x8a#64 := by decide
-theorem namex_ret_ac : jumpPc (KA.«namex» + 0xac#64) = KA.«namex» + 0xac#64 := by decide
-theorem namex_ret_c6 : jumpPc (KA.«namex» + 0xc6#64) = KA.«namex» + 0xc6#64 := by decide
-theorem namex_ret_e8 : jumpPc (KA.«namex» + 0xe8#64) = KA.«namex» + 0xe8#64 := by decide
-theorem namex_ret_136 : jumpPc (KA.«namex» + 0x136#64) = KA.«namex» + 0x136#64 := by decide
-theorem namex_ret_14a : jumpPc (KA.«namex» + 0x14a#64) = KA.«namex» + 0x14a#64 := by decide
+theorem namex_ret_50 : jumpPc (KA.«namex» + 0x54#64) = KA.«namex» + 0x54#64 := by decide
+theorem namex_ret_8a : jumpPc (KA.«namex» + 0x8e#64) = KA.«namex» + 0x8e#64 := by decide
+theorem namex_ret_ac : jumpPc (KA.«namex» + 0xb0#64) = KA.«namex» + 0xb0#64 := by decide
+theorem namex_ret_c6 : jumpPc (KA.«namex» + 0xca#64) = KA.«namex» + 0xca#64 := by decide
+theorem namex_ret_e8 : jumpPc (KA.«namex» + 0xec#64) = KA.«namex» + 0xec#64 := by decide
+theorem namex_ret_136 : jumpPc (KA.«namex» + 0x13a#64) = KA.«namex» + 0x13a#64 := by decide
+theorem namex_ret_14a : jumpPc (KA.«namex» + 0x14e#64) = KA.«namex» + 0x14e#64 := by decide
 
 /-! ## The stack budget (Rocq's `nx_kb`) -/
 

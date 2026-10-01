@@ -106,17 +106,17 @@ offset (`+0x1e4f0`), because the relocation is computed from each pair's
 own `auipc`. -/
 
 
-theorem lw_br_acq : KA.«log_write» + 0xffffffffffffcd02#64 = KA.«acquire» := by decide
-theorem lw_br_bpin : KA.«log_write» + 0xffffffffffffeedc#64 = KA.«bpin» := by decide
-theorem lw_br_rel : KA.«log_write» + 0xffffffffffffcd8a#64 = KA.«release» := by decide
+theorem lw_br_acq : KA.«log_write» + 0xffffffffffffcc8e#64 = KA.«acquire» := by decide
+theorem lw_br_bpin : KA.«log_write» + 0xffffffffffffee7c#64 = KA.«bpin» := by decide
+theorem lw_br_rel : KA.«log_write» + 0xffffffffffffcd16#64 = KA.«release» := by decide
 theorem lw_ret_18 : jumpPc (KA.«log_write» + 0x18#64) = KA.«log_write» + 0x18#64 := by decide
 theorem lw_ret_6c : jumpPc (KA.«log_write» + 0x6c#64) = KA.«log_write» + 0x6c#64 := by decide
 theorem lw_ret_ba : jumpPc (KA.«log_write» + 0xba#64) = KA.«log_write» + 0xba#64 := by decide
 
-theorem lw_log : KA.«log_write» + 0x1e6da#64 = logAddr := by unfold logAddr; decide
-theorem lw_lhn : KA.«log_write» + 0x1e706#64 = lhNAddr := by unfold lhNAddr logAddr; decide
-theorem lw_lout : KA.«log_write» + 0x1e6f6#64 = lOut := by unfold lOut logAddr; decide
-theorem lw_blk0 : KA.«log_write» + 0x1e70a#64 = lhBlock 0 := by unfold lhBlock logAddr; decide
+theorem lw_log : KA.«log_write» + 0x1e906#64 = logAddr := by unfold logAddr; decide
+theorem lw_lhn : KA.«log_write» + 0x1e932#64 = lhNAddr := by unfold lhNAddr logAddr; decide
+theorem lw_lout : KA.«log_write» + 0x1e922#64 = lOut := by unfold lOut logAddr; decide
+theorem lw_blk0 : KA.«log_write» + 0x1e936#64 = lhBlock 0 := by unfold lhBlock logAddr; decide
 
 
 /-- **The scan's index, as the machine holds it**: a 64-bit word the
@@ -987,10 +987,10 @@ theorem lw_store (c : CPU) (kc : KCtx) (hsie : kc.sie = false) (kk i n : Nat)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x9c auipc a4,0x1e ; +0xa0 addi a4,a4,1108 ; +0xa4 add a4,a4,a3
-  k_step (wp_s_auipc c _ (KA.«log_write» + 0x9c#64) false 0x1e#20 14#5 (by decide))
+  k_step (wp_s_auipc c _ (KA.«log_write» + 0x9c#64) false 0x1f#20 14#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_addi c _ (KA.«log_write» + 0xa0#64) false 1598#12 14#5 14#5 (by decide))
+  k_step (wp_s_addi c _ (KA.«log_write» + 0xa0#64) false 2154#12 14#5 14#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [lw_log]
   iintro Hk Hpc
   k_step (wp_s_add c _ (KA.«log_write» + 0xa4#64) true 14#5 14#5 13#5 (by decide))
@@ -1063,10 +1063,10 @@ theorem lw_miss (c : CPU) (kc : KCtx) (hsie : kc.sie = false) (kk n : Nat)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x58 auipc a5,0x1e ; +0x5c addi a5,a5,1176 ; +0x60 add a5,a5,a2
-  k_step (wp_s_auipc c _ (KA.«log_write» + 0x58#64) false 0x1e#20 15#5 (by decide))
+  k_step (wp_s_auipc c _ (KA.«log_write» + 0x58#64) false 0x1f#20 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_addi c _ (KA.«log_write» + 0x5c#64) false 1666#12 15#5 15#5 (by decide))
+  k_step (wp_s_addi c _ (KA.«log_write» + 0x5c#64) false 2222#12 15#5 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [lw_log]
   iintro Hk Hpc
   k_step (wp_s_add c _ (KA.«log_write» + 0x60#64) true 15#5 15#5 12#5 (by decide))
@@ -1123,7 +1123,7 @@ theorem lw_append (BP : BPIN) (c : CPU) (k : KCtx) (a b : Bool) (R : RegMap) (kk
   k_step (wp_s_add c _ (KA.«log_write» + 0x66#64) true 10#5 0#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [KCtx.rget_zero, h9]
   iintro Hk Hpc
-  k_step (wp_s_jal c _ (KA.«log_write» + 0x68#64) false 2092660#21 1#5 (by decide))
+  k_step (wp_s_jal c _ (KA.«log_write» + 0x68#64) false 2092564#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [lw_br_bpin]
   iintro Hk Hpc
   iapply (lw_bp BP c _ γl γb V kk dev bno ?hnb ?hKb ?hlb hkk ?ha0b)
@@ -1149,10 +1149,10 @@ theorem lw_append (BP : BPIN) (c : CPU) (k : KCtx) (a b : Bool) (R : RegMap) (kk
   k_norm at hcs1
   obtain ⟨g2, g8, g9, g18, g19, g20, g21, g22, g23, g24, g25, g26, g27⟩ := hcs1
   -- +0x6c auipc a4,0x1e ; +0x70 addi a4,a4,1156
-  k_step (wp_s_auipc c _ (KA.«log_write» + 0x6c#64) false 0x1e#20 14#5 (by decide))
+  k_step (wp_s_auipc c _ (KA.«log_write» + 0x6c#64) false 0x1f#20 14#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_addi c _ (KA.«log_write» + 0x70#64) false 1646#12 14#5 14#5 (by decide))
+  k_step (wp_s_addi c _ (KA.«log_write» + 0x70#64) false 2202#12 14#5 14#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [lw_log]
   iintro Hk Hpc
   -- +0x74 lw a5,44(a4) ; +0x76 addiw a5,a5,1 ; +0x78 sw a5,44(a4)
@@ -1696,13 +1696,13 @@ theorem lw_exit (RE : RELEASE) (c : CPU) (k : KCtx) (a b : Bool) (R : RegMap) (k
   iintro ⟨Hk, Hpc, #Hctx, Hlocked, Hres, Harm, Hframe, Hnext⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- +0xae auipc a0,0x1e ; +0xb2 addi a0,a0,1090 ; +0xb6 jal release
-  k_step (wp_s_auipc c _ (KA.«log_write» + 0xae#64) false 0x1e#20 10#5 (by decide))
+  k_step (wp_s_auipc c _ (KA.«log_write» + 0xae#64) false 0x1f#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [lwK_sie k a b]
   iintro Hk Hpc
-  k_step (wp_s_addi c _ (KA.«log_write» + 0xb2#64) false 1580#12 10#5 10#5 (by decide))
+  k_step (wp_s_addi c _ (KA.«log_write» + 0xb2#64) false 2136#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [lwK_sie k a b, lw_log]
   iintro Hk Hpc
-  k_step (wp_s_jal c _ (KA.«log_write» + 0xb6#64) false 2084052#21 1#5 (by decide))
+  k_step (wp_s_jal c _ (KA.«log_write» + 0xb6#64) false 2083936#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [lwK_sie k a b, lw_br_rel]
   iintro Hk Hpc
   iapply (lw_re RE c _ γ γb γfs cov ls dev ?ha0 ?hsr ?hnr ?hKr k.sie ?hrr ?hor)
@@ -1831,13 +1831,13 @@ theorem logWrite_au_range (AC : ACQUIRE) (RE : RELEASE) (BP : BPIN) :
     with [KCtx.rget_zero, ha0] next c2 hp2
   iintro Hk Hpc
   -- +0x0c auipc a0,0x1e ; +0x10 addi a0,a0,1252 ; +0x14 jal acquire
-  k_step_gen (wp_s_auipc c2 _ (KA.«log_write» + 0xc#64) false 0x1e#20 10#5 (by decide))
+  k_step_gen (wp_s_auipc c2 _ (KA.«log_write» + 0xc#64) false 0x1f#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c3 hp3
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c3 _ (KA.«log_write» + 0x10#64) false 1742#12 10#5 10#5 (by decide))
+  k_step_gen (wp_s_addi c3 _ (KA.«log_write» + 0x10#64) false 2298#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [lw_log] next c4 hp4
   iintro Hk Hpc
-  k_step_gen (wp_s_jal c4 _ (KA.«log_write» + 0x14#64) false 2084078#21 1#5 (by decide))
+  k_step_gen (wp_s_jal c4 _ (KA.«log_write» + 0x14#64) false 2083962#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [lw_br_acq] next c5 hp5
   iintro Hk Hpc
   iapply (lw_ac AC c5 _ γ γb γfs V.cov logstart dev ?ha0a ?hna ?hKa ?hla) $$ [- $Hk $Hpc]
@@ -1904,10 +1904,10 @@ theorem logWrite_au_range (AC : ACQUIRE) (RE : RELEASE) (BP : BPIN) :
   isimp only [wordAtN_cur] at Hn
   isimp only [wordAtN_cur] at Hout
   -- ===== +0x18 auipc a2,0x1e ; +0x1c lw a2,1284(a2) =====
-  k_step (wp_s_auipc c _ (KA.«log_write» + 0x18#64) false 0x1e#20 12#5 (by decide))
+  k_step (wp_s_auipc c _ (KA.«log_write» + 0x18#64) false 0x1f#20 12#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_lw c _ (KA.«log_write» + 0x1c#64) false 1774#12 12#5 12#5 (by decide) (by decide)
+  k_step (wp_s_lw c _ (KA.«log_write» + 0x1c#64) false 2330#12 12#5 12#5 (by decide) (by decide)
       (DFrac.own 1) (BitVec.ofNat 32 n))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [lw_lhn, lw_lwn n hn31]
   iintro Hk Hpc Hn
@@ -1922,10 +1922,10 @@ theorem logWrite_au_range (AC : ACQUIRE) (RE : RELEASE) (BP : BPIN) :
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hc1]
   iintro Hk Hpc
   -- ===== +0x26 auipc a5,0x1e ; +0x2a lw a5,1254(a5) ; +0x2e blez a5 : dead too =====
-  k_step (wp_s_auipc c _ (KA.«log_write» + 0x26#64) false 0x1e#20 15#5 (by decide))
+  k_step (wp_s_auipc c _ (KA.«log_write» + 0x26#64) false 0x1f#20 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_lw c _ (KA.«log_write» + 0x2a#64) false 1744#12 15#5 15#5 (by decide) (by decide)
+  k_step (wp_s_lw c _ (KA.«log_write» + 0x2a#64) false 2300#12 15#5 15#5 (by decide) (by decide)
       (DFrac.own 1) (BitVec.ofNat 32 out))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [lw_lout, lw_lwn out (by omega)]
@@ -2020,10 +2020,10 @@ theorem logWrite_au_range (AC : ACQUIRE) (RE : RELEASE) (BP : BPIN) :
         wordPointsTo (aBufBlockno (bnode kk)) 4 (DFrac.own (1 : Qp).half) bno from by
       rw [Xv6.bno_addr]) $$ Hbnoc
     -- +0x3a auipc a4,0x1e ; +0x3e addi a4,a4,1254 ; +0x42 li a5,0
-    k_step (wp_s_auipc c _ (KA.«log_write» + 0x3a#64) false 0x1e#20 14#5 (by decide))
+    k_step (wp_s_auipc c _ (KA.«log_write» + 0x3a#64) false 0x1f#20 14#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     iintro Hk Hpc
-    k_step (wp_s_addi c _ (KA.«log_write» + 0x3e#64) false 1744#12 14#5 14#5 (by decide))
+    k_step (wp_s_addi c _ (KA.«log_write» + 0x3e#64) false 2300#12 14#5 14#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [lw_blk0]
     iintro Hk Hpc
     k_step (wp_s_addi c _ (KA.«log_write» + 0x42#64) true 0#12 15#5 0#5 (by decide))

@@ -56,7 +56,7 @@ theorem yield_br_ffffffffffffff44 : KA.«yield» + 0xffffffffffffff44#64 = KA.«
 
 theorem yield_br_ffffffffffffecb0 : KA.«yield» + 0xffffffffffffecb0#64 = KA.«acquire» := by decide
 
-theorem yield_br_fffffffffffff9e0 : KA.«yield» + 0xfffffffffffff9e0#64 = KA.«myproc» := by decide
+theorem yield_br_fffffffffffff9d4 : KA.«yield» + 0xfffffffffffff9d4#64 = KA.«myproc» := by decide
 
 set_option maxHeartbeats 4000000 in
 theorem yield_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (SC : SCHED) : YIELD :=
@@ -82,8 +82,8 @@ theorem yield_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (SC : SCHED) : Y
   iintro Hk Hpc Hframe
   k_norm
   -- jal myproc
-  k_step (wp_s_jal cpu _ (KA.«yield» + 0xa#64) false 2095574#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [yield_br_fffffffffffff9e0]
+  k_step (wp_s_jal cpu _ (KA.«yield» + 0xa#64) false 2095562#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [yield_br_fffffffffffff9d4]
   iintro Hk Hpc
   -- myproc()
   have hmp : ∀ (k' : KCtx) (_ : k'.sie = false) (hnoff' : k'.noff + 1 < 2 ^ 31) (hK' : 10 ≤ k'.avail),

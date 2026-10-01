@@ -42,7 +42,7 @@ Rocq's header on the share choreography, the four exits and the budget
    `isItable2_escrows` + `icEscrows_lookup`).
 
 Stale in Rocq, recorded: the SpecNamex / LinkNamex headers list absolute
-`jal` targets (`myproc 0x80001906` …) of an older image, and SpecNamex says
+`jal` targets (`myproc 0x800018fa` …) of an older image, and SpecNamex says
 the function is 318 bytes; it is 334 (0x14e) in both images, and the offsets
 above are the Lean image's (read off `KA.«namex»`, identical to Rocq's
 `+0x..`).  SpecNamex's header describes the pre-§G.24 LINEAR budget

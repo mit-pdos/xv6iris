@@ -126,7 +126,7 @@ theorem namexEra_consts (MM : MEMMOVE) (IL : ILOCK) (IUP : IUNLOCKPUT) (IU : IUN
   k_step_e (wp_s_addi cpu _ (KA.«namex» + 0x44#64) true 1#12 23#5 0#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_j cpu _ (KA.«namex» + 0x46#64) true 174#21)
+  k_step_e (wp_s_j cpu _ (KA.«namex» + 0x46#64) true 178#21)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   ihave IH := namexEra_loop MM IL IUP IU DL IP Γ k A hs P Pmiss (A.plen + 1) $$ Henv
@@ -174,12 +174,12 @@ theorem namexEra_abs (MM : MEMMOVE) (IL : ILOCK) (IUP : IUNLOCKPUT) (IU : IUNLOC
   k_step_e (wp_s_add cpu _ (KA.«namex» + 0x4a#64) true 10#5 0#5 11#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_jal cpu _ (KA.«namex» + 0x4c#64) false 2094466#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«namex» + 0x50#64) false 2095266#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [namex_br_iget]
   iintro Hk Hpc
   have h := IG.wp_iget (hlc := hlc) (GF := GF) cpu
     ((((k.withSpie k.spie k.spp).pushed 12).withRegs
-      (((R.set 11#5 1#64).set 10#5 1#64).set 1#5 (KA.«namex» + 0x50#64))))
+      (((R.set 11#5 1#64).set 10#5 1#64).set 1#5 (KA.«namex» + 0x54#64))))
     (BitVec.ofNat 32 ROOTINO) .rootL
     (by show igetSlots ≤ k.avail - 12; exact namex_slots_iget _ hs.hK)
     (by show k.noff + 3 < 2 ^ 31; rw [hs.hnoff]; omega)
@@ -211,10 +211,10 @@ theorem namexEra_abs (MM : MEMMOVE) (IL : ILOCK) (IUP : IUNLOCKPUT) (IU : IUNLOC
   imod Hst $$ %ROOTINO %hr0 with ⟨HP, Hhops⟩
   imodintro
   -- +0x50  c.mv s4,a0 ; +0x52  c.j +0x3c
-  k_step_e (wp_s_add cpu _ (KA.«namex» + 0x50#64) true 20#5 0#5 10#5 (by decide))
+  k_step_e (wp_s_add cpu _ (KA.«namex» + 0x54#64) true 20#5 0#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ha0]
   iintro Hk Hpc
-  k_step_e (wp_s_j cpu _ (KA.«namex» + 0x52#64) true 2097130#21)
+  k_step_e (wp_s_j cpu _ (KA.«namex» + 0x56#64) true 2097126#21)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   have hr' : namexEntryRegs k (R'.set 20#5 (ientry kk)) (ientry kk) := by
@@ -257,7 +257,7 @@ theorem namexEra_rel (MM : MEMMOVE) (IL : ILOCK) (IUP : IUNLOCKPUT) (IU : IUNLOC
   icases (namexKeep_open k A).1 $$ Hkeep with ⟨Hsb, Hsi, Hpid, Hcwd, Hcwr⟩
   ihave Hcwd := (namex_cwd_cell k.proc A.dqc A.cwdv).1 $$ Hcwd
   -- +0x2e  jal myproc
-  k_step_e (wp_s_jal cpu _ (KA.«namex» + 0x2e#64) false 2088840#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«namex» + 0x2e#64) false 2088740#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [namex_br_myproc]
   iintro Hk Hpc
   have h := MP.wp_myproc (hlc := hlc) (GF := GF) cpu
@@ -287,7 +287,7 @@ theorem namexEra_rel (MM : MEMMOVE) (IL : ILOCK) (IUP : IUNLOCKPUT) (IU : IUNLOC
   -- THE CWD'S PACKAGE, at the slot the cell names
   icases namex_heldAt_slot A.cwdv A.cwi $$ Hcwr with ⟨%ck, %⟨hce, hck⟩, Hcwr⟩
   -- +0x36  jal idup
-  k_step_e (wp_s_jal cpu _ (KA.«namex» + 0x36#64) false 2095360#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«namex» + 0x36#64) false 2095292#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [namex_br_idup]
   iintro Hk Hpc
   have h := ID.wp_idup (hlc := hlc) (GF := GF) cpu

@@ -103,7 +103,7 @@ theorem filestat_copy (CO : COPYOUT) (cpu : CPU) (k : KCtx) (spie spp : Bool) (R
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [r18, Xv6.sys_pipe_pt, filestat_pt']
   iintro Hk Hpc Hpg
   -- +0x4a  jal copyout
-  k_step_e (wp_s_jal cpu _ (KA.«filestat» + 0x4a#64) false 2085460#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«filestat» + 0x4a#64) false 2085344#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [filestat_br_copyout]
   iintro Hk Hpc
   ihave Hhole := (show wordPointsTo (GF := GF) (k.regs 2#5 + 0xFFFFFFFFFFFFFFC4#64) 4 (DFrac.own 1) h ⊢
@@ -227,7 +227,7 @@ theorem filestat_stat (ST : STATI) (IU : IUNLOCK) (CO : COPYOUT) (Γ : SchedName
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [r9]
   iintro Hk Hpc Hip
   -- +0x32  jal stati
-  k_step_e (wp_s_jal cpu _ (KA.«filestat» + 0x32#64) false 2093972#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«filestat» + 0x32#64) false 2093876#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [filestat_br_stati]
   iintro Hk Hpc
   -- the buffer, as `statAt` at some values + the hole
@@ -265,7 +265,7 @@ theorem filestat_stat (ST : STATI) (IU : IUNLOCK) (CO : COPYOUT) (Γ : SchedName
   iintro Hk Hpc Hip
   ihave Hfields := Hfw $$ Hip
   -- +0x38  jal iunlock
-  k_step_e (wp_s_jal cpu _ (KA.«filestat» + 0x38#64) false 2093200#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«filestat» + 0x38#64) false 2093104#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [filestat_br_iunlock]
   iintro Hk Hpc
   icases filerw_priv_pid (procAddr j) pid V V.upt M $$ Hpriv with ⟨Hpid, Hpw⟩
@@ -367,7 +367,7 @@ theorem filestat_lock (IL : ILOCK) (ST : STATI) (IU : IUNLOCK) (CO : COPYOUT) (�
   iintro Hk Hpc Hip
   ihave Hfields := Hfw $$ Hip
   -- +0x26  jal ilock
-  k_step_e (wp_s_jal cpu _ (KA.«filestat» + 0x26#64) false 2093044#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«filestat» + 0x26#64) false 2092948#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [filestat_br_ilock]
   iintro Hk Hpc
   unfold fstatEnvP

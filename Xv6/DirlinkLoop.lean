@@ -83,7 +83,7 @@ theorem dirlink_read (RD : READI) (SN : STRNCPY) (WI : WRITEI) (PA : PANIC)
   k_step_e (wp_s_add cpu _ (KA.«dirlink» + 0x38#64) true 10#5 0#5 18#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_jal cpu _ (KA.«dirlink» + 0x3a#64) false 2096062#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«dirlink» + 0x3a#64) false 2095990#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [dirlink_br_readi]
   iintro Hk Hpc
   -- readi(dp, 0, &de, 16 i, 16): the kernel arm

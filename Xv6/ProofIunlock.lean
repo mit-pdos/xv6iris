@@ -83,8 +83,8 @@ set_option linter.unusedVariables false
 
 theorem iul_ret_1a : jumpPc (KA.«iunlock» + 0x1a#64) = (KA.«iunlock» + 0x1a#64) := by decide
 theorem iul_ret_28 : jumpPc (KA.«iunlock» + 0x28#64) = (KA.«iunlock» + 0x28#64) := by decide
-theorem iul_br_hold : KA.«iunlock» + 0xd64#64 = KA.«holdingsleep» := by decide
-theorem iul_br_relsleep : KA.«iunlock» + 0xd2c#64 = KA.«releasesleep» := by decide
+theorem iul_br_hold : KA.«iunlock» + 0xdc4#64 = KA.«holdingsleep» := by decide
+theorem iul_br_relsleep : KA.«iunlock» + 0xd8c#64 = KA.«releasesleep» := by decide
 
 /-- `ip == 0` is dead: the entry is slot `kk` (Rocq `iul_entry_nonzero`). -/
 theorem iul_beqz_ientry (kk : Nat) (hkk : kk < NINODE) :
@@ -295,7 +295,7 @@ theorem iunlock_proof (HS : HOLDINGSLEEP) (RS : RELEASESLEEP_HOOK) : IUNLOCK := 
   k_step_gen (wp_s_add c4 _ (KA.«iunlock» + 0x14#64) true 10#5 0#5 18#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c5 hp5
   iintro Hk Hpc
-  k_step_gen (wp_s_jal c5 _ (KA.«iunlock» + 0x16#64) false 3406#21 1#5 (by decide))
+  k_step_gen (wp_s_jal c5 _ (KA.«iunlock» + 0x16#64) false 3502#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [iul_br_hold] next c6 hp6
   iintro Hk Hpc
   iapply (iul_holdingsleep HS c6 _ fscIc γil γisl kk s pidv dqp k.proc (by k_norm_g)
@@ -350,7 +350,7 @@ theorem iunlock_proof (HS : HOLDINGSLEEP) (RS : RELEASESLEEP_HOOK) : IUNLOCK := 
   k_step_gen (wp_s_add c10 _ (KA.«iunlock» + 0x22#64) true 10#5 0#5 18#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h18] next c11 hp11
   iintro Hk Hpc
-  k_step_gen (wp_s_jal c11 _ (KA.«iunlock» + 0x24#64) false 3336#21 1#5 (by decide))
+  k_step_gen (wp_s_jal c11 _ (KA.«iunlock» + 0x24#64) false 3432#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [iul_br_relsleep] next c12 hp12
   iintro Hk Hpc
   iapply (iul_releasesleep RS Γ c12 _ fscIc γil γisl kk s pidv Tc ?ra ?rn ?rK ?rs ?rp ?rt)
