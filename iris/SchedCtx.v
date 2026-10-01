@@ -1391,14 +1391,14 @@ Section SchedCtxPay.
   Qed.
 
   Lemma sched_vc_at_tok (E : coPset) (h : CPU) (c p : mword 64) :
-    ▷ sched_vc_at h c p ={E}=∗
+    ▷ sched_vc_at h c p -∗ £ 1 ={E}=∗
     ∃ XIs : CtxId, own_context (CID := h) XIs ∗ ▷ valid_context p_sched (Some h) c p XIs.
   Proof using .
-    rewrite /sched_vc_at bi.later_exist. iIntros "(%XIs & H)".
-    rewrite bi.later_sep. iDestruct "H" as "[Hown Hrec]".
-    iPoseProof (bi.equiv_entails_1_1 _ _ (bi.timeless_except_0 _ (own_context_timeless (CID := h) XIs))
-                  with "Hown") as "Hown".
-    iMod "Hown". iModIntro. iExists XIs. iFrame.
+    (* the record's later is spent with the caller's credit (port-ordinal
+       guardrail (5)): the context witness then comes out whole *)
+    iIntros "H Hlc". iMod (lc_fupd_elim_later with "Hlc H") as "H".
+    rewrite /sched_vc_at. iDestruct "H" as (XIs) "[Hown Hrec]".
+    iModIntro. iExists XIs. iFrame "Hown". iNext. iExact "Hrec".
   Qed.
 
   (* a migratable record at the holder's own context IS what swtch wants of
