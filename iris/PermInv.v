@@ -164,20 +164,19 @@ Section perm.
   Lemma perm_deposit (gd : nat) (γP : gname) (w : disk_wr) (Q : iProp Σ)
       (E : coPset) :
     ↑permN ⊆ E ->
-    perm_inv gd γP -∗ disk_seq_permit gd w Q ={E}=∗
+    perm_inv gd γP -∗ disk_seq_permit gd w Q -∗ £ 1 ={E}=∗
       ∃ (k : nat) (γq : gname),
         perm_tok γP k true γq w (set_seq 0 (wr_nsectors w)) ∗
         perm_receipt γq Q.
   Proof using .
-    iIntros (HE) "#Hinv Hperm".
+    iIntros (HE) "#Hinv Hperm Hlc".
     iMod (saved_prop_alloc Q DfracDiscarded) as (γq) "#Hsp"; [done|].
     iInv "Hinv" as "Hbody" "Hclose".
-    (* the body is under a [▷]; the AUTH is timeless, so it strips inside
-       this fupd, and the entries stay under the later -- which is all we
-       need, because a deposit only ever ADDS to them. *)
+    (* the body is under a [▷]: the opener spends the step's credit on it
+       (port-ordinal guardrail (5)), so the map's witness comes out. *)
+    iMod (lc_fupd_elim_later with "Hlc Hbody") as "Hbody".
     iDestruct "Hbody" as (m) "Hbody".
     iDestruct "Hbody" as "[Hauth Hents]".
-    iMod "Hauth".
     set (k := fresh (dom m)).
     assert (Hk : m !! k = None).
     { apply not_elem_of_dom. apply is_fresh. }
@@ -359,12 +358,12 @@ Section perm.
   Lemma perm_deposit_kq (gd : nat) (γP : gname) (w : disk_wr) (Q : iProp Σ)
       (E : coPset) :
     ↑permN ⊆ E ->
-    perm_inv gd γP -∗ disk_seq_permit gd w Q ={E}=∗
+    perm_inv gd γP -∗ disk_seq_permit gd w Q -∗ £ 1 ={E}=∗
       ∃ kq : nat * gname,
         perm_pend γP kq w (set_seq 0 (wr_nsectors w)) ∗ perm_receipt kq.2 Q.
   Proof using .
-    iIntros (HE) "#Hinv Hperm".
-    iMod (perm_deposit gd γP w Q E HE with "Hinv Hperm") as (k γq) "[Htok #Hrc]".
+    iIntros (HE) "#Hinv Hperm Hlc".
+    iMod (perm_deposit gd γP w Q E HE with "Hinv Hperm Hlc") as (k γq) "[Htok #Hrc]".
     iModIntro. iExists (k, γq). rewrite /perm_pend /=. iFrame "Htok Hrc".
   Qed.
 
@@ -401,22 +400,23 @@ Section perm.
   Lemma perm_collect (gd : nat) (γP : gname) (k : nat) (γq : gname)
       (w : disk_wr) (Q : iProp Σ) (E : coPset) :
     ↑permN ⊆ E ->
-    perm_inv gd γP -∗ perm_receipt γq Q -∗ perm_tok γP k false γq w ∅ ={E}=∗
+    perm_inv gd γP -∗ perm_receipt γq Q -∗ perm_tok γP k false γq w ∅ -∗ £ 1 ={E}=∗
       ▷ ▷ Q.
   Proof using .
-    iIntros (HE) "#Hinv #Hrc Htok".
+    iIntros (HE) "#Hinv #Hrc Htok Hlc".
     iInv "Hinv" as "Hbody" "Hclose".
+    (* the opener spends the step's credit on the body's later (port-ordinal
+       guardrail (5)): the map's witness and the slots come out whole, so no
+       [big_sepM_later] (finite-index only) is needed. *)
+    iMod (lc_fupd_elim_later with "Hlc Hbody") as "Hbody".
     rewrite /perm_inv_body /perm_tok /perm_receipt.
     iDestruct "Hbody" as (m) "Hbody".
     iDestruct "Hbody" as "[Hauth Hents]".
-    iMod "Hauth".
     iDestruct (ghost_map_lookup with "Hauth Htok") as %Hk.
-    iEval (rewrite big_sepM_later) in "Hents".
     iDestruct (big_sepM_delete
-                 (fun k x => ▷ perm_slot gd x.1.1 x.1.2 x.2.1 x.2.2)%I
+                 (fun k x => perm_slot gd x.1.1 x.1.2 x.2.1 x.2.2)%I
                  m k (false, γq, (w, ∅)) Hk with "Hents") as "[Hent Hents]".
     iMod (ghost_map_delete with "Hauth Htok") as "Hauth".
-    iEval (rewrite -big_sepM_later) in "Hents".
     iMod ("Hclose" with "[Hauth Hents]") as "_".
     { iNext. iExists (delete k m). iFrame "Hauth Hents". }
     rewrite /perm_slot /=.

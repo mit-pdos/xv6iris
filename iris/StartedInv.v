@@ -319,14 +319,16 @@ Section StartedInv.
       (P : nat -> CtxId -> iProp Σ)
       `{!∀ pos ξ, Persistent (P pos ξ)} :
     ↑startedN ⊆ Em ->
-    started_inv γi ξd P -∗
+    started_inv γi ξd P -∗ £ 1 -∗
     (|={Em, Em ∖ ↑startedN}=> started_res γi ξd P ∗
        (started_res γi ξd P ={Em ∖ ↑startedN, Em}=∗ True)).
   Proof using .
-    iIntros (HE) "#Hinv".
+    iIntros (HE) "#Hinv Hlc".
     iMod (inv_acc Em startedN with "Hinv") as "[Hbody Hclose]"; [exact HE|].
-    iDestruct "Hbody" as "(>#Hcl & >%Himg & [Hl | Hr])".
-    - iDestruct "Hl" as "(>Hw & >Ha & >Hpk)".
+    (* the opener spends the step's credit on the body's later (port-ordinal guardrail (5)) *)
+    iMod (lc_fupd_elim_later with "Hlc Hbody") as "Hbody".
+    iDestruct "Hbody" as "(#Hcl & %Himg & [Hl | Hr])".
+    - iDestruct "Hl" as "(Hw & Ha & Hpk)".
       iEval (rewrite -(Qp.quarter_quarter) dset_auth_split) in "Ha".
       iDestruct "Ha" as "[Ha1 Ha2]".
       iModIntro. iSplitL "Hw Ha1".
@@ -338,7 +340,7 @@ Section StartedInv.
         iFrame "Ha1 Ha2".
       + iDestruct "Hbad" as (i) "(_ & Hidx & _)".
         iDestruct (dset_lookup with "Ha2 Hidx") as %Hin. set_solver.
-    - iDestruct "Hr" as (i T) "(>Hw & >Ha & >Hpk & >%HT & #HP)".
+    - iDestruct "Hr" as (i T) "(Hw & Ha & Hpk & %HT & #HP)".
       iMod (dset_get γi 1 {[(S i, started_addr)]} (S i, started_addr)
               (elem_of_singleton_2 _ _ eq_refl) with "Ha") as "[Ha #Hidx]".
       iModIntro. iSplitL "Hw".
@@ -502,15 +504,17 @@ Section StartedInv.
       `{!∀ pos, CtxMorph (P pos)} `{!∀ pos ξ, Persistent (P pos ξ)} (i V0 : nat) :
     ↑startedN ⊆ E -> (S i <= V0)%nat ->
     started_inv γi ξd P -∗ started_idx γi i -∗ hart_view_lb V0 -∗
-    own_context cur_ctx -∗ P (S i) ξd ={E}=∗
+    own_context cur_ctx -∗ P (S i) ξd -∗ £ 1 ={E}=∗
     own_context cur_ctx ∗ P (S i) cur_ctx.
   Proof using .
-    iIntros (HE HiV) "#Hinv #Hidx #HK Hrun HP".
+    iIntros (HE HiV) "#Hinv #Hidx #HK Hrun HP Hlc".
     iMod (inv_acc E startedN with "Hinv") as "[Hbody Hclose]"; [exact HE|].
-    iDestruct "Hbody" as "(>#Hcl & >%Himg & [Hl | Hr])".
-    - iDestruct "Hl" as "(_ & >Ha & _)".
+    (* the opener spends the step's credit on the body's later (port-ordinal guardrail (5)) *)
+    iMod (lc_fupd_elim_later with "Hlc Hbody") as "Hbody".
+    iDestruct "Hbody" as "(#Hcl & %Himg & [Hl | Hr])".
+    - iDestruct "Hl" as "(_ & Ha & _)".
       iDestruct (dset_lookup with "Ha Hidx") as %Hin. set_solver.
-    - iDestruct "Hr" as (i' T) "(>Hw & >Ha & >Hpk & >%HT & #HPd)".
+    - iDestruct "Hr" as (i' T) "(Hw & Ha & Hpk & %HT & #HPd)".
       iDestruct (dset_lookup with "Ha Hidx") as %Hin.
       apply elem_of_singleton in Hin. injection Hin as Hii. subst i'.
       iMod (ctx_absorb_lb (P (S i)) ξd cur_ctx T V0 ltac:(lia)
