@@ -64,6 +64,7 @@ a STAGE file (no `Proof` prefix).
 -/
 import Xv6.KexecCParts
 import Xv6.CopyLemmas
+import MachCSL.LockFacts
 
 namespace Xv6
 

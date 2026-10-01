@@ -25,6 +25,7 @@
                   `virtio_disk_init` chose) and `scheduler()` is entered.
 -/
 import Xv6.MainSecondaryParts
+import MachCSL.WpLock
 
 namespace Xv6
 

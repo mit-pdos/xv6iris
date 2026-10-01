@@ -17,6 +17,7 @@ import Xv6.SpecRelease
 import Xv6.CodeTactics
 import MachCSL.WpSmodeBits
 import Xv6.SpecPrintint
+import MachCSL.WpLock
 
 namespace Xv6
 

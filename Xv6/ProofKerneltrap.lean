@@ -24,6 +24,7 @@ import Xv6.SpecYield
 import Xv6.CodeTactics
 import Xv6.StepLemmas
 import MachCSL.WpSmodeFrame6
+import MachCSL.LockFacts
 
 namespace Xv6
 

@@ -22,7 +22,7 @@ The descriptor's four fields are written through the four cells of
 `Xv6.descAt pd i` (`fd_descAt`).
 -/
 import MachCSL.WpSmodeFrame12b
-import MachCSL.WpLock
+import MachCSL.LockFacts
 import Xv6.SpecFreeDesc
 import Xv6.CodeTactics
 import Xv6.VirtioDiskRwDefs2

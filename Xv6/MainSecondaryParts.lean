@@ -41,6 +41,7 @@ import Xv6.SpecMainSecondary
 import Xv6.SpecCpuid
 import Xv6.SpecTrapinithart
 import Xv6.SpecPlicinithart
+import MachCSL.LockFacts
 
 namespace Xv6
 

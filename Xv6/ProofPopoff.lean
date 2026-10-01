@@ -12,7 +12,7 @@ import Xv6.SpecPopoff
 import Xv6.SpecMycpu
 import Xv6.CodeTactics
 import Xv6.StepLemmas
-import MachCSL.WpLock
+import MachCSL.LockFacts
 
 namespace Xv6
 

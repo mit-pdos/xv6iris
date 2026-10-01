@@ -63,7 +63,7 @@ import Xv6.SpecIunlock
 import Xv6.IcacheBoxSites
 import Xv6.IcachePinwLw
 import Xv6.CodeTactics
-import MachCSL.WpLock
+import MachCSL.LockFacts
 import Xv6.SpecHoldingsleep
 import MachCSL.WpSmodeFrame
 

@@ -22,6 +22,7 @@ resumed with, so the induction hypothesis is `Xv6.vdrwLoopHead` at
 import Xv6.VirtioDiskRwDefs4
 import Xv6.CodeTactics
 import Xv6.PrintkDefs
+import MachCSL.LockFacts
 
 namespace Xv6
 

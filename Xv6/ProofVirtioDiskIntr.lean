@@ -48,6 +48,7 @@ import Xv6.DiskAcc
 import Xv6.CodeTactics
 import Xv6.VirtioDiskRwDefs2
 import Xv6.VirtioDiskRwDefs3
+import MachCSL.LockFacts
 
 namespace Xv6
 

@@ -27,6 +27,7 @@ A stage file: it imports Spec and definitional files only.
 import Xv6.SpecRelease
 import MachCSL.WpSmodeFrame6
 import Xv6.ParkCap
+import MachCSL.LockFacts
 
 namespace Xv6
 

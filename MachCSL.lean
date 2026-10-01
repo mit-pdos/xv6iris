@@ -91,6 +91,8 @@ import MachCSL.WpSmodeAu
 import MachCSL.WpSmodeAuDefs
 import MachCSL.WpSmodeAtomic
 import MachCSL.WpLock
+import MachCSL.WpLockSchema
+import MachCSL.LockFacts
 import MachCSL.WpSmodeMem2
 import MachCSL.WpSmodeBits
 import MachCSL.Pte

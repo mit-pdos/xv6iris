@@ -64,7 +64,7 @@ import Xv6.CodeTactics
 import MachCSL.WpSmodeFrame6
 import Xv6.SpecAcquire
 import Xv6.SpecRelease
-import MachCSL.WpLock
+import MachCSL.LockFacts
 import Xv6.VirtioDiskRwDefs2
 import Xv6.LogGhostCommit
 

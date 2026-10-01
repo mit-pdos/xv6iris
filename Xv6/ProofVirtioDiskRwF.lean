@@ -33,6 +33,7 @@ before `free_desc` zeroes it, so the loop walks `c.d0 -> c.md`,
 import MachCSL.WpSmodeFrame12b
 import Xv6.VirtioDiskRwDefs4
 import Xv6.CodeTactics
+import MachCSL.LockFacts
 
 namespace Xv6
 

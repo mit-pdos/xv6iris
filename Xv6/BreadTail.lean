@@ -16,6 +16,7 @@ import MachCSL.WpSmodeFrame6c
 import Xv6.CodeTactics
 import Xv6.BufEscrow
 import Xv6.SpecBread
+import MachCSL.LockFacts
 
 namespace Xv6
 

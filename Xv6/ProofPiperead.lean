@@ -42,7 +42,7 @@ import Xv6.SpecSleepPrepare
 import Xv6.SpecSleep
 import Xv6.SpecKilled
 import Xv6.SpecCopyout
-import MachCSL.WpLock
+import MachCSL.LockFacts
 import Xv6.UMemWindow
 import Xv6.PipeQstep
 import Xv6.KillRow

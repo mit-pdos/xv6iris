@@ -50,6 +50,7 @@ import Xv6.SyscallRet
 import Xv6.ArgLemmas
 import MachCSL.WpSmodeJalr
 import MachCSL.WpSmodeAlu2
+import MachCSL.LockFacts
 
 namespace Xv6
 

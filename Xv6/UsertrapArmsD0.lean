@@ -22,6 +22,7 @@ import Xv6.SpecVmfault
 import Xv6.UsysMemOkSpec
 import Xv6.UsertrapArms
 import Xv6.UsertrapDispatch
+import MachCSL.WpLock
 
 namespace Xv6
 

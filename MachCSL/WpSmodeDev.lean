@@ -23,7 +23,8 @@ file (`execSpecF_lbu_dev`, `execSpecF_sb_dev`: the kernel page table maps
 the device page identically), and the `wpLoop` rules (`wp_s_lbu_dev`,
 `wp_s_sb_dev`).
 -/
-import MachCSL.WpLock
+import MachCSL.WpLockSchema
+import MachCSL.WpSmodeRules
 
 namespace MachCSL
 

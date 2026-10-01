@@ -33,6 +33,7 @@ import MachCSL.WpSmodeFrame12b
 import MachCSL.WpSmodeSltu
 import Xv6.VirtioDiskRwDefs3
 import Xv6.CodeTactics
+import MachCSL.WpLock
 
 namespace Xv6
 

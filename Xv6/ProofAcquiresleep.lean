@@ -27,7 +27,7 @@ import Xv6.SpecRelease
 import Xv6.SpecMyproc
 import Xv6.SpecSleepPrepare
 import Xv6.CodeTactics
-import MachCSL.WpLock
+import MachCSL.LockFacts
 import Xv6.FsWords
 import Xv6.KilledDefs
 import Xv6.VirtioDiskRwDefs3

@@ -22,6 +22,7 @@ about `s2` is needed: either arm ends at +0xae).
 import Xv6.SpecYield
 import Xv6.UsertrapBlocks
 import Xv6.ConsoleintrParts
+import MachCSL.LockFacts
 
 namespace Xv6
 

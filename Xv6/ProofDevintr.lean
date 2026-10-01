@@ -40,6 +40,7 @@ import Xv6.CodeTactics
 import Xv6.SpecUartintr
 import Xv6.SpecVirtioDiskIntr
 import Xv6.SpecClockintr
+import MachCSL.LockFacts
 
 namespace Xv6
 

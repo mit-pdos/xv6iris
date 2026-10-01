@@ -8,7 +8,7 @@ import Xv6.SpecMyproc
 import Xv6.SpecHolding
 import Xv6.SpecSwtch
 import Xv6.CodeTactics
-import MachCSL.WpLock
+import MachCSL.LockFacts
 import MachCSL.WpSmodeFrame6
 
 namespace Xv6

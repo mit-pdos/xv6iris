@@ -64,6 +64,7 @@ import Xv6.SpecSleepPrepare
 import Xv6.SpecSleep
 import Xv6.PipeRw
 import Xv6.WordFrac
+import MachCSL.LockFacts
 
 namespace Xv6
 

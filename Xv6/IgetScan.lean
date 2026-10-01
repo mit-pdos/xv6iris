@@ -44,6 +44,7 @@ The invariant (Rocq's): no live slot `< j` carries (dev, inum)
 import Xv6.IgetRecycle
 import Xv6.IgetHit
 import Xv6.IcachePinwObl
+import MachCSL.LockFacts
 
 namespace Xv6
 

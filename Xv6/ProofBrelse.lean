@@ -1,7 +1,7 @@
 /-
 Proof of `brelse`'s specification (`SpecBrelse.BRELSE`).
 -/
-import MachCSL.WpLock
+import MachCSL.LockFacts
 import MachCSL.WpSmodeRegOps
 import MachCSL.WpSmodeFrame
 import Xv6.SpecBrelse

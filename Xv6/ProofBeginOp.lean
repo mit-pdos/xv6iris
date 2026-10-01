@@ -62,6 +62,7 @@ import Xv6.SpecAcquire
 import Xv6.SpecRelease
 import Xv6.PrintkDefs
 import Xv6.VirtioDiskRwDefs2
+import MachCSL.LockFacts
 
 namespace Xv6
 

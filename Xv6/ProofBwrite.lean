@@ -12,7 +12,7 @@ caller's own `p->pid` cell agrees, so `holdingsleep` returns 1 and the
 `virtio_disk_rw` the buffer and the block's image fragment with `a1 = 1`, and
 both come back at the buffer's bytes: the write-through.
 -/
-import MachCSL.WpLock
+import MachCSL.LockFacts
 import Xv6.SpecBwrite
 import Xv6.SpecHoldingsleep
 import Xv6.BcacheLock
