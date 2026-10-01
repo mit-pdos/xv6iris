@@ -464,14 +464,25 @@ Lemma xv6_slot_project {Σ : gFunctors} `{!xv6G Σ, !riscvGpreS Σ}
        ▷ xv6_slot N app_fs app_okc cov ls γd γsw γreg γst c ∗
        ⌜fs_boot_pure cov ls dk⌝).
 Proof.
-  iIntros "Ha HP". rewrite /xv6_slot.
-  iDestruct "HP" as (gt) "[HP HG]".
-  iMod (P_fs_project gt γd XV6_DISK_BYTES γsw γreg γst cov ls dk
-          with "Ha HP") as "(Ha & HP & %Hp)".
+  iIntros "Ha HP".
+  (* CREDIT-FREE at every step index (port-ordinal): the slot's existential
+     cannot leave its later whole (the guest claim is not timeless), so only
+     the pure fact does -- a persistent assertion that reads the file
+     system's half (timeless, so its existential strips) against the auth and
+     consumes nothing; the slot goes back exactly as it came in *)
+  iAssert (◇ ⌜fs_boot_pure cov ls dk⌝)%I as "#>%Hp".
+  { iAssert (▷ ∃ gt : gname, P_fs_named_at gt γd XV6_DISK_BYTES γsw γreg γst cov ls)%I
+      with "[HP]" as ">Hfs".
+    { iNext. rewrite /xv6_slot. iDestruct "HP" as (gt) "[HP _]".
+      iExists gt. iExact "HP". }
+    iDestruct "Hfs" as (gt) "Hfs".
+    iMod (P_fs_project gt γd XV6_DISK_BYTES γsw γreg γst cov ls dk
+            with "Ha [Hfs]") as "(_ & _ & %Hp)"; [by iNext |].
+    iModIntro. iPureIntro. exact Hp. }
   (* placed by name, never framed: the record owns the durable disk's byte
      big-op behind a [Definition] (durable-notes on [iFrame]) *)
-  iModIntro. iSplitL "Ha"; [iExact "Ha" |]. iSplitL; [| iPureIntro; exact Hp].
-  iNext. iExists gt. iSplitL "HP"; [iExact "HP" | iExact "HG"].
+  iModIntro. iSplitL "Ha"; [iExact "Ha" |]. iSplitL; [iExact "HP" |].
+  iPureIntro. exact Hp.
 Qed.
 
 Lemma fs_trace_hook (Σ : gFunctors) `{!xv6G Σ, !riscvGpreS Σ}
@@ -783,9 +794,13 @@ Section SystemBoot.
          beside the boot resource and produced by the same transport: the
          claim holds the application's authority, so it is minted per era
          and the mint founds the console port's invariant clause from it. *)
+      (* no later on the claim's package (port-ordinal): [app_dur_at] carries
+         its own on the claim only, so the guest half agrees with the
+         clone's kernel half credit-free -- the lend [xv6_power_adequacy_gen]
+         hands down has this shape *)
       (fun dk => ∃ (gt : gname) (r : N),
          P_fs_lend_at gt cov (FsImg.sb_logstart sb) dk ∗
-         ▷ app_dur_at A gt r ∗ B (Datatypes.S gen_id) r)%I Tn g
+         app_dur_at A gt r ∗ B (Datatypes.S gen_id) r)%I Tn g
     ={⊤}=∗
       ([∗ list] c ∈ enum CPU,
          mWP (LoopE gen_id c : expr riscv_lang) @ ⊤) ∗

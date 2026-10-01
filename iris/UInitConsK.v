@@ -892,6 +892,31 @@ Section UInitConsK.
     iModIntro. iFrame "Hp Hn".
   Qed.
 
+  (* [AppInv.app_claim_update] CREDIT-FREE at a TIMELESS claim (port-ordinal):
+     the general form spends a credit on the body's later; at an era whose
+     claim is timeless (echo's, [AppEcho.echo_pred_timeless]; the file era's,
+     [AppFile.file_pred_timeless]) the whole body is, and its later strips
+     as one ([exist_timeless] needs no finite index). *)
+  Lemma app_claim_update_tl (E : coPset) (γfs : FsBlocks.fs_names) (R Q : iProp Σ) :
+    ↑appN ⊆ E ->
+    (forall av : aview, Timeless (app_pred app_run av)) ->
+    app_inv γfs -∗
+    □ (∀ av : aview, R -∗ ▷ app_pred app_run av ={E ∖ ↑appN}=∗
+         ▷ app_pred app_run av ∗ Q) -∗
+    R ={E}=∗ Q.
+  Proof using .
+    iIntros (HE HTL) "#Hinv #Hstep HR".
+    iMod (inv_acc E appN with "Hinv") as "[Hbody Hclose]"; [exact HE |].
+    iEval (rewrite /app_body) in "Hbody".
+    iDestruct "Hbody" as ">Hbody".
+    iDestruct "Hbody" as (I) "(Hh & Hp & %Hd)".
+    iMod ("Hstep" $! (abs_view I) with "HR [Hp]") as "[Hp HQ]"; [by iNext |].
+    iMod ("Hclose" with "[Hh Hp]") as "_".
+    { iNext. rewrite /app_body. iExists I. iFrame "Hh Hp".
+      iPureIntro. exact Hd. }
+    iModIntro. iExact "HQ".
+  Qed.
+
   (* WHAT A FAILED MKNOD LEAVES AT THE KEY ARM: the key is SPENT and what
      comes back is the seal, its own dead-walk leaf, and the credential the
      shell is handed. *)
@@ -905,8 +930,10 @@ Section UInitConsK.
   Proof using .
     intros Heq. iIntros "#Hinv !> HK".
     iDestruct (init_cons_never_abs_law γ r Heq) as "#Habs".
-    iMod (app_claim_update ⊤ fsc_fs (cons_key r)
-            (cons_never r ∨ echo_taint γ)%I ltac:(set_solver)
+    assert (HTL : forall av : aview, Timeless (app_pred app_run av)).
+    { intros av. rewrite Heq. cbn [app_pred app_run app_names]. apply _. }
+    iMod (app_claim_update_tl ⊤ fsc_fs (cons_key r)
+            (cons_never r ∨ echo_taint γ)%I ltac:(set_solver) HTL
             with "Hinv [] HK") as "Hn".
     { iApply (init_cons_seal_law_echo γ r Heq). }
     iModIntro. rewrite /UkInit.uki_mknod_out.

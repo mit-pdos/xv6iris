@@ -106,12 +106,15 @@ Section LogGhostCommit.
      waiters' hooks at a fresh durable pair at the unchanged committed map.
      The loan and the token come back unchanged, beside each hook's [Q].
      The credit pays the crash invariant's later ([HartCustody.wp_crash_fupd]):
-     the composite it guards is not timeless at ordinal step indices. *)
+     the composite it guards is not timeless at ordinal step indices.  The
+     SECOND credit is the hooked law's ([LogSnapLaw.snap_law_ghost_at],
+     port-ordinal option (a)): the law opens the application's invariant. *)
   Lemma log_ghost_commit (e : mexpr) (Qs : list (iProp Σ))
       (γ : log_names) (bn : bio_names) (γfs : fs_names) (cov : gset Z) (ls : Z)
       (dev : mword 32) (L : gmap Z (list (bv 8))) (M : log_mirror) :
     thread_gen e = Some gen_id ->
     log_ctx γ bn γfs cov ls dev -∗
+    £ 1 -∗
     £ 1 -∗
     log_quiet γ γfs cov ls L M -∗
     riscv_sync_tok gen_id -∗
@@ -120,7 +123,7 @@ Section LogGhostCommit.
        ([∗ list] Q ∈ Qs, Q) -∗ mWP e) -∗
     mWP e.
   Proof using .
-    intros Hg. iIntros "#Hctx Hlc Hq HT HQs Hk".
+    intros Hg. iIntros "#Hctx Hlc Hlcl Hq HT HQs Hk".
     iPoseProof (log_ctx_gen_cert with "Hctx") as "#Hcert".
     iPoseProof (log_ctx_crash_inv with "Hctx") as "#Hcinv".
     iPoseProof (log_ctx_swap with "Hctx") as "#Hswlb".
@@ -133,7 +136,7 @@ Section LogGhostCommit.
     iApply (wp_crash_fupd e
               (log_quiet γ γfs cov ls L M ∗ riscv_sync_tok gen_id ∗
                ([∗ list] Q ∈ Qs, Q))%I Hg
-              with "Hcert Hcinv Hlc [Hq HT HQs] [Hk]");
+              with "Hcert Hcinv Hlc [Hq HT HQs Hlcl] [Hk]");
       last first.
     { iIntros "(Hq & HT & HQs)". iApply ("Hk" with "Hq HT HQs"). }
     iIntros (n Hn) "Hsa Hc".
@@ -167,7 +170,8 @@ Section LogGhostCommit.
     (* ---- 4. the hooked law ---- *)
     (* ...LENT the custody fupd's started auth, which it lends the merge
        (sync SY3-A1) and hands back *)
-    iMod ("Hlaw" $! Lb C Qs gt_o n with "[%] [%] [%] [%] Hba Htx HG HT [//] Hsa HQs")
+    iMod ("Hlaw" $! Lb C Qs gt_o n
+            with "[%] [%] [%] [%] Hba Htx HG HT [//] Hsa Hlcl HQs")
       as "(Hpair & HT & Hsa & HQs & Hba & Htx)";
       [exact Hdom | exact Hlens | exact Hbt | exact Hdm |].
     iMod ("Hclose" with "[Hba HC Hxa]") as "_".
@@ -193,6 +197,7 @@ Section LogGhostCommit.
       (γ : log_names) (bn : bio_names) (γfs : fs_names) (cov : gset Z) (ls : Z)
       (dev : mword 32) (L : gmap Z (list (bv 8))) (M : log_mirror) :
     log_ctx γ bn γfs cov ls dev -∗
+    £ 1 -∗
     £ 1 -∗
     log_quiet γ γfs cov ls L M -∗
     riscv_sync_tok gen_id -∗

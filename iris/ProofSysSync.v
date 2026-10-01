@@ -359,11 +359,13 @@ Section SsProps.
     - iModIntro. iSplitL "Hhelp"; [iExact "Hhelp" | by iNext].
   Qed.
 
-  (* the fast path's ghost commit, at either option *)
+  (* the fast path's ghost commit, at either option (two credits: the crash
+     invariant's later and the hooked law's, [LogGhostCommit.log_ghost_commit]) *)
   Lemma ss_ghost_commit `{GEN : GenId} (c : CPU) (oQ : option (iProp Σ))
       (γ : log_names) (bn : bio_names) (γfs : fs_names) (cov : gset Z) (ls : Z)
       (dev : mword 32) (L : gmap Z (list (bv 8))) (M : log_mirror) :
     log_ctx γ bn γfs cov ls dev -∗
+    £ 1 -∗
     £ 1 -∗
     log_quiet γ γfs cov ls L M -∗
     riscv_sync_tok gen_id -∗
@@ -372,14 +374,14 @@ Section SsProps.
        mWP (LoopE gen_id c)) -∗
     mWP (LoopE gen_id c).
   Proof using .
-    iIntros "#Hctx Hlc Hq Htk Hhook Hk". destruct oQ as [Q|]; rewrite /hook_opt /Q_opt.
+    iIntros "#Hctx Hlc Hlcl Hq Htk Hhook Hk". destruct oQ as [Q|]; rewrite /hook_opt /Q_opt.
     - iApply (log_ghost_commit_loop c [Q] γ bn γfs cov ls dev L M
-                with "Hctx Hlc Hq Htk [Hhook]").
+                with "Hctx Hlc Hlcl Hq Htk [Hhook]").
       { rewrite big_sepL_singleton. iExact "Hhook". }
       iIntros "Hq Htk HQ". rewrite big_sepL_singleton.
       iApply ("Hk" with "Hq Htk HQ").
     - iApply (log_ghost_commit_loop c [] γ bn γfs cov ls dev L M
-                with "Hctx Hlc Hq Htk []").
+                with "Hctx Hlc Hlcl Hq Htk []").
       { by rewrite big_sepL_nil. }
       iIntros "Hq Htk _". iApply ("Hk" with "Hq Htk []"). done.
   Qed.
@@ -1575,7 +1577,9 @@ Section ProofSysSync.
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc [] Hout").
       { iApply (ssi_22 with "Htext"). }
-      iApply wp_next_off_intro. iIntros "Hcg Hpc Hout".
+      (* the credit is kept: the fast path's ghost commit spends it on the
+         hooked law ([LogSnapLaw.snap_law_ghost_at], port-ordinal option (a)) *)
+      iApply wp_next_off_intro_lc. iIntros "Hlcl Hcg Hpc Hout".
       iEval (rewrite Houta) in "Hout".
       set (G4 := <[Regidx Ra5 := regval_into_reg
           (sign_extend' 64 (mword_of_int (Z.of_nat out) : mword 32))]> G3).
@@ -1613,7 +1617,7 @@ Section ProofSysSync.
         (* acquire's credit pays the ghost commit (the crash invariant's
            later); the branch below pays the exit with its own *)
         iApply (ss_ghost_commit _ oQ γ bn γfs cov logstart dev Lq Mq
-                  with "Hlog Hlc Hq Hstok Hhook").
+                  with "Hlog Hlc Hlcl Hq Hstok Hhook").
         iIntros "Hq Hstok HQ".
         iDestruct ("Hqclose" with "Hq Hstok Hout Hcmt Hnc Hhelp") as "Hres".
         iApply (wp_bge_x0_taken_s_sconf (mword_of_int (SS + 0x26)) (mword_of_int 56 : mword 13)

@@ -184,11 +184,12 @@ Section UnionInitBoot.
                    ∗ f0_bt (ugn_file ug) vf0 s0)%I
       with "[Hty]" as (s0) "[#Hbt #Hbtf]".
     { iDestruct "Hbf" as "[#HT | (%ls1 & #Hl1 & %Hu & #Hty1)]".
-      - rewrite bi.later_or. iDestruct "Hty" as "[#Hty | #HT']".
-        + iExists (dst_content s). iSplitR; [iNext; rewrite /boot_at; iLeft; by iFrame "Hty" |].
-          iExists vf. iFrame "Hvf". by iLeft.
-        + iExists ∅. iSplitR; [iNext; rewrite /boot_at; iRight; by iFrame "HT'" |].
-          iExists vf. iFrame "Hvf". by iLeft.
+      - (* CREDIT-FREE at every step index (port-ordinal): [▷ (P ∨ Q)] does
+           not split at an ordinal index, and the state cannot be chosen
+           under the later -- but the taint is in hand HERE, so the empty
+           state is the choice, whatever the deed's witness says *)
+        iExists ∅. iSplitR; [iNext; rewrite /boot_at; iRight; by iFrame "HT" |].
+        iExists vf. iFrame "Hvf". by iLeft.
       - iExists (dst_content s).
         iSplitR; [iNext; rewrite /boot_at; iLeft; by iFrame "Hty1" |].
         iExists vf. iFrame "Hvf". iRight. iExists ls1. iFrame "Hl1". by iPureIntro. }

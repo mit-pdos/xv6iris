@@ -1839,20 +1839,28 @@ Section CollectAll.
     sb_park γfs sb -∗
     col_auth γfs Lb C (fs_home_set cov ls) -∗
     ghost_map_auth_frac (ln_tx icfg_log) 1 (∅ : gmap nat unit) -∗
+    (* the law's later credit (port-ordinal, option (a)): it strips the
+       application's invariant's later, below *)
+    £ 1 -∗
     T ={E}=∗
       dur_pair (app_guest Okc) T gd (col_view C (fs_home_set cov ls))
       ∗ col_auth γfs Lb C (fs_home_set cov ls)
       ∗ ghost_map_auth_frac (ln_tx icfg_log) 1 (∅ : gmap nat unit).
   Proof using .
     intros Hgeom Hap Hft Hir Hbmn Hsbn Hipn Hien HOk.
-    iIntros "#Hmerge #Hireg #Hbmi #Hesc #Hpool #Hpark Hauth Htx HT".
+    iIntros "#Hmerge #Hireg #Hbmi #Hesc #Hpool #Hpark Hauth Htx Hlc HT".
     iDestruct "Hireg" as "(#Hiregi & _ & #Hftop & #Happ)".
     iDestruct "Hbmi" as "(#Hbmb & _)".
     (* ---- 0. the application's invariant: its half, its claim, the domain
        row (the transport stays put) ---- *)
     iMod (inv_acc E appN with "Happ") as "[Hab Hclapp]"; [exact Hap |].
+    (* the credit strips the body's later WHOLE: the claim must come out at
+       the kernel's map while the kernel's half ([Hta], below) stays
+       outside for the collection, which the existential under the later
+       cannot give at an ordinal step index *)
+    iMod (lc_fupd_elim_later with "Hlc Hab") as "Hab".
     iEval (rewrite /app_body) in "Hab".
-    iDestruct "Hab" as (Ia) "(>Hha & Hpa & >%Hdom)".
+    iDestruct "Hab" as (Ia) "(Hha & Hpa & %Hdom)".
     (* ---- 1. the abstract map's authority ---- *)
     iMod (inv_acc (E ∖ ↑appN) ftopN with "Hftop") as "[Hfb Hclft]";
       [solve_ndisj |].
@@ -1993,6 +2001,8 @@ Section CollectAll.
     ▷ app_guest Okc gt_o -∗
     T -∗
     start_auth n -∗
+    (* the law's later credit, as [fs_collect_dur]'s *)
+    £ 1 -∗
     ([∗ list] Q ∈ Qs, Hk Q) ={E}=∗
       (∃ gt : gname,
          P_dur_at gt (col_view C (fs_home_set cov ls)) ∗ ▷ app_guest Okc gt)
@@ -2003,14 +2013,19 @@ Section CollectAll.
       ∗ ghost_map_auth_frac (ln_tx icfg_log) 1 (∅ : gmap nat unit).
   Proof using .
     intros Hgeom Hap Hft Hir Hbmn Hsbn Hipn Hien Hn HOk.
-    iIntros "#Hmerge #Hrun #Hireg #Hbmi #Hesc #Hpool #Hpark Hauth Htx Hold HT Hsa HQs".
+    iIntros "#Hmerge #Hrun #Hireg #Hbmi #Hesc #Hpool #Hpark Hauth Htx Hold HT Hsa Hlc HQs".
     iDestruct "Hireg" as "(#Hiregi & _ & #Hftop & #Happ)".
     iDestruct "Hbmi" as "(#Hbmb & _)".
     (* ---- 0. the application's invariant: its half, its claim, the domain
        row (the transport stays put) ---- *)
     iMod (inv_acc E appN with "Happ") as "[Hab Hclapp]"; [exact Hap |].
+    (* the credit strips the body's later WHOLE: the claim must come out at
+       the kernel's map while the kernel's half ([Hta], below) stays
+       outside for the collection, which the existential under the later
+       cannot give at an ordinal step index *)
+    iMod (lc_fupd_elim_later with "Hlc Hab") as "Hab".
     iEval (rewrite /app_body) in "Hab".
-    iDestruct "Hab" as (Ia) "(>Hha & Hpa & >%Hdom)".
+    iDestruct "Hab" as (Ia) "(Hha & Hpa & %Hdom)".
     (* ---- 1. the abstract map's authority ---- *)
     iMod (inv_acc (E ∖ ↑appN) ftopN with "Hftop") as "[Hfb Hclft]";
       [solve_ndisj |].
@@ -2181,7 +2196,7 @@ Section CollectAll.
       pose proof (fsbN_sbN_disj) as Hsb.
       set_solver. }
     rewrite /snap_law_at.
-    iModIntro. iIntros (E Lb C) "%HN %Hdom %Hlens %Htie %Hdm Hb Ht HT".
+    iModIntro. iIntros (E Lb C) "%HN %Hdom %Hlens %Htie %Hdm Hb Ht Hlc HT".
     assert (Hap : (↑appN : coPset) ⊆ E) by (etrans; [| exact HN]; set_solver).
     assert (Hft : (↑ftopN : coPset) ⊆ E) by (etrans; [| exact HN]; set_solver).
     assert (Hir : (↑iregN : coPset) ⊆ E) by (etrans; [| exact HN]; set_solver).
@@ -2191,7 +2206,7 @@ Section CollectAll.
     assert (Hen : (↑icEscN : coPset) ⊆ E) by (etrans; [| exact HN]; set_solver).
     iMod (fs_collect_dur E cn γfs γi cov ls sb Lb C T gd Ok Okc Hgeom
             Hap Hft Hir Hbn Hsn Hpn Hen HOk
-            with "Hmerge Hireg Hbm Hesc Hpool Hpark [Hb] Ht HT")
+            with "Hmerge Hireg Hbm Hesc Hpool Hpark [Hb] Ht Hlc HT")
       as "(Hdur & Hauth & Ht)".
     { rewrite /col_auth. iFrame "Hb".
       iSplitR; [iPureIntro; exact Hdom |].
@@ -2258,7 +2273,7 @@ Section CollectAll.
     { exact fs_collect_ns_crashN. }
     rewrite /snap_law_ghost_at.
     iModIntro. iIntros (E Lb C Qs gt_o n)
-      "%HN %Hdom %Hlens %Htie %Hdm Hb Ht Hold HT %Hn Hsa HQs".
+      "%HN %Hdom %Hlens %Htie %Hdm Hb Ht Hold HT %Hn Hsa Hlc HQs".
     assert (Hap : (↑appN : coPset) ⊆ E) by (etrans; [| exact HN]; set_solver).
     assert (Hft : (↑ftopN : coPset) ⊆ E) by (etrans; [| exact HN]; set_solver).
     assert (Hir : (↑iregN : coPset) ⊆ E) by (etrans; [| exact HN]; set_solver).
@@ -2268,7 +2283,7 @@ Section CollectAll.
     assert (Hen : (↑icEscN : coPset) ⊆ E) by (etrans; [| exact HN]; set_solver).
     iMod (fs_collect_ghost E cn γfs γi cov ls sb Lb C T gd Ok Okc Hk Qs gt_o n Hgeom
             Hap Hft Hir Hbn Hsn Hpn Hen Hn HOk
-            with "Hmerge Hrun Hireg Hbm Hesc Hpool Hpark [Hb] Ht Hold HT Hsa HQs")
+            with "Hmerge Hrun Hireg Hbm Hesc Hpool Hpark [Hb] Ht Hold HT Hsa Hlc HQs")
       as "(Hdur & HT & Hsa & HQs & Hauth & Ht)".
     { rewrite /col_auth. iFrame "Hb".
       iSplitR; [iPureIntro; exact Hdom |].

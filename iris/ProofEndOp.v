@@ -820,6 +820,9 @@ Section EndOpDefs.
     log_ctx γ bn γfs cov logstart dev -∗
     ghost_map_auth_frac (fs_cache γfs) 1 L -∗
     ghost_map_auth_frac (ln_tx γ) 1 T -∗
+    (* the law's later credit ([LogSnapLaw.snap_law_at], port-ordinal
+       option (a)), paid out of an instruction's continuation *)
+    £ 1 -∗
     (* the era's token, checked out of [log_res] with the batch (sync
        K3-3): the law puts it into the pair *)
     riscv_sync_tok gen_id ={⊤}=∗
@@ -832,7 +835,7 @@ Section EndOpDefs.
       ghost_map_auth_frac (fs_cache γfs) 1 L ∗
       ghost_map_auth_frac (ln_tx γ) 1 T.
   Proof using .
-    intros Hsz Hom. iIntros "#Hctx HcL Ht HT".
+    intros Hsz Hom. iIntros "#Hctx HcL Ht Hlc HT".
     iPoseProof (log_ctx_bytes with "Hctx") as "#Hbrow".
     iPoseProof (log_ctx_seal with "Hctx") as "#Hbseal".
     iDestruct "Hbrow" as (Xv) "#Hbinv".
@@ -846,7 +849,7 @@ Section EndOpDefs.
     assert (Htie : bytes_tie Lb C) by (apply bytes_tie_exc_empty; exact Htiex).
     iDestruct (eo_cache_body_sub γfs L C with "HcL HC") as %Hsub.
     iMod (log_ctx_snap_law_of_ops γ bn γfs cov logstart dev om T Lb C
-            Hsz Hom Hdom Hlens Htie Hdm with "Hctx Hba Ht HT")
+            Hsz Hom Hdom Hlens Htie Hdm with "Hctx Hba Ht Hlc HT")
       as "(Hlaw & Hba & Ht)".
     iMod ("Hclose" with "[Hba HC Hxa]") as "_".
     { iApply bi.later_intro. iExists Lb, C, ∅. by iFrame. }
@@ -989,6 +992,7 @@ Section EndOpDefs.
     log_ctx γ bn γfs cov logstart dev -∗
     eo_open bn γfs cov logstart n W L Db Lw t -∗
     ghost_map_auth_frac (ln_tx γ) 1 T -∗
+    £ 1 -∗
     riscv_sync_tok gen_id ={⊤}=∗
       (∃ G : gname -> iProp Σ,
          fs_crash_seam_at G cov logstart ∗
@@ -996,12 +1000,12 @@ Section EndOpDefs.
       eo_open bn γfs cov logstart n W L Db Lw t ∗
       ghost_map_auth_frac (ln_tx γ) 1 T.
   Proof using .
-    intros Hsz Hom. iIntros "#Hctx Hopen Ht HT".
+    intros Hsz Hom. iIntros "#Hctx Hopen Ht Hlc HT".
     rewrite /eo_open.
     iDestruct "Hopen" as
       "(Hncell & HW & Hjunk & HauthL & HauthD & Hcov & Hhdr & Hdone & Hrest & Hpool)".
     iMod (eo_snap_law_of_auth γ bn γfs cov logstart dev om T L Hsz Hom
-            with "Hctx HauthL Ht HT") as "(Hlaw & HauthL & Ht)".
+            with "Hctx HauthL Ht Hlc HT") as "(Hlaw & HauthL & Ht)".
     iModIntro. iFrame "Hlaw Ht". rewrite /eo_open. iFrame.
   Qed.
 
@@ -1516,7 +1520,9 @@ Section EndOpBlocks.
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
     { iApply (eoi_4c with "Htext"). }
-    iIntros (CIDa4 Hsa4) "_ Hcg Hpc".
+    (* the credit is kept: the ghost commit below spends it on the hooked
+       law ([LogSnapLaw.snap_law_ghost_at], port-ordinal option (a)) *)
+    iIntros (CIDa4 Hsa4) "Hlcl Hcg Hpc".
     pose (E4 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KernelSyms.end_op + 0x4c) : mword 64) 4)]> E3).
     assert (Htgt4c : add_vec (mword_of_int (KernelSyms.end_op + 0x4c) : mword 64)
@@ -1615,7 +1621,7 @@ Section EndOpBlocks.
       as (Lq Mq) "[Hq Hqclose]".
     iDestruct (log_help_extract with "Hhelp") as (Qs) "[Hhooks Hflip]".
     iApply (log_ghost_commit_loop _ Qs γ bn γfs cov logstart dev Lq Mq
-              with "Hlctx Hlc Hq Hstok Hhooks").
+              with "Hlctx Hlc Hlcl Hq Hstok Hhooks").
     iIntros "Hq Hstok HQs".
     iDestruct ("Hqclose" with "Hq") as "[Htxa Hbatch]".
     (* ===== +0x50 sw zero,32(s1) : committing := 0 ===== *)
@@ -4833,7 +4839,9 @@ Section ProofEndOp.
               T4 (trap_res eb + (K - 8))%nat false ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; discriminate) Hnz24 with "Hcg Hpc []").
     { iApply (eoi_24 with "Htext"). }
-    iApply wp_next_off_intro. iIntros "Hcg Hpc".
+    (* the credit is kept: the commit arm's law spends it
+       ([LogSnapLaw.snap_law_at], port-ordinal option (a)) *)
+    iApply wp_next_off_intro_lc. iIntros "Hlcl Hcg Hpc".
     assert (Hpp26 : add_vec_int (mword_of_int (KernelSyms.end_op + 0x24) : mword 64) 2
                     = mword_of_int (KernelSyms.end_op + 0x26))
       by (apply bv_eq; vm_compute; reflexivity).
@@ -4869,7 +4877,7 @@ Section ProofEndOp.
       iApply fupd_wp.
       iMod (eo_open_snap_law γ bn γfs cov logstart dev
               (delete i0 om) (delete tt0 Tx) nl W L Dd (fun _ => []) 0
-              Hsztd Hommt0 with "Hlctx Hopen Htxa Hstok")
+              Hsztd Hommt0 with "Hlctx Hopen Htxa Hlcl Hstok")
         as "(Hepoch & Hopen & Htxa)".
       (* the law's guest, named where its existential is opened (round C):
          the seam and the epoch at it go down together *)
