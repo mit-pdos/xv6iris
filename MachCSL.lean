@@ -57,6 +57,7 @@ import MachCSL.WpSmodeFrame6
 import MachCSL.WpSmodeFrame12
 import MachCSL.WpSmodeFrame16
 import MachCSL.WpStagesM
+import MachCSL.WpTick
 import MachCSL.WpGpr
 import MachCSL.GprLit
 import MachCSL.Instr

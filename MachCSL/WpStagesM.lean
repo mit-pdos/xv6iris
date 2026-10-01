@@ -1,8 +1,8 @@
 /-
 MachCSL: the machine-mode stage lemmas over a symbolic configuration.
 
-The same stages as `WpStages.lean` (interrupt dispatch, clock tick, aligned
-RAM reads, fetch), stated over `mConf cpu dq c` for any `c` satisfying
+The same stages as `WpStages.lean` (interrupt dispatch, aligned RAM reads,
+fetch; the clock tick is `MachCSL.WpTick`), stated over `mConf cpu dq c` for any `c` satisfying
 `MConf.ok`, so that instructions run after the boot code has rewritten CSRs
 (mstatus.MPP, mepc, delegation, PMP entry 0, menvcfg, ...) are covered.
 -/
@@ -33,47 +33,7 @@ theorem swp_dispatchInterrupt_conf (cpu : CPU) (dq : DFrac) (c : MConf) (hok : c
   mconf_intro HmConf
   iapply HΦ $$ HmConf Hmip
 
-set_option maxHeartbeats 4000000 in
-/-- The clock tick, in machine or supervisor mode: `mcycle`/`mtime` advance,
-the pending bits are refreshed from the timer compares (whatever they are),
-no interrupt is taken. -/
-theorem swp_tick_clock_cells (cpu : CPU) (dq : DFrac) (p : Privilege)
-    (hp : p = Privilege.Machine ∨ p = Privilege.Supervisor) (c : MConf) (mcycle mtime mip : BitVec 64)
-    (Φ : Unit → IProp GF) :
-    confCells cpu dq p c ∗ Register.mcycle ↦ᵣ[cpu] mcycle ∗ Register.mtime ↦ᵣ[cpu] mtime ∗
-    Register.mip ↦ᵣ[cpu] mip ∗
-    ▷ (∀ mcycle' mtime' mip', confCells cpu dq p c -∗ Register.mcycle ↦ᵣ[cpu] mcycle' -∗
-        Register.mtime ↦ᵣ[cpu] mtime' -∗ Register.mip ↦ᵣ[cpu] mip' -∗ Φ ())
-    ⊢ swp cpu (tick_clock ()) Φ := by
-  iintro ⟨HmConf, Hmcycle, Hmtime, Hmip, HΦ⟩
-  conf_cases HmConf
-  unfold tick_clock
-  rcases hp with rfl | rfl
-  all_goals
-    swp_run 60
-    split
-    all_goals
-      swp_run 60
-      (try split)
-      all_goals
-        swp_run 60
-        (try split)
-        all_goals
-          swp_run 60
-          (try split)
-          all_goals
-            swp_run 40
-            conf_intro HmConf
-            iapply HΦ $$ %_ %_ %_ HmConf Hmcycle Hmtime Hmip
-
-theorem swp_tick_clock_conf (cpu : CPU) (dq : DFrac) (c : MConf) (mcycle mtime mip : BitVec 64)
-    (Φ : Unit → IProp GF) :
-    mConf cpu dq c ∗ Register.mcycle ↦ᵣ[cpu] mcycle ∗ Register.mtime ↦ᵣ[cpu] mtime ∗
-    Register.mip ↦ᵣ[cpu] mip ∗
-    ▷ (∀ mcycle' mtime' mip', mConf cpu dq c -∗ Register.mcycle ↦ᵣ[cpu] mcycle' -∗
-        Register.mtime ↦ᵣ[cpu] mtime' -∗ Register.mip ↦ᵣ[cpu] mip' -∗ Φ ())
-    ⊢ swp cpu (tick_clock ()) Φ :=
-  swp_tick_clock_cells cpu dq Privilege.Machine (Or.inl rfl) c mcycle mtime mip Φ
+-- The clock tick (`swp_tick_clock_cells`, `swp_tick_clock_conf`) lives in `MachCSL.WpTick`.
 
 /-! ### Aligned RAM reads -/
 

@@ -30,89 +30,9 @@ open LeanRV64D LeanRV64D.Functions
 
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 
-/-! ## The configuration cells at an arbitrary hart state
+-- `confCellsHS` and its `confhs_cases`/`confhs_intro` live in `MachCSL.WpTick`.
 
-`MConf.confCells` pins `hart_state` to `HART_ACTIVE`; a parked hart holds the
-same cells with `hart_state` at `HART_WAITING (WAIT_WFI, instbits)`.
-`confCellsHS` is that family, definitionally `confCells` at `HART_ACTIVE`. -/
-
-/-- The configuration cells of `cpu` with `hart_state` at `hs` (`confCells`
-with the hart state as a parameter). -/
-def confCellsHS (cpu : CPU) (dq : DFrac) (p : Privilege) (c : MConf) (hs : HartState) : IProp GF := iprop%
-  Register.cur_privilege ↦ᵣ[cpu]{dq} p ∗
-  Register.hart_state ↦ᵣ[cpu]{dq} hs ∗
-  Register.mstatus ↦ᵣ[cpu]{dq} c.mstatus ∗
-  Register.mie ↦ᵣ[cpu]{dq} c.mie ∗
-  Register.mideleg ↦ᵣ[cpu]{dq} c.mideleg ∗
-  Register.medeleg ↦ᵣ[cpu]{dq} c.medeleg ∗
-  Register.mepc ↦ᵣ[cpu]{dq} c.mepc ∗
-  Register.satp ↦ᵣ[cpu]{dq} c.satp ∗
-  Register.menvcfg ↦ᵣ[cpu]{dq} c.menvcfg ∗
-  Register.mcounteren ↦ᵣ[cpu]{dq} c.mcounteren ∗
-  Register.mtimecmp ↦ᵣ[cpu]{dq} c.mtimecmp ∗
-  Register.stimecmp ↦ᵣ[cpu]{dq} c.stimecmp ∗
-  Register.pmpcfg_n ↦ᵣ[cpu]{dq} c.pmpcfg ∗
-  Register.pmpaddr_n ↦ᵣ[cpu]{dq} c.pmpaddr ∗
-  hwConfig cpu
-
-/-- At `HART_ACTIVE` the family is `confCells` itself. -/
-theorem confCellsHS_active (cpu : CPU) (dq : DFrac) (p : Privilege) (c : MConf) :
-    confCellsHS (GF := GF) cpu dq p c (HartState.HART_ACTIVE ()) = confCells cpu dq p c := rfl
-
-theorem confCellsHS_cases (cpu : CPU) (dq : DFrac) (p : Privilege) (c : MConf) (hs : HartState) :
-    confCellsHS (GF := GF) cpu dq p c hs ⊢
-    Register.cur_privilege ↦ᵣ[cpu]{dq} p ∗
-    Register.hart_state ↦ᵣ[cpu]{dq} hs ∗
-    Register.mstatus ↦ᵣ[cpu]{dq} c.mstatus ∗
-    Register.mie ↦ᵣ[cpu]{dq} c.mie ∗
-    Register.mideleg ↦ᵣ[cpu]{dq} c.mideleg ∗
-    Register.medeleg ↦ᵣ[cpu]{dq} c.medeleg ∗
-    Register.mepc ↦ᵣ[cpu]{dq} c.mepc ∗
-    Register.satp ↦ᵣ[cpu]{dq} c.satp ∗
-    Register.menvcfg ↦ᵣ[cpu]{dq} c.menvcfg ∗
-    Register.mcounteren ↦ᵣ[cpu]{dq} c.mcounteren ∗
-    Register.mtimecmp ↦ᵣ[cpu]{dq} c.mtimecmp ∗
-    Register.stimecmp ↦ᵣ[cpu]{dq} c.stimecmp ∗
-    Register.pmpcfg_n ↦ᵣ[cpu]{dq} c.pmpcfg ∗
-    Register.pmpaddr_n ↦ᵣ[cpu]{dq} c.pmpaddr ∗
-    hwConfig cpu := by
-  unfold confCellsHS; exact .rfl
-
-theorem confCellsHS_intro (cpu : CPU) (dq : DFrac) (p : Privilege) (c : MConf) (hs : HartState) :
-    Register.cur_privilege ↦ᵣ[cpu]{dq} p ∗
-    Register.hart_state ↦ᵣ[cpu]{dq} hs ∗
-    Register.mstatus ↦ᵣ[cpu]{dq} c.mstatus ∗
-    Register.mie ↦ᵣ[cpu]{dq} c.mie ∗
-    Register.mideleg ↦ᵣ[cpu]{dq} c.mideleg ∗
-    Register.medeleg ↦ᵣ[cpu]{dq} c.medeleg ∗
-    Register.mepc ↦ᵣ[cpu]{dq} c.mepc ∗
-    Register.satp ↦ᵣ[cpu]{dq} c.satp ∗
-    Register.menvcfg ↦ᵣ[cpu]{dq} c.menvcfg ∗
-    Register.mcounteren ↦ᵣ[cpu]{dq} c.mcounteren ∗
-    Register.mtimecmp ↦ᵣ[cpu]{dq} c.mtimecmp ∗
-    Register.stimecmp ↦ᵣ[cpu]{dq} c.stimecmp ∗
-    Register.pmpcfg_n ↦ᵣ[cpu]{dq} c.pmpcfg ∗
-    Register.pmpaddr_n ↦ᵣ[cpu]{dq} c.pmpaddr ∗
-    hwConfig cpu ⊢ confCellsHS (GF := GF) cpu dq p c hs := by
-  unfold confCellsHS; exact .rfl
-
-open Iris.ProofMode in
-set_option hygiene false in
-/-- Split `H : confCellsHS cpu dq p c hs` into its cells, named `H<register>`
-(the names `conf_intro` and `confhs_intro` reassemble). -/
-macro "confhs_cases " h:ident : tactic =>
-  `(tactic| ihave ⟨Hcur_privilege, Hhart_state, Hmstatus, Hmie, Hmideleg, Hmedeleg, Hmepc,
-                  Hsatp, Hmenvcfg, Hmcounteren, Hmtimecmp, Hstimecmp, Hpmpcfg_n, Hpmpaddr_n, #Hhw⟩ := confCellsHS_cases _ _ _ _ _ $$ $h:ident)
-
-open Iris.ProofMode in
-set_option hygiene false in
-/-- Reassemble `H : confCellsHS cpu dq p c hs` from the cells. -/
-macro "confhs_intro " h:ident : tactic =>
-  `(tactic| (ihave $h:ident := confCellsHS_intro _ _ _ _ _ $$ [Hcur_privilege Hhart_state Hmstatus Hmie Hmideleg Hmedeleg Hmepc
-                  Hsatp Hmenvcfg Hmcounteren Hmtimecmp Hstimecmp Hpmpcfg_n Hpmpaddr_n]
-             case' _ => (iframe; iexact Hhw)))
-
-set_option maxHeartbeats 4000000 in
+set_option linter.unusedVariables false in
 /-- The clock tick at an arbitrary hart state (`swp_tick_clock_cells` at
 `confCellsHS`): the tick does not look at `hart_state`. -/
 theorem swp_tick_clock_cellsHS (cpu : CPU) (dq : DFrac) (p : Privilege)
@@ -122,27 +42,8 @@ theorem swp_tick_clock_cellsHS (cpu : CPU) (dq : DFrac) (p : Privilege)
     Register.mip ↦ᵣ[cpu] mip ∗
     ▷ (∀ mcycle' mtime' mip', confCellsHS cpu dq p c hs -∗ Register.mcycle ↦ᵣ[cpu] mcycle' -∗
         Register.mtime ↦ᵣ[cpu] mtime' -∗ Register.mip ↦ᵣ[cpu] mip' -∗ Φ ())
-    ⊢ swp cpu (tick_clock ()) Φ := by
-  iintro ⟨HmConf, Hmcycle, Hmtime, Hmip, HΦ⟩
-  confhs_cases HmConf
-  unfold tick_clock
-  rcases hp with rfl | rfl
-  all_goals
-    swp_run 60
-    split
-    all_goals
-      swp_run 60
-      (try split)
-      all_goals
-        swp_run 60
-        (try split)
-        all_goals
-          swp_run 60
-          (try split)
-          all_goals
-            swp_run 40
-            confhs_intro HmConf
-            iapply HΦ $$ %_ %_ %_ HmConf Hmcycle Hmtime Hmip
+    ⊢ swp cpu (tick_clock ()) Φ :=
+  swp_tick_clock_hs cpu dq p c hs mcycle mtime mip Φ
 
 /-! ## The execute stage of `wfi` -/
 

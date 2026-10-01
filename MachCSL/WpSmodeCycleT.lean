@@ -27,7 +27,7 @@ open LeanRV64D LeanRV64D.Functions
 
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 
-set_option maxHeartbeats 4000000 in
+set_option linter.unusedVariables false in
 /-- The clock tick in supervisor or user mode (the retire stage of a cycle
 that ends in either privilege). -/
 theorem swp_tick_clock_cells_SU (cpu : CPU) (dq : DFrac) (p : Privilege)
@@ -37,27 +37,8 @@ theorem swp_tick_clock_cells_SU (cpu : CPU) (dq : DFrac) (p : Privilege)
     Register.mip ↦ᵣ[cpu] mip ∗
     ▷ (∀ mcycle' mtime' mip', confCells cpu dq p c -∗ Register.mcycle ↦ᵣ[cpu] mcycle' -∗
         Register.mtime ↦ᵣ[cpu] mtime' -∗ Register.mip ↦ᵣ[cpu] mip' -∗ Φ ())
-    ⊢ swp cpu (tick_clock ()) Φ := by
-  rcases hp with rfl | rfl
-  · exact swp_tick_clock_cells cpu dq _ (Or.inr rfl) c mcycle mtime mip Φ
-  iintro ⟨HmConf, Hmcycle, Hmtime, Hmip, HΦ⟩
-  conf_cases HmConf
-  unfold tick_clock
-  swp_run 60
-  split
-  all_goals
-    swp_run 60
-    (try split)
-    all_goals
-      swp_run 60
-      (try split)
-      all_goals
-        swp_run 60
-        (try split)
-        all_goals
-          swp_run 40
-          conf_intro HmConf
-          iapply HΦ $$ %_ %_ %_ HmConf Hmcycle Hmtime Hmip
+    ⊢ swp cpu (tick_clock ()) Φ :=
+  swp_tick_clock_hs cpu dq p c (HartState.HART_ACTIVE ()) mcycle mtime mip Φ
 
 set_option hygiene false in
 /-- The retire stage of a cycle landing in privilege `p'` (`hp'`). -/

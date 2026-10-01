@@ -39,40 +39,7 @@ theorem swp_dispatchInterrupt_m (cpu : CPU) (dq : DFrac) (ip ms : BitVec 64)
   swp_run 40
   iapply HΦ $$ Hmideleg Hmip Hmie Hmstatus
 
-set_option maxHeartbeats 4000000 in
-/-- The clock tick in machine mode with the reset configuration: `mcycle` and
-`mtime` advance, the pending bits may be refreshed, no interrupt is taken. -/
-theorem swp_tick_clock_m (cpu : CPU) (dq : DFrac) (mcycle mtime mip : BitVec 64)
-    (Φ : Unit → IProp GF) :
-    hwConfig cpu ∗
-    Register.cur_privilege ↦ᵣ[cpu]{dq} Privilege.Machine ∗
-    Register.menvcfg ↦ᵣ[cpu]{dq} 0#64 ∗
-    Register.mtimecmp ↦ᵣ[cpu]{dq} 0xFFFFFFFFFFFFFFFF#64 ∗
-    Register.stimecmp ↦ᵣ[cpu]{dq} 0xFFFFFFFFFFFFFFFF#64 ∗
-    Register.mcycle ↦ᵣ[cpu] mcycle ∗
-    Register.mtime ↦ᵣ[cpu] mtime ∗
-    Register.mip ↦ᵣ[cpu] mip ∗
-    ▷ (∀ mcycle' mtime' mip',
-        Register.cur_privilege ↦ᵣ[cpu]{dq} Privilege.Machine -∗
-        Register.menvcfg ↦ᵣ[cpu]{dq} 0#64 -∗
-        Register.mtimecmp ↦ᵣ[cpu]{dq} 0xFFFFFFFFFFFFFFFF#64 -∗
-        Register.stimecmp ↦ᵣ[cpu]{dq} 0xFFFFFFFFFFFFFFFF#64 -∗
-        Register.mcycle ↦ᵣ[cpu] mcycle' -∗ Register.mtime ↦ᵣ[cpu] mtime' -∗
-        Register.mip ↦ᵣ[cpu] mip' -∗ Φ ())
-    ⊢ swp cpu (tick_clock ()) Φ := by
-  iintro ⟨#Hhw, Hcur_privilege, Hmenvcfg, Hmtimecmp, Hstimecmp, Hmcycle, Hmtime, Hmip, HΦ⟩
-  unfold tick_clock
-  swp_run 60
-  split
-  all_goals
-    swp_run 60
-    (try split)
-    all_goals
-      swp_run 60
-      (try split)
-      all_goals
-        swp_run 60
-        iapply HΦ $$ %_ %_ %_ Hcur_privilege Hmenvcfg Hmtimecmp Hstimecmp Hmcycle Hmtime Hmip
+-- The clock tick (`swp_tick_clock_m` and its generalisations) lives in `MachCSL.WpTick`.
 
 /-! ### Aligned RAM reads in machine mode -/
 

@@ -9,6 +9,7 @@ behaviour.  Instruction rules (`WpMmode.lean`) instantiate the execute part;
 code files instantiate the fetch and decode parts.
 -/
 import MachCSL.WpStagesM
+import MachCSL.WpTick
 import MachCSL.Instr
 import MachCSL.Boot
 
