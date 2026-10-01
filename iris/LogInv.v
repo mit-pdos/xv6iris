@@ -1656,6 +1656,9 @@ Section LogCtx.
     log_ctx γ bn γfs cov logstart dev -∗
     ghost_map_auth_frac (fs_bytes γfs) 1 Lb -∗
     ghost_map_auth_frac (ln_tx γ) 1 T -∗
+    (* the law's later credit (port-ordinal, option (a): the law opens the
+       application's invariant), paid by the committer *)
+    £ 1 -∗
     (* the era's token, checked out of [log_res] with the batch (sync
        K3-3): the law puts it into the pair *)
     riscv_sync_tok gen_id ={⊤ ∖ ↑fsbN}=∗
@@ -1669,11 +1672,11 @@ Section LogCtx.
       ∗ ghost_map_auth_frac (fs_bytes γfs) 1 Lb
       ∗ ghost_map_auth_frac (ln_tx γ) 1 T.
   Proof using .
-    intros Hsz Hom Hdom Hlens Htie Hdm. iIntros "#Hctx Hb Ht HT".
+    intros Hsz Hom Hdom Hlens Htie Hdm. iIntros "#Hctx Hb Ht Hlc HT".
     rewrite (log_tx_empty_of_ops om T Hsz Hom).
     iDestruct (log_ctx_snap_law with "Hctx") as "#Hlaw".
     iApply (snap_law_run γ γfs cov logstart (riscv_sync_tok gen_id) gen_id Lb C
-              Hdom Hlens Htie Hdm with "Hlaw Hb Ht HT").
+              Hdom Hlens Htie Hdm with "Hlaw Hb Ht Hlc HT").
   Qed.
 
   (* an op token against the authority: out >= 1 (kills log_write's
