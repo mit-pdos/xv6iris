@@ -777,7 +777,7 @@ theorem kvmmake_proof (KAL : KALLOC) (MS : MEMSET) (KM : KVMMAP) (PM : PROC_MAPS
   k_step_gen (wp_s_jal c1 _ (KA.«kvmmake» + 0xa#64) false 2095636#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kvmmake_br_fffffffffffffa1e] next c2 hp2
   iintro Hk Hpc
-  iapply (Xv6.uc_kalloc_call KAL c2 _ γl γk (some nb) ?hn1 ?hK1 ?hl1) $$ [- $Hk $Hpc]
+  iapply (Xv6.uc_kalloc_call KAL c2 _ γl γk (some nb) ?hn1 ?hK1 ?hl1 ?hz1) $$ [- $Hk $Hpc]
   rotate_right 1
   k_norm_g
   iframe #
@@ -785,6 +785,7 @@ theorem kvmmake_proof (KAL : KALLOC) (MS : MEMSET) (KM : KVMMAP) (PM : PROC_MAPS
   case hn1 => k_norm_g; omega
   case hK1 => k_norm_g; omega
   case hl1 => k_norm_g; exact hlk
+  case hz1 => k_norm_g; exact hp0
   k_norm_g
   iapply wpNext_intro_pin
   iintro %c3 %hp3 %spie1 %spp1 %R1 %hsp1 Hk Hpc HPost %hcs1

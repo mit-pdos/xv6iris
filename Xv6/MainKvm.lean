@@ -10,7 +10,8 @@
 ```
 
   * `mn_kinit`      +0x6e → +0x72: `kinit()` at kit 1's allocator names
-                    (`fscKalloc` / `fsReadyKmem`, Rocq debt (E));
+                    (`fscKalloc` / `fsReadyKmem`, Rocq debt (E)), at `k.proc = 0`
+                    (the boot premise, permit sweep L3b);
   * `mn_kvminit`    +0x72 → +0x76: `kvminit()`, at `k.proc = 0` (the boot
                     lends nothing, permit sweep L2: Rocq main's `Hp0`);
   * `mn_publish`    (ghost) THE TABLE PUBLICATION (Rocq's one-way door):
@@ -48,13 +49,13 @@ theorem mn_br_6e : KA.«main» + 18446744073709550716#64 = KA.«kinit» := by de
 theorem mn_ret_72 : jumpPc (KA.«main» + 114#64) = KA.«main» + 114#64 := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF]
 
 set_option maxHeartbeats 4000000 in
 /-- **+0x6e → +0x72**: `kinit()`: the `kmem` lock is born at `γl` over the
 free list, and the page count is `kinitPages`. -/
 theorem mn_kinit (KI : KINIT) [CurCtx] (cpu : CPU) (k : KCtx) (R0 : RegMap) (hsie : k.sie = false)
-    (hK : 22 ≤ k.avail) (hnoff : k.noff = 0) (hlocks : k.locks = [])
+    (hK : 22 ≤ k.avail) (hnoff : k.noff = 0) (hlocks : k.locks = []) (hproc : k.proc = 0#64)
     (γl : GName) (γk : KmemNames) (vl : BitVec 32) (vn vc : BitVec 64) :
     kctx cpu (k.withRegs R0) ∗ pcIs cpu (KA.«main» + 110#64) ∗
     kmapId kmemLockAddr ∗ kmapId (kmemLockAddr + 16#64) ∗
@@ -73,7 +74,7 @@ theorem mn_kinit (KI : KINIT) [CurCtx] (cpu : CPU) (k : KCtx) (R0 : RegMap) (hsi
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [mn_br_6e]
   iintro Hk Hpc
   have hki := KI.wp_kinit (hlc := hlc) (GF := GF) cpu (k.withRegs (R0.set 1#5 (KA.«main» + 114#64)))
-    γl γk vl vn vc (by simp [hnoff]) (by simp; omega) (by simp [hlocks])
+    γl γk vl vn vc (by simp [hnoff]) (by simp; omega) (by simp [hlocks]) (by simp [hproc])
   unfold wp_kinit_body at hki
   simp only [kinitAddr] at hki
   iapply hki

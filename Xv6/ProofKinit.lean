@@ -76,10 +76,10 @@ theorem ki_initlock_call (IL : INITLOCK) [CurCtx] (c : CPU) (k' : KCtx)
 
 set_option maxHeartbeats 1000000 in
 /-- `freerange`'s contract as a rule. -/
-theorem ki_freerange_call (FR : FREERANGE) [CurCtx] (c : CPU) (k' : KCtx)
+theorem ki_freerange_call [WchG GF] (FR : FREERANGE) [CurCtx] (c : CPU) (k' : KCtx)
     (γl : GName) (γk : KmemNames) (on : Option Nat) (base : BitVec 64) (n : Nat)
     (hnoff : k'.noff + 1 < 2 ^ 31) (hK : 20 ≤ k'.avail) (hlk : "kmem" ∉ k'.locks)
-    (hargs : freerangeArgs (k'.regs 10#5) (k'.regs 11#5) base n) :
+    (hargs : freerangeArgs (k'.regs 10#5) (k'.regs 11#5) base n) (hp0 : k'.proc = 0#64) :
     kctx c k' ∗ pcIs c KA.«freerange» ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
     pageRange base n ∗ kallocAvail γk on ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
@@ -87,7 +87,7 @@ theorem ki_freerange_call (FR : FREERANGE) [CurCtx] (c : CPU) (k' : KCtx)
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       kallocAvail γk (availAdd on n) -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := FR.wp_freerange (hlc := hlc) (GF := GF) c k' γl γk on base n hnoff hK hlk hargs
+  have h := FR.wp_freerange (hlc := hlc) (GF := GF) c k' γl γk on base n hnoff hK hlk hargs hp0
   unfold wp_freerange_body at h
   simp only [freerangeAddr] at h
   exact h
@@ -170,7 +170,7 @@ theorem kinit_br_64fe : KA.«kinit» + 0x64fe#64 = KStr.«kmem» := by decide
 
 set_option maxHeartbeats 4000000 in
 theorem kinit_proof (IL : INITLOCK) (FR : FREERANGE) : KINIT :=
-  ⟨fun {hlc GF} _ _ _ cpu k γl γk vlock vname vcpu hnoff hK hlk => by
+  ⟨fun {hlc GF} _ _ _ _ cpu k γl γk vlock vname vcpu hnoff hK hlk hp0 => by
   unfold wp_kinit_body
   iintro ⟨Hk, Hpc, #Hcl, #Hcl', Hwlock, Hwname, Hwcpu, Hfl, Hpages, Hlkf, Hav, Hauth, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -252,7 +252,7 @@ theorem kinit_proof (IL : INITLOCK) (FR : FREERANGE) : KINIT :=
   have hpin12 : k.sie = false ∨ k.proc = 0#64 → c12 = cpu := fun h =>
     (hp12 h).trans ((hp11 h).trans ((hp10 h).trans ((hp9 h).trans ((hp8 h).trans
       ((hp7 h).trans (hpin6 h))))))
-  iapply (ki_freerange_call FR c12 _ γl γk (some 0) kinitBase kinitPages ?hnf ?hKf ?hlf ?hargs)
+  iapply (ki_freerange_call FR c12 _ γl γk (some 0) kinitBase kinitPages ?hnf ?hKf ?hlf ?hargs ?hzf)
     $$ [- $Hk $Hpc]
   rotate_right 1
   k_norm_g
@@ -262,6 +262,7 @@ theorem kinit_proof (IL : INITLOCK) (FR : FREERANGE) : KINIT :=
   case hKf => k_norm_g; omega
   case hlf => k_norm_g; exact hlk
   case hargs => k_norm_g; exact ki_hargs
+  case hzf => k_norm_g; exact hp0
   -- past freerange: the epilogue
   iapply wpNext_intro_pin
   iintro %c13 %hp13 %spie %spp %R2 %hsp Hk Hpc Hav %hcs2

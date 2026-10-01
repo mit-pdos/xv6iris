@@ -127,6 +127,14 @@ party that threads a lock's gname.
    with a fourth bound value after `R'` (`mappages`' `fresh`), and
    `actLend_cont_frame_r`, `∀ R'` with two premises (`uvmunmap`'s raw
    form, which keeps the interrupt bits).
+11. **`actLend_step` / `actLend_ret_step` / `actLend_cont_give` (permit
+   sweep L3b, no Rocq counterpart: Rocq never landed L3).**  The step the
+   allocator's led forms take (`|==>`, the left disjunct kept, the counter
+   moved by `actCnt_step`), the stepped lend re-shaped as a callee's
+   return (`∃ k' ≥ ke`), the continuation frame at an exact count, and
+   `actLend_cont_frame_step` (a stepped lend framed into a continuation
+   that wants `∃ k' ≥ ke`); `actLend_congr` / `actLend_ret_congr` move a
+   lend across an equation of proc words.
 
 Imports only definitional files.
 -/
@@ -586,6 +594,74 @@ theorem actLend_cont_frame_r (sie : Bool) (p : BitVec 64) (cpu : CPU) (p' : BitV
   iexists ke
   iframe Hl
   ipureintro; exact Nat.le_refl ke
+
+/-- **THE STEP** (permit sweep L3b, no Rocq counterpart; design
+ni-strong-instance.md §7): what an allocator event costs.  At `p = 0` (the
+boot, no actor) the lend is the fact and stays; otherwise it is the
+exclusive counter, moved up by one (`actCnt_step`). -/
+theorem actLend_step (p : BitVec 64) (k : Nat) :
+    actLend (GF := GF) p k ⊢ |==> actLend p (k + 1) := by
+  unfold actLend
+  iintro (%hz | Hc)
+  · imodintro
+    ileft
+    ipureintro; exact hz
+  · imod actCnt_step p k $$ Hc with Hc
+    imodintro
+    iright
+    iexact Hc
+
+/-- A lend STEPPED by a callee that was handed it at `k1 ≥ ke`, in the
+returned shape at `ke` (permit sweep L3b: what a ring member does with
+`kalloc`'s / `kfree`'s `actLend p (k1 + 1)`). -/
+theorem actLend_ret_step (p : BitVec 64) {ke k1 : Nat} (h : ke ≤ k1) :
+    actLend (GF := GF) p (k1 + 1) ⊢ ∃ k' : Nat, ⌜ke ≤ k'⌝ ∗ actLend p k' := by
+  iintro Hl
+  iexists k1 + 1
+  iframe Hl
+  ipureintro; omega
+
+/-- A FIXED lend given into the continuation (permit sweep L3b): the shape
+of `actLend_cont_frame` with the returned lend at an exact count.  The
+allocator's led forms step the lend at entry and give the stepped lend
+here, so the rest of their proofs see the continuation they had before. -/
+theorem actLend_cont_give (sie : Bool) (p : BitVec 64) (cpu : CPU) (p' : BitVec 64) (k : Nat)
+    (A B C T : CPU → Bool → Bool → RegMap → IProp GF) :
+    wpNext sie p cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
+      A cpu' spie spp R' -∗ B cpu' spie spp R' -∗ C cpu' spie spp R' -∗
+      actLend p' k -∗ T cpu' spie spp R')) ⊢
+    actLend p' k -∗
+    wpNext sie p cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
+      A cpu' spie spp R' -∗ B cpu' spie spp R' -∗ C cpu' spie spp R' -∗ T cpu' spie spp R')) := by
+  unfold wpNext
+  iintro H Hl %cpu' %h %spie %spp %R' HA HB HC
+  iapply H $$ %cpu' %h %spie %spp %R' HA HB HC Hl
+
+/-- `actLend_cont_frame_ret` at a lend a callee STEPPED (permit sweep L3b):
+the caller lent `k1 ≥ ke` to `kalloc` / `kfree` and got `k1 + 1` back; the
+stepped lend is framed into a continuation that wants `∃ k' ≥ ke`. -/
+theorem actLend_cont_frame_step (sie : Bool) (p : BitVec 64) (cpu : CPU) (p' : BitVec 64)
+    {ke k1 : Nat} (h : ke ≤ k1) (A B C T : CPU → Bool → Bool → RegMap → IProp GF) :
+    wpNext sie p cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
+      A cpu' spie spp R' -∗ B cpu' spie spp R' -∗ C cpu' spie spp R' -∗
+      (∃ k' : Nat, ⌜ke ≤ k'⌝ ∗ actLend p' k') -∗ T cpu' spie spp R')) ⊢
+    actLend p' (k1 + 1) -∗
+    wpNext sie p cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
+      A cpu' spie spp R' -∗ B cpu' spie spp R' -∗ C cpu' spie spp R' -∗ T cpu' spie spp R')) := by
+  iintro H Hl
+  ihave Hl := actLend_ret_step p' h $$ Hl
+  iapply actLend_cont_frame_ret sie p cpu p' ke A B C T $$ H Hl
+
+/-- The lend at an equal proc word (permit sweep L3b: `(k.pushed m).proc`
+and `k.proc` are equal but not syntactically). -/
+theorem actLend_congr {p p' : BitVec 64} (h : p = p') (k : Nat) :
+    actLend (GF := GF) p k ⊢ actLend p' k := by
+  subst h; exact .rfl
+
+/-- ...and in the returned shape. -/
+theorem actLend_ret_congr {p p' : BitVec 64} (h : p = p') (ke : Nat) :
+    (∃ k' : Nat, ⌜ke ≤ k'⌝ ∗ actLend (GF := GF) p k') ⊢ ∃ k' : Nat, ⌜ke ≤ k'⌝ ∗ actLend p' k' := by
+  subst h; exact .rfl
 
 /-! ## The pid register -/
 

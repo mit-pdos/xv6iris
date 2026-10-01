@@ -325,7 +325,7 @@ theorem pms_iter (KAL : KALLOC) (KM : KVMMAP) [CurCtx]
   k_step_gen (wp_s_jal cur _ (KA.«proc_mapstacks» + 0x52#64) false 2093874#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [proc_mapstacks_br_fffffffffffff384] next c1 hp1
   iintro Hk Hpc
-  iapply (Xv6.uc_kalloc_call KAL c1 _ γl γk (some (nb - i - fr.length)) ?hn ?hKa ?hl) $$ [- $Hk $Hpc]
+  iapply (Xv6.uc_kalloc_call KAL c1 _ γl γk (some (nb - i - fr.length)) ?hn ?hKa ?hl ?hz) $$ [- $Hk $Hpc]
   rotate_right 1
   k_norm_g
   iframe #
@@ -333,6 +333,7 @@ theorem pms_iter (KAL : KALLOC) (KM : KVMMAP) [CurCtx]
   case hn => k_norm_g; omega
   case hKa => k_norm_g; omega
   case hl => k_norm_g; exact hlk
+  case hz => k_norm_g; exact hp0
   iapply wpNext_intro_pin
   iintro %c2 %hp2 %spie2 %spp2 %R2 %hsp2 Hk Hpc HPost %hcs2
   k_norm_g [MachCSL.KCtx.withSpie_twice, pms_ret_17a2]

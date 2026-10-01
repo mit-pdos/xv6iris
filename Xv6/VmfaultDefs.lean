@@ -249,21 +249,20 @@ theorem vf_ismapped_call (IM : ISMAPPED) [CurCtx] (c : CPU) (k' : KCtx) (dq : DF
   exact h
 
 set_option maxHeartbeats 1000000 in
-/-- `kfree`'s contract at its entry address. -/
-theorem vf_kfree_call (KF : KFREE) [CurCtx] (c : CPU) (k' : KCtx) (γl : GName) (γk : KmemNames)
-    (on : Option Nat) (hnoff : k'.noff + 1 < 2 ^ 31) (hK : 14 ≤ k'.avail)
+/-- `kfree`'s led contract at its entry address, at a lend (permit sweep
+L3b): the lend back stepped. -/
+theorem vf_kfree_call [WchG GF] (KF : KFREE) [CurCtx] (c : CPU) (k' : KCtx) (γl : GName) (γk : KmemNames)
+    (on : Option Nat) (ke : Nat) (hnoff : k'.noff + 1 < 2 ^ 31) (hK : 14 ≤ k'.avail)
     (hlk : "kmem" ∉ k'.locks) (hp : pageValid (k'.regs 10#5)) :
     kctx c k' ∗ pcIs c KA.«kfree» ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
-    pageOwn (k'.regs 10#5) ∗ kallocAvail γk on ∗
+    pageOwn (k'.regs 10#5) ∗ kallocAvail γk on ∗ actLend k'.proc ke ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
       ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
+      actLend k'.proc (ke + 1) -∗
       kallocAvail γk (availInc on) -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
-    ⊢ wpLoop (GF := GF) c := by
-  have h := KF.wp_kfree (hlc := hlc) (GF := GF) c k' γl γk on hnoff hK hlk hp
-  unfold wp_kfree_body at h
-  simp only [kfreeAddr] at h
-  exact h
+    ⊢ wpLoop (GF := GF) c :=
+  uc_kfree_lend_call KF c k' γl γk on ke hnoff hK hlk hp
 
 set_option maxHeartbeats 1000000 in
 /-- `memset`'s contract at its entry address. -/

@@ -18,12 +18,14 @@ entry address (`fw_rec_call`).  Stated at either interrupt index, as
 THE LEND (permit sweep L3a, no Rocq counterpart): carried by the loop
 (`freewalk_iter` / `freewalk_loop` take and return `∃ k1 ≥ ke`), passed to
 each recursive call (`fw_rec_call`, the induction hypothesis at the count in
-hand), its returned bound composed back to `ke`; `kfree` does not take it
-yet (L3b), so at the tail it is framed into the continuation
-(`SlotGen.actLend_cont_frame_ret`).
+hand), its returned bound composed back to `ke`; at the tail it is lent to
+`kfree` (L3b, `fw_kfree_call` over `uc_kfree_lend_call`), which steps it,
+and the stepped lend is framed into the continuation
+(`SlotGen.actLend_cont_frame_step`).
 -/
 import Xv6.SpecFreewalk
 import Xv6.SpecKfree
+import Xv6.UvmCallSites
 import Xv6.UPtFreeLemmas
 import Xv6.CodeTactics
 import MachCSL.WpSmodeFrame6
@@ -163,22 +165,21 @@ theorem fwSaved_of_calleeSaved {R R' : RegMap} (h : calleeSaved R R') : fwSaved 
 /-! ## The two calls -/
 
 set_option maxHeartbeats 1000000 in
-/-- `kfree`'s contract at its entry address, as a rule. -/
-theorem fw_kfree_call (KF : KFREE) [CurCtx] (c : CPU) (k' : KCtx)
-    (γl : GName) (γk : KmemNames)
+/-- `kfree`'s LED contract at its entry address, as a rule, at a lend
+(permit sweep L3b): the lend back stepped. -/
+theorem fw_kfree_call [WchG GF] (KF : KFREE) [CurCtx] (c : CPU) (k' : KCtx)
+    (γl : GName) (γk : KmemNames) (ke : Nat)
     (hnoff' : k'.noff + 1 < 2 ^ 31) (hK' : 14 ≤ k'.avail) (hlk' : "kmem" ∉ k'.locks)
     (hp : pageValid (k'.regs 10#5)) :
     kctx c k' ∗ pcIs c KA.«kfree» ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
-    pageOwn (k'.regs 10#5) ∗ kallocAvail γk none ∗
+    pageOwn (k'.regs 10#5) ∗ kallocAvail γk none ∗ actLend k'.proc ke ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie' : Bool, ∀ spp' : Bool, ∀ R' : RegMap,
       ⌜k'.sie = false → spie' = k'.spie ∧ spp' = k'.spp⌝ -∗
       kctx cpu' ((k'.withSpie spie' spp').withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
+      actLend k'.proc (ke + 1) -∗
       kallocAvail γk (availInc none) -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
-    ⊢ wpLoop (GF := GF) c := by
-  have h := KF.wp_kfree (hlc := hlc) (GF := GF) c k' γl γk none hnoff' hK' hlk' hp
-  unfold wp_kfree_body at h
-  simp only [kfreeAddr] at h
-  exact h
+    ⊢ wpLoop (GF := GF) c :=
+  uc_kfree_lend_call KF c k' γl γk none ke hnoff' hK' hlk' hp
 
 set_option maxHeartbeats 1000000 in
 /-- The induction hypothesis at `freewalk`'s entry address, as a rule. -/
@@ -271,8 +272,8 @@ theorem freewalk_br_fffffffffffff6be : KA.«freewalk» + 0xfffffffffffff6be#64 =
 set_option maxHeartbeats 4000000 in
 /-- At `0x80001420`: the node page, all its entries cleared, goes back to
 the allocator, then the epilogue. -/
-theorem freewalk_tail (KF : KFREE) [CurCtx] (cpu cur : CPU) (k : KCtx)
-    (γl : GName) (γk : KmemNames) (t : PTree)
+theorem freewalk_tail [WchG GF] (KF : KFREE) [CurCtx] (cpu cur : CPU) (k : KCtx)
+    (γl : GName) (γk : KmemNames) (t : PTree) (ke : Nat)
     (hpin : k.sie = false ∨ k.proc = 0#64 → cur = cpu)
     (hnoff : k.noff + 1 < 2 ^ 31) (hK : 20 ≤ k.avail) (hlk : "kmem" ∉ k.locks)
     (hpv : pageValid (pageAddr t.base))
@@ -286,12 +287,14 @@ theorem freewalk_tail (KF : KFREE) [CurCtx] (cpu cur : CPU) (k : KCtx)
     isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
     pageOwn (pageAddr t.base) ∗
     fwFrame (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5) v5 ∗
+    (∃ k1 : Nat, ⌜ke ≤ k1⌝ ∗ actLend k.proc k1) ∗
     wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ spie' : Bool, ∀ spp' : Bool, ∀ R' : RegMap,
       ⌜k.sie = false → spie' = k.spie ∧ spp' = k.spp⌝ -∗
       kctx cpu' ((k.withSpie spie' spp').withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
+      (∃ k1 : Nat, ⌜ke ≤ k1⌝ ∗ actLend k.proc k1) -∗
       ⌜calleeSaved k.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) cur := by
-  iintro ⟨Hk, Hpc, #Hlk, #Hav, Hpage, Hframe, HΦ⟩
+  iintro ⟨Hk, Hpc, #Hlk, #Hav, Hpage, Hframe, ⟨%k1, %hk1, Hlend⟩, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- c.mv a0,s3 : the page
   k_step_gen (wp_s_add cur _ (KA.«freewalk» + 0x48#64) true 10#5 0#5 19#5 (by decide))
@@ -301,17 +304,19 @@ theorem freewalk_tail (KF : KFREE) [CurCtx] (cpu cur : CPU) (k : KCtx)
   k_step_gen (wp_s_jal c1 _ (KA.«freewalk» + 0x4a#64) false 2094708#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [freewalk_br_fffffffffffff6be] next c2 hp2
   iintro Hk Hpc
-  iapply (fw_kfree_call KF c2 _ γl γk ?hn ?hKa ?hl ?hpvg) $$ [- $Hk $Hpc]
+  iapply (fw_kfree_call KF c2 _ γl γk k1 ?hn ?hKa ?hl ?hpvg) $$ [- $Hk $Hpc]
   rotate_right 1
   k_norm_g
   iframe #
-  iframe Hpage
+  iframe Hpage Hlend
   case hn => k_norm_g; omega
   case hKa => k_norm_g; omega
   case hl => k_norm_g; exact hlk
   case hpvg => k_norm_g; exact hpv
   iapply wpNext_intro_pin
-  iintro %c3 %hp3 %spie2 %spp2 %R2 %hsp2 Hk Hpc Hav2 %hcs2
+  iintro %c3 %hp3 %spie2 %spp2 %R2 %hsp2 Hk Hpc Hlend Hav2 %hcs2
+  -- the lend comes back stepped: framed into the exit
+  ihave HΦ := actLend_cont_frame_step _ _ _ _ hk1 _ _ _ _ $$ HΦ Hlend
   k_norm_g [MachCSL.KCtx.withSpie_twice, fw_ret_1378]
   unfold calleeSaved at hcs2
   k_norm_g [hR2, h19, h20, h21, h22, h23, h24, h25, h26, h27] at hcs2
@@ -571,11 +576,10 @@ theorem freewalk_loop [WchG GF] (KF : KFREE) [CurCtx] (lvl : Nat) (t : PTree)
     ihave Hdone := fwDone_full t.base $$ Hdone
     ihave Hpage := zeroNode_pageOwn t.base $$ Hdone
     obtain ⟨s2, s8, s18, s19, s20, s21, s22, s23, s24, s25, s26, s27⟩ := hsaved.1
-    -- the lend: `kfree` does not take it yet, framed through
-    ihave HΦ := actLend_cont_frame_ret _ _ _ _ _ _ _ _ _ $$ HΦ Hlend
-    iapply (freewalk_tail KF cur c1 k γl γk t hp1 hnoff ?hK20 hlk
+    -- the lend: passed to the tail, which lends it to `kfree`
+    iapply (freewalk_tail KF cur c1 k γl γk t ke hp1 hnoff ?hK20 hlk
       (hpg t.base (base_mem_pages lvl t)) spie2 spp2 ?hsp' R2 ?g2 ?g19 ?g20 ?g21 ?g22 ?g23
-      ?g24 ?g25 ?g26 ?g27 v5) $$ [- $Hk $Hpc $Hpage $Hframe $HΦ]
+      ?g24 ?g25 ?g26 ?g27 v5) $$ [- $Hk $Hpc $Hpage $Hframe $Hlend $HΦ]
     rotate_right 1
     iframe #
     case hK20 => simp only [freewalkSlots] at hK; omega

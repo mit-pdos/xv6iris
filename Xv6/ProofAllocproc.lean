@@ -31,12 +31,15 @@ THE LEND (permit sweep L1a, Rocq f344a089a): the cells-level continuation
 `apCont` takes the lend back right after the return pc, and the scan
 (`ap_scan` / `ap_found`) carries `∃ k' ≥ ke, actLend k.proc k'` beside it
 to the two freeproc tails (`ap_fp_call` takes it) and the four exits;
-since L2 (Rocq 78f9234b8) `proc_pagetable` takes it too (`ap_pp_call`).
+since L2 (Rocq 78f9234b8) `proc_pagetable` takes it too (`ap_pp_call`), and
+since L3b (no Rocq counterpart) `kalloc` (`ap_kalloc_call`, the led form)
+takes the count in hand and steps it.
 -/
 import Xv6.SpecAllocproc
 import Xv6.SpecAcquire
 import Xv6.SpecRelease
 import Xv6.SpecKalloc
+import Xv6.UvmCallSites
 import Xv6.SpecMemset
 import Xv6.SpecFreeproc
 import Xv6.UPtLemmas
@@ -1430,20 +1433,20 @@ end
 section Calls
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
-/-- `kalloc`'s contract at its call site (address folded). -/
+/-- `kalloc`'s led contract at its call site (address folded), at a lend
+(permit sweep L3b): the lend back stepped. -/
 theorem ap_kalloc_call (KAL : KALLOC) (c : CPU) (k' : KCtx) (γl : GName) (γk : KmemNames)
-    (on : Option Nat) (hnoff' : k'.noff + 1 < 2 ^ 31) (hK' : 14 ≤ k'.avail) (hlk' : "kmem" ∉ k'.locks) :
+    (on : Option Nat) (ke : Nat) (hnoff' : k'.noff + 1 < 2 ^ 31) (hK' : 14 ≤ k'.avail)
+    (hlk' : "kmem" ∉ k'.locks) :
     kctx c k' ∗ pcIs c KA.«kalloc» ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
-    kallocAvail γk on ∗
+    kallocAvail γk on ∗ actLend k'.proc ke ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
       ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
+      actLend k'.proc (ke + 1) -∗
       kallocPost γk on (R' 10#5) -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
-    ⊢ wpLoop (GF := GF) c := by
-  have h := KAL.wp_kalloc (hlc := hlc) (GF := GF) c k' γl γk on hnoff' hK' hlk'
-  unfold wp_kalloc_body at h
-  simp only [kallocAddr] at h
-  exact h
+    ⊢ wpLoop (GF := GF) c :=
+  uc_kalloc_lend_call KAL c k' γl γk on ke hnoff' hK' hlk'
 
 /-- `proc_pagetable`'s contract at its call site (address folded). -/
 theorem ap_pp_call (PP : PROC_PAGETABLE) (c : CPU) (k' : KCtx) (γl : GName) (γk : KmemNames)
@@ -2063,10 +2066,12 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
   k_step (wp_s_jal c _ (KA.«allocproc» + 0x9c#64) false 2092900#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [allocproc_br_fffffffffffff000]
   iintro Hk Hpc
-  iapply (ap_kalloc_call KAL c _ γl γk on ?hnk ?hKk ?hlkk) $$ [- $Hk $Hpc $Hlk $Hav]
+  icases Hlend with ⟨%k0, %hk0, Hlend⟩
+  iapply (ap_kalloc_call KAL c _ γl γk on k0 ?hnk ?hKk ?hlkk) $$ [- $Hk $Hpc $Hlk $Hav]
   rotate_right 1
   k_norm
   iframe #
+  iframe Hlend
   case hnk => k_norm; omega
   case hKk => k_norm; omega
   case hlkk =>
@@ -2080,8 +2085,10 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
     · exact hlk h2
   -- past kalloc
   iapply wpNext_off_intro
-  iintro %spie4 %spp4 %Rk %hsp4 Hk Hpc HkallocPost %hcsk
+  iintro %spie4 %spp4 %Rk %hsp4 Hk Hpc Hlend HkallocPost %hcsk
   k_norm [ap_ret_b80]
+  -- the lend comes back stepped
+  ihave Hlend := actLend_ret_step k.proc hk0 $$ Hlend
   have hRk9 : Rk 9#5 = procAddr n := by
     have h := hcsk.2.2.1
     simp only [RegMap.set_apply, BitVec.reduceEq, ite_false] at h

@@ -34,6 +34,10 @@ at the exits that reach none); after a fileclose everything is at its return
 hart and the caller's `true` crossing follows by the process pin
 (`pa_next_shift`).  The two files closed are untyped, so fileclose's
 environment is `emp` (`filecloseEnv_none`) and the page count never leaves.
+
+THE LEND (permit sweep L1b, a pass-through `paLend`): since L3b (no Rocq
+counterpart) `kalloc` takes the count in hand and steps it (`pa_kalloc`, the
+led form over `UvmCallSites.uc_kalloc_lend_call`).
 -/
 import Xv6.SpecPipealloc
 import Xv6.SpecFilealloc
@@ -44,6 +48,7 @@ import Xv6.KstackMap
 import MachCSL.WpSmodeFrame6
 import Xv6.PipeBirth
 import Xv6.SpecKalloc
+import Xv6.UvmCallSites
 import Xv6.CopyLemmas
 import Xv6.DinodeSlot
 import Xv6.KmemTier
@@ -184,19 +189,19 @@ theorem pa_filealloc (FA : FILEALLOC) (c : CPU) (k' : KCtx) (γl : GName) (γ : 
   simp only [fileallocAddr] at h
   exact h
 
+/-- `kalloc`'s led contract, at a lend (permit sweep L3b): the lend back
+stepped. -/
 theorem pa_kalloc (KAL : KALLOC) (c : CPU) (k' : KCtx) (γkl : GName) (γk : KmemNames) (on : Option Nat)
-    (hnoff : k'.noff + 1 < 2 ^ 31) (hK : 14 ≤ k'.avail) (hlk : "kmem" ∉ k'.locks) :
+    (ke : Nat) (hnoff : k'.noff + 1 < 2 ^ 31) (hK : 14 ≤ k'.avail) (hlk : "kmem" ∉ k'.locks) :
     kctx c k' ∗ pcIs c KA.«kalloc» ∗ isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗
-    kallocAvail γk on ∗
+    kallocAvail γk on ∗ actLend k'.proc ke ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
       ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
+      actLend k'.proc (ke + 1) -∗
       kallocPost γk on (R' 10#5) -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
-    ⊢ wpLoop (GF := GF) c := by
-  have h := KAL.wp_kalloc (hlc := hlc) (GF := GF) c k' γkl γk on hnoff hK hlk
-  unfold wp_kalloc_body at h
-  simp only [kallocAddr] at h
-  exact h
+    ⊢ wpLoop (GF := GF) c :=
+  uc_kalloc_lend_call KAL c k' γkl γk on ke hnoff hK hlk
 
 theorem pa_initlock (IL : INITLOCK) (c : CPU) (k' : KCtx) (vlock : BitVec 32) (vname vcpu : BitVec 64)
     (hK : 2 ≤ k'.avail) :
@@ -962,16 +967,22 @@ theorem pipealloc_proof (FA : FILEALLOC) (KAL : KALLOC) (IL : INITLOCK) (FC : FI
       k_step_gen (wp_s_jal c14 _ (KA.«pipealloc» + 0x2c#64) false 2082236#21 1#5 (by decide))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pipealloc_br_ffffffffffffc5e8] next c15 hp15
       iintro Hk Hpc
-      iapply (pa_kalloc KAL c15 _ γkl γk on ?hn4 ?hK4 ?hl4) $$ [- $Hk $Hpc $Hav]
+      icases Hlend with ⟨%k4, %hk4, Hlend⟩
+      iapply (pa_kalloc KAL c15 _ γkl γk on k4 ?hn4 ?hK4 ?hl4) $$ [- $Hk $Hpc $Hav]
       rotate_right 1
       k_norm_g [pa_ret_44c2]
       iframe #
+      iframe Hlend
       case hn4 => k_norm_g; omega
       case hK4 => k_norm_g; unfold pipeallocSlots at hK; have := filecloseSlots_callees.2.2.2; omega
       case hl4 => k_norm_g; exact hkmem
       iapply wpNext_intro_pin
-      iintro %c16 %hp16 %spie3 %spp3 %R3 %hsp3 Hk Hpc Hkp %hcs3
+      iintro %c16 %hp16 %spie3 %spp3 %R3 %hsp3 Hk Hpc Hlend Hkp %hcs3
       k_norm_g [MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed, MachCSL.KCtx.withSpie_withRegs]
+      -- the lend comes back stepped
+      ihave Hlend : paLend (GF := GF) k.proc ke $$ [Hlend]
+      · iapply (actLend_ret_step k.proc hk4)
+        iexact Hlend
       k_norm_g at hsp3
       unfold calleeSaved at hcs3
       k_norm_g at hcs3

@@ -58,6 +58,11 @@ builds its congruence proof over the whole context).
    (`sysExecKA A P kv …`, Rocq `us_upt (upd_usV U (upd_ev (us_V U) k)) P`),
    and the continuation returns `⌜A.V.ev ≤ kv⌝` (`SysExecParts`
    deviation 9).
+7. Permit sweep L3b (no Rocq counterpart): the success tail's free loop
+   steps the counter, so the break lends it out of the block kexec
+   returned (`ProcPrivAcc.procPrivFd_evLend`) and hands the continuation the
+   block at the raised record `V''` (`evAfter V' V''`), kexec's arms moved
+   there by `execArms_evAfter` (the success arm does not read the count).
 
 Imports only the shared vocabulary and kexec's Spec.
 -/
@@ -274,6 +279,64 @@ theorem sys_exec_kexec (KX : KEXEC) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF �
 
 /-! ## §4.  THE BREAK (Rocq `sx_break_au`) -/
 
+/-- A successful `kexecOk` does not read the returned record's event count
+(permit sweep L3b). -/
+theorem kexecOk_updEv_ok {V V' : ProcPriv} {r entry spv szv' : BitVec 64} {na : Nat}
+    {alen : Nat → Nat} (k : Nat) (hr : r ≠ 0xFFFFFFFFFFFFFFFF#64)
+    (h : kexecOk V V' r entry spv szv' na alen) : kexecOk V (V'.updEv k) r entry spv szv' na alen := by
+  rcases h with ⟨hr', -⟩ | h
+  · exact absurd hr' hr
+  · exact Or.inr h
+
+/-- **kexec's arms survive a raised count on the returned block** (permit
+sweep L3b): the failure arm's `evAfter` composes, the success arm does not
+read the count.  What the break needs once the success tail's free loop has
+stepped the counter of the block kexec returned. -/
+theorem execArms_evAfter {Fs : Pfam GF (Uvis → IProp GF)} {Γ : FsViewNames GF} {γfs : FsNames}
+    {cw : Nat} {secc : BitVec 64} {Q : Int → IProp GF} {P Pmiss : Nat → Nat → IProp GF}
+    {Fo : Pfam GF (Aview → Nat → Anode → IProp GF)} {pl : List (BitVec 8)} {na : Nat}
+    {alen : Nat → Nat} {afun : Nat → Nat → BitVec 8} {sts : List FdState} {gn : GName}
+    {cs : Std.ExtTreeSet GName compare} {pidv : BitVec 32} {V : ProcPriv}
+    {M : Nat → List (BitVec 8)} {V' : ProcPriv} {M' : Nat → List (BitVec 8)} {r : BitVec 64}
+    {V'' : ProcPriv} (h : evAfter V' V'') :
+    execArms (hlc := hlc) Fs Γ γfs cw secc Q P Pmiss Fo pl na alen afun sts gn cs pidv V M V' M' r ⊢
+      execArms (hlc := hlc) Fs Γ γfs cw secc Q P Pmiss Fo pl na alen afun sts gn cs pidv V M V'' M' r := by
+  obtain ⟨k, hk, rfl⟩ := h
+  unfold execArms execPostOk
+  iintro (⟨%hf, Hf⟩ | ⟨%i, %av, %a, %harow, Hok⟩)
+  · ileft
+    iframe Hf
+    ipureintro
+    obtain ⟨hr, ⟨k0, hk0, hV⟩, hM⟩ := hf
+    subst hV
+    exact ⟨hr, ⟨k, Nat.le_trans hk0 hk, rfl⟩, hM⟩
+  · iright
+    iexists i, av, a
+    isplitr
+    · ipureintro; exact harow
+    icases Hok with (⟨%f, %nl, %ha, %hld, %hex, %himg, Hrecv⟩ | ⟨%hnl, %hok, Hrecv⟩)
+    · ileft
+      iexists f, nl
+      isplitr; · ipureintro; exact ha
+      isplitr; · ipureintro; exact hld
+      isplitr
+      · ipureintro
+        obtain ⟨e, spv, szv', he, hr, hok⟩ := hex
+        exact ⟨e, spv, szv', he, hr, kexecOk_updEv_ok k hr hok⟩
+      isplitr; · ipureintro; exact himg
+      iapply (show Fs.pfRecv (execKey V' M' sts gn cs pidv na) ⊢
+        Fs.pfRecv (execKey (V'.updEv k) M' sts gn cs pidv na) from .rfl)
+      iexact Hrecv
+    · iright
+      isplitr; · ipureintro; exact hnl
+      isplitr
+      · ipureintro
+        obtain ⟨entry, spv, szv', hr, hok⟩ := hok
+        exact ⟨entry, spv, szv', hr, kexecOk_updEv_ok k hr hok⟩
+      iapply (show Fs.pfRecv (execKey V' M' sts gn cs pidv na) ⊢
+        Fs.pfRecv (execKey (V'.updEv k) M' sts gn cs pidv na) from .rfl)
+      iexact Hrecv
+
 theorem sys_exec_br_kexec : sysExecAddr + 0xFFFFFFFFFFFFF42C#64 = KA.«kexec» := by decide
 theorem sys_exec_ret_ce : jumpPc (sysExecAddr + 0xce#64) = sysExecAddr + 0xce#64 := by decide
 
@@ -356,12 +419,19 @@ theorem sys_exec_break (KX : KEXEC) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF �
   ihave Hcarry := Hcback $$ Hpath
   ihave Harr := (sysExecBreak_argv (GF := GF) (k.regs 2#5) A P kv pl i pg alen afun hi).2 $$ [Hargv Hhi]
   · iframe
+  -- the counter of the block kexec returned, lent to the success tail's free
+  -- loop (permit sweep L3b): each kfree steps it
+  icases procPrivFd_evLend A.γ (procAddr A.j) A.pid V' M' $$ Hblk with ⟨Hl, Hblk⟩
+  ihave Hl := actLend_congr hS.hproc.symm V'.ev $$ Hl
   -- +0xce THE SUCCESS TAIL
-  iapply hsucc $$ %c2 %spie2 %spp2 %R2 %i %pg %afun %pl %rest %(R2 10#5)
+  iapply hsucc $$ %c2 %spie2 %spp2 %R2 %i %pg %afun %pl %rest %(R2 10#5) %V'.ev
     %⟨Nat.le_of_lt hi, sysExecOk_pgOk pg alen afun i hok, sysExecLoopPins_bad k R2 i hpins2, rfl, hal⟩
-    Hk Hpc Hte Hce Henv Hcarry H59 H60 Harr Hpgs
-  iintro %c3 %spie3 %spp3 %R3 %⟨hcs3, h10⟩ Hk Hpc Hte Hce
-  iapply HΦ $$ %c3 %spie3 %spp3 %R3 %V' %M' %hcs3 %hargs %hext %hkv [Harms] Hk Hpc Hte Hce Hbs Hir Hblk
+    Hk Hpc Hte Hce Henv Hcarry H59 H60 Harr Hpgs Hl
+  iintro %c3 %spie3 %spp3 %R3 %⟨hcs3, h10⟩ Hk Hpc Hte Hce ⟨%k1, %hk1, Hl⟩
+  ihave Hl := actLend_congr hS.hproc k1 $$ Hl
+  icases Hblk $$ %k1 %hk1 Hl with ⟨%V'', %hV'', Hblk⟩
+  ihave Harms := execArms_evAfter hV'' $$ Harms
+  iapply HΦ $$ %c3 %spie3 %spp3 %R3 %V'' %M' %hcs3 %hargs %hext %hkv [Harms] Hk Hpc Hte Hce Hbs Hir Hblk
   rw [h10]
   iexact Harms
 

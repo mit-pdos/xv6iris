@@ -243,7 +243,7 @@ theorem mn_phaseC (BI : BINIT) (II : IINIT) (FI : FILEINIT) (VD : VIRTIO_DISK_IN
   iframe Hk Hpc Hflk Hfent Hirf
   iintro %R3 Hk Hpc ⟨%γft, %γf, #Hft⟩
   -- +0x9a  virtio_disk_init, and the vdisk lock
-  iapply (mn_virtio VD startedPrimary k R3 hsie hsl.2.2.1 hnoff hlocks γd fscKalloc γdl fsReadyKmem
+  iapply (mn_virtio VD startedPrimary k R3 hsie hsl.2.2.1 hnoff hlocks hproc γd fscKalloc γdl fsReadyKmem
     (kinitPages - kvmmakeCount) (by decide) c0 hdead)
   iframe Hk Hpc Hkml Hav Hdinv Hcc Hcfg Hgh Hcells
   isplitl [Hdlf]
@@ -540,7 +540,7 @@ theorem main_proof (CI : CPUID) (CN : CONSOLEINIT) (PI : PRINTKINIT) (PK : PRINT
   iframe Hk Hpc Hpk
   iintro %R6 Hk Hpc
   -- +0x6e  kinit
-  iapply (mn_kinit KI startedPrimary (k.pushed 2) R6 hs2 (by simp; omega) hn2 hl2 fscKalloc fsReadyKmem
+  iapply (mn_kinit KI startedPrimary (k.pushed 2) R6 hs2 (by simp; omega) hn2 hl2 (by simp [hproc]) fscKalloc fsReadyKmem
     vkl vkn vkc)
   iframe Hk Hpc Hkm0 Hkm16 Hkw Hkn Hkc Hfl Hpages Hklf Hkav0 Hkauth
   iintro %R7 Hk Hpc #Hkml Hkav

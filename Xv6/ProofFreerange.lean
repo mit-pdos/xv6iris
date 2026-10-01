@@ -243,11 +243,12 @@ theorem freerange_epi [CurCtx] (cpu cur : CPU) (k : KCtx)
 /-! ## The call to `kfree` -/
 
 set_option maxHeartbeats 1000000 in
-/-- `kfree`'s contract at its entry address, as a rule. -/
-theorem fr_kfree_call (KF : KFREE) [CurCtx] (c : CPU) (k' : KCtx)
+/-- `kfree`'s contract at its entry address, as a rule, at the boot (`hp0`,
+permit sweep L3b). -/
+theorem fr_kfree_call [WchG GF] (KF : KFREE) [CurCtx] (c : CPU) (k' : KCtx)
     (γl : GName) (γk : KmemNames) (on' : Option Nat)
     (hnoff' : k'.noff + 1 < 2 ^ 31) (hK' : 14 ≤ k'.avail) (hlk' : "kmem" ∉ k'.locks)
-    (hp : pageValid (k'.regs 10#5)) :
+    (hp : pageValid (k'.regs 10#5)) (hp0 : k'.proc = 0#64) :
     kctx c k' ∗ pcIs c KA.«kfree» ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
     pageOwn (k'.regs 10#5) ∗ kallocAvail γk on' ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie' : Bool, ∀ spp' : Bool, ∀ R' : RegMap,
@@ -255,7 +256,7 @@ theorem fr_kfree_call (KF : KFREE) [CurCtx] (c : CPU) (k' : KCtx)
       kctx cpu' ((k'.withSpie spie' spp').withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       kallocAvail γk (availInc on') -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := KF.wp_kfree (hlc := hlc) (GF := GF) c k' γl γk on' hnoff' hK' hlk' hp
+  have h := KF.wp_kfree (hlc := hlc) (GF := GF) c k' γl γk on' hnoff' hK' hlk' hp hp0
   unfold wp_kfree_body at h
   simp only [kfreeAddr] at h
   exact h
@@ -267,9 +268,10 @@ theorem freerange_br_ffffffffffffff94 : KA.«freerange» + 0xffffffffffffff94#64
 set_option maxHeartbeats 4000000 in
 /-- The body at `0x80000b2c`: `kfree` the page below the cursor, step the
 cursor, test.  The continuation runs at whichever hart the thread is on. -/
-theorem freerange_iter (KF : KFREE) [CurCtx]
+theorem freerange_iter [WchG GF] (KF : KFREE) [CurCtx]
     (k : KCtx) (γl : GName) (γk : KmemNames) (on : Option Nat) (base : BitVec 64) (n : Nat)
     (hnoff : k.noff + 1 < 2 ^ 31) (hK : 20 ≤ k.avail) (hlk : "kmem" ∉ k.locks)
+    (hp0 : k.proc = 0#64)
     (hbal : base &&& 0xfff#64 = 0#64)
     (hb1 : base.toNat + 4096 * n ≤ (k.regs 11#5).toNat)
     (hb2 : (k.regs 11#5).toNat < base.toNat + 4096 * (n + 1))
@@ -300,7 +302,7 @@ theorem freerange_iter (KF : KFREE) [CurCtx]
     $$ [- $Hk $Hpc] with [freerange_br_ffffffffffffff94] next c2 hp2
   iintro Hk Hpc
   -- kfree(pa)
-  iapply (fr_kfree_call KF c2 _ γl γk (availAdd on i) ?hn ?hKa ?hl ?hpv) $$ [- $Hk $Hpc]
+  iapply (fr_kfree_call KF c2 _ γl γk (availAdd on i) ?hn ?hKa ?hl ?hpv ?hz) $$ [- $Hk $Hpc]
   rotate_right 1
   k_norm_g
   iframe #
@@ -309,6 +311,7 @@ theorem freerange_iter (KF : KFREE) [CurCtx]
   case hKa => k_norm_g; omega
   case hl => k_norm_g; exact hlk
   case hpv => k_norm_g; exact fr_pageValid (k.regs 11#5) base n i hi hbal hb1 hb3 hb4
+  case hz => k_norm_g; exact hp0
   iapply wpNext_intro_pin
   iintro %c3 %hp3 %spie2 %spp2 %R2 %hsp2 Hk Hpc Hav %hcs2
   k_norm_g [MachCSL.KCtx.withSpie_twice, ret_a96, availInc_availAdd]
@@ -337,9 +340,10 @@ theorem freerange_iter (KF : KFREE) [CurCtx]
 set_option maxHeartbeats 4000000 in
 /-- The loop from `0x80000b2c` with `i` pages freed (`i < n`) runs to the
 caller's continuation.  The hart is quantified inside the induction. -/
-theorem freerange_loop (KF : KFREE) [CurCtx]
+theorem freerange_loop [WchG GF] (KF : KFREE) [CurCtx]
     (k : KCtx) (γl : GName) (γk : KmemNames) (on : Option Nat) (base : BitVec 64) (n : Nat)
     (hnoff : k.noff + 1 < 2 ^ 31) (hK : 20 ≤ k.avail) (hlk : "kmem" ∉ k.locks)
+    (hp0 : k.proc = 0#64)
     (hbal : base &&& 0xfff#64 = 0#64)
     (hb1 : base.toNat + 4096 * n ≤ (k.regs 11#5).toNat)
     (hb2 : (k.regs 11#5).toNat < base.toNat + 4096 * (n + 1))
@@ -373,7 +377,7 @@ theorem freerange_loop (KF : KFREE) [CurCtx]
     iintro ⟨Hk, Hpc, #Hlk, Hpages, Hav, Hframe, HΦ⟩
     rw [hc]
     icases pageRange_peel _ _ $$ Hpages with ⟨Hpg, _⟩
-    iapply (freerange_iter KF k γl γk on base n hnoff hK hlk hbal hb1 hb2 hb3 hb4 i hi
+    iapply (freerange_iter KF k γl γk on base n hnoff hK hlk hp0 hbal hb1 hb2 hb3 hb4 i hi
       spie spp R h9 h18 h19 h20 cur) $$ [- $Hk $Hpc $Hpg $Hav]
     iframe #
     iapply wpNext_intro_pin
@@ -420,7 +424,7 @@ theorem freerange_loop (KF : KFREE) [CurCtx]
     iintro ⟨Hk, Hpc, #Hlk, Hpages, Hav, Hframe, HΦ⟩
     rw [hc]
     icases pageRange_peel _ _ $$ Hpages with ⟨Hpg, Hpages⟩
-    iapply (freerange_iter KF k γl γk on base n hnoff hK hlk hbal hb1 hb2 hb3 hb4 i hi
+    iapply (freerange_iter KF k γl γk on base n hnoff hK hlk hp0 hbal hb1 hb2 hb3 hb4 i hi
       spie spp R h9 h18 h19 h20 cur) $$ [- $Hk $Hpc $Hpg $Hav]
     iframe #
     iapply wpNext_intro_pin
@@ -445,7 +449,7 @@ theorem freerange_loop (KF : KFREE) [CurCtx]
 
 set_option maxHeartbeats 4000000 in
 theorem freerange_proof (KF : KFREE) : FREERANGE :=
-  ⟨fun {hlc GF} _ _ _ cpu k γl γk on base n hnoff hK hlk hargs => by
+  ⟨fun {hlc GF} _ _ _ _ cpu k γl γk on base n hnoff hK hlk hargs hp0 => by
   obtain ⟨hbase, hb1, hb2, hb3, hb4⟩ := hargs
   have hbal : base &&& 0xfff#64 = 0#64 := by rw [hbase]; exact pgRoundUp_aligned _
   unfold wp_freerange_body
@@ -550,7 +554,7 @@ theorem freerange_proof (KF : KFREE) : FREERANGE :=
       (hp18 h).trans ((hp17 h).trans ((hp16 h).trans ((hp15 h).trans ((hp14 h).trans
         ((hp13 h).trans (hpin12 h))))))) $$ HΦ
     rw [Xv6.ua_pushed_spie_self k 6]
-    iapply (freerange_loop KF k γl γk on base n hnoff hK hlk hbal hb1 hb2 hb3 hb4 (n - 1)
+    iapply (freerange_loop KF k γl γk on base n hnoff hK hlk hp0 hbal hb1 hb2 hb3 hb4 (n - 1)
       0 (by omega) k.spie k.spp (fun _ => ⟨rfl, rfl⟩) _ ?g2 ?g9 ?g18 ?g19 ?g20 ?g21 ?g22 ?g23
       ?g24 ?g25 ?g26 ?g27 c18) $$ [- $Hk $Hpc $Hframe $HΦ]
     rotate_right 1

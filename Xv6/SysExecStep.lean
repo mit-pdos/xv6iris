@@ -329,15 +329,28 @@ theorem sys_exec_step_kalloc (KL : KALLOC) (FS : FETCHSTR) (Γ : SchedNames) (k 
   k_step_e (wp_s_jal cpu _ (KA.«sys_exec» + 0x70#64) false 2078270#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_exec_br_kalloc]
   iintro Hk Hpc
-  iapply (sys_exec_kalloc KL cpu _ k.sie (by k_norm_g) k.proc (by k_norm_g) ?gn ?gK)
-    $$ [- $Hk $Hpc $Hte $Hce]
+  -- the block's counter, lent to kalloc (permit sweep L3b): the event costs
+  -- one count, and the block comes back at the raised record
+  icases procPrivFd_evAcc A.γ (procAddr A.j) A.pid (sysExecV2 A P kv) (sysExecM2 A P) $$ Hblk
+    with ⟨Hcnt, Hblk⟩
+  icases actLend_borrow (procAddr A.j) kv $$ Hcnt with ⟨Hl, Hlb⟩
+  ihave Hl := actLend_congr hS.hproc.symm kv $$ Hl
+  iapply (sys_exec_kalloc KL cpu _ k.sie (by k_norm_g) k.proc (by k_norm_g) ?gn ?gK kv)
+    $$ [- $Hk $Hpc $Hte $Hce $Hl]
   rotate_right 1
   k_norm_g [sys_exec_ret_74]
   iframe
   iframe #
   case gn => k_norm_g; exact hS.hnoff
   case gK => k_norm_g; omega
-  iintro %cpu %spie1 %spp1 %R1 %hcs1 Hk Hpc Hte Hce Hpost
+  iintro %cpu %spie1 %spp1 %R1 %hcs1 Hk Hpc Hte Hce Hl Hpost
+  ihave Hl := actLend_congr hS.hproc (kv + 1) $$ Hl
+  icases Hlb $$ %(kv + 1) %(Nat.le_succ kv) Hl with ⟨%kv1, %hkv1, Hcnt⟩
+  ihave Hblk := Hblk $$ %kv1 Hcnt
+  ihave Hblk := (show procPrivFd (GF := GF) A.γ (procAddr A.j) A.pid
+      ((sysExecV2 A P kv).updEv kv1) (sysExecM2 A P) ⊢
+    procPrivFd A.γ (procAddr A.j) A.pid (sysExecV2 A P kv1) (sysExecM2 A P) from .rfl) $$ Hblk
+  have hkv' : A.V.ev ≤ kv1 := Nat.le_trans hkv hkv1
   k_norm_g [sys_exec_ret_74, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp1 : sysExecLoopPins k R1 i := by
     refine sysExecPins_cs k _ R1 _ _ _ _ _ _ _ ?_ hcs1
@@ -367,7 +380,7 @@ theorem sys_exec_step_kalloc (KL : KALLOC) (FS : FETCHSTR) (Γ : SchedNames) (k 
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hr0, MachCSL.beqz_zero]
     iintro Hk Hpc
     unfold sysExecStepOut
-    iapply HΦ $$ %cpu %spie1 %spp1 %_ %P %kv %i %pg %alen %afun %uvf
+    iapply HΦ $$ %cpu %spie1 %spp1 %_ %P %kv1 %i %pg %alen %afun %uvf
     iright
     iright
     unfold sysExecBadSt
@@ -375,7 +388,7 @@ theorem sys_exec_step_kalloc (KL : KALLOC) (FS : FETCHSTR) (Γ : SchedNames) (k 
     iframe Hk Hpc Hte Hce Hblk Hcarry H59 Harr Hpgs
     isplitr
     · ipureintro
-      exact ⟨by omega, hext, hkv, sysExecOk_pgOk _ _ _ _ hok, sysExecLoopPins_bad k _ _ hp2, hal⟩
+      exact ⟨by omega, hext, hkv', sysExecOk_pgOk _ _ _ _ hok, sysExecLoopPins_bad k _ _ hp2, hal⟩
     iexists u
     iexact H60
   · -- ===== a page: on to fetchstr =====
@@ -384,8 +397,8 @@ theorem sys_exec_step_kalloc (KL : KALLOC) (FS : FETCHSTR) (Γ : SchedNames) (k 
     k_step_e (wp_s_branch cpu _ (KA.«sys_exec» + 0x7a#64) true 24#13 10#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [MachCSL.beq_ne _ hnz]
     iintro Hk Hpc
-    iapply (sys_exec_step_str FS Γ k A hS cpu spie1 spp1 _ P kv i pg alen afun uvf pl rest u (R1 10#5)
-      hi hext hkv hok hav hp2 hal hu hunz hpv (by simp only [RegMap.set_apply, ite_true]))
+    iapply (sys_exec_step_str FS Γ k A hS cpu spie1 spp1 _ P kv1 i pg alen afun uvf pl rest u (R1 10#5)
+      hi hext hkv' hok hav hp2 hal hu hunz hpv (by simp only [RegMap.set_apply, ite_true]))
     simp only [sysExecAddr]
     iframe
     iframe #

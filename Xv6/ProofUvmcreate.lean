@@ -6,9 +6,10 @@ interfaces of `kalloc` and `memset`.
 the zeroed page is an empty root node (`PTree.zeroNode`), owned whole
 (`ptreeOwn 2`).  Stated at either interrupt index, as `kalloc` is.
 
-THE LEND (permit sweep L3a, no Rocq counterpart): `kalloc` does not take
-it yet, so it is framed through the continuation once, at entry
-(`SlotGen.actLend_cont_frame`), and returns at `ke`.
+THE LEND (permit sweep L3a/L3b, no Rocq counterpart): passed to `kalloc`
+(`uc_kalloc_lend_call`, L3b), which steps it; the stepped lend is framed
+into the exit (`SlotGen.actLend_cont_frame_step`), so uvmcreate returns at
+`ke + 1`.
 -/
 import Xv6.SpecUvmcreate
 import Xv6.SpecMemset
@@ -76,8 +77,6 @@ theorem uvmcreate_proof (KAL : KALLOC) (MS : MEMSET) : UVMCREATE :=
   simp only [uvmcreateAddr]
   have hK' : 18 ≤ k.avail := hK
   iintro ⟨Hk, Hpc, #Hlk, Hav, Hlend, HΦ⟩
-  -- the lend: `kalloc` does not take it yet, framed through
-  ihave HΦ := actLend_cont_frame _ _ _ _ _ _ _ _ _ $$ HΦ Hlend
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   k_norm_g
   -- the prologue
@@ -92,17 +91,19 @@ theorem uvmcreate_proof (KAL : KALLOC) (MS : MEMSET) : UVMCREATE :=
   k_step_gen (wp_s_jal c1 _ (KA.«uvmcreate» + 0xa#64) false 2095418#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [uvmcreate_br_fffffffffffff944] next c2 hp2
   iintro Hk Hpc
-  iapply (uc_kalloc_call KAL c2 _ γl γk on ?hn1 ?hK1 ?hl1) $$ [- $Hk $Hpc]
+  iapply (uc_kalloc_lend_call KAL c2 _ γl γk on ke ?hn1 ?hK1 ?hl1) $$ [- $Hk $Hpc]
   rotate_right 1
   k_norm_g
   iframe #
-  iframe Hav
+  iframe Hav Hlend
   case hn1 => k_norm_g; omega
   case hK1 => k_norm_g; omega
   case hl1 => k_norm_g; exact hlk
   k_norm_g [uc_ret_119a]
   iapply wpNext_intro_pin
-  iintro %c3 %hp3 %spie1 %spp1 %R1 %hsp1 Hk Hpc HPost %hcs1
+  iintro %c3 %hp3 %spie1 %spp1 %R1 %hsp1 Hk Hpc Hlend HPost %hcs1
+  -- the lend comes back stepped: framed into the exit
+  ihave HΦ := actLend_cont_frame_step _ _ _ _ (Nat.le_refl ke) _ _ _ _ $$ HΦ Hlend
   k_norm_g
   unfold calleeSaved at hcs1
   k_norm_g at hcs1

@@ -26,6 +26,10 @@ sys_exec's FILL-LOOP CALL SITES AND BOOKKEEPING (stage file of
 2. Permit sweep L1b: the fetchaddr / fetchstr wrappers' continuations take
    the callee's raised count (`(kv : Nat)`, `⌜V.ev ≤ kv⌝`, the block at
    `V.updEv kv`).
+3. Permit sweep L3b (no Rocq counterpart): `sys_exec_kalloc` is `kalloc`'s
+   LED form at a lend `actLend pj kc` (the caller borrows it from the block,
+   `SysExecStep.sys_exec_step_kalloc`), handing back `actLend pj (kc + 1)`;
+   the receipt is dropped.
 
 Imports only the shared vocabulary and callee Specs.
 -/
@@ -207,33 +211,36 @@ theorem sys_exec_fetchaddr (FA : FETCHADDR) (cpu : CPU) (k' : KCtx) (se : Bool) 
   exact ⟨hcs, hf.1, hf.2⟩
 
 set_option maxHeartbeats 8000000 in
-/-- `kalloc()` (Rocq `Kalloc.wp_kalloc_sconf`), untracked count. -/
+/-- `kalloc()` (Rocq `Kalloc.wp_kalloc_sconf`), untracked count; at the
+block's lend (permit sweep L3b: the led form, the lend back stepped, the
+receipt dropped). -/
 theorem sys_exec_kalloc (KL : KALLOC) (cpu : CPU) (k' : KCtx) (se : Bool) (hs : k'.sie = se)
-    (pj : BitVec 64) (hpj : k'.proc = pj) (hnoff : k'.noff = 0) (hK : 14 ≤ k'.avail) :
+    (pj : BitVec 64) (hpj : k'.proc = pj) (hnoff : k'.noff = 0) (hK : 14 ≤ k'.avail) (kc : Nat) :
     kctx cpu k' ∗ pcIs cpu KA.«kalloc» ∗ trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗
-    fsReady (hlc := hlc) ∗
+    fsReady (hlc := hlc) ∗ actLend pj kc ∗
     (∀ (c : CPU) (spie spp : Bool) (R' : RegMap), ⌜calleeSaved k'.regs R'⌝ -∗
       kctx c ((k'.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k'.regs 1#5)) -∗
-      trapCsrsExt c se -∗ cpuClaimExt c se pj -∗
+      trapCsrsExt c se -∗ cpuClaimExt c se pj -∗ actLend pj (kc + 1) -∗
       kallocPost fsReadyKmem none (R' 10#5) -∗ wpLoop c)
     ⊢ wpLoop (GF := GF) cpu := by
   subst hs hpj
-  iintro ⟨Hk, Hpc, Hte, Hce, #Hrdy, HK⟩
+  iintro ⟨Hk, Hpc, Hte, Hce, #Hrdy, Hl, HK⟩
   icases sysfile_nolocks cpu k' hnoff $$ Hk with ⟨%hlocks, Hk⟩
   icases fsReady_kmem $$ Hrdy with ⟨#Hkl, #Hav⟩
-  have h := KL.wp_kalloc (hlc := hlc) (GF := GF) cpu k' fscKalloc fsReadyKmem none
+  have h := KL.wp_kalloc_led (hlc := hlc) (GF := GF) cpu k' fscKalloc fsReadyKmem none kc
     (by rw [hnoff]; omega) hK (by rw [hlocks]; simp)
-  unfold wp_kalloc_body at h
+  unfold wp_kalloc_led_body at h
   simp only [kallocAddr] at h
   iapply h
-  iframe Hk Hpc
+  iframe Hk Hpc Hl
   iframe #
   iapply wpNext_intro_pin
-  iintro %c %hpin %spie %spp %R' %- Hk Hpc Hpost %hcs
+  iintro %c %hpin %spie %spp %R' %- Hk Hpc Hl Hpost %hcs
+  ihave Hpost := kallocPostLed_post fsReadyKmem none k'.proc (R' 10#5) $$ Hpost
   have hpin' : k'.sie = false → c = cpu := fun h => hpin (Or.inl h)
   ihave Hte := trapCsrsExt_move _ _ _ hpin' $$ Hte
   ihave Hce := cpuClaimExt_move _ _ _ _ hpin' $$ Hce
-  iapply HK $$ %c %spie %spp %R' %hcs Hk Hpc Hte Hce Hpost
+  iapply HK $$ %c %spie %spp %R' %hcs Hk Hpc Hte Hce Hl Hpost
 
 set_option maxHeartbeats 8000000 in
 /-- `fetchstr(addr, buf, max)` (Rocq `Fetchstr.wp_fetchstr_sconf`): the

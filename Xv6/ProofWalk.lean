@@ -9,14 +9,18 @@ applied at level 2 and then at level 1; with `alloc` it calls
 zero node in (`PTree.fill`), and it bails out to the shared epilogue with
 `a0 = 0` when `alloc` is off or `kalloc` fails.
 
-THE LEND (permit sweep L3a, no Rocq counterpart): the allocating contract
-takes it; `kalloc` does not take it yet, so it is framed through the
-continuation once, at entry (`SlotGen.actLend_cont_frame_x`), and returns
-at `ke`.  The non-allocating contract is unchanged.
+THE LEND (permit sweep L3a/L3b, no Rocq counterpart): the allocating
+contract takes it and threads it (L3b): `walk_alloc` passes the count in
+hand to `kalloc` (`uc_kalloc_lend_call`), which steps it; `walk_descend`
+carries `∃ k' ≥ ke` out of both arms; `walk_proof` lends the first descent
+`ke`, the second the count the first returned, and frames the final count
+into the caller's continuation at the exit (`walkPostL_frame`).  The
+non-allocating contract is unchanged.
 -/
 import MachCSL.WpSmodeAlu2
 import Xv6.SpecWalk
 import Xv6.SpecKalloc
+import Xv6.UvmCallSites
 import Xv6.SpecMemset
 import Xv6.PtOwnLemmas
 import Xv6.CodeTactics
@@ -270,17 +274,18 @@ theorem walk_br_fffffffffffffd6a : KA.«walk» + 0xfffffffffffffd6a#64 = KA.«me
 
 theorem walk_br_fffffffffffffbd0 : KA.«walk» + 0xfffffffffffffbd0#64 = KA.«kalloc» := by decide
 
-theorem walk_alloc (KAL : KALLOC) (MS : MEMSET) [Xv6G GF] [CurCtx]
-    (cpu : CPU) (kb : KCtx) (γl : GName) (γk : KmemNames) (on : Option Nat)
+theorem walk_alloc [WchG GF] (KAL : KALLOC) (MS : MEMSET) [Xv6G GF] [CurCtx]
+    (cpu : CPU) (kb : KCtx) (γl : GName) (γk : KmemNames) (on : Option Nat) (ke : Nat)
     (hnoff : kb.noff + 1 < 2 ^ 31) (hK : 14 ≤ kb.avail) (hlk : "kmem" ∉ kb.locks)
     (R : RegMap) (pe : BitVec 64) (h18 : R 18#5 = pe) (h22 : R 22#5 = 1#64) (Res1 Res2 Res3 Res4 : IProp GF) :
     kctx cpu (kb.withRegs R) ∗ pcIs cpu (KA.«walk» + 0x72#64) ∗
     isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
     wordPointsTo pe 8 (DFrac.own 1) 0#64 ∗ kallocAvail γk on ∗ Res1 ∗ Res2 ∗ Res3 ∗ Res4 ∗
+    actLend kb.proc ke ∗
     wpNext kb.sie kb.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (b : BitVec 44),
       ⌜kb.sie = false → spie = kb.spie ∧ spp = kb.spp⌝ -∗
       kctx cpu' ((kb.withSpie spie spp).withRegs R') -∗ pcIs cpu' (KA.«walk» + 0x40#64) -∗
-      Res1 -∗ Res2 -∗ Res3 -∗ Res4 -∗
+      Res1 -∗ Res2 -∗ Res3 -∗ Res4 -∗ actLend kb.proc (ke + 1) -∗
       wordPointsTo pe 8 (DFrac.own 1) (kPtr b) -∗
       nodeOwn (DFrac.own 1) (PTree.zeroNode b) -∗
       kallocAvail γk (availDec on) -∗
@@ -288,11 +293,11 @@ theorem walk_alloc (KAL : KALLOC) (MS : MEMSET) [Xv6G GF] [CurCtx]
     wpNext kb.sie kb.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
       ⌜kb.sie = false → spie = kb.spie ∧ spp = kb.spp⌝ -∗
       kctx cpu' ((kb.withSpie spie spp).withRegs R') -∗ pcIs cpu' (KA.«walk» + 0x52#64) -∗
-      Res1 -∗ Res2 -∗ Res3 -∗ Res4 -∗
+      Res1 -∗ Res2 -∗ Res3 -∗ Res4 -∗ actLend kb.proc (ke + 1) -∗
       wordPointsTo pe 8 (DFrac.own 1) 0#64 -∗ kallocAvail γk on -∗
       ⌜R' 10#5 = 0#64 ∧ availZero on ∧ walkPres R R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) cpu := by
-  iintro ⟨Hk, Hpc, #Hlk, Hpe, Hav, HR1, HR2, HR3, HR4, Hok, Hbad⟩
+  iintro ⟨Hk, Hpc, #Hlk, Hpe, Hav, HR1, HR2, HR3, HR4, Hl, Hok, Hbad⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- beqz s6, 0x80001044 : not taken (alloc = 1)
   k_step_gen (wp_s_branch cpu _ (KA.«walk» + 0x72#64) false 36#13 22#5 0#5 (by decide) bop.BEQ)
@@ -302,31 +307,17 @@ theorem walk_alloc (KAL : KALLOC) (MS : MEMSET) [Xv6G GF] [CurCtx]
   k_step_gen (wp_s_jal c1 _ (KA.«walk» + 0x76#64) false 2095962#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext
     $$ [- $Hk $Hpc] with [walk_br_fffffffffffffbd0] next c2 hp2
   iintro Hk Hpc
-  have hka : ∀ (k' : KCtx) (hnoff' : k'.noff + 1 < 2 ^ 31) (hK' : 14 ≤ k'.avail)
-      (hlk' : "kmem" ∉ k'.locks),
-      kctx c2 k' ∗ pcIs c2 KA.«kalloc» ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
-      kallocAvail γk on ∗
-      wpNext k'.sie k'.proc c2 (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
-        ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
-        kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
-        kallocPost γk on (R' 10#5) -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
-      ⊢ wpLoop (GF := GF) c2 := by
-    intro k' hnoff' hK' hlk'
-    have h := KAL.wp_kalloc (hlc := hlc) (GF := GF) c2 k' γl γk on hnoff' hK' hlk'
-    unfold wp_kalloc_body at h
-    simp only [kallocAddr] at h
-    exact h
-  iapply (hka _ ?hn1 ?hK1 ?hl1) $$ [- $Hk $Hpc]
+  iapply (uc_kalloc_lend_call KAL c2 _ γl γk on ke ?hn1 ?hK1 ?hl1) $$ [- $Hk $Hpc]
   rotate_right 1
   k_norm_g
   iframe #
-  iframe Hav
+  iframe Hav Hl
   case hn1 => k_norm_g; exact hnoff
   case hK1 => k_norm_g; exact hK
   case hl1 => k_norm_g; exact hlk
   k_norm_g
   iapply wpNext_intro_pin
-  iintro %c3 %hp3 %spie %spp %R2 %hsp Hk Hpc HPost %hcs
+  iintro %c3 %hp3 %spie %spp %R2 %hsp Hk Hpc Hl HPost %hcs
   k_norm_g [w_ret_f8a]
   -- c.mv s1,a0
   k_step_gen (wp_s_add c3 _ (KA.«walk» + 0x7a#64) true 9#5 0#5 10#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext
@@ -347,7 +338,7 @@ theorem walk_alloc (KAL : KALLOC) (MS : MEMSET) [Xv6G GF] [CurCtx]
     have hpin : kb.sie = false ∨ kb.proc = 0#64 → c5 = cpu :=
       fun h => (hp5 h).trans ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h))))
     ihave Hbad := wpNext_at _ _ _ c5 _ hpin $$ Hbad
-    iapply Hbad $$ %spie %spp %_ %hsp Hk Hpc HR1 HR2 HR3 HR4 Hpe Hav
+    iapply Hbad $$ %spie %spp %_ %hsp Hk Hpc HR1 HR2 HR3 HR4 Hl Hpe Hav
     ipureintro
     refine ⟨by simp [RegMap.set_apply, hr0], hzero, ?_⟩
     exact ⟨by simp [RegMap.set_apply, e2], by simp [RegMap.set_apply, e8],
@@ -434,7 +425,7 @@ theorem walk_alloc (KAL : KALLOC) (MS : MEMSET) [Xv6G GF] [CurCtx]
       rw [hpb]
       iexact Hbuf
     iapply Hok $$ %spie %spp %_ %(BitVec.extractLsb' 12 44 (R2 10#5)) %hsp Hk Hpc
-      HR1 HR2 HR3 HR4 Hptr Hnode Hav
+      HR1 HR2 HR3 HR4 Hl Hptr Hnode Hav
     · ipureintro
       refine ⟨by rw [hpb]; exact hvalid, by simp [RegMap.set_apply, f9, hpb], ?_⟩
       exact ⟨by simp [RegMap.set_apply, f2, e2], by simp [RegMap.set_apply, f8, e8],
@@ -450,8 +441,8 @@ set_option maxHeartbeats 4000000 in
 /-- From `0x80000fd4`, one level of the descent: the entry is read, and the
 walk either continues in the existing subtree or in a freshly allocated
 zero node (`(KernelSyms.«walk» + 0x40)`), or gives up (`(KernelSyms.«walk» + 0x52)`, `a0 = 0`). -/
-theorem walk_descend (KAL : KALLOC) (MS : MEMSET) [Xv6G GF] [CurCtx]
-    (cpu : CPU) (kb : KCtx) (γl : GName) (γk : KmemNames) (on : Option Nat)
+theorem walk_descend [WchG GF] (KAL : KALLOC) (MS : MEMSET) [Xv6G GF] [CurCtx]
+    (cpu : CPU) (kb : KCtx) (γl : GName) (γk : KmemNames) (on : Option Nat) (ke : Nat)
     (hnoff : kb.noff + 1 < 2 ^ 31) (hK : 14 ≤ kb.avail) (hlk : "kmem" ∉ kb.locks)
     (lvl : Nat) (sh : Nat) (t : PTree) (va : BitVec 64) (hwf : t.wfU (lvl+1))
     (i : BitVec 9) (hi : i = vpnIdx (vpnOf va) (lvl+1))
@@ -463,11 +454,12 @@ theorem walk_descend (KAL : KALLOC) (MS : MEMSET) [Xv6G GF] [CurCtx]
     kctx cpu (kb.withRegs R) ∗ pcIs cpu (KA.«walk» + 0x26#64) ∗
     isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
     ptreeOwn (lvl+1) (DFrac.own 1) t ∗ kallocAvail γk on ∗ Res1 ∗ Res2 ∗ Res3 ∗
+    actLend kb.proc ke ∗
     wpNext kb.sie kb.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap)
         (fresh : List (BitVec 44)) (u c : PTree),
       ⌜kb.sie = false → spie = kb.spie ∧ spp = kb.spp⌝ -∗
       kctx cpu' ((kb.withSpie spie spp).withRegs R') -∗ pcIs cpu' (KA.«walk» + 0x40#64) -∗
-      Res1 -∗ Res2 -∗ Res3 -∗
+      Res1 -∗ Res2 -∗ Res3 -∗ (∃ k' : Nat, ⌜ke ≤ k'⌝ ∗ actLend kb.proc k') -∗
       ptreeOwn lvl (DFrac.own 1) c -∗
       (∀ c' : PTree, ptreeOwn lvl (DFrac.own 1) c' -∗
           ptreeOwn (lvl+1) (DFrac.own 1) (u.setKid i c')) -∗
@@ -479,11 +471,11 @@ theorem walk_descend (KAL : KALLOC) (MS : MEMSET) [Xv6G GF] [CurCtx]
     wpNext kb.sie kb.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
       ⌜kb.sie = false → spie = kb.spie ∧ spp = kb.spp⌝ -∗
       kctx cpu' ((kb.withSpie spie spp).withRegs R') -∗ pcIs cpu' (KA.«walk» + 0x52#64) -∗
-      Res1 -∗ Res2 -∗ Res3 -∗
+      Res1 -∗ Res2 -∗ Res3 -∗ (∃ k' : Nat, ⌜ke ≤ k'⌝ ∗ actLend kb.proc k') -∗
       ptreeOwn (lvl+1) (DFrac.own 1) t -∗ kallocAvail γk on -∗
       ⌜t.kids i = none ∧ R' 10#5 = 0#64 ∧ availZero on ∧ walkPres R R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) cpu := by
-  iintro ⟨Hk, Hpc, #Hlk, Htree, Hav, HR1, HR2, HR3, Hok, Hbad⟩
+  iintro ⟨Hk, Hpc, #Hlk, Htree, Hav, HR1, HR2, HR3, Hl, Hok, Hbad⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- srl s2,s3,s4 ; andi s2,s2,511 ; c.slli s2,3 ; c.add s2,s2,s1
   k_step_gen (wp_s_srl cpu _ (KA.«walk» + 0x26#64) false 18#5 19#5 20#5 (by decide))
@@ -533,8 +525,9 @@ theorem walk_descend (KAL : KALLOC) (MS : MEMSET) [Xv6G GF] [CurCtx]
     case' _ =>
       rw [List.length_nil, Xv6.availSub_zero]
       iexact Hav
+    ihave Hl := actLend_ret_intro kb.proc ke $$ Hl
     iapply Hok $$ %kb.spie %kb.spp %_ %([] : List (BitVec 44)) %t %c
-      %(fun _ => ⟨rfl, rfl⟩) Hk Hpc HR1 HR2 HR3 Hc Hcl Hav
+      %(fun _ => ⟨rfl, rfl⟩) Hk Hpc HR1 HR2 HR3 Hl Hc Hcl Hav
     ipureintro
     refine ⟨?_, hcwf, by simp, by simp, ?_⟩
     · intro fr
@@ -564,7 +557,7 @@ theorem walk_descend (KAL : KALLOC) (MS : MEMSET) [Xv6G GF] [CurCtx]
         ((hp2 h).trans (hp1 h))))))
     ihave Hok := wpNext_shift _ _ _ _ _ hpin7 $$ Hok
     ihave Hbad := wpNext_shift _ _ _ _ _ hpin7 $$ Hbad
-    iapply (walk_alloc KAL MS c7 kb γl γk on hnoff hK hlk _ (pteAddr t.base i) ?hh18 ?hh22
+    iapply (walk_alloc KAL MS c7 kb γl γk on ke hnoff hK hlk _ (pteAddr t.base i) ?hh18 ?hh22
       iprop(∀ (v : BitVec 64) (oc : Option PTree),
         wordPointsTo (pteAddr t.base i) 8 (DFrac.own 1) v -∗ kidOwnO lvl (DFrac.own 1) oc -∗
         ptreeOwn (lvl+1) (DFrac.own 1) (setKidO (t.setEnt i v) i oc))
@@ -583,10 +576,13 @@ theorem walk_descend (KAL : KALLOC) (MS : MEMSET) [Xv6G GF] [CurCtx]
     · iexact HR2
     isplitl [HR3]
     · iexact HR3
+    isplitl [Hl]
+    · iexact Hl
     isplitl [Hok]
     · -- the allocation succeeded
       iapply wpNext_mono _ _ _ _ _ $$ Hok
-      iintro %cc H %spie %spp %R' %b %hsp Hk Hpc Hcl HR1 HR2 HR3 Hptr Hnode Hav %hfacts
+      iintro %cc H %spie %spp %R' %b %hsp Hk Hpc Hcl HR1 HR2 HR3 Hl Hptr Hnode Hav %hfacts
+      ihave Hl := actLend_ret_step kb.proc (Nat.le_refl ke) $$ Hl
       obtain ⟨hvb, h9', hpres⟩ := hfacts
       ihave Hnode2 : kidOwnO (GF := GF) lvl (DFrac.own 1) (some (PTree.zeroNode b)) $$ [Hnode]
       case' _ =>
@@ -603,7 +599,7 @@ theorem walk_descend (KAL : KALLOC) (MS : MEMSET) [Xv6G GF] [CurCtx]
         $$ Htree with ⟨Hc, Hcl2⟩
       iapply H $$ %spie %spp %R' %([b] : List (BitVec 44))
         %(setKidO (t.setEnt i (kPtr b)) i (some (PTree.zeroNode b)))
-        %(PTree.zeroNode b) %hsp Hk Hpc HR1 HR2 HR3 Hc Hcl2 Hav
+        %(PTree.zeroNode b) %hsp Hk Hpc HR1 HR2 HR3 Hl Hc Hcl2 Hav
       ipureintro
       refine ⟨?_, PTree.zeroNode_wfU b lvl, ?_, h9', ?_⟩
       · intro fr
@@ -620,7 +616,8 @@ theorem walk_descend (KAL : KALLOC) (MS : MEMSET) [Xv6G GF] [CurCtx]
           by simp [RegMap.set_apply], by simp [RegMap.set_apply]⟩
     · -- the allocation failed
       iapply wpNext_mono _ _ _ _ _ $$ Hbad
-      iintro %cc H %spie %spp %R' %hsp Hk Hpc Hcl HR1 HR2 HR3 Hptr Hav %hfacts
+      iintro %cc H %spie %spp %R' %hsp Hk Hpc Hcl HR1 HR2 HR3 Hl Hptr Hav %hfacts
+      ihave Hl := actLend_ret_step kb.proc (Nat.le_refl ke) $$ Hl
       obtain ⟨h10', hz, hpres⟩ := hfacts
       have hconv : ptreeOwn (GF := GF) (lvl+1) (DFrac.own 1) (setKidO (t.setEnt i 0#64) i none)
           ⊢ ptreeOwn (lvl+1) (DFrac.own 1) t := by
@@ -632,7 +629,7 @@ theorem walk_descend (KAL : KALLOC) (MS : MEMSET) [Xv6G GF] [CurCtx]
         iempintro
       ihave Htree := Hcl $$ %(0#64 : BitVec 64) %(none : Option PTree) Hptr Hemp
       ihave Htree := hconv $$ Htree
-      iapply H $$ %spie %spp %R' %hsp Hk Hpc HR1 HR2 HR3 Htree Hav
+      iapply H $$ %spie %spp %R' %hsp Hk Hpc HR1 HR2 HR3 Hl Htree Hav
       ipureintro
       refine ⟨trivial, h10', hz, ?_⟩
       refine walkPres_trans ?_ hpres
@@ -673,6 +670,32 @@ def walkPost [Xv6G GF] [CurCtx] (k : KCtx) (γk : KmemNames) (on : Option Nat) (
       walkRet (t.fill 2 (vpnOf (k.regs 11#5)) fresh).1 (vpnOf (k.regs 11#5)) (R' 10#5) ∧
       (R' 10#5 = 0#64 → availZero (availSub on fresh.length))⌝ -∗
     wpLoop cpu'
+
+/-- The caller's continuation as the contract states it (permit sweep L3b):
+`walkPost` with the returned lend `∃ k' ≥ ke` right after the return pc. -/
+def walkPostL [Xv6G GF] [WchG GF] [CurCtx] (k : KCtx) (γk : KmemNames) (on : Option Nat) (t : PTree)
+    (ke : Nat) (cpu' : CPU) : IProp GF := iprop%
+  ∀ spie : Bool, ∀ spp : Bool, ∀ (R' : RegMap) (fresh : List (BitVec 44)),
+    ⌜k.sie = false → spie = k.spie ∧ spp = k.spp⌝ -∗
+    kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
+    (∃ k' : Nat, ⌜ke ≤ k'⌝ ∗ actLend k.proc k') -∗
+    ptreeOwn 2 (DFrac.own 1) (t.fill 2 (vpnOf (k.regs 11#5)) fresh).1 -∗
+    kallocAvail γk (availSub on fresh.length) -∗
+    ⌜calleeSaved k.regs R' ∧
+      (t.fill 2 (vpnOf (k.regs 11#5)) fresh).2 = [] ∧
+      fresh.Nodup ∧ (∀ b ∈ fresh, pageValid (pageAddr b) ∧ b ∉ t.pages 2) ∧
+      walkRet (t.fill 2 (vpnOf (k.regs 11#5)) fresh).1 (vpnOf (k.regs 11#5)) (R' 10#5) ∧
+      (R' 10#5 = 0#64 → availZero (availSub on fresh.length))⌝ -∗
+    wpLoop cpu'
+
+/-- At the exit the final lend is framed into the caller's continuation. -/
+theorem walkPostL_frame [Xv6G GF] [WchG GF] [CurCtx] (sie : Bool) (p : BitVec 64) (cpu : CPU)
+    (k : KCtx) (γk : KmemNames) (on : Option Nat) (t : PTree) (ke : Nat) :
+    wpNext sie p cpu (walkPostL (GF := GF) k γk on t ke) ⊢
+    (∃ k' : Nat, ⌜ke ≤ k'⌝ ∗ actLend k.proc k') -∗ wpNext sie p cpu (walkPost k γk on t) := by
+  unfold walkPostL walkPost wpNext
+  iintro H Hl %cpu' %h %spie %spp %R' %fresh HA HB HC
+  iapply H $$ %cpu' %h %spie %spp %R' %fresh HA HB HC Hl
 
 /-! ## The exit -/
 
@@ -734,8 +757,6 @@ theorem walk_proof (KAL : KALLOC) (MS : MEMSET) : WALK :=
   unfold wp_walk_body
   simp only [walkAddr]
   iintro ⟨Hk, Hpc, #Hlk, Htree, Hav, Hlend, Hnext⟩
-  -- the lend: `kalloc` does not take it yet, framed through
-  ihave Hnext := actLend_cont_frame_x _ _ _ _ _ _ _ _ _ $$ Hnext Hlend
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   icases kctx_wf _ _ $$ Hk with ⟨%hwfk, Hk⟩
   have hK8 : 8 ≤ k.avail := by omega
@@ -776,12 +797,12 @@ theorem walk_proof (KAL : KALLOC) (MS : MEMSET) : WALK :=
   have hpin9 : k.sie = false ∨ k.proc = 0#64 → c9 = cpu :=
     fun h => (hp9 h).trans ((hp8 h).trans ((hp7 h).trans ((hp6 h).trans ((hp5 h).trans
       ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h))))))))
-  iapply (walk_descend KAL MS c9 (k.pushed 8) γl γk on ?hn1 ?hK1 ?hl1 1 30 t (k.regs 11#5)
+  iapply (walk_descend KAL MS c9 (k.pushed 8) γl γk on ke ?hn1 ?hK1 ?hl1 1 30 t (k.regs 11#5)
     hwf (vpnIdx (vpnOf (k.regs 11#5)) 2) rfl (fun b => w_idx2 (k.regs 11#5) b) _
     ?h9a ?h19a ?h20a ?h22a
     iprop(frame8 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)
       (k.regs 20#5) (k.regs 21#5) (k.regs 22#5))
-    iprop(wpNext k.sie k.proc cpu (walkPost k γk on t)) iprop(emp)) $$ [- $Hk $Hpc]
+    iprop(wpNext k.sie k.proc cpu (walkPostL k γk on t ke)) iprop(emp)) $$ [- $Hk $Hpc]
   rotate_right 1
   case hn1 => simp only [KCtx.pushed_noff]; exact hnoff
   case hK1 => simp only [KCtx.pushed_avail]; omega
@@ -795,14 +816,17 @@ theorem walk_proof (KAL : KALLOC) (MS : MEMSET) : WALK :=
   iframe Hav
   iframe Hframe
   isplitl [Hnext]
-  · unfold walkPost
+  · unfold walkPostL
     iexact Hnext
   isplitl []
   · iempintro
+  isplitl [Hlend]
+  · iapply (actLend_congr (KCtx.pushed_proc k 8).symm ke)
+    iexact Hlend
   isplitl []
   · -- the descent reached the level-1 node
     iapply wpNext_intro_pin
-    iintro %ca %hpa %spie1 %spp1 %R1 %fresh1 %u2 %c1 %hsp1 Hk Hpc Hframe Hnext _ Hc1 Hcl2 Hav %hf1
+    iintro %ca %hpa %spie1 %spp1 %R1 %fresh1 %u2 %c1 %hsp1 Hk Hpc Hframe Hnext _ ⟨%k1, %hk1, Hl1⟩ Hc1 Hcl2 Hav %hf1
     obtain ⟨hfill1, hwf1, hval1, h9a, hpres1⟩ := hf1
     obtain ⟨p2, p8, p19, p20, p21, p22, p23, p24, p25, p26, p27⟩ := hpres1
     have hpina : k.sie = false ∨ k.proc = 0#64 → ca = cpu := fun h => (hpa h).trans (hpin9 h)
@@ -815,12 +839,12 @@ theorem walk_proof (KAL : KALLOC) (MS : MEMSET) : WALK :=
     have hpinc : k.sie = false ∨ k.proc = 0#64 → cc = cpu :=
       fun h => (hpcc h).trans ((hpb h).trans (hpina h))
     iapply (walk_descend KAL MS cc ((k.pushed 8).withSpie spie1 spp1) γl γk
-      (availSub on fresh1.length) ?hn2 ?hK2 ?hl2 0 21 c1 (k.regs 11#5) hwf1
+      (availSub on fresh1.length) k1 ?hn2 ?hK2 ?hl2 0 21 c1 (k.regs 11#5) hwf1
       (vpnIdx (vpnOf (k.regs 11#5)) 1) rfl (fun b => w_idx1 (k.regs 11#5) b) _
       ?h9b ?h19b ?h20b ?h22b
       iprop(frame8 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)
         (k.regs 20#5) (k.regs 21#5) (k.regs 22#5))
-      iprop(wpNext k.sie k.proc cpu (walkPost k γk on t))
+      iprop(wpNext k.sie k.proc cpu (walkPostL k γk on t ke))
       iprop(∀ c' : PTree, ptreeOwn 1 (DFrac.own 1) c' -∗
         ptreeOwn (1+1) (DFrac.own 1) (u2.setKid (vpnIdx (vpnOf (k.regs 11#5)) 2) c')))
       $$ [- $Hk $Hpc]
@@ -838,11 +862,17 @@ theorem walk_proof (KAL : KALLOC) (MS : MEMSET) : WALK :=
     iframe Hframe
     iframe Hnext
     iframe Hcl2
+    ihave Hl1 := actLend_congr (p := k.proc) (p' := ((k.pushed 8).withSpie spie1 spp1).proc)
+      (by simp) k1 $$ Hl1
+    iframe Hl1
     isplitl []
     · -- the descent reached the level-0 node
       iapply wpNext_intro_pin
-      iintro %cd %hpd %spie2 %spp2 %R2 %fresh2 %u1 %c0 %hsp2 Hk Hpc Hframe Hnext Hcl2 Hc0 Hcl1 Hav
+      iintro %cd %hpd %spie2 %spp2 %R2 %fresh2 %u1 %c0 %hsp2 Hk Hpc Hframe Hnext Hcl2 Hl Hc0 Hcl1 Hav
         %hf2
+      ihave Hl := actLend_ret_congr (p' := k.proc) (by simp) k1 $$ Hl
+      ihave Hl := actLend_ret_weaken k.proc hk1 $$ Hl
+      ihave Hnext := walkPostL_frame _ _ _ _ _ _ _ _ $$ Hnext Hl
       obtain ⟨hfill2', hwf0, hval2, h9b, hpres2⟩ := hf2
       obtain ⟨q2, q8, q19, q20, q21, q22, q23, q24, q25, q26, q27⟩ := hpres2
       have hpind : k.sie = false ∨ k.proc = 0#64 → cd = cpu := fun h => (hpd h).trans (hpinc h)
@@ -943,7 +973,10 @@ theorem walk_proof (KAL : KALLOC) (MS : MEMSET) : WALK :=
           decide) hnz
     · -- the level-1 pointer was missing and `kalloc` failed
       iapply wpNext_intro_pin
-      iintro %cd %hpd %spie2 %spp2 %R2 %hsp2 Hk Hpc Hframe Hnext Hcl2 Hc1 Hav %hf2
+      iintro %cd %hpd %spie2 %spp2 %R2 %hsp2 Hk Hpc Hframe Hnext Hcl2 Hl Hc1 Hav %hf2
+      ihave Hl := actLend_ret_congr (p' := k.proc) (by simp) k1 $$ Hl
+      ihave Hl := actLend_ret_weaken k.proc hk1 $$ Hl
+      ihave Hnext := walkPostL_frame _ _ _ _ _ _ _ _ $$ Hnext Hl
       obtain ⟨hk1, h10b, hz, hpres2⟩ := hf2
       obtain ⟨q2, q8, q19, q20, q21, q22, q23, q24, q25, q26, q27⟩ := hpres2
       have hpind : k.sie = false ∨ k.proc = 0#64 → cd = cpu := fun h => (hpd h).trans (hpinc h)
@@ -975,7 +1008,9 @@ theorem walk_proof (KAL : KALLOC) (MS : MEMSET) : WALK :=
         $$ [- $Hk3 $Hpc $Hframe $Htree2 $Hav $Hnext]
   · -- the level-2 pointer was missing and `kalloc` failed
     iapply wpNext_intro_pin
-    iintro %ca %hpa %spie1 %spp1 %R1 %hsp1 Hk Hpc Hframe Hnext _ Htree Hav %hf1
+    iintro %ca %hpa %spie1 %spp1 %R1 %hsp1 Hk Hpc Hframe Hnext _ Hl Htree Hav %hf1
+    ihave Hl := actLend_ret_congr (KCtx.pushed_proc k 8) ke $$ Hl
+    ihave Hnext := walkPostL_frame _ _ _ _ _ _ _ _ $$ Hnext Hl
     obtain ⟨hk2, h10a, hz, hpres1⟩ := hf1
     obtain ⟨p2, p8, p19, p20, p21, p22, p23, p24, p25, p26, p27⟩ := hpres1
     have hpina : k.sie = false ∨ k.proc = 0#64 → ca = cpu := fun h => (hpa h).trans (hpin9 h)

@@ -8,6 +8,13 @@ THE LED FORM IS THE PROOF (NI-LEDGER-KALLOC, Rocq bed7ee0dd):
 appends `KAlloc k.proc` (`kmemAuth_dec`) -- and `kalloc_proof`'s landed
 field is its corollary.
 
+THE LEND, STEPPED (permit sweep L3b, no Rocq counterpart): the led form
+takes `actLend k.proc ke` and steps it once at entry (`SlotGen.actLend_step`
+under `wpLoop_bupd`); the stepped lend is given into the continuation
+(`actLend_cont_give`), so the rest of the proof is unchanged.  The plain
+field is the corollary at `hp0 : k.proc = 0` (`actLend_of_zero` in, the lend
+and the receipt dropped out).
+
 The shape follows the Rocq `ProofKalloc.v`: the four-slot frame (`ra`,
 `s0`, `s1`), `acquire(&kmem.lock)`, the freelist load and the `beqz` split
 (the empty chain releases and returns `0`; the non-empty chain unlinks the
@@ -284,12 +291,17 @@ set_option maxHeartbeats 4000000 in
 `wp_kalloc` follows as a corollary in `kalloc_proof`.  The actor of the
 ledger's event is `k.proc`, the `cpu_own` proc word (design D3). -/
 theorem kalloc_led_proof (AC : ACQUIRE) (RE : RELEASE) (MS : MEMSET)
-    {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx] (cpu : CPU) (k : KCtx)
-    (γl : GName) (γk : KmemNames) (on : Option Nat) hnoff hK hlk :
-    wp_kalloc_led_body (hlc := hlc) (GF := GF) cpu k γl γk on hnoff hK hlk := by
+    {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx] (cpu : CPU) (k : KCtx)
+    (γl : GName) (γk : KmemNames) (on : Option Nat) (ke : Nat) hnoff hK hlk :
+    wp_kalloc_led_body (hlc := hlc) (GF := GF) cpu k γl γk on ke hnoff hK hlk := by
   unfold wp_kalloc_led_body
   simp only [kallocAddr]
-  iintro ⟨Hk, Hpc, #Hlk, Hav, Hnext⟩
+  iintro ⟨Hk, Hpc, #Hlk, Hav, Hl, Hnext⟩
+  -- the lend: the event costs one count, stepped here and given back
+  iapply wpLoop_bupd
+  imod (actLend_step k.proc ke) $$ Hl with Hl
+  imodintro
+  ihave Hnext := actLend_cont_give _ _ _ _ _ _ _ _ _ $$ Hnext Hl
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩
   have hK4 : 4 ≤ k.avail := by omega
@@ -564,11 +576,12 @@ theorem kalloc_led_proof (AC : ACQUIRE) (RE : RELEASE) (MS : MEMSET)
     ipureintro
     exact hfacts.2
 
-/-- The proved `kalloc` interface: the led form, and the landed contract as
-its corollary (the receipt dropped, `kallocPostLed_post`). -/
+/-- The proved `kalloc` interface: the led form, and the landed contract at
+the boot (`hp0`) as its corollary (the lend from `actLend_of_zero`, the
+stepped lend and the receipt dropped, `kallocPostLed_post`). -/
 theorem kalloc_proof (AC : ACQUIRE) (RE : RELEASE) (MS : MEMSET) : KALLOC :=
-  ⟨fun {hlc GF} _ _ _ cpu k γl γk on hnoff hK hlk => by
-    have h := kalloc_led_proof AC RE MS (hlc := hlc) (GF := GF) cpu k γl γk on hnoff hK hlk
+  ⟨fun {hlc GF} _ _ _ _ cpu k γl γk on hnoff hK hlk hp0 => by
+    have h := kalloc_led_proof AC RE MS (hlc := hlc) (GF := GF) cpu k γl γk on 0 hnoff hK hlk
     unfold wp_kalloc_led_body at h
     unfold wp_kalloc_body
     iintro ⟨Hk, Hpc, #Hlk, Hav, Hnext⟩
@@ -577,13 +590,14 @@ theorem kalloc_proof (AC : ACQUIRE) (RE : RELEASE) (MS : MEMSET) : KALLOC :=
     isplitl [Hpc]; · iexact Hpc
     isplitl []; · iexact Hlk
     isplitl [Hav]; · iexact Hav
+    isplitl []; · iapply (actLend_of_zero k.proc hp0 0)
     iapply wpNext_mono _ _ _ _ _ $$ Hnext
-    iintro %c H %spie %spp %R' %hs Hk Hpc Hpost %hcs
+    iintro %c H %spie %spp %R' %hs Hk Hpc _ Hpost %hcs
     ihave Hpost := kallocPostLed_post γk on k.proc (R' 10#5) $$ Hpost
     iapply H $$ %spie %spp %R' %hs Hk Hpc Hpost
     ipureintro
     exact hcs,
-   fun {hlc GF} _ _ _ cpu k γl γk on hnoff hK hlk =>
-    kalloc_led_proof AC RE MS (hlc := hlc) (GF := GF) cpu k γl γk on hnoff hK hlk⟩
+   fun {hlc GF} _ _ _ _ cpu k γl γk on ke hnoff hK hlk =>
+    kalloc_led_proof AC RE MS (hlc := hlc) (GF := GF) cpu k γl γk on ke hnoff hK hlk⟩
 
 end Xv6

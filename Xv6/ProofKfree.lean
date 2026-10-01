@@ -13,6 +13,12 @@ THE LED FORM IS THE PROOF (NI-LEDGER-KALLOC, Rocq bed7ee0dd): the shared
 (`kmemAuth_inc`) and returns `kfreePostLed`; `kfree_led_proof` is the
 contract, `kfree_proof`'s landed field and `kfree_free_proof` drop the
 receipt (`kfree_cont_led`).
+
+THE LEND, STEPPED (permit sweep L3b, no Rocq counterpart): `kfree_led_proof`
+and `kfree_free_proof` take `actLend k.proc ke` and step it once at entry
+(`SlotGen.actLend_step` under `wpLoop_bupd`), giving the stepped lend into
+the continuation (`actLend_cont_give`); the plain field is the corollary at
+`hp0 : k.proc = 0` (`actLend_of_zero` in, the lend and the receipt dropped).
 -/
 import MachCSL.WpSmodeSltu
 import Xv6.SpecKfree
@@ -385,12 +391,17 @@ set_option maxHeartbeats 4000000 in
 `wp_kfree` follows as a corollary in `kfree_proof`.  The actor of the
 ledger's event is `k.proc`, the `cpu_own` proc word (design D3). -/
 theorem kfree_led_proof (AC : ACQUIRE) (RE : RELEASE) (MS : MEMSET)
-    {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx] (cpu : CPU) (k : KCtx)
-    (γl : GName) (γk : KmemNames) (on : Option Nat) hnoff hK hlk hp :
-    wp_kfree_led_body (hlc := hlc) (GF := GF) cpu k γl γk on hnoff hK hlk hp := by
+    {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx] (cpu : CPU) (k : KCtx)
+    (γl : GName) (γk : KmemNames) (on : Option Nat) (ke : Nat) hnoff hK hlk hp :
+    wp_kfree_led_body (hlc := hlc) (GF := GF) cpu k γl γk on ke hnoff hK hlk hp := by
   unfold wp_kfree_led_body
   simp only [kfreeAddr]
-  iintro ⟨Hk, Hpc, #Hlk, Hpage, Hav, Hnext⟩
+  iintro ⟨Hk, Hpc, #Hlk, Hpage, Hav, Hl, Hnext⟩
+  -- the lend: the event costs one count, stepped here and given back
+  iapply wpLoop_bupd
+  imod (actLend_step k.proc ke) $$ Hl with Hl
+  imodintro
+  ihave Hnext := actLend_cont_give _ _ _ _ _ _ _ _ _ $$ Hnext Hl
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩
   -- prologue
@@ -481,11 +492,12 @@ theorem kfree_led_proof (AC : ACQUIRE) (RE : RELEASE) (MS : MEMSET)
   iframe #
   iframe
 
-/-- The proved `kfree` interface: the led form, and the landed contract as
-its corollary (the receipt dropped, `kfree_cont_led`). -/
+/-- The proved `kfree` interface: the led form, and the landed contract at
+the boot (`hp0`) as its corollary (the lend from `actLend_of_zero`, the
+stepped lend dropped, the receipt dropped by `kfree_cont_led`). -/
 theorem kfree_proof (AC : ACQUIRE) (RE : RELEASE) (MS : MEMSET) : KFREE :=
-  ⟨fun {hlc GF} _ _ _ cpu k γl γk on hnoff hK hlk hp => by
-    have h := kfree_led_proof AC RE MS (hlc := hlc) (GF := GF) cpu k γl γk on hnoff hK hlk hp
+  ⟨fun {hlc GF} _ _ _ _ cpu k γl γk on hnoff hK hlk hp hp0 => by
+    have h := kfree_led_proof AC RE MS (hlc := hlc) (GF := GF) cpu k γl γk on 0 hnoff hK hlk hp
     unfold wp_kfree_led_body at h
     unfold wp_kfree_body
     iintro ⟨Hk, Hpc, #Hlk, Hpage, Hav, Hnext⟩
@@ -496,16 +508,26 @@ theorem kfree_proof (AC : ACQUIRE) (RE : RELEASE) (MS : MEMSET) : KFREE :=
     isplitl []; · iexact Hlk
     isplitl [Hpage]; · iexact Hpage
     isplitl [Hav]; · iexact Hav
-    iexact Hnext,
-   fun {hlc GF} _ _ _ cpu k γl γk on hnoff hK hlk hp =>
-    kfree_led_proof AC RE MS (hlc := hlc) (GF := GF) cpu k γl γk on hnoff hK hlk hp⟩
+    isplitl []; · iapply (actLend_of_zero k.proc hp0 0)
+    iapply wpNext_mono _ _ _ _ _ $$ Hnext
+    iintro %c H %spie %spp %R' %hs Hk Hpc _ Hpost %hcs
+    iapply H $$ %spie %spp %R' %hs Hk Hpc Hpost
+    ipureintro
+    exact hcs,
+   fun {hlc GF} _ _ _ _ cpu k γl γk on ke hnoff hK hlk hp =>
+    kfree_led_proof AC RE MS (hlc := hlc) (GF := GF) cpu k γl γk on ke hnoff hK hlk hp⟩
 
 set_option maxHeartbeats 4000000 in
 theorem kfree_free_proof (AC : ACQUIRE) (RE : RELEASE) (MS : MEMSET_FREE) : KFREE_FREE :=
-  ⟨fun {hlc GF} _ _ _ cpu k γl γk on hnoff hK hlk hp => by
+  ⟨fun {hlc GF} _ _ _ _ cpu k γl γk on ke hnoff hK hlk hp => by
   unfold wp_kfree_free_body
   simp only [kfreeAddr]
-  iintro ⟨Hk, Hpc, #Hlk, Hpage, Hav, Hnext⟩
+  iintro ⟨Hk, Hpc, #Hlk, Hpage, Hav, Hl, Hnext⟩
+  -- the lend: the event costs one count, stepped here and given back
+  iapply wpLoop_bupd
+  imod (actLend_step k.proc ke) $$ Hl with Hl
+  imodintro
+  ihave Hnext := actLend_cont_give _ _ _ _ _ _ _ _ _ $$ Hnext Hl
   -- the shared tail proves the led post; this contract drops the receipt
   ihave Hnext := kfree_cont_led cpu k γk on $$ Hnext
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩

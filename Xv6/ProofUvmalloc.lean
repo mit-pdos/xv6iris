@@ -12,12 +12,16 @@ THE LEND (permit sweep L1a, Rocq f344a089a; threaded by L2, Rocq
 78f9234b8): carried by the loop (`uvma_iter` / `uvma_loop` / the two
 rollbacks take and return `∃ k1 ≥ ke`, Rocq `ua_loop`'s `kl`) and passed to
 `mappages` and to the rollbacks' `uvmdealloc`, each return's bound composed
-back to `ke`; the arms that call neither hand it back at `ke`.
+back to `ke`; the arms that call neither hand it back at `ke`.  Since L3b
+(no Rocq counterpart) `kalloc` and the rollback's `kfree` take it too
+(`ua_kalloc_call` / `ua_kfree_call`, the led forms over
+`UvmCallSites.uc_kalloc_lend_call` / `uc_kfree_lend_call`) and step it.
 -/
 import Xv6.SpecUvmalloc
 import Xv6.SpecUvmdealloc
 import Xv6.SpecKalloc
 import Xv6.SpecKfree
+import Xv6.UvmCallSites
 import Xv6.SpecMemset
 import Xv6.SpecMappages
 import Xv6.UmCovered
@@ -205,34 +209,36 @@ theorem ua_ret_1318 : jumpPc (KA.«uvmalloc» + 0x98#64) = (KA.«uvmalloc» + 0x
 
 /-! ## The callees, as rules at their entry addresses -/
 
-theorem ua_kalloc_call (KAL : KALLOC) [CurCtx] (γl : GName) (γk : KmemNames)
-    (cc : CPU) (k' : KCtx) (hnoff' : k'.noff + 1 < 2 ^ 31) (hK' : 14 ≤ k'.avail)
+/-- `kalloc`'s led contract, at a lend (permit sweep L3b): the lend back
+stepped. -/
+theorem ua_kalloc_call [WchG GF] (KAL : KALLOC) [CurCtx] (γl : GName) (γk : KmemNames)
+    (cc : CPU) (k' : KCtx) (ke : Nat) (hnoff' : k'.noff + 1 < 2 ^ 31) (hK' : 14 ≤ k'.avail)
     (hlk' : "kmem" ∉ k'.locks) :
     kctx cc k' ∗ pcIs cc KA.«kalloc» ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
-    kallocAvail γk none ∗
+    kallocAvail γk none ∗ actLend k'.proc ke ∗
     wpNext k'.sie k'.proc cc (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
       ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
+      actLend k'.proc (ke + 1) -∗
       kallocPost γk none (R' 10#5) -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
-    ⊢ wpLoop (GF := GF) cc := by
-  have h := KAL.wp_kalloc (hlc := hlc) (GF := GF) cc k' γl γk none hnoff' hK' hlk'
-  unfold wp_kalloc_body at h
-  simp only [kallocAddr] at h
-  exact h
+    ⊢ wpLoop (GF := GF) cc :=
+  uc_kalloc_lend_call KAL cc k' γl γk none ke hnoff' hK' hlk'
 
-theorem ua_kfree_call (KF : KFREE) [CurCtx] (γl : GName) (γk : KmemNames)
-    (cc : CPU) (k' : KCtx) (hnoff' : k'.noff + 1 < 2 ^ 31) (hK' : 14 ≤ k'.avail)
+/-- `kfree`'s led contract, at a lend (permit sweep L3b): the lend back
+stepped. -/
+theorem ua_kfree_call [WchG GF] (KF : KFREE) [CurCtx] (γl : GName) (γk : KmemNames)
+    (cc : CPU) (k' : KCtx) (ke : Nat) (hnoff' : k'.noff + 1 < 2 ^ 31) (hK' : 14 ≤ k'.avail)
     (hlk' : "kmem" ∉ k'.locks) (hp : pageValid (k'.regs 10#5)) :
     kctx cc k' ∗ pcIs cc KA.«kfree» ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
-    pageOwn (k'.regs 10#5) ∗ kallocAvail γk none ∗
+    pageOwn (k'.regs 10#5) ∗ kallocAvail γk none ∗ actLend k'.proc ke ∗
     wpNext k'.sie k'.proc cc (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
       ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
+      actLend k'.proc (ke + 1) -∗
       kallocAvail γk none -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) cc := by
-  have h := KF.wp_kfree (hlc := hlc) (GF := GF) cc k' γl γk none hnoff' hK' hlk' hp
-  unfold wp_kfree_body at h
-  simp only [kfreeAddr, availInc, Option.map] at h
+  have h := uc_kfree_lend_call (GF := GF) KF cc k' γl γk none ke hnoff' hK' hlk' hp
+  simp only [availInc, Option.map] at h
   exact h
 
 theorem ua_memset_call (MS : MEMSET) [CurCtx] (cc : CPU) (k' : KCtx)
@@ -460,17 +466,17 @@ theorem uvma_rollB [WchG GF] (KF : KFREE) (UD : UVMDEALLOC) [CurCtx]
   k_step_gen (wp_s_jal c1 _ (KA.«uvmalloc» + 0x8a#64) false 2094814#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [uvmalloc_br_fffffffffffff768] next c2 hp2
   iintro Hk Hpc
-  iapply (ua_kfree_call KF γl γk c2 _ ?hn0 ?hK0 ?hl0 ?hp0) $$ [- $Hk $Hpc]
+  iapply (ua_kfree_call KF γl γk c2 _ k1 ?hn0 ?hK0 ?hl0 ?hp0) $$ [- $Hk $Hpc]
   rotate_right 1
   k_norm_g
   iframe #
-  iframe Hpo Hav
+  iframe Hpo Hav Hlend
   case hn0 => k_norm_g; omega
   case hK0 => k_norm_g; unfold uvmallocSlots at hK; omega
   case hl0 => k_norm_g; exact hlk
   case hp0 => k_norm_g; exact hr
   iapply wpNext_intro_pin
-  iintro %c3 %hp3 %spie1 %spp1 %R1 %hsp1 Hk Hpc Hav %hcs0
+  iintro %c3 %hp3 %spie1 %spp1 %R1 %hsp1 Hk Hpc Hlend Hav %hcs0
   k_norm_g [ua_ret_130e, MachCSL.KCtx.withSpie_twice]
   unfold calleeSaved at hcs0
   simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false] at hcs0
@@ -488,7 +494,7 @@ theorem uvma_rollB [WchG GF] (KF : KFREE) (UD : UVMDEALLOC) [CurCtx]
   k_step_gen (wp_s_jal c6 _ (KA.«uvmalloc» + 0x94#64) false 2096936#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [uvmalloc_br_ffffffffffffffbc] next c7 hp7
   iintro Hk Hpc
-  iapply (ua_uvmdealloc_call UD γl γk c7 _ Pi Mi ?hn1 ?hK1 ?hl1 ?hr1 ?ho1 k1) $$ [- $Hk $Hpc]
+  iapply (ua_uvmdealloc_call UD γl γk c7 _ Pi Mi ?hn1 ?hK1 ?hl1 ?hr1 ?ho1 (k1 + 1)) $$ [- $Hk $Hpc]
   rotate_right 1
   k_norm_g
   iframe #
@@ -500,7 +506,7 @@ theorem uvma_rollB [WchG GF] (KF : KFREE) (UD : UVMDEALLOC) [CurCtx]
   case ho1 => k_norm_g; rw [f18, g18]; exact hbound
   iapply wpNext_intro_pin
   iintro %c8 %hp8 %spie2 %spp2 %R2 %hsp2 Hk Hpc Hlend HP %hcs
-  ihave Hlend := actLend_ret_weaken _ hk1 $$ Hlend
+  ihave Hlend := actLend_ret_weaken _ (Nat.le_succ_of_le hk1) $$ Hlend
   k_norm_g [ua_ret_1318, MachCSL.KCtx.withSpie_twice]
   rw [uvmdVpn0_run' (R1 23#5) A (by rw [f23]; exact g23) hA4,
     uvmdNp_run' (R1 18#5) (R1 23#5) A i (by rw [f18]; exact g18) (by rw [f23]; exact g23) hA4,
@@ -784,16 +790,18 @@ theorem uvma_iter [WchG GF] (KAL : KALLOC) (KF : KFREE) (MS : MEMSET) (MA : MAPP
   k_step_gen (wp_s_jal cur _ (KA.«uvmalloc» + 0x36#64) false 2095130#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [uvmalloc_br_fffffffffffff850] next c1 hp1
   iintro Hk Hpc
-  iapply (ua_kalloc_call KAL γl γk c1 _ ?hn0 ?hK0 ?hl0) $$ [- $Hk $Hpc]
+  icases Hlend with ⟨%k0, %hk0, Hlend⟩
+  iapply (ua_kalloc_call KAL γl γk c1 _ k0 ?hn0 ?hK0 ?hl0) $$ [- $Hk $Hpc]
   rotate_right 1
   k_norm_g
   iframe #
-  iframe Hav
+  iframe Hav Hlend
   case hn0 => k_norm_g; omega
   case hK0 => k_norm_g; unfold uvmallocSlots at hK; omega
   case hl0 => k_norm_g; exact hlk
   iapply wpNext_intro_pin
-  iintro %c2 %hp2 %spie1 %spp1 %R1 %hsp1 Hk Hpc HPost %hcs1
+  iintro %c2 %hp2 %spie1 %spp1 %R1 %hsp1 Hk Hpc Hlend HPost %hcs1
+  ihave Hlend := actLend_ret_step _ hk0 $$ Hlend
   k_norm_g [ua_ret_12ba, MachCSL.KCtx.withSpie_twice]
   have hcs1' : calleeSaved R R1 := by
     unfold calleeSaved at hcs1 ⊢

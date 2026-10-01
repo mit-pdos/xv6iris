@@ -27,11 +27,20 @@ the driver's protocol tokens at zero ride inside the payload.  Interrupts are of
 move (`SIE` false; `main` on hart 0, before the scheduler).  Stack: its
 4-slot frame over `kalloc`'s 14.
 
+THE BOOT PREMISE (permit sweep L3b; no Rocq counterpart, Rocq never landed
+L3; design ni-strong-instance.md §7): stated at `hp0 : k.proc = 0` (the
+boot lends nothing), where `kalloc`'s plain form survives; `main`
+discharges it (`MainFs.mn_virtio`).  `[WchG GF]` joins the field's binders.
+
+Deviations from Rocq: L3b, no Rocq counterpart (Rocq's
+`wp_virtio_disk_init` has no boot premise).
+
 Imports only definitional files.
 -/
 import MachCSL.WpSmodeCtl
 import Xv6.Image
 import Xv6.DiskInvDefs
+import Xv6.SlotGen
 
 namespace Xv6
 
@@ -98,7 +107,8 @@ def wp_virtio_disk_init_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc G
     (cpu : CPU) (k : KCtx) (γ : DiskNames) (γkl : GName) (γk : KmemNames) (nb : Nat) (c0 : VirtioCfg)
     (vlock : BitVec 32) (vname vcpu pd0 pav0 pu0 : BitVec 64) (free0 : List (BitVec 8))
     (hsie : k.sie = false) (hK : virtioDiskInitSlots ≤ k.avail) (hnoff : k.noff + 1 < 2 ^ 31)
-    (hlk : "kmem" ∉ k.locks) (hnb : 3 ≤ nb) (hdead : Virtio.live c0 = false) : Prop :=
+    (hlk : "kmem" ∉ k.locks) (hnb : 3 ≤ nb) (hdead : Virtio.live c0 = false)
+    (hp0 : k.proc = 0#64) : Prop :=
   kctx cpu k ∗ pcIs cpu virtioDiskInitAddr ∗
   isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk (some nb) ∗
   diskInv γ ∗ diskCfgOwn γ c0 ∗ diskInitGhosts γ ∗
@@ -114,11 +124,11 @@ def wp_virtio_disk_init_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc G
 
 /-- The interface of `virtio_disk_init`. -/
 structure VIRTIO_DISK_INIT : Prop where
-  wp_virtio_disk_init : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [CurCtx]
+  wp_virtio_disk_init : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [WchG GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γ : DiskNames) (γkl : GName) (γk : KmemNames) (nb : Nat) (c0 : VirtioCfg)
     (vlock : BitVec 32) (vname vcpu pd0 pav0 pu0 : BitVec 64) (free0 : List (BitVec 8))
-    hsie hK hnoff hlk hnb hdead,
+    hsie hK hnoff hlk hnb hdead hp0,
     wp_virtio_disk_init_body (hlc := hlc) (GF := GF) cpu k γ γkl γk nb c0 vlock vname vcpu pd0 pav0 pu0 free0
-      hsie hK hnoff hlk hnb hdead
+      hsie hK hnoff hlk hnb hdead hp0
 
 end Xv6

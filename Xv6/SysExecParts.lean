@@ -116,6 +116,15 @@ the prologue); slot `n` is `sp0 - 8 n`:
    the count explicitly (`sysExecLoopSt` / `sysExecBadSt` gain `kv` and
    `⌜A.V.ev ≤ kv⌝`, Rocq `sx_body`'s `k`), down to the contract's `k'`
    (the break hands it to kexec; the -1 arms' `evAfter_refl`).
+10. **THE ALLOCATOR STEPS IT (permit sweep L3b, no Rocq counterpart).**  The
+   fill loop's `kalloc` borrows the block's counter and steps it
+   (`SysExecStep.sys_exec_step_kalloc`); the free loop (`sysExecFreeBody`)
+   takes the running proc's lend at a count `ke` and hands back `∃ k1 ≥ ke`
+   (each `kfree` steps it); bad: borrows it from the block around the loop,
+   so `sysExecBadTailBody`'s continuation takes the block at a raised count
+   `kv'` (`⌜A.V.ev ≤ kv'⌝`); the success tail (`sysExecSuccTailBody`) takes
+   the lend and hands it back raised, the break borrowing it from kexec's
+   returned block (`SysExecBreak`).
 
 ## Dropped/simplified vs Rocq
 
@@ -1130,16 +1139,19 @@ loop leaves at `ea` (the NULL) or at `base + 14` (the fall-through at `m =
 (bad:) and `(0xd4, 0xe2)` (the success tail), deviation 7. -/
 def sysExecFreeBody (Γ : SchedNames) (k : KCtx) (A : SysExecArgs) (base ea : BitVec 64) : IProp GF :=
   iprop(∀ (c : CPU) (spie spp : Bool) (R : RegMap) (pg : Nat → BitVec 64)
-      (afun : Nat → Nat → BitVec 8) (m t : Nat),
+      (afun : Nat → Nat → BitVec 8) (m t : Nat) (ke : Nat),
     ⌜m ≤ t ∧ m < 32 ∧ t ≤ 32 ∧ sysExecPgOk pg t ∧ R 9#5 = sysExecArgvAt (k.regs 2#5) m ∧
       R 20#5 = sysExecPath (k.regs 2#5)⌝ -∗
     kctx c (((k.withSpie spie spp).pushed 60).withRegs R) -∗ pcIs c (sysExecAddr + base) -∗
     trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗ sysExecEnv (hlc := hlc) Γ A -∗
     sysExecArgvFrom (k.regs 2#5) m t pg -∗ sysExecPages pg afun m t -∗
+    -- the running proc's lend (permit sweep L3b): each kfree steps it
+    actLend k.proc ke -∗
     (∀ (c' : CPU) (spie' spp' : Bool) (R' : RegMap) (pcx : BitVec 64),
       ⌜pcx = sysExecAddr + ea ∨ pcx = sysExecAddr + base + 14#64⌝ -∗ ⌜sysExecKeepS1 R R'⌝ -∗
       kctx c' (((k.withSpie spie' spp').pushed 60).withRegs R') -∗ pcIs c' pcx -∗
-      trapCsrsExt c' k.sie -∗ cpuClaimExt c' k.sie k.proc -∗ sysExecArgvFree (k.regs 2#5) -∗
+      trapCsrsExt c' k.sie -∗ cpuClaimExt c' k.sie k.proc -∗
+      (∃ k1 : Nat, ⌜ke ≤ k1⌝ ∗ actLend k.proc k1) -∗ sysExecArgvFree (k.regs 2#5) -∗
       wpLoop c') -∗
     wpLoop c)
 
@@ -1153,12 +1165,13 @@ def sysExecBadTailBody (Γ : SchedNames) (k : KCtx) (A : SysExecArgs) : IProp GF
       (pg : Nat → BitVec 64)
       (afun : Nat → Nat → BitVec 8) (pl rest : List (BitVec 8)),
     sysExecBadSt (hlc := hlc) k A spie spp R P kv t pg afun pl rest c -∗ sysExecEnv (hlc := hlc) Γ A -∗
-    (∀ (c' : CPU) (spie' spp' : Bool) (R' : RegMap),
+    (∀ (c' : CPU) (spie' spp' : Bool) (R' : RegMap) (kv' : Nat),
       ⌜calleeSaved k.regs R' ∧ R' 10#5 = 0xFFFFFFFFFFFFFFFF#64 ∧ A.V.upt.extSz A.V.sz P ∧
-        A.V.ev ≤ kv⌝ -∗
+        A.V.ev ≤ kv'⌝ -∗
       kctx c' ((k.withSpie spie' spp').withRegs R') -∗ pcIs c' (jumpPc (k.regs 1#5)) -∗
       trapCsrsExt c' k.sie -∗ cpuClaimExt c' k.sie k.proc -∗
-      procPrivFd A.γ (procAddr A.j) A.pid (sysExecV2 A P kv) (sysExecM2 A P) -∗ wpLoop c') -∗
+      -- the block at the count the free loop's kfrees raised it to (L3b)
+      procPrivFd A.γ (procAddr A.j) A.pid (sysExecV2 A P kv') (sysExecM2 A P) -∗ wpLoop c') -∗
     wpLoop c)
 
 /-- **THE SUCCESS TAIL, +0x0ce .. +0x102** (Rocq `sx_succ_tail`, with
@@ -1168,16 +1181,19 @@ s2`, the seven reloads, the jump to +0x104.  The block is not touched (the
 seal frames whatever kexec returned through the continuation). -/
 def sysExecSuccTailBody (Γ : SchedNames) (k : KCtx) (A : SysExecArgs) : IProp GF :=
   iprop(∀ (c : CPU) (spie spp : Bool) (R : RegMap) (t : Nat) (pg : Nat → BitVec 64)
-      (afun : Nat → Nat → BitVec 8) (pl rest : List (BitVec 8)) (rv : BitVec 64),
+      (afun : Nat → Nat → BitVec 8) (pl rest : List (BitVec 8)) (rv : BitVec 64) (ke : Nat),
     ⌜t ≤ 32 ∧ sysExecPgOk pg t ∧ sysExecBadPins k R ∧ R 10#5 = rv ∧ (k.regs 2#5).toNat % 8 = 0⌝ -∗
     kctx c (((k.withSpie spie spp).pushed 60).withRegs R) -∗ pcIs c (sysExecAddr + 0xce#64) -∗
     trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗ sysExecEnv (hlc := hlc) Γ A -∗
     sysExecCarry k pl rest -∗ wordPointsTo (sysExecUargv (k.regs 2#5)) 8 (DFrac.own 1) A.v1 -∗
     (∃ w : BitVec 64, wordPointsTo (sysExecUarg (k.regs 2#5)) 8 (DFrac.own 1) w) -∗
     sysExecArgvArr (k.regs 2#5) (sysExecArgvL pg t) -∗ sysExecPages pg afun 0 t -∗
+    -- the running proc's lend, borrowed by the break from kexec's block (L3b)
+    actLend k.proc ke -∗
     (∀ (c' : CPU) (spie' spp' : Bool) (R' : RegMap), ⌜calleeSaved k.regs R' ∧ R' 10#5 = rv⌝ -∗
       kctx c' ((k.withSpie spie' spp').withRegs R') -∗ pcIs c' (jumpPc (k.regs 1#5)) -∗
-      trapCsrsExt c' k.sie -∗ cpuClaimExt c' k.sie k.proc -∗ wpLoop c') -∗
+      trapCsrsExt c' k.sie -∗ cpuClaimExt c' k.sie k.proc -∗
+      (∃ k1 : Nat, ⌜ke ≤ k1⌝ ∗ actLend k.proc k1) -∗ wpLoop c') -∗
     wpLoop c)
 
 /-- **THE BREAK, +0x0b6 .. +0x0cc, THE CALL TO kexec, AND THE SUCCESS TAIL**
@@ -1311,10 +1327,10 @@ theorem sys_exec_compose (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu : C
         ipureintro; exact ⟨hpath, hargs⟩
     · -- ---- bad: free what was allocated and return -1 ----
       iapply hbad $$ %c3 %spie3 %spp3 %R3 %P3 %k3 %i3 %pg3 %af3 %pl %rest Hbadst Henv
-      iintro %c4 %spie4 %spp4 %R4 %⟨hcs4, ha0, hext3, hk3⟩ Hk Hpc Hte Hce Hblk
-      iapply HΦ $$ %c4 %spie4 %spp4 %R4 %P3 %k3 %hcs4 %hext3 %hk3 Hk Hpc Hte Hce Hbs Hir
+      iintro %c4 %spie4 %spp4 %R4 %k4 %⟨hcs4, ha0, hext3, hk4⟩ Hk Hpc Hte Hce Hblk
+      iapply HΦ $$ %c4 %spie4 %spp4 %R4 %P3 %k4 %hcs4 %hext3 %hk4 Hk Hpc Hte Hce Hbs Hir
       unfold sysExecArms
-      iexists sysExecV2 A P3 k3, sysExecM2 A P3
+      iexists sysExecV2 A P3 k4, sysExecM2 A P3
       iframe Hblk
       ileft
       isplitr

@@ -698,3 +698,84 @@ allocproc, freeproc ...) passes it instead.  **L3c**: the four ledger
 appends require and step it -- allocproc's pid section (`PAlloc`),
 freeproc's (`PFree`), kwait's (`ZReap`), kexit's exit append (`ZExit`).
 **T**: the rows' `ev' = ev` on the non-ecall rows and `ut_round_quiet`.
+
+### 7.6L L3b as landed in Lean (2026-10-01)
+
+Lean lane PJ-L3b, no Rocq counterpart (Rocq never landed L3).  **The permit
+counter acquires its meaning here: every allocator event costs one count of
+the acting process's permit.**
+
+- **The step** (`SlotGen`): `actLend_step : actLend p k ⊢ |==> actLend p
+  (k+1)` (the left disjunct kept, the counter moved by `actCnt_step`), plus
+  `actLend_ret_step` (a stepped lend re-shaped as `∃ k' ≥ ke`),
+  `actLend_cont_give` (a fixed lend given into a continuation),
+  `actLend_cont_frame_step` (a stepped lend framed into a continuation that
+  wants `∃ k' ≥ ke`), `actLend_congr` / `actLend_ret_congr` (across `p =
+  p'`, for `(k.pushed m).proc` against `k.proc`).
+- **The led forms take the lend and step it exactly once**:
+  `wp_kalloc_led_body` / `wp_kfree_led_body` gain `(ke : Nat)`, `actLend
+  k.proc ke` before the `wpNext`, and hand back `actLend k.proc (ke + 1)`
+  right after the return pc (not `∃ k' ≥ ke`: the append IS the step; both
+  kalloc arms, `KAlloc` and `KNull`, are events).  The proofs step at entry
+  (`wpLoop_bupd` + `actLend_step`, then `actLend_cont_give`), so the bodies
+  are otherwise byte-identical: the counter is exclusive ghost state, so
+  stepping at entry or at the ledger append is indistinguishable to every
+  client.  `[WchG GF]` joins the fields.
+- **The plain forms survive only at `p = 0`**: `wp_kalloc_body` /
+  `wp_kfree_body` gain `(hp0 : k.proc = 0#64)` (last) and their structure
+  fields are corollaries of the led ones (`actLend_of_zero` in, the stepped
+  lend and the receipt dropped) -- this tree's way of "the token-free led
+  forms are deleted".  `wp_kfree_free_body` (the visibility-free page; one
+  caller, `pipeclose`, a lend holder since L1b) takes the lend and steps it
+  instead of gaining `hp0` (still no receipt).
+- **The boot premise**: `kinit`, `freerange`, `virtio_disk_init` gain `(hp0 :
+  k.proc = 0#64)` (last) and `[WchG GF]`; main's two stages `MainKvm.mn_kinit`
+  / `MainFs.mn_virtio` take `hproc` and `ProofMain` passes its own.  The kvm
+  chain (kvmmake, proc_mapstacks) reaches the plain `kalloc` through
+  `UvmCallSites.uc_kalloc_call`, which now takes `hp0` (they had it since L2).
+- **Call-site inventory.**  Plain form at `p = 0`: kvmmake, proc_mapstacks
+  (`uc_kalloc_call`), freerange (`fr_kfree_call`), virtio_disk_init
+  (`vdi_kalloc_call`, three calls).  Led + lend (shared rules
+  `UvmCallSites.uc_kalloc_lend_call` / `uc_kfree_lend_call`): walk
+  (`walk_alloc`: `walk_descend` carries `∃ k' ≥ ke` out of both arms,
+  `walk_proof` lends the second descent the first's count and frames the
+  last into the caller's continuation, `walkPostL_frame`), uvmcreate, freewalk's
+  tail, uvmalloc (kalloc in `uvma_iter`, kfree in `uvma_rollB`, which now
+  lends `uvmdealloc` the stepped count), uvmcopy (kalloc, and the
+  mappages-failure kfree), uvmunmap (the generic body threads `unFreeL` =
+  `unFree ∗ ∃ k1 ≥ ke` through the cursor loop; `uvmunmap_free_page` lends the
+  count in hand), vmfault (kalloc, then mappages at the stepped count, then
+  the mappages-failure kfree), allocproc (`ap_kalloc_call`), freeproc's
+  trapframe kfree (`fp_kfree`), pipealloc (`pa_kalloc`), pipeclose's
+  freeing arm (`pc_kfree`, `KFREE_FREE`; `pc_tail` / `pc_free` /
+  `pc_nonfree` carry the lend unframed, the non-freeing arm frames it),
+  sys_exec's fill loop (`sys_exec_kalloc` lent the block's counter by
+  `sys_exec_step_kalloc`, `procPrivFd_evAcc` + `actLend_borrow`) and its two
+  free loops (`sysExecFreeBody` takes a lend and returns `∃ k1 ≥ ke`; bad:
+  borrows it from the block, so `sysExecBadTailBody`'s continuation takes
+  the block at a raised `kv'`; the success tail takes the lend the break
+  borrows from the block kexec returned, and the break moves kexec's arms to
+  the raised record by the new `SysExecBreak.execArms_evAfter` -- the
+  success arm does not read the count).
+- **Moved**: the five allocator bodies / fields (above), the three boot
+  contracts' premise and `[WchG GF]`.  Proof-internal: the call rules listed,
+  `walk_alloc` / `walk_descend` (+ `walkPostL`), `freewalk_tail`,
+  `uvmunmap_{free_page,iter,loop,gen}` (+ `unFreeL`), `pc_{tail,free,
+  nonfree,cont_fold}`, the sys_exec bodies `sysExecFreeBody` /
+  `sysExecBadTailBody` / `sysExecSuccTailBody`, `sys_exec_free_{exit,gen}`,
+  `freerange_{iter,loop}`, `vdi_alloc`, `mn_kinit` / `mn_virtio`.
+- **Unchanged**: every other Spec (in particular every L1a-L3a contract:
+  `SpecWalk`, `SpecUvmcreate`, `SpecFreewalk`, `SpecMappages`,
+  `SpecUvmalloc`, `SpecUvmcopy`, `SpecUvmunmap`, `SpecVmfault`,
+  `SpecAllocproc`, `SpecFreeproc`, `SpecPipealloc`, `SpecPipeclose`,
+  `SpecSysExec`, `SpecKexec`, `SpecKvmmake`, ...), all Link files.
+
+Full `lake build Xv6 MachCSL` 2732 jobs, exit 0; `lint.sh` all lints passed
+(layering ok, no `sorry`); `tcb.sh` exit 0 (no module entered: `SlotGen` was
+already in, still 6 defs / 33 lines); `audit.sh` PASS (0 `sorryAx`, baseline
+unchanged).
+
+What remains (L3c, T).  **L3c**: the four ledger appends require and step
+the lend -- allocproc's pid section (`PAlloc`), freeproc's (`PFree`),
+kwait's (`ZReap`), kexit's exit append (`ZExit`, from its own block).
+**T**: the rows' `ev' = ev` on the non-ecall rows and `ut_round_quiet`.

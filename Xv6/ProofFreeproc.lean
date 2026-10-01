@@ -14,10 +14,13 @@ THE LEND (permit sweep L1a, Rocq f344a089a): the caller's lend is carried at
 a count at least `ke` beside the led continuation (`fpContLedL`, the
 contract's shape, filled by `fpContLedL_fill` once the lend is back) and
 handed to proc_freepagetable on the pagetable arm (`fp_after_tf`); the
-restated call `fp_freepagetable` takes it.
+restated call `fp_freepagetable` takes it.  Since L3b (no Rocq counterpart)
+the trapframe arm's `kfree` takes it first and steps it (`fp_kfree`, the led
+form over `UvmCallSites.uc_kfree_lend_call`).
 -/
 import Xv6.SpecFreeproc
 import Xv6.SpecKfree
+import Xv6.UvmCallSites
 import Xv6.SpecProcFreepagetable
 import Xv6.SpecAcquire
 import Xv6.SpecRelease
@@ -836,22 +839,21 @@ theorem fp_pid (AC : ACQUIRE) (RE : RELEASE) [X : CurCtx]
 
 /-! ## The entry: prologue, `kfree`, `proc_freepagetable` -/
 
-/-- `kfree`'s contract at its call site (address folded). -/
+/-- `kfree`'s led contract at its call site (address folded), at a lend
+(permit sweep L3b): the lend back stepped. -/
 theorem fp_kfree (KF : KFREE) [CurCtx]
-    (c : CPU) (k' : KCtx) (γl : GName) (γk : KmemNames) (on : Option Nat)
+    (c : CPU) (k' : KCtx) (γl : GName) (γk : KmemNames) (on : Option Nat) (ke : Nat)
     (hnoff' : k'.noff + 1 < 2 ^ 31) (hK' : 14 ≤ k'.avail) (hlk' : "kmem" ∉ k'.locks)
     (hp' : pageValid (k'.regs 10#5)) :
     kctx c k' ∗ pcIs c KA.«kfree» ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
-    pageOwn (k'.regs 10#5) ∗ kallocAvail γk on ∗
+    pageOwn (k'.regs 10#5) ∗ kallocAvail γk on ∗ actLend k'.proc ke ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
       ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
+      actLend k'.proc (ke + 1) -∗
       kallocAvail γk (availInc on) -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
-    ⊢ wpLoop (GF := GF) c := by
-  have h := KF.wp_kfree (hlc := hlc) (GF := GF) c k' γl γk on hnoff' hK' hlk' hp'
-  unfold wp_kfree_body at h
-  simp only [kfreeAddr] at h
-  exact h
+    ⊢ wpLoop (GF := GF) c :=
+  uc_kfree_lend_call KF c k' γl γk on ke hnoff' hK' hlk' hp'
 
 /-- `availInc none = none`, at the resource level. -/
 theorem fp_avail_reduce [CurCtx] (γk : KmemNames) :
@@ -1179,17 +1181,17 @@ theorem freeproc_led_proof (KF : KFREE) (PFP : PROC_FREEPAGETABLE) (AC : ACQUIRE
         rw [htfa.1]
         iapply (fp_tfPage_pageOwn V.upt.tfp V.tf)
         iexact Htfpage
-      iapply (fp_kfree (on := none) KF cpu _ γl γk ?hn ?hKk ?hlkk ?hpv) $$ [- $Hk $Hpc $Hav]
+      iapply (fp_kfree (on := none) KF cpu _ γl γk ke ?hn ?hKk ?hlkk ?hpv) $$ [- $Hk $Hpc $Hav]
       rotate_right 1
       k_norm
-      iframe Hlkk Hpage
+      iframe Hlkk Hpage Hlend
       case hn => k_norm; omega
       case hKk => k_norm; unfold freeprocSlots at hK; omega
       case hlkk => k_norm; exact hlk
       case hpv => k_norm; exact htfa.2
       -- past kfree
       iapply wpNext_off_intro
-      iintro %spie %spp %R' %hsp Hk Hpc Hav0 %hcs
+      iintro %spie %spp %R' %hsp Hk Hpc Hlend Hav0 %hcs
       obtain ⟨rfl, rfl⟩ := hsp trivial
       ihave Hav : kallocAvail γk none $$ [Hav0]
       case' _ => iapply fp_avail_reduce; iexact Hav0
@@ -1209,9 +1211,9 @@ theorem freeproc_led_proof (KF : KFREE) (PFP : PROC_FREEPAGETABLE) (AC : ACQUIRE
             simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]))
       iframe Hk Hpc Hframe Hlkk Hav Hlkp Hlocked Hpg Hpub Hpub4 Hpriv Hsz Hpt Htf Hptarm Hkeep Hgh
       isplitl [Hlend]
-      · iexists ke
-        iframe Hlend
-        ipureintro; exact Nat.le_refl ke
+      · -- the lend came back stepped
+        iapply (actLend_ret_step k.proc (Nat.le_refl ke))
+        iexact Hlend
       unfold fpContLedL
       k_norm
       iexact HPhi

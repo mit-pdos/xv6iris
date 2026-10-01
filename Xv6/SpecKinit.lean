@@ -23,6 +23,14 @@ are what the era fupd hands over (`Xv6.fsKitKalloc`).  Stated at either interrup
 slots (its frame of 2, then `freerange`'s 20) and returns them; the
 callee-saved registers are preserved.
 
+THE BOOT PREMISE (permit sweep L3b; no Rocq counterpart, Rocq never landed
+L3; design ni-strong-instance.md §7): stated at `hp0 : k.proc = 0` (the
+boot lends nothing), which `freerange` now requires; `main` discharges it
+(`MainKvm.mn_kinit`).  `[WchG GF]` joins the field's binders.
+
+Deviations from Rocq: L3b, no Rocq counterpart (Rocq's `wp_kinit` has no
+boot premise).
+
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
 import MachCSL.LockBornHook
@@ -46,7 +54,8 @@ def kmemNameAddr : BitVec 64 := KStr.«kmem»
 /-- The specification of `kinit`. -/
 def wp_kinit_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γl : GName) (γk : KmemNames) (vlock : BitVec 32) (vname vcpu : BitVec 64)
-    (hnoff : k.noff + 1 < 2 ^ 31) (hK : 22 ≤ k.avail) (hlk : "kmem" ∉ k.locks) : Prop :=
+    (hnoff : k.noff + 1 < 2 ^ 31) (hK : 22 ≤ k.avail) (hlk : "kmem" ∉ k.locks)
+    (hp0 : k.proc = 0#64) : Prop :=
   kctx cpu k ∗ pcIs cpu kinitAddr ∗
   kmapId kmemLockAddr ∗ kmapId (kmemLockAddr + 16#64) ∗
   wordPointsTo kmemLockAddr 4 (DFrac.own 1) vlock ∗
@@ -67,8 +76,8 @@ def wp_kinit_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF
 
 /-- The interface of `kinit`. -/
 structure KINIT : Prop where
-  wp_kinit : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx] (cpu : CPU) (k : KCtx)
-    (γl : GName) (γk : KmemNames) (vlock : BitVec 32) (vname vcpu : BitVec 64) hnoff hK hlk,
-    wp_kinit_body (hlc := hlc) (GF := GF) cpu k γl γk vlock vname vcpu hnoff hK hlk
+  wp_kinit : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx] (cpu : CPU) (k : KCtx)
+    (γl : GName) (γk : KmemNames) (vlock : BitVec 32) (vname vcpu : BitVec 64) hnoff hK hlk hp0,
+    wp_kinit_body (hlc := hlc) (GF := GF) cpu k γl γk vlock vname vcpu hnoff hK hlk hp0
 
 end Xv6

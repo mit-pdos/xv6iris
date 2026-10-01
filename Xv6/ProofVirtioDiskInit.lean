@@ -200,16 +200,17 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
 
 set_option maxHeartbeats 1000000 in
 /-- `kalloc`'s contract as a rule (interrupts off, so `SPIE`/`SPP` come back
-unchanged). -/
-theorem vdi_kalloc_call (KAL : KALLOC) [CurCtx] (c : CPU) (k' : KCtx) (hsie : k'.sie = false)
+unchanged), at the boot (`hp0`, permit sweep L3b). -/
+theorem vdi_kalloc_call [WchG GF] (KAL : KALLOC) [CurCtx] (c : CPU) (k' : KCtx) (hsie : k'.sie = false)
     (γl : GName) (γk : KmemNames) (on : Option Nat)
-    (hnoff : k'.noff + 1 < 2 ^ 31) (hK : 14 ≤ k'.avail) (hlk : "kmem" ∉ k'.locks) :
+    (hnoff : k'.noff + 1 < 2 ^ 31) (hK : 14 ≤ k'.avail) (hlk : "kmem" ∉ k'.locks)
+    (hp0 : k'.proc = 0#64) :
     kctx c k' ∗ pcIs c KA.«kalloc» ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
     kallocAvail γk on ∗
     (∀ R' : RegMap, kctx c (k'.withRegs R') -∗ pcIs c (jumpPc (k'.regs 1#5)) -∗
       kallocPost γk on (R' 10#5) -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop c)
     ⊢ wpLoop (GF := GF) c := by
-  have h := KAL.wp_kalloc (hlc := hlc) (GF := GF) c k' γl γk on hnoff hK hlk
+  have h := KAL.wp_kalloc (hlc := hlc) (GF := GF) c k' γl γk on hnoff hK hlk hp0
   unfold wp_kalloc_body at h
   simp only [kallocAddr] at h
   iintro ⟨Hk, Hpc, #Hl, Hav, HΦ⟩
@@ -1182,10 +1183,10 @@ set_option maxHeartbeats 4000000 in
 /-- **The three queue pages**: `kalloc` three times (it cannot fail, the
 count is at least three), store the pointers into `struct disk` and check
 them against `0`. -/
-theorem vdi_alloc (KAL : KALLOC) (cpu : CPU) (k : KCtx) (R : RegMap)
+theorem vdi_alloc [WchG GF] (KAL : KALLOC) (cpu : CPU) (k : KCtx) (R : RegMap)
     (γkl : GName) (γk : KmemNames) (nb : Nat) (pd0 pav0 pu0 : BitVec 64)
     (hsie : k.sie = false) (hnoff : k.noff + 1 < 2 ^ 31) (hK : 18 ≤ k.avail)
-    (hlk : "kmem" ∉ k.locks) (hnb : 3 ≤ nb) :
+    (hlk : "kmem" ∉ k.locks) (hnb : 3 ≤ nb) (hp0 : k.proc = 0#64) :
     kctx cpu ((k.pushed 4).withRegs R) ∗ pcIs cpu (KA.«virtio_disk_init» + 0xbe#64) ∗
     isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk (some nb) ∗
     wordPointsTo KA.«disk» 8 (DFrac.own 1) pd0 ∗
@@ -1209,7 +1210,7 @@ theorem vdi_alloc (KAL : KALLOC) (cpu : CPU) (k : KCtx) (R : RegMap)
   k_step (wp_s_jal cpu _ (KA.«virtio_disk_init» + 0xbe#64) false 2077316#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [vdi_jal_kalloc]
   iintro Hk Hpc
-  iapply (vdi_kalloc_call KAL cpu _ ?hs1 γkl γk (some nb) ?hn1 ?hK1 ?hl1) $$ [- $Hk $Hpc]
+  iapply (vdi_kalloc_call KAL cpu _ ?hs1 γkl γk (some nb) ?hn1 ?hK1 ?hl1 ?hz1) $$ [- $Hk $Hpc]
   rotate_right 1
   k_norm
   iframe #
@@ -1218,6 +1219,7 @@ theorem vdi_alloc (KAL : KALLOC) (cpu : CPU) (k : KCtx) (R : RegMap)
   case hn1 => k_norm; omega
   case hK1 => k_norm; omega
   case hl1 => k_norm; exact hlk
+  case hz1 => k_norm; exact hp0
   iintro %R1 Hk Hpc HPost %hcs1
   k_norm [vdi_ret_c2]
   unfold kallocPost
@@ -1243,7 +1245,7 @@ theorem vdi_alloc (KAL : KALLOC) (cpu : CPU) (k : KCtx) (R : RegMap)
   k_step (wp_s_jal cpu _ (KA.«virtio_disk_init» + 0xcc#64) false 2077302#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [vdi_jal_kalloc]
   iintro Hk Hpc
-  iapply (vdi_kalloc_call KAL cpu _ ?hs2 γkl γk (some (nb - 1)) ?hn2 ?hK2 ?hl2) $$ [- $Hk $Hpc]
+  iapply (vdi_kalloc_call KAL cpu _ ?hs2 γkl γk (some (nb - 1)) ?hn2 ?hK2 ?hl2 ?hz2) $$ [- $Hk $Hpc]
   rotate_right 1
   k_norm
   iframe #
@@ -1252,6 +1254,7 @@ theorem vdi_alloc (KAL : KALLOC) (cpu : CPU) (k : KCtx) (R : RegMap)
   case hn2 => k_norm; omega
   case hK2 => k_norm; omega
   case hl2 => k_norm; exact hlk
+  case hz2 => k_norm; exact hp0
   iintro %R2 Hk Hpc HPost %hcs2
   k_norm [vdi_ret_d0]
   unfold kallocPost
@@ -1270,7 +1273,7 @@ theorem vdi_alloc (KAL : KALLOC) (cpu : CPU) (k : KCtx) (R : RegMap)
   k_step (wp_s_jal cpu _ (KA.«virtio_disk_init» + 0xd2#64) false 2077296#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [vdi_jal_kalloc]
   iintro Hk Hpc
-  iapply (vdi_kalloc_call KAL cpu _ ?hs3 γkl γk (some (nb - 1 - 1)) ?hn3 ?hK3 ?hl3)
+  iapply (vdi_kalloc_call KAL cpu _ ?hs3 γkl γk (some (nb - 1 - 1)) ?hn3 ?hK3 ?hl3 ?hz3)
     $$ [- $Hk $Hpc]
   rotate_right 1
   k_norm
@@ -1280,6 +1283,7 @@ theorem vdi_alloc (KAL : KALLOC) (cpu : CPU) (k : KCtx) (R : RegMap)
   case hn3 => k_norm; omega
   case hK3 => k_norm; omega
   case hl3 => k_norm; exact hlk
+  case hz3 => k_norm; exact hp0
   iintro %R3 Hk Hpc HPost %hcs3
   k_norm [vdi_ret_d6]
   unfold kallocPost
@@ -1948,8 +1952,8 @@ set_option maxHeartbeats 4000000 in
 set_option maxRecDepth 100000 in
 theorem virtio_disk_init_proof (IL : INITLOCK) (KAL : KALLOC)
     (MS : MEMSET) : VIRTIO_DISK_INIT :=
-  ⟨fun {hlc GF} _ _ _ _ cpu k γ γkl γk nb c0 vlock vname vcpu pd0 pav0 pu0 free0
-      hsie hK hnoff hlk hnb hdead => by
+  ⟨fun {hlc GF} _ _ _ _ _ cpu k γ γkl γk nb c0 vlock vname vcpu pd0 pav0 pu0 free0
+      hsie hK hnoff hlk hnb hdead hp0 => by
   unfold wp_virtio_disk_init_body diskInitCells
   simp only [virtioDiskInitAddr, vdi_aDescPtr, vdi_aAvailPtr, vdi_aUsedPtr, vdi_aUsedIdx]
   iintro ⟨Hk, Hpc, #Hlock, Hav, #Hinv, Htok, HG,
@@ -2014,7 +2018,7 @@ theorem virtio_disk_init_proof (IL : INITLOCK) (KAL : KALLOC)
   iframe Hinv Hk Hpc Htok
   iintro %R4 Hk Hpc Htok %hp4
   -- the three pages
-  iapply (vdi_alloc KAL cpu k _ γkl γk nb pd0 pav0 pu0 hsie hnoff hKa hlk hnb)
+  iapply (vdi_alloc KAL cpu k _ γkl γk nb pd0 pav0 pu0 hsie hnoff hKa hlk hnb hp0)
   iframe Hk Hpc Hlock Hav Hd Ha Hu
   iintro %R5 %pd %pav %pu Hk Hpc Hav Hbd Hba Hbu Hd Ha Hu %hp5
   obtain ⟨hpvd, hpva, hpvu, h10_5, h9_5, h2_5, h18_5, hk5⟩ := hp5

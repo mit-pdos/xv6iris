@@ -19,6 +19,9 @@ THE LEND (permit sweep L1a, Rocq f344a089a; threaded by L2, Rocq
 78f9234b8): carried by the loop (`uvmcopy_iter` / `uvmcopy_loop` /
 `uvmcopy_err` take and return `∃ k1 ≥ ke`) and passed to `mappages` and to
 the failure tail's `uvmunmap`, each return's bound composed back to `ke`.
+Since L3b (no Rocq counterpart) `kalloc` and the mappages-failure arm's
+`kfree` take the count in hand too and step it (`uc_kalloc_lend_call`,
+`uc_kfree_call` over `uc_kfree_lend_call`).
 -/
 import Xv6.SpecUvmcopy
 import Xv6.SpecWalk
@@ -180,20 +183,20 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
 /-! ## The callees, at their entry addresses -/
 
 set_option maxHeartbeats 1000000 in
-theorem uc_kfree_call (KF : KFREE) [CurCtx] (c : CPU) (k' : KCtx) (γl : GName) (γk : KmemNames)
-    (on : Option Nat) (hnoff' : k'.noff + 1 < 2 ^ 31) (hK' : 14 ≤ k'.avail)
+/-- `kfree`'s led contract, at a lend (permit sweep L3b): the lend back
+stepped. -/
+theorem uc_kfree_call [WchG GF] (KF : KFREE) [CurCtx] (c : CPU) (k' : KCtx) (γl : GName) (γk : KmemNames)
+    (on : Option Nat) (ke : Nat) (hnoff' : k'.noff + 1 < 2 ^ 31) (hK' : 14 ≤ k'.avail)
     (hlk' : "kmem" ∉ k'.locks) (hp' : pageValid (k'.regs 10#5)) :
     kctx c k' ∗ pcIs c KA.«kfree» ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
-    pageOwn (k'.regs 10#5) ∗ kallocAvail γk on ∗
+    pageOwn (k'.regs 10#5) ∗ kallocAvail γk on ∗ actLend k'.proc ke ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
       ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
+      actLend k'.proc (ke + 1) -∗
       kallocAvail γk (availInc on) -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
-    ⊢ wpLoop (GF := GF) c := by
-  have h := KF.wp_kfree (hlc := hlc) (GF := GF) c k' γl γk on hnoff' hK' hlk' hp'
-  unfold wp_kfree_body at h
-  simp only [kfreeAddr] at h
-  exact h
+    ⊢ wpLoop (GF := GF) c :=
+  uc_kfree_lend_call KF c k' γl γk on ke hnoff' hK' hlk' hp'
 
 set_option maxHeartbeats 1000000 in
 theorem uc_memmove_call (MM : MEMMOVE) [CurCtx] (c : CPU) (k' : KCtx)
@@ -864,16 +867,18 @@ theorem uvmcopy_iter [WchG GF] (W : WALK_NOALLOC) (KAL : KALLOC) (KF : KFREE) (M
       k_step_gen (wp_s_jal c9 _ (KA.«uvmcopy» + 0x40#64) false 2094808#21 1#5 (by decide))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [uvmcopy_br_fffffffffffff718] next c10 hp10
       iintro Hk Hpc
-      iapply (uc_kalloc_call KAL c10 _ γl γk none ?hnk ?hKk ?hlkk) $$ [- $Hk $Hpc]
+      icases Hlend with ⟨%k2, %hk2, Hlend⟩
+      iapply (uc_kalloc_lend_call KAL c10 _ γl γk none k2 ?hnk ?hKk ?hlkk) $$ [- $Hk $Hpc]
       rotate_right 1
       k_norm_g
       iframe #
-      iframe Hav
+      iframe Hav Hlend
       case hnk => k_norm_g; omega
       case hKk => k_norm_g; omega
       case hlkk => k_norm_g; exact hlk
       iapply wpNext_intro_pin
-      iintro %c11 %hp11 %spie2 %spp2 %R3 %hsp2 Hk Hpc Hkp %hcs2
+      iintro %c11 %hp11 %spie2 %spp2 %R3 %hsp2 Hk Hpc Hlend Hkp %hcs2
+      ihave Hlend := actLend_ret_step _ hk2 $$ Hlend
       have hpin10 : k.sie = false ∨ k.proc = 0#64 → c11 = cur := fun h =>
         (hp11 h).trans ((hp10 h).trans ((hp9 h).trans ((hp8 h).trans ((hp7 h).trans
           ((hp6 h).trans (hpin4 h))))))
@@ -1159,17 +1164,19 @@ theorem uvmcopy_iter [WchG GF] (W : WALK_NOALLOC) (KAL : KALLOC) (KF : KFREE) (M
             isplitl []
             · ipureintro; exact hlen
             · iexact Hdst
-          iapply (uc_kfree_call KF c28 _ γl γk none ?hnf ?hKf ?hlkf ?hpf) $$ [- $Hk $Hpc]
+          icases Hlend with ⟨%k3, %hk3, Hlend⟩
+          iapply (uc_kfree_call KF c28 _ γl γk none k3 ?hnf ?hKf ?hlkf ?hpf) $$ [- $Hk $Hpc]
           rotate_right 1
           k_norm_g
           iframe #
-          iframe Hown Hav
+          iframe Hown Hav Hlend
           case hnf => k_norm_g; omega
           case hKf => k_norm_g; omega
           case hlkf => k_norm_g; exact hlk
           case hpf => k_norm_g; exact hpv
           iapply wpNext_intro_pin
-          iintro %c29 %hp29 %spie4 %spp4 %R6 %hsp4 Hk Hpc Hav %hcs5
+          iintro %c29 %hp29 %spie4 %spp4 %R6 %hsp4 Hk Hpc Hlend Hav %hcs5
+          ihave Hlend := actLend_ret_step _ hk3 $$ Hlend
           have hpin29 : k.sie = false ∨ k.proc = 0#64 → c29 = cur := fun h =>
             (hp29 h).trans ((hp28 h).trans ((hp27 h).trans ((hp26 h).trans (hpin25 h))))
           k_norm_g [MachCSL.KCtx.withSpie_twice, uc_ret_1424, Xv6.availInc_none]

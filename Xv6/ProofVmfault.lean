@@ -11,7 +11,10 @@ are in `Xv6/VmfaultDefs.lean`.
 
 THE LEND (permit sweep L2, Rocq 78f9234b8): passed to `mappages` (its
 returned bound is the contract's on the two arms past it); the arms that
-fail before it hand the lend back at `ke`.
+fail before it hand the lend back at `ke`.  Since L3b (no Rocq counterpart)
+`kalloc` takes it first and steps it (`uc_kalloc_lend_call`), `mappages` is
+lent the stepped count, and the mappages-failure arm's `kfree` steps it
+again (`vf_kfree_call`, the led form).
 -/
 import Xv6.SpecVmfault
 import Xv6.VmfaultDefs
@@ -151,15 +154,18 @@ theorem vmfault_proof (IM : ISMAPPED) (KAL : KALLOC) (KF : KFREE) (MS : MEMSET)
       k_step_gen (wp_s_jal c18 _ (KA.«vmfault» + 0x3a#64) false 2094590#21 1#5 (by decide))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [vmfault_br_fffffffffffff638] next c19 hp19
       iintro Hk Hpc
-      iapply (Xv6.uc_kalloc_call KAL c19 _ γl γk none ?hn1 ?hK1 ?hl1) $$ [- $Hk $Hpc]
+      iapply (Xv6.uc_kalloc_lend_call KAL c19 _ γl γk none ke ?hn1 ?hK1 ?hl1) $$ [- $Hk $Hpc]
       rotate_right 1
       k_norm_g
       iframe #
+      iframe Hlend
       case hn1 => k_norm_g; omega
       case hK1 => k_norm_g; omega
       case hl1 => k_norm_g; exact hlk
       iapply wpNext_intro_pin
-      iintro %c20 %hp20 %spie %spp %R3 %hsp Hk Hpc HPost %hcs3
+      iintro %c20 %hp20 %spie %spp %R3 %hsp Hk Hpc Hlend HPost %hcs3
+      -- the lend comes back stepped
+      ihave Hlend := actLend_ret_step _ (Nat.le_refl ke) $$ Hlend
       k_norm_g [vf_ret_14d6, MachCSL.KCtx.withSpie_pushed]
       unfold calleeSaved at hcs3
       k_norm_g at hcs3
@@ -221,7 +227,6 @@ theorem vmfault_proof (IM : ISMAPPED) (KAL : KALLOC) (KF : KFREE) (MS : MEMSET)
         iapply wpNext_mono _ _ _ _ _ $$ HΦ
         iintro %c27 HΦ %R' Hk Hpc %hfacts
         obtain ⟨h10, h1, h2, h8, h20, hrest⟩ := hfacts
-        ihave Hlend := actLend_ret_intro _ _ $$ Hlend
         iapply HΦ $$ %spie %spp %R' %hsp Hk Hpc Hlend [Hpt]
         · ileft
           isplitl []
@@ -298,8 +303,9 @@ theorem vmfault_proof (IM : ISMAPPED) (KAL : KALLOC) (KF : KFREE) (MS : MEMSET)
           have : i = 0 := by omega
           subst this
           simpa using hrep.2.2.2.2 _ hnone
+        icases Hlend with ⟨%k1, %hk1, Hlend⟩
         iapply (vf_mappages_call MA c33 _ γl γk none t 1 22#64 ?hn2 ?hK2 ?hl2 ?hro2 ?hag2 ?hpm2
-          vf_perm_mask vf_perm_rwx hrep.1 hrep.2.1 hrep.2.2.1 ke) $$ [- $Hk $Hpc]
+          vf_perm_mask vf_perm_rwx hrep.1 hrep.2.1 hrep.2.2.1 k1) $$ [- $Hk $Hpc]
         rotate_right 1
         k_norm_g
         iframe #
@@ -321,6 +327,7 @@ theorem vmfault_proof (IM : ISMAPPED) (KAL : KALLOC) (KF : KFREE) (MS : MEMSET)
           · rw [e19]; exact hblock
         iapply wpNext_intro_pin
         iintro %c34 %hp34 %spie2 %spp2 %R5 %fresh %hsp2 Hk Hpc Hlend Htree _ %hpost5
+        ihave Hlend := actLend_ret_weaken _ hk1 $$ Hlend
         k_norm_g [vf_ret_14f2, MachCSL.KCtx.withSpie_pushed, MachCSL.KCtx.withSpie_twice]
         obtain ⟨hcs5, hsup, hfrnd, hfrpg, hres⟩ := hpost5
         unfold calleeSaved at hcs5
@@ -501,17 +508,19 @@ theorem vmfault_proof (IM : ISMAPPED) (KAL : KALLOC) (KF : KFREE) (MS : MEMSET)
             isplitl []
             · ipureintro; exact List.length_replicate ..
             · iexact Hbuf
-          iapply (vf_kfree_call KF c37 _ γl γk none ?hnf ?hKf ?hlf ?hpf) $$ [- $Hk $Hpc]
+          icases Hlend with ⟨%k2, %hk2, Hlend⟩
+          iapply (vf_kfree_call KF c37 _ γl γk none k2 ?hnf ?hKf ?hlf ?hpf) $$ [- $Hk $Hpc]
           rotate_right 1
           k_norm_g
           iframe #
-          iframe Hpage
+          iframe Hpage Hlend
           case hnf => k_norm_g; omega
           case hKf => k_norm_g; omega
           case hlf => k_norm_g; exact hlk
           case hpf => k_norm_g; exact hvalid
           iapply wpNext_intro_pin
-          iintro %c38 %hp38 %spie3 %spp3 %R6 %hsp3 Hk Hpc Hav2 %hcs6
+          iintro %c38 %hp38 %spie3 %spp3 %R6 %hsp3 Hk Hpc Hlend Hav2 %hcs6
+          ihave Hlend := actLend_ret_step _ hk2 $$ Hlend
           k_norm_g [vf_ret_1502, MachCSL.KCtx.withSpie_pushed, MachCSL.KCtx.withSpie_twice]
           unfold calleeSaved at hcs6
           k_norm_g at hcs6
