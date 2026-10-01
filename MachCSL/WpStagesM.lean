@@ -186,24 +186,26 @@ theorem swp_fetch_m4_conf (cpu : CPU) (dq : DFrac) (c : MConf) (hok : MConf.ok (
   have hva := is_aligned_vaddr_of pc 4 hal
   have hb0 := bit0_clear_of_even pc (by omega)
   have hb1 := bit1_clear_of_mod4 pc hal
+  unfold fetch
+  swp_run 80
+  mconf_intro HmConf
+  iapply swp_bind
+  iapply (swp_translateAddr_M cpu dq c hok pc _ (Or.inl rfl))
+  iframe HmConf
+  iintro HmConf
+  mconf_cases HmConf
+  swp_run 40
+  mconf_intro HmConf
+  iapply swp_bind
+  iapply swp_checked_mem_read_ifetch4_conf (hok := hok) (hram := hram) (hal := hal)
+  iframe
+  inext
+  iintro HmConf Hbytes
+  -- the fetched bits' `isRVC` matters only from here: split after the shared
+  -- walk (splitting first walked the translation and the read twice)
   rcases Bool.eq_false_or_eq_true (isRVC (BitVec.extractLsb' 0 16 w)) with hc | hc
   all_goals
     simp only [fetched4, hc, Bool.false_eq_true, ite_false, ite_true]
-    unfold fetch
-    swp_run 80
-    mconf_intro HmConf
-    iapply swp_bind
-    iapply (swp_translateAddr_M cpu dq c hok pc _ (Or.inl rfl))
-    iframe HmConf
-    iintro HmConf
-    mconf_cases HmConf
-    swp_run 40
-    mconf_intro HmConf
-    iapply swp_bind
-    iapply swp_checked_mem_read_ifetch4_conf (hok := hok) (hram := hram) (hal := hal)
-    iframe
-    inext
-    iintro HmConf Hbytes
     swp_run 40
     iapply HΦ $$ HmConf HPC Hbytes
 
@@ -227,24 +229,25 @@ theorem swp_fetch_m2_conf (cpu : CPU) (dq : DFrac) (c : MConf) (hok : MConf.ok (
   have hal2 : pc.toNat % 2 = 0 := by omega
   have hram2' : inRam (pc + 2#64) 2 := by simp only [inRam, ramBase, ramEnd, h2] at *; omega
   have hal2' : (pc + 2#64).toNat % 2 = 0 := by rw [h2]; omega
+  unfold fetch
+  swp_run 80
+  mconf_intro HmConf
+  iapply swp_bind
+  iapply (swp_translateAddr_M cpu dq c hok pc _ (Or.inl rfl))
+  iframe HmConf
+  iintro HmConf
+  mconf_cases HmConf
+  swp_run 40
+  mconf_intro HmConf
+  iapply swp_bind
+  iapply swp_checked_mem_read_ifetch2_conf (hok := hok) (hram := hram2) (hal := hal2)
+  iframe
+  inext
+  iintro HmConf Hlo
+  -- the fetched bits' `isRVC` matters only from here: split after the shared
+  -- walk (splitting first walked the translation and the read twice)
   rcases Bool.eq_false_or_eq_true (isRVC lo) with hc | hc
-  all_goals
-    simp only [fetched2, hc, Bool.false_eq_true, ite_false, ite_true]
-    unfold fetch
-    swp_run 80
-    mconf_intro HmConf
-    iapply swp_bind
-    iapply (swp_translateAddr_M cpu dq c hok pc _ (Or.inl rfl))
-    iframe HmConf
-    iintro HmConf
-    mconf_cases HmConf
-    swp_run 40
-    mconf_intro HmConf
-    iapply swp_bind
-    iapply swp_checked_mem_read_ifetch2_conf (hok := hok) (hram := hram2) (hal := hal2)
-    iframe
-    inext
-    iintro HmConf Hlo
+  all_goals simp only [fetched2, hc, Bool.false_eq_true, ite_false, ite_true]
   · swp_run 40
     iapply HΦ $$ HmConf HPC Hlo Hhi
   · mconf_cases HmConf

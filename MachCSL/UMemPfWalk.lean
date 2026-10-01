@@ -50,15 +50,24 @@ theorem ume_check_perm_pf (D : UFoot) (orc : UOrc) (s : UWSt) (hp : UwkPins D s.
     (c : cbop_zicbop) (mxr sum : Bool) (hrw : (uwkR w || !uwkW w) = true) :
     runRW D orc s (check_PTE_permission (umoPf c) .User mxr sum (uwkFl w) (uwkExt w) ()) =
       some (uwkPerm (umePfAcc c) mxr w, s, orc) := by
-  uwk_pins hp
   unfold uwkPerm uwkPermOk uwkAccOk
   cases c <;> simp only [umePfAcc]
+  -- `uwk_check_perm`'s proof: a function of the four flag bits and `mxr`,
+  -- the assertion and the shadow-stack arm decided once from `hrw`, each of
+  -- the 32 closed programs evaluated by `rfl` (no stepper: 96 walks, 3.3 s
+  -- -> 32 x 3 `rfl`s)
   all_goals
-    cases hU : uwkU w <;> cases hR : uwkR w <;> cases hW : uwkW w <;> cases hX : uwkX w <;>
-      cases mxr <;> simp only [hR, hW, Bool.not_true, Bool.not_false, Bool.or_false, Bool.or_true,
-        Bool.false_eq_true] at hrw <;>
-      uwk_run -bv
-  all_goals simp_all
+    unfold check_PTE_permission
+    simp only [uwkU, uwkR, uwkW, uwkX] at *
+    simp only [uwk_perm_assert _ _ (bit_to_bool (_get_PTE_Flags_X (uwkFl w))) hrw,
+      uwk_perm_noss _ _ (bit_to_bool (_get_PTE_Flags_X (uwkFl w))) hrw, Bool.false_eq_true, if_false]
+    obtain ⟨U, hU⟩ : ∃ U, bit_to_bool (_get_PTE_Flags_U (uwkFl w)) = U := ⟨_, rfl⟩
+    obtain ⟨R, hR⟩ : ∃ R, bit_to_bool (_get_PTE_Flags_R (uwkFl w)) = R := ⟨_, rfl⟩
+    obtain ⟨W, hW⟩ : ∃ W, bit_to_bool (_get_PTE_Flags_W (uwkFl w)) = W := ⟨_, rfl⟩
+    obtain ⟨X, hX⟩ : ∃ X, bit_to_bool (_get_PTE_Flags_X (uwkFl w)) = X := ⟨_, rfl⟩
+    simp only [hU, hR, hW, hX]
+    clear hU hR hW hX hrw
+    cases U <;> cases R <;> cases W <;> cases X <;> cases mxr <;> rfl
 
 set_option maxHeartbeats 4000000 in
 set_option maxRecDepth 100000 in

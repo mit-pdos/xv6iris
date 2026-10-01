@@ -241,8 +241,12 @@ def bmRead (mm : BMap) (pa : PAddr) : (n : Nat) → Option (BitVec (8 * n))
 def bmOwned (mm : BMap) (pa : PAddr) (n : Nat) : Bool :=
   (List.range n).all fun j => (mm (pa + BitVec.ofNat 64 j)).isSome
 
-/-- Set one byte. -/
-def bmSet (mm : BMap) (a : PAddr) (b : BitVec 8) : BMap :=
+/-- Set one byte.  Irreducible to the elaborator (`unfold bmSet` still
+works; the kernel is unaffected): a failed unification of two different
+`bmWrite`s otherwise unfolds each `bmSet` level twice -- `2^n` for an
+`n`-byte store (`umo_amo_ok` at width 8: 2.6 s in `uwk_run`'s closing
+`isDefEq`). -/
+@[irreducible] def bmSet (mm : BMap) (a : PAddr) (b : BitVec 8) : BMap :=
   fun a' => if a' = a then some b else mm a'
 
 /-- Store the `n` bytes of `w` at `pa`. -/

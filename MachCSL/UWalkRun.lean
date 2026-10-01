@@ -195,6 +195,16 @@ theorem uwk_silent (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (m m' : SailM 
 
 theorem uwk_toNat_ofNat (n : Nat) : (Int.ofNat n).toNat = n := rfl
 
+/-- An undecided `if` whose two branches end in the same state and oracle
+(`uwk_run +merge`): the result is the `if` of the two results. -/
+theorem uwk_ite_merge (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (c : Prop) (inst : Decidable c)
+    (a b : SailM X) (x1 x2 : X) (s' : UWSt) (orc' : UOrc)
+    (ha : c → runRW D orc s a = some (x1, s', orc')) (hb : ¬ c → runRW D orc s b = some (x2, s', orc')) :
+    runRW D orc s (@ite _ c inst a b) = some (@ite X c inst x1 x2, s', orc') := by
+  by_cases hc : c
+  · rw [if_pos hc, if_pos hc]; exact ha hc
+  · rw [if_neg hc, if_neg hc]; exact hb hc
+
 /-! ## The stepper -/
 
 namespace UWalkRun
@@ -218,6 +228,10 @@ structure Cfg where
   limit : Nat := 20000
   /-- whether `bv_decide` may be tried on a side condition -/
   bv : Bool := true
+  /-- `+merge`: walk both branches of an undecided `if` (each under its
+  condition) and, when they end in the same state and oracle, return the `if`
+  of the two results -/
+  merge : Bool := false
 
 def whnfI (e : Lean.Expr) : MetaM Lean.Expr := withTransparency .instances <| whnf e
 
@@ -402,6 +416,9 @@ def decideProp (cx : Cfg) (c : Lean.Expr) : TacticM (Option (Lean.Expr × Bool))
   let toOrig (p : Lean.Expr) : MetaM Lean.Expr := match r.proof? with
     | some pf => mkAppM ``Eq.mpr #[pf, p]
     | none => pure p
+  -- `+merge`: an undecided branch is merged, not bit-blasted (both arms are
+  -- walked under their condition; the leaf's own closer sees the `if`)
+  if cx.merge then return none
   if let some p ← byBv c' cx.bv then return some (← toOrig p, true)
   if let some p ← byBv (mkNot c') cx.bv then
     let pf ← match r.proof? with
@@ -587,7 +604,10 @@ partial def walk (cx : Cfg) (X orc s m : Lean.Expr) : TacticM (Lean.Expr × Lean
     | some (hc, false) =>
       let (r, p) ← walk cx X orc s eb
       return (r, mkAppN (mkConst ``uwk_ite_neg) #[X, cx.D, orc, s, c, inst, tb, eb, r, hc, p])
-    | none => throwError "uwk_run: cannot decide{indentExpr c}"
+    | none =>
+      if cx.merge then
+        if let some rp ← walkMerge cx X orc s c inst tb eb then return rp
+      throwError "uwk_run: cannot decide{indentExpr c}"
   if fn.isConstOf ``dite then
     let a := m.getAppArgs
     let c := a[1]!; let inst := a[2]!; let tb := a[3]!; let eb := a[4]!
@@ -641,6 +661,33 @@ partial def walk (cx : Cfg) (X orc s m : Lean.Expr) : TacticM (Lean.Expr × Lean
       if m' == m then throwError "uwk_run: cannot unfold {n}{indentExpr m}"
       return ← walk cx X orc s m'
   throwError "uwk_run: stuck at{indentExpr m}"
+
+/-- `+merge` at an undecided `if c then a else b`: walk `a` under `c` and `b`
+under `¬ c`; if both end in the same state and oracle (and their results do
+not mention the branch hypothesis), the `if` of the results. -/
+partial def walkMerge (cx : Cfg) (X orc s c inst a b : Lean.Expr) :
+    TacticM (Option (Lean.Expr × Lean.Expr)) := do
+  let saved ← saveState
+  try
+    let side (T br : Lean.Expr) : TacticM (Lean.Expr × Lean.Expr × Lean.Expr × Lean.Expr) :=
+      withLocalDeclD `hsplit T fun h => do
+        let (r, p) ← walk cx X orc s br
+        let r ← instantiateMVars r
+        let some (x, s', o') ← parseRes r | throwError "uwk_run +merge: branch result{indentExpr r}"
+        let x ← instantiateMVars x; let s' ← instantiateMVars s'; let o' ← instantiateMVars o'
+        if x.containsFVar h.fvarId! || s'.containsFVar h.fvarId! || o'.containsFVar h.fvarId! then
+          throwError "uwk_run +merge: the result mentions the branch hypothesis"
+        return (x, s', o', ← mkLambdaFVars #[h] (← instantiateMVars p))
+    let (x1, s1, o1, p1) ← side c a
+    let (x2, s2, o2, p2) ← side (mkNot c) b
+    unless ← withReducible (isDefEq s1 s2) do throwError "uwk_run +merge: states differ"
+    unless ← withReducible (isDefEq o1 o2) do throwError "uwk_run +merge: oracles differ"
+    let x := mkApp5 (mkConst ``ite [levelOne]) X c inst x1 x2
+    return some (mkRes X x s1 o1,
+      mkAppN (mkConst ``uwk_ite_merge) #[X, cx.D, orc, s, c, inst, a, b, x1, x2, s1, o1, p1, p2])
+  catch _ =>
+    restoreState saved
+    return none
 
 /-- A hypothesis or given lemma `runRW D orc s m = r` for this `m`. -/
 partial def bySubFact (cx : Cfg) (X orc s m : Lean.Expr) (retry : Bool := true) :
@@ -794,7 +841,8 @@ def mkCtx (lemmas : Array Syntax.Term) : TacticM (Simp.Context × Simp.SimprocsA
   return (ctx, simprocs)
 
 /-- Run the walker on `lhs = runRW D orc s m`: the result and the proof. -/
-def run (lemmas : Array Syntax.Term) (lhs : Lean.Expr) (bv : Bool) : TacticM (Lean.Expr × Lean.Expr) := do
+def run (lemmas : Array Syntax.Term) (lhs : Lean.Expr) (bv : Bool) (merge : Bool := false) :
+    TacticM (Lean.Expr × Lean.Expr) := do
   let lhs ← instantiateMVars lhs
   unless lhs.isAppOfArity ``runRW 5 do throwError "uwk_run: not a walk{indentExpr lhs}"
   let a := lhs.getAppArgs
@@ -811,7 +859,7 @@ def run (lemmas : Array Syntax.Term) (lhs : Lean.Expr) (bv : Bool) : TacticM (Le
     instantiateMVars e
   let steps ← IO.mkRef 0
   let cx : Cfg :=
-    { D := D, lemmas := ls, simpCtx := ctx, simprocs := simprocs, argCtx := argCtx, steps := steps, bv := bv }
+    { D := D, lemmas := ls, simpCtx := ctx, simprocs := simprocs, argCtx := argCtx, steps := steps, bv := bv, merge := merge }
   let (r, p) ← walk cx X orc s m
   trace m!"uwk_run: {← steps.get} steps"
   -- the result's closed data evaluated (a definitional step)
@@ -820,20 +868,26 @@ def run (lemmas : Array Syntax.Term) (lhs : Lean.Expr) (bv : Bool) : TacticM (Le
 
 end UWalkRun
 
-syntax (name := uwkRun) "uwk_run" ("-bv")? (" [" term,* "]")? : tactic
+syntax (name := uwkRun) "uwk_run" ("-bv")? ("+merge")? (" [" term,* "]")? : tactic
 
 open Lean Elab Tactic Meta in
 /-- `uwk_run [l₁, …]` on `runRW D orc s m = rhs`: walk `m`, leave `r = rhs`
-(closed by `rfl` when possible). -/
+(closed by `rfl` when possible).  `uwk_run +merge`: a branch whose condition
+the stepper cannot decide is walked on BOTH sides (each under its condition)
+and, when the two end in the same state and oracle, the result is the `if`
+of the two results -- one walk, linear in the program (case-splitting the
+goal instead walks the shared tail once per path); the condition is then
+the closing tactic's business (`bv_decide` on the leaf). -/
 @[tactic uwkRun] def evalUwkRun : Tactic := fun stx => do
   let bv := stx[1].isNone
+  let merge := !stx[2].isNone
   let lemmas : Array Syntax.Term :=
-    if stx[2].isNone then #[] else (stx[2][1].getSepArgs.map fun s => ⟨s⟩)
+    if stx[3].isNone then #[] else (stx[3][1].getSepArgs.map fun s => ⟨s⟩)
   withMainContext do
     let g ← getMainGoal
     let tgt ← whnfR (← instantiateMVars (← g.getType))
     let some (ty, lhs, rhs) := tgt.eq? | throwError "uwk_run: the goal is not an equation{indentExpr tgt}"
-    let (r, p) ← UWalkRun.run lemmas lhs bv
+    let (r, p) ← UWalkRun.run lemmas lhs bv merge
     let g' ← mkFreshExprSyntheticOpaqueMVar (← mkEq r rhs)
     g.assign (← mkEqTrans p g')
     let _ := ty

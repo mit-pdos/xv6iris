@@ -199,6 +199,12 @@ theorem ufCfg_file (C : UCfg) (P : UPtd) (v : UfVals) (hv : v.lf.ok) : UfCfg C P
   intro r x h
   cases r <;> simp only [hwVal, reduceCtorEq, Option.some.injEq] at h <;> (subst h; rfl)
 
+/-- A register `hwVal` pins is one of `hwRegs` (a case split over every
+register, in an empty context: under `ufCfg_of_ro`'s hypotheses each of the
+~250 arms' `simp_all` cost ~9 ms). -/
+theorem uf_hwVal_mem (r : Register) (x : RegisterType r) (h : hwVal r = some x) : r ∈ hwRegs := by
+  cases r <;> simp only [hwVal, reduceCtorEq] at h <;> decide
+
 /-- The pins only mention read-only cells: a file agreeing there keeps them. -/
 theorem ufCfg_of_ro (C : UCfg) (P : UPtd) (f f' : RegFile) (hc : UfCfg C P f)
     (h : ∀ r ∈ ufRoList, f' r = f r) : UfCfg C P f' := by
@@ -211,7 +217,7 @@ theorem ufCfg_of_ro (C : UCfg) (P : UPtd) (f f' : RegFile) (hc : UfCfg C P f)
     (e _ (by decide)).trans hc.satp, hl ▸ hc.lok, ?_⟩
   intro r x hx
   have hm : r ∈ ufRoList := by
-    have : r ∈ hwRegs := by cases r <;> simp_all [hwVal, hwRegs]
+    have : r ∈ hwRegs := uf_hwVal_mem r x hx
     simp only [ufRoList, List.mem_append]; exact Or.inr (Or.inr this)
   rw [e r hm]; exact hc.hw r x hx
 

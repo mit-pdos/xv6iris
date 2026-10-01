@@ -116,107 +116,33 @@ theorem argrawEntry_target (i : Nat) (hi : i < 6) :
   | 4, _ => decide
   | 5, _ => decide
 
+/-- Entry `i` from one decision over its four `.rodata` bytes (`rodataRun`,
+one list walk) instead of one `Kernel.rodata[j]? = some _` per byte. -/
+theorem argraw_tbl_word_of (i : Nat) (b0 b1 b2 b3 : BitVec 8)
+    (hrun : rodataRun (KernelSyms.«etext» + 0x780 + 4 * i) [b0, b1, b2, b3])
+    (hal : (BitVec.ofNat 64 (KernelSyms.«etext» + 0x780 + 4 * i)).toNat % 4 = 0)
+    (hw : bytesToWord4 [b0, b1, b2, b3] = argrawEntry i) :
+    kmapStatic (GF := GF) ⊢ kernelData -∗
+      wordPointsTo (argrawTbl + BitVec.ofNat 64 (4 * i)) 4 DFrac.discard (argrawEntry i) := by
+  have ea : argrawTbl + BitVec.ofNat 64 (4 * i) = BitVec.ofNat 64 (KernelSyms.«etext» + 0x780 + 4 * i) := by
+    unfold argrawTbl KA.«etext»; rw [BitVec.ofNat_add, BitVec.ofNat_add]
+  rw [ea, ← hw]
+  iintro #HS #H
+  iapply (word4_of_bytes_val _ DFrac.discard b0 b1 b2 b3 hal)
+  iapply (kernelData_buf_nat (GF := GF) _ _ hrun) $$ HS H
+
 set_option maxRecDepth 100000 in
 /-- Entry `i` of the table, straight out of the read-only image. -/
 theorem argraw_tbl_word (i : Nat) (hi : i < 6) :
     kmapStatic (GF := GF) ⊢ kernelData -∗
       wordPointsTo (argrawTbl + BitVec.ofNat 64 (4 * i)) 4 DFrac.discard (argrawEntry i) := by
-  iintro #HS #H
-  have hb : ∀ (j a b : Nat), Kernel.rodata[j]? = some (a, b) → (KernelSyms.«etext» + 0x780) ≤ a → a < KernelSyms.«syscalls» →
-      kmapStatic (GF := GF) ⊢ kernelData -∗ wordPointsTo (BitVec.ofNat 64 a) 1 DFrac.discard (BitVec.ofNat 8 b) := by
-    intro j a b hj hlo hhi
-    have he : KernelSyms.«etext» = 0x80007 * 4096 := by decide
-    have hs : KernelSyms.«syscalls» ≤ 0x80008 * 4096 := by decide
-    exact kernelData_byte j a b hj (by unfold inRam ramBase ramEnd; simp only [BitVec.toNat_ofNat]; omega)
-      (by
-        have : (vpnOf (BitVec.ofNat 64 a)).toNat = 0x80007 := by
-          rw [Xv6.UPtUnmap.vpnOf_toNat]; simp only [BitVec.toNat_ofNat, Nat.reducePow]; omega
-        rw [this]; decide)
-  have hfour : ∀ (a : Nat) (b0 b1 b2 b3 : BitVec 8), a % 4 = 0 → (KernelSyms.«etext» + 0x780) ≤ a → a + 3 < KernelSyms.«syscalls» →
-      wordPointsTo (GF := GF) (BitVec.ofNat 64 a) 1 DFrac.discard b0 ∗
-      wordPointsTo (BitVec.ofNat 64 (a + 1)) 1 DFrac.discard b1 ∗
-      wordPointsTo (BitVec.ofNat 64 (a + 2)) 1 DFrac.discard b2 ∗
-      wordPointsTo (BitVec.ofNat 64 (a + 3)) 1 DFrac.discard b3 ⊢
-      wordPointsTo (BitVec.ofNat 64 a) 4 DFrac.discard (bytesToWord4 [b0, b1, b2, b3]) := by
-    intro a b0 b1 b2 b3 hal hlo hhi
-    iintro ⟨H0, H1, H2, H3⟩
-    iapply word4_of_bytes_val (BitVec.ofNat 64 a) DFrac.discard b0 b1 b2 b3
-      (by simp only [BitVec.toNat_ofNat, Nat.reducePow]; omega)
-    unfold byteBuf
-    simp only [Iris.Algebra.BigOpL.bigOpL_cons, Iris.Algebra.BigOpL.bigOpL_nil, Nat.reduceAdd]
-    have e0 : BitVec.ofNat 64 a + BitVec.ofNat 64 0 = BitVec.ofNat 64 a := by simp
-    have e1 : BitVec.ofNat 64 a + BitVec.ofNat 64 1 = BitVec.ofNat 64 (a + 1) := by rw [BitVec.ofNat_add]
-    have e2 : BitVec.ofNat 64 a + BitVec.ofNat 64 2 = BitVec.ofNat 64 (a + 2) := by rw [BitVec.ofNat_add]
-    have e3 : BitVec.ofNat 64 a + BitVec.ofNat 64 3 = BitVec.ofNat 64 (a + 3) := by rw [BitVec.ofNat_add]
-    rw [e0, e1, e2, e3]
-    iframe H0 H1 H2 H3
   match i, hi with
-  | 0, _ =>
-    ihave #B0 := hb 1920 (KernelSyms.«etext» + 0x780) 0xde rfl (by decide) (by decide) $$ HS H
-    ihave #B1 := hb 1921 (KernelSyms.«etext» + 0x781) 0xb0 rfl (by decide) (by decide) $$ HS H
-    ihave #B2 := hb 1922 (KernelSyms.«etext» + 0x782) 0xff rfl (by decide) (by decide) $$ HS H
-    ihave #B3 := hb 1923 (KernelSyms.«etext» + 0x783) 0xff rfl (by decide) (by decide) $$ HS H
-    iapply (show wordPointsTo (GF := GF) (BitVec.ofNat 64 (KernelSyms.«etext» + 0x780)) 4 DFrac.discard
-        (bytesToWord4 [0xde#8, 0xb0#8, 0xff#8, 0xff#8]) ⊢
-        wordPointsTo (argrawTbl + BitVec.ofNat 64 (4 * 0)) 4 DFrac.discard (argrawEntry 0) from by
-      unfold argrawTbl argrawEntry; simp only [Nat.mul_zero, BitVec.add_zero]; rfl)
-    iapply hfour (KernelSyms.«etext» + 0x780) _ _ _ _ (by decide) (by decide) (by decide)
-    iframe B0 B1 B2 B3
-  | 1, _ =>
-    ihave #B0 := hb 1924 (KernelSyms.«etext» + 0x784) 0xec rfl (by decide) (by decide) $$ HS H
-    ihave #B1 := hb 1925 (KernelSyms.«etext» + 0x785) 0xb0 rfl (by decide) (by decide) $$ HS H
-    ihave #B2 := hb 1926 (KernelSyms.«etext» + 0x786) 0xff rfl (by decide) (by decide) $$ HS H
-    ihave #B3 := hb 1927 (KernelSyms.«etext» + 0x787) 0xff rfl (by decide) (by decide) $$ HS H
-    iapply (show wordPointsTo (GF := GF) (BitVec.ofNat 64 (KernelSyms.«etext» + 0x784)) 4 DFrac.discard
-        (bytesToWord4 [0xec#8, 0xb0#8, 0xff#8, 0xff#8]) ⊢
-        wordPointsTo (argrawTbl + BitVec.ofNat 64 (4 * 1)) 4 DFrac.discard (argrawEntry 1) from by
-      unfold argrawTbl argrawEntry; rfl)
-    iapply hfour (KernelSyms.«etext» + 0x784) _ _ _ _ (by decide) (by decide) (by decide)
-    iframe B0 B1 B2 B3
-  | 2, _ =>
-    ihave #B0 := hb 1928 (KernelSyms.«etext» + 0x788) 0xf2 rfl (by decide) (by decide) $$ HS H
-    ihave #B1 := hb 1929 (KernelSyms.«etext» + 0x789) 0xb0 rfl (by decide) (by decide) $$ HS H
-    ihave #B2 := hb 1930 (KernelSyms.«etext» + 0x78a) 0xff rfl (by decide) (by decide) $$ HS H
-    ihave #B3 := hb 1931 (KernelSyms.«etext» + 0x78b) 0xff rfl (by decide) (by decide) $$ HS H
-    iapply (show wordPointsTo (GF := GF) (BitVec.ofNat 64 (KernelSyms.«etext» + 0x788)) 4 DFrac.discard
-        (bytesToWord4 [0xf2#8, 0xb0#8, 0xff#8, 0xff#8]) ⊢
-        wordPointsTo (argrawTbl + BitVec.ofNat 64 (4 * 2)) 4 DFrac.discard (argrawEntry 2) from by
-      unfold argrawTbl argrawEntry; rfl)
-    iapply hfour (KernelSyms.«etext» + 0x788) _ _ _ _ (by decide) (by decide) (by decide)
-    iframe B0 B1 B2 B3
-  | 3, _ =>
-    ihave #B0 := hb 1932 (KernelSyms.«etext» + 0x78c) 0xf8 rfl (by decide) (by decide) $$ HS H
-    ihave #B1 := hb 1933 (KernelSyms.«etext» + 0x78d) 0xb0 rfl (by decide) (by decide) $$ HS H
-    ihave #B2 := hb 1934 (KernelSyms.«etext» + 0x78e) 0xff rfl (by decide) (by decide) $$ HS H
-    ihave #B3 := hb 1935 (KernelSyms.«etext» + 0x78f) 0xff rfl (by decide) (by decide) $$ HS H
-    iapply (show wordPointsTo (GF := GF) (BitVec.ofNat 64 (KernelSyms.«etext» + 0x78c)) 4 DFrac.discard
-        (bytesToWord4 [0xf8#8, 0xb0#8, 0xff#8, 0xff#8]) ⊢
-        wordPointsTo (argrawTbl + BitVec.ofNat 64 (4 * 3)) 4 DFrac.discard (argrawEntry 3) from by
-      unfold argrawTbl argrawEntry; rfl)
-    iapply hfour (KernelSyms.«etext» + 0x78c) _ _ _ _ (by decide) (by decide) (by decide)
-    iframe B0 B1 B2 B3
-  | 4, _ =>
-    ihave #B0 := hb 1936 (KernelSyms.«etext» + 0x790) 0xfe rfl (by decide) (by decide) $$ HS H
-    ihave #B1 := hb 1937 (KernelSyms.«etext» + 0x791) 0xb0 rfl (by decide) (by decide) $$ HS H
-    ihave #B2 := hb 1938 (KernelSyms.«etext» + 0x792) 0xff rfl (by decide) (by decide) $$ HS H
-    ihave #B3 := hb 1939 (KernelSyms.«etext» + 0x793) 0xff rfl (by decide) (by decide) $$ HS H
-    iapply (show wordPointsTo (GF := GF) (BitVec.ofNat 64 (KernelSyms.«etext» + 0x790)) 4 DFrac.discard
-        (bytesToWord4 [0xfe#8, 0xb0#8, 0xff#8, 0xff#8]) ⊢
-        wordPointsTo (argrawTbl + BitVec.ofNat 64 (4 * 4)) 4 DFrac.discard (argrawEntry 4) from by
-      unfold argrawTbl argrawEntry; rfl)
-    iapply hfour (KernelSyms.«etext» + 0x790) _ _ _ _ (by decide) (by decide) (by decide)
-    iframe B0 B1 B2 B3
-  | 5, _ =>
-    ihave #B0 := hb 1940 (KernelSyms.«etext» + 0x794) 0x04 rfl (by decide) (by decide) $$ HS H
-    ihave #B1 := hb 1941 (KernelSyms.«etext» + 0x795) 0xb1 rfl (by decide) (by decide) $$ HS H
-    ihave #B2 := hb 1942 (KernelSyms.«etext» + 0x796) 0xff rfl (by decide) (by decide) $$ HS H
-    ihave #B3 := hb 1943 (KernelSyms.«etext» + 0x797) 0xff rfl (by decide) (by decide) $$ HS H
-    iapply (show wordPointsTo (GF := GF) (BitVec.ofNat 64 (KernelSyms.«etext» + 0x794)) 4 DFrac.discard
-        (bytesToWord4 [0x04#8, 0xb1#8, 0xff#8, 0xff#8]) ⊢
-        wordPointsTo (argrawTbl + BitVec.ofNat 64 (4 * 5)) 4 DFrac.discard (argrawEntry 5) from by
-      unfold argrawTbl argrawEntry; rfl)
-    iapply hfour (KernelSyms.«etext» + 0x794) _ _ _ _ (by decide) (by decide) (by decide)
-    iframe B0 B1 B2 B3
+  | 0, _ => exact argraw_tbl_word_of 0 0xde#8 0xb0#8 0xff#8 0xff#8 (by decide +kernel) (by decide) (by decide)
+  | 1, _ => exact argraw_tbl_word_of 1 0xec#8 0xb0#8 0xff#8 0xff#8 (by decide +kernel) (by decide) (by decide)
+  | 2, _ => exact argraw_tbl_word_of 2 0xf2#8 0xb0#8 0xff#8 0xff#8 (by decide +kernel) (by decide) (by decide)
+  | 3, _ => exact argraw_tbl_word_of 3 0xf8#8 0xb0#8 0xff#8 0xff#8 (by decide +kernel) (by decide) (by decide)
+  | 4, _ => exact argraw_tbl_word_of 4 0xfe#8 0xb0#8 0xff#8 0xff#8 (by decide +kernel) (by decide) (by decide)
+  | 5, _ => exact argraw_tbl_word_of 5 0x04#8 0xb1#8 0xff#8 0xff#8 (by decide +kernel) (by decide) (by decide)
 
 end
 

@@ -68,25 +68,27 @@ theorem swp_fetch_s4X (cpu : CPU) (c : MConf) (sie : Bool) (hok : SConfPhys (GF 
   have hva := is_aligned_vaddr_of pc 4 hal
   have hb0 := bit0_clear_of_even pc (by omega)
   have hb1 := bit1_clear_of_mod4 pc (by omega)
+  conf_cases HmConf
+  unfold fetch
+  swp_run 80
+  conf_intro HmConf
+  iapply swp_bind
+  iapply (htr _)
+  iframe HmConf HT
+  iintro HmConf HT
+  conf_cases HmConf
+  swp_run 40
+  conf_intro HmConf
+  iapply swp_bind
+  iapply swp_checked_mem_read_ifetch4_S (hok := hok) (hram := hram) (hal := hpal)
+  iframe
+  inext
+  iintro HmConf Hbytes
+  -- the fetched word's `isRVC` matters only from here: split here, not
+  -- before the walk (the translation and the read were walked twice)
   rcases Bool.eq_false_or_eq_true (isRVC (BitVec.extractLsb' 0 16 w)) with hc | hc
   all_goals
     simp only [fetched4, hc, Bool.false_eq_true, ite_false, ite_true]
-    conf_cases HmConf
-    unfold fetch
-    swp_run 80
-    conf_intro HmConf
-    iapply swp_bind
-    iapply (htr _)
-    iframe HmConf HT
-    iintro HmConf HT
-    conf_cases HmConf
-    swp_run 40
-    conf_intro HmConf
-    iapply swp_bind
-    iapply swp_checked_mem_read_ifetch4_S (hok := hok) (hram := hram) (hal := hpal)
-    iframe
-    inext
-    iintro HmConf Hbytes
     swp_run 40
     iapply HΦ $$ HmConf HPC HT Hbytes
 
@@ -114,25 +116,25 @@ theorem swp_fetch_s2X (cpu : CPU) (c : MConf) (sie : Bool) (hok : SConfPhys (GF 
   have hal2 : pa.toNat % 2 = 0 := by omega
   have hram2' : inRam (pa + 2#64) 2 := by simp only [inRam, ramBase, ramEnd, h2] at *; omega
   have hal2' : (pa + 2#64).toNat % 2 = 0 := by rw [h2]; omega
+  conf_cases HmConf
+  unfold fetch
+  swp_run 80
+  conf_intro HmConf
+  iapply swp_bind
+  iapply (htr _)
+  iframe HmConf HT
+  iintro HmConf HT
+  conf_cases HmConf
+  swp_run 40
+  conf_intro HmConf
+  iapply swp_bind
+  iapply swp_checked_mem_read_ifetch2_S (hok := hok) (hram := hram2) (hal := hal2)
+  iframe
+  inext
+  iintro HmConf Hlo
+  -- the low half's `isRVC` matters only from here (split after the shared walk)
   rcases Bool.eq_false_or_eq_true (isRVC lo) with hc | hc
-  all_goals
-    simp only [fetched2, hc, Bool.false_eq_true, ite_false, ite_true]
-    conf_cases HmConf
-    unfold fetch
-    swp_run 80
-    conf_intro HmConf
-    iapply swp_bind
-    iapply (htr _)
-    iframe HmConf HT
-    iintro HmConf HT
-    conf_cases HmConf
-    swp_run 40
-    conf_intro HmConf
-    iapply swp_bind
-    iapply swp_checked_mem_read_ifetch2_S (hok := hok) (hram := hram2) (hal := hal2)
-    iframe
-    inext
-    iintro HmConf Hlo
+  all_goals simp only [fetched2, hc, Bool.false_eq_true, ite_false, ite_true]
   · swp_run 40
     iapply HΦ $$ HmConf HPC HT Hlo Hhi
   · conf_cases HmConf

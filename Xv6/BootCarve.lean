@@ -415,20 +415,6 @@ theorem bootImage_has (a w e : Nat) (h : bcImgOk a w e = true) :
   rw [bootImage_get?, if_pos (by unfold inRam ramBase ramEnd; rw [ha]; omega), ha]
   exact congrArg some (beq_iff_eq.1 (hc j hj))
 
-/-- `bcImgOk` with the dump row fetched ONCE per word: `bootByte` indexes the
-dump (`KernelElf.pages`, 4 KiB pages of 32-byte rows) per byte, a unary walk
-of up to 128 rows the kernel pays again for every byte of an instruction.  A
-word that sits inside one row reads its bytes off that row; any other word
-falls back to `bcImgOk`. -/
-def bcImgOkRow (a w e : Nat) : Bool :=
-  if KernelElf.elfBase ≤ a ∧ a + w ≤ KernelElf.elfEnd ∧ (a - KernelElf.elfBase) % 32 + w ≤ 32 then
-    decide (ramBase ≤ a ∧ a + w ≤ ramEnd) &&
-      (let off := a - KernelElf.elfBase
-       let row := (KernelElf.pages.getD (off / 4096) []).getD (off % 4096 / 32) 0
-       (List.range w).all fun j =>
-         KernelElf.rowByte row (off % 32 + j) == (e >>> (8 * j)) % 256)
-  else bcImgOk a w e
-
 /-- Byte `j` of a `w`-byte word, read off its `Nat`. -/
 theorem bc_nthByte_ofNat (w e j : Nat) (hj : j < w) :
     nthByte (BitVec.ofNat (8 * w) e) j = BitVec.ofNat 8 ((e >>> (8 * j)) % 256) := by
@@ -438,11 +424,80 @@ theorem bc_nthByte_ofNat (w e j : Nat) (hj : j < w) :
   rw [hw, Nat.pow_add, Nat.mod_mul_right_div_self, Nat.mod_mod_of_dvd _ (Nat.pow_dvd_pow 2 (by omega))]
   omega
 
-theorem bcImgOkRow_sound (a w e : Nat) (h : bcImgOkRow a w e = true) : bcImgOk a w e = true := by
-  unfold bcImgOkRow at h
+/-! The bytes of the dump, read by a SHARED walk: `bootByte` (and a per-word
+row lookup) walks a page's row list from the front for every read
+(`List.getD`, ~27 µs a cell, nothing shared between two reads).  `bcRowsDrop n` is a `Nat.rec` over the
+dump's rows in address order: the kernel caches each `bcRowsDrop k`, so a
+chunk's words, in address order, walk the rows once between them. -/
+
+/-- The dump's 32-byte rows in address order. -/
+def bcRows : List Nat := KernelElf.pages.flatten
+
+/-- `bcRows.drop n` as a `Nat.rec` (its steps are cached across reads). -/
+def bcRowsDrop (n : Nat) : List Nat := Nat.rec (motive := fun _ => List Nat) bcRows (fun _ r => r.tail) n
+
+theorem bcRowsDrop_eq (n : Nat) : bcRowsDrop n = bcRows.drop n := by
+  induction n with
+  | zero => rfl
+  | succ n ih =>
+    show (bcRowsDrop n).tail = _
+    rw [ih, List.tail_drop]
+
+/-- A row of a page whose predecessors are full pages, off the flattened rows. -/
+theorem bc_flatten_getD (L : List (List Nat)) (p r : Nat)
+    (hfull : ∀ i < p, (L.getD i []).length = 128) (hr : r < (L.getD p []).length) :
+    (L.flatten.drop (128 * p + r)).headD 0 = (L.getD p []).getD r 0 := by
+  induction L generalizing p with
+  | nil => simp at hr
+  | cons x xs ih =>
+    rw [List.flatten_cons]
+    cases p with
+    | zero =>
+      simp only [List.getD_cons_zero] at hr ⊢
+      rw [Nat.mul_zero, Nat.zero_add, List.drop_append_of_le_length (by omega),
+        List.headD_eq_head?, List.head?_append, List.head?_drop, List.getElem?_eq_getElem hr]
+      simp only [Option.some_or, Option.getD_some, List.getD_eq_getElem?_getD, List.getElem?_eq_getElem hr]
+    | succ p =>
+      have hx : x.length = 128 := hfull 0 (by omega)
+      simp only [List.getD_cons_succ] at hr ⊢
+      rw [show 128 * (p + 1) + r = x.length + (128 * p + r) by rw [hx]; omega,
+        List.drop_append]
+      simp only [List.drop_eq_nil_of_le (Nat.le_add_right _ _), List.nil_append, Nat.add_sub_cancel_left]
+      exact ih p (fun i hi => by simpa using hfull (i + 1) (by omega)) hr
+
+set_option maxRecDepth 100000 in
+theorem bc_pages_full : ∀ i < 10, (KernelElf.pages.getD i []).length = 128 := by decide +kernel
+set_option maxRecDepth 100000 in
+theorem bc_page10_len : (KernelElf.pages.getD 10 []).length = 27 := by decide +kernel
+
+/-- The row of an offset inside the dump, off the shared walk. -/
+theorem bc_row_eq (off : Nat) (h : off < KernelElf.elfEnd - KernelElf.elfBase) :
+    (KernelElf.pages.getD (off / 4096) []).getD (off % 4096 / 32) 0 = (bcRowsDrop (off / 32)).headD 0 := by
+  unfold KernelElf.elfEnd KernelElf.elfBase at h
+  have hp : off / 4096 ≤ 10 := by omega
+  have hr : off % 4096 / 32 < (KernelElf.pages.getD (off / 4096) []).length := by
+    rcases Nat.lt_or_ge (off / 4096) 10 with h10 | h10
+    · rw [bc_pages_full _ h10]; omega
+    · rw [show off / 4096 = 10 by omega, bc_page10_len]; omega
+  rw [bcRowsDrop_eq, bcRows, show off / 32 = 128 * (off / 4096) + off % 4096 / 32 by omega]
+  exact (bc_flatten_getD _ _ _ (fun i hi => bc_pages_full i (by omega)) hr).symm
+
+/-- Byte `off` of the dump, its row read off the shared walk. -/
+def bcByteS (off : Nat) : Nat := KernelElf.rowByte ((bcRowsDrop (off / 32)).headD 0) (off % 32)
+
+/-- `bcImgOk` with every byte read off the shared walk (a word crossing a
+32-byte row costs what any other does). -/
+def bcImgOkS (a w e : Nat) : Bool :=
+  if KernelElf.elfBase ≤ a ∧ a + w ≤ KernelElf.elfEnd then
+    decide (ramBase ≤ a ∧ a + w ≤ ramEnd) &&
+      (List.range w).all fun j => bcByteS (a - KernelElf.elfBase + j) == (e >>> (8 * j)) % 256
+  else bcImgOk a w e
+
+theorem bcImgOkS_sound (a w e : Nat) (h : bcImgOkS a w e = true) : bcImgOk a w e = true := by
+  unfold bcImgOkS at h
   split at h
   · rename_i hin
-    obtain ⟨h0, h1, h2⟩ := hin
+    obtain ⟨h0, h1⟩ := hin
     simp only [Bool.and_eq_true, decide_eq_true_eq, List.all_eq_true, List.mem_range] at h
     obtain ⟨hr, hc⟩ := h
     simp only [bcImgOk, Bool.and_eq_true, decide_eq_true_eq, List.all_eq_true, List.mem_range]
@@ -450,21 +505,16 @@ theorem bcImgOkRow_sound (a w e : Nat) (h : bcImgOkRow a w e = true) : bcImgOk a
     rw [bc_nthByte_ofNat w e j hj]
     have hcj := hc j hj
     simp only [beq_iff_eq] at hcj ⊢
+    unfold bcByteS at hcj
+    rw [← bc_row_eq _ (by unfold KernelElf.elfEnd KernelElf.elfBase at *; omega)] at hcj
     unfold bootByte KernelElf.elfByte
-    rw [if_pos (by omega)]
-    have e1 : (a + j - KernelElf.elfBase) / 4096 = (a - KernelElf.elfBase) / 4096 := by
-      unfold KernelElf.elfBase at *; omega
-    have e2 : (a + j - KernelElf.elfBase) % 4096 / 32 = (a - KernelElf.elfBase) % 4096 / 32 := by
-      unfold KernelElf.elfBase at *; omega
-    have e3 : (a + j - KernelElf.elfBase) % 32 = (a - KernelElf.elfBase) % 32 + j := by
-      unfold KernelElf.elfBase at *; omega
-    rw [e1, e2, e3, hcj]
+    rw [if_pos (by omega), show a + j - KernelElf.elfBase = a - KernelElf.elfBase + j by omega, hcj]
   · exact h
 
-theorem bc_img_row (l : List Kernel.KInstr) (h : l.all (fun k => bcImgOkRow k.addr k.width k.enc) = true) :
+theorem bc_img_row (l : List Kernel.KInstr) (h : l.all (fun k => bcImgOkS k.addr k.width k.enc) = true) :
     l.all (fun k => bcImgOk k.addr k.width k.enc) = true := by
   simp only [List.all_eq_true] at h ⊢
-  exact fun k hk => bcImgOkRow_sound _ _ _ (h k hk)
+  exact fun k hk => bcImgOkS_sound _ _ _ (h k hk)
 
 theorem bc_img_text0 : Kernel.textChunk0.all (fun k => bcImgOk k.addr k.width k.enc) = true :=
   bc_img_row _ (by decide +kernel)
@@ -507,18 +557,23 @@ theorem bc_img_text_all : Kernel.text.all (fun k => bcImgOk k.addr k.width k.enc
   unfold Kernel.text
   simp only [List.all_append, bc_img_text0, bc_img_text1, bc_img_text2, bc_img_text3, bc_img_text4, bc_img_text5, bc_img_text6, bc_img_text7, bc_img_text8, bc_img_text9, bc_img_text10, bc_img_text11, bc_img_text12, bc_img_text13, bc_img_text14, bc_img_text15, bc_img_text16, bc_img_text17, Bool.and_self]
 
-theorem bc_img_ro0 : Kernel.rodataChunk0.all (fun p => bcImgOk p.1 1 p.2) = true := by
-  decide +kernel
-theorem bc_img_ro1 : Kernel.rodataChunk1.all (fun p => bcImgOk p.1 1 p.2) = true := by
-  decide +kernel
-theorem bc_img_ro2 : Kernel.rodataChunk2.all (fun p => bcImgOk p.1 1 p.2) = true := by
-  decide +kernel
-theorem bc_img_ro3 : Kernel.rodataChunk3.all (fun p => bcImgOk p.1 1 p.2) = true := by
-  decide +kernel
-theorem bc_img_ro4 : Kernel.rodataChunk4.all (fun p => bcImgOk p.1 1 p.2) = true := by
-  decide +kernel
-theorem bc_img_ro5 : Kernel.rodataChunk5.all (fun p => bcImgOk p.1 1 p.2) = true := by
-  decide +kernel
+theorem bc_img_ro_row (l : List (Nat × Nat)) (h : l.all (fun p => bcImgOkS p.1 1 p.2) = true) :
+    l.all (fun p => bcImgOk p.1 1 p.2) = true := by
+  simp only [List.all_eq_true] at h ⊢
+  exact fun p hp => bcImgOkS_sound _ _ _ (h p hp)
+
+theorem bc_img_ro0 : Kernel.rodataChunk0.all (fun p => bcImgOk p.1 1 p.2) = true :=
+  bc_img_ro_row _ (by decide +kernel)
+theorem bc_img_ro1 : Kernel.rodataChunk1.all (fun p => bcImgOk p.1 1 p.2) = true :=
+  bc_img_ro_row _ (by decide +kernel)
+theorem bc_img_ro2 : Kernel.rodataChunk2.all (fun p => bcImgOk p.1 1 p.2) = true :=
+  bc_img_ro_row _ (by decide +kernel)
+theorem bc_img_ro3 : Kernel.rodataChunk3.all (fun p => bcImgOk p.1 1 p.2) = true :=
+  bc_img_ro_row _ (by decide +kernel)
+theorem bc_img_ro4 : Kernel.rodataChunk4.all (fun p => bcImgOk p.1 1 p.2) = true :=
+  bc_img_ro_row _ (by decide +kernel)
+theorem bc_img_ro5 : Kernel.rodataChunk5.all (fun p => bcImgOk p.1 1 p.2) = true :=
+  bc_img_ro_row _ (by decide +kernel)
 
 theorem bc_img_ro_all : Kernel.rodata.all (fun p => bcImgOk p.1 1 p.2) = true := by
   unfold Kernel.rodata

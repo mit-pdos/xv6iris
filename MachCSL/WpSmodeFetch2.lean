@@ -46,27 +46,28 @@ theorem swp_fetch_s2_tier [CurCtx] (cpu : CPU) (dq : DFrac) (c : MConf) (sie : B
   have hlt' := inRam_lt38 (pc + 2#64) 2 hram2'
   have hid := paOf_id pc (inRam_lt pc 4 hram)
   have hid' := paOf_id (pc + 2#64) (inRam_lt (pc + 2#64) 2 hram2')
+  conf_cases HmConf
+  unfold fetch
+  swp_run 80
+  conf_intro HmConf
+  iapply swp_bind
+  iapply (swp_translateAddr_tier cpu dq c sie tier root hok pc hlt _ (Or.inl rfl) (idPpn (vpnOf pc)) .rx rfl
+    (tierPin_id tier pc (inRam_lt pc 4 hram)))
+  iframe HmConf Hcl Htrans Htok
+  iintro HmConf Htrans Htok
+  rw [hid]
+  conf_cases HmConf
+  swp_run 40
+  conf_intro HmConf
+  iapply swp_bind
+  iapply swp_checked_mem_read_ifetch2_S (hok := hok') (hram := hram2) (hal := hal2)
+  iframe
+  inext
+  iintro HmConf Hlo
+  -- the fetched bits' `isRVC` matters only from here: split after the shared
+  -- walk (splitting first walked the translation and the read twice)
   rcases Bool.eq_false_or_eq_true (isRVC lo) with hc | hc
-  all_goals
-    simp only [fetched2, hc, Bool.false_eq_true, ite_false, ite_true]
-    conf_cases HmConf
-    unfold fetch
-    swp_run 80
-    conf_intro HmConf
-    iapply swp_bind
-    iapply (swp_translateAddr_tier cpu dq c sie tier root hok pc hlt _ (Or.inl rfl) (idPpn (vpnOf pc)) .rx rfl
-      (tierPin_id tier pc (inRam_lt pc 4 hram)))
-    iframe HmConf Hcl Htrans Htok
-    iintro HmConf Htrans Htok
-    rw [hid]
-    conf_cases HmConf
-    swp_run 40
-    conf_intro HmConf
-    iapply swp_bind
-    iapply swp_checked_mem_read_ifetch2_S (hok := hok') (hram := hram2) (hal := hal2)
-    iframe
-    inext
-    iintro HmConf Hlo
+  all_goals simp only [fetched2, hc, Bool.false_eq_true, ite_false, ite_true]
   · swp_run 40
     iapply HΦ $$ HmConf HPC [Htrans Htok] Hlo Hhi
     iframe Htrans Htok

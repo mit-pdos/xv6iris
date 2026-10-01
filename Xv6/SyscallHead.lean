@@ -163,6 +163,25 @@ theorem syscall_head_secc [X : CurCtx] (hct : curTier = KTier.kpt) (γ : FileNam
   subst hct
   exact hacc
 
+/-- A write outside the pinned registers keeps the pins.  (The pin goals of
+this file used to be `simp_all`, which also rewrote the arms' hypotheses
+`hA`/`hF`/`hB` -- the large part of the context -- once per conjunct.) -/
+theorem syscPins_set (k : KCtx) (R : RegMap) (i : BitVec 5) (v : BitVec 64)
+    (hi : i ≠ 2#5 ∧ i ≠ 19#5 ∧ i ≠ 20#5 ∧ i ≠ 21#5 ∧ i ≠ 22#5 ∧ i ≠ 23#5 ∧ i ≠ 24#5 ∧ i ≠ 25#5 ∧
+      i ≠ 26#5 ∧ i ≠ 27#5) (hp : syscPins k R) :
+    syscPins k (R.set i v) := by
+  obtain ⟨h2, h19, h20, h21, h22, h23, h24, h25, h26, h27⟩ := hp
+  obtain ⟨n2, n19, n20, n21, n22, n23, n24, n25, n26, n27⟩ := hi
+  simp only [syscPins, RegMap.set_apply, if_neg (Ne.symm n2), if_neg (Ne.symm n19), if_neg (Ne.symm n20),
+    if_neg (Ne.symm n21), if_neg (Ne.symm n22), if_neg (Ne.symm n23), if_neg (Ne.symm n24),
+    if_neg (Ne.symm n25), if_neg (Ne.symm n26), if_neg (Ne.symm n27)]
+  exact ⟨h2, h19, h20, h21, h22, h23, h24, h25, h26, h27⟩
+
+/-- `syscPins k (R.set i₁ v₁ … .set iₙ vₙ)` from `syscPins k R` in scope, each
+index decided outside the pins. -/
+macro "sysc_pins" : tactic =>
+  `(tactic| ((repeat (refine syscPins_set _ _ _ _ (by decide) ?_)); assumption))
+
 /-! ## §3 +0x22 .. +0x44: the split, the table, the mask, the call -/
 
 set_option maxHeartbeats 4000000 in
@@ -286,11 +305,9 @@ theorem syscall_head_split (PT : SchedNames → IProp GF) (Γ : SchedNames) [Cla
           (14#5) (syscTarget n)).set (15#5) V.pvSecc).set
           (15#5) (V.pvSecc >>> Sail.BitVec.extractLsb (BitVec.ofNat 64 n) 5 0)).set (15#5) 1#64).set (1#5) (KA.«syscall» + 70#64))
         n hn1' hn22' hnum ?hp ?h1 ?h2 ?hra)
-      case hp =>
-        obtain ⟨p2, p19, p20, p21, p22, p23, p24, p25, p26, p27⟩ := hpins
-        refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;> simp only [RegMap.set_apply] <;> simp_all
-      case h1 => simp only [RegMap.set_apply]; simp_all
-      case h2 => simp only [RegMap.set_apply]; simp_all
+      case hp => sysc_pins
+      case h1 => simpa only [RegMap.set_apply, reduceIte, BitVec.reduceEq] using hs1
+      case h2 => simpa only [RegMap.set_apply, reduceIte, BitVec.reduceEq] using hs2
       case hra => simp only [RegMap.set_apply]; unfold syscallRet syscallAddr; rfl
       unfold syscHeadRest
       icases Hrest with ⟨Hpi, Hwl, Hbs, Hip, Hfd, Hir, Henv, Hfr, Hch, Hsi, Hfi, Hpi', Hslot⟩
@@ -310,11 +327,9 @@ theorem syscall_head_split (PT : SchedNames → IProp GF) (Γ : SchedNames) [Cla
           (14#5) (syscTarget n)).set (15#5) V.pvSecc).set
           (15#5) (V.pvSecc >>> Sail.BitVec.extractLsb (BitVec.ofNat 64 n) 5 0)).set (15#5) 0#64))
         hblk ?hp ?h1 ?h2)
-      case hp =>
-        obtain ⟨p2, p19, p20, p21, p22, p23, p24, p25, p26, p27⟩ := hpins
-        refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;> simp only [RegMap.set_apply] <;> simp_all
-      case h1 => simp only [RegMap.set_apply]; simp_all
-      case h2 => simp only [RegMap.set_apply]; simp_all
+      case hp => sysc_pins
+      case h1 => simpa only [RegMap.set_apply, reduceIte, BitVec.reduceEq] using hs1
+      case h2 => simpa only [RegMap.set_apply, reduceIte, BitVec.reduceEq] using hs2
       unfold syscHeadRest
       icases Hrest with ⟨Hpi, Hwl, Hbs, Hip, Hfd, Hir, Henv, Hfr, Hch, Hsi, Hfi, Hpi', Hslot⟩
       iframe
@@ -424,8 +439,6 @@ theorem syscall_head_num (PT : SchedNames → IProp GF) (Γ : SchedNames) [Claim
   k_step_e (wp_s_addi cpu _ (KA.«syscall» + 0x20#64) true 22#12 14#5 0#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  have hpins' := hpins
-  obtain ⟨p2, p19, p20, p21, p22, p23, p24, p25, p26, p27⟩ := hpins'
   iapply (syscall_head_split PT Γ c0 k γw γ j pid V M sts gn cs ip f hE hj hproc hK hnoff htier hgn
     hA hF hB cpu spie spp
     (((((R.set (18#5) (pageAddr V.upt.tfp)).set (15#5) (tfW V.tf (tfArgIdx 7))).set (13#5)
@@ -433,11 +446,10 @@ theorem syscall_head_num (PT : SchedNames → IProp GF) (Γ : SchedNames) [Claim
       (BitVec.signExtend 64 (BitVec.extractLsb' 0 32 (tfW V.tf (tfArgIdx 7) + 0xFFFFFFFFFFFFFFFF#64)))).set
       14#5 22#64)
     (tfW V.tf (tfArgIdx 7)) ?sp ?s1 ?s2 ?a10 rfl ?r13 ?r14 ?r15)
-  case sp =>
-    refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;> simp only [RegMap.set_apply] <;> simp_all
-  case s1 => simp only [RegMap.set_apply]; simp_all
+  case sp => sysc_pins
+  case s1 => simpa only [RegMap.set_apply, reduceIte, BitVec.reduceEq] using hs1
   case s2 => simp only [RegMap.set_apply]; simp
-  case a10 => simp only [RegMap.set_apply]; simp_all
+  case a10 => simpa only [RegMap.set_apply, reduceIte, BitVec.reduceEq] using ha0
   case r13 => simp only [RegMap.set_apply]; simp
   case r14 => simp only [RegMap.set_apply]; simp
   case r15 => simp only [RegMap.set_apply]; simp

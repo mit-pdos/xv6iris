@@ -99,18 +99,6 @@ def uwkPerm (acc : MemoryAccessType mem_payload) (mxr : Bool) (w : BitVec 64) : 
 theorem uwk_bit_to_bool (x : BitVec 1) : bit_to_bool x = (x == 1#1) := by
   revert x; decide
 
-open Lean Elab Tactic Meta in
-/-- Case-split the goal's first `if` (pre-order) whose condition is closed
-under binders, rewriting it away in both branches (the condition stays as a
-hypothesis).  `uwk_run` walks a symbolic branch only when a hypothesis
-decides it; the short-circuit chains branch on an entry's symbolic bits. -/
-elab "uwk_split" : tactic => withMainContext do
-  let tgt ← instantiateMVars (← getMainTarget)
-  let some e := tgt.find? (fun e => e.isAppOfArity ``ite 5 && !(e.getArg! 1).hasLooseBVars)
-    | throwError "uwk_split: no closed `if` in the goal"
-  let cStx ← Term.exprToSyntax (e.getArg! 1)
-  evalTactic (← `(tactic| (by_cases hsplit : $cStx <;> first | rw [if_pos hsplit] | rw [if_neg hsplit])))
-
 set_option linter.unusedSimpArgs false in
 set_option maxHeartbeats 4000000 in
 set_option maxRecDepth 100000 in
@@ -123,11 +111,13 @@ theorem uwk_pte_is_invalid (D : UFoot) (orc : UOrc) (s : UWSt) (hp : UwkPins D s
   unfold pte_is_invalid
   simp only [hres, ↓reduceIte]
   -- the short-circuit chain branches on the entry's (symbolic) bits: walk
-  -- to each branch, split it, walk on
-  repeat' (first | uwk_run -bv | uwk_split)
+  -- both arms of each and merge them (one walk; splitting the goal per
+  -- branch walked the shared tail once per path, 29 paths: 4.5 s -> 1.4 s),
+  -- then ONE leaf: the merged `if` against `uwkInv`
+  uwk_run -bv +merge
   all_goals
-    -- the leaves are pure bit facts: drop the pins first, or every leaf's
-    -- `simp … at *` and `bv_decide` carry them (5.7 s -> 4.4 s)
+    -- the leaf is a pure bit fact: drop the pins first, or the leaf's
+    -- `simp … at *` and `bv_decide` carry them
     clear hDmisa hDmenv hDpmpc hDpmpa hDpma hDhtif hmisa hmenv hpmp0 hpma hhtif hres hp
     simp only [Option.some.injEq, Prod.mk.injEq, and_true, uwkInv, uwk_pbmt_matches, pte_is_non_leaf,
       Functions.not, Bool.and_true, Bool.false_or, Bool.and_false, Bool.true_and] at *

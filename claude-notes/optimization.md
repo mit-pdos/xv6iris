@@ -1041,6 +1041,87 @@ Lessons:
   tree-wide before dedup) -- the same scheme would need `drefU` facts and a
   `utextDecodeWith` lemma for the window word; not worth a second generator.
 
+### Lean: the next tier of heavy declarations (lane S)
+
+Measured Oct 1 2026, each module's saved base copy vs the edit, back to back
+under the lock (`lean -Dtrace.profiler=true -DElab.async=false`, so module
+times are sequential CPU).  Eight causes; each is a rule.
+
+- **`simp_all` meets the context you did not build for it.**  `SyscallHead`'s
+  pin goals (`syscPins k (R.set …)`, ten conjuncts) were `refine ⟨…⟩ <;>
+  simp only [RegMap.set_apply] <;> simp_all` with the three arm hypotheses
+  (`hA`/`hF`/`hB`, unfolded continuations) in scope: `simp_all` rewrote all
+  of them once per conjunct.  A lemma for the shape (`syscPins_set`, write
+  outside the pins, index side condition by `decide`; the `sysc_pins`
+  macro) and `simpa … using` the one fact a register goal needs:
+  `syscall_head_split` 5.58 → 1.45 s, module 8.0 → 3.7 s.  Same in
+  `UserFrame.ufCfg_of_ro`: `cases r <;> simp_all [hwVal, hwRegs]` over ~250
+  `Register` arms under `UfCfg` -- the case split in its own lemma with only
+  the one hypothesis (`uf_hwVal_mem`): 2.27 → 0.42 s.
+- **Never read an image byte by `rfl` on a list index.**  `argraw_tbl_word`
+  proved its 24 table bytes by `Kernel.rodata[1920 + k]? = some _ := rfl`:
+  each walked ~1920 cells in the elaborator AND again in the kernel.  One
+  `rodataRun` decision per entry (`kernelData_buf_nat`) instead: 7.2 → 1.07 s,
+  module 8.1 → 1.8 s.
+- **Share the walk across a chunk's reads.**  `BootCarve`'s image check read
+  each word's row by `List.getD` from the front of its page (up to 128 rows,
+  ~27 µs a cell) and sent row-crossing words to a per-BYTE page walk.  Bytes
+  now come off `bcRowsDrop n = Nat.rec bcRows (·.tail) n` over the flattened
+  rows (`bc_row_eq`: equal to the page lookup inside the dump; ten full pages
+  checked by `decide +kernel`): the kernel caches each `bcRowsDrop k`, so a
+  chunk's words, in address order, walk the rows once.  Text chunks 0.44 →
+  0.2 s each; rodata the same way; module 10.1 → 7.0 s.  (Probe first: a
+  trivial predicate over the same chunk was 24 ms, so the reads were the
+  whole cost.)
+- **Prove the rule over the parameter the walk does not branch on.**
+  `WpSmodeCtl` proved twelve branch rules (six operators, `rs1 = x0` or not),
+  each a full symbolic run of `execute_BTYPE` (~1.1 s).  The model's
+  per-operator `match` is one comparison: a program equation
+  (`execute_BTYPE_bcond`: two reads, then `if bcond op a b`), proved by
+  `cases op <;> simp only [bind_assoc, pure_bind, …]`, lets ONE run cover an
+  abstract `op`; the operators are one-line corollaries (statements
+  unchanged): module 19.2 → 7.4 s.
+- **Split late.**  The fetch rules split on `isRVC` of the fetched bits and
+  then walked the translation and the memory read in BOTH arms; the bits
+  matter only after the read.  Split after the shared prefix: `WpSmodeFetch4`
+  2.73 → 1.78 s, `WpSmodeFetch2` 3.79 → 2.62 s (both on the S-mode prefix of
+  the critical path), `WpStagesM` 12.6 → 10.5 s, `WpSmodeSatpU` 11.0 → 8.9 s.
+- **Merge, do not split, a symbolic branch whose arms rejoin.**
+  `uwk_pte_is_invalid` walked `pte_is_invalid`'s short-circuit chain by
+  `repeat' (first | uwk_run | uwk_split)`: every undecided `if` failed the
+  walk (after two failing `bv_omega`s), the goal was split, and the walk
+  restarted from the top -- 29 paths, each re-walking its prefix, then 29
+  `bv_decide` leaves.  `uwk_run +merge` walks both arms of an undecided `if`
+  under `c` / `¬c` and, when they end in the same state and oracle, returns
+  `if c then x₁ else x₂` (`uwk_ite_merge`); merge mode does not bit-blast
+  undecided conditions.  One walk, one leaf: 4.5 → 1.4 s.  Where the
+  program is closed once its bits are named, skip the stepper altogether:
+  `ume_check_perm_pf` (32 bit cases x 3 operations, 96 walks) now has
+  `uwk_check_perm`'s proof (`rfl` per closed program): `UMemPfWalk` 5.4 →
+  2.2 s.  `UWalk` 10.3 → ~7 s.
+- **A failed trial `isDefEq` doubles per level on a two-branch function.**
+  `uwk_run` tries to close `r = rhs` at default transparency; when it fails
+  on two different `bmWrite`s (`umo_amo_ok`: the model's AMO value vs
+  `umoNew op …` with `op` still abstract), `isDefEq` compares `bmSet m a b`
+  arguments (fails), unfolds both, and compares `m a'` under the `if` again:
+  2^n for an `n`-byte store, 2.6 s at width 8.  `bmSet` is now
+  `@[irreducible]` (every proof used `unfold bmSet`; the kernel is
+  unaffected): `UMemAmo` 15.6 → 4.6 s.  The tell is a `[Meta.isDefEq] ❌`
+  tower whose times halve at each level.  Do not "fix" it by closing at
+  instance transparency: three `UWalk` proofs rely on the default-
+  transparency close.
+- **What did not move, and why.**  `KexecB2` and `CreateMkdir` are
+  whole-function step proofs with no dominant declaration piece (each stage
+  ~1-2.5 s, ~30 % kernel), i.e. the per-`k_step` floor (lane K's
+  machinery).  `WpSmodeFrame12b`'s `sh`/`lhu` rules (1.3-2 s) are the shared
+  `store_file_S_proof`/`load_file_S_proof` walks of `execute_STORE`/`LOAD`
+  -- a width-generic rule would need the same program-equation treatment as
+  the branches, over `BitVec (8 * n)`.  `UExecCsrTabR`/`W` are four
+  `kernel_rfl`s of ~1 s each, already split per access type; their cost is
+  the model's `check_CSR_result` run for the 339 non-default numbers.
+  `FsImgCheckSweeps.fsimgRegionBareB` (1.8 s) reads ~10k bytes one at a
+  time; a whole-record `Nat` test needs a byte-vs-`Nat` equivalence lemma.
+
 ## Build shape
 
 The build is critical-path bound and core-saturated in the middle: the path is a
