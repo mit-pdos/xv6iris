@@ -414,42 +414,93 @@ theorem bootImage_has (a w e : Nat) (h : bcImgOk a w e = true) :
   rw [bootImage_get?, if_pos (by unfold inRam ramBase ramEnd; rw [ha]; omega), ha]
   exact congrArg some (beq_iff_eq.1 (hc j hj))
 
-theorem bc_img_text0 : Kernel.textChunk0.all (fun k => bcImgOk k.addr k.width k.enc) = true := by
-  decide +kernel
-theorem bc_img_text1 : Kernel.textChunk1.all (fun k => bcImgOk k.addr k.width k.enc) = true := by
-  decide +kernel
-theorem bc_img_text2 : Kernel.textChunk2.all (fun k => bcImgOk k.addr k.width k.enc) = true := by
-  decide +kernel
-theorem bc_img_text3 : Kernel.textChunk3.all (fun k => bcImgOk k.addr k.width k.enc) = true := by
-  decide +kernel
-theorem bc_img_text4 : Kernel.textChunk4.all (fun k => bcImgOk k.addr k.width k.enc) = true := by
-  decide +kernel
-theorem bc_img_text5 : Kernel.textChunk5.all (fun k => bcImgOk k.addr k.width k.enc) = true := by
-  decide +kernel
-theorem bc_img_text6 : Kernel.textChunk6.all (fun k => bcImgOk k.addr k.width k.enc) = true := by
-  decide +kernel
-theorem bc_img_text7 : Kernel.textChunk7.all (fun k => bcImgOk k.addr k.width k.enc) = true := by
-  decide +kernel
-theorem bc_img_text8 : Kernel.textChunk8.all (fun k => bcImgOk k.addr k.width k.enc) = true := by
-  decide +kernel
-theorem bc_img_text9 : Kernel.textChunk9.all (fun k => bcImgOk k.addr k.width k.enc) = true := by
-  decide +kernel
-theorem bc_img_text10 : Kernel.textChunk10.all (fun k => bcImgOk k.addr k.width k.enc) = true := by
-  decide +kernel
-theorem bc_img_text11 : Kernel.textChunk11.all (fun k => bcImgOk k.addr k.width k.enc) = true := by
-  decide +kernel
-theorem bc_img_text12 : Kernel.textChunk12.all (fun k => bcImgOk k.addr k.width k.enc) = true := by
-  decide +kernel
-theorem bc_img_text13 : Kernel.textChunk13.all (fun k => bcImgOk k.addr k.width k.enc) = true := by
-  decide +kernel
-theorem bc_img_text14 : Kernel.textChunk14.all (fun k => bcImgOk k.addr k.width k.enc) = true := by
-  decide +kernel
-theorem bc_img_text15 : Kernel.textChunk15.all (fun k => bcImgOk k.addr k.width k.enc) = true := by
-  decide +kernel
-theorem bc_img_text16 : Kernel.textChunk16.all (fun k => bcImgOk k.addr k.width k.enc) = true := by
-  decide +kernel
-theorem bc_img_text17 : Kernel.textChunk17.all (fun k => bcImgOk k.addr k.width k.enc) = true := by
-  decide +kernel
+/-- `bcImgOk` with the dump row fetched ONCE per word: `bootByte` indexes the
+dump (`KernelElf.pages`, 4 KiB pages of 32-byte rows) per byte, a unary walk
+of up to 128 rows the kernel pays again for every byte of an instruction.  A
+word that sits inside one row reads its bytes off that row; any other word
+falls back to `bcImgOk`. -/
+def bcImgOkRow (a w e : Nat) : Bool :=
+  if KernelElf.elfBase ≤ a ∧ a + w ≤ KernelElf.elfEnd ∧ (a - KernelElf.elfBase) % 32 + w ≤ 32 then
+    decide (ramBase ≤ a ∧ a + w ≤ ramEnd) &&
+      (let off := a - KernelElf.elfBase
+       let row := (KernelElf.pages.getD (off / 4096) []).getD (off % 4096 / 32) 0
+       (List.range w).all fun j =>
+         KernelElf.rowByte row (off % 32 + j) == (e >>> (8 * j)) % 256)
+  else bcImgOk a w e
+
+/-- Byte `j` of a `w`-byte word, read off its `Nat`. -/
+theorem bc_nthByte_ofNat (w e j : Nat) (hj : j < w) :
+    nthByte (BitVec.ofNat (8 * w) e) j = BitVec.ofNat 8 ((e >>> (8 * j)) % 256) := by
+  apply BitVec.eq_of_toNat_eq
+  simp only [nthByte, BitVec.extractLsb'_toNat, BitVec.toNat_ofNat, Nat.shiftRight_eq_div_pow]
+  have hw : 8 * w = 8 * j + 8 * (w - j) := by omega
+  rw [hw, Nat.pow_add, Nat.mod_mul_right_div_self, Nat.mod_mod_of_dvd _ (Nat.pow_dvd_pow 2 (by omega))]
+  omega
+
+theorem bcImgOkRow_sound (a w e : Nat) (h : bcImgOkRow a w e = true) : bcImgOk a w e = true := by
+  unfold bcImgOkRow at h
+  split at h
+  · rename_i hin
+    obtain ⟨h0, h1, h2⟩ := hin
+    simp only [Bool.and_eq_true, decide_eq_true_eq, List.all_eq_true, List.mem_range] at h
+    obtain ⟨hr, hc⟩ := h
+    simp only [bcImgOk, Bool.and_eq_true, decide_eq_true_eq, List.all_eq_true, List.mem_range]
+    refine ⟨hr, fun j hj => ?_⟩
+    rw [bc_nthByte_ofNat w e j hj]
+    have hcj := hc j hj
+    simp only [beq_iff_eq] at hcj ⊢
+    unfold bootByte KernelElf.elfByte
+    rw [if_pos (by omega)]
+    have e1 : (a + j - KernelElf.elfBase) / 4096 = (a - KernelElf.elfBase) / 4096 := by
+      unfold KernelElf.elfBase at *; omega
+    have e2 : (a + j - KernelElf.elfBase) % 4096 / 32 = (a - KernelElf.elfBase) % 4096 / 32 := by
+      unfold KernelElf.elfBase at *; omega
+    have e3 : (a + j - KernelElf.elfBase) % 32 = (a - KernelElf.elfBase) % 32 + j := by
+      unfold KernelElf.elfBase at *; omega
+    rw [e1, e2, e3, hcj]
+  · exact h
+
+theorem bc_img_row (l : List Kernel.KInstr) (h : l.all (fun k => bcImgOkRow k.addr k.width k.enc) = true) :
+    l.all (fun k => bcImgOk k.addr k.width k.enc) = true := by
+  simp only [List.all_eq_true] at h ⊢
+  exact fun k hk => bcImgOkRow_sound _ _ _ (h k hk)
+
+theorem bc_img_text0 : Kernel.textChunk0.all (fun k => bcImgOk k.addr k.width k.enc) = true :=
+  bc_img_row _ (by decide +kernel)
+theorem bc_img_text1 : Kernel.textChunk1.all (fun k => bcImgOk k.addr k.width k.enc) = true :=
+  bc_img_row _ (by decide +kernel)
+theorem bc_img_text2 : Kernel.textChunk2.all (fun k => bcImgOk k.addr k.width k.enc) = true :=
+  bc_img_row _ (by decide +kernel)
+theorem bc_img_text3 : Kernel.textChunk3.all (fun k => bcImgOk k.addr k.width k.enc) = true :=
+  bc_img_row _ (by decide +kernel)
+theorem bc_img_text4 : Kernel.textChunk4.all (fun k => bcImgOk k.addr k.width k.enc) = true :=
+  bc_img_row _ (by decide +kernel)
+theorem bc_img_text5 : Kernel.textChunk5.all (fun k => bcImgOk k.addr k.width k.enc) = true :=
+  bc_img_row _ (by decide +kernel)
+theorem bc_img_text6 : Kernel.textChunk6.all (fun k => bcImgOk k.addr k.width k.enc) = true :=
+  bc_img_row _ (by decide +kernel)
+theorem bc_img_text7 : Kernel.textChunk7.all (fun k => bcImgOk k.addr k.width k.enc) = true :=
+  bc_img_row _ (by decide +kernel)
+theorem bc_img_text8 : Kernel.textChunk8.all (fun k => bcImgOk k.addr k.width k.enc) = true :=
+  bc_img_row _ (by decide +kernel)
+theorem bc_img_text9 : Kernel.textChunk9.all (fun k => bcImgOk k.addr k.width k.enc) = true :=
+  bc_img_row _ (by decide +kernel)
+theorem bc_img_text10 : Kernel.textChunk10.all (fun k => bcImgOk k.addr k.width k.enc) = true :=
+  bc_img_row _ (by decide +kernel)
+theorem bc_img_text11 : Kernel.textChunk11.all (fun k => bcImgOk k.addr k.width k.enc) = true :=
+  bc_img_row _ (by decide +kernel)
+theorem bc_img_text12 : Kernel.textChunk12.all (fun k => bcImgOk k.addr k.width k.enc) = true :=
+  bc_img_row _ (by decide +kernel)
+theorem bc_img_text13 : Kernel.textChunk13.all (fun k => bcImgOk k.addr k.width k.enc) = true :=
+  bc_img_row _ (by decide +kernel)
+theorem bc_img_text14 : Kernel.textChunk14.all (fun k => bcImgOk k.addr k.width k.enc) = true :=
+  bc_img_row _ (by decide +kernel)
+theorem bc_img_text15 : Kernel.textChunk15.all (fun k => bcImgOk k.addr k.width k.enc) = true :=
+  bc_img_row _ (by decide +kernel)
+theorem bc_img_text16 : Kernel.textChunk16.all (fun k => bcImgOk k.addr k.width k.enc) = true :=
+  bc_img_row _ (by decide +kernel)
+theorem bc_img_text17 : Kernel.textChunk17.all (fun k => bcImgOk k.addr k.width k.enc) = true :=
+  bc_img_row _ (by decide +kernel)
 
 theorem bc_img_text_all : Kernel.text.all (fun k => bcImgOk k.addr k.width k.enc) = true := by
   unfold Kernel.text
