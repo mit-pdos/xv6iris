@@ -162,6 +162,34 @@ elab "k_norm_goal" " [" extra:term,* "]" : tactic => withMainContext do
       mkLambdaFVars #[x] (withConcl x)
     replaceMainGoal [← goal.replaceTargetEq tgt' (← mkCongrArg motive h)]
 
+/-! The step's continuation, entered without the proof mode: `iapply
+wpNext_off_intro` (~2.5 ms) and `iapply wpNext_intro_pin; iintro %c %hp`
+(~5 ms) run an `IntoWand`/`FromForall` search and rebuild the context, where
+the goal is just `Entails' e (wpNext sie p cpu K)` and the context stays as it
+is.  `k_next_off` / `k_next_pin c hp` refine it by the two lemmas below and
+beta-reduce the continuation, which is what the proof-mode tactics left. -/
+
+theorem entails'_wpNext_off {e : IProp GF} {p : BitVec 64} {cpu : CPU} {K : CPU → IProp GF}
+    (h : Entails' e (K cpu)) : Entails' e (wpNext false p cpu K) :=
+  (show e ⊢ K cpu from h).trans (wpNext_off_intro p cpu K)
+
+open Lean Elab Tactic Meta in
+/-- Beta-reduce the conclusion of the main (proof-mode) goal. -/
+def betaConcl : TacticM Unit := withMainContext do
+  let g ← getMainGoal
+  let tgt ← instantiateMVars (← g.getType)
+  unless tgt.isAppOfArity ``Iris.ProofMode.Entails' 4 do return
+  let q := tgt.getArg! 3
+  let q' := q.headBeta
+  if q' == q then return
+  replaceMainGoal [← g.replaceTargetDefEq (mkAppN tgt.getAppFn (tgt.getAppArgs.set! 3 q'))]
+
+open Lean Elab Tactic Meta in
+/-- `iapply wpNext_off_intro`, by `entails'_wpNext_off`. -/
+elab "k_next_off" : tactic => do
+  evalTactic (← `(tactic| refine MachCSL.entails'_wpNext_off ?_))
+  betaConcl
+
 /-- One instruction: apply its rule (written with `?hs` for the
 interrupt fact) with the pattern `[- $Hk $Hpc]` (frame the
 context, clock and pc, carry the rest); normalise (optionally with extra
@@ -191,18 +219,8 @@ macro_rules
                first
                  | inext_goal
                  | (k_norm [$extra,*]; iframe; inext_goal)
-               iapply wpNext_off_intro
+               k_next_off
                try (case hs => k_norm)))
-
-/-- `k_code code HT`: discharge the leading `instr` conjuncts of the goal, each
-by `code` (a proof of `instr ...` from the persistent text hypothesis `HT`,
-e.g. `(text_instr _ _ _ _ rfl rfl) Htext`), in subgoals; stops at the first
-conjunct that is not an instruction.  Use it after the rest of a
-multi-instruction lemma's premise has been framed. -/
-syntax "k_code" term:max ident : tactic
-macro_rules
-  | `(tactic| k_code $code:term $ht:ident) =>
-    `(tactic| repeat (isplitr; · iapply $code:term; iexact $ht:ident))
 
 set_option hygiene false in
 /-- `k_step rule from code HT $$ pat`: as `k_step`, with the rule's `instr`
@@ -222,7 +240,7 @@ macro_rules
                first
                  | inext_goal
                  | (k_norm [$extra,*]; iframe; inext_goal)
-               iapply wpNext_off_intro
+               k_next_off
                try (case hs => k_norm)))
 
 /-- `wpNext` by its definition: the continuation at every hart the
@@ -240,6 +258,21 @@ theorem wpNext_shift (sie : Bool) (p : BitVec 64) (cpu cpu' : CPU) (K : CPU → 
   unfold wpNext
   iintro H %c %hc
   iapply H $$ %c %(fun hh => (hc hh).trans (h hh))
+
+theorem entails'_wpNext_pin {e : IProp GF} {sie : Bool} {p : BitVec 64} {cpu : CPU}
+    {K : CPU → IProp GF} (h : ∀ c, (sie = false ∨ p = 0#64 → c = cpu) → Entails' e (K c)) :
+    Entails' e (wpNext sie p cpu K) := by
+  show e ⊢ wpNext sie p cpu K
+  refine Entails.trans ?_ (wpNext_intro_pin sie p cpu K)
+  iintro He %c %hc
+  iapply (show e ⊢ K c from h c hc)
+  iexact He
+
+open Lean Elab Tactic Meta in
+/-- `iapply wpNext_intro_pin; iintro %c %hp`, by `entails'_wpNext_pin`. -/
+elab "k_next_pin " c:ident hp:ident : tactic => do
+  evalTactic (← `(tactic| refine MachCSL.entails'_wpNext_pin fun $c $hp => ?_))
+  betaConcl
 
 /-- `k_step` at either `SIE`: the continuation is introduced at a fresh
 hart `c` with its pinning fact `hp` (`c = <previous hart>` when interrupts
@@ -263,8 +296,7 @@ macro_rules
                first
                  | inext_goal
                  | (k_norm_g [$extra,*]; iframe; inext_goal)
-               iapply wpNext_intro_pin
-               iintro %$c %$hp
+               k_next_pin $c $hp
                k_norm_g [$extra,*]
                try (case hs => k_norm_g)))
   | `(tactic| k_step_gen $rule:term from $code:term $ht:ident $$ $pat:specPat next $c:ident $hp:ident) =>
@@ -279,8 +311,7 @@ macro_rules
                first
                  | inext_goal
                  | (k_norm_g [$extra,*]; iframe; inext_goal)
-               iapply wpNext_intro_pin
-               iintro %$c %$hp
+               k_next_pin $c $hp
                k_norm_g [$extra,*]
                try (case hs => k_norm_g)))
 
@@ -323,8 +354,7 @@ macro_rules
                first
                  | inext_goal
                  | (k_norm_g [$extra,*]; iframe; inext_goal)
-               iapply wpNext_intro_pin
-               iintro %cpu %hpin
+               k_next_pin cpu hpin
                k_ext_move
                k_norm_g [$extra,*]
                try (case hs => k_norm_g)))
@@ -340,8 +370,7 @@ macro_rules
                first
                  | inext_goal
                  | (k_norm_g [$extra,*]; iframe; inext_goal)
-               iapply wpNext_intro_pin
-               iintro %cpu %hpin
+               k_next_pin cpu hpin
                k_ext_move
                k_norm_g [$extra,*]
                try (case hs => k_norm_g)))
@@ -372,8 +401,7 @@ syntax "k_next_e" : tactic
 set_option hygiene false in
 macro_rules
   | `(tactic| k_next_e) =>
-    `(tactic| (iapply wpNext_intro_pin
-               iintro %cpu %hpin
+    `(tactic| (k_next_pin cpu hpin
                k_ext_move))
 
 set_option maxHeartbeats 4000000 in

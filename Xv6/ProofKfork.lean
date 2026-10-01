@@ -149,8 +149,7 @@ syntax "kf_next" ident " [" term,* "]" : tactic
 set_option hygiene false in
 macro_rules
   | `(tactic| kf_next $c:ident [$extra,*]) =>
-    `(tactic| (iapply wpNext_intro_pin
-               iintro %$c %hpin
+    `(tactic| (k_next_pin $c hpin
                kf_shift [$extra,*]))
 
 /-! ## Addresses -/

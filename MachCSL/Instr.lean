@@ -198,6 +198,17 @@ theorem instr_pure_elim (pc : BitVec 64) (is_rvc : Bool) (i : instruction) (Q R 
   iframe
   iframe #
 
+/-- `k_code code HT`: discharge the leading `instr` conjuncts of the goal, each
+by `code` (a proof of `instr ...` from the persistent text hypothesis `HT`,
+e.g. `(text_instr _ _ _ _ rfl rfl) Htext`), in subgoals; stops at the first
+conjunct that is not an instruction.  Use it after the rest of a
+multi-instruction lemma's premise has been framed.  (`Xv6.CodeTactics` adds a
+faster expansion for the kernel text's `text_instr _ _ _ _ rfl rfl`.) -/
+syntax "k_code" term:max ident : tactic
+macro_rules
+  | `(tactic| k_code $code:term $ht:ident) =>
+    `(tactic| repeat (isplitr; · iapply $code:term; iexact $ht:ident))
+
 /-- The length of an instruction: 2 bytes if compressed, 4 otherwise. -/
 def instrLen : Bool → BitVec 64
   | true => 2#64

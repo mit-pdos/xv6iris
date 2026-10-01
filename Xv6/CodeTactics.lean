@@ -240,4 +240,78 @@ theorem text_instr (pc : BitVec 64) (rvc : Bool) (i i₀ : instruction)
       · exact absurd hM (by simp)
     · rw [if_neg hw2] at hM; exact absurd hM (by simp)
 
+/-! ## The decode, checked by the kernel alone
+
+`text_instr _ _ _ _ rfl rfl` makes the ELABORATOR evaluate both decodes (its
+`rfl`s must solve `i₀`, which the goal `instr pc rvc i` does not determine),
+~19 ms an instruction, and then the kernel evaluates them again (~7 ms).
+`text_instrK` names `i₀` instead (`textI0`, the machine-map decode's own
+AST), so once the goal fixes `pc`, `rvc` and `i` both equations are closed
+and `k_code_text` assigns them `Eq.refl` unchecked: the kernel's evaluation at
+`addDecl` is the only one.  A wrong instruction (one the text does not hold
+at `pc`) then fails at the declaration, "(kernel) application type mismatch",
+rather than at the step; `set_option xv6.textInstrCheck true` restores the
+checked evaluation to find it. -/
+
+/-- The encoding's own AST at `pc` on the machine map -- `text_instr`'s `i₀`
+-- or `dflt` where the text holds no instruction. -/
+noncomputable def textI0 (pc : BitVec 64) (dflt : instruction) : instruction :=
+  match textDecodeWith drefM pc with
+  | some (_, _, j) => j
+  | none => dflt
+
+/-- `text_instr` with `i₀` named, so that both equations are closed once the
+goal fixes `pc`, `rvc` and `i`. -/
+theorem text_instrK (pc : BitVec 64) (rvc : Bool) (i : instruction)
+    (hM : textDecodeWith drefM pc = some (rvc, i, textI0 pc i))
+    (hS : textDecodeWith drefS pc = some (rvc, i, textI0 pc i)) :
+    kernelText (GF := GF) ⊢ instr pc rvc i :=
+  text_instr pc rvc i _ hM hS
+
+register_option xv6.textInstrCheck : Bool := {
+  defValue := false
+  descr := "k_code_text: check the decode equations in the elaborator (for locating a wrong \
+    instruction) instead of leaving them to the kernel"
+}
+
+open Lean Elab Tactic Meta in
+/-- `k_code_text HT`: the leading `instr pc rvc i` conjuncts of the goal (with
+`pc`, `rvc`, `i` known), each by `text_instrK` from the persistent text
+hypothesis `HT`, its decode equations assigned unchecked (see above); stops at
+the first conjunct that is not an instruction.  The expansion of
+`k_code (text_instr _ _ _ _ rfl rfl) HT`. -/
+elab "k_code_text " ht:ident : tactic => do
+  let check := xv6.textInstrCheck.get (← getOptions)
+  repeat do
+    let tgt ← instantiateMVars (← (← getMainGoal).getType)
+    unless tgt.isAppOfArity ``Iris.ProofMode.Entails' 4 do break
+    let q := tgt.getArg! 3
+    unless q.isAppOfArity ``Iris.BI.BIBase.sep 4 do break
+    let a := q.getArg! 2
+    unless a.isAppOfArity ``MachCSL.instr 6 do break
+    let args := a.getAppArgs
+    let (pc, rvc, i) := (args[3]!, args[4]!, args[5]!)
+    if pc.hasMVar || rvc.hasMVar || i.hasMVar then break
+    evalTactic (← `(tactic| isplitr))
+    let pf ← withMainContext do
+      let rhs ← mkAppM ``Option.some
+        #[← mkAppM ``Prod.mk #[rvc, ← mkAppM ``Prod.mk #[i, ← mkAppM ``textI0 #[pc, i]]]]
+      let eqn (dref : Name) : MetaM Lean.Expr := do
+        let lhs ← mkAppM ``textDecodeWith #[mkConst dref, pc]
+        let ty ← mkEq lhs rhs
+        if check then
+          let m ← mkFreshExprMVar ty
+          unless ← isDefEq m (← mkEqRefl lhs) do
+            throwError "k_code_text: the kernel text does not decode to{indentExpr i}\nat{indentExpr pc}"
+          instantiateMVars m
+        else
+          mkExpectedTypeHint (← mkEqRefl lhs) ty
+      Term.exprToSyntax <| ← mkAppOptM ``text_instrK
+        #[some args[0]!, some args[1]!, some args[2]!, some pc, some rvc, some i,
+          some (← eqn ``drefM), some (← eqn ``drefS)]
+    evalTactic (← `(tactic| focus (iapply $pf:term; iexact $ht; done)))
+
+macro_rules
+  | `(tactic| k_code (text_instr _ _ _ _ rfl rfl) $ht:ident) => `(tactic| k_code_text $ht)
+
 end Xv6

@@ -57,8 +57,7 @@ macro_rules
                first
                  | inext_goal
                  | (k_norm_g [$extra,*]; iframe; inext_goal)
-               iapply wpNext_intro_pin
-               iintro %cpu %hpin
+               k_next_pin cpu hpin
                try simp only [k_norm_simps] at hpin
                ihave Hnext := wpNext_shift _ _ _ _ _ hpin $$ Hnext
                clear hpin

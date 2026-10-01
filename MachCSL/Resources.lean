@@ -45,6 +45,7 @@ import Iris.Instances.Lib.Invariants
 import Iris.BI.Lib.MonoNat
 import Iris.Instances.Lib.GhostVar
 import Iris.ProgramLogic.WeakestPre
+import MachCSL.FrameFilter
 
 namespace MachCSL
 

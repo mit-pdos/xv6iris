@@ -129,7 +129,7 @@ macro_rules
                iframe
                inext
                k_norm [$extra,*]
-               iapply wpNext_off_intro
+               k_next_off
                try (case hs => k_norm)))
 
 /-! ## The offsets the kernel touches, as legal word accesses -/

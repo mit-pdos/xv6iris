@@ -888,6 +888,91 @@ read into a shift of the block literal: FsConsPin 5.5 s → 0.9 s (kernel
 4.8 → 0.1), FsImgNames 3.1 s → 1.0 s.  Any `decide +kernel` that reads the
 image through `fsimgP`/`fsImgBlock` should go through `fsimg_decide`.
 
+### Lean: what one `k_step` costs, and the two cuts that paid
+
+Measured Oct 1 2026 by timing each part of the step macros (a probe copy
+of the module with `macro_rules` that wrap every part in a timer and print
+it), plus kernel ablations (re-`addDecl` the finished proof term with
+chosen subterms replaced by `sorryAx` of their type). Before the cuts, a
+`k_step` cost 66-106 ms of elaboration, plus ~20 ms of kernel:
+
+- bare `iframe` 26-35 ms, `iframe #` 5-14 ms: a `Frame` search (and the
+  removal proof it builds first) for EVERY spatial/persistent hypothesis,
+  ~0.7 ms each even when it fails, and in a 35-hypothesis context all but
+  the one cell fail;
+- `k_code`'s `iapply (text_instr _ _ _ _ rfl rfl)` ~19-24 ms: the `rfl`s
+  make the ELABORATOR evaluate both decodes (to solve `i₀`, which the goal
+  does not fix), and the kernel evaluates them again (~7.5 ms) at
+  `addDecl`; plus a failing `isplitr; iapply` attempt past the last `instr`
+  conjunct (~5 ms);
+- `iapply rule $$ [- $Hk $Hpc]` 10-15 ms (rule elaboration ~3, the two
+  spec-pattern frames ~6, its `(by decide)` ~1.3, `AsEmpValid`/`IntoWand`
+  ~2), `k_norm_goal` 6-19 ms, `iapply wpNext_off_intro` 2-3 ms,
+  `iapply wpNext_intro_pin; iintro %c %h` ~5 ms.
+
+The cuts (no proof changed):
+
+1. **`MachCSL.FrameFilter`: `iframe` skips hypotheses that cannot frame.**
+   An `elab_rules` for iris-lean's own `iframe` syntax (so every `iframe`
+   downstream of `MachCSL.Resources` uses it) hands an IMPLICITLY selected
+   hypothesis (`∗`, `#`, `%`) to the `Frame` search only if its head
+   constant (after instance-transparency `whnf`, under peeled modalities)
+   is the head of some atom of the goal. All `Frame` instances are keyed on
+   the goal's shape, so this is exact, not a heuristic (see the module
+   header for the argument and its one assumption). Step `iframe` 26 → 10
+   ms, `iframe #` 5 → 0.4 ms; `typeclass inference IPM` 1.55 → 0.64 s in
+   `ProofVirtioDiskRwC`.
+2. **`Xv6.k_code_text`: the decode is evaluated by the kernel only.**
+   `text_instrK` names `i₀` (`textI0 pc i`, the machine-map decode's own
+   AST), so once the goal fixes `pc`, `rvc`, `i` both decode equations are
+   closed and get `Eq.refl` unchecked; a `macro_rules` turns `k_code
+   (text_instr _ _ _ _ rfl rfl) HT` (7189 `from` sites, all the step
+   macros) into it. `k_code` 26 → 3.5 ms; kernel time UNCHANGED (1.16 s
+   before and after on `vdrw_P3`) -- this is the formulation that does not
+   trade elaboration for kernel time, because the kernel was already
+   evaluating the same two decodes. Cost: a wrong instruction now fails at
+   the declaration ("(kernel) application type mismatch"); `set_option
+   xv6.textInstrCheck true` puts the elaborator's check back to locate it.
+3. Small: `k_next_off` / `k_next_pin c hp` enter the step's `wpNext`
+   continuation by a lemma on `Entails'` (no `IntoWand`/`FromForall`
+   search): ~2.5 → 0.3 ms and ~5 → 0.5 ms; −1-3 % per module. Swept into
+   the local step macros (`kf_next`, `k_step_prc`/`pwc`/`c`/`r`/`au`,
+   `bm_step`); `PrintkDefs` does not import `WpSmodeFrame` and keeps
+   `iapply`.
+
+Result (one isolated run of each module, base 052b27489 vs after, back to
+back under the lock): the sixteen slowest modules 222.6 → 169.8 s CPU
+(−24 %; each −16 to −35 %: Kfork 27.8 → 22.8, Printk 29.0 → 21.2, Allocproc
+16.3 → 12.5, InstallTrans 19.8 → 15.6, VirtioDiskRwC 7.7 → 5.0); declaration
+elaboration −25 to −50 % (`vdrw_P3` 7.5 → 3.9 s, `kfork_proof` 9.6 → 7.0,
+`ap_found` 9.0 → 6.0, `it_body` 5.9 → 3.7, `initlog_proof` 6.8 → 5.3), the
+kernel's share unchanged (now ~30 % of a big declaration).
+
+**Negative results -- do not redo:**
+- *A `Frame` tactic instance that skips conjuncts whose heads cannot
+  match* (prio above `frameSep`): fires, buys nothing. A failed `Frame R
+  P1` is cheap; the cost is the SUCCESSFUL frame (`frame_here_absorbing`
+  + two `QuickAbsorbing` + `MakeSep` searches, ~1.5 ms per framed
+  hypothesis), i.e. the per-frame floor of the proof mode.
+- *A simproc dropping shadowed register writes* (`(C.set i v).set .. .set
+  i w`, chains of 23 `set`s for 8 registers after 30 straight-line steps):
+  −13 % on `ProofVirtioDiskRwC`, noise on `ProofKfork`, and it breaks proofs
+  that state register chains explicitly (`InitlogHead`, `ProofPrintk`'s
+  `pkRegsN_set` chain, `ProofKwait`, `ProofAllocproc`'s `apKeepPid_set`).
+- *`k_step_gen`/`k_step_e` normalising only the conclusion after the
+  intro* (`k_norm_goal` for the whole-context `k_norm_g`): proofs rely on
+  the hypotheses being rewritten (`InitlogHead`, `ProofPipealloc`).
+- The kernel's per-step cost (~3 ms with an empty context, ~14 ms in a
+  35-hypothesis one, plus 7.5 ms per decoded instruction) is not a few hot
+  subterms: ablating `Eq.mpr` proofs, the step rules, `wpNext_off_intro`
+  each moves nothing; only removing the decodes does (−23 of 32 ms on
+  three steps). The lever left there is per-ENCODING decode facts
+  (a generated module of `runRead dref (ext_decode enc) = some (i, true)`
+  lemmas, 7.5 ms × 7709 sites tree-wide), not attempted.
+- Kernel `diagnostics` show `UPred.holds`/`Entails` unfolded tens of
+  thousands of times per module; per step these are cheap whnf-to-structure
+  steps, not semantic comparisons (a one-step proof unfolds ~30).
+
 ## Build shape
 
 The build is critical-path bound and core-saturated in the middle: the path is a

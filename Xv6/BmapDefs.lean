@@ -452,8 +452,7 @@ macro_rules
                first
                  | inext_goal
                  | (k_norm_g [$extra,*]; iframe; inext_goal)
-               iapply wpNext_intro_pin
-               iintro %c %hpin
+               k_next_pin c hpin
                k_ext_move
                k_norm_g [$extra,*]
                try (case hs => k_norm_g)))
@@ -462,8 +461,7 @@ syntax "bm_next" : tactic
 set_option hygiene false in
 macro_rules
   | `(tactic| bm_next) =>
-    `(tactic| (iapply wpNext_intro_pin
-               iintro %c %hpin
+    `(tactic| (k_next_pin c hpin
                k_ext_move))
 
 /-! ## The kit, the continuation -/
