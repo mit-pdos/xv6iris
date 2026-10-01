@@ -11,7 +11,7 @@ for pc, w, e, asm in NEW:
     if 0x1d2 <= pc < 0x29e:
         d = decode(e, w)
         assert d, hex(pc)
-        L.append("/-- `%#x  %s` -/\ntheorem ushI_%03x (γt : GName) :\n    ushCode (GF := GF) γt ⊢ uinstrIs γt (BitVec.ofNat 64 %#x) %s (%s) :=\n  ushm_uis γt %#x _ _ ⟨_, _, _, rfl⟩ (by decide) (by decide)\n"
+        L.append("/-- `%#x  %s` -/\ntheorem ushI_%03x (γt : GName) :\n    ushCode (GF := GF) γt ⊢ uinstrIs γt (BitVec.ofNat 64 %#x) %s (%s) :=\n  ushm_uisK γt %#x _ _ (by kernel_rfl) (by decide)\n"
                  % (pc, asm.replace('\t', ' '), pc, pc, 'true' if w == 2 else 'false', d, pc))
 s = s[:a] + '\n'.join(L) + '\n' + s[b:]
 open(p, 'w').write(s)

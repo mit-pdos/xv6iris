@@ -15,11 +15,10 @@ chain's `_spec`/`_ok` readings; this file only EVALUATES them at the image.
 **HOW THE EVALUATION IS PAID.**  Rocq runs `vm_compute` (its `vm_eq`: one
 kernel-checked VM reduction per sentence).  Lean's counterpart is
 `decide +kernel`: the kernel itself evaluates the checker, with no compiler
-in the trusted base (no `native_decide`).  The evaluations live in the sweep
-files `Xv6/FsImgCheckIno{A,B,C,D}.lean`, `FsImgCheckDirs`, `FsImgCheckUsed`
-and `FsImgCheckRegion` (`Xv6/FsImgCheckBase.lean` says why they are split),
-stated at the computing form `fsImgBlock`; this file rewrites the block view
-to it (`FsImgDisk.fsimgP_eq`) and cites them, computing nothing itself.
+in the trusted base (no `native_decide`).  The evaluations live in
+`Xv6/FsImgCheckSweeps.lean` (which says how they are paid), stated at the
+computing form `fsImgBlock`; this file rewrites the block view to it
+(`FsImgDisk.fsimgP_eq`) and cites them, computing nothing itself.
 
 **THE LEAF RULE** (Rocq's): no proof file imports this one.
 
@@ -36,13 +35,7 @@ to it (`FsImgDisk.fsimgP_eq`) and cites them, computing nothing itself.
 3. `fsimg_live_set`'s set EQUALITY (`ExtTreeSet` has no `DecidableEq`) is
    stated as its membership law directly (`fsimgLiveSetMem`), off one sweep.
 -/
-import Xv6.FsImgCheckInoA
-import Xv6.FsImgCheckInoB
-import Xv6.FsImgCheckInoC
-import Xv6.FsImgCheckInoD
-import Xv6.FsImgCheckDirs
-import Xv6.FsImgCheckUsed
-import Xv6.FsImgCheckRegion
+import Xv6.FsImgCheckSweeps
 import Xv6.FsBootParams
 import Xv6.FsDurImg
 

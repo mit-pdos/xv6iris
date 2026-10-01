@@ -1241,13 +1241,8 @@ import Xv6.BootShared
 import Xv6.FsImgRaw
 import Xv6.FsImgDisk
 import Xv6.FsImgCheckBase
-import Xv6.FsImgCheckInoA
-import Xv6.FsImgCheckInoB
-import Xv6.FsImgCheckInoC
-import Xv6.FsImgCheckInoD
-import Xv6.FsImgCheckDirs
-import Xv6.FsImgCheckUsed
-import Xv6.FsImgCheckRegion
+import Xv6.FsImgEval
+import Xv6.FsImgCheckSweeps
 import Xv6.FsImgCheck
 import Xv6.FsImgBoot
 import Xv6.SystemBootEra

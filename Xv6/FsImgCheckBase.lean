@@ -1,16 +1,14 @@
 /-
 **THE LITERAL-IMAGE CHECK, SHARED BASE**: the superblock record (Rocq
-`FsImgCheck.fsimg_sb`) and the per-inum form of W3, which the sweep files
-`Xv6/FsImgCheckIno*.lean` / `FsImgCheckDirs` / `FsImgCheckUsed` /
-`FsImgCheckRegion` evaluate and `Xv6/FsImgCheck.lean` assembles.
+`FsImgCheck.fsimg_sb`) and the per-inum form of W3, which
+`Xv6/FsImgCheckSweeps.lean` evaluates and `Xv6/FsImgCheck.lean` assembles.
 
-**WHY THE CHECK IS SPLIT ACROSS FILES** (no Rocq counterpart: Rocq runs each
-sentence as one `vm_compute`).  Lean's `decide +kernel` evaluates
-call-by-name with a per-declaration cache, so ONE declaration evaluating all
-of W3 (`fsInodesWf`) grew past 18 GB and aborted; per-inum declarations cost
-2-8 s each and free their cache in between.  Every sentence is stated at the
-computing form `fsImgBlock` (`Xv6/FsImgDisk.lean` deviation 2), and the files
-build in parallel.  Leaf rule: no proof file imports any of them.
+**WHY W3 IS PER INUM** (no Rocq counterpart: Rocq runs each sentence as one
+`vm_compute`).  Read through the chain's lists, ONE declaration evaluating
+all of W3 (`fsInodesWf`) grew past 18 GB and aborted, so W3 is stated per
+inum.  The sweeps now read the image by shifts of the block literals
+(`Xv6/FsImgEval.lean`) and each inum costs well under a second; the split
+stays as the sentences `FsImgCheck.fsimgWfOk` cites.
 -/
 import Xv6.FsImgDisk
 import Xv6.FsImgInode

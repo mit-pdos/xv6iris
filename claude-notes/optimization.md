@@ -734,6 +734,59 @@ lemma stated at the unfolded post (`UkFileDev.xpostWrite_elim`,
 proof ending in `all_goals sorry` under `-Dtrace.profiler=true`: the kernel
 still checks the partial term.
 
+### Lean: `decide +kernel` walks lists at ~27 µs a cell and shares nothing
+
+The kernel evaluates `List.drop` / `l[j]!` / `List.map` by unfolding their
+structural (`brecOn`) recursions: ~27 µs per cell, measured, and a read at
+offset `o` walks `o` cells from the list's front EVERY time (the kernel's
+whnf cache keys on the whole term, and the list term differs per read).
+So a sweep reading fields at increasing offsets is quadratic: the fs.img
+checks (`fsLeAt bs (4*j) 4` over a 256-entry indirect block, `fsDinode`'s
+18 field `drop`s per record, `fileByte` per directory byte) spent ~4 min of
+CPU walking.  Probes (`Xv6/FsImgEval.lean` header): a 1024-byte block
+decoded and summed linearly is 0.06 s; the same block read at 256 offsets
+is 3.5 s; one `ExtTreeSet` insert ~4.5 ms.
+- **Make every read O(1) arithmetic**: generic equations that turn the read
+  into a `Nat` primitive on a literal (`(fsImgBlock b)[j]! = fsImgByte b j`,
+  one `>>>` of the block's big-endian `Nat`; `fsLeAt` as indexed bytes;
+  `((range n).map f)[j]! = if j < n then f j else default`), applied by
+  `unfold <checker defs>; simp only [eqs]` before `decide +kernel`.  The
+  checkers and the sentences stay unchanged.  13 sentences + 25 per-inum
+  facts: ~230 s → a few seconds (`Xv6/FsImgCheckSweeps.lean`).
+- **Use `unfold`, not `simp only [defs]`, to expose the reads**: `simp`
+  hit `maxRecDepth` unfolding `fsInodeWf` (default simprocs off or on); and
+  `unfold` reaches partially applied occurrences (`List.filterMap
+  (fsRecTicket P self dn)`), which `simp`'s equation lemmas skip silently,
+  leaving the slow reads in place (`fsLinksWf` stayed at 10 s).
+- **A recursive checker that reads in its OWN body** (`dirUniqb`) is out of
+  reach of the rewrite: restate it over a byte function and prove the two
+  equal by induction (`dirUniqb_eval`).
+- **Replace `ExtTreeSet` by a `Nat` bitmask** for a membership-heavy
+  evaluation (`nodupMask`, `fsUsedWf_mask`: 20 s → 1.5 s).
+- **A `Nat.rec`-defined `drop` IS shared across reads** of the same list
+  term (`Nat.rec l (fun _ r => r.tail) n` reuses the cached `n-1` step):
+  0.06 s vs 3.5 s for the 256-offset probe.  Use it when the list can't be
+  bypassed.
+- **Never unify two `match`es on an image term**: `exact lemma` whose
+  conclusion is `match fsUsedSet … with …` against the file's own `match`
+  sent the ELABORATOR into evaluating `fsUsedSet` (maxRecDepth).  State the
+  lemma as `∃ u, fsUsedSet … = some u ∧ …` and `rw` the discriminant.
+- **`trace.profiler` at a low threshold pretty-prints the unfolded goals**:
+  a 3 s file took 29 s and 13 GB at threshold 20 ms; keep ≥ 300 ms there.
+
+### Lean: `⟨_, _, _, rfl⟩` evaluates twice; `kernel_rfl` once
+
+An existential closed by `rfl` (`ushm_uis … ⟨_, _, _, rfl⟩`, the per-pc
+decode facts) makes the ELABORATOR evaluate the decode (to solve the
+witnesses, `Meta.whnf`), and then the kernel evaluates it again.  State the
+fact without the witnesses (`ushm_uisK`: `(decode pc).map (fun r => (r.1,
+r.2.1)) = some (rvc, i)`) and close it with `kernel_rfl`
+(`UkShMallocDefs`): it assigns `Eq.refl lhs` unchecked and the kernel checks
+it at `addDecl` (a wrong AST fails there, "(kernel) application type
+mismatch").  60 facts: 2.86 s → 1.40 s CPU.  The same `⟨_, _, _, rfl⟩`
+shape is in every `U*Code` / `*Defs` fetch (`gfetch` etc.); not converted
+here.
+
 ## Build shape
 
 The build is critical-path bound and core-saturated in the middle: the path is a

@@ -81,7 +81,42 @@ theorem ushm_uis (γt : GName) (pc : Nat) (rvc : Bool) (i : instruction)
   obtain ⟨i₀, n, w, e⟩ := h
   exact uinstrIs_of_text γt User.Sh.textOk pc rvc i i₀ n w e hpc
 
+/-- `ushm_uis` with the decode stated without its existential witnesses, so
+a generated fact can close it by `kernel_rfl` (the kernel alone evaluates
+the decode; `⟨_, _, _, rfl⟩` made the ELABORATOR evaluate it first, to
+solve the witnesses, at twice the kernel's cost). -/
+theorem ushm_uisK (γt : GName) (pc : Nat) (rvc : Bool) (i : instruction)
+    (h : (User.utextDecodeWith udrefU User.Sh.tree User.Sh.code.byte pc).map
+      (fun r => (r.1, r.2.1)) = some (rvc, i))
+    (hpc : pc < 2 ^ 64) :
+    ukCode (GF := GF) γt User.Sh.code.byte ⊢ uinstrIs γt (BitVec.ofNat 64 pc) rvc i := by
+  refine ushm_uis γt pc rvc i ?_ hpc
+  rcases e : User.utextDecodeWith udrefU User.Sh.tree User.Sh.code.byte pc with
+    _ | ⟨r1, r2, i₀, n, w⟩
+  · rw [e] at h; cases h
+  · rw [e] at h
+    simp only [Option.map_some, Option.some.injEq, Prod.mk.injEq] at h
+    obtain ⟨rfl, rfl⟩ := h
+    exact ⟨i₀, n, w, rfl⟩
+
 end Code
+
+open Lean Meta Elab Tactic in
+/-- **Close `a = b` by `Eq.refl a`, checked by the KERNEL only.**  The
+elaborator does not unify the sides (its `whnf` evaluates a concrete decode
+several times slower than the kernel); the kernel checks the term at
+`addDecl`, so a wrong equation still fails, there.  For closed evaluations
+only (`ushm_uisK`'s per-pc decode). -/
+elab "kernel_rfl" : tactic => do
+  let g ← getMainGoal
+  g.withContext do
+    let ty ← instantiateMVars (← g.getType)
+    let some (α, a, _) := ty.eq? | throwError "kernel_rfl: not an equation{indentExpr ty}"
+    if ty.hasMVar || ty.hasFVar then
+      throwError "kernel_rfl: the equation is not closed{indentExpr ty}"
+    let u ← getLevel α
+    g.assign (mkApp2 (mkConst ``Eq.refl [u]) α a)
+    replaceMainGoal []
 
 /-! ## §2 The allocator's static cells (deviation 1) -/
 
