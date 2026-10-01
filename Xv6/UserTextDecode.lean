@@ -221,4 +221,44 @@ theorem utext_step_rvc (dref : (r : Register) → Option (RegisterType r)) {t : 
 
 end Step
 
+/-! ## Closing a decode fact by the kernel alone -/
+
+/-- A decode fact without its witnesses: the instruction-fact catalogs
+(`<p>_uis`, `stub_of_text`) take `∃ i₀ n w, utextDecodeWith … = some (rvc, i,
+i₀, n, w)`; this states the same from the projection to `(rvc, i)`, which
+`kernel_rfl` can close with no witness to solve (`udec%`). -/
+theorem utextDecodeWith_ex {dref : (r : Register) → Option (RegisterType r)} {t : UTextTree}
+    {m : ElfMem} {pc : Nat} {rvc : Bool} {i : instruction}
+    (h : (utextDecodeWith dref t m pc).map (fun r => (r.1, r.2.1)) = some (rvc, i)) :
+    ∃ i₀ n w, utextDecodeWith dref t m pc = some (rvc, i, i₀, n, w) := by
+  rcases e : utextDecodeWith dref t m pc with _ | ⟨r1, r2, i₀, n, w⟩
+  · rw [e] at h; cases h
+  · rw [e] at h
+    simp only [Option.map_some, Option.some.injEq, Prod.mk.injEq] at h
+    obtain ⟨rfl, rfl⟩ := h
+    exact ⟨i₀, n, w, rfl⟩
+
+open Lean Meta Elab Tactic in
+/-- **Close `a = b` by `Eq.refl a`, checked by the KERNEL only.**  The
+elaborator does not unify the sides (its `whnf` evaluates a concrete decode
+several times slower than the kernel); the kernel checks the term at
+`addDecl`, so a wrong equation still fails, there ("(kernel) application
+type mismatch").  For closed evaluations only (`udec%`, `ushm_uisK`). -/
+elab "kernel_rfl" : tactic => do
+  let g ← getMainGoal
+  g.withContext do
+    let ty ← instantiateMVars (← g.getType)
+    let some (α, a, _) := ty.eq? | throwError "kernel_rfl: not an equation{indentExpr ty}"
+    if ty.hasMVar || ty.hasFVar then
+      throwError "kernel_rfl: the equation is not closed{indentExpr ty}"
+    let u ← getLevel α
+    g.assign (mkApp2 (mkConst ``Eq.refl [u]) α a)
+    replaceMainGoal []
+
+/-- **`udec%`: a closed decode fact, evaluated by the kernel alone** -- the
+drop-in for `⟨_, _, _, rfl⟩` at a literal pc, which made the elaborator
+evaluate the decode first (to solve the three witnesses) and the kernel
+again. -/
+macro "udec%" : term => `(Xv6.User.utextDecodeWith_ex (by kernel_rfl))
+
 end Xv6.User

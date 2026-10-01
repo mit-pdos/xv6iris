@@ -781,11 +781,14 @@ decode facts) makes the ELABORATOR evaluate the decode (to solve the
 witnesses, `Meta.whnf`), and then the kernel evaluates it again.  State the
 fact without the witnesses (`ushm_uisK`: `(decode pc).map (fun r => (r.1,
 r.2.1)) = some (rvc, i)`) and close it with `kernel_rfl`
-(`UkShMallocDefs`): it assigns `Eq.refl lhs` unchecked and the kernel checks
-it at `addDecl` (a wrong AST fails there, "(kernel) application type
-mismatch").  60 facts: 2.86 s → 1.40 s CPU.  The same `⟨_, _, _, rfl⟩`
-shape is in every `U*Code` / `*Defs` fetch (`gfetch` etc.); not converted
-here.
+(`Xv6/UserTextDecode.lean`): it assigns `Eq.refl lhs` unchecked and the
+kernel checks it at `addDecl` (a wrong AST fails there, "(kernel)
+application type mismatch").  60 facts: 2.86 s → 1.40 s CPU.  **At any
+catalog site write `udec%`** (same file) instead of `⟨_, _, _, rfl⟩`: it
+elaborates to `utextDecodeWith_ex (by kernel_rfl)`, whose conclusion is the
+catalogs' existential, so no catalog lemma changes; the conclusion unifies
+with the expected type syntactically (no evaluation) and the tactic runs
+once the pc and AST are known.
 
 ## Build shape
 

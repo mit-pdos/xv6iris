@@ -101,23 +101,6 @@ theorem ushm_uisK (γt : GName) (pc : Nat) (rvc : Bool) (i : instruction)
 
 end Code
 
-open Lean Meta Elab Tactic in
-/-- **Close `a = b` by `Eq.refl a`, checked by the KERNEL only.**  The
-elaborator does not unify the sides (its `whnf` evaluates a concrete decode
-several times slower than the kernel); the kernel checks the term at
-`addDecl`, so a wrong equation still fails, there.  For closed evaluations
-only (`ushm_uisK`'s per-pc decode). -/
-elab "kernel_rfl" : tactic => do
-  let g ← getMainGoal
-  g.withContext do
-    let ty ← instantiateMVars (← g.getType)
-    let some (α, a, _) := ty.eq? | throwError "kernel_rfl: not an equation{indentExpr ty}"
-    if ty.hasMVar || ty.hasFVar then
-      throwError "kernel_rfl: the equation is not closed{indentExpr ty}"
-    let u ← getLevel α
-    g.assign (mkApp2 (mkConst ``Eq.refl [u]) α a)
-    replaceMainGoal []
-
 /-! ## §2 The allocator's static cells (deviation 1) -/
 
 /-- **Rocq `SH_FREEP`** (0x2010): the free-list head, in .bss. -/

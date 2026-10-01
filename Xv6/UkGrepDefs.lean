@@ -78,7 +78,7 @@ syntax "gfetch " term:max term:max term:max : tactic
 set_option hygiene false in
 macro_rules
   | `(tactic| gfetch $pc $rvc $i) =>
-    `(tactic| ihave Hi := grep_uis N.t $pc $rvc $i ⟨_, _, _, rfl⟩ (by decide) $$ Hc)
+    `(tactic| ihave Hi := grep_uis N.t $pc $rvc $i udec% (by decide) $$ Hc)
 
 /-! ## §1 Pure helpers -/
 

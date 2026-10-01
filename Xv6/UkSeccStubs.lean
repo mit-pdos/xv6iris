@@ -38,21 +38,21 @@ unseal LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled in
 /-- seccomp's exit stub @0x34c. -/
 theorem secc_stub_exit (UL : UK_LEAVES) (N : UkNames GF) :
     ⊢ exitStubLaw (hlc := hlc) N (ukCode N.t User.Seccomp.code.byte) User.Seccomp.Sym.«exit» :=
-  exit_stub_of_text UL N User.Seccomp.textOk _ 2#12 (by decide) ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩
+  exit_stub_of_text UL N User.Seccomp.textOk _ 2#12 (by decide) udec% udec%
     (by decide)
 
 unseal LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled in
 /-- seccomp's wait stub @0x354. -/
 theorem secc_stub_wait (UL : UK_LEAVES) (N : UkNames GF) :
     ⊢ stubLaw (hlc := hlc) N (ukCode N.t User.Seccomp.code.byte) 3 User.Seccomp.Sym.«wait» :=
-  stub_of_text UL N User.Seccomp.textOk 3 _ 3#12 (by decide) ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩
+  stub_of_text UL N User.Seccomp.textOk 3 _ 3#12 (by decide) udec% udec% udec%
     (by decide) (by decide)
 
 unseal LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled in
 /-- seccomp's seccomp stub @0x3f4. -/
 theorem secc_stub_secc (UL : UK_LEAVES) (N : UkNames GF) :
     ⊢ stubLaw (hlc := hlc) N (ukCode N.t User.Seccomp.code.byte) 23 User.Seccomp.Sym.«seccomp» :=
-  stub_of_text UL N User.Seccomp.textOk 23 _ 23#12 (by decide) ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩
+  stub_of_text UL N User.Seccomp.textOk 23 _ 23#12 (by decide) udec% udec% udec%
     (by decide) (by decide)
 
 /-- **Rocq `wp_ksecc_exit`**: exit(status) @0x34c; the payload is the

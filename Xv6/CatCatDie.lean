@@ -113,17 +113,17 @@ theorem catCat_dieCw (UL : UK_LEAVES) (HF : CAT_FPRINTF) (N : UkNames GF) (h : C
       urun (hlc := hlc) N h m (BitVec.ofNat 64 0x40) (10 + (12 + (4 + n))) -∗ wpLoop h := by
   unfold kcatDgCw
   iintro Hdg #Hc Hrun
-  ihave Hi0 := cat_uis N.t 0x40 false (.UTYPE (1#20, .Regidx 11#5, .AUIPC)) ⟨_, _, _, rfl⟩
+  ihave Hi0 := cat_uis N.t 0x40 false (.UTYPE (1#20, .Regidx 11#5, .AUIPC)) udec%
     (by decide) $$ Hc
-  ihave Hi1 := cat_uis N.t 0x44 false (.ITYPE (0x970#12, .Regidx 11#5, .Regidx 11#5, .ADDI)) ⟨_, _, _, rfl⟩
+  ihave Hi1 := cat_uis N.t 0x44 false (.ITYPE (0x970#12, .Regidx 11#5, .Regidx 11#5, .ADDI)) udec%
     (by decide) $$ Hc
-  ihave Hi2 := cat_uis N.t 0x48 true (.ITYPE (2#12, .Regidx 0#5, .Regidx 10#5, .ADDI)) ⟨_, _, _, rfl⟩
+  ihave Hi2 := cat_uis N.t 0x48 true (.ITYPE (2#12, .Regidx 0#5, .Regidx 10#5, .ADDI)) udec%
     (by decide) $$ Hc
-  ihave Hi3 := cat_uis N.t 0x4a false (.JAL (0x78e#21, .Regidx 1#5)) ⟨_, _, _, rfl⟩
+  ihave Hi3 := cat_uis N.t 0x4a false (.JAL (0x78e#21, .Regidx 1#5)) udec%
     (by decide) $$ Hc
-  ihave Hi4 := cat_uis N.t 0x4e true (.ITYPE (1#12, .Regidx 0#5, .Regidx 10#5, .ADDI)) ⟨_, _, _, rfl⟩
+  ihave Hi4 := cat_uis N.t 0x4e true (.ITYPE (1#12, .Regidx 0#5, .Regidx 10#5, .ADDI)) udec%
     (by decide) $$ Hc
-  ihave Hi5 := cat_uis N.t 0x50 false (.JAL (0x35c#21, .Regidx 1#5)) ⟨_, _, _, rfl⟩
+  ihave Hi5 := cat_uis N.t 0x50 false (.JAL (0x35c#21, .Regidx 1#5)) udec%
     (by decide) $$ Hc
   iapply catCat_dieAt UL HF N h m n 0x40 0x9b0 17 0x970#12 0x78e#21 0x35c#21 User.Cat.lit_write_ok
     (by decide) (by decide) (by decide) (by decide) (by decide) (by decide)
@@ -135,17 +135,17 @@ theorem catCat_dieCr (UL : UK_LEAVES) (HF : CAT_FPRINTF) (N : UkNames GF) (h : C
       urun (hlc := hlc) N h m (BitVec.ofNat 64 0x6a) (10 + (12 + (4 + n))) -∗ wpLoop h := by
   unfold kcatDgCr
   iintro Hdg #Hc Hrun
-  ihave Hi0 := cat_uis N.t 0x6a false (.UTYPE (1#20, .Regidx 11#5, .AUIPC)) ⟨_, _, _, rfl⟩
+  ihave Hi0 := cat_uis N.t 0x6a false (.UTYPE (1#20, .Regidx 11#5, .AUIPC)) udec%
     (by decide) $$ Hc
-  ihave Hi1 := cat_uis N.t 0x6e false (.ITYPE (0x95e#12, .Regidx 11#5, .Regidx 11#5, .ADDI)) ⟨_, _, _, rfl⟩
+  ihave Hi1 := cat_uis N.t 0x6e false (.ITYPE (0x95e#12, .Regidx 11#5, .Regidx 11#5, .ADDI)) udec%
     (by decide) $$ Hc
-  ihave Hi2 := cat_uis N.t 0x72 true (.ITYPE (2#12, .Regidx 0#5, .Regidx 10#5, .ADDI)) ⟨_, _, _, rfl⟩
+  ihave Hi2 := cat_uis N.t 0x72 true (.ITYPE (2#12, .Regidx 0#5, .Regidx 10#5, .ADDI)) udec%
     (by decide) $$ Hc
-  ihave Hi3 := cat_uis N.t 0x74 false (.JAL (0x764#21, .Regidx 1#5)) ⟨_, _, _, rfl⟩
+  ihave Hi3 := cat_uis N.t 0x74 false (.JAL (0x764#21, .Regidx 1#5)) udec%
     (by decide) $$ Hc
-  ihave Hi4 := cat_uis N.t 0x78 true (.ITYPE (1#12, .Regidx 0#5, .Regidx 10#5, .ADDI)) ⟨_, _, _, rfl⟩
+  ihave Hi4 := cat_uis N.t 0x78 true (.ITYPE (1#12, .Regidx 0#5, .Regidx 10#5, .ADDI)) udec%
     (by decide) $$ Hc
-  ihave Hi5 := cat_uis N.t 0x7a false (.JAL (0x332#21, .Regidx 1#5)) ⟨_, _, _, rfl⟩
+  ihave Hi5 := cat_uis N.t 0x7a false (.JAL (0x332#21, .Regidx 1#5)) udec%
     (by decide) $$ Hc
   iapply catCat_dieAt UL HF N h m n 0x6a 0x9c8 16 0x95e#12 0x764#21 0x332#21 User.Cat.lit_read_ok
     (by decide) (by decide) (by decide) (by decide) (by decide) (by decide)

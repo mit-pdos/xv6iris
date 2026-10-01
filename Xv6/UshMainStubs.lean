@@ -48,31 +48,31 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [Uexec
 unseal LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled in
 theorem sh_stub_write (UL : UK_LEAVES) (N : UkNames GF) :
     ⊢ stubLaw (hlc := hlc) N (ushCode N.t) 16 User.Sh.Sym.«write» :=
-  stub_of_text UL N User.Sh.textOk 16 _ 16#12 (by decide) ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩
+  stub_of_text UL N User.Sh.textOk 16 _ 16#12 (by decide) udec% udec% udec%
     (by decide) (by decide)
 
 unseal LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled in
 theorem sh_stub_read (UL : UK_LEAVES) (N : UkNames GF) :
     ⊢ stubLaw (hlc := hlc) N (ushCode N.t) 5 User.Sh.Sym.«read» :=
-  stub_of_text UL N User.Sh.textOk 5 _ 5#12 (by decide) ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩
+  stub_of_text UL N User.Sh.textOk 5 _ 5#12 (by decide) udec% udec% udec%
     (by decide) (by decide)
 
 unseal LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled in
 theorem sh_stub_close (UL : UK_LEAVES) (N : UkNames GF) :
     ⊢ stubLaw (hlc := hlc) N (ushCode N.t) 21 User.Sh.Sym.«close» :=
-  stub_of_text UL N User.Sh.textOk 21 _ 21#12 (by decide) ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩
+  stub_of_text UL N User.Sh.textOk 21 _ 21#12 (by decide) udec% udec% udec%
     (by decide) (by decide)
 
 unseal LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled in
 theorem sh_stub_open (UL : UK_LEAVES) (N : UkNames GF) :
     ⊢ stubLaw (hlc := hlc) N (ushCode N.t) 15 User.Sh.Sym.«open» :=
-  stub_of_text UL N User.Sh.textOk 15 _ 15#12 (by decide) ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩
+  stub_of_text UL N User.Sh.textOk 15 _ 15#12 (by decide) udec% udec% udec%
     (by decide) (by decide)
 
 unseal LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled in
 theorem sh_stub_exit (UL : UK_LEAVES) (N : UkNames GF) :
     ⊢ exitStubLaw (hlc := hlc) N (ushCode N.t) User.Sh.Sym.«exit» :=
-  exit_stub_of_text UL N User.Sh.textOk _ 2#12 (by decide) ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩
+  exit_stub_of_text UL N User.Sh.textOk _ 2#12 (by decide) udec% udec%
     (by decide)
 
 /-! ## §2 The stubs -/

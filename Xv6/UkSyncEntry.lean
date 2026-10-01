@@ -95,7 +95,7 @@ theorem ksyncLeaf_xv6 (UL : UK_LEAVES) (N : UkNames GF) (oQ : Option (IProp GF))
   iintro %h %m %avail %c %hn #Hc Hrun Hcwd Hhook Hcont
   -- the ecall's decode, at the stub's own address (as `sync_stub_sync` reads it)
   have hdec : ∃ i₀ n w, User.utextDecodeWith udrefU User.Sync.tree User.Sync.code.byte
-      (User.Sync.Sym.«sync» + 2) = some (false, .ECALL (), i₀, n, w) := ⟨_, _, _, rfl⟩
+      (User.Sync.Sym.«sync» + 2) = some (false, .ECALL (), i₀, n, w) := udec%
   ihave #Hi := sync_uis N.t (User.Sync.Sym.«sync» + 2) false (.ECALL ()) hdec (by decide) $$ Hc
   rw [show User.Sync.Sym.«sync» + 2 = 0x36a from rfl]
   iapply (wp_uk_ecall_quiet_recv_img UL N h m (BitVec.ofNat 64 0x36a) 22 avail

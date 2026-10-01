@@ -52,7 +52,7 @@ theorem shFree_scan (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (p 
   have hF : ushmFreep = 0x2010 := rfl
   iintro #Hc Hfp Hbn Hsz Hrun Hcont
   -- 0x10f2  addi a3,a0,-16 : bp
-  ihave Hi := ushm_uis N.t 0x10f2 false (.ITYPE (4080#12, .Regidx 10#5, .Regidx 13#5, .ADDI)) ⟨_, _, _, rfl⟩
+  ihave Hi := ushm_uis N.t 0x10f2 false (.ITYPE (4080#12, .Regidx 10#5, .Regidx 13#5, .ADDI)) udec%
     (by decide) $$ Hc
   iapply wp_uk_itype UL N h m (BitVec.ofNat 64 0x10f2) false 4080#12 10#5 13#5 .ADDI n
     (by unfold unotSp spIdx; decide) $$ Hi Hrun
@@ -63,7 +63,7 @@ theorem shFree_scan (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (p 
   have k1 : ushmKeep [13#5] m m1 := e1 ▸ ushmKeep_wr _ _ _
   have f13 : m1.get 13#5 = BitVec.ofNat 64 p := e1 ▸ ukWr_get_same _ _ _ (by decide)
   -- 0x10f6  auipc a5,0x1
-  ihave Hi := ushm_uis N.t 0x10f6 false (.UTYPE (1#20, .Regidx 15#5, .AUIPC)) ⟨_, _, _, rfl⟩
+  ihave Hi := ushm_uis N.t 0x10f6 false (.UTYPE (1#20, .Regidx 15#5, .AUIPC)) udec%
     (by decide) $$ Hc
   iapply wp_uk_utype UL N h1 m1 (BitVec.ofNat 64 0x10f6) false 1#20 15#5 .AUIPC n
     (by unfold unotSp spIdx; decide) $$ Hi Hrun
@@ -75,7 +75,7 @@ theorem shFree_scan (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (p 
   have k2 : ushmKeep [15#5] m1 m2 := e2 ▸ ushmKeep_wr _ _ _
   have f15 : m2.get 15#5 = BitVec.ofNat 64 0x20f6 := e2 ▸ ukWr_get_same _ _ _ (by decide)
   -- 0x10fa  ld a5,-266(a5) : p = freep
-  ihave Hi := ushm_uis N.t 0x10fa false (.LOAD (3866#12, .Regidx 15#5, .Regidx 15#5, false, 8)) ⟨_, _, _, rfl⟩
+  ihave Hi := ushm_uis N.t 0x10fa false (.LOAD (3866#12, .Regidx 15#5, .Regidx 15#5, false, 8)) udec%
     (by decide) $$ Hc
   iapply wp_uk_ld UL N h2 m2 (BitVec.ofNat 64 0x10fa) false 3866#12 15#5 15#5 (DFrac.own 1) ushmFreep _ n
     (by unfold unotSp spIdx; decide) (ushm_adr f15 (by decide) _ _ (by rw [hF]; decide)) (by rw [hF]) $$ Hi Hfp Hrun
@@ -87,13 +87,13 @@ theorem shFree_scan (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (p 
   have g15 : m3.get 15#5 = BitVec.ofNat 64 ushmBase := e3 ▸ ukWr_get_same _ _ _ (by decide)
   have g13 : m3.get 13#5 = BitVec.ofNat 64 p := by rw [k3 _ (by decide), k2 _ (by decide), f13]
   -- 0x10fe  c.j 0x110c
-  ihave Hi := ushm_uis N.t 0x10fe true (.JAL (14#21, .Regidx 0#5)) ⟨_, _, _, rfl⟩ (by decide) $$ Hc
+  ihave Hi := ushm_uis N.t 0x10fe true (.JAL (14#21, .Regidx 0#5)) udec% (by decide) $$ Hc
   iapply ushm_j UL N h3 m3 (BitVec.ofNat 64 0x10fe) true 14#21 n (BitVec.ofNat 64 0x110c) (by decide) (by decide)
     $$ Hi Hrun
   inext
   iintro %h4 Hrun
   -- 0x110c  bgeu a5,a3 : NOT taken, base < bp
-  ihave Hi := ushm_uis N.t 0x110c false (.BTYPE (8180#13, .Regidx 13#5, .Regidx 15#5, .BGEU)) ⟨_, _, _, rfl⟩
+  ihave Hi := ushm_uis N.t 0x110c false (.BTYPE (8180#13, .Regidx 13#5, .Regidx 15#5, .BGEU)) udec%
     (by decide) $$ Hc
   iapply ushm_br UL N h4 m3 (BitVec.ofNat 64 0x110c) false 8180#13 13#5 15#5 .BGEU n false
     (by rw [g15, g13, Xv6.bgeu_nat _ _ (by rw [hB]; decide) (by omega)]; simp only [decide_eq_false_iff_not]; omega)
@@ -101,7 +101,7 @@ theorem shFree_scan (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (p 
   inext
   iintro %h5 Hrun
   -- 0x1110  c.ld a4,0(a5) : p->s.ptr, which IS base
-  ihave Hi := ushm_uis N.t 0x1110 true (.LOAD (0#12, .Regidx 15#5, .Regidx 14#5, false, 8)) ⟨_, _, _, rfl⟩
+  ihave Hi := ushm_uis N.t 0x1110 true (.LOAD (0#12, .Regidx 15#5, .Regidx 14#5, false, 8)) udec%
     (by decide) $$ Hc
   iapply wp_uk_ld UL N h5 m3 (BitVec.ofNat 64 0x1110) true 0#12 15#5 14#5 (DFrac.own 1) ushmBase _ n
     (by unfold unotSp spIdx; decide) (ushm_adr g15 (by rw [hB]; decide) _ _ (by rw [hB]; decide)) (by rw [hB])
@@ -115,7 +115,7 @@ theorem shFree_scan (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (p 
   have h15 : m4.get 15#5 = BitVec.ofNat 64 ushmBase := by rw [k4 _ (by decide), g15]
   have h13 : m4.get 13#5 = BitVec.ofNat 64 p := by rw [k4 _ (by decide), g13]
   -- 0x1112  bltu a3,a4 : NOT taken
-  ihave Hi := ushm_uis N.t 0x1112 false (.BTYPE (8#13, .Regidx 14#5, .Regidx 13#5, .BLTU)) ⟨_, _, _, rfl⟩
+  ihave Hi := ushm_uis N.t 0x1112 false (.BTYPE (8#13, .Regidx 14#5, .Regidx 13#5, .BLTU)) udec%
     (by decide) $$ Hc
   iapply ushm_br UL N h6 m4 (BitVec.ofNat 64 0x1112) false 8#13 14#5 13#5 .BLTU n false
     (by rw [h13, h14, ushm_bltu _ _ (by omega) (by rw [hB]; decide)]; simp only [decide_eq_false_iff_not]; omega)
@@ -123,7 +123,7 @@ theorem shFree_scan (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (p 
   inext
   iintro %h7 Hrun
   -- 0x1116  bltu a5,a4 : NOT taken, the list WRAPPED, so break
-  ihave Hi := ushm_uis N.t 0x1116 false (.BTYPE (8180#13, .Regidx 14#5, .Regidx 15#5, .BLTU)) ⟨_, _, _, rfl⟩
+  ihave Hi := ushm_uis N.t 0x1116 false (.BTYPE (8180#13, .Regidx 14#5, .Regidx 15#5, .BLTU)) udec%
     (by decide) $$ Hc
   iapply ushm_br UL N h7 m4 (BitVec.ofNat 64 0x1116) false 8180#13 14#5 15#5 .BLTU n false
     (by rw [h15, h14, ushm_bltu _ _ (by rw [hB]; decide) (by rw [hB]; decide)]; simp)
@@ -133,7 +133,7 @@ theorem shFree_scan (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (p 
   -- 0x111a  lw a1,-8(a0) : the block's own unit count
   have h10 : m4.get 10#5 = BitVec.ofNat 64 (p + 16) := by
     rw [k4 _ (by decide), k3 _ (by decide), k2 _ (by decide), k1 _ (by decide), ha0]
-  ihave Hi := ushm_uis N.t 0x111a false (.LOAD (4088#12, .Regidx 10#5, .Regidx 11#5, false, 4)) ⟨_, _, _, rfl⟩
+  ihave Hi := ushm_uis N.t 0x111a false (.LOAD (4088#12, .Regidx 10#5, .Regidx 11#5, false, 4)) udec%
     (by decide) $$ Hc
   iapply ushm_lw UL N h8 m4 (BitVec.ofNat 64 0x111a) false 4088#12 10#5 11#5 (DFrac.own 1) (p + 8) nu n
     (by unfold unotSp spIdx; decide)
@@ -147,7 +147,7 @@ theorem shFree_scan (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (p 
   have i11 : m5.get 11#5 = BitVec.ofNat 64 nu := e5 ▸ ukWr_get_same _ _ _ (by decide)
   have i15 : m5.get 15#5 = BitVec.ofNat 64 ushmBase := by rw [k5 _ (by decide), h15]
   -- 0x111e  c.ld a2,0(a5)
-  ihave Hi := ushm_uis N.t 0x111e true (.LOAD (0#12, .Regidx 15#5, .Regidx 12#5, false, 8)) ⟨_, _, _, rfl⟩
+  ihave Hi := ushm_uis N.t 0x111e true (.LOAD (0#12, .Regidx 15#5, .Regidx 12#5, false, 8)) udec%
     (by decide) $$ Hc
   iapply wp_uk_ld UL N h9 m5 (BitVec.ofNat 64 0x111e) true 0#12 15#5 12#5 (DFrac.own 1) ushmBase _ n
     (by unfold unotSp spIdx; decide) (ushm_adr i15 (by rw [hB]; decide) _ _ (by rw [hB]; decide)) (by rw [hB])
@@ -160,7 +160,7 @@ theorem shFree_scan (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (p 
   have j12 : m6.get 12#5 = BitVec.ofNat 64 ushmBase := e6 ▸ ukWr_get_same _ _ _ (by decide)
   have j11 : m6.get 11#5 = BitVec.ofNat 64 nu := by rw [k6 _ (by decide), i11]
   -- 0x1120  slli a6,a1,32 ; 0x1124  srli a4,a6,28 : nu * 16
-  ihave Hi := ushm_uis N.t 0x1120 false (.SHIFTIOP (32#6, .Regidx 11#5, .Regidx 16#5, .SLLI)) ⟨_, _, _, rfl⟩
+  ihave Hi := ushm_uis N.t 0x1120 false (.SHIFTIOP (32#6, .Regidx 11#5, .Regidx 16#5, .SLLI)) udec%
     (by decide) $$ Hc
   iapply wp_uk_shiftiop UL N h10 m6 (BitVec.ofNat 64 0x1120) false 32#6 11#5 16#5 .SLLI n
     (by unfold unotSp spIdx; decide) $$ Hi Hrun
@@ -170,7 +170,7 @@ theorem shFree_scan (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (p 
   generalize e7 : ukWr m6 16#5 (ukShiftiopVal .SLLI (BitVec.ofNat 64 nu) 32#6) = m7
   have k7 : ushmKeep [16#5] m6 m7 := e7 ▸ ushmKeep_wr _ _ _
   have l16 : m7.get 16#5 = ukShiftiopVal .SLLI (BitVec.ofNat 64 nu) 32#6 := e7 ▸ ukWr_get_same _ _ _ (by decide)
-  ihave Hi := ushm_uis N.t 0x1124 false (.SHIFTIOP (28#6, .Regidx 16#5, .Regidx 14#5, .SRLI)) ⟨_, _, _, rfl⟩
+  ihave Hi := ushm_uis N.t 0x1124 false (.SHIFTIOP (28#6, .Regidx 16#5, .Regidx 14#5, .SRLI)) udec%
     (by decide) $$ Hc
   iapply wp_uk_shiftiop UL N h11 m7 (BitVec.ofNat 64 0x1124) false 28#6 16#5 14#5 .SRLI n
     (by unfold unotSp spIdx; decide) $$ Hi Hrun
@@ -183,7 +183,7 @@ theorem shFree_scan (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (p 
   have n13 : m8.get 13#5 = BitVec.ofNat 64 p := by
     rw [k8 _ (by decide), k7 _ (by decide), k6 _ (by decide), k5 _ (by decide), h13]
   -- 0x1128  c.add a4,a4,a3 : the block's END
-  ihave Hi := ushm_uis N.t 0x1128 true (.RTYPE (.Regidx 13#5, .Regidx 14#5, .Regidx 14#5, .ADD)) ⟨_, _, _, rfl⟩
+  ihave Hi := ushm_uis N.t 0x1128 true (.RTYPE (.Regidx 13#5, .Regidx 14#5, .Regidx 14#5, .ADD)) udec%
     (by decide) $$ Hc
   iapply wp_uk_rtype UL N h12 m8 (BitVec.ofNat 64 0x1128) true 13#5 14#5 14#5 .ADD n
     (by unfold unotSp spIdx; decide) $$ Hi Hrun
@@ -195,7 +195,7 @@ theorem shFree_scan (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (p 
   have o14 : m9.get 14#5 = BitVec.ofNat 64 (nu * 16 + p) := e9 ▸ ukWr_get_same _ _ _ (by decide)
   have o12 : m9.get 12#5 = BitVec.ofNat 64 ushmBase := by rw [k9 _ (by decide), k8 _ (by decide), k7 _ (by decide), j12]
   -- 0x112a  beq a2,a4 : NOT taken, no forward coalesce
-  ihave Hi := ushm_uis N.t 0x112a false (.BTYPE (42#13, .Regidx 14#5, .Regidx 12#5, .BEQ)) ⟨_, _, _, rfl⟩
+  ihave Hi := ushm_uis N.t 0x112a false (.BTYPE (42#13, .Regidx 14#5, .Regidx 12#5, .BEQ)) udec%
     (by decide) $$ Hc
   iapply ushm_br UL N h13 m9 (BitVec.ofNat 64 0x112a) false 42#13 14#5 12#5 .BEQ n false
     (by rw [o12, o14, Xv6.beq_nat _ _ (by rw [hB]; decide) (by omega)]; simp only [decide_eq_false_iff_not]; omega)

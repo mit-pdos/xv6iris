@@ -66,7 +66,7 @@ theorem shMalloc_pro (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (n
   obtain ⟨hal8, hroom⟩ := hstk
   have hlo : 64 ≤ (m.get spIdx).toNat := by omega
   -- 0x1170  addi sp,sp,-64 : THE PUSH
-  ihave Hi := ushm_uis N.t 0x1170 true (.ITYPE (4032#12, .Regidx spIdx, .Regidx spIdx, .ADDI)) ⟨_, _, _, rfl⟩
+  ihave Hi := ushm_uis N.t 0x1170 true (.ITYPE (4032#12, .Regidx spIdx, .Regidx spIdx, .ADDI)) udec%
     (by decide) $$ Hc
   iapply wp_uk_addi_sp_dn UL N h m (BitVec.ofNat 64 0x1170) true 4032#12 8 n (by decide) $$ Hi Hrun
   inext
@@ -80,7 +80,7 @@ theorem shMalloc_pro (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (n
       ((m1.get 2#5).toNat : Int) + imm.toInt = (((m.get spIdx).toNat - (64 - k) : Nat) : Int) := by
     intro k imm hk hk'; rw [hs64, hk]; omega
   -- 0x1172  sd ra,56(sp)
-  ihave Hi := ushm_uis N.t 0x1172 true (.STORE (56#12, .Regidx 1#5, .Regidx 2#5, 8)) ⟨_, _, _, rfl⟩
+  ihave Hi := ushm_uis N.t 0x1172 true (.STORE (56#12, .Regidx 1#5, .Regidx 2#5, 8)) udec%
     (by decide) $$ Hc
   iapply wp_uk_sd UL N h1 m1 (BitVec.ofNat 64 0x1172) true 56#12 2#5 1#5 _ v0 n (hA 56 _ (by decide) (by omega))
     (by omega) $$ Hi W0 Hrun
@@ -88,7 +88,7 @@ theorem shMalloc_pro (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (n
   iintro W0 %h2 Hrun
   rw [ukPc 0x1172 0x1174 true rfl]
   -- 0x1174  sd s0,48(sp)
-  ihave Hi := ushm_uis N.t 0x1174 true (.STORE (48#12, .Regidx 8#5, .Regidx 2#5, 8)) ⟨_, _, _, rfl⟩
+  ihave Hi := ushm_uis N.t 0x1174 true (.STORE (48#12, .Regidx 8#5, .Regidx 2#5, 8)) udec%
     (by decide) $$ Hc
   iapply wp_uk_sd UL N h2 m1 (BitVec.ofNat 64 0x1174) true 48#12 2#5 8#5 _ v1 n (hA 48 _ (by decide) (by omega))
     (by omega) $$ Hi W1 Hrun
@@ -96,7 +96,7 @@ theorem shMalloc_pro (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (n
   iintro W1 %h3 Hrun
   rw [ukPc 0x1174 0x1176 true rfl]
   -- 0x1176  sd s2,32(sp)
-  ihave Hi := ushm_uis N.t 0x1176 true (.STORE (32#12, .Regidx 18#5, .Regidx 2#5, 8)) ⟨_, _, _, rfl⟩
+  ihave Hi := ushm_uis N.t 0x1176 true (.STORE (32#12, .Regidx 18#5, .Regidx 2#5, 8)) udec%
     (by decide) $$ Hc
   iapply wp_uk_sd UL N h3 m1 (BitVec.ofNat 64 0x1176) true 32#12 2#5 18#5 _ v3 n (hA 32 _ (by decide) (by omega))
     (by omega) $$ Hi W3 Hrun
@@ -104,7 +104,7 @@ theorem shMalloc_pro (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (n
   iintro W3 %h4 Hrun
   rw [ukPc 0x1176 0x1178 true rfl]
   -- 0x1178  sd s3,24(sp)
-  ihave Hi := ushm_uis N.t 0x1178 true (.STORE (24#12, .Regidx 19#5, .Regidx 2#5, 8)) ⟨_, _, _, rfl⟩
+  ihave Hi := ushm_uis N.t 0x1178 true (.STORE (24#12, .Regidx 19#5, .Regidx 2#5, 8)) udec%
     (by decide) $$ Hc
   iapply wp_uk_sd UL N h4 m1 (BitVec.ofNat 64 0x1178) true 24#12 2#5 19#5 _ v4 n (hA 24 _ (by decide) (by omega))
     (by omega) $$ Hi W4 Hrun
@@ -112,7 +112,7 @@ theorem shMalloc_pro (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (n
   iintro W4 %h5 Hrun
   rw [ukPc 0x1178 0x117a true rfl]
   -- 0x117a  addi s0,sp,64
-  ihave Hi := ushm_uis N.t 0x117a true (.ITYPE (64#12, .Regidx 2#5, .Regidx 8#5, .ADDI)) ⟨_, _, _, rfl⟩
+  ihave Hi := ushm_uis N.t 0x117a true (.ITYPE (64#12, .Regidx 2#5, .Regidx 8#5, .ADDI)) udec%
     (by decide) $$ Hc
   iapply wp_uk_itype UL N h5 m1 (BitVec.ofNat 64 0x117a) true 64#12 2#5 8#5 .ADDI n
     (by unfold unotSp spIdx; decide) $$ Hi Hrun
@@ -155,7 +155,7 @@ theorem shMalloc_epi (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (mm : RegMap) (
   have hs64 : (mm.get 2#5).toNat = sp0.toNat - 64 := by rw [hsp]; exact uv_avi_neg sp0 64 hlo
   iintro #Hc W0 W1 W2 W3 W4 W5 W6 W7 Hrun Hcont
   -- 0x124c  ld ra,56(sp)
-  ihave Hi := ushm_uis N.t 0x124c true (.LOAD (56#12, .Regidx 2#5, .Regidx 1#5, false, 8)) ⟨_, _, _, rfl⟩
+  ihave Hi := ushm_uis N.t 0x124c true (.LOAD (56#12, .Regidx 2#5, .Regidx 1#5, false, 8)) udec%
     (by decide) $$ Hc
   iapply wp_uk_ld UL N h mm (BitVec.ofNat 64 0x124c) true 56#12 2#5 1#5 (DFrac.own 1) (sp0.toNat - 8) vra n
     (by unfold unotSp spIdx; decide) (by rw [hs64, show (56#12 : BitVec 12).toInt = 56 from by decide]; omega)
@@ -166,7 +166,7 @@ theorem shMalloc_epi (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (mm : RegMap) (
   let q1 := ukWr mm 1#5 vra
   have hq1 : (q1.get 2#5).toNat = sp0.toNat - 64 := by rw [← hs64]; ureg
   -- 0x124e  ld s0,48(sp)
-  ihave Hi := ushm_uis N.t 0x124e true (.LOAD (48#12, .Regidx 2#5, .Regidx 8#5, false, 8)) ⟨_, _, _, rfl⟩
+  ihave Hi := ushm_uis N.t 0x124e true (.LOAD (48#12, .Regidx 2#5, .Regidx 8#5, false, 8)) udec%
     (by decide) $$ Hc
   iapply wp_uk_ld UL N h1 q1 (BitVec.ofNat 64 0x124e) true 48#12 2#5 8#5 (DFrac.own 1) (sp0.toNat - 16) vs0 n
     (by unfold unotSp spIdx; decide) (by rw [hq1, show (48#12 : BitVec 12).toInt = 48 from by decide]; omega)
@@ -177,7 +177,7 @@ theorem shMalloc_epi (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (mm : RegMap) (
   let q2 := ukWr q1 8#5 vs0
   have hq2 : (q2.get 2#5).toNat = sp0.toNat - 64 := by rw [← hq1]; ureg
   -- 0x1250  ld s2,32(sp)
-  ihave Hi := ushm_uis N.t 0x1250 true (.LOAD (32#12, .Regidx 2#5, .Regidx 18#5, false, 8)) ⟨_, _, _, rfl⟩
+  ihave Hi := ushm_uis N.t 0x1250 true (.LOAD (32#12, .Regidx 2#5, .Regidx 18#5, false, 8)) udec%
     (by decide) $$ Hc
   iapply wp_uk_ld UL N h2 q2 (BitVec.ofNat 64 0x1250) true 32#12 2#5 18#5 (DFrac.own 1) (sp0.toNat - 32) vs2 n
     (by unfold unotSp spIdx; decide) (by rw [hq2, show (32#12 : BitVec 12).toInt = 32 from by decide]; omega)
@@ -188,7 +188,7 @@ theorem shMalloc_epi (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (mm : RegMap) (
   let q3 := ukWr q2 18#5 vs2
   have hq3 : (q3.get 2#5).toNat = sp0.toNat - 64 := by rw [← hq2]; ureg
   -- 0x1252  ld s3,24(sp)
-  ihave Hi := ushm_uis N.t 0x1252 true (.LOAD (24#12, .Regidx 2#5, .Regidx 19#5, false, 8)) ⟨_, _, _, rfl⟩
+  ihave Hi := ushm_uis N.t 0x1252 true (.LOAD (24#12, .Regidx 2#5, .Regidx 19#5, false, 8)) udec%
     (by decide) $$ Hc
   iapply wp_uk_ld UL N h3 q3 (BitVec.ofNat 64 0x1252) true 24#12 2#5 19#5 (DFrac.own 1) (sp0.toNat - 40) vs3 n
     (by unfold unotSp spIdx; decide) (by rw [hq3, show (24#12 : BitVec 12).toInt = 24 from by decide]; omega)
@@ -204,7 +204,7 @@ theorem shMalloc_epi (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (mm : RegMap) (
     rw [Xv6.paAddToNat' _ _ (by rw [uv_avi_neg sp0 64 hlo]; have := sp0.isLt; omega), uv_avi_neg sp0 64 hlo]
     omega
   -- 0x1254  addi sp,sp,64 : THE POP
-  ihave Hi := ushm_uis N.t 0x1254 true (.ITYPE (64#12, .Regidx spIdx, .Regidx spIdx, .ADDI)) ⟨_, _, _, rfl⟩
+  ihave Hi := ushm_uis N.t 0x1254 true (.ITYPE (64#12, .Regidx spIdx, .Regidx spIdx, .ADDI)) udec%
     (by decide) $$ Hc
   ihave Hfr : ustack N.d (q4.get spIdx + BitVec.ofNat 64 (8 * 8)) 8 $$ [W0 W1 W2 W3 W4 W5 W6 W7]
   · rw [hq4]
@@ -218,7 +218,7 @@ theorem shMalloc_epi (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (mm : RegMap) (
   iintro %h5 Hrun
   rw [ukPc 0x1254 0x1256 true rfl, hq4]
   -- 0x1256  ret
-  ihave Hi := ushm_uis N.t 0x1256 true (.JALR (0#12, .Regidx 1#5, .Regidx 0#5)) ⟨_, _, _, rfl⟩
+  ihave Hi := ushm_uis N.t 0x1256 true (.JALR (0#12, .Regidx 1#5, .Regidx 0#5)) udec%
     (by decide) $$ Hc
   iapply wp_uk_ret UL N h5 _ (BitVec.ofNat 64 0x1256) true 1#5 (8 + n) $$ Hi Hrun
   inext

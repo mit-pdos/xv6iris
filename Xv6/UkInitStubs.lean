@@ -59,49 +59,49 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [Uexec
 unseal LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled in
 theorem init_stub_fork (UL : UK_LEAVES) (N : UkNames GF) :
     ⊢ stubLaw (hlc := hlc) N (initCode N.t) 1 User.Init.Sym.«fork» :=
-  stub_of_text UL N User.Init.textOk 1 _ 1#12 (by decide) ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩
+  stub_of_text UL N User.Init.textOk 1 _ 1#12 (by decide) udec% udec% udec%
     (by decide) (by decide)
 
 unseal LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled in
 theorem init_stub_exit (UL : UK_LEAVES) (N : UkNames GF) :
     ⊢ exitStubLaw (hlc := hlc) N (initCode N.t) User.Init.Sym.«exit» :=
-  exit_stub_of_text UL N User.Init.textOk _ 2#12 (by decide) ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩
+  exit_stub_of_text UL N User.Init.textOk _ 2#12 (by decide) udec% udec%
     (by decide)
 
 unseal LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled in
 theorem init_stub_wait (UL : UK_LEAVES) (N : UkNames GF) :
     ⊢ stubLaw (hlc := hlc) N (initCode N.t) 3 User.Init.Sym.«wait» :=
-  stub_of_text UL N User.Init.textOk 3 _ 3#12 (by decide) ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩
+  stub_of_text UL N User.Init.textOk 3 _ 3#12 (by decide) udec% udec% udec%
     (by decide) (by decide)
 
 unseal LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled in
 theorem init_stub_write (UL : UK_LEAVES) (N : UkNames GF) :
     ⊢ stubLaw (hlc := hlc) N (initCode N.t) 16 User.Init.Sym.«write» :=
-  stub_of_text UL N User.Init.textOk 16 _ 16#12 (by decide) ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩
+  stub_of_text UL N User.Init.textOk 16 _ 16#12 (by decide) udec% udec% udec%
     (by decide) (by decide)
 
 unseal LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled in
 theorem init_stub_exec (UL : UK_LEAVES) (N : UkNames GF) :
     ⊢ stubLaw (hlc := hlc) N (initCode N.t) 7 User.Init.Sym.«exec» :=
-  stub_of_text UL N User.Init.textOk 7 _ 7#12 (by decide) ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩
+  stub_of_text UL N User.Init.textOk 7 _ 7#12 (by decide) udec% udec% udec%
     (by decide) (by decide)
 
 unseal LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled in
 theorem init_stub_open (UL : UK_LEAVES) (N : UkNames GF) :
     ⊢ stubLaw (hlc := hlc) N (initCode N.t) 15 User.Init.Sym.«open» :=
-  stub_of_text UL N User.Init.textOk 15 _ 15#12 (by decide) ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩
+  stub_of_text UL N User.Init.textOk 15 _ 15#12 (by decide) udec% udec% udec%
     (by decide) (by decide)
 
 unseal LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled in
 theorem init_stub_mknod (UL : UK_LEAVES) (N : UkNames GF) :
     ⊢ stubLaw (hlc := hlc) N (initCode N.t) 17 User.Init.Sym.«mknod» :=
-  stub_of_text UL N User.Init.textOk 17 _ 17#12 (by decide) ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩
+  stub_of_text UL N User.Init.textOk 17 _ 17#12 (by decide) udec% udec% udec%
     (by decide) (by decide)
 
 unseal LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled in
 theorem init_stub_dup (UL : UK_LEAVES) (N : UkNames GF) :
     ⊢ stubLaw (hlc := hlc) N (initCode N.t) 10 User.Init.Sym.«dup» :=
-  stub_of_text UL N User.Init.textOk 10 _ 10#12 (by decide) ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩
+  stub_of_text UL N User.Init.textOk 10 _ 10#12 (by decide) udec% udec% udec%
     (by decide) (by decide)
 
 /-! ## §2 The stubs -/

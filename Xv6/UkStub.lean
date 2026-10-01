@@ -227,105 +227,105 @@ unseal LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled in
 /-- **Rocq `echo_stub_write`**. -/
 theorem echo_stub_write (UL : UK_LEAVES) (N : UkNames GF) :
     ⊢ stubLaw (hlc := hlc) N (ukCode N.t User.Echo.code.byte) 16 User.Echo.Sym.«write» :=
-  stub_of_text UL N User.Echo.textOk 16 _ 16#12 (by decide) ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩
+  stub_of_text UL N User.Echo.textOk 16 _ 16#12 (by decide) udec% udec% udec%
     (by decide) (by decide)
 
 unseal LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled in
 /-- **Rocq `echo_stub_read`**. -/
 theorem echo_stub_read (UL : UK_LEAVES) (N : UkNames GF) :
     ⊢ stubLaw (hlc := hlc) N (ukCode N.t User.Echo.code.byte) 5 User.Echo.Sym.«read» :=
-  stub_of_text UL N User.Echo.textOk 5 _ 5#12 (by decide) ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩
+  stub_of_text UL N User.Echo.textOk 5 _ 5#12 (by decide) udec% udec% udec%
     (by decide) (by decide)
 
 unseal LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled in
 /-- **Rocq `echo_stub_close`**. -/
 theorem echo_stub_close (UL : UK_LEAVES) (N : UkNames GF) :
     ⊢ stubLaw (hlc := hlc) N (ukCode N.t User.Echo.code.byte) 21 User.Echo.Sym.«close» :=
-  stub_of_text UL N User.Echo.textOk 21 _ 21#12 (by decide) ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩
+  stub_of_text UL N User.Echo.textOk 21 _ 21#12 (by decide) udec% udec% udec%
     (by decide) (by decide)
 
 unseal LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled in
 /-- **Rocq `echo_stub_open`**. -/
 theorem echo_stub_open (UL : UK_LEAVES) (N : UkNames GF) :
     ⊢ stubLaw (hlc := hlc) N (ukCode N.t User.Echo.code.byte) 15 User.Echo.Sym.«open» :=
-  stub_of_text UL N User.Echo.textOk 15 _ 15#12 (by decide) ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩
+  stub_of_text UL N User.Echo.textOk 15 _ 15#12 (by decide) udec% udec% udec%
     (by decide) (by decide)
 
 unseal LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled in
 /-- **Rocq `echo_stub_exit`**. -/
 theorem echo_stub_exit (UL : UK_LEAVES) (N : UkNames GF) :
     ⊢ exitStubLaw (hlc := hlc) N (ukCode N.t User.Echo.code.byte) User.Echo.Sym.«exit» :=
-  exit_stub_of_text UL N User.Echo.textOk _ 2#12 (by decide) ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩
+  exit_stub_of_text UL N User.Echo.textOk _ 2#12 (by decide) udec% udec%
     (by decide)
 
 unseal LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled in
 /-- **Rocq `cat_stub_write`**. -/
 theorem cat_stub_write (UL : UK_LEAVES) (N : UkNames GF) :
     ⊢ stubLaw (hlc := hlc) N (ukCode N.t User.Cat.code.byte) 16 User.Cat.Sym.«write» :=
-  stub_of_text UL N User.Cat.textOk 16 _ 16#12 (by decide) ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩
+  stub_of_text UL N User.Cat.textOk 16 _ 16#12 (by decide) udec% udec% udec%
     (by decide) (by decide)
 
 unseal LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled in
 /-- **Rocq `cat_stub_read`**. -/
 theorem cat_stub_read (UL : UK_LEAVES) (N : UkNames GF) :
     ⊢ stubLaw (hlc := hlc) N (ukCode N.t User.Cat.code.byte) 5 User.Cat.Sym.«read» :=
-  stub_of_text UL N User.Cat.textOk 5 _ 5#12 (by decide) ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩
+  stub_of_text UL N User.Cat.textOk 5 _ 5#12 (by decide) udec% udec% udec%
     (by decide) (by decide)
 
 unseal LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled in
 /-- **Rocq `cat_stub_close`**. -/
 theorem cat_stub_close (UL : UK_LEAVES) (N : UkNames GF) :
     ⊢ stubLaw (hlc := hlc) N (ukCode N.t User.Cat.code.byte) 21 User.Cat.Sym.«close» :=
-  stub_of_text UL N User.Cat.textOk 21 _ 21#12 (by decide) ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩
+  stub_of_text UL N User.Cat.textOk 21 _ 21#12 (by decide) udec% udec% udec%
     (by decide) (by decide)
 
 unseal LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled in
 /-- **Rocq `cat_stub_open`**. -/
 theorem cat_stub_open (UL : UK_LEAVES) (N : UkNames GF) :
     ⊢ stubLaw (hlc := hlc) N (ukCode N.t User.Cat.code.byte) 15 User.Cat.Sym.«open» :=
-  stub_of_text UL N User.Cat.textOk 15 _ 15#12 (by decide) ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩
+  stub_of_text UL N User.Cat.textOk 15 _ 15#12 (by decide) udec% udec% udec%
     (by decide) (by decide)
 
 unseal LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled in
 /-- **Rocq `cat_stub_exit`**. -/
 theorem cat_stub_exit (UL : UK_LEAVES) (N : UkNames GF) :
     ⊢ exitStubLaw (hlc := hlc) N (ukCode N.t User.Cat.code.byte) User.Cat.Sym.«exit» :=
-  exit_stub_of_text UL N User.Cat.textOk _ 2#12 (by decide) ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩
+  exit_stub_of_text UL N User.Cat.textOk _ 2#12 (by decide) udec% udec%
     (by decide)
 
 unseal LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled in
 /-- **Rocq `grep_stub_write`**. -/
 theorem grep_stub_write (UL : UK_LEAVES) (N : UkNames GF) :
     ⊢ stubLaw (hlc := hlc) N (ukCode N.t User.Grep.code.byte) 16 User.Grep.Sym.«write» :=
-  stub_of_text UL N User.Grep.textOk 16 _ 16#12 (by decide) ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩
+  stub_of_text UL N User.Grep.textOk 16 _ 16#12 (by decide) udec% udec% udec%
     (by decide) (by decide)
 
 unseal LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled in
 /-- **Rocq `grep_stub_read`**. -/
 theorem grep_stub_read (UL : UK_LEAVES) (N : UkNames GF) :
     ⊢ stubLaw (hlc := hlc) N (ukCode N.t User.Grep.code.byte) 5 User.Grep.Sym.«read» :=
-  stub_of_text UL N User.Grep.textOk 5 _ 5#12 (by decide) ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩
+  stub_of_text UL N User.Grep.textOk 5 _ 5#12 (by decide) udec% udec% udec%
     (by decide) (by decide)
 
 unseal LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled in
 /-- **Rocq `grep_stub_close`**. -/
 theorem grep_stub_close (UL : UK_LEAVES) (N : UkNames GF) :
     ⊢ stubLaw (hlc := hlc) N (ukCode N.t User.Grep.code.byte) 21 User.Grep.Sym.«close» :=
-  stub_of_text UL N User.Grep.textOk 21 _ 21#12 (by decide) ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩
+  stub_of_text UL N User.Grep.textOk 21 _ 21#12 (by decide) udec% udec% udec%
     (by decide) (by decide)
 
 unseal LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled in
 /-- **Rocq `grep_stub_open`**. -/
 theorem grep_stub_open (UL : UK_LEAVES) (N : UkNames GF) :
     ⊢ stubLaw (hlc := hlc) N (ukCode N.t User.Grep.code.byte) 15 User.Grep.Sym.«open» :=
-  stub_of_text UL N User.Grep.textOk 15 _ 15#12 (by decide) ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩
+  stub_of_text UL N User.Grep.textOk 15 _ 15#12 (by decide) udec% udec% udec%
     (by decide) (by decide)
 
 unseal LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled in
 /-- **Rocq `grep_stub_exit`**. -/
 theorem grep_stub_exit (UL : UK_LEAVES) (N : UkNames GF) :
     ⊢ exitStubLaw (hlc := hlc) N (ukCode N.t User.Grep.code.byte) User.Grep.Sym.«exit» :=
-  exit_stub_of_text UL N User.Grep.textOk _ 2#12 (by decide) ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩
+  exit_stub_of_text UL N User.Grep.textOk _ 2#12 (by decide) udec% udec%
     (by decide)
 
 end UkStub

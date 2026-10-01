@@ -35,14 +35,14 @@ unseal LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled in
 /-- sh's `wait` stub (0xc6a, number 3). -/
 theorem ushRS_stub_wait (UL : UK_LEAVES) (N : UkNames GF) :
     ⊢ stubLaw (hlc := hlc) N (ushCode N.t) 3 User.Sh.Sym.«wait» :=
-  stub_of_text UL N User.Sh.textOk 3 _ 3#12 (by decide) ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩
+  stub_of_text UL N User.Sh.textOk 3 _ 3#12 (by decide) udec% udec% udec%
     (by decide) (by decide)
 
 unseal LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled in
 /-- sh's `dup` stub (0xcda, number 10). -/
 theorem ushRS_stub_dup (UL : UK_LEAVES) (N : UkNames GF) :
     ⊢ stubLaw (hlc := hlc) N (ushCode N.t) 10 User.Sh.Sym.«dup» :=
-  stub_of_text UL N User.Sh.textOk 10 _ 10#12 (by decide) ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩
+  stub_of_text UL N User.Sh.textOk 10 _ 10#12 (by decide) udec% udec% udec%
     (by decide) (by decide)
 
 end

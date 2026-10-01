@@ -37,14 +37,14 @@ unseal LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled in
 /-- sync's exit stub @0x2c8. -/
 theorem sync_stub_exit (UL : UK_LEAVES) (N : UkNames GF) :
     ⊢ exitStubLaw (hlc := hlc) N (ukCode N.t User.Sync.code.byte) User.Sync.Sym.«exit» :=
-  exit_stub_of_text UL N User.Sync.textOk _ 2#12 (by decide) ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩
+  exit_stub_of_text UL N User.Sync.textOk _ 2#12 (by decide) udec% udec%
     (by decide)
 
 unseal LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled in
 /-- sync's sync stub @0x368. -/
 theorem sync_stub_sync (UL : UK_LEAVES) (N : UkNames GF) :
     ⊢ stubLaw (hlc := hlc) N (ukCode N.t User.Sync.code.byte) 22 User.Sync.Sym.«sync» :=
-  stub_of_text UL N User.Sync.textOk 22 _ 22#12 (by decide) ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩
+  stub_of_text UL N User.Sync.textOk 22 _ 22#12 (by decide) udec% udec% udec%
     (by decide) (by decide)
 
 /-- **Rocq `wp_ksync_exit`**: exit(status) @0x2c8 DIVERGES.  The payload is
@@ -73,7 +73,7 @@ theorem ksyncLeaf_none (HS : UK_SYS_P) (Hps : ∀ k : Int, freeNum k → UprogSG
   iintro %h %m %avail %c %hn #Hc Hrun Hcwd - Hcont
   -- the ecall's decode, at the stub's own address (as `sync_stub_sync` reads it)
   have hdec : ∃ i₀ n w, User.utextDecodeWith udrefU User.Sync.tree User.Sync.code.byte
-      (User.Sync.Sym.«sync» + 2) = some (false, .ECALL (), i₀, n, w) := ⟨_, _, _, rfl⟩
+      (User.Sync.Sym.«sync» + 2) = some (false, .ECALL (), i₀, n, w) := udec%
   ihave #Hi := sync_uis N.t (User.Sync.Sym.«sync» + 2) false (.ECALL ()) hdec (by decide) $$ Hc
   rw [show User.Sync.Sym.«sync» + 2 = 0x36a from rfl]
   iapply HS.quiet N h m (BitVec.ofNat 64 0x36a) 22 avail hn
