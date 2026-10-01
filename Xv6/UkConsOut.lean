@@ -400,8 +400,10 @@ theorem consWrite (UL : UK_LEAVES) (N : UkNames GF) (P : Uprog GF) [HPc : Persis
   · rw [e1]; iexact Hs1
   iapply consLeaf (hlc := hlc) UL N h1 (ukWr m 17#5 (BitVec.ofInt 64 16)) (BitVec.ofNat 64 (P.write + 2))
     avail _ l tx (dqHalf dq) bs.length f hsys hal $$ Hi Hrun Hdep Hstd Hs1
-  iintro %h' %ret %Wv %cw' %cs' %hka0 %hka1 %hka2 %htk %hlz %hnf Hstd Hs1 Hpost Hrun
-  icases uwrite_no_short (hlc := hlc) _ N.pay Wv ret Wv.M Wv.fd cw' cs' l fd rb bs.length
+  iintro %h' %ret %Wv %cw' %cs' %hka0 %hka1 %hka2 %htk %hlz %hnf Hstd Hs1
+  rw [spostAt_xv6_write]
+  iintro Hpost Hrun
+  icases xpostWrite_no_short (hlc := hlc) _ N.pay Wv ret l fd rb bs.length
       (by rw [hka0]; exact hi0) hfd htk hl (by rw [hka2, e2, ha2, hcz]) hlz
       (by rw [hka1]; exact hnf) $$ Hpost with ⟨%hret, Hd, Hs2⟩
   rw [hpc]

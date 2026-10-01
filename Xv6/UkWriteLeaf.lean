@@ -265,6 +265,23 @@ theorem uwrite_no_short (Q : Nat → IProp GF) (Xp : Int → IProp GF) (W : Uvis
     exact hno (hnf P d hwf hpm (hlf hlz) (by omega))
   · exfalso; omega
 
+/-- `uwrite_no_short` at the UNFOLDED post.  Rewrite a continuation's
+`spostAt … 16 …` premise with `spostAt_xv6_write` BEFORE `iintro`ing it, then
+read it with this: the proof mode files a spatial hypothesis `P` as `□?false
+P`, and the kernel's `□?false P = P` check at `P = spostAt …` (whose head
+unfolds to `xv6Spost`'s if-chain on the number) costs ~6 s per proof; at
+`xpostWrite …` it is free (claude-notes/optimization.md). -/
+theorem xpostWrite_no_short (Q : Nat → IProp GF) (Xp : Int → IProp GF) (W : Uvis) (r : BitVec 64)
+    (l : List FdState) (i : Nat) (rb : Bool) (nb : Nat)
+    (h0 : (BitVec.setWidth 32 (tfW W.tf (tfArgIdx 0))).toInt = (i : Int)) (hi : i < NSTD)
+    (htake : W.fd.take NSTD = l) (hli : l[i]? = some (.open rb true (.device CONSOLE)))
+    (hcnt : argZ (tfW W.tf (tfArgIdx 2)) = (nb : Int)) (hlz : W.lazy = false)
+    (hnf : ∀ (P : UPtd) (j : Nat), uptWf P → permOf P.um W.sz = W.perm →
+      lazyFree P.um (BitVec.ofNat 64 W.sz) → j < nb →
+      uvaRmapped P (tfW W.tf (tfArgIdx 1) + BitVec.ofNat 64 j).toNat) :
+    xpostWrite (hlc := hlc) (xfamWr Q Xp).wQ (xfamWr Q Xp).wQe W r ⊢ ⌜r = BitVec.ofNat 64 nb⌝ ∗ Q nb :=
+  uwrite_no_short Q Xp W r W.M W.fd 0 ∅ l i rb nb h0 hi htake hli hcnt hlz hnf
+
 end Post
 
 end Xv6
