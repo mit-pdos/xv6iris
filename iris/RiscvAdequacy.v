@@ -802,7 +802,11 @@ Section power.
          ⊢ era_registered gen HE -∗ gen_started gen -∗
            start_auth (gen + 1)%nat -∗ disk_fixed_auth dk -∗
            ghost_var_frac (era_mirror_name HE) 1 (Mof dk) -∗
-           ▷ riscv_crash_pred -∗
+           (* UNLATERED (port-ordinal, owner 2026-10-01): the PowerOn arm spends
+              the power step's own credit on [crash_inv]'s later, so the client
+              need not strip it -- at ordinal step indices it could not, its
+              slot being a timeless record beside an ARBITRARY guest *)
+           riscv_crash_pred -∗
            (* the era's turn, lent by [Hobs]'s on-arm (sync SY3-A1) *)
            Tn (S gen) ==∗
              ◇ (start_auth (gen + 1)%nat ∗ disk_fixed_auth dk ∗
@@ -1024,7 +1028,9 @@ Section power.
         | (_ & -> & [ (Hpw' & _) | (_ & -> & -> & Hbs) ]) ] ] ] ];
         [ discriminate Hc | discriminate Hc | discriminate Hc | discriminate Hc
         | congruence | ].
-      iIntros "_".
+      (* the power step's credit: spent on [crash_inv]'s later at the custody
+         hook below *)
+      iIntros "Hlc".
       destruct Hbs as (Hgen2 & Hvirt2 & Hbf).
       pose proof (proj1 Hbf) as Hpow2.
       (* THE DISK IS WHAT A POWER CYCLE PRESERVES ([VirtioModel.virtio_reset]
@@ -1124,6 +1130,7 @@ Section power.
       iAssert (gen_started g.(ggen)) as "#Hgst".
       { rewrite /gen_started -Hsg. iExact "Hstartlb". }
       iInv "Hcinv" as "HPsw" "Hclosesw".
+      iMod (lc_fupd_elim_later with "Hlc HPsw") as "HPsw".
       (* ...LENT the turn [Hobs] yielded above, and yielding the one the
          boot is handed (sync SY3-A1) *)
       iMod (Hswap HE g.(ggen) (v_disk (g2.(gdev).(dvirtio)))
@@ -1769,7 +1776,8 @@ Theorem riscv_power_adequacy Σ `{!xv6G Σ, !riscvGpreS Σ}
          mono_nat_auth_own_frac γst 1 (gen + 1)%nat -∗
          disk_img_auth_sized γdisk ndisk dk -∗
          ghost_var_frac (era_mirror_name E) 1 (Mof dk) -∗
-         ▷ Pc γdisk γsw γreg γst c -∗
+         (* unlatered: see [wp_power_loop]'s [Hswap] *)
+         Pc γdisk γsw γreg γst c -∗
          Tn c (S gen) ==∗
            ◇ (mono_nat_auth_own_frac γst 1 (gen + 1)%nat ∗
               disk_img_auth_sized γdisk ndisk dk ∗
@@ -2203,7 +2211,7 @@ Proof.
            ltac:(intros γdisk γsw γreg γst c _ E gen dk; cbv beta;
                  iIntros "Hr Hl Ha Hd Hm HP _";
                  iMod (Hswap γdisk γsw γreg γst E gen dk
-                         with "Hr Hl Ha Hd Hm HP") as "H";
+                         with "Hr Hl Ha Hd Hm [HP]") as "H"; [by iNext |];
                  iModIntro; iMod "H" as "(H1 & H2 & H3 & H4 & H5 & H6)";
                  iModIntro; iFrame "H1 H2 H3 H4 H5 H6")
            (fun γobs _ => obs_ledger_at R γobs)

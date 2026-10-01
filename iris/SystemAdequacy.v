@@ -379,28 +379,30 @@ Proof. iEmpIntro. Qed.
    [r] exposed; [app_dur_raw] is it with the existential put back. *)
 Definition app_dur_at {Σ : gFunctors} `{!fsTopG Σ} {N : Type}
     (A : N -> FsAbsDefs.aview -> iProp Σ) (gt : gname) (r : N) : iProp Σ :=
+  (* the later sits on the CLAIM only (port-ordinal guardrail (4), the census's
+     app_dur D shape): the guest half is timeless and comes out at every step
+     index, the claim is arbitrary *)
   (∃ I : gmap Z FsNode.fs_node,
-     ghost_map_auth_frac gt (1/2) I ∗ A r (FsAbsDefs.abs_view I))%I.
+     ghost_map_auth_frac gt (1/2) I ∗ ▷ A r (FsAbsDefs.abs_view I))%I.
 
 Lemma app_dur_at_pack {Σ} `{!fsTopG Σ} {N}
     (A : N -> FsAbsDefs.aview -> iProp Σ) (gt : gname) (r : N)
     (I : gmap Z FsNode.fs_node) :
   ghost_map_auth_frac gt (1/2) I -∗ ▷ A r (FsAbsDefs.abs_view I) -∗
-  ▷ app_dur_at A gt r.
+  app_dur_at A gt r.
 Proof.
-  iIntros "Hh Hp". iNext. rewrite /app_dur_at. iExists I. iFrame "Hh Hp".
+  iIntros "Hh Hp". rewrite /app_dur_at. iExists I. iFrame "Hh Hp".
 Qed.
 
 Lemma app_dur_at_agree {Σ} `{!fsTopG Σ} {N}
     (A : N -> FsAbsDefs.aview -> iProp Σ) (gt : gname) (r : N)
     (q : Qp) (I : gmap Z FsNode.fs_node) :
-  ghost_map_auth_frac gt q I -∗ ▷ app_dur_at A gt r -∗
+  ghost_map_auth_frac gt q I -∗ app_dur_at A gt r -∗
     ◇ (ghost_map_auth_frac gt q I ∗ ghost_map_auth_frac gt (1/2) I ∗
        ▷ A r (FsAbsDefs.abs_view I)).
 Proof.
   iIntros "Hk Hg". rewrite /app_dur_at.
-  iDestruct (bi.later_exist_except_0 with "Hg") as "Hg".
-  iMod "Hg" as (I') "[>Hh Hp]".
+  iDestruct "Hg" as (I') "[Hh Hp]".
   iDestruct (ghost_map_auth_agree with "Hk Hh") as %<-.
   iModIntro. iFrame "Hk Hh". iExact "Hp".
 Qed.
@@ -1751,7 +1753,7 @@ Proof.
               step now, and they ride [power_boot_res] itself. *)
            (fun c k dk => ∃ (gt : gname) (r : app_names),
               P_fs_lend_at gt cov (FsImg.sb_logstart sb) dk ∗
-              ▷ app_dur_at (app_fs c) gt r ∗ app_boot c (Datatypes.S k) r)%I
+              app_dur_at (app_fs c) gt r ∗ app_boot c (Datatypes.S k) r)%I
            (* THE ERA'S TURN INTO THE SWAP AND OUT (sync SY3-A1): the
               power-on step's yield is lent to the transport, which hands
               on the boot's *)
@@ -1759,16 +1761,16 @@ Proof.
            ltac:(intros γd γsw γreg γst c Hborn Er gen dk; cbv beta;
                  iIntros "#Hreg #Hst Hsa Ha HM HP Htn";
                  rewrite /xv6_slot; iDestruct "HP" as (gt) "[HP HG]";
-                 iMod (app_dur_raw_open with "HG") as (r I) "(%Hr & Hh & Hcl)";
+                 rewrite /app_dur_raw; iDestruct "HG" as (r I) "(%Hr & Hh & Hcl)";
                  iMod (P_fs_swap gt γd XV6_DISK_BYTES γsw γreg γst cov
                          (FsImg.sb_logstart sb) dk Er gen I
-                         with "Hreg Hst Hsa Ha HM [Hh] HP")
+                         with "Hreg Hst Hsa Ha HM [Hh] [HP]")
                    as ">(Hsa & Ha & HP & HM & #Hsw & Hh & Hl)";
-                 [rewrite /snap_guest; iExact "Hh" |];
+                 [rewrite /snap_guest; iExact "Hh" | by iNext |];
                  iPoseProof (Happ_boot c gen γd γsw γreg γst Hborn) as "#Hxfer";
                  iEval (rewrite /app_xfer_boot_raw) in "Hxfer";
-                 iMod ("Hxfer" $! _ _ (gen + 1)%nat with "[//] Hsa [//] Htn Hcl")
-                   as ">(Hsa & Htn & Hnew)";
+                 iMod ("Hxfer" $! _ _ (gen + 1)%nat with "[//] Hsa [//] Htn [Hcl]")
+                   as ">(Hsa & Htn & Hnew)"; [by iNext |];
                  iDestruct "Hnew" as (rs rnew) "(%Hrs & Hcl & Hnew & Hbnew)";
                  iDestruct "Hl" as (gt') "[Hl Hg']";
                  iEval (rewrite /snap_guest) in "Hh Hg'";

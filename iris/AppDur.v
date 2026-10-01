@@ -76,20 +76,20 @@ Section AppDurRaw.
     (∃ (r : N) (I : gmap Z fs_node),
        ⌜Okc r⌝ ∗ ghost_map_auth_frac gt (1/2) I ∗ A r (abs_view I))%I.
 
-  (* OPENING A LATER-SHAPED GUEST: the half and the record's predicate are
-     timeless and come out; the claim stays under its later.  [N] need not
-     be inhabited, which is why the existential is pulled through the later
-     with the [◇]. *)
+  (* OPENING A GUEST.  At ordinal step indices a LATER-shaped guest cannot be
+     opened this way (its instance [r] is pinned by nothing timeless, so the
+     existential does not leave the later); every guest that is opened now
+     arrives unlatered -- the crash slot at the PowerOn arm and in the disk
+     permit, whose consumers spend their step's credit (port-ordinal, owner
+     2026-10-01).  The claim is handed on under a later, as before. *)
   Lemma app_dur_raw_open {N} (A : N -> aview -> iProp Σ) (Okc : N -> Prop)
       (gt : gname) :
-    ▷ app_dur_raw A Okc gt -∗
+    app_dur_raw A Okc gt -∗
       ◇ ∃ (r : N) (I : gmap Z fs_node),
           ⌜Okc r⌝ ∗ ghost_map_auth_frac gt (1/2) I ∗ ▷ A r (abs_view I).
   Proof using .
     iIntros "H". rewrite /app_dur_raw.
-    iPoseProof (bi.later_exist_except_0 with "H") as "H".
-    iMod "H" as (r) "H".
-    iDestruct "H" as (I) "(>%Hr & >Hh & Hp)".
+    iDestruct "H" as (r I) "(%Hr & Hh & Hp)".
     iModIntro. iExists r, I. iFrame "Hh Hp". by iPureIntro.
   Qed.
 
@@ -111,7 +111,7 @@ Section AppDurRaw.
   Lemma app_dur_raw_agree {N} (A : N -> aview -> iProp Σ) (Okc : N -> Prop)
       (gt : gname) (q : Qp) (I : gmap Z fs_node) :
     ghost_map_auth_frac gt q I -∗
-    ▷ app_dur_raw A Okc gt -∗
+    app_dur_raw A Okc gt -∗
       ◇ (ghost_map_auth_frac gt q I ∗ ghost_map_auth_frac gt (1/2) I ∗
          ∃ r : N, ⌜Okc r⌝ ∗ ▷ A r (abs_view I)).
   Proof using .
