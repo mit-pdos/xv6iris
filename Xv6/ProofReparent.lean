@@ -32,8 +32,8 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 
 /-- `&proc[i]` as a number, up to and including the sentinel `&proc[NPROC]`. -/
 theorem rp_procAddr_toNat (j : Nat) (hj : j ≤ NPROC) :
-    (procAddr j).toNat = KernelSyms.«proc» + 368 * j := by
-  have h1 : (BitVec.ofNat 64 (procSize * j)).toNat = 368 * j := by
+    (procAddr j).toNat = KernelSyms.«proc» + 376 * j := by
+  have h1 : (BitVec.ofNat 64 (procSize * j)).toNat = 376 * j := by
     simp only [BitVec.toNat_ofNat, procSize]
     exact Nat.mod_eq_of_lt (by unfold NPROC at hj; omega)
   have h2 : (procsAddr : BitVec 64).toNat = KernelSyms.«proc» := by decide
@@ -42,11 +42,11 @@ theorem rp_procAddr_toNat (j : Nat) (hj : j ≤ NPROC) :
   rw [BitVec.toNat_add, h1, h2]
   exact Nat.mod_eq_of_lt (by unfold NPROC at hj; omega)
 
-/-- The cursor one slot on (`addi s1,s1,368`). -/
-theorem rp_cursor (i : Nat) : procAddr i + 368#64 = procAddr (i + 1) := by
+/-- The cursor one slot on (`addi s1,s1,376`). -/
+theorem rp_cursor (i : Nat) : procAddr i + 376#64 = procAddr (i + 1) := by
   unfold procAddr procSize
-  rw [show 368 * (i + 1) = 368 * i + 368 from by omega, BitVec.ofNat_add,
-    show BitVec.ofNat 64 368 = 368#64 from rfl, BitVec.add_assoc]
+  rw [show 376 * (i + 1) = 376 * i + 376 from by omega, BitVec.ofNat_add,
+    show BitVec.ofNat 64 376 = 376#64 from rfl, BitVec.add_assoc]
 
 theorem rp_sentinel : procAddr NPROC = KA.«tickslock» := by decide
 
@@ -58,7 +58,7 @@ theorem rp_cursor_eq (i : Nat) (hi : i < NPROC) :
     have h := congrArg BitVec.toNat he
     rw [rp_procAddr_toNat (i + 1) (by unfold NPROC at hi ⊢; omega)] at h
     have hr : (KA.«tickslock»).toNat = KernelSyms.«tickslock» := rfl
-    have hts : KernelSyms.«tickslock» = KernelSyms.«proc» + 368 * 64 := by decide
+    have hts : KernelSyms.«tickslock» = KernelSyms.«proc» + 376 * 64 := by decide
     rw [hr] at h
     unfold NPROC
     omega
@@ -315,8 +315,8 @@ theorem rp_iter (WK : WAKEUP) [X : CurCtx]
     k_step_gen (wp_s_j cW _ (KA.«reparent» + 0x44#64) true 2097128#21)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c6 hp6
     iintro Hk Hpc
-    -- addi s1,s1,368
-    k_step_gen (wp_s_addi c6 _ (KA.«reparent» + 0x2c#64) false 368#12 9#5 9#5 (by decide))
+    -- addi s1,s1,376
+    k_step_gen (wp_s_addi c6 _ (KA.«reparent» + 0x2c#64) false 376#12 9#5 9#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [g9, rp_cursor] next c7 hp7
     iintro Hk Hpc
@@ -349,8 +349,8 @@ theorem rp_iter (WK : WAKEUP) [X : CurCtx]
       (reparentedUpto parents p ip i i) $$ Hword
     ihave HW := Hback $$ %(reparentedUpto parents p ip i i) Hword
     ihave HW := waitResAt_eq curCtx _ _ (reparentedUpto_succ_nomatch parents p ip i hcm) $$ HW
-    -- addi s1,s1,368
-    k_step_gen (wp_s_addi c2 _ (KA.«reparent» + 0x2c#64) false 368#12 9#5 9#5 (by decide))
+    -- addi s1,s1,376
+    k_step_gen (wp_s_addi c2 _ (KA.«reparent» + 0x2c#64) false 376#12 9#5 9#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [h9, rp_cursor] next c3 hp3
     iintro Hk Hpc
@@ -544,23 +544,23 @@ theorem rp_epi [CurCtx] (cpu cur : CPU) (k : KCtx) (rr : Nat → BitVec 64)
 
 /-- `&proc[0]`, folded out of `auipc s1,0x10; addi s1,s1,1964`. -/
 theorem rp_proc0_addr :
-    KA.«reparent» + 0x107ea#64 = KA.«proc» := by decide
+    KA.«reparent» + 0x1088a#64 = KA.«proc» := by decide
 
 /-- `&initproc`, folded out of `auipc s4,0x8; addi s4,s4,620`. -/
 theorem rp_init_addr :
-    KA.«reparent» + 0x82ca#64 = KA.«initproc» := by decide
+    KA.«reparent» + 0x836a#64 = KA.«initproc» := by decide
 
 /-- `&proc[NPROC]`, folded out of `auipc s3,0x16; addi s3,s3,412`. -/
 theorem rp_sent_addr :
-    KA.«reparent» + 0x163ea#64 = KA.«tickslock» := by decide
+    KA.«reparent» + 0x1668a#64 = KA.«tickslock» := by decide
 
 theorem rp_init_addr_fold : initprocAddr = KA.«initproc» := rfl
 
-theorem reparent_br_163ea : KA.«reparent» + 0x163ea#64 = KA.«tickslock» := by decide
+theorem reparent_br_1668a : KA.«reparent» + 0x1668a#64 = KA.«tickslock» := by decide
 
-theorem reparent_br_82ca : KA.«reparent» + 0x82ca#64 = KA.«initproc» := by decide
+theorem reparent_br_836a : KA.«reparent» + 0x836a#64 = KA.«initproc» := by decide
 
-theorem reparent_br_107ea : KA.«reparent» + 0x107ea#64 = KA.«proc» := by decide
+theorem reparent_br_1088a : KA.«reparent» + 0x1088a#64 = KA.«proc» := by decide
 
 set_option maxHeartbeats 8000000 in
 /-- **`reparent` meets its specification.** -/
@@ -605,23 +605,23 @@ theorem reparent_proof (WK : WAKEUP) : REPARENT :=
   k_step_gen (wp_s_add c8 _ (KA.«reparent» + 0x10#64) true 18#5 0#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c9 hp9
   iintro Hk Hpc
-  k_step_gen (wp_s_auipc c9 _ (KA.«reparent» + 0x12#64) false 16#20 9#5 (by decide))
+  k_step_gen (wp_s_auipc c9 _ (KA.«reparent» + 0x12#64) false 17#20 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c10 hp10
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c10 _ (KA.«reparent» + 0x16#64) false 2008#12 9#5 9#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [reparent_br_107ea, rp_proc0_addr] next c11 hp11
+  k_step_gen (wp_s_addi c10 _ (KA.«reparent» + 0x16#64) false 2168#12 9#5 9#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [reparent_br_1088a, rp_proc0_addr] next c11 hp11
   iintro Hk Hpc
   k_step_gen (wp_s_auipc c11 _ (KA.«reparent» + 0x1a#64) false 8#20 20#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c12 hp12
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c12 _ (KA.«reparent» + 0x1e#64) false 688#12 20#5 20#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [reparent_br_82ca, rp_init_addr] next c13 hp13
+  k_step_gen (wp_s_addi c12 _ (KA.«reparent» + 0x1e#64) false 848#12 20#5 20#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [reparent_br_836a, rp_init_addr] next c13 hp13
   iintro Hk Hpc
   k_step_gen (wp_s_auipc c13 _ (KA.«reparent» + 0x22#64) false 22#20 19#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c14 hp14
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c14 _ (KA.«reparent» + 0x26#64) false 968#12 19#5 19#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [reparent_br_163ea, rp_sent_addr] next c15 hp15
+  k_step_gen (wp_s_addi c14 _ (KA.«reparent» + 0x26#64) false 1640#12 19#5 19#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [reparent_br_1668a, rp_sent_addr] next c15 hp15
   iintro Hk Hpc
   k_step_gen (wp_s_j c15 _ (KA.«reparent» + 0x2a#64) true 10#21)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c16 hp16

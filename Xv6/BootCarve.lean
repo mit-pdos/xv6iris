@@ -468,7 +468,7 @@ theorem bc_flatten_getD (L : List (List Nat)) (p r : Nat)
 set_option maxRecDepth 100000 in
 theorem bc_pages_full : ∀ i < 10, (KernelElf.pages.getD i []).length = 128 := by decide +kernel
 set_option maxRecDepth 100000 in
-theorem bc_page10_len : (KernelElf.pages.getD 10 []).length = 27 := by decide +kernel
+theorem bc_page10_len : (KernelElf.pages.getD 10 []).length = 32 := by decide +kernel
 
 /-- The row of an offset inside the dump, off the shared walk. -/
 theorem bc_row_eq (off : Nat) (h : off < KernelElf.elfEnd - KernelElf.elfBase) :
@@ -582,7 +582,7 @@ theorem bc_img_ro_all : Kernel.rodata.all (fun p => bcImgOk p.1 1 p.2) = true :=
 theorem bc_img_data : Kernel.dataInit.all (fun p => bcImgOk p.1 1 p.2) = true := by
   decide +kernel
 
-theorem bc_img_got : bcImgOk 0x8000a348 8 MachCSL.KernelSyms.«stack0» = true := by
+theorem bc_img_got : bcImgOk 0x8000a3e8 8 MachCSL.KernelSyms.«stack0» = true := by
   decide +kernel
 
 /-- **THE BOOT IMAGE IS THE KERNEL'S ELF**, as far as the carve reads it (was
@@ -592,7 +592,7 @@ theorem bootImage_wf : BootImage bootImage where
   text k hk := bootImage_has _ _ _ (List.all_eq_true.1 bc_img_text_all k hk)
   rodata p hp := bootImage_has _ _ _ (List.all_eq_true.1 bc_img_ro_all p hp)
   got := by
-    rw [show stack0Slot = BitVec.ofNat 64 0x8000a348 by decide]
+    rw [show stack0Slot = BitVec.ofNat 64 0x8000a3e8 by decide]
     exact bootImage_has _ _ _ bc_img_got
   data p hp := bootImage_has _ _ _ (List.all_eq_true.1 bc_img_data p hp)
   bss a h1 h2 := by
@@ -809,13 +809,13 @@ fraction: the shared allocation discards it and gives each hart a copy). -/
 theorem bootCarve_got [CurCtx] :
     bootRan (GF := GF) (imgFlat bootImage) MachCSL.KernelSyms.«_data» MachCSL.KernelSyms.«_bss» ⊢
       pwordPointsTo stack0Slot 8 (DFrac.own 1) KA.«stack0» := by
-  have hs : stack0Slot = BitVec.ofNat 64 0x8000a348 := by decide
-  have hA : bcInRam 0x8000a348 8 := by unfold bcInRam ramBase ramEnd; omega
+  have hs : stack0Slot = BitVec.ofNat 64 0x8000a3e8 := by decide
+  have hA : bcInRam 0x8000a3e8 8 := by unfold bcInRam ramBase ramEnd; omega
   iintro H
-  icases (bootRan_split (GF := GF) (imgFlat bootImage) _ 0x8000a348 _ (by decide) (by decide)).1 $$ H with ⟨-, H⟩
-  icases (bootRan_split (GF := GF) (imgFlat bootImage) _ (0x8000a348 + 8) _ (by decide) (by decide)).1 $$ H with ⟨H, -⟩
+  icases (bootRan_split (GF := GF) (imgFlat bootImage) _ 0x8000a3e8 _ (by decide) (by decide)).1 $$ H with ⟨-, H⟩
+  icases (bootRan_split (GF := GF) (imgFlat bootImage) _ (0x8000a3e8 + 8) _ (by decide) (by decide)).1 $$ H with ⟨H, -⟩
   rw [hs]
-  ihave H := bootImg_ctxBytes (GF := GF) curCtx bootImage 0x8000a348 8 _ hA (hs ▸ bootImage_wf.got) $$ H
+  ihave H := bootImg_ctxBytes (GF := GF) curCtx bootImage 0x8000a3e8 8 _ hA (hs ▸ bootImage_wf.got) $$ H
   iapply pwordPointsTo_intro _ 8 _ _ (bcInRam_inRam hA) (by decide) $$ H
 
 end

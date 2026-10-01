@@ -832,7 +832,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
 
-theorem kxc_br_iup_66 : KA.«kexec» + 0x66#64 + BitVec.signExtend 64 2092080#21 = KA.«iunlockput» := by
+theorem kxc_br_iup_66 : KA.«kexec» + 0x66#64 + BitVec.signExtend 64 2091984#21 = KA.«iunlockput» := by
   decide
 theorem kxc_ret_66 : jumpPc (KA.«kexec» + 0x66#64 + 4#64) = KA.«kexec» + 0x66#64 + 4#64 := by decide
 theorem kxc_br_eo_6a : KA.«kexec» + 0x6a#64 + BitVec.signExtend 64 2094286#21 = KA.«end_op» := by
@@ -876,7 +876,7 @@ theorem kxc_bad64 (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames) [ClaimIs (h
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h20]
   iintro Hk Hpc
   -- +0x066  jal iunlockput
-  iapply (kxc_call_iup IUP Γ cpu k A spie spp _ (KA.«kexec» + 0x66#64) 2092080#21 kxc_br_iup_66
+  iapply (kxc_call_iup IUP Γ cpu k A spie spp _ (KA.«kexec» + 0x66#64) 2091984#21 kxc_br_iup_66
       kxc_ret_66 kf qf sf gyf loyf tlyf inumf dnf bmf data gilf gislf n2 hK hnoff htier hj hproc hkf
       hnib hn2 (by simp [RegMap.set_apply, h20]))
     $$ [- $Hk $Hpc $Hte $Hce $Hfab $Hop $Hlog $Hbs $Hpid]
@@ -997,7 +997,7 @@ theorem kxc_call_pfp (PFP : PROC_FREEPAGETABLE) (Γ : SchedNames) (cpu : CPU) (k
   ipureintro
   simpa using hcs
 
-theorem kxc_br_pfp_1da : KA.«kexec» + 0x1da#64 + BitVec.signExtend 64 2084862#21 =
+theorem kxc_br_pfp_1da : KA.«kexec» + 0x1da#64 + BitVec.signExtend 64 2084734#21 =
     KA.«proc_freepagetable» := by decide
 theorem kxc_ret_1da : jumpPc (KA.«kexec» + 0x1da#64 + 4#64) = KA.«kexec» + 0x1da#64 + 4#64 := by
   decide
@@ -1044,7 +1044,7 @@ theorem kxc_bad_1d6 (PFP : PROC_FREEPAGETABLE) (Γ : SchedNames)
   -- +0x1da  jal proc_freepagetable, the block's event counter lent to the
   -- frees (permit sweep L1a, Rocq `proc_priv_ev_lend`)
   icases procPrivFd_evLend A.γ k.proc A.pidv A.V A.M $$ Hpriv with ⟨Hlend, Hpback⟩
-  iapply (kxc_call_pfp PFP Γ cpu k A spie spp _ (KA.«kexec» + 0x1da#64) 2084862#21 kxc_br_pfp_1da
+  iapply (kxc_call_pfp PFP Γ cpu k A spie spp _ (KA.«kexec» + 0x1da#64) 2084734#21 kxc_br_pfp_1da
       kxc_ret_1da P Mi A.V.ev hK hnoff (by simp [RegMap.set_apply, h22]) (by simpa [RegMap.set_apply, h24] using hsz)
       (by simpa [RegMap.set_apply, h24] using hbelow))
     $$ [- $Hk $Hpc $Hte $Hce $Hfab $Hpt $Hlend]

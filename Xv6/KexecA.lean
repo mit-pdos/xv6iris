@@ -327,7 +327,7 @@ theorem kxc_a1_au (MP : MYPROC) (BO : BEGIN_OP) (NE : NAMEI_ERA) (EO : END_OP)
   ihave Hk := kctx_eq_mono cpu _ (((k.withSpie k.spie k.spp).pushed 68).withRegs R)
     (by kctx_ext) $$ Hk
   -- +0x020  jal myproc
-  iapply (kxcA_call_myproc MP cpu k k.spie k.spp R (KA.«kexec» + 0x20#64) 2084972#21 kxcA_br_myproc
+  iapply (kxcA_call_myproc MP cpu k k.spie k.spp R (KA.«kexec» + 0x20#64) 2084844#21 kxcA_br_myproc
       kxcA_ret_24 hK hnoff) $$ [- $Hk $Hpc $Hte $Hce]
   isplitr
   · iapply (text_instr _ _ _ _ rfl rfl); iexact Htext
@@ -359,7 +359,7 @@ theorem kxc_a1_au (MP : MYPROC) (BO : BEGIN_OP) (NE : NAMEI_ERA) (EO : END_OP)
   -- +0x02c  jal namei  (THE ERA WALK)
   unfold kxcBufs
   icases Hbufs with ⟨Hpath, Hargv, Hargs⟩
-  iapply (kxcA_call_namei_era NE Γ cpu k A spie2 spp2 _ (KA.«kexec» + 0x2c#64) 2093730#21
+  iapply (kxcA_call_namei_era NE Γ cpu k A spie2 spp2 _ (KA.«kexec» + 0x2c#64) 2093706#21
       kxcA_br_namei kxcA_ret_30 P Pmiss hK hnoff htier hj hproc hnn hterm hplen
       (by simp [RegMap.set_apply, e18]))
     $$ [- $Hk $Hpc $Hte $Hce $Hfab $Hcore $Hpath $Hbs $Hirs $Hlog $Hstart]

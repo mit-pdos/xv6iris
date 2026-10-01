@@ -75,8 +75,8 @@ set_option linter.unusedVariables false
 
 /-! ## Constants -/
 
-theorem sys_open_br_argint : KA.«sys_open» + 0xffffffffffffd6d0#64 = KA.«argint» := by decide
-theorem sys_open_br_argstr : KA.«sys_open» + 0xffffffffffffd708#64 = KA.«argstr» := by decide
+theorem sys_open_br_argint : KA.«sys_open» + 0xffffffffffffd670#64 = KA.«argint» := by decide
+theorem sys_open_br_argstr : KA.«sys_open» + 0xffffffffffffd6a8#64 = KA.«argstr» := by decide
 theorem sys_open_br_begin_op : KA.«sys_open» + 0xffffffffffffeb56#64 = KA.«begin_op» := by decide
 
 theorem sys_open_ret_12 : jumpPc (KA.«sys_open» + 0x12#64) = KA.«sys_open» + 0x12#64 := by decide
@@ -404,7 +404,7 @@ theorem sys_open_args (AI : ARGINT) (AS : ARGSTR) (BO : BEGIN_OP) (Γ : SchedNam
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x0e  jal argint
-  k_step_e (wp_s_jal cpu _ (KA.«sys_open» + 0xe#64) false 2086594#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_open» + 0xe#64) false 2086498#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_open_br_argint]
   iintro Hk Hpc
   icases sysOpenCells_om _ _ _ _ _ _ _ _ _ _ $$ Hcells with ⟨Hom, Hcback⟩
@@ -452,7 +452,7 @@ theorem sys_open_args (AI : ARGINT) (AS : ARGSTR) (BO : BEGIN_OP) (Γ : SchedNam
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x1c  jal argstr
-  k_step_e (wp_s_jal cpu _ (KA.«sys_open» + 0x1c#64) false 2086636#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_open» + 0x1c#64) false 2086540#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_open_br_argstr]
   iintro Hk Hpc
   icases sysfile_blk_bare_ev _ _ _ _ _ $$ Hblk with ⟨Hbare, Hclose⟩

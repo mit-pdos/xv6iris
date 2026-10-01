@@ -36,7 +36,7 @@ set_option linter.unusedSectionVars false
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-theorem mn_started_addr' : KA.«main» + 162#64 + 36864#64 + 1008#64 = KA.«started» := by decide
+theorem mn_started_addr' : KA.«main» + 162#64 + 36864#64 + 1168#64 = KA.«started» := by decide
 theorem mn_j_3e : KA.«main» + 178#64 + BitVec.signExtend 64 2097036#21 = KA.«main» + 62#64 := by decide
 
 section
@@ -71,7 +71,7 @@ theorem mn_started [CurCtx] (cpu : CPU) (k : KCtx) (R0 : RegMap) (hsie : k.sie =
   k_step (wp_s_auipc startedPrimary _ (KA.«main» + 162#64) false 9#20 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_addi startedPrimary _ (KA.«main» + 166#64) false 1008#12 15#5 15#5 (by decide))
+  k_step (wp_s_addi startedPrimary _ (KA.«main» + 166#64) false 1168#12 15#5 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0xaa  li a4,1

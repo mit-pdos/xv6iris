@@ -359,7 +359,7 @@ theorem iput_lk_a (RH : RELEASE_HOOK) (AC : ACQUIRE_LLB) (ASN : ACQUIRESLEEP_NB)
   · iframe
   imodintro
   -- +0x5a jal acquiresleep
-  k_step (wp_s_jal c _ (KA.«iput» + 0x5a#64) false 2986#21 1#5 (by decide))
+  k_step (wp_s_jal c _ (KA.«iput» + 0x5a#64) false 3082#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [iput_br_acquiresleep]
   iintro Hk Hpc
   iapply (iput_lk_asl ASN c _ γil γisl kk q pidv dqp ?ha ?hk ?hs ?hn ?hsl ?ht)
@@ -400,13 +400,13 @@ theorem iput_lk_a (RH : RELEASE_HOOK) (AC : ACQUIRE_LLB) (ASN : ACQUIRESLEEP_NB)
   ihave Hk := Hkback $$ Hrun
   imodintro
   -- +0x5e auipc a0 ; +0x62 addi a0 ; +0x66 jal release
-  k_step (wp_s_auipc c2 _ (KA.«iput» + 0x5e#64) false 0x1d#20 10#5 (by decide))
+  k_step (wp_s_auipc c2 _ (KA.«iput» + 0x5e#64) false 0x1e#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_addi c2 _ (KA.«iput» + 0x62#64) false 1642#12 10#5 10#5 (by decide))
+  k_step (wp_s_addi c2 _ (KA.«iput» + 0x62#64) false 2294#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [iput_lock]
   iintro Hk Hpc
-  k_step (wp_s_jal c2 _ (KA.«iput» + 0x66#64) false 2086842#21 1#5 (by decide))
+  k_step (wp_s_jal c2 _ (KA.«iput» + 0x66#64) false 2086822#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [iput_br_release]
   iintro Hk Hpc
   iapply (iput_release RH c2 k hwf hK16 hlk _ ?h10 (KA.«iput» + 0x6a#64) ?h1)

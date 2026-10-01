@@ -181,17 +181,17 @@ set_option linter.unusedSectionVars false
 /-! ## Constants the code computes -/
 
 /-- `&itable.lock`, from all three `auipc a0,0x1e ; addi a0,a0,_` pairs. -/
-theorem ig_lock : KA.«iget» + 121832#64 = itableLock := by unfold itableLock; decide
+theorem ig_lock : KA.«iget» + 122484#64 = itableLock := by unfold itableLock; decide
 /-- `&itable.inode[0]`, the cursor's start. -/
-theorem ig_s1_0 : KA.«iget» + 121856#64 = ientry 0 := by decide
+theorem ig_s1_0 : KA.«iget» + 122508#64 = ientry 0 := by decide
 /-- `&itable.inode[NINODE]`, which IS the next symbol `log` (`ientry_sentinel`). -/
-theorem ig_a3_log : KA.«iget» + 128656#64 = KA.«log» := by decide
+theorem ig_a3_log : KA.«iget» + 129308#64 = KA.«log» := by decide
 /-- The `"iget: no inodes"` literal. -/
-theorem ig_msg : KA.«iget» + 0x4468#64 = KStr.«iget: no inodes» := by decide
+theorem ig_msg : KA.«iget» + 0x444c#64 = KStr.«iget: no inodes» := by decide
 
-theorem ig_br_acq : KA.«iget» + 0xffffffffffffdcb8#64 = KA.«acquire» := by decide
-theorem ig_br_rel : KA.«iget» + 0xffffffffffffdd40#64 = KA.«release» := by decide
-theorem ig_br_panic : KA.«iget» + 0xffffffffffffd898#64 = KA.«panic» := by decide
+theorem ig_br_acq : KA.«iget» + 0xffffffffffffdca4#64 = KA.«acquire» := by decide
+theorem ig_br_rel : KA.«iget» + 0xffffffffffffdd2c#64 = KA.«release» := by decide
+theorem ig_br_panic : KA.«iget» + 0xffffffffffffd884#64 = KA.«panic» := by decide
 
 theorem ig_ret_20 : jumpPc (KA.«iget» + 0x20#64) = (KA.«iget» + 0x20#64) := by decide
 theorem ig_ret_66 : jumpPc (KA.«iget» + 0x66#64) = (KA.«iget» + 0x66#64) := by decide
@@ -270,7 +270,7 @@ theorem ig_quarter_rest : qpSub (1 : Qp).half Qp.quarter = some Qp.quarter := by
 
 /-! ## The `"iget: no inodes"` literal -/
 
-/-- `iget: no inodes` at `0x80007408`. -/
+/-- `iget: no inodes` at `0x80007400`. -/
 def igMsgStr : List (BitVec 8) :=
   [0x69#8, 0x67#8, 0x65#8, 0x74#8, 0x3a#8, 0x20#8, 0x6e#8, 0x6f#8, 0x20#8,
    0x69#8, 0x6e#8, 0x6f#8, 0x64#8, 0x65#8, 0x73#8]

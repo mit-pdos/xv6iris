@@ -458,7 +458,7 @@ theorem createFail_parent_tail (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hl
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- ===== +0x158  jal iunlockput(dp) =====
-  k_step_e (wp_s_jal cpu _ (KA.«create» + 0x158#64) false 2090826#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«create» + 0x158#64) false 2090730#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [create_br_iunlockput]
   iintro Hk Hpc
   icases Hdep with ⟨%lodc, %tldc, %hledc, Hfldc, Hdep⟩
@@ -601,7 +601,7 @@ theorem create_fail_half (IUP : IUNLOCKPUT) (IU : IUPDATE) (Γ : SchedNames)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- ===== +0x14c  jal iupdate : THE UNLINK FLUSH =====
-  k_step_e (wp_s_jal cpu _ (KA.«create» + 0x14c#64) false 2090062#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«create» + 0x14c#64) false 2089966#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [create_br_iupdate]
   iintro Hk Hpc
   icases bslots_uncons 2 $$ Hbsl with ⟨Hb1, Hb2⟩
@@ -646,7 +646,7 @@ theorem create_fail_half (IUP : IUNLOCKPUT) (IU : IUPDATE) (Γ : SchedNames)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- ===== +0x152  jal iunlockput(ip) : THE PUT THAT FREES =====
-  k_step_e (wp_s_jal cpu _ (KA.«create» + 0x152#64) false 2090832#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«create» + 0x152#64) false 2090736#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [create_br_iunlockput]
   iintro Hk Hpc
   -- THE TWO RE-PARKS: the UNARM fires at the child, the parent retags

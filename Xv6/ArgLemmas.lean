@@ -84,17 +84,17 @@ theorem word8_join4 (a : BitVec 64) (lo hi : BitVec 32) (hal : a.toNat % 8 = 0) 
 
 /-! ## argraw's jump table -/
 
-/-- The table base (`auipc a4,0x5 ; addi a4,a4,-192` at `argraw + 0x18`). -/
-def argrawTbl : BitVec 64 := (KA.«etext» + 0x780#64)
+/-- The table base (`auipc a4,0x5 ; addi a4,a4,-234` at `argraw + 0x18`). -/
+def argrawTbl : BitVec 64 := (KA.«etext» + 0x778#64)
 
 /-- Entry `i`: the case body's displacement from the table base. -/
 def argrawEntry : Nat → BitVec 32
-  | 0 => 0xffffb0de#32
-  | 1 => 0xffffb0ec#32
-  | 2 => 0xffffb0f2#32
-  | 3 => 0xffffb0f8#32
-  | 4 => 0xffffb0fe#32
-  | _ => 0xffffb104#32
+  | 0 => 0xffffb0fa#32
+  | 1 => 0xffffb108#32
+  | 2 => 0xffffb10e#32
+  | 3 => 0xffffb114#32
+  | 4 => 0xffffb11a#32
+  | _ => 0xffffb120#32
 
 /-- The case body entry `i` lands on: `argraw + 0x28`, then `+0x36, +0x3c, ...`. -/
 def argrawCase : Nat → BitVec 64
@@ -119,12 +119,12 @@ theorem argrawEntry_target (i : Nat) (hi : i < 6) :
 /-- Entry `i` from one decision over its four `.rodata` bytes (`rodataRun`,
 one list walk) instead of one `Kernel.rodata[j]? = some _` per byte. -/
 theorem argraw_tbl_word_of (i : Nat) (b0 b1 b2 b3 : BitVec 8)
-    (hrun : rodataRun (KernelSyms.«etext» + 0x780 + 4 * i) [b0, b1, b2, b3])
-    (hal : (BitVec.ofNat 64 (KernelSyms.«etext» + 0x780 + 4 * i)).toNat % 4 = 0)
+    (hrun : rodataRun (KernelSyms.«etext» + 0x778 + 4 * i) [b0, b1, b2, b3])
+    (hal : (BitVec.ofNat 64 (KernelSyms.«etext» + 0x778 + 4 * i)).toNat % 4 = 0)
     (hw : bytesToWord4 [b0, b1, b2, b3] = argrawEntry i) :
     kmapStatic (GF := GF) ⊢ kernelData -∗
       wordPointsTo (argrawTbl + BitVec.ofNat 64 (4 * i)) 4 DFrac.discard (argrawEntry i) := by
-  have ea : argrawTbl + BitVec.ofNat 64 (4 * i) = BitVec.ofNat 64 (KernelSyms.«etext» + 0x780 + 4 * i) := by
+  have ea : argrawTbl + BitVec.ofNat 64 (4 * i) = BitVec.ofNat 64 (KernelSyms.«etext» + 0x778 + 4 * i) := by
     unfold argrawTbl KA.«etext»; rw [BitVec.ofNat_add, BitVec.ofNat_add]
   rw [ea, ← hw]
   iintro #HS #H
@@ -137,12 +137,12 @@ theorem argraw_tbl_word (i : Nat) (hi : i < 6) :
     kmapStatic (GF := GF) ⊢ kernelData -∗
       wordPointsTo (argrawTbl + BitVec.ofNat 64 (4 * i)) 4 DFrac.discard (argrawEntry i) := by
   match i, hi with
-  | 0, _ => exact argraw_tbl_word_of 0 0xde#8 0xb0#8 0xff#8 0xff#8 (by decide +kernel) (by decide) (by decide)
-  | 1, _ => exact argraw_tbl_word_of 1 0xec#8 0xb0#8 0xff#8 0xff#8 (by decide +kernel) (by decide) (by decide)
-  | 2, _ => exact argraw_tbl_word_of 2 0xf2#8 0xb0#8 0xff#8 0xff#8 (by decide +kernel) (by decide) (by decide)
-  | 3, _ => exact argraw_tbl_word_of 3 0xf8#8 0xb0#8 0xff#8 0xff#8 (by decide +kernel) (by decide) (by decide)
-  | 4, _ => exact argraw_tbl_word_of 4 0xfe#8 0xb0#8 0xff#8 0xff#8 (by decide +kernel) (by decide) (by decide)
-  | 5, _ => exact argraw_tbl_word_of 5 0x04#8 0xb1#8 0xff#8 0xff#8 (by decide +kernel) (by decide) (by decide)
+  | 0, _ => exact argraw_tbl_word_of 0 0xfa#8 0xb0#8 0xff#8 0xff#8 (by decide +kernel) (by decide) (by decide)
+  | 1, _ => exact argraw_tbl_word_of 1 0x08#8 0xb1#8 0xff#8 0xff#8 (by decide +kernel) (by decide) (by decide)
+  | 2, _ => exact argraw_tbl_word_of 2 0x0e#8 0xb1#8 0xff#8 0xff#8 (by decide +kernel) (by decide) (by decide)
+  | 3, _ => exact argraw_tbl_word_of 3 0x14#8 0xb1#8 0xff#8 0xff#8 (by decide +kernel) (by decide) (by decide)
+  | 4, _ => exact argraw_tbl_word_of 4 0x1a#8 0xb1#8 0xff#8 0xff#8 (by decide +kernel) (by decide) (by decide)
+  | 5, _ => exact argraw_tbl_word_of 5 0x20#8 0xb1#8 0xff#8 0xff#8 (by decide +kernel) (by decide) (by decide)
 
 end
 

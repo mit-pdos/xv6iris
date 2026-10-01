@@ -81,7 +81,7 @@ theorem namexEra_tests (IUP : IUNLOCKPUT) (IU : IUNLOCK) (DL : DIRLOOKUP)
     (es0 : List (List (BitVec 8))) (el : List (BitVec 8)) (wc : Bool) (fuel : Nat)
     (hf : NamexLvlFacts k A R o2 ik inum ncur Scur es0 el nf wc fuel) (hle : lo ≤ tl)
     (hns2 : A.pfun o2 ≠ SLASH) :
-    kctx cpu (((k.withSpie spie spp).pushed 12).withRegs R) ∗ pcIs cpu (KA.«namex» + 0xc6#64) ∗
+    kctx cpu (((k.withSpie spie spp).pushed 12).withRegs R) ∗ pcIs cpu (KA.«namex» + 0xca#64) ∗
     namexFrame k ∗ trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     namexEnv (hlc := hlc) Γ A ∗
     namexLk A ik q g lo tl inum dn γil γisl ∗ icLoaded fscFs fscIreg fscCov fscLogst ik inum dn bm ∗
@@ -99,7 +99,7 @@ theorem namexEra_tests (IUP : IUNLOCKPUT) (IU : IUNLOCK) (DL : DIRLOOKUP)
     ⟨%data, %⟨hok, hdok, hdoc⟩, Hdl, Hdi, Hmeta, Hmap, Hblk, Hclose⟩
   -- +0xc6  lh a5,68(s4)
   icases namex_meta_type (ientry ik) dn $$ Hmeta with ⟨Hty, Hmcl⟩
-  k_step_e (wp_s_lh cpu _ (KA.«namex» + 0xc6#64) false 68#12 15#5 20#5 (by decide) (by decide)
+  k_step_e (wp_s_lh cpu _ (KA.«namex» + 0xca#64) false 68#12 15#5 20#5 (by decide) (by decide)
       (DFrac.own 1) dn.diType)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [r20, iType]
   iintro Hk Hpc Hty
@@ -110,7 +110,7 @@ theorem namexEra_tests (IUP : IUNLOCKPUT) (IU : IUNLOCK) (DL : DIRLOOKUP)
   by_cases hnt : dn.diType ≠ T_DIR
   · -- ===== NOT A DIRECTORY: L_notdir, LEFT death =====
     have hd : decide (dn.diType ≠ T_DIR) = true := by simp [hnt]
-    k_step_e (wp_s_branch cpu _ (KA.«namex» + 0xca#64) false 8074#13 15#5 23#5 (by decide) bop.BNE)
+    k_step_e (wp_s_branch cpu _ (KA.«namex» + 0xce#64) false 8074#13 15#5 23#5 (by decide) bop.BNE)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [r23, hbt, hd]
     iintro Hk Hpc
     ihave Hload := Hclose $$ Hdl Hdi Hmeta Hmap Hblk
@@ -121,12 +121,12 @@ theorem namexEra_tests (IUP : IUNLOCKPUT) (IU : IUNLOCK) (DL : DIRLOOKUP)
         $Hnext]
   have hty : dn.diType = T_DIR := Classical.not_not.mp hnt
   have hd : decide (dn.diType ≠ T_DIR) = false := by simp [hty]
-  k_step_e (wp_s_branch cpu _ (KA.«namex» + 0xca#64) false 8074#13 15#5 23#5 (by decide) bop.BNE)
+  k_step_e (wp_s_branch cpu _ (KA.«namex» + 0xce#64) false 8074#13 15#5 23#5 (by decide) bop.BNE)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [r23, hbt, hd]
   iintro Hk Hpc
   -- +0xce  lh a5,74(s4)
   icases namex_meta_nlink (ientry ik) dn $$ Hmeta with ⟨Hnl, Hmcl⟩
-  k_step_e (wp_s_lh cpu _ (KA.«namex» + 0xce#64) false 74#12 15#5 20#5 (by decide) (by decide)
+  k_step_e (wp_s_lh cpu _ (KA.«namex» + 0xd2#64) false 74#12 15#5 20#5 (by decide) (by decide)
       (DFrac.own 1) dn.diNlink)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [r20, iNlink]
   iintro Hk Hpc Hnl
@@ -137,7 +137,7 @@ theorem namexEra_tests (IUP : IUNLOCKPUT) (IU : IUNLOCK) (DL : DIRLOOKUP)
   by_cases hnz : dn.diNlink = 0#16
   · -- ===== THE GUARD FIRES: L_nlink, LEFT death =====
     have hd : decide (dn.diNlink = 0#16) = true := by simp [hnz]
-    k_step_e (wp_s_branch cpu _ (KA.«namex» + 0xd2#64) true 8104#13 15#5 0#5 (by decide) bop.BEQ)
+    k_step_e (wp_s_branch cpu _ (KA.«namex» + 0xd6#64) true 8104#13 15#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hbz, hd]
     iintro Hk Hpc
     ihave Hload := Hclose $$ Hdl Hdi Hmeta Hmap Hblk
@@ -147,7 +147,7 @@ theorem namexEra_tests (IUP : IUNLOCKPUT) (IU : IUNLOCK) (DL : DIRLOOKUP)
       $$ [$Hk $Hpc $Hframe $Hte $Hce $Henv $Hlk $Hload $Hs1 $Hkeep $Hpath $Hnm $Hbs $Hop $Hdead
         $Hnext]
   have hd : decide (dn.diNlink = 0#16) = false := by simp [hnz]
-  k_step_e (wp_s_branch cpu _ (KA.«namex» + 0xd2#64) true 8104#13 15#5 0#5 (by decide) bop.BEQ)
+  k_step_e (wp_s_branch cpu _ (KA.«namex» + 0xd6#64) true 8104#13 15#5 0#5 (by decide) bop.BEQ)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hbz, hd]
   iintro Hk Hpc
   have hnl := namex_nlink_nz dn.diNlink hnz
@@ -170,7 +170,7 @@ theorem namexEra_tests (IUP : IUNLOCKPUT) (IU : IUNLOCK) (DL : DIRLOOKUP)
     rw [hnp] at hnpar
     simp only [Bool.false_eq_true, if_false] at hnpar
     have hd6 : decide (R 22#5 = 0#64) = true := by simp [r22, hnpar]
-    k_step_e (wp_s_branch cpu _ (KA.«namex» + 0xd4#64) false 10#13 22#5 0#5 (by decide) bop.BEQ)
+    k_step_e (wp_s_branch cpu _ (KA.«namex» + 0xd8#64) false 10#13 22#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hbz6, hd6]
     iintro Hk Hpc
     iapply (namexEra_look IUP DL Γ cpu k A hs P Pmiss spie spp _ o2 ik q g lo tl inum dn bm γil γisl
@@ -180,14 +180,14 @@ theorem namexEra_tests (IUP : IUNLOCKPUT) (IU : IUNLOCK) (DL : DIRLOOKUP)
   · rw [hnp] at hnpar
     simp only [if_true] at hnpar
     have hd6 : decide (R 22#5 = 0#64) = false := by simp [r22, hnpar]
-    k_step_e (wp_s_branch cpu _ (KA.«namex» + 0xd4#64) false 10#13 22#5 0#5 (by decide) bop.BEQ)
+    k_step_e (wp_s_branch cpu _ (KA.«namex» + 0xd8#64) false 10#13 22#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hbz6, hd6]
     iintro Hk Hpc
     -- +0xd8  lbu a5,0(s1)
     have hacc := namex_path_lookup A.plen o2 A.pfun hf.ho2
     unfold namexPath
     icases byteBuf_acc _ A.dqpv _ o2 (A.pfun o2) hacc $$ Hpath with ⟨Hb, Hbk⟩
-    k_step_e (wp_s_lbu cpu _ (KA.«namex» + 0xd8#64) false 0#12 15#5 9#5 (by decide) (by decide)
+    k_step_e (wp_s_lbu cpu _ (KA.«namex» + 0xdc#64) false 0#12 15#5 9#5 (by decide) (by decide)
         A.dqpv (A.pfun o2))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [r9]
     iintro Hk Hpc Hb
@@ -198,7 +198,7 @@ theorem namexEra_tests (IUP : IUNLOCKPUT) (IU : IUNLOCK) (DL : DIRLOOKUP)
     by_cases hz : A.pfun o2 = 0#8
     · -- ===== NAMEIPARENT STOPS ONE LEVEL EARLY: L_par, THE PARENT'S PIN =====
       have hdz : decide (A.pfun o2 = 0#8) = true := by simp [hz]
-      k_step_e (wp_s_branch cpu _ (KA.«namex» + 0xdc#64) true 8104#13 15#5 0#5 (by decide) bop.BEQ)
+      k_step_e (wp_s_branch cpu _ (KA.«namex» + 0xe0#64) true 8104#13 15#5 0#5 (by decide) bop.BEQ)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hbzb, hdz]
       iintro Hk Hpc
       have ho2 : o2 = A.plen := namex_nul_eq hs o2 hf.ho2 hz
@@ -217,7 +217,7 @@ theorem namexEra_tests (IUP : IUNLOCKPUT) (IU : IUNLOCK) (DL : DIRLOOKUP)
       unfold namexPath; iexact Hpath
     · -- ===== THE PATH CONTINUES: the lookup, another element left =====
       have hdz : decide (A.pfun o2 = 0#8) = false := by simp [hz]
-      k_step_e (wp_s_branch cpu _ (KA.«namex» + 0xdc#64) true 8104#13 15#5 0#5 (by decide) bop.BEQ)
+      k_step_e (wp_s_branch cpu _ (KA.«namex» + 0xe0#64) true 8104#13 15#5 0#5 (by decide) bop.BEQ)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hbzb, hdz]
       iintro Hk Hpc
       have hRne : pathElems (A.pl.drop o2) ≠ [] :=
@@ -245,7 +245,7 @@ theorem namexEra_level (IL : ILOCK) (IUP : IUNLOCKPUT) (IU : IUNLOCK) (DL : DIRL
     (hbud : namexBud A.n ncur wc ((pathElems (A.pl.drop o2)).length + 1))
     (hW : wc = true → fscBmapstart ∈ Scur) (hSb : ∀ x ∈ A.Sb, x ∈ Scur)
     (hfu : A.plen - o2 < fuel) (hns2 : A.pfun o2 ≠ SLASH) :
-    kctx cpu (((k.withSpie spie spp).pushed 12).withRegs R) ∗ pcIs cpu (KA.«namex» + 0xc0#64) ∗
+    kctx cpu (((k.withSpie spie spp).pushed 12).withRegs R) ∗ pcIs cpu (KA.«namex» + 0xc4#64) ∗
     namexFrame k ∗ trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     namexEnv (hlc := hlc) Γ A ∗ namexEraWalk k A P Pmiss ipv dcur es0.length ncur Scur nf ∗
     (∀ c' : CPU, namexEraPostR k A P Pmiss c') ∗ namexEraLoop k A P Pmiss fuel
@@ -274,11 +274,11 @@ theorem namexEra_level (IL : ILOCK) (IUP : IUNLOCKPUT) (IU : IUNLOCK) (DL : DIRL
   icases Hkeep with ⟨Hsb, Hsi, Hpid, Hcwd, Hcwr⟩
   icases namex_bslots3_split fscBio $$ Hbs with ⟨Hb1, Hb2⟩
   -- +0xc0  c.mv a0,s4
-  k_step_e (wp_s_add cpu _ (KA.«namex» + 0xc0#64) true 10#5 0#5 20#5 (by decide))
+  k_step_e (wp_s_add cpu _ (KA.«namex» + 0xc4#64) true 10#5 0#5 20#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [r20]
   iintro Hk Hpc
   -- +0xc2  jal ilock
-  k_step_e (wp_s_jal cpu _ (KA.«namex» + 0xc2#64) false 2095274#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«namex» + 0xc6#64) false 2095202#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [namex_br_ilock]
   iintro Hk Hpc
   iapply (namex_ilock IL Γ cpu _ A ik q g lo tl inum γil γisl hs.hj ?gp ?gK ?gn ?gt hik hs.hgeom hcov

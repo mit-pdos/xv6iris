@@ -44,7 +44,7 @@ set_option linter.unusedVariables false
 
 /-! ## Constants the code computes -/
 
-theorem namei_br_namex : KA.«namei» + 0xfffffffffffffe08#64 = KA.«namex» := by decide
+theorem namei_br_namex : KA.«namei» + 0xfffffffffffffe04#64 = KA.«namex» := by decide
 theorem namei_ret_12 : jumpPc (KA.«namei» + 0x12#64) = (KA.«namei» + 0x12#64) := by decide
 
 theorem namei_slots_4 (a : Nat) (h : nameiSlots ≤ a) : 4 ≤ a := by
@@ -136,7 +136,7 @@ theorem namei_main (NX : NAMEX)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x0e  jal namex
-  k_step_e (wp_s_jal cpu _ (KA.«namei» + 0xe#64) false 2096634#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«namei» + 0xe#64) false 2096630#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [namei_br_namex]
   iintro Hk Hpc
   -- THE CALL: namex(path, 0, name) at its eb contract

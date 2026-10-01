@@ -129,7 +129,7 @@ theorem ba_alloc (BR : BREAD) (LW : LOG_WRITE) (BE : BRELSE) (MS : MEMSET)
   k_step_e (wp_s_add cpu _ (KA.«balloc» + 0x40#64) true 10#5 0#5 18#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [a18]
   iintro Hk Hpc
-  k_step_e (wp_s_jal cpu _ (KA.«balloc» + 0x42#64) false 4218#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«balloc» + 0x42#64) false 4314#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ba_br_logwrite]
   iintro Hk Hpc
   -- THE BITMAP BLOCK'S log_write, CREDITED AND THROUGH THE INVARIANT

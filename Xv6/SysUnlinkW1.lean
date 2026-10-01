@@ -312,7 +312,7 @@ theorem sys_unlink_w1_walk (BO : BEGIN_OP) (NP : NPAR_WRAP_ERA) (EO : END_OP) (�
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hp1.2.1, sys_unlink_bufpath]
   iintro Hk Hpc
   -- +0x28  jal nameiparent
-  k_step_e (wp_s_jal cpu _ (KA.«sys_unlink» + 0x28#64) false 2091754#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_unlink» + 0x28#64) false 2091730#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_unlink_br_nameiparent]
   iintro Hk Hpc
   icases sys_unlink_name_open (k.regs 2#5) $$ Hnm with ⟨%nfun, %tl, %htl, Hnm, Htl⟩
@@ -457,7 +457,7 @@ theorem sys_unlink_w1_args (AS : ARGSTR_W) (BO : BEGIN_OP) (NP : NPAR_WRAP_ERA) 
   k_step_e (wp_s_addi cpu _ (KA.«sys_unlink» + 0x10#64) true 0#12 10#5 0#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_jal cpu _ (KA.«sys_unlink» + 0x12#64) false 2087030#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_unlink» + 0x12#64) false 2086934#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_unlink_br_argstr]
   iintro Hk Hpc
   icases (procPrivFd_split _ _ _ _ _).1 $$ Hblk with ⟨Hcore, Howe⟩

@@ -56,12 +56,12 @@ set_option linter.unusedSectionVars false
 /-! ## The constants the code computes -/
 
 /-- `auipc a1,0x1d; lw a1,1784(a1)` reads `sb.inodestart`. -/
-theorem iu_sb_addr : KA.«iupdate» + 0x1d8f6#64 = sbInodestart := by
+theorem iu_sb_addr : KA.«iupdate» + 0x1db82#64 = sbInodestart := by
   unfold sbInodestart; decide
 
 theorem iu_br_bread : KA.«iupdate» + 0xFFFFFFFFFFFFFA1C#64 = KA.«bread» := by decide
-theorem iu_br_memmove : KA.«iupdate» + 0xffffffffffffdaee#64 = KA.«memmove» := by decide
-theorem iu_br_logwrite : KA.«iupdate» + 0xCCC#64 = KA.«log_write» := by decide
+theorem iu_br_memmove : KA.«iupdate» + 0xffffffffffffdada#64 = KA.«memmove» := by decide
+theorem iu_br_logwrite : KA.«iupdate» + 0xd2c#64 = KA.«log_write» := by decide
 theorem iu_br_brelse : KA.«iupdate» + 0xFFFFFFFFFFFFFB24#64 = KA.«brelse» := by decide
 
 theorem iu_ret_24 : jumpPc (KA.«iupdate» + 0x24#64) = (KA.«iupdate» + 0x24#64) := by decide

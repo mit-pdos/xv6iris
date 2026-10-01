@@ -367,7 +367,7 @@ theorem eo_body (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE)
   k_norm_g [p20, eo_o_dev]
   k_next_e
   iintro Hk Hpc -
-  k_step_e (wp_s_jal cpu _ (KA.«end_op» + 0xc2#64) false 2092464#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«end_op» + 0xc2#64) false 2092368#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eo_br_bread]
   iintro Hk Hpc
   iapply (bread_call_eb BR Γ cpu _ γl γb V γdl pd pav pu j pidv dev
@@ -418,7 +418,7 @@ theorem eo_body (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE)
   k_norm_g [y20, eo_o_dev]
   k_next_e
   iintro Hk Hpc -
-  k_step_e (wp_s_jal cpu _ (KA.«end_op» + 0xd0#64) false 2092450#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«end_op» + 0xd0#64) false 2092354#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eo_br_bread]
   iintro Hk Hpc
   iapply (bread_call_eb BR Γ cpu _ γl γb V γdl pd pav pu j pidv dev wt dqp k.proc (by k_norm_g)
@@ -475,7 +475,7 @@ theorem eo_body (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [(id hfix3).2.2.1, Xv6.vdrw3_bufData]
   iintro Hk Hpc
-  k_step_e (wp_s_jal cpu _ (KA.«end_op» + 0xe2#64) false 2084450#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«end_op» + 0xe2#64) false 2084334#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eo_br_memmove]
   iintro Hk Hpc
   iapply (eo_memmove MM cpu _ bsD bsL BSIZE (DFrac.own 1) (aBufData (bnode kkD))
@@ -508,7 +508,7 @@ theorem eo_body (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE)
   k_step_e (wp_s_add cpu _ (KA.«end_op» + 0xe6#64) true 10#5 0#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [KCtx.rget_zero, m9]
   iintro Hk Hpc
-  k_step_e (wp_s_jal cpu _ (KA.«end_op» + 0xe8#64) false 2092640#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«end_op» + 0xe8#64) false 2092544#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eo_br_bwrite]
   iintro Hk Hpc
   -- THE LOG FILL's permit (Rocq `fs_logfill_v_seq_permit`): the mirror half
@@ -560,7 +560,7 @@ theorem eo_body (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE)
   k_step_e (wp_s_add cpu _ (KA.«end_op» + 0xec#64) true 10#5 0#5 19#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [KCtx.rget_zero, n19]
   iintro Hk Hpc
-  k_step_e (wp_s_jal cpu _ (KA.«end_op» + 0xee#64) false 2092684#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«end_op» + 0xee#64) false 2092588#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eo_br_brelse]
   iintro Hk Hpc
   iapply (brelse_call BE Γ cpu _ γl γb V kkD pidv dev wt dqp bsD bsdD dD k.proc (by k_norm_g)
@@ -591,7 +591,7 @@ theorem eo_body (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE)
   k_step_e (wp_s_add cpu _ (KA.«end_op» + 0xf2#64) true 10#5 0#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [KCtx.rget_zero, o9]
   iintro Hk Hpc
-  k_step_e (wp_s_jal cpu _ (KA.«end_op» + 0xf4#64) false 2092678#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«end_op» + 0xf4#64) false 2092582#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eo_br_brelse]
   iintro Hk Hpc
   iapply (brelse_call BE Γ cpu _ γl γb V kkL pidv dev (BitVec.ofNat 32 (logSlotBno ls t)) dqp

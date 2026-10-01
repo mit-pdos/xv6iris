@@ -116,7 +116,7 @@ theorem fc_inode (BO : BEGIN_OP) (IP : IPUT) (EO : END_OP) [Fscfg] [Icfg] [CurCt
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR1.2.1]
   iintro Hk Hpc
   -- +0xb0  jal iput
-  k_step_e (wp_s_jal cpu _ (KA.«fileclose» + 0xb0#64) false 2093486#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«fileclose» + 0xb0#64) false 2093390#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fileclose_br_iput]
   iintro Hk Hpc
   iapply (iput_sconf_callF IP Γ cpu _ γbl pd pav pu j γil γisl kk q inum MAXOPBLOCKS pidv dqp

@@ -39,7 +39,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
   [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
 
 /-- The separator skip's code at `+0xae`, from the kernel text. -/
-theorem namex_skip_code_ae : kernelText (GF := GF) ⊢ namexSkipCode (KA.«namex» + 0xae#64) := by
+theorem namex_skip_code_ae : kernelText (GF := GF) ⊢ namexSkipCode (KA.«namex» + 0xb2#64) := by
   iintro #Htext
   unfold namexSkipCode
   isplitr; · iapply (text_instr _ _ _ _ rfl rfl); iexact Htext
@@ -49,7 +49,7 @@ theorem namex_skip_code_ae : kernelText (GF := GF) ⊢ namexSkipCode (KA.«namex
   iapply (text_instr _ _ _ _ rfl rfl); iexact Htext
 
 /-- ...and at `+0xf4`. -/
-theorem namex_skip_code_f4 : kernelText (GF := GF) ⊢ namexSkipCode (KA.«namex» + 0xf4#64) := by
+theorem namex_skip_code_f4 : kernelText (GF := GF) ⊢ namexSkipCode (KA.«namex» + 0xf8#64) := by
   iintro #Htext
   unfold namexSkipCode
   isplitr; · iapply (text_instr _ _ _ _ rfl rfl); iexact Htext
@@ -75,7 +75,7 @@ theorem namex_rest (IL : ILOCK) (IUP : IUNLOCKPUT) (IU : IUNLOCK) (DL : DIRLOOKU
     (hW : wc = true → fscBmapstart ∈ Scur) (hSb : ∀ x ∈ A.Sb, x ∈ Scur)
     (hfu : A.plen - off < fuel + 1)
     (hnm : bname 14 nf = (bview (e - a) (fun i => A.pfun (a + i))).take 14) :
-    kctx cpu (((k.withSpie spie spp).pushed 12).withRegs R) ∗ pcIs cpu (KA.«namex» + 0xae#64) ∗
+    kctx cpu (((k.withSpie spie spp).pushed 12).withRegs R) ∗ pcIs cpu (KA.«namex» + 0xb2#64) ∗
     namexFrame k ∗ trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     namexEnv (hlc := hlc) Γ A ∗ namexWalk k A ipv ncur Scur nf ∗
     (∀ c' : CPU, namexPostA k A c') ∗ namexLoop k A fuel
@@ -88,7 +88,7 @@ theorem namex_rest (IL : ILOCK) (IUP : IUNLOCKPUT) (IU : IUNLOCK) (DL : DIRLOOKU
   unfold namexWalk
   icases Hwalk with ⟨Hip, Hs1, Hkeep, Hpath, Hnm, Hbs, Hop, Htx⟩
   unfold namexPath
-  iapply (namex_skip (KA.«namex» + 0xae#64) (k.regs 10#5) ((k.withSpie spie spp).pushed 12) A.plen
+  iapply (namex_skip (KA.«namex» + 0xb2#64) (k.regs 10#5) ((k.withSpie spie spp).pushed 12) A.plen
       A.pfun A.dqpv hstop' e R cpu hep r9 r19)
     $$ [- $Hcode $Hk $Hpc $Hpath]
   k_norm_g
@@ -215,7 +215,7 @@ structure NamexElemFacts [Fscfg] [Icfg] (k : KCtx) (A : NamexArgs) (R : RegMap) 
   hSb : ∀ x ∈ A.Sb, x ∈ Scur
   hfu : A.plen - off < fuel + 1
 
-theorem namex_ret_ac' : jumpPc (KA.«namex» + 0xac#64) = KA.«namex» + 0xac#64 := namex_ret_ac
+theorem namex_ret_ac' : jumpPc (KA.«namex» + 0xb0#64) = KA.«namex» + 0xb0#64 := namex_ret_ac
 
 set_option maxHeartbeats 16000000 in
 /-- **THE LONG BRANCH `+0xa2 .. +0xac`**: `memmove(name, s, 14)` with NO
@@ -226,7 +226,7 @@ theorem namex_long (MM : MEMMOVE) (IL : ILOCK) (IUP : IUNLOCKPUT) (IU : IUNLOCK)
     (off a e : Nat) (ipv : BitVec 64) (nf : Nat → BitVec 8) (ncur : Nat) (Scur : List Nat)
     (es0 : List (List (BitVec 8))) (wc : Bool) (fuel : Nat)
     (hf : NamexElemFacts k A R off a e ipv ncur Scur es0 wc fuel) (h14 : 14 ≤ e - a) :
-    kctx cpu (((k.withSpie spie spp).pushed 12).withRegs R) ∗ pcIs cpu (KA.«namex» + 0xa2#64) ∗
+    kctx cpu (((k.withSpie spie spp).pushed 12).withRegs R) ∗ pcIs cpu (KA.«namex» + 0xa6#64) ∗
     namexFrame k ∗ trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     namexEnv (hlc := hlc) Γ A ∗ namexWalk k A ipv ncur Scur nf ∗
     (∀ c' : CPU, namexPostA k A c') ∗ namexLoop k A fuel
@@ -237,17 +237,17 @@ theorem namex_long (MM : MEMMOVE) (IL : ILOCK) (IUP : IUNLOCKPUT) (IU : IUNLOCK)
   iintro ⟨Hk, Hpc, Hframe, Hte, Hce, #Henv, Hwalk, Hnext, IH⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- +0xa2  c.mv a2,s9 ; +0xa4  c.mv a1,s1 ; +0xa6  c.mv a0,s5
-  k_step_e (wp_s_add cpu _ (KA.«namex» + 0xa2#64) true 12#5 0#5 25#5 (by decide))
+  k_step_e (wp_s_add cpu _ (KA.«namex» + 0xa6#64) true 12#5 0#5 25#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_add cpu _ (KA.«namex» + 0xa4#64) true 11#5 0#5 9#5 (by decide))
+  k_step_e (wp_s_add cpu _ (KA.«namex» + 0xa8#64) true 11#5 0#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_add cpu _ (KA.«namex» + 0xa6#64) true 10#5 0#5 21#5 (by decide))
+  k_step_e (wp_s_add cpu _ (KA.«namex» + 0xaa#64) true 10#5 0#5 21#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0xa8  jal memmove
-  k_step_e (wp_s_jal cpu _ (KA.«namex» + 0xa8#64) false 2085630#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«namex» + 0xac#64) false 2085538#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [namex_br_memmove]
   iintro Hk Hpc
   unfold namexWalk namexPath
@@ -282,7 +282,7 @@ theorem namex_long (MM : MEMMOVE) (IL : ILOCK) (IUP : IUNLOCKPUT) (IU : IUNLOCK)
   have h18' : R' 18#5 = k.regs 10#5 + BitVec.ofNat 64 e := by
     rw [hcs.2.2.2.1]; simp [RegMap.set_apply, hf.h18]
   -- +0xac  c.mv s1,s2
-  k_step_e (wp_s_add cpu _ (KA.«namex» + 0xac#64) true 9#5 0#5 18#5 (by decide))
+  k_step_e (wp_s_add cpu _ (KA.«namex» + 0xb0#64) true 9#5 0#5 18#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   have hr'' : namexRegs k (R'.set 9#5 (R' 18#5)) e ipv := by
@@ -298,7 +298,7 @@ theorem namex_long (MM : MEMMOVE) (IL : ILOCK) (IUP : IUNLOCKPUT) (IU : IUNLOCK)
   iframe #
 
 
-theorem namex_ret_136' : jumpPc (KA.«namex» + 0x136#64) = KA.«namex» + 0x136#64 := namex_ret_136
+theorem namex_ret_136' : jumpPc (KA.«namex» + 0x13a#64) = KA.«namex» + 0x13a#64 := namex_ret_136
 
 set_option maxHeartbeats 16000000 in
 /-- **THE SHORT BRANCH `+0x12c .. +0x13e`**: `memmove(name, s, len)`,
@@ -310,7 +310,7 @@ theorem namex_short (MM : MEMMOVE) (IL : ILOCK) (IUP : IUNLOCKPUT) (IU : IUNLOCK
     (es0 : List (List (BitVec 8))) (wc : Bool) (fuel : Nat)
     (hf : NamexElemFacts k A R off a e ipv ncur Scur es0 wc fuel) (h13 : e - a ≤ 13)
     (h12 : R 12#5 = BitVec.ofNat 64 (e - a)) (h26 : R 26#5 = BitVec.ofNat 64 (e - a)) :
-    kctx cpu (((k.withSpie spie spp).pushed 12).withRegs R) ∗ pcIs cpu (KA.«namex» + 0x12c#64) ∗
+    kctx cpu (((k.withSpie spie spp).pushed 12).withRegs R) ∗ pcIs cpu (KA.«namex» + 0x130#64) ∗
     namexFrame k ∗ trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     namexEnv (hlc := hlc) Γ A ∗ namexWalk k A ipv ncur Scur nf ∗
     (∀ c' : CPU, namexPostA k A c') ∗ namexLoop k A fuel
@@ -323,17 +323,17 @@ theorem namex_short (MM : MEMMOVE) (IL : ILOCK) (IUP : IUNLOCKPUT) (IU : IUNLOCK
   iintro ⟨Hk, Hpc, Hframe, Hte, Hce, #Henv, Hwalk, Hnext, IH⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- +0x12c  c.addiw a2,a2,0 ; +0x12e  c.mv a1,s1 ; +0x130  c.mv a0,s5
-  k_step_e (wp_s_addiw cpu _ (KA.«namex» + 0x12c#64) true 0#12 12#5 12#5 (by decide))
+  k_step_e (wp_s_addiw cpu _ (KA.«namex» + 0x130#64) true 0#12 12#5 12#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h12, hsx]
   iintro Hk Hpc
-  k_step_e (wp_s_add cpu _ (KA.«namex» + 0x12e#64) true 11#5 0#5 9#5 (by decide))
+  k_step_e (wp_s_add cpu _ (KA.«namex» + 0x132#64) true 11#5 0#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_add cpu _ (KA.«namex» + 0x130#64) true 10#5 0#5 21#5 (by decide))
+  k_step_e (wp_s_add cpu _ (KA.«namex» + 0x134#64) true 10#5 0#5 21#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x132  jal memmove
-  k_step_e (wp_s_jal cpu _ (KA.«namex» + 0x132#64) false 2085492#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«namex» + 0x136#64) false 2085400#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [namex_br_memmove]
   iintro Hk Hpc
   unfold namexWalk namexPath
@@ -373,7 +373,7 @@ theorem namex_short (MM : MEMMOVE) (IL : ILOCK) (IUP : IUNLOCKPUT) (IU : IUNLOCK
   have h26' : R' 26#5 = BitVec.ofNat 64 (e - a) := by
     rw [hcs.2.2.2.2.2.2.2.2.2.2.2.1]; simp [RegMap.set_apply, h26]
   -- +0x136  c.add s10,s10,s5
-  k_step_e (wp_s_add cpu _ (KA.«namex» + 0x136#64) true 26#5 26#5 21#5 (by decide))
+  k_step_e (wp_s_add cpu _ (KA.«namex» + 0x13a#64) true 26#5 26#5 21#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h26', s21]
   iintro Hk Hpc
   -- +0x138  sb zero,0(s10) : name[len] = 0
@@ -381,16 +381,16 @@ theorem namex_short (MM : MEMMOVE) (IL : ILOCK) (IUP : IUNLOCKPUT) (IU : IUNLOCK
     $$ Hnm with ⟨Hc, Hcl⟩
   have hadr : BitVec.ofNat 64 (e - a) + k.regs 12#5 = k.regs 12#5 + BitVec.ofNat 64 (e - a) :=
     BitVec.add_comm _ _
-  k_step_e (wp_s_sb cpu _ (KA.«namex» + 0x138#64) false 0#12 26#5 0#5 (by decide) (nf (e - a)))
+  k_step_e (wp_s_sb cpu _ (KA.«namex» + 0x13c#64) false 0#12 26#5 0#5 (by decide) (nf (e - a)))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hadr]
   iintro Hk Hpc Hc
   ihave Hnm := Hcl $$ %(0#8) Hc
   rw [namex_name_short_set a (e - a) A.pfun nf (by omega)]
   -- +0x13c  c.mv s1,s2 ; +0x13e  c.j +0xae
-  k_step_e (wp_s_add cpu _ (KA.«namex» + 0x13c#64) true 9#5 0#5 18#5 (by decide))
+  k_step_e (wp_s_add cpu _ (KA.«namex» + 0x140#64) true 9#5 0#5 18#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_j cpu _ (KA.«namex» + 0x13e#64) true 2097008#21)
+  k_step_e (wp_s_j cpu _ (KA.«namex» + 0x142#64) true 2097008#21)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   have hr'' : namexRegs k (((R'.set 26#5 (k.regs 12#5 + BitVec.ofNat 64 (e - a))).set 9#5
@@ -420,7 +420,7 @@ theorem namex_elem (MM : MEMMOVE) (IL : ILOCK) (IUP : IUNLOCKPUT) (IU : IUNLOCK)
     (off a e : Nat) (ipv : BitVec 64) (nf : Nat → BitVec 8) (ncur : Nat) (Scur : List Nat)
     (es0 : List (List (BitVec 8))) (wc : Bool) (fuel : Nat)
     (hf : NamexElemFacts k A R off a e ipv ncur Scur es0 wc fuel) :
-    kctx cpu (((k.withSpie spie spp).pushed 12).withRegs R) ∗ pcIs cpu (KA.«namex» + 0x96#64) ∗
+    kctx cpu (((k.withSpie spie spp).pushed 12).withRegs R) ∗ pcIs cpu (KA.«namex» + 0x9a#64) ∗
     namexFrame k ∗ trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     namexEnv (hlc := hlc) Γ A ∗ namexWalk k A ipv ncur Scur nf ∗
     (∀ c' : CPU, namexPostA k A c') ∗ namexLoop k A fuel
@@ -438,11 +438,11 @@ theorem namex_elem (MM : MEMMOVE) (IL : ILOCK) (IUP : IUNLOCKPUT) (IU : IUNLOCK)
   iintro ⟨Hk, Hpc, Hframe, Hte, Hce, #Henv, Hwalk, Hnext, IH⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- +0x96  sub a2,s2,s1
-  k_step_e (wp_s_sub cpu _ (KA.«namex» + 0x96#64) false 12#5 18#5 9#5 (by decide))
+  k_step_e (wp_s_sub cpu _ (KA.«namex» + 0x9a#64) false 12#5 18#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hlen]
   iintro Hk Hpc
   -- +0x9a  sext.w s10,a2
-  k_step_e (wp_s_addiw cpu _ (KA.«namex» + 0x9a#64) false 0#12 26#5 12#5 (by decide))
+  k_step_e (wp_s_addiw cpu _ (KA.«namex» + 0x9e#64) false 0#12 26#5 12#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hsx]
   iintro Hk Hpc
   have hf' : NamexElemFacts k A ((R.set 12#5 (BitVec.ofNat 64 (e - a))).set 26#5
@@ -456,7 +456,7 @@ theorem namex_elem (MM : MEMMOVE) (IL : ILOCK) (IUP : IUNLOCKPUT) (IU : IUNLOCK)
   -- +0x9e  bge s8,s10,+0x12c
   by_cases h13 : e - a ≤ 13
   · have hd : decide (e - a ≤ 13) = true := by simp [h13]
-    k_step_e (wp_s_branch cpu _ (KA.«namex» + 0x9e#64) false 142#13 24#5 26#5 (by decide) bop.BGE)
+    k_step_e (wp_s_branch cpu _ (KA.«namex» + 0xa2#64) false 142#13 24#5 26#5 (by decide) bop.BGE)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [r24, hbge, hd]
     iintro Hk Hpc
     iapply (namex_short MM IL IUP IU DL Γ cpu k A hs spie spp _ off a e ipv nf ncur Scur es0 wc fuel hf'
@@ -464,7 +464,7 @@ theorem namex_elem (MM : MEMMOVE) (IL : ILOCK) (IUP : IUNLOCKPUT) (IU : IUNLOCK)
       $$ [$Hk $Hpc $Hframe $Hte $Hce $Hwalk $Hnext $IH]
     iframe #
   · have hd : decide (e - a ≤ 13) = false := by simp [h13]
-    k_step_e (wp_s_branch cpu _ (KA.«namex» + 0x9e#64) false 142#13 24#5 26#5 (by decide) bop.BGE)
+    k_step_e (wp_s_branch cpu _ (KA.«namex» + 0xa2#64) false 142#13 24#5 26#5 (by decide) bop.BGE)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [r24, hbge, hd]
     iintro Hk Hpc
     iapply (namex_long MM IL IUP IU DL Γ cpu k A hs spie spp _ off a e ipv nf ncur Scur es0 wc fuel hf'

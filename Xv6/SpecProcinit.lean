@@ -61,9 +61,9 @@ def nextpidNameAddr : BitVec 64 := KStr.«nextpid»
 def waitLockNameAddr : BitVec 64 := KStr.«wait_lock»
 /-- The `"proc"` literal. -/
 def procNameAddr : BitVec 64 := KStr.«proc»
-/-- `&proc[i]` is `ProcDefs.procAddr` (`sizeof(struct proc) = 368`); its
+/-- `&proc[i]` is `ProcDefs.procAddr` (`sizeof(struct proc) = 376`); its
 lock is its first field, `state` at `+24`, `kstack` at `+64`. -/
-theorem procAddr_eq (i : Nat) : procAddr i = KA.«proc» + BitVec.ofNat 64 (368 * i) := rfl
+theorem procAddr_eq (i : Nat) : procAddr i = KA.«proc» + BitVec.ofNat 64 (376 * i) := rfl
 /-- `KSTACK(i)`. -/
 def kstackVa (i : Nat) : BitVec 64 := 0x3ffffff000#64 - BitVec.ofNat 64 ((i + 1) * 8192)
 

@@ -296,7 +296,7 @@ def namexLoop (k : KCtx) (A : NamexArgs) (fuel : Nat) : IProp GF := iprop(
     (Scur : List Nat) (es0 : List (List (BitVec 8))) (nf : Nat → BitVec 8) (wc : Bool),
     ⌜namexInv k A R off ipv ncur Scur es0 wc fuel⌝ -∗
     kctx c (((k.withSpie spie spp).pushed 12).withRegs R) -∗
-    pcIs c (KA.«namex» + 0xf4#64) -∗
+    pcIs c (KA.«namex» + 0xf8#64) -∗
     namexFrame k -∗ trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗
     namexWalk k A ipv ncur Scur nf -∗
     (∀ c' : CPU, namexPostA k A c') -∗ wpLoop c)
@@ -307,7 +307,7 @@ theorem namexLoop_elim (k : KCtx) (A : NamexArgs) (fuel : Nat) :
         (Scur : List Nat) (es0 : List (List (BitVec 8))) (nf : Nat → BitVec 8) (wc : Bool),
       ⌜namexInv k A R off ipv ncur Scur es0 wc fuel⌝ -∗
       kctx c (((k.withSpie spie spp).pushed 12).withRegs R) -∗
-      pcIs c (KA.«namex» + 0xf4#64) -∗
+      pcIs c (KA.«namex» + 0xf8#64) -∗
       namexFrame k -∗ trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗
       namexWalk k A ipv ncur Scur nf -∗
       (∀ c' : CPU, namexPostA k A c') -∗ wpLoop c := by
@@ -318,7 +318,7 @@ theorem namexLoop_intro (k : KCtx) (A : NamexArgs) (fuel : Nat) :
         (Scur : List Nat) (es0 : List (List (BitVec 8))) (nf : Nat → BitVec 8) (wc : Bool),
       ⌜namexInv k A R off ipv ncur Scur es0 wc fuel⌝ -∗
       kctx c (((k.withSpie spie spp).pushed 12).withRegs R) -∗
-      pcIs c (KA.«namex» + 0xf4#64) -∗
+      pcIs c (KA.«namex» + 0xf8#64) -∗
       namexFrame k -∗ trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗
       namexWalk k A ipv ncur Scur nf -∗
       (∀ c' : CPU, namexPostA k A c') -∗ wpLoop c) ⊢ namexLoop (GF := GF) k A fuel := by

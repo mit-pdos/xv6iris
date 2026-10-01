@@ -4,7 +4,7 @@
 `kexec("/init", (char *[]){"/init", 0})`, `p->trapframe->a0 = <ret>`, and
 the `-1` test.
 
-    +0x2c  auipc a5,0x5 ; addi a5,a5,1954     a5 = "/init"
+    +0x2c  auipc a5,0x5 ; addi a5,a5,1966     a5 = "/init"
     +0x34  sd   a5,-48(s0)                      argv[0] = "/init"
     +0x38  sd   zero,-40(s0)                    argv[1] = 0
     +0x3c  addi a1,s0,-48 ; c.mv a0,a5
@@ -13,7 +13,7 @@ the `-1` test.
     +0x4a  c.ld a5,88(s1) ; c.ld a4,112(a5)
     +0x4e  c.li a5,-1
     +0x50  beq  a4,a5,+0x8a
-    +0x8a  auipc a0,0x5 ; addi a0,a0,1868 ; jal panic      panic("exec")
+    +0x8a  auipc a0,0x5 ; addi a0,a0,1880 ; jal panic      panic("exec")
 
 THE ARGV VECTOR IS A COMPOUND LITERAL in forkret's own frame (Rocq): the
 bottom two of the six slots, at -48(s0) / -40(s0); kexec only reads them and
@@ -59,11 +59,11 @@ set_option linter.unusedSimpArgs false
 
 /-! ## §1.  The literal, the vector, kexec's record -/
 
-theorem fkr_init_addr : KA.«forkret» + 20524#64 + 1954#64 = KStr.«/init» := by decide
-theorem fkr_br_kexec : KA.«forkret» + 12098#64 = KA.«kexec» := by decide
+theorem fkr_init_addr : KA.«forkret» + 20524#64 + 1966#64 = KStr.«/init» := by decide
+theorem fkr_br_kexec : KA.«forkret» + 12226#64 = KA.«kexec» := by decide
 theorem fkr_ret46 : jumpPc (KA.«forkret» + 0x46#64) = KA.«forkret» + 0x46#64 := by decide
-theorem fkr_br_panic : KA.«forkret» + 0xffffffffffffee7e#64 = KA.«panic» := by decide
-theorem fkr_msg_addr : KA.«forkret» + 20618#64 + 1868#64 = KStr.«exec» := by decide
+theorem fkr_br_panic : KA.«forkret» + 0xffffffffffffee8a#64 = KA.«panic» := by decide
+theorem fkr_msg_addr : KA.«forkret» + 20618#64 + 1880#64 = KStr.«exec» := by decide
 
 /-- `argv`: the literal, then the terminator (Rocq `fkr_argv`). -/
 def fkrArgv (i : Nat) : BitVec 64 := if i = 0 then KStr.«/init» else 0#64
@@ -328,12 +328,12 @@ theorem fkr_exec_tail [X : CurCtx] (PN : PANIC) (c : CPU) (kx : KCtx) (eb : Bool
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c7 hp7
     iintro Hk Hpc
     -- +0x8e  addi a0,a0,1868
-    k_step_gen (wp_s_addi c7 _ (KA.«forkret» + 0x8e#64) false 1868#12 10#5 10#5 (by decide))
+    k_step_gen (wp_s_addi c7 _ (KA.«forkret» + 0x8e#64) false 1880#12 10#5 10#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [KCtx.rget_eq, KCtx.setReg_regs, RegMap.set_apply, fkr_msg_addr] next c8 hp8
     iintro Hk Hpc
     -- +0x92  jal panic
-    k_step_gen (wp_s_jal c8 _ (KA.«forkret» + 0x92#64) false 2092524#21 1#5 (by decide))
+    k_step_gen (wp_s_jal c8 _ (KA.«forkret» + 0x92#64) false 2092536#21 1#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fkr_br_panic] next c9 hp9
     iintro Hk Hpc
     ihave Hmsg := fkr_msg_cstr $$ HS HD
@@ -410,7 +410,7 @@ theorem fkr_boot_exec [X : CurCtx] (KX : KEXEC) (PN : PANIC) (Γ : SchedNames) [
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c1 hp1
   iintro Hk Hpc
   -- +0x30  addi a5,a5,1954
-  k_step_gen (wp_s_addi c1 _ (KA.«forkret» + 0x30#64) false 1954#12 15#5 15#5 (by decide))
+  k_step_gen (wp_s_addi c1 _ (KA.«forkret» + 0x30#64) false 1966#12 15#5 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [KCtx.rget_eq, KCtx.setReg_regs, RegMap.set_apply, fkr_init_addr] next c2 hp2
   iintro Hk Hpc
@@ -435,7 +435,7 @@ theorem fkr_boot_exec [X : CurCtx] (KX : KEXEC) (PN : PANIC) (Γ : SchedNames) [
     with [KCtx.rget_eq, KCtx.setReg_regs, RegMap.set_apply] next c6 hp6
   iintro Hk Hpc
   -- +0x42  jal kexec
-  k_step_gen (wp_s_jal c6 _ (KA.«forkret» + 0x42#64) false 12032#21 1#5 (by decide))
+  k_step_gen (wp_s_jal c6 _ (KA.«forkret» + 0x42#64) false 12160#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fkr_br_kexec] next c7 hp7
   iintro Hk Hpc
   simp only [KCtx.setReg_sie, KCtx.setReg_proc, hs, hp] at hp1 hp2 hp3 hp4 hp5 hp6 hp7

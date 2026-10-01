@@ -120,7 +120,7 @@ theorem namexEra_look (IUP : IUNLOCKPUT) (DL : DIRLOOKUP) (Γ : SchedNames)
     (hf : NamexLvlFacts k A R o2 ik inum ncur Scur es0 el nf wc fuel) (hle : lo ≤ tl)
     (hty : dn.diType = T_DIR) (hnl : dn.diNlink.toNat ≠ 0)
     (hRne : A.npar = true → pathElems (A.pl.drop o2) ≠ []) :
-    kctx cpu (((k.withSpie spie spp).pushed 12).withRegs R) ∗ pcIs cpu (KA.«namex» + 0xde#64) ∗
+    kctx cpu (((k.withSpie spie spp).pushed 12).withRegs R) ∗ pcIs cpu (KA.«namex» + 0xe2#64) ∗
     namexFrame k ∗ trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     namexEnv (hlc := hlc) Γ A ∗
     namexLk A ik q g lo tl inum dn γil γisl ∗ icLoaded fscFs fscIreg fscCov fscLogst ik inum dn bm ∗
@@ -137,17 +137,17 @@ theorem namexEra_look (IUP : IUNLOCKPUT) (DL : DIRLOOKUP) (Γ : SchedNames)
     HP, Hhops, Hnext, IH⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- +0xde  c.li a2,0 ; +0xe0  c.mv a1,s5 ; +0xe2  c.mv a0,s4
-  k_step_e (wp_s_addi cpu _ (KA.«namex» + 0xde#64) true 0#12 12#5 0#5 (by decide))
+  k_step_e (wp_s_addi cpu _ (KA.«namex» + 0xe2#64) true 0#12 12#5 0#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_add cpu _ (KA.«namex» + 0xe0#64) true 11#5 0#5 21#5 (by decide))
+  k_step_e (wp_s_add cpu _ (KA.«namex» + 0xe4#64) true 11#5 0#5 21#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_add cpu _ (KA.«namex» + 0xe2#64) true 10#5 0#5 20#5 (by decide))
+  k_step_e (wp_s_add cpu _ (KA.«namex» + 0xe6#64) true 10#5 0#5 20#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0xe4  jal dirlookup
-  k_step_e (wp_s_jal cpu _ (KA.«namex» + 0xe4#64) false 2096752#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«namex» + 0xe8#64) false 2096680#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [namex_br_dl]
   iintro Hk Hpc
   icases namexEra_loaded_open ik inum dn bm $$ Hload with
@@ -197,7 +197,7 @@ theorem namexEra_look (IUP : IUNLOCKPUT) (DL : DIRLOOKUP) (Γ : SchedNames)
   -- ===== THE PEEL: hop `length es0` off the family =====
   icases namexEraHops_cons A P Pmiss es0 el _ hf.hes hRne $$ Hhops with ⟨Hhop, Hhops⟩
   -- +0xe8  c.mv s2,a0
-  k_step_e (wp_s_add cpu _ (KA.«namex» + 0xe8#64) true 18#5 0#5 10#5 (by decide))
+  k_step_e (wp_s_add cpu _ (KA.«namex» + 0xec#64) true 18#5 0#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   have hbz := Xv6.dirlookup_beqz (R' 10#5)
@@ -215,7 +215,7 @@ theorem namexEra_look (IUP : IUNLOCKPUT) (DL : DIRLOOKUP) (Γ : SchedNames)
     ihave Hload := Hclose $$ Hdl Hdi Hmeta Hmap Hblk Ht
     ihave Hdead := namexEra_dead_missed A P Pmiss es0 el _ inum.toNat hf.hes hRne $$ [$HP $Hhops]
     have hd : decide (R' 10#5 = 0#64) = true := by simp [ha0]
-    k_step_e (wp_s_branch cpu _ (KA.«namex» + 0xea#64) true 8098#13 10#5 0#5 (by decide) bop.BEQ)
+    k_step_e (wp_s_branch cpu _ (KA.«namex» + 0xee#64) true 8098#13 10#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hbz, hd]
     iintro Hk Hpc
     ihave Hs1' := (show irefSlot (GF := GF) ⊢ irefSlots 1 from .rfl) $$ Hs1'
@@ -240,18 +240,18 @@ theorem namexEra_look (IUP : IUNLOCKPUT) (DL : DIRLOOKUP) (Γ : SchedNames)
     ihave Hload := Hclose $$ Hdl Hdi Hmeta Hmap Hblk Ht
     have hne := ientry_ne_zero kslot (Nat.le_of_lt hks)
     have hd : decide (R' 10#5 = 0#64) = false := by simp [ha0, hne]
-    k_step_e (wp_s_branch cpu _ (KA.«namex» + 0xea#64) true 8098#13 10#5 0#5 (by decide) bop.BEQ)
+    k_step_e (wp_s_branch cpu _ (KA.«namex» + 0xee#64) true 8098#13 10#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hbz, hd]
     iintro Hk Hpc
     ihave Hip := namexEra_found_heldAt data dn kd kslot qq (bname 14 nf) hty hdok hsome hks
       $$ [$Href $Hru2]
     -- +0xec  c.mv a0,s4
-    k_step_e (wp_s_add cpu _ (KA.«namex» + 0xec#64) true 10#5 0#5 20#5 (by decide))
+    k_step_e (wp_s_add cpu _ (KA.«namex» + 0xf0#64) true 10#5 0#5 20#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     iintro Hk Hpc
     obtain ⟨hA, hB, hn, hC⟩ := hf.hbud
     -- +0xee  jal iunlockput, CREDITED on the inode block
-    iapply (namex_call_iup IUP Γ cpu k A hs spie' spp' _ (KA.«namex» + 0xee#64) 2095826#21
+    iapply (namex_call_iup IUP Γ cpu k A hs spie' spp' _ (KA.«namex» + 0xf2#64) 2095754#21
         namex_br_iup_ee namex_ret_ee ik q g lo tl inum dn bm γil γisl ncur Scur wc true e0 hf.hik
         hf.hnib hle hf.hW hn (by simp [RegMap.set_apply, s20]))
       $$ [- $Hk $Hpc $Hte $Hce $Henv $Hlk $Hload $Hkeep $Hbs $Hop]
@@ -265,7 +265,7 @@ theorem namexEra_look (IUP : IUNLOCKPUT) (DL : DIRLOOKUP) (Γ : SchedNames)
     let cpu := c
     k_norm_g
     -- +0xf2  c.mv s4,s2 ; and FALL into +0xf4
-    k_step_e (wp_s_add cpu _ (KA.«namex» + 0xf2#64) true 20#5 0#5 18#5 (by decide))
+    k_step_e (wp_s_add cpu _ (KA.«namex» + 0xf6#64) true 20#5 0#5 18#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     iintro Hk Hpc
     have h18 : R'' 18#5 = ientry kslot := by

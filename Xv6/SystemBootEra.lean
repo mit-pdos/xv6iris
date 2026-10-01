@@ -350,7 +350,7 @@ at the era's application record `⟨N, appFs c, r⟩`, handed the application's
 invariant, the era's boot resource and THE ERA'S TURN `Tn c (gen + 1)` (the
 application's own per-era credential, minted at the power-on step and
 carried by `powerBootRes`; Rocq `Tn -∗`).  The bundle is at the first
-process's mask `seccAll` (userinit's `li a5,-1 ; sd a5,360(s1)`; Rocq
+process's mask `seccAll` (userinit's `li a5,-1 ; sd a5,368(s1)`; Rocq
 `init_boot_bundle … ProcDefs.secc_all fdt0`). -/
 def EraInitBoot {CT : Type} (N : Type) (appFs : CT → N → Aview → IProp GF)
     (appBoot : CT → Nat → N → IProp GF) (Tn : CT → Nat → IProp GF) (c : CT) : Prop :=

@@ -81,7 +81,7 @@ theorem mn_entry (CI : CPUID) [CurCtx] (cpu : CPU) (k : KCtx) (hsie : k.sie = fa
   inext
   iintro Hk Hpc _
   -- +0x08  jal cpuid
-  k_step (wp_s_jal startedPrimary _ (KA.«main» + 0x8#64) false 2686#21 1#5 (by decide))
+  k_step (wp_s_jal startedPrimary _ (KA.«main» + 0x8#64) false 2674#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ms_cpuid_br]
   iintro Hk Hpc
   iapply (ms_call_cpuid CI startedPrimary _ ?hs2 ?hK2) $$ [- $Hk $Hpc]
@@ -96,7 +96,7 @@ theorem mn_entry (CI : CPUID) [CurCtx] (cpu : CPU) (k : KCtx) (hsie : k.sie = fa
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x10  addi a4,a4,1110
-  k_step (wp_s_addi startedPrimary _ (KA.«main» + 0x10#64) false 1158#12 14#5 14#5 (by decide))
+  k_step (wp_s_addi startedPrimary _ (KA.«main» + 0x10#64) false 1318#12 14#5 14#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x14  beqz a0,main+0x42 : TAKEN

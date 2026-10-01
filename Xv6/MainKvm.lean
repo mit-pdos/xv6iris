@@ -196,7 +196,7 @@ end
 
 /-! ## `procinit()` and the proc table's invariant -/
 
-theorem mn_br_7a : KA.«main» + 2512#64 = KA.«procinit» := by decide
+theorem mn_br_7a : KA.«main» + 2506#64 = KA.«procinit» := by decide
 theorem mn_ret_7e : jumpPc (KA.«main» + 126#64) = KA.«main» + 126#64 := by decide
 
 section
@@ -217,7 +217,7 @@ theorem mn_procinit (PR : PROCINIT) [CurCtx] (cpu : CPU) (k : KCtx) (R0 : RegMap
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hpl, Hwl, Hraw, Hfd, Hir, Hbs, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
-  k_step (wp_s_jal cpu _ (KA.«main» + 122#64) false 2390#21 1#5 (by decide))
+  k_step (wp_s_jal cpu _ (KA.«main» + 122#64) false 2384#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [mn_br_7a]
   iintro Hk Hpc
   have hpi := PR.wp_procinit (hlc := hlc) (GF := GF) cpu (k.withRegs (R0.set 1#5 (KA.«main» + 126#64)))

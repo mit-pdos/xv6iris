@@ -337,7 +337,7 @@ theorem execArms_evAfter {Fs : Pfam GF (Uvis → IProp GF)} {Γ : FsViewNames GF
         Fs.pfRecv (execKey (V'.updEv k) M' sts gn cs pidv na) from .rfl)
       iexact Hrecv
 
-theorem sys_exec_br_kexec : sysExecAddr + 0xFFFFFFFFFFFFF42C#64 = KA.«kexec» := by decide
+theorem sys_exec_br_kexec : sysExecAddr + 0xfffffffffffff3ac#64 = KA.«kexec» := by decide
 theorem sys_exec_ret_ce : jumpPc (sysExecAddr + 0xce#64) = sysExecAddr + 0xce#64 := by decide
 
 set_option maxHeartbeats 32000000 in
@@ -388,7 +388,7 @@ theorem sys_exec_break (KX : KEXEC) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF �
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [a8]
   iintro Hk Hpc
   -- +0xca jal kexec
-  k_step_e (wp_s_jal cpu _ (sysExecAddr + 0xca#64) false 2093922#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (sysExecAddr + 0xca#64) false 2093794#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_exec_br_kexec]
   iintro Hk Hpc
   -- kexec(path, argv)

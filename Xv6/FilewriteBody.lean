@@ -122,7 +122,7 @@ theorem fwr_seg_open (BO : BEGIN_OP) (IL : ILOCK) (Γ : SchedNames) [ClaimIs (hl
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [s18]
   iintro Hk Hpc Hip
   -- +0x94  jal ilock
-  k_step_e (wp_s_jal cpu _ (KA.«filewrite» + 0x94#64) false 2092626#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«filewrite» + 0x94#64) false 2092530#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fwr_br_ilock]
   iintro Hk Hpc
   iapply (fwr_ilock IL Γ cpu _ j ik s g lo tl ty inum γil γisl pid Tl hj ?iproc ?iK ?inoff ?itier
@@ -227,7 +227,7 @@ theorem fwr_seg_write (WI : WRITEI) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF �
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [r18]
   iintro Hk Hpc Hip
   -- +0xa8  jal writei
-  k_step_e (wp_s_jal cpu _ (KA.«filewrite» + 0xa8#64) false 2093834#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«filewrite» + 0xa8#64) false 2093738#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fwr_br_writei]
   iintro Hk Hpc
   iapply (fwr_writei WI Γ cpu _ j γkl γk ik inum bm data dn v.toNat c V P Mv Sb pid ht hj ?wproc
@@ -353,7 +353,7 @@ theorem fwr_seg_close (IU : IUNLOCK) (EO : END_OP) (Γ : SchedNames) [ClaimIs (h
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [r18]
   iintro Hk Hpc Hip
   -- +0xc0  jal iunlock
-  k_step_e (wp_s_jal cpu _ (KA.«filewrite» + 0xc0#64) false 2092756#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«filewrite» + 0xc0#64) false 2092660#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fwr_br_iunlock]
   iintro Hk Hpc
   iapply (fwr_iunlock IU Γ cpu _ ik s g lo tl inum dn bm γil γisl pid ?uK ?unoff ?ulocks ?utier hkk

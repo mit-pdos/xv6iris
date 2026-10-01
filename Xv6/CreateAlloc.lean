@@ -702,7 +702,7 @@ theorem create_alloc_cok (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := h
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0xe2  jal iunlockput
-  k_step_e (wp_s_jal cpu _ (KA.«create» + 0xe2#64) false 2090944#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«create» + 0xe2#64) false 2090848#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [create_br_iunlockput]
   iintro Hk Hpc
   icases logOpS_named icfgLog n' Sb' $$ Hop with ⟨%e0, Hop⟩
@@ -977,7 +977,7 @@ theorem create_alloc_file (IUP : IUNLOCKPUT) (DLK : DIRLINK) (Γ : SchedNames)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0xd8  jal dirlink
-  k_step_e (wp_s_jal cpu _ (KA.«create» + 0xd8#64) false 2092376#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«create» + 0xd8#64) false 2092352#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [create_br_dirlink]
   iintro Hk Hpc
   icases create_bare_pid ht0 k.proc pid V M $$ Hbare with ⟨Hpid, Hpw⟩
@@ -1308,7 +1308,7 @@ theorem create_alloc_made (IUP : IUNLOCKPUT) (IU : IUPDATE) (DLK : DIRLINK) (Γ 
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0xc4  jal iupdate : THE MINT
-  k_step_e (wp_s_jal cpu _ (KA.«create» + 0xc4#64) false 2090198#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«create» + 0xc4#64) false 2090102#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [create_br_iupdate]
   iintro Hk Hpc
   icases create_bare_pid ht0 k.proc pid V M $$ Hbare with ⟨Hpid, Hpw⟩
@@ -1536,7 +1536,7 @@ theorem create_alloc_half (IL : ILOCK) (IUP : IUNLOCKPUT) (IA : IALLOC) (IU : IU
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     iintro Hk Hpc
     -- +0xee  jal iunlockput(dp), UNCREDITED
-    k_step_e (wp_s_jal cpu _ (KA.«create» + 0xee#64) false 2090932#21 1#5 (by decide))
+    k_step_e (wp_s_jal cpu _ (KA.«create» + 0xee#64) false 2090836#21 1#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [create_br_iunlockput]
     iintro Hk Hpc
     icases create_alloc_map_open (ientry kd) bm $$ Hmap with ⟨Ha, Hi⟩

@@ -65,7 +65,7 @@ theorem sleep_prepare_br_ffffffffffffed0c : KA.«sleep_prepare» + 0xfffffffffff
 
 theorem sleep_prepare_br_ffffffffffffec84 : KA.«sleep_prepare» + 0xffffffffffffec84#64 = KA.«acquire» := by decide
 
-theorem sleep_prepare_br_fffffffffffff9b4 : KA.«sleep_prepare» + 0xfffffffffffff9b4#64 = KA.«myproc» := by decide
+theorem sleep_prepare_br_fffffffffffff9a8 : KA.«sleep_prepare» + 0xfffffffffffff9a8#64 = KA.«myproc» := by decide
 
 set_option maxHeartbeats 4000000 in
 /-- **`sleep_prepare` meets its specification.** -/
@@ -96,8 +96,8 @@ theorem sleep_prepare_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) : SLEEP_
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c2 hp2
   iintro Hk Hpc
   -- jal myproc
-  k_step_gen (wp_s_jal c2 _ (KA.«sleep_prepare» + 0xe#64) false 2095526#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sleep_prepare_br_fffffffffffff9b4] next c3 hp3
+  k_step_gen (wp_s_jal c2 _ (KA.«sleep_prepare» + 0xe#64) false 2095514#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sleep_prepare_br_fffffffffffff9a8] next c3 hp3
   iintro Hk Hpc
   have hmp : ∀ (cc : CPU) (k' : KCtx) (hnoff' : k'.noff + 1 < 2 ^ 31) (hK' : 10 ≤ k'.avail),
       kctx cc k' ∗ pcIs cc KA.«myproc» ∗

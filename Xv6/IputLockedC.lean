@@ -537,17 +537,17 @@ theorem iput_lk_c (RH : RELEASE_HOOK) (HO : IputOfflockSpec)
   ihave Hk := Hkback $$ Hrun
   imodintro
   -- +0x8c auipc a0 ; +0x90 addi a0 ; +0x94 jal release
-  k_step (wp_s_auipc c _ (KA.«iput» + 0x8c#64) false 0x1d#20 10#5 (by decide))
+  k_step (wp_s_auipc c _ (KA.«iput» + 0x8c#64) false 0x1e#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_addi c _ (KA.«iput» + 0x90#64) false 1596#12 10#5 10#5 (by decide))
+  k_step (wp_s_addi c _ (KA.«iput» + 0x90#64) false 2248#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [iput_lock]
   iintro Hk Hpc
-  k_step (wp_s_jal c _ (KA.«iput» + 0x94#64) false 2086796#21 1#5 (by decide))
+  k_step (wp_s_jal c _ (KA.«iput» + 0x94#64) false 2086776#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [iput_br_release]
   iintro Hk Hpc
   iapply (iput_release RH c (k.withSpie s p) hkwf hK16 hlk
-    ((((((R.set 15#5 1#64).set 15#5 0#64).set (10#5) (KA.«iput» + 118924#64)).set (10#5)
+    ((((((R.set 15#5 1#64).set 15#5 0#64).set (10#5) (KA.«iput» + 123020#64)).set (10#5)
       itableLock).set (1#5) (KA.«iput» + 152#64))) ?h10 (KA.«iput» + 0x98#64) ?h1)
     $$ [- $Hpc $Hit $Hlocked $HRin]
   rotate_right 1

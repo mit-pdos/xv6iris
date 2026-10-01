@@ -900,7 +900,7 @@ theorem pi_minus_addr (sp0 : BitVec 64) (i : Nat) :
 /-! ## The body from `+0x12`: the digit loop, the sign, the join -/
 
 /-- The `auipc`/`addi` pair at `+0x1a` names the digit table. -/
-theorem pi_digits_addr : KA.«printint» + 0x72a8#64 = KA.«digits» := by decide
+theorem pi_digits_addr : KA.«printint» + 0x72a0#64 = KA.«digits» := by decide
 
 set_option maxHeartbeats 4000000 in
 /-- From `+0x12` (where all three entry paths meet, `t1` holding the sign
@@ -954,7 +954,7 @@ theorem pi_setup (PP : PRPUTC) [Xv6G GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = 
     from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x1e addi a6,a6,654 : a6 = digits
-  k_step (wp_s_addi cpu _ (KA.«printint» + 0x1e#64) false 654#12 16#5 16#5 (by decide))
+  k_step (wp_s_addi cpu _ (KA.«printint» + 0x1e#64) false 646#12 16#5 16#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [pi_digits_addr]
   iintro Hk Hpc
   -- the digit loop

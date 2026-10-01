@@ -90,15 +90,15 @@ theorem syscall_jblk_tgt : syscallAddr + 0x52#64 + BitVec.signExtend 64 (0x1a#21
 /-- `auipc a5,0x5 ; addi a5,a5,-532` at `+0x2a`/`+0x2e` is the table's base
 (Rocq's `syscalls` fold). -/
 theorem syscall_tbl_addr :
-    syscallAddr + 0x2a#64 + BitVec.signExtend 64 (5#20 ++ 0#12) + BitVec.signExtend 64 (0xdec#12) =
+    syscallAddr + 0x2a#64 + BitVec.signExtend 64 (5#20 ++ 0#12) + BitVec.signExtend 64 (0xdd0#12) =
       syscallsTbl := by
   unfold syscallsTbl syscallAddr; decide
 
-/-- `auipc a0,0x5 ; addi a0,a0,-1604` at `+0x5a`/`+0x5e`: the fallback's
-format string (Rocq `sysc_fmt_a`, 0x80007398). -/
+/-- `auipc a0,0x5 ; addi a0,a0,-1632` at `+0x5a`/`+0x5e`: the fallback's
+format string (Rocq `sysc_fmt_a`, 0x80007390). -/
 theorem syscall_fmt_addr :
-    syscallAddr + 0x5a#64 + BitVec.signExtend 64 (5#20 ++ 0#12) + BitVec.signExtend 64 (0x9bc#12) =
-      0x80007398#64 := by
+    syscallAddr + 0x5a#64 + BitVec.signExtend 64 (5#20 ++ 0#12) + BitVec.signExtend 64 (0x9a0#12) =
+      0x80007390#64 := by
   unfold syscallAddr; decide
 
 /-- The entries are the entry Specs' addresses (reflexivity, one per arm):

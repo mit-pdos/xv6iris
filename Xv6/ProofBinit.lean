@@ -266,10 +266,10 @@ theorem bi_initsleeplock_call (IS : INITSLEEPLOCK) [CurCtx] (c : CPU) (k' : KCtx
 
 /-! ## One iteration -/
 
-theorem binit_br_146e : KA.«binit» + 0x146e#64 = KA.«initsleeplock» := by decide
+theorem binit_br_14ce : KA.«binit» + 0x14ce#64 = KA.«initsleeplock» := by decide
 
 set_option maxHeartbeats 4000000 in
-/-- The body at `0x80002c70`: splice `&buf[i]` in after the head, initialise
+/-- The body at `0x80002c84`: splice `&buf[i]` in after the head, initialise
 its sleeplock, step the cursor and test for the last buffer. -/
 theorem bi_iter (IS : INITSLEEPLOCK) [CurCtx] (k : KCtx) (hK : 12 ≤ k.avail)
     (i : Nat) (hi : i < 30) (R : RegMap)
@@ -311,8 +311,8 @@ theorem bi_iter (IS : INITSLEEPLOCK) [CurCtx] (k : KCtx) (hK : 12 ≤ k.avail)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9] next c5 hp5
   iintro Hk Hpc
   -- jal ra, initsleeplock
-  k_step_gen (wp_s_jal c5 _ (KA.«binit» + 0x60#64) false 5134#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [binit_br_146e] next c6 hp6
+  k_step_gen (wp_s_jal c5 _ (KA.«binit» + 0x60#64) false 5230#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [binit_br_14ce] next c6 hp6
   iintro Hk Hpc
   iapply (bi_initsleeplock_call IS c6 _ ?hKi (bufAddr i + 16#64) bufferNameAddr ?ha0 ?ha1)
     $$ [- $Hk $Hpc]
@@ -376,7 +376,7 @@ theorem bi_iter (IS : INITSLEEPLOCK) [CurCtx] (k : KCtx) (hK : 12 ≤ k.avail)
 /-! ## The loop -/
 
 set_option maxHeartbeats 4000000 in
-/-- The loop from `0x80002c70` with `i` buffers spliced in (`fuel + 1` left)
+/-- The loop from `0x80002c84` with `i` buffers spliced in (`fuel + 1` left)
 runs to the epilogue at `(KernelSyms.«binit» + 0x76)`.  The hart is quantified inside the
 induction. -/
 theorem bi_loop (IS : INITSLEEPLOCK) [CurCtx] (k : KCtx) (hK : 12 ≤ k.avail) (fuel : Nat) :
@@ -469,7 +469,7 @@ theorem biFrame_join [CurCtx] (sp v0 v1 v2 v3 v4 v5 : BitVec 64) :
   unfold biFrame; iintro H; iexact H
 
 set_option maxHeartbeats 4000000 in
-/-- The epilogue at `0x80002c96`: restore `ra`, `s0`, `s1`..`s4`, pop the
+/-- The epilogue at `0x80002caa`: restore `ra`, `s0`, `s1`..`s4`, pop the
 frame, return to the caller (carrying the body's resources `Q`). -/
 theorem bi_epi [CurCtx] (cpu cur : CPU) (k : KCtx)
     (hpin : k.sie = false ∨ k.proc = 0#64 → cur = cpu) (hK : 6 ≤ k.avail)
@@ -561,19 +561,19 @@ theorem bi_lockInited [CurCtx] :
 
 theorem bi_buf0 : bufAddr 0 = (KA.«bcache» + 0x18#64) := by decide
 
-theorem binit_br_47a0 : KA.«binit» + 0x47a0#64 = KStr.«buffer» := by decide
+theorem binit_br_4784 : KA.«binit» + 0x4784#64 = KStr.«buffer» := by decide
 
-theorem binit_br_158a0 : KA.«binit» + 0x158a0#64 = (KA.«bcache» + 0x18#64) := by decide
+theorem binit_br_15b2c : KA.«binit» + 0x15b2c#64 = (KA.«bcache» + 0x18#64) := by decide
 
-theorem binit_br_1daf0 : KA.«binit» + 0x1daf0#64 = (KA.«bcache» + 0x8268#64) := by decide
+theorem binit_br_1dd7c : KA.«binit» + 0x1dd7c#64 = (KA.«bcache» + 0x8268#64) := by decide
 
-theorem binit_br_1d888 : KA.«binit» + 0x1d888#64 = (KA.«bcache» + 0x8000#64) := by decide
+theorem binit_br_1db14 : KA.«binit» + 0x1db14#64 = (KA.«bcache» + 0x8000#64) := by decide
 
-theorem binit_br_ffffffffffffdfb8 : KA.«binit» + 0xffffffffffffdfb8#64 = KA.«initlock» := by decide
+theorem binit_br_ffffffffffffdfa4 : KA.«binit» + 0xffffffffffffdfa4#64 = KA.«initlock» := by decide
 
-theorem binit_br_15888 : KA.«binit» + 0x15888#64 = KA.«bcache» := by decide
+theorem binit_br_15b14 : KA.«binit» + 0x15b14#64 = KA.«bcache» := by decide
 
-theorem binit_br_4798 : KA.«binit» + 0x4798#64 = KStr.«bcache» := by decide
+theorem binit_br_477c : KA.«binit» + 0x477c#64 = KStr.«bcache» := by decide
 
 set_option maxHeartbeats 4000000 in
 theorem binit_proof (IL : INITLOCK) (IS : INITSLEEPLOCK) : BINIT :=
@@ -616,18 +616,18 @@ theorem binit_proof (IL : INITLOCK) (IS : INITSLEEPLOCK) : BINIT :=
   k_step_gen (wp_s_auipc c8 _ (KA.«binit» + 0x10#64) false 4#20 11#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [Xv6.UPtPpt.u20_4] next c9 hp9
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c9 _ (KA.«binit» + 0x14#64) false 1928#12 11#5 11#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [binit_br_4798] next c10 hp10
+  k_step_gen (wp_s_addi c9 _ (KA.«binit» + 0x14#64) false 1900#12 11#5 11#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [binit_br_477c] next c10 hp10
   iintro Hk Hpc
   k_step_gen (wp_s_auipc c10 _ (KA.«binit» + 0x18#64) false 0x16#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [bi_u15] next c11 hp11
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c11 _ (KA.«binit» + 0x1c#64) false 2160#12 10#5 10#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [binit_br_15888] next c12 hp12
+  k_step_gen (wp_s_addi c11 _ (KA.«binit» + 0x1c#64) false 2812#12 10#5 10#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [binit_br_15b14] next c12 hp12
   iintro Hk Hpc
   -- jal ra, initlock
-  k_step_gen (wp_s_jal c12 _ (KA.«binit» + 0x20#64) false 2088856#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [binit_br_ffffffffffffdfb8] next c13 hp13
+  k_step_gen (wp_s_jal c12 _ (KA.«binit» + 0x20#64) false 2088836#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [binit_br_ffffffffffffdfa4] next c13 hp13
   iintro Hk Hpc
   have hpin13 : k.sie = false ∨ k.proc = 0#64 → c13 = cpu := fun h =>
     (hp13 h).trans ((hp12 h).trans ((hp11 h).trans ((hp10 h).trans ((hp9 h).trans ((hp8 h).trans
@@ -655,14 +655,14 @@ theorem binit_proof (IL : INITLOCK) (IS : INITSLEEPLOCK) : BINIT :=
   k_step_gen (wp_s_auipc c14 _ (KA.«binit» + 0x24#64) false 0x1e#20 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [bi_u1d] next c15 hp15
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c15 _ (KA.«binit» + 0x28#64) false 2148#12 15#5 15#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [binit_br_1d888] next c16 hp16
+  k_step_gen (wp_s_addi c15 _ (KA.«binit» + 0x28#64) false 2800#12 15#5 15#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [binit_br_1db14] next c16 hp16
   iintro Hk Hpc
   k_step_gen (wp_s_auipc c16 _ (KA.«binit» + 0x2c#64) false 0x1e#20 14#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [bi_u1e] next c17 hp17
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c17 _ (KA.«binit» + 0x30#64) false 2756#12 14#5 14#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [binit_br_1daf0] next c18 hp18
+  k_step_gen (wp_s_addi c17 _ (KA.«binit» + 0x30#64) false 3408#12 14#5 14#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [binit_br_1dd7c] next c18 hp18
   iintro Hk Hpc
   -- head.prev = head.next = &head
   k_step_gen (wp_s_sd c18 _ (KA.«binit» + 0x34#64) false 688#12 15#5 14#5 (by decide) vhp)
@@ -675,8 +675,8 @@ theorem binit_proof (IL : INITLOCK) (IS : INITSLEEPLOCK) : BINIT :=
   k_step_gen (wp_s_auipc c20 _ (KA.«binit» + 0x3c#64) false 0x16#20 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [bi_u15] next c21 hp21
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c21 _ (KA.«binit» + 0x40#64) false 2148#12 9#5 9#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [binit_br_158a0] next c22 hp22
+  k_step_gen (wp_s_addi c21 _ (KA.«binit» + 0x40#64) false 2800#12 9#5 9#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [binit_br_15b2c] next c22 hp22
   iintro Hk Hpc
   k_step_gen (wp_s_add c22 _ (KA.«binit» + 0x44#64) true 18#5 0#5 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c23 hp23
@@ -687,8 +687,8 @@ theorem binit_proof (IL : INITLOCK) (IS : INITSLEEPLOCK) : BINIT :=
   k_step_gen (wp_s_auipc c24 _ (KA.«binit» + 0x48#64) false 4#20 20#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [Xv6.UPtPpt.u20_4] next c25 hp25
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c25 _ (KA.«binit» + 0x4c#64) false 1880#12 20#5 20#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [binit_br_47a0] next c26 hp26
+  k_step_gen (wp_s_addi c25 _ (KA.«binit» + 0x4c#64) false 1852#12 20#5 20#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [binit_br_4784] next c26 hp26
   iintro Hk Hpc
   have hpin26 : k.sie = false ∨ k.proc = 0#64 → c26 = c14 := fun h =>
     (hp26 h).trans ((hp25 h).trans ((hp24 h).trans ((hp23 h).trans ((hp22 h).trans ((hp21 h).trans ((hp20 h).trans ((hp19 h).trans ((hp18 h).trans ((hp17 h).trans ((hp16 h).trans ((hp15 h))))))))))))
@@ -710,7 +710,7 @@ theorem binit_proof (IL : INITLOCK) (IS : INITSLEEPLOCK) : BINIT :=
     · exact BigSepL.bigSepL_nil_intro
     isplitl []
     · exact BigSepL.bigSepL_nil_intro
-    -- the exit at 0x80002c96 and the epilogue
+    -- the exit at 0x80002caa and the epilogue
     · iapply wpNext_intro_pin
       iintro %cE %hpE %R2 Hk Hpc Hhn Hpend Hnodes Hrests %hkept
       have hk2 : R2 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFD0#64 := by

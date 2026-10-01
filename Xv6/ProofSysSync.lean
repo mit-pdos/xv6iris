@@ -85,18 +85,18 @@ All three `auipc`/`addi` pairs that materialise `&log` (`+0x08`, `+0x36`,
 `+0x5e`) normalise to the SAME offset, because each pair's relocation is
 computed from its own `auipc`. -/
 
-theorem ss_log : KA.«sys_sync» + 0x1e616#64 = logAddr := by unfold logAddr; decide
-theorem ss_lcmt : KA.«sys_sync» + 0x1e636#64 = lCmt := by unfold lCmt logAddr; decide
-theorem ss_lout : KA.«sys_sync» + 0x1e632#64 = lOut := by unfold lOut logAddr; decide
-theorem ss_lnc : KA.«sys_sync» + 0x1e63e#64 = lNcommit := by unfold lNcommit logAddr; decide
+theorem ss_log : KA.«sys_sync» + 0x1e842#64 = logAddr := by unfold logAddr; decide
+theorem ss_lcmt : KA.«sys_sync» + 0x1e862#64 = lCmt := by unfold lCmt logAddr; decide
+theorem ss_lout : KA.«sys_sync» + 0x1e85e#64 = lOut := by unfold lOut logAddr; decide
+theorem ss_lnc : KA.«sys_sync» + 0x1e86a#64 = lNcommit := by unfold lNcommit logAddr; decide
 
 /-- `lw a5,40(s1)` at `+0x54`, with `s1 = &log`. -/
 theorem ss_nc_addr : logAddr + 40#64 = lNcommit := rfl
 
-theorem ss_br_acq : KA.«sys_sync» + 0xffffffffffffcc3e#64 = KA.«acquire» := by decide
-theorem ss_br_rel : KA.«sys_sync» + 0xffffffffffffccc6#64 = KA.«release» := by decide
-theorem ss_br_sp : KA.«sys_sync» + 0xffffffffffffdfba#64 = KA.«sleep_prepare» := by decide
-theorem ss_br_sl : KA.«sys_sync» + 0xffffffffffffdff6#64 = KA.«sleep» := by decide
+theorem ss_br_acq : KA.«sys_sync» + 0xffffffffffffcbca#64 = KA.«acquire» := by decide
+theorem ss_br_rel : KA.«sys_sync» + 0xffffffffffffcc52#64 = KA.«release» := by decide
+theorem ss_br_sp : KA.«sys_sync» + 0xffffffffffffdf46#64 = KA.«sleep_prepare» := by decide
+theorem ss_br_sl : KA.«sys_sync» + 0xffffffffffffdf82#64 = KA.«sleep» := by decide
 
 theorem ss_ret_14 : jumpPc (KA.«sys_sync» + 0x14#64) = KA.«sys_sync» + 0x14#64 := by decide
 theorem ss_ret_44 : jumpPc (KA.«sys_sync» + 0x44#64) = KA.«sys_sync» + 0x44#64 := by decide
@@ -653,10 +653,10 @@ theorem ss_tail (RE : RELEASE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
   iapply wpNext_off_intro
   try (case hs => k_norm)
   iintro Hk Hpc
-  k_step (wp_s_addi c _ (KA.«sys_sync» + 0x62#64) false 1464#12 10#5 10#5 (by decide))
+  k_step (wp_s_addi c _ (KA.«sys_sync» + 0x62#64) false 2020#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ssK_sie k, ss_log]
   iintro Hk Hpc
-  k_step (wp_s_jal c _ (KA.«sys_sync» + 0x66#64) false 2083936#21 1#5 (by decide))
+  k_step (wp_s_jal c _ (KA.«sys_sync» + 0x66#64) false 2083820#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ssK_sie k, ss_br_rel]
   iintro Hk Hpc
   -- the release takes back the arm the entry acquire paid out
@@ -758,7 +758,7 @@ theorem ss_body (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SLEEP)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [ssK_sie k, KCtx.rget_zero, q9]
   iintro Hk Hpc
-  k_step (wp_s_jal cpu _ (KA.«sys_sync» + 0x40#64) false 2088826#21 1#5 (by decide))
+  k_step (wp_s_jal cpu _ (KA.«sys_sync» + 0x40#64) false 2088710#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ssK_sie k, ss_br_sp]
   iintro Hk Hpc
   iapply (ss_sp SP Γ cpu _ jp hjp ?hp1 ?hc1 ?hn1 ?hK1 ?hl1 ?ht1) $$ [- $Hk $Hpc]
@@ -788,7 +788,7 @@ theorem ss_body (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SLEEP)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [ssK_sie k, KCtx.rget_zero, r9]
   iintro Hk Hpc
-  k_step (wp_s_jal cpu _ (KA.«sys_sync» + 0x46#64) false 2083968#21 1#5 (by decide))
+  k_step (wp_s_jal cpu _ (KA.«sys_sync» + 0x46#64) false 2083852#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ssK_sie k, ss_br_rel]
   iintro Hk Hpc
   -- the release takes back the arm; the complement goes on to `sleep`
@@ -816,7 +816,7 @@ theorem ss_body (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SLEEP)
     refine ⟨rfl, rfl, ?_, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩
     simp only [RegMap.set_apply, BitVec.reduceEq, ite_false])) (by k_norm_g at hcs2; exact hcs2)
   -- +0x4a jal sleep
-  k_step_e (wp_s_jal cpu _ (KA.«sys_sync» + 0x4a#64) false 2088876#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_sync» + 0x4a#64) false 2088760#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ss_br_sl]
   iintro Hk Hpc
   iapply (ss_sl SL Γ cpu _ jp k.sie k.proc hjp ?hp3 ?hK3 ?hn3 ?ht3 ?hs3 ?hpp3)
@@ -841,7 +841,7 @@ theorem ss_body (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SLEEP)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [KCtx.rget_zero, t9]
   iintro Hk Hpc
-  k_step_e (wp_s_jal cpu _ (KA.«sys_sync» + 0x50#64) false 2083822#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_sync» + 0x50#64) false 2083706#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ss_br_acq]
   iintro Hk Hpc
   iapply (ss_ac AC cpu _ γ γb γfs cov ls dev ?ha0q ?hnq ?hKq ?hsq) $$ [- $Hk $Hpc]
@@ -1091,20 +1091,20 @@ theorem ss_setup (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
   case' _ => iframe Hc1 Hc2 Hc3 Hc4
   -- +0x2e auipc s2,0x1e ; +0x32 lw s2,1062(s2)
   isimp only [wordAtN_cur] at Hnc
-  k_step (wp_s_auipc cpu _ (KA.«sys_sync» + 0x2e#64) false 0x1e#20 18#5 (by decide))
+  k_step (wp_s_auipc cpu _ (KA.«sys_sync» + 0x2e#64) false 0x1f#20 18#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ssK_sie k]
   iintro Hk Hpc
-  k_step (wp_s_lw cpu _ (KA.«sys_sync» + 0x32#64) false 1552#12 18#5 18#5 (by decide) (by decide)
+  k_step (wp_s_lw cpu _ (KA.«sys_sync» + 0x32#64) false 2108#12 18#5 18#5 (by decide) (by decide)
       (DFrac.own 1) nc0)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ssK_sie k, ss_lnc]
   iintro Hk Hpc Hnc
   isimp only [← wordAtN_cur] at Hnc
   ihave Hpay := Hclose $$ Hnc
   -- +0x36 auipc s1,0x1e ; +0x3a addi s1,s1,1014
-  k_step (wp_s_auipc cpu _ (KA.«sys_sync» + 0x36#64) false 0x1e#20 9#5 (by decide))
+  k_step (wp_s_auipc cpu _ (KA.«sys_sync» + 0x36#64) false 0x1f#20 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ssK_sie k]
   iintro Hk Hpc
-  k_step (wp_s_addi cpu _ (KA.«sys_sync» + 0x3a#64) false 1504#12 9#5 9#5 (by decide))
+  k_step (wp_s_addi cpu _ (KA.«sys_sync» + 0x3a#64) false 2060#12 9#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ssK_sie k, ss_log]
   iintro Hk Hpc
   iapply Hloop $$ %cpu %(k.spie) %(k.spp) %(BitVec.signExtend 64 nc0) %_
@@ -1147,13 +1147,13 @@ theorem ss_entry (AC : ACQUIRE) (RE : RELEASE) (Γ : SchedNames) [ClaimIs (hlc :
   k_next_e
   iintro Hk Hpc Hfr
   -- +0x08 auipc a0,0x1e ; +0x0c addi a0,a0,1060 ; +0x10 jal acquire
-  k_step_e (wp_s_auipc cpu _ (KA.«sys_sync» + 0x8#64) false 0x1e#20 10#5 (by decide))
+  k_step_e (wp_s_auipc cpu _ (KA.«sys_sync» + 0x8#64) false 0x1f#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_addi cpu _ (KA.«sys_sync» + 0xc#64) false 1550#12 10#5 10#5 (by decide))
+  k_step_e (wp_s_addi cpu _ (KA.«sys_sync» + 0xc#64) false 2106#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ss_log]
   iintro Hk Hpc
-  k_step_e (wp_s_jal cpu _ (KA.«sys_sync» + 0x10#64) false 2083886#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_sync» + 0x10#64) false 2083770#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ss_br_acq]
   iintro Hk Hpc
   iapply (ss_ac AC cpu _ γ γb γfs cov ls dev ?ha0 ?hna ?hKa ?hla) $$ [- $Hk $Hpc]
@@ -1190,10 +1190,10 @@ theorem ss_entry (AC : ACQUIRE) (RE : RELEASE) (Γ : SchedNames) [ClaimIs (hlc :
   · -- ============ log.committing == 0 ============
     isimp only [Bool.false_eq_true, if_false] at Hcmt
     -- +0x14 auipc a5,0x1e ; +0x18 lw a5,1080(a5) ; +0x1c bnez a5 (not taken)
-    k_step (wp_s_auipc cpu _ (KA.«sys_sync» + 0x14#64) false 0x1e#20 15#5 (by decide))
+    k_step (wp_s_auipc cpu _ (KA.«sys_sync» + 0x14#64) false 0x1f#20 15#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ssK_sie (k.withSpie s0 p0)]
     iintro Hk Hpc
-    k_step (wp_s_lw cpu _ (KA.«sys_sync» + 0x18#64) false 1570#12 15#5 15#5 (by decide)
+    k_step (wp_s_lw cpu _ (KA.«sys_sync» + 0x18#64) false 2126#12 15#5 15#5 (by decide)
         (by decide) (DFrac.own 1) (0#32 : BitVec 32))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ssK_sie (k.withSpie s0 p0), ss_lcmt]
     iintro Hk Hpc Hcmt
@@ -1202,10 +1202,10 @@ theorem ss_entry (AC : ACQUIRE) (RE : RELEASE) (Γ : SchedNames) [ClaimIs (hlc :
       with [ssK_sie (k.withSpie s0 p0), KCtx.rget_zero, MachCSL.bcond_bne_zero]
     iintro Hk Hpc
     -- +0x1e auipc a5,0x1e ; +0x22 lw a5,1066(a5) ; +0x26 blez a5
-    k_step (wp_s_auipc cpu _ (KA.«sys_sync» + 0x1e#64) false 0x1e#20 15#5 (by decide))
+    k_step (wp_s_auipc cpu _ (KA.«sys_sync» + 0x1e#64) false 0x1f#20 15#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ssK_sie (k.withSpie s0 p0)]
     iintro Hk Hpc
-    k_step (wp_s_lw cpu _ (KA.«sys_sync» + 0x22#64) false 1556#12 15#5 15#5 (by decide)
+    k_step (wp_s_lw cpu _ (KA.«sys_sync» + 0x22#64) false 2112#12 15#5 15#5 (by decide)
         (by decide) (DFrac.own 1) (BitVec.ofNat 32 out))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ssK_sie (k.withSpie s0 p0), ss_lout]
     iintro Hk Hpc Hout
@@ -1271,10 +1271,10 @@ theorem ss_entry (AC : ACQUIRE) (RE : RELEASE) (Γ : SchedNames) [ClaimIs (hlc :
         exact hRE
   · -- ============ log.committing != 0: wait ============
     isimp only [if_true] at Hcmt
-    k_step (wp_s_auipc cpu _ (KA.«sys_sync» + 0x14#64) false 0x1e#20 15#5 (by decide))
+    k_step (wp_s_auipc cpu _ (KA.«sys_sync» + 0x14#64) false 0x1f#20 15#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ssK_sie (k.withSpie s0 p0)]
     iintro Hk Hpc
-    k_step (wp_s_lw cpu _ (KA.«sys_sync» + 0x18#64) false 1570#12 15#5 15#5 (by decide)
+    k_step (wp_s_lw cpu _ (KA.«sys_sync» + 0x18#64) false 2126#12 15#5 15#5 (by decide)
         (by decide) (DFrac.own 1) (1#32 : BitVec 32))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ssK_sie (k.withSpie s0 p0), ss_lcmt]
     iintro Hk Hpc Hcmt
