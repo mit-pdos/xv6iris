@@ -143,7 +143,7 @@ Section ProofVirtioDiskRwCSeam.
   Proof using .
     iIntros "#Htext #Hgeom Hbd Hexit".
     rewrite /P2.vdrw_p2_exit.
-    iIntros (CIDx Hsx M np nr cm fr h m2 t) "%Hrh %Hfacts %Hal
+    iIntros (CIDx Hsx) "Hlc"; iIntros (M np nr cm fr h m2 t) "%Hrh %Hfacts %Hal
              Hcg Hown Htc Hclm Hpc Htok Hbody [Hbh Hfh] [Hbm Hfm] [Hbt Hft] Hidx".
     destruct Hrh as (Hregs & Hhi).
     destruct Hfacts as (Hok & Hfrh & Hfrm & Hfrt).
@@ -155,7 +155,7 @@ Section ProofVirtioDiskRwCSeam.
               with "Hcg Htext Hpc Hdp Hidx Hbh Hbm Hbt Hbd").
     iIntros (M1) "%F Hcg Hpc Hidx Hchain".
     destruct F as (Hcs & H1a0 & H1a1 & H1a5).
-    iSpecialize ("Hexit" $! CIDx with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hexit" $! CIDx with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hexit" $! M1 np nr cm fr h m2 t
               with "[%] [%] [%] [%] Hcg Hown Htc Hclm Hpc Htok Hbody
                     Hchain Hfh Hfm Hft Hidx").

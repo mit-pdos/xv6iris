@@ -679,7 +679,7 @@ Section SBundle.
     iSplitR; [ iPureIntro; apply sexit_pay_at | iExact "Hb" ].
   Qed.
 
-  Global Instance sbundle_ne (k : nat) :
+  Global Instance sbundle_ne k :
     Proper (dist k ==> eq ==> eq ==> dist k) sbundle.
   Proof using .
     intros X Y HXY n ? <- W ? <-. rewrite /sbundle.

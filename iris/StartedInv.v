@@ -246,8 +246,11 @@ Section StartedInv.
     - iModIntro. iFrame "Hw Hda Hpk Hprim HP".
       iIntros "Hr". iMod ("Hclose" with "[Hr]") as "_"; [| done].
       iNext. iFrame "Hcl". iSplitR; [iPureIntro; exact Himg |]. iRight. iExact "Hr".
-    - iDestruct "Hr" as (i T) "(_ & >Hda & _)".
-      iExFalso. iApply (dset_auth_excl with "Hda"). rewrite /started_prim. iExact "Hprim".
+    - (* the armed arm is refuted by the primary's token; at an ordinal index its ∃ (whose
+         payload P is not timeless) cannot leave the later, so refute under it *)
+      iAssert (▷ False)%I with "[Hr Hprim]" as ">[]".
+      iNext. iDestruct "Hr" as (i T) "(_ & Hda & _)".
+      iApply (dset_auth_excl with "Hda"). rewrite /started_prim. iExact "Hprim".
   Qed.
 
   Lemma started_inv_claim (E : coPset) (γi : gname) (ξd : CtxId)
@@ -317,13 +320,18 @@ Section StartedInv.
       `{!∀ pos ξ, Persistent (P pos ξ)} :
     ↑startedN ⊆ Em ->
     started_inv γi ξd P -∗
-    (|={Em, Em ∖ ↑startedN}=> started_res γi ξd P ∗
-       (started_res γi ξd P ={Em ∖ ↑startedN, Em}=∗ True)).
+    (|={Em, Em ∖ ↑startedN}=> ▷ |==> (started_res γi ξd P ∗
+       (started_res γi ξd P ={Em ∖ ↑startedN, Em}=∗ True))).
   Proof using .
     iIntros (HE) "#Hinv".
     iMod (inv_acc Em startedN with "Hinv") as "[Hbody Hclose]"; [exact HE|].
-    iDestruct "Hbody" as "(>#Hcl & >%Himg & [Hl | Hr])".
-    - iDestruct "Hl" as "(>Hw & >Ha & >Hpk)".
+    (* at an ordinal step index the body cannot be destructed under its later
+       (an [∨] and an [∃] whose witness nothing outside pins), and the load
+       needs nothing from it before its own: hand it over under the later
+       ([WpSconfMem.wp_load_s_sconf_au_relr_lat]), the registration behind it. *)
+    iModIntro. iNext.
+    iDestruct "Hbody" as "(#Hcl & %Himg & [Hl | Hr])".
+    - iDestruct "Hl" as "(Hw & Ha & Hpk)".
       iEval (rewrite -(Qp.quarter_quarter) dset_auth_split) in "Ha".
       iDestruct "Ha" as "[Ha1 Ha2]".
       iModIntro. iSplitL "Hw Ha1".
@@ -335,7 +343,7 @@ Section StartedInv.
         iFrame "Ha1 Ha2".
       + iDestruct "Hbad" as (i) "(_ & Hidx & _)".
         iDestruct (dset_lookup with "Ha2 Hidx") as %Hin. set_solver.
-    - iDestruct "Hr" as (i T) "(>Hw & >Ha & >Hpk & >%HT & #HP)".
+    - iDestruct "Hr" as (i T) "(Hw & Ha & Hpk & %HT & #HP)".
       iMod (dset_get γi 1 {[(S i, started_addr)]} (S i, started_addr)
               (elem_of_singleton_2 _ _ eq_refl) with "Ha") as "[Ha #Hidx]".
       iModIntro. iSplitL "Hw".
@@ -502,21 +510,32 @@ Section StartedInv.
     own_context cur_ctx -∗ P (S i) ξd ={E}=∗
     own_context cur_ctx ∗ P (S i) cur_ctx.
   Proof using .
-    iIntros (HE HiV) "#Hinv #Hidx #HK Hrun HP".
+    iIntros (HE HiV) "#Hinv #Hidx #HK Hrun #HP".
     iMod (inv_acc E startedN with "Hinv") as "[Hbody Hclose]"; [exact HE|].
-    iDestruct "Hbody" as "(>#Hcl & >%Himg & [Hl | Hr])".
-    - iDestruct "Hl" as "(_ & >Ha & _)".
+    iDestruct "Hbody" as "(>#Hcl & >%Himg & Harms)".
+    (* the armed arm's one non-timeless part is the payload, which is
+       PERSISTENT and which the caller holds a copy of: drop it under the
+       later, take the timeless rest out, and close with the caller's copy *)
+    iAssert (▷ ((started_win_plain ∗ dset_auth γi (1/2) ∅ ∗ ctx_stamped ξd 0)
+              ∨ ∃ i' T : nat, started_win_rel i' ∗
+                  dset_auth γi 1 {[(S i', started_addr)]} ∗
+                  ctx_stamped ξd T ∗ ⌜(T ≤ S i')%nat⌝))%I
+      with "[Harms]" as ">[Hl | Hr]".
+    { iNext. iDestruct "Harms" as "[Hl | Hr]"; [by iLeft | iRight].
+      iDestruct "Hr" as (i' T) "(Hw & Ha & Hpk & %HT & _)".
+      iExists i', T. iFrame "Hw Ha Hpk". by iPureIntro. }
+    - iDestruct "Hl" as "(_ & Ha & _)".
       iDestruct (dset_lookup with "Ha Hidx") as %Hin. set_solver.
-    - iDestruct "Hr" as (i' T) "(>Hw & >Ha & >Hpk & >%HT & #HPd)".
+    - iDestruct "Hr" as (i' T) "(Hw & Ha & Hpk & %HT)".
       iDestruct (dset_lookup with "Ha Hidx") as %Hin.
       apply elem_of_singleton in Hin. injection Hin as Hii. subst i'.
       iMod (ctx_absorb_lb (P (S i)) ξd cur_ctx T V0 ltac:(lia)
               with "Hrun HK Hpk HP")
-        as "(Hrun & Hpk & HP)".
+        as "(Hrun & Hpk & HP')".
       iMod ("Hclose" with "[Hw Ha Hpk]") as "_".
       { iNext. rewrite /started_body. iFrame "Hcl". iSplitR; [by iPureIntro|].
-        iRight. iExists i, T. iFrame "Hw Ha Hpk HPd". by iPureIntro. }
-      iModIntro. iFrame "Hrun HP".
+        iRight. iExists i, T. iFrame "Hw Ha Hpk HP". by iPureIntro. }
+      iModIntro. iFrame "Hrun HP'".
   Qed.
 
   (* ------------------------------------------------------------------- *)

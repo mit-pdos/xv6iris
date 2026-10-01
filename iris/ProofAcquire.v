@@ -263,7 +263,7 @@ Section ProofAcquire.
     iApply (wp_caddi_sp_push_s_sconf pcE (mword_of_int 32 : mword 6) m av 4 b ltac:(lia) Hpush
               with "Hcg Hpc []").
     { iApply (aqi_00 with "Htext"). }
-    iIntros (CID1 Hs1) "Hcg Hframe Hpc".
+    iIntros (CID1 Hs1) "_ Hcg Hframe Hpc".
     iEval (rewrite Hspm) in "Hframe".
     change (<[Regidx csp_rs1 := regval_into_reg
         (add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))]> m) with A0.
@@ -293,7 +293,7 @@ Section ProofAcquire.
               with "Hcg Hpc [] [Hr24]").
     { iApply (aqi_02 with "Htext"). }
     { iEval (rewrite HcspA0 -Hb1). iExact "Hr24". }
-    iIntros (CID2 Hs2) "Hcg Hpc Hr24".
+    iIntros (CID2 Hs2) "_ Hcg Hpc Hr24".
     iEval (rgne) in "Hr24".
     assert (Hpc04 : add_vec_int (mword_of_int (KernelSyms.acquire + 0x02) : mword 64) 2 = mword_of_int (KernelSyms.acquire + 0x04)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc04) in "Hpc".
@@ -302,7 +302,7 @@ Section ProofAcquire.
               with "Hcg Hpc [] [Hr16]").
     { iApply (aqi_04 with "Htext"). }
     { iEval (rewrite HcspA0 -Hb2). iExact "Hr16". }
-    iIntros (CID3 Hs3) "Hcg Hpc Hr16".
+    iIntros (CID3 Hs3) "_ Hcg Hpc Hr16".
     iEval (rgne) in "Hr16".
     assert (Hpc06 : add_vec_int (mword_of_int (KernelSyms.acquire + 0x04) : mword 64) 2 = mword_of_int (KernelSyms.acquire + 0x06)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc06) in "Hpc".
@@ -311,7 +311,7 @@ Section ProofAcquire.
               with "Hcg Hpc [] [Hr8]").
     { iApply (aqi_06 with "Htext"). }
     { iEval (rewrite HcspA0 -Hb3). iExact "Hr8". }
-    iIntros (CID4 Hs4) "Hcg Hpc Hr8".
+    iIntros (CID4 Hs4) "_ Hcg Hpc Hr8".
     iEval (rgne) in "Hr8".
     assert (Hpc08 : add_vec_int (mword_of_int (KernelSyms.acquire + 0x06) : mword 64) 2 = mword_of_int (KernelSyms.acquire + 0x08)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc08) in "Hpc".
@@ -321,7 +321,7 @@ Section ProofAcquire.
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (aqi_08 with "Htext"). }
-    iIntros (CID5 Hs5) "Hcg Hpc".
+    iIntros (CID5 Hs5) "_ Hcg Hpc".
     set (A1 := <[Regidx (mword_of_int 8 : mword 5) := regval_into_reg
         (add_vec (A0 !!! Regidx csp_rs1) (sign_extend' 64 (caddi4spn_imm (mword_of_int 8 : mword 8))))]> A0).
     change (<[Regidx (mword_of_int 8 : mword 5) := regval_into_reg
@@ -334,7 +334,7 @@ Section ProofAcquire.
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (aqi_0a with "Htext"). }
-    iIntros (CID6 Hs6) "Hcg Hpc". iEval (rgne) in "Hcg".
+    iIntros (CID6 Hs6) "_ Hcg Hpc". iEval (rgne) in "Hcg".
     set (A2 := <[Regidx (mword_of_int 9 : mword 5) := regval_into_reg
         (add_vec zero_reg (A1 !!! Regidx (mword_of_int 10 : mword 5)))]> A1).
     change (<[Regidx (mword_of_int 9 : mword 5) := regval_into_reg
@@ -347,7 +347,7 @@ Section ProofAcquire.
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (aqi_0c with "Htext"). }
-    iIntros (CID7 Hs7) "Hcg Hpc".
+    iIntros (CID7 Hs7) "_ Hcg Hpc".
     set (A3 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.acquire + 0x0c) : mword 64) 4)]> A2).
     change (<[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.acquire + 0x0c) : mword 64) 4)]> A2) with A3.
     assert (Hpcpo : add_vec (mword_of_int (KernelSyms.acquire + 0x0c) : mword 64) (sign_extend' 64 (mword_of_int 0x1fffba : mword 21))
@@ -369,7 +369,7 @@ Section ProofAcquire.
               ltac:(lia)
               ltac:(lia)
               with "Hcg Hown Htext Hpc").
-    iIntros (CIDpo Hspo ms mp) "%Hmsf Hcg Hown Hpay Hpc %Hmp".
+    iIntros (CIDpo Hspo) "Hlc"; iIntros (ms mp) "%Hmsf Hcg Hown Hpay Hpc %Hmp".
     destruct Hmp as (Hcspp & Hs0p & Hs1p & Hs2p & Hs3p & Hs4p & Hs5p & Hs6p & Hs7p & Hs8p & Hs9p & Hs10p & Hs11p).
     (* ===== from here on b = false LITERALLY (push_off's own flip) and the
        hart is pinned at CIDpo for the rest of the function: every remaining
@@ -692,7 +692,7 @@ Section ProofAcquire.
     (* the payload and the view receipt were produced at the take, above:
        the winner runs the lock's context on this hart from the moment it
        wins the word, so nothing about the hand-off is left for the return. *)
-    iSpecialize ("Hcont" $! CIDpo with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CIDpo with "[%] Hlc"); [wp_next_chain|].
     iAssert (∃ K : nat, hart_view_lb (CID := CIDpo) K)%I as "Hlb".
     { iExists K0. iExact "HK0s". }
     iApply ("Hcont" $! ms E4 with "[%] HTc Hcg Hpc [%] Htok HRes Hpaira Hlb Hown Hpay").
@@ -845,8 +845,8 @@ Section ProofAcquire.
               Hpos Hav Hfresh Href Hrefpre
               with "Hcg Hown Htext Hpc Hlock [] HTc [Hcont]").
     { iApply TsoGhost.llb_0. }
-    iIntros (CID2) "%Hs2".
-    iSpecialize ("Hcont" $! CID2 with "[%]"); [exact Hs2|].
+    iIntros (CID2) "%Hs2 Hlc".
+    iSpecialize ("Hcont" $! CID2 with "[%] Hlc"); [exact Hs2|].
     iIntros (ms mfin) "%Hms HTc Hcg Hpc %Hcs Htok HRes _ Hlb Hown Hpay".
     iApply ("Hcont" $! ms mfin with "[%] HTc Hcg Hpc [%] Htok HRes Hlb Hown Hpay");
       [exact Hms | exact Hcs].
@@ -910,8 +910,8 @@ Section OfGen.
               with "Hcg Hown Htext Hpc [] []").
     { iApply (is_lock_openable with "Hlock"). }
     { done. }
-    iIntros (CIDg Hsg ms mfin) "%Hms _ Hcg Hpc %Hcs Htok HRes Hlb Hown Hpay".
-    iSpecialize ("Hcont" $! CIDg with "[%]"); [wp_next_chain|].
+    iIntros (CIDg Hsg) "Hlc"; iIntros (ms mfin) "%Hms _ Hcg Hpc %Hcs Htok HRes Hlb Hown Hpay".
+    iSpecialize ("Hcont" $! CIDg with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! ms mfin with "[//] Hcg Hpc [//] Htok HRes Hlb Hown Hpay").
   Qed.
 
@@ -931,8 +931,8 @@ Section OfGen.
               with "Hcg Hown Htext Hpc [] Hllb []").
     { iApply (is_lock_openable with "Hlock"). }
     { done. }
-    iIntros (CIDg Hsg ms mfin) "%Hms _ Hcg Hpc %Hcs Htok HRes Hfl Hlb Hown Hpay".
-    iSpecialize ("Hcont" $! CIDg with "[%]"); [wp_next_chain|].
+    iIntros (CIDg Hsg) "Hlc"; iIntros (ms mfin) "%Hms _ Hcg Hpc %Hcs Htok HRes Hfl Hlb Hown Hpay".
+    iSpecialize ("Hcont" $! CIDg with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! ms mfin with "[//] Hcg Hpc [//] Htok HRes Hfl Hlb Hown Hpay").
   Qed.
 

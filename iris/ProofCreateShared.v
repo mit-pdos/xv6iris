@@ -1656,15 +1656,15 @@ Section ProofCreateMain.
     abs_of n' = Some (MkAnode c 1%nat) ->
     ftop_inv fsc_fs -∗ app_inv fsc_fs -∗ t ↪[ln_tx icfg_log]{#(1/2)} tt -∗
     pf_at (aarm_commit_at (fs_gamma_L fsc_fs) appE c) Farm -∗
-    top_frag (fs_gamma_L fsc_fs) i n ={E}=∗
+    top_frag (fs_gamma_L fsc_fs) i n -∗ £ 1 ={E}=∗
       cr_dirty t i ∗ top_frag (fs_gamma_L fsc_fs) i n' ∗ cre_arm_fired Farm i.
   Proof using .
-    iIntros (HE Hnone Hrow) "#Hi #Hai Htx Hcm Hf".
+    iIntros (HE Hnone Hrow) "#Hi #Hai Htx Hcm Hf Hlc".
     iMod (ireg_arm E fsc_fs i t (1/2)%Qp (ftopN_sub_app E HE) with "Hi Htx")
       as (k) "Harm".
     iMod (caf_arm_fire fsc_fs E k t (1/2)%Qp {[i]} i c Farm n n' HE
             ltac:(apply elem_of_singleton, eq_refl) Hnone Hrow
-            with "Hi Hai Harm Hcm Hf") as "(Harm & Hf & Hr)".
+            with "Hi Hai Harm Hcm Hf Hlc") as "(Harm & Hf & Hr)".
     iModIntro. iFrame "Hf Hr". rewrite /cr_dirty. iExists k. iExact "Harm".
   Qed.
 
@@ -1675,15 +1675,15 @@ Section ProofCreateMain.
     abs_of n' = Some (MkAnode (ADir (dots_ents full i d)) 1%nat) ->
     ftop_inv fsc_fs -∗ app_inv fsc_fs -∗ cr_dirty t i -∗
     pf_at (adots_commit_at (fs_gamma_L fsc_fs) appE) Fdots -∗
-    top_frag (fs_gamma_L fsc_fs) i n ={E}=∗
+    top_frag (fs_gamma_L fsc_fs) i n -∗ £ 1 ={E}=∗
       cr_dirty t i ∗ top_frag (fs_gamma_L fsc_fs) i n'
       ∗ cre_dots_fired Fdots i d full.
   Proof using .
-    iIntros (HE Hrow Hrow') "#Hi #Hai Hd Hcm Hf". rewrite /cr_dirty.
+    iIntros (HE Hrow Hrow') "#Hi #Hai Hd Hcm Hf Hlc". rewrite /cr_dirty.
     iDestruct "Hd" as (k) "Harm".
     iMod (caf_dots_fire fsc_fs E k t (1/2)%Qp {[i]} i d full Fdots n n' HE
             ltac:(apply elem_of_singleton, eq_refl) Hrow Hrow'
-            with "Hi Hai Harm Hcm Hf") as "(Harm & Hf & Hr)".
+            with "Hi Hai Harm Hcm Hf Hlc") as "(Harm & Hf & Hr)".
     iModIntro. iFrame "Hf Hr". iExists k. iExact "Harm".
   Qed.
 
@@ -1695,15 +1695,15 @@ Section ProofCreateMain.
     abs_of n' = Some (MkAnode (ADir (dots_ents full i d)) 1%nat) ->
     ftop_inv fsc_fs -∗ app_inv fsc_fs -∗ cr_dirty t i -∗
     pf_at (adots_commit_at (fs_gamma_L fsc_fs) appE) Fdots -∗
-    top_frag (fs_gamma_L fsc_fs) i n ={E}=∗
+    top_frag (fs_gamma_L fsc_fs) i n -∗ £ 1 ={E}=∗
       t ↪[ln_tx icfg_log]{#(1/2)} tt ∗ top_frag (fs_gamma_L fsc_fs) i n'
       ∗ cre_dots_fired Fdots i d full.
   Proof using .
-    iIntros (HE Hloc Hrow Hrow') "#Hi #Hai Hd Hcm Hf". rewrite /cr_dirty.
+    iIntros (HE Hloc Hrow Hrow') "#Hi #Hai Hd Hcm Hf Hlc". rewrite /cr_dirty.
     iDestruct "Hd" as (k) "Harm".
     iMod (caf_dots_fire fsc_fs E k t (1/2)%Qp {[i]} i d full Fdots n n' HE
             ltac:(apply elem_of_singleton, eq_refl) Hrow Hrow'
-            with "Hi Hai Harm Hcm Hf") as "(Harm & Hf & Hr)".
+            with "Hi Hai Harm Hcm Hf Hlc") as "(Harm & Hf & Hr)".
     iMod (ireg_disarm E fsc_fs k t (1/2)%Qp {[i]} i n' (ftopN_sub_app E HE) Hloc
             with "Hi Harm Hf") as "[Harm Hf]".
     iEval (rewrite difference_diag_L) in "Harm".
@@ -1720,15 +1720,15 @@ Section ProofCreateMain.
     abs_of n' = None ->
     ftop_inv fsc_fs -∗ app_inv fsc_fs -∗ cr_dirty t i -∗
     aunarm_commit_at (fs_gamma_L fsc_fs) appE i Fun.(pf_recv) -∗
-    top_frag (fs_gamma_L fsc_fs) i n ={E}=∗
+    top_frag (fs_gamma_L fsc_fs) i n -∗ £ 1 ={E}=∗
       t ↪[ln_tx icfg_log]{#(1/2)} tt ∗ top_frag (fs_gamma_L fsc_fs) i n'
       ∗ cre_unarm_fired Fun i.
   Proof using .
-    iIntros (HE Hloc Hrow Hnone) "#Hi #Hai Hd Hcm Hf". rewrite /cr_dirty.
+    iIntros (HE Hloc Hrow Hnone) "#Hi #Hai Hd Hcm Hf Hlc". rewrite /cr_dirty.
     iDestruct "Hd" as (k) "Harm".
     iMod (caf_unarm_fire_armed fsc_fs E k t (1/2)%Qp {[i]} i c Fun n n' HE
             ltac:(apply elem_of_singleton, eq_refl) Hrow Hnone
-            with "Hi Hai Harm Hcm Hf") as "(Harm & Hf & Hr)".
+            with "Hi Hai Harm Hcm Hf Hlc") as "(Harm & Hf & Hr)".
     iMod (ireg_disarm E fsc_fs k t (1/2)%Qp {[i]} i n' (ftopN_sub_app E HE) Hloc
             with "Hi Harm Hf") as "[Harm Hf]".
     iEval (rewrite difference_diag_L) in "Harm".
@@ -1761,11 +1761,11 @@ Section ProofCreateMain.
     Nd c ->
     ftop_inv γfs -∗ app_inv γfs -∗
     aunarm_commit_at_nd (fs_gamma_L γfs) appE i Nd Fun.(pf_recv) -∗
-    top_frag (fs_gamma_L γfs) i n ={E}=∗
+    top_frag (fs_gamma_L γfs) i n -∗ £ 1 ={E}=∗
       top_frag (fs_gamma_L γfs) i n' ∗ cre_unarm_fired Fun i.
   Proof using .
-    iIntros (HE Hloc Hrow Hnone HNd) "#Hi #Hai Hcm Hf".
-    iApply (caf_retag γfs E i n n' _ HE Hloc with "Hi Hai [Hcm] Hf").
+    iIntros (HE Hloc Hrow Hnone HNd) "#Hi #Hai Hcm Hf Hlc".
+    iApply (caf_retag γfs E i n n' _ HE Hloc with "Hi Hai [Hcm] Hf Hlc").
     iIntros (I Hlk) "Hta".
     assert (Hav : abs_view I !! i = Some (MkAnode c 1%nat))
       by (rewrite (abs_view_lookup_of I i n Hlk); exact Hrow).
@@ -1790,13 +1790,13 @@ Section ProofCreateMain.
     Nd c ->
     ftop_inv γfs -∗ app_inv γfs -∗ ireg_armed k t q S -∗
     aunarm_commit_at_nd (fs_gamma_L γfs) appE i Nd Fun.(pf_recv) -∗
-    top_frag (fs_gamma_L γfs) i n ={E}=∗
+    top_frag (fs_gamma_L γfs) i n -∗ £ 1 ={E}=∗
       ireg_armed k t q S ∗ top_frag (fs_gamma_L γfs) i n'
       ∗ cre_unarm_fired Fun i.
   Proof using .
-    iIntros (HE Hin Hrow Hnone HNd) "#Hi #Hai Hrec Hcm Hf".
+    iIntros (HE Hin Hrow Hnone HNd) "#Hi #Hai Hrec Hcm Hf Hlc".
     iApply (caf_armed_retag γfs E k t q S i n n' _ HE Hin
-              with "Hi Hai Hrec [Hcm] Hf").
+              with "Hi Hai Hrec [Hcm] Hf Hlc").
     iIntros (I Hlk) "Hta".
     assert (Hav : abs_view I !! i = Some (MkAnode c 1%nat))
       by (rewrite (abs_view_lookup_of I i n Hlk); exact Hrow).
@@ -1820,15 +1820,15 @@ Section ProofCreateMain.
     Nd c ->
     ftop_inv fsc_fs -∗ app_inv fsc_fs -∗ cr_dirty t i -∗
     aunarm_commit_at_nd (fs_gamma_L fsc_fs) appE i Nd Fun.(pf_recv) -∗
-    top_frag (fs_gamma_L fsc_fs) i n ={E}=∗
+    top_frag (fs_gamma_L fsc_fs) i n -∗ £ 1 ={E}=∗
       t ↪[ln_tx icfg_log]{#(1/2)} tt ∗ top_frag (fs_gamma_L fsc_fs) i n'
       ∗ cre_unarm_fired Fun i.
   Proof using .
-    iIntros (HE Hloc Hrow Hnone HNd) "#Hi #Hai Hd Hcm Hf". rewrite /cr_dirty.
+    iIntros (HE Hloc Hrow Hnone HNd) "#Hi #Hai Hd Hcm Hf Hlc". rewrite /cr_dirty.
     iDestruct "Hd" as (k) "Harm".
     iMod (caf_unarm_fire_armed_nd fsc_fs E k t (1/2)%Qp {[i]} i c Nd Fun n n' HE
             ltac:(apply elem_of_singleton, eq_refl) Hrow Hnone HNd
-            with "Hi Hai Harm Hcm Hf") as "(Harm & Hf & Hr)".
+            with "Hi Hai Harm Hcm Hf Hlc") as "(Harm & Hf & Hr)".
     iMod (ireg_disarm E fsc_fs k t (1/2)%Qp {[i]} i n' (ftopN_sub_app E HE) Hloc
             with "Hi Harm Hf") as "[Harm Hf]".
     iEval (rewrite difference_diag_L) in "Harm".
@@ -1850,13 +1850,13 @@ Section ProofCreateMain.
     ↑ftopN ∪ ↑appN ⊆ E ->
     FsAbsDefs.abs_of n = FsAbsDefs.abs_of n' ->
     ftop_inv fsc_fs -∗ app_inv fsc_fs -∗ cr_dirty t i -∗
-    top_frag (fs_gamma_L fsc_fs) i n ={E}=∗
+    top_frag (fs_gamma_L fsc_fs) i n -∗ £ 1 ={E}=∗
       cr_dirty t i ∗ top_frag (fs_gamma_L fsc_fs) i n'.
   Proof using .
-    iIntros (HE Habs) "#Hi #Hai Hd Hf". rewrite /cr_dirty.
+    iIntros (HE Habs) "#Hi #Hai Hd Hf Hlc". rewrite /cr_dirty.
     iDestruct "Hd" as (k) "Harm".
     iMod (ireg_top_retag_armed_same E fsc_fs k t (1/2)%Qp {[i]} i n n' HE
-            ltac:(apply elem_of_singleton, eq_refl) Habs with "Hi Hai Harm Hf")
+            ltac:(apply elem_of_singleton, eq_refl) Habs with "Hi Hai Harm Hf Hlc")
       as "[Harm Hf]".
     iModIntro. iFrame "Hf". iExists k. iExact "Harm".
   Qed.
@@ -1867,13 +1867,13 @@ Section ProofCreateMain.
     FsAbsDefs.abs_of n = FsAbsDefs.abs_of n' ->
     inode_local i n' ->
     ftop_inv fsc_fs -∗ app_inv fsc_fs -∗ cr_dirty t i -∗
-    top_frag (fs_gamma_L fsc_fs) i n ={E}=∗
+    top_frag (fs_gamma_L fsc_fs) i n -∗ £ 1 ={E}=∗
       t ↪[ln_tx icfg_log]{#(1/2)} tt ∗ top_frag (fs_gamma_L fsc_fs) i n'.
   Proof using .
-    iIntros (HE Habs Hloc) "#Hi #Hai Hd Hf". rewrite /cr_dirty.
+    iIntros (HE Habs Hloc) "#Hi #Hai Hd Hf Hlc". rewrite /cr_dirty.
     iDestruct "Hd" as (k) "Harm".
     iMod (ireg_top_retag_armed_same E fsc_fs k t (1/2)%Qp {[i]} i n n' HE
-            ltac:(apply elem_of_singleton, eq_refl) Habs with "Hi Hai Harm Hf")
+            ltac:(apply elem_of_singleton, eq_refl) Habs with "Hi Hai Harm Hf Hlc")
       as "[Harm Hf]".
     iMod (ireg_disarm E fsc_fs k t (1/2)%Qp {[i]} i n' (ftopN_sub_app E HE) Hloc
             with "Hi Harm Hf") as "[Harm Hf]".
@@ -2148,14 +2148,14 @@ Section ProofCreateMain.
     assert (Hcsa0 : is_cs_idx Ra0 = false) by (vm_compute; reflexivity).
     assert (Hcsra : is_cs_idx Rra = false) by (vm_compute; reflexivity).
     iIntros "#Htext". iModIntro.
-    iIntros (CIDt Hst Mt w5 dnew)
+    iIntros (CIDt Hst) "_"; iIntros (Mt w5 dnew)
       "%HTr Hcg Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hnb Hqc".
     destruct HTr as [HTsp HTthr].
     (* +0x70 c.mv a0,s2 : the answer register *)
     iApply (wp_cmv_s_sconf (mword_of_int (CK + 0x70)) Ra0 Rs2 Mt
               (K - 10)%nat b ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
     { iApply (cri_070 with "Htext"). }
-    iIntros (CIDT0 HqT0) "Hcg Hpc". iEval (rgne) in "Hcg".
+    iIntros (CIDT0 HqT0) "_ Hcg Hpc". iEval (rgne) in "Hcg".
     pose (P0 := <[Regidx Ra0 := regval_into_reg
                   (add_vec (zero_reg : mword 64) (Mt !!! Regidx Rs2))]> Mt).
     change (<[Regidx Ra0 := regval_into_reg
@@ -2174,7 +2174,7 @@ Section ProofCreateMain.
               Rra P0 (K - 10)%nat (m !!! Regidx Rra : mword 64) b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc [] Hb1").
     { iApply (cri_072 with "Htext"). }
-    iIntros (CIDT1 HqT1) "Hcg Hpc Hb1".
+    iIntros (CIDT1 HqT1) "_ Hcg Hpc Hb1".
     pose (P1 := <[Regidx Rra := regval_into_reg (m !!! Regidx Rra : mword 64)]> P0).
     change (<[Regidx Rra := regval_into_reg (m !!! Regidx Rra : mword 64)]> P0) with P1.
     assert (HP1sp : P1 !!! Regidx csp_rs1 = pa_stk sp0 10)
@@ -2190,7 +2190,7 @@ Section ProofCreateMain.
               Rs0 P1 (K - 10)%nat (m !!! Regidx Rs0 : mword 64) b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc [] Hb2").
     { iApply (cri_074 with "Htext"). }
-    iIntros (CIDT2 HqT2) "Hcg Hpc Hb2".
+    iIntros (CIDT2 HqT2) "_ Hcg Hpc Hb2".
     pose (P2 := <[Regidx Rs0 := regval_into_reg (m !!! Regidx Rs0 : mword 64)]> P1).
     change (<[Regidx Rs0 := regval_into_reg (m !!! Regidx Rs0 : mword 64)]> P1) with P2.
     assert (HP2sp : P2 !!! Regidx csp_rs1 = pa_stk sp0 10)
@@ -2206,7 +2206,7 @@ Section ProofCreateMain.
               Rs1 P2 (K - 10)%nat (m !!! Regidx Rs1 : mword 64) b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc [] Hb3").
     { iApply (cri_076 with "Htext"). }
-    iIntros (CIDT3 HqT3) "Hcg Hpc Hb3".
+    iIntros (CIDT3 HqT3) "_ Hcg Hpc Hb3".
     pose (P3 := <[Regidx Rs1 := regval_into_reg (m !!! Regidx Rs1 : mword 64)]> P2).
     change (<[Regidx Rs1 := regval_into_reg (m !!! Regidx Rs1 : mword 64)]> P2) with P3.
     assert (HP3sp : P3 !!! Regidx csp_rs1 = pa_stk sp0 10)
@@ -2222,7 +2222,7 @@ Section ProofCreateMain.
               Rs2 P3 (K - 10)%nat (m !!! Regidx Rs2 : mword 64) b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc [] Hb4").
     { iApply (cri_078 with "Htext"). }
-    iIntros (CIDT4 HqT4) "Hcg Hpc Hb4".
+    iIntros (CIDT4 HqT4) "_ Hcg Hpc Hb4".
     pose (P4 := <[Regidx Rs2 := regval_into_reg (m !!! Regidx Rs2 : mword 64)]> P3).
     change (<[Regidx Rs2 := regval_into_reg (m !!! Regidx Rs2 : mword 64)]> P3) with P4.
     assert (HP4sp : P4 !!! Regidx csp_rs1 = pa_stk sp0 10)
@@ -2238,7 +2238,7 @@ Section ProofCreateMain.
               Rs4 P4 (K - 10)%nat (m !!! Regidx Rs4 : mword 64) b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc [] Hb6").
     { iApply (cri_07a with "Htext"). }
-    iIntros (CIDT5 HqT5) "Hcg Hpc Hb6".
+    iIntros (CIDT5 HqT5) "_ Hcg Hpc Hb6".
     pose (P5 := <[Regidx Rs4 := regval_into_reg (m !!! Regidx Rs4 : mword 64)]> P4).
     change (<[Regidx Rs4 := regval_into_reg (m !!! Regidx Rs4 : mword 64)]> P4) with P5.
     assert (HP5sp : P5 !!! Regidx csp_rs1 = pa_stk sp0 10)
@@ -2254,7 +2254,7 @@ Section ProofCreateMain.
               Rs5 P5 (K - 10)%nat (m !!! Regidx Rs5 : mword 64) b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc [] Hb7").
     { iApply (cri_07c with "Htext"). }
-    iIntros (CIDT6 HqT6) "Hcg Hpc Hb7".
+    iIntros (CIDT6 HqT6) "_ Hcg Hpc Hb7".
     pose (P6 := <[Regidx Rs5 := regval_into_reg (m !!! Regidx Rs5 : mword 64)]> P5).
     change (<[Regidx Rs5 := regval_into_reg (m !!! Regidx Rs5 : mword 64)]> P5) with P6.
     assert (HP6sp : P6 !!! Regidx csp_rs1 = pa_stk sp0 10)
@@ -2270,7 +2270,7 @@ Section ProofCreateMain.
               Rs6 P6 (K - 10)%nat (m !!! Regidx Rs6 : mword 64) b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc [] Hb8").
     { iApply (cri_07e with "Htext"). }
-    iIntros (CIDT7 HqT7) "Hcg Hpc Hb8".
+    iIntros (CIDT7 HqT7) "_ Hcg Hpc Hb8".
     pose (P7 := <[Regidx Rs6 := regval_into_reg (m !!! Regidx Rs6 : mword 64)]> P6).
     change (<[Regidx Rs6 := regval_into_reg (m !!! Regidx Rs6 : mword 64)]> P6) with P7.
     assert (HP7sp : P7 !!! Regidx csp_rs1 = pa_stk sp0 10)
@@ -2312,7 +2312,7 @@ Section ProofCreateMain.
               (mword_of_int 5 : mword 6) P7 (K - 10)%nat 10 b Hpop
               with "Hcg Hpc [] Hstk").
     { iApply (cri_080 with "Htext"). }
-    iIntros (CIDT8 HqT8) "Hcg Hpc".
+    iIntros (CIDT8 HqT8) "_ Hcg Hpc".
     pose (P8 := <[Regidx csp_rs1 := regval_into_reg
                    (add_vec (P7 !!! Regidx csp_rs1 : mword 64)
                       (sign_extend' 64 (caddi16sp_imm (mword_of_int 5 : mword 6))))]> P7).
@@ -2332,7 +2332,7 @@ Section ProofCreateMain.
     iApply (wp_cret_s_sconf (mword_of_int (CK + 0x82)) Rra P8 K b
               ltac:(nz) with "Hcg Hpc []").
     { iApply (cri_082 with "Htext"). }
-    iIntros (CIDT9 HqT9) "Hcg Hpc".
+    iIntros (CIDT9 HqT9) "Hlc Hcg Hpc".
     iEval (rgne) in "Hpc".
     assert (Hretf : ret_pc (P8 !!! Regidx Rra : mword 64) = ret_tgt)
       by (rewrite CPra; exact Hrt).
@@ -2381,7 +2381,7 @@ Section ProofCreateMain.
       rewrite /P4 upd_ne; [| nz]. rewrite /P3 upd_ne; [| nz].
       rewrite /P2 upd_ne; [| nz]. rewrite /P1 upd_ne; [| nz].
       rewrite /P0 upd_eq. apply add_vec_zero_l. }
-    iSpecialize ("Hqc" $! CIDT9 with "[%]"); [wp_next_chain |].
+    iSpecialize ("Hqc" $! CIDT9 with "[%] Hlc"); [wp_next_chain |].
     iApply ("Hqc" $! P8 with "[%] [%] Hcg Hpc").
     - unfold callee_saved. split_and!;
         first [ exact CPsp | exact CPs0 | exact CPs1 | exact CPs2

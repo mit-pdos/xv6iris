@@ -716,7 +716,7 @@ Section CreateFire.
        ([FsAbsCreateFire.acre_commit_at_gen]'s note at [Pd]). *)
     Pd d -∗
     top_frag (fs_gamma_L γfs) d np -∗
-    top_frag_q (fs_gamma_L γfs) dqc i nc ={E}=∗
+    top_frag_q (fs_gamma_L γfs) dqc i nc -∗ £ 1 ={E}=∗
       top_frag (fs_gamma_L γfs) d np'
       ∗ top_frag_q (fs_gamma_L γfs) dqc i nc
       ∗ Pd d
@@ -725,7 +725,7 @@ Section CreateFire.
           ∗ Fok.(pf_recv) av d nm i.
   Proof using .
     intros HE HNm Hloc Hdir Hnl Hnone Hpnm Habsp' Habsc.
-    iIntros "#Hi #Hai Hcm Harm HPd Hfp Hfc".
+    iIntros "#Hi #Hai Hcm Harm HPd Hfp Hfc Hlc".
     iDestruct (pf_at_au with "Hcm") as "Hcm".
     (* the re-spelling is needed because
        [γtop (fs_gamma_L γfs)] and [fs_top γfs] are the SAME gname
@@ -760,7 +760,7 @@ Section CreateFire.
        of [appN] beside its claim, which the caller's step re-establishes
        under the later ([AppInv.app_top_update]) *)
     iMod (app_top_update appE γfs I d np np' ltac:(rewrite /appE; done)
-            with "Hai [Hstep] Hta Hfp") as "[Hta Hfp]".
+            with "Hai [Hstep] Hta Hfp Hlc") as "[Hta Hfp]".
     { iIntros (_) "Hp". iApply (app_step_at d I _ np' Hdelta with "Hstep Hp"). }
     iMod ("Hph2" $! (<[d := np']> I) with "[//] Hta") as "[Hta HΦ]".
     iMod "Hcl2".
@@ -797,7 +797,7 @@ Section CreateFire.
     cre_arm_fired Farm i -∗
     Pd d -∗
     top_frag (fs_gamma_L γfs) d np -∗
-    top_frag_q (fs_gamma_L γfs) dqc i nc ={E}=∗
+    top_frag_q (fs_gamma_L γfs) dqc i nc -∗ £ 1 ={E}=∗
       top_frag (fs_gamma_L γfs) d np'
       ∗ top_frag_q (fs_gamma_L γfs) dqc i nc
       ∗ Pd d
@@ -806,10 +806,10 @@ Section CreateFire.
           ∗ Fok.(pf_recv) av d nm i.
   Proof using .
     intros HE Hloc Hdir Hnl Hnone Hpnm Habsp' Habsc.
-    iIntros "Hi Hai Hcm Harm HPd Hfp Hfc".
+    iIntros "Hi Hai Hcm Harm HPd Hfp Hfc Hlc".
     iApply (caf_acre_fire_nm γfs E cf (fun _ => True) Pd Farm Fok d i nm dqc
               np np' nc HE I Hloc Hdir Hnl Hnone Hpnm Habsp' Habsc
-              with "Hi Hai [Hcm] Harm HPd Hfp Hfc").
+              with "Hi Hai [Hcm] Harm HPd Hfp Hfc Hlc").
     iApply (pf_at_mono with "[] Hcm"). iIntros "Hcm".
     iApply (acre_commit_at_gen_nm_of (fs_gamma_L γfs) appE cf
               (fun _ => True) Pd Farm Fok.(pf_recv) with "Hcm").
@@ -835,7 +835,7 @@ Section CreateFire.
     cre_arm_fired Farm i -∗
     Pd d -∗
     top_frag (fs_gamma_L γfs) d np -∗
-    top_frag_q (fs_gamma_L γfs) dqc i nc ={E}=∗
+    top_frag_q (fs_gamma_L γfs) dqc i nc -∗ £ 1 ={E}=∗
       top_frag (fs_gamma_L γfs) d np'
       ∗ top_frag_q (fs_gamma_L γfs) dqc i nc
       ∗ Pd d
@@ -844,11 +844,11 @@ Section CreateFire.
           ∗ Fok.(pf_recv) av d nm i.
   Proof using .
     intros HE Hloc Hdir Hnl Hnone Hpnm Habsp' Habsc.
-    iIntros "Hi Hai Hcm Harm HPd Hfp Hfc".
+    iIntros "Hi Hai Hcm Harm HPd Hfp Hfc Hlc".
     iApply (caf_acre_fire γfs E (fun _ _ => AFile []) Pd Farm Fok d i nm dqc
               np np' nc HE Hloc Hdir Hnl Hnone Hpnm
               ltac:(rewrite Habsp'; cbn [acre_bump]; by rewrite Nat.add_0_r)
-              Habsc with "Hi Hai Hcm Harm HPd Hfp Hfc").
+              Habsc with "Hi Hai Hcm Harm HPd Hfp Hfc Hlc").
   Qed.
 
   (* THE MINTED CHILD'S ROW AT ANY TYPE: [FsAbsCreateFire.create_made] at a

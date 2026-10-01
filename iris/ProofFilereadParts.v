@@ -503,7 +503,7 @@ Section ProofFilereadParts.
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (fri_5e with "Htext"). }
-    iIntros (CID1 Hs1) "Hcg Hpc". iEval (rgne) in "Hcg".
+    iIntros (CID1 Hs1) "_ Hcg Hpc". iEval (rgne) in "Hcg".
     set (T0 := <[Regidx Ra0 := regval_into_reg (add_vec zero_reg (Mt !!! Regidx Rs2))]> Mt).
     assert (HT0a0 : T0 !!! Regidx Ra0 = rv).
     { rewrite /T0 upd_eq. unfold regval_into_reg. rewrite Hmts2.
@@ -523,7 +523,7 @@ Section ProofFilereadParts.
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc [] Hb1").
     { iApply (fri_60 with "Htext"). }
-    iIntros (CID2 Hs2) "Hcg Hpc Hb1". iEval (rewrite Hpa1) in "Hb1".
+    iIntros (CID2 Hs2) "_ Hcg Hpc Hb1". iEval (rewrite Hpa1) in "Hb1".
     set (T1 := <[Regidx Rra := regval_into_reg ra0]> T0).
     assert (HT1sp : T1 !!! Regidx csp_rs1 = pa_stk sp0 6)
       by (rewrite /T1 upd_ne; [exact HT0sp | vm_compute; discriminate]).
@@ -540,7 +540,7 @@ Section ProofFilereadParts.
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc [] Hb2").
     { iApply (fri_62 with "Htext"). }
-    iIntros (CID3 Hs3) "Hcg Hpc Hb2". iEval (rewrite Hpa2) in "Hb2".
+    iIntros (CID3 Hs3) "_ Hcg Hpc Hb2". iEval (rewrite Hpa2) in "Hb2".
     set (T2 := <[Regidx Rs0 := regval_into_reg s00]> T1).
     assert (HT2sp : T2 !!! Regidx csp_rs1 = pa_stk sp0 6)
       by (rewrite /T2 upd_ne; [exact HT1sp | vm_compute; discriminate]).
@@ -557,7 +557,7 @@ Section ProofFilereadParts.
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc [] Hb4").
     { iApply (fri_64 with "Htext"). }
-    iIntros (CID4 Hs4) "Hcg Hpc Hb4". iEval (rewrite Hpa4) in "Hb4".
+    iIntros (CID4 Hs4) "_ Hcg Hpc Hb4". iEval (rewrite Hpa4) in "Hb4".
     set (T3 := <[Regidx Rs2 := regval_into_reg s20]> T2).
     assert (HT3sp : T3 !!! Regidx csp_rs1 = pa_stk sp0 6)
       by (rewrite /T3 upd_ne; [exact HT2sp | vm_compute; discriminate]).
@@ -585,7 +585,7 @@ Section ProofFilereadParts.
     iApply (wp_caddi16sp_pop_s_sconf (mword_of_int (FR + 0x66)) (mword_of_int 3 : mword 6)
               T3 (K - 6)%nat 6 b Hpop with "Hcg Hpc [] Hframe").
     { iApply (fri_66 with "Htext"). }
-    iIntros (CID5 Hs5) "Hcg Hpc".
+    iIntros (CID5 Hs5) "_ Hcg Hpc".
     assert (Hnk : ((K - 6) + 6)%nat = K) by exact (fr_frame_back K HK).
     iEval (rewrite Hnk) in "Hcg".
     set (T4 := <[Regidx csp_rs1 := regval_into_reg
@@ -606,10 +606,10 @@ Section ProofFilereadParts.
     iApply (wp_cret_s_sconf (mword_of_int (FR + 0x68)) Rra T4 K b
               ltac:(vm_compute; discriminate) with "Hcg Hpc []").
     { iApply (fri_68 with "Htext"). }
-    iIntros (CID6 Hs6) "Hcg Hpc".
+    iIntros (CID6 Hs6) "Hlc Hcg Hpc".
     iEval (rgne) in "Hpc".
     iEval (rewrite HT4ra) in "Hpc".
-    iSpecialize ("Hcont" $! CID6 with "[]"); [iPureIntro; wp_next_chain|].
+    iSpecialize ("Hcont" $! CID6 with "[] Hlc"); [iPureIntro; wp_next_chain|].
     iApply ("Hcont" $! T4 with "[%] Hcg Hpc").
     assert (Hrest : forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
                       r <> Rs0 -> r <> Rs2 -> r <> Rra -> r <> Ra0 ->
@@ -682,7 +682,7 @@ Section ProofFilereadParts.
     iApply (wp_cldsp_s_sconf (mword_of_int za) (mword_of_int 3 : mword 6) Rs1
               Mt K v1 b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hia Hb3").
-    iIntros (CID1 Hs1) "Hcg Hpc Hb3". iEval (rewrite Hpa3) in "Hb3".
+    iIntros (CID1 Hs1) "_ Hcg Hpc Hb3". iEval (rewrite Hpa3) in "Hb3".
     set (U1 := <[Regidx Rs1 := regval_into_reg v1]> Mt).
     assert (HU1sp : U1 !!! Regidx csp_rs1 = pa_stk sp0 6)
       by (rewrite /U1 upd_ne; [exact Hmtsp | vm_compute; discriminate]).
@@ -695,10 +695,10 @@ Section ProofFilereadParts.
     iApply (wp_cldsp_s_sconf (mword_of_int zb) (mword_of_int 1 : mword 6) Rs3
               U1 K v3 b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hib Hb5").
-    iIntros (CID2 Hs2) "Hcg Hpc Hb5". iEval (rewrite Hpa5) in "Hb5".
+    iIntros (CID2 Hs2) "Hlc Hcg Hpc Hb5". iEval (rewrite Hpa5) in "Hb5".
     set (U2 := <[Regidx Rs3 := regval_into_reg v3]> U1).
     iEval (rewrite Hbc) in "Hpc".
-    iSpecialize ("Hcont" $! CID2 with "[]"); [iPureIntro; wp_next_chain|].
+    iSpecialize ("Hcont" $! CID2 with "[] Hlc"); [iPureIntro; wp_next_chain|].
     iApply ("Hcont" $! U2 with "[%] Hcg Hpc Hb3 Hb5").
     assert (HU2sp : U2 !!! Regidx csp_rs1 = pa_stk sp0 6)
       by (rewrite /U2 upd_ne; [exact HU1sp | vm_compute; discriminate]).
@@ -763,14 +763,14 @@ Section ProofFilereadParts.
               (mword_of_int (-1) : mword 64) Mt K b
               ltac:(vm_compute; discriminate) ltac:(rdok) fr_lim1
               with "Hcg Hpc Hia").
-    iIntros (CID1 Hs1) "Hcg Hpc".
+    iIntros (CID1 Hs1) "_ Hcg Hpc".
     set (W1 := <[Regidx Ra5 := regval_into_reg (mword_of_int (-1) : mword 64)]> Mt).
     iEval (rewrite Hab) in "Hpc".
     (* c.mv s2,a5 *)
     iApply (wp_cmv_s_sconf (mword_of_int zb) Rs2 Ra5 W1 K b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hib").
-    iIntros (CID2 Hs2) "Hcg Hpc". iEval (rgne) in "Hcg".
+    iIntros (CID2 Hs2) "_ Hcg Hpc". iEval (rgne) in "Hcg".
     set (W2 := <[Regidx Rs2 := regval_into_reg (add_vec zero_reg (W1 !!! Regidx Ra5))]> W1).
     assert (HW2s2 : W2 !!! Regidx Rs2 = (mword_of_int (-1) : mword 64)).
     { rewrite /W2 upd_eq. unfold regval_into_reg. rewrite /W1 upd_eq.
@@ -782,16 +782,16 @@ Section ProofFilereadParts.
     (* the s1/s3 restore *)
     iApply (fr_rest2 (CID0 := CID2) W2 K sp0 v1 v3 zc zd ze p b HW2sp Hcd Hde
               with "Hcg Hpc Hic Hid Hb3 Hb5").
-    iIntros (CID3 Hs3 Mr) "%Hmr Hcg Hpc Hb3 Hb5".
+    iIntros (CID3 Hs3) "_"; iIntros (Mr) "%Hmr Hcg Hpc Hb3 Hb5".
     destruct Hmr as (Hmrsp & Hmrs1 & Hmrs3 & Hmrthr).
     (* the c.j into the epilogue: the alignment side condition is about the
        TARGET, so the equation is rewritten BEFORE [vm_compute]. *)
     iApply (wp_cj_s_sconf (mword_of_int ze) jimm Mr K b
               ltac:(rewrite Hjt; vm_compute; reflexivity)
               with "Hcg Hpc Hie").
-    iIntros (CID4 Hs4). iApply bi.later_intro. iIntros "Hcg Hpc".
+    iApply bi.later_intro. iIntros (CID4 Hs4) "Hlc". iIntros "Hcg Hpc".
     iEval (rewrite Hjt) in "Hpc".
-    iSpecialize ("Hcont" $! CID4 with "[]"); [iPureIntro; wp_next_chain|].
+    iSpecialize ("Hcont" $! CID4 with "[] Hlc"); [iPureIntro; wp_next_chain|].
     iApply ("Hcont" $! Mr with "[%] Hcg Hpc Hb3 Hb5").
     split; [exact Hmrsp|].
     split.

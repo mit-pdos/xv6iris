@@ -2419,8 +2419,8 @@ Section ProofMain.
               (sign_extend' 21 (concat_vec (mword_of_int 1990 : mword 11) ('b"0")))
               S3 n false ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
     { iApply (mni_b2 with "Htext"). }
-    iApply wp_next_off_intro.
-    iApply bi.later_intro. iIntros "Hcg Hpc".
+    iApply bi.later_intro.
+    iApply wp_next_off_intro. iIntros "Hcg Hpc".
     assert (Htgtj : add_vec (mword_of_int (KernelSyms.main + 0xb2) : mword 64)
               (sign_extend' 64 (sign_extend' 21
                  (concat_vec (mword_of_int 1990 : mword 11) ('b"0"))))

@@ -310,7 +310,7 @@ Section ProofUserinit.
     iApply (wp_caddi_sp_push_s_sconf pcE (mword_of_int 32 : mword 6) m K 4 b
               K4 Hpush with "Hcg Hpc []").
     { iApply (uin_00 with "Htext"). }
-    iIntros (CID1 Hq1) "Hcg Hframe Hpc".
+    iIntros (CID1 Hq1) "_ Hcg Hframe Hpc".
     set (R1 := <[Regidx csp_rs1 := regval_into_reg
                   (add_vec (m !!! Regidx csp_rs1 : mword 64)
                      (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))]> m).
@@ -341,7 +341,7 @@ Section ProofUserinit.
               (mword_of_int 3 : mword 6) Rra R1 (K - 4)%nat w1 b
               with "Hcg Hpc [] Hf1").
     { iApply (uin_02 with "Htext"). }
-    iIntros (CID2 Hq2) "Hcg Hpc Hf1".
+    iIntros (CID2 Hq2) "_ Hcg Hpc Hf1".
     assert (Hpp04 : add_vec_int (mword_of_int (UI + 0x02) : mword 64) 2
                     = mword_of_int (UI + 0x04)) by pcw.
     iEval (rewrite Hpp04) in "Hpc".
@@ -350,7 +350,7 @@ Section ProofUserinit.
               (mword_of_int 2 : mword 6) Rs0 R1 (K - 4)%nat w2 b
               with "Hcg Hpc [] Hf2").
     { iApply (uin_04 with "Htext"). }
-    iIntros (CID3 Hq3) "Hcg Hpc Hf2".
+    iIntros (CID3 Hq3) "_ Hcg Hpc Hf2".
     assert (Hpp06 : add_vec_int (mword_of_int (UI + 0x04) : mword 64) 2
                     = mword_of_int (UI + 0x06)) by pcw.
     iEval (rewrite Hpp06) in "Hpc".
@@ -359,7 +359,7 @@ Section ProofUserinit.
               (mword_of_int 1 : mword 6) Rs1 R1 (K - 4)%nat w3 b
               with "Hcg Hpc [] Hf3").
     { iApply (uin_06 with "Htext"). }
-    iIntros (CID4 Hq4) "Hcg Hpc Hf3".
+    iIntros (CID4 Hq4) "_ Hcg Hpc Hf3".
     assert (Hpp08 : add_vec_int (mword_of_int (UI + 0x06) : mword 64) 2
                     = mword_of_int (UI + 0x08)) by pcw.
     iEval (rewrite Hpp08) in "Hpc".
@@ -379,7 +379,7 @@ Section ProofUserinit.
               ltac:(vm_compute; reflexivity) ltac:(nz) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (uin_08 with "Htext"). }
-    iIntros (CID5 Hq5) "Hcg Hpc".
+    iIntros (CID5 Hq5) "_ Hcg Hpc".
     set (R2 := <[Regidx Rs0 := regval_into_reg
                   (add_vec (R1 !!! Regidx csp_rs1)
                      (sign_extend' 64 (caddi4spn_imm (mword_of_int 8 : mword 8))))]> R1).
@@ -401,7 +401,7 @@ Section ProofUserinit.
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (uin_0a with "Htext"). }
-    iIntros (CID6 Hq6) "Hcg Hpc".
+    iIntros (CID6 Hq6) "_ Hcg Hpc".
     set (R3 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (UI + 0x0a) : mword 64) 4)]> R2).
     assert (Htgtap : add_vec (mword_of_int (UI + 0x0a) : mword 64)
@@ -433,7 +433,7 @@ Section ProofUserinit.
               with "HKu Hcg Hcpu Htext Hpc Hpinv Hlpid Hkenv Hpav []").
     { (* the boot lends nothing (permit sweep L1a) *)
       rewrite Hpj0. iApply SlotGen.act_lend_zero. }
-    iIntros (CID7 Hq7 mr1) "%Hcsap Hpc _ Hpost".
+    iIntros (CID7 Hq7) "_"; iIntros (mr1) "%Hcsap Hpc _ Hpost".
     assert (Hpc0e : ret_pc (R3 !!! Regidx Rra : mword 64)
                     = mword_of_int (UI + 0x0e)) by (rewrite HR3ra; pcw).
     iEval (rewrite Hpc0e) in "Hpc".
@@ -1030,7 +1030,7 @@ Section ProofUserinit.
               ({["proc"]} ∪ lks) Hlka Krl
               with "Hcg Htext Hpc [] Htok HR Hcpu Hpay").
     { iApply (procs_inv_lookup γs j γl Hgl with "Hpinv"). }
-    iIntros (CID20 Hq20 mr3) "Hcg Hpc %Hcsrl Hcpu".
+    iIntros (CID20 Hq20) "_"; iIntros (mr3) "Hcg Hpc %Hcsrl Hcpu".
     iEval (rewrite (_ : ({["proc"]} ∪ lks) ∖ {["proc"]} = lks);
            [| apply locks_add_del_below; exact Hbelow]) in "Hcpu".
     assert (Hpc38 : ret_pc (R11 !!! Regidx Rra : mword 64)
@@ -1081,7 +1081,7 @@ Section ProofUserinit.
               with "Hcg Hpc [] [Hf1]").
     { iApply (uin_38 with "Htext"). }
     { iEval (rewrite Hc1). iExact "Hf1". }
-    iIntros (CID21 Hq21) "Hcg Hpc Hf1".
+    iIntros (CID21 Hq21) "_ Hcg Hpc Hf1".
     iEval (rewrite Hc1) in "Hf1".
     set (P1 := <[Regidx Rra := regval_into_reg (m !!! Regidx Rra : mword 64)]> mr3).
     assert (HP1sp : uin_sp m P1)
@@ -1100,7 +1100,7 @@ Section ProofUserinit.
               with "Hcg Hpc [] [Hf2]").
     { iApply (uin_3a with "Htext"). }
     { iEval (rewrite HP1sp -Hspf Hc2). iExact "Hf2". }
-    iIntros (CID22 Hq22) "Hcg Hpc Hf2".
+    iIntros (CID22 Hq22) "_ Hcg Hpc Hf2".
     iEval (rewrite HP1sp -Hspf Hc2) in "Hf2".
     set (P2 := <[Regidx Rs0 := regval_into_reg (m !!! Regidx Rs0 : mword 64)]> P1).
     assert (HP2sp : uin_sp m P2)
@@ -1119,7 +1119,7 @@ Section ProofUserinit.
               with "Hcg Hpc [] [Hf3]").
     { iApply (uin_3c with "Htext"). }
     { iEval (rewrite HP2sp -Hspf Hc3). iExact "Hf3". }
-    iIntros (CID23 Hq23) "Hcg Hpc Hf3".
+    iIntros (CID23 Hq23) "_ Hcg Hpc Hf3".
     iEval (rewrite HP2sp -Hspf Hc3) in "Hf3".
     set (P3 := <[Regidx Rs1 := regval_into_reg (m !!! Regidx Rs1 : mword 64)]> P2).
     assert (HP3sp : uin_sp m P3)
@@ -1153,7 +1153,7 @@ Section ProofUserinit.
               (mword_of_int 2 : mword 6) P3 (K - 4)%nat 4 b Hpopeq
               with "Hcg Hpc [] Hstk").
     { iApply (uin_3e with "Htext"). }
-    iIntros (CID24 Hq24) "Hcg Hpc".
+    iIntros (CID24 Hq24) "_ Hcg Hpc".
     set (P4 := <[Regidx csp_rs1 := regval_into_reg
                   (add_vec (P3 !!! Regidx csp_rs1 : mword 64)
                      (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6))))]> P3).
@@ -1167,7 +1167,7 @@ Section ProofUserinit.
     iApply (wp_cret_s_sconf (mword_of_int (UI + 0x40)) Rra P4 K b
               ltac:(nz) with "Hcg Hpc []").
     { iApply (uin_40 with "Htext"). }
-    iIntros (CID25 Hq25) "Hcg Hpc".
+    iIntros (CID25 Hq25) "Hlc Hcg Hpc".
     iEval (rgne) in "Hpc".
     assert (Hretf : ret_pc (P4 !!! Regidx Rra : mword 64)
                     = ret_pc (m !!! Regidx Rra : mword 64))
@@ -1217,7 +1217,7 @@ Section ProofUserinit.
       by (apply Hfin; namidx).
     iDestruct (cpu_own_transport CID20 CID25 0%nat b pj b
                  ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-    iSpecialize ("Hcont" $! CID25 with "[%]"); [wp_next_chain |].
+    iSpecialize ("Hcont" $! CID25 with "[%] Hlc"); [wp_next_chain |].
     iApply ("Hcont" $! P4 with "Hcg Hpc [%] Hcpu [] Hpav [Hinitproc]").
     - split; [| exact HP4ra].
       unfold callee_saved. split_and!; assumption.

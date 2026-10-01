@@ -300,12 +300,12 @@ Section swp.
     gen_cert -∗
     resv_frag cpu_id rr -∗
     ▷ (∀ tick : bool,
-         resv_frag cpu_id None -∗
+         resv_frag cpu_id None -∗ £ 1 -∗
          swp (riscv_step tick) (fun _ => mWP (Loop : expr riscv_lang))) -∗
     mWP (Loop : expr riscv_lang).
   Proof using .
     iIntros "#Hcert Hfrag H". iApply (wp_hart_restart rr with "Hcert Hfrag").
-    iNext. iIntros (tick) "Hfrag". iApply swp_wp_loop. iApply ("H" with "Hfrag").
+    iNext. iIntros (tick) "Hfrag Hlc". iApply swp_wp_loop. iApply ("H" with "Hfrag Hlc").
   Qed.
 
   (* ---- modalities: [swp] is closed under everything WP is ---- *)

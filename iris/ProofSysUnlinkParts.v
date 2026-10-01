@@ -1145,7 +1145,7 @@ Section ProofSysUnlinkEpilogue.
               with "Hcg Hpc [] [Hf1]").
     { iApply (suli_168 with "Htext"). }
     { iEval (rewrite Hc1). iExact "Hf1". }
-    iIntros (CID1 Hq1) "Hcg Hpc Hf1".
+    iIntros (CID1 Hq1) "_ Hcg Hpc Hf1".
     iEval (rewrite Hc1) in "Hf1".
     set (M1 := <[Regidx Rra := regval_into_reg (m !!! Regidx Rra : mword 64)]> M).
     assert (HM1sp : su_sp sp0 M1)
@@ -1176,7 +1176,7 @@ Section ProofSysUnlinkEpilogue.
               with "Hcg Hpc [] [Hf2]").
     { iApply (suli_16a with "Htext"). }
     { iEval (rewrite Hc2). iExact "Hf2". }
-    iIntros (CID2 Hq2) "Hcg Hpc Hf2".
+    iIntros (CID2 Hq2) "_ Hcg Hpc Hf2".
     iEval (rewrite Hc2) in "Hf2".
     set (M2 := <[Regidx Rs0 := regval_into_reg (m !!! Regidx Rs0 : mword 64)]> M1).
     assert (HM2sp : su_sp sp0 M2)
@@ -1219,7 +1219,7 @@ Section ProofSysUnlinkEpilogue.
               (mword_of_int 15 : mword 6) M2 (K - 30)%nat 30 b Hpop
               with "Hcg Hpc [] Hstk").
     { iApply (suli_16c with "Htext"). }
-    iIntros (CID3 Hq3) "Hcg Hpc".
+    iIntros (CID3 Hq3) "_ Hcg Hpc".
     set (M3 := <[Regidx csp_rs1 := regval_into_reg
                   (add_vec (M2 !!! Regidx csp_rs1 : mword 64)
                      (sign_extend' 64 (caddi16sp_imm (mword_of_int 15 : mword 6))))]> M2).
@@ -1233,7 +1233,7 @@ Section ProofSysUnlinkEpilogue.
     iApply (wp_cret_s_sconf (mword_of_int (SU + 0x16e)) Rra M3 K b
               ltac:(nz) with "Hcg Hpc []").
     { iApply (suli_16e with "Htext"). }
-    iIntros (CID4 Hq4) "Hcg Hpc".
+    iIntros (CID4 Hq4) "Hlc Hcg Hpc".
     iEval (rgne) in "Hpc".
     assert (Hretf : ret_pc (M3 !!! Regidx Rra : mword 64)
                     = ret_pc (m !!! Regidx Rra : mword 64))
@@ -1260,7 +1260,7 @@ Section ProofSysUnlinkEpilogue.
     assert (Hfin : su_thr m M3).
     { intros c Hc N2 N8 N9 N18 N19. rewrite /M3 upd_ne; [| regne].
       exact (HM2thr c Hc N2 N8 N9 N18 N19). }
-    iSpecialize ("Hcont" $! CID4 with "[%]"); [wp_next_chain |].
+    iSpecialize ("Hcont" $! CID4 with "[%] Hlc"); [wp_next_chain |].
     iApply ("Hcont" $! M3 with "[%] [%] Hcg Hpc").
     { unfold callee_saved. split_and!;
         [ exact Csp | exact Cs0 | exact Cs1 | exact Cs2 | exact Cs3

@@ -160,7 +160,7 @@ Section ProofVirtioDiskRwDSeam.
     intros Hbno Hlenbuf Hbufkd.
     iIntros "#Htext #Hdinv #Hgeom Hbuf Hdisk Hpend Hexit".
     rewrite /P3.vdrw_p3_exit.
-    iIntros (CIDx Hsx M np nr cm fr h m2 t) "%Hrh %Hpin %Hfacts %Hal
+    iIntros (CIDx Hsx) "Hlc"; iIntros (M np nr cm fr h m2 t) "%Hrh %Hpin %Hfacts %Hal
              Hcg Hown Htc Hclm Hpc Htok Hbody Hchain Hfh Hfm Hft Hidx".
     destruct Hrh as (Hregs & Hhi).
     destruct Hpin as (Ha0 & Ha1 & Ha5).
@@ -177,7 +177,7 @@ Section ProofVirtioDiskRwDSeam.
               with "Hcg Htext Hpc Hdinv Hgeom Hbody Hchain Hfh Hbuf Hdisk Hpend").
     iIntros (M1 pin) "%F %Hpinr Hcg Hpc Hbody Hact Hrm Hrt".
     destruct F as (Hcs & H1a1).
-    iSpecialize ("Hexit" $! CIDx with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hexit" $! CIDx with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hexit" $! M1 np (S np) nr
               (<[ np := DClaim b (vdrwd_slot kq b h wr (vdrw_sector_raw bno)
                                     (vdrwd_sldata wr bs_buf bs_disk))

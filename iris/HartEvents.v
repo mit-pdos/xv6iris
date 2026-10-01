@@ -216,7 +216,7 @@ Section events.
       intros j Hj.
       pose proof (coh_win_max_ge (hr_coh hr) (Interface.ReadReq.pa req) n j Hj).
       rewrite /tvw. lia. }
-    iNext. iIntros (m' σ' log' tv' itv' hr' rv') "%Hstep".
+    iNext. iIntros (m' σ' log' tv' itv' hr' rv') "%Hstep _".
     rewrite /mnode_step in Hstep. cbn beta iota in Hstep.
     rewrite Hdev in Hstep. cbn beta iota in Hstep.
     destruct Hstep as [(Hif' & _)
@@ -371,7 +371,7 @@ Section events.
       left. split; [exact Hif|].
       exists itv, w. split_and!; [lia|exact Hitv| |done|done|done|done|done|done|done].
       exact (Hrd itv (Nat.le_refl itv) Hitv). }
-    iNext. iIntros (m' σ' log' tv' itv' hr' rv') "%Hstep".
+    iNext. iIntros (m' σ' log' tv' itv' hr' rv') "%Hstep _".
     rewrite /mnode_step in Hstep. cbn beta iota in Hstep.
     rewrite Hdev in Hstep. cbn beta iota in Hstep.
     destruct Hstep as [(_ & tvn & w' & Hlo & Hhi & Hbytes' & -> & -> & ->
@@ -473,7 +473,7 @@ Section events.
       iSplitR.
       { iPureIntro. rewrite /mnode_step. cbn beta iota.
         rewrite Hdev. cbn beta iota. right. rewrite Heq. done. }
-      iNext. iIntros (m' σ' log' tv' itv' hr' rv') "%Hstep".
+      iNext. iIntros (m' σ' log' tv' itv' hr' rv') "%Hstep _".
       rewrite /mnode_step in Hstep. cbn beta iota in Hstep.
       rewrite Hdev in Hstep. cbn beta iota in Hstep.
       destruct Hstep as [(Hov & _) | (_ & -> & -> & -> & -> & -> & -> & ->)]; [done|].
@@ -493,7 +493,7 @@ Section events.
       iSplitR.
       { iPureIntro. rewrite /mnode_step. cbn beta iota.
         rewrite Hdev. cbn beta iota. left. done. }
-      iNext. iIntros (m' σ' log' tv' itv' hr' rv') "%Hstep".
+      iNext. iIntros (m' σ' log' tv' itv' hr' rv') "%Hstep _".
       rewrite /mnode_step in Hstep. cbn beta iota in Hstep.
       rewrite Hdev in Hstep. cbn beta iota in Hstep.
       destruct Hstep as [(_ & -> & -> & -> & -> & -> & -> & ->) | (Hfree & _)]; [|done].
@@ -593,7 +593,7 @@ Section events.
         rewrite Hdev. cbn beta iota.
         right. right. split; [exact Hexcl|]. right. split; [exact Hfree|].
         exists w. split; [exact (read_bytes_spec _ _ _ _ Hrb)|]. rewrite /rtv. done. }
-      iNext. iIntros (m' σ' log' tv' itv' hr' rv') "%Hstep".
+      iNext. iIntros (m' σ' log' tv' itv' hr' rv') "%Hstep _".
       rewrite /mnode_step in Hstep. cbn beta iota in Hstep.
       rewrite Hdev in Hstep. cbn beta iota in Hstep.
       destruct Hstep as [(Hs1 & _)
@@ -620,7 +620,7 @@ Section events.
       { iPureIntro. rewrite /mnode_step. cbn beta iota.
         rewrite Hdev. cbn beta iota.
         right. right. split; [exact Hexcl|]. left. done. }
-      iNext. iIntros (m' σ' log' tv' itv' hr' rv') "%Hstep".
+      iNext. iIntros (m' σ' log' tv' itv' hr' rv') "%Hstep _".
       rewrite /mnode_step in Hstep. cbn beta iota in Hstep.
       rewrite Hdev in Hstep. cbn beta iota in Hstep.
       destruct Hstep as [(Hs1 & _)
@@ -710,7 +710,7 @@ Section events.
       iSplitR.
       { iPureIntro. rewrite /mnode_step. cbn beta iota.
         rewrite Hdev. cbn beta iota. right. rewrite Heq. done. }
-      iNext. iIntros (m' σ' log' tv' itv' hr' rv') "%Hstep".
+      iNext. iIntros (m' σ' log' tv' itv' hr' rv') "%Hstep _".
       rewrite /mnode_step in Hstep. cbn beta iota in Hstep.
       rewrite Hdev in Hstep. cbn beta iota in Hstep.
       destruct Hstep as [(Hov & _) | (_ & -> & -> & -> & -> & -> & -> & ->)]; [done|].
@@ -731,7 +731,7 @@ Section events.
       iSplitR.
       { iPureIntro. rewrite /mnode_step. cbn beta iota.
         rewrite Hdev. cbn beta iota. left. done. }
-      iNext. iIntros (m' σ' log' tv' itv' hr' rv') "%Hstep".
+      iNext. iIntros (m' σ' log' tv' itv' hr' rv') "%Hstep _".
       rewrite /mnode_step in Hstep. cbn beta iota in Hstep.
       rewrite Hdev in Hstep. cbn beta iota in Hstep.
       destruct Hstep as [(_ & -> & -> & -> & -> & -> & -> & ->) | (Hfree & _)]; [|done].
@@ -783,7 +783,7 @@ Section events.
     { iPureIntro. rewrite /mnode_step. cbn beta iota.
       rewrite Hdev. cbn beta iota.
       exists w, d'. done. }
-    iNext. iIntros (m' σ' log' tv' itv' hr' rv') "%Hstep".
+    iNext. iIntros (m' σ' log' tv' itv' hr' rv') "%Hstep _".
     rewrite /mnode_step in Hstep. cbn beta iota in Hstep.
     rewrite Hdev in Hstep. cbn beta iota in Hstep.
     destruct Hstep as (w' & d'' & Hdr' & -> & -> & -> & -> & -> & -> & ->).
@@ -831,7 +831,7 @@ Section events.
     { iPureIntro. rewrite /mnode_step. cbn beta iota.
       rewrite Hdev. cbn beta iota.
       exists d'. done. }
-    iNext. iIntros (m' σ' log' tv' itv' hr' rv') "%Hstep".
+    iNext. iIntros (m' σ' log' tv' itv' hr' rv') "%Hstep _".
     rewrite /mnode_step in Hstep. cbn beta iota in Hstep.
     rewrite Hdev in Hstep. cbn beta iota in Hstep.
     destruct Hstep as (d'' & Hdw' & -> & -> & -> & -> & -> & -> & ->).

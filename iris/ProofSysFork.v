@@ -138,7 +138,7 @@ Section ProofSysFork.
     iApply (wp_caddi_sp_push_s_sconf pcE imm_entry m av 2 b ltac:(lia) Hpush
               with "Hcg Hpc []").
     { iApply (sf_00 with "Htext"). }
-    iIntros (CID1 Hs1) "Hcg Hframe Hpc".
+    iIntros (CID1 Hs1) "_ Hcg Hframe Hpc".
     assert (Hpp02 : add_vec_int (pcE : mword 64) 2 = mword_of_int (KernelSyms.sys_fork + 0x02)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp02) in "Hpc".
     iDestruct (stack_own_2_elim (KTR := KT1) with "Hframe") as (vr24 vs16) "[Hbra Hbs0]".
@@ -154,14 +154,14 @@ Section ProofSysFork.
     iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.sys_fork + 0x02)) (mword_of_int 1 : mword 6) (mword_of_int 1 : mword 5) M1 (av - 2)%nat vr24 b
               with "Hcg Hpc [] Hbra").
     { iApply (sf_02 with "Htext"). }
-    iIntros (CID2 Hs2) "Hcg Hpc Hbra".
+    iIntros (CID2 Hs2) "_ Hcg Hpc Hbra".
     assert (Hpp04 : add_vec_int (mword_of_int (KernelSyms.sys_fork + 0x02) : mword 64) 2 = mword_of_int (KernelSyms.sys_fork + 0x04)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp04) in "Hpc".
     (* ---- +0x04: c.sdsp s0,0(sp) ---- *)
     iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.sys_fork + 0x04)) (mword_of_int 0 : mword 6) (mword_of_int 8 : mword 5) M1 (av - 2)%nat vs16 b
               with "Hcg Hpc [] Hbs0").
     { iApply (sf_04 with "Htext"). }
-    iIntros (CID3 Hs3) "Hcg Hpc Hbs0".
+    iIntros (CID3 Hs3) "_ Hcg Hpc Hbs0".
     assert (Hpp06 : add_vec_int (mword_of_int (KernelSyms.sys_fork + 0x04) : mword 64) 2 = mword_of_int (KernelSyms.sys_fork + 0x06)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp06) in "Hpc".
     assert (Hra0v : forall (CID' : CpuId), rget (CID := CID') M1 (mword_of_int 1 : mword 5) = ra0).
@@ -175,7 +175,7 @@ Section ProofSysFork.
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (sf_06 with "Htext"). }
-    iIntros (CID4 Hs4) "Hcg Hpc".
+    iIntros (CID4 Hs4) "_ Hcg Hpc".
     assert (Hpp08 : add_vec_int (mword_of_int (KernelSyms.sys_fork + 0x06) : mword 64) 2 = mword_of_int (KernelSyms.sys_fork + 0x08)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp08) in "Hpc".
     change (<[Regidx (mword_of_int 8 : mword 5) := regval_into_reg (add_vec (M1 !!! Regidx csp_rs1) (sign_extend' 64 (caddi4spn_imm nzimm_s0)))]> M1) with M2.
@@ -184,7 +184,7 @@ Section ProofSysFork.
               M2 (av - 2)%nat b ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (sf_08 with "Htext"). }
-    iIntros (CID5 Hs5) "Hcg Hpc".
+    iIntros (CID5 Hs5) "_ Hcg Hpc".
     set (Bj := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.sys_fork + 0x08) : mword 64) 4)]> M2).
     change (<[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.sys_fork + 0x08) : mword 64) 4)]> M2) with Bj.
     assert (Hjmp : add_vec (mword_of_int (KernelSyms.sys_fork + 0x08) : mword 64) (sign_extend' 64 (mword_of_int 2093798 : mword 21)) = mword_of_int KernelSyms.kfork)
@@ -218,7 +218,7 @@ Section ProofSysFork.
               with "Hcg Hcpu Htext Hpc Hprocs Hplock Hwlock Hftbl Hpe
                     Hitbl Hitinv Hireg Henvn Hpav Hworld Htoken HjRc Hjslot Hjkw Hfdone Hpriv Hpfrag
                     Hpchrow").
-    iIntros (CID6 Hs6 MF) "%HcsMF Hpc Hpost".
+    iIntros (CID6 Hs6) "_"; iIntros (MF) "%HcsMF Hpc Hpost".
     iDestruct "Hpost" as "(Hcg & Hcpu & Hpriv & Hpfrag & #Henv & Hrv)".
     iDestruct "Hpriv" as (kev) "[%Hkev Hpriv]".
     assert (Hpc0c : ret_pc (Bj !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.sys_fork + 0x0c))
@@ -241,7 +241,7 @@ Section ProofSysFork.
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc [] Hbra").
     { iApply (sf_0c with "Htext"). }
-    iIntros (CID8 Hs8) "Hcg Hpc Hbra".
+    iIntros (CID8 Hs8) "_ Hcg Hpc Hbra".
     assert (Hpp0e : add_vec_int (mword_of_int (KernelSyms.sys_fork + 0x0c) : mword 64) 2 = mword_of_int (KernelSyms.sys_fork + 0x0e)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp0e) in "Hpc".
     set (E0c := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg ra0]> MF).
@@ -254,7 +254,7 @@ Section ProofSysFork.
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc [] Hbs0").
     { iApply (sf_0e with "Htext"). }
-    iIntros (CID9 Hs9) "Hcg Hpc Hbs0".
+    iIntros (CID9 Hs9) "_ Hcg Hpc Hbs0".
     assert (Hpp10 : add_vec_int (mword_of_int (KernelSyms.sys_fork + 0x0e) : mword 64) 2 = mword_of_int (KernelSyms.sys_fork + 0x10)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp10) in "Hpc".
     set (E0e := <[Regidx (mword_of_int 8 : mword 5) := regval_into_reg s00]> E0c).
@@ -276,7 +276,7 @@ Section ProofSysFork.
               (av - 2)%nat 2 b Hpop
               with "Hcg Hpc [] Hframe").
     { iApply (sf_10 with "Htext"). }
-    iIntros (CID10 Hs10) "Hcg Hpc".
+    iIntros (CID10 Hs10) "_ Hcg Hpc".
     assert (Hnk : ((av - 2) + 2)%nat = av) by lia.
     iEval (rewrite Hnk) in "Hcg".
     assert (Hpp12 : add_vec_int (mword_of_int (KernelSyms.sys_fork + 0x10) : mword 64) 2 = mword_of_int (KernelSyms.sys_fork + 0x12)) by (apply bv_eq; vm_compute; reflexivity).
@@ -292,7 +292,7 @@ Section ProofSysFork.
               ltac:(vm_compute; discriminate)
               with "Hcg Hpc []").
     { iApply (sf_12 with "Htext"). }
-    iIntros (CID11 Hs11) "Hcg Hpc".
+    iIntros (CID11 Hs11) "Hlc Hcg Hpc".
     assert (Hra_final : ret_pc (E10 !!! Regidx (mword_of_int 1 : mword 5)) = ret_tgt)
       by (rewrite HE10ra; reflexivity).
     iEval (rewrite Hra_final) in "Hpc".
@@ -323,7 +323,7 @@ Section ProofSysFork.
     { rewrite /E10 upd_ne; [| vm_compute; discriminate].
       rewrite /E0e upd_ne; [| vm_compute; discriminate].
       rewrite /E0c upd_ne; [reflexivity | vm_compute; discriminate]. }
-    iSpecialize ("Hcont" $! CID11 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CID11 with "[%] Hlc"); [wp_next_chain|].
     (* [Hcpu] has sat at [CID6] (kfork's own resumed hart) since the
        crossing; the four leaf steps since then never touched it. *)
     iDestruct (cpu_own_transport CID6 CID11 lvl eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".

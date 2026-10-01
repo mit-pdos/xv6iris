@@ -77,7 +77,7 @@ Section WpInitlockWrapper.
     { unfold pa_stk, add_vec_int. apply f_equal. apply bv_eq; vm_compute; reflexivity. }
     iApply (wp_caddi_sp_push_s_sconf (mword_of_int F : mword 64) (mword_of_int 48 : mword 6) m K 2 b ltac:(lia) Hpush
               with "Hcg Hpc Hi00 [-]").
-    iEval (rewrite /wp_next). iIntros (CID1 Hs1) "Hcg Hframe Hpc".
+    iEval (rewrite /wp_next). iIntros (CID1 Hs1) "_ Hcg Hframe Hpc".
     iEval (rewrite Hspm) in "Hframe".
     change (<[Regidx csp_rs1 := regval_into_reg (add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6))))]> m) with R1.
     assert (HspR1 : R1 !!! Regidx csp_rs1 = spr) by (rewrite /R1 upd_eq; reflexivity).
@@ -89,7 +89,7 @@ Section WpInitlockWrapper.
     iApply (wp_csdsp_s_sconf (mword_of_int (F + 0x02)) (mword_of_int 1 : mword 6) (mword_of_int 1 : mword 5)
               R1 (K - 2)%nat vra0 b with "Hcg Hpc Hi02 [Hras] [-]").
     { iEval (rewrite HspR1 Hb1). iExact "Hras". }
-    iEval (rewrite /wp_next). iIntros (CID2 Hs2) "Hcg Hpc Hras".
+    iEval (rewrite /wp_next). iIntros (CID2 Hs2) "_ Hcg Hpc Hras".
     iEval (rewrite (rget_ne (CID := CID1) R1 (mword_of_int 1 : mword 5)
                       ltac:(intro He; injection He as He2; vm_compute in He2; congruence))) in "Hras".
     iEval (rewrite HspR1 Hb1) in "Hras".
@@ -101,7 +101,7 @@ Section WpInitlockWrapper.
     iApply (wp_csdsp_s_sconf (mword_of_int (F + 0x04)) (mword_of_int 0 : mword 6) (mword_of_int 8 : mword 5)
               R1 (K - 2)%nat vs00 b with "Hcg Hpc Hi04 [Hs0s] [-]").
     { iEval (rewrite HspR1 Hb2). iExact "Hs0s". }
-    iEval (rewrite /wp_next). iIntros (CID3 Hs3) "Hcg Hpc Hs0s".
+    iEval (rewrite /wp_next). iIntros (CID3 Hs3) "_ Hcg Hpc Hs0s".
     iEval (rewrite (rget_ne (CID := CID2) R1 (mword_of_int 8 : mword 5)
                       ltac:(intro He; injection He as He2; vm_compute in He2; congruence))) in "Hs0s".
     iEval (rewrite HspR1 Hb2) in "Hs0s".
@@ -113,7 +113,7 @@ Section WpInitlockWrapper.
     iApply (wp_caddi4spn_s_sconf (mword_of_int (F + 0x06)) (Cregidx (mword_of_int 0)) (mword_of_int 4 : mword 8) (mword_of_int 8 : mword 5)
               R1 (K - 2)%nat b ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi06 [-]").
-    iEval (rewrite /wp_next). iIntros (CID4 Hs4) "Hcg Hpc".
+    iEval (rewrite /wp_next). iIntros (CID4 Hs4) "_ Hcg Hpc".
     set (R2 := <[Regidx (mword_of_int 8 : mword 5) := regval_into_reg (add_vec (R1 !!! Regidx csp_rs1) (sign_extend' 64 (caddi4spn_imm (mword_of_int 4 : mword 8))))]> R1).
     iEval (rewrite (pc_step F 0x06 2 0x08 eq_refl)) in "Hpc".
     (* ===== compute a1 = &"name", a0 = &lock (0x08..0x14) ===== *)
@@ -121,14 +121,14 @@ Section WpInitlockWrapper.
     iApply (wp_auipc_s_sconf (mword_of_int (F + 0x08)) (mword_of_int 11 : mword 5) uname
               R2 (K - 2)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi08 [-]").
-    iEval (rewrite /wp_next). iIntros (CID5 Hs5) "Hcg Hpc".
+    iEval (rewrite /wp_next). iIntros (CID5 Hs5) "_ Hcg Hpc".
     set (R3 := <[Regidx (mword_of_int 11 : mword 5) := regval_into_reg (add_vec (mword_of_int (F + 0x08) : mword 64) (auipc_off uname))]> R2).
     iEval (rewrite (pc_step F 0x08 4 0x0c eq_refl)) in "Hpc".
     (* +0x0c addi a1,a1,<iname> *)
     iApply (wp_addi4_s_sconf (mword_of_int (F + 0x0c)) (mword_of_int 11 : mword 5) (mword_of_int 11 : mword 5) iname
               R3 (K - 2)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi0c [-]").
-    iEval (rewrite /wp_next). iIntros (CID6 Hs6) "Hcg Hpc".
+    iEval (rewrite /wp_next). iIntros (CID6 Hs6) "_ Hcg Hpc".
     set (R4 := <[Regidx (mword_of_int 11 : mword 5) := regval_into_reg (add_vec (R3 !!! Regidx (mword_of_int 11 : mword 5)) (sign_extend' 64 iname))]> R3).
     iEval (rewrite (pc_step F 0x0c 4 0x10 eq_refl)) in "Hpc".
     assert (HR4a1 : R4 !!! Regidx (mword_of_int 11 : mword 5) = name).
@@ -137,14 +137,14 @@ Section WpInitlockWrapper.
     iApply (wp_auipc_s_sconf (mword_of_int (F + 0x10)) (mword_of_int 10 : mword 5) ulk
               R4 (K - 2)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi10 [-]").
-    iEval (rewrite /wp_next). iIntros (CID7 Hs7) "Hcg Hpc".
+    iEval (rewrite /wp_next). iIntros (CID7 Hs7) "_ Hcg Hpc".
     set (R5 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg (add_vec (mword_of_int (F + 0x10) : mword 64) (auipc_off ulk))]> R4).
     iEval (rewrite (pc_step F 0x10 4 0x14 eq_refl)) in "Hpc".
     (* +0x14 addi a0,a0,<ilk>  (a0 := &lock) *)
     iApply (wp_addi4_s_sconf (mword_of_int (F + 0x14)) (mword_of_int 10 : mword 5) (mword_of_int 10 : mword 5) ilk
               R5 (K - 2)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi14 [-]").
-    iEval (rewrite /wp_next). iIntros (CID8 Hs8) "Hcg Hpc".
+    iEval (rewrite /wp_next). iIntros (CID8 Hs8) "_ Hcg Hpc".
     set (R6 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg (add_vec (R5 !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 ilk))]> R5).
     iEval (rewrite (pc_step F 0x14 4 0x18 eq_refl)) in "Hpc".
     assert (HR6a0 : R6 !!! Regidx (mword_of_int 10 : mword 5) = lk).
@@ -163,7 +163,7 @@ Section WpInitlockWrapper.
               R6 (K - 2)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(rewrite Hjrel; vm_compute; reflexivity)
               with "Hcg Hpc Hi18 [-]").
-    iEval (rewrite /wp_next). iIntros (CID9 Hs9) "Hcg Hpc".
+    iEval (rewrite /wp_next). iIntros (CID9 Hs9) "_ Hcg Hpc".
     set (R7 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (F + 0x18) : mword 64) 4)]> R6).
     iEval (rewrite Hjrel) in "Hpc".
     assert (HR7a0 : R7 !!! Regidx (mword_of_int 10 : mword 5) = lk)
@@ -182,7 +182,7 @@ Section WpInitlockWrapper.
     { iEval (rewrite HR7a0). iExact "Hlock". }
     { iEval (rewrite HR7a0). iExact "Hname". }
     { iEval (rewrite HR7a0). iExact "Hcpu". }
-    iEval (rewrite /wp_next). iIntros (CID10 Hs10 mil) "Hcg Hpc %Hilcs Hlock Hlname Hcpu".
+    iEval (rewrite /wp_next). iIntros (CID10 Hs10) "_"; iIntros (mil) "Hcg Hpc %Hilcs Hlock Hlname Hcpu".
     iEval (rewrite HR7a0) in "Hlock".
     iEval (rewrite HR7a0 HR7a1) in "Hlname".
     iMod (lock_name_intro with "Hstr Hlname") as "#Hlnm".
@@ -200,7 +200,7 @@ Section WpInitlockWrapper.
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi1c [Hras] [-]").
     { iEval (rewrite -Hb1 -Hmilsp) in "Hras". iExact "Hras". }
-    iEval (rewrite /wp_next). iIntros (CID11 Hs11) "Hcg Hpc Hras".
+    iEval (rewrite /wp_next). iIntros (CID11 Hs11) "_ Hcg Hpc Hras".
     iEval (rewrite Hmilsp Hb1) in "Hras".
     set (E1 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (m !!! Regidx (mword_of_int 1 : mword 5))]> mil).
     assert (HE1sp : E1 !!! Regidx csp_rs1 = spr) by (rewrite /E1 upd_ne; [exact Hmilsp | vm_compute; discriminate]).
@@ -211,7 +211,7 @@ Section WpInitlockWrapper.
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi1e [Hs0s] [-]").
     { iEval (rewrite -Hb2 -HE1sp) in "Hs0s". iExact "Hs0s". }
-    iEval (rewrite /wp_next). iIntros (CID12 Hs12) "Hcg Hpc Hs0s".
+    iEval (rewrite /wp_next). iIntros (CID12 Hs12) "_ Hcg Hpc Hs0s".
     iEval (rewrite HE1sp Hb2) in "Hs0s".
     set (E2 := <[Regidx (mword_of_int 8 : mword 5) := regval_into_reg (m !!! Regidx (mword_of_int 8 : mword 5))]> E1).
     assert (HE2sp : E2 !!! Regidx csp_rs1 = spr) by (rewrite /E2 upd_ne; [exact HE1sp | vm_compute; discriminate]).
@@ -233,7 +233,7 @@ Section WpInitlockWrapper.
     iEval (rewrite -Hwv) in "Hframe".
     iApply (wp_caddi_sp_pop_s_sconf (mword_of_int (F + 0x20)) (mword_of_int 16 : mword 6) E2 (K - 2)%nat 2 b Hpop
               with "Hcg Hpc Hi20 Hframe [-]").
-    iEval (rewrite /wp_next). iIntros (CID13 Hs13) "Hcg Hpc".
+    iEval (rewrite /wp_next). iIntros (CID13 Hs13) "_ Hcg Hpc".
     assert (Hnk : ((K - 2) + 2)%nat = K) by lia.
     iEval (rewrite Hnk) in "Hcg".
     change (<[Regidx csp_rs1 := regval_into_reg (add_vec (E2 !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 16 : mword 6))))]> E2) with E3.
@@ -246,11 +246,11 @@ Section WpInitlockWrapper.
     iApply (wp_cret_s_sconf (mword_of_int (F + 0x22)) (mword_of_int 1 : mword 5) E3 K b
               ltac:(vm_compute; discriminate)
               with "Hcg Hpc Hi22 [-]").
-    iEval (rewrite /wp_next). iIntros (CID14 Hs14) "Hcg Hpc".
+    iEval (rewrite /wp_next). iIntros (CID14 Hs14) "Hlc Hcg Hpc".
     assert (Hretf : ret_pc (E3 !!! Regidx (mword_of_int 1 : mword 5)) = ret_tgt)
       by (rewrite HE3ra; reflexivity).
     iEval (rewrite Hretf) in "Hpc".
-    iSpecialize ("Hcont" $! CID14 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CID14 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! E3 with "Hcg Hpc [%] Hlock Hlnm Hcpu").
     (* callee_saved m E3: the sub-call preserves s1..s11; the epilogue
        restores sp/s0, and ra (caller-saved) is irrelevant. *)

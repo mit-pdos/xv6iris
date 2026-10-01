@@ -85,7 +85,7 @@ Section ProofInitsleeplock.
     iApply (wp_caddi_sp_push_s_sconf pcE (mword_of_int 32 : mword 6) m av 4 b ltac:(lia) Hpush
               with "Hcg Hpc []").
     { iApply (isl_00 with "Htext"). }
-    iIntros (CID1 Hs1) "Hcg Hframe Hpc".
+    iIntros (CID1 Hs1) "_ Hcg Hframe Hpc".
     iEval (rewrite Hspm) in "Hframe".
     change (<[Regidx csp_rs1 := regval_into_reg
         (add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))]> m) with A0.
@@ -114,7 +114,7 @@ Section ProofInitsleeplock.
               A0 (av - 4)%nat vr24 b with "Hcg Hpc [] [Hr24]").
     { iApply (isl_02 with "Htext"). }
     { iEval (rewrite HcspA0 -Hb1). iExact "Hr24". }
-    iIntros (CID2 Hs2) "Hcg Hpc Hr24".
+    iIntros (CID2 Hs2) "_ Hcg Hpc Hr24".
     assert (HraA0 : A0 !!! Regidx (mword_of_int 1 : mword 5) = m !!! Regidx (mword_of_int 1 : mword 5))
       by (rewrite /A0 upd_ne; [reflexivity | vm_compute; discriminate]).
     iEval (rewrite HcspA0; rgne; rewrite HraA0) in "Hr24".
@@ -125,7 +125,7 @@ Section ProofInitsleeplock.
               A0 (av - 4)%nat vr16 b with "Hcg Hpc [] [Hr16]").
     { iApply (isl_04 with "Htext"). }
     { iEval (rewrite HcspA0 -Hb2). iExact "Hr16". }
-    iIntros (CID3 Hs3) "Hcg Hpc Hr16".
+    iIntros (CID3 Hs3) "_ Hcg Hpc Hr16".
     assert (Hs0A0 : A0 !!! Regidx (mword_of_int 8 : mword 5) = m !!! Regidx (mword_of_int 8 : mword 5))
       by (rewrite /A0 upd_ne; [reflexivity | vm_compute; discriminate]).
     iEval (rewrite HcspA0; rgne; rewrite Hs0A0) in "Hr16".
@@ -136,7 +136,7 @@ Section ProofInitsleeplock.
               A0 (av - 4)%nat vr8 b with "Hcg Hpc [] [Hr8]").
     { iApply (isl_06 with "Htext"). }
     { iEval (rewrite HcspA0 -Hb3). iExact "Hr8". }
-    iIntros (CID4 Hs4) "Hcg Hpc Hr8".
+    iIntros (CID4 Hs4) "_ Hcg Hpc Hr8".
     assert (Hs1A0 : A0 !!! Regidx (mword_of_int 9 : mword 5) = m !!! Regidx (mword_of_int 9 : mword 5))
       by (rewrite /A0 upd_ne; [reflexivity | vm_compute; discriminate]).
     iEval (rewrite HcspA0; rgne; rewrite Hs1A0) in "Hr8".
@@ -147,7 +147,7 @@ Section ProofInitsleeplock.
               A0 (av - 4)%nat vr0 b with "Hcg Hpc [] [Hr0]").
     { iApply (isl_08 with "Htext"). }
     { iEval (rewrite HcspA0 -Hb4). iExact "Hr0". }
-    iIntros (CID5 Hs5) "Hcg Hpc Hr0".
+    iIntros (CID5 Hs5) "_ Hcg Hpc Hr0".
     assert (Hs2A0 : A0 !!! Regidx (mword_of_int 18 : mword 5) = m !!! Regidx (mword_of_int 18 : mword 5))
       by (rewrite /A0 upd_ne; [reflexivity | vm_compute; discriminate]).
     iEval (rewrite HcspA0; rgne; rewrite Hs2A0) in "Hr0".
@@ -158,7 +158,7 @@ Section ProofInitsleeplock.
               A0 (av - 4)%nat b ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (isl_0a with "Htext"). }
-    iIntros (CID6 Hs6) "Hcg Hpc".
+    iIntros (CID6 Hs6) "_ Hcg Hpc".
     set (A1 := <[Regidx (mword_of_int 8 : mword 5) := regval_into_reg
         (add_vec (A0 !!! Regidx csp_rs1) (sign_extend' 64 (caddi4spn_imm (mword_of_int 8 : mword 8))))]> A0).
     change (<[Regidx (mword_of_int 8 : mword 5) := regval_into_reg
@@ -170,7 +170,7 @@ Section ProofInitsleeplock.
               A1 (av - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (isl_0c with "Htext"). }
-    iIntros (CID7 Hs7) "Hcg Hpc".
+    iIntros (CID7 Hs7) "_ Hcg Hpc".
     set (A2 := <[Regidx (mword_of_int 9 : mword 5) := regval_into_reg (add_vec zero_reg (rget A1 (mword_of_int 10 : mword 5)))]> A1).
     change (<[Regidx (mword_of_int 9 : mword 5) := regval_into_reg (add_vec zero_reg (rget A1 (mword_of_int 10 : mword 5)))]> A1) with A2.
     assert (Hpc0e : add_vec_int (mword_of_int (KernelSyms.initsleeplock + 0x0c) : mword 64) 2 = mword_of_int (KernelSyms.initsleeplock + 0x0e)) by (apply bv_eq; vm_compute; reflexivity).
@@ -180,7 +180,7 @@ Section ProofInitsleeplock.
               A2 (av - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (isl_0e with "Htext"). }
-    iIntros (CID8 Hs8) "Hcg Hpc".
+    iIntros (CID8 Hs8) "_ Hcg Hpc".
     set (A3 := <[Regidx (mword_of_int 18 : mword 5) := regval_into_reg (add_vec zero_reg (rget A2 (mword_of_int 11 : mword 5)))]> A2).
     change (<[Regidx (mword_of_int 18 : mword 5) := regval_into_reg (add_vec zero_reg (rget A2 (mword_of_int 11 : mword 5)))]> A2) with A3.
     assert (Hpc10 : add_vec_int (mword_of_int (KernelSyms.initsleeplock + 0x0e) : mword 64) 2 = mword_of_int (KernelSyms.initsleeplock + 0x10)) by (apply bv_eq; vm_compute; reflexivity).
@@ -190,7 +190,7 @@ Section ProofInitsleeplock.
               A3 (av - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (isl_10 with "Htext"). }
-    iIntros (CID9 Hs9) "Hcg Hpc".
+    iIntros (CID9 Hs9) "_ Hcg Hpc".
     set (A4 := <[Regidx (mword_of_int 11 : mword 5) := regval_into_reg (add_vec (mword_of_int (KernelSyms.initsleeplock + 0x10) : mword 64) (auipc_off (mword_of_int 0x3 : mword 20)))]> A3).
     change (<[Regidx (mword_of_int 11 : mword 5) := regval_into_reg (add_vec (mword_of_int (KernelSyms.initsleeplock + 0x10) : mword 64) (auipc_off (mword_of_int 0x3 : mword 20)))]> A3) with A4.
     assert (Hpc14 : add_vec_int (mword_of_int (KernelSyms.initsleeplock + 0x10) : mword 64) 4 = mword_of_int (KernelSyms.initsleeplock + 0x14)) by (apply bv_eq; vm_compute; reflexivity).
@@ -200,7 +200,7 @@ Section ProofInitsleeplock.
               A4 (av - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (isl_14 with "Htext"). }
-    iIntros (CID10 Hs10) "Hcg Hpc".
+    iIntros (CID10 Hs10) "_ Hcg Hpc".
     set (A5 := <[Regidx (mword_of_int 11 : mword 5) := regval_into_reg (add_vec (rget A4 (mword_of_int 11 : mword 5)) (sign_extend' 64 (mword_of_int 1234 : mword 12)))]> A4).
     change (<[Regidx (mword_of_int 11 : mword 5) := regval_into_reg (add_vec (rget A4 (mword_of_int 11 : mword 5)) (sign_extend' 64 (mword_of_int 1234 : mword 12)))]> A4) with A5.
     assert (Hpc18 : add_vec_int (mword_of_int (KernelSyms.initsleeplock + 0x14) : mword 64) 4 = mword_of_int (KernelSyms.initsleeplock + 0x18)) by (apply bv_eq; vm_compute; reflexivity).
@@ -212,7 +212,7 @@ Section ProofInitsleeplock.
               A5 (av - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (isl_18 with "Htext"). }
-    iIntros (CID11 Hs11) "Hcg Hpc".
+    iIntros (CID11 Hs11) "_ Hcg Hpc".
     set (A6 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg
         (add_vec (rget A5 (mword_of_int 10 : mword 5)) (sign_extend' 64 (sign_extend' 12 (mword_of_int 8 : mword 6))))]> A5).
     change (<[Regidx (mword_of_int 10 : mword 5) := regval_into_reg
@@ -235,7 +235,7 @@ Section ProofInitsleeplock.
               A6 (av - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (isl_1a with "Htext"). }
-    iIntros (CID12 Hs12) "Hcg Hpc".
+    iIntros (CID12 Hs12) "_ Hcg Hpc".
     set (A7 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.initsleeplock + 0x1a) : mword 64) 4)]> A6).
     change (<[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.initsleeplock + 0x1a) : mword 64) 4)]> A6) with A7.
     assert (Htgtil : add_vec (mword_of_int (KernelSyms.initsleeplock + 0x1a) : mword 64) (sign_extend' 64 (mword_of_int 2083632 : mword 21)) = mword_of_int KernelSyms.initlock)
@@ -292,7 +292,7 @@ Section ProofInitsleeplock.
     { iEval (rewrite HA7a0). iExact "Hlk". }
     { iEval (rewrite HA7a0). iExact "Hlkname". }
     { iEval (rewrite HA7a0). iExact "Hcpu". }
-    iIntros (CID13 Hs13 mil) "Hcg Hpc %Hilcs Hlk Hlname Hcpu".
+    iIntros (CID13 Hs13) "_"; iIntros (mil) "Hcg Hpc %Hilcs Hlk Hlname Hcpu".
     iEval (rewrite HA7a0) in "Hlk". iEval (rewrite HA7a0 HA7a1) in "Hlname". iEval (rewrite HA7a0) in "Hcpu".
     iMod (lock_name_intro with "Hstr Hlname") as "#Hlnm".
     assert (Hpcil : ret_pc (A7 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.initsleeplock + 0x1e)).
@@ -313,7 +313,7 @@ Section ProofInitsleeplock.
               mil (av - 4)%nat vname b with "Hcg Hpc [] [Hnamefield]").
     { iApply (isl_1e with "Htext"). }
     { iEval (rgne; rewrite Hmils1). unfold sl_name_field. iExact "Hnamefield". }
-    iIntros (CID14 Hs14) "Hcg Hpc Hnamefield".
+    iIntros (CID14 Hs14) "_ Hcg Hpc Hnamefield".
     iEval (rgne; rewrite Hmils1; rgne; rewrite Hmils2) in "Hnamefield".
     assert (Hpc22 : add_vec_int (mword_of_int (KernelSyms.initsleeplock + 0x1e) : mword 64) 4 = mword_of_int (KernelSyms.initsleeplock + 0x22)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc22) in "Hpc".
@@ -322,7 +322,7 @@ Section ProofInitsleeplock.
               mil (av - 4)%nat vlocked b with "Hcg Hpc [] [Hlocked]").
     { iApply (isl_22 with "Htext"). }
     { iEval (rgne; rewrite Hmils1 addv_sext0). iExact "Hlocked". }
-    iIntros (CID15 Hs15) "Hcg Hpc Hlocked".
+    iIntros (CID15 Hs15) "_ Hcg Hpc Hlocked".
     iEval (rgne; rewrite Hmils1 addv_sext0) in "Hlocked".
     assert (Hpc26 : add_vec_int (mword_of_int (KernelSyms.initsleeplock + 0x22) : mword 64) 4 = mword_of_int (KernelSyms.initsleeplock + 0x26)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc26) in "Hpc".
@@ -331,7 +331,7 @@ Section ProofInitsleeplock.
               mil (av - 4)%nat vpid b with "Hcg Hpc [] [Hpid]").
     { iApply (isl_26 with "Htext"). }
     { iEval (rgne; rewrite Hmils1). unfold sl_pid. iExact "Hpid". }
-    iIntros (CID16 Hs16) "Hcg Hpc Hpid".
+    iIntros (CID16 Hs16) "_ Hcg Hpc Hpid".
     iEval (rgne; rewrite Hmils1) in "Hpid".
     assert (Hpc2a : add_vec_int (mword_of_int (KernelSyms.initsleeplock + 0x26) : mword 64) 4 = mword_of_int (KernelSyms.initsleeplock + 0x2a)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc2a) in "Hpc".
@@ -355,7 +355,7 @@ Section ProofInitsleeplock.
               with "Hcg Hpc [] [Hr24]").
     { iApply (isl_2a with "Htext"). }
     { iEval (rewrite Hmilsp). iExact "Hr24". }
-    iIntros (CID17 Hs17) "Hcg Hpc Hr24".
+    iIntros (CID17 Hs17) "_ Hcg Hpc Hr24".
     iEval (rewrite Hmilsp) in "Hr24".
     set (E1 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (m !!! Regidx (mword_of_int 1 : mword 5))]> mil).
     change (<[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (m !!! Regidx (mword_of_int 1 : mword 5))]> mil) with E1.
@@ -369,7 +369,7 @@ Section ProofInitsleeplock.
               with "Hcg Hpc [] [Hr16]").
     { iApply (isl_2c with "Htext"). }
     { iEval (rewrite HcspE1). iExact "Hr16". }
-    iIntros (CID18 Hs18) "Hcg Hpc Hr16".
+    iIntros (CID18 Hs18) "_ Hcg Hpc Hr16".
     iEval (rewrite HcspE1) in "Hr16".
     set (E2 := <[Regidx (mword_of_int 8 : mword 5) := regval_into_reg (m !!! Regidx (mword_of_int 8 : mword 5))]> E1).
     change (<[Regidx (mword_of_int 8 : mword 5) := regval_into_reg (m !!! Regidx (mword_of_int 8 : mword 5))]> E1) with E2.
@@ -383,7 +383,7 @@ Section ProofInitsleeplock.
               with "Hcg Hpc [] [Hr8]").
     { iApply (isl_2e with "Htext"). }
     { iEval (rewrite HcspE2). iExact "Hr8". }
-    iIntros (CID19 Hs19) "Hcg Hpc Hr8".
+    iIntros (CID19 Hs19) "_ Hcg Hpc Hr8".
     iEval (rewrite HcspE2) in "Hr8".
     set (E3 := <[Regidx (mword_of_int 9 : mword 5) := regval_into_reg (m !!! Regidx (mword_of_int 9 : mword 5))]> E2).
     change (<[Regidx (mword_of_int 9 : mword 5) := regval_into_reg (m !!! Regidx (mword_of_int 9 : mword 5))]> E2) with E3.
@@ -397,7 +397,7 @@ Section ProofInitsleeplock.
               with "Hcg Hpc [] [Hr0]").
     { iApply (isl_30 with "Htext"). }
     { iEval (rewrite HcspE3). iExact "Hr0". }
-    iIntros (CID20 Hs20) "Hcg Hpc Hr0".
+    iIntros (CID20 Hs20) "_ Hcg Hpc Hr0".
     iEval (rewrite HcspE3) in "Hr0".
     set (E4 := <[Regidx (mword_of_int 18 : mword 5) := regval_into_reg (m !!! Regidx (mword_of_int 18 : mword 5))]> E3).
     change (<[Regidx (mword_of_int 18 : mword 5) := regval_into_reg (m !!! Regidx (mword_of_int 18 : mword 5))]> E3) with E4.
@@ -433,7 +433,7 @@ Section ProofInitsleeplock.
     iApply (wp_caddi16sp_pop_s_sconf (mword_of_int (KernelSyms.initsleeplock + 0x32)) (mword_of_int 2 : mword 6) E4 (av - 4)%nat 4 b Hpop
               with "Hcg Hpc [] Hframe4").
     { iApply (isl_32 with "Htext"). }
-    iIntros (CID21 Hs21) "Hcg Hpc".
+    iIntros (CID21 Hs21) "_ Hcg Hpc".
     assert (Hnk : ((av - 4) + 4)%nat = av) by lia.
     iEval (rewrite Hnk) in "Hcg".
     change (<[Regidx csp_rs1 := regval_into_reg
@@ -451,10 +451,10 @@ Section ProofInitsleeplock.
               ltac:(vm_compute; discriminate)
               with "Hcg Hpc []").
     { iApply (isl_34 with "Htext"). }
-    iIntros (CID22 Hs22) "Hcg Hpc".
+    iIntros (CID22 Hs22) "Hlc Hcg Hpc".
     iEval (rgne; rewrite HE5ra) in "Hpc".
     (* ===== hand everything back to the caller ===== *)
-    iSpecialize ("Hcont" $! CID22 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CID22 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! E5 with "Hcg Hpc [%] Hlocked Hlk Hlnm Hcpu Hslname Hpid").
     (* callee_saved m E5 (13 conjuncts -- sp,s0,s1,s2,s3..s11) *)
     assert (Hthread : forall c : mword 5, is_cs_idx c = true ->

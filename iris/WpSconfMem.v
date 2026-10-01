@@ -411,7 +411,7 @@ Section WpSconfMem.
   (* [WpSconfLock]'s evidence premises rely on).  A phys-datum instance    *)
   (* simply ignores that argument: the ledger tier needs no token.         *)
   (* ==================================================================== *)
-  Lemma wp_load_s_sconf_au_dat {ktd : ktier} (width : Z) (c uns : bool) (pc : mword 64) (rd rs1 : mword 5)
+  Lemma wp_load_s_sconf_au_dat_lat {ktd : ktier} (width : Z) (c uns : bool) (pc : mword 64) (rd rs1 : mword 5)
       `{!SrcOk rs1} (imm : mword 12)
       (m : regfile) (n : nat) (ext : mword (8*width) -> mword 64)
       (* [dqm] is GONE from this one: the datum is [Dat] now, so a fraction
@@ -483,8 +483,12 @@ Section WpSconfMem.
     pc_is pc -∗
     instr pc c (LOAD (imm, Regidx rs1, Regidx rd, uns, width)) -∗
     wordw_claim (KTR := ktd) width ea -∗
+    (* ▷-TOLERANT: the datum may arrive under a later -- an invariant's body,
+       which at an ordinal step index cannot be destructed before one.  The
+       read node needs only a PURE fact before its own later, so the value is
+       named outside the later and the rest stays under it. *)
     (|={⊤ ∖ ↑minstretN, Em}=> ∃ v : mword (8*width),
-       Dat v ∗ (Dat v ={Em, ⊤ ∖ ↑minstretN}=∗ Ψ v)) -∗
+       ▷ (Dat v ∗ (Dat v ={Em, ⊤ ∖ ↑minstretN}=∗ Ψ v))) -∗
     ( ∀ v : mword (8*width),
       wp_next b p (fun (CID : CpuId) =>
         sie_cap_gpr kt (<[Regidx rd := regval_into_reg (ext v)]> m) n b p -∗
@@ -513,7 +517,7 @@ Section WpSconfMem.
               with "Hcg Hpc Hinstr [HAU Hcont]").
     iNext.
     rename CID into CID0.
-    iIntros (CID Hs). rewrite /sconf_step_obl. iSplitL "HAU".
+    iIntros (CID Hs) "Hlc". rewrite /sconf_step_obl. iSplitL "HAU".
     - (* ---------------- THE INSTRUCTION ---------------- *)
       iIntros "Hsc Hcap Hfile HPC HnPC Hresv".
       assert (Lpin_rs1 : tp_pin (CID := CID) m !!! Regidx rs1 = rget m rs1)
@@ -695,24 +699,31 @@ Section WpSconfMem.
             iIntros (sigma img log tv V) "%Htv Hsi Htso".
             iDestruct "Hsi" as "[Hreg [Hmem Hdev]]".
             iMod (fupd_mask_subseteq (⊤ ∖ ↑minstretN)) as "Hb1"; [set_solver|].
-            iMod "HAU" as (v) "[Hbw Hcl]".
+            iMod "HAU" as (v) "HAU".
             (* A6.63'': the read obligation is at the FRESH CpuId too --
                [wordw_pointsto_load_c] now concludes at [@cpu_id CID], and
                the ambient spelling here would print identically while
                failing to unify (tso-port.md §0.20′). *)
-            iAssert (⌜forall tvr : nat, (V (hart_agent (@cpu_id CID)) <= tvr)%nat ->
+            (* THE DATUM MAY STILL BE UNDER ITS INVARIANT'S LATER: the read
+               node owes only a PURE fact before its own later, and a pure
+               fact comes out from under a later for free ([▷ ⌜φ⌝] is
+               timeless at every index), every hypothesis staying in place.
+               The closer runs after the node's [iNext]. *)
+            iAssert (▷ ⌜forall tvr : nat, (V (hart_agent (@cpu_id CID)) <= tvr)%nat ->
                        tso_read_bytes img log (hart_agent (@cpu_id CID)) tvr
-                         (pa_of ppn ea) (Z.to_N width) v⌝)%I as %Hrb.
-            { iApply (Hload CID img sigma log V ppn v Hcan Hoff Hid Hs
+                         (pa_of ppn ea) (Z.to_N width) v⌝)%I as "#>%Hrb".
+            { iNext. iDestruct "HAU" as "[Hbw _]".
+              iApply (Hload CID img sigma log V ppn v Hcan Hoff Hid Hs
                         with "Hk Hmem Htso Hctx Hbw"). }
-            iMod ("Hcl" with "Hbw") as "HPsi".
-            iMod "Hb1" as "_".
             iMod (fupd_mask_subseteq ∅) as "Hb2"; [set_solver|].
             iModIntro. iExists v.
             iSplitR.
             { iPureIntro. intros tvr Hlo _. rewrite -Htv in Hlo.
               exact (Hrb tvr Hlo). }
-            iNext. iMod "Hb2" as "_". iModIntro.
+            iNext. iMod "Hb2" as "_".
+            iDestruct "HAU" as "[Hbw Hcl]".
+            iMod ("Hcl" with "Hbw") as "HPsi".
+            iMod "Hb1" as "_". iModIntro.
             (* [Psic] is RIGID (clearbody), so the ∗-shape has to be given
                back explicitly before the frame *)
             rewrite HPsic. cbn beta.
@@ -776,7 +787,67 @@ Section WpSconfMem.
       iIntros (npc ms' m' n') "Hcg' Hpc' Hpay".
       iDestruct "Hpay" as (v) "(-> & -> & -> & HPsi)".
       iDestruct (sie_cap_gpr_at_close (CID := CID) with "Hcg'") as "Hcg'".
-      iApply ("Hcont" $! v CID with "[%] Hcg' Hpc' HPsi"). exact Hs.
+      iApply ("Hcont" $! v CID with "[%] Hlc Hcg' Hpc' HPsi"). exact Hs.
+  Qed.
+
+  (* THE NOW-FORM: the datum in hand when the update closes.  [_dat_lat]
+     above takes it under a later -- an invariant's body, opened at an
+     ordinal step index, cannot be destructed before one -- and this form is
+     its instance at [later_intro]. *)
+  Lemma wp_load_s_sconf_au_dat {ktd : ktier} (width : Z) (c uns : bool) (pc : mword 64) (rd rs1 : mword 5)
+      `{!SrcOk rs1} (imm : mword 12)
+      (m : regfile) (n : nat) (ext : mword (8*width) -> mword 64)
+      (Ψ : mword (8*width) -> iProp Σ) (Em : coPset) (b : bool) `{!KtierLe ktd kt}
+      (Dat : mword (8*width) -> iProp Σ) :
+    0 < width -> width <= 8 ->
+    vmem_width width ->
+    (width | 4096) ->
+    uint (to_bits 64 width) = width ->
+    (forall (addr : mword 64) (w : mword (8*width)) s,
+       dev_addr addr = false ->
+       (forall j : nat, (N.of_nat j < Z.to_N width)%N ->
+          s.(mem) !! (pa_add addr j) = Some (nth_byte w j)) ->
+       exec (read_ram rv64d_types.Read_plain (Physaddr addr) width false) s
+         = Some ((w, default_meta), s)) ->
+    (forall v : mword (8*width), extend_value uns v = ext v) ->
+    let ea := add_vec (rget m rs1) (sign_extend' 64 imm) in
+    uint rd <> 0 ->
+    rd_ok rd ->
+    ↑kptN ⊆ Em ->
+    (forall (CIDw : CpuId) (img : bytemap) (sigma : mstate) (log : list pwmsg)
+            (V : agent -> nat) (ppn : mword 44) (v : mword (8*width)),
+       (uint ea < 274877906944)%Z ->
+       (bv_unsigned (subrange_vec_dec ea 11 0) + width <= 4096)%Z ->
+       ktier_pin ktd ppn ea ->
+       (b = false \/ p = zero_reg -> (CIDw : CPU) = (CID : CPU)) ->
+       kmap_at (svpn_of ea) ppn KP_rw -∗
+       gen_heap_interp (hG := riscv_memGS) sigma.(mem) -∗
+       tso_interp_of riscv_eraGS img sigma.(mem) log V -∗
+       TsoCtx.own_context (CID := CIDw) CtxIdDefs.cur_ctx -∗
+       Dat v -∗
+       ⌜forall tvr : nat, (V (hart_agent (@cpu_id CIDw)) <= tvr)%nat ->
+          tso_read_bytes img log (hart_agent (@cpu_id CIDw)) tvr
+            (pa_of ppn ea) (Z.to_N width) v⌝) ->
+    sie_cap_gpr kt m n b p -∗
+    pc_is pc -∗
+    instr pc c (LOAD (imm, Regidx rs1, Regidx rd, uns, width)) -∗
+    wordw_claim (KTR := ktd) width ea -∗
+    (|={⊤ ∖ ↑minstretN, Em}=> ∃ v : mword (8*width),
+       Dat v ∗ (Dat v ={Em, ⊤ ∖ ↑minstretN}=∗ Ψ v)) -∗
+    ( ∀ v : mword (8*width),
+      wp_next b p (fun (CID : CpuId) =>
+        sie_cap_gpr kt (<[Regidx rd := regval_into_reg (ext v)]> m) n b p -∗
+        pc_is (add_vec_int pc (if c then 2 else 4)) -∗
+        Ψ v -∗
+        mWP (Loop : expr riscv_lang))) -∗
+    mWP (Loop : expr riscv_lang).
+  Proof using .
+    intros Hw0 Hw8 Hvw Hwdvd Huintw Hread_plain Hext ea Hrd Hrdok HkptEm Hload.
+    iIntros "Hcg Hpc Hinstr Hclaim HAU Hcont".
+    iApply (wp_load_s_sconf_au_dat_lat (ktd := ktd) width c uns pc rd rs1 imm m n ext Ψ Em b Dat
+              Hw0 Hw8 Hvw Hwdvd Huintw Hread_plain Hext Hrd Hrdok HkptEm Hload
+              with "Hcg Hpc Hinstr Hclaim [HAU] Hcont").
+    iMod "HAU" as (v) "HAU". iModIntro. iExists v. by iNext.
   Qed.
 
   (* THE ORIGINAL, character-identical, as an instance of the above at the
@@ -856,7 +927,7 @@ Section WpSconfMem.
   (* associates right.  What changes here is three arguments and four     *)
   (* tactics; the other ~300 sentences are [_dat]'s verbatim.            *)
   (* ==================================================================== *)
-  Lemma wp_load_s_sconf_au_exv {ktd : ktier} (width : Z) (c uns : bool) (pc : mword 64) (rd rs1 : mword 5)
+  Lemma wp_load_s_sconf_au_exv_lat {ktd : ktier} (width : Z) (c uns : bool) (pc : mword 64) (rd rs1 : mword 5)
       `{!SrcOk rs1} (imm : mword 12)
       (m : regfile) (n : nat) (ext : mword (8*width) -> mword 64)
       (* NO [dqm] and NO value-indexed [Ψ]: the datum is a value-INDEPENDENT
@@ -922,7 +993,9 @@ Section WpSconfMem.
     pc_is pc -∗
     instr pc c (LOAD (imm, Regidx rs1, Regidx rd, uns, width)) -∗
     wordw_claim (KTR := ktd) width ea -∗
-    (|={⊤ ∖ ↑minstretN, Em}=> Res ∗ (Res ={Em, ⊤ ∖ ↑minstretN}=∗ T)) -∗
+    (* ▷-TOLERANT: the resource may arrive under an invariant's later (see
+       [_dat_lat]) *)
+    (|={⊤ ∖ ↑minstretN, Em}=> ▷ (Res ∗ (Res ={Em, ⊤ ∖ ↑minstretN}=∗ T))) -∗
     ( ∀ v : mword (8*width),
       wp_next b p (fun (CID : CpuId) =>
         sie_cap_gpr kt (<[Regidx rd := regval_into_reg (ext v)]> m) n b p -∗
@@ -951,7 +1024,7 @@ Section WpSconfMem.
               with "Hcg Hpc Hinstr [HAU Hcont]").
     iNext.
     rename CID into CID0.
-    iIntros (CID Hs). rewrite /sconf_step_obl. iSplitL "HAU".
+    iIntros (CID Hs) "Hlc". rewrite /sconf_step_obl. iSplitL "HAU".
     - (* ---------------- THE INSTRUCTION ---------------- *)
       iIntros "Hsc Hcap Hfile HPC HnPC Hresv".
       assert (Lpin_rs1 : tp_pin (CID := CID) m !!! Regidx rs1 = rget m rs1)
@@ -1106,25 +1179,30 @@ Section WpSconfMem.
             iIntros (sigma img log tv V) "%Htv Hsi Htso".
             iDestruct "Hsi" as "[Hreg [Hmem Hdev]]".
             iMod (fupd_mask_subseteq (⊤ ∖ ↑minstretN)) as "Hb1"; [set_solver|].
-            iMod "HAU" as "[Hbw Hcl]".
+            iMod "HAU" as "HAU".
             (* A6.63'': the read obligation is at the FRESH CpuId too --
                [wordw_pointsto_load_c] now concludes at [@cpu_id CID], and
                the ambient spelling here would print identically while
                failing to unify (tso-port.md §0.20′). *)
-            iAssert (⌜forall tvr : nat, (V (hart_agent (@cpu_id CID)) <= tvr)%nat ->
+            (* the resource may still be under its invariant's later: the
+               node owes only a PURE fact before its own later (see
+               [_dat_lat]); the closer runs after the node's [iNext]. *)
+            iAssert (▷ ⌜forall tvr : nat, (V (hart_agent (@cpu_id CID)) <= tvr)%nat ->
                        exists v : mword (8*width),
                          tso_read_bytes img log (hart_agent (@cpu_id CID)) tvr
-                           (pa_of ppn ea) (Z.to_N width) v /\ P v⌝)%I as %Hrb.
-            { iApply (Hload CID img sigma log V ppn Hcan Hoff Hid Hs
+                           (pa_of ppn ea) (Z.to_N width) v /\ P v⌝)%I as "#>%Hrb".
+            { iNext. iDestruct "HAU" as "[Hbw _]".
+              iApply (Hload CID img sigma log V ppn Hcan Hoff Hid Hs
                         with "Hk Hmem Htso Hctx Hbw"). }
-            iMod ("Hcl" with "Hbw") as "HT".
-            iMod "Hb1" as "_".
             iMod (fupd_mask_subseteq ∅) as "Hb2"; [set_solver|].
             iModIntro.
             iSplitR.
             { iPureIntro. intros tvr Hlo _. rewrite -Htv in Hlo.
               exact (Hrb tvr Hlo). }
-            iNext. iMod "Hb2" as "_". iModIntro.
+            iNext. iMod "Hb2" as "_".
+            iDestruct "HAU" as "[Hbw Hcl]".
+            iMod ("Hcl" with "Hbw") as "HT".
+            iMod "Hb1" as "_". iModIntro.
             (* [Rex] is RIGID (clearbody), so the ∗-shape has to be given
                back explicitly before the frame *)
             rewrite HRex.
@@ -1191,7 +1269,64 @@ Section WpSconfMem.
       iIntros (npc ms' m' n') "Hcg' Hpc' Hpay".
       iDestruct "Hpay" as (v) "(-> & -> & -> & %HPv & HT)".
       iDestruct (sie_cap_gpr_at_close (CID := CID) with "Hcg'") as "Hcg'".
-      iApply ("Hcont" $! v CID with "[%] Hcg' Hpc' [%] HT"); [exact Hs|exact HPv].
+      iApply ("Hcont" $! v CID with "[%] Hlc Hcg' Hpc' [%] HT"); [exact Hs|exact HPv].
+  Qed.
+
+  (* the now-form, as [_dat]'s is: [_exv_lat] at [later_intro] *)
+  Lemma wp_load_s_sconf_au_exv {ktd : ktier} (width : Z) (c uns : bool) (pc : mword 64) (rd rs1 : mword 5)
+      `{!SrcOk rs1} (imm : mword 12)
+      (m : regfile) (n : nat) (ext : mword (8*width) -> mword 64)
+      (Em : coPset) (b : bool) `{!KtierLe ktd kt}
+      (P : mword (8*width) -> Prop) (Res T : iProp Σ) :
+    0 < width -> width <= 8 ->
+    vmem_width width ->
+    (width | 4096) ->
+    uint (to_bits 64 width) = width ->
+    (forall (addr : mword 64) (w : mword (8*width)) s,
+       dev_addr addr = false ->
+       (forall j : nat, (N.of_nat j < Z.to_N width)%N ->
+          s.(mem) !! (pa_add addr j) = Some (nth_byte w j)) ->
+       exec (read_ram rv64d_types.Read_plain (Physaddr addr) width false) s
+         = Some ((w, default_meta), s)) ->
+    (forall v : mword (8*width), extend_value uns v = ext v) ->
+    let ea := add_vec (rget m rs1) (sign_extend' 64 imm) in
+    uint rd <> 0 ->
+    rd_ok rd ->
+    ↑kptN ⊆ Em ->
+    (forall (CIDw : CpuId) (img : bytemap) (sigma : mstate) (log : list pwmsg)
+            (V : agent -> nat) (ppn : mword 44),
+       (uint ea < 274877906944)%Z ->
+       (bv_unsigned (subrange_vec_dec ea 11 0) + width <= 4096)%Z ->
+       ktier_pin ktd ppn ea ->
+       (b = false \/ p = zero_reg -> (CIDw : CPU) = (CID : CPU)) ->
+       kmap_at (svpn_of ea) ppn KP_rw -∗
+       gen_heap_interp (hG := riscv_memGS) sigma.(mem) -∗
+       tso_interp_of riscv_eraGS img sigma.(mem) log V -∗
+       TsoCtx.own_context (CID := CIDw) CtxIdDefs.cur_ctx -∗
+       Res -∗
+       ⌜forall tvr : nat, (V (hart_agent (@cpu_id CIDw)) <= tvr)%nat ->
+          exists v : mword (8*width),
+            tso_read_bytes img log (hart_agent (@cpu_id CIDw)) tvr
+              (pa_of ppn ea) (Z.to_N width) v /\ P v⌝) ->
+    sie_cap_gpr kt m n b p -∗
+    pc_is pc -∗
+    instr pc c (LOAD (imm, Regidx rs1, Regidx rd, uns, width)) -∗
+    wordw_claim (KTR := ktd) width ea -∗
+    (|={⊤ ∖ ↑minstretN, Em}=> Res ∗ (Res ={Em, ⊤ ∖ ↑minstretN}=∗ T)) -∗
+    ( ∀ v : mword (8*width),
+      wp_next b p (fun (CID : CpuId) =>
+        sie_cap_gpr kt (<[Regidx rd := regval_into_reg (ext v)]> m) n b p -∗
+        pc_is (add_vec_int pc (if c then 2 else 4)) -∗
+        ⌜P v⌝ -∗ T -∗
+        mWP (Loop : expr riscv_lang))) -∗
+    mWP (Loop : expr riscv_lang).
+  Proof using .
+    intros Hw0 Hw8 Hvw Hwdvd Huintw Hread_plain Hext ea Hrd Hrdok HkptEm Hload.
+    iIntros "Hcg Hpc Hinstr Hclaim HAU Hcont".
+    iApply (wp_load_s_sconf_au_exv_lat (ktd := ktd) width c uns pc rd rs1 imm m n ext Em b P Res T
+              Hw0 Hw8 Hvw Hwdvd Huintw Hread_plain Hext Hrd Hrdok HkptEm Hload
+              with "Hcg Hpc Hinstr Hclaim [HAU] Hcont").
+    iMod "HAU" as "HAU". iModIntro. by iNext.
   Qed.
 
   (* ==================================================================== *)
@@ -1302,7 +1437,7 @@ Section WpSconfMem.
               with "Hcg Hpc Hinstr [HAU Hcont]").
     iNext.
     rename CID into CID0.
-    iIntros (CID Hs). rewrite /sconf_step_obl. iSplitL "HAU".
+    iIntros (CID Hs) "Hlc". rewrite /sconf_step_obl. iSplitL "HAU".
     - (* ---------------- THE INSTRUCTION ---------------- *)
       iIntros "Hsc Hcap Hfile HPC HnPC Hresv".
       assert (Lpin_rs1 : tp_pin (CID := CID) m !!! Regidx rs1 = rget m rs1)
@@ -1553,7 +1688,7 @@ Section WpSconfMem.
       iIntros (npc ms' m' n') "Hcg' Hpc' Hpay".
       iDestruct "Hpay" as (v) "(-> & -> & -> & HQv & HT)".
       iDestruct (sie_cap_gpr_at_close (CID := CID) with "Hcg'") as "Hcg'".
-      iApply ("Hcont" $! v CID with "[%] Hcg' Hpc' HQv HT"); [exact Hs].
+      iApply ("Hcont" $! v CID with "[%] Hlc Hcg' Hpc' HQv HT"); [exact Hs].
   Qed.
 
   (* ==================================================================== *)
@@ -1565,7 +1700,7 @@ Section WpSconfMem.
   (* the view it settled on and the continuation gets [W v V0] beside the  *)
   (* receipt for the SAME [V0].  The node is [HartSMem.Mobl_ram_exvvr].    *)
   (* ==================================================================== *)
-  Lemma wp_load_s_sconf_au_relr {ktd : ktier} (width : Z) (c uns : bool) (pc : mword 64) (rd rs1 : mword 5)
+  Lemma wp_load_s_sconf_au_relr_lat {ktd : ktier} (width : Z) (c uns : bool) (pc : mword 64) (rd rs1 : mword 5)
       `{!SrcOk rs1} (imm : mword 12)
       (m : regfile) (n : nat) (ext : mword (8*width) -> mword 64)
       (* NO [dqm] and NO value-indexed [Ψ]: the datum is a value-INDEPENDENT
@@ -1640,7 +1775,10 @@ Section WpSconfMem.
     pc_is pc -∗
     instr pc c (LOAD (imm, Regidx rs1, Regidx rd, uns, width)) -∗
     wordw_claim (KTR := ktd) width ea -∗
-    (|={⊤ ∖ ↑minstretN, Em}=> Res ∗ (Res ={Em, ⊤ ∖ ↑minstretN}=∗ T)) -∗
+    (* ▷-TOLERANT, with a BASIC update behind the later (an opener that
+       registers what it found): the node needs only [Hload]'s pure totality
+       before its own later, and a basic update yields a pure fact. *)
+    (|={⊤ ∖ ↑minstretN, Em}=> ▷ |==> (Res ∗ (Res ={Em, ⊤ ∖ ↑minstretN}=∗ T))) -∗
     ( ∀ v : mword (8*width),
       wp_next b p (fun (CID : CpuId) =>
         sie_cap_gpr kt (<[Regidx rd := regval_into_reg (ext v)]> m) n b p -∗
@@ -1669,7 +1807,7 @@ Section WpSconfMem.
               with "Hcg Hpc Hinstr [HAU Hcont]").
     iNext.
     rename CID into CID0.
-    iIntros (CID Hs). rewrite /sconf_step_obl. iSplitL "HAU".
+    iIntros (CID Hs) "Hlc". rewrite /sconf_step_obl. iSplitL "HAU".
     - (* ---------------- THE INSTRUCTION ---------------- *)
       iIntros "Hsc Hcap Hfile HPC HnPC Hresv".
       assert (Lpin_rs1 : tp_pin (CID := CID) m !!! Regidx rs1 = rget m rs1)
@@ -1826,20 +1964,36 @@ Section WpSconfMem.
             iIntros (sigma img log tv V) "%Htv Hsi Htso".
             iDestruct "Hsi" as "[Hreg [Hmem Hdev]]".
             iMod (fupd_mask_subseteq (⊤ ∖ ↑minstretN)) as "Hb1"; [set_solver|].
-            iMod "HAU" as "[Hbw Hcl]".
+            iMod "HAU" as "HAU".
             (* A6.63'': the read obligation is at the FRESH CpuId too --
                [wordw_pointsto_load_c] now concludes at [@cpu_id CID], and
                the ambient spelling here would print identically while
                failing to unify (tso-port.md §0.20′). *)
-            iMod (Hload CID img sigma log V ppn Hcan Hoff Hid Hs
-                    with "Hk Hmem Htso Hctx Hbw") as "(Hmem & Htso & Hctx & Hbw & %Htot & HW)".
-            iMod ("Hcl" with "Hbw") as "HT".
-            iMod "Hb1" as "_".
+            (* the resource may still be under its invariant's later, behind
+               a basic update (an opener that registers what it found).  The
+               node owes only the PURE totality fact before its own later, and
+               a basic update yields a pure fact ([bupd_elim]), so the
+               obligation is first run for that fact alone, under the later;
+               it runs for real -- and the closer after it -- past the node's
+               [iNext]. *)
+            iAssert (▷ ⌜forall tvr : nat, (V (hart_agent (@cpu_id CID)) <= tvr)%nat ->
+                       exists v : mword (8*width),
+                         tso_read_bytes img log (hart_agent (@cpu_id CID)) tvr
+                           (pa_of ppn ea) (Z.to_N width) v⌝)%I as "#>%Htot".
+            { iNext. iMod "HAU" as "[Hbw _]".
+              iMod (Hload CID img sigma log V ppn Hcan Hoff Hid Hs
+                      with "Hk Hmem Htso Hctx Hbw") as "(_ & _ & _ & _ & %Htot & _)".
+              iPureIntro. exact Htot. }
             iMod (fupd_mask_subseteq ∅) as "Hb2"; [set_solver|].
             iModIntro.
             iSplitR.
             { iPureIntro. intros tvr Hlo _. rewrite -Htv in Hlo. exact (Htot tvr Hlo). }
-            iNext. iMod "Hb2" as "_". iModIntro.
+            iNext. iMod "Hb2" as "_".
+            iMod "HAU" as "[Hbw Hcl]".
+            iMod (Hload CID img sigma log V ppn Hcan Hoff Hid Hs
+                    with "Hk Hmem Htso Hctx Hbw") as "(Hmem & Htso & Hctx & Hbw & _ & HW)".
+            iMod ("Hcl" with "Hbw") as "HT".
+            iMod "Hb1" as "_". iModIntro.
             iFrame "Hreg Hmem Hdev Htso".
             iIntros (tvr bs) "%Hlo %Hhi %Hread". rewrite HRex. iFrame "Hctx HT".
             iApply ("HW" $! tvr bs with "[%] [%]"); [rewrite -Htv in Hlo; exact Hlo | exact Hread]. }
@@ -1908,7 +2062,74 @@ Section WpSconfMem.
       iIntros (npc ms' m' n') "Hcg' Hpc' Hpay".
       iDestruct "Hpay" as (v) "(-> & -> & -> & HQv & HT)".
       iDestruct (sie_cap_gpr_at_close (CID := CID) with "Hcg'") as "Hcg'".
-      iApply ("Hcont" $! v CID with "[%] Hcg' Hpc' HQv HT"); [exact Hs].
+      iApply ("Hcont" $! v CID with "[%] Hlc Hcg' Hpc' HQv HT"); [exact Hs].
+  Qed.
+
+  (* the now-form, as [_dat]'s is: [_relr_lat] at [later_intro] and
+     [bupd_intro] *)
+  Lemma wp_load_s_sconf_au_relr {ktd : ktier} (width : Z) (c uns : bool) (pc : mword 64) (rd rs1 : mword 5)
+      `{!SrcOk rs1} (imm : mword 12)
+      (m : regfile) (n : nat) (ext : mword (8*width) -> mword 64)
+      (Em : coPset) (b : bool) `{!KtierLe ktd kt}
+      (W : mword (8*width) -> nat -> iProp Σ) (Res T : iProp Σ) :
+    0 < width -> width <= 8 ->
+    vmem_width width ->
+    (width | 4096) ->
+    uint (to_bits 64 width) = width ->
+    (forall (addr : mword 64) (w : mword (8*width)) s,
+       dev_addr addr = false ->
+       (forall j : nat, (N.of_nat j < Z.to_N width)%N ->
+          s.(mem) !! (pa_add addr j) = Some (nth_byte w j)) ->
+       exec (read_ram rv64d_types.Read_plain (Physaddr addr) width false) s
+         = Some ((w, default_meta), s)) ->
+    (forall v : mword (8*width), extend_value uns v = ext v) ->
+    let ea := add_vec (rget m rs1) (sign_extend' 64 imm) in
+    uint rd <> 0 ->
+    rd_ok rd ->
+    ↑kptN ⊆ Em ->
+    (forall (CIDw : CpuId) (img : bytemap) (sigma : mstate) (log : list pwmsg)
+            (V : agent -> nat) (ppn : mword 44),
+       (uint ea < 274877906944)%Z ->
+       (bv_unsigned (subrange_vec_dec ea 11 0) + width <= 4096)%Z ->
+       ktier_pin ktd ppn ea ->
+       (b = false \/ p = zero_reg -> (CIDw : CPU) = (CID : CPU)) ->
+       kmap_at (svpn_of ea) ppn KP_rw -∗
+       gen_heap_interp (hG := riscv_memGS) sigma.(mem) -∗
+       tso_interp_of riscv_eraGS img sigma.(mem) log V -∗
+       TsoCtx.own_context (CID := CIDw) CtxIdDefs.cur_ctx -∗
+       Res ==∗
+       gen_heap_interp (hG := riscv_memGS) sigma.(mem) ∗
+       tso_interp_of riscv_eraGS img sigma.(mem) log V ∗
+       TsoCtx.own_context (CID := CIDw) CtxIdDefs.cur_ctx ∗
+       Res ∗
+       ⌜forall tvr : nat, (V (hart_agent (@cpu_id CIDw)) <= tvr)%nat ->
+          exists v : mword (8*width),
+            tso_read_bytes img log (hart_agent (@cpu_id CIDw)) tvr
+              (pa_of ppn ea) (Z.to_N width) v⌝ ∗
+       (∀ (tvr : nat) (v : mword (8*width)),
+          ⌜(V (hart_agent (@cpu_id CIDw)) <= tvr)%nat⌝ -∗
+          ⌜tso_read_bytes img log (hart_agent (@cpu_id CIDw)) tvr
+             (pa_of ppn ea) (Z.to_N width) v⌝ -∗
+          W v tvr)) ->
+    sie_cap_gpr kt m n b p -∗
+    pc_is pc -∗
+    instr pc c (LOAD (imm, Regidx rs1, Regidx rd, uns, width)) -∗
+    wordw_claim (KTR := ktd) width ea -∗
+    (|={⊤ ∖ ↑minstretN, Em}=> Res ∗ (Res ={Em, ⊤ ∖ ↑minstretN}=∗ T)) -∗
+    ( ∀ v : mword (8*width),
+      wp_next b p (fun (CID : CpuId) =>
+        sie_cap_gpr kt (<[Regidx rd := regval_into_reg (ext v)]> m) n b p -∗
+        pc_is (add_vec_int pc (if c then 2 else 4)) -∗
+        (∃ V0 : nat, hart_rview_lb_at (@cpu_id CID) V0 ∗ W v V0) -∗ T -∗
+        mWP (Loop : expr riscv_lang))) -∗
+    mWP (Loop : expr riscv_lang).
+  Proof using .
+    intros Hw0 Hw8 Hvw Hwdvd Huintw Hread_plain Hext ea Hrd Hrdok HkptEm Hload.
+    iIntros "Hcg Hpc Hinstr Hclaim HAU Hcont".
+    iApply (wp_load_s_sconf_au_relr_lat (ktd := ktd) width c uns pc rd rs1 imm m n ext Em b W Res T
+              Hw0 Hw8 Hvw Hwdvd Huintw Hread_plain Hext Hrd Hrdok HkptEm Hload
+              with "Hcg Hpc Hinstr Hclaim [HAU] Hcont").
+    iMod "HAU" as "HAU". iModIntro. iNext. by iModIntro.
   Qed.
 
   (* A6.126 §6: [_au_rel] with an iProp-valued [Q].  The continuation gets
@@ -2014,7 +2235,7 @@ Section WpSconfMem.
               with "Hcg Hpc Hinstr [HAU Hcont]").
     iNext.
     rename CID into CID0.
-    iIntros (CID Hs). rewrite /sconf_step_obl. iSplitL "HAU".
+    iIntros (CID Hs) "Hlc". rewrite /sconf_step_obl. iSplitL "HAU".
     - (* ---------------- THE INSTRUCTION ---------------- *)
       iIntros "Hsc Hcap Hfile HPC HnPC Hresv".
       assert (Lpin_rs1 : tp_pin (CID := CID) m !!! Regidx rs1 = rget m rs1)
@@ -2267,7 +2488,7 @@ Section WpSconfMem.
       iIntros (npc ms' m' n') "Hcg' Hpc' Hpay".
       iDestruct "Hpay" as (v) "(-> & -> & -> & HQv & HT)".
       iDestruct (sie_cap_gpr_at_close (CID := CID) with "Hcg'") as "Hcg'".
-      iApply ("Hcont" $! v CID with "[%] Hcg' Hpc' HQv HT"); [exact Hs].
+      iApply ("Hcont" $! v CID with "[%] Hlc Hcg' Hpc' HQv HT"); [exact Hs].
   Qed.
   (* The non-atomic instance: the caller owns the cell throughout.  Generic
      in BOTH the width and the extension flag [uns], so every RAM load leaf
@@ -2324,9 +2545,9 @@ Section WpSconfMem.
               Hw0 Hw8 Hvw Hwdvd Huintw Hread_plain (fun w => eq_refl) Hrd Hrdok
               ltac:(solve_ndisj) with "Hcg Hpc Hinstr Hclaim [Hbytes]").
     { iModIntro. iExists v. iFrame "Hbytes". iIntros "Hb". iModIntro. by iFrame "Hb". }
-    iIntros (w CID1 Hs1) "Hcg Hpc [-> Hbw]".
+    iIntros (w CID1 Hs1) "Hlc Hcg Hpc [-> Hbw]".
     iEval (rewrite Hlv) in "Hcg".
-    iApply ("Hcont" $! CID1 with "[] Hcg Hpc Hbw").
+    iApply ("Hcont" $! CID1 with "[] Hlc Hcg Hpc Hbw").
     iPureIntro. exact Hs1.
   Qed.
 
@@ -2485,12 +2706,12 @@ Section WpSconfMem.
          SC-era crossing here was already an identity.  Deleted, not
          replaced. *)
       iExact "Hbyte". }
-    iIntros (CID1 Hs1) "Hcg Hpc Hbw".
+    iIntros (CID1 Hs1) "Hlc Hcg Hpc Hbw".
     iEval (rewrite /wordw_pointsto) in "Hbw".
     iDestruct "Hbw" as "(_ & Hbw)".
     iEval (change (Z.to_nat 1) with 1%nat;
            rewrite big_sepL_singleton pa_add_0 nth_byte0_id) in "Hbw".
-    iApply ("Hcont" $! CID1 with "[] Hcg Hpc Hbw").
+    iApply ("Hcont" $! CID1 with "[] Hlc Hcg Hpc Hbw").
     iPureIntro. exact Hs1.
   Qed.
 
@@ -2564,9 +2785,9 @@ Section WpSconfMem.
               ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 512; reflexivity) ltac:(vm_compute; reflexivity)
               exec_read_ram_plain_8 (data2_ext_8 v) Hrd Hrdok
               with "Hcg Hpc Hinstr Hbytes [Hcont]").
-    iIntros (CID1 Hs1) "Hcg Hpc Hbw".
+    iIntros (CID1 Hs1) "Hlc Hcg Hpc Hbw".
     iEval (rewrite (wordw8_ctx (KTR2 := ktd))) in "Hbw".
-    iApply ("Hcont" $! CID1 with "[] Hcg Hpc Hbw").
+    iApply ("Hcont" $! CID1 with "[] Hlc Hcg Hpc Hbw").
     iPureIntro. exact Hs1.
   Qed.
 
@@ -2596,9 +2817,9 @@ Section WpSconfMem.
               ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 512; reflexivity) ltac:(vm_compute; reflexivity)
               exec_read_ram_plain_8 (data2_ext_8 v) Hrd Hrdok
               with "Hcg Hpc Hinstr Hbytes [Hcont]").
-    iIntros (CID1 Hs1) "Hcg Hpc Hbw".
+    iIntros (CID1 Hs1) "Hlc Hcg Hpc Hbw".
     iEval (rewrite (wordw8_ctx (KTR2 := ktd))) in "Hbw".
-    iApply ("Hcont" $! CID1 with "[] Hcg Hpc Hbw").
+    iApply ("Hcont" $! CID1 with "[] Hlc Hcg Hpc Hbw").
     iPureIntro. exact Hs1.
   Qed.
 
@@ -2694,7 +2915,7 @@ Section WpSconfMem.
   (* needs no annotation; a datum at a DIFFERENT tier (static image data    *)
   (* under a tier-generic hart) says so with [(ktd := cur_ktier)].          *)
   (* ==================================================================== *)
-  Lemma wp_store_s_sconf_au_dat {ktd : ktier} (width : Z) (c : bool) (pc : mword 64) (rs2 rs1 : mword 5)
+  Lemma wp_store_s_sconf_au_dat_lat {ktd : ktier} (width : Z) (c : bool) (pc : mword 64) (rs2 rs1 : mword 5)
       `{!SrcOk rs1} `{!SrcOk rs2} (imm : mword 12)
       (m : regfile) (n : nat) (sv : mword (8*width)) (Ψ : iProp Σ) (Em : coPset) (b : bool)
       `{!KtierLe ktd kt} (Res Post : iProp Σ) :
@@ -2758,7 +2979,10 @@ Section WpSconfMem.
     pc_is pc -∗
     instr pc c (STORE (imm, Regidx rs2, Regidx rs1, width)) -∗
     wordw_claim (KTR := ktd) width ea -∗
-    (|={⊤ ∖ ↑minstretN, Em}=> Res ∗ (Post ={Em, ⊤ ∖ ↑minstretN}=∗ Ψ)) -∗
+    (* ▷-TOLERANT: the write node needs nothing before its own later, so the
+       cell may arrive under an invariant's later, with an update (a ghost
+       step on what was found there) behind it; the gate runs after it. *)
+    (|={⊤ ∖ ↑minstretN, Em}=> ▷ |={Em}=> (Res ∗ (Post ={Em, ⊤ ∖ ↑minstretN}=∗ Ψ))) -∗
     wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr kt m n b p -∗
       pc_is (add_vec_int pc (if c then 2 else 4)) -∗
@@ -2781,7 +3005,7 @@ Section WpSconfMem.
               with "Hcg Hpc Hinstr [HAU Hcont]").
     iNext.
     rename CID into CID0.
-    iIntros (CID Hs). rewrite /sconf_step_obl. iSplitL "HAU".
+    iIntros (CID Hs) "Hlc". rewrite /sconf_step_obl. iSplitL "HAU".
     - (* ---------------- THE INSTRUCTION ---------------- *)
       iIntros "Hsc Hcap Hfile HPC HnPC Hresv".
       assert (Lpin_rs1 : tp_pin (CID := CID) m !!! Regidx rs1 = rget m rs1)
@@ -2912,14 +3136,19 @@ Section WpSconfMem.
             iIntros (sigma img log tv V) "%Htv Hsi Htso".
             iDestruct "Hsi" as "[Hreg [Hmem Hdev]]".
             iMod (fupd_mask_subseteq (⊤ ∖ ↑minstretN)) as "Hb1"; [set_solver|].
+            iMod "HAU" as "HAU".
+            (* the write node owes NOTHING before its own later, so the
+               caller's resource may still be under its invariant's later
+               (with an update behind it): the gate and the closer both run
+               after the node's [iNext]. *)
+            iMod (fupd_mask_subseteq ∅) as "Hb2"; [set_solver|].
+            iModIntro. iNext. iMod "Hb2" as "_".
             iMod "HAU" as "[Hres Hcl]".
             iMod (Hwrite CID img sigma log V ppn Hcan Hoff Hid Hs
                 with "Hk Hmem Htso Hctx Hres")
               as "(Hmem & Htso & Hctx & Hpost)".
             iMod ("Hcl" with "Hpost") as "HPsi".
-            iMod "Hb1" as "_".
-            iMod (fupd_mask_subseteq ∅) as "Hb2"; [set_solver|].
-            iModIntro. iNext. iMod "Hb2" as "_". iModIntro.
+            iMod "Hb1" as "_". iModIntro.
             subst tv.
             iFrame "Hreg Hmem Hdev Htso Hctx HPsi". }
       (* ---- the post ---- *)
@@ -2967,7 +3196,65 @@ Section WpSconfMem.
     - (* ---------------- THE CONTINUATION ---------------- *)
       iIntros (npc ms' m' n') "Hcg' Hpc' (-> & -> & -> & HPsi)".
       iDestruct (sie_cap_gpr_at_close (CID := CID) with "Hcg'") as "Hcg'".
-      iApply ("Hcont" $! CID with "[%] Hcg' Hpc' HPsi"). exact Hs.
+      iApply ("Hcont" $! CID with "[%] Hlc Hcg' Hpc' HPsi"). exact Hs.
+  Qed.
+
+  (* the now-form, as [_dat]'s is: [wp_store_s_sconf_au_dat_lat] at [later_intro] and the
+     trivial update *)
+  Lemma wp_store_s_sconf_au_dat {ktd : ktier} (width : Z) (c : bool) (pc : mword 64) (rs2 rs1 : mword 5)
+      `{!SrcOk rs1} `{!SrcOk rs2} (imm : mword 12)
+      (m : regfile) (n : nat) (sv : mword (8*width)) (Ψ : iProp Σ) (Em : coPset) (b : bool)
+      `{!KtierLe ktd kt} (Res Post : iProp Σ) :
+    0 < width -> width <= 8 -> vmem_width width ->
+    (width | 4096) -> uint (to_bits 64 width) = width ->
+    (forall (addr : mword 64) (data : mword (8*width)) s,
+       dev_addr addr = false ->
+       exec (write_ram rv64d_types.Write_plain (Physaddr addr) width data tt) s
+         = Some (true, MState s.(sregs) (write_bytes s.(mem) addr (Z.to_N width) data) s.(mdev))) ->
+    (autocast (T := mword) (subrange_vec_dec (rget m rs2) (width*8-1) 0)
+     : mword (8*width)) = sv ->
+    ↑kptN ⊆ Em ->
+    let ea := add_vec (rget m rs1) (sign_extend' 64 imm) in
+    (forall (CIDw : CpuId) (img : bytemap) (sigma : mstate)
+            (log : list pwmsg) (V : agent -> nat) (ppn : mword 44),
+       (uint ea < 274877906944)%Z ->
+       (bv_unsigned (subrange_vec_dec ea 11 0) + width <= 4096)%Z ->
+       ktier_pin ktd ppn ea ->
+       (b = false \/ p = zero_reg -> (CIDw : CPU) = (CID : CPU)) ->
+       kmap_at (svpn_of ea) ppn KP_rw -∗
+       gen_heap_interp (hG := riscv_memGS) sigma.(mem) -∗
+       tso_interp_of riscv_eraGS img sigma.(mem) log V -∗
+       TsoCtx.own_context (CID := CIDw) CtxIdDefs.cur_ctx -∗
+       Res ==∗
+       gen_heap_interp (hG := riscv_memGS)
+         (write_bytes sigma.(mem) (pa_of ppn ea) (Z.to_N width) sv) ∗
+       tso_interp_of riscv_eraGS img
+         (write_bytes sigma.(mem) (pa_of ppn ea) (Z.to_N width) sv)
+         (log ++ [PWMsg (snap_of (pa_of ppn ea) (Z.to_N width) sv)
+                    (hart_agent (@cpu_id CIDw))])%list
+         (vstep (hart_agent (@cpu_id CIDw)) (V (hart_agent (@cpu_id CIDw)))
+            (log ++ [PWMsg (snap_of (pa_of ppn ea) (Z.to_N width) sv)
+                       (hart_agent (@cpu_id CIDw))])%list V) ∗
+       TsoCtx.own_context (CID := CIDw) CtxIdDefs.cur_ctx ∗
+       Post) ->
+    sie_cap_gpr kt m n b p -∗
+    pc_is pc -∗
+    instr pc c (STORE (imm, Regidx rs2, Regidx rs1, width)) -∗
+    wordw_claim (KTR := ktd) width ea -∗
+    (|={⊤ ∖ ↑minstretN, Em}=> Res ∗ (Post ={Em, ⊤ ∖ ↑minstretN}=∗ Ψ)) -∗
+    wp_next b p (fun (CID : CpuId) =>
+      sie_cap_gpr kt m n b p -∗
+      pc_is (add_vec_int pc (if c then 2 else 4)) -∗
+      Ψ -∗
+      mWP (Loop : expr riscv_lang)) -∗
+    mWP (Loop : expr riscv_lang).
+  Proof using .
+    intros Hw0 Hw8 Hvw Hwdvd Huintw Hwrite_plain Hsv HkptEm ea Hwrite.
+    iIntros "Hcg Hpc Hinstr Hclaim HAU Hcont".
+    iApply (wp_store_s_sconf_au_dat_lat (ktd := ktd) width c pc rs2 rs1 imm m n sv Ψ Em b Res Post
+              Hw0 Hw8 Hvw Hwdvd Huintw Hwrite_plain Hsv HkptEm Hwrite
+              with "Hcg Hpc Hinstr Hclaim [HAU] Hcont").
+    iMod "HAU" as "HAU". iModIntro. iNext. by iModIntro.
   Qed.
   (* THE CTX-WORD INSTANCE, character-identical to what this leaf always was:
      [Res] is the cell before the store, [Post] the cell after it, and the
@@ -3063,8 +3350,8 @@ Section WpSconfMem.
               Hw0 Hw8 Hvw Hwdvd Huintw Hwrite_plain Hsv
               ltac:(solve_ndisj) with "Hcg Hpc Hinstr Hclaim [Hbytes]").
     { iModIntro. iExists vold. iFrame "Hbytes". iIntros "Hb". by iModIntro. }
-    iIntros (CID1 Hs1) "Hcg Hpc Hbw".
-    iApply ("Hcont" $! CID1 with "[] Hcg Hpc Hbw").
+    iIntros (CID1 Hs1) "Hlc Hcg Hpc Hbw".
+    iApply ("Hcont" $! CID1 with "[] Hlc Hcg Hpc Hbw").
     iPureIntro. exact Hs1.
   Qed.
 
@@ -3119,8 +3406,8 @@ Section WpSconfMem.
       iApply (wordw_free_write_c (KTR := ktd) (CIDw := CIDw) width img sigma log V
                 pa ppn sv Hw0 Hcan Hoff with "Hk Hmem Htso Hctx Hbw"). }
     { iModIntro. iFrame "Hbytes". iIntros "Hb". by iModIntro. }
-    iIntros (CID1 Hs1) "Hcg Hpc Hbw".
-    iApply ("Hcont" $! CID1 with "[] Hcg Hpc Hbw").
+    iIntros (CID1 Hs1) "Hlc Hcg Hpc Hbw".
+    iApply ("Hcont" $! CID1 with "[] Hlc Hcg Hpc Hbw").
     iPureIntro. exact Hs1.
   Qed.
 
@@ -3177,9 +3464,9 @@ Section WpSconfMem.
               ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 512; reflexivity) ltac:(vm_compute; reflexivity)
               exec_write_ram_plain_8 (store_ext_8 (rget m rs2))
               with "Hcg Hpc Hinstr Hbytes [Hcont]").
-    iIntros (CID1 Hs1) "Hcg Hpc Hbw".
+    iIntros (CID1 Hs1) "Hlc Hcg Hpc Hbw".
     iEval (rewrite (wordw8_ctx (KTR2 := ktd))) in "Hbw".
-    iApply ("Hcont" $! CID1 with "[] Hcg Hpc Hbw").
+    iApply ("Hcont" $! CID1 with "[] Hlc Hcg Hpc Hbw").
     iPureIntro. exact Hs1.
   Qed.
 
@@ -3216,9 +3503,9 @@ Section WpSconfMem.
               ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 512; reflexivity) ltac:(vm_compute; reflexivity)
               exec_write_ram_plain_8 (store_ext_8 (rget m rs2))
               with "Hcg Hpc Hinstr Hbytes [Hcont]").
-    iIntros (CID1 Hs1) "Hcg Hpc Hbw".
+    iIntros (CID1 Hs1) "Hlc Hcg Hpc Hbw".
     iEval (rewrite (wordw8_ctx (KTR2 := ktd))) in "Hbw".
-    iApply ("Hcont" $! CID1 with "[] Hcg Hpc Hbw").
+    iApply ("Hcont" $! CID1 with "[] Hlc Hcg Hpc Hbw").
     iPureIntro. exact Hs1.
   Qed.
 
@@ -3429,8 +3716,8 @@ Section WpSconfMem.
               exec_write_ram_plain_1 eq_refl
               with "Hcg Hpc Hinstr [Hbyte] [Hcont]").
     { iApply (wordw1_byte (KTR := ktd) ea (DfracOwn 1) vold). iExact "Hbyte". }
-    iIntros (CID1 Hs1) "Hcg Hpc Hbw".
-    iApply ("Hcont" $! CID1 with "[%] Hcg Hpc [Hbw]"); [ exact Hs1 | ].
+    iIntros (CID1 Hs1) "Hlc Hcg Hpc Hbw".
+    iApply ("Hcont" $! CID1 with "[%] Hlc Hcg Hpc [Hbw]"); [ exact Hs1 | ].
     iEval (rewrite (wordw1_byte (KTR := ktd) ea (DfracOwn 1) storeval)) in "Hbw".
     iExact "Hbw".
   Qed.
@@ -3469,8 +3756,8 @@ Section WpSconfMem.
               exec_write_ram_plain_1 eq_refl
               with "Hcg Hpc Hinstr [Hbyte] [Hcont]").
     { iApply (wordw1_free (KTR := ktd) ea). iExact "Hbyte". }
-    iIntros (CID1 Hs1) "Hcg Hpc Hbw".
-    iApply ("Hcont" $! CID1 with "[%] Hcg Hpc [Hbw]"); [ exact Hs1 | ].
+    iIntros (CID1 Hs1) "Hlc Hcg Hpc Hbw".
+    iApply ("Hcont" $! CID1 with "[%] Hlc Hcg Hpc [Hbw]"); [ exact Hs1 | ].
     iEval (rewrite (wordw1_byte (KTR := ktd) ea (DfracOwn 1) storeval)) in "Hbw".
     iExact "Hbw".
   Qed.
@@ -3638,9 +3925,9 @@ Section WpSconfMem.
               ltac:(exists 512; reflexivity) ltac:(vm_compute; reflexivity)
               exec_write_ram_plain_8 Hsv
               with "Hcg Hpc Hinstr Hbytes [Hcont]").
-    iIntros (CID1 Hs1) "Hcg Hpc Hbw".
+    iIntros (CID1 Hs1) "Hlc Hcg Hpc Hbw".
     iEval (rewrite (wordw8_ctx (KTR2 := ktd))) in "Hbw".
-    iApply ("Hcont" $! CID1 with "[] Hcg Hpc Hbw").
+    iApply ("Hcont" $! CID1 with "[] Hlc Hcg Hpc Hbw").
     iPureIntro. exact Hs1.
   Qed.
 
@@ -3924,9 +4211,9 @@ Section WpSconfMem.
       iExists (S (length log)). rewrite (Hz j ltac:(apply lookup_seq in Hj; lia)).
       iExact "H". }
     { iModIntro. iFrame "Hwin". iIntros "Hp". by iModIntro. }
-    iIntros (CID1 Hs1) "Hcg Hpc Hp".
+    iIntros (CID1 Hs1) "Hlc Hcg Hpc Hp".
     iDestruct "Hp" as (pl own') "(-> & %Hown' & Hp)".
-    iApply ("Hcont" $! CID1 with "[] Hcg Hpc [Hp]").
+    iApply ("Hcont" $! CID1 with "[] Hlc Hcg Hpc [Hp]").
     { iPureIntro. exact Hs1. }
     { iExists own'. by iFrame "Hp". }
   Qed.
@@ -4036,9 +4323,9 @@ Section WpSconfMem.
       iSplitR; [ iPureIntro; exact (ktier_pin_id ppn ea Hid) | ].
       iFrame "Hlb Hw". iExact "Hpay". }
     { iModIntro. iFrame "Hbytes". iIntros "Hp". by iModIntro. }
-    iIntros (CID1 Hs1) "Hcg Hpc Hp".
+    iIntros (CID1 Hs1) "Hlc Hcg Hpc Hp".
     iDestruct "Hp" as (pl lo) "(-> & #Hlb & #Hw & Hp)".
-    iApply ("Hcont" $! CID1 with "[] Hcg Hpc Hclaim [Hp]").
+    iApply ("Hcont" $! CID1 with "[] Hlc Hcg Hpc Hclaim [Hp]").
     { iPureIntro. exact Hs1. }
     { iExists lo. iFrame "Hlb Hw". iExact "Hp". }
   Qed.

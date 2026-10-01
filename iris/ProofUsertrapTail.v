@@ -829,7 +829,7 @@ Section UtRet2.
     iApply (wp_cret_s_sconf (mword_of_int (UT + 0xc6)) Rra S9 av false
               ltac:(vm_compute; discriminate) with "Hcg Hpc [] [-]").
     { iApply (uti_0c6 with "Htext"). }
-    iApply wp_next_off_intro. iIntros "Hcg Hpc".
+    iApply wp_next_off_intro_lc. iIntros "Hlc Hcg Hpc".
     iEval (rewrite HS9ra) in "Hpc".
     (* ================================================================== *)
     (*  THE EXIT: the payload back into the boundary's pieces.             *)
@@ -897,7 +897,7 @@ Section UtRet2.
     destruct Hptwf as (Hmapwf & Haccwf & _ & _ & _).
     iDestruct "Hscause" as (scv) "Hscause".
     iDestruct "Hstval" as (stv) "Hstval".
-    iSpecialize ("Hcont" $! CID with "[%]"); [intros _; reflexivity|].
+    iSpecialize ("Hcont" $! CID with "[%] Hlc"); [intros _; reflexivity|].
     iDestruct ("Hownback" $! U sts cs2 with "Hpv Hufr Hch Hsy") as "Hown".
     iAssert (⌜ut_live_out scw (pv_secc (us_V U0)) (<[tf_epc_idx := ret_pc epw]> (pv_tf (us_V U0))) sts0
                 (pv_tf (us_V U) !!! tf_arg_idx 0) cs2⌝)%I as "Hlv";
@@ -1107,7 +1107,7 @@ Section UtRet.
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc [] [-]").
     { iApply (uti_0ae with "Htext"). }
-    iIntros (CID1 Hk1) "Hcg Hpc".
+    iIntros (CID1 Hk1) "_ Hcg Hpc".
     set (M1 := <[Regidx Rra := regval_into_reg
                    (add_vec_int (mword_of_int (UT + 0xae) : mword 64) 4)]> m).
     change (<[Regidx Rra := regval_into_reg
@@ -1131,7 +1131,7 @@ Section UtRet.
     iApply (PR.wp_prepare_return_sconf (un_f N) (un_ks N) pid U
               M1 nx (un_pj N) uepc b lks ltac:(lia) Hepc
               with "Hcg Hcpu Hcsrs Htext Hpc Hkst Hpv [-]").
-    iIntros (CIDp Hkp mf ksat kroot vb)
+    iIntros (CIDp Hkp) "_"; iIntros (mf ksat kroot vb)
       "%Hcspr %Hmode %Hasid %Hppn #Hkinv Hcg Hcpu Hclmpay Hsepc Hscause Hstval
        Hsret Hstvec Hq4 Hkptr Hpv Hpc".
     assert (Hpc0b2 : ret_pc (M1 !!! Regidx Rra) = mword_of_int (UT + 0xb2))
@@ -1450,7 +1450,7 @@ Section UtA6.
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc [] [-]").
     { iApply (uti_0a6 with "Htext"). }
-    iIntros (CID1 Hk1) "Hcg Hpc".
+    iIntros (CID1 Hk1) "_ Hcg Hpc".
     set (M1 := <[Regidx Ra0 := regval_into_reg (add_vec zero_reg (rget m Rs1))]> m).
     change (<[Regidx Ra0 := regval_into_reg (add_vec zero_reg (rget m Rs1))]> m)
       with M1.
@@ -1473,7 +1473,7 @@ Section UtA6.
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc [] [-]").
     { iApply (uti_0a8 with "Htext"). }
-    iIntros (CID2 Hk2) "Hcg Hpc".
+    iIntros (CID2 Hk2) "_ Hcg Hpc".
     set (M2 := <[Regidx Rra := regval_into_reg
                    (add_vec_int (mword_of_int (UT + 0xa8) : mword 64) 4)]> M1).
     change (<[Regidx Rra := regval_into_reg
@@ -1775,7 +1775,7 @@ Section UtA6.
               ltac:(lkbelow)
               with "Hkacc Hcg Hcpu Htext Hpc Hpi [-]").
     all: try lkbelow.
-    iIntros (CID3 Hk3 mf kl)
+    iIntros (CID3 Hk3) "_"; iIntros (mf kl)
       "[%Hcskl %Hkla0] (#Hkw & Hkores & Hqp & Hrg & Hlvres & Htear) Hcg Hcpu Hpc".
     iDestruct ("Hpvback" with "Hqp Hrg") as "Hpv".
     iDestruct ("Hownback" $! U sts cs2 with "Hpv Hufr Hch Hsy") as "Hown".
@@ -1812,7 +1812,7 @@ Section UtA6.
                 ltac:(rewrite Hrgmf; exact Hnz) ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc [] [-]").
       { iApply (uti_0ac with "Htext"). }
-      iApply bi.later_intro. iIntros (CID4 Hk4) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID4 Hk4) "_ Hcg Hpc".
       assert (Hpf4 : add_vec (mword_of_int (UT + 0xac) : mword 64)
                        (sign_extend' 64 (sign_extend' 13
                           (concat_vec (mword_of_int 36 : mword 8) ('b"0"))))
@@ -1826,7 +1826,7 @@ Section UtA6.
                 mf nx b ltac:(vm_compute; discriminate) ltac:(rdok) eq_refl
                 with "Hcg Hpc [] [-]").
       { iApply (uti_0f4 with "Htext"). }
-      iIntros (CID5 Hk5) "Hcg Hpc".
+      iIntros (CID5 Hk5) "_ Hcg Hpc".
       set (K1 := <[Regidx Rs2 := regval_into_reg
                      (add_vec zero_reg (sign_extend' 64
                         (sign_extend' 12 (mword_of_int 0 : mword 6))))]> mf).
@@ -1844,7 +1844,7 @@ Section UtA6.
                 K1 nx b ltac:(vm_compute; discriminate) ltac:(rdok) eq_refl
                 with "Hcg Hpc [] [-]").
       { iApply (uti_0f6 with "Htext"). }
-      iIntros (CID6 Hk6) "Hcg Hpc".
+      iIntros (CID6 Hk6) "_ Hcg Hpc".
       set (K2 := <[Regidx Ra0 := regval_into_reg
                      (add_vec zero_reg (sign_extend' 64
                         (sign_extend' 12 (mword_of_int 63 : mword 6))))]> K1).
@@ -1860,7 +1860,7 @@ Section UtA6.
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 ltac:(vm_compute; reflexivity) with "Hcg Hpc [] [-]").
       { iApply (uti_0f8 with "Htext"). }
-      iIntros (CID7 Hk7) "Hcg Hpc".
+      iIntros (CID7 Hk7) "_ Hcg Hpc".
       assert (Hkex : add_vec (mword_of_int (UT + 0xf8) : mword 64)
                        (sign_extend' 64 (mword_of_int 2095464 : mword 21))
                      = mword_of_int KernelSyms.kexit) by pcw.
@@ -1953,7 +1953,7 @@ Section UtA6.
                 ltac:(rewrite Hrgmf; exact Hnz)
                 with "Hcg Hpc [] [-]").
       { iApply (uti_0ac with "Htext"). }
-      iIntros (CID4 Hk4) "Hcg Hpc".
+      iIntros (CID4 Hk4) "_ Hcg Hpc".
       assert (Hpae : add_vec_int (mword_of_int (UT + 0xac) : mword 64) 2
                      = mword_of_int (UT + 0xae)) by pcw.
       iEval (rewrite Hpae) in "Hpc".
@@ -2115,7 +2115,7 @@ Section UtFa.
               m nx b ltac:(vm_compute; discriminate) ltac:(rdok) eq_refl
               with "Hcg Hpc [] [-]").
     { iApply (uti_0fc with "Htext"). }
-    iIntros (CID1 Hk1) "Hcg Hpc".
+    iIntros (CID1 Hk1) "_ Hcg Hpc".
     set (M1 := <[Regidx Ra5 := regval_into_reg
                    (add_vec zero_reg (sign_extend' 64
                       (sign_extend' 12 (mword_of_int 2 : mword 6))))]> m).
@@ -2141,7 +2141,7 @@ Section UtFa.
                 Hne ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc [] [-]").
       { iApply (uti_0fe with "Htext"). }
-      iApply bi.later_intro. iIntros (CID2 Hk2) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID2 Hk2) "_ Hcg Hpc".
       assert (Hpae : add_vec (mword_of_int (UT + 0xfe) : mword 64)
                        (sign_extend' 64 (mword_of_int 8112 : mword 13))
                      = mword_of_int (UT + 0xae)) by pcw.
@@ -2170,7 +2170,7 @@ Section UtFa.
                 ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
                 Hne with "Hcg Hpc [] [-]").
       { iApply (uti_0fe with "Htext"). }
-      iIntros (CID2 Hk2) "Hcg Hpc".
+      iIntros (CID2 Hk2) "_ Hcg Hpc".
       assert (Hp102 : add_vec_int (mword_of_int (UT + 0xfe) : mword 64) 4
                       = mword_of_int (UT + 0x102)) by pcw.
       iEval (rewrite Hp102) in "Hpc".
@@ -2180,7 +2180,7 @@ Section UtFa.
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 ltac:(vm_compute; reflexivity) with "Hcg Hpc [] [-]").
       { iApply (uti_102 with "Htext"). }
-      iIntros (CID3 Hk3) "Hcg Hpc".
+      iIntros (CID3 Hk3) "_ Hcg Hpc".
       set (M2 := <[Regidx Rra := regval_into_reg
                      (add_vec_int (mword_of_int (UT + 0x102) : mword 64) 4)]> M1).
       change (<[Regidx Rra := regval_into_reg
@@ -2209,7 +2209,7 @@ Section UtFa.
       iApply (YI.wp_yield_sconf (CID := CID3) (un_s N) (un_j N) (un_l N)
                 M2 nx b Hj Hjl ltac:(lia)
                 with "Hcg Hcpu Htext Hpc Hpi Hcsrs Hclm [-]").
-      iIntros (CID4 Hk4 mf) "%Hcsy Hcg Hcpu Hpc Hcsrs Hclm".
+      iIntros (CID4 Hk4) "_"; iIntros (mf) "%Hcsy Hcg Hcpu Hpc Hcsrs Hclm".
       assert (Hret106 : ret_pc (M2 !!! Regidx Rra) = mword_of_int (UT + 0x106))
         by (rewrite HM2ra; pcw).
       iEval (rewrite Hret106) in "Hpc".
@@ -2221,7 +2221,7 @@ Section UtFa.
                 mf nx b ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc [] [-]").
       { iApply (uti_106 with "Htext"). }
-      iIntros (CID5 Hk5). iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID5 Hk5) "_". iIntros "Hcg Hpc".
       assert (Hpae2 : add_vec (mword_of_int (UT + 0x106) : mword 64)
                         (sign_extend' 64 (sign_extend' 21
                            (concat_vec (mword_of_int 2004 : mword 11) ('b"0"))))

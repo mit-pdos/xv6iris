@@ -148,7 +148,7 @@ Section ProofPushOff.
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc [] Hp8").
     { iApply (ppi_28 with "Htext"). }
-    iIntros (CID1 Hh1) "Hcg Hpc Hp8".
+    iIntros (CID1 Hh1) "_ Hcg Hpc Hp8".
     assert (Hpc2a : add_vec_int (mword_of_int (KernelSyms.pop_off + 0x28) : mword 64) 2 = mword_of_int (KernelSyms.pop_off + 0x2a))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc2a) in "Hpc".
@@ -162,7 +162,7 @@ Section ProofPushOff.
               with "Hcg Hpc [] [Hp0]").
     { iApply (ppi_2a with "Htext"). }
     { iEval (rewrite Hsp4). iExact "Hp0". }
-    iIntros (CID2 Hh2) "Hcg Hpc Hp0".
+    iIntros (CID2 Hh2) "_ Hcg Hpc Hp0".
     assert (Hpc2c : add_vec_int (mword_of_int (KernelSyms.pop_off + 0x2a) : mword 64) 2 = mword_of_int (KernelSyms.pop_off + 0x2c))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc2c) in "Hpc".
@@ -195,7 +195,7 @@ Section ProofPushOff.
     iApply (wp_caddi_sp_pop_s_sconf (mword_of_int (KernelSyms.pop_off + 0x2c)) (mword_of_int 16 : mword 6) M5 av 2 b Hpop
               with "Hcg Hpc [] Hframe").
     { iApply (ppi_2c with "Htext"). }
-    iIntros (CID3 Hh3) "Hcg Hpc".
+    iIntros (CID3 Hh3) "_ Hcg Hpc".
     assert (Hpc2e : add_vec_int (mword_of_int (KernelSyms.pop_off + 0x2c) : mword 64) 2 = mword_of_int (KernelSyms.pop_off + 0x2e))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc2e) in "Hpc".
@@ -210,12 +210,12 @@ Section ProofPushOff.
               ltac:(vm_compute; discriminate)
               with "Hcg Hpc []").
     { iApply (ppi_2e with "Htext"). }
-    iIntros (CID4 Hh4) "Hcg Hpc".
+    iIntros (CID4 Hh4) "Hlc Hcg Hpc".
     iEval (rgne) in "Hpc".
     assert (Hra_final : ret_pc (M6 !!! Regidx (mword_of_int 1 : mword 5)) = ret_tgt)
       by (rewrite HM6ra; reflexivity).
     iEval (rewrite Hra_final) in "Hpc".
-    iSpecialize ("Hcont" $! CID4 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CID4 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! M6 with "Hcg Hpc [%]").
     rewrite /M6 /M5 /M4 Hsp5. reflexivity.
   Qed.
@@ -647,7 +647,7 @@ Section ProofPushOff.
               ltac:(lia) Hpush
               with "Hcg Hpc []").
     { iApply (poi_00 with "Htext"). }
-    iIntros (CID1 Hh1) "Hcg Hframe Hpc".
+    iIntros (CID1 Hh1) "_ Hcg Hframe Hpc".
     iEval (rewrite (stack_own_slots (KTR := kt)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1 & S2 & S3 & S4 & _)".
     iDestruct "S1" as (vr24) "Hr24".
@@ -664,7 +664,7 @@ Section ProofPushOff.
               with "Hcg Hpc [] [Hr24]").
     { iApply (poi_02 with "Htext"). }
     { iEval (rewrite Hcsp0). iExact "Hr24". }
-    iIntros (CID2 Hh2) "Hcg Hpc Hr24".
+    iIntros (CID2 Hh2) "_ Hcg Hpc Hr24".
     assert (Hpp04 : add_vec_int (mword_of_int (KernelSyms.push_off + 0x02) : mword 64) 2 = mword_of_int (KernelSyms.push_off + 0x04)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp04) in "Hpc".
     (* ---- 0x04: c.sdsp s0,16(sp) ---- *)
@@ -673,7 +673,7 @@ Section ProofPushOff.
               with "Hcg Hpc [] [Hr16]").
     { iApply (poi_04 with "Htext"). }
     { iEval (rewrite Hcsp0). iExact "Hr16". }
-    iIntros (CID3 Hh3) "Hcg Hpc Hr16".
+    iIntros (CID3 Hh3) "_ Hcg Hpc Hr16".
     assert (Hpp06 : add_vec_int (mword_of_int (KernelSyms.push_off + 0x04) : mword 64) 2 = mword_of_int (KernelSyms.push_off + 0x06)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp06) in "Hpc".
     (* ---- 0x06: c.sdsp s1,8(sp) ---- *)
@@ -682,7 +682,7 @@ Section ProofPushOff.
               with "Hcg Hpc [] [Hr8]").
     { iApply (poi_06 with "Htext"). }
     { iEval (rewrite Hcsp0). iExact "Hr8". }
-    iIntros (CID4 Hh4) "Hcg Hpc Hr8".
+    iIntros (CID4 Hh4) "_ Hcg Hpc Hr8".
     assert (Hpp08 : add_vec_int (mword_of_int (KernelSyms.push_off + 0x06) : mword 64) 2 = mword_of_int (KernelSyms.push_off + 0x08)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp08) in "Hpc".
     (* ---- 0x08: c.addi4spn s0,sp,32 ---- *)
@@ -691,7 +691,7 @@ Section ProofPushOff.
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (poi_08 with "Htext"). }
-    iIntros (CID5 Hh5) "Hcg Hpc".
+    iIntros (CID5 Hh5) "_ Hcg Hpc".
     assert (Hpp0a : add_vec_int (mword_of_int (KernelSyms.push_off + 0x08) : mword 64) 2 = mword_of_int (KernelSyms.push_off + 0x0a)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp0a) in "Hpc".
     (* ---- 0x0a: csrrci a5,sstatus,2 -- THE FLIP, and the arm seam ---- *)
@@ -702,9 +702,9 @@ Section ProofPushOff.
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hcnt Hpc []").
     { iApply (poi_0a with "Htext"). }
-    iIntros (CID6 Hh6 mstatus0) "%Hmsf %Hsie Hcg Hcnt Htcp Hclm Hpay Hpc".
+    iIntros (CID6 Hh6) "Hlc"; iIntros (mstatus0) "%Hmsf %Hsie Hcg Hcnt Htcp Hclm Hpay Hpc".
     iDestruct (po_cells_transport CID5 CID6 n eb p b lks ltac:(wp_next_chain) with "Hcells0") as "Hcells0".
-    iSpecialize ("Hcont" $! CID6 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CID6 with "[%] Hlc"); [wp_next_chain|].
     (* THE HART IS PINNED AT CID6 FROM HERE ON (push_off never re-enables),
        so drop the entry hart, the five prologue harts and their conditional
        equalities: with exactly one [CpuId] left in context the ambient
@@ -883,8 +883,8 @@ Section ProofPushOff.
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (poi_38 with "Htext"). }
-      iApply wp_next_off_intro.
       iApply bi.later_intro.
+      iApply wp_next_off_intro.
       iIntros "Hcg Hpc".
       assert (Htgt18t : add_vec (mword_of_int (KernelSyms.push_off + 0x38) : mword 64)
                  (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 2032 : mword 11) ('b"0")))) = mword_of_int (KernelSyms.push_off + 0x18))
@@ -1507,14 +1507,14 @@ Section ProofPushOff.
                 with "Hcg Htext Hpc [Hr8] [Hr0]").
       { iEval (rewrite HcspP6). iExact "Hr8". }
       { iEval (rewrite HcspP6). iExact "Hr0". }
-      iApply wp_next_off_intro.
+      iApply wp_next_off_intro_lc. iIntros "Hlc".
       iIntros (mf) "Hcg Hpc %Hmf".
       assert (Hav2 : (av - 2 + 2)%nat = av) by lia.
       iEval (rewrite Hav2) in "Hcg".
       subst mf.
       (* still nested: neq nv1 0 = true, so n = S n'; the token rides
          through un-flipped, repacked one level lower. *)
-      iApply ("Hcont" with "Hcg [Hnoff Hint Hlks Htok Hproc Hcsrs] Hpc [%]").
+      iApply ("Hcont" with "Hlc Hcg [Hnoff Hint Hlks Htok Hproc Hcsrs] Hpc [%]").
       { (* cpu_own (S n') eb p false *)
         rewrite /cpu_own /cpu_hart /cpu_priv /cpu_cells.
         iSplitL "Hnoff Hint Hlks Hproc Hcsrs".
@@ -1691,12 +1691,12 @@ Section ProofPushOff.
                   with "Hcg Htext Hpc [Hr8] [Hr0]").
         { iEval (rewrite HcspP7). iExact "Hr8". }
         { iEval (rewrite HcspP7). iExact "Hr0". }
-        iApply wp_next_off_intro.
+        iApply wp_next_off_intro_lc. iIntros "Hlc".
         iIntros (mf) "Hcg Hpc %Hmf".
         assert (Hav2 : (av - 2 + 2)%nat = av) by lia.
         iEval (rewrite Hav2) in "Hcg".
         subst mf.
-        iApply ("Hcont" with "Hcg [Hnoff Hint Hlks Htok Hproc Hcsrs] Hpc [%]").
+        iApply ("Hcont" with "Hlc Hcg [Hnoff Hint Hlks Htok Hproc Hcsrs] Hpc [%]").
         { rewrite /cpu_own /cpu_hart /cpu_priv /cpu_cells.
           iSplitL "Hnoff Hint Hlks Hproc Hcsrs".
           { iSplitL "Hnoff Hint Hproc";
@@ -1915,11 +1915,11 @@ Section ProofPushOff.
                   with "Hcg Htext Hpc [Hr8] [Hr0]").
         { iEval (rewrite HcspP7). iExact "Hr8". }
         { iEval (rewrite HcspP7). iExact "Hr0". }
-        iIntros (CIDe Hse mf) "Hcg Hpc %Hmf".
+        iIntros (CIDe Hse) "Hlc"; iIntros (mf) "Hcg Hpc %Hmf".
         assert (Hav2 : (av - 2 + 2)%nat = av) by lia.
         iEval (rewrite Hav2) in "Hcg".
         subst mf.
-        iSpecialize ("Hcont" $! CIDe with "[%]"); [wp_next_chain|].
+        iSpecialize ("Hcont" $! CIDe with "[%] Hlc"); [wp_next_chain|].
         iApply ("Hcont" with "Hcg [] Hpc [%]").
         { rewrite (size_le_zero_empty lks Hszlks).
           iApply (cpu_own_on_intro p). }

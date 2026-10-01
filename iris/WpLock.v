@@ -1731,7 +1731,7 @@ Section Lock.
   Proof using .
     iIntros "#Hi #Hf". iExists lo. iFrame "Hf". iIntros "!>" (E T HE) "Hrefute HT".
     iMod (inv_acc E lockN with "Hi") as "[Hbody Hclose]"; [done|].
-    rewrite bi.later_or. iDestruct "Hbody" as "[Hlive | >Hdead]".
+    rewrite uPred.later_or. iDestruct "Hbody" as "[Hlive | >Hdead]".
     2:{ iExFalso. iApply ("Hrefute" with "HT Hdead"). }
     iModIntro. iFrame "Hlive HT".
     iSplit.

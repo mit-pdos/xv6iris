@@ -117,7 +117,14 @@ Section SnapLaw.
 
   (* THE LAW, at a NAMED mask and a NAMED guest.  Every premise below is a
      row of [FsBlocks.fs_bytes_body] -- what a committer holds when it has
-     [fsbN] open -- plus the empty transaction authority. *)
+     [fsbN] open -- plus the empty transaction authority.
+     ...AND ONE LATER CREDIT (port-ordinal, owner's option (a), 2026-10-01):
+     the law opens the application's invariant ([AppInv.app_inv]) and needs
+     its claim at the kernel's map while the kernel's half stays outside
+     ([FsCollectAll.fs_collect_dur]); at an ordinal step index that later
+     is not stripped for free, and the only party with a credit is the
+     law's RUNNER (the committer, out of an instruction's continuation).
+     [snap_law_ghost_at] takes one too, for the same reason. *)
   Definition snap_law_at (γ : log_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z) (N : coPset) (G : gname -> iProp Σ)
       (T : iProp Σ) (gd : nat) : iProp Σ :=
@@ -130,6 +137,7 @@ Section SnapLaw.
           ⌜bytes_dom Lb (fs_home_set cov logstart)⌝ -∗
           ghost_map_auth_frac (fs_bytes γfs) 1 Lb -∗
           ghost_map_auth_frac (ln_tx γ) 1 (∅ : gmap nat unit) -∗
+          £ 1 -∗
           T ={E}=∗
             snap_law_out G T gd C (fs_home_set cov logstart)
             ∗ ghost_map_auth_frac (fs_bytes γfs) 1 Lb
@@ -185,6 +193,7 @@ Section SnapLaw.
     snap_law γ γfs cov logstart T gd -∗
     ghost_map_auth_frac (fs_bytes γfs) 1 Lb -∗
     ghost_map_auth_frac (ln_tx γ) 1 (∅ : gmap nat unit) -∗
+    £ 1 -∗
     T ={⊤ ∖ ↑fsbN}=∗
       (* the epoch AND the seam, at the law's own guest (round C) *)
       (∃ G : gname -> iProp Σ,
@@ -193,9 +202,9 @@ Section SnapLaw.
       ∗ ghost_map_auth_frac (fs_bytes γfs) 1 Lb
       ∗ ghost_map_auth_frac (ln_tx γ) 1 (∅ : gmap nat unit).
   Proof using .
-    intros Hdom Hlens Htie Hdm. iIntros "#Hlaw Hb Ht HT".
+    intros Hdom Hlens Htie Hdm. iIntros "#Hlaw Hb Ht Hlc HT".
     iDestruct "Hlaw" as (N G Hdj) "[#Hseam #Hbody]".
-    iMod ("Hbody" $! (⊤ ∖ ↑fsbN) Lb C with "[%] [%] [%] [%] [%] Hb Ht HT")
+    iMod ("Hbody" $! (⊤ ∖ ↑fsbN) Lb C with "[%] [%] [%] [%] [%] Hb Ht Hlc HT")
       as "(Hout & Hb & Ht)";
       [| exact Hdom | exact Hlens | exact Htie | exact Hdm |].
     2: { iModIntro. iFrame "Hb Ht". iExists G. iFrame "Hseam". iExact "Hout". }
@@ -246,6 +255,7 @@ Section SnapLaw.
           ▷ G gt_o -∗
           T -∗
           ⌜n = (gd + 1)%nat⌝ -∗ start_auth n -∗
+          £ 1 -∗
           ([∗ list] Q ∈ Qs, Hk Q) ={E}=∗
             (∃ gt : gname,
                P_dur_at gt (fs_restrict (dv_of_D C) (fs_home_set cov logstart))
@@ -312,6 +322,7 @@ Section SnapLaw.
            ▷ G gt_o -∗
            T -∗
            ⌜n = (gd + 1)%nat⌝ -∗ start_auth n -∗
+           £ 1 -∗
            ([∗ list] Q ∈ Qs, Hk Q) ={⊤ ∖ ↑crashN ∖ ↑fsbN}=∗
              (∃ gt : gname,
                 P_dur_at gt (fs_restrict (dv_of_D C) (fs_home_set cov logstart))
@@ -325,9 +336,9 @@ Section SnapLaw.
     iIntros "#Hlaw".
     iDestruct "Hlaw" as (N G Hdj Hdc) "[#Hseam #Hbody]".
     iExists G. iFrame "Hseam". iModIntro.
-    iIntros (Lb C Qs gt_o n Hdom Hlens Htie Hdm) "Hb Ht HG HT %Hn Hsa HQs".
+    iIntros (Lb C Qs gt_o n Hdom Hlens Htie Hdm) "Hb Ht HG HT %Hn Hsa Hlc HQs".
     iApply ("Hbody" $! (⊤ ∖ ↑crashN ∖ ↑fsbN) Lb C Qs gt_o n
-              with "[%] [%] [%] [%] [%] Hb Ht HG HT [//] Hsa HQs");
+              with "[%] [%] [%] [%] [%] Hb Ht HG HT [//] Hsa Hlc HQs");
       [| exact Hdom | exact Hlens | exact Htie | exact Hdm].
     (* the law's mask misses both namespaces the ghost commit holds open *)
     intros x Hx. apply elem_of_difference. split.

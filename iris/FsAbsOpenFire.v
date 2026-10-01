@@ -381,12 +381,12 @@ Section OpenFire.
        the O_CREATE surface, nothing at all on the plain one
        ([SysOpenDefs.open_trunc_at]). *)
     pf_at (atrunc_commit_i (fs_gamma_L γfs) appE i) Ft -∗
-    top_frag (fs_gamma_L γfs) i n ={E}=∗
+    top_frag (fs_gamma_L γfs) i n -∗ £ 1 ={E}=∗
       top_frag (fs_gamma_L γfs) i n'
       ∗ ∃ av : aview,
           ⌜arow_at av i (MkAnode (AFile bs0) nl)⌝ ∗ Ft.(pf_recv) av i bs0.
   Proof using .
-    intros HE Hloc Hnz Habs Hnz' Habs'. iIntros "#Hi #Hai Hcm Hf".
+    intros HE Hloc Hnz Habs Hnz' Habs'. iIntros "#Hi #Hai Hcm Hf Hlc".
     iDestruct (pf_at_au with "Hcm") as "Hcm".
     rewrite /top_frag /fs_gamma_L /=.
     iMod (inv_acc E ftopN with "Hi") as "[Hbody Hclose]"; [solve_ndisj |].
@@ -411,7 +411,7 @@ Section OpenFire.
        of [appN] beside its claim, which the caller's step re-establishes
        under the later ([AppInv.app_top_update]) *)
     iMod (app_top_update appE γfs I i n n' ltac:(rewrite /appE; done)
-            with "Hai [Hstep] Hta Hf") as "[Hta Hf]".
+            with "Hai [Hstep] Hta Hf Hlc") as "[Hta Hf]".
     { iIntros (_) "Hp". iApply (app_step_at i I _ n' Hdelta with "Hstep Hp"). }
     iMod ("Hph2" $! (<[i := n']> I) with "[//] Hta") as "[Hta HΦ]".
     iMod "Hcl2".

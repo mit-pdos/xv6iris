@@ -812,7 +812,7 @@ Section ProofSysLinkBody.
     iApply (wp_caddi16sp_push_s_sconf pcE (mword_of_int 45 : mword 6) m K 38 b
               ltac:(exact K38) (sl_push sp0) with "Hcg Hpc []").
     { iApply (slki_00 with "Htext"). }
-    iIntros (CID1 Hq1) "Hcg Hframe Hpc".
+    iIntros (CID1 Hq1) "_ Hcg Hframe Hpc".
     set (M1 := <[Regidx csp_rs1 := regval_into_reg
                   (add_vec sp0 (sign_extend' 64
                      (caddi16sp_imm (mword_of_int 45 : mword 6))))]> m).
@@ -845,7 +845,7 @@ Section ProofSysLinkBody.
               (mword_of_int 37 : mword 6) Rra M1 (K - 38)%nat u1 b
               with "Hcg Hpc [] Hf1").
     { iApply (slki_02 with "Htext"). }
-    iIntros (CID2 Hq2) "Hcg Hpc Hf1".
+    iIntros (CID2 Hq2) "_ Hcg Hpc Hf1".
     iEval (rgne; rewrite Hc1 HM1ra) in "Hf1".
     assert (Hpp04 : add_vec_int (mword_of_int (SL + 0x2) : mword 64) 2
                     = mword_of_int (SL + 0x4)) by pcw.
@@ -856,7 +856,7 @@ Section ProofSysLinkBody.
               (mword_of_int 36 : mword 6) Rs0 M1 (K - 38)%nat u2 b
               with "Hcg Hpc [] Hf2").
     { iApply (slki_04 with "Htext"). }
-    iIntros (CID3 Hq3) "Hcg Hpc Hf2".
+    iIntros (CID3 Hq3) "_ Hcg Hpc Hf2".
     iEval (rgne; rewrite Hc2 HM1s0) in "Hf2".
     assert (Hpp06 : add_vec_int (mword_of_int (SL + 0x4) : mword 64) 2
                     = mword_of_int (SL + 0x6)) by pcw.
@@ -868,7 +868,7 @@ Section ProofSysLinkBody.
               ltac:(vm_compute; reflexivity) ltac:(nz) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (slki_06 with "Htext"). }
-    iIntros (CID4 Hq4) "Hcg Hpc".
+    iIntros (CID4 Hq4) "_ Hcg Hpc".
     set (M2 := <[Regidx Rs0 := regval_into_reg
                   (add_vec (M1 !!! Regidx csp_rs1)
                      (sign_extend' 64 (caddi4spn_imm (mword_of_int 76 : mword 8))))]> M1).
@@ -891,7 +891,7 @@ Section ProofSysLinkBody.
               (mword_of_int (Z.of_nat 128) : mword 64) M2 (K - 38)%nat b
               ltac:(nz) ltac:(rdok) ltac:(pcw) with "Hcg Hpc []").
     { iApply (slki_08 with "Htext"). }
-    iIntros (CID5 Hq5) "Hcg Hpc".
+    iIntros (CID5 Hq5) "_ Hcg Hpc".
     set (M3 := <[Regidx Ra2 := regval_into_reg
                   (mword_of_int (Z.of_nat 128) : mword 64)]> M2).
     assert (HM3a2 : (M3 !!! Regidx Ra2 : mword 64)
@@ -908,7 +908,7 @@ Section ProofSysLinkBody.
               (mword_of_int 3792 : mword 12) M3 (K - 38)%nat b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
     { iApply (slki_0c with "Htext"). }
-    iIntros (CID6 Hq6) "Hcg Hpc".
+    iIntros (CID6 Hq6) "_ Hcg Hpc".
     set (M4 := <[Regidx Ra1 := regval_into_reg
                   (add_vec (M3 !!! Regidx Rs0)
                      (sign_extend' 64 (mword_of_int 3792 : mword 12)))]> M3).
@@ -930,7 +930,7 @@ Section ProofSysLinkBody.
               (mword_of_int (Z.of_nat 0) : mword 64) M4 (K - 38)%nat b
               ltac:(nz) ltac:(rdok) ltac:(pcw) with "Hcg Hpc []").
     { iApply (slki_10 with "Htext"). }
-    iIntros (CID7 Hq7) "Hcg Hpc".
+    iIntros (CID7 Hq7) "_ Hcg Hpc".
     set (M5 := <[Regidx Ra0 := regval_into_reg
                   (mword_of_int (Z.of_nat 0) : mword 64)]> M4).
     assert (HM5a0 : (M5 !!! Regidx Ra0 : mword 64)
@@ -953,7 +953,7 @@ Section ProofSysLinkBody.
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (slki_12 with "Htext"). }
-    iIntros (CID8 Hq8) "Hcg Hpc".
+    iIntros (CID8 Hq8) "_ Hcg Hpc".
     set (M6 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (SL + 0x12) : mword 64) 4)]> M5).
     assert (Hjas : add_vec (mword_of_int (SL + 0x12) : mword 64)
@@ -982,7 +982,7 @@ Section ProofSysLinkBody.
               sl_maxpath_lt (Hlb "kmem"%string)
               with "Hcg Hown Htext Hdata Hpc Hpriv Hkenv [HbO]").
     { iEval (rewrite HM6a1). iExact "HbO". }
-    iIntros (CID9 Hq9 mas P1 bo1 k1) "%Hcsas %Hupt1 %Hk1 Hcg Hown Hpc Hpriv HbO %Hfsr1 _".
+    iIntros (CID9 Hq9) "_"; iIntros (mas P1 bo1 k1) "%Hcsas %Hupt1 %Hk1 Hcg Hown Hpc Hpriv HbO %Hfsr1 _".
     iEval (rewrite HM6a1) in "HbO".
     assert (Hpc16 : ret_pc (M6 !!! Regidx Rra : mword 64)
                     = mword_of_int (SL + 0x16)) by (rewrite HM6ra; pcw).
@@ -996,7 +996,7 @@ Section ProofSysLinkBody.
               mas (K - 38)%nat b ltac:(nz) ltac:(rdok) ltac:(pcw)
               with "Hcg Hpc []").
     { iApply (slki_16 with "Htext"). }
-    iIntros (CID10 Hq10) "Hcg Hpc".
+    iIntros (CID10 Hq10) "_ Hcg Hpc".
     set (M7 := <[Regidx Ra5 := regval_into_reg
                   (mword_of_int (-1) : mword 64)]> mas).
     assert (HM7a5 : (M7 !!! Regidx Ra5 : mword 64) = (mword_of_int (-1) : mword 64))
@@ -1019,7 +1019,7 @@ Section ProofSysLinkBody.
                       exact (sl_nonneg _ (sl_len_range pk1 Hpk1)))
                 with "Hcg Hpc []").
       { iApply (slki_18 with "Htext"). }
-      iIntros (CID11 Hq11) "Hcg Hpc".
+      iIntros (CID11 Hq11) "_ Hcg Hpc".
       assert (Hpp1c : add_vec_int (mword_of_int (SL + 0x18) : mword 64) 4
                       = mword_of_int (SL + 0x1c)) by pcw.
       iEval (rewrite Hpp1c) in "Hpc".
@@ -1029,7 +1029,7 @@ Section ProofSysLinkBody.
                 (mword_of_int (Z.of_nat 128) : mword 64) M7 (K - 38)%nat b
                 ltac:(nz) ltac:(rdok) ltac:(pcw) with "Hcg Hpc []").
       { iApply (slki_1c with "Htext"). }
-      iIntros (CID12 Hq12) "Hcg Hpc".
+      iIntros (CID12 Hq12) "_ Hcg Hpc".
       set (N0 := <[Regidx Ra2 := regval_into_reg
                     (mword_of_int (Z.of_nat 128) : mword 64)]> M7).
       assert (HN0a2 : (N0 !!! Regidx Ra2 : mword 64)
@@ -1046,7 +1046,7 @@ Section ProofSysLinkBody.
                 (mword_of_int 3920 : mword 12) N0 (K - 38)%nat b
                 ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
       { iApply (slki_20 with "Htext"). }
-      iIntros (CID13 Hq13) "Hcg Hpc".
+      iIntros (CID13 Hq13) "_ Hcg Hpc".
       set (N1 := <[Regidx Ra1 := regval_into_reg
                     (add_vec (N0 !!! Regidx Rs0)
                        (sign_extend' 64 (mword_of_int 3920 : mword 12)))]> N0).
@@ -1068,7 +1068,7 @@ Section ProofSysLinkBody.
                 (mword_of_int (Z.of_nat 1) : mword 64) N1 (K - 38)%nat b
                 ltac:(nz) ltac:(rdok) ltac:(pcw) with "Hcg Hpc []").
       { iApply (slki_24 with "Htext"). }
-      iIntros (CID14 Hq14) "Hcg Hpc".
+      iIntros (CID14 Hq14) "_ Hcg Hpc".
       set (N2 := <[Regidx Ra0 := regval_into_reg
                     (mword_of_int (Z.of_nat 1) : mword 64)]> N1).
       assert (HN2a0 : (N2 !!! Regidx Ra0 : mword 64)
@@ -1091,7 +1091,7 @@ Section ProofSysLinkBody.
                 ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (slki_26 with "Htext"). }
-      iIntros (CID15 Hq15) "Hcg Hpc".
+      iIntros (CID15 Hq15) "_ Hcg Hpc".
       set (N3 := <[Regidx Rra := regval_into_reg
                     (add_vec_int (mword_of_int (SL + 0x26) : mword 64) 4)]> N2).
       assert (Hjas2 : add_vec (mword_of_int (SL + 0x26) : mword 64)
@@ -1120,7 +1120,7 @@ Section ProofSysLinkBody.
                 sl_maxpath_lt (Hlb "kmem"%string)
                 with "Hcg Hown Htext Hdata Hpc Hpriv Hkenv [HbW]").
       { iEval (rewrite HN3a1). iExact "HbW". }
-      iIntros (CID16 Hq16 mas2 P2 bw1 k2)
+      iIntros (CID16 Hq16) "_"; iIntros (mas2 P2 bw1 k2)
         "%Hcsas2 %Hupt2 %Hk2 Hcg Hown Hpc Hpriv HbW %Hfsr2 _".
       iEval (rewrite HN3a1) in "HbW".
       (* the two fetches lent the block's counter in turn (permit sweep
@@ -1149,7 +1149,7 @@ Section ProofSysLinkBody.
                 mas2 (K - 38)%nat b ltac:(nz) ltac:(rdok) ltac:(pcw)
                 with "Hcg Hpc []").
       { iApply (slki_2a with "Htext"). }
-      iIntros (CID17 Hq17) "Hcg Hpc".
+      iIntros (CID17 Hq17) "_ Hcg Hpc".
       set (N4 := <[Regidx Ra5 := regval_into_reg
                     (mword_of_int (-1) : mword 64)]> mas2).
       assert (HN4a5 : (N4 !!! Regidx Ra5 : mword 64)
@@ -1174,7 +1174,7 @@ Section ProofSysLinkBody.
                         exact (sl_nonneg _ (sl_len_range pk2 Hpk2)))
                   with "Hcg Hpc []").
         { iApply (slki_2c with "Htext"). }
-        iIntros (CID18 Hq18) "Hcg Hpc".
+        iIntros (CID18 Hq18) "_ Hcg Hpc".
         assert (Hpp30 : add_vec_int (mword_of_int (SL + 0x2c) : mword 64) 4
                         = mword_of_int (SL + 0x30)) by pcw.
         iEval (rewrite Hpp30) in "Hpc".
@@ -1213,7 +1213,7 @@ Section ProofSysLinkBody.
                   (mword_of_int 35 : mword 6) Rs1 N4 (K - 38)%nat u3 b
                   with "Hcg Hpc [] Hf3").
         { iApply (slki_30 with "Htext"). }
-        iIntros (CID19 Hq19) "Hcg Hpc Hf3".
+        iIntros (CID19 Hq19) "_ Hcg Hpc Hf3".
         iEval (rgne; rewrite Hd3 HN4s1) in "Hf3".
         assert (Hpp32 : add_vec_int (mword_of_int (SL + 0x30) : mword 64) 2
                         = mword_of_int (SL + 0x32)) by pcw.
@@ -1224,7 +1224,7 @@ Section ProofSysLinkBody.
                   ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc []").
         { iApply (slki_32 with "Htext"). }
-        iIntros (CID20 Hq20) "Hcg Hpc".
+        iIntros (CID20 Hq20) "_ Hcg Hpc".
         set (Q0 := <[Regidx Rra := regval_into_reg
                       (add_vec_int (mword_of_int (SL + 0x32) : mword 64) 4)]> N4).
         assert (Hjbo : add_vec (mword_of_int (SL + 0x32) : mword 64)
@@ -1244,7 +1244,7 @@ Section ProofSysLinkBody.
                   with "Hcg Hown [] [] Htext Hpc Hlog Hpidq Hprocs").
         { rewrite Heb /trap_csrs_ext. done. }
         { rewrite Heb /cpu_claim_ext. done. }
-        iIntros (CID21 Hq21 mbo) "%Hcsbo Hcg Hown _ _ Hpc Hpidq Hop".
+        iIntros (CID21 Hq21) "_"; iIntros (mbo) "%Hcsbo Hcg Hown _ _ Hpc Hpidq Hop".
         assert (Hpc36 : ret_pc (Q0 !!! Regidx Rra : mword 64)
                         = mword_of_int (SL + 0x36)) by (rewrite HQ0ra; pcw).
         iEval (rewrite Hpc36) in "Hpc".
@@ -1256,7 +1256,7 @@ Section ProofSysLinkBody.
                   (mword_of_int 3792 : mword 12) mbo (K - 38)%nat b
                   ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
         { iApply (slki_36 with "Htext"). }
-        iIntros (CID22 Hq22) "Hcg Hpc".
+        iIntros (CID22 Hq22) "_ Hcg Hpc".
         set (Q1 := <[Regidx Ra0 := regval_into_reg
                       (add_vec (mbo !!! Regidx Rs0)
                          (sign_extend' 64 (mword_of_int 3792 : mword 12)))]> mbo).
@@ -1275,7 +1275,7 @@ Section ProofSysLinkBody.
                   ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc []").
         { iApply (slki_3a with "Htext"). }
-        iIntros (CID23 Hq23) "Hcg Hpc".
+        iIntros (CID23 Hq23) "_ Hcg Hpc".
         set (Q2 := <[Regidx Rra := regval_into_reg
                       (add_vec_int (mword_of_int (SL + 0x3a) : mword 64) 4)]> Q1).
         assert (Hjna : add_vec (mword_of_int (SL + 0x3a) : mword 64)
@@ -1309,7 +1309,7 @@ Section ProofSysLinkBody.
         { rewrite Heb /trap_csrs_ext. done. }
         { rewrite Heb /cpu_claim_ext. done. }
         { iEval (rewrite HQ2a0). iExact "Hbufk". }
-        iIntros (CID24 Hq24 mna n1 Sb1 ok ipv w1)
+        iIntros (CID24 Hq24) "_"; iIntros (mna n1 Sb1 ok ipv w1)
           "%Hcsna Hcg Hown _ _ Hpc Hsbb Hsbi Hpidq Hcwdref
            Hbufk Hbsl %HSb1 %Hw1 %Hn1 [HopS Htx] Hres".
         iEval (rewrite HQ2a0) in "Hbufk".
@@ -1323,7 +1323,7 @@ Section ProofSysLinkBody.
         iApply (wp_cmv_s_sconf (CID := CID24) (mword_of_int (SL + 0x3e)) Rs1 Ra0
                   mna (K - 38)%nat b ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
         { iApply (slki_3e with "Htext"). }
-        iIntros (CID25 Hq25) "Hcg Hpc".
+        iIntros (CID25 Hq25) "_ Hcg Hpc".
         set (Q3 := <[Regidx Rs1 := regval_into_reg
                       (add_vec zero_reg (mna !!! Regidx Ra0))]> mna).
         assert (HQ3a0 : (Q3 !!! Regidx Ra0 : mword 64)
@@ -1352,7 +1352,7 @@ Section ProofSysLinkBody.
                           apply (proj2 (eq_vec_false_iff _ _)); exact Hipnz)
                     with "Hcg Hpc []").
           { iApply (slki_40 with "Htext"). }
-          iIntros (CID26 Hq26) "Hcg Hpc".
+          iIntros (CID26 Hq26) "_ Hcg Hpc".
           assert (Hpp42 : add_vec_int (mword_of_int (SL + 0x40) : mword 64) 2
                           = mword_of_int (SL + 0x42)) by pcw.
           iEval (rewrite Hpp42) in "Hpc".
@@ -1391,7 +1391,7 @@ Section ProofSysLinkBody.
                     ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
                     with "Hcg Hpc []").
           { iApply (slki_42 with "Htext"). }
-          iIntros (CID27 Hq27) "Hcg Hpc".
+          iIntros (CID27 Hq27) "_ Hcg Hpc".
           set (R0 := <[Regidx Rra := regval_into_reg
                         (add_vec_int (mword_of_int (SL + 0x42) : mword 64) 4)]> Q3).
           assert (Hjil : add_vec (mword_of_int (SL + 0x42) : mword 64)
@@ -1424,7 +1424,7 @@ Section ProofSysLinkBody.
                           Hbs1 Htx Hllb0").
           { rewrite Heb /trap_csrs_ext. done. }
           { rewrite Heb /cpu_claim_ext. done. }
-          iIntros (CID28 Hq28 mil dn bm fl)
+          iIntros (CID28 Hq28) "_"; iIntros (mil dn bm fl)
             "%Hcsil _ Hcg Hown _ _ Hpc Hpidq Hsbi Hbs1 Hslkd Hdep Hoffr
              Hidev Hiinum Hivalid Hload #Hshot Hfrz %Hfl Hru %Hilkp".
           assert (Hpc46 : ret_pc (R0 !!! Regidx Rra : mword 64)
@@ -1446,7 +1446,7 @@ Section ProofSysLinkBody.
                     with "Hcg Hpc [] [Hity]").
           { iApply (slki_46 with "Htext"). }
           { iEval (rgne; rewrite Hils1). iExact "Hity". }
-          iIntros (CID29 Hq29) "Hcg Hpc Hity".
+          iIntros (CID29 Hq29) "_ Hcg Hpc Hity".
           iEval (rgne; rewrite Hils1) in "Hity".
           set (R1 := <[Regidx Ra4 := regval_into_reg
                         (sign_extend' 64 (di_type dn : mword 16) : mword 64)]> mil).
@@ -1465,7 +1465,7 @@ Section ProofSysLinkBody.
                     R1 (K - 38)%nat b ltac:(nz) ltac:(rdok) ltac:(pcw)
                     with "Hcg Hpc []").
           { iApply (slki_4a with "Htext"). }
-          iIntros (CID30 Hq30) "Hcg Hpc".
+          iIntros (CID30 Hq30) "_ Hcg Hpc".
           set (R2 := <[Regidx Ra5 := regval_into_reg
                         (mword_of_int 1 : mword 64)]> R1).
           assert (HR2a5 : (R2 !!! Regidx Ra5 : mword 64) = (mword_of_int 1 : mword 64))
@@ -1495,7 +1495,7 @@ Section ProofSysLinkBody.
                        ltac:(vm_compute; reflexivity)
                        with "Hcg Hpc []").
              { iApply (slki_4c with "Htext"). }
-             iIntros (CID31 Hq31). iApply bi.later_intro. iIntros "Hcg Hpc".
+             iApply bi.later_intro. iIntros (CID31 Hq31) "_". iIntros "Hcg Hpc".
              iEval (rewrite Htgc6) in "Hpc".
              iAssert (ic_loaded fsc_fs fsc_ireg fsc_cov fsc_logst kk inum dn bm)
                with "[Hdiat Hity Himaj Himin Hinl Hisz Haddrs Hind Hblocks Hdlnk Htopl]"
@@ -1542,10 +1542,10 @@ Section ProofSysLinkBody.
              { rewrite Heb /cpu_claim_ext. done. }
              { iApply (log_opS_opb with "HopS"). }
              iEval (rewrite /wp_next).
-             iIntros (CIDy) "%Hqy". iIntros (mf)
+             iIntros (CIDy) "%Hqy Hlc". iIntros (mf)
                "%Hcsf %Ha0f Hcg Hown Htce Hcce Hpc Hpidq Hsbb Hsbi
                 Hbsl Hislot".
-             iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain |].
+             iSpecialize ("Hcont" $! CIDy with "[%] Hlc"); [wp_next_chain |].
              iDestruct (cwd_ref_at_of_held_at with "Hcwdref") as "Href".
              iCombine "Hpidq Hofiles" as "Hpnc".
              iEval (rewrite -(proc_priv_nocwd_bare _ _ _ _ Hlzq)) in "Hpnc".
@@ -1572,7 +1572,7 @@ Section ProofSysLinkBody.
                              exact (sl_tdir_ne _ Hty))
                        with "Hcg Hpc []").
              { iApply (slki_4c with "Htext"). }
-             iIntros (CID31 Hq31) "Hcg Hpc".
+             iIntros (CID31 Hq31) "_ Hcg Hpc".
              assert (Hpp50 : add_vec_int (mword_of_int (SL + 0x4c) : mword 64) 4
                              = mword_of_int (SL + 0x50)) by pcw.
              iEval (rewrite Hpp50) in "Hpc".
@@ -1583,7 +1583,7 @@ Section ProofSysLinkBody.
                        with "Hcg Hpc [] [Hinl]").
              { iApply (slki_50 with "Htext"). }
              { iEval (rgne; rewrite HR2s1). iExact "Hinl". }
-             iIntros (CID32 Hq32) "Hcg Hpc Hinl".
+             iIntros (CID32 Hq32) "_ Hcg Hpc Hinl".
              iEval (rgne; rewrite HR2s1) in "Hinl".
              set (R3 := <[Regidx Ra5 := regval_into_reg
                            (sign_extend' 64 (di_nlink dn : mword 16) : mword 64)]> R2).
@@ -1602,7 +1602,7 @@ Section ProofSysLinkBody.
                        (mword_of_int 32768 : mword 64) R3 (K - 38)%nat b
                        ltac:(nz) ltac:(rdok) sl_lui8 with "Hcg Hpc []").
              { iApply (slki_54 with "Htext"). }
-             iIntros (CID33 Hq33) "Hcg Hpc".
+             iIntros (CID33 Hq33) "_ Hcg Hpc".
              set (R4 := <[Regidx Ra4 := regval_into_reg
                            (mword_of_int 32768 : mword 64)]> R3).
              assert (HR4a4 : (R4 !!! Regidx Ra4 : mword 64)
@@ -1622,7 +1622,7 @@ Section ProofSysLinkBody.
                        (mword_of_int 63 : mword 6) R4 (K - 38)%nat b
                        ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
              { iApply (slki_56 with "Htext"). }
-             iIntros (CID34 Hq34) "Hcg Hpc".
+             iIntros (CID34 Hq34) "_ Hcg Hpc".
              set (R5 := <[Regidx Ra4 := regval_into_reg
                            (add_vec (rget R4 Ra4)
                               (sign_extend' 64
@@ -1656,7 +1656,7 @@ Section ProofSysLinkBody.
                           ltac:(vm_compute; reflexivity)
                           with "Hcg Hpc []").
                 { iApply (slki_58 with "Htext"). }
-                iIntros (CID35 Hq35). iApply bi.later_intro. iIntros "Hcg Hpc".
+                iApply bi.later_intro. iIntros (CID35 Hq35) "_". iIntros "Hcg Hpc".
                 iEval (rewrite Htgd6) in "Hpc".
                 iAssert (ic_loaded fsc_fs fsc_ireg fsc_cov fsc_logst kk inum dn bm)
                   with "[Hdiat Hity Himaj Himin Hinl Hisz Haddrs Hind Hblocks
@@ -1706,10 +1706,10 @@ Section ProofSysLinkBody.
                 { rewrite Heb /cpu_claim_ext. done. }
                 { iApply (log_opS_opb with "HopS"). }
                 iEval (rewrite /wp_next).
-                iIntros (CIDy) "%Hqy". iIntros (mf)
+                iIntros (CIDy) "%Hqy Hlc". iIntros (mf)
                   "%Hcsf %Ha0f Hcg Hown Htce Hcce Hpc Hpidq Hsbb Hsbi
                    Hbsl Hislot".
-                iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain |].
+                iSpecialize ("Hcont" $! CIDy with "[%] Hlc"); [wp_next_chain |].
                 iDestruct (cwd_ref_at_of_held_at with "Hcwdref") as "Href".
                 iCombine "Hpidq Hofiles" as "Hpnc".
                 iEval (rewrite -(proc_priv_nocwd_bare _ _ _ _ Hlzq)) in "Hpnc".
@@ -1736,7 +1736,7 @@ Section ProofSysLinkBody.
                                 exact (sl_nmax_ne _ Hnl))
                           with "Hcg Hpc []").
                 { iApply (slki_58 with "Htext"). }
-                iIntros (CID35 Hq35) "Hcg Hpc".
+                iIntros (CID35 Hq35) "_ Hcg Hpc".
                 assert (Hpp5c : add_vec_int (mword_of_int (SL + 0x58) : mword 64) 4
                                 = mword_of_int (SL + 0x5c)) by pcw.
                 iEval (rewrite Hpp5c) in "Hpc".
@@ -1758,7 +1758,7 @@ Section ProofSysLinkBody.
                           (mword_of_int 34 : mword 6) Rs2 R5 (K - 38)%nat u4 b
                           with "Hcg Hpc [] Hf4").
                 { iApply (slki_5c with "Htext"). }
-                iIntros (CID36 Hq36) "Hcg Hpc Hf4".
+                iIntros (CID36 Hq36) "_ Hcg Hpc Hf4".
                 iEval (rgne; rewrite Hd4 HR5s2) in "Hf4".
                 assert (Hpp5e : add_vec_int (mword_of_int (SL + 0x5c) : mword 64) 2
                                 = mword_of_int (SL + 0x5e)) by pcw.
@@ -1768,7 +1768,7 @@ Section ProofSysLinkBody.
                           Ra5 (mword_of_int 1 : mword 6) R5 (K - 38)%nat b
                           ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
                 { iApply (slki_5e with "Htext"). }
-                iIntros (CID37 Hq37) "Hcg Hpc".
+                iIntros (CID37 Hq37) "_ Hcg Hpc".
                 set (S0 := <[Regidx Ra5 := regval_into_reg
                               (sign_extend' 64 (subrange_vec_dec
                                  (add_vec (rget R5 Ra5)
@@ -1801,7 +1801,7 @@ Section ProofSysLinkBody.
                           (di_nlink dn : mword 16) b with "Hcg Hpc [] [Hinl]").
                 { iApply (slki_60 with "Htext"). }
                 { iEval (rgne; rewrite HS0s1). iExact "Hinl". }
-                iIntros (CID38 Hq38) "Hcg Hpc Hinl".
+                iIntros (CID38 Hq38) "_ Hcg Hpc Hinl".
                 iEval (rgne; rgne; rewrite HS0s1 HS0a5) in "Hinl".
                 iEval (rewrite (sl_nlink_incr (di_nlink dn))) in "Hinl".
                 iAssert (inode_meta (ientry kk) (sl_incnl dn))
@@ -1819,7 +1819,7 @@ Section ProofSysLinkBody.
                           Ra0 Rs1 S0 (K - 38)%nat b ltac:(nz) ltac:(rdok)
                           with "Hcg Hpc []").
                 { iApply (slki_64 with "Htext"). }
-                iIntros (CID39 Hq39) "Hcg Hpc".
+                iIntros (CID39 Hq39) "_ Hcg Hpc".
                 set (S1 := <[Regidx Ra0 := regval_into_reg
                               (add_vec zero_reg (S0 !!! Regidx Rs1))]> S0).
                 assert (HS1a0 : (S1 !!! Regidx Ra0 : mword 64) = ientry kk).
@@ -1838,7 +1838,7 @@ Section ProofSysLinkBody.
                           ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
                           with "Hcg Hpc []").
                 { iApply (slki_66 with "Htext"). }
-                iIntros (CID40 Hq40) "Hcg Hpc".
+                iIntros (CID40 Hq40) "_ Hcg Hpc".
                 set (S2 := <[Regidx Rra := regval_into_reg
                               (add_vec_int (mword_of_int (SL + 0x66) : mword 64) 4)]> S1).
                 assert (Hjiu : add_vec (mword_of_int (SL + 0x66) : mword 64)
@@ -1912,7 +1912,9 @@ Section ProofSysLinkBody.
                                 Hmeta Hmap Hsbi Hireg Hdiat [Hfrz] Hpidq Hprocs
                                 Hdev Hgeo Hdlk Hbs2 HopS").
                 { rewrite /InodeRegion.ireg_link_pin. iExact "Hfrz". }
-                iIntros (CID41 Hq41 miu)
+                (* iupdate's return credit pays INSTANT 1's opener
+                   ([lf_tgt_fire]'s [£ 1], spent at [AppInv.app_top_update]) *)
+                iIntros (CID41 Hq41) "Hlc"; iIntros (miu)
                   "%Hcsiu Hcg Hown Hpc Hpidq Hidev Hiinum Hmeta Hmap Hsbi Hdiat
                    (%vtok & [%Hvok _] & Htoken) Hpin Hbs2 HopS".
                 (* the minted fragment's VALUE, read off [ip]'s own record:
@@ -2022,7 +2024,7 @@ Section ProofSysLinkBody.
                         uf_nd_top Hlocnl Htynz0 Hokt
                         (lf_nlink_row dn (sl_incnl dn) bm dat Htynz
                            Hityi Hiszi Himaji Himini Hnlinc)
-                        with "[] [] Hltgt Htop") as "[Htop Htgtr0]";
+                        with "[] [] Hltgt Htop Hlc") as "[Htop Htgtr0]";
                   [iApply (ireg_inv_ftop with "Hireg") | iApply (ireg_inv_app with "Hireg") |].
                 iAssert (ltgt_fired Ftgt (bv_unsigned inum)) with "[Htgtr0]"
                   as "Htgtr".
@@ -2065,7 +2067,7 @@ Section ProofSysLinkBody.
                           Ra0 Rs1 miu (K - 38)%nat b ltac:(nz) ltac:(rdok)
                           with "Hcg Hpc []").
                 { iApply (slki_6a with "Htext"). }
-                iIntros (CID42 Hq42) "Hcg Hpc".
+                iIntros (CID42 Hq42) "_ Hcg Hpc".
                 set (S3 := <[Regidx Ra0 := regval_into_reg
                               (add_vec zero_reg (miu !!! Regidx Rs1))]> miu).
                 assert (HS3a0 : (S3 !!! Regidx Ra0 : mword 64) = ientry kk).
@@ -2084,7 +2086,7 @@ Section ProofSysLinkBody.
                           ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
                           with "Hcg Hpc []").
                 { iApply (slki_6c with "Htext"). }
-                iIntros (CID43 Hq43) "Hcg Hpc".
+                iIntros (CID43 Hq43) "_ Hcg Hpc".
                 set (S4 := <[Regidx Rra := regval_into_reg
                               (add_vec_int (mword_of_int (SL + 0x6c) : mword 64) 4)]> S3).
                 assert (Hjul : add_vec (mword_of_int (SL + 0x6c) : mword 64)
@@ -2110,7 +2112,7 @@ Section ProofSysLinkBody.
                           with "Hcg Hown Htext Hpc Hitinv Hesck Hslkk
                                 Hslkd Hpidq Hprocs [//] Hflsh Hclaimssl Hdep Hoffd Hidev Hiinum
                                 Hivalid Hload Hshot2 Hfrz").
-                iIntros (CID44 Hq44 mul) "%Hcsul Hcg Hown Hpc Hpidq Hshr Htx".
+                iIntros (CID44 Hq44) "_"; iIntros (mul) "%Hcsul Hcg Hown Hpc Hpidq Hshr Htx".
 
                 (* THE GENERATION SURVIVES THE WINDOW, and sys_link is the
                    caller that needs it: the share it still holds denies the
@@ -2129,7 +2131,7 @@ Section ProofSysLinkBody.
                           Ra1 Rs0 (mword_of_int 4048 : mword 12) mul (K - 38)%nat b
                           ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
                 { iApply (slki_70 with "Htext"). }
-                iIntros (CID45 Hq45) "Hcg Hpc".
+                iIntros (CID45 Hq45) "_ Hcg Hpc".
                 set (T0 := <[Regidx Ra1 := regval_into_reg
                               (add_vec (mul !!! Regidx Rs0)
                                  (sign_extend' 64 (mword_of_int 4048 : mword 12)))]> mul).
@@ -2148,7 +2150,7 @@ Section ProofSysLinkBody.
                           Ra0 Rs0 (mword_of_int 3920 : mword 12) T0 (K - 38)%nat b
                           ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
                 { iApply (slki_74 with "Htext"). }
-                iIntros (CID46 Hq46) "Hcg Hpc".
+                iIntros (CID46 Hq46) "_ Hcg Hpc".
                 set (T1 := <[Regidx Ra0 := regval_into_reg
                               (add_vec (T0 !!! Regidx Rs0)
                                  (sign_extend' 64 (mword_of_int 3920 : mword 12)))]> T0).
@@ -2170,7 +2172,7 @@ Section ProofSysLinkBody.
                           ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
                           with "Hcg Hpc []").
                 { iApply (slki_78 with "Htext"). }
-                iIntros (CID47 Hq47) "Hcg Hpc".
+                iIntros (CID47 Hq47) "_ Hcg Hpc".
                 set (T2 := <[Regidx Rra := regval_into_reg
                               (add_vec_int (mword_of_int (SL + 0x78) : mword 64) 4)]> T1).
                 assert (Hjnp : add_vec (mword_of_int (SL + 0x78) : mword 64)
@@ -2216,7 +2218,7 @@ Section ProofSysLinkBody.
                 { rewrite Heb /cpu_claim_ext. done. }
                 { iEval (rewrite HT2a0). iExact "Hbufw". }
                 { iEval (rewrite HT2a1). iExact "Hnm14". }
-                iIntros (CID48 Hq48 mnp n2 Sb2 ok2 nf dpv w2)
+                iIntros (CID48 Hq48) "_"; iIntros (mnp n2 Sb2 ok2 nf dpv w2)
                   "%Hcsnp Hcg Hown _ _ Hpc Hsbb Hsbi Hpidq
                    Hcwdref Hbufw Hnm14 Hbsl %HSb2 %Hw2 %Hn2 [HopS Htx] Hres2".
                 iEval (rewrite HT2a0) in "Hbufw".
@@ -2237,7 +2239,7 @@ Section ProofSysLinkBody.
                           Rs2 Ra0 mnp (K - 38)%nat b ltac:(nz) ltac:(rdok)
                           with "Hcg Hpc []").
                 { iApply (slki_7c with "Htext"). }
-                iIntros (CID49 Hq49) "Hcg Hpc".
+                iIntros (CID49 Hq49) "_ Hcg Hpc".
                 set (T3 := <[Regidx Rs2 := regval_into_reg
                               (add_vec zero_reg (mnp !!! Regidx Ra0))]> mnp).
                 assert (HT3a0 : (T3 !!! Regidx Ra0 : mword 64)
@@ -2276,7 +2278,7 @@ Section ProofSysLinkBody.
                                    exact Hdpnz)
                              with "Hcg Hpc []").
                    { iApply (slki_7e with "Htext"). }
-                   iIntros (CID50 Hq50) "Hcg Hpc".
+                   iIntros (CID50 Hq50) "_ Hcg Hpc".
                    assert (Hpp80 : add_vec_int (mword_of_int (SL + 0x7e) : mword 64) 2
                                    = mword_of_int (SL + 0x80)) by pcw.
                    iEval (rewrite Hpp80) in "Hpc".
@@ -2319,7 +2321,7 @@ Section ProofSysLinkBody.
                              ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
                              with "Hcg Hpc []").
                    { iApply (slki_80 with "Htext"). }
-                   iIntros (CID51 Hq51) "Hcg Hpc".
+                   iIntros (CID51 Hq51) "_ Hcg Hpc".
                    set (U0 := <[Regidx Rra := regval_into_reg
                                  (add_vec_int (mword_of_int (SL + 0x80) : mword 64) 4)]> T3).
                    assert (Hjild : add_vec (mword_of_int (SL + 0x80) : mword 64)
@@ -2352,7 +2354,7 @@ Section ProofSysLinkBody.
                                    Hdev Hgeo Hdlk Hbs1d Htx Hllb0b").
                    { rewrite Heb /trap_csrs_ext. done. }
                    { rewrite Heb /cpu_claim_ext. done. }
-                   iIntros (CID52 Hq52 mild dnd bmd fld)
+                   iIntros (CID52 Hq52) "_"; iIntros (mild dnd bmd fld)
                      "%Hcsild _ Hcg Hown _ _ Hpc Hpidq Hsbi Hbs1d Hslkdd
                       Hdepd Hoffrd Hidevd Hiinumd Hivalidd Hloadd #Hshotd2 Hfrzd
                       %Hfld Hrud %Hilkpd".
@@ -2405,7 +2407,7 @@ Section ProofSysLinkBody.
                              ltac:(nz) ltac:(rdok) with "Hcg Hpc [] [Hinld]").
                    { iApply (slki_84 with "Htext"). }
                    { iEval (rgne; rewrite Hilds2). iExact "Hinld". }
-                   iIntros (CIDg0 Hqg0) "Hcg Hpc Hinld".
+                   iIntros (CIDg0 Hqg0) "_ Hcg Hpc Hinld".
                    iEval (rgne; rewrite Hilds2) in "Hinld".
                    set (Ug := <[Regidx Ra5 := regval_into_reg
                                  (sign_extend' 64 (di_nlink dnd : mword 16)
@@ -2442,7 +2444,7 @@ Section ProofSysLinkBody.
                                ltac:(rewrite Htge6_88; vm_compute; reflexivity)
                                with "Hcg Hpc []").
                      { iApply (slki_88 with "Htext"). }
-                     iIntros (CIDg1 Hqg1). iApply bi.later_intro. iIntros "Hcg Hpc".
+                     iApply bi.later_intro. iIntros (CIDg1 Hqg1) "_". iIntros "Hcg Hpc".
                      iEval (rewrite Htge6_88) in "Hpc".
                      (* the parent's record, handed back whole: the guard READ
                         the halfword and wrote nothing. *)
@@ -2504,10 +2506,10 @@ Section ProofSysLinkBody.
                                      HbN HbW HbO
                                      [Hsbs Hir1c Hcwdref Hofiles Hftok Htgtr Hlent Hcont]").
                      iEval (rewrite /wp_next).
-                     iIntros (CIDy) "%Hqy". iIntros (mf)
+                     iIntros (CIDy) "%Hqy Hlc". iIntros (mf)
                        "%Hcsf %Ha0f Hcg Hown Htce Hcce Hpc Hpidq Hsbb
                         Hsbi Hbsl Hislots Huntgt".
-                     iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain |].
+                     iSpecialize ("Hcont" $! CIDy with "[%] Hlc"); [wp_next_chain |].
                      iDestruct (cwd_ref_at_of_held_at with "Hcwdref") as "Href".
                      iCombine "Hpidq Hofiles" as "Hpnc".
                      iEval (rewrite -(proc_priv_nocwd_bare _ _ _ _ Hlzq)) in "Hpnc".
@@ -2533,7 +2535,7 @@ Section ProofSysLinkBody.
                              ltac:(rgne; rewrite HUga5; exact (sl_nlz_ne _ Hdnl0))
                              with "Hcg Hpc []").
                    { iApply (slki_88 with "Htext"). }
-                   iIntros (CIDg1 Hqg1) "Hcg Hpc".
+                   iIntros (CIDg1 Hqg1) "_ Hcg Hpc".
                    assert (Hpp8a : add_vec_int (mword_of_int (SL + 0x88) : mword 64) 2
                                    = mword_of_int (SL + 0x8a)) by pcw.
                    iEval (rewrite Hpp8a) in "Hpc".
@@ -2542,7 +2544,7 @@ Section ProofSysLinkBody.
                              Ra0 Rs2 Ug (K - 38)%nat b ltac:(nz) ltac:(rdok)
                              with "Hcg Hpc []").
                    { iApply (slki_8a with "Htext"). }
-                   iIntros (CID53 Hq53) "Hcg Hpc".
+                   iIntros (CID53 Hq53) "_ Hcg Hpc".
                    set (U1 := <[Regidx Ra0 := regval_into_reg
                                  (add_vec zero_reg (Ug !!! Regidx Rs2))]> Ug).
                    assert (HU1a0 : (U1 !!! Regidx Ra0 : mword 64) = ientry kd).
@@ -2565,7 +2567,7 @@ Section ProofSysLinkBody.
                              icfg_dev b ltac:(nz) ltac:(rdok) with "Hcg Hpc [] [Hidevd]").
                    { iApply (slki_8c with "Htext"). }
                    { iEval (rgne; rewrite HU1s2). iExact "Hidevd". }
-                   iIntros (CID54 Hq54) "Hcg Hpc Hidevd".
+                   iIntros (CID54 Hq54) "_ Hcg Hpc Hidevd".
                    iEval (rgne; rewrite HU1s2) in "Hidevd".
                    set (U2 := <[Regidx Ra4 := regval_into_reg
                                  (sign_extend' 64 icfg_dev : mword 64)]> U1).
@@ -2598,7 +2600,7 @@ Section ProofSysLinkBody.
                              icfg_dev b ltac:(nz) ltac:(rdok) with "Hcg Hpc [] [Hipdev]").
                    { iApply (slki_90 with "Htext"). }
                    { iEval (rgne; rewrite HU2s1). iExact "Hipdev". }
-                   iIntros (CID55 Hq55) "Hcg Hpc Hipdev".
+                   iIntros (CID55 Hq55) "_ Hcg Hpc Hipdev".
                    iEval (rgne; rewrite HU2s1) in "Hipdev".
                    set (U3 := <[Regidx Ra5 := regval_into_reg
                                  (sign_extend' 64 icfg_dev : mword 64)]> U2).
@@ -2626,7 +2628,7 @@ Section ProofSysLinkBody.
                                    apply sl_neq_refl)
                              with "Hcg Hpc []").
                    { iApply (slki_92 with "Htext"). }
-                   iIntros (CID56 Hq56) "Hcg Hpc".
+                   iIntros (CID56 Hq56) "_ Hcg Hpc".
                    assert (Hpp96 : add_vec_int (mword_of_int (SL + 0x92) : mword 64) 4
                                    = mword_of_int (SL + 0x96)) by pcw.
                    iEval (rewrite Hpp96) in "Hpc".
@@ -2637,7 +2639,7 @@ Section ProofSysLinkBody.
                              with "Hcg Hpc [] [Hipinum]").
                    { iApply (slki_96 with "Htext"). }
                    { iEval (rgne; rewrite HU3s1). iExact "Hipinum". }
-                   iIntros (CID57 Hq57) "Hcg Hpc Hipinum".
+                   iIntros (CID57 Hq57) "_ Hcg Hpc Hipinum".
                    iEval (rgne; rewrite HU3s1) in "Hipinum".
                    set (U4 := <[Regidx Ra2 := regval_into_reg
                                  (sign_extend' 64 inum : mword 64)]> U3).
@@ -2659,7 +2661,7 @@ Section ProofSysLinkBody.
                              Ra1 Rs0 (mword_of_int 4048 : mword 12) U4 (K - 38)%nat b
                              ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
                    { iApply (slki_98 with "Htext"). }
-                   iIntros (CID58 Hq58) "Hcg Hpc".
+                   iIntros (CID58 Hq58) "_ Hcg Hpc".
                    set (U5 := <[Regidx Ra1 := regval_into_reg
                                  (add_vec (U4 !!! Regidx Rs0)
                                     (sign_extend' 64 (mword_of_int 4048 : mword 12)))]> U4).
@@ -2683,7 +2685,7 @@ Section ProofSysLinkBody.
                              ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
                              with "Hcg Hpc []").
                    { iApply (slki_9c with "Htext"). }
-                   iIntros (CID59 Hq59) "Hcg Hpc".
+                   iIntros (CID59 Hq59) "_ Hcg Hpc".
                    set (U6 := <[Regidx Rra := regval_into_reg
                                  (add_vec_int (mword_of_int (SL + 0x9c) : mword 64) 4)]> U5).
                    assert (Hjdl : add_vec (mword_of_int (SL + 0x9c) : mword 64)
@@ -2784,7 +2786,7 @@ Section ProofSysLinkBody.
                                    Hprocs Hdev Hgeo Hdlk Hbsl Hitab Hitinv Hescrows
                                    Hslks Hir1c Hdlnkd HopS Htxs").
                    { iEval (rewrite HU6a1). iExact "Hnm14". }
-                   iIntros (CID60 Hq60 mdl found bmd' datd' dnd' dnd0' n3 Sb3 tot)
+                   iIntros (CID60 Hq60) "_"; iIntros (mdl found bmd' datd' dnd' dnd0' n3 Sb3 tot)
                      "%Hcsdl Hcg Hown Hpc Hidevd Hiinumd Hmetad Hmapd Hblocksd
                       Hnm14 Hsbi Hsbs Hsbb Hdiatd Hpidq Hbsl Hir1c Hdlnkd %Hn3
                       %HSb3 %Hdlp %Hfnd HopS Htxs %Hcapd %Hsizedd %Harm".
@@ -2848,7 +2850,7 @@ Section ProofSysLinkBody.
                                  ltac:(rewrite Htgee_a0; vm_compute; reflexivity)
                                  with "Hcg Hpc []").
                        { iApply (slki_a0 with "Htext"). }
-                       iIntros (CID61 Hq61). iApply bi.later_intro. iIntros "Hcg Hpc".
+                       iApply bi.later_intro. iIntros (CID61 Hq61) "_". iIntros "Hcg Hpc".
                        iEval (rewrite Htgee_a0) in "Hpc".
                        subst bmd' datd' dnd' dnd0'.
                        (* dirlink handed the ledger half back verbatim and
@@ -2922,10 +2924,10 @@ Section ProofSysLinkBody.
                                        HbN HbW HbO
                                        [Hsbs Hir1c Hcwdref Hofiles Hftok Htgtr Hlent Hcont]").
                        iEval (rewrite /wp_next).
-                       iIntros (CIDy) "%Hqy". iIntros (mf)
+                       iIntros (CIDy) "%Hqy Hlc". iIntros (mf)
                          "%Hcsf %Ha0f Hcg Hown Htce Hcce Hpc Hpidq Hsbb
                           Hsbi Hbsl Hislots Huntgt".
-                       iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain |].
+                       iSpecialize ("Hcont" $! CIDy with "[%] Hlc"); [wp_next_chain |].
                        iDestruct (cwd_ref_at_of_held_at with "Hcwdref") as "Href".
                        iCombine "Hpidq Hofiles" as "Hpnc".
                        iEval (rewrite -(proc_priv_nocwd_bare _ _ _ _ Hlzq)) in "Hpnc".
@@ -3066,7 +3068,9 @@ Section ProofSysLinkBody.
                                       ltac:(rgne; rewrite Ha0z; exact sl_zero_nonneg)
                                       with "Hcg Hpc []").
                             { iApply (slki_a0 with "Htext"). }
-                            iIntros (CID61 Hq61) "Hcg Hpc".
+                            (* the blt's credit pays INSTANT 2's opener
+                               ([lf_ent_fire]'s [£ 1]) *)
+                            iIntros (CID61 Hq61) "Hlc Hcg Hpc".
                             assert (Hppa4 : add_vec_int
                                       (mword_of_int (SL + 0xa0) : mword 64) 4
                                       = mword_of_int (SL + 0xa4)) by pcw.
@@ -3261,7 +3265,7 @@ Section ProofSysLinkBody.
                                        fsc_cov fsc_logst dnd' bmd' datd'
                                        Hdiok' Hrl_datd' Hduq' Hddix')
                                     Hdirp Hnlp0 Hentnone Hparentrow
-                                    with "[] [] Hlent Htopd")
+                                    with "[] [] Hlent Htopd Hlc")
                               as "[Htopd Hentr0]";
                               [iApply (ireg_inv_ftop with "Hireg") | iApply (ireg_inv_app with "Hireg") |].
                             iAssert (lent_fired Fent (bv_unsigned dinum)
@@ -3299,7 +3303,7 @@ Section ProofSysLinkBody.
                                       (K - 38)%nat b ltac:(nz) ltac:(rdok)
                                       with "Hcg Hpc []").
                             { iApply (slki_a4 with "Htext"). }
-                            iIntros (CID62 Hq62) "Hcg Hpc".
+                            iIntros (CID62 Hq62) "_ Hcg Hpc".
                             set (W0 := <[Regidx Ra0 := regval_into_reg
                                           (add_vec zero_reg (mdl !!! Regidx Rs2))]> mdl).
                             assert (HW0a0 : (W0 !!! Regidx Ra0 : mword 64) = ientry kd).
@@ -3320,7 +3324,7 @@ Section ProofSysLinkBody.
                                       ltac:(vm_compute; reflexivity)
                                       with "Hcg Hpc []").
                             { iApply (slki_a6 with "Htext"). }
-                            iIntros (CID63 Hq63) "Hcg Hpc".
+                            iIntros (CID63 Hq63) "_ Hcg Hpc".
                             set (W1 := <[Regidx Rra := regval_into_reg
                                           (add_vec_int
                                              (mword_of_int (SL + 0xa6) : mword 64) 4)]> W0).
@@ -3368,7 +3372,7 @@ Section ProofSysLinkBody.
                             { rewrite Heb /trap_csrs_ext. done. }
                             { rewrite Heb /cpu_claim_ext. done. }
                             { done. }
-                            iIntros (CID64 Hq64 mupd n4 Sb4 wd)
+                            iIntros (CID64 Hq64) "_"; iIntros (mupd n4 Sb4 wd)
                               "%Hcsupd Hcg Hown _ _ Hpc Hpidq Hsbb Hsbi
                                Hbsl %HSb4 %Hwd %Hcrbwd %Hn4 HopS Htx Hislotd".
                             assert (Hpcaa : ret_pc (W1 !!! Regidx Rra : mword 64)
@@ -3390,7 +3394,7 @@ Section ProofSysLinkBody.
                                       (K - 38)%nat b ltac:(nz) ltac:(rdok)
                                       with "Hcg Hpc []").
                             { iApply (slki_aa with "Htext"). }
-                            iIntros (CID65 Hq65) "Hcg Hpc".
+                            iIntros (CID65 Hq65) "_ Hcg Hpc".
                             set (W2 := <[Regidx Ra0 := regval_into_reg
                                           (add_vec zero_reg
                                              (mupd !!! Regidx Rs1))]> mupd).
@@ -3412,7 +3416,7 @@ Section ProofSysLinkBody.
                                       ltac:(vm_compute; reflexivity)
                                       with "Hcg Hpc []").
                             { iApply (slki_ac with "Htext"). }
-                            iIntros (CID66 Hq66) "Hcg Hpc".
+                            iIntros (CID66 Hq66) "_ Hcg Hpc".
                             set (W3 := <[Regidx Rra := regval_into_reg
                                           (add_vec_int
                                              (mword_of_int (SL + 0xac) : mword 64) 4)]> W2).
@@ -3464,7 +3468,7 @@ Section ProofSysLinkBody.
                             { rewrite Heb /trap_csrs_ext. done. }
                             { rewrite Heb /cpu_claim_ext. done. }
                             { iApply (log_opS_op with "HopS Htx"). }
-                            iIntros (CID67 Hq67 mip n5)
+                            iIntros (CID67 Hq67) "_"; iIntros (mip n5)
                               "%Hcsip Hcg Hown _ _ Hpc Hpidq Hsbb Hsbi
                                Hbsl %Hn5 Hop Hisloti".
                             assert (Hpcb0 : ret_pc (W3 !!! Regidx Rra : mword 64)
@@ -3481,7 +3485,7 @@ Section ProofSysLinkBody.
                                       ltac:(vm_compute; reflexivity)
                                       with "Hcg Hpc []").
                             { iApply (slki_b0 with "Htext"). }
-                            iIntros (CID68 Hq68) "Hcg Hpc".
+                            iIntros (CID68 Hq68) "_ Hcg Hpc".
                             set (W4 := <[Regidx Rra := regval_into_reg
                                           (add_vec_int
                                              (mword_of_int (SL + 0xb0) : mword 64) 4)]> mip).
@@ -3507,7 +3511,7 @@ Section ProofSysLinkBody.
                                             Hseam Hgen Hpidq Hprocs Hdev Hgeo Hdlk Hop").
                             { rewrite Heb /trap_csrs_ext. done. }
                             { rewrite Heb /cpu_claim_ext. done. }
-                            iIntros (CID69 Hq69 meo) "%Hcseo Hcg Hown _ _ Hpc Hpidq".
+                            iIntros (CID69 Hq69) "_"; iIntros (meo) "%Hcseo Hcg Hown _ _ Hpc Hpidq".
                             assert (Hpcb4 : ret_pc (W4 !!! Regidx Rra : mword 64)
                                       = mword_of_int (SL + 0xb4))
                               by (rewrite HW4ra; pcw).
@@ -3522,7 +3526,7 @@ Section ProofSysLinkBody.
                                       ltac:(nz) ltac:(rdok) ltac:(pcw)
                                       with "Hcg Hpc []").
                             { iApply (slki_b4 with "Htext"). }
-                            iIntros (CID70 Hq70) "Hcg Hpc".
+                            iIntros (CID70 Hq70) "_ Hcg Hpc".
                             set (W5 := <[Regidx Ra5 := regval_into_reg
                                           (zero_reg : mword 64)]> meo).
                             assert (HW5a5 : (W5 !!! Regidx Ra5 : mword 64)
@@ -3550,7 +3554,7 @@ Section ProofSysLinkBody.
                                       ltac:(rdok) with "Hcg Hpc [] [Hf3]").
                             { iApply (slki_b6 with "Htext"). }
                             { iEval (rewrite Hg3). iExact "Hf3". }
-                            iIntros (CID71 Hq71) "Hcg Hpc Hf3".
+                            iIntros (CID71 Hq71) "_ Hcg Hpc Hf3".
                             iEval (rewrite Hg3) in "Hf3".
                             set (W6 := <[Regidx Rs1 := regval_into_reg
                                           (m !!! Regidx Rs1 : mword 64)]> W5).
@@ -3583,7 +3587,7 @@ Section ProofSysLinkBody.
                                       ltac:(rdok) with "Hcg Hpc [] [Hf4]").
                             { iApply (slki_b8 with "Htext"). }
                             { iEval (rewrite Hg4). iExact "Hf4". }
-                            iIntros (CID72 Hq72) "Hcg Hpc Hf4".
+                            iIntros (CID72 Hq72) "_ Hcg Hpc Hf4".
                             iEval (rewrite Hg4) in "Hf4".
                             set (W7 := <[Regidx Rs2 := regval_into_reg
                                           (m !!! Regidx Rs2 : mword 64)]> W6).
@@ -3608,7 +3612,7 @@ Section ProofSysLinkBody.
                                       ltac:(vm_compute; reflexivity)
                                       with "Hcg Hpc []").
                             { iApply (slki_ba with "Htext"). }
-                            iIntros (CID73 Hq73). iApply bi.later_intro. iIntros "Hcg Hpc".
+                            iApply bi.later_intro. iIntros (CID73 Hq73) "_". iIntros "Hcg Hpc".
                             iEval (rewrite Htg11aba) in "Hpc".
                             iDestruct (sl_nm_join (pa_stk sp0 6) bn0 nf
                                          with "Hnm14 Hnm2") as "HbN".
@@ -3640,9 +3644,9 @@ Section ProofSysLinkBody.
                                              Hpidq Hftok Htgtr Hentr Huntgtc
                                              Hcont]").
                             iEval (rewrite /wp_next).
-                            iIntros (CIDy) "%Hqy". iIntros (mf) "%Hcsf %Ha0f Hcg Hpc".
+                            iIntros (CIDy) "%Hqy Hlc". iIntros (mf) "%Hcsf %Ha0f Hcg Hpc".
                             sl_own_transport CID73 CIDy eb pj b.
-                            iSpecialize ("Hcont" $! CIDy with "[%]");
+                            iSpecialize ("Hcont" $! CIDy with "[%] Hlc");
                               [wp_next_chain |].
                             iDestruct (cwd_ref_at_of_held_at with "Hcwdref") as "Href".
                             iCombine "Hpidq Hofiles" as "Hpnc".
@@ -3680,7 +3684,9 @@ Section ProofSysLinkBody.
                                       ltac:(rewrite Htgee_a0; vm_compute; reflexivity)
                                       with "Hcg Hpc []").
                             { iApply (slki_a0 with "Htext"). }
-                            iIntros (CID61 Hq61). iApply bi.later_intro. iIntros "Hcg Hpc".
+                            (* the blt's credit pays the parent's retag
+                               ([InodeRegion.ireg_top_retag_same]'s [£ 1]) *)
+                            iApply bi.later_intro. iIntros (CID61 Hq61) "Hlc". iIntros "Hcg Hpc".
                             iEval (rewrite Htgee_a0) in "Hpc".
                             (* THE ENTRY UNITS RIDE WITH IT:
                                nothing was written, so the entry map does not
@@ -3779,7 +3785,7 @@ Section ProofSysLinkBody.
                                     (inode_local_of_ok_rec (bv_unsigned dinum)
                                        fsc_cov fsc_logst dnd' bmd' datd'
                                        Hdiok' Hrl_datd' Hduq' Hddix')
-                                    with "[] [] Htopd")
+                                    with "[] [] Htopd Hlc")
                               as "Htopd";
                               [iApply (ireg_inv_ftop with "Hireg") | iApply (ireg_inv_app with "Hireg") |].
                             iModIntro.
@@ -3860,10 +3866,10 @@ Section ProofSysLinkBody.
                                             HbN HbW HbO
                                             [Hsbs Hir1c Hcwdref Hofiles Hftok Htgtr Hlent Hcont]").
                             iEval (rewrite /wp_next).
-                            iIntros (CIDy) "%Hqy". iIntros (mf)
+                            iIntros (CIDy) "%Hqy Hlc". iIntros (mf)
                               "%Hcsf %Ha0f Hcg Hown Htce Hcce Hpc Hpidq
                                Hsbb Hsbi Hbsl Hislots Huntgt".
-                            iSpecialize ("Hcont" $! CIDy with "[%]");
+                            iSpecialize ("Hcont" $! CIDy with "[%] Hlc");
                               [wp_next_chain |].
                             iDestruct (cwd_ref_at_of_held_at with "Hcwdref") as "Href".
                             iCombine "Hpidq Hofiles" as "Hpnc".
@@ -3893,7 +3899,7 @@ Section ProofSysLinkBody.
                              ltac:(vm_compute; reflexivity)
                              with "Hcg Hpc []").
                    { iApply (slki_7e with "Htext"). }
-                   iIntros (CID50 Hq50). iApply bi.later_intro. iIntros "Hcg Hpc".
+                   iApply bi.later_intro. iIntros (CID50 Hq50) "_". iIntros "Hcg Hpc".
                    iEval (rewrite Htgf4) in "Hpc".
                    (* the two buffers, rejoined for the epilogue *)
                    iDestruct (sl_buf_join (pa_stk sp0 22) bw1 pk2 Hpk2
@@ -3944,10 +3950,10 @@ Section ProofSysLinkBody.
                                    Hdlk Hbsl HopS Htx Hf1 Hf2 Hf3 Hf4 HbN HbW HbO
                                    [Hsbs Hir2d Hcwdref Hofiles Hftok Htgtr Hlent Hcont]").
                    iEval (rewrite /wp_next).
-                   iIntros (CIDy) "%Hqy". iIntros (mf)
+                   iIntros (CIDy) "%Hqy Hlc". iIntros (mf)
                      "%Hcsf %Ha0f Hcg Hown Htce Hcce Hpc Hpidq Hsbb Hsbi
                       Hbsl Hislot Huntgt".
-                   iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain |].
+                   iSpecialize ("Hcont" $! CIDy with "[%] Hlc"); [wp_next_chain |].
                    iDestruct (cwd_ref_at_of_held_at with "Hcwdref") as "Href".
                    iCombine "Hpidq Hofiles" as "Hpnc".
                    iEval (rewrite -(proc_priv_nocwd_bare _ _ _ _ Hlzq)) in "Hpnc".
@@ -3975,7 +3981,7 @@ Section ProofSysLinkBody.
                     ltac:(vm_compute; reflexivity)
                     with "Hcg Hpc []").
           { iApply (slki_40 with "Htext"). }
-          iIntros (CID26 Hq26). iApply bi.later_intro. iIntros "Hcg Hpc".
+          iApply bi.later_intro. iIntros (CID26 Hq26) "_". iIntros "Hcg Hpc".
           iEval (rewrite Htgbc) in "Hpc".
           iDestruct (sl_buf_join (pa_stk sp0 38) bo1 pk1 Hpk1
                        with "Hbufk Hbufrest") as "HbO".
@@ -4000,9 +4006,9 @@ Section ProofSysLinkBody.
           { rewrite Heb /cpu_claim_ext. done. }
           { iApply (log_opS_op with "HopS Htx"). }
           iEval (rewrite /wp_next).
-          iIntros (CIDy) "%Hqy". iIntros (mf) "%Hcsf %Ha0f Hcg Hown Htce Hcce
+          iIntros (CIDy) "%Hqy Hlc". iIntros (mf) "%Hcsf %Ha0f Hcg Hown Htce Hcce
                                                Hpc Hpidq".
-          iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain |].
+          iSpecialize ("Hcont" $! CIDy with "[%] Hlc"); [wp_next_chain |].
           iDestruct (cwd_ref_at_of_held_at with "Hcwdref") as "Href".
           iCombine "Hpidq Hofiles" as "Hpnc".
           iEval (rewrite -(proc_priv_nocwd_bare _ _ _ _ Hlzq)) in "Hpnc".
@@ -4027,7 +4033,7 @@ Section ProofSysLinkBody.
                   ltac:(rewrite Htg10c2c; vm_compute; reflexivity)
                   with "Hcg Hpc []").
         { iApply (slki_2c with "Htext"). }
-        iIntros (CID18 Hq18). iApply bi.later_intro. iIntros "Hcg Hpc".
+        iApply bi.later_intro. iIntros (CID18 Hq18) "_". iIntros "Hcg Hpc".
         iEval (rewrite Htg10c2c) in "Hpc".
         iDestruct (sl_bytes_name (pa_stk sp0 6) 16 with "HbN") as (bn0) "HbN".
         iDestruct (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CID18)
@@ -4040,9 +4046,9 @@ Section ProofSysLinkBody.
                   with "Hcg Htext Hpc Hf1 Hf2 Hf3 Hf4 HbN HbW HbO
                         [Hown Hbsl Hsbb Hsbi Hsbs Hir Hpriv Hltgt Hlent Huntgtc Hcont]").
         iEval (rewrite /wp_next).
-        iIntros (CIDy) "%Hqy". iIntros (mf) "%Hcsf %Ha0f Hcg Hpc".
+        iIntros (CIDy) "%Hqy Hlc". iIntros (mf) "%Hcsf %Ha0f Hcg Hpc".
         sl_own_transport CID16 CIDy eb pj b.
-        iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain |].
+        iSpecialize ("Hcont" $! CIDy with "[%] Hlc"); [wp_next_chain |].
         iApply ("Hcont" $! mf P2 k2 with "[%] [%] [%] Hcg Hown [] [] Hpc Hbsl
                   Hsbb Hsbi Hsbs Hir Hpriv [%] [Hltgt Hlent Huntgtc]").
         { exact Hcsf. }
@@ -4064,7 +4070,7 @@ Section ProofSysLinkBody.
                 ltac:(rewrite Htg10c18; vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (slki_18 with "Htext"). }
-      iIntros (CID11 Hq11). iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID11 Hq11) "_". iIntros "Hcg Hpc".
       iEval (rewrite Htg10c18) in "Hpc".
       iDestruct (sl_bytes_name (pa_stk sp0 6) 16 with "HbN") as (bn0) "HbN".
       iDestruct (sl_bytes_name (pa_stk sp0 22) 128 with "HbW") as (bw0) "HbW".
@@ -4078,9 +4084,9 @@ Section ProofSysLinkBody.
                 with "Hcg Htext Hpc Hf1 Hf2 Hf3 Hf4 HbN HbW HbO
                       [Hown Hbsl Hsbb Hsbi Hsbs Hir Hpriv Hltgt Hlent Huntgtc Hcont]").
       iEval (rewrite /wp_next).
-      iIntros (CIDy) "%Hqy". iIntros (mf) "%Hcsf %Ha0f Hcg Hpc".
+      iIntros (CIDy) "%Hqy Hlc". iIntros (mf) "%Hcsf %Ha0f Hcg Hpc".
       sl_own_transport CID9 CIDy eb pj b.
-      iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain |].
+      iSpecialize ("Hcont" $! CIDy with "[%] Hlc"); [wp_next_chain |].
       iApply ("Hcont" $! mf P1 k1 with "[%] [%] [%] Hcg Hown [] [] Hpc Hbsl
                 Hsbb Hsbi Hsbs Hir Hpriv [%] [Hltgt Hlent Huntgtc]").
       { exact Hcsf. }

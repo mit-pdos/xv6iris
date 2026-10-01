@@ -376,7 +376,7 @@ Section ProofSysOpenEntryC.
               (sign_extend' 64 (mword_of_int 0 : mword 16)) N (K - 24)%nat b
               ltac:(nz) ltac:(rdok) ltac:(pcw) with "Hcg Hpc []").
     { iApply (soi_038 with "Htext"). }
-    iIntros (CID1 Hq1) "Hcg Hpc".
+    iIntros (CID1 Hq1) "_ Hcg Hpc".
     set (N1 := <[Regidx Ra3 := regval_into_reg
                   (sign_extend' 64 (mword_of_int 0 : mword 16))]> N).
     assert (HN1a3 : (N1 !!! Regidx Ra3 : mword 64)
@@ -391,7 +391,7 @@ Section ProofSysOpenEntryC.
               (sign_extend' 64 (mword_of_int 0 : mword 16)) N1 (K - 24)%nat b
               ltac:(nz) ltac:(rdok) ltac:(pcw) with "Hcg Hpc []").
     { iApply (soi_03a with "Htext"). }
-    iIntros (CID2 Hq2) "Hcg Hpc".
+    iIntros (CID2 Hq2) "_ Hcg Hpc".
     set (N2 := <[Regidx Ra2 := regval_into_reg
                   (sign_extend' 64 (mword_of_int 0 : mword 16))]> N1).
     assert (HN2a2 : (N2 !!! Regidx Ra2 : mword 64)
@@ -409,7 +409,7 @@ Section ProofSysOpenEntryC.
               (sign_extend' 64 (FsAbsCreateFire.T_FILE : mword 16)) N2 (K - 24)%nat b
               ltac:(nz) ltac:(rdok) ltac:(pcw) with "Hcg Hpc []").
     { iApply (soi_03c with "Htext"). }
-    iIntros (CID3 Hq3) "Hcg Hpc".
+    iIntros (CID3 Hq3) "_ Hcg Hpc".
     set (N3 := <[Regidx Ra1 := regval_into_reg
                   (sign_extend' 64 (FsAbsCreateFire.T_FILE : mword 16))]> N2).
     assert (HN3a1 : (N3 !!! Regidx Ra1 : mword 64)
@@ -432,7 +432,7 @@ Section ProofSysOpenEntryC.
               (mword_of_int 3920 : mword 12) N3 (K - 24)%nat b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
     { iApply (soi_03e with "Htext"). }
-    iIntros (CID4 Hq4) "Hcg Hpc".
+    iIntros (CID4 Hq4) "_ Hcg Hpc".
     set (N4 := <[Regidx Ra0 := regval_into_reg
                   (add_vec (N3 !!! Regidx Rs0)
                      (sign_extend' 64 (mword_of_int 3920 : mword 12)))]> N3).
@@ -457,7 +457,7 @@ Section ProofSysOpenEntryC.
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (soi_042 with "Htext"). }
-    iIntros (CID5 Hq5) "Hcg Hpc".
+    iIntros (CID5 Hq5) "_ Hcg Hpc".
     set (N5 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (SO + 0x42) : mword 64) 4)]> N4).
     assert (Hjcr : add_vec (mword_of_int (SO + 0x42) : mword 64)
@@ -551,7 +551,7 @@ Section ProofSysOpenEntryC.
                     [Hwp] Hdl Hcre").
     { iEval (rewrite HN5a0). iExact "Hbufk". }
     { iExact "Hwp". }
-    iIntros (CID6 Hq6 mcr ok made kk qi ss gy inum dn bm u1 Sb1 ns1)
+    iIntros (CID6 Hq6) "_"; iIntros (mcr ok made kk qi ss gy inum dn bm u1 Sb1 ns1)
       "%Hcscr Hcg Hown Hpc Hsbn Hsbi Hsbs Hsbb Hpriv Hbufk Hbsl
        %Hns1 Hisl %Hu1 HopS Hok".
     iEval (rewrite HN5a0) in "Hbufk".
@@ -581,7 +581,7 @@ Section ProofSysOpenEntryC.
     iApply (wp_cmv_s_sconf (CID := CID6) (mword_of_int (SO + 0x46)) Rs1 Ra0
               mcr (K - 24)%nat b ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
     { iApply (soi_046 with "Htext"). }
-    iIntros (CID7 Hq7) "Hcg Hpc".
+    iIntros (CID7 Hq7) "_ Hcg Hpc".
     set (P1 := <[Regidx Rs1 := regval_into_reg
                   (add_vec zero_reg (mcr !!! Regidx Ra0))]> mcr).
     assert (HP1s1 : (P1 !!! Regidx Rs1 : mword 64) = (mcr !!! Regidx Ra0 : mword 64)).
@@ -615,7 +615,7 @@ Section ProofSysOpenEntryC.
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (soi_048 with "Htext"). }
-      iIntros (CID8 Hq8). iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID8 Hq8) "_". iIntros "Hcg Hpc".
       assert (Htg48 : add_vec (mword_of_int (SO + 0x48) : mword 64)
                         (sign_extend' 64
                            (sign_extend' 13 (concat_vec (mword_of_int 69 : mword 8) ('b"0"))))
@@ -638,10 +638,10 @@ Section ProofSysOpenEntryC.
       { rewrite Heb /trap_csrs_ext. done. }
       { rewrite Heb /cpu_claim_ext. done. }
       iEval (rewrite /wp_next).
-      iIntros (CIDy) "%Hqy". iIntros (mf) "%Hcsf %Ha0f Hcg Hown Htce Hcce Hpc
+      iIntros (CIDy) "%Hqy Hlc". iIntros (mf) "%Hcsf %Ha0f Hcg Hown Htce Hcce Hpc
                                            Hpbare".
       iDestruct ("Hpback" with "Hpbare") as "Hpriv".
-      iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain |].
+      iSpecialize ("Hcont" $! CIDy with "[%] Hlc"); [wp_next_chain |].
       (* this arm lends nothing: the count it came in at (permit sweep L1b) *)
       iSpecialize ("Hcont" $! mf ns1 (pv_ev (us_V U))).
       iEval (rewrite upd_ev_id upd_usV_id) in "Hcont".
@@ -688,7 +688,7 @@ Section ProofSysOpenEntryC.
                     apply (proj2 (eq_vec_false_iff _ _)); exact Hipnz)
               with "Hcg Hpc []").
     { iApply (soi_048 with "Htext"). }
-    iIntros (CID8 Hq8) "Hcg Hpc".
+    iIntros (CID8 Hq8) "_ Hcg Hpc".
     assert (Hpp48 : add_vec_int (mword_of_int (SO + 0x48) : mword 64) 2
                     = mword_of_int (SO + 0x4a)) by pcw.
     iEval (rewrite Hpp48) in "Hpc".
@@ -761,10 +761,10 @@ Section ProofSysOpenEntryC.
                                 (fn_nlink (era_node dn bm data))))
                     (socr_ft (bview plen bp) P Phiarm Phiok Phiex (bv_unsigned inum) Phit) m K eb b lks))
         with "[Hcont Hsbn Hsbs HR]" as "Hcontj".
-      { iEval (rewrite /wp_next). iIntros (CIDz) "%Hqz".
+      { iEval (rewrite /wp_next). iIntros (CIDz) "%Hqz Hlc".
         iEval (rewrite /so_cont_au). iIntros (mf ns2 k2) "%Hcsf %Hns2 %Hk2".
         iIntros "Hcg Hown Htce Hcce Hpc Hsbb Hsbi Hbsl Hisl Hpost".
-        iSpecialize ("Hcont" $! CIDz with "[%]"); [wp_next_chain |].
+        iSpecialize ("Hcont" $! CIDz with "[%] Hlc"); [wp_next_chain |].
         iApply fupd_wp.
         iMod (socr_arms_fresh omo gf (proc_addr jx) pidv Mim pvv vom P Pmiss
                 Phiarm Phiun Phiok Phiex Phio Phit (upd_usV U (upd_ev (us_V U) k2)) sts _ (bview plen bp) (bv_unsigned inum)
@@ -853,10 +853,10 @@ Section ProofSysOpenEntryC.
                        (abs_row (era_node dn bm data)) Phio)
                     (socr_ft_ex (bview plen bp) P Phiarm Phiex (bv_unsigned inum) Phit) m K eb b lks))
         with "[Hcont Hsbn Hsbs HR]" as "Hcontj".
-      { iEval (rewrite /wp_next). iIntros (CIDz) "%Hqz".
+      { iEval (rewrite /wp_next). iIntros (CIDz) "%Hqz Hlc".
         iEval (rewrite /so_cont_au). iIntros (mf ns2 k2) "%Hcsf %Hns2 %Hk2".
         iIntros "Hcg Hown Htce Hcce Hpc Hsbb Hsbi Hbsl Hisl Hpost".
-        iSpecialize ("Hcont" $! CIDz with "[%]"); [wp_next_chain |].
+        iSpecialize ("Hcont" $! CIDz with "[%] Hlc"); [wp_next_chain |].
         iApply fupd_wp.
         iMod (socr_arms_exists omo gf (proc_addr jx) pidv Mim pvv vom P Pmiss
                 Phiarm Phiun Phiok Phiex Phio Phit (upd_usV U (upd_ev (us_V U) k2)) sts _ (bview plen bp) (bv_unsigned inum)

@@ -318,7 +318,7 @@ Section ProofRelease.
               ltac:(lia)
               ltac:(exact (size_del_lt s lks n Hin Hsz))
               with "Hcg Hown Hpay Htext Hpc").
-    iIntros (CIDpo Hspo mf) "Hcg Hown Hpc %Hmf".
+    iIntros (CIDpo Hspo) "_"; iIntros (mf) "Hcg Hown Hpc %Hmf".
     iEval (rewrite upd_eq) in "Hpc".
     assert (Hpc22 : ret_pc (add_vec_int (mword_of_int (KernelSyms.release + 0x1e) : mword 64) 4)
                     = (mword_of_int (KernelSyms.release + 0x22) : mword 64)) by (apply bv_eq; vm_compute; reflexivity).
@@ -342,7 +342,7 @@ Section ProofRelease.
               with "Hcg Hpc [] [Hr24]").
     { iApply (rli_22 with "Htext"). }
     { iEval (rewrite Hcspmf). iExact "Hr24". }
-    iIntros (CIDe1 Hse1) "Hcg Hpc Hr24".
+    iIntros (CIDe1 Hse1) "_ Hcg Hpc Hr24".
     set (E1 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (m !!! Regidx (mword_of_int 1 : mword 5))]> mf).
     change (<[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (m !!! Regidx (mword_of_int 1 : mword 5))]> mf) with E1.
     assert (Hpc24 : add_vec_int (mword_of_int (KernelSyms.release + 0x22) : mword 64) 2 = mword_of_int (KernelSyms.release + 0x24)) by (apply bv_eq; vm_compute; reflexivity).
@@ -355,7 +355,7 @@ Section ProofRelease.
               with "Hcg Hpc [] [Hr16]").
     { iApply (rli_24 with "Htext"). }
     { iEval (rewrite HcspE1). iExact "Hr16". }
-    iIntros (CIDe2 Hse2) "Hcg Hpc Hr16".
+    iIntros (CIDe2 Hse2) "_ Hcg Hpc Hr16".
     set (E2 := <[Regidx (mword_of_int 8 : mword 5) := regval_into_reg (m !!! Regidx (mword_of_int 8 : mword 5))]> E1).
     change (<[Regidx (mword_of_int 8 : mword 5) := regval_into_reg (m !!! Regidx (mword_of_int 8 : mword 5))]> E1) with E2.
     assert (Hpc26 : add_vec_int (mword_of_int (KernelSyms.release + 0x24) : mword 64) 2 = mword_of_int (KernelSyms.release + 0x26)) by (apply bv_eq; vm_compute; reflexivity).
@@ -368,7 +368,7 @@ Section ProofRelease.
               with "Hcg Hpc [] [Hr8]").
     { iApply (rli_26 with "Htext"). }
     { iEval (rewrite HcspE2). iExact "Hr8". }
-    iIntros (CIDe3 Hse3) "Hcg Hpc Hr8".
+    iIntros (CIDe3 Hse3) "_ Hcg Hpc Hr8".
     set (E3 := <[Regidx (mword_of_int 9 : mword 5) := regval_into_reg (m !!! Regidx (mword_of_int 9 : mword 5))]> E2).
     change (<[Regidx (mword_of_int 9 : mword 5) := regval_into_reg (m !!! Regidx (mword_of_int 9 : mword 5))]> E2) with E3.
     assert (Hpc28 : add_vec_int (mword_of_int (KernelSyms.release + 0x26) : mword 64) 2 = mword_of_int (KernelSyms.release + 0x28)) by (apply bv_eq; vm_compute; reflexivity).
@@ -402,7 +402,7 @@ Section ProofRelease.
     iApply (wp_caddi16sp_pop_s_sconf (mword_of_int (KernelSyms.release + 0x28)) (mword_of_int 2 : mword 6) E3 (av - 4)%nat 4 (match n with O => eb | S _ => false end) Hpop
               with "Hcg Hpc [] Hframe4").
     { iApply (rli_28 with "Htext"). }
-    iIntros (CIDe4 Hse4) "Hcg Hpc".
+    iIntros (CIDe4 Hse4) "_ Hcg Hpc".
     assert (Hnk : ((av - 4) + 4)%nat = av) by lia.
     iEval (rewrite Hnk) in "Hcg".
     change (<[Regidx csp_rs1 := regval_into_reg
@@ -419,14 +419,14 @@ Section ProofRelease.
               ltac:(vm_compute; discriminate)
               with "Hcg Hpc []").
     { iApply (rli_2a with "Htext"). }
-    iIntros (CIDe5 Hse5) "Hcg Hpc".
+    iIntros (CIDe5 Hse5) "Hlc Hcg Hpc".
     iEval (rgne) in "Hpc".
     assert (Hra_final : ret_pc (E4 !!! Regidx (mword_of_int 1 : mword 5)) = ret_tgt)
       by (rewrite HE4ra; reflexivity).
     iEval (rewrite Hra_final) in "Hpc".
     assert (Hchainf : (match n with O => eb | S _ => false end) = false \/ p = zero_reg -> (CIDe5 : CPU) = (CIDpo : CPU)) by wp_next_chain.
     iDestruct (cpu_own_transport CIDpo CIDe5 n eb p (match n with O => eb | S _ => false end) Hchainf with "Hown") as "Hown".
-    iSpecialize ("Hcont" $! CIDe5 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CIDe5 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! E4 with "HOut Hcg Hpc [%] Hown").
     unfold callee_saved. repeat split.
     + rewrite HE4sp. reflexivity.
@@ -558,8 +558,8 @@ Section OfGen.
               with "Hcg Htext Hpc [] Htoken HR [] Hown Hpay").
     { iApply (is_lock_openable with "Hlock"). }
     { iApply lock_finisher_close. }
-    iIntros (CIDg Hsg mr) "_ Hcg Hpc %Hcs Hown".
-    iSpecialize ("Hcont" $! CIDg with "[%]"); [exact Hsg|].
+    iIntros (CIDg Hsg) "Hlc"; iIntros (mr) "_ Hcg Hpc %Hcs Hown".
+    iSpecialize ("Hcont" $! CIDg with "[%] Hlc"); [exact Hsg|].
     iApply ("Hcont" $! mr with "Hcg Hpc [//] Hown").
   Qed.
 
@@ -581,8 +581,8 @@ Section OfGen.
               with "Hcg Htext Hpc [] Htoken [HR Hhook] Hown Hpay").
     { iApply (is_lock_openable with "Hlock"). }
     { iApply (lock_finisher_close_hook with "HR Hhook"). }
-    iIntros (CIDg Hsg mr) "_ Hcg Hpc %Hcs Hown".
-    iSpecialize ("Hcont" $! CIDg with "[%]"); [exact Hsg|].
+    iIntros (CIDg Hsg) "Hlc"; iIntros (mr) "_ Hcg Hpc %Hcs Hown".
+    iSpecialize ("Hcont" $! CIDg with "[%] Hlc"); [exact Hsg|].
     iApply ("Hcont" $! mr with "Hcg Hpc [//] Hown").
   Qed.
 
@@ -624,8 +624,8 @@ Section CancelOfGen.
          retired SC shim [ctx_dom_sc] used to conjure here).  Nothing to
          bridge. *)
       iApply lock_finisher_destroy. iExact "Hbuild". }
-    iIntros (CIDg Hsg mr) "(Hword & Hcpu & HOut) Hcg Hpc %Hcs Hown".
-    iSpecialize ("Hcont" $! CIDg with "[%]"); [exact Hsg|].
+    iIntros (CIDg Hsg) "Hlc"; iIntros (mr) "(Hword & Hcpu & HOut) Hcg Hpc %Hcs Hown".
+    iSpecialize ("Hcont" $! CIDg with "[%] Hlc"); [exact Hsg|].
     iApply ("Hcont" $! mr with "Hword Hcpu HOut Hcg Hpc [//] Hown").
   Qed.
 

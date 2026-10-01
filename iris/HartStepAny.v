@@ -386,7 +386,7 @@ Section stepany.
         destruct Hag as (rsP & (rs2 & mi & HQ & ->) & Hag).
         iApply ("Hcont" with "[%] Hrw Hro HPsi").
         exists rs2, mi. split; [exact HQ | exact Hag]. }
-    iNext. iIntros "Hfrag".
+    iNext. iIntros "Hfrag _".
     iApply (swp_mono with "[] [-]");
       [| iApply (swp_try_step_any Drw Dro Df rs1 Q Psi Hdisj HDpriv
                    HDhart HDmc HDcfg HWmi HDmi HWms HDms HWpc HDpc HDnpc
@@ -675,7 +675,7 @@ Section stepany.
         destruct HQe as [HQ ->].
         iApply ("Hcont" with "[%] Hrw Hro HPsi").
         split; [exact HQ | exact Hag]. }
-    iNext. iIntros "Hfrag".
+    iNext. iIntros "Hfrag _".
     iApply (swp_mono with "[] [-]");
       [| iApply (swp_try_step_any_ex Drw Dro Df rs1 Q Psi Hdisj HDpriv
                    HDhart HDmc HDcfg HWmi HDmi HWms HDms HWpc HDpc HDnpc

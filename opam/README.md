@@ -20,7 +20,7 @@ means changing this file** (build the new switch, export it, replace the file, r
 | coq / rocq-prover | 9.0.1 / 9.0.0 (`coq` is the compatibility package; the binaries are `rocq` and `coqc`) | rocq-released |
 | rocq-stdpp, rocq-stdpp-bitvector | dev.2026-09-17.0.d510b616 (stdpp master) | git rocq-iris/stdpp @ `d510b616` |
 | rocq-iris | dev.2026-09-24.0.8e490959+transfinite.ad972179 (Iris master `8e4909593a` + the 4 commits of Iris branch `robbert/transfinite` + 1 local fix) | git gitlab.mpi-sws.org/dongjae/iris @ `ad972179`, branch `dongjae/transfinite-base` (`transfinite` branch only; see "The transfinite pins") |
-| rocq-iris-transfinite | dev.2026-09-29.0.57dcd565 (the Transfinite Iris core: ordinal step indices, transfinite `uPred`/`iProp`, base-logic libraries, program logic) | git github.com/dongjaelee1/transfinite-iris @ `57dcd565` (`transfinite` branch only) |
+| rocq-iris-transfinite | dev.2026-09-29.0.3996c333 (the Transfinite Iris core: ordinal step indices, transfinite `uPred`/`iProp`, base-logic libraries, program logic) | git github.com/dongjaelee1/transfinite-iris @ `3996c333` (`transfinite` branch only; see "The transfinite pins" for how the export records its source) |
 | rocq-elpi, elpi | 3.5.1, 3.7.3 (Iris master needs rocq-elpi) | release tarballs |
 | rocq-sail-stdpp | 0.20.3 | git rems-project/coq-sail @ `e7b914cd` |
 | coq-lsp | 0.2.5+9.0 (`pet`, `fcc`: editor and agent tooling; harmless if unused) | release tarball |
@@ -36,9 +36,13 @@ is the SAME upstream commit with Iris's unmerged branch `robbert/transfinite` ap
 the BI interface so that a transfinite `uPred` can be a `bi`: `later_exist_false` and `later_sep_1`
 become conditional on `SIdxFinite`, `Timeless P := <only0> P ⊢ P`), and `rocq-iris-transfinite`
 is the Transfinite Iris core built on it. Both are pinned by commit. The core is pinned from its
-repository, `git+https://github.com/dongjaelee1/transfinite-iris.git#57dcd565…`. The patched Iris
+repository; the export still records it by local path, `git+file:///work/transfinite-iris#3996c333…`
+(the commit has been on GitHub since 2026-10-01; the pin goes back to
+`git+https://github.com/dongjaelee1/transfinite-iris.git#…` at the next re-pin). The patched Iris
 is pinned from the public fork, `git+https://gitlab.mpi-sws.org/dongjae/iris.git#ad972179…`: branch
 `dongjae/transfinite-base`, exactly the four `robbert/transfinite` commits and the fix on `8e490959`.
+Until that re-pin, the core's local path is the one part of this export that cannot be imported
+on another machine.
 The day upstream merges `robbert/transfinite`, `rocq-iris` goes back to a stock pin and only
 `rocq-iris-transfinite` remains.
 
@@ -91,7 +95,13 @@ until the new tree is green.
 
 - 2026-09-30: `rocq-iris` re-pinned from the development machine's checkout to the public fork
   https://gitlab.mpi-sws.org/dongjae/iris (branch `dongjae/transfinite-base`), the same commit
-  `ad972179`: no content change; with the core pinned from GitHub, the export now imports on any machine.
+  `ad972179`: no content change.
+- 2026-09-30 (branch `agent/transfinite-ordinal`, merged into `transfinite` 2026-10-01):
+  `rocq-iris-transfinite` at `3996c333` (the core's proof mode destructs `∗`/`∃` under `▷` for
+  timeless bodies and splits persistent parts off under `▷`, at every step index; `3996c333`: those
+  instances as priority-100 fallbacks), pinned by local path (`transfinite` had `57dcd565` from GitHub,
+  the ordinal branch `8c060bde` from GitHub before that); the commit is on GitHub since 2026-10-01.
+  Everything else unchanged.
 - 2026-09-29 (branch `transfinite`): `rocq-iris` re-pinned to the patched upstream commit
   (`8e490959` + `robbert/transfinite` + 1 fix, version `…+transfinite.ad972179`); `rocq-iris-transfinite`
   added (the Transfinite Iris core with its program logic). Everything else identical to `main`'s

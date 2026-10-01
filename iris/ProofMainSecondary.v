@@ -349,7 +349,7 @@ Section ProofMainSecondary.
        drain chose, with [hart_view_lb V0] beside it: either the word read
        as 0, or it read as 1 and [V0] is at or past the release store's
        index -- which is what lets the acquire below absorb the deposit. *)
-    iApply (wp_load_s_sconf_au_relr (kt := KT0) (ktd := KT0) 4 true false (mword_of_int (KernelSyms.main + 0x16))
+    iApply (wp_load_s_sconf_au_relr_lat (kt := KT0) (ktd := KT0) 4 true false (mword_of_int (KernelSyms.main + 0x16))
               (mword_of_int 15 : mword 5) (mword_of_int 14 : mword 5)
               (mword_of_int 0 : mword 12) m n
               (fun v => sign_extend' 64 v)

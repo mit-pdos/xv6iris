@@ -1728,7 +1728,7 @@ Section UservecAllPt.
          an OPAQUE key -- the loop's own -- so this boundary relays it
          verbatim. *)
       iExact "Hkin". }
-    iApply wp_next_intro. iIntros (CID2).
+    iApply wp_next_intro_lc. iIntros (CID2) "Hlc".
     iEval (rewrite /usertrap_post).
     (* [usertrap_post] names where the round left the descriptor states *)
     iIntros (pt' mf ms' usatp uepc sc' stval' mdv0 U2 sts2 cs2)
@@ -1862,7 +1862,7 @@ Section UservecAllPt.
        point lives at.  Specialising it to the SECTION's [CID] instead type-
        checks nowhere useful and fails with an [iSpecialize] whose two sides
        print identically. *)
-    iSpecialize ("Hcont" $! CID2 with "[%]").
+    iSpecialize ("Hcont" $! CID2 with "[%] Hlc").
     { intros [Hf | Hz]; [discriminate Hf |].
       exfalso. exact (proc_addr_nonzero j Hjlt Hz). }
     iEval (rewrite /uservec_post) in "Hcont".

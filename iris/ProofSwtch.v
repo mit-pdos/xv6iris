@@ -18,12 +18,16 @@
      [hart_state] / [strans_inv] ride through untouched and are re-bundled at
      both exits.
 
-   - ▷ TARGET: the [valid_context newc] premise is ▷-guarded.  At entry,
-     [fupd_wp] + [later_exist_except_0] + timelessness strip the two pure
-     facts and the (timeless) [ctx_cells]; the non-timeless resume wand
-     stays under ▷ until the final c.ret, discharged with the later-handing
-     leaf [wp_cret_s_zca_r_later] (WpSmodePtCtl.v) -- the [iNext] there
-     strips it.
+   - ▷ TARGET: the [valid_context newc] premise is ▷-guarded, and at
+     ordinal step indices it cannot be opened before a step ([later_exist]
+     fails at limit indices; the resume wand is not timeless).  So swtch's
+     first instruction [sd ra,0(a0)] -- which writes only the OLD context's
+     cell 0 -- runs ON ITS OWN through the ▷-continuation store leaf
+     [WpSwtchVc.wp_sd_s_r_t_later]; its [iNext] strips the whole record's ▷
+     (no later credit), the record is opened unguarded, and the VCgen runs
+     the remaining 27 instructions ([WpSwtchVc.swtch_run_t]).  The final
+     c.ret still goes through the later-handing leaf [wp_cret_s_zca_r_later]
+     (WpSmodePtCtl.v).
 
    - PAYLOAD: P is seven-place (resuming hart + its SIE ghost, the resumer
      record's admissibility index, resumed ctx, resumer ctx, resumer tp, the
@@ -139,16 +143,59 @@ Section ProofSwtch.
     iDestruct (ghost_var_agree with "Hhalf Hq0") as %Hb0.
     assert (HSIE : eq_vec (_get_Mstatus_SIE ms) ('b"1") = false)
       by (rewrite Hb0; vm_compute; reflexivity).
-    (* ---- strip the ▷ off the target VC record.  [valid_context γ Φ P newc p]
-       is indexed by the caller's OWN [p]; its existentials are just (vs, av),
-       and its resume wand demands cpu_own at that SAME index p -- so the
-       cpu_own we already hold fits with no retune, no equation. ---- *)
-    iApply fupd_wp.
+    (* ---- swtch's FIRST instruction runs ON ITS OWN, and its step pays for
+       the target record's ▷ (owner decision 2026-10-01: no later credit,
+       and [SpecSwtch]'s [▷ valid_context] premise stays as it is).  At
+       ordinal step indices the record cannot be opened before a step:
+       [bi.later_exist] needs the ▷ to commute with the record's
+       existentials, which fails at limit indices, and its resume wand is
+       not timeless.  But +0x00 is [sd ra,0(a0)], which writes only the OLD
+       context's cell 0 -- the new context's cells are first read at +0x34
+       -- so it runs through the ▷-continuation store leaf
+       [WpSwtchVc.wp_sd_s_r_t_later] BEFORE the record is touched, the
+       [iNext] of its continuation strips the whole [▷ valid_context], and
+       the record is then destructed unguarded.  The other 27 instructions
+       run through the VCgen from the state that store leaves
+       ([swtch_run_t]); everything from the block's end on is unchanged. *)
     iDestruct "Hvalidnew" as (XIt) "[Htok_t Hvalidnew]".
-    iEval (rewrite (valid_context_unfold P An newc p XIt)
-                   /valid_context_pre !bi.later_exist) in "Hvalidnew".
-    iDestruct "Hvalidnew" as (new_vs av_t) "Hvalidnew".
-    iDestruct "Hvalidnew" as "(>%Hlen_new & >%Hal_new & >Hnewcells & >Hstk_t & Hnewwand)".
+    (* fold [tp_pin m0] into an opaque local name FIRST: [rho] and every
+       [vm_compute]-driven side condition below is far cheaper against one
+       flat map than against a live [<[Regidx Rtp := ...]> m0] insert
+       re-exposed at every one of [rho]'s 32 low branches. *)
+    set (M0 := tp_pin m0).
+    assert (HM10 : M0 !!! Regidx (mword_of_int 10 : mword 5) = oldc).
+    { unfold M0, tp_pin. rewrite upd_ne; [exact Holdc | vm_compute; discriminate]. }
+    (* old's cell 0 is the store's target; cells 1..13 ride to the block. *)
+    destruct old_vs as [|ov0 old_tl]; [discriminate Hlen_old|].
+    iEval (rewrite /ctx_cells; cbn [ctx_cells_at]) in "Holdcells".
+    iDestruct "Holdcells" as "[Hold0 Holdtl]".
+    assert (Hea0 : add_vec (M0 !!! Regidx (mword_of_int 10 : mword 5))
+                     (sign_extend' 64 (mword_of_int 0 : mword 12))
+                   = add_vec oldc (mword_of_int 0)).
+    { rewrite HM10. f_equal. }
+    iEval (rewrite -Hea0) in "Hold0".
+    iPoseProof (SRegime.sr_ktier_wit_KT0 strans_regime) as "#Hkw".
+    iApply (wp_sd_s_r_t_later strans_regime KT0 KT0
+              (mword_of_int KernelSyms.swtch) (mword_of_int 1) (mword_of_int 10)
+              (mword_of_int 0) M0 ov0 ms MIE_S mdv0 menvcfg0 (dq:=DfracOwn 1)
+              HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
+              with "Hkw Hhw Hminv Hhs Hpriv Hms Hmie Hmdl Hmenv Htr
+                    Hpc Hfile [] Hctx Hold0").
+    { iApply (swi_00 with "Ht"). }
+    (* ---- THE STEP'S ▷: it strips the target record's, credit-free ---- *)
+    iNext.
+    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htr Hpc Hfile Hctx Hold0".
+    iEval (rewrite avi_mword) in "Hpc".
+    iEval (rewrite Hea0) in "Hold0".
+    (* ---- open the target VC record, now unguarded.  [valid_context γ Φ P
+       newc p] is indexed by the caller's OWN [p]; its existentials are just
+       (vs, av), and its resume wand demands cpu_own at that SAME index p --
+       so the cpu_own we already hold fits with no retune, no equation. ---- *)
+    iApply fupd_wp.
+    iEval (rewrite (valid_context_unfold P An newc p XIt) /valid_context_pre)
+      in "Hvalidnew".
+    iDestruct "Hvalidnew" as (new_vs av_t)
+      "(%Hlen_new & %Hal_new & Hnewcells & Hstk_t & Hnewwand)".
     (* RE-CONNECT THE TARGET'S CONTEXT TO THIS CPU (§0.42′ / A6.127 §6).
        A migratable record arrives PARKED UNDER THIS THREAD'S OWN CONTEXT
        ([TsoCtx.ctx_parked XIt cur_ctx] -- where the p->lock acquire's
@@ -171,13 +218,10 @@ Section ProofSwtch.
     (* ---- the symbolic environment: 0..31 = [gpr_file]'s ACTUAL map
        [tp_pin m0] (its tp slot, index 4, is [cid_word_of cpu_id] by
        construction, not whatever [m0]'s raw slot 4 happens to hold);
-       32..45 = new's saved; 46..59 = old's.  Every OTHER index agrees with
-       raw [m0] via [rget_ne] (tp_pin only ever touches index 4). ---- *)
-    (* fold [tp_pin m0] into an opaque local name FIRST: [rho] and every
-       [vm_compute]-driven side condition below is far cheaper against one
-       flat map than against a live [<[Regidx Rtp := ...]> m0] insert
-       re-exposed at every one of [rho]'s 32 low branches. *)
-    set (M0 := tp_pin m0).
+       32..45 = new's saved; 46..59 = old's as they were before the first
+       store (slot 46, old's cell 0, is no longer referenced: the tail's
+       heap holds ra there).  Every OTHER index agrees with raw [m0] via
+       [rget_ne] (tp_pin only ever touches index 4). ---- *)
     iDestruct (VcGenS.gpr_file_dom with "Hfile") as "[%Hdom Hfile]".
     iDestruct (gpr_file_x0 M0 (mword_of_int 0) ltac:(vm_compute; reflexivity)
                  with "Hfile") as "[%Hx0 Hfile]".
@@ -185,39 +229,50 @@ Section ProofSwtch.
            if (k <? 32)%nat
            then M0 !!! Regidx (mword_of_int (Z.of_nat k) : mword 5)
            else if (k <? 46)%nat then nth (k - 32) new_vs (mword_of_int 0)
-           else nth (k - 46) old_vs (mword_of_int 0)).
+           else nth (k - 46) (ov0 :: old_tl) (mword_of_int 0)).
     assert (Hden : vregs_den rho vregs_init = M0).
     { apply (vregs_den_init_agree _ _ Hx0). intros k Hk.
       unfold rho. rewrite (proj2 (Nat.ltb_lt k 32) Hk). reflexivity. }
     assert (Hrho10 : rho 10%nat = oldc).
-    { unfold rho; cbn. unfold M0, tp_pin. rewrite upd_ne; [exact Holdc | vm_compute; discriminate]. }
+    { unfold rho; cbn. exact HM10. }
     assert (Hrho11 : rho 11%nat = newc).
     { unfold rho; cbn. unfold M0, tp_pin. rewrite upd_ne; [exact Hnewc | vm_compute; discriminate]. }
     assert (Hmapold : map (fun w => rho w)
-              [46;47;48;49;50;51;52;53;54;55;56;57;58;59]%nat = old_vs).
+              [46;47;48;49;50;51;52;53;54;55;56;57;58;59]%nat = ov0 :: old_tl).
     { unfold rho; cbn.
-      apply (list14_nth old_vs (mword_of_int 0) Hlen_old). }
+      exact (list14_nth (ov0 :: old_tl) (mword_of_int 0) Hlen_old). }
+    (* the tail's view of old's cells: ra (the store's value) at cell 0,
+       then old's untouched cells 1..13. *)
+    assert (Hmapold_t : map (fun w => rho w)
+              [1;47;48;49;50;51;52;53;54;55;56;57;58;59]%nat
+              = M0 !!! Regidx (mword_of_int 1 : mword 5) :: old_tl).
+    { change (map (fun w => rho w) [1;47;48;49;50;51;52;53;54;55;56;57;58;59]%nat)
+        with (rho 1%nat :: tl (map (fun w => rho w)
+                                  [46;47;48;49;50;51;52;53;54;55;56;57;58;59]%nat)).
+      rewrite Hmapold. reflexivity. }
     assert (Hmapnew : map (fun w => rho w)
               [32;33;34;35;36;37;38;39;40;41;42;43;44;45]%nat = new_vs).
     { unfold rho; cbn.
       apply (list14_nth new_vs (mword_of_int 0) Hlen_new). }
     iEval (rewrite -Hden) in "Hfile".
-    (* ---- run the 28-instruction straight-line block (regime-blind engine) ---- *)
-    iApply (wp_vc_block_s_den_r strans_regime swtch_prog
-              (VSt KernelSyms.swtch vregs_init swtch_heap0 [])
+    (* ---- run the remaining 27-instruction straight-line block
+       (regime-blind engine) from +0x04 ---- *)
+    iApply (wp_vc_block_s_den_r strans_regime (tl swtch_prog)
+              (VSt (KernelSyms.swtch + 4) vregs_init swtch_heap0_t [])
               (VSt (KernelSyms.swtch + 0x68) swtch_regs1 swtch_heap1 [])
               rho ms MIE_S mdv0 menvcfg0 (dq:=DfracOwn 1)
               HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
-              (SRegime.sr_ktier_wit_KT0 strans_regime) swtch_run
+              (SRegime.sr_ktier_wit_KT0 strans_regime) swtch_run_t
               with "Hhw Hminv Hhs Hpriv Hms Hmie Hmdl Hmenv Htr
-                    Hpc Hfile [] [Holdcells Hnewcells] [] Hctx").
-    { iApply (swtch_code with "Ht"). }
-    { rewrite /vheap_own /swtch_heap0 big_sepL_app.
+                    Hpc Hfile [] [Hold0 Holdtl Hnewcells] [] Hctx").
+    { iApply (swtch_code_tl with "Ht"). }
+    { rewrite /vheap_own /swtch_heap0_t big_sepL_app.
       rewrite (seg_cells_ctx rho 10 oldc 0 _ Hrho10).
       rewrite (seg_cells_ctx rho 11 newc 0 _ Hrho11).
-      rewrite Hmapold Hmapnew.
-      rewrite -/(ctx_cells oldc old_vs) -/(ctx_cells newc new_vs).
-      iFrame "Holdcells Hnewcells". }
+      rewrite Hmapold_t Hmapnew.
+      rewrite -/(ctx_cells newc new_vs).
+      cbn [ctx_cells_at].
+      iFrame "Hold0 Holdtl Hnewcells". }
     { rewrite /vheap4_own. cbn [vheap4]. done. }
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htr Hpc Hfile Hheap _ Hctx".
     (* ---- split the post-block heap into old's (now current callee regs) and new's ---- *)
@@ -348,7 +403,7 @@ Section ProofSwtch.
                     [Hnewwand Hvoldc Htok Hnewpart HP Hhalf Hspp Hq0 Hcpuown Hstk_t
                      Hctx_t]").
     { iApply (swi_68 with "Ht"). }
-    (* ---- the ▷ continuation: iNext strips it AND the record's ▷'d pieces ---- *)
+    (* ---- the ▷ continuation (the record was already opened after +0x00) ---- *)
     iNext.
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htr Hpc Hfile".
     (* ---- rebuild sconf ---- *)

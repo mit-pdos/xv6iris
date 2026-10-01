@@ -70,18 +70,26 @@ Section Custody.
     iFrame "Hgauth Hsauth Htie HR Hobs".
   Qed.
 
+  (* THE CREDIT (port-ordinal, owner 2026-10-01).  The hook receives the
+     crash predicate UNLATERED: the caller's credit strips the invariant's
+     later here.  At ordinal step indices a client's composite (a timeless
+     record beside an ARBITRARY guest, [FsCrash.P_fs_comp]) is not timeless,
+     and its guest name is pinned by nothing timeless, so the hook could not
+     strip the later itself -- the same shape as [RiscvPtsto.disk_write_permit]
+     (commit 52d17cd12).  The output stays latered. *)
   Lemma wp_crash_fupd (e : mexpr) (P : iProp Σ) :
     thread_gen e = Some gen_id ->
-    gen_cert -∗ crash_inv -∗
-    (∀ n : nat, ⌜n = (gen_id + 1)%nat⌝ -∗ start_auth n -∗ ▷ riscv_crash_pred
+    gen_cert -∗ crash_inv -∗ £ 1 -∗
+    (∀ n : nat, ⌜n = (gen_id + 1)%nat⌝ -∗ start_auth n -∗ riscv_crash_pred
        ={⊤ ∖ ↑crashN}=∗ start_auth n ∗ ▷ riscv_crash_pred ∗ P) -∗
     (P -∗ mWP e) -∗ mWP e.
   Proof using .
     intros Hg.
-    iIntros "#Hcert #Hinv Hhook Hk".
-    iApply (wp_start_auth_fupd e P Hg with "Hcert [Hhook] Hk").
+    iIntros "#Hcert #Hinv Hlc Hhook Hk".
+    iApply (wp_start_auth_fupd e P Hg with "Hcert [Hlc Hhook] Hk").
     iIntros (n) "%Hn Hs".
     iInv "Hinv" as "Hc" "Hclose".
+    iMod (lc_fupd_elim_later with "Hlc Hc") as "Hc".
     iMod ("Hhook" $! n with "[//] Hs Hc") as "(Hs & Hc & HP)".
     iMod ("Hclose" with "Hc") as "_".
     iModIntro. iFrame "Hs HP".
@@ -89,8 +97,8 @@ Section Custody.
 
   (* the instance at the instruction boundary *)
   Lemma wp_crash_fupd_loop (P : iProp Σ) :
-    gen_cert -∗ crash_inv -∗
-    (∀ n : nat, ⌜n = (gen_id + 1)%nat⌝ -∗ start_auth n -∗ ▷ riscv_crash_pred
+    gen_cert -∗ crash_inv -∗ £ 1 -∗
+    (∀ n : nat, ⌜n = (gen_id + 1)%nat⌝ -∗ start_auth n -∗ riscv_crash_pred
        ={⊤ ∖ ↑crashN}=∗ start_auth n ∗ ▷ riscv_crash_pred ∗ P) -∗
     (P -∗ mWP (Loop : expr riscv_lang)) -∗ mWP (Loop : expr riscv_lang).
   Proof using . apply wp_crash_fupd. reflexivity. Qed.

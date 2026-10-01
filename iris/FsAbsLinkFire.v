@@ -253,14 +253,14 @@ Section LinkFire.
     /\ abs_row nt' = MkAnode (an_node (abs_row nt)) (fn_nlink nt + 1)%nat ->
     ftop_inv γfs -∗ app_inv γfs -∗
     pf_at (ltgt_commit_at (fs_gamma_L γfs) appE) Ftgt -∗
-    top_frag (fs_gamma_L γfs) t nt ={E}=∗
+    top_frag (fs_gamma_L γfs) t nt -∗ £ 1 ={E}=∗
       top_frag (fs_gamma_L γfs) t nt'
       ∗ ∃ av : aview,
           ⌜arow_at av t (abs_row nt)⌝
           ∗ ⌜link_tgt_ok (an_node (abs_row nt))⌝
           ∗ Ftgt.(pf_recv) av t (abs_row nt).
   Proof using .
-    intros HE Hloc Hnzt Hok Habs'. iIntros "#Hi #Hai Hcm Hf".
+    intros HE Hloc Hnzt Hok Habs'. iIntros "#Hi #Hai Hcm Hf Hlc".
     (* THE PIECE IS SPENT: the fire eliminates to the AU side. *)
     iDestruct (pf_at_au with "Hcm") as "Hcm".
     rewrite /top_frag /fs_gamma_L /=.
@@ -281,7 +281,7 @@ Section LinkFire.
        of [appN] beside its claim, which the caller's step re-establishes
        under the later ([AppInv.app_top_update]) *)
     iMod (app_top_update appE γfs I t nt nt' ltac:(rewrite /appE; done)
-            with "Hai [Hstep] Hta Hf") as "[Hta Hf]".
+            with "Hai [Hstep] Hta Hf Hlc") as "[Hta Hf]".
     { iIntros (_) "Hp". iApply (app_step_at t I _ nt' Hdelta with "Hstep Hp"). }
     iMod ("Hph2" $! (<[t := nt']> I) with "[//] Hta") as "[Hta HΦ]".
     iMod "Hcl2".
@@ -317,14 +317,14 @@ Section LinkFire.
       = Some (MkAnode (ADir (<[nm := t]> (dir_entries np))) (fn_nlink np)) ->
     ftop_inv γfs -∗ app_inv γfs -∗
     pf_at (lent_commit_at (fs_gamma_L γfs) appE) Fent -∗
-    top_frag (fs_gamma_L γfs) d np ={E}=∗
+    top_frag (fs_gamma_L γfs) d np -∗ £ 1 ={E}=∗
       top_frag (fs_gamma_L γfs) d np'
       ∗ ∃ av : aview,
           ⌜av !! d = Some (MkAnode (ADir (dir_entries np)) (fn_nlink np))⌝
           ∗ ⌜dir_entries np !! nm = None⌝
           ∗ Fent.(pf_recv) av d nm t.
   Proof using .
-    intros HE Hloc Hdir Hnl Hnm Habsp'. iIntros "#Hi #Hai Hcm Hf".
+    intros HE Hloc Hdir Hnl Hnm Habsp'. iIntros "#Hi #Hai Hcm Hf Hlc".
     iDestruct (pf_at_au with "Hcm") as "Hcm".
     rewrite /top_frag /fs_gamma_L /=.
     iMod (inv_acc E ftopN with "Hi") as "[Hbody Hclose]"; [solve_ndisj |].
@@ -344,7 +344,7 @@ Section LinkFire.
     iMod ("Hcm" $! I d t nm (dir_entries np) (fn_nlink np)
             with "[//] [//] Hta") as "(Hta & Hstep & Hph2)".
     iMod (app_top_update appE γfs I d np np' ltac:(rewrite /appE; done)
-            with "Hai [Hstep] Hta Hf") as "[Hta Hf]".
+            with "Hai [Hstep] Hta Hf Hlc") as "[Hta Hf]".
     { iIntros (_) "Hp". iApply (app_step_at d I _ np' Hdelta with "Hstep Hp"). }
     iMod ("Hph2" $! (<[d := np']> I) with "[//] Hta") as "[Hta HΦ]".
     iMod "Hcl2".

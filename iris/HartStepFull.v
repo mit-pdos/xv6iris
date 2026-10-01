@@ -758,7 +758,7 @@ Section stepfull.
         iDestruct "HPsi" as (rs2) "[%Hpost HPsi]".
         iApply ("Hcont" with "[%] Hrw Hro HPsi").
         exists rsP. split; [exact Hpost | exact Hag]. }
-    iNext. iIntros "Hfrag".
+    iNext. iIntros "Hfrag _".
     iApply (swp_mono with "[] [-]");
       [| iApply (swp_try_step_full Drw Dro Df rs1 Q Psi Hdisj HDpriv
                    HWhart HDhart HDmc HDcfg HWmi HDmi HWms HDms HWpc HDpc
@@ -1063,7 +1063,7 @@ Section stepfull.
               with "Hcert Hany [Hrw Hro HPsi] [Hcont]").
     2:{ iNext. iIntros (rs3) "%Hag Hrw Hro [Hany HPsi]".
         iApply ("Hcont" with "[%] Hrw Hro Hany HPsi"). exact Hag. }
-    iNext. iIntros "Hfr".
+    iNext. iIntros "Hfr _".
     iDestruct (resv_any_intro cpu_id None with "Hfr") as "Hany".
     iApply (swp_try_step_waiting Dr Dw Drw Dro Df rs wr ib Psi Hdisj HDr HDw
               Hip Hie Hhs HDpriv HDhart HDmc HDcfg HWmi HDmi HWms HDms HWpc

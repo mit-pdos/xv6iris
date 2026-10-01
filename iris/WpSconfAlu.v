@@ -1123,8 +1123,8 @@ Section WpSconfAlu.
       iDestruct (sie_cap_push (CID := CIDx) m _ n k b Hk Hsp' with "Hcap")
         as "[Hcap Hframe]".
       iFrame "Hcap Hframe". }
-    iIntros (CID1 Hs1) "Hcg Hframe Hpc".
-    iApply ("Hcont" $! CID1 with "[] Hcg Hframe Hpc").
+    iIntros (CID1 Hs1) "Hlc Hcg Hframe Hpc".
+    iApply ("Hcont" $! CID1 with "[] Hlc Hcg Hframe Hpc").
     iPureIntro. exact Hs1.
   Qed.
 
@@ -1156,8 +1156,8 @@ Section WpSconfAlu.
       iSplitL; [| done].
       iApply (sie_cap_pop (CID := CIDx) m _ n k b Hsp with "[Hframe] Hcap").
       rewrite upd_eq. iExact "Hframe". }
-    iIntros (CID1 Hs1) "Hcg _ Hpc".
-    iApply ("Hcont" $! CID1 with "[] Hcg Hpc").
+    iIntros (CID1 Hs1) "Hlc Hcg _ Hpc".
+    iApply ("Hcont" $! CID1 with "[] Hlc Hcg Hpc").
     iPureIntro. exact Hs1.
   Qed.
 
@@ -1189,8 +1189,8 @@ Section WpSconfAlu.
       iDestruct (sie_cap_push (CID := CIDx) m _ n k b Hk Hsp' with "Hcap")
         as "[Hcap Hframe]".
       iFrame "Hcap Hframe". }
-    iIntros (CID1 Hs1) "Hcg Hframe Hpc".
-    iApply ("Hcont" $! CID1 with "[] Hcg Hframe Hpc").
+    iIntros (CID1 Hs1) "Hlc Hcg Hframe Hpc".
+    iApply ("Hcont" $! CID1 with "[] Hlc Hcg Hframe Hpc").
     iPureIntro. exact Hs1.
   Qed.
 
@@ -1222,8 +1222,8 @@ Section WpSconfAlu.
       iSplitL; [| done].
       iApply (sie_cap_pop (CID := CIDx) m _ n k b Hsp with "[Hframe] Hcap").
       rewrite upd_eq. iExact "Hframe". }
-    iIntros (CID1 Hs1) "Hcg _ Hpc".
-    iApply ("Hcont" $! CID1 with "[] Hcg Hpc").
+    iIntros (CID1 Hs1) "Hlc Hcg _ Hpc".
+    iApply ("Hcont" $! CID1 with "[] Hlc Hcg Hpc").
     iPureIntro. exact Hs1.
   Qed.
 
@@ -1301,8 +1301,8 @@ Section WpSconfAlu.
       iDestruct (sie_cap_push (CID := CIDx) m _ n k b Hk Hsp' with "Hcap")
         as "[Hcap Hframe]".
       iFrame "Hcap Hframe". }
-    iIntros (CID1 Hs1) "Hcg Hframe Hpc".
-    iApply ("Hcont" $! CID1 with "[] Hcg Hframe Hpc").
+    iIntros (CID1 Hs1) "Hlc Hcg Hframe Hpc".
+    iApply ("Hcont" $! CID1 with "[] Hlc Hcg Hframe Hpc").
     iPureIntro. exact Hs1.
   Qed.
 
@@ -1334,8 +1334,8 @@ Section WpSconfAlu.
       iSplitL; [| done].
       iApply (sie_cap_pop (CID := CIDx) m _ n k b Hsp with "[Hframe] Hcap").
       rewrite upd_eq. iExact "Hframe". }
-    iIntros (CID1 Hs1) "Hcg _ Hpc".
-    iApply ("Hcont" $! CID1 with "[] Hcg Hpc").
+    iIntros (CID1 Hs1) "Hlc Hcg _ Hpc".
+    iApply ("Hcont" $! CID1 with "[] Hlc Hcg Hpc").
     iPureIntro. exact Hs1.
   Qed.
 

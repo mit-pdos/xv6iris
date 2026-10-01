@@ -408,7 +408,7 @@ Section ProofVirtioDiskRwE.
     intros HK Hj Hjl Hbnz Hbelow.
     iIntros "#Htext #Hpinv #Hdinv #Hlk Hexit".
     rewrite /P4.vdrw_p4_exit.
-    iIntros (CIDx Hsx M q np nr cm fr h m2 t pin)
+    iIntros (CIDx Hsx) "Hlc"; iIntros (M q np nr cm fr h m2 t pin)
             "%Hrh %Ha1 %Hok %Hpinr %Hal Hcg Hown Htc Hclm Hpc Htok Hbody Hact Hfm Hft Hrm Hrt Hidx".
     destruct Hrh as (Hregs & Hhi).
     pose proof Hok as (Hhm & Hht & Hmt & Hh8 & Hm8 & Ht8). cbn in Hh8, Hm8, Ht8.
@@ -420,7 +420,7 @@ Section ProofVirtioDiskRwE.
     iAssert (vdrw_p5_loop CID γk γs j γd pd pav pu K eb sp0 b wr sector
                bs_buf bs_disk h m2 t q pin m0 kq lks)%I with "[]" as "Hloop".
     { iLöb as "IH". rewrite {2}/vdrw_p5_loop.
-      iIntros (CIDlp Hslp M') "%Hinv Hcg Hown Htc Hclm Hpc Htok HR Hact Hfm Hft Hrm Hrt Hidx
+      iIntros (CIDlp Hslp) "_"; iIntros (M') "%Hinv Hcg Hown Htc Hclm Hpc Htok HR Hact Hfm Hft Hrm Hrt Hidx
                     %HokL %HalL %HpinrL HexitL".
       destruct Hinv as (HregsL & Hs1L & Hs2L & HhiL).
       pose proof HregsL as HregsL'.
@@ -540,7 +540,7 @@ Section ProofVirtioDiskRwE.
                 ({["virtio_disk"]} ∪ lks)
                 HW4a0 ltac:(pose proof (vdrw_K10 K HK); lia)
                 with "Hcg Htext Hpc Hlk Htok HR Hown Hpay").
-      iIntros (CIDrl Hsrl mfr) "Hcg Hpc %Hrcs Hown". rgall.
+      iIntros (CIDrl Hsrl) "_"; iIntros (mfr) "Hcg Hpc %Hrcs Hown". rgall.
       assert (Hr1c0 : ret_pc (W4 !!! Regidx Rra)
                       = mword_of_int (KernelSyms.virtio_disk_rw + 0x1c0))
         by (rewrite HW4ra; pcstep).
@@ -551,7 +551,7 @@ Section ProofVirtioDiskRwE.
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
       { iApply (rwi_1c0 with "Htext"). }
-      iIntros (CIDjs Hsjs) "Hcg Hpc". rgall.
+      iIntros (CIDjs Hsjs) "_ Hcg Hpc". rgall.
       set (W5 := <[Regidx Rra := regval_into_reg
                     (add_vec_int (mword_of_int (KernelSyms.virtio_disk_rw + 0x1c0) : mword 64) 4)]> mfr).
       change (<[Regidx Rra := regval_into_reg
@@ -580,7 +580,7 @@ Section ProofVirtioDiskRwE.
                 Hj Hjl ltac:(pose proof (vdrw_K22 K HK); lia)
                 with "Hcg Hown Htext Hpc Hpinv Hextc Hextm").
       all: try lkbelow.
-      iIntros (CIDsl Hssl mfs) "%Hscs Hcg Hown Hpc Hextc Hextm". rgall.
+      iIntros (CIDsl Hssl) "_"; iIntros (mfs) "%Hscs Hcg Hown Hpc Hextc Hextm". rgall.
       assert (Hr1c4 : ret_pc (W5 !!! Regidx Rra)
                       = mword_of_int (KernelSyms.virtio_disk_rw + 0x1c4))
         by (rewrite HW5ra; pcstep).
@@ -596,7 +596,7 @@ Section ProofVirtioDiskRwE.
                 (K - 12)%nat eb ltac:(vm_compute; discriminate)
                 ltac:(rdok) with "Hcg Hpc []").
       { iApply (rwi_1c4 with "Htext"). }
-      iIntros (CIDm Hsm) "Hcg Hpc". rgall.
+      iIntros (CIDm Hsm) "_ Hcg Hpc". rgall.
       set (W6 := <[Regidx Ra0 := regval_into_reg
                     (add_vec zero_reg (mfs !!! Regidx Rs1))]> mfs).
       change (<[Regidx Ra0 := regval_into_reg
@@ -612,7 +612,7 @@ Section ProofVirtioDiskRwE.
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
       { iApply (rwi_1c6 with "Htext"). }
-      iIntros (CIDd3 Hsd3) "Hcg Hpc". rgall.
+      iIntros (CIDd3 Hsd3) "_ Hcg Hpc". rgall.
       set (W7 := <[Regidx Rra := regval_into_reg
                     (add_vec_int (mword_of_int (KernelSyms.virtio_disk_rw + 0x1c6) : mword 64) 4)]> W6).
       change (<[Regidx Rra := regval_into_reg
@@ -639,7 +639,7 @@ Section ProofVirtioDiskRwE.
                 with "Hcg Hown Htext Hpc []").
       all: try lkbelow.
       { iEval (rewrite HW7a0). iExact "Hlk". }
-      iIntros (CIDaq Hsaq msA Mf) "_ Hcg Hpc %Hacs Htok HR _ Hown Hpay". rgall.
+      iIntros (CIDaq Hsaq) "Hlc"; iIntros (msA Mf) "_ Hcg Hpc %Hacs Htok HR _ Hown Hpay". rgall.
       assert (Hret : ret_pc (W7 !!! Regidx Rra) = mword_of_int (KernelSyms.virtio_disk_rw + 0x1ca))
         by (rewrite HW7ra; pcstep).
       iEval (rewrite Hret) in "Hpc".
@@ -728,7 +728,7 @@ Section ProofVirtioDiskRwE.
                         = mword_of_int (KernelSyms.virtio_disk_rw + 0x1b4)) by pcstep.
         iEval (rewrite Hback) in "Hpc".
         iDestruct (vdrw_body_close γd pd pav pu with "Hbody") as "HR".
-        iSpecialize ("IH" $! CIDaq with "[%]"); [wp_next_chain|].
+        iSpecialize ("IH" $! CIDaq with "[%] Hlc"); [wp_next_chain|].
         iApply ("IH" $! L4 with
                   "[%] Hcg Hown Htc Hclm Hpc Htok HR Hact Hfm Hft Hrm Hrt Hidx
                    [%] [%] [%] HexitL").
@@ -757,7 +757,7 @@ Section ProofVirtioDiskRwE.
                         = mword_of_int (KernelSyms.virtio_disk_rw + 0x1d2)) by pcstep.
         iEval (rewrite Hp1b0) in "Hpc".
         rewrite /vdrw_p5_exit.
-        iSpecialize ("HexitL" $! CIDaq with "[%]"); [wp_next_chain|].
+        iSpecialize ("HexitL" $! CIDaq with "[%] Hlc"); [wp_next_chain|].
         (* the row's pieces, spelled at the claim's projections *)
         iEval (rewrite /V; cbn [dc_buf dc_slot dc_pin];
                rewrite (vdrwd_slot_head kq b h wr sector _ Hh8)) in "Hib".
@@ -970,7 +970,7 @@ Section ProofVirtioDiskRwE.
       iEval (rewrite Hp1a0) in "Hpc".
       iDestruct (vdrw_body_close γd pd pav pu with "Hbody") as "HR".
       rewrite /vdrw_p5_loop.
-      iSpecialize ("Hloop" $! CIDx with "[%]"); [wp_next_chain|].
+      iSpecialize ("Hloop" $! CIDx with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hloop" $! N5 with
                 "[%] Hcg Hown Htc Hclm Hpc Htok HR Hact Hfm Hft Hrm Hrt Hidx
                  [%] [%] [%] Hexit").
@@ -992,7 +992,7 @@ Section ProofVirtioDiskRwE.
                       = mword_of_int (KernelSyms.virtio_disk_rw + 0x1d2)) by pcstep.
       iEval (rewrite Hb1b0) in "Hpc".
       rewrite /vdrw_p5_exit.
-      iSpecialize ("Hexit" $! CIDx with "[%]"); [wp_next_chain|].
+      iSpecialize ("Hexit" $! CIDx with "[%] Hlc"); [wp_next_chain|].
       (* the row's pieces, spelled at the claim's projections *)
       iEval (rewrite /V; cbn [dc_buf dc_slot dc_pin];
              rewrite (vdrwd_slot_head kq b h wr sector _ Hh8)) in "Hib".

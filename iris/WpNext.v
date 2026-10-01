@@ -45,36 +45,56 @@
 From iris.proofmode Require Import proofmode.
 From xv6iris Require Import StepIndex.
 From transfinite.base_logic.lib Require Import own.
+From transfinite.base_logic.lib Require Import later_credits.
 Require Import SailStdpp.Base SailStdpp.Values SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.   (* [zero_reg]: the idle hatch *)
 Require Import RiscvLang.
 
 Section WpNext.
   Context {Σ : gFunctors}.
+  (* the credit's supply: resolved from [riscvGS] ([riscvF_invGS] → [invGS_lc]) at every use *)
+  Context `{!lcGS HasLc Σ}.
 
   Definition wp_next `{GEN : GenId} `{CID0 : CpuId} (b : bool) (p : mword 64)
       (K : forall (CID : CpuId), iProp Σ) : iProp Σ :=
     (∀ CID : CpuId,
-       ⌜ b = false \/ p = zero_reg -> (CID : CPU) = (CID0 : CPU) ⌝ -∗ K CID)%I.
+       ⌜ b = false \/ p = zero_reg -> (CID : CPU) = (CID0 : CPU) ⌝ -∗ £ 1 -∗ K CID)%I.
+  (* THE LATER CREDIT (2026-09-30, local-plan/later-credits-study.md §8).  Every continuation
+     receives one [£ 1]: the credit of the step between two instructions
+     ([RiscvExec.wp_hart_restart] → [HartSwp.swp_loop] → the engines), carried through the
+     instruction and paid here.  A proof that does not need it drops it ([wp_next_intro],
+     [wp_next_off_intro] do so silently; a hand introduction writes [_]); one that needs it keeps it
+     ([wp_next_intro_lc], [wp_next_off_intro_lc], or a named pattern) -- e.g. to strip the later of
+     an invariant whose body is not timeless, at an ordinal step index.  Whoever ELIMINATES a
+     [wp_next] pays the credit ([wp_next_at], [wp_next_here], the [⊣⊢] forms below); a function
+     proof pays its return continuation with the credit its last instruction delivered. *)
 
   (* Always available, at ANY [b] and any [p]: proving the hart-generic form
      discharges the step's obligation.  (The converse needs one of the two
      pinning conditions.) *)
   Lemma wp_next_intro `{GEN : GenId} `{CID0 : CpuId} (b : bool) (p : mword 64) K :
     (∀ CID : CpuId, K CID) -∗ wp_next b p K.
-  Proof using . iIntros "H" (CID _). iApply "H". Qed.
+  Proof using . iIntros "H" (CID _) "_". iApply "H". Qed.
+  (* ... keeping the credit *)
+  Lemma wp_next_intro_lc `{GEN : GenId} `{CID0 : CpuId} (b : bool) (p : mword 64) K :
+    (∀ CID : CpuId, £ 1 -∗ K CID) -∗ wp_next b p K.
+  Proof using . iIntros "H" (CID _) "Hlc". iApply ("H" with "Hlc"). Qed.
 
   (* Interrupts off: the hart is the one we started with (and hence so is its
      canonical SIE ghost), so the continuation is stated with no binder --
      today's spelling exactly. *)
   Lemma wp_next_off `{GEN : GenId} `{CID0 : CpuId} (p : mword 64) K :
-    wp_next false p K ⊣⊢ K CID0.
+    wp_next false p K ⊣⊢ (£ 1 -∗ K CID0).
   Proof using .
     iSplit.
     - iIntros "H". iApply ("H" $! CID0). iPureIntro. intros _. reflexivity.
-    - iIntros "H" (CID Hs). pose proof (Hs (or_introl eq_refl)) as Hc.
-      rewrite (_ : CID = CID0); [ iExact "H" | exact Hc ].
+    - iIntros "H" (CID Hs) "Hlc". pose proof (Hs (or_introl eq_refl)) as Hc.
+      rewrite (_ : CID = CID0); [ iApply ("H" with "Hlc") | exact Hc ].
   Qed.
+  (* the elimination half, as a wand: it costs the credit *)
+  Lemma wp_next_off_elim `{GEN : GenId} `{CID0 : CpuId} (p : mword 64) K :
+    wp_next false p K -∗ £ 1 -∗ K CID0.
+  Proof using . iIntros "H Hlc". iApply (wp_next_off with "H Hlc"). Qed.
 
   (* THE INTRODUCTION HALF OF [wp_next_off], AS A WAND -- and the spelling a
      whole-function proof should use.  [rewrite wp_next_off] is a SETOID
@@ -86,19 +106,29 @@ Section WpNext.
      the same continuation. *)
   Lemma wp_next_off_intro `{GEN : GenId} `{CID0 : CpuId} (p : mword 64) K :
     K CID0 -∗ wp_next false p K.
+  Proof using . iIntros "H". iApply wp_next_off. iIntros "_". iExact "H". Qed.
+  (* ... keeping the credit *)
+  Lemma wp_next_off_intro_lc `{GEN : GenId} `{CID0 : CpuId} (p : mword 64) K :
+    (£ 1 -∗ K CID0) -∗ wp_next false p K.
   Proof using . iIntros "H". by iApply wp_next_off. Qed.
 
   (* NO CURRENT PROC: the thread cannot be yielded, so the hart is pinned even
      at [b = true].  Same collapse as [wp_next_off], from the other hatch. *)
   Lemma wp_next_idle `{GEN : GenId} `{CID0 : CpuId} (b : bool) (p : mword 64) K :
-    p = zero_reg -> wp_next b p K ⊣⊢ K CID0.
+    p = zero_reg -> wp_next b p K ⊣⊢ (£ 1 -∗ K CID0).
   Proof using .
     intros Hp.
     iSplit.
     - iIntros "H". iApply ("H" $! CID0). iPureIntro. intros _. reflexivity.
-    - iIntros "H" (CID Hs). pose proof (Hs (or_intror Hp)) as Hc.
-      rewrite (_ : CID = CID0); [ iExact "H" | exact Hc ].
+    - iIntros "H" (CID Hs) "Hlc". pose proof (Hs (or_intror Hp)) as Hc.
+      rewrite (_ : CID = CID0); [ iApply ("H" with "Hlc") | exact Hc ].
   Qed.
+  Lemma wp_next_idle_intro `{GEN : GenId} `{CID0 : CpuId} (b : bool) (p : mword 64) K :
+    p = zero_reg -> K CID0 -∗ wp_next b p K.
+  Proof using . iIntros (Hp) "H". iApply (wp_next_idle b p K Hp). iIntros "_". iExact "H". Qed.
+  Lemma wp_next_idle_elim `{GEN : GenId} `{CID0 : CpuId} (b : bool) (p : mword 64) K :
+    p = zero_reg -> wp_next b p K -∗ £ 1 -∗ K CID0.
+  Proof using . iIntros (Hp) "H Hlc". iApply (wp_next_idle b p K Hp with "H Hlc"). Qed.
 
   (* THE ELIMINATION FORM AN ENGINE USES, at an EXPLICIT hart.  A layer whose
      own step neither pins nor moves the hart (it sits between two [wp_next]s)
@@ -114,8 +144,8 @@ Section WpNext.
   Lemma wp_next_at `{GEN : GenId} `{CID0 : CpuId} (b : bool) (p : mword 64) K
       (CIDn : CpuId) :
     (b = false \/ p = zero_reg -> (CIDn : CPU) = (CID0 : CPU)) ->
-    wp_next (CID0 := CID0) b p K -∗ K CIDn.
-  Proof using . iIntros (Hs) "H". iApply ("H" $! CIDn). iPureIntro. exact Hs. Qed.
+    wp_next (CID0 := CID0) b p K -∗ £ 1 -∗ K CIDn.
+  Proof using . iIntros (Hs) "H Hlc". iApply ("H" $! CIDn with "[%] Hlc"). exact Hs. Qed.
 
   (* ... and the SAME-HART instance of it: an engine that provably returns to
      the hart it started on (STAGE 1 -- the absorbing Löb is at a fixed hart,
@@ -139,7 +169,7 @@ Section WpNext.
      resuming hart, so that half of the move belongs with [intr_handler_spec] /
      [intr_frame], not here. *)
   Lemma wp_next_here `{GEN : GenId} `{CID0 : CpuId} (b : bool) (p : mword 64) K :
-    wp_next b p K -∗ K CID0.
+    wp_next b p K -∗ £ 1 -∗ K CID0.
   Proof using . iApply (wp_next_at b p K CID0). intros _. reflexivity. Qed.
 
   (* RE-ANCHORING A CALLER'S OBLIGATION AT ANOTHER HART.  A layer whose own
@@ -172,8 +202,8 @@ Section WpNext.
     (b = false \/ p = zero_reg -> (CID1 : CPU) = (CID0 : CPU)) ->
     wp_next (CID0 := CID0) b p K -∗ wp_next (CID0 := CID1) b p K.
   Proof using .
-    intros Heq. iIntros "H" (CID Hs). iApply "H".
-    iPureIntro. intros Hb. rewrite (Hs Hb). exact (Heq Hb).
+    intros Heq. iIntros "H" (CID Hs) "Hlc". iApply ("H" with "[%] Hlc").
+    intros Hb. rewrite (Hs Hb). exact (Heq Hb).
   Qed.
 
   (* The inference-friendly form used when transporting a live continuation

@@ -718,12 +718,12 @@ Module FsLookupTree (DL : DIRLOOKUP).
        where the complement is [emp]. *)
     { rewrite Heb /trap_csrs_ext. done. }
     { rewrite Heb /cpu_claim_ext. done. }
-    iIntros (CIDd Hgd mf found k kslot q)
+    iIntros (CIDd Hgd) "Hlc"; iIntros (mf found k kslot q)
       "%Hcs Hcg Hcnt _ _ Hpc Hidev Hmeta Hmap Hblocks Hname Hppid Hbslot
        Hedges Hdiat Harm".
     iEval (rewrite Hkeq) in "Hedges".
     iDestruct (wp_next_at (CID0 := CID) true (proc_addr j) _ CIDd Hgd
-                 with "Hcont") as "Hcont".
+                 with "Hcont Hlc") as "Hcont".
     iApply ("Hcont" $! mf found k kslot q
               with "[] Hcg Hcnt Hpc Hidev Hmeta Hmap
                     [Hdiat Hblocks] Hname Hppid Hbslot Hedges [Harm]").

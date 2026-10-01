@@ -2090,7 +2090,7 @@ Section WpSconfCsr.
                  ⌜npc = add_vec_int pc 4⌝ ∗ ⌜m' = m⌝ ∗ ⌜n' = n⌝ ∗
                  stvec ↦ᵣ wval)%I
               with "Hcg Hpc Hinstr [Hstv Hcont]").
-    iNext. iApply wp_next_off_intro. rewrite /sconf_step_obl.
+    iNext. iApply wp_next_off_intro_lc. iIntros "Hlc". rewrite /sconf_step_obl.
     iSplitL "Hstv".
     - iIntros "Hsc Hcap Hfile HPC HnPC Hresv".
       iDestruct (sconf_to_cells (CID := CID) with "Hsc") as (ms0 mdv0)
@@ -2146,7 +2146,7 @@ Section WpSconfCsr.
                   with "Hcert Hrw Hro").
     - iIntros (npc ms' m' n') "Hcg' Hpc' (-> & -> & -> & Hstv)".
       iDestruct (sie_cap_gpr_at_close (CID := CID) with "Hcg'") as "Hcg'".
-      iApply ("Hcont" $! cpu_id with "[%] Hcg' Hstv Hpc'"). done.
+      iApply ("Hcont" $! cpu_id with "[%] Hlc Hcg' Hstv Hpc'"). done.
   Qed.
 
   (* ---- csrw satp,rs1 -- THE Bare -> Sv39 SWITCH (kvminithart's +0x1c).
@@ -2231,7 +2231,7 @@ Section WpSconfCsr.
               (fun (_ : CpuId) npc ms' m' n' =>
                  ⌜npc = add_vec_int pc 4⌝ ∗ ⌜m' = m⌝ ∗ ⌜n' = n⌝ ∗ Rout)%I
               with "Hcg Hpc Hinstr [Hbit Hhook HP Hslot Hcont]").
-    iNext. iApply wp_next_off_intro. rewrite /sconf_step_obl.
+    iNext. iApply wp_next_off_intro_lc. iIntros "Hlc". rewrite /sconf_step_obl.
     iSplitL "Hbit Hhook HP Hslot".
     - (* ---- the instruction ---- *)
       iIntros "Hsc Hcap Hfile HPC HnPC Hresv".
@@ -2330,7 +2330,7 @@ Section WpSconfCsr.
         { iFrame "Hctx HP". }
     - iIntros (npc ms' m' n') "Hcg' Hpc' (-> & -> & -> & Hout)".
       iDestruct (sie_cap_gpr_at_close (CID := CID) with "Hcg'") as "Hcg'".
-      iApply ("Hcont" $! cpu_id with "[%] Hcg' Hout Hpc'"). done.
+      iApply ("Hcont" $! cpu_id with "[%] Hlc Hcg' Hout Hpc'"). done.
   Qed.
 
 
@@ -2367,7 +2367,7 @@ Section WpSconfCsr.
               (fun (_ : CpuId) npc ms' m' n' =>
                  ⌜npc = add_vec_int pc 4⌝ ∗ ⌜m' = m⌝ ∗ ⌜n' = n⌝ ∗ Rout)%I
               with "Hcg Hpc Hinstr [Hbit Hslot Hcont]").
-    iNext. iApply wp_next_off_intro. rewrite /sconf_step_obl.
+    iNext. iApply wp_next_off_intro_lc. iIntros "Hlc". rewrite /sconf_step_obl.
     iSplitL "Hbit Hslot".
     - (* ---- the instruction ---- *)
       iIntros "Hsc Hcap Hfile HPC HnPC Hresv".
@@ -2445,7 +2445,7 @@ Section WpSconfCsr.
                   Hok HSXL with "Hcert Hrw Hro").
     - iIntros (npc ms' m' n') "Hcg' Hpc' (-> & -> & -> & Hout)".
       iDestruct (sie_cap_gpr_at_close (CID := CID) with "Hcg'") as "Hcg'".
-      iApply ("Hcont" $! cpu_id with "[%] Hcg' Hout Hpc'"). done.
+      iApply ("Hcont" $! cpu_id with "[%] Hlc Hcg' Hout Hpc'"). done.
   Qed.
 
   (* ---- csrw sstatus,rs1 -- THE S-STATUS RESTORE, and the one leaf whose
@@ -2542,7 +2542,7 @@ Section WpSconfCsr.
                  ⌜npc = add_vec_int pc 4⌝ ∗ ⌜m' = m⌝ ∗ ⌜n' = n⌝ ∗
                  sepc ↦ᵣ mepc_val wval)%I
               with "Hcg Hpc Hinstr [Hsepc Hcont]").
-    iNext. iApply wp_next_off_intro. rewrite /sconf_step_obl.
+    iNext. iApply wp_next_off_intro_lc. iIntros "Hlc". rewrite /sconf_step_obl.
     iSplitL "Hsepc".
     - iIntros "Hsc Hcap Hfile HPC HnPC Hresv".
       iDestruct (sconf_to_cells (CID := CID) with "Hsc") as (ms0 mdv0)
@@ -2599,7 +2599,7 @@ Section WpSconfCsr.
                   with "Hcert Hrw Hro").
     - iIntros (npc ms' m' n') "Hcg' Hpc' (-> & -> & -> & Hsepc)".
       iDestruct (sie_cap_gpr_at_close (CID := CID) with "Hcg'") as "Hcg'".
-      iApply ("Hcont" $! cpu_id with "[%] Hcg' Hsepc Hpc'"). done.
+      iApply ("Hcont" $! cpu_id with "[%] Hlc Hcg' Hsepc Hpc'"). done.
   Qed.
 
   (* ------------------------------------------------------------------- *)
@@ -2716,7 +2716,7 @@ Section WpSconfCsr.
               with "Hcg Hpc Hinstr [Hrdcsr Hcell Hcont]").
     (* INTERRUPTS ARE OFF AT THIS LEAF, so the funnel's hart-generic callback
        is discharged at the ambient hart and nothing is renamed. *)
-    iNext. iApply wp_next_off_intro. rewrite /sconf_step_obl.
+    iNext. iApply wp_next_off_intro_lc. iIntros "Hlc". rewrite /sconf_step_obl.
     iSplitL "Hrdcsr Hcell".
     - (* ---- the instruction ---- *)
       iIntros "Hsc Hcap Hfile HPC HnPC Hresv".
@@ -2784,7 +2784,7 @@ Section WpSconfCsr.
     - (* ---- the continuation ---- *)
       iIntros (npc ms' m' n') "Hcg' Hpc' (-> & -> & -> & Hcell)".
       iDestruct (sie_cap_gpr_at_close (CID := CID) with "Hcg'") as "Hcg'".
-      iApply ("Hcont" $! cpu_id with "[%] Hcg' Hcell Hpc'"). done.
+      iApply ("Hcont" $! cpu_id with "[%] Hlc Hcg' Hcell Hpc'"). done.
   Qed.
 
   (* ---- the three instances.  scause and stval read their cell verbatim;
@@ -2977,8 +2977,8 @@ Section WpSconfCsr.
                  ⌜npc = add_vec_int pc 4⌝ ∗ ⌜m' = m⌝ ∗ ⌜n' = n⌝ ∗
                  ⌜∃ ms : mword 64, sconf_ms_facts ms⌝)%I
               with "Hcg Hpc Hinstr [Hcont]").
-    iNext. iApply wp_next_off_intro. rewrite /sconf_step_obl.
-    iSplitR "Hcont".
+    iNext. iApply wp_next_off_intro_lc. iIntros "Hlc". rewrite /sconf_step_obl.
+    iSplitR "Hcont Hlc".
     - (* ---- the instruction: a read-MODIFY-write at x0 ---- *)
       iIntros "Hsc Hcap Hfile HPC HnPC Hresv".
       iDestruct (sconf_to_cells (CID := CID) with "Hsc") as (ms0 mdv0)
@@ -3084,7 +3084,7 @@ Section WpSconfCsr.
       iIntros (npc ms' m' n') "Hcg' Hpc' (-> & -> & -> & %Hex)".
       iDestruct (sie_cap_gpr_at_close (CID := CID) with "Hcg'") as "Hcg'".
       destruct Hex as (ms & Hmsf).
-      iSpecialize ("Hcont" $! cpu_id with "[%]"); [done|].
+      iSpecialize ("Hcont" $! cpu_id with "[%] Hlc"); [done|].
       iApply ("Hcont" $! ms with "[%] Hcg' Hpc'"). exact Hmsf.
   Qed.
 
@@ -3117,8 +3117,8 @@ Section WpSconfCsr.
        instruction can be trapped and the thread resumed elsewhere, so every
        resource below is about the hart the callback binds. *)
     rename CID into CID0.
-    iIntros (CID Hs). rewrite /sconf_step_obl.
-    iSplitR "Hcont".
+    iIntros (CID Hs) "Hlc". rewrite /sconf_step_obl.
+    iSplitR "Hcont Hlc".
     - (* ---- the instruction: a read-MODIFY-write at x0 ---- *)
       iIntros "Hsc Hcap Hfile HPC HnPC Hresv".
       iDestruct (sconf_to_cells (CID := CID) with "Hsc") as (ms0 mdv0)
@@ -3235,7 +3235,7 @@ Section WpSconfCsr.
       iIntros (npc ms' m' n') "Hcg' Hpc' (-> & -> & -> & %Hex)".
       iDestruct (sie_cap_gpr_at_close (CID := CID) with "Hcg'") as "Hcg'".
       destruct Hex as (ms & Hmsf).
-      iSpecialize ("Hcont" $! CID with "[%]"); [exact Hs|].
+      iSpecialize ("Hcont" $! CID with "[%] Hlc"); [exact Hs|].
       iApply ("Hcont" $! ms with "[%] Hcg' Hpc'"). exact Hmsf.
   Qed.
 
@@ -3289,7 +3289,7 @@ Section WpSconfCsr.
                  ⌜_get_Mstatus_SPIE ms' = _get_Sstatus_SPIE wval⌝ ∗
                  sret_bits (_get_Mstatus_SPP ms') (_get_Mstatus_SPIE ms'))%I
               with "Hcg Hpc Hinstr [Hsppc Hcont]").
-    iNext. iApply wp_next_off_intro. rewrite /sconf_step_obl.
+    iNext. iApply wp_next_off_intro_lc. iIntros "Hlc". rewrite /sconf_step_obl.
     iSplitL "Hsppc".
     - (* ---- the instruction ---- *)
       iIntros "Hsc Hcap Hfile HPC HnPC Hresv".
@@ -3394,7 +3394,7 @@ Section WpSconfCsr.
            hand-through. ---- *)
       iIntros (npc ms' m' n')
         "Hcg' Hpc' (-> & -> & -> & %Hsie & %Hspp & %Hspie & Hsppc)".
-      iSpecialize ("Hcont" $! cpu_id with "[%]"); [done|].
+      iSpecialize ("Hcont" $! cpu_id with "[%] Hlc"); [done|].
       iApply ("Hcont" $! ms' with "[%] [%] [%] Hcg' Hsppc Hpc'").
       { exact Hsie. }
       { exact Hspp. }
@@ -3445,9 +3445,9 @@ Section WpSconfCsr.
               ltac:(unfold sstatus_read; rewrite WpGprCsrwC.subrange_full
                       WpGprCsrwC.sXS_lower; exact HXS0)
               with "Hcg Hsppc Hpc Hinstr [-]").
-    iApply wp_next_off_intro.
+    iApply wp_next_off_intro_lc. iIntros "Hlc".
     iIntros (msf) "%Hf_sie %Hf_spp %Hf_spie Hcgat Hsppc Hpc".
-    iSpecialize ("Hcont" $! cpu_id with "[]"); [iPureIntro; done|].
+    iSpecialize ("Hcont" $! cpu_id with "[] Hlc"); [iPureIntro; done|].
     iApply ("Hcont" $! msf with "[%] [%] [%] Hcgat Hsppc Hpc").
     - rewrite Hf_sie Hsie0. reflexivity.
     - rewrite Hf_spp HWspp. reflexivity.
@@ -3497,8 +3497,8 @@ Section WpSconfCsr.
                       (satp_to_ppn (autocast (T := mword) sp0 : mword 64))
                       = root⌝ ∗ kpt_inv root)%I
               with "Hcg Hpc Hinstr [Hcont]").
-    iNext. iApply wp_next_off_intro. rewrite /sconf_step_obl.
-    iSplitR "Hcont".
+    iNext. iApply wp_next_off_intro_lc. iIntros "Hlc". rewrite /sconf_step_obl.
+    iSplitR "Hcont Hlc".
     - (* ---- the instruction ---- *)
       iIntros "Hsc Hcap Hfile HPC HnPC Hresv".
       (* THE BORROW, taken inside: the receipt pins the arm, the arm's
@@ -3592,7 +3592,7 @@ Section WpSconfCsr.
       iDestruct (sie_cap_gpr_at_close (CID := CID) with "Hcg'") as "Hcg'".
       iDestruct "Hex" as (sp0 root) "(%Hex & #Hkinv)".
       destruct Hex as (-> & Hmode & Hasid & Hppn).
-      iSpecialize ("Hcont" $! cpu_id with "[%]"); [done|].
+      iSpecialize ("Hcont" $! cpu_id with "[%] Hlc"); [done|].
       iApply ("Hcont" $! sp0 root with "[%] [%] [%] Hkinv Hcg' Hkptr Hpc'").
       { exact Hmode. }
       { exact Hasid. }
@@ -3649,8 +3649,8 @@ Section WpSconfCsr.
               with "Hcg Hpc Hinstr
                     [Htok Hhx Hkptr Hsepcx Hscausex Hstvalx Hsppc Hcells Hclm
                      Hcont]").
-    iNext. iApply wp_next_off_intro. rewrite /sconf_step_obl.
-    iSplitR "Hcont".
+    iNext. iApply wp_next_off_intro_lc. iIntros "Hlc". rewrite /sconf_step_obl.
+    iSplitR "Hcont Hlc".
     - (* ---- the instruction, and the four-piece ghost flip ---- *)
       iIntros "Hsc Hcap Hfile HPC HnPC Hresv".
       iDestruct (sconf_to_cells (CID := CID) with "Hsc") as (ms0 mdv0)
@@ -3777,7 +3777,7 @@ Section WpSconfCsr.
       iIntros (npc ms' m' n') "Hcg' Hpc' (-> & -> & -> & %Hex)".
       iDestruct (sie_cap_gpr_at_close (CID := CID) with "Hcg'") as "Hcg'".
       destruct Hex as (ms & Hmsf).
-      iDestruct (wp_next_here with "Hcont") as "Hcont".
+      iDestruct (wp_next_here with "Hcont Hlc") as "Hcont".
       iApply ("Hcont" $! ms with "[%] Hcg' Hpc'"). exact Hmsf.
   Qed.
 
@@ -3895,8 +3895,8 @@ Section WpSconfCsr.
        trapped and the thread resumed elsewhere, and every resource the
        continuation hands on is then about THAT hart. *)
     rename CID into CID0.
-    iIntros (CID Hs). rewrite /sconf_step_obl.
-    iSplitR "Hcont".
+    iIntros (CID Hs) "Hlc". rewrite /sconf_step_obl.
+    iSplitR "Hcont Hlc".
     - (* ---- the instruction ---- *)
       iIntros "Hsc Hcap Hfile HPC HnPC Hresv".
       iDestruct (sconf_to_cells (CID := CID) with "Hsc") as (ms0 mdv0)
@@ -4000,7 +4000,7 @@ Section WpSconfCsr.
       iDestruct "Hown" as "(Hms & Hhalf & Htie & %Hmsf)".
       iDestruct (sie_arm_half_agree (CID := CID) b p ms' with "Hhalf Harm")
         as %Hb.
-      iSpecialize ("Hcont" $! CID with "[%]"); [exact Hs|].
+      iSpecialize ("Hcont" $! CID with "[%] Hlc"); [exact Hs|].
       iApply ("Hcont" $! ms' with "[%] Hhs [Hms Hhalf Htie Hcl] Htr Hpc' Hfile
                 [Hstk Harm Hctx]").
       { exact Hmsf. }
@@ -4071,8 +4071,8 @@ Section WpSconfCsr.
               with "Hcg Hpc Hinstr [Hcont]").
     iNext.
     rename CID into CID0.
-    iIntros (CID Hs). rewrite /sconf_step_obl.
-    iSplitR "Hcont".
+    iIntros (CID Hs) "Hlc". rewrite /sconf_step_obl.
+    iSplitR "Hcont Hlc".
     - (* ---- the instruction, and the four-piece ghost flip ---- *)
       iIntros "Hsc Hcap Hfile HPC HnPC Hresv".
       iDestruct (sconf_to_cells (CID := CID) with "Hsc") as (ms0 mdv0)
@@ -4215,7 +4215,7 @@ Section WpSconfCsr.
         "Hcg' Hpc' (-> & -> & -> & %Hex & Hcnt & Htr & Hclm & Hcells)".
       iDestruct (sie_cap_gpr_at_close (CID := CID) with "Hcg'") as "Hcg'".
       destruct Hex as (ms & Hmsf).
-      iSpecialize ("Hcont" $! CID with "[%]"); [exact Hs|].
+      iSpecialize ("Hcont" $! CID with "[%] Hlc"); [exact Hs|].
       iApply ("Hcont" $! ms with "[%] Hcg' Hcnt Htr Hclm Hcells Hpc'").
       exact Hmsf.
   Qed.
@@ -4270,8 +4270,8 @@ Section WpSconfCsr.
                 with "Hcg Hpc Hinstr [Hcont]").
       iNext.
       rename CID into CID0.
-      iIntros (CID Hs). rewrite /sconf_step_obl.
-      iSplitR "Hcont".
+      iIntros (CID Hs) "Hlc". rewrite /sconf_step_obl.
+      iSplitR "Hcont Hlc".
       + iIntros "Hsc Hcap Hfile HPC HnPC Hresv".
         iDestruct (sconf_to_cells (CID := CID) with "Hsc") as (ms0 mdv0)
           "(%Hmsf & %Hmm & #Hhw & #Hminv & Hpriv & Hms & Hhalf & Hspp & Hmie &
@@ -4414,7 +4414,7 @@ Section WpSconfCsr.
           "Hcg' Hpc' (-> & -> & %Hex & Hcnt & Htr & Hclm & Hcells)".
         iDestruct (sie_cap_gpr_at_close (CID := CID) with "Hcg'") as "Hcg'".
         destruct Hex as (ms & -> & Hmsf & Hsie).
-        iSpecialize ("Hcont" $! CID with "[%]"); [exact Hs|].
+        iSpecialize ("Hcont" $! CID with "[%] Hlc"); [exact Hs|].
         iApply ("Hcont" $! ms with "[%] [%] Hcg' Hcnt Htr Hclm Hcells Hpc'");
           [ exact Hmsf | exact Hsie ].
     - (* ================= b = false: the IDEMPOTENT write ================= *)
@@ -4433,8 +4433,8 @@ Section WpSconfCsr.
                    cpu_claim_pay (CID := CIDr) k eb p ∗
                    cpu_priv_pay (CID := CIDr) false p)%I
                 with "Hcg Hpc Hinstr [Hcnt Hcont]").
-      iNext. iApply wp_next_off_intro. rewrite /sconf_step_obl.
-      iSplitR "Hcont".
+      iNext. iApply wp_next_off_intro_lc. iIntros "Hlc". rewrite /sconf_step_obl.
+      iSplitR "Hcont Hlc".
       + iIntros "Hsc Hcap Hfile HPC HnPC Hresv".
         iDestruct (sconf_to_cells (CID := CID) with "Hsc") as (ms0 mdv0)
           "(%Hmsf & %Hmm & #Hhw & #Hminv & Hpriv & Hms & Hhalf & Hspp & Hmie &
@@ -4562,7 +4562,7 @@ Section WpSconfCsr.
           "Hcg' Hpc' (-> & -> & %Hex & Hcnt & Htr & Hclm & Hcells)".
         iDestruct (sie_cap_gpr_at_close (CID := CID) with "Hcg'") as "Hcg'".
         destruct Hex as (ms & -> & Hmsf & Hsie).
-        iSpecialize ("Hcont" $! cpu_id with "[%]"); [done|].
+        iSpecialize ("Hcont" $! cpu_id with "[%] Hlc"); [done|].
         iApply ("Hcont" $! ms with "[%] [%] Hcg' Hcnt Htr Hclm Hcells Hpc'");
           [ exact Hmsf | exact Hsie ].
   Qed.

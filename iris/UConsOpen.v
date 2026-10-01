@@ -356,25 +356,32 @@ Section UConsOpen.
       destruct (ents !! fname_console) as [c |]; by iRight. }
     destruct Hpd as [_ Hd]. subst d.
     iMod (inv_acc ⊤ appN with "Hinv") as "[Hbody Hclose]"; [ set_solver | ].
-    iEval (rewrite /app_body) in "Hbody".
-    iDestruct "Hbody" as (I) "(>Hh & Hp & >%Hdom)".
-    iAssert (▷ (app_pred app_run (abs_view I) ∗ K
-                ∗ (⌜cons_absent (abs_view I)⌝ ∨ T)))%I
-      with "[Hp HK]" as "Hpc".
-    { iNext. iApply ("Hcl" with "HK Hp"). }
-    iDestruct "Hpc" as "[Hp [HK Hc]]".
-    iMod "Hc". iMod "HK".
-    iDestruct (pobs_elend_astep γfs (1/2)%Qp I FsImg.ROOTINO dqv ents
-                 fname_console with "Hh HF") as %Hae.
-    iMod ("Hclose" with "[Hh Hp]") as "_".
-    { iNext. rewrite /app_body. iExists I. iFrame "Hh Hp".
-      iPureIntro. exact Hdom. }
+    (* CREDIT-FREE at every step index (port-ordinal;
+       [PinnedObs.pobs_hop_dead_lin]'s form): only a PURE reading or the
+       persistent, timeless [T] leaves the body's later -- a persistent
+       assertion sees the credential and the body and consumes neither --
+       and the body goes back exactly as it was opened. *)
+    iAssert (▷ (⌜∃ v, cons_absent v
+                      ∧ astep v FsImg.ROOTINO fname_console
+                        = ents !! fname_console⌝ ∨ T))%I as "#>Hc".
+    { iNext. iEval (rewrite /app_body) in "Hbody".
+      iDestruct "Hbody" as (I) "(Hh & Hp & _)".
+      iAssert (app_pred app_run (abs_view I) ∗ K
+               ∗ (⌜cons_absent (abs_view I)⌝ ∨ T))%I
+        with "[Hp HK]" as "(_ & _ & [%HP | #HT])".
+      { iApply ("Hcl" with "HK Hp"). }
+      2: { iRight. iExact "HT". }
+      iDestruct (pobs_elend_astep γfs (1/2)%Qp I FsImg.ROOTINO dqv ents
+                   fname_console with "Hh HF") as %Hae.
+      iLeft. iPureIntro. exists (abs_view I). split; [ exact HP | exact Hae ]. }
+    iMod ("Hclose" with "Hbody") as "_".
     iModIntro. iFrame "HF".
-    iDestruct "Hc" as "[%HP | #HT]"; last first.
+    iDestruct "Hc" as "[%Hv | #HT]"; last first.
     { destruct (ents !! fname_console) as [c |]; by iRight. }
+    destruct Hv as (v & HP & Hae).
     assert (Hn : ents !! fname_console = None)
       by (rewrite -Hae;
-          exact (Hmiss (abs_view I) fname_console HP init_cons_elems_hd)).
+          exact (Hmiss v fname_console HP init_cons_elems_hd)).
     rewrite Hn. iLeft. iExact "HK".
   Qed.
 

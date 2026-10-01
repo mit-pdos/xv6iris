@@ -342,7 +342,7 @@ Section WpSmodeIntr.
          BEFORE the body has to be supplied. ---- *)
       iDestruct "Hresv" as (rr) "Hfrag".
       iApply (swp_loop rr with "Hcert Hfrag").
-      iNext. iIntros (tick) "Hfrag".
+      iNext. iIntros (tick) "Hfrag Hlc".
       iApply (swp_mono _ _ (fun _ => mWP (Loop : expr riscv_lang))%I
                 with "[] [-]").
       2:{ iApply (swp_tick_wrap_ex s_Drwb s_Dro (s_Df (DfracOwn 1))
@@ -396,6 +396,7 @@ Section WpSmodeIntr.
                            arm it is holding the tlb cell. *)
                         (wp_next false p
                            (sconf_step_obl_clock m n false b' pc is_rvc i R)
+                         ∗ £ 1   (* the boundary credit: paid when the obligation is taken *)
                          ∗ ghost_var_frac sie_gname (1/2) (_get_Mstatus_SIE mst0)
                          ∗ sret_tie mst0 ∗ sie_cap_rest kt m n false p
                          ∗ gpr_file (tp_pin m)
@@ -410,7 +411,7 @@ Section WpSmodeIntr.
                         Hmisaval HSXL HMPRV Hmm Helpnp (pma_all_ram Hpmaall)
                         Hbsok Hpok
                         with "Hcert Hinstr Hres Hfrag
-                              [$Hbody $Hhalf $Htie $Hrest $Hfile $Hclose]
+                              [$Hbody $Hlc $Hhalf $Htie $Hrest $Hfile $Hclose]
                               Hrw Hro
                               [] []").
               (* ---------- NO TRAP: SIE = 0 makes [s_dispatch] [None] ------- *)
@@ -419,7 +420,7 @@ Section WpSmodeIntr.
                 rewrite /s_dispatch HSIE in Hd. cbn [andb] in Hd. discriminate. }
               (* ---------- THE INSTRUCTION ---------- *)
               iIntros (tv') "HW HRes Hany Hrw Hro".
-              iDestruct "HW" as "(Hwn & Hhalf & Htie & Hrest & Hfile & Hclose)".
+              iDestruct "HW" as "(Hwn & Hlc & Hhalf & Htie & Hrest & Hfile & Hclose)".
               pose proof (s_rs_set_nPC pc pc
                          (add_vec_int pc (if is_rvc then 2 else 4)) msr
                          (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0
@@ -452,7 +453,7 @@ Section WpSmodeIntr.
                           with "Hsatp Htlb Hpcfg Hpaddr HRes Hrest"). }
               iAssert (clock_res) with "[Hcy Hti Hip]" as "Hclk".
               { iExists cy, ti, ip. iFrame. }
-              iDestruct (wp_next_at false p _ CID (fun _ => eq_refl) with "Hwn")
+              iDestruct (wp_next_at false p _ CID (fun _ => eq_refl) with "Hwn Hlc")
                 as "[Hobl Hcont]".
               iApply (swp_mono with "[Hmsr Hmi Hhs Hcont] [-]").
               2:{ iApply ("Hobl" with "Hsc Hcap Hfile HPC HnPC Hany Hclk"). }
@@ -601,7 +602,7 @@ Section WpSmodeIntr.
          BEFORE the body has to be supplied. ---- *)
       iDestruct "Hresv" as (rr) "Hfrag".
       iApply (swp_loop rr with "Hcert Hfrag").
-      iNext. iIntros (tick) "Hfrag".
+      iNext. iIntros (tick) "Hfrag Hlc".
       iApply (swp_mono _ _ (fun _ => mWP (Loop : expr riscv_lang))%I
                 with "[] [-]").
       2:{ iApply (swp_tick_wrap_ex s_Drw s_Dro (s_Df (DfracOwn 1))
@@ -652,6 +653,7 @@ Section WpSmodeIntr.
                            arm it is holding the tlb cell. *)
                         (wp_next false p
                            (sconf_step_obl_clock m n false b' pc is_rvc i R)
+                         ∗ £ 1   (* the boundary credit: paid when the obligation is taken *)
                          ∗ ghost_var_frac sie_gname (1/2) (_get_Mstatus_SIE mst0)
                          ∗ sret_tie mst0 ∗ sie_cap_rest kt m n false p
                          ∗ gpr_file (tp_pin m)
@@ -666,7 +668,7 @@ Section WpSmodeIntr.
                         Hmisaval HSXL HMPRV Hmm Helpnp (pma_all_ram Hpmaall)
                         Hsok Hpok
                         with "Hcert Hinstr Hres Hfrag
-                              [$Hbody $Hhalf $Htie $Hrest $Hfile $Hclose]
+                              [$Hbody $Hlc $Hhalf $Htie $Hrest $Hfile $Hclose]
                               Hrw Hro
                               [] []").
               (* ---------- NO TRAP: SIE = 0 makes [s_dispatch] [None] ------- *)
@@ -675,7 +677,7 @@ Section WpSmodeIntr.
                 rewrite /s_dispatch HSIE in Hd. cbn [andb] in Hd. discriminate. }
               (* ---------- THE INSTRUCTION ---------- *)
               iIntros (tv') "HW HRes Hany Hrw Hro".
-              iDestruct "HW" as "(Hwn & Hhalf & Htie & Hrest & Hfile & Hclose)".
+              iDestruct "HW" as "(Hwn & Hlc & Hhalf & Htie & Hrest & Hfile & Hclose)".
               pose proof (s_rs_set_nPC pc pc
                          (add_vec_int pc (if is_rvc then 2 else 4)) msr
                          (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0
@@ -707,7 +709,7 @@ Section WpSmodeIntr.
                           with "Hsatp Htlb Hpcfg Hpaddr HRes Hrest"). }
               iAssert (clock_res) with "[Hcy Hti Hip]" as "Hclk".
               { iExists cy, ti, ip. iFrame. }
-              iDestruct (wp_next_at false p _ CID (fun _ => eq_refl) with "Hwn")
+              iDestruct (wp_next_at false p _ CID (fun _ => eq_refl) with "Hwn Hlc")
                 as "[Hobl Hcont]".
               iApply (swp_mono with "[Hmsr Hmi Hhs Hcont] [-]").
               2:{ iApply ("Hobl" with "Hsc Hcap Hfile HPC HnPC Hany Hclk"). }
@@ -871,8 +873,8 @@ Section WpSmodeIntr.
               with "Hcg Hpc Hinstr [H]").
     (* the rename has to come AFTER the sibling application; see §3 *)
     rename CID into CID0.
-    iNext. iIntros (CID Hs).
-    iDestruct (wp_next_at b p _ CID Hs with "H") as "Hb".
+    iNext. iIntros (CID Hs) "Hlc".
+    iDestruct (wp_next_at b p _ CID Hs with "H Hlc") as "Hb".
     iEval (rewrite /sconf_step_obl) in "Hb".
     iDestruct "Hb" as "[Hobl Hcont]".
     rewrite /sconf_step_obl_clock.
@@ -968,7 +970,7 @@ Section WpSmodeIntr.
        the funnel application: inside a Section, a reference to a SIBLING
        lemma is resolved through the section variables BY NAME. *)
     rename CID into CID0.
-    iIntros (CID Hs). rewrite /sconf_step_obl. iSplitL "Hex".
+    iIntros (CID Hs) "Hlc". rewrite /sconf_step_obl. iSplitL "Hex".
     - (* the instruction: hand the walk the file, take the written one back *)
       iIntros "Hsc Hcap Hfile HPC HnPC Hresv".
       iDestruct "Hsc" as "(#Hhw & #Hminv & Hsc)".
@@ -994,7 +996,7 @@ Section WpSmodeIntr.
     - (* the continuation: the engine resumes on the hart [Hs] names *)
       iIntros (npc ms' m' n') "Hcg' Hpc' (-> & -> & ->)".
       iDestruct (sie_cap_gpr_at_close (CID := CID) with "Hcg'") as "Hcg'".
-      iApply ("Hcont" $! CID with "[%] Hcg' Hpc'"). exact Hs.
+      iApply ("Hcont" $! CID with "[%] Hlc Hcg' Hpc'"). exact Hs.
   Qed.
 
   (* the 4-byte (base-encoding) variant: pc advances by 4 *)

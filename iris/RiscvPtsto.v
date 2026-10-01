@@ -1179,14 +1179,21 @@ Definition disk_write_permit `{!riscvFixedGS Σ} (gd : nat) (w : disk_wr)
         which is how a reader learns something DURABLE about what it read,
         at the only instant anybody can. *)
      disk_fixed_auth dk -∗
-     ▷ riscv_crash_pred ={∅}=∗
+     (* the predicate arrives with its later already stripped: the consumer
+        ([WpUart.wp_disk_loop]) spends the disk step's own credit on the crash
+        invariant's later.  At ordinal step indices a client's composite (a
+        timeless record beside an ARBITRARY guest) is not timeless, so it
+        could not strip the later itself (port-ordinal, owner 2026-10-01). *)
+     riscv_crash_pred ={∅}=∗
        disk_fixed_auth (wr_apply w dk) ∗
        ▷ riscv_crash_pred ∗ start_auth n ∗ Q)%I.
 
-(* WHY A MASK-[∅] FUPD AND NOT A BASIC UPDATE.  A client whose crash
+(* WHY A MASK-[∅] FUPD AND NOT A BASIC UPDATE.  (Written when this type
+   handed the predicate under a [▷]; it now hands it unlatered, see above, and
+   a fupd remains the weakest thing to prove.)  A client whose crash
    predicate is TIMELESS -- [FsCrash.P_fs_any] is, every conjunct of it is a
-   [ghost_map]/[mono_nat]/[own] over a discrete cmra -- has to STRIP the [▷]
-   this type hands it before it can update the record's ghosts, and a basic
+   [ghost_map]/[mono_nat]/[own] over a discrete cmra -- had to STRIP that
+   [▷] before it could update the record's ghosts, and a basic
    update cannot do that: [◇] is not absorbed by [|==>] (there is no
    [▷ |==> P ⊢ |==> ▷ P] in Iris either).  A fupd at ANY mask absorbs [◇], so
    [∅] is the right choice: it is the weakest thing to PROVE (no invariant is

@@ -711,7 +711,7 @@ Section Ut56.
     { iApply (uti_082 with "Htext"). }
     (* [iNext] rather than [bi.later_intro]: this step is where the later on
        the self-kill's payload comes off ([ChildTok.kill_owed_pay]) *)
-    iApply wp_next_off_intro. iNext. iIntros "Hcg Hpc".
+    iNext. iApply wp_next_off_intro. iIntros "Hcg Hpc".
     assert (Hpa6 : add_vec (mword_of_int (UT + 0x82) : mword 64)
                      (sign_extend' 64 (sign_extend' 21
                         (concat_vec (mword_of_int 18 : mword 11) ('b"0"))))
@@ -1168,7 +1168,7 @@ Section UtD0.
                 mr nx false ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc [] [-]").
       { iApply (uti_0e8 with "Htext"). }
-      iApply wp_next_off_intro. iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iApply wp_next_off_intro. iIntros "Hcg Hpc".
       assert (Hp56 : add_vec (mword_of_int (UT + 0xe8) : mword 64)
                        (sign_extend' 64 (sign_extend' 21
                           (concat_vec (mword_of_int 1975 : mword 11) ('b"0"))))
@@ -1581,7 +1581,7 @@ Section UtE8.
                 mf nx false ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc [] [-]").
       { iApply (uti_0f2 with "Htext"). }
-      iApply wp_next_off_intro. iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iApply wp_next_off_intro. iIntros "Hcg Hpc".
       assert (Hpf6 : add_vec (mword_of_int (UT + 0xf2) : mword 64)
                        (sign_extend' 64 (sign_extend' 21
                           (concat_vec (mword_of_int 2 : mword 11) ('b"0"))))

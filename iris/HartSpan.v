@@ -512,7 +512,7 @@ Section span.
       iExists (C (k tt)), (MState (register_set reg regval rsM) mem0 dev0),
         log, tv, itv, hr, rv.
       iSplitR; [iPureIntro; split_and!; reflexivity|].
-      iNext. iIntros (m' σ' log' tv' itv' hr' rv') "%Hstep".
+      iNext. iIntros (m' σ' log' tv' itv' hr' rv') "%Hstep _".
       destruct Hstep as (-> & Hσ' & -> & -> & -> & -> & ->).
       assert (σ' = MState (register_set reg regval rsM) mem0 dev0) as ->
         by exact Hσ'.
@@ -535,7 +535,7 @@ Section span.
     all: iApply fupd_mask_intro; [apply empty_subseteq|]; iIntros "Hmask";
          iExists _, (MState rsM mem0 dev0), log, _, _, hr, rv;
          (iSplitR; [iPureIntro; split_and!; reflexivity|]);
-         iNext; iIntros (m' σ' log' tv' itv' hr' rv') "%Hstep";
+         iNext; iIntros (m' σ' log' tv' itv' hr' rv') "%Hstep _";
          destruct Hstep as (-> & -> & -> & -> & -> & -> & ->);
          iMod "Hmask" as "_"; iModIntro;
          (iSplitR "H Hrf Hro Htso Hiv Hrv"; [iFrame "Hri Hmem Hdev"|]);
