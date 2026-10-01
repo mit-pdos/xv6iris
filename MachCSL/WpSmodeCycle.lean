@@ -10,6 +10,8 @@ instantiate, at the context's own tier.
 import MachCSL.Translate
 import MachCSL.WpTrap
 import MachCSL.WpAluFile
+import MachCSL.WpTick
+import MachCSL.Instr
 
 namespace MachCSL
 

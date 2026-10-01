@@ -8,7 +8,11 @@ variants.  Only `rd ≠ 0` is assumed (`x0` writes are dropped by the model;
 the kernel never targets it).  Privilege-generic (default: supervisor).
 -/
 import MachCSL.KCtxGpr
-import MachCSL.WpMmodeAlu
+import MachCSL.AluFacts
+import MachCSL.PlatformFacts
+import MachCSL.ModelFacts
+import MachCSL.WpCycleDefs
+import MachCSL.WpGpr
 import MachCSL.KCtx
 
 namespace MachCSL

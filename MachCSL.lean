@@ -64,6 +64,8 @@ import MachCSL.WpGprDefs
 import MachCSL.GprLit
 import MachCSL.Instr
 import MachCSL.WpCycle
+import MachCSL.WpCycleDefs
+import MachCSL.AluFacts
 import MachCSL.WpMmode
 import MachCSL.WpMmodeAlu
 import MachCSL.WpStore
@@ -93,6 +95,7 @@ import MachCSL.WpSmodeTrapCsr
 import MachCSL.WpSmodeSltu
 import MachCSL.ByteWord
 import MachCSL.WpSmodeMint
+import MachCSL.CtxKeyMint
 import MachCSL.WpStoreFree
 import MachCSL.WpSmodeAlu2
 import MachCSL.WpSmodeAlu4

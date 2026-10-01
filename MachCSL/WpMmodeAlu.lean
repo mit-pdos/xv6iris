@@ -4,6 +4,7 @@ MachCSL: machine-mode rules for the remaining register-only instructions
 three-register `add`, `mv`, `and`/`or`, `ori`/`andi`, `srli`/`slli`, `addiw`.
 Same shape as `WpMmode.lean`.
 -/
+import MachCSL.AluFacts
 import MachCSL.WpCycle
 import MachCSL.WpGpr
 
@@ -15,17 +16,7 @@ open LeanRV64D LeanRV64D.Functions
 
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 
-/-! ### Facts: the model's shift helpers and `x0` are Lean's -/
-
-@[sail_facts] theorem log2_xlen_eq : Functions.log2_xlen = 6 := rfl
-@[sail_facts] theorem zero_reg_eq : zero_reg = 0#64 := rfl
-@[sail_facts] theorem shift_bits_right_eq {n m : Nat} (bv : BitVec n) (sh : BitVec m) :
-    Sail.shift_bits_right bv sh = bv >>> sh.toNat := rfl
-@[sail_facts] theorem shift_bits_left_eq {n m : Nat} (bv : BitVec n) (sh : BitVec m) :
-    Sail.shift_bits_left bv sh = bv <<< sh.toNat := rfl
-attribute [sail_facts] BitVec.zero_add
-/-- Reading `x0` yields zero (by computation). -/
-@[sail_facts] theorem rX_bits_zero : rX_bits (regidx.Regidx 0#5) = pure (0#64) := rfl
+-- The model-shift / `x0` facts live in `MachCSL.AluFacts`.
 
 /-! ### Execute stages -/
 

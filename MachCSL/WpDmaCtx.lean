@@ -25,7 +25,9 @@ This file is the arithmetic of that split:
   plus `ctxFloor_le` for a store the hart's floor has passed -- e.g. one
   the DISK authored, which is how a DMA-written buffer reaches the driver).
 -/
-import MachCSL.WpSmodeMint
+import MachCSL.CtxKeyMint
+import MachCSL.WpAtomic
+import MachCSL.BytesFree
 
 namespace MachCSL
 

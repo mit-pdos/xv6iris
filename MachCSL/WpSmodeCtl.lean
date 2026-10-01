@@ -6,10 +6,14 @@ arithmetic `subw`/`addw`.  Execute stages only; the `kctx` rules are in
 `WpSmodeRules.lean`.
 -/
 import MachCSL.KCtxGpr
-import MachCSL.WpMmodeCtl
+import MachCSL.AluFacts
+import MachCSL.Instr
+import MachCSL.WpCycleDefs
+import MachCSL.WpGpr
+import MachCSL.PlatformFacts
+import MachCSL.ModelFacts
 import MachCSL.SConfPhysDefs
 import MachCSL.KCtx
-import MachCSL.WpMmodeAlu
 
 namespace MachCSL
 

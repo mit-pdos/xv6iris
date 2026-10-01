@@ -2,6 +2,7 @@
 MachCSL: machine-mode control-flow rules beyond `jal`: the return `jalr x0,
 0(rs1)` (`ret` / `c.jr`).
 -/
+import MachCSL.AluFacts
 import MachCSL.WpCycle
 import MachCSL.WpGpr
 
@@ -13,15 +14,7 @@ open LeanRV64D LeanRV64D.Functions
 
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 
-/-- `jalr` clears bit 0 of its target. -/
-theorem update_bit0_eq (v : BitVec 64) : BitVec.update v 0 0#1 = v &&& 0xFFFFFFFFFFFFFFFE#64 := by
-  simp only [Sail.BitVec.update, Sail.BitVec.updateSubrange']; bv_decide
-
-theorem ofBool_bit0_and_mask (v : BitVec 64) :
-    (BitVec.ofBool (v &&& 0xFFFFFFFFFFFFFFFE#64)[0]! == 0#1) = true := by
-  have h0 : (v &&& 0xFFFFFFFFFFFFFFFE#64)[0] = false := by
-    rw [BitVec.getElem_eq_testBit_toNat, BitVec.toNat_and]; simp
-  simp [h0]
+-- `update_bit0_eq` / `ofBool_bit0_and_mask` live in `MachCSL.AluFacts`.
 
 set_option maxHeartbeats 4000000 in
 /-- `jalr x0, 0(rs1)` (`ret` when `rs1 = ra`), `rs1 ≠ 0`. -/
