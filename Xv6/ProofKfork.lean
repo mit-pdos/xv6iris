@@ -1693,6 +1693,7 @@ theorem kf_idup [CurCtx] (ID : IDUP) (c : CPU) (k' : KCtx) (kk z : Nat) (hsie : 
   unfold wp_idup_body at h
   simp only [idupAddr] at h
   iintro ⟨Hk, Hp, #Hit, #Hiti, #Hireg, Hs, Hr, Hcont⟩
+  ihave #Hireg := iregInv_reg (hlc := hlc) fscIreg fscFs icfgIst icfgNib $$ Hireg
   iapply h
   iframe Hk Hp Hit Hiti Hireg Hs Hr
   rw [hsie]

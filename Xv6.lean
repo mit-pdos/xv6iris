@@ -620,6 +620,7 @@ import Xv6.InodeRegionLink
 import Xv6.FsStateEraResB
 import Xv6.IcacheEscrowTok
 import Xv6.IcacheHeld
+import Xv6.IcacheShortCarve
 import Xv6.ProcInv
 import Xv6.ProcPrivAcc
 import Xv6.InodeRegionWithdraw
@@ -901,6 +902,7 @@ import Xv6.KexecPtImage
 import Xv6.KexecImageAlg
 import Xv6.KexecImageOk
 import Xv6.IregLinkNz
+import Xv6.IregClaimPlain
 import Xv6.CreateDefs
 import Xv6.CreateParts
 import Xv6.CreateFreshTy
