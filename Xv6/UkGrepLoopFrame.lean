@@ -425,6 +425,7 @@ theorem grepLoop_epi (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m m0 : RegMap)
   rw [ukPc 0x1b2 0x1b4 true rfl]
   let c1 := ukWr m 1#5 (m0.get 1#5)
   have hs1 : (c1.get 2#5).toNat = sp0.toNat - 112 := by rw [ukWr_get_other _ _ _ _ (by decide)]; exact hs0
+  clear hs0
   gfetch 0x1b4 true (.LOAD (96#12, .Regidx 2#5, .Regidx 8#5, false, 8))
   iapply wp_uk_ld UL N h1 c1 (BitVec.ofNat 64 0x1b4) true 96#12 2#5 8#5 (DFrac.own 1)
     (sp0.toNat - 16) (m0.get 8#5) (4 + n2) (by unfold unotSp spIdx; decide)
@@ -434,6 +435,7 @@ theorem grepLoop_epi (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m m0 : RegMap)
   rw [ukPc 0x1b4 0x1b6 true rfl]
   let c2 := ukWr c1 8#5 (m0.get 8#5)
   have hs2 : (c2.get 2#5).toNat = sp0.toNat - 112 := by rw [ukWr_get_other _ _ _ _ (by decide)]; exact hs1
+  clear hs1
   gfetch 0x1b6 true (.LOAD (88#12, .Regidx 2#5, .Regidx 9#5, false, 8))
   iapply wp_uk_ld UL N h2 c2 (BitVec.ofNat 64 0x1b6) true 88#12 2#5 9#5 (DFrac.own 1)
     (sp0.toNat - 24) (m0.get 9#5) (4 + n2) (by unfold unotSp spIdx; decide)
@@ -443,6 +445,7 @@ theorem grepLoop_epi (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m m0 : RegMap)
   rw [ukPc 0x1b6 0x1b8 true rfl]
   let c3 := ukWr c2 9#5 (m0.get 9#5)
   have hs3 : (c3.get 2#5).toNat = sp0.toNat - 112 := by rw [ukWr_get_other _ _ _ _ (by decide)]; exact hs2
+  clear hs2
   gfetch 0x1b8 true (.LOAD (80#12, .Regidx 2#5, .Regidx 18#5, false, 8))
   iapply wp_uk_ld UL N h3 c3 (BitVec.ofNat 64 0x1b8) true 80#12 2#5 18#5 (DFrac.own 1)
     (sp0.toNat - 32) (m0.get 18#5) (4 + n2) (by unfold unotSp spIdx; decide)
@@ -452,6 +455,7 @@ theorem grepLoop_epi (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m m0 : RegMap)
   rw [ukPc 0x1b8 0x1ba true rfl]
   let c4 := ukWr c3 18#5 (m0.get 18#5)
   have hs4 : (c4.get 2#5).toNat = sp0.toNat - 112 := by rw [ukWr_get_other _ _ _ _ (by decide)]; exact hs3
+  clear hs3
   gfetch 0x1ba true (.LOAD (72#12, .Regidx 2#5, .Regidx 19#5, false, 8))
   iapply wp_uk_ld UL N h4 c4 (BitVec.ofNat 64 0x1ba) true 72#12 2#5 19#5 (DFrac.own 1)
     (sp0.toNat - 40) (m0.get 19#5) (4 + n2) (by unfold unotSp spIdx; decide)
@@ -461,6 +465,7 @@ theorem grepLoop_epi (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m m0 : RegMap)
   rw [ukPc 0x1ba 0x1bc true rfl]
   let c5 := ukWr c4 19#5 (m0.get 19#5)
   have hs5 : (c5.get 2#5).toNat = sp0.toNat - 112 := by rw [ukWr_get_other _ _ _ _ (by decide)]; exact hs4
+  clear hs4
   gfetch 0x1bc true (.LOAD (64#12, .Regidx 2#5, .Regidx 20#5, false, 8))
   iapply wp_uk_ld UL N h5 c5 (BitVec.ofNat 64 0x1bc) true 64#12 2#5 20#5 (DFrac.own 1)
     (sp0.toNat - 48) (m0.get 20#5) (4 + n2) (by unfold unotSp spIdx; decide)
@@ -470,6 +475,7 @@ theorem grepLoop_epi (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m m0 : RegMap)
   rw [ukPc 0x1bc 0x1be true rfl]
   let c6 := ukWr c5 20#5 (m0.get 20#5)
   have hs6 : (c6.get 2#5).toNat = sp0.toNat - 112 := by rw [ukWr_get_other _ _ _ _ (by decide)]; exact hs5
+  clear hs5
   gfetch 0x1be true (.LOAD (56#12, .Regidx 2#5, .Regidx 21#5, false, 8))
   iapply wp_uk_ld UL N h6 c6 (BitVec.ofNat 64 0x1be) true 56#12 2#5 21#5 (DFrac.own 1)
     (sp0.toNat - 56) (m0.get 21#5) (4 + n2) (by unfold unotSp spIdx; decide)
@@ -479,6 +485,7 @@ theorem grepLoop_epi (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m m0 : RegMap)
   rw [ukPc 0x1be 0x1c0 true rfl]
   let c7 := ukWr c6 21#5 (m0.get 21#5)
   have hs7 : (c7.get 2#5).toNat = sp0.toNat - 112 := by rw [ukWr_get_other _ _ _ _ (by decide)]; exact hs6
+  clear hs6
   gfetch 0x1c0 true (.LOAD (48#12, .Regidx 2#5, .Regidx 22#5, false, 8))
   iapply wp_uk_ld UL N h7 c7 (BitVec.ofNat 64 0x1c0) true 48#12 2#5 22#5 (DFrac.own 1)
     (sp0.toNat - 64) (m0.get 22#5) (4 + n2) (by unfold unotSp spIdx; decide)
@@ -488,6 +495,7 @@ theorem grepLoop_epi (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m m0 : RegMap)
   rw [ukPc 0x1c0 0x1c2 true rfl]
   let c8 := ukWr c7 22#5 (m0.get 22#5)
   have hs8 : (c8.get 2#5).toNat = sp0.toNat - 112 := by rw [ukWr_get_other _ _ _ _ (by decide)]; exact hs7
+  clear hs7
   gfetch 0x1c2 true (.LOAD (40#12, .Regidx 2#5, .Regidx 23#5, false, 8))
   iapply wp_uk_ld UL N h8 c8 (BitVec.ofNat 64 0x1c2) true 40#12 2#5 23#5 (DFrac.own 1)
     (sp0.toNat - 72) (m0.get 23#5) (4 + n2) (by unfold unotSp spIdx; decide)
@@ -497,6 +505,7 @@ theorem grepLoop_epi (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m m0 : RegMap)
   rw [ukPc 0x1c2 0x1c4 true rfl]
   let c9 := ukWr c8 23#5 (m0.get 23#5)
   have hs9 : (c9.get 2#5).toNat = sp0.toNat - 112 := by rw [ukWr_get_other _ _ _ _ (by decide)]; exact hs8
+  clear hs8
   gfetch 0x1c4 true (.LOAD (32#12, .Regidx 2#5, .Regidx 24#5, false, 8))
   iapply wp_uk_ld UL N h9 c9 (BitVec.ofNat 64 0x1c4) true 32#12 2#5 24#5 (DFrac.own 1)
     (sp0.toNat - 80) (m0.get 24#5) (4 + n2) (by unfold unotSp spIdx; decide)
@@ -506,6 +515,7 @@ theorem grepLoop_epi (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m m0 : RegMap)
   rw [ukPc 0x1c4 0x1c6 true rfl]
   let c10 := ukWr c9 24#5 (m0.get 24#5)
   have hs10 : (c10.get 2#5).toNat = sp0.toNat - 112 := by rw [ukWr_get_other _ _ _ _ (by decide)]; exact hs9
+  clear hs9
   gfetch 0x1c6 true (.LOAD (24#12, .Regidx 2#5, .Regidx 25#5, false, 8))
   iapply wp_uk_ld UL N h10 c10 (BitVec.ofNat 64 0x1c6) true 24#12 2#5 25#5 (DFrac.own 1)
     (sp0.toNat - 88) (m0.get 25#5) (4 + n2) (by unfold unotSp spIdx; decide)
@@ -515,6 +525,7 @@ theorem grepLoop_epi (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m m0 : RegMap)
   rw [ukPc 0x1c6 0x1c8 true rfl]
   let c11 := ukWr c10 25#5 (m0.get 25#5)
   have hs11 : (c11.get 2#5).toNat = sp0.toNat - 112 := by rw [ukWr_get_other _ _ _ _ (by decide)]; exact hs10
+  clear hs10
   gfetch 0x1c8 true (.LOAD (16#12, .Regidx 2#5, .Regidx 26#5, false, 8))
   iapply wp_uk_ld UL N h11 c11 (BitVec.ofNat 64 0x1c8) true 16#12 2#5 26#5 (DFrac.own 1)
     (sp0.toNat - 96) (m0.get 26#5) (4 + n2) (by unfold unotSp spIdx; decide)
@@ -524,6 +535,7 @@ theorem grepLoop_epi (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m m0 : RegMap)
   rw [ukPc 0x1c8 0x1ca true rfl]
   let c12 := ukWr c11 26#5 (m0.get 26#5)
   have hs12 : (c12.get 2#5).toNat = sp0.toNat - 112 := by rw [ukWr_get_other _ _ _ _ (by decide)]; exact hs11
+  clear hs11
   gfetch 0x1ca true (.LOAD (8#12, .Regidx 2#5, .Regidx 27#5, false, 8))
   iapply wp_uk_ld UL N h12 c12 (BitVec.ofNat 64 0x1ca) true 8#12 2#5 27#5 (DFrac.own 1)
     (sp0.toNat - 104) (m0.get 27#5) (4 + n2) (by unfold unotSp spIdx; decide)
@@ -533,6 +545,7 @@ theorem grepLoop_epi (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m m0 : RegMap)
   rw [ukPc 0x1ca 0x1cc true rfl]
   let c13 := ukWr c12 27#5 (m0.get 27#5)
   have hs13 : (c13.get 2#5).toNat = sp0.toNat - 112 := by rw [ukWr_get_other _ _ _ _ (by decide)]; exact hs12
+  clear hs12
   have hsp13 : c13.get spIdx = sp0 + BitVec.ofInt 64 (-((8 * 14 : Nat) : Int)) := by
     show c13.get 2#5 = _
     ureg; exact g1

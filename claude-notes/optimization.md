@@ -847,6 +847,19 @@ fail a step far from any missing NAME (`WpSmodeTime` needed `AluFacts`);
 and an Xv6 module may reach a MachCSL name only transitively (`ProofSpin`
 used `wpLoop_m_instr` through `WpSmodeCtl`), so finish with the full build.
 
+### Lean: `omega` splits EVERY `Nat` subtraction in scope — clear dead chain links
+
+`omega` reads every hypothesis of the local context, and each `a - b` on
+`Nat` it finds becomes a case split, so k facts of the shape
+`(cK.get 2#5).toNat = sp0.toNat - 112` cost 2^k even though only the
+newest is used.  `UkGrepLoopFrame.grepLoop_epi` threaded such a chain
+(`hs0` … `hs13`, one per reload) and its per-step `omega` doubled down the
+walk: 0.05 s, 0.09, 0.16, 0.29, 0.59, 1.22, 2.51 s (`[omega] Assuming fact`
+nests in the trace are the tell).  `clear hsK` right after deriving
+`hs(K+1)`: the declaration 6.9 s → 0.7 s, module wall 6.2 s → 4.0 s.  Rule:
+in a straight-line walk, a chain of `Nat`-subtraction facts keeps only its
+live link.
+
 ## Build shape
 
 The build is critical-path bound and core-saturated in the middle: the path is a
