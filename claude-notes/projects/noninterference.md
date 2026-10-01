@@ -39,6 +39,20 @@ move.  Rocq sources: `git show <sha>:iris/<File>.v` (the shared `.git` holds the
 | **PJ-L1b** | b69bd0fab | §7.3 | copy ring + every block-holding chain (84 Rocq files; 68 twins; sys_open/unlink parts restructured) | PJ-L1a |
 | **PJ-L2** | 78f9234b8 | §7.4 | inner VM ring (32 Rocq files; 30 twins) | PJ-L1b |
 
+**L3 (opened 2026-10-01, owner: "go ahead with L3").** Rocq never landed L3, so there is no Rocq commit to
+port: the design is §7 of `design/ni-strong-instance.md` (the lend is REQUIRED and STEPPED at the leaves) and the
+Lean-specific "what remains" list of §7.4L. Three gated sub-lanes, in dependency order, integrated on `lean-l3`:
+
+| Lane | Content | Depends on |
+|---|---|---|
+| **PJ-L3a** | `walk` (allocating form), `freewalk`, `uvmcreate` take the lend (`(ke : Nat)`, `actLend k.proc ke` in, `∃ k' ≥ ke` out, framed through; their callers in the VM ring pass theirs instead of framing) | L2 |
+| **PJ-L3b** | `kalloc`/`kfree` led forms take the lend and STEP it (`actLend p (ke+1)` out: the append IS the step; `actLend_step` on the right disjunct, nothing at `p = 0`); the token-free led forms are deleted; the plain `wp_kalloc`/`wp_kfree` survive only with the premise `k.proc = 0` for the boot contracts (`kinit`, `freerange`, `virtio_disk_init`, the kvm chain already at `p = 0`, …); every non-boot allocator call site switches to the led+lend form and drops the receipt; the block-holders' `V.updEv k'` closes absorb the raised counts | L3a |
+| **PJ-L3c** | the four ledger appends require and step the lend: allocproc's pid section (`PAlloc`), freeproc's led form (`PFree`), kwait's led forms (`ZReap`), kexit's exit append (`ZExit`, from its own block: the ZOMBIE park rides the deficit block) | L3b |
+
+- [ ] PJ-L3a  - [ ] PJ-L3b  - [ ] PJ-L3c
+
+Then **T**: the rows and the theorem (`ut_round` gains `ev ev'`, `ev' = ev` on the non-ecall rows; `ut_round_quiet`).
+
 Not ported: 42666b2b7 (`tools/intr_cone.py`, a Rocq-module cone audit; the Lean counterpart is a
 `tools/` item for when T lands).  Rocq's L3 and T were never landed; they stay future work.
 
