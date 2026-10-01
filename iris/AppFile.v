@@ -2779,9 +2779,15 @@ Section FileMerge.
     intros Hst. rewrite /app_merge_raw. iIntros "!>" (r av) "%Hok Hp HT".
     rewrite /file_ok in Hok.
     iDestruct (echo_xfer (ff_echo c)) as "#Hex". rewrite /app_xfer_raw.
-    iAssert (▷ echo_pred (ff_echo c) (fn_cons r) av ∗ ▷ file_rest c r av)%I
-      with "[Hp]" as "[He Hrest]".
-    { rewrite -bi.later_sep. iNext. iApply (file_pred_split with "Hp"). }
+    (* CREDIT-FREE at every step index (port-ordinal): [▷ (P ∗ Q)] does not
+       split into [▷ P ∗ ▷ Q] at an ordinal index, but the claim is TIMELESS
+       ([file_pred_timeless]), so its later is an except-0, which splits *)
+    iAssert (◇ (echo_pred (ff_echo c) (fn_cons r) av ∗ file_rest c r av))%I
+      with "[Hp]" as "Hp".
+    { iMod "Hp". iModIntro. iApply (file_pred_split with "Hp"). }
+    iDestruct (bi.except_0_sep with "Hp") as "[He Hrest]".
+    iDestruct (bi.except_0_into_later with "He") as "He".
+    iDestruct (bi.except_0_into_later with "Hrest") as "Hrest".
     iMod ("Hex" $! (fn_cons r) av with "He") as "[He He']".
     iDestruct "He'" as (rc) "He'".
     iMod (fnames_alloc rc (fcontent_of av) (fn_sync r) (fn_era r) true 0)

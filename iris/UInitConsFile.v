@@ -293,9 +293,12 @@ Section UInitConsFile.
   Proof using .
     intros Heq. iIntros "#Hinv !> HK".
     iDestruct (init_cons_never_abs_law_file Heq) as "#Habs".
-    iMod (app_claim_update ⊤ fsc_fs (cons_key (fn_cons r))
+    (* credit-free: the file era's claim is timeless ([UInitConsK.app_claim_update_tl]) *)
+    assert (HTL : forall av : aview, Timeless (app_pred app_run av)).
+    { intros av. rewrite Heq. cbn [app_pred app_run app_names]. apply _. }
+    iMod (app_claim_update_tl ⊤ fsc_fs (cons_key (fn_cons r))
             (cons_never (fn_cons r) ∨ file_taint (FileOut.fgn_cl g))%I
-            ltac:(set_solver) with "Hinv [] HK") as "Hn".
+            ltac:(set_solver) HTL with "Hinv [] HK") as "Hn".
     { iApply (init_cons_seal_law_file Heq). }
     iModIntro. rewrite /UkInit.uki_mknod_out.
     iDestruct "Hn" as "[#Hn | #HT]"; last first.
