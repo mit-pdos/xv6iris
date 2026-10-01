@@ -8,7 +8,8 @@ answer is the kernel's, the count or -1, the cursor one chunk on either
 way; the source is split, one piece lent to the call and one to the
 deposit, which reads its bytes at the key's image).  Row 16's reader and
 writer at the xv6 instance (`sbundleAt_write_intro`, `spostAt_write_elim`,
-UkFileDevDefs deviation 1) are here.  See `UkFileDevDefs` for the cone, the
+UkFileDevDefs deviation 1) are here, with `xpostWrite_elim` (the post read
+at its unfolded form, which keeps the kernel's check of the proof cheap).  See `UkFileDevDefs` for the cone, the
 parameters and the deviations.
 -/
 import Xv6.UkFileDevRead
@@ -53,6 +54,19 @@ theorem spostAt_write_elim (X : Uvis → IProp GF) (f : Xfam GF) (W : Uvis) (r :
         filewriteExtra (hlc := hlc) W.gen Pt (fdStOfKey (xkA W 0) W.fd) (argZ (xkA W 2)) Mv (xkA W 1) f.wQ f.wQe r :=
   wand_intro (emp_sep.1.trans
     (spostAt_write_elim_at X f W (xkA W 0) (xkA W 1) (xkA W 2) W.fd r M' fdv' cw' cs' rfl rfl rfl rfl))
+
+/-- `spostAt_write_elim` at the UNFOLDED post.  **Rewrite a continuation's
+`spostAt … 16 …` premise with `spostAt_xv6_write` BEFORE `iintro`ing it, then
+read it with this**: the proof mode files a spatial hypothesis `P` as `□?false
+P`, and the kernel's `□?false P = P` check at `P = spostAt …` (whose head
+unfolds to `xv6Spost`'s if-chain on the number) costs ~6 s per proof; at
+`xpostWrite …` it is free. -/
+theorem xpostWrite_elim (f : Xfam GF) (W : Uvis) (r : BitVec 64) :
+    ⊢ xpostWrite (hlc := hlc) f.wQ f.wQe W r -∗
+      ⌜filewriteRet (argZ (xkA W 2)) r⌝ ∗
+      ∃ (Pt : UPtd) (Mv : Nat → List (BitVec 8)), ⌜permOf Pt.um W.sz = W.perm⌝ ∗ ⌜imgAgrees W.M Mv⌝ ∗
+        filewriteExtra (hlc := hlc) W.gen Pt (fdStOfKey (xkA W 0) W.fd) (argZ (xkA W 2)) Mv (xkA W 1) f.wQ f.wQe r :=
+  spostAt_write_elim (fun _ => iprop(emp)) f W r W.M W.fd 0 ∅
 
 theorem xkA_run2 (m : RegMap) (pc : BitVec 64) (M : ElfMem) (π : Nat → Option UPerm) (sz : Nat)
     (fdv : List FdState) (cw : Nat) (g : GName) (cs : ExtTreeSet GName compare) (pid : BitVec 32) (lz : Bool)
@@ -256,8 +270,10 @@ theorem file_write (SYSD : UkFileDevSysP (hlc := hlc) (GF := GF))
     iapply fdev_chain_adv_frame i γo Mv ((ukWr m 17#5 (BitVec.ofInt 64 16)).get 11#5) Pt (bs.length : Int)
       (efcur (hlc := hlc) c r nm sf i γo ws sel jx) (usrcAt N tx dq2 ua bs.length f) (wchunks (bs.length : Int)) 0 $$ Hc Hs2
   -- THE POST: the arm names the answer, the chain's stop the cursor and the piece
-  iintro %h2 %ret %W %cw' %cs' %hk0 %hk1 %hk2 %htk %hlz %hnf Hstd Hs1 Hpost Hrun
-  ihave Hel := spostAt_write_elim _ _ W ret W.M W.fd cw' cs' $$ Hpost
+  iintro %h2 %ret %W %cw' %cs' %hk0 %hk1 %hk2 %htk %hlz %hnf Hstd Hs1
+  rw [spostAt_xv6_write]
+  iintro Hpost Hrun
+  ihave Hel := xpostWrite_elim _ W ret $$ Hpost
   icases Hel with ⟨-, %Pt, %Mv, -, -, Hp⟩
   have e0 : xkA W 0 = (ukWr m 17#5 (BitVec.ofInt 64 16)).get 10#5 := hk0
   have e2 : xkA W 2 = (ukWr m 17#5 (BitVec.ofInt 64 16)).get 12#5 := hk2

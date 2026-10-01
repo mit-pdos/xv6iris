@@ -49,8 +49,10 @@ theorem wp_uk_ecall_open_read_deed_v (N : UkNames GF) (omo : OffMode) (h : CPU) 
     $$ Hinv Hro Hd1 Hd2
   iapply SYS.openRecvGimg N h m pc l avail (fileOpenFam omo c r q1 q2 i bs Nf s N.pay) cw Img hn hal
     $$ Hi Hro Hrun Hcwd Hsb Hstd
-  iintro %h' %rv %W %M' %fdv' %cw' %cs' %himg %hlen %hk0 %hk1 %hcw %htk Hfd Hpost Hcwd Hrun
-  ihave Hrc := spostAt_open_elim _ _ W rv M' fdv' cw' cs' $$ Hpost
+  iintro %h' %rv %W %M' %fdv' %cw' %cs' %himg %hlen %hk0 %hk1 %hcw %htk Hfd
+  rw [spostAt_open_eq]
+  iintro Hpost Hcwd Hrun
+  ihave Hrc := xpostOpen_elim _ W rv fdv' $$ Hpost
   icases Hrc with ⟨%Mv, %hag, Hrc⟩
   have e0 : xkA W 0 = m.get 10#5 := hk0
   have e1 : xkA W 1 = m.get 11#5 := hk1

@@ -42,6 +42,21 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Icache
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
+/-- `uwrite_no_short` at the UNFOLDED post: `pns_cons_nil` rewrites its
+continuation's `spostAt … 16 …` premise with `spostAt_xv6_write` BEFORE
+`iintro`ing it (the kernel's check of the proof mode's `□?false P = P` at `P =
+spostAt …` costs ~6 s; see `UkFileDev.xpostWrite_elim`). -/
+theorem xpostWrite_no_short (Q : Nat → IProp GF) (Xp : Int → IProp GF) (W : Uvis) (r : BitVec 64)
+    (l : List FdState) (i : Nat) (rb : Bool) (nb : Nat)
+    (h0 : (BitVec.setWidth 32 (tfW W.tf (tfArgIdx 0))).toInt = (i : Int)) (hi : i < NSTD)
+    (htake : W.fd.take NSTD = l) (hli : l[i]? = some (.open rb true (.device CONSOLE)))
+    (hcnt : argZ (tfW W.tf (tfArgIdx 2)) = (nb : Int)) (hlz : W.lazy = false)
+    (hnf : ∀ (P : UPtd) (j : Nat), uptWf P → permOf P.um W.sz = W.perm →
+      lazyFree P.um (BitVec.ofNat 64 W.sz) → j < nb →
+      uvaRmapped P (tfW W.tf (tfArgIdx 1) + BitVec.ofNat 64 j).toNat) :
+    xpostWrite (hlc := hlc) (xfamWr Q Xp).wQ (xfamWr Q Xp).wQe W r ⊢ ⌜r = BitVec.ofNat 64 nb⌝ ∗ Q nb :=
+  uwrite_no_short Q Xp W r W.M W.fd 0 ∅ l i rb nb h0 hi htake hli hcnt hlz hnf
+
 /-- **Rocq `pns_cons_nil`** (= `UkPipeIface.pif_cons_nil`): a ZERO-LENGTH
 write at a console row, at any device resource. -/
 theorem pns_cons_nil (UL : UK_LEAVES) (N : UkNames GF) (P : Uprog GF) (Hsw : ⊢ stubLaw (hlc := hlc) N P.code 16 P.write)
@@ -78,8 +93,10 @@ theorem pns_cons_nil (UL : UK_LEAVES) (N : UkNames GF) (P : Uprog GF) (Hsw : ⊢
     simp only [Int.toNat_zero, consOutChain_0]
     iexact HR
   · rw [h11]; iexact Hsrc
-  iintro %h' %ret %Wv %cw' %cs' %hk0 %hk1 %hk2 %htk %hlz %hnf Hstd Hs1 Hpost Hrun
-  ihave ⟨%hret, HR⟩ := uwrite_no_short (fun _ => iprop(R ∗ emp)) N.pay Wv ret Wv.M Wv.fd cw' cs' l fd rb 0
+  iintro %h' %ret %Wv %cw' %cs' %hk0 %hk1 %hk2 %htk %hlz %hnf Hstd Hs1
+  rw [spostAt_xv6_write]
+  iintro Hpost Hrun
+  ihave ⟨%hret, HR⟩ := xpostWrite_no_short (fun _ => iprop(R ∗ emp)) N.pay Wv ret l fd rb 0
     (by rw [hk0]; exact h0) hfd htk hlk (by rw [hk2, h12]; exact hcz) hlz
     (fun _ j _ _ _ hj => absurd hj (Nat.not_lt_zero j)) $$ Hpost
   rw [hpc]

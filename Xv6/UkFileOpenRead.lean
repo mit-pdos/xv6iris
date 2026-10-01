@@ -71,6 +71,25 @@ theorem udepwfSt_toK (N : UkNames GF) (m : RegMap) (pc : BitVec 64) (n : Int) (f
   iintro %M %pm %sz %fdv %cw %gn %cs %pidv %hst %_ Hmy Hheap Hufd
   iapply H $$ %M %pm %sz %fdv %cw %gn %cs %pidv %hst Hmy Hheap Hufd
 
+/-- `UkReadRows.spostAt_read_elimR` at the UNFOLDED post.  The read below
+rewrites its continuation's `spostAt … USYS_read …` premise with
+`spostAt_xv6_read` BEFORE `iintro`ing it and reads it with this: the proof
+mode files a spatial hypothesis `P` as `□?false P`, and the kernel's `□?false
+P = P` check at `P = spostAt …` (whose head unfolds to `xv6Spost`'s if-chain on
+the number) costs ~6 s per proof; at `xpostRead …` it is free. -/
+theorem xpostRead_elimR (f : Xfam GF) (W : Uvis) (v0 v1 v2 : BitVec 64) (sts : List FdState) (r : BitVec 64)
+    (M' : ElfMem) (h0 : tfW W.tf (tfArgIdx 0) = v0) (h1 : tfW W.tf (tfArgIdx 1) = v1)
+    (h2 : tfW W.tf (tfArgIdx 2) = v2) (hfd : W.fd = sts) :
+    xpostRead (hlc := hlc) f.rF f.rRd f.rRin f.rPq f.rPqe W r M' ⊢
+      ⌜filereadRet (argZ v2) r⌝ ∗
+      ∃ (P Pr : UPtd) (Mv : Nat → List (BitVec 8)),
+        ⌜umemLazy P W.sz Mv = M'⌝ ∗ ⌜W.lazy = false → imgAgrees M' Mv⌝ ∗
+        ⌜permOf P.um W.sz = W.perm⌝ ∗ ⌜permOf Pr.um W.sz = W.perm⌝ ∗ ⌜uptWf Pr⌝ ∗
+        ⌜W.lazy = false → lazyFree Pr.um (BitVec.ofNat 64 W.sz)⌝ ∗
+        filereadExtraCore (hlc := hlc) W.gen Pr (fdStOfKey v0 sts) (argZ v2) f.rF f.rRd f.rRin
+          f.rPq f.rPqe r Mv v1 :=
+  spostAt_read_elimR (fun _ => iprop(emp)) f W v0 v1 v2 sts r M' W.fd 0 ∅ h0 h1 h2 hfd
+
 /-- **Rocq `wp_uk_read_deed_learns_held_at`**: read at a HELD descriptor on
 the deed's inum -- at most `cnt` bytes, and either exactly the deed's next
 bytes with the half advanced, or the taint with the half unmoved. -/
@@ -104,9 +123,9 @@ theorem wp_uk_read_deed_learns_held_at (UL : UK_LEAVES) (N : UkNames GF) (h : CP
     (by rw [← argZ_setWidth]; exact hcnt) hcapk hal hag
     $$ Hi Hrun Hsb HD Hbuf
   iintro %h' %rv %dd %gb %W %M' %fdv' %cw' %cs' %hdd %hgf %hlin %himg %hnf %h0 %h1 %h2 %hkey %hlz %hlive HD
-    Hpost Hrun Hbuf
-  ihave Hel := spostAt_read_elimR _ _ W (m.get 10#5) (m.get 11#5) (m.get 12#5) W.fd rv M' fdv'
-    cw' cs' h0 h1 h2 rfl $$ Hpost
+  rw [show (USYS_read : Int) = 5 from rfl, spostAt_xv6_read]
+  iintro Hpost Hrun Hbuf
+  ihave Hel := xpostRead_elimR _ W (m.get 10#5) (m.get 11#5) (m.get 12#5) W.fd rv M' h0 h1 h2 rfl $$ Hpost
   icases Hel with ⟨%hret, %Pres, %Pt, %Mv, -, %hagl, -, %hperm, %hwf, %hlz', Hcore⟩
   have hkey' : fdStOfKey (m.get 10#5) W.fd = .open true wb (.inode i γo .held) := hkey
   rw [hkey', hcnt]

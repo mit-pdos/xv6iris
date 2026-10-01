@@ -103,8 +103,10 @@ theorem file_write_nil (N : UkNames GF) (Pr : Uprog GF) (STB : FdevStubs (hlc :=
     iintro %Mv %_ %Pt %_
     rw [wchunks_nonpos 0 (by omega), awriteChainAdv_0]
     iempintro
-  iintro %h2 %ret %W %cw' %cs' %hk0 %_ %hk2 %_ %_ %_ Hstd Hs1 Hpost Hrun
-  ihave Hel := spostAt_write_elim _ _ W ret W.M W.fd cw' cs' $$ Hpost
+  iintro %h2 %ret %W %cw' %cs' %hk0 %_ %hk2 %_ %_ %_ Hstd Hs1
+  rw [spostAt_xv6_write]
+  iintro Hpost Hrun
+  ihave Hel := xpostWrite_elim _ W ret $$ Hpost
   icases Hel with ⟨%hret, -⟩
   have e2 : xkA W 2 = (ukWr m 17#5 (BitVec.ofInt 64 16)).get 12#5 := hk2
   rw [e2, hcnt] at hret
@@ -152,8 +154,10 @@ theorem file_write_nil_at (N : UkNames GF) (Pr : Uprog GF) (STB : FdevStubs (hlc
       exact ⟨fun j hj => absurd hj (by omega), fun _ j _ _ _ hj => absurd hj (by omega)⟩) $$ Hi Hrun [] Hd Hsrc
   · -- THE DEPOSIT: nothing, the row is not writable
     iapply fdev_udepwf_K_nowr N _ _ _ rb t (fun _ => iprop(emp)) (fun fdv hk => hk)
-  iintro %h2 %ret %W %cw' %cs' %_ %_ %hk2 %_ %_ %_ Hd Hs1 Hpost Hrun
-  ihave Hel := spostAt_write_elim _ _ W ret W.M W.fd cw' cs' $$ Hpost
+  iintro %h2 %ret %W %cw' %cs' %_ %_ %hk2 %_ %_ %_ Hd Hs1
+  rw [spostAt_xv6_write]
+  iintro Hpost Hrun
+  ihave Hel := xpostWrite_elim _ W ret $$ Hpost
   icases Hel with ⟨%hret, -⟩
   have e2 : xkA W 2 = (ukWr m 17#5 (BitVec.ofInt 64 16)).get 12#5 := hk2
   rw [e2, hcnt] at hret

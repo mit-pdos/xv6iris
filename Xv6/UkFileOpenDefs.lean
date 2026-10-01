@@ -316,6 +316,25 @@ theorem spostAt_open_elim (X : Uvis → IProp GF) (f : Xfam GF) (W : Uvis) (r : 
   iintro H
   iexact H
 
+/-- The open's post at the xv6 instance IS `xpostOpen` (`rfl`).  **Rewrite a
+continuation's `spostAt … USYS_open …` premise with it BEFORE `iintro`ing
+it** and read it with `xpostOpen_elim`: the proof mode files a spatial
+hypothesis `P` as `□?false P`, and the kernel's `□?false P = P` check at `P =
+spostAt …` (whose head unfolds to `xv6Spost`'s if-chain on the number) costs
+~6 s per proof; at `xpostOpen …` it is free. -/
+theorem spostAt_open_eq (X : Uvis → IProp GF) (f : Xfam GF) (W : Uvis) (r : BitVec 64) (M' : ElfMem)
+    (fdv' : List FdState) (cw' : Nat) (cs' : ExtTreeSet GName compare) :
+    UexecSG.spostAt (self := uexecSGXv6 (hlc := hlc)) X USYS_open f W r M' fdv' cw' cs' =
+      xpostOpen (hlc := hlc) f.oOm f.oP f.oPmiss f.oFarm f.oFun f.oFok f.oFex f.oFo f.oFt W r fdv' := rfl
+
+/-- `spostAt_open_elim` at the unfolded post (see `spostAt_open_eq`). -/
+theorem xpostOpen_elim (f : Xfam GF) (W : Uvis) (r : BitVec 64) (fdv' : List FdState) :
+    ⊢ xpostOpen (hlc := hlc) f.oOm f.oP f.oPmiss f.oFarm f.oFun f.oFok f.oFex f.oFo f.oFt W r fdv' -∗
+      ∃ Mv : Nat → List (BitVec 8), ⌜imgAgrees W.M Mv⌝ ∗
+        openReceipt (hlc := hlc) f.oOm (fsGammaL (hlc := hlc) fscFs) fscFs W.cwd Mv (xkA W 0).toNat (xkA W 1)
+          f.oP f.oPmiss f.oFarm f.oFun f.oFok f.oFex f.oFo f.oFt W.fd r fdv' :=
+  spostAt_open_elim (fun _ => iprop(emp)) f W r W.M fdv' 0 ∅
+
 /-- The key's argument words at a running machine's key. -/
 theorem xkA_run0 (m : RegMap) (pc : BitVec 64) (M : ElfMem) (π : Nat → Option UPerm) (sz : Nat)
     (fdv : List FdState) (cw : Nat) (g : GName) (cs : ExtTreeSet GName compare) (pid : BitVec 32) (lz : Bool)
