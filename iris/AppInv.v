@@ -550,20 +550,24 @@ Section AppInv.
     (⌜I !! i = Some n⌝ -∗
        ▷ app_pred app_run (abs_view I) ==∗
        ▷ app_pred app_run (abs_view (<[i := n']> I))) -∗
-    ghost_map_auth_frac (fs_top γfs) (1/2) I -∗ i ↪[fs_top γfs] n ={E}=∗
+    ghost_map_auth_frac (fs_top γfs) (1/2) I -∗ i ↪[fs_top γfs] n -∗ £ 1 ={E}=∗
       ghost_map_auth_frac (fs_top γfs) (1/2) (<[i := n']> I) ∗ i ↪[fs_top γfs] n'.
   Proof using .
-    iIntros (HE) "#Hinv Hstep Hk Hf".
+    iIntros (HE) "#Hinv Hstep Hk Hf Hlc".
     iMod (inv_acc E appN with "Hinv") as "[Hbody Hclose]"; [exact HE |].
+    (* the opener spends the step's credit on the body's later (port-ordinal
+       guardrail (5)): the witness and the authority come out, and the claim
+       is handed to the step under the later it expects. *)
+    iMod (lc_fupd_elim_later with "Hlc Hbody") as "Hbody".
     iEval (rewrite /app_body) in "Hbody".
-    iDestruct "Hbody" as (I') "(>Hh & Hp & >%Hd)".
+    iDestruct "Hbody" as (I') "(Hh & Hp & %Hd)".
     iDestruct (ghost_map_auth_agree with "Hk Hh") as %<-.
     iDestruct (ghost_map_lookup with "Hk Hf") as %Hi.
     iAssert (ghost_map_auth_frac (fs_top γfs) 1 I) with "[Hk Hh]" as "Hk".
     { iEval (rewrite -Qp.half_half). iSplitL "Hk"; [iExact "Hk" | iExact "Hh"]. }
     iMod (ghost_map_update n' with "Hk Hf") as "[Hk Hf]".
     iDestruct "Hk" as "[Hk Hh]".
-    iMod ("Hstep" with "[//] Hp") as "Hp".
+    iMod ("Hstep" with "[//] [Hp]") as "Hp"; [by iNext|].
     iMod ("Hclose" with "[Hh Hp]") as "_".
     { iNext. rewrite /app_body. iExists (<[i := n']> I). iFrame "Hh Hp".
       iPureIntro. exact (app_dom_insert I i n n' Hi Hd). }
@@ -576,11 +580,11 @@ Section AppInv.
     ↑appN ⊆ E ->
     abs_of n = abs_of n' ->
     app_inv γfs -∗
-    ghost_map_auth_frac (fs_top γfs) (1/2) I -∗ i ↪[fs_top γfs] n ={E}=∗
+    ghost_map_auth_frac (fs_top γfs) (1/2) I -∗ i ↪[fs_top γfs] n -∗ £ 1 ={E}=∗
       ghost_map_auth_frac (fs_top γfs) (1/2) (<[i := n']> I) ∗ i ↪[fs_top γfs] n'.
   Proof using .
-    iIntros (HE Habs) "#Hinv Hk Hf".
-    iApply (app_top_update E γfs I i n n' HE with "Hinv [] Hk Hf").
+    iIntros (HE Habs) "#Hinv Hk Hf Hlc".
+    iApply (app_top_update E γfs I i n n' HE with "Hinv [] Hk Hf Hlc").
     iIntros (Hi) "Hp". iModIntro.
     rewrite (abs_view_insert_same I i n n' Hi Habs). iExact "Hp".
   Qed.
@@ -592,11 +596,11 @@ Section AppInv.
     app_inv γfs -∗
     (app_pred app_run (abs_view I) -∗
        app_pred app_run (abs_view (<[i := n']> I))) -∗
-    ghost_map_auth_frac (fs_top γfs) (1/2) I -∗ i ↪[fs_top γfs] n ={E}=∗
+    ghost_map_auth_frac (fs_top γfs) (1/2) I -∗ i ↪[fs_top γfs] n -∗ £ 1 ={E}=∗
       ghost_map_auth_frac (fs_top γfs) (1/2) (<[i := n']> I) ∗ i ↪[fs_top γfs] n'.
   Proof using .
-    iIntros (HE) "#Hinv Hstep Hk Hf".
-    iApply (app_top_update E γfs I i n n' HE with "Hinv [Hstep] Hk Hf").
+    iIntros (HE) "#Hinv Hstep Hk Hf Hlc".
+    iApply (app_top_update E γfs I i n n' HE with "Hinv [Hstep] Hk Hf Hlc").
     iIntros (Hi) "Hp". iModIntro. iNext. iApply ("Hstep" with "Hp").
   Qed.
 
@@ -613,11 +617,11 @@ Section AppInv.
     app_inv γfs -∗
     (▷ app_pred app_run (abs_view I) ==∗
        ▷ app_pred app_run (abs_view (<[i := n']> I))) -∗
-    ghost_map_auth_frac (fs_top γfs) (1/2) I -∗ i ↪[fs_top γfs] n ={E}=∗
+    ghost_map_auth_frac (fs_top γfs) (1/2) I -∗ i ↪[fs_top γfs] n -∗ £ 1 ={E}=∗
       ghost_map_auth_frac (fs_top γfs) (1/2) (<[i := n']> I) ∗ i ↪[fs_top γfs] n'.
   Proof using .
-    iIntros (HE) "#Hinv Hstep Hk Hf".
-    iApply (app_top_update E γfs I i n n' HE with "Hinv [Hstep] Hk Hf").
+    iIntros (HE) "#Hinv Hstep Hk Hf Hlc".
+    iApply (app_top_update E γfs I i n n' HE with "Hinv [Hstep] Hk Hf Hlc").
     iIntros (Hi) "Hp". iApply ("Hstep" with "Hp").
   Qed.
 
@@ -679,13 +683,15 @@ Section AppInv.
     app_inv γfs -∗
     □ (∀ av : aview, R -∗ ▷ app_pred app_run av ={E ∖ ↑appN}=∗
          ▷ app_pred app_run av ∗ Q) -∗
-    R ={E}=∗ Q.
+    R -∗ £ 1 ={E}=∗ Q.
   Proof using .
-    iIntros (HE) "#Hinv #Hstep HR".
+    iIntros (HE) "#Hinv #Hstep HR Hlc".
     iMod (inv_acc E appN with "Hinv") as "[Hbody Hclose]"; [exact HE |].
+    (* the opener spends the step's credit on the body's later (guardrail (5)) *)
+    iMod (lc_fupd_elim_later with "Hlc Hbody") as "Hbody".
     iEval (rewrite /app_body) in "Hbody".
-    iDestruct "Hbody" as (I) "(>Hh & Hp & >%Hd)".
-    iMod ("Hstep" $! (abs_view I) with "HR Hp") as "[Hp HQ]".
+    iDestruct "Hbody" as (I) "(Hh & Hp & %Hd)".
+    iMod ("Hstep" $! (abs_view I) with "HR [Hp]") as "[Hp HQ]"; [by iNext|].
     iMod ("Hclose" with "[Hh Hp]") as "_".
     { iNext. rewrite /app_body. iExists I. iFrame "Hh Hp".
       iPureIntro. exact Hd. }
