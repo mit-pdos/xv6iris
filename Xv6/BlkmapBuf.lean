@@ -71,6 +71,7 @@ Dropped vs Rocq: `bm_align_arith` (a `Z` helper; `omega` has no
 import Xv6.BlockWords
 import Xv6.BcacheInv
 import Xv6.FsBytesMint
+import Xv6.StepLemmas
 
 namespace Xv6
 

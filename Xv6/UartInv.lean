@@ -28,7 +28,7 @@ re-establishes the ghosts.  The THR store moves the port's claim by the
 caller's store obligation (`UartLinks.storeOb`); the RHR pop hands out the
 popped byte's history, rider and the token at its new anchor.
 -/
-import MachCSL.WpSmodeDev
+import MachCSL.SmodeDevDefs
 import Xv6.UartModel
 import Xv6.UartLinks
 

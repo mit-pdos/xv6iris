@@ -12,6 +12,7 @@ Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
 import Xv6.Image
 import Xv6.UartInv
+import MachCSL.AluFacts
 
 namespace Xv6
 

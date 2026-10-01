@@ -19,6 +19,7 @@ import Xv6.ConsoleintrArms
 import Xv6.ConsoleintrParts
 import Xv6.FsWords
 import Xv6.VirtioDiskRwDefs3
+import Xv6.StepLemmas
 
 namespace Xv6
 

@@ -23,6 +23,7 @@ alone -- the decrement must burn the escrow's reference beside the cache's
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
 import Xv6.BcacheInv
+import MachCSL.WpSmodeIntr
 
 namespace Xv6
 

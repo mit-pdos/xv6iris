@@ -104,7 +104,11 @@ names.
    `MachCSL.wordPointsTo … 4`, the port's spelling of Rocq's `↦₄`.
 -/
 import Xv6.FsBytesGamma
-import Xv6.LogInv
+import Xv6.LogDefs
+import Xv6.FsBytesMint
+import Xv6.FsStateBitmap
+import Xv6.IrefSlots
+import Xv6.SlotGen
 
 namespace Xv6
 

@@ -20,6 +20,7 @@ import MachCSL.WpSmodeJalr
 import Xv6.SpecUartintr
 import Xv6.SpecWakeup
 import Xv6.CodeTactics
+import MachCSL.WpSmodeDev
 
 namespace Xv6
 

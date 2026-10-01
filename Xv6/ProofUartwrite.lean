@@ -39,6 +39,7 @@ import MachCSL.WpSmodeFrame8b
 import Xv6.PrintkDefs
 import Xv6.StepLemmas
 import MachCSL.BvLemmas
+import MachCSL.WpSmodeDev
 
 namespace Xv6
 

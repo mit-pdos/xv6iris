@@ -21,6 +21,7 @@ import Xv6.SpecUartputcSync
 import Xv6.SpecAcquire
 import Xv6.SpecRelease
 import Xv6.CodeTactics
+import MachCSL.WpSmodeDev
 
 namespace Xv6
 

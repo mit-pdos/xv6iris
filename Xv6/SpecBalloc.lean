@@ -95,6 +95,7 @@ Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
 import Xv6.BitmapInv
 import Xv6.SpecBread
+import Xv6.LogInv
 
 namespace Xv6
 

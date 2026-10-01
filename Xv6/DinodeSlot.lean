@@ -94,6 +94,7 @@ import Xv6.BcacheInv
 import Xv6.FsBytesMint
 import Xv6.ByteCursor
 import Xv6.FsWords
+import Xv6.StepLemmas
 
 namespace Xv6
 

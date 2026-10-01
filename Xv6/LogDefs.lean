@@ -658,4 +658,20 @@ theorem loggedAt_in (γ : LogNames) (X : RegMapF (Nat × Nat)) (e b : Nat) :
 
 end
 
+/-! ## The covered-range bounds (moved here from `Xv6/LogInv.lean`, whose
+contracts state them, so the inode-cache invariants name them without
+waiting for the log invariant) -/
+
+/-- The block-number bounds every log function's interior `bread`s need
+(Rocq's `cov_ok`): `bread`'s own arithmetic premise is `bno < 2^31`, and
+block 0 is never a client block. -/
+def covOk (cov : Std.ExtTreeSet Nat compare) : Prop :=
+  ∀ z ∈ cov, 0 < z ∧ z < 2 ^ 31
+
+/-- The log's own storage is part of the covered range (Rocq's
+`log_geom_ok`): the log layer is the CLIENT of the header block and the
+`LOGBLOCKS` slots, and `write_head`/`install_trans` `bread` them. -/
+def logGeomOk (cov : Std.ExtTreeSet Nat compare) (logstart : Nat) : Prop :=
+  covOk cov ∧ ∀ b, logRegion logstart b = true → b ∈ cov
+
 end Xv6

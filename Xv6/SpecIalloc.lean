@@ -117,6 +117,7 @@ import Xv6.FsCfgDefs
 import Xv6.SpecBread
 import Xv6.IcacheTable
 import Xv6.InodeRegionInv
+import Xv6.LogInv
 
 namespace Xv6
 

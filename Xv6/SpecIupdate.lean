@@ -119,6 +119,7 @@ Imports only definitional files and callee `Spec*` files.
 import Xv6.InodeRegionLink
 import Xv6.FsCfgDefs
 import Xv6.SpecBread
+import Xv6.LogInv
 
 namespace Xv6
 

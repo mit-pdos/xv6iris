@@ -94,17 +94,7 @@ def lhBlock (i : Nat) : BitVec 64 := logAddr + BitVec.ofNat 64 (48 + 4 * i)
 
 /-! ## The pure vocabulary the contracts need -/
 
-/-- The block-number bounds every log function's interior `bread`s need
-(Rocq's `cov_ok`): `bread`'s own arithmetic premise is `bno < 2^31`, and
-block 0 is never a client block. -/
-def covOk (cov : Std.ExtTreeSet Nat compare) : Prop :=
-  ∀ z ∈ cov, 0 < z ∧ z < 2 ^ 31
-
-/-- The log's own storage is part of the covered range (Rocq's
-`log_geom_ok`): the log layer is the CLIENT of the header block and the
-`LOGBLOCKS` slots, and `write_head`/`install_trans` `bread` them. -/
-def logGeomOk (cov : Std.ExtTreeSet Nat compare) (logstart : Nat) : Prop :=
-  covOk cov ∧ ∀ b, logRegion logstart b = true → b ∈ cov
+-- `covOk` and `logGeomOk` live in `Xv6/LogDefs.lean`.
 
 /-- `install_trans`'s effect on the pin authority: exactly the installed
 write set goes back to `false` (Rocq's `dirty_clear`). -/

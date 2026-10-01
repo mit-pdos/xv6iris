@@ -22,6 +22,7 @@ import MachCSL.HartCustody
 import MachCSL.HwConfig
 import MachCSL.WpDev
 import MachCSL.WpSmodeDev
+import MachCSL.SmodeDevDefs
 import MachCSL.Power
 import MachCSL.Adequacy
 import MachCSL.SimpAttr

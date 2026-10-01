@@ -93,7 +93,7 @@ import Xv6.BioPool
 import Xv6.BufDefs
 import Xv6.SleepLockDefs
 import MachCSL.CtxBox
-import Xv6.StepLemmas
+
 
 namespace Xv6
 
@@ -1424,7 +1424,7 @@ theorem bc_refcnt_nonzero (n : Nat) (hn : n ≠ 0) (hlt : n < 2 ^ 31) :
 /-- `bnez a5` after the decrement: taken exactly when a reference remains. -/
 theorem bc_bnez (m : Nat) (h : m < 2 ^ 31) :
     bcond bop.BNE (BitVec.signExtend 64 (BitVec.ofNat 32 m)) 0#64 = decide (m ≠ 0) := by
-  rw [bcond_bne_eq]
+  show (BitVec.signExtend 64 (BitVec.ofNat 32 m) != 0#64) = decide (m ≠ 0)
   by_cases hm : m = 0
   · subst hm; decide
   · rw [bne_iff_ne.mpr (bc_refcnt_nonzero m hm h), decide_eq_true (show m ≠ 0 from hm)]

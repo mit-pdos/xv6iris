@@ -142,6 +142,7 @@ Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
 import Xv6.LogInv
 import Xv6.FsBytesGamma
+import MachCSL.WpSmodeIntr
 
 namespace Xv6
 

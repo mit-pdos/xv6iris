@@ -64,6 +64,7 @@ shared `MachCSL.calleeSaved_epi6s3`, `MachCSL/WpSmodeFrame6c.lean`; the
 import Xv6.SpecItrunc
 import Xv6.SpecBrelse
 import Xv6.SpecIupdate
+import Xv6.StepLemmas
 
 namespace Xv6
 

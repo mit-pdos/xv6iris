@@ -11,6 +11,7 @@ import MachCSL.WpSmodeSltu
 import Xv6.SpecUartinitone
 import Xv6.SpecInitlock
 import Xv6.CodeTactics
+import MachCSL.WpSmodeDev
 
 namespace Xv6
 

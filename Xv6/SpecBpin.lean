@@ -42,6 +42,7 @@ disk names `γd` come with it.
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
 import Xv6.BcacheInv
+import MachCSL.WpSmodeIntr
 
 namespace Xv6
 

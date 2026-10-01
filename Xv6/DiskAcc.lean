@@ -53,7 +53,7 @@ import Xv6.DiskInv
 import MachCSL.WpSmodeFenceFloor
 import Xv6.PtOwnLemmas
 import Xv6.DiskTier
-import MachCSL.WpSmodeDev
+import MachCSL.SmodeDevDefs
 
 namespace Xv6
 
