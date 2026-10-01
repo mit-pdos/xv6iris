@@ -690,7 +690,6 @@ Section WpSconfLock.
     instr pc true (LOAD (imm, Regidx rs1, Regidx rd, false, 4)) -∗
     lock_openable γl lk s R Dc -∗
     locked γl h0 -∗
-    £ 1 -∗
     ( ∀ v : mword 32,
       wp_next b p (fun (CID : CpuId) =>
         ⌜neq_vec (sign_extend' 64 v) zero_reg = true⌝ -∗
@@ -707,7 +706,7 @@ Section WpSconfLock.
     assert (Hpa_all : forall hh : CpuId,
               add_vec (rget (CID := hh) m rs1) (sign_extend' 64 imm) = pa)
       by (intros hh; unfold pa; by rewrite (src_ok_rget_indep m rs1 hh CID)).
-    iIntros "Hcg Hpc Hinstr #Hlock Htok Hlc Hcont".
+    iIntros "Hcg Hpc Hinstr #Hlock Htok Hcont".
     iDestruct (WpLock.lock_openable_parts with "Hlock") as (lo) "[#Hfl #Hopen]".
     iApply fupd_wp.
     iMod (lock_claims γl lk s R (locked γl h0) Dc ⊤ ltac:(solve_ndisj) Href
@@ -721,7 +720,7 @@ Section WpSconfLock.
        invariant minted. <<< *)
     iEval (rewrite locked_split) in "Htok".
     iDestruct "Htok" as "[(%Btok & Htok & #Hflok) Hheld]".
-    iApply (wp_load_s_sconf_au_exv (kt := kt) (ktd := KT0) 4 true false pc rd rs1 imm m n
+    iApply (wp_load_s_sconf_au_exv_lat (kt := kt) (ktd := KT0) 4 true false pc rd rs1 imm m n
               (fun w => sign_extend' 64 w)
               (⊤ ∖ ↑minstretN ∖ ↑lockN) b
               (fun w => neq_vec (sign_extend' 64 w) zero_reg = true)
@@ -735,7 +734,7 @@ Section WpSconfLock.
               ltac:(solve_ndisj)
               (lock_word_read_pin (add_vec (rget m rs1) (sign_extend' 64 imm))
                  b Btok Hbp)
-              with "Hcg Hpc Hinstr [] [Htok Hheld Hlc] [Hcont]").
+              with "Hcg Hpc Hinstr [] [Htok Hheld] [Hcont]").
     { replace (add_vec (rget m rs1) (sign_extend' 64 imm)) with lk
         by (symmetry; exact Hpalk). iApply (lk_addr_claim_wordw with "Hc4"). }
     { replace (add_vec (rget m rs1) (sign_extend' 64 imm)) with lk
@@ -750,12 +749,13 @@ Section WpSconfLock.
         | iFrame "Htok Hheld" |].
       iDestruct "Htok" as "[Htok Hheld]".
       iDestruct "Hbody" as "(Hbody & >#Hcl4 & >#Hcl8)".
-      (* the opener spends the step's credit on the lock body's later (port-ordinal guardrail (5)) *)
-      iMod (lc_fupd_elim_later with "Hlc Hbody") as "Hbody".
+      (* the body is still under the invariant's later, and at an ordinal step
+         index it cannot be destructed before one: the ▷-tolerant rule takes
+         it there, and the instruction's own later strips it. *)
+      iModIntro. iNext.
       iDestruct "Hbody" as (w st B) "(Hword & Hcpu & Hg & Hbr)".
       iDestruct (lock_pos_agree with "Hg Htok") as %[-> ->].
       iDestruct "Hbr" as "[(%Hnone & _) | (_ & %Hwnz)]"; [ congruence | ].
-      iModIntro.
       iSplitL "Hword".
       { iFrame "Hflok". iExists w. iSplitR; [done|]. iExact "Hword". }
       iIntros "[_ (%w' & %Hwnz' & Hword)]".
@@ -929,7 +929,6 @@ Section WpSconfLock.
        takes the finisher's store-time BODY and never sees the token. *)
     Pay -∗
     lock_finisher_body γl lk s R Dc Out (⊤ ∖ ↑minstretN) Pay -∗
-    £ 1 -∗
     wp_next b p (fun (CID : CpuId) =>
       Out -∗
       sie_cap_gpr kt m n b p -∗
@@ -944,7 +943,7 @@ Section WpSconfLock.
     assert (Hpa_all : forall hh : CpuId,
               add_vec (rget (CID := hh) m rs1) (sign_extend' 64 imm) = pa)
       by (intros hh; unfold pa; by rewrite (src_ok_rget_indep m rs1 hh CID)).
-    iIntros "Hcg Hpc Hinstr #Hlock Htok HRes Hfin Hlc Hcont".
+    iIntros "Hcg Hpc Hinstr #Hlock Htok HRes Hfin Hcont".
     iDestruct (WpLock.lock_openable_parts with "Hlock") as (lo) "[#Hfl #Hopen]".
     iApply fupd_wp.
     iMod (lock_claims γl lk s R (locked_pre γl cpu_id) Dc ⊤
@@ -960,7 +959,7 @@ Section WpSconfLock.
       by (rewrite Hz; apply bv_eq; vm_compute; reflexivity).
     (* >>> A6.89: THE DATUM IS THE LEDGER WORD, so the release store goes
        through [_dat] with [lock_word_store_plain] as its write gate. <<< *)
-    iApply (wp_store_s_sconf_au_dat (kt := kt) (ktd := KT0) 4 false pc (mword_of_int 0 : mword 5) rs1 imm m n
+    iApply (wp_store_s_sconf_au_dat_lat (kt := kt) (ktd := KT0) 4 false pc (mword_of_int 0 : mword 5) rs1 imm m n
               (trunc32 (tp_pin m !!! Regidx (mword_of_int 0 : mword 5)))
               Out
               (⊤ ∖ ↑minstretN ∖ ↑lockN) b
@@ -974,7 +973,7 @@ Section WpSconfLock.
               ltac:(solve_ndisj)
               (lock_word_store_plain (add_vec (rget m rs1) (sign_extend' 64 imm))
                  (trunc32 (tp_pin m !!! Regidx (mword_of_int 0 : mword 5))) b)
-              with "Hcg Hpc Hinstr [] [Htok HRes Hfin Hlc] [Hcont]").
+              with "Hcg Hpc Hinstr [] [Htok HRes Hfin] [Hcont]").
     { replace (add_vec (rget m rs1) (sign_extend' 64 imm)) with lk
         by (symmetry; exact Hpalk). iApply (lk_addr_claim_wordw with "Hc4"). }
     { replace (add_vec (rget m rs1) (sign_extend' 64 imm)) with lk
@@ -984,8 +983,10 @@ Section WpSconfLock.
       (* A6.87: peel the M4 invariant's two address claims; hand them
          back at the close.  Everything between is the pre-flip text. *)
       iDestruct "Hbody" as "(Hbody & >#Hcl4 & >#Hcl8)".
-      (* the opener spends the step's credit on the lock body's later (port-ordinal guardrail (5)) *)
-      iMod (lc_fupd_elim_later with "Hlc Hbody") as "Hbody".
+      (* the body is still under the invariant's later, and at an ordinal step
+         index it cannot be destructed before one: the ▷-tolerant rule takes
+         it there, and the instruction's own later strips it. *)
+      iModIntro. iNext.
       iDestruct "Hbody" as (w st B) "(Hword & Hcpu & Hg & Hbr)".
       iMod (lock_give γl st B cpu_id with "Hg Htok") as "(%Hst & Hg & Hfrag)".
       iDestruct "Hbr" as "[(%Hnone & _) | (_ & %Hwnz)]"; [ congruence | ].
@@ -1290,7 +1291,6 @@ Section WpSconfLock.
     instr pc true (LOAD (imm, Regidx rs1, Regidx rd, false, 8)) -∗
     lock_openable γl lk s R Dc -∗
     locked γl h0 -∗
-    £ 1 -∗
     wp_next b p (fun (CID : CpuId) =>
       locked γl h0 -∗
       sie_cap_gpr kt (<[Regidx rd := regval_into_reg cpuv]> m) n b p -∗
@@ -1305,12 +1305,12 @@ Section WpSconfLock.
     assert (Hpa_all : forall hh : CpuId,
               add_vec (rget (CID := hh) m rs1) (sign_extend' 64 imm) = pa)
       by (intros hh; unfold pa; by rewrite (src_ok_rget_indep m rs1 hh CID)).
-    iIntros "Hcg Hpc Hinstr #Hlock Htok Hlc Hcont".
+    iIntros "Hcg Hpc Hinstr #Hlock Htok Hcont".
     iDestruct (WpLock.lock_openable_parts with "Hlock") as (lo) "[#Hfl #Hopen]".
     iApply fupd_wp.
     iMod (lock_claims γl lk s R (locked γl h0) Dc ⊤ ltac:(solve_ndisj) Href
             with "Hlock Htok") as "(#Hc4 & #Hc8 & Htok)".
-    iApply (wp_load_s_sconf_au_dat (kt := kt) (ktd := KT0) 8 true false pc rd rs1 imm m n
+    iApply (wp_load_s_sconf_au_dat_lat (kt := kt) (ktd := KT0) 8 true false pc rd rs1 imm m n
               (fun w => w)
               (fun c => (⌜c = cpuv⌝ ∗ locked γl h0)%I)
               (⊤ ∖ ↑minstretN ∖ ↑lockN) b
@@ -1319,27 +1319,29 @@ Section WpSconfLock.
               exec_read_ram_plain_8 data2_ext_8 Hrd Hrdok
               ltac:(solve_ndisj)
               (lock_cell_read_vis (add_vec (rget m rs1) (sign_extend' 64 imm)) lk b lo Hpacpu Hbp)
-              with "Hcg Hpc Hinstr [] [Htok Hlc] [Hcont]").
+              with "Hcg Hpc Hinstr [] [Htok] [Hcont]").
     { replace (add_vec (rget m rs1) (sign_extend' 64 imm)) with (lock_cpu lk)
         by (symmetry; exact Hpacpu).
       iApply (lk_addr_claim_wordw with "Hc8"). }
     { iMod ("Hopen" $! (⊤ ∖ ↑minstretN) (locked γl h0) with "[%] [] Htok")
         as "(Hbody & Htok & [Hclose _])"; [solve_ndisj| iApply Href |].
       iDestruct "Hbody" as "(Hbody & >#Hcl4 & >#Hcl8)".
-      (* the opener spends the step's credit on the lock body's later (port-ordinal guardrail (5)) *)
-      iMod (lc_fupd_elim_later with "Hlc Hbody") as "Hbody".
+      (* the value is the holder's, fixed by the token, so it is named before
+         the later; the body is destructed after the instruction's own later
+         strips the invariant's (the ▷-tolerant rule). *)
+      iModIntro. iExists (lk_cpu_val (Some (h0, true))). iNext.
       iDestruct "Hbody" as (w st B) "(Hword & Hcpures & Hg & Hbr)".
       iDestruct (locked_state_at with "Hg Htok") as "[%Hst #HflB]".
+      subst st.
       iEval (rewrite /lk_cpu_res) in "Hcpures".
       iDestruct "Hcpures" as "[Hcpu Hrest]".
-      iModIntro. iExists (lk_cpu_val st).
-      iSplitL "Hcpu"; [ rewrite Hst; iExact "Hcpu" | ].
+      iSplitL "Hcpu"; [ iExact "Hcpu" | ].
       iIntros "Hcpu".
       iMod ("Hclose" with "[Hword Hcpu Hrest Hg Hbr]") as "_".
-      { iNext. rewrite /lock_inv /lock_body. iFrame "Hcl4 Hcl8". iExists w, st, B. iFrame "Hword Hg Hbr".
-        rewrite /lk_cpu_res. iFrame "Hrest". rewrite Hst. iExact "Hcpu". }
+      { iNext. rewrite /lock_inv /lock_body. iFrame "Hcl4 Hcl8". iExists w, (Some (h0, true)), B. iFrame "Hword Hg Hbr".
+        rewrite /lk_cpu_res. iFrame "Hrest". iExact "Hcpu". }
       iModIntro. iFrame "Htok". iPureIntro.
-      rewrite Hst /cpuv -cpus_ptr_cid. reflexivity. }
+      rewrite /cpuv -cpus_ptr_cid. reflexivity. }
     iIntros (c). iEval (rewrite /wp_next). iIntros (CID1 Hs1) "Hlc Hcg Hpc (%Hc & Htok)".
     subst c.
     iApply ("Hcont" $! CID1 with "[] Hlc Htok Hcg Hpc").
@@ -1384,7 +1386,6 @@ Section WpSconfLock.
     lock_openable γl lk s R Dc -∗
     T -∗
     cpu_locks_at h0 lks -∗
-    £ 1 -∗
     ( ∀ c : mword 64,
       wp_next b p (fun (CID : CpuId) =>
         ⌜c <> cpus_ptr h0⌝ -∗
@@ -1399,14 +1400,14 @@ Section WpSconfLock.
     assert (Hpa_all : forall hh : CpuId,
               add_vec (rget (CID := hh) m rs1) (sign_extend' 64 imm) = pa)
       by (intros hh; unfold pa; by rewrite (src_ok_rget_indep m rs1 hh CID)).
-    iIntros "Hcg Hpc Hinstr #Hlock HT Hlks Hlc Hcont".
+    iIntros "Hcg Hpc Hinstr #Hlock HT Hlks Hcont".
     iDestruct (WpLock.lock_openable_parts with "Hlock") as (lo) "[#Hfl #Hopen]".
     iApply fupd_wp.
     iMod (lock_claims γl lk s R (T ∗ cpu_locks_at h0 lks)%I Dc ⊤
             ltac:(solve_ndisj) ltac:(iIntros "[HT _]"; iApply Href; iExact "HT")
             with "Hlock [$HT $Hlks]") as "(#Hc4 & #Hc8 & [HT Hlks])".
     iDestruct (WpLock.lk_addr_claim_ram (lock_cpu lk) 8 with "Hc8") as %Hram.
-    iApply (wp_load_s_sconf_au_exv (kt := kt) (ktd := KT0) 8 cmp false pc rd rs1 imm m n
+    iApply (wp_load_s_sconf_au_exv_lat (kt := kt) (ktd := KT0) 8 cmp false pc rd rs1 imm m n
               (fun w => w)
               (⊤ ∖ ↑minstretN ∖ ↑lockN) b
               (fun c => c <> cpus_ptr h0)
@@ -1426,7 +1427,7 @@ Section WpSconfLock.
               (lock_cell_read_notheld (add_vec (rget m rs1) (sign_extend' 64 imm))
                  lk b lo γl s R Hpacpu Hbp
                  ltac:(intros j Hj; exact (Hram j Hj)))
-              with "Hcg Hpc Hinstr [] [HT Hlks Hlc] [Hcont]").
+              with "Hcg Hpc Hinstr [] [HT Hlks] [Hcont]").
     { replace (add_vec (rget m rs1) (sign_extend' 64 imm)) with (lock_cpu lk)
         by (symmetry; exact Hpacpu).
       iApply (lk_addr_claim_wordw with "Hc8"). }
@@ -1436,8 +1437,10 @@ Section WpSconfLock.
         as "(Hbody & [HT Hlks] & [Hclose _])";
         [solve_ndisj | iIntros "[HT _]"; iApply Href; iExact "HT" |].
       iDestruct "Hbody" as "(Hbody & >#Hcl4 & >#Hcl8)".
-      (* the opener spends the step's credit on the lock body's later (port-ordinal guardrail (5)) *)
-      iMod (lc_fupd_elim_later with "Hlc Hbody") as "Hbody".
+      (* the body is still under the invariant's later, and at an ordinal step
+         index it cannot be destructed before one: the ▷-tolerant rule takes
+         it there, and the instruction's own later strips it. *)
+      iModIntro. iNext.
       iDestruct "Hbody" as (w st B) "(Hword & Hcpures & Hg & Hbr)".
       (* THIS HART IS NOT THE HOLDER, and that is the whole credential: were
          it, the invariant would be keeping [lk_in cpu_id s] beside the cell,
@@ -1449,7 +1452,7 @@ Section WpSconfLock.
         destruct (decide (i = h0)) as [->|Hni].
         - iDestruct (cpu_locks_not_in h0 lks s Hfresh with "Hlks Hin") as %[].
         - iPureIntro. intros Heq. by injection Heq. }
-      iModIntro. iFrame "Hfl".
+      iFrame "Hfl".
       iSplitL "Hword Hcpures Hg Hbr".
       { iExists w, st, B. iFrame "Hword Hcpures Hg Hbr". by iPureIntro. }
       iIntros "[_ (%v' & %st' & %B' & _ & Hword' & Hcpures' & Hg' & Hbr')]".
@@ -1502,7 +1505,6 @@ Section WpSconfLock.
     lock_openable γl lk s R Dc -∗
     Tc -∗
     cpu_locks_at h0 lks -∗
-    £ 1 -∗
     ( ∀ c : mword 64,
       wp_next b p (fun (CID : CpuId) =>
         ⌜c <> cpuv⌝ -∗
@@ -1520,12 +1522,12 @@ Section WpSconfLock.
     (* the free / window states record 0, and no hart's [struct cpu] is 0 *)
     assert (Hz : forall i : CPU, (zero_reg : mword 64) <> cpus_ptr i)
       by (intro i; apply eq_vec_false_iff; apply cpus_ptr_nonzero).
-    iIntros "Hcg Hpc Hinstr #Hlock HTc Hlks Hlc Hcont".
+    iIntros "Hcg Hpc Hinstr #Hlock HTc Hlks Hcont".
     iApply (wp_ld_lkcpu_notheld_gen true γl lk s R Dc pc rd rs1 imm m n
               Tc b lks
               Hpacpu Hrd Hrdok Hfresh Hbp
               ltac:(iIntros "HTc"; iApply Href; iExact "HTc")
-              with "Hcg Hpc Hinstr Hlock HTc Hlks Hlc [Hcont]").
+              with "Hcg Hpc Hinstr Hlock HTc Hlks [Hcont]").
     iIntros (c). iEval (rewrite /wp_next). iIntros (CID1 Hs1) "Hlc %Hc HTc Hlks Hcg Hpc".
     iApply ("Hcont" $! c CID1 with "[] Hlc [%] HTc Hlks Hcg Hpc");
       [ iPureIntro; exact Hs1
@@ -1709,7 +1711,6 @@ Section WpSconfLock.
        assumed: this leaf bound the floor and never used it. *)
     lock_openable γl lk s R Dc -∗
     T -∗
-    £ 1 -∗
     wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr kt m n b p -∗
       pc_is (add_vec_int pc (if cmp then 2 else 4)) -∗
@@ -1726,12 +1727,12 @@ Section WpSconfLock.
       by (intros hh; unfold pa; by rewrite (src_ok_rget_indep m rs1 hh CID)).
     assert (Hsv2_all : forall hh : CpuId, rget (CID := hh) m rs2 = rget (CID := CID) m rs2)
       by (intros hh; exact (src_ok_rget_indep m rs2 hh CID)).
-    iIntros "Hcg Hpc Hinstr #Hlock HT Hlc Hcont".
+    iIntros "Hcg Hpc Hinstr #Hlock HT Hcont".
     iDestruct (WpLock.lock_openable_parts with "Hlock") as (lo) "[#Hfl #Hopen]".
     iApply fupd_wp.
     iMod (lock_claims γl lk s R T Dc ⊤ ltac:(solve_ndisj) Href
             with "Hlock HT") as "(#Hc4 & #Hc8 & HT)".
-    iApply (wp_store_s_sconf_au_dat (kt := kt) (ktd := KT0) 8 cmp pc rs2 rs1 imm m n
+    iApply (wp_store_s_sconf_au_dat_lat (kt := kt) (ktd := KT0) 8 cmp pc rs2 rs1 imm m n
               (rget m rs2) T' (⊤ ∖ ↑minstretN ∖ ↑lockN) b
               (lk_cpu_cell_ex lo lk uold exold)
               (lk_cpu_cell_ex lo lk (rget m rs2) (lk_ex stn))
@@ -1742,14 +1743,16 @@ Section WpSconfLock.
               (lock_cell_store_frame (add_vec (rget m rs1) (sign_extend' 64 imm))
                  lk b lo (rget m rs2) (lk_cpu_val stn) (lk_ex stn) exold uold
                  Hpacpu Hsv Hbp Harm)
-              with "Hcg Hpc Hinstr [] [HT Hlc] [Hcont]").
+              with "Hcg Hpc Hinstr [] [HT] [Hcont]").
     { replace (add_vec (rget m rs1) (sign_extend' 64 imm)) with (lock_cpu lk)
         by (symmetry; exact Hpacpu). iApply (lk_addr_claim_wordw with "Hc8"). }
     { iMod ("Hopen" $! (⊤ ∖ ↑minstretN) T with "[%] [] HT")
         as "(Hbody & HT & [Hclose _])"; [solve_ndisj| iApply Href |].
       iDestruct "Hbody" as "(Hbody & >#Hcl4 & >#Hcl8)".
-      (* the opener spends the step's credit on the lock body's later (port-ordinal guardrail (5)) *)
-      iMod (lc_fupd_elim_later with "Hlc Hbody") as "Hbody".
+      (* the body is still under the invariant's later, and at an ordinal step
+         index it cannot be destructed before one: the ▷-tolerant rule takes
+         it there, and the instruction's own later strips it. *)
+      iModIntro. iNext.
       iDestruct "Hbody" as (w st B) "(Hword & Hcpures & Hg & Hbr)".
       iMod (Hupd lo B st with "Hg Hcpures HT")
         as "(%Hstne & %Hstnne & %Huold & %Hexold & %Hwex & Hg & Hcpu & Hback)".
@@ -1889,7 +1892,6 @@ Section WpSconfLock.
        state fragment to make [locked] ([WpLock.locked_split]). *)
     lock_ctx_held -∗
     cpu_locks_at h0 S -∗
-    £ 1 -∗
     wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr kt m n b p -∗
       pc_is (add_vec_int pc 2) -∗
@@ -1909,7 +1911,7 @@ Section WpSconfLock.
       by (intros hh; exact (src_ok_rget_indep m rs2 hh CID)).
     assert (Hsv : lk_cpu_val (Some (h0, true)) = rget m rs2).
     { rewrite lk_cpu_val_held cpus_ptr_cid. exact (eq_sym Hmycpu). }
-    iIntros "Hcg Hpc Hinstr #Hlock Htok Hheld Hcl Hlc0 Hcont".
+    iIntros "Hcg Hpc Hinstr #Hlock Htok Hheld Hcl Hcont".
     iApply (wp_sd_lkcpu_lockopen_gen true γl lk s R Dc pc rs2 rs1 imm m n
               (locked_pre γl h0 ∗ lock_ctx_held ∗ cpu_locks_at h0 S)%I
               (locked γl h0 ∗ cpu_locks_at h0 ({[s]} ∪ S))%I
@@ -1925,7 +1927,7 @@ Section WpSconfLock.
               Hbp
               (lkcpu_take_exchange γl lk s S Hfresh)
               ltac:(iIntros "[Htok _]"; iApply Href; iExact "Htok")
-              with "Hcg Hpc Hinstr Hlock [Htok Hheld Hcl] Hlc0 [Hcont]").
+              with "Hcg Hpc Hinstr Hlock [Htok Hheld Hcl] [Hcont]").
     { iFrame "Htok Hheld Hcl". }
     iEval (rewrite /wp_next). iIntros (CID1 Hs1) "Hlc Hcg Hpc [Htok Hcl]".
     iApply ("Hcont" $! CID1 with "[] Hlc Hcg Hpc Htok Hcl").
@@ -1953,7 +1955,6 @@ Section WpSconfLock.
     lock_openable γl lk s R Dc -∗
     locked γl h0 -∗
     cpu_locks_at h0 S -∗
-    £ 1 -∗
     wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr kt m n b p -∗
       pc_is (add_vec_int pc 4) -∗
@@ -1976,7 +1977,7 @@ Section WpSconfLock.
     assert (Hpa_all : forall hh : CpuId,
               add_vec (rget (CID := hh) m rs1) (sign_extend' 64 imm) = pa)
       by (intros hh; unfold pa; by rewrite (src_ok_rget_indep m rs1 hh CID)).
-    iIntros "Hcg Hpc Hinstr #Hlock Htok Hcl Hlc0 Hcont".
+    iIntros "Hcg Hpc Hinstr #Hlock Htok Hcl Hcont".
     iDestruct (sie_cap_gpr_split with "Hcg") as "(Hhs & Hsc & Hcap & Hfile)".
     iDestruct (gpr_file_x0 (tp_pin m) (mword_of_int 0 : mword 5) ltac:(vm_compute; reflexivity)
                  with "Hfile") as "[%Hz Hfile]".
@@ -2000,7 +2001,7 @@ Section WpSconfLock.
               Hbp
               (lkcpu_give_exchange γl lk s S)
               ltac:(iIntros "[Htok _]"; iApply Href; iExact "Htok")
-              with "Hcg Hpc Hinstr Hlock [Htok Hcl] Hlc0 [Hcont]").
+              with "Hcg Hpc Hinstr Hlock [Htok Hcl] [Hcont]").
     { iFrame "Htok Hcl". }
     iEval (rewrite /wp_next). iIntros (CID1 Hs1) "Hlc Hcg Hpc (Htok & Hheld & Hcl & %Hin)".
     iApply ("Hcont" $! CID1 with "[] Hlc Hcg Hpc Htok Hheld Hcl [%]"); [ | exact Hin ].
@@ -2039,7 +2040,6 @@ Section WpSconfLock.
     lock_openable γl lk s R Dc -∗
     TsoGhost.llb loglen_name Tl -∗
     Tc -∗
-    £ 1 -∗
     ( ∀ w : mword 32,
       wp_next b p (fun (CID : CpuId) =>
         Tc -∗
@@ -2070,7 +2070,7 @@ Section WpSconfLock.
       by (rewrite Hone /amoswap_stored /WpLock.lkw_one;
           apply bv_eq; vm_compute; reflexivity).
     rdok_split Hrdok.
-    iIntros "Hcg Hpc #Hinstr #Hlock #Hllb HTc Hlc0 Hcont".
+    iIntros "Hcg Hpc #Hinstr #Hlock #Hllb HTc Hcont".
     iDestruct (WpLock.lock_openable_parts with "Hlock") as (lo) "[#Hfl #Hopen]".
     iApply (wp_instr_s_sconf m n b b pc false
               (AMO (AMOSWAP, true, false, Regidx rs2, Regidx rs1, 4, Regidx rd))
@@ -2082,10 +2082,10 @@ Section WpSconfLock.
                    (∃ K : nat, ⌜(Tl <= K)%nat⌝ ∗ TsoCtx.ctx_floor CtxIdDefs.cur_ctx K) ∗
                    (⌜w = (mword_of_int 0 : mword 32)⌝ ∗ locked_pre γl h0 ∗ WpLock.lock_pay_won R
                     ∨ ⌜neq_vec (sign_extend' 64 w) zero_reg = true⌝))%I
-              with "Hcg Hpc Hinstr [HTc Hlc0 Hcont]").
+              with "Hcg Hpc Hinstr [HTc Hcont]").
     iNext.
     rename CID into CID0.
-    iIntros (CID Hs) "Hlc". rewrite /sconf_step_obl. iSplitL "HTc Hlc0".
+    iIntros (CID Hs) "Hlc". rewrite /sconf_step_obl. iSplitL "HTc".
     - (* ---------------- THE INSTRUCTION ---------------- *)
       iIntros "Hsc Hcap Hfile HPC HnPC Hresv".
       assert (Lpin_rs1 : tp_pin (CID := CID) m !!! Regidx rs1 = rget m rs1)
@@ -2158,7 +2158,7 @@ Section WpSconfLock.
                     (sda_rs mst0 MENVCFG_S satp0 pmar0 pcfg paddr tlbv)
                     rs2 rs1 rd (tp_pin (CID := CID) m) (pa_of ppn pa)
                     pmar0 pcfg paddr
-                    (fun _ => (Tc ∗ £ 1)%I)
+                    (fun _ => Tc)
                     (* A6.119: the RUNNING TOKEN RIDES OUT WITH THE RESULT.
                        [ctx_bound_raise] -- the AMO's export -- needs
                        [own_context], and the capability bundle hands it to
@@ -2193,7 +2193,7 @@ Section WpSconfLock.
                     (pa_aligned_div ppn pa 4 ltac:(lia) ltac:(exists 1024; lia)
                        Halign4)
                     Hrd
-                    with "Hcert Hfrag HRes Hfile Hrw Hro [Htrobl] [HTc Hlc0] [Hctx]").
+                    with "Hcert Hfrag HRes Hfile Hrw Hro [Htrobl] [HTc] [Hctx]").
           - (* the data translation, ALREADY DISCHARGED at [SD] by the
                accessor -- this leaf never learns which arm it is on *)
             iIntros "Hfrag HRes Hrw Hro".
@@ -2219,7 +2219,7 @@ Section WpSconfLock.
             iDestruct "Hbody" as "(Hbody & >#Hcl4' & >#Hcl8')".
             (* the read needs only a PURE fact about the word, and a pure fact
                comes out from under the body's later without a credit: the
-               step's one credit is the write node's (port-ordinal guardrail (5)) *)
+               write node opens the invariant for itself *)
             iAssert (▷ ⌜exists v1 : mword 32, forall j : nat, (j < 4)%nat ->
                        sigma.(mem) !! (pa_add lk j) = Some (nth_byte v1 j)⌝)%I
               as "#>%Hbfx".
@@ -2236,7 +2236,7 @@ Section WpSconfLock.
             { iPureIntro. intros j Hj.
               rewrite (ktier_pin_id ppn pa Hid) Hpalk. apply Hbf. lia. }
             iNext. iMod "Hclm" as "_". iModIntro.
-            iFrame "Hreg Hmem Hdev HTc Hlc0".
+            iFrame "Hreg Hmem Hdev HTc".
           - (* the conditional WRITE node *)
             (* >>> A6.119: THE AMO'S WRITE NODE, RE-CUT TO THE LEDGER TIER.
                This text had never been checked against the M4 flip -- the
@@ -2248,14 +2248,17 @@ Section WpSconfLock.
                ([HartSMem.swp_execute_AMOSWAP_S_ex_mode]), which is exactly
                what [lock_word_amo_mint] has wanted since A6.89 and never
                had a client for. <<< *)
-            iIntros (bytes) "[HTc Hlc0]".
+            iIntros (bytes) "HTc".
             iIntros (sigma img log tv V) "%Hrb %Htv Hsi Htso".
             iDestruct "Hsi" as "[Hreg [Hmem Hdev]]".
             iMod ("Hopen" $! ⊤ Tc with "[%] [] HTc")
               as "(Hbody & HTc & [Hcl _])"; [solve_ndisj | iApply Href |].
             iDestruct "Hbody" as "(Hbody & >#Hcl4w & >#Hcl8w)".
-            (* the opener spends the step's credit on the lock body's later (port-ordinal guardrail (5)) *)
-            iMod (lc_fupd_elim_later with "Hlc0 Hbody") as "Hbody".
+            (* the write node owes nothing before its own later, so the body
+               (under the invariant's later, which at an ordinal step index
+               cannot be destructed before one) is taken apart after it. *)
+            iMod (fupd_mask_subseteq ∅) as "Hclm"; [set_solver|].
+            iModIntro. iNext. iMod "Hclm" as "_".
             iDestruct "Hbody" as (v2 st2 B2) "(Hw & Hcpu & Hg & Hbr)".
             iDestruct (lock_word_flat_bytes st2 B2 lk v2 sigma.(mem)
                          with "Hmem Hw") as %Hbf2.
@@ -2330,7 +2333,7 @@ Section WpSconfLock.
                        TsoCtx.own_context (CID := CID) CtxIdDefs.cur_ctx ∗
                        (∃ K : nat, ⌜(Tl <= K)%nat⌝ ∗ TsoCtx.ctx_floor CtxIdDefs.cur_ctx K) ∗
                        (⌜bytes = (mword_of_int 0 : mword 32)⌝ ∗
-                          locked_pre γl h0 ∗ ▷ WpLock.lock_pay_won R
+                          locked_pre γl h0 ∗ WpLock.lock_pay_won R
                         ∨ ⌜neq_vec (sign_extend' 64 bytes) zero_reg = true⌝))%I
               with "[Hw Hcpu Hg Hbr Hcl Hmem Htso Hctx]"
               as ">(Hmem & Htso & Hctx & #Hpaira & Hpay)".
@@ -2404,7 +2407,7 @@ Section WpSconfLock.
                 { iExists _. iSplit; [iPureIntro; exact HTlKa | iExact "Hflba"]. }
                 iModIntro. iFrame "Hmem Htso Hctx Hpaira".
                 iLeft. iFrame "Hpre". iSplitR; [ iPureIntro; exact Hw0 | ].
-                iNext. iExists ξw, Tw. iFrame "Hpkw HR". iExact "Hflw0".
+                iExists ξw, Tw. iFrame "Hpkw HR". iExact "Hflw0".
               - (* THE LOSER: the pin survives, at the B it already had *)
                 iMod (lock_word_amo_keep pa (amoswap_stored (rget m rs2)) bytes B2 CID img sigma log V
                         Hset1
@@ -2451,8 +2454,7 @@ Section WpSconfLock.
                 { iExists _. iSplit; [iPureIntro; exact HTlKa | iExact "Hflba"]. }
                 iModIntro. iFrame "Hmem Htso Hctx Hpaira".
                 iRight. iPureIntro. exact Hwnz. }
-            iMod (fupd_mask_subseteq ∅) as "Hclm"; [set_solver|].
-            iModIntro. iNext. iMod "Hclm" as "_". iModIntro.
+            iModIntro.
             rewrite Lpin_rs2.
             (* the node spells the stored value UNFOLDED ([sign_extend' …
                (trunc … _)]); the gates spell it [amoswap_stored].  Fold once
