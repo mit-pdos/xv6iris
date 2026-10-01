@@ -230,6 +230,48 @@ theorem confCells_intro (cpu : CPU) (dq : DFrac) (p : Privilege) (c : MConf) :
     hwConfig cpu ⊢ confCells (GF := GF) cpu dq p c := by
   unfold confCells; exact .rfl
 
+/-- `confCells_intro` curried: the reassembly specialises one wand per cell
+(a name lookup each), where the bundled form pays a whole-goal `iframe`
+search per use (~60 ms at every `conf_intro`). -/
+theorem confCells_introW (cpu : CPU) (dq : DFrac) (p : Privilege) (c : MConf) :
+    ⊢ Register.cur_privilege ↦ᵣ[cpu]{dq} p -∗
+    Register.hart_state ↦ᵣ[cpu]{dq} HartState.HART_ACTIVE () -∗
+    Register.mstatus ↦ᵣ[cpu]{dq} c.mstatus -∗
+    Register.mie ↦ᵣ[cpu]{dq} c.mie -∗
+    Register.mideleg ↦ᵣ[cpu]{dq} c.mideleg -∗
+    Register.medeleg ↦ᵣ[cpu]{dq} c.medeleg -∗
+    Register.mepc ↦ᵣ[cpu]{dq} c.mepc -∗
+    Register.satp ↦ᵣ[cpu]{dq} c.satp -∗
+    Register.menvcfg ↦ᵣ[cpu]{dq} c.menvcfg -∗
+    Register.mcounteren ↦ᵣ[cpu]{dq} c.mcounteren -∗
+    Register.mtimecmp ↦ᵣ[cpu]{dq} c.mtimecmp -∗
+    Register.stimecmp ↦ᵣ[cpu]{dq} c.stimecmp -∗
+    Register.pmpcfg_n ↦ᵣ[cpu]{dq} c.pmpcfg -∗
+    Register.pmpaddr_n ↦ᵣ[cpu]{dq} c.pmpaddr -∗
+    hwConfig cpu -∗ confCells (GF := GF) cpu dq p c := by
+  iintro H1 H2 H3 H4 H5 H6 H7 H8 H9 H10 H11 H12 H13 H14 H15
+  unfold confCells
+  iframe
+
+/-- `mConf_intro` curried (see `confCells_introW`). -/
+theorem mConf_introW (cpu : CPU) (dq : DFrac) (c : MConf) :
+    ⊢ Register.cur_privilege ↦ᵣ[cpu]{dq} Privilege.Machine -∗
+    Register.hart_state ↦ᵣ[cpu]{dq} HartState.HART_ACTIVE () -∗
+    Register.mstatus ↦ᵣ[cpu]{dq} c.mstatus -∗
+    Register.mie ↦ᵣ[cpu]{dq} c.mie -∗
+    Register.mideleg ↦ᵣ[cpu]{dq} c.mideleg -∗
+    Register.medeleg ↦ᵣ[cpu]{dq} c.medeleg -∗
+    Register.mepc ↦ᵣ[cpu]{dq} c.mepc -∗
+    Register.satp ↦ᵣ[cpu]{dq} c.satp -∗
+    Register.menvcfg ↦ᵣ[cpu]{dq} c.menvcfg -∗
+    Register.mcounteren ↦ᵣ[cpu]{dq} c.mcounteren -∗
+    Register.mtimecmp ↦ᵣ[cpu]{dq} c.mtimecmp -∗
+    Register.stimecmp ↦ᵣ[cpu]{dq} c.stimecmp -∗
+    Register.pmpcfg_n ↦ᵣ[cpu]{dq} c.pmpcfg -∗
+    Register.pmpaddr_n ↦ᵣ[cpu]{dq} c.pmpaddr -∗
+    hwConfig cpu -∗ mConf (GF := GF) cpu dq c :=
+  confCells_introW cpu dq Privilege.Machine c
+
 open Iris.ProofMode in
 set_option hygiene false in
 /-- Split `H : confCells cpu dq p c` (any privilege) into its cells. -/
@@ -241,9 +283,8 @@ open Iris.ProofMode in
 set_option hygiene false in
 /-- Reassemble `H : confCells cpu dq p c` from the cells (`p` and `c` from the goal). -/
 macro "conf_intro " h:ident : tactic =>
-  `(tactic| (ihave $h:ident := confCells_intro _ _ _ _ $$ [Hcur_privilege Hhart_state Hmstatus Hmie Hmideleg Hmedeleg Hmepc
-                  Hsatp Hmenvcfg Hmcounteren Hmtimecmp Hstimecmp Hpmpcfg_n Hpmpaddr_n]
-             case' _ => (iframe; iexact Hhw)))
+  `(tactic| ihave $h:ident := confCells_introW _ _ _ _ $$ Hcur_privilege Hhart_state Hmstatus Hmie Hmideleg
+                  Hmedeleg Hmepc Hsatp Hmenvcfg Hmcounteren Hmtimecmp Hstimecmp Hpmpcfg_n Hpmpaddr_n Hhw)
 
 open Iris.ProofMode in
 set_option hygiene false in
@@ -256,9 +297,8 @@ open Iris.ProofMode in
 set_option hygiene false in
 /-- Reassemble `H : mConf cpu dq c` from the cells `mconf_cases` produced. -/
 macro "mconf_intro " h:ident : tactic =>
-  `(tactic| (ihave $h:ident := mConf_intro _ _ _ $$ [Hcur_privilege Hhart_state Hmstatus Hmie Hmideleg Hmedeleg Hmepc
-                  Hsatp Hmenvcfg Hmcounteren Hmtimecmp Hstimecmp Hpmpcfg_n Hpmpaddr_n]
-             case' _ => (iframe; iexact Hhw)))
+  `(tactic| ihave $h:ident := mConf_introW _ _ _ $$ Hcur_privilege Hhart_state Hmstatus Hmie Hmideleg
+                  Hmedeleg Hmepc Hsatp Hmenvcfg Hmcounteren Hmtimecmp Hstimecmp Hpmpcfg_n Hpmpaddr_n Hhw)
 
 /-- The machine-mode boot configuration of a hart (Rocq `mmode_config`,
 which carries `hw_config` as `confCells` does, together with the cells
