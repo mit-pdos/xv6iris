@@ -181,10 +181,13 @@ Section UShFileRedir.
     { iModIntro. iSplitR; [ by iRight | by iRight ]. }
     iDestruct "HK" as (i γo) "(%Hty & [Hd Htk] & Hpos & Hpub)".
     iMod (inv_acc E appN with "Hinv") as "[Hbody Hclose]"; [ exact HE | ].
-    iEval (rewrite /app_body) in "Hbody".
-    iDestruct "Hbody" as (I0) "(>Hka & Hp & >%Hdom)".
-    iEval (rewrite Heq; cbn [app_pred app_run app_names]) in "Hp".
-    iDestruct "Hp" as ">Hp".
+    (* CREDIT-FREE at every step index (port-ordinal): at this instance the
+       claim is TIMELESS ([AppFile.file_pred_timeless]), so the whole body
+       is, and its later strips as one ([exist_timeless] needs no finite
+       index; only splitting a later does). *)
+    iEval (rewrite /app_body Heq; cbn [app_pred app_run app_names]) in "Hbody".
+    iDestruct "Hbody" as ">Hbody".
+    iDestruct "Hbody" as (I0) "(Hka & Hp & %Hdom)".
     iDestruct (AppFileCons.file_deed_inum_acc (fgn_cl g) r _
                  (<[nm := (i, [])]> s) nm i []
                  (lookup_insert_eq _ _ _)
