@@ -126,7 +126,7 @@ statement is the pin's. Then port in this order:
    - Rough size: the largest item, about 11.5k Rocq lines added over about 250 file touches. For Lean,
      estimate 2 waves (kernel ghost first, then app/union).
    - The system theorem's statement survives unchanged.
-4. **Optional, defer: I + J (NI ledgers and permit sweep).** No theorem consumes them yet, and J changes
+4. **I + J (NI ledgers and permit sweep) — PORTED 2026-10-01** (ten lanes, `claude-notes/projects/noninterference.md` "PORT TO LEAN"; the original recommendation follows). **Optional, defer: I + J.** No theorem consumes them yet, and J changes
    about 70 kernel contracts (`pv_ev`, `act_lend`). Port them only when Rocq's NI theorem lands and the
    Lean port wants it. They are mechanical but wide (about 6.4k Rocq lines added over about 240 file
    touches).

@@ -1,8 +1,8 @@
 # Lean xv6 port — status
 
 **2026-09-30.**  All three top theorems are closed.  The port covers everything the Rocq development (archived on the
-`rocq` branch; final state 7d988ae13) proved, except its noninterference groundwork (drift themes I+J,
-deliberately not ported).  The Rocq tree is no longer maintained; this tree and its `claude-notes/` are
+`rocq` branch; final state 7d988ae13) proved, including, since 2026-10-01, its noninterference groundwork (drift themes I+J, ported lane by lane:
+`claude-notes/projects/noninterference.md` "PORT TO LEAN"; what remains is Rocq's never-landed L3 and T).  The Rocq tree is no longer maintained; this tree and its `claude-notes/` are
 the development now:
 
 - `Xv6.xv6FsAdequacy_closed` — the system theorem (hypotheses: generation 0, power off, disk = `fs.img`).

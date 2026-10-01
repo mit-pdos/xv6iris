@@ -15,8 +15,9 @@ A paper about this project: <https://arxiv.org/abs/2609.04043>.
 
 This development is a port of the original Rocq/Iris development, which is archived (no longer
 maintained) on the [`rocq` branch](https://github.com/mit-pdos/xv6iris/tree/rocq) of this repository;
-the port covers everything the Rocq tree proved as of its final state, except its unfinished
-noninterference groundwork.  The design and project notes came over with it and are maintained here,
+the port covers everything the Rocq tree proved as of its final state; its noninterference
+groundwork (the M1 ledgers and the permit sweep G/L1a/L1b/L2, drift themes I+J) was ported on
+2026-10-01 (`claude-notes/projects/noninterference.md`, "PORT TO LEAN").  The design and project notes came over with it and are maintained here,
 under [`claude-notes/`](claude-notes/) — they are the design documentation of this tree (start with
 [`claude-notes/LEAN.md`](claude-notes/LEAN.md), which explains how their Rocq vocabulary maps to Lean).
 
