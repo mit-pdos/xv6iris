@@ -962,6 +962,57 @@ per-file TIMED `real`, never from per-file time sums.
   State the whole `instr` introduction as ONE lemma so the proofmode work happens
   once. This is what an `XV6_REV` bump re-pays.
 
+### Lean: shortening the critical path when many routes tie
+
+Lane C (Oct 2026), measured by the same clean profiling build (proofs only,
+deps cached): wall 149 → 131 s, critical path 146.1 → 128.6 s, ΣCPU 7600 →
+7530 s, without touching a proof body.  What is left on the path is the
+S-mode rule prefix (~46 s), the Spec chain into `sys_unlink`, its eight
+proof pieces (`SysUnlinkShared` … `W5D`, ~42 s) and the `Link*` chain; the
+next routes (sh pipes tail, `LinkSystemAdequacyClosed`) are within 4 s.
+What worked, and the traps:
+
+- **The path is a plateau of near-equal routes.** After the first cuts, every
+  further single cut moved the model by 0-1 s because another route of the
+  same length took over (S-mode prefix → Spec chain → `SysUnlinkW*`; vocabulary
+  → `UkPipesIface*`; `UkRun` → `UshCode` → sh tail).  Price a cut with the
+  static model (`tools/import_graph.py --move`, own times file) and batch cuts
+  per route; a cut that gains 0 s today pays once the other route shrinks.
+- **Regional exact-needs pruning** is the cheapest big lever: `import_shake`'s
+  exact edits applied only to modules within ~1 s of the critical path,
+  iterated (recompute slack after each batch), plus compensating imports for
+  every module that lost a needed module.  First pass 144.5 → 131.7 s model,
+  117 files, 3 build fixes.
+- **The needs dump misses real uses.** (a) A tactic module's syntax
+  QUOTATIONS resolve names against ITS import closure when it is compiled:
+  `MachCSL.Tactics`'s `swp_run` names `Wp`'s memory leaves, so making
+  `HwConfig` (Tactics' import) see only a `WpCore` half broke every `swp_run`
+  through a memory read ("cannot apply Φ (Ok …) to swp cpu") far from the
+  edit.  Never shrink a tactic module's closure.  (b) `indirect` needs are
+  sometimes real constant uses (`VirtioDiskRwDefs` → `WpSmodeFrame`'s
+  `wpNext_shift`, `ProofIunlock` → the `k_norm_g` syntax); dropping all local
+  `indirect` needs is a good estimate but every such edge must be built.
+  (c) Names that appear only as simp arguments or in an unused `variable`
+  line (`SysMkdirTails`, `UshCatFStageDefs`) are invisible.  The full build
+  is the gate; expect ~1 fix per 40 edited files.
+- **One rule per module for rule files on the path.** A module of N
+  independent instruction rules costs their SUM on the chain (Elab.async
+  helps ~2x at best); one module per rule plus an umbrella under the old name
+  costs the max + ~0.6 s: `WpSmodeMem` 9.3 → 2.5 + 0.6 s, `WpSmodeFetch`,
+  `WpSmodeCycleBase`, `ElfUser`/`FsImgFiles` per program, `UshCode`'s 632
+  decode facts per function (15 s → ~2 s slices, each walk importing only
+  its function's slice).  Shared macros go in a `*Tac` module that imports
+  everything but the slow dependency (`WpSmodeMemTac` builds beside
+  `Translate`: macros are syntax, names resolve at use).
+- **Single-name edges.** `tools/edge_usage.py` on the path lists edges where
+  the child names one or two constants of the parent; move those (usually a
+  `def`, or an `rfl` lemma replaced by `show`) to a light module the child
+  already reaches: `tfEpcIdx` → `ProcGeom`, `covOk` → `LogDefs`,
+  `consShort` → `ConsNames`, `fsReadyKmem` → `FsCfgDefs`, `ownCtx_boot` →
+  `CtxBoot`, `StepLemmas` proving `signExtend_ofNat32` inline so it no
+  longer imports the S-mode rules.  Keep the old name importing the new
+  module so no other importer changes.
+
 ### Splitting a whole-function proof across files
 
 1. **Are the blocks independent?** They are if each seam is the next block's
