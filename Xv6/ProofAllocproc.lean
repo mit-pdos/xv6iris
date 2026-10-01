@@ -2272,6 +2272,7 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
     iintro Hk Hpc
     ihave HΦ := wpNext_shift _ _ _ _ _ (fun h => (hp5 h).trans (hp4 h)) $$ HΦ
     k_norm_g
+    simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false, calleeSaved] at hcsr2 hcsf hcsk hcsr hcs3
     iapply (ap_tail c5 (k.withSpie spie5 spp5) hK4' 0#64 k.regs rfl _ ?hR2f ?h9f ?h19f ?h20f
         ?h21f ?h22f ?h23f ?h24f ?h25f ?h26f ?h27f) $$ [- $Hk $Hpc $Hframe]
     rotate_right 1
@@ -2303,62 +2304,52 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
       ipureintro; exact hcs
     case h9f => simp only [RegMap.set_apply, BitVec.reduceEq, ite_true]
     case hR2f =>
-      simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false,
-        calleeSaved] at hcsr2 hcsf hcsk hcsr hcs3 ⊢
+      try simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
       rw [hcsr2.1, hcsf.1, hcsk.1, hcsr.1,
         hkeep 2#5 (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide),
         hcs3.1, hR2]
     case h19f =>
-      simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false,
-        calleeSaved] at hcsr2 hcsf hcsk hcsr hcs3 ⊢
+      try simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
       rw [hcsr2.2.2.2.2.1, hcsf.2.2.2.2.1, hcsk.2.2.2.2.1, hcsr.2.2.2.2.1,
         hkeep 19#5 (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide),
         hcs3.2.2.2.2.1, h19]
     case h20f =>
-      simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false,
-        calleeSaved] at hcsr2 hcsf hcsk hcsr hcs3 ⊢
+      try simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
       rw [hcsr2.2.2.2.2.2.1, hcsf.2.2.2.2.2.1, hcsk.2.2.2.2.2.1, hcsr.2.2.2.2.2.1,
         hkeep 20#5 (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide),
         hcs3.2.2.2.2.2.1, h20]
     case h21f =>
-      simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false,
-        calleeSaved] at hcsr2 hcsf hcsk hcsr hcs3 ⊢
+      try simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
       rw [hcsr2.2.2.2.2.2.2.1, hcsf.2.2.2.2.2.2.1, hcsk.2.2.2.2.2.2.1, hcsr.2.2.2.2.2.2.1,
         hkeep 21#5 (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide),
         hcs3.2.2.2.2.2.2.1, h21]
     case h22f =>
-      simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false,
-        calleeSaved] at hcsr2 hcsf hcsk hcsr hcs3 ⊢
+      try simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
       rw [hcsr2.2.2.2.2.2.2.2.1, hcsf.2.2.2.2.2.2.2.1, hcsk.2.2.2.2.2.2.2.1, hcsr.2.2.2.2.2.2.2.1,
         hkeep 22#5 (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide),
         hcs3.2.2.2.2.2.2.2.1, h22]
     case h23f =>
-      simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false,
-        calleeSaved] at hcsr2 hcsf hcsk hcsr hcs3 ⊢
+      try simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
       rw [hcsr2.2.2.2.2.2.2.2.2.1, hcsf.2.2.2.2.2.2.2.2.1, hcsk.2.2.2.2.2.2.2.2.1, hcsr.2.2.2.2.2.2.2.2.1,
         hkeep 23#5 (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide),
         hcs3.2.2.2.2.2.2.2.2.1, h23]
     case h24f =>
-      simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false,
-        calleeSaved] at hcsr2 hcsf hcsk hcsr hcs3 ⊢
+      try simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
       rw [hcsr2.2.2.2.2.2.2.2.2.2.1, hcsf.2.2.2.2.2.2.2.2.2.1, hcsk.2.2.2.2.2.2.2.2.2.1, hcsr.2.2.2.2.2.2.2.2.2.1,
         hkeep 24#5 (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide),
         hcs3.2.2.2.2.2.2.2.2.2.1, h24]
     case h25f =>
-      simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false,
-        calleeSaved] at hcsr2 hcsf hcsk hcsr hcs3 ⊢
+      try simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
       rw [hcsr2.2.2.2.2.2.2.2.2.2.2.1, hcsf.2.2.2.2.2.2.2.2.2.2.1, hcsk.2.2.2.2.2.2.2.2.2.2.1, hcsr.2.2.2.2.2.2.2.2.2.2.1,
         hkeep 25#5 (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide),
         hcs3.2.2.2.2.2.2.2.2.2.2.1, h25]
     case h26f =>
-      simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false,
-        calleeSaved] at hcsr2 hcsf hcsk hcsr hcs3 ⊢
+      try simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
       rw [hcsr2.2.2.2.2.2.2.2.2.2.2.2.1, hcsf.2.2.2.2.2.2.2.2.2.2.2.1, hcsk.2.2.2.2.2.2.2.2.2.2.2.1, hcsr.2.2.2.2.2.2.2.2.2.2.2.1,
         hkeep 26#5 (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide),
         hcs3.2.2.2.2.2.2.2.2.2.2.2.1, h26]
     case h27f =>
-      simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false,
-        calleeSaved] at hcsr2 hcsf hcsk hcsr hcs3 ⊢
+      try simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
       rw [hcsr2.2.2.2.2.2.2.2.2.2.2.2.2, hcsf.2.2.2.2.2.2.2.2.2.2.2.2, hcsk.2.2.2.2.2.2.2.2.2.2.2.2, hcsr.2.2.2.2.2.2.2.2.2.2.2.2,
         hkeep 27#5 (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide),
         hcs3.2.2.2.2.2.2.2.2.2.2.2.2, h27]
@@ -2660,6 +2651,7 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
           obtain ⟨a4, b4⟩ := hsp4 trivial
           obtain ⟨a2, b2⟩ := hsp2 hks
           exact ⟨a6.trans (a4.trans a2), b6.trans (b4.trans b2)⟩
+        simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false, calleeSaved] at hpostm hcspp hcsk hcsr hcs3
         iapply (ap_tail cg ((k.pushOffAt spie6 spp6).withLocks ("proc" :: k.locks))
             (by simp only [KCtx.withLocks_avail, KCtx.pushOffAt_avail]; omega) (procAddr n)
             k.regs rfl _ ?hR2s ?h9s ?h19s ?h20s ?h21s ?h22s ?h23s ?h24s ?h25s ?h26s ?h27s)
@@ -2714,56 +2706,46 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
           iapply HΦ $$ %spie6 %spp6 %R'' %hspc6 Hdisj Hpc Hpost
           ipureintro; exact hcs
         case hR2s =>
-          simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false,
-            calleeSaved] at hpostm hcspp hcsk hcsr hcs3 ⊢
+          try simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
           rw [hpostm.1.1, hcspp.1, hcsk.1, hcsr.1,
             hkeep 2#5 (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide), hcs3.1, hR2]
         case h9s =>
           simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]
           exact hRm9
         case h19s =>
-          simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false,
-            calleeSaved] at hpostm hcspp hcsk hcsr hcs3 ⊢
+          try simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
           rw [hpostm.1.2.2.2.2.1, hcspp.2.2.2.2.1, hcsk.2.2.2.2.1, hcsr.2.2.2.2.1,
             hkeep 19#5 (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide), hcs3.2.2.2.2.1, h19]
         case h20s =>
-          simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false,
-            calleeSaved] at hpostm hcspp hcsk hcsr hcs3 ⊢
+          try simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
           rw [hpostm.1.2.2.2.2.2.1, hcspp.2.2.2.2.2.1, hcsk.2.2.2.2.2.1, hcsr.2.2.2.2.2.1,
             hkeep 20#5 (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide), hcs3.2.2.2.2.2.1, h20]
         case h21s =>
-          simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false,
-            calleeSaved] at hpostm hcspp hcsk hcsr hcs3 ⊢
+          try simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
           rw [hpostm.1.2.2.2.2.2.2.1, hcspp.2.2.2.2.2.2.1, hcsk.2.2.2.2.2.2.1, hcsr.2.2.2.2.2.2.1,
             hkeep 21#5 (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide), hcs3.2.2.2.2.2.2.1, h21]
         case h22s =>
-          simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false,
-            calleeSaved] at hpostm hcspp hcsk hcsr hcs3 ⊢
+          try simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
           rw [hpostm.1.2.2.2.2.2.2.2.1, hcspp.2.2.2.2.2.2.2.1, hcsk.2.2.2.2.2.2.2.1, hcsr.2.2.2.2.2.2.2.1,
             hkeep 22#5 (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide), hcs3.2.2.2.2.2.2.2.1, h22]
         case h23s =>
-          simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false,
-            calleeSaved] at hpostm hcspp hcsk hcsr hcs3 ⊢
+          try simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
           rw [hpostm.1.2.2.2.2.2.2.2.2.1, hcspp.2.2.2.2.2.2.2.2.1, hcsk.2.2.2.2.2.2.2.2.1, hcsr.2.2.2.2.2.2.2.2.1,
             hkeep 23#5 (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide), hcs3.2.2.2.2.2.2.2.2.1, h23]
         case h24s =>
-          simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false,
-            calleeSaved] at hpostm hcspp hcsk hcsr hcs3 ⊢
+          try simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
           rw [hpostm.1.2.2.2.2.2.2.2.2.2.1, hcspp.2.2.2.2.2.2.2.2.2.1, hcsk.2.2.2.2.2.2.2.2.2.1, hcsr.2.2.2.2.2.2.2.2.2.1,
             hkeep 24#5 (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide), hcs3.2.2.2.2.2.2.2.2.2.1, h24]
         case h25s =>
-          simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false,
-            calleeSaved] at hpostm hcspp hcsk hcsr hcs3 ⊢
+          try simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
           rw [hpostm.1.2.2.2.2.2.2.2.2.2.2.1, hcspp.2.2.2.2.2.2.2.2.2.2.1, hcsk.2.2.2.2.2.2.2.2.2.2.1, hcsr.2.2.2.2.2.2.2.2.2.2.1,
             hkeep 25#5 (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide), hcs3.2.2.2.2.2.2.2.2.2.2.1, h25]
         case h26s =>
-          simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false,
-            calleeSaved] at hpostm hcspp hcsk hcsr hcs3 ⊢
+          try simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
           rw [hpostm.1.2.2.2.2.2.2.2.2.2.2.2.1, hcspp.2.2.2.2.2.2.2.2.2.2.2.1, hcsk.2.2.2.2.2.2.2.2.2.2.2.1, hcsr.2.2.2.2.2.2.2.2.2.2.2.1,
             hkeep 26#5 (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide), hcs3.2.2.2.2.2.2.2.2.2.2.2.1, h26]
         case h27s =>
-          simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false,
-            calleeSaved] at hpostm hcspp hcsk hcsr hcs3 ⊢
+          try simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
           rw [hpostm.1.2.2.2.2.2.2.2.2.2.2.2.2, hcspp.2.2.2.2.2.2.2.2.2.2.2.2, hcsk.2.2.2.2.2.2.2.2.2.2.2.2, hcsr.2.2.2.2.2.2.2.2.2.2.2.2,
             hkeep 27#5 (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide), hcs3.2.2.2.2.2.2.2.2.2.2.2.2, h27]
     · -- right: Rpp10 = 0, tail2
@@ -2983,6 +2965,7 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
       iintro Hk Hpc
       ihave HΦ := wpNext_shift _ _ _ _ _ (fun h => (hp5 h).trans (hp4 h)) $$ HΦ
       k_norm_g
+      simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false, calleeSaved] at hcsr2 hcsf hcspp hcsk hcsr hcs3
       iapply (ap_tail c5 (k.withSpie spie5 spp5) hK4' 0#64 k.regs rfl _ ?hR2f ?h9f ?h19f ?h20f
           ?h21f ?h22f ?h23f ?h24f ?h25f ?h26f ?h27f) $$ [- $Hk $Hpc $Hframe]
       rotate_right 1
@@ -3014,62 +2997,52 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
         ipureintro; exact hcs
       case h9f => simp only [RegMap.set_apply, BitVec.reduceEq, ite_true]
       case hR2f =>
-        simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false,
-          calleeSaved] at hcsr2 hcsf hcspp hcsk hcsr hcs3 ⊢
+        try simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
         rw [hcsr2.1, hcsf.1, hcspp.1, hcsk.1, hcsr.1,
           hkeep 2#5 (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide),
           hcs3.1, hR2]
       case h19f =>
-        simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false,
-          calleeSaved] at hcsr2 hcsf hcspp hcsk hcsr hcs3 ⊢
+        try simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
         rw [hcsr2.2.2.2.2.1, hcsf.2.2.2.2.1, hcspp.2.2.2.2.1, hcsk.2.2.2.2.1, hcsr.2.2.2.2.1,
           hkeep 19#5 (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide),
           hcs3.2.2.2.2.1, h19]
       case h20f =>
-        simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false,
-          calleeSaved] at hcsr2 hcsf hcspp hcsk hcsr hcs3 ⊢
+        try simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
         rw [hcsr2.2.2.2.2.2.1, hcsf.2.2.2.2.2.1, hcspp.2.2.2.2.2.1, hcsk.2.2.2.2.2.1, hcsr.2.2.2.2.2.1,
           hkeep 20#5 (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide),
           hcs3.2.2.2.2.2.1, h20]
       case h21f =>
-        simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false,
-          calleeSaved] at hcsr2 hcsf hcspp hcsk hcsr hcs3 ⊢
+        try simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
         rw [hcsr2.2.2.2.2.2.2.1, hcsf.2.2.2.2.2.2.1, hcspp.2.2.2.2.2.2.1, hcsk.2.2.2.2.2.2.1, hcsr.2.2.2.2.2.2.1,
           hkeep 21#5 (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide),
           hcs3.2.2.2.2.2.2.1, h21]
       case h22f =>
-        simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false,
-          calleeSaved] at hcsr2 hcsf hcspp hcsk hcsr hcs3 ⊢
+        try simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
         rw [hcsr2.2.2.2.2.2.2.2.1, hcsf.2.2.2.2.2.2.2.1, hcspp.2.2.2.2.2.2.2.1, hcsk.2.2.2.2.2.2.2.1, hcsr.2.2.2.2.2.2.2.1,
           hkeep 22#5 (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide),
           hcs3.2.2.2.2.2.2.2.1, h22]
       case h23f =>
-        simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false,
-          calleeSaved] at hcsr2 hcsf hcspp hcsk hcsr hcs3 ⊢
+        try simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
         rw [hcsr2.2.2.2.2.2.2.2.2.1, hcsf.2.2.2.2.2.2.2.2.1, hcspp.2.2.2.2.2.2.2.2.1, hcsk.2.2.2.2.2.2.2.2.1, hcsr.2.2.2.2.2.2.2.2.1,
           hkeep 23#5 (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide),
           hcs3.2.2.2.2.2.2.2.2.1, h23]
       case h24f =>
-        simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false,
-          calleeSaved] at hcsr2 hcsf hcspp hcsk hcsr hcs3 ⊢
+        try simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
         rw [hcsr2.2.2.2.2.2.2.2.2.2.1, hcsf.2.2.2.2.2.2.2.2.2.1, hcspp.2.2.2.2.2.2.2.2.2.1, hcsk.2.2.2.2.2.2.2.2.2.1, hcsr.2.2.2.2.2.2.2.2.2.1,
           hkeep 24#5 (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide),
           hcs3.2.2.2.2.2.2.2.2.2.1, h24]
       case h25f =>
-        simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false,
-          calleeSaved] at hcsr2 hcsf hcspp hcsk hcsr hcs3 ⊢
+        try simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
         rw [hcsr2.2.2.2.2.2.2.2.2.2.2.1, hcsf.2.2.2.2.2.2.2.2.2.2.1, hcspp.2.2.2.2.2.2.2.2.2.2.1, hcsk.2.2.2.2.2.2.2.2.2.2.1, hcsr.2.2.2.2.2.2.2.2.2.2.1,
           hkeep 25#5 (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide),
           hcs3.2.2.2.2.2.2.2.2.2.2.1, h25]
       case h26f =>
-        simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false,
-          calleeSaved] at hcsr2 hcsf hcspp hcsk hcsr hcs3 ⊢
+        try simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
         rw [hcsr2.2.2.2.2.2.2.2.2.2.2.2.1, hcsf.2.2.2.2.2.2.2.2.2.2.2.1, hcspp.2.2.2.2.2.2.2.2.2.2.2.1, hcsk.2.2.2.2.2.2.2.2.2.2.2.1, hcsr.2.2.2.2.2.2.2.2.2.2.2.1,
           hkeep 26#5 (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide),
           hcs3.2.2.2.2.2.2.2.2.2.2.2.1, h26]
       case h27f =>
-        simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false,
-          calleeSaved] at hcsr2 hcsf hcspp hcsk hcsr hcs3 ⊢
+        try simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
         rw [hcsr2.2.2.2.2.2.2.2.2.2.2.2.2, hcsf.2.2.2.2.2.2.2.2.2.2.2.2, hcspp.2.2.2.2.2.2.2.2.2.2.2.2, hcsk.2.2.2.2.2.2.2.2.2.2.2.2, hcsr.2.2.2.2.2.2.2.2.2.2.2.2,
           hkeep 27#5 (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide),
           hcs3.2.2.2.2.2.2.2.2.2.2.2.2, h27]
