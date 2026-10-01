@@ -273,7 +273,7 @@ Section ProofKerneltrap.
                   Hp0 ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc []").
         { iApply (kti_8a with "Htext"). }
-        iApply bi.later_intro. iApply wp_next_off_intro. iIntros "Hcg Hpc".
+        iApply bi.later_intro. iApply wp_next_off_intro_lc. iIntros "Hlc Hcg Hpc".
         assert (Hpcb : add_vec (mword_of_int (KernelSyms.kerneltrap + 0x8a) : mword 64)
                          (sign_extend' 64 (sign_extend' 13 (concat_vec (mword_of_int 214 : mword 8) ('b"0"))))
                        = mword_of_int (KernelSyms.kerneltrap + 0x36)) by pcw.
@@ -296,7 +296,7 @@ Section ProofKerneltrap.
            the handler spec -- the repair its predecessor [intr_handler_avail]
            needed at all three of this proof's continuation sites. *)
         iRename "Havail" into "Havz".
-        iSpecialize ("Hcont" $! CID with "[]"); [iPureIntro; intros _; reflexivity|].
+        iSpecialize ("Hcont" $! CID with "[] Hlc"); [iPureIntro; intros _; reflexivity|].
         iApply ("Hcont" $! mf ms_f sc tv with "[%] [%] [%] [%] Hcgat Hmir Havz Hkptr Hcpu
                               Hsepc Hscause Hstval Hpc Hclm").
         { exact Hcsf. }
@@ -390,7 +390,7 @@ Section ProofKerneltrap.
            there is no arm to take it from, which is exactly why a preempting
            trap must arrive holding it. *)
         { rewrite /cpu_claim_ext -Hpj. iExact "Hclm". }
-        iIntros (CIDy Hsy myd) "%Hcs_yd Hcg Hcpu Hpc Hext Hclm".
+        iIntros (CIDy Hsy) "Hlc"; iIntros (myd) "%Hcs_yd Hcg Hcpu Hpc Hext Hclm".
         iEval (rewrite Hpj) in "Hcg". iEval (rewrite Hpj) in "Hcpu".
         (* back, possibly on ANOTHER hart: the trap CSRs are that hart's *)
         rewrite /trap_csrs_ext /trap_csrs.
@@ -416,7 +416,7 @@ Section ProofKerneltrap.
                   myd (av - 6)%nat false ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc []").
         { iApply (kti_90 with "Htext"). }
-        iApply wp_next_off_intro. iApply bi.later_intro. iIntros "Hcg Hpc".
+        iApply bi.later_intro. iApply wp_next_off_intro. iIntros "Hcg Hpc".
         assert (Hpcj : add_vec (mword_of_int (KernelSyms.kerneltrap + 0x90) : mword 64)
                          (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 2003 : mword 11) ('b"0"))))
                        = mword_of_int (KernelSyms.kerneltrap + 0x36)) by pcw.
@@ -442,7 +442,7 @@ Section ProofKerneltrap.
         (* yield handed the bundle back at the literal [∅] (its contract pins
            it); [lks = ∅] at depth 0 makes that kerneltrap's own set. *)
         iEval (rewrite -Hlkempty) in "Hcpu".
-        iSpecialize ("Hcont" $! CIDy with "[%]").
+        iSpecialize ("Hcont" $! CIDy with "[%] Hlc").
         { intros [Hf | Hz]; [ discriminate | exfalso; exact (Hpne Hz) ]. }
         iApply ("Hcont" $! mf ms_f sc' tv' with "[%] [%] [%] [%] Hcgat Hmir Havz Hkptr_y Hcpu
                               Hsepc Hscause Hstval Hpc [Hclm]").
@@ -458,7 +458,7 @@ Section ProofKerneltrap.
                 ltac:(apply not_true_iff_false; exact Htim)
                 with "Hcg Hpc []").
       { iApply (kti_32 with "Htext"). }
-      iApply wp_next_off_intro. iIntros "Hcg Hpc".
+      iApply wp_next_off_intro_lc. iIntros "Hlc Hcg Hpc".
       assert (Hpc36 : add_vec_int (mword_of_int (KernelSyms.kerneltrap + 0x32) : mword 64) 4
                       = mword_of_int (KernelSyms.kerneltrap + 0x36)) by pcw.
       iEval (rewrite Hpc36) in "Hpc".
@@ -476,7 +476,7 @@ Section ProofKerneltrap.
         iEval (rewrite Hav6) in "Hcgat".
       (* NO RE-SEAL NEEDED -- see the twin above. *)
       iRename "Havail" into "Havz".
-      iSpecialize ("Hcont" $! CID with "[]"); [iPureIntro; intros _; reflexivity|].
+      iSpecialize ("Hcont" $! CID with "[] Hlc"); [iPureIntro; intros _; reflexivity|].
       iApply ("Hcont" $! mf ms_f sc tv with "[%] [%] [%] [%] Hcgat Hmir Havz Hkptr Hcpu
                             Hsepc Hscause Hstval Hpc Hclm").
       { exact Hcsf. }

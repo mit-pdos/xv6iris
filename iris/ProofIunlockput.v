@@ -132,7 +132,7 @@ Section ProofIunlockputMain.
     iApply (wp_caddi_sp_push_s_sconf pcE (mword_of_int 32 : mword 6) m K 4 b
               ltac:(lia) Hpush with "Hcg Hpc []").
     { iApply (iulpi_00 with "Htext"). }
-    iIntros (CID1 Hq1) "Hcg Hframe Hpc".
+    iIntros (CID1 Hq1) "_ Hcg Hframe Hpc".
     set (R1 := <[Regidx csp_rs1 := regval_into_reg
                   (add_vec (m !!! Regidx csp_rs1 : mword 64)
                      (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))]> m).
@@ -166,7 +166,7 @@ Section ProofIunlockputMain.
               (mword_of_int 3 : mword 6) Rra R1 (K - 4)%nat v1 b
               with "Hcg Hpc [] Hf1").
     { iApply (iulpi_02 with "Htext"). }
-    iIntros (CID2 Hq2) "Hcg Hpc Hf1".
+    iIntros (CID2 Hq2) "_ Hcg Hpc Hf1".
     assert (Hpp04 : add_vec_int (mword_of_int (KernelSyms.iunlockput + 0x02) : mword 64) 2
                     = mword_of_int (KernelSyms.iunlockput + 0x04)) by pcw.
     iEval (rewrite Hpp04) in "Hpc".
@@ -174,7 +174,7 @@ Section ProofIunlockputMain.
               (mword_of_int 2 : mword 6) Rs0 R1 (K - 4)%nat v2 b
               with "Hcg Hpc [] Hf2").
     { iApply (iulpi_04 with "Htext"). }
-    iIntros (CID3 Hq3) "Hcg Hpc Hf2".
+    iIntros (CID3 Hq3) "_ Hcg Hpc Hf2".
     assert (Hpp06 : add_vec_int (mword_of_int (KernelSyms.iunlockput + 0x04) : mword 64) 2
                     = mword_of_int (KernelSyms.iunlockput + 0x06)) by pcw.
     iEval (rewrite Hpp06) in "Hpc".
@@ -182,7 +182,7 @@ Section ProofIunlockputMain.
               (mword_of_int 1 : mword 6) Rs1 R1 (K - 4)%nat v3 b
               with "Hcg Hpc [] Hf3").
     { iApply (iulpi_06 with "Htext"). }
-    iIntros (CID4 Hq4) "Hcg Hpc Hf3".
+    iIntros (CID4 Hq4) "_ Hcg Hpc Hf3".
     assert (Hpp08 : add_vec_int (mword_of_int (KernelSyms.iunlockput + 0x06) : mword 64) 2
                     = mword_of_int (KernelSyms.iunlockput + 0x08)) by pcw.
     iEval (rewrite Hpp08) in "Hpc".
@@ -202,7 +202,7 @@ Section ProofIunlockputMain.
               ltac:(vm_compute; reflexivity) ltac:(nz) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (iulpi_08 with "Htext"). }
-    iIntros (CID5 Hq5) "Hcg Hpc".
+    iIntros (CID5 Hq5) "_ Hcg Hpc".
     set (R2 := <[Regidx Rs0 := regval_into_reg
                   (add_vec (R1 !!! Regidx csp_rs1)
                      (sign_extend' 64 (caddi4spn_imm (mword_of_int 8 : mword 8))))]> R1).
@@ -220,7 +220,7 @@ Section ProofIunlockputMain.
     iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.iunlockput + 0x0a)) Rs1 Ra0
               R2 (K - 4)%nat b ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
     { iApply (iulpi_0a with "Htext"). }
-    iIntros (CID6 Hq6) "Hcg Hpc".
+    iIntros (CID6 Hq6) "_ Hcg Hpc".
     set (R3 := <[Regidx Rs1 := regval_into_reg
                   (add_vec (zero_reg : mword 64) (rget R2 Ra0))]> R2).
     assert (HR3s1 : R3 !!! Regidx Rs1 = ip).
@@ -241,7 +241,7 @@ Section ProofIunlockputMain.
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (iulpi_0c with "Htext"). }
-    iIntros (CID7 Hq7) "Hcg Hpc".
+    iIntros (CID7 Hq7) "_ Hcg Hpc".
     set (R4 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KernelSyms.iunlockput + 0x0c) : mword 64) 4)]> R3).
     assert (Htgtiu : add_vec (mword_of_int (KernelSyms.iunlockput + 0x0c) : mword 64)
@@ -276,7 +276,7 @@ Section ProofIunlockputMain.
                     Hprocs [%] Hfly Hclaims Hdep Hoffd Hidev Hinumc Hvalid Hlk Hshot Hfrz").
     all: try lkbelow.
     { exact Hley. }
-    iIntros (CID8 Hq8 mU) "%HcsU Hcg Hcnt Hpc Hppid Hshr Hside".
+    iIntros (CID8 Hq8) "_"; iIntros (mU) "%HcsU Hcg Hcnt Hpc Hppid Hshr Hside".
     (* THE SHARE IPUT'S WINDOWS PARK IS THE ONE THE ARM JUST HANDED BACK
        (durable-disk B''-tx5): [ic_dep_side] at the write arm IS the parked
        share, so iunlockput lends it on to its own [iput] and takes it back
@@ -308,7 +308,7 @@ Section ProofIunlockputMain.
     iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.iunlockput + 0x10)) Ra0 Rs1
               mU (K - 4)%nat b ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
     { iApply (iulpi_10 with "Htext"). }
-    iIntros (CID9 Hq9) "Hcg Hpc".
+    iIntros (CID9 Hq9) "_ Hcg Hpc".
     set (R5 := <[Regidx Ra0 := regval_into_reg
                   (add_vec (zero_reg : mword 64) (rget mU Rs1))]> mU).
     assert (HR5a0 : R5 !!! Regidx Ra0 = ip).
@@ -327,7 +327,7 @@ Section ProofIunlockputMain.
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (iulpi_12 with "Htext"). }
-    iIntros (CID10 Hq10) "Hcg Hpc".
+    iIntros (CID10 Hq10) "_ Hcg Hpc".
     set (R6 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KernelSyms.iunlockput + 0x12) : mword 64) 4)]> R5).
     assert (Htgtip : add_vec (mword_of_int (KernelSyms.iunlockput + 0x12) : mword 64)
@@ -372,7 +372,7 @@ Section ProofIunlockputMain.
                     Hbslots Hnlz [Hlogop Htx]").
     all: try lkbelow.
     { rewrite /log_opSet. iFrame "Hlogop Htx". }
-    iIntros (CID11 Hq11 mP n' Sb' wp)
+    iIntros (CID11 Hq11) "_"; iIntros (mP n' Sb' wp)
             "%HcsP Hcg Hcnt Htc Hclm Hpc Hppid Hbms Hins Hbslots
              %Hssub %Hwbm %Hwc %Hbud Hlogop Htx Hslot _".
 
@@ -417,7 +417,7 @@ Section ProofIunlockputMain.
               with "Hcg Hpc [] [Hf1]").
     { iApply (iulpi_16 with "Htext"). }
     { iEval (rewrite Hc1). iExact "Hf1". }
-    iIntros (CID12 Hq12) "Hcg Hpc Hf1".
+    iIntros (CID12 Hq12) "_ Hcg Hpc Hf1".
     iEval (rewrite Hc1) in "Hf1".
     set (P1 := <[Regidx Rra := regval_into_reg (m !!! Regidx Rra : mword 64)]> mP).
     assert (HP1sp : iulp_sp m P1)
@@ -436,7 +436,7 @@ Section ProofIunlockputMain.
               with "Hcg Hpc [] [Hf2]").
     { iApply (iulpi_18 with "Htext"). }
     { iEval (rewrite HP1sp -HmPsp Hc2). iExact "Hf2". }
-    iIntros (CID13 Hq13) "Hcg Hpc Hf2".
+    iIntros (CID13 Hq13) "_ Hcg Hpc Hf2".
     iEval (rewrite HP1sp -HmPsp Hc2) in "Hf2".
     set (P2 := <[Regidx Rs0 := regval_into_reg (m !!! Regidx Rs0 : mword 64)]> P1).
     assert (HP2sp : iulp_sp m P2)
@@ -455,7 +455,7 @@ Section ProofIunlockputMain.
               with "Hcg Hpc [] [Hf3]").
     { iApply (iulpi_1a with "Htext"). }
     { iEval (rewrite HP2sp -HmPsp Hc3). iExact "Hf3". }
-    iIntros (CID14 Hq14) "Hcg Hpc Hf3".
+    iIntros (CID14 Hq14) "_ Hcg Hpc Hf3".
     iEval (rewrite HP2sp -HmPsp Hc3) in "Hf3".
     set (P3 := <[Regidx Rs1 := regval_into_reg (m !!! Regidx Rs1 : mword 64)]> P2).
     assert (HP3sp : iulp_sp m P3)
@@ -508,7 +508,7 @@ Section ProofIunlockputMain.
               (mword_of_int 2 : mword 6) P3 (K - 4)%nat 4 b Hpop
               with "Hcg Hpc [] Hstk").
     { iApply (iulpi_1c with "Htext"). }
-    iIntros (CID15 Hq15) "Hcg Hpc".
+    iIntros (CID15 Hq15) "_ Hcg Hpc".
     set (P4 := <[Regidx csp_rs1 := regval_into_reg
                   (add_vec (P3 !!! Regidx csp_rs1 : mword 64)
                      (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6))))]> P3).
@@ -523,7 +523,7 @@ Section ProofIunlockputMain.
     iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.iunlockput + 0x1e)) Rra P4 K b
               ltac:(nz) with "Hcg Hpc []").
     { iApply (iulpi_1e with "Htext"). }
-    iIntros (CID16 Hq16) "Hcg Hpc".
+    iIntros (CID16 Hq16) "Hlc Hcg Hpc".
     iEval (rgne) in "Hpc".
     assert (Hretf : ret_pc (P4 !!! Regidx Rra : mword 64)
                     = ret_pc (m !!! Regidx Rra : mword 64))
@@ -578,7 +578,7 @@ Section ProofIunlockputMain.
                  ltac:(rewrite Hbm; wp_next_chain) with "Htc") as "Htc".
     iDestruct (cpu_claim_ext_transport CID11 CID16 eb pj
                  ltac:(rewrite Hbm; wp_next_chain) with "Hclm") as "Hclm".
-    iSpecialize ("Hcont" $! CID16 with "[%]"); [wp_next_chain |].
+    iSpecialize ("Hcont" $! CID16 with "[%] Hlc"); [wp_next_chain |].
     iApply ("Hcont" $! P4 n' Sb' wp with "[%] Hcg Hcnt Htc Hclm Hpc Hppid Hbms Hins
                                              Hbslots [%] [%] [%] [%] Hlogop Hslot Hside").
     { unfold callee_saved. split_and!; assumption. }
@@ -634,10 +634,10 @@ Section ProofIunlockputMain.
     { exact Hley. }
     { iEval (cbn beta iota). iEmpIntro. }
     iEval (rewrite /wp_next).
-    iIntros (CIDf) "%Hchain".
+    iIntros (CIDf) "%Hchain Hlc".
     iIntros (mf n' Sb' wf) "%Hcs Hcg Hcnt Htc Hclm Hpc Hppid Hbms Hins
                                Hbslots %Hssub %Hwbm %Hwc %Hbnd Hlogop Hslot Hside".
-    iSpecialize ("Hcont" $! CIDf with "[%]"); [exact Hchain|].
+    iSpecialize ("Hcont" $! CIDf with "[%] Hlc"); [exact Hchain|].
     iApply ("Hcont" $! mf n' with "[%] Hcg Hcnt Htc Hclm Hpc Hppid Hbms Hins
                      Hbslots [%] [Hlogop] Hslot Hside").
     { exact Hcs. }

@@ -92,8 +92,8 @@ Section WpSconfCtl.
       iIntros (e) "(-> & Hpriv & Hmenv)". iSplitR; [done|].
       iDestruct ("Hback" with "Hpriv Hmenv") as "Hsc". iFrame.
     - iIntros (CIDx) "Hcap". iSplitL; [ iExact "Hcap" | done ].
-    - iNext. iIntros (CIDx Hs) "Hcg' _ Hpc'".
-      iApply ("Hcont" $! CIDx with "[%] Hcg' Hpc'"). exact Hs.
+    - iNext. iIntros (CIDx Hs) "Hlc Hcg' _ Hpc'".
+      iApply ("Hcont" $! CIDx with "[%] Hlc Hcg' Hpc'"). exact Hs.
   Qed.
 
   Lemma wp_fencei_s_sconf
@@ -120,8 +120,8 @@ Section WpSconfCtl.
         [| iApply (swp_execute_FENCEI_s (CID := CIDn) imm rs rd with "Hcert") ].
       iIntros (e) "->". iSplitR; [done|]. iFrame.
     - iIntros (CIDx) "Hcap". iSplitL; [ iExact "Hcap" | done ].
-    - iNext. iIntros (CIDx Hs) "Hcg' _ Hpc'".
-      iApply ("Hcont" $! CIDx with "[%] Hcg' Hpc'"). exact Hs.
+    - iNext. iIntros (CIDx Hs) "Hlc Hcg' _ Hpc'".
+      iApply ("Hcont" $! CIDx with "[%] Hlc Hcg' Hpc'"). exact Hs.
   Qed.
 
   (* the rw,w instance -- [release]'s [__sync_lock_release] barrier.  A
@@ -166,10 +166,10 @@ Section WpSconfCtl.
     sie_cap_gpr kt m n b p -∗
     pc_is pc -∗
     instr pc false (FENCE (fm, pred, succ, rs, rd)) -∗
-    wp_next b p (fun (CID : CpuId) =>
-      ▷ ( sie_cap_gpr kt m n b p -∗
-        pc_is (add_vec_int pc 4) -∗
-        mWP (Loop : expr riscv_lang))) -∗
+    ▷ wp_next b p (fun (CID : CpuId) =>
+      sie_cap_gpr kt m n b p -∗
+      pc_is (add_vec_int pc 4) -∗
+      mWP (Loop : expr riscv_lang)) -∗
     mWP (Loop : expr riscv_lang).
   Proof using .
     iIntros "Hcg Hpc Hinstr Hcont".
@@ -185,11 +185,10 @@ Section WpSconfCtl.
       iIntros (e) "(-> & Hpriv & Hmenv)". iSplitR; [done|].
       iDestruct ("Hback" with "Hpriv Hmenv") as "Hsc". iFrame.
     - iIntros (CIDx) "Hcap". iSplitL; [ iExact "Hcap" | done ].
-    - (* the later this leaf HANDS OUT is the step's own, and the funnel
-         offers it outermost -- [wp_next_later] is the commutation. *)
-      iApply wp_next_later. iIntros (CIDx Hs).
-      iSpecialize ("Hcont" $! CIDx with "[%]"); [exact Hs|].
-      iNext. iIntros "Hcg' _ Hpc'". iApply ("Hcont" with "Hcg' Hpc'").
+    - (* the later this leaf HANDS OUT is the step's own, stated outermost
+         as the funnel offers it; the step's credit rides inside [wp_next]. *)
+      iNext. iIntros (CIDx Hs) "Hlc Hcg' _ Hpc'".
+      iApply ("Hcont" $! CIDx with "[%] Hlc Hcg' Hpc'"). exact Hs.
   Qed.
 
   (* ------------------------------------------------------------------- *)
@@ -203,10 +202,10 @@ Section WpSconfCtl.
     eq_vec (access_vec_dec tgt 0) ('b"0") = true ->
     sie_cap_gpr kt m n b p -∗
     pc_is pc -∗ instr pc true (JAL (jimm, zreg)) -∗
-    wp_next b p (fun (CID : CpuId) =>
-      ▷ ( sie_cap_gpr kt m n b p -∗
-        pc_is tgt -∗
-        mWP (Loop : expr riscv_lang))) -∗
+    ▷ wp_next b p (fun (CID : CpuId) =>
+      sie_cap_gpr kt m n b p -∗
+      pc_is tgt -∗
+      mWP (Loop : expr riscv_lang)) -∗
     mWP (Loop : expr riscv_lang).
   Proof using .
     intros tgt Hal0.
@@ -227,9 +226,8 @@ Section WpSconfCtl.
                      with "Hcert Hf HPC HnPC Hmisa") ].
       iIntros (e) "(-> & Hf & HPC & HnPC & _)". iSplitR; [done|]. iFrame.
     - iIntros (CIDx) "Hcap". iSplitL; [ iExact "Hcap" | done ].
-    - iApply wp_next_later. iIntros (CIDx Hs).
-      iSpecialize ("Hcont" $! CIDx with "[%]"); [exact Hs|].
-      iNext. iIntros "Hcg' _ Hpc'". iApply ("Hcont" with "Hcg' Hpc'").
+    - iNext. iIntros (CIDx Hs) "Hlc Hcg' _ Hpc'".
+      iApply ("Hcont" $! CIDx with "[%] Hlc Hcg' Hpc'"). exact Hs.
   Qed.
 
   (* ------------------------------------------------------------------- *)
@@ -277,8 +275,8 @@ Section WpSconfCtl.
       iApply (sie_cap_retarget (CID := CIDx) m
                 (<[Regidx rd := regval_into_reg (add_vec_int pc 4)]> m) n b Hsp
                 with "Hcap").
-    - iNext. iIntros (CIDx Hs) "Hcg' _ Hpc'".
-      iApply ("Hcont" $! CIDx with "[%] Hcg' Hpc'"). exact Hs.
+    - iNext. iIntros (CIDx Hs) "Hlc Hcg' _ Hpc'".
+      iApply ("Hcont" $! CIDx with "[%] Hlc Hcg' Hpc'"). exact Hs.
   Qed.
 
   (* ------------------------------------------------------------------- *)
@@ -355,8 +353,8 @@ Section WpSconfCtl.
       iDestruct ("Hback" with "Hpriv Hmenv") as "Hsc".
       rewrite (Htgt_all CIDn). iFrame.
     - iIntros (CIDx) "Hcap". iSplitL; [ iExact "Hcap" | done ].
-    - iNext. iIntros (CIDx Hs) "Hcg' _ Hpc'".
-      iApply ("Hcont" $! CIDx with "[%] Hcg' Hpc'"). exact Hs.
+    - iNext. iIntros (CIDx Hs) "Hlc Hcg' _ Hpc'".
+      iApply ("Hcont" $! CIDx with "[%] Hlc Hcg' Hpc'"). exact Hs.
   Qed.
 
   (* ------------------------------------------------------------------- *)
@@ -436,8 +434,8 @@ Section WpSconfCtl.
       iApply (sie_cap_retarget (CID := CIDx) m
                 (<[Regidx rd := regval_into_reg (add_vec_int pc 2)]> m) n b Hsp
                 with "Hcap").
-    - iNext. iIntros (CIDx Hs) "Hcg' _ Hpc'".
-      iApply ("Hcont" $! CIDx with "[%] Hcg' Hpc'"). exact Hs.
+    - iNext. iIntros (CIDx Hs) "Hlc Hcg' _ Hpc'".
+      iApply ("Hcont" $! CIDx with "[%] Hlc Hcg' Hpc'"). exact Hs.
   Qed.
 
   (* ------------------------------------------------------------------- *)

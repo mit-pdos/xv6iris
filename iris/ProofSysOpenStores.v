@@ -389,7 +389,7 @@ Section ProofSysOpenStores.
               with "Hcg Hpc [] [Hfip]").
     { iApply (soi_088 with "Htext"). }
     { iEval (rgne; rewrite HNs2). iExact "Hfip". }
-    iIntros (CID1 Hq1) "Hcg Hpc Hfip".
+    iIntros (CID1 Hq1) "_ Hcg Hpc Hfip".
     iEval (rgne; rewrite HNs2; rgne; rewrite HNs1) in "Hfip".
     assert (Hpp88 : add_vec_int (mword_of_int (SO + 0x88) : mword 64) 4
                     = mword_of_int (SO + 0x8c)) by pcw.
@@ -400,7 +400,7 @@ Section ProofSysOpenStores.
               ltac:(nz) ltac:(rdok) with "Hcg Hpc [] [H23hi]").
     { iApply (soi_08c with "Htext"). }
     { iEval (rgne; rewrite HNs0; rewrite so_omode). iExact "H23hi". }
-    iIntros (CID2 Hq2) "Hcg Hpc H23hi".
+    iIntros (CID2 Hq2) "_ Hcg Hpc H23hi".
     iEval (rgne; rewrite HNs0; rewrite so_omode) in "H23hi".
     iDestruct (so_omode_join sp0 lo om Hal23 with "H23lo H23hi") as "H23".
     set (N1 := <[Regidx Ra5 := regval_into_reg (sign_extend' 64 om : mword 64)]> N).
@@ -430,7 +430,7 @@ Section ProofSysOpenStores.
               ltac:(rgne; rewrite HN1a5; reflexivity)
               with "Hcg Hpc []").
     { iApply (soi_090 with "Htext"). }
-    iIntros (CID3 Hq3) "Hcg Hpc".
+    iIntros (CID3 Hq3) "_ Hcg Hpc".
     set (N2 := <[Regidx Ra4 := regval_into_reg (so_and om 1)]> N1).
     assert (HN2a4 : (N2 !!! Regidx Ra4 : mword 64) = so_and om 1)
       by (rewrite /N2; apply upd_eq).
@@ -448,7 +448,7 @@ Section ProofSysOpenStores.
               ltac:(rgne; rewrite HN2a4; reflexivity)
               with "Hcg Hpc []").
     { iApply (soi_094 with "Htext"). }
-    iIntros (CID4 Hq4) "Hcg Hpc".
+    iIntros (CID4 Hq4) "_ Hcg Hpc".
     set (N3 := <[Regidx Ra4 := regval_into_reg (so_rd_word om)]> N2).
     assert (HN3a4 : (N3 !!! Regidx Ra4 : mword 64) = so_rd_word om)
       by (rewrite /N3; apply upd_eq).
@@ -466,7 +466,7 @@ Section ProofSysOpenStores.
               with "Hcg Hpc [] [Hfrd]").
     { iApply (soi_098 with "Htext"). }
     { iEval (rgne; rewrite HN3s2). iExact "Hfrd". }
-    iIntros (CID5 Hq5) "Hcg Hpc Hfrd".
+    iIntros (CID5 Hq5) "_ Hcg Hpc Hfrd".
     iEval (rgne; rewrite HN3s2; rgne; rewrite HN3a4) in "Hfrd".
     assert (Hpp98 : add_vec_int (mword_of_int (SO + 0x98) : mword 64) 4
                     = mword_of_int (SO + 0x9c)) by pcw.
@@ -478,7 +478,7 @@ Section ProofSysOpenStores.
               ltac:(rgne; rewrite HN3a5; reflexivity)
               with "Hcg Hpc []").
     { iApply (soi_09c with "Htext"). }
-    iIntros (CID6 Hq6) "Hcg Hpc".
+    iIntros (CID6 Hq6) "_ Hcg Hpc".
     set (N4 := <[Regidx Ra4 := regval_into_reg (so_and om 3)]> N3).
     assert (HN4a4 : (N4 !!! Regidx Ra4 : mword 64) = so_and om 3)
       by (rewrite /N4; apply upd_eq).
@@ -497,7 +497,7 @@ Section ProofSysOpenStores.
               ltac:(rgne; rewrite HN4x0; rgne; rewrite HN4a4; reflexivity)
               with "Hcg Hpc []").
     { iApply (soi_0a0 with "Htext"). }
-    iIntros (CID7 Hq7) "Hcg Hpc".
+    iIntros (CID7 Hq7) "_ Hcg Hpc".
     set (N5 := <[Regidx Ra4 := regval_into_reg (so_wr_word om)]> N4).
     assert (HN5a4 : (N5 !!! Regidx Ra4 : mword 64) = so_wr_word om)
       by (rewrite /N5; apply upd_eq).
@@ -515,7 +515,7 @@ Section ProofSysOpenStores.
               with "Hcg Hpc [] [Hfwr]").
     { iApply (soi_0a4 with "Htext"). }
     { iEval (rgne; rewrite HN5s2). iExact "Hfwr". }
-    iIntros (CID8 Hq8) "Hcg Hpc Hfwr".
+    iIntros (CID8 Hq8) "_ Hcg Hpc Hfwr".
     iEval (rgne; rewrite HN5s2; rgne; rewrite HN5a4) in "Hfwr".
     assert (Hppa4 : add_vec_int (mword_of_int (SO + 0xa4) : mword 64) 4
                     = mword_of_int (SO + 0xa8)) by pcw.
@@ -549,7 +549,7 @@ Section ProofSysOpenStores.
               ltac:(rgne; rewrite HN5a5; reflexivity)
               with "Hcg Hpc []").
     { iApply (soi_0a8 with "Htext"). }
-    iIntros (CID9 Hq9) "Hcg Hpc".
+    iIntros (CID9 Hq9) "_ Hcg Hpc".
     set (N6 := <[Regidx Ra5 := regval_into_reg (so_and om 1024)]> N5).
     assert (HN6a5 : (N6 !!! Regidx Ra5 : mword 64) = so_and om 1024)
       by (rewrite /N6; apply upd_eq).
@@ -585,7 +585,7 @@ Section ProofSysOpenStores.
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (soi_0ac with "Htext"). }
-      iIntros (CID10 Hq10). iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID10 Hq10) "_". iIntros "Hcg Hpc".
       assert (Htgac : add_vec (mword_of_int (SO + 0xac) : mword 64)
                         (sign_extend' 64
                            (sign_extend' 13 (concat_vec (mword_of_int 6 : mword 8) ('b"0"))))
@@ -632,7 +632,7 @@ Section ProofSysOpenStores.
               ltac:(rgne; rewrite HN6a5; exact Htr)
               with "Hcg Hpc []").
     { iApply (soi_0ac with "Htext"). }
-    iIntros (CID10 Hq10) "Hcg Hpc".
+    iIntros (CID10 Hq10) "_ Hcg Hpc".
     assert (Hppac : add_vec_int (mword_of_int (SO + 0xac) : mword 64) 2
                     = mword_of_int (SO + 0xae)) by pcw.
     iEval (rewrite Hppac) in "Hpc".
@@ -646,7 +646,7 @@ Section ProofSysOpenStores.
               with "Hcg Hpc [] [Hity]").
     { iApply (soi_0ae with "Htext"). }
     { iEval (rgne; rewrite HN6s1). iExact "Hity". }
-    iIntros (CID11 Hq11) "Hcg Hpc Hity".
+    iIntros (CID11 Hq11) "_ Hcg Hpc Hity".
     iEval (rgne; rewrite HN6s1) in "Hity".
     iDestruct ("Hmback" with "[Hity]") as "Hmeta";
       [iEval (rewrite /i_type); iExact "Hity" |].
@@ -665,7 +665,7 @@ Section ProofSysOpenStores.
               N7 (K - 24)%nat b ltac:(nz) ltac:(rdok) ltac:(pcw)
               with "Hcg Hpc []").
     { iApply (soi_0b2 with "Htext"). }
-    iIntros (CID12 Hq12) "Hcg Hpc".
+    iIntros (CID12 Hq12) "_ Hcg Hpc".
     set (N8 := <[Regidx Ra5 := regval_into_reg (mword_of_int 2 : mword 64)]> N7).
     assert (HN8a4 : (N8 !!! Regidx Ra4 : mword 64)
                     = (sign_extend' 64 (di_type dn : mword 16) : mword 64))
@@ -697,7 +697,7 @@ Section ProofSysOpenStores.
                       exact (so_ty_ne (di_type dn) 2 so_tfile_range Hnf))
                 with "Hcg Hpc []").
       { iApply (soi_0b4 with "Htext"). }
-      iIntros (CID13 Hq13) "Hcg Hpc".
+      iIntros (CID13 Hq13) "_ Hcg Hpc".
       assert (Hppb4 : add_vec_int (mword_of_int (SO + 0xb4) : mword 64) 4
                       = mword_of_int (SO + 0xb8)) by pcw.
       iEval (rewrite Hppb4) in "Hpc".
@@ -743,7 +743,7 @@ Section ProofSysOpenStores.
               ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (soi_0b4 with "Htext"). }
-    iIntros (CID13 Hq13). iApply bi.later_intro. iIntros "Hcg Hpc".
+    iApply bi.later_intro. iIntros (CID13 Hq13) "_". iIntros "Hcg Hpc".
     assert (Htgb4 : add_vec (mword_of_int (SO + 0xb4) : mword 64)
                       (sign_extend' 64 (mword_of_int 154 : mword 13))
                     = mword_of_int (SO + 0x14e)) by pcw.
@@ -752,7 +752,7 @@ Section ProofSysOpenStores.
     iApply (wp_cmv_s_sconf (CID := CID13) (mword_of_int (SO + 0x14e)) Ra0 Rs1
               N8 (K - 24)%nat b ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
     { iApply (soi_14e with "Htext"). }
-    iIntros (CID14 Hq14) "Hcg Hpc".
+    iIntros (CID14 Hq14) "_ Hcg Hpc".
     set (P1 := <[Regidx Ra0 := regval_into_reg
                   (add_vec zero_reg (N8 !!! Regidx Rs1))]> N8).
     assert (HP1a0 : (P1 !!! Regidx Ra0 : mword 64) = ientry kk).
@@ -777,7 +777,7 @@ Section ProofSysOpenStores.
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (soi_150 with "Htext"). }
-    iIntros (CID15 Hq15) "Hcg Hpc".
+    iIntros (CID15 Hq15) "_ Hcg Hpc".
     set (P2 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (SO + 0x150) : mword 64) 4)]> P1).
     assert (Hjit : add_vec (mword_of_int (SO + 0x150) : mword 64)
@@ -841,7 +841,7 @@ Section ProofSysOpenStores.
                     Hdev Hgeo Hdlk Hbsl [] Hop").
     { iApply (log_credit_own icfg_log false Sb2 e2 (IBLOCK inum icfg_ist)
                 ltac:(discriminate)). }
-    iIntros (CID16 Hq16 mit) "%Hcsit Hcg Hown Htce Hcce Hpc Hpbare Hidev Hiinum
+    iIntros (CID16 Hq16) "_"; iIntros (mit) "%Hcsit Hcg Hown Htce Hcce Hpc Hpbare Hidev Hiinum
                               Hsbb Hsbi Hmeta Hmap Hblk Hat Hbsl Hop".
     iDestruct "Hop" as (wit u3 Sb3)
       "(%Hsb3 & %Hib3 & %Hwit & %Hcrb3 & %Hu3g & Hop)".
@@ -935,7 +935,7 @@ Section ProofSysOpenStores.
               mit (K - 24)%nat b ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (soi_154 with "Htext"). }
-    iIntros (CID17 Hq17). iApply bi.later_intro. iIntros "Hcg Hpc".
+    iApply bi.later_intro. iIntros (CID17 Hq17) "_". iIntros "Hcg Hpc".
     assert (Htg154 : add_vec (mword_of_int (SO + 0x154) : mword 64)
                        (sign_extend' 64
                           (sign_extend' 21 (concat_vec (mword_of_int 1970 : mword 11) ('b"0"))))

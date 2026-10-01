@@ -654,7 +654,7 @@ Section UtSysBlock.
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 ltac:(vm_compute; reflexivity) with "Hcg Hpc [] [-]").
       { iApply (uti_0a2 with "Htext"). }
-      iIntros (CID1 Hk1) "Hcg Hpc".
+      iIntros (CID1 Hk1) "_ Hcg Hpc".
       set (S4 := <[Regidx Rra := regval_into_reg
                      (add_vec_int (mword_of_int (UT + 0xa2) : mword 64) 4)]> S3).
       change (<[Regidx Rra := regval_into_reg
@@ -820,7 +820,7 @@ Section UtSysBlock.
          descriptor up to a lazy-fault extension, the size).  Framed, not
          read -- like [Hmemg], they are the CALLER's to consume, and the trap
          loop's own invariant is indifferent to all four. *)
-      iIntros (CID2 Hk2 mg U2 stsR csR)
+      iIntros (CID2 Hk2) "_"; iIntros (mg U2 stsR csR)
         "%Hcsg %Hmemg %Hfdrow %Hpiperow %Hchrow %Hmemne2 %Hmema0 %Hmemupt %Hmemsz %Hmemlz %Htfg %Hfgg %Hchgg %Hgengg %Hcwig %Hsbrg %Hfkg %Hrdg %Hpidg %Hsecg Hcg Hcpu Hbs Hip Hfd Hir Hsy Hpv Hufr Hch Hpc Hxo Hso Hfo Hwo".
       destruct U2 as [V2 M2].
       assert (Hreta6 : ret_pc (S4 !!! Regidx Rra) = mword_of_int (UT + 0xa6))

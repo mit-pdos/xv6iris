@@ -431,7 +431,7 @@ Proof using .
   iApply (wp_cmv_s_sconf (mword_of_int (CK + 0xa4)) Ra1 Rs4 Ma K b
             ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
   { iApply (cri_0a4 with "Htext"). }
-  iIntros (CID1 Hq1) "Hcg Hpc". iEval (rgne) in "Hcg".
+  iIntros (CID1 Hq1) "_ Hcg Hpc". iEval (rgne) in "Hcg".
   pose (A1 := <[Regidx Ra1 := regval_into_reg
                  (add_vec (zero_reg : mword 64) (Ma !!! Regidx Rs4))]> Ma).
   change (<[Regidx Ra1 := regval_into_reg
@@ -454,7 +454,7 @@ Proof using .
             (mword_of_int 0 : mword 12) A1 K icfg_dev b (dqm := dqp)
             ltac:(nz) ltac:(rdok) with "Hcg Hpc [] Hidev").
   { iApply (cri_0a6 with "Htext"). }
-  iIntros (CID2 Hq2) "Hcg Hpc Hidev".
+  iIntros (CID2 Hq2) "_ Hcg Hpc Hidev".
   iEval (rewrite Hdevadr) in "Hidev".
   pose (A2 := <[Regidx Ra0 := regval_into_reg
                  (sign_extend' 64 (icfg_dev : mword 32))]> A1).
@@ -476,7 +476,7 @@ Proof using .
             ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
             with "Hcg Hpc []").
   { iApply (cri_0a8 with "Htext"). }
-  iIntros (CID3 Hq3) "Hcg Hpc".
+  iIntros (CID3 Hq3) "_ Hcg Hpc".
   iEval (rewrite Htgia) in "Hpc".
   pose (A3 := <[Regidx Rra := regval_into_reg
                  (add_vec_int (mword_of_int (CK + 0xa8) : mword 64) 4)]> A2).
@@ -509,14 +509,14 @@ Proof using .
             with "Hcg Hcnt Htext Hpc Hkd Hpk Hbio Hlogc Hsbn Hsbi Hireg Hiopen
                   Hppid Hprocs Hdevi Hdgeom Hdlk Hbs2 Hitb2 Hitbl Hesc Hisl Hop
                   Htc").
-  iIntros (CID4 Hq4 Mi alloc kslot q inum dn')
+  iIntros (CID4 Hq4) "_"; iIntros (Mi alloc kslot q inum dn')
     "%Hcsi Hcg Hcnt Hpc Hsbn Hsbi Hppid Hbs2 Hres".
   iEval (rewrite Hpcac) in "Hpc".
   (* ===== +0xac  c.mv s3,a0 : s3 := ip =============================== *)
   iApply (wp_cmv_s_sconf (mword_of_int (CK + 0xac)) Rs3 Ra0 Mi K b
             ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
   { iApply (cri_0ac with "Htext"). }
-  iIntros (CID5 Hq5) "Hcg Hpc". iEval (rgne) in "Hcg".
+  iIntros (CID5 Hq5) "_ Hcg Hpc". iEval (rgne) in "Hcg".
   pose (F1 := <[Regidx Rs3 := regval_into_reg
                  (add_vec (zero_reg : mword 64) (Mi !!! Regidx Ra0))]> Mi).
   change (<[Regidx Rs3 := regval_into_reg
@@ -546,7 +546,7 @@ Proof using .
                     apply cft_entry_nonzero; unfold NINODE in *; lia)
               with "Hcg Hpc []").
     { iApply (cri_0ae with "Htext"). }
-    iIntros (CID6 Hq6) "Hcg Hpc".
+    iIntros (CID6 Hq6) "_ Hcg Hpc".
     assert (Hpp0b0 : add_vec_int (mword_of_int (CK + 0xae) : mword 64) 2
                      = mword_of_int (CK + 0xb0)) by pcw.
     iEval (rewrite Hpp0b0) in "Hpc".
@@ -559,7 +559,7 @@ Proof using .
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (cri_0b0 with "Htext"). }
-    iIntros (CID7 Hq7) "Hcg Hpc".
+    iIntros (CID7 Hq7) "_ Hcg Hpc".
     iEval (rewrite Htgil) in "Hpc".
     pose (B1 := <[Regidx Rra := regval_into_reg
                    (add_vec_int (mword_of_int (CK + 0xb0) : mword 64) 4)]> F1).
@@ -616,7 +616,7 @@ Proof using .
     { rewrite Heb /trap_csrs_ext. done. }
     { rewrite Heb /cpu_claim_ext. done. }
     { rewrite /ic_dep_side. iExact "Htx". }
-    iIntros (CID8 Hq8 Mo dnc bmc filled)
+    iIntros (CID8 Hq8) "Hlc"; iIntros (Mo dnc bmc filled)
       "%Hcso _ Hcg Hcnt _ _ Hpc Hppid Hsbi Hbs1 Hslq Hdep Hoffr
        Hcidev Hciinum Hcivalid Hcload #Hcshot Hcfrz %Hfrf Hwb %Hilkp".
     (* THE CLAIM ARM'S PAYOUT IS A PAIR since durable-disk C-5: the plain
@@ -632,7 +632,7 @@ Proof using .
     iEval (rewrite Hpcb4) in "Hpc".
     iDestruct (cft_bs3 with "[Hbs1 Hbs2]") as "Hbsl";
       [iSplitL "Hbs1"; [iExact "Hbs1" | iExact "Hbs2"] |].
-    iSpecialize ("Hcont" $! CID8 with "[%]"); [wp_next_chain |].
+    iSpecialize ("Hcont" $! CID8 with "[%] Hlc"); [wp_next_chain |].
     iApply ("Hcont" $! Mo true kslot q gsh inum gilc gislc dnc bmc
               with "[%] Hcg Hcnt Hsbn Hsbi Hppid Hbsl Hidev
                     [Hpc Hslq Hdep Hoffr Hcidev Hciinum Hcivalid Hcload Hcfrz
@@ -684,13 +684,13 @@ Proof using .
               with "Hcg Hpc []").
     { iApply (cri_0ae with "Htext"). }
     iApply bi.later_intro.
-    iIntros (CID6 Hq6) "Hcg Hpc".
+    iIntros (CID6 Hq6) "Hlc Hcg Hpc".
     iEval (rewrite Htk) in "Hpc".
     iDestruct (cft_bs3 with "[Hbs1 Hbs2]") as "Hbsl";
       [iSplitL "Hbs1"; [iExact "Hbs1" | iExact "Hbs2"] |].
     iDestruct (cpu_own_transport CID4 CID6 0%nat eb (proc_addr j) b
                  ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
-    iSpecialize ("Hcont" $! CID6 with "[%]"); [wp_next_chain |].
+    iSpecialize ("Hcont" $! CID6 with "[%] Hlc"); [wp_next_chain |].
     iApply ("Hcont" $! F1 false 0%nat 1%Qp γl inum γl γl dn' bm_empty
               with "[%] Hcg Hcnt Hsbn Hsbi Hppid Hbsl Hidev [Hpc Hisl Htx Htc Hop]").
     { intros c Hc Hne.

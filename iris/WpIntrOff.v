@@ -100,16 +100,16 @@ Section WpIntrOff.
       iDestruct "Hcpu" as "%Hpure". destruct Hpure as (_ & _ & ->).
       iApply (wp_csrci_sstatus_x0_s_sconf pc m n true with "Hcg [] Hpc Hinstr [Hcont]").
       { iPureIntro. exact (conj eq_refl eq_refl). }
-      iIntros (CIDn Hk ms) "%Hmsf Hcg Hcnt Hcsrs Hclm Hcells Hpc".
-      iDestruct (wp_next_at true p _ CIDn Hk with "Hcont") as "Hcont".
+      iIntros (CIDn Hk) "Hlc"; iIntros (ms) "%Hmsf Hcg Hcnt Hcsrs Hclm Hcells Hpc".
+      iDestruct (wp_next_at true p _ CIDn Hk with "Hcont Hlc") as "Hcont".
       iApply ("Hcont" $! ms with "[%//] Hcg [Hcells Hcnt] Hcsrs [Hclm] Hpc").
       { rewrite /cpu_own /cpu_hart /cpu_priv_pay. iFrame "Hcells Hcnt". }
       { rewrite /cpu_claim_pay. iExact "Hclm". }
     - (* ---- ALREADY DISABLED: a no-op; the caller brought the CSRs. ---- *)
       iIntros "Hcg Hcpu Hcsrs Hpc Hinstr Hcont".
       iApply (wp_csrci_sstatus_x0_idem_s_sconf pc m n with "Hcg Hpc Hinstr").
-      iApply wp_next_off_intro. iIntros (ms) "%Hmsf Hcg Hpc".
-      iDestruct (wp_next_here false p with "Hcont") as "Hcont".
+      iApply wp_next_off_intro_lc. iIntros "Hlc". iIntros (ms) "%Hmsf Hcg Hpc".
+      iDestruct (wp_next_here false p with "Hcont Hlc") as "Hcont".
       iApply ("Hcont" $! ms with "[%//] Hcg Hcpu Hcsrs [] Hpc").
       rewrite /cpu_claim_pay. done.
   Qed.

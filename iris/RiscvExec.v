@@ -767,7 +767,7 @@ Section WPExec.
             m m0 σ0 log0 tv0 itv0 hr0 r0⌝ ∗
           ▷ (∀ m' σ' log' tv' itv' hr' r',
                ⌜mnode_step oth (hart_agent cpu_id) img σ log tv itv hr r
-                  m m' σ' log' tv' itv' hr' r'⌝ ={∅,⊤}=∗
+                  m m' σ' log' tv' itv' hr' r'⌝ -∗ £ 1 ={∅,⊤}=∗
                mstate_interp σ' ∗
                hart_iview_auth cpu_id itv' ∗
                hart_rview_auth cpu_id (hr_rv hr') ∗
@@ -853,14 +853,15 @@ Section WPExec.
       by (rewrite Hvd; exact Hdview).
     assert (Hvd2 : v_disk (dvirtio (gdev g)) = v_disk (dvirtio (mdev σ2)))
       by (symmetry; exact Hvd).
-    iMod ("Hk" $! m2 σ2 log2 tv2 itv2 hr2 r2 with "[//]")
+    iIntros "Hlc".
+    iMod ("Hk" $! m2 σ2 log2 tv2 itv2 hr2 r2 with "[//] Hlc")
       as "[(Hri' & Hmem' & Hdev') (Hivc' & Hrvc' & Htso' & HWP)]".
     iDestruct ("Hclose" with "Hri'") as "Hgr'".
     iDestruct ("Hivclose" with "Hivc'") as "Hiv2".
     iDestruct ("Hrvclose" with "Hrvc'") as "Hrv2".
     iDestruct (tso_interp_hart_wb _ g cpu_id σ2.(sregs) σ2.(mem) σ2.(mdev)
                  r2 log2 tv2 itv2 hr2 with "Htso'") as "Htso2".
-    iIntros "_ !>".
+    iModIntro.
     iEval (rewrite /disk_fixed_interp Hvd2) in "Htie".
     (* the trace conjunct: a hart step is SILENT, so it is re-packed at the
        same history ([obs_interp_silent]) *)
@@ -918,7 +919,7 @@ Section WPExec.
             m m0 σ0 log0 tv0 itv0 hr0 r0⌝ ∗
           ▷ (∀ m' σ' log' tv' itv' hr' r',
                ⌜mnode_step oth (hart_agent cpu_id) img σ log tv itv hr rr
-                  m m' σ' log' tv' itv' hr' r'⌝ ={∅,⊤}=∗
+                  m m' σ' log' tv' itv' hr' r'⌝ -∗ £ 1 ={∅,⊤}=∗
                mstate_interp σ' ∗
                hart_iview_auth cpu_id itv' ∗
                hart_rview_auth cpu_id (hr_rv hr') ∗
@@ -1008,7 +1009,8 @@ Section WPExec.
     assert (Hvd2 : v_disk (dvirtio (gdev g)) = v_disk (dvirtio (mdev σ2)))
       by (symmetry; exact Hvd).
     rewrite Hrr in Hnode.
-    iMod ("Hk" $! m2 σ2 log2 tv2 itv2 hr2 r2 with "[//]")
+    iIntros "Hlc".
+    iMod ("Hk" $! m2 σ2 log2 tv2 itv2 hr2 r2 with "[//] Hlc")
       as "[(Hri' & Hmem' & Hdev') (Hivc' & Hrvc' & Htso' & HWP)]".
     iDestruct ("Hclose" with "Hri'") as "Hgr'".
     iDestruct ("Hivclose" with "Hivc'") as "Hiv2".
@@ -1018,7 +1020,7 @@ Section WPExec.
     iMod (resv_fragb_update g.(gresv) g.(ghr) cpu_id rr b r2 hr2 with "Hresv Hfrag")
       as "[Hresv Hfrag]".
     iDestruct ("HWP" with "Hfrag") as "HWP".
-    iIntros "_ !>".
+    iModIntro.
     iEval (rewrite /disk_fixed_interp Hvd2) in "Htie".
     (* the trace conjunct: a hart step is SILENT, so it is re-packed at the
        same history ([obs_interp_silent]) *)
@@ -1057,7 +1059,7 @@ Section WPExec.
     gen_cert -∗
     resv_frag cpu_id rr -∗
     ▷ (∀ tick : bool,
-         resv_frag cpu_id None -∗
+         resv_frag cpu_id None -∗ £ 1 -∗
          mWP (HartE gen_id cpu_id (riscv_step tick) : expr riscv_lang)) -∗
     mWP (Loop : expr riscv_lang).
   Proof using .
@@ -1069,7 +1071,7 @@ Section WPExec.
     iExists (riscv_step false), σ, log, tv, itv,
       (HRead (hr_rv hr) (hr_coh hr) false), None.
     iSplitR; [iPureIntro; by exists false|].
-    iNext. iIntros (m' σ' log' tv' itv' hr' r') "%Hn".
+    iNext. iIntros (m' σ' log' tv' itv' hr' r') "%Hn Hlc".
     destruct Hn as (tick & -> & -> & -> & -> & -> & -> & ->).
     iMod "Hback" as "_". iModIntro. iFrame "Hsi Hiv Hrv".
     (* the boundary touches neither the log nor the view (an instruction
@@ -1078,7 +1080,7 @@ Section WPExec.
        dangling reservation. *)
     iSplitL "Htso".
     { rewrite -Htv. iApply (tso_interp_of_idle with "Htso"). }
-    iIntros "Hfrag". iApply ("H" with "[Hfrag]").
+    iIntros "Hfrag". iApply ("H" with "[Hfrag] Hlc").
     iApply (resv_frag_of_fragb with "Hfrag").
   Qed.
 
@@ -1122,7 +1124,7 @@ Section WPDev.
        ⌜obs_ins i (open_seg h) = u_recv (duart d i)⌝ -∗
        ⌜obs_boots h = S gen_id⌝ -∗
        gregs_interp gr ∗ gen_heap_interp m ∗ dev_interp d ∗ obs_auth h ={⊤,∅}=∗
-       ▷ (∀ κ d', ⌜uart_step i d κ d'⌝ ={∅,⊤}=∗
+       ▷ (∀ κ d', ⌜uart_step i d κ d'⌝ -∗ £ 1 ={∅,⊤}=∗
             gregs_interp gr ∗ gen_heap_interp m ∗ dev_interp d' ∗
             obs_auth (h ++ κ)%list ∗
             mWP (UartLoop i : expr riscv_lang))) -∗
@@ -1182,14 +1184,15 @@ Section WPDev.
     destruct (prim_step_uart_inv _ _ _ _ _ _ _ Hstep)
       as (-> & -> & [ (Hlive & d' & Hdstep & ->) | (Hnl & _) ]);
       last by (exfalso; apply Hnl; split; congruence).
-    iMod ("Hk" $! κ d' with "[//]") as "(Hgr' & Hmem' & Hdev' & Hoauth' & HWP)".
+    iIntros "Hlc".
+    iMod ("Hk" $! κ d' with "[//] Hlc") as "(Hgr' & Hmem' & Hdev' & Hoauth' & HWP)".
     (* a UART step moves no disk byte, so the durable conjunct is FRAMED *)
     pose proof (uart_step_v_disk _ _ _ _ Hdstep) as Hvd.
     assert (Hdview2 : disk_view dmap (v_disk (dvirtio d')))
       by (rewrite Hvd; exact Hdview).
     assert (Hvd2 : v_disk (dvirtio (gdev g)) = v_disk (dvirtio d'))
       by (symmetry; exact Hvd).
-    iIntros "_ !>".
+    iModIntro.
     iEval (rewrite /disk_fixed_interp Hvd2) in "Htie".
     (* the trace conjunct, re-packed at the extended history: the client
        moved the ghost, the language's step invariant does the rest *)
@@ -1261,8 +1264,8 @@ Section WPDev.
             (* [%list]: this file sits in [Z_scope] and the model's imports
                leave [++] resolving to STRING append otherwise *)
             ⌜(W = ∅ /\ log' = log)
-             \/ (W <> ∅ /\ log' = (log ++ [PWMsg W disk_agent])%list)⌝
-            ={∅,⊤}=∗
+             \/ (W <> ∅ /\ log' = (log ++ [PWMsg W disk_agent])%list)⌝ -∗
+            £ 1 ={∅,⊤}=∗
             gregs_interp gr ∗ gen_heap_interp (W ∪ m) ∗ dev_interp d' ∗
             disk_img_auth disk_img_name (v_disk (dvirtio d')) ∗
             disk_fixed_auth (v_disk (dvirtio d')) ∗ start_auth n ∗
@@ -1331,11 +1334,12 @@ Section WPDev.
       as (-> & -> & -> & [ (Hlive & d' & W & log' & Hdstep & Hlog & _ & ->)
                          | (Hnl & ->) ]);
       last by (exfalso; apply Hnl; split; congruence).
-    iMod ("Hk" $! d' W log' with "[//] [//]")
+    iIntros "Hlc".
+    iMod ("Hk" $! d' W log' with "[//] [//] Hlc")
       as "(Hgr' & Hmem' & Hdev' & Hdur' & Htie' & Hsauth' & Htso' & HWP)".
     iDestruct (tso_interp_disk_wb _ g (W ∪ g.(gmem)) d' log' with "Htso'")
       as "Htso2".
-    iIntros "_ !>".
+    iModIntro.
     iEval (cbn [app]) in "Hobs".
     iDestruct (obs_interp_silent _ _ _ _ _ _ Hstep with "Hobs") as "Hobs".
     rewrite /state_interp /power_interp /disk_fixed_interp
@@ -1360,7 +1364,7 @@ Section WPDev.
   Lemma wp_plic_step :
     gen_cert -∗
     (∀ gr m d, gregs_interp gr ∗ gen_heap_interp m ∗ dev_interp d ={⊤,∅}=∗
-       ▷ (∀ gr', ⌜plic_step d gr gr'⌝ ={∅,⊤}=∗
+       ▷ (∀ gr', ⌜plic_step d gr gr'⌝ -∗ £ 1 ={∅,⊤}=∗
             gregs_interp gr' ∗ gen_heap_interp m ∗ dev_interp d ∗
             mWP (PlicLoop : expr riscv_lang))) -∗
     mWP (PlicLoop : expr riscv_lang).
@@ -1414,8 +1418,9 @@ Section WPDev.
     destruct (prim_step_plic_inv _ _ _ _ _ _ Hstep)
       as (-> & -> & -> & [ (Hlive & gr' & Hdstep & ->) | (Hnl & ->) ]);
       last by (exfalso; apply Hnl; split; congruence).
-    iMod ("Hk" $! gr' with "[//]") as "(Hgr' & Hmem' & Hdev' & HWP)".
-    iIntros "_ !>".
+    iIntros "Hlc".
+    iMod ("Hk" $! gr' with "[//] Hlc") as "(Hgr' & Hmem' & Hdev' & HWP)".
+    iModIntro.
     iEval (cbn [app]) in "Hobs".
     iDestruct (obs_interp_silent _ _ _ _ _ _ Hstep with "Hobs") as "Hobs".
     rewrite /state_interp /power_interp /disk_fixed_interp

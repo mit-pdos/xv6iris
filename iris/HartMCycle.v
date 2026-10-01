@@ -969,7 +969,7 @@ Section mcycle.
        instruction left comes in, the boundary drops it, and the body starts
        at [None] *)
     resv_any cpu_id -∗
-    ▷ (resv_frag cpu_id None -∗
+    ▷ (resv_frag cpu_id None -∗ £ 1 -∗
        swp (try_step 0 false)
          (fun _ => ∃ rs1 : regstate, ⌜P rs1⌝ ∗
                      hreg_frame rs1 Drw ∗ hreg_frame_ro Df rs1 Dro ∗ Ψ)) -∗
@@ -984,11 +984,11 @@ Section mcycle.
     iIntros "#Hcert Hfrag Hbody Hcont".
     iDestruct "Hfrag" as (rr) "Hfrag".
     iApply (swp_loop rr with "Hcert Hfrag").
-    iNext. iIntros (tick) "Hfrag".
+    iNext. iIntros (tick) "Hfrag Hlc".
     iApply (swp_mono _ _ (fun _ => mWP (Loop : expr riscv_lang))%I
               with "[Hcont] [-]").
     2:{ iApply (swp_tick_wrap Drw Dro Df P Ψ tick Hdisj HWcy HWti HWip
-                  with "Hcert [Hbody Hfrag]"). iApply ("Hbody" with "Hfrag"). }
+                  with "Hcert [Hbody Hfrag Hlc]"). iApply ("Hbody" with "Hfrag Hlc"). }
     iIntros (u). iDestruct 1 as (rs2) "(%Hex & Hrw & Hro & HPsi)".
     iApply ("Hcont" with "[%] Hrw Hro HPsi"). exact Hex.
   Qed.
@@ -1002,7 +1002,7 @@ Section mcycle.
     (R_bitvector_64 mip : register) ∈ Drw ->
     gen_cert -∗
     resv_any cpu_id -∗
-    ▷ (resv_frag cpu_id None -∗
+    ▷ (resv_frag cpu_id None -∗ £ 1 -∗
        swp (try_step 0 false)
          (fun _ => ∃ rs1 : regstate, ⌜P rs1⌝ ∗
                      hreg_frame rs1 Drw ∗ hreg_frame_ro Df rs1 Dro ∗ Ψ rs1)) -∗
@@ -1016,11 +1016,11 @@ Section mcycle.
     iIntros "#Hcert Hfrag Hbody Hcont".
     iDestruct "Hfrag" as (rr) "Hfrag".
     iApply (swp_loop rr with "Hcert Hfrag").
-    iNext. iIntros (tick) "Hfrag".
+    iNext. iIntros (tick) "Hfrag Hlc".
     iApply (swp_mono _ _ (fun _ => mWP (Loop : expr riscv_lang))%I
               with "[Hcont] [-]").
     2:{ iApply (swp_tick_wrap_ex Drw Dro Df P Ψ tick Hdisj HWcy HWti HWip
-                  with "Hcert [Hbody Hfrag]"). iApply ("Hbody" with "Hfrag"). }
+                  with "Hcert [Hbody Hfrag Hlc]"). iApply ("Hbody" with "Hfrag Hlc"). }
     iIntros (u). iDestruct 1 as (rs2 rs1) "(%Hex & Hrw & Hro & HPsi)".
     iApply ("Hcont" with "[%] Hrw Hro HPsi"). exact Hex.
   Qed.
@@ -1141,7 +1141,7 @@ Section mcycle.
     2:{ iNext. iIntros (rs3) "%Hag Hrw Hro HPsi".
         destruct Hag as (rsP & (mi & ->) & Hag).
         iApply ("Hcont" with "[%] Hrw Hro HPsi"). by exists mi. }
-    iNext. iIntros "Hfrag".
+    iNext. iIntros "Hfrag _".
     iApply (swp_mono with "[] [-]");
       [| iApply (swp_try_step_gen Drw Dro Df rs1 rsB Psi Hdisj HDpriv
                    HDhart HDmc HDcfg HWmi HDmi HWms HDms HWpc HDpc HDnpc

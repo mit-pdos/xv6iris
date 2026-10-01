@@ -822,7 +822,7 @@ Section VdrwfP6.
     intros HK Hglen Hlenbuf Hlendisk Hsec Hbufkd Hsp0m Hbelow.
     iIntros "#Htext #Hpinv #Hqinv #Hrcpt #Hdinv #Hgeom #Hlk Hsaved Hbno Hcont".
     rewrite /P5.vdrw_p5_exit.
-    iIntros (CIDx Hsx M q np nr cm fr h m2 t pin)
+    iIntros (CIDx Hsx) "_"; iIntros (M q np nr cm fr h m2 t pin)
             "%Hrh %Hok %Hpinr %Hal Hcg Hown Htc Hclm Hpc Htok
              Hbody Hact Hinfob Hhcm Hbdisk Hu Hfm Hft Hrm Hrt Hidx".
     (* SPLIT AT THE INDEX, ONCE, RIGHT HERE: [Hpay] rides UNCHANGED through
@@ -1412,7 +1412,7 @@ Section VdrwfP6.
               ({["virtio_disk"]} ∪ lks)
               HH3a0 ltac:(pose proof (vdrw_K10 K HK); lia)
               with "Hcg Htext Hpc Hlk Htok HR Hown Hpay").
-    iIntros (CIDr Hsr MR) "Hcg Hpc %HcsR Hown".
+    iIntros (CIDr Hsr) "_"; iIntros (MR) "Hcg Hpc %HcsR Hown".
     (* the release gave the virtio rank back; hand the caller the bare set
        P1-P4 name (see the two-conventions note in lock-set.md). *)
     iEval (rewrite (locks_add_del_below "virtio_disk" lks Hbelow)) in "Hown".
@@ -1480,7 +1480,7 @@ Section VdrwfP6.
               ltac:(rdok) with "Hcg Hpc [] [Hk1]").
     { iApply (rwi_21c with "Htext"). }
     { rgall. iEval (rewrite HMRsp Hb1). iExact "Hk1". }
-    iIntros (CIDp1 Hsp1) "Hcg Hpc Hk1". rgall. iEval (rewrite HMRsp Hb1) in "Hk1".
+    iIntros (CIDp1 Hsp1) "_ Hcg Hpc Hk1". rgall. iEval (rewrite HMRsp Hb1) in "Hk1".
     set (R1 := <[Regidx Rra := regval_into_reg (m !!! Regidx Rra)]> MR).
     change (<[Regidx Rra := regval_into_reg (m !!! Regidx Rra)]> MR) with R1.
     assert (HR1sp : R1 !!! Regidx csp_rs1 = (pa_stk sp0 12 : SailStdpp.Values.mword 64))
@@ -1494,7 +1494,7 @@ Section VdrwfP6.
               ltac:(rdok) with "Hcg Hpc [] [Hk2]").
     { iApply (rwi_21e with "Htext"). }
     { rgall. iEval (rewrite HR1sp Hb2). iExact "Hk2". }
-    iIntros (CIDp2 Hsp2) "Hcg Hpc Hk2". rgall. iEval (rewrite HR1sp Hb2) in "Hk2".
+    iIntros (CIDp2 Hsp2) "_ Hcg Hpc Hk2". rgall. iEval (rewrite HR1sp Hb2) in "Hk2".
     set (R2 := <[Regidx Rs0 := regval_into_reg (m !!! Regidx Rs0)]> R1).
     change (<[Regidx Rs0 := regval_into_reg (m !!! Regidx Rs0)]> R1) with R2.
     assert (HR2sp : R2 !!! Regidx csp_rs1 = (pa_stk sp0 12 : SailStdpp.Values.mword 64))
@@ -1508,7 +1508,7 @@ Section VdrwfP6.
               ltac:(rdok) with "Hcg Hpc [] [Hk3]").
     { iApply (rwi_220 with "Htext"). }
     { rgall. iEval (rewrite HR2sp Hb3). iExact "Hk3". }
-    iIntros (CIDp3 Hsp3) "Hcg Hpc Hk3". rgall. iEval (rewrite HR2sp Hb3) in "Hk3".
+    iIntros (CIDp3 Hsp3) "_ Hcg Hpc Hk3". rgall. iEval (rewrite HR2sp Hb3) in "Hk3".
     set (R3 := <[Regidx Rs1 := regval_into_reg (m !!! Regidx Rs1)]> R2).
     change (<[Regidx Rs1 := regval_into_reg (m !!! Regidx Rs1)]> R2) with R3.
     assert (HR3sp : R3 !!! Regidx csp_rs1 = (pa_stk sp0 12 : SailStdpp.Values.mword 64))
@@ -1522,7 +1522,7 @@ Section VdrwfP6.
               ltac:(rdok) with "Hcg Hpc [] [Hk4]").
     { iApply (rwi_222 with "Htext"). }
     { rgall. iEval (rewrite HR3sp Hb4). iExact "Hk4". }
-    iIntros (CIDp4 Hsp4) "Hcg Hpc Hk4". rgall. iEval (rewrite HR3sp Hb4) in "Hk4".
+    iIntros (CIDp4 Hsp4) "_ Hcg Hpc Hk4". rgall. iEval (rewrite HR3sp Hb4) in "Hk4".
     set (R4 := <[Regidx Rs2 := regval_into_reg (m !!! Regidx Rs2)]> R3).
     change (<[Regidx Rs2 := regval_into_reg (m !!! Regidx Rs2)]> R3) with R4.
     assert (HR4sp : R4 !!! Regidx csp_rs1 = (pa_stk sp0 12 : SailStdpp.Values.mword 64))
@@ -1536,7 +1536,7 @@ Section VdrwfP6.
               ltac:(rdok) with "Hcg Hpc [] [Hk5]").
     { iApply (rwi_224 with "Htext"). }
     { rgall. iEval (rewrite HR4sp Hb5). iExact "Hk5". }
-    iIntros (CIDp5 Hsp5) "Hcg Hpc Hk5". rgall. iEval (rewrite HR4sp Hb5) in "Hk5".
+    iIntros (CIDp5 Hsp5) "_ Hcg Hpc Hk5". rgall. iEval (rewrite HR4sp Hb5) in "Hk5".
     set (R5 := <[Regidx Rs3 := regval_into_reg (m !!! Regidx Rs3)]> R4).
     change (<[Regidx Rs3 := regval_into_reg (m !!! Regidx Rs3)]> R4) with R5.
     assert (HR5sp : R5 !!! Regidx csp_rs1 = (pa_stk sp0 12 : SailStdpp.Values.mword 64))
@@ -1550,7 +1550,7 @@ Section VdrwfP6.
               ltac:(rdok) with "Hcg Hpc [] [Hk6]").
     { iApply (rwi_226 with "Htext"). }
     { rgall. iEval (rewrite HR5sp Hb6). iExact "Hk6". }
-    iIntros (CIDp6 Hsp6) "Hcg Hpc Hk6". rgall. iEval (rewrite HR5sp Hb6) in "Hk6".
+    iIntros (CIDp6 Hsp6) "_ Hcg Hpc Hk6". rgall. iEval (rewrite HR5sp Hb6) in "Hk6".
     set (R6 := <[Regidx Rs4 := regval_into_reg (m !!! Regidx Rs4)]> R5).
     change (<[Regidx Rs4 := regval_into_reg (m !!! Regidx Rs4)]> R5) with R6.
     assert (HR6sp : R6 !!! Regidx csp_rs1 = (pa_stk sp0 12 : SailStdpp.Values.mword 64))
@@ -1564,7 +1564,7 @@ Section VdrwfP6.
               ltac:(rdok) with "Hcg Hpc [] [Hk7]").
     { iApply (rwi_228 with "Htext"). }
     { rgall. iEval (rewrite HR6sp Hb7). iExact "Hk7". }
-    iIntros (CIDp7 Hsp7) "Hcg Hpc Hk7". rgall. iEval (rewrite HR6sp Hb7) in "Hk7".
+    iIntros (CIDp7 Hsp7) "_ Hcg Hpc Hk7". rgall. iEval (rewrite HR6sp Hb7) in "Hk7".
     set (R7 := <[Regidx Rs5 := regval_into_reg (m !!! Regidx Rs5)]> R6).
     change (<[Regidx Rs5 := regval_into_reg (m !!! Regidx Rs5)]> R6) with R7.
     assert (HR7sp : R7 !!! Regidx csp_rs1 = (pa_stk sp0 12 : SailStdpp.Values.mword 64))
@@ -1578,7 +1578,7 @@ Section VdrwfP6.
               ltac:(rdok) with "Hcg Hpc [] [Hk8]").
     { iApply (rwi_22a with "Htext"). }
     { rgall. iEval (rewrite HR7sp Hb8). iExact "Hk8". }
-    iIntros (CIDp8 Hsp8) "Hcg Hpc Hk8". rgall. iEval (rewrite HR7sp Hb8) in "Hk8".
+    iIntros (CIDp8 Hsp8) "_ Hcg Hpc Hk8". rgall. iEval (rewrite HR7sp Hb8) in "Hk8".
     set (R8 := <[Regidx Rs6 := regval_into_reg (m !!! Regidx Rs6)]> R7).
     change (<[Regidx Rs6 := regval_into_reg (m !!! Regidx Rs6)]> R7) with R8.
     assert (HR8sp : R8 !!! Regidx csp_rs1 = (pa_stk sp0 12 : SailStdpp.Values.mword 64))
@@ -1592,7 +1592,7 @@ Section VdrwfP6.
               ltac:(rdok) with "Hcg Hpc [] [Hk9]").
     { iApply (rwi_22c with "Htext"). }
     { rgall. iEval (rewrite HR8sp Hb9). iExact "Hk9". }
-    iIntros (CIDp9 Hsp9) "Hcg Hpc Hk9". rgall. iEval (rewrite HR8sp Hb9) in "Hk9".
+    iIntros (CIDp9 Hsp9) "_ Hcg Hpc Hk9". rgall. iEval (rewrite HR8sp Hb9) in "Hk9".
     set (R9 := <[Regidx Rs7 := regval_into_reg (m !!! Regidx Rs7)]> R8).
     change (<[Regidx Rs7 := regval_into_reg (m !!! Regidx Rs7)]> R8) with R9.
     assert (HR9sp : R9 !!! Regidx csp_rs1 = (pa_stk sp0 12 : SailStdpp.Values.mword 64))
@@ -1606,7 +1606,7 @@ Section VdrwfP6.
               ltac:(rdok) with "Hcg Hpc [] [Hk10]").
     { iApply (rwi_22e with "Htext"). }
     { rgall. iEval (rewrite HR9sp Hb10). iExact "Hk10". }
-    iIntros (CIDp10 Hsp10) "Hcg Hpc Hk10". rgall. iEval (rewrite HR9sp Hb10) in "Hk10".
+    iIntros (CIDp10 Hsp10) "_ Hcg Hpc Hk10". rgall. iEval (rewrite HR9sp Hb10) in "Hk10".
     set (R10 := <[Regidx Rs8 := regval_into_reg (m !!! Regidx Rs8)]> R9).
     change (<[Regidx Rs8 := regval_into_reg (m !!! Regidx Rs8)]> R9) with R10.
     assert (HR10sp : R10 !!! Regidx csp_rs1 = (pa_stk sp0 12 : SailStdpp.Values.mword 64))
@@ -1658,7 +1658,7 @@ Section VdrwfP6.
               (mword_of_int 6 : mword 6) R10 (K - 12)%nat 12 eb Hpop
               with "Hcg Hpc [] Hframe").
     { iApply (rwi_230 with "Htext"). }
-    iIntros (CIDp11 Hsp11) "Hcg Hpc". rgall.
+    iIntros (CIDp11 Hsp11) "_ Hcg Hpc". rgall.
     set (R11 := <[Regidx csp_rs1 := regval_into_reg
                    (add_vec (R10 !!! Regidx csp_rs1)
                       (sign_extend' 64 (caddi16sp_imm (mword_of_int 6 : mword 6))))]> R10).
@@ -1685,7 +1685,7 @@ Section VdrwfP6.
     iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x232) : mword 64) Rra R11 K eb
               ltac:(vm_compute; discriminate) with "Hcg Hpc []").
     { iApply (rwi_232 with "Htext"). }
-    iIntros (CIDp12 Hsp12) "Hcg Hpc". rgall.
+    iIntros (CIDp12 Hsp12) "Hlc Hcg Hpc". rgall.
     iEval (rewrite HR11ra) in "Hpc".
     (* ================= the spec's continuation ======================== *)
     assert (Hthr : forall r : mword 5, is_cs_idx r = true ->
@@ -1805,7 +1805,7 @@ Section VdrwfP6.
                  with "Hextc") as "Hextc".
     iDestruct (cpu_claim_ext_transport CIDx CIDp12 eb (proc_addr j) ltac:(wp_next_chain)
                  with "Hextm") as "Hextm".
-    iSpecialize ("Hcont" $! CIDp12 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CIDp12 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! R11 with
               "[%] Hcg Hown Hextc Hextm Hpc [Hbno Hbdisk Hbufm] [Hdbytes] [HQ]").
     - exact Hcs.
@@ -1897,7 +1897,7 @@ Section ProofVirtioDiskRwF.
     (* ---- P1: prologue + acquire ---- *)
     iApply (P1.wp_vdrw_p1 γd γk pd pav pu m K eb (proc_addr j) bno lks HK Hbelow
               with "Hcg Hown Hextc Hextm Htext Hpc Hlk Hbno").
-    iIntros (CIDa Hsa M) "%Hrh Hcg Hown Hpay Hextc Hextm Hpc Htok HR Hsaved Hscr Hbno".
+    iIntros (CIDa Hsa) "_"; iIntros (M) "%Hrh Hcg Hown Hpay Hextc Hextm Hpc Htok HR Hsaved Hscr Hbno".
     destruct Hrh as (Hregs & Hhi).
     (* JOIN AT THE INDEX: P1's own acquire freed the pair at [eb = true] and
        nothing at [eb = false], where the caller (our own precondition)
@@ -1935,10 +1935,10 @@ Section ProofVirtioDiskRwF.
               HK Hglen Hlenbuf Hlendisk Hsecval Hbufkd eq_refl
               ltac:(lkbelow)
               with "Htext Hpinv Hqinv Hrcpt Hdinv Hgeom Hlk Hsaved Hbno").
-    iIntros (CIDf Hsf mf) "%Hcsf Hcg Hown Hextc Hextm Hpc Hbufo Hdisko HQ".
+    iIntros (CIDf Hsf) "Hlc"; iIntros (mf) "%Hcsf Hcg Hown Hextc Hextm Hpc Hbufo Hdisko HQ".
     iEval (rewrite Hsld) in "Hbufo".
     iEval (rewrite Hsld) in "Hdisko".
-    iSpecialize ("Hcont" $! CIDf with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CIDf with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! mf with
               "[%] Hcg Hown Hextc Hextm Hpc Hbufo Hdisko HQ").
     { exact Hcsf. }

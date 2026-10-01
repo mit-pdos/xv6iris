@@ -296,7 +296,7 @@ Section batch2.
     { iPureIntro.
       exact (hsil_node2_mnode Drw Dro rs0 rs2 m m1 mem0 dev0 Hnode2 oth
                (hart_agent cpu_id) img log tv itv hr r). }
-    iNext. iIntros (m' σ' log' tv' itv' hr' r') "%Hstep".
+    iNext. iIntros (m' σ' log' tv' itv' hr' r') "%Hstep _".
     destruct (hsil_node2_mnode_inv Drw Dro rs0 rs2 m m1 m' mem0 dev0 σ' oth
                 (hart_agent cpu_id) img log log' tv tv' itv itv' hr hr' r r' Hnode2 Hstep)
       as (-> & -> & -> & -> & -> & -> & ->).

@@ -763,7 +763,7 @@ Section KvmmakeHouse.
               Mf (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (kmki_b2 with "Htext"). }
-    iIntros (CID1 Hs1cr) "Hcg Hpc".
+    iIntros (CID1 Hs1cr) "_ Hcg Hpc".
     iEval (rgne) in "Hcg".
     set (E0 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg (add_vec zero_reg (Mf !!! Regidx (mword_of_int 9 : mword 5)))]> Mf).
     assert (Hpb4 : add_vec_int (mword_of_int (KernelSyms.kvmmake + 0xb2) : mword 64) 2 = mword_of_int (KernelSyms.kvmmake + 0xb4)) by (apply bv_eq; vm_compute; reflexivity).
@@ -776,7 +776,7 @@ Section KvmmakeHouse.
               with "Hcg Hpc [] [Hc1]").
     { iApply (kmki_b4 with "Htext"). }
     { iEval (rewrite HE0sp Hb1). iExact "Hc1". }
-    iIntros (CID2 Hs2cr) "Hcg Hpc Hc1". iEval (rewrite HE0sp Hb1) in "Hc1".
+    iIntros (CID2 Hs2cr) "_ Hcg Hpc Hc1". iEval (rewrite HE0sp Hb1) in "Hc1".
     set (E1 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (mm !!! Regidx (mword_of_int 1 : mword 5))]> E0).
     assert (Hpb6 : add_vec_int (mword_of_int (KernelSyms.kvmmake + 0xb4) : mword 64) 2 = mword_of_int (KernelSyms.kvmmake + 0xb6)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpb6) in "Hpc".
@@ -788,7 +788,7 @@ Section KvmmakeHouse.
               with "Hcg Hpc [] [Hc2]").
     { iApply (kmki_b6 with "Htext"). }
     { iEval (rewrite HE1sp Hb2). iExact "Hc2". }
-    iIntros (CID3 Hs3cr) "Hcg Hpc Hc2". iEval (rewrite HE1sp Hb2) in "Hc2".
+    iIntros (CID3 Hs3cr) "_ Hcg Hpc Hc2". iEval (rewrite HE1sp Hb2) in "Hc2".
     set (E2 := <[Regidx (mword_of_int 8 : mword 5) := regval_into_reg (mm !!! Regidx (mword_of_int 8 : mword 5))]> E1).
     assert (Hpb8 : add_vec_int (mword_of_int (KernelSyms.kvmmake + 0xb6) : mword 64) 2 = mword_of_int (KernelSyms.kvmmake + 0xb8)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpb8) in "Hpc".
@@ -800,7 +800,7 @@ Section KvmmakeHouse.
               with "Hcg Hpc [] [Hc3]").
     { iApply (kmki_b8 with "Htext"). }
     { iEval (rewrite HE2sp Hb3). iExact "Hc3". }
-    iIntros (CID4 Hs4cr) "Hcg Hpc Hc3". iEval (rewrite HE2sp Hb3) in "Hc3".
+    iIntros (CID4 Hs4cr) "_ Hcg Hpc Hc3". iEval (rewrite HE2sp Hb3) in "Hc3".
     set (E3 := <[Regidx (mword_of_int 9 : mword 5) := regval_into_reg (mm !!! Regidx (mword_of_int 9 : mword 5))]> E2).
     assert (Hpba : add_vec_int (mword_of_int (KernelSyms.kvmmake + 0xb8) : mword 64) 2 = mword_of_int (KernelSyms.kvmmake + 0xba)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpba) in "Hpc".
@@ -824,7 +824,7 @@ Section KvmmakeHouse.
     iApply (wp_caddi16sp_pop_s_sconf (mword_of_int (KernelSyms.kvmmake + 0xba)) (mword_of_int 2 : mword 6)
               E3 (K - 4)%nat 4 b Hpop with "Hcg Hpc [] Hframe").
     { iApply (kmki_ba with "Htext"). }
-    iIntros (CID5 Hs5cr) "Hcg Hpc".
+    iIntros (CID5 Hs5cr) "_ Hcg Hpc".
     change (<[Regidx csp_rs1 := regval_into_reg (add_vec (E3 !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6))))]> E3) with E4.
     assert (Hnk : ((K - 4) + 4)%nat = K) by lia.
     iEval (rewrite Hnk) in "Hcg".
@@ -836,7 +836,7 @@ Section KvmmakeHouse.
     iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.kvmmake + 0xbc)) (mword_of_int 1 : mword 5) E4 K b
               ltac:(vm_compute; discriminate) with "Hcg Hpc []").
     { iApply (kmki_bc with "Htext"). }
-    iIntros (CID6 Hs6cr) "Hcg Hpc".
+    iIntros (CID6 Hs6cr) "Hlc Hcg Hpc".
     iEval (rgne) in "Hpc".
     iEval (rewrite Hrt) in "Hpc".
     (* a0 = root byte address *)
@@ -847,7 +847,7 @@ Section KvmmakeHouse.
       rewrite /E0 upd_eq. rewrite add_vec_zero_l. exact Hs1. }
     iDestruct (cpu_own_transport CID0 CID6 lvl eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iSpecialize ("Hcont" $! CID6 with "[]"); [ iPureIntro; wp_next_chain | ].
+    iSpecialize ("Hcont" $! CID6 with "[] Hlc"); [ iPureIntro; wp_next_chain | ].
     iApply ("Hcont" $! E4 tf pas with "Hcg Hcnt Hpc Hptree [%] [%] [%] Henv [%] [%] Hpages").
     { exact HE4a0. }
     { exact Hrep. }
@@ -1054,7 +1054,7 @@ Section KvmmakeBody.
     iApply (wp_caddi_sp_push_s_sconf (mword_of_int KernelSyms.kvmmake) (mword_of_int 32 : mword 6) mm K 4 b Hc4 Hpush
               with "Hcg Hpc []").
     { iApply (kmki_00 with "Htext"). }
-    iIntros (CID1 Hs1) "Hcg Hframe Hpc".
+    iIntros (CID1 Hs1) "_ Hcg Hframe Hpc".
     set (W1 := <[Regidx csp_rs1 := regval_into_reg
         (add_vec (mm !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))]> mm).
     iEval (rewrite (stack_own_slots (KTR := KT0)); cbn [seq]) in "Hframe".
@@ -1069,7 +1069,7 @@ Section KvmmakeBody.
               W1 (K - 4)%nat v1 b with "Hcg Hpc [] [Hc1]").
     { iApply (kmki_02 with "Htext"). }
     { iEval (rewrite HspW1 Hb1). iExact "Hc1". }
-    iIntros (CID2 Hs2) "Hcg Hpc Hc1". iEval (rewrite HspW1 Hb1) in "Hc1".
+    iIntros (CID2 Hs2) "_ Hcg Hpc Hc1". iEval (rewrite HspW1 Hb1) in "Hc1".
     iEval (rgne) in "Hc1".
     assert (HW1r1 : W1 !!! Regidx (mword_of_int 1 : mword 5) = mm !!! Regidx (mword_of_int 1)) by (rewrite /W1; rewrite upd_ne; [reflexivity | reg_neq]).
     iEval (rewrite HW1r1) in "Hc1".
@@ -1080,7 +1080,7 @@ Section KvmmakeBody.
               W1 (K - 4)%nat v2 b with "Hcg Hpc [] [Hc2]").
     { iApply (kmki_04 with "Htext"). }
     { iEval (rewrite HspW1 Hb2). iExact "Hc2". }
-    iIntros (CID3 Hs3) "Hcg Hpc Hc2". iEval (rewrite HspW1 Hb2) in "Hc2".
+    iIntros (CID3 Hs3) "_ Hcg Hpc Hc2". iEval (rewrite HspW1 Hb2) in "Hc2".
     iEval (rgne) in "Hc2".
     assert (HW1r8 : W1 !!! Regidx (mword_of_int 8 : mword 5) = mm !!! Regidx (mword_of_int 8)) by (rewrite /W1; rewrite upd_ne; [reflexivity | reg_neq]).
     iEval (rewrite HW1r8) in "Hc2".
@@ -1091,7 +1091,7 @@ Section KvmmakeBody.
               W1 (K - 4)%nat v3 b with "Hcg Hpc [] [Hc3]").
     { iApply (kmki_06 with "Htext"). }
     { iEval (rewrite HspW1 Hb3). iExact "Hc3". }
-    iIntros (CID4 Hs4) "Hcg Hpc Hc3". iEval (rewrite HspW1 Hb3) in "Hc3".
+    iIntros (CID4 Hs4) "_ Hcg Hpc Hc3". iEval (rewrite HspW1 Hb3) in "Hc3".
     iEval (rgne) in "Hc3".
     assert (HW1r9 : W1 !!! Regidx (mword_of_int 9 : mword 5) = mm !!! Regidx (mword_of_int 9)) by (rewrite /W1; rewrite upd_ne; [reflexivity | reg_neq]).
     iEval (rewrite HW1r9) in "Hc3".
@@ -1102,7 +1102,7 @@ Section KvmmakeBody.
               W1 (K - 4)%nat b ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (kmki_08 with "Htext"). }
-    iIntros (CID5 Hs5) "Hcg Hpc".
+    iIntros (CID5 Hs5) "_ Hcg Hpc".
     set (W2 := <[Regidx (mword_of_int 8 : mword 5) := regval_into_reg (add_vec (W1 !!! Regidx csp_rs1) (sign_extend' 64 (caddi4spn_imm (mword_of_int 8 : mword 8))))]> W1).
     assert (Hp0a : add_vec_int (mword_of_int (KernelSyms.kvmmake + 0x08) : mword 64) 2 = mword_of_int (KernelSyms.kvmmake + 0x0a)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp0a) in "Hpc".
@@ -1111,7 +1111,7 @@ Section KvmmakeBody.
               W2 (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (kmki_0a with "Htext"). }
-    iIntros (CID6 Hs6) "Hcg Hpc".
+    iIntros (CID6 Hs6) "_ Hcg Hpc".
     set (J := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.kvmmake + 0x0a) : mword 64) 4)]> W2).
     assert (Htgtk : add_vec (mword_of_int (KernelSyms.kvmmake + 0x0a) : mword 64) (sign_extend' 64 (mword_of_int 2095636 : mword 21)) = mword_of_int KernelSyms.kalloc) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtk) in "Hpc".
@@ -1131,7 +1131,7 @@ Section KvmmakeBody.
               ltac:(vm_compute; reflexivity)
               Hbelow
               with "Hcg Hcnt Htext Hpc Hlock Havail").
-    iIntros (CID7 Hs7 mr0) "Hcg Hcnt Hpc %Hkcs0 Hkpost".
+    iIntros (CID7 Hs7) "_"; iIntros (mr0) "Hcg Hcnt Hpc %Hkcs0 Hkpost".
     assert (Hret0e : ret_pc (J !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.kvmmake + 0x0e)).
     { rewrite /J upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hret0e) in "Hpc".
@@ -1155,7 +1155,7 @@ Section KvmmakeBody.
               mr0 (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (kmki_0e with "Htext"). }
-    iIntros (CID8 Hs8) "Hcg Hpc".
+    iIntros (CID8 Hs8) "_ Hcg Hpc".
     iEval (rgne) in "Hcg".
     set (M1 := <[Regidx (mword_of_int 9 : mword 5) := regval_into_reg (add_vec zero_reg (mr0 !!! Regidx (mword_of_int 10 : mword 5)))]> mr0).
     assert (Hp10 : add_vec_int (mword_of_int (KernelSyms.kvmmake + 0x0e) : mword 64) 2 = mword_of_int (KernelSyms.kvmmake + 0x10)) by (apply bv_eq; vm_compute; reflexivity).
@@ -1164,7 +1164,7 @@ Section KvmmakeBody.
     iApply (wp_clui_s_sconf (mword_of_int (KernelSyms.kvmmake + 0x10)) (mword_of_int 12 : mword 5) (sign_extend' 20 (mword_of_int 1 : mword 6)) (luival (sign_extend' 20 (mword_of_int 1 : mword 6)))
               M1 (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(reflexivity) with "Hcg Hpc []").
     { iApply (kmki_10 with "Htext"). }
-    iIntros (CID9 Hs9) "Hcg Hpc".
+    iIntros (CID9 Hs9) "_ Hcg Hpc".
     set (M2 := <[Regidx (mword_of_int 12 : mword 5) := regval_into_reg (luival (sign_extend' 20 (mword_of_int 1 : mword 6)))]> M1).
     assert (Hp12 : add_vec_int (mword_of_int (KernelSyms.kvmmake + 0x10) : mword 64) 2 = mword_of_int (KernelSyms.kvmmake + 0x12)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp12) in "Hpc".
@@ -1172,7 +1172,7 @@ Section KvmmakeBody.
     iApply (wp_cli_s_sconf (mword_of_int (KernelSyms.kvmmake + 0x12)) (mword_of_int 11 : mword 5) (mword_of_int 0 : mword 6) (add_vec zero_reg (sign_extend' 64 (sign_extend' 12 (mword_of_int 0 : mword 6))))
               M2 (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(reflexivity) with "Hcg Hpc []").
     { iApply (kmki_12 with "Htext"). }
-    iIntros (CID10 Hs10) "Hcg Hpc".
+    iIntros (CID10 Hs10) "_ Hcg Hpc".
     set (M3 := <[Regidx (mword_of_int 11 : mword 5) := regval_into_reg (add_vec zero_reg (sign_extend' 64 (sign_extend' 12 (mword_of_int 0 : mword 6))))]> M2).
     assert (Hp14 : add_vec_int (mword_of_int (KernelSyms.kvmmake + 0x12) : mword 64) 2 = mword_of_int (KernelSyms.kvmmake + 0x14)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp14) in "Hpc".
@@ -1181,7 +1181,7 @@ Section KvmmakeBody.
               M3 (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (kmki_14 with "Htext"). }
-    iIntros (CID11 Hs11) "Hcg Hpc".
+    iIntros (CID11 Hs11) "_ Hcg Hpc".
     set (M4 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.kvmmake + 0x14) : mword 64) 4)]> M3).
     assert (Htgtm : add_vec (mword_of_int (KernelSyms.kvmmake + 0x14) : mword 64) (sign_extend' 64 (mword_of_int 2096036 : mword 21)) = mword_of_int KernelSyms.memset) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtm) in "Hpc".
@@ -1200,7 +1200,7 @@ Section KvmmakeBody.
               Hc2 ltac:(vm_compute; reflexivity) ltac:(reflexivity) HM4a2
               with "Hcg Htext Hpc [Hpage]").
     { iApply (big_sepL_impl with "Hpage"). iIntros "!>" (k j _) "H". rewrite HM4a0. iExact "H". }
-    iIntros (CID12 Hs12 mfin) "Hcg Hpc Hbytes %Hmcs".
+    iIntros (CID12 Hs12) "Hlc"; iIntros (mfin) "Hcg Hpc Hbytes %Hmcs".
     assert (Hret18 : ret_pc (M4 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.kvmmake + 0x18)).
     { rewrite /M4 upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hret18) in "Hpc".
@@ -1246,7 +1246,7 @@ Section KvmmakeBody.
     (* the s2..s11 registers: untouched since [mm] (through kalloc/memset callee-saved) *)
     iDestruct (cpu_own_transport CID7 CID12 0%nat eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iSpecialize ("Hcont" $! CID12 with "[]"); [ iPureIntro; wp_next_chain | ].
+    iSpecialize ("Hcont" $! CID12 with "[] Hlc"); [ iPureIntro; wp_next_chain | ].
     iApply ("Hcont" $! mfin bppn with "Hcg Hcnt Hpc Hptree Henv Hc1 Hc2 Hc3 [Hc4] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%]").
     { iExists v4. iExact "Hc4". }
     { exact Hbase9. }
@@ -1304,7 +1304,7 @@ Section KvmmakeBody.
     iApply (wp_cli_s_sconf (mword_of_int (KernelSyms.kvmmake + 0x18)) (mword_of_int 14 : mword 5) (mword_of_int 6 : mword 6) (add_vec zero_reg (sign_extend' 64 (sign_extend' 12 (mword_of_int 6 : mword 6))))
               M (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(reflexivity) with "Hcg Hpc []").
     { iApply (kmki_18 with "Htext"). }
-    iIntros (CID1 Hs1) "Hcg Hpc".
+    iIntros (CID1 Hs1) "_ Hcg Hpc".
     set (U14 := <[Regidx (mword_of_int 14 : mword 5) := regval_into_reg (add_vec zero_reg (sign_extend' 64 (sign_extend' 12 (mword_of_int 6 : mword 6))))]> M).
     assert (Hp1a : add_vec_int (mword_of_int (KernelSyms.kvmmake + 0x18) : mword 64) 2 = mword_of_int (KernelSyms.kvmmake + 0x1a)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp1a) in "Hpc".
@@ -1312,7 +1312,7 @@ Section KvmmakeBody.
     iApply (wp_clui_s_sconf (mword_of_int (KernelSyms.kvmmake + 0x1a)) (mword_of_int 13 : mword 5) (sign_extend' 20 (mword_of_int 1 : mword 6)) (luival (sign_extend' 20 (mword_of_int 1 : mword 6)))
               U14 (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(reflexivity) with "Hcg Hpc []").
     { iApply (kmki_1a with "Htext"). }
-    iIntros (CID2 Hs2) "Hcg Hpc".
+    iIntros (CID2 Hs2) "_ Hcg Hpc".
     set (U13 := <[Regidx (mword_of_int 13 : mword 5) := regval_into_reg (luival (sign_extend' 20 (mword_of_int 1 : mword 6)))]> U14).
     assert (Hp1c : add_vec_int (mword_of_int (KernelSyms.kvmmake + 0x1a) : mword 64) 2 = mword_of_int (KernelSyms.kvmmake + 0x1c)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp1c) in "Hpc".
@@ -1320,7 +1320,7 @@ Section KvmmakeBody.
     iApply (wp_lui_s_sconf (mword_of_int (KernelSyms.kvmmake + 0x1c)) (mword_of_int 12 : mword 5) (mword_of_int 65536 : mword 20) (luival (mword_of_int 65536 : mword 20))
               U13 (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(reflexivity) with "Hcg Hpc []").
     { iApply (kmki_1c with "Htext"). }
-    iIntros (CID3 Hs3) "Hcg Hpc".
+    iIntros (CID3 Hs3) "_ Hcg Hpc".
     set (U12 := <[Regidx (mword_of_int 12 : mword 5) := regval_into_reg (luival (mword_of_int 65536 : mword 20))]> U13).
     assert (Hp20 : add_vec_int (mword_of_int (KernelSyms.kvmmake + 0x1c) : mword 64) 4 = mword_of_int (KernelSyms.kvmmake + 0x20)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp20) in "Hpc".
@@ -1328,7 +1328,7 @@ Section KvmmakeBody.
     iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.kvmmake + 0x20)) (mword_of_int 11 : mword 5) (mword_of_int 12 : mword 5)
               U12 (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok) with "Hcg Hpc []").
     { iApply (kmki_20 with "Htext"). }
-    iIntros (CID4 Hs4) "Hcg Hpc".
+    iIntros (CID4 Hs4) "_ Hcg Hpc".
     iEval (rgne) in "Hcg".
     set (U11 := <[Regidx (mword_of_int 11 : mword 5) := regval_into_reg (add_vec zero_reg (U12 !!! Regidx (mword_of_int 12 : mword 5)))]> U12).
     assert (Hp22 : add_vec_int (mword_of_int (KernelSyms.kvmmake + 0x20) : mword 64) 2 = mword_of_int (KernelSyms.kvmmake + 0x22)) by (apply bv_eq; vm_compute; reflexivity).
@@ -1337,7 +1337,7 @@ Section KvmmakeBody.
     iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.kvmmake + 0x22)) (mword_of_int 10 : mword 5) (mword_of_int 9 : mword 5)
               U11 (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok) with "Hcg Hpc []").
     { iApply (kmki_22 with "Htext"). }
-    iIntros (CID5 Hs5) "Hcg Hpc".
+    iIntros (CID5 Hs5) "_ Hcg Hpc".
     iEval (rgne) in "Hcg".
     set (U10 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg (add_vec zero_reg (U11 !!! Regidx (mword_of_int 9 : mword 5)))]> U11).
     assert (Hp24 : add_vec_int (mword_of_int (KernelSyms.kvmmake + 0x22) : mword 64) 2 = mword_of_int (KernelSyms.kvmmake + 0x24)) by (apply bv_eq; vm_compute; reflexivity).
@@ -1347,7 +1347,7 @@ Section KvmmakeBody.
               U10 (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (kmki_24 with "Htext"). }
-    iIntros (CID6 Hs6) "Hcg Hpc".
+    iIntros (CID6 Hs6) "_ Hcg Hpc".
     set (Wk := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.kvmmake + 0x24) : mword 64) 4)]> U10).
     assert (Htgt : add_vec (mword_of_int (KernelSyms.kvmmake + 0x24) : mword 64) (sign_extend' 64 (mword_of_int 2097076 : mword 21)) = mword_of_int KernelSyms.kvmmap) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgt) in "Hpc".
@@ -1390,7 +1390,7 @@ Section KvmmakeBody.
               Hp0 Hbelow
               with "Hcg Hcnt Htext Hpc Hptree [Henv]").
     { iExact "Henv". }
-    iIntros (CID7 Hs7 mr t' g) "Hcg Hcnt Hpc Hptree %Hnodes' Henv %Hkcs %Hbase' %Hrep' %Hpres %Hgmiss".
+    iIntros (CID7 Hs7) "Hlc"; iIntros (mr t' g) "Hcg Hcnt Hpc Hptree %Hnodes' Henv %Hkcs %Hbase' %Hrep' %Hpres %Hgmiss".
     assert (Hret : ret_pc (Wk !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.kvmmake + 0x28)).
     { rewrite /Wk upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hret) in "Hpc".
@@ -1402,7 +1402,7 @@ Section KvmmakeBody.
     { rewrite /Wk /U10 /U11 /U12 /U13 /U14.
       repeat (apply callee_saved_insert_r; [vm_compute; reflexivity |]). apply callee_saved_refl. }
     assert (HcsMmr : callee_saved M mr) by (apply (callee_saved_trans _ Wk _ HcsMWk Hkcs)).
-    iSpecialize ("Hcont" $! CID7 with "[]"); [ iPureIntro; wp_next_chain | ].
+    iSpecialize ("Hcont" $! CID7 with "[] Hlc"); [ iPureIntro; wp_next_chain | ].
     iApply ("Hcont" $! mr t' g with "Hcg Hcnt Hpc Hptree Henv [%] [%] [%] [%] [%] [%] [%]").
     { exact HcsMmr. }
     { rewrite (callee_saved_lookup HcsMmr (mword_of_int 9) ltac:(vm_compute; reflexivity)). exact HM9. }
@@ -1455,28 +1455,28 @@ Section KvmmakeBody.
     iApply (wp_cli_s_sconf (mword_of_int (KernelSyms.kvmmake + 0x28)) (mword_of_int 14 : mword 5) (mword_of_int 6 : mword 6) (add_vec zero_reg (sign_extend' 64 (sign_extend' 12 (mword_of_int 6 : mword 6))))
               M (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(reflexivity) with "Hcg Hpc []").
     { iApply (kmki_28 with "Htext"). }
-    iIntros (CID1 Hs1) "Hcg Hpc".
+    iIntros (CID1 Hs1) "_ Hcg Hpc".
     set (A14 := <[Regidx (mword_of_int 14 : mword 5) := regval_into_reg (add_vec zero_reg (sign_extend' 64 (sign_extend' 12 (mword_of_int 6 : mword 6))))]> M).
     assert (Hp2a : add_vec_int (mword_of_int (KernelSyms.kvmmake + 0x28) : mword 64) 2 = mword_of_int (KernelSyms.kvmmake + 0x2a)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp2a) in "Hpc".
     iApply (wp_clui_s_sconf (mword_of_int (KernelSyms.kvmmake + 0x2a)) (mword_of_int 13 : mword 5) (sign_extend' 20 (mword_of_int 1 : mword 6)) (luival (sign_extend' 20 (mword_of_int 1 : mword 6)))
               A14 (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(reflexivity) with "Hcg Hpc []").
     { iApply (kmki_2a with "Htext"). }
-    iIntros (CID2 Hs2) "Hcg Hpc".
+    iIntros (CID2 Hs2) "_ Hcg Hpc".
     set (A13 := <[Regidx (mword_of_int 13 : mword 5) := regval_into_reg (luival (sign_extend' 20 (mword_of_int 1 : mword 6)))]> A14).
     assert (Hp2c : add_vec_int (mword_of_int (KernelSyms.kvmmake + 0x2a) : mword 64) 2 = mword_of_int (KernelSyms.kvmmake + 0x2c)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp2c) in "Hpc".
     iApply (wp_lui_s_sconf (mword_of_int (KernelSyms.kvmmake + 0x2c)) (mword_of_int 12 : mword 5) (mword_of_int 65546 : mword 20) (luival (mword_of_int 65546 : mword 20))
               A13 (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(reflexivity) with "Hcg Hpc []").
     { iApply (kmki_2c with "Htext"). }
-    iIntros (CID3 Hs3) "Hcg Hpc".
+    iIntros (CID3 Hs3) "_ Hcg Hpc".
     set (A12 := <[Regidx (mword_of_int 12 : mword 5) := regval_into_reg (luival (mword_of_int 65546 : mword 20))]> A13).
     assert (Hp30 : add_vec_int (mword_of_int (KernelSyms.kvmmake + 0x2c) : mword 64) 4 = mword_of_int (KernelSyms.kvmmake + 0x30)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp30) in "Hpc".
     iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.kvmmake + 0x30)) (mword_of_int 11 : mword 5) (mword_of_int 12 : mword 5)
               A12 (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok) with "Hcg Hpc []").
     { iApply (kmki_30 with "Htext"). }
-    iIntros (CID4 Hs4) "Hcg Hpc".
+    iIntros (CID4 Hs4) "_ Hcg Hpc".
     iEval (rgne) in "Hcg".
     set (A11 := <[Regidx (mword_of_int 11 : mword 5) := regval_into_reg (add_vec zero_reg (A12 !!! Regidx (mword_of_int 12 : mword 5)))]> A12).
     assert (Hp32 : add_vec_int (mword_of_int (KernelSyms.kvmmake + 0x30) : mword 64) 2 = mword_of_int (KernelSyms.kvmmake + 0x32)) by (apply bv_eq; vm_compute; reflexivity).
@@ -1484,7 +1484,7 @@ Section KvmmakeBody.
     iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.kvmmake + 0x32)) (mword_of_int 10 : mword 5) (mword_of_int 9 : mword 5)
               A11 (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok) with "Hcg Hpc []").
     { iApply (kmki_32 with "Htext"). }
-    iIntros (CID5 Hs5) "Hcg Hpc".
+    iIntros (CID5 Hs5) "_ Hcg Hpc".
     iEval (rgne) in "Hcg".
     set (A10 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg (add_vec zero_reg (A11 !!! Regidx (mword_of_int 9 : mword 5)))]> A11).
     assert (Hp34 : add_vec_int (mword_of_int (KernelSyms.kvmmake + 0x32) : mword 64) 2 = mword_of_int (KernelSyms.kvmmake + 0x34)) by (apply bv_eq; vm_compute; reflexivity).
@@ -1493,7 +1493,7 @@ Section KvmmakeBody.
               A10 (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (kmki_34 with "Htext"). }
-    iIntros (CID6 Hs6) "Hcg Hpc".
+    iIntros (CID6 Hs6) "_ Hcg Hpc".
     set (Wk := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.kvmmake + 0x34) : mword 64) 4)]> A10).
     assert (Htgt : add_vec (mword_of_int (KernelSyms.kvmmake + 0x34) : mword 64) (sign_extend' 64 (mword_of_int 2097060 : mword 21)) = mword_of_int KernelSyms.kvmmap) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgt) in "Hpc".
@@ -1532,7 +1532,7 @@ Section KvmmakeBody.
               Hp0 Hbelow
               with "Hcg Hcnt Htext Hpc Hptree [Henv]").
     { iExact "Henv". }
-    iIntros (CID7 Hs7 mr t' g) "Hcg Hcnt Hpc Hptree %Hnodes' Henv %Hkcs %Hbase' %Hrep' %Hpres %Hgmiss".
+    iIntros (CID7 Hs7) "Hlc"; iIntros (mr t' g) "Hcg Hcnt Hpc Hptree %Hnodes' Henv %Hkcs %Hbase' %Hrep' %Hpres %Hgmiss".
     assert (Hret : ret_pc (Wk !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.kvmmake + 0x38)).
     { rewrite /Wk upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hret) in "Hpc".
@@ -1542,7 +1542,7 @@ Section KvmmakeBody.
     { rewrite /Wk /A10 /A11 /A12 /A13 /A14.
       repeat (apply callee_saved_insert_r; [vm_compute; reflexivity |]). apply callee_saved_refl. }
     assert (HcsMmr : callee_saved M mr) by (apply (callee_saved_trans _ Wk _ HcsMWk Hkcs)).
-    iSpecialize ("Hcont" $! CID7 with "[]"); [ iPureIntro; wp_next_chain | ].
+    iSpecialize ("Hcont" $! CID7 with "[] Hlc"); [ iPureIntro; wp_next_chain | ].
     iApply ("Hcont" $! mr t' g with "Hcg Hcnt Hpc Hptree Henv [%] [%] [%] [%] [%] [%] [%]").
     { exact HcsMmr. }
     { rewrite (callee_saved_lookup HcsMmr (mword_of_int 9) ltac:(vm_compute; reflexivity)). exact HM9. }
@@ -1591,28 +1591,28 @@ Section KvmmakeBody.
     iApply (wp_cli_s_sconf (mword_of_int (KernelSyms.kvmmake + 0x38)) (mword_of_int 14 : mword 5) (mword_of_int 6 : mword 6) (add_vec zero_reg (sign_extend' 64 (sign_extend' 12 (mword_of_int 6 : mword 6))))
               M (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(reflexivity) with "Hcg Hpc []").
     { iApply (kmki_38 with "Htext"). }
-    iIntros (CID1 Hs1) "Hcg Hpc".
+    iIntros (CID1 Hs1) "_ Hcg Hpc".
     set (V14 := <[Regidx (mword_of_int 14 : mword 5) := regval_into_reg (add_vec zero_reg (sign_extend' 64 (sign_extend' 12 (mword_of_int 6 : mword 6))))]> M).
     assert (Hp3a : add_vec_int (mword_of_int (KernelSyms.kvmmake + 0x38) : mword 64) 2 = mword_of_int (KernelSyms.kvmmake + 0x3a)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp3a) in "Hpc".
     iApply (wp_clui_s_sconf (mword_of_int (KernelSyms.kvmmake + 0x3a)) (mword_of_int 13 : mword 5) (sign_extend' 20 (mword_of_int 1 : mword 6)) (luival (sign_extend' 20 (mword_of_int 1 : mword 6)))
               V14 (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(reflexivity) with "Hcg Hpc []").
     { iApply (kmki_3a with "Htext"). }
-    iIntros (CID2 Hs2) "Hcg Hpc".
+    iIntros (CID2 Hs2) "_ Hcg Hpc".
     set (V13 := <[Regidx (mword_of_int 13 : mword 5) := regval_into_reg (luival (sign_extend' 20 (mword_of_int 1 : mword 6)))]> V14).
     assert (Hp3c : add_vec_int (mword_of_int (KernelSyms.kvmmake + 0x3a) : mword 64) 2 = mword_of_int (KernelSyms.kvmmake + 0x3c)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp3c) in "Hpc".
     iApply (wp_lui_s_sconf (mword_of_int (KernelSyms.kvmmake + 0x3c)) (mword_of_int 12 : mword 5) (mword_of_int 65537 : mword 20) (luival (mword_of_int 65537 : mword 20))
               V13 (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(reflexivity) with "Hcg Hpc []").
     { iApply (kmki_3c with "Htext"). }
-    iIntros (CID3 Hs3) "Hcg Hpc".
+    iIntros (CID3 Hs3) "_ Hcg Hpc".
     set (V12 := <[Regidx (mword_of_int 12 : mword 5) := regval_into_reg (luival (mword_of_int 65537 : mword 20))]> V13).
     assert (Hp40 : add_vec_int (mword_of_int (KernelSyms.kvmmake + 0x3c) : mword 64) 4 = mword_of_int (KernelSyms.kvmmake + 0x40)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp40) in "Hpc".
     iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.kvmmake + 0x40)) (mword_of_int 11 : mword 5) (mword_of_int 12 : mword 5)
               V12 (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok) with "Hcg Hpc []").
     { iApply (kmki_40 with "Htext"). }
-    iIntros (CID4 Hs4) "Hcg Hpc".
+    iIntros (CID4 Hs4) "_ Hcg Hpc".
     iEval (rgne) in "Hcg".
     set (V11 := <[Regidx (mword_of_int 11 : mword 5) := regval_into_reg (add_vec zero_reg (V12 !!! Regidx (mword_of_int 12 : mword 5)))]> V12).
     assert (Hp42 : add_vec_int (mword_of_int (KernelSyms.kvmmake + 0x40) : mword 64) 2 = mword_of_int (KernelSyms.kvmmake + 0x42)) by (apply bv_eq; vm_compute; reflexivity).
@@ -1620,7 +1620,7 @@ Section KvmmakeBody.
     iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.kvmmake + 0x42)) (mword_of_int 10 : mword 5) (mword_of_int 9 : mword 5)
               V11 (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok) with "Hcg Hpc []").
     { iApply (kmki_42 with "Htext"). }
-    iIntros (CID5 Hs5) "Hcg Hpc".
+    iIntros (CID5 Hs5) "_ Hcg Hpc".
     iEval (rgne) in "Hcg".
     set (V10 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg (add_vec zero_reg (V11 !!! Regidx (mword_of_int 9 : mword 5)))]> V11).
     assert (Hp44 : add_vec_int (mword_of_int (KernelSyms.kvmmake + 0x42) : mword 64) 2 = mword_of_int (KernelSyms.kvmmake + 0x44)) by (apply bv_eq; vm_compute; reflexivity).
@@ -1629,7 +1629,7 @@ Section KvmmakeBody.
               V10 (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (kmki_44 with "Htext"). }
-    iIntros (CID6 Hs6) "Hcg Hpc".
+    iIntros (CID6 Hs6) "_ Hcg Hpc".
     set (Wk := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.kvmmake + 0x44) : mword 64) 4)]> V10).
     assert (Htgt : add_vec (mword_of_int (KernelSyms.kvmmake + 0x44) : mword 64) (sign_extend' 64 (mword_of_int 2097044 : mword 21)) = mword_of_int KernelSyms.kvmmap) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgt) in "Hpc".
@@ -1668,7 +1668,7 @@ Section KvmmakeBody.
               Hp0 Hbelow
               with "Hcg Hcnt Htext Hpc Hptree [Henv]").
     { iExact "Henv". }
-    iIntros (CID7 Hs7 mr t' g) "Hcg Hcnt Hpc Hptree %Hnodes' Henv %Hkcs %Hbase' %Hrep' %Hpres %Hgmiss".
+    iIntros (CID7 Hs7) "Hlc"; iIntros (mr t' g) "Hcg Hcnt Hpc Hptree %Hnodes' Henv %Hkcs %Hbase' %Hrep' %Hpres %Hgmiss".
     assert (Hret : ret_pc (Wk !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.kvmmake + 0x48)).
     { rewrite /Wk upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hret) in "Hpc".
@@ -1678,7 +1678,7 @@ Section KvmmakeBody.
     { rewrite /Wk /V10 /V11 /V12 /V13 /V14.
       repeat (apply callee_saved_insert_r; [vm_compute; reflexivity |]). apply callee_saved_refl. }
     assert (HcsMmr : callee_saved M mr) by (apply (callee_saved_trans _ Wk _ HcsMWk Hkcs)).
-    iSpecialize ("Hcont" $! CID7 with "[]"); [ iPureIntro; wp_next_chain | ].
+    iSpecialize ("Hcont" $! CID7 with "[] Hlc"); [ iPureIntro; wp_next_chain | ].
     iApply ("Hcont" $! mr t' g with "Hcg Hcnt Hpc Hptree Henv [%] [%] [%] [%] [%] [%] [%]").
     { exact HcsMmr. }
     { rewrite (callee_saved_lookup HcsMmr (mword_of_int 9) ltac:(vm_compute; reflexivity)). exact HM9. }
@@ -1727,28 +1727,28 @@ Section KvmmakeBody.
     iApply (wp_cli_s_sconf (mword_of_int (KernelSyms.kvmmake + 0x48)) (mword_of_int 14 : mword 5) (mword_of_int 6 : mword 6) (add_vec zero_reg (sign_extend' 64 (sign_extend' 12 (mword_of_int 6 : mword 6))))
               M (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(reflexivity) with "Hcg Hpc []").
     { iApply (kmki_48 with "Htext"). }
-    iIntros (CID1 Hs1) "Hcg Hpc".
+    iIntros (CID1 Hs1) "_ Hcg Hpc".
     set (P14 := <[Regidx (mword_of_int 14 : mword 5) := regval_into_reg (add_vec zero_reg (sign_extend' 64 (sign_extend' 12 (mword_of_int 6 : mword 6))))]> M).
     assert (Hp4a : add_vec_int (mword_of_int (KernelSyms.kvmmake + 0x48) : mword 64) 2 = mword_of_int (KernelSyms.kvmmake + 0x4a)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp4a) in "Hpc".
     iApply (wp_lui_s_sconf (mword_of_int (KernelSyms.kvmmake + 0x4a)) (mword_of_int 13 : mword 5) (mword_of_int 16384 : mword 20) (luival (mword_of_int 16384 : mword 20))
               P14 (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(reflexivity) with "Hcg Hpc []").
     { iApply (kmki_4a with "Htext"). }
-    iIntros (CID2 Hs2) "Hcg Hpc".
+    iIntros (CID2 Hs2) "_ Hcg Hpc".
     set (P13 := <[Regidx (mword_of_int 13 : mword 5) := regval_into_reg (luival (mword_of_int 16384 : mword 20))]> P14).
     assert (Hp4e : add_vec_int (mword_of_int (KernelSyms.kvmmake + 0x4a) : mword 64) 4 = mword_of_int (KernelSyms.kvmmake + 0x4e)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp4e) in "Hpc".
     iApply (wp_lui_s_sconf (mword_of_int (KernelSyms.kvmmake + 0x4e)) (mword_of_int 12 : mword 5) (mword_of_int 49152 : mword 20) (luival (mword_of_int 49152 : mword 20))
               P13 (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(reflexivity) with "Hcg Hpc []").
     { iApply (kmki_4e with "Htext"). }
-    iIntros (CID3 Hs3) "Hcg Hpc".
+    iIntros (CID3 Hs3) "_ Hcg Hpc".
     set (P12 := <[Regidx (mword_of_int 12 : mword 5) := regval_into_reg (luival (mword_of_int 49152 : mword 20))]> P13).
     assert (Hp52 : add_vec_int (mword_of_int (KernelSyms.kvmmake + 0x4e) : mword 64) 4 = mword_of_int (KernelSyms.kvmmake + 0x52)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp52) in "Hpc".
     iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.kvmmake + 0x52)) (mword_of_int 11 : mword 5) (mword_of_int 12 : mword 5)
               P12 (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok) with "Hcg Hpc []").
     { iApply (kmki_52 with "Htext"). }
-    iIntros (CID4 Hs4) "Hcg Hpc".
+    iIntros (CID4 Hs4) "_ Hcg Hpc".
     iEval (rgne) in "Hcg".
     set (P11 := <[Regidx (mword_of_int 11 : mword 5) := regval_into_reg (add_vec zero_reg (P12 !!! Regidx (mword_of_int 12 : mword 5)))]> P12).
     assert (Hp54 : add_vec_int (mword_of_int (KernelSyms.kvmmake + 0x52) : mword 64) 2 = mword_of_int (KernelSyms.kvmmake + 0x54)) by (apply bv_eq; vm_compute; reflexivity).
@@ -1756,7 +1756,7 @@ Section KvmmakeBody.
     iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.kvmmake + 0x54)) (mword_of_int 10 : mword 5) (mword_of_int 9 : mword 5)
               P11 (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok) with "Hcg Hpc []").
     { iApply (kmki_54 with "Htext"). }
-    iIntros (CID5 Hs5) "Hcg Hpc".
+    iIntros (CID5 Hs5) "_ Hcg Hpc".
     iEval (rgne) in "Hcg".
     set (P10 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg (add_vec zero_reg (P11 !!! Regidx (mword_of_int 9 : mword 5)))]> P11).
     assert (Hp56 : add_vec_int (mword_of_int (KernelSyms.kvmmake + 0x54) : mword 64) 2 = mword_of_int (KernelSyms.kvmmake + 0x56)) by (apply bv_eq; vm_compute; reflexivity).
@@ -1765,7 +1765,7 @@ Section KvmmakeBody.
               P10 (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (kmki_56 with "Htext"). }
-    iIntros (CID6 Hs6) "Hcg Hpc".
+    iIntros (CID6 Hs6) "_ Hcg Hpc".
     set (Wk := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.kvmmake + 0x56) : mword 64) 4)]> P10).
     assert (Htgt : add_vec (mword_of_int (KernelSyms.kvmmake + 0x56) : mword 64) (sign_extend' 64 (mword_of_int 2097026 : mword 21)) = mword_of_int KernelSyms.kvmmap) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgt) in "Hpc".
@@ -1804,7 +1804,7 @@ Section KvmmakeBody.
               Hp0 Hbelow
               with "Hcg Hcnt Htext Hpc Hptree [Henv]").
     { iExact "Henv". }
-    iIntros (CID7 Hs7 mr t' g) "Hcg Hcnt Hpc Hptree %Hnodes' Henv %Hkcs %Hbase' %Hrep' %Hpres %Hgmiss".
+    iIntros (CID7 Hs7) "Hlc"; iIntros (mr t' g) "Hcg Hcnt Hpc Hptree %Hnodes' Henv %Hkcs %Hbase' %Hrep' %Hpres %Hgmiss".
     assert (Hret : ret_pc (Wk !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.kvmmake + 0x5a)).
     { rewrite /Wk upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hret) in "Hpc".
@@ -1814,7 +1814,7 @@ Section KvmmakeBody.
     { rewrite /Wk /P10 /P11 /P12 /P13 /P14.
       repeat (apply callee_saved_insert_r; [vm_compute; reflexivity |]). apply callee_saved_refl. }
     assert (HcsMmr : callee_saved M mr) by (apply (callee_saved_trans _ Wk _ HcsMWk Hkcs)).
-    iSpecialize ("Hcont" $! CID7 with "[]"); [ iPureIntro; wp_next_chain | ].
+    iSpecialize ("Hcont" $! CID7 with "[] Hlc"); [ iPureIntro; wp_next_chain | ].
     iApply ("Hcont" $! mr t' g with "Hcg Hcnt Hpc Hptree Henv [%] [%] [%] [%] [%] [%] [%]").
     { exact HcsMmr. }
     { rewrite (callee_saved_lookup HcsMmr (mword_of_int 9) ltac:(vm_compute; reflexivity)). exact HM9. }
@@ -1863,21 +1863,21 @@ Section KvmmakeBody.
     iApply (wp_cli_s_sconf (mword_of_int (KernelSyms.kvmmake + 0x5a)) (mword_of_int 14 : mword 5) (mword_of_int 10 : mword 6) (add_vec zero_reg (sign_extend' 64 (sign_extend' 12 (mword_of_int 10 : mword 6))))
               M (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(reflexivity) with "Hcg Hpc []").
     { iApply (kmki_5a with "Htext"). }
-    iIntros (CID1 Hs1) "Hcg Hpc".
+    iIntros (CID1 Hs1) "_ Hcg Hpc".
     set (T14 := <[Regidx (mword_of_int 14 : mword 5) := regval_into_reg (add_vec zero_reg (sign_extend' 64 (sign_extend' 12 (mword_of_int 10 : mword 6))))]> M).
     assert (Hp5c : add_vec_int (mword_of_int (KernelSyms.kvmmake + 0x5a) : mword 64) 2 = mword_of_int (KernelSyms.kvmmake + 0x5c)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp5c) in "Hpc".
     iApply (wp_auipc_s_sconf (mword_of_int (KernelSyms.kvmmake + 0x5c)) (mword_of_int 13 : mword 5) (mword_of_int 524294 : mword 20)
               T14 (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok) with "Hcg Hpc []").
     { iApply (kmki_5c with "Htext"). }
-    iIntros (CID2 Hs2) "Hcg Hpc".
+    iIntros (CID2 Hs2) "_ Hcg Hpc".
     set (T13a := <[Regidx (mword_of_int 13 : mword 5) := regval_into_reg (add_vec (mword_of_int (KernelSyms.kvmmake + 0x5c)) (auipc_off (mword_of_int 524294 : mword 20)))]> T14).
     assert (Hp60 : add_vec_int (mword_of_int (KernelSyms.kvmmake + 0x5c) : mword 64) 4 = mword_of_int (KernelSyms.kvmmake + 0x60)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp60) in "Hpc".
     iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.kvmmake + 0x60)) (mword_of_int 13 : mword 5) (mword_of_int 13 : mword 5) (mword_of_int 3652 : mword 12)
               T13a (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok) with "Hcg Hpc []").
     { iApply (kmki_60 with "Htext"). }
-    iIntros (CID3 Hs3) "Hcg Hpc".
+    iIntros (CID3 Hs3) "_ Hcg Hpc".
     iEval (rgne) in "Hcg".
     set (T13 := <[Regidx (mword_of_int 13 : mword 5) := regval_into_reg (add_vec (T13a !!! Regidx (mword_of_int 13 : mword 5)) (sign_extend' 64 (mword_of_int 3652 : mword 12)))]> T13a).
     assert (Hp64 : add_vec_int (mword_of_int (KernelSyms.kvmmake + 0x60) : mword 64) 4 = mword_of_int (KernelSyms.kvmmake + 0x64)) by (apply bv_eq; vm_compute; reflexivity).
@@ -1885,14 +1885,14 @@ Section KvmmakeBody.
     iApply (wp_cli_s_sconf (mword_of_int (KernelSyms.kvmmake + 0x64)) (mword_of_int 12 : mword 5) (mword_of_int 1 : mword 6) (add_vec zero_reg (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6))))
               T13 (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(reflexivity) with "Hcg Hpc []").
     { iApply (kmki_64 with "Htext"). }
-    iIntros (CID4 Hs4) "Hcg Hpc".
+    iIntros (CID4 Hs4) "_ Hcg Hpc".
     set (T12a := <[Regidx (mword_of_int 12 : mword 5) := regval_into_reg (add_vec zero_reg (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6))))]> T13).
     assert (Hp66 : add_vec_int (mword_of_int (KernelSyms.kvmmake + 0x64) : mword 64) 2 = mword_of_int (KernelSyms.kvmmake + 0x66)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp66) in "Hpc".
     iApply (wp_cslli_s_sconf (mword_of_int (KernelSyms.kvmmake + 0x66)) (Regidx (mword_of_int 12 : mword 5)) (mword_of_int 12 : mword 5) (mword_of_int 31 : mword 6)
               T12a (K - 4)%nat b eq_refl ltac:(vm_compute; discriminate) ltac:(rdok) with "Hcg Hpc []").
     { iApply (kmki_66 with "Htext"). }
-    iIntros (CID5 Hs5) "Hcg Hpc".
+    iIntros (CID5 Hs5) "_ Hcg Hpc".
     iEval (rgne) in "Hcg".
     set (T12 := <[Regidx (mword_of_int 12 : mword 5) := regval_into_reg (shift_bits_left (T12a !!! Regidx (mword_of_int 12 : mword 5)) (subrange_vec_dec (mword_of_int 31 : mword 6) (Z.sub log2_xlen 1) 0))]> T12a).
     assert (Hp68 : add_vec_int (mword_of_int (KernelSyms.kvmmake + 0x66) : mword 64) 2 = mword_of_int (KernelSyms.kvmmake + 0x68)) by (apply bv_eq; vm_compute; reflexivity).
@@ -1900,7 +1900,7 @@ Section KvmmakeBody.
     iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.kvmmake + 0x68)) (mword_of_int 11 : mword 5) (mword_of_int 12 : mword 5)
               T12 (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok) with "Hcg Hpc []").
     { iApply (kmki_68 with "Htext"). }
-    iIntros (CID6 Hs6) "Hcg Hpc".
+    iIntros (CID6 Hs6) "_ Hcg Hpc".
     iEval (rgne) in "Hcg".
     set (T11 := <[Regidx (mword_of_int 11 : mword 5) := regval_into_reg (add_vec zero_reg (T12 !!! Regidx (mword_of_int 12 : mword 5)))]> T12).
     assert (Hp6a : add_vec_int (mword_of_int (KernelSyms.kvmmake + 0x68) : mword 64) 2 = mword_of_int (KernelSyms.kvmmake + 0x6a)) by (apply bv_eq; vm_compute; reflexivity).
@@ -1908,7 +1908,7 @@ Section KvmmakeBody.
     iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.kvmmake + 0x6a)) (mword_of_int 10 : mword 5) (mword_of_int 9 : mword 5)
               T11 (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok) with "Hcg Hpc []").
     { iApply (kmki_6a with "Htext"). }
-    iIntros (CID7 Hs7) "Hcg Hpc".
+    iIntros (CID7 Hs7) "_ Hcg Hpc".
     iEval (rgne) in "Hcg".
     set (T10 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg (add_vec zero_reg (T11 !!! Regidx (mword_of_int 9 : mword 5)))]> T11).
     assert (Hp6c : add_vec_int (mword_of_int (KernelSyms.kvmmake + 0x6a) : mword 64) 2 = mword_of_int (KernelSyms.kvmmake + 0x6c)) by (apply bv_eq; vm_compute; reflexivity).
@@ -1917,7 +1917,7 @@ Section KvmmakeBody.
               T10 (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (kmki_6c with "Htext"). }
-    iIntros (CID8 Hs8) "Hcg Hpc".
+    iIntros (CID8 Hs8) "_ Hcg Hpc".
     set (Wk := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.kvmmake + 0x6c) : mword 64) 4)]> T10).
     assert (Htgt : add_vec (mword_of_int (KernelSyms.kvmmake + 0x6c) : mword 64) (sign_extend' 64 (mword_of_int 2097004 : mword 21)) = mword_of_int KernelSyms.kvmmap) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgt) in "Hpc".
@@ -1956,7 +1956,7 @@ Section KvmmakeBody.
               Hp0 Hbelow
               with "Hcg Hcnt Htext Hpc Hptree [Henv]").
     { iExact "Henv". }
-    iIntros (CID9 Hs9 mr t' g) "Hcg Hcnt Hpc Hptree %Hnodes' Henv %Hkcs %Hbase' %Hrep' %Hpres %Hgmiss".
+    iIntros (CID9 Hs9) "Hlc"; iIntros (mr t' g) "Hcg Hcnt Hpc Hptree %Hnodes' Henv %Hkcs %Hbase' %Hrep' %Hpres %Hgmiss".
     assert (Hret : ret_pc (Wk !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.kvmmake + 0x70)).
     { rewrite /Wk upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hret) in "Hpc".
@@ -1966,7 +1966,7 @@ Section KvmmakeBody.
     { rewrite /Wk /T10 /T11 /T12 /T13 /T13a /T14.
       repeat (apply callee_saved_insert_r; [vm_compute; reflexivity |]). apply callee_saved_refl. }
     assert (HcsMmr : callee_saved M mr) by (apply (callee_saved_trans _ Wk _ HcsMWk Hkcs)).
-    iSpecialize ("Hcont" $! CID9 with "[]"); [ iPureIntro; wp_next_chain | ].
+    iSpecialize ("Hcont" $! CID9 with "[] Hlc"); [ iPureIntro; wp_next_chain | ].
     iApply ("Hcont" $! mr t' g with "Hcg Hcnt Hpc Hptree Henv [%] [%] [%] [%] [%] [%] [%]").
     { exact HcsMmr. }
     { rewrite (callee_saved_lookup HcsMmr (mword_of_int 9) ltac:(vm_compute; reflexivity)). exact HM9. }
@@ -2015,21 +2015,21 @@ Section KvmmakeBody.
     iApply (wp_cli_s_sconf (mword_of_int (KernelSyms.kvmmake + 0x70)) (mword_of_int 14 : mword 5) (mword_of_int 6 : mword 6) (add_vec zero_reg (sign_extend' 64 (sign_extend' 12 (mword_of_int 6 : mword 6))))
               M (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(reflexivity) with "Hcg Hpc []").
     { iApply (kmki_70 with "Htext"). }
-    iIntros (CID1 Hs1) "Hcg Hpc".
+    iIntros (CID1 Hs1) "_ Hcg Hpc".
     set (D14 := <[Regidx (mword_of_int 14 : mword 5) := regval_into_reg (add_vec zero_reg (sign_extend' 64 (sign_extend' 12 (mword_of_int 6 : mword 6))))]> M).
     assert (Hp72 : add_vec_int (mword_of_int (KernelSyms.kvmmake + 0x70) : mword 64) 2 = mword_of_int (KernelSyms.kvmmake + 0x72)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp72) in "Hpc".
     iApply (wp_auipc_s_sconf (mword_of_int (KernelSyms.kvmmake + 0x72)) (mword_of_int 13 : mword 5) (mword_of_int 6 : mword 20)
               D14 (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok) with "Hcg Hpc []").
     { iApply (kmki_72 with "Htext"). }
-    iIntros (CID2 Hs2) "Hcg Hpc".
+    iIntros (CID2 Hs2) "_ Hcg Hpc".
     set (D13a := <[Regidx (mword_of_int 13 : mword 5) := regval_into_reg (add_vec (mword_of_int (KernelSyms.kvmmake + 0x72)) (auipc_off (mword_of_int 6 : mword 20)))]> D14).
     assert (Hp76 : add_vec_int (mword_of_int (KernelSyms.kvmmake + 0x72) : mword 64) 4 = mword_of_int (KernelSyms.kvmmake + 0x76)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp76) in "Hpc".
     iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.kvmmake + 0x76)) (mword_of_int 13 : mword 5) (mword_of_int 13 : mword 5) (mword_of_int 3630 : mword 12)
               D13a (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok) with "Hcg Hpc []").
     { iApply (kmki_76 with "Htext"). }
-    iIntros (CID3 Hs3) "Hcg Hpc".
+    iIntros (CID3 Hs3) "_ Hcg Hpc".
     iEval (rgne) in "Hcg".
     set (D13b := <[Regidx (mword_of_int 13 : mword 5) := regval_into_reg (add_vec (D13a !!! Regidx (mword_of_int 13 : mword 5)) (sign_extend' 64 (mword_of_int 3630 : mword 12)))]> D13a).
     assert (Hp7a : add_vec_int (mword_of_int (KernelSyms.kvmmake + 0x76) : mword 64) 4 = mword_of_int (KernelSyms.kvmmake + 0x7a)) by (apply bv_eq; vm_compute; reflexivity).
@@ -2037,14 +2037,14 @@ Section KvmmakeBody.
     iApply (wp_cli_s_sconf (mword_of_int (KernelSyms.kvmmake + 0x7a)) (mword_of_int 15 : mword 5) (mword_of_int 17 : mword 6) (add_vec zero_reg (sign_extend' 64 (sign_extend' 12 (mword_of_int 17 : mword 6))))
               D13b (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(reflexivity) with "Hcg Hpc []").
     { iApply (kmki_7a with "Htext"). }
-    iIntros (CID4 Hs4) "Hcg Hpc".
+    iIntros (CID4 Hs4) "_ Hcg Hpc".
     set (D15a := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (add_vec zero_reg (sign_extend' 64 (sign_extend' 12 (mword_of_int 17 : mword 6))))]> D13b).
     assert (Hp7c : add_vec_int (mword_of_int (KernelSyms.kvmmake + 0x7a) : mword 64) 2 = mword_of_int (KernelSyms.kvmmake + 0x7c)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp7c) in "Hpc".
     iApply (wp_cslli_s_sconf (mword_of_int (KernelSyms.kvmmake + 0x7c)) (Regidx (mword_of_int 15 : mword 5)) (mword_of_int 15 : mword 5) (mword_of_int 27 : mword 6)
               D15a (K - 4)%nat b eq_refl ltac:(vm_compute; discriminate) ltac:(rdok) with "Hcg Hpc []").
     { iApply (kmki_7c with "Htext"). }
-    iIntros (CID5 Hs5) "Hcg Hpc".
+    iIntros (CID5 Hs5) "_ Hcg Hpc".
     iEval (rgne) in "Hcg".
     set (D15 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (shift_bits_left (D15a !!! Regidx (mword_of_int 15 : mword 5)) (subrange_vec_dec (mword_of_int 27 : mword 6) (Z.sub log2_xlen 1) 0))]> D15a).
     assert (Hp7e : add_vec_int (mword_of_int (KernelSyms.kvmmake + 0x7c) : mword 64) 2 = mword_of_int (KernelSyms.kvmmake + 0x7e)) by (apply bv_eq; vm_compute; reflexivity).
@@ -2057,21 +2057,21 @@ Section KvmmakeBody.
                     rewrite Hr15 Hr13; apply bv_eq; vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (kmki_7e with "Htext"). }
-    iIntros (CID6 Hs6) "Hcg Hpc".
+    iIntros (CID6 Hs6) "_ Hcg Hpc".
     set (D13 := <[Regidx (mword_of_int 13 : mword 5) := regval_into_reg (mword_of_int (Z.of_nat data_npages * 4096))]> D15).
     assert (Hp82 : add_vec_int (mword_of_int (KernelSyms.kvmmake + 0x7e) : mword 64) 4 = mword_of_int (KernelSyms.kvmmake + 0x82)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp82) in "Hpc".
     iApply (wp_auipc_s_sconf (mword_of_int (KernelSyms.kvmmake + 0x82)) (mword_of_int 12 : mword 5) (mword_of_int 6 : mword 20)
               D13 (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok) with "Hcg Hpc []").
     { iApply (kmki_82 with "Htext"). }
-    iIntros (CID7 Hs7) "Hcg Hpc".
+    iIntros (CID7 Hs7) "_ Hcg Hpc".
     set (D12a := <[Regidx (mword_of_int 12 : mword 5) := regval_into_reg (add_vec (mword_of_int (KernelSyms.kvmmake + 0x82)) (auipc_off (mword_of_int 6 : mword 20)))]> D13).
     assert (Hp86 : add_vec_int (mword_of_int (KernelSyms.kvmmake + 0x82) : mword 64) 4 = mword_of_int (KernelSyms.kvmmake + 0x86)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp86) in "Hpc".
     iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.kvmmake + 0x86)) (mword_of_int 12 : mword 5) (mword_of_int 12 : mword 5) (mword_of_int 3614 : mword 12)
               D12a (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok) with "Hcg Hpc []").
     { iApply (kmki_86 with "Htext"). }
-    iIntros (CID8 Hs8) "Hcg Hpc".
+    iIntros (CID8 Hs8) "_ Hcg Hpc".
     iEval (rgne) in "Hcg".
     set (D12 := <[Regidx (mword_of_int 12 : mword 5) := regval_into_reg (add_vec (D12a !!! Regidx (mword_of_int 12 : mword 5)) (sign_extend' 64 (mword_of_int 3614 : mword 12)))]> D12a).
     assert (Hp8a : add_vec_int (mword_of_int (KernelSyms.kvmmake + 0x86) : mword 64) 4 = mword_of_int (KernelSyms.kvmmake + 0x8a)) by (apply bv_eq; vm_compute; reflexivity).
@@ -2079,7 +2079,7 @@ Section KvmmakeBody.
     iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.kvmmake + 0x8a)) (mword_of_int 11 : mword 5) (mword_of_int 12 : mword 5)
               D12 (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok) with "Hcg Hpc []").
     { iApply (kmki_8a with "Htext"). }
-    iIntros (CID9 Hs9) "Hcg Hpc".
+    iIntros (CID9 Hs9) "_ Hcg Hpc".
     iEval (rgne) in "Hcg".
     set (D11 := <[Regidx (mword_of_int 11 : mword 5) := regval_into_reg (add_vec zero_reg (D12 !!! Regidx (mword_of_int 12 : mword 5)))]> D12).
     assert (Hp8c : add_vec_int (mword_of_int (KernelSyms.kvmmake + 0x8a) : mword 64) 2 = mword_of_int (KernelSyms.kvmmake + 0x8c)) by (apply bv_eq; vm_compute; reflexivity).
@@ -2087,7 +2087,7 @@ Section KvmmakeBody.
     iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.kvmmake + 0x8c)) (mword_of_int 10 : mword 5) (mword_of_int 9 : mword 5)
               D11 (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok) with "Hcg Hpc []").
     { iApply (kmki_8c with "Htext"). }
-    iIntros (CID10 Hs10) "Hcg Hpc".
+    iIntros (CID10 Hs10) "_ Hcg Hpc".
     iEval (rgne) in "Hcg".
     set (D10 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg (add_vec zero_reg (D11 !!! Regidx (mword_of_int 9 : mword 5)))]> D11).
     assert (Hp8e : add_vec_int (mword_of_int (KernelSyms.kvmmake + 0x8c) : mword 64) 2 = mword_of_int (KernelSyms.kvmmake + 0x8e)) by (apply bv_eq; vm_compute; reflexivity).
@@ -2096,7 +2096,7 @@ Section KvmmakeBody.
               D10 (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (kmki_8e with "Htext"). }
-    iIntros (CID11 Hs11) "Hcg Hpc".
+    iIntros (CID11 Hs11) "_ Hcg Hpc".
     set (Wk := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.kvmmake + 0x8e) : mword 64) 4)]> D10).
     assert (Htgt : add_vec (mword_of_int (KernelSyms.kvmmake + 0x8e) : mword 64) (sign_extend' 64 (mword_of_int 2096970 : mword 21)) = mword_of_int KernelSyms.kvmmap) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgt) in "Hpc".
@@ -2134,7 +2134,7 @@ Section KvmmakeBody.
               Hp0 Hbelow
               with "Hcg Hcnt Htext Hpc Hptree [Henv]").
     { iExact "Henv". }
-    iIntros (CID12 Hs12 mr t' g) "Hcg Hcnt Hpc Hptree %Hnodes' Henv %Hkcs %Hbase' %Hrep' %Hpres %Hgmiss".
+    iIntros (CID12 Hs12) "Hlc"; iIntros (mr t' g) "Hcg Hcnt Hpc Hptree %Hnodes' Henv %Hkcs %Hbase' %Hrep' %Hpres %Hgmiss".
     assert (Hret : ret_pc (Wk !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.kvmmake + 0x92)).
     { rewrite /Wk upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hret) in "Hpc".
@@ -2144,7 +2144,7 @@ Section KvmmakeBody.
     { rewrite /Wk /D10 /D11 /D12 /D12a /D13 /D15 /D15a /D13b /D13a /D14.
       repeat (apply callee_saved_insert_r; [vm_compute; reflexivity |]). apply callee_saved_refl. }
     assert (HcsMmr : callee_saved M mr) by (apply (callee_saved_trans _ Wk _ HcsMWk Hkcs)).
-    iSpecialize ("Hcont" $! CID12 with "[]"); [ iPureIntro; wp_next_chain | ].
+    iSpecialize ("Hcont" $! CID12 with "[] Hlc"); [ iPureIntro; wp_next_chain | ].
     iApply ("Hcont" $! mr t' g with "Hcg Hcnt Hpc Hptree Henv [%] [%] [%] [%] [%] [%] [%]").
     { exact HcsMmr. }
     { rewrite (callee_saved_lookup HcsMmr (mword_of_int 9) ltac:(vm_compute; reflexivity)). exact HM9. }
@@ -2193,28 +2193,28 @@ Section KvmmakeBody.
     iApply (wp_cli_s_sconf (mword_of_int (KernelSyms.kvmmake + 0x92)) (mword_of_int 14 : mword 5) (mword_of_int 10 : mword 6) (add_vec zero_reg (sign_extend' 64 (sign_extend' 12 (mword_of_int 10 : mword 6))))
               M (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(reflexivity) with "Hcg Hpc []").
     { iApply (kmki_92 with "Htext"). }
-    iIntros (CID1 Hs1) "Hcg Hpc".
+    iIntros (CID1 Hs1) "_ Hcg Hpc".
     set (R14 := <[Regidx (mword_of_int 14 : mword 5) := regval_into_reg (add_vec zero_reg (sign_extend' 64 (sign_extend' 12 (mword_of_int 10 : mword 6))))]> M).
     assert (Hp94 : add_vec_int (mword_of_int (KernelSyms.kvmmake + 0x92) : mword 64) 2 = mword_of_int (KernelSyms.kvmmake + 0x94)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp94) in "Hpc".
     iApply (wp_clui_s_sconf (mword_of_int (KernelSyms.kvmmake + 0x94)) (mword_of_int 13 : mword 5) (sign_extend' 20 (mword_of_int 1 : mword 6)) (luival (sign_extend' 20 (mword_of_int 1 : mword 6)))
               R14 (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(reflexivity) with "Hcg Hpc []").
     { iApply (kmki_94 with "Htext"). }
-    iIntros (CID2 Hs2) "Hcg Hpc".
+    iIntros (CID2 Hs2) "_ Hcg Hpc".
     set (R13 := <[Regidx (mword_of_int 13 : mword 5) := regval_into_reg (luival (sign_extend' 20 (mword_of_int 1 : mword 6)))]> R14).
     assert (Hp96 : add_vec_int (mword_of_int (KernelSyms.kvmmake + 0x94) : mword 64) 2 = mword_of_int (KernelSyms.kvmmake + 0x96)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp96) in "Hpc".
     iApply (wp_auipc_s_sconf (mword_of_int (KernelSyms.kvmmake + 0x96)) (mword_of_int 12 : mword 5) (mword_of_int 5 : mword 20)
               R13 (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok) with "Hcg Hpc []").
     { iApply (kmki_96 with "Htext"). }
-    iIntros (CID3 Hs3) "Hcg Hpc".
+    iIntros (CID3 Hs3) "_ Hcg Hpc".
     set (R12a := <[Regidx (mword_of_int 12 : mword 5) := regval_into_reg (add_vec (mword_of_int (KernelSyms.kvmmake + 0x96)) (auipc_off (mword_of_int 5 : mword 20)))]> R13).
     assert (Hp9a : add_vec_int (mword_of_int (KernelSyms.kvmmake + 0x96) : mword 64) 4 = mword_of_int (KernelSyms.kvmmake + 0x9a)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp9a) in "Hpc".
     iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.kvmmake + 0x9a)) (mword_of_int 12 : mword 5) (mword_of_int 12 : mword 5) (mword_of_int 3594 : mword 12)
               R12a (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok) with "Hcg Hpc []").
     { iApply (kmki_9a with "Htext"). }
-    iIntros (CID4 Hs4) "Hcg Hpc".
+    iIntros (CID4 Hs4) "_ Hcg Hpc".
     iEval (rgne) in "Hcg".
     set (R12 := <[Regidx (mword_of_int 12 : mword 5) := regval_into_reg (add_vec (R12a !!! Regidx (mword_of_int 12 : mword 5)) (sign_extend' 64 (mword_of_int 3594 : mword 12)))]> R12a).
     assert (Hp9e : add_vec_int (mword_of_int (KernelSyms.kvmmake + 0x9a) : mword 64) 4 = mword_of_int (KernelSyms.kvmmake + 0x9e)) by (apply bv_eq; vm_compute; reflexivity).
@@ -2222,14 +2222,14 @@ Section KvmmakeBody.
     iApply (wp_lui_s_sconf (mword_of_int (KernelSyms.kvmmake + 0x9e)) (mword_of_int 11 : mword 5) (mword_of_int 16384 : mword 20) (luival (mword_of_int 16384 : mword 20))
               R12 (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(reflexivity) with "Hcg Hpc []").
     { iApply (kmki_9e with "Htext"). }
-    iIntros (CID5 Hs5) "Hcg Hpc".
+    iIntros (CID5 Hs5) "_ Hcg Hpc".
     set (R11a := <[Regidx (mword_of_int 11 : mword 5) := regval_into_reg (luival (mword_of_int 16384 : mword 20))]> R12).
     assert (Hpa2 : add_vec_int (mword_of_int (KernelSyms.kvmmake + 0x9e) : mword 64) 4 = mword_of_int (KernelSyms.kvmmake + 0xa2)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpa2) in "Hpc".
     iApply (wp_caddi_s_sconf (mword_of_int (KernelSyms.kvmmake + 0xa2)) (mword_of_int 11 : mword 5) (mword_of_int 63 : mword 6)
               R11a (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok) with "Hcg Hpc []").
     { iApply (kmki_a2 with "Htext"). }
-    iIntros (CID6 Hs6) "Hcg Hpc".
+    iIntros (CID6 Hs6) "_ Hcg Hpc".
     iEval (rgne) in "Hcg".
     set (R11b := <[Regidx (mword_of_int 11 : mword 5) := regval_into_reg (add_vec (R11a !!! Regidx (mword_of_int 11 : mword 5)) (sign_extend' 64 (sign_extend' 12 (mword_of_int 63 : mword 6))))]> R11a).
     assert (Hpa4 : add_vec_int (mword_of_int (KernelSyms.kvmmake + 0xa2) : mword 64) 2 = mword_of_int (KernelSyms.kvmmake + 0xa4)) by (apply bv_eq; vm_compute; reflexivity).
@@ -2237,7 +2237,7 @@ Section KvmmakeBody.
     iApply (wp_cslli_s_sconf (mword_of_int (KernelSyms.kvmmake + 0xa4)) (Regidx (mword_of_int 11 : mword 5)) (mword_of_int 11 : mword 5) (mword_of_int 12 : mword 6)
               R11b (K - 4)%nat b eq_refl ltac:(vm_compute; discriminate) ltac:(rdok) with "Hcg Hpc []").
     { iApply (kmki_a4 with "Htext"). }
-    iIntros (CID7 Hs7) "Hcg Hpc".
+    iIntros (CID7 Hs7) "_ Hcg Hpc".
     iEval (rgne) in "Hcg".
     set (R11 := <[Regidx (mword_of_int 11 : mword 5) := regval_into_reg (shift_bits_left (R11b !!! Regidx (mword_of_int 11 : mword 5)) (subrange_vec_dec (mword_of_int 12 : mword 6) (Z.sub log2_xlen 1) 0))]> R11b).
     assert (Hpa6 : add_vec_int (mword_of_int (KernelSyms.kvmmake + 0xa4) : mword 64) 2 = mword_of_int (KernelSyms.kvmmake + 0xa6)) by (apply bv_eq; vm_compute; reflexivity).
@@ -2245,7 +2245,7 @@ Section KvmmakeBody.
     iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.kvmmake + 0xa6)) (mword_of_int 10 : mword 5) (mword_of_int 9 : mword 5)
               R11 (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok) with "Hcg Hpc []").
     { iApply (kmki_a6 with "Htext"). }
-    iIntros (CID8 Hs8) "Hcg Hpc".
+    iIntros (CID8 Hs8) "_ Hcg Hpc".
     iEval (rgne) in "Hcg".
     set (R10 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg (add_vec zero_reg (R11 !!! Regidx (mword_of_int 9 : mword 5)))]> R11).
     assert (Hpa8 : add_vec_int (mword_of_int (KernelSyms.kvmmake + 0xa6) : mword 64) 2 = mword_of_int (KernelSyms.kvmmake + 0xa8)) by (apply bv_eq; vm_compute; reflexivity).
@@ -2254,7 +2254,7 @@ Section KvmmakeBody.
               R10 (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (kmki_a8 with "Htext"). }
-    iIntros (CID9 Hs9) "Hcg Hpc".
+    iIntros (CID9 Hs9) "_ Hcg Hpc".
     set (Wk := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.kvmmake + 0xa8) : mword 64) 4)]> R10).
     assert (Htgt : add_vec (mword_of_int (KernelSyms.kvmmake + 0xa8) : mword 64) (sign_extend' 64 (mword_of_int 2096944 : mword 21)) = mword_of_int KernelSyms.kvmmap) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgt) in "Hpc".
@@ -2291,7 +2291,7 @@ Section KvmmakeBody.
               Hp0 Hbelow
               with "Hcg Hcnt Htext Hpc Hptree [Henv]").
     { iExact "Henv". }
-    iIntros (CID10 Hs10 mr t' g) "Hcg Hcnt Hpc Hptree %Hnodes' Henv %Hkcs %Hbase' %Hrep' %Hpres %Hgmiss".
+    iIntros (CID10 Hs10) "Hlc"; iIntros (mr t' g) "Hcg Hcnt Hpc Hptree %Hnodes' Henv %Hkcs %Hbase' %Hrep' %Hpres %Hgmiss".
     assert (Hret : ret_pc (Wk !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.kvmmake + 0xac)).
     { rewrite /Wk upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hret) in "Hpc".
@@ -2301,7 +2301,7 @@ Section KvmmakeBody.
     { rewrite /Wk /R10 /R11 /R11b /R11a /R12 /R12a /R13 /R14.
       repeat (apply callee_saved_insert_r; [vm_compute; reflexivity |]). apply callee_saved_refl. }
     assert (HcsMmr : callee_saved M mr) by (apply (callee_saved_trans _ Wk _ HcsMWk Hkcs)).
-    iSpecialize ("Hcont" $! CID10 with "[]"); [ iPureIntro; wp_next_chain | ].
+    iSpecialize ("Hcont" $! CID10 with "[] Hlc"); [ iPureIntro; wp_next_chain | ].
     iApply ("Hcont" $! mr t' g with "Hcg Hcnt Hpc Hptree Henv [%] [%] [%] [%] [%] [%] [%]").
     { exact HcsMmr. }
     { rewrite (callee_saved_lookup HcsMmr (mword_of_int 9) ltac:(vm_compute; reflexivity)). exact HM9. }
@@ -2331,49 +2331,49 @@ Section KvmmakeBody.
     (* ---- prologue: frame + root kalloc + memset -> pt_empty_node bppn ---- *)
     iApply (wp_kmk_prologue_node γa γk mm K eb p nb b lks Hp0 Hbelow HK Hnbk
               with "Hcg Hcnt Htext Hpc Henv").
-    iIntros (CIDpr Hspr M0 bppn) "Hcg Hcnt Hpc Hptree Henv Hc1 Hc2 Hc3 Hc4 %H9 %Hsp0 %H18 %H19 %H20 %H21 %H22 %H23 %H24 %H25 %H26 %H27".
+    iIntros (CIDpr Hspr) "_"; iIntros (M0 bppn) "Hcg Hcnt Hpc Hptree Henv Hc1 Hc2 Hc3 Hc4 %H9 %Hsp0 %H18 %H19 %H20 %H21 %H22 %H23 %H24 %H25 %H26 %H27".
     (* ---- region 1: UART ---- *)
     iApply (wp_kmk_region_uart γa γk mm M0 bppn K eb p nb 0%nat b lks
               Hp0 Hbelow HK Hnb (Nat.le_0_l 0) Hsp0 H9
               with "Hcg Hcnt Htext Hpc Hptree Henv").
-    iIntros (CID1 Hs1 mr1 t1 g1) "Hcg Hcnt Hpc Hptree Henv %Hcs1 %H9_1 %Hsp1 %Hbase1 %Hrep1 %Hnodes1 %Hg1".
+    iIntros (CID1 Hs1) "_"; iIntros (mr1 t1 g1) "Hcg Hcnt Hpc Hptree Henv %Hcs1 %H9_1 %Hsp1 %Hbase1 %Hrep1 %Hnodes1 %Hg1".
     (* ---- region 2: UART1 (the second 16550; grows the tree by nothing) ---- *)
     assert (Bu1 : (0 + g1 <= 2)%nat) by (rewrite Nat.add_0_l; exact Hg1).
     iApply (wp_kmk_region_uart1 γa γk mm mr1 bppn t1 K eb p nb (0 + g1)%nat b lks
               Hp0 Hbelow HK Hnb Bu1 Hsp1 H9_1 Hbase1 Hrep1
               with "Hcg Hcnt Htext Hpc Hptree Henv").
-    iIntros (CIDu1 Hsu1 mru1 tu1 gu1) "Hcg Hcnt Hpc Hptree Henv %Hcsu1 %H9_u1 %Hspu1 %Hbaseu1 %Hrepu1 %Hnodesu1 %Hgu1".
+    iIntros (CIDu1 Hsu1) "_"; iIntros (mru1 tu1 gu1) "Hcg Hcnt Hpc Hptree Henv %Hcsu1 %H9_u1 %Hspu1 %Hbaseu1 %Hrepu1 %Hnodesu1 %Hgu1".
     (* ---- region 3: VIRTIO ---- *)
     assert (Bv : (0 + g1 + gu1 <= 2)%nat)
       by exact (acc_step (0+g1) gu1 2 0 2 Bu1 Hgu1 ltac:(nat_le)).
     iApply (wp_kmk_region_virtio γa γk mm mru1 bppn tu1 K eb p nb (0 + g1 + gu1)%nat b lks
               Hp0 Hbelow HK Hnb Bv Hspu1 H9_u1 Hbaseu1 Hrepu1
               with "Hcg Hcnt Htext Hpc Hptree Henv").
-    iIntros (CID2 Hs2 mr2 t2 g2) "Hcg Hcnt Hpc Hptree Henv %Hcs2 %H9_2 %Hsp2 %Hbase2 %Hrep2 %Hnodes2 %Hg2".
+    iIntros (CID2 Hs2) "_"; iIntros (mr2 t2 g2) "Hcg Hcnt Hpc Hptree Henv %Hcs2 %H9_2 %Hsp2 %Hbase2 %Hrep2 %Hnodes2 %Hg2".
     (* ---- region 4: PLIC ---- *)
     assert (Bp : (0 + g1 + gu1 + g2 <= 2)%nat) by exact (acc_step (0+g1+gu1) g2 2 0 2 Bv Hg2 ltac:(nat_le)).
     iApply (wp_kmk_region_plic γa γk mm mr2 bppn t2 K eb p nb (0 + g1 + gu1 + g2)%nat b lks
               Hp0 Hbelow HK Hnb Bp Hsp2 H9_2 Hbase2 Hrep2
               with "Hcg Hcnt Htext Hpc Hptree Henv").
-    iIntros (CID3 Hs3 mr3 t3 g3) "Hcg Hcnt Hpc Hptree Henv %Hcs3 %H9_3 %Hsp3 %Hbase3 %Hrep3 %Hnodes3 %Hg3".
+    iIntros (CID3 Hs3) "_"; iIntros (mr3 t3 g3) "Hcg Hcnt Hpc Hptree Henv %Hcs3 %H9_3 %Hsp3 %Hbase3 %Hrep3 %Hnodes3 %Hg3".
     (* ---- region 5: text ---- *)
     assert (Bt : (0 + g1 + gu1 + g2 + g3 <= 34)%nat) by exact (acc_step (0+g1+gu1+g2) g3 2 32 34 Bp Hg3 ltac:(nat_le)).
     iApply (wp_kmk_region_text γa γk mm mr3 bppn t3 K eb p nb (0 + g1 + gu1 + g2 + g3)%nat b lks
               Hp0 Hbelow HK Hnb Bt Hsp3 H9_3 Hbase3 Hrep3
               with "Hcg Hcnt Htext Hpc Hptree Henv").
-    iIntros (CID4 Hs4 mr4 t4 g4) "Hcg Hcnt Hpc Hptree Henv %Hcs4 %H9_4 %Hsp4 %Hbase4 %Hrep4 %Hnodes4 %Hg4".
+    iIntros (CID4 Hs4) "_"; iIntros (mr4 t4 g4) "Hcg Hcnt Hpc Hptree Henv %Hcs4 %H9_4 %Hsp4 %Hbase4 %Hrep4 %Hnodes4 %Hg4".
     (* ---- region 6: data ---- *)
     assert (Bd : (0 + g1 + gu1 + g2 + g3 + g4 <= 36)%nat) by exact (acc_step (0+g1+gu1+g2+g3) g4 34 2 36 Bt Hg4 ltac:(nat_le)).
     iApply (wp_kmk_region_data γa γk mm mr4 bppn t4 K eb p nb (0 + g1 + gu1 + g2 + g3 + g4)%nat b lks
               Hp0 Hbelow HK Hnb Bd Hsp4 H9_4 Hbase4 Hrep4
               with "Hcg Hcnt Htext Hpc Hptree Henv").
-    iIntros (CID5 Hs5 mr5 t5 g5) "Hcg Hcnt Hpc Hptree Henv %Hcs5 %H9_5 %Hsp5 %Hbase5 %Hrep5 %Hnodes5 %Hg5".
+    iIntros (CID5 Hs5) "_"; iIntros (mr5 t5 g5) "Hcg Hcnt Hpc Hptree Henv %Hcs5 %H9_5 %Hsp5 %Hbase5 %Hrep5 %Hnodes5 %Hg5".
     (* ---- region 7: trampoline ---- *)
     assert (Br : (0 + g1 + gu1 + g2 + g3 + g4 + g5 <= 99)%nat) by exact (acc_step (0+g1+gu1+g2+g3+g4) g5 36 63 99 Bd Hg5 ltac:(nat_le)).
     iApply (wp_kmk_region_tramp γa γk mm mr5 bppn t5 K eb p nb (0 + g1 + gu1 + g2 + g3 + g4 + g5)%nat b lks
               Hp0 Hbelow HK Hnb Br Hsp5 H9_5 Hbase5 Hrep5
               with "Hcg Hcnt Htext Hpc Hptree Henv").
-    iIntros (CID6 Hs6 mr6 t6 g6) "Hcg Hcnt Hpc Hptree Henv %Hcs6 %H9_6 %Hsp6 %Hbase6 %Hrep6 %Hnodes6 %Hg6".
+    iIntros (CID6 Hs6) "_"; iIntros (mr6 t6 g6) "Hcg Hcnt Hpc Hptree Henv %Hcs6 %H9_6 %Hsp6 %Hbase6 %Hrep6 %Hnodes6 %Hg6".
     (* ---- census pin: pt_nodes t6 = 102, growth-sum = 101 ---- *)
     assert (HN : pt_nodes t6 = (1 + g1 + gu1 + g2 + g3 + g4 + g5 + g6)%nat).
     { rewrite Hnodes6 Hnodes5 Hnodes4 Hnodes3 Hnodes2 Hnodesu1 Hnodes1. reflexivity. }
@@ -2383,7 +2383,7 @@ Section KvmmakeBody.
     iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.kvmmake + 0xac)) (mword_of_int 10 : mword 5) (mword_of_int 9 : mword 5)
               mr6 (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok) with "Hcg Hpc []").
     { iApply (kmki_ac with "Htext"). }
-    iIntros (CID7 Hs7) "Hcg Hpc".
+    iIntros (CID7 Hs7) "_ Hcg Hpc".
     iEval (rgne) in "Hcg".
     set (Wm := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg (add_vec zero_reg (mr6 !!! Regidx (mword_of_int 9 : mword 5)))]> mr6).
     assert (Hpae : add_vec_int (mword_of_int (KernelSyms.kvmmake + 0xac) : mword 64) 2 = mword_of_int (KernelSyms.kvmmake + 0xae)) by (apply bv_eq; vm_compute; reflexivity).
@@ -2392,7 +2392,7 @@ Section KvmmakeBody.
               Wm (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (kmki_ae with "Htext"). }
-    iIntros (CID8 Hs8) "Hcg Hpc".
+    iIntros (CID8 Hs8) "_ Hcg Hpc".
     set (Wp := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.kvmmake + 0xae) : mword 64) 4)]> Wm).
     assert (Htgtp : add_vec (mword_of_int (KernelSyms.kvmmake + 0xae) : mword 64) (sign_extend' 64 (mword_of_int 1516 : mword 21)) = mword_of_int KernelSyms.proc_mapstacks) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtp) in "Hpc".
@@ -2412,7 +2412,7 @@ Section KvmmakeBody.
               Hp0 Hbelow
               with "Hcg Hcnt Htext Hpc Hptree [Henv]").
     { rewrite avail_sub_Some. iExact "Henv". }
-    iIntros (CID9 Hs9 mr7 t7 g7 pas) "Hcg Hcnt Hpc Hptree %Hnodes7' Henv %Hcs7 %Hbase7' %Hpasok %Hrep7 %Hg7le Hpages".
+    iIntros (CID9 Hs9) "_"; iIntros (mr7 t7 g7 pas) "Hcg Hcnt Hpc Hptree %Hnodes7' Henv %Hcs7 %Hbase7' %Hpasok %Hrep7 %Hg7le Hpages".
     (* g7 = 0 (no growth left) and pt_nodes t7 = 102 *)
     assert (Hg7 : g7 = 0%nat).
     { pose proof (kstacks_missing_zero t6 Hrep6) as Hkm0. rewrite Hkm0 in Hg7le. exact (proj1 (Nat.le_0_r g7) Hg7le). }

@@ -750,7 +750,7 @@ Section InitlogBlocks.
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc [] Hword").
     { iApply (ili_52 with "Htext"). }
-    iIntros (CIDc1 Hsc1) "Hcg Hpc Hword".
+    iIntros (CIDc1 Hsc1) "_ Hcg Hpc Hword".
     iEval (rewrite Hcaddr) in "Hword".
     iDestruct ("Hback" with "Hword") as "Hby".
     set (E1 := <[Regidx Ra3 := regval_into_reg
@@ -781,7 +781,7 @@ Section InitlogBlocks.
               (mword_of_int 0 : SailStdpp.Values.mword 12) E1 nK wj b
               with "Hcg Hpc [] Hcell").
     { iApply (ili_54 with "Htext"). }
-    iIntros (CIDc2 Hsc2) "Hcg Hpc Hcell".
+    iIntros (CIDc2 Hsc2) "_ Hcg Hpc Hcell".
     iEval (rewrite Hsaddr) in "Hcell".
     assert (Hstv : trunc32 (rget E1 Ra3) = il_wordw bs_hdr (S t)).
     { rgne. rewrite HE1a3. apply trunc32_sext64. }
@@ -795,7 +795,7 @@ Section InitlogBlocks.
               E1 nK b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (ili_56 with "Htext"). }
-    iIntros (CIDc3 Hsc3) "Hcg Hpc".
+    iIntros (CIDc3 Hsc3) "_ Hcg Hpc".
     iEval (rgne) in "Hcg".
     assert (Hcurstep : add_vec (E1 !!! Regidx Ra5)
                          (sign_extend' 64 (sign_extend' 12 (mword_of_int 4 : SailStdpp.Values.mword 6)))
@@ -822,7 +822,7 @@ Section InitlogBlocks.
               E2 nK b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (ili_58 with "Htext"). }
-    iIntros (CIDc4 Hsc4) "Hcg Hpc".
+    iIntros (CIDc4 Hsc4) "_ Hcg Hpc".
     iEval (rgne) in "Hcg".
     assert (Hblkstep : add_vec (E2 !!! Regidx (mword_of_int 14 : SailStdpp.Values.mword 5))
                          (sign_extend' 64 (sign_extend' 12 (mword_of_int 4 : SailStdpp.Values.mword 6)))
@@ -873,12 +873,12 @@ Section InitlogBlocks.
                 ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
                 Hcmp with "Hcg Hpc []").
       { iApply (ili_5a with "Htext"). }
-      iIntros (CIDc5 Hsc5) "Hcg Hpc".
+      iIntros (CIDc5 Hsc5) "Hlc Hcg Hpc".
       assert (Hpp5e : add_vec_int (mword_of_int (KernelSyms.initlog + 0x5a) : SailStdpp.Values.mword 64) 4
                       = mword_of_int (KernelSyms.initlog + 0x5e))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp5e) in "Hpc".
-      iSpecialize ("Hcont" $! CIDc5 with "[%]"); [wp_next_chain|].
+      iSpecialize ("Hcont" $! CIDc5 with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hcont" $! E3 with "[%] [%] Hcg Hpc Hby [Hdone] [Hjunk]").
       + exact HE3cs.
       + exact HE3a0.
@@ -895,7 +895,7 @@ Section InitlogBlocks.
                 ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
                 Hcmp ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
       { iApply (ili_5a with "Htext"). }
-      iNext. iIntros (CIDc5 Hsc5) "Hcg Hpc".
+      iNext. iIntros (CIDc5 Hsc5) "_ Hcg Hpc".
       assert (Htgt52 : add_vec (mword_of_int (KernelSyms.initlog + 0x5a) : SailStdpp.Values.mword 64)
                          (sign_extend' 64 (mword_of_int 8184 : SailStdpp.Values.mword 13))
                        = mword_of_int (KernelSyms.initlog + 0x52))
@@ -903,8 +903,8 @@ Section InitlogBlocks.
       iEval (rewrite Htgt52) in "Hpc".
       iApply (IH CIDc5 (S t) E3 ltac:(lia) ltac:(lia) HE3a5 HE3a4 HE3a2 HE3a0
                 with "Hcg Hpc Htext Hby Hdone Hjunk [Hcont]").
-      rewrite /wp_next. iIntros (CIDo Hso M') "%HcsX %Ha0X HcgX HpcX HbyX HdoneX HjunkX".
-      iSpecialize ("Hcont" $! CIDo with "[%]"); [wp_next_chain|].
+      rewrite /wp_next. iIntros (CIDo Hso) "Hlc"; iIntros (M') "%HcsX %Ha0X HcgX HpcX HbyX HdoneX HjunkX".
+      iSpecialize ("Hcont" $! CIDo with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hcont" $! M' with "[%] [%] HcgX HpcX HbyX HdoneX HjunkX").
       + intros c Hc. rewrite (HcsX c Hc). exact (HE3cs c Hc).
       + exact Ha0X.
@@ -963,13 +963,13 @@ Section InitlogBlocks.
                 ltac:(vm_compute; discriminate) Hcmp ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (ili_40 with "Htext"). }
-      iNext. iIntros (CIDh1 Hsh1) "Hcg Hpc".
+      iNext. iIntros (CIDh1 Hsh1) "Hlc Hcg Hpc".
       assert (Htgt5e : add_vec (mword_of_int (KernelSyms.initlog + 0x40) : SailStdpp.Values.mword 64)
                          (sign_extend' 64 (mword_of_int 30 : SailStdpp.Values.mword 13))
                        = mword_of_int (KernelSyms.initlog + 0x5e))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgt5e) in "Hpc".
-      iSpecialize ("Hcont" $! CIDh1 with "[%]"); [wp_next_chain|].
+      iSpecialize ("Hcont" $! CIDh1 with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hcont" $! M with "[%] [%] Hcg Hpc Hby [] [Hjunk]").
       + intros c Hc. reflexivity.
       + exact Ha0.
@@ -985,7 +985,7 @@ Section InitlogBlocks.
                 ltac:(vm_compute; discriminate) Hcmp
                 with "Hcg Hpc []").
       { iApply (ili_40 with "Htext"). }
-      iIntros (CIDh1 Hsh1) "Hcg Hpc".
+      iIntros (CIDh1 Hsh1) "_ Hcg Hpc".
       assert (Hpp44 : add_vec_int (mword_of_int (KernelSyms.initlog + 0x40) : SailStdpp.Values.mword 64) 4
                       = mword_of_int (KernelSyms.initlog + 0x44))
         by (apply bv_eq; vm_compute; reflexivity).
@@ -995,7 +995,7 @@ Section InitlogBlocks.
                 M nK b ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc []").
       { iApply (ili_44 with "Htext"). }
-      iIntros (CIDh2 Hsh2) "Hcg Hpc".
+      iIntros (CIDh2 Hsh2) "_ Hcg Hpc".
       iEval (rgne) in "Hcg".
       assert (Hcur0 : add_vec (zero_reg : SailStdpp.Values.mword 64) (M !!! Regidx Ra0)
                       = il_cur kk 0).
@@ -1019,7 +1019,7 @@ Section InitlogBlocks.
                 F1 nK b ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc []").
       { iApply (ili_46 with "Htext"). }
-      iIntros (CIDh3 Hsh3) "Hcg Hpc".
+      iIntros (CIDh3 Hsh3) "_ Hcg Hpc".
       set (F2 := <[Regidx (mword_of_int 14 : SailStdpp.Values.mword 5)
                    := regval_into_reg
                         (add_vec (mword_of_int (KernelSyms.initlog + 0x46) : SailStdpp.Values.mword 64)
@@ -1034,7 +1034,7 @@ Section InitlogBlocks.
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc []").
       { iApply (ili_4a with "Htext"). }
-      iIntros (CIDh4 Hsh4) "Hcg Hpc".
+      iIntros (CIDh4 Hsh4) "_ Hcg Hpc".
       iEval (rgne) in "Hcg".
       set (F3 := <[Regidx (mword_of_int 14 : SailStdpp.Values.mword 5)
                    := regval_into_reg
@@ -1064,7 +1064,7 @@ Section InitlogBlocks.
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc []").
       { iApply (ili_4e with "Htext"). }
-      iIntros (CIDh5 Hsh5) "Hcg Hpc".
+      iIntros (CIDh5 Hsh5) "_ Hcg Hpc".
       set (F4 := <[Regidx Ra2 := regval_into_reg
                     (shift_bits_left (F3 !!! Regidx Ra2)
                        (subrange_vec_dec (mword_of_int 2 : SailStdpp.Values.mword 6)
@@ -1085,7 +1085,7 @@ Section InitlogBlocks.
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc []").
       { iApply (ili_50 with "Htext"). }
-      iIntros (CIDh6 Hsh6) "Hcg Hpc".
+      iIntros (CIDh6 Hsh6) "_ Hcg Hpc".
       iEval (rgne) in "Hcg". iEval (rgne) in "Hcg".
       assert (Hendv : add_vec (F4 !!! Regidx Ra2) (F4 !!! Regidx Ra0)
                       = il_cur kk nh).
@@ -1127,8 +1127,8 @@ Section InitlogBlocks.
       iApply (il_copy nh kk nh bs_hdr pj nK b Hkk Hnh Hlen CIDh6 0%nat F5
                 Hposn ltac:(lia) HF5a5 HF5a4 HF5a2 HF5a0
                 with "Hcg Hpc Htext Hby Hdone Hjunk [Hcont]").
-      rewrite /wp_next. iIntros (CIDo Hso M') "%HcsX %Ha0X HcgX HpcX HbyX HdoneX HjunkX".
-      iSpecialize ("Hcont" $! CIDo with "[%]"); [wp_next_chain|].
+      rewrite /wp_next. iIntros (CIDo Hso) "Hlc"; iIntros (M') "%HcsX %Ha0X HcgX HpcX HbyX HdoneX HjunkX".
+      iSpecialize ("Hcont" $! CIDo with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hcont" $! M' with "[%] [%] HcgX HpcX HbyX HdoneX HjunkX").
       + intros c Hc. rewrite (HcsX c Hc). exact (HF5cs c Hc).
       + exact Ha0X.
@@ -1292,7 +1292,7 @@ Section ProofInitlog.
     iApply (wp_caddi16sp_push_s_sconf pcE (mword_of_int 61 : mword 6) m K 6 b
               ltac:(lia) Hspr6 with "Hcg Hpc []").
     { iApply (ili_00 with "Htext"). }
-    iIntros (CID1 Hs1) "Hcg Hframe Hpc".
+    iIntros (CID1 Hs1) "_ Hcg Hframe Hpc".
     change (<[Regidx csp_rs1 := regval_into_reg
         (add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 61 : mword 6))))]> m) with R1.
     assert (HspR1 : R1 !!! Regidx csp_rs1 = spr)
@@ -1324,7 +1324,7 @@ Section ProofInitlog.
               R1 (K - 6)%nat vra0 b with "Hcg Hpc [] [Hc1]").
     { iApply (ili_02 with "Htext"). }
     { iEval (rewrite HspR1 Hb1). iExact "Hc1". }
-    iIntros (CID2 Hs2) "Hcg Hpc Hc1".
+    iIntros (CID2 Hs2) "_ Hcg Hpc Hc1".
     iEval (rgne) in "Hc1". iEval (rewrite HspR1 Hb1 Hra_v) in "Hc1".
     assert (Hpp04 : add_vec_int (mword_of_int (KernelSyms.initlog + 0x02) : mword 64) 2
                     = mword_of_int (KernelSyms.initlog + 0x04))
@@ -1335,7 +1335,7 @@ Section ProofInitlog.
               R1 (K - 6)%nat vs00 b with "Hcg Hpc [] [Hc2]").
     { iApply (ili_04 with "Htext"). }
     { iEval (rewrite HspR1 Hb2). iExact "Hc2". }
-    iIntros (CID3 Hs3) "Hcg Hpc Hc2".
+    iIntros (CID3 Hs3) "_ Hcg Hpc Hc2".
     iEval (rgne) in "Hc2". iEval (rewrite HspR1 Hb2 Hs0_v) in "Hc2".
     assert (Hpp06 : add_vec_int (mword_of_int (KernelSyms.initlog + 0x04) : mword 64) 2
                     = mword_of_int (KernelSyms.initlog + 0x06))
@@ -1346,7 +1346,7 @@ Section ProofInitlog.
               R1 (K - 6)%nat vs10 b with "Hcg Hpc [] [Hc3]").
     { iApply (ili_06 with "Htext"). }
     { iEval (rewrite HspR1 Hb3). iExact "Hc3". }
-    iIntros (CID4 Hs4) "Hcg Hpc Hc3".
+    iIntros (CID4 Hs4) "_ Hcg Hpc Hc3".
     iEval (rgne) in "Hc3". iEval (rewrite HspR1 Hb3 Hs1_v) in "Hc3".
     assert (Hpp08 : add_vec_int (mword_of_int (KernelSyms.initlog + 0x06) : mword 64) 2
                     = mword_of_int (KernelSyms.initlog + 0x08))
@@ -1357,7 +1357,7 @@ Section ProofInitlog.
               R1 (K - 6)%nat vs20 b with "Hcg Hpc [] [Hc4]").
     { iApply (ili_08 with "Htext"). }
     { iEval (rewrite HspR1 Hb4). iExact "Hc4". }
-    iIntros (CID5 Hs5) "Hcg Hpc Hc4".
+    iIntros (CID5 Hs5) "_ Hcg Hpc Hc4".
     iEval (rgne) in "Hc4". iEval (rewrite HspR1 Hb4 Hs2_v) in "Hc4".
     assert (Hpp0a : add_vec_int (mword_of_int (KernelSyms.initlog + 0x08) : mword 64) 2
                     = mword_of_int (KernelSyms.initlog + 0x0a))
@@ -1368,7 +1368,7 @@ Section ProofInitlog.
               R1 (K - 6)%nat vs30 b with "Hcg Hpc [] [Hc5]").
     { iApply (ili_0a with "Htext"). }
     { iEval (rewrite HspR1 Hb5). iExact "Hc5". }
-    iIntros (CID6 Hs6) "Hcg Hpc Hc5".
+    iIntros (CID6 Hs6) "_ Hcg Hpc Hc5".
     iEval (rgne) in "Hc5". iEval (rewrite HspR1 Hb5 Hs3_v) in "Hc5".
     assert (Hpp0c : add_vec_int (mword_of_int (KernelSyms.initlog + 0x0a) : mword 64) 2
                     = mword_of_int (KernelSyms.initlog + 0x0c))
@@ -1380,7 +1380,7 @@ Section ProofInitlog.
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (ili_0c with "Htext"). }
-    iIntros (CID7 Hs7) "Hcg Hpc".
+    iIntros (CID7 Hs7) "_ Hcg Hpc".
     set (R2 := <[Regidx Rs0 := regval_into_reg
                   (add_vec (R1 !!! Regidx csp_rs1)
                      (sign_extend' 64 (caddi4spn_imm (mword_of_int 12 : mword 8))))]> R1).
@@ -1393,7 +1393,7 @@ Section ProofInitlog.
               R2 (K - 6)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (ili_0e with "Htext"). }
-    iIntros (CID8 Hs8) "Hcg Hpc".
+    iIntros (CID8 Hs8) "_ Hcg Hpc".
     set (R3 := <[Regidx Rs1 := regval_into_reg
                   (add_vec (zero_reg : mword 64) (rget R2 Ra0))]> R2).
     assert (HR2a0 : R2 !!! Regidx Ra0 = sign_extend' 64 dev)
@@ -1412,7 +1412,7 @@ Section ProofInitlog.
               R3 (K - 6)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (ili_10 with "Htext"). }
-    iIntros (CID9 Hs9) "Hcg Hpc".
+    iIntros (CID9 Hs9) "_ Hcg Hpc".
     set (R4 := <[Regidx Rs3 := regval_into_reg
                   (add_vec (zero_reg : mword 64) (rget R3 Ra1))]> R3).
     assert (HR4s3 : R4 !!! Regidx Rs3 = sb).
@@ -1428,7 +1428,7 @@ Section ProofInitlog.
               R4 (K - 6)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (ili_12 with "Htext"). }
-    iIntros (CID10 Hs10) "Hcg Hpc".
+    iIntros (CID10 Hs10) "_ Hcg Hpc".
     set (R5 := <[Regidx Rs2 := regval_into_reg
                   (add_vec (mword_of_int (KernelSyms.initlog + 0x12) : mword 64)
                      (auipc_off (mword_of_int 31 : mword 20)))]> R4).
@@ -1442,7 +1442,7 @@ Section ProofInitlog.
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (ili_16 with "Htext"). }
-    iIntros (CID11 Hs11) "Hcg Hpc".
+    iIntros (CID11 Hs11) "_ Hcg Hpc".
     set (R6 := <[Regidx Rs2 := regval_into_reg
                   (add_vec (rget R5 Rs2)
                      (sign_extend' 64 (mword_of_int 2296 : mword 12)))]> R5).
@@ -1458,7 +1458,7 @@ Section ProofInitlog.
               R6 (K - 6)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (ili_1a with "Htext"). }
-    iIntros (CID12 Hs12) "Hcg Hpc".
+    iIntros (CID12 Hs12) "_ Hcg Hpc".
     set (R7 := <[Regidx Ra1 := regval_into_reg
                   (add_vec (mword_of_int (KernelSyms.initlog + 0x1a) : mword 64)
                      (auipc_off (mword_of_int 3 : mword 20)))]> R6).
@@ -1472,7 +1472,7 @@ Section ProofInitlog.
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (ili_1e with "Htext"). }
-    iIntros (CID13 Hs13) "Hcg Hpc".
+    iIntros (CID13 Hs13) "_ Hcg Hpc".
     set (R8 := <[Regidx Ra1 := regval_into_reg
                   (add_vec (rget R7 Ra1)
                      (sign_extend' 64 (mword_of_int 2016 : mword 12)))]> R7).
@@ -1491,7 +1491,7 @@ Section ProofInitlog.
               R8 (K - 6)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (ili_22 with "Htext"). }
-    iIntros (CID14 Hs14) "Hcg Hpc".
+    iIntros (CID14 Hs14) "_ Hcg Hpc".
     set (R9 := <[Regidx Ra0 := regval_into_reg
                   (add_vec (zero_reg : mword 64) (rget R8 Rs2))]> R8).
     assert (HR9a0 : R9 !!! Regidx Ra0 = log_addr).
@@ -1508,7 +1508,7 @@ Section ProofInitlog.
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
     { iApply (ili_24 with "Htext"). }
-    iIntros (CID15 Hs15) "Hcg Hpc".
+    iIntros (CID15 Hs15) "_ Hcg Hpc".
     set (RA := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KernelSyms.initlog + 0x24) : mword 64) 4)]> R9).
     assert (Htgtil : add_vec (mword_of_int (KernelSyms.initlog + 0x24) : mword 64)
@@ -1567,7 +1567,7 @@ Section ProofInitlog.
     { iEval (rewrite HRAa0). iExact "Hlock". }
     { iEval (rewrite HRAa0). iExact "Hname". }
     { iEval (rewrite HRAa0). iExact "Hcpu". }
-    iIntros (CID16 Hs16 mil) "Hcg Hpc %Hilcs Hlock Hlname Hcpu".
+    iIntros (CID16 Hs16) "_"; iIntros (mil) "Hcg Hpc %Hilcs Hlock Hlname Hcpu".
     iEval (rewrite HRAa0) in "Hlock".
     iEval (rewrite HRAa0 HRAa1) in "Hlname".
     iEval (rewrite HRAa0) in "Hcpu".
@@ -1621,7 +1621,7 @@ Section ProofInitlog.
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc [] Hsbf").
     { iApply (ili_28 with "Htext"). }
-    iIntros (CID17 Hs17) "Hcg Hpc Hsbf".
+    iIntros (CID17 Hs17) "_ Hcg Hpc Hsbf".
     iEval (rewrite Hsbad) in "Hsbf".
     set (T1 := <[Regidx Ra1 := regval_into_reg
                   (sign_extend' 64 (mword_of_int logstart : mword 32))]> mil).
@@ -1652,7 +1652,7 @@ Section ProofInitlog.
               (mword_of_int 24 : mword 12) T1 (K - 6)%nat v_start b
               with "Hcg Hpc [] Hstc").
     { iApply (ili_2c with "Htext"). }
-    iIntros (CID18 Hs18) "Hcg Hpc Hstc".
+    iIntros (CID18 Hs18) "_ Hcg Hpc Hstc".
     iEval (rewrite Hstad) in "Hstc".
     assert (Hsv1 : trunc32 (rget T1 Ra1) = (mword_of_int logstart : mword 32)).
     { rgne. rewrite HT1a1. apply trunc32_sext64. }
@@ -1670,7 +1670,7 @@ Section ProofInitlog.
               (mword_of_int 36 : mword 12) T1 (K - 6)%nat v_dev b
               with "Hcg Hpc [] Hdevc").
     { iApply (ili_30 with "Htext"). }
-    iIntros (CID19 Hs19) "Hcg Hpc Hdevc".
+    iIntros (CID19 Hs19) "_ Hcg Hpc Hdevc".
     iEval (rewrite Hdvad) in "Hdevc".
     assert (Hsv2 : trunc32 (rget T1 Rs1) = dev).
     { rgne. rewrite HT1s1. apply trunc32_sext64. }
@@ -1689,7 +1689,7 @@ Section ProofInitlog.
               T1 (K - 6)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (ili_34 with "Htext"). }
-    iIntros (CID20 Hs20) "Hcg Hpc".
+    iIntros (CID20 Hs20) "_ Hcg Hpc".
     set (T2 := <[Regidx Ra0 := regval_into_reg
                   (add_vec (zero_reg : mword 64) (rget T1 Rs1))]> T1).
     assert (HT2a0 : T2 !!! Regidx Ra0 = sign_extend' 64 dev).
@@ -1716,7 +1716,7 @@ Section ProofInitlog.
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
     { iApply (ili_36 with "Htext"). }
-    iIntros (CID21 Hs21) "Hcg Hpc".
+    iIntros (CID21 Hs21) "_ Hcg Hpc".
     set (T3 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KernelSyms.initlog + 0x36) : mword 64) 4)]> T2).
     assert (Htgtbr : add_vec (mword_of_int (KernelSyms.initlog + 0x36) : mword 64)
@@ -1763,7 +1763,7 @@ Section ProofInitlog.
               with "Hcg Hcnt Hextc Hclmc Htext Hkdata Hpc Hpenv Hbio Hppid Hprocs
                     Hdevi Hdgeom Hdlock Hs1u").
     all: try lkbelow.
-    iIntros (CID22 Hs22 mB kk bs0 bsd0 d0)
+    iIntros (CID22 Hs22) "_"; iIntros (mB kk bs0 bsd0 d0)
       "%Hfacts Hcg Hcnt Hextc Hclmc Hpc Hppid Hheld".
     destruct Hfacts as [Hcs1 HmBa0].
     assert (Hpc3a : ret_pc (T3 !!! Regidx Rra : mword 64)
@@ -1812,7 +1812,7 @@ Section ProofInitlog.
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc [] Hword").
     { iApply (ili_3a with "Htext"). }
-    iIntros (CID23 Hs23) "Hcg Hpc Hword".
+    iIntros (CID23 Hs23) "_ Hcg Hpc Hword".
     iEval (rewrite Hhaddr) in "Hword".
     iDestruct ("Hback" with "Hword") as "Hby".
     set (B1 := <[Regidx Ra2 := regval_into_reg
@@ -1844,7 +1844,7 @@ Section ProofInitlog.
               (mword_of_int 44 : mword 12) B1 (K - 6)%nat v_n b
               with "Hcg Hpc [] Hncell").
     { iApply (ili_3c with "Htext"). }
-    iIntros (CID24 Hs24) "Hcg Hpc Hncell".
+    iIntros (CID24 Hs24) "_ Hcg Hpc Hncell".
     iEval (rewrite Hlhad) in "Hncell".
     assert (Hsv3 : trunc32 (rget B1 Ra2) = il_hdrw bs_hdr).
     { rgne. rewrite HB1a2. apply trunc32_sext64. }
@@ -1858,7 +1858,7 @@ Section ProofInitlog.
     iApply (il_hd kk ((hdr_dec bs_hdr).1) bs_hdr pj (K - 6)%nat b B1
               HA Hbnd eq_refl Hlen HB1a2 HB1a0
               with "Hcg Hpc Htext Hby Hblk").
-    iIntros (CID25 Hs25 B1x) "%HB1xcs %HB1xa0 Hcg Hpc Hby Hcells Hjunk".
+    iIntros (CID25 Hs25) "_"; iIntros (B1x) "%HB1xcs %HB1xa0 Hcg Hpc Hby Hcells Hjunk".
     (* the head's register facts, carried across the dispatch *)
     assert (HB1xsp : B1x !!! Regidx csp_rs1 = spr).
     { rewrite (HB1xcs csp_rs1 ltac:(vm_compute; reflexivity)). exact HB1sp. }
@@ -1885,7 +1885,7 @@ Section ProofInitlog.
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
     { iApply (ili_5e with "Htext"). }
-    iIntros (CID26 Hs26) "Hcg Hpc".
+    iIntros (CID26 Hs26) "_ Hcg Hpc".
     set (B2 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KernelSyms.initlog + 0x5e) : mword 64) 4)]> B1x).
     assert (Htgtbl : add_vec (mword_of_int (KernelSyms.initlog + 0x5e) : mword 64)
@@ -1920,7 +1920,7 @@ Section ProofInitlog.
               Hbelow
               with "Hcg Hcnt Htext Hpc Hbio Hppid Hprocs Hheld").
     all: try lkbelow.
-    iIntros (CID27 Hs27 mR) "%Hcs2 Hcg Hcnt Hpc Hppid Hs1u".
+    iIntros (CID27 Hs27) "_"; iIntros (mR) "%Hcs2 Hcg Hcnt Hpc Hppid Hs1u".
     assert (Hpc62 : ret_pc (B2 !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.initlog + 0x62)).
     { rewrite HB2ra. apply bv_eq; vm_compute; reflexivity. }
@@ -1942,7 +1942,7 @@ Section ProofInitlog.
               ltac:(apply bv_eq; vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (ili_62 with "Htext"). }
-    iIntros (CID28 Hs28) "Hcg Hpc".
+    iIntros (CID28 Hs28) "_ Hcg Hpc".
     set (C1 := <[Regidx Ra0 := regval_into_reg (mword_of_int 1 : mword 64)]> mR).
     assert (HC1a0 : C1 !!! Regidx Ra0 = (mword_of_int 1 : mword 64))
       by (rewrite /C1; apply upd_eq).
@@ -1963,7 +1963,7 @@ Section ProofInitlog.
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
     { iApply (ili_64 with "Htext"). }
-    iIntros (CID29 Hs29) "Hcg Hpc".
+    iIntros (CID29 Hs29) "_ Hcg Hpc".
     set (C2 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KernelSyms.initlog + 0x64) : mword 64) 4)]> C1).
     assert (Htgtit : add_vec (mword_of_int (KernelSyms.initlog + 0x64) : mword 64)
@@ -2165,7 +2165,7 @@ Section ProofInitlog.
                 with "Hseam Hregc2 Hswlb [Hmi]").
       iNext. iExact "Hmi". }
     { iNext. iExact "Hmirh". }
-    iIntros (CID30 Hs30 mI) "%Hcs3 Hcg Hcnt Hextc Hclmc Hpc Hppid
+    iIntros (CID30 Hs30) "_"; iIntros (mI) "%Hcs3 Hcg Hcnt Hextc Hclmc Hpc Hppid
                              Hncell Hcells HLauth HDauth Hxo Hents Hs2 HRcust".
     (* RECOVERY IS DONE (durable-disk lane E-except): every entry has been
        landed, so the residue is empty and the handle is spent for the
@@ -2202,7 +2202,7 @@ Section ProofInitlog.
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (ili_68 with "Htext"). }
-    iIntros (CID31 Hs31) "Hcg Hpc".
+    iIntros (CID31 Hs31) "_ Hcg Hpc".
     set (D1 := <[Regidx Ra5 := regval_into_reg
                   (add_vec (mword_of_int (KernelSyms.initlog + 0x68) : mword 64)
                      (auipc_off (mword_of_int 31 : mword 20)))]> mI).
@@ -2227,7 +2227,7 @@ Section ProofInitlog.
               (mword_of_int (Z.of_nat ((hdr_dec bs_hdr).1)) : mword 32) b
               with "Hcg Hpc [] Hncell").
     { iApply (ili_6c with "Htext"). }
-    iIntros (CID32 Hs32) "Hcg Hpc Hncell".
+    iIntros (CID32 Hs32) "_ Hcg Hpc Hncell".
     iEval (rewrite Hlhad2) in "Hncell".
     (* the install chain's last picture; its later strips on this step
        (the mirror half is timeless) *)
@@ -2270,7 +2270,7 @@ Section ProofInitlog.
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
     { iApply (ili_70 with "Htext"). }
-    iIntros (CID33 Hs33) "Hcg Hpc".
+    iIntros (CID33 Hs33) "_ Hcg Hpc".
     set (D2 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KernelSyms.initlog + 0x70) : mword 64) 4)]> D1).
     assert (Htgtwh : add_vec (mword_of_int (KernelSyms.initlog + 0x70) : mword 64)
@@ -2376,7 +2376,7 @@ Section ProofInitlog.
                 Hlen' ltac:(rewrite Hhn'; reflexivity) Hbnd HMn
                 (fun c (_ : c <> log_hdr_bno logstart) => eq_refl) Hcaught
                 with "Hseam Hregc Hswlb Hmirn"). }
-    iIntros (CID34 Hs34 mW bs') "%Hcs4 Hcg Hcnt Hextc Hclmc Hpc Hppid
+    iIntros (CID34 Hs34) "_"; iIntros (mW bs') "%Hcs4 Hcg Hcnt Hextc Hclmc Hpc Hppid
                                  Hncell _ HLauth Hfsb %Hhn %Hhdec Hs1u HQ".
     assert (Hpc74 : ret_pc (D2 !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.initlog + 0x74)).
@@ -2400,7 +2400,7 @@ Section ProofInitlog.
               with "Hcg Hpc [] [Hc1]").
     { iApply (ili_74 with "Htext"). }
     { iEval (rewrite HmWsp Hb1). iExact "Hc1". }
-    iIntros (CID35 Hs35) "Hcg Hpc Hc1".
+    iIntros (CID35 Hs35) "_ Hcg Hpc Hc1".
     iEval (rewrite HmWsp Hb1) in "Hc1".
     set (P1 := <[Regidx Rra := regval_into_reg (m !!! Regidx Rra : mword 64)]> mW).
     assert (HP1sp : P1 !!! Regidx csp_rs1 = spr)
@@ -2416,7 +2416,7 @@ Section ProofInitlog.
               with "Hcg Hpc [] [Hc2]").
     { iApply (ili_76 with "Htext"). }
     { iEval (rewrite HP1sp Hb2). iExact "Hc2". }
-    iIntros (CID36 Hs36) "Hcg Hpc Hc2".
+    iIntros (CID36 Hs36) "_ Hcg Hpc Hc2".
     iEval (rewrite HP1sp Hb2) in "Hc2".
     set (P2 := <[Regidx Rs0 := regval_into_reg (m !!! Regidx Rs0 : mword 64)]> P1).
     assert (HP2sp : P2 !!! Regidx csp_rs1 = spr)
@@ -2432,7 +2432,7 @@ Section ProofInitlog.
               with "Hcg Hpc [] [Hc3]").
     { iApply (ili_78 with "Htext"). }
     { iEval (rewrite HP2sp Hb3). iExact "Hc3". }
-    iIntros (CID37 Hs37) "Hcg Hpc Hc3".
+    iIntros (CID37 Hs37) "_ Hcg Hpc Hc3".
     iEval (rewrite HP2sp Hb3) in "Hc3".
     set (P3 := <[Regidx Rs1 := regval_into_reg (m !!! Regidx Rs1 : mword 64)]> P2).
     assert (HP3sp : P3 !!! Regidx csp_rs1 = spr)
@@ -2448,7 +2448,7 @@ Section ProofInitlog.
               with "Hcg Hpc [] [Hc4]").
     { iApply (ili_7a with "Htext"). }
     { iEval (rewrite HP3sp Hb4). iExact "Hc4". }
-    iIntros (CID38 Hs38) "Hcg Hpc Hc4".
+    iIntros (CID38 Hs38) "_ Hcg Hpc Hc4".
     iEval (rewrite HP3sp Hb4) in "Hc4".
     set (P4 := <[Regidx Rs2 := regval_into_reg (m !!! Regidx Rs2 : mword 64)]> P3).
     assert (HP4sp : P4 !!! Regidx csp_rs1 = spr)
@@ -2464,7 +2464,7 @@ Section ProofInitlog.
               with "Hcg Hpc [] [Hc5]").
     { iApply (ili_7c with "Htext"). }
     { iEval (rewrite HP4sp Hb5). iExact "Hc5". }
-    iIntros (CID39 Hs39) "Hcg Hpc Hc5".
+    iIntros (CID39 Hs39) "_ Hcg Hpc Hc5".
     iEval (rewrite HP4sp Hb5) in "Hc5".
     set (P5 := <[Regidx Rs3 := regval_into_reg (m !!! Regidx Rs3 : mword 64)]> P4).
     assert (HP5sp : P5 !!! Regidx csp_rs1 = spr)
@@ -2496,7 +2496,7 @@ Section ProofInitlog.
               (mword_of_int 3 : mword 6) P5 (K - 6)%nat 6 b Hpop
               with "Hcg Hpc [] Hframe6").
     { iApply (ili_7e with "Htext"). }
-    iIntros (CID40 Hs40) "Hcg Hpc".
+    iIntros (CID40 Hs40) "_ Hcg Hpc".
     set (P6 := <[Regidx csp_rs1 := regval_into_reg
                   (add_vec (P5 !!! Regidx csp_rs1 : mword 64)
                      (sign_extend' 64 (caddi16sp_imm (mword_of_int 3 : mword 6))))]> P5).
@@ -2517,7 +2517,7 @@ Section ProofInitlog.
     iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.initlog + 0x80)) Rra P6 K b
               ltac:(vm_compute; discriminate) with "Hcg Hpc []").
     { iApply (ili_80 with "Htext"). }
-    iIntros (CID41 Hs41) "Hcg Hpc".
+    iIntros (CID41 Hs41) "Hlc Hcg Hpc".
     iEval (rgne) in "Hpc".
     assert (Hretf : ret_pc (P6 !!! Regidx Rra : mword 64)
                     = ret_pc (m !!! Regidx Rra : mword 64))
@@ -2768,7 +2768,7 @@ Section ProofInitlog.
                  ltac:(rewrite Hbm; wp_next_chain) with "Hextc") as "Hextc".
     iDestruct (cpu_claim_ext_transport CID34 CID41 eb pj
                  ltac:(rewrite Hbm; wp_next_chain) with "Hclmc") as "Hclmc".
-    iSpecialize ("Hcont" $! CID41 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CID41 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! P6 with "[%] Hcg Hcnt Hextc Hclmc Hpc Hppid Hsbf Hs2 Hctx").
     { unfold callee_saved. repeat split; assumption. }
   Qed.

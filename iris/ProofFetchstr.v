@@ -212,7 +212,7 @@ Section ProofFetchstr.
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc [] Hb1").
     { iApply (fsi_30 with "Htext"). }
-    iIntros (CID1 Hk1) "Hcg Hpc Hb1".
+    iIntros (CID1 Hk1) "_ Hcg Hpc Hb1".
     iEval (rewrite Hpa1) in "Hb1".
     set (T1 := <[Regidx Rra := regval_into_reg ra0]> Mt).
     change (<[Regidx Rra := regval_into_reg ra0]> Mt) with T1.
@@ -232,7 +232,7 @@ Section ProofFetchstr.
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc [] Hb2").
     { iApply (fsi_32 with "Htext"). }
-    iIntros (CID2 Hk2) "Hcg Hpc Hb2".
+    iIntros (CID2 Hk2) "_ Hcg Hpc Hb2".
     iEval (rewrite Hpa2) in "Hb2".
     set (T2 := <[Regidx Rs0 := regval_into_reg s00]> T1).
     change (<[Regidx Rs0 := regval_into_reg s00]> T1) with T2.
@@ -252,7 +252,7 @@ Section ProofFetchstr.
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc [] Hb3").
     { iApply (fsi_34 with "Htext"). }
-    iIntros (CID3 Hk3) "Hcg Hpc Hb3".
+    iIntros (CID3 Hk3) "_ Hcg Hpc Hb3".
     iEval (rewrite Hpa3) in "Hb3".
     set (T3 := <[Regidx Rs1 := regval_into_reg s10]> T2).
     change (<[Regidx Rs1 := regval_into_reg s10]> T2) with T3.
@@ -272,7 +272,7 @@ Section ProofFetchstr.
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc [] Hb4").
     { iApply (fsi_36 with "Htext"). }
-    iIntros (CID4 Hk4) "Hcg Hpc Hb4".
+    iIntros (CID4 Hk4) "_ Hcg Hpc Hb4".
     iEval (rewrite Hpa4) in "Hb4".
     set (T4 := <[Regidx Rs2 := regval_into_reg s20]> T3).
     change (<[Regidx Rs2 := regval_into_reg s20]> T3) with T4.
@@ -292,7 +292,7 @@ Section ProofFetchstr.
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc [] Hb5").
     { iApply (fsi_38 with "Htext"). }
-    iIntros (CID5 Hk5) "Hcg Hpc Hb5".
+    iIntros (CID5 Hk5) "_ Hcg Hpc Hb5".
     iEval (rewrite Hpa5) in "Hb5".
     set (T5 := <[Regidx Rs3 := regval_into_reg s30]> T4).
     change (<[Regidx Rs3 := regval_into_reg s30]> T4) with T5.
@@ -323,7 +323,7 @@ Section ProofFetchstr.
               (mword_of_int 3 : mword 6) T5 (av - 6)%nat 6 b Hpop
               with "Hcg Hpc [] Hframe").
     { iApply (fsi_3a with "Htext"). }
-    iIntros (CID6 Hk6) "Hcg Hpc".
+    iIntros (CID6 Hk6) "_ Hcg Hpc".
     assert (Hnk : ((av - 6) + 6)%nat = av) by lia.
     iEval (rewrite Hnk) in "Hcg".
     assert (Hpp3c : add_vec_int (mword_of_int (KernelSyms.fetchstr + 0x3a) : mword 64) 2
@@ -345,7 +345,7 @@ Section ProofFetchstr.
               Rra T6 av b ltac:(vm_compute; discriminate)
               with "Hcg Hpc []").
     { iApply (fsi_3c with "Htext"). }
-    iIntros (CID7 Hk7) "Hcg Hpc".
+    iIntros (CID7 Hk7) "Hlc Hcg Hpc".
     iEval (rewrite (rget_ne (CID := CID6) T6 Rra ltac:(vm_compute; discriminate))) in "Hpc".
     iEval (rewrite HT6ra) in "Hpc".
     (* ---- the postcondition ---- *)
@@ -389,7 +389,7 @@ Section ProofFetchstr.
       rewrite /T2 upd_ne; [| congruence].
       rewrite /T1 upd_ne; [| congruence].
       apply Hthr; assumption. }
-    iSpecialize ("Hcont" $! CID7 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CID7 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! T6 with "[%] Hcg Hpc").
     split; [| exact HT6a0].
     unfold callee_saved.
@@ -434,7 +434,7 @@ Section ProofFetchstr.
               ltac:(lia) (stk_push_48 (m !!! Regidx csp_rs1))
               with "Hcg Hpc []").
     { iApply (fsi_00 with "Htext"). }
-    iIntros (CID1 Hk1) "Hcg Hframe Hpc".
+    iIntros (CID1 Hk1) "_ Hcg Hframe Hpc".
     change (<[Regidx csp_rs1 := regval_into_reg
               (add_vec (m !!! Regidx csp_rs1)
                  (sign_extend' 64 (caddi16sp_imm (mword_of_int 61 : mword 6))))]> m) with M1.
@@ -477,7 +477,7 @@ Section ProofFetchstr.
               (mword_of_int 5 : mword 6) Rra M1 (av - 6)%nat u1 b
               with "Hcg Hpc [] Hs1").
     { iApply (fsi_02 with "Htext"). }
-    iIntros (CID2 Hk2) "Hcg Hpc Hs1".
+    iIntros (CID2 Hk2) "_ Hcg Hpc Hs1".
     assert (Hpp04 : add_vec_int (mword_of_int (KernelSyms.fetchstr + 0x02) : mword 64) 2
                     = mword_of_int (KernelSyms.fetchstr + 0x04)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp04) in "Hpc".
@@ -486,7 +486,7 @@ Section ProofFetchstr.
               (mword_of_int 4 : mword 6) Rs0 M1 (av - 6)%nat u2 b
               with "Hcg Hpc [] Hs2").
     { iApply (fsi_04 with "Htext"). }
-    iIntros (CID3 Hk3) "Hcg Hpc Hs2".
+    iIntros (CID3 Hk3) "_ Hcg Hpc Hs2".
     assert (Hpp06 : add_vec_int (mword_of_int (KernelSyms.fetchstr + 0x04) : mword 64) 2
                     = mword_of_int (KernelSyms.fetchstr + 0x06)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp06) in "Hpc".
@@ -495,7 +495,7 @@ Section ProofFetchstr.
               (mword_of_int 3 : mword 6) Rs1 M1 (av - 6)%nat u3 b
               with "Hcg Hpc [] Hs3").
     { iApply (fsi_06 with "Htext"). }
-    iIntros (CID4 Hk4) "Hcg Hpc Hs3".
+    iIntros (CID4 Hk4) "_ Hcg Hpc Hs3".
     assert (Hpp08 : add_vec_int (mword_of_int (KernelSyms.fetchstr + 0x06) : mword 64) 2
                     = mword_of_int (KernelSyms.fetchstr + 0x08)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp08) in "Hpc".
@@ -504,7 +504,7 @@ Section ProofFetchstr.
               (mword_of_int 2 : mword 6) Rs2 M1 (av - 6)%nat u4 b
               with "Hcg Hpc [] Hs4").
     { iApply (fsi_08 with "Htext"). }
-    iIntros (CID5 Hk5) "Hcg Hpc Hs4".
+    iIntros (CID5 Hk5) "_ Hcg Hpc Hs4".
     assert (Hpp0a : add_vec_int (mword_of_int (KernelSyms.fetchstr + 0x08) : mword 64) 2
                     = mword_of_int (KernelSyms.fetchstr + 0x0a)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp0a) in "Hpc".
@@ -513,7 +513,7 @@ Section ProofFetchstr.
               (mword_of_int 1 : mword 6) Rs3 M1 (av - 6)%nat u5 b
               with "Hcg Hpc [] Hs5").
     { iApply (fsi_0a with "Htext"). }
-    iIntros (CID6 Hk6) "Hcg Hpc Hs5".
+    iIntros (CID6 Hk6) "_ Hcg Hpc Hs5".
     assert (Hpp0c : add_vec_int (mword_of_int (KernelSyms.fetchstr + 0x0a) : mword 64) 2
                     = mword_of_int (KernelSyms.fetchstr + 0x0c)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp0c) in "Hpc".
@@ -540,7 +540,7 @@ Section ProofFetchstr.
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (fsi_0c with "Htext"). }
-    iIntros (CID7 Hk7) "Hcg Hpc".
+    iIntros (CID7 Hk7) "_ Hcg Hpc".
     set (M2 := <[Regidx Rs0 := regval_into_reg
                   (add_vec (M1 !!! Regidx csp_rs1) (sign_extend' 64 (caddi4spn_imm (mword_of_int 12 : mword 8))))]> M1).
     change (<[Regidx Rs0 := regval_into_reg
@@ -554,7 +554,7 @@ Section ProofFetchstr.
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (fsi_0e with "Htext"). }
-    iIntros (CID8 Hk8) "Hcg Hpc".
+    iIntros (CID8 Hk8) "_ Hcg Hpc".
     set (M3 := <[Regidx Rs3 := regval_into_reg (add_vec zero_reg (M2 !!! Regidx Ra0))]> M2).
     change (<[Regidx Rs3 := regval_into_reg (add_vec zero_reg (M2 !!! Regidx Ra0))]> M2) with M3.
     assert (Hpp10 : add_vec_int (mword_of_int (KernelSyms.fetchstr + 0x0e) : mword 64) 2
@@ -566,7 +566,7 @@ Section ProofFetchstr.
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (fsi_10 with "Htext"). }
-    iIntros (CID9 Hk9) "Hcg Hpc".
+    iIntros (CID9 Hk9) "_ Hcg Hpc".
     set (M4 := <[Regidx Rs1 := regval_into_reg (add_vec zero_reg (M3 !!! Regidx Ra1))]> M3).
     change (<[Regidx Rs1 := regval_into_reg (add_vec zero_reg (M3 !!! Regidx Ra1))]> M3) with M4.
     assert (Hpp12 : add_vec_int (mword_of_int (KernelSyms.fetchstr + 0x10) : mword 64) 2
@@ -578,7 +578,7 @@ Section ProofFetchstr.
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (fsi_12 with "Htext"). }
-    iIntros (CID10 Hk10) "Hcg Hpc".
+    iIntros (CID10 Hk10) "_ Hcg Hpc".
     set (M5 := <[Regidx Rs2 := regval_into_reg (add_vec zero_reg (M4 !!! Regidx Ra2))]> M4).
     change (<[Regidx Rs2 := regval_into_reg (add_vec zero_reg (M4 !!! Regidx Ra2))]> M4) with M5.
     assert (Hpp14 : add_vec_int (mword_of_int (KernelSyms.fetchstr + 0x12) : mword 64) 2
@@ -612,7 +612,7 @@ Section ProofFetchstr.
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (fsi_14 with "Htext"). }
-    iIntros (CID11 Hk11) "Hcg Hpc".
+    iIntros (CID11 Hk11) "_ Hcg Hpc".
     set (M6 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KernelSyms.fetchstr + 0x14) : mword 64) 4)]> M5).
     change (<[Regidx Rra := regval_into_reg
@@ -640,7 +640,7 @@ Section ProofFetchstr.
     iApply (Myproc.wp_myproc_sconf M6 (av - 6)%nat n eb p b lks
               Hn ltac:(lia)
               with "Hcg Hcpu Htext Hpc").
-    iIntros (CID12 Hk12 ms A) "%Hms Hcg Hcpu Hpc %HcsA".
+    iIntros (CID12 Hk12) "_"; iIntros (ms A) "%Hms Hcg Hcpu Hpc %HcsA".
     destruct HcsA as [HcsA HAa0].
     assert (Hpc18 : ret_pc (M6 !!! Regidx Rra) = mword_of_int (KernelSyms.fetchstr + 0x18))
       by (rewrite HM6ra; apply bv_eq; vm_compute; reflexivity).
@@ -677,7 +677,7 @@ Section ProofFetchstr.
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (fsi_18 with "Htext"). }
-    iIntros (CID13 Hk13) "Hcg Hpc".
+    iIntros (CID13 Hk13) "_ Hcg Hpc".
     set (A1 := <[Regidx Ra4 := regval_into_reg (add_vec zero_reg (A !!! Regidx Rs2))]> A).
     change (<[Regidx Ra4 := regval_into_reg (add_vec zero_reg (A !!! Regidx Rs2))]> A) with A1.
     assert (Hpp1a : add_vec_int (mword_of_int (KernelSyms.fetchstr + 0x18) : mword 64) 2
@@ -689,7 +689,7 @@ Section ProofFetchstr.
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (fsi_1a with "Htext"). }
-    iIntros (CID14 Hk14) "Hcg Hpc".
+    iIntros (CID14 Hk14) "_ Hcg Hpc".
     set (A2 := <[Regidx Ra3 := regval_into_reg (add_vec zero_reg (A1 !!! Regidx Rs3))]> A1).
     change (<[Regidx Ra3 := regval_into_reg (add_vec zero_reg (A1 !!! Regidx Rs3))]> A1) with A2.
     assert (Hpp1c : add_vec_int (mword_of_int (KernelSyms.fetchstr + 0x1a) : mword 64) 2
@@ -701,7 +701,7 @@ Section ProofFetchstr.
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (fsi_1c with "Htext"). }
-    iIntros (CID15 Hk15) "Hcg Hpc".
+    iIntros (CID15 Hk15) "_ Hcg Hpc".
     set (A3 := <[Regidx Ra2 := regval_into_reg (add_vec zero_reg (A2 !!! Regidx Rs1))]> A2).
     change (<[Regidx Ra2 := regval_into_reg (add_vec zero_reg (A2 !!! Regidx Rs1))]> A2) with A3.
     assert (Hpp1e : add_vec_int (mword_of_int (KernelSyms.fetchstr + 0x1c) : mword 64) 2
@@ -724,7 +724,7 @@ Section ProofFetchstr.
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc [] Hszc").
     { iApply (fsi_1e with "Htext"). }
-    iIntros (CID15b Hk15b) "Hcg Hpc Hszc".
+    iIntros (CID15b Hk15b) "_ Hcg Hpc Hszc".
     iEval (rewrite Hszaddr) in "Hszc".
     set (Az := <[Regidx Ra1 := regval_into_reg (pv_sz (us_V U))]> A3).
     change (<[Regidx Ra1 := regval_into_reg (pv_sz (us_V U))]> A3) with Az.
@@ -743,7 +743,7 @@ Section ProofFetchstr.
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc [] Hptc").
     { iApply (fsi_20 with "Htext"). }
-    iIntros (CID16 Hk16) "Hcg Hpc Hptc".
+    iIntros (CID16 Hk16) "_ Hcg Hpc Hptc".
     iEval (rewrite Hptaddr) in "Hptc".
     set (A4 := <[Regidx Ra0 := regval_into_reg (page_base (ud_root (pv_upt (us_V U))))]> Az).
     change (<[Regidx Ra0 := regval_into_reg (page_base (ud_root (pv_upt (us_V U))))]> Az) with A4.
@@ -756,7 +756,7 @@ Section ProofFetchstr.
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (fsi_22 with "Htext"). }
-    iIntros (CID17 Hk17) "Hcg Hpc".
+    iIntros (CID17 Hk17) "_ Hcg Hpc".
     set (A5 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KernelSyms.fetchstr + 0x22) : mword 64) 4)]> A4).
     change (<[Regidx Rra := regval_into_reg
@@ -839,7 +839,7 @@ Section ProofFetchstr.
               HK50 HA5a0 HA5a1 HA5a4 Hmax64 Hszb Hn
               with "Hcg Hcpu Htext Hpc Hpt Henv Hlend Hbuf").
     all: try lkbelow.
-    iIntros (CID18 Hk18 mr P' dst_new) "Hcg Hcpu (%kc1 & %Hkc1 & Hlend) Hpc Hpt Hbuf %Hcsr %Hext %Hret".
+    iIntros (CID18 Hk18) "_"; iIntros (mr P' dst_new) "Hcg Hcpu (%kc1 & %Hkc1 & Hlend) Hpc Hpt Hbuf %Hcsr %Hext %Hret".
     iDestruct ("Hlback" $! kc1 with "[%] Hlend") as (kc2) "[%Hkc2 Hev]"; [exact Hkc1|].
     rewrite HA5a3 in Hret.
     iEval (rewrite HA5a2) in "Hbuf".
@@ -872,7 +872,7 @@ Section ProofFetchstr.
                 ltac:(vm_compute; discriminate) Hfall
                 with "Hcg Hpc []").
       { iApply (fsi_26 with "Htext"). }
-      iIntros (CID19 Hk19) "Hcg Hpc".
+      iIntros (CID19 Hk19) "_ Hcg Hpc".
       assert (Hpp2a : add_vec_int (mword_of_int (KernelSyms.fetchstr + 0x26) : mword 64) 4
                       = mword_of_int (KernelSyms.fetchstr + 0x2a)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp2a) in "Hpc".
@@ -882,7 +882,7 @@ Section ProofFetchstr.
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc []").
       { iApply (fsi_2a with "Htext"). }
-      iIntros (CID20 Hk20) "Hcg Hpc".
+      iIntros (CID20 Hk20) "_ Hcg Hpc".
       set (B1 := <[Regidx Ra0 := regval_into_reg (add_vec zero_reg (mr !!! Regidx Rs1))]> mr).
       change (<[Regidx Ra0 := regval_into_reg (add_vec zero_reg (mr !!! Regidx Rs1))]> mr) with B1.
       assert (Hpp2c : add_vec_int (mword_of_int (KernelSyms.fetchstr + 0x2a) : mword 64) 2
@@ -904,7 +904,7 @@ Section ProofFetchstr.
                 ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (fsi_2c with "Htext"). }
-      iIntros (CID21 Hk21) "Hcg Hpc".
+      iIntros (CID21 Hk21) "_ Hcg Hpc".
       set (B2 := <[Regidx Rra := regval_into_reg
                     (add_vec_int (mword_of_int (KernelSyms.fetchstr + 0x2c) : mword 64) 4)]> B1).
       change (<[Regidx Rra := regval_into_reg
@@ -934,7 +934,7 @@ Section ProofFetchstr.
       iApply (Strlen.wp_strlen_sconf ktb B2 maxn k dst_new (av - 6)%nat (DfracOwn 1) b p
                 ltac:(lia) Hkmax Hcstr Hk31
                 with "Hcg Htext Hpc Hbuf").
-      iIntros (CID22 Hk22 msl) "Hcg Hpc Hbuf %Hcssl %Hsla0".
+      iIntros (CID22 Hk22) "_"; iIntros (msl) "Hcg Hpc Hbuf %Hcssl %Hsla0".
       iEval (rewrite HB2a0) in "Hbuf".
       assert (Hpc30 : ret_pc (B2 !!! Regidx Rra) = mword_of_int (KernelSyms.fetchstr + 0x30))
         by (rewrite HB2ra; apply bv_eq; vm_compute; reflexivity).
@@ -950,12 +950,12 @@ Section ProofFetchstr.
                 ltac:(lia) eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl
                 Hslsp Hsla0 Hthrsl
                 with "Hcg Htext Hpc Hs1 Hs2 Hs3 Hs4 Hs5 Hs6").
-      iIntros (CID23 Hk23 mf) "[%Hcsf %Hfa0] Hcg Hpc".
+      iIntros (CID23 Hk23) "Hlc"; iIntros (mf) "[%Hcsf %Hfa0] Hcg Hpc".
       (* [Hcpu] has been sitting at [CID12] (myproc's exit hart) ever since;
          re-anchor it at the final hart before it can feed the function's own
          [Hcont]. *)
       iDestruct (cpu_own_transport CID18 CID23 n eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-      iSpecialize ("Hcont" $! CID23 with "[%]"); [wp_next_chain|].
+      iSpecialize ("Hcont" $! CID23 with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hcont" $! mf P' dst_new kc2 with "[%] [%] [%] Hcg Hcpu Hpc Hpriv Hbuf [%] [%]").
       { exact Hcsf. }
       { exact Hext. }
@@ -974,7 +974,7 @@ Section ProofFetchstr.
                 ltac:(vm_compute; discriminate) Htk ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (fsi_26 with "Htext"). }
-      iApply bi.later_intro. iIntros (CID19 Hk19) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID19 Hk19) "_ Hcg Hpc".
       assert (Hjb : add_vec (mword_of_int (KernelSyms.fetchstr + 0x26) : mword 64)
                       (sign_extend' 64 (mword_of_int 24 : mword 13))
                     = mword_of_int (KernelSyms.fetchstr + 0x3e))
@@ -987,7 +987,7 @@ Section ProofFetchstr.
                 ltac:(apply bv_eq; vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (fsi_3e with "Htext"). }
-      iIntros (CID20 Hk20) "Hcg Hpc".
+      iIntros (CID20 Hk20) "_ Hcg Hpc".
       set (E1 := <[Regidx Ra0 := regval_into_reg (mword_of_int (-1) : mword 64)]> mr).
       change (<[Regidx Ra0 := regval_into_reg (mword_of_int (-1) : mword 64)]> mr) with E1.
       assert (Hpp40 : add_vec_int (mword_of_int (KernelSyms.fetchstr + 0x3e) : mword 64) 2
@@ -999,7 +999,7 @@ Section ProofFetchstr.
                 E1 (av - 6)%nat b ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (fsi_40 with "Htext"). }
-      iIntros (CID21 Hk21). iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID21 Hk21) "_". iIntros "Hcg Hpc".
       assert (Hjc : add_vec (mword_of_int (KernelSyms.fetchstr + 0x40) : mword 64)
                       (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 2040 : mword 11) ('b"0"))))
                     = mword_of_int (KernelSyms.fetchstr + 0x30))
@@ -1020,9 +1020,9 @@ Section ProofFetchstr.
                 ltac:(lia) eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl
                 HE1sp HE1a0 HthrE1
                 with "Hcg Htext Hpc Hs1 Hs2 Hs3 Hs4 Hs5 Hs6").
-      iIntros (CID22 Hk22 mf) "[%Hcsf %Hfa0] Hcg Hpc".
+      iIntros (CID22 Hk22) "Hlc"; iIntros (mf) "[%Hcsf %Hfa0] Hcg Hpc".
       iDestruct (cpu_own_transport CID18 CID22 n eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-      iSpecialize ("Hcont" $! CID22 with "[%]"); [wp_next_chain|].
+      iSpecialize ("Hcont" $! CID22 with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hcont" $! mf P' dst_new kc2 with "[%] [%] [%] Hcg Hcpu Hpc Hpriv Hbuf [%] [%]").
       { exact Hcsf. }
       { exact Hext. }

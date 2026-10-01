@@ -3214,7 +3214,7 @@ Section SmodeCorePt.
       left. split; [exact Hif|].
       exists (length log), w0.
       split_and!; [exact Hitv|lia|exact Hrd0|done|done|done|done|done|done|done]. }
-    iNext. iIntros (m' σ' log' tv' itv' hr' rv') "%Hstep".
+    iNext. iIntros (m' σ' log' tv' itv' hr' rv') "%Hstep _".
     rewrite /mnode_step in Hstep. cbn beta iota in Hstep.
     rewrite Hdev in Hstep. cbn beta iota in Hstep.
     destruct Hstep as [(_ & tvn & w' & Hlo & Hhi & Hbytes' & -> & -> & ->

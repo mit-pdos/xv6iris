@@ -53,8 +53,8 @@ Section ProofMemsetPage.
               Hn ltac:(vm_compute; reflexivity) Hcval Ha2'
               with "Hcg Htext Hpc [Hpage]").
     { iApply (big_sepL_impl with "Hpage"). iIntros "!>" (k j _) "H". iExact "H". }
-    iIntros (CID1 Hs1 mfin) "Hcg Hpc Hbuf %Hcs".
-    iSpecialize ("Hcont" $! CID1 with "[]"); [iPureIntro; exact Hs1|].
+    iIntros (CID1 Hs1) "Hlc"; iIntros (mfin) "Hcg Hpc Hbuf %Hcs".
+    iSpecialize ("Hcont" $! CID1 with "[] Hlc"); [iPureIntro; exact Hs1|].
     iApply ("Hcont" $! mfin with "Hcg Hpc [Hbuf] [%]").
     - iApply (big_sepL_impl with "Hbuf"). iIntros "!>" (k j _) "H". iExact "H".
     - exact Hcs.
@@ -70,8 +70,8 @@ Section ProofMemsetPage.
     iIntros "Hcg #Htext Hpc Hpage Hcont".
     iApply (wp_memset_page_val_sconf m0 n cval b pcur Hn Hpv Hcval Ha2
               with "Hcg Htext Hpc Hpage").
-    rewrite /wp_next. iIntros (CID1) "%Hs1".
-    iSpecialize ("Hcont" $! CID1 with "[]"); [iPureIntro; exact Hs1|].
+    rewrite /wp_next. iIntros (CID1) "%Hs1 Hlc".
+    iSpecialize ("Hcont" $! CID1 with "[] Hlc"); [iPureIntro; exact Hs1|].
     iIntros (mfin) "Hcg Hpc Hbuf %Hcs".
     iApply ("Hcont" $! mfin with "Hcg Hpc [Hbuf] [%]"); [| exact Hcs].
     iApply page_own_of_named. iExact "Hbuf".

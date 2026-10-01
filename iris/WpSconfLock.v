@@ -348,8 +348,8 @@ Section WpSconfLock.
         by (symmetry; exact Hpalk).
       iApply (lk_addr_claim_wordw with "Hc4"). }
     { iModIntro. iFrame "HTc". iIntros "_". by iModIntro. }
-    iIntros (v). iEval (rewrite /wp_next). iIntros (CID1 Hs1) "Hcg Hpc _ HTc".
-    iApply ("Hcont" $! v CID1 with "[] HTc Hcg Hpc").
+    iIntros (v). iEval (rewrite /wp_next). iIntros (CID1 Hs1) "Hlc Hcg Hpc _ HTc".
+    iApply ("Hcont" $! v CID1 with "[] Hlc HTc Hcg Hpc").
     iPureIntro. exact Hs1.
   Qed.
 
@@ -762,8 +762,8 @@ Section WpSconfLock.
         iRight. iPureIntro. split; [ discriminate | exact Hwnz' ]. }
       iModIntro. iFrame "Htok Hheld". }
     iIntros (v). iEval (rewrite /wp_next).
-    iIntros (CID1 Hs1) "Hcg Hpc %Hvnz [Htok Hheld]".
-    iApply ("Hcont" $! v CID1 with "[] [] [Htok Hheld] Hcg Hpc").
+    iIntros (CID1 Hs1) "Hlc Hcg Hpc %Hvnz [Htok Hheld]".
+    iApply ("Hcont" $! v CID1 with "[] Hlc [] [Htok Hheld] Hcg Hpc").
     - iPureIntro. exact Hs1.
     - iPureIntro. exact Hvnz.
     - rewrite locked_split. iFrame "Hheld". iExists Btok. iFrame "Htok Hflok".
@@ -1002,8 +1002,8 @@ Section WpSconfLock.
          cell PLUS the address claim a ledger cell does not carry.  The
          claim is the invariant's own, peeled at the open. *)
       { rewrite /lk_cpu_fresh. iFrame "Hcl8". iExact "Hcpu". } }
-    iEval (rewrite /wp_next). iIntros (CID1 Hs1) "Hcg Hpc HOut".
-    iApply ("Hcont" $! CID1 with "[] HOut Hcg Hpc").
+    iEval (rewrite /wp_next). iIntros (CID1 Hs1) "Hlc Hcg Hpc HOut".
+    iApply ("Hcont" $! CID1 with "[] Hlc HOut Hcg Hpc").
     iPureIntro. exact Hs1.
   Qed.
 
@@ -1107,8 +1107,8 @@ Section WpSconfLock.
         by (symmetry; exact Hpacpu).
       iApply (lk_addr_claim_wordw with "Hc8"). }
     { iModIntro. iFrame "HTc". iIntros "_". by iModIntro. }
-    iIntros (v). iEval (rewrite /wp_next). iIntros (CID1 Hs1) "Hcg Hpc _ HTc".
-    iApply ("Hcont" $! v CID1 with "[] HTc Hcg Hpc").
+    iIntros (v). iEval (rewrite /wp_next). iIntros (CID1 Hs1) "Hlc Hcg Hpc _ HTc".
+    iApply ("Hcont" $! v CID1 with "[] Hlc HTc Hcg Hpc").
     iPureIntro. exact Hs1.
   Qed.
 
@@ -1331,9 +1331,9 @@ Section WpSconfLock.
         rewrite /lk_cpu_res. iFrame "Hrest". rewrite Hst. iExact "Hcpu". }
       iModIntro. iFrame "Htok". iPureIntro.
       rewrite Hst /cpuv -cpus_ptr_cid. reflexivity. }
-    iIntros (c). iEval (rewrite /wp_next). iIntros (CID1 Hs1) "Hcg Hpc (%Hc & Htok)".
+    iIntros (c). iEval (rewrite /wp_next). iIntros (CID1 Hs1) "Hlc Hcg Hpc (%Hc & Htok)".
     subst c.
-    iApply ("Hcont" $! CID1 with "[] Htok Hcg Hpc").
+    iApply ("Hcont" $! CID1 with "[] Hlc Htok Hcg Hpc").
     iPureIntro. exact Hs1.
   Qed.
 
@@ -1445,8 +1445,8 @@ Section WpSconfLock.
       { iNext. rewrite /lock_inv /lock_body. iFrame "Hcl4 Hcl8".
         iExists v', st', B'. iFrame "Hword' Hcpures' Hg' Hbr'". }
       iModIntro. iFrame "HT Hlks". }
-    iIntros (c). iEval (rewrite /wp_next). iIntros (CID1 Hs1) "Hcg Hpc %Hc [HT Hlks]".
-    iApply ("Hcont" $! c CID1 with "[] [%] HT Hlks Hcg Hpc");
+    iIntros (c). iEval (rewrite /wp_next). iIntros (CID1 Hs1) "Hlc Hcg Hpc %Hc [HT Hlks]".
+    iApply ("Hcont" $! c CID1 with "[] Hlc [%] HT Hlks Hcg Hpc");
       [ iPureIntro; exact Hs1 | exact Hc ].
   Qed.
 
@@ -1513,8 +1513,8 @@ Section WpSconfLock.
               Hpacpu Hrd Hrdok Hfresh Hbp
               ltac:(iIntros "HTc"; iApply Href; iExact "HTc")
               with "Hcg Hpc Hinstr Hlock HTc Hlks [Hcont]").
-    iIntros (c). iEval (rewrite /wp_next). iIntros (CID1 Hs1) "%Hc HTc Hlks Hcg Hpc".
-    iApply ("Hcont" $! c CID1 with "[] [%] HTc Hlks Hcg Hpc");
+    iIntros (c). iEval (rewrite /wp_next). iIntros (CID1 Hs1) "Hlc %Hc HTc Hlks Hcg Hpc".
+    iApply ("Hcont" $! c CID1 with "[] Hlc [%] HTc Hlks Hcg Hpc");
       [ iPureIntro; exact Hs1
       | unfold cpuv; rewrite -cpus_ptr_cid; exact Hc ].
   Qed.
@@ -1750,8 +1750,8 @@ Section WpSconfLock.
         iFrame "Hword Hg Hcpures".
         iRight. iPureIntro. split; [ exact Hstnne | exact Hwnz ]. }
       iModIntro. iFrame "HT'". }
-    iEval (rewrite /wp_next). iIntros (CID1 Hs1) "Hcg Hpc HT'".
-    iApply ("Hcont" $! CID1 with "[] Hcg Hpc HT'").
+    iEval (rewrite /wp_next). iIntros (CID1 Hs1) "Hlc Hcg Hpc HT'".
+    iApply ("Hcont" $! CID1 with "[] Hlc Hcg Hpc HT'").
     iPureIntro. exact Hs1.
   Qed.
 
@@ -1910,8 +1910,8 @@ Section WpSconfLock.
               ltac:(iIntros "[Htok _]"; iApply Href; iExact "Htok")
               with "Hcg Hpc Hinstr Hlock [Htok Hheld Hcl] [Hcont]").
     { iFrame "Htok Hheld Hcl". }
-    iEval (rewrite /wp_next). iIntros (CID1 Hs1) "Hcg Hpc [Htok Hcl]".
-    iApply ("Hcont" $! CID1 with "[] Hcg Hpc Htok Hcl").
+    iEval (rewrite /wp_next). iIntros (CID1 Hs1) "Hlc Hcg Hpc [Htok Hcl]".
+    iApply ("Hcont" $! CID1 with "[] Hlc Hcg Hpc Htok Hcl").
     iPureIntro. exact Hs1.
   Qed.
 
@@ -1984,8 +1984,8 @@ Section WpSconfLock.
               ltac:(iIntros "[Htok _]"; iApply Href; iExact "Htok")
               with "Hcg Hpc Hinstr Hlock [Htok Hcl] [Hcont]").
     { iFrame "Htok Hcl". }
-    iEval (rewrite /wp_next). iIntros (CID1 Hs1) "Hcg Hpc (Htok & Hheld & Hcl & %Hin)".
-    iApply ("Hcont" $! CID1 with "[] Hcg Hpc Htok Hheld Hcl [%]"); [ | exact Hin ].
+    iEval (rewrite /wp_next). iIntros (CID1 Hs1) "Hlc Hcg Hpc (Htok & Hheld & Hcl & %Hin)".
+    iApply ("Hcont" $! CID1 with "[] Hlc Hcg Hpc Htok Hheld Hcl [%]"); [ | exact Hin ].
     iPureIntro. exact Hs1.
   Qed.
 
@@ -2066,7 +2066,7 @@ Section WpSconfLock.
               with "Hcg Hpc Hinstr [HTc Hcont]").
     iNext.
     rename CID into CID0.
-    iIntros (CID Hs). rewrite /sconf_step_obl. iSplitL "HTc".
+    iIntros (CID Hs) "Hlc". rewrite /sconf_step_obl. iSplitL "HTc".
     - (* ---------------- THE INSTRUCTION ---------------- *)
       iIntros "Hsc Hcap Hfile HPC HnPC Hresv".
       assert (Lpin_rs1 : tp_pin (CID := CID) m !!! Regidx rs1 = rget m rs1)
@@ -2492,7 +2492,7 @@ Section WpSconfLock.
       iIntros (npc ms' m' n') "Hcg' Hpc' Hpay".
       iDestruct "Hpay" as (w) "(-> & -> & -> & HTc & #Hpaira & Hpay)".
       iDestruct (sie_cap_gpr_at_close (CID := CID) with "Hcg'") as "Hcg'".
-      iApply ("Hcont" $! w CID with "[%] HTc Hcg' Hpc' Hpaira Hpay"). exact Hs.
+      iApply ("Hcont" $! w CID with "[%] Hlc HTc Hcg' Hpc' Hpaira Hpay"). exact Hs.
   Qed.
 
 

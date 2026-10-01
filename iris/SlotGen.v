@@ -57,7 +57,7 @@ From iris.algebra Require Import dfrac gmap agree.
 From xv6iris Require Import StepIndex.
 From iris.algebra.lib Require Import dfrac_agree mono_list.
 From iris.proofmode Require Import proofmode.
-From transfinite.base_logic.lib Require Import own ghost_map.
+From transfinite.base_logic.lib Require Import own ghost_map later_credits.
 Require Import SailStdpp.Base SailStdpp.Operators_mwords SailStdpp.Values.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import ProcGeom.
@@ -347,7 +347,7 @@ Section SlotGen.
      continuation it had before the premise existed (the lend comes back
      at [k' := k]).  Stated over the continuation's first two premises and
      its tail as higher-order patterns, so one lemma serves every shape. *)
-  Lemma act_lend_cont_frame `{GEN : GenId} `{CID0 : CpuId} {R : Type}
+  Lemma act_lend_cont_frame `{GEN : GenId} `{CID0 : CpuId} `{!lcGS HasLc Σ} {R : Type}
       (b : bool) (p p' : mword 64) (k : nat)
       (A B C : CpuId -> R -> iProp Σ) :
     wp_next b p (fun CID => ∀ mr : R, A CID mr -∗ B CID mr -∗
@@ -355,8 +355,8 @@ Section SlotGen.
     act_lend p' k -∗
     wp_next b p (fun CID => ∀ mr : R, A CID mr -∗ B CID mr -∗ C CID mr).
   Proof using .
-    iIntros "H Hl" (CID Hs mr) "HA HB".
-    iApply ("H" $! CID Hs mr with "HA HB"). iExists k. iFrame "Hl". done.
+    iIntros "H Hl" (CID Hs) "Hlc". iIntros (mr) "HA HB".
+    iSpecialize ("H" $! CID Hs with "Hlc"). iApply ("H" $! mr with "HA HB"). iExists k. iFrame "Hl". done.
   Qed.
 
   (* ...AND THE ONE-WAY DISCARD, WHICH <INIT> ALONE TAKES (lane

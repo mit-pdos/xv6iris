@@ -568,8 +568,8 @@ Section KforkTfLoop.
                   ltac:(rgne; rgne; exact Hfall)
                   with "Hcg Hpc []").
         { iApply (kfk_062 with "Htext"). }
-        iApply wp_next_off_intro.
-        iIntros "Hcg Hpc".
+        iApply wp_next_off_intro_lc.
+        iIntros "Hlc Hcg Hpc".
         assert (Hp66 : add_vec_int (mword_of_int (KF + 0x62) : mword 64) 4 = mword_of_int (KF + 0x66))
           by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hp66) in "Hpc".
@@ -579,7 +579,7 @@ Section KforkTfLoop.
           - rewrite Hwslen36. rewrite (kfk_send9_mul k Hend) in Hagree4. exact Hagree4. }
         iAssert (tf_page tfdst ws) with "[Hdstp]" as "Hdstp".
         { rewrite -Hcur4_ws. iExact "Hdstp". }
-        iSpecialize ("Hcont" $! CID0 with "[%]"); [intros _; reflexivity |].
+        iSpecialize ("Hcont" $! CID0 with "[%] Hlc"); [intros _; reflexivity |].
         iApply ("Hcont" $! M6 with "[%] Hcg Hpc Hsrcp Hdstp").
         + split; [| split].
           * rewrite /callee_saved. split_and!;

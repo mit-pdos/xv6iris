@@ -82,7 +82,7 @@ Section WpMemsetArray.
     { iApply (minstr_002 with "Htext"). }
     { iApply (minstr_004 with "Htext"). }
     { iApply (minstr_006 with "Htext"). }
-    iEval (rewrite /wp_next). iIntros (CID1 Hs1) "Hcg Hpc Hbra Hbs0".
+    iEval (rewrite /wp_next). iIntros (CID1 Hs1) "_ Hcg Hpc Hbra Hbs0".
     (* --- SKIP: the count is zero, so 0x08 branches to the epilogue --- *)
     assert (Hz : eq_vec (m2 !!! Regidx a2_idx) zero_reg = true).
     { unfold m2, m1.
@@ -96,7 +96,7 @@ Section WpMemsetArray.
     iApply (Memset.wp_memset_skip_sconf kt m2 (n - 2)%nat imm8_beqz b pcur Hz Htgt
               with "Hcg Hpc [] [-]").
     { iApply (minstr_008 with "Htext"). }
-    iEval (rewrite /wp_next). iIntros (CID2 Hs2) "Hcg Hpc".
+    iEval (rewrite /wp_next). iIntros (CID2 Hs2) "_ Hcg Hpc".
     (* --- SUFFIX: 0x1e..0x24 --- *)
     assert (Hsuf_sp : m2 !!! Regidx csp_rs1 = sp').
     { unfold m2. rewrite upd_ne; [| vm_compute; discriminate].
@@ -109,10 +109,10 @@ Section WpMemsetArray.
     { iApply (minstr_024 with "Htext"). }
     { iEval (rewrite Hsuf_sp). iExact "Hbra". }
     { iEval (rewrite Hsuf_sp). iExact "Hbs0". }
-    iEval (rewrite /wp_next). iIntros (CID3 Hs3 mfin) "Hcg Hpc %Hmeq".
+    iEval (rewrite /wp_next). iIntros (CID3 Hs3) "Hlc"; iIntros (mfin) "Hcg Hpc %Hmeq".
     assert (Hnk : ((n - 2) + 2)%nat = n) by lia.
     iEval (rewrite Hnk) in "Hcg".
-    iSpecialize ("Hcont" $! CID3 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CID3 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! mfin with "Hcg Hpc [Hbuf] [%]").
     - (* the buffer is empty at len = 0 *) iExact "Hbuf".
     - (* callee_saved m0 mfin: only sp/s0 moved, and both are restored *)
@@ -202,7 +202,7 @@ Section WpMemsetArray.
     { iApply (minstr_002 with "Htext"). }
     { iApply (minstr_004 with "Htext"). }
     { iApply (minstr_006 with "Htext"). }
-    iEval (rewrite /wp_next). iIntros (CID1 Hs1) "Hcg Hpc Hbra Hbs0".
+    iEval (rewrite /wp_next). iIntros (CID1 Hs1) "_ Hcg Hpc Hbra Hbs0".
     (* --- SETUP: 0x08..0x10 (the count is nonzero: c.beqz falls through) --- *)
     iApply (Memset.wp_memset_setup_sconf kt m2 (n - 2)%nat shamt_l shamt_r imm8_beqz
               wval_add b pcur Hn0 Hvalue_add
@@ -212,7 +212,7 @@ Section WpMemsetArray.
     { iApply (minstr_00c with "Htext"). }
     { iApply (minstr_00e with "Htext"). }
     { iApply (minstr_010 with "Htext"). }
-    iEval (rewrite /wp_next). iIntros (CID2 Hs2) "Hcg Hpc".
+    iEval (rewrite /wp_next). iIntros (CID2 Hs2) "_ Hcg Hpc".
     change (<[Regidx a4_idx := regval_into_reg wval_add]> m5) with m6.
     (* pc at pcE+20 = memset+0x14 = loop top *)
     assert (Hpc1 : add_vec_int pcE 20 = mword_of_int (KernelSyms.memset + 0x14)) by (apply bv_eq; vm_compute; reflexivity).
@@ -248,7 +248,7 @@ Section WpMemsetArray.
               minstr_014 minstr_018 minstr_01a
               len 0%nat m6 ltac:(reflexivity) ltac:(lia) Hcur Hm4 Hm1
               with "Hcg Htext Hpc Hbuf [-]").
-    iEval (rewrite /wp_next). iIntros (CID3 Hs3) "Hcg Hpc Hbuf".
+    iEval (rewrite /wp_next). iIntros (CID3 Hs3) "_ Hcg Hpc Hbuf".
     set (m7 := <[Regidx a5_idx := regval_into_reg (ms_addr p len)]> m6).
     change (<[Regidx a5_idx := regval_into_reg (ms_addr p len)]> m6) with m7.
     assert (Hpc2 : add_vec_int (add_vec_int (mword_of_int (KernelSyms.memset + 0x14) : mword 64) 6) 4 = (mword_of_int (KernelSyms.memset + 0x1e) : mword 64)) by (apply bv_eq; vm_compute; reflexivity).
@@ -270,11 +270,11 @@ Section WpMemsetArray.
     { iApply (minstr_024 with "Htext"). }
     { iEval (rewrite Hsuf_sp). iExact "Hbra". }
     { iEval (rewrite Hsuf_sp). iExact "Hbs0". }
-    iEval (rewrite /wp_next). iIntros (CID4 Hs4 mfin) "Hcg Hpc %Hmeq".
+    iEval (rewrite /wp_next). iIntros (CID4 Hs4) "Hlc"; iIntros (mfin) "Hcg Hpc %Hmeq".
     assert (Hnk : ((n - 2) + 2)%nat = n) by lia.
     iEval (rewrite Hnk) in "Hcg".
     (* hand the all-cbyte buffer back directly (KEEP the written bytes) *)
-    iSpecialize ("Hcont" $! CID4 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CID4 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! mfin with "Hcg Hpc [Hbuf] [%]").
     - iApply (big_sepL_impl with "Hbuf"). iIntros "!>" (k j _) "H".
       iEval (rewrite ms_pa_ms_addr) in "H".

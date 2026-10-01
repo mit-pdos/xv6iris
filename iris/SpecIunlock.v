@@ -331,9 +331,9 @@ Proof.
                   [%] Hfl Hclaims Hdep Hoffd Hidev Hiinum Hivalid [Hload] Hshot Hfrz [Ht2 Hcont]").
   { exact Hle. }
   { rewrite /ic_dep_held /=. iExact "Hload". }
-  iIntros (CIDx Hqx mf) "%Hcs Hcg Hown Hpc Hppid Hshr Ht1".
+  iIntros (CIDx Hqx) "Hlc"; iIntros (mf) "%Hcs Hcg Hown Hpc Hppid Hshr Ht1".
   rewrite /ic_dep_side.
-  iApply ("Hcont" $! CIDx Hqx mf with
+  iSpecialize ("Hcont" $! CIDx Hqx with "Hlc"). iApply ("Hcont" $! mf with
             "[%] Hcg Hown Hpc Hppid Hshr [Ht1 Ht2]"); [exact Hcs |].
   iApply (log_tx_join icfg_log t with "Ht1 Ht2").
 Qed.

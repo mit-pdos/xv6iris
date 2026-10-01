@@ -81,7 +81,7 @@ Section ProofProcdumpMain.
     (* +0x00 .. +0x1a -- the frame, the nine saves, a0 := "\n"            *)
     (* ================================================================== *)
     iApply (wp_pd_prologue (CID0 := CID) m K b p ltac:(lia) with "Hcg Htext Hpc").
-    iIntros (CID1 Hs1 M) "%Hpro Hcg Hframe Hpc".
+    iIntros (CID1 Hs1) "_"; iIntros (M) "%Hpro Hcg Hframe Hpc".
     pose proof (pd_regs_hi_of_pro m M Hpro) as HhiM.
     destruct Hpro as (Hprosp & _ & Hproa0 & _).
     (* ================================================================== *)
@@ -93,7 +93,7 @@ Section ProofProcdumpMain.
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (pdi_1e with "Htext"). }
-    iIntros (CID2 Hs2) "Hcg Hpc".
+    iIntros (CID2 Hs2) "_ Hcg Hpc".
     set (M1 := <[Regidx Rra := regval_into_reg
                   (add_vec_int
                      (mword_of_int (KernelSyms.procdump + 0x1e) : mword 64) 4)]> M).
@@ -127,7 +127,7 @@ Section ProofProcdumpMain.
     all: try lkbelow.
     { rewrite HM1a0. iExact "Hnlstr". }
     { done. }
-    iIntros (CID3 Hs3 mP) "Hcg Hpc %Hcsp Hcnt _ _".
+    iIntros (CID3 Hs3) "_"; iIntros (mP) "Hcg Hpc %Hcsp Hcnt _ _".
     destruct Hcsp as [Hcs Hra1].
     assert (Hpc22 : ret_pc (M1 !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.procdump + 0x22))
@@ -137,7 +137,7 @@ Section ProofProcdumpMain.
     (* +0x22 .. +0x54 -- the seven hoisted constants                      *)
     (* ================================================================== *)
     iApply (wp_pd_consts (CID0 := CID3) mP (K - 10)%nat b p with "Hcg Htext Hpc").
-    iIntros (CID4 Hs4 M') "%Hcon Hcg Hpc".
+    iIntros (CID4 Hs4) "_"; iIntros (M') "%Hcon Hcg Hpc".
     destruct Hcon as [Hloop Hhi'].
     (* the stack pointer the scan carries and the epilogue wants back *)
     assert (HmPsp : mP !!! pdR 2 = pa_stk (m !!! pdR 2 : mword 64) 10).
@@ -162,14 +162,14 @@ Section ProofProcdumpMain.
                   (pa_stk (m !!! pdR 2 : mword 64) 10) p (K - 10)%nat eb b lks
  (pd_K52 K HK) Hlkbelow
                   with "Htext Hkdata Hpenv [Hframe Hcont]") as "Hscan".
-    { iIntros (CIDx Hsx Mx) "%Hxc Hcg Hcnt2 Hpc Hview".
+    { iIntros (CIDx Hsx) "_"; iIntros (Mx) "%Hxc Hcg Hcnt2 Hpc Hview".
       destruct Hxc as [Hxsp Hxhi].
       iApply (wp_pd_epilogue (CID0 := CIDx) m Mx K b p (pd_K10 K HK) Hxsp Hxhi
                 with "Hcg Htext Hpc Hframe").
-      iIntros (CIDy Hsy mf) "%Hcsf Hcg Hpc".
+      iIntros (CIDy Hsy) "Hlc"; iIntros (mf) "%Hcsf Hcg Hpc".
       iDestruct (cpu_own_transport CIDx CIDy 0%nat eb p b
                    ltac:(wp_next_chain) with "Hcnt2") as "Hcnt2".
-      iSpecialize ("Hcont" $! CIDy with "[%]"); [ wp_next_chain |].
+      iSpecialize ("Hcont" $! CIDy with "[%] Hlc"); [ wp_next_chain |].
       iApply ("Hcont" $! mf with "Hcg Hpc [%] Hcnt2 Hview").
       exact Hcsf. }
     iApply ("Hscan" $! 0%nat M' with "[%] [%] Hcg Hcnt Hpc [] [Hview]").

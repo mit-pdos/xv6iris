@@ -145,7 +145,7 @@ Section ProofUvmcreate.
               Mt (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (uvci_1a with "Htext"). }
-    iIntros (CID6 Hs6) "Hcg Hpc".
+    iIntros (CID6 Hs6) "_ Hcg Hpc".
     (* [wval] is let-bound OUTSIDE the leaf's [wp_next] lambda, so it is
        fixed at the hart ambient WHEN THIS LEMMA WAS APPLIED (CID0, this
        lemma's own binder), NOT the freshly-bound CID6. *)
@@ -161,7 +161,7 @@ Section ProofUvmcreate.
               with "Hcg Hpc [] [Hc1]").
     { iApply (uvci_1c with "Htext"). }
     { iEval (rewrite HE0sp Hb1). iExact "Hc1". }
-    iIntros (CID7 Hs7) "Hcg Hpc Hc1". iEval (rewrite HE0sp Hb1) in "Hc1".
+    iIntros (CID7 Hs7) "_ Hcg Hpc Hc1". iEval (rewrite HE0sp Hb1) in "Hc1".
     set (E1 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (mm !!! Regidx (mword_of_int 1 : mword 5))]> E0).
     change (<[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (mm !!! Regidx (mword_of_int 1 : mword 5))]> E0) with E1.
     assert (Hp1e : add_vec_int (mword_of_int (KernelSyms.uvmcreate + 0x1c) : mword 64) 2 = mword_of_int (KernelSyms.uvmcreate + 0x1e)) by (apply bv_eq; vm_compute; reflexivity).
@@ -174,7 +174,7 @@ Section ProofUvmcreate.
               with "Hcg Hpc [] [Hc2]").
     { iApply (uvci_1e with "Htext"). }
     { iEval (rewrite HE1sp Hb2). iExact "Hc2". }
-    iIntros (CID8 Hs8) "Hcg Hpc Hc2". iEval (rewrite HE1sp Hb2) in "Hc2".
+    iIntros (CID8 Hs8) "_ Hcg Hpc Hc2". iEval (rewrite HE1sp Hb2) in "Hc2".
     set (E2 := <[Regidx (mword_of_int 8 : mword 5) := regval_into_reg (mm !!! Regidx (mword_of_int 8 : mword 5))]> E1).
     change (<[Regidx (mword_of_int 8 : mword 5) := regval_into_reg (mm !!! Regidx (mword_of_int 8 : mword 5))]> E1) with E2.
     assert (Hp20 : add_vec_int (mword_of_int (KernelSyms.uvmcreate + 0x1e) : mword 64) 2 = mword_of_int (KernelSyms.uvmcreate + 0x20)) by (apply bv_eq; vm_compute; reflexivity).
@@ -187,7 +187,7 @@ Section ProofUvmcreate.
               with "Hcg Hpc [] [Hc3]").
     { iApply (uvci_20 with "Htext"). }
     { iEval (rewrite HE2sp Hb3). iExact "Hc3". }
-    iIntros (CID9 Hs9) "Hcg Hpc Hc3". iEval (rewrite HE2sp Hb3) in "Hc3".
+    iIntros (CID9 Hs9) "_ Hcg Hpc Hc3". iEval (rewrite HE2sp Hb3) in "Hc3".
     set (E3 := <[Regidx (mword_of_int 9 : mword 5) := regval_into_reg (mm !!! Regidx (mword_of_int 9 : mword 5))]> E2).
     change (<[Regidx (mword_of_int 9 : mword 5) := regval_into_reg (mm !!! Regidx (mword_of_int 9 : mword 5))]> E2) with E3.
     assert (Hp22 : add_vec_int (mword_of_int (KernelSyms.uvmcreate + 0x20) : mword 64) 2 = mword_of_int (KernelSyms.uvmcreate + 0x22)) by (apply bv_eq; vm_compute; reflexivity).
@@ -210,7 +210,7 @@ Section ProofUvmcreate.
     iApply (wp_caddi16sp_pop_s_sconf (mword_of_int (KernelSyms.uvmcreate + 0x22)) (mword_of_int 2 : mword 6)
               E3 (K - 4)%nat 4 b Hpop with "Hcg Hpc [] Hframe").
     { iApply (uvci_22 with "Htext"). }
-    iIntros (CID10 Hs10) "Hcg Hpc".
+    iIntros (CID10 Hs10) "_ Hcg Hpc".
     set (E4 := <[Regidx csp_rs1 := regval_into_reg
         (add_vec (E3 !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6))))]> E3).
     change (<[Regidx csp_rs1 := regval_into_reg (add_vec (E3 !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6))))]> E3) with E4.
@@ -228,7 +228,7 @@ Section ProofUvmcreate.
     iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.uvmcreate + 0x24)) (mword_of_int 1 : mword 5) E4 K b
               ltac:(vm_compute; discriminate) with "Hcg Hpc []").
     { iApply (uvci_24 with "Htext"). }
-    iIntros (CID11 Hs11) "Hcg Hpc". iEval (rewrite Hrt) in "Hpc".
+    iIntros (CID11 Hs11) "Hlc Hcg Hpc". iEval (rewrite Hrt) in "Hpc".
     (* [Hts1] is about [Mt !!! Regidx 9]; the leaf's write is [rget Mt 9]
        (same [CID0] annotation as [E0] above -- this is the SAME [wval],
        just re-derived here) -- bridge with [rgne] before chasing the
@@ -250,7 +250,7 @@ Section ProofUvmcreate.
       rewrite /E1 upd_ne; [| congruence].
       rewrite /E0 upd_ne; [| congruence].
       exact (Htrest r Hr Ncsp N8 N9). }
-    iSpecialize ("Hcont" $! CID11 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hcont" $! CID11 with "[%] Hlc"); [wp_next_chain|].
     (* [cpu_own] was obtained at this lemma's OWN entry hart [CID0] and is
        never rebound by any of the six plain leaves above (none of them
        mention [cpu_own]); the continuation needs it at [CID11].
@@ -312,7 +312,7 @@ Section ProofUvmcreate.
     iApply (wp_caddi_sp_push_s_sconf (mword_of_int KernelSyms.uvmcreate) (mword_of_int 32 : mword 6) mm K 4 b Hc4 Hpush
               with "Hcg Hpc []").
     { iApply (uvci_00 with "Htext"). }
-    iIntros (CID1 Hs1) "Hcg Hframe Hpc".
+    iIntros (CID1 Hs1) "_ Hcg Hframe Hpc".
     set (W1 := <[Regidx csp_rs1 := regval_into_reg
         (add_vec (mm !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))]> mm).
     iEval (rewrite (stack_own_slots (KTR := KT1)); cbn [seq]) in "Hframe".
@@ -327,7 +327,7 @@ Section ProofUvmcreate.
               W1 (K - 4)%nat v1 b with "Hcg Hpc [] [Hc1]").
     { iApply (uvci_02 with "Htext"). }
     { iEval (rewrite HspW1 Hb1). iExact "Hc1". }
-    iIntros (CID2 Hs2) "Hcg Hpc Hc1". iEval (rewrite HspW1 Hb1) in "Hc1".
+    iIntros (CID2 Hs2) "_ Hcg Hpc Hc1". iEval (rewrite HspW1 Hb1) in "Hc1".
     (* the stored value is [rget W1 _] (a leaf whose source register is a
        VARIABLE index) -- [rgne] bridges it to the plain map fact, exactly
        as at the c.sdsp sites in ProofCpuid.v/ProofMycpu.v.  MUST be
@@ -348,7 +348,7 @@ Section ProofUvmcreate.
               W1 (K - 4)%nat v2 b with "Hcg Hpc [] [Hc2]").
     { iApply (uvci_04 with "Htext"). }
     { iEval (rewrite HspW1 Hb2). iExact "Hc2". }
-    iIntros (CID3 Hs3) "Hcg Hpc Hc2". iEval (rewrite HspW1 Hb2) in "Hc2".
+    iIntros (CID3 Hs3) "_ Hcg Hpc Hc2". iEval (rewrite HspW1 Hb2) in "Hc2".
     (* annotated [(CID := CID2)]: ambient hart when THIS csdsp was applied. *)
     assert (HW1r8 : rget (CID := CID2) W1 (mword_of_int 8 : mword 5) = mm !!! Regidx (mword_of_int 8))
       by (rgne; rewrite /W1; rewrite upd_ne; [reflexivity | reg_neq]).
@@ -360,7 +360,7 @@ Section ProofUvmcreate.
               W1 (K - 4)%nat v3 b with "Hcg Hpc [] [Hc3]").
     { iApply (uvci_06 with "Htext"). }
     { iEval (rewrite HspW1 Hb3). iExact "Hc3". }
-    iIntros (CID4 Hs4) "Hcg Hpc Hc3". iEval (rewrite HspW1 Hb3) in "Hc3".
+    iIntros (CID4 Hs4) "_ Hcg Hpc Hc3". iEval (rewrite HspW1 Hb3) in "Hc3".
     (* annotated [(CID := CID3)]: ambient hart when THIS csdsp was applied. *)
     assert (HW1r9 : rget (CID := CID3) W1 (mword_of_int 9 : mword 5) = mm !!! Regidx (mword_of_int 9))
       by (rgne; rewrite /W1; rewrite upd_ne; [reflexivity | reg_neq]).
@@ -372,7 +372,7 @@ Section ProofUvmcreate.
               W1 (K - 4)%nat b ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (uvci_08 with "Htext"). }
-    iIntros (CID5 Hs5) "Hcg Hpc".
+    iIntros (CID5 Hs5) "_ Hcg Hpc".
     set (W2 := <[Regidx (mword_of_int 8 : mword 5) := regval_into_reg (add_vec (W1 !!! Regidx csp_rs1) (sign_extend' 64 (caddi4spn_imm (mword_of_int 8 : mword 8))))]> W1).
     assert (Hp0a : add_vec_int (mword_of_int (KernelSyms.uvmcreate + 0x08) : mword 64) 2 = mword_of_int (KernelSyms.uvmcreate + 0x0a)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp0a) in "Hpc".
@@ -381,7 +381,7 @@ Section ProofUvmcreate.
               W2 (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (uvci_0a with "Htext"). }
-    iIntros (CID6 Hs6) "Hcg Hpc".
+    iIntros (CID6 Hs6) "_ Hcg Hpc".
     set (J := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.uvmcreate + 0x0a) : mword 64) 4)]> W2).
     assert (Htgtk : add_vec (mword_of_int (KernelSyms.uvmcreate + 0x0a) : mword 64) (sign_extend' 64 (mword_of_int 2095418 : mword 21)) = mword_of_int KernelSyms.kalloc) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtk) in "Hpc".
@@ -414,7 +414,7 @@ Section ProofUvmcreate.
               Hbelow
               with "Hcg Hcnt Htext Hpc Hlock Havail").
     all: try lkbelow.
-    iIntros (CID7 Hs7 mr0) "Hcg Hcnt Hpc %Hkcs0 Hkpost".
+    iIntros (CID7 Hs7) "_"; iIntros (mr0) "Hcg Hcnt Hpc %Hkcs0 Hkpost".
     assert (Hret0e : ret_pc (J !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.uvmcreate + 0x0e)).
     { rewrite /J upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hret0e) in "Hpc".
@@ -426,7 +426,7 @@ Section ProofUvmcreate.
               mr0 (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (uvci_0e with "Htext"). }
-    iIntros (CID8 Hs8) "Hcg Hpc".
+    iIntros (CID8 Hs8) "_ Hcg Hpc".
     (* [wval] in [wp_cmv_s_sconf] is LET-BOUND OUTSIDE its [wp_next] lambda,
        so it is fixed at the hart ambient WHEN THE LEAF WAS APPLIED (CID7,
        right after kalloc's own continuation), not at CID8 (bound just
@@ -469,7 +469,7 @@ Section ProofUvmcreate.
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (uvci_10 with "Htext"). }
-      iNext. iIntros (CID9 Hs9) "Hcg Hpc".
+      iNext. iIntros (CID9 Hs9) "_ Hcg Hpc".
       assert (Htgt1a : add_vec (mword_of_int (KernelSyms.uvmcreate + 0x10) : mword 64)
                          (sign_extend' 64 (sign_extend' 13 (concat_vec (mword_of_int 5 : mword 8) ('b"0"))))
                        = mword_of_int (KernelSyms.uvmcreate + 0x1a))
@@ -494,8 +494,8 @@ Section ProofUvmcreate.
          [CID].  Re-derive it at the fresh hart the same way [uvc_htail]
          discharges its OWN continuation: [iIntros] the fresh hart plus the
          crossing equality, chase [Hcont] there with [iSpecialize], done. *)
-      iIntros (CIDx Hsx).
-      iSpecialize ("Hcont" $! CIDx with "[%]"); [wp_next_chain|].
+      iIntros (CIDx Hsx) "Hlc".
+      iSpecialize ("Hcont" $! CIDx with "[%] Hlc"); [wp_next_chain|].
       iExact "Hcont".
     }
     iAssert (kalloc_env_at γa γk (avail_sub on 1))
@@ -510,14 +510,14 @@ Section ProofUvmcreate.
                     exact (page_valid_ne_null _ Hpv))
               with "Hcg Hpc []").
     { iApply (uvci_10 with "Htext"). }
-    iIntros (CID9 Hs9) "Hcg Hpc".
+    iIntros (CID9 Hs9) "_ Hcg Hpc".
     assert (Hp12 : add_vec_int (mword_of_int (KernelSyms.uvmcreate + 0x10) : mword 64) 2 = mword_of_int (KernelSyms.uvmcreate + 0x12)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp12) in "Hpc".
     (* +0x12 lui a2,0x1 *)
     iApply (wp_clui_s_sconf (mword_of_int (KernelSyms.uvmcreate + 0x12)) (mword_of_int 12 : mword 5) (sign_extend' 20 (mword_of_int 1 : mword 6)) (luival (sign_extend' 20 (mword_of_int 1 : mword 6)))
               M1 (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(reflexivity) with "Hcg Hpc []").
     { iApply (uvci_12 with "Htext"). }
-    iIntros (CID10 Hs10) "Hcg Hpc".
+    iIntros (CID10 Hs10) "_ Hcg Hpc".
     set (M2 := <[Regidx (mword_of_int 12 : mword 5) := regval_into_reg (luival (sign_extend' 20 (mword_of_int 1 : mword 6)))]> M1).
     assert (Hp14 : add_vec_int (mword_of_int (KernelSyms.uvmcreate + 0x12) : mword 64) 2 = mword_of_int (KernelSyms.uvmcreate + 0x14)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp14) in "Hpc".
@@ -525,7 +525,7 @@ Section ProofUvmcreate.
     iApply (wp_cli_s_sconf (mword_of_int (KernelSyms.uvmcreate + 0x14)) (mword_of_int 11 : mword 5) (mword_of_int 0 : mword 6) (add_vec zero_reg (sign_extend' 64 (sign_extend' 12 (mword_of_int 0 : mword 6))))
               M2 (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(reflexivity) with "Hcg Hpc []").
     { iApply (uvci_14 with "Htext"). }
-    iIntros (CID11 Hs11) "Hcg Hpc".
+    iIntros (CID11 Hs11) "_ Hcg Hpc".
     set (M3 := <[Regidx (mword_of_int 11 : mword 5) := regval_into_reg (add_vec zero_reg (sign_extend' 64 (sign_extend' 12 (mword_of_int 0 : mword 6))))]> M2).
     assert (Hp16 : add_vec_int (mword_of_int (KernelSyms.uvmcreate + 0x14) : mword 64) 2 = mword_of_int (KernelSyms.uvmcreate + 0x16)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp16) in "Hpc".
@@ -534,7 +534,7 @@ Section ProofUvmcreate.
               M3 (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (uvci_16 with "Htext"). }
-    iIntros (CID12 Hs12) "Hcg Hpc".
+    iIntros (CID12 Hs12) "_ Hcg Hpc".
     set (M4 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.uvmcreate + 0x16) : mword 64) 4)]> M3).
     assert (Htgtm : add_vec (mword_of_int (KernelSyms.uvmcreate + 0x16) : mword 64) (sign_extend' 64 (mword_of_int 2095816 : mword 21)) = mword_of_int KernelSyms.memset) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtm) in "Hpc".
@@ -562,7 +562,7 @@ Section ProofUvmcreate.
          flipped with ↦ₘ), so no shim crossing here: only the address form
          differs. *)
       iApply (big_sepL_impl with "Hpage"). iIntros "!>" (k j _) "H". rewrite HM4a0. iExact "H". }
-    iIntros (CID13 Hs13 mfin) "Hcg Hpc Hbytes %Hmcs".
+    iIntros (CID13 Hs13) "_"; iIntros (mfin) "Hcg Hpc Hbytes %Hmcs".
     assert (Hret1a : ret_pc (M4 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.uvmcreate + 0x1a)).
     { rewrite /M4 upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hret1a) in "Hpc".
@@ -641,8 +641,8 @@ Section ProofUvmcreate.
       iFrame "Hptree Henv". }
     (* same re-derivation as the taken branch: [uvc_htail]'s [wp_next]
        obligation here is at CID13, not [Hcont]'s (outer-entry-hart) one. *)
-    iIntros (CIDy Hsy).
-    iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain|].
+    iIntros (CIDy Hsy) "Hlc".
+    iSpecialize ("Hcont" $! CIDy with "[%] Hlc"); [wp_next_chain|].
     iExact "Hcont".
   Qed.
 
