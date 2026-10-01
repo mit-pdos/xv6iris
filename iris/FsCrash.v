@@ -2673,12 +2673,13 @@ Section fs_crash_seam.
     iIntros "#Hseam Hrec". rewrite /disk_write_permit.
     iIntros (dk n) "Hsa %Hn Ha HP".
     iDestruct "Hseam" as "[Hfwd Hbwd]".
-    iAssert (▷ P_fs_comp G cov ls)%I with "[HP]" as "HP";
-      [iNext; by iApply "Hfwd"|].
-    (* the composite is NOT timeless: the later comes off the file system's
-       half alone, and the guest is carried as it is *)
+    (* the predicate arrives unlatered (the disk step's credit stripped the
+       crash invariant's later), so the composite opens here, guest included:
+       its guest name [gt] is not pinned by anything timeless, so this could
+       not happen under the later at ordinal step indices *)
+    iDestruct ("Hfwd" with "HP") as "HP".
     rewrite /P_fs_comp. iDestruct "HP" as (gt) "[HP HG]".
-    iMod "HP". rewrite /P_fs_any_at /P_fs_named_at.
+    rewrite /P_fs_any_at /P_fs_named_at.
     iDestruct "HP" as (dk0) "(Hfr & %Hext & HPr)".
     (* the fragments read the machine's image: the record's [dk0] agrees
        with [dk] on the whole durable disk *)
@@ -2687,8 +2688,8 @@ Section fs_crash_seam.
     rewrite disk_read_length in Hrd.
     iDestruct (P_fs_rec_agree gt _ _ _ cov ls riscv_disk_size dk0 dk
                  (eq_sym Hrd) Hext with "HPr") as "HPr".
-    iMod ("Hrec" $! dk n gt with "Hsa [//] [HPr] HG")
-      as (gt') "(HPr & HG & Hsa & HQ)"; [iNext; iExact "HPr"|].
+    iMod ("Hrec" $! dk n gt with "Hsa [//] [HPr] [HG]")
+      as (gt') "(HPr & HG & Hsa & HQ)"; [iNext; iExact "HPr"|iNext; iExact "HG"|].
     (* the fragments and the auth, to the post-write image *)
     iEval (rewrite -Hrd) in "Hfr".
     iMod (disk_img_sized_write _ _ dk (wr_apply w dk) with "Ha Hfr") as "[Ha Hfr]".

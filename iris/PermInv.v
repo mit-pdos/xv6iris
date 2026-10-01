@@ -222,7 +222,7 @@ Section perm.
     perm_inv_body gd γP -∗ perm_tok γP k true γq w todo -∗
     start_auth n -∗ ⌜n = (gd + 1)%nat⌝ -∗
     disk_fixed_auth dk -∗
-    ▷ riscv_crash_pred ={∅}=∗
+    riscv_crash_pred ={∅}=∗
       perm_inv_body gd γP ∗ perm_tok γP k true γq w (todo ∖ {[ i ]}) ∗
       start_auth n ∗
       disk_fixed_auth (wr_apply (wr_sector w i) dk) ∗
@@ -271,7 +271,7 @@ Section perm.
     perm_inv_body gd γP -∗ perm_tok γP k true γq w ∅ -∗
     start_auth n -∗ ⌜n = (gd + 1)%nat⌝ -∗
     disk_fixed_auth dk -∗
-    ▷ riscv_crash_pred ={∅}=∗
+    riscv_crash_pred ={∅}=∗
       perm_inv_body gd γP ∗ perm_tok γP k false γq w ∅ ∗ start_auth n ∗
       disk_fixed_auth (wr_apply None dk) ∗
       ▷ riscv_crash_pred.
@@ -324,7 +324,7 @@ Section perm.
     perm_inv_body gd γP -∗ perm_pend γP kq w todo -∗
     start_auth n -∗ ⌜n = (gd + 1)%nat⌝ -∗
     disk_fixed_auth dk -∗
-    ▷ riscv_crash_pred ={∅}=∗
+    riscv_crash_pred ={∅}=∗
       perm_inv_body gd γP ∗ perm_pend γP kq w (todo ∖ {[ i ]}) ∗
       start_auth n ∗
       disk_fixed_auth (wr_apply (wr_sector w i) dk) ∗
@@ -342,7 +342,7 @@ Section perm.
     perm_inv_body gd γP -∗ perm_pend γP kq w ∅ -∗
     start_auth n -∗ ⌜n = (gd + 1)%nat⌝ -∗
     disk_fixed_auth dk -∗
-    ▷ riscv_crash_pred ={∅}=∗
+    riscv_crash_pred ={∅}=∗
       perm_inv_body gd γP ∗ perm_done γP kq w ∗ start_auth n ∗
       disk_fixed_auth (wr_apply None dk) ∗
       ▷ riscv_crash_pred.

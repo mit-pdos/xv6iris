@@ -4156,7 +4156,7 @@ Section DevLoops.
        so the openings compose ([solve_ndisj]). *)
     iInv "Hqinv" as "Hpbody" "Hpclose".
     iApply fupd_mask_intro; [set_solver|]. iIntros "Hmask".
-    iNext. iIntros (d' W log') "%Hstep %Hlog _".
+    iNext. iIntros (d' W log') "%Hstep %Hlog Hlc".
     iMod "Hmask" as "_".
     destruct Hstep as [mv vnew Hview Hpop | mv h vnew Hview Hfetch
                       | mv h vnew Hview Hcap | h vnew w Hwrite
@@ -4395,6 +4395,9 @@ Section DevLoops.
          The permit is a mask-[∅] fupd and three invariants are open, so
          shrink the mask around it and restore. *)
       iInv "Hcinv" as "HP" "Hcclose".
+      (* the disk step's credit strips the crash invariant's later: the permit
+         takes the predicate unlatered (RiscvPtsto.disk_write_permit) *)
+      iMod (lc_fupd_elim_later with "Hlc HP") as "HP".
       iMod (fupd_mask_subseteq ∅) as "Hmclose"; [set_solver|].
       iMod (perm_consume_kq gen_id (dn_perm γd) kq wr (v_disk (dvirtio d)) n
               with "Hpbody Hpend Hsa [//] Htie HP")
@@ -4571,6 +4574,9 @@ Section DevLoops.
                       = v_disk vnew)
         by (rewrite Hv Hwr; reflexivity).
       iInv "Hcinv" as "HP" "Hcclose".
+      (* the disk step's credit strips the crash invariant's later: the permit
+         takes the predicate unlatered (RiscvPtsto.disk_write_permit) *)
+      iMod (lc_fupd_elim_later with "Hlc HP") as "HP".
       iMod (fupd_mask_subseteq ∅) as "Hmclose"; [set_solver|].
       (* CONSUME AND RE-DEPOSIT (sector-atomic-disk.md §6e): the branch the
          device took is spent and the RESIDUAL obligation for the remaining
