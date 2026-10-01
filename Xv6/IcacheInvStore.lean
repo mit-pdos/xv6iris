@@ -742,7 +742,7 @@ theorem iref_upgrade_mir_store_pinw_au [Icfg] (Eo : CoPset) (γi : GName) (γfs 
     (hin : (inum.toNat : Int) < 16 * (nib : Int))
     (hMk : PartialMap.get? M k = some (qt, n)) (hq : qt + qn < (1 : Qp).half)
     (hno : n.succ.val ≤ IREFSLOTS) :
-    ⊢@{IProp GF} itableInv (hlc := hlc) -∗ iregInv (hlc := hlc) γi γfs inodestart nib -∗
+    ⊢@{IProp GF} itableInv (hlc := hlc) -∗ iregReg (hlc := hlc) γi γfs inodestart nib -∗
       itableHalf M -∗ liveGenlo k s g lo -∗ islSlot M k -∗
       frzmH inum.toNat false -∗ runit bfl inum.toNat -∗ icntHalf inum.toNat n.val -∗
       istmpAuth k (1 : Qp).half tstp -∗ topLb tstp -∗
