@@ -8,6 +8,11 @@ applied at level 2 and then at level 1; with `alloc` it calls
 `kalloc` + `memset(.,0,4096)` behind a missing pointer and links the fresh
 zero node in (`PTree.fill`), and it bails out to the shared epilogue with
 `a0 = 0` when `alloc` is off or `kalloc` fails.
+
+THE LEND (permit sweep L3a, no Rocq counterpart): the allocating contract
+takes it; `kalloc` does not take it yet, so it is framed through the
+continuation once, at entry (`SlotGen.actLend_cont_frame_x`), and returns
+at `ke`.  The non-allocating contract is unchanged.
 -/
 import MachCSL.WpSmodeAlu2
 import Xv6.SpecWalk
@@ -725,10 +730,12 @@ end
 
 set_option maxHeartbeats 4000000 in
 theorem walk_proof (KAL : KALLOC) (MS : MEMSET) : WALK :=
-  ⟨fun {hlc GF} _ _ _ cpu k γl γk on t hnoff hK hlk hroot hva halloc hwf hnd hpgt => by
+  ⟨fun {hlc GF} _ _ _ _ cpu k γl γk on t ke hnoff hK hlk hroot hva halloc hwf hnd hpgt => by
   unfold wp_walk_body
   simp only [walkAddr]
-  iintro ⟨Hk, Hpc, #Hlk, Htree, Hav, Hnext⟩
+  iintro ⟨Hk, Hpc, #Hlk, Htree, Hav, Hlend, Hnext⟩
+  -- the lend: `kalloc` does not take it yet, framed through
+  ihave Hnext := actLend_cont_frame_x _ _ _ _ _ _ _ _ _ $$ Hnext Hlend
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   icases kctx_wf _ _ $$ Hk with ⟨%hwfk, Hk⟩
   have hK8 : 8 ≤ k.avail := by omega

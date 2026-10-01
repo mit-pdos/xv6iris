@@ -12,10 +12,10 @@ address space, which both fixed pages share.  A failure of either
 `uvmfree`) and returns `0`.  The call rules it shares with
 `proc_freepagetable` are in `Xv6/ProcPagetableDefs.lean`.
 
-THE LEND (permit sweep L2, Rocq 78f9234b8): passed to each `mappages`,
-`uvmunmap` and `uvmfree` in turn, each taking it at the count the previous
-one returned, the bounds composed back to `ke`; `uvmcreate` does not take
-it yet (it stays in the frame across that call).
+THE LEND (permit sweep L2, Rocq 78f9234b8; L3a, no Rocq counterpart):
+passed to `uvmcreate`, then to each `mappages`, `uvmunmap` and `uvmfree` in
+turn, each taking it at the count the previous one returned, the bounds
+composed back to `ke`.
 -/
 import Xv6.SpecProcPagetable
 import Xv6.ProcPagetableDefs
@@ -125,17 +125,17 @@ theorem proc_pagetable_proof (UC : UVMCREATE) (MP : MAPPAGES_ANY) (UM : UVMUNMAP
   k_step_gen (wp_s_jal c2 _ (KA.«proc_pagetable» + 0xe#64) false 2095068#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [proc_pagetable_br_fffffffffffff7ea] next c3 hp3
   iintro Hk Hpc
-  iapply (pp_uvmcreate_call UC c3 _ γl γk on ?hn1 ?hK1 ?hl1) $$ [- $Hk $Hpc]
+  iapply (pp_uvmcreate_call UC c3 _ γl γk on ke ?hn1 ?hK1 ?hl1) $$ [- $Hk $Hpc]
   rotate_right 1
   k_norm_g
   iframe #
-  iframe Hav
+  iframe Hav Hlend
   case hn1 => k_norm_g; omega
   case hK1 =>
     k_norm_g; unfold uvmcreateSlots; unfold procPagetableSlots at hK; omega
   case hl1 => k_norm_g; exact hlk
   iapply wpNext_intro_pin
-  iintro %c4 %hp4 %spie1 %spp1 %R1 %hsp1 Hk Hpc HPost %hcs1
+  iintro %c4 %hp4 %spie1 %spp1 %R1 %hsp1 Hk Hpc ⟨%k0, %hk0, Hlend⟩ HPost %hcs1
   k_norm_g [pp_ret_19c4]
   unfold calleeSaved at hcs1
   k_norm_g at hcs1
@@ -165,6 +165,7 @@ theorem proc_pagetable_proof (UC : UVMCREATE) (MP : MAPPAGES_ANY) (UM : UVMUNMAP
       iapply wpNext_mono _ _ _ _ _ $$ HΦ
       iintro %c' HΦ %R'' Hk Hpc %hpost
       ihave Hlend := actLend_ret_intro _ _ $$ Hlend
+      ihave Hlend := actLend_ret_weaken _ hk0 $$ Hlend
       iapply HΦ $$ %spie1 %spp1 %R'' %hsp1 Hk Hpc Hlend Htf [Hav]
       · unfold pptPost
         iright
@@ -224,7 +225,7 @@ theorem proc_pagetable_proof (UC : UVMCREATE) (MP : MAPPAGES_ANY) (UM : UVMUNMAP
       intro i hi
       exact MachCSL.PTree.zeroNode_walk b 2 _
     iapply (pp_mappages_call MP c14 _ γl γk (availDec on) (PTree.zeroNode b) 1 10#64
-      ?hn2 ?hK2 ?hl2 ?hr2 ?hg2 ?hpm2 ?hmk2 ?hrw2 ?hwf2 ?hnd2 ?hpg2 ke) $$ [- $Hk $Hpc]
+      ?hn2 ?hK2 ?hl2 ?hr2 ?hg2 ?hpm2 ?hmk2 ?hrw2 ?hwf2 ?hnd2 ?hpg2 k0) $$ [- $Hk $Hpc]
     rotate_right 1
     k_norm_g
     iframe #
@@ -367,7 +368,7 @@ theorem proc_pagetable_proof (UC : UVMCREATE) (MP : MAPPAGES_ANY) (UM : UVMUNMAP
           iapply wpNext_mono _ _ _ _ _ $$ HΦ
           iintro %c' HΦ %R'' Hk Hpc %hpost
           ihave Hlend := actLend_ret_intro _ _ $$ Hlend
-          ihave Hlend := actLend_ret_weaken _ (Nat.le_trans hk1 hk2) $$ Hlend
+          ihave Hlend := actLend_ret_weaken _ (Nat.le_trans hk0 (Nat.le_trans hk1 hk2)) $$ Hlend
           iapply HΦ $$ %spie3 %spp3 %R'' %hspB Hk Hpc Hlend Htf [HT HU Hav]
           · unfold pptPost procPagetableNodes
             ileft
@@ -485,7 +486,7 @@ theorem proc_pagetable_proof (UC : UVMCREATE) (MP : MAPPAGES_ANY) (UM : UVMUNMAP
         case hb8 => exact umBelow_empty _ b _
         iapply wpNext_intro_pin
         iintro %c38 %hp38 %spie4 %spp4 %R5 %hsp4 Hk Hpc Hlend %hcs5
-        ihave Hlend := actLend_ret_weaken _ (Nat.le_trans hk1 (Nat.le_trans hk2 hk3)) $$ Hlend
+        ihave Hlend := actLend_ret_weaken _ (Nat.le_trans hk0 (Nat.le_trans hk1 (Nat.le_trans hk2 hk3))) $$ Hlend
         k_norm_g [pp_ret_1a32, MachCSL.KCtx.withSpie_twice]
         unfold calleeSaved at hcs5
         k_norm_g at hcs5
@@ -583,7 +584,7 @@ theorem proc_pagetable_proof (UC : UVMCREATE) (MP : MAPPAGES_ANY) (UM : UVMUNMAP
       case hb6 => exact umBelow_empty _ b _
       iapply wpNext_intro_pin
       iintro %c20 %hp20 %spie3 %spp3 %R3 %hsp3 Hk Hpc Hlend %hcs3
-      ihave Hlend := actLend_ret_weaken _ hk1 $$ Hlend
+      ihave Hlend := actLend_ret_weaken _ (Nat.le_trans hk0 hk1) $$ Hlend
       k_norm_g [pp_ret_1a14, MachCSL.KCtx.withSpie_twice]
       unfold calleeSaved at hcs3
       k_norm_g at hcs3

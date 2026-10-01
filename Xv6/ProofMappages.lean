@@ -8,10 +8,11 @@ induction on the pages left: one `walk(pagetable, a, 1)` per page, the
 level-0 entry read (zero, by `mappagesArgs`) and written with the leaf.
 Stated at either interrupt index, as `walk` is.
 
-THE LEND (permit sweep L2, Rocq 78f9234b8): `walk` does not take it yet,
-so the general contract frames it through the continuation once, at entry
-(`SlotGen.actLend_cont_frame_x`), and returns it at `ke`; the counted
-corollary passes it to the general one.
+THE LEND (permit sweep L2, Rocq 78f9234b8; threaded by L3a, no Rocq
+counterpart): carried by the loop (`mappages_iter` / `mappages_loop` take
+and return `∃ k1 ≥ ke`) and passed to each `walk` at the count in hand, its
+returned bound composed back to `ke`; the counted corollary passes it to
+the general one.
 -/
 import Xv6.SpecMappages
 import Xv6.SpecWalk
@@ -184,18 +185,19 @@ theorem mp_availSub (nb g : Nat) : availSub (some nb) g = some (nb - g) := rfl
 
 set_option maxHeartbeats 1000000 in
 /-- `walk`'s contract at its entry address, as a rule. -/
-theorem mp_walk_call (W : WALK) [CurCtx] (c : CPU) (k' : KCtx) (γl : GName) (γk : KmemNames)
-    (on' : Option Nat) (t' : PTree)
+theorem mp_walk_call [WchG GF] (W : WALK) [CurCtx] (c : CPU) (k' : KCtx) (γl : GName) (γk : KmemNames)
+    (on' : Option Nat) (t' : PTree) (ke : Nat)
     (hnoff' : k'.noff + 1 < 2 ^ 31) (hK' : 22 ≤ k'.avail) (hlk' : "kmem" ∉ k'.locks)
     (hroot' : k'.regs 10#5 = pageAddr t'.base) (hva' : (k'.regs 11#5).toNat < 2 ^ 38)
     (halloc' : k'.regs 12#5 = 1#64) (hwf' : t'.wfU 2) (hnd' : t'.pagesNodup 2)
     (hpgt' : ∀ b ∈ t'.pages 2, pageValid (pageAddr b)) :
     kctx c k' ∗ pcIs c KA.«walk» ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
-    ptreeOwn 2 (DFrac.own 1) t' ∗ kallocAvail γk on' ∗
+    ptreeOwn 2 (DFrac.own 1) t' ∗ kallocAvail γk on' ∗ actLend k'.proc ke ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool,
       ∀ (R' : RegMap) (fresh : List (BitVec 44)),
       ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
+      (∃ k1 : Nat, ⌜ke ≤ k1⌝ ∗ actLend k'.proc k1) -∗
       ptreeOwn 2 (DFrac.own 1) (t'.fill 2 (vpnOf (k'.regs 11#5)) fresh).1 -∗
       kallocAvail γk (availSub on' fresh.length) -∗
       ⌜calleeSaved k'.regs R' ∧ (t'.fill 2 (vpnOf (k'.regs 11#5)) fresh).2 = [] ∧
@@ -203,7 +205,7 @@ theorem mp_walk_call (W : WALK) [CurCtx] (c : CPU) (k' : KCtx) (γl : GName) (γ
         walkRet (t'.fill 2 (vpnOf (k'.regs 11#5)) fresh).1 (vpnOf (k'.regs 11#5)) (R' 10#5) ∧
         (R' 10#5 = 0#64 → availZero (availSub on' fresh.length))⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := W.wp_walk (hlc := hlc) (GF := GF) c k' γl γk on' t' hnoff' hK' hlk' hroot' hva'
+  have h := W.wp_walk (hlc := hlc) (GF := GF) c k' γl γk on' t' ke hnoff' hK' hlk' hroot' hva'
     halloc' hwf' hnd' hpgt'
   unfold wp_walk_body at h
   simp only [walkAddr] at h
@@ -220,9 +222,9 @@ and the last page tested for.  Either way the tree is the one-page
 `PTree.mapRun`. -/
 theorem mappages_br_ffffffffffffff2c : KA.«mappages» + 0xffffffffffffff2c#64 = KA.«walk» := by decide
 
-theorem mappages_iter (W : WALK) [CurCtx]
+theorem mappages_iter [WchG GF] (W : WALK) [CurCtx]
     (k : KCtx) (γl : GName) (γk : KmemNames) (perm : BitVec 64) (va pa : BitVec 64) (n : Nat)
-    (hnoff : k.noff + 1 < 2 ^ 31) (hK : 32 ≤ k.avail) (hlk : "kmem" ∉ k.locks)
+    (hnoff : k.noff + 1 < 2 ^ 31) (hK : 32 ≤ k.avail) (hlk : "kmem" ∉ k.locks) (ke : Nat)
     (hvr : va.toNat + 4096 * n ≤ 2 ^ 38) (hpr : pa.toNat + 4096 * n < 2 ^ 56)
     (i : Nat) (hi : i < n) (t : PTree) (on : Option Nat) (hwf : t.wfU 2) (hnd : t.pagesNodup 2)
     (hpgt : ∀ b ∈ t.pages 2, pageValid (pageAddr b))
@@ -235,12 +237,13 @@ theorem mappages_iter (W : WALK) [CurCtx]
     (cur : CPU) :
     kctx cur (((k.pushed 10).withSpie spie spp).withRegs R) ∗ pcIs cur (KA.«mappages» + 0x3e#64) ∗
     isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
-    ptreeOwn 2 (DFrac.own 1) t ∗ kallocAvail γk on ∗
+    ptreeOwn 2 (DFrac.own 1) t ∗ kallocAvail γk on ∗ (∃ k1 : Nat, ⌜ke ≤ k1⌝ ∗ actLend k.proc k1) ∗
     wpNext k.sie k.proc cur (fun cpu' => iprop(∀ (spie2 spp2 : Bool) (R2 : RegMap)
       (fresh : List (BitVec 44)) (pcv : BitVec 64),
       ⌜k.sie = false → spie2 = spie ∧ spp2 = spp⌝ -∗
       kctx cpu' (((k.pushed 10).withSpie spie2 spp2).withRegs R2) -∗
       pcIs cpu' pcv -∗
+      (∃ k1 : Nat, ⌜ke ≤ k1⌝ ∗ actLend k.proc k1) -∗
       ptreeOwn 2 (DFrac.own 1) (t.mapRun (vpnOf va + BitVec.ofNat 27 i)
         (BitVec.extractLsb' 12 44 pa + BitVec.ofNat 44 i) perm 1 fresh).1 -∗
       kallocAvail γk (availSub on fresh.length) -∗
@@ -254,7 +257,7 @@ theorem mappages_iter (W : WALK) [CurCtx]
             ¬ (t.fill 2 (vpnOf va + BitVec.ofNat 27 i) fresh).1.complete 2
               (vpnOf va + BitVec.ofNat 27 i)))⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) cur := by
-  iintro ⟨Hk, Hpc, #Hlk, Htree, Hav, HΦ⟩
+  iintro ⟨Hk, Hpc, #Hlk, Htree, Hav, ⟨%k1, %hk1, Hlend⟩, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   have hlt64 : va.toNat + 4096 * i < 2 ^ 64 := by omega
   have hplt64 : pa.toNat + 4096 * i < 2 ^ 64 := by omega
@@ -271,12 +274,12 @@ theorem mappages_iter (W : WALK) [CurCtx]
   k_step_gen (wp_s_jal c3 _ (KA.«mappages» + 0x44#64) false 2096872#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [mappages_br_ffffffffffffff2c] next c4 hp4
   iintro Hk Hpc
-  iapply (mp_walk_call W c4 _ γl γk on t ?hn ?hKa ?hl ?hro ?hv ?ha hwf hnd hpgt)
+  iapply (mp_walk_call W c4 _ γl γk on t k1 ?hn ?hKa ?hl ?hro ?hv ?ha hwf hnd hpgt)
     $$ [- $Hk $Hpc]
   rotate_right 1
   k_norm_g
   iframe #
-  iframe Htree Hav
+  iframe Htree Hav Hlend
   case hn => k_norm_g; omega
   case hKa => k_norm_g; omega
   case hl => k_norm_g; exact hlk
@@ -284,7 +287,8 @@ theorem mappages_iter (W : WALK) [CurCtx]
   case hv => k_norm_g; rw [Xv6.paAddToNat' va _ hlt64]; omega
   case ha => k_norm_g
   iapply wpNext_intro_pin
-  iintro %c5 %hp5 %spie2 %spp2 %R2 %fresh %hsp2 Hk Hpc Htree Hav %hpost
+  iintro %c5 %hp5 %spie2 %spp2 %R2 %fresh %hsp2 Hk Hpc Hlend Htree Hav %hpost
+  ihave Hlend := actLend_ret_weaken _ hk1 $$ Hlend
   have hpinA : k.sie = false ∨ k.proc = 0#64 → c5 = cur :=
     fun h => (hp5 h).trans ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h))))
   k_norm_g [MachCSL.KCtx.withSpie_twice, mp_ret_102c, mp_vpn va i hlt64]
@@ -325,7 +329,7 @@ theorem mappages_iter (W : WALK) [CurCtx]
       (hp7 h).trans ((hp6 h).trans (hpinA h))
     ihave HΦ' := wpNext_at _ _ _ c7 _ hpinZ $$ HΦ
     rw [← hmf1]
-    iapply HΦ' $$ %spie2 %spp2 %_ %fresh %_ %hsp2 Hk Hpc Htree Hav
+    iapply HΦ' $$ %spie2 %spp2 %_ %fresh %_ %hsp2 Hk Hpc Hlend Htree Hav
     ipureintro
     refine ⟨?_, hsupply, hfrnd, hfrpg, Or.inr ⟨rfl, ?_, hz0 hz, hnc⟩⟩
     · unfold calleeSaved at hcs' ⊢
@@ -420,7 +424,7 @@ theorem mappages_iter (W : WALK) [CurCtx]
           ((hp6 h).trans (hpinA h)))))))))))
     ihave HΦ' := wpNext_at _ _ _ c16 _ hpinZ $$ HΦ
     rw [← hmo1]
-    iapply HΦ' $$ %spie2 %spp2 %_ %fresh %_ %hsp2 Hk Hpc Htree Hav
+    iapply HΦ' $$ %spie2 %spp2 %_ %fresh %_ %hsp2 Hk Hpc Hlend Htree Hav
     ipureintro
     refine ⟨?_, hsupply, hfrnd, hfrpg, Or.inl ⟨rfl, hlen, hcomp⟩⟩
     unfold calleeSaved
@@ -434,9 +438,9 @@ set_option maxHeartbeats 4000000 in
 to the success exit at `(KernelSyms.«mappages» + 0xb2)` or, when a `walk` failed, straight to
 the epilogue at `(KernelSyms.«mappages» + 0x9c)` with `-1` in `a0`.  The hart is quantified
 inside the induction. -/
-theorem mappages_loop (W : WALK) [CurCtx]
+theorem mappages_loop [WchG GF] (W : WALK) [CurCtx]
     (k : KCtx) (γl : GName) (γk : KmemNames) (perm : BitVec 64) (va pa : BitVec 64) (n : Nat)
-    (hnoff : k.noff + 1 < 2 ^ 31) (hK : 32 ≤ k.avail) (hlk : "kmem" ∉ k.locks)
+    (hnoff : k.noff + 1 < 2 ^ 31) (hK : 32 ≤ k.avail) (hlk : "kmem" ∉ k.locks) (ke : Nat)
     (hrwx : perm &&& 0xE#64 ≠ 0#64)
     (hvr : va.toNat + 4096 * n ≤ 2 ^ 38) (hpr : pa.toNat + 4096 * n < 2 ^ 56)
     (fuel : Nat) :
@@ -452,12 +456,13 @@ theorem mappages_loop (W : WALK) [CurCtx]
       (cur : CPU),
     kctx cur (((k.pushed 10).withSpie spie spp).withRegs R) ∗ pcIs cur (KA.«mappages» + 0x3e#64) ∗
     isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
-    ptreeOwn 2 (DFrac.own 1) t ∗ kallocAvail γk on ∗
+    ptreeOwn 2 (DFrac.own 1) t ∗ kallocAvail γk on ∗ (∃ k1 : Nat, ⌜ke ≤ k1⌝ ∗ actLend k.proc k1) ∗
     wpNext k.sie k.proc cur (fun cpu' => iprop(∀ (spie2 spp2 : Bool) (R2 : RegMap)
       (fresh : List (BitVec 44)) (pcv : BitVec 64),
       ⌜k.sie = false → spie2 = spie ∧ spp2 = spp⌝ -∗
       kctx cpu' (((k.pushed 10).withSpie spie2 spp2).withRegs R2) -∗
       pcIs cpu' pcv -∗
+      (∃ k1 : Nat, ⌜ke ≤ k1⌝ ∗ actLend k.proc k1) -∗
       ptreeOwn 2 (DFrac.own 1) (t.mapRun (vpnOf va + BitVec.ofNat 27 i)
         (BitVec.extractLsb' 12 44 pa + BitVec.ofNat 44 i) perm (n - i) fresh).1 -∗
       kallocAvail γk (availSub on fresh.length) -∗
@@ -480,14 +485,14 @@ theorem mappages_loop (W : WALK) [CurCtx]
     have hi : i < n := by omega
     have hlast : i + 1 = n := by omega
     have hni : n - i = 1 := by omega
-    iintro ⟨Hk, Hpc, #Hlk, Htree, Hav, HΦ⟩
-    iapply (mappages_iter W k γl γk perm va pa n hnoff hK hlk hvr hpr i hi t on hwf hnd hpgt
-      ?hb spie spp R h9 h18 h19 h20 h21 h22 cur) $$ [- $Hk $Hpc $Htree $Hav]
+    iintro ⟨Hk, Hpc, #Hlk, Htree, Hav, Hlend, HΦ⟩
+    iapply (mappages_iter W k γl γk perm va pa n hnoff hK hlk ke hvr hpr i hi t on hwf hnd hpgt
+      ?hb spie spp R h9 h18 h19 h20 h21 h22 cur) $$ [- $Hk $Hpc $Htree $Hav $Hlend]
     rotate_right 1
     iframe #
     case hb => simpa using hblock 0 (by omega)
     iapply wpNext_intro_pin
-    iintro %c6 %hp6 %spie2 %spp2 %R2 %fresh %pcv %hsp2 Hk Hpc Htree Hav %hpost
+    iintro %c6 %hp6 %spie2 %spp2 %R2 %fresh %pcv %hsp2 Hk Hpc Hlend Htree Hav %hpost
     obtain ⟨hcs, hsup, hfrnd, hfrpg, hrest⟩ := hpost
     ihave HΦ' := wpNext_at _ _ _ c6 _ hp6 $$ HΦ
     rw [hni]
@@ -501,7 +506,7 @@ theorem mappages_loop (W : WALK) [CurCtx]
           (BitVec.extractLsb' 12 44 pa + BitVec.ofNat 44 i) perm 1 fresh).2.2 = 1 := by
         rw [PtRun.mapRun_one t _ _ perm fresh hlen hcomp]
       ihave HΦ2 := HΦ' $$ %spie2 %spp2 %R2 %fresh %_
-      iapply HΦ2 $$ %hsp2 Hk Hpc Htree Hav
+      iapply HΦ2 $$ %hsp2 Hk Hpc Hlend Htree Hav
       ipureintro
       exact ⟨mpKept_of_calleeSaved hcs, hmf2, hfrnd, hfrpg, Or.inl ⟨rfl, hmf3⟩⟩
     · subst hpc
@@ -517,7 +522,7 @@ theorem mappages_loop (W : WALK) [CurCtx]
           (BitVec.extractLsb' 12 44 pa + BitVec.ofNat 44 i) perm 1 fresh).2.2 = 0 := by
         rw [PtRun.mapRun_fail t _ _ perm 0 fresh hnc]
       ihave HΦ2 := HΦ' $$ %spie2 %spp2 %R2 %fresh %_
-      iapply HΦ2 $$ %hsp2 Hk Hpc Htree Hav
+      iapply HΦ2 $$ %hsp2 Hk Hpc Hlend Htree Hav
       ipureintro
       exact ⟨mpKept_of_calleeSaved hcs, hmf2.trans hsup, hfrnd, hfrpg,
         Or.inr ⟨rfl, hm1, hzz, by rw [hmf3]; omega⟩⟩
@@ -525,14 +530,14 @@ theorem mappages_loop (W : WALK) [CurCtx]
     intro i hc t on hwf hnd hpgt hblock spie spp R h9 h18 h19 h20 h21 h22 h23 cur
     have hi : i < n := by omega
     have hlast : ¬ (i + 1 = n) := by omega
-    iintro ⟨Hk, Hpc, #Hlk, Htree, Hav, HΦ⟩
-    iapply (mappages_iter W k γl γk perm va pa n hnoff hK hlk hvr hpr i hi t on hwf hnd hpgt
-      ?hb spie spp R h9 h18 h19 h20 h21 h22 cur) $$ [- $Hk $Hpc $Htree $Hav]
+    iintro ⟨Hk, Hpc, #Hlk, Htree, Hav, Hlend, HΦ⟩
+    iapply (mappages_iter W k γl γk perm va pa n hnoff hK hlk ke hvr hpr i hi t on hwf hnd hpgt
+      ?hb spie spp R h9 h18 h19 h20 h21 h22 cur) $$ [- $Hk $Hpc $Htree $Hav $Hlend]
     rotate_right 1
     iframe #
     case hb => simpa using hblock 0 (by omega)
     iapply wpNext_intro_pin
-    iintro %c6 %hp6 %spie2 %spp2 %R2 %fresh %pcv %hsp2 Hk Hpc Htree Hav %hpost
+    iintro %c6 %hp6 %spie2 %spp2 %R2 %fresh %pcv %hsp2 Hk Hpc Hlend Htree Hav %hpost
     obtain ⟨hcs, hsup, hfrnd, hfrpg, hrest⟩ := hpost
     have hni : n - i = (n - (i + 1)) + 1 := by omega
     rcases hrest with ⟨hpc, hlen, hcomp⟩ | ⟨hpc, hm1, hzz, hnc⟩
@@ -556,7 +561,7 @@ theorem mappages_loop (W : WALK) [CurCtx]
         rw [hni, PtRun.mapRun_fail t _ _ perm (n - (i+1)) fresh hnc]
       ihave HΦ2 := HΦ' $$ %spie2 %spp2 %R2 %fresh %_
       rw [hmn1, hmf1]
-      iapply HΦ2 $$ %hsp2 Hk Hpc Htree Hav
+      iapply HΦ2 $$ %hsp2 Hk Hpc Hlend Htree Hav
       ipureintro
       exact ⟨mpKept_of_calleeSaved hcs, hmn2.trans hsup, hfrnd, hfrpg,
         Or.inr ⟨rfl, hm1, hzz, by rw [hmn3]; omega⟩⟩
@@ -640,11 +645,11 @@ theorem mappages_loop (W : WALK) [CurCtx]
         fun h => (hp8 h).trans ((hp7 h).trans (hp6 h))
       ihave HΦ := wpNext_shift _ _ _ _ _ hpin8 $$ HΦ
       iapply (ih (i + 1) (by omega) _ (availSub on fresh.length) hwf' hnd' hpgt' hblock' spie2 spp2 _
-        ?g9 ?g18 ?g19 ?g20 ?g21 ?g22 ?g23 c8) $$ [- $Hk $Hpc $Htree $Hav]
+        ?g9 ?g18 ?g19 ?g20 ?g21 ?g22 ?g23 c8) $$ [- $Hk $Hpc $Htree $Hav $Hlend]
       rotate_right 1
       · iframe #
         iapply wpNext_mono _ _ _ _ _ $$ HΦ
-        iintro %c9 HΦ %spie3 %spp3 %R3 %fresh2 %pcv3 %hsp3 Hk Hpc Htree Hav %hpost2
+        iintro %c9 HΦ %spie3 %spp3 %R3 %fresh2 %pcv3 %hsp3 Hk Hpc Hlend Htree Hav %hpost2
         obtain ⟨hkept3, hsup3, hnd3, hpg3, hrest3⟩ := hpost2
         ihave HΦ' := HΦ $$ %spie3 %spp3 %R3 %(fresh ++ fresh2) %pcv3
         have hmap : t.mapRun (vpnOf va + BitVec.ofNat 27 i)
@@ -705,7 +710,7 @@ theorem mappages_loop (W : WALK) [CurCtx]
           obtain ⟨e1, e2⟩ := hsp3 h
           rw [e1, e2]
           exact hsp2 h
-        iapply HΦ' $$ %hsp' Hk Hpc Htree Hav
+        iapply HΦ' $$ %hsp' Hk Hpc Hlend Htree Hav
         ipureintro
         refine ⟨mpKept_trans (mpKept_of_calleeSaved hcs) hkept3, hsup3, ?_, ?_, ?_⟩
         · refine List.nodup_append.mpr ⟨hfrnd, hnd3, ?_⟩
@@ -869,9 +874,8 @@ theorem mappages_any_proof (W : WALK) : MAPPAGES_ANY :=
   unfold wp_mappages_any_body
   simp only [mappagesAddr]
   iintro ⟨Hk, Hpc, #Hlk, Htree, Hav, Hlend, HΦ⟩
-  -- the lend (permit sweep L2): `walk` does not take it yet, so it is
-  -- framed through the continuation once, here
-  ihave HΦ := actLend_cont_frame_x _ _ _ _ _ _ _ _ _ $$ HΦ Hlend
+  -- the lend, in the shape the loop carries (passed to each `walk`)
+  ihave Hlend := actLend_ret_intro _ _ $$ Hlend
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   have hK10 : 10 ≤ k.avail := by omega
   have hvash : k.regs 11#5 <<< 52 = 0#64 := MachCSL.va_aligned _ hvaal
@@ -970,14 +974,14 @@ theorem mappages_any_proof (W : WALK) : MAPPAGES_ANY :=
     ((hp25 h).trans ((hp24 h).trans ((hp23 h).trans ((hp22 h).trans ((hp21 h).trans ((hp20 h).trans ((hp19 h).trans ((hp18 h).trans ((hp17 h).trans ((hp16 h).trans ((hp15 h).trans ((hp14 h).trans ((hp13 h).trans ((hp12 h).trans (hpin11 h)))))))))))))))
   -- the loop
   rw [Xv6.ua_pushed_spie_self k 10]
-  iapply (mappages_loop W k γl γk perm (k.regs 11#5) (k.regs 13#5) n hnoff hK hlk hrwx hvr hpr
+  iapply (mappages_loop W k γl γk perm (k.regs 11#5) (k.regs 13#5) n hnoff hK hlk ke hrwx hvr hpr
     (n - 1) 0 (by omega) t on hwf hnd hpgt ?hb k.spie k.spp _
-    ?g9 ?g18 ?g19 ?g20 ?g21 ?g22 ?g23 c25) $$ [- $Hk $Hpc $Htree $Hav]
+    ?g9 ?g18 ?g19 ?g20 ?g21 ?g22 ?g23 c25) $$ [- $Hk $Hpc $Htree $Hav $Hlend]
   rotate_right 1
   · iframe #
     -- the exit at 0x80001134, or the `return -1`, then the epilogue
     iapply wpNext_intro_pin
-    iintro %cE %hpE %spie2 %spp2 %R2 %fresh %pcv %hsp2 Hk Hpc Htree Hav %hpost
+    iintro %cE %hpE %spie2 %spp2 %R2 %fresh %pcv %hsp2 Hk Hpc Hlend Htree Hav %hpost
     obtain ⟨hkept, hsupF, hndF, hpgF, hrest⟩ := hpost
     have hk2 : R2 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFB0#64 := by
       have h := hkept.1
@@ -1021,7 +1025,7 @@ theorem mappages_any_proof (W : WALK) : MAPPAGES_ANY :=
       · iapply wpNext_mono _ _ _ _ _ $$ HΦ
         iintro %cX HΦ %spie3 %spp3 %R3 %hsp3 Hk Hpc Htree Hav %hpure
         simp only [Nat.sub_zero, MachCSL.add_ofNat_zero] at *
-        iapply HΦ $$ %spie3 %spp3 %R3 %fresh %hsp3 Hk Hpc Htree Hav
+        iapply HΦ $$ %spie3 %spp3 %R3 %fresh %hsp3 Hk Hpc Hlend Htree Hav
         ipureintro
         refine ⟨hpure.1, hsupF, hndF, hpgF, Or.inl ⟨?_, hfull⟩⟩
         have h10 := hpure.2
@@ -1045,7 +1049,7 @@ theorem mappages_any_proof (W : WALK) : MAPPAGES_ANY :=
       iapply wpNext_mono _ _ _ _ _ $$ HΦ
       iintro %cX HΦ %spie3 %spp3 %R3 %hsp3 Hk Hpc Htree Hav %hpure
       simp only [Nat.sub_zero, MachCSL.add_ofNat_zero] at *
-      iapply HΦ $$ %spie3 %spp3 %R3 %fresh %hsp3 Hk Hpc Htree Hav
+      iapply HΦ $$ %spie3 %spp3 %R3 %fresh %hsp3 Hk Hpc Hlend Htree Hav
       ipureintro
       exact ⟨hpure.1, hsupF, hndF, hpgF, Or.inr ⟨hpure.2.trans hm1, hlt, hzz⟩⟩
   case hb =>

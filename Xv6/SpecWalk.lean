@@ -16,12 +16,23 @@ either interrupt index (the exit as `kalloc`'s).  The function needs 22 of the
 caller's stack slots (its frame of 8, then `kalloc`'s 14) and returns
 them; the callee-saved registers are preserved.
 
+THE LEND (permit sweep L3a; no Rocq counterpart, Rocq never landed L3;
+design ni-strong-instance.md §7): the allocating contract takes the running
+proc's event-counter lend `actLend k.proc ke` and hands it back at a count
+no lower (`∃ k' ≥ ke`) right after the return pc; `kalloc` does not take it
+yet (L3b), so the proof frames it.  `[WchG GF]` joins its binders.  The
+non-allocating contract calls no allocator and takes nothing.
+
+Deviations from Rocq: L3a, no Rocq counterpart (Rocq's `wp_walk` takes no
+lend).
+
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
 import MachCSL.WpSmodeFrame
 import Xv6.PtOwn
 import Xv6.Image
 import Xv6.KallocDefs
+import Xv6.SlotGen
 
 namespace Xv6
 
@@ -38,17 +49,18 @@ def walkRet (t : PTree) (vpn : BitVec 27) (r : BitVec 64) : Prop :=
   (t.complete 2 vpn ∧ r = pteAddr (t.slot 2 vpn).1 (vpnIdx vpn 0))
 
 /-- The specification of `walk` with `alloc = 1`. -/
-def wp_walk_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
-    (cpu : CPU) (k : KCtx) (γl : GName) (γk : KmemNames) (on : Option Nat) (t : PTree)
+def wp_walk_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx]
+    (cpu : CPU) (k : KCtx) (γl : GName) (γk : KmemNames) (on : Option Nat) (t : PTree) (ke : Nat)
     (hnoff : k.noff + 1 < 2 ^ 31) (hK : 22 ≤ k.avail) (hlk : "kmem" ∉ k.locks)
     (hroot : k.regs 10#5 = pageAddr t.base) (hva : (k.regs 11#5).toNat < 2 ^ 38)
     (halloc : k.regs 12#5 = 1#64) (hwf : t.wfU 2) (hnd : t.pagesNodup 2)
     (hpg : ∀ b ∈ t.pages 2, pageValid (pageAddr b)) : Prop :=
   kctx cpu k ∗ pcIs cpu walkAddr ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
-  ptreeOwn 2 (DFrac.own 1) t ∗ kallocAvail γk on ∗
+  ptreeOwn 2 (DFrac.own 1) t ∗ kallocAvail γk on ∗ actLend k.proc ke ∗
   wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ (R' : RegMap) (fresh : List (BitVec 44)),
     ⌜k.sie = false → spie = k.spie ∧ spp = k.spp⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
+    (∃ k' : Nat, ⌜ke ≤ k'⌝ ∗ actLend k.proc k') -∗
     ptreeOwn 2 (DFrac.own 1) (t.fill 2 (vpnOf (k.regs 11#5)) fresh).1 -∗
     kallocAvail γk (availSub on fresh.length) -∗
     ⌜calleeSaved k.regs R' ∧
@@ -61,9 +73,9 @@ def wp_walk_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
 
 /-- The interface of `walk` (allocating). -/
 structure WALK : Prop where
-  wp_walk : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx] (cpu : CPU) (k : KCtx)
-    (γl : GName) (γk : KmemNames) (on : Option Nat) (t : PTree) hnoff hK hlk hroot hva halloc hwf hnd hpg,
-    wp_walk_body (hlc := hlc) (GF := GF) cpu k γl γk on t hnoff hK hlk hroot hva halloc hwf hnd hpg
+  wp_walk : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx] (cpu : CPU) (k : KCtx)
+    (γl : GName) (γk : KmemNames) (on : Option Nat) (t : PTree) (ke : Nat) hnoff hK hlk hroot hva halloc hwf hnd hpg,
+    wp_walk_body (hlc := hlc) (GF := GF) cpu k γl γk on t ke hnoff hK hlk hroot hva halloc hwf hnd hpg
 
 /-- The specification of `walk` with `alloc = 0`: no allocation, the tree
 (at any fraction) unchanged. -/

@@ -5,6 +5,10 @@ interfaces of `kalloc` and `memset`.
 `uvmcreate()` is `kalloc()` and, when that succeeded, `memset(page, 0, 4096)`:
 the zeroed page is an empty root node (`PTree.zeroNode`), owned whole
 (`ptreeOwn 2`).  Stated at either interrupt index, as `kalloc` is.
+
+THE LEND (permit sweep L3a, no Rocq counterpart): `kalloc` does not take
+it yet, so it is framed through the continuation once, at entry
+(`SlotGen.actLend_cont_frame`), and returns at `ke`.
 -/
 import Xv6.SpecUvmcreate
 import Xv6.SpecMemset
@@ -67,11 +71,13 @@ theorem uvmcreate_br_fffffffffffff944 : KA.«uvmcreate» + 0xfffffffffffff944#64
 set_option maxHeartbeats 4000000 in
 set_option maxRecDepth 100000 in
 theorem uvmcreate_proof (KAL : KALLOC) (MS : MEMSET) : UVMCREATE :=
-  ⟨fun {hlc GF} _ _ _ cpu k γl γk on hnoff hK hlk => by
+  ⟨fun {hlc GF} _ _ _ _ cpu k γl γk on ke hnoff hK hlk => by
   unfold wp_uvmcreate_body
   simp only [uvmcreateAddr]
   have hK' : 18 ≤ k.avail := hK
-  iintro ⟨Hk, Hpc, #Hlk, Hav, HΦ⟩
+  iintro ⟨Hk, Hpc, #Hlk, Hav, Hlend, HΦ⟩
+  -- the lend: `kalloc` does not take it yet, framed through
+  ihave HΦ := actLend_cont_frame _ _ _ _ _ _ _ _ _ $$ HΦ Hlend
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   k_norm_g
   -- the prologue

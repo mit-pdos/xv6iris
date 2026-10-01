@@ -640,3 +640,61 @@ those REQUIRE the permit and step it, the token-free led forms go, and the
 remaining boot contracts that reach kalloc (`kinit`, `freerange`,
 `virtio_disk_init`) take the `p = 0` premise; then T (the rows' `ev' = ev`
 and `ut_round_quiet`).
+
+### 7.5L L3a as landed in Lean (2026-10-01)
+
+Lean lane PJ-L3a, no Rocq counterpart (Rocq never landed L3).  11 files (10
+Lean + this note).  The three Spec files that moved: `SpecWalk`,
+`SpecFreewalk`, `SpecUvmcreate`.
+
+- **The remaining VM leaves take the lend** (`(ke : Nat)`, `actLend k.proc
+  ke` before the `wpNext`, `∃ k' ≥ ke` right after the return pc, `[WchG
+  GF]` joins the binders): `wp_walk_body` (the allocating `WALK`; the
+  non-allocating `WALK_NOALLOC` calls no allocator and is unchanged),
+  `wp_freewalk_body`, `wp_uvmcreate_body`, and their structure fields.
+  walk and uvmcreate frame it at entry (`actLend_cont_frame_x` /
+  `actLend_cont_frame`: `kalloc` does not take it until L3b); freewalk
+  threads it (below).
+- **freewalk's recursion passes it**: `FwAt` (the level-indexed contract
+  the induction proves) gains the binder and the lend; `freewalk_iter` /
+  `freewalk_loop` carry `∃ k1 ≥ ke`; the pointer arm lends the count in
+  hand to the child (`fw_rec_call` at `k1`) and composes its bound back
+  (`actLend_ret_weaken`); the tail frames it round `kfree` and the
+  epilogue (`actLend_cont_frame_ret`, `freewalk_tail` / `freewalk_epi`
+  unchanged).
+- **Real threading in the callers** (L2's frames removed): mappages
+  (`mp_walk_call` takes it; `mappages_iter` / `mappages_loop` carry `∃ k1
+  ≥ ke` and lend it to each `walk`; `mappages_any_proof` enters the loop
+  with `actLend_ret_intro` instead of framing at entry); uvmfree
+  (`uf_freewalk_call` takes it; `uvmfree_tail` carries `∃ k1 ≥ ke`, both
+  arms enter it with the lend -- the `sz = 0` arm at `ke`, the `sz > 0` arm
+  at what uvmunmap returned -- and frames it round its epilogue);
+  proc_pagetable (`pp_uvmcreate_call` takes it; uvmcreate is lent `ke`, the
+  first mappages the returned `k0`, every later bound composed through
+  `hk0`).
+- **Call-site inventory.**  `walk` (allocating): mappages only (copyout,
+  walkaddr, ismapped, uvmunmap, uvmcopy, uvmclear call `WALK_NOALLOC`).
+  `freewalk`: uvmfree and its own recursion.  `uvmcreate`: proc_pagetable
+  only.  The boot chain reaches walk through kvmmap -> mappages, already at
+  `p = 0` (L2's `actLend_of_zero`); no boot statement moved.
+- **Unchanged**: every other `wp_*` contract and Spec structure (in
+  particular `SpecMappages`, `SpecUvmfree`, `SpecProcPagetable`, `SpecKalloc`,
+  `SpecKfree`), every stage lemma outside the six Proof files, `SlotGen`,
+  all Link files.  No forced binder moves beyond the three Spec files'
+  `[WchG GF]`.
+
+Full `lake build Xv6 MachCSL` 2732 jobs, 0 errors; `lint.sh` all lints
+passed (layering ok, no `sorry`); `tcb.sh` exit 0 (no module entered);
+`audit.sh` PASS (baseline unchanged).
+
+What remains (L3b, L3c, T).  **L3b**: `kalloc` / `kfree` led forms take
+the lend and STEP it (`wp_kalloc_body` / `_led_body`, `wp_kfree_body` /
+`_led_body` / `wp_kfree_free_body`), the token-free led forms go, the
+plain forms survive only at `k.proc = 0` for the boot contracts (`kinit`,
+`freerange`, `virtio_disk_init`, the kvm chain), and every ring member that
+now frames the lend round an allocator call (walk, uvmcreate, freewalk's
+tail, uvmalloc, uvmcopy, uvmunmap, uvmdealloc, proc_freepagetable,
+allocproc, freeproc ...) passes it instead.  **L3c**: the four ledger
+appends require and step it -- allocproc's pid section (`PAlloc`),
+freeproc's (`PFree`), kwait's (`ZReap`), kexit's exit append (`ZExit`).
+**T**: the rows' `ev' = ev` on the non-ecall rows and `ut_round_quiet`.

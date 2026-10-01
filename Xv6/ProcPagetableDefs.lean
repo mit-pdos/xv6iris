@@ -6,7 +6,8 @@ addresses, and the call rules of the four user-memory callees
 
 The `mappages`, `uvmunmap` and `uvmfree` rules carry the callee's lend
 (permit sweep L2, Rocq 78f9234b8): `actLend k'.proc ke` in, `∃ k1 ≥ ke`
-back right after the return pc.
+back right after the return pc; so does the `uvmcreate` rule (permit sweep
+L3a, no Rocq counterpart).
 
 Imports only definitional and Spec files (never a `Code*`, `Proof*` or
 `Link*` file).
@@ -76,17 +77,18 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
 
 set_option maxHeartbeats 1000000 in
 /-- `uvmcreate`'s contract as a rule. -/
-theorem pp_uvmcreate_call (UC : UVMCREATE) [CurCtx] (c : CPU) (k' : KCtx)
-    (γl : GName) (γk : KmemNames) (on : Option Nat)
+theorem pp_uvmcreate_call [WchG GF] (UC : UVMCREATE) [CurCtx] (c : CPU) (k' : KCtx)
+    (γl : GName) (γk : KmemNames) (on : Option Nat) (ke : Nat)
     (hnoff : k'.noff + 1 < 2 ^ 31) (hK : uvmcreateSlots ≤ k'.avail) (hlk : "kmem" ∉ k'.locks) :
     kctx c k' ∗ pcIs c KA.«uvmcreate» ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
-    kallocAvail γk on ∗
+    kallocAvail γk on ∗ actLend k'.proc ke ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
       ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
+      (∃ k1 : Nat, ⌜ke ≤ k1⌝ ∗ actLend k'.proc k1) -∗
       uvmcreatePost γk on (R' 10#5) -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := UC.wp_uvmcreate (hlc := hlc) (GF := GF) c k' γl γk on hnoff hK hlk
+  have h := UC.wp_uvmcreate (hlc := hlc) (GF := GF) c k' γl γk on ke hnoff hK hlk
   unfold wp_uvmcreate_body at h
   simp only [uvmcreateAddr] at h
   exact h
