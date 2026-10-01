@@ -249,7 +249,7 @@ theorem sys_open_pub (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (k : KCtx) (
   ihave Hisl := (irefSlots_op nsj 1).2 $$ [$Hisl $Hiru]
   rw [hns]
   ispecialize Hpost $$ %c'
-  iapply Hpost $$ %spie' %spp' %R' %P2 %hcs %hP2 Hk Hpc Hte Hce Hbs Hisl
+  iapply Hpost $$ %spie' %spp' %R' %P2 %A.V.ev %hcs %hP2 %(Nat.le_refl _) Hk Hpc Hte Hce Hbs Hisl
   unfold openArmsPlain
   iframe Hfds
   iright

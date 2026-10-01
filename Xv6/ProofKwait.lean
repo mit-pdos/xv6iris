@@ -726,32 +726,35 @@ end
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
-/-- **The copy borrow** (Rocq `ProcInv.proc_priv_copy`, the cells-level
-twin of `ProcPrivAcc.procPrivFd_copy`): the two fields `copyout` reads and
-the address space it grows out, with the block's pure row; back at a
-descriptor that only grew under the same size (`UPtd.extSz`), `umBelow` and
-the lazy claim re-established here once.  `⟨curCtx, kpt⟩` is the ambient
-context, so these cells are `copyout`'s. -/
-theorem kw_priv_copy (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
+/-- **The copy borrow, with the event counter lent out beside it** (Rocq
+`ProcInv.proc_priv_copy_ev`, permit sweep L1b; the cells-level twin of
+`ProcPrivAcc.procPrivFd_copy`): the two fields `copyout` reads, the address
+space it grows out and the block's counter (copyout's lend), with the
+block's pure row; back at a descriptor that only grew under the same size
+(`UPtd.extSz`) and at whatever count came back, `umBelow` and the lazy
+claim re-established here once.  `⟨curCtx, kpt⟩` is the ambient context,
+so these cells are `copyout`'s. -/
+theorem kw_priv_copy_ev (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) :
     procPrivNoctxAt (GF := GF) curCtx pa pid V M ⊢
       ⌜V.sz.toNat ≤ uvmMaxsz ∧ umBelow V.sz V.upt ∧ V.pagetable = pageAddr V.upt.root ∧
          V.trapframe = pageAddr V.upt.tfp⌝ ∗
       @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pSz pa) 8 (DFrac.own 1) V.sz ∗
       @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPagetable pa) 8 (DFrac.own 1) V.pagetable ∗
-      @procPtAt hlc GF _ ⟨curCtx, KTier.kpt⟩ V.upt M ∗
-      (∀ (P' : UPtd) (M' : Nat → List (BitVec 8)),
+      @procPtAt hlc GF _ ⟨curCtx, KTier.kpt⟩ V.upt M ∗ actCnt pa V.ev ∗
+      (∀ (P' : UPtd) (M' : Nat → List (BitVec 8)) (k' : Nat),
         ⌜V.upt.extSz V.sz P'⌝ -∗
         (@wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pSz pa) 8 (DFrac.own 1) V.sz ∗
           @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPagetable pa) 8 (DFrac.own 1) V.pagetable ∗
           @procPtAt hlc GF _ ⟨curCtx, KTier.kpt⟩ P' M') -∗
-        procPrivNoctxAt curCtx pa pid { V with upt := P' } M') := by
+        actCnt pa k' -∗
+        procPrivNoctxAt curCtx pa pid { V.updEv k' with upt := P' } M') := by
   unfold procPrivNoctxAt procFieldsNoctx
   iintro ⟨%hf, Hpid, ⟨Hks, Hszc, Hpgc, Htfc, Hof, Hcwd, Hnm, Hsc⟩, Hspace, Htfp, %hlz, Hev⟩
   isplitl []
   · ipureintro; exact hf
-  iframe Hszc Hpgc Hspace
-  iintro %P' %M' %hext ⟨Hszc, Hpgc, Hspace⟩
+  iframe Hszc Hpgc Hspace Hev
+  iintro %P' %M' %k' %hext ⟨Hszc, Hpgc, Hspace⟩ Hev
   have htfp : P'.tfp = V.upt.tfp := hext.1.2.1
   ihave Htfp := (show @tfPageAt hlc GF _ ⟨curCtx, KTier.kpt⟩ V.upt.tfp V.tf ⊢
       @tfPageAt hlc GF _ ⟨curCtx, KTier.kpt⟩ P'.tfp V.tf from by rw [htfp]) $$ Htfp
@@ -850,16 +853,18 @@ set_option maxHeartbeats 1000000 in
 /-- `copyout`'s contract at its entry (folded to `0x800015c2`). -/
 theorem kw_copyout (CO : COPYOUT) (c : CPU) (k' : KCtx) (γl : GName) (γk : KmemNames)
     (P : UPtd) (M : Nat → List (BitVec 8)) (dqs : DFrac) (bs : List (BitVec 8))
+    (ke : Nat) (p : BitVec 64) (hp : k'.proc = p)
     (src dst : BitVec 64) (hsrc : k'.regs 13#5 = src) (hdst : k'.regs 12#5 = dst)
     (hnoff : k'.noff + 1 < 2 ^ 31) (hK : 52 ≤ k'.avail) (hlk : "kmem" ∉ k'.locks)
     (hroot : k'.regs 10#5 = pageAddr P.root) (hsz : (k'.regs 11#5).toNat ≤ 2 ^ 38)
     (hlen : k'.regs 14#5 = BitVec.ofNat 64 bs.length) (hlen' : bs.length < 2 ^ 63) :
     kctx c k' ∗ pcIs c KA.«copyout» ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
     kallocAvail γk none ∗ procPtAt P M ∗
-    byteBuf src dqs bs ∗
+    byteBuf src dqs bs ∗ actLend p ke ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
       ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
+      (∃ k1 : Nat, ⌜ke ≤ k1⌝ ∗ actLend p k1) -∗
       byteBuf src dqs bs -∗
       (∃ (P' : UPtd) (M' : Nat → List (BitVec 8)),
         ⌜P.extSz (k'.regs 11#5) P' ∧
@@ -871,8 +876,8 @@ theorem kw_copyout (CO : COPYOUT) (c : CPU) (k' : KCtx) (γl : GName) (γk : Kme
         procPtAt P' M') -∗
       ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  subst hsrc hdst
-  have h := CO.wp_copyout_nr (hlc := hlc) (GF := GF) c k' γl γk P M dqs bs hnoff hK hlk hroot hsz hlen hlen'
+  subst hsrc hdst hp
+  have h := CO.wp_copyout_nr (hlc := hlc) (GF := GF) c k' γl γk P M dqs bs ke hnoff hK hlk hroot hsz hlen hlen'
   unfold wp_copyout_nr_body at h
   simp only [copyoutAddr] at h
   exact h
@@ -1239,7 +1244,7 @@ theorem kw_reap (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE)
   -- Parameterised by the caller's (possibly grown) descriptor P', its memory M'', the count d
   -- and `xw` (the status word actually written).
   ihave Hcommon : (∀ (Rc : RegMap) (P' : UPtd) (M'' : Nat → List (BitVec 8))
-      (d : Nat),
+      (d : Nat) (kc : Nat),
       ⌜Rc 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFB0#64 ∧ Rc 9#5 = procAddr n ∧ Rc 18#5 = procAddr j ∧
         Rc 19#5 = BitVec.signExtend 64 pid0 ∧ Rc 22#5 = waitLockAddr ∧ Rc 24#5 = k.regs 24#5 ∧
         Rc 25#5 = k.regs 25#5 ∧ Rc 26#5 = k.regs 26#5 ∧ Rc 27#5 = k.regs 27#5 ∧
@@ -1257,16 +1262,18 @@ theorem kw_reap (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE)
       wordPointsTo (pPid (procAddr n)) 4 pidPub pid0 -∗
       killPaidAt (MachFixedGS.killCred (hlc := hlc) (GF := GF)) pid0 kl -∗
       procSlotsAt Γ curCtx (procAddr n) ZOMBIE -∗
-      procPrivNoctxAt curCtx (procAddr j) pid { V with upt := P' } M'' -∗
+      -- at the count copyout raised it to (permit sweep L1b)
+      ⌜V.ev ≤ kc⌝ -∗
+      procPrivNoctxAt curCtx (procAddr j) pid { V.updEv kc with upt := P' } M'' -∗
       trapCsrs cur -∗ cpuClaim cur k.proc -∗ intrRes cur -∗
       kwFrame (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)
         (k.regs 20#5) (k.regs 21#5) (k.regs 22#5) (k.regs 23#5) w9 -∗
       kwPost cpu k j pid V M cs -∗
       wpLoop cur) $$ []
   case' _ =>
-    iintro %Rc %P' %M'' %d
+    iintro %Rc %P' %M'' %d %kc
       %⟨hcsp, hc9, hc18, hc19, hc22, hc24, hc25, hc26, hc27, hext, hd, hans, hmap, hM⟩
-      Hk Hpc HlpC Hlockw Hwr Hwrest Hg Hstate Hpl Hchan Hkilled Hxs Hpid Hkp Hslots Hpriv Htc Hcl Hir
+      Hk Hpc HlpC Hlockw Hwr Hwrest Hg Hstate Hpl Hchan Hkilled Hxs Hpid Hkp Hslots %hkc Hpriv Htc Hcl Hir
       Hframe HΦ
     icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
     -- pp->parent := 0
@@ -1304,9 +1311,9 @@ theorem kw_reap (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE)
     -- THE REAPER'S EVENT COUNTER, lent to freeproc (permit sweep L1a): the
     -- reaper is the actor of the slot's release
     icases procPrivNoctxAt_evAcc (GF := GF) curCtx (procAddr j) pid _ _ $$ Hpriv with ⟨Hcnt, Hpback⟩
-    ihave Hlend := actLend_of_cnt (GF := GF) (procAddr j) V.ev $$ Hcnt
+    ihave Hlend := actLend_of_cnt (GF := GF) (procAddr j) kc $$ Hcnt
     iapply (kw_freeproc FP Γ cur _ γl γp γk n ZOMBIE ch pid0 Vf Mf gf hn ?hfp (Or.inr rfl)
-      ?hfnoff ?hfK ?hfsie ?hflk ?hflp ?hftier V.ev (procAddr j) ?hfpa)
+      ?hfnoff ?hfK ?hfsie ?hflk ?hflp ?hftier kc (procAddr j) ?hfpa)
       $$ [- $Hk $Hpc $Hlk $Hav $Hlp $Hheld $Hfin $Hfgen $Hlend]
     rotate_right 1
     · k_norm_g
@@ -1418,7 +1425,8 @@ theorem kw_reap (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE)
           k_norm_g [hpe2, hkbws, kwj_2226, kw_filter_wait,
             MachCSL.strip_locks (k.withSpie spie3 spp3) (by simp only [KCtx.withSpie_locks, hklocks0])]
           iapply (kw_epi Γ cpu cur k γw γp γl γk j pid V M cs hj hkproc (by omega) spie3 spp3 R5
-              pid0 xs d P' w9 hR5_2 hR5_19 hR5_24 hR5_25 hR5_26 hR5_27 hext hd hans hmap k2 hk2)
+              pid0 xs d P' w9 hR5_2 hR5_19 hR5_24 hR5_25 hR5_26 hR5_27 hext hd hans hmap k2
+              (Nat.le_trans hkc hk2))
             $$ [- $Hk $Hpc $Hframe $Hpriv $Hte $Hce $Hans $HΦ]
         case haddrw => k_norm_g
         case hsw => k_norm_g
@@ -1446,9 +1454,10 @@ theorem kw_reap (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE)
     ihave Hpc := (show pcIs (GF := GF) cur (if k.regs 10#5 = 0#64 then (KA.«kwait» + 0x60#64) else (KA.«kwait» + 0x48#64))
       ⊢ pcIs cur (KA.«kwait» + 0x60#64) from by rw [if_pos haddr]) $$ Hpc
     ihave HprivE := (show procPrivNoctxAt (GF := GF) curCtx (procAddr j) pid V M ⊢
-        procPrivNoctxAt curCtx (procAddr j) pid { V with upt := V.upt } M from .rfl) $$ Hpriv
-    iapply Hcommon $$ %(R2.set 19#5 (BitVec.signExtend 64 pid0)) %V.upt %M %0 []
-      Hk Hpc Hlockp Hlockw Hwr Hwrest Hg Hstate Hpl Hchan Hkilled Hxs Hpid Hkp Hslots HprivE Htc Hcl Hir
+        procPrivNoctxAt curCtx (procAddr j) pid { V.updEv V.ev with upt := V.upt } M from .rfl) $$ Hpriv
+    iapply Hcommon $$ %(R2.set 19#5 (BitVec.signExtend 64 pid0)) %V.upt %M %0 %V.ev []
+      Hk Hpc Hlockp Hlockw Hwr Hwrest Hg Hstate Hpl Hchan Hkilled Hxs Hpid Hkp Hslots
+      %(Nat.le_refl V.ev) HprivE Htc Hcl Hir
       Hframe HΦ
     · ipureintro
       refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, extSz_refl _ V.upt, by omega,
@@ -1467,7 +1476,9 @@ theorem kw_reap (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE)
     ihave Hpc := (show pcIs (GF := GF) cur
         (if k.regs 10#5 = 0#64 then (KA.«kwait» + 0x60#64) else (KA.«kwait» + 0x48#64)) ⊢ pcIs cur (KA.«kwait» + 0x48#64)
         from by rw [if_neg haddr]) $$ Hpc
-    icases kw_priv_copy (procAddr j) pid V M $$ Hpriv with ⟨%hpf, Hsz, Hpg, HptP, Hback⟩
+    icases kw_priv_copy_ev (procAddr j) pid V M $$ Hpriv with ⟨%hpf, Hsz, Hpg, HptP, Hcnt, Hback⟩
+    -- the lend (permit sweep L1b): the block's counter, borrowed for copyout
+    icases actLend_borrow (procAddr j) V.ev $$ Hcnt with ⟨Hlend, Hlback⟩
     ihave Hbytes := kw_word4_to_bytes (pXstate (procAddr n)) xsHalf xs
       (kw_pXstate_align4 n hn) $$ Hxs
     -- c.li a4,4
@@ -1495,13 +1506,14 @@ theorem kw_reap (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kwait_br_fffffffffffff366]
     iintro Hk Hpc
     -- copyout(p->pagetable, p->sz, addr, &pp->xstate, 4)
-    iapply (kw_copyout CO cur _ γl γk V.upt M xsHalf (xstateBytes xs)
+    iapply (kw_copyout CO cur _ γl γk V.upt M xsHalf (xstateBytes xs) V.ev (procAddr j) ?hcp
         (pXstate (procAddr n)) (k.regs 10#5) ?hsrc ?hdst
-        ?hcn ?hcK ?hclk ?hcroot ?hcsz ?hclen ?hclen') $$ [- $Hk $Hpc $Hlk $Hav $HptP $Hbytes]
+        ?hcn ?hcK ?hclk ?hcroot ?hcsz ?hclen ?hclen') $$ [- $Hk $Hpc $Hlk $Hav $HptP $Hbytes $Hlend]
     rotate_right 1
     · k_norm_g
       iapply wpNext_intro_pin
-      iintro %c2 %hpin2 %spieC %sppC %RC %hspC Hk Hpc Hbytes Hdisj %hcsC
+      iintro %c2 %hpin2 %spieC %sppC %RC %hspC Hk Hpc ⟨%kc1, %hkc1, Hlend⟩ Hbytes Hdisj %hcsC
+      icases Hlback $$ %kc1 %hkc1 Hlend with ⟨%kc2, %hkc2, Hcnt⟩
       -- copyout runs at sie=false, so it returns on the same hart
       have hc2 : c2 = cur := hpin2 (Or.inl (by simp only [KCtx.setReg_sie, KCtx.withLocks_sie,
         KCtx.withRegs_sie, KCtx.pushOffAt_sie]))
@@ -1558,12 +1570,13 @@ theorem kw_reap (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE)
         iintro Hk Hpc
         ihave Hxs := kw_bytes_to_word4 (pXstate (procAddr n)) xsHalf xs
           (kw_pXstate_align4 n hn) $$ Hbytes
-        ihave HprivE : procPrivNoctxAt curCtx (procAddr j) pid { V with upt := P' } M' $$ [Hsz Hpg HptP' Hback]
+        ihave HprivE : procPrivNoctxAt curCtx (procAddr j) pid { V.updEv kc2 with upt := P' } M'
+            $$ [Hsz Hpg HptP' Hback Hcnt]
         case' _ =>
-          iapply Hback $$ %P' %M' %hext'
+          iapply Hback $$ %P' %M' %kc2 %hext' [Hsz Hpg HptP'] Hcnt
           iframe Hsz Hpg HptP'
-        iapply Hcommon $$ %RC %P' %M' %(4 : Nat) []
-          Hk Hpc Hlockp Hlockw Hwr Hwrest Hg Hstate Hpl Hchan Hkilled Hxs Hpid Hkp Hslots HprivE Htc Hcl
+        iapply Hcommon $$ %RC %P' %M' %(4 : Nat) %kc2 []
+          Hk Hpc Hlockp Hlockw Hwr Hwrest Hg Hstate Hpl Hchan Hkilled Hxs Hpid Hkp Hslots %hkc2 HprivE Htc Hcl
           Hir Hframe HΦ
         · ipureintro
           refine ⟨hRC2, hRC9, hRC18, hRC19, hRC22, hRC24, hRC25, hRC26, hRC27, hext', by omega,
@@ -1586,11 +1599,11 @@ theorem kw_reap (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE)
         ihave Hpay := kw_wait_pay_intro curCtx parents $$ [Hwr Hwrest]
         · iframe Hwr Hwrest
         -- the grown parent priv-ext for the epilogue
-        ihave HprivE : procPrivNoctxAt curCtx (procAddr j) pid { V with upt := P' }
+        ihave HprivE : procPrivNoctxAt curCtx (procAddr j) pid { V.updEv kc2 with upt := P' }
             (umemWrite (viewFaulted V.upt P' M) (k.regs 10#5).toNat ((xstateBytes xs).take dd))
-            $$ [Hsz Hpg HptP' Hback]
+            $$ [Hsz Hpg HptP' Hback Hcnt]
         case' _ =>
-          iapply Hback $$ %P' %_ %hext'
+          iapply Hback $$ %P' %_ %kc2 %hext' [Hsz Hpg HptP'] Hcnt
           iframe Hsz Hpg HptP'
         -- concrete-kb field facts (needed for the balanced releases)
         have hkbn : kb.noff = 0 := by
@@ -1701,7 +1714,7 @@ theorem kw_reap (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE)
               · iexact Hg
             iapply (kw_epi Γ cpu c7 k γw γp γl γk j pid V M cs hj hkproc (by omega) spie2 spp2
                 (R5.set 19#5 18446744073709551615#64) (-1#32) xs dd P' w9 ?heR2 ?heS3 ?heH24 ?heH25 ?heH26 ?heH27
-                hext' ?heD ?heAns hmapC V.ev (Nat.le_refl _)) $$ [- $Hk $Hpc $Hframe $HprivE $Hte $Hce $Hans $HΦ]
+                hext' ?heD ?heAns hmapC kc2 hkc2) $$ [- $Hk $Hpc $Hframe $HprivE $Hte $Hce $Hans $HΦ]
             case heR2 =>
               simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact hR5_2
             case heS3 =>
@@ -1728,6 +1741,7 @@ theorem kw_reap (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE)
         case hrKp => k_norm_g; omega
         case hrrp => k_norm_g; simp [hkhnoff]
         case hrop => simp
+    case hcp => k_norm_g; first | exact hkproc | (rw [hkhproc]; exact hkproc) | exact hkhproc
     case hsrc => k_norm_g; exact kw_pXstate (procAddr n)
     case hdst => k_norm_g
     case hcn => k_norm_g; omega

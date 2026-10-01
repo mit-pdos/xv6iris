@@ -121,7 +121,7 @@ theorem srd_fail_arm (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : Bi
   have hm1 : R' 10#5 = 0xFFFFFFFFFFFFFFFF#64 := by
     rw [h10']; try simp only [RegMap.set_apply, BitVec.reduceEq, ite_true]
   unfold sysReadPost
-  iapply HΦ $$ %c' %spie %spp %R' %V.upt %M %0 [] Hk Hpc Hte Hce Hblk Hfr Hfso [HP]
+  iapply HΦ $$ %c' %spie %spp %R' %V.upt %M %0 %V.ev [] Hk Hpc Hte Hce %(Nat.le_refl V.ev) Hblk Hfr Hfso [HP]
   · ipureintro
     refine ⟨hcs, UMemL.extSz_refl _ _, by omega, Or.inr (by rw [hm1]; decide),
       UMemL.umemWrote_refl _ _ _⟩
@@ -143,12 +143,13 @@ theorem srd_ok_back (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : Bit
     (hkk : kk < NFILE) (hst : st ≠ .closed) (hsts : sts[fd0]? = some st)
     (hext : V.upt.extSz V.sz P') (hd : (d : Int) ≤ max 0 (argZ v2))
     (hr10 : R 10#5 = BitVec.ofNat 64 d ∨ R 10#5 = -1#64) (hwin : umemWrote V.upt M v1 d P' M')
-    (hal : (k.regs 2#5 + 0xFFFFFFFFFFFFFFE0#64).toNat % 8 = 0) (a1 : BitVec 64) (ha1 : a1 = v1) :
+    (hal : (k.regs 2#5 + 0xFFFFFFFFFFFFFFE0#64).toNat % 8 = 0) (a1 : BitVec 64) (ha1 : a1 = v1)
+    (kv : Nat) (hkv : V.ev ≤ kv) :
     kctx cpu (((k.withSpie spie spp).pushed 6).withRegs R) ∗
     pcIs cpu (KA.«sys_read» + 0x40#64) ∗
     srdCells (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) wf lo hi wp ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    procPrivCoreNoctxAt curCtx (procAddr j) pid { V with upt := P' } M' ∗
+    procPrivCoreNoctxAt curCtx (procAddr j) pid { V.updEv kv with upt := P' } M' ∗
     procOfilesOwe γ V.fdg (procAddr j) V.ofile [fd0] ∗
     fileRef γ kk q st ∗ fdStAuth V.fdg fd0 st ∗ fdFrags V.fdg sts ∗
     filereadEnvOut (hlc := hlc) st ∗ (filereadEnvOut (hlc := hlc) st -∗ filereadFsOut) ∗
@@ -170,9 +171,9 @@ theorem srd_ok_back (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : Bit
   iintro %c' %R' %⟨hcs, h10⟩ Hk Hpc Hte Hce
   unfold sysReadPost
   rw [← h10] at hr10
-  iapply HΦ $$ %c' %spie %spp %R' %P' %M' %d [] Hk Hpc Hte Hce [Hcore Howe] Hfr Hfso [Harms]
+  iapply HΦ $$ %c' %spie %spp %R' %P' %M' %d %kv [] Hk Hpc Hte Hce %hkv [Hcore Howe] Hfr Hfso [Harms]
   · ipureintro; exact ⟨hcs, hext, hd, hr10, hwin⟩
-  · iapply (procPrivFd_split γ (procAddr j) pid { V with upt := P' } M').2
+  · iapply (procPrivFd_split γ (procAddr j) pid { V.updEv kv with upt := P' } M').2
     iframe Hcore Howe
   · rw [h10]; iexact Harms
 
@@ -248,8 +249,8 @@ theorem srd_ok_jal (FR : FILEREAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ
   -- ===== back from fileread (at any hart) =====
   iintro %cpu
   unfold filereadPost
-  iintro %spie3 %spp3 %R3 %P' %M' %d %⟨hcs3, hext, hdle, hr10, hwin⟩ Hk Hpc Hte Hce Href Hcore
-    Henvo Harms
+  iintro %spie3 %spp3 %R3 %P' %M' %d %kv %⟨hcs3, hext, hdle, hr10, hwin⟩ Hk Hpc Hte Hce Href %hkv
+    Hcore Henvo Harms
   k_norm_g [srd_ret_40, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed, MachCSL.KCtx.withSpie_withRegs]
   k_norm_g [h11] at hwin
   have hr5 : srdRegs k R3 := by
@@ -257,7 +258,7 @@ theorem srd_ok_jal (FR : FILEREAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ
     repeat (refine srdRegs_set _ _ _ _ ?_ (by decide))
     exact hr
   iapply (srd_ok_back cpu k γ j pid V M sts v v1 v2 F Rd Rin Rp Rpe P spie3 spp3 R3 fd0 kk q st P' M' d wf wp
-      lo hi hK6 hr5 ht0 hsome hfv hkk hst hsts hext hdle hr10 hwin hal _ h11)
+      lo hi hK6 hr5 ht0 hsome hfv hkk hst hsts hext hdle hr10 hwin hal _ h11 kv hkv)
     $$ [$Hk $Hpc $Hcells $Hte $Hce $Hcore $Howe $Href $Hauth $Hfr $Henvo $Henvb $Harms $HΦ]
 
 set_option maxHeartbeats 16000000 in

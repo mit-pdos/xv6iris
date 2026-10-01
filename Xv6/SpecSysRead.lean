@@ -216,12 +216,16 @@ def sysReadPost (k : KCtx) (γ : FileNames) (j : Nat) (pid : BitVec 32) (V : Pro
     (Rin : List (List Obs × BitVec 8) → IProp GF)
     (Rp : List (BitVec 8) → IProp GF) (Rpe : List (BitVec 8) → PipeSt → IProp GF) (P : IProp GF)
     (cpu' : CPU) : IProp GF :=
-  iprop(∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd) (M' : Nat → List (BitVec 8)) (d : Nat),
+  iprop(∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd) (M' : Nat → List (BitVec 8)) (d : Nat)
+      (k' : Nat),
     ⌜calleeSaved k.regs R' ∧ V.upt.extSz V.sz P' ∧ (d : Int) ≤ max 0 (argZ v2) ∧
       (R' 10#5 = BitVec.ofNat 64 d ∨ R' 10#5 = -1#64) ∧ umemWrote V.upt M v1 d P' M'⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
-    procPrivFd γ (procAddr j) pid { V with upt := P' } M' -∗
+    -- THE EVENT COUNTER (permit sweep L1b): fileread's copies take the
+    -- block's counter as their lend and may step it
+    ⌜V.ev ≤ k'⌝ -∗
+    procPrivFd γ (procAddr j) pid { V.updEv k' with upt := P' } M' -∗
     fdFrags V.fdg sts -∗ filereadFsOut -∗
     sysReadArms (hlc := hlc) V v sts (argZ v2) F Rd Rin Rp Rpe P (R' 10#5) M' v1 -∗ wpLoop cpu')
 

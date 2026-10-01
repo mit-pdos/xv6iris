@@ -1311,10 +1311,13 @@ theorem cstr_loop (WA : WALKADDR) (VF : VMFAULT) [Xv6G GF] [CurCtx]
 set_option maxHeartbeats 4000000 in
 /-- **`copyinstr` meets its specification.** -/
 theorem copyinstr_proof (WA : WALKADDR) (VF : VMFAULT) : COPYINSTR :=
-  ⟨fun {hlc GF} _ _ _ cpu k γl γk P M old hnoff hK hlk hroot hsz hmax hmax' => by
+  ⟨fun {hlc GF} _ _ _ _ cpu k γl γk P M old ke hnoff hK hlk hroot hsz hmax hmax' => by
   unfold wp_copyinstr_body
   simp only [copyinstrAddr]
-  iintro ⟨Hk, Hpc, #Hlk, #Hav, HP, Hdst, HΦ⟩
+  iintro ⟨Hk, Hpc, #Hlk, #Hav, HP, Hdst, Hlend, HΦ⟩
+  -- the lend (permit sweep L1b): no callee takes it yet, so it is framed
+  -- through the continuation once, here
+  ihave HΦ := actLend_cont_frame _ _ _ _ _ _ _ _ _ $$ HΦ Hlend
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   by_cases hnil : old.length = 0
   · -- max is 0: return -1 immediately

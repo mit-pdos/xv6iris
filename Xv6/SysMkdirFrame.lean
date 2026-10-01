@@ -34,6 +34,10 @@ path[128]` at `sp0-144`.  The buffer is a `byteBuf` list
    the slots↔bytes carve are the shared `Xv6/SysfileCalls.lean` helpers
    (`Xv6.kxc_stackOwn_byteBuf`, `sysfile_buf_split` / `_join`); the fold is the
    landed `KstackMap.byteBuf_stackOwn`.
+4. THE EVENT COUNTER (permit sweep L1b, Rocq b69bd0fab): argstr hands the
+   block back at a raised count `kv`; the run below argstr is at the record
+   `A.raise kv` (`SysMkdirArgs.raise`), the contract's continuation moved
+   there by `sysMkdirK_raise`; the exit reads it at the count it came in at.
 -/
 import Xv6.SysfileCalls
 import Xv6.SpecSysMkdir
@@ -323,6 +327,26 @@ abbrev sysMkdirPostA (k : KCtx) (A : SysMkdirArgs GF) (c : CPU) : IProp GF :=
   sysMkdirK (hlc := hlc) k A.γ (procAddr A.j) A.pid A.V A.M A.ns A.v.toNat A.P A.Pmiss A.Farm
     A.Fdots A.Fun A.Fok A.Fex c
 
+/-- THE RECORD AT A RAISED COUNT (permit sweep L1b, deviation 4): argstr
+hands the block back at `A.V.updEv kv`. -/
+abbrev SysMkdirArgs.raise (A : SysMkdirArgs GF) (kv : Nat) : SysMkdirArgs GF :=
+  { A with V := A.V.updEv kv }
+
+/-- The contract's continuation at a raised count (deviation 4): it takes
+any count at least `V.ev`, so any count at least `kv`. -/
+theorem sysMkdirK_raise (k : KCtx) (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32)
+    (V : ProcPriv) (M : Nat → List (BitVec 8)) (ns pv : Nat) (P Pmiss : Nat → Nat → IProp GF)
+    (Farm : Pfam GF (Aview → Nat → IProp GF))
+    (Fdots : Pfam GF (Aview → Nat → Nat → Bool → IProp GF))
+    (Fun : Pfam GF (Aview → Nat → IProp GF))
+    (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) (c : CPU) (kv : Nat)
+    (hkv : V.ev ≤ kv) :
+    sysMkdirK (hlc := hlc) k γ pa pid V M ns pv P Pmiss Farm Fdots Fun Fok Fex c ⊢
+      sysMkdirK (hlc := hlc) k γ pa pid (V.updEv kv) M ns pv P Pmiss Farm Fdots Fun Fok Fex c := by
+  unfold sysMkdirK
+  iintro H %spie %spp %R' %P' %k' %hcs %hext %hk'
+  iapply H $$ %spie %spp %R' %P' %k' %hcs %hext %(Nat.le_trans hkv hk')
+
 /-- The block after argstr: the page table grown to `P2` and the view
 faulted (argstr's post). -/
 abbrev sysMkdirV1 (A : SysMkdirArgs GF) (P2 : UPtd) : ProcPriv := { A.V with upt := P2 }
@@ -394,7 +418,7 @@ theorem sys_mkdir_exit (cpu : CPU) (k : KCtx) (A : SysMkdirArgs GF)
   ihave %hret := mkdirArms_ret (hlc := hlc) _ _ _ _ _ _ _ _ _ _ _ _ _ $$ Harms
   ispecialize HΦ $$ %c
   unfold sysMkdirPostA sysMkdirK
-  iapply HΦ $$ %spie %spp %_ %P' %hcs %hP' Hk Hpc Hte Hce Hbs Hir Hblk [] [Harms]
+  iapply HΦ $$ %spie %spp %_ %P' %A.V.ev %hcs %hP' %(Nat.le_refl _) Hk Hpc Hte Hce Hbs Hir Hblk [] [Harms]
   · ipureintro
     simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
     exact hret

@@ -197,13 +197,14 @@ theorem sys_open_split_create (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (k 
 theorem sys_open_plain (AI : ARGINT) (AS : ARGSTR) (BO : BEGIN_OP) (Γ : SchedNames)
     [ClaimIs (hlc := hlc) GF Γ] (cpu : CPU) (k : KCtx) (A : SysOpenArgs GF)
     (hS : SysOpenStatic k A)
-    (hEN : ⊢ sysOpenEntryNBody (hlc := hlc) Γ k A) (hc : omCreate A.vom = false) :
+    (hEN : ∀ kv : Nat, ⊢ sysOpenEntryNBody (hlc := hlc) Γ k (A.raise kv))
+    (hc : omCreate A.vom = false) :
     wp_sys_open_plain_eb_body (hlc := hlc) A.omo Γ cpu k A.γl A.γ A.j A.ns A.v A.vom A.pid A.V A.M
       A.sts A.P A.Pmiss A.Fo A.Ft hS.hj hS.hproc hS.htier hS.hnoff hS.hK hS.hns hS.hv0 hS.hv1
       hc := by
   unfold wp_sys_open_plain_eb_body wp_sys_open_frame
   exact sys_open_entry AI AS BO Γ cpu k A hS _ _ (sys_open_arm0_plain A)
-    (sys_open_split_plain Γ k A hc hEN)
+    (fun kv => sys_open_split_plain Γ k (A.raise kv) hc (hEN kv))
 
 /-- **THE O_CREATE ARM** (Rocq `ProofSysOpenFull.wp_sys_open_create`, its
 entry half): `SpecSysOpen.wp_sys_open_create_eb_body` at the record `A`,
@@ -213,14 +214,14 @@ theorem sys_open_create (AI : ARGINT) (AS : ARGSTR) (BO : BEGIN_OP) (Γ : SchedN
     (Farm Fun : Pfam GF (Aview → Nat → IProp GF))
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
     (hS : SysOpenStatic k A)
-    (hEC : ⊢ sysOpenEntryCBody (hlc := hlc) Γ k A Farm Fun Fok Fex)
+    (hEC : ∀ kv : Nat, ⊢ sysOpenEntryCBody (hlc := hlc) Γ k (A.raise kv) Farm Fun Fok Fex)
     (hc : omCreate A.vom = true) :
     wp_sys_open_create_eb_body (hlc := hlc) A.omo Γ cpu k A.γl A.γ A.j A.ns A.v A.vom A.pid A.V A.M
       A.sts A.P A.Pmiss Farm Fun Fok Fex A.Fo A.Ft hS.hj hS.hproc hS.htier hS.hnoff hS.hK hS.hns
       hS.hv0 hS.hv1 hc := by
   unfold wp_sys_open_create_eb_body wp_sys_open_frame
   exact sys_open_entry AI AS BO Γ cpu k A hS _ _ (sys_open_arm0_create A Farm Fun Fok Fex)
-    (sys_open_split_create Γ k A Farm Fun Fok Fex hc hEC)
+    (fun kv => sys_open_split_create Γ k (A.raise kv) Farm Fun Fok Fex hc (hEC kv))
 
 end
 

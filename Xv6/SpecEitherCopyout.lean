@@ -36,6 +36,12 @@ AND THE FAILING EXIT CARRIES ITS REASON (Rocq `either_copyout_post`'s user
 wrapped address `dst + d`, is not writable (`uvaWmapped`) at the descriptor
 `P` the call was handed.
 
+THE EVENT COUNTER (permit sweep L1b, Rocq b69bd0fab; design
+ni-strong-instance.md §7.3): the USER arm lends the block's counter to the
+copy, which may step it, so the block comes back at a count at least the
+one it left at (`∃ k' ≥ V.ev`, the record at `V.updEv k'`).  The kernel arm
+lends nothing.
+
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
 import Xv6.EitherDefs
@@ -72,7 +78,7 @@ def wp_either_copyout_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     byteBuf (k.regs 12#5) dqs bs -∗
     (if user then
-      (∃ (P' : UPtd) (M' : Nat → List (BitVec 8)),
+      (∃ (P' : UPtd) (M' : Nat → List (BitVec 8)) (k' : Nat),
         ⌜P.extSz V.sz P' ∧
           ((R' 10#5 = 0#64 ∧ M' = umemWrite (viewFaulted P P' M) (k.regs 11#5).toNat bs ∧
             umMapped P' (k.regs 11#5).toNat bs.length) ∨
@@ -80,7 +86,7 @@ def wp_either_copyout_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
               M' = umemWrite (viewFaulted P P' M) (k.regs 11#5).toNat (bs.take d) ∧
               umMapped P' (k.regs 11#5).toNat d ∧
               ¬ uvaWmapped P (k.regs 11#5 + BitVec.ofNat 64 d).toNat))⌝ ∗
-        procPrivExt (procAddr j) pid V P' M')
+        ⌜V.ev ≤ k'⌝ ∗ procPrivExt (procAddr j) pid (V.updEv k') P' M')
      else ⌜R' 10#5 = 0#64⌝ ∗ byteBuf (k.regs 11#5) (DFrac.own 1) bs) -∗
     ⌜calleeSaved k.regs R'⌝ -∗ wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu

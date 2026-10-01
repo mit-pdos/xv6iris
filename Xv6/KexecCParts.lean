@@ -520,7 +520,7 @@ theorem kxcC_call_copyout (Γ : SchedNames) (CO : COPYOUT) (cpu : CPU) (k : KCtx
     (spie spp : Bool) (R : RegMap)
     (X : BitVec 64) (imm : BitVec 21) (hX : X + BitVec.signExtend 64 imm = KA.«copyout»)
     (hret : jumpPc (X + 4#64) = X + 4#64) (P : UPtd) (M : Nat → List (BitVec 8))
-    (dqs : DFrac) (bs : List (BitVec 8)) (src : BitVec 64)
+    (dqs : DFrac) (bs : List (BitVec 8)) (src : BitVec 64) (ke : Nat)
     (hK : kexecSlots ≤ k.avail) (hnoff : k.noff = 0) (hsrc : R 13#5 = src)
     (hroot : R 10#5 = pageAddr P.root) (hsz : (R 11#5).toNat ≤ 2 ^ 38)
     (hlen : R 14#5 = BitVec.ofNat 64 bs.length) (hlen' : bs.length < 2 ^ 63) :
@@ -528,17 +528,19 @@ theorem kxcC_call_copyout (Γ : SchedNames) (CO : COPYOUT) (cpu : CPU) (k : KCtx
     kctx cpu (((k.withSpie spie spp).pushed 68).withRegs R) ∗ pcIs cpu X ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     fsFabric (hlc := hlc) Γ A.pd A.pav A.pu ∗ procPtAt P M ∗ byteBuf src dqs bs ∗
+    actLend k.proc ke ∗
     (∀ (c : CPU) (spie' spp' : Bool) (R' : RegMap) (P' : UPtd) (M' : Nat → List (BitVec 8)),
       ⌜calleeSaved (R.set 1#5 (X + 4#64)) R' ∧ P.extSz (R 11#5) P' ∧
         ((R' 10#5 = 0#64 ∧ M' = umemWrite (viewFaulted P P' M) (R 12#5).toNat bs) ∨
          R' 10#5 = -1#64)⌝ -∗
       kctx c (((k.withSpie spie' spp').pushed 68).withRegs R') -∗ pcIs c (X + 4#64) -∗
       trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗
+      (∃ k1 : Nat, ⌜ke ≤ k1⌝ ∗ actLend k.proc k1) -∗
       byteBuf src dqs bs -∗ procPtAt P' M' -∗ wpLoop c)
     ⊢ wpLoop (GF := GF) cpu := by
   have hK' : 52 ≤ k.avail - 68 := by rw [kxc_slots_val] at hK; omega
   subst hsrc
-  iintro ⟨#Hi, Hk, Hpc, Hte, Hce, #Hfab, Hpt, Hb, HK⟩
+  iintro ⟨#Hi, Hk, Hpc, Hte, Hce, #Hfab, Hpt, Hb, Hlend, HK⟩
   icases fsFabric_all Γ A.pd A.pav A.pu $$ Hfab with
     ⟨⟨-, -, -, -, -, -, -, -, #Hkl, #Hav, -, -, -⟩, -, -, -, -⟩
   icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩
@@ -550,7 +552,7 @@ theorem kxcC_call_copyout (Γ : SchedNames) (CO : COPYOUT) (cpu : CPU) (k : KCtx
   iintro Hk Hpc
   have h := CO.wp_copyout (hlc := hlc) (GF := GF) cpu
     ((((k.withSpie spie spp).pushed 68).withRegs R).setReg 1#5 (X + 4#64)) fscKalloc fsReadyKmem P M
-    dqs bs (by k_norm_g; omega) (by k_norm_g; exact hK') (by k_norm_g; simp [hlocks])
+    dqs bs ke (by k_norm_g; omega) (by k_norm_g; exact hK') (by k_norm_g; simp [hlocks])
     (by k_norm_g; simp [RegMap.set_apply, hroot]) (by k_norm_g; simpa [RegMap.set_apply] using hsz)
     (by k_norm_g; simpa [RegMap.set_apply] using hlen) hlen'
   unfold wp_copyout_body at h
@@ -561,7 +563,7 @@ theorem kxcC_call_copyout (Γ : SchedNames) (CO : COPYOUT) (cpu : CPU) (k : KCtx
   iframe
   iframe #
   iapply wpNext_intro_pin
-  iintro %c %hpin %spie' %spp' %R' %_ Hk Hpc Hb ⟨%P', %M', %hw, Hpt⟩ %hcs
+  iintro %c %hpin %spie' %spp' %R' %_ Hk Hpc Hlend Hb ⟨%P', %M', %hw, Hpt⟩ %hcs
   have hpin' : k.sie = false → c = cpu := fun h => hpin (Or.inl (by k_norm_g; exact h))
   ihave Hte := trapCsrsExt_move _ _ _ hpin' $$ Hte
   ihave Hce := cpuClaimExt_move _ _ _ _ hpin' $$ Hce
@@ -569,7 +571,7 @@ theorem kxcC_call_copyout (Γ : SchedNames) (CO : COPYOUT) (cpu : CPU) (k : KCtx
   ihave Hk := kctx_eq_mono c _ (((k.withSpie spie' spp').pushed 68).withRegs R')
     (kxc_ctx_ret k spie spp spie' spp' R') $$ Hk
   try simp only [RegMap.set_apply, BitVec.reduceEq, ite_false] at hw
-  iapply HK $$ %c %spie' %spp' %R' %P' %M' [] Hk Hpc Hte Hce Hb Hpt
+  iapply HK $$ %c %spie' %spp' %R' %P' %M' [] Hk Hpc Hte Hce Hlend Hb Hpt
   ipureintro
   refine ⟨by simpa using hcs, hw.1, ?_⟩
   rcases hw.2 with ⟨h0, hM, -⟩ | ⟨h1, -⟩

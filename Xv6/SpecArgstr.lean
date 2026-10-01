@@ -29,6 +29,9 @@ buffer holds the process's NUL-terminated string at `v`, read at the ENTRY
 image with its lazy pages zeroed (Rocq's `us_M`, `SpecFetchstr`), and `a0`
 is its length, or `a0 = -1`.  (`Xv6/ArgPath.lean`'s `argPathOf_umemStr` turns the
 success arm into the syscall's `argPathOf`.)
+
+THE EVENT COUNTER (permit sweep L1b, Rocq b69bd0fab): fetchstr's raised
+count, relayed (`∃ k' ≥ V.ev`, the block at `{ V.updEv k' with upt := P' }`).
 -/
 import Xv6.SpecFetchstr
 import Xv6.SpecArgraw
@@ -59,9 +62,9 @@ def wp_argstr_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G G
   wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
     ⌜k.sie = false → spie = k.spie ∧ spp = k.spp⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
-    (∃ (P' : UPtd) (bs : List (BitVec 8)),
+    (∃ (P' : UPtd) (bs : List (BitVec 8)) (k' : Nat),
       ⌜V.upt.extSz V.sz P' ∧ fetchstrRet (viewLazy V.upt V.sz M) v.toNat old bs (R' 10#5)⌝ ∗
-      procPrivBareAt curCtx pa pid { V with upt := P' } (viewFaulted V.upt P' M) ∗
+      ⌜V.ev ≤ k'⌝ ∗ procPrivBareAt curCtx pa pid { V.updEv k' with upt := P' } (viewFaulted V.upt P' M) ∗
       byteBuf (k.regs 11#5) (DFrac.own 1) bs) -∗
     ⌜calleeSaved k.regs R'⌝ -∗ wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu

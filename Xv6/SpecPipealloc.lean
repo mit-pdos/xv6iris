@@ -75,7 +75,14 @@ def pipeallocPost {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF
 eb-generic at depth 0: the trap-CSR complement, the running thread's pid
 cell and fileclose's iref loan are PASS-THROUGHS, in and straight back out
 (the two files the error paths close are untyped, `filecloseEnv_none`, but
-fileclose's crossing is `true` on every arm, so pipealloc's is too). -/
+fileclose's crossing is `true` on every arm, so pipealloc's is too).
+
+THE EVENT COUNTER IS A LEND, NOT THE BLOCK (permit sweep L1b, Rocq
+b69bd0fab; `SpecFileclose` deviation 8): Rocq's pipealloc holds
+`proc_priv_bare` and hands it back at a raised count (its error paths lend
+the counter to fileclose).  Lean's holds only the pid cell, so it is a
+BLOCK-LESS contract and takes the lend itself: `actLend k.proc ke` in, `∃ k'
+≥ ke` back right after the return pc. -/
 def wp_pipealloc_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
@@ -83,7 +90,7 @@ def wp_pipealloc_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (γ : FileNames)
     (γkl : GName) (γk : KmemNames) (on : Option Nat) (v0 v1 : BitVec 64)
-    (pidv : BitVec 32) (dqp : DFrac)
+    (pidv : BitVec 32) (dqp : DFrac) (ke : Nat)
     (hK : pipeallocSlots ≤ k.avail) (hnoff : k.noff = 0) (htier : k.tier = KTier.kpt) : Prop :=
   kctx cpu k ∗ pcIs cpu pipeallocAddr ∗
   trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
@@ -91,10 +98,11 @@ def wp_pipealloc_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
   isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk on ∗
   fdSlot ∗ fdSlot ∗
   wordPointsTo (k.regs 10#5) 8 (DFrac.own 1) v0 ∗ wordPointsTo (k.regs 11#5) 8 (DFrac.own 1) v1 ∗
-  wordPointsTo (pPid k.proc) 4 dqp pidv ∗ irefSlot ∗
+  wordPointsTo (pPid k.proc) 4 dqp pidv ∗ irefSlot ∗ actLend k.proc ke ∗
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
     ⌜calleeSaved k.regs R'⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
+    (∃ k' : Nat, ⌜ke ≤ k'⌝ ∗ actLend k.proc k') -∗
     trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
     pipeallocPost γ γk on (k.regs 10#5) (k.regs 11#5) (R' 10#5) -∗
     wordPointsTo (pPid k.proc) 4 dqp pidv -∗ irefSlot -∗ wpLoop cpu'))
@@ -112,7 +120,7 @@ structure PIPEALLOC : Prop where
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (γ : FileNames)
     (γkl : GName) (γk : KmemNames) (on : Option Nat) (v0 v1 : BitVec 64)
-    (pidv : BitVec 32) (dqp : DFrac) hK hnoff htier,
-    wp_pipealloc_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl γ γkl γk on v0 v1 pidv dqp hK hnoff htier
+    (pidv : BitVec 32) (dqp : DFrac) (ke : Nat) hK hnoff htier,
+    wp_pipealloc_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl γ γkl γk on v0 v1 pidv dqp ke hK hnoff htier
 
 end Xv6

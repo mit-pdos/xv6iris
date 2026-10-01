@@ -72,19 +72,24 @@ theorem sys_pipe_stage_c (hct : curTier = KTier.kpt) (FC : FILECLOSE) (FD : FDAL
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, MachCSL.bltz_m1] next c2 hp2
     iintro Hk Hpc
     have hpin2 : k.sie = false ∨ k.proc = 0#64 → c2 = cpu := fun h => (hp2 h).trans ((hp1 h).trans (hpin h))
-    icases sys_pipe_core_pid pa pid V M $$ Hcore with ⟨Hpid, Hcw⟩
+    icases procPrivCoreNoctxAt_pidLend curCtx pa pid V M $$ Hcore with ⟨Hpid, Hlend, Hcw⟩
     iapply (sys_pipe_close2_c8 FC Γ cpu c2 k γl γ pa pid V M sts v γkl γk spie spp R k0 k1 γp
         hk0 hk1 hct hproc htier hnoff hK hpin2 hpins v 0xFFFFFFFF#32 w1
         iprop((@wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPid pa) 4 pidPriv pid -∗
-            procPrivCoreNoctxAt curCtx pa pid V M) ∗ procOfilesOwe γ V.fdg pa V.ofile [] ∗ fdFrags V.fdg sts)
+            (∃ k1 : Nat, ⌜V.ev ≤ k1⌝ ∗ actLend pa k1) -∗
+            ∃ k2 : Nat, ⌜V.ev ≤ k2⌝ ∗ procPrivCoreNoctxAt curCtx pa pid (V.updEv k2) M) ∗
+          procOfilesOwe γ V.fdg pa V.ofile [] ∗ fdFrags V.fdg sts)
         (by
+          iintro ⟨⟨Hcw, Ho, Hf⟩, Hp, Hl⟩
+          icases Hcw $$ Hp Hl with ⟨%k2, %hk2, Hc⟩
+          iexists k2
+          isplitl []
+          · ipureintro; exact hk2
           unfold sysPipePost procPrivFd procOfiles
-          iintro ⟨⟨Hcw, Ho, Hf⟩, Hp⟩
-          ihave Hc := Hcw $$ Hp
           ileft
           iframe Hc Ho Hf
           ipureintro; rfl))
-      $$ [- $Hk $Hpc $Hfr $Hrf $Hwf $Hr0 $Hr1 $Hqf $Hpid $Hnext]
+      $$ [- $Hk $Hpc $Hfr $Hrf $Hwf $Hr0 $Hr1 $Hqf $Hpid $Hlend $Hnext]
     iframe Hcw Howe Hfrag
     iframe #
   · -- fd0 allocated: bltz falls through ; fdalloc(wf)

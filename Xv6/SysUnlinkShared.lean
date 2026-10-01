@@ -136,6 +136,17 @@ structure SuOk {GF : BundledGFunctors} (k : KCtx) (A : SysUnlinkArgs GF) : Prop 
   hsp : 240 ≤ (k.regs 2#5).toNat
   hal : (sysUnlinkDel (k.regs 2#5)).toNat % 8 = 0
 
+/-- THE RECORD AT A RAISED COUNT (permit sweep L1b): argstr hands the block
+back at `A.V.updEv kv`, and the walk runs at this record. -/
+abbrev SysUnlinkArgs.raise {GF : BundledGFunctors} (A : SysUnlinkArgs GF) (kv : Nat) :
+    SysUnlinkArgs GF :=
+  { A with V := A.V.updEv kv }
+
+/-- The static premises survive the raise (the counter is in none of them). -/
+theorem SuOk.raise {GF : BundledGFunctors} {k : KCtx} {A : SysUnlinkArgs GF} (ok : SuOk k A)
+    (kv : Nat) : SuOk k (A.raise kv) :=
+  ⟨ok.hj, ok.hproc, ok.hK, ok.hnoff, ok.htier, ok.hsp, ok.hal⟩
+
 /-- `&off` is not NULL (dirlookup's `poff` premise; SpecSysUnlink deviation 9). -/
 theorem sys_unlink_off_nonnull (sp : BitVec 64) (h : 240 ≤ sp.toNat) :
     sp + 0xFFFFFFFFFFFFFF2C#64 ≠ 0#64 := by

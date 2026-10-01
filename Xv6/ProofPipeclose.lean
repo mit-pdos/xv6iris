@@ -721,10 +721,13 @@ theorem pipeclose_br_ffffffffffffc5fa : KA.«pipeclose» + 0xffffffffffffc5fa#64
 set_option maxHeartbeats 8000000 in
 theorem pipeclose_proof (Acq : ACQUIRE_GEN) (Wk : WAKEUP) (Rel : RELEASE_REFUTE)
     (RelC : RELEASE_CANCEL) (Kf : KFREE_FREE) : PIPECLOSE := ⟨
-  fun {hlc GF} _ _ _ _ _ _ _ _ Γ cpu k γl γp w γkl γk on Φ hw hnoff hK hpipe hproc hkmem htier => by
+  fun {hlc GF} _ _ _ _ _ _ _ _ Γ cpu k γl γp w γkl γk on Φ ke hw hnoff hK hpipe hproc hkmem htier => by
   unfold wp_pipeclose_body
   simp only [pipecloseAddr]
-  iintro ⟨Hk, Hpc, #Hpipe, Href, Hcpay, #Hkl, Hav, #Hpinv, HPhi⟩
+  iintro ⟨Hk, Hpc, #Hpipe, Href, Hcpay, #Hkl, Hav, Hlend, #Hpinv, HPhi⟩
+  -- the lend (permit sweep L1b): no callee takes it yet, so it is framed
+  -- through the continuation once, here
+  ihave HPhi := actLend_cont_frame _ _ _ _ _ _ _ _ _ $$ HPhi Hlend
   icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   ihave %hok := isPipe_valid γl γp _ $$ Hpipe

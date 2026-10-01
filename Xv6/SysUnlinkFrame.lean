@@ -45,6 +45,11 @@ slots 9..10 `name[DIRSIZ]` (`s0-80`, fourteen bytes and two spare), slots
    pid cell (`sysUnlinkHole`, Rocq's `proc_priv_split_cwd` +
    `proc_priv_nocwd_bare` + the pid quarter), which every later callee's
    `proc_priv_bare` premise is.
+5. THE EVENT COUNTER (permit sweep L1b, Rocq b69bd0fab): argstr hands the
+   block back at a raised count `kv`; the walk runs at the record
+   `A.raise kv` (`SysUnlinkShared.SysUnlinkArgs.raise`), the contract's
+   continuation moved there by `sysUnlinkPost_raise`; the exit reads it at
+   the count it came in at.
 -/
 import Xv6.SpecSysUnlink
 import MachCSL.StackOwnBounds
@@ -518,6 +523,19 @@ abbrev sysUnlinkPostA (k : KCtx) (A : SysUnlinkArgs GF) (c : CPU) : IProp GF :=
     A.Fex
     A.Fmiss c
 
+/-- The contract's continuation at a raised count (deviation 5). -/
+theorem sysUnlinkPost_raise (k : KCtx) (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32)
+    (V : ProcPriv) (M : Nat → List (BitVec 8)) (pv : Nat) (P Pmiss : Nat → Nat → IProp GF)
+    (Fent : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
+    (Ftgt : Pfam GF (Aview → Nat → IProp GF))
+    (Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
+    (Fmiss : Pfam GF (Aview → Nat → Fname → IProp GF)) (c : CPU) (kv : Nat) (hkv : V.ev ≤ kv) :
+    sysUnlinkPost (hlc := hlc) k γ pa pid V M pv P Pmiss Fent Ftgt Fex Fmiss c ⊢
+      sysUnlinkPost (hlc := hlc) k γ pa pid (V.updEv kv) M pv P Pmiss Fent Ftgt Fex Fmiss c := by
+  unfold sysUnlinkPost
+  iintro H %spie %spp %R' %P' %k' %hcs %hext %hk'
+  iapply H $$ %spie %spp %R' %P' %k' %hcs %hext %(Nat.le_trans hkv hk')
+
 /-- The armed post, at the record. -/
 abbrev sysUnlinkArmsA (A : SysUnlinkArgs GF) (r : BitVec 64) : IProp GF :=
   unlinkArms (hlc := hlc) (fsGammaL fscFs) fscFs A.V.cwi (viewLazy A.V.upt A.V.sz A.M) A.v0.toNat
@@ -645,7 +663,7 @@ theorem sys_unlink_exit (cpu : CPU) (k : KCtx) (A : SysUnlinkArgs GF)
   subst hr
   ispecialize HΦ $$ %c
   unfold sysUnlinkPostA sysUnlinkPost
-  iapply HΦ $$ %spie %spp %_ %P' %hcs %hP' Hk Hpc Hte Hce Hbs Hir Hblk
+  iapply HΦ $$ %spie %spp %_ %P' %A.V.ev %hcs %hP' %(Nat.le_refl _) Hk Hpc Hte Hce Hbs Hir Hblk
   simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
   iexact Harms
 

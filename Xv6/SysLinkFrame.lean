@@ -28,6 +28,11 @@ THE CARVE (Rocq `sl_frame_carve`): the thirty-eight slots below the entry
    the walk's values and `s3 .. s11` to the entry's.
 2. The shrink-wrapped saves are the pin's `s1` / `s2` arguments plus the
    slot cells' contents: a slot not yet saved holds a junk word.
+3. THE EVENT COUNTER (permit sweep L1b, Rocq b69bd0fab): each argstr hands
+   the block back at a raised count; the arms past an argstr run at the
+   record `A.raise kv` (`SysLinkArgs.raise`), the contract's continuation
+   moved there by `sysLinkPost_raise`; the exit reads it at the count it
+   came in at.
 -/
 import Xv6.SpecSysLink
 import Xv6.KstackMap
@@ -359,6 +364,22 @@ process pins nothing). -/
 abbrev sysLinkPostA (k : KCtx) (A : SysLinkArgs GF) (c : CPU) : IProp GF :=
   sysLinkPost (hlc := hlc) k A.γ (procAddr A.j) A.pid A.V A.M A.Ftgt A.Fent A.Funt c
 
+/-- THE RECORD AT A RAISED COUNT (permit sweep L1b, deviation 3). -/
+abbrev SysLinkArgs.raise (A : SysLinkArgs GF) (kv : Nat) : SysLinkArgs GF :=
+  { A with V := A.V.updEv kv }
+
+/-- The contract's continuation at a raised count (deviation 3). -/
+theorem sysLinkPost_raise (k : KCtx) (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32)
+    (V : ProcPriv) (M : Nat → List (BitVec 8))
+    (Ftgt : Pfam GF (Aview → Nat → Anode → IProp GF))
+    (Fent : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
+    (Funt : Pfam GF (Aview → Nat → IProp GF)) (c : CPU) (kv : Nat) (hkv : V.ev ≤ kv) :
+    sysLinkPost (hlc := hlc) k γ pa pid V M Ftgt Fent Funt c ⊢
+      sysLinkPost (hlc := hlc) k γ pa pid (V.updEv kv) M Ftgt Fent Funt c := by
+  unfold sysLinkPost
+  iintro H %spie %spp %R' %P' %k' %hcs %hext %hk'
+  iapply H $$ %spie %spp %R' %P' %k' %hcs %hext %(Nat.le_trans hkv hk')
+
 /-- What every exit hands the epilogue beside the machine state: the two
 allowances whole, the block at some grown page table, and the legs'
 receipts keyed on the answer `r`. -/
@@ -454,7 +475,7 @@ theorem sys_link_exit (cpu : CPU) (k : KCtx) (A : SysLinkArgs GF)
   ihave %hret := linkArms_ret (hlc := hlc) _ _ _ _ _ $$ Harms
   ispecialize HΦ $$ %c
   unfold sysLinkPostA sysLinkPost
-  iapply HΦ $$ %spie %spp %_ %P' %hcs %hP' Hk Hpc Hte Hce Hbs Hir Hblk [] [Harms]
+  iapply HΦ $$ %spie %spp %_ %P' %A.V.ev %hcs %hP' %(Nat.le_refl _) Hk Hpc Hte Hce Hbs Hir Hblk [] [Harms]
   · ipureintro
     simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
     exact hret

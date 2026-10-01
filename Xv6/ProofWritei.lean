@@ -136,8 +136,9 @@ theorem writei_entry (IU : IUPDATE) (BM : BMAP) (BR : BREAD) (LW : LOG_WRITE) (B
       wordPointsTo sbSizeAddr 4 A.dqz (BitVec.ofNat 32 fscSize) -∗
       wordPointsTo sbBmapstartAddr 4 A.dqb (BitVec.ofNat 32 fscBmapstart) -∗
       dinodeAt fscIreg A.inum dn0' -∗
-      (if A.user then procPrivBareAt curCtx (procAddr A.j) A.pidv { A.V with upt := P' }
-          (viewFaulted A.V.upt P' A.M)
+      (if A.user then iprop(∃ k' : Nat, ⌜A.V.ev ≤ k'⌝ ∗
+          procPrivBareAt curCtx (procAddr A.j) A.pidv { A.V.updEv k' with upt := P' }
+          (viewFaulted A.V.upt P' A.M))
        else iprop(byteBuf (k.regs 12#5) A.dqs A.sbs ∗ wordPointsTo (pPid k.proc) 4 A.dqp A.pidv)) -∗
       bslots 3 -∗
       logOpS icfgLog n' Sb' -∗ wpLoop cpu'))
@@ -170,7 +171,14 @@ theorem writei_entry (IU : IUPDATE) (BM : BMAP) (BR : BREAD) (LW : LOG_WRITE) (B
       rw [hA.hproc]
       iexact Hsrc
     · simp only [if_true]
-      rw [← procPrivExt_eq]
+      icases Hsrc with ⟨%kv, %hkv, Hsrc⟩
+      iexists kv
+      isplitl []
+      · ipureintro; exact hkv
+      ihave Hsrc := (show procPrivExt (GF := GF) (procAddr A.j) A.pidv (A.V.updEv kv) P'
+          (viewFaulted A.V.upt P' A.M) ⊢ procPrivBareAt ξ0 (procAddr A.j) A.pidv
+          { A.V.updEv kv with upt := P' } (viewFaulted A.V.upt P' A.M) from by
+        rw [procPrivExt_eq]) $$ Hsrc
       iexact Hsrc
   ihave Hcells : wiCells (GF := GF) A $$ [Hidev Hinum Hsi Hsz Hbms]
   · unfold wiCells; iframe
@@ -182,7 +190,10 @@ theorem writei_entry (IU : IUPDATE) (BM : BMAP) (BR : BREAD) (LW : LOG_WRITE) (B
       rw [← hA.hproc]
       iexact Hsrc
     · simp only [if_true]
-      have e : ({ A.V with upt := A.V.upt } : ProcPriv) = A.V := rfl
+      iexists A.V.ev
+      isplitl []
+      · ipureintro; exact Nat.le_refl _
+      have e : ({ A.V.updEv A.V.ev with upt := A.V.upt } : ProcPriv) = A.V := rfl
       rw [procPrivExt_eq, e]
       iexact Hsrc
   ihave Henv : wiEnv (GF := GF) Γ A $$ []

@@ -133,6 +133,19 @@ current values and the cells hold junk until saved.
 9. `so_word_half_join` / `so_ip_split` (the `f->ip` cell's halves) are not
    needed: Lean's `fileFieldsAt` holds `f->ip` WHOLE at fraction one.
    `flive_tok` has no Lean counterpart (FileDefs deviation 2).
+10. **THE EVENT COUNTER (permit sweep L1b, Rocq b69bd0fab).**  Rocq names
+   the raised record inline (`UA := upd_usV U (upd_ev (us_V U) kA)`) and
+   raises its own internal continuations (`so_cont0_au`, `so_tail_f`'s
+   `wp_next`) by a `k'` binder.  The Lean stages are generic in the record
+   `A`, so the raise is ONE record operation `SysOpenArgs.raise` (with
+   `SysOpenStatic.raise`): below argstr every stage runs at `A.raise kv`,
+   and the ONE continuation `sysOpenK` (SpecSysOpen deviation 11) carries
+   `k'`; `sysOpenK_raise` moves it to the raised record, `sysOpenK_same`
+   reads it at the count it came in at (the arms that lend nothing; Rocq's
+   `upd_ev_id` rewrites).  ARM F-FAIL's fileclose takes the lend
+   (`sysOpenTailFBody` gains `actLend` in and `∃ k1 ≥ A.V.ev` out), lent
+   out of the whole block by `sysOpen_fd_pidLend` (Rocq
+   `proc_priv_core_bare_ev_acc`, over `FdTable.procPrivCoreNoctxAt_pidLend`).
 
 ## Dropped/simplified vs Rocq
 
@@ -895,6 +908,17 @@ structure SysOpenStatic {GF : BundledGFunctors} (k : KCtx) (A : SysOpenArgs GF) 
   hv0 : A.V.tf[tfArgIdx 0]? = some A.v
   hv1 : A.V.tf[tfArgIdx 1]? = some A.vom
 
+/-- THE RECORD AT A RAISED COUNT (permit sweep L1b; Rocq's `UA := upd_usV U
+(upd_ev (us_V U) kA)` in `ProofSysOpen`): argstr hands the block back at
+`A.V.updEv kv`, and the run below +0x20 is at this record. -/
+abbrev SysOpenArgs.raise {GF : BundledGFunctors} (A : SysOpenArgs GF) (kv : Nat) : SysOpenArgs GF :=
+  { A with V := A.V.updEv kv }
+
+/-- The static premises survive the raise (the counter is in none of them). -/
+theorem SysOpenStatic.raise {GF : BundledGFunctors} {k : KCtx} {A : SysOpenArgs GF}
+    (hS : SysOpenStatic k A) (kv : Nat) : SysOpenStatic k (A.raise kv) :=
+  ⟨hS.hj, hS.hproc, hS.htier, hS.hnoff, hS.hK, hS.hns, hS.hv0, hS.hv1⟩
+
 /-- The block after argstr: the page table grown to `P2`, the view faulted
 (argstr's post; Rocq's `us_upt U P2`). -/
 abbrev sysOpenV2 {GF : BundledGFunctors} (A : SysOpenArgs GF) (P2 : UPtd) : ProcPriv := { A.V with upt := P2 }
@@ -961,9 +985,36 @@ theorem sysOpenK_mono (k : KCtx) (ns : Nat) (V : ProcPriv) (M : Nat → List (Bi
       (∀ (VW : ProcPriv) (MW : Nat → List (BitVec 8)) (r : BitVec 64), ARMS' VW MW r -∗ ARMS VW MW r) -∗
       sysOpenK (hlc := hlc) k ns V M ARMS' c := by
   unfold sysOpenK
-  iintro H Hw %spie %spp %R' %P' %hcs %hext Hk Hpc Hte Hce Hbs Hir Harms
+  iintro H Hw %spie %spp %R' %P' %k' %hcs %hext %hk' Hk Hpc Hte Hce Hbs Hir Harms
   ihave Harms := Hw $$ %_ %_ %_ Harms
-  iapply H $$ %spie %spp %R' %P' %hcs %hext Hk Hpc Hte Hce Hbs Hir Harms
+  iapply H $$ %spie %spp %R' %P' %k' %hcs %hext %hk' Hk Hpc Hte Hce Hbs Hir Harms
+
+/-- THE CONTINUATION AT A RAISED COUNT (permit sweep L1b, Rocq's `UA` in
+`ProofSysOpen`): argstr hands the block back at `V.updEv kv`, and the rest
+of the run is at that record; the contract's continuation, which takes any
+count at least `V.ev`, takes any count at least `kv`. -/
+theorem sysOpenK_raise (k : KCtx) (ns : Nat) (V : ProcPriv) (M : Nat → List (BitVec 8))
+    (ARMS : ProcPriv → (Nat → List (BitVec 8)) → BitVec 64 → IProp GF) (c : CPU) (kv : Nat)
+    (hkv : V.ev ≤ kv) :
+    sysOpenK (hlc := hlc) k ns V M ARMS c ⊢ sysOpenK (hlc := hlc) k ns (V.updEv kv) M ARMS c := by
+  unfold sysOpenK
+  iintro H %spie %spp %R' %P' %k' %hcs %hext %hk'
+  iapply H $$ %spie %spp %R' %P' %k' %hcs %hext %(Nat.le_trans hkv hk')
+
+/-- ...and at the count it came in at (an arm that lends nothing; Rocq
+`upd_ev_id`): the continuation's old shape. -/
+theorem sysOpenK_same (k : KCtx) (ns : Nat) (V : ProcPriv) (M : Nat → List (BitVec 8))
+    (ARMS : ProcPriv → (Nat → List (BitVec 8)) → BitVec 64 → IProp GF) (c : CPU) :
+    sysOpenK (hlc := hlc) k ns V M ARMS c ⊢
+      ∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd),
+        ⌜calleeSaved k.regs R'⌝ -∗ ⌜V.upt.extSz V.sz P'⌝ -∗
+        kctx c ((k.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k.regs 1#5)) -∗
+        trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗
+        bslots 3 -∗ irefSlots ns -∗
+        ARMS { V with upt := P' } (viewFaulted V.upt P' M) (R' 10#5) -∗ wpLoop c := by
+  unfold sysOpenK
+  iintro H %spie %spp %R' %P' %hcs %hext
+  iapply H $$ %spie %spp %R' %P' %V.ev %hcs %hext %(Nat.le_refl _)
 
 /-- A FAILURE TAIL's own continuation (Rocq's generic `wp_next true pj (fun
 _ => ∀ mf, ⌜callee_saved m mf⌝ -∗ … -∗ WP)`): at the returned registers,
@@ -991,6 +1042,36 @@ theorem sysOpen_pid_core (hct : curTier = KTier.kpt) (pa : BitVec 64)
   isplitl []
   · ipureintro; exact h
   · ipureintro; exact hlz
+
+/-- THE PID CELL AND THE COUNTER, LENT out of the whole block (permit sweep
+L1b; Rocq `proc_priv_core_bare_ev_acc` at ARM F-FAIL): fileclose takes both,
+and the block closes at the raised count it hands back. -/
+theorem sysOpen_fd_pidLend (hct : curTier = KTier.kpt) (γ : FileNames) (pa : BitVec 64)
+    (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) :
+    procPrivFd (GF := GF) γ pa pid V M ⊢
+      wordPointsTo (pPid pa) 4 pidPriv pid ∗ actLend pa V.ev ∗
+      (wordPointsTo (pPid pa) 4 pidPriv pid -∗ (∃ k1 : Nat, ⌜V.ev ≤ k1⌝ ∗ actLend pa k1) -∗
+        ∃ k2 : Nat, ⌜V.ev ≤ k2⌝ ∗ procPrivFd γ pa pid (V.updEv k2) M) := by
+  have h : ∀ (X : CurCtx), X.curTier = KTier.kpt →
+      letI := X
+      procPrivFd (GF := GF) γ pa pid V M ⊢
+        wordPointsTo (pPid pa) 4 pidPriv pid ∗ actLend pa V.ev ∗
+        (wordPointsTo (pPid pa) 4 pidPriv pid -∗ (∃ k1 : Nat, ⌜V.ev ≤ k1⌝ ∗ actLend pa k1) -∗
+          ∃ k2 : Nat, ⌜V.ev ≤ k2⌝ ∗ procPrivFd γ pa pid (V.updEv k2) M) := by
+    intro X hX
+    obtain ⟨c, t⟩ := X
+    simp only at hX
+    subst hX
+    unfold procPrivFd
+    iintro ⟨Hcore, Ho⟩
+    icases procPrivCoreNoctxAt_pidLend c pa pid V M $$ Hcore with ⟨Hpid, Hl, Hb⟩
+    iframe Hpid Hl
+    iintro Hpid Hl
+    icases Hb $$ Hpid Hl with ⟨%k2, %hk2, Hcore⟩
+    iexists k2
+    iframe Hcore Ho
+    ipureintro; exact hk2
+  exact h _ hct
 
 /-- THE PAYLOAD, PEELED AT AN EXPLICIT `data` (Rocq `ProofSysOpenShared.so_flat`
 = `icLoadedFlatBody` with its `data` exposed): THE OBSERVED-ROW TIE IS A DATA
@@ -1118,12 +1199,14 @@ theorem sys_open_argstr (AS : ARGSTR) (Γ : SchedNames) (A : SysOpenArgs GF) (cp
     kctx cpu k' ∗ pcIs cpu KA.«argstr» ∗
     trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗ sysOpenEnv (hlc := hlc) Γ A ∗
     procPrivBareAt curCtx pa A.pid V M ∗ byteBuf (k'.regs 11#5) (DFrac.own 1) old ∗
-    (∀ (c : CPU) (spie spp : Bool) (R' : RegMap) (P' : UPtd) (bs : List (BitVec 8)),
+    (∀ (c : CPU) (spie spp : Bool) (R' : RegMap) (P' : UPtd) (bs : List (BitVec 8)) (kv : Nat),
       ⌜calleeSaved k'.regs R' ∧ V.upt.extSz V.sz P' ∧
         fetchstrRet (viewLazy V.upt V.sz M) v.toNat old bs (R' 10#5)⌝ -∗
       kctx c ((k'.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k'.regs 1#5)) -∗
       trapCsrsExt c se -∗ cpuClaimExt c se pj -∗
-      procPrivBareAt curCtx pa A.pid { V with upt := P' } (viewFaulted V.upt P' M) -∗
+      -- the block's counter, lent through argstr (permit sweep L1b)
+      ⌜V.ev ≤ kv⌝ -∗
+      procPrivBareAt curCtx pa A.pid { V.updEv kv with upt := P' } (viewFaulted V.upt P' M) -∗
       byteBuf (k'.regs 11#5) (DFrac.own 1) bs -∗ wpLoop c)
     ⊢ wpLoop (GF := GF) cpu := by
   subst hs hpj
@@ -1140,11 +1223,11 @@ theorem sys_open_argstr (AS : ARGSTR) (Γ : SchedNames) (A : SysOpenArgs GF) (cp
   iframe Hk Hpc Hblk Hbuf
   iframe #
   iapply wpNext_intro_pin
-  iintro %c %hpin %spie %spp %R' %- Hk Hpc ⟨%P', %bs, %hf, Hblk, Hbuf⟩ %hcs
+  iintro %c %hpin %spie %spp %R' %- Hk Hpc ⟨%P', %bs, %kv, %hf, %hkv, Hblk, Hbuf⟩ %hcs
   have hpin' : k'.sie = false → c = cpu := fun h => hpin (Or.inl h)
   ihave Hte := trapCsrsExt_move _ _ _ hpin' $$ Hte
   ihave Hce := cpuClaimExt_move _ _ _ _ hpin' $$ Hce
-  iapply HK $$ %c %spie %spp %R' %P' %bs [] Hk Hpc Hte Hce Hblk Hbuf
+  iapply HK $$ %c %spie %spp %R' %P' %bs %kv [] Hk Hpc Hte Hce %hkv Hblk Hbuf
   ipureintro
   exact ⟨hcs, hf.1, hf.2⟩
 
@@ -1297,8 +1380,10 @@ def sysOpenTailFBody (Γ : SchedNames) (k : KCtx) (A : SysOpenArgs GF) : IProp G
     sysOpenLk γil γisl loc tlc A.pid kk s g inum dn -∗
     icLoaded fscFs fscIreg fscCov fscLogst kk inum dn bm -∗ sysOpenKeep kk s g inum -∗
     sysOpenPid A -∗ bslots 3 -∗ irefSlot -∗ logOpb icfgLog u -∗
+    -- the block's counter, for fileclose to lend to pipeclose (permit sweep L1b)
+    actLend (procAddr A.j) A.V.ev -∗
     sysOpenRet (hlc := hlc) k (fun r => iprop(⌜r = 0xFFFFFFFFFFFFFFFF#64⌝ ∗ sysOpenPid A ∗
-      bslots 3 ∗ irefSlots 2 ∗ fdSlot)) -∗
+      bslots 3 ∗ irefSlots 2 ∗ fdSlot ∗ ∃ k1 : Nat, ⌜A.V.ev ≤ k1⌝ ∗ actLend (procAddr A.j) k1)) -∗
     wpLoop c)
 
 /-- **ARM S, +0xb8** (Rocq `so_tail_s`): `iunlock(ip)`, `end_op`, `a0 = fd`,

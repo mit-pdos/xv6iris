@@ -73,11 +73,15 @@ payment's answer comes back at the state argument 0 names (Rocq
 def sysCloseCont (Γ : SchedNames) (cpu : CPU) (k : KCtx) (γ : FileNames) (γd : GName)
     (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState)
     (v : BitVec 64) (j : Nat) (γkl : GName) (γk : KmemNames) (Φc : IProp GF) : IProp GF :=
-  wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
+  wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (k' : Nat),
     ⌜calleeSaved k.regs R'⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
-    sysClosePost γ γd pa pid V M sts v (R' 10#5) -∗
+    -- THE EVENT COUNTER (permit sweep L1b): fileclose takes the block's
+    -- counter as its lend (for pipeclose's kfree), so the block comes back
+    -- at a count at least the one it left at
+    ⌜V.ev ≤ k'⌝ -∗
+    sysClosePost γ γd pa pid (V.updEv k') M sts v (R' 10#5) -∗
     filecloseCpostAny (hlc := hlc) (sysFdSt v V.ofile sts) Φc -∗
     -- the whole environment back (the page count may have moved)
     (∃ on', fileclosePipeEnv (hlc := hlc) Γ γkl γk on') -∗

@@ -556,12 +556,13 @@ process may be consumed on any hart. -/
 def fstatK (k : KCtx) (γ : FileNames) (fk : Nat) (q : Qp) (st : FdState) (pa : BitVec 64)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) : IProp GF :=
   iprop(∀ (c : CPU) (spie spp : Bool) (R' : RegMap) (P' : UPtd) (M' : Nat → List (BitVec 8))
-      (d : Nat),
+      (d : Nat) (k' : Nat),
     ⌜calleeSaved k.regs R' ∧ filestatRet (R' 10#5) ∧ V.upt.extSz V.sz P' ∧ d ≤ 24 ∧
       umemWrote V.upt M (k.regs 11#5) d P' M'⌝ -∗
     kctx c ((k.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k.regs 1#5)) -∗
     trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗
-    fileRef γ fk q st -∗ procPrivExt pa pid V P' M' -∗ filestatEnvOut st -∗ wpLoop c)
+    fileRef γ fk q st -∗ ⌜V.ev ≤ k'⌝ -∗ procPrivExt pa pid (V.updEv k') P' M' -∗
+    filestatEnvOut st -∗ wpLoop c)
 
 end
 

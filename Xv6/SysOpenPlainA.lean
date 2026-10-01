@@ -51,6 +51,9 @@ the state at +0x36 (`sysOpenAt36`), whose proof per side is in
    call site `SysOpenParts.sys_open_argstr`.  `sys_open_umemStr` restates
    `SysMkdirFrame.sys_mkdir_umemStr` (a stage file of another Proof cannot
    be imported).
+7. Permit sweep L1b: argstr hands the block back at a raised count `kv`;
+   `sys_open_args` continues at the record `A.raise kv` (Rocq's `UA`), so
+   `sys_open_args` / `sys_open_entry` take the +0x36 body for every `kv`.
 -/
 import Xv6.SysOpenParts
 import Xv6.SysfileCalls
@@ -353,7 +356,7 @@ theorem sys_open_fetched (BO : BEGIN_OP) (Γ : SchedNames) [ClaimIs (hlc := hlc)
         trapCsrsExt c' k.sie -∗ cpuClaimExt c' k.sie k.proc -∗ wpLoop c') $$ [HΦ Hx Hblk Hfr Hfd Hbs Hir]
     · iintro %c' %R' %⟨hcs, ha0⟩ Hk Hpc Hte Hce
       ispecialize HΦ $$ %c'
-      unfold sysOpenK
+      ihave HΦ := sysOpenK_same k A.ns A.V A.M ARMS c' $$ HΦ
       have ha0' : R' 10#5 = 0xFFFFFFFFFFFFFFFF#64 := by
         rw [ha0]; simp only [RegMap.set_apply, ite_true]
       iapply HΦ $$ %spie %spp %R' %P2 %hcs %hP2 Hk Hpc Hte Hce Hbs Hir
@@ -375,7 +378,7 @@ theorem sys_open_args (AI : ARGINT) (AS : ARGSTR) (BO : BEGIN_OP) (Γ : SchedNam
     (cpu : CPU) (k : KCtx) (A : SysOpenArgs GF) (hS : SysOpenStatic k A)
     (EXTRA : IProp GF) (ARMS : ProcPriv → (Nat → List (BitVec 8)) → BitVec 64 → IProp GF)
     (harm0 : sysOpenArm0 A EXTRA ARMS)
-    (h36 : ⊢ sysOpenAt36 (hlc := hlc) Γ k A EXTRA ARMS)
+    (h36 : ∀ kv : Nat, ⊢ sysOpenAt36 (hlc := hlc) Γ k (A.raise kv) EXTRA ARMS)
     (spie spp : Bool) (R : RegMap) (w3 w4 w5 w6 : BitVec 64) (lo om : BitVec 32) (w24 : BitVec 64)
     (hct : curTier = KTier.kpt)
     (hpins : sysOpenPins k R (k.regs 9#5) (k.regs 18#5) (k.regs 19#5))
@@ -452,7 +455,7 @@ theorem sys_open_args (AI : ARGINT) (AS : ARGSTR) (BO : BEGIN_OP) (Γ : SchedNam
   k_step_e (wp_s_jal cpu _ (KA.«sys_open» + 0x1c#64) false 2086636#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_open_br_argstr]
   iintro Hk Hpc
-  icases sysfile_blk_bare _ _ _ _ _ $$ Hblk with ⟨Hbare, Hclose⟩
+  icases sysfile_blk_bare_ev _ _ _ _ _ $$ Hblk with ⟨Hbare, Hclose⟩
   unfold sysOpenAny
   icases Hbuf with ⟨%old, %hold, Hbuf⟩
   ihave Hbuf := (show byteBuf (GF := GF) (sysOpenPath (k.regs 2#5)) (DFrac.own 1) old ⊢
@@ -470,20 +473,36 @@ theorem sys_open_args (AI : ARGINT) (AS : ARGSTR) (BO : BEGIN_OP) (Γ : SchedNam
   case gn => k_norm_g; exact hS.hnoff
   case gK => k_norm_g; exact hKas
   case gmx => k_norm_g [hold]
-  iintro %cpu %spie1 %spp1 %R1 %P2 %bs %⟨hcs1, hext, hret⟩ Hk Hpc Hte Hce Hbare Hbuf
+  iintro %cpu %spie1 %spp1 %R1 %P2 %bs %kv %⟨hcs1, hext, hret⟩ Hk Hpc Hte Hce %hkv Hbare Hbuf
   k_norm_g [sys_open_ret_20, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   ihave Hbuf := (show byteBuf (GF := GF) (k.regs 2#5 + 18446744073709551440#64) (DFrac.own 1) bs ⊢
     byteBuf (sysOpenPath (k.regs 2#5)) (DFrac.own 1) bs from .rfl) $$ Hbuf
-  ihave Hblk := Hclose $$ %P2 %(viewFaulted A.V.upt P2 A.M) Hbare
+  ihave Hblk := Hclose $$ %P2 %(viewFaulted A.V.upt P2 A.M) %kv Hbare
+  -- argstr lent the block's counter (permit sweep L1b): the rest of the run
+  -- is at the record it came back at (Rocq's `UA`)
+  ihave HΦ : (∀ c' : CPU, sysOpenK (hlc := hlc) k (A.raise kv).ns (A.raise kv).V (A.raise kv).M
+      ARMS c') $$ [HΦ]
+  · iintro %c'
+    ispecialize HΦ $$ %c'
+    iapply (sysOpenK_raise k A.ns A.V A.M ARMS c' kv hkv) $$ HΦ
   ihave Hpc := (show pcIs (GF := GF) cpu (KA.«sys_open» + 32#64) ⊢
     pcIs cpu (sysOpenAddr + 0x20#64) from .rfl) $$ Hpc
   have hp1 : sysOpenPins k R1 (k.regs 9#5) (k.regs 18#5) (k.regs 19#5) := by
     refine sysOpenPins_cs k _ R1 _ _ _ ?_ hcs1
     repeat (refine sysOpenPins_set _ _ _ _ _ _ _ ?_ (by decide))
     exact hp2
-  iapply (sys_open_fetched BO Γ cpu k A hS EXTRA ARMS harm0 h36 P2 spie1 spp1 R1 old bs
-      w3 w4 w5 w6 lo w24 hct hp1 hal hext hold hret)
-    $$ [$Hk $Hpc $Hte $Hce $Henv $Hcells $Hbuf $Hblk $Hbs $Hir $Hfd $Hfr $Hx $HΦ]
+  ihave #Henv' := (show sysOpenEnv (hlc := hlc) (GF := GF) Γ A ⊢ sysOpenEnv Γ (A.raise kv)
+    from .rfl) $$ Henv
+  ihave Hblk := (show procPrivFd (GF := GF) A.γ (procAddr A.j) A.pid { A.V.updEv kv with upt := P2 }
+      (viewFaulted A.V.upt P2 A.M) ⊢
+    procPrivFd (A.raise kv).γ (procAddr (A.raise kv).j) (A.raise kv).pid (sysOpenV2 (A.raise kv) P2)
+      (sysOpenM2 (A.raise kv) P2) from .rfl) $$ Hblk
+  ihave Hir := (show irefSlots (GF := GF) A.ns ⊢ irefSlots (A.raise kv).ns from .rfl) $$ Hir
+  ihave Hfr := (show fdFrags (GF := GF) A.V.fdg A.sts ⊢ fdFrags (A.raise kv).V.fdg (A.raise kv).sts
+    from .rfl) $$ Hfr
+  iapply (sys_open_fetched BO Γ cpu k (A.raise kv) (hS.raise kv) EXTRA ARMS harm0 (h36 kv) P2 spie1
+      spp1 R1 old bs w3 w4 w5 w6 lo w24 hct hp1 hal hext hold hret)
+    $$ [$Hk $Hpc $Hte $Hce $Henv' $Hcells $Hbuf $Hblk $Hbs $Hir $Hfd $Hfr $Hx $HΦ]
 
 /-! ## The entry: the prologue -/
 
@@ -498,7 +517,7 @@ theorem sys_open_entry (AI : ARGINT) (AS : ARGSTR) (BO : BEGIN_OP) (Γ : SchedNa
     (cpu : CPU) (k : KCtx) (A : SysOpenArgs GF) (hS : SysOpenStatic k A)
     (EXTRA : IProp GF) (ARMS : ProcPriv → (Nat → List (BitVec 8)) → BitVec 64 → IProp GF)
     (harm0 : sysOpenArm0 A EXTRA ARMS)
-    (h36 : ⊢ sysOpenAt36 (hlc := hlc) Γ k A EXTRA ARMS) :
+    (h36 : ∀ kv : Nat, ⊢ sysOpenAt36 (hlc := hlc) Γ k (A.raise kv) EXTRA ARMS) :
     kctx cpu k ∗ pcIs cpu sysOpenAddr ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     procsInv Γ ∗ panicEnv ∗ fsReady (hlc := hlc) ∗ isFtable A.γl A.γ ∗

@@ -94,12 +94,15 @@ def wp_pipewrite_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6
   procPrivBareAt curCtx (procAddr j) pid V M ∗ genHalvesPriv (procAddr j) pid V.gen ∗
   -- THE BYTE QUEUE'S PAYMENT: one link per byte, or the taint
   pipeWpay (hlc := hlc) γp.pnQueue (writerImg V.upt M) (k.regs 11#5) Q Qe n.toNat ∗
-  wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd),
+  wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd) (k' : Nat),
     ⌜calleeSaved k.regs R' ∧ V.upt.extSz V.sz P' ∧ pipeRwRet n (R' 10#5)⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     trapCsrs cpu' -∗ cpuClaim cpu' k.proc -∗ intrRes cpu' -∗
     pipeRef γp w q -∗
-    procPrivBareAt curCtx (procAddr j) pid { V with upt := P' } (viewFaulted V.upt P' M) -∗
+    -- THE EVENT COUNTER (permit sweep L1b): the copy loop lends the
+    -- block's counter to copyin, which may step it
+    ⌜V.ev ≤ k'⌝ -∗
+    procPrivBareAt curCtx (procAddr j) pid { V.updEv k' with upt := P' } (viewFaulted V.upt P' M) -∗
     genHalvesPriv (procAddr j) pid V.gen -∗
     -- THE QUEUE'S POST: the chain at the stop cursor with the answer's reason,
     -- or the taint with the payment back
@@ -132,12 +135,15 @@ def wp_pipewrite_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
   procPrivBareAt curCtx (procAddr j) pid V M ∗ genHalvesPriv (procAddr j) pid V.gen ∗
   -- THE BYTE QUEUE'S PAYMENT: one link per byte, or the taint
   pipeWpay (hlc := hlc) γp.pnQueue (writerImg V.upt M) (k.regs 11#5) Q Qe n.toNat ∗
-  wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd),
+  wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd) (k' : Nat),
     ⌜calleeSaved k.regs R' ∧ V.upt.extSz V.sz P' ∧ pipeRwRet n (R' 10#5)⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
     pipeRef γp w q -∗
-    procPrivBareAt curCtx (procAddr j) pid { V with upt := P' } (viewFaulted V.upt P' M) -∗
+    -- THE EVENT COUNTER (permit sweep L1b): the copy loop lends the
+    -- block's counter to copyin, which may step it
+    ⌜V.ev ≤ k'⌝ -∗
+    procPrivBareAt curCtx (procAddr j) pid { V.updEv k' with upt := P' } (viewFaulted V.upt P' M) -∗
     genHalvesPriv (procAddr j) pid V.gen -∗
     -- THE QUEUE'S POST: the chain at the stop cursor with the answer's reason,
     -- or the taint with the payment back
@@ -180,7 +186,7 @@ theorem PIPEWRITE.wp_pipewrite (A : PIPEWRITE) {hlc : HasLC} {GF : BundledGFunct
   iapply h
   iframe H0 H1 H2 Htc Hcl Hir H6 H7 H8 H9 H10 H11 H12
   iapply wpNext_mono $$ Hnext
-  iintro %cpu' HK %spie %spp %R' %P' %p0 H1 H2 ⟨Htc, Hir⟩ Hcl H6 H7 H8 H9
-  iapply HK $$ %spie %spp %R' %P' %p0 H1 H2 Htc Hcl Hir H6 H7 H8 H9
+  iintro %cpu' HK %spie %spp %R' %P' %k' %p0 H1 H2 ⟨Htc, Hir⟩ Hcl H6 %hk' H7 H8 H9
+  iapply HK $$ %spie %spp %R' %P' %k' %p0 H1 H2 Htc Hcl Hir H6 %hk' H7 H8 H9
 
 end Xv6

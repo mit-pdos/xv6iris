@@ -134,15 +134,17 @@ theorem fetchstr_myproc (MP : MYPROC) (c : CPU) (k' : KCtx)
 
 set_option maxHeartbeats 1000000 in
 theorem fetchstr_copyinstr (CI : COPYINSTR) (c : CPU) (k' : KCtx) (γl : GName) (γk : KmemNames)
-    (P : UPtd) (M : Nat → List (BitVec 8)) (old : List (BitVec 8))
+    (P : UPtd) (M : Nat → List (BitVec 8)) (old : List (BitVec 8)) (ke : Nat)
     (hnoff : k'.noff + 1 < 2 ^ 31) (hK : 50 ≤ k'.avail) (hlk : "kmem" ∉ k'.locks)
     (hroot : k'.regs 10#5 = pageAddr P.root) (hsz : (k'.regs 11#5).toNat ≤ 2 ^ 38)
     (hmax : k'.regs 14#5 = BitVec.ofNat 64 old.length) (hmax' : old.length < 2 ^ 63) :
     kctx c k' ∗ pcIs c KA.«copyinstr» ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
     kallocAvail γk none ∗ procPtAt P M ∗ byteBuf (k'.regs 12#5) (DFrac.own 1) old ∗
+    actLend k'.proc ke ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
       ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
+      (∃ k1 : Nat, ⌜ke ≤ k1⌝ ∗ actLend k'.proc k1) -∗
       (∃ (P' : UPtd) (bs' : List (BitVec 8)),
         ⌜P.extSz (k'.regs 11#5) P' ∧
           ((R' 10#5 = 0#64 ∧ ∃ s, umemStr (viewFaulted P P' M) (k'.regs 13#5).toNat old.length = some s ∧
@@ -152,7 +154,7 @@ theorem fetchstr_copyinstr (CI : COPYINSTR) (c : CPU) (k' : KCtx) (γl : GName) 
         procPtAt P' (viewFaulted P P' M) ∗ byteBuf (k'.regs 12#5) (DFrac.own 1) bs') -∗
       ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := CI.wp_copyinstr (hlc := hlc) (GF := GF) c k' γl γk P M old hnoff hK hlk hroot hsz hmax hmax'
+  have h := CI.wp_copyinstr (hlc := hlc) (GF := GF) c k' γl γk P M old ke hnoff hK hlk hroot hsz hmax hmax'
   unfold wp_copyinstr_body at h
   simp only [copyinstrAddr] at h
   exact h
@@ -336,6 +338,8 @@ theorem fetchstr_proof (MP : MYPROC) (CI : COPYINSTR) (SL : STRLEN) : FETCHSTR :
   have hK56 : 56 ≤ k.avail := hK
   have hK6 : 6 ≤ k.avail := by omega
   icases fetchstr_priv_split (GF := GF) ξ0 rfl pa pid V M $$ Hpriv with ⟨%hfacts, Hsz, Hpg, Hspace, Hrest⟩
+  -- the block's counter, lent to copyinstr (permit sweep L1b)
+  icases ecRest_lend k.proc pa hproc pid V V.upt $$ Hrest with ⟨Hlend, Hrest⟩
   -- the descriptor, named: every step below reads it as `P`
   generalize hP : V.upt = P at hfacts
   -- the prologue
@@ -402,11 +406,11 @@ theorem fetchstr_proof (MP : MYPROC) (CI : COPYINSTR) (SL : STRLEN) : FETCHSTR :
   iintro Hk Hpc
   k_norm_g
   -- copyinstr(p->pagetable, p->sz, buf, addr, max)
-  iapply (fetchstr_copyinstr CI c12 _ γl γk P M old ?hnC ?hKC ?hlC ?hrC ?hszC ?hmC ?hm'C)
+  iapply (fetchstr_copyinstr CI c12 _ γl γk P M old V.ev ?hnC ?hKC ?hlC ?hrC ?hszC ?hmC ?hm'C)
     $$ [- $Hk $Hpc]
   rotate_right 1
   k_norm_g [e9]
-  iframe Hlk Hav Hspace Hbuf
+  iframe Hlk Hav Hspace Hbuf Hlend
   case hnC => k_norm_g; omega
   case hKC => k_norm_g; omega
   case hlC => k_norm_g; exact hlk
@@ -416,9 +420,10 @@ theorem fetchstr_proof (MP : MYPROC) (CI : COPYINSTR) (SL : STRLEN) : FETCHSTR :
   case hm'C => omega
   k_norm_g [fetchstr_ret_26]
   iapply wpNext_intro_pin
-  iintro %c13 %hp13 %spie2 %spp2 %R2 %hsp2 Hk Hpc Hres %hcs2
+  iintro %c13 %hp13 %spie2 %spp2 %R2 %hsp2 Hk Hpc Hlend Hres %hcs2
   k_norm_g
   icases Hres with ⟨%P', %bs', %hpost, Hspace, Hbuf⟩
+  icases Hrest $$ Hlend with ⟨%kc, %hkc, Hrest⟩
   rw [e19] at hpost
   unfold calleeSaved at hcs2
   k_norm_g at hcs2
@@ -429,7 +434,7 @@ theorem fetchstr_proof (MP : MYPROC) (CI : COPYINSTR) (SL : STRLEN) : FETCHSTR :
   have hsp12 : k.sie = false → spie2 = k.spie ∧ spp2 = k.spp :=
     fun h => ⟨(hsp2 h).1.trans (hsp1 h).1, (hsp2 h).2.trans (hsp1 h).2⟩
   -- the block closes here, at copyinstr's descriptor, before the branch
-  ihave Hblk := fetchstr_priv_close (GF := GF) ξ0 rfl pa pid V P P' (viewFaulted P P' M) hpost.1 hfacts
+  ihave Hblk := fetchstr_priv_close (GF := GF) ξ0 rfl pa pid (V.updEv kc) P P' (viewFaulted P P' M) hpost.1 hfacts
     $$ [Hsz Hpg Hspace Hrest]
   case' _ => simp only [pSz, pPagetable]; iframe
   rw [MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
@@ -442,27 +447,34 @@ theorem fetchstr_proof (MP : MYPROC) (CI : COPYINSTR) (SL : STRLEN) : FETCHSTR :
     obtain ⟨pl, rfl, hnul, hlt⟩ := UMemL.umemStr_nul _ _ _ s hs
     subst hbs
     iapply (fetchstr_tail_ok SL cpu c13 k
-      (fun r => iprop(∃ (Q' : UPtd) (cs : List (BitVec 8)),
+      (fun r => iprop(∃ (Q' : UPtd) (cs : List (BitVec 8)) (k' : Nat),
         ⌜P.extSz V.sz Q' ∧ fetchstrRet (viewLazy P V.sz M) (k.regs 10#5).toNat old cs r⌝ ∗
-        procPrivBareAt curCtx pa pid { V with upt := Q' } (viewFaulted P Q' M) ∗ byteBuf (k.regs 11#5) (DFrac.own 1) cs)) hK56 hpin13 spie2 spp2 hsp12 R2 hR2 hpins (f9.trans e9) h0
+        ⌜V.ev ≤ k'⌝ ∗ procPrivBareAt curCtx pa pid { V.updEv k' with upt := Q' } (viewFaulted P Q' M) ∗ byteBuf (k.regs 11#5) (DFrac.own 1) cs)) hK56 hpin13 spie2 spp2 hsp12 R2 hR2 hpins (f9.trans e9) h0
         pl (old.drop (pl ++ [0#8]).length) (by omega) hnul)
       $$ [- $Hk $Hpc $Hframe $Hbuf $HΦ]
     iintro Hbuf
     iexists P'
     iexists (pl ++ [0#8] ++ old.drop (pl ++ [0#8]).length)
+    iexists kc
+    isplitl []
+    · ipureintro; exact ⟨hext, fetchstr_ret_ok _ _ old pl (UMemL.umemStr_viewLazy M hext hs hmap)⟩
+    isplitl []
+    · ipureintro; exact hkc
     iframe Hblk Hbuf
-    ipureintro
-    exact ⟨hext, fetchstr_ret_ok _ _ old pl (UMemL.umemStr_viewLazy M hext hs hmap)⟩
   · -- failure: -1
     iapply (fetchstr_tail_fail cpu c13 k
-      (fun r => iprop(∃ (Q' : UPtd) (cs : List (BitVec 8)),
+      (fun r => iprop(∃ (Q' : UPtd) (cs : List (BitVec 8)) (k' : Nat),
         ⌜P.extSz V.sz Q' ∧ fetchstrRet (viewLazy P V.sz M) (k.regs 10#5).toNat old cs r⌝ ∗
-        procPrivBareAt curCtx pa pid { V with upt := Q' } (viewFaulted P Q' M) ∗ byteBuf (k.regs 11#5) (DFrac.own 1) cs)) hK56 hpin13 spie2 spp2 hsp12 R2 hR2 hpins hm1)
+        ⌜V.ev ≤ k'⌝ ∗ procPrivBareAt curCtx pa pid { V.updEv k' with upt := Q' } (viewFaulted P Q' M) ∗ byteBuf (k.regs 11#5) (DFrac.own 1) cs)) hK56 hpin13 spie2 spp2 hsp12 R2 hR2 hpins hm1)
       $$ [- $Hk $Hpc $Hframe $HΦ]
     iexists P'
     iexists bs'
-    iframe Hblk Hbuf
-    ipureintro
-    exact ⟨hext, fetchstr_ret_fail _ _ old bs' (by rw [hbs, List.length_append, UMemL.umemRead_length, List.length_drop]; omega)⟩⟩
+    iexists kc
+    isplitl []
+    · ipureintro
+      exact ⟨hext, fetchstr_ret_fail _ _ old bs' (by rw [hbs, List.length_append, UMemL.umemRead_length, List.length_drop]; omega)⟩
+    isplitl []
+    · ipureintro; exact hkc
+    iframe Hblk Hbuf⟩
 
 end Xv6

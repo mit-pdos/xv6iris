@@ -50,9 +50,9 @@ def rdPost (k : KCtx) (γb : BcacheNames) (γfs : FsNames) (dev : BitVec 32) (j 
     inodeMeta ip dn -∗
     inodeMapQ γfs dq ip bm -∗ inodeBlocksQ γfs dq bm data -∗
     (if user then
-      (∃ (P' : UPtd) (M' : Nat → List (BitVec 8)),
+      (∃ (P' : UPtd) (M' : Nat → List (BitVec 8)) (k' : Nat),
         ⌜Vp.upt.extSz Vp.sz P' ∧ rdImg Vp.upt P' M M' (k.regs 12#5) data off tot⌝ ∗
-        procPrivRun (procAddr j) pidv { Vp with upt := P' } M')
+        ⌜Vp.ev ≤ k'⌝ ∗ procPrivRun (procAddr j) pidv { Vp.updEv k' with upt := P' } M')
      else byteBuf (k.regs 12#5) (DFrac.own 1) (rdDelivered data olds off tot) ∗
        wordPointsTo (pPid k.proc) 4 dqp pidv) -∗
     bslot -∗ wpLoop cpu')
@@ -74,9 +74,9 @@ theorem rdPost_elim (k : KCtx) (γb : BcacheNames) (γfs : FsNames) (dev : BitVe
     inodeMeta ip dn -∗
     inodeMapQ γfs dq ip bm -∗ inodeBlocksQ γfs dq bm data -∗
     (if user then
-      (∃ (P' : UPtd) (M' : Nat → List (BitVec 8)),
+      (∃ (P' : UPtd) (M' : Nat → List (BitVec 8)) (k' : Nat),
         ⌜Vp.upt.extSz Vp.sz P' ∧ rdImg Vp.upt P' M M' (k.regs 12#5) data off tot⌝ ∗
-        procPrivRun (procAddr j) pidv { Vp with upt := P' } M')
+        ⌜Vp.ev ≤ k'⌝ ∗ procPrivRun (procAddr j) pidv { Vp.updEv k' with upt := P' } M')
      else byteBuf (k.regs 12#5) (DFrac.own 1) (rdDelivered data olds off tot) ∗
        wordPointsTo (pPid k.proc) 4 dqp pidv) -∗
     bslot -∗ wpLoop cpu' := by
@@ -89,9 +89,9 @@ theorem rdDst_post (k : KCtx) (user : Bool) (j : Nat) (pidv : BitVec 32) (Vp : P
     (hproc : k.proc = procAddr j) (hok : rdUserOk user Vp M P Mi (k.regs 12#5) data off tot) :
     rdDst (GF := GF) user (k.regs 12#5) j pidv Vp P Mi dqp data olds off tot ⊢
       (if user then
-        (∃ (P' : UPtd) (M' : Nat → List (BitVec 8)),
+        (∃ (P' : UPtd) (M' : Nat → List (BitVec 8)) (k' : Nat),
           ⌜Vp.upt.extSz Vp.sz P' ∧ rdImg Vp.upt P' M M' (k.regs 12#5) data off tot⌝ ∗
-          procPrivRun (procAddr j) pidv { Vp with upt := P' } M')
+          ⌜Vp.ev ≤ k'⌝ ∗ procPrivRun (procAddr j) pidv { Vp.updEv k' with upt := P' } M')
        else byteBuf (k.regs 12#5) (DFrac.own 1) (rdDelivered data olds off tot) ∗
          wordPointsTo (pPid k.proc) 4 dqp pidv) := by
   cases user
@@ -100,12 +100,13 @@ theorem rdDst_post (k : KCtx) (user : Bool) (j : Nat) (pidv : BitVec 32) (Vp : P
     iintro H; iexact H
   · rw [rdDst_true]
     simp only [if_true]
-    iintro H
-    iexists P, Mi
+    iintro ⟨%kv, %hkv, H⟩
+    iexists P, Mi, kv
     ihave H := procPrivExt_close _ _ _ _ _ $$ H
     iframe H
-    ipureintro
-    exact hok rfl
+    isplitl []
+    · ipureintro; exact hok rfl
+    · ipureintro; exact hkv
 
 set_option maxHeartbeats 8000000 in
 /-- **`+0xd8 .. +0xec`: THE JOIN AND THE RETURN** (Rocq's `rd_join` +

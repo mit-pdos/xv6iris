@@ -198,16 +198,16 @@ theorem fetchaddr_tail [CurCtx] (c : CPU) (k : KCtx) (hK : 4 ≤ k.avail) (spie 
       R 25#5 = k.regs 25#5 ∧ R 26#5 = k.regs 26#5 ∧ R 27#5 = k.regs 27#5) :
     kctx c (((k.pushed 4).withSpie spie spp).withRegs R) ∗ pcIs c (KA.«fetchaddr» + 0x36#64) ∗
     fetchaddrFrame (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) ∗
-    (∃ (P' : UPtd) (w : BitVec 64),
+    (∃ (P' : UPtd) (w : BitVec 64) (k' : Nat),
       ⌜P.extSz V.sz P' ∧ fetchaddrAns (viewLazy P V.sz M) (k.regs 10#5) V.sz oldv (R 10#5) w⌝ ∗
-      procPrivExt (procAddr j) pid V P' (viewFaulted P P' M) ∗
+      ⌜V.ev ≤ k'⌝ ∗ procPrivExt (procAddr j) pid (V.updEv k') P' (viewFaulted P P' M) ∗
       wordPointsTo (k.regs 11#5) 8 (DFrac.own 1) w) ∗
     wpNext k.sie k.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
       ⌜k.sie = false → spie = k.spie ∧ spp = k.spp⌝ -∗
       kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
-      (∃ (P' : UPtd) (w : BitVec 64),
+      (∃ (P' : UPtd) (w : BitVec 64) (k' : Nat),
         ⌜P.extSz V.sz P' ∧ fetchaddrAns (viewLazy P V.sz M) (k.regs 10#5) V.sz oldv (R' 10#5) w⌝ ∗
-        procPrivExt (procAddr j) pid V P' (viewFaulted P P' M) ∗
+        ⌜V.ev ≤ k'⌝ ∗ procPrivExt (procAddr j) pid (V.updEv k') P' (viewFaulted P P' M) ∗
         wordPointsTo (k.regs 11#5) 8 (DFrac.own 1) w) -∗
       ⌜calleeSaved k.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
@@ -220,9 +220,9 @@ theorem fetchaddr_tail [CurCtx] (c : CPU) (k : KCtx) (hK : 4 ≤ k.avail) (spie 
   iapply wpNext_mono _ _ _ _ _ $$ HΦ
   iintro %c' HΦ %R3 Hk Hpc %hexit
   obtain ⟨x10, x1, x2, x8, x9, x18, xrest⟩ := hexit
-  ihave HQ : (∃ (P' : UPtd) (w : BitVec 64),
+  ihave HQ : (∃ (P' : UPtd) (w : BitVec 64) (k' : Nat),
       ⌜P.extSz V.sz P' ∧ fetchaddrAns (viewLazy P V.sz M) (k.regs 10#5) V.sz oldv (R3 10#5) w⌝ ∗
-      procPrivExt (GF := GF) (procAddr j) pid V P' (viewFaulted P P' M) ∗
+      ⌜V.ev ≤ k'⌝ ∗ procPrivExt (GF := GF) (procAddr j) pid (V.updEv k') P' (viewFaulted P P' M) ∗
       wordPointsTo (k.regs 11#5) 8 (DFrac.own 1) w) $$ [HQ]
   case' _ => rw [x10]; iexact HQ
   iapply HΦ $$ %spie %spp %R3 %hsp Hk Hpc HQ
@@ -324,17 +324,20 @@ theorem fetchaddr_proof (MP : MYPROC) (CI : COPYIN) : FETCHADDR :=
     ihave HΦ := wpNext_shift _ _ _ _ _ hpin $$ HΦ
     have hr : ((R1.set 11#5 V.sz).set 10#5 18446744073709551615#64) 10#5 = -1#64 := by
       simp only [RegMap.set_apply, ite_true]; decide
-    ihave Hout : (∃ (P' : UPtd) (w : BitVec 64),
+    ihave Hout : (∃ (P' : UPtd) (w : BitVec 64) (k' : Nat),
         ⌜P.extSz V.sz P' ∧ fetchaddrAns (viewLazy P V.sz M) (k.regs 10#5) V.sz oldv
           (((R1.set 11#5 V.sz).set 10#5 18446744073709551615#64) 10#5) w⌝ ∗
-        procPrivExt (GF := GF) (procAddr j) pid V P' (viewFaulted P P' M) ∗
+        ⌜V.ev ≤ k'⌝ ∗ procPrivExt (GF := GF) (procAddr j) pid (V.updEv k') P' (viewFaulted P P' M) ∗
         wordPointsTo (k.regs 11#5) 8 (DFrac.own 1) w) $$ [Hsz Hpg Hspace Hrest Hip]
     case' _ =>
       iexists P
       iexists oldv
+      iexists V.ev
       rw [UMemL.viewFaulted_self]
       isplitl []
       · ipureintro; exact ⟨UMemL.extSz_refl _ P, Or.inl ⟨hr, fetchaddr_ge_bad _ _ hb, rfl⟩⟩
+      isplitl []
+      · ipureintro; exact Nat.le_refl _
       · isplitl [Hsz Hpg Hspace Hrest]
         · iapply (ec_priv_close (procAddr j) pid V P P M (UMemL.extSz_refl _ P) hf)
           simp only [pSz, pPagetable]
@@ -374,17 +377,20 @@ theorem fetchaddr_proof (MP : MYPROC) (CI : COPYIN) : FETCHADDR :=
       ihave HΦ := wpNext_shift _ _ _ _ _ hpin $$ HΦ
       have hr : (((R1.set 11#5 V.sz).set 15#5 (k.regs 10#5 + 8#64)).set 10#5 18446744073709551615#64) 10#5 = -1#64 := by
         simp only [RegMap.set_apply, ite_true]; decide
-      ihave Hout : (∃ (P' : UPtd) (w : BitVec 64),
+      ihave Hout : (∃ (P' : UPtd) (w : BitVec 64) (k' : Nat),
           ⌜P.extSz V.sz P' ∧ fetchaddrAns (viewLazy P V.sz M) (k.regs 10#5) V.sz oldv
             ((((R1.set 11#5 V.sz).set 15#5 (k.regs 10#5 + 8#64)).set 10#5 18446744073709551615#64) 10#5) w⌝ ∗
-          procPrivExt (GF := GF) (procAddr j) pid V P' (viewFaulted P P' M) ∗
+          ⌜V.ev ≤ k'⌝ ∗ procPrivExt (GF := GF) (procAddr j) pid (V.updEv k') P' (viewFaulted P P' M) ∗
           wordPointsTo (k.regs 11#5) 8 (DFrac.own 1) w) $$ [Hsz Hpg Hspace Hrest Hip]
       case' _ =>
         iexists P
         iexists oldv
+        iexists V.ev
         rw [UMemL.viewFaulted_self]
         isplitl []
         · ipureintro; exact ⟨UMemL.extSz_refl _ P, Or.inl ⟨hr, fetchaddr_lt_bad _ _ hszb hb hc, rfl⟩⟩
+        isplitl []
+        · ipureintro; exact Nat.le_refl _
         · isplitl [Hsz Hpg Hspace Hrest]
           · iapply (ec_priv_close (procAddr j) pid V P P M (UMemL.extSz_refl _ P) hf)
             simp only [pSz, pPagetable]
@@ -423,12 +429,14 @@ theorem fetchaddr_proof (MP : MYPROC) (CI : COPYIN) : FETCHADDR :=
       iintro Hk Hpc
       k_norm_g
       icases fetchaddr_word_to_bytes (k.regs 11#5) oldv $$ Hip with ⟨%hal, Hbuf⟩
+      -- the block's counter, lent to copyin (permit sweep L1b)
+      icases ecRest_lend k.proc (procAddr j) hproc pid V P $$ Hrest with ⟨Hlend, Hrest⟩
       -- copyin(p->pagetable, p->sz, ip, addr, 8)
-      iapply (ec_copyin_call CI c19 _ γl γk P M (wordToBytes oldv) ?hnC ?hKC ?hlC ?hrC ?hszC
+      iapply (ec_copyin_call CI c19 _ γl γk P M (wordToBytes oldv) V.ev ?hnC ?hKC ?hlC ?hrC ?hszC
         ?hlnC ?hl'C) $$ [- $Hk $Hpc]
       rotate_right 1
       k_norm_g [e18]
-      iframe Hlk Hav Hspace Hbuf
+      iframe Hlk Hav Hspace Hbuf Hlend
       case hnC => k_norm_g; omega
       case hKC => k_norm_g; omega
       case hlC => k_norm_g; exact hlk
@@ -438,9 +446,10 @@ theorem fetchaddr_proof (MP : MYPROC) (CI : COPYIN) : FETCHADDR :=
       case hl'C => rw [wordToBytes_length]; decide
       k_norm_g [fetchaddr_ret_2e]
       iapply wpNext_intro_pin
-      iintro %c20 %hp20 %spie2 %spp2 %R2 %hsp2 Hk Hpc Hres %hcs2
+      iintro %c20 %hp20 %spie2 %spp2 %R2 %hsp2 Hk Hpc Hlend Hres %hcs2
       k_norm_g
       icases Hres with ⟨%P', %bs', %hpost, Hspace, Hbuf⟩
+      icases Hrest $$ Hlend with ⟨%kc, %hkc, Hrest⟩
       unfold calleeSaved at hcs2
       k_norm_g at hcs2
       obtain ⟨f2, f8, f9, f18, f19, f20, f21, f22, f23, f24, f25, f26, f27⟩ := hcs2
@@ -467,16 +476,17 @@ theorem fetchaddr_proof (MP : MYPROC) (CI : COPYIN) : FETCHADDR :=
             ((hp12 h).trans ((hp11 h).trans (hpin10 h))))))))))))
       ihave HΦ := wpNext_shift _ _ _ _ _ hpin $$ HΦ
       rw [MachCSL.KCtx.withSpie_twice]
-      ihave Hout : (∃ (P'' : UPtd) (w : BitVec 64),
+      ihave Hout : (∃ (P'' : UPtd) (w : BitVec 64) (k' : Nat),
           ⌜P.extSz V.sz P'' ∧ fetchaddrAns (viewLazy P V.sz M) (k.regs 10#5) V.sz oldv
             (((R2.set 10#5 (if (0#64 : BitVec 64).ult (R2 10#5) = true then 1#64 else 0#64)).set 10#5
           (BitVec.signExtend 64 (-BitVec.extractLsb' 0 32
             (if (0#64 : BitVec 64).ult (R2 10#5) = true then 1#64 else 0#64)))) 10#5) w⌝ ∗
-          procPrivExt (GF := GF) (procAddr j) pid V P'' (viewFaulted P P'' M) ∗
+          ⌜V.ev ≤ k'⌝ ∗ procPrivExt (GF := GF) (procAddr j) pid (V.updEv k') P'' (viewFaulted P P'' M) ∗
           wordPointsTo (k.regs 11#5) 8 (DFrac.own 1) w) $$ [Hsz Hpg Hspace Hrest Hw]
       case' _ =>
         iexists P'
         iexists (bytesToWord bs')
+        iexists kc
         isplitl []
         · ipureintro
           refine ⟨hpost.1, Or.inr ⟨hok, ?_⟩⟩
@@ -485,8 +495,10 @@ theorem fetchaddr_proof (MP : MYPROC) (CI : COPYIN) : FETCHADDR :=
           rcases hpost.2 with ⟨h0, hb', hm⟩ | ⟨h1, _⟩
           · exact Or.inl ⟨h0, by rw [hb', UMemL.umemRead_viewLazy M hpost.1 hm]⟩
           · exact Or.inr (by rw [h1]; decide)
+        isplitl []
+        · ipureintro; exact hkc
         · isplitl [Hsz Hpg Hspace Hrest]
-          · iapply (ec_priv_close (procAddr j) pid V P P' (viewFaulted P P' M) hpost.1 hf)
+          · iapply (ec_priv_close (procAddr j) pid (V.updEv kc) P P' (viewFaulted P P' M) hpost.1 hf)
             simp only [pSz, pPagetable]
             iframe
           · iexact Hw

@@ -128,7 +128,7 @@ def fwrHead (Γ : SchedNames) (k : KCtx) (A : FwrA) (Q : Nat → IProp GF) (Qe :
   frame12 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)
     (k.regs 20#5) (k.regs 21#5) (k.regs 22#5) (k.regs 23#5) (k.regs 24#5) (k.regs 25#5) v11 ∗
   fwrEnv (hlc := hlc) Γ A ∗ fileRef A.γ A.fk A.q A.st ∗
-  procPrivExt (procAddr A.j) A.pid A.V P A.img ∗ bslots 3 ∗
+  procPrivExtEv (procAddr A.j) A.pid A.V P A.img ∗ bslots 3 ∗
   fwrSt (hlc := hlc) A.om (fsGammaL fscFs) A.i A.γo A.V.upt A.n A.img (k.regs 11#5) Q t p 0 ∗
   fwrK (hlc := hlc) k A.γul A.γuu A.γ A.fk A.q A.st A.j A.pid A.V A.M A.n Q Qe
 
@@ -159,7 +159,7 @@ theorem fwr_tests (Γ : SchedNames) (k : KCtx) (A : FwrA) (hA : FwrFacts k A) (Q
     frame12 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)
       (k.regs 20#5) (k.regs 21#5) (k.regs 22#5) (k.regs 23#5) (k.regs 24#5) (k.regs 25#5) v11 ∗
     fwrEnv (hlc := hlc) Γ A ∗ fileRef A.γ A.fk A.q A.st ∗
-    procPrivExt (procAddr A.j) A.pid A.V P A.img ∗ bslots 3 ∗
+    procPrivExtEv (procAddr A.j) A.pid A.V P A.img ∗ bslots 3 ∗
     ((⌜tot = c⌝ ∗ fwrSt (hlc := hlc) A.om (fsGammaL fscFs) A.i A.γo A.V.upt A.n A.img (k.regs 11#5) Q (t + c)
         (p + 1) 0) ∨
      (⌜tot < c⌝ ∗ ∃ x : Nat, ⌜x ≤ 1⌝ ∗
@@ -337,7 +337,7 @@ theorem fwr_iter (BO : BEGIN_OP) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK) (EO :
   icases fsReady_icache $$ Hfs with ⟨-, -, #Hslks⟩
   icases icSleeplocks_lookup fscIc ik hik $$ Hslks with ⟨%γil, %γisl, #Hslk⟩
   icases bslots_uncons 2 $$ Hbs with ⟨Hbs1, Hbs2⟩
-  icases filerw_priv_pid (procAddr A.j) A.pid A.V P A.img $$ Hpriv with ⟨Hpid, Hpback⟩
+  icases filerw_priv_pidEv (procAddr A.j) A.pid A.V P A.img $$ Hpriv with ⟨Hpid, Hpback⟩
   ihave Hpid : wordPointsTo (pPid k.proc) 4 pidPriv A.pid $$ [Hpid]
   · rw [hA.hproc]; iexact Hpid
   -- +0x8a .. +0x94 : begin_op, ilock
@@ -409,7 +409,7 @@ theorem fwr_iter (BO : BEGIN_OP) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK) (EO :
   · unfold fwrLk; iframe
   ihave #Hshot'' : ityShot g dn'.diType $$ []
   · rw [hty', htyeq]; iexact Hshot
-  icases filerw_priv_pid (procAddr A.j) A.pid A.V P' (viewFaulted P P' A.img) $$ Hpriv
+  icases filerw_priv_pidEv (procAddr A.j) A.pid A.V P' (viewFaulted P P' A.img) $$ Hpriv
     with ⟨Hpid, Hpback⟩
   ihave Hpid : wordPointsTo (pPid k.proc) 4 pidPriv A.pid $$ [Hpid]
   · rw [hA.hproc]; iexact Hpid
@@ -422,10 +422,10 @@ theorem fwr_iter (BO : BEGIN_OP) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK) (EO :
   ihave Hpid : wordPointsTo (pPid (procAddr A.j)) 4 pidPriv A.pid $$ [Hpid]
   · rw [← hA.hproc]; iexact Hpid
   ihave Hpriv := Hpback $$ Hpid
-  have hpv : procPrivExt (GF := GF) (procAddr A.j) A.pid A.V P' (viewFaulted P P' A.img) ⊢
-      procPrivExt (procAddr A.j) A.pid A.V P' A.img := by
-    show procPrivExt (GF := GF) (procAddr A.j) A.pid A.V P' (viewFaulted P P' (writerImg A.V.upt A.M)) ⊢
-      procPrivExt (procAddr A.j) A.pid A.V P' (writerImg A.V.upt A.M)
+  have hpv : procPrivExtEv (GF := GF) (procAddr A.j) A.pid A.V P' (viewFaulted P P' A.img) ⊢
+      procPrivExtEv (procAddr A.j) A.pid A.V P' A.img := by
+    show procPrivExtEv (GF := GF) (procAddr A.j) A.pid A.V P' (viewFaulted P P' (writerImg A.V.upt A.M)) ⊢
+      procPrivExtEv (procAddr A.j) A.pid A.V P' (writerImg A.V.upt A.M)
     rw [writerImg_fault A.V.upt P P' A.M hext.1 hPP.1]
   ihave Hpriv := hpv $$ Hpriv
   ihave Hfields := Hfw $$ Hip

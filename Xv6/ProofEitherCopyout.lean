@@ -30,15 +30,16 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 set_option maxHeartbeats 1000000 in
 /-- `copyout`'s contract as a rule. -/
 theorem ec_copyout_call (CO : COPYOUT) [CurCtx] (c : CPU) (k' : KCtx) (γl : GName) (γk : KmemNames)
-    (P : UPtd) (M : Nat → List (BitVec 8)) (dqs : DFrac) (bs : List (BitVec 8))
+    (P : UPtd) (M : Nat → List (BitVec 8)) (dqs : DFrac) (bs : List (BitVec 8)) (ke : Nat)
     (hnoff : k'.noff + 1 < 2 ^ 31) (hK : 52 ≤ k'.avail) (hlk : "kmem" ∉ k'.locks)
     (hroot : k'.regs 10#5 = pageAddr P.root) (hsz : (k'.regs 11#5).toNat ≤ 2 ^ 38)
     (hlen : k'.regs 14#5 = BitVec.ofNat 64 bs.length) (hlen' : bs.length < 2 ^ 63) :
     kctx c k' ∗ pcIs c KA.«copyout» ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
-    kallocAvail γk none ∗ procPtAt P M ∗ byteBuf (k'.regs 13#5) dqs bs ∗
+    kallocAvail γk none ∗ procPtAt P M ∗ byteBuf (k'.regs 13#5) dqs bs ∗ actLend k'.proc ke ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
       ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
+      (∃ k1 : Nat, ⌜ke ≤ k1⌝ ∗ actLend k'.proc k1) -∗
       byteBuf (k'.regs 13#5) dqs bs -∗
       (∃ (P' : UPtd) (M' : Nat → List (BitVec 8)),
         ⌜P.extSz (k'.regs 11#5) P' ∧
@@ -51,7 +52,7 @@ theorem ec_copyout_call (CO : COPYOUT) [CurCtx] (c : CPU) (k' : KCtx) (γl : GNa
         procPtAt P' M') -∗
       ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := CO.wp_copyout (hlc := hlc) (GF := GF) c k' γl γk P M dqs bs hnoff hK hlk hroot hsz hlen hlen'
+  have h := CO.wp_copyout (hlc := hlc) (GF := GF) c k' γl γk P M dqs bs ke hnoff hK hlk hroot hsz hlen hlen'
   unfold wp_copyout_body at h
   simp only [copyoutAddr] at h
   exact h
@@ -145,6 +146,8 @@ theorem either_copyout_proof (MP : MYPROC) (CO : COPYOUT) (MM : MEMMOVE) : EITHE
     have hpa : R1 10#5 = procAddr j := h10.trans (hproc rfl)
     simp only [reduceIte]
     icases ec_priv_split (procAddr j) pid V P M $$ Harm with ⟨%hfacts, Hsz, Hpg, Hspace, Hrest⟩
+    -- the block's counter, lent to copyout (permit sweep L1b)
+    icases ecRest_lend k.proc (procAddr j) (hproc rfl) pid V P $$ Hrest with ⟨Hlend, Hrest⟩
     k_step_gen (wp_s_branch c14 _ (KA.«either_copyout» + 0x1c#64) true 32#13 9#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [e9, ec_beq_ne _ huser] next c15 hp15
@@ -173,11 +176,11 @@ theorem either_copyout_proof (MP : MYPROC) (CO : COPYOUT) (MM : MEMMOVE) : EITHE
     iintro Hk Hpc
     k_norm_g
     -- copyout(p->pagetable, p->sz, dst, src, len)
-    iapply (ec_copyout_call CO c21 _ γl γk P M dqs bs ?hnC ?hKC ?hlC ?hrC ?hszC ?hlnC ?hl'C)
+    iapply (ec_copyout_call CO c21 _ γl γk P M dqs bs V.ev ?hnC ?hKC ?hlC ?hrC ?hszC ?hlnC ?hl'C)
       $$ [- $Hk $Hpc]
     rotate_right 1
     k_norm_g [e19]
-    iframe Hlk Hav Hspace Hbs
+    iframe Hlk Hav Hspace Hbs Hlend
     case hnC => k_norm_g; omega
     case hKC => k_norm_g; omega
     case hlC => k_norm_g; exact hlk
@@ -187,9 +190,10 @@ theorem either_copyout_proof (MP : MYPROC) (CO : COPYOUT) (MM : MEMMOVE) : EITHE
     case hl'C => exact hlen'
     k_norm_g [ec_ret_2e0]
     iapply wpNext_intro_pin
-    iintro %c22 %hp22 %spie2 %spp2 %R2 %hsp2 Hk Hpc Hbs Hres %hcs2
+    iintro %c22 %hp22 %spie2 %spp2 %R2 %hsp2 Hk Hpc Hlend Hbs Hres %hcs2
     k_norm_g
     icases Hres with ⟨%P', %M', %hpost, Hspace⟩
+    icases Hrest $$ Hlend with ⟨%kc, %hkc, Hrest⟩
     rw [e20] at hpost
     unfold calleeSaved at hcs2
     k_norm_g at hcs2
@@ -211,7 +215,7 @@ theorem either_copyout_proof (MP : MYPROC) (CO : COPYOUT) (MM : MEMMOVE) : EITHE
     iapply wpNext_mono _ _ _ _ _ $$ HΦ
     iintro %c23 HΦ %R3 Hk Hpc %hexit
     obtain ⟨x10, x1, x2, x8, x9, x18, x19, x20, xrest⟩ := hexit
-    ihave Hout : (∃ (Q : UPtd) (N : Nat → List (BitVec 8)),
+    ihave Hout : (∃ (Q : UPtd) (N : Nat → List (BitVec 8)) (k' : Nat),
         ⌜P.extSz V.sz Q ∧
           ((R3 10#5 = 0#64 ∧ N = umemWrite (viewFaulted P Q M) (k.regs 11#5).toNat bs ∧
               umMapped Q (k.regs 11#5).toNat bs.length) ∨
@@ -219,13 +223,16 @@ theorem either_copyout_proof (MP : MYPROC) (CO : COPYOUT) (MM : MEMMOVE) : EITHE
               N = umemWrite (viewFaulted P Q M) (k.regs 11#5).toNat (List.take d bs) ∧
               umMapped Q (k.regs 11#5).toNat d ∧
               ¬ uvaWmapped P (k.regs 11#5 + BitVec.ofNat 64 d).toNat))⌝ ∗
-        procPrivExt (procAddr j) pid V Q N) $$ [Hsz Hpg Hspace Hrest]
+        ⌜V.ev ≤ k'⌝ ∗ procPrivExt (procAddr j) pid (V.updEv k') Q N) $$ [Hsz Hpg Hspace Hrest]
     case' _ =>
       iexists P'
       iexists M'
+      iexists kc
       isplitl []
       · ipureintro; rw [x10]; exact hpost
-      · iapply (ec_priv_close (procAddr j) pid V P P' M' hpost.1
+      isplitl []
+      · ipureintro; exact hkc
+      · iapply (ec_priv_close (procAddr j) pid (V.updEv kc) P P' M' hpost.1
           hfacts)
         simp only [pSz, pPagetable]
         iframe

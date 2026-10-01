@@ -57,6 +57,11 @@ whole doubleword lay inside the address space.
 fact (carried by `wordPointsTo`) is what the proof uses to lend it to
 `copyin` as eight bytes and take it back.
 
+THE EVENT COUNTER (permit sweep L1b, Rocq b69bd0fab): fetchaddr lends the
+block's counter to copyin, which may step it, so the block comes back at a
+count at least the one it left at (`∃ k' ≥ V.ev`, the record at
+`V.updEv k'`; the range-test arms return it at `V.ev`).
+
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
 import Xv6.EitherDefs
@@ -97,9 +102,9 @@ def wp_fetchaddr_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6
   wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
     ⌜k.sie = false → spie = k.spie ∧ spp = k.spp⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
-    (∃ (P' : UPtd) (w : BitVec 64),
+    (∃ (P' : UPtd) (w : BitVec 64) (k' : Nat),
       ⌜P.extSz V.sz P' ∧ fetchaddrAns (viewLazy P V.sz M) (k.regs 10#5) V.sz oldv (R' 10#5) w⌝ ∗
-      procPrivExt (procAddr j) pid V P' (viewFaulted P P' M) ∗
+      ⌜V.ev ≤ k'⌝ ∗ procPrivExt (procAddr j) pid (V.updEv k') P' (viewFaulted P P' M) ∗
       wordPointsTo (k.regs 11#5) 8 (DFrac.own 1) w) -∗
     ⌜calleeSaved k.regs R'⌝ -∗ wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu

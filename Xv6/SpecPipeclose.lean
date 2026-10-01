@@ -32,9 +32,15 @@ payment back.
 at entry they are on at exit with `SPIE`/`SPP` pinned by whatever trap ran,
 and the continuation is at whichever hart the thread landed on.  It runs at
 the kernel page table (`.kpt`), which `wakeup`/`procsInv` and `isPipe` need.
+
+THE LEND (permit sweep L1b, Rocq b69bd0fab; design ni-strong-instance.md
+§7): the closer's event-counter lend `actLend k.proc ke` (for kfree) goes in
+and comes back at a count no lower (`∃ k' ≥ ke`) right after the return pc;
+the proof frames it through for now.
 -/
 import Xv6.PipeInvDefs
 import Xv6.SchedCtx
+import Xv6.SlotGen
 import MachCSL.WpSmodeIntr
 
 namespace Xv6
@@ -61,7 +67,7 @@ nothing the caller holds is `"pipe"`, and `wakeup`'s `"proc"` is free too. -/
 def wp_pipeclose_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
     (Γ : SchedNames) (cpu : CPU) (k : KCtx)
     (γl : GName) (γp : PipeNames) (w : Bool)
-    (γkl : GName) (γk : KmemNames) (on : Option Nat) (Φ : IProp GF)
+    (γkl : GName) (γk : KmemNames) (on : Option Nat) (Φ : IProp GF) (ke : Nat)
     (hw : w = decide (k.regs 11#5 ≠ 0#64))
     (hnoff : k.noff + 2 < 2 ^ 31) (hK : pipecloseSlots ≤ k.avail)
     (hpipe : "pipe" ∉ k.locks) (hproc : "proc" ∉ k.locks) (hkmem : "kmem" ∉ k.locks)
@@ -71,10 +77,12 @@ def wp_pipeclose_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6
   -- THE CLOSE STEP OF THE BYTE QUEUE: a close link, or the taint
   pipeCpay (hlc := hlc) γp.pnQueue w Φ ∗
   isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk on ∗
+  actLend k.proc ke ∗
   procsInv Γ ∗
   wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
     ⌜k.sie = false → spie = k.spie ∧ spp = k.spp⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
+    (∃ k' : Nat, ⌜ke ≤ k'⌝ ∗ actLend k.proc k') -∗
     ⌜calleeSaved k.regs R'⌝ -∗
     (kallocAvail γk on ∨ kallocAvail γk (availInc on)) -∗
     -- the link fired, or the pipe is tainted and the payment comes back
@@ -86,9 +94,9 @@ structure PIPECLOSE : Prop where
   wp_pipeclose : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
     (Γ : SchedNames) (cpu : CPU) (k : KCtx)
     (γl : GName) (γp : PipeNames) (w : Bool)
-    (γkl : GName) (γk : KmemNames) (on : Option Nat) (Φ : IProp GF)
+    (γkl : GName) (γk : KmemNames) (on : Option Nat) (Φ : IProp GF) (ke : Nat)
     hw hnoff hK hpipe hproc hkmem htier,
-    wp_pipeclose_body (hlc := hlc) (GF := GF) Γ cpu k γl γp w γkl γk on Φ
+    wp_pipeclose_body (hlc := hlc) (GF := GF) Γ cpu k γl γp w γkl γk on Φ ke
       hw hnoff hK hpipe hproc hkmem htier
 
 end Xv6

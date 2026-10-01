@@ -395,8 +395,9 @@ def wp_writei_gen_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv
     wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 fscBmapstart) -∗
     dinodeAt fscIreg inum dn0' -∗
     -- the source goes back the way it came
-    (if user then procPrivBareAt curCtx (procAddr j) pidv { V with upt := P' }
-        (viewFaulted V.upt P' M)
+    (if user then iprop(∃ k' : Nat, ⌜V.ev ≤ k'⌝ ∗
+        procPrivBareAt curCtx (procAddr j) pidv { V.updEv k' with upt := P' }
+        (viewFaulted V.upt P' M))
      else iprop(byteBuf (k.regs 12#5) dqs sbs ∗ wordPointsTo (pPid k.proc) 4 dqp pidv)) -∗
     bslots 3 -∗
     logOpS icfgLog n' Sb' -∗ wpLoop cpu'))
@@ -484,8 +485,9 @@ def wp_writei_gen_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] 
     wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 fscBmapstart) -∗
     dinodeAt fscIreg inum dn0' -∗
     -- the source goes back the way it came
-    (if user then procPrivBareAt curCtx (procAddr j) pidv { V with upt := P' }
-        (viewFaulted V.upt P' M)
+    (if user then iprop(∃ k' : Nat, ⌜V.ev ≤ k'⌝ ∗
+        procPrivBareAt curCtx (procAddr j) pidv { V.updEv k' with upt := P' }
+        (viewFaulted V.upt P' M))
      else iprop(byteBuf (k.regs 12#5) dqs sbs ∗ wordPointsTo (pPid k.proc) 4 dqp pidv)) -∗
     bslots 3 -∗
     logOpS icfgLog n' Sb' -∗ wpLoop cpu'))

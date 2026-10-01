@@ -128,7 +128,7 @@ def frdK (k : KCtx) (γ : FileNames) (fk : Nat) (q : Qp) (st : FdState) (j : Nat
       umemWrote V.upt M (k.regs 11#5) d P' M'⌝ -∗
     kctx c ((k.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k.regs 1#5)) -∗
     trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗
-    fileRef γ fk q st -∗ procPrivExt (procAddr j) pid V P' M' -∗
+    fileRef γ fk q st -∗ procPrivExtEv (procAddr j) pid V P' M' -∗
     genHalvesPriv (procAddr j) pid V.gen -∗
     filereadEnvOut (hlc := hlc) st -∗
     filereadArms (hlc := hlc) V.gen V.upt st n F Rd Rin Rp Rpe P (R' 10#5) M' (k.regs 11#5) -∗ wpLoop c)
@@ -360,7 +360,7 @@ theorem frd_seg_read (RD : READI) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
       wordPointsTo (iDev (ientry ik)) 4 (DFrac.own (1 : Qp).half) icfgDev -∗
       inodeMeta (ientry ik) dn -∗ inodeMapQ fscFs (DFrac.own Qp.quarter) (ientry ik) bm -∗
       inodeBlocksQ fscFs (DFrac.own Qp.quarter) bm data -∗
-      procPrivExt (procAddr j) pid V P' M' -∗ bslot -∗ wpLoop c')
+      procPrivExtEv (procAddr j) pid V P' M' -∗ bslot -∗ wpLoop c')
     ⊢ wpLoop (GF := GF) cpu := by
   have hK' : 6 + readiSlots ≤ k.avail := hK
   have hmb : MAXFILE * BSIZE = 274432 := rfl

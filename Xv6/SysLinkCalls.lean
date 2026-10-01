@@ -34,6 +34,9 @@ projection family); the superblock cells are the persistent
    into quarters (`log_tx_split` / `log_tx_add`) and lends one.  dirlink's
    contract returns exactly the `(tid, qtx)` it got, so the split buys
    nothing.
+3. Permit sweep L1b: `sys_link_argstr`'s continuation takes argstr's raised
+   count (`(kv : Nat)`, `⌜V.ev ≤ kv⌝`, the block at
+   `{ V.updEv kv with upt := P' }`).
 -/
 import Xv6.SysLinkFrame
 import Xv6.SpecNamecmp
@@ -71,12 +74,14 @@ theorem sys_link_argstr (AS : ARGSTR) (Γ : SchedNames) (cpu : CPU) (k' : KCtx) 
     kctx cpu k' ∗ pcIs cpu KA.«argstr» ∗
     trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗ sysfileEnv (hlc := hlc) Γ ∗
     procPrivBareAt curCtx pa pid V M ∗ byteBuf buf (DFrac.own 1) old ∗
-    (∀ (c : CPU) (spie spp : Bool) (R' : RegMap) (P' : UPtd) (bs : List (BitVec 8)),
+    (∀ (c : CPU) (spie spp : Bool) (R' : RegMap) (P' : UPtd) (bs : List (BitVec 8)) (kv : Nat),
       ⌜calleeSaved k'.regs R' ∧ V.upt.extSz V.sz P' ∧
         fetchstrRet (viewLazy V.upt V.sz M) v.toNat old bs (R' 10#5)⌝ -∗
       kctx c ((k'.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k'.regs 1#5)) -∗
       trapCsrsExt c se -∗ cpuClaimExt c se pj -∗
-      procPrivBareAt curCtx pa pid { V with upt := P' } (viewFaulted V.upt P' M) -∗
+      -- the block's counter, lent through argstr (permit sweep L1b)
+      ⌜V.ev ≤ kv⌝ -∗
+      procPrivBareAt curCtx pa pid { V.updEv kv with upt := P' } (viewFaulted V.upt P' M) -∗
       byteBuf buf (DFrac.own 1) bs -∗ wpLoop c)
     ⊢ wpLoop (GF := GF) cpu := by
   subst hs hpj hbuf
@@ -93,11 +98,11 @@ theorem sys_link_argstr (AS : ARGSTR) (Γ : SchedNames) (cpu : CPU) (k' : KCtx) 
   iframe Hk Hpc Hblk Hbuf
   iframe #
   iapply wpNext_intro_pin
-  iintro %c %hpin %spie %spp %R' %- Hk Hpc ⟨%P', %bs, %hf, Hblk, Hbuf⟩ %hcs
+  iintro %c %hpin %spie %spp %R' %- Hk Hpc ⟨%P', %bs, %kv, %hf, %hkv, Hblk, Hbuf⟩ %hcs
   have hpin' : k'.sie = false → c = cpu := fun h => hpin (Or.inl h)
   ihave Hte := trapCsrsExt_move _ _ _ hpin' $$ Hte
   ihave Hce := cpuClaimExt_move _ _ _ _ hpin' $$ Hce
-  iapply HK $$ %c %spie %spp %R' %P' %bs [] Hk Hpc Hte Hce Hblk Hbuf
+  iapply HK $$ %c %spie %spp %R' %P' %bs %kv [] Hk Hpc Hte Hce %hkv Hblk Hbuf
   ipureintro
   exact ⟨hcs, hf.1, hf.2⟩
 

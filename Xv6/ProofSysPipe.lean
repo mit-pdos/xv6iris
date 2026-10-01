@@ -151,22 +151,24 @@ theorem sys_pipe_proof (MP : MYPROC) (AA : ARGADDR) (PA : PIPEALLOC) (FD : FDALL
   ihave Hte := trapCsrsExt_move _ _ _ (fun h => hpin11 (Or.inl h)) $$ Hte
   ihave Hce := cpuClaimExt_move _ _ _ _ (fun h => hpin11 (Or.inl h)) $$ Hce
   -- THE PID CELL, LENT OUT OF THE BLOCK for the call
-  icases sys_pipe_core_pid pa pid V M $$ Hcore with ⟨Hpid, Hcw⟩
+  -- ...AND THE BLOCK'S EVENT COUNTER, LENT (permit sweep L1b): pipealloc's
+  -- error paths close files, and fileclose takes the lend
+  icases procPrivCoreNoctxAt_pidLend curCtx pa pid V M $$ Hcore with ⟨Hpid, Hlend, Hcw⟩
   ihave Hpid := (show @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPid pa) 4 pidPriv pid ⊢
       wordPointsTo (pPid pa) 4 pidPriv pid from .rfl) $$ Hpid
-  iapply (sys_pipe_pipealloc PA Γ c11 _ γl γ γkl γk none rf wf pid pidPriv k.sie (by k_norm_g) pa
+  iapply (sys_pipe_pipealloc PA Γ c11 _ γl γ γkl γk none rf wf pid pidPriv V.ev k.sie (by k_norm_g) pa
       (by k_norm_g; exact hproc) ?hKp ?hnp ?ht)
     $$ [- $Hk $Hpc]
   rotate_right 1
   k_norm_g [sys_pipe_ret_26, p8', sys_pipe_a48, sys_pipe_a56]
   iframe #
-  iframe Hrf Hwf Hu0 Hu1 Hte Hce Hpid Hir
+  iframe Hrf Hwf Hu0 Hu1 Hte Hce Hpid Hir Hlend
   case hKp => k_norm_g; rw [sysPipeSlots_eq] at hK; rw [pipeallocSlots_eq]; omega
   case hnp => k_norm_g; exact hnoff
   case ht => k_norm_g; exact htier
   -- back from pipealloc (at any hart)
   iapply wpNext_intro_pin
-  iintro %c12 %hp12 %spie3 %spp3 %R3 %hcs3 Hk Hpc Hte Hce Hpost Hpid Hir
+  iintro %c12 %hp12 %spie3 %spp3 %R3 %hcs3 Hk Hpc Hlend Hte Hce Hpost Hpid Hir
   k_norm_g [MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed, MachCSL.KCtx.withSpie_withRegs]
   unfold calleeSaved at hcs3
   k_norm_g at hcs3
@@ -178,10 +180,12 @@ theorem sys_pipe_proof (MP : MYPROC) (AA : ARGADDR) (PA : PIPEALLOC) (FD : FDALL
       @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPid pa) 4 pidPriv pid from .rfl) $$ Hpid
   ihave Hce := (show cpuClaimExt (GF := GF) c12 k.sie pa ⊢ cpuClaimExt c12 k.sie k.proc from by
     rw [hproc]) $$ Hce
-  ihave Hcore := Hcw $$ Hpid
+  icases Hcw $$ Hpid Hlend with ⟨%kv, %hkv, Hcore⟩
   ihave Hnext := sys_pipe_cont_shift cpu c12 k γ V.fdg pa pid V M sts v
     (fun e => (hp12 (Or.inr (hproc.symm.trans e))).trans (hpin11 (Or.inr e))) $$ Hnext
-  iapply (sys_pipe_stage_b rfl FC FD CO Γ c12 c12 k γl γ pa pid V M sts v γkl γk spie3 spp3 R3
+  -- the rest of the call at the record pipealloc's lend came back at
+  ihave Hnext := sys_pipe_cont_after c12 k γ V.fdg pa pid V M sts v kv hkv $$ Hnext
+  iapply (sys_pipe_stage_b rfl FC FD CO Γ c12 c12 k γl γ pa pid (V.updEv kv) M sts v γkl γk spie3 spp3 R3
       hproc htier hnoff hK hlk hplk hprc hkmem (fun _ => rfl) hpins3
       (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false] at h9'; exact h9'.trans h9) w0 w1)
     $$ [- $Hk $Hpc $Hfr $Hpost $Hcore $Howe $Hfrag]

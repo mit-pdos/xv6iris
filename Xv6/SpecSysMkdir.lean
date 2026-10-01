@@ -313,16 +313,20 @@ def sysMkdirK (k : KCtx) (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V 
     (Fdots : Pfam GF (Aview → Nat → Nat → Bool → IProp GF))
     (Fun : Pfam GF (Aview → Nat → IProp GF))
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) (cpu' : CPU) : IProp GF :=
-  iprop(∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd),
+  iprop(∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd) (k' : Nat),
     ⌜calleeSaved k.regs R'⌝ -∗
     -- the page table may have GROWN: argstr's fetchstr faults user pages in
     ⌜V.upt.extSz V.sz P'⌝ -∗
+    -- THE EVENT COUNTER (permit sweep L1b): argstr lends the block's counter
+    -- to copyinstr, which may step it, so the block comes back at a count at
+    -- least the one it left at
+    ⌜V.ev ≤ k'⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
     bslots 3 -∗
     -- THE LEDGER CLOSES, EXACTLY: the header's reference ledger
     irefSlots ns -∗
-    procPrivFd γ pa pid { V with upt := P' } (viewFaulted V.upt P' M) -∗
+    procPrivFd γ pa pid { V.updEv k' with upt := P' } (viewFaulted V.upt P' M) -∗
     ⌜sysMkdirRet (R' 10#5)⌝ -∗
     -- ...and the legs' receipts, keyed on that answer
     mkdirArms (hlc := hlc) (fsGammaL fscFs) fscFs V.cwi (viewLazy V.upt V.sz M) pv

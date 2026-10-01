@@ -176,7 +176,7 @@ theorem fwr_seg_write (WI : WRITEI) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF �
     wordPointsTo (iInum (ientry ik)) 4 (DFrac.own (1 : Qp).half) inum ∗
     inodeMeta (ientry ik) dn ∗ inodeMap fscFs (ientry ik) bm ∗ inodeBlocks fscFs bm data ∗
     dinodeAt fscIreg inum dn ∗
-    procPrivExt (procAddr j) pid V P Mv ∗ bslots 3 ∗ logOpS icfgLog MAXOPBLOCKS Sb ∗
+    procPrivExtEv (procAddr j) pid V P Mv ∗ bslots 3 ∗ logOpS icfgLog MAXOPBLOCKS Sb ∗
     (∀ (c' : CPU) (spie' spp' : Bool) (R' : RegMap)
         (tot : Nat) (bm' : Blkmap) (data' : Nat → List (BitVec 8)) (dn' dn0' : Dinode)
         (n' : Nat) (wrote : Nat → BitVec 8) (dist : Nat) (dstb : Nat → BitVec 8) (P' : UPtd)
@@ -194,7 +194,7 @@ theorem fwr_seg_write (WI : WRITEI) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF �
       wordPointsTo (iInum (ientry ik)) 4 (DFrac.own (1 : Qp).half) inum -∗
       inodeMeta (ientry ik) dn' -∗ inodeMap fscFs (ientry ik) bm' -∗
       inodeBlocks fscFs bm' data' -∗ dinodeAt fscIreg inum dn0' -∗
-      procPrivExt (procAddr j) pid V P' (viewFaulted P P' Mv) -∗
+      procPrivExtEv (procAddr j) pid V P' (viewFaulted P P' Mv) -∗
       bslots 3 -∗ logOpS icfgLog n' Sb' -∗ wpLoop c')
     ⊢ wpLoop (GF := GF) cpu := by
   have hK' : 12 + writeiSlots ≤ k.avail := hK

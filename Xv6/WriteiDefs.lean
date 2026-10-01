@@ -24,6 +24,11 @@ instruction stream computes, and each callee's contract at its call site.
    at the running descriptor and the lazy view (what `either_copyin`
    takes); the pid share is borrowed out of either arm by ONE lemma
    (`Xv6.wiSrc_pid`, Rocq's `wi_src_bare`), at `Xv6.wiQ` (Rocq's `wi_q`).
+   THE EVENT COUNT RIDES INSIDE IT (permit sweep L1b, Rocq b69bd0fab): each
+   round's either_copyin lends the block's counter to copyin, which may step
+   it; Rocq threads the count beside the loop's state, here the user arm is
+   the block at SOME count no lower than the entry's (`∃ kv ≥ A.V.ev`), so
+   no loop statement names it and the entry/exit convert once.
 5. The continuation (`Xv6.wiContEb`) is the contract's, with the five
    read-only cells bundled (`Xv6.wiCells`) and the source at `wiSrc`; the
    entry lemma converts once.
@@ -238,7 +243,8 @@ def wiCells (A : WiArgs) : IProp GF := iprop%
 
 /-- THE SOURCE BRACKET (deviation 4), at the descriptor `P`. -/
 def wiSrc (A : WiArgs) (src : BitVec 64) (P : UPtd) : IProp GF :=
-  if A.user then procPrivExt (procAddr A.j) A.pidv A.V P (viewFaulted A.V.upt P A.M)
+  if A.user then iprop(∃ kv : Nat, ⌜A.V.ev ≤ kv⌝ ∗
+    procPrivExt (procAddr A.j) A.pidv (A.V.updEv kv) P (viewFaulted A.V.upt P A.M))
   else iprop(byteBuf src A.dqs A.sbs ∗ wordPointsTo (pPid (procAddr A.j)) 4 A.dqp A.pidv)
 
 /-- The pid-share fraction each arm lends (Rocq's `wi_q`). -/
@@ -258,11 +264,12 @@ theorem wiSrc_pid (A : WiArgs) (src : BitVec 64) (P : UPtd) :
     iframe Hb Hp
   · simp only [if_true]
     unfold procPrivExt
-    iintro ⟨%h, Hp, Hf, Ht, Htf, %hl, Hev⟩
+    iintro ⟨%kv, %hkv, %h, Hp, Hf, Ht, Htf, %hl, Hev⟩
     iframe Hp
     iintro Hp
+    iexists kv
     iframe Hp Hf Ht Htf Hev
-    ipureintro; exact ⟨h, hl⟩
+    ipureintro; exact ⟨hkv, h, hl⟩
 
 /-- ...at the running proc's address as the caller names it. -/
 theorem wiSrc_pidAt (A : WiArgs) (src : BitVec 64) (P : UPtd) (pa : BitVec 64)
@@ -349,29 +356,47 @@ theorem writei_either_copyin (EC : EITHER_COPYIN) (c : CPU) (k' : KCtx) (γl : G
     (hbs : bs.length = old.length) :
     kctx c k' ∗ pcIs c KA.«either_copyin» ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
     kallocAvail γk none ∗ byteBuf (k'.regs 10#5) (DFrac.own 1) old ∗
-    (if user then procPrivExt (procAddr j) pid V P M else byteBuf (k'.regs 12#5) dqs bs) ∗
+    (if user then iprop(∃ kv : Nat, ⌜V.ev ≤ kv⌝ ∗ procPrivExt (procAddr j) pid (V.updEv kv) P M)
+     else byteBuf (k'.regs 12#5) dqs bs) ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
       ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       (if user then
-        (∃ (P' : UPtd) (bs' : List (BitVec 8)),
+        (∃ (P' : UPtd) (bs' : List (BitVec 8)) (kv' : Nat),
           ⌜P.extSz V.sz P' ∧
             ((R' 10#5 = 0#64 ∧ bs' = umemRead (viewFaulted P P' M) (k'.regs 12#5).toNat old.length ∧
                 (k'.regs 12#5).toNat + old.length < 2 ^ 64) ∨
              (R' 10#5 = -1#64 ∧ (∃ d, d ≤ old.length ∧
                 bs' = umemRead (viewFaulted P P' M) (k'.regs 12#5).toNat d ++ old.drop d) ∧
               ∃ e, e < old.length ∧ ¬ uvaRmapped P (k'.regs 12#5 + BitVec.ofNat 64 e).toNat))⌝ ∗
-          procPrivExt (procAddr j) pid V P' (viewFaulted P P' M) ∗
+          ⌜V.ev ≤ kv'⌝ ∗ procPrivExt (procAddr j) pid (V.updEv kv') P' (viewFaulted P P' M) ∗
           byteBuf (k'.regs 10#5) (DFrac.own 1) bs')
        else ⌜R' 10#5 = 0#64⌝ ∗ byteBuf (k'.regs 12#5) dqs bs ∗
          byteBuf (k'.regs 10#5) (DFrac.own 1) bs) -∗
       ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := EC.wp_either_copyin (hlc := hlc) (GF := GF) c k' γl γk j pid V P M user dqs
-    bs old hj hproc hnoff hK hlk huser hlen hlen' hbs
-  unfold wp_either_copyin_body at h
-  simp only [eitherCopyinAddr] at h
-  exact h
+  cases user
+  · have h := EC.wp_either_copyin (hlc := hlc) (GF := GF) c k' γl γk j pid V P M false dqs
+      bs old hj hproc hnoff hK hlk huser hlen hlen' hbs
+    unfold wp_either_copyin_body at h
+    simp only [eitherCopyinAddr] at h
+    exact h
+  · -- the block at the count the earlier rounds raised it to
+    simp only [if_true]
+    iintro ⟨Hk, Hpc, #Hl, #Hav, Hold, ⟨%kv, %hkv, Hpriv⟩, HΦ⟩
+    have h := EC.wp_either_copyin (hlc := hlc) (GF := GF) c k' γl γk j pid (V.updEv kv) P M true
+      dqs bs old hj hproc hnoff hK hlk huser hlen hlen' hbs
+    unfold wp_either_copyin_body at h
+    simp only [eitherCopyinAddr, if_true] at h
+    iapply h
+    iframe Hk Hpc Hl Hav Hold Hpriv
+    iapply wpNext_mono _ _ _ _ _ $$ HΦ
+    iintro %c' HK %spie %spp %R' %hs Hk Hpc ⟨%P', %bs', %kc, %hpost, %hkc, Hpriv, Hold⟩ %hcs
+    iapply HK $$ %spie %spp %R' %hs Hk Hpc [Hpriv Hold] %hcs
+    iexists P', bs', kc
+    iframe Hpriv Hold
+    ipureintro
+    exact ⟨hpost, Nat.le_trans hkv hkc⟩
 
 end
 

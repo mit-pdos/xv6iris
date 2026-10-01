@@ -942,10 +942,13 @@ theorem ci_loop (WA : WALKADDR) (VF : VMFAULT) (MM : MEMMOVE) [Xv6G GF] [CurCtx]
 set_option maxHeartbeats 4000000 in
 /-- **`copyin` meets its specification.** -/
 theorem copyin_proof (WA : WALKADDR) (VF : VMFAULT) (MM : MEMMOVE) : COPYIN :=
-  ⟨fun {hlc GF} _ _ _ cpu k γl γk P M old hnoff hK hlk hroot hsz hlen hlen' => by
+  ⟨fun {hlc GF} _ _ _ _ cpu k γl γk P M old ke hnoff hK hlk hroot hsz hlen hlen' => by
   unfold wp_copyin_body
   simp only [copyinAddr]
-  iintro ⟨Hk, Hpc, #Hlk, #Hav, HP, Hdst, HΦ⟩
+  iintro ⟨Hk, Hpc, #Hlk, #Hav, HP, Hdst, Hlend, HΦ⟩
+  -- the lend (permit sweep L1b): no callee takes it yet, so it is framed
+  -- through the continuation once, here
+  ihave HΦ := actLend_cont_frame _ _ _ _ _ _ _ _ _ $$ HΦ Hlend
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   by_cases hnil : old.length = 0
   · -- nothing to copy

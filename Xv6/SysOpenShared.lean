@@ -491,7 +491,7 @@ theorem sys_open_fail_ret (k : KCtx) (A : SysOpenArgs GF) (P2 : UPtd) (nsj : Nat
   icases Hres with ⟨%hpl, HP, Hobs, Htc⟩
   ispecialize Hpost $$ %c'
   unfold sysOpenPostP sysOpenK
-  iapply Hpost $$ %spie' %spp' %R' %P2 %hcs %hP2 Hk Hpc Hte Hce Hbs Hisl
+  iapply Hpost $$ %spie' %spp' %R' %P2 %A.V.ev %hcs %hP2 %(Nat.le_refl _) Hk Hpc Hte Hce Hbs Hisl
   iapply (sys_open_arm_fail (hlc := hlc) A.omo (fsGammaL fscFs) fscFs A.V.cwi A.γ (procAddr A.j) A.pid
       (sysOpenIm A) A.v.toNat A.vom A.P A.Pmiss A.Fo A.Ft A.sts (sysOpenV2 A P2) (sysOpenM2 A P2) (R' 10#5)
       pl inum.toNat (eraNode dn bm data) hpl hr)

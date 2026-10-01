@@ -307,7 +307,7 @@ theorem sys_open_ec_fail (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (k : KCt
   ihave Hblk := Hback $$ Hpid
   ispecialize HΦ $$ %c'
   unfold sysOpenPostC sysOpenK
-  iapply HΦ $$ %spie' %spp' %R' %P2 %hcs %hP2 Hk Hpc Hte Hce Hbs Hir
+  iapply HΦ $$ %spie' %spp' %R' %P2 %A.V.ev %hcs %hP2 %(Nat.le_refl _) Hk Hpc Hte Hce Hbs Hir
   unfold openArmsCreate
   iframe Hfd
   ileft

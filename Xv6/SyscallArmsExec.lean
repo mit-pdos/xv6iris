@@ -52,7 +52,8 @@ W8-S4; Rocq `ProofSyscall.v` §SyscallArms `sysc_exec_in_open` /
 
 The failed exec's block is the caller's at a later event count (permit
 sweep L1a, the arms' `evAfter`); `syscExec_arms_read` destructs it, no row
-reading the count.
+reading the count.  Permit sweep L1b: the arms are read at the argument
+fetches' raised count `k'` (`syscExec_arms_read` takes it).
 -/
 import Xv6.SyscallRet
 import Xv6.UsysMemOkSpec
@@ -116,9 +117,10 @@ immobility facts, the exec channel's answer at the record after the a0
 store, and the failing exec's refund. -/
 theorem syscExec_arms_read (f : UexecSG.sfam GF) (V : ProcPriv) (M : Nat → List (BitVec 8))
     (sts : List FdState) (gn : GName) (cs : ExtTreeSet GName compare) (pid : BitVec 32)
-    (P' : UPtd) (hext : V.upt.extSz V.sz P') (V' : ProcPriv) (M' : Nat → List (BitVec 8))
+    (P' : UPtd) (k' : Nat) (hext : V.upt.extSz V.sz P') (V' : ProcPriv) (M' : Nat → List (BitVec 8))
     (r : BitVec 64) (P Pmiss : Nat → Nat → IProp GF) (Fo : Pfam GF (Aview → Nat → Anode → IProp GF)) :
-    ((⌜r = 0xFFFFFFFFFFFFFFFF#64 ∧ evAfter { V with upt := P' } V' ∧ M' = viewFaulted V.upt P' M⌝ ∗
+    ((⌜r = 0xFFFFFFFFFFFFFFFF#64 ∧ evAfter { V.updEv k' with upt := P' } V' ∧
+        M' = viewFaulted V.upt P' M⌝ ∗
         sysExecPostFail (hlc := hlc) ⟨uslot (hlc := hlc), UexecSG.sexecRefund f⟩ (fsGammaL fscFs) fscFs
           V.cwi V.pvSecc (UexecSG.sexitPay f) P Pmiss Fo (viewLazy V.upt V.sz M)
           (tfW V.tf (tfArgIdx 0)) (tfW V.tf (tfArgIdx 1)) sts cs pid) ∨
@@ -126,7 +128,7 @@ theorem syscExec_arms_read (f : UexecSG.sfam GF) (V : ProcPriv) (M : Nat → Lis
         ⌜argPathOf (viewLazy V.upt V.sz M) (tfW V.tf (tfArgIdx 0)).toNat pl⌝ ∗
         ⌜execArgsOf (viewLazy V.upt V.sz M) (tfW V.tf (tfArgIdx 1)) na alen afun⌝ ∗
         execPostOk ⟨uslot (hlc := hlc), UexecSG.sexecRefund f⟩ na alen afun sts gn cs pid
-          { V with upt := P' } V' M' r)) ⊢
+          { V.updEv k' with upt := P' } V' M' r)) ⊢
       ⌜SyscExecKeep V V'⌝ ∗
       syscExecOut (hlc := hlc) V M (syscStore V' r) M' sts sts gn cs pid ∗
       (⌜r = BitVec.ofInt 64 (-1)⌝ -∗ UexecSG.sexecRefund f) := by
@@ -154,7 +156,7 @@ theorem syscExec_arms_read (f : UexecSG.sfam GF) (V : ProcPriv) (M : Nat → Lis
     icases Hok with ⟨%i, %av, %a, -, Hok⟩
     -- both success arms: the same slot, the same facts
     ihave Hs : iprop(∃ (entry spv szv' : BitVec 64),
-        ⌜r ≠ 0xFFFFFFFFFFFFFFFF#64 ∧ kexecOk { V with upt := P' } V' r entry spv szv' na alen⌝ ∗
+        ⌜r ≠ 0xFFFFFFFFFFFFFFFF#64 ∧ kexecOk { V.updEv k' with upt := P' } V' r entry spv szv' na alen⌝ ∗
         uslot (hlc := hlc) (execKey V' M' sts gn cs pid na)) $$ [Hok]
     · icases Hok with (⟨%f0, %nl, -, -, %hkx, -, Hslot⟩ | ⟨-, %hkx, Hslot⟩)
       · obtain ⟨e, spv, szv', -, hne, hk⟩ := hkx
@@ -265,7 +267,7 @@ theorem syscall_arm_exec (SE : SYSEXEC) (hD : SyscDepExec (hlc := hlc) (GF := GF
   iframe Hk Hpc Hte Hce Hfab Hbs Hir2 Hpriv Hmp Hau
   iapply wpNext_intro_pin
   unfold sysExecK
-  iintro %cpu %- %spie2 %spp2 %R2 %P' %hcs %hext Hk Hpc Hte Hce Hbs Hir2 Harms
+  iintro %cpu %- %spie2 %spp2 %R2 %P' %k' %hcs %hext %hk' Hk Hpc Hte Hce Hbs Hir2 Harms
   have hww : ∀ (K : KCtx) (a b c d : Bool), (K.withSpie a b).withSpie c d = K.withSpie c d :=
     fun _ _ _ _ _ => rfl
   have hpsw : ∀ (K : KCtx) (m : Nat) (a b : Bool),
@@ -274,7 +276,9 @@ theorem syscall_arm_exec (SE : SYSEXEC) (hD : SyscDepExec (hlc := hlc) (GF := GF
   k_norm_g at hcs
   unfold sysExecArms
   icases Harms with ⟨%V', %M', Hpriv, Harm⟩
-  icases syscExec_arms_read f V M sts gn cs pid P' hext V' M' (R2 10#5) P Pmiss Fo $$ Harm
+  -- the arms at the fetches' raised event count (permit sweep L1b): the
+  -- failed exec's block is the caller's at a later count, which no row reads
+  icases syscExec_arms_read f V M sts gn cs pid P' k' hext V' M' (R2 10#5) P Pmiss Fo $$ Harm
     with ⟨%hkeep, Hxo, Hrf⟩
   have hpins2 := syscPins_calleeSaved k R R2 hpins hcs
   have hs2' : R2 18#5 = pageAddr V'.upt.tfp := by

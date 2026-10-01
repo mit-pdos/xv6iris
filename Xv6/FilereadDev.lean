@@ -89,6 +89,7 @@ theorem frd_dev_m1_post (k : KCtx) (spie spp : Bool) (γ : FileNames) (fk : Nat)
   ihave Hex := filereadExtra_dev_m1 V.gen V.upt F Rd Rin P Rp Rpe true wb mj n M (k.regs 11#5) hne $$ Hin HP
   ihave Henv := frd_envout_dev true wb mj $$ Henv
   unfold frdK
+  ihave Hpriv := procPrivExtEv_of _ _ _ _ _ $$ Hpriv
   iapply HΦ $$ %c' %spie %spp %R' %V.upt %M %0 [] Hk Hpc Hte Hce Href Hpriv Hgen Henv [Hex]
   · ipureintro
     exact ⟨hcs, UMemL.extSz_refl _ _, by omega, Or.inr h10, Xv6.UMemL.umemWrote_refl _ _ _⟩
@@ -366,7 +367,7 @@ theorem frd_arm_dev (CR : CONSOLEREAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) G
   k_norm_g
   iframe
   iintro %c' %R' %⟨hcs, h10'⟩ Hk Hpc Hte Hce
-  icases frd_pageLen (procAddr j) pid V P' M' $$ Hpriv with ⟨%hpl, Hpriv⟩
+  icases frd_pageLenEv (procAddr j) pid V P' M' $$ Hpriv with ⟨%hpl, Hpriv⟩
   have hd63 : d < 2 ^ 63 := by omega
   have hr10 : R' 10#5 = BitVec.ofNat 64 d ∨ R' 10#5 = -1#64 := by
     rw [h10']

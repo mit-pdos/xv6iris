@@ -37,6 +37,10 @@ is a `byteBuf` list (`Xv6/NamexParts.lean` deviation 4), not Rocq's
    the slots↔bytes carve are the shared `Xv6/SysfileCalls.lean` helpers
    (`Xv6.kxc_stackOwn_byteBuf`, `sysfile_buf_split` / `_join`); the fold is the
    landed `KstackMap.byteBuf_stackOwn`.
+4. THE EVENT COUNTER (permit sweep L1b, Rocq b69bd0fab): argstr hands the
+   block back at a raised count `kv`; the run below argstr is at the record
+   `A.raise kv` (`SysChdirArgs.raise`), the contract's continuation moved
+   there by `sysChdirK_raise`; the exit reads it at the count it came in at.
 -/
 import Xv6.SysfileCalls
 import Xv6.SpecSysChdir
@@ -358,6 +362,21 @@ at a process pins nothing). -/
 abbrev sysChdirPostA (k : KCtx) (A : SysChdirArgs GF) (c : CPU) : IProp GF :=
   sysChdirK (hlc := hlc) k A.γ (procAddr A.j) A.pid A.V A.M A.P A.Pmiss A.Fo c
 
+/-- THE RECORD AT A RAISED COUNT (permit sweep L1b, deviation 4): argstr
+hands the block back at `A.V.updEv kv`. -/
+abbrev SysChdirArgs.raise (A : SysChdirArgs GF) (kv : Nat) : SysChdirArgs GF :=
+  { A with V := A.V.updEv kv }
+
+/-- The contract's continuation at a raised count (deviation 4). -/
+theorem sysChdirK_raise (k : KCtx) (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32)
+    (V : ProcPriv) (M : Nat → List (BitVec 8)) (P Pmiss : Nat → Nat → IProp GF)
+    (Fo : Pfam GF (Aview → Nat → Anode → IProp GF)) (c : CPU) (kv : Nat) (hkv : V.ev ≤ kv) :
+    sysChdirK (hlc := hlc) k γ pa pid V M P Pmiss Fo c ⊢
+      sysChdirK (hlc := hlc) k γ pa pid (V.updEv kv) M P Pmiss Fo c := by
+  unfold sysChdirK
+  iintro H %spie %spp %R' %P' %k' %hcs %hext %hk'
+  iapply H $$ %spie %spp %R' %P' %k' %hcs %hext %(Nat.le_trans hkv hk')
+
 /-- The block after argstr: the page table grown to `P2` and the view
 faulted (argstr's post). -/
 abbrev sysChdirV1 (A : SysChdirArgs GF) (P2 : UPtd) : ProcPriv := { A.V with upt := P2 }
@@ -451,7 +470,7 @@ theorem sys_chdir_exit (cpu : CPU) (k : KCtx) (A : SysChdirArgs GF)
   icases Hout with ⟨Hbs, Hir, ⟨%P', %hP', Harms⟩⟩
   ispecialize HΦ $$ %c
   unfold sysChdirPostA sysChdirK
-  iapply HΦ $$ %spie %spp %_ %P' %hcs %hP' Hk Hpc Hte Hce Hbs Hir
+  iapply HΦ $$ %spie %spp %_ %P' %A.V.ev %hcs %hP' %(Nat.le_refl _) Hk Hpc Hte Hce Hbs Hir
   simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
   iexact Harms
 

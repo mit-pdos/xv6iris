@@ -292,9 +292,13 @@ so the binders are `(R', P')` and the block returns at
 def sysChdirK (k : KCtx) (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (P Pmiss : Nat → Nat → IProp GF)
     (Fo : Pfam GF (Aview → Nat → Anode → IProp GF)) (cpu' : CPU) : IProp GF :=
-  iprop(∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd),
+  iprop(∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd) (k' : Nat),
     ⌜calleeSaved k.regs R'⌝ -∗
     ⌜V.upt.extSz V.sz P'⌝ -∗
+    -- THE EVENT COUNTER (permit sweep L1b): argstr lends the block's counter
+    -- to copyinstr, which may step it, so the block comes back at a count at
+    -- least the one it left at
+    ⌜V.ev ≤ k'⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
     bslots 3 -∗
@@ -302,7 +306,7 @@ def sysChdirK (k : KCtx) (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V 
     irefSlots 2 -∗
     -- the armed post (implies `sysChdirPost`, through `chdirArms_landed`)
     chdirArms (hlc := hlc) (fsGammaL fscFs) fscFs γ pa pid V.cwi P Pmiss Fo
-      { V with upt := P' } (viewFaulted V.upt P' M) (R' 10#5) -∗
+      { V.updEv k' with upt := P' } (viewFaulted V.upt P' M) (R' 10#5) -∗
     wpLoop cpu')
 
 end

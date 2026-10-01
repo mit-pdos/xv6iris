@@ -366,6 +366,7 @@ theorem kxcC_setup_ok (UC : UVMCLEAR)
       [] [-Hcl] Hcl
     · ipureintro; exact hfacts
     iright
+    ihave Hpriv := procPrivFd_evAfter_of _ _ _ _ _ $$ Hpriv
     unfold kxcAt272 kxcCRes kxcBufs
     iframe Hk Hte Hce Hirs Hbs Hpt Hpriv Hpath Hargv Hstrs Helf Hfr
     isplitr
@@ -399,6 +400,7 @@ theorem kxcC_setup_ok (UC : UVMCLEAR)
       [] [-Hcl] Hcl
     · ipureintro; exact hfacts
     ileft
+    ihave Hpriv := procPrivFd_evAfter_of _ _ _ _ _ $$ Hpriv
     unfold kxcAt21a kxcCRes kxcBufs
     iframe Hk Hte Hce Hirs Hbs Hpt Hpriv Hpath Hargv Hstrs Helf Hfr
     isplitr

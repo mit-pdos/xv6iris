@@ -475,13 +475,17 @@ def kxcAt1ae (k : KCtx) (A : KexecArgs) (c : CPU) (spie spp : Bool) (R : RegMap)
   kxcFrameBk k (k.regs 11#5) w5 w6 w7 w8 w9 w10 w11 w12 w13 w67
 
 /-- **Rocq `kxc_c_res`**: what neither the argv loop's head nor its exit looks
-inside. -/
+inside.  THE BLOCK AT A LATER EVENT COUNT (permit sweep L1b): every round's
+copyout takes the block's counter as its lend, so the block rides at SOME
+record `evAfter A.V` (Rocq threads the record `U'` through the loop's
+statements; here it rides inside, so no loop statement names it, and phase
+C's exit hands it to phase D's continuation at `{ A with V := V1 }`). -/
 def kxcCRes (k : KCtx) (A : KexecArgs) (w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 : BitVec 64)
     (ef : List (BitVec 8)) (P : UPtd) (Mi : Nat → List (BitVec 8)) (c : Nat) (sz1 : BitVec 64) :
     IProp GF := iprop%
   irefSlots 2 ∗ bslots 3 ∗
   procPtAt P Mi ∗
-  procPrivFd A.γ k.proc A.pidv A.V A.M ∗
+  (∃ V1 : ProcPriv, ⌜evAfter A.V V1⌝ ∗ procPrivFd A.γ k.proc A.pidv V1 A.M) ∗
   kxcBufs k A ∗
   byteBuf (kxcElfBuf (k.regs 2#5)) (DFrac.own 1) ef ∗
   kxcFrameC (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 10#5)

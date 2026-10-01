@@ -44,6 +44,10 @@ list (`Xv6/NamexParts.lean` deviation 4), not Rocq's `bytes_own` /
 4. The fetched string's shape is `UMemL.umemStr_nul`; the path buffer and
    the slots↔bytes carve are the shared `Xv6/SysfileCalls.lean` helpers;
    the fold is the landed `KstackMap.byteBuf_stackOwn`.
+5. THE EVENT COUNTER (permit sweep L1b, Rocq b69bd0fab): argstr hands the
+   block back at a raised count `kv`; the run below argstr is at the record
+   `A.raise kv` (`SysMknodArgs.raise`), the contract's continuation moved
+   there by `sysMknodK_raise`; the exit reads it at the count it came in at.
 -/
 import Xv6.SysfileCalls
 import Xv6.SpecSysMknod
@@ -496,6 +500,23 @@ abbrev sysMknodAu (A : SysMknodArgs GF) : IProp GF :=
   mknodAuAt (hlc := hlc) (fsGammaL fscFs) fscFs A.V.cwi (viewLazy A.V.upt A.V.sz A.M) A.v0.toNat
     (devArg A.v1) (devArg A.v2) A.P A.Pmiss A.Farm A.Fun A.Fok A.Fex
 
+/-- THE RECORD AT A RAISED COUNT (permit sweep L1b, deviation 5): argstr
+hands the block back at `A.V.updEv kv`. -/
+abbrev SysMknodArgs.raise (A : SysMknodArgs GF) (kv : Nat) : SysMknodArgs GF :=
+  { A with V := A.V.updEv kv }
+
+/-- The contract's continuation at a raised count (deviation 5). -/
+theorem sysMknodK_raise (k : KCtx) (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32)
+    (V : ProcPriv) (M : Nat → List (BitVec 8)) (ns pv ma mi : Nat)
+    (P Pmiss : Nat → Nat → IProp GF) (Farm Fun : Pfam GF (Aview → Nat → IProp GF))
+    (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) (c : CPU) (kv : Nat)
+    (hkv : V.ev ≤ kv) :
+    sysMknodK (hlc := hlc) k γ pa pid V M ns pv ma mi P Pmiss Farm Fun Fok Fex c ⊢
+      sysMknodK (hlc := hlc) k γ pa pid (V.updEv kv) M ns pv ma mi P Pmiss Farm Fun Fok Fex c := by
+  unfold sysMknodK
+  iintro H %spie %spp %R' %P' %k' %hcs %hext %hk'
+  iapply H $$ %spie %spp %R' %P' %k' %hcs %hext %(Nat.le_trans hkv hk')
+
 /-- The block after argstr: the page table grown to `P2` and the view
 faulted (argstr's post). -/
 abbrev sysMknodV1 (A : SysMknodArgs GF) (P2 : UPtd) : ProcPriv := { A.V with upt := P2 }
@@ -591,7 +612,7 @@ theorem sys_mknod_exit (cpu : CPU) (k : KCtx) (A : SysMknodArgs GF)
   icases Hout with ⟨Hbs, Hir, ⟨%P', %hP', Hblk, Harms⟩⟩
   ispecialize HΦ $$ %c
   unfold sysMknodPostA sysMknodK
-  iapply HΦ $$ %spie %spp %_ %P' %hcs %hP' Hk Hpc Hte Hce Hbs Hir Hblk
+  iapply HΦ $$ %spie %spp %_ %P' %A.V.ev %hcs %hP' %(Nat.le_refl _) Hk Hpc Hte Hce Hbs Hir Hblk
   simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
   iexact Harms
 

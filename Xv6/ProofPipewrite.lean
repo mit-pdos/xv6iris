@@ -33,6 +33,11 @@ observed shut (`pwPost_ro`, a flag-word observation fired at the
 `readopen` test), or the kill arm, whose shot and killer's credential come
 out of `killed()`'s reading with the incarnation's marker lent
 (`pw_kill_lend`, Rocq `kill_paid_shot_tear`).
+
+Permit sweep L1b (Rocq b69bd0fab), a Lean shape: the copy loop carries the block
+at SOME raised count (`∃ kv ≥ V.ev`, the record at `V.updEv kv`) inside
+its block row, so the loop/stage statements need not name the count; Rocq threads
+an explicit `k`.  The contract's post is Rocq's (`∀ k' ≥ V.ev`).
 -/
 import Xv6.SpecPipewrite
 import Xv6.PipeRw
@@ -323,15 +328,17 @@ theorem pw_sleep (SL : SLEEP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
 /-- `copyin` at pipewrite's call site (entry `0x80001688`): one byte into the
 frame's `ch` slot. -/
 theorem pw_copyin (CI : COPYIN) (c : CPU) (k' : KCtx) (γl : GName) (γk : KmemNames)
-    (P : UPtd) (M : Nat → List (BitVec 8)) (old : List (BitVec 8))
+    (P : UPtd) (M : Nat → List (BitVec 8)) (old : List (BitVec 8)) (ke : Nat) (p : BitVec 64)
+    (hp : k'.proc = p)
     (hnoff : k'.noff + 1 < 2 ^ 31) (hK : 50 ≤ k'.avail) (hlk : "kmem" ∉ k'.locks)
     (hroot : k'.regs 10#5 = pageAddr P.root) (hsz : (k'.regs 11#5).toNat ≤ 2 ^ 38)
     (hlen : k'.regs 14#5 = BitVec.ofNat 64 old.length) (hlen' : old.length < 2 ^ 63) :
     kctx c k' ∗ pcIs c KA.«copyin» ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
-    procPtAt P M ∗ byteBuf (k'.regs 12#5) (DFrac.own 1) old ∗
+    procPtAt P M ∗ byteBuf (k'.regs 12#5) (DFrac.own 1) old ∗ actLend p ke ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
       ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
+      (∃ k1 : Nat, ⌜ke ≤ k1⌝ ∗ actLend p k1) -∗
       (∃ (P' : UPtd) (bs' : List (BitVec 8)),
         ⌜P.extSz (k'.regs 11#5) P' ∧
           ((R' 10#5 = 0#64 ∧ bs' = umemRead (viewFaulted P P' M) (k'.regs 13#5).toNat old.length ∧
@@ -342,7 +349,8 @@ theorem pw_copyin (CI : COPYIN) (c : CPU) (k' : KCtx) (γl : GName) (γk : KmemN
         procPtAt P' (viewFaulted P P' M) ∗ byteBuf (k'.regs 12#5) (DFrac.own 1) bs') -∗
       ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := CI.wp_copyin (hlc := hlc) (GF := GF) c k' γl γk P M old hnoff hK hlk hroot hsz hlen hlen'
+  subst hp
+  have h := CI.wp_copyin (hlc := hlc) (GF := GF) c k' γl γk P M old ke hnoff hK hlk hroot hsz hlen hlen'
   unfold wp_copyin_body at h
   simp only [copyinAddr] at h
   exact h
@@ -423,12 +431,13 @@ theorem pwFix_set (k : KCtx) (j : Nat) (n : Int) (R : RegMap) (h : pwFix k j n R
 def pwPost (k : KCtx) (γp : PipeNames) (w : Bool) (q : Qp) (j : Nat) (pid : BitVec 32)
     (V : ProcPriv) (M : Nat → List (BitVec 8)) (n : Int)
     (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF) : CPU → IProp GF :=
-  fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd),
+  fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd) (k' : Nat),
     ⌜calleeSaved k.regs R' ∧ V.upt.extSz V.sz P' ∧ pipeRwRet n (R' 10#5)⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
     pipeRef γp w q -∗
-    procPrivBareAt curCtx (procAddr j) pid { V with upt := P' } (viewFaulted V.upt P' M) -∗
+    ⌜V.ev ≤ k'⌝ -∗
+    procPrivBareAt curCtx (procAddr j) pid { V.updEv k' with upt := P' } (viewFaulted V.upt P' M) -∗
     genHalvesPriv (procAddr j) pid V.gen -∗
     pipeWpost (hlc := hlc) V.upt γp.pnQueue (writerImg V.upt M) (k.regs 11#5) Q Qe
       iprop(killShot V.gen ∗ □ MachFixedGS.killCred (hlc := hlc) (GF := GF)) n.toNat (R' 10#5) -∗
@@ -437,12 +446,13 @@ def pwPost (k : KCtx) (γp : PipeNames) (w : Bool) (q : Qp) (j : Nat) (pid : Bit
 theorem pwPost_elim (k : KCtx) (γp : PipeNames) (w : Bool) (q : Qp) (j : Nat) (pid : BitVec 32)
     (V : ProcPriv) (M : Nat → List (BitVec 8)) (n : Int)
     (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF) (cpu' : CPU) :
-    pwPost (GF := GF) k γp w q j pid V M n Q Qe cpu' ⊢ ∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd),
+    pwPost (GF := GF) k γp w q j pid V M n Q Qe cpu' ⊢ ∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd) (k' : Nat),
       ⌜calleeSaved k.regs R' ∧ V.upt.extSz V.sz P' ∧ pipeRwRet n (R' 10#5)⌝ -∗
       kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
       trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
       pipeRef γp w q -∗
-      procPrivBareAt curCtx (procAddr j) pid { V with upt := P' } (viewFaulted V.upt P' M) -∗
+      ⌜V.ev ≤ k'⌝ -∗
+      procPrivBareAt curCtx (procAddr j) pid { V.updEv k' with upt := P' } (viewFaulted V.upt P' M) -∗
       genHalvesPriv (procAddr j) pid V.gen -∗
       pipeWpost (hlc := hlc) V.upt γp.pnQueue (writerImg V.upt M) (k.regs 11#5) Q Qe
         iprop(killShot V.gen ∗ □ MachFixedGS.killCred (hlc := hlc) (GF := GF)) n.toNat (R' 10#5) -∗
@@ -456,12 +466,13 @@ theorem pw_post_at (cpu c : CPU) (k : KCtx) (γp : PipeNames) (w : Bool) (q : Qp
     (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF)
     (hj : j < NPROC) (hkproc : k.proc = procAddr j) :
     wpNext true k.proc cpu (pwPost (GF := GF) k γp w q j pid V M n Q Qe) ⊢
-      ∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd),
+      ∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd) (k' : Nat),
       ⌜calleeSaved k.regs R' ∧ V.upt.extSz V.sz P' ∧ pipeRwRet n (R' 10#5)⌝ -∗
       kctx c ((k.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k.regs 1#5)) -∗
       trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗
       pipeRef γp w q -∗
-      procPrivBareAt curCtx (procAddr j) pid { V with upt := P' } (viewFaulted V.upt P' M) -∗
+      ⌜V.ev ≤ k'⌝ -∗
+      procPrivBareAt curCtx (procAddr j) pid { V.updEv k' with upt := P' } (viewFaulted V.upt P' M) -∗
       genHalvesPriv (procAddr j) pid V.gen -∗
       pipeWpost (hlc := hlc) V.upt γp.pnQueue (writerImg V.upt M) (k.regs 11#5) Q Qe
         iprop(killShot V.gen ∗ □ MachFixedGS.killCred (hlc := hlc) (GF := GF)) n.toNat (R' 10#5) -∗
@@ -651,11 +662,12 @@ theorem pw_epi (cpu c : CPU) (k : KCtx) (γp : PipeNames) (w : Bool) (q : Qp) (j
     pwFrame (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)
       (k.regs 20#5) (k.regs 21#5) v7 v8 v9 v10 v11 v12 v13 ∗
     trapCsrsExt c k.sie ∗ cpuClaimExt c k.sie k.proc ∗ pipeRef γp w q ∗
-    procPrivBareAt curCtx (procAddr j) pid { V with upt := P' } (viewFaulted V.upt P' M) ∗
+    (∃ kv : Nat, ⌜V.ev ≤ kv⌝ ∗
+      procPrivBareAt curCtx (procAddr j) pid { V.updEv kv with upt := P' } (viewFaulted V.upt P' M)) ∗
     genHalvesPriv (procAddr j) pid V.gen ∗ pwOut (hlc := hlc) V γp M (k.regs 11#5) Q Qe n r ∗
     wpNext true k.proc cpu (pwPost k γp w q j pid V M n Q Qe)
     ⊢ wpLoop (GF := GF) c := by
-  iintro ⟨Hk, Hpc, Hframe, Hte, Hce, Href, Hpriv, Hgen, Hpost, Hnext⟩
+  iintro ⟨Hk, Hpc, Hframe, Hte, Hce, Href, ⟨%kv, %hkv, Hpriv⟩, Hgen, Hpost, Hnext⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- c.mv a0,s2
   k_step_pwc (wp_s_add c _ (KA.«pipewrite» + 0x58#64) true 10#5 0#5 18#5 (by decide))
@@ -675,7 +687,7 @@ theorem pw_epi (cpu c : CPU) (k : KCtx) (γp : PipeNames) (w : Bool) (q : Qp) (j
   k_next_pwc
   iintro Hk Hpc
   ihave HK := pw_post_at cpu c k γp w q j pid V M n Q Qe hj hkproc $$ Hnext
-  iapply HK $$ %spie %spp %_ %P' [] Hk Hpc Hte Hce Href Hpriv Hgen [Hpost]
+  iapply HK $$ %spie %spp %_ %P' %kv [] Hk Hpc Hte Hce Href %hkv Hpriv Hgen [Hpost]
   · ipureintro
     refine ⟨?_, hext, ?_⟩
     · unfold calleeSaved
@@ -778,7 +790,8 @@ theorem pw_tail (WK : WAKEUP) (RE : RELEASE_GEN) (Γ : SchedNames)
     pwFrame (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)
       (k.regs 20#5) (k.regs 21#5) v7 v8 v9 v10 v11 v12 v13 ∗
     trapCsrs c ∗ cpuClaim c k.proc ∗ intrRes c ∗
-    procPrivBareAt curCtx (procAddr j) pid { V with upt := P' } (viewFaulted V.upt P' M) ∗
+    (∃ kv : Nat, ⌜V.ev ≤ kv⌝ ∗
+      procPrivBareAt curCtx (procAddr j) pid { V.updEv kv with upt := P' } (viewFaulted V.upt P' M)) ∗
     genHalvesPriv (procAddr j) pid V.gen ∗ pwOut (hlc := hlc) V γp M (k.regs 11#5) Q Qe n r ∗
     wpNext true k.proc cpu (pwPost k γp w q j pid V M n Q Qe)
     ⊢ wpLoop (GF := GF) c := by
@@ -916,7 +929,8 @@ theorem pw_minus1 (RE : RELEASE_GEN)
       (k.regs 20#5) (k.regs 21#5) (k.regs 22#5) (k.regs 23#5) (k.regs 24#5) (k.regs 25#5)
       (k.regs 26#5) v12 v13 ∗
     trapCsrs c ∗ cpuClaim c k.proc ∗ intrRes c ∗
-    procPrivBareAt curCtx (procAddr j) pid { V with upt := P' } (viewFaulted V.upt P' M) ∗
+    (∃ kv : Nat, ⌜V.ev ≤ kv⌝ ∗
+      procPrivBareAt curCtx (procAddr j) pid { V.updEv kv with upt := P' } (viewFaulted V.upt P' M)) ∗
     genHalvesPriv (procAddr j) pid V.gen ∗ pwOut (hlc := hlc) V γp M (k.regs 11#5) Q Qe n (-1#64) ∗
     wpNext true k.proc cpu (pwPost k γp w q j pid V M n Q Qe)
     ⊢ wpLoop (GF := GF) c := by
@@ -1021,7 +1035,8 @@ theorem pw_fail (WK : WAKEUP) (RE : RELEASE_GEN) (Γ : SchedNames)
       (k.regs 20#5) (k.regs 21#5) (k.regs 22#5) (k.regs 23#5) (k.regs 24#5) (k.regs 25#5)
       (k.regs 26#5) v12 v13 ∗
     trapCsrs c ∗ cpuClaim c k.proc ∗ intrRes c ∗
-    procPrivBareAt curCtx (procAddr j) pid { V with upt := P' } (viewFaulted V.upt P' M) ∗
+    (∃ kv : Nat, ⌜V.ev ≤ kv⌝ ∗
+      procPrivBareAt curCtx (procAddr j) pid { V.updEv kv with upt := P' } (viewFaulted V.upt P' M)) ∗
     genHalvesPriv (procAddr j) pid V.gen ∗
     pwPay (hlc := hlc) γp (writerImg V.upt M) (k.regs 11#5) Q Qe m n.toNat ∗
     wpNext true k.proc cpu (pwPost k γp w q j pid V M n Q Qe)
@@ -1153,7 +1168,8 @@ def pwLoop (cpu : CPU) (k kb : KCtx) (γl : GName) (γp : PipeNames) (w : Bool) 
     kctx curL (((kb.pushOffAt a b).withLocks ["pipe"]).withRegs Rl) -∗ pcIs curL (KA.«pipewrite» + 0x88#64) -∗
     trapCsrs curL -∗ cpuClaim curL k.proc -∗ intrRes curL -∗
     locked γl curL -∗ pipeResAt γp (k.regs 10#5) curCtx -∗ pipeRef γp w q -∗
-    procPrivBareAt curCtx (procAddr j) pid { V with upt := P } (viewFaulted V.upt P M) -∗
+    (∃ kv : Nat, ⌜V.ev ≤ kv⌝ ∗
+      procPrivBareAt curCtx (procAddr j) pid { V.updEv kv with upt := P } (viewFaulted V.upt P M)) -∗
     genHalvesPriv (procAddr j) pid V.gen -∗
     pwPay (hlc := hlc) γp (writerImg V.upt M) (k.regs 11#5) Q Qe m n.toNat -∗
     pwFrame (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)
@@ -1170,7 +1186,8 @@ theorem pwLoop_elim (cpu : CPU) (k kb : KCtx) (γl : GName) (γp : PipeNames) (w
       kctx curL (((kb.pushOffAt a b).withLocks ["pipe"]).withRegs Rl) -∗ pcIs curL (KA.«pipewrite» + 0x88#64) -∗
       trapCsrs curL -∗ cpuClaim curL k.proc -∗ intrRes curL -∗
       locked γl curL -∗ pipeResAt γp (k.regs 10#5) curCtx -∗ pipeRef γp w q -∗
-      procPrivBareAt curCtx (procAddr j) pid { V with upt := P } (viewFaulted V.upt P M) -∗
+      (∃ kv : Nat, ⌜V.ev ≤ kv⌝ ∗
+      procPrivBareAt curCtx (procAddr j) pid { V.updEv kv with upt := P } (viewFaulted V.upt P M)) -∗
     genHalvesPriv (procAddr j) pid V.gen -∗
     pwPay (hlc := hlc) γp (writerImg V.upt M) (k.regs 11#5) Q Qe m n.toNat -∗
       pwFrame (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)
@@ -1187,7 +1204,8 @@ theorem pwLoop_intro (cpu : CPU) (k kb : KCtx) (γl : GName) (γp : PipeNames) (
       kctx curL (((kb.pushOffAt a b).withLocks ["pipe"]).withRegs Rl) -∗ pcIs curL (KA.«pipewrite» + 0x88#64) -∗
       trapCsrs curL -∗ cpuClaim curL k.proc -∗ intrRes curL -∗
       locked γl curL -∗ pipeResAt γp (k.regs 10#5) curCtx -∗ pipeRef γp w q -∗
-      procPrivBareAt curCtx (procAddr j) pid { V with upt := P } (viewFaulted V.upt P M) -∗
+      (∃ kv : Nat, ⌜V.ev ≤ kv⌝ ∗
+      procPrivBareAt curCtx (procAddr j) pid { V.updEv kv with upt := P } (viewFaulted V.upt P M)) -∗
     genHalvesPriv (procAddr j) pid V.gen -∗
     pwPay (hlc := hlc) γp (writerImg V.upt M) (k.regs 11#5) Q Qe m n.toNat -∗
       pwFrame (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)
@@ -1227,7 +1245,8 @@ theorem pw_sleep_arm (AC : ACQUIRE_GEN) (RE : RELEASE_GEN) (WK : WAKEUP) (SP : S
       (k.regs 20#5) (k.regs 21#5) (k.regs 22#5) (k.regs 23#5) (k.regs 24#5) (k.regs 25#5)
       (k.regs 26#5) v12 v13 ∗
     trapCsrs c ∗ cpuClaim c k.proc ∗ intrRes c ∗
-    procPrivBareAt curCtx (procAddr j) pid { V with upt := P } (viewFaulted V.upt P M) ∗
+    (∃ kv : Nat, ⌜V.ev ≤ kv⌝ ∗
+      procPrivBareAt curCtx (procAddr j) pid { V.updEv kv with upt := P } (viewFaulted V.upt P M)) ∗
     genHalvesPriv (procAddr j) pid V.gen ∗
     pwPay (hlc := hlc) γp (writerImg V.upt M) (k.regs 11#5) Q Qe m n.toNat ∗
     wpNext true k.proc cpu (pwPost k γp w q j pid V M n Q Qe) ∗
@@ -1409,7 +1428,8 @@ theorem pw_body (AC : ACQUIRE_GEN) (RE : RELEASE_GEN) (WK : WAKEUP) (SP : SLEEP_
       (k.regs 20#5) (k.regs 21#5) (k.regs 22#5) (k.regs 23#5) (k.regs 24#5) (k.regs 25#5)
       (k.regs 26#5) v12 v13 ∗
     trapCsrs c ∗ cpuClaim c k.proc ∗ intrRes c ∗
-    procPrivBareAt curCtx (procAddr j) pid { V with upt := P } (viewFaulted V.upt P M) ∗
+    (∃ kv : Nat, ⌜V.ev ≤ kv⌝ ∗
+      procPrivBareAt curCtx (procAddr j) pid { V.updEv kv with upt := P } (viewFaulted V.upt P M)) ∗
     genHalvesPriv (procAddr j) pid V.gen ∗
     pwPay (hlc := hlc) γp (writerImg V.upt M) (k.regs 11#5) Q Qe m n.toNat ∗
     wpNext true k.proc cpu (pwPost k γp w q j pid V M n Q Qe) ∗
@@ -1479,7 +1499,8 @@ theorem pw_body (AC : ACQUIRE_GEN) (RE : RELEASE_GEN) (WK : WAKEUP) (SP : SLEEP_
   iintro Hk Hpc
   -- THE KILL CHECK READS THE ROW WITH THE MARKER LENT (Rocq
   -- `kill_paid_shot_tear`): the pid half, the registration eighth, the marker
-  icases pw_priv_pid (procAddr j) pid { V with upt := P } (viewFaulted V.upt P M) $$ Hpriv with ⟨Hpw, Hpcl⟩
+  icases Hpriv with ⟨%kv, %hkv, Hpriv⟩
+  icases pw_priv_pid (procAddr j) pid { V.updEv kv with upt := P } (viewFaulted V.upt P M) $$ Hpriv with ⟨Hpw, Hpcl⟩
   icases pw_gen_open (procAddr j) pid V.gen $$ Hgen with ⟨Hrg, Htk, Hgcl⟩
   ihave Hlend := pw_kill_lend j pid V.gen $$ [Hpw Hrg Htk]
   · iframe
@@ -1499,6 +1520,9 @@ theorem pw_body (AC : ACQUIRE_GEN) (RE : RELEASE_GEN) (WK : WAKEUP) (SP : SLEEP_
   icases Hko with ⟨Hkr, Hpw, Hrg, Htk⟩
   ihave Hgen := Hgcl $$ Hrg Htk
   ihave Hpriv := Hpcl $$ Hpw
+  ihave Hpriv : (∃ kv : Nat, ⌜V.ev ≤ kv⌝ ∗
+      procPrivBareAt curCtx (procAddr j) pid { V.updEv kv with upt := P } (viewFaulted V.upt P M)) $$ [Hpriv]
+  · iexists kv; iframe Hpriv; ipureintro; exact hkv
   k_norm_g at hspK
   obtain ⟨e1, e2⟩ := hspK trivial
   subst spieK; subst sppK
@@ -1582,7 +1606,11 @@ theorem pw_body (AC : ACQUIRE_GEN) (RE : RELEASE_GEN) (WK : WAKEUP) (SP : SLEEP_
   k_step (wp_s_add c _ (KA.«pipewrite» + 0xb0#64) true 12#5 0#5 24#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [j24]
   iintro Hk Hpc
-  icases pw_privExt_split (procAddr j) pid V P _ $$ Hpriv with ⟨%hpf, Hsz, Hpg, Hpt, Hrest⟩
+  icases Hpriv with ⟨%kv, %hkv, Hpriv⟩
+  icases pw_privExt_split (procAddr j) pid (V.updEv kv) P _ $$ Hpriv with ⟨%hpf, Hsz, Hpg, Hpt, Hrest⟩
+  dsimp only [ProcPriv.updEv] at hpf
+  -- the block's counter, lent to copyin (permit sweep L1b)
+  icases ecRest_lend (procAddr j) (procAddr j) rfl pid (V.updEv kv) P $$ Hrest with ⟨Hlend, Hrest⟩
   k_step (wp_s_ld c _ (KA.«pipewrite» + 0xb2#64) false 72#12 11#5 19#5 (by decide) (by decide) (DFrac.own 1) V.sz)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [j19, pw_pSz_r, pw_pSz_lit]
   iintro Hk Hpc Hsz
@@ -1597,12 +1625,13 @@ theorem pw_body (AC : ACQUIRE_GEN) (RE : RELEASE_GEN) (WK : WAKEUP) (SP : SLEEP_
     with ⟨Hf0, Hf1, Hf2, Hf3, Hf4, Hf5, Hf6, Hf7, Hf8, Hf9, Hf10, Hf11, Hf12, Hf13⟩
   icases pw_ch_carve (k.regs 2#5) v12 $$ Hf12 with ⟨Hch, Hchcl⟩
   ihave Hbuf := pw_byteBuf_one_intro _ _ _ $$ Hch
-  iapply (pw_copyin CI c _ γkl γk P (viewFaulted V.upt P M) [nthByte (n := 8) v12 7]
-      ?hnC ?hKC ?hlC ?hrC ?hszC ?hlnC ?hl'C) $$ [- $Hk $Hpc $Hpt]
+  iapply (pw_copyin CI c _ γkl γk P (viewFaulted V.upt P M) [nthByte (n := 8) v12 7] kv (procAddr j)
+      ?hpC ?hnC ?hKC ?hlC ?hrC ?hszC ?hlnC ?hl'C) $$ [- $Hk $Hpc $Hpt $Hlend]
   rotate_right 1
   k_norm_g [pwj_4676]
   iframe Hbuf
   iframe #
+  case hpC => k_norm_g; rw [hb.proc]; exact hkproc
   case hnC => k_norm_g; rw [hb.noff]; decide
   case hKC => k_norm_g; unfold pipewriteSlots at hK; omega
   case hlC => k_norm_g; decide
@@ -1612,7 +1641,8 @@ theorem pw_body (AC : ACQUIRE_GEN) (RE : RELEASE_GEN) (WK : WAKEUP) (SP : SLEEP_
   case hl'C => simp
   -- past copyin
   iapply wpNext_off_intro
-  iintro %spieC %sppC %RC %hspC Hk Hpc ⟨%P2, %bs', %hpost, Hpt, Hbuf⟩ %hcsC
+  iintro %spieC %sppC %RC %hspC Hk Hpc Hlend ⟨%P2, %bs', %hpost, Hpt, Hbuf⟩ %hcsC
+  icases Hrest $$ Hlend with ⟨%kc, %hkc, Hrest⟩
   k_norm_g at hspC
   obtain ⟨e1, e2⟩ := hspC trivial
   subst spieC; subst sppC
@@ -1650,12 +1680,16 @@ theorem pw_body (AC : ACQUIRE_GEN) (RE : RELEASE_GEN) (WK : WAKEUP) (SP : SLEEP_
   obtain ⟨l2, l8, l9, l19, l20, l21, l22, l23, l24, l25, l26, l27⟩ := id hfixC
   have hext' : V.upt.extSz V.sz P2 := UMemL.extSz_trans hext hext2
   ihave Hch := pw_byteBuf_one_elim _ _ _ $$ Hbuf
-  ihave Hpriv := pw_privExt_close (procAddr j) pid V P P2 _ hext2 hpf $$ [Hsz Hpg Hpt Hrest]
+  ihave Hpriv := pw_privExt_close (procAddr j) pid ((V.updEv kv).updEv kc) P P2 _ hext2 hpf
+    $$ [Hsz Hpg Hpt Hrest]
   case' _ => iframe
-  ihave Hpriv := (show procPrivBareAt (GF := GF) curCtx (procAddr j) pid { V with upt := P2 }
+  rw [ProcPriv.updEv_updEv]
+  ihave Hpriv := (show procPrivBareAt (GF := GF) curCtx (procAddr j) pid { V.updEv kc with upt := P2 }
       (viewFaulted P P2 (viewFaulted V.upt P M)) ⊢
-      procPrivBareAt curCtx (procAddr j) pid { V with upt := P2 } (viewFaulted V.upt P2 M) from by
-    rw [UMemL.viewFaulted_trans M hext.1 hext2.1]) $$ Hpriv
+      (∃ kv : Nat, ⌜V.ev ≤ kv⌝ ∗
+        procPrivBareAt curCtx (procAddr j) pid { V.updEv kv with upt := P2 } (viewFaulted V.upt P2 M)) from by
+    rw [UMemL.viewFaulted_trans M hext.1 hext2.1]
+    iintro H; iexists kc; iframe H; ipureintro; exact Nat.le_trans hkv hkc) $$ Hpriv
   ihave Hnw := (show wordPointsTo (GF := GF) (k.regs 10#5 + 540#64) 4 (DFrac.own 1) nw ⊢
       wordAtN curCtx (aPnwrite (k.regs 10#5)) 4 (DFrac.own 1) nw from by
     rw [wordAtN_cur, pw_addr_nw]) $$ Hnw
@@ -1850,12 +1884,13 @@ theorem pw_wr_ws_wr (X : KCtx) (R : RegMap) (s s' : Bool) (R' : RegMap) :
 theorem pw_post_of_spec (cpu : CPU) (k : KCtx) (γp : PipeNames) (w : Bool) (q : Qp) (j : Nat)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (n : Int)
     (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF) :
-    wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd),
+    wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd) (k' : Nat),
       ⌜calleeSaved k.regs R' ∧ V.upt.extSz V.sz P' ∧ pipeRwRet n (R' 10#5)⌝ -∗
       kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
       trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
       pipeRef γp w q -∗
-      procPrivBareAt curCtx (procAddr j) pid { V with upt := P' } (viewFaulted V.upt P' M) -∗
+      ⌜V.ev ≤ k'⌝ -∗
+      procPrivBareAt curCtx (procAddr j) pid { V.updEv k' with upt := P' } (viewFaulted V.upt P' M) -∗
       genHalvesPriv (procAddr j) pid V.gen -∗
       pipeWpost (hlc := hlc) V.upt γp.pnQueue (writerImg V.upt M) (k.regs 11#5) Q Qe
         iprop(killShot V.gen ∗ □ MachFixedGS.killCred (hlc := hlc) (GF := GF)) n.toNat (R' 10#5) -∗
@@ -1899,6 +1934,10 @@ theorem pipewrite_proof (MP : MYPROC) (AC : ACQUIRE_GEN) (RE : RELEASE_GEN) (WK 
   ihave Hpriv := (show procPrivBareAt (GF := GF) curCtx (procAddr j) pid { V with upt := V.upt } M ⊢
       procPrivBareAt curCtx (procAddr j) pid { V with upt := V.upt } (viewFaulted V.upt V.upt M) from by
     rw [UMemL.viewFaulted_self]) $$ Hpriv
+  ihave Hpriv : (∃ kv : Nat, ⌜V.ev ≤ kv⌝ ∗ procPrivBareAt curCtx (procAddr j) pid
+      { V.updEv kv with upt := V.upt } (viewFaulted V.upt V.upt M)) $$ [Hpriv]
+  · iexists V.ev; isplitl []; · ipureintro; exact Nat.le_refl _
+    iexact Hpriv
   -- the prologue
   iapply (wp_prologuePw_gen cpu k KA.«pipewrite» hK14)
   k_code (text_instr _ _ _ _ rfl rfl) Htext

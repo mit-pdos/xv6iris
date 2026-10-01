@@ -109,6 +109,13 @@ the prologue); slot `n` is `sp0 - 8 n`:
    `sx_cursor`, `sx_addv_comm`, `sx_stk_ne`) are the Rocq step rules' cast
    chains: a Lean stage states the one it needs at the Lean shape (`bcond`
    over `BitVec`, one `bv_decide` / `decide`).
+9. **THE EVENT COUNTER (permit sweep L1b, Rocq b69bd0fab).**  The argument
+   fetches lend the block's counter (argstr, fetchaddr and fetchstr to
+   copyinstr / copyin): the block after them is `sysExecV2 A P kv` (Rocq
+   `us_upt (upd_usV U (upd_ev (us_V U) k)) P`), and the loop state carries
+   the count explicitly (`sysExecLoopSt` / `sysExecBadSt` gain `kv` and
+   `⌜A.V.ev ≤ kv⌝`, Rocq `sx_body`'s `k`), down to the contract's `k'`
+   (the break hands it to kexec; the -1 arms' `evAfter_refl`).
 
 ## Dropped/simplified vs Rocq
 
@@ -820,8 +827,9 @@ structure SysExecStatic (k : KCtx) (A : SysExecArgs) : Prop where
 /-- THE IMAGE THE ARGUMENTS ARE READ AT (Rocq's `us_M U` at entry). -/
 abbrev sysExecIm (A : SysExecArgs) : Nat → List (BitVec 8) := viewLazy A.V.upt A.V.sz A.M
 
-/-- The block after the copy-ins grew the table to `P` (Rocq `us_upt U P`). -/
-abbrev sysExecV2 (A : SysExecArgs) (P : UPtd) : ProcPriv := { A.V with upt := P }
+/-- The block after the copy-ins grew the table to `P` and raised the counter
+to `kv` (Rocq `us_upt (upd_usV U (upd_ev (us_V U) k)) P`, deviation 9). -/
+abbrev sysExecV2 (A : SysExecArgs) (P : UPtd) (kv : Nat) : ProcPriv := { A.V.updEv kv with upt := P }
 abbrev sysExecM2 (A : SysExecArgs) (P : UPtd) : Nat → List (BitVec 8) := viewFaulted A.V.upt P A.M
 
 /-- The AU side of the contract (only the break and the seal read it). -/
@@ -913,29 +921,31 @@ theorem sysExecCarry_rest (k : KCtx) (pl rest : List (BitVec 8)) (w59 : BitVec 6
 bookkeeping, the machine at the frame, the complement, the block at the
 table the copy-ins grew, the carry, `uargv` (= `A.v1`, deviation 6) and the
 `uarg` cell, the array and the pages. -/
-def sysExecLoopSt (k : KCtx) (A : SysExecArgs) (spie spp : Bool) (R : RegMap) (P : UPtd) (i : Nat)
+def sysExecLoopSt (k : KCtx) (A : SysExecArgs) (spie spp : Bool) (R : RegMap) (P : UPtd) (kv : Nat)
+    (i : Nat)
     (pg : Nat → BitVec 64) (alen : Nat → Nat) (afun : Nat → Nat → BitVec 8)
     (uvf : Nat → BitVec 64) (pl rest : List (BitVec 8)) (pc : BitVec 64) (c : CPU) : IProp GF :=
-  iprop(⌜i < 32 ∧ A.V.upt.extSz A.V.sz P ∧ sysExecOk pg alen afun i ∧
+  iprop(⌜i < 32 ∧ A.V.upt.extSz A.V.sz P ∧ A.V.ev ≤ kv ∧ sysExecOk pg alen afun i ∧
       sysExecAvOk (sysExecIm A) A.v1 uvf alen afun i ∧ sysExecLoopPins k R i ∧
       (k.regs 2#5).toNat % 8 = 0⌝ ∗
     kctx c (((k.withSpie spie spp).pushed 60).withRegs R) ∗ pcIs c pc ∗
     trapCsrsExt c k.sie ∗ cpuClaimExt c k.sie k.proc ∗
-    procPrivFd A.γ (procAddr A.j) A.pid (sysExecV2 A P) (sysExecM2 A P) ∗
+    procPrivFd A.γ (procAddr A.j) A.pid (sysExecV2 A P kv) (sysExecM2 A P) ∗
     sysExecCarry k pl rest ∗ wordPointsTo (sysExecUargv (k.regs 2#5)) 8 (DFrac.own 1) A.v1 ∗
     (∃ w : BitVec 64, wordPointsTo (sysExecUarg (k.regs 2#5)) 8 (DFrac.own 1) w) ∗
     sysExecArgvArr (k.regs 2#5) (sysExecArgvL pg i) ∗ sysExecPages pg afun 0 i)
 
 /-- **bad: at +0x092** (Rocq `sx_bad`): the string half of the bookkeeping is
 gone (a failing fetchstr's page has nothing said about its bytes). -/
-def sysExecBadSt (k : KCtx) (A : SysExecArgs) (spie spp : Bool) (R : RegMap) (P : UPtd) (t : Nat)
+def sysExecBadSt (k : KCtx) (A : SysExecArgs) (spie spp : Bool) (R : RegMap) (P : UPtd) (kv : Nat)
+    (t : Nat)
     (pg : Nat → BitVec 64) (afun : Nat → Nat → BitVec 8) (pl rest : List (BitVec 8)) (c : CPU) :
     IProp GF :=
-  iprop(⌜t ≤ 32 ∧ A.V.upt.extSz A.V.sz P ∧ sysExecPgOk pg t ∧ sysExecBadPins k R ∧
+  iprop(⌜t ≤ 32 ∧ A.V.upt.extSz A.V.sz P ∧ A.V.ev ≤ kv ∧ sysExecPgOk pg t ∧ sysExecBadPins k R ∧
       (k.regs 2#5).toNat % 8 = 0⌝ ∗
     kctx c (((k.withSpie spie spp).pushed 60).withRegs R) ∗ pcIs c (sysExecAddr + 0x92#64) ∗
     trapCsrsExt c k.sie ∗ cpuClaimExt c k.sie k.proc ∗
-    procPrivFd A.γ (procAddr A.j) A.pid (sysExecV2 A P) (sysExecM2 A P) ∗
+    procPrivFd A.γ (procAddr A.j) A.pid (sysExecV2 A P kv) (sysExecM2 A P) ∗
     sysExecCarry k pl rest ∗ wordPointsTo (sysExecUargv (k.regs 2#5)) 8 (DFrac.own 1) A.v1 ∗
     (∃ w : BitVec 64, wordPointsTo (sysExecUarg (k.regs 2#5)) 8 (DFrac.own 1) w) ∗
     sysExecArgvArr (k.regs 2#5) (sysExecArgvL pg t) ∗ sysExecPages pg afun 0 t)
@@ -1017,17 +1027,18 @@ def sysExecHeadBody (Γ : SchedNames) (k : KCtx) (A : SysExecArgs) : IProp GF :=
   iprop(∀ c : CPU,
     kctx c k -∗ pcIs c sysExecAddr -∗ trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗
     sysExecEnv (hlc := hlc) Γ A -∗ procPrivFd A.γ (procAddr A.j) A.pid A.V A.M -∗
-    ((∀ (c' : CPU) (spie spp : Bool) (R' : RegMap) (P' : UPtd),
-        ⌜calleeSaved k.regs R' ∧ R' 10#5 = 0xFFFFFFFFFFFFFFFF#64 ∧ A.V.upt.extSz A.V.sz P'⌝ -∗
+    ((∀ (c' : CPU) (spie spp : Bool) (R' : RegMap) (P' : UPtd) (kv : Nat),
+        ⌜calleeSaved k.regs R' ∧ R' 10#5 = 0xFFFFFFFFFFFFFFFF#64 ∧ A.V.upt.extSz A.V.sz P' ∧
+          A.V.ev ≤ kv⌝ -∗
         kctx c' ((k.withSpie spie spp).withRegs R') -∗ pcIs c' (jumpPc (k.regs 1#5)) -∗
         trapCsrsExt c' k.sie -∗ cpuClaimExt c' k.sie k.proc -∗
-        procPrivFd A.γ (procAddr A.j) A.pid (sysExecV2 A P') (sysExecM2 A P') -∗ wpLoop c') ∧
-     (∀ (c' : CPU) (spie spp : Bool) (R : RegMap) (P' : UPtd) (pl rest : List (BitVec 8)),
-        ⌜sysExecPinsE k R ∧ A.V.upt.extSz A.V.sz P' ∧ pl.length < 128 ∧
+        procPrivFd A.γ (procAddr A.j) A.pid (sysExecV2 A P' kv) (sysExecM2 A P') -∗ wpLoop c') ∧
+     (∀ (c' : CPU) (spie spp : Bool) (R : RegMap) (P' : UPtd) (kv : Nat) (pl rest : List (BitVec 8)),
+        ⌜sysExecPinsE k R ∧ A.V.upt.extSz A.V.sz P' ∧ A.V.ev ≤ kv ∧ pl.length < 128 ∧
           argPathOf (sysExecIm A) A.v0.toNat pl ∧ (k.regs 2#5).toNat % 8 = 0⌝ -∗
         kctx c' (((k.withSpie spie spp).pushed 60).withRegs R) -∗ pcIs c' (sysExecAddr + 0x28#64) -∗
         trapCsrsExt c' k.sie -∗ cpuClaimExt c' k.sie k.proc -∗
-        procPrivFd A.γ (procAddr A.j) A.pid (sysExecV2 A P') (sysExecM2 A P') -∗
+        procPrivFd A.γ (procAddr A.j) A.pid (sysExecV2 A P' kv) (sysExecM2 A P') -∗
         sysExecRaS0 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) -∗ sysExecSpillsFree (k.regs 2#5) -∗
         sysExecSlot10 (k.regs 2#5) -∗ sysExecPathBuf (k.regs 2#5) pl rest -∗
         sysfileAny (sysExecArgv (k.regs 2#5)) 256 -∗
@@ -1063,19 +1074,22 @@ edge (`i' = i + 1`; at `i' = 32` it falls into bad:).  This round's
 fetchaddr / fetchstr fault user pages in: the table grows, the ENTRY image
 does not move (`sysExec_viewLazy_faulted`). -/
 def sysExecStepBody (Γ : SchedNames) (k : KCtx) (A : SysExecArgs) : IProp GF :=
-  iprop(∀ (c : CPU) (spie spp : Bool) (R : RegMap) (P : UPtd) (i : Nat) (pg : Nat → BitVec 64)
+  iprop(∀ (c : CPU) (spie spp : Bool) (R : RegMap) (P : UPtd) (kv : Nat) (i : Nat)
+      (pg : Nat → BitVec 64)
       (alen : Nat → Nat) (afun : Nat → Nat → BitVec 8) (uvf : Nat → BitVec 64)
       (pl rest : List (BitVec 8)),
-    sysExecLoopSt (hlc := hlc) k A spie spp R P i pg alen afun uvf pl rest (sysExecAddr + 0x56#64) c -∗
+    sysExecLoopSt (hlc := hlc) k A spie spp R P kv i pg alen afun uvf pl rest (sysExecAddr + 0x56#64)
+      c -∗
     sysExecEnv (hlc := hlc) Γ A -∗
-    (∀ (c' : CPU) (spie' spp' : Bool) (R' : RegMap) (P' : UPtd) (i' : Nat) (pg' : Nat → BitVec 64)
+    (∀ (c' : CPU) (spie' spp' : Bool) (R' : RegMap) (P' : UPtd) (kv' : Nat) (i' : Nat)
+        (pg' : Nat → BitVec 64)
         (alen' : Nat → Nat) (afun' : Nat → Nat → BitVec 8) (uvf' : Nat → BitVec 64),
-      ((⌜i' = i + 1⌝ ∗ sysExecLoopSt (hlc := hlc) k A spie' spp' R' P' i' pg' alen' afun' uvf' pl rest
-          (sysExecAddr + 0x56#64) c') ∨
+      ((⌜i' = i + 1⌝ ∗ sysExecLoopSt (hlc := hlc) k A spie' spp' R' P' kv' i' pg' alen' afun' uvf' pl
+          rest (sysExecAddr + 0x56#64) c') ∨
        (⌜bytesToWord (umemRead (sysExecIm A) (A.v1 + BitVec.ofNat 64 (8 * i')).toNat 8) = 0#64⌝ ∗
-          sysExecLoopSt (hlc := hlc) k A spie' spp' R' P' i' pg' alen' afun' uvf' pl rest
+          sysExecLoopSt (hlc := hlc) k A spie' spp' R' P' kv' i' pg' alen' afun' uvf' pl rest
             (sysExecAddr + 0xb6#64) c') ∨
-       sysExecBadSt (hlc := hlc) k A spie' spp' R' P' i' pg' afun' pl rest c') -∗
+       sysExecBadSt (hlc := hlc) k A spie' spp' R' P' kv' i' pg' afun' pl rest c') -∗
       wpLoop c') -∗
     wpLoop c)
 
@@ -1083,17 +1097,20 @@ def sysExecStepBody (Γ : SchedNames) (k : KCtx) (A : SysExecArgs) : IProp GF :=
 `32 - i` over `sysExecStepBody`): from the loop head to the break (with its
 NULL) or to bad:. -/
 def sysExecLoopBody (Γ : SchedNames) (k : KCtx) (A : SysExecArgs) : IProp GF :=
-  iprop(∀ (c : CPU) (spie spp : Bool) (R : RegMap) (P : UPtd) (i : Nat) (pg : Nat → BitVec 64)
+  iprop(∀ (c : CPU) (spie spp : Bool) (R : RegMap) (P : UPtd) (kv : Nat) (i : Nat)
+      (pg : Nat → BitVec 64)
       (alen : Nat → Nat) (afun : Nat → Nat → BitVec 8) (uvf : Nat → BitVec 64)
       (pl rest : List (BitVec 8)),
-    sysExecLoopSt (hlc := hlc) k A spie spp R P i pg alen afun uvf pl rest (sysExecAddr + 0x56#64) c -∗
+    sysExecLoopSt (hlc := hlc) k A spie spp R P kv i pg alen afun uvf pl rest (sysExecAddr + 0x56#64)
+      c -∗
     sysExecEnv (hlc := hlc) Γ A -∗
-    (∀ (c' : CPU) (spie' spp' : Bool) (R' : RegMap) (P' : UPtd) (i' : Nat) (pg' : Nat → BitVec 64)
+    (∀ (c' : CPU) (spie' spp' : Bool) (R' : RegMap) (P' : UPtd) (kv' : Nat) (i' : Nat)
+        (pg' : Nat → BitVec 64)
         (alen' : Nat → Nat) (afun' : Nat → Nat → BitVec 8) (uvf' : Nat → BitVec 64),
       ((⌜bytesToWord (umemRead (sysExecIm A) (A.v1 + BitVec.ofNat 64 (8 * i')).toNat 8) = 0#64⌝ ∗
-          sysExecLoopSt (hlc := hlc) k A spie' spp' R' P' i' pg' alen' afun' uvf' pl rest
+          sysExecLoopSt (hlc := hlc) k A spie' spp' R' P' kv' i' pg' alen' afun' uvf' pl rest
             (sysExecAddr + 0xb6#64) c') ∨
-       sysExecBadSt (hlc := hlc) k A spie' spp' R' P' i' pg' afun' pl rest c') -∗
+       sysExecBadSt (hlc := hlc) k A spie' spp' R' P' kv' i' pg' afun' pl rest c') -∗
       wpLoop c') -∗
     wpLoop c)
 
@@ -1132,14 +1149,16 @@ def sysExecFreeBody (Γ : SchedNames) (k : KCtx) (A : SysExecArgs) (base ea : Bi
 reloads, the jump to +0x104 (`sys_exec_exit`).  The block comes back at the
 table the loop grew. -/
 def sysExecBadTailBody (Γ : SchedNames) (k : KCtx) (A : SysExecArgs) : IProp GF :=
-  iprop(∀ (c : CPU) (spie spp : Bool) (R : RegMap) (P : UPtd) (t : Nat) (pg : Nat → BitVec 64)
+  iprop(∀ (c : CPU) (spie spp : Bool) (R : RegMap) (P : UPtd) (kv : Nat) (t : Nat)
+      (pg : Nat → BitVec 64)
       (afun : Nat → Nat → BitVec 8) (pl rest : List (BitVec 8)),
-    sysExecBadSt (hlc := hlc) k A spie spp R P t pg afun pl rest c -∗ sysExecEnv (hlc := hlc) Γ A -∗
+    sysExecBadSt (hlc := hlc) k A spie spp R P kv t pg afun pl rest c -∗ sysExecEnv (hlc := hlc) Γ A -∗
     (∀ (c' : CPU) (spie' spp' : Bool) (R' : RegMap),
-      ⌜calleeSaved k.regs R' ∧ R' 10#5 = 0xFFFFFFFFFFFFFFFF#64 ∧ A.V.upt.extSz A.V.sz P⌝ -∗
+      ⌜calleeSaved k.regs R' ∧ R' 10#5 = 0xFFFFFFFFFFFFFFFF#64 ∧ A.V.upt.extSz A.V.sz P ∧
+        A.V.ev ≤ kv⌝ -∗
       kctx c' ((k.withSpie spie' spp').withRegs R') -∗ pcIs c' (jumpPc (k.regs 1#5)) -∗
       trapCsrsExt c' k.sie -∗ cpuClaimExt c' k.sie k.proc -∗
-      procPrivFd A.γ (procAddr A.j) A.pid (sysExecV2 A P) (sysExecM2 A P) -∗ wpLoop c') -∗
+      procPrivFd A.γ (procAddr A.j) A.pid (sysExecV2 A P kv) (sysExecM2 A P) -∗ wpLoop c') -∗
     wpLoop c)
 
 /-- **THE SUCCESS TAIL, +0x0ce .. +0x102** (Rocq `sx_succ_tail`, with
@@ -1172,12 +1191,14 @@ are `kxcBufs`), the bundle instantiated at the vector the loop built
 kexec's ARMED post at the reading, the reading itself, and the block kexec
 returned. -/
 def sysExecBreakBody (Γ : SchedNames) (k : KCtx) (A : SysExecArgs) (U : SysExecAU GF) : IProp GF :=
-  iprop(∀ (c : CPU) (spie spp : Bool) (R : RegMap) (P : UPtd) (i : Nat) (pg : Nat → BitVec 64)
+  iprop(∀ (c : CPU) (spie spp : Bool) (R : RegMap) (P : UPtd) (kv : Nat) (i : Nat)
+      (pg : Nat → BitVec 64)
       (alen : Nat → Nat) (afun : Nat → Nat → BitVec 8) (uvf : Nat → BitVec 64)
       (pl rest : List (BitVec 8)),
     ⌜bytesToWord (umemRead (sysExecIm A) (A.v1 + BitVec.ofNat 64 (8 * i)).toNat 8) = 0#64⌝ -∗
     ⌜pl.length < 128 ∧ argPathOf (sysExecIm A) A.v0.toNat pl⌝ -∗
-    sysExecLoopSt (hlc := hlc) k A spie spp R P i pg alen afun uvf pl rest (sysExecAddr + 0xb6#64) c -∗
+    sysExecLoopSt (hlc := hlc) k A spie spp R P kv i pg alen afun uvf pl rest (sysExecAddr + 0xb6#64)
+      c -∗
     sysExecEnv (hlc := hlc) Γ A -∗ bslots 3 -∗ irefSlots 2 -∗
     myPay U.gn U.Q -∗
     sysExecAuPre (hlc := hlc) U.Fs (fsGammaL fscFs) fscFs A.V.cwi A.V.pvSecc U.Q U.P U.Pmiss U.Fo (sysExecIm A)
@@ -1185,8 +1206,11 @@ def sysExecBreakBody (Γ : SchedNames) (k : KCtx) (A : SysExecArgs) (U : SysExec
     (∀ (c' : CPU) (spie' spp' : Bool) (R' : RegMap) (V' : ProcPriv) (M' : Nat → List (BitVec 8)),
       ⌜calleeSaved k.regs R'⌝ -∗ ⌜execArgsOf (sysExecIm A) A.v1 i alen afun⌝ -∗
       ⌜A.V.upt.extSz A.V.sz P⌝ -∗
+      -- the count the argument fetches left the block at (deviation 9);
+      -- kexec was handed the block there
+      ⌜A.V.ev ≤ kv⌝ -∗
       execArms (hlc := hlc) U.Fs (fsGammaL fscFs) fscFs A.V.cwi A.V.pvSecc U.Q U.P U.Pmiss U.Fo pl i alen afun
-        U.sts U.gn U.cs A.pid (sysExecV2 A P) (sysExecM2 A P) V' M' (R' 10#5) -∗
+        U.sts U.gn U.cs A.pid (sysExecV2 A P kv) (sysExecM2 A P) V' M' (R' 10#5) -∗
       kctx c' ((k.withSpie spie' spp').withRegs R') -∗ pcIs c' (jumpPc (k.regs 1#5)) -∗
       trapCsrsExt c' k.sie -∗ cpuClaimExt c' k.sie k.proc -∗ bslots 3 -∗ irefSlots 2 -∗
       procPrivFd A.γ (procAddr A.j) A.pid V' M' -∗ wpLoop c') -∗
@@ -1231,10 +1255,10 @@ theorem sys_exec_compose (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu : C
   iapply hhead $$ %cpu Hk Hpc Hte Hce Henv Hblk
   isplit
   · -- ---- argstr failed: -1, BEFORE kexec, the bundle unspent ----
-    iintro %c' %spie %spp %R' %P' %⟨hcs, ha0, hext⟩ Hk Hpc Hte Hce Hblk
-    iapply HΦ $$ %c' %spie %spp %R' %P' %hcs %hext Hk Hpc Hte Hce Hbs Hir
+    iintro %c' %spie %spp %R' %P' %kv %⟨hcs, ha0, hext, hkv⟩ Hk Hpc Hte Hce Hblk
+    iapply HΦ $$ %c' %spie %spp %R' %P' %kv %hcs %hext %hkv Hk Hpc Hte Hce Hbs Hir
     unfold sysExecArms
-    iexists sysExecV2 A P', sysExecM2 A P'
+    iexists sysExecV2 A P' kv, sysExecM2 A P'
     iframe Hblk
     ileft
     isplitr
@@ -1243,28 +1267,29 @@ theorem sys_exec_compose (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu : C
     ileft
     iexact Hau
   · -- ---- the path is in: run the rest of the function ----
-    iintro %c1 %spie %spp %R %P' %pl %rest %⟨hpins, hext, hpl, hpath, hal⟩ Hk Hpc Hte Hce Hblk Hrs
+    iintro %c1 %spie %spp %R %P' %kv %pl %rest %⟨hpins, hext, hkv, hpl, hpath, hal⟩ Hk Hpc Hte Hce
+      Hblk Hrs
       Hsp H10 Hpb Hargv H59 H60
     iapply hsetup $$ %c1 %spie %spp %R %⟨hpins, hal⟩ Hk Hpc Hte Hce Hsp Hargv
     iintro %c2 %R2 %hp2 Hk Hpc Hte Hce Hsp Harr
-    iapply hloop $$ %c2 %spie %spp %R2 %P' %0 %(fun _ => 0#64) %(fun _ => 0) %(fun _ _ => 0#8)
+    iapply hloop $$ %c2 %spie %spp %R2 %P' %kv %0 %(fun _ => 0#64) %(fun _ => 0) %(fun _ _ => 0#8)
       %(fun _ => 0#64) %pl %rest [Hk Hpc Hte Hce Hblk Hrs Hsp H10 Hpb H59 H60 Harr] Henv
     · unfold sysExecLoopSt sysExecCarry sysExecPages
       rw [sysExecArgvL_zero]
       iframe
       isplitl []
       · ipureintro
-        exact ⟨by omega, hext, fun j hj => absurd hj (by omega), fun j hj => absurd hj (by omega),
+        exact ⟨by omega, hext, hkv, fun j hj => absurd hj (by omega), fun j hj => absurd hj (by omega),
           hp2, hal⟩
       · simp only [Nat.sub_self, List.range'_zero]
         iapply BigSepL.bigSepL_nil.2
         iempintro
-    iintro %c3 %spie3 %spp3 %R3 %P3 %i3 %pg3 %al3 %af3 %uv3 (⟨%hnul, Hbrk⟩ | Hbadst)
+    iintro %c3 %spie3 %spp3 %R3 %P3 %k3 %i3 %pg3 %al3 %af3 %uv3 (⟨%hnul, Hbrk⟩ | Hbadst)
     · -- ---- the break: argv[i] = 0, then kexec ----
-      iapply hbreak $$ %c3 %spie3 %spp3 %R3 %P3 %i3 %pg3 %al3 %af3 %uv3 %pl %rest %hnul %⟨hpl, hpath⟩
-        Hbrk Henv Hbs Hir Hpay Hau
-      iintro %c4 %spie4 %spp4 %R4 %V' %M' %hcs4 %hargs %hext3 Harms Hk Hpc Hte Hce Hbs Hir Hblk
-      iapply HΦ $$ %c4 %spie4 %spp4 %R4 %P3 %hcs4 %hext3 Hk Hpc Hte Hce Hbs Hir
+      iapply hbreak $$ %c3 %spie3 %spp3 %R3 %P3 %k3 %i3 %pg3 %al3 %af3 %uv3 %pl %rest %hnul
+        %⟨hpl, hpath⟩ Hbrk Henv Hbs Hir Hpay Hau
+      iintro %c4 %spie4 %spp4 %R4 %V' %M' %hcs4 %hargs %hext3 %hk3 Harms Hk Hpc Hte Hce Hbs Hir Hblk
+      iapply HΦ $$ %c4 %spie4 %spp4 %R4 %P3 %k3 %hcs4 %hext3 %hk3 Hk Hpc Hte Hce Hbs Hir
       unfold sysExecArms
       iexists V', M'
       iframe Hblk
@@ -1285,11 +1310,11 @@ theorem sys_exec_compose (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu : C
         iframe Hok
         ipureintro; exact ⟨hpath, hargs⟩
     · -- ---- bad: free what was allocated and return -1 ----
-      iapply hbad $$ %c3 %spie3 %spp3 %R3 %P3 %i3 %pg3 %af3 %pl %rest Hbadst Henv
-      iintro %c4 %spie4 %spp4 %R4 %⟨hcs4, ha0, hext3⟩ Hk Hpc Hte Hce Hblk
-      iapply HΦ $$ %c4 %spie4 %spp4 %R4 %P3 %hcs4 %hext3 Hk Hpc Hte Hce Hbs Hir
+      iapply hbad $$ %c3 %spie3 %spp3 %R3 %P3 %k3 %i3 %pg3 %af3 %pl %rest Hbadst Henv
+      iintro %c4 %spie4 %spp4 %R4 %⟨hcs4, ha0, hext3, hk3⟩ Hk Hpc Hte Hce Hblk
+      iapply HΦ $$ %c4 %spie4 %spp4 %R4 %P3 %k3 %hcs4 %hext3 %hk3 Hk Hpc Hte Hce Hbs Hir
       unfold sysExecArms
-      iexists sysExecV2 A P3, sysExecM2 A P3
+      iexists sysExecV2 A P3 k3, sysExecM2 A P3
       iframe Hblk
       ileft
       isplitr

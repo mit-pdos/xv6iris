@@ -91,14 +91,19 @@ theorem sys_open_proof (AI : ARGINT) (AS : ARGSTR) (BO : BEGIN_OP) (NI : NAMEI_E
   have hS : SysOpenStatic k A := ⟨hj, hproc, htier, hnoff, hK, hns, hv0, hv1⟩
   exact wp_sys_open_eb_of_arms omo Γ cpu k γl γ j ns v vom pid V M sts P Pmiss Farm Fun Fok Fex Fo Ft
     hj hproc htier hnoff hK hns hv0 hv1
+    -- below argstr the run is at the record argstr handed back (permit sweep
+    -- L1b, Rocq's `UA`): every stage at `A.raise kv`
     (fun hc => sys_open_plain AI AS BO Γ cpu k A hS
-      (sys_open_entry_n NI IL Γ k A hS (sys_open_join_all IU IUP EO FC IT FA FD Γ k A hS)
-        (sys_open_alloc_all IU IUP EO FC IT FA FD Γ k A hS) (sys_open_tail_b EO Γ k A hS)
-        (sys_open_tail_c IUP EO Γ k A hS)) hc)
+      (fun kv => sys_open_entry_n NI IL Γ k (A.raise kv) (hS.raise kv)
+        (sys_open_join_all IU IUP EO FC IT FA FD Γ k (A.raise kv) (hS.raise kv))
+        (sys_open_alloc_all IU IUP EO FC IT FA FD Γ k (A.raise kv) (hS.raise kv))
+        (sys_open_tail_b EO Γ k (A.raise kv) (hS.raise kv))
+        (sys_open_tail_c IUP EO Γ k (A.raise kv) (hS.raise kv))) hc)
     (fun hc => sys_open_create AI AS BO Γ cpu k A Farm Fun Fok Fex hS
-      (sys_open_entry_c CR Γ k A hS Farm Fun Fok Fex
+      (fun kv => sys_open_entry_c CR Γ k (A.raise kv) (hS.raise kv) Farm Fun Fok Fex
         (fun P' Pm' Fo' Ft' => sys_open_join_all IU IUP EO FC IT FA FD Γ k
-          (sysOpenCrA A P' Pm' Fo' Ft') (sysOpenCrA_static k A P' Pm' Fo' Ft' hS))
-        (sys_open_tail_a EO Γ k A hS)) hc)⟩
+          (sysOpenCrA (A.raise kv) P' Pm' Fo' Ft')
+          (sysOpenCrA_static k (A.raise kv) P' Pm' Fo' Ft' (hS.raise kv)))
+        (sys_open_tail_a EO Γ k (A.raise kv) (hS.raise kv))) hc)⟩
 
 end Xv6

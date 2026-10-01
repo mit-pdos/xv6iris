@@ -21,6 +21,7 @@ and sys_exec consume, over the ONE block `FdTable.procPrivFd` = Rocq
 | `proc_priv_settle` :3001 | `procPrivFd_settle` |
 | `proc_priv_ev_acc` (permit sweep G) | `procPrivFd_evAcc` (the core's: `FdTable.procPrivCoreNoctxAt_evAcc`, the bare block's: `ProcPrivBare.procPrivBareAt_evAcc`) |
 | `proc_priv_ev_lend` (permit sweep L1a) | `procPrivFd_evLend` (at `ProcDefs.evAfter`, Rocq `ev_after`) |
+| (permit sweep L1b) | `procPrivFd_evAfter_of` (the block at its own record, lent form) |
 
 ## Where this sits
 `ProcInv` is imported BY `FdTable` (the block's cwd reference), so the
@@ -189,6 +190,17 @@ theorem procPrivFd_evLend (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V
   isplitl []
   · ipureintro; exact ⟨k2, hk2, rfl⟩
   · iapply Hb $$ %k2 Hc
+
+/-- ...and the block at its own record, in the lent form (`evAfter_refl`):
+what a state that carries the block at SOME later record starts from
+(kexec's phase C, permit sweep L1b). -/
+theorem procPrivFd_evAfter_of (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
+    (M : Nat → List (BitVec 8)) :
+    procPrivFd (GF := GF) γ pa pid V M ⊢ ∃ V1 : ProcPriv, ⌜evAfter V V1⌝ ∗ procPrivFd γ pa pid V1 M := by
+  iintro H
+  iexists V
+  iframe H
+  ipureintro; exact evAfter_refl V
 
 /-! ## The trapframe -/
 

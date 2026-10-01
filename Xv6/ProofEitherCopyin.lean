@@ -114,6 +114,8 @@ theorem either_copyin_proof (MP : MYPROC) (CI : COPYIN) (MM : MEMMOVE) : EITHER_
     have hpa : R1 10#5 = procAddr j := h10.trans (hproc rfl)
     simp only [reduceIte]
     icases ec_priv_split (procAddr j) pid V P M $$ Harm with ⟨%hfacts, Hsz, Hpg, Hspace, Hrest⟩
+    -- the block's counter, lent to copyin (permit sweep L1b)
+    icases ecRest_lend k.proc (procAddr j) (hproc rfl) pid V P $$ Hrest with ⟨Hlend, Hrest⟩
     k_step_gen (wp_s_branch c14 _ (KA.«either_copyin» + 0x1c#64) true 32#13 9#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [e9, ec_beq_ne _ huser] next c15 hp15
@@ -142,11 +144,11 @@ theorem either_copyin_proof (MP : MYPROC) (CI : COPYIN) (MM : MEMMOVE) : EITHER_
     iintro Hk Hpc
     k_norm_g
     -- copyin(p->pagetable, p->sz, dst, src, len)
-    iapply (ec_copyin_call CI c21 _ γl γk P M old ?hnC ?hKC ?hlC ?hrC ?hszC ?hlnC ?hl'C)
+    iapply (ec_copyin_call CI c21 _ γl γk P M old V.ev ?hnC ?hKC ?hlC ?hrC ?hszC ?hlnC ?hl'C)
       $$ [- $Hk $Hpc]
     rotate_right 1
     k_norm_g [e20]
-    iframe Hlk Hav Hspace Hold
+    iframe Hlk Hav Hspace Hold Hlend
     case hnC => k_norm_g; omega
     case hKC => k_norm_g; omega
     case hlC => k_norm_g; exact hlk
@@ -156,9 +158,10 @@ theorem either_copyin_proof (MP : MYPROC) (CI : COPYIN) (MM : MEMMOVE) : EITHER_
     case hl'C => exact hlen'
     k_norm_g [ei_ret_32c]
     iapply wpNext_intro_pin
-    iintro %c22 %hp22 %spie2 %spp2 %R2 %hsp2 Hk Hpc Hres %hcs2
+    iintro %c22 %hp22 %spie2 %spp2 %R2 %hsp2 Hk Hpc Hlend Hres %hcs2
     k_norm_g
     icases Hres with ⟨%P', %bs', %hpost, Hspace, Hold⟩
+    icases Hrest $$ Hlend with ⟨%kc, %hkc, Hrest⟩
     icases UMemL.procPtAt_wf _ _ $$ Hspace with ⟨Hspace, %hwf'⟩
     rw [e19] at hpost
     unfold calleeSaved at hcs2
@@ -181,7 +184,7 @@ theorem either_copyin_proof (MP : MYPROC) (CI : COPYIN) (MM : MEMMOVE) : EITHER_
     iapply wpNext_mono _ _ _ _ _ $$ HΦ
     iintro %c23 HΦ %R3 Hk Hpc %hexit
     obtain ⟨x10, x1, x2, x8, x9, x18, x19, x20, xrest⟩ := hexit
-    ihave Hout : (∃ (Q : UPtd) (cs : List (BitVec 8)),
+    ihave Hout : (∃ (Q : UPtd) (cs : List (BitVec 8)) (k' : Nat),
         ⌜P.extSz V.sz Q ∧
           ((R3 10#5 = 0#64 ∧
               cs = umemRead (viewFaulted P Q M) (k.regs 12#5).toNat old.length ∧
@@ -189,16 +192,19 @@ theorem either_copyin_proof (MP : MYPROC) (CI : COPYIN) (MM : MEMMOVE) : EITHER_
            (R3 10#5 = 18446744073709551615#64 ∧ (∃ d, d ≤ old.length ∧
               cs = umemRead (viewFaulted P Q M) (k.regs 12#5).toNat d ++ old.drop d) ∧
             ∃ e, e < old.length ∧ ¬ uvaRmapped P (k.regs 12#5 + BitVec.ofNat 64 e).toNat))⌝ ∗
-        procPrivExt (procAddr j) pid V Q (viewFaulted P Q M) ∗
+        ⌜V.ev ≤ k'⌝ ∗ procPrivExt (procAddr j) pid (V.updEv k') Q (viewFaulted P Q M) ∗
         byteBuf (k.regs 10#5) (DFrac.own 1) cs) $$ [Hsz Hpg Hspace Hrest Hold]
     case' _ =>
       iexists P'
       iexists bs'
+      iexists kc
       isplitl []
       · ipureintro; rw [x10]; exact ⟨hpost.1, hpost.2.imp
         (fun h => ⟨h.1, h.2.1, UMemL.umMapped_nowrap hwf' h.2.2 (BitVec.isLt _)⟩) id⟩
+      isplitl []
+      · ipureintro; exact hkc
       · isplitl [Hsz Hpg Hspace Hrest]
-        · iapply (ec_priv_close (procAddr j) pid V P P' (viewFaulted P P' M) hpost.1
+        · iapply (ec_priv_close (procAddr j) pid (V.updEv kc) P P' (viewFaulted P P' M) hpost.1
             hfacts)
           simp only [pSz, pPagetable]
           iframe

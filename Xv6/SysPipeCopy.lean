@@ -240,12 +240,16 @@ theorem sys_pipe_stage_e {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
     iintro Hk Hpc
     icases sys_pipe_frame_fd1 _ _ _ _ _ _ _ $$ Hfr with ⟨%hal, Hc1, Hfrw⟩
     ihave Hb1 := (sys_pipe_fd1_bytes (k.regs 2#5) hal fd1).1 $$ Hc1
-    iapply (sys_pipe_copyout CO c8 _ γkl γk P1 M1 (sysPipeFdBytes fd1) ?hn ?hKc ?hl ?hroot ?hsz ?hlen (by simp))
-      $$ [- $Hk $Hpc $Hpt]
+    -- the rest's event counter, lent to copyout (permit sweep L1b)
+    icases sysPipeCoreRest_lend pa pa rfl pid V $$ Hrest with ⟨Hlend, Hrestb⟩
+    iapply (sys_pipe_copyout CO c8 _ γkl γk P1 M1 (sysPipeFdBytes fd1) V.ev pa ?hpp ?hn ?hKc ?hl ?hroot ?hsz
+        ?hlen (by simp))
+      $$ [- $Hk $Hpc $Hpt $Hlend]
     rotate_right 1
     k_norm_g [sys_pipe_ret_7a, p8, sys_pipe_a64]
     iframe #
     iframe Hb1
+    case hpp => k_norm_g; exact hproc
     case hn => k_norm_g; omega
     case hKc => k_norm_g; rw [sysPipeSlots_eq] at hK; omega
     case hl => k_norm_g; exact hkmem
@@ -253,7 +257,8 @@ theorem sys_pipe_stage_e {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
     case hsz => k_norm_g; have := hf.1; unfold uvmMaxsz at this; omega
     case hlen => k_norm_g; rfl
     iapply wpNext_intro_pin
-    iintro %c9 %hp9 %spie2 %spp2 %R2 %hsp2 Hk Hpc Hb1 ⟨%P2, %M2, %⟨hext2, hr2⟩, Hpt⟩ %hcs2
+    iintro %c9 %hp9 %spie2 %spp2 %R2 %hsp2 Hk Hpc Hlend Hb1 ⟨%P2, %M2, %⟨hext2, hr2⟩, Hpt⟩ %hcs2
+    icases Hrestb $$ Hlend with ⟨%kv, %hkv, Hrest⟩
     icases UMemL.procPtAt_wf _ _ $$ Hpt with ⟨Hpt, %hwf2⟩
     k_norm_g [MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed, MachCSL.KCtx.withSpie_withRegs]
     k_norm_g [p8, sys_pipe_a64] at hr2
@@ -266,12 +271,15 @@ theorem sys_pipe_stage_e {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
     obtain ⟨hpins2, h9'⟩ := sys_pipe_pins_call k _ R2 hpins0 hcs2
     ihave Hc1 := (sys_pipe_fd1_bytes (k.regs 2#5) hal fd1).2 $$ Hb1
     ihave Hfr := Hfrw $$ %(BitVec.ofNat 32 fd1) Hc1
-    ihave Hcore := sys_pipe_core_ext pa pid V P2 M2 (UMemL.extSz_trans hext1 hext2) hf $$ [Hsz Hpg Hpt Hrest]
+    ihave Hcore := sys_pipe_core_ext pa pid (V.updEv kv) P2 M2 (UMemL.extSz_trans hext1 hext2) hf
+      $$ [Hsz Hpg Hpt Hrest]
     · iframe
+    -- the rest of the call at the record the copyout raised the block to
+    ihave Hnext := sys_pipe_turn_after cpu k γ V.fdg pa pid V M sts v kv hkv $$ Hnext
     have hpin9 : k.sie = false ∨ k.proc = 0#64 → c9 = cpu := fun h =>
       (hp9 h).trans ((hp8 h).trans ((hp7 h).trans ((hp6 h).trans ((hp5 h).trans ((hp4 h).trans
         ((hp3 h).trans ((hp2 h).trans ((hp1 h).trans (hpin h)))))))))
-    iapply (sys_pipe_stage_f FC Γ cpu c9 k γl γ pa pid V M sts v γkl γk spie2 spp2 R2 k0 k1 fd0 fd1 γp hk0 hk1
+    iapply (sys_pipe_stage_f FC Γ cpu c9 k γl γ pa pid (V.updEv kv) M sts v γkl γk spie2 spp2 R2 k0 k1 fd0 fd1 γp hk0 hk1
         hfd0 hfd1 hz0 hz1 hne l hfrees P1 P2 M1 M2 hext1 hext2 hwf2 hM1 hmap1 hr2 rfl hproc htier hnoff hK hlk hplk hprc hkmem
         hpin9 hpins2 (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false] at h9'; exact h9'.trans h9))
       $$ [- $Hk $Hpc $Hfr $Hrf $Hwf $Hr0 $Hr1 $Hqf $Hcore $Howe $Hu0 $Ha0 $Hu1 $Ha1 $Hfrag $Hnext]
@@ -394,12 +402,16 @@ theorem sys_pipe_stage_d {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
     iintro Hk Hpc
     icases sys_pipe_frame_fd0 _ _ _ _ _ _ _ $$ Hfr with ⟨%hal', Hc0, Hfrw⟩
     ihave Hb0 := (sys_pipe_fd0_bytes (k.regs 2#5) hal' fd0).1 $$ Hc0
-    iapply (sys_pipe_copyout CO c8 _ γkl γk V.upt M (sysPipeFdBytes fd0) ?hn ?hKc ?hl ?hroot ?hsz ?hlen (by simp))
-      $$ [- $Hk $Hpc $Hpt]
+    -- the rest's event counter, lent to copyout (permit sweep L1b)
+    icases sysPipeCoreRest_lend pa pa rfl pid V $$ Hrest with ⟨Hlend, Hrestb⟩
+    iapply (sys_pipe_copyout CO c8 _ γkl γk V.upt M (sysPipeFdBytes fd0) V.ev pa ?hpp ?hn ?hKc ?hl ?hroot ?hsz
+        ?hlen (by simp))
+      $$ [- $Hk $Hpc $Hpt $Hlend]
     rotate_right 1
     k_norm_g [sys_pipe_ret_62, p8, sys_pipe_a60]
     iframe #
     iframe Hb0
+    case hpp => k_norm_g; exact hproc
     case hn => k_norm_g; omega
     case hKc => k_norm_g; rw [sysPipeSlots_eq] at hK; omega
     case hl => k_norm_g; exact hkmem
@@ -407,7 +419,10 @@ theorem sys_pipe_stage_d {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
     case hsz => k_norm_g; have := hf.1; unfold uvmMaxsz at this; omega
     case hlen => k_norm_g; rfl
     iapply wpNext_intro_pin
-    iintro %c9 %hp9 %spie2 %spp2 %R2 %hsp2 Hk Hpc Hb0 ⟨%P1, %M1, %⟨hext1, hr1⟩, Hpt⟩ %hcs2
+    iintro %c9 %hp9 %spie2 %spp2 %R2 %hsp2 Hk Hpc Hlend Hb0 ⟨%P1, %M1, %⟨hext1, hr1⟩, Hpt⟩ %hcs2
+    icases Hrestb $$ Hlend with ⟨%kv, %hkv, Hrest⟩
+    -- the rest of the call at the record the copyout raised the block to
+    ihave Hnext := sys_pipe_turn_after cpu k γ V.fdg pa pid V M sts v kv hkv $$ Hnext
     k_norm_g [MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed, MachCSL.KCtx.withSpie_withRegs]
     k_norm_g [p8, sys_pipe_a60] at hr1
     k_norm_g at hsp2
@@ -422,7 +437,7 @@ theorem sys_pipe_stage_d {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
     have hpin9 : k.sie = false ∨ k.proc = 0#64 → c9 = cpu := fun h =>
       (hp9 h).trans ((hp8 h).trans ((hp7 h).trans ((hp6 h).trans ((hp5 h).trans ((hp4 h).trans
         ((hp3 h).trans ((hp2 h).trans ((hp1 h).trans (hpin h)))))))))
-    iapply (sys_pipe_stage_e rfl FC CO Γ cpu c9 k γl γ pa pid V M sts v γkl γk spie2 spp2 R2 k0 k1 fd0 fd1 γp
+    iapply (sys_pipe_stage_e rfl FC CO Γ cpu c9 k γl γ pa pid (V.updEv kv) M sts v γkl γk spie2 spp2 R2 k0 k1 fd0 fd1 γp
         hk0 hk1 hfd0 hfd1 hz0 hz1 hne l hfrees P1 M1 hext1 hf hr1
         hproc htier hnoff hK hlk hplk hprc hkmem hpin9 hpins2
         (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false] at h9'; exact h9'.trans h9))

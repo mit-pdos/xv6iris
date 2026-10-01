@@ -265,28 +265,46 @@ theorem fclose_core_take [Icfg] [CurCtx] (E : CoPset) (kk : Nat) (pn : FPNames) 
 /-- `pipeclose`'s contract at fileclose's call site. -/
 theorem fc_pipeclose [CurCtx] (PC : PIPECLOSE) (Γ : SchedNames) (c : CPU) (k' : KCtx)
     (γl : GName) (γp : PipeNames) (w : Bool) (γkl : GName) (γk : KmemNames) (on : Option Nat)
-    (Φ : IProp GF) (hw : w = decide (k'.regs 11#5 ≠ 0#64))
+    (Φ : IProp GF) (ke : Nat) (p : BitVec 64) (hp : k'.proc = p) (hw : w = decide (k'.regs 11#5 ≠ 0#64))
     (hnoff : k'.noff + 2 < 2 ^ 31) (hK : pipecloseSlots ≤ k'.avail)
     (hpipe : "pipe" ∉ k'.locks) (hproc : "proc" ∉ k'.locks) (hkmem : "kmem" ∉ k'.locks)
     (htier : k'.tier = KTier.kpt) :
     kctx c k' ∗ pcIs c KA.«pipeclose» ∗
     isPipe γl γp (k'.regs 10#5) ∗ pipeRef γp w 1 ∗
     pipeCpay (hlc := hlc) γp.pnQueue w Φ ∗
-    isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk on ∗
+    isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk on ∗ actLend p ke ∗
     procsInv Γ ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
       ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
+      (∃ k1 : Nat, ⌜ke ≤ k1⌝ ∗ actLend p k1) -∗
       ⌜calleeSaved k'.regs R'⌝ -∗
       (kallocAvail γk on ∨ kallocAvail γk (availInc on)) -∗
       pipeCpost (hlc := hlc) γp.pnQueue w Φ true -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := PC.wp_pipeclose (hlc := hlc) (GF := GF) Γ c k' γl γp w γkl γk on Φ hw hnoff hK hpipe hproc hkmem htier
+  subst hp
+  have h := PC.wp_pipeclose (hlc := hlc) (GF := GF) Γ c k' γl γp w γkl γk on Φ ke hw hnoff hK hpipe hproc hkmem htier
   unfold wp_pipeclose_body at h
   simp only [pipecloseAddr] at h
   exact h
 
 /-! ## The exit: the epilogue at `(KernelSyms.«fileclose» + 0x8e)` -/
+
+/-- **THE LEND, HANDED BACK AT A RAISED COUNT** (permit sweep L1b): the
+`SlotGen.actLend_cont_frame` of a lend that came back from a callee (here
+pipeclose) at `k1 ≥ ke` -- the continuation that takes the lend back is
+discharged with it, and is left with the shape it had before. -/
+theorem fc_lend_frame (sie : Bool) (p : BitVec 64) (cpu : CPU) (p' : BitVec 64) (ke : Nat)
+    (A B C T : CPU → Bool → Bool → RegMap → IProp GF) :
+    wpNext sie p cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
+      A cpu' spie spp R' -∗ B cpu' spie spp R' -∗ C cpu' spie spp R' -∗
+      (∃ k' : Nat, ⌜ke ≤ k'⌝ ∗ actLend p' k') -∗ T cpu' spie spp R')) ⊢
+    (∃ k1 : Nat, ⌜ke ≤ k1⌝ ∗ actLend p' k1) -∗
+    wpNext sie p cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
+      A cpu' spie spp R' -∗ B cpu' spie spp R' -∗ C cpu' spie spp R' -∗ T cpu' spie spp R')) := by
+  unfold wpNext
+  iintro H Hl %cpu' %h %spie %spp %R' HA HB HC
+  iapply H $$ %cpu' %h %spie %spp %R' HA HB HC Hl
 
 /-- THE CLOSE PAYMENT'S RECEIPT, folded into the caller's continuation (Rocq
 threads `fileclose_cpost` to the post directly): the continuation that takes

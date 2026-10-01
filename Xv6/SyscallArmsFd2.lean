@@ -18,6 +18,10 @@ vocabulary is `SyscallArmsFdDefs`; dup, fstat and close are `SyscallArmsFd`.
   dispatch's whole `bslots 3`, the write column (`syscallEnv_devsw`).
   Rows: the image unmoved (`syscImg_faulted`).  The armed post is paid by
   the deposit's out-wand.
+
+Permit sweep L1b: read, write and pipe hand the block back at a raised count
+(the copy ring's lend); the arms relay it through `SyscallRet.SyscRows.updEv`
+(the rows do not read the count).
 -/
 import Xv6.SyscallArmsFdDefs
 
@@ -94,7 +98,12 @@ theorem syscall_arm_read (SR : SYSREAD)
   iframe Hk Hpc Hpi Hte Hce Hpe Hpriv Hfr Hkl Hka Hfs Hcons Hin HP
   k_next_e
   unfold sysReadPost
-  iintro %spie2 %spp2 %R2 %P' %M1 %d %⟨hcs, hext, hd, hr, hw⟩ Hk Hpc Hte Hce Hpriv Hfr Hb1 Harms
+  iintro %spie2 %spp2 %R2 %P' %M1 %d %k' %⟨hcs, hext, hd, hr, hw⟩ Hk Hpc Hte Hce %hk' Hpriv Hfr Hb1
+    Harms
+  -- the block at the callee's raised event count (permit sweep L1b): the
+  -- rows do not read it (`SyscRows.updEv`)
+  ihave Hpriv := (show procPrivFd (GF := GF) γ (procAddr j) pid { V.updEv k' with upt := P' } M1 ⊢
+    procPrivFd γ (procAddr j) pid (({ V with upt := P' } : ProcPriv).updEv k') M1 from .rfl) $$ Hpriv
   have hww : ∀ (K : KCtx) (a b c d : Bool), (K.withSpie a b).withSpie c d = K.withSpie c d :=
     fun _ _ _ _ _ => rfl
   have hpsw : ∀ (K : KCtx) (m : Nat) (a b : Bool),
@@ -131,11 +140,11 @@ theorem syscall_arm_read (SR : SYSREAD)
   ihave Hsp := Hout $$ %(R2 10#5) %P' %M1 %d %⟨hext, hw, hfr, hfacts0.2.2.2, hfacts0.2.2.1, hfacts.2.2.1⟩ Hx
   unfold syscallRet syscallAddr at *
   iapply (syscall_ret_fd PT Γ c0 cpu k spie2 spp2 R2 γ j pid V M sts V.gen cs ip f
-    { V with upt := P' } M1 sts cs hj hproc hK htier hpins2 hs2' hrows 5 hn5
-    (by decide) (by decide) (by decide))
+    (({ V with upt := P' } : ProcPriv).updEv k') M1 sts cs hj hproc hK htier hpins2 hs2'
+    (hrows.updEv k') 5 hn5 (by decide) (by decide) (by decide))
   iframe Hk Hpc Hframe Hte Hce Hbs Hip Hfd Hir Henv Hpriv Hfr Hch Hnext
-  iapply (syscSysOut_ret f V M sts V.gen cs pid { V with upt := P' } M1 (R2 10#5)
-    (umemLazy P' V.sz.toNat M1) sts V.cwi cs 5 hn5 (by decide) (by decide) hl0 rfl rfl)
+  iapply (syscSysOut_ret f V M sts V.gen cs pid (({ V with upt := P' } : ProcPriv).updEv k') M1
+    (R2 10#5) (umemLazy P' V.sz.toNat M1) sts V.cwi cs 5 hn5 (by decide) (by decide) hl0 rfl rfl)
   iexact Hsp
 
 set_option maxHeartbeats 4000000 in
@@ -201,7 +210,11 @@ theorem syscall_arm_write (SW : SYSWRITE)
   iframe Hk Hpc Hpi Hte Hce Hpe Hpriv Hfr Hkl Hka Hfs Hdev Hin
   k_next_e
   unfold sysWritePost
-  iintro %spie2 %spp2 %R2 %P' %⟨hcs, hext⟩ Hk Hpc Hte Hce Hpriv Hfr Hbs Harms
+  iintro %spie2 %spp2 %R2 %P' %k' %⟨hcs, hext⟩ Hk Hpc Hte Hce %hk' Hpriv Hfr Hbs Harms
+  -- the block at the callee's raised event count (permit sweep L1b): the
+  -- rows do not read it (`SyscRows.updEv`)
+  ihave Hpriv := (show procPrivFd (GF := GF) γ (procAddr j) pid { V.updEv k' with upt := P' } (viewFaulted V.upt P' M) ⊢
+    procPrivFd γ (procAddr j) pid (({ V with upt := P' } : ProcPriv).updEv k') (viewFaulted V.upt P' M) from .rfl) $$ Hpriv
   have hww : ∀ (K : KCtx) (a b c d : Bool), (K.withSpie a b).withSpie c d = K.withSpie c d :=
     fun _ _ _ _ _ => rfl
   have hpsw : ∀ (K : KCtx) (m : Nat) (a b : Bool),
@@ -235,10 +248,11 @@ theorem syscall_arm_write (SW : SYSWRITE)
   unfold filewriteFsOut
   unfold syscallRet syscallAddr at *
   iapply (syscall_ret_fd PT Γ c0 cpu k spie2 spp2 R2 γ j pid V M sts V.gen cs ip f
-    { V with upt := P' } (viewFaulted V.upt P' M) sts cs hj hproc hK htier hpins2 hs2' hrows 16 hn16
-    (by decide) (by decide) (by decide))
+    (({ V with upt := P' } : ProcPriv).updEv k') (viewFaulted V.upt P' M) sts cs hj hproc hK htier
+    hpins2 hs2' (hrows.updEv k') 16 hn16 (by decide) (by decide) (by decide))
   iframe Hk Hpc Hframe Hte Hce Hbs Hip Hfd Hir Henv Hpriv Hfr Hch Hnext
-  iapply (syscSysOut_ret f V M sts V.gen cs pid { V with upt := P' } (viewFaulted V.upt P' M) (R2 10#5)
+  iapply (syscSysOut_ret f V M sts V.gen cs pid (({ V with upt := P' } : ProcPriv).updEv k')
+    (viewFaulted V.upt P' M) (R2 10#5)
     (syscImg V M) sts V.cwi cs 16 hn16 (by decide) (by decide) hl0 himg rfl)
   iexact Hsp
 
@@ -295,7 +309,7 @@ theorem syscall_arm_pipe (SP : SYSPIPE)
   isplitl [Hi1]
   · unfold irefSlot; iexact Hi1
   k_next_e
-  iintro %spie2 %spp2 %R2 %hcs Hk Hpc Hte Hce Hpost Hs1 Hs2 Hi1
+  iintro %spie2 %spp2 %R2 %k' %hcs Hk Hpc Hte Hce %hk' Hpost Hs1 Hs2 Hi1
   have hww : ∀ (K : KCtx) (a b c d : Bool), (K.withSpie a b).withSpie c d = K.withSpie c d :=
     fun _ _ _ _ _ => rfl
   have hpsw : ∀ (K : KCtx) (m : Nat) (a b : Bool),
@@ -319,6 +333,10 @@ theorem syscall_arm_pipe (SP : SYSPIPE)
   -- pipe deposits nothing: its row is `emp`, and the post is sys_pipe's receipt
   iclear Hsi
   · -- nothing moved
+    -- the block at sys_pipe's raised event count (permit sweep L1b): the
+    -- rows do not read it (`SyscRows.updEv`)
+    ihave Hpriv := (show procPrivFd (GF := GF) γ (procAddr j) pid (V.updEv k') M ⊢
+    procPrivFd γ (procAddr j) pid (({ V with ofile := V.ofile, upt := V.upt } : ProcPriv).updEv k') M from .rfl) $$ Hpriv
     have hmem : syscMemOk V (syscStore { V with ofile := V.ofile, upt := V.upt } (R2 10#5)) (syscImg V M)
         (syscImg (syscStore { V with ofile := V.ofile, upt := V.upt } (R2 10#5)) M) := by
       unfold syscMemOk
@@ -336,13 +354,16 @@ theorem syscall_arm_pipe (SP : SYSPIPE)
       rw [hr] at h0
       exact absurd h0 (by decide)
     iapply (syscall_ret_fd PT Γ c0 cpu k spie2 spp2 R2 γ j pid V M sts gn cs ip f
-      { V with ofile := V.ofile, upt := V.upt } M sts cs hj hproc hK htier hpins2 hs2' hrows 4 hn4
-      (by decide) (by decide) (by decide))
+      (({ V with ofile := V.ofile, upt := V.upt } : ProcPriv).updEv k') M sts cs hj hproc hK htier
+      hpins2 hs2' (hrows.updEv k') 4 hn4 (by decide) (by decide) (by decide))
     iframe Hk Hpc Hframe Hte Hce Hbs Hip Hfd Hir Henv Hpriv Hfr Hch Hnext
-    iapply (syscSysOut_ret f V M sts gn cs pid { V with ofile := V.ofile, upt := V.upt } M (R2 10#5)
+    iapply (syscSysOut_ret f V M sts gn cs pid
+      (({ V with ofile := V.ofile, upt := V.upt } : ProcPriv).updEv k') M (R2 10#5)
       _ sts V.cwi cs 4 hn4 (by decide) (by decide) hl0 rfl rfl)
     iexact Hsp
   · -- a copyout failed: the descriptors are null again, a prefix reached the image
+    ihave Hpriv := (show procPrivFd (GF := GF) γ (procAddr j) pid { V.updEv k' with upt := P' } M1 ⊢
+    procPrivFd γ (procAddr j) pid (({ V with ofile := V.ofile, upt := P' } : ProcPriv).updEv k') M1 from .rfl) $$ Hpriv
     icases syscFd_pageLen hct γ (procAddr j) pid _ M1 $$ Hpriv with ⟨%hpl, Hpriv⟩
     icases procPrivFd_facts γ (procAddr j) pid _ M1 $$ Hpriv with ⟨Hpriv, %hfacts⟩
     have himg := syscImg_wrote_at V.upt P' V.sz M M1 _ _ hext heq hm hpl hfacts.1 hfacts.2.1
@@ -367,13 +388,16 @@ theorem syscall_arm_pipe (SP : SYSPIPE)
       rw [hr] at h0
       exact absurd h0 (by decide)
     iapply (syscall_ret_fd PT Γ c0 cpu k spie2 spp2 R2 γ j pid V M sts gn cs ip f
-      { V with ofile := V.ofile, upt := P' } M1 sts cs hj hproc hK htier hpins2 hs2'' hrows 4 hn4
-      (by decide) (by decide) (by decide))
+      (({ V with ofile := V.ofile, upt := P' } : ProcPriv).updEv k') M1 sts cs hj hproc hK htier
+      hpins2 hs2'' (hrows.updEv k') 4 hn4 (by decide) (by decide) (by decide))
     iframe Hk Hpc Hframe Hte Hce Hbs Hip Hfd Hir Henv Hpriv Hfr Hch Hnext
-    iapply (syscSysOut_ret f V M sts gn cs pid { V with ofile := V.ofile, upt := P' } M1 (R2 10#5)
+    iapply (syscSysOut_ret f V M sts gn cs pid
+      (({ V with ofile := V.ofile, upt := P' } : ProcPriv).updEv k') M1 (R2 10#5)
       _ sts V.cwi cs 4 hn4 (by decide) (by decide) hl0 rfl rfl)
     iexact Hsp
   · -- success: both ends installed, the two numbers written
+    ihave Hpriv := (show procPrivFd (GF := GF) γ (procAddr j) pid { V.updEv k' with ofile := ((V.updEv k').ofile.set fd0 (fnode k0)).set fd1 (fnode k1), upt := P' } M1 ⊢
+    procPrivFd γ (procAddr j) pid (({ V with ofile := (V.ofile.set fd0 (fnode k0)).set fd1 (fnode k1), upt := P' } : ProcPriv).updEv k') M1 from .rfl) $$ Hpriv
     icases syscFd_pageLen hct γ (procAddr j) pid _ M1 $$ Hpriv with ⟨%hpl, Hpriv⟩
     icases procPrivFd_facts γ (procAddr j) pid _ M1 $$ Hpriv with ⟨Hpriv, %hfacts⟩
     have himg := syscImg_wrote_at V.upt P' V.sz M M1 _ _ hext heq hm hpl hfacts.1 hfacts.2.1
@@ -403,11 +427,13 @@ theorem syscall_arm_pipe (SP : SYSPIPE)
       ipureintro
       exact ⟨hne, hl0', hl1', rfl⟩
     iapply (syscall_ret_fd PT Γ c0 cpu k spie2 spp2 R2 γ j pid V M sts gn cs ip f
-      { V with ofile := (V.ofile.set fd0 (fnode k0)).set fd1 (fnode k1), upt := P' } M1 _ cs
-      hj hproc hK htier hpins2 hs2'' hrows 4 hn4 (by decide) (by decide) (by decide))
+      (({ V with ofile := (V.ofile.set fd0 (fnode k0)).set fd1 (fnode k1), upt := P' } : ProcPriv).updEv
+        k') M1 _ cs
+      hj hproc hK htier hpins2 hs2'' (hrows.updEv k') 4 hn4 (by decide) (by decide) (by decide))
     iframe Hk Hpc Hframe Hte Hce Hbs Hip Hfd Hir Henv Hpriv Hfr Hch Hnext
     iapply (syscSysOut_ret f V M sts gn cs pid
-      { V with ofile := (V.ofile.set fd0 (fnode k0)).set fd1 (fnode k1), upt := P' } M1 (R2 10#5)
+      (({ V with ofile := (V.ofile.set fd0 (fnode k0)).set fd1 (fnode k1), upt := P' } : ProcPriv).updEv
+        k') M1 (R2 10#5)
       _ _ V.cwi cs 4 hn4 (by decide) (by decide) hl0 rfl rfl)
     iexact Hsp
 

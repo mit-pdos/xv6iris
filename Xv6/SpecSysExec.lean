@@ -304,14 +304,19 @@ def sysExecK (k : KCtx) (γ : FileNames) (j : Nat) (v0 v1 : BitVec 64) (pid : Bi
     (cs : Std.ExtTreeSet GName compare) (Fs : Pfam GF (Uvis → IProp GF)) (Q : Int → IProp GF)
     (P Pmiss : Nat → Nat → IProp GF) (Fo : Pfam GF (Aview → Nat → Anode → IProp GF))
     (cpu' : CPU) : IProp GF :=
-  iprop(∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd),
+  iprop(∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd) (k' : Nat),
     ⌜calleeSaved k.regs R'⌝ -∗
     ⌜V.upt.extSz V.sz P'⌝ -∗
+    -- THE EVENT COUNTER (permit sweep L1b): the argument fetches (fetchaddr,
+    -- fetchstr) lend the block's counter to copyin / copyinstr, which may
+    -- step it, so the arms start from a count at least the entry's (and
+    -- kexec's failure arm raises it further)
+    ⌜V.ev ≤ k'⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
     bslots 3 -∗ irefSlots 2 -∗
     sysExecArms (hlc := hlc) Fs (fsGammaL fscFs) fscFs V.cwi V.pvSecc γ (procAddr j) pid Q P Pmiss Fo
-      (viewLazy V.upt V.sz M) v0 v1 sts gn cs { V with upt := P' } (viewFaulted V.upt P' M)
+      (viewLazy V.upt V.sz M) v0 v1 sts gn cs { V.updEv k' with upt := P' } (viewFaulted V.upt P' M)
       (R' 10#5) -∗
     wpLoop cpu')
 

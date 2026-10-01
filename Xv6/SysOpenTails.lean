@@ -67,6 +67,10 @@ back generation-named; the wide hop -- iunlock is not in `SysfileCalls`) and
    (`.closed`), so Rocq's opaque `fileclose_env` / `_out` threading is
    `emp` (the frozen body's own statement; `SysOpenParts` §4).
 4. `so_iref_two` is `irefSlots_op 1 1`.
+5. Permit sweep L1b: `sys_open_tails_fileclose_none` takes `(ke : Nat)` and
+   `actLend` for fileclose and hands back `∃ k1 ≥ ke`; ARM F-FAIL carries it
+   past ARM E-FAIL into its own return (Rocq's `kev` binder of
+   `so_tail_f`'s `wp_next`).
 
 Imports `SysOpenParts` and the shared call-site files `FsCallSitesOp`, `SysfileCalls`.
 -/
@@ -249,31 +253,32 @@ set_option maxHeartbeats 4000000 in
 the borrowed iref unit come back. -/
 theorem sys_open_tails_fileclose_none (FC : FILECLOSE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k' : KCtx) (se : Bool) (hs : k'.sie = se) (pj : BitVec 64)
-    (hpj : k'.proc = pj) (A : SysOpenArgs GF) (kf : Nat)
+    (hpj : k'.proc = pj) (A : SysOpenArgs GF) (kf : Nat) (ke : Nat)
     (hproc : pj = procAddr A.j) (hK : filecloseSlots ≤ k'.avail)
     (hnoff : k'.noff = 0) (htier : k'.tier = KTier.kpt) (ha0 : k'.regs 10#5 = fnode kf) :
     kctx cpu k' ∗ pcIs cpu KA.«fileclose» ∗
     trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗ sysOpenEnv (hlc := hlc) Γ A ∗
-    fileRef A.γ kf 1 .closed ∗ sysOpenPid A ∗ irefSlot ∗
+    fileRef A.γ kf 1 .closed ∗ sysOpenPid A ∗ irefSlot ∗ actLend (procAddr A.j) ke ∗
     (∀ (c : CPU) (spie spp : Bool) (R' : RegMap),
       ⌜calleeSaved k'.regs R'⌝ -∗
       kctx c ((k'.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k'.regs 1#5)) -∗
       trapCsrsExt c se -∗ cpuClaimExt c se pj -∗ sysOpenPid A -∗
+      (∃ k1 : Nat, ⌜ke ≤ k1⌝ ∗ actLend (procAddr A.j) k1) -∗
       fdSlot -∗ irefSlot -∗ wpLoop c)
     ⊢ wpLoop (GF := GF) cpu := by
   subst hproc
-  iintro ⟨Hk, Hpc, Hte, Hce, #Henv, Hf, Hpid, Hiru, HK⟩
+  iintro ⟨Hk, Hpc, Hte, Hce, #Henv, Hf, Hpid, Hiru, Hlend, HK⟩
   unfold sysOpenEnv
   icases Henv with ⟨#Hpi, #Hpe, #Hrdy, #Hft⟩
   ihave Henvf := filecloseEnv_none (hlc := hlc) (GF := GF) Γ A.j (procAddr A.j) 0 ⟨0, 0⟩ none
   -- an untyped file pays no close link (Rocq `fileclose_cpay_none`)
   ihave Hcpay := filecloseCpay_none (hlc := hlc) (GF := GF) iprop(emp)
   iapply (fileclose_call FC Γ cpu k' A.γl A.γ kf 1 .closed A.j 0 ⟨0, 0⟩ none A.pid pidPriv iprop(emp)
-    se hs (procAddr A.j) hpj hK hnoff htier ha0)
-  iframe Hk Hpc Hte Hce Hft Hpe Hf Hpid Hiru Henvf Hcpay
+    ke se hs (procAddr A.j) hpj hK hnoff htier ha0)
+  iframe Hk Hpc Hte Hce Hft Hpe Hf Hpid Hiru Henvf Hcpay Hlend
   iapply wpNext_intro_pin
-  iintro %c %_ %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid Hfd Hiru - -
-  iapply HK $$ %c %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid Hfd Hiru
+  iintro %c %_ %spie %spp %R' %hcs Hk Hpc Hlend Hte Hce Hpid Hfd Hiru - -
+  iapply HK $$ %c %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid Hlend Hfd Hiru
 
 /-! ## ARM A-FAIL and ARM B-FAIL -/
 
@@ -652,7 +657,7 @@ theorem sys_open_tail_f (IUP : IUNLOCKPUT) (EO : END_OP) (FC : FILECLOSE) (Γ : 
   unfold sysOpenTailFBody
   iintro %cpu %spie %spp %R %s3v %w6 %lo %om %w24 %γil %γisl %loc %tlc %kk %s %g %inum %dn %bm %kf %u
     %⟨hkk, hnib, hle, hu, hkf⟩ %hpins %hal Hk Hpc Hte Hce #Henv Hcells Hbuf Hf Hlk Hload Hkeep Hpid Hbs
-    Hiru Hop Hret
+    Hiru Hop Hlend Hret
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   obtain ⟨-, -, -, -, -, -, -, -, -, -, -, hKfc, -⟩ := sys_open_K _ hS.hK
   -- +0x126  mv a0,s2
@@ -663,16 +668,16 @@ theorem sys_open_tail_f (IUP : IUNLOCKPUT) (EO : END_OP) (FC : FILECLOSE) (Γ : 
   k_step_e (wp_s_jal cpu _ (sysOpenAddr + 0x128#64) false 2092776#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_open_tails_br_fileclose]
   iintro Hk Hpc
-  iapply (sys_open_tails_fileclose_none FC Γ cpu _ k.sie (by k_norm_g) k.proc (by k_norm_g) A kf hS.hproc
-      ?fK ?fn ?ft ?fa)
-    $$ [- $Hk $Hpc $Hte $Hce $Henv $Hf $Hpid $Hiru]
+  iapply (sys_open_tails_fileclose_none FC Γ cpu _ k.sie (by k_norm_g) k.proc (by k_norm_g) A kf A.V.ev
+      hS.hproc ?fK ?fn ?ft ?fa)
+    $$ [- $Hk $Hpc $Hte $Hce $Henv $Hf $Hpid $Hiru $Hlend]
   rotate_right 1
   k_norm_g [sys_open_tails_ret_12c]
   case fK => k_norm_g; exact hKfc
   case fn => k_norm_g; exact hS.hnoff
   case ft => k_norm_g; exact hS.htier
   case fa => k_norm_g
-  iintro %cpu %spie1 %spp1 %R1 %hcs1 Hk Hpc Hte Hce Hpid Hfd Hiru
+  iintro %cpu %spie1 %spp1 %R1 %hcs1 Hk Hpc Hte Hce Hpid Hlend Hfd Hiru
   k_norm_g [sys_open_tails_ret_12c, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp1 := sysOpenPins_cs k _ R1 _ _ _ (sysOpenPins_set k _ _ _ _ 1#5 _
     (sysOpenPins_set k R _ _ _ 10#5 _ hpins (by decide)) (Or.inl rfl)) hcs1
@@ -690,7 +695,7 @@ theorem sys_open_tail_f (IUP : IUNLOCKPUT) (EO : END_OP) (FC : FILECLOSE) (Γ : 
   -- fall into +0x12e (ARM E-FAIL)
   iapply hE $$ %cpu %spie1 %spp1 %_ %(fnode kf) %(k.regs 19#5) %w6 %lo %om %w24 %γil %γisl %loc %tlc
     %kk %s %g %inum %dn %bm %u %⟨hkk, hnib, hle, hu⟩ %hp2 %hal Hk Hpc Hte Hce Henv Hcells Hbuf Hlk
-    Hload Hkeep Hpid Hbs Hop [Hret Hfd Hiru]
+    Hload Hkeep Hpid Hbs Hop [Hret Hfd Hiru Hlend]
   unfold sysOpenRet
   iintro %c %spie' %spp' %R' %hcs Hk Hpc Hte Hce ⟨%hr, Hpid, Hbs, Hslot⟩
   ihave Hiru := (show irefSlot (GF := GF) ⊢ irefSlots 1 from .rfl) $$ Hiru
@@ -698,7 +703,7 @@ theorem sys_open_tail_f (IUP : IUNLOCKPUT) (EO : END_OP) (FC : FILECLOSE) (Γ : 
   ihave Hir2 := (irefSlots_op 1 1).2 $$ [$Hiru $Hslot]
   iapply Hret $$ %c %spie' %spp' %R' %hcs Hk Hpc Hte Hce
   dsimp only
-  iframe Hpid Hbs Hir2 Hfd
+  iframe Hpid Hbs Hir2 Hfd Hlend
   ipureintro; exact hr
 
 /-! ## ARM S -/

@@ -44,6 +44,12 @@ whole), so a caller that copies in a LOOP
 (`consolewrite`'s 32-byte chunks) can re-enter it -- `procPrivRun` pins
 `P = V.upt` and cannot be rebuilt once the first call has faulted a page in.
 
+THE EVENT COUNTER (permit sweep L1b, Rocq b69bd0fab; design
+ni-strong-instance.md §7.3): the USER arm lends the block's counter to the
+copy, which may step it, so the block comes back at a count at least the
+one it left at (`∃ k' ≥ V.ev`, the record at `V.updEv k'`).  The kernel arm
+lends nothing.
+
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
 import Xv6.EitherDefs
@@ -78,14 +84,14 @@ def wp_either_copyin_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] 
     ⌜k.sie = false → spie = k.spie ∧ spp = k.spp⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     (if user then
-      (∃ (P' : UPtd) (bs' : List (BitVec 8)),
+      (∃ (P' : UPtd) (bs' : List (BitVec 8)) (k' : Nat),
         ⌜P.extSz V.sz P' ∧
           ((R' 10#5 = 0#64 ∧ bs' = umemRead (viewFaulted P P' M) (k.regs 12#5).toNat old.length ∧
               (k.regs 12#5).toNat + old.length < 2 ^ 64) ∨
            (R' 10#5 = -1#64 ∧ (∃ d, d ≤ old.length ∧
               bs' = umemRead (viewFaulted P P' M) (k.regs 12#5).toNat d ++ old.drop d) ∧
             ∃ e, e < old.length ∧ ¬ uvaRmapped P (k.regs 12#5 + BitVec.ofNat 64 e).toNat))⌝ ∗
-        procPrivExt (procAddr j) pid V P' (viewFaulted P P' M) ∗
+        ⌜V.ev ≤ k'⌝ ∗ procPrivExt (procAddr j) pid (V.updEv k') P' (viewFaulted P P' M) ∗
         byteBuf (k.regs 10#5) (DFrac.own 1) bs')
      else ⌜R' 10#5 = 0#64⌝ ∗ byteBuf (k.regs 12#5) dqs bs ∗
        byteBuf (k.regs 10#5) (DFrac.own 1) bs) -∗

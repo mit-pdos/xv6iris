@@ -39,6 +39,9 @@ ARM C-OK, the directory really was MADE).
    `procPrivFd`'s own definition (core ∗ array, core = bare ∗ cwd
    reference), create takes the WHOLE block, and begin_op / iunlockput /
    end_op are lent the pid quarter (`sys_mkdir_pid`).
+4. Permit sweep L1b: argstr hands the block back at a raised count, and
+   `sys_mkdir_fetched` runs at the raised record (SysMkdirFrame
+   deviation 4).
 -/
 import Xv6.SysMkdirTails
 import Xv6.SysMkdirCalls
@@ -319,7 +322,7 @@ theorem sys_mkdir_args (AS : ARGSTR) (CR : CREATE) (IUP : IUNLOCKPUT) (EO : END_
   k_step_e (wp_s_jal cpu _ (KA.«sys_mkdir» + 0x16#64) false 2086300#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_mkdir_br_argstr]
   iintro Hk Hpc
-  icases sysfile_blk_bare _ _ _ _ _ $$ Hblk with ⟨Hbare, Hclose⟩
+  icases sysfile_blk_bare_ev _ _ _ _ _ $$ Hblk with ⟨Hbare, Hclose⟩
   ihave Hbuf := (show byteBuf (GF := GF) (sysMkdirBuf (k.regs 2#5)) (DFrac.own 1) old ⊢
     byteBuf (k.regs 2#5 + 0xFFFFFFFFFFFFFF70#64) (DFrac.own 1) old from .rfl) $$ Hbuf
   iapply (sysfile_argstr AS Γ cpu _ k.sie (by k_norm_g) (procAddr A.j) (by k_norm_g; exact hproc)
@@ -334,16 +337,34 @@ theorem sys_mkdir_args (AS : ARGSTR) (CR : CREATE) (IUP : IUNLOCKPUT) (EO : END_
   case gn => k_norm_g; omega
   case gK => k_norm_g; exact hKas
   case gmx => k_norm_g [hold]
-  iintro %cpu %spie1 %spp1 %R1 %P2 %bs %⟨hcs1, hext, hret⟩ Hk Hpc Hte Hce Hbare Hbuf
+  iintro %cpu %spie1 %spp1 %R1 %P2 %bs %kv %⟨hcs1, hext, hret⟩ Hk Hpc Hte Hce %hkv Hbare Hbuf
   k_norm_g [sys_mkdir_ret_1a, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   ihave Hbuf := (show byteBuf (GF := GF) (k.regs 2#5 + 0xFFFFFFFFFFFFFF70#64) (DFrac.own 1) bs ⊢
     byteBuf (sysMkdirBuf (k.regs 2#5)) (DFrac.own 1) bs from .rfl) $$ Hbuf
-  ihave Hblk := Hclose $$ %P2 %(viewFaulted A.V.upt P2 A.M) Hbare
+  ihave Hblk := Hclose $$ %P2 %(viewFaulted A.V.upt P2 A.M) %kv Hbare
+  -- argstr lent the block's counter (permit sweep L1b): the rest of the run
+  -- is at the record it came back at (SysMkdirFrame deviation 4)
+  ihave Hblk := (show procPrivFd (GF := GF) A.γ (procAddr A.j) A.pid { A.V.updEv kv with upt := P2 }
+      (viewFaulted A.V.upt P2 A.M) ⊢
+    procPrivFd (A.raise kv).γ (procAddr (A.raise kv).j) (A.raise kv).pid (sysMkdirV1 (A.raise kv) P2)
+      (sysMkdirM1 (A.raise kv) P2) from .rfl) $$ Hblk
+  ihave HΦ : (∀ c : CPU, sysMkdirPostA k (A.raise kv) c) $$ [HΦ]
+  · iintro %c
+    ispecialize HΦ $$ %c
+    iapply (sysMkdirK_raise k A.γ (procAddr A.j) A.pid A.V A.M A.ns A.v.toNat A.P A.Pmiss A.Farm
+      A.Fdots A.Fun A.Fok A.Fex c kv hkv) $$ HΦ
+  ihave Hir := (show irefSlots (GF := GF) A.ns ⊢ irefSlots (A.raise kv).ns from .rfl) $$ Hir
+  ihave Hau := (show mkdirAuAt (hlc := hlc) (GF := GF) (fsGammaL fscFs) fscFs A.V.cwi
+      (viewLazy A.V.upt A.V.sz A.M) A.v.toNat A.P A.Pmiss A.Farm A.Fdots A.Fun A.Fok A.Fex ⊢
+    mkdirAuAt (hlc := hlc) (fsGammaL fscFs) fscFs (A.raise kv).V.cwi
+      (viewLazy (A.raise kv).V.upt (A.raise kv).V.sz (A.raise kv).M) (A.raise kv).v.toNat
+      (A.raise kv).P (A.raise kv).Pmiss (A.raise kv).Farm (A.raise kv).Fdots (A.raise kv).Fun
+      (A.raise kv).Fok (A.raise kv).Fex from .rfl) $$ Hau
   have hp1 : sysMkdirPins k R1 := by
     refine sysMkdirPins_cs k _ R1 ?_ hcs1
     repeat (refine sysMkdirPins_set _ _ _ _ ?_ (by decide))
     exact hpins
-  iapply (sys_mkdir_fetched CR IUP EO Γ cpu k A P2 spie1 spp1 R1 old bs hj hproc hK
+  iapply (sys_mkdir_fetched CR IUP EO Γ cpu k (A.raise kv) P2 spie1 spp1 R1 old bs hj hproc hK
       hnoff htier hct hns hp1 hal hext hold hret)
     $$ [$Hk $Hpc $Hcells $Hbuf $Hte $Hce $Henv $Hblk $HΦ $Hbs $Hir $Hop $Hau]
 

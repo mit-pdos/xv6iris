@@ -35,7 +35,10 @@ generation ghosts this layer cannot see.
 THE EVENT COUNTER (permit sweep G+G', design ni-strong-instance.md §7.2):
 both twins end, as the bare block does, in `SlotGen.actCnt pa V.ev`, so the
 two `rfl` bridges (`procPrivRun_eq`, `procPrivExt_eq`) keep their
-statements; the section takes `[WchG GF]` for it.
+statements; the section takes `[WchG GF]` for it.  Permit sweep L1b (Rocq
+b69bd0fab): `copyin` takes the lend, so `ec_copyin_call` does too, and the
+user arms lend the counter out of the opened block (`ecRest_lend`) and close
+it at the count that came back.
 
 Imports only definitional and Spec files (never a `Code*`, `Proof*` or
 `Link*` file).
@@ -141,6 +144,37 @@ theorem procPrivExt_close (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P' 
     (M' : Nat → List (BitVec 8)) :
     procPrivExt (GF := GF) pa pid V P' M' ⊢ procPrivRun pa pid { V with upt := P' } M' := .rfl
 
+/-- **The block at SOME raised event count** (permit sweep L1b): what a
+block-holder above the copy ring gets back from a callee that lent the
+block's counter on -- the count is at least the one the block left at.
+The file layer's internal continuations carry it in this form so no stage
+statement names the count; the contract's own post names it (`∀ k' ≥
+V.ev`). -/
+def procPrivExtEv (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P' : UPtd)
+    (M' : Nat → List (BitVec 8)) : IProp GF :=
+  iprop(∃ kv : Nat, ⌜V.ev ≤ kv⌝ ∗ procPrivExt pa pid (V.updEv kv) P' M')
+
+theorem procPrivExtEv_intro (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P' : UPtd)
+    (M' : Nat → List (BitVec 8)) (kv : Nat) (h : V.ev ≤ kv) :
+    procPrivExt (GF := GF) pa pid (V.updEv kv) P' M' ⊢ procPrivExtEv pa pid V P' M' := by
+  unfold procPrivExtEv
+  iintro H
+  iexists kv
+  iframe H
+  ipureintro; exact h
+
+/-- Opened (by `rfl`; `icases` cannot see through the definition). -/
+theorem procPrivExtEv_elim (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P' : UPtd)
+    (M' : Nat → List (BitVec 8)) :
+    procPrivExtEv (GF := GF) pa pid V P' M' ⊢
+      ∃ kv : Nat, ⌜V.ev ≤ kv⌝ ∗ procPrivExt pa pid (V.updEv kv) P' M' := .rfl
+
+/-- ... at the block's own count. -/
+theorem procPrivExtEv_of (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P' : UPtd)
+    (M' : Nat → List (BitVec 8)) :
+    procPrivExt (GF := GF) pa pid V P' M' ⊢ procPrivExtEv pa pid V P' M' :=
+  procPrivExtEv_intro pa pid V P' M' V.ev (Nat.le_refl _)
+
 end
 
 /-- At the kernel-page-table tier the contracts' bare block
@@ -162,6 +196,14 @@ theorem procPrivExt_conv0 {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] 
   simp only at h
   subst h
   exact .rfl
+
+/-! ## The event count's record algebra (permit sweep L1b) -/
+
+/-- A second raise overrides the first (both are record updates). -/
+theorem ProcPriv.updEv_updEv (V : ProcPriv) (a b : Nat) : (V.updEv a).updEv b = V.updEv b := rfl
+
+/-- The block's own record, at its own count and descriptor. -/
+theorem ProcPriv.updEv_self_upt (V : ProcPriv) : { V.updEv V.ev with upt := V.upt } = V := rfl
 
 /-! ## Arithmetic facts -/
 
@@ -382,15 +424,17 @@ set_option maxHeartbeats 1000000 in
 /-- `copyin`'s contract as a rule (shared by `either_copyin` and `fetchaddr`;
 formerly also ProofFetchaddr's `fetchaddr_copyin_call`). -/
 theorem ec_copyin_call (CI : COPYIN) [CurCtx] (c : CPU) (k' : KCtx) (γl : GName) (γk : KmemNames)
-    (P : UPtd) (M : Nat → List (BitVec 8)) (old : List (BitVec 8))
+    (P : UPtd) (M : Nat → List (BitVec 8)) (old : List (BitVec 8)) (ke : Nat)
     (hnoff : k'.noff + 1 < 2 ^ 31) (hK : 50 ≤ k'.avail) (hlk : "kmem" ∉ k'.locks)
     (hroot : k'.regs 10#5 = pageAddr P.root) (hsz : (k'.regs 11#5).toNat ≤ 2 ^ 38)
     (hlen : k'.regs 14#5 = BitVec.ofNat 64 old.length) (hlen' : old.length < 2 ^ 63) :
     kctx c k' ∗ pcIs c KA.«copyin» ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
     kallocAvail γk none ∗ procPtAt P M ∗ byteBuf (k'.regs 12#5) (DFrac.own 1) old ∗
+    actLend k'.proc ke ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
       ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
+      (∃ k1 : Nat, ⌜ke ≤ k1⌝ ∗ actLend k'.proc k1) -∗
       (∃ (P' : UPtd) (bs' : List (BitVec 8)),
         ⌜P.extSz (k'.regs 11#5) P' ∧
           ((R' 10#5 = 0#64 ∧ bs' = umemRead (viewFaulted P P' M) (k'.regs 13#5).toNat old.length ∧
@@ -401,7 +445,7 @@ theorem ec_copyin_call (CI : COPYIN) [CurCtx] (c : CPU) (k' : KCtx) (γl : GName
         procPtAt P' (viewFaulted P P' M) ∗ byteBuf (k'.regs 12#5) (DFrac.own 1) bs') -∗
       ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := CI.wp_copyin (hlc := hlc) (GF := GF) c k' γl γk P M old hnoff hK hlk hroot hsz hlen hlen'
+  have h := CI.wp_copyin (hlc := hlc) (GF := GF) c k' γl γk P M old ke hnoff hK hlk hroot hsz hlen hlen'
   unfold wp_copyin_body at h
   simp only [copyinAddr] at h
   exact h
@@ -451,6 +495,30 @@ theorem ec_priv_close [CurCtx] (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
   · ipureintro; exact ⟨hf.1, UMemL.umBelow_extSz hf.2.2.2 hext, hf.2.1, hf.2.2.1⟩
   · iframe
     ipureintro; exact fun h => LazyFree.lazyFree_extSz hext (hlz h)
+
+/-- **The opened block's event counter, lent** (permit sweep L1b; Rocq's
+`proc_priv_core_copy_ev` hands the counter out beside the copy's cells,
+here the rest keeps it): the counter goes out as `SlotGen.actLend` and the
+rest comes back at whatever count the copy returned -- at least the one it
+left at.  `p` is the lend's name for the slot (the callee's `k.proc`). -/
+theorem ecRest_lend [CurCtx] (p pa : BitVec 64) (hp : p = pa) (pid : BitVec 32) (V : ProcPriv)
+    (P : UPtd) :
+    ecRest (GF := GF) pa pid V P ⊢
+      actLend p V.ev ∗
+      ((∃ k1 : Nat, ⌜V.ev ≤ k1⌝ ∗ actLend p k1) -∗
+        ∃ k2 : Nat, ⌜V.ev ≤ k2⌝ ∗ ecRest pa pid (V.updEv k2) P) := by
+  subst p
+  unfold ecRest
+  iintro ⟨Hpid, Hks, Htfc, Hcwd, Hnm, Hsc, Htfp, %hlz, Hev⟩
+  icases actLend_borrow pa V.ev $$ Hev with ⟨Hl, Hlb⟩
+  iframe Hl
+  iintro ⟨%k1, %hk1, Hl⟩
+  icases Hlb $$ %k1 %hk1 Hl with ⟨%k2, %hk2, Hev⟩
+  iexists k2
+  iframe
+  isplitl []
+  · ipureintro; exact hk2
+  · ipureintro; exact hlz
 
 
 end

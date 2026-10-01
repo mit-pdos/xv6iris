@@ -90,6 +90,8 @@ theorem filestat_copy (CO : COPYOUT) (cpu : CPU) (k : KCtx) (spie spp : Bool) (R
   iintro Hk Hpc
   -- the block split around the call: `p->sz`, `p->pagetable`, the table
   icases ec_priv_split (procAddr j) pid V V.upt M $$ Hpriv with ⟨%hf, Hsz, Hpg, Hpt, Hrest⟩
+  -- the block's counter, lent to copyout (permit sweep L1b)
+  icases ecRest_lend (procAddr j) (procAddr j) rfl pid V V.upt $$ Hrest with ⟨Hlend, Hrest⟩
   -- +0x42  ld a1,72(s2)
   k_step_e (wp_s_ld cpu _ (KA.«filestat» + 0x42#64) false 72#12 11#5 18#5 (by decide) (by decide)
       (DFrac.own 1) V.sz)
@@ -109,12 +111,13 @@ theorem filestat_copy (CO : COPYOUT) (cpu : CPU) (k : KCtx) (spie spp : Bool) (R
     rw [fstatBufAddr, BitVec.add_assoc]; exact .rfl) $$ Hhole
   ihave Hbuf := fstat_stat_bytes _ hal dev ino ty nl sz h $$ [Hstat Hhole]
   · iframe
-  iapply (fstat_copyout CO cpu _ γkl γk V.upt M (fstatBytes dev ino ty nl h sz) ?hn ?hKc ?hl
-      ?hroot ?hsz ?hlen (by simp)) $$ [- $Hk $Hpc $Hpt]
+  iapply (fstat_copyout CO cpu _ γkl γk V.upt M (fstatBytes dev ino ty nl h sz) V.ev (procAddr j)
+      ?hp ?hn ?hKc ?hl ?hroot ?hsz ?hlen (by simp)) $$ [- $Hk $Hpc $Hpt $Hlend]
   rotate_right 1
   k_norm_g [r19, r20]
   iframe
   iframe #
+  case hp => k_norm_g; exact hproc
   case hn => k_norm_g; omega
   case hKc => k_norm_g; omega
   case hl => k_norm_g; rw [hlocks]; simp
@@ -122,7 +125,8 @@ theorem filestat_copy (CO : COPYOUT) (cpu : CPU) (k : KCtx) (spie spp : Bool) (R
   case hsz => k_norm_g; have := hf.1; unfold uvmMaxsz at this; omega
   case hlen => k_norm_g; rw [fstatBytes_length]
   -- ===== back from copyout =====
-  iintro %c1 %spie1 %spp1 %R1 %P' %M' %⟨hcs, hext, hw⟩ Hk Hpc Hte Hce Hbuf Hpt
+  iintro %c1 %spie1 %spp1 %R1 %P' %M' %⟨hcs, hext, hw⟩ Hk Hpc Hte Hce Hlend Hbuf Hpt
+  icases Hrest $$ Hlend with ⟨%kc, %hkc, Hrest⟩
   k_norm_g [filestat_ret_4e, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed] at hext
   k_norm_g [filestat_ret_4e, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed, r20]
   have hr1 : fstatRegs k fk (procAddr j) (fstatBufAddr (k.regs 2#5)) R1 := by
@@ -150,7 +154,7 @@ theorem filestat_copy (CO : COPYOUT) (cpu : CPU) (k : KCtx) (spie spp : Bool) (R
       (k.regs 19#5) (k.regs 20#5) v9 $$ [Hf8 Hf16 Hf24 Hf32 Hf40 Hf48 Hf80]
   · unfold fstatFrame; iframe
   ihave Hcells := fstat_buf_close (k.regs 2#5) hal _ (fstatBytes_length _ _ _ _ _ _) $$ Hbuf
-  ihave Hpriv := ec_priv_close (procAddr j) pid V V.upt P' M' hext hf $$ [Hsz Hpg Hpt Hrest]
+  ihave Hpriv := ec_priv_close (procAddr j) pid (V.updEv kc) V.upt P' M' hext hf $$ [Hsz Hpg Hpt Hrest]
   · iframe
   ihave Henv := (show bslot (GF := GF) ⊢ filestatEnvOut st from
     filestat_env_out_in st hst) $$ Hbs
@@ -165,10 +169,10 @@ theorem filestat_copy (CO : COPYOUT) (cpu : CPU) (k : KCtx) (spie spp : Bool) (R
   unfold fstatK
   have hR : R' 10#5 = R1 10#5 := by rw [h10']
   rcases hw with ⟨h10, hM, hmap⟩ | ⟨h10, d, hd, hM, hmap⟩
-  · iapply HΦ $$ %c' %spie1 %spp1 %R' %P' %M' %24 [] Hk Hpc Hte Hce Href Hpriv Henv
+  · iapply HΦ $$ %c' %spie1 %spp1 %R' %P' %M' %24 %kc [] Hk Hpc Hte Hce Href %hkc Hpriv Henv
     ipureintro
     refine ⟨hcs', Or.inl (hR.trans h10), hext, Nat.le_refl _, ⟨_, fstatBytes_length _ _ _ _ _ _, hM, hmap⟩⟩
-  · iapply HΦ $$ %c' %spie1 %spp1 %R' %P' %M' %d [] Hk Hpc Hte Hce Href Hpriv Henv
+  · iapply HΦ $$ %c' %spie1 %spp1 %R' %P' %M' %d %kc [] Hk Hpc Hte Hce Href %hkc Hpriv Henv
     have hd' : d < 24 := hd
     ipureintro
     refine ⟨hcs', Or.inr (hR.trans h10), hext, Nat.le_of_lt hd', ⟨_, ?_, hM, hmap⟩⟩

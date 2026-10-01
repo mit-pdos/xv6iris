@@ -88,6 +88,7 @@ theorem fwr_arm_neg (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (γl :
   ihave Hpriv := fwr_priv_self (procAddr j) pid V M $$ Hpriv
   ihave Henv := filewrite_env_out_of_env γl γu st $$ Henv
   unfold fwrK
+  ihave Hpriv := procPrivExtEv_of _ _ _ _ _ $$ Hpriv
   iapply HΦ $$ %c' %spie %spp %R' %V.upt [] Hk Hpc Hte Hce Href Hpriv Henv [Hin]
   · ipureintro; exact ⟨hcs, UMemL.extSz_refl _ _⟩
   · unfold filewriteArms
@@ -162,6 +163,7 @@ theorem fwr_arm_zero (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (γl 
   ihave Hpriv := fwr_priv_self (procAddr j) pid V M $$ Hpriv
   ihave Henv := filewrite_env_out_of_env γl γu _ $$ Henv
   unfold fwrK
+  ihave Hpriv := procPrivExtEv_of _ _ _ _ _ $$ Hpriv
   iapply HΦ $$ %c' %spie %spp %R' %V.upt [] Hk Hpc Hte Hce Href Hpriv Henv [Hin]
   · ipureintro; exact ⟨hcs, UMemL.extSz_refl _ _⟩
   · -- the chain at the writer's table, at EITHER mode (Rocq L2: the
@@ -348,6 +350,7 @@ theorem fwr_dev_m1 (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (γl : 
   ihave Href := filerw_ref_close γ fk q _ C $$ [Htok Hfields Hpay]
   · iframe
   unfold fwrK
+  ihave Hpriv := procPrivExtEv_of _ _ _ _ _ $$ Hpriv
   iapply HΦ $$ %c' %spie %spp %R' %V.upt [] Hk Hpc Hte Hce Href Hpriv [] [Hin]
   · ipureintro; exact ⟨hcs, UMemL.extSz_refl _ _⟩
   · unfold filewriteEnvOut; iexact Henv
@@ -675,6 +678,7 @@ theorem fwr_arm_inode (BO : BEGIN_OP) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK) 
     refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
       simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] <;> first | assumption | rfl
   ihave Hpriv := fwr_priv_img (procAddr A.j) A.pid A.V A.M $$ Hpriv
+  ihave Hpriv := procPrivExtEv_of _ _ _ _ _ $$ Hpriv
   -- THE CARRIER AT THE ROW'S MODE (Rocq lane OFF-LINK-5's `fw_au_st_init`,
   -- at the file's own mode since L2)
   ihave Hc := filewriteIn_inode_any (hlc := hlc) pmv szv lzv A.rb A.om A.i A.γo A.n A.img (k.regs 11#5) Q Qe $$ Hc

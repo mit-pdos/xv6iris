@@ -84,6 +84,12 @@ Specification of `readi` (kernel/fs.c): the public contract.  Mirrors Rocq
 6. Rocq's `j < NPROC ∧ γs !! j = Some γl` is `hj`/`hproc`, as bread;
    `a1`'s `eq_vec … = negb user` is `huser` in `EITHER_COPYOUT`'s form.
 
+THE EVENT COUNTER (permit sweep L1b, Rocq b69bd0fab): on the USER arm the
+block comes back at a count at least the one it left at (`∃ k' ≥ Vp.ev`,
+the record at `{ Vp.updEv k' with upt := P' }`): each chunk's
+either_copyout lends the block's counter to copyout.  The kernel arm lends
+nothing and is unchanged.
+
 Imports only definitional files and callee `Spec*` files.
 -/
 import Xv6.SpecBmap
@@ -230,9 +236,9 @@ def wp_readi_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF
     inodeMeta ip dn -∗
     inodeMapQ γfs dq ip bm -∗ inodeBlocksQ γfs dq bm data -∗
     (if user then
-      (∃ (P' : UPtd) (M' : Nat → List (BitVec 8)),
+      (∃ (P' : UPtd) (M' : Nat → List (BitVec 8)) (k' : Nat),
         ⌜Vp.upt.extSz Vp.sz P' ∧ rdImg Vp.upt P' M M' (k.regs 12#5) data off tot⌝ ∗
-        procPrivRun (procAddr j) pidv { Vp with upt := P' } M')
+        ⌜Vp.ev ≤ k'⌝ ∗ procPrivRun (procAddr j) pidv { Vp.updEv k' with upt := P' } M')
      else byteBuf (k.regs 12#5) (DFrac.own 1) (rdDelivered data olds off tot) ∗
        wordPointsTo (pPid k.proc) 4 dqp pidv) -∗
     bslot -∗ wpLoop cpu'))
@@ -291,9 +297,9 @@ def wp_readi_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
     inodeMeta ip dn -∗
     inodeMapQ γfs dq ip bm -∗ inodeBlocksQ γfs dq bm data -∗
     (if user then
-      (∃ (P' : UPtd) (M' : Nat → List (BitVec 8)),
+      (∃ (P' : UPtd) (M' : Nat → List (BitVec 8)) (k' : Nat),
         ⌜Vp.upt.extSz Vp.sz P' ∧ rdImg Vp.upt P' M M' (k.regs 12#5) data off tot⌝ ∗
-        procPrivRun (procAddr j) pidv { Vp with upt := P' } M')
+        ⌜Vp.ev ≤ k'⌝ ∗ procPrivRun (procAddr j) pidv { Vp.updEv k' with upt := P' } M')
      else byteBuf (k.regs 12#5) (DFrac.own 1) (rdDelivered data olds off tot) ∗
        wordPointsTo (pPid k.proc) 4 dqp pidv) -∗
     bslot -∗ wpLoop cpu'))

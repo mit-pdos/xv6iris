@@ -102,7 +102,7 @@ def wp_consoleread_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
   procPrivBareAt curCtx (procAddr j) pid V M ∗ genHalvesPriv (procAddr j) pid V.gen ∗
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd)
     (M' : Nat → List (BitVec 8)) (d dc cur : Nat) (bs : Nat → BitVec 8) (hs : List (List Obs))
-    (sl : List (List Obs × BitVec 8)),
+    (sl : List (List Obs × BitVec 8)) (k' : Nat),
     ⌜calleeSaved k.regs R' ∧ V.upt.extSz V.sz P' ∧ (d : Int) ≤ max 0 n ∧ consReadRet d (R' 10#5) ∧
       M' = umemWrite (viewFaulted V.upt P' M) (k.regs 11#5).toNat ((List.range d).map bs) ∧
       umMapped P' (k.regs 11#5).toNat d ∧
@@ -127,7 +127,10 @@ def wp_consoleread_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
     consOut cn Wd ord cur dc -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
-    procPrivBareAt curCtx (procAddr j) pid { V with upt := P' } M' -∗
+    -- THE EVENT COUNTER (permit sweep L1b): the copy loop lends the
+    -- block's counter to either_copyout, which may step it
+    ⌜V.ev ≤ k'⌝ -∗
+    procPrivBareAt curCtx (procAddr j) pid { V.updEv k' with upt := P' } M' -∗
     genHalvesPriv (procAddr j) pid V.gen -∗ wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
 

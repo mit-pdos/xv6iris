@@ -150,17 +150,21 @@ def sysLinkPost (k : KCtx) (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32)
     (Ftgt : Pfam GF (Aview → Nat → Anode → IProp GF))
     (Fent : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
     (Funt : Pfam GF (Aview → Nat → IProp GF)) (cpu' : CPU) : IProp GF :=
-  iprop(∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd),
+  iprop(∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd) (k' : Nat),
     ⌜calleeSaved k.regs R'⌝ -∗
     -- the page table may have GROWN: the two fetchstrs fault user pages in
     ⌜V.upt.extSz V.sz P'⌝ -∗
+    -- THE EVENT COUNTER (permit sweep L1b): argstr lends the block's counter
+    -- to copyinstr, which may step it, so the block comes back at a count at
+    -- least the one it left at
+    ⌜V.ev ≤ k'⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
     bslots 3 -∗
     -- the allowance, whole: see the header's reference ledger
     irefSlots sysLinkIrefs -∗
     -- the process block, at the same everything but the page table
-    procPrivFd γ pa pid { V with upt := P' } (viewFaulted V.upt P' M) -∗
+    procPrivFd γ pa pid { V.updEv k' with upt := P' } (viewFaulted V.upt P' M) -∗
     ⌜sysLinkRet (R' 10#5)⌝ -∗
     -- ...and the legs' receipts, keyed on that answer
     linkArms (hlc := hlc) (fsGammaL fscFs) Ftgt Fent Funt (R' 10#5) -∗ wpLoop cpu')

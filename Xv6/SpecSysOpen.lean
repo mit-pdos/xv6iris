@@ -185,6 +185,11 @@ reaches this contract.
    (`SpecArgstr`).  So the reading is `argPathOf (viewLazy V.upt V.sz M)
    v.toNat pl` (`SysOpenParts.sysOpenIm` at the stage record); the block
    itself returns at the faulted view as before.
+11. **THE EVENT COUNTER (permit sweep L1b, Rocq b69bd0fab).**  `sysOpenK`
+   gains Rocq's fourth binder `k'` and `⌜V.ev ≤ k'⌝`; the armed post is at
+   `{ V.updEv k' with upt := P' }` (Rocq `us_upt (upd_usV U (upd_ev (us_V U)
+   k')) P'`): argstr lends the block's counter to copyinstr, and ARM
+   F-FAIL's fileclose lends it to pipeclose.
 
 ## Dropped/simplified vs Rocq
 
@@ -1093,14 +1098,19 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 /-- **THE CONTRACT'S CONTINUATION** (the `wp_next true pj (…)` body of Rocq's
 `wp_sys_open_frame`): the registers, the complement, the two allowances
 whole, and the ARMED post on the final block and the returned a0.  THE
-IMAGE DOES NOT MOVE: the binders are `(R', P')` and the block returns at
-`{ V with upt := P' }` at the faulted view (Rocq `us_upt U P'`). -/
+IMAGE DOES NOT MOVE: the binders are `(R', P', k')` and the block returns at
+`{ V.updEv k' with upt := P' }` at the faulted view (Rocq `us_upt U P'`, at
+the raised count of deviation 11). -/
 def sysOpenK (k : KCtx) (ns : Nat) (V : ProcPriv) (M : Nat → List (BitVec 8))
     (ARMS : ProcPriv → (Nat → List (BitVec 8)) → BitVec 64 → IProp GF) (cpu' : CPU) :
     IProp GF :=
-  iprop(∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd),
+  iprop(∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd) (k' : Nat),
     ⌜calleeSaved k.regs R'⌝ -∗
     ⌜V.upt.extSz V.sz P'⌝ -∗
+    -- THE EVENT COUNTER (permit sweep L1b): argstr lends the block's counter
+    -- to copyinstr and the failing arm's fileclose lends it to pipeclose, so
+    -- the block comes back at a count at least the one it left at
+    ⌜V.ev ≤ k'⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
     bslots 3 -∗
@@ -1108,7 +1118,7 @@ def sysOpenK (k : KCtx) (ns : Nat) (V : ProcPriv) (M : Nat → List (BitVec 8))
     irefSlots ns -∗
     -- the armed post on the final block and the returned a0 (implies the
     -- landed `sysOpenPost`, through `openArms_landed`)
-    ARMS { V with upt := P' } (viewFaulted V.upt P' M) (R' 10#5) -∗
+    ARMS { V.updEv k' with upt := P' } (viewFaulted V.upt P' M) (R' 10#5) -∗
     wpLoop cpu')
 
 /-- **THE WHOLE-FUNCTION FRAME** (Rocq's `wp_sys_open_frame`), abstracted

@@ -46,7 +46,12 @@ theorem rdDst_init (k : KCtx) (user : Bool) (j : Nat) (pidv : BitVec 32) (Vp : P
     iintro H; iexact H
   · rw [rdDst_true]
     simp only [if_true]
-    exact procPriv_to_ext _ _ _ _
+    iintro H
+    iexists Vp.ev
+    rw [ProcPriv.updEv_id]
+    isplitl []
+    · ipureintro; exact Nat.le_refl _
+    · iapply procPriv_to_ext; iexact H
 
 /-- The specification's `wpNext`, named. -/
 theorem rd_post_of_spec (cpu : CPU) (k : KCtx) (γb : BcacheNames) (γfs : FsNames)
@@ -65,9 +70,9 @@ theorem rd_post_of_spec (cpu : CPU) (k : KCtx) (γb : BcacheNames) (γfs : FsNam
       inodeMeta ip dn -∗
       inodeMapQ γfs dq ip bm -∗ inodeBlocksQ γfs dq bm data -∗
       (if user then
-        (∃ (P' : UPtd) (M' : Nat → List (BitVec 8)),
+        (∃ (P' : UPtd) (M' : Nat → List (BitVec 8)) (k' : Nat),
           ⌜Vp.upt.extSz Vp.sz P' ∧ rdImg Vp.upt P' M M' (k.regs 12#5) data off tot⌝ ∗
-          procPrivRun (procAddr j) pidv { Vp with upt := P' } M')
+          ⌜Vp.ev ≤ k'⌝ ∗ procPrivRun (procAddr j) pidv { Vp.updEv k' with upt := P' } M')
        else byteBuf (k.regs 12#5) (DFrac.own 1) (rdDelivered data olds off tot) ∗
          wordPointsTo (pPid k.proc) 4 dqp pidv) -∗
       bslot -∗ wpLoop cpu'))

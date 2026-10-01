@@ -92,7 +92,7 @@ theorem frd_piperead (PR : PIPEREAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF 
         pipeReadRet d (R' 10#5) ∧ umemWrote V.upt M (k'.regs 11#5) d P' M'⌝ -∗
       kctx c' ((k'.withSpie spie spp).withRegs R') -∗ pcIs c' (jumpPc (k'.regs 1#5)) -∗
       trapCsrsExt c' k'.sie -∗ cpuClaimExt c' k'.sie k'.proc -∗
-      pipeRef γp w q -∗ procPrivExt (procAddr j) pid V P' M' -∗
+      pipeRef γp w q -∗ procPrivExtEv (procAddr j) pid V P' M' -∗
       genHalvesPriv (procAddr j) pid V.gen -∗
       pipeRpostImg (hlc := hlc) V.upt γp.pnQueue Rp Rpe
         iprop(killShot V.gen ∗ □ MachFixedGS.killCred (hlc := hlc) (GF := GF)) n.toNat (R' 10#5) M'
@@ -107,10 +107,11 @@ theorem frd_piperead (PR : PIPEREAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF 
   iapply h
   iframe Hk Hpc Hpi Hte Hce Hpp Href Hkl Hav Hpriv Hgen Hpay
   iapply wpNext_intro
-  iintro %c' %spie %spp %R' %P' %M' %d %bsW %⟨hcs, hext, hdle, hret, hlen, hM, hmap⟩ Hk Hpc Hte Hce
-    Href Hpriv Hgen Hpost
-  ihave Hpriv := (procPrivExt_conv ht (procAddr j) pid V P' M').1 $$ Hpriv
-  icases frd_pageLen (procAddr j) pid V P' M' $$ Hpriv with ⟨%hpl, Hpriv⟩
+  iintro %c' %spie %spp %R' %P' %M' %d %bsW %kv %⟨hcs, hext, hdle, hret, hlen, hM, hmap⟩ Hk Hpc Hte Hce
+    Href %hkv Hpriv Hgen Hpost
+  ihave Hpriv := (procPrivExt_conv ht (procAddr j) pid (V.updEv kv) P' M').1 $$ Hpriv
+  icases frd_pageLen (procAddr j) pid (V.updEv kv) P' M' $$ Hpriv with ⟨%hpl, Hpriv⟩
+  ihave Hpriv := procPrivExtEv_intro _ _ _ _ _ kv hkv $$ Hpriv
   ihave Hpost := frd_rpost_img V.upt γp.pnQueue (k'.regs 11#5) Rp Rpe _ n.toNat d bsW (R' 10#5) P'
     (viewFaulted V.upt P' M) M' hlen hM hmap hpl $$ Hpost
   iapply HK $$ %c' %spie %spp %R' %P' %M' %d [] Hk Hpc Hte Hce Href Hpriv Hgen Hpost
@@ -156,7 +157,7 @@ theorem frd_consoleread (CR : CONSOLEREAD) (Γ : SchedNames) [ClaimIs (hlc := hl
       consOut fscCons (appRdcred (hlc := hlc) (GF := GF)) ord cur dc -∗
       kctx c' ((k'.withSpie spie spp).withRegs R') -∗ pcIs c' (jumpPc (k'.regs 1#5)) -∗
       trapCsrsExt c' k'.sie -∗ cpuClaimExt c' k'.sie k'.proc -∗
-      procPrivExt (procAddr j) pid V P' M' -∗ genHalvesPriv (procAddr j) pid V.gen -∗ wpLoop c')
+      procPrivExtEv (procAddr j) pid V P' M' -∗ genHalvesPriv (procAddr j) pid V.gen -∗ wpLoop c')
     ⊢ wpLoop (GF := GF) c := by
   have h := CR.wp_consoleread_eb (hlc := hlc) (GF := GF) Γ c k' γc fscCons (appRdcred (hlc := hlc) (GF := GF)) ord Rin γkl γk j
     pid V M n hj hproc hK hnoff htier huser hn hn'
@@ -167,9 +168,10 @@ theorem frd_consoleread (CR : CONSOLEREAD) (Γ : SchedNames) [ClaimIs (hlc := hl
   iapply h
   iframe Hk Hpc Hpi Hte Hce Hcl Hpay Hrin Hui Hkl Hav Hpriv Hgen
   iapply wpNext_intro
-  iintro %c' %spie %spp %R' %P' %M' %d %dc %cur %bs %hs %sl %hp Hks Hts Hlb Hwin Hout Hk Hpc Hte Hce
-    Hpriv Hgen
-  ihave Hpriv := (procPrivExt_conv ht (procAddr j) pid V P' M').1 $$ Hpriv
+  iintro %c' %spie %spp %R' %P' %M' %d %dc %cur %bs %hs %sl %kv %hp Hks Hts Hlb Hwin Hout Hk Hpc Hte Hce
+    %hkv Hpriv Hgen
+  ihave Hpriv := (procPrivExt_conv ht (procAddr j) pid (V.updEv kv) P' M').1 $$ Hpriv
+  ihave Hpriv := procPrivExtEv_intro _ _ _ _ _ kv hkv $$ Hpriv
   iapply HK $$ %c' %spie %spp %R' %P' %M' %d %dc %cur %bs %hs %sl %hp Hks Hts Hlb Hwin Hout Hk Hpc Hte
     Hce Hpriv Hgen
 
@@ -321,7 +323,7 @@ theorem frd_readi (RD : READI) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
       inodeMeta (ientry ik) dn -∗
       inodeMapQ fscFs (DFrac.own Qp.quarter) (ientry ik) bm -∗
       inodeBlocksQ fscFs (DFrac.own Qp.quarter) bm data -∗
-      procPrivExt (procAddr j) pid V P' M' -∗ bslot -∗ wpLoop c')
+      procPrivExtEv (procAddr j) pid V P' M' -∗ bslot -∗ wpLoop c')
     ⊢ wpLoop (GF := GF) c := by
   obtain ⟨hwf, hcovs, hda, hnz, hcap, hhz, -⟩ := hok
   iintro ⟨Hk, Hpc, #Hpi, Hte, Hce, #Hpe, #Hfs, #Hkl, #Hav, Hdev, Hmeta, Hmap, Hblk, Hpriv, Hbs, HK⟩
@@ -347,9 +349,10 @@ theorem frd_readi (RD : READI) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
       from .rfl) $$ Hpriv
   iapply wpNext_intro
   iintro %c' %spie %spp %R' %tot %hcs %hle %hret Hk Hpc Hte Hce Hdev Hmeta Hmap Hblk
-    ⟨%P', %M', %⟨hext, himg⟩, Hpriv⟩ Hbs
-  ihave Hpriv := (show procPrivRun (GF := GF) (procAddr j) pid { V with upt := P' } M' ⊢
-      procPrivExt (procAddr j) pid V P' M' from .rfl) $$ Hpriv
+    ⟨%P', %M', %kv, %⟨hext, himg⟩, %hkv, Hpriv⟩ Hbs
+  ihave Hpriv := (show procPrivRun (GF := GF) (procAddr j) pid { V.updEv kv with upt := P' } M' ⊢
+      procPrivExt (procAddr j) pid (V.updEv kv) P' M' from .rfl) $$ Hpriv
+  ihave Hpriv := procPrivExtEv_intro _ _ _ _ _ kv hkv $$ Hpriv
   iapply HK $$ %c' %spie %spp %R' %tot %P' %M' [] Hk Hpc Hte Hce Hdev Hmeta Hmap Hblk Hpriv Hbs
   ipureintro
   refine ⟨hcs, hle, ?_, hext, himg⟩

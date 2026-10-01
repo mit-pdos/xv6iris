@@ -17,6 +17,13 @@ contract at its call site.
    `Xv6.brelse_call` (FsCallSites).  `rd_copyout` is the whole
    either_copyout step on both arms (the kernel arm's window split and
    spliced back, the user arm's `rdImg` advanced by the chunk it wrote).
+3. THE EVENT COUNT RIDES INSIDE `rdDst` (permit sweep L1b, Rocq b69bd0fab):
+   each round's either_copyout takes the block's counter as its lend and may
+   step it.  Rocq threads the count `kv` beside `tot` through every loop
+   lemma (`rd_img … kv`, `pv_ev ≤ kv`); here the user arm of `rdDst` is the
+   block at SOME count no lower than the entry's (`∃ kv ≥ Vp.ev`,
+   `Vp.updEv kv`), so no loop statement names it and `rdDst_post` exposes
+   it at the exit.
 -/
 import Xv6.ReadiParts
 import Xv6.DinodeSlot
@@ -38,12 +45,13 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 /-! ## The destination -/
 
 /-- THE DESTINATION (Rocq's `rd_dst`): on the user arm the running block at
-the table the copies have grown to (`P`, image `Mi`); on the kernel arm the
-caller's buffer after `tot` bytes, and the pid cell bread needs. -/
+the table the copies have grown to (`P`, image `Mi`) and at the event count
+they have raised it to (deviation 3); on the kernel arm the caller's buffer
+after `tot` bytes, and the pid cell bread needs. -/
 def rdDst (user : Bool) (dst : BitVec 64) (j : Nat) (pidv : BitVec 32) (Vp : ProcPriv)
     (P : UPtd) (Mi : Nat → List (BitVec 8)) (dqp : DFrac) (data : Nat → List (BitVec 8))
     (olds : List (BitVec 8)) (off tot : Nat) : IProp GF :=
-  if user then procPrivExt (procAddr j) pidv Vp P Mi
+  if user then iprop(∃ kv : Nat, ⌜Vp.ev ≤ kv⌝ ∗ procPrivExt (procAddr j) pidv (Vp.updEv kv) P Mi)
   else iprop(byteBuf dst (DFrac.own 1) (rdDelivered data olds off tot) ∗
     wordPointsTo (pPid (procAddr j)) 4 dqp pidv)
 
@@ -79,10 +87,13 @@ theorem rdDst_pid (user : Bool) (dst : BitVec 64) (j : Nat) (pidv : BitVec 32) (
     iframe Hb Hp
   · simp only [rdDst, rdQ, if_true]
     unfold procPrivExt
-    iintro ⟨%h1, Hp, Hf, Hpt, Htf, %h2, Hev⟩
+    iintro ⟨%kv, %hkv, %h1, Hp, Hf, Hpt, Htf, %h2, Hev⟩
     iframe Hp
     iintro Hp
+    iexists kv
     iframe Hp Hf Hpt Htf Hev
+    isplitl []
+    · ipureintro; exact hkv
     isplitl []
     · ipureintro; exact h1
     · ipureintro; exact h2
@@ -100,7 +111,7 @@ theorem rdDst_true (dst : BitVec 64) (j : Nat) (pidv : BitVec 32) (Vp : ProcPriv
     (P : UPtd) (Mi : Nat → List (BitVec 8)) (dqp : DFrac) (data : Nat → List (BitVec 8))
     (olds : List (BitVec 8)) (off tot : Nat) :
     rdDst (GF := GF) true dst j pidv Vp P Mi dqp data olds off tot =
-      procPrivExt (procAddr j) pidv Vp P Mi := rfl
+      iprop(∃ kv : Nat, ⌜Vp.ev ≤ kv⌝ ∗ procPrivExt (procAddr j) pidv (Vp.updEv kv) P Mi) := rfl
 
 end
 
@@ -230,23 +241,28 @@ theorem rd_copyout (EC : EITHER_COPYOUT) (c : CPU) (k' : KCtx) (γkl : GName) (�
     · rw [rdDst_false]; iframe Hbuf Hpid
   · -- THE USER ARM: copyout into the running process
     obtain ⟨hext0, hout0⟩ := hok rfl
-    have h := EC.wp_either_copyout (hlc := hlc) (GF := GF) c k' γkl γk j pidv Vp P Mi true
+    rw [rdDst_true]
+    iintro ⟨Hk, Hpc, #Hkl, #Hav, Hsrc, ⟨%kv, %hkv, Hpriv⟩, Hnext⟩
+    -- the block at the count the earlier rounds raised it to (deviation 3)
+    have h := EC.wp_either_copyout (hlc := hlc) (GF := GF) c k' γkl γk j pidv (Vp.updEv kv) P Mi true
       (DFrac.own 1) bs bs hj (fun _ => hproc) hnoff hK hlk huser (by rw [ha3, hbs])
       (by simp only [if_true]; omega) rfl
     unfold wp_either_copyout_body at h
     simp only [eitherCopyoutAddr, if_true] at h
-    rw [rdDst_true]
-    iintro ⟨Hk, Hpc, #Hkl, #Hav, Hsrc, Hpriv, Hnext⟩
     iapply h
     iframe Hk Hpc Hsrc Hpriv
     iframe #
     ihave Hn := wpNext_mono _ _ _ _ _ $$ Hnext
     iapply Hn
-    iintro %cpu' HK %spie %spp %R' %hs Hk Hpc Hsrc ⟨%P', %M', %⟨hext, harm⟩, Hpriv⟩ %hcs
+    iintro %cpu' HK %spie %spp %R' %hs Hk Hpc Hsrc ⟨%P', %M', %kc, %⟨hext, harm⟩, %hkc, Hpriv⟩ %hcs
     icases procPrivExt_wf _ _ _ _ _ $$ Hpriv with ⟨Hpriv, %hwf⟩
     iapply HK $$ %spie %spp %R' %P' %M' %hs %hcs [] Hk Hpc Hsrc
     rotate_left 1
-    · rw [rdDst_true]; iexact Hpriv
+    · rw [rdDst_true]
+      iexists kc
+      isplitl []
+      · ipureintro; exact Nat.le_trans hkv hkc
+      · iexact Hpriv
     · ipureintro
       rw [ha1] at harm
       have hext' := UMemL.extSz_trans hext0 hext

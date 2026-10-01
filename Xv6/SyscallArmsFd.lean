@@ -19,6 +19,10 @@ laws, `syscall_ret_fd`) is `SyscallArmsFdDefs`; pipe, read and write are
   takes the dispatch's `bslots 3` and comes back with them), the iref loan
   out of `IREFSPARE`.  Rows: the fd row (`syscClose_fd_*`); the syscall
   channel pays through `SyscDepClose`.
+
+Permit sweep L1b: fstat and close hand the block back at a raised count
+(filestat's copyout, fileclose's pipeclose); the arms relay it through
+`SyscallRet.SyscRows.updEv` (the rows do not read the count).
 -/
 import Xv6.SyscallArmsFdDefs
 
@@ -175,7 +179,11 @@ theorem syscall_arm_fstat (SF : SYSFSTAT)
   iframe Hk Hpc Hpi Hte Hce Hpe Hpriv Hkl Hka Hfs
   k_next_e
   unfold sysFstatPost
-  iintro %spie2 %spp2 %R2 %P' %M1 %d %⟨hcs, hret, hext, hd, hw⟩ Hk Hpc Hte Hce Hpriv Hb1
+  iintro %spie2 %spp2 %R2 %P' %M1 %d %k' %⟨hcs, hret, hext, hd, hw⟩ Hk Hpc Hte Hce %hk' Hpriv Hb1
+  -- the block at filestat's raised event count (permit sweep L1b): the rows
+  -- do not read it (`SyscRows.updEv`)
+  ihave Hpriv := (show procPrivFd (GF := GF) γ (procAddr j) pid { V.updEv k' with upt := P' } M1 ⊢
+    procPrivFd γ (procAddr j) pid (({ V with upt := P' } : ProcPriv).updEv k') M1 from .rfl) $$ Hpriv
   have hww : ∀ (K : KCtx) (a b c d : Bool), (K.withSpie a b).withSpie c d = K.withSpie c d :=
     fun _ _ _ _ _ => rfl
   have hpsw : ∀ (K : KCtx) (m : Nat) (a b : Bool),
@@ -202,8 +210,8 @@ theorem syscall_arm_fstat (SF : SYSFSTAT)
   · unfold filestatFsOut; iframe
   unfold syscallRet syscallAddr at *
   iapply (syscall_ret_fd PT Γ c0 cpu k spie2 spp2 R2 γ j pid V M sts gn cs ip f
-    { V with upt := P' } M1 sts cs hj hproc hK htier hpins2 hs2' hrows 8 hn8
-    (by decide) (by decide) (by decide))
+    (({ V with upt := P' } : ProcPriv).updEv k') M1 sts cs hj hproc hK htier hpins2 hs2'
+    (hrows.updEv k') 8 hn8 (by decide) (by decide) (by decide))
   iframe Hk Hpc Hframe Hte Hce Hbs Hip Hfd Hir Henv Hpriv Hfr Hch Hnext
   iapply syscSysOut_quiet f V M sts hE gn cs pid _ _ sts _ cs 8 hn8 (by decide)
 
@@ -266,7 +274,7 @@ theorem syscall_arm_close (SC : SYSCLOSE)
   isplitl [Hcpay]
   · rw [sysFdSt_key ha]; iexact Hcpay
   k_next_e
-  iintro %spie2 %spp2 %R2 %hcs Hk Hpc Hte Hce Hpost Hcp - HfsE Hi1
+  iintro %spie2 %spp2 %R2 %k' %hcs Hk Hpc Hte Hce %hk' Hpost Hcp - HfsE Hi1
   rw [sysFdSt_key ha]
   have hww : ∀ (K : KCtx) (a b c d : Bool), (K.withSpie a b).withSpie c d = K.withSpie c d :=
     fun _ _ _ _ _ => rfl
@@ -291,11 +299,17 @@ theorem syscall_arm_close (SC : SYSCLOSE)
       (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide)
       hl0 hfd
     ihave Hsp := Hout $$ %(R2 10#5) %sts Hcp
+    -- the block at fileclose's raised event count (permit sweep L1b): the
+    -- rows do not read it (`SyscRows.updEv`)
+    ihave Hpriv := (show procPrivFd (GF := GF) γ (procAddr j) pid (V.updEv k') M ⊢
+      procPrivFd γ (procAddr j) pid (({ V with ofile := V.ofile } : ProcPriv).updEv k') M from .rfl)
+      $$ Hpriv
     iapply (syscall_ret_fd PT Γ c0 cpu k spie2 spp2 R2 γ j pid V M sts gn cs ip f
-      { V with ofile := V.ofile } M sts cs hj hproc hK htier hpins2 hs2' hrows 21 hn21
-      (by decide) (by decide) (by decide))
+      (({ V with ofile := V.ofile } : ProcPriv).updEv k') M sts cs hj hproc hK htier hpins2 hs2'
+      (hrows.updEv k') 21 hn21 (by decide) (by decide) (by decide))
     iframe Hk Hpc Hframe Hte Hce Hbs Hip Hfd Hir Henv Hpriv Hfr Hch Hnext
-    iapply (syscSysOut_ret f V M sts gn cs pid { V with ofile := V.ofile } M (R2 10#5) (syscImg V M)
+    iapply (syscSysOut_ret f V M sts gn cs pid (({ V with ofile := V.ofile } : ProcPriv).updEv k') M
+      (R2 10#5) (syscImg V M)
       sts V.cwi cs 21 hn21 (by decide) (by decide) hl0 rfl rfl)
     iexact Hsp
   · have hfd := syscClose_fd_ok V sts hn21 fd fv hsome
@@ -304,11 +318,16 @@ theorem syscall_arm_close (SC : SYSCLOSE)
       (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide)
       hl0 hfd
     ihave Hsp := Hout $$ %(R2 10#5) %_ Hcp
+    ihave Hpriv := (show procPrivFd (GF := GF) γ (procAddr j) pid
+        { V.updEv k' with ofile := (V.updEv k').ofile.set fd 0#64 } M ⊢
+      procPrivFd γ (procAddr j) pid (({ V with ofile := V.ofile.set fd 0#64 } : ProcPriv).updEv k') M
+      from .rfl) $$ Hpriv
     iapply (syscall_ret_fd PT Γ c0 cpu k spie2 spp2 R2 γ j pid V M sts gn cs ip f
-      { V with ofile := V.ofile.set fd 0#64 } M _ cs hj hproc hK htier hpins2 hs2' hrows 21 hn21
-      (by decide) (by decide) (by decide))
+      (({ V with ofile := V.ofile.set fd 0#64 } : ProcPriv).updEv k') M _ cs hj hproc hK htier hpins2
+      hs2' (hrows.updEv k') 21 hn21 (by decide) (by decide) (by decide))
     iframe Hk Hpc Hframe Hte Hce Hbs Hip Hfd Hir Henv Hpriv Hfr Hch Hnext
-    iapply (syscSysOut_ret f V M sts gn cs pid { V with ofile := V.ofile.set fd 0#64 } M (R2 10#5)
+    iapply (syscSysOut_ret f V M sts gn cs pid
+      (({ V with ofile := V.ofile.set fd 0#64 } : ProcPriv).updEv k') M (R2 10#5)
       (syscImg V M) _ V.cwi cs 21 hn21 (by decide) (by decide) hl0 rfl rfl)
     iexact Hsp
 

@@ -98,11 +98,11 @@ theorem filestat_main (MP : MYPROC) (IL : ILOCK) (ST : STATI) (IU : IUNLOCK) (CO
   icases (filerw_core_conv ht0 (procAddr j) pid V V.upt M).1 $$ Hpriv with ⟨Hpriv, Hcwd⟩
   ihave HΦ : fstatK k γ fk q st (procAddr j) pid V M $$ [Hnext Hcwd]
   · unfold fstatK filestatPost
-    iintro %c %spie %spp %R' %P' %M' %d %hp Hk Hpc Hte Hce Href Hpriv Henv
+    iintro %c %spie %spp %R' %P' %M' %d %kv %hp Hk Hpc Hte Hce Href %hkv Hpriv Henv
     ihave HK := wpNext_at true k.proc cpu c _ (Xv6.rd_pin hj k hproc c cpu) $$ Hnext
-    ihave Hpriv := (filerw_core_conv ht0 (procAddr j) pid V P' M').2 $$ [Hpriv Hcwd]
+    ihave Hpriv := (filerw_core_conv ht0 (procAddr j) pid (V.updEv kv) P' M').2 $$ [Hpriv Hcwd]
     · iframe
-    iapply HK $$ %spie %spp %R' %P' %M' %d %hp Hk Hpc Hte Hce Href Hpriv Henv
+    iapply HK $$ %spie %spp %R' %P' %M' %d %kv %hp Hk Hpc Hte Hce Href %hkv Hpriv Henv
   simp only [filestatAddr]
   -- +0x00 .. +0x0a  the prologue
   iapply (wp_prologue_filestat cpu k KA.«filestat» hK10)

@@ -269,11 +269,12 @@ theorem fileread_main (PR : PIPEREAD) (IL : ILOCK) (RD : READI) (IU : IUNLOCK) (
   ihave HΦ : frdK (hlc := hlc) k γ fk q st j pid V M n F Rd Rin Rp Rpe P $$ [Hnext Hcwd Hft HQ Hxs]
   · unfold frdK filereadPost
     iintro %c %spie %spp %R' %P' %M' %d %hp Hk Hpc Hte Hce Href Hpriv Hgen Henv Harms
+    icases procPrivExtEv_elim _ _ _ _ _ $$ Hpriv with ⟨%kv, %hkv, Hpriv⟩
     ihave HK := wpNext_at true k.proc cpu c _ (Xv6.rd_pin hj k hproc c cpu) $$ Hnext
-    ihave Hpriv := (filerw_core_conv ht0 (procAddr j) pid V P' M').2 $$ [Hpriv Hcwd Hft HQ Hxs Hgen]
+    ihave Hpriv := (filerw_core_conv ht0 (procAddr j) pid (V.updEv kv) P' M').2 $$ [Hpriv Hcwd Hft HQ Hxs Hgen]
     · unfold procGenAt
       iframe
-    iapply HK $$ %spie %spp %R' %P' %M' %d %hp Hk Hpc Hte Hce Href Hpriv Henv Harms
+    iapply HK $$ %spie %spp %R' %P' %M' %d %kv %hp Hk Hpc Hte Hce Href %hkv Hpriv Henv Harms
   -- the reference, taken apart
   icases filerw_ref_open γ fk q st $$ Href with ⟨%C, %⟨inumC, γoC, omC, γpC, hok⟩, Htok, Hfields, Hpay⟩
   simp only [filereadAddr]
@@ -316,6 +317,7 @@ theorem fileread_main (PR : PIPEREAD) (IL : ILOCK) (RD : READI) (IU : IUNLOCK) (
     ihave Henv := fileread_env_out_of_env st $$ Henv
     ihave HP := filereadIn_unreadable F Rd Rin P Rp Rpe inumC γoC omC γpC C st n hok hrz $$ Hin HP
     unfold frdK
+    ihave Hpriv := procPrivExtEv_of _ _ _ _ _ $$ Hpriv
     iapply HΦ $$ %c' %k.spie %k.spp %R' %V.upt %M %0 [] Hk Hpc Hte Hce Href Hpriv Hgen Henv [HP]
     · ipureintro
       exact ⟨hcs, UMemL.extSz_refl _ _, by omega, Or.inr h10, Xv6.UMemL.umemWrote_refl _ _ _⟩
@@ -390,6 +392,7 @@ theorem fileread_main (PR : PIPEREAD) (IL : ILOCK) (RD : READI) (IU : IUNLOCK) (
     imod filereadExtra_neg V.gen V.upt F Rd Rin P Rp Rpe st n M (k.regs 11#5) hneg $$ Hin HP with Hex
     imodintro
     unfold frdK
+    ihave Hpriv := procPrivExtEv_of _ _ _ _ _ $$ Hpriv
     iapply HΦ $$ %c' %k.spie %k.spp %R' %V.upt %M %0 [] Hk Hpc Hte Hce Href Hpriv Hgen Henv [Hex]
     · ipureintro
       exact ⟨hcs, UMemL.extSz_refl _ _, by omega, Or.inr h10, Xv6.UMemL.umemWrote_refl _ _ _⟩

@@ -42,6 +42,10 @@ Rocq's header, kept because the reasons are the content:
    nameiparent the whole core; the descriptor array rides aside as
    `procOfilesOwe … []` (`procPrivFd_split`).  After nameiparent the pid cell
    is lent out of the core for the rest of the walk (`sys_unlink_core_open`).
+5. Permit sweep L1b: argstr hands the block back at a raised count `kv`,
+   and everything below it runs at the record `A.raise kv` (SysUnlinkFrame
+   deviation 5), so `sys_unlink_w1_args` / `sys_unlink_w1` take the W2
+   body for every `kv`.
 -/
 import Xv6.SysUnlinkTails
 import Xv6.DirlookupParts
@@ -421,11 +425,12 @@ theorem sys_unlink_w1_args (AS : ARGSTR_W) (BO : BEGIN_OP) (NP : NPAR_WRAP_ERA) 
     (ok : SuOk k A) (hv0 : A.V.tf[tfArgIdx 0]? = some A.v0) (spie spp : Bool)
     (R : RegMap) (w₃ w₄ w₅ : BitVec 64)
     (hpins : sysUnlinkPins k R (k.regs 9#5) (k.regs 18#5) (k.regs 19#5))
-    (hW2 : ∀ (P2 : UPtd) (plen : Nat) (pfun : Nat → BitVec 8) (cpu : CPU) (spie spp : Bool)
+    (hW2 : ∀ (kv : Nat) (P2 : UPtd) (plen : Nat) (pfun : Nat → BitVec 8) (cpu : CPU)
+        (spie spp : Bool)
         (R : RegMap) (dpv : BitVec 64) (nf : Nat → BitVec 8) (tl : List (BitVec 8)) (iL n : Nat)
         (Sb : List Nat),
-      sysUnlinkAt30 (hlc := hlc) Γ cpu k A spie spp R dpv w₄ w₅ nf tl P2 (bview plen pfun) iL n Sb
-        ⊢ wpLoop cpu) :
+      sysUnlinkAt30 (hlc := hlc) Γ cpu k (A.raise kv) spie spp R dpv w₄ w₅ nf tl P2 (bview plen pfun)
+        iL n Sb ⊢ wpLoop cpu) :
     kctx cpu (((k.withSpie spie spp).pushed 30).withRegs R) ∗
     pcIs cpu (KA.«sys_unlink» + 0x8#64) ∗
     sysUnlinkCells (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) w₃ w₄ w₅ ∗ sysUnlinkBufs (k.regs 2#5) ∗
@@ -470,14 +475,31 @@ theorem sys_unlink_w1_args (AS : ARGSTR_W) (BO : BEGIN_OP) (NP : NPAR_WRAP_ERA) 
   case gK => k_norm_g; exact hKas
   case gmx => k_norm_g [hold]
   case gba => k_norm_g [hpins.2.1, sys_unlink_bufpath]
-  iintro %cpu %spie1 %spp1 %R1 %P2 %bs %hf1 Hk Hpc Hte Hce Hbare Hpath
+  iintro %cpu %spie1 %spp1 %R1 %P2 %bs %kv %hf1 Hk Hpc Hte Hce %hkv Hbare Hpath
   obtain ⟨hcs1, hext, hret, hlen⟩ := hf1
   k_norm_g [sys_unlink_ret_16, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp1 := sysUnlinkPins_cs k _ R1 (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)
     (sysUnlinkPins_set k _ _ _ _ 1#5 _ (sysUnlinkPins_set k _ _ _ _ 10#5 _
       (sysUnlinkPins_set k _ _ _ _ 11#5 _ (sysUnlinkPins_set k R _ _ _ 12#5 _ hpins (by decide))
         (by decide)) (by decide)) (Or.inl rfl)) hcs1
-  ihave Hcore := (procPrivCoreNoctxAt_bare _ _ _ { A.V with upt := P2 } _).2 $$ [$Hbare $Hcwr]
+  ihave Hcore := (procPrivCoreNoctxAt_bare _ _ _ { A.V.updEv kv with upt := P2 } _).2 $$ [$Hbare $Hcwr]
+  -- argstr lent the block's counter (permit sweep L1b): the rest of the run
+  -- is at the record it came back at (SysUnlinkFrame deviation 5)
+  ihave Hcore := (show procPrivCoreNoctxAt (GF := GF) curCtx (procAddr A.j) A.pid
+      { A.V.updEv kv with upt := P2 } (viewFaulted A.V.upt P2 A.M) ⊢
+    procPrivCoreNoctxAt curCtx (procAddr (A.raise kv).j) (A.raise kv).pid
+      { (A.raise kv).V with upt := P2 } (viewFaulted (A.raise kv).V.upt P2 (A.raise kv).M)
+    from .rfl) $$ Hcore
+  ihave Howe := (show procOfilesOwe (GF := GF) A.γ A.V.fdg (procAddr A.j) A.V.ofile [] ⊢
+    procOfilesOwe (A.raise kv).γ (A.raise kv).V.fdg (procAddr (A.raise kv).j) (A.raise kv).V.ofile []
+    from .rfl) $$ Howe
+  ihave HΦ : (∀ c : CPU, sysUnlinkPostA k (A.raise kv) c) $$ [HΦ]
+  · iintro %c
+    ispecialize HΦ $$ %c
+    iapply (sysUnlinkPost_raise k A.γ (procAddr A.j) A.pid A.V A.M A.v0.toNat A.P A.Pmiss A.Fent
+      A.Ftgt A.Fex A.Fmiss c kv hkv) $$ HΦ
+  ihave Hau := (show sysUnlinkAuA (hlc := hlc) (GF := GF) A ⊢ sysUnlinkAuA (A.raise kv) from .rfl)
+    $$ Hau
   rcases hret with ⟨pl, hs, hbs, hr⟩ | hr
   · -- argstr succeeded: the path
     have hpl : pl.length < 128 := by
@@ -490,8 +512,8 @@ theorem sys_unlink_w1_args (AS : ARGSTR_W) (BO : BEGIN_OP) (NP : NPAR_WRAP_ERA) 
     iintro Hk Hpc
     icases sys_unlink_path_of (GF := GF) (sysUnlinkPath (k.regs 2#5)) _ _ old bs pl hold hs hbs
       $$ Hpath with ⟨%pfun, %⟨hnn, hterm, -, hpof⟩, Hpath⟩
-    iapply (sys_unlink_w1_walk BO NP EO Γ cpu k A ok P2 hext spie1 spp1 R1 w₃ w₄ w₅ pl.length pfun
-        hp1 hnn hterm hpl hpof (hW2 P2 pl.length pfun))
+    iapply (sys_unlink_w1_walk BO NP EO Γ cpu k (A.raise kv) (ok.raise kv) P2 hext spie1 spp1 R1 w₃
+        w₄ w₅ pl.length pfun hp1 hnn hterm hpl hpof (hW2 kv P2 pl.length pfun))
     iframe
     iframe #
   · -- ARM A: argstr failed, nothing fs-visible happened
@@ -502,7 +524,7 @@ theorem sys_unlink_w1_args (AS : ARGSTR_W) (BO : BEGIN_OP) (NP : NPAR_WRAP_ERA) 
     ihave Harms := unlinkArms_whole (hlc := hlc) (fsGammaL fscFs) fscFs A.V.cwi (viewLazy A.V.upt A.V.sz A.M)
       A.v0.toNat A.P A.Pmiss A.Fent
       A.Ftgt A.Fex A.Fmiss $$ Hau
-    ihave Hout : sysUnlinkOut A 0xFFFFFFFFFFFFFFFF#64 $$ [Hbs Hir Hcore Howe Harms]
+    ihave Hout : sysUnlinkOut (A.raise kv) 0xFFFFFFFFFFFFFFFF#64 $$ [Hbs Hir Hcore Howe Harms]
     · unfold sysUnlinkOut
       iframe Hbs Hir Harms
       iexists P2
@@ -513,7 +535,7 @@ theorem sys_unlink_w1_args (AS : ARGSTR_W) (BO : BEGIN_OP) (NP : NPAR_WRAP_ERA) 
     ihave Hpath := suAny_intro (GF := GF) _ bs 128 (by omega) $$ Hpath
     ihave Hbufs : sysUnlinkBufs (k.regs 2#5) $$ [Hjunk Hde Hnm Hpath Hoff Hdel]
     · unfold sysUnlinkBufs; iframe
-    iapply (sys_unlink_tail_a cpu k A ok spie1 spp1 _ w₃ w₄ w₅ hp1)
+    iapply (sys_unlink_tail_a cpu k (A.raise kv) (ok.raise kv) spie1 spp1 _ w₃ w₄ w₅ hp1)
       $$ [$Hk $Hpc $Hcells $Hbufs $Hte $Hce $Hout $HΦ]
 
 set_option maxHeartbeats 16000000 in
@@ -524,12 +546,12 @@ theorem sys_unlink_w1 (AS : ARGSTR_W) (BO : BEGIN_OP) (NP : NPAR_WRAP_ERA) (EO :
     (hv0 : A.V.tf[tfArgIdx 0]? = some A.v0)
     (hj : A.j < NPROC) (hproc : k.proc = procAddr A.j) (htier : k.tier = KTier.kpt)
     (hnoff : k.noff = 0) (hK : sysUnlinkK ≤ k.avail)
-    (hW2 : ∀ (ok : SuOk k A) (w₄ w₅ : BitVec 64) (P2 : UPtd) (plen : Nat)
+    (hW2 : ∀ (kv : Nat) (ok : SuOk k (A.raise kv)) (w₄ w₅ : BitVec 64) (P2 : UPtd) (plen : Nat)
         (pfun : Nat → BitVec 8) (cpu : CPU) (spie spp : Bool)
         (R : RegMap) (dpv : BitVec 64) (nf : Nat → BitVec 8) (tl : List (BitVec 8)) (iL n : Nat)
         (Sb : List Nat),
-      sysUnlinkAt30 (hlc := hlc) Γ cpu k A spie spp R dpv w₄ w₅ nf tl P2 (bview plen pfun) iL n Sb
-        ⊢ wpLoop cpu) :
+      sysUnlinkAt30 (hlc := hlc) Γ cpu k (A.raise kv) spie spp R dpv w₄ w₅ nf tl P2 (bview plen pfun)
+        iL n Sb ⊢ wpLoop cpu) :
     kctx cpu k ∗ pcIs cpu sysUnlinkAddr ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     procsInv Γ ∗ panicEnv ∗ fsReady (hlc := hlc) ∗
@@ -560,7 +582,7 @@ theorem sys_unlink_w1 (AS : ARGSTR_W) (BO : BEGIN_OP) (NP : NPAR_WRAP_ERA) (EO :
   ihave %hsp := sys_unlink_sp_bound (k.regs 2#5) $$ Hbufs
   have ok : SuOk k A := ⟨hj, hproc, hK, hnoff, htier, hsp, hal⟩
   iapply (sys_unlink_w1_args AS BO NP EO Γ cpu k A ok hv0 k.spie k.spp _ w₃ w₄ w₅
-      (sysUnlinkPins_entry k) (hW2 ok w₄ w₅))
+      (sysUnlinkPins_entry k) (fun kv => hW2 kv (ok.raise kv) w₄ w₅))
     $$ [$Hk $Hpc $Hcells $Hbufs $Hte $Hce $Henv $Hblk $HΦ $Hbs $Hir $Hau]
 
 end

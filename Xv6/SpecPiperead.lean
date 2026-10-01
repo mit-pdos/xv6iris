@@ -79,14 +79,17 @@ def wp_piperead_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
   -- THE BYTE QUEUE'S PAYMENT: one link per byte taken, or the taint
   pipeRpay (hlc := hlc) γp.pnQueue Q Qe n.toNat ∗
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd)
-    (M' : Nat → List (BitVec 8)) (d : Nat) (bsW : List (BitVec 8)),
+    (M' : Nat → List (BitVec 8)) (d : Nat) (bsW : List (BitVec 8)) (k' : Nat),
     ⌜calleeSaved k.regs R' ∧ V.upt.extSz V.sz P' ∧ (d : Int) ≤ max 0 n ∧ pipeReadRet d (R' 10#5) ∧
       bsW.length = d ∧ M' = umemWrite (viewFaulted V.upt P' M) (k.regs 11#5).toNat bsW ∧
       umMapped P' (k.regs 11#5).toNat d⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     trapCsrs cpu' -∗ cpuClaim cpu' k.proc -∗ intrRes cpu' -∗
     pipeRef γp w q -∗
-    procPrivBareAt curCtx (procAddr j) pid { V with upt := P' } M' -∗
+    -- THE EVENT COUNTER (permit sweep L1b): the copy loop lends the
+    -- block's counter to copyout, which may step it
+    ⌜V.ev ≤ k'⌝ -∗
+    procPrivBareAt curCtx (procAddr j) pid { V.updEv k' with upt := P' } M' -∗
     genHalvesPriv (procAddr j) pid V.gen -∗
     -- THE QUEUE'S POST at the window written: the stop's reason, or the taint
     -- with the payment back
@@ -121,14 +124,17 @@ def wp_piperead_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [X
   -- THE BYTE QUEUE'S PAYMENT: one link per byte taken, or the taint
   pipeRpay (hlc := hlc) γp.pnQueue Q Qe n.toNat ∗
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd)
-    (M' : Nat → List (BitVec 8)) (d : Nat) (bsW : List (BitVec 8)),
+    (M' : Nat → List (BitVec 8)) (d : Nat) (bsW : List (BitVec 8)) (k' : Nat),
     ⌜calleeSaved k.regs R' ∧ V.upt.extSz V.sz P' ∧ (d : Int) ≤ max 0 n ∧ pipeReadRet d (R' 10#5) ∧
       bsW.length = d ∧ M' = umemWrite (viewFaulted V.upt P' M) (k.regs 11#5).toNat bsW ∧
       umMapped P' (k.regs 11#5).toNat d⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
     pipeRef γp w q -∗
-    procPrivBareAt curCtx (procAddr j) pid { V with upt := P' } M' -∗
+    -- THE EVENT COUNTER (permit sweep L1b): the copy loop lends the
+    -- block's counter to copyout, which may step it
+    ⌜V.ev ≤ k'⌝ -∗
+    procPrivBareAt curCtx (procAddr j) pid { V.updEv k' with upt := P' } M' -∗
     genHalvesPriv (procAddr j) pid V.gen -∗
     -- THE QUEUE'S POST at the window written: the stop's reason, or the taint
     -- with the payment back
@@ -171,7 +177,7 @@ theorem PIPEREAD.wp_piperead (A : PIPEREAD) {hlc : HasLC} {GF : BundledGFunctors
   iapply h
   iframe H0 H1 H2 Htc Hcl Hir H6 H7 H8 H9 H10 H11 H12
   iapply wpNext_mono $$ Hnext
-  iintro %cpu' HK %spie %spp %R' %P' %M' %d %bsW %p0 H1 H2 ⟨Htc, Hir⟩ Hcl H6 H7 H8 H9
-  iapply HK $$ %spie %spp %R' %P' %M' %d %bsW %p0 H1 H2 Htc Hcl Hir H6 H7 H8 H9
+  iintro %cpu' HK %spie %spp %R' %P' %M' %d %bsW %k' %p0 H1 H2 ⟨Htc, Hir⟩ Hcl H6 %hk' H7 H8 H9
+  iapply HK $$ %spie %spp %R' %P' %M' %d %bsW %k' %p0 H1 H2 Htc Hcl Hir H6 %hk' H7 H8 H9
 
 end Xv6

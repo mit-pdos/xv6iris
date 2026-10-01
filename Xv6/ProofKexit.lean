@@ -309,21 +309,32 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [X : CurCtx]
 
-/-- THE PID CELL, A QUARTER OF IT LENT OUT OF THE CORE for a callee's call
-(Rocq's `proc_priv_pid_ofile` / `proc_priv_cwd_pid` lending, `1/4`;
-`ProofSysClose`'s `sc_core_pid`). -/
-theorem kx_core_pid (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) :
+/-- **THE PID CELL (a quarter) AND THE BLOCK'S EVENT COUNTER, LENT OUT OF THE
+CORE** for fileclose's call (permit sweep L1b, Rocq's
+`proc_priv_bare_ofile_ev` at kexit's altitude): fileclose takes the lend
+(for pipeclose's kfree) and hands it back at a count no lower, so the core
+comes back at SOME later record (`evAfter`). -/
+theorem kx_core_lend (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) :
     procPrivCoreUnmarkedAt (GF := GF) curCtx pa pid V M ⊢
       @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPid pa) 4 (DFrac.own (1 : Qp).half.half) pid ∗
+      actLend pa V.ev ∗
       (@wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPid pa) 4 (DFrac.own (1 : Qp).half.half) pid -∗
-        procPrivCoreUnmarkedAt curCtx pa pid V M) := by
+        (∃ k1 : Nat, ⌜V.ev ≤ k1⌝ ∗ actLend pa k1) -∗
+        ∃ V1 : ProcPriv, ⌜evAfter V V1⌝ ∗ procPrivCoreUnmarkedAt curCtx pa pid V1 M) := by
   unfold procPrivCoreUnmarkedAt procPrivBareAt pidPriv
   iintro ⟨⟨%hf, Hpid, Hf, Hpt, Htfp, %hlz, Hev⟩, Hcw⟩
   icases procPrivAcc_split curCtx _ 4 (1 : Qp).half _ $$ Hpid with ⟨Hpid, Hpid1⟩
-  iframe Hpid
-  iintro Hpid
+  icases actLend_borrow pa V.ev $$ Hev with ⟨Hl, Hlb⟩
+  iframe Hpid Hl
+  iintro Hpid ⟨%k1, %hk1, Hl⟩
+  icases Hlb $$ %k1 %hk1 Hl with ⟨%k2, %hk2, Hev⟩
   ihave Hpid := procPrivAcc_join curCtx _ 4 (1 : Qp).half _ $$ [Hpid Hpid1]
   · iframe
+  iexists V.updEv k2
+  isplitl []
+  · ipureintro; exact ⟨k2, hk2, rfl⟩
+  ihave Hf := (show @procFieldsNoOfile hlc GF _ ⟨curCtx, KTier.kpt⟩ pa (DFrac.own 1) V ⊢
+      @procFieldsNoOfile hlc GF _ ⟨curCtx, KTier.kpt⟩ pa (DFrac.own 1) (V.updEv k2) from .rfl) $$ Hf
   iframe Hpid Hf Hpt Htfp Hcw Hev
   isplitl []
   · ipureintro; exact hf
@@ -339,7 +350,7 @@ def kxLoopExit (Γ : SchedNames) (γ : FileNames) (γkl : GName) (γk : KmemName
   ∀ (c' : CPU) (kk : KCtx), kxFrame kk j eb status spval availval →
     (kctx c' kk ∗ pcIs c' (KA.«kexit» + 0x4c#64) ∗ trapCsrsExt c' eb ∗
       cpuClaimExt c' eb (procAddr j) ∗
-      procPrivCoreUnmarkedAt curCtx (procAddr j) pid V M ∗
+      (∃ V1 : ProcPriv, ⌜evAfter V V1⌝ ∗ procPrivCoreUnmarkedAt curCtx (procAddr j) pid V1 M) ∗
       procOfiles γ V.fdg (procAddr j) (List.replicate NOFILE 0#64) ∗
       (∃ on', fileclosePipeEnv (hlc := hlc) Γ γkl γk on') ∗
       filecloseFsEnv (hlc := hlc) Γ j (procAddr j) ∗ irefSlot ∗ Ψ) ⊢ wpLoop (GF := GF) c'
@@ -367,7 +378,7 @@ theorem kx_loop (FC : FILECLOSE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
       (∀ i, i < fd → L[i]? = some 0#64) →
       (kctx c k ∗ pcIs c (KA.«kexit» + 0x3e#64) ∗ trapCsrsExt c eb ∗
         cpuClaimExt c eb (procAddr j) ∗ isFtable γl γ ∗ panicEnv ∗
-        procPrivCoreUnmarkedAt curCtx (procAddr j) pid V M ∗
+        (∃ V1 : ProcPriv, ⌜evAfter V V1⌝ ∗ procPrivCoreUnmarkedAt curCtx (procAddr j) pid V1 M) ∗
         procOfiles γ V.fdg (procAddr j) L ∗
           (∃ sts, fdFrags V.fdg sts ∗ filecloseCpays (hlc := hlc) sts) ∗
         (∃ on', fileclosePipeEnv (hlc := hlc) Γ γkl γk on') ∗
@@ -388,7 +399,7 @@ theorem kx_loop (FC : FILECLOSE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
         (∀ i, i < fd + 1 → L'[i]? = some 0#64) →
         (kctx c'' k'' ∗ pcIs c'' (KA.«kexit» + 0x38#64) ∗ trapCsrsExt c'' eb ∗
           cpuClaimExt c'' eb (procAddr j) ∗ isFtable γl γ ∗ panicEnv ∗
-          procPrivCoreUnmarkedAt curCtx (procAddr j) pid V M ∗
+          (∃ V1 : ProcPriv, ⌜evAfter V V1⌝ ∗ procPrivCoreUnmarkedAt curCtx (procAddr j) pid V1 M) ∗
           procOfiles γ V.fdg (procAddr j) L' ∗
           (∃ sts, fdFrags V.fdg sts ∗ filecloseCpays (hlc := hlc) sts) ∗
           (∃ on', fileclosePipeEnv (hlc := hlc) Γ γkl γk on') ∗
@@ -397,7 +408,7 @@ theorem kx_loop (FC : FILECLOSE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
         k.regs 9#5 = pOfile (procAddr j) fd → (∀ i, i < fd → L[i]? = some 0#64) →
         (kctx cpu k ∗ pcIs cpu (KA.«kexit» + 0x3e#64) ∗ trapCsrsExt cpu eb ∗
           cpuClaimExt cpu eb (procAddr j) ∗ isFtable γl γ ∗ panicEnv ∗
-          procPrivCoreUnmarkedAt curCtx (procAddr j) pid V M ∗
+          (∃ V1 : ProcPriv, ⌜evAfter V V1⌝ ∗ procPrivCoreUnmarkedAt curCtx (procAddr j) pid V1 M) ∗
           procOfiles γ V.fdg (procAddr j) L ∗
           (∃ sts, fdFrags V.fdg sts ∗ filecloseCpays (hlc := hlc) sts) ∗
           (∃ on', fileclosePipeEnv (hlc := hlc) Γ γkl γk on') ∗
@@ -464,23 +475,29 @@ theorem kx_loop (FC : FILECLOSE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
         with [kexit_br_2166, KCtx.setReg_sie, KCtx.setReg_proc]
       iintro Hk Hpc
       -- THE PID CELL, LENT out of the core ; THE ENVIRONMENT the state selects
-      icases kx_core_pid (procAddr j) pid V M $$ Hcore with ⟨Hpid, Hcw⟩
+      -- the pid cell and the block's event counter, lent (permit sweep L1b)
+      icases Hcore with ⟨%V1, %hV1, Hcore⟩
+      icases kx_core_lend (procAddr j) pid V1 M $$ Hcore with ⟨Hpid, Hlend, Hcw⟩
       icases Hpenv with ⟨%on, Hpenv⟩
       icases filecloseEnv_frame Γ j (procAddr j) γkl γk on st $$ [Hpenv Hfenv] with ⟨Henv, Hback⟩
       · iframe
       iapply (fileclose_call FC Γ cpu ((k.setReg 10#5 (L[fd]'hfdlt2)).setReg 1#5 (KA.«kexit» + 0x46#64))
-          γl γ kk q st j γkl γk on pid (DFrac.own (1 : Qp).half.half) iprop(emp) k.sie (by simp only [KCtx.setReg_sie]) (procAddr j)
+          γl γ kk q st j γkl γk on pid (DFrac.own (1 : Qp).half.half) iprop(emp) V1.ev k.sie
+          (by simp only [KCtx.setReg_sie]) (procAddr j)
           (by simp only [KCtx.setReg_proc]; exact hp)
           (by simp only [KCtx.setReg_avail]; exact hK) (by simp only [KCtx.setReg_noff]; exact hn)
           (by simp only [KCtx.setReg_tier]; exact ht)
           (by simp only [KCtx.setReg_regs, RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]; exact hvk))
-        $$ [- $Hk $Hpc $Hte $Hce $Hft $Hpe $Href $Hpid $Hir $Henv $Hcpay]
+        $$ [- $Hk $Hpc $Hte $Hce $Hft $Hpe $Href $Hpid $Hir $Henv $Hcpay $Hlend]
       iapply wpNext_intro_pin
       iintro %cpu %_
       -- the close's receipt is dropped: the payload was `emp`
-      iintro %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid Hu Hir Hout -
+      iintro %spie %spp %R' %hcs Hk Hpc Hlend Hte Hce Hpid Hu Hir Hout -
       icases Hback $$ Hout with ⟨Hpenv, Hfenv⟩
-      ihave Hcore := Hcw $$ Hpid
+      icases Hcw $$ Hpid Hlend with ⟨%V2, %hV2, Hcore⟩
+      ihave Hcore : (∃ V3 : ProcPriv, ⌜evAfter V V3⌝ ∗ procPrivCoreUnmarkedAt curCtx (procAddr j) pid V3 M)
+        $$ [Hcore]
+      · iexists V2; iframe Hcore; ipureintro; exact evAfter_trans hV1 hV2
       have hkframe1 : kxFrame ((k.setReg 10#5 (L[fd]'hfdlt2)).setReg 1#5 (KA.«kexit» + 0x46#64)) j k.sie
           status spval availval :=
         kx_setReg_frame _ j status spval 1#5 _ hkframe10 (by decide) (by decide) (by decide) (by decide)
@@ -1377,14 +1394,20 @@ theorem kx_after_loop (AC : ACQUIRE) (RE : RELEASE) (RP : REPARENT) (WU : WAKEUP
   letI : CurCtx := ⟨ξ0, KTier.kpt⟩
   unfold kxLoopExit
   intro c' kk hkk
-  unfold procPrivCoreUnmarkedAt procPrivBareAt procFieldsNoOfile filecloseFsEnv
-  iintro ⟨Hk, Hpc, Hte, Hce, ⟨⟨%hV, Hpid, ⟨Hks, Hsz, Hpg, Htf, Hcwd, Hname, Hsc⟩, HPt, HTf, %hlz, Hev⟩, Hcwr, Hgen⟩,
-    Hofs, -, ⟨-, -, #Hpinv, #Hrdy, Hbs⟩, Hir, ⟨Hfsp, Hirs, #Hpe, Hframe, Hcloser, #Hwl, #Hinit, Hch, #Hmy, HQ⟩⟩
+  iintro ⟨Hk, Hpc, Hte, Hce, ⟨%V1, %hV1, Hcore⟩, Hofs, Hpenv, Hfenv, Hir, HΨ⟩
+  -- the core at the record fileclose's lends raised it to (permit sweep L1b)
+  obtain ⟨kv, hkv, rfl⟩ := hV1
+  iunfold procPrivCoreUnmarkedAt, procPrivBareAt, procFieldsNoOfile at Hcore
+  unfold filecloseFsEnv
+  icases Hcore with ⟨⟨%hV, Hpid, ⟨Hks, Hsz, Hpg, Htf, Hcwd, Hname, Hsc⟩, HPt, HTf, %hlz, Hev⟩, Hcwr, Hgen⟩
+  icases Hpenv with -
+  icases Hfenv with ⟨-, -, #Hpinv, #Hrdy, Hbs⟩
+  icases HΨ with ⟨Hfsp, Hirs, #Hpe, Hframe, Hcloser, #Hwl, #Hinit, Hch, #Hmy, HQ⟩
   icases kx_ofiles_null γ V.fdg (procAddr j) $$ Hofs with ⟨Hofile, Hfds⟩
   ihave Hirs := (show irefSlot (GF := GF) ∗ irefSlots 3 ⊢ irefSlots IREFSPARE from
     irefSlots_combine 1 3) $$ [Hir Hirs]
   · iframe
-  iapply (kx_rest AC RE RP WU SC BO IP EO Γ γw j hj pid V M ip cs Q eb status spval availval hV hlz
+  iapply (kx_rest AC RE RP WU SC BO IP EO Γ γw j hj pid (V.updEv kv) M ip cs Q eb status spval availval hV hlz
     c' kk hkk)
   iframe Hk Hpc Hte Hce Hbs Hofile Hfds Hfsp Hirs Hpid Hks Hsz Hpg Htf Hcwd Hcwr Hgen Hname Hsc HPt HTf Hframe Hev
     Hcloser Hch HQ
@@ -1529,6 +1552,9 @@ theorem kexit_proof (MP : MYPROC) (FC : FILECLOSE) (BO : BEGIN_OP) (IP : IPUT) (
   have hK6 : 6 ≤ k.avail := by rw [kexitSlots_eq] at hK; omega
   -- THE BLOCK: the core rides the loop untouched, the array is what it walks
   icases (procPrivUnmarked_split γ (procAddr j) pid V M).1 $$ Hpriv with ⟨Hcore, Hofs⟩
+  ihave Hcore : (∃ V1 : ProcPriv, ⌜evAfter V V1⌝ ∗ procPrivCoreUnmarkedAt curCtx (procAddr j) pid V1 M)
+    $$ [Hcore]
+  · iexists V; iframe Hcore; ipureintro; exact evAfter_refl V
   -- the loop carries the fragment bundle and the table's close payments at
   -- an existential table (Rocq `kx_fdpay`)
   ihave Hfr : (∃ sts', fdFrags (GF := GF) V.fdg sts' ∗ filecloseCpays (hlc := hlc) sts') $$ [Hfr Hcps]

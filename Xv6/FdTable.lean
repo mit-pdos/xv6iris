@@ -718,6 +718,35 @@ theorem procPrivCoreNoctxAt_evAcc (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32
   ihave Hb := Hw $$ %k Hev
   iframe Hb Hc Hg
 
+/-- **The pid cell and the event counter, lent out of the core around a
+callee that takes the lend** (permit sweep L1b, Rocq
+`proc_priv_core_bare_ev_acc` / `proc_priv_bare_acc_ev` /
+`proc_priv_bare_ofile_ev`, folding sys_close's `sc_core_pid`, sys_pipe's
+`sys_pipe_core_pid` and sys_open's frame): fileclose reads the pid cell and
+takes the lend (for pipeclose's kfree); the core comes back at whatever
+count the callee handed back -- at least the one it left at. -/
+theorem procPrivCoreNoctxAt_pidLend (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
+    (M : Nat → List (BitVec 8)) :
+    procPrivCoreNoctxAt (GF := GF) ξ pa pid V M ⊢
+      @wordPointsTo hlc GF _ ⟨ξ, KTier.kpt⟩ (pPid pa) 4 pidPriv pid ∗ actLend pa V.ev ∗
+      (@wordPointsTo hlc GF _ ⟨ξ, KTier.kpt⟩ (pPid pa) 4 pidPriv pid -∗
+        (∃ k1 : Nat, ⌜V.ev ≤ k1⌝ ∗ actLend pa k1) -∗
+        ∃ k2 : Nat, ⌜V.ev ≤ k2⌝ ∗ procPrivCoreNoctxAt ξ pa pid (V.updEv k2) M) := by
+  unfold procPrivCoreNoctxAt procPrivBareAt
+  simp only [ProcPriv.updEv, procFieldsNoOfile_updEv]
+  iintro ⟨⟨%hf, Hpid, Hf, Hpt, Htfp, %hlz, Hev⟩, Hcw, Hg⟩
+  icases actLend_borrow pa V.ev $$ Hev with ⟨Hl, Hlb⟩
+  iframe Hpid Hl
+  iintro Hpid ⟨%k1, %hk1, Hl⟩
+  icases Hlb $$ %k1 %hk1 Hl with ⟨%k2, %hk2, Hev⟩
+  iexists k2
+  iframe Hpid Hf Hpt Htfp Hev Hcw Hg
+  isplitl []
+  · ipureintro; exact hk2
+  isplitl []
+  · ipureintro; exact hf
+  · ipureintro; exact hlz
+
 /-- The core does not mention the array, so it survives any store into it. -/
 theorem procPrivCoreNoctxAt_ofile (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (fs : List (BitVec 64)) :

@@ -122,12 +122,18 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
 
+/-- THE LEND, AS A PASS-THROUGH (permit sweep L1b, SpecPipealloc's deviation):
+the caller's event counter at some count no lower than the one it was lent
+at; the error paths' filecloses take it and hand it back raised. -/
+abbrev paLend (p : BitVec 64) (ke : Nat) : IProp GF := iprop(∃ k1 : Nat, ⌜ke ≤ k1⌝ ∗ actLend p k1)
+
 /-- The caller's continuation (the contract's `true` crossing's body). -/
 abbrev paCont (k : KCtx) (γ : FileNames) (γk : KmemNames) (on : Option Nat) (pidv : BitVec 32)
-    (dqp : DFrac) (cpu' : CPU) : IProp GF :=
+    (dqp : DFrac) (ke : Nat) (cpu' : CPU) : IProp GF :=
   iprop(∀ (spie spp : Bool) (R' : RegMap),
     ⌜calleeSaved k.regs R'⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
+    (∃ k' : Nat, ⌜ke ≤ k'⌝ ∗ actLend k.proc k') -∗
     trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
     pipeallocPost γ γk on (k.regs 10#5) (k.regs 11#5) (R' 10#5) -∗
     wordPointsTo (pPid k.proc) 4 dqp pidv -∗ irefSlot -∗ wpLoop cpu')
@@ -211,35 +217,36 @@ theorem pa_initlock (IL : INITLOCK) (c : CPU) (k' : KCtx) (vlock : BitVec 32) (v
 
 theorem pa_fileclose (FC : FILECLOSE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (c : CPU)
     (k' : KCtx) (γl : GName) (γ : FileNames) (kk : Nat) (γkl : GName) (γk : KmemNames)
-    (on : Option Nat) (pidv : BitVec 32) (dqp : DFrac)
+    (on : Option Nat) (pidv : BitVec 32) (dqp : DFrac) (ke : Nat)
     (s : Bool) (hs : k'.sie = s) (pj : BitVec 64) (hpj : k'.proc = pj)
     (hK : filecloseSlots ≤ k'.avail) (hnoff : k'.noff = 0)
     (htier : k'.tier = KTier.kpt) (ha0 : k'.regs 10#5 = fnode kk) :
     kctx c k' ∗ pcIs c KA.«fileclose» ∗ trapCsrsExt c s ∗ cpuClaimExt c s pj ∗
     isFtable γl γ ∗ panicEnv ∗ fileRef γ kk 1 .closed ∗
-    wordPointsTo (pPid pj) 4 dqp pidv ∗ irefSlot ∗
+    wordPointsTo (pPid pj) 4 dqp pidv ∗ irefSlot ∗ paLend pj ke ∗
     wpNext true pj c (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
       ⌜calleeSaved k'.regs R'⌝ -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       trapCsrsExt cpu' s -∗ cpuClaimExt cpu' s pj -∗
-      wordPointsTo (pPid pj) 4 dqp pidv -∗ fdSlot -∗ irefSlot -∗ wpLoop cpu'))
+      wordPointsTo (pPid pj) 4 dqp pidv -∗ fdSlot -∗ irefSlot -∗ paLend pj ke -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   subst hs hpj
+  iintro ⟨Hk, Hpc, Hte, Hce, #Hft, #Hpe, Href, Hpid, Hir, ⟨%k1, %hk1, Hlend⟩, Hnext⟩
   have h := FC.wp_fileclose_eb (hlc := hlc) (GF := GF) Γ c k' γl γ kk 1 .closed 0 γkl γk on pidv dqp
-    iprop(emp) hK hnoff htier ha0
+    iprop(emp) k1 hK hnoff htier ha0
   unfold wp_fileclose_eb_body at h
   simp only [filecloseAddr] at h
-  iintro ⟨Hk, Hpc, Hte, Hce, #Hft, #Hpe, Href, Hpid, Hir, Hnext⟩
   iapply h
-  iframe Hk Hpc Hte Hce Hft Hpe Href Hpid Hir
+  iframe Hk Hpc Hte Hce Hft Hpe Href Hpid Hir Hlend
   isplitl []
   · iapply filecloseEnv_none
   -- an untyped file pays no close link (Rocq `fileclose_cpay_none`)
   isplitl []
   · iapply filecloseCpay_none
   iapply wpNext_mono _ _ _ _ _ $$ Hnext
-  iintro %c' HK %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid Hfd Hir - -
-  iapply HK $$ %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid Hfd Hir
+  iintro %c' HK %spie %spp %R' %hcs Hk Hpc ⟨%k2, %hk2, Hlend⟩ Hte Hce Hpid Hfd Hir - -
+  iapply HK $$ %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid Hfd Hir [Hlend]
+  iexists k2; iframe Hlend; ipureintro; exact Nat.le_trans hk1 hk2
 
 /-! ## The tail: the epilogue at `(KernelSyms.«pipealloc» + 0xb8)` -/
 
@@ -274,7 +281,7 @@ theorem pa_tail (c : CPU) (kb : KCtx) (hK : 6 ≤ kb.avail)
 matching post, the block and the iref loan; the complement and the caller's
 crossing at the current hart, moved by the epilogue's own step. -/
 theorem pa_exit (cr : CPU) (k : KCtx) (γ : FileNames) (γk : KmemNames) (on : Option Nat)
-    (pidv : BitVec 32) (dqp : DFrac)
+    (pidv : BitVec 32) (dqp : DFrac) (ke : Nat)
     (hK : 6 ≤ k.avail) (spie spp : Bool)
     (R : RegMap) (hR2 : R 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFD0#64) (hpins : paPins k R)
     (r : BitVec 64) (h10 : R 10#5 = r) :
@@ -282,34 +289,34 @@ theorem pa_exit (cr : CPU) (k : KCtx) (γ : FileNames) (γk : KmemNames) (on : O
     frame6s4 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 20#5) ∗
     trapCsrsExt cr k.sie ∗ cpuClaimExt cr k.sie k.proc ∗
     pipeallocPost γ γk on (k.regs 10#5) (k.regs 11#5) r ∗
-    wordPointsTo (pPid k.proc) 4 dqp pidv ∗ irefSlot ∗
-    wpNext true k.proc cr (paCont k γ γk on pidv dqp)
+    wordPointsTo (pPid k.proc) 4 dqp pidv ∗ irefSlot ∗ paLend k.proc ke ∗
+    wpNext true k.proc cr (paCont k γ γk on pidv dqp ke)
     ⊢ wpLoop (GF := GF) cr := by
-  iintro ⟨Hk, Hpc, Hframe, Hte, Hce, Hpost, Hpid, Hir, Hnext⟩
+  iintro ⟨Hk, Hpc, Hframe, Hte, Hce, Hpost, Hpid, Hir, Hlend, Hnext⟩
   obtain ⟨p18, p19, p21, p22, p23, p24, p25, p26, p27⟩ := hpins
   iapply (pa_tail cr (k.withSpie spie spp) (by simp only [KCtx.withSpie_avail]; exact hK)
       k.regs rfl R hR2 (pa_calleeSaved_mk _ _ p18 p19 p21 p22 p23 p24 p25 p26 p27)
       iprop(pipeallocPost γ γk on (k.regs 10#5) (k.regs 11#5) r ∗
-        wordPointsTo (pPid k.proc) 4 dqp pidv ∗ irefSlot))
+        wordPointsTo (pPid k.proc) 4 dqp pidv ∗ irefSlot ∗ paLend k.proc ke))
     $$ [- $Hk $Hpc $Hframe]
-  isplitl [Hpost Hpid Hir]
-  · iframe Hpost Hpid Hir
+  isplitl [Hpost Hpid Hir Hlend]
+  · iframe Hpost Hpid Hir Hlend
   iapply wpNext_intro_pin
-  iintro %c %hpin %R'' Hk Hpc %hfacts ⟨Hpost, Hpid, Hir⟩
+  iintro %c %hpin %R'' Hk Hpc %hfacts ⟨Hpost, Hpid, Hir, Hlend⟩
   have hpin' : k.sie = false → c = cr := fun h => hpin (Or.inl h)
   ihave Hte := trapCsrsExt_move _ _ _ hpin' $$ Hte
   ihave Hce := cpuClaimExt_move _ _ _ _ hpin' $$ Hce
   ihave HΦ := wpNext_at true k.proc cr c _
     (fun h => hpin (h.elim (fun e => absurd e (by decide)) Or.inr)) $$ Hnext
   k_norm_g
-  iapply HΦ $$ %spie %spp %R'' [] Hk Hpc Hte Hce [Hpost] Hpid Hir
+  iapply HΦ $$ %spie %spp %R'' [] Hk Hpc Hlend Hte Hce [Hpost] Hpid Hir
   · ipureintro; exact hfacts.1
   · rw [hfacts.2, h10]; iexact Hpost
 
 /-- The exit from a balanced stretch: the complement and the crossing make
 one wide hop from the entry hart along the stretch's pinning. -/
 theorem pa_exit_pin (cpu cr : CPU) (k : KCtx) (γ : FileNames) (γk : KmemNames) (on : Option Nat)
-    (pidv : BitVec 32) (dqp : DFrac)
+    (pidv : BitVec 32) (dqp : DFrac) (ke : Nat)
     (hK : 6 ≤ k.avail) (hpin : k.sie = false ∨ k.proc = 0#64 → cr = cpu) (spie spp : Bool)
     (R : RegMap) (hR2 : R 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFD0#64) (hpins : paPins k R)
     (r : BitVec 64) (h10 : R 10#5 = r) :
@@ -317,15 +324,15 @@ theorem pa_exit_pin (cpu cr : CPU) (k : KCtx) (γ : FileNames) (γk : KmemNames)
     frame6s4 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 20#5) ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     pipeallocPost γ γk on (k.regs 10#5) (k.regs 11#5) r ∗
-    wordPointsTo (pPid k.proc) 4 dqp pidv ∗ irefSlot ∗
-    wpNext true k.proc cpu (paCont k γ γk on pidv dqp)
+    wordPointsTo (pPid k.proc) 4 dqp pidv ∗ irefSlot ∗ paLend k.proc ke ∗
+    wpNext true k.proc cpu (paCont k γ γk on pidv dqp ke)
     ⊢ wpLoop (GF := GF) cr := by
-  iintro ⟨Hk, Hpc, Hframe, Hte, Hce, Hpost, Hpid, Hir, Hnext⟩
+  iintro ⟨Hk, Hpc, Hframe, Hte, Hce, Hpost, Hpid, Hir, Hlend, Hnext⟩
   ihave Hte := trapCsrsExt_move _ _ _ (fun h => hpin (Or.inl h)) $$ Hte
   ihave Hce := cpuClaimExt_move _ _ _ _ (fun h => hpin (Or.inl h)) $$ Hce
   ihave Hnext := pa_next_shift k cpu cr _ (fun h => hpin (Or.inr h)) $$ Hnext
-  iapply (pa_exit cr k γ γk on pidv dqp hK spie spp R hR2 hpins r h10)
-    $$ [$Hk $Hpc $Hframe $Hte $Hce $Hpost $Hpid $Hir $Hnext]
+  iapply (pa_exit cr k γ γk on pidv dqp ke hK spie spp R hR2 hpins r h10)
+    $$ [$Hk $Hpc $Hframe $Hte $Hce $Hpost $Hpid $Hir $Hlend $Hnext]
 
 /-! ## The bad tail from `(KernelSyms.«pipealloc» + 0xa8)`: close `*f1` if taken, return -1 -/
 
@@ -338,7 +345,7 @@ theorem pipealloc_br_fffffffffffffccc : KA.«pipealloc» + 0xfffffffffffffccc#64
 
 theorem pa_bad_tail (FC : FILECLOSE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (c : CPU)
     (k : KCtx) (γl : GName) (γ : FileNames) (γkl : GName) (γk : KmemNames) (on : Option Nat)
-    (pidv : BitVec 32) (dqp : DFrac)
+    (pidv : BitVec 32) (dqp : DFrac) (ke : Nat)
     (hwf : k.wf) (hK : pipeallocSlots ≤ k.avail) (hnoff : k.noff = 0)
     (htier : k.tier = KTier.kpt)
     (spie spp : Bool)
@@ -351,10 +358,10 @@ theorem pa_bad_tail (FC : FILECLOSE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF 
     wordPointsTo (k.regs 10#5) 8 (DFrac.own 1) w0 ∗ wordPointsTo (k.regs 11#5) 8 (DFrac.own 1) v1 ∗
     fileallocPost γ v1 ∗
     frame6s4 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 20#5) ∗
-    wordPointsTo (pPid k.proc) 4 dqp pidv ∗ irefSlot ∗
-    wpNext true k.proc c (paCont k γ γk on pidv dqp)
+    wordPointsTo (pPid k.proc) 4 dqp pidv ∗ irefSlot ∗ paLend k.proc ke ∗
+    wpNext true k.proc c (paCont k γ γk on pidv dqp ke)
     ⊢ wpLoop (GF := GF) c := by
-  iintro ⟨Hk, Hpc, Hte, Hce, #Hft, #Hpe, Hav, Hfd, Hc0, Hc1, Hpost1, Hframe, Hpid, Hir, Hnext⟩
+  iintro ⟨Hk, Hpc, Hte, Hce, #Hft, #Hpe, Hav, Hfd, Hc0, Hc1, Hpost1, Hframe, Hpid, Hir, Hlend, Hnext⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   have hK6 : 6 ≤ k.avail := by unfold pipeallocSlots at hK; have := filecloseSlots_callees.2.2.2; omega
   -- ld a5,0(s4) ; li a0,-1
@@ -384,14 +391,14 @@ theorem pa_bad_tail (FC : FILECLOSE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF 
       iexists w0, 0#64
       iframe Hc0 Hc1
     obtain ⟨p18, p19, p21, p22, p23, p24, p25, p26, p27⟩ := hpins
-    iapply (pa_exit_pin c c3 k γ γk on pidv dqp hK6 hpin3 spie spp _
+    iapply (pa_exit_pin c c3 k γ γk on pidv dqp ke hK6 hpin3 spie spp _
         (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact hR2)
         (by
           refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
             simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] <;> assumption)
         0xFFFFFFFFFFFFFFFF#64
         (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, MachCSL.li_m1]))
-      $$ [$Hk $Hpc $Hframe $Hte $Hce $Hpost $Hpid $Hir $Hnext]
+      $$ [$Hk $Hpc $Hframe $Hte $Hce $Hpost $Hpid $Hir $Hlend $Hnext]
   · -- *f1 = fnode k1: beqz not taken ; mv a0,a5 ; jal fileclose ; li a0,-1 ; exit
     subst hv1
     k_step_gen (wp_s_branch c2 _ (KA.«pipealloc» + 0xae#64) true 10#13 15#5 0#5 (by decide) bop.BEQ)
@@ -407,8 +414,8 @@ theorem pa_bad_tail (FC : FILECLOSE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF 
       (hp5 h).trans ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h))))
     ihave Hte := trapCsrsExt_move _ _ _ (fun h => hpin5 (Or.inl h)) $$ Hte
     ihave Hce := cpuClaimExt_move _ _ _ _ (fun h => hpin5 (Or.inl h)) $$ Hce
-    iapply (pa_fileclose FC Γ c5 _ γl γ k1 γkl γk on pidv dqp k.sie (by k_norm_g) k.proc (by k_norm_g) ?hKc ?hn ?ht ?ha)
-      $$ [- $Hk $Hpc $Hte $Hce $Hft $Hpe $Href1 $Hpid $Hir]
+    iapply (pa_fileclose FC Γ c5 _ γl γ k1 γkl γk on pidv dqp ke k.sie (by k_norm_g) k.proc (by k_norm_g) ?hKc ?hn ?ht ?ha)
+      $$ [- $Hk $Hpc $Hte $Hce $Hft $Hpe $Href1 $Hpid $Hir $Hlend]
     rotate_right 1
     k_norm_g [pa_ret_4548]
     case hKc => k_norm_g; unfold pipeallocSlots at hK; omega
@@ -417,7 +424,7 @@ theorem pa_bad_tail (FC : FILECLOSE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF 
     case ha => k_norm_g
     -- past fileclose (at any hart): li a0,-1 ; exit
     iapply wpNext_intro_pin
-    iintro %c6 %hp6 %spie2 %spp2 %R6 %hcs6 Hk Hpc Hte Hce Hpid Hfd' Hir
+    iintro %c6 %hp6 %spie2 %spp2 %R6 %hcs6 Hk Hpc Hte Hce Hpid Hfd' Hir Hlend
     k_norm_g [MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed, MachCSL.KCtx.withSpie_withRegs]
     unfold calleeSaved at hcs6
     k_norm_g at hcs6
@@ -440,7 +447,7 @@ theorem pa_bad_tail (FC : FILECLOSE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF 
       iexists w0, fnode k1
       iframe Hc0 Hc1
     obtain ⟨p18, p19, p21, p22, p23, p24, p25, p26, p27⟩ := hpins
-    iapply (pa_exit c7 k γ γk on pidv dqp hK6 spie2 spp2 _
+    iapply (pa_exit c7 k γ γk on pidv dqp ke hK6 spie2 spp2 _
         (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact e2.trans hR2)
         (by
           refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
@@ -457,7 +464,7 @@ theorem pa_bad_tail (FC : FILECLOSE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF 
               | exact e27.trans p27)
         0xFFFFFFFFFFFFFFFF#64
         (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, MachCSL.li_m1]))
-      $$ [$Hk $Hpc $Hframe $Hte $Hce $Hpost $Hpid $Hir $Hnext]
+      $$ [$Hk $Hpc $Hframe $Hte $Hce $Hpost $Hpid $Hir $Hlend $Hnext]
 
 /-! ## The success arm, from `(KernelSyms.«pipealloc» + 0x34)` -/
 
@@ -471,7 +478,7 @@ theorem pipealloc_br_ffffffffffffc642 : KA.«pipealloc» + 0xffffffffffffc642#64
 theorem pipealloc_br_302a : KA.«pipealloc» + 0x302a#64 = KStr.«pipe» := by decide
 
 theorem pa_success (IL : INITLOCK) (cpu c : CPU) (k : KCtx) (γ : FileNames) (γk : KmemNames) (on : Option Nat)
-    (pidv : BitVec 32) (dqp : DFrac)
+    (pidv : BitVec 32) (dqp : DFrac) (ke : Nat)
     (k0 k1 : Nat) (hk0 : k0 < NFILE) (hk1 : k1 < NFILE) (pi : BitVec 64) (hpv : pageValid pi)
     (hwf : k.wf) (hK : pipeallocSlots ≤ k.avail)
     (spie spp : Bool) (hsp : k.sie = false → spie = k.spie ∧ spp = k.spp)
@@ -490,11 +497,11 @@ theorem pa_success (IL : INITLOCK) (cpu c : CPU) (k : KCtx) (γ : FileNames) (γ
     wordPointsTo (k.regs 2#5 + 0xFFFFFFFFFFFFFFE0#64) 8 (DFrac.own 1) (k.regs 18#5) ∗
     wordPointsTo (k.regs 2#5 + 0xFFFFFFFFFFFFFFD8#64) 8 (DFrac.own 1) w2 ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    wordPointsTo (pPid k.proc) 4 dqp pidv ∗ irefSlot ∗
-    wpNext true k.proc cpu (paCont k γ γk on pidv dqp)
+    wordPointsTo (pPid k.proc) 4 dqp pidv ∗ irefSlot ∗ paLend k.proc ke ∗
+    wpNext true k.proc cpu (paCont k γ γk on pidv dqp ke)
     ⊢ wpLoop (GF := GF) c := by
   iintro ⟨Hk, Hpc, Hav, Hpage, Hc0, Hc1, Href0, Href1, Hra, Hs0, Hs1, Hs4, Hsp1, Hsp2, Hte, Hce,
-    Hpid, Hir, Hnext⟩
+    Hpid, Hir, Hlend, Hnext⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   icases kctx_kmapStatic _ _ $$ Hk with ⟨#HS, Hk⟩
   have hK6 : 6 ≤ k.avail := by unfold pipeallocSlots at hK; have := filecloseSlots_callees.2.2.2; omega
@@ -755,7 +762,7 @@ theorem pa_success (IL : INITLOCK) (cpu c : CPU) (k : KCtx) (γ : FileNames) (γ
     iexists k0, k1, γp
     iframe Hc0 Hc1 Href0' Href1' Hqf
     ipureintro; exact ⟨hk0, hk1⟩
-  iapply (pa_exit_pin cpu cU k γ γk on pidv dqp hK6 hpinU spie spp _
+  iapply (pa_exit_pin cpu cU k γ γk on pidv dqp ke hK6 hpinU spie spp _
       (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact a2.trans hR2)
       (by
         refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
@@ -772,7 +779,7 @@ theorem pa_success (IL : INITLOCK) (cpu c : CPU) (k : KCtx) (γ : FileNames) (γ
             | exact a26.trans p26
             | exact a27.trans p27)
       0#64 (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]; first | done | decide))
-    $$ [$Hk $Hpc $Hframe $Hte $Hce $Hpost $Hpid $Hir $Hnext]
+    $$ [$Hk $Hpc $Hframe $Hte $Hce $Hpost $Hpid $Hir $Hlend $Hnext]
 
 end
 
@@ -785,10 +792,13 @@ theorem pipealloc_br_fffffffffffffc28 : KA.«pipealloc» + 0xfffffffffffffc28#64
 set_option maxHeartbeats 16000000 in
 theorem pipealloc_proof (FA : FILEALLOC) (KAL : KALLOC) (IL : INITLOCK) (FC : FILECLOSE) : PIPEALLOC := ⟨
   fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Γ _ cpu k γl γ γkl γk on v0 v1 pidv dqp
-      hK hnoff htier => by
+      ke hK hnoff htier => by
   unfold wp_pipealloc_eb_body
   simp only [pipeallocAddr]
-  iintro ⟨Hk, Hpc, Hte, Hce, #Hft, #Hpe, #Hkl, Hav, Hfd1, Hfd2, Hc0, Hc1, Hpid, Hir, Hnext⟩
+  iintro ⟨Hk, Hpc, Hte, Hce, #Hft, #Hpe, #Hkl, Hav, Hfd1, Hfd2, Hc0, Hc1, Hpid, Hir, Hlend, Hnext⟩
+  -- the lend, as the pass-through every exit hands back (permit sweep L1b)
+  ihave Hlend : paLend (GF := GF) k.proc ke $$ [Hlend]
+  · iexists ke; iframe Hlend; ipureintro; exact Nat.le_refl _
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩
   have hlocks : k.locks = [] := List.eq_nil_of_length_eq_zero (by have := hwf.2.2.2.1; omega)
@@ -855,9 +865,9 @@ theorem pipealloc_proof (FA : FILEALLOC) (KAL : KALLOC) (IL : INITLOCK) (FC : FI
     ihave Hte := trapCsrsExt_move _ _ _ (fun h => hpin9 (Or.inl h)) $$ Hte
     ihave Hce := cpuClaimExt_move _ _ _ _ (fun h => hpin9 (Or.inl h)) $$ Hce
     ihave Hnext := pa_next_shift k cpu c9 _ (fun h => hpin9 (Or.inr h)) $$ Hnext
-    iapply (pa_bad_tail FC Γ c9 k γl γ γkl γk on pidv dqp hwf hK hnoff htier spie spp
+    iapply (pa_bad_tail FC Γ c9 k γl γ γkl γk on pidv dqp ke hwf hK hnoff htier spie spp
         R1 b20 b2 ⟨b18, b19, b21, b22, b23, b24, b25, b26, b27⟩ 0#64 0#64)
-      $$ [$Hk $Hpc $Hte $Hce $Hft $Hpe $Hav $Hfd $Hc0 $Hc1 $Hpost1 $Hframe $Hpid $Hir $Hnext]
+      $$ [$Hk $Hpc $Hte $Hce $Hft $Hpe $Hav $Hfd $Hc0 $Hc1 $Hpost1 $Hframe $Hpid $Hir $Hlend $Hnext]
   · -- *f0 = fnode k0: beqz not taken ; jal filealloc
     k_step_gen (wp_s_branch c8 _ (KA.«pipealloc» + 0x1e#64) true 138#13 10#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hr0, MachCSL.beq_ne _ (fnode_nonzero k0 hk0)] next c9 hp9
@@ -913,8 +923,8 @@ theorem pipealloc_proof (FA : FILEALLOC) (KAL : KALLOC) (IL : INITLOCK) (FC : FI
         (hp16 h).trans ((hp15 h).trans ((hp14 h).trans ((hp13 h).trans (hpin12 h))))
       ihave Hte := trapCsrsExt_move _ _ _ (fun h => hpin16 (Or.inl h)) $$ Hte
       ihave Hce := cpuClaimExt_move _ _ _ _ (fun h => hpin16 (Or.inl h)) $$ Hce
-      iapply (pa_fileclose FC Γ c16 _ γl γ k0 γkl γk on pidv dqp k.sie (by k_norm_g) k.proc (by k_norm_g) ?hK3 ?hn3 ?ht3 ?ha3)
-        $$ [- $Hk $Hpc $Hte $Hce $Hft $Hpe $Href0 $Hpid $Hir]
+      iapply (pa_fileclose FC Γ c16 _ γl γ k0 γkl γk on pidv dqp ke k.sie (by k_norm_g) k.proc (by k_norm_g) ?hK3 ?hn3 ?ht3 ?ha3)
+        $$ [- $Hk $Hpc $Hte $Hce $Hft $Hpe $Href0 $Hpid $Hir $Hlend]
       rotate_right 1
       k_norm_g [pa_ret_453a]
       case hK3 => k_norm_g; unfold pipeallocSlots at hK; omega
@@ -923,7 +933,7 @@ theorem pipealloc_proof (FA : FILEALLOC) (KAL : KALLOC) (IL : INITLOCK) (FC : FI
       case ha3 => k_norm_g
       -- past fileclose (at any hart)
       iapply wpNext_intro_pin
-      iintro %c17 %hp17 %spie3 %spp3 %R3 %hcs3 Hk Hpc Hte Hce Hpid Hfd' Hir
+      iintro %c17 %hp17 %spie3 %spp3 %R3 %hcs3 Hk Hpc Hte Hce Hpid Hfd' Hir Hlend
       k_norm_g [MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed, MachCSL.KCtx.withSpie_withRegs]
       unfold calleeSaved at hcs3
       k_norm_g at hcs3
@@ -935,13 +945,13 @@ theorem pipealloc_proof (FA : FILEALLOC) (KAL : KALLOC) (IL : INITLOCK) (FC : FI
       case' _ => iframe
       ihave Hpost1 : fileallocPost (GF := GF) γ 0#64 $$ [Hfd]
       case' _ => unfold fileallocPost; ileft; iframe Hfd; ipureintro; rfl
-      iapply (pa_bad_tail FC Γ c17 k γl γ γkl γk on pidv dqp hwf hK hnoff htier spie3 spp3
+      iapply (pa_bad_tail FC Γ c17 k γl γ γkl γk on pidv dqp ke hwf hK hnoff htier spie3 spp3
           R3 (f20.trans d20') (f2.trans d2')
           ⟨f18.trans (d18.trans b18), f19.trans (d19.trans b19), f21.trans (d21.trans b21),
             f22.trans (d22.trans b22), f23.trans (d23.trans b23), f24.trans (d24.trans b24),
             f25.trans (d25.trans b25), f26.trans (d26.trans b26), f27.trans (d27.trans b27)⟩
           (fnode k0) 0#64)
-        $$ [$Hk $Hpc $Hte $Hce $Hft $Hpe $Hav $Hfd' $Hc0 $Hc1 $Hpost1 $Hframe $Hpid $Hir $Hnext]
+        $$ [$Hk $Hpc $Hte $Hce $Hft $Hpe $Hav $Hfd' $Hc0 $Hc1 $Hpost1 $Hframe $Hpid $Hir $Hlend $Hnext]
     · -- *f1 = fnode k1: beqz not taken ; sd s2,16(sp) ; jal kalloc
       k_step_gen (wp_s_branch c12 _ (KA.«pipealloc» + 0x28#64) true 120#13 10#5 0#5 (by decide) bop.BEQ)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hr1, MachCSL.beq_ne _ (fnode_nonzero k1 hk1)] next c13 hp13
@@ -1011,8 +1021,8 @@ theorem pipealloc_proof (FA : FILEALLOC) (KAL : KALLOC) (IL : INITLOCK) (FC : FI
             ((hp19 h).trans ((hp18 h).trans (hpin17 h))))))
         ihave Hte := trapCsrsExt_move _ _ _ (fun h => hpin23 (Or.inl h)) $$ Hte
         ihave Hce := cpuClaimExt_move _ _ _ _ (fun h => hpin23 (Or.inl h)) $$ Hce
-        iapply (pa_fileclose FC Γ c23 _ γl γ k0 γkl γk on pidv dqp k.sie (by k_norm_g) k.proc (by k_norm_g) ?hK5 ?hn5 ?ht5 ?ha5)
-          $$ [- $Hk $Hpc $Hte $Hce $Hft $Hpe $Href0 $Hpid $Hir]
+        iapply (pa_fileclose FC Γ c23 _ γl γ k0 γkl γk on pidv dqp ke k.sie (by k_norm_g) k.proc (by k_norm_g) ?hK5 ?hn5 ?ht5 ?ha5)
+          $$ [- $Hk $Hpc $Hte $Hce $Hft $Hpe $Href0 $Hpid $Hir $Hlend]
         rotate_right 1
         k_norm_g [pa_ret_453a]
         case hK5 => k_norm_g; unfold pipeallocSlots at hK; omega
@@ -1021,7 +1031,7 @@ theorem pipealloc_proof (FA : FILEALLOC) (KAL : KALLOC) (IL : INITLOCK) (FC : FI
         case ha5 => k_norm_g
         -- past fileclose (at any hart)
         iapply wpNext_intro_pin
-        iintro %c24 %hp24 %spie4 %spp4 %R4 %hcs4 Hk Hpc Hte Hce Hpid Hfd' Hir
+        iintro %c24 %hp24 %spie4 %spp4 %R4 %hcs4 Hk Hpc Hte Hce Hpid Hfd' Hir Hlend
         k_norm_g [MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed, MachCSL.KCtx.withSpie_withRegs]
         unfold calleeSaved at hcs4
         k_norm_g at hcs4
@@ -1033,20 +1043,20 @@ theorem pipealloc_proof (FA : FILEALLOC) (KAL : KALLOC) (IL : INITLOCK) (FC : FI
         case' _ => iframe
         ihave Hpost1 : fileallocPost (GF := GF) γ (fnode k1) $$ [Href1]
         case' _ => unfold fileallocPost; iright; iexists k1; iframe Href1; ipureintro; exact ⟨hk1, rfl⟩
-        iapply (pa_bad_tail FC Γ c24 k γl γ γkl γk on pidv dqp hwf hK hnoff htier spie4 spp4
+        iapply (pa_bad_tail FC Γ c24 k γl γ γkl γk on pidv dqp ke hwf hK hnoff htier spie4 spp4
             R4 (f20.trans g20') (f2.trans g2')
             ⟨f18, f19.trans (g19.trans (d19.trans b19)), f21.trans (g21.trans (d21.trans b21)),
               f22.trans (g22.trans (d22.trans b22)), f23.trans (g23.trans (d23.trans b23)),
               f24.trans (g24.trans (d24.trans b24)), f25.trans (g25.trans (d25.trans b25)),
               f26.trans (g26.trans (d26.trans b26)), f27.trans (g27.trans (d27.trans b27))⟩
             (fnode k0) (fnode k1))
-          $$ [$Hk $Hpc $Hte $Hce $Hft $Hpe $Hav $Hfd' $Hc0 $Hc1 $Hpost1 $Hframe $Hpid $Hir $Hnext]
+          $$ [$Hk $Hpc $Hte $Hce $Hft $Hpe $Hav $Hfd' $Hc0 $Hc1 $Hpost1 $Hframe $Hpid $Hir $Hlend $Hnext]
       · -- a page: beqz not taken ; the success arm
         k_step_gen (wp_s_branch c17 _ (KA.«pipealloc» + 0x32#64) true 98#13 10#5 0#5 (by decide) bop.BEQ)
           from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [MachCSL.beq_ne _ (Xv6.PtRun.pageValid_ne_zero _ hpv)] next c18 hp18
         iintro Hk Hpc
         have hpin18 : k.sie = false ∨ k.proc = 0#64 → c18 = cpu := fun h => (hp18 h).trans (hpin17 h)
-        iapply (pa_success IL cpu c18 k γ γk on pidv dqp k0 k1 hk0 hk1 (R3 10#5) hpv hwf hK spie3 spp3 hsp3' hpin18 _
+        iapply (pa_success IL cpu c18 k γ γk on pidv dqp ke k0 k1 hk0 hk1 (R3 10#5) hpv hwf hK spie3 spp3 hsp3' hpin18 _
             (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact g9')
             (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact g20')
             (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false])
@@ -1066,6 +1076,6 @@ theorem pipealloc_proof (FA : FILEALLOC) (KAL : KALLOC) (IL : INITLOCK) (FC : FI
                   | exact g27.trans (d27.trans b27))
             w2)
           $$ [$Hk $Hpc $Hav $Hpage $Hc0 $Hc1 $Href0 $Href1 $Hra $Hs0 $Hs1 $Hs4 $Hsp1 $Hsp2 $Hte $Hce
-            $Hpid $Hir $Hnext]⟩
+            $Hpid $Hir $Hlend $Hnext]⟩
 
 end Xv6

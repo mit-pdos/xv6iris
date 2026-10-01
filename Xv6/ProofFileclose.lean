@@ -67,10 +67,10 @@ set_option maxHeartbeats 16000000 in
 theorem fileclose_proof (AC : ACQUIRE) (RE : RELEASE) (PC : PIPECLOSE) (BO : BEGIN_OP)
     (IP : IPUT) (EO : END_OP) : FILECLOSE := ⟨
   fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Γ _ cpu k γl γ kk q st j γkl γk on pidv dqp
-      Φc hK hnoff htier ha0 => by
+      Φc ke hK hnoff htier ha0 => by
   unfold wp_fileclose_eb_body
   simp only [filecloseAddr]
-  iintro ⟨Hk, Hpc, Hte, Hce, #Hft, #Hpe, Href, Hpid, Hir, Henv, Hcpay, Hnext⟩
+  iintro ⟨Hk, Hpc, Hte, Hce, #Hft, #Hpe, Href, Hpid, Hir, Henv, Hcpay, Hlend, Hnext⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩
   obtain ⟨hKi, hKb, hKp, hK18⟩ := filecloseSlots_callees
@@ -185,7 +185,7 @@ theorem fileclose_proof (AC : ACQUIRE) (RE : RELEASE) (PC : PIPECLOSE) (BO : BEG
     rw [hlast] at hok'
     icases fileRest_join γ kk s t id q q' C C' pn st hlast $$ [Hrest Hf Hp] with ⟨%pn2, %hok2, Hf, Ht, Hc⟩
     · iframe
-    iapply (fc_last RE PC BO IP EO Γ cpu c k γl γ j γkl γk on pidv dqp kk st q Φc C pn2 _ nx Ls hwf hK
+    iapply (fc_last RE PC BO IP EO Γ cpu c k γl γ j γkl γk on pidv dqp kk st q Φc ke C pn2 _ nx Ls hwf hK
         hnoff hlocks htier hok2 spie spp hpin _
         (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]; exact h9)
         (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]; exact b2)
@@ -194,7 +194,7 @@ theorem fileclose_proof (AC : ACQUIRE) (RE : RELEASE) (PC : PIPECLOSE) (BO : BEG
             simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] <;> assumption)
         hfresh' hok')
       $$ [$Hk $Hpc $Hlk $Hlocked $Ha $Hcl $Hrefc $Hhalves $Hfdn $Hf $Ht $Hc $Hfd $Hframe $Harm
-        $Hte $Hce $Hpe $Hpid $Hir $Henv $Hcpay $Hnext]
+        $Hte $Hce $Hpe $Hpid $Hir $Henv $Hcpay $Hlend $Hnext]
   · -- not the last: taken to 0x41e0 ; release ; the epilogue
     have hn2 : 2 ≤ n := by
       have : (s ++ t).length ≠ 0 := by intro h; exact hlast (List.eq_nil_of_length_eq_zero h)
@@ -209,6 +209,8 @@ theorem fileclose_proof (AC : ACQUIRE) (RE : RELEASE) (PC : PIPECLOSE) (BO : BEG
     -- `Hqne`) -- which is exactly `filecloseCpost_of_cpay`'s `q ≠ 1`
     icases fileRest_q_ne_one γ kk s t id q q' C' pn hlast $$ Hrest with ⟨%hq1, Hrest⟩
     ihave Hcp := filecloseCpost_of_cpay q st Φc hq1 $$ Hcpay
+    -- the lend: no callee on this arm takes it (permit sweep L1b)
+    ihave Hnext := actLend_cont_frame _ _ _ _ _ _ _ _ _ $$ Hnext Hlend
     ihave Hnext := fc_cont_fold cpu k γk on st pidv dqp q Φc $$ Hnext Hcp
     icases fileRest_absorb γ kk s t id q q' C C' pn st hlast $$ [Hrest Hf Hp] with ⟨%C'', %pn'', %q'', Hrest⟩
     · iframe

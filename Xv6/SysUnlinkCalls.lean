@@ -46,6 +46,10 @@ ones, so the callee hands them back into nothing.
    -- exactly Rocq's `ic_shrink_tx` at ProofSysUnlinkW3:1499.  The wrappers
    below only package the two call shapes; the shrink / grow are the
    walk's.
+3. Permit sweep L1b: `wp_argstr_w_body` relays argstr's raised count
+   (`∃ k' ≥ V.ev`, the block at `{ V.updEv k' with upt := P' }`), and
+   `sys_unlink_argstr`'s continuation takes it (`(kv : Nat)`,
+   `⌜V.ev ≤ kv⌝`).
 -/
 import Xv6.FsCallSitesI
 import Xv6.SpecIupdate
@@ -109,10 +113,10 @@ def wp_argstr_w_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
   wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
     ⌜k.sie = false → spie = k.spie ∧ spp = k.spp⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
-    (∃ (P' : UPtd) (bs : List (BitVec 8)),
+    (∃ (P' : UPtd) (bs : List (BitVec 8)) (k' : Nat),
       ⌜V.upt.extSz V.sz P' ∧ fetchstrRet (viewLazy V.upt V.sz M) v.toNat old bs (R' 10#5) ∧
         bs.length = old.length⌝ ∗
-      procPrivBareAt curCtx pa pid { V with upt := P' } (viewFaulted V.upt P' M) ∗
+      ⌜V.ev ≤ k'⌝ ∗ procPrivBareAt curCtx pa pid { V.updEv k' with upt := P' } (viewFaulted V.upt P' M) ∗
       byteBuf (k.regs 11#5) (DFrac.own 1) bs) -∗
     ⌜calleeSaved k.regs R'⌝ -∗ wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
@@ -141,12 +145,13 @@ theorem argstrW_of_argstr (AS : ARGSTR) : ARGSTR_W := ⟨by
   iapply h
   iframe Hk Hpc Hl Ha Hb Hbuf
   iapply wpNext_mono _ _ _ _ _ $$ Hn
-  iintro %c' H %spie %spp %R' %hs Hk Hpc ⟨%P', %bs, %hf, Hblk, Hbuf⟩ %hcs
+  iintro %c' H %spie %spp %R' %hs Hk Hpc ⟨%P', %bs, %k', %hf, %hk', Hblk, Hbuf⟩ %hcs
   iapply H $$ %spie %spp %R' %hs Hk Hpc [Hblk Hbuf] %hcs
-  iexists P', bs
+  iexists P', bs, k'
   iframe
-  ipureintro
-  exact ⟨hf.1, hf.2, sys_unlink_fetch_len _ _ _ _ _ hf.2⟩⟩
+  isplitr
+  · ipureintro; exact ⟨hf.1, hf.2, sys_unlink_fetch_len _ _ _ _ _ hf.2⟩
+  ipureintro; exact hk'⟩
 
 set_option maxHeartbeats 8000000 in
 /-- `argstr(0, path, MAXPATH)` at +0x12 (Rocq `Argstr.wp_argstr_sconf`):
@@ -164,12 +169,14 @@ theorem sys_unlink_argstr (AS : ARGSTR_W) (Γ : SchedNames) (cpu : CPU) (k' : KC
     kctx cpu k' ∗ pcIs cpu KA.«argstr» ∗
     trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗ sysfileEnv (hlc := hlc) Γ ∗
     procPrivBareAt curCtx pa pid V M ∗ byteBuf ba (DFrac.own 1) old ∗
-    (∀ (c : CPU) (spie spp : Bool) (R' : RegMap) (P' : UPtd) (bs : List (BitVec 8)),
+    (∀ (c : CPU) (spie spp : Bool) (R' : RegMap) (P' : UPtd) (bs : List (BitVec 8)) (kv : Nat),
       ⌜calleeSaved k'.regs R' ∧ V.upt.extSz V.sz P' ∧
         fetchstrRet (viewLazy V.upt V.sz M) v.toNat old bs (R' 10#5) ∧ bs.length = old.length⌝ -∗
       kctx c ((k'.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k'.regs 1#5)) -∗
       trapCsrsExt c se -∗ cpuClaimExt c se pj -∗
-      procPrivBareAt curCtx pa pid { V with upt := P' } (viewFaulted V.upt P' M) -∗
+      -- the block's counter, lent through argstr (permit sweep L1b)
+      ⌜V.ev ≤ kv⌝ -∗
+      procPrivBareAt curCtx pa pid { V.updEv kv with upt := P' } (viewFaulted V.upt P' M) -∗
       byteBuf ba (DFrac.own 1) bs -∗ wpLoop c)
     ⊢ wpLoop (GF := GF) cpu := by
   subst hs hpj hba
@@ -186,11 +193,11 @@ theorem sys_unlink_argstr (AS : ARGSTR_W) (Γ : SchedNames) (cpu : CPU) (k' : KC
   iframe Hk Hpc Hblk Hbuf
   iframe #
   iapply wpNext_intro_pin
-  iintro %c %hpin %spie %spp %R' %- Hk Hpc ⟨%P', %bs, %hf, Hblk, Hbuf⟩ %hcs
+  iintro %c %hpin %spie %spp %R' %- Hk Hpc ⟨%P', %bs, %kv, %hf, %hkv, Hblk, Hbuf⟩ %hcs
   have hpin' : k'.sie = false → c = cpu := fun h => hpin (Or.inl h)
   ihave Hte := trapCsrsExt_move _ _ _ hpin' $$ Hte
   ihave Hce := cpuClaimExt_move _ _ _ _ hpin' $$ Hce
-  iapply HK $$ %c %spie %spp %R' %P' %bs [] Hk Hpc Hte Hce Hblk Hbuf
+  iapply HK $$ %c %spie %spp %R' %P' %bs %kv [] Hk Hpc Hte Hce %hkv Hblk Hbuf
   ipureintro
   exact ⟨hcs, hf.1, hf.2.1, hf.2.2⟩
 

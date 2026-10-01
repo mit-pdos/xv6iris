@@ -97,7 +97,7 @@ def fwrK (k : KCtx) (γl : GName) (γu : UartNames) (γ : FileNames) (fk : Nat) 
     ⌜calleeSaved k.regs R' ∧ V.upt.extSz V.sz P'⌝ -∗
     kctx c ((k.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k.regs 1#5)) -∗
     trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗
-    fileRef γ fk q st -∗ procPrivExt (procAddr j) pid V P' (viewFaulted V.upt P' M) -∗
+    fileRef γ fk q st -∗ procPrivExtEv (procAddr j) pid V P' (viewFaulted V.upt P' M) -∗
     filewriteEnvOut γl γu st -∗
     filewriteArms (hlc := hlc) V.gen V.upt st n (writerImg V.upt M) (k.regs 11#5) Q Qe (R' 10#5) -∗ wpLoop c)
 
@@ -178,7 +178,7 @@ theorem fwr_exit_ok (cpu : CPU) (k : KCtx) (A : FwrA) (hA : FwrFacts k A) (Q : N
     frame12 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)
       (k.regs 20#5) (k.regs 21#5) (k.regs 22#5) (k.regs 23#5) (k.regs 24#5) (k.regs 25#5) v11 ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    fileRef A.γ A.fk A.q A.st ∗ procPrivExt (procAddr A.j) A.pid A.V P A.img ∗ bslots 3 ∗
+    fileRef A.γ A.fk A.q A.st ∗ procPrivExtEv (procAddr A.j) A.pid A.V P A.img ∗ bslots 3 ∗
     fwrSt (hlc := hlc) A.om (fsGammaL fscFs) A.i A.γo A.V.upt A.n A.img (k.regs 11#5) Q t p 0 ∗
     fwrK (hlc := hlc) k A.γul A.γuu A.γ A.fk A.q A.st A.j A.pid A.V A.M A.n Q Qe
     ⊢ wpLoop (GF := GF) cpu := by
@@ -219,7 +219,7 @@ theorem fwr_exit_ok (cpu : CPU) (k : KCtx) (A : FwrA) (hA : FwrFacts k A) (Q : N
   iintro %c' %R' %⟨hcs, h10⟩ Hk Hpc Hte Hce
   have ha0 : R' 10#5 = BitVec.ofInt 64 A.n := by
     simp only [h10, RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
-  ihave Hpriv := fwr_priv_back (procAddr A.j) A.pid A.V P A.M hext.1 $$ Hpriv
+  ihave Hpriv := fwr_priv_backEv (procAddr A.j) A.pid A.V P A.M hext.1 $$ Hpriv
   unfold fwrK
   iapply HΦ $$ %c' %spie %spp %R' %P [] Hk Hpc Hte Hce Href Hpriv [Hbs] [Hst]
   · ipureintro; exact ⟨hcs, hext⟩
@@ -248,7 +248,7 @@ theorem fwr_exit_fail (cpu : CPU) (k : KCtx) (A : FwrA) (hA : FwrFacts k A) (Q :
     frame12 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)
       (k.regs 20#5) (k.regs 21#5) (k.regs 22#5) (k.regs 23#5) (k.regs 24#5) (k.regs 25#5) v11 ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    fileRef A.γ A.fk A.q A.st ∗ procPrivExt (procAddr A.j) A.pid A.V P A.img ∗ bslots 3 ∗
+    fileRef A.γ A.fk A.q A.st ∗ procPrivExtEv (procAddr A.j) A.pid A.V P A.img ∗ bslots 3 ∗
     fwrSt (hlc := hlc) A.om (fsGammaL fscFs) A.i A.γo A.V.upt A.n A.img (k.regs 11#5) Q t p x ∗
     fwrK (hlc := hlc) k A.γul A.γuu A.γ A.fk A.q A.st A.j A.pid A.V A.M A.n Q Qe
     ⊢ wpLoop (GF := GF) cpu := by
@@ -294,7 +294,7 @@ theorem fwr_exit_fail (cpu : CPU) (k : KCtx) (A : FwrA) (hA : FwrFacts k A) (Q :
   iintro %c' %R' %⟨hcs, h10⟩ Hk Hpc Hte Hce
   have ha0 : R' 10#5 = -1#64 := by
     simp only [h10, RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]; decide
-  ihave Hpriv := fwr_priv_back (procAddr A.j) A.pid A.V P A.M hext.1 $$ Hpriv
+  ihave Hpriv := fwr_priv_backEv (procAddr A.j) A.pid A.V P A.M hext.1 $$ Hpriv
   unfold fwrK
   iapply HΦ $$ %c' %spie %spp %R' %P [] Hk Hpc Hte Hce Href Hpriv [Hbs] [Hst]
   · ipureintro; exact ⟨hcs, hext⟩

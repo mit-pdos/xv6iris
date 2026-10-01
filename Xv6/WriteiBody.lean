@@ -424,7 +424,8 @@ def wiSrcRest (A : WiArgs) (src : BitVec 64) (tot mm : Nat) : IProp GF :=
 theorem writei_src_split (A : WiArgs) (src : BitVec 64) (PI : UPtd) (tot mm : Nat)
     (hle : A.user = false → tot + mm ≤ A.sbs.length) :
     wiSrc (GF := GF) A src PI ⊢
-      (if A.user then procPrivExt (procAddr A.j) A.pidv A.V PI (viewFaulted A.V.upt PI A.M)
+      (if A.user then iprop(∃ kv : Nat, ⌜A.V.ev ≤ kv⌝ ∗
+          procPrivExt (procAddr A.j) A.pidv (A.V.updEv kv) PI (viewFaulted A.V.upt PI A.M))
        else byteBuf (src + BitVec.ofNat 64 tot) A.dqs ((A.sbs.drop tot).take mm)) ∗
       wiSrcRest A src tot mm := by
   unfold wiSrc wiSrcRest
@@ -443,7 +444,7 @@ theorem writei_copy_norm (A : WiArgs) (src : BitVec 64) (tot mm : Nat) (PI : UPt
     (r dst : BitVec 64) (old : List (BitVec 8)) (hold : old.length = mm)
     (hext : A.V.upt.extSz A.V.sz PI) (hle : A.user = false → tot + mm ≤ A.sbs.length) :
     iprop((if A.user then
-        (∃ (P' : UPtd) (bs' : List (BitVec 8)),
+        (∃ (P' : UPtd) (bs' : List (BitVec 8)) (kv' : Nat),
           ⌜PI.extSz A.V.sz P' ∧
             ((r = 0#64 ∧ bs' = umemRead (viewFaulted PI P' (viewFaulted A.V.upt PI A.M))
                 (src + BitVec.ofNat 64 tot).toNat old.length ∧
@@ -453,7 +454,8 @@ theorem writei_copy_norm (A : WiArgs) (src : BitVec 64) (tot mm : Nat) (PI : UPt
                   (src + BitVec.ofNat 64 tot).toNat d ++ old.drop d) ∧
               ∃ e, e < old.length ∧
                 ¬ uvaRmapped PI (src + (BitVec.ofNat 64 tot + BitVec.ofNat 64 e)).toNat))⌝ ∗
-          procPrivExt (procAddr A.j) A.pidv A.V P' (viewFaulted PI P' (viewFaulted A.V.upt PI A.M)) ∗
+          ⌜A.V.ev ≤ kv'⌝ ∗
+          procPrivExt (procAddr A.j) A.pidv (A.V.updEv kv') P' (viewFaulted PI P' (viewFaulted A.V.upt PI A.M)) ∗
           byteBuf dst (DFrac.own 1) bs')
        else ⌜r = 0#64⌝ ∗ byteBuf (src + BitVec.ofNat 64 tot) A.dqs ((A.sbs.drop tot).take mm) ∗
          byteBuf dst (DFrac.own 1) ((A.sbs.drop tot).take mm)) ∗
@@ -483,13 +485,16 @@ theorem writei_copy_norm (A : WiArgs) (src : BitVec 64) (tot mm : Nat) (PI : UPt
       iapply UMemL.byteBuf_join_td src A.dqs A.sbs _ tot mm hl hcl
       iframe
   · simp only [if_true]
-    iintro ⟨⟨%P', %bs', ⟨%hx, %hpost⟩, Hpriv, Hd⟩, -⟩
+    iintro ⟨⟨%P', %bs', %kv, ⟨%hx, %hpost⟩, %hkv, Hpriv, Hd⟩, -⟩
     have e := UMemL.viewFaulted_trans A.M hext.1 hx.1
     rw [e] at hpost
     rcases hpost with ⟨hr, hbs, hnwc⟩ | ⟨hr, ⟨dd, hdd, hbs⟩, hwhy⟩
     · iexists P', bs', true
       rw [← e]
-      iframe Hpriv Hd
+      iframe Hd
+      isplitr [Hpriv]
+      rotate_left 1
+      · iexists kv; iframe Hpriv; ipureintro; exact hkv
       ipureintro
       refine ⟨⟨by rw [hbs, UMemL.umemRead_length, hold], hx, fun h => absurd (hu.symm.trans h)
         (by decide), fun _ _ => ⟨by rw [hbs, hold], by rw [← hold]; exact hnwc⟩, fun _ => hu,
@@ -498,7 +503,10 @@ theorem writei_copy_norm (A : WiArgs) (src : BitVec 64) (tot mm : Nat) (PI : UPt
         fun h => absurd h (by decide)⟩
     · iexists P', bs', false
       rw [← e]
-      iframe Hpriv Hd
+      iframe Hd
+      isplitr [Hpriv]
+      rotate_left 1
+      · iexists kv; iframe Hpriv; ipureintro; exact hkv
       ipureintro
       refine ⟨⟨by rw [hbs, List.length_append, UMemL.umemRead_length, List.length_drop]; omega,
         hx, fun h => absurd (hu.symm.trans h) (by decide), fun _ h => absurd h (by decide),

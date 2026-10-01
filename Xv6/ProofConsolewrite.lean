@@ -39,6 +39,11 @@ so the block is normalised to it at entry (`cw_priv_img`) and back at exit
 (`consOutChain_run`, tied by `cw_at`) for `uartwrite`, and every exit reads
 the caller's cursor off the residue (`consOutChain_cursor`).  The console
 licence payment (`cwPort`, the step-2 interim) is gone.
+
+Permit sweep L1b (Rocq b69bd0fab), a Lean shape: the copy loop's block row carries the block
+at SOME raised count (`∃ kv ≥ V.ev`, the record at `V.updEv kv`) inside
+the row, so the loop/stage statements need not name the count; Rocq threads
+an explicit `k`.  The contract's post is Rocq's (`∀ k' ≥ V.ev`).
 -/
 import Xv6.SpecConsolewrite
 import Xv6.UartConsAcc
@@ -498,14 +503,14 @@ theorem cw_either_copyin (EC : EITHER_COPYIN) (c : CPU) (k' : KCtx) (γl : GName
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
       ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
-      (∃ (P' : UPtd) (bs' : List (BitVec 8)),
+      (∃ (P' : UPtd) (bs' : List (BitVec 8)) (kv : Nat),
         ⌜P.extSz V.sz P' ∧
           ((R' 10#5 = 0#64 ∧ bs' = umemRead (viewFaulted P P' M) (k'.regs 12#5).toNat old.length ∧
               (k'.regs 12#5).toNat + old.length < 2 ^ 64) ∨
            (R' 10#5 = -1#64 ∧ (∃ d, d ≤ old.length ∧
               bs' = umemRead (viewFaulted P P' M) (k'.regs 12#5).toNat d ++ old.drop d) ∧
             ∃ e, e < old.length ∧ ¬ uvaRmapped P (k'.regs 12#5 + BitVec.ofNat 64 e).toNat))⌝ ∗
-        procPrivExt (procAddr j) pid V P' (viewFaulted P P' M) ∗
+        ⌜V.ev ≤ kv⌝ ∗ procPrivExt (procAddr j) pid (V.updEv kv) P' (viewFaulted P P' M) ∗
         byteBuf (k'.regs 10#5) (DFrac.own 1) bs') -∗
       ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
@@ -599,12 +604,13 @@ theorem cwFix_set (k : KCtx) (N : Nat) (R : RegMap) (h : cwFix k N R)
 /-- The caller's continuation (the spec's, named). -/
 def cwPost (k : KCtx) (j : Nat) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
     (n : Int) (Q : Nat → IProp GF) : CPU → IProp GF :=
-  fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd) (i : Nat),
+  fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd) (i : Nat) (k' : Nat),
     ⌜calleeSaved k.regs R' ∧ V.upt.extSz V.sz P' ∧ R' 10#5 = BitVec.ofNat 64 i ∧
       (i : Int) ≤ max 0 n ∧ ((i : Int) < n → writeConsShort V.upt (k.regs 11#5) i n)⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
-    procPrivBareAt curCtx (procAddr j) pid { V with upt := P' } (viewFaulted V.upt P' M) -∗
+    ⌜V.ev ≤ k'⌝ -∗
+    procPrivBareAt curCtx (procAddr j) pid { V.updEv k' with upt := P' } (viewFaulted V.upt P' M) -∗
     Q i -∗ wpLoop cpu')
 
 /-- The whole-function continuation at any hart (the process is real, so the
@@ -668,10 +674,11 @@ theorem cw_epi (c0 cpu : CPU) (k : KCtx) (j : Nat)
     pcIs cpu (KA.«consolewrite» + 0x98#64) ∗
     frame16s1 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    procPrivBareAt curCtx (procAddr j) pid { V with upt := P' } (writerImg V.upt M) ∗ Q i ∗
+    (∃ kv : Nat, ⌜V.ev ≤ kv⌝ ∗
+      procPrivBareAt curCtx (procAddr j) pid { V.updEv kv with upt := P' } (writerImg V.upt M)) ∗ Q i ∗
     wpNext true k.proc c0 (cwPost k j pid V M n Q)
     ⊢ wpLoop (GF := GF) cpu := by
-  iintro ⟨Hk, Hpc, Hframe, Hte, Hce, Hpriv, HQ, Hnext⟩
+  iintro ⟨Hk, Hpc, Hframe, Hte, Hce, ⟨%kv, %hkv, Hpriv⟩, HQ, Hnext⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   k_step_e (wp_s_add cpu _ (KA.«consolewrite» + 0x98#64) true 10#5 0#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
@@ -689,9 +696,9 @@ theorem cw_epi (c0 cpu : CPU) (k : KCtx) (j : Nat)
   k_next_e
   iintro Hk Hpc
   ihave HK := cw_post_at c0 cpu k j pid V M n Q hj hkproc $$ Hnext
-  ihave Hpriv := cw_priv_back curCtx (procAddr j) pid V P' M $$ Hpriv
+  ihave Hpriv := cw_priv_back curCtx (procAddr j) pid (V.updEv kv) P' M $$ Hpriv
   unfold cwPost
-  iapply HK $$ %spie %spp %_ %P' %i [] Hk Hpc Hte Hce Hpriv HQ
+  iapply HK $$ %spie %spp %_ %P' %i %kv [] Hk Hpc Hte Hce %hkv Hpriv HQ
   ipureintro
   refine ⟨?_, hext, ?_, hin, hwhy⟩
   · unfold calleeSaved
@@ -770,7 +777,8 @@ theorem cw_finish (c0 cpu : CPU) (k : KCtx) (j : Nat)
     cwSpare9 (k.regs 2#5) ∗
     byteBuf (k.regs 2#5 + 0xFFFFFFFFFFFFFF80#64) (DFrac.own 1) buf ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    procPrivBareAt curCtx (procAddr j) pid { V with upt := P' } (writerImg V.upt M) ∗ Q i ∗
+    (∃ kv : Nat, ⌜V.ev ≤ kv⌝ ∗
+      procPrivBareAt curCtx (procAddr j) pid { V.updEv kv with upt := P' } (writerImg V.upt M)) ∗ Q i ∗
     wpNext true k.proc c0 (cwPost k j pid V M n Q)
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hra, Hs0, Hs1, Hsp9, Hbuf, Hte, Hce, Hpriv, HQ, Hnext⟩
@@ -799,7 +807,8 @@ def cwLoopInv (cpu : CPU) (k : KCtx) (j : Nat)
     kctx c (((k.withSpie a b).pushed 16).withRegs R) -∗
     pcIs c (KA.«consolewrite» + 0x60#64) -∗
     trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗ consOutChain (genId (hlc := hlc) (GF := GF) + 1) (writerImg V.upt M) (k.regs 11#5) Q i (N - i) -∗
-    procPrivBareAt curCtx (procAddr j) pid { V with upt := P } (writerImg V.upt M) -∗
+    (∃ kv : Nat, ⌜V.ev ≤ kv⌝ ∗
+      procPrivBareAt curCtx (procAddr j) pid { V.updEv kv with upt := P } (writerImg V.upt M)) -∗
     wordPointsTo (k.regs 2#5 + 0xFFFFFFFFFFFFFFF8#64) 8 (DFrac.own 1) (k.regs 1#5) -∗
     wordPointsTo (k.regs 2#5 + 0xFFFFFFFFFFFFFFF0#64) 8 (DFrac.own 1) (k.regs 8#5) -∗
     wordPointsTo (k.regs 2#5 + 0xFFFFFFFFFFFFFFE8#64) 8 (DFrac.own 1) (k.regs 9#5) -∗
@@ -816,7 +825,8 @@ theorem cwLoopInv_elim (cpu : CPU) (k : KCtx) (j : Nat)
       kctx c (((k.withSpie a b).pushed 16).withRegs R) -∗
       pcIs c (KA.«consolewrite» + 0x60#64) -∗
       trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗ consOutChain (genId (hlc := hlc) (GF := GF) + 1) (writerImg V.upt M) (k.regs 11#5) Q i (N - i) -∗
-      procPrivBareAt curCtx (procAddr j) pid { V with upt := P } (writerImg V.upt M) -∗
+      (∃ kv : Nat, ⌜V.ev ≤ kv⌝ ∗
+      procPrivBareAt curCtx (procAddr j) pid { V.updEv kv with upt := P } (writerImg V.upt M)) -∗
       wordPointsTo (k.regs 2#5 + 0xFFFFFFFFFFFFFFF8#64) 8 (DFrac.own 1) (k.regs 1#5) -∗
       wordPointsTo (k.regs 2#5 + 0xFFFFFFFFFFFFFFF0#64) 8 (DFrac.own 1) (k.regs 8#5) -∗
       wordPointsTo (k.regs 2#5 + 0xFFFFFFFFFFFFFFE8#64) 8 (DFrac.own 1) (k.regs 9#5) -∗
@@ -833,7 +843,8 @@ theorem cwLoopInv_intro (cpu : CPU) (k : KCtx) (j : Nat)
       kctx c (((k.withSpie a b).pushed 16).withRegs R) -∗
       pcIs c (KA.«consolewrite» + 0x60#64) -∗
       trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗ consOutChain (genId (hlc := hlc) (GF := GF) + 1) (writerImg V.upt M) (k.regs 11#5) Q i (N - i) -∗
-      procPrivBareAt curCtx (procAddr j) pid { V with upt := P } (writerImg V.upt M) -∗
+      (∃ kv : Nat, ⌜V.ev ≤ kv⌝ ∗
+      procPrivBareAt curCtx (procAddr j) pid { V.updEv kv with upt := P } (writerImg V.upt M)) -∗
       wordPointsTo (k.regs 2#5 + 0xFFFFFFFFFFFFFFF8#64) 8 (DFrac.own 1) (k.regs 1#5) -∗
       wordPointsTo (k.regs 2#5 + 0xFFFFFFFFFFFFFFF0#64) 8 (DFrac.own 1) (k.regs 8#5) -∗
       wordPointsTo (k.regs 2#5 + 0xFFFFFFFFFFFFFFE8#64) 8 (DFrac.own 1) (k.regs 9#5) -∗
@@ -858,7 +869,8 @@ theorem cwLoopInv_use (cpu c : CPU) (k : KCtx) (j : Nat)
     kctx c (((k.withSpie a b).pushed 16).withRegs R) ∗
     pcIs c (KA.«consolewrite» + 0x60#64) ∗
     trapCsrsExt c k.sie ∗ cpuClaimExt c k.sie k.proc ∗ consOutChain (genId (hlc := hlc) (GF := GF) + 1) (writerImg V.upt M) (k.regs 11#5) Q i (N - i) ∗
-    procPrivBareAt curCtx (procAddr j) pid { V with upt := P } (writerImg V.upt M) ∗
+    (∃ kv : Nat, ⌜V.ev ≤ kv⌝ ∗
+      procPrivBareAt curCtx (procAddr j) pid { V.updEv kv with upt := P } (writerImg V.upt M)) ∗
     wordPointsTo (k.regs 2#5 + 0xFFFFFFFFFFFFFFF8#64) 8 (DFrac.own 1) (k.regs 1#5) ∗
     wordPointsTo (k.regs 2#5 + 0xFFFFFFFFFFFFFFF0#64) 8 (DFrac.own 1) (k.regs 8#5) ∗
     wordPointsTo (k.regs 2#5 + 0xFFFFFFFFFFFFFFE8#64) 8 (DFrac.own 1) (k.regs 9#5) ∗
@@ -901,7 +913,8 @@ theorem cw_body (EC : EITHER_COPYIN) (UW : UARTWRITE) (Γ : SchedNames) [ClaimIs
     procsInv Γ ∗ uartPort .uart0 γl γ ∗ isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗
     kallocAvail γk none ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ consOutChain (genId (hlc := hlc) (GF := GF) + 1) (writerImg V.upt M) (k.regs 11#5) Q i (N - i) ∗
-    procPrivBareAt curCtx (procAddr j) pid { V with upt := P } (writerImg V.upt M) ∗
+    (∃ kv : Nat, ⌜V.ev ≤ kv⌝ ∗
+      procPrivBareAt curCtx (procAddr j) pid { V.updEv kv with upt := P } (writerImg V.upt M)) ∗
     wordPointsTo (k.regs 2#5 + 0xFFFFFFFFFFFFFFF8#64) 8 (DFrac.own 1) (k.regs 1#5) ∗
     wordPointsTo (k.regs 2#5 + 0xFFFFFFFFFFFFFFF0#64) 8 (DFrac.own 1) (k.regs 8#5) ∗
     wordPointsTo (k.regs 2#5 + 0xFFFFFFFFFFFFFFE8#64) 8 (DFrac.own 1) (k.regs 9#5) ∗
@@ -948,10 +961,11 @@ theorem cw_body (EC : EITHER_COPYIN) (UW : UARTWRITE) (Γ : SchedNames) [ClaimIs
   have htk : (buf.take nn).length = nn := by rw [List.length_take, hbuf]; omega
   icases (cw_buf_split (k.regs 2#5 + 0xFFFFFFFFFFFFFF80#64) buf nn (by omega)).1 $$ Hbuf
     with ⟨Hb1, Hb2⟩
-  ihave Hpriv := (show procPrivBareAt (GF := GF) curCtx (procAddr j) pid { V with upt := P }
-      (writerImg V.upt M) ⊢ procPrivExt (procAddr j) pid V P (writerImg V.upt M) from by
+  icases Hpriv with ⟨%kv, %hkv, Hpriv⟩
+  ihave Hpriv := (show procPrivBareAt (GF := GF) curCtx (procAddr j) pid { V.updEv kv with upt := P }
+      (writerImg V.upt M) ⊢ procPrivExt (procAddr j) pid (V.updEv kv) P (writerImg V.upt M) from by
     unfold procPrivBareAt procPrivExt procFieldsNoOfile; iintro H; iexact H) $$ Hpriv
-  iapply (cw_either_copyin EC cpu _ γkl γk j pid V P (writerImg V.upt M) (buf.take nn)
+  iapply (cw_either_copyin EC cpu _ γkl γk j pid (V.updEv kv) P (writerImg V.upt M) (buf.take nn)
       hj ?hpC ?hnC ?hKC ?hlkC ?huC ?hlnC ?hl'C) $$ [- $Hk $Hpc $Hpriv]
   rotate_right 1
   k_norm_g [cwj_4a]
@@ -965,7 +979,8 @@ theorem cw_body (EC : EITHER_COPYIN) (UW : UARTWRITE) (Γ : SchedNames) [ClaimIs
   case hlnC => k_norm_g; try rw [htk]
   case hl'C => rw [htk]; omega
   k_next_e
-  iintro %spieC %sppC %RC %_ Hk Hpc ⟨%P2, %bs', %hpost, Hpriv, Hb1⟩ %hcsC
+  iintro %spieC %sppC %RC %_ Hk Hpc ⟨%P2, %bs', %kc, %hpost, %hkc, Hpriv, Hb1⟩ %hcsC
+  rw [ProcPriv.updEv_updEv]
   k_norm_g [cw_ctx_collapse, cw_spie_pushed]
   obtain ⟨hext2, hpost⟩ := hpost
   have hbs' : bs'.length = nn := by
@@ -989,11 +1004,15 @@ theorem cw_body (EC : EITHER_COPYIN) (UW : UARTWRITE) (Γ : SchedNames) [ClaimIs
     exact h
   have hfix2 := writerImg_fault V.upt P P2 M hext.1 hext2.1
   rw [hfix2] at hpost
-  ihave Hpriv := (show procPrivExt (GF := GF) (procAddr j) pid V P2
+  ihave Hpriv := (show procPrivExt (GF := GF) (procAddr j) pid (V.updEv kc) P2
       (viewFaulted P P2 (writerImg V.upt M)) ⊢
-      procPrivBareAt curCtx (procAddr j) pid { V with upt := P2 } (writerImg V.upt M) from by
+      (∃ kv : Nat, ⌜V.ev ≤ kv⌝ ∗
+        procPrivBareAt curCtx (procAddr j) pid { V.updEv kv with upt := P2 } (writerImg V.upt M)) from by
     rw [hfix2]
-    unfold procPrivBareAt procPrivExt procFieldsNoOfile; iintro H; iexact H) $$ Hpriv
+    unfold procPrivBareAt procPrivExt procFieldsNoOfile; iintro H; iexists kc
+    isplitl []
+    · ipureintro; exact Nat.le_trans hkv hkc
+    · iexact H) $$ Hpriv
   rcases hpost with ⟨hr0, hbsE, hnwC⟩ | ⟨hr1, -, hwhyC⟩
   case inr =>
     -- the copy faulted: `beq a0,s8` taken, restore `s2..s10` at `+0x86`, return `i`
@@ -1247,6 +1266,13 @@ theorem consolewrite_proof (EC : EITHER_COPYIN) (UW : UARTWRITE) : CONSOLEWRITE 
   · unfold cwPost; iexact HΦ
   ihave Hpriv := pw_bare_to_ext curCtx (procAddr j) pid V M $$ Hpriv
   ihave Hpriv := cw_priv_img curCtx (procAddr j) pid V M $$ Hpriv
+  ihave Hpriv : (∃ kv : Nat, ⌜V.ev ≤ kv⌝ ∗
+      procPrivBareAt curCtx (procAddr j) pid { V.updEv kv with upt := V.upt } (writerImg V.upt M))
+    $$ [Hpriv]
+  · iexists V.ev
+    isplitl []
+    · ipureintro; exact Nat.le_refl _
+    · iexact Hpriv
   -- the prologue
   iapply (wp_prologue16s1_gen cpu k KA.«consolewrite» hK16)
   k_code (text_instr _ _ _ _ rfl rfl) Htext

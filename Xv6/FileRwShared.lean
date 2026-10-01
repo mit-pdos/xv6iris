@@ -143,6 +143,23 @@ theorem filerw_priv_pid (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P : U
   iframe
   ipureintro; exact hf
 
+/-- ...at the block's raised event count (`EitherDefs.procPrivExtEv`,
+permit sweep L1b). -/
+theorem filerw_priv_pidEv (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P : UPtd)
+    (M : Nat → List (BitVec 8)) :
+    procPrivExtEv (GF := GF) pa pid V P M ⊢
+      wordPointsTo (pPid pa) 4 pidPriv pid ∗
+      (wordPointsTo (pPid pa) 4 pidPriv pid -∗ procPrivExtEv pa pid V P M) := by
+  unfold procPrivExtEv
+  iintro ⟨%kv, %hkv, H⟩
+  icases filerw_priv_pid pa pid (V.updEv kv) P M $$ H with ⟨Hp, Hb⟩
+  iframe Hp
+  iintro Hp
+  iexists kv
+  isplitl []
+  · ipureintro; exact hkv
+  · iapply Hb $$ Hp
+
 end Block
 
 /-- **The contracts' block** (the core, Rocq `proc_priv_core`) at the

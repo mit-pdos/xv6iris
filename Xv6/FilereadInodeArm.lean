@@ -164,7 +164,7 @@ theorem frd_arm_inode (IL : ILOCK) (RD : READI) (IU : IUNLOCK) (Γ : SchedNames)
   -- +0x54 .. +0x5c : iunlock and the lazy restores
   ihave Hlk : frdLk ik s g lo inum γisl pid $$ [Hsl Hdep Hdev Hin Hval Hfrz]
   · unfold frdLk; iframe
-  icases filerw_priv_pid (procAddr j) pid V P' M' $$ Hpriv with ⟨Hpid, Hpback⟩
+  icases filerw_priv_pidEv (procAddr j) pid V P' M' $$ Hpriv with ⟨Hpid, Hpback⟩
   ihave Hpid : wordPointsTo (pPid k.proc) 4 pidPriv pid $$ [Hpid]
   · rw [hproc]; iexact Hpid
   iapply (frd_seg_unlock IU Γ cpu k spie2 spp2 R2 fk ik q C.ip s g lo tl inum dn bm γil γisl pid a0
@@ -183,7 +183,7 @@ theorem frd_arm_inode (IL : ILOCK) (RD : READI) (IU : IUNLOCK) (Γ : SchedNames)
   iapply (frd_tail cpu k spie3 spp3 R3 a0 (k.regs 9#5) (k.regs 19#5) hK6 hr3)
   iframe Hk Hpc Hframe Hte Hce
   iintro %c' %R' %⟨hcs, h10'⟩ Hk Hpc Hte Hce
-  icases frd_pageLen (procAddr j) pid V P' M' $$ Hpriv with ⟨%hpl, Hpriv⟩
+  icases frd_pageLenEv (procAddr j) pid V P' M' $$ Hpriv with ⟨%hpl, Hpriv⟩
   have hclamp := rdClamp_le dn.diSize v.toNat n.toNat
   have hr10 : R' 10#5 = BitVec.ofNat 64 tot ∨ R' 10#5 = -1#64 := by
     rw [h10']

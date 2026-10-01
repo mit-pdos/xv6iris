@@ -21,6 +21,10 @@ epilogue `+0xf4 .. +0x100` restores the eager five and pops.
    callee-saved registers are one bundle `fwrRegs` (filestat's `fstatRegs`
    shape).
 3. Names carry the `fwr` prefix (`fw_` is FsWords' / freewalk's).
+4. Permit sweep L1b (Rocq b69bd0fab): the loop and its stages carry the
+   block at SOME raised count (`EitherDefs.procPrivExtEv`, `∃ kv ≥ V.ev`;
+   `fwr_priv_congrEv` / `fwr_priv_backEv`), so their statements need not
+   name the count (Rocq threads it explicitly).
 -/
 import MachCSL.WpSmodeFrame12
 import Xv6.UMemImg
@@ -402,6 +406,18 @@ theorem fwr_priv_congr (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P : UP
   · iapply procPtAt_congr P M M' h $$ Hpt
   · ipureintro; exact hlz
 
+/-- ...at the block's raised event count (permit sweep L1b). -/
+theorem fwr_priv_congrEv (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P : UPtd)
+    (M M' : Nat → List (BitVec 8))
+    (h : ∀ kp w, Iris.Std.PartialMap.get? P.um kp = some w → M kp = M' kp) :
+    procPrivExtEv (GF := GF) pa pid V P M ⊢ procPrivExtEv pa pid V P M' := by
+  unfold procPrivExtEv
+  iintro ⟨%kv, %hkv, H⟩
+  iexists kv
+  isplitl []
+  · ipureintro; exact hkv
+  · iapply fwr_priv_congr pa pid (V.updEv kv) P M M' h $$ H
+
 /-- THE ENTRY NORMALISATION: the block's view read at the writer's image
 (free: `umPages` owns only the mapped pages). -/
 theorem fwr_priv_img (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) :
@@ -421,7 +437,21 @@ theorem fwr_priv_back (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P' : UP
   | some w' => simp
   | none => simp [hk]
 
+
+/-- ...at the block's raised event count (permit sweep L1b). -/
+theorem fwr_priv_backEv (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P' : UPtd)
+    (M : Nat → List (BitVec 8)) (hext : V.upt.ext P') :
+    procPrivExtEv (GF := GF) pa pid V P' (writerImg V.upt M) ⊢
+      procPrivExtEv pa pid V P' (viewFaulted V.upt P' M) := by
+  unfold procPrivExtEv
+  iintro ⟨%kv, %hkv, H⟩
+  iexists kv
+  isplitl []
+  · ipureintro; exact hkv
+  · iapply fwr_priv_back pa pid (V.updEv kv) P' M hext $$ H
+
 end Block
+
 
 /-! ## 6.  The chunk's bytes (the content seam: SpecFilewrite deviations 4-5) -/
 

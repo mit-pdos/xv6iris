@@ -47,6 +47,9 @@ arm.
    a fixed width (`bytes_own`); the Lean `SpecFetchstr.fetchstrRet` failure
    arm must say `bs.length = old.length` (the coordinator-side edit reported
    with this file; `ProofFetchstr` has the fact in hand from copyinstr).
+5. Permit sweep L1b: argstr hands the block back at a raised count, and
+   `sys_chdir_fetched` runs at the raised record (SysChdirFrame
+   deviation 4).
 -/
 import Xv6.SysChdirTails
 import Xv6.FsAbsOpenFire
@@ -553,7 +556,7 @@ theorem sys_chdir_args (AS : ARGSTR) (NI : NAMEI_ERA) (IL : ILOCK) (IU : IUNLOCK
   k_step_e (wp_s_jal cpu _ (KA.«sys_chdir» + 0x1e#64) false 2086124#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_chdir_br_argstr]
   iintro Hk Hpc
-  icases sysfile_blk_bare _ _ _ _ _ $$ Hblk with ⟨Hbare, Hclose⟩
+  icases sysfile_blk_bare_ev _ _ _ _ _ $$ Hblk with ⟨Hbare, Hclose⟩
   ihave Hbuf := (show byteBuf (GF := GF) (sysChdirBuf (k.regs 2#5)) (DFrac.own 1) old ⊢
     byteBuf (k.regs 2#5 + 18446744073709551456#64) (DFrac.own 1) old from .rfl) $$ Hbuf
   iapply (sysfile_argstr AS Γ cpu _ k.sie (by k_norm_g) (procAddr A.j) (by k_norm_g; exact hproc)
@@ -568,16 +571,29 @@ theorem sys_chdir_args (AS : ARGSTR) (NI : NAMEI_ERA) (IL : ILOCK) (IU : IUNLOCK
   case gn => k_norm_g; omega
   case gK => k_norm_g; exact hKas
   case gmx => k_norm_g [hold]
-  iintro %cpu %spie1 %spp1 %R1 %P2 %bs %⟨hcs1, hext, hret⟩ Hk Hpc Hte Hce Hbare Hbuf
+  iintro %cpu %spie1 %spp1 %R1 %P2 %bs %kv %⟨hcs1, hext, hret⟩ Hk Hpc Hte Hce %hkv Hbare Hbuf
   k_norm_g [sys_chdir_ret_22, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   ihave Hbuf := (show byteBuf (GF := GF) (k.regs 2#5 + 18446744073709551456#64) (DFrac.own 1) bs ⊢
     byteBuf (sysChdirBuf (k.regs 2#5)) (DFrac.own 1) bs from .rfl) $$ Hbuf
-  ihave Hblk := Hclose $$ %P2 %(viewFaulted A.V.upt P2 A.M) Hbare
+  ihave Hblk := Hclose $$ %P2 %(viewFaulted A.V.upt P2 A.M) %kv Hbare
+  -- argstr lent the block's counter (permit sweep L1b): the rest of the run
+  -- is at the record it came back at (SysChdirFrame deviation 4)
+  ihave Hblk := (show procPrivFd (GF := GF) A.γ (procAddr A.j) A.pid { A.V.updEv kv with upt := P2 }
+      (viewFaulted A.V.upt P2 A.M) ⊢
+    procPrivFd (A.raise kv).γ (procAddr (A.raise kv).j) (A.raise kv).pid (sysChdirV1 (A.raise kv) P2)
+      (sysChdirM1 (A.raise kv) P2) from .rfl) $$ Hblk
+  ihave HΦ : (∀ c : CPU, sysChdirPostA k (A.raise kv) c) $$ [HΦ]
+  · iintro %c
+    ispecialize HΦ $$ %c
+    iapply (sysChdirK_raise k A.γ (procAddr A.j) A.pid A.V A.M A.P A.Pmiss A.Fo c kv hkv) $$ HΦ
+  ihave Hau := (show chdirAuPre (hlc := hlc) (GF := GF) (fsGammaL fscFs) fscFs A.V.cwi A.P A.Pmiss A.Fo ⊢
+    chdirAuPre (hlc := hlc) (fsGammaL fscFs) fscFs (A.raise kv).V.cwi (A.raise kv).P (A.raise kv).Pmiss
+      (A.raise kv).Fo from .rfl) $$ Hau
   have hp1 : sysChdirPins k R1 (k.regs 9#5) (procAddr A.j) := by
     refine sysChdirPins_cs k _ R1 _ _ ?_ hcs1
     repeat (refine sysChdirPins_set _ _ _ _ _ _ ?_ (by decide))
     exact hpins
-  iapply (sys_chdir_fetched NI IL IU IP IUP EO Γ cpu k A P2 spie1 spp1 R1 w₃ v old bs hj hproc hK
+  iapply (sys_chdir_fetched NI IL IU IP IUP EO Γ cpu k (A.raise kv) P2 spie1 spp1 R1 w₃ v old bs hj hproc hK
       hnoff htier hct hp1 hal hext hold hret)
     $$ [$Hk $Hpc $Hcells $Hbuf $Hte $Hce $Henv $Hblk $HΦ $Hbs $Hir $Hop $Hau]
 

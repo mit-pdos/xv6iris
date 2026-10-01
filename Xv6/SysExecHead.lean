@@ -38,6 +38,9 @@ Three lemmas, one per call site (each a few seconds):
    `argPathOf (sysExecIm A) A.v0.toNat pl` (`ArgPath.argPathOf_umemStr`) and
    `pl.length < 128` (`UMemL.umemStr_nul`); its per-byte path rows are
    `sysExecPathBuf` (`SysfileCalls.sysfile_buf_split`).
+5. Permit sweep L1b: argstr hands the block back at a raised count `kv`;
+   both ways out carry it (`sysExecV2 A P' kv`, `⌜A.V.ev ≤ kv⌝`,
+   `SysExecParts` deviation 9; Rocq's `kh`).
 
 Imports only the shared vocabulary.
 -/
@@ -67,17 +70,18 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 
 /-- THE HEAD'S TWO WAYS OUT (`sysExecHeadBody`'s `∧`, verbatim). -/
 def sysExecHeadOuts (k : KCtx) (A : SysExecArgs) : IProp GF :=
-  iprop((∀ (c' : CPU) (spie spp : Bool) (R' : RegMap) (P' : UPtd),
-        ⌜calleeSaved k.regs R' ∧ R' 10#5 = 0xFFFFFFFFFFFFFFFF#64 ∧ A.V.upt.extSz A.V.sz P'⌝ -∗
+  iprop((∀ (c' : CPU) (spie spp : Bool) (R' : RegMap) (P' : UPtd) (kv : Nat),
+        ⌜calleeSaved k.regs R' ∧ R' 10#5 = 0xFFFFFFFFFFFFFFFF#64 ∧ A.V.upt.extSz A.V.sz P' ∧
+          A.V.ev ≤ kv⌝ -∗
         kctx c' ((k.withSpie spie spp).withRegs R') -∗ pcIs c' (jumpPc (k.regs 1#5)) -∗
         trapCsrsExt c' k.sie -∗ cpuClaimExt c' k.sie k.proc -∗
-        procPrivFd A.γ (procAddr A.j) A.pid (sysExecV2 A P') (sysExecM2 A P') -∗ wpLoop c') ∧
-     (∀ (c' : CPU) (spie spp : Bool) (R : RegMap) (P' : UPtd) (pl rest : List (BitVec 8)),
-        ⌜sysExecPinsE k R ∧ A.V.upt.extSz A.V.sz P' ∧ pl.length < 128 ∧
+        procPrivFd A.γ (procAddr A.j) A.pid (sysExecV2 A P' kv) (sysExecM2 A P') -∗ wpLoop c') ∧
+     (∀ (c' : CPU) (spie spp : Bool) (R : RegMap) (P' : UPtd) (kv : Nat) (pl rest : List (BitVec 8)),
+        ⌜sysExecPinsE k R ∧ A.V.upt.extSz A.V.sz P' ∧ A.V.ev ≤ kv ∧ pl.length < 128 ∧
           argPathOf (sysExecIm A) A.v0.toNat pl ∧ (k.regs 2#5).toNat % 8 = 0⌝ -∗
         kctx c' (((k.withSpie spie spp).pushed 60).withRegs R) -∗ pcIs c' (sysExecAddr + 0x28#64) -∗
         trapCsrsExt c' k.sie -∗ cpuClaimExt c' k.sie k.proc -∗
-        procPrivFd A.γ (procAddr A.j) A.pid (sysExecV2 A P') (sysExecM2 A P') -∗
+        procPrivFd A.γ (procAddr A.j) A.pid (sysExecV2 A P' kv) (sysExecM2 A P') -∗
         sysExecRaS0 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) -∗ sysExecSpillsFree (k.regs 2#5) -∗
         sysExecSlot10 (k.regs 2#5) -∗ sysExecPathBuf (k.regs 2#5) pl rest -∗
         sysfileAny (sysExecArgv (k.regs 2#5)) 256 -∗
@@ -99,12 +103,13 @@ a0,-1`, `bltz a5,+0x104`.  argstr's -1 goes to THE JOIN POINT
 length falls through to +0x028 with the path read (`argPathOf` at the
 entry image) and cut at its NUL (`sysExecPathBuf`). -/
 theorem sys_exec_head_ret (k : KCtx) (A : SysExecArgs) (hS : SysExecStatic k A) (c : CPU)
-    (spie spp : Bool) (R : RegMap) (P' : UPtd) (old bs : List (BitVec 8))
+    (spie spp : Bool) (R : RegMap) (P' : UPtd) (kv : Nat) (old bs : List (BitVec 8))
     (hpins : sysExecPinsE k R) (hal : (k.regs 2#5).toNat % 8 = 0) (hext : A.V.upt.extSz A.V.sz P')
+    (hkv : A.V.ev ≤ kv)
     (hold : old.length = 128) (hret : fetchstrRet (sysExecIm A) A.v0.toNat old bs (R 10#5)) :
     kctx c (((k.withSpie spie spp).pushed 60).withRegs R) ∗ pcIs c (KA.«sys_exec» + 0x20#64) ∗
     trapCsrsExt c k.sie ∗ cpuClaimExt c k.sie k.proc ∗
-    procPrivFd A.γ (procAddr A.j) A.pid (sysExecV2 A P') (sysExecM2 A P') ∗
+    procPrivFd A.γ (procAddr A.j) A.pid (sysExecV2 A P' kv) (sysExecM2 A P') ∗
     sysExecRaS0 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) ∗ sysExecSpillsFree (k.regs 2#5) ∗
     sysExecSlot10 (k.regs 2#5) ∗ byteBuf (sysExecPath (k.regs 2#5)) (DFrac.own 1) bs ∗
     sysfileAny (sysExecArgv (k.regs 2#5)) 256 ∗
@@ -141,10 +146,10 @@ theorem sys_exec_head_ret (k : KCtx) (A : SysExecArgs) (hS : SysExecStatic k A) 
     iintro Hk Hpc
     icases HO with ⟨-, HO⟩
     icases sysfile_buf_split _ pl'' _ $$ Hbuf with ⟨Hp, Hrest⟩
-    iapply HO $$ %cpu %spie %spp %_ %P' %pl'' %(old.drop (pl''.length + 1)) [] Hk Hpc Hte Hce Hblk
-      Hrs Hsp H10 [Hp Hrest] Hargv H59 H60
+    iapply HO $$ %cpu %spie %spp %_ %P' %kv %pl'' %(old.drop (pl''.length + 1)) [] Hk Hpc Hte Hce
+      Hblk Hrs Hsp H10 [Hp Hrest] Hargv H59 H60
     · ipureintro
-      refine ⟨?_, hext, hlt, hof, hal⟩
+      refine ⟨?_, hext, hkv, hlt, hof, hal⟩
       repeat (refine sysExecPins_set _ _ _ _ _ _ _ _ _ _ _ ?_ (by decide))
       exact hpins
     · unfold sysExecPathBuf
@@ -171,9 +176,9 @@ theorem sys_exec_head_ret (k : KCtx) (A : SysExecArgs) (hS : SysExecStatic k A) 
     iapply hx
     iframe
     iintro %c' %R' %⟨hcs, ha0⟩ Hk Hpc Hte Hce
-    iapply HO $$ %c' %spie %spp %R' %P' [] Hk Hpc Hte Hce Hblk
+    iapply HO $$ %c' %spie %spp %R' %P' %kv [] Hk Hpc Hte Hce Hblk
     ipureintro
-    refine ⟨hcs, ?_, hext⟩
+    refine ⟨hcs, ?_, hext, hkv⟩
     rw [ha0]
     simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
 
@@ -218,7 +223,7 @@ theorem sys_exec_head_str (AS : ARGSTR) (Γ : SchedNames) (k : KCtx) (A : SysExe
   k_step_e (wp_s_jal cpu _ (KA.«sys_exec» + 0x1c#64) false 2085998#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_exec_head_br_argstr]
   iintro Hk Hpc
-  icases sysfile_blk_bare _ _ _ _ _ $$ Hblk with ⟨Hbare, Hclose⟩
+  icases sysfile_blk_bare_ev _ _ _ _ _ $$ Hblk with ⟨Hbare, Hclose⟩
   ihave Hbuf := (show byteBuf (GF := GF) (sysExecPath (k.regs 2#5)) (DFrac.own 1) old ⊢
     byteBuf (k.regs 2#5 + 0xFFFFFFFFFFFFFF30#64) (DFrac.own 1) old from .rfl) $$ Hbuf
   iapply (sysfile_argstr AS Γ cpu _ k.sie (by k_norm_g) k.proc (by k_norm_g)
@@ -234,16 +239,16 @@ theorem sys_exec_head_str (AS : ARGSTR) (Γ : SchedNames) (k : KCtx) (A : SysExe
   case gn => k_norm_g; rw [hS.hnoff]
   case gK => k_norm_g; exact hKas
   case gmx => k_norm_g [hold]
-  iintro %cpu %spie1 %spp1 %R1 %P2 %bs %⟨hcs1, hext, hret⟩ Hk Hpc Hte Hce Hbare Hbuf
+  iintro %cpu %spie1 %spp1 %R1 %P2 %bs %kv %⟨hcs1, hext, hret⟩ Hk Hpc Hte Hce %hkv Hbare Hbuf
   k_norm_g [sys_exec_head_ret_20, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed, MachCSL.KCtx.withSpie_withRegs]
   ihave Hbuf := (show byteBuf (GF := GF) (k.regs 2#5 + 0xFFFFFFFFFFFFFF30#64) (DFrac.own 1) bs ⊢
     byteBuf (sysExecPath (k.regs 2#5)) (DFrac.own 1) bs from .rfl) $$ Hbuf
-  ihave Hblk := Hclose $$ %P2 %(viewFaulted A.V.upt P2 A.M) Hbare
+  ihave Hblk := Hclose $$ %P2 %(viewFaulted A.V.upt P2 A.M) %kv Hbare
   have hp1 : sysExecPinsE k R1 := by
     refine sysExecPins_cs k _ R1 _ _ _ _ _ _ _ ?_ hcs1
     repeat (refine sysExecPins_set _ _ _ _ _ _ _ _ _ _ _ ?_ (by decide))
     exact hpins
-  iapply (sys_exec_head_ret k A hS cpu spie1 spp1 R1 P2 old bs hp1 hal hext hold hret)
+  iapply (sys_exec_head_ret k A hS cpu spie1 spp1 R1 P2 kv old bs hp1 hal hext hkv hold hret)
     $$ [$Hk $Hpc $Hte $Hce $Hblk $Hrs $Hsp $H10 $Hbuf $Hargv $H59 $H60 $HO]
 
 

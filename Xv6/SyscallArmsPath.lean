@@ -49,6 +49,11 @@ channel: the law's out-wand at the entry's receipt).
    (Rocq `proc_priv_frags_least`, not in the landed Lean `FdTable` --
    recommended move: FdTable / ProcPrivAcc, where dup's and pipe's arms can
    share it).
+5. Permit sweep L1b: the six path entries hand the block back at argstr's
+   raised count (`∀ k' ≥ V.ev`, the record `{ V.updEv k' with upt := P' }`);
+   each arm reads its rows at that record (`syscPath_rows`' field equalities
+   are `rfl` through `updEv`, and `syscPath_openFdOk` takes the count) -- no
+   row reads the count.
 
 Imports only `SyscallRet` (which re-exports the dispatch files and every
 entry Spec).
@@ -334,9 +339,9 @@ theorem syscall_arm_chdir (SC : SYSCHDIR) (hdep : SyscDepChdir (hlc := hlc) (GF 
   iapply wpNext_intro_pin
   iintro %c %_
   unfold sysChdirK
-  iintro %spie2 %spp2 %R2 %P' %hcs %hext Hk Hpc Hte Hce Hbs Hir2 Harms
+  iintro %spie2 %spp2 %R2 %P' %k' %hcs %hext %hk' Hk Hpc Hte Hce Hbs Hir2 Harms
   icases chdirArms_split (hlc := hlc) (fsGammaL fscFs) fscFs γ (procAddr j) pid V.cwi P Pmiss Fo
-    { V with upt := P' } (viewFaulted V.upt P' M) (R2 10#5) rfl $$ Harms with
+    { V.updEv k' with upt := P' } (viewFaulted V.upt P' M) (R2 10#5) rfl $$ Harms with
     ⟨%V1, %hdisj, Hpriv, Hrc⟩
   ihave Hir := (show irefSlots (GF := GF) 2 ∗ irefSlots 2 ⊢ irefSlots IREFSPARE from
     irefSlots_combine 2 2) $$ [Hir2 Hirk]
@@ -430,7 +435,7 @@ theorem syscall_arm_unlink (SU : SYSUNLINK) (hdep : SyscDepUnlink (hlc := hlc) (
   iapply wpNext_intro_pin
   iintro %c %_
   unfold sysUnlinkPost
-  iintro %spie2 %spp2 %R2 %P' %hcs %hext Hk Hpc Hte Hce Hbs Hir2 Hpriv Harms
+  iintro %spie2 %spp2 %R2 %P' %k' %hcs %hext %hk' Hk Hpc Hte Hce Hbs Hir2 Hpriv Harms
   ihave Hir := (show irefSlots (GF := GF) sysUnlinkSlots ∗ irefSlots 2 ⊢ irefSlots IREFSPARE from
     irefSlots_combine 2 2) $$ [Hir2 Hirk]
   · iframe
@@ -441,15 +446,15 @@ theorem syscall_arm_unlink (SU : SYSUNLINK) (hdep : SyscDepUnlink (hlc := hlc) (
   k_norm_g [hra, syscallRet_jumpPc, hww, hpsw]
   k_norm_g at hcs
   have hpins2 := syscPins_calleeSaved k R R2 hpins hcs
-  have hs2' : R2 18#5 = pageAddr ({ V with upt := P' } : ProcPriv).upt.tfp := by
+  have hs2' : R2 18#5 = pageAddr ({ V.updEv k' with upt := P' } : ProcPriv).upt.tfp := by
     rw [hcs.2.2.2.1.trans hs2]; exact congrArg pageAddr hext.1.2.1.symm
-  have hrows := syscPath_rows V M sts sts cs pid P' { V with upt := P' } (R2 10#5) 18 hn
+  have hrows := syscPath_rows V M sts sts cs pid P' { V.updEv k' with upt := P' } (R2 10#5) 18 hn
     (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide)
     (by decide) hl hext rfl rfl rfl rfl rfl rfl rfl rfl (Or.inr rfl)
     (syscFdOk_refl_at V _ sts 18 hn (by decide) (by decide) (by decide) (by decide))
-  have ha0 := syscPath_a0 V { V with upt := P' } (R2 10#5) hl rfl
+  have ha0 := syscPath_a0 V { V.updEv k' with upt := P' } (R2 10#5) hl rfl
   unfold syscallRet syscallAddr at *
-  iapply (syscall_ret_tail PT Γ c0 c k spie2 spp2 R2 γ j pid V M sts gn cs ip f { V with upt := P' }
+  iapply (syscall_ret_tail PT Γ c0 c k spie2 spp2 R2 γ j pid V M sts gn cs ip f { V.updEv k' with upt := P' }
     (viewFaulted V.upt P' M) sts cs hj hproc hK htier hpins2 hs2' hrows)
   iframe Hk Hpc Hframe Hte Hce Hbs Hip Hfd Hir Henv Hpriv Hfr Hch Hnext
   isplitr
@@ -508,7 +513,7 @@ theorem syscall_arm_link (SL : SYSLINK) (hdep : SyscDepLink (hlc := hlc) (GF := 
   iapply wpNext_intro_pin
   iintro %c %_
   unfold sysLinkPost
-  iintro %spie2 %spp2 %R2 %P' %hcs %hext Hk Hpc Hte Hce Hbs Hir2 Hpriv %- Harms
+  iintro %spie2 %spp2 %R2 %P' %k' %hcs %hext %hk' Hk Hpc Hte Hce Hbs Hir2 Hpriv %- Harms
   ihave Hir := (show irefSlots (GF := GF) sysLinkIrefs ∗ irefSlots 1 ⊢ irefSlots IREFSPARE from
     irefSlots_combine 3 1) $$ [Hir2 Hirk]
   · iframe
@@ -519,15 +524,15 @@ theorem syscall_arm_link (SL : SYSLINK) (hdep : SyscDepLink (hlc := hlc) (GF := 
   k_norm_g [hra, syscallRet_jumpPc, hww, hpsw]
   k_norm_g at hcs
   have hpins2 := syscPins_calleeSaved k R R2 hpins hcs
-  have hs2' : R2 18#5 = pageAddr ({ V with upt := P' } : ProcPriv).upt.tfp := by
+  have hs2' : R2 18#5 = pageAddr ({ V.updEv k' with upt := P' } : ProcPriv).upt.tfp := by
     rw [hcs.2.2.2.1.trans hs2]; exact congrArg pageAddr hext.1.2.1.symm
-  have hrows := syscPath_rows V M sts sts cs pid P' { V with upt := P' } (R2 10#5) 19 hn
+  have hrows := syscPath_rows V M sts sts cs pid P' { V.updEv k' with upt := P' } (R2 10#5) 19 hn
     (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide)
     (by decide) hl hext rfl rfl rfl rfl rfl rfl rfl rfl (Or.inr rfl)
     (syscFdOk_refl_at V _ sts 19 hn (by decide) (by decide) (by decide) (by decide))
-  have ha0 := syscPath_a0 V { V with upt := P' } (R2 10#5) hl rfl
+  have ha0 := syscPath_a0 V { V.updEv k' with upt := P' } (R2 10#5) hl rfl
   unfold syscallRet syscallAddr at *
-  iapply (syscall_ret_tail PT Γ c0 c k spie2 spp2 R2 γ j pid V M sts gn cs ip f { V with upt := P' }
+  iapply (syscall_ret_tail PT Γ c0 c k spie2 spp2 R2 γ j pid V M sts gn cs ip f { V.updEv k' with upt := P' }
     (viewFaulted V.upt P' M) sts cs hj hproc hK htier hpins2 hs2' hrows)
   iframe Hk Hpc Hframe Hte Hce Hbs Hip Hfd Hir Henv Hpriv Hfr Hch Hnext
   isplitr
@@ -588,7 +593,7 @@ theorem syscall_arm_mkdir (SM : SYSMKDIR) (hdep : SyscDepMkdir (hlc := hlc) (GF 
   iapply wpNext_intro_pin
   iintro %c %_
   unfold sysMkdirK
-  iintro %spie2 %spp2 %R2 %P' %hcs %hext Hk Hpc Hte Hce Hbs Hir Hpriv %- Harms
+  iintro %spie2 %spp2 %R2 %P' %k' %hcs %hext %hk' Hk Hpc Hte Hce Hbs Hir Hpriv %- Harms
   have hww : ∀ (K : KCtx) (a b c d : Bool), (K.withSpie a b).withSpie c d = K.withSpie c d :=
     fun _ _ _ _ _ => rfl
   have hpsw : ∀ (K : KCtx) (m : Nat) (a b : Bool),
@@ -596,15 +601,15 @@ theorem syscall_arm_mkdir (SM : SYSMKDIR) (hdep : SyscDepMkdir (hlc := hlc) (GF 
   k_norm_g [hra, syscallRet_jumpPc, hww, hpsw]
   k_norm_g at hcs
   have hpins2 := syscPins_calleeSaved k R R2 hpins hcs
-  have hs2' : R2 18#5 = pageAddr ({ V with upt := P' } : ProcPriv).upt.tfp := by
+  have hs2' : R2 18#5 = pageAddr ({ V.updEv k' with upt := P' } : ProcPriv).upt.tfp := by
     rw [hcs.2.2.2.1.trans hs2]; exact congrArg pageAddr hext.1.2.1.symm
-  have hrows := syscPath_rows V M sts sts cs pid P' { V with upt := P' } (R2 10#5) 20 hn
+  have hrows := syscPath_rows V M sts sts cs pid P' { V.updEv k' with upt := P' } (R2 10#5) 20 hn
     (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide)
     (by decide) hl hext rfl rfl rfl rfl rfl rfl rfl rfl (Or.inr rfl)
     (syscFdOk_refl_at V _ sts 20 hn (by decide) (by decide) (by decide) (by decide))
-  have ha0 := syscPath_a0 V { V with upt := P' } (R2 10#5) hl rfl
+  have ha0 := syscPath_a0 V { V.updEv k' with upt := P' } (R2 10#5) hl rfl
   unfold syscallRet syscallAddr at *
-  iapply (syscall_ret_tail PT Γ c0 c k spie2 spp2 R2 γ j pid V M sts gn cs ip f { V with upt := P' }
+  iapply (syscall_ret_tail PT Γ c0 c k spie2 spp2 R2 γ j pid V M sts gn cs ip f { V.updEv k' with upt := P' }
     (viewFaulted V.upt P' M) sts cs hj hproc hK htier hpins2 hs2' hrows)
   iframe Hk Hpc Hframe Hte Hce Hbs Hip Hfd Hir Henv Hpriv Hfr Hch Hnext
   isplitr
@@ -667,7 +672,7 @@ theorem syscall_arm_mknod (SN : SYSMKNOD) (hdep : SyscDepMknod (hlc := hlc) (GF 
   iapply wpNext_intro_pin
   iintro %c %_
   unfold sysMknodK
-  iintro %spie2 %spp2 %R2 %P' %hcs %hext Hk Hpc Hte Hce Hbs Hir Hpriv Harms
+  iintro %spie2 %spp2 %R2 %P' %k' %hcs %hext %hk' Hk Hpc Hte Hce Hbs Hir Hpriv Harms
   have hww : ∀ (K : KCtx) (a b c d : Bool), (K.withSpie a b).withSpie c d = K.withSpie c d :=
     fun _ _ _ _ _ => rfl
   have hpsw : ∀ (K : KCtx) (m : Nat) (a b : Bool),
@@ -675,15 +680,15 @@ theorem syscall_arm_mknod (SN : SYSMKNOD) (hdep : SyscDepMknod (hlc := hlc) (GF 
   k_norm_g [hra, syscallRet_jumpPc, hww, hpsw]
   k_norm_g at hcs
   have hpins2 := syscPins_calleeSaved k R R2 hpins hcs
-  have hs2' : R2 18#5 = pageAddr ({ V with upt := P' } : ProcPriv).upt.tfp := by
+  have hs2' : R2 18#5 = pageAddr ({ V.updEv k' with upt := P' } : ProcPriv).upt.tfp := by
     rw [hcs.2.2.2.1.trans hs2]; exact congrArg pageAddr hext.1.2.1.symm
-  have hrows := syscPath_rows V M sts sts cs pid P' { V with upt := P' } (R2 10#5) 17 hn
+  have hrows := syscPath_rows V M sts sts cs pid P' { V.updEv k' with upt := P' } (R2 10#5) 17 hn
     (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide)
     (by decide) hl hext rfl rfl rfl rfl rfl rfl rfl rfl (Or.inr rfl)
     (syscFdOk_refl_at V _ sts 17 hn (by decide) (by decide) (by decide) (by decide))
-  have ha0 := syscPath_a0 V { V with upt := P' } (R2 10#5) hl rfl
+  have ha0 := syscPath_a0 V { V.updEv k' with upt := P' } (R2 10#5) hl rfl
   unfold syscallRet syscallAddr at *
-  iapply (syscall_ret_tail PT Γ c0 c k spie2 spp2 R2 γ j pid V M sts gn cs ip f { V with upt := P' }
+  iapply (syscall_ret_tail PT Γ c0 c k spie2 spp2 R2 γ j pid V M sts gn cs ip f { V.updEv k' with upt := P' }
     (viewFaulted V.upt P' M) sts cs hj hproc hK htier hpins2 hs2' hrows)
   iframe Hk Hpc Hframe Hte Hce Hbs Hip Hfd Hir Henv Hpriv Hfr Hch Hnext
   isplitr
@@ -746,9 +751,11 @@ theorem syscPath_ofileAgreeKeep (γ : FileNames) (pa : BitVec 64) (pid : BitVec 
 
 /-- **open's descriptor row** (Rocq `sysc_arm_open`'s fdalloc-scan
 conversion): the split's row, read against the block the split returned and
-the fragments at the resume view. -/
-theorem syscPath_openFdOk (V V' : ProcPriv) (P' : UPtd) (sts sts' : List FdState) (r : BitVec 64)
-    (hn : syscNum V = (15 : Int)) (hrow : openSplitRow r { V with upt := P' } V' sts sts')
+the fragments at the resume view (the block at sys_open's raised event
+count, permit sweep L1b: the row does not read it). -/
+theorem syscPath_openFdOk (V V' : ProcPriv) (P' : UPtd) (k' : Nat) (sts sts' : List FdState)
+    (r : BitVec 64)
+    (hn : syscNum V = (15 : Int)) (hrow : openSplitRow r { V.updEv k' with upt := P' } V' sts sts')
     (hag : ∀ (j : Nat) (v : BitVec 64) (st : FdState), V'.ofile[j]? = some v → sts'[j]? = some st →
         (v = 0#64 ∧ st = .closed) ∨ (v ≠ 0#64 ∧ st ≠ .closed)) :
     syscFdOk V r sts sts' := by
@@ -824,10 +831,10 @@ theorem syscall_arm_open (SO : SYSOPEN) (hdep : SyscDepOpen (hlc := hlc) (GF := 
   iapply wpNext_intro_pin
   iintro %c %_
   unfold sysOpenK
-  iintro %spie2 %spp2 %R2 %P' %hcs %hext Hk Hpc Hte Hce Hbs Hir Harms
+  iintro %spie2 %spp2 %R2 %P' %k' %hcs %hext %hk' Hk Hpc Hte Hce Hbs Hir Harms
   icases openArms_split (hlc := hlc) omo (fsGammaL fscFs) fscFs V.cwi γ (procAddr j) pid
     (viewLazy V.upt V.sz M) (tfW V.tf (tfArgIdx 0)).toNat (tfW V.tf (tfArgIdx 1)) P Pmiss Farm Fun
-    Fok Fex Fo Ft sts { V with upt := P' } (viewFaulted V.upt P' M) (R2 10#5) $$ Harms with
+    Fok Fex Fo Ft sts { V.updEv k' with upt := P' } (viewFaulted V.upt P' M) (R2 10#5) $$ Harms with
     ⟨%V1, %sts', %hrow, Hpriv, Hfr, Hfd1, Hrc⟩
   ihave Hfd := (show fdSlot (GF := GF) ∗ fdSlots 3 ⊢ fdSlots FDSPARE from fdSlots_add 1 3) $$
     [Hfd1 Hfdk]
@@ -842,7 +849,7 @@ theorem syscall_arm_open (SO : SYSOPEN) (hdep : SyscDepOpen (hlc := hlc) (GF := 
   icases syscPath_ofileAgreeKeep γ (procAddr j) pid V1 (viewFaulted V.upt P' M) V.fdg hfdg sts' $$
     [Hpriv Hfr] with ⟨%hag, Hpriv, Hfr⟩
   · iframe
-  have hfdrow := syscPath_openFdOk V V1 P' sts sts' (R2 10#5) hn hrow hag
+  have hfdrow := syscPath_openFdOk V V1 P' k' sts sts' (R2 10#5) hn hrow hag
   have hww : ∀ (K : KCtx) (a b c d : Bool), (K.withSpie a b).withSpie c d = K.withSpie c d :=
     fun _ _ _ _ _ => rfl
   have hpsw : ∀ (K : KCtx) (m : Nat) (a b : Bool),

@@ -337,16 +337,20 @@ theorem kxc_c_close (CO : COPYOUT) (PFP : PROC_FREEPAGETABLE) (Γ : SchedNames)
       (k.regs 27#5) ci ∗
     fsFabric (hlc := hlc) Γ A.pd A.pav A.pu ∗
     (∀ c' : CPU, kexecCloser Q QF k A c') ∗
-    (∀ (c : CPU) (spie' spp' : Bool) (R' : RegMap) (P' : UPtd) (Mo : Nat → List (BitVec 8)),
-      kxcAt2a6 k A c spie' spp' R' (k.regs 19#5) (k.regs 20#5) (k.regs 21#5) (k.regs 22#5)
-          (k.regs 23#5) (k.regs 24#5) (k.regs 25#5) (k.regs 26#5) w13 w67 fb ef P' Mo oldsz sz1
-          (k.regs 27#5) ci -∗
-      (∀ c' : CPU, kexecCloser Q QF k A c') -∗ wpLoop c)
+    -- PHASE C's EXIT AT A LATER RECORD (permit sweep L1b): the copyouts took
+    -- the block's counter, so phase D goes on at `{ A with V := V2 }`
+    (∀ V2 : ProcPriv, ⌜evAfter A.V V2⌝ -∗
+      ∀ (c : CPU) (spie' spp' : Bool) (R' : RegMap) (P' : UPtd) (Mo : Nat → List (BitVec 8)),
+      kxcAt2a6 k { A with V := V2 } c spie' spp' R' (k.regs 19#5) (k.regs 20#5) (k.regs 21#5)
+          (k.regs 22#5) (k.regs 23#5) (k.regs 24#5) (k.regs 25#5) (k.regs 26#5) w13 w67 fb ef P' Mo
+          oldsz sz1 (k.regs 27#5) ci -∗
+      (∀ c' : CPU, kexecCloser Q QF k { A with V := V2 } c') -∗ wpLoop c)
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hst, #Hfab, Hcl, HK⟩
   iunfold kxcAt272, kxcCRes, kxcFrameC at Hst
-  icases Hst with ⟨%hR, %hC, %hT, %hI, Hk, Hpc, Hte, Hce, Hirs, Hbs, Hpt, Hpriv, Hbufs, Helf,
-    F1, F2, F3, F4, F5, F6, F7, F8, F9, F10, F11, F12, F13, Fu, Fw, Fp, F64, F65, F66, F67, F68⟩
+  icases Hst with ⟨%hR, %hC, %hT, %hI, Hk, Hpc, Hte, Hce, Hirs, Hbs, Hpt, ⟨%V1, %hV1, Hpriv⟩, Hbufs,
+    Helf, F1, F2, F3, F4, F5, F6, F7, F8, F9, F10, F11, F12, F13, Fu, Fw, Fp, F64, F65, F66, F67, F68⟩
+  ihave Hbufs := (show kxcBufs (GF := GF) k A ⊢ kxcBufs k { A with V := V1 } from .rfl) $$ Hbufs
   obtain ⟨h2, h8, h9, h24, h18, h19, h22, h20, h27, h21⟩ := hR
   obtain ⟨hcle, hc32, havf, hsp⟩ := hC
   obtain ⟨htfp, hbelow, hcov⟩ := hT
@@ -407,8 +411,9 @@ theorem kxc_c_close (CO : COPYOUT) (PFP : PROC_FREEPAGETABLE) (Γ : SchedNames)
         (k.regs 23#5) (k.regs 24#5) (k.regs 25#5) (k.regs 26#5) w13 w67 ci sz1 A.alen ef (by omega) hal hl
       $$ [F1 F2 F3 F4 F5 F6 F7 F8 F9 F10 F11 F12 F13 Fu Fw Fp F64 F65 F66 F67 F68 Helf]
     · unfold kxcFrameC; iframe
-    iapply (kxc_bad_1d6 PFP Γ Q QF cpu k A spie spp _ P Mi sz1 w13 ⟨.argsFit, hfit⟩ hK hnoff ?s2 ?s24
-        ?s22 ?s27 hbelow hcov)
+    ihave Hcl := kexecCloser_after Q QF k A V1 hV1 $$ Hcl
+    iapply (kxc_bad_1d6 PFP Γ Q QF cpu k { A with V := V1 } spie spp _ P Mi sz1 w13 ⟨.argsFit, hfit⟩ hK
+        hnoff ?s2 ?s24 ?s22 ?s27 hbelow hcov)
       $$ [$Hk $Hpc $Hte $Hce $Hfab $Hpt $Hpriv $Hbufs $Hbs $Hirs $Hfr $Hcl]
     case s2 => simp [RegMap.set_apply, h2]
     case s24 => simp [RegMap.set_apply, h18]
@@ -441,12 +446,13 @@ theorem kxc_c_close (CO : COPYOUT) (PFP : PROC_FREEPAGETABLE) (Γ : SchedNames)
         ++ wordToBytes 0#64) ⊢
       byteBuf (kxcUstackBuf (k.regs 2#5)) (DFrac.own 1)
         (kxcVecBytes (fun j => BitVec.ofInt 64 (kxcSp (sz1.toNat : Int) A.alen (j + 1))) ci) from .rfl) $$ Hv
-  -- +0x294  jal copyout
+  -- +0x294  jal copyout, the block's event counter lent to it (permit sweep L1b)
+  icases procPrivFd_evLend A.γ k.proc A.pidv V1 A.M $$ Hpriv with ⟨Hlend, Hpback⟩
   iapply (kxcC_call_copyout Γ CO cpu k A spie spp _ (KA.«kexec» + 0x294#64) 2083378#21 kxcC_br_copyout2
       kxcC_ret_294 P Mi (DFrac.own 1)
       (kxcVecBytes (fun j => BitVec.ofInt 64 (kxcSp (sz1.toNat : Int) A.alen (j + 1))) ci)
-      (kxcUstackBuf (k.regs 2#5)) hK hnoff ?c13 ?c10 ?c11 ?c14 (by rw [kxcVecBytes_length]; omega))
-    $$ [- $Hk $Hpc $Hte $Hce $Hfab $Hpt $Hv]
+      (kxcUstackBuf (k.regs 2#5)) V1.ev hK hnoff ?c13 ?c10 ?c11 ?c14 (by rw [kxcVecBytes_length]; omega))
+    $$ [- $Hk $Hpc $Hte $Hce $Hfab $Hpt $Hv $Hlend]
   case c13 => simp [RegMap.set_apply, kxcUstackBuf]
   case c10 => simp [RegMap.set_apply]
   case c11 => simp only [RegMap.set_apply]; simp; omega
@@ -456,7 +462,12 @@ theorem kxc_c_close (CO : COPYOUT) (PFP : PROC_FREEPAGETABLE) (Γ : SchedNames)
     rw [kxcC_ofInt_8 _ (by omega)]
   isplitr
   · iapply (text_instr _ _ _ _ rfl rfl); iexact Htext
-  iintro %c3 %spie3 %spp3 %R3 %P' %M' %⟨hcs3, hext, hret⟩ Hk Hpc Hte Hce Hv Hpt
+  iintro %c3 %spie3 %spp3 %R3 %P' %M' %⟨hcs3, hext, hret⟩ Hk Hpc Hte Hce ⟨%k1, %hk1, Hlend⟩ Hv Hpt
+  icases Hpback $$ %k1 %hk1 Hlend with ⟨%V2, %hV2, Hpriv⟩
+  have hV12 : evAfter A.V V2 := evAfter_trans hV1 hV2
+  ihave Hcl := kexecCloser_after Q QF k A V2 hV12 $$ Hcl
+  ihave Hbufs := (show kxcBufs (GF := GF) k { A with V := V1 } ⊢ kxcBufs k { A with V := V2 } from .rfl)
+    $$ Hbufs
   let cpu := c3
   k_norm_g
   obtain ⟨d2, d8, d9, d18, d19, d20, d21, d22, d23, d24, d25, d26, d27⟩ := hcs3
@@ -477,7 +488,7 @@ theorem kxc_c_close (CO : COPYOUT) (PFP : PROC_FREEPAGETABLE) (Γ : SchedNames)
         (k.regs 22#5) (k.regs 23#5) (k.regs 24#5) (k.regs 25#5) (k.regs 26#5) w13 w67 ef hal hl
       $$ [F1 F2 F3 F4 F5 F6 F7 F8 F9 F10 F11 F12 F13 Fu Fp F64 F65 F66 F67 F68 Helf]
     · unfold kxcFrameB; iframe
-    iapply (kxc_bad_1d6 PFP Γ Q QF cpu k A spie3 spp3 R3 P' M' sz1 w13 ⟨.noMem, hqf⟩ hK hnoff
+    iapply (kxc_bad_1d6 PFP Γ Q QF cpu k { A with V := V2 } spie3 spp3 R3 P' M' sz1 w13 ⟨.noMem, hqf⟩ hK hnoff
         (by rw [d2, h2]) (by rw [d24]) hroot' (by rw [d27, h27]) (UMemL.umBelow_extSz hbelow hext)
         (LazyFree.lazyFree_extSz hext hcov))
       $$ [$Hk $Hpc $Hte $Hce $Hfab $Hpt $Hpriv $Hbufs $Hbs $Hirs $Hfr $Hcl]
@@ -488,7 +499,8 @@ theorem kxc_c_close (CO : COPYOUT) (PFP : PROC_FREEPAGETABLE) (Γ : SchedNames)
   have hdst := kxcC_toNat_ofInt (kxcSpFinal (sz1.toNat : Int) A.alen ci) hfin0 (by omega)
   obtain ⟨q1, q2, q3, q4, q5, q6, q7⟩ := kxcC_vec_rows (fb := fb) (ef := ef) (afun := A.afun) hdst hsp hfin
     htfp hbelow hcov hstr hzero himg hext hM
-  iapply HK $$ %cpu %spie3 %spp3 %R3 %P' %M' [-Hcl] Hcl
+  obtain ⟨kv2, hkv2, rfl⟩ := hV12
+  iapply HK $$ %(A.V.updEv kv2) %⟨kv2, hkv2, rfl⟩ %cpu %spie3 %spp3 %R3 %P' %M' [-Hcl] Hcl
   unfold kxcAt2a6 kxcDRes kxcFrameBk kxcFrameB
   iframe Hk Hpc Hte Hce Hirs Hbs Hpt Hpriv Hbufs Helf F1 F2 F3 F4 F5 F6 F7 F8 F9 F10 F11 F12 F13 Fu Fp F64
     F65 F66 F67 F68
@@ -535,18 +547,19 @@ theorem kxc_phaseC (MP : MYPROC) (UA : UVMALLOC) (UC : UVMCLEAR) (SL : STRLEN) (
   -- phase C's uvmalloc moved the block's event count (permit sweep L1a): the
   -- rest of the phase runs at the record it came back at
   iintro %V1 %hV1 %c %spie' %spp' %R' %P' %Mo %sz1 %⟨h8192, h38, -, hal, hl⟩ Hs Hcl
-  ihave HK := HK $$ %V1 %hV1
   have hsz1 : 8192 ≤ sz1.toNat ∧ sz1.toNat ≤ 2 ^ 38 := ⟨h8192, h38⟩
-  -- the close, as the continuation both entries share
+  -- the close, as the continuation both entries share; phase D goes on at the
+  -- record the copyouts raised the block to (permit sweep L1b)
   ihave #Hclose : (□ ∀ (c : CPU) (spie' spp' : Bool) (R' : RegMap) (P' : UPtd) (Mo : Nat → List (BitVec 8))
       (ci : Nat),
-      (∀ (c : CPU) (spie' spp' : Bool) (R' : RegMap) (P' : UPtd) (Mo : Nat → List (BitVec 8))
+      (∀ V2 : ProcPriv, ⌜evAfter A.V V2⌝ -∗
+        ∀ (c : CPU) (spie' spp' : Bool) (R' : RegMap) (P' : UPtd) (Mo : Nat → List (BitVec 8))
           (sz1 : BitVec 64) (ci : Nat),
         ⌜8192 ≤ sz1.toNat ∧ (kxcElfBuf (k.regs 2#5)).toNat % 8 = 0 ∧ ef.length = 64⌝ -∗
-        kxcAt2a6 k { A with V := V1 } c spie' spp' R' (k.regs 19#5) (k.regs 20#5) (k.regs 21#5) (k.regs 22#5)
+        kxcAt2a6 k { A with V := V2 } c spie' spp' R' (k.regs 19#5) (k.regs 20#5) (k.regs 21#5) (k.regs 22#5)
             (k.regs 23#5) (k.regs 24#5) (k.regs 25#5) (k.regs 26#5) w13 w67 fb ef P' Mo A.V.sz sz1
             (k.regs 27#5) ci -∗
-        (∀ c' : CPU, kexecCloser Q QF k { A with V := V1 } c') -∗ wpLoop c) -∗
+        (∀ c' : CPU, kexecCloser Q QF k { A with V := V2 } c') -∗ wpLoop c) -∗
       kxcAt272 k { A with V := V1 } c spie' spp' R' (k.regs 19#5) (k.regs 20#5) (k.regs 21#5) (k.regs 22#5)
           (k.regs 23#5) (k.regs 24#5) (k.regs 25#5) (k.regs 26#5) w13 w67 fb ef P' Mo A.V.sz sz1
           (k.regs 27#5) ci -∗
@@ -556,8 +569,8 @@ theorem kxc_phaseC (MP : MYPROC) (UA : UVMALLOC) (UC : UVMCLEAR) (SL : STRLEN) (
     iapply (kxc_c_close CO PFP Γ Q QF c2 k { A with V := V1 } spie2 spp2 R2 w13 w67 fb ef P2 Mo2 A.V.sz sz1 ci2 hqf hqfa hK
         hnoff hsz1 hal hl)
     iframe H272 Hfab Hcl
-    iintro %c3 %spie3 %spp3 %R3 %P3 %Mo3 H2a6 Hcl
-    iapply HK $$ %c3 %spie3 %spp3 %R3 %P3 %Mo3 %sz1 %ci2 [] H2a6 Hcl
+    iintro %V2 %hV2 %c3 %spie3 %spp3 %R3 %P3 %Mo3 H2a6 Hcl
+    iapply HK $$ %V2 %(evAfter_trans hV1 hV2) %c3 %spie3 %spp3 %R3 %P3 %Mo3 %sz1 %ci2 [] H2a6 Hcl
     ipureintro; exact ⟨h8192, hal, hl⟩
   icases Hs with (H21a | H272)
   · icases kxcC_at21a_pure k { A with V := V1 } c spie' spp' R' _ _ _ _ _ _ _ _ w13 w67 fb ef P' Mo A.V.sz sz1 _ 0

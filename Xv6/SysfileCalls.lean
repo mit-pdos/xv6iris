@@ -265,12 +265,13 @@ theorem sysfile_argstr (AS : ARGSTR) (Γ : SchedNames) (cpu : CPU) (k' : KCtx) (
     kctx cpu k' ∗ pcIs cpu KA.«argstr» ∗
     trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗ sysfileEnv (hlc := hlc) Γ ∗
     procPrivBareAt curCtx pa pid V M ∗ byteBuf (k'.regs 11#5) (DFrac.own 1) old ∗
-    (∀ (c : CPU) (spie spp : Bool) (R' : RegMap) (P' : UPtd) (bs : List (BitVec 8)),
+    (∀ (c : CPU) (spie spp : Bool) (R' : RegMap) (P' : UPtd) (bs : List (BitVec 8)) (kv : Nat),
       ⌜calleeSaved k'.regs R' ∧ V.upt.extSz V.sz P' ∧
         fetchstrRet (viewLazy V.upt V.sz M) v.toNat old bs (R' 10#5)⌝ -∗
       kctx c ((k'.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k'.regs 1#5)) -∗
       trapCsrsExt c se -∗ cpuClaimExt c se pj -∗
-      procPrivBareAt curCtx pa pid { V with upt := P' } (viewFaulted V.upt P' M) -∗
+      ⌜V.ev ≤ kv⌝ -∗
+      procPrivBareAt curCtx pa pid { V.updEv kv with upt := P' } (viewFaulted V.upt P' M) -∗
       byteBuf (k'.regs 11#5) (DFrac.own 1) bs -∗ wpLoop c)
     ⊢ wpLoop (GF := GF) cpu := by
   subst hs hpj
@@ -287,11 +288,11 @@ theorem sysfile_argstr (AS : ARGSTR) (Γ : SchedNames) (cpu : CPU) (k' : KCtx) (
   iframe Hk Hpc Hblk Hbuf
   iframe #
   iapply wpNext_intro_pin
-  iintro %c %hpin %spie %spp %R' %- Hk Hpc ⟨%P', %bs, %hf, Hblk, Hbuf⟩ %hcs
+  iintro %c %hpin %spie %spp %R' %- Hk Hpc ⟨%P', %bs, %kv, %hf, %hkv, Hblk, Hbuf⟩ %hcs
   have hpin' : k'.sie = false → c = cpu := fun h => hpin (Or.inl h)
   ihave Hte := trapCsrsExt_move _ _ _ hpin' $$ Hte
   ihave Hce := cpuClaimExt_move _ _ _ _ hpin' $$ Hce
-  iapply HK $$ %c %spie %spp %R' %P' %bs [] Hk Hpc Hte Hce Hblk Hbuf
+  iapply HK $$ %c %spie %spp %R' %P' %bs %kv [] Hk Hpc Hte Hce %hkv Hblk Hbuf
   ipureintro
   exact ⟨hcs, hf.1, hf.2⟩
 
@@ -498,6 +499,23 @@ theorem sysfile_blk_bare (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V 
   iintro ⟨⟨Hb, Hc⟩, Ho⟩
   iframe Hb
   iintro %P' %M' Hb
+  iframe
+
+/-- ...and closing at ANY count (permit sweep L1b, Rocq
+`proc_priv_bare_acc_ev`): argstr lends the bare block's counter to
+copyinstr and hands it back raised; the cwd reference, the generation row
+and the descriptor array do not mention `ev`. -/
+theorem sysfile_blk_bare_ev (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
+    (M : Nat → List (BitVec 8)) :
+    procPrivFd (GF := GF) γ pa pid V M ⊢
+      procPrivBareAt curCtx pa pid V M ∗
+      (∀ (P' : UPtd) (M' : Nat → List (BitVec 8)) (kv : Nat),
+        procPrivBareAt curCtx pa pid { V.updEv kv with upt := P' } M' -∗
+        procPrivFd γ pa pid { V.updEv kv with upt := P' } M') := by
+  unfold procPrivFd procPrivCoreNoctxAt
+  iintro ⟨⟨Hb, Hc⟩, Ho⟩
+  iframe Hb
+  iintro %P' %M' %kv Hb
   iframe
 
 end

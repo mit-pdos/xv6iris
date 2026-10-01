@@ -1158,10 +1158,13 @@ set_option maxHeartbeats 4000000 in
 /-- **`copyout` meets its specification.** -/
 theorem copyout_proof (WA : WALKADDR) (VF : VMFAULT) (W : WALK_NOALLOC) (MM : MEMMOVE) :
     COPYOUT :=
-  ⟨fun {hlc GF} _ _ _ cpu k γl γk P M dqs bs hnoff hK hlk hroot hsz hlen hlen' => by
+  ⟨fun {hlc GF} _ _ _ _ cpu k γl γk P M dqs bs ke hnoff hK hlk hroot hsz hlen hlen' => by
   unfold wp_copyout_body
   simp only [copyoutAddr]
-  iintro ⟨Hk, Hpc, #Hlk, #Hav, HP, Hsrc, HΦ⟩
+  iintro ⟨Hk, Hpc, #Hlk, #Hav, HP, Hsrc, Hlend, HΦ⟩
+  -- the lend (permit sweep L1b): no callee takes it yet, so it is framed
+  -- through the continuation once, here
+  ihave HΦ := actLend_cont_frame _ _ _ _ _ _ _ _ _ $$ HΦ Hlend
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   by_cases hnil : bs.length = 0
   · -- nothing to copy

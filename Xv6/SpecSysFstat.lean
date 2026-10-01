@@ -108,12 +108,16 @@ complement, the WHOLE block back at filestat's extended descriptor with a
 window of `d ≤ 24` bytes written at `v1`, and the fs environment's output. -/
 def sysFstatPost (k : KCtx) (γ : FileNames) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (v v1 : BitVec 64) (cpu' : CPU) : IProp GF :=
-  iprop(∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd) (M' : Nat → List (BitVec 8)) (d : Nat),
+  iprop(∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd) (M' : Nat → List (BitVec 8)) (d : Nat)
+      (k' : Nat),
     ⌜calleeSaved k.regs R' ∧ sysFstatRet V v (R' 10#5) ∧ V.upt.extSz V.sz P' ∧ d ≤ 24 ∧
       umemWrote V.upt M v1 d P' M'⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
-    procPrivFd γ (procAddr j) pid { V with upt := P' } M' -∗
+    -- THE EVENT COUNTER (permit sweep L1b): filestat lends the block's
+    -- counter to copyout, which may step it
+    ⌜V.ev ≤ k'⌝ -∗
+    procPrivFd γ (procAddr j) pid { V.updEv k' with upt := P' } M' -∗
     filestatFsOut -∗ wpLoop cpu')
 
 end

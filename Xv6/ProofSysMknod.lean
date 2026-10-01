@@ -46,6 +46,9 @@ is never taken at `T_DEVICE`), and the two arms read at the device type
    `ArgLemmas.word8_split4` / `word8_join4` (Rocq
    `InstrBytes.word_pointsto_split4`) and each cell into halfwords by
    `SysMknodFrame.sys_mknod_split4` / `_join4` (deviation 2 there).
+5. Permit sweep L1b: argstr hands the block back at a raised count, and
+   `sys_mknod_fetched` runs at the raised record (SysMknodFrame
+   deviation 5).
 -/
 import Xv6.SysMknodTails
 import MachCSL.WpSmodeLh
@@ -443,7 +446,7 @@ theorem sys_mknod_args (AS : ARGSTR) (CR : CREATE) (IUP : IUNLOCKPUT) (EO : END_
   k_step_e (wp_s_jal cpu _ (KA.«sys_mknod» + 0x2a#64) false 2086208#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_mknod_br_argstr]
   iintro Hk Hpc
-  icases sysfile_blk_bare _ _ _ _ _ $$ Hblk with ⟨Hbare, Hclose⟩
+  icases sysfile_blk_bare_ev _ _ _ _ _ $$ Hblk with ⟨Hbare, Hclose⟩
   ihave Hbuf := (show byteBuf (GF := GF) (sysMknodBuf (k.regs 2#5)) (DFrac.own 1) old ⊢
     byteBuf (k.regs 2#5 + 18446744073709551472#64) (DFrac.own 1) old from .rfl) $$ Hbuf
   iapply (sysfile_argstr AS Γ cpu _ k.sie (by k_norm_g) (procAddr A.j) (by k_norm_g; exact hproc)
@@ -459,16 +462,29 @@ theorem sys_mknod_args (AS : ARGSTR) (CR : CREATE) (IUP : IUNLOCKPUT) (EO : END_
   case gn => k_norm_g; omega
   case gK => k_norm_g; exact hKas
   case gmx => k_norm_g [hold]
-  iintro %cpu %spie1 %spp1 %R1 %P2 %bs %⟨hcs1, hext, hret⟩ Hk Hpc Hte Hce Hbare Hbuf
+  iintro %cpu %spie1 %spp1 %R1 %P2 %bs %kv %⟨hcs1, hext, hret⟩ Hk Hpc Hte Hce %hkv Hbare Hbuf
   k_norm_g [sys_mknod_ret_2e, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   ihave Hbuf := (show byteBuf (GF := GF) (k.regs 2#5 + 18446744073709551472#64) (DFrac.own 1) bs ⊢
     byteBuf (sysMknodBuf (k.regs 2#5)) (DFrac.own 1) bs from .rfl) $$ Hbuf
-  ihave Hblk := Hclose $$ %P2 %(viewFaulted A.V.upt P2 A.M) Hbare
+  ihave Hblk := Hclose $$ %P2 %(viewFaulted A.V.upt P2 A.M) %kv Hbare
+  -- argstr lent the block's counter (permit sweep L1b): the rest of the run
+  -- is at the record it came back at (SysMknodFrame deviation 5)
+  ihave Hblk := (show procPrivFd (GF := GF) A.γ (procAddr A.j) A.pid { A.V.updEv kv with upt := P2 }
+      (viewFaulted A.V.upt P2 A.M) ⊢
+    procPrivFd (A.raise kv).γ (procAddr (A.raise kv).j) (A.raise kv).pid (sysMknodV1 (A.raise kv) P2)
+      (sysMknodM1 (A.raise kv) P2) from .rfl) $$ Hblk
+  ihave HΦ : (∀ c : CPU, sysMknodPostA k (A.raise kv) c) $$ [HΦ]
+  · iintro %c
+    ispecialize HΦ $$ %c
+    iapply (sysMknodK_raise k A.γ (procAddr A.j) A.pid A.V A.M A.ns A.v0.toNat (devArg A.v1)
+      (devArg A.v2) A.P A.Pmiss A.Farm A.Fun A.Fok A.Fex c kv hkv) $$ HΦ
+  ihave Hir := (show irefSlots (GF := GF) A.ns ⊢ irefSlots (A.raise kv).ns from .rfl) $$ Hir
+  ihave Hau := (show sysMknodAu (hlc := hlc) (GF := GF) A ⊢ sysMknodAu (A.raise kv) from .rfl) $$ Hau
   have hp1 : sysMknodPins k R1 := by
     refine sysMknodPins_cs k _ R1 ?_ hcs1
     repeat (refine sysMknodPins_set _ _ _ _ ?_ (by decide))
     exact hpins
-  iapply (sys_mknod_fetched CR IUP EO Γ cpu k A P2 spie1 spp1 R1 old bs hj hproc hK hnoff htier hct
+  iapply (sys_mknod_fetched CR IUP EO Γ cpu k (A.raise kv) P2 spie1 spp1 R1 old bs hj hproc hK hnoff htier hct
       hns hp1 hal hal8 hext hold hret)
     $$ [$Hk $Hpc $Hcells $Hbuf $Hints $Hte $Hce $Henv $Hblk $HΦ $Hbs $Hir $Hop $Hau]
 

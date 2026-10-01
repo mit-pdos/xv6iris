@@ -139,11 +139,14 @@ def sysPipePost (γ : FileNames) (γd : GName) (pa : BitVec 64) (pid : BitVec 32
 def sysPipeCont (cpu : CPU) (k : KCtx) (γ : FileNames) (γd : GName) (pa : BitVec 64)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) (v : BitVec 64) :
     IProp GF :=
-  wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
+  wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (k' : Nat),
     ⌜calleeSaved k.regs R'⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
-    sysPipePost γ γd pa pid V M sts v (R' 10#5) -∗
+    -- THE EVENT COUNTER (permit sweep L1b): sys_pipe lends the block's
+    -- counter to pipealloc, the copyouts and the closes, which may step it
+    ⌜V.ev ≤ k'⌝ -∗
+    sysPipePost γ γd pa pid (V.updEv k') M sts v (R' 10#5) -∗
     fdSlot -∗ fdSlot -∗ irefSlot -∗ wpLoop cpu'))
 
 /-- **WP of `sys_pipe()`** (Rocq `wp_sys_pipe_sconf_body`), eb-generic at

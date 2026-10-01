@@ -51,6 +51,11 @@ at which `fetchstr_got` is stated).  copyinstr says the string's pages are
 mapped in the table it returns (`umMapped`), and on those pages the faulted
 view is the lazy image (`UMemL.umemStr_viewLazy`).  For a block with no lazy
 page it is `M` itself (`UMemL.viewLazy_of_lazyFree`).
+
+THE EVENT COUNTER (permit sweep L1b, Rocq b69bd0fab): fetchstr lends the
+block's counter to copyinstr, which may step it, so the block comes back at
+a count at least the one it left at (`∃ k' ≥ V.ev`, the record at
+`{ V.updEv k' with upt := P' }`).
 -/
 import Xv6.UMemLazy
 import Xv6.ProcPrivBare
@@ -91,10 +96,11 @@ def wp_fetchstr_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
   wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
     ⌜k.sie = false → spie = k.spie ∧ spp = k.spp⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
-    (∃ (P' : UPtd) (bs : List (BitVec 8)),
+    (∃ (P' : UPtd) (bs : List (BitVec 8)) (k' : Nat),
       ⌜V.upt.extSz V.sz P' ∧
         fetchstrRet (viewLazy V.upt V.sz M) (k.regs 10#5).toNat old bs (R' 10#5)⌝ ∗
-      procPrivBareAt curCtx pa pid { V with upt := P' } (viewFaulted V.upt P' M) ∗
+      ⌜V.ev ≤ k'⌝ ∗
+      procPrivBareAt curCtx pa pid { V.updEv k' with upt := P' } (viewFaulted V.upt P' M) ∗
       byteBuf (k.regs 11#5) (DFrac.own 1) bs) -∗
     ⌜calleeSaved k.regs R'⌝ -∗ wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu

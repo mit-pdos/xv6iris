@@ -482,6 +482,70 @@ arm, `uvmdealloc`, `proc_pagetable`, `uvmfree`, the four `uvmunmap`s,
 requiring the lend, the token-free led forms deleted, the boot chains
 at `p = 0`; T the rows and the theorem.
 
+### 7.3L L1b as landed in Lean (2026-10-01)
+
+Lean lane PJ-L1b, Rocq b69bd0fab.  132 files (131 Lean + this note).
+`SpecSyscall`, `SpecKexec`, `SpecKwait` unchanged; the 32 Spec files that
+moved are exactly Rocq's 32 (`SpecArgstr` … `SpecWritei`).
+
+- **The copy ring takes the lend**: `wp_copyout_body` (both bodies and the
+  `_nr` field), `copyin`, `copyinstr`, `pipeclose` gain `(ke : Nat)`,
+  `actLend k.proc ke ∗` before the `wpNext`, `∃ k' ≥ ke` right after the
+  return pc (`[WchG GF]` where missing); the proofs frame it
+  (`actLend_cont_frame`).
+- **USER arm only**: either_copyout / either_copyin (post `∃ … k' ≥ V.ev`,
+  the record at `V.updEv k'`) and readi / writei; their kernel arms lend
+  nothing, so dirlookup / dirlink / unlink's walk / kexec's reads did not
+  move.  readi's `rdDst` and writei's `wiSrc` carry the count INSIDE the
+  user arm (`∃ kv ≥ Vp.ev`), the "ev trick" -- no loop statement names it.
+- **Block-holding chains expose `∀ k' ≥ V.ev`** (continuation side, the
+  record at `V.updEv k'`): fetchaddr / fetchstr / argstr; consoleread /
+  consolewrite, piperead / pipewrite, filestat / fileread / filewrite (the
+  file layer threads `EitherDefs.procPrivExtEv`, the ev trick);
+  sys_read / sys_write / sys_fstat / sys_close / sys_pipe; the six path
+  entries sys_chdir / mkdir / mknod / link / unlink / open and sys_exec.
+- **fileclose and pipealloc are BLOCK-LESS in Lean** (they hold only the
+  pid cell): they take the lend themselves (`SpecFileclose` deviation 8,
+  `SpecPipealloc`), where Rocq raises the held `proc_priv_bare`.  Their
+  callers lend the counter out of the core (`FdTable.procPrivCoreNoctxAt_
+  pidLend`, Rocq `proc_priv_core_bare_ev_acc`; sys_close's `sc_core_pid`,
+  sys_pipe's `sys_pipe_core_pid` folded in) or out of the whole block
+  (`SysOpenParts.sysOpen_fd_pidLend`, sys_open's ARM F-FAIL).
+- **The record raise**: a Lean stage generic in its args record continues
+  past argstr at `A.raise kv` (`{ A with V := A.V.updEv kv }`, Rocq's
+  `UA`), its contract continuation moved by a one-line `*_raise` lemma:
+  sys_open (`SysOpenArgs.raise`, `SysOpenStatic.raise`, `sysOpenK_raise`,
+  `sysOpenK_same` for the arms that lend nothing), mkdir, mknod, chdir,
+  unlink (`SuOk.raise`), link (twice: `kv1`, then `kv2`).
+- **The argv loop carries an explicit count** (Rocq's `sx_body` `k`):
+  `sysExecV2 A P kv`, `sysExecLoopSt` / `sysExecBadSt` gain `kv` and
+  `⌜A.V.ev ≤ kv⌝`, the head / step / loop / break / bad-tail bodies thread
+  it, kexec is handed the block there (`sysExecKA A P kv …`), and the -1
+  arms close with `evAfter_refl` at `k3`.
+- **kexec's phase C at `evAfter`**: `KexecSeam.kxcCRes`'s block is `∃ V1,
+  ⌜evAfter A.V V1⌝`, the argv copyout lends through `procPrivFd_evLend`,
+  `kxc_c_close` takes `∀ V2 ≥`; `kxc_phaseC`'s statement unchanged.
+  kexit's close loop carries its core the same way (`kx_core_lend`), kwait
+  relays copyout's count internally (`kw_priv_copy_ev`).
+- **The dispatcher**: the fd arms (fstat, close, read, write, pipe) relay
+  through `SyscallRet.SyscRows.updEv`; the path arms read their rows at the
+  raised record (`syscPath_rows`' equalities are `rfl` through `updEv`,
+  `syscPath_openFdOk` takes the count); `syscExec_arms_read` takes `k'`.
+- **New accessors**: `ProcPrivAcc.procPrivFd_evAfter_of`,
+  `FdTable.procPrivCoreNoctxAt_pidLend`, `SysfileCalls.sysfile_blk_bare_ev`
+  (Rocq `proc_priv_bare_acc_ev`), `EitherDefs.ecRest_lend`,
+  `procPrivExtEv` (+ `_intro` / `_elim` / `_of`), `ProcPriv.updEv_updEv` /
+  `updEv_self_upt`.
+- **Deviations** (each in its file's header): (1) fileclose / pipealloc
+  take the lend (block-less); (2) the ev trick in readi / writei, the
+  console / pipe copy loops and the file layer; (3) the record raise for
+  the path entries (Rocq names `UA` inline); (4) the lend sits right after
+  the return pc in every Lean continuation (as L1a).
+
+Full `lake build Xv6 MachCSL` 2684 jobs, 0 errors; `lint.sh` all lints
+passed (layering ok, no `sorry`); `tcb.sh` exit 0 (no module entered);
+`audit.sh` PASS (baseline unchanged).
+
 ### 7.4 L2 as landed (2026-09-29, 78f9234b8)
 
 The inner VM ring (32 files, +707 / -451): `vmfault`, `uvmdealloc`,

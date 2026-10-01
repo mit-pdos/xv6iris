@@ -39,6 +39,8 @@ symbolic base (`sys_exec_reload`, Rocq `sx_reload`), used at +0x0a6,
    γf (proc_addr jp) pid (us_upt U P)`); the success tail frames no block
    (Rocq's `proc_priv γf … UW` rides through `sx_succ_tail` untouched; the
    Lean break frames it around the tail).
+   Permit sweep L1b: the bad tail returns `⌜A.V.ev ≤ kv⌝` with the block at
+   `sysExecV2 A P kv` (`SysExecParts` deviation 9).
 
 Imports only the shared vocabulary.
 -/
@@ -206,8 +208,8 @@ theorem sys_exec_bad_tail (Γ : SchedNames) (k : KCtx) (A : SysExecArgs) (hS : S
     ⊢ sysExecBadTailBody (hlc := hlc) (GF := GF) Γ k A := by
   unfold sysExecFreeBody at hfree
   unfold sysExecBadTailBody sysExecBadSt
-  iintro %c %spie %spp %R %P %t %pg %afun %pl %rest
-    ⟨%⟨ht, hext, hpg, hbp, hal⟩, Hk, Hpc, Hte, Hce, Hblk, Hcarry, H59, H60, Harr, Hpgs⟩ #Henv HΦ
+  iintro %c %spie %spp %R %P %kv %t %pg %afun %pl %rest
+    ⟨%⟨ht, hext, hkv, hpg, hbp, hal⟩, Hk, Hpc, Hte, Hce, Hblk, Hcarry, H59, H60, Harr, Hpgs⟩ #Henv HΦ
   obtain ⟨s2, s3, s5, s6, s7, a2, a8, a9, a18, a19, a20, a21, a22, a23, a24, a25, a26, a27⟩ := hbp
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- +0x92 addi s4,s4,256
@@ -252,7 +254,7 @@ theorem sys_exec_bad_tail (Γ : SchedNames) (k : KCtx) (A : SysExecArgs) (hS : S
       A.v1 hS.hK hpins hal)
     iframe
     iintro %c4 %R4 %⟨hcs, h10⟩ Hk Hpc Hte Hce
-    iapply HΦ $$ %c4 %spie2 %spp2 %R4 %⟨hcs, h10.trans ha0, hext⟩ Hk Hpc Hte Hce Hblk
+    iapply HΦ $$ %c4 %spie2 %spp2 %R4 %⟨hcs, h10.trans ha0, hext, hkv⟩ Hk Hpc Hte Hce Hblk
   · -- ---- +0xa4 (the cursor ran out): li a0,-1 ; the reloads ; c.j +0x104 ----
     rw [sys_exec_bad_pc]
     k_step_e (wp_s_addi c2 _ (sysExecAddr + 0xa4#64) true 4095#12 10#5 0#5 (by decide))
@@ -271,7 +273,7 @@ theorem sys_exec_bad_tail (Γ : SchedNames) (k : KCtx) (A : SysExecArgs) (hS : S
       hpins hal)
     iframe
     iintro %c4 %R4 %⟨hcs, h10⟩ Hk Hpc Hte Hce
-    iapply HΦ $$ %c4 %spie2 %spp2 %R4 %⟨hcs, h10.trans ha0, hext⟩ Hk Hpc Hte Hce Hblk
+    iapply HΦ $$ %c4 %spie2 %spp2 %R4 %⟨hcs, h10.trans ha0, hext, hkv⟩ Hk Hpc Hte Hce Hblk
 
 /-! ## §5.  THE SUCCESS TAIL (Rocq `sx_succ_tail`) -/
 

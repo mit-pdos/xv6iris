@@ -769,11 +769,11 @@ theorem sysOpenK_mono_fupd (k : KCtx) (ns : Nat) (V : ProcPriv) (M : Nat → Lis
         ARMS' VW MW r -∗ |={⊤}=> ARMS VW MW r) -∗
       sysOpenK (hlc := hlc) k ns V M ARMS' c := by
   unfold sysOpenK
-  iintro H Hw %spie %spp %R' %P' %hcs %hext Hk Hpc Hte Hce Hbs Hir Harms
+  iintro H Hw %spie %spp %R' %P' %k' %hcs %hext %hk' Hk Hpc Hte Hce Hbs Hir Harms
   iapply wpLoop_fupd
   imod Hw $$ %_ %_ %_ Harms with Harms
   imodintro
-  iapply H $$ %spie %spp %R' %P' %hcs %hext Hk Hpc Hte Hce Hbs Hir Harms
+  iapply H $$ %spie %spp %R' %P' %k' %hcs %hext %hk' Hk Hpc Hte Hce Hbs Hir Harms
 
 /-- The FRESH continuation shim: the create arms' continuation, read at the
 shimmed record, THE RESIDUE RIDING ITS CLOSURE (Rocq's first inline

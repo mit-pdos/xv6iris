@@ -33,6 +33,10 @@ eager three and pops.
    sign test, `f->off += r`, the block's `priv_conv(0)` / `priv_pid`, the
    reference's open/close, field borrows and pipe payload) live ONCE in
    `Xv6/FileRwShared.lean` (`filerw_*`).
+5. Permit sweep L1b (Rocq b69bd0fab): the stage continuations carry the
+   block at SOME raised count (`EitherDefs.procPrivExtEv`, `∃ kv ≥ V.ev`),
+   so the stage statements need not name the count (Rocq threads it
+   explicitly); `frd_pageLenEv` reads the page length through it.
 -/
 import Xv6.SpecFileread
 import MachCSL.WpSmodeFrame6c
@@ -435,6 +439,17 @@ theorem frd_pageLen (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P : UPtd)
   isplitl [Hpt]
   · iexact Hpt
   · ipureintro; exact hlz
+
+/-- ...at the block's raised event count (permit sweep L1b). -/
+theorem frd_pageLenEv (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P : UPtd)
+    (M : Nat → List (BitVec 8)) :
+    procPrivExtEv (GF := GF) pa pid V P M ⊢ ⌜umPageLen P M⌝ ∗ procPrivExtEv pa pid V P M := by
+  iintro H
+  icases procPrivExtEv_elim pa pid V P M $$ H with ⟨%kv, %hkv, H⟩
+  icases frd_pageLen pa pid (V.updEv kv) P M $$ H with ⟨%h, H⟩
+  isplitr
+  · ipureintro; exact h
+  · iapply procPrivExtEv_intro pa pid V P M kv hkv $$ H
 
 end Block
 

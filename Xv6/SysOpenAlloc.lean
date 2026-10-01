@@ -52,6 +52,9 @@ Rocq's header, kept (the reasons are the content):
    `sysOpenAllocDev`): the slot's untyped content with `f->type` (and
    `f->major`) replaced.  The device arm's box name is an arbitrary one
    (Rocq's `inhabitant`): its off conjunct is `offFree` and never reads it.
+6. Permit sweep L1b: ARM F-FAIL lends the pid cell and the block's counter
+   to fileclose (`sysOpen_fd_pidLend`), and `sys_open_alloc_fail_ret_f`
+   closes the block at the count fileclose handed back (Rocq's `kev`).
 
 Imports `SysOpenParts`, the parts layer `SysOpenShared` (as Rocq's Alloc
 imports `ProofSysOpenShared`), `MachCSL.WpStoreFree4`.
@@ -223,16 +226,20 @@ theorem sys_open_alloc_fail_ret_f (k : KCtx) (A : SysOpenArgs GF) (P2 : UPtd) (n
     (data : Nat → List (BitVec 8)) (hns : nsj + 1 = A.ns) (hnsj : 1 ≤ nsj)
     (hP2 : A.V.upt.extSz A.V.sz P2) :
     (wordPointsTo (pPid (procAddr A.j)) 4 pidPriv A.pid -∗
-        procPrivFd (GF := GF) A.γ (procAddr A.j) A.pid (sysOpenV2 A P2) (sysOpenM2 A P2)) ∗
+        (∃ k1 : Nat, ⌜A.V.ev ≤ k1⌝ ∗ actLend (procAddr A.j) k1) -∗
+        ∃ k2 : Nat, ⌜A.V.ev ≤ k2⌝ ∗
+          procPrivFd (GF := GF) A.γ (procAddr A.j) A.pid ((sysOpenV2 A P2).updEv k2)
+            (sysOpenM2 A P2)) ∗
       irefSlots (nsj - 1) ∗ fdFrags A.V.fdg A.sts ∗
       sysOpenResidue (hlc := hlc) A pl inum dn bm data ∗
       (∀ c' : CPU, sysOpenPostP (hlc := hlc) k A c') ⊢
     sysOpenRet (hlc := hlc) k (fun r => iprop(⌜r = 0xFFFFFFFFFFFFFFFF#64⌝ ∗ sysOpenPid A ∗
-      bslots 3 ∗ irefSlots 2 ∗ fdSlot)) := by
+      bslots 3 ∗ irefSlots 2 ∗ fdSlot ∗ ∃ k1 : Nat, ⌜A.V.ev ≤ k1⌝ ∗ actLend (procAddr A.j) k1)) := by
   iintro ⟨Hpback, Hisl, Hfrags, Hres, Hpost⟩
   unfold sysOpenRet
-  iintro %c' %spie' %spp' %R' %hcs Hk Hpc Hte Hce ⟨%hr, Hpid, Hbs, Hir2, Hfds⟩
-  ihave Hpriv := Hpback $$ Hpid
+  iintro %c' %spie' %spp' %R' %hcs Hk Hpc Hte Hce ⟨%hr, Hpid, Hbs, Hir2, Hfds, Hlend⟩
+  -- the block back at the count fileclose handed back (permit sweep L1b)
+  icases Hpback $$ Hpid Hlend with ⟨%k2, %hk2, Hpriv⟩
   ihave Hisl := (irefSlots_op (nsj - 1) 2).2 $$ [$Hisl $Hir2]
   have e : nsj - 1 + 2 = A.ns := by omega
   rw [e]
@@ -240,10 +247,10 @@ theorem sys_open_alloc_fail_ret_f (k : KCtx) (A : SysOpenArgs GF) (P2 : UPtd) (n
   icases Hres with ⟨%hpl, HP, Hobs, Htc⟩
   ispecialize Hpost $$ %c'
   unfold sysOpenPostP sysOpenK
-  iapply Hpost $$ %spie' %spp' %R' %P2 %hcs %hP2 Hk Hpc Hte Hce Hbs Hisl
+  iapply Hpost $$ %spie' %spp' %R' %P2 %k2 %hcs %hP2 %hk2 Hk Hpc Hte Hce Hbs Hisl
   iapply (sys_open_arm_fail (hlc := hlc) A.omo (fsGammaL fscFs) fscFs A.V.cwi A.γ (procAddr A.j) A.pid
-      (sysOpenIm A) A.v.toNat A.vom A.P A.Pmiss A.Fo A.Ft A.sts (sysOpenV2 A P2) (sysOpenM2 A P2)
-      (R' 10#5) pl inum.toNat (eraNode dn bm data) hpl hr)
+      (sysOpenIm A) A.v.toNat A.vom A.P A.Pmiss A.Fo A.Ft A.sts ((sysOpenV2 A P2).updEv k2)
+      (sysOpenM2 A P2) (R' 10#5) pl inum.toNat (eraNode dn bm data) hpl hr)
     $$ Hpriv Hfrags Hfds HP Hobs Htc
 
 /-! ## +0x74 .. +0x84 and +0x140 .. +0x14c: the descriptor's TYPE -/
@@ -493,7 +500,8 @@ theorem sys_open_alloc_fd (FD : FDALLOC) (Γ : SchedNames) [ClaimIs (hlc := hlc)
     icases kctx_tier _ _ $$ Hk with ⟨%htk, Hk⟩
     have hct : curTier = KTier.kpt := by
       simp only [k_norm_simps] at htk; exact htk.symm.trans hS.htier
-    icases Xv6.sys_mknod_pid hct _ _ _ _ _ $$ Hpriv with ⟨Hpid, Hpback⟩
+    -- the pid cell and the block's counter, lent to fileclose (permit sweep L1b)
+    icases sysOpen_fd_pidLend hct _ _ _ _ _ $$ Hpriv with ⟨Hpid, Hlend, Hpback⟩
     -- fileclose's loan, off the allowance (deviation 4)
     have hsplit : nsj = 1 + (nsj - 1) := by omega
     ihave Hisl := (show irefSlots (GF := GF) nsj ⊢ irefSlots (1 + (nsj - 1)) from by
@@ -507,7 +515,7 @@ theorem sys_open_alloc_fd (FD : FDALLOC) (Γ : SchedNames) [ClaimIs (hlc := hlc)
     iapply hTF $$ %cpu %spie1 %spp1 %_ %(0xFFFFFFFFFFFFFFFF#64) %w6 %lo %(sysOpenOm A) %w24 %γil
       %γisl %loc %tlc %kk %s %g %inum %dn %bm %kf %u %⟨hkk, hinb, hle, hiu, hkf⟩
       %(sysOpenPins_s3 k R1 _ _ _ _ hp1) %hal Hk Hpc Hte Hce Henv Hcells Hbuf Hf Hlk Hload Hkeep Hpid
-      Hbs Hiru Hop [Hpback Hisl Hfrags Hres Hpost]
+      Hbs Hiru Hop Hlend [Hpback Hisl Hfrags Hres Hpost]
     iapply sys_open_alloc_fail_ret_f k A P2 nsj pl inum dn bm data hns hnsj hP2
     iframe
   · -- ---- the descriptor installed ----

@@ -254,7 +254,7 @@ theorem fwr_writei (WI : WRITEI) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     wordPointsTo (iInum (ientry ik)) 4 (DFrac.own (1 : Qp).half) inum ∗
     inodeMeta (ientry ik) dn ∗ inodeMap fscFs (ientry ik) bm ∗ inodeBlocks fscFs bm data ∗
     dinodeAt fscIreg inum dn ∗
-    procPrivExt (procAddr j) pid V P Mv ∗ bslots 3 ∗ logOpS icfgLog MAXOPBLOCKS Sb ∗
+    procPrivExtEv (procAddr j) pid V P Mv ∗ bslots 3 ∗ logOpS icfgLog MAXOPBLOCKS Sb ∗
     (∀ (c' : CPU) (spie spp : Bool) (R' : RegMap)
         (tot : Nat) (bm' : Blkmap) (data' : Nat → List (BitVec 8)) (dn' dn0' : Dinode)
         (n' : Nat) (wrote : Nat → BitVec 8) (dist : Nat) (dstb : Nat → BitVec 8) (P' : UPtd)
@@ -269,12 +269,13 @@ theorem fwr_writei (WI : WRITEI) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
       wordPointsTo (iInum (ientry ik)) 4 (DFrac.own (1 : Qp).half) inum -∗
       inodeMeta (ientry ik) dn' -∗ inodeMap fscFs (ientry ik) bm' -∗ inodeBlocks fscFs bm' data' -∗
       dinodeAt fscIreg inum dn0' -∗
-      procPrivExt (procAddr j) pid V P' (viewFaulted P P' Mv) -∗
+      procPrivExtEv (procAddr j) pid V P' (viewFaulted P P' Mv) -∗
       bslots 3 -∗ logOpS icfgLog n' Sb' -∗ wpLoop c')
     ⊢ wpLoop (GF := GF) c := by
   obtain ⟨hwf, hcovs, hda, hnz, hcap, hhz, -⟩ := hok
-  iintro ⟨Hk, Hpc, #Hpi, Hte, Hce, #Hpe, #Hfs, #Hkl, #Hav, Hdev, Hin, Hmeta, Hmap, Hblk, Hdi, Hpriv,
-    Hbs, Hop, HK⟩
+  iintro ⟨Hk, Hpc, #Hpi, Hte, Hce, #Hpe, #Hfs, #Hkl, #Hav, Hdev, Hin, Hmeta, Hmap, Hblk, Hdi,
+    Hpriv, Hbs, Hop, HK⟩
+  icases procPrivExtEv_elim _ _ _ _ _ $$ Hpriv with ⟨%kv, %hkv, Hpriv⟩
   ihave %hgo := fsReady_geom $$ Hfs
   icases fsReady_bio $$ Hfs with ⟨%γl, #Hbc⟩
   icases fsReady_disk $$ Hfs with ⟨%pd, %pav, %pu, #Hdc, %hpd⟩
@@ -286,7 +287,7 @@ theorem fwr_writei (WI : WRITEI) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     have : MAXFILE * BSIZE = 274432 := rfl
     omega
   have h := WI.wp_writei_gen_eb (hlc := hlc) (GF := GF) Γ c k' γl pd pav pu j γkl γk (ientry ik)
-    inum bm data dn dn true off cnt (List.replicate cnt 0#8) { V with upt := P } Mv MAXOPBLOCKS Sb
+    inum bm data dn dn true off cnt (List.replicate cnt 0#8) { V.updEv kv with upt := P } Mv MAXOPBLOCKS Sb
     pid pidPriv (DFrac.own 1) (DFrac.own (1 : Qp).half) (DFrac.own (1 : Qp).half) DFrac.discard
     DFrac.discard DFrac.discard hj hproc hK hnoff htier hcost hgo.fgoLog (hgo.iblockCov inum hnib)
     (hgo.iblockOut inum hnib) hnib hda hnz (diTypeStable_refl dn) (diNlinkStable_refl dn hnz) hwf
@@ -294,17 +295,19 @@ theorem fwr_writei (WI : WRITEI) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (by simp only [if_true]; rw [ha1]; decide) ha3 ha4
   unfold wp_writei_gen_eb_body at h
   simp only [writeiAddr, if_true] at h
-  ihave Hpriv := (procPrivExt_conv ht (procAddr j) pid V P Mv).2 $$ Hpriv
+  ihave Hpriv := (procPrivExt_conv ht (procAddr j) pid (V.updEv kv) P Mv).2 $$ Hpriv
   iapply h
   iframe Hk Hpc Hpi Hte Hce Hpe Hbc Hlc Hdc Hkl Hav Hdev Hin Hmeta Hmap Hblk Hsi Hss Hsb Hbmi
     Hinv Hdi Hpriv Hbs Hop
   iapply wpNext_intro
   iintro %c' %spie %spp %R' %tot %bm' %data' %dn' %dn0' %n' %wrote %dist %dstb %P' %Sb' %hcs
-    %hout Hk Hpc Hte Hce Hdev Hin Hmeta Hmap Hblk - - - Hdi Hpriv Hbs Hop
-  ihave Hpriv := (procPrivExt_conv ht (procAddr j) pid V P' (viewFaulted P P' Mv)).1 $$ Hpriv
+    %hout Hk Hpc Hte Hce Hdev Hin Hmeta Hmap Hblk - - - Hdi ⟨%kc, %hkc, Hpriv⟩ Hbs Hop
+  -- the block back at the count the writei raised it to (permit sweep L1b)
+  ihave Hpriv := (procPrivExt_conv ht (procAddr j) pid (V.updEv kc) P' (viewFaulted P P' Mv)).1 $$ Hpriv
+  ihave Hpriv := procPrivExtEv_intro _ _ _ _ _ kc (Nat.le_trans hkv hkc) $$ Hpriv
   iapply HK $$ %c' %spie %spp %R' %tot %bm' %data' %dn' %dn0' %n' %wrote %dist %dstb %P' %Sb' []
     Hk Hpc Hte Hce Hdev Hin Hmeta Hmap Hblk Hdi Hpriv Hbs Hop
-  ipureintro; exact ⟨hcs, hout⟩
+  ipureintro; exact ⟨hcs, { hout with }⟩
 
 set_option maxHeartbeats 8000000 in
 /-- `pipewrite(f->pipe, addr, n)` at `+0x5e`: the eb contract, the block
@@ -329,7 +332,7 @@ theorem fwr_pipewrite (PW : PIPEWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) G
       kctx c' ((k'.withSpie spie spp).withRegs R') -∗ pcIs c' (jumpPc (k'.regs 1#5)) -∗
       trapCsrsExt c' k'.sie -∗ cpuClaimExt c' k'.sie k'.proc -∗
       pipeRef γp w q -∗
-      procPrivExt (procAddr j) pid V P' (viewFaulted V.upt P' M) -∗
+      procPrivExtEv (procAddr j) pid V P' (viewFaulted V.upt P' M) -∗
       genHalvesPriv (procAddr j) pid V.gen -∗
       pipeWpost (hlc := hlc) V.upt γp.pnQueue (writerImg V.upt M) (k'.regs 11#5) Q Qe
         iprop(killShot V.gen ∗ □ MachFixedGS.killCred (hlc := hlc) (GF := GF)) n.toNat (R' 10#5) -∗
@@ -344,8 +347,9 @@ theorem fwr_pipewrite (PW : PIPEWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) G
   iapply h
   iframe Hk Hpc Hpi Hte Hce Hpp Href Hkl Hav Hpriv Hgen Hpay
   iapply wpNext_intro
-  iintro %c' %spie %spp %R' %P' %hp Hk Hpc Hte Hce Href Hpriv Hgen Hpost
-  ihave Hpriv := (procPrivExt_conv ht (procAddr j) pid V P' (viewFaulted V.upt P' M)).1 $$ Hpriv
+  iintro %c' %spie %spp %R' %P' %kv %hp Hk Hpc Hte Hce Href %hkv Hpriv Hgen Hpost
+  ihave Hpriv := (procPrivExt_conv ht (procAddr j) pid (V.updEv kv) P' (viewFaulted V.upt P' M)).1 $$ Hpriv
+  ihave Hpriv := procPrivExtEv_intro _ _ _ _ _ kv hkv $$ Hpriv
   iapply HK $$ %c' %spie %spp %R' %P' %hp Hk Hpc Hte Hce Href Hpriv Hgen Hpost
 
 set_option maxHeartbeats 8000000 in
@@ -371,7 +375,7 @@ theorem fwr_consolewrite (CW : CONSOLEWRITE) (Γ : SchedNames) [ClaimIs (hlc := 
         (i : Int) ≤ max 0 n ∧ ((i : Int) < n → writeConsShort V.upt (k'.regs 11#5) i n)⌝ -∗
       kctx c' ((k'.withSpie spie spp).withRegs R') -∗ pcIs c' (jumpPc (k'.regs 1#5)) -∗
       trapCsrsExt c' k'.sie -∗ cpuClaimExt c' k'.sie k'.proc -∗
-      procPrivExt (procAddr j) pid V P' (viewFaulted V.upt P' M) -∗ Q i -∗ wpLoop c')
+      procPrivExtEv (procAddr j) pid V P' (viewFaulted V.upt P' M) -∗ Q i -∗ wpLoop c')
     ⊢ wpLoop (GF := GF) c := by
   have h := CW.wp_consolewrite_eb (hlc := hlc) (GF := GF) Γ c k' γl γu γkl γk j pid V M n Q
     hj hproc hK hnoff htier huser hn hn'
@@ -382,8 +386,9 @@ theorem fwr_consolewrite (CW : CONSOLEWRITE) (Γ : SchedNames) [ClaimIs (hlc := 
   iapply h
   iframe Hk Hpc Hpi Hte Hce Hport Hch Hkl Hav Hpriv
   iapply wpNext_intro
-  iintro %c' %spie %spp %R' %P' %i %hp Hk Hpc Hte Hce Hpriv HQ
-  ihave Hpriv := (procPrivExt_conv ht (procAddr j) pid V P' (viewFaulted V.upt P' M)).1 $$ Hpriv
+  iintro %c' %spie %spp %R' %P' %i %kv %hp Hk Hpc Hte Hce %hkv Hpriv HQ
+  ihave Hpriv := (procPrivExt_conv ht (procAddr j) pid (V.updEv kv) P' (viewFaulted V.upt P' M)).1 $$ Hpriv
+  ihave Hpriv := procPrivExtEv_intro _ _ _ _ _ kv hkv $$ Hpriv
   iapply HK $$ %c' %spie %spp %R' %P' %i %hp Hk Hpc Hte Hce Hpriv HQ
 
 end

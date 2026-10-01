@@ -196,11 +196,14 @@ unchanged, the fs environment's output, and the armed output. -/
 def sysWritePost (k : KCtx) (γ : FileNames) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (sts : List FdState) (v v1 v2 : BitVec 64) (Q : Nat → IProp GF)
     (Qe : Nat → PipeSt → IProp GF) (cpu' : CPU) : IProp GF :=
-  iprop(∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd),
+  iprop(∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd) (k' : Nat),
     ⌜calleeSaved k.regs R' ∧ V.upt.extSz V.sz P'⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
-    procPrivFd γ (procAddr j) pid { V with upt := P' } (viewFaulted V.upt P' M) -∗
+    -- THE EVENT COUNTER (permit sweep L1b): filewrite's copies take the
+    -- block's counter as their lend and may step it
+    ⌜V.ev ≤ k'⌝ -∗
+    procPrivFd γ (procAddr j) pid { V.updEv k' with upt := P' } (viewFaulted V.upt P' M) -∗
     fdFrags V.fdg sts -∗
     filewriteFsOut -∗
     sysWriteArms (hlc := hlc) V v sts (argZ v2) (writerImg V.upt M) v1 Q Qe (R' 10#5) -∗

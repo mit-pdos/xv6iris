@@ -82,6 +82,13 @@ descriptor that is not a pipe pays and gets back nothing.
    two as equal (`reflexivity`); `Xv6.filecloseEnv_frame` is stated over
    `filecloseFsEnv` directly (its only use, kexit's loop).
 6. `ic_escrows_acc` (Rocq, stated here) is `FsReady.fsReady_escrow` in Lean.
+8. **THE EVENT COUNTER IS A LEND, NOT THE BLOCK** (permit sweep L1b, Rocq
+   b69bd0fab): Rocq's fileclose holds `proc_priv_bare` and hands it back at
+   a raised count (`∀ k' ≥ pv_ev Upr`, the pipe arm lends the counter to
+   pipeclose).  Lean's fileclose holds only the pid cell (deviation 4), so
+   it is a BLOCK-LESS contract and takes the lend itself (design §7.2's
+   rule): `actLend k.proc ke` in, `∃ k' ≥ ke` back right after the return
+   pc; the pipe arm hands it to pipeclose, the other arms frame it.
 7. (RETIRED by crash batch C-4, D38.)  The crash layer's `fs_crash_seam`
    and `gen_cert` ride `fsReady` (`fsReady_seam` / `fsReady_gen`).
 
@@ -439,7 +446,7 @@ def wp_fileclose_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (γ : FileNames) (kk : Nat) (q : Qp) (st : FdState)
     (j : Nat) (γkl : GName) (γk : KmemNames) (on : Option Nat)
-    (pidv : BitVec 32) (dqp : DFrac) (Φc : IProp GF)
+    (pidv : BitVec 32) (dqp : DFrac) (Φc : IProp GF) (ke : Nat)
     (hK : filecloseSlots ≤ k.avail) (hnoff : k.noff = 0) (htier : k.tier = KTier.kpt)
     (ha0 : k.regs 10#5 = fnode kk) : Prop :=
   kctx cpu k ∗ pcIs cpu filecloseAddr ∗
@@ -454,10 +461,14 @@ def wp_fileclose_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
   -- THE BYTE QUEUE'S CLOSE PAYMENT: a link or the taint on a pipe
   -- descriptor, nothing on any other (Rocq `fileclose_cpay st Φc`)
   filecloseCpay (hlc := hlc) st Φc ∗
+  -- THE LEND (permit sweep L1b, deviation 8): the caller's event counter,
+  -- for pipeclose's kfree
+  actLend k.proc ke ∗
   -- THE CROSSING IS THE LITERAL `true`
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
     ⌜calleeSaved k.regs R'⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
+    (∃ k' : Nat, ⌜ke ≤ k'⌝ ∗ actLend k.proc k') -∗
     trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
     wordPointsTo (pPid k.proc) 4 dqp pidv -∗
     fdSlot -∗ irefSlot -∗ filecloseEnvOut γk on st -∗
@@ -475,8 +486,8 @@ structure FILECLOSE : Prop where
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (γ : FileNames) (kk : Nat) (q : Qp) (st : FdState)
     (j : Nat) (γkl : GName) (γk : KmemNames) (on : Option Nat) (pidv : BitVec 32) (dqp : DFrac)
-    (Φc : IProp GF) hK hnoff htier ha0,
-    wp_fileclose_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl γ kk q st j γkl γk on pidv dqp Φc
+    (Φc : IProp GF) (ke : Nat) hK hnoff htier ha0,
+    wp_fileclose_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl γ kk q st j γkl γk on pidv dqp Φc ke
       hK hnoff htier ha0
 
 end Xv6

@@ -39,9 +39,9 @@ builds its congruence proof over the whole context).
    continuation is `∀ c'`.
 3. **PROCESS LAYER (flagged, `SysExecParts` deviation 4 / `SpecKexec`
    deviation 2)**: kexec is called at the block `procPrivFd A.γ (procAddr
-   A.j) A.pid (sysExecV2 A P) (sysExecM2 A P)` (Rocq `proc_priv γf
+   A.j) A.pid (sysExecV2 A P kv) (sysExecM2 A P)` (Rocq `proc_priv γf
    (proc_addr jp) pid (us_upt U P)`), and its arms are read at that block
-   (`execArms … (sysExecV2 A P) (sysExecM2 A P) V' M'`); the block kexec
+   (`execArms … (sysExecV2 A P kv) (sysExecM2 A P) V' M'`); the block kexec
    returns (`V'`, `M'`) is framed around the success tail and handed to
    the continuation (Rocq threads `proc_priv … U'` through `sx_succ_tail`).
    Rocq's `exec_post_ok_V` (the pre-state's image is immaterial) is not
@@ -54,6 +54,10 @@ builds its congruence proof over the whole context).
    `SysExecParts.sysExecArgvArr_acc` + `sysExecArgvL_set0`; the cast lemmas
    (`w32_sextw_moi`, `ofile_slli3`, `sx_scaled`, `sx_argv`, `sx_path`) are
    `sysExecBreak_sext` / `sysExecBreak_slot` at the normaliser's shape.
+6. Permit sweep L1b: kexec is handed the block at the loop's count
+   (`sysExecKA A P kv …`, Rocq `us_upt (upd_usV U (upd_ev (us_V U) k)) P`),
+   and the continuation returns `⌜A.V.ev ≤ kv⌝` (`SysExecParts`
+   deviation 9).
 
 Imports only the shared vocabulary and kexec's Spec.
 -/
@@ -76,9 +80,9 @@ set_option linter.unusedVariables false
 the block at the table the copy-ins grew, the fetched path, the argument
 vector the loop built (`sysExecAvf pg i`), each string's page as its owned
 run (`aslen = 4096`), everything owned whole. -/
-def sysExecKA (A : SysExecArgs) (P : UPtd) (pl : List (BitVec 8)) (i : Nat)
+def sysExecKA (A : SysExecArgs) (P : UPtd) (kv : Nat) (pl : List (BitVec 8)) (i : Nat)
     (pg : Nat → BitVec 64) (alen : Nat → Nat) (afun : Nat → Nat → BitVec 8) : KexecArgs :=
-  ⟨A.γ, A.j, A.pid, sysExecV2 A P, sysExecM2 A P, pl.length, sysfilePfun pl, i, sysExecAvf pg i,
+  ⟨A.γ, A.j, A.pid, sysExecV2 A P kv, sysExecM2 A P, pl.length, sysfilePfun pl, i, sysExecAvf pg i,
     alen, fun _ => 4096, afun, DFrac.own 1, DFrac.own 1, DFrac.own 1, A.pd, A.pav, A.pu⟩
 
 theorem sysExecBreak_sext_all : ∀ i : Fin 32,
@@ -122,10 +126,11 @@ def sysExecBreakHi (sp0 : BitVec 64) (pg : Nat → BitVec 64) (i : Nat) : IProp 
 
 /-- **Rocq `sx_argv_kx`**: the array at the break IS kexec's `argv[0 .. i]`
 beside the words above it. -/
-theorem sysExecBreak_argv (sp0 : BitVec 64) (A : SysExecArgs) (P : UPtd) (pl : List (BitVec 8))
+theorem sysExecBreak_argv (sp0 : BitVec 64) (A : SysExecArgs) (P : UPtd) (kv : Nat)
+    (pl : List (BitVec 8))
     (i : Nat) (pg : Nat → BitVec 64) (alen : Nat → Nat) (afun : Nat → Nat → BitVec 8) (hi : i < 32) :
     sysExecArgvArr (GF := GF) sp0 (sysExecArgvL pg i) ⊣⊢
-      kxcArgv (sysExecArgv sp0) (sysExecKA A P pl i pg alen afun) ∗ sysExecBreakHi sp0 pg i := by
+      kxcArgv (sysExecArgv sp0) (sysExecKA A P kv pl i pg alen afun) ∗ sysExecBreakHi sp0 pg i := by
   unfold sysExecArgvArr sysExecBreakHi kxcArgv sysExecKA
   dsimp only
   refine (BigSepL.bigSepL_take_drop (n := i + 1)).trans ?_
@@ -149,9 +154,9 @@ theorem sysExecBreak_argv (sp0 : BitVec 64) (A : SysExecArgs) (P : UPtd) (pl : L
 
 /-- **Rocq `sx_pages_ext`**: the kalloc'd pages ARE kexec's argument
 strings. -/
-theorem sysExecBreak_pages (A : SysExecArgs) (P : UPtd) (pl : List (BitVec 8)) (i : Nat)
+theorem sysExecBreak_pages (A : SysExecArgs) (P : UPtd) (kv : Nat) (pl : List (BitVec 8)) (i : Nat)
     (pg : Nat → BitVec 64) (alen : Nat → Nat) (afun : Nat → Nat → BitVec 8) :
-    sysExecPages (GF := GF) pg afun 0 i ⊣⊢ kxcArgStrs (sysExecKA A P pl i pg alen afun) := by
+    sysExecPages (GF := GF) pg afun 0 i ⊣⊢ kxcArgStrs (sysExecKA A P kv pl i pg alen afun) := by
   unfold sysExecPages kxcArgStrs sysExecKA
   dsimp only
   simp only [Nat.sub_zero, ← List.range_eq_range']
@@ -195,22 +200,22 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
 
 section Fields
-variable (A : SysExecArgs) (P : UPtd) (pl : List (BitVec 8)) (i : Nat) (pg : Nat → BitVec 64)
+variable (A : SysExecArgs) (P : UPtd) (kv : Nat) (pl : List (BitVec 8)) (i : Nat) (pg : Nat → BitVec 64)
   (alen : Nat → Nat) (afun : Nat → Nat → BitVec 8)
-theorem sysExecKA_γ : (sysExecKA A P pl i pg alen afun).γ = A.γ := rfl
-theorem sysExecKA_pidv : (sysExecKA A P pl i pg alen afun).pidv = A.pid := rfl
-theorem sysExecKA_V : (sysExecKA A P pl i pg alen afun).V = sysExecV2 A P := rfl
-theorem sysExecKA_M : (sysExecKA A P pl i pg alen afun).M = sysExecM2 A P := rfl
-theorem sysExecKA_plen : (sysExecKA A P pl i pg alen afun).plen = pl.length := rfl
-theorem sysExecKA_pfun : (sysExecKA A P pl i pg alen afun).pfun = sysfilePfun pl := rfl
-theorem sysExecKA_na : (sysExecKA A P pl i pg alen afun).na = i := rfl
-theorem sysExecKA_alen : (sysExecKA A P pl i pg alen afun).alen = alen := rfl
-theorem sysExecKA_afun : (sysExecKA A P pl i pg alen afun).afun = afun := rfl
-theorem sysExecKA_dqpv : (sysExecKA A P pl i pg alen afun).dqpv = DFrac.own 1 := rfl
-theorem sysExecKA_pd : (sysExecKA A P pl i pg alen afun).pd = A.pd := rfl
-theorem sysExecKA_pav : (sysExecKA A P pl i pg alen afun).pav = A.pav := rfl
-theorem sysExecKA_pu : (sysExecKA A P pl i pg alen afun).pu = A.pu := rfl
-theorem sysExecKA_cwi : (sysExecV2 A P).cwi = A.V.cwi := rfl
+theorem sysExecKA_γ : (sysExecKA A P kv pl i pg alen afun).γ = A.γ := rfl
+theorem sysExecKA_pidv : (sysExecKA A P kv pl i pg alen afun).pidv = A.pid := rfl
+theorem sysExecKA_V : (sysExecKA A P kv pl i pg alen afun).V = sysExecV2 A P kv := rfl
+theorem sysExecKA_M : (sysExecKA A P kv pl i pg alen afun).M = sysExecM2 A P := rfl
+theorem sysExecKA_plen : (sysExecKA A P kv pl i pg alen afun).plen = pl.length := rfl
+theorem sysExecKA_pfun : (sysExecKA A P kv pl i pg alen afun).pfun = sysfilePfun pl := rfl
+theorem sysExecKA_na : (sysExecKA A P kv pl i pg alen afun).na = i := rfl
+theorem sysExecKA_alen : (sysExecKA A P kv pl i pg alen afun).alen = alen := rfl
+theorem sysExecKA_afun : (sysExecKA A P kv pl i pg alen afun).afun = afun := rfl
+theorem sysExecKA_dqpv : (sysExecKA A P kv pl i pg alen afun).dqpv = DFrac.own 1 := rfl
+theorem sysExecKA_pd : (sysExecKA A P kv pl i pg alen afun).pd = A.pd := rfl
+theorem sysExecKA_pav : (sysExecKA A P kv pl i pg alen afun).pav = A.pav := rfl
+theorem sysExecKA_pu : (sysExecKA A P kv pl i pg alen afun).pu = A.pu := rfl
+theorem sysExecKA_cwi : (sysExecV2 A P kv).cwi = A.V.cwi := rfl
 end Fields
 
 set_option maxHeartbeats 16000000 in
@@ -219,32 +224,32 @@ in `sx_break_au`): the three buffers in the break's spelling, the bundle
 narrowed at the path argstr fetched, the arms read back at that path. -/
 theorem sys_exec_kexec (KX : KEXEC) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu : CPU)
     (k' : KCtx) (se : Bool) (hs : k'.sie = se) (A : SysExecArgs) (U : SysExecAU GF)
-    (hpj : k'.proc = procAddr A.j) (P : UPtd) (pl : List (BitVec 8)) (i : Nat)
+    (hpj : k'.proc = procAddr A.j) (P : UPtd) (kv : Nat) (pl : List (BitVec 8)) (i : Nat)
     (pg : Nat → BitVec 64) (alen : Nat → Nat) (afun : Nat → Nat → BitVec 8) (sp0 : BitVec 64)
     (hK : kexecSlots ≤ k'.avail) (hnoff : k'.noff = 0) (htier : k'.tier = KTier.kpt)
     (hj : A.j < NPROC) (hpl : argPathShape pl) (hi : i < 32) (hok : sysExecOk pg alen afun i)
     (h10 : k'.regs 10#5 = sysExecPath sp0) (h11 : k'.regs 11#5 = sysExecArgv sp0) :
     kctx cpu k' ∗ pcIs cpu KA.«kexec» ∗ trapCsrsExt cpu se ∗ cpuClaimExt cpu se (procAddr A.j) ∗
     sysExecEnv (hlc := hlc) Γ A ∗
-    procPrivFd A.γ (procAddr A.j) A.pid (sysExecV2 A P) (sysExecM2 A P) ∗
+    procPrivFd A.γ (procAddr A.j) A.pid (sysExecV2 A P kv) (sysExecM2 A P) ∗
     byteBuf (sysExecPath sp0) (DFrac.own 1) (bview (pl.length + 1) (sysfilePfun pl)) ∗
-    kxcArgv (sysExecArgv sp0) (sysExecKA A P pl i pg alen afun) ∗
+    kxcArgv (sysExecArgv sp0) (sysExecKA A P kv pl i pg alen afun) ∗
     sysExecPages pg afun 0 i ∗ bslots 3 ∗ irefSlots 2 ∗ myPay U.gn U.Q ∗
     execAuPre (hlc := hlc) U.Fs (fsGammaL fscFs) fscFs A.V.cwi A.V.pvSecc U.Q U.P U.Pmiss U.Fo pl i alen afun
       U.sts U.cs A.pid ∗
     (∀ (c : CPU) (spie spp : Bool) (R' : RegMap) (V' : ProcPriv) (M' : Nat → List (BitVec 8)),
       ⌜calleeSaved k'.regs R'⌝ -∗
       execArms (hlc := hlc) U.Fs (fsGammaL fscFs) fscFs A.V.cwi A.V.pvSecc U.Q U.P U.Pmiss U.Fo pl i alen afun
-        U.sts U.gn U.cs A.pid (sysExecV2 A P) (sysExecM2 A P) V' M' (R' 10#5) -∗
+        U.sts U.gn U.cs A.pid (sysExecV2 A P kv) (sysExecM2 A P) V' M' (R' 10#5) -∗
       kctx c ((k'.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k'.regs 1#5)) -∗
       trapCsrsExt c se -∗ cpuClaimExt c se (procAddr A.j) -∗
       procPrivFd A.γ (procAddr A.j) A.pid V' M' -∗
       byteBuf (sysExecPath sp0) (DFrac.own 1) (bview (pl.length + 1) (sysfilePfun pl)) -∗
-      kxcArgv (sysExecArgv sp0) (sysExecKA A P pl i pg alen afun) -∗
+      kxcArgv (sysExecArgv sp0) (sysExecKA A P kv pl i pg alen afun) -∗
       sysExecPages pg afun 0 i -∗ bslots 3 -∗ irefSlots 2 -∗ wpLoop c)
     ⊢ wpLoop (GF := GF) cpu := by
   subst hs
-  have h := KX.wp_kexec_eb (hlc := hlc) (GF := GF) Γ cpu k' (sysExecKA A P pl i pg alen afun) U.Fs
+  have h := KX.wp_kexec_eb (hlc := hlc) (GF := GF) Γ cpu k' (sysExecKA A P kv pl i pg alen afun) U.Fs
     U.sts U.gn U.cs U.Q U.P U.Pmiss U.Fo hK hnoff htier hj hpj (sysExecBreak_nn pl hpl)
     (sysfile_pfun_term pl) hpl.1
     (fun j hj => by
@@ -257,14 +262,14 @@ theorem sys_exec_kexec (KX : KEXEC) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF �
     sysExecKA_alen, sysExecKA_afun, sysExecKA_dqpv, sysExecKA_pd, sysExecKA_pav, sysExecKA_pu,
     sysExecKA_cwi, Xv6.sys_mknod_bview_self, h10, h11, hpj] at h
   iintro ⟨Hk, Hpc, Hte, Hce, #Henv, Hblk, Hpath, Hargv, Hpgs, Hbs, Hir, Hpay, Hau, HΦ⟩
-  ihave Hpgs := (sysExecBreak_pages (GF := GF) A P pl i pg alen afun).1 $$ Hpgs
+  ihave Hpgs := (sysExecBreak_pages (GF := GF) A P kv pl i pg alen afun).1 $$ Hpgs
   iapply h
   unfold sysExecEnv
   iframe
   iframe #
   iapply wpNext_intro_pin
   iintro %c %- %spie %spp %R' %V' %M' %hcs Harms Hk Hpc Hte Hce Hblk ⟨Hpath, Hargv, Hstrs⟩ Hbs Hir
-  ihave Hpgs := (sysExecBreak_pages (GF := GF) A P pl i pg alen afun).2 $$ Hstrs
+  ihave Hpgs := (sysExecBreak_pages (GF := GF) A P kv pl i pg alen afun).2 $$ Hstrs
   iapply HΦ $$ %c %spie %spp %R' %V' %M' %hcs Harms Hk Hpc Hte Hce Hblk Hpath Hargv Hpgs Hbs Hir
 
 /-! ## §4.  THE BREAK (Rocq `sx_break_au`) -/
@@ -281,8 +286,8 @@ theorem sys_exec_break (KX : KEXEC) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF �
     ⊢ sysExecBreakBody (hlc := hlc) (GF := GF) Γ k A U := by
   unfold sysExecSuccTailBody at hsucc
   unfold sysExecBreakBody sysExecLoopSt
-  iintro %c %spie %spp %R %P %i %pg %alen %afun %uvf %pl %rest %hnul %⟨hpl, hpath⟩
-    ⟨%⟨hi, hext, hok, havok, hpins, hal⟩, Hk, Hpc, Hte, Hce, Hblk, Hcarry, H59, H60, Harr, Hpgs⟩
+  iintro %c %spie %spp %R %P %kv %i %pg %alen %afun %uvf %pl %rest %hnul %⟨hpl, hpath⟩
+    ⟨%⟨hi, hext, hkv, hok, havok, hpins, hal⟩, Hk, Hpc, Hte, Hce, Hblk, Hcarry, H59, H60, Harr, Hpgs⟩
     #Henv Hbs Hir Hpay Hau HΦ
   obtain ⟨hK60, hKx, -, -, -, -, -, -⟩ := sys_exec_K _ hS.hK
   -- THE BUNDLE'S INSTANTIATION, at the vector the loop built
@@ -325,11 +330,11 @@ theorem sys_exec_break (KX : KEXEC) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF �
   iintro Hk Hpc
   -- kexec(path, argv)
   icases sysExecBreak_path (GF := GF) k pl rest $$ Hcarry with ⟨Hpath, Hcback⟩
-  icases (sysExecBreak_argv (GF := GF) (k.regs 2#5) A P pl i pg alen afun hi).1 $$ Harr with
+  icases (sysExecBreak_argv (GF := GF) (k.regs 2#5) A P kv pl i pg alen afun hi).1 $$ Harr with
     ⟨Hargv, Hhi⟩
   ihave Hce := (show cpuClaimExt (GF := GF) cpu k.sie k.proc ⊢ cpuClaimExt cpu k.sie (procAddr A.j) by
     rw [hS.hproc]) $$ Hce
-  iapply (sys_exec_kexec KX Γ cpu _ k.sie ?hs A U ?hpj P pl i pg alen afun (k.regs 2#5) ?hKx ?hno ?hti
+  iapply (sys_exec_kexec KX Γ cpu _ k.sie ?hs A U ?hpj P kv pl i pg alen afun (k.regs 2#5) ?hKx ?hno ?hti
       hS.hj hpath.1 hi hok ?h10 ?h11) $$ [- $Hk $Hpc $Hte $Hce $Hblk $Hpath $Hargv $Hpgs $Hbs $Hir $Hpay $Hau]
   rotate_right 1
   iframe #
@@ -349,14 +354,14 @@ theorem sys_exec_break (KX : KEXEC) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF �
   ihave Hce := (show cpuClaimExt (GF := GF) c2 k.sie (procAddr A.j) ⊢ cpuClaimExt c2 k.sie k.proc by
     rw [hS.hproc]) $$ Hce
   ihave Hcarry := Hcback $$ Hpath
-  ihave Harr := (sysExecBreak_argv (GF := GF) (k.regs 2#5) A P pl i pg alen afun hi).2 $$ [Hargv Hhi]
+  ihave Harr := (sysExecBreak_argv (GF := GF) (k.regs 2#5) A P kv pl i pg alen afun hi).2 $$ [Hargv Hhi]
   · iframe
   -- +0xce THE SUCCESS TAIL
   iapply hsucc $$ %c2 %spie2 %spp2 %R2 %i %pg %afun %pl %rest %(R2 10#5)
     %⟨Nat.le_of_lt hi, sysExecOk_pgOk pg alen afun i hok, sysExecLoopPins_bad k R2 i hpins2, rfl, hal⟩
     Hk Hpc Hte Hce Henv Hcarry H59 H60 Harr Hpgs
   iintro %c3 %spie3 %spp3 %R3 %⟨hcs3, h10⟩ Hk Hpc Hte Hce
-  iapply HΦ $$ %c3 %spie3 %spp3 %R3 %V' %M' %hcs3 %hargs %hext [Harms] Hk Hpc Hte Hce Hbs Hir Hblk
+  iapply HΦ $$ %c3 %spie3 %spp3 %R3 %V' %M' %hcs3 %hargs %hext %hkv [Harms] Hk Hpc Hte Hce Hbs Hir Hblk
   rw [h10]
   iexact Harms
 

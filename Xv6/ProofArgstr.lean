@@ -113,10 +113,10 @@ theorem argstr_fetchstr (FS : FETCHSTR) (c : CPU) (k' : KCtx) (γl : GName) (γk
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
       ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
-      (∃ (P' : UPtd) (bs : List (BitVec 8)),
+      (∃ (P' : UPtd) (bs : List (BitVec 8)) (kv : Nat),
         ⌜V.upt.extSz V.sz P' ∧
           fetchstrRet (viewLazy V.upt V.sz M) (k'.regs 10#5).toNat old bs (R' 10#5)⌝ ∗
-        procPrivBareAt curCtx pa pid { V with upt := P' } (viewFaulted V.upt P' M) ∗
+        ⌜V.ev ≤ kv⌝ ∗ procPrivBareAt curCtx pa pid { V.updEv kv with upt := P' } (viewFaulted V.upt P' M) ∗
         byteBuf (k'.regs 11#5) (DFrac.own 1) bs) -∗
       ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
@@ -255,9 +255,9 @@ theorem argstr_proof (AR : ARGRAW) (FS : FETCHSTR) : ARGSTR :=
   obtain ⟨f2, f8, f9, f18, f19, f20, f21, f22, f23, f24, f25, f26, f27⟩ := hcs2
   rw [MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   iapply (argstr_exit cpu c9 k
-      (fun r => iprop(∃ (Q' : UPtd) (cs : List (BitVec 8)),
+      (fun r => iprop(∃ (Q' : UPtd) (cs : List (BitVec 8)) (kv : Nat),
         ⌜V.upt.extSz V.sz Q' ∧ fetchstrRet (viewLazy V.upt V.sz M) v.toNat old cs r⌝ ∗
-        procPrivBareAt curCtx pa pid { V with upt := Q' } (viewFaulted V.upt Q' M) ∗ byteBuf (k.regs 11#5) (DFrac.own 1) cs))
+        ⌜V.ev ≤ kv⌝ ∗ procPrivBareAt curCtx pa pid { V.updEv kv with upt := Q' } (viewFaulted V.upt Q' M) ∗ byteBuf (k.regs 11#5) (DFrac.own 1) cs))
       hK4
       (fun h => (hp9 h).trans ((hp8 h).trans ((hp7 h).trans ((hp6 h).trans ((hp5 h).trans
         ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h)))))))))
