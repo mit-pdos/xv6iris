@@ -45,7 +45,7 @@ Not ported: 42666b2b7 (`tools/intr_cone.py`, a Rocq-module cone audit; the Lean 
 Each lane's as-landed line goes under its row's design note (the Rocq notes' rule), and this table's
 checkbox below flips when the lane is on `lean-ni`:
 
-- [ ] PI-1  - [ ] PI-2  - [ ] PI-3  - [ ] PI-4  - [ ] PI-5  - [ ] PI-6  - [ ] PJ-G  - [ ] PJ-L1a  - [ ] PJ-L1b  - [ ] PJ-L2
+- [ ] PI-1  - [ ] PI-2  - [ ] PI-3  - [ ] PI-4  - [ ] PI-5  - [x] PI-6  - [ ] PJ-G  - [ ] PJ-L1a  - [ ] PJ-L1b  - [ ] PJ-L2
 
 ## Lanes (opened 2026-09-15)
 
