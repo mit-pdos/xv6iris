@@ -10,10 +10,16 @@ the checked-in baseline `tools/audit/baseline.json`.
 
 Run it (on a machine sized for a Lean build), against an already-built tree:
 
-    tools/ci/audit.sh            # = lake env lean tools/audit/Audit.lean
+    tools/ci/audit.sh
 
-It is NOT a module of the `Xv6` library (as the Rocq files are out of
-`iris/_CoqProject`): nothing imports it and `lake build` never compiles it.
+which builds this file as a NATIVE executable -- its own lake package,
+tools/audit/ (`lake -d tools/audit build audit`): it imports only `Lean` and
+loads Xv6 and MachCSL at run time from the `LEAN_PATH` of `lake env` -- and
+runs it.  It is NOT a module of the `Xv6` library (as the Rocq files are out
+of `iris/_CoqProject`): nothing imports it and `lake build Xv6 MachCSL`
+never compiles it.  (Interpreted, as `lake env lean` on a file with a command,
+it took 32 s on the 96-core VM and 83 s on CI, nearly all of it the opaque
+search below; compiled, and with that walk done once and in parallel, ~3 s.)
 
 WHAT A READER MUST TRUST, AND WHAT THE CHECK ENFORCES.
 
@@ -63,23 +69,23 @@ because `Print Assumptions` re-walks the whole cone per call): Lean 4.32
 records each declaration's axioms in its module's `.olean`
 (`Lean.CollectAxioms`' exported-axioms extension), so `collectAxioms` on an
 imported theorem is a table lookup.  The only real walk here is the
-`opaque` search, one pass over the tree's proof terms shared by all the
-theorems.
+`opaque` search: every constant in the union of the theorems' cones is
+walked ONCE for the constants it names (`depGraph`, in parallel over each
+breadth-first frontier), and each theorem's cone is then a traversal of that
+graph.
 
 THE OTHER HALF OF THE TRUSTED BASE -- what a reader must READ for each
 statement to mean what they think -- is `tools/tcb/Tcb.lean`.
 
 Output (directory `$XV6_CI_OUT`, default `.lake/ci`): `audit.json`
-(machine-readable) and `audit.md` (the summary).  The file elaborates with
-an error, so `lean` exits non-zero, iff the audit fails.
+(machine-readable) and `audit.md` (the summary).  The executable exits
+non-zero iff the audit fails (or the tree cannot be loaded).
 (`$XV6_AUDIT_BASELINE` names another baseline file; for testing the check.)
 ======================================================================
 -/
 import Lean
-import Xv6
-import MachCSL
 
-open Lean Elab Command
+open Lean
 
 namespace Xv6.CI.Audit
 
@@ -132,26 +138,72 @@ def constDeps (env : Environment) (c : Name) : Array Name :=
 
 abbrev DepCache := Std.HashMap Name (Array Name)
 
+/-- `xs.map f` on all cores: one task per chunk of `chunk` items, results in
+order. -/
+def parMap {α β : Type} (xs : Array α) (f : α → β) (chunk : Nat := 64) : Array β := Id.run do
+  let mut ts : Array (Task (Array β)) := #[]
+  let mut i := 0
+  while i < xs.size do
+    let part := xs.extract i (i + chunk)
+    ts := ts.push (Task.spawn fun _ => part.map f)
+    i := i + chunk
+  let mut out : Array β := #[]
+  for t in ts do out := out ++ t.get
+  return out
+
+/-- The term graph of every constant reachable from some root, the
+constants numbered (in the order they are found): the per-theorem
+traversals then index arrays instead of hashing names, which was most of
+the run. -/
+structure Graph where
+  names : Array Name
+  index : Std.HashMap Name Nat
+  adj : Array (Array Nat)
+
+/-- `constDeps` of every constant reachable from `roots`: breadth-first, each
+frontier's constants walked in parallel, every constant walked once. -/
+def depGraph (env : Environment) (roots : Array Name) : Graph := Id.run do
+  let mut names : Array Name := #[]
+  let mut index : Std.HashMap Name Nat := {}
+  let mut deps : Array (Array Name) := #[]
+  for r in roots do
+    unless index.contains r do
+      index := index.insert r names.size
+      names := names.push r
+  -- the frontier is always the constants numbered [lo, names.size)
+  let mut lo := 0
+  while lo < names.size do
+    let hi := names.size
+    let ds := parMap (names.extract lo hi) (constDeps env) 128
+    for d in ds do
+      deps := deps.push d
+      for x in d do
+        unless index.contains x do
+          index := index.insert x names.size
+          names := names.push x
+    lo := hi
+  let idx := index
+  let adj := parMap deps (fun d => d.map (idx.getD · 0)) 256
+  return { names, index, adj }
+
 /-- The whole cone of `root` (every constant its type and proof transitively
-mention), with the per-constant dependency lists cached across calls. -/
-def cone (env : Environment) (root : Name) : StateM DepCache (Std.HashSet Name) := do
-  let mut seen : Std.HashSet Name := {}
-  let mut stack : Array Name := #[root]
-  seen := seen.insert root
+mention): its members, read off the graph (`depGraph` of a set of roots
+including `root`). -/
+def Graph.cone (g : Graph) (root : Name) : Array Name := Id.run do
+  let some r := g.index[root]? | return #[root]
+  let mut seen := ByteArray.mk (Array.replicate g.names.size 0)
+  let mut stack : Array Nat := #[r]
+  let mut out : Array Name := #[root]
+  seen := seen.set! r 1
   while !stack.isEmpty do
     let c := stack.back!
     stack := stack.pop
-    let ds ← match (← get)[c]? with
-      | some ds => pure ds
-      | none =>
-        let ds := constDeps env c
-        modify (·.insert c ds)
-        pure ds
-    for d in ds do
-      unless seen.contains d do
-        seen := seen.insert d
+    for d in g.adj[c]! do
+      if seen.get! d == 0 then
+        seen := seen.set! d 1
+        out := out.push g.names[d]!
         stack := stack.push d
-  return seen
+  return out
 
 structure ThmBaseline where
   name : Name
@@ -195,15 +247,16 @@ def strs (xs : Array Name) : Array String := xs.map toString
 def mdList (xs : Array Name) : String :=
   if xs.isEmpty then "none" else ", ".intercalate (xs.toList.map fun x => s!"`{x}`")
 
-def ppType (c : Name) : CommandElabM String := do
+def ppType (c : Name) : CoreM String := do
   match (← getEnv).find? c with
-  | some ci => liftTermElabM do return (← Meta.ppExpr ci.type).pretty 100
+  | some ci => return (← (Meta.ppExpr ci.type).run').pretty 100
   | none => return "?"
 
 def outDir : IO System.FilePath := do
   return (← IO.getEnv "XV6_CI_OUT").getD ".lake/ci"
 
-elab "#xv6_audit" : command => do
+/-- The audit; `false` iff it fails (the problems are printed). -/
+def run : CoreM Bool := do
   let env ← getEnv
   let baselinePath : System.FilePath := (← IO.getEnv "XV6_AUDIT_BASELINE").getD "tools/audit/baseline.json"
   let bl ← match parseBaseline (← IO.FS.readFile baselinePath) with
@@ -211,7 +264,19 @@ elab "#xv6_audit" : command => do
     | .error e => throwError "audit: cannot parse {baselinePath}: {e}"
   let t0 ← IO.monoMsNow
   -- 1. per theorem: axioms (table lookup) and the cone's opaques (one shared walk)
-  let mut cache : DepCache := {}
+  for tb in bl.theorems do
+    unless (env.find? tb.name).isSome do
+      throwError "audit: baseline theorem {tb.name} does not exist"
+  let graph := depGraph env (bl.theorems.map (·.name))
+  -- every theorem's cone, and the opaques in it, at once: one task each
+  let cones := parMap bl.theorems (chunk := 1) fun tb => Id.run do
+    let members := graph.cone tb.name
+    let mut ops : Array Name := #[]
+    let mut extOps : Array Name := #[]
+    for c in members do
+      if let some (.opaqueInfo _) := env.find? c then
+        if isLocalConst env c then ops := ops.push c else extOps := extOps.push c
+    return (members.size, ops, extOps)
   let mut results : Array ThmResult := #[]
   let mut allAxioms : Std.HashSet Name := {}
   for tb in bl.theorems do
@@ -223,14 +288,8 @@ elab "#xv6_audit" : command => do
     let certNamed := axs.filter isBvCertName
     let badCerts := certNamed.filter (!bvCertShapeOk env ·)
     let plain := sortNames (axs.filter (!isBvCertName ·))
-    let (coneSet, cache') := (cone env tb.name).run cache
-    cache := cache'
-    let mut ops : Array Name := #[]
-    let mut extOps : Array Name := #[]
-    for c in coneSet do
-      if let some (.opaqueInfo _) := env.find? c then
-        if isLocalConst env c then ops := ops.push c else extOps := extOps.push c
-    ops := sortNames ops
+    let (coneSize, ops, extOps) := cones[results.size]!
+    let ops := sortNames ops
     for a in plain do
       unless tb.axioms.contains a do
         problems := problems.push s!"{tb.name}: axiom `{a}` is not in the baseline"
@@ -246,7 +305,7 @@ elab "#xv6_audit" : command => do
       unless ops.contains o do
         problems := problems.push s!"{tb.name}: baseline opaque `{o}` is no longer reached (stale baseline; remove it)"
     results := results.push { name := tb.name, plain, certs := certNamed.size - badCerts.size, badCerts,
-                              opaques := ops, extOpaques := sortNames extOps, coneSize := coneSet.size, problems }
+                              opaques := ops, extOpaques := sortNames extOps, coneSize, problems }
   let t1 ← IO.monoMsNow
   -- 2. the Sail platform hooks
   let mut hookProblems : Array String := #[]
@@ -376,8 +435,26 @@ elab "#xv6_audit" : command => do
   IO.println md
   IO.println s!"audit: theorems {t1 - t0} ms, tree {t2 - t1} ms; wrote {dir / "audit.json"}, {dir / "audit.md"}"
   unless ok do
-    throwError "audit FAILED:\n{"\n".intercalate problems.toList}"
+    IO.println s!"audit FAILED:\n{"\n".intercalate problems.toList}"
+  return ok
 
 end Xv6.CI.Audit
 
-#xv6_audit
+/-- The executable: import the built tree as a file's `import Xv6`/`import
+MachCSL` would (extensions included: pretty-printing the opaques' types uses
+the imported notations), then the audit in the scope the elaborated command
+had (`open Lean Elab Command`, no namespace), so the printed types match. -/
+unsafe def main : IO UInt32 := do
+  initSearchPath (← findSysroot)
+  enableInitializersExecution
+  let env ← importModules #[{ module := `Lean }, { module := `Xv6 }, { module := `MachCSL }] {}
+    (loadExts := true) (leakEnv := true)
+  let ctx : Core.Context := {
+    fileName := "<audit>", fileMap := default
+    openDecls := [.simple `Lean [], .simple `Lean.Elab [], .simple `Lean.Elab.Command []] }
+  try
+    let (ok, _) ← (Xv6.CI.Audit.run).toIO ctx { env }
+    return if ok then 0 else 1
+  catch e =>
+    IO.println s!"error: {e}"
+    return 1

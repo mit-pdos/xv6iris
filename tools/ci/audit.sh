@@ -5,7 +5,8 @@
 # Runs tools/audit/Audit.lean against an ALREADY-BUILT tree: the axioms of each
 # top theorem, the `opaque` constants in its cone and the Sail platform hooks,
 # checked against tools/audit/baseline.json.  That file's header says what a
-# reader must trust.  ~35 s, ~5 GB.
+# reader must trust.  ~3 s (a native executable, built here if CI's build
+# step has not), ~5 GB.
 #
 #   --build   `lake build Xv6 MachCSL` first (Rocq's `make audit` vs `audit-only`).
 #             Without it a stale .lake/build is audited as it stands.
@@ -32,7 +33,13 @@ if [ "${1:-}" = "--build" ]; then
 fi
 
 rc=0
-lake env lean tools/audit/Audit.lean > "$XV6_CI_OUT/audit.log" 2>&1 || rc=$?
+# tools/audit/Audit.lean is a native executable in its own lake package (its
+# header): build it (nothing to do when up to date; CI builds it alongside
+# the proofs), then run it on the built tree through `lake env`.
+lake -d tools/audit build audit -q > "$XV6_CI_OUT/audit.log" 2>&1 || rc=$?
+if [ "$rc" -eq 0 ]; then
+  lake env tools/audit/.lake/build/bin/audit >> "$XV6_CI_OUT/audit.log" 2>&1 || rc=$?
+fi
 cat "$XV6_CI_OUT/audit.log"
 
 if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then

@@ -1,0 +1,14 @@
+# tools/tcb/Tcb.lean as a NATIVE executable (see its header; the same
+# arrangement as tools/ci/envfacts/).  Its own package so that the proofs'
+# lakefile is untouched: it imports only `Lean` (the toolchain's, picked by
+# the repository's lean-toolchain) and finds Xv6/MachCSL at run time through
+# `lake env`'s LEAN_PATH.
+#   lake -d tools/tcb build tcb     (tools/ci/tcb.sh does it)
+name = "tcb"
+
+[[lean_exe]]
+name = "tcb"
+root = "Tcb"
+# `importModules (loadExts := true)` runs the imported modules' extension
+# initializers, which needs the interpreter.
+supportInterpreter = true

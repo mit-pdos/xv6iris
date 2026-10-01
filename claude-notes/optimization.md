@@ -948,8 +948,21 @@ byte-identical at every stage):
   sources was 2.5 of coverage's 3.3 s (a `\b(\w+)` leading alternative is tried
   at every word); anchoring on the literal tail: 0.11 s. Run each report tool
   ONCE and write both formats (`--text-out`, `--md-out`).
-- The same treatment would apply to `tools/audit/Audit.lean` and
-  `tools/tcb/Tcb.lean` (83 s + 57 s on CI, also interpreted `#eval`s), not done.
+- Same treatment for `tools/audit/Audit.lean` and `tools/tcb/Tcb.lean` (sibling
+  packages tools/audit/, tools/tcb/; outputs byte-identical, the JSON's own
+  `ms` field aside): audit 32.3 → 2.9 s, tcb 13.7 → 1.7 s on the VM (83 s and
+  57 s on CI before). The audit's opaque search was six cone walks with a
+  shared dependency cache; now the union of the cones is walked once
+  (breadth-first, each frontier's `getUsedConstants` in parallel), the
+  constants numbered, and the six cones are index traversals in parallel.
+  Hashing names per edge was the next cost after the walk itself: number
+  the graph. The tcb's cost after the walk was attributing each cone's
+  constants to declarations (`findDeclarationRanges?`): one task per theorem.
+  Its `isProp` classifications run in parallel too, each task its own
+  `MetaM` state over the shared environment.
+- Timing native code from inside: a pure `let x := f y` between two
+  `IO.monoMsNow`s can be moved by the compiler, so the stamps read 0 ms.
+  Make the input depend on the first stamp, or time whole runs.
 
 ## Smaller traps
 

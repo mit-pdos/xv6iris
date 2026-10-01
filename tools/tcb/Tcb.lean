@@ -14,6 +14,15 @@ Run it (on a machine sized for a Lean build), against an already-built tree:
     tools/ci/tcb.sh              # check against tools/tcb/expected.json
     tools/ci/tcb.sh --update     # rewrite tools/tcb/expected.json
 
+which builds this file as a NATIVE executable -- its own lake package,
+tools/tcb/ (`lake -d tools/tcb build tcb`): it imports only `Lean` and loads
+Xv6 and MachCSL at run time from the `LEAN_PATH` of `lake env` -- and runs
+it.  (Interpreted, as `lake env lean` on a file with a command, it took 14 s
+on the 96-core VM and 57 s on CI.)  Every constant of the statements' cones
+is classified and walked ONCE (`stmtGraph`, in parallel over each
+breadth-first frontier); each theorem's cone is then a traversal of that
+graph, in the order the sequential walk took.
+
 THE WALK.  Start from the constants of the theorem's TYPE (never its proof)
 and close under "is mentioned by":
 
@@ -58,10 +67,8 @@ baseline file (for testing the check).
 ======================================================================
 -/
 import Lean
-import Xv6
-import MachCSL
 
-open Lean Elab Command Meta
+open Lean Meta
 
 namespace Xv6.CI.Tcb
 
@@ -107,13 +114,55 @@ def stmtDeps (ci : ConstantInfo) : MetaM (Option (Array Name)) := do
 
 abbrev DepCache := Std.HashMap Name (Option (Array Name))
 
+/-- `stmtDeps` of every constant reachable from `roots` (the walk below,
+without the per-theorem bookkeeping): breadth-first, each frontier
+classified in parallel (`chunk` constants per task, each task its own
+`MetaM` state), every constant once.  A constant the environment does not
+have is skipped, as the walk skips it. -/
+def stmtGraph (roots : Array Name) (chunk : Nat := 64) : CoreM DepCache := do
+  let env ← getEnv
+  let ctx ← read
+  let mut g : DepCache := {}
+  let mut seen : Std.HashSet Name := {}
+  let mut frontier : Array ConstantInfo := #[]
+  for r in roots do
+    unless seen.contains r do
+      seen := seen.insert r
+      if let some ci := env.find? r then frontier := frontier.push ci
+  while !frontier.isEmpty do
+    let mut tasks := #[]
+    let mut i := 0
+    while i < frontier.size do
+      let part := frontier.extract i (i + chunk)
+      let act : IO (Array (Option (Array Name))) := do
+        let (r, _) ← (part.mapM fun ci => (stmtDeps ci).run').toIO
+          { ctx with maxHeartbeats := 0 } { env }
+        return r
+      tasks := tasks.push (← IO.asTask act)
+      i := i + chunk
+    let mut next : Array ConstantInfo := #[]
+    let mut j := 0
+    for t in tasks do
+      let ds ← IO.ofExcept (← IO.wait t)
+      for d in ds do
+        let ci := frontier[j]!
+        j := j + 1
+        g := g.insert ci.name d
+        for x in d.getD #[] do
+          unless seen.contains x do
+            seen := seen.insert x
+            if let some cx := env.find? x then next := next.push cx
+    frontier := next
+  return g
+
 structure Cone where
   consts : Array Name := #[]   -- trusted constants
   proofs : Nat := 0            -- proofs mentioned, not followed
   axioms : Array Name := #[]
   opaques : Array Name := #[]
 
-/-- The statement cone of `thm`. -/
+/-- The statement cone of `thm`; `stmtGraph` has (or the walk fills in)
+the classification of each constant. -/
 def stmtCone (thm : Name) : StateT DepCache MetaM Cone := do
   let env ← getEnv
   let some ti := env.find? thm | throwError "tcb: no constant {thm}"
@@ -358,7 +407,9 @@ def caveats : String :=
   "* **Do not read containment off the file column**: two theorems can share their files and neither\n" ++
   "  definition set contain the other.\n\n</details>\n"
 
-elab "#xv6_tcb" : command => do
+/-- The report and check; `false` iff the trusted base moved (the problems
+are printed). -/
+def run : CoreM Bool := do
   let env ← getEnv
   let expectedPath : System.FilePath := (← IO.getEnv "XV6_TCB_EXPECTED").getD "tools/tcb/expected.json"
   let expected ← match parseExpected (← IO.FS.readFile expectedPath) with
@@ -377,14 +428,26 @@ elab "#xv6_tcb" : command => do
     else if modelRoots.contains m.getRoot then
       lc := lc.insert m (← readLines m)
       tt := { tt with modelFiles := tt.modelFiles.insert m.getRoot (tt.modelFiles.getD m.getRoot 0 + 1) }
-  let mut cache : DepCache := {}
-  let mut reports : Array ThmReport := #[]
+  let mut roots : Array Name := #[]
   for e in expected do
-    let (rep, cache') ← liftTermElabM do
-      let (cone, cache') ← (stmtCone e.name).run cache
-      return (← report lc e.name cone, cache')
+    if let some ti := env.find? e.name then roots := roots ++ ti.type.getUsedConstants
+  let mut cache : DepCache ← stmtGraph roots
+  -- the cones in order (each a walk of the graph), then the reports, one
+  -- task each (attributing a cone's constants to declarations is most of
+  -- the work, and independent across theorems)
+  let mut cones : Array (Name × Cone) := #[]
+  for e in expected do
+    let (cone, cache') ← MetaM.run' ((stmtCone e.name).run cache)
     cache := cache'
-    reports := reports.push rep
+    cones := cones.push (e.name, cone)
+  let ctx ← read
+  let mut tasks := #[]
+  for (n, cone) in cones do
+    tasks := tasks.push (← IO.asTask do
+      let (r, _) ← (MetaM.run' (report lc n cone)).toIO ctx { env }
+      return r)
+  let mut reports : Array ThmReport := #[]
+  for t in tasks do reports := reports.push (← IO.ofExcept (← IO.wait t))
   let t1 ← IO.monoMsNow
   let mut problems : Array String := #[]
   for (e, r) in expected.zip reports do
@@ -431,8 +494,22 @@ elab "#xv6_tcb" : command => do
     IO.FS.writeFile expectedPath ((expectedJson reports).pretty ++ "\n")
     IO.println s!"tcb: rewrote {expectedPath} ({problems.size} change(s))"
   else unless problems.isEmpty do
-    throwError "tcb FAILED: the trusted base moved\n{"\n".intercalate problems.toList}"
+    IO.println s!"tcb FAILED: the trusted base moved\n{"\n".intercalate problems.toList}"
+  return ok
 
 end Xv6.CI.Tcb
 
-#xv6_tcb
+/-- The executable: import the built tree as a file's imports would
+(extensions included: declaration ranges), then `run`. -/
+unsafe def main : IO UInt32 := do
+  initSearchPath (← findSysroot)
+  enableInitializersExecution
+  let env ← importModules #[{ module := `Lean }, { module := `Xv6 }, { module := `MachCSL }] {}
+    (loadExts := true) (leakEnv := true)
+  let ctx : Core.Context := { fileName := "<tcb>", fileMap := default }
+  try
+    let (ok, _) ← (Xv6.CI.Tcb.run).toIO ctx { env }
+    return if ok then 0 else 1
+  catch e =>
+    IO.println s!"error: {e}"
+    return 1

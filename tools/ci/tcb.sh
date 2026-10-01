@@ -4,7 +4,8 @@
 #
 # Runs tools/tcb/Tcb.lean against an ALREADY-BUILT tree: for each top theorem,
 # the definitions its STATEMENT transitively depends on (what one must read to
-# trust it), per file, with declaration and line counts.  ~15 s, ~3 GB.
+# trust it), per file, with declaration and line counts.  ~2 s (a native
+# executable, built here if CI's build step has not), ~3 GB.
 #
 #   --build    `lake build Xv6 MachCSL` first.
 #   --update   rewrite tools/tcb/expected.json from this run instead of
@@ -39,7 +40,13 @@ for arg in "$@"; do
 done
 
 rc=0
-lake env lean tools/tcb/Tcb.lean > "$XV6_CI_OUT/tcb.log" 2>&1 || rc=$?
+# tools/tcb/Tcb.lean is a native executable in its own lake package (its
+# header): build it (nothing to do when up to date; CI builds it alongside
+# the proofs), then run it on the built tree through `lake env`.
+lake -d tools/tcb build tcb -q > "$XV6_CI_OUT/tcb.log" 2>&1 || rc=$?
+if [ "$rc" -eq 0 ]; then
+  lake env tools/tcb/.lake/build/bin/tcb >> "$XV6_CI_OUT/tcb.log" 2>&1 || rc=$?
+fi
 cat "$XV6_CI_OUT/tcb.log"
 
 if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
