@@ -10,6 +10,9 @@ back (the kernel obligation `ukb`'s body), through
     the deposit           UserretClosedRows.urc_deposit
     usertrap (USERTRAP)   at the record uservec saved, crossing `wpNext`
     the answers           UserretClosedRows.urc_post (steps A/B)
+    the key history       one lawful round appended to the residue's history
+                          (UtResFits.usertrapResAt_uhist_acc, UhistDefs;
+                          design/ni-uhist.md D5, Rocq 5634a3874)
     the resume            UserretClosedResume.urc_resume (userret, steps C/D)
 
 back to the next round, under the loop hypothesis `▷ urcLoop`.
@@ -106,6 +109,15 @@ theorem urc_exit (UR : USERRET) (PT : SchedNames → IProp GF) (Γ : SchedNames)
   ihave Hslot := urc_post W V Mp gn cs pid sc f V' M' sts' cs' hl hlw hM hpi hsz hcw hgn hch hpid hlz hsc hround
     hfdk hchk hfde hpipe hrp hlive $$ [Hxo Hfo Hwo Hko Hso Harm]
   · iframe Hxo Hfo Hwo Hko Hso Harm
+  -- THE KEY HISTORY (design/ni-uhist.md D5): one lawful round appended --
+  -- the cause, the trapped key, the key the round left; the lower bound the
+  -- grow hands back is dropped (ruling R3)
+  icases usertrapResAt_uhist_acc PT Γ j cpu' P' ksp V' sts' cs' pid $$ Hres with ⟨%γh, %hh, Huh, %hwf, Hback⟩
+  iapply wpLoop_bupd
+  imod uhistAuth_grow γh hh (sc, W, uvisOf V' M' sts' gn cs' pid) $$ Huh with ⟨Huh, -⟩
+  ihave Hres := Hback $$ %_ Huh
+    %(uhistWf_snoc hwf (urc_roundOkKeys W V Mp sc V' M' sts' gn cs' pid hl hM hpi hsz hcw hlz hsc hround))
+  imodintro
   -- the resume, at usertrap's exit
   have hpcu : jumpPc ((uservecCtx k (tfResumeGpr0 W.tf) V.tf).regs 1#5) = userretVa :=
     urc_uservecRegs_ra (tfResumeGpr0 W.tf) V.tf

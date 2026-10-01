@@ -19,6 +19,21 @@ namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 
+/-- **THE ENCODED LEDGER'S CARRIER** (Rocq `Xv6Cameras.uledG`'s
+`leibnizO positive`; claude-notes/design/ni-uhist.md §5): a per-process
+ledger over a type defined ABOVE this file (the U tier's key record
+`UexecSlot.Uvis`, which itself depends on `Xv6G`) is stored as the list of
+its entries' encodings, so the camera never names the entry type.  Rocq
+encodes into `positive` through `Countable`; Lean's key record holds
+functions (`Uvis.M`, `Uvis.perm`), so the carrier is a tree whose
+`fn` node holds a `Nat`-indexed family -- every key embeds injectively
+(`UhistDefs.UledEnc`).  Its user is the per-process key history
+(`UhistDefs.uhistAuth`). -/
+inductive Uled where
+  | nat (n : Nat)
+  | pair (a b : Uled)
+  | fn (f : Nat → Uled)
+
 /-- The ghost state the xv6 client needs beyond `MachGS` -- and the ONE home
 of every camera two xv6 subsystems share (one instance per camera type, as
 Rocq's `inG`; the subsystems' ghost NAMES keep their resources apart).  The
@@ -86,6 +101,11 @@ class Xv6G (GF : BundledGFunctors) where
   `kalloc`/`kfree` call, its authority inside `kmemAuth`
   (`KallocDefs.kmemLedger`) -/
   [mlKevG : MonoListG GF Kev]
+  /-- THE ENCODED PER-PROCESS LEDGER (Rocq `xv6_uled :: uledG`, a
+  `mono_listR (leibnizO positive)`; NI-LEDGER-REST): the per-process key
+  history (`UhistDefs.uhistAuth`), its entries encoded as `Uled`s so that
+  this class never names the U tier's key record -/
+  [mlUledG : MonoListG GF Uled]
   /-- the ledger's camera is not the seal token's: the ledger lives at the
   seal's own name `γk.pend` (KallocDefs deviation 1), which needs the two
   slots apart (`MachCSL.iOwn_alloc_same_name`).  `decide` at a concrete
@@ -96,7 +116,7 @@ attribute [instance] Xv6G.monoListG Xv6G.gvListG
 attribute [reducible, instance] Xv6G.gvNatG Xv6G.gvUnitG Xv6G.gvCpuG Xv6G.gvW32G Xv6G.gvBoolG
 attribute [reducible, instance] Xv6G.gmUnitG Xv6G.gmBlkG Xv6G.authUfracG Xv6G.cinvG
 attribute [reducible, instance] Xv6G.gvPopG Xv6G.gvOHistG Xv6G.gvDelivG Xv6G.gvLogG Xv6G.gvArmG Xv6G.mlLogG
-attribute [reducible, instance] Xv6G.mlStoredG Xv6G.mlHistG Xv6G.pipeqG Xv6G.mlKevG
+attribute [reducible, instance] Xv6G.mlStoredG Xv6G.mlHistG Xv6G.pipeqG Xv6G.mlKevG Xv6G.mlUledG
 
 /-- The names of one port's ghosts (the Rocq `UartNames.uart_names`, the
 subset the Lean port carries): the accepted trace (`mono_list` over

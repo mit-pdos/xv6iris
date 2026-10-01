@@ -481,8 +481,16 @@ theorem ui_finish [X : CurCtx] (RE : RELEASE) (FP : FORKRET_PARK_PAID)
   have hup := parkToken_park (hlc := hlc) (GF := GF) (SG := uexecSGXv6) cpu ξ0 ⟨γft, γ, γw, Γ, j, procAddr j, pid⟩
     (List.replicate 12 0#64) { V with cwd := kf.regs 10#5, pvSecc := seccAll, cwi := ROOTINO, fdg := V.fdg } M
     (List.replicate NOFILE FdState.closed) ∅ hj (by simp)
-  dsimp only [UtNames.pj, parkOwn, utParkCaps] at hup
-  ihave Hup := hup $$ Hown Htok Hrows Hused Hbs Hig Hfr Hch Hbun Hrd Hchildr
+  -- THE INCARNATION'S KEY HISTORY (design/ni-uhist.md D2), born empty at its
+  -- park and carried by `parkOwn` (UsertrapRes deviation 11)
+  imod (uhistAuth_alloc (GF := GF)) with ⟨%γuh, Huh⟩
+  ihave Hpo : parkOwn (GF := GF) $$ [Hbs Huh]
+  · unfold parkOwn
+    iframe Hbs
+    iexists γuh
+    iexact Huh
+  dsimp only [UtNames.pj, utParkCaps] at hup
+  ihave Hup := hup $$ Hown Htok Hrows Hused Hpo Hig Hfr Hch Hbun Hrd Hchildr
   imod Hup with ⟨Hown, HprocCtx⟩
   ihave Hk := Hback $$ Hown
   imod (pstateWhole_update Γ (procAddr j) USED RUNNABLE) $$ Hwhole with Hwhole

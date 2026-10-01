@@ -195,6 +195,9 @@ def xv6GF : BundledGFunctors :=
   -- WchGpre: the zombie ledger (Rocq `wzl_pre_inG`'s `mono_listR (leibnizO zev)`,
   -- NI-LEDGER-REST); slot 123, clear of the union's (95..108)
   |>.set 123 ⟨xgfMl Zev, inferInstance⟩
+  -- Xv6G: the encoded per-process ledger (Rocq `uledG`'s `mono_listR (leibnizO positive)`,
+  -- NI-LEDGER-REST, the key history); slot 124, clear of the union's (95..108)
+  |>.set 124 ⟨xgfMl Uled, inferInstance⟩
 
 /-! ## One instance per camera -/
 
@@ -327,6 +330,8 @@ instance xgfMlKev : MonoListG xv6GF Kev := ⟨xgf_slot 121⟩
 instance xgfMlPev : MonoListG xv6GF Pev := ⟨xgf_slot 122⟩
 -- WchGpre: the zombie ledger
 instance xgfMlZev : MonoListG xv6GF Zev := ⟨xgf_slot 123⟩
+-- Xv6G: the encoded per-process ledger (the key history)
+instance xgfMlUled : MonoListG xv6GF Uled := ⟨xgf_slot 124⟩
 
 end cameras
 

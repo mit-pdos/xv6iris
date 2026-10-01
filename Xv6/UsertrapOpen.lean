@@ -28,10 +28,10 @@ theorem ut_own_pin (PT : SchedNames → IProp GF) (Γ : SchedNames) (j : Nat) (N
     utOwn (GF := GF) (utSysEnvAt (hlc := hlc) PT Γ j) N V M sts cs pid ⊢
       ⌜N.Γ = Γ ∧ N.j = j⌝ ∗ utOwn (utSysEnvAt (hlc := hlc) PT Γ j) N V M sts cs pid := by
   unfold utOwn utSysEnvAt
-  iintro ⟨Hb, Hfd, Hir, Hpv, Hfr, Hch, ⟨%hp, Hsy⟩⟩
+  iintro ⟨Hb, Hfd, Hir, Hpv, Hfr, Hch, ⟨%hp, Hsy⟩, Huh⟩
   isplitl []
   · ipureintro; exact hp
-  iframe Hb Hfd Hir Hpv Hfr Hch Hsy
+  iframe Hb Hfd Hir Hpv Hfr Hch Hsy Huh
   ipureintro; exact hp
 
 set_option maxHeartbeats 4000000 in

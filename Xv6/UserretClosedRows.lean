@@ -62,6 +62,25 @@ theorem urc_skey_run (W : Uvis) (V : ProcPriv) (Mp : Nat → List (BitVec 8)) (g
     h3.symm.trans (uvisRun_arg W 1 (by decide)).symm, h4.symm.trans (uvisRun_arg W 2 (by decide)).symm,
     h5.symm, h6.symm, h7.symm, h8.symm, h9.symm, h10.symm, h11.symm, h12.symm, h13.symm⟩
 
+/-- **The round, at the keys** (Rocq: `round_ok_keys_of_record` on a copy of
+`Hround'`, design/ni-uhist.md D5): usertrap's round relation at the record
+uservec saved, read at the trapped key's run projection, is the round
+relation at the trapped key and the key the round left -- the key history's
+append. -/
+theorem urc_roundOkKeys (W : Uvis) (V : ProcPriv) (Mp : Nat → List (BitVec 8)) (sc : BitVec 64)
+    (V' : ProcPriv) (M' : Nat → List (BitVec 8)) (sts' : List FdState) (gn : GName)
+    (cs' : ExtTreeSet GName compare) (pid : BitVec 32) (hl : V.tf.length = 36)
+    (hM : umemLazy V.upt V.sz.toNat Mp = W.M) (hpi : W.perm = permOf V.upt.um V.sz.toNat)
+    (hsz : W.sz = V.sz.toNat) (hcw : W.cwd = V.cwi) (hlz : W.lazy = V.pvLazy) (hsc : W.secc = V.pvSecc)
+    (hround : utRound (tfW W.tf tfEpcIdx) sc (urcV0 V W) Mp V' M') :
+    roundOkKeys sc W (uvisOf V' M' sts' gn cs' pid) := by
+  have hu := urc_proTf_run W V hl
+  have h : uroundOk sc (uvisRun W).tf (umemLazy V.upt V.sz.toNat Mp) (permOf V.upt.um V.sz.toNat) V.sz.toNat
+      V.cwi V.pvLazy V.pvSecc V'.tf (umemLazy V'.upt V'.sz.toNat M') (permOf V'.upt.um V'.sz.toNat)
+      V'.sz.toNat V'.cwi V'.pvLazy V'.pvSecc := uroundOk_ueq_l hu hround
+  rw [hM, ← hpi, ← hsz, ← hcw, ← hlz, ← hsc] at h
+  exact roundOkKeys_of_record sc W V' M' sts' gn cs' pid h
+
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
@@ -217,11 +236,7 @@ theorem urc_post (W : Uvis) (V : ProcPriv) (Mp : Nat → List (BitVec 8)) (gn : 
   -- the pure rows, at the run projection
   have hr : uroundOk sc (uvisRun W).tf W.M W.perm W.sz W.cwd W.lazy W.secc V'.tf
       (umemLazy V'.upt V'.sz.toNat M') (permOf V'.upt.um V'.sz.toNat) V'.sz.toNat V'.cwi V'.pvLazy V'.pvSecc := by
-    have h : uroundOk sc (uvisRun W).tf (umemLazy V.upt V.sz.toNat Mp) (permOf V.upt.um V.sz.toNat) V.sz.toNat
-        V.cwi V.pvLazy V.pvSecc V'.tf (umemLazy V'.upt V'.sz.toNat M') (permOf V'.upt.um V'.sz.toNat)
-        V'.sz.toNat V'.cwi V'.pvLazy V'.pvSecc := uroundOk_ueq_l hu hround
-    rw [hM, ← hpi, ← hsz, ← hcw, ← hlz, ← hsc] at h
-    exact h
+    exact urc_roundOkKeys W V Mp sc V' M' sts' gn cs' pid hl hM hpi hsz hcw hlz hsc hround
   have hfd : sc ≠ uecallScause → sts' = W.fd := hfdk
   have hchrow : ¬ (sc = uecallScause ∧ (usysEff W.secc (uvisRun W).tf = USYS_fork ∨
       usysEff W.secc (uvisRun W).tf = USYS_wait)) → cs' = W.ch := by

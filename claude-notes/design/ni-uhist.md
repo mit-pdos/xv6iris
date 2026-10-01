@@ -195,3 +195,40 @@ the led contracts, which is M0's re-cut (the consumers), not M1's.
   contracts (M0's re-cut), at which point the round can be recorded
   beside the ledgers' receipts.
 
+
+## Lean port as landed (2026-10-01)
+
+Lane PI-5 on `lean-ni` (Rocq 5634a3874).  `Xv6/UhistDefs.lean` is
+`UhistDefs.v`: `Uround := BitVec 64 × Uvis × Uvis`, `roundOkKeys`,
+`uhistWf` (+ `_nil`, `_snoc`), `roundOkKeys_of_record`, and the ghost
+`uhistAuth`/`uhistLb` (`_lb`, `_prefix`, `_lb`, `_grow`, `uhistAuth_alloc`),
+`uhistOwn` (+ `_nil`) and the residue's row `uhistRow := ∃ γ, uhistOwn γ`.
+**The camera is ENCODED, as in Rocq, but not into `positive`**: `Uvis` sits
+above `Xv6G` (`UexecSlot` → `FileDefs` → … → `UartTrace`), and it holds
+functions (`M`, `perm`), so it is not countable; the carrier is a small tree
+`UartTrace.Uled` (numbers, pairs, `Nat`-indexed families) defined beside
+`Xv6G`, whose new field `mlUledG : MonoListG GF Uled` sits at slot 124
+(`Xv6GF`, `UnionGF`); `UhistDefs.UledEnc` is the injection (Rocq's
+`Countable` instances, with `Nat → α` and `ExtTreeSet` added), and
+prefix/comparability come back through `uled_map_inj`.  **The history's
+name is existential, not a `UtNames` field** (UsertrapRes deviation 11):
+Lean's `parkOwn` takes no names record, so `un_uh` + `park_own N` would have
+moved the park's landed statements (`utParkIntroBody`, `parkChan`,
+`parkCloser_of_chan`, `parkToken_park[_steady]`); instead `parkOwn := bslots
+3 ∗ ∃ γ, uhistAuth γ []` and `utOwn`/`utOwnNm`/`utOwnBare` end in
+`uhistRow` -- equivalent, since the residue is `∃ N` anyway, and the
+accessor `utResBare_uhist_acc` / `UtResFits.usertrapResAt_uhist_acc` has
+Rocq's `∃ γ h` shape (one implementation, no seals: Lean has no
+`USERTRAP_RES`).  The park sites (`ProofKfork`, `ProofUserinit`) mint the
+empty history (`uhistAuth_alloc`) beside `bslots 3`; `utResBare_park` builds
+the row with `uhistOwn_nil`.  The append is in
+`UserretClosedRound.urc_exit` right after `urc_post` (steps A/B), with
+`UserretClosedRows.urc_roundOkKeys` (factored out of `urc_post`'s `hr`) as the
+lawfulness fact; the lower bound is dropped (R3).  Statements that moved, all
+internal: `utOwn_rebuild` (takes the row), `UsertrapSys.ut90_call` and
+`UsertrapSysTail.ut90_tail` (one more premise row: Lean's syscall arm is
+split into stage lemmas where Rocq's is one proof).  Byte-identical: every
+contract (`USERTRAP`, the loop's, kfork/userinit/forkret's), `utOwn` /
+`utOwnNm` / `utOwnBare` / `parkOwn` / `utResBare` arities, `UtNames`, the
+park's statements.  `Xv6.UhistDefs` does not enter `xv6PowerAdequacy`'s
+trusted base (the carrier lives in `UartTrace`, already in it).
