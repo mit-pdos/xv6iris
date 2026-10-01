@@ -172,7 +172,7 @@ import Xv6.DinodeEnc
 import Xv6.BlkmapDefs
 import Xv6.OffBoxCam
 import Xv6.SleepLockGhost
-import MachCSL.WpSmodeFrame
+import MachCSL.CtxBox
 
 namespace Xv6
 

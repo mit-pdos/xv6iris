@@ -22,6 +22,7 @@ Imports only definitional files.
 -/
 import Xv6.FileDefs
 import Xv6.Image
+import MachCSL.WpSmodeIntr
 
 namespace Xv6
 
