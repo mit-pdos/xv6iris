@@ -140,6 +140,9 @@ theorem uwk_pte_is_invalid (D : UFoot) (orc : UOrc) (s : UWSt) (hp : UwkPins D s
   -- to each branch, split it, walk on
   repeat' (first | uwk_run -bv | uwk_split)
   all_goals
+    -- the leaves are pure bit facts: drop the pins first, or every leaf's
+    -- `simp … at *` and `bv_decide` carry them (5.7 s -> 4.4 s)
+    clear hDmisa hDmenv hDpmpc hDpmpa hDpma hDhtif hmisa hmenv hpmp0 hpma hhtif hres hp
     simp only [Option.some.injEq, Prod.mk.injEq, and_true, uwkInv, uwk_pbmt_matches, pte_is_non_leaf,
       Functions.not, Bool.and_true, Bool.false_or, Bool.and_false, Bool.true_and] at *
     simp only [_get_PTE_Flags_V, _get_PTE_Flags_R, _get_PTE_Flags_W, _get_PTE_Flags_X, _get_PTE_Flags_A,

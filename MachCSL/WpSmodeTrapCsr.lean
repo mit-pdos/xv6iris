@@ -442,7 +442,8 @@ theorem smFacts_sstatusWrite (o v : BitVec 64) (s a b : Bool) (hsm : smFacts o s
   simp only [Bool.false_eq_true, ite_false] at v1 ⊢
   unfold smFacts
   simp only [Bool.false_eq_true, ite_false]
-  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;> sstatus_write_bits
+  -- one bit-blast of the whole conjunction (eleven separate ones: 3.5 s)
+  sstatus_write_bits
 
 set_option maxHeartbeats 4000000 in
 /-- Writing back a full `sstatus` reading with `SIE = 0` pins `SPIE`/`SPP`
@@ -453,8 +454,8 @@ theorem sretFacts_sstatusWrite (o v : BitVec 64) (s a b : Bool) (hsm : smFacts o
   obtain ⟨v1, v58, v9, v13, v15, v19⟩ := hv
   obtain ⟨v5, v8⟩ := v58 rfl
   intro _
-  have e5 : BitVec.extractLsb' 5 1 (sstatusWrite o v) = BitVec.extractLsb' 5 1 v := by sstatus_write_bits
-  have e8 : BitVec.extractLsb' 8 1 (sstatusWrite o v) = BitVec.extractLsb' 8 1 v := by sstatus_write_bits
+  obtain ⟨e5, e8⟩ : BitVec.extractLsb' 5 1 (sstatusWrite o v) = BitVec.extractLsb' 5 1 v ∧
+      BitVec.extractLsb' 8 1 (sstatusWrite o v) = BitVec.extractLsb' 8 1 v := by sstatus_write_bits
   rw [e5, e8]
   exact ⟨v5, v8⟩
 
