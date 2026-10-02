@@ -174,21 +174,22 @@ theorem wpLoop_userret_sret [CurCtx] (U : USER) (cpu : CPU) (C : UCfg) (P : UPtd
     { sConfOf KTier.kpt P.root ms C.mideleg mepc stc lf with mstatus := sretMs ms } hok.phys hmdl rfl
     Privilege.User (Or.inr rfl) pc (paOf trampPpn pc) (epc &&& 0xFFFFFFFFFFFFFFFE#64) false (instruction.SRET ())
     iprop(uptSlot cpu P ∗ □ kmapStatic ∗ ctxTok cpu curCtx)
-    iprop(hartObsStep cpu Privilege.Supervisor Privilege.User ∗ gprFile cpu g ∗ Register.sepc ↦ᵣ[cpu] epc)
-    iprop((uptSlot cpu P ∗ □ kmapStatic ∗ ctxTok cpu curCtx) ∗ gprFile cpu g ∗ Register.sepc ↦ᵣ[cpu] epc)
+    iprop(hartObsStep (Obs.uEnter cpu (sConfOf KTier.kpt P.root ms C.mideleg mepc stc lf).satp epc (gprList g)) emp ∗ gprFile cpu g ∗ Register.sepc ↦ᵣ[cpu] epc)
+    iprop((uptSlot cpu P ∗ □ kmapStatic ∗ ctxTok cpu curCtx) ∗ gprFile cpu g ∗ Register.sepc ↦ᵣ[cpu] epc ∗ emp)
     (uptTransSpecX_tramp cpu _ false P hok pc hlt hvpn)
     (by rw [← hpa2]; exact uptTransSpecX_tramp cpu _ false P hok (pc + 2#64) hlt2 hvpn2)
-    ((execSpecF_sretU cpu _ false hok.phys hspp pc (pc + instrLen false) epc g).frameL _))
+    ((execSpecF_sretU cpu _ false hok.phys hspp pc (pc + instrLen false) epc g emp).frameL _))
   iframe HI HmConf Hclock Hpc
   isplitl [Hslot Htok]
   · iframe Hslot Htok; iexact HS
   -- the user-boundary permit for the `sret`'s privilege write, off the
   -- shared wire bundle (NI M2-W1)
-  ihave Hpriv := wireInv_step cpu Privilege.Supervisor Privilege.User $$ Hwire
+  -- M2-W2a interim: W2c removes this (USERRET then carries the evidence)
+  ihave Hpriv := wireInv_enterBlind (Obs.uEnter cpu (sConfOf KTier.kpt P.root ms C.mideleg mepc stc lf).satp epc (gprList g)) rfl $$ Hwire
   isplitl [Hpriv HF Hsepc]
   · iframe Hpriv HF Hsepc
   inext
-  iintro HmConf Hclock Hpc ⟨⟨Hslot, _, Htok⟩, HF, Hsepc⟩
+  iintro HmConf Hclock Hpc ⟨⟨Hslot, _, Htok⟩, HF, Hsepc, -⟩
   ihave HRut := HR $$ Htok
   ihave HU := userInv_of_sret cpu C P Rut M ms mepc stc (epc &&& 0xFFFFFFFFFFFFFFFE#64) epc sc tv lf g hdq hmie hmed
     (userMstatusOk_sretMs ms hsm hspie) hlf $$ [HmConf Hclock Hpc HF Hsepc Hsc Hstv Hstvec Hslot Hum HRut]

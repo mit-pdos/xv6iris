@@ -125,7 +125,7 @@ end
 `userretVa` on the kernel table, at prepare_return's post shape, with the
 user `satp` in `a0`.  `wireInv` (NI M2-W1): the shared trace bundle, whose
 user-boundary permit the final `sret`'s privilege write consumes (the
-`uEnter` event, `MachCSL.swp_writeReg_priv`). -/
+`uEnter` event, `MachCSL.swp_writeReg_uenter`). -/
 def wp_userret_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (P : UPtd) (M : Nat → List (BitVec 8)) (ws : List (BitVec 64))
     (sep sc tv : BitVec 64)

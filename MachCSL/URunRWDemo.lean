@@ -168,7 +168,7 @@ theorem urwDemo_add_sym (orc : UOrc) (rs : RegFile) (mm : BMap) (rv : Bool) (rs1
 The spike's third fact ran `execute (ECALL ())` and the model's own trap
 tower through the walker.  That tower writes `cur_privilege` from User to
 Supervisor -- since M2-W1 an OBSERVED event (`Obs.uExit`) that needs the
-client's consent (`swp_writeReg_priv`), so no walker footprint may write
+client's consent (`swp_writeReg_uexit`/`_uenter`), so no walker footprint may write
 `cur_privilege` (`UFoot.noPriv`) and the walk facts and their `swp` form
 (`urwDemo_ecall_ok`, `urwDemo_ecall`, `urwDemo_ecall_scause`,
 `urwDemo_swp_ecall`) are retired.  The real tower is `MachCSL.UTrap`. -/

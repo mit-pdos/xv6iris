@@ -170,9 +170,20 @@ theorem xv6PowerAdequacyGen (g : GState) (sb : FsSb) (nib : Nat) (cov : ExtTreeS
           Tnn' c (obsBoots h + 1) ⊢@{IProp GF}
         |==> ◇ (▷ Pt γobs c ∗ (γobs ↪VAR{.own (1 : Qp).half} (h ++ [Obs.powerOn])) ∗
           Tnn'' c (obsBoots h + 1)))
-    -- THE USER-EVENT HOOK (NI M2-W1): the trace slot accepts a hart's
-    -- user-boundary event (`MachCSL.riscvPowerAdequacy`'s `Huser`)
-    (Huser : ∀ (γobs : GName) (c : CT) (h : List Obs) (e : Obs), isUser e = true →
+    -- THE USER-EVENT HOOKS (NI M2-W1, split by M2-W2a): the trace slot
+    -- accepts a hart's user exit, and a user entry with the cited receipt's
+    -- reading (`MachCSL.riscvPowerAdequacy`'s `HuserExit`/`HuserEnter`; the
+    -- record's `uFit` is blind until W2c, so the entry hook is handed no
+    -- justification)
+    (HuserExit : ∀ (γobs : GName) (c : CT) (h : List Obs) (e : Obs), isUExit e = true →
+      ▷ Pt γobs c ∗ (γobs ↪VAR{.own (1 : Qp).half} h) ⊢@{IProp GF}
+        |==> ◇ (▷ Pt γobs c ∗ (γobs ↪VAR{.own (1 : Qp).half} (h ++ [e]))))
+    (HuserEnter : ∀ (γobs : GName) (c : CT) (h : List Obs) (e : Obs) (ox : Option (Nat × Obs)),
+      isUEnter e = true → (∀ i x, ox = some (i, x) → i < h.length ∧ h[i]? = some x) →
+      ▷ Pt γobs c ∗ (γobs ↪VAR{.own (1 : Qp).half} h) ⊢@{IProp GF}
+        |==> ◇ (▷ Pt γobs c ∗ (γobs ↪VAR{.own (1 : Qp).half} (h ++ [e]))))
+    -- M2-W2a interim: W2c removes this (USERRET then carries the evidence)
+    (HuserEnterBlind : ∀ (γobs : GName) (c : CT) (h : List Obs) (e : Obs), isUEnter e = true →
       ▷ Pt γobs c ∗ (γobs ↪VAR{.own (1 : Qp).half} h) ⊢@{IProp GF}
         |==> ◇ (▷ Pt γobs c ∗ (γobs ↪VAR{.own (1 : Qp).half} (h ++ [e]))))
     (Hperm : ∀ (Hinv : InvGS_gen hlc GF) (γgen γstart γreg γd γsw γobs γhist : GName) (c : CT)
@@ -210,7 +221,10 @@ theorem xv6PowerAdequacyGen (g : GState) (sb : FsSb) (nib : Nat) (cov : ExtTreeS
     (fun c => (Ai c).wild) (fun c k => (Ai c).wild_persistent k) (fun c k => (Ai c).wild_timeless k)
     (fun c => (Ai c).rdwild) (fun c k => (Ai c).rdwild_persistent k)
     (fun c k => (Ai c).rdwild_timeless k)
-    HPt Hobs Hback Huser phi Hphi Hgen0 Hpow ?_ n κs t2 g2 hsteps
+    (fun _ _ => True)
+    HPt Hobs Hback HuserExit (fun γobs c h e ox he _ hv => HuserEnter γobs c h e ox he hv)
+    HuserEnterBlind -- M2-W2a interim: W2c removes this (USERRET then carries the evidence)
+    phi Hphi Hgen0 Hpow ?_ n κs t2 g2 hsteps
   intro F Hinv γgen γstart γreg γd γsw γobs γhist c T hF hborn E gen σ hbf hdv hpp
   -- the merge and the runner at the record literal, read off the equations
   -- the literal satisfies by `rfl` (Rocq's `Hmergefix`/`Hrunfix`)
@@ -355,6 +369,9 @@ theorem xv6PowerAdequacy (US : USER) (g : GState) (sb : FsSb) (nib : Nat)
       (fun _ => .rfl) (fun _ => .rfl) γd γobs h on dk hs)
     (fun _ _ _ => backId _ _ _)
     (fun γobs _ h e _ => obsPredAt_user γobs h e)
+    (fun γobs _ h e _ _ _ => obsPredAt_user γobs h e)
+    -- M2-W2a interim: W2c removes this (USERRET then carries the evidence)
+    (fun γobs _ h e _ => obsPredAt_user γobs h e)
     (fun Hinv γgen γstart γreg γd γsw γobs γhist c T =>
       xv6Triv_perm cov sb.sbLogstart Hinv γgen γstart γreg γd γsw γobs γhist c T)
     (fun g' _ => phi g')
@@ -383,7 +400,7 @@ theorem xv6FsAdequacy (US : USER) (g : GState) (sb : FsSb) (nib : Nat)
   xv6PowerAdequacy (hlc := hlc) (GF := GF) US g sb nib cov (xv6TracePure cov sb.sbLogstart)
     (fun Hinv γgen γstart γreg γd γsw γobs γhist c T g' =>
       xv6TraceHook Unit (fun _ _ _ => iprop(True)) appTrivOkc cov sb.sbLogstart (appIfaceTriv GF)
-        Hinv γgen γstart γreg γd γsw γobs γhist c T (obsPredAt γobs) (appTrivTk c) (appTrivHk c) g')
+        Hinv γgen γstart γreg γd γsw γobs γhist c T (obsPredAt γobs) (appTrivTk c) (appTrivHk c) (fun _ _ => True) g')
     Hgen0 Hpow Himg n κs t2 g2 hsteps
 
 include hlc GF in

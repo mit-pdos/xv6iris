@@ -197,7 +197,7 @@ elab "kernel_walk " h:ident " : " t:term : tactic => withMainContext do
 registers answered by the oracle.  The user boundary (M2-W1, 2026-10-01):
 `cur_privilege` is never WRITABLE by a walk (`noPriv`) -- a privilege write
 can cross the user boundary, which is an observed event needing the
-client's consent (`MachCSL.swp_writeReg_priv`), so it is never a silent walker
+client's consent (`MachCSL.swp_writeReg_uexit`/`_uenter`), so it is never a silent walker
 step; the towers that make it (`MachCSL.UTrap`, `MachCSL.WpSmodeSretU`) run
 outside the walker. -/
 structure UFoot where

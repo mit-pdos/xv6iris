@@ -661,14 +661,29 @@ def swpStepCore (x fn : Lean.Expr) (bind : Bool) : TacticM Unit := do
           | (iapply (swp_writeReg_hw_bind (r := $rStx) (v := $wStx) (h := by rfl)); iframe $hw:ident; try inext)
           | (iapply (swp_writeReg_bind (r := $rStx) (w := $wStx) (hq := Or.inl (by decide))); (first | iframe $h:ident | iframe); try (inext; iintro $h:ident))))
       else if rE.isAppOf ``LeanRV64D.Register.cur_privilege then
-        -- THE USER BOUNDARY (NI M2-W1): a privilege write that stays on one
-        -- side of the boundary is silent; a crossing write needs the
-        -- client's consent, the one-write permit `Hpriv : hartObsStep cpu p p'`
-        -- in the context
+        -- THE USER BOUNDARY (NI M2-W1/W2a): a privilege write that stays on
+        -- one side of the boundary is silent; a crossing write needs the
+        -- client's consent for the exact event, `Hpriv : hartObsStep e Out`,
+        -- and the event's read frame (`Hsatp`, `Hscause` at an exit, `Hsepc`,
+        -- the GPR cells `Hgprs`); it hands back the frame, `Hout` and the
+        -- receipt `Hrcpt`
         let hp := mkIdent `Hpriv
+        let hs := mkIdent `Hsatp
+        let hsc := mkIdent `Hscause
+        let hep := mkIdent `Hsepc
+        let hg := mkIdent `Hgprs
+        let ho := mkIdent `Hout
+        let hr := mkIdent `Hrcpt
         evalTactic (← `(tactic| first
           | (iapply swp_writeReg_priv_quiet_bind; iframe $h:ident; isplitl []; (ipureintro; rfl); try (inext; iintro $h:ident))
-          | (iapply swp_writeReg_priv_bind; iframe $hp:ident $h:ident; try (inext; iintro $h:ident))))
+          | (iapply swp_writeReg_uexit_bind; iframe $hp:ident $h:ident $hs:ident $hsc:ident $hep:ident $hg:ident;
+             try (inext; iintro $h:ident $hs:ident $hsc:ident $hep:ident $hg:ident $ho:ident $hr:ident))
+          | (iapply (swp_writeReg_uenter_bind (p := Privilege.Supervisor) (hp := rfl));
+             iframe $hp:ident $h:ident $hs:ident $hep:ident $hg:ident;
+             try (inext; iintro $h:ident $hs:ident $hep:ident $hg:ident $ho:ident $hr:ident))
+          | (iapply (swp_writeReg_uenter_bind (p := Privilege.Machine) (hp := rfl));
+             iframe $hp:ident $h:ident $hs:ident $hep:ident $hg:ident;
+             try (inext; iintro $h:ident $hs:ident $hep:ident $hg:ident $ho:ident $hr:ident))))
       else
         evalTactic (← `(tactic| (iapply (swp_writeReg_bind (r := $rStx) (w := $wStx) (hq := Or.inl (by decide))); (first | iframe $h:ident | iframe); try (inext; iintro $h:ident))))
     else if n == ``LeanRV64D.ConcurrencyInterfaceV1.sail_mem_read then

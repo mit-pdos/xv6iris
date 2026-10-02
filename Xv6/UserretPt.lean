@@ -166,22 +166,24 @@ theorem userret_usret [CurCtx] (cpu : CPU) (c : MConf) (P : UPtd) (hc : urConfOk
   obtain ⟨hlt, hlt2, hv, hv2⟩ := hpc
   unfold urSt
   iintro ⟨#HI, #HS, #Hwi, ⟨HmConf, Hclock, Hpc, Hslot, Htok, HF⟩, Hsepc, HΦ⟩
-  -- the user-boundary permit for the `sret`'s privilege write (NI M2-W1)
-  ihave Hpriv := wireInv_step cpu Privilege.Supervisor Privilege.User $$ Hwi
+  -- the user-boundary consent for the `sret`'s privilege write, at the event
+  -- its read frame names (NI M2-W1/W2a)
+  -- M2-W2a interim: W2c removes this (USERRET then carries the evidence)
+  ihave Hpriv := wireInv_enterBlind (Obs.uEnter cpu c.satp epc (gprList R)) rfl $$ Hwi
   iapply (wpLoop_sT_instr cpu c { c with mstatus := sretMs c.mstatus } hok.phys hmie hmenv
     Privilege.User (Or.inr rfl) pc (paOf trampPpn pc) (epc &&& 0xFFFFFFFFFFFFFFFE#64) false urSret
     iprop(uptSlot cpu P ∗ □ kmapStatic ∗ ctxTok cpu curCtx)
-    iprop(hartObsStep cpu Privilege.Supervisor Privilege.User ∗ gprFile cpu R ∗ Register.sepc ↦ᵣ[cpu] epc)
-    iprop((uptSlot cpu P ∗ □ kmapStatic ∗ ctxTok cpu curCtx) ∗ gprFile cpu R ∗ Register.sepc ↦ᵣ[cpu] epc)
+    iprop(hartObsStep (Obs.uEnter cpu c.satp epc (gprList R)) emp ∗ gprFile cpu R ∗ Register.sepc ↦ᵣ[cpu] epc)
+    iprop((uptSlot cpu P ∗ □ kmapStatic ∗ ctxTok cpu curCtx) ∗ gprFile cpu R ∗ Register.sepc ↦ᵣ[cpu] epc ∗ emp)
     (uptTransSpecX_tramp cpu c false P hok pc hlt hv)
     (by rw [← urPa2 pc hpc']; exact uptTransSpecX_tramp cpu c false P hok (pc + 2#64) hlt2 hv2)
-    ((execSpecF_sretU cpu c false hok.phys hspp pc (pc + instrLen false) epc R).frameL _))
+    ((execSpecF_sretU cpu c false hok.phys hspp pc (pc + instrLen false) epc R emp).frameL _))
   iframe HI HmConf Hclock Hpc Hpriv HF Hsepc
   isplitl [Hslot Htok]
   · iframe Hslot Htok
     iexact HS
   inext
-  iintro HmConf Hclock Hpc ⟨⟨Hslot, _, Htok⟩, HF, Hsepc⟩
+  iintro HmConf Hclock Hpc ⟨⟨Hslot, _, Htok⟩, HF, Hsepc, -⟩
   iapply HΦ $$ HmConf Hclock Hpc Hslot Htok HF Hsepc
 
 /-! ## The user machine, repackaged -/

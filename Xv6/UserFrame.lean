@@ -527,7 +527,8 @@ set_option maxRecDepth 10000 in
 /-- **The frame opened into UTrap's cells** (with `hwConfig`, the caller's
 persistent copy, this is exactly the premise list of `swp_trap_handler_U` /
 `swp_exception_handler_U` / `swp_handle_interrupt_U` / `swp_exec_trap_U` /
-`swp_handle_exception_U`), and closed at the tower's post-values. -/
+`swp_handle_exception_U`), and closed at the tower's post-values.  Since NI
+M2-W2a it also lends `satp` and the GPR file: the exit's read frame. -/
 theorem uf_trapCells (cpu : CPU) (C : UCfg) (P : UPtd) (f : RegFile) (hc : UfCfg C P f) :
     (ufRegF (GF := GF) cpu C).F f ⊢
       Register.cur_privilege ↦ᵣ[cpu] f .cur_privilege ∗ Register.mstatus ↦ᵣ[cpu] f .mstatus ∗
@@ -535,11 +536,13 @@ theorem uf_trapCells (cpu : CPU) (C : UCfg) (P : UPtd) (f : RegFile) (hc : UfCfg
       Register.sepc ↦ᵣ[cpu] f .sepc ∗ Register.stvec ↦ᵣ[cpu]{C.dqc} C.stvec ∗
       Register.medeleg ↦ᵣ[cpu]{C.dqc} C.medeleg ∗ Register.PC ↦ᵣ[cpu] f .PC ∗
       Register.nextPC ↦ᵣ[cpu] f .nextPC ∗
+      Register.satp ↦ᵣ[cpu] f .satp ∗ gprFile cpu (uxaXget f) ∗
       ∀ (p : Privilege) (ms sc stv sep npc : BitVec 64),
         Register.cur_privilege ↦ᵣ[cpu] p -∗ Register.mstatus ↦ᵣ[cpu] ms -∗ Register.scause ↦ᵣ[cpu] sc -∗
         Register.stval ↦ᵣ[cpu] stv -∗ Register.sepc ↦ᵣ[cpu] sep -∗
         Register.stvec ↦ᵣ[cpu]{C.dqc} C.stvec -∗ Register.medeleg ↦ᵣ[cpu]{C.dqc} C.medeleg -∗
         Register.PC ↦ᵣ[cpu] f .PC -∗ Register.nextPC ↦ᵣ[cpu] npc -∗
+        Register.satp ↦ᵣ[cpu] f .satp -∗ gprFile cpu (uxaXget f) -∗
         (ufRegF cpu C).F (ufTrapSet f p ms sc stv sep npc) := by
   have hro : ∀ r ∈ ufRwNamed ++ uxaGprs ++ ufRoList, r ∉ ufTrapRw := by decide
   have ho : ∀ r ∈ ufRwNamed ++ uxaGprs ++ ufRoList, ∀ (p : Privilege) (ms sc stv sep npc : BitVec 64),
@@ -549,9 +552,11 @@ theorem uf_trapCells (cpu : CPU) (C : UCfg) (P : UPtd) (f : RegFile) (hc : UfCfg
   icases (uf_F_split cpu C f).1 $$ HF with ⟨H1, H2, H3, H4, H5, H6⟩
   icases (uf_trapRw_cells cpu f).1 $$ H1 with ⟨Hpr, Hms, Hsc, Hstv, Hsep, Hpc, Hnpc, -⟩
   icases (uf_cfgRo_cells cpu C.dqc f).1 $$ H4 with ⟨Hstvec, Hmedl, Hmie, Hmdl, Hmenv, -⟩
+  icases (uf_ownRo_cells cpu C.dqc f).1 $$ H5 with ⟨Hmcen, Hmtc, Hstc, Hsatp, Hpcfg, Hpaddr, -⟩
+  ihave Hg := (uf_gprFile_cells cpu f).2 $$ H3
   rw [hc.stvec, hc.medeleg]
-  iframe Hpr Hms Hsc Hstv Hsep Hstvec Hmedl Hpc Hnpc
-  iintro %p %ms %sc %stv %sep %npc Hpr Hms Hsc Hstv Hsep Hstvec Hmedl Hpc Hnpc
+  iframe Hpr Hms Hsc Hstv Hsep Hstvec Hmedl Hpc Hnpc Hsatp Hg
+  iintro %p %ms %sc %stv %sep %npc Hpr Hms Hsc Hstv Hsep Hstvec Hmedl Hpc Hnpc Hsatp Hg
   have hn : ∀ r, r ∈ ufRwNamed ∨ r ∈ uxaGprs ∨ r ∈ ufRoList → ufTrapSet f p ms sc stv sep npc r = f r := by
     intro r hr
     refine ho r ?_ p ms sc stv sep npc
@@ -573,15 +578,18 @@ theorem uf_trapCells (cpu : CPU) (C : UCfg) (P : UPtd) (f : RegFile) (hc : UfCfg
     iframe
   isplitl [H2]
   · iapply ufCells_congr cpu ufRwNamed f _ (fun r hr => hn r (Or.inl hr)) $$ H2
-  isplitl [H3]
-  · iapply ufCells_congr cpu uxaGprs f _ (fun r hr => hn r (Or.inr (Or.inl hr))) $$ H3
+  isplitl [Hg]
+  · iapply ufCells_congr cpu uxaGprs f _ (fun r hr => hn r (Or.inr (Or.inl hr)))
+    iapply (uf_gprFile_cells cpu f).1 $$ Hg
   isplitl [Hstvec Hmedl Hmie Hmdl Hmenv]
   · iapply ufCellsD_congr cpu _ ufCfgRo f _ hcfg
     iapply (uf_cfgRo_cells cpu C.dqc f).2
     rw [hc.stvec, hc.medeleg]
     iframe
-  isplitl [H5]
-  · iapply ufCellsD_congr cpu _ ufOwnRo f _ hown $$ H5
+  isplitl [Hmcen Hmtc Hstc Hsatp Hpcfg Hpaddr]
+  · iapply ufCellsD_congr cpu _ ufOwnRo f _ hown
+    iapply (uf_ownRo_cells cpu C.dqc f).2
+    iframe
   · iapply ufCellsD_congr cpu _ hwRegs f _ hhw $$ H6
 
 end seams

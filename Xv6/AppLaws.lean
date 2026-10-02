@@ -37,8 +37,10 @@ Rocq's header on the laws, kept because the reasons are the content:
 
 A twelfth law, `al_user`: the ledger takes a hart's user-boundary event
 (`Obs.uEnter`/`Obs.uExit`).  It is what the machine's user-event hook
-(`MachCSL.wp_power`'s `Huser`, `riscvPowerAdequacy`'s) is built from at the
-ledger (`obsLedgerAt_user`); the power thread seals the resulting permit
+(`MachCSL.wp_power`'s `HuserExit`/`HuserEnter` and the interim
+`HuserEnterBlind`, `riscvPowerAdequacy`'s) are built from at the ledger
+(`obsLedgerAt_uexit`/`_uenter`, M2-W2a: the law serves both arms, blind to
+the entry's evidence); the power thread seals the resulting permit
 into `wireInv`.  The landed ledgers read the history only through its
 power cycles' console segments, the open segment and the boot count, none
 of which a user event moves, so they discharge it unchanged
@@ -211,7 +213,7 @@ class Xv6AppLaws {hlc : HasLC} {GF : BundledGFunctors} [MachGpreS hlc GF] [Xv6G 
       A.R c (h ++ [Obs.powerOn]) ∗ A.turn'' c (obsBoots h + 1)
   /-- THE USER BOUNDARY (NI M2-W1): the ledger takes a hart's user-boundary
   event (`Obs.uEnter`/`Obs.uExit`) -- what seals the hart's permit into the
-  wire invariant at every power-on (`MachCSL.wp_power`'s `Huser`).  The
+  wire invariant at every power-on (`MachCSL.wp_power`'s `HuserExit`/`HuserEnter`).  The
   console ledgers read the history through its power cycles, which no
   user-boundary event enters (`MachCSL.cyclesOf_user`). -/
   al_user : ∀ (c : A.fixed) (h : List Obs) (e : Obs), isUser e = true →
@@ -366,7 +368,13 @@ theorem xv6AppAdequacy (g : GState) (sb : FsSb) (nib : Nat) (cov : ExtTreeSet Na
     -- THE RETURN PATH: the ledger's own second step (Rocq SY3-A1)
     (fun γobs c h => obsLedgerAt_back (A.R c) _ _ (h ++ [Obs.powerOn]) (AL.al_back c h) γobs)
     -- THE USER BOUNDARY (NI M2-W1): the ledger's own user-event step
-    (fun γobs c h e he => obsLedgerAt_user (A.R c) (AL.al_user c) γobs h e he)
+    (fun γobs c h e he => obsLedgerAt_uexit (A.R c) (fun h e he => AL.al_user c h e (isUser_of_uexit he))
+      γobs h e he)
+    (fun γobs c h e ox he hv => obsLedgerAt_uenter (A.R c) (fun _ _ => True)
+      (fun h e _ he _ _ => AL.al_user c h e (isUser_of_uenter he)) γobs h e ox he trivial hv)
+    -- M2-W2a interim: W2c removes this (USERRET then carries the evidence)
+    (fun γobs c h e he => obsLedgerAt_userP (A.R c) (fun _ e => isUEnter e = true)
+      (fun h e he => AL.al_user c h e (isUser_of_uenter he)) γobs h e he)
     -- the permit at the ledger (Rocq's `Hperm` assertion): the application's
     -- two wands at the era's instance, the ledger/tag/claim equations by `rfl`
     -- at the literal

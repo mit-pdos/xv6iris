@@ -176,6 +176,22 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 def gprFile (cpu : CPU) (m : RegMap) : IProp GF := iprop%
   [∗list] i ∈ gprIdxs, gpr cpu i (DFrac.own 1) (m i)
 
+/-- The GPR values `x1..x31` of a register map, in order (the list a
+boundary event names, `MachCSL.hartGprs`). -/
+def gprList (m : RegMap) : List (BitVec 64) := gprIdxs.map m
+
+/-- **The file is the read frame's GPR cells** (NI M2-W2a). -/
+theorem gprFile_gprCells (cpu : CPU) (m : RegMap) :
+    gprFile (GF := GF) cpu m ⊣⊢ gprCells cpu (gprList m) := by
+  unfold gprFile gprList gprIdxs
+  simp only [Iris.Algebra.BigOpL.bigOpL_cons, Iris.Algebra.BigOpL.bigOpL_nil, List.map_cons, List.map_nil]
+  dsimp only [gpr, gprCells, BitVec.reduceToNat]
+  constructor
+  · iintro ⟨H1, H2, H3, H4, H5, H6, H7, H8, H9, H10, H11, H12, H13, H14, H15, H16, H17, H18, H19, H20, H21, H22, H23, H24, H25, H26, H27, H28, H29, H30, H31, -⟩
+    iframe
+  · iintro ⟨H1, H2, H3, H4, H5, H6, H7, H8, H9, H10, H11, H12, H13, H14, H15, H16, H17, H18, H19, H20, H21, H22, H23, H24, H25, H26, H27, H28, H29, H30, H31⟩
+    iframe
+
 /-- Take one register out of the file, and put it back at any value. -/
 theorem gprFile_acc (cpu : CPU) (m : RegMap) (i : BitVec 5) (hi : i ≠ 0#5) :
     gprFile (GF := GF) cpu m ⊢

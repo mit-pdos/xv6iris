@@ -23,11 +23,13 @@ The user boundary (M2-W1, 2026-10-01).  `wireInv` is the persistent bundle
 of the TRACE PERMITS the two tiers share: the wire tie (the pins'
 invariant) and, since M2-W1, the hart's user-boundary permit
 `hartObsPermit` (`MachCSL.Resources`), which every privilege-crossing write
-of `cur_privilege` consumes (`swp_writeReg_priv`).  Both the user tier
+of `cur_privilege` consumes (`swp_writeReg_uexit`/`_uenter`; M2-W2a: an
+exit arm, an evidence-carrying entry arm and the interim blind entry arm).  Both the user tier
 (`SpecUser.USER`'s `wireInv -∗`) and the kernel's `sret` to user mode hold
 `wireInv`, so the permit reaches both boundaries with no statement naming
 it.  The power thread seals it in at power-on beside the pins, out of the
-trace invariant and the client's user-event hook (`wp_power`'s `Huser`).
+trace invariant and the client's user-event hooks (`wp_power`'s
+`HuserExit`/`HuserEnter`/`HuserEnterBlind`).
 
 The Rocq prototype: `WireInv.v` (`wire_inv_body`, `wire_inv_alloc`) and
 `WpIntrCore.v:115-175` (`swp_read_reg_any`).
@@ -115,11 +117,30 @@ theorem wireInv_permit : wireInv (GF := GF) ⊢ hartObsPermit := by
   iintro ⟨_, #Hp⟩
   iexact Hp
 
-/-- One write's permit, read off the shared bundle. -/
-theorem wireInv_step (cpu : CPU) (p p' : Privilege) :
-    wireInv (GF := GF) ⊢ hartObsStep cpu p p' := by
+/-- **An exit's consent**, read off the shared bundle (M2-W2a; W1's
+`wireInv_step` split): any user exit, yielding nothing. -/
+theorem wireInv_exit (e : Obs) (he : isUExit e = true) :
+    wireInv (GF := GF) ⊢ hartObsStep e emp := by
   iintro #Hw
-  iapply hartObsPermit_step
+  iapply hartObsPermit_exit e he
+  iapply wireInv_permit $$ Hw
+
+/-- **An entry's consent**, read off the shared bundle (M2-W2a): the entry
+with its justification `uFit ox e` and the cited receipt. -/
+theorem wireInv_enter (e : Obs) (ox : Option (Nat × Obs)) (he : isUEnter e = true)
+    (hf : MachFixedGS.uFit (hlc := hlc) (GF := GF) ox e) :
+    wireInv (GF := GF) ⊢ uRcptOpt ox -∗ hartObsStep e emp := by
+  iintro #Hw
+  iapply hartObsPermit_enter e ox he hf
+  iapply wireInv_permit $$ Hw
+
+-- M2-W2a interim: W2c removes this (USERRET then carries the evidence)
+/-- **An entry's blind consent** (M2-W2a interim), for the kernel's `sret`
+until W2c hands it the evidence. -/
+theorem wireInv_enterBlind (e : Obs) (he : isUEnter e = true) :
+    wireInv (GF := GF) ⊢ hartObsStep e emp := by
+  iintro #Hw
+  iapply hartObsPermit_enterBlind e he
   iapply wireInv_permit $$ Hw
 
 /-- Allocate the invariant from the owned pin cells, at any levels, beside

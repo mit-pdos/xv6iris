@@ -35,14 +35,14 @@ theorem uk_armOb_interrupt (Q : Step → UWSt → Prop) (sX : UWSt) (hc : UfCfg 
       ucArmOb (ufRegF cpu C) (ubFrame curCtx D) Q (fun _ _ => Rr)
         (Step.Step_Pending_Interrupt (i, Privilege.Supervisor)) :=
   ust_trapArmGen cpu C P D Rr Q sX hc hp hact _ (handle_interrupt i Privilege.Supervisor) (sCause i) 0#64 (sX.file .PC)
-    (fun Φ => by
-      iintro ⟨#Hhw, Hpriv, Hp, Hms, Hsc, Hstv, Hsep, Hstvec, Hmd, Hpc, Hnpc, HΦ⟩
+    (fun Out Φ => by
+      iintro ⟨#Hhw, Hpriv, Hsatp, Hgprs, Hp, Hms, Hsc, Hstv, Hsep, Hstvec, Hmd, Hpc, Hnpc, HΦ⟩
       iapply swp_handle_interrupt_U cpu i (sX.file .PC) (sX.file .nextPC) (sX.file .mstatus) (sX.file .scause)
         (sX.file .stval) (sX.file .sepc) C.stvec C.tvd C.dqc (DFrac.own 1)
-      iframe Hhw Hpriv Hp Hms Hsc Hstv Hsep Hstvec Hpc Hnpc
+      iframe Hhw Hpriv Hsatp Hgprs Hp Hms Hsc Hstv Hsep Hstvec Hpc Hnpc
       inext
-      iintro Hp Hms Hsc Hstv Hsep Hstvec Hpc Hnpc
-      iapply HΦ $$ Hp Hms Hsc Hstv Hsep Hstvec Hmd Hpc Hnpc)
+      iintro Hp Hms Hsc Hstv Hsep Hstvec Hpc Hnpc Hsatp Hgprs Hout Hrcpt
+      iapply HΦ $$ Hp Hms Hsc Hstv Hsep Hstvec Hmd Hpc Hnpc Hsatp Hgprs Hout Hrcpt)
     (fun _ => rfl) hq
 
 /-- **The execute-trap arm** (a payload-free delegable trap at User). -/
@@ -58,14 +58,14 @@ theorem uk_armOb_trap (Q : Step → UWSt → Prop) (sX : UWSt) (hc : UfCfg C P s
         (Step.Step_Execute (.Trap (Privilege.User, exc, pc0), ib)) :=
   ust_trapArmGen cpu C P D Rr Q sX hc hp hact _ (exception_handler Privilege.User exc pc0 >>= set_next_pc)
     (utrapScause (.Exception exc.trap) (sX.file .scause)) (tval exc.excinfo) pc0
-    (fun Φ => by
-      iintro ⟨#Hhw, Hpriv, Hp, Hms, Hsc, Hstv, Hsep, Hstvec, Hmd, Hpc, Hnpc, HΦ⟩
+    (fun Out Φ => by
+      iintro ⟨#Hhw, Hpriv, Hsatp, Hgprs, Hp, Hms, Hsc, Hstv, Hsep, Hstvec, Hmd, Hpc, Hnpc, HΦ⟩
       iapply ust_swp_exec_trap cpu exc hext pc0 (sX.file .nextPC) (sX.file .mstatus) (sX.file .scause)
         (sX.file .stval) (sX.file .sepc) C.stvec C.medeleg C.tvd C.dqc C.dqc (C.del _ he)
-      iframe Hhw Hpriv Hp Hms Hsc Hstv Hsep Hstvec Hmd Hnpc
+      iframe Hhw Hpriv Hsatp Hgprs Hp Hms Hsc Hstv Hsep Hstvec Hmd Hnpc
       inext
-      iintro Hp Hms Hsc Hstv Hsep Hstvec Hmd Hnpc
-      iapply HΦ $$ Hp Hms Hsc Hstv Hsep Hstvec Hmd Hpc Hnpc)
+      iintro Hp Hms Hsc Hstv Hsep Hstvec Hmd Hnpc Hsatp Hgprs Hout Hrcpt
+      iapply HΦ $$ Hp Hms Hsc Hstv Hsep Hstvec Hmd Hpc Hnpc Hsatp Hgprs Hout Hrcpt)
     (fun _ => rfl) hq
 
 /-- **The retiring arm**: the frames at the execute's landing, handed over. -/

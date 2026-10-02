@@ -381,6 +381,8 @@ the era). -/
     MachFixedGS hlc GF :=
   Ai.bootFixedGS Hinv γgen γstart γreg γd XV6_DISK_BYTES γsw
     (xv6Slot N appFs appOkc cov ls γd γsw γreg γstart c) Tkp Hkp γobs T Ptp γhist
+    -- the enter's justification: blind until W2c sets `niFit` (NI M2-W2a)
+    (fun _ _ => True)
 
 set_option maxHeartbeats 800000 in
 /-- **ONE ERA** (Rocq `SystemAdequacy.xv6_boot_era`): at the machine's record

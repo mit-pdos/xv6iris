@@ -30,9 +30,9 @@ register write is silent by computation (`swp_event`'s auto-discharged
 `hsil`); a register write is silent unless it is a crossing write of
 `cur_privilege` (`hartObs_regWrite_quiet`), so `swp_writeReg` takes
 `r ≠ .cur_privilege ∨ v = w`, and the crossing write itself is
-`swp_writeReg_priv`, which takes the CLIENT'S CONSENT as a premise
-(`hartObsStep`: move the history by the event; `hartObsPermit` its
-persistent, every-write form; `hartObsPermit_triv` the trivial trace
+`swp_writeReg_uexit`/`swp_writeReg_uenter`, which take the CLIENT'S CONSENT as a premise
+(`hartObsStep e Out`: move the history by exactly `e`; `hartObsPermit` its
+persistent form; `hartObsPermit_triv` the trivial trace
 predicate's instance).
 
 Eras: `wpHart` is stated at the ambient generation and takes the generation's
@@ -186,7 +186,7 @@ step, and re-establishes the interpretation at every possible successor,
 handing the history back extended by the step's own observations
 (`hartObsM`; only a crossing write of `cur_privilege` has any).  The other
 half of the history lives in the client's trace predicate, so a caller
-extending it is a caller with the client's consent (`swp_writeReg_priv`).
+extending it is a caller with the client's consent (`swp_writeReg_uexit`/`_uenter`).
 The era bookkeeping is dispatched here. -/
 theorem wpHart_lift_obs (cpu : CPU) (m : SailM Unit) :
     (∀ (g : GState) (h : List Obs), ⌜obsWf h g ∧ threadLive g (genId (hlc := hlc) (GF := GF))⌝ -∗
@@ -305,7 +305,7 @@ theorem wpHart_lift_obs (cpu : CPU) (m : SailM Unit) :
 /-- **The SILENT lifting lemma** (today's `wpHart_lift`, NI M2-W1): for a step
 that emits nothing -- the callback shows `hartObsM cpu m σ = []` at the
 machine it is handed -- the history is framed and the callback never sees
-it.  Every per-event rule but `swp_writeReg_priv` is proved from this. -/
+it.  Every per-event rule but the observed privilege writes is proved from this. -/
 theorem wpHart_lift (cpu : CPU) (m : SailM Unit) :
     (∀ σ, machInterp σ ={⊤,∅}=∗
       ⌜hartObsM cpu m σ = [] ∧ ∃ m' σ', hartStep cpu m σ m' σ'⌝ ∗
@@ -689,7 +689,7 @@ theorem swp_readReg_any_bind (cpu : CPU) {X : Type} (r : Register)
 /-- Write a register: needs the full cell, and hands back the updated cell.
 A SILENT write (NI M2-W1): any register but `cur_privilege`, or the value
 already there (`hq`); the crossing write of `cur_privilege` is
-`swp_writeReg_priv`. -/
+`swp_writeReg_uexit`/`swp_writeReg_uenter`. -/
 theorem swp_writeReg (cpu : CPU) (r : Register) (v w : RegisterType r)
     (hq : r ≠ .cur_privilege ∨ v = w) (Φ : PUnit → IProp GF) :
     r ↦ᵣ[cpu] v ∗ ▷ (r ↦ᵣ[cpu] w -∗ Φ ()) ⊢ swp cpu (writeReg r w) Φ := by
@@ -768,55 +768,353 @@ theorem swp_event_obs (cpu : CPU) {X : Type} (o : Outcome Register RegisterType)
     iapply Hswp $$ %C %hC Hcont
   · exact absurd hb (hnb _ _)
 
-/-- **The privilege write, OBSERVED** (NI M2-W1): writing `p'` over `p` to
-`cur_privilege`, with the client's consent for exactly that write.  The
-U→S trap (`MachCSL.UTrap`) and the S→U `sret` (`MachCSL.WpSmodeSretU`) are
-its two crossing instances; a same-value write needs no consent
-(`swp_writeReg`). -/
-theorem swp_writeReg_priv (cpu : CPU) (p p' : Privilege) (Φ : PUnit → IProp GF) :
-    hartObsStep cpu p p' ∗ Register.cur_privilege ↦ᵣ[cpu] p ∗
-      ▷ (Register.cur_privilege ↦ᵣ[cpu] p' -∗ Φ ())
-    ⊢ swp cpu (writeReg Register.cur_privilege p') Φ := by
+/-! ### The read frame of the boundary events (NI M2-W2a) -/
+
+/-- **The 31 user GPR cells `x1..x31`, holding the list `gs`** (in order; a
+list of any other length holds nothing).  The register file `gprFile cpu G`
+is these cells at `gprList G` (`MachCSL.gprFile_gprCells`). -/
+def gprCells (cpu : CPU) : List (BitVec 64) → IProp GF
+  | [a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15, a16, a17, a18, a19, a20, a21, a22, a23, a24, a25, a26, a27, a28, a29, a30, a31] => iprop(
+      Register.x1 ↦ᵣ[cpu] a1 ∗
+      Register.x2 ↦ᵣ[cpu] a2 ∗
+      Register.x3 ↦ᵣ[cpu] a3 ∗
+      Register.x4 ↦ᵣ[cpu] a4 ∗
+      Register.x5 ↦ᵣ[cpu] a5 ∗
+      Register.x6 ↦ᵣ[cpu] a6 ∗
+      Register.x7 ↦ᵣ[cpu] a7 ∗
+      Register.x8 ↦ᵣ[cpu] a8 ∗
+      Register.x9 ↦ᵣ[cpu] a9 ∗
+      Register.x10 ↦ᵣ[cpu] a10 ∗
+      Register.x11 ↦ᵣ[cpu] a11 ∗
+      Register.x12 ↦ᵣ[cpu] a12 ∗
+      Register.x13 ↦ᵣ[cpu] a13 ∗
+      Register.x14 ↦ᵣ[cpu] a14 ∗
+      Register.x15 ↦ᵣ[cpu] a15 ∗
+      Register.x16 ↦ᵣ[cpu] a16 ∗
+      Register.x17 ↦ᵣ[cpu] a17 ∗
+      Register.x18 ↦ᵣ[cpu] a18 ∗
+      Register.x19 ↦ᵣ[cpu] a19 ∗
+      Register.x20 ↦ᵣ[cpu] a20 ∗
+      Register.x21 ↦ᵣ[cpu] a21 ∗
+      Register.x22 ↦ᵣ[cpu] a22 ∗
+      Register.x23 ↦ᵣ[cpu] a23 ∗
+      Register.x24 ↦ᵣ[cpu] a24 ∗
+      Register.x25 ↦ᵣ[cpu] a25 ∗
+      Register.x26 ↦ᵣ[cpu] a26 ∗
+      Register.x27 ↦ᵣ[cpu] a27 ∗
+      Register.x28 ↦ᵣ[cpu] a28 ∗
+      Register.x29 ↦ᵣ[cpu] a29 ∗
+      Register.x30 ↦ᵣ[cpu] a30 ∗
+      Register.x31 ↦ᵣ[cpu] a31)
+  | _ => iprop(False)
+
+/-- The cells pin the file's GPRs: the event's `hartGprs` is the list. -/
+theorem gprCells_valid (cpu : CPU) (f : RegFile) (gs : List (BitVec 64)) :
+    regInterp (GF := GF) cpu f ∗ gprCells cpu gs ⊢ ⌜hartGprs f = gs⌝ := by
+  unfold gprCells
+  split
+  · rename_i a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11 a12 a13 a14 a15 a16 a17 a18 a19 a20 a21 a22 a23 a24 a25 a26 a27 a28 a29 a30 a31
+    iintro ⟨Hregs, ⟨H1, H2, H3, H4, H5, H6, H7, H8, H9, H10, H11, H12, H13, H14, H15, H16, H17, H18, H19, H20, H21, H22, H23, H24, H25, H26, H27, H28, H29, H30, H31⟩⟩
+    ihave %h1 : ⌜f Register.x1 = a1⌝ $$ [Hregs H1]
+    · icases reg_valid cpu f Register.x1 (DFrac.own 1) a1 $$ [$Hregs $H1] with %_
+      itrivial
+    ihave %h2 : ⌜f Register.x2 = a2⌝ $$ [Hregs H2]
+    · icases reg_valid cpu f Register.x2 (DFrac.own 1) a2 $$ [$Hregs $H2] with %_
+      itrivial
+    ihave %h3 : ⌜f Register.x3 = a3⌝ $$ [Hregs H3]
+    · icases reg_valid cpu f Register.x3 (DFrac.own 1) a3 $$ [$Hregs $H3] with %_
+      itrivial
+    ihave %h4 : ⌜f Register.x4 = a4⌝ $$ [Hregs H4]
+    · icases reg_valid cpu f Register.x4 (DFrac.own 1) a4 $$ [$Hregs $H4] with %_
+      itrivial
+    ihave %h5 : ⌜f Register.x5 = a5⌝ $$ [Hregs H5]
+    · icases reg_valid cpu f Register.x5 (DFrac.own 1) a5 $$ [$Hregs $H5] with %_
+      itrivial
+    ihave %h6 : ⌜f Register.x6 = a6⌝ $$ [Hregs H6]
+    · icases reg_valid cpu f Register.x6 (DFrac.own 1) a6 $$ [$Hregs $H6] with %_
+      itrivial
+    ihave %h7 : ⌜f Register.x7 = a7⌝ $$ [Hregs H7]
+    · icases reg_valid cpu f Register.x7 (DFrac.own 1) a7 $$ [$Hregs $H7] with %_
+      itrivial
+    ihave %h8 : ⌜f Register.x8 = a8⌝ $$ [Hregs H8]
+    · icases reg_valid cpu f Register.x8 (DFrac.own 1) a8 $$ [$Hregs $H8] with %_
+      itrivial
+    ihave %h9 : ⌜f Register.x9 = a9⌝ $$ [Hregs H9]
+    · icases reg_valid cpu f Register.x9 (DFrac.own 1) a9 $$ [$Hregs $H9] with %_
+      itrivial
+    ihave %h10 : ⌜f Register.x10 = a10⌝ $$ [Hregs H10]
+    · icases reg_valid cpu f Register.x10 (DFrac.own 1) a10 $$ [$Hregs $H10] with %_
+      itrivial
+    ihave %h11 : ⌜f Register.x11 = a11⌝ $$ [Hregs H11]
+    · icases reg_valid cpu f Register.x11 (DFrac.own 1) a11 $$ [$Hregs $H11] with %_
+      itrivial
+    ihave %h12 : ⌜f Register.x12 = a12⌝ $$ [Hregs H12]
+    · icases reg_valid cpu f Register.x12 (DFrac.own 1) a12 $$ [$Hregs $H12] with %_
+      itrivial
+    ihave %h13 : ⌜f Register.x13 = a13⌝ $$ [Hregs H13]
+    · icases reg_valid cpu f Register.x13 (DFrac.own 1) a13 $$ [$Hregs $H13] with %_
+      itrivial
+    ihave %h14 : ⌜f Register.x14 = a14⌝ $$ [Hregs H14]
+    · icases reg_valid cpu f Register.x14 (DFrac.own 1) a14 $$ [$Hregs $H14] with %_
+      itrivial
+    ihave %h15 : ⌜f Register.x15 = a15⌝ $$ [Hregs H15]
+    · icases reg_valid cpu f Register.x15 (DFrac.own 1) a15 $$ [$Hregs $H15] with %_
+      itrivial
+    ihave %h16 : ⌜f Register.x16 = a16⌝ $$ [Hregs H16]
+    · icases reg_valid cpu f Register.x16 (DFrac.own 1) a16 $$ [$Hregs $H16] with %_
+      itrivial
+    ihave %h17 : ⌜f Register.x17 = a17⌝ $$ [Hregs H17]
+    · icases reg_valid cpu f Register.x17 (DFrac.own 1) a17 $$ [$Hregs $H17] with %_
+      itrivial
+    ihave %h18 : ⌜f Register.x18 = a18⌝ $$ [Hregs H18]
+    · icases reg_valid cpu f Register.x18 (DFrac.own 1) a18 $$ [$Hregs $H18] with %_
+      itrivial
+    ihave %h19 : ⌜f Register.x19 = a19⌝ $$ [Hregs H19]
+    · icases reg_valid cpu f Register.x19 (DFrac.own 1) a19 $$ [$Hregs $H19] with %_
+      itrivial
+    ihave %h20 : ⌜f Register.x20 = a20⌝ $$ [Hregs H20]
+    · icases reg_valid cpu f Register.x20 (DFrac.own 1) a20 $$ [$Hregs $H20] with %_
+      itrivial
+    ihave %h21 : ⌜f Register.x21 = a21⌝ $$ [Hregs H21]
+    · icases reg_valid cpu f Register.x21 (DFrac.own 1) a21 $$ [$Hregs $H21] with %_
+      itrivial
+    ihave %h22 : ⌜f Register.x22 = a22⌝ $$ [Hregs H22]
+    · icases reg_valid cpu f Register.x22 (DFrac.own 1) a22 $$ [$Hregs $H22] with %_
+      itrivial
+    ihave %h23 : ⌜f Register.x23 = a23⌝ $$ [Hregs H23]
+    · icases reg_valid cpu f Register.x23 (DFrac.own 1) a23 $$ [$Hregs $H23] with %_
+      itrivial
+    ihave %h24 : ⌜f Register.x24 = a24⌝ $$ [Hregs H24]
+    · icases reg_valid cpu f Register.x24 (DFrac.own 1) a24 $$ [$Hregs $H24] with %_
+      itrivial
+    ihave %h25 : ⌜f Register.x25 = a25⌝ $$ [Hregs H25]
+    · icases reg_valid cpu f Register.x25 (DFrac.own 1) a25 $$ [$Hregs $H25] with %_
+      itrivial
+    ihave %h26 : ⌜f Register.x26 = a26⌝ $$ [Hregs H26]
+    · icases reg_valid cpu f Register.x26 (DFrac.own 1) a26 $$ [$Hregs $H26] with %_
+      itrivial
+    ihave %h27 : ⌜f Register.x27 = a27⌝ $$ [Hregs H27]
+    · icases reg_valid cpu f Register.x27 (DFrac.own 1) a27 $$ [$Hregs $H27] with %_
+      itrivial
+    ihave %h28 : ⌜f Register.x28 = a28⌝ $$ [Hregs H28]
+    · icases reg_valid cpu f Register.x28 (DFrac.own 1) a28 $$ [$Hregs $H28] with %_
+      itrivial
+    ihave %h29 : ⌜f Register.x29 = a29⌝ $$ [Hregs H29]
+    · icases reg_valid cpu f Register.x29 (DFrac.own 1) a29 $$ [$Hregs $H29] with %_
+      itrivial
+    ihave %h30 : ⌜f Register.x30 = a30⌝ $$ [Hregs H30]
+    · icases reg_valid cpu f Register.x30 (DFrac.own 1) a30 $$ [$Hregs $H30] with %_
+      itrivial
+    ihave %h31 : ⌜f Register.x31 = a31⌝ $$ [Hregs H31]
+    · icases reg_valid cpu f Register.x31 (DFrac.own 1) a31 $$ [$Hregs $H31] with %_
+      itrivial
+    ipureintro
+    simp only [hartGprs, h1, h2, h3, h4, h5, h6, h7, h8, h9, h10, h11, h12, h13, h14, h15, h16, h17, h18, h19, h20, h21, h22, h23, h24, h25, h26, h27, h28, h29, h30, h31]
+  · iintro ⟨-, H⟩
+    iexfalso
+    iexact H
+
+/-- **The exit's read frame**: the cells `uExit` reads at a trap delegated to
+Supervisor -- `satp`, `scause`, `sepc`, the GPRs. -/
+def hartRdX (cpu : CPU) (s sc ep : BitVec 64) (gs : List (BitVec 64)) : IProp GF := iprop%
+  Register.satp ↦ᵣ[cpu] s ∗ Register.scause ↦ᵣ[cpu] sc ∗ Register.sepc ↦ᵣ[cpu] ep ∗ gprCells cpu gs
+
+/-- **The entry's read frame**: the cells `uEnter` reads -- `satp`, `sepc`,
+the GPRs. -/
+def hartRdE (cpu : CPU) (s ep : BitVec 64) (gs : List (BitVec 64)) : IProp GF := iprop%
+  Register.satp ↦ᵣ[cpu] s ∗ Register.sepc ↦ᵣ[cpu] ep ∗ gprCells cpu gs
+
+/-- The receipt of the event just appended at `h`. -/
+theorem uRcpt_of_lb (h : List Obs) (e : Obs) :
+    obsHistLb (GF := GF) (h ++ [e]) ⊢ ∃ i, uRcpt (i, e) := by
+  iintro #H
+  iexists h.length
+  unfold uRcpt
+  iexists h
+  isplitr
+  · ipureintro; rfl
+  iexact H
+
+/-- **The U→S privilege write, OBSERVED, cell form** (the read frame spelled
+out; `swp_writeReg_uexit` is its `hartRdX` statement). -/
+theorem swp_writeReg_uexit_cells (cpu : CPU) (s sc ep : BitVec 64) (gs : List (BitVec 64))
+    (Out : IProp GF) (Φ : PUnit → IProp GF) :
+    hartObsStep (.uExit cpu s sc ep gs) Out ∗ Register.cur_privilege ↦ᵣ[cpu] Privilege.User ∗
+      Register.satp ↦ᵣ[cpu] s ∗ Register.scause ↦ᵣ[cpu] sc ∗ Register.sepc ↦ᵣ[cpu] ep ∗
+      gprCells cpu gs ∗
+      ▷ (Register.cur_privilege ↦ᵣ[cpu] Privilege.Supervisor -∗ Register.satp ↦ᵣ[cpu] s -∗
+          Register.scause ↦ᵣ[cpu] sc -∗ Register.sepc ↦ᵣ[cpu] ep -∗ gprCells cpu gs -∗ Out -∗
+          (∃ i, uRcpt (i, .uExit cpu s sc ep gs)) -∗ Φ ())
+    ⊢ swp cpu (writeReg Register.cur_privilege Privilege.Supervisor) Φ := by
   unfold writeReg PreSail.writeReg PreSail.emit hartObsStep
-  iintro ⟨Hperm, Hr, HΦ⟩
-  iapply swp_event_obs cpu (.regWrite Register.cur_privilege p') (fun v => FreeM.pure v) Φ
+  iintro ⟨Hperm, Hr, Hs, Hsc, Hep, Hg, HΦ⟩
+  iapply swp_event_obs cpu (.regWrite Register.cur_privilege Privilege.Supervisor) (fun v => FreeM.pure v) Φ
+    (fun _ _ h => h)
+  iintro %g %h %hf ⟨Hσ, Ha⟩
+  icases machInterp_acc g.m cpu $$ Hσ with ⟨Hregs, Hclose⟩
+  ihave %Hv : ⌜g.m.regs cpu Register.cur_privilege = Privilege.User⌝ $$ [Hregs Hr]
+  · icases reg_valid cpu (g.m.regs cpu) Register.cur_privilege (DFrac.own 1) Privilege.User $$ [$Hregs $Hr] with %_
+    itrivial
+  ihave %hs : ⌜g.m.regs cpu Register.satp = s⌝ $$ [Hregs Hs]
+  · icases reg_valid cpu (g.m.regs cpu) Register.satp (DFrac.own 1) s $$ [$Hregs $Hs] with %_
+    itrivial
+  ihave %hsc : ⌜g.m.regs cpu Register.scause = sc⌝ $$ [Hregs Hsc]
+  · icases reg_valid cpu (g.m.regs cpu) Register.scause (DFrac.own 1) sc $$ [$Hregs $Hsc] with %_
+    itrivial
+  ihave %hep : ⌜g.m.regs cpu Register.sepc = ep⌝ $$ [Hregs Hep]
+  · icases reg_valid cpu (g.m.regs cpu) Register.sepc (DFrac.own 1) ep $$ [$Hregs $Hep] with %_
+    itrivial
+  ihave %hg : ⌜hartGprs (g.m.regs cpu) = gs⌝ $$ [Hregs Hg]
+  · icases gprCells_valid cpu (g.m.regs cpu) gs $$ [$Hregs $Hg] with %_
+    itrivial
+  have he : hartObs cpu (.regWrite Register.cur_privilege Privilege.Supervisor) g.m =
+      [.uExit cpu s sc ep gs] := by
+    show hartObsPriv cpu (g.m.regs cpu) Privilege.Supervisor = _
+    simp only [hartObsPriv, Hv, privUser, uExitOf, hs, hsc, hep, hg]
+  imod reg_update cpu (g.m.regs cpu) Register.cur_privilege Privilege.User Privilege.Supervisor $$ [$Hregs $Hr]
+    with ⟨Hregs, Hr⟩
+  iapply fupd_mask_intro LawfulSet.empty_subset
+  iintro Hmask
+  isplit
+  · ipureintro
+    exact ⟨(), g.m.setReg cpu Register.cur_privilege Privilege.Supervisor, rfl⟩
+  inext
+  iintro %v' %σ' %Hev
+  obtain rfl := Hev
+  imod Hmask
+  imod Hperm $$ %h %g %⟨hf.1, hf.2.1⟩ Ha with ⟨Ha, HOut⟩
+  icases obsAuth_lb (h ++ [.uExit cpu s sc ep gs]) $$ Ha with ⟨Ha, #Hlb⟩
+  imodintro
+  rw [he]
+  isplitl [Hregs Hclose]
+  · iapply Hclose $$ Hregs
+  isplitl [Ha]
+  · iexact Ha
+  · iapply swp_ret
+    iapply HΦ $$ Hr Hs Hsc Hep Hg HOut
+    iapply uRcpt_of_lb $$ Hlb
+
+/-- **The U→S privilege write, OBSERVED** (NI M2-W2a, design §3; W1's
+`swp_writeReg_priv` retired): the trap's write of `Supervisor` over `User`
+with the consent for EXACTLY the event its read frame names, which hands
+back the frame, `Out` and the event's machine receipt. -/
+theorem swp_writeReg_uexit (cpu : CPU) (s sc ep : BitVec 64) (gs : List (BitVec 64))
+    (Out : IProp GF) (Φ : PUnit → IProp GF) :
+    hartObsStep (.uExit cpu s sc ep gs) Out ∗ Register.cur_privilege ↦ᵣ[cpu] Privilege.User ∗
+      hartRdX cpu s sc ep gs ∗
+      ▷ (Register.cur_privilege ↦ᵣ[cpu] Privilege.Supervisor -∗ hartRdX cpu s sc ep gs -∗ Out -∗
+          (∃ i, uRcpt (i, .uExit cpu s sc ep gs)) -∗ Φ ())
+    ⊢ swp cpu (writeReg Register.cur_privilege Privilege.Supervisor) Φ := by
+  unfold hartRdX
+  iintro ⟨Hperm, Hr, ⟨Hs, Hsc, Hep, Hg⟩, HΦ⟩
+  iapply swp_writeReg_uexit_cells cpu s sc ep gs Out Φ
+  iframe Hperm Hr Hs Hsc Hep Hg
+  inext
+  iintro Hr Hs Hsc Hep Hg HOut HR
+  iapply HΦ $$ Hr [Hs Hsc Hep Hg] HOut HR
+  iframe
+
+theorem swp_writeReg_uexit_bind (cpu : CPU) {X : Type} (s sc ep : BitVec 64) (gs : List (BitVec 64))
+    (Out : IProp GF) (f : PUnit → SailM X) (Φ : X → IProp GF) :
+    hartObsStep (.uExit cpu s sc ep gs) Out ∗ Register.cur_privilege ↦ᵣ[cpu] Privilege.User ∗
+      Register.satp ↦ᵣ[cpu] s ∗ Register.scause ↦ᵣ[cpu] sc ∗ Register.sepc ↦ᵣ[cpu] ep ∗
+      gprCells cpu gs ∗
+      ▷ (Register.cur_privilege ↦ᵣ[cpu] Privilege.Supervisor -∗ Register.satp ↦ᵣ[cpu] s -∗
+          Register.scause ↦ᵣ[cpu] sc -∗ Register.sepc ↦ᵣ[cpu] ep -∗ gprCells cpu gs -∗ Out -∗
+          (∃ i, uRcpt (i, .uExit cpu s sc ep gs)) -∗ swp cpu (f ()) Φ)
+    ⊢ swp cpu (writeReg Register.cur_privilege Privilege.Supervisor >>= f) Φ := by
+  iintro H
+  iapply swp_bind
+  iapply (swp_writeReg_uexit_cells cpu s sc ep gs Out (fun _ => swp cpu (f ()) Φ))
+  iexact H
+
+/-- **The S→U privilege write, OBSERVED, cell form.** -/
+theorem swp_writeReg_uenter_cells (cpu : CPU) (p : Privilege) (hp : privUser p = false)
+    (s ep : BitVec 64) (gs : List (BitVec 64)) (Out : IProp GF) (Φ : PUnit → IProp GF) :
+    hartObsStep (.uEnter cpu s ep gs) Out ∗ Register.cur_privilege ↦ᵣ[cpu] p ∗
+      Register.satp ↦ᵣ[cpu] s ∗ Register.sepc ↦ᵣ[cpu] ep ∗ gprCells cpu gs ∗
+      ▷ (Register.cur_privilege ↦ᵣ[cpu] Privilege.User -∗ Register.satp ↦ᵣ[cpu] s -∗
+          Register.sepc ↦ᵣ[cpu] ep -∗ gprCells cpu gs -∗ Out -∗
+          (∃ i, uRcpt (i, .uEnter cpu s ep gs)) -∗ Φ ())
+    ⊢ swp cpu (writeReg Register.cur_privilege Privilege.User) Φ := by
+  unfold writeReg PreSail.writeReg PreSail.emit hartObsStep
+  iintro ⟨Hperm, Hr, Hs, Hep, Hg, HΦ⟩
+  iapply swp_event_obs cpu (.regWrite Register.cur_privilege Privilege.User) (fun v => FreeM.pure v) Φ
     (fun _ _ h => h)
   iintro %g %h %hf ⟨Hσ, Ha⟩
   icases machInterp_acc g.m cpu $$ Hσ with ⟨Hregs, Hclose⟩
   ihave %Hv : ⌜g.m.regs cpu Register.cur_privilege = p⌝ $$ [Hregs Hr]
   · icases reg_valid cpu (g.m.regs cpu) Register.cur_privilege (DFrac.own 1) p $$ [$Hregs $Hr] with %_
     itrivial
-  imod reg_update cpu (g.m.regs cpu) Register.cur_privilege p p' $$ [$Hregs $Hr] with ⟨Hregs, Hr⟩
+  ihave %hs : ⌜g.m.regs cpu Register.satp = s⌝ $$ [Hregs Hs]
+  · icases reg_valid cpu (g.m.regs cpu) Register.satp (DFrac.own 1) s $$ [$Hregs $Hs] with %_
+    itrivial
+  ihave %hep : ⌜g.m.regs cpu Register.sepc = ep⌝ $$ [Hregs Hep]
+  · icases reg_valid cpu (g.m.regs cpu) Register.sepc (DFrac.own 1) ep $$ [$Hregs $Hep] with %_
+    itrivial
+  ihave %hg : ⌜hartGprs (g.m.regs cpu) = gs⌝ $$ [Hregs Hg]
+  · icases gprCells_valid cpu (g.m.regs cpu) gs $$ [$Hregs $Hg] with %_
+    itrivial
+  have he : hartObs cpu (.regWrite Register.cur_privilege Privilege.User) g.m =
+      [.uEnter cpu s ep gs] := by
+    show hartObsPriv cpu (g.m.regs cpu) Privilege.User = _
+    unfold hartObsPriv
+    rw [Hv, hp]
+    simp only [privUser, uEnterOf, hs, hep, hg]
+  imod reg_update cpu (g.m.regs cpu) Register.cur_privilege p Privilege.User $$ [$Hregs $Hr]
+    with ⟨Hregs, Hr⟩
   iapply fupd_mask_intro LawfulSet.empty_subset
   iintro Hmask
   isplit
   · ipureintro
-    exact ⟨(), g.m.setReg cpu Register.cur_privilege p', rfl⟩
+    exact ⟨(), g.m.setReg cpu Register.cur_privilege Privilege.User, rfl⟩
   inext
   iintro %v' %σ' %Hev
   obtain rfl := Hev
   imod Hmask
-  imod Hperm $$ %h %g %⟨hf.1, hf.2.1, Hv⟩ Ha with Ha
+  imod Hperm $$ %h %g %⟨hf.1, hf.2.1⟩ Ha with ⟨Ha, HOut⟩
+  icases obsAuth_lb (h ++ [.uEnter cpu s ep gs]) $$ Ha with ⟨Ha, #Hlb⟩
   imodintro
-  have e : hartObs cpu (.regWrite Register.cur_privilege p') g.m =
-      hartObsPriv cpu (g.m.regs cpu) p' := rfl
-  rw [e]
+  rw [he]
   isplitl [Hregs Hclose]
   · iapply Hclose $$ Hregs
   isplitl [Ha]
   · iexact Ha
   · iapply swp_ret
-    iapply HΦ $$ Hr
+    iapply HΦ $$ Hr Hs Hep Hg HOut
+    iapply uRcpt_of_lb $$ Hlb
 
-theorem swp_writeReg_priv_bind (cpu : CPU) {X : Type} (p p' : Privilege) (f : PUnit → SailM X)
-    (Φ : X → IProp GF) :
-    hartObsStep cpu p p' ∗ Register.cur_privilege ↦ᵣ[cpu] p ∗
-      ▷ (Register.cur_privilege ↦ᵣ[cpu] p' -∗ swp cpu (f ()) Φ)
-    ⊢ swp cpu (writeReg Register.cur_privilege p' >>= f) Φ := by
-  iintro ⟨Hperm, Hr, HΦ⟩
+/-- **The S→U privilege write, OBSERVED** (NI M2-W2a, design §3): the dual
+of `swp_writeReg_uexit` -- `User` over a non-user `p`, the entry's read
+frame `hartRdE`. -/
+theorem swp_writeReg_uenter (cpu : CPU) (p : Privilege) (hp : privUser p = false)
+    (s ep : BitVec 64) (gs : List (BitVec 64)) (Out : IProp GF) (Φ : PUnit → IProp GF) :
+    hartObsStep (.uEnter cpu s ep gs) Out ∗ Register.cur_privilege ↦ᵣ[cpu] p ∗
+      hartRdE cpu s ep gs ∗
+      ▷ (Register.cur_privilege ↦ᵣ[cpu] Privilege.User -∗ hartRdE cpu s ep gs -∗ Out -∗
+          (∃ i, uRcpt (i, .uEnter cpu s ep gs)) -∗ Φ ())
+    ⊢ swp cpu (writeReg Register.cur_privilege Privilege.User) Φ := by
+  unfold hartRdE
+  iintro ⟨Hperm, Hr, ⟨Hs, Hep, Hg⟩, HΦ⟩
+  iapply swp_writeReg_uenter_cells cpu p hp s ep gs Out Φ
+  iframe Hperm Hr Hs Hep Hg
+  inext
+  iintro Hr Hs Hep Hg HOut HR
+  iapply HΦ $$ Hr [Hs Hep Hg] HOut HR
+  iframe
+
+theorem swp_writeReg_uenter_bind (cpu : CPU) {X : Type} (p : Privilege) (hp : privUser p = false)
+    (s ep : BitVec 64) (gs : List (BitVec 64)) (Out : IProp GF) (f : PUnit → SailM X) (Φ : X → IProp GF) :
+    hartObsStep (.uEnter cpu s ep gs) Out ∗ Register.cur_privilege ↦ᵣ[cpu] p ∗
+      Register.satp ↦ᵣ[cpu] s ∗ Register.sepc ↦ᵣ[cpu] ep ∗ gprCells cpu gs ∗
+      ▷ (Register.cur_privilege ↦ᵣ[cpu] Privilege.User -∗ Register.satp ↦ᵣ[cpu] s -∗
+          Register.sepc ↦ᵣ[cpu] ep -∗ gprCells cpu gs -∗ Out -∗
+          (∃ i, uRcpt (i, .uEnter cpu s ep gs)) -∗ swp cpu (f ()) Φ)
+    ⊢ swp cpu (writeReg Register.cur_privilege Privilege.User >>= f) Φ := by
+  iintro H
   iapply swp_bind
-  iapply swp_writeReg_priv cpu p p' $$ [Hperm Hr HΦ]
-  iframe Hperm Hr HΦ
+  iapply (swp_writeReg_uenter_cells cpu p hp s ep gs Out (fun _ => swp cpu (f ()) Φ))
+  iexact H
 
 /-- **A privilege write that crosses nothing** (NI M2-W1): `p` and `p'` on
 the same side of the user boundary (S→S, M→S, S→M, ...): silent, no

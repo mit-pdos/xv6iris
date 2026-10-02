@@ -464,10 +464,21 @@ theorem wp_power [KernelMap]
           Tn' (obsBoots h + 1) ⊢@{IProp GF}
         |==> ◇ (▷ MachFixedGS.obsPred (hlc := hlc) (GF := GF) ∗ obsHalf (h ++ [Obs.powerOn]) ∗
           Tn'' (obsBoots h + 1)))
-    -- THE USER-EVENT HOOK (NI M2-W1): the client's trace predicate accepts a
-    -- hart's user-boundary event; the permit built from it is sealed into the
-    -- wire invariant at every power-on (`hartObsPermit_of_hook`)
-    (Huser : ∀ (h : List Obs) (e : Obs), isUser e = true →
+    -- THE USER-EVENT HOOKS (NI M2-W1, split by M2-W2a): the client's trace
+    -- predicate accepts a hart's user exit, and a user entry given its
+    -- justification (`MachFixedGS.uFit`) and that the cited receipt's
+    -- position holds the cited exit; the permit built from them is sealed
+    -- into the wire invariant at every power-on (`hartObsPermit_of_hook`)
+    (HuserExit : ∀ (h : List Obs) (e : Obs), isUExit e = true →
+      ▷ MachFixedGS.obsPred (hlc := hlc) (GF := GF) ∗ obsHalf h ⊢@{IProp GF}
+        |==> ◇ (▷ MachFixedGS.obsPred (hlc := hlc) (GF := GF) ∗ obsHalf (h ++ [e])))
+    (HuserEnter : ∀ (h : List Obs) (e : Obs) (ox : Option (Nat × Obs)), isUEnter e = true →
+      MachFixedGS.uFit (hlc := hlc) (GF := GF) ox e →
+      (∀ i x, ox = some (i, x) → i < h.length ∧ h[i]? = some x) →
+      ▷ MachFixedGS.obsPred (hlc := hlc) (GF := GF) ∗ obsHalf h ⊢@{IProp GF}
+        |==> ◇ (▷ MachFixedGS.obsPred (hlc := hlc) (GF := GF) ∗ obsHalf (h ++ [e])))
+    -- M2-W2a interim: W2c removes this (USERRET then carries the evidence)
+    (HuserEnterBlind : ∀ (h : List Obs) (e : Obs), isUEnter e = true →
       ▷ MachFixedGS.obsPred (hlc := hlc) (GF := GF) ∗ obsHalf h ⊢@{IProp GF}
         |==> ◇ (▷ MachFixedGS.obsPred (hlc := hlc) (GF := GF) ∗ obsHalf (h ++ [e])))
     (Hboot : ∀ (E : EraGS) (gen : Nat) (σ : MState),
@@ -609,7 +620,8 @@ theorem wp_power [KernelMap]
     -- ...beside the user-boundary permit (NI M2-W1), out of the trace
     -- invariant and the client's user-event hook
     ihave #Hhp : hartObsPermit (hlc := hlc) (GF := GF) $$ [Hoinv]
-    · iapply hartObsPermit_of_hook Huser
+    · iapply hartObsPermit_of_hook HuserExit HuserEnter HuserEnterBlind
+      -- (M2-W2a interim: W2c removes HuserEnterBlind, USERRET then carries the evidence)
       unfold obsInv
       iexact Hoinv
     imod (wireInvAt_alloc ⟨names, γh, γm, vn, ivn, rvn, γtop, γauth, γresv, lsn, γkmap, γkroot, dn, γmir⟩ ⊤

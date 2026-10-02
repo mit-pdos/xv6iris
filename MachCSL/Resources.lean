@@ -258,6 +258,13 @@ class MachFixedGS (hlc : outParam HasLC) (GF : BundledGFunctors) where
   rxTag : List Obs → IProp GF
   rxTag_persistent : ∀ h, Persistent (rxTag h)
   rxTag_timeless : ∀ h, Timeless (rxTag h)
+  /-- THE ENTER'S JUSTIFICATION (NI M2-W2a): which entries into user mode the
+  client's ledger files, as a pure relation between the evidence the kernel
+  cites -- `none` (an origin) or the machine receipt `some (i, x)` of the
+  exit at position `i` it resumes -- and the entry event.  The hart's permit
+  (`hartObsPermit`) lets an entry through only with this fact and the
+  receipt; the client reads the meaning (Xv6: `niFit`, from W2c). -/
+  uFit : Option (Nat × Obs) → Obs → Prop
   /-- THE KILL CREDENTIAL (Rocq `riscv_kill_cred`): the ambient price of a
   kill, an application-chosen persistent proposition every party a kill
   touches is handed (the killer, the killed slot's public payload, the trap
@@ -1281,70 +1288,183 @@ def obsInv : IProp GF := inv obsN (MachFixedGS.obsPred (hlc := hlc) (GF := GF))
 
 instance : Persistent (PROP := IProp GF) obsInv := by unfold obsInv; infer_instance
 
-/-! ### The hart's trace permit (NI M2-W1)
+/-! ### The hart's trace permit (NI M2-W1; evidence-carrying since M2-W2a)
 
-The user boundary (M2-W1, 2026-10-01).  A hart's privilege-crossing write
-of `cur_privilege` emits `Obs.uExit`/`Obs.uEnter` (`MachCSL.hartObs`), so,
-like a UART's observed arm, it moves the history ghost and needs the
-client's consent: `hartObsStep` for one write, `hartObsPermit` its
-persistent, every-write form (the observed rule is
-`MachCSL.swp_writeReg_priv`).  The permit is FIXED-LAYER (it names no era),
-so the power thread can seal it into the wire invariant it allocates at
-power-on (`MachCSL.wireInvAt`), out of the trace invariant and the client's
-user-event hook (`hartObsPermit_of_hook`). -/
+The user boundary.  A hart's privilege-crossing write of `cur_privilege`
+emits `Obs.uExit`/`Obs.uEnter` (`MachCSL.hartObs`), so, like a UART's
+observed arm, it moves the history ghost and needs the client's consent.
+Since M2-W2a the consent is for an EXACT event: `hartObsStep e Out` moves
+the history by `e` and yields `Out`; the observed rules
+(`MachCSL.swp_writeReg_uexit`/`_uenter`) take the cells the event reads as a
+read frame, so the caller names the event it emits, and hand back the
+machine receipt `uRcpt (i, e)` (persistent: the event sits at position `i`
+of the history).  `hartObsPermit` is the persistent permit: any exit; an
+entry with its justification (`MachFixedGS.uFit`) and the cited receipt.
+The permit is FIXED-LAYER, so the power thread seals it into the wire
+invariant at power-on (`MachCSL.wireInvAt`), out of the trace invariant and
+the client's hooks (`hartObsPermit_of_hook`). -/
 
-/-- **THE HART'S TRACE PERMIT, one write**: the client's consent to a write of
-`p'` to hart `cpu`'s `cur_privilege` over `p`.  Handed what the machine
-layer knows of the history at that write (it is well-formed for the machine
-`g`, the power is on, the privilege it overwrites is `p`) and the machine's
-half of the history, it moves the history by exactly what the write emits:
-`hartObsPriv cpu (g.m.regs cpu) p'` (`= hartObs cpu (.regWrite
-.cur_privilege p') g.m`) -- `uExit`/`uEnter` with the registers of the file
-it is written over at a crossing, nothing otherwise. -/
-def hartObsStep (cpu : CPU) (p p' : Privilege) : IProp GF := iprop%
-  ∀ (h : List Obs) (g : GState),
-    ⌜obsWf h g ∧ g.pow = true ∧ g.m.regs cpu .cur_privilege = p⌝ -∗
-    obsAuth h ={⊤}=∗ obsAuth (h ++ hartObsPriv cpu (g.m.regs cpu) p')
+/-- **THE HART'S CONSENT FOR EXACTLY `e`** (M2-W2a; W1's per-write
+`hartObsStep cpu p p'` retired): handed what the machine layer knows of the
+history at the write (well-formed for the machine `g`, the power on) and the
+machine's half, it appends `e` and yields `Out`. -/
+def hartObsStep (e : Obs) (Out : IProp GF) : IProp GF := iprop%
+  ∀ (h : List Obs) (g : GState), ⌜obsWf h g ∧ g.pow = true⌝ -∗
+    obsAuth h ={⊤}=∗ obsAuth (h ++ [e]) ∗ Out
 
-/-- **THE HART'S TRACE PERMIT**, persistent and for every write. -/
+/-- **THE MACHINE RECEIPT** (M2-W2a): event `ix.2` sits at position `ix.1` of
+the history (persistent; the machine's own mono-list, so unforgeable). -/
+def uRcpt (ix : Nat × Obs) : IProp GF := iprop%
+  ∃ h0 : List Obs, ⌜h0.length = ix.1⌝ ∗ obsHistLb (h0 ++ [ix.2])
+
+instance (ix : Nat × Obs) : Persistent (PROP := IProp GF) (uRcpt ix) := by
+  unfold uRcpt; infer_instance
+instance (ix : Nat × Obs) : Timeless (PROP := IProp GF) (uRcpt ix) := by
+  unfold uRcpt; infer_instance
+
+/-- The cited evidence of an entry: nothing (an origin) or a receipt. -/
+def uRcptOpt : Option (Nat × Obs) → IProp GF
+  | none => iprop(emp)
+  | some ix => uRcpt ix
+
+instance (ox : Option (Nat × Obs)) : Persistent (PROP := IProp GF) (uRcptOpt ox) := by
+  cases ox <;> unfold uRcptOpt <;> infer_instance
+
+/-- A receipt read against the authority: its position is in the history and
+holds its event. -/
+theorem uRcpt_valid (h : List Obs) (ix : Nat × Obs) :
+    obsAuth (GF := GF) h ∗ uRcpt ix ⊢ ⌜ix.1 < h.length ∧ h[ix.1]? = some ix.2⌝ := by
+  unfold uRcpt
+  iintro ⟨Ha, ⟨%h0, %hl, Hlb⟩⟩
+  ihave %hp := obsHistLb_prefix h (h0 ++ [ix.2]) $$ [Ha Hlb]
+  · iframe Ha Hlb
+  ipureintro
+  obtain ⟨t, ht⟩ := hp
+  subst ht
+  rw [← hl]
+  simp
+
+theorem uRcptOpt_valid (h : List Obs) (ox : Option (Nat × Obs)) :
+    obsAuth (GF := GF) h ∗ uRcptOpt ox ⊢
+      ⌜∀ i x, ox = some (i, x) → i < h.length ∧ h[i]? = some x⌝ := by
+  cases ox with
+  | none =>
+    iintro _
+    ipureintro
+    intro i x hx
+    cases hx
+  | some ix =>
+    unfold uRcptOpt
+    iintro H
+    ihave %hv := uRcpt_valid h ix $$ H
+    ipureintro
+    intro i x hx
+    cases hx
+    exact hv
+
+/-- **THE HART'S TRACE PERMIT** (M2-W2a, design §3), persistent: any exit;
+an entry with its justification and the cited receipt.  The THIRD arm is the
+M2-W2a interim blind entry the kernel's `sret` uses until W2c. -/
 def hartObsPermit : IProp GF := iprop%
-  □ ∀ (cpu : CPU) (p p' : Privilege), hartObsStep cpu p p'
+  □ ((∀ e : Obs, ⌜isUExit e = true⌝ -∗ hartObsStep e emp) ∧
+     (∀ (e : Obs) (ox : Option (Nat × Obs)),
+        ⌜isUEnter e = true ∧ MachFixedGS.uFit (hlc := hlc) (GF := GF) ox e⌝ -∗
+        uRcptOpt ox -∗ hartObsStep e emp) ∧
+     -- M2-W2a interim: W2c removes this (USERRET then carries the evidence)
+     (∀ e : Obs, ⌜isUEnter e = true⌝ -∗ hartObsStep e emp))
 
 instance hartObsPermit_persistent : Persistent (hartObsPermit (hlc := hlc) (GF := GF)) := by
   unfold hartObsPermit; infer_instance
 
-theorem hartObsPermit_step (cpu : CPU) (p p' : Privilege) :
-    hartObsPermit (hlc := hlc) (GF := GF) ⊢ hartObsStep cpu p p' := by
+/-- The exit arm. -/
+theorem hartObsPermit_exit (e : Obs) (he : isUExit e = true) :
+    hartObsPermit (hlc := hlc) (GF := GF) ⊢ hartObsStep e emp := by
   unfold hartObsPermit
   iintro #H
-  iapply H
+  icases H with ⟨H, -⟩
+  iapply H $$ %e %he
 
-/-- **The permit from the client's USER-EVENT HOOK**: a trace predicate that
-accepts every user-boundary event (`Huser`, the hart's counterpart of
-`wp_power`'s `Hobs`) grants the permit, through the trace invariant. -/
-theorem hartObsPermit_of_hook
-    (Huser : ∀ (h : List Obs) (e : Obs), isUser e = true →
+/-- The evidence-carrying entry arm. -/
+theorem hartObsPermit_enter (e : Obs) (ox : Option (Nat × Obs)) (he : isUEnter e = true)
+    (hf : MachFixedGS.uFit (hlc := hlc) (GF := GF) ox e) :
+    hartObsPermit (hlc := hlc) (GF := GF) ⊢ uRcptOpt ox -∗ hartObsStep e emp := by
+  unfold hartObsPermit
+  iintro #H
+  icases H with ⟨-, H, -⟩
+  iapply H $$ %e %ox %⟨he, hf⟩
+
+-- M2-W2a interim: W2c removes this (USERRET then carries the evidence)
+/-- The blind entry arm (M2-W2a interim). -/
+theorem hartObsPermit_enterBlind (e : Obs) (he : isUEnter e = true) :
+    hartObsPermit (hlc := hlc) (GF := GF) ⊢ hartObsStep e emp := by
+  unfold hartObsPermit
+  iintro #H
+  icases H with ⟨-, -, H⟩
+  iapply H $$ %e %he
+
+/-- One consent from a hook on the client's half. -/
+theorem hartObsStep_of_hook (e : Obs)
+    (Hk : ∀ h : List Obs,
       ▷ MachFixedGS.obsPred (hlc := hlc) (GF := GF) ∗ obsHalf h ⊢@{IProp GF}
         |==> ◇ (▷ MachFixedGS.obsPred (hlc := hlc) (GF := GF) ∗ obsHalf (h ++ [e]))) :
-    obsInv ⊢@{IProp GF} hartObsPermit := by
-  unfold hartObsPermit hartObsStep
-  iintro #Hoinv !> %cpu %p %p' %h %g %_ Ha
-  rcases hartObsPriv_cases cpu (g.m.regs cpu) p' with he | ⟨e, he, hu⟩
-  · rw [he, List.append_nil]
-    imodintro
-    iexact Ha
-  rw [he]
+    obsInv ⊢@{IProp GF} hartObsStep e emp := by
+  unfold hartObsStep
+  iintro #Hoinv %h %g %_ Ha
   unfold obsAuth
   icases Ha with ⟨Hhalf, Hhist⟩
   unfold obsInv
   imod (inv_acc (E := ⊤) (N := obsN) (P := MachFixedGS.obsPred (hlc := hlc) (GF := GF))
     CoPset.subseteq_top) $$ Hoinv with ⟨HP, Hoclose⟩
-  imod Huser h e hu $$ [HP Hhalf] with >⟨HP, Hhalf⟩
+  imod Hk h $$ [HP Hhalf] with >⟨HP, Hhalf⟩
   · iframe HP Hhalf
   imod Hoclose $$ HP
   imod obsHistAuth_step h (h ++ [e]) (List.prefix_append _ _) $$ Hhist with Hhist
   imodintro
   iframe Hhalf Hhist
+
+/-- **The permit from the client's USER-EVENT HOOKS** (M2-W2a): the exit hook
+accepts any exit; the entry hook accepts an entry given PURE facts only -- its
+justification `uFit ox e` and, for a cited receipt, that the position holds
+the cited event (the permit validates the receipt against the authority
+itself, so no hook is lent it); the blind hook (M2-W2a interim) any entry. -/
+theorem hartObsPermit_of_hook
+    (HuserExit : ∀ (h : List Obs) (e : Obs), isUExit e = true →
+      ▷ MachFixedGS.obsPred (hlc := hlc) (GF := GF) ∗ obsHalf h ⊢@{IProp GF}
+        |==> ◇ (▷ MachFixedGS.obsPred (hlc := hlc) (GF := GF) ∗ obsHalf (h ++ [e])))
+    (HuserEnter : ∀ (h : List Obs) (e : Obs) (ox : Option (Nat × Obs)), isUEnter e = true →
+      MachFixedGS.uFit (hlc := hlc) (GF := GF) ox e →
+      (∀ i x, ox = some (i, x) → i < h.length ∧ h[i]? = some x) →
+      ▷ MachFixedGS.obsPred (hlc := hlc) (GF := GF) ∗ obsHalf h ⊢@{IProp GF}
+        |==> ◇ (▷ MachFixedGS.obsPred (hlc := hlc) (GF := GF) ∗ obsHalf (h ++ [e])))
+    -- M2-W2a interim: W2c removes this (USERRET then carries the evidence)
+    (HuserEnterBlind : ∀ (h : List Obs) (e : Obs), isUEnter e = true →
+      ▷ MachFixedGS.obsPred (hlc := hlc) (GF := GF) ∗ obsHalf h ⊢@{IProp GF}
+        |==> ◇ (▷ MachFixedGS.obsPred (hlc := hlc) (GF := GF) ∗ obsHalf (h ++ [e]))) :
+    obsInv ⊢@{IProp GF} hartObsPermit := by
+  unfold hartObsPermit
+  iintro #Hoinv !>
+  isplit
+  · iintro %e %he
+    iapply hartObsStep_of_hook e (fun h => HuserExit h e he) $$ Hoinv
+  isplit
+  · iintro %e %ox %⟨he, hf⟩ #Hr
+    unfold hartObsStep
+    iintro %h %g %_ Ha
+    ihave %hv := uRcptOpt_valid h ox $$ [Ha Hr]
+    · iframe Ha Hr
+    unfold obsAuth
+    icases Ha with ⟨Hhalf, Hhist⟩
+    unfold obsInv
+    imod (inv_acc (E := ⊤) (N := obsN) (P := MachFixedGS.obsPred (hlc := hlc) (GF := GF))
+      CoPset.subseteq_top) $$ Hoinv with ⟨HP, Hoclose⟩
+    imod HuserEnter h e ox he hf hv $$ [HP Hhalf] with >⟨HP, Hhalf⟩
+    · iframe HP Hhalf
+    imod Hoclose $$ HP
+    imod obsHistAuth_step h (h ++ [e]) (List.prefix_append _ _) $$ Hhist with Hhist
+    imodintro
+    iframe Hhalf Hhist
+  · iintro %e %he
+    iapply hartObsStep_of_hook e (fun h => HuserEnterBlind h e he) $$ Hoinv
 
 /-- **THE PERMIT OF THE TRIVIAL TRACE PREDICATE** (the hart's
 `devObsPermit_triv`): a client that states no trace property moves the
@@ -1352,25 +1472,24 @@ ghost and ignores the event. -/
 theorem hartObsPermit_triv
     (heq : MachFixedGS.obsPred (hlc := hlc) (GF := GF) = obsPredTriv) :
     obsInv ⊢@{IProp GF} hartObsPermit := by
-  unfold hartObsPermit hartObsStep
-  iintro #Hoinv !> %cpu %p %p' %h %g %_ Ha
-  unfold obsInv
-  rw [heq]
-  imod (inv_acc_timeless (E := ⊤) (N := obsN) (P := obsPredTriv (GF := GF)) CoPset.subseteq_top)
-    $$ Hoinv with ⟨HP, Hclose⟩
-  unfold obsPredTriv
-  icases HP with ⟨%h', Hfrag⟩
-  ihave %he := obsAgree h h' $$ [Ha Hfrag]
-  · iframe Ha Hfrag
-  subst he
-  imod obsUpdate h (h ++ hartObsPriv cpu (g.m.regs cpu) p') (List.prefix_append _ _) $$ [Ha Hfrag]
-    with ⟨Ha, Hfrag⟩
-  · iframe Ha Hfrag
-  imod Hclose $$ [Hfrag]
-  · iexists (h ++ hartObsPriv cpu (g.m.regs cpu) p')
-    iexact Hfrag
-  imodintro
-  iexact Ha
+  have Hk : ∀ (h : List Obs) (e : Obs),
+      ▷ MachFixedGS.obsPred (hlc := hlc) (GF := GF) ∗ obsHalf h ⊢@{IProp GF}
+        |==> ◇ (▷ MachFixedGS.obsPred (hlc := hlc) (GF := GF) ∗ obsHalf (h ++ [e])) := by
+    intro h e
+    rw [heq]
+    unfold obsPredTriv obsHalf obsFrag
+    iintro ⟨⟨%h', >Hfrag⟩, Hauth⟩
+    ihave %he := ghost_var_agree _ h' _ h _ $$ Hfrag Hauth
+    subst he
+    imod ghost_var_update_halves (h' ++ [e]) _ h' h' $$ Hauth Hfrag with ⟨Hauth, Hfrag⟩
+    imodintro
+    imodintro
+    isplitl [Hfrag]
+    · inext
+      iexists _
+      iexact Hfrag
+    iexact Hauth
+  exact hartObsPermit_of_hook (fun h e _ => Hk h e) (fun h e _ _ _ _ => Hk h e) (fun h e _ => Hk h e)
 
 /-! ### The crash-spanning invariant and the swap counter (Rocq `RiscvPtsto`:
 `crashN`, `crash_inv`, `swap_auth`, `swap_lb`) -/

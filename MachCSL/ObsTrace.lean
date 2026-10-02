@@ -463,6 +463,26 @@ def isUser : Obs → Bool
   | .uExit .. => true
   | _ => false
 
+/-- The two halves of the user boundary (NI M2-W2a): the exit out of user
+mode and the entry into it, told apart by the permit (`MachCSL.hartObsPermit`). -/
+def isUExit : Obs → Bool
+  | .uExit .. => true
+  | _ => false
+
+def isUEnter : Obs → Bool
+  | .uEnter .. => true
+  | _ => false
+
+theorem isUser_of_uexit {e : Obs} (h : isUExit e = true) : isUser e = true := by
+  cases e <;> simp_all [isUExit, isUser]
+
+theorem isUser_of_uenter {e : Obs} (h : isUEnter e = true) : isUser e = true := by
+  cases e <;> simp_all [isUEnter, isUser]
+
+/-- A user event is one of the two. -/
+theorem isUser_cases {e : Obs} (h : isUser e = true) : isUExit e = true ∨ isUEnter e = true := by
+  cases e <;> simp_all [isUEnter, isUExit, isUser]
+
 /-- The two power events. -/
 def isPower : Obs → Bool
   | .powerOn => true
