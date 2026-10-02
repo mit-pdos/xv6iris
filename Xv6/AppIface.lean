@@ -75,8 +75,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-! ## The console interface (Rocq `RiscvPtsto.app_iface`) -/
 
 /-- THE APPLICATION'S CONSOLE INTERFACE, as ONE record (Rocq `app_iface`,

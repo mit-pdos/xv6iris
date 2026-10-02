@@ -76,9 +76,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## Publishing a word: `own 1 → discard`
 
@@ -90,12 +88,10 @@ set_option linter.unusedVariables false
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 
-
 end
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
-
 
 /-- **Publish `initproc`**: the owned word becomes the persistent
 `initprocIs`. -/
@@ -396,7 +392,6 @@ theorem ui_pushOffAt_pushed (k : KCtx) (hs : k.sie = false) (m : Nat) (R : RegMa
 /-- `["proc"]` is emptied by the release's filter. -/
 theorem ui_filter_one : (["proc"] : List String).filter (fun x => x ≠ "proc") = [] := by
   simp
-
 
 /-! ## The publish, from `(KernelSyms.«userinit» + 0x24)` -/
 
@@ -803,7 +798,6 @@ theorem ui_calleeSaved_epi (R0 R5 : RegMap) (ra : BitVec 64)
   · exact hhi 27#5 (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (rfl))))))))))
 
 end
-
 
 /-- <init>'s kill wand: its payload is `True`. -/
 theorem ui_killw {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] :

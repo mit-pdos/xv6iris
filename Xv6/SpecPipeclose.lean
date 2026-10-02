@@ -46,8 +46,6 @@ import MachCSL.WpSmodeIntr
 namespace Xv6
 
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
-set_option linter.unusedSectionVars false
 open Iris Iris.ProgramLogic Iris.BI Std MachCSL
 open LeanRV64D
 

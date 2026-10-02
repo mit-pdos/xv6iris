@@ -64,7 +64,6 @@ theorem ups_decode0 (i : UartId) : devDecode (uartBaseAddr i) = some (.uart i, 0
 theorem ups_byteOk0 (i : UartId) : devByteOk (uartBaseAddr i) := by
   cases i <;> decide
 
-
 /-- The low byte of `x & 0xff` is the low byte of `x` (`zext.b`). -/
 theorem ups_zext_b (x : BitVec 64) :
     BitVec.extractLsb' 0 8 (x &&& 255#64) = BitVec.extractLsb' 0 8 x := by bv_decide
@@ -91,7 +90,6 @@ theorem ups_filter_cons (s : String) (l : List String) (h : s ∉ l) :
   exact List.filter_eq_self.2 (fun x hx => by simp; intro e; subst e; exact h hx)
 
 section
-set_option linter.unusedSectionVars false
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
 
 theorem ups_txRes_elim [CurCtx] (γ : UartNames) :
@@ -153,7 +151,6 @@ theorem ups_release (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors} [MachGS
   unfold isTxLockAt
   rw [← haddr]
   exact h
-
 
 /-! ## The THRE poll -/
 
@@ -217,7 +214,6 @@ theorem ups_poll {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
     intro j hj
     simp only [RegMap.set_apply, hj, ite_false]
     exact hinv j hj
-
 
 /-! ## The function -/
 

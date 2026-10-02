@@ -131,8 +131,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Std MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-! ## 0.  THE IMAGE'S GEOMETRY: the accessors (Rocq `fgo_*`)
 
 The record itself is `Xv6.FsGeomOk` (`Xv6/FsCfgDefs.lean`).  These are

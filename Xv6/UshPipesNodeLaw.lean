@@ -42,6 +42,7 @@ is `NodeOk`.
 import Xv6.UshPipesNodeObl
 import Xv6.UshPipesStageEcho
 import Xv6.UshPipesStageLast
+import Xv6.UshPipesStageMid
 
 namespace Xv6
 
@@ -52,8 +53,6 @@ open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 open Wid RdOut WrOut
 open UShPipesDefs UShPipesStage UShPipeLeaves UShPipeCall
-
-set_option linter.unusedSectionVars false
 
 /-- **Rocq's second section hypotheses** (deviation 1): the stages as the
 parse cut them and sh's ledger at the top node. -/

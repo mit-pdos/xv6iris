@@ -36,8 +36,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
-
 /-- `addi a0,s0,-40` at the frame pointer's value. -/
 theorem ushpi_addi40 (sp0 : BitVec 64) (hlo : 40 ≤ sp0.toNat) :
     ukItypeVal .ADDI sp0 4056#12 = BitVec.ofNat 64 (sp0.toNat - 40) := by

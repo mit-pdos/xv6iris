@@ -93,9 +93,6 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
 open Iris.ProgramLogic Language.Notation PrimStep
 
-set_option linter.unusedSectionVars false
-set_option linter.unusedVariables false
-
 /-! ## §1 The laws (Rocq `App.xv6_app_laws`) -/
 
 /-- **THE APPLICATION'S LAWS** (Rocq `xv6_app_laws`): eleven fields, in
@@ -400,7 +397,6 @@ theorem appTriv_initBoot (US : USER) (c : Unit)
     $$ Hs Hk Hl Hg
 
 end trivBoot
-
 
 section triv
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGpreS hlc GF] [Xv6G GF] [WchGpre GF]

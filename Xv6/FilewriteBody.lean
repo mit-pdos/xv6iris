@@ -30,9 +30,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-- `c.addiw s3,s3,0` on the chunk (Rocq's `fw_sextw_moi`). -/
 theorem fwr_sextw (c : Nat) (hc : c < 2 ^ 31) :

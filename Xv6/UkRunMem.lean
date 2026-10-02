@@ -48,8 +48,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
-
 /-! ## §0 The address, as a number -/
 
 /-- The sign-extended 12-bit immediate is its signed value. -/

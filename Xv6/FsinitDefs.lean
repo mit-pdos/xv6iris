@@ -26,9 +26,6 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedSectionVars false
-set_option linter.unusedVariables false
-
 /-! ## The crash rows the stages thread to `initlog`
 
 Built once at fsinit's entry (`Xv6.fsinit_entry`, the top of Rocq's

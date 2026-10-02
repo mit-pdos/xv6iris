@@ -17,9 +17,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## Constants the code computes -/
 
@@ -204,7 +202,6 @@ theorem br_tail (RE : RELEASE_HOOK) (cpu c : CPU) (k : KCtx) (γl : GName) (γ :
       (f24.trans h24) (f25.trans h25) (f26.trans h26) (f27.trans h27)
   · iexact Hpid
   · iexact Hbslot
-
 
 end
 

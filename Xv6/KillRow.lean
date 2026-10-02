@@ -63,8 +63,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
 
-set_option linter.unusedSectionVars false
-
 section KillRow
 variable {GF : BundledGFunctors} [CtokG GF]
 

@@ -57,8 +57,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Iris.Std.PartialMap
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
-
 /-! ## §2d The process (deviation 1) -/
 
 /-- **Rocq `UkPipesIface`'s process context (data)**. -/

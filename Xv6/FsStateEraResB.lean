@@ -109,8 +109,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-! ## helpers -/
 
 /-- `ExtTreeMap.insert` IS iris-lean's `PartialMap.insert` (the twin of

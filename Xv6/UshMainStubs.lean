@@ -30,8 +30,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
-
 /-- The number a stub's `c.li a7` leaves, read as the trap reads it. -/
 theorem ush_usysno (m : RegMap) (v : BitVec 64) :
     UkSysP.usysno (ukWr m 17#5 v) = (BitVec.extractLsb' 0 32 v).toInt := by

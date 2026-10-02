@@ -10,6 +10,7 @@ import MachCSL.WpMmode
 import MachCSL.GprLit
 import Xv6.SpecEntry
 import Xv6.CodeTactics
+import MachCSL.MConfBoot
 
 namespace Xv6
 

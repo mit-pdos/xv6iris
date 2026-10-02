@@ -16,8 +16,6 @@ namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-- The recovered header's reading rides the whole recovering pass (Rocq
 `HMi`). -/
 theorem il_install_hdrs (W : List (BitVec 32)) (Lw : Nat → List (BitVec 8)) (M : LogMirror)

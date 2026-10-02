@@ -46,9 +46,6 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedSectionVars false
-set_option linter.unusedVariables false
-
 /-! ## Call targets, return addresses -/
 
 theorem filestat_br_myproc : KA.«filestat» + 0xffffffffffffd5e4#64 = KA.«myproc» := by decide

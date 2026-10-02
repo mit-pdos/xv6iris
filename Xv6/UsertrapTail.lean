@@ -27,8 +27,6 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedVariables false
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
 
 theorem ut_br_prepare_return : utPc 0xae#64 + BitVec.signExtend 64 0x1ffe02#21 = KA.«prepare_return» := by

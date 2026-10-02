@@ -67,8 +67,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
-
 /-! ## S1 THE PURE HALF: init's rodata banner IS the era's -/
 
 /-- **Rocq `init_banner_bytes_bool`** (deviation 6). -/

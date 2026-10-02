@@ -47,9 +47,7 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
@@ -145,7 +143,6 @@ theorem dv_calleeSaved_mk (k : KCtx) (R : RegMap) (h9 : R 9#5 = k.regs 9#5) (h :
     first
       | rfl
       | assumption
-
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
@@ -292,7 +289,6 @@ theorem dv_retOk_1 (γ0 γ1 : UartNames) :
 
 end
 
-
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
@@ -390,7 +386,6 @@ theorem dv_join (PM : PLIC_COMPLETE) (cpu : CPU) (k : KCtx) (sc : BitVec 64) (γ
     exact hret.symm
 
 end
-
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
@@ -583,7 +578,6 @@ theorem dv_arm_virtio (PM : PLIC_COMPLETE) (VI : VIRTIO_DISK_INTR) (Γ : SchedNa
   iframe #
 
 end
-
 
 /-- The claim's answer, opened. -/
 theorem dv_retOk_cases {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
@@ -798,7 +792,6 @@ theorem dv_disp_0 (cpu : CPU) (k : KCtx) (sc : BitVec 64)
     exact (dv_ret_of_ext sc hext).symm
 
 end
-
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]

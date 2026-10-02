@@ -309,7 +309,25 @@ over `wp_namei_gen_eb`; `ic_escrows` rides inside `isItable2` in Lean.
 `SpecDirlookup`: `dlSelf s dinum rti`, the
 share row `inodeShr kd sd icfgDev dinum ∗ runitAny dinum.toNat`, the whole
 root row, the `self` binder last; `SpecIdup.wp_idup_shr` is the share form;
-`IcacheShortCarve.lean`, `IregClaimPlain.lean`.  `FsAbsEra.umStartOf rt cw
+`IcacheShortCarve.lean`, `IregClaimPlain.lean`.  `SpecDirlink` relays the
+same rows (`kd sd rootv rti dqr`, `ip = ientry kd`), parks them in
+`DirlinkDefs.dirlinkRoot` inside `dirlinkKeep`, and `DirlinkOut` takes `rti`
+for its found disjunct; callers lend the share with
+`IcacheShortCarve.inodeRefShortGenlo_lend`/`_regather` off the short keep
+and the root rows with `ProcPrivAcc.procPrivFd_root_lend_pid` (the pid cell
+out of the whole block) or `procPrivFd_root_lend_bare` (out of the bare
+block under create's split), both over `procPrivFd_rootPidPriv`; mkdir's
+three links go through `createMkdirKeep_lend_par`/`_lend_kid`.  R1 is
+`create_fresh_ty`'s lent `inodeHeldAt rootv rti` and the pure
+`inum.toNat ≠ rti` in `createFreshAlloc`, threaded as `CreateMkdirKid.hnrt`
+(the structure takes `rti`) and `createMkdirBody`'s `⌜cinum.toNat ≠ V.rti⌝`.
+create's found half: `createFound_dirlookup` has the `self` arm,
+`createFound_join` names the child's generation at the lookup
+(`createFound_genlo_agree` pins it to the parent's on the self arm), and
+`createFound_found`/`createFound_tests` take the fired value `cexv` with
+`⌜cexv = cinum.toNat⌝ ∨ ityShot gc T_DIR` -- arm F-OK refutes the self arm
+by `ityShot_agree`, the fail arms fire the receipt at `cexv`.  The
+`..`-at-a-miss refutations are `DirView.dirDots_miss_not_dots`.  `FsAbsEra.umStartOf rt cw
 pl`, `FsAbsWalk.axHop rt` with `axHopEnt` the record reading and
 `axHop_nodot`/`axHops_nodot` the bridges, `exStart γfs rt cw`, `epStart`,
 `nameiWalkPreEra γfs rt cw`, `nparWalkPreEra`; the program tier's deposits

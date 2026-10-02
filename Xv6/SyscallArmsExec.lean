@@ -65,9 +65,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## §1 The exec deposit law and the arms' pure reading -/
 
@@ -618,7 +616,6 @@ theorem syscall_fallback (PK : PRINTK)
   isplitr
   · iapply syscForkOut_ne; exact hne 1 (by decide) (by decide)
   · iapply syscWaitOut_ne; exact hne 3 (by decide) (by decide)
-
 
 set_option maxHeartbeats 4000000 in
 /-- **THE BLOCKED ARM** (xv6 7b2c1b1b; Rocq `sysc_blocked`): the mask's bit

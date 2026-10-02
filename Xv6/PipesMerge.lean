@@ -495,7 +495,7 @@ theorem mergeN_local (f g : W → List α) (sel : List W) (hfg : ∀ w ∈ sel, 
 theorem sel_wfN_cons_inv (src : W → List α) (w : W) (s : List W) (hwf : sel_wfN src (w :: s)) :
     ∃ b r, src w = b :: r ∧ sel_wfN (supd src w r) s := by
   have hw := hwf w
-  simp only [cntN, if_pos rfl] at hw
+  simp only [cntN] at hw
   cases h : src w with
   | nil => rw [h] at hw; simp at hw
   | cons b r =>

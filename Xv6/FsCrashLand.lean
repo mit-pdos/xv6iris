@@ -45,8 +45,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Std MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-! ## The pure halves -/
 
 /-- The committed view after the commit's first sector: `L` on the home set

@@ -10,6 +10,7 @@ import MachCSL.MConf
 import MachCSL.PlatformFacts
 import MachCSL.ModelFacts
 import MachCSL.FetchedDefs
+import MachCSL.Tactics
 
 namespace MachCSL
 
@@ -143,11 +144,11 @@ theorem swp_transform_effective_address_M (cpu : CPU) (dq : DFrac) (c : MConf) (
     iapply swp_translationMode_M
     swp_run 60
     reduce_closed_widths
-    simp only [pm_transform_PA, pm_transform_VA, zero_extend, sign_extend, Sail.BitVec.zeroExtend,
-      Sail.BitVec.signExtend, Sail.BitVec.extractLsb, BitVec.extractLsb, Functions.xlen, Int.reduceSub,
-      Int.reduceToNat, Int.reduceAdd, Nat.reduceSub, Nat.reduceAdd, Nat.sub_zero, Int.cast_ofNat_Int]
+    simp only [pm_transform_PA, zero_extend, Sail.BitVec.zeroExtend,
+      Sail.BitVec.extractLsb, BitVec.extractLsb, Functions.xlen, Int.reduceSub,
+      Int.reduceToNat, Nat.reduceAdd, Nat.sub_zero, Int.cast_ofNat_Int]
     reduce_closed_widths
-    try simp only [BitVec.zeroExtend, setWidth_extract64', signExtend_extract64']
+    try simp only [BitVec.zeroExtend, setWidth_extract64']
     mconf_intro HmConf
     iapply HΦ $$ HmConf
 

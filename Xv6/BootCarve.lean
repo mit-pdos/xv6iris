@@ -78,8 +78,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-- The address-range predicate. -/
 def bcRanIn (lo hi : Nat) : PAddr → Hist → Bool := fun a _ => decide (lo ≤ a.toNat ∧ a.toNat < hi)
 
@@ -93,7 +91,6 @@ theorem bc_addr_toNat (A j : Nat) (h : A + j < 2 ^ 64) :
   rw [Nat.mod_eq_of_lt (show A % 2 ^ 64 + j % 2 ^ 64 < 2 ^ 64 by
     rw [Nat.mod_eq_of_lt (by omega), Nat.mod_eq_of_lt (by omega)]; omega)]
   rw [Nat.mod_eq_of_lt (by omega), Nat.mod_eq_of_lt (by omega)]
-
 
 /-- Every kernel data page (`[etext, PHYSTOP)`) is a read-write static page. -/
 theorem bc_kmapClass_rw (a : PAddr) (h1 : 0x80007000 ≤ a.toNat) (h2 : a.toNat < 0x88000000) :

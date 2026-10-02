@@ -246,21 +246,21 @@ def uorcTy : Lean.Expr := mkConst ``UOrc
 
 /-- `Option (X × UWSt × UOrc)`. -/
 def optTy (X : Lean.Expr) : Lean.Expr :=
-  mkApp (mkConst ``Option [levelZero])
-    (mkApp2 (mkConst ``Prod [levelZero, levelZero]) X
-      (mkApp2 (mkConst ``Prod [levelZero, levelZero]) uwstTy uorcTy))
+  mkApp (mkConst ``Option [Level.zero])
+    (mkApp2 (mkConst ``Prod [Level.zero, Level.zero]) X
+      (mkApp2 (mkConst ``Prod [Level.zero, Level.zero]) uwstTy uorcTy))
 
 /-- `some (x, s, orc)`. -/
 def mkRes (X x s orc : Lean.Expr) : Lean.Expr :=
-  let T2 := mkApp2 (mkConst ``Prod [levelZero, levelZero]) uwstTy uorcTy
-  let T := mkApp2 (mkConst ``Prod [levelZero, levelZero]) X T2
-  mkApp2 (mkConst ``Option.some [levelZero]) T
-    (mkApp4 (mkConst ``Prod.mk [levelZero, levelZero]) X T2 x
-      (mkApp4 (mkConst ``Prod.mk [levelZero, levelZero]) uwstTy uorcTy s orc))
+  let T2 := mkApp2 (mkConst ``Prod [Level.zero, Level.zero]) uwstTy uorcTy
+  let T := mkApp2 (mkConst ``Prod [Level.zero, Level.zero]) X T2
+  mkApp2 (mkConst ``Option.some [Level.zero]) T
+    (mkApp4 (mkConst ``Prod.mk [Level.zero, Level.zero]) X T2 x
+      (mkApp4 (mkConst ``Prod.mk [Level.zero, Level.zero]) uwstTy uorcTy s orc))
 
 def mkNone (X : Lean.Expr) : Lean.Expr :=
-  let T2 := mkApp2 (mkConst ``Prod [levelZero, levelZero]) uwstTy uorcTy
-  mkApp (mkConst ``Option.none [levelZero]) (mkApp2 (mkConst ``Prod [levelZero, levelZero]) X T2)
+  let T2 := mkApp2 (mkConst ``Prod [Level.zero, Level.zero]) uwstTy uorcTy
+  mkApp (mkConst ``Option.none [Level.zero]) (mkApp2 (mkConst ``Prod [Level.zero, Level.zero]) X T2)
 
 /-- Read `some (x, s, orc)` back. -/
 def parseRes (r : Lean.Expr) : MetaM (Option (Lean.Expr × Lean.Expr × Lean.Expr)) := do
@@ -295,10 +295,10 @@ def decideClosed (T : Lean.Expr) : MetaM (Option (Lean.Expr × Bool)) := do
   let r ← try withTransparency .all <| whnf d catch _ => return none
   if r.isConstOf ``Bool.true then
     return some (mkApp3 (mkConst ``of_decide_eq_true) T inst
-      (mkApp2 (mkConst ``Eq.refl [levelOne]) (mkConst ``Bool) trueE), true)
+      (mkApp2 (mkConst ``Eq.refl [Level.one]) (mkConst ``Bool) trueE), true)
   if r.isConstOf ``Bool.false then
     return some (mkApp3 (mkConst ``of_decide_eq_false) T inst
-      (mkApp2 (mkConst ``Eq.refl [levelOne]) (mkConst ``Bool) falseE), false)
+      (mkApp2 (mkConst ``Eq.refl [Level.one]) (mkConst ``Bool) falseE), false)
   return none
 
 /-- Unification at instance transparency, then (on failure) at default. -/
@@ -682,7 +682,7 @@ partial def walkMerge (cx : Cfg) (X orc s c inst a b : Lean.Expr) :
     let (x2, s2, o2, p2) ← side (mkNot c) b
     unless ← withReducible (isDefEq s1 s2) do throwError "uwk_run +merge: states differ"
     unless ← withReducible (isDefEq o1 o2) do throwError "uwk_run +merge: oracles differ"
-    let x := mkApp5 (mkConst ``ite [levelOne]) X c inst x1 x2
+    let x := mkApp5 (mkConst ``ite [Level.one]) X c inst x1 x2
     return some (mkRes X x s1 o1,
       mkAppN (mkConst ``uwk_ite_merge) #[X, cx.D, orc, s, c, inst, a, b, x1, x2, s1, o1, p1, p2])
   catch _ =>

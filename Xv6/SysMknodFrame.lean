@@ -63,9 +63,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## Constants (Rocq `mn_push` / `mn_pop` / `mn_fp` / `mn_buf` / `mn_min` /
 `mn_maj` / `mn_frm*`) -/

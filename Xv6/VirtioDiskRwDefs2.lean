@@ -32,8 +32,6 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedSectionVars false
-
 /-! ## Pointwise update of a boolean marking -/
 
 /-- `f` with index `j` set to `b`. -/
@@ -60,7 +58,7 @@ theorem tk3_apply (h m t : Nat) (i : Nat) :
   by_cases h3 : i = t
   · simp [h3]
   · by_cases h2 : i = m
-    · simp [h2, h3]
+    · simp [h2]
     · by_cases h1 : i = h <;> simp [h1, h2, h3]
 
 theorem tk3_true (h m t : Nat) : tk3 h m t h = true ∧ tk3 h m t m = true ∧ tk3 h m t t = true := by

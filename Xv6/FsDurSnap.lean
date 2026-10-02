@@ -78,8 +78,6 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open FsStateLink
 
-set_option linter.unusedSectionVars false
-
 /-! ## Pure-reading helpers (deviation 4) -/
 
 section Helpers
@@ -203,7 +201,6 @@ theorem pDurAt_intro (g gl gt : GName) (D : BlockMap) (S : FsStateRec) :
 
 instance pDurAt_timeless (gt : GName) (D : BlockMap) : Timeless (pDurAt (GF := GF) gt D) := by
   unfold pDurAt; infer_instance
-
 
 /-! ## 6b.  The epoch off an instance -/
 
@@ -723,7 +720,6 @@ theorem fsSnap_readOk_keep (g gl gt : GName) (D : BlockMap) (S : FsStateRec) (hf
     fsSnap (snapGamma (GF := GF) g gl gt) g D S ⊢
       ⌜snapOk S D⌝ ∗ fsSnap (snapGamma g gl gt) g D S :=
   fsDurKeep (fsSnap_readOk g gl gt D S hf)
-
 
 /-! ## 8.  What a consumer reads off the current snapshot -/
 

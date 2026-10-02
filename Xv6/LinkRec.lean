@@ -71,8 +71,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-- an instance with no payload (Rocq `lk_emp_valid`, sync SY3-A4): the
 `gR_0/_pan/_exf` of an `emp` family -/
 theorem lkEmp_valid {GF : BundledGFunctors} : ⊢ (emp : IProp GF) := by

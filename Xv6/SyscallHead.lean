@@ -59,12 +59,9 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## §1 Addresses and the pure steps -/
-
 
 /-- `jal myproc` at `+0x0c`. -/
 theorem syscall_head_br_myproc : KA.«syscall» + 18446744073709547494#64 = KA.«myproc» := by
@@ -78,7 +75,6 @@ theorem syscall_head_jump (n : Nat) (h1 : 1 ≤ n) (h22 : n ≤ 24) : jumpPc (sy
 
 /-- `myproc`'s return lands at `+0x10`. -/
 theorem syscall_head_ret10 : jumpPc (KA.«syscall» + 0x10#64) = KA.«syscall» + 0x10#64 := by decide
-
 
 /-- The `beqz a4` at `+0x36` falls through: the entry is nonzero. -/
 theorem syscall_head_beqz (n : Nat) (h1 : 1 ≤ n) (h22 : n ≤ 24) :
@@ -356,7 +352,6 @@ theorem syscall_head_split (PT : SchedNames → IProp GF) (Γ : SchedNames) [Cla
     icases Hrest with ⟨Hpi, Hwl, Hbs, Hip, Hfd, Hir, Henv, Hfr, Hch, Hsi, Hfi, Hpi', Hslot⟩
     iframe
 
-
 /-! ## §4 +0x12 .. +0x20: the two loads and the check's arithmetic -/
 
 /-- **The trapframe pointer quarter and the page it names** (Rocq
@@ -454,7 +449,6 @@ theorem syscall_head_num (PT : SchedNames → IProp GF) (Γ : SchedNames) [Claim
   case r14 => simp only [RegMap.set_apply]; simp
   case r15 => simp only [RegMap.set_apply]; simp
   iframe
-
 
 /-! ## §5 +0x00 .. +0x10: the frame and `myproc()` -/
 

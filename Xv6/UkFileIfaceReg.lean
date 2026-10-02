@@ -59,14 +59,15 @@ import Xv6.HfpReg
 import Xv6.EchoOut
 import Xv6.SysOpenDefs
 import Xv6.ConsoleInvDefs
+import Xv6.UserFd
+import Xv6.UkHandler
+import Xv6.ProgTree
 
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Iris.Std.PartialMap
 open Std (ExtTreeSet)
-
-set_option linter.unusedSectionVars false
 
 /-! ## §0 The device values -/
 
@@ -289,7 +290,7 @@ theorem fif_ok_open_std (fdm : Fdmap) (l : List FdState) (vs : FifVs) (k : Nat) 
       subst e
       simp only [fifRow]
       refine ⟨by omega, ?_⟩
-      simp [List.getElem?_set, hkl]
+      simp [hkl]
     · rw [if_neg e] at h
       rw [LawfulPartialMap.get?_insert, if_neg (fun e' => hfr fd (by rw [e']; exact h))]
       have hr := h2 fd d' h

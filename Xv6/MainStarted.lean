@@ -32,8 +32,6 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedSectionVars false
-
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
 theorem mn_started_addr' : KA.«main» + 162#64 + 36864#64 + 1168#64 = KA.«started» := by decide

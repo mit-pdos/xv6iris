@@ -33,9 +33,6 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedVariables false
-set_option linter.unusedSectionVars false
-
 /-- The status `c.li a0,-1` stores. -/
 theorem ut_xstateOf_neg1 : xstateOf (-1#64) = -1 := by decide
 

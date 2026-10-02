@@ -28,8 +28,6 @@ open HfpFileClaimsP UkFileOpen
 open Std (ExtTreeSet)
 open Iris.Std (get?)
 
-set_option linter.unusedSectionVars false
-
 namespace UkFileOpen
 
 /-- A write-mapped byte of a table's lazy view reads its page. -/

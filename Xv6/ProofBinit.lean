@@ -34,7 +34,6 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
@@ -51,7 +50,6 @@ the value `buf[j].next` ends up holding. -/
 theorem bi_node_zero : bufNextVal 0 = (KA.«bcache» + 0x8268#64) := rfl
 theorem bi_node_succ (j : Nat) : bufNextVal (j + 1) = bufAddr j := rfl
 
-
 theorem bi_u15 : BitVec.signExtend 64 (0x15#20 ++ 0#12) = 0x15000#64 := by decide
 theorem bi_u1d : BitVec.signExtend 64 (0x1d#20 ++ 0#12) = 0x1d000#64 := by decide
 theorem bi_u1e : BitVec.signExtend 64 (0x1e#20 ++ 0#12) = 0x1e000#64 := by decide
@@ -61,7 +59,6 @@ theorem bi_ret_b40 : jumpPc (KA.«binit» + 0x24#64) = (KA.«binit» + 0x24#64) 
   decide
 theorem bi_ret_b80 : jumpPc (KA.«binit» + 0x64#64) = (KA.«binit» + 0x64#64) := by
   decide
-
 
 theorem bi_bufAddr_toNat (m : Nat) (h : m ≤ 30) :
     (bufAddr m).toNat = KernelSyms.«bcache» + 0x18 + 1112 * m := by
@@ -372,7 +369,6 @@ theorem bi_iter (IS : INITSLEEPLOCK) [CurCtx] (k : KCtx) (hK : 12 ≤ k.avail)
     exact ⟨e2, e8, e18, e19, e20, e21, e22, e23, e24, e25, e26, e27⟩
   · simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
 
-
 /-! ## The loop -/
 
 set_option maxHeartbeats 4000000 in
@@ -445,7 +441,6 @@ theorem bi_loop (IS : INITSLEEPLOCK) [CurCtx] (k : KCtx) (hK : 12 ≤ k.avail) (
     iapply HΦ $$ %R3 Hk Hpc Hhn Hpend Hnodes Hrests
     ipureintro
     exact biKept_trans hkept hkept3
-
 
 /-! ## The frame and the epilogue -/
 
@@ -528,7 +523,6 @@ theorem bi_epi [CurCtx] (cpu cur : CPU) (k : KCtx)
   simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
   refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
   all_goals first | trivial | assumption | (rw [hR2]; bv_omega_g)
-
 
 /-! ## Entering and leaving the loop -/
 
@@ -767,7 +761,6 @@ theorem binit_proof (IL : INITLOCK) (IS : INITSLEEPLOCK) : BINIT :=
   case g18 => k_norm_g
   case g19 => k_norm_g
   case g20 => k_norm_g; rfl⟩
-
 
 end
 

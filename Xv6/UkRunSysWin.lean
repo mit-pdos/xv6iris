@@ -32,8 +32,6 @@ open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 open UexecSG
 
-set_option linter.unusedSectionVars false
-
 /-- **Rocq `usys_win`**: the buffer argument and the cap of the four window
 rows. -/
 def usysWin (n : Int) (tf : List (BitVec 64)) : Option (BitVec 64 × Nat) :=

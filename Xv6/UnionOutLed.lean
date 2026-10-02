@@ -37,8 +37,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-- WHAT THE UNION'S BIRTH PROMISES OF THE MACHINE'S NAMES (Rocq
 `union_born`, `App.app_born`): the file application's fixed part keeps the
 started counter's. -/

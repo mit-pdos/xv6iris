@@ -41,8 +41,6 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
-
 /-! ## Pure facts -/
 
 theorem sl_pChan (pa : BitVec 64) : pa + 32#64 = pChan pa := rfl

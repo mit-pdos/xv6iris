@@ -70,8 +70,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
-
 /-! ## S1  THE PATH, OFF /init's READ-ONLY IMAGE -/
 
 /-- **Rocq `init_cons_ro_bytes_bool`**: "console" at 0x980 in /init's image. -/

@@ -45,8 +45,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-! ## 11d.  The theorem -/
 
 /-- `imgState`'s four fields, read out (helpers; `rfl` at an abstract `P`,

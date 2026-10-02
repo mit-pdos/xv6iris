@@ -79,8 +79,6 @@ namespace MachCSL
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Iris.Std Std
 open LeanRV64D
 
-set_option linter.unusedSectionVars false
-
 section transport
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 
@@ -710,7 +708,6 @@ theorem stampMap_valid (m : StampMap Id) : ✓ m := by
 
 end helpers
 
-
 /-! ## The box's cameras (Rocq `Xv6Cameras` §15's `stampsR` / `boxG`) -/
 
 /-- **THE STAMPS CAMERA** (Rocq's `stampsR id := authR (gmapUR (id * nat)
@@ -1068,7 +1065,6 @@ theorem bigSepL_topLb_max (P : Nat → Nat → IProp GF) :
         iframe HP'
         iexact Hl'
 
-
 section withX
 variable [GhostVarG GF (SlotReg Id X)]
 
@@ -1313,7 +1309,6 @@ theorem box_floor_view2 (cpu : CPU) (ξ : CtxId) (K1 K2 T : Nat) (h : T ≤ K1 �
     iexists K
     iframe HK
     ipureintro; omega
-
 
 section inh
 variable [Inhabited Id] [Inhabited X]
@@ -1812,7 +1807,6 @@ theorem boxCheckoutHook (P : BoxPay GF Id X) [BoxPayOk P] (N : Namespace) (γ : 
     iframe Hrp0
     iexact Hllbh
 
-
 /-- Rocq's `box_checkout` -- plain (e): the caller's `Q2` passes straight
 into the arm. -/
 theorem boxCheckout (P : BoxPay GF Id X) [BoxPayOk P] (N : Namespace) (γ : BoxNames)
@@ -2225,7 +2219,6 @@ theorem boxAlloc (P : BoxPay GF Id X) [BoxPayOk P] (N : Namespace)
   iexact H
 
 end inh
-
 
 end withX
 end box

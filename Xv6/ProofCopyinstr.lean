@@ -26,7 +26,6 @@ open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open Iris.Std (get? insert delete)
 open LeanRV64D
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
@@ -38,7 +37,6 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 variable {lent : Bool}
 
 /-! # `copyinstr`: the byte-by-byte string copy (kernel/vm.c) -/
-
 
 /-! ## The twelve-slot frame of `copyinstr` (ra, s0..s9, one unused slot) -/
 
@@ -476,7 +474,6 @@ theorem cs_noNul_step (view : Nat → List (BitVec 8)) (A d j : Nat)
     subst this
     exact hb
 
-
 theorem cs_ite_beq_byte {α : Type _} (b : BitVec 8) (x y : α) :
     (if bcond bop.BEQ (BitVec.setWidth 64 b) 0#64 then x else y) = if b = 0#8 then x else y := by
   by_cases hb : b = 0#8
@@ -506,7 +503,6 @@ theorem cs_extract_setw (b : BitVec 8) : BitVec.extractLsb' 0 8 (BitVec.setWidth
 theorem cs_a5_step (dst0 : BitVec 64) (m : Nat) :
     dst0 + (BitVec.ofNat 64 m + 1#64) = dst0 + BitVec.ofNat 64 (m + 1) := by
   rw [show (1#64 : BitVec 64) = BitVec.ofNat 64 1 from rfl, co_ofNat_add]
-
 
 /-- `a5` after `addi a5,1`, in `k_norm_g`'s normal form. -/
 theorem cs_a5_split (dst0 : BitVec 64) (d j : Nat) :
@@ -942,7 +938,6 @@ theorem cstr_nsel [Xv6G GF] [CurCtx]
     case h262' => simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]; exact h26
     case h272' => simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]; exact h27
 
-
 /-! ## What `copyinstr` leaves behind -/
 
 /-- The final buffer `bs'`: either the NUL-terminated string (return 0) or a
@@ -989,7 +984,6 @@ theorem cs_s4adv (dst0 : BitVec 64) (L D2 : Nat) (h1 : 1 ≤ D2) (hD2 : D2 ≤ L
 
 theorem cs_s1adv (v : Nat) : BitVec.ofNat 64 v + 4096#64 = BitVec.ofNat 64 (v + 4096) := by
   rw [show (4096#64 : BitVec 64) = BitVec.ofNat 64 4096 from rfl, co_ofNat_add]
-
 
 theorem cs_xori_01 : (0#64 : BitVec 64) ^^^ BitVec.signExtend 64 (1#12) = 1#64 := by decide
 

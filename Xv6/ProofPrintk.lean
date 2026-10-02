@@ -172,8 +172,7 @@ theorem printk_release_tail (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors}
   obtain ⟨h9, h19, h20, h21, h22', h23, h24, h25, h26, h27⟩ := hcs
   constructor
   · unfold calleeSaved
-    simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, eq_self_iff_true, _root_.true_and,
-      _root_.and_true]
+    simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, _root_.true_and]
     exact ⟨c2_9.trans h9, c2_19.trans h19, c2_20.trans h20, c2_21.trans h21, c2_22.trans h22',
       c2_23.trans h23, c2_24.trans h24, c2_25.trans h25, c2_26.trans h26, c2_27.trans h27⟩
   · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
@@ -442,7 +441,7 @@ theorem printk_arm_d (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFunctors} [Mach
   k_step (wp_s_j cpu _ (KA.«printk» + 0xde#64) true 2097038#21) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
   iintro Hk Hpc
   ihave Hframe' : pkFrame (k.regs 2#5) k.regs (pkApBase (k.regs 2#5) + 8#64 * BitVec.ofNat 64 (kk + 1)) w18 $$ [Hframe]
-  · simp only [BitVec.ofNat_add, BitVec.reduceOfNat]; iexact Hframe
+  · simp only [BitVec.ofNat_add]; iexact Hframe
   iapply Hnext $$ %_ %(i + 1) %(kk + 1) %cs %_ Hk Hpc Hbuf Hdescs Hframe' Hsent Hlocked
   ipureintro
   refine ⟨?_, ?_, by omega, hp, hkinds⟩
@@ -526,12 +525,12 @@ theorem printk_arm_ld (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFunctors} [Mac
   k_step (wp_s_j cpu _ (KA.«printk» + 0xc6#64) true 2097062#21) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
   iintro Hk Hpc
   ihave Hframe' : pkFrame (k.regs 2#5) k.regs (pkApBase (k.regs 2#5) + 8#64 * BitVec.ofNat 64 (kk + 1)) w18 $$ [Hframe]
-  · simp only [BitVec.ofNat_add, BitVec.reduceOfNat]; iexact Hframe
+  · simp only [BitVec.ofNat_add]; iexact Hframe
   iapply Hnext $$ %_ %(i + 2) %(kk + 1) %cs %_ Hk Hpc Hbuf Hdescs Hframe' Hsent Hlocked
   ipureintro
   refine ⟨?_, ?_, by omega, hp, hkinds⟩
   · exact pkRegs_set _ _ 9#5 _ (pkRegs_calleeSaved _ _ _ hR hcs) (by decide)
-  · simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, BitVec.ofNat_add, BitVec.reduceOfNat]
+  · simp only [RegMap.set_apply, ite_true, BitVec.ofNat_add]
 
 set_option maxHeartbeats 4000000 in
 /-- The `%lld` arm at `0x80000610#64`: the next vararg to `printint`. -/
@@ -610,12 +609,12 @@ theorem printk_arm_lld (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFunctors} [Ma
   k_step (wp_s_j cpu _ (KA.«printk» + 0x104#64) true 2097000#21) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
   iintro Hk Hpc
   ihave Hframe' : pkFrame (k.regs 2#5) k.regs (pkApBase (k.regs 2#5) + 8#64 * BitVec.ofNat 64 (kk + 1)) w18 $$ [Hframe]
-  · simp only [BitVec.ofNat_add, BitVec.reduceOfNat]; iexact Hframe
+  · simp only [BitVec.ofNat_add]; iexact Hframe
   iapply Hnext $$ %_ %(i + 3) %(kk + 1) %cs %_ Hk Hpc Hbuf Hdescs Hframe' Hsent Hlocked
   ipureintro
   refine ⟨?_, ?_, by omega, hp, hkinds⟩
   · exact pkRegs_set _ _ 9#5 _ (pkRegs_calleeSaved _ _ _ hR hcs) (by decide)
-  · simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, BitVec.ofNat_add, BitVec.reduceOfNat]
+  · simp only [RegMap.set_apply, ite_true, BitVec.ofNat_add]
 
 set_option maxHeartbeats 4000000 in
 /-- The `%u` arm at `0x8000062c#64`: the next vararg to `printint`. -/
@@ -691,7 +690,7 @@ theorem printk_arm_u (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFunctors} [Mach
   k_step (wp_s_j cpu _ (KA.«printk» + 0x11e#64) true 2096974#21) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
   iintro Hk Hpc
   ihave Hframe' : pkFrame (k.regs 2#5) k.regs (pkApBase (k.regs 2#5) + 8#64 * BitVec.ofNat 64 (kk + 1)) w18 $$ [Hframe]
-  · simp only [BitVec.ofNat_add, BitVec.reduceOfNat]; iexact Hframe
+  · simp only [BitVec.ofNat_add]; iexact Hframe
   iapply Hnext $$ %_ %(i + 1) %(kk + 1) %cs %_ Hk Hpc Hbuf Hdescs Hframe' Hsent Hlocked
   ipureintro
   refine ⟨?_, ?_, by omega, hp, hkinds⟩
@@ -775,12 +774,12 @@ theorem printk_arm_lu (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFunctors} [Mac
   k_step (wp_s_j cpu _ (KA.«printk» + 0x13a#64) true 2096946#21) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
   iintro Hk Hpc
   ihave Hframe' : pkFrame (k.regs 2#5) k.regs (pkApBase (k.regs 2#5) + 8#64 * BitVec.ofNat 64 (kk + 1)) w18 $$ [Hframe]
-  · simp only [BitVec.ofNat_add, BitVec.reduceOfNat]; iexact Hframe
+  · simp only [BitVec.ofNat_add]; iexact Hframe
   iapply Hnext $$ %_ %(i + 2) %(kk + 1) %cs %_ Hk Hpc Hbuf Hdescs Hframe' Hsent Hlocked
   ipureintro
   refine ⟨?_, ?_, by omega, hp, hkinds⟩
   · exact pkRegs_set _ _ 9#5 _ (pkRegs_calleeSaved _ _ _ hR hcs) (by decide)
-  · simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, BitVec.ofNat_add, BitVec.reduceOfNat]
+  · simp only [RegMap.set_apply, ite_true, BitVec.ofNat_add]
 
 set_option maxHeartbeats 4000000 in
 /-- The `%llu` arm at `0x80000662#64`: the next vararg to `printint`. -/
@@ -859,12 +858,12 @@ theorem printk_arm_llu (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFunctors} [Ma
   k_step (wp_s_j cpu _ (KA.«printk» + 0x156#64) true 2096918#21) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
   iintro Hk Hpc
   ihave Hframe' : pkFrame (k.regs 2#5) k.regs (pkApBase (k.regs 2#5) + 8#64 * BitVec.ofNat 64 (kk + 1)) w18 $$ [Hframe]
-  · simp only [BitVec.ofNat_add, BitVec.reduceOfNat]; iexact Hframe
+  · simp only [BitVec.ofNat_add]; iexact Hframe
   iapply Hnext $$ %_ %(i + 3) %(kk + 1) %cs %_ Hk Hpc Hbuf Hdescs Hframe' Hsent Hlocked
   ipureintro
   refine ⟨?_, ?_, by omega, hp, hkinds⟩
   · exact pkRegs_set _ _ 9#5 _ (pkRegs_calleeSaved _ _ _ hR hcs) (by decide)
-  · simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, BitVec.ofNat_add, BitVec.reduceOfNat]
+  · simp only [RegMap.set_apply, ite_true, BitVec.ofNat_add]
 
 set_option maxHeartbeats 4000000 in
 /-- The `%x` arm at `0x8000067e#64`: the next vararg to `printint`. -/
@@ -940,7 +939,7 @@ theorem printk_arm_x (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFunctors} [Mach
   k_step (wp_s_j cpu _ (KA.«printk» + 0x170#64) true 2096892#21) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
   iintro Hk Hpc
   ihave Hframe' : pkFrame (k.regs 2#5) k.regs (pkApBase (k.regs 2#5) + 8#64 * BitVec.ofNat 64 (kk + 1)) w18 $$ [Hframe]
-  · simp only [BitVec.ofNat_add, BitVec.reduceOfNat]; iexact Hframe
+  · simp only [BitVec.ofNat_add]; iexact Hframe
   iapply Hnext $$ %_ %(i + 1) %(kk + 1) %cs %_ Hk Hpc Hbuf Hdescs Hframe' Hsent Hlocked
   ipureintro
   refine ⟨?_, ?_, by omega, hp, hkinds⟩
@@ -1021,12 +1020,12 @@ theorem printk_arm_lx (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFunctors} [Mac
   k_step (wp_s_j cpu _ (KA.«printk» + 0x18a#64) true 2096866#21) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
   iintro Hk Hpc
   ihave Hframe' : pkFrame (k.regs 2#5) k.regs (pkApBase (k.regs 2#5) + 8#64 * BitVec.ofNat 64 (kk + 1)) w18 $$ [Hframe]
-  · simp only [BitVec.ofNat_add, BitVec.reduceOfNat]; iexact Hframe
+  · simp only [BitVec.ofNat_add]; iexact Hframe
   iapply Hnext $$ %_ %(i + 2) %(kk + 1) %cs %_ Hk Hpc Hbuf Hdescs Hframe' Hsent Hlocked
   ipureintro
   refine ⟨?_, ?_, by omega, hp, hkinds⟩
   · exact pkRegs_set _ _ 9#5 _ (pkRegs_calleeSaved _ _ _ hR hcs) (by decide)
-  · simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, BitVec.ofNat_add, BitVec.reduceOfNat]
+  · simp only [RegMap.set_apply, ite_true, BitVec.ofNat_add]
 
 set_option maxHeartbeats 4000000 in
 /-- The `%llx` arm at `0x800006b2#64`: the next vararg to `printint`. -/
@@ -1105,12 +1104,12 @@ theorem printk_arm_llx (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFunctors} [Ma
   k_step (wp_s_j cpu _ (KA.«printk» + 0x1a6#64) true 2096838#21) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
   iintro Hk Hpc
   ihave Hframe' : pkFrame (k.regs 2#5) k.regs (pkApBase (k.regs 2#5) + 8#64 * BitVec.ofNat 64 (kk + 1)) w18 $$ [Hframe]
-  · simp only [BitVec.ofNat_add, BitVec.reduceOfNat]; iexact Hframe
+  · simp only [BitVec.ofNat_add]; iexact Hframe
   iapply Hnext $$ %_ %(i + 3) %(kk + 1) %cs %_ Hk Hpc Hbuf Hdescs Hframe' Hsent Hlocked
   ipureintro
   refine ⟨?_, ?_, by omega, hp, hkinds⟩
   · exact pkRegs_set _ _ 9#5 _ (pkRegs_calleeSaved _ _ _ hR hcs) (by decide)
-  · simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, BitVec.ofNat_add, BitVec.reduceOfNat]
+  · simp only [RegMap.set_apply, ite_true, BitVec.ofNat_add]
 
 set_option maxHeartbeats 4000000 in
 /-- The `%c` arm at `0x80000714`: the next vararg to `prputc`. -/
@@ -1179,7 +1178,7 @@ theorem printk_arm_c (PP : PRPUTC) {hlc : HasLC} {GF : BundledGFunctors} [MachGS
   k_step (wp_s_j cpu _ (KA.«printk» + 0x200#64) true 2096748#21) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
   iintro Hk Hpc
   ihave Hframe' : pkFrame (k.regs 2#5) k.regs (pkApBase (k.regs 2#5) + 8#64 * BitVec.ofNat 64 (kk + 1)) w18 $$ [Hframe]
-  · simp only [BitVec.ofNat_add, BitVec.reduceOfNat]; iexact Hframe
+  · simp only [BitVec.ofNat_add]; iexact Hframe
   iapply Hnext $$ %_ %(i + 1) %(kk + 1) %cs2 %_ Hk Hpc Hbuf Hdescs Hframe' Hsent Hlocked
   ipureintro
   refine ⟨?_, ?_, by omega, hp, hkinds⟩
@@ -1364,7 +1363,7 @@ theorem printk_arm_plain (PP : PRPUTC) {hlc : HasLC} {GF : BundledGFunctors} [Ma
   ipureintro
   refine ⟨?_, ?_, le_refl _, hi, hkinds⟩
   · exact pkRegs_set _ _ 9#5 _ (pkRegs_calleeSaved _ _ _ hR hcs2) (by decide)
-  · simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, BitVec.ofNat_add, BitVec.reduceOfNat]
+  · simp only [RegMap.set_apply, ite_true]
 
 
 set_option maxHeartbeats 4000000 in
@@ -1475,8 +1474,7 @@ theorem printk_str_loop (PP : PRPUTC) {hlc : HasLC} {GF : BundledGFunctors} [Mac
     iintro Hk Hpc
     iapply (ih (j + 1) _ (bs ++ cs2) (by omega)
       (pkRegs_set _ _ 10#5 _ (pkRegs_set _ _ 20#5 _ (pkRegs_calleeSaved _ _ _ hR hcs2) (by decide)) (by decide))
-      (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, BitVec.ofNat_add,
-        BitVec.reduceOfNat])
+      (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, BitVec.ofNat_add])
       (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_true])) $$ [- $Hk $Hpc $Hbuf $Hsent]
     iframe #
     iintro %R' %cs' Hk Hpc Hbuf Hsent %h'
@@ -1575,7 +1573,7 @@ theorem printk_hex_iter (PP : PRPUTC) {hlc : HasLC} {GF : BundledGFunctors} [Mac
   · exact pkRegsN_set _ _ 20#5 _ (pkRegsN_set _ _ 21#5 _ (pkRegsN_calleeSaved _ _ _ hR hcs2) (by decide)) (by decide)
   · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact hcs2.2.2.1
   · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact hcs2.2.2.2.2.2.2.2.2.2.2.1.trans hR25
-  · simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, BitVec.ofNat_add, BitVec.reduceOfNat]
+  · simp only [RegMap.set_apply, BitVec.reduceEq, ite_true]
 
 set_option maxHeartbeats 4000000 in
 /-- The `%p` digit loop: from count `m + 1` down to the exit at `0x80000710`. -/
@@ -1637,13 +1635,13 @@ theorem printk_dispatch_7d0 {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF
   iintro Hk Hpc
   by_cases hp : c0 = chP
   · ihave Hpc := MachCSL.pcIs_pos _ _ _ _ hp $$ Hpc
-    have htgt : dispatch7a0 c0 c1 c2 = (KA.«printk» + 0x1a8#64) := by simp [dispatch7a0, chD, chU, chX, chP, chC, chS, chL, chPct, hp]
+    have htgt : dispatch7a0 c0 c1 c2 = (KA.«printk» + 0x1a8#64) := by simp [dispatch7a0, chU, chX, chP, chL, hp]
     simp only [htgt]
     iapply HΦ $$ %_ Hk Hpc
     ipureintro
     refine ⟨?_, ?_, ?_, ?_⟩
     · repeat (first | exact hR | refine pkRegs_set _ _ _ _ ?_ (by decide))
-    all_goals simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, h21]
+    all_goals simp only [h21]
   ihave Hpc := MachCSL.pcIs_neg _ _ _ _ hp $$ Hpc
   k_step (wp_s_addi cpu _ (KA.«printk» + 0x2d2#64) false 99#12 15#5 0#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
   iintro Hk Hpc
@@ -1652,13 +1650,13 @@ theorem printk_dispatch_7d0 {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF
   iintro Hk Hpc
   by_cases hc : c0 = chC
   · ihave Hpc := MachCSL.pcIs_pos _ _ _ _ hc $$ Hpc
-    have htgt : dispatch7a0 c0 c1 c2 = (KA.«printk» + 0x1ee#64) := by simp [dispatch7a0, chD, chU, chX, chP, chC, chS, chL, chPct, hc]
+    have htgt : dispatch7a0 c0 c1 c2 = (KA.«printk» + 0x1ee#64) := by simp [dispatch7a0, chU, chX, chP, chC, chL, hc]
     simp only [htgt]
     iapply HΦ $$ %_ Hk Hpc
     ipureintro
     refine ⟨?_, ?_, ?_, ?_⟩
     · repeat (first | exact hR | refine pkRegs_set _ _ _ _ ?_ (by decide))
-    all_goals simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, h21]
+    all_goals simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, h21]
   ihave Hpc := MachCSL.pcIs_neg _ _ _ _ hc $$ Hpc
   k_step (wp_s_addi cpu _ (KA.«printk» + 0x2da#64) false 115#12 15#5 0#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
   iintro Hk Hpc
@@ -1667,13 +1665,13 @@ theorem printk_dispatch_7d0 {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF
   iintro Hk Hpc
   by_cases hs : c0 = chS
   · ihave Hpc := MachCSL.pcIs_pos _ _ _ _ hs $$ Hpc
-    have htgt : dispatch7a0 c0 c1 c2 = (KA.«printk» + 0x202#64) := by simp [dispatch7a0, chD, chU, chX, chP, chC, chS, chL, chPct, hs]
+    have htgt : dispatch7a0 c0 c1 c2 = (KA.«printk» + 0x202#64) := by simp [dispatch7a0, chU, chX, chP, chC, chS, chL, hs]
     simp only [htgt]
     iapply HΦ $$ %_ Hk Hpc
     ipureintro
     refine ⟨?_, ?_, ?_, ?_⟩
     · repeat (first | exact hR | refine pkRegs_set _ _ _ _ ?_ (by decide))
-    all_goals simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, h21]
+    all_goals simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, h21]
   ihave Hpc := MachCSL.pcIs_neg _ _ _ _ hs $$ Hpc
   k_step (wp_s_addi cpu _ (KA.«printk» + 0x2e2#64) false 37#12 15#5 0#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
   iintro Hk Hpc
@@ -1682,26 +1680,26 @@ theorem printk_dispatch_7d0 {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF
   iintro Hk Hpc
   by_cases hpct : c0 = chPct
   · ihave Hpc := MachCSL.pcIs_pos _ _ _ _ hpct $$ Hpc
-    have htgt : dispatch7a0 c0 c1 c2 = (KA.«printk» + 0x23a#64) := by simp [dispatch7a0, chD, chU, chX, chP, chC, chS, chL, chPct, hpct]
+    have htgt : dispatch7a0 c0 c1 c2 = (KA.«printk» + 0x23a#64) := by simp [dispatch7a0, chU, chX, chP, chC, chS, chL, chPct, hpct]
     simp only [htgt]
     iapply HΦ $$ %_ Hk Hpc
     ipureintro
     refine ⟨?_, ?_, ?_, ?_⟩
     · repeat (first | exact hR | refine pkRegs_set _ _ _ _ ?_ (by decide))
-    all_goals simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, h21]
+    all_goals simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, h21]
   ihave Hpc := MachCSL.pcIs_neg _ _ _ _ hpct $$ Hpc
   k_step (wp_s_branch cpu _ (KA.«printk» + 0x2ea#64) false 20#13 21#5 0#5 (by decide) bop.BEQ) from (text_instr _ _ _ _ rfl rfl) HT
     $$ [- $Hk $Hpc] with [h21, ite_beq_byte]
   iintro Hk Hpc
   by_cases h0 : c0 = 0#8
   · ihave Hpc := MachCSL.pcIs_pos _ _ _ _ h0 $$ Hpc
-    have htgt : dispatch7a0 c0 c1 c2 = (KA.«printk» + 0x2fe#64) := by simp [dispatch7a0, chD, chU, chX, chP, chC, chS, chL, chPct, h0]
+    have htgt : dispatch7a0 c0 c1 c2 = (KA.«printk» + 0x2fe#64) := by simp [dispatch7a0, chU, chX, chP, chC, chS, chL, chPct, h0]
     simp only [htgt]
     iapply HΦ $$ %_ Hk Hpc
     ipureintro
     refine ⟨?_, ?_, ?_, ?_⟩
     · repeat (first | exact hR | refine pkRegs_set _ _ _ _ ?_ (by decide))
-    all_goals simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, h21]
+    all_goals simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, h21]
   ihave Hpc := MachCSL.pcIs_neg _ _ _ _ h0 $$ Hpc
   have htgt : dispatch7a0 c0 c1 c2 = (KA.«printk» + 0x2ee#64) := by simp [dispatch7a0, eq_false hu, eq_false hlu, eq_false hllu, eq_false hx, eq_false hlx, eq_false hllx, eq_false hp, eq_false hc, eq_false hs, eq_false hpct, eq_false h0]
   simp only [htgt]
@@ -1709,7 +1707,7 @@ theorem printk_dispatch_7d0 {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF
   ipureintro
   refine ⟨?_, ?_, ?_, ?_⟩
   · repeat (first | exact hR | refine pkRegs_set _ _ _ _ ?_ (by decide))
-  all_goals simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, h21]
+  all_goals simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, h21]
 
 set_option maxHeartbeats 4000000 in
 /-- The dispatch chain from `0x800007ea`: `%llx`, then `0x7d0`. -/
@@ -1737,31 +1735,31 @@ theorem printk_dispatch_7c6 {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF
     iintro Hk Hpc
     by_cases hll : c1 = chL ∧ c0 = chL
     · ihave Hpc := MachCSL.pcIs_pos _ _ _ _ hll $$ Hpc
-      have htgt : dispatch7a0 c0 c1 c2 = (KA.«printk» + 0x18c#64) := by simp [dispatch7a0, chD, chU, chX, chP, chC, chS, chL, chPct, hc2, hll.1, hll.2]
+      have htgt : dispatch7a0 c0 c1 c2 = (KA.«printk» + 0x18c#64) := by simp [dispatch7a0, chU, chX, chL, hc2, hll.1, hll.2]
       simp only [htgt]
       iapply HΦ $$ %_ Hk Hpc
       ipureintro
       refine ⟨?_, ?_, ?_, ?_⟩
       · repeat (first | exact hR | refine pkRegs_set _ _ _ _ ?_ (by decide))
-      all_goals simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, h21]
+      all_goals simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, h21]
     ihave Hpc := MachCSL.pcIs_neg _ _ _ _ hll $$ Hpc
-    iapply (printk_dispatch_7d0 cpu k hsie c0 c1 c2 _ (pkRegs_set _ _ _ _ hR (by decide)) (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, h21]) hu hlu hllu hx hlx ?Hllxa) $$ [- $Hk $Hpc]
+    iapply (printk_dispatch_7d0 cpu k hsie c0 c1 c2 _ (pkRegs_set _ _ _ _ hR (by decide)) (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, h21]) hu hlu hllu hx hlx ?Hllxa) $$ [- $Hk $Hpc]
     rotate_right 1
     iframe #
     case Hllxa => intro h; exact hll h.2
     iintro %R'' Hk Hpc %h''
     iapply HΦ $$ %_ Hk Hpc
     ipureintro
-    refine ⟨h''.1, ?_, ?_, ?_⟩ <;> simp only [h''.2.1, h''.2.2.1, h''.2.2.2, RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, h21]
+    refine ⟨h''.1, ?_, ?_, ?_⟩ <;> simp only [h''.2.1, h''.2.2.1, h''.2.2.2, RegMap.set_apply, BitVec.reduceEq, ite_false, h21]
   ihave Hpc := MachCSL.pcIs_neg _ _ _ _ hc2 $$ Hpc
-  iapply (printk_dispatch_7d0 cpu k hsie c0 c1 c2 _ (pkRegs_set _ _ _ _ hR (by decide)) (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, h21]) hu hlu hllu hx hlx ?Hllxb) $$ [- $Hk $Hpc]
+  iapply (printk_dispatch_7d0 cpu k hsie c0 c1 c2 _ (pkRegs_set _ _ _ _ hR (by decide)) (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, h21]) hu hlu hllu hx hlx ?Hllxb) $$ [- $Hk $Hpc]
   rotate_right 1
   iframe #
   case Hllxb => intro h; exact hc2 h.1
   iintro %R'' Hk Hpc %h''
   iapply HΦ $$ %_ Hk Hpc
   ipureintro
-  refine ⟨h''.1, ?_, ?_, ?_⟩ <;> simp only [h''.2.1, h''.2.2.1, h''.2.2.2, RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, h21]
+  refine ⟨h''.1, ?_, ?_, ?_⟩ <;> simp only [h''.2.1, h''.2.2.1, h''.2.2.2, RegMap.set_apply, BitVec.reduceEq, ite_false, h21]
 
 set_option maxHeartbeats 4000000 in
 /-- The dispatch chain from `0x800007dc`: `%x`, `%lx`, then `0x7c6`. -/
@@ -1783,13 +1781,13 @@ theorem printk_dispatch_7b8 {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF
   iintro Hk Hpc
   by_cases hx : c0 = chX
   · ihave Hpc := MachCSL.pcIs_pos _ _ _ _ hx $$ Hpc
-    have htgt : dispatch7a0 c0 c1 c2 = (KA.«printk» + 0x158#64) := by simp [dispatch7a0, chD, chU, chX, chP, chC, chS, chL, chPct, hx]
+    have htgt : dispatch7a0 c0 c1 c2 = (KA.«printk» + 0x158#64) := by simp [dispatch7a0, chU, chX, chL, hx]
     simp only [htgt]
     iapply HΦ $$ %_ Hk Hpc
     ipureintro
     refine ⟨?_, ?_, ?_, ?_⟩
     · repeat (first | exact hR | refine pkRegs_set _ _ _ _ ?_ (by decide))
-    all_goals simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, h21]
+    all_goals simp only [h21]
   ihave Hpc := MachCSL.pcIs_neg _ _ _ _ hx $$ Hpc
   k_step (wp_s_addi cpu _ (KA.«printk» + 0x2ba#64) false 3976#12 12#5 12#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [h12]
   iintro Hk Hpc
@@ -1803,31 +1801,31 @@ theorem printk_dispatch_7b8 {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF
     iintro Hk Hpc
     by_cases hl : c0 = chL
     · ihave Hpc := MachCSL.pcIs_pos _ _ _ _ hl $$ Hpc
-      have htgt : dispatch7a0 c0 c1 c2 = (KA.«printk» + 0x172#64) := by simp [dispatch7a0, chD, chU, chX, chP, chC, chS, chL, chPct, hc1, hl]
+      have htgt : dispatch7a0 c0 c1 c2 = (KA.«printk» + 0x172#64) := by simp [dispatch7a0, chU, chX, chL, hc1, hl]
       simp only [htgt]
       iapply HΦ $$ %_ Hk Hpc
       ipureintro
       refine ⟨?_, ?_, ?_, ?_⟩
       · repeat (first | exact hR | refine pkRegs_set _ _ _ _ ?_ (by decide))
-      all_goals simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, h21]
+      all_goals simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, h21]
     ihave Hpc := MachCSL.pcIs_neg _ _ _ _ hl $$ Hpc
-    iapply (printk_dispatch_7c6 cpu k hsie c0 c1 c2 _ (pkRegs_set _ _ _ _ hR (by decide)) (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, h21]) (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, h13]) (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, h15]) hu hlu hllu hx ?Hlxa) $$ [- $Hk $Hpc]
+    iapply (printk_dispatch_7c6 cpu k hsie c0 c1 c2 _ (pkRegs_set _ _ _ _ hR (by decide)) (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, h21]) (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, h13]) (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, h15]) hu hlu hllu hx ?Hlxa) $$ [- $Hk $Hpc]
     rotate_right 1
     iframe #
     case Hlxa => intro h; exact hl h.2
     iintro %R'' Hk Hpc %h''
     iapply HΦ $$ %_ Hk Hpc
     ipureintro
-    refine ⟨h''.1, ?_, ?_, ?_⟩ <;> simp only [h''.2.1, h''.2.2.1, h''.2.2.2, RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, h21]
+    refine ⟨h''.1, ?_, ?_, ?_⟩ <;> simp only [h''.2.1, h''.2.2.1, h''.2.2.2, RegMap.set_apply, BitVec.reduceEq, ite_false, h21]
   ihave Hpc := MachCSL.pcIs_neg _ _ _ _ hc1 $$ Hpc
-  iapply (printk_dispatch_7c6 cpu k hsie c0 c1 c2 _ (pkRegs_set _ _ _ _ hR (by decide)) (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, h21]) (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, h13]) (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, h15]) hu hlu hllu hx ?Hlxb) $$ [- $Hk $Hpc]
+  iapply (printk_dispatch_7c6 cpu k hsie c0 c1 c2 _ (pkRegs_set _ _ _ _ hR (by decide)) (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, h21]) (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, h13]) (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, h15]) hu hlu hllu hx ?Hlxb) $$ [- $Hk $Hpc]
   rotate_right 1
   iframe #
   case Hlxb => intro h; exact hc1 h.1
   iintro %R'' Hk Hpc %h''
   iapply HΦ $$ %_ Hk Hpc
   ipureintro
-  refine ⟨h''.1, ?_, ?_, ?_⟩ <;> simp only [h''.2.1, h''.2.2.1, h''.2.2.2, RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, h21]
+  refine ⟨h''.1, ?_, ?_, ?_⟩ <;> simp only [h''.2.1, h''.2.2.1, h''.2.2.2, RegMap.set_apply, BitVec.reduceEq, ite_false, h21]
 
 set_option maxHeartbeats 4000000 in
 /-- The dispatch chain from `0x800007d2`: `%llu`, then `0x7b8`. -/
@@ -1855,31 +1853,31 @@ theorem printk_dispatch_7ae {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF
     iintro Hk Hpc
     by_cases hll : c1 = chL ∧ c0 = chL
     · ihave Hpc := MachCSL.pcIs_pos _ _ _ _ hll $$ Hpc
-      have htgt : dispatch7a0 c0 c1 c2 = (KA.«printk» + 0x13c#64) := by simp [dispatch7a0, chD, chU, chX, chP, chC, chS, chL, chPct, hc2, hll.1, hll.2]
+      have htgt : dispatch7a0 c0 c1 c2 = (KA.«printk» + 0x13c#64) := by simp [dispatch7a0, chU, chL, hc2, hll.1, hll.2]
       simp only [htgt]
       iapply HΦ $$ %_ Hk Hpc
       ipureintro
       refine ⟨?_, ?_, ?_, ?_⟩
       · repeat (first | exact hR | refine pkRegs_set _ _ _ _ ?_ (by decide))
-      all_goals simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, h21]
+      all_goals simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, h21]
     ihave Hpc := MachCSL.pcIs_neg _ _ _ _ hll $$ Hpc
-    iapply (printk_dispatch_7b8 cpu k hsie c0 c1 c2 _ (pkRegs_set _ _ _ _ hR (by decide)) (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, h21]) (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, h12]) (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, h13]) (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, h14]) (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, h15]) hu hlu ?Hllua) $$ [- $Hk $Hpc]
+    iapply (printk_dispatch_7b8 cpu k hsie c0 c1 c2 _ (pkRegs_set _ _ _ _ hR (by decide)) (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, h21]) (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, h12]) (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, h13]) (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, h14]) (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, h15]) hu hlu ?Hllua) $$ [- $Hk $Hpc]
     rotate_right 1
     iframe #
     case Hllua => intro h; exact hll h.2
     iintro %R'' Hk Hpc %h''
     iapply HΦ $$ %_ Hk Hpc
     ipureintro
-    refine ⟨h''.1, ?_, ?_, ?_⟩ <;> simp only [h''.2.1, h''.2.2.1, h''.2.2.2, RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, h21]
+    refine ⟨h''.1, ?_, ?_, ?_⟩ <;> simp only [h''.2.1, h''.2.2.1, h''.2.2.2, RegMap.set_apply, BitVec.reduceEq, ite_false, h21]
   ihave Hpc := MachCSL.pcIs_neg _ _ _ _ hc2 $$ Hpc
-  iapply (printk_dispatch_7b8 cpu k hsie c0 c1 c2 _ (pkRegs_set _ _ _ _ hR (by decide)) (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, h21]) (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, h12]) (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, h13]) (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, h14]) (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, h15]) hu hlu ?Hllub) $$ [- $Hk $Hpc]
+  iapply (printk_dispatch_7b8 cpu k hsie c0 c1 c2 _ (pkRegs_set _ _ _ _ hR (by decide)) (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, h21]) (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, h12]) (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, h13]) (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, h14]) (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, h15]) hu hlu ?Hllub) $$ [- $Hk $Hpc]
   rotate_right 1
   iframe #
   case Hllub => intro h; exact hc2 h.1
   iintro %R'' Hk Hpc %h''
   iapply HΦ $$ %_ Hk Hpc
   ipureintro
-  refine ⟨h''.1, ?_, ?_, ?_⟩ <;> simp only [h''.2.1, h''.2.2.1, h''.2.2.2, RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, h21]
+  refine ⟨h''.1, ?_, ?_, ?_⟩ <;> simp only [h''.2.1, h''.2.2.1, h''.2.2.2, RegMap.set_apply, BitVec.reduceEq, ite_false, h21]
 
 set_option maxHeartbeats 4000000 in
 /-- The dispatch chain from `0x800007c4`: `%u`, `%lu`, then `0x7ae`. -/
@@ -1900,13 +1898,13 @@ theorem printk_dispatch_7a0 {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF
   iintro Hk Hpc
   by_cases hu : c0 = chU
   · ihave Hpc := MachCSL.pcIs_pos _ _ _ _ hu $$ Hpc
-    have htgt : dispatch7a0 c0 c1 c2 = (KA.«printk» + 0x106#64) := by simp [dispatch7a0, chD, chU, chX, chP, chC, chS, chL, chPct, hu]
+    have htgt : dispatch7a0 c0 c1 c2 = (KA.«printk» + 0x106#64) := by simp [dispatch7a0, chU, hu]
     simp only [htgt]
     iapply HΦ $$ %_ Hk Hpc
     ipureintro
     refine ⟨?_, ?_, ?_, ?_⟩
     · repeat (first | exact hR | refine pkRegs_set _ _ _ _ ?_ (by decide))
-    all_goals simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, h21]
+    all_goals simp only [h21]
   ihave Hpc := MachCSL.pcIs_neg _ _ _ _ hu $$ Hpc
   k_step (wp_s_addi cpu _ (KA.«printk» + 0x2a2#64) false 3979#12 11#5 12#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [h12]
   iintro Hk Hpc
@@ -1920,31 +1918,31 @@ theorem printk_dispatch_7a0 {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF
     iintro Hk Hpc
     by_cases hl : c0 = chL
     · ihave Hpc := MachCSL.pcIs_pos _ _ _ _ hl $$ Hpc
-      have htgt : dispatch7a0 c0 c1 c2 = (KA.«printk» + 0x120#64) := by simp [dispatch7a0, chD, chU, chX, chP, chC, chS, chL, chPct, hc1, hl]
+      have htgt : dispatch7a0 c0 c1 c2 = (KA.«printk» + 0x120#64) := by simp [dispatch7a0, chU, chL, hc1, hl]
       simp only [htgt]
       iapply HΦ $$ %_ Hk Hpc
       ipureintro
       refine ⟨?_, ?_, ?_, ?_⟩
       · repeat (first | exact hR | refine pkRegs_set _ _ _ _ ?_ (by decide))
-      all_goals simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, h21]
+      all_goals simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, h21]
     ihave Hpc := MachCSL.pcIs_neg _ _ _ _ hl $$ Hpc
-    iapply (printk_dispatch_7ae cpu k hsie c0 c1 c2 _ (pkRegs_set _ _ _ _ hR (by decide)) (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, h21]) (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, h12]) (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, h13]) (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, h14]) (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, h15]) hu ?Hlua) $$ [- $Hk $Hpc]
+    iapply (printk_dispatch_7ae cpu k hsie c0 c1 c2 _ (pkRegs_set _ _ _ _ hR (by decide)) (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, h21]) (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, h12]) (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, h13]) (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, h14]) (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, h15]) hu ?Hlua) $$ [- $Hk $Hpc]
     rotate_right 1
     iframe #
     case Hlua => intro h; exact hl h.2
     iintro %R'' Hk Hpc %h''
     iapply HΦ $$ %_ Hk Hpc
     ipureintro
-    refine ⟨h''.1, ?_, ?_, ?_⟩ <;> simp only [h''.2.1, h''.2.2.1, h''.2.2.2, RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, h21]
+    refine ⟨h''.1, ?_, ?_, ?_⟩ <;> simp only [h''.2.1, h''.2.2.1, h''.2.2.2, RegMap.set_apply, BitVec.reduceEq, ite_false, h21]
   ihave Hpc := MachCSL.pcIs_neg _ _ _ _ hc1 $$ Hpc
-  iapply (printk_dispatch_7ae cpu k hsie c0 c1 c2 _ (pkRegs_set _ _ _ _ hR (by decide)) (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, h21]) (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, h12]) (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, h13]) (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, h14]) (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, h15]) hu ?Hlub) $$ [- $Hk $Hpc]
+  iapply (printk_dispatch_7ae cpu k hsie c0 c1 c2 _ (pkRegs_set _ _ _ _ hR (by decide)) (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, h21]) (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, h12]) (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, h13]) (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, h14]) (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, h15]) hu ?Hlub) $$ [- $Hk $Hpc]
   rotate_right 1
   iframe #
   case Hlub => intro h; exact hc1 h.1
   iintro %R'' Hk Hpc %h''
   iapply HΦ $$ %_ Hk Hpc
   ipureintro
-  refine ⟨h''.1, ?_, ?_, ?_⟩ <;> simp only [h''.2.1, h''.2.2.1, h''.2.2.2, RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, h21]
+  refine ⟨h''.1, ?_, ?_, ?_⟩ <;> simp only [h''.2.1, h''.2.2.1, h''.2.2.2, RegMap.set_apply, BitVec.reduceEq, ite_false, h21]
 
 theorem printk_br_720a : KA.«printk» + 0x720a#64 = KA.«digits» := by decide
 
@@ -2063,7 +2061,7 @@ theorem printk_arm_p (PP : PRPUTC) {hlc : HasLC} {GF : BundledGFunctors} [MachGS
   ihave Hsent := (show uartSentSub γd (bs ++ cs2 ++ cs3 ++ cs4) ⊢ uartSentSub γd (bs ++ (cs2 ++ (cs3 ++ cs4))) from
     by rw [List.append_assoc, List.append_assoc]) $$ Hsent
   ihave Hframe' : pkFrame (k.regs 2#5) k.regs (pkApBase (k.regs 2#5) + 8#64 * BitVec.ofNat 64 (kk + 1)) (k.regs 25#5) $$ [Hframe]
-  · simp only [BitVec.ofNat_add, BitVec.reduceOfNat]; iexact Hframe
+  · simp only [BitVec.ofNat_add]; iexact Hframe
   iapply Hnext $$ %_ %(i + 1) %(kk + 1) %(cs2 ++ (cs3 ++ cs4)) %_ Hk Hpc Hbuf Hdescs Hframe' Hsent Hlocked
   ipureintro
   refine ⟨pkRegs_set25 _ _ h4.1, ?_, by omega, hp, hkinds⟩
@@ -2154,7 +2152,7 @@ theorem printk_arm_s (PP : PRPUTC) {hlc : HasLC} {GF : BundledGFunctors} [MachGS
     ihave Hd := pkDescRes_null_intro _ hv
     ihave Hdescs := Hdcl $$ Hd
     ihave Hframe' : pkFrame (k.regs 2#5) k.regs (pkApBase (k.regs 2#5) + 8#64 * BitVec.ofNat 64 (kk + 1)) w18 $$ [Hframe]
-    · simp only [BitVec.ofNat_add, BitVec.reduceOfNat]; iexact Hframe
+    · simp only [BitVec.ofNat_add]; iexact Hframe
     iapply Hnext $$ %_ %(i + 1) %(kk + 1) %cs %_ Hk Hpc Hbuf Hdescs Hframe' Hsent Hlocked
     ipureintro
     refine ⟨h'.1, ?_, by omega, hp, hkinds⟩
@@ -2186,7 +2184,7 @@ theorem printk_arm_s (PP : PRPUTC) {hlc : HasLC} {GF : BundledGFunctors} [MachGS
       ihave Hdescs := Hdcl $$ Hd
       ihave Hsent := (show uartSentSub γd bs ⊢ uartSentSub γd (bs ++ []) from by rw [List.append_nil]) $$ Hsent
       ihave Hframe' : pkFrame (k.regs 2#5) k.regs (pkApBase (k.regs 2#5) + 8#64 * BitVec.ofNat 64 (kk + 1)) w18 $$ [Hframe]
-      · simp only [BitVec.ofNat_add, BitVec.reduceOfNat]; iexact Hframe
+      · simp only [BitVec.ofNat_add]; iexact Hframe
       iapply Hnext $$ %_ %(i + 1) %(kk + 1) %([]) %_ Hk Hpc Hbuf Hdescs Hframe' Hsent Hlocked
       ipureintro
       refine ⟨?_, ?_, by omega, hp, hkinds⟩
@@ -2205,7 +2203,7 @@ theorem printk_arm_s (PP : PRPUTC) {hlc : HasLC} {GF : BundledGFunctors} [MachGS
       ihave Hd := Hdcl' $$ Hbs
       ihave Hdescs := Hdcl $$ Hd
       ihave Hframe' : pkFrame (k.regs 2#5) k.regs (pkApBase (k.regs 2#5) + 8#64 * BitVec.ofNat 64 (kk + 1)) w18 $$ [Hframe]
-      · simp only [BitVec.ofNat_add, BitVec.reduceOfNat]; iexact Hframe
+      · simp only [BitVec.ofNat_add]; iexact Hframe
       iapply Hnext $$ %_ %(i + 1) %(kk + 1) %cs %_ Hk Hpc Hbuf Hdescs Hframe' Hsent Hlocked
       ipureintro
       refine ⟨h'.1, ?_, by omega, hp, hkinds⟩
@@ -2247,8 +2245,8 @@ theorem printk_pct_tail (PP : PRPUTC) (PI : PRINTINT) {hlc : HasLC} {GF : Bundle
     rotate_right 1
     iframe #
     case HRu => repeat (first | exact hR | refine pkRegs_set _ _ _ _ ?_ (by decide))
-    case H20u => first | (rw [h'.2.2.1]; simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR20]) | simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR20]
-    case H9u => first | (rw [h'.2.1]; simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR9]) | simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR9] | simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
+    case H20u => first | (rw [h'.2.2.1]; simp only [hR20]) | simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR20]
+    case H9u => first | (rw [h'.2.1]; simp only [hR9]) | simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR9] | simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
   ihave Hpc := MachCSL.pcIs_neg _ _ _ _ hu $$ Hpc
   by_cases hlu : c1 = chU ∧ c0 = chL
   · ihave Hpc := MachCSL.pcIs_pos _ _ _ _ hlu $$ Hpc
@@ -2263,8 +2261,8 @@ theorem printk_pct_tail (PP : PRPUTC) (PI : PRINTINT) {hlc : HasLC} {GF : Bundle
     rotate_right 1
     iframe #
     case HRlu => repeat (first | exact hR | refine pkRegs_set _ _ _ _ ?_ (by decide))
-    case H20lu => first | (rw [h'.2.2.1]; simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR20]) | simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR20]
-    case H9lu => first | (rw [h'.2.1]; simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR9]) | simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR9] | simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
+    case H20lu => first | (rw [h'.2.2.1]; simp only [hR20]) | simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR20]
+    case H9lu => first | (rw [h'.2.1]; simp only [hR9]) | simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR9] | simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
   ihave Hpc := MachCSL.pcIs_neg _ _ _ _ hlu $$ Hpc
   by_cases hllu : c2 = chU ∧ (c1 = chL ∧ c0 = chL)
   · ihave Hpc := MachCSL.pcIs_pos _ _ _ _ hllu $$ Hpc
@@ -2280,8 +2278,8 @@ theorem printk_pct_tail (PP : PRPUTC) (PI : PRINTINT) {hlc : HasLC} {GF : Bundle
     rotate_right 1
     iframe #
     case HRllu => repeat (first | exact hR | refine pkRegs_set _ _ _ _ ?_ (by decide))
-    case H20llu => first | (rw [h'.2.2.1]; simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR20]) | simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR20]
-    case H9llu => first | (rw [h'.2.1]; simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR9]) | simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR9] | simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
+    case H20llu => first | (rw [h'.2.2.1]; simp only [hR20]) | simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR20]
+    case H9llu => first | (rw [h'.2.1]; simp only [hR9]) | simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR9] | simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
   ihave Hpc := MachCSL.pcIs_neg _ _ _ _ hllu $$ Hpc
   by_cases hx : c0 = chX
   · ihave Hpc := MachCSL.pcIs_pos _ _ _ _ hx $$ Hpc
@@ -2295,8 +2293,8 @@ theorem printk_pct_tail (PP : PRPUTC) (PI : PRINTINT) {hlc : HasLC} {GF : Bundle
     rotate_right 1
     iframe #
     case HRx => repeat (first | exact hR | refine pkRegs_set _ _ _ _ ?_ (by decide))
-    case H20x => first | (rw [h'.2.2.1]; simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR20]) | simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR20]
-    case H9x => first | (rw [h'.2.1]; simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR9]) | simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR9] | simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
+    case H20x => first | (rw [h'.2.2.1]; simp only [hR20]) | simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR20]
+    case H9x => first | (rw [h'.2.1]; simp only [hR9]) | simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR9] | simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
   ihave Hpc := MachCSL.pcIs_neg _ _ _ _ hx $$ Hpc
   by_cases hlx : c1 = chX ∧ c0 = chL
   · ihave Hpc := MachCSL.pcIs_pos _ _ _ _ hlx $$ Hpc
@@ -2311,8 +2309,8 @@ theorem printk_pct_tail (PP : PRPUTC) (PI : PRINTINT) {hlc : HasLC} {GF : Bundle
     rotate_right 1
     iframe #
     case HRlx => repeat (first | exact hR | refine pkRegs_set _ _ _ _ ?_ (by decide))
-    case H20lx => first | (rw [h'.2.2.1]; simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR20]) | simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR20]
-    case H9lx => first | (rw [h'.2.1]; simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR9]) | simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR9] | simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
+    case H20lx => first | (rw [h'.2.2.1]; simp only [hR20]) | simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR20]
+    case H9lx => first | (rw [h'.2.1]; simp only [hR9]) | simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR9] | simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
   ihave Hpc := MachCSL.pcIs_neg _ _ _ _ hlx $$ Hpc
   by_cases hllx : c2 = chX ∧ (c1 = chL ∧ c0 = chL)
   · ihave Hpc := MachCSL.pcIs_pos _ _ _ _ hllx $$ Hpc
@@ -2328,8 +2326,8 @@ theorem printk_pct_tail (PP : PRPUTC) (PI : PRINTINT) {hlc : HasLC} {GF : Bundle
     rotate_right 1
     iframe #
     case HRllx => repeat (first | exact hR | refine pkRegs_set _ _ _ _ ?_ (by decide))
-    case H20llx => first | (rw [h'.2.2.1]; simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR20]) | simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR20]
-    case H9llx => first | (rw [h'.2.1]; simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR9]) | simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR9] | simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
+    case H20llx => first | (rw [h'.2.2.1]; simp only [hR20]) | simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR20]
+    case H9llx => first | (rw [h'.2.1]; simp only [hR9]) | simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR9] | simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
   ihave Hpc := MachCSL.pcIs_neg _ _ _ _ hllx $$ Hpc
   by_cases hpp : c0 = chP
   · ihave Hpc := MachCSL.pcIs_pos _ _ _ _ hpp $$ Hpc
@@ -2343,8 +2341,8 @@ theorem printk_pct_tail (PP : PRPUTC) (PI : PRINTINT) {hlc : HasLC} {GF : Bundle
     rotate_right 1
     iframe #
     case HRp => repeat (first | exact hR | refine pkRegs_set _ _ _ _ ?_ (by decide))
-    case H20p => first | (rw [h'.2.2.1]; simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR20]) | simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR20]
-    case H9p => first | (rw [h'.2.1]; simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR9]) | simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR9] | simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
+    case H20p => first | (rw [h'.2.2.1]; simp only [hR20]) | simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR20]
+    case H9p => first | (rw [h'.2.1]; simp only [hR9]) | simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR9] | simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
   ihave Hpc := MachCSL.pcIs_neg _ _ _ _ hpp $$ Hpc
   by_cases hc : c0 = chC
   · ihave Hpc := MachCSL.pcIs_pos _ _ _ _ hc $$ Hpc
@@ -2358,8 +2356,8 @@ theorem printk_pct_tail (PP : PRPUTC) (PI : PRINTINT) {hlc : HasLC} {GF : Bundle
     rotate_right 1
     iframe #
     case HRc => repeat (first | exact hR | refine pkRegs_set _ _ _ _ ?_ (by decide))
-    case H20c => first | (rw [h'.2.2.1]; simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR20]) | simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR20]
-    case H9c => first | (rw [h'.2.1]; simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR9]) | simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR9] | simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
+    case H20c => first | (rw [h'.2.2.1]; simp only [hR20]) | simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR20]
+    case H9c => first | (rw [h'.2.1]; simp only [hR9]) | simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR9] | simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
   ihave Hpc := MachCSL.pcIs_neg _ _ _ _ hc $$ Hpc
   by_cases hs : c0 = chS
   · ihave Hpc := MachCSL.pcIs_pos _ _ _ _ hs $$ Hpc
@@ -2372,8 +2370,8 @@ theorem printk_pct_tail (PP : PRPUTC) (PI : PRINTINT) {hlc : HasLC} {GF : Bundle
     rotate_right 1
     iframe #
     case HRs => repeat (first | exact hR | refine pkRegs_set _ _ _ _ ?_ (by decide))
-    case H20s => first | (rw [h'.2.2.1]; simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR20]) | simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR20]
-    case H9s => first | (rw [h'.2.1]; simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR9]) | simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR9] | simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
+    case H20s => first | (rw [h'.2.2.1]; simp only [hR20]) | simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR20]
+    case H9s => first | (rw [h'.2.1]; simp only [hR9]) | simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR9] | simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
   ihave Hpc := MachCSL.pcIs_neg _ _ _ _ hs $$ Hpc
   by_cases hpct : c0 = chPct
   · ihave Hpc := MachCSL.pcIs_pos _ _ _ _ hpct $$ Hpc
@@ -2385,8 +2383,8 @@ theorem printk_pct_tail (PP : PRPUTC) (PI : PRINTINT) {hlc : HasLC} {GF : Bundle
     rotate_right 1
     iframe #
     case HRpct => repeat (first | exact hR | refine pkRegs_set _ _ _ _ ?_ (by decide))
-    case H20pct => first | (rw [h'.2.2.1]; simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR20]) | simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR20]
-    case H9pct => first | (rw [h'.2.1]; simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR9]) | simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR9] | simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
+    case H20pct => first | (rw [h'.2.2.1]; simp only [hR20]) | simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR20]
+    case H9pct => first | (rw [h'.2.1]; simp only [hR9]) | simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR9] | simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
   ihave Hpc := MachCSL.pcIs_neg _ _ _ _ hpct $$ Hpc
   by_cases h0 : c0 = 0#8
   · ihave Hpc := MachCSL.pcIs_pos _ _ _ _ h0 $$ Hpc
@@ -2420,8 +2418,8 @@ theorem printk_pct_tail (PP : PRPUTC) (PI : PRINTINT) {hlc : HasLC} {GF : Bundle
   rotate_right 1
   iframe #
   case HRdef => repeat (first | exact hR | refine pkRegs_set _ _ _ _ ?_ (by decide))
-  case H20def => first | (rw [h'.2.2.1]; simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR20]) | simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR20]
-  case H9def => first | (rw [h'.2.1]; simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR9]) | simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR9] | simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
+  case H20def => first | (rw [h'.2.2.1]; simp only [hR20]) | simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR20]
+  case H9def => first | (rw [h'.2.1]; simp only [hR9]) | simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR9] | simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
 
 set_option maxHeartbeats 4000000 in
 /-- The `%` path from `0x80000606`: the third byte, the `l`/`ll` flags, `%lld`, the dispatch. -/
@@ -2471,8 +2469,8 @@ theorem printk_pct_5e2 (PP : PRPUTC) (PI : PRINTINT) {hlc : HasLC} {GF : Bundled
   have hb15 : b15 = (if c1 = chL then 1#64 else 0#64) := hb15g.symm
   k_step_noite (wp_s_and_bits cpu _ ?hs (KA.«printk» + 0x292#64) true 15#5 15#5 14#5 (by decide) (c1 = chL) (c0 = chL) ?h1 ?h2) from (text_instr _ _ _ _ rfl rfl) HT
     $$ [- $Hk $Hpc]
-  case h1 => simp only [KCtx.rget_withRegs', KCtx.setReg_withRegs, RegMap.set_apply, BitVec.reduceEq]; exact hb15
-  case h2 => simp only [KCtx.rget_withRegs', KCtx.setReg_withRegs, RegMap.set_apply, BitVec.reduceEq]; exact hR14
+  case h1 => simp only [KCtx.rget_withRegs', RegMap.set_apply, BitVec.reduceEq]; exact hb15
+  case h2 => simp only [KCtx.rget_withRegs', RegMap.set_apply, BitVec.reduceEq]; exact hR14
   iintro Hk Hpc
   generalize hb15'g : (if c1 = chL ∧ c0 = chL then 1#64 else 0#64) = b15'
   have hb15' : b15' = (if c1 = chL ∧ c0 = chL then 1#64 else 0#64) := hb15'g.symm
@@ -2500,46 +2498,46 @@ theorem printk_pct_5e2 (PP : PRPUTC) (PI : PRINTINT) {hlc : HasLC} {GF : Bundled
       rotate_right 1
       iframe #
       case HRlld => repeat (first | exact hR | refine pkRegs_set _ _ _ _ ?_ (by decide))
-      case H20lld => first | (rw [h'.2.2.1]; simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true, hR20]) | simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true, hR20]
-      case H9lld => first | (rw [h'.2.1]; simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true, hR9]) | simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true, hR9] | simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true]
+      case H20lld => first | (rw [h'.2.2.1]; simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true, hR20]) | simp only [RegMap.set_apply, BitVec.reduceEq, if_false, hR20]
+      case H9lld => first | (rw [h'.2.1]; simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true, hR9]) | simp only [RegMap.set_apply, BitVec.reduceEq, if_false, hR9] | simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true]
     ihave Hpc := MachCSL.pcIs_neg _ _ _ _ hll $$ Hpc
     iapply (printk_dispatch_7a0 cpu k hsie c0 c1 c2 _ ?HRa ?H21a ?H12a ?H13a ?H14a ?H15a)
       $$ [- $Hk $Hpc]
     rotate_right 1
     iframe #
     case HRa => repeat (first | exact hR | refine pkRegs_set _ _ _ _ ?_ (by decide))
-    case H21a => simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true, hR21]
+    case H21a => simp only [RegMap.set_apply, BitVec.reduceEq, if_false, hR21]
     case H12a => simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true]
     case H13a => simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true]
-    case H14a => simp only [KCtx.rget_withRegs', KCtx.setReg_withRegs, RegMap.set_apply, BitVec.reduceEq]; exact hR14
-    case H15a => simp only [KCtx.rget_withRegs', KCtx.setReg_withRegs, RegMap.set_apply, BitVec.reduceEq]; exact hb15'
+    case H14a => simp only [RegMap.set_apply, BitVec.reduceEq]; exact hR14
+    case H15a => simp only [RegMap.set_apply, BitVec.reduceEq]; exact hb15'
     iintro %R' Hk Hpc %h'
     iapply (printk_pct_tail PP PI cpu k γpr γl γd bs dqf f descs hsie hK hnoff huart hflen hnonul hdlen i kk R' w18
       h'.1 ?HAa ?HBa c0 c1 c2 hc0 hc1 hc2 ?HCa hd hld (fun h => hll h.2) hi hp hkinds) $$ [- $Hk $Hpc $Hbuf $Hdescs $Hframe $Hsent $Hlocked $Hcont]
     rotate_right 1
     iframe #
-    case HAa => rw [h'.2.2.1]; simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true]; exact hR20
-    case HBa => rw [h'.2.1]; simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true]; exact hR9
-    case HCa => rw [h'.2.2.2]; simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true, hR21]
+    case HAa => rw [h'.2.2.1]; simp only [RegMap.set_apply, BitVec.reduceEq, if_false]; exact hR20
+    case HBa => rw [h'.2.1]; simp only [RegMap.set_apply, BitVec.reduceEq, if_false]; exact hR9
+    case HCa => rw [h'.2.2.2]; simp only [RegMap.set_apply, BitVec.reduceEq, if_false, hR21]
   ihave Hpc := MachCSL.pcIs_neg _ _ _ _ hc2d $$ Hpc
   iapply (printk_dispatch_7a0 cpu k hsie c0 c1 c2 _ ?HRb ?H21b ?H12b ?H13b ?H14b ?H15b)
     $$ [- $Hk $Hpc]
   rotate_right 1
   iframe #
   case HRb => repeat (first | exact hR | refine pkRegs_set _ _ _ _ ?_ (by decide))
-  case H21b => simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true, hR21]
+  case H21b => simp only [RegMap.set_apply, BitVec.reduceEq, if_false, hR21]
   case H12b => simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true]
   case H13b => simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true]
-  case H14b => simp only [KCtx.rget_withRegs', KCtx.setReg_withRegs, RegMap.set_apply, BitVec.reduceEq]; exact hR14
-  case H15b => simp only [KCtx.rget_withRegs', KCtx.setReg_withRegs, RegMap.set_apply, BitVec.reduceEq]; exact hb15'
+  case H14b => simp only [RegMap.set_apply, BitVec.reduceEq]; exact hR14
+  case H15b => simp only [RegMap.set_apply, BitVec.reduceEq]; exact hb15'
   iintro %R' Hk Hpc %h'
   iapply (printk_pct_tail PP PI cpu k γpr γl γd bs dqf f descs hsie hK hnoff huart hflen hnonul hdlen i kk R' w18
     h'.1 ?HAb ?HBb c0 c1 c2 hc0 hc1 hc2 ?HCb hd hld (fun h => hc2d h.1) hi hp hkinds) $$ [- $Hk $Hpc $Hbuf $Hdescs $Hframe $Hsent $Hlocked $Hcont]
   rotate_right 1
   iframe #
-  case HAb => rw [h'.2.2.1]; simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true]; exact hR20
-  case HBb => rw [h'.2.1]; simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true]; exact hR9
-  case HCb => rw [h'.2.2.2]; simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true, hR21]
+  case HAb => rw [h'.2.2.1]; simp only [RegMap.set_apply, BitVec.reduceEq, if_false]; exact hR20
+  case HBb => rw [h'.2.1]; simp only [RegMap.set_apply, BitVec.reduceEq, if_false]; exact hR9
+  case HCb => rw [h'.2.2.2]; simp only [RegMap.set_apply, BitVec.reduceEq, if_false, hR21]
 
 set_option maxHeartbeats 4000000 in
 /-- A `%` at `0x800005a0`: the next bytes, `%d`, `%ld`, and the paths to the dispatch. -/
@@ -2608,8 +2606,8 @@ theorem printk_pct (PP : PRPUTC) (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFun
     have hb15 : b15 = (if c0 = chL then 1#64 else 0#64) := hb15g.symm
     k_step_noite (wp_s_and_bits cpu _ ?hs (KA.«printk» + 0x292#64) true 15#5 15#5 14#5 (by decide) (c0 = chL) (c0 = chL) ?h1 ?h2) from (text_instr _ _ _ _ rfl rfl) HT
       $$ [- $Hk $Hpc]
-    case h1 => simp only [KCtx.rget_withRegs', KCtx.setReg_withRegs, RegMap.set_apply, BitVec.reduceEq]; exact hb15
-    case h2 => simp only [KCtx.rget_withRegs', KCtx.setReg_withRegs, RegMap.set_apply, BitVec.reduceEq]; exact hb14
+    case h1 => simp only [KCtx.rget_withRegs', RegMap.set_apply, BitVec.reduceEq]; exact hb15
+    case h2 => simp only [KCtx.rget_withRegs', RegMap.set_apply, BitVec.reduceEq]; exact hb14
     iintro Hk Hpc
     generalize hb15'g : (if c0 = chL ∧ c0 = chL then 1#64 else 0#64) = b15'
     have hb15' : b15' = (if c0 = chL ∧ c0 = chL then 1#64 else 0#64) := hb15'g.symm
@@ -2627,7 +2625,7 @@ theorem printk_pct (PP : PRPUTC) (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFun
     case H21z => simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true]
     case H12z => simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true]; rw [hc1z, hc00]
     case H13z => simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true]; rw [hc2z, hc00]
-    case H14z => simp only [KCtx.rget_withRegs', KCtx.setReg_withRegs, RegMap.set_apply, BitVec.reduceEq]; exact hb14
+    case H14z => simp only [RegMap.set_apply, BitVec.reduceEq]; exact hb14
     case H15z => exact hb15'.trans (by rw [hc1z, hc00])
     iintro %R' Hk Hpc %h'
     iapply (printk_pct_tail PP PI cpu k γpr γl γd bs dqf f descs hsie hK hnoff huart hflen hnonul hdlen i kk R' w18
@@ -2636,7 +2634,7 @@ theorem printk_pct (PP : PRPUTC) (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFun
       hi hp hkinds) $$ [- $Hk $Hpc $Hbuf $Hdescs $Hframe $Hsent $Hlocked $Hcont]
     rotate_right 1
     iframe #
-    case HAz => rw [h'.2.2.1]; simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true]; exact hR20
+    case HAz => rw [h'.2.2.1]; simp only [RegMap.set_apply, BitVec.reduceEq, if_false]; exact hR20
     case HBz => rw [h'.2.1]; simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true]
     case HCz => rw [h'.2.2.2]; simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true]
   · ihave Hpc := MachCSL.pcIs_neg _ _ _ _ hc00 $$ Hpc
@@ -2671,7 +2669,7 @@ theorem printk_pct (PP : PRPUTC) (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFun
         rotate_right 1
         iframe #
         case HRd1 => repeat (first | exact hR | refine pkRegs_set _ _ _ _ ?_ (by decide))
-        case H20d1 => first | (rw [h'.2.2.1]; simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true, hR20]) | simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true, hR20]
+        case H20d1 => first | (rw [h'.2.2.1]; simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true, hR20]) | simp only [RegMap.set_apply, BitVec.reduceEq, if_false, hR20]
         case H9d1 => first | (rw [h'.2.1]; simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true, hR9]) | simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true, hR9] | simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true]
       · ihave Hpc := MachCSL.pcIs_neg _ _ _ _ hd $$ Hpc
         k_step_noite (wp_s_addi cpu _ (KA.«printk» + 0x270#64) false 3988#12 14#5 21#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
@@ -2694,7 +2692,7 @@ theorem printk_pct (PP : PRPUTC) (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFun
         case H21y => simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true]
         case H12y => simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true]
         case H13y => simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true]; rw [hc2z, hc10]
-        case H14y => simp only [KCtx.rget_withRegs', KCtx.setReg_withRegs, RegMap.set_apply, BitVec.reduceEq]; exact hb14
+        case H14y => simp only [RegMap.set_apply, BitVec.reduceEq]; exact hb14
         case H15y =>
           refine Eq.trans (b := 0#64) rfl ?_
           rw [if_neg]; intro h; rw [hc10] at h; exact absurd h.1 (by decide)
@@ -2705,7 +2703,7 @@ theorem printk_pct (PP : PRPUTC) (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFun
           hi hp hkinds) $$ [- $Hk $Hpc $Hbuf $Hdescs $Hframe $Hsent $Hlocked $Hcont]
         rotate_right 1
         iframe #
-        case HAy => rw [h'.2.2.1]; simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true]; exact hR20
+        case HAy => rw [h'.2.2.1]; simp only [RegMap.set_apply, BitVec.reduceEq, if_false]; exact hR20
         case HBy => rw [h'.2.1]; simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true]
         case HCy => rw [h'.2.2.2]; simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true]
     · ihave Hpc := MachCSL.pcIs_neg _ _ _ _ hc10 $$ Hpc
@@ -2725,7 +2723,7 @@ theorem printk_pct (PP : PRPUTC) (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFun
         rotate_right 1
         iframe #
         case HRd2 => repeat (first | exact hR | refine pkRegs_set _ _ _ _ ?_ (by decide))
-        case H20d2 => first | (rw [h'.2.2.1]; simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true, hR20]) | simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true, hR20]
+        case H20d2 => first | (rw [h'.2.2.1]; simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true, hR20]) | simp only [RegMap.set_apply, BitVec.reduceEq, if_false, hR20]
         case H9d2 => first | (rw [h'.2.1]; simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true, hR9]) | simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true, hR9] | simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true]
       · ihave Hpc := MachCSL.pcIs_neg _ _ _ _ hd $$ Hpc
         k_step_noite (wp_s_addi cpu _ (KA.«printk» + 0x9c#64) false 3988#12 14#5 21#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
@@ -2757,7 +2755,7 @@ theorem printk_pct (PP : PRPUTC) (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFun
             rotate_right 1
             iframe #
             case HRld => repeat (first | exact hR | refine pkRegs_set _ _ _ _ ?_ (by decide))
-            case H20ld => first | (rw [h'.2.2.1]; simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true, hR20]) | simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true, hR20]
+            case H20ld => first | (rw [h'.2.2.1]; simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true, hR20]) | simp only [RegMap.set_apply, BitVec.reduceEq, if_false, hR20]
             case H9ld => first | (rw [h'.2.1]; simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true, hR9]) | simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true, hR9] | simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true]
           · ihave Hpc := MachCSL.pcIs_neg _ _ _ _ hl $$ Hpc
             iapply (printk_pct_5e2 PP PI cpu k γpr γl γd bs dqf f descs hsie hK hnoff huart hflen hnonul hdlen i kk _ w18
@@ -2766,11 +2764,11 @@ theorem printk_pct (PP : PRPUTC) (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFun
             rotate_right 1
             iframe #
             case HRa => repeat (first | exact hR | refine pkRegs_set _ _ _ _ ?_ (by decide))
-            case H20a => simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true]; exact hR20
+            case H20a => simp only [RegMap.set_apply, BitVec.reduceEq, if_false]; exact hR20
             case H9a => simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true]
             case H15a => simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true]
             case H13a => simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true]
-            case H14a => simp only [KCtx.rget_withRegs', KCtx.setReg_withRegs, RegMap.set_apply, BitVec.reduceEq]; exact hb14
+            case H14a => simp only [RegMap.set_apply, BitVec.reduceEq]; exact hb14
             case H21a => simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true]
         · ihave Hpc := MachCSL.pcIs_neg _ _ _ _ hc1d $$ Hpc
           iapply (printk_pct_5e2 PP PI cpu k γpr γl γd bs dqf f descs hsie hK hnoff huart hflen hnonul hdlen i kk _ w18
@@ -2779,11 +2777,11 @@ theorem printk_pct (PP : PRPUTC) (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFun
           rotate_right 1
           iframe #
           case HRb => repeat (first | exact hR | refine pkRegs_set _ _ _ _ ?_ (by decide))
-          case H20b => simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true]; exact hR20
+          case H20b => simp only [RegMap.set_apply, BitVec.reduceEq, if_false]; exact hR20
           case H9b => simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true]
           case H15b => simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true]
           case H13b => simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true]
-          case H14b => simp only [KCtx.rget_withRegs', KCtx.setReg_withRegs, RegMap.set_apply, BitVec.reduceEq]; exact hb14
+          case H14b => simp only [RegMap.set_apply, BitVec.reduceEq]; exact hb14
           case H21b => simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true]
 
 set_option maxHeartbeats 4000000 in
@@ -2875,8 +2873,7 @@ theorem printk_loop (PP : PRPUTC) (PI : PRINTINT) (RE : RELEASE) {hlc : HasLC} {
     rotate_right 1
     iframe #
     case HRt => repeat (first | exact hR | refine pkRegs_set _ _ _ _ ?_ (by decide))
-    case H20t => simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true, BitVec.ofNat_add,
-      BitVec.reduceOfNat]
+    case H20t => simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true, BitVec.ofNat_add]
     case H10t => simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true]
     isplit
     · -- back at 0x56e
@@ -3100,7 +3097,7 @@ theorem printk_proof (AC : ACQUIRE) (RE : RELEASE) (PP : PRPUTC) (PI : PRINTINT)
   iframe #
   case HR =>
     unfold pkRegs pkRegsN pkConsts
-    simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, _root_.and_true, _root_.true_and]
+    simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, _root_.and_true]
     exact ⟨⟨h2_2, h2_8, h2_18⟩, h2_25⟩
   case H20 => simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true]
   case H10 => simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true]

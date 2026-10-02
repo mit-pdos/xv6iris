@@ -39,8 +39,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Std MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-- Rocq's `fs_names`, minus its two abstract-state gnames (`fs_link` /
 `fs_top`), which Rocq itself documents as belonging one level up: "Nothing
 stated over the byte view ALONE reads them" (`FsBytesGamma.v`). -/

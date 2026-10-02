@@ -62,8 +62,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Iris.Std.PartialMap
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
-
 /-- The code-segment readings `utextAll_img` asks for, at a key whose page
 0 is X-and-not-W. -/
 theorem initCode_rows (M : ElfMem) (π : Nat → Option UPerm) (hsub : uimgSub User.Init.code.byte M)

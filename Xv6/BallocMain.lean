@@ -22,9 +22,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## The constants `+0x24 .. +0xa8` computes -/
 
@@ -328,7 +326,6 @@ theorem ba_saves (BR : BREAD) (LW : LOG_WRITE) (BE : BRELSE) (MS : MEMSET) (PK :
   · unfold baFrameK baFrame
     iframe
   all_goals assumption
-
 
 end
 

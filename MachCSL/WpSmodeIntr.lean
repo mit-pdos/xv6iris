@@ -616,12 +616,12 @@ theorem KCtx.pushOffAt_popExit (k : KCtx) (a b : Bool) (hwf : k.wf) :
   obtain ⟨regs, sie, spie, spp, avail, noff, intena, locks, tier, root, proc⟩ := k
   simp only at w1 w2 w3
   cases sie
-  · simp only [KCtx.popExit_false, KCtx.pushOffAt, KCtx.popOff, KCtx.withSpie, KCtx.mk.injEq, _root_.true_and,
-      _root_.and_true, trapRes, Bool.false_eq_true, ite_false, Nat.zero_add, Nat.add_sub_cancel]
+  · simp only [KCtx.popExit_false, KCtx.pushOffAt, KCtx.popOff, KCtx.withSpie, 
+      trapRes, Bool.false_eq_true, ite_false, Nat.zero_add, Nat.add_sub_cancel]
   · obtain ⟨hn, hi, -, -⟩ := w3 rfl
     subst hn hi
-    simp only [KCtx.popExit_true, KCtx.pushOffAt, KCtx.popOff, KCtx.intrOn, KCtx.withSpie, KCtx.mk.injEq,
-      _root_.true_and, _root_.and_true, trapRes, ite_true, Nat.add_sub_cancel_left]
+    simp only [KCtx.popExit_true, KCtx.pushOffAt, KCtx.popOff, KCtx.intrOn, KCtx.withSpie, 
+      trapRes, ite_true, Nat.add_sub_cancel_left]
 
 /-! ## The trap-CSR complement (Rocq `trap_csrs_ext` / `cpu_claim_ext`)
 

@@ -66,8 +66,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-! ## The fixed part and the instance -/
 
 /-- THE FIXED PART (Rocq `file_fixed`): echo's (the taint counter and the

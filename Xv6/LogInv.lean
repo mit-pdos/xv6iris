@@ -71,8 +71,6 @@ namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-! ## Geometry
 
 `struct log` at `KA.«log»`: `spinlock@0` (24 B), `start@24`,
@@ -870,7 +868,6 @@ theorem logEpochBump (γ : LogNames) (E : Nat) :
     (by simp only [MaxNat.le_toNat]; omega)) $$ H with ⟨Ha, -⟩
   imodintro
   iexact Ha
-
 
 end
 

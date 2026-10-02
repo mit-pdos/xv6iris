@@ -92,8 +92,6 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
-
 /-! ## §0 Arithmetic -/
 
 /-- **Rocq `pdev_signed_nat`**. -/

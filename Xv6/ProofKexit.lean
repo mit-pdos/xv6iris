@@ -129,8 +129,6 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
-
 /-! ## Pure geometry facts -/
 
 /-- `&p->ofile[0]` from the base pointer. -/

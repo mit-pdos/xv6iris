@@ -21,9 +21,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## The little-endian image the copy loop lays down -/
 
@@ -93,7 +91,7 @@ theorem whBytes_step (n t : Nat) (W : List (BitVec 32)) (bs0 : List (BitVec 8)) 
       show 4 * (t + 1) + 4 = 4 * (t + 1 + 1) from by omega]
   rw [hd]
   unfold whBytes
-  rw [List.take_succ, hw, wbytes_append]
+  rw [List.take_add_one, hw, wbytes_append]
   simp only [Option.toList_some, wbytes, List.append_nil, List.append_assoc]
 
 theorem whBytes_word (n : Nat) (W : List (BitVec 32)) (bs0 : List (BitVec 8)) (i : Nat)

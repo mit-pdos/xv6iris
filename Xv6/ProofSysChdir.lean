@@ -66,19 +66,15 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## Pure facts -/
-
 
 theorem sysChdirPins_entry (k : KCtx) :
     sysChdirPins k ((k.regs.set 2#5 (k.regs 2#5 + 0xFFFFFFFFFFFFFF60#64)).set 8#5 (k.regs 2#5))
       (k.regs 9#5) (k.regs 18#5) := by
   refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
     simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
-
 
 /-- the observed row is NOT a directory's (Rocq's `abs_row_dir_inv` step). -/
 theorem sys_chdir_notdir (dn : Dinode) (bm : Blkmap) (data : Nat → List (BitVec 8))
@@ -93,16 +89,13 @@ theorem sys_chdir_notdir (dn : Dinode) (bm : Blkmap) (data : Nat → List (BitVe
   rw [Xv6.era_notDir dn bm data hnd] at hd
   cases hd
 
-
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
 
-
 /-! ## The block, taken apart the way argstr and namei take it -/
-
 
 /-- `procPrivFd` IS core ∗ array (its definition). -/
 theorem sys_chdir_blk_open (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
@@ -237,7 +230,6 @@ theorem sys_chdir_tested (IU : IUNLOCK) (IP : IPUT) (IUP : IUNLOCKPUT) (EO : END
     case hp1 =>
       repeat (refine sysChdirPins_set _ _ _ _ _ _ ?_ (by decide))
       exact hpins
-
 
 /-! ## +0x30: namei came back -/
 
@@ -596,7 +588,6 @@ theorem sys_chdir_args (AS : ARGSTR) (NI : NAMEI_ERA) (IL : ILOCK) (IU : IUNLOCK
   iapply (sys_chdir_fetched NI IL IU IP IUP EO Γ cpu k (A.raise kv) P2 spie1 spp1 R1 w₃ v old bs hj hproc hK
       hnoff htier hct hp1 hal hext hold hret)
     $$ [$Hk $Hpc $Hcells $Hbuf $Hte $Hce $Henv $Hblk $HΦ $Hbs $Hir $Hop $Hau]
-
 
 /-! ## The entry: prologue, myproc, begin_op -/
 

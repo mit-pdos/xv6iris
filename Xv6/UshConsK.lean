@@ -86,8 +86,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
-
 /-! ## S1 The path, off sh's read-only image -/
 
 /-- **Rocq `sh_cons_ro_bytes_bool`**: the seven bytes of "console" at

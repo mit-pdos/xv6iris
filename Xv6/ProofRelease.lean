@@ -154,8 +154,7 @@ theorem release_hook_proof (HO : HOLDING) (PO : POPOFF) : RELEASE_HOOK := ⟨
   simp only [RegMap.set_apply, BitVec.reduceEq, ite_false] at c3_18 c3_19 c3_20 c3_21 c3_22 c3_23 c3_24 c3_25 c3_26 c3_27
   simp only [RegMap.set_apply, BitVec.reduceEq, ite_false] at c2_18 c2_19 c2_20 c2_21 c2_22 c2_23 c2_24 c2_25 c2_26 c2_27
   unfold calleeSaved
-  simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, eq_self_iff_true, _root_.true_and,
-    _root_.and_true]
+  simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, _root_.true_and]
   exact ⟨c3_18.trans c2_18, c3_19.trans c2_19, c3_20.trans c2_20, c3_21.trans c2_21, c3_22.trans c2_22,
     c3_23.trans c2_23, c3_24.trans c2_24, c3_25.trans c2_25, c3_26.trans c2_26, c3_27.trans c2_27⟩⟩
 
@@ -297,8 +296,7 @@ theorem release_gen_proof (HO : HOLDING) (PO : POPOFF) : RELEASE_GEN := ⟨
   simp only [RegMap.set_apply, BitVec.reduceEq, ite_false] at c3_18 c3_19 c3_20 c3_21 c3_22 c3_23 c3_24 c3_25 c3_26 c3_27
   simp only [RegMap.set_apply, BitVec.reduceEq, ite_false] at c2_18 c2_19 c2_20 c2_21 c2_22 c2_23 c2_24 c2_25 c2_26 c2_27
   unfold calleeSaved
-  simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, eq_self_iff_true, _root_.true_and,
-    _root_.and_true]
+  simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, _root_.true_and]
   exact ⟨c3_18.trans c2_18, c3_19.trans c2_19, c3_20.trans c2_20, c3_21.trans c2_21, c3_22.trans c2_22,
     c3_23.trans c2_23, c3_24.trans c2_24, c3_25.trans c2_25, c3_26.trans c2_26, c3_27.trans c2_27⟩⟩
 
@@ -441,8 +439,7 @@ theorem release_cancel_proof (HO : HOLDING) (PO : POPOFF) : RELEASE_CANCEL := �
   simp only [RegMap.set_apply, BitVec.reduceEq, ite_false] at c3_18 c3_19 c3_20 c3_21 c3_22 c3_23 c3_24 c3_25 c3_26 c3_27
   simp only [RegMap.set_apply, BitVec.reduceEq, ite_false] at c2_18 c2_19 c2_20 c2_21 c2_22 c2_23 c2_24 c2_25 c2_26 c2_27
   unfold calleeSaved
-  simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, eq_self_iff_true, _root_.true_and,
-    _root_.and_true]
+  simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, _root_.true_and]
   exact ⟨c3_18.trans c2_18, c3_19.trans c2_19, c3_20.trans c2_20, c3_21.trans c2_21, c3_22.trans c2_22,
     c3_23.trans c2_23, c3_24.trans c2_24, c3_25.trans c2_25, c3_26.trans c2_26, c3_27.trans c2_27⟩⟩
 
@@ -587,8 +584,7 @@ theorem release_refute_proof (HO : HOLDING) (PO : POPOFF) : RELEASE_REFUTE := �
   simp only [RegMap.set_apply, BitVec.reduceEq, ite_false] at c3_18 c3_19 c3_20 c3_21 c3_22 c3_23 c3_24 c3_25 c3_26 c3_27
   simp only [RegMap.set_apply, BitVec.reduceEq, ite_false] at c2_18 c2_19 c2_20 c2_21 c2_22 c2_23 c2_24 c2_25 c2_26 c2_27
   unfold calleeSaved
-  simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, eq_self_iff_true, _root_.true_and,
-    _root_.and_true]
+  simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, _root_.true_and]
   exact ⟨c3_18.trans c2_18, c3_19.trans c2_19, c3_20.trans c2_20, c3_21.trans c2_21, c3_22.trans c2_22,
     c3_23.trans c2_23, c3_24.trans c2_24, c3_25.trans c2_25, c3_26.trans c2_26, c3_27.trans c2_27⟩⟩
 

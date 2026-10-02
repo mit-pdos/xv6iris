@@ -63,8 +63,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-! ## The potential, as list arithmetic
 
 None of this exists in the tree; it is all pure `List`/`omega`. -/

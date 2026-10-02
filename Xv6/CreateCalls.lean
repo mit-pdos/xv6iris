@@ -22,8 +22,6 @@ itself; their uses now name it.)
 -/
 import Xv6.CreateSharedBody
 
-set_option linter.unusedSectionVars false
-
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL

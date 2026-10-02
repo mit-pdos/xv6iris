@@ -70,8 +70,6 @@ open Iris.Std.PartialMap
 open HfpFileClaimsP UkFileOpen
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
-
 /-! ## §0 The pure facts -/
 
 /-- **Rocq `fsm_panic`**: a panic alternative moves no file, at any line. -/

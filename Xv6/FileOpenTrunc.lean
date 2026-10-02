@@ -34,8 +34,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-- THE TRUNCATE AT THE CREATE'S CHILD IS FREE (Rocq `file_trunc_free`). -/
 theorem fileTrunc_free (av0 av : Aview) (i : Nat) (s : Dst)
     (hrow0 : PartialMap.get? av0 i = some ⟨.AFile [], 1⟩) (hpure0 : fileFsPure av0)

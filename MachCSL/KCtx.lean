@@ -85,7 +85,7 @@ resource), `cpuClaim` (the proc table's running claim), `lockSet` (the
 held-lock authority), `trapReady` (the trap handler's contract),
 `ctxToken` (the memory-model context).
 -/
-import MachCSL.WpGprDefs
+import MachCSL.Gpr
 import MachCSL.Boot
 import MachCSL.KptInv
 import Iris.BI.Lib.Fixpoint

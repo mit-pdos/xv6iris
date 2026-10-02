@@ -70,8 +70,6 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedSectionVars false
-
 /-! ## The constants -/
 
 /-- create's own frame is 80 bytes (10 slots) -- UNCHANGED by upstream

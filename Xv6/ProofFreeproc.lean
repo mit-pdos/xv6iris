@@ -42,7 +42,6 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
@@ -73,7 +72,6 @@ theorem fp_ctxByte_join (ξ : CtxId) (a : PAddr) (q1 q2 : Qp) (v1 v2 : BitVec 8)
     isplit
     · ipureintro; exact hv1
     · iexact Hk1
-
 
 /-- A four-byte word's fractions join. -/
 theorem fp_word4_join [CurCtx] (a : BitVec 64) (q1 q2 : Qp) (w1 w2 : BitVec 32) :
@@ -479,7 +477,6 @@ theorem fp_dormant_intro [CurCtx] (pa : BitVec 64) (V : ProcPriv) (nm : List (Bi
     iframe Hxs
   · ipureintro; exact ⟨rfl, rfl, rfl, rfl⟩
 
-
 /-! ## Registers -/
 
 /-- What `freeproc`'s frame keeps of the entry registers (`s1` is the
@@ -716,7 +713,6 @@ theorem fp_filter_nextpid (l : List String) (h : "nextpid" ∉ l) :
     ("nextpid" :: l).filter (fun x => x ≠ "nextpid") = l := by
   simp only [List.filter_cons, ne_eq, not_true_eq_false, decide_false]
   exact List.filter_eq_self.2 (fun x hx => by simp; intro e; subst e; exact h hx)
-
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]

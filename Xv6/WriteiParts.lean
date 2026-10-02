@@ -28,8 +28,6 @@ namespace Xv6
 
 open MachCSL LeanRV64D
 
-set_option linter.unusedVariables false
-
 /-! ## (2) The block splice -/
 
 /-- The block with the chunk `c` written at offset `o` (Rocq's
@@ -245,7 +243,7 @@ theorem writei_usr_step (P0 PI P2 : UPtd) (M : Nat → List (BitVec 8)) (src : B
     refine ⟨P2, UMemL.ext_trans h0 h2, UMemL.ext_refl P2, ?_⟩
     simp only [getElem!_def, UMemL.umemRead_getElem?, hsrc]
     rw [if_pos (by omega)]
-    simp only [Option.getD_some]
+    simp only []
     congr 1; omega
 
 /-! ## (4) The budget: the iteration bound -/
@@ -365,7 +363,7 @@ theorem wi16Pre_spend (bms : Nat) (inum : BitVec 32) (inodestart : Nat)
   obtain ⟨hs, -, -⟩ := hpre h1
   unfold wi16Spend
   by_cases hc : IBLOCK inum inodestart ∈ Sc
-  · simp only [hc, decide_true, if_true, Bool.false_eq_true, if_false]
+  · simp only [hc, decide_true, if_true]
     by_cases hb : IBLOCK inum inodestart ∈ Sb
     · simp only [hb, decide_true, if_true]; omega
     · simp only [hb, decide_false, Bool.false_eq_true, if_false]; omega

@@ -271,10 +271,10 @@ theorem sncpy_pad_loop (kb : KCtx) (dst : BitVec 64) (n : Nat) (hn31 : n < 2 ^ 3
       (by rw [List.length_set]; exact hcur) _ ?h14 ?hw15 c4) $$ [- $Hk $Hpc $Hdst]
     rotate_right 1
     case h14 =>
-      simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false, reduceIte]
+      simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
       exact sy_succ' dst j
     case hw15 =>
-      simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false, reduceIte]
+      simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]
       exact hw15
     iapply wpNext_mono _ _ _ _ _ $$ HΦ
     iintro %c' HΦ %R' %cur' Hk Hpc Hdst %⟨hl', hpre', hpad', hkept'⟩
@@ -417,7 +417,7 @@ theorem sncpy_copy_loop (kb : KCtx) (dst src : BitVec 64) (dq : DFrac)
       · ipureintro
         refine ⟨by rw [List.length_set]; exact hcur, ?_⟩
         intro r h11' h12' h13' h14' h15' h16'
-        simp only [RegMap.set_apply, h11', h12', h13', h14', h15', h16', if_false]
+        simp only [RegMap.set_apply, h11', h13', h14', h15', h16', if_false]
       · unfold sncpyCopyPost
         iright
         iframe
@@ -429,11 +429,11 @@ theorem sncpy_copy_loop (kb : KCtx) (dst src : BitVec 64) (dq : DFrac)
             rw [List.getElem?_set_self (by rw [hcur]; omega), hbi]
           · rw [List.getElem?_set_ne (by omega)]
             exact hcp j (by omega)
-        · simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false, reduceIte]
+        · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]
           exact h12
-        · simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false, reduceIte]
+        · simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
           exact sy_succ' dst i
-        · simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false, reduceIte]
+        · simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
     · -- a non-NUL byte: go round
       ihave Hpc := (show pcIs (GF := GF) c8
           (if bss[i] = 0#8 then (KA.«strncpy» + 0x26#64) else (KA.«strncpy» + 0xc#64)) ⊢
@@ -457,13 +457,13 @@ theorem sncpy_copy_loop (kb : KCtx) (dst src : BitVec 64) (dq : DFrac)
         _ ?h11 ?h12 ?h15 c9) $$ [- $Hk $Hpc $Hdst $Hsrc]
       rotate_right 1
       case h11 =>
-        simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false, reduceIte]
+        simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
         exact sy_succ' src i
       case h12 =>
-        simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false, reduceIte]
+        simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
         congr 1 <;> omega
       case h15 =>
-        simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false, reduceIte]
+        simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
         exact sy_succ' dst i
       iapply wpNext_mono _ _ _ _ _ $$ HΦ
       iintro %c' HΦ %R' %cur' Hk Hdst Hsrc %⟨hl', hkept'⟩ Hpost
@@ -525,7 +525,7 @@ theorem strncpy_proof : STRNCPY := ⟨fun {hlc GF} _ _ cpu k bsd bss n dq hK hn 
     ipureintro
     refine ⟨?_, ?_, hlen', hpost⟩
     · unfold calleeSaved
-      simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, eq_self_iff_true,
+      simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, 
         _root_.true_and]
       exact ⟨hcs 9#5 (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide),
         hcs 18#5 (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide),
@@ -538,7 +538,7 @@ theorem strncpy_proof : STRNCPY := ⟨fun {hlc GF} _ _ cpu k bsd bss n dq hK hn 
         hcs 25#5 (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide),
         hcs 26#5 (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide),
         hcs 27#5 (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide)⟩
-    · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
+    · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]
       exact hcs 10#5 (by decide) (by decide) (by decide) (by decide) (by decide) (by decide)
         (by decide) (by decide)
   -- mv a5,a0
@@ -558,7 +558,7 @@ theorem strncpy_proof : STRNCPY := ⟨fun {hlc GF} _ _ cpu k bsd bss n dq hK hn 
   rotate_right 1
   case h11 => simp [RegMap.set_apply]
   case h12 => simp [RegMap.set_apply, hn]
-  case h15 => simp [RegMap.set_apply]
+  case h15 => simp []
   k_norm_g
   iapply wpNext_intro_pin
   iintro %c4 %hp4 %R4 %cur4 Hk Hdst Hsrc %⟨hl4, hkept4⟩
@@ -643,10 +643,10 @@ theorem strncpy_proof : STRNCPY := ⟨fun {hlc GF} _ _ cpu k bsd bss n dq hK hn 
         (by omega) (by omega) cur4 hl4 _ ?h14 ?hw15 c8) $$ [- $Hk $Hpc $Hdst]
       rotate_right 1
       case h14 =>
-        simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false, reduceIte]
+        simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
         exact sy_succ' (k.regs 10#5) i
       case hw15 =>
-        simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false, reduceIte]
+        simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
         rw [sy_succ' (k.regs 10#5) i]
         exact sy_pad_w (k.regs 10#5) n i hi hn31
       iapply wpNext_intro_pin

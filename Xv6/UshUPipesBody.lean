@@ -25,6 +25,7 @@ DROPPED (unreached): `ush_pipes_branch_holds` (and so R-round's
    payload-constancy `Hc` is `ushRestLAt`'s own premise.
 -/
 import Xv6.UshUPipesCatF
+import Xv6.UshUPipesEcho
 import Xv6.UshURoundSecc
 import Xv6.UshURoundRedir
 import Xv6.UshURoundSync
@@ -37,8 +38,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Std (ExtTreeSet)
 open Wid Pline'
 open UShPipesDefs UShPipesStage UShPipesNode
-
-set_option linter.unusedSectionVars false
 
 section Body
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [IcacheG GF]

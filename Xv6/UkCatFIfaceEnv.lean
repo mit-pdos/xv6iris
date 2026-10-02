@@ -54,8 +54,6 @@ open Iris.Std.PartialMap
 open HfpPipeP HfpFileClaimsP
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
-
 /-! ## §0 The handles (deviation 3) -/
 
 /-- **Rocq `cif_hf`**: the handle a tail input's descriptor holds. -/

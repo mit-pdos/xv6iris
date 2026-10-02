@@ -36,12 +36,9 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 theorem filestat_pt' (x : BitVec 64) : x + 80#64 = pPagetable x := rfl
-
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
@@ -178,7 +175,6 @@ theorem filestat_copy (CO : COPYOUT) (cpu : CPU) (k : KCtx) (spie spp : Bool) (R
     refine ⟨hcs', Or.inr (hR.trans h10), hext, Nat.le_of_lt hd', ⟨_, ?_, hM, hmap⟩⟩
     rw [List.length_take, fstatBytes_length]; omega
 
-
 set_option maxHeartbeats 16000000 in
 /-- **`+0x2a .. +0x3a`: `&st`, stati, iunlock** (Rocq's `+0x2a .. +0x38`
 block): the buffer opened as `statAt` + the hole, stati over the read arm's
@@ -307,7 +303,6 @@ theorem filestat_stat (ST : STATI) (IU : IUNLOCK) (CO : COPYOUT) (Γ : SchedName
   iframe #
   rw [hproc]
   iexact Hce
-
 
 set_option maxHeartbeats 16000000 in
 /-- **`+0x1e .. +0x28`: the lazy saves, `s2 := p`, ilock at the read arm**

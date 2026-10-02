@@ -51,8 +51,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-! ## The key rows the bundles read -/
 
 /-- **Rocq `skey_eq`**: a bundle for syscall `n` reads the image, argument
@@ -78,8 +76,6 @@ theorem skeyEq_symm {W W' : Uvis} (h : skeyEq W W') : skeyEq W' W := by
     hpi.symm, hsz.symm, hlz.symm, hsc.symm⟩
 
 /-! ## The class -/
-
-
 
 /-- **Rocq `uexecSG`**, indexed by `CtokG` (the generic-family law hands a
 slot `myPay`).  Field order and content are Rocq's. -/

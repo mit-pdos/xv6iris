@@ -93,9 +93,6 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedVariables false
-set_option linter.unusedSectionVars false
-
 /-- Rocq `ParkCap`'s residue family `URB`, indexed by the slot (deviation 1). -/
 abbrev ParkURB (GF : BundledGFunctors) : Type _ :=
   Nat → CPU → CurCtx → UPtd → BitVec 64 → ProcPriv → List FdState → ExtTreeSet GName compare →

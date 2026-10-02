@@ -36,8 +36,6 @@ open Iris Iris.BI Iris.ProofMode Std MachCSL
 open Iris.Std.PartialMap Iris.Std.FiniteMap
 open Sail LeanRV64D LeanRV64D.Functions
 
-set_option linter.unusedSectionVars false
-
 /-! ## §1 The text pages, and the image split by them -/
 
 /-- The physical addresses of the DATA pages (every mapped user page that is
@@ -139,6 +137,5 @@ def ukViewStore (V : Nat → List (BitVec 8)) (a n : Nat) (v : BitVec 64) : Nat 
   fun k => if k = a / 4096 then
       (V k).mapIdx (fun j b => if a % 4096 ≤ j ∧ j < a % 4096 + n then nthByte (n := 8) v (j - a % 4096) else b)
     else V k
-
 
 end Xv6

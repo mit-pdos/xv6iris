@@ -41,8 +41,6 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedSectionVars false
-
 /-! ## The chain the phase formats -/
 
 /-- The `Xv6.Chain` record `virtio_disk_rw` builds out of the three
@@ -474,9 +472,9 @@ theorem vdrw_chainWr_arm (c : Chain) (wr : Bool) (bno : BitVec 32) (dataBuf : Li
     chainWr (c.arm e pw ξ kq) = vdrwWr wr bno dataBuf := by
   unfold chainWr vdrwWr
   cases wr
-  · simp only [Chain.arm_dwr, hdwr, Bool.not_false, ite_true, Bool.false_eq_true, ite_false]
+  · simp only [hdwr, Bool.not_false, ite_true, Bool.false_eq_true, ite_false]
   · have hd : c.dwr = false := by rw [hdwr]; rfl
-    simp only [Chain.arm_dwr, hd, Chain.arm_blk, hblk, Chain.arm_pay, hpw hd,
+    simp only [hd, Chain.arm_blk, hblk, Chain.arm_pay, hpw hd,
       bytesOf_bvOfBytes BSIZE dataBuf hdl, Bool.false_eq_true, ite_false, ite_true]
 
 /-- The era's crash-permit channel, out of the bundle. -/
@@ -822,7 +820,6 @@ theorem vdrw3_nextIdx (i : Nat) (hi : i < NUM) :
 theorem vdrw3_statusByte :
     BitVec.extractLsb' 0 8 (0xffffffffffffffff#64) = 0xff#8 := by decide
 
-
 /-- `lhu a5,2(a4) ; addiw a5,a5,1 ; sh a5,2(a4)`: the published count. -/
 theorem vdrw4_bump (n : Nat) :
     BitVec.extractLsb' 0 16
@@ -884,6 +881,5 @@ theorem vdrw4_idx_write (γ : DiskNames) (pd pav pu : PAddr) (cpu : CPU) (np i :
   exact disk_avail_idx_write γ pd pav pu cpu np i c
 
 end ring
-
 
 end Xv6

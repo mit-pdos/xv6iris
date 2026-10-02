@@ -40,8 +40,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-- Rocq `io_singleton`. -/
 theorem io_singleton (e : Obs) (he : isIo e = true) : ∀ x ∈ [e], isIo x = true := by
   intro x hx

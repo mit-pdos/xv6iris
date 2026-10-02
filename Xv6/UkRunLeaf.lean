@@ -63,8 +63,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
-
 /-- A write to a nonzero register is `RegMap.set`. -/
 theorem ukWr_ne0 (m : RegMap) (rd : BitVec 5) (v : BitVec 64) (h : rd ≠ 0#5) : ukWr m rd v = m.set rd v := by
   unfold ukWr; rw [if_neg h]

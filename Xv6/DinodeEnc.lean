@@ -268,7 +268,6 @@ theorem diblkBytes_insert_same (ds : List Dinode) (k : Nat) (d : Dinode) (j : Na
   have hv : (ds.set k d)[k]! = d := getElem!_of_getElem? (List.getElem?_set_self hk)
   rw [hv]
 
-set_option linter.unusedVariables false in
 /-- Rocq keeps `k < length ds` as a premise; the statement is the one
 consumers quote. -/
 theorem diblkBytes_insert_other (ds : List Dinode) (k : Nat) (d : Dinode) (i : Nat)

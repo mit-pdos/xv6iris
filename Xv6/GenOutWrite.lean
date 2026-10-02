@@ -21,8 +21,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-- THE ORDINARY WRITE, pure (the stage half of Rocq `gcl_step_write`). -/
 theorem gclPure_write (M : LModel) (sd : M.lmSt) (k : Nat) (ho : List Obs) (so : GStage M)
     (H : ConsHist) (P : Nat) (b : BitVec 8) (ps0 cs0 : List Nat) (I0 : List (BitVec 8))

@@ -56,8 +56,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
-
 /-- **Rocq `UkTree.stub_ret`**: the run at a stub's return -- a0 the answer,
 a7 the number (deviation 2). -/
 def stubRet (m : RegMap) (num : Int) (ret : BitVec 64) : RegMap :=

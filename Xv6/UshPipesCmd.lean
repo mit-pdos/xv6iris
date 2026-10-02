@@ -38,8 +38,6 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode MachCSL
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
-
 /-- A pipeline line is in the catalogued symbol scope: every symbol is a
 bar (Rocq: read off `ushq_barw`'s `ushq_sym_ok`, or the last stage's
 `ushq_nosym_from`). -/

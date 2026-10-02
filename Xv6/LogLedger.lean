@@ -32,8 +32,6 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedSectionVars false
-
 /-! ## The sum of the remaining budgets, over the list view -/
 
 /-- `Xv6.opSum`'s fold, on a plain list of entries. -/

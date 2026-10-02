@@ -16,9 +16,6 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedVariables false
-set_option linter.unusedSectionVars false
-
 /-- Rocq `ut_fmt1`. -/
 def utFmt1 : List (BitVec 8) :=
   [0x75#8, 0x73#8, 0x65#8, 0x72#8, 0x74#8, 0x72#8, 0x61#8, 0x70#8, 0x28#8, 0x29#8, 0x3a#8, 0x20#8,

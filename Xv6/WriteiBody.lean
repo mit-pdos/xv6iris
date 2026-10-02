@@ -28,9 +28,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 theorem writei_br_logwrite : KA.«writei» + 0x7ac#64 = KA.«log_write» := by decide
 theorem writei_br_brelse : KA.«writei» + 0xFFFFFFFFFFFFF5A4#64 = KA.«brelse» := by decide

@@ -74,8 +74,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Iris.Std.PartialMap
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
-
 /-! ## §0 The process's ghost names, in one record -/
 
 /-- **Rocq `uk_names`**: the engine's per-process ghosts, and THE EXIT
@@ -786,7 +784,6 @@ theorem ukWr_x0 (m : RegMap) (rd : BitVec 5) (v : BitVec 64) (h0 : m 0#5 = 0#64)
   · exact h0
   · rename_i hrd
     rw [RegMap.set_other _ _ _ _ (Ne.symm hrd)]; exact h0
-
 
 /-! ## §3 THE CLOSE, THE GENERIC CONTINUATION, AND WHAT A LEAF READS -/
 

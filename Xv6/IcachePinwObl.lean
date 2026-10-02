@@ -93,8 +93,6 @@ explicit `cpu : CPU`.
 -/
 import Xv6.IcacheInvRef
 
-set_option linter.unusedSectionVars false
-
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL

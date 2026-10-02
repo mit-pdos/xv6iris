@@ -75,8 +75,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-- WHAT THE CLAIM READS OF AN APPLICATION (Rocq `gen_cparams`). -/
 structure GenCparams (hlc : HasLC) (GF : BundledGFunctors) [MachGS hlc GF] [Xv6G GF] [DiskG GF]
     [EchoOutG GF] (M : LModel) where

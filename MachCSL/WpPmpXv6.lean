@@ -15,6 +15,7 @@ arbitrary `MemoryAccessType`.
 import MachCSL.MConf
 import MachCSL.PmpXv6Defs
 import MachCSL.PlatformFacts
+import MachCSL.WpPmp
 
 namespace MachCSL
 

@@ -69,9 +69,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## Constants -/
 
@@ -82,7 +80,6 @@ theorem sys_open_br_begin_op : KA.«sys_open» + 0xffffffffffffeb56#64 = KA.«be
 theorem sys_open_ret_12 : jumpPc (KA.«sys_open» + 0x12#64) = KA.«sys_open» + 0x12#64 := by decide
 theorem sys_open_ret_20 : jumpPc (KA.«sys_open» + 0x20#64) = KA.«sys_open» + 0x20#64 := by decide
 theorem sys_open_ret_2e : jumpPc (KA.«sys_open» + 0x2e#64) = KA.«sys_open» + 0x2e#64 := by decide
-
 
 /-! ## The fetched path (argstr's buffer as a function) -/
 
@@ -165,7 +162,6 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
 
 /-! ## The block's seams -/
-
 
 /-! ## The call sites: the shared sysfile wrappers (`SysfileCalls`) -/
 
@@ -364,7 +360,6 @@ theorem sys_open_fetched (BO : BEGIN_OP) (Γ : SchedNames) [ClaimIs (hlc := hlc)
       iapply (harm0 (sysOpenV2 A P2) (sysOpenM2 A P2) rfl) $$ [$Hx $Hblk $Hfr $Hfd]
     iapply (sys_open_exit cpu k spie spp _ w3 w4 w5 w6 lo (sysOpenOm A) w24 hS.hK hp1 hal)
       $$ [$Hk $Hpc $Hcells $Hbuf $Hte $Hce $HK]
-
 
 /-! ## +0x08: argint and argstr -/
 

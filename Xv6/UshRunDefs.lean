@@ -48,8 +48,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
-
 /-! ## §1 The command tree, as data -/
 
 /-- **Rocq `ushcmd`**: sh.c's five node kinds, with exactly the fields

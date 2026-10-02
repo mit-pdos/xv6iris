@@ -59,9 +59,7 @@ open Iris.Std (get?)
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## §1 PURE ARITHMETIC -/
 
@@ -342,9 +340,7 @@ theorem kxcC_frameC_at [CurCtx] (sp0 ra0 s00 s10 s20 pv av w5 w6 w7 w8 w9 w10 w1
 
 end Frame
 
-
 /-! ## §4b SMALL ACCESSORS -/
-
 
 section Acc
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]

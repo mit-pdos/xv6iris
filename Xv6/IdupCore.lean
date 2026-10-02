@@ -56,8 +56,6 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
 open Iris.Algebra
 
-set_option linter.unusedSectionVars false
-
 /-! ## The mint's two fraction facts (Rocq `Xv6.ig_frac_lt` / `Xv6.ig_frac_rest`) -/
 
 /-- A proposition equation as an entailment. -/

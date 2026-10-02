@@ -59,9 +59,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 theorem sys_exec_br_fetchaddr : KA.«sys_exec» + 0xffffffffffffd2e6#64 = KA.«fetchaddr» := by decide
 theorem sys_exec_br_kalloc : KA.«sys_exec» + 0xffffffffffffb5ba#64 = KA.«kalloc» := by decide

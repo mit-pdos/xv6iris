@@ -45,6 +45,7 @@ and INSTANT 2 FIRES, `lfEnt_fire`).  The two failures go to `bad:` through
 2. dirlink's transaction share is the whole half (`SysLinkCalls` deviation 2).
 -/
 import Xv6.SysLinkTails
+import Xv6.IcacheShortCarve
 import MachCSL.WpSmodeLh
 import Xv6.CreateSharedRegs
 
@@ -55,9 +56,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## Pure facts -/
 
@@ -542,15 +541,21 @@ theorem sys_link_walk_dp (IL : ILOCK) (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : EN
     rw [Xv6.iDev_eq]) $$ Hdevd
   ihave Hinumd := (show wordPointsTo (GF := GF) (ientry kd + 4#64) 4 (DFrac.own (1 : Qp).half) dinum ⊢
       wordPointsTo (iInum (ientry kd)) 4 (DFrac.own (1 : Qp).half) dinum from .rfl) $$ Hinumd
+  -- the inner lookup's rows (chroot): a share off dp's short keep and its
+  -- unit, the root cell and reference out of the block's rows
+  icases inodeRefShortGenlo_lend kd (qd.half + qd.half) qd.half icfgDev dinum gd lod tld hled
+    $$ [$Hfld $Hkeepd] with ⟨Hkeepd, Hshrd⟩
+  icases Hcwr with ⟨Hcwh, Hrt, Hrh⟩
   iapply (sys_link_dirlink DLK Γ cpu _ k.sie (by k_norm_g) k.proc (by k_norm_g) A.j
       (sysLinkName (k.regs 2#5)) ?dnb kd dinum bmd datd dnd
-      nf (BitVec.setWidth 16 inum) n2 Sb2 td (1 : Qp).half A.pid hj ?dp ?dK ?dn ?dt hdtype hcovd hszbd
+      nf (BitVec.setWidth 16 inum) n2 Sb2 td (1 : Qp).half A.pid qd.half.half A.V.root A.V.rti hj
+      ?dp ?dK ?dn ?dt hdtype hcovd hszbd
       (dirOk_dir icfgNib dnd datd hdtype hdokd) (Or.inl hnl0) hdocd (diNlinkStable_refl dnd htynzd)
       hwfd hholesd hdad (by have : MAXFILE * BSIZE < 2 ^ 31 := by decide
                             omega)
-      hdnib hinib16 (Nat.le_trans (dlNeed_le _ _) (by unfold dirlinkUnits; omega)) ?da0 ?da2)
-    $$ [- $Hk $Hpc $Hte $Hce $Henv $Hdevd $Hinumd $Hmetad $Hmapd $Hbd $Hname $Hdid $Hpid $Hbs $Hslot
-      $Hdld $Hop $Htxp]
+      hdnib hinib16 (Nat.le_trans (dlNeed_le _ _) (by unfold dirlinkUnits; omega)) ?da0 ?da2 hkd)
+    $$ [- $Hk $Hpc $Hte $Hce $Henv $Hdevd $Hinumd $Hmetad $Hmapd $Hbd $Hname $Hdid $Hpid $Hshrd $Hrud
+      $Hrt $Hrh $Hbs $Hslot $Hdld $Hop $Htxp]
   rotate_right 1
   k_norm_g [sys_link_ret_a0]
   case dp => k_norm_g; rw [hproc]
@@ -562,7 +567,12 @@ theorem sys_link_walk_dp (IL : ILOCK) (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : EN
   case dnb => k_norm_g [hp1.2.1, sys_link_bufname]; rfl
   unfold sysLinkDlK
   iintro %cpu %spie2 %spp2 %R2 %found %bm' %data' %dn' %dn0' %n3 %Sb3 %tot %⟨hcs2, hout⟩ Hk Hpc Hte
-    Hce Hdevd Hinumd Hmetad Hmapd Hbd Hname Hdid Hpid Hbs Hslot Hdld Hop Htxp
+    Hce Hdevd Hinumd Hmetad Hmapd Hbd Hname Hdid Hpid Hshrd Hrud Hrt Hrh Hbs Hslot Hdld Hop Htxp
+  ihave Hkeepd := inodeRefShortGenlo_regather kd (qd.half + qd.half) qd.half icfgDev dinum gd lod
+    $$ [$Hkeepd $Hshrd]
+  ihave Hcwr : (inodeHeldAt A.V.cwd A.V.cwi ∗ wordPointsTo (pRoot k.proc) 8 (DFrac.own 1) A.V.root ∗
+      inodeHeldAt A.V.root A.V.rti) $$ [Hcwh Hrt Hrh]
+  · iframe
   k_norm_g [sys_link_ret_a0, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp3 := sysLinkPins_cs k _ R2 (ientry kk) (ientry kd)
     (sysLinkPins_set k _ _ _ 1#5 _ (sysLinkPins_set k _ _ _ 11#5 _ (sysLinkPins_set k _ _ _ 12#5 _

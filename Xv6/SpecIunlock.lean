@@ -101,8 +101,6 @@ import Xv6.SpecReleasesleep
 
 namespace Xv6
 
-set_option linter.unusedVariables false
-
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 

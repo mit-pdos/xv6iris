@@ -38,9 +38,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-- The registers at the loop's body test `+0x20`, cursor `k`: `s1` the
 cursor `&ip->addrs[k]`, `s2` the limit `&ip->addrs[NDIRECT]`, `s3 = ip`. -/

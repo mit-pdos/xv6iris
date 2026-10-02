@@ -53,14 +53,11 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
 /-! ## Arithmetic -/
-
 
 /-- `8`-alignment survives adding a multiple of eight. -/
 theorem pi_align_add (a : BitVec 64) (m : Nat) (h : a.toNat % 8 = 0) (hm : m % 8 = 0) :
@@ -188,7 +185,6 @@ theorem piBuf_acc (a : BitVec 64) (j : Nat) (hj : j < 24) :
   · ipureintro; rw [List.length_set]; exact hl
   iexact H
 
-
 /-! ## The frame
 
 `addi sp,sp,-64; sd ra,56(sp); sd s0,48(sp); sd s2,32(sp); addi s0,sp,64`:
@@ -301,7 +297,6 @@ theorem wp_pi_epilogue (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
   k_step (wp_s_ret cpu _ (pc + 8#64) true 1#5) $$ [- $Hk $Hpc]
   iintro Hk Hpc
   iapply HΦ $$ Hk Hpc
-
 
 /-! ## Instruction-level arithmetic -/
 

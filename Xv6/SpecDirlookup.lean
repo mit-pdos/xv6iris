@@ -190,8 +190,6 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedVariables false
-
 /-- Address of `dirlookup`. -/
 def dirlookupAddr : BitVec 64 := KA.«dirlookup»
 

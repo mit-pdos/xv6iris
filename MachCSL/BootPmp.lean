@@ -16,7 +16,7 @@ predicate quantifies over EVERY index, so the out-of-range reads (the
 `Inhabited` default `0#8`) are part of the fact.
 -/
 import MachCSL.BootPeel
-import MachCSL.WpPmp
+import MachCSL.WpPmpDefs
 
 namespace MachCSL
 

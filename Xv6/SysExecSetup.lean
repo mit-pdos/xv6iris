@@ -38,9 +38,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 theorem sys_exec_br_memset : KA.«sys_exec» + 0xffffffffffffb754#64 = KA.«memset» := by decide
 theorem sys_exec_ret_46 : jumpPc (KA.«sys_exec» + 0x46#64) = KA.«sys_exec» + 0x46#64 := by decide

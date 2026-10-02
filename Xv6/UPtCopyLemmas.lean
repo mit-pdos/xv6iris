@@ -21,8 +21,6 @@ open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D LeanRV64D.Functions Sail
 open Iris.Std Iris.Std.PartialMap Iris.Std.LawfulPartialMap
 
-set_option linter.unusedSectionVars false
-
 /-! ## The leaf a copy writes -/
 
 /-- `PTE_FLAGS` keeps only the ten flag bits (`mappages`' `hmask`). -/

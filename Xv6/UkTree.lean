@@ -68,8 +68,6 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
-
 /-! ## §0 The program instance, the answer readings -/
 
 /-- **Rocq `uprog`**: the program instance -- its code, and where its five

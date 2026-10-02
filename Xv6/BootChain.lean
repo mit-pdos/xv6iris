@@ -70,8 +70,6 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedSectionVars false
-
 /-! ## Stack budgets -/
 
 /-- `main`'s boot arm fits the boot stack (Rocq `K_main_boot_le`). -/

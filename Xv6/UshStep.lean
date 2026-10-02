@@ -55,8 +55,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
-
 /-! ## §0 Pure helpers -/
 
 /-- **Rocq `ushp_pc_step'`**, the return address: a 2-aligned `Nat` pc is
@@ -78,7 +76,6 @@ theorem ush_retPc (x : Nat) (hx : x % 2 = 0) (hlt : x < 2 ^ 64) :
 /-- A jump target at `Nat` pcs. -/
 theorem ush_tgt {w : Nat} (x t : Nat) (imm : BitVec w) (h : BitVec.ofNat 64 x + BitVec.signExtend 64 imm = BitVec.ofNat 64 t) :
     BitVec.ofNat 64 x + BitVec.signExtend 64 imm = BitVec.ofNat 64 t := h
-
 
 /-- `addi rd, rs, -d` at a `Nat` value (a local's address off the frame
 pointer). -/
@@ -449,7 +446,6 @@ theorem ushS_store (UL : UK_LEAVES) (N : UkNames GF) {x : Nat} {rvc : Bool} {imm
   inext
   rw [ukPc x y rvc hy]
   iexact Hk
-
 
 /-! ## §2 The frame (Rocq §4b–§4c) -/
 

@@ -23,7 +23,11 @@ producer's loan `Rd`; `ufin` hands the deed back at its PRE tie
 3. Rocq's `fown r s = fdq r (1/2) s ∗ ftkt r s` split is `fown`'s own
    (`fdeed r s ∗ ftkt r s`, `fdeed r s` being `fdq r (1/2) s` by `.rfl`).
 -/
-import Xv6.UshUPipesEcho
+import Xv6.UshUPipesKit
+import Xv6.PipesCutMain
+import Xv6.UshURoundCat
+import Xv6.UshUPipesPure
+import Xv6.UshPipesNodeLaw
 import Xv6.UshCatFStageSup
 
 namespace Xv6
@@ -34,8 +38,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Std (ExtTreeSet)
 open Wid Pline'
 open UShPipesDefs UShPipesStage UShPipesNode
-
-set_option linter.unusedSectionVars false
 
 section CatF
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [IcacheG GF]

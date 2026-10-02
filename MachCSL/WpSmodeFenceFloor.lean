@@ -101,7 +101,7 @@ theorem memModel_load_rv (σ : MState) (cpu : CPU) (pa : PAddr) (n tvn : Nat) (h
   imodintro
   have hresv : resvMap (σ.afterLoad cpu pa n tvn) = resvMap σ :=
     resvMap_congr _ _ (fun c => by
-      simp only [MState.afterLoad, updCpu]
+      simp only [updCpu]
       split
       · rename_i hc; subst hc; simp [HRead.afterLoad]
       · simp)
@@ -112,9 +112,9 @@ theorem memModel_load_rv (σ : MState) (cpu : CPU) (pa : PAddr) (n tvn : Nat) (h
     · iapply Hclose $$ %(σ.afterLoad cpu pa n tvn)
       · ipureintro
         intro c hc
-        simp [MState.afterLoad, updCpu, hc]
+        simp [updCpu, hc]
       · iapply hartViewsAt_intro
-        simp only [MState.afterLoad, updCpu, if_true, HRead.afterLoad]
+        simp only [updCpu, if_true, HRead.afterLoad]
         iframe Hv Hi Hr
     · ipureintro
       exact mmOk_afterLoad σ cpu pa n tvn htv hmm
@@ -145,7 +145,7 @@ theorem memModel_fence_acq (σ : MState) (cpu : CPU) (b : barrier_kind)
   have e : (σ.fence cpu b).tv cpu =
       fencePost (fenceDrains b) (fenceAcq b) (σ.tv cpu) (σ.hr cpu).rv
         (ownPub (hartAgent cpu) σ.log) := by
-    simp [MState.fence, updCpu]
+    simp [updCpu]
   have hle : T ≤ (σ.fence cpu b).tv cpu := by
     rw [e, hacq]
     unfold fencePost

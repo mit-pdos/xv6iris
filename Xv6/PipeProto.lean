@@ -87,8 +87,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-! ## 0.  The protocol's cameras and names -/
 
 /-- THE READER'S END-OF-FILE SNAPSHOT (Rocq `pipe_eofR`): `Csum.inl` is "no

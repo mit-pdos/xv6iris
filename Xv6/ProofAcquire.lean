@@ -148,12 +148,12 @@ theorem acquire_body (HO : HOLDING) (MC : MYCPU) {hlc : HasLC} {GF : BundledGFun
   -- the spin
   have h39 : R3 9#5 = kb.regs 10#5 := by
     have := hcs3.2.2.1
-    simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] at this
+    simp only [RegMap.set_apply, BitVec.reduceEq, ite_false] at this
     rw [this]; exact h9
   iapply (acquire_spin cpu (kb.pushed 4) (by k_norm) γ (kb.regs 10#5) s R tl
     (by k_norm; exact hs) (by k_norm; exact hlen) (R3.set 14#5 1#64)
     (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact h39)
-    (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_true])) $$ [HΦ Hframe] %_ %(fun _ _ => rfl) Hk Hpc
+    (by simp only [RegMap.set_apply, ite_true])) $$ [HΦ Hframe] %_ %(fun _ _ => rfl) Hk Hpc
   -- after the spin: mycpu, the owner store, the epilogue
   iframe #
   iintro %R' Hk Hpc %hR' Hpre HR Hheld Hview
@@ -223,8 +223,7 @@ theorem acquire_body (HO : HOLDING) (MC : MYCPU) {hlc : HasLC} {GF : BundledGFun
       rw [hR' i hi]
       simp only [RegMap.set_apply, hi', ite_false]
     unfold calleeSaved
-    simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, eq_self_iff_true, _root_.true_and,
-      _root_.and_true]
+    simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, _root_.true_and]
     exact ⟨(c4_18.trans (hR'' _ (by decide) (by decide))).trans (c3_18.trans c2_18),
       (c4_19.trans (hR'' _ (by decide) (by decide))).trans (c3_19.trans c2_19),
       (c4_20.trans (hR'' _ (by decide) (by decide))).trans (c3_20.trans c2_20),
@@ -425,12 +424,12 @@ theorem acquire_body_gen (HO : HOLDING) (MC : MYCPU) {hlc : HasLC} {GF : Bundled
   -- the spin
   have h39 : R3 9#5 = kb.regs 10#5 := by
     have := hcs3.2.2.1
-    simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] at this
+    simp only [RegMap.set_apply, BitVec.reduceEq, ite_false] at this
     rw [this]; exact h9
   iapply (acquire_spin_gen cpu (kb.pushed 4) (by k_norm) γ (kb.regs 10#5) s R D Tc hrefute tl
     (by k_norm; exact hs) (by k_norm; exact hlen) (R3.set 14#5 1#64)
     (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact h39)
-    (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_true])) $$ [HΦ Hframe] %_ %(fun _ _ => rfl) Hk Hpc Hcred
+    (by simp only [RegMap.set_apply, ite_true])) $$ [HΦ Hframe] %_ %(fun _ _ => rfl) Hk Hpc Hcred
   -- after the spin: mycpu, the owner store, the epilogue
   iframe #
   iintro %R' Hk Hpc %hR' Hpre HR Hheld Hview Hcred
@@ -500,8 +499,7 @@ theorem acquire_body_gen (HO : HOLDING) (MC : MYCPU) {hlc : HasLC} {GF : Bundled
       rw [hR' i hi]
       simp only [RegMap.set_apply, hi', ite_false]
     unfold calleeSaved
-    simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, eq_self_iff_true, _root_.true_and,
-      _root_.and_true]
+    simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, _root_.true_and]
     exact ⟨(c4_18.trans (hR'' _ (by decide) (by decide))).trans (c3_18.trans c2_18),
       (c4_19.trans (hR'' _ (by decide) (by decide))).trans (c3_19.trans c2_19),
       (c4_20.trans (hR'' _ (by decide) (by decide))).trans (c3_20.trans c2_20),

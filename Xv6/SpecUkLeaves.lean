@@ -84,8 +84,6 @@ open Iris Iris.BI Iris.ProofMode MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Sail
 
-set_option linter.unusedSectionVars false
-
 /-! ## §1 The U-mode decode fact (Rocq `UmodeMem.udecode_base/_rvc`) -/
 
 /-- **Rocq `dstateU` on `D_u`**: what the decoder may read at User privilege,

@@ -95,8 +95,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Std MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-! ## Constants the contract quotes by name -/
 
 /-- `param.h` `MAXARG` (the `li s8,32` the argument loop compares against). -/

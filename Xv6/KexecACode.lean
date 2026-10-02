@@ -81,9 +81,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## The branch targets and return addresses of phase A's calls -/
 
@@ -179,7 +177,6 @@ theorem kxcA_priv_rows5 [X : CurCtx] (hct : X.curTier = KTier.kpt) (γ : FileNam
 
 end Pid
 
-
 theorem kxcA_bne (x y : BitVec 64) : bcond bop.BNE x y = decide (x ≠ y) := by
   simp only [bcond]; by_cases h : x = y
   · subst h; simp
@@ -204,12 +201,10 @@ theorem kxcA_tot64 (tot : Nat) (h : tot ≤ 64) : (BitVec.ofNat 64 tot = 64#64) 
     simpa using this
   · rintro rfl; rfl
 
-
 theorem kxcA_br_30 : KA.«kexec» + 0x30#64 + BitVec.signExtend 64 88#13 = KA.«kexec» + 0x88#64 := by
   decide
 theorem kxcA_j_72 : KA.«kexec» + 0x8e#64 + BitVec.signExtend 64 2097124#21 = KA.«kexec» + 0x72#64 := by
   decide
-
 
 /-- **Rocq `kxc_bad_cause`**: why phase A's +0x064 tail jumped -- a file too
 short to hold a header, or a header whose magic word is wrong. -/

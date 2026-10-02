@@ -47,8 +47,6 @@ import Xv6.UPtDefs
 import Xv6.KillRow
 import Xv6.WaitInv
 
-set_option linter.unusedSectionVars false
-
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Std MachCSL
@@ -298,7 +296,6 @@ def procPub (pa : BitVec 64) (st : BitVec 32) (chan : BitVec 64) (killed xstate 
   wordPointsTo (pXstate pa) 4 xsHalf xstate ∗
   wordPointsTo (pPid pa) 4 pidPub pid ∗
   killPaidAt (MachFixedGS.killCred (hlc := hlc) (GF := GF)) pid killed
-
 
 /-- **The dormant slot's allowances** (Rocq `proc_dormant`'s four supply
 rows, ProcDefs.v:623): one fd-slot unit per descriptor (`[∗ list] _ ∈

@@ -45,8 +45,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Wid RdOut WrOut
 open UShPipesDefs UShPipesStage UShPipeLeaves
 
-set_option linter.unusedSectionVars false
-
 /-- **Rocq `gin_of`**: the read end a node's fd 0 is, below the top. -/
 def gin_of : FdState → Option PipeNames
   | .open true _ (.pipe gin) => some gin

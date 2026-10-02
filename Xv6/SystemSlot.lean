@@ -107,8 +107,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Std MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-! ## 1.  The era-independent coverage facts, off the image -/
 
 /-- THE THREE ERA-INDEPENDENT FACTS a boot needs about the COVERED RANGE,

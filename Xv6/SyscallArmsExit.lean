@@ -31,9 +31,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 theorem syscArmExit_sp4 (x : BitVec 64) :
     x - 8#64 * BitVec.ofNat 64 4 = x + 0xFFFFFFFFFFFFFFE0#64 := by bv_decide

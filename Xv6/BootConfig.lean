@@ -46,13 +46,12 @@ Imports only definitional files.
 import MachCSL.Power
 import MachCSL.MConf
 import Xv6.KernelImage
+import MachCSL.MConfBoot
 
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
 open LeanRV64D
-
-set_option linter.unusedSectionVars false
 
 /-! ## §0 The `_entry` address bridge -/
 

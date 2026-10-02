@@ -33,8 +33,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
-
 /-! ## §0 Pure helpers -/
 
 theorem ushCons_blt_neg1 : ukBtaken .BLT (BitVec.ofInt 64 (-1)) 0#64 = true := by decide

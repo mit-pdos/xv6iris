@@ -22,8 +22,6 @@ lemma per read, and no hart is fixed before the step:
 import MachCSL.WpSmodeLwKey
 import Xv6.IcachePinwObl
 
-set_option linter.unusedSectionVars false
-
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL LeanRV64D

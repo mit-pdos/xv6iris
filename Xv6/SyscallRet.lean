@@ -50,9 +50,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-- **The record after the tail's store** (Rocq `<[tf_arg_idx 0 := r]>`):
 `p->trapframe->a0 = r`. -/

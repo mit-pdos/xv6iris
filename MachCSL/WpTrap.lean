@@ -11,6 +11,7 @@ import MachCSL.SConfPhysDefs
 import MachCSL.ModelFacts
 import MachCSL.PlatformFacts
 import MachCSL.KCtx
+import MachCSL.Tactics
 
 namespace MachCSL
 

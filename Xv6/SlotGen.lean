@@ -148,8 +148,6 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
 open Iris.Algebra OFE COFE
 
-set_option linter.unusedSectionVars false
-
 /-! ## The cameras (Rocq `Xv6Cameras.v` §14; deviation 1) -/
 
 /-- A map keyed by a 64-bit ADDRESS (Rocq `gmap (mword 64) _`). -/

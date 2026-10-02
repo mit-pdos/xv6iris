@@ -145,8 +145,7 @@ theorem kerneltrap_proof (DI : DEVINTR) (MP : MYPROC) (YI : YIELD) : KERNELTRAP 
     ipureintro
     obtain ⟨h20, h21, h22, h23, h24, h25, h26, h27⟩ := hcs
     unfold calleeSaved
-    simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, eq_self_iff_true, _root_.true_and,
-      _root_.and_true]
+    simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, _root_.true_and]
     exact ⟨h20, h21, h22, h23, h24, h25, h26, h27⟩
   -- addi sp,sp,-48 ; sd ra,40(sp) ; sd s0,32(sp) ; sd s1,24(sp) ; sd s2,16(sp) ; sd s3,8(sp) ; addi s0,sp,48
   k_step (wp_s_push cpu _ KA.«kerneltrap» true 4048#12 6 (by omega) imm_m48) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
@@ -243,11 +242,11 @@ theorem kerneltrap_proof (DI : DEVINTR) (MP : MYPROC) (YI : YIELD) : KERNELTRAP 
       $$ [- $Hk $Pc $Hsepc $Hscause $Hstval $Hclaim $Hres $C0 $C1 $C2 $C3 $C4 $C5 $HΦ]
     rotate_right 1
     iframe #
-    case hR2a => simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]; exact c1_2
-    case hR9a => simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]; exact c1_9
-    case hR18a => simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]; exact c1_18
+    case hR2a => simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact c1_2
+    case hR9a => simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact c1_9
+    case hR18a => simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact c1_18
     case hcsa =>
-      simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
+      simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]
       exact ⟨c1_20, c1_21, c1_22, c1_23, c1_24, c1_25, c1_26, c1_27⟩
   · -- the timer: myproc, then yield if there is a process
     k_step (wp_s_branch cpu _ (KA.«kerneltrap» + 0x32#64) false 84#13 10#5 15#5 (by decide) bop.BEQ) from (text_instr _ _ _ _ rfl rfl) Htext

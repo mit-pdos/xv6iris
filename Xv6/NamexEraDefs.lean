@@ -58,9 +58,6 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedSectionVars false
-set_option linter.unusedVariables false
-
 /-! ## The hop list, and the peel's pure half -/
 
 /-- The list the walk's hop family ranges over: every path element on the
@@ -398,7 +395,7 @@ theorem namexEra_post_of_spec (k : KCtx) (A : NamexArgs) (P Pmiss : Nat → Nat 
     Hnm Hbs %hf Hop Htx
   unfold namexEraArm namexEraDead
   rw [hnp]
-  simp only [Bool.false_eq_true, if_false]
+  simp only [Bool.false_eq_true, if_false, hrti]
   iexact Harm
 
 /-- THE NAMEIPARENT SIDE's continuation, in row form. -/
@@ -425,7 +422,7 @@ theorem nparEra_post_of_spec (k : KCtx) (A : NamexArgs) (P Pmiss : Nat → Nat �
     Hnm Hbs %hf Hop Htx
   unfold namexEraArm namexEraDead
   rw [hnp]
-  simp only [if_true]
+  simp only [if_true, hrti]
   iexact Harm
 
 end Seal

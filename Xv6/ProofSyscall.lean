@@ -50,9 +50,6 @@ namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 
-set_option linter.unusedSectionVars false
-set_option linter.unusedVariables false
-
 /-- **`syscall()` meets its specification** at the kernel's deposit instance,
 given the 24 table entries' interfaces, `myproc` and `printk`. -/
 theorem syscall_proof (MP : MYPROC) (PK : PRINTK)

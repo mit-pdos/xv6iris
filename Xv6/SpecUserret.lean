@@ -85,8 +85,6 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedVariables false
-
 /-- userret's entry, `TRAMPOLINE + (userret - trampoline)` (Rocq `uva 0x9c`). -/
 def userretVa : BitVec 64 := TRAMPOLINE + 0x9c#64
 

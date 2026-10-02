@@ -53,9 +53,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 theorem sys_exec_head_br_argaddr : KA.«sys_exec» + 0xffffffffffffd38e#64 = KA.«argaddr» := by decide
 theorem sys_exec_head_br_argstr : KA.«sys_exec» + 0xffffffffffffd3aa#64 = KA.«argstr» := by decide
@@ -182,7 +180,6 @@ theorem sys_exec_head_ret (k : KCtx) (A : SysExecArgs) (hS : SysExecStatic k A) 
     rw [ha0]
     simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
 
-
 set_option maxHeartbeats 16000000 in
 /-- **+0x012 .. +0x01c** (Rocq `sx_head`'s argstr): `li a2,128`, `addi
 a1,s0,-208`, `c.li a0,0`, `argstr(0, path, 128)` over the bare block (the
@@ -250,7 +247,6 @@ theorem sys_exec_head_str (AS : ARGSTR) (Γ : SchedNames) (k : KCtx) (A : SysExe
     exact hpins
   iapply (sys_exec_head_ret k A hS cpu spie1 spp1 R1 P2 kv old bs hp1 hal hext hkv hold hret)
     $$ [$Hk $Hpc $Hte $Hce $Hblk $Hrs $Hsp $H10 $Hbuf $Hargv $H59 $H60 $HO]
-
 
 set_option maxHeartbeats 16000000 in
 /-- **THE HEAD, +0x000 .. +0x026 AND THE -1 EXIT** (Rocq `sx_head`): the

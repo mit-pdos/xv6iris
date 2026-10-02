@@ -26,8 +26,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
-
 /-! ## §1 The word arithmetic of grep's loop (deviation 2) -/
 
 /-- `addw` at a result that fits (Rocq `moi_addw_rr`). -/

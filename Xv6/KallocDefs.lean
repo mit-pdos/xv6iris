@@ -88,8 +88,6 @@ def availDec (on : Option Nat) : Option Nat := on.map (· - 1)
 /-- Whether the allocator may answer `0`. -/
 def availZero (on : Option Nat) : Prop := on = none ∨ on = some 0
 
-set_option linter.unusedSectionVars false
-
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
 
@@ -414,7 +412,6 @@ theorem kmemCnt_agree (γk : KmemNames) (n : Nat) (on : Option Nat) :
       ileft; iexact Hc'
     · ihave %hv := ghost_var_valid_2 _ _ _ _ _ $$ Hp Hs
       exact absurd hv.1 (by simp [DFrac.valid_own_op_discard])
-
 
 /-- `kfree`'s ghost step (Rocq `kmem_avail_inc`): the client's count agrees
 with the allocator's, the pair steps up, and the actor's `KFree` is

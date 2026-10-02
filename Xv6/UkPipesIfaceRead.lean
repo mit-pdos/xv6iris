@@ -21,6 +21,7 @@ CONE (reached): the six laws above.
    input half is read by `pns_pk_copy_in` at either sink.
 -/
 import Xv6.UkPipesIfaceCtx
+import Xv6.UkPipesIfaceDevU
 
 namespace Xv6
 
@@ -28,8 +29,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Iris.Std.PartialMap
 open Std (ExtTreeSet)
 open UexecSG
-
-set_option linter.unusedSectionVars false
 
 section PkIn
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [IcacheG GF] [PipeProtoG GF] [PipeOutG GF] [CtokG GF] [DiskG GF] [EchoOutG GF] [PipesNG GF]

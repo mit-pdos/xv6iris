@@ -9,6 +9,7 @@ import MachCSL.WpStore
 import MachCSL.GprLit
 import Xv6.SpecTimerinit
 import Xv6.CodeTactics
+import MachCSL.WpMmodeAlu
 
 namespace Xv6
 

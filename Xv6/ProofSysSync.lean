@@ -75,9 +75,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## The constants the image computes
 
@@ -104,7 +102,6 @@ theorem ss_ret_4a : jumpPc (KA.«sys_sync» + 0x4a#64) = KA.«sys_sync» + 0x4a#
 theorem ss_ret_4e : jumpPc (KA.«sys_sync» + 0x4e#64) = KA.«sys_sync» + 0x4e#64 := by decide
 theorem ss_ret_54 : jumpPc (KA.«sys_sync» + 0x54#64) = KA.«sys_sync» + 0x54#64 := by decide
 theorem ss_ret_6a : jumpPc (KA.«sys_sync» + 0x6a#64) = KA.«sys_sync» + 0x6a#64 := by decide
-
 
 /-! ## The context and the register pins -/
 
@@ -170,7 +167,6 @@ theorem ssK_fold (k : KCtx) (a b : Bool) (hK : 4 ≤ k.avail) :
     _root_.true_and, _root_.and_true]
   omega
 
-
 /-- The register pins the wait loop maintains: the frame pointers,
 `s1 = &log`, `s2` the saved `log.ncommit`, and the callee-saved registers
 the function never touches (`s3`..`s11`). -/
@@ -213,7 +209,6 @@ theorem ssRegs_set (k : KCtx) (nv : BitVec 64) (R : RegMap) (h : ssRegs k nv R)
   · rw [RegMap.set_apply, if_neg (Ne.symm n25)]; exact a25
   · rw [RegMap.set_apply, if_neg (Ne.symm n26)]; exact a26
   · rw [RegMap.set_apply, if_neg (Ne.symm n27)]; exact a27
-
 
 /-- The pins at the EXIT: `s1` and `s2` are back at the caller's values
 (the fast arm never wrote them; the loop arm restored them at `+0x5a`). -/
@@ -284,7 +279,6 @@ theorem ss_cs_trans (R R' R'' : RegMap) (h1 : calleeSaved R R') (h2 : calleeSave
   exact ⟨b2.trans a2, b8.trans a8, b9.trans a9, b18.trans a18, b19.trans a19, b20.trans a20,
     b21.trans a21, b22.trans a22, b23.trans a23, b24.trans a24, b25.trans a25, b26.trans a26,
     b27.trans a27⟩
-
 
 theorem ss_a0_epi (KR R : RegMap) (h10 : R 10#5 = 0#64) :
     (((R.set 1#5 (KR 1#5)).set 8#5 (KR 8#5)).set 2#5 (KR 2#5)) 10#5 = 0#64 := by
@@ -1304,7 +1298,6 @@ theorem ss_entry (AC : ACQUIRE) (RE : RELEASE) (Γ : SchedNames) [ClaimIs (hlc :
     case hRs2 =>
       repeat refine ssRegsE_set _ _ ?_ _ _ (by decide)
       exact hRE
-
 
 end
 

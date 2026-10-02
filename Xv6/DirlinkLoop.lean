@@ -16,9 +16,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
@@ -36,6 +34,7 @@ theorem dirlink_read (RD : READI) (SN : STRNCPY) (WI : WRITEI) (PA : PANIC)
     (ip : BitVec 64) (dinum : BitVec 32) (bm : Blkmap) (data : Nat → List (BitVec 8))
     (dn dn0 : Dinode) (fn : Nat → BitVec 8) (inum : BitVec 16) (ncount : Nat) (Sb : List Nat)
     (tid : Nat) (qtx : Qp) (pidv : BitVec 32) (dqp dqd dqf dqn dqs dqbs dqb : DFrac)
+    (kd : Nat) (sd : Qp) (rootv : BitVec 64) (rti : Nat) (dqr : DFrac)
     (i fuel : Nat) (bs : List (BitVec 8))
     (hs : DirlinkStatic k j bm data dn dn0 fn inum dinum ncount Sb) (hpd : descPageRw pd)
     (hr : dirlinkRegs k ip (BitVec.ofNat 64 (16 * i)) 16#64 (dirlinkDeAddr (k.regs 2#5)) R)
@@ -48,14 +47,14 @@ theorem dirlink_read (RD : READI) (SN : STRNCPY) (WI : WRITEI) (PA : PANIC)
       (k.regs 20#5) (k.regs 21#5) (k.regs 22#5) ∗
     dirlinkDe (k.regs 2#5) bs ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    dirlinkKeep k ip dinum bm data dn dn0 fn pidv dqp dqd dqf dqn dqs dqbs dqb ∗
+    dirlinkKeep k ip dinum bm data dn dn0 fn pidv dqp dqd dqf dqn dqs dqbs dqb kd sd rootv rti dqr ∗
     bslots 3 ∗ irefSlot ∗ dlinks fscFs dinum.toNat dn bm data ∗
     logOpS icfgLog ncount Sb ∗ txPin icfgLog tid qtx ∗
     dirlinkEnv (hlc := hlc) Γ γl pd pav pu γkl γk ∗
     (∀ c' : CPU, dirlinkPost k ip dinum bm data dn dn0 fn inum ncount Sb tid qtx pidv
-      dqp dqd dqf dqn dqs dqbs dqb c') ∗
+      dqp dqd dqf dqn dqs dqbs dqb kd sd rootv rti dqr c') ∗
     dirlinkLoop Γ γl pd pav pu γkl γk k ip dinum bm data dn dn0 fn inum ncount Sb tid qtx pidv
-      dqp dqd dqf dqn dqs dqbs dqb fuel
+      dqp dqd dqf dqn dqs dqbs dqb kd sd rootv rti dqr fuel
     ⊢ wpLoop (GF := GF) cpu := by
   have hmaxb := Xv6.rd_maxbytes
   have hszb := hs.hszb
@@ -91,7 +90,7 @@ theorem dirlink_read (RD : READI) (SN : STRNCPY) (WI : WRITEI) (PA : PANIC)
     dirlinkEnv_open (hlc := hlc) Γ γl pd pav pu γkl γk $$ Henv
   ihave #Hany := iregInv_bytes (hlc := hlc) fscIreg fscFs icfgIst icfgNib $$ Hinv
   unfold dirlinkKeep
-  icases Hkeep with ⟨Hdev, Hin, Hmeta, Hmap, Hblk, Hnm, Hsi, Hss, Hsb, Hdi, Hpid⟩
+  icases Hkeep with ⟨Hdev, Hin, Hmeta, Hmap, Hblk, Hnm, Hsi, Hss, Hsb, Hdi, Hpid, Hdr⟩
   icases bslots_uncons 2 $$ Hbs with ⟨Hb1, Hb2⟩
   unfold dirlinkDe
   icases Hde with ⟨Hbuf, %hbl⟩
@@ -153,11 +152,11 @@ theorem dirlink_read (RD : READI) (SN : STRNCPY) (WI : WRITEI) (PA : PANIC)
     iframe Hbuf
     ipureintro
     simp [bview_length]; rfl
-  ihave Hkeep : dirlinkKeep k ip dinum bm data dn dn0 fn pidv dqp dqd dqf dqn dqs dqbs dqb
-    $$ [Hdev Hin Hmeta Hmap Hblk Hnm Hsi Hss Hsb Hdi Hpid]
+  ihave Hkeep : dirlinkKeep k ip dinum bm data dn dn0 fn pidv dqp dqd dqf dqn dqs dqbs dqb kd sd rootv rti dqr
+    $$ [Hdev Hin Hmeta Hmap Hblk Hnm Hsi Hss Hsb Hdi Hpid Hdr]
   · unfold dirlinkKeep; iframe
   iapply (dirlink_record SN WI Γ cpu k spie1 spp1 R1 j γl pd pav pu γkl γk ip dinum bm data dn dn0
-      fn inum ncount Sb tid qtx pidv dqp dqd dqf dqn dqs dqbs dqb i fuel hs hpd hr1 hrec hnone
+      fn inum ncount Sb tid qtx pidv dqp dqd dqf dqn dqs dqbs dqb kd sd rootv rti dqr i fuel hs hpd hr1 hrec hnone
       hfree hfu)
     $$ [$Hk $Hpc $Hframe $Hde $Hte $Hce $Hkeep $Hbs $Hslot $Hlk $Hop $Htx $Henv $Hpost $IH]
 
@@ -169,11 +168,12 @@ theorem dirlink_loop (RD : READI) (SN : STRNCPY) (WI : WRITEI) (PA : PANIC)
     (ip : BitVec 64) (dinum : BitVec 32) (bm : Blkmap) (data : Nat → List (BitVec 8))
     (dn dn0 : Dinode) (fn : Nat → BitVec 8) (inum : BitVec 16) (ncount : Nat) (Sb : List Nat)
     (tid : Nat) (qtx : Qp) (pidv : BitVec 32) (dqp dqd dqf dqn dqs dqbs dqb : DFrac)
+    (kd : Nat) (sd : Qp) (rootv : BitVec 64) (rti : Nat) (dqr : DFrac)
     (hs : DirlinkStatic k j bm data dn dn0 fn inum dinum ncount Sb) (hpd : descPageRw pd)
     (hnone : dirFirst data (dirNrec dn.diSize.toNat) (bname 14 fn) = none) :
     ∀ fuel : Nat, dirlinkEnv (hlc := hlc) (GF := GF) Γ γl pd pav pu γkl γk -∗
       dirlinkLoop Γ γl pd pav pu γkl γk k ip dinum bm data dn dn0 fn inum ncount Sb tid qtx pidv
-        dqp dqd dqf dqn dqs dqbs dqb fuel := by
+        dqp dqd dqf dqn dqs dqbs dqb kd sd rootv rti dqr fuel := by
   intro fuel
   induction fuel with
   | zero =>
@@ -188,7 +188,7 @@ theorem dirlink_loop (RD : READI) (SN : STRNCPY) (WI : WRITEI) (PA : PANIC)
       Hkeep Hbs Hslot Hlk Hop Htx Hpost
     ihave IH := ih $$ Henv
     iapply (dirlink_read RD SN WI PA Γ cpu k spie spp R j γl pd pav pu γkl γk ip dinum bm data dn
-        dn0 fn inum ncount Sb tid qtx pidv dqp dqd dqf dqn dqs dqbs dqb i f bs hs hpd hr hlt hnone
+        dn0 fn inum ncount Sb tid qtx pidv dqp dqd dqf dqn dqs dqbs dqb kd sd rootv rti dqr i f bs hs hpd hr hlt hnone
         hfree hfu)
       $$ [$Hk $Hpc $Hframe $Hde $Hte $Hce $Hkeep $Hbs $Hslot $Hlk $Hop $Htx $Henv $Hpost $IH]
 

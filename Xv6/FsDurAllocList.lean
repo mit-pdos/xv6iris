@@ -28,8 +28,6 @@ namespace Xv6
 open Iris Iris.Std MachCSL
 open Iris.Std.PartialMap
 
-set_option linter.unusedSectionVars false
-
 /-! ## 2d.  The family, enumerated -/
 
 /-- Rocq's `fp_recs` (deviation 1). -/

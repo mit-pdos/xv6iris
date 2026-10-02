@@ -160,9 +160,6 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedVariables false
-set_option linter.unusedSectionVars false
-
 /-! ## §0 The budget -/
 
 /-- **Rocq `K_usertrap`**: usertrap's own 4-slot frame, the `kv_frame_slots`

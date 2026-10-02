@@ -24,8 +24,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
-set_option linter.unusedSectionVars false
-
 section AppFileDeed
 variable {GF : BundledGFunctors} [FileAppG GF]
 

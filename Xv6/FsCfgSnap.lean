@@ -76,8 +76,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
 
-set_option linter.unusedSectionVars false
-
 -- `fsBlocks dk b` is a 1024-byte `diskRead`: never unfold it during unification.
 attribute [local irreducible] fsBlocks
 
@@ -178,7 +176,6 @@ theorem fsCfgSnap_region [Icfg] (E : CoPset) (γfs : FsNames) (S : FsStateRec)
   iapply (BigSepS.bigSepS_mono fun {z} hz => by
     rw [show (fpNode S z).fnRec = imageDinode dss z from hrecat z hz]) $$ Hout
 
-
 /-! ## Staging 3.  The stocking: region, pool, bitmap, remainder -/
 
 /-- **Steps 5-7b**: the peels of the home ledger, the inode region, the
@@ -247,7 +244,6 @@ theorem fsCfgSnap_stock [Icfg] (E : CoPset) (γfs : FsNames) (S : FsStateRec)
   iexists γi
   ihave Hb1 := BigSepS.bigSepS_singleton.1 $$ Hb1
   iframe Hireg Hboot Hipool Hb1 Hbm Hrem
-
 
 /-! ## Staging 4.  The file system's ghosts -/
 
@@ -346,7 +342,6 @@ theorem fsCfgSnap_fs [Icfg] (E : CoPset) (γv : DiskNames) (dk : Nat → BitVec 
   iframe HaL HaD
   ipureintro
   exact fsC0_lookup dk cov
-
 
 /-- One slot's identification cell, at its dummy values, as kit 1's
 existential row. -/
@@ -535,7 +530,6 @@ theorem fsCfgAllocSnap_of (mk : GName → GName → KmemNames → UartNames → 
     (Ψ := fun _ k => offSetAuth (GF := GF) offCfg k ∅) (fun _ => .rfl))
   iexact Hoffa
 
-
 /-- **The mint off the snapshot hypothesis** (Rocq `BootShared`'s inline
 destructuring of `fs_boot_snap_wf` before its `fs_cfg_alloc_snap` call):
 `Xexc` is the on-disk header's write set, `16 * nib ≤ 2^32` is the
@@ -570,7 +564,6 @@ theorem fsCfgAllocSnap_wf (mk : GName → GName → KmemNames → UartNames → 
     (by rw [hnibeq]; have : (2 : Nat) ^ 16 ≤ 2 ^ 32 := Nat.pow_le_pow_right (by decide) (by decide)
         omega)
     hcovin (fun b h1 h2 => snapCovWindow S Pb cov b (skBytes hok) hlogsub h1 h2)
-
 
 /-- **Rocq `MkFscfg`**: the configuration record the mint returns, at the
 names it minted (deviation 8's concrete builder). -/

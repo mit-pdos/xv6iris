@@ -21,8 +21,6 @@ open Iris Std MachCSL
 open Iris.Std.PartialMap Iris.Std.FiniteMap
 open Sail LeanRV64D LeanRV64D.Functions
 
-set_option linter.unusedSectionVars false
-
 /-! ## §1 Pure facts -/
 
 theorem ukm_ppn_of_pa (a b : BitVec 64) (h : pte2pa a = pte2pa b) : ptePpn a = ptePpn b := by

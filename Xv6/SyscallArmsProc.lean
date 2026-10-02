@@ -17,9 +17,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## The block's cells at the ambient context (D31 adapters) -/
 
@@ -457,7 +455,6 @@ theorem syscall_arm_sync
   isplitr
   · iapply syscForkOut_ne; rw [hnN]; decide
   · iapply syscWaitOut_ne; rw [hnN]; decide
-
 
 set_option maxHeartbeats 4000000 in
 /-- **Arm 23, `sys_seccomp`** (xv6 7b2c1b1b; Rocq `sysc_arm_seccomp`): the

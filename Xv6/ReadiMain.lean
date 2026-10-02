@@ -23,9 +23,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 theorem rd_priv_eta (Vp : ProcPriv) : { Vp with upt := Vp.upt } = Vp := rfl
 

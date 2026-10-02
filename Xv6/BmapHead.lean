@@ -34,10 +34,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
-
 
 /-- The indirect cell put back at the value it had. -/
 theorem bm_cells_restore_ind (bm : Blkmap) (hlen : bm.bmDir.length = NDIRECT) :
@@ -177,7 +174,6 @@ theorem bm_head_ok (BA : BALLOC) (LW : LOG_WRITE) (BR : BREAD) (BE : BRELSE)
       simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] <;> assumption
   all_goals (simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] <;>
     first | exact hR2 | exact h10 | exact h18 | exact h19 | rfl)
-
 
 set_option maxHeartbeats 16000000 in
 /-- **`+0x4e .. +0x56`: THE INDIRECT-BLOCK balloc**, and its failure arm

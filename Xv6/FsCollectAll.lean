@@ -68,8 +68,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-! ## 3.  THE NAMESPACE ARITHMETIC -/
 
 /-- `sbN` sits under `logN` (helper). -/

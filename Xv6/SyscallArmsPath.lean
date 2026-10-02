@@ -60,6 +60,7 @@ entry Spec).
 -/
 import Xv6.SyscallRet
 import Xv6.SpecFdalloc
+import Xv6.UkPipeDevDefs
 
 namespace Xv6
 
@@ -68,9 +69,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## §1 Shared pure facts -/
 

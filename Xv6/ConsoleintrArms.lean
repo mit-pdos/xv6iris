@@ -18,12 +18,9 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## Word and byte arithmetic of the arms -/
-
 
 theorem ci_inc32 (x : BitVec 32) :
     BitVec.extractLsb' 0 32 (BitVec.signExtend 64 (BitVec.extractLsb' 0 32 (BitVec.signExtend 64 x + 1#64)))
@@ -52,7 +49,6 @@ theorem ci_cs_bs : consputcCs 256#64 = consputcBs := by decide
 theorem ci_cs_byte (c : BitVec 8) (h : c ≠ 13#8) : consputcCs (BitVec.setWidth 64 c) = [echoOf c] := by
   have h1 : BitVec.setWidth 64 c ≠ cpBackspace := by unfold cpBackspace; bv_decide
   simp only [consputcCs, h1, if_false, echoOf, h, ci_byte_lo]
-
 
 /-- The ring-space test `bltu 127, e - r` falling through: there is room. -/
 theorem ci_room (r e : BitVec 32)
@@ -87,7 +83,6 @@ theorem ci_dec_le (r w e : BitVec 32) (hok : consOk r w e) (hne : e ≠ w) :
     (e - 1#32 - r).toNat ≤ (e - r).toNat := by
   unfold consOk INPUT_BUF_SIZE at hok
   bv_omega
-
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]

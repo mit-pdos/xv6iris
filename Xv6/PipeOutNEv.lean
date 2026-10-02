@@ -40,8 +40,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode MachCSL
 
-set_option linter.unusedSectionVars false
-
 section OpenEventsPure
 variable (M : LModel) (sd : M.lmSt)
 

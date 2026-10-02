@@ -81,8 +81,6 @@ namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Iris.Std Std MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-! ## The pure model of what reparent() does to the parent table -/
 
 /-- one slot: a child of `p` is handed to `ip`, anything else is untouched

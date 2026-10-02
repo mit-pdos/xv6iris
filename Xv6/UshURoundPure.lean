@@ -48,8 +48,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-! ## S0 THE UNION'S CODES AT A FILE LINE, READ BACK AS THE FILE'S -/
 
 /-- **Rocq `ulm_ok_R`**. -/

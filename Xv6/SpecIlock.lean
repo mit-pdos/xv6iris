@@ -118,8 +118,6 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedVariables false
-
 /-- Address of `ilock`. -/
 def ilockAddr : BitVec 64 := KA.«ilock»
 
@@ -167,7 +165,6 @@ def ilockPostDep [Fscfg] [Icfg] [CurCtx] (k : KCtx) (γisl : GName) (kk : Nat) (
     ⌜filled = true → freshShape dn⌝ -∗
     iregWdBack o g inum.toNat -∗
     ⌜ilkPost o filled dn⌝ -∗ wpLoop cpu')
-
 
 /-- `ilockPostDep` at either `SIE`: the complement comes back. -/
 def ilockPostDepEb [Fscfg] [Icfg] [CurCtx] (k : KCtx) (γisl : GName) (kk : Nat) (s : Qp)
@@ -227,7 +224,6 @@ def ilockPostTx [Fscfg] [Icfg] [CurCtx] (k : KCtx) (γisl : GName) (kk : Nat) (s
     ⌜filled = true → freshShape dn⌝ -∗
     iregWdBack o g inum.toNat -∗
     ⌜ilkPost o filled dn⌝ -∗ wpLoop cpu')
-
 
 /-- `ilockPostTx` at either `SIE`: the complement comes back. -/
 def ilockPostTxEb [Fscfg] [Icfg] [CurCtx] (k : KCtx) (γisl : GName) (kk : Nat) (s : Qp)
@@ -312,7 +308,6 @@ def wp_ilock_dep_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6
   topLb Tl ∗
   wpNext true k.proc cpu (ilockPostDep k γisl kk s g d o inum pidv dqp dqs Tl)
   ⊢ wpLoop (GF := GF) cpu
-
 
 /-- The eb-generic form of `wp_ilock_dep_body` (Rocq: `cpu_own 0 eb`, the complement
 `trap_csrs_ext` / `cpu_claim_ext` in and out; depth 0, so no spinlock held). -/
@@ -409,7 +404,6 @@ def wp_ilock_tx_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
   topLb Tl ∗
   wpNext true k.proc cpu (ilockPostTx k γisl kk s g lo o inum pidv dqp dqs Tl)
   ⊢ wpLoop (GF := GF) cpu
-
 
 /-- The eb-generic form of `wp_ilock_tx_body` (Rocq: `cpu_own 0 eb`, the complement
 `trap_csrs_ext` / `cpu_claim_ext` in and out; depth 0, so no spinlock held). -/
@@ -528,7 +522,6 @@ theorem ilockPostDep_tx [Fscfg] [Icfg] [CurCtx] (k : KCtx) (γisl : GName) (kk :
   iapply HΦ $$ %spie %spp %R' %dn %bm %filled %hcs Hfl Hk Hpc Htc Hcl Hir Hpid Hsb Hsl Hslk
     Hdep Hoff Hidev Hinum Hval Hload Hshot Hfoff %hfr Hwb %hpost
 
-
 theorem ilockPostDepEb_tx [Fscfg] [Icfg] [CurCtx] (k : KCtx) (γisl : GName) (kk : Nat) (s : Qp)
     (g : GName) (lo t : Nat) (o : Ilkc) (inum : BitVec 32) (pidv : BitVec 32)
     (dqp dqs : DFrac) (Tl : Nat) (cpu' : CPU) :
@@ -579,7 +572,6 @@ theorem ILOCK.wp_ilock_tx (IL : ILOCK) {hlc : HasLC} {GF : BundledGFunctors} [Ma
   iapply wpNext_mono $$ HΦ
   iintro %cpu' HΦ
   iapply ilockPostDep_tx k γisl kk s g lo t o inum pidv dqp dqs Tl cpu' $$ Ht2 HΦ
-
 
 theorem ILOCK.wp_ilock_tx_eb (IL : ILOCK) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
     [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF]

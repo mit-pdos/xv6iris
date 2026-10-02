@@ -26,8 +26,6 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
-
 /-- Two lists agree when their lengths and their `!`-lookups do. -/
 theorem ushGets_list_ext {α : Type} [Inhabited α] (u v : List α) (hl : u.length = v.length)
     (h : ∀ i, i < u.length → u[i]! = v[i]!) : u = v := by

@@ -59,8 +59,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-! ## The children set, as a resource (Rocq `Section UserChildren`) -/
 
 section UserChildren

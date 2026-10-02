@@ -114,7 +114,7 @@ def uptWf (P : UPtd) : Prop :=
 /-- The pins survive the hardware's `A`/`D` write-back. -/
 theorem uLeafPins_setAD (w : BitVec 64) (a d : BitVec 1) (h : uLeafPins w) : uLeafPins (pteSetAD w a d) := by
   unfold uLeafPins at *
-  simp only [pteSetAD, Sail.BitVec.length, Nat.reduceBEq, Bool.false_eq_true, ↓reduceIte,
+  simp only [pteSetAD, 
     Sail.BitVec.extractLsb, Sail.BitVec.updateSubrange, Sail.BitVec.updateSubrange', BitVec.extractLsb,
     LeanRV64D.Functions._update_PTE_Flags_A, LeanRV64D.Functions._update_PTE_Flags_D]
   revert h; bv_decide

@@ -38,8 +38,6 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedSectionVars false
-
 /-- `iputUnits ≤ MAXOPBLOCKS`: begin_op's reservation pays iput (Rocq's
 `unfold iput_units, MAXOPBLOCKS; lia`). -/
 theorem iputUnits_le_max : iputUnits ≤ MAXOPBLOCKS := by

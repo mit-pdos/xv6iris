@@ -36,8 +36,6 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedVariables false
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
 
 theorem fkr_br_myproc : KA.«forkret» + 0xffffffffffffffce#64 = KA.«myproc» := by decide

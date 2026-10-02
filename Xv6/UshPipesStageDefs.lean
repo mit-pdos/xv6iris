@@ -65,8 +65,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Wid RdOut WrOut
 open UShPipesDefs
 
-set_option linter.unusedSectionVars false
-
 /-! ## Pure -/
 
 /-- **Rocq `dg_app_lookup`**: the diagnostic's bytes are the family

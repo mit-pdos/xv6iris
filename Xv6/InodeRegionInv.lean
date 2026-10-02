@@ -131,8 +131,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Iris.Algebra MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-! ## 0.  List helpers (Rocq `list_lookup_total_insert(_ne)`) -/
 
 theorem getElem!_set_self {α : Type _} [Inhabited α] (l : List α) (i : Nat) (v : α)

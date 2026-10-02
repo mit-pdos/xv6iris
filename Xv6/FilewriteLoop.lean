@@ -28,9 +28,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## The loop's arithmetic -/
 
@@ -447,7 +445,6 @@ theorem fwr_iter (BO : BEGIN_OP) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK) (EO :
       hr3 ha0 htotc)
   iframe Hk Hpc Hte Hce Hframe Href Hpriv Hbs Hst HΦ
   unfold fwrEnv; iexact Henv
-
 
 /-- **THE LOOP** (Rocq's `fw_loop`, the `[∀]`-fuel induction at `n - i`):
 the test, then one chunk, whose back edge is the induction hypothesis. -/

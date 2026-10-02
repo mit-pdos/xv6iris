@@ -58,8 +58,6 @@ open Iris.Std.PartialMap
 open HfpPipeP HfpFileClaimsP
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
-
 /-! ## The one protected device, a producer device -/
 
 /-- **Rocq `cfe_nodup0`**. -/

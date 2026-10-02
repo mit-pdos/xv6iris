@@ -46,7 +46,8 @@ records), and the program entries `UkTreeEntryEcho.echoImageEntryEnvC_of_leaves`
    `echoNodeImg`, the page view `Mv` for `imageEntry`, `imgAgrees Me Mv`.
 3. Rocq's `udep_free` premise is `StgOk.hudep`.
 -/
-import Xv6.UkPipesEntries
+import Xv6.UkPipesEntriesCat
+import Xv6.UkPipesEntriesGrep
 import Xv6.UshExecEnvRun
 import Xv6.SpecShRuncmdExec
 import Xv6.UshExecPinPure
@@ -61,8 +62,6 @@ open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 open Wid
 open UShPipesDefs
-
-set_option linter.unusedSectionVars false
 
 section Ctx
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [IcacheG GF]
@@ -184,6 +183,33 @@ theorem pse_filt_last_image_entry (S : StgEnv D) (K : StgOk D S) (F : Filt) (Me 
     iapply K.hudep
 
 end Ctx
+
+section CtxD
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [IcacheG GF]
+  [PipeProtoG GF] [PipeOutG GF] [CtokG GF] [FsTopG GF] [OffboxG GF] [Appcfg GF] [FsBytesG GF] [Fscfg] [Icfg]
+  [PS : UprogSG GF]
+  [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
+  [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
+  [DiskG GF] [EchoOutG GF] [PnsRegG GF] [PipesNG GF] [FileAppG GF]
+variable (D : PdRound hlc GF)
+
+/-- `pflow`, unfolded. -/
+theorem pflow_unfold (j : Nat) : D.pflow j = flowF D.L (fapp (lfilt D.lR j)) (D.prevP j) := rfl
+
+/-- the taint, from the kill credential (Rocq `rewrite Hkill`). -/
+theorem stg_T_of_kill (S : StgEnv D) (K : StgOk D S) : uKillCred (hlc := hlc) (GF := GF) ⊢ D.T := by
+  unfold PdRound.T uKillCred
+  rw [K.hkill]
+
+/-- a failed stage's deposit, made (Rocq inline). -/
+theorem pdep_left_fail_mk (k : Nat) (s : List (BitVec 8)) (hs : s ≠ [])
+    (hf : failSrc D.pr (lfilts D.lR) k s) :
+    D.shotsF k ∗ osS (D.gG k) ∗ wcur (D.P k) 0 ⊢ pdep D (WLeft k) s := by
+  rw [pdep_unfold D (WLeft k) s hs (Or.inl hf)]
+  simp only [PdRound.pdepNe]
+  rw [if_pos hf]
+
+end CtxD
 
 end UShPipesStage
 

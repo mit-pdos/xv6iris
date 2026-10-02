@@ -61,7 +61,6 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
 
 /-! ## Addresses and pure arithmetic -/
@@ -125,7 +124,6 @@ theorem ap_procAddr_end : procAddr NPROC = KA.«tickslock» := by
   unfold procAddr procsAddr procSize NPROC
   decide
 
-
 /-- The scan's loop test `bne s1,s2`. -/
 theorem ap_bcond_bne_end {m : Nat} (h : m < NPROC) :
     bcond bop.BNE (procAddr m) KA.«tickslock» = true := by
@@ -147,7 +145,6 @@ theorem ap_bcond_beq_end {m : Nat} (h : m < NPROC) :
   simp only [beq_eq_false_iff_ne, ne_eq]
   exact Xv6.procAddr_ne_end h
 
-
 /-- The context a balanced `acquire`/`release` pair leaves. -/
 theorem ap_relctx (k : KCtx) (a b : Bool) (R : RegMap) (m : Nat) :
     (((k.withSpie a b).withLocks k.locks).pushed m).withRegs R
@@ -156,8 +153,6 @@ theorem ap_relctx (k : KCtx) (a b : Bool) (R : RegMap) (m : Nat) :
 /-- The frame and the pinned bits commute. -/
 theorem ap_pushed_withSpie (k : KCtx) (a b : Bool) (m : Nat) :
     (k.pushed m).withSpie a b = (k.withSpie a b).pushed m := rfl
-
-
 
 /-- `c.beqz a5` on the state word. -/
 theorem ap_bcond_state (st : BitVec 32) :
@@ -203,8 +198,6 @@ theorem ap_filter_cons (s : String) (l : List String) (h : s ∉ l) :
   simp only [List.filter_cons, ne_eq, not_true_eq_false, decide_false]
   exact List.filter_eq_self.2 (fun x hx => by simp; intro e; subst e; exact h hx)
 
-
-
 /-- Assembling `calleeSaved` past the four-slot frame (`sp`, `s0`, `s1`,
 `s2` are the restored ones). -/
 theorem ap_calleeSaved_mk (KR R : RegMap)
@@ -222,10 +215,7 @@ theorem ap_calleeSaved_mk (KR R : RegMap)
 
 /-! ## `availSub` -/
 
-
 theorem ap_availSub_one (on : Option Nat) : availSub on 1 = availDec on := rfl
-
-
 
 /-! ## Fractions of a word cell
 
@@ -902,7 +892,6 @@ theorem ap_addiw_succ (x : BitVec 32) :
       = BitVec.signExtend 64 (x + 1#32) := by
   bv_decide
 
-
 /-- The registers the pid scan leaves alone. -/
 def apKeep (R R' : RegMap) : Prop := ∀ i : BitVec 5, i ≠ 14#5 → i ≠ 15#5 → R' i = R i
 
@@ -1055,7 +1044,6 @@ theorem ap_pidscan {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G G
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-
 
 end
 

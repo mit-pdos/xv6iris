@@ -70,8 +70,6 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedSectionVars false
-
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [BcacheG GF] [DiskG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
 
@@ -411,6 +409,30 @@ theorem procPrivFd_rootPid (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (
   · ipureintro; exact h
   · ipureintro; exact hlz
 
+/-- **The root and the pid cell together, at the cell's own fraction**
+(chroot): `dirlookup` reads `p->root` and its reference, and `dirlink`
+relays them, beside the pid cell every sleeping callee takes at `pidPriv`.
+`procPrivFd_rootPid`'s shape without the quartering. -/
+theorem procPrivFd_rootPidPriv (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
+    (M : Nat → List (BitVec 8)) :
+    procPrivFd (GF := GF) γ pa pid V M ⊢
+      @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pRoot pa) 8 (DFrac.own 1) V.root ∗
+      @rootRefAt hlc GF _ _ _ _ _ ⟨curCtx, KTier.kpt⟩ V.root V.rti ∗
+      @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPid pa) 4 pidPriv pid ∗
+      (∀ (v' : BitVec 64) (z' : Nat),
+        @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pRoot pa) 8 (DFrac.own 1) v' -∗
+        @rootRefAt hlc GF _ _ _ _ _ ⟨curCtx, KTier.kpt⟩ v' z' -∗
+        @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPid pa) 4 pidPriv pid -∗
+        procPrivFd γ pa pid { V with root := v', rti := z' } M) := by
+  unfold procPrivFd procPrivCoreNoctxAt procPrivBareAt procFieldsNoOfile
+  iintro ⟨⟨⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hcwd, Hnm, Hsc, Hrt⟩, Hpt, Htfp, %hlz, Hev⟩, Hc, Hr, Hg⟩, Ho⟩
+  iframe Hrt Hr Hpid Hev
+  iintro %v' %z' Hrt Hr Hpid
+  iframe Hpid Hk Hs Hpg Htf Hcwd Hnm Hsc Hrt Hpt Htfp Hc Hr Hg Ho
+  isplitl []
+  · ipureintro; exact h
+  · ipureintro; exact hlz
+
 /-! ## The address space -/
 
 /-- **The grow/shrink bridge** (Rocq `proc_priv_addrspace`): `p->sz`, the
@@ -723,6 +745,95 @@ theorem procPrivFd_noctx [X : CurCtx] (h : curTier = KTier.kpt) (γ : FileNames)
       from by rw [h7]) $$ Hg
   iapply Hw $$ %V' %M' [] Hn Hg
   ipureintro; exact ⟨h1, h2, h3, h4, h5, h6⟩
+
+end
+
+/-! ## The root rows, lent beside a borrowed pid cell (chroot)
+
+The fs syscalls' inner `dirlookup` and `dirlink` take `p->root`, the root
+reference and the pid cell at `pidPriv` together.  Their callers hold the
+block in one of two borrowed shapes -- the pid cell out of the whole block
+(`kxc_priv_pid`'s wand, create's found half) or out of the bare block under
+`create_alloc_priv_open`'s split (create's allocate half) -- and these two
+accessors lend the root rows from either shape and hand the same shape back.
+The block is unchanged: the root comes back verbatim, so the record is `V`
+again (structure eta). -/
+section
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [BcacheG GF] [DiskG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg]
+
+theorem procPrivFd_root_lend_pid [X : CurCtx] (hct : X.curTier = KTier.kpt) (γ : FileNames)
+    (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) :
+    wordPointsTo (GF := GF) (pPid pa) 4 pidPriv pid ∗
+    (wordPointsTo (pPid pa) 4 pidPriv pid -∗ procPrivFd γ pa pid V M) ⊢
+      wordPointsTo (pPid pa) 4 pidPriv pid ∗
+      wordPointsTo (pRoot pa) 8 (DFrac.own 1) V.root ∗ inodeHeldAt V.root V.rti ∗
+      (wordPointsTo (pPid pa) 4 pidPriv pid -∗ wordPointsTo (pRoot pa) 8 (DFrac.own 1) V.root -∗
+        inodeHeldAt V.root V.rti -∗
+        wordPointsTo (pPid pa) 4 pidPriv pid ∗
+        (wordPointsTo (pPid pa) 4 pidPriv pid -∗ procPrivFd γ pa pid V M)) := by
+  obtain ⟨ξ, t⟩ := X
+  simp only at hct
+  subst hct
+  letI : CurCtx := ⟨ξ, KTier.kpt⟩
+  iintro ⟨Hpid, Hw⟩
+  ihave Hfd := Hw $$ Hpid
+  icases procPrivFd_rootPidPriv γ pa pid V M $$ Hfd with ⟨Hrt, Hrr, Hpid, Hback⟩
+  ihave Hrh := rootRefAt_heldAt V.root V.rti $$ Hrr
+  iframe Hpid Hrt Hrh
+  iintro Hpid Hrt Hrh
+  ihave Hrr := rootRefAt_ofHeldAt V.root V.rti $$ Hrh
+  ihave Hfd := Hback $$ %V.root %V.rti Hrt Hrr Hpid
+  ihave Hfd := (show procPrivFd (GF := GF) γ pa pid { V with root := V.root, rti := V.rti } M ⊢
+    procPrivFd γ pa pid V M from .rfl) $$ Hfd
+  unfold procPrivFd procPrivCoreNoctxAt procPrivBareAt
+  icases Hfd with ⟨⟨⟨%hf, Hpid, Hf, Hpt, Htfp, %hlz, Hev⟩, Hcw⟩, Hof⟩
+  iframe Hpid
+  iintro Hpid
+  iframe Hpid Hf Hpt Htfp Hcw Hof Hev
+  isplitl []
+  · ipureintro; exact hf
+  · ipureintro; exact hlz
+
+theorem procPrivFd_root_lend_bare [X : CurCtx] (hct : X.curTier = KTier.kpt) (γ : FileNames)
+    (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) :
+    wordPointsTo (GF := GF) (pPid pa) 4 pidPriv pid ∗
+    (wordPointsTo (pPid pa) 4 pidPriv pid -∗ procPrivBareAt curCtx pa pid V M) ∗
+    (procPrivBareAt curCtx pa pid V M -∗ procPrivFd γ pa pid V M) ⊢
+      wordPointsTo (pPid pa) 4 pidPriv pid ∗
+      wordPointsTo (pRoot pa) 8 (DFrac.own 1) V.root ∗ inodeHeldAt V.root V.rti ∗
+      (wordPointsTo (pPid pa) 4 pidPriv pid -∗ wordPointsTo (pRoot pa) 8 (DFrac.own 1) V.root -∗
+        inodeHeldAt V.root V.rti -∗
+        wordPointsTo (pPid pa) 4 pidPriv pid ∗
+        (wordPointsTo (pPid pa) 4 pidPriv pid -∗ procPrivBareAt curCtx pa pid V M) ∗
+        (procPrivBareAt curCtx pa pid V M -∗ procPrivFd γ pa pid V M)) := by
+  obtain ⟨ξ, t⟩ := X
+  simp only at hct
+  subst hct
+  letI : CurCtx := ⟨ξ, KTier.kpt⟩
+  iintro ⟨Hpid, Hpw, Hbw⟩
+  ihave Hbare := Hpw $$ Hpid
+  ihave Hfd := Hbw $$ Hbare
+  icases procPrivFd_rootPidPriv γ pa pid V M $$ Hfd with ⟨Hrt, Hrr, Hpid, Hback⟩
+  ihave Hrh := rootRefAt_heldAt V.root V.rti $$ Hrr
+  iframe Hpid Hrt Hrh
+  iintro Hpid Hrt Hrh
+  ihave Hrr := rootRefAt_ofHeldAt V.root V.rti $$ Hrh
+  ihave Hfd := Hback $$ %V.root %V.rti Hrt Hrr Hpid
+  ihave Hfd := (show procPrivFd (GF := GF) γ pa pid { V with root := V.root, rti := V.rti } M ⊢
+    procPrivFd γ pa pid V M from .rfl) $$ Hfd
+  unfold procPrivFd procPrivCoreNoctxAt
+  icases Hfd with ⟨⟨Hb, Hc⟩, Ho⟩
+  unfold procPrivBareAt
+  icases Hb with ⟨%h, Hpid, Hf, Hpt, Htfp, %hlz, Hev⟩
+  iframe Hpid
+  isplitl [Hf Hpt Htfp Hev]
+  · iintro Hpid
+    iframe Hpid Hf Hpt Htfp Hev
+    isplitl []
+    · ipureintro; exact h
+    · ipureintro; exact hlz
+  · iintro Hb
+    iframe Hb Hc Ho
 
 end
 

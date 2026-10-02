@@ -35,8 +35,6 @@ namespace Xv6
 open MachCSL
 open Sail LeanRV64D LeanRV64D.Functions
 
-set_option linter.unusedSectionVars false
-
 /-- **Rocq `upt_map_wf`'s `pte_valid` pin**: every user leaf is valid. -/
 def UftLeavesValid (P : UPtd) : Prop :=
   ∀ k w, Iris.Std.PartialMap.get? P.um k = some w → uwkInv w = false

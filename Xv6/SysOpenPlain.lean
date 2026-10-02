@@ -44,9 +44,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-- O_CREATE set: the +0x32 mask is non-zero (Rocq's `soau_create_nonzero`,
 read the other way). -/

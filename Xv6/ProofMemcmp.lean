@@ -164,7 +164,7 @@ theorem memcmp_loop {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCt
         ileft
         iframe
         ipureintro
-        exact ⟨i, bs1[i], bs2[i], hin, heq, ha, hb, hab, by simp [RegMap.set_apply], by simp [RegMap.set_apply]⟩
+        exact ⟨i, bs1[i], bs2[i], hin, heq, ha, hb, hab, by simp [RegMap.set_apply], by simp []⟩
   | succ d ih =>
     intro i hin hd heq R h10 h11 h13 cpu
     have hi : i + 1 < n := by omega
@@ -219,7 +219,7 @@ theorem memcmp_loop {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCt
         ileft
         iframe
         ipureintro
-        exact ⟨i, bs1[i], bs2[i], hin, heq, ha, hb, hab, by simp [RegMap.set_apply], by simp [RegMap.set_apply]⟩
+        exact ⟨i, bs1[i], bs2[i], hin, heq, ha, hb, hab, by simp [RegMap.set_apply], by simp []⟩
 
 /-! ## The function -/
 
@@ -266,8 +266,7 @@ theorem memcmp_proof : MEMCMP := ⟨fun {hlc GF} _ _ cpu k bs1 bs2 n dq1 dq2 hK 
     ipureintro
     constructor
     · unfold calleeSaved
-      simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, eq_self_iff_true, _root_.true_and,
-        _root_.and_true]
+      simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, _root_.true_and]
       exact ⟨hcs 9#5 (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide),
         hcs 18#5 (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide),
         hcs 19#5 (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide),
@@ -279,7 +278,7 @@ theorem memcmp_proof : MEMCMP := ⟨fun {hlc GF} _ _ cpu k bs1 bs2 n dq1 dq2 hK 
         hcs 25#5 (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide),
         hcs 26#5 (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide),
         hcs 27#5 (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide)⟩
-    · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
+    · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]
       exact hres
   -- beqz a2,cd6
   k_step_gen (wp_s_branch c1 _ (KA.«memcmp» + 0x8#64) true 46#13 12#5 0#5 (by decide) bop.BEQ) from (text_instr _ _ _ _ rfl rfl) Htext
@@ -304,7 +303,7 @@ theorem memcmp_proof : MEMCMP := ⟨fun {hlc GF} _ _ cpu k bs1 bs2 n dq1 dq2 hK 
     case hcs => intro r h10 _ _ _ _ _ h2 h8; simp [RegMap.set_apply, h10, h2, h8]
     case hres =>
       right
-      exact ⟨fun j hj => absurd hj (by omega), by simp [RegMap.set_apply]⟩
+      exact ⟨fun j hj => absurd hj (by omega), by simp []⟩
   · -- n > 0: truncate the count, compute the end pointer, run the loop
     simp only [hn0, ite_false]
     k_step_gen (wp_s_slli c2 _ (KA.«memcmp» + 0xa#64) true 32#6 12#5 12#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
@@ -323,7 +322,7 @@ theorem memcmp_proof : MEMCMP := ⟨fun {hlc GF} _ _ cpu k bs1 bs2 n dq1 dq2 hK 
     iframe
     case h10 => simp [RegMap.set_apply]
     case h11 => simp [RegMap.set_apply]
-    case h13 => simp [RegMap.set_apply]
+    case h13 => simp []
     k_norm_g
     iapply wpNext_intro_pin
     iintro %c6 %hp6 %R' Hk Hbuf1 Hbuf2 %hother
@@ -331,9 +330,9 @@ theorem memcmp_proof : MEMCMP := ⟨fun {hlc GF} _ _ cpu k bs1 bs2 n dq1 dq2 hK 
         r ≠ 2#5 → r ≠ 8#5 → R' r = k.regs r := by
       intro r h10' h11' h12' h13' h14' h15' h2' h8'
       rw [hother r h10' h11' h14' h15']
-      simp [RegMap.set_apply, h12', h13', h2', h8']
+      simp [h12', h13', h2', h8']
     have hR2 : R' 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFF0#64 := by
-      rw [hother 2#5 (by decide) (by decide) (by decide) (by decide)]; simp [RegMap.set_apply]
+      rw [hother 2#5 (by decide) (by decide) (by decide) (by decide)]; simp []
     have hpin6 : k.sie = false ∨ k.proc = 0#64 → c6 = cpu :=
       fun h => (hp6 h).trans ((hp5 h).trans ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h)))))
     unfold memcmpLoopPost
@@ -354,7 +353,7 @@ theorem memcmp_proof : MEMCMP := ⟨fun {hlc GF} _ _ cpu k bs1 bs2 n dq1 dq2 hK 
         exact hcs r h10' h11' h12' h13' h14' h15' h2' h8'
       case hres =>
         left
-        exact ⟨j, a, b, hj, hpre, ha, hb, hab, by simp [RegMap.set_apply]⟩
+        exact ⟨j, a, b, hj, hpre, ha, hb, hab, by simp []⟩
     · -- all equal: a0 := 0, jump to the epilogue
       k_step_gen (wp_s_addi c6 _ (KA.«memcmp» + 0x26#64) true 0#12 10#5 0#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
         next c7 hp7
@@ -373,6 +372,6 @@ theorem memcmp_proof : MEMCMP := ⟨fun {hlc GF} _ _ cpu k bs1 bs2 n dq1 dq2 hK 
         exact hcs r h10' h11' h12' h13' h14' h15' h2' h8'
       case hres =>
         right
-        exact ⟨heqall, by simp [RegMap.set_apply]⟩⟩
+        exact ⟨heqall, by simp []⟩⟩
 
 end Xv6

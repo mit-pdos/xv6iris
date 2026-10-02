@@ -39,9 +39,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 theorem dirlink_slots_readi (a : Nat) (h : dirlinkSlots ≤ a) : readiSlots ≤ a - 10 := by
   have h1 : readiSlots = 92 := by decide
@@ -100,6 +98,7 @@ theorem dirlink_record (SN : STRNCPY) (WI : WRITEI) (Γ : SchedNames) [ClaimIs (
     (ip : BitVec 64) (dinum : BitVec 32) (bm : Blkmap) (data : Nat → List (BitVec 8))
     (dn dn0 : Dinode) (fn : Nat → BitVec 8) (inum : BitVec 16) (ncount : Nat) (Sb : List Nat)
     (tid : Nat) (qtx : Qp) (pidv : BitVec 32) (dqp dqd dqf dqn dqs dqbs dqb : DFrac)
+    (kd : Nat) (sd : Qp) (rootv : BitVec 64) (rti : Nat) (dqr : DFrac)
     (i fuel : Nat)
     (hs : DirlinkStatic k j bm data dn dn0 fn inum dinum ncount Sb) (hpd : descPageRw pd)
     (hr : dirlinkRegs k ip (BitVec.ofNat 64 (16 * i)) 16#64 (dirlinkDeAddr (k.regs 2#5)) R)
@@ -112,14 +111,14 @@ theorem dirlink_record (SN : STRNCPY) (WI : WRITEI) (Γ : SchedNames) [ClaimIs (
       (k.regs 20#5) (k.regs 21#5) (k.regs 22#5) ∗
     dirlinkDe (k.regs 2#5) (halfBytes (dirInum data i) ++ bview 14 (dirName data i)) ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    dirlinkKeep k ip dinum bm data dn dn0 fn pidv dqp dqd dqf dqn dqs dqbs dqb ∗
+    dirlinkKeep k ip dinum bm data dn dn0 fn pidv dqp dqd dqf dqn dqs dqbs dqb kd sd rootv rti dqr ∗
     bslots 3 ∗ irefSlot ∗ dlinks fscFs dinum.toNat dn bm data ∗
     logOpS icfgLog ncount Sb ∗ txPin icfgLog tid qtx ∗
     dirlinkEnv (hlc := hlc) Γ γl pd pav pu γkl γk ∗
     (∀ c' : CPU, dirlinkPost k ip dinum bm data dn dn0 fn inum ncount Sb tid qtx pidv
-      dqp dqd dqf dqn dqs dqbs dqb c') ∗
+      dqp dqd dqf dqn dqs dqbs dqb kd sd rootv rti dqr c') ∗
     dirlinkLoop Γ γl pd pav pu γkl γk k ip dinum bm data dn dn0 fn inum ncount Sb tid qtx pidv
-      dqp dqd dqf dqn dqs dqbs dqb fuel
+      dqp dqd dqf dqn dqs dqbs dqb kd sd rootv rti dqr fuel
     ⊢ wpLoop (GF := GF) cpu := by
   have hmaxb := Xv6.rd_maxbytes
   have hszb := hs.hszb
@@ -166,7 +165,7 @@ theorem dirlink_record (SN : STRNCPY) (WI : WRITEI) (Γ : SchedNames) [ClaimIs (
       $$ [Hf8 Hf16 Hf24 Hf32 Hf40 Hf48 Hf56 Hf64]
     · unfold dirlinkFrame; iframe
     iapply (dirlink_after SN WI Γ cpu k spie spp _ j γl pd pav pu γkl γk ip dinum bm data dn dn0 fn
-        inum ncount Sb tid qtx pidv dqp dqd dqf dqn dqs dqbs dqb (k.regs 19#5) (k.regs 20#5) _ hs
+        inum ncount Sb tid qtx pidv dqp dqd dqf dqn dqs dqbs dqb kd sd rootv rti dqr (k.regs 19#5) (k.regs 20#5) _ hs
         hpd ?hr hnone)
       $$ [$Hk $Hpc $Hframe $Hde $Hte $Hce $Hkeep $Hbs $Hslot $Hlk $Hop $Htx $Henv $Hpost]
     rw [hk0]
@@ -184,7 +183,7 @@ theorem dirlink_record (SN : STRNCPY) (WI : WRITEI) (Γ : SchedNames) [ClaimIs (
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [r9, ha16]
   iintro Hk Hpc
   -- +0x4a  lw a5,76(s2)
-  icases dirlink_keep_size k ip dinum bm data dn dn0 fn pidv dqp dqd dqf dqn dqs dqbs dqb $$ Hkeep
+  icases dirlink_keep_size k ip dinum bm data dn dn0 fn pidv dqp dqd dqf dqn dqs dqbs dqb kd sd rootv rti dqr $$ Hkeep
     with ⟨Hsz, Hkcl⟩
   k_step_e (wp_s_lw cpu _ (KA.«dirlink» + 0x4a#64) false 76#12 15#5 18#5 (by decide) (by decide)
       (DFrac.own 1) dn.diSize)
@@ -210,7 +209,7 @@ theorem dirlink_record (SN : STRNCPY) (WI : WRITEI) (Γ : SchedNames) [ClaimIs (
         (k.regs 19#5) (k.regs 20#5) (k.regs 21#5) (k.regs 22#5)
       $$ [Hf8 Hf16 Hf24 Hf32 Hf40 Hf48 Hf56 Hf64]
     · unfold dirlinkFrame; iframe
-    ihave IH := dirlinkLoop_elim _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ $$ IH
+    ihave IH := dirlinkLoop_elim _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ $$ IH
     iapply IH $$ %cpu %spie %spp %_ %(i + 1) %_ [] Hk Hpc Hframe Hde Hte Hce Hkeep Hbs Hslot Hlk
       Hop Htx Hpost
     ipureintro
@@ -249,7 +248,7 @@ theorem dirlink_record (SN : STRNCPY) (WI : WRITEI) (Γ : SchedNames) [ClaimIs (
       $$ [Hf8 Hf16 Hf24 Hf32 Hf40 Hf48 Hf56 Hf64]
     · unfold dirlinkFrame; iframe
     iapply (dirlink_after SN WI Γ cpu k spie spp _ j γl pd pav pu γkl γk ip dinum bm data dn dn0 fn
-        inum ncount Sb tid qtx pidv dqp dqd dqf dqn dqs dqbs dqb (k.regs 19#5) (k.regs 20#5) _ hs
+        inum ncount Sb tid qtx pidv dqp dqd dqf dqn dqs dqbs dqb kd sd rootv rti dqr (k.regs 19#5) (k.regs 20#5) _ hs
         hpd ?hr2 hnone)
       $$ [$Hk $Hpc $Hframe $Hde $Hte $Hce $Hkeep $Hbs $Hslot $Hlk $Hop $Htx $Henv $Hpost]
     rw [hk0]

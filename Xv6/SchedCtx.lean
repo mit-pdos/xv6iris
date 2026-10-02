@@ -29,8 +29,6 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedSectionVars false
-
 /-! ## The ghost names -/
 
 /-- The per-proc ghost names: the slot's spinlock, its hart tag
@@ -107,7 +105,6 @@ theorem parkOk_not_RUNNING {st : BitVec 32} (h : parkOk st) : st ≠ RUNNING := 
 @[simp] theorem isRunning_RUNNING : isRunning RUNNING := rfl
 @[simp] theorem notRunning_RUNNING : ¬ notRunning RUNNING := by decide
 @[simp] theorem unclaimed_RUNNING : ¬ unclaimed RUNNING := by decide
-
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
@@ -674,8 +671,8 @@ theorem ctxMorph_ptreeOwn (tier : KTier) : ∀ (lvl : Nat) (dq : DFrac) (t : PTr
           | none => iprop(emp))
         (fun _ i => by
           cases h : t.kids i with
-          | none => simp only [h]; exact instCtxMorphConst _
-          | some c => simp only [h]; exact ctxMorph_ptreeOwn tier lvl dq c))
+          | none => simp only []; exact instCtxMorphConst _
+          | some c => simp only []; exact ctxMorph_ptreeOwn tier lvl dq c))
 
 instance instCtxMorphPtreeOwn (tier : KTier) (lvl : Nat) (dq : DFrac) (t : PTree) :
     CtxMorph (GF := GF) (fun ξ => @ptreeOwn hlc GF _ ⟨ξ, tier⟩ lvl dq t) :=
@@ -714,7 +711,6 @@ instance instCtxMorphTfPageAt (tier : KTier) (tfp : BitVec 44) (ws : List (BitVe
           @byteBuf hlc GF _ ⟨ξ, tier⟩ (pageAddr tfp + 288#64) (DFrac.own 1) bs))
         (fun bs => @instCtxMorphSep hlc GF _ (fun _ => iprop(⌜bs.length = 4096 - 288⌝)) _
           (instCtxMorphConst _) (instCtxMorphByteBuf _ _ _ _))))
-
 
 instance instCtxMorphDormantSpace (tier : KTier) (st : BitVec 32) (V : ProcPriv) (pid : BitVec 32) :
     CtxMorph (GF := GF) (fun ξ => @dormantSpace hlc GF _ ⟨ξ, tier⟩ st V pid) := by
@@ -891,7 +887,6 @@ instance instCtxMorphProcHeld (Γ : SchedNames) (h : CPU) (j : Nat) (st : BitVec
     (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _)
       (@instCtxMorphExists hlc GF _ _ _ (fun _ => @instCtxMorphExists hlc GF _ _ _
         (fun _ => @instCtxMorphExists hlc GF _ _ _ (fun _ => instCtxMorphProcPub _ _ _ _ _ _ _)))))
-
 
 /-! ### Address disjointness: `cpus[]` and `proc[]` -/
 

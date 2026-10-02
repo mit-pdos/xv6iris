@@ -52,8 +52,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-! ## 0.  THE REGION'S INUMS, BLOCK BY BLOCK -/
 
 /-- Rocq's `moi_unsigned_z` (deviation 1). -/

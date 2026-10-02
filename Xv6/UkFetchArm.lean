@@ -28,8 +28,6 @@ open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open Sail LeanRV64D LeanRV64D.Functions
 open Register HartState Step ExecutionResult FetchResult ExceptionType
 
-set_option linter.unusedSectionVars false
-
 /-! ## §1 The execute outcome -/
 
 /-- **What a verified instruction's execute does** (the union of Rocq's

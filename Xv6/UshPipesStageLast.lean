@@ -27,7 +27,11 @@ diagnostic `ldg`).
 
 As `UshPipesStageMid`.
 -/
-import Xv6.UshPipesStageMid
+import Xv6.UshPipesStageCtx
+import Xv6.UshExecPin
+import Xv6.UshExecPinHolds
+import Xv6.UshEchoPipePay
+import Xv6.UshPipesStageW
 
 namespace Xv6
 
@@ -38,8 +42,6 @@ open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 open Wid RdOut WrOut
 open UShPipesDefs
-
-set_option linter.unusedSectionVars false
 
 section Last
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [IcacheG GF]

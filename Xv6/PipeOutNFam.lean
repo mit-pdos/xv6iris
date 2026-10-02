@@ -35,7 +35,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode MachCSL Wid Pline' PipeStage
 
-set_option linter.unusedSectionVars false
 set_option synthInstance.maxSize 1024
 
 section PipeOutNFam

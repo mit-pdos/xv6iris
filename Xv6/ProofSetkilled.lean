@@ -17,9 +17,7 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
@@ -165,6 +163,5 @@ theorem setkilled_proof (AC : ACQUIRE) (RE : RELEASE) : SETKILLED :=
   exact ⟨trivial, trivial, trivial, e18.trans b18, e19.trans b19, e20.trans b20, e21.trans b21,
     e22.trans b22, e23.trans b23, e24.trans b24, e25.trans b25, e26.trans b26,
     e27.trans b27⟩⟩
-
 
 end Xv6

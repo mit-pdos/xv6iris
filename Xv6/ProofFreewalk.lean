@@ -38,7 +38,6 @@ open Xv6.UPtFree
 open LeanRV64D LeanRV64D.Functions
 
 set_option maxRecDepth 8000
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled

@@ -56,8 +56,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-! ## §0 The registry's values -/
 
 /-- **Rocq `csink`**: the copy device's sink. -/

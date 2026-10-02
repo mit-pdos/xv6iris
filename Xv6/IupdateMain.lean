@@ -39,9 +39,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 set_option maxHeartbeats 16000000 in
 /-- `+0x56 .. +0x62`, the memmove of the thirteen addrs, the slot rebuilt at
@@ -278,7 +276,6 @@ theorem iu_copy (LW : LOG_WRITE) (BE : BRELSE) (MM : MEMMOVE)
   all_goals first
     | exact hs1 | exact hs2 | exact ha5 | exact hR2 | exact p19 | exact p20 | exact p21
     | exact p22 | exact p23 | exact p24 | exact p25 | exact p26 | exact p27
-
 
 /-- The slot index, off the sign-extended inum, at `c.andi`'s normal form. -/
 theorem iu_andi15 (inum : BitVec 32) :

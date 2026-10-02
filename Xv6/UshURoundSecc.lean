@@ -56,7 +56,6 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
 set_option synthInstance.maxSize 1024
 
 section UShURoundSecc
@@ -88,7 +87,6 @@ theorem consLicenceAt_of_useccTok (ug : UnionGn)
   imodintro
   iintro %h %H %ev %hw %hok Hres
   iapply Hl $$ %h %H %ev %(hev ev hw) %hok Hres
-
 
 /-- The file family at index 3, opened. -/
 theorem uWcf3_open (ug : UnionGn) (r : FileAppNames) (s0 : Fstate) (I : List (BitVec 8)) :

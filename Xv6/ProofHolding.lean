@@ -132,7 +132,7 @@ theorem holding_tail (MC : MYCPU) {hlc : HasLC} {GF : BundledGFunctors} [MachGS 
   obtain ⟨c2_2, c2_8, c2_9, c2_18, c2_19, c2_20, c2_21, c2_22, c2_23, c2_24, c2_25, c2_26, c2_27⟩ := hcs2
   constructor
   · unfold calleeSaved
-    simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, eq_self_iff_true, true_and, and_true]
+    simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, true_and]
     exact ⟨c2_18, c2_19, c2_20, c2_21, c2_22, c2_23, c2_24, c2_25, c2_26, c2_27⟩
   · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
 
@@ -170,8 +170,8 @@ theorem holding_notheld_proof (MC : MYCPU) {hlc : HasLC} {GF : BundledGFunctors}
     ipureintro
     constructor
     · unfold calleeSaved
-      simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, eq_self_iff_true, true_and, and_true]
-    · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, BitVec.reduceSignExtend, BitVec.add_zero]
+      simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, and_true]
+    · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
   · -- the word is nonzero: read the owner word, which is not ours
     k_step (wp_s_branch cpu _ (KA.«holding» + 0x2#64) true 6#13 15#5 0#5 (by decide) bop.BNE) from (text_instr _ _ _ _ rfl rfl) Htext
       $$ [- $Hk $Hpc] with [MachCSL.bcond_bne_sext_ne w hw]
@@ -247,8 +247,8 @@ theorem holding_notheld_gen_proof (MC : MYCPU) {hlc : HasLC} {GF : BundledGFunct
     ipureintro
     constructor
     · unfold calleeSaved
-      simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, eq_self_iff_true, true_and, and_true]
-    · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, BitVec.reduceSignExtend, BitVec.add_zero]
+      simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, and_true]
+    · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
   · -- the word is nonzero: read the owner word, which is not ours; Tc rides in Q
     k_step (wp_s_branch cpu _ (KA.«holding» + 0x2#64) true 6#13 15#5 0#5 (by decide) bop.BNE) from (text_instr _ _ _ _ rfl rfl) Htext
       $$ [- $Hk $Hpc] with [MachCSL.bcond_bne_sext_ne w hw]

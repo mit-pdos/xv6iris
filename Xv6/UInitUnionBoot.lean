@@ -54,9 +54,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Std (ExtTreeSet)
 open UShUPipes
 
-set_option linter.unusedSectionVars false
-set_option linter.unusedVariables false
-
 /-! ## A slot absorbs a `◇` (Rocq `uslot_except_0_u`) -/
 
 section Slot

@@ -32,7 +32,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
 
 /-- `lbu ; seqz ; negw` on the first byte: -1 on a NUL, 0 otherwise. -/

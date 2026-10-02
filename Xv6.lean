@@ -1859,6 +1859,7 @@ import Xv6.UkPipesIfaceDefs
 import Xv6.UkPipesIfaceKit
 import Xv6.UkCatFIfaceCon
 import Xv6.UkPipesIfaceDevU
+import Xv6.PnsKeep
 import Xv6.UkPipesIfaceReg
 import Xv6.UkPipesIfaceDev
 import Xv6.UkFileDevSysHolds
@@ -1895,6 +1896,9 @@ import Xv6.UkPipesIfaceExit
 import Xv6.UkPipesIfaceRec
 import Xv6.UkPipesEntriesDefs
 import Xv6.UkPipesEntries
+import Xv6.UkPipesEntriesEcho
+import Xv6.UkPipesEntriesCat
+import Xv6.UkPipesEntriesGrep
 import Xv6.UkUnionEntriesPure
 import Xv6.UkUnionEntriesLend
 import Xv6.UkUnionEntriesDefs

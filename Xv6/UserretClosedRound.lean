@@ -40,9 +40,6 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedVariables false
-set_option linter.unusedSectionVars false
-
 /-- uservec's `ld sp, 8(a0)`: usertrap's stack pointer is `kernel_sp`. -/
 theorem urc_uservecRegs_sp (g : RegMap) (ws : List (BitVec 64)) : uservecRegs g ws 2#5 = tfW ws 1 := by
   simp only [uservecRegs, RegMap.set_other _ _ 2#5 _ (by decide : (2#5 : BitVec 5) ≠ 1#5),

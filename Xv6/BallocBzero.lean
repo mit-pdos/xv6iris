@@ -23,9 +23,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 theorem ba_br_bread : KA.«balloc» + 0xFFFFFFFFFFFFFE0C#64 = KA.«bread» := by decide
 theorem ba_br_memset : KA.«balloc» + 0xffffffffffffde6a#64 = KA.«memset» := by decide
@@ -197,7 +195,6 @@ theorem ba_bzero_fill (LW : LOG_WRITE) (BE : BRELSE) (MS : MEMSET)
     obtain ⟨p25, p26, p27⟩ := hp
     exact ⟨by rw [f25, e25, d25]; exact p25, by rw [f26, e26, d26]; exact p26,
       by rw [f27, e27, d27]; exact p27⟩
-
 
 set_option maxHeartbeats 16000000 in
 /-- **`+0x4c .. +0x6c`: THE INLINED bzero** (Rocq's `ba_bzero`), from the

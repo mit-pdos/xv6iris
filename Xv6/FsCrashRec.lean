@@ -41,8 +41,6 @@ namespace Xv6
 
 open MachCSL Std
 
-set_option linter.unusedSectionVars false
-
 /-! ## §1c''' The two sectors of an xv6 block write -/
 
 /-- A block write is exactly two sectors (Rocq `wr_nsectors_block`). -/

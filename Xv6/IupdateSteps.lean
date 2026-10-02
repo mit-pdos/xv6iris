@@ -51,8 +51,6 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedSectionVars false
-
 /-! ## The constants the code computes -/
 
 /-- `auipc a1,0x1d; lw a1,1784(a1)` reads `sb.inodestart`. -/

@@ -29,14 +29,11 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
 /-! ## `kkill`: arithmetic, the frame and the branch conditions -/
-
 
 /-- `&proc[i]` as a number, up to and including the sentinel `&proc[NPROC]`. -/
 theorem kk_procAddr_toNat (j : Nat) (hj : j ≤ NPROC) :
@@ -87,7 +84,6 @@ theorem kk_bne_last {α : Type} (i : Nat) (hi : i < NPROC) (p q : α) :
   · rw [if_neg he, if_pos (by
       simp only [bcond, bne_iff_ne, ne_eq]
       exact fun hc => he ((kk_cursor_eq i hi).mp hc))]
-
 
 /-- `&proc`, folded out of `auipc s1,0x10 ; addi s1,s1,1714`. -/
 theorem kk_proc0_addr :
@@ -634,7 +630,6 @@ theorem kk_iter (AC : ACQUIRE) (RE : RELEASE) {hlc : HasLC} {GF : BundledGFuncto
 
 /-! ## `kkill`: the loop -/
 
-
 set_option maxHeartbeats 4000000 in
 /-- The scan from `+0x22` with `i` slots behind it runs to the
 epilogue at `+0x54`, either through a match (`a0 = 0`) or off the end
@@ -967,6 +962,5 @@ theorem kkill_proof (AC : ACQUIRE) (RE : RELEASE) : KKILL :=
     exact kk_procAddr_zero.symm
   case g18 => simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
   case g19 => simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]⟩
-
 
 end Xv6

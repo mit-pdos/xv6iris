@@ -165,8 +165,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-! ## 4.  THE FIFTY ENTRIES, THE ESCROWS, THE TABLE AND THE LOCK
 
 ### The pure boot state's well-formedness facts -/

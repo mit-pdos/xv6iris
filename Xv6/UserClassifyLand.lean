@@ -33,8 +33,6 @@ namespace Xv6
 open MachCSL
 open Sail LeanRV64D LeanRV64D.Functions
 
-set_option linter.unusedSectionVars false
-
 /-! ## §1 The generalised execute fact -/
 
 /-- **An execute fact for any computation from any state**: every oracle's

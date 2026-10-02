@@ -23,8 +23,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
-
 /-- A string's pointer is not NULL. -/
 theorem ushExec_ptr_ne0 (x : Nat) (h0 : 0 < x) (h38 : x < 2 ^ 38) : (BitVec.ofNat 64 x == 0#64) = false := by
   rw [beq_eq_false_iff_ne]

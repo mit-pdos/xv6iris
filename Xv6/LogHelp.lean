@@ -37,8 +37,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Std MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-- The escrows' namespace (Rocq `helpN`). -/
 def helpN : Namespace := ndot nroot "loghelp"
 

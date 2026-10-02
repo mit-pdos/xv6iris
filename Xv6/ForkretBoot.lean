@@ -46,8 +46,6 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedVariables false
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
 
 theorem fkr_rootdev : (1#64 : BitVec 64) = BitVec.signExtend 64 (BitVec.ofNat 32 ROOTDEV) := by

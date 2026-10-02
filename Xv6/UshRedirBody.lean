@@ -39,8 +39,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
-
 /-! ## §1 The redirect line, as a line shape -/
 
 /-- **Rocq `ushs_lp`**: the body's words are the command's, then `>`, then

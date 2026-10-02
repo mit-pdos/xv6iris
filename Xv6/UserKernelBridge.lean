@@ -29,8 +29,6 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open Sail LeanRV64D LeanRV64D.Functions
 
-set_option linter.unusedSectionVars false
-
 /-! ## `mstatus` across the boundary -/
 
 /-- **Rocq `user_mstatus_ok_sret_ms5`**: `sret` (with `SPIE = 1`) from the

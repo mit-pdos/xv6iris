@@ -16,9 +16,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-- A slot of a well-formed block is a well-formed record. -/
 theorem il_dnwf (ds : List Dinode) (hwf : diblkWf ds) (inum : BitVec 32) :

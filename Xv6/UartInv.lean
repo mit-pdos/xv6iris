@@ -36,8 +36,6 @@ namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-! ## The ports -/
 
 /-- The MMIO base of port `i` (`UART0`, `UART1` of `kernel/memlayout.h`). -/

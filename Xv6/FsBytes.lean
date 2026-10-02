@@ -50,8 +50,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Std MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-! ## The ghost library
 
 THE LOGGED VIEW `L`, keyed by BYTE ADDRESS, is typed by the FIXED layer's

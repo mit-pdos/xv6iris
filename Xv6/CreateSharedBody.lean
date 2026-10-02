@@ -92,9 +92,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## 0.  The static premises and the persistent context -/
 
@@ -772,6 +770,9 @@ def createMkdirBody (k : KCtx) (plen : Nat) (pfun : Nat → BitVec 8) (ty major 
     -- the child, as the gate and the three `sh`s left it
     ⌜kslot < NINODE⌝ -∗ ⌜0 < cinum.toNat ∧ cinum.toNat < fscNinodes⌝ -∗
     ⌜cinum.toNat < 16 * icfgNib⌝ -∗
+    -- ...and NOT the process's root's (R1: the fresh-type span's ledger fact,
+    -- what the `".."` link's inner lookup needs to refute its self arm)
+    ⌜cinum.toNat ≠ V.rti⌝ -∗
     ⌜freshShape dnc⌝ -∗ ⌜inodeRecLocal dnc⌝ -∗ ⌜dnc.diType = ty⌝ -∗
     ⌜inodeOk fscCov fscLogst dnc bmc datc⌝ -∗ ⌜dirOk icfgNib dnc datc⌝ -∗
     -- the ledger

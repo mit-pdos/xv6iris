@@ -142,8 +142,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Iris.Algebra MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-! ## 0.  THE KEY-TYPE SEAM (header) -/
 
 /-- `iregCouple`'s `Int` key at block `bi`, slot `i` IS the cast of the

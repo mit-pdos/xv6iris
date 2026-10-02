@@ -91,8 +91,6 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
 open Iris.Algebra
 
-set_option linter.unusedSectionVars false
-
 /-! ## 5.  THE ADDRESS-KEYED FORM OF A REFERENCE -/
 
 section IcacheHeld

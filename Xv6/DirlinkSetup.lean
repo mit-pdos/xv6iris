@@ -20,9 +20,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-- The empty directory's slot is record 0 (Rocq's `dl_nrec_zero` +
 `dl_slot_zero`). -/
@@ -49,6 +47,7 @@ theorem dirlink_setup (RD : READI) (SN : STRNCPY) (WI : WRITEI) (PA : PANIC)
     (ip : BitVec 64) (dinum : BitVec 32) (bm : Blkmap) (data : Nat → List (BitVec 8))
     (dn dn0 : Dinode) (fn : Nat → BitVec 8) (inum : BitVec 16) (ncount : Nat) (Sb : List Nat)
     (tid : Nat) (qtx : Qp) (pidv : BitVec 32) (dqp dqd dqf dqn dqs dqbs dqb : DFrac)
+    (kd : Nat) (sd : Qp) (rootv : BitVec 64) (rti : Nat) (dqr : DFrac)
     (w1 w3 w4 : BitVec 64) (bs : List (BitVec 8))
     (hs : DirlinkStatic k j bm data dn dn0 fn inum dinum ncount Sb) (hpd : descPageRw pd)
     (hr : dirlinkRegs k ip (k.regs 9#5) (k.regs 19#5) (k.regs 20#5) R)
@@ -59,12 +58,12 @@ theorem dirlink_setup (RD : READI) (SN : STRNCPY) (WI : WRITEI) (PA : PANIC)
       (k.regs 22#5) ∗
     dirlinkDe (k.regs 2#5) bs ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    dirlinkKeep k ip dinum bm data dn dn0 fn pidv dqp dqd dqf dqn dqs dqbs dqb ∗
+    dirlinkKeep k ip dinum bm data dn dn0 fn pidv dqp dqd dqf dqn dqs dqbs dqb kd sd rootv rti dqr ∗
     bslots 3 ∗ irefSlot ∗ dlinks fscFs dinum.toNat dn bm data ∗
     logOpS icfgLog ncount Sb ∗ txPin icfgLog tid qtx ∗
     dirlinkEnv (hlc := hlc) Γ γl pd pav pu γkl γk ∗
     (∀ c' : CPU, dirlinkPost k ip dinum bm data dn dn0 fn inum ncount Sb tid qtx pidv
-      dqp dqd dqf dqn dqs dqbs dqb c')
+      dqp dqd dqf dqn dqs dqbs dqb kd sd rootv rti dqr c')
     ⊢ wpLoop (GF := GF) cpu := by
   have hmaxb := Xv6.rd_maxbytes
   have hszb := hs.hszb
@@ -87,7 +86,7 @@ theorem dirlink_setup (RD : READI) (SN : STRNCPY) (WI : WRITEI) (PA : PANIC)
   iintro Hk Hpc Hf24
   k_norm_g [r9]
   -- +0x1e  lw s1,76(s2)
-  icases dirlink_keep_size k ip dinum bm data dn dn0 fn pidv dqp dqd dqf dqn dqs dqbs dqb $$ Hkeep
+  icases dirlink_keep_size k ip dinum bm data dn dn0 fn pidv dqp dqd dqf dqn dqs dqbs dqb kd sd rootv rti dqr $$ Hkeep
     with ⟨Hsz, Hkcl⟩
   k_step_e (wp_s_lw cpu _ (KA.«dirlink» + 0x1e#64) false 76#12 9#5 18#5 (by decide) (by decide)
       (DFrac.own 1) dn.diSize)
@@ -106,7 +105,7 @@ theorem dirlink_setup (RD : READI) (SN : STRNCPY) (WI : WRITEI) (PA : PANIC)
       $$ [Hf8 Hf16 Hf24 Hf32 Hf40 Hf48 Hf56 Hf64]
     · unfold dirlinkFrame; iframe
     iapply (dirlink_after SN WI Γ cpu k spie spp _ j γl pd pav pu γkl γk ip dinum bm data dn dn0 fn
-        inum ncount Sb tid qtx pidv dqp dqd dqf dqn dqs dqbs dqb w3 w4 bs hs hpd ?hr hnone)
+        inum ncount Sb tid qtx pidv dqp dqd dqf dqn dqs dqbs dqb kd sd rootv rti dqr w3 w4 bs hs hpd ?hr hnone)
       $$ [$Hk $Hpc $Hframe $Hde $Hte $Hce $Hkeep $Hbs $Hslot $Hlk $Hop $Htx $Henv $Hpost]
     rw [hk0]
     have hsz0 : BitVec.ofNat 64 dn.diSize.toNat = BitVec.ofNat 64 (16 * 0) := by rw [hz]
@@ -141,9 +140,9 @@ theorem dirlink_setup (RD : READI) (SN : STRNCPY) (WI : WRITEI) (PA : PANIC)
   · unfold dirlinkFrame; iframe
   -- into the scan at record 0
   ihave IH := dirlink_loop RD SN WI PA Γ k j γl pd pav pu γkl γk ip dinum bm data dn dn0 fn inum
-    ncount Sb tid qtx pidv dqp dqd dqf dqn dqs dqbs dqb hs hpd hnone (dirNrec dn.diSize.toNat + 2)
+    ncount Sb tid qtx pidv dqp dqd dqf dqn dqs dqbs dqb kd sd rootv rti dqr hs hpd hnone (dirNrec dn.diSize.toNat + 2)
     $$ Henv
-  ihave IH := dirlinkLoop_elim _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ $$ IH
+  ihave IH := dirlinkLoop_elim _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ $$ IH
   iapply IH $$ %cpu %spie %spp %_ %0 %bs [] Hk Hpc Hframe Hde Hte Hce Hkeep Hbs Hslot Hlk Hop Htx
     Hpost
   ipureintro

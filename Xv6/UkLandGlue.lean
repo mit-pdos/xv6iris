@@ -17,8 +17,6 @@ namespace Xv6
 open MachCSL
 open Sail LeanRV64D LeanRV64D.Functions
 
-set_option linter.unusedSectionVars false
-
 /-! ## §1 Disjointness, and the lift of `runRW` walks -/
 
 /-- **The walker's map misses the text map** (`UkMem.nodup` + `dom` + `domT`). -/

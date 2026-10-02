@@ -12,14 +12,13 @@ Deviations from Rocq: as in `SpecShSysSbrk`; the three instructions are
 `stub_run`'s, not walked inline.
 -/
 import Xv6.SpecShSysSbrk
+import Xv6.UkPipeDevDefs
 
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
-
-set_option linter.unusedSectionVars false
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]

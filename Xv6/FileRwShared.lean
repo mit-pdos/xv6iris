@@ -25,18 +25,14 @@ import Xv6.FdTable
 import Xv6.FilePay
 import Xv6.NamexParts
 
-
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedSectionVars false
-set_option linter.unusedVariables false
 set_option linter.unusedSimpArgs false
 
 /-! ## The dispatch's readings and `f->off` -/
-
 
 theorem filerw_beq1 (t : BitVec 32) :
     bcond bop.BEQ (BitVec.signExtend 64 t) 1#64 = decide (t = FD_PIPE) := by

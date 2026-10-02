@@ -25,9 +25,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
@@ -73,11 +71,12 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 /-- `dirlinkKeep` with the caller's name buffer out, and back. -/
 theorem dirlink_keep_name (k : KCtx) (ip : BitVec 64) (dinum : BitVec 32) (bm : Blkmap)
     (data : Nat → List (BitVec 8)) (dn dn0 : Dinode) (fn : Nat → BitVec 8)
-    (pidv : BitVec 32) (dqp dqd dqf dqn dqs dqbs dqb : DFrac) :
-    dirlinkKeep (GF := GF) k ip dinum bm data dn dn0 fn pidv dqp dqd dqf dqn dqs dqbs dqb ⊢
+    (pidv : BitVec 32) (dqp dqd dqf dqn dqs dqbs dqb : DFrac)
+    (kd : Nat) (sd : Qp) (rootv : BitVec 64) (rti : Nat) (dqr : DFrac) :
+    dirlinkKeep (GF := GF) k ip dinum bm data dn dn0 fn pidv dqp dqd dqf dqn dqs dqbs dqb kd sd rootv rti dqr ⊢
       byteBuf (k.regs 11#5) dqn (bview 14 fn) ∗
       (byteBuf (k.regs 11#5) dqn (bview 14 fn) -∗
-        dirlinkKeep k ip dinum bm data dn dn0 fn pidv dqp dqd dqf dqn dqs dqbs dqb) := by
+        dirlinkKeep k ip dinum bm data dn dn0 fn pidv dqp dqd dqf dqn dqs dqbs dqb kd sd rootv rti dqr) := by
   unfold dirlinkKeep
   iintro ⟨Hdev, Hin, Hmeta, Hmap, Hblk, Hnm, Hrest⟩
   iframe Hnm
@@ -93,6 +92,7 @@ theorem dirlink_after (SN : STRNCPY) (WI : WRITEI) (Γ : SchedNames) [ClaimIs (h
     (ip : BitVec 64) (dinum : BitVec 32) (bm : Blkmap) (data : Nat → List (BitVec 8))
     (dn dn0 : Dinode) (fn : Nat → BitVec 8) (inum : BitVec 16) (ncount : Nat) (Sb : List Nat)
     (tid : Nat) (qtx : Qp) (pidv : BitVec 32) (dqp dqd dqf dqn dqs dqbs dqb : DFrac)
+    (kd : Nat) (sd : Qp) (rootv : BitVec 64) (rti : Nat) (dqr : DFrac)
     (v3 v4 : BitVec 64) (bs : List (BitVec 8))
     (hs : DirlinkStatic k j bm data dn dn0 fn inum dinum ncount Sb) (hpd : descPageRw pd)
     (hr : dirlinkRegs k ip (BitVec.ofNat 64 (16 * dirSlot data (dirNrec dn.diSize.toNat)))
@@ -103,12 +103,12 @@ theorem dirlink_after (SN : STRNCPY) (WI : WRITEI) (Γ : SchedNames) [ClaimIs (h
       (k.regs 21#5) (k.regs 22#5) ∗
     dirlinkDe (k.regs 2#5) bs ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    dirlinkKeep k ip dinum bm data dn dn0 fn pidv dqp dqd dqf dqn dqs dqbs dqb ∗
+    dirlinkKeep k ip dinum bm data dn dn0 fn pidv dqp dqd dqf dqn dqs dqbs dqb kd sd rootv rti dqr ∗
     bslots 3 ∗ irefSlot ∗ dlinks fscFs dinum.toNat dn bm data ∗
     logOpS icfgLog ncount Sb ∗ txPin icfgLog tid qtx ∗
     dirlinkEnv (hlc := hlc) Γ γl pd pav pu γkl γk ∗
     (∀ c' : CPU, dirlinkPost k ip dinum bm data dn dn0 fn inum ncount Sb tid qtx pidv
-      dqp dqd dqf dqn dqs dqbs dqb c')
+      dqp dqd dqf dqn dqs dqbs dqb kd sd rootv rti dqr c')
     ⊢ wpLoop (GF := GF) cpu := by
   obtain ⟨r2, r8, r9, r18, r19, r20, r21, r22, r23, r24, r25, r26, r27⟩ := id hr
   have hK12 : 2 ≤ k.avail - 10 := by have := hs.hK; unfold dirlinkSlots dirlookupSlots at this; omega
@@ -129,7 +129,7 @@ theorem dirlink_after (SN : STRNCPY) (WI : WRITEI) (Γ : SchedNames) [ClaimIs (h
   k_step_e (wp_s_jal cpu _ (KA.«dirlink» + 0x78#64) false 2085426#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [dirlink_br_strncpy]
   iintro Hk Hpc
-  icases dirlink_keep_name k ip dinum bm data dn dn0 fn pidv dqp dqd dqf dqn dqs dqbs dqb $$ Hkeep
+  icases dirlink_keep_name k ip dinum bm data dn dn0 fn pidv dqp dqd dqf dqn dqs dqbs dqb kd sd rootv rti dqr $$ Hkeep
     with ⟨Hnm, Hkcl⟩
   iapply (dirlink_strncpy SN cpu _ nm fn dqn ?gK ?gn hnl) $$ [- $Hk $Hpc]
   rotate_right 1
@@ -162,7 +162,7 @@ theorem dirlink_after (SN : STRNCPY) (WI : WRITEI) (Γ : SchedNames) [ClaimIs (h
       b21.trans r21, b22.trans r22, b23.trans r23, b24.trans r24, b25.trans r25, b26.trans r26,
       b27.trans r27⟩
   iapply (dirlink_write WI Γ cpu k spie spp R1 j γl pd pav pu γkl γk ip dinum bm data dn dn0 fn inum
-      ncount Sb tid qtx pidv dqp dqd dqf dqn dqs dqbs dqb v3 v4 hs hpd hr1 hnone)
+      ncount Sb tid qtx pidv dqp dqd dqf dqn dqs dqbs dqb kd sd rootv rti dqr v3 v4 hs hpd hr1 hnone)
     $$ [$Hk $Hpc $Hframe $Hde $Hte $Hce $Hkeep $Hbs $Hslot $Hlk $Hop $Htx $Henv $Hpost]
 
 end

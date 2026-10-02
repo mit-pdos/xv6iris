@@ -39,8 +39,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
-
 /-- **Rocq `ucallee_saved_upd`**: a write to a register that is not
 callee-saved keeps the callee-saved file. -/
 theorem ush_ucs_upd (m : RegMap) (r : BitVec 5) (v : BitVec 64) (hr : ucalleeSavedIdx r = false) :

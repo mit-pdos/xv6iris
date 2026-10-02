@@ -48,13 +48,11 @@ open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Xv6.UPtAlloc
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
 /-! ## Shared facts -/
-
 
 /-- `blez`/`bgez` (the signed branches against `zero`). -/
 theorem gp_toInt_zero : (0#64 : BitVec 64).toInt = 0 := by decide
@@ -252,13 +250,11 @@ theorem gp_store (c : CPU) (kb : KCtx) (hK : 4 ≤ kb.avail) (spie spp : Bool) (
 
 end
 
-
 /-! ## The pure side conditions -/
 
 namespace GrowProc
 
 open Iris.Std Iris.Std.PartialMap Iris.Std.LawfulPartialMap Xv6.UPt
-
 
 /-- Above `PGROUNDUP(sz)` nothing is mapped: what `uvmalloc` demands. -/
 theorem um_free_above (sz newsz : BitVec 64) (P : UPtd) (h : umBelow sz P) (i : Nat)
@@ -339,7 +335,6 @@ theorem umBelow_shrink (oldsz newsz : BitVec 64) (P : UPtd) (h : umBelow oldsz P
       omega
 
 end GrowProc
-
 
 /-! ## The three shapes of `growprocOk` -/
 
@@ -879,6 +874,5 @@ theorem growproc_proof (MP : MYPROC) (UA : UVMALLOC) (UD : UVMDEALLOC) : GROWPRO
             | rfl
             | exact e19 | exact e20 | exact e21 | exact e22 | exact e23
             | exact e24 | exact e25 | exact e26 | exact e27⟩
-
 
 end Xv6

@@ -18,9 +18,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-- `addiw a5,a5,-1` on a sign-extended index word, as `k_norm` leaves it. -/
 theorem ci_dec32n (x : BitVec 32) :

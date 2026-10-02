@@ -6,8 +6,9 @@ The four-byte analogue of `MachCSL.ByteWord`.  Code that reads or writes a
 it walks is a `byteBuf` -- a list of one-byte cells.  This file is the
 bridge at width 4:
 
-* `wordToBytes4` / `bytesToWord4`: the little-endian byte list of a word
-  and its inverse, mutually inverse on four bytes;
+* `wordToBytes4` / `bytesToWord4` (defined in `MachCSL.ByteWordDefs`): the
+  little-endian byte list of a word and its inverse, mutually inverse on
+  four bytes;
 * `wordPointsTo_of_bytes4` / `wordPointsTo_to_bytes4`: four byte cells at a
   4-aligned address are a word cell, and back;
 * `byteBuf_word4_acc`: take the first word out of a buffer, write it, put
@@ -87,14 +88,6 @@ theorem toNat_mod4_add (a : BitVec 64) (hal : a.toNat % 4 = 0) (k : Nat) :
   omega
 
 /-! ## Words as bytes -/
-
-/-- The four bytes of a word, little-endian. -/
-def wordToBytes4 (w : BitVec 32) : List (BitVec 8) :=
-  [nthByte (n := 4) w 0, nthByte (n := 4) w 1, nthByte (n := 4) w 2, nthByte (n := 4) w 3]
-
-/-- The word of a byte list, little-endian (the first byte lowest). -/
-def bytesToWord4 (bs : List (BitVec 8)) : BitVec 32 :=
-  bs.foldr (fun b acc => acc <<< 8 ||| BitVec.setWidth 32 b) 0#32
 
 theorem wordToBytes4_length (w : BitVec 32) : (wordToBytes4 w).length = 4 := rfl
 

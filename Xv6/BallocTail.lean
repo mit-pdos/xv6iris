@@ -27,9 +27,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-- `auipc a0,0x4 ; addi a0,a0,1190` at `+0xf6`: the format string. -/
 theorem ba_a_fmt : KA.«balloc» + 0x453a#64 = KStr.«balloc: out of blocks\n» := by decide

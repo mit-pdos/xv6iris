@@ -48,7 +48,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode MachCSL
 
-set_option linter.unusedSectionVars false
 -- the claim's big separating conjunctions exceed the default instance-size budget
 set_option synthInstance.maxSize 1024
 

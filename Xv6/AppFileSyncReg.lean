@@ -48,8 +48,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-! ## The instance's record moves -/
 
 /-- The instance at a new sync list, era, role and round position (the

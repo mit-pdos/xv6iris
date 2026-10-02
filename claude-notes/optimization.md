@@ -1341,6 +1341,40 @@ What worked, and the traps:
   longer imports the S-mode rules.  Keep the old name importing the new
   module so no other importer changes.
 
+### Lean: lake runs ready modules first come first served
+
+On a core-bound machine (CI's 24 cores) the wall is ΣCPU/cores plus an
+early dip and a late tail, and both are shaped by lake's order, not by the
+critical path:
+
+- **Lake's ready queue is FIFO** (every module job runs at one task
+  priority).  In the saturated middle a chain waits behind hundreds of
+  queued modules at EVERY link (5-15 s each on CI), so a 360 s critical
+  path finishes at ~650 s and its last ten links run on an idle machine.
+  Price a cut by the FIFO makespan (`tools/import_graph.py --cores 24`
+  prints it beside the longest-path-first one), averaged over a few
+  ±20 %-perturbed copies of the times: it is chaotic, and a graph with a
+  SHORTER critical path can have a longer FIFO makespan (the exact-needs
+  graph does).  On 96 cores the two agree and nothing here pays.
+- **Early, everything hangs on one spine** (`TsoMem` … `Lang` …
+  `Tactics` …).  A spine module that imports a later one for a few
+  definitions gates every module below it: split the definitions from the
+  proofs that need the later module (`WpPmpDefs`, `Gpr`, `ByteWordDefs`,
+  `MConfBoot`), and the family that only decodes bytes or states
+  configurations starts minutes early.
+- **The needs dump does not see tactic syntax.**  A module that RUNS
+  `swp_run`, or a `macro` whose quotation contains it, needs `Tactics`,
+  and no `N` row says so.  Scan the sources for the keywords each module
+  declares (`syntax`/`macro`/`elab "kw"`) and treat a use as a need, per
+  declaration when splitting (a `macro` is its own declaration, not part of
+  the `def` above it).  ConstDeps also misses some value references
+  (`MConf.bootConf_ok`); the build is the gate, and a compensating import
+  per module that reached the cut module through the old edge is the fix.
+- **Late, a tail module holding N independent stage proofs costs their
+  sum**: one module per program (`UkPipesEntriesEcho`/`Cat`/`Grep`), and
+  a lemma two sibling stages share moves up to their common parent
+  (`UshPipesStageCtx`), so the siblings build side by side.
+
 ### Splitting a whole-function proof across files
 
 1. **Are the blocks independent?** They are if each seam is the next block's

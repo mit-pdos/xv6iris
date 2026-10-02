@@ -35,8 +35,6 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedSectionVars false
-
 /-- the byte view's namespace is inside the custody fupd's mask (Rocq
 `fsbN_sub_crash`) -/
 theorem fsbN_sub_crash : (↑fsbN : CoPset) ⊆ ⊤ \ ↑crashN := by

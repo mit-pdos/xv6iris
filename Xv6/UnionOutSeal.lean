@@ -30,8 +30,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
-set_option linter.unusedSectionVars false
-
 section UnionBirth
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [FileAppG GF] [FileOutG GF] [PipeOutG GF]
@@ -115,7 +113,6 @@ theorem unionLed_init (ug : UnionGn) : ⊢ unionClAll (hlc := hlc) (GF := GF) ug
     ipureintro; exact pinDom_single γ0
   · unfold unionBase; ileft; ipureintro; rfl
 
-
 /-- **Rocq `union_era_split`**: THE FOUNDING -- the era's ghosts become the
 claim at the start of its era and init's credential. -/
 theorem union_era_split (ug : UnionGn) (k : Nat) (v : EraPins) (vf : FileEra) (w : PipeEra) (gb : GName) :
@@ -181,7 +178,6 @@ theorem union_era_split (ug : UnionGn) (k : Nat) (v : EraPins) (vf : FileEra) (w
   · unfold fturn turn dlCnt
     iexists v, vf
     iframe Hpin Hfp Ht2 Hdl2 Hcslb Hpslb Hinp Hrp Hf0
-
 
 /-- the conclusion's resource carried across a power loss (Rocq
 `union_led_pow`'s off-arm). -/

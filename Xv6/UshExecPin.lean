@@ -72,8 +72,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
-
 /-! ## 2.  THE REBASE: a node read field by field -/
 
 /-- **Rocq `big_sepL_Forall2_equiv`**. -/

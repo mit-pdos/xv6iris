@@ -24,9 +24,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-- The two `auipc/addi` pairs land on the same `trampoline`: the `c.sub`
 yields zero (Rocq ProofPrepareReturnParts §1). -/

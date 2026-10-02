@@ -41,9 +41,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-- `auipc a5,0x1e ; lw a5,-1314(a5)` at `+0x0a`: `sb.size`. -/
 theorem ba_a_size : KA.«balloc» + 0x1df5e#64 = sbSizeAddr := by unfold sbSizeAddr; decide

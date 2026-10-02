@@ -46,9 +46,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
@@ -161,7 +159,6 @@ theorem rd_clamp_n (BM : BMAP_NOALLOC) (BR : BREAD) (BE : BRELSE) (EC : EITHER_C
     all_goals (simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] <;>
       first | assumption | rfl)
 
-
 set_option maxHeartbeats 16000000 in
 theorem rd_entry (BM : BMAP_NOALLOC) (BR : BREAD) (BE : BRELSE) (EC : EITHER_COPYOUT)
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
@@ -257,7 +254,6 @@ theorem rd_entry (BM : BMAP_NOALLOC) (BR : BREAD) (BE : BRELSE) (EC : EITHER_COP
       $Hblk $Hdst $Hsl $Hnext]
   all_goals (simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] <;>
     first | rfl | exact ha0 | exact ha3 | exact ha4 | exact MachCSL.signExtend_ofNat32 off hoff31 | skip)
-
 
 set_option maxHeartbeats 16000000 in
 theorem readi_main (BM : BMAP_NOALLOC) (BR : BREAD) (BE : BRELSE) (EC : EITHER_COPYOUT)

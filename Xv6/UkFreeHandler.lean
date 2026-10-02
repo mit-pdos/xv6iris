@@ -65,8 +65,6 @@ open Iris.Std.PartialMap
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
-
 namespace UkSysP
 
 section

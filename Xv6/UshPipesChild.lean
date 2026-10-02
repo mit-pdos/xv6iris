@@ -29,8 +29,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
-
 /-- **Rocq `ushq_stages`**: the stages' argument lists, cut from the one
 line, as the runner's right spine. -/
 abbrev ushqStages (s0 len : Nat) (f : Nat → BitVec 8) (a : List (Nat × Nat)) (rest : List (List (Nat × Nat))) :

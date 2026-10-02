@@ -128,7 +128,6 @@ def igetAddr : BitVec 64 := KA.«iget»
 want only 10): Rocq's `K_iget = 62`. -/
 def igetSlots : Nat := 6 + panicSlots
 
-set_option linter.unusedVariables false in
 /-- **WP of `iget(dev = a0, inum = a1)`** at either `SIE` (Rocq
 `wp_iget_sconf_body`). -/
 def wp_iget_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IcacheG GF]

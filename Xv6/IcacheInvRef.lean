@@ -153,8 +153,6 @@ itable.lock's payload.
 import Xv6.IcacheInvAlg
 import Xv6.IcacheRef
 
-set_option linter.unusedSectionVars false
-
 /-! ## 0.  Word-history and context helpers (design note §3/§5) -/
 
 namespace MachCSL

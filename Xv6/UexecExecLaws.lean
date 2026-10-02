@@ -32,8 +32,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Std MachCSL
 
-set_option linter.unusedSectionVars false
-
 theorem fdStOfKey_eq_syscFdKey (v : BitVec 64) (sts : List FdState) : fdStOfKey v sts = syscFdKey v sts :=
   rfl
 

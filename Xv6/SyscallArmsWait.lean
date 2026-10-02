@@ -27,9 +27,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-- **The copyout's window at the lazy image** (Rocq `uwait_wr`'s image
 equation): kwait's `umemWrite` over the faulted view is `usysWr` of the

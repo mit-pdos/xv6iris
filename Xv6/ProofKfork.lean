@@ -128,9 +128,7 @@ open Xv6.UPt
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-- Re-anchor the client's continuation `Hcl` (a `wpNext k.sie k.proc`) along
 a pinning fact `hpin` (whose context index is normalised with the extra
@@ -234,7 +232,6 @@ theorem kf_j_failtail : (KA.«kfork» + 0x8c#64) + BitVec.signExtend 64 (132#21)
 
 /-- `c.j 0x80001e1e` at `0x80001e2e` (allocproc-fail tail to the epilogue). -/
 theorem kf_j_allocfail : (KA.«kfork» + 0x120#64) + BitVec.signExtend 64 (-16#21) = (KA.«kfork» + 0x110#64) := by decide
-
 
 /-! ## Trapframe-copy arithmetic (the 9-chunk word loop)
 
@@ -926,7 +923,6 @@ theorem kfork_br_257a : KA.«kfork» + 0x257a#64 = KA.«filedup» := by decide
 `ofileSlot` is a cell and what the cell's value owns (`kfPay`); the parent's
 array is read cell by cell with the old read-only accessor while each
 descriptor's payload is halved by `filedup`. -/
-
 
 /-- What descriptor `fd`'s cell value owns (the payload half of `ofileSlot`,
 ProcInv.v's `ofile_slot` minus the cell). -/
@@ -2067,7 +2063,6 @@ theorem kf_pay_unused [CurCtx] (Γ : SchedNames) (ξl : CtxId) (j : Nat) (c : CP
   iapply procLockRes_intro Γ ξl (procAddr j) UNUSED 0#64 kl xs pid
   unfold procPubRest
   iframe Hstate Hpl Hchan Hslots Hrest
-
 
 /-- `uvmcopyOk` carries the parent's `umBelow` to the copied child table:
 every leaf `Pnew'` has came from a parent leaf below `sz` (the fresh child

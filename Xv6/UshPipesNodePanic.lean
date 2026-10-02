@@ -50,8 +50,6 @@ open Std (ExtTreeSet)
 open Wid RdOut WrOut
 open UShPipesDefs UShPipesStage UShPipeLeaves
 
-set_option linter.unusedSectionVars false
-
 /-- **Rocq `alt_forkc_panic`**. -/
 theorem alt_forkc_panic : altForkc = altPanic ++ uPrompt := rfl
 

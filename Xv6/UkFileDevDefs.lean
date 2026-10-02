@@ -93,8 +93,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open HfpFileClaimsP UkFileOpen
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
-
 namespace UkFileDev
 
 /-! ## §0 Pure: words, chunks, fractions -/

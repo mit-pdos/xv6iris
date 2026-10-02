@@ -51,8 +51,6 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
-
 /-! ## S1 THE FAMILY -/
 
 /-- **Rocq `xfam_wr`**: row 16's one field, the caller's own output cursor

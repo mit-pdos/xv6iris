@@ -104,9 +104,9 @@ theorem memModel_read_excl (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w :
   · iapply Hclose $$ %(σ.afterExcl cpu pa n w acq)
     · ipureintro
       intro c hc
-      simp [MState.afterExcl, updCpu, hc]
+      simp [updCpu, hc]
     · iapply hartViewsAt_intro
-      simp only [MState.afterExcl, updCpu, if_true, HRead.afterExcl]
+      simp only [updCpu, if_true, HRead.afterExcl]
       iframe Hv Hi Hr
   · ipureintro
     obtain ⟨h1, h2, h3, h4⟩ := hmm
@@ -115,11 +115,11 @@ theorem memModel_read_excl (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w :
       simp only [MState.top] at *
       by_cases hc : c = cpu
       · subst hc
-        simp only [MState.afterExcl, updCpu, if_true, HRead.afterExcl]
+        simp only [updCpu, if_true, HRead.afterExcl]
         refine ⟨by split <;> omega, a2, Nat.le_refl _, a4⟩
-      · simp only [MState.afterExcl, updCpu, hc, if_false]
+      · simp only [updCpu, hc, if_false]
         exact ⟨a1, a2, a3, a4⟩
-    · simp only [MState.afterExcl, updCpu] at hr ⊢
+    · simp only [updCpu] at hr ⊢
       by_cases hc : c = cpu
       · subst hc
         simp only [if_true, Option.some.injEq] at hr

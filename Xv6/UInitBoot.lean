@@ -53,8 +53,6 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode MachCSL
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
-
 /-! ## 1.  The path, as the walk reads it -/
 
 /-- **Rocq `init_boot_path_elems`**: "/init" is the one name the pin is

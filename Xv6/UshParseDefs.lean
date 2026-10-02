@@ -33,8 +33,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
-
 /-! ## §1 The byte algebra (Rocq §2) -/
 
 /-- **Rocq `ushp_zext_nul`**: a byte is NUL exactly when its zero-extended
@@ -46,7 +44,7 @@ theorem ush_zext_zero (b : BitVec 8) : BitVec.setWidth 64 b = 0#64 ↔ b = ubyte
 
 /-- `beqz`/`bnez` on a `Nat`-valued word below `2^64`. -/
 theorem ush_beqz_nat (x : Nat) (hx : x < 2 ^ 64) : ukBtaken .BEQ (BitVec.ofNat 64 x) 0#64 = decide (x = 0) := by
-  simp only [ukBtaken, beq_iff_eq]
+  simp only [ukBtaken]
   by_cases h : x = 0
   · subst h; simp
   · have : BitVec.ofNat 64 x ≠ 0#64 := by
@@ -57,7 +55,7 @@ theorem ush_beqz_nat (x : Nat) (hx : x < 2 ^ 64) : ukBtaken .BEQ (BitVec.ofNat 6
 
 theorem ush_bnez_nat (x : Nat) (hx : x < 2 ^ 64) : ukBtaken .BNE (BitVec.ofNat 64 x) 0#64 = !decide (x = 0) := by
   have := ush_beqz_nat x hx
-  simp only [ukBtaken, bne, beq_iff_eq] at this ⊢
+  simp only [ukBtaken, bne] at this ⊢
   rw [this]
 
 /-! ## §0 The addresses of the two static tables and of peek's literals -/

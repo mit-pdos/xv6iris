@@ -51,8 +51,6 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
-
 /-! ## §0 The C `int` reading, two spellings -/
 
 /-- `argZ` (the kernel's reading) is the C `int` reading the leaves state. -/

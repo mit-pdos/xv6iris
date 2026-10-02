@@ -75,8 +75,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-! ## Two ghost-var helpers -/
 
 section gvHelpers

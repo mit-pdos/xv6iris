@@ -83,6 +83,7 @@ with `inode_ref_short_shr_genlo_agree` after two separate intros.
   `ireclaim_ientry_beq` (a stage-file lemma this stage cannot import).
 -/
 import Xv6.CreateParts
+import Xv6.IregClaimPlain
 
 namespace Xv6
 
@@ -91,9 +92,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-- THE SPAN'S REGISTER CONTRACT (Rocq's `cr_cs_but_s3`): `calleeSaved`
 everywhere BUT `s3` -- the `c.mv s3,a0` at `+0xac` is the point of the
@@ -140,11 +139,13 @@ instance createFreshEnv_persistent (Γ : SchedNames) (γl : GName) (pd pav pu : 
 /-- **THE ALLOCATE ARM's PAYOUT** at `+0xb4`: the child LOCKED and FILLED
 (ilock's post at the claim licence), the kept short parent, the claim box's
 share home, ialloc's set growth. -/
-def createFreshAlloc (pidv : BitVec 32) (ty : BitVec 16) (u : Nat) (Sb : List Nat) (t : Nat)
-    (qt qc : Qp) (R' : RegMap) (kslot : Nat) (q : Qp) (g : GName) (lo tl : Nat)
+def createFreshAlloc (pidv : BitVec 32) (rti : Nat) (ty : BitVec 16) (u : Nat) (Sb : List Nat)
+    (t : Nat) (qt qc : Qp) (R' : RegMap) (kslot : Nat) (q : Qp) (g : GName) (lo tl : Nat)
     (inum : BitVec 32) (γil γisl : GName) (dn : Dinode) (bm : Blkmap) (c : CPU) : IProp GF :=
   iprop(⌜R' 19#5 = ientry kslot ∧ kslot < NINODE ∧ 0 < inum.toNat ∧ inum.toNat < fscNinodes ∧
-      inum.toNat < 16 * icfgNib ∧ dn.diType = ty ∧ freshShape dn ∧ lo ≤ tl⌝ ∗
+      inum.toNat < 16 * icfgNib ∧ dn.diType = ty ∧ freshShape dn ∧ lo ≤ tl ∧
+      -- R1 (design/chroot.md §8): the fresh inum is not the process's root's
+      inum.toNat ≠ rti⌝ ∗
     pcIs c (KA.«create» + 0xb4#64) ∗
     isSleeplockGen γil γisl (iLock (ientry kslot)) (icSlp fscIc kslot) (slhTok (icfgIsl kslot)) ∗
     sleeplockedQ γisl q.half (iLock (ientry kslot)) pidv ∗
@@ -169,7 +170,8 @@ def createFreshFail (u : Nat) (Sb : List Nat) (t : Nat) (qt qc : Qp) (R' : RegMa
 
 /-- The span's continuation, hart-free. -/
 def createFreshPost (k : KCtx) (R : RegMap) (ty : BitVec 16) (kd : Nat) (dqd : DFrac) (u : Nat)
-    (Sb : List Nat) (t : Nat) (qt qc : Qp) (pidv : BitVec 32) (dqp dqs dqn : DFrac) (c : CPU) :
+    (Sb : List Nat) (t : Nat) (qt qc : Qp) (pidv : BitVec 32) (dqp dqs dqn : DFrac)
+    (rootv : BitVec 64) (rti : Nat) (c : CPU) :
     IProp GF := iprop(
   ∀ (spie spp : Bool) (R' : RegMap) (alloc : Bool) (kslot : Nat) (q : Qp) (g : GName)
     (lo tl : Nat) (inum : BitVec 32) (γil γisl : GName) (dn : Dinode) (bm : Blkmap),
@@ -179,9 +181,10 @@ def createFreshPost (k : KCtx) (R : RegMap) (ty : BitVec 16) (kd : Nat) (dqd : D
     wordPointsTo sbNinodes 4 dqn (BitVec.ofNat 32 fscNinodes) -∗
     wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) -∗
     wordPointsTo (pPid k.proc) 4 dqp pidv -∗
+    inodeHeldAt rootv rti -∗
     bslots 3 -∗
     wordPointsTo (iDev (ientry kd)) 4 dqd icfgDev -∗
-    (if alloc then createFreshAlloc pidv ty u Sb t qt qc R' kslot q g lo tl inum γil γisl dn bm c
+    (if alloc then createFreshAlloc pidv rti ty u Sb t qt qc R' kslot q g lo tl inum γil γisl dn bm c
      else createFreshFail u Sb t qt qc R' c) -∗
     wpLoop c)
 
@@ -331,7 +334,7 @@ reads and hands straight back. -/
 theorem create_fresh_ty (IA : IALLOC) (IL : ILOCK) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (R : RegMap) (j : Nat) (γl : GName) (pd pav pu : BitVec 64)
     (ty : BitVec 16) (kd : Nat) (dqd : DFrac) (u : Nat) (Sb : List Nat) (t : Nat) (qt qc : Qp)
-    (pidv : BitVec 32) (dqp dqs dqn : DFrac)
+    (pidv : BitVec 32) (dqp dqs dqn : DFrac) (rootv : BitVec 64) (rti : Nat)
     (hj : j < NPROC) (hproc : k.proc = procAddr j)
     (hKia : iallocSlots ≤ k.avail) (hKil : ilockSlots ≤ k.avail)
     (hnoff : k.noff = 0) (htier : k.tier = KTier.kpt)
@@ -344,13 +347,21 @@ theorem create_fresh_ty (IA : IALLOC) (IL : ILOCK) (Γ : SchedNames) [ClaimIs (h
     createFreshEnv (hlc := hlc) Γ γl pd pav pu ∗
     wordPointsTo sbNinodes 4 dqn (BitVec.ofNat 32 fscNinodes) ∗
     wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) ∗
-    wordPointsTo (pPid k.proc) 4 dqp pidv ∗ bslots 3 ∗ irefSlot ∗
+    wordPointsTo (pPid k.proc) 4 dqp pidv ∗
+    -- THE ROOT REFERENCE, LENT (chroot; design/chroot.md §8 R1): while
+    -- ialloc's claim is outstanding -- between the claim and the fill at this
+    -- span's own ilock -- the claim pin says no plain unit exists at the
+    -- claimed inum (`ireg_claim_plain_ne`); the process's root reference
+    -- carries one at `rti`, so the fresh inum is not the root's.  mkdir's
+    -- `dirlink(ip, "..", ..)` needs exactly that to refute its inner lookup's
+    -- self arm.  Back verbatim.
+    inodeHeldAt rootv rti ∗ bslots 3 ∗ irefSlot ∗
     wordPointsTo (iDev (ientry kd)) 4 dqd icfgDev ∗
     txPin icfgLog t qt ∗ txPin icfgLog t qc ∗ logOpS icfgLog (u + 1) Sb ∗
-    (∀ c : CPU, createFreshPost k R ty kd dqd u Sb t qt qc pidv dqp dqs dqn c)
+    (∀ c : CPU, createFreshPost k R ty kd dqd u Sb t qt qc pidv dqp dqs dqn rootv rti c)
     ⊢ wpLoop (GF := GF) cpu := by
   have hdev0 : iDev (ientry kd) = ientry kd := by simp [iDev]
-  iintro ⟨Hk, Hpc, Hte, Hce, #Henv, Hsn, Hsi, Hpid, Hbs, Hisl, Hdev, Htx, Htc, Hop, Hpost⟩
+  iintro ⟨Hk, Hpc, Hte, Hce, #Henv, Hsn, Hsi, Hpid, Hrh, Hbs, Hisl, Hdev, Htx, Htc, Hop, Hpost⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- +0xa4  c.mv a1,s4
   k_step_e (wp_s_add cpu _ (KA.«create» + 0xa4#64) true 11#5 0#5 20#5 (by decide))
@@ -407,7 +418,7 @@ theorem create_fresh_ty (IA : IALLOC) (IL : ILOCK) (Γ : SchedNames) [ClaimIs (h
     ispecialize Hpost $$ %cpu
     unfold createFreshPost createFreshFail
     iapply Hpost $$ %spie1 %spp1 %(R1.set 19#5 0#64) %false %0 %1 %γl %0 %0 %inum %γl %γl
-      %dn' %default [] Hk Hte Hce Hsn Hsi Hpid Hbs Hdev
+      %dn' %default [] Hk Hte Hce Hsn Hsi Hpid Hrh Hbs Hdev
     · ipureintro
       refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
         simp [RegMap.set_apply, e2, e8, e9, e18, e20, e21, e22, e23, e24, e25, e26, e27]
@@ -420,6 +431,32 @@ theorem create_fresh_ty (IA : IALLOC) (IL : ILOCK) (Γ : SchedNames) [ClaimIs (h
     icases Harm with ⟨%hp, Hcl, Hop⟩
     obtain ⟨ha0, hkk, hpos, hlt, hnib, -, -, -⟩ := hp
     obtain ⟨hcov, -⟩ := hblk inum hnib
+    -- R1, WHILE THE CLAIM IS OUTSTANDING: the claim at `inum` and the root
+    -- reference's plain unit at `rti` never share an inum.
+    ihave #Hireg : iregReg (hlc := hlc) fscIreg fscFs icfgIst icfgNib $$ [Henv]
+    · unfold createFreshEnv
+      icases Henv with ⟨-, -, -, -, -, Hinv, -, -, -, -⟩
+      ihave H := iregInv_reg (hlc := hlc) fscIreg fscFs icfgIst icfgNib $$ Hinv
+      iexact H
+    unfold inodeClaimed
+    icases Hcl with ⟨Href, Hruc, Hclaim⟩
+    unfold inodeHeldAt inodeRefp
+    icases Hrh with ⟨%kr, %qr, %inr, %hre, %hkr, %hinr, %hinrpos, %hinrz, Hrefr, Hrur⟩
+    ihave Hrur := (show runitAny (GF := GF) inr.toNat ⊢ runitPlain rti by
+      rw [hinrz]; exact .rfl) $$ Hrur
+    iapply wpLoop_fupd
+    imod (ireg_claim_plain_ne (hlc := hlc) (GF := GF) ⊤ fscIreg fscFs icfgIst icfgNib inum ty t qc
+      rti CoPset.subseteq_top (by omega)) $$ Hireg Hclaim Hrur with ⟨%hnrt, Hclaim, Hrur⟩
+    imodintro
+    ihave Hrur := (show runitPlain (GF := GF) rti ⊢ runitAny inr.toNat by
+      rw [hinrz]; exact .rfl) $$ Hrur
+    ihave Hrh : inodeHeldAt rootv rti $$ [Hrefr Hrur]
+    · unfold inodeHeldAt inodeRefp
+      iexists kr, qr, inr
+      iframe Hrefr Hrur
+      ipureintro; exact ⟨hre, hkr, hinr, hinrpos, hinrz⟩
+    ihave Hcl : inodeClaimed ty kslot q icfgDev inum t qc $$ [Href Hruc Hclaim]
+    · unfold inodeClaimed; iframe
     k_step_e (wp_s_branch cpu _ (KA.«create» + 0xae#64) true 62#13 10#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [ha0, create_beqz_ientry kslot hkk]
@@ -454,7 +491,7 @@ theorem create_fresh_ty (IA : IALLOC) (IL : ILOCK) (Γ : SchedNames) [ClaimIs (h
     ispecialize Hpost $$ %cpu
     unfold createFreshPost createFreshAlloc
     iapply Hpost $$ %spie2 %spp2 %R2 %true %kslot %q %g %lo %tl %inum %γil %γisl %dn %bm
-      [] Hk Hte Hce Hsn Hsi Hpid Hbs Hdev
+      [] Hk Hte Hce Hsn Hsi Hpid Hrh Hbs Hdev
     · ipureintro
       exact ⟨by simp [f2, e2], by simp [f8, e8], by simp [f9, e9], by simp [f18, e18],
         by simp [f20, e20], by simp [f21, e21], by simp [f22, e22], by simp [f23, e23],
@@ -462,7 +499,7 @@ theorem create_fresh_ty (IA : IALLOC) (IL : ILOCK) (Γ : SchedNames) [ClaimIs (h
     simp only [if_true]
     iframe Hpc Hslk Hsl Hfl Hdep Hoff Hdevc Hinum Hval Hload Hshot Hfrz Hpar Hru Htc Hop
     ipureintro
-    exact ⟨by simp [f19, ha0], hkk, hpos, hlt, hnib, htyeq, hfresh, hle⟩
+    exact ⟨by simp [f19, ha0], hkk, hpos, hlt, hnib, htyeq, hfresh, hle, hnrt⟩
 
 end
 

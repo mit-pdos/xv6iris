@@ -23,7 +23,6 @@ open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open Iris.Std (get? insert delete)
 open LeanRV64D
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
@@ -36,7 +35,6 @@ set_option maxRecDepth 8000
 survives as such: it is split into `BitVec.ofNat 64 A + BitVec.ofNat 64 d`
 (and `BitVec.add_assoc` then re-associates).  These are the page-offset folds
 stated on the shapes the normaliser actually leaves. -/
-
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
@@ -57,7 +55,6 @@ def frameCi [CurCtx] (sp ra s0 s1 s2 s3 s4 s5 s6 s7 s8 s9 s10 : BitVec 64) : IPr
   wordPointsTo (sp + 0xFFFFFFFFFFFFFFB0#64) 8 (DFrac.own 1) s8 ∗
   wordPointsTo (sp + 0xFFFFFFFFFFFFFFA8#64) 8 (DFrac.own 1) s9 ∗
   wordPointsTo (sp + 0xFFFFFFFFFFFFFFA0#64) 8 (DFrac.own 1) s10
-
 
 set_option maxHeartbeats 4000000 in
 /-- The prologue at `0x8000168a`. -/
@@ -946,7 +943,6 @@ theorem ci_loop (WA : WALKADDR) (VF : VMFAULT) (MM : MEMMOVE) [Xv6G GF] [WchG GF
       exact hpost3
 
 /-! ## `copyin` meets its specification -/
-
 
 set_option maxHeartbeats 4000000 in
 /-- **`copyin` meets its specification.** -/

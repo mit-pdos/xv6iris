@@ -821,7 +821,7 @@ theorem memModel_load (σ : MState) (cpu : CPU) (pa : PAddr) (n tvn : Nat) (htv 
   imodintro
   have hresv : resvMap (σ.afterLoad cpu pa n tvn) = resvMap σ :=
     resvMap_congr _ _ (fun c => by
-      simp only [MState.afterLoad, updCpu]
+      simp only [updCpu]
       split
       · rename_i hc; subst hc; simp [HRead.afterLoad]
       · simp)
@@ -831,9 +831,9 @@ theorem memModel_load (σ : MState) (cpu : CPU) (pa : PAddr) (n tvn : Nat) (htv 
   · iapply Hclose $$ %(σ.afterLoad cpu pa n tvn)
     · ipureintro
       intro c hc
-      simp [MState.afterLoad, updCpu, hc]
+      simp [updCpu, hc]
     · iapply hartViewsAt_intro
-      simp only [MState.afterLoad, updCpu, if_true, HRead.afterLoad]
+      simp only [updCpu, if_true, HRead.afterLoad]
       iframe Hv Hi Hr
   · ipureintro
     exact mmOk_afterLoad σ cpu pa n tvn htv hmm
@@ -851,12 +851,12 @@ theorem memModel_fence (σ : MState) (cpu : CPU) (b : barrier_kind) :
   have htv' : (σ.fence cpu b).tv cpu ≤ σ.top := (hmm'.2.1 cpu).1
   have e_tv : (σ.fence cpu b).tv cpu =
       fencePost (fenceDrains b) (fenceAcq b) (σ.tv cpu) (σ.hr cpu).rv (ownPub (hartAgent cpu) σ.log) := by
-    simp [MState.fence, updCpu]
+    simp [updCpu]
   have e_itv : (σ.fence cpu b).itv cpu =
       (if fenceIfetch b then
         max (σ.itv cpu) (fencePost true false (σ.tv cpu) (σ.hr cpu).rv (ownPub (hartAgent cpu) σ.log))
        else σ.itv cpu) := by
-    simp [MState.fence, updCpu]
+    simp [updCpu]
   imod MonoNat.own_update _ (.ofNat (σ.tv cpu)) (.ofNat ((σ.fence cpu b).tv cpu))
     (by rw [e_tv]; simp only [MaxNat.le_toNat]; exact fencePost_ge _ _ _ _ _) $$ Hv with ⟨Hv, #Hvlb⟩
   imod MonoNat.own_update _ (.ofNat (σ.itv cpu)) (.ofNat ((σ.fence cpu b).itv cpu))
@@ -871,7 +871,7 @@ theorem memModel_fence (σ : MState) (cpu : CPU) (b : barrier_kind) :
     · iapply Hclose $$ %(σ.fence cpu b)
       · ipureintro
         intro c hc
-        simp [MState.fence, updCpu, hc]
+        simp [updCpu, hc]
       · iapply hartViewsAt_intro
         rw [show ((σ.fence cpu b).hr cpu).rv = (σ.hr cpu).rv from rfl]
         iframe Hv Hi Hr
@@ -888,10 +888,10 @@ theorem hartViews_store_plain (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (
     (c : CPU) : hartViewsAt (GF := GF) E (σ.store cpu pa n w false) c = hartViewsAt E σ c := by
   unfold hartViewsAt
   have e1 : (σ.store cpu pa n w false).tv c = σ.tv c := by
-    simp only [MState.store, updCpu, Bool.false_and, if_false]; split <;> simp_all
+    simp only [updCpu, Bool.false_and]; split <;> simp_all
   have e2 : (σ.store cpu pa n w false).itv c = σ.itv c := rfl
   have e3 : ((σ.store cpu pa n w false).hr c).rv = (σ.hr c).rv := by
-    simp only [MState.store, updCpu]; split <;> simp_all [HRead.clearAcq]
+    simp only [updCpu]; split <;> simp_all [HRead.clearAcq]
   rw [e1, e2, e3]
 
 /-- A plain store by a hart: the store order grows by the hart's message,
@@ -923,7 +923,7 @@ theorem memModel_store_plain (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w
   iframe Hfrag Hresv
   isplitl [Htop Hauth Hviews]
   · rw [show (σ.store cpu pa n w false).top = σ.top + 1 by
-          simp [MState.store, MState.top],
+          simp [MState.top],
         show (σ.store cpu pa n w false).log = σ.log ++ [hartAgent cpu] from rfl, authMap_snoc]
     iframe Htop Hauth
     isplitl [Hviews]

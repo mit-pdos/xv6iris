@@ -53,9 +53,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-- `s3`: no candidate yet, or a free entry (Rocq's `Hemp`). -/
 def igS3 (M : RegMapF (Qp × PosNat)) (R : RegMap) : Prop :=
@@ -137,7 +135,6 @@ theorem ig_step (RH : RELEASE_HOOK) (PA : PANIC) (c cpu : CPU) (k : KCtx) (spie 
     ipureintro
     refine ⟨hR.set 9#5 _ (by decide), ?_, hs3' _, hscan⟩
     simp only [RegMap.set_apply, BitVec.reduceEq, ite_true]
-
 
 theorem ig_blez_zero64 : bcond bop.BGE 0#64 0#64 = true := by decide
 
@@ -223,7 +220,6 @@ theorem ig_free (RH : RELEASE_HOOK) (PA : PANIC) (c cpu : CPU) (k : KCtx) (spie 
     iframe Hk Hpc Henv Hloop
     unfold igTab
     iframe
-
 
 /-- A live slot's word under the lock (Rocq's `iref_word M j`). -/
 theorem ig_irefWord (M : RegMapF (Qp × PosNat)) (j : Nat) (qj : Qp) (nj : PosNat)
@@ -398,7 +394,6 @@ theorem ig_live (RH : RELEASE_HOOK) (PA : PANIC) (c cpu : CPU) (k : KCtx) (spie 
     iframe Hk Hpc Henv Hcarry Hloop
     unfold igTab
     iframe
-
 
 set_option maxHeartbeats 2000000 in
 /-- One iteration at `+0x44` (Rocq's induction body): the slot is live or

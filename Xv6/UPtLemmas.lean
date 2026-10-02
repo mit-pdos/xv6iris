@@ -19,8 +19,6 @@ open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Iris.Std Iris.Std.PartialMap Iris.Std.LawfulPartialMap
 
-set_option linter.unusedSectionVars false
-
 /-! ## The leaf word -/
 
 /-- `PTE2PA` of a user leaf, when `perm` is flag bits only. -/

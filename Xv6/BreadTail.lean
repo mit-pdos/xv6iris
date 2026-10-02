@@ -25,9 +25,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-- The callee-saved registers `s4..s11` and the frame pointer, pinned to
 the entry map: what survives bread's body. -/

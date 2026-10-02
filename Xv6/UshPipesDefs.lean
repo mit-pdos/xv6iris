@@ -67,8 +67,6 @@ namespace UShPipesDefs
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Wid RdOut WrOut
 
-set_option linter.unusedSectionVars false
-
 /-! ## §0 Pure: the writers, the diagnostics, the flow chain's indices -/
 
 /-- **Rocq `chain`**: the chain of the content writer -- its cursor is what

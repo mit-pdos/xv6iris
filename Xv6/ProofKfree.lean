@@ -74,9 +74,7 @@ theorem kf_align8 (p : BitVec 64) (h : pageValid p) : p.toNat % 8 = 0 := by
 
 theorem kf_c4096 : BitVec.signExtend 64 (1#20 ++ 0#12) = BitVec.ofNat 64 4096 := by decide
 
-
 section
-set_option linter.unusedSectionVars false
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
 
 /-- The lock payload, opened at the caller's own context. -/
@@ -145,7 +143,6 @@ theorem kf_memset (MS : MEMSET) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hl
   unfold wp_memset_body at h
   simp only [memsetAddr] at h
   exact h
-
 
 set_option maxHeartbeats 1000000 in
 /-- `memset`'s raw (visibility-free) contract at the call site. -/

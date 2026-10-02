@@ -40,9 +40,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
@@ -86,25 +84,39 @@ theorem namexEra_loaded_open (ik : Nat) (inum : BitVec 32) (dn : Dinode) (bm : B
   exact ⟨hok, hrl, hdok, hddix, hdoc, hduq⟩
 
 /-- The found arm's reference, AT THE CHILD'S INUM (Rocq's
-`inode_held_at (ientry kslot) (bv_unsigned (dir_inum datl kdir))`). -/
-theorem namexEra_found_heldAt (data : Nat → List (BitVec 8)) (dn : Dinode) (kd kslot : Nat)
-    (qq : Qp) (s : List (BitVec 8)) (hty : dn.diType = T_DIR) (hdok : dirOk icfgNib dn data)
-    (hf : dirFirst data (dirNrec dn.diSize.toNat) s = some kd) (hks : kslot < NINODE) :
-    inodeRef (GF := GF) kslot qq icfgDev (BitVec.setWidth 32 (dirInum data kd)) ∗
-      runitAny (BitVec.setWidth 32 (dirInum data kd)).toNat ⊢
-    inodeHeldAt (ientry kslot) (dirInum data kd).toNat := by
+`inode_held_at (ientry kslot) (bv_unsigned (dir_inum datl kdir))`), on both
+of the lookup's arms (chroot): the matched record's child, or -- the SELF
+arm -- dp itself. -/
+theorem namexEra_found_heldAt (data : Nat → List (BitVec 8)) (dn : Dinode) (dinum : BitVec 32)
+    (rti kk kslot ik : Nat) (qq : Qp) (s : List (BitVec 8)) (self : Bool) (inum2 : BitVec 32)
+    (hty : dn.diType = T_DIR) (hdok : dirOk icfgNib dn data)
+    (hib : dinum.toNat < 16 * icfgNib) (hip : 0 < dinum.toNat) (hks : kslot < NINODE)
+    (harm : if self then dlSelf s dinum rti ∧ inum2 = dinum ∧ ientry kslot = ientry ik
+      else ¬ dlSelf s dinum rti ∧ dirFirst data (dirNrec dn.diSize.toNat) s = some kk ∧
+        inum2 = BitVec.setWidth 32 (dirInum data kk)) :
+    inodeRef (GF := GF) kslot qq icfgDev inum2 ∗ runitAny inum2.toNat ⊢
+    inodeHeldAt (ientry kslot) inum2.toNat := by
   have hinums := dirOk_dir icfgNib dn data hty hdok
-  have hlt := dirFirst_lt _ _ _ _ hf
-  have hlive := dirFirst_live _ _ _ _ hf
-  have hnib : (BitVec.setWidth 32 (dirInum data kd)).toNat < 16 * icfgNib := by
-    rw [MachCSL.zext32_toNat]; exact hinums kd hlt hlive
-  have hpos := Xv6.dirlookup_live_pos data kd hlive
+  have hfacts : inum2.toNat < 16 * icfgNib ∧ 0 < inum2.toNat := by
+    cases self with
+    | true =>
+      simp only [if_true] at harm
+      obtain ⟨-, heq, -⟩ := harm
+      rw [heq]; exact ⟨hib, hip⟩
+    | false =>
+      simp only [Bool.false_eq_true, if_false] at harm
+      obtain ⟨-, hf, heq⟩ := harm
+      have hlt := dirFirst_lt _ _ _ _ hf
+      have hlive := dirFirst_live _ _ _ _ hf
+      rw [heq]
+      exact ⟨by rw [MachCSL.zext32_toNat]; exact hinums kk hlt hlive,
+        Xv6.dirlookup_live_pos data kk hlive⟩
   iintro ⟨Href, Hru⟩
   unfold inodeHeldAt inodeRefp
-  iexists kslot, qq, BitVec.setWidth 32 (dirInum data kd)
+  iexists kslot, qq, inum2
   iframe Href Hru
   ipureintro
-  exact ⟨rfl, hks, hnib, hpos, MachCSL.zext32_toNat _⟩
+  exact ⟨rfl, hks, hfacts.1, hfacts.2, rfl⟩
 
 set_option maxHeartbeats 16000000 in
 /-- **`+0xde .. +0xf2`: THE LOOKUP AND THE FIRE**, the miss exit (`L_miss`,
@@ -155,15 +167,19 @@ theorem namexEra_look (IUP : IUNLOCKPUT) (DL : DIRLOOKUP) (Γ : SchedNames)
   unfold namexLk
   icases Hlk with ⟨#Hslk, #Hesc, #Hfl, Hsl, Hdep, Hoff, Hdev, Hinum, Hval, #Hshot, Hfrz, Hpar, Hru⟩
   unfold namexKeep
-  icases Hkeep with ⟨Hsb, Hsi, Hpid, Hcwd, Hcwr⟩
+  icases Hkeep with ⟨Hsb, Hsi, Hpid, Hcwd, Hcwr, Hrtc, Hrtr⟩
   icases namex_bslots3_split fscBio $$ Hbs with ⟨Hb1, Hb2⟩
   ihave Hs1 := (show irefSlots (GF := GF) 1 ⊢ irefSlot from .rfl) $$ Hs1
-  iapply (namex_dirlookup DL Γ cpu _ A ik inum bm data dn nf hs.hj ?gp ?gK ?gn ?gt hty hnl hs.hgeom
-      hok hdok hdoc hs.hpd ?ga0 ?ga2)
+  -- THE SELF ARM'S SHARE (chroot.md §2.2): dp is LOCKED, so the walk holds a
+  -- SHORT parent; half of what it still holds is lent (forgotten) with the unit
+  icases inodeRefShortGenlo_lend ik (q.half + q.half) q.half icfgDev inum g lo tl hle
+    $$ [$Hfl $Hpar] with ⟨Hpar, Hshr⟩
+  iapply (namex_dirlookup DL Γ cpu _ A ik inum bm data dn nf q.half.half hs.hj ?gp ?gK ?gn ?gt hty
+      hnl hs.hgeom hok hdok hdoc hf.hik hf.hnib hf.hpos hs.hpd ?ga0 ?ga2)
     $$ [- $Hk $Hpc]
   rotate_right 1
   k_norm_g [r20, r21]
-  iframe Hte Hce Hdev Hmeta Hmap Hblk Hnm Hpid Hb1 Hs1 Hdl Hdi
+  iframe Hte Hce Hdev Hmeta Hmap Hblk Hshr Hru Hnm Hpid Hrtc Hrtr Hb1 Hs1 Hdl Hdi
   iframe #
   case gp => k_norm_g; try exact hs.hproc
   case gK => k_norm_g; try exact namex_slots_sub _ hs.hK
@@ -172,8 +188,11 @@ theorem namexEra_look (IUP : IUNLOCKPUT) (DL : DIRLOOKUP) (Γ : SchedNames)
   case ga0 => k_norm_g; try exact r20
   case ga2 => k_norm_g
   unfold namexDlK
-  iintro %c %spie' %spp' %R' %found %kd %kslot %qq %hcs Hk Hpc Hte Hce Hdev Hmeta Hmap Hblk Hnm
-    Hpid Hb1 Hdl Hdi Harm
+  iintro %c %spie' %spp' %R' %found %kslot %qq %hcs Hk Hpc Hte Hce Hdev Hmeta Hmap Hblk Hshr Hru
+    Hnm Hpid Hrtc Hrtr Hb1 Hdl Hdi Harm
+  -- the lent share, re-pinned to the parent's generation and gathered back
+  ihave Hpar := inodeRefShortGenlo_regather ik (q.half + q.half) q.half icfgDev inum g lo
+    $$ [$Hpar $Hshr]
   let cpu := c
   k_norm_g [namex_ret_e8, r20, r21]
   ihave Hk := kctx_eq_mono c _ (((k.withSpie spie' spp').pushed 12).withRegs R')
@@ -192,7 +211,7 @@ theorem namexEra_look (IUP : IUNLOCKPUT) (DL : DIRLOOKUP) (Γ : SchedNames)
   ihave Hbs := namex_bslots3_join fscBio $$ [$Hb1 $Hb2]
   ihave Hlk : namexLk A ik q g lo tl inum dn γil γisl $$ [Hsl Hdep Hoff Hdev Hinum Hval Hfrz Hpar Hru]
   · unfold namexLk; iframe; iframe #
-  ihave Hkeep : namexKeep k A $$ [Hsb Hsi Hpid Hcwd Hcwr]
+  ihave Hkeep : namexKeep k A $$ [Hsb Hsi Hpid Hcwd Hcwr Hrtc Hrtr]
   · unfold namexKeep; iframe
   -- ===== THE PEEL: hop `length es0` off the family =====
   icases namexEraHops_cons A P Pmiss es0 el _ hf.hes hRne $$ Hhops with ⟨Hhop, Hhops⟩
@@ -204,12 +223,13 @@ theorem namexEra_look (IUP : IUNLOCKPUT) (DL : DIRLOOKUP) (Γ : SchedNames)
   cases found
   · -- ===== MISS: THE FIRE MISSES, then +0xea c.beqz a0 TAKEN, L_miss =====
     simp only [Bool.false_eq_true, if_false]
-    icases Harm with ⟨%⟨hnone, ha0⟩, Hs1'⟩
+    icases Harm with ⟨%⟨hnself, hnone, ha0⟩, Hs1'⟩
     have hents : (dirView data (dirNrec dn.diSize.toNat))[el]? = none := by
       rw [← hf.hel]; exact dv_lookup_none _ data _ _ rfl hnone
     iapply wpLoop_fupd
-    ihave Hfire := elend_fire_miss fscFs fscCov fscLogst P Pmiss es0.length el inum.toNat dn bm data
-      hok htyz hnl hents $$ Hhop HP Ht
+    ihave Hfire := elend_fire_miss A.rti fscFs fscCov fscLogst P Pmiss es0.length el inum.toNat dn
+      bm data hok htyz hnl hents
+      (fun h => hnself ⟨by rw [hf.hel, ← DOTDOT_dotdot]; exact h.1, h.2⟩) $$ Hhop HP Ht
     imod Hfire with ⟨Ht, HP⟩
     imodintro
     ihave Hload := Hclose $$ Hdl Hdi Hmeta Hmap Hblk Ht
@@ -229,12 +249,32 @@ theorem namexEra_look (IUP : IUNLOCKPUT) (DL : DIRLOOKUP) (Γ : SchedNames)
     case f18 => simp [RegMap.set_apply, ha0]
   · -- ===== FOUND: THE FIRE HITS, the cursor steps to the child =====
     simp only [if_true]
-    icases Harm with ⟨%⟨hsome, hks, ha0⟩, Href, Hru2⟩
-    have hents : (dirView data (dirNrec dn.diSize.toNat))[el]? = some (dirInum data kd).toNat := by
-      rw [← hf.hel]; exact dv_lookup_found _ data _ _ kd rfl hsome
+    icases Harm with ⟨%inum2, %self, %kk, %⟨hks, ha0⟩, %harm, Href, Hru2⟩
+    -- THE FIRE, on both of the lookup's arms (chroot): at the matched record's
+    -- child (`elend_fire_hit`), or -- the SELF arm, `..` at the process's
+    -- root -- at dp itself (`elend_fire_self`); the cursor steps to `inum2`
+    -- either way
+    have hfire : ⊢@{IProp GF} exHop A.rti fscFs P Pmiss es0.length el -∗ P es0.length inum.toNat -∗
+        topFrag (fsGammaL fscFs) inum.toNat (eraNode dn bm data) ={⊤}=∗
+          topFrag (fsGammaL fscFs) inum.toNat (eraNode dn bm data) ∗
+            P (es0.length + 1) inum2.toNat := by
+      cases self with
+      | true =>
+        simp only [if_true] at harm
+        obtain ⟨⟨hdd, hrt⟩, heq, -⟩ := harm
+        rw [heq]
+        exact elend_fire_self A.rti fscFs fscCov fscLogst P Pmiss es0.length el inum.toNat dn bm
+          data hok htyz hnl (by rw [← hf.hel, hdd]; exact DOTDOT_dotdot.symm) hrt
+      | false =>
+        simp only [Bool.false_eq_true, if_false] at harm
+        obtain ⟨hns, hsome, heq⟩ := harm
+        have hents : (dirView data (dirNrec dn.diSize.toNat))[el]? = some inum2.toNat := by
+          rw [heq, MachCSL.zext32_toNat, ← hf.hel]; exact dv_lookup_found _ data _ _ kk rfl hsome
+        exact elend_fire_hit A.rti fscFs fscCov fscLogst P Pmiss es0.length el inum.toNat dn bm
+          data inum2.toNat hok htyz hnl hents
+          (fun h => hns ⟨by rw [hf.hel, ← DOTDOT_dotdot]; exact h.1, h.2⟩)
     iapply wpLoop_fupd
-    ihave Hfire := elend_fire_hit fscFs fscCov fscLogst P Pmiss es0.length el inum.toNat dn bm data
-      (dirInum data kd).toNat hok htyz hnl hents $$ Hhop HP Ht
+    ihave Hfire := hfire $$ Hhop HP Ht
     imod Hfire with ⟨Ht, HP⟩
     imodintro
     ihave Hload := Hclose $$ Hdl Hdi Hmeta Hmap Hblk Ht
@@ -243,8 +283,8 @@ theorem namexEra_look (IUP : IUNLOCKPUT) (DL : DIRLOOKUP) (Γ : SchedNames)
     k_step_e (wp_s_branch cpu _ (KA.«namex» + 0xee#64) true 8098#13 10#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hbz, hd]
     iintro Hk Hpc
-    ihave Hip := namexEra_found_heldAt data dn kd kslot qq (bname 14 nf) hty hdok hsome hks
-      $$ [$Href $Hru2]
+    ihave Hip := namexEra_found_heldAt data dn inum A.rti kk kslot ik qq (bname 14 nf) self inum2 hty
+      hdok hf.hnib hf.hpos hks harm $$ [$Href $Hru2]
     -- +0xec  c.mv a0,s4
     k_step_e (wp_s_add cpu _ (KA.«namex» + 0xf0#64) true 10#5 0#5 20#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
@@ -282,13 +322,13 @@ theorem namexEra_look (IUP : IUNLOCKPUT) (DL : DIRLOOKUP) (Γ : SchedNames)
     obtain ⟨hA', hB', hD', hC'⟩ := namex_wi_step (pathElems (A.pl.drop o2)).length A.n ncur n' wc w
       hA hB hn hC hww hn1 hn2
     have hlen : (es0 ++ [el]).length = es0.length + 1 := by simp
-    ihave Hwalk : namexEraWalk k A P Pmiss (ientry kslot) (dirInum data kd).toNat
+    ihave Hwalk : namexEraWalk k A P Pmiss (ientry kslot) inum2.toNat
         (es0 ++ [el]).length n' Sb' nf $$ [Hip HP Hhops Hslot Hkeep Hpath Hnm Hbs Hops Htx]
     · rw [hlen]; unfold namexEraWalk; iframe
       iapply (show irefSlot (GF := GF) ⊢ irefSlots 1 from .rfl); iexact Hslot
     ihave IH := namexEraLoop_elim k A P Pmiss fuel $$ IH
     iapply IH $$ %cpu %spie'' %spp'' %_ %o2 %(ientry kslot) %n' %Sb' %(es0 ++ [el]) %nf
-      %(wc || w) %((dirInum data kd).toNat) [] Hk Hpc Hframe Hte Hce Hwalk Hnext
+      %(wc || w) %inum2.toNat [] Hk Hpc Hframe Hte Hce Hwalk Hnext
     ipureintro
     refine ⟨⟨?_, hf.hfu, hf.ho2, hf.hes, ⟨hA', hB', hD', hC'⟩,
       namex_report _ _ _ wc w hsub hf.hW hwr, namex_sub_trans _ _ _ hf.hSb hsub⟩,

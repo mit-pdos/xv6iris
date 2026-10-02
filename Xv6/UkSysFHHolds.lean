@@ -14,8 +14,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
-
 /-- **`UK_SYS_FH` holds**, at the engine. -/
 theorem ukSysFH_holds (UL : UK_LEAVES) : UK_SYS_FH where
   read := fun N h m pc a cnt f avail hn ha hc hal4 => wp_uk_ecall_read UL N h m pc a cnt f avail hn ha hc hal4

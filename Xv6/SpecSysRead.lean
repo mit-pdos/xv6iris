@@ -84,9 +84,6 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedVariables false
-set_option linter.unusedSectionVars false
-
 def sysReadAddr : BitVec 64 := KA.«sys_read»
 
 /-- sys_read's own 6-slot frame over fileread's 98 (argfd's 24, argint's /

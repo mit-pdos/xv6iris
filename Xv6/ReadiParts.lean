@@ -39,8 +39,6 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedSectionVars false
-
 /-! ## Call targets and return addresses -/
 
 theorem rd_br_either : KA.«readi» + 0xffffffffffffec4e#64 = KA.«either_copyout» := by decide

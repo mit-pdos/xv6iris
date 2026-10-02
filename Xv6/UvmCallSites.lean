@@ -12,8 +12,6 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedSectionVars false
-
 /-- A branch on a value known to be nonzero: not taken. -/
 theorem uc_beq_ne {α : Type} (x : BitVec 64) (h : x ≠ 0#64) (p q : α) :
     (if bcond bop.BEQ x 0#64 then p else q) = q := by
@@ -72,7 +70,6 @@ theorem uc_kalloc_lend_call [WchG GF] (KAL : KALLOC) [CurCtx] (c : CPU) (k' : KC
   iapply H $$ %spie %spp %R' %hs Hk Hpc Hl Hpost
   ipureintro
   exact hcs
-
 
 set_option maxHeartbeats 1000000 in
 /-- `kfree`'s LED contract as a rule, at a lend (permit sweep L3b): the lend

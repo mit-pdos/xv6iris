@@ -66,8 +66,8 @@ theorem split_on_page_boundary_2 (va : BitVec 64) (h : va.toNat % 2 = 0) :
   · simp only [Functions.pagesize_bits, Functions.ones, Functions.zeros, Sail.BitVec.updateSubrange,
       Sail.BitVec.subInt, Sail.BitVec.updateSubrange', Sail.BitVec.length, sail_ones, Sail.BitVec.addInt,
       Int.cast_ofNat_Int, Int.reduceSub, Int.reduceToNat, Nat.reduceSub, Nat.reduceAdd, BitVec.reduceOfInt,
-      BitVec.zero_eq, BitVec.reduceAllOnes, BitVec.reduceSetWidth, BitVec.reduceZeroExtend,
-      BitVec.setWidth_eq, BitVec.shiftLeft_zero, BitVec.and_allOnes, BitVec.or_zero]
+      BitVec.zero_eq, BitVec.reduceAllOnes, BitVec.reduceZeroExtend,
+      BitVec.shiftLeft_zero, BitVec.or_zero]
     exact page_mask_same2 va h1
 
 /-- A signed load's value is sign-extended. -/

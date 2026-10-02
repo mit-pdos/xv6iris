@@ -37,9 +37,7 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## Constants -/
 
@@ -47,7 +45,6 @@ theorem sys_open_walk_br_namei : KA.«sys_open» + 0xffffffffffffe960#64 = KA.«
 theorem sys_open_walk_br_ilock : KA.«sys_open» + 0xffffffffffffe08c#64 = KA.«ilock» := by decide
 theorem sys_open_walk_ret_e4 : jumpPc (KA.«sys_open» + 0xe4#64) = KA.«sys_open» + 0xe4#64 := by decide
 theorem sys_open_walk_ret_ec : jumpPc (KA.«sys_open» + 0xec#64) = KA.«sys_open» + 0xec#64 := by decide
-
 
 /-- The whole walk fits the op's reservation (Rocq `so_namei_need`). -/
 theorem sys_open_walk_bud (L : Nat) : walkNeed L ≤ MAXOPBLOCKS := by

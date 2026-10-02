@@ -146,7 +146,7 @@ open LeanRV64D LeanRV64D.Functions in
 theorem kLeaf_rw_ppn_inj (p q : BitVec 44) (h : kLeaf p .rw 0#1 0#1 = kLeaf q .rw 0#1 0#1) : p = q := by
   unfold kLeaf mkPte pteSetAD KPerm.flags at h
   simp only [_update_PTE_Flags_D, _update_PTE_Flags_A, Sail.BitVec.updateSubrange, Sail.BitVec.updateSubrange',
-    Sail.BitVec.extractLsb, BitVec.extractLsb, Sail.BitVec.length] at h
+    Sail.BitVec.extractLsb, BitVec.extractLsb] at h
   bv_decide
 
 /-- A kernel word whose page is its own (the identity claim) is the physical

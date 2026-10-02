@@ -151,7 +151,7 @@ theorem utlb_miss_ok (D : UFoot) (orc orc' : UOrc) (s s' : UWSt) (hdr : D.Dr .tl
   cases po <;> uwk_run -bv [tlbHash_eq] <;>
     simp only [uwkOut, tlbHash_eq, Option.getD_none, Option.getD_some] <;>
     reduce_closed_widths <;> simp only [tlbEntryOf] <;> congr <;>
-    simp only [sign_extend, zero_extend, ones, sail_ones, Sail.BitVec.signExtend, Sail.BitVec.zeroExtend, ptePpn] <;>
+    simp only [zero_extend, ones, sail_ones, Sail.BitVec.zeroExtend, ptePpn] <;>
     bv_decide
 
 /-! ## §4 The user TLB invariant (Rocq `PtTree.tlb_ok_pt`, the TLB row of

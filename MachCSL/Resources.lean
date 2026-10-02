@@ -638,7 +638,7 @@ theorem not_devBytes_of_ramBytes {pa : PAddr} {n : Nat} (h : ramBytes pa n) (hn 
     ¬ devBytes pa n := by
   intro hd
   have h1 := hd 0 hn
-  simp only [BitVec.ofNat_eq_ofNat, BitVec.add_zero] at h1
+  simp only [BitVec.add_zero] at h1
   rw [devAddr_false_of_ramBytes h hn] at h1
   exact absurd h1 (by decide)
 
@@ -766,7 +766,7 @@ theorem mmOk_afterLoad (σ : MState) (cpu : CPU) (pa : PAddr) (n tvn : Nat) (htv
   simp only [MState.top] at *
   by_cases hc : c = cpu
   · subst hc
-    simp only [MState.afterLoad, updCpu, if_true]
+    simp only [updCpu, if_true]
     refine ⟨a1, a2, ?_, ?_⟩
     · simp only [HRead.afterLoad]; omega
     · intro a
@@ -774,7 +774,7 @@ theorem mmOk_afterLoad (σ : MState) (cpu : CPU) (pa : PAddr) (n tvn : Nat) (htv
       split
       · exact htv
       · exact a4 a
-  · simp only [MState.afterLoad, updCpu, hc, if_false]
+  · simp only [updCpu, hc, if_false]
     exact ⟨a1, a2, a3, a4⟩
 
 theorem mmOk_fence (σ : MState) (cpu : CPU) (b : barrier_kind) (h : mmOk σ) : mmOk (σ.fence cpu b) := by
@@ -786,12 +786,12 @@ theorem mmOk_fence (σ : MState) (cpu : CPU) (b : barrier_kind) (h : mmOk σ) : 
   simp only [MState.top] at *
   by_cases hc : c = cpu
   · subst hc
-    simp only [MState.fence, updCpu, if_true]
+    simp only [updCpu, if_true]
     refine ⟨fencePost_le _ _ _ _ _ _ b1 b3 hpub, ?_, a3, a4⟩
     split
     · exact Nat.max_le.2 ⟨b2, fencePost_le _ _ _ _ _ _ b1 b3 hpub⟩
     · exact b2
-  · simp only [MState.fence, updCpu, hc, if_false]
+  · simp only [updCpu, hc, if_false]
     exact ⟨a1, a2, a3, a4⟩
 
 theorem mmOk_store (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (excl : Bool)
@@ -806,15 +806,15 @@ theorem mmOk_store (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec 
     simp only [MState.top] at *
     by_cases hc : c = cpu
     · subst hc
-      simp only [MState.store, updCpu, if_true, List.length_append, List.length_singleton]
+      simp only [updCpu, if_true, List.length_append, List.length_singleton]
       refine ⟨?_, by omega, ?_, ?_⟩
       · split <;> omega
       · simp only [HRead.clearAcq]; omega
       · intro a; simp only [HRead.clearAcq]; have := a4 a; omega
-    · simp only [MState.store, updCpu, hc, if_false, List.length_append, List.length_singleton]
+    · simp only [updCpu, hc, if_false, List.length_append, List.length_singleton]
       exact ⟨by omega, by omega, by omega, fun a => by have := a4 a; omega⟩
   · intro c r hr a v hav
-    simp only [MState.store, updCpu] at hr ⊢
+    simp only [updCpu] at hr ⊢
     by_cases hc : c = cpu
     · subst hc
       simp at hr
@@ -840,10 +840,10 @@ theorem mmOk_storeDma (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
     exact FlatMem.writeBytes_histOk σ.mem σ.log pa w diskAgent h1 a H hget
   · intro c
     obtain ⟨a1, a2, a3, a4⟩ := h2 c
-    simp only [MState.storeDma, MState.top, List.length_append, List.length_singleton] at *
+    simp only [MState.top, List.length_append, List.length_singleton] at *
     exact ⟨by omega, by omega, by omega, fun a => by have := a4 a; omega⟩
   · intro c r hr a v hav
-    simp only [MState.storeDma] at hr ⊢
+    simp only [] at hr ⊢
     have hno' : ∀ j, j < n → a ≠ pa + BitVec.ofNat 64 j := by
       intro j hj heq
       exact hno ⟨c, r, hr, j, hj, by rw [← heq, hav]; rfl⟩
@@ -858,7 +858,7 @@ theorem mmOk_setRt (σ : MState) (d : DevId) (rt : DevRt)
     (hnext : 0 < (σ.devrt d).next → 0 < rt.next) (h : mmOk σ) : mmOk (σ.setRt d rt) := by
   obtain ⟨h1, h2, h3, h4, h5⟩ := h
   refine ⟨h1, h2, h3, h4, fun d' => ?_⟩
-  simp only [MState.setRt, updCpu']
+  simp only [updCpu']
   by_cases hd : d' = d
   · subst hd; simp only [if_true]; exact hnext (h5 d')
   · simp only [hd, if_false]; exact h5 d'

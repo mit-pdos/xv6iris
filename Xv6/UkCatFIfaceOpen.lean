@@ -31,8 +31,6 @@ open Iris.Std.PartialMap
 open HfpPipeP HfpFileClaimsP
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
-
 /-- The handle function after a standard slot's input joined. -/
 theorem cifHf_insert_std (fdm : Fdmap) (vs : RegMapF CfDev) (k d : Nat) (nm : List (BitVec 8)) (i : Nat)
     (γo : GName) (hnone : fdm (k : Int) = none) (hfr : ∀ fd', fdm fd' ≠ some d) (fd : Int) :

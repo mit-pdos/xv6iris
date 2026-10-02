@@ -45,8 +45,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Std MachCSL LeanRV64D
 
-set_option linter.unusedSectionVars false
-
 /-! ## §1 `retPc` and the `+4` congruence (K4) -/
 
 /-- **Rocq `ret_pc_add4`**: true UNCONDITIONALLY. -/

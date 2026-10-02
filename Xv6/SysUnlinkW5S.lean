@@ -35,9 +35,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-- The target's record after `ip->nlink--` (Rocq's `su_setnl dni (su_dec16 …)`). -/
 abbrev sysUnlinkDni2 (dni : Dinode) : Dinode := sysfileSetnl dni (sysUnlinkDec16 dni.diNlink)

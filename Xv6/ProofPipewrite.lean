@@ -59,9 +59,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-- `k_step_e` for a stretch whose CURRENT hart is named `c` (the name
 `cpu` is the caller-continuation anchor here): the new hart shadows `c`,

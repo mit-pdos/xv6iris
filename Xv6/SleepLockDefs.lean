@@ -45,8 +45,6 @@ namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 
-set_option linter.unusedSectionVars false
-
 -- The ghost class `SleepLockG` and the counting camera `SlhRF` live in
 -- `Xv6.SleepLockGhost`.
 
@@ -406,7 +404,6 @@ theorem kctx_newSleeplock [CurCtx] {lent : Bool} (cpu : CPU) (k : KCtx) (slk nam
   iexists γl, γ
   unfold isSleeplockGen
   iexact Hlk
-
 
 set_option maxHeartbeats 1000000 in
 /-- Rocq `SleepLock.sl_fresh_new_genl` (at `own_context`, any mask): a

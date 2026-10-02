@@ -21,6 +21,7 @@ writer's deposit (`EXf`).
 3. `cmtN_fire_wid` is `PipeBothN.cmtNFire` at `W := Wid`.
 -/
 import Xv6.UshPipesDefs
+import Xv6.UkPipeDevDefs
 
 namespace Xv6
 

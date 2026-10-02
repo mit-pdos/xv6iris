@@ -34,9 +34,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 theorem dirlink_slots_writei (a : Nat) (h : dirlinkSlots ≤ a) : writeiSlots ≤ a - 10 := by
   have h1 : writeiSlots = 92 := by decide
@@ -81,7 +79,7 @@ clauses one per writei outcome (`dirlink_wiok`), the range clause two-way
 (the disturbed region is empty on the kernel arm), the branchless return. -/
 theorem dirlink_out_append [Fscfg] [Icfg] (bm bm' : Blkmap) (data data' : Nat → List (BitVec 8))
     (dn dn0 dn' dn0' : Dinode) (fn : Nat → BitVec 8) (inum : BitVec 16) (dinum : BitVec 32)
-    (ncount n' : Nat) (Sb Sb' : List Nat) (src a0 : BitVec 64) (tot : Nat)
+    (rti : Nat) (ncount n' : Nat) (Sb Sb' : List Nat) (src a0 : BitVec 64) (tot : Nat)
     (wrote dstb : Nat → BitVec 8) (P' : UPtd)
     (hoff : 16 * dirSlot data (dirNrec dn.diSize.toNat) ≤ dn.diSize.toNat)
     (hda : dn.diAddrs = bmCells bm)
@@ -89,7 +87,7 @@ theorem dirlink_out_append [Fscfg] [Icfg] (bm bm' : Blkmap) (data data' : Nat �
     (hout : WriteiOut fscCov fscLogst fscBmapstart dinum icfgIst bm data dn dn0 false
       (16 * dirSlot data (dirNrec dn.diSize.toNat)) 16 (direntBytes (deOfName inum (bname 14 fn)))
       readiKVp (fun _ => []) src ncount Sb a0 tot bm' data' dn' dn0' n' wrote 0 dstb P' Sb') :
-    DirlinkOut bm data dn dn0 fn inum dinum ncount Sb
+    DirlinkOut bm data dn dn0 fn inum dinum rti ncount Sb
       (if a0 = 16#64 then 0#64 else 0xFFFFFFFFFFFFFFFF#64) false bm' data' dn' dn0' n' Sb' tot := by
   have hb := Xv6.sys_unlink_wi_blocks (dirSlot data (dirNrec dn.diSize.toNat))
   have hsp := hout.spend
@@ -218,6 +216,7 @@ theorem dirlink_write (WI : WRITEI) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF �
     (ip : BitVec 64) (dinum : BitVec 32) (bm : Blkmap) (data : Nat → List (BitVec 8))
     (dn dn0 : Dinode) (fn : Nat → BitVec 8) (inum : BitVec 16) (ncount : Nat) (Sb : List Nat)
     (tid : Nat) (qtx : Qp) (pidv : BitVec 32) (dqp dqd dqf dqn dqs dqbs dqb : DFrac)
+    (kd : Nat) (sd : Qp) (rootv : BitVec 64) (rti : Nat) (dqr : DFrac)
     (v3 v4 : BitVec 64)
     (hs : DirlinkStatic k j bm data dn dn0 fn inum dinum ncount Sb) (hpd : descPageRw pd)
     (hr : dirlinkRegs k ip (BitVec.ofNat 64 (16 * dirSlot data (dirNrec dn.diSize.toNat)))
@@ -228,12 +227,12 @@ theorem dirlink_write (WI : WRITEI) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF �
       (k.regs 21#5) (k.regs 22#5) ∗
     dirlinkDe (k.regs 2#5) (direntBytes (deOfName inum (bname 14 fn))) ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    dirlinkKeep k ip dinum bm data dn dn0 fn pidv dqp dqd dqf dqn dqs dqbs dqb ∗
+    dirlinkKeep k ip dinum bm data dn dn0 fn pidv dqp dqd dqf dqn dqs dqbs dqb kd sd rootv rti dqr ∗
     bslots 3 ∗ irefSlot ∗ dlinks fscFs dinum.toNat dn bm data ∗
     logOpS icfgLog ncount Sb ∗ txPin icfgLog tid qtx ∗
     dirlinkEnv (hlc := hlc) Γ γl pd pav pu γkl γk ∗
     (∀ c' : CPU, dirlinkPost k ip dinum bm data dn dn0 fn inum ncount Sb tid qtx pidv
-      dqp dqd dqf dqn dqs dqbs dqb c')
+      dqp dqd dqf dqn dqs dqbs dqb kd sd rootv rti dqr c')
     ⊢ wpLoop (GF := GF) cpu := by
   have hww : ∀ (K : KCtx) (a b c d : Bool), (K.withSpie a b).withSpie c d = K.withSpie c d :=
     fun _ _ _ _ _ => rfl
@@ -271,7 +270,7 @@ theorem dirlink_write (WI : WRITEI) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF �
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [dirlink_br_writei]
   iintro Hk Hpc
   unfold dirlinkKeep
-  icases Hkeep with ⟨Hdev, Hin, Hmeta, Hmap, Hblk, Hnm, Hsi, Hss, Hsb, Hdi, Hpid⟩
+  icases Hkeep with ⟨Hdev, Hin, Hmeta, Hmap, Hblk, Hnm, Hsi, Hss, Hsb, Hdi, Hpid, Hdr⟩
   unfold dirlinkDe
   icases Hde with ⟨Hsrc, %hsl⟩
   iapply (dirlink_writei WI Γ cpu _ γl pd pav pu j γkl γk ip dinum bm data dn dn0
@@ -338,21 +337,21 @@ theorem dirlink_write (WI : WRITEI) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF �
   · unfold dirlinkFrame; iframe
   ihave Hde : dirlinkDe (k.regs 2#5) (direntBytes (deOfName inum (bname 14 fn))) $$ [Hsrc]
   · unfold dirlinkDe; iframe; ipureintro; exact hsl
-  have hout' := dirlink_out_append bm bm' data data' dn dn0 dn' dn0' fn inum dinum ncount n' Sb Sb'
+  have hout' := dirlink_out_append bm bm' data data' dn dn0 dn' dn0' fn inum dinum rti ncount n' Sb Sb'
     _ (R1 10#5) tot wrote dstb P' hoff hs.hda hnone hout
   iapply (dirlink_tail cpu k spie1 spp1 _ (k.regs 9#5) v3 v4 _
       (by have := hs.hK; unfold dirlinkSlots at this; omega) hs.hal ?t2 ?t9 ?t19 ?t20 ?t23 ?t24
       ?t25 ?t26 ?t27)
     $$ [$Hk $Hpc $Hframe $Hde $Hte $Hce Hpost Hdev Hin Hmeta Hmap Hblk Hnm Hsi Hss Hsb Hdi Hpid
-      Hbs Hslot Hlk Hop Htx]
+      Hdr Hbs Hslot Hlk Hop Htx]
   case t2 | t9 | t19 | t20 | t23 | t24 | t25 | t26 | t27 =>
     simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, b2, b9, b19,
       b20, b23, b24, b25, b26, b27, r2, r9, r19, r20, r23, r24, r25, r26, r27]
   · iintro %c' %R' %⟨hcs', ha0'⟩ Hk Hpc Hte Hce
     ispecialize Hpost $$ %c'
-    ihave HΦ := dirlinkPost_elim _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ $$ Hpost
+    ihave HΦ := dirlinkPost_elim _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ $$ Hpost
     iapply HΦ $$ %spie1 %spp1 %R' %false %bm' %data' %dn' %dn0' %n' %Sb' %tot %hcs' [] Hk Hpc Hte
-      Hce [Hdev Hin Hmeta Hmap Hblk Hnm Hsi Hss Hsb Hdi Hpid] Hbs Hslot Hlk Hop Htx
+      Hce [Hdev Hin Hmeta Hmap Hblk Hnm Hsi Hss Hsb Hdi Hpid Hdr] Hbs Hslot Hlk Hop Htx
     · ipureintro
       simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] at ha0'
       rw [ha0']; exact hout'

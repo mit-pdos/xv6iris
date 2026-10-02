@@ -12,8 +12,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
-
 /-- **`UK_SYS_IO` holds**, at the engine. -/
 theorem ukSysIO_holds (UL : UK_LEAVES) : UK_SYS_IO where
   readRecvAt := fun N h m pc cnt k f avail fdep l v hn hc hk hal4 =>

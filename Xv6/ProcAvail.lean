@@ -30,8 +30,6 @@ namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-- The namespace of the sealed regime's invariant. -/
 def pavN : Namespace := ndot nroot "xv6procavail"
 
@@ -62,7 +60,7 @@ theorem pav_filter_clear (f : Nat → Bool) (j0 : Nat) (l : List Nat) (hnd : l.N
         apply List.filter_congr
         intro j hj
         exact pavClear_ne f a j (fun he => ha (he ▸ hj))
-      simp [List.filter_cons, pavClear_self, hf, hfilt]
+      simp [pavClear_self, hf, hfilt]
     · have hm' : j0 ∈ t := by
         rcases List.mem_cons.mp hm with h | h
         · exact absurd h.symm hea
@@ -256,7 +254,6 @@ theorem procsAvail_seal (Γ : SchedNames) (n : Nat) :
       iintro H; ileft; iexact H
   imodintro
   iexact Hinv
-
 
 /-! ## The boot-era token (Rocq `procs_avail_at` / `pav_boot` / `pav_spent`)
 

@@ -24,8 +24,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-- `map_Forall` survives an insert of an entry satisfying it (the helper
 `map_Forall_insert_2` the Rocq proofs use). -/
 theorem dst_forall_insert (s : Dst) (N : Fname) (v : Nat × List (BitVec 8))

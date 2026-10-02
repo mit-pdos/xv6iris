@@ -25,8 +25,6 @@ namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-- Port `i`'s invariant's namespace. -/
 def uartN : UartId → Namespace
   | .uart0 => ndot nroot "xv6uart0"

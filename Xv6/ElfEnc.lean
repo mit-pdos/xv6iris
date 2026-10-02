@@ -91,7 +91,7 @@ kept because the reasons are the content:
 
 Imports only definitional files.
 -/
-import MachCSL.ByteWord4
+import MachCSL.ByteWordDefs
 
 namespace Xv6
 

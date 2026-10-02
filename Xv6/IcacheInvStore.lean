@@ -133,8 +133,6 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
 open Iris.Algebra
 
-set_option linter.unusedSectionVars false
-
 /-! ## 0.  Pure helpers: the map after a count move -/
 
 /-- Rocq's inline `icM_wf` re-proof after an `<[k := (q, n')]>`
@@ -193,7 +191,6 @@ theorem logN_sub_diff_icacheN (E : CoPset) (h : (↑logN : CoPset) ⊆ E) :
   intro p hp
   rw [CoPset.in_diff]
   exact ⟨h p hp, fun hc => icacheN_logN_disj p ⟨hc, hp⟩⟩
-
 
 /-- THE NOT-LAST CLOSE's local update at the slot (Rocq's inline
 `gmap_local_update` in `iref_close_step_noarm`): the departing `(q, 1)`

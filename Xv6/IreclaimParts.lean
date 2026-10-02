@@ -39,8 +39,6 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedSectionVars false
-
 /-! ## Addresses -/
 
 /-- `auipc a4,0x1d ; lw a4,984(a4)` at `+0x00`: `sb.ninodes`. -/

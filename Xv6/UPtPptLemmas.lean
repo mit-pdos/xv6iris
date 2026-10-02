@@ -22,8 +22,6 @@ open LeanRV64D LeanRV64D.Functions
 open Iris.Std Iris.Std.PartialMap Iris.Std.LawfulPartialMap
 open Xv6.PtRun Xv6.UPt
 
-set_option linter.unusedSectionVars false
-
 /-! ## Branches -/
 
 /-- `bltz` on a result known to be `0`: not taken. -/

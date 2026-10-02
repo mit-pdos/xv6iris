@@ -47,8 +47,6 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Iris.Std.PartialMap
 
-set_option linter.unusedSectionVars false
-
 section XferBytes
 variable {GF : BundledGFunctors} [GhostMapG GF Nat (BitVec 8) RegMapF]
 

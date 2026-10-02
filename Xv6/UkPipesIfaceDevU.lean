@@ -27,25 +27,13 @@ import Xv6.UkFileDevDefs
 import Xv6.PipeOut
 import Xv6.PipeProtoRead
 import Xv6.UkPipeDevWrite
+import Xv6.PnsKeep
 
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Std (ExtTreeSet)
 open UexecSG
-
-set_option linter.unusedSectionVars false
-
-/-- A pure conclusion of two resources keeps them. -/
-theorem pns_keep2 {GF : BundledGFunctors} {P Q : IProp GF} {φ : Prop} (h : ⊢ P -∗ Q -∗ ⌜φ⌝) :
-    P ∗ Q ⊢ ⌜φ⌝ ∗ (P ∗ Q) := by
-  refine BI.pure_elim φ ?_ (fun hφ => ?_)
-  · iintro ⟨HP, HQ⟩
-    iapply h $$ HP HQ
-  · iintro H
-    isplitr
-    · ipureintro; exact hφ
-    · iexact H
 
 section DevU
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [IcacheG GF] [PipeProtoG GF] [PipeOutG GF] [CtokG GF] [SG : UexecSG GF]
@@ -190,7 +178,6 @@ theorem pns_write_haltU (UL : UK_LEAVES) (DK : PipeDevK hlc GF)
         iexfalso; iexact HQ
     · icases HK with ⟨-, HK⟩
       iapply HK $$ Hstd Ht
-
 
 /-- **Rocq `pns_read_atU`**: THE READ AT AN EXACT CURSOR, at a flow
 parameter (`UkPipeDev.pipe_read_at` with `pipe_rpay_of_invU`). -/

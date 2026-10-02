@@ -21,8 +21,6 @@ Imports only definitional files.
 -/
 import Xv6.SlotSupply
 
-set_option linter.unusedSectionVars false
-
 namespace Xv6
 
 open Iris Iris.BI Std MachCSL

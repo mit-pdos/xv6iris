@@ -47,8 +47,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Std MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-- The gname record the crash predicate is parameterised by (Rocq
 `fs_crash_names`): the history, and the three fixed-layer names passed as
 parameters (see the header). -/

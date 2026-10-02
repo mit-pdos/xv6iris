@@ -71,8 +71,6 @@ namespace Xv6
 
 open Iris Iris.Std Std MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-! ## Helpers -/
 
 /-- Duplicate-freedom makes the index of an entry unique (stdpp's

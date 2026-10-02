@@ -179,8 +179,6 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
 open Iris.Algebra
 
-set_option linter.unusedSectionVars false
-
 /-! ## 0.  THE CAMERAS (Rocq `Xv6Cameras.v` §11 and the icache box; deviation 1) -/
 
 /-- Rocq's `positiveR`: the positive naturals under `+`, with NO core and no

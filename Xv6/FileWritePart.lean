@@ -36,8 +36,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-- a write that starts and ends inside one block touches one block (Rocq
 `fwp_single_block`) -/
 theorem fwpSingleBlock (off n : Nat) (hn : 0 < n) (hfit : off % BSIZE + n < BSIZE) :

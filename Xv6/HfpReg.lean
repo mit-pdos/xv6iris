@@ -31,14 +31,12 @@ is the fragment of number `d` at fraction `q`.
 4. The ghost-map family (`[∗ map] d ↦ x ∈ vs, tok d (1/2) x`) is over
    `vs : RegMapF X` (Rocq `gmap nat X`); `dom vs` is `PartialMap.dom vs`.
 -/
-import Xv6.UkHandler
+import MachCSL.WpSmodeFrame
 
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Iris.Std.PartialMap
-
-set_option linter.unusedSectionVars false
 
 namespace HfpReg
 

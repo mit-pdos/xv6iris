@@ -58,8 +58,6 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedSectionVars false
-
 /-! ## The context `main` is entered in -/
 
 /-- **The kernel context of a hart at `main`'s entry** (Rocq `boot_bridge`'s

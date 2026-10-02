@@ -31,8 +31,6 @@ import Xv6.UkGrepMatchDefs
 
 namespace Xv6
 
-set_option linter.unusedSectionVars false
-
 /-! ## §1 The scan, one line at a time -/
 
 /-- **Rocq `nul_ne_nl`**. -/

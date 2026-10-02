@@ -24,8 +24,6 @@ open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open Iris.Std.PartialMap Iris.Std.FiniteMap
 open Sail LeanRV64D LeanRV64D.Functions
 
-set_option linter.unusedSectionVars false
-
 /-! ## §1 The register map as the reference file's GPRs -/
 
 theorem ukRegs_ufFile (C : UCfg) (P : UPtd) (v : UfVals) (m : RegMap) (hg : v.g = m) :
