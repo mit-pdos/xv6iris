@@ -199,40 +199,6 @@ theorem mkdirCre_inst (Γ : FsViewNames GF) (M : Nat → List (BitVec 8)) (pv : 
   · iapply (nparCur_out M pv pl P hpl)
   · iapply (nparCur_in M pv pl P hpl)
 
-/-- Rocq's `mkdir_au_at_inst`: at the path argstr read, the walk wand fires
-and the cursor moves. -/
-theorem mkdirAuAt_inst (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat)
-    (M : Nat → List (BitVec 8)) (pv : Nat) (pl : List (BitVec 8))
-    (P Pmiss : Nat → Nat → IProp GF)
-    (Farm : Pfam GF (Aview → Nat → IProp GF))
-    (Fdots : Pfam GF (Aview → Nat → Nat → Bool → IProp GF))
-    (Fun : Pfam GF (Aview → Nat → IProp GF))
-    (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) (hpl : argPathOf M pv pl) :
-    mkdirAuAt (hlc := hlc) Γ γfs rt cw M pv P Pmiss Farm Fdots Fun Fok Fex ⊢
-      mkdirAuPre (hlc := hlc) Γ γfs rt cw pl P Pmiss Farm Fdots Fun Fok Fex := by
-  unfold mkdirAuAt mkdirAuPre
-  iintro ⟨Hw, Hex, Hcre⟩
-  ihave Hcre := mkdirCre_inst Γ M pv pl P Farm Fdots Fun Fok hpl $$ Hcre
-  iframe Hex Hcre
-  iapply Hw $$ %pl %hpl
-
-/-- THE GENERIC SUPPLIER'S ONE LINE (Rocq's `mkdir_au_at_of_all`). -/
-theorem mkdirAuAt_of_all (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat)
-    (M : Nat → List (BitVec 8)) (pv : Nat) (P Pmiss : Nat → Nat → IProp GF)
-    (Farm : Pfam GF (Aview → Nat → IProp GF))
-    (Fdots : Pfam GF (Aview → Nat → Nat → Bool → IProp GF))
-    (Fun : Pfam GF (Aview → Nat → IProp GF))
-    (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) :
-    nparWalkPreEra (hlc := hlc) γfs rt cw P Pmiss ⊢
-      pfAt (dlookupCommitAt (hlc := hlc) Γ appE) Fex -∗
-      creCommits (hlc := hlc) Γ T_DIR.toNat 0 0 (fun _ => True) (fun _ => True) (nparCur M pv P) Farm Fdots Fun Fok -∗
-      mkdirAuAt (hlc := hlc) Γ γfs rt cw M pv P Pmiss Farm Fdots Fun Fok Fex := by
-  unfold mkdirAuAt
-  iintro Hw Hex Hcre
-  iframe Hex Hcre
-  iintro %pl %_
-  iapply (npStart_of_mknod (hlc := hlc) γfs rt cw P Pmiss pl) $$ Hw
-
 /-- SATISFIABILITY (Rocq's `mkdir_au_at_unit`): the generic application asks
 nothing of mkdir's walk or its legs -- every hop says yes, every cursor is
 `True`, every commit is its own unit, paid off the SUPPLY. -/

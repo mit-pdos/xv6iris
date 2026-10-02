@@ -38,9 +38,6 @@ theorem ush_cs_wr (m : RegMap) (rd r : BitVec 5) (v : BitVec 64) (hr : ucalleeSa
     (hd : ucalleeSavedIdx rd = false) : (ukWr m rd v).get r = m.get r :=
   ukWr_get_other _ _ _ _ (ucs_ne r rd hr hd)
 
-/-- **Rocq `E62u`**. -/
-theorem ushRedirs_E62 : ((rbGt.toNat : Nat) : Int) = 62 := by decide
-
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]

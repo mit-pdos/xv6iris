@@ -208,10 +208,6 @@ theorem utEvQuiet_of_ev (sc : BitVec 64) (V V' : ProcPriv) (h : V'.ev = V.ev) : 
 /-- The quiet row is vacuous at the ecall cause. -/
 theorem utEvQuiet_ecall (V V' : ProcPriv) : utEvQuiet uecallScause V V' := fun hc => absurd rfl hc
 
-/-- The quiet row is vacuous for a lazy process. -/
-theorem utEvQuiet_lazy (sc : BitVec 64) (V V' : ProcPriv) (h : V.pvLazy = true) : utEvQuiet sc V V' :=
-  fun _ hl => absurd (h.symm.trans hl) (by decide)
-
 theorem utFdEcall_quiet (sc secc : BitVec 64) (tf tf' : List (BitVec 64)) (sts sts' : List FdState)
     (h : sc ≠ uecallScause) : utFdEcall sc secc tf tf' sts sts' := fun hc => absurd hc h
 
@@ -219,21 +215,10 @@ theorem utPipeEcall_quiet (sc secc : BitVec 64) (tf tf' : List (BitVec 64)) (M M
     (sts sts' : List FdState) (h : sc ≠ uecallScause) : utPipeEcall sc secc tf tf' M M' sts sts' :=
   fun hc => absurd hc h
 
-/-- Rocq `ut_ret_pid_ne`. -/
-theorem utRetPid_ne (sc secc : BitVec 64) (tf tf' : List (BitVec 64)) (pid : BitVec 32)
-    (h : usysEff secc tf ≠ USYS_getpid) : utRetPid sc secc tf tf' pid :=
-  fun _ => usysRetPid_ne _ _ _ h
-
 /-- Rocq `ut_live_out_ne`. -/
 theorem utLiveOut_ne (sc secc : BitVec 64) (tf : List (BitVec 64)) (sts : List FdState) (r : BitVec 64)
     (cs' : ExtTreeSet GName compare) (h : sc ≠ uecallScause) : utLiveOut sc secc tf sts r cs' :=
   fun hc => absurd hc h
-
-/-- Rocq `ut_live_out_num`. -/
-theorem utLiveOut_num (sc secc : BitVec 64) (tf : List (BitVec 64)) (sts : List FdState) (r : BitVec 64)
-    (cs' : ExtTreeSet GName compare) (hr : usysEff secc tf ≠ USYS_read) (hw : usysEff secc tf ≠ USYS_wait) :
-    utLiveOut sc secc tf sts r cs' :=
-  fun _ => uexecLiveOk_ne tf sts r cs' hr hw
 
 /-- **Rocq `ut_round_entry`**: at a non-ecall cause, the prologue's record
 is a round (the identity). -/
@@ -244,17 +229,6 @@ theorem utRound_entry (sep sc : BitVec 64) (V : ProcPriv) (M : Nat → List (Bit
   unfold utRound uroundOk syscImg
   rw [if_neg hne, htf, hupt, hsz, hM, hcwi, hlz, hsc]
   exact ⟨⟨rfl, rfl⟩, rfl, rfl, rfl, rfl, rfl, rfl⟩
-
-/-- **Rocq `ut_round_same`**: a block that does not move the user-visible
-state relays the round. -/
-theorem utRound_same (sep sc : BitVec 64) (V : ProcPriv) (M : Nat → List (BitVec 8)) (V' V'' : ProcPriv)
-    (M' M'' : Nat → List (BitVec 8)) (h1 : V''.tf = V'.tf) (h2 : V''.upt = V'.upt) (h3 : M'' = M')
-    (h4 : V''.sz = V'.sz) (h5 : V''.cwi = V'.cwi) (h6 : V''.pvLazy = V'.pvLazy)
-    (h7 : V''.pvSecc = V'.pvSecc)
-    (h : utRound sep sc V M V' M') : utRound sep sc V M V'' M'' := by
-  unfold utRound syscImg at h ⊢
-  rw [h1, h2, h3, h4, h5, h6, h7]
-  exact h
 
 end Pure
 
@@ -328,37 +302,6 @@ def utResumeIn (sc : BitVec 64) (W : Uvis) (gn : GName) : IProp GF :=
 /-- Rocq `ut_kill_out_ecall`. -/
 theorem utKillOut_ecall (W : Uvis) : ⊢ utKillOut (hlc := hlc) (GF := GF) uecallScause W := by
   unfold utKillOut; rw [if_pos rfl]; iintro; iempintro
-
-/-- Rocq `ut_resume_in_ecall`. -/
-theorem utResumeIn_ecall (W : Uvis) (gn : GName) :
-    ⊢ utResumeIn (hlc := hlc) (GF := GF) uecallScause W gn := by
-  unfold utResumeIn; rw [if_pos rfl]; iintro; iempintro
-
-/-- Rocq `ut_resume_in_of_slot`. -/
-theorem utResumeIn_of_slot (sc : BitVec 64) (W : Uvis) (gn : GName) (h : sc ≠ uecallScause) :
-    uslot (hlc := hlc) W ⊢ utResumeIn (GF := GF) sc W gn := by
-  unfold utResumeIn; rw [if_neg h]; iintro H; ileft; iexact H
-
-/-- Rocq `ut_resume_in_of_shot`. -/
-theorem utResumeIn_of_shot (sc : BitVec 64) (W : Uvis) (gn : GName) :
-    killShot gn ⊢ utResumeIn (hlc := hlc) (GF := GF) sc W gn := by
-  unfold utResumeIn
-  by_cases h : sc = uecallScause
-  · rw [if_pos h]; iintro -; iempintro
-  · rw [if_neg h]; iintro H; iright; iexact H
-
-/-- Rocq `ut_kill_out_of_slot`: the resume row, with the shot refuted. -/
-theorem utKillOut_of_resume (sc : BitVec 64) (W : Uvis) (gn : GName) :
-    utResumeIn (hlc := hlc) (GF := GF) sc W gn ⊢ (killShot gn -∗ False) -∗ utKillOut sc W := by
-  unfold utResumeIn utKillOut
-  by_cases h : sc = uecallScause
-  · rw [if_pos h, if_pos h]; iintro - -; iempintro
-  · rw [if_neg h, if_neg h]
-    iintro H Hno
-    icases H with (H | Hs)
-    · iexact H
-    · ihave Hf := Hno $$ Hs
-      iexfalso; iexact Hf
 
 /-- The out rows at a non-ecall cause owe nothing (Rocq `ut_sys_out_quiet`,
 `ut_exec_out_quiet`, `ut_fork_out_quiet`, `ut_wait_out_quiet`). -/

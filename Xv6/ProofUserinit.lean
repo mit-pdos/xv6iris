@@ -617,8 +617,6 @@ theorem ui_held_open [CurCtx] (v : BitVec 64) (z : Nat) :
   iframe Hr
   ipureintro; exact ⟨rfl, hk, hb, hp, hz⟩
 
-theorem userinit_br_879e : KA.«userinit» + 0x879e#64 = KA.«initproc» := by decide
-
 set_option maxHeartbeats 2000000 in
 /-- **From `0x80001c80`**: `s1 = p`, `initproc = p` (published),
 `p->root = igetroot()`, `idup(p->root)`, then `ui_finish`. -/

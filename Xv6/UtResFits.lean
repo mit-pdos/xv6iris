@@ -99,13 +99,6 @@ theorem usertrapResAt_join (h : curTier = KTier.kpt) (M : Nat → List (BitVec 8
       usertrapResRunAt PT Γ j cpu P ksp V M sts cs pid :=
   utResBare_join h cpu _ P ksp V M sts cs pid
 
-/-- **Rocq `usertrap_res_tlb_open` / `_ptm_open`** (UsertrapRes
-`utResBare_split`). -/
-theorem usertrapResAt_split (h : curTier = KTier.kpt) (M : Nat → List (BitVec 8)) :
-    usertrapResRunAt (GF := GF) PT Γ j cpu P ksp V M sts cs pid ⊢
-      usertrapResAt PT Γ j cpu P ksp V sts cs pid ∗ procPtAt P M ∗ tfPageAt P.tfp V.tf :=
-  utResBare_split h cpu _ P ksp V M sts cs pid
-
 /-- The kernel words (uservec's `hkw`, with `utTfk_uservec`). -/
 theorem usertrapResAt_tfk :
     usertrapResAt (GF := GF) PT Γ j cpu P ksp V sts cs pid ⊢

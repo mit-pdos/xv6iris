@@ -691,22 +691,6 @@ theorem parentsOwn_acc [CurCtx] (ξ : CtxId) (ps : Nat → BitVec 64) (j : Nat) 
   · intro v' i hi; simp only [hi, if_false]
   · simp only [if_true]; exact .rfl
 
-/-- the read-only instance: the cell comes back unchanged (Rocq
-`parents_own_read`). -/
-theorem parentsOwn_read [CurCtx] (ξ : CtxId) (ps : Nat → BitVec 64) (j : Nat) (hj : j < NPROC) :
-    parentsOwnAt (GF := GF) ξ ps ⊢
-      wordAtN ξ (pParent (procAddr j)) 8 (.own 1) (ps j) ∗
-      (wordAtN ξ (pParent (procAddr j)) 8 (.own 1) (ps j) -∗ parentsOwnAt ξ ps) := by
-  refine (parentsOwn_acc ξ ps j hj).trans (sep_mono_right ?_)
-  have hid : (fun i => if i = j then ps j else ps i) = ps := funext fun i => by
-    by_cases e : i = j
-    · rw [if_pos e, e]
-    · rw [if_neg e]
-  iintro H Hc
-  ihave H := H $$ %(ps j) Hc
-  rw [hid]
-  iexact H
-
 end WaitInvTies
 
 /-! ## Boot: mint the canonical names this class carries

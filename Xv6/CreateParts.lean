@@ -260,17 +260,6 @@ theorem create_bltu_trange (t : BitVec 16) :
     bcond bop.BLTU 1#64 (createTrange t) = !(t == 2#16 || t == 3#16) := by
   rw [createTrange_eq]; simp only [bcond]; bv_decide
 
-/-- +0x6c FALL-THROUGH: ARM F-OK, and this is the clause the contract wants
-(Rocq's `cr_trange_in`). -/
-theorem create_trange_in (t : BitVec 16) (h : bcond bop.BLTU 1#64 (createTrange t) = false) :
-    t.toNat = T_FILE ∨ t.toNat = T_DEVICE := by
-  rw [create_bltu_trange] at h
-  unfold T_FILE T_DEVICE
-  simp only [Bool.not_eq_false', Bool.or_eq_true, beq_iff_eq] at h
-  rcases h with h | h <;> subst h
-  · exact Or.inl rfl
-  · exact Or.inr rfl
-
 /-- +0x6c TAKEN: the found inode is neither a file nor a device, ARM F-BAD
 (Rocq's `cr_trange_out`). -/
 theorem create_trange_out (t : BitVec 16) (h2 : t.toNat ≠ T_FILE) (h3 : t.toNat ≠ T_DEVICE) :

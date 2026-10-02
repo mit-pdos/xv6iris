@@ -352,20 +352,6 @@ theorem linkElem_insert (I : RegMapF FsNode) (i : Nat) (n : FsNode) (f : LinkCho
   unfold linkElem
   exact BigOpM.bigOpM_insert_eq _ n hi
 
-theorem linkElem_delete (I : RegMapF FsNode) (i : Nat) (n : FsNode) (f : LinkChoice)
-    (hi : get? I i = some n) :
-    linkElem I f = linkElemNode i n (lcV f i) (lcTyf f i) • linkElem (delete I i) f := by
-  unfold linkElem
-  exact BigOpM.bigOpM_delete_eq _ hi
-
-theorem linkElemOk_ext (I : RegMapF FsNode) (f g : LinkChoice)
-    (hfg : ∀ i, (∃ n, get? I i = some n) → f i = g i) (hok : linkElemOk I f) :
-    linkElemOk I g := by
-  intro i n hi
-  unfold lcD lcV lcTyf
-  rw [← hfg i ⟨n, hi⟩]
-  exact hok i n hi
-
 /-- A big-op of SINGLETONS AT THEIR OWN (cast) KEYS reads pointwise: the one
 induction every "the family is valid" argument needs (Rocq's
 `big_op_singletons_lookup`, deviation 4). -/
@@ -588,19 +574,6 @@ at a different map than the link family. -/
 section FsStateBoot
 variable {GF : BundledGFunctors} [FsLinkG GF] [FsTopG GF]
 open FsStateLink
-
-/-- BOTH era ghosts, allocated together from maps of nodes: the top map's
-AUTH plus one fragment per inum, and the link family (Rocq's
-`fs_boot_alloc_at`). -/
-theorem fsBootAlloc_at (IL IT : RegMapF FsNode) (f : LinkChoice) (hok : linkElemOk IL f)
-    (hv : ✓ linkElem IL f) :
-    ⊢ |==> ∃ gl gt : GName,
-        iprop((gt ↪●MAP IT) ∗ ([∗map] i ↦ n ∈ IT, gt ↪◯MAP[i] n) ∗ fsLinks (GF := GF) gl IL) := by
-  imod (fsLinks_alloc (GF := GF) IL f hok hv) with ⟨%gl, Hl⟩
-  imod (ghost_map_alloc (GF := GF) (K := Nat) (V := FsNode) (H := RegMapF) IT) with ⟨%gt, Ha, Hf⟩
-  imodintro
-  iexists gl, gt
-  iframe Ha Hf Hl
 
 /-- THE BOOT MINT'S ALLOCATION, AT THE SLACKED ELEMENT: ONE `own_alloc` at
 `linkElem I f • linkTokElem r v` yields the whole `fsLinks` bundle PLUS the

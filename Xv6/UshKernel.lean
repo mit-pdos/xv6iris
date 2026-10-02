@@ -85,29 +85,6 @@ theorem shkImgSub_of_elf (M : ElfMem) (h : uimgSub (elfImage User.Sh.elf) M) :
   rw [User.Sh.elf_image] at h
   exact uimgSub_union_l _ _ _ (uimgSub_union_l _ _ _ h)
 
-/-- **Rocq `elf_segments_loads`**: the PT_LOAD table read off
-`elfSegments`, for a VARIABLE file. -/
-theorem elfSegments_loads (f : ElfBytes) (segs : List (Nat × Nat × Nat × Nat))
-    (h : elfSegments f = some segs) :
-    (elfLoads f).map (fun p => (p.vaddr, p.filesz, p.memsz, p.flags)) = segs := by
-  unfold elfSegments at h
-  unfold elfLoads
-  cases hp : elfPhdrs f with
-  | none => rw [hp] at h; cases h
-  | some ps =>
-    rw [hp] at h
-    simp only [Option.bind_eq_bind, Option.bind_some] at h
-    cases h
-    rfl
-
-/-- **Rocq `sh_loads`** (deviation 3): sh's two PT_LOADs, `(0x0, 0x1c74,
-R-X)` and `(0x2000, 0x98, RW-)`. -/
-theorem shLoads :
-    ∃ p0 p1 : ElfPhdr, elfLoads User.Sh.elf = [p0, p1] ∧
-      p0.vaddr = 0 ∧ p0.memsz = 0x1c74 ∧ p0.flags = 5 ∧
-      p1.vaddr = 0x2000 ∧ p1.memsz = 0x98 ∧ p1.flags = 6 :=
-  ⟨_, _, User.Sh.elf_loads, rfl, rfl, rfl, rfl, rfl, rfl⟩
-
 /-- The break's page, read off `elfMemEnd` for a VARIABLE file (the kernel
 never evaluates sh's 29 KB constant: a defeq check against the concrete
 file would parse it). -/

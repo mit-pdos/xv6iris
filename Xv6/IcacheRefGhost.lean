@@ -223,13 +223,6 @@ theorem liveGen_split [Icfg] (k : Nat) (s1 s2 : Qp) (g : GName) :
     iapply liveGenlo_join
     iframe H1 H2
 
-theorem liveGen_agree [Icfg] (k : Nat) (s1 : Qp) (g1 : GName) (s2 : Qp) (g2 : GName) :
-    liveGen (GF := GF) k s1 g1 ∗ liveGen k s2 g2 ⊢ ⌜g1 = g2⌝ := by
-  unfold liveGen
-  iintro ⟨⟨%lo1, H1⟩, ⟨%lo2, H2⟩⟩
-  ihave %h := liveGenlo_agree k s1 g1 lo1 s2 g2 lo2 $$ [$H1 $H2]
-  ipureintro; exact h.1
-
 theorem liveGen_join [Icfg] (k : Nat) (s1 s2 : Qp) (g : GName) :
     liveGen (GF := GF) k s1 g ∗ liveGen k s2 g ⊢ liveGen k (s1 + s2) g :=
   (liveGen_split k s1 s2 g).2

@@ -36,12 +36,6 @@ def faPins (k : KCtx) (R : RegMap) : Prop :=
   R 22#5 = k.regs 22#5 ∧ R 23#5 = k.regs 23#5 ∧ R 24#5 = k.regs 24#5 ∧ R 25#5 = k.regs 25#5 ∧
   R 26#5 = k.regs 26#5 ∧ R 27#5 = k.regs 27#5
 
-theorem faPins_cs (k : KCtx) (R R' : RegMap) (h : faPins k R) (hcs : calleeSaved R R') : faPins k R' := by
-  obtain ⟨a18, a19, a20, a21, a22, a23, a24, a25, a26, a27⟩ := h
-  obtain ⟨-, -, -, c18, c19, c20, c21, c22, c23, c24, c25, c26, c27⟩ := hcs
-  exact ⟨c18.trans a18, c19.trans a19, c20.trans a20, c21.trans a21, c22.trans a22, c23.trans a23,
-    c24.trans a24, c25.trans a25, c26.trans a26, c27.trans a27⟩
-
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
 

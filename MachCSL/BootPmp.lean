@@ -95,9 +95,6 @@ theorem pmpRange_mem {i : Int} (h : i ∈ pmpRange) : 0 ≤ i ∧ i ≤ 63 := by
   simp [Membership.mem] at h
   omega
 
-theorem pmpLoop_arith {i : Int} {n : Nat} (hi : 0 ≤ i) (hn : i + (n : Int) = 64) :
-    (i + 1) + ((n - 1 : Nat) : Int) = 64 ∨ n = 0 := by omega
-
 /-- THE LOOP (Rocq `pmp_loop`), generic in the body and keeping the vector
 abstract, by induction on the remaining iteration count. -/
 theorem bootFin_pmpLoop (body : (i : Int) → i ∈ pmpRange → Unit → SailM (ForInStep Unit))

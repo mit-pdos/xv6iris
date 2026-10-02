@@ -136,16 +136,6 @@ to it; the reclaimed page whose per-byte era keys are gone is one. -/
 def pageFree [CurCtx] (p : BitVec 64) : IProp GF := iprop%
   ∃ bs : List (BitVec 8), ⌜bs.length = 4096⌝ ∗ bytesFree p bs
 
-/-- An owned (valued) page forgets to a visibility-free one. -/
-theorem pageOwn_pageFree [CurCtx] (p : BitVec 64) :
-    pageOwn (GF := GF) p ⊢ pageFree p := by
-  unfold pageOwn pageFree
-  iintro ⟨%bs, %hbs, Hbuf⟩
-  iexists bs
-  isplit
-  · ipureintro; exact hbs
-  · iapply byteBuf_bytesFree p bs $$ Hbuf
-
 /-! ## The freelist chain -/
 
 /-- The chain of free pages from `head`: each page's first word is the next
@@ -207,29 +197,6 @@ def ledLb (γe : GName) (h : List Kev) : IProp GF := γe ↪◯ML h
 
 instance ledLb_persistent (γe : GName) (h : List Kev) : Persistent (ledLb (GF := GF) γe h) := by
   unfold ledLb; infer_instance
-
-theorem ledAuth_lb (γe : GName) (h : List Kev) :
-    ledAuth (GF := GF) γe h ⊢ ledAuth γe h ∗ ledLb γe h := by
-  unfold ledAuth ledLb
-  iintro Ha
-  ihave #Hb := MonoList.lb_own_get γe _ h $$ Ha
-  isplitl [Ha]
-  · iexact Ha
-  · iexact Hb
-
-theorem ledLb_prefix (γe : GName) (h h' : List Kev) :
-    ledAuth (GF := GF) γe h ⊢ ledLb γe h' -∗ ⌜h' <+: h⌝ := by
-  unfold ledAuth ledLb
-  iintro Ha Hb
-  ihave %hv := MonoList.auth_lb_own_valid γe _ h h' $$ Ha Hb
-  ipureintro; exact hv.2
-
-/-- Two lower bounds of one ledger are comparable (Rocq `led_lb_lb`). -/
-theorem ledLb_lb (γe : GName) (h h' : List Kev) :
-    ledLb (GF := GF) γe h ⊢ ledLb γe h' -∗ ⌜h <+: h' ∨ h' <+: h⌝ := by
-  unfold ledLb
-  iintro Ha Hb
-  iapply MonoList.lb_own_valid γe h h' $$ Ha Hb
 
 theorem ledAuth_grow (γe : GName) (h : List Kev) (e : Kev) :
     ledAuth (GF := GF) γe h ⊢ |==> (ledAuth γe (h ++ [e]) ∗ ledLb γe (h ++ [e])) := by

@@ -168,15 +168,6 @@ theorem absOf_some (n : FsNode) (a : Anode) (h : absOf n = some a) :
     cases h
     exact ⟨fun hc => h0 (Or.inl hc), fun hc => h0 (Or.inr hc), rfl⟩
 
-theorem absOf_isSome (n : FsNode) : (absOf n).isSome ↔ fnType n ≠ 0 ∧ fnNlink n ≠ 0 := by
-  constructor
-  · intro h
-    obtain ⟨a, ha⟩ := Option.isSome_iff_exists.1 h
-    obtain ⟨h1, h2, _⟩ := absOf_some n a ha
-    exact ⟨h1, h2⟩
-  · rintro ⟨hnz, hnl⟩
-    rw [absOf_live n hnz hnl]; rfl
-
 /-- a directory is typed: `T_DIR_z` is 1 (Rocq's `fn_is_dir_typed`) -/
 theorem fnIsDir_typed (n : FsNode) (h : fnIsDir n = true) : fnType n ≠ 0 := by
   unfold fnIsDir at h
@@ -184,10 +175,6 @@ theorem fnIsDir_typed (n : FsNode) (h : fnIsDir n = true) : fnType n ≠ 0 := by
   rw [this]; decide
 
 theorem absRow_nlink (n : FsNode) : (absRow n).anNlink = fnNlink n := rfl
-
-theorem absOf_nlink (n : FsNode) (a : Anode) (h : absOf n = some a) :
-    a.anNlink = fnNlink n := by
-  obtain ⟨_, _, rfl⟩ := absOf_some n a h; rfl
 
 theorem absRow_dir (n : FsNode) (hd : fnIsDir n = true) :
     (absRow n).anNode = .ADir (dirEntries n) := by
@@ -219,11 +206,6 @@ theorem absRow_dir_inv (n : FsNode) (e : Std.ExtTreeMap Fname Nat compare)
     · rw [if_pos ht] at h; cases h
     · rw [if_neg ht] at h; cases h
 
-theorem absOf_dir_inv (n : FsNode) (a : Anode) (e : Std.ExtTreeMap Fname Nat compare)
-    (ha : absOf n = some a) (he : a.anNode = .ADir e) : fnIsDir n = true ∧ e = dirEntries n := by
-  obtain ⟨_, _, rfl⟩ := absOf_some n a ha
-  exact absRow_dir_inv n e he
-
 theorem absRow_file (n : FsNode) (hd : fnIsDir n = false) (ht : fnType n = T_FILE) :
     (absRow n).anNode = .AFile (fnFileBytes n) := by
   simp [absRow, absNode, hd, ht]
@@ -246,13 +228,6 @@ theorem absOf_dev (n : FsNode) (hd : fnIsDir n = false) (ht : fnType n ≠ T_FIL
     absOf n = some ⟨.ADev (fnMajor n) (fnMinor n), fnNlink n⟩ := by
   rw [absOf_live n hnz hnl]
   simp [absRow, absNode, hd, ht]
-
-/-- THE ORPHAN READING, INVERTED (E2-V2, ruling Q-d): a row in the view is
-never an orphan.  An unlinked-but-open node has NO row; what a holder of a
-client share (`FsAbs.nview`) learns is that its node is linked. -/
-theorem absOf_orphan (n : FsNode) (a : Anode) (h : absOf n = some a) : a.anNlink ≠ 0 := by
-  obtain ⟨_, hnl, rfl⟩ := absOf_some n a h
-  exact hnl
 
 /-- a BARE record -- `ialloc`'s claim box (typed, size 0, nlink 0) as much
 as the corpse `itrunc` leaves or a free inum -- has no row at all: the
@@ -284,14 +259,6 @@ theorem arowAt_live (av : Aview) (i : Nat) (a : Anode) (h : arowAt av i a)
 theorem arowAt_gone (av : Aview) (i : Nat) (a : Anode) (h : arowAt av i a)
     (hz : a.anNlink = 0) : PartialMap.get? av i = none := by
   unfold arowAt at h; rw [h, if_pos hz]
-
-theorem arowAt_of_some (av : Aview) (i : Nat) (a : Anode) (hnl : a.anNlink ≠ 0)
-    (h : PartialMap.get? av i = some a) : arowAt av i a := by
-  unfold arowAt; rw [h, if_neg hnl]
-
-theorem arowAt_of_none (av : Aview) (i : Nat) (a : Anode) (hz : a.anNlink = 0)
-    (h : PartialMap.get? av i = none) : arowAt av i a := by
-  unfold arowAt; rw [h, if_pos hz]
 
 theorem arowAt_cases (av : Aview) (i : Nat) (a : Anode) (h : arowAt av i a) :
     (a.anNlink = 0 ∧ PartialMap.get? av i = none) ∨
@@ -362,22 +329,6 @@ def absFsnode (a : Anode) : Fsnode :=
 def absTree (av : Aview) (r : Nat) : Fstree :=
   ⟨PartialMap.bindAlter (fun _ a => some (absFsnode a)) av, r⟩
 
-/-- `absFsnode ∘ absOf` IS `FsTree.nodeOf` wherever `nodeOf` can speak --
-directories and regular files.  Devices are excluded on purpose: `nodeOf`
-collapses every non-directory onto `NFile`, so it cannot see the arm
-`Absnode` adds. -/
-theorem absFsnode_nodeOf (n : FsNode) (hn : fnIsDir n = true ∨ fnType n = T_FILE) :
-    absFsnode (absRow n) = nodeOf n.fnRec (fnData n) := by
-  unfold absFsnode absRow absNode nodeOf
-  by_cases hd : fnIsDir n = true
-  · have hd' : n.fnRec.diType.toNat = T_DIR_z := of_decide_eq_true hd
-    simp only [hd, if_true, hd']
-    unfold dirEntries; rw [if_pos hd]; rfl
-  · have hd' : ¬ n.fnRec.diType.toNat = T_DIR_z := fun h => hd (decide_eq_true h)
-    have ht : fnType n = T_FILE := hn.resolve_left hd
-    simp only [hd, ht, if_false, if_true, hd', Bool.false_eq_true]
-    rfl
-
 /-! ## 2.  `apathAt`: THE HOP-BY-HOP FIRST-MATCH LOOKUP
 
 One hop out of a node.  A file, a device and an inum with no row all have
@@ -430,28 +381,6 @@ theorem absTree_ent (av : Aview) (r d : Nat) (s : Fname) :
     obtain ⟨an, nl⟩ := a
     cases an <;> rfl
 
-theorem apathAt_tree (av : Aview) (r d : Nat) (ps : List Fname) :
-    pathAt (absTree av r) d ps = apathAt av d ps := by
-  induction ps generalizing d with
-  | nil => rfl
-  | cons s ps ih =>
-    rw [pathAt_cons, apathAt_cons, absTree_ent]
-    cases astep av d s with
-    | some c => exact ih c
-    | none => rfl
-
-theorem apathAt_app (av : Aview) (d : Nat) (ps qs : List Fname) :
-    apathAt av d (ps ++ qs) = match apathAt av d ps with
-      | some c => apathAt av c qs
-      | none => none := by
-  induction ps generalizing d with
-  | nil => rfl
-  | cons s ps ih =>
-    rw [List.cons_append, apathAt_cons, apathAt_cons]
-    cases astep av d s with
-    | some c => exact ih c
-    | none => rfl
-
 /-! ### 2a.  THE RUN: a walk's answer, index by index
 
 `apathAt` is the ANSWER; a pinned walk needs the inums it VISITS, one per
@@ -476,10 +405,6 @@ theorem arun_length {av : Aview} {d : Nat} {ps : List Fname} {ds : List Nat}
 theorem arun_lookup_0 {av : Aview} {d : Nat} {ps : List Fname} {ds : List Nat}
     (h : Arun av d ps ds) : ds[0]? = some d := by
   cases h <;> rfl
-
-theorem arun_head {av : Aview} {d : Nat} {ps : List Fname} {ds : List Nat}
-    (h : Arun av d ps ds) : ds[0]! = d :=
-  getElem!_of_getElem? (arun_lookup_0 h)
 
 theorem arun_apath {av : Aview} {d : Nat} {ps : List Fname} {ds : List Nat}
     (h : Arun av d ps ds) : apathAt av d ps = ds[ps.length]? := by
@@ -518,28 +443,6 @@ theorem arun_step_tot {av : Aview} {d : Nat} {ps : List Fname} {ds : List Nat}
   obtain ⟨c1, c2, h1, h2, h3⟩ := arun_step k s h hk
   rw [getElem!_of_getElem? h1, getElem!_of_getElem? h2]
   exact h3
-
-/-- the converse: an answer HAS a run, so nothing is lost by stating the
-pinned walk over `Arun` rather than over `apathAt` -/
-theorem apathAt_arun (av : Aview) (d : Nat) (ps : List Fname) (i : Nat)
-    (hp : apathAt av d ps = some i) : ∃ ds, Arun av d ps ds ∧ ds[ps.length]! = i := by
-  induction ps generalizing d with
-  | nil =>
-    refine ⟨[d], .nil d, ?_⟩
-    have h := Option.some.inj hp
-    subst h; rfl
-  | cons s ps ih =>
-    rw [apathAt_cons] at hp
-    cases hst : astep av d s with
-    | none => rw [hst] at hp; cases hp
-    | some c =>
-      rw [hst] at hp
-      obtain ⟨ds, hr, _⟩ := ih c hp
-      have hr' : Arun av d (s :: ps) (d :: ds) := .cons d c s ps ds hst hr
-      refine ⟨d :: ds, hr', ?_⟩
-      have he := arun_apath_tot hr'
-      rw [apathAt_cons, hst, hp] at he
-      exact (Option.some.inj he).symm
 
 /-! ## 3a'.  `absView`: THE RAW γtop MAP, READ THROUGH `absOf`
 
@@ -588,11 +491,6 @@ theorem absView_lookup_some (I : RegMapF FsNode) (i : Nat) (a : Anode)
   cases hi : PartialMap.get? I i with
   | none => rw [hi] at h; cases h
   | some n => rw [hi] at h; exact ⟨n, rfl, h⟩
-
-theorem absView_lookup_isSome (I : RegMapF FsNode) (i : Nat) (a : Anode)
-    (h : PartialMap.get? (absView I) i = some a) : (PartialMap.get? I i).isSome := by
-  obtain ⟨n, hi, _⟩ := absView_lookup_some I i a h
-  rw [hi]; rfl
 
 /-- pushing one raw-map insert through the view: a live node lands as its
 row (stdpp's `omap_insert_Some`) -/

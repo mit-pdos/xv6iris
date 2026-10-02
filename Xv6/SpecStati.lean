@@ -101,17 +101,6 @@ def stNlink (st : BitVec 64) : BitVec 64 := st + 10#64
 /-- `&st->size` (`c.sd a5,16(a1)`). -/
 def stSize (st : BitVec 64) : BitVec 64 := st + 16#64
 
-theorem stDev_sext (st : BitVec 64) : st + BitVec.signExtend 64 0#12 = stDev st := by
-  unfold stDev; congr 1
-theorem stIno_sext (st : BitVec 64) : st + BitVec.signExtend 64 4#12 = stIno st := by
-  unfold stIno; congr 1
-theorem stType_sext (st : BitVec 64) : st + BitVec.signExtend 64 8#12 = stType st := by
-  unfold stType; congr 1
-theorem stNlink_sext (st : BitVec 64) : st + BitVec.signExtend 64 10#12 = stNlink st := by
-  unfold stNlink; congr 1
-theorem stSize_sext (st : BitVec 64) : st + BitVec.signExtend 64 16#12 = stSize st := by
-  unfold stSize; congr 1
-
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 

@@ -65,46 +65,6 @@ theorem headsAre_glue {k m : Nat} (Hs1 Hs2 : Nat → Hist) (w : BitVec (8 * (k +
 
 /-! ## The three DMA windows, split and joined -/
 
-theorem dmaOwn_split_at (pa : PAddr) (k m : Nat) :
-    dmaOwn (GF := GF) pa (k + m) ⊢ dmaOwn pa k ∗ dmaOwn (pa + BitVec.ofNat 64 k) m := by
-  unfold dmaOwn
-  iintro ⟨%Hs, Hb⟩
-  icases histBytes_split_at pa k m (DFrac.own 1) Hs $$ Hb with ⟨H1, H2⟩
-  isplitl [H1]
-  · iexists Hs; iexact H1
-  · iexists (fun j => Hs (k + j)); iexact H2
-
-theorem dmaOwn_join_at (pa : PAddr) (k m : Nat) :
-    dmaOwn (GF := GF) pa k ∗ dmaOwn (pa + BitVec.ofNat 64 k) m ⊢ dmaOwn pa (k + m) := by
-  unfold dmaOwn
-  iintro ⟨⟨%Hs1, H1⟩, ⟨%Hs2, H2⟩⟩
-  iexists (glueHist k Hs1 Hs2)
-  iapply histBytes_glue pa k m (DFrac.own 1) Hs1 Hs2
-  iframe H1 H2
-
-theorem dmaOwnAt_split_at (pa : PAddr) (k m : Nat) (w : BitVec (8 * (k + m))) :
-    dmaOwnAt (GF := GF) pa (k + m) w ⊢
-      dmaOwnAt pa k (BitVec.extractLsb' 0 (8 * k) w) ∗
-      dmaOwnAt (pa + BitVec.ofNat 64 k) m (BitVec.extractLsb' (8 * k) (8 * m) w) := by
-  unfold dmaOwnAt
-  iintro ⟨%Hs, Hb, %hh⟩
-  icases histBytes_split_at pa k m (DFrac.own 1) Hs $$ Hb with ⟨H1, H2⟩
-  isplitl [H1]
-  · iexists Hs; iframe H1; ipureintro; exact headsAre_lo Hs w hh
-  · iexists (fun j => Hs (k + j)); iframe H2; ipureintro; exact headsAre_hi Hs w hh
-
-theorem dmaOwnAt_join_at (pa : PAddr) (k m : Nat) (w : BitVec (8 * (k + m))) :
-    dmaOwnAt (GF := GF) pa k (BitVec.extractLsb' 0 (8 * k) w) ∗
-      dmaOwnAt (pa + BitVec.ofNat 64 k) m (BitVec.extractLsb' (8 * k) (8 * m) w) ⊢
-      dmaOwnAt pa (k + m) w := by
-  unfold dmaOwnAt
-  iintro ⟨⟨%Hs1, H1, %h1⟩, ⟨%Hs2, H2, %h2⟩⟩
-  iexists (glueHist k Hs1 Hs2)
-  isplitl [H1 H2]
-  · iapply histBytes_glue pa k m (DFrac.own 1) Hs1 Hs2
-    iframe H1 H2
-  · ipureintro; exact headsAre_glue Hs1 Hs2 w h1 h2
-
 theorem dmaHalfAt_split_at (pa : PAddr) (k m : Nat) (w : BitVec (8 * (k + m))) :
     dmaHalfAt (GF := GF) pa (k + m) w ⊢
       dmaHalfAt pa k (BitVec.extractLsb' 0 (8 * k) w) ∗
@@ -655,14 +615,6 @@ theorem inflightOk_arm3 (st : Nat → HState) (c : Chain) (hwf : c.wf)
     (inflightOk_mem _ _ c.md c.hd (armSt3_md_free st c hwf h2)
       (inflightOk_arm v st c.hd c h1 hx))
 
-theorem imgOk_arm3 (st : Nat → HState) (c : Chain) (hwf : c.wf)
-    (h1 : st c.hd = .inactive) (h2 : st c.md = .inactive) (h3 : st c.tl = .inactive)
-    (v : VirtioState) (m : RegMapF (List (BitVec 8)))
-    (hx : imgOk v m (inFlightBlk st)) : imgOk v m (inFlightBlk (armSt3 st c)) :=
-  imgOk_mem _ _ _ c.tl c.hd (armSt3_tl_free st c hwf h3)
-    (imgOk_mem _ _ _ c.md c.hd (armSt3_md_free st c hwf h2)
-      (imgOk_arm v m st c.hd c h1 hx))
-
 /-- **A block the driver holds whole is in nobody's flight**: the
 invariant keeps an armed chain's fragment at three quarters inside its
 row, and a ghost-map element cannot be held at more than one. -/
@@ -780,13 +732,6 @@ theorem rowDone_arm3 (st : Nat → HState) (sb : Nat → SByte) (c : Chain) (lo 
             exact Or.inl ⟨hst, updS_ne sb c.hd SByte.free i hi1⟩)
     h
 
-theorem cachedOk_arm3 (st : Nat → HState) (c : Chain) (hwf : c.wf)
-    (h1 : st c.hd = .inactive) (h2 : st c.md = .inactive) (h3 : st c.tl = .inactive)
-    (v : VirtioState) (hx : cachedOk v st) : cachedOk v (armSt3 st c) :=
-  cachedOk_mem _ _ c.tl c.hd (armSt3_tl_free st c hwf h3)
-    (cachedOk_mem _ _ c.md c.hd (armSt3_md_free st c hwf h2)
-      (cachedOk_arm v st c.hd c h1 hx))
-
 theorem permOk_arm3 (st : Nat → HState) (c : Chain) (hwf : c.wf)
     (h1 : st c.hd = .inactive) (h2 : st c.md = .inactive) (h3 : st c.tl = .inactive)
     (v : VirtioState) (pm : RegMapF PermVal) (hx : permOk v pm st) :
@@ -892,16 +837,6 @@ theorem freeSt_active (st : Nat → HState) (i j : Nat) (c : Chain)
   by_cases hj : j = i
   · rw [hj, freeSt_self] at h; exact absurd h (by simp)
   · exact ⟨hj, by rw [← freeSt_ne st i j hj]; exact h⟩
-
-theorem freeSt_isActive (st : Nat → HState) (i j : Nat)
-    (h : (freeSt st i j).isActive = true) : j ≠ i ∧ (st j).isActive = true := by
-  by_cases hj : j = i
-  · rw [hj, freeSt_self] at h; exact absurd h (by simp [HState.isActive])
-  · exact ⟨hj, by rw [← freeSt_ne st i j hj]; exact h⟩
-
-theorem blkInj_free (st : Nat → HState) (i : Nat) (h : blkInj st) : blkInj (freeSt st i) := by
-  intro j j' cj cj' hj hj' hne hst hst'
-  exact h j j' cj cj' hj hj' hne (freeSt_active st i j cj hst).2 (freeSt_active st i j' cj' hst').2
 
 /-- The three receipts of a chain, all given back. -/
 def freeSt3 (st : Nat → HState) (c : Chain) : Nat → HState :=
@@ -1117,25 +1052,7 @@ theorem epPend_publish (st : Nat → HState) (ring : Nat → Nat) (lo np : Nat) 
     exact h.2 i rfl cc hcc
   · exact h.1 p h1 (by omega) cc hcc
 
-/-- **The collect frees a head**: a receipt that is no longer armed is
-seen by no clause of the epoch. -/
-theorem epOk_free (v : VirtioState) (st : Nat → HState) (pm : RegMapF PermVal)
-    (dl : List UsedRec) (ring : Nat → Nat) (lo np : Nat) (stg : Option Nat)
-    (st' : Nat → HState)
-    (hsub : ∀ (j : Nat) (cc : Chain), st' j = HState.active cc → st j = HState.active cc)
-    (h : epOk v st pm dl ring lo np stg) : epOk v st' pm dl ring lo np stg :=
-  ⟨⟨fun p h1 h2 cc hcc => h.1.1 p h1 h2 cc (hsub _ cc hcc),
-      fun j hj cc hcc => h.1.2 j hj cc (hsub _ cc hcc)⟩,
-    h.2.1, h.2.2.1,
-    fun hh cc hsc => h.2.2.2.1 hh cc (hsub _ cc hsc), h.2.2.2.2⟩
-
 /-! ## `struct disk` is kernel data -/
-
-theorem info_b_kmapRw (i : Nat) (hi : i < NUM) :
-    kmapClass (vpnOf (aInfoB i)).toNat = some .rw := by
-  have h : i = 0 ∨ i = 1 ∨ i = 2 ∨ i = 3 ∨ i = 4 ∨ i = 5 ∨ i = 6 ∨ i = 7 := by
-    unfold NUM at hi; omega
-  rcases h with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide
 
 theorem info_status_kmapRw (i : Nat) (hi : i < NUM) :
     kmapClass (vpnOf (aInfoStatus i)).toNat = some .rw := by

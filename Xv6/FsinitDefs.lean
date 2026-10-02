@@ -105,10 +105,6 @@ theorem fsinit_bne_dead (w : BitVec 32) (hw : w.toNat = FSMAGIC) :
 
 /-! ## The superblock image, read back as eight cells -/
 
-theorem fsinit_sbImage_length (a b c d e f g h : BitVec 32) :
-    (sbImage a b c d e f g h).length = 32 := by
-  simp [sbImage, wordToBytes4_length]
-
 /-- `&sb` is word aligned, and so is every field. -/
 theorem fsinit_sb_align (i : Nat) (hi : i < 8) : (KA.«sb» + BitVec.ofNat 64 (4 * i)).toNat % 4 = 0 := by
   have hs : KA.«sb».toNat = 0x80020e08 := rfl

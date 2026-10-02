@@ -230,11 +230,6 @@ def ciKeep (R R2 : RegMap) : Prop :=
   R2 22#5 = R 22#5 ∧ R2 23#5 = R 23#5 ∧ R2 24#5 = R 24#5 ∧ R2 25#5 = R 25#5 ∧
   R2 26#5 = R 26#5 ∧ R2 27#5 = R 27#5
 
-theorem ciKeep_of_calleeSaved {R R' : RegMap} (h : calleeSaved R R') : ciKeep R R' :=
-  ⟨h.1, h.2.2.2.1, h.2.2.2.2.2.1, h.2.2.2.2.2.2.1, h.2.2.2.2.2.2.2.1,
-    h.2.2.2.2.2.2.2.2.1, h.2.2.2.2.2.2.2.2.2.1, h.2.2.2.2.2.2.2.2.2.2.1,
-    h.2.2.2.2.2.2.2.2.2.2.2.1, h.2.2.2.2.2.2.2.2.2.2.2.2⟩
-
 /-- What `copyin` leaves behind: the final kernel buffer `bs'`. -/
 def ciPost (psz : BitVec 64) (P : UPtd) (M : Nat → List (BitVec 8)) (A : Nat) (old : List (BitVec 8))
     (P' : UPtd) (bs' : List (BitVec 8)) (r : BitVec 64) : Prop :=

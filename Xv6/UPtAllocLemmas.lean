@@ -563,24 +563,6 @@ theorem uvmdNp_run' (x y : BitVec 64) (A i : Nat) (hx : x.toNat = A + 4096 * i)
       pgRoundUpN_mul, pgRoundUpN_mul]
     omega
 
-theorem uvmdVpn0_run (A : Nat) (h4 : 4096 ∣ A) (hlt : A < 2 ^ 64) :
-    pgRoundUpN (BitVec.ofNat 64 A).toNat / 4096 = A / 4096 := by
-  rw [Xv6.bcOfNatToNat _ hlt]
-  obtain ⟨q, rfl⟩ := h4
-  rw [pgRoundUpN_mul]
-
-theorem uvmdNp_run (A i : Nat) (h4 : 4096 ∣ A) (hlt : A + 4096 * i < 2 ^ 64) :
-    uvmdNp (BitVec.ofNat 64 (A + 4096 * i)) (BitVec.ofNat 64 A) = i := by
-  obtain ⟨q, rfl⟩ := h4
-  unfold uvmdNp
-  rw [Xv6.bcOfNatToNat _ (by omega), Xv6.bcOfNatToNat _ (by omega)]
-  by_cases h0 : i = 0
-  · subst h0; rw [if_neg (by omega)]
-  · rw [if_pos (by omega),
-      show 4096 * q + 4096 * i = 4096 * (q + i) from by omega,
-      pgRoundUpN_mul, pgRoundUpN_mul]
-    omega
-
 /-! ## The space at a different view -/
 
 section

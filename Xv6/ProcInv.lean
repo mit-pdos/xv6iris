@@ -103,14 +103,6 @@ theorem cwdRefAt_ofHeldAt (v : BitVec 64) (z : Nat) :
 theorem cwdRefAt_held (v : BitVec 64) (z : Nat) :
     cwdRefAt (GF := GF) v z ⊢ inodeHeld v := inodeHeldAt_held v z
 
-theorem cwdRef_held (v : BitVec 64) : cwdRef (GF := GF) v ⊢ inodeHeld v := by
-  unfold cwdRef
-  iintro ⟨%z, H⟩
-  iapply cwdRefAt_held v z $$ H
-
-theorem cwdRef_ofHeld (v : BitVec 64) : inodeHeld (GF := GF) v ⊢ cwdRef v :=
-  inodeHeld_zi v
-
 /-- ... and the projection the missing null arm buys. -/
 theorem cwdRefAt_nonzero (v : BitVec 64) (z : Nat) :
     cwdRefAt (GF := GF) v z ⊢ cwdRefAt v z ∗ ⌜v ≠ 0#64⌝ := by
@@ -128,15 +120,6 @@ theorem cwdRefAt_nonzero (v : BitVec 64) (z : Nat) :
     subst hv
     exact ientry_ne_zero k (Nat.le_of_lt hk)
 
-theorem cwdRef_nonzero (v : BitVec 64) :
-    cwdRef (GF := GF) v ⊢ cwdRef v ∗ ⌜v ≠ 0#64⌝ := by
-  unfold cwdRef
-  iintro ⟨%z, H⟩
-  icases cwdRefAt_nonzero v z $$ H with ⟨H, %hv⟩
-  isplitl [H]
-  · iexists z; iexact H
-  · ipureintro; exact hv
-
 /-! ## The root's reference (Rocq `root_ref_at`, chroot) -/
 
 /-- `p->root`'s reference, AT its inum (Rocq `root_ref_at`): `cwdRefAt`'s
@@ -150,10 +133,6 @@ theorem rootRefAt_heldAt (v : BitVec 64) (z : Nat) :
 /-- Rocq `root_ref_at_of_held_at`. -/
 theorem rootRefAt_ofHeldAt (v : BitVec 64) (z : Nat) :
     inodeHeldAt (GF := GF) v z ⊢ rootRefAt v z := .rfl
-
-/-- Rocq `root_ref_at_held`. -/
-theorem rootRefAt_held (v : BitVec 64) (z : Nat) :
-    rootRefAt (GF := GF) v z ⊢ inodeHeld v := inodeHeldAt_held v z
 
 /-- The projection the missing null arm buys (Rocq `root_ref_at_nonzero`). -/
 theorem rootRefAt_nonzero (v : BitVec 64) (z : Nat) :

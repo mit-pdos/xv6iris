@@ -976,18 +976,4 @@ theorem wpDev_localR (N : Namespace) (d : DevId) [DevDiskInert d] (rel : DevSt d
     $$ [Hinv Hcert] %tid %m %hm.localO
   iframe Hinv Hstep Hcert
 
-/-- The UARTs are local devices. -/
-theorem uart_local (i : UartId) : DevSig.Local (.uart i) := by
-  refine ⟨?_, fun t => nomatch t⟩
-  show DevM.Local (Uart.body i)
-  unfold Uart.body DevM.chooseLt DevM.chooseByte DevM.choose DevM.step DevM.lift
-  simp only [bind, DevM.bind, Pure.pure]
-  refine DevM.Local.op _ _ (fun _ _ _ _ => nofun) (fun _ _ _ => nofun) fun r => ?_
-  split
-  · exact DevM.Local.op _ _ (fun _ _ _ _ => nofun) (fun _ _ _ => nofun) fun _ => DevM.Local.pure ()
-  split
-  · refine DevM.Local.op _ _ (fun _ _ _ _ => nofun) (fun _ _ _ => nofun) fun _ => ?_
-    exact DevM.Local.op _ _ (fun _ _ _ _ => nofun) (fun _ _ _ => nofun) fun _ => DevM.Local.pure ()
-  · exact DevM.Local.pure ()
-
 end MachCSL

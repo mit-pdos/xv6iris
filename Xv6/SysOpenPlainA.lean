@@ -205,13 +205,6 @@ def sysOpenArm0 (A : SysOpenArgs GF) (EXTRA : IProp GF)
     EXTRA ∗ procPrivFd A.γ (procAddr A.j) A.pid VW MW ∗ fdFrags VW.fdg A.sts ∗ fdSlot ⊢
       ARMS VW MW 0xFFFFFFFFFFFFFFFF#64
 
-theorem sys_open_ret_m1 : (0#64 : BitVec 64) + BitVec.signExtend 64 4095#12 = 0xFFFFFFFFFFFFFFFF#64 := by
-  decide
-
-theorem sys_open_s1slot (x : BitVec 64) :
-    x + 0xFFFFFFFFFFFFFF40#64 + BitVec.signExtend 64 168#12 = x + 0xFFFFFFFFFFFFFFE8#64 := by
-  bv_decide
-
 /-! ## +0x20: argstr came back -/
 
 set_option maxHeartbeats 32000000 in

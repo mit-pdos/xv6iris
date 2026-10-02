@@ -140,21 +140,6 @@ theorem regHalf_agree [Icfg] (z : Nat) (ge1 gr1 ge2 gr2 : GName) :
   ipureintro
   exact Prod.mk.inj Heq
 
-/-- THE `ireg_claim_au` REFUTATION: a full element and any half of the SAME
-key exceed fraction 1 -- impossible.  ialloc holds `regFull z` for the inum
-it claims (rejoined from the redeem, or read from the pool's imark arm for a
-boot-free inum), so the pending arm's `regHalf` is refuted here. -/
-theorem regFull_half_False [Icfg] (z : Nat) (ge gr ge' gr' : GName) :
-    regFull (GF := GF) z ge gr ∗ regHalf z ge' gr' ⊢ False := by
-  unfold regFull regHalf
-  iintro H
-  icases ghost_map_elem_valid_2 $$ H with ⟨%Hv, -⟩
-  exfalso
-  have h := DFrac.valid_own_op Hv
-  have h1 : (1 : Qp).val = 1 := rfl
-  have h2 : 0 < ((1 : Qp).half).val := ((1 : Qp).half).property
-  grind
-
 theorem regJoin [Icfg] (z : Nat) (ge gr : GName) :
     regHalf (GF := GF) z ge gr ∗ regHalf z ge gr ⊢ regFull z ge gr := by
   unfold regHalf regFull

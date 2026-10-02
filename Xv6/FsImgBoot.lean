@@ -34,11 +34,4 @@ theorem fsimgHdk (g : GState) (Hdisk : diskOf g.m.devs = fsImgDisk) :
     fsBlocks (diskOf g.m.devs) = fsimgP := by
   rw [Hdisk]; rfl
 
-/-- The era-0 disk recovers, with no log to replay, to its own home blocks
-(Rocq `FsImgDisk.fsimg_recovery`, at the machine). -/
-theorem fsimgBootRecovery (g : GState) (Hdisk : diskOf g.m.devs = fsImgDisk)
-    (cov : ExtTreeSet Nat compare) :
-    fsRecovery (fsBlocks (diskOf g.m.devs)) (fsimgD0 cov) cov fsimgSb.sbLogstart := by
-  rw [fsimgHdk g Hdisk]; exact fsimgRecovery cov
-
 end Xv6

@@ -136,10 +136,6 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [Uexec
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int] [Xv6G GF] [DiskG GF]
   [FsTopG GF] [Appcfg GF] [Icfg]
 
-/-- **Rocq `shk_rodata_img`** (deviation 1): sh's rodata, at the shape the
-`_img` leaf takes it. -/
-theorem shkRodata_img (γ : GName) : ushCode (GF := GF) γ ⊢ ukCode γ User.Sh.code.byte := .rfl
-
 /-! ## S2 The persistent absence law (ruling (A)) -/
 
 /-- **Rocq `sh_cons_never_law`**: what sh's absent arm runs on -- a holder

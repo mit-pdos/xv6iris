@@ -106,25 +106,6 @@ theorem acqPost_ne [CurCtx] (γ : GName) (R : CtxId → IProp GF) (cpu : CPU) (t
 section lock
 variable [CurCtx] [KernelGeom] [KernelImage GF]
 
-/-- The two views a lock reader cashes: the lock's floor and, for a holder,
-its acquire position. -/
-theorem lock_reader_view (cpu : CPU) (lo B : Nat) :
-    ownCtx (GF := GF) cpu curCtx ∗ ctxFloor curCtx lo ∗ ctxFloor curCtx B ⊢
-      ownCtx cpu curCtx ∗ ∃ K, viewLb cpu K ∗ ⌜lo ≤ K ∧ B ≤ K⌝ := by
-  iintro ⟨Hctx, #Hlo, #HB⟩
-  icases ownCtx_floor_view cpu curCtx lo $$ [Hctx Hlo] with ⟨Hctx, ⟨%K1, #HK1, %h1⟩⟩
-  · iframe Hctx; iexact Hlo
-  icases ownCtx_floor_view cpu curCtx B $$ [Hctx HB] with ⟨Hctx, ⟨%K2, #HK2, %h2⟩⟩
-  · iframe Hctx; iexact HB
-  iframe Hctx
-  iexists max K1 K2
-  isplit
-  · iapply viewLb_max cpu K1 K2
-    isplit
-    · iexact HK1
-    · iexact HK2
-  · ipureintro; omega
-
 /-- The receipts a lock reader cashes: the lock's floor (a KEY of its
 context -- a view receipt, or its own authorship of the entries there) and,
 for a holder, its acquire position (a floor proper). -/

@@ -228,13 +228,6 @@ theorem grepArgvFits_of_ok_x (ws : List (List (BitVec 8))) (hok : execOk ws) :
 
 /-! ## 2. The two PT_LOADs, the entry, and the .bss window -/
 
-/-- **Rocq `grep_loads`** (deviation 3). -/
-theorem grepLoads :
-    ∃ p0 p1 : ElfPhdr, elfLoads User.Grep.elf = [p0, p1] ∧
-      p0.vaddr = 0 ∧ p0.memsz = 0x10dc ∧ p0.flags = 5 ∧
-      p1.vaddr = 0x2000 ∧ p1.memsz = 0x420 ∧ p1.flags = 6 :=
-  ⟨_, _, User.Grep.elf_loads, rfl, rfl, rfl, rfl, rfl, rfl⟩
-
 /-- **Rocq `grep_start_pc`**: the entry, as the resume pc reads it. -/
 theorem grepStart_pc : retPc (BitVec.ofNat 64 User.Grep.entry) = BitVec.ofNat 64 User.Grep.Sym.«start» := by
   decide

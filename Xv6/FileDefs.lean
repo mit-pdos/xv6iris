@@ -265,13 +265,6 @@ instance fdvNopipe_dec (l : List FdState) : Decidable (fdvNopipe l) := by
 /-- Rocq `fdst_nopipe_closed`. -/
 theorem fdstNopipe_closed : fdstNopipe .closed := trivial
 
-/-- Rocq `fdst_nopipe_dev`. -/
-theorem fdstNopipe_dev (r w : Bool) (mj : Nat) : fdstNopipe (.open r w (.device mj)) := trivial
-
-/-- Rocq `fdst_nopipe_inode`. -/
-theorem fdstNopipe_inode (r w : Bool) (i : Nat) (γo : GName) (om : OffMode) :
-    fdstNopipe (.open r w (.inode i γo om)) := trivial
-
 /-- Rocq `fdst_nopipe_ne`: what the predicate says of a row, in the shape the
 exit row's mint reads. -/
 theorem fdstNopipe_ne (st : FdState) (h : fdstNopipe st) :
@@ -291,11 +284,6 @@ theorem fdvNopipe_lookup_total (l : List FdState) (k : Nat) (hl : fdvNopipe l) :
   | none => trivial
   | some st => exact fdvNopipe_lookup l k st hl h
 
-/-- Rocq `fdv_nopipe_elem`. -/
-theorem fdvNopipe_elem (l : List FdState) (hl : fdvNopipe l) :
-    ∀ st ∈ l, ∀ (rb wb : Bool) (gp : PipeNames), st ≠ .open rb wb (.pipe gp) :=
-  fun st hin => fdstNopipe_ne st (hl st hin)
-
 /-- Rocq `fdv_nopipe_insert`. -/
 theorem fdvNopipe_insert (l : List FdState) (k : Nat) (st : FdState) (hl : fdvNopipe l)
     (hst : fdstNopipe st) : fdvNopipe (l.set k st) := by
@@ -314,46 +302,6 @@ theorem fdvNopipe_replicate (n : Nat) (st : FdState) (hst : fdstNopipe st) :
 /-- Rocq `fdv_nopipe_closed`. -/
 theorem fdvNopipe_closed (n : Nat) : fdvNopipe (List.replicate n .closed) :=
   fdvNopipe_replicate n .closed fdstNopipe_closed
-
-/-- A pipe file's ends are complementary (Rocq `fdstate_ok_pipe_ends`). -/
-theorem fdstateOk_pipe_ends (inum : BitVec 32) (γo : GName) (om : OffMode) (γp : PipeNames) (C : FContent)
-    (r w : Bool) (g : PipeNames) (h : fdstateOk inum γo om γp C (.open r w (.pipe g))) : w = !r :=
-  h.2.2.2.2
-
-/-- A READABLE pipe row IS the read end of the payload's pipe (Rocq
-`fdstate_ok_pipe_rd`). -/
-theorem fdstateOk_pipe_rd (inum : BitVec 32) (γo : GName) (om : OffMode) (γp : PipeNames) (C : FContent)
-    (st : FdState) (h : fdstateOk inum γo om γp C st) (ht : C.type = FD_PIPE)
-    (hr : C.readable ≠ 0#8) : st = .open true false (.pipe γp) := by
-  have e := fdstateOk_type inum γo om γp C st h
-  rcases st with _ | ⟨r, w, _ | ⟨n, g, om⟩ | mj⟩
-  · simp [fdTypeCode, FD_NONE, FD_PIPE, ht] at e
-  · obtain ⟨hr', -, -, hg, hends⟩ := h
-    subst hg
-    cases r
-    · exact absurd hr' (by simpa using hr)
-    · unfold fdpipeEnds at hends; subst hends; rfl
-  · simp [fdTypeCode, FD_INODE, FD_PIPE, ht] at e
-  · simp [fdTypeCode, FD_DEVICE, FD_PIPE, ht] at e
-
-/-- ...and a WRITABLE one the write end (the mirror, what pipewrite's `w =
-true` is read off). -/
-theorem fdstateOk_pipe_wr (inum : BitVec 32) (γo : GName) (om : OffMode) (γp : PipeNames) (C : FContent)
-    (st : FdState) (h : fdstateOk inum γo om γp C st) (ht : C.type = FD_PIPE)
-    (hw : C.writable ≠ 0#8) : st = .open false true (.pipe γp) := by
-  have e := fdstateOk_type inum γo om γp C st h
-  rcases st with _ | ⟨r, w, _ | ⟨n, g, om⟩ | mj⟩
-  · simp [fdTypeCode, FD_NONE, FD_PIPE, ht] at e
-  · obtain ⟨-, hw', -, hg, hends⟩ := h
-    subst hg
-    cases w
-    · exact absurd hw' (by simpa using hw)
-    · unfold fdpipeEnds at hends
-      cases r
-      · rfl
-      · exact absurd hends (by decide)
-  · simp [fdTypeCode, FD_INODE, FD_PIPE, ht] at e
-  · simp [fdTypeCode, FD_DEVICE, FD_PIPE, ht] at e
 
 /-! ## Ghost names -/
 

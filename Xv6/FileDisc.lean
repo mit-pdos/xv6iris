@@ -701,11 +701,6 @@ noncomputable def discSegF' (s : Fstate) (seg : List Obs) : Prop :=
   ∧ ∃ ps cs : List Nat, altsOk (consIns seg) cs
     ∧ ∀ p ∈ inPres seg, proOkF ps cs (nlines (consIns p)) ∧ discPtF ps cs s p
 
-/-- THE DISCIPLINE OVER THE WHOLE HISTORY: each cycle is read at SOME boot
-state -/
-noncomputable def discF (h : List Obs) : Prop :=
-  ∀ seg ∈ cyclesOf h, ∃ s : Fstate, fstateOk s ∧ discSegF' s seg
-
 /-! ### The lines the file may hold -/
 
 /-- a redirect line's file and word list -/

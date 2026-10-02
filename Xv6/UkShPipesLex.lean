@@ -62,33 +62,6 @@ def ushqRebase (c : Nat) (toks : List (Nat × Nat)) : List (Nat × Nat) :=
 theorem ushqRebase_length (c : Nat) (toks : List (Nat × Nat)) : (ushqRebase c toks).length = toks.length := by
   simp [ushqRebase]
 
-theorem ushsToks_rel (len c : Nat) (f : Nat → BitVec 8) : ∀ (off : Nat) (toks : List (Nat × Nat)),
-    UshsToks len f len off toks → c ≤ off →
-    ∃ rel, UshsToks (len - c) (fun j => f (c + j)) (len - c) (off - c) rel ∧ toks = ushqRebase c rel := by
-  intro off toks h
-  induction h with
-  | nil off hnil =>
-    intro hc
-    refine ⟨[], ?_, rfl⟩
-    apply ushsToks_nil'
-    rw [show len - c - (off - c) = len - off by omega, ← ushpSkipws_shift, show c + (off - c) = off by omega]
-    omega
-  | cons off toks hn _ ih =>
-    intro hc
-    obtain ⟨rel, hrel, rfl⟩ := ih (by have := ushpSkipws_le (len - off) off f; omega)
-    generalize hk : ushpSkipws (len - off) off f = k at *
-    generalize hn' : ushpToklen (len - (off + k)) (off + k) f = n at *
-    have ek : ushpSkipws (len - c - (off - c)) (off - c) (fun j => f (c + j)) = k := by
-      rw [show len - c - (off - c) = len - off by omega, ← ushpSkipws_shift, show c + (off - c) = off by omega, hk]
-    have en : ushpToklen (len - c - (off - c + k)) (off - c + k) (fun j => f (c + j)) = n := by
-      rw [show len - c - (off - c + k) = len - (off + k) by omega, ← ushpToklen_shift,
-        show c + (off - c + k) = off + k by omega, hn']
-    refine ⟨(off - c + k, off - c + k + n) :: rel, ?_, ?_⟩
-    · apply ushs_tok_step _ _ _ _ _ _ _ ek en hn
-      rw [show off - c + k + n = off + k + n - c by omega]; exact hrel
-    · simp only [ushqRebase, List.map_cons, List.cons.injEq, Prod.mk.injEq]
-      exact ⟨⟨by omega, by omega⟩, by trivial⟩
-
 /-! ## §3 The line of a pipeline -/
 
 /-- **Rocq `ushq_bars`**. -/
@@ -113,12 +86,6 @@ def ushqTailIs (g : Nat → BitVec 8) : Nat → Nat → List (List (BitVec 8)) �
 
 /-- Rocq `ushq_ws_ok`. -/
 def ushqWsOk (ws : List (List (BitVec 8))) : Prop := fnWf ws ∧ 0 < ws.length ∧ ws.length < 10
-
-/-- **Rocq `ushq_lines_is`**. -/
-def ushqLinesIs (ws rs : List (List (BitVec 8))) (f : Nat → BitVec 8) (k len : Nat) : Prop :=
-  ushqWsOk ws ∧ (∀ j, j < (wlBody ws).length → f (k + j) = (wlBody ws)[j]!) ∧
-    f (k + (wlBody ws).length) = wlSp ∧ f (k + (wlBody ws).length + 1) = ushqBar ∧
-    f (k + (wlBody ws).length + 2) = wlSp ∧ ushqTailIs (fun j => f (k + j)) ((wlBody ws).length + 3) len rs
 
 /-! ## §4b Filter pipelines: a word list per stage -/
 

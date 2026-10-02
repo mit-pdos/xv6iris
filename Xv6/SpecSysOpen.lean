@@ -278,27 +278,6 @@ def sysOpenPost (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPri
       fdFrags V.fdg (sts.set fd (.open (soRdOf om) (soWrOf om) t)))) ∗
     fdSlot)
 
-/-- THE LANDED SHAPE, DERIVED (Rocq's `sys_open_post_any`): the descriptor
-disjunction with the bundle beside it at an existential table. -/
-theorem sysOpenPost_any (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
-    (M : Nat → List (BitVec 8)) (sts : List FdState) (om : BitVec 32) (r : BitVec 64) :
-    sysOpenPost (GF := GF) γ pa pid V M sts om r ⊢
-      ((⌜r = 0xFFFFFFFFFFFFFFFF#64⌝ ∗ procPrivFd γ pa pid V M) ∨
-        (∃ (fd : Nat) (l : List Nat) (k : Nat),
-          ⌜r = BitVec.ofNat 64 fd ∧ fdFrees V.ofile = fd :: l⌝ ∗
-          procPrivFd γ pa pid { V with ofile := V.ofile.set fd (fnode k) } M)) ∗
-      (∃ sts' : List FdState, fdFrags V.fdg sts') ∗ fdSlot := by
-  unfold sysOpenPost
-  iintro ⟨(⟨%hr, Hp, Hb⟩ | ⟨%fd, %l, %k, %t, ⟨%hr, %hfl, -⟩, Hp, Hb⟩), Hfd⟩
-  · iframe Hfd
-    isplitl [Hp]
-    · ileft; iframe Hp; ipureintro; exact hr
-    · iexists sts; iexact Hb
-  · iframe Hfd
-    isplitl [Hp]
-    · iright; iexists fd, l, k; iframe Hp; ipureintro; exact ⟨hr, hfl⟩
-    · iexists (sts.set fd (.open (soRdOf om) (soWrOf om) t)); iexact Hb
-
 end Post
 
 /-! ## 2.  THE ARMS.  Two families, one per side of the O_CREATE key -/

@@ -29,14 +29,6 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode MachCSL
 open Std (ExtTreeSet)
 
-/-- **Rocq `ushp_oom_str_bytes`**: "out of memory" and its NUL at
-`ushpOomStr`, read off sh's image -- a relayout that moves the string fails
-HERE. -/
-theorem ushpOomStr_bytes :
-    (List.range 14).map (fun j => User.Sh.code.byte (ushpOomStr + j)) =
-      [111, 117, 116, 32, 111, 102, 32, 109, 101, 109, 111, 114, 121, 0].map (fun b => some (BitVec.ofNat 8 b)) := by
-  decide
-
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]

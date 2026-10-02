@@ -188,40 +188,6 @@ theorem wp_shMallocFirst (UL : UK_LEAVES) (HS : SH_SBRK) (HF : SH_FREE)
       iexists g'
       iexact Hbody
 
-/-- **Rocq `wp_kshm_malloc_first`**: the first call with the list DROPPED
-(the statement Rocq's parser stage consumes). -/
-theorem wp_shMallocFirstDrop (UL : UK_LEAVES) (HS : SH_SBRK) (HF : SH_FREE)
-    (hps : ∀ k : Int, freeNum k → UprogSG.psok (GF := GF) k)
-    (N : UkNames GF) (h : CPU) (m : RegMap) (nbytes sz : Nat) (fb : Nat → BitVec 8) (avail : Nat)
-    (ha0 : m.get 10#5 = BitVec.ofNat 64 nbytes) (hnb0 : 0 < nbytes) (hnbhi : nbytes ≤ 65504)
-    (hszlo : ushmBase + 16 ≤ sz) (hszal : pgRoundUpN sz = sz) (hszok : uszOk (sz + 65536)) :
-    ⊢ ukCode N.t User.Sh.code.byte -∗ uword N.d ushmFreep 0#64 -∗ ubytes N.d ushmBase 16 fb -∗
-      usz N.s sz -∗ urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Sh.Sym.«malloc») (10 + avail) -∗
-      (∀ (h' : CPU) (m' : RegMap) (r : BitVec 64), ⌜ucalleeSaved m m'⌝ -∗ ⌜m'.get 10#5 = r⌝ -∗
-        ((⌜r = 0#64⌝ ∗ ushmSbrkAns N sz 65536 (BitVec.ofInt 64 (-1))) ∨
-          ∃ (q : Nat) (g : Nat → BitVec 8), ⌜r = BitVec.ofNat 64 q⌝ ∗
-            ⌜0 < q ∧ q % 16 = 0 ∧ q + nbytes < 2 ^ 38⌝ ∗ usz N.s (sz + 65536) ∗ ubytes N.d q nbytes g) -∗
-        urun (hlc := hlc) N h' m' (retPc (m.get 1#5)) (10 + avail) -∗ wpLoop h') -∗
-      wpLoop h := by
-  iintro #Hc Hfp Hbase Hsz Hrun Hcont
-  iapply wp_shMallocFirst UL HS HF hps N h m nbytes sz fb avail ha0 hnb0 hnbhi hszlo hszal hszok
-    $$ Hc Hfp Hbase Hsz Hrun
-  iintro %h' %m' %r %hcs %ha Hans Hrun
-  iapply Hcont $$ %h' %m' %r [] [] [Hans] Hrun
-  · ipureintro; exact hcs
-  · ipureintro; exact ha
-  icases Hans with (Hf | ⟨%q, %g, %hq, %hb, Hone, Hb⟩)
-  · ileft; iexact Hf
-  · iright
-    iexists q, g
-    isplitr
-    · ipureintro; exact hq
-    isplitr
-    · ipureintro; exact hb
-    unfold ushmOne
-    icases Hone with ⟨%c, -, -, -, -, -, Hsz⟩
-    iframe Hsz Hb
-
 /-- **Rocq `wp_kshm_malloc_one`**. -/
 theorem wp_shMallocOne (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (nbytes szv R avail : Nat)
     (ha0 : m.get 10#5 = BitVec.ofNat 64 nbytes) (hnb0 : 0 < nbytes) (hnbhi : nbytes ≤ 65504)

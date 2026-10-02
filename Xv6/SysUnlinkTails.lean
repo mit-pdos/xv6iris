@@ -60,8 +60,6 @@ set_option linter.unusedSimpArgs false
 
 /-! ## Context bookkeeping -/
 
-theorem sys_unlink_li0 : BitVec.signExtend 64 0#12 = 0#64 := by decide
-
 /-- The panic literals, as the `auipc` / `addi` pair leaves them. -/
 theorem sys_unlink_msg_nlink : KA.«sys_unlink» + 0x24aa#64 = KStr.«unlink: nlink < 1» := by decide
 theorem sys_unlink_msg_readi : KA.«sys_unlink» + 0x24c2#64 = KStr.«isdirempty: readi» := by decide

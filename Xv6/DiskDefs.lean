@@ -61,7 +61,6 @@ def dOffUsedIdx : Nat := 32
 def dOffInfo : Nat := 40
 def dOffOps : Nat := 168
 def dOffLock : Nat := 296
-def dSize : Nat := 320
 /-- `sizeof(disk.info[0])` -/
 def infoSize : Nat := 16
 /-- `sizeof(struct virtio_blk_req)` -/
@@ -84,7 +83,6 @@ def aInfoB (i : Nat) : BitVec 64 := diskAddr (dOffInfo + infoSize * i)
 def aInfoStatus (i : Nat) : BitVec 64 := diskAddr (dOffInfo + infoSize * i + 8)
 /-- `&disk.ops[i]` -- the request header the device reads. -/
 def aOps (i : Nat) : BitVec 64 := diskAddr (dOffOps + opsSize * i)
-def aOpsType (i : Nat) : BitVec 64 := aOps i
 def aOpsReserved (i : Nat) : BitVec 64 := diskAddr (dOffOps + opsSize * i + 4)
 def aOpsSector (i : Nat) : BitVec 64 := diskAddr (dOffOps + opsSize * i + 8)
 /-- `&disk.vdisk_lock` -/
@@ -98,10 +96,7 @@ def bOffDev : Nat := 8
 def bOffBlockno : Nat := 12
 def bOffLock : Nat := 16
 def bOffRefcnt : Nat := 64
-def bOffPrev : Nat := 72
-def bOffNext : Nat := 80
 def bOffData : Nat := 88
-def bufSize : Nat := bOffData + BSIZE
 
 def aBufValid (b : BitVec 64) : BitVec 64 := b + BitVec.ofNat 64 bOffValid
 /-- `&b->disk`: 1 while the request is with the device. -/
@@ -357,22 +352,6 @@ theorem chain_d2 (c : Chain) :
     Virtio.descOf c.d2 =
       { addr := c.status, len := 1#32, flags := BitVec.ofNat 16 Virtio.descFWrite, next := 0#16 } :=
   descOf_descWord _ _ _ _
-
-/-- The header descriptor chains on. -/
-theorem chain_d0_next (c : Chain) :
-    (Virtio.descOf c.d0).has Virtio.descFNext = true := by
-  simp [chain_d0, Virtio.VqDesc.has, Virtio.descFNext]
-
-/-- ... to the data descriptor, which chains on to the status descriptor. -/
-theorem chain_d1_next (c : Chain) :
-    (Virtio.descOf c.d1).has Virtio.descFNext = true := by
-  simp [chain_d1, Virtio.VqDesc.has, Virtio.descFNext, Virtio.descFWrite]
-  cases c.dwr <;> decide
-
-/-- The status descriptor ends the chain. -/
-theorem chain_d2_nonext (c : Chain) :
-    (Virtio.descOf c.d2).has Virtio.descFNext = false := by
-  simp [chain_d2, Virtio.VqDesc.has, Virtio.descFNext, Virtio.descFWrite]
 
 /-- The direction the device reads off the data descriptor. -/
 theorem chain_d1_wr (c : Chain) :

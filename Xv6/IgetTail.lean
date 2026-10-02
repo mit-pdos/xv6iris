@@ -39,13 +39,6 @@ def igPins (k : KCtx) (R : RegMap) : Prop :=
   R 21#5 = k.regs 21#5 ∧ R 22#5 = k.regs 22#5 ∧ R 23#5 = k.regs 23#5 ∧ R 24#5 = k.regs 24#5 ∧
   R 25#5 = k.regs 25#5 ∧ R 26#5 = k.regs 26#5 ∧ R 27#5 = k.regs 27#5
 
-theorem igPins_cs (k : KCtx) (R R' : RegMap) (h : igPins k R) (hcs : calleeSaved R R') :
-    igPins k R' := by
-  obtain ⟨a21, a22, a23, a24, a25, a26, a27⟩ := h
-  obtain ⟨-, -, -, -, -, -, c21, c22, c23, c24, c25, c26, c27⟩ := hcs
-  exact ⟨c21.trans a21, c22.trans a22, c23.trans a23, c24.trans a24, c25.trans a25,
-    c26.trans a26, c27.trans a27⟩
-
 /-- The epilogue's register file is the caller's, up to what iget may
 clobber. -/
 theorem ig_calleeSaved_mk (KR R : RegMap) (ra : BitVec 64)

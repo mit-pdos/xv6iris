@@ -46,10 +46,4 @@ structure SYSCALL_XV6 : Prop where
     wp_syscall_body (hlc := hlc) (GF := GF) (parkToken (hlc := hlc)) Γ cpu k γw γ j pid V M sts gn cs ip f
       hj hproc hK hnoff htier hgn
 
-/-- The specialised contract at the instance IS `SYSCALL`'s field there: any
-proof of `SYSCALL` gives `SYSCALL_XV6`. -/
-theorem SYSCALL.toXv6 (S : SYSCALL) : SYSCALL_XV6 :=
-  ⟨fun Γ _ cpu k γw γ j pid V M sts gn cs ip f hj hproc hK hnoff htier hgn =>
-    S.wp_syscall (parkToken (hlc := _)) Γ cpu k γw γ j pid V M sts gn cs ip f hj hproc hK hnoff htier hgn⟩
-
 end Xv6

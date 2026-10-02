@@ -310,12 +310,6 @@ theorem kx_pcIs_jump (cpu : CPU) (X : KCtx) (R : RegMap) (v : BitVec 64) (hv : j
   rw [KCtx.withRegs_regs, RegMap.set_apply, if_pos rfl, hv]
 end
 
-/-- The scan's increment, with the immediate as the instruction supplies it. -/
-theorem kx_succ8 (pa : BitVec 64) (fd : Nat) :
-    pOfile pa fd + BitVec.signExtend 64 8#12 = pOfile pa (fd + 1) := by
-  rw [show BitVec.signExtend 64 8#12 = 8#64 from by simp]
-  exact kx_pOfile_succ pa fd
-
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
@@ -1700,8 +1694,6 @@ section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 
 theorem kexit_br_fffffffffffff880 : KA.«kexit» + 0xfffffffffffff880#64 = KA.«myproc» := by decide
-
-theorem kexit_br_8314 : KA.«kexit» + 0x8314#64 = initprocAddr := by decide
 
 set_option maxHeartbeats 8000000 in
 set_option maxRecDepth 8000 in

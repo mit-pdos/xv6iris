@@ -492,20 +492,6 @@ theorem wpDev_dmaV (N : Namespace) (d : DevId) [DevDiskInert d] (hsil : DevSilen
         · iapply hmk _ _ hm' $$ IH HC
         · exact BigSepL.bigSepL_nil_intro
 
-/-- The root thread of a bus-mastering device, as the power thread forks it:
-it starts at the end of an (empty) iteration, so the client must hand it the
-loop's own resource `Cr` once, at power-on. -/
-theorem wpDev_dmaV_root (N : Namespace) (d : DevId) [DevDiskInert d] (hsil : DevSilent d) (R : DevSt d → IProp GF)
-    [∀ s, Timeless (R s)] (Lt : DevTask d → IProp GF) (Cr : IProp GF)
-    (hloc : DevSig.LeaseV d R Lt Cr) :
-    devInvR N d R ∗ genCert ∗ Cr ⊢@{IProp GF}
-      devWP (genId (hlc := hlc) (GF := GF)) d rootTask (DevM.pure ()) := by
-  iintro ⟨Hinv, Hcert, HCr⟩
-  ihave H := wpDev_dmaV N d hsil R Lt Cr hloc $$ [Hinv Hcert]
-  case' _ => iframe Hinv Hcert
-  iapply H $$ %rootTask %(DevM.pure ()) %Cr
-    %(by rw [if_pos rfl]; exact DevM.LeaseV.pure _ () .rfl) HCr
-
 /-! ## `DevM.LeaseL` embeds
 
 Every old derivation is a new one: the new arm is the only difference, and
@@ -523,9 +509,5 @@ theorem leaseV_of_leaseL {S T : Type} (R : S → IProp GF) (Lt : T → IProp GF)
   | dmaWrite C C' g pa n w k hlease hfalse hk ih =>
     exact .dmaWrite C C' g pa n w k hlease hfalse ih
   | fork C C' t k hsplit hk ih => exact .fork C C' t k hsplit ih
-
-theorem leaseV_of_leaseL_sig (d : DevId) (R : DevSt d → IProp GF) (Lt : DevTask d → IProp GF)
-    (Cr : IProp GF) (h : DevSig.LeaseL d R Lt Cr) : DevSig.LeaseV d R Lt Cr :=
-  ⟨leaseV_of_leaseL _ _ _ _ _ h.1, fun t => leaseV_of_leaseL _ _ _ _ _ (h.2 t)⟩
 
 end MachCSL

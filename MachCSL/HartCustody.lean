@@ -120,15 +120,6 @@ theorem wpHart_crash_fupd (cpu : CPU) (m : SailM Unit) (P : IProp GF) :
   imodintro
   iframe Hs HP
 
-/-- ...at the instruction boundary (Rocq `wp_crash_fupd_loop`). -/
-theorem wpLoop_crash_fupd (cpu : CPU) (P : IProp GF) :
-    crashInv (hlc := hlc) (GF := GF) ⊢@{IProp GF}
-      (∀ n : Nat, ⌜n = genId (hlc := hlc) (GF := GF) + 1⌝ -∗ startAuth n -∗
-        ▷ MachFixedGS.crashPred (hlc := hlc) (GF := GF) ={⊤ \ ↑crashN}=∗
-        startAuth n ∗ ▷ MachFixedGS.crashPred (hlc := hlc) (GF := GF) ∗ P) -∗
-      (P -∗ wpLoop cpu) -∗ wpLoop cpu :=
-  wpHart_crash_fupd cpu (pure ()) P
-
 end custody
 
 end MachCSL

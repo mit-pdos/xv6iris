@@ -54,17 +54,6 @@ theorem co_off (x : BitVec 64) :
   rw [BitVec.toNat_setWidth, BitVec.toNat_ofNat, BitVec.extractLsb'_toNat]
   simp only [Nat.shiftRight_zero, Nat.reducePow]
 
-/-- `PGSIZE - (dstva - va0)`. -/
-theorem co_n_val (x : BitVec 64) :
-    (x &&& 0xFFFFFFFFFFFFF000#64) - x + 4096#64 = BitVec.ofNat 64 (4096 - x.toNat % 4096) := by
-  have h := co_off x
-  have hoff : x.toNat % 4096 < 4096 := Nat.mod_lt _ (by omega)
-  have h2 : (x &&& 0xFFFFFFFFFFFFF000#64) - x + 4096#64
-      = 4096#64 - BitVec.ofNat 64 (x.toNat % 4096) := by
-    rw [← h]; bv_decide
-  rw [h2, show (4096#64 : BitVec 64) = BitVec.ofNat 64 4096 from rfl,
-    co_ofNat_sub 4096 _ (by omega) (by omega)]
-
 /-! ## Return addresses -/
 
 theorem co_ret_1578 : jumpPc (KA.«copyout» + 0x64#64) = (KA.«copyout» + 0x64#64) := by
@@ -279,21 +268,6 @@ def coKeep (R R2 : RegMap) : Prop :=
   R2 2#5 = R 2#5 ∧ R2 18#5 = R 18#5 ∧ R2 20#5 = R 20#5 ∧ R2 21#5 = R 21#5 ∧
   R2 22#5 = R 22#5 ∧ R2 23#5 = R 23#5 ∧ R2 24#5 = R 24#5 ∧ R2 25#5 = R 25#5 ∧
   R2 26#5 = R 26#5 ∧ R2 27#5 = R 27#5
-
-theorem coKeep_refl (R : RegMap) : coKeep R R :=
-  ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩
-
-theorem coKeep_trans {R R' R'' : RegMap} (h : coKeep R R') (h' : coKeep R' R'') :
-    coKeep R R'' := by
-  obtain ⟨a1, a2, a3, a4, a5, a6, a7, a8, a9, a10⟩ := h
-  obtain ⟨b1, b2, b3, b4, b5, b6, b7, b8, b9, b10⟩ := h'
-  exact ⟨b1.trans a1, b2.trans a2, b3.trans a3, b4.trans a4, b5.trans a5, b6.trans a6,
-    b7.trans a7, b8.trans a8, b9.trans a9, b10.trans a10⟩
-
-theorem coKeep_of_calleeSaved {R R' : RegMap} (h : calleeSaved R R') : coKeep R R' :=
-  ⟨h.1, h.2.2.2.1, h.2.2.2.2.2.1, h.2.2.2.2.2.2.1, h.2.2.2.2.2.2.2.1,
-    h.2.2.2.2.2.2.2.2.1, h.2.2.2.2.2.2.2.2.2.1, h.2.2.2.2.2.2.2.2.2.2.1,
-    h.2.2.2.2.2.2.2.2.2.2.2.1, h.2.2.2.2.2.2.2.2.2.2.2.2⟩
 
 /-- What `copyout` leaves behind. -/
 def coPost (psz : BitVec 64) (P : UPtd) (M : Nat → List (BitVec 8)) (A : Nat) (bs : List (BitVec 8))

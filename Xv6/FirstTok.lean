@@ -238,14 +238,6 @@ instance firstBootPersist_persistent [Fscfg] [Icfg] [CurCtx] :
     Persistent (firstBootPersist (hlc := hlc) (GF := GF)) := by
   unfold firstBootPersist; infer_instance
 
-/-- The image's arithmetic, off the persistent half (every geometry premise
-of `wp_fsinit_eb_body` is a projection of it, deviation 3). -/
-theorem firstBootPersist_geom [Fscfg] [Icfg] [CurCtx] :
-    firstBootPersist (hlc := hlc) (GF := GF) ⊢ ⌜FsGeomOk⌝ := by
-  unfold firstBootPersist
-  iintro ⟨-, -, -, -, -, -, -, -, -, %h, -⟩
-  ipureintro; exact h
-
 /-! ## 2.  THE PURE BLOCK -/
 
 /-- **Rocq `first_fsinit_pures`**, verbatim over the era's durable disk `dk`,
@@ -431,19 +423,6 @@ instance firstDone_persistent [Fscfg] [Icfg] [CurCtx] :
 def firstTok [Fscfg] [Icfg] [CurCtx] : IProp GF := iprop(
   firstBoot (hlc := hlc) ∨
     (wordPointsTo firstAddr 4 DFrac.discard 0#32 ∗ fsReady (hlc := hlc) ∗ fsabsEnv (hlc := hlc)))
-
-/-- Rocq `first_tok_done`: the steady arm's two rows make a token. -/
-theorem firstTok_done [Fscfg] [Icfg] [CurCtx] :
-    wordPointsTo (GF := GF) firstAddr 4 DFrac.discard 0#32 ⊢
-      fsReady (hlc := hlc) -∗ fsabsEnv (hlc := hlc) -∗ firstTok (hlc := hlc) := by
-  unfold firstTok
-  iintro H #F #A
-  iright
-  isplitl [H]
-  · iexact H
-  isplitr
-  · iexact F
-  · iexact A
 
 /-- Rocq `first_done_fsabs`: the application's environment, off the steady
 arm. -/

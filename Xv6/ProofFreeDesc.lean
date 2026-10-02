@@ -90,10 +90,6 @@ theorem fd_blt_false (i : Nat) (h : i < NUM) :
 
 /-! ## The stored zeroes -/
 
-theorem fd_z64 : BitVec.extractLsb' 0 64 (0#128) = 0#64 := by decide
-theorem fd_z32 : BitVec.extractLsb' 64 32 (0#128) = 0#32 := by decide
-theorem fd_z16a : BitVec.extractLsb' 96 16 (0#128) = 0#16 := by decide
-theorem fd_z16b : BitVec.extractLsb' 112 16 (0#128) = 0#16 := by decide
 theorem fd_s32 : BitVec.extractLsb' 0 32 (0#64) = 0#32 := by decide
 theorem fd_s16 : BitVec.extractLsb' 0 16 (0#64) = 0#16 := by decide
 theorem fd_s8 : BitVec.extractLsb' 0 8 (1#64) = 1#8 := by decide

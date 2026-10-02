@@ -55,8 +55,6 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 
 theorem iput_ent_t3c : KA.«iput» + 0x3c#64 + BitVec.signExtend 64 8164#13 = KA.«iput» + 0x20#64 := by
   decide
-theorem iput_ent_t4e : KA.«iput» + 0x4e#64 + BitVec.signExtend 64 126#13 = KA.«iput» + 0xcc#64 := by
-  decide
 theorem iput_ent_td0 : KA.«iput» + 0xd0#64 + BitVec.signExtend 64 2096976#21 =
     KA.«iput» + 0x20#64 := by decide
 

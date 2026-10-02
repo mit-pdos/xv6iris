@@ -227,46 +227,6 @@ theorem ushI_832 (γt : GName) :
     ushCode (GF := GF) γt ⊢ uinstrIs γt (BitVec.ofNat 64 0x832) true (.JAL (2097128#21, .Regidx 0#5)) :=
   ushm_uisK γt 0x832 _ _ (by kernel_rfl) (by decide)
 
-/-- `0x834  ld a0,8(a0)` -/
-theorem ushI_834 (γt : GName) :
-    ushCode (GF := GF) γt ⊢ uinstrIs γt (BitVec.ofNat 64 0x834) true (.LOAD (8#12, .Regidx 10#5, .Regidx 10#5, false, 8)) :=
-  ushm_uisK γt 0x834 _ _ (by kernel_rfl) (by decide)
-
-/-- `0x836  jal 7ca <nulterminate>` -/
-theorem ushI_836 (γt : GName) :
-    ushCode (GF := GF) γt ⊢ uinstrIs γt (BitVec.ofNat 64 0x836) false (.JAL (2097044#21, .Regidx 1#5)) :=
-  ushm_uisK γt 0x836 _ _ (by kernel_rfl) (by decide)
-
-/-- `0x83a  ld a0,16(s1)` -/
-theorem ushI_83a (γt : GName) :
-    ushCode (GF := GF) γt ⊢ uinstrIs γt (BitVec.ofNat 64 0x83a) true (.LOAD (16#12, .Regidx 9#5, .Regidx 10#5, false, 8)) :=
-  ushm_uisK γt 0x83a _ _ (by kernel_rfl) (by decide)
-
-/-- `0x83c  jal 7ca <nulterminate>` -/
-theorem ushI_83c (γt : GName) :
-    ushCode (GF := GF) γt ⊢ uinstrIs γt (BitVec.ofNat 64 0x83c) false (.JAL (2097038#21, .Regidx 1#5)) :=
-  ushm_uisK γt 0x83c _ _ (by kernel_rfl) (by decide)
-
-/-- `0x840  j 81a <nulterminate+0x50>` -/
-theorem ushI_840 (γt : GName) :
-    ushCode (GF := GF) γt ⊢ uinstrIs γt (BitVec.ofNat 64 0x840) true (.JAL (2097114#21, .Regidx 0#5)) :=
-  ushm_uisK γt 0x840 _ _ (by kernel_rfl) (by decide)
-
-/-- `0x842  ld a0,8(a0)` -/
-theorem ushI_842 (γt : GName) :
-    ushCode (GF := GF) γt ⊢ uinstrIs γt (BitVec.ofNat 64 0x842) true (.LOAD (8#12, .Regidx 10#5, .Regidx 10#5, false, 8)) :=
-  ushm_uisK γt 0x842 _ _ (by kernel_rfl) (by decide)
-
-/-- `0x844  jal 7ca <nulterminate>` -/
-theorem ushI_844 (γt : GName) :
-    ushCode (GF := GF) γt ⊢ uinstrIs γt (BitVec.ofNat 64 0x844) false (.JAL (2097030#21, .Regidx 1#5)) :=
-  ushm_uisK γt 0x844 _ _ (by kernel_rfl) (by decide)
-
-/-- `0x848  j 81a <nulterminate+0x50>` -/
-theorem ushI_848 (γt : GName) :
-    ushCode (GF := GF) γt ⊢ uinstrIs γt (BitVec.ofNat 64 0x848) true (.JAL (2097106#21, .Regidx 0#5)) :=
-  ushm_uisK γt 0x848 _ _ (by kernel_rfl) (by decide)
-
 end
 
 end Xv6

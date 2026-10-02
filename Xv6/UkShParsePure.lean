@@ -222,14 +222,6 @@ theorem ushp_ws_chr_z (c : BitVec 8) (h : ushpIsWs c = false) :
     rw [hv] at hm
     simp [ushpIsWs, hm] at h
 
-theorem ushp_ws_chr_nz (c : BitVec 8) (h : ushpIsWs c = true) :
-    ∃ j, j < 5 ∧ ushpChr ushpWhitespace 5 0 ushpWsF c = ushpWhitespace + j := by
-  simp only [ushpIsWs, decide_eq_true_eq] at h
-  obtain ⟨j, hj, hv⟩ := ushp_ws_mem_inv c h
-  obtain ⟨k, hk⟩ := ushpFind_some_of 5 0 j ushpWsF c ⟨by omega, by omega⟩ hv
-  have := ushpFind_ge 5 0 ushpWsF c k hk
-  exact ⟨k, by omega, ushpChr_hit _ 5 0 ushpWsF c k hk⟩
-
 /-- Rocq `ushp_sym_f`: the symbols table as an index function. -/
 def ushpSymF (i : Nat) : BitVec 8 :=
   match i with
@@ -265,14 +257,6 @@ theorem ushp_sym_chr_z (c : BitVec 8) (h : ushpIsSym c = false) :
     have hm := ushp_sym_mem j (by omega)
     rw [hv] at hm
     simp [ushpIsSym, hm] at h
-
-theorem ushp_sym_chr_nz (c : BitVec 8) (h : ushpIsSym c = true) :
-    ∃ j, j < 7 ∧ ushpChr ushpSymbols 7 0 ushpSymF c = ushpSymbols + j := by
-  simp only [ushpIsSym, decide_eq_true_eq] at h
-  obtain ⟨j, hj, hv⟩ := ushp_sym_mem_inv c h
-  obtain ⟨k, hk⟩ := ushpFind_some_of 7 0 j ushpSymF c ⟨by omega, by omega⟩ hv
-  have := ushpFind_ge 7 0 ushpSymF c k hk
-  exact ⟨k, by omega, ushpChr_hit _ 7 0 ushpSymF c k hk⟩
 
 /-- Rocq `ushp_nsym_bv`: a byte not in `symbols` is none of the seven values
 gettoken's dispatch chain tests. -/
@@ -355,16 +339,6 @@ theorem ushp_len_app1 {A : Type} (l : List A) (x : A) : (l ++ [x]).length = l.le
 
 theorem ushp_len_app_cons {A : Type} (l : List A) (x : A) (r : List A) :
     (l ++ x :: r).length = l.length + r.length + 1 := by simp; omega
-
-theorem ushp_lookup_app_mid' {A : Type} (l : List A) (x : A) (r : List A) :
-    (l ++ x :: r)[l.length]? = some x := by simp
-
-theorem ushp_lookup_app_next {A : Type} (l : List A) (x y : A) (r : List A) :
-    (l ++ x :: y :: r)[l.length + 1]? = some y := by
-  rw [List.getElem?_append_right (by omega)]; simp
-
-theorem ushp_lookup_app_past {A : Type} (l : List A) (x : A) : (l ++ [x])[l.length + 1]? = none := by
-  simp
 
 /-- **Rocq `ushpTokens_skip`**: the invariant survives a blank skip. -/
 theorem ushpTokens_skip (len : Nat) (f : Nat → BitVec 8) (off : Nat) (toks : List (Nat × Nat))

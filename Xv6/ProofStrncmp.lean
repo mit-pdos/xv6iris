@@ -30,11 +30,6 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 
 /-! ## Arithmetic facts -/
 
-/-- `extractLsb' 0 32` is additive. -/
-theorem sn_E_add (x y : BitVec 64) :
-    BitVec.extractLsb' 0 32 (x + y) = BitVec.extractLsb' 0 32 x + BitVec.extractLsb' 0 32 y := by
-  bv_decide
-
 /-- `sext.w` is the identity on a small count. -/
 theorem sn_sext32 (m : Nat) (hm : m < 2 ^ 31) :
     BitVec.signExtend 64 (BitVec.extractLsb' 0 32 (BitVec.ofNat 64 m)) = BitVec.ofNat 64 m := by

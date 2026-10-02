@@ -562,23 +562,6 @@ theorem bootHartRes_ofEra (E : EraGS) (gen : Nat) (cP : CPU → BitVec 64 → IP
   letI : MachGS hlc GF := MachGS.ofEra E gen cP cI
   bootHartRes_intro (σ.regs c) c (bootFacts_resetRegsRun hbf c)
 
-/-- **All eight harts' `.bss` shares at `Hboot`'s era**: `bootCarve_harts`
-with the `viewLb … 0` receipts read off `powerBootRes`'s token row (which is
-handed back). -/
-theorem bootCarve_harts_ofEra (E : EraGS) (gen : Nat) (cP : CPU → BitVec 64 → IProp GF)
-    (cI : ∀ cpu : CPU, ⊢ cP cpu 0#64) :
-    letI : MachGS hlc GF := MachGS.ofEra E gen cP cI
-    kmapStatic (GF := GF) ⊢ ([∗list] c ∈ cpus, ∃ ξ : CtxId, ctxTokAt E c ξ) -∗
-      bootRan (imgFlat bootImage) MachCSL.KernelSyms.«stack0» (MachCSL.KernelSyms.«stack0» + 4096 * NCPU) -∗
-      bootRan (imgFlat bootImage) MachCSL.KernelSyms.«cpus» (MachCSL.KernelSyms.«cpus» + 128 * NCPU) -∗
-      |==> (([∗list] c ∈ cpus, ∃ ξ : CtxId, ctxTokAt E c ξ) ∗ [∗list] c ∈ cpus, bootHartBss c) := by
-  letI : MachGS hlc GF := MachGS.ofEra E gen cP cI
-  iintro #Hk Ht Hs Hc
-  icases ctxTokAt_viewLb0_list E cpus $$ Ht with ⟨Ht, Hv⟩
-  imod (bootCarve_harts) $$ Hk Hv Hs Hc with Hb
-  imodintro
-  iframe Ht Hb
-
 end era
 
 end Xv6

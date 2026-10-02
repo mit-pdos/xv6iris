@@ -104,11 +104,6 @@ theorem it_blez (m : Nat) (hm : m < 2 ^ 63) :
   have h := it_bge_nat 0 m (by decide) hm
   simpa using h
 
-/-- `bge s3,a5` at `+0x68`. -/
-theorem it_bge (a b : Nat) (ha : a < 2 ^ 63) (hb : b < 2 ^ 63) :
-    bcond bop.BGE (BitVec.ofNat 64 a) (BitVec.ofNat 64 b) = decide (b ≤ a) :=
-  it_bge_nat a b ha hb
-
 /-- `bge s3,a5` as `k_norm` leaves the incremented cursor. -/
 theorem it_bge_add (x y m : Nat) (hx : x + y < 2 ^ 63) (hm : m < 2 ^ 63) :
     bcond bop.BGE (BitVec.ofNat 64 x + BitVec.ofNat 64 y) (BitVec.ofNat 64 m) =
@@ -556,17 +551,6 @@ theorem itDat_zero (recovering : Bool) (D : RegMapF Bool) (W : List (BitVec 32))
     itDat recovering D W 0 = D := by
   unfold itDat; split <;> rfl
 
-theorem itLat_full (recovering : Bool) (W : List (BitVec 32)) (Lw : Nat → List (BitVec 8))
-    (L : BlockMap) (n : Nat) (hn : n = W.length) :
-    itLat recovering W Lw L n = (if recovering then itRecL W Lw L else L) := by
-  unfold itLat itRecL; rw [hn]
-
-theorem itDat_full (recovering : Bool) (D : RegMapF Bool) (W : List (BitVec 32)) (n : Nat)
-    (hn : n = W.length) :
-    itDat recovering D W n = (if recovering then D else dirtyClear D (W.map (fun w => w.toNat))) := by
-  unfold itDat
-  rw [hn, List.take_length]
-
 /-- The pinned set's step: entry `t`'s block goes back to `false` (Rocq's
 `it_dirty_flip_step`).  No duplicate-freedom premise is needed -- the
 inserted key is the same on both sides. -/
@@ -597,13 +581,6 @@ theorem dirtyClear_step (D : RegMapF Bool) (W : List (BitVec 32)) (t : Nat) (wt 
           · exact hm h'
           · exact hz (by simpa using h')), dirtyClear_out D _ z hm]
   exact Std.ExtTreeMap.ext_getElem? key
-
-theorem itDat_succ (D : RegMapF Bool) (W : List (BitVec 32)) (t : Nat) (wt : BitVec 32)
-    (htlen : t < W.length) (hwteq : W[t] = wt) :
-    itDat false D W (t + 1) = PartialMap.insert (itDat false D W t) wt.toNat false := by
-  unfold itDat
-  simp only [Bool.false_eq_true, if_false]
-  exact dirtyClear_step D W t wt htlen hwteq
 
 /-- The registers the loop pins: the frame, the cursor `s3 = tail`,
 `s5 = &log.lh.block[tail]`, `s4 = &log`, `s6` the recovering flag,

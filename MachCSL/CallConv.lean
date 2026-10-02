@@ -59,10 +59,6 @@ theorem byteBuf_upd [CurCtx] (a : BitVec 64) (bs : List (BitVec 8)) (j : Nat) (b
 /-- No NUL byte inside. -/
 def nonul (s : List (BitVec 8)) : Prop := ∀ b ∈ s, b ≠ 0#8
 
-/-- RAM starts above 0: a pointer into RAM is not null. -/
-theorem inRam_ne_zero {a : BitVec 64} {n : Nat} (h : inRam a n) : a ≠ 0#64 := by
-  intro h0; subst h0; unfold inRam ramBase at h; simp at h
-
 /-- **The C string `s` at `a`**, owned at `dq`: the bytes of `s` followed by
 the terminating NUL, with no NUL inside `s`.  What a `char *` argument
 points to: the points-to of a string. -/
@@ -188,20 +184,6 @@ theorem KCtx.pop_pushed (k : KCtx) (m : Nat) (R : RegMap) (hm : m ≤ k.avail) :
 
 theorem KCtx.setReg_withRegs (k : KCtx) (R : RegMap) (i : BitVec 5) (v : BitVec 64) :
     (k.withRegs R).setReg i v = k.withRegs (R.set i v) := rfl
-
-theorem KCtx.rget_push (cpu : CPU) (k : KCtx) (m : Nat) (j : BitVec 5) :
-    (k.push m).rget cpu j = if j = 2#5 then k.sp - 8#64 * BitVec.ofNat 64 m else k.rget cpu j := by
-  show (k.setReg 2#5 _).rget cpu j = _
-  rw [KCtx.rget_setReg _ _ _ _ _ (by decide) (by decide)]
-
-theorem KCtx.rget_pop (cpu : CPU) (k : KCtx) (m : Nat) (j : BitVec 5) :
-    (k.pop m).rget cpu j = if j = 2#5 then k.sp + 8#64 * BitVec.ofNat 64 m else k.rget cpu j := by
-  show (k.setReg 2#5 _).rget cpu j = _
-  rw [KCtx.rget_setReg _ _ _ _ _ (by decide) (by decide)]
-
-/-- `sp` as a read. -/
-theorem KCtx.rget_sp (cpu : CPU) (k : KCtx) : k.rget cpu 2#5 = k.sp :=
-  KCtx.rget_ne cpu k 2#5 (by decide) (by decide)
 
 /-- The context after `push_off`: the depth incremented, `intena` untouched
 (the write of `old` at depth 0 is exactly `wf`'s canonical value there,

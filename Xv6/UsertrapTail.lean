@@ -37,8 +37,6 @@ theorem ut_br_prepare_return' : KA.«usertrap» + 18446744073709551280#64 = KA.�
 
 theorem ut_ret_jump' : jumpPc (KA.«usertrap» + 178#64) = utPc 0xb2#64 := by decide
 
-theorem ut_ret_jump : jumpPc (utPc 0xae#64 + 4#64) = utPc 0xb2#64 := by decide
-
 /-- **The context prepare_return hands back, re-based** at the entry's. -/
 theorem ut_ret_ctx (k kb : KCtx) (h : utBase k kb) (hk : 4 ≤ kb.avail) (R R' : RegMap) :
     (((kb.pushed 4).withRegs R).intrOff true false).withRegs R' =

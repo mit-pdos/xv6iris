@@ -106,22 +106,6 @@ theorem pipeQueue_agree (γ : GName) (s s' : PipeSt) :
   ipureintro
   exact (ExclAuth.agree Hv).symm
 
-/-- Rocq `pipe_qfrag_excl`. -/
-theorem pipeQfrag_excl (γ : GName) (s s' : PipeSt) :
-    pipeQfrag (GF := GF) γ s -∗ pipeQfrag γ s' -∗ False := by
-  unfold pipeQfrag
-  iintro H1 H2
-  icombine H1 H2 gives %Hv
-  exact (ExclAuth.frag_op_valid.1 Hv).elim
-
-/-- Rocq `pipe_qauth_excl`. -/
-theorem pipeQauth_excl (γ : GName) (s s' : PipeSt) :
-    pipeQauth (GF := GF) γ s -∗ pipeQauth γ s' -∗ False := by
-  unfold pipeQauth
-  iintro H1 H2
-  icombine H1 H2 gives %Hv
-  exact (ExclAuth.auth_op_valid.1 Hv).elim
-
 /-- THE ONE STEP, and it needs both halves (Rocq `pipe_queue_update`). -/
 theorem pipeQueue_update (γ : GName) (s s' s'' : PipeSt) :
     pipeQauth (GF := GF) γ s -∗ pipeQfrag γ s' ==∗ pipeQauth γ s'' ∗ pipeQfrag γ s'' := by
@@ -176,17 +160,6 @@ def pipeClink (γ : GName) (w : Bool) (Φ : IProp GF) : IProp GF :=
 
 /-! ### The holder's constructors: a link out of the fragment -/
 
-/-- Rocq `pipe_olink_of_frag`. -/
-theorem pipeOlink_of_frag (γ : GName) (Φ : PipeSt → IProp GF) (s0 : PipeSt) :
-    pipeQfrag γ s0 -∗ (pipeQfrag γ s0 ={⊤}=∗ Φ s0) -∗ pipeOlink γ Φ := by
-  unfold pipeOlink
-  iintro Hf Hk %s Ha
-  ihave %he := pipeQueue_agree γ s s0 $$ Ha Hf
-  subst he
-  imod Hk $$ Hf with HΦ
-  imodintro
-  iframe Ha HΦ
-
 /-- Rocq `pipe_wlink_of_frag`. -/
 theorem pipeWlink_of_frag (γ : GName) (b : BitVec 8) (Φ : IProp GF) (s0 : PipeSt) :
     pipeQfrag γ s0 -∗ (pipeQfrag γ (pstWrite b s0) ={⊤}=∗ Φ) -∗ pipeWlink γ b Φ := by
@@ -196,42 +169,6 @@ theorem pipeWlink_of_frag (γ : GName) (b : BitVec 8) (Φ : IProp GF) (s0 : Pipe
   subst he
   imod pipeQueue_update γ s0 s0 (pstWrite b s0) $$ Ha Hf with ⟨Ha, Hf⟩
   imod Hk $$ Hf with HΦ
-  imodintro
-  iframe Ha HΦ
-
-/-- Rocq `pipe_wolink_of_frag`. -/
-theorem pipeWolink_of_frag (γ : GName) (Φ : PipeSt → IProp GF) (s0 : PipeSt) :
-    pipeQfrag γ s0 -∗ (pipeQfrag γ s0 ={⊤}=∗ Φ s0) -∗ pipeWolink γ Φ := by
-  unfold pipeWolink
-  iintro Hf Hk %s %_ Ha
-  ihave %he := pipeQueue_agree γ s s0 $$ Ha Hf
-  subst he
-  imod Hk $$ Hf with HΦ
-  imodintro
-  iframe Ha HΦ
-
-/-- Rocq `pipe_rolink_of_frag`. -/
-theorem pipeRolink_of_frag (γ : GName) (Φ : PipeSt → IProp GF) (s0 : PipeSt) :
-    pipeQfrag γ s0 -∗ (pipeQfrag γ s0 ={⊤}=∗ Φ s0) -∗ pipeRolink γ Φ := by
-  unfold pipeRolink
-  iintro Hf Hk %s %_ Ha
-  ihave %he := pipeQueue_agree γ s s0 $$ Ha Hf
-  subst he
-  imod Hk $$ Hf with HΦ
-  imodintro
-  iframe Ha HΦ
-
-/-- Rocq `pipe_rlink_of_frag`. -/
-theorem pipeRlink_of_frag (γ : GName) (Φ : BitVec 8 → IProp GF) (s0 : PipeSt) :
-    pipeQfrag γ s0 -∗
-    (∀ b : BitVec 8, ⌜pstNext s0 = some b⌝ -∗ pipeQfrag γ (pstRead s0) ={⊤}=∗ Φ b) -∗
-    pipeRlink γ Φ := by
-  unfold pipeRlink
-  iintro Hf Hk %s %b %_ %hb Ha
-  ihave %he := pipeQueue_agree γ s s0 $$ Ha Hf
-  subst he
-  imod pipeQueue_update γ s0 s0 (pstRead s0) $$ Ha Hf with ⟨Ha, Hf⟩
-  imod Hk $$ %b %hb Hf with HΦ
   imodintro
   iframe Ha HΦ
 
@@ -249,26 +186,6 @@ theorem pipeClink_of_frag (γ : GName) (w : Bool) (Φ : IProp GF) (s0 : PipeSt) 
 
 /-! ### Monotonicity, and the premises only weaken -/
 
-/-- Rocq `pipe_olink_mono`. -/
-theorem pipeOlink_mono (γ : GName) (Φ Φ' : PipeSt → IProp GF) :
-    (∀ s, Φ s -∗ Φ' s) -∗ pipeOlink γ Φ -∗ pipeOlink γ Φ' := by
-  unfold pipeOlink
-  iintro Hw Hl %s Ha
-  imod Hl $$ %s Ha with ⟨Ha, HΦ⟩
-  imodintro
-  iframe Ha
-  iapply Hw $$ HΦ
-
-/-- Rocq `pipe_wlink_mono`. -/
-theorem pipeWlink_mono (γ : GName) (b : BitVec 8) (Φ Φ' : IProp GF) :
-    (Φ -∗ Φ') -∗ pipeWlink γ b Φ -∗ pipeWlink γ b Φ' := by
-  unfold pipeWlink
-  iintro Hw Hl %s %hwo %hro Ha
-  imod Hl $$ %s %hwo %hro Ha with ⟨Ha, HΦ⟩
-  imodintro
-  iframe Ha
-  iapply Hw $$ HΦ
-
 /-- SANITY (lanes PQ-FLAG, PQ-FLAG-2): an UNCONDITIONAL stepper is still a
 write link (Rocq `pipe_wlink_of_uncond`); the converse is false and
 deliberately not stated. -/
@@ -277,25 +194,6 @@ theorem pipeWlink_of_uncond (γ : GName) (b : BitVec 8) (Φ : IProp GF) :
   unfold pipeWlink
   iintro Hl %s %_ %_ Ha
   iapply Hl $$ %s Ha
-
-/-- ...and the one-premise link of design 3.1 is still one too (Rocq
-`pipe_wlink_of_wo_only`). -/
-theorem pipeWlink_of_wo_only (γ : GName) (b : BitVec 8) (Φ : IProp GF) :
-    (∀ s : PipeSt, ⌜s.wo = true⌝ -∗ pipeQauth γ s ={⊤}=∗ pipeQauth γ (pstWrite b s) ∗ Φ) -∗
-    pipeWlink γ b Φ := by
-  unfold pipeWlink
-  iintro Hl %s %hwo %_ Ha
-  iapply Hl $$ %s %hwo Ha
-
-/-- Rocq `pipe_rlink_mono`. -/
-theorem pipeRlink_mono (γ : GName) (Φ Φ' : BitVec 8 → IProp GF) :
-    (∀ b : BitVec 8, Φ b -∗ Φ' b) -∗ pipeRlink γ Φ -∗ pipeRlink γ Φ' := by
-  unfold pipeRlink
-  iintro Hw Hl %s %b %hro %hb Ha
-  imod Hl $$ %s %b %hro %hb Ha with ⟨Ha, HΦ⟩
-  imodintro
-  iframe Ha
-  iapply Hw $$ HΦ
 
 /-- The read link's own sanity lemma (lane PIPE-RO, Rocq
 `pipe_rlink_of_uncond`). -/
@@ -306,41 +204,6 @@ theorem pipeRlink_of_uncond (γ : GName) (Φ : BitVec 8 → IProp GF) :
   unfold pipeRlink
   iintro Hl %s %b %_ %hb Ha
   iapply Hl $$ %s %b %hb Ha
-
-/-- Rocq `pipe_wolink_mono`. -/
-theorem pipeWolink_mono (γ : GName) (Φ Φ' : PipeSt → IProp GF) :
-    (∀ s, Φ s -∗ Φ' s) -∗ pipeWolink γ Φ -∗ pipeWolink γ Φ' := by
-  unfold pipeWolink
-  iintro Hw Hl %s %hwo Ha
-  imod Hl $$ %s %hwo Ha with ⟨Ha, HΦ⟩
-  imodintro
-  iframe Ha
-  iapply Hw $$ HΦ
-
-/-- Rocq `pipe_rolink_mono`. -/
-theorem pipeRolink_mono (γ : GName) (Φ Φ' : PipeSt → IProp GF) :
-    (∀ s, Φ s -∗ Φ' s) -∗ pipeRolink γ Φ -∗ pipeRolink γ Φ' := by
-  unfold pipeRolink
-  iintro Hw Hl %s %hro Ha
-  imod Hl $$ %s %hro Ha with ⟨Ha, HΦ⟩
-  imodintro
-  iframe Ha
-  iapply Hw $$ HΦ
-
-/-- An unconditional OBSERVER is still one of each (lane PIPE-RO, Rocq
-`pipe_wolink_of_olink`). -/
-theorem pipeWolink_of_olink (γ : GName) (Φ : PipeSt → IProp GF) :
-    pipeOlink γ Φ -∗ pipeWolink γ Φ := by
-  unfold pipeOlink pipeWolink
-  iintro Hl %s %_ Ha
-  iapply Hl $$ %s Ha
-
-/-- Rocq `pipe_rolink_of_olink`. -/
-theorem pipeRolink_of_olink (γ : GName) (Φ : PipeSt → IProp GF) :
-    pipeOlink γ Φ -∗ pipeRolink γ Φ := by
-  unfold pipeOlink pipeRolink
-  iintro Hl %s %_ Ha
-  iapply Hl $$ %s Ha
 
 /-- Rocq `pipe_clink_mono`. -/
 theorem pipeClink_mono (γ : GName) (w : Bool) (Φ Φ' : IProp GF) :
@@ -581,62 +444,6 @@ def pipeRpost (P : UPtd) (γ : GName) (addr : BitVec 64) (Q : List (BitVec 8) �
         (⌜acc.length = d⌝ ∗ pipeRstopNoobs P addr Rk n d r ∗
           pipeRchain γ Q Qe acc (n - acc.length)))) ∨
     (MachFixedGS.killCred (hlc := hlc) (GF := GF) ∗ pipeRpay (hlc := hlc) γ Q Qe n))
-
-/-- The sign guard's exit, from the payment alone (Rocq `pipe_rpost_neg`). -/
-theorem pipeRpost_neg (P : UPtd) (γ : GName) (addr : BitVec 64) (Q : List (BitVec 8) → IProp GF)
-    (Qe : List (BitVec 8) → PipeSt → IProp GF) (Rk : IProp GF) (bs : Nat → BitVec 8) :
-    pipeRpay (hlc := hlc) γ Q Qe 0 ⊢ pipeRpost (hlc := hlc) P γ addr Q Qe Rk 0 0 bs (-1#64) := by
-  unfold pipeRpost pipeRpay
-  iintro (Hch | #Ht)
-  · ileft
-    iexists []
-    isplitr
-    · ipureintro; exact Nat.le_refl 0
-    isplitr
-    · ipureintro; intro j hj; exact absurd hj (Nat.not_lt_zero j)
-    iright
-    isplitr
-    · ipureintro; rfl
-    isplitr
-    · unfold pipeRstopNoobs
-      iright; iright; iright
-      ipureintro; exact ⟨rfl, rfl, rfl⟩
-    iexact Hch
-  · iright
-    isplitr
-    · iexact Ht
-    · iright; iexact Ht
-
-/-- The stop alone, whichever arm (Rocq `pipe_rpost_stop`). -/
-theorem pipeRpost_stop (P : UPtd) (γ : GName) (addr : BitVec 64) (Q : List (BitVec 8) → IProp GF)
-    (Qe : List (BitVec 8) → PipeSt → IProp GF) (Rk : IProp GF) (n d : Nat) (bs : Nat → BitVec 8)
-    (r : BitVec 64) :
-    pipeRpost (hlc := hlc) P γ addr Q Qe Rk n d bs r ⊢
-      (∃ acc : List (BitVec 8), ⌜acc.length ≤ n⌝ ∗ ⌜∀ j : Nat, j < d → bs j = acc[j]!⌝ ∗
-        pipeRstop P addr Qe Rk n acc d r) ∨
-      (MachFixedGS.killCred (hlc := hlc) (GF := GF) ∗ pipeRpay (hlc := hlc) γ Q Qe n) := by
-  unfold pipeRpost pipeRstop
-  iintro (⟨%acc, %h1, %h2, (⟨%h3, Hobs⟩ | ⟨%h3, Hno, -⟩)⟩ | H)
-  · ileft; iexists acc
-    isplitr
-    · ipureintro; exact h1
-    isplitr
-    · ipureintro; exact h2
-    isplitr
-    · ipureintro; exact h3.2.1
-    ileft
-    isplitr
-    · ipureintro; exact ⟨h3.1, h3.2.2⟩
-    iexact Hobs
-  · ileft; iexists acc
-    isplitr
-    · ipureintro; exact h1
-    isplitr
-    · ipureintro; exact h2
-    isplitr
-    · ipureintro; exact h3
-    iright; iexact Hno
-  · iright; iexact H
 
 /-- THE READ-BACK TIE at the image (deviation 2): under the caller's
 linearity of its buffer, the `d` bytes at `addr` in `M'` ARE `acc`'s. -/

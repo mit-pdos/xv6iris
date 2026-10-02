@@ -80,12 +80,6 @@ def sysMknodMaj (sp0 : BitVec 64) : BitVec 64 := sp0 + 0xFFFFFFFFFFFFFF6C#64
 /-- slot 20, the padding, `s0 - 160`. -/
 def sysMknodPad (sp0 : BitVec 64) : BitVec 64 := sp0 + 0xFFFFFFFFFFFFFF60#64
 
-theorem sys_mknod_buf_addr (x : BitVec 64) : x + BitVec.signExtend 64 3952#12 = sysMknodBuf x := by
-  unfold sysMknodBuf; bv_decide
-theorem sys_mknod_min_addr (x : BitVec 64) : x + BitVec.signExtend 64 3944#12 = sysMknodMin x := by
-  unfold sysMknodMin; bv_decide
-theorem sys_mknod_maj_addr (x : BitVec 64) : x + BitVec.signExtend 64 3948#12 = sysMknodMaj x := by
-  unfold sysMknodMaj; bv_decide
 theorem sys_mknod_min4 (x : BitVec 64) : sysMknodMin x + 4#64 = sysMknodMaj x := by
   unfold sysMknodMin sysMknodMaj; bv_decide
 
@@ -108,10 +102,6 @@ theorem sys_mknod_K (a : Nat) (h : sysMknodSlots ≤ a) :
 
 /-! ## The sign cluster (the `bltz` at +0x2e, the `c.beqz` at +0x44) and
 the immediates -/
-
-theorem sys_mknod_li2 : 0#64 + BitVec.signExtend 64 2#12 = BitVec.ofNat 64 2 := by decide
-theorem sys_mknod_li3 : 0#64 + BitVec.signExtend 64 3#12 = BitVec.signExtend 64 T_DEVICE_w := by
-  decide
 
 theorem sys_mknod_tdev_nz : T_DEVICE_w.toNat ≠ 0 := by decide
 

@@ -339,9 +339,6 @@ theorem bslots_cons (n : Nat) : bslot (GF := GF) ∗ bslots n ⊢ bslots (n + 1)
 theorem bslots_uncons (n : Nat) : bslots (GF := GF) (n + 1) ⊢ bslot ∗ bslots n :=
   slotToks_uncons _ _ n
 
-theorem bslots_op_add (m n : Nat) : bslots (GF := GF) m ∗ bslots n ⊢ bslots (m + n) :=
-  slotToks_add _ _ m n
-
 theorem bslots_split (m n : Nat) : bslots (GF := GF) (m + n) ⊢ bslots m ∗ bslots n :=
   slotToks_split _ _ m n
 

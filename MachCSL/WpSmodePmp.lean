@@ -66,12 +66,6 @@ theorem pmpPassesS_ent0 (cpu : CPU) (dq : DFrac) (c : MConf) (h0 : pmpEnt0Ok c.p
   intro addr width acc Φ hacc hram
   exact swp_pmpCheck_ent0_S cpu dq addr width acc Φ c.pmpcfg c.pmpaddr h0 hacc hram
 
-theorem pmpPassesS_xv6 (cpu : CPU) (dq : DFrac) (c : MConf) (hcfg : c.pmpcfg = xv6Pmpcfg)
-    (haddr : c.pmpaddr = xv6Pmpaddr) : pmpPassesS (GF := GF) cpu dq c := by
-  intro addr width acc Φ hacc hram
-  rw [hcfg, haddr]
-  exact swp_pmpCheck_xv6_S cpu dq addr width acc Φ hacc hram
-
 -- `SConfBare` lives in `MachCSL.SConfAtDefs`.
 
 set_option maxHeartbeats 4000000 in

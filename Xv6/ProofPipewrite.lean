@@ -415,15 +415,6 @@ theorem pwFix_cs (k : KCtx) (j : Nat) (n : Int) (R R' : RegMap) (h : pwFix k j n
   exact ⟨c2.trans a2, c8.trans a8, c9.trans a9, c19.trans a19, c20.trans a20, c21.trans a21,
     c22.trans a22, c23.trans a23, c24.trans a24, c25.trans a25, c26.trans a26, c27.trans a27⟩
 
-theorem pwFix_set (k : KCtx) (j : Nat) (n : Int) (R : RegMap) (h : pwFix k j n R)
-    (r : BitVec 5) (v : BitVec 64) (hr : r ∉ ([2, 8, 9, 19, 20, 21, 22, 23, 24, 25, 26, 27] : List (BitVec 5))) :
-    pwFix k j n (R.set r v) := by
-  obtain ⟨a2, a8, a9, a19, a20, a21, a22, a23, a24, a25, a26, a27⟩ := h
-  simp only [List.mem_cons, List.mem_nil_iff, or_false, not_or] at hr
-  obtain ⟨n2, n8, n9, n19, n20, n21, n22, n23, n24, n25, n26, n27⟩ := hr
-  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
-    simp only [RegMap.set_apply] <;> rw [if_neg (Ne.symm ‹_›)] <;> assumption
-
 /-- The caller's continuation (the spec's, named). -/
 def pwPost (k : KCtx) (γp : PipeNames) (w : Bool) (q : Qp) (j : Nat) (pid : BitVec 32)
     (V : ProcPriv) (M : Nat → List (BitVec 8)) (n : Int)
@@ -712,12 +703,6 @@ theorem pw_withSpie_pushOffAt (k : KCtx) (a b c d : Bool) :
     (k.withSpie a b).pushOffAt c d = k.pushOffAt c d := rfl
 theorem pw_strip_locks (k0 : KCtx) (h : k0.locks = []) : k0.withLocks [] = k0 := by
   cases k0; simp only [KCtx.withLocks]; simp only at h; rw [h]
-/-- The loop's context after a `withSpie` from `sleep` and the re-acquire. -/
-theorem pw_reacq_ctx (kb : KCtx) (s s' a b : Bool) (RS R7 : RegMap) (hkbl : kb.locks = []) :
-    ((((kb.withSpie s s').withRegs RS).pushOffAt a b).withLocks ("pipe" :: kb.locks)).withRegs R7 =
-      ((kb.pushOffAt a b).withLocks ["pipe"]).withRegs R7 := by
-  rw [KCtx.pushOffAt_withRegs, pw_withSpie_pushOffAt, KCtx.withRegs_withLocks,
-    KCtx.withRegs_withRegs, hkbl]
 /-- The epilogue's context from the loop's base. -/
 theorem pw_epi_ctx (k : KCtx) (s0 s1b a b : Bool) (Rb R : RegMap) :
     ((((k.pushed 14).withSpie s0 s1b).withRegs Rb).withSpie a b).withRegs R =
@@ -737,10 +722,6 @@ structure PwBase (k kb : KCtx) : Prop where
   intena : kb.intena = k.sie
   struct : ∃ (s0 s1b : Bool) (Rb : RegMap), kb = ((k.pushed 14).withSpie s0 s1b).withRegs Rb
 
-/-- Facts about the in-section context `((kb.pushOffAt a b).withLocks ["pipe"]).withRegs R`. -/
-theorem pw_sec_noff (kb : KCtx) (a b : Bool) (R : RegMap) (hb : kb.noff = 0) :
-    (((kb.pushOffAt a b).withLocks ["pipe"]).withRegs R).noff = 1 := by
-  simp only [KCtx.withRegs_noff, KCtx.withLocks_noff, KCtx.pushOffAt_noff, hb]
 theorem pw_sec_avail (kb : KCtx) (a b : Bool) (R : RegMap) (s : Bool) (hs : kb.sie = s) :
     (((kb.pushOffAt a b).withLocks ["pipe"]).withRegs R).avail = trapRes s + kb.avail := by
   simp only [KCtx.withRegs_avail, KCtx.withLocks_avail, KCtx.pushOffAt_avail, hs]

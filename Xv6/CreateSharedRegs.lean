@@ -480,16 +480,6 @@ theorem createRegs3_set (k : KCtx) (dpv ansv s3v : BitVec 64) (ty mj mn : BitVec
     | (rw [if_neg (Ne.symm n25)]; assumption) | (rw [if_neg (Ne.symm n26)]; assumption)
     | (rw [if_neg (Ne.symm n27)]; assumption)
 
-/-- the `c.mv s2,s3` at +0xe6 (ARM C-OK) and +0xf2 (ARM A-FAIL) (Rocq's
-`cr_regs3_s2`) -/
-theorem createRegs3_s2 (k : KCtx) (dpv ansv ansv' s3v : BitVec 64) (ty mj mn : BitVec 16)
-    (R : RegMap) (v : BitVec 64) (hv : v = ansv') (h : createRegs3 k dpv ansv s3v ty mj mn R) :
-    createRegs3 k dpv ansv' s3v ty mj mn (R.set 18#5 v) := by
-  obtain ⟨a2, a8, a9, _, a19, a20, a21, a22, a23, a24, a25, a26, a27⟩ := h
-  simp only [createRegs3, createThr3, RegMap.set_apply]
-  simp only [BitVec.reduceEq, if_false, if_true]
-  exact ⟨a2, a8, a9, hv, a19, a20, a21, a22, a23, a24, a25, a26, a27⟩
-
 /-- the `ld s3,40(sp)` at +0xe8 / +0xf4 / +0x15c (Rocq's `cr_regs3_s3`) -/
 theorem createRegs3_s3 (k : KCtx) (dpv ansv s3v s3w : BitVec 64) (ty mj mn : BitVec 16)
     (R : RegMap) (v : BitVec 64) (hv : v = s3w) (h : createRegs3 k dpv ansv s3v ty mj mn R) :
@@ -555,11 +545,6 @@ theorem create_mem_cons (S : List Nat) (x : Nat) : x ∈ x :: S := List.mem_cons
 theorem create_sub_cons (S : List Nat) (x : Nat) : ∀ y ∈ S, y ∈ x :: S :=
   fun _ hy => List.mem_cons_of_mem _ hy
 
-/-- ARMS N / G return the ledger WHOLE (Rocq's `cr_slots_ns`). -/
-theorem create_slots_ns (ok : Bool) (ns : Nat) (hok : ok = false) :
-    if ok then ns + 1 = ns else ns = ns := by
-  subst hok; rfl
-
 /-- F-OK keeps one out (Rocq's `cr_slots_1`). -/
 theorem create_slots_1 (ok : Bool) (ns : Nat) (hok : ok = true) (hns : createIrefSlots ≤ ns) :
     if ok then (1 + (ns - 2)) + 1 = ns else 1 + (ns - 2) = ns := by
@@ -568,11 +553,6 @@ theorem create_slots_1 (ok : Bool) (ns : Nat) (hok : ok = true) (hns : createIre
 /-- F-BAD / A-FAIL give it back too (Rocq's `cr_slots_2`). -/
 theorem create_slots_2 (ok : Bool) (ns : Nat) (hok : ok = false) (hns : createIrefSlots ≤ ns) :
     if ok then (1 + (1 + (ns - 2))) + 1 = ns else 1 + (1 + (ns - 2)) = ns := by
-  subst hok; unfold createIrefSlots at hns; simp; omega
-
-/-- ARM C-OK (Rocq's `cr_slots_3`). -/
-theorem create_slots_3 (ok : Bool) (ns : Nat) (hok : ok = true) (hns : createIrefSlots ≤ ns) :
-    if ok then (1 + (1 + (ns - 3))) + 1 = ns else 1 + (1 + (ns - 3)) = ns := by
   subst hok; unfold createIrefSlots at hns; simp; omega
 
 /-- Rocq's `cr_ns_split`. -/
@@ -610,13 +590,6 @@ theorem create_a2_low16 (v : BitVec 32) (h : v.toNat < 2 ^ 16) :
   unfold createLow16
   bv_decide
 
-/-- the `c.li a4,1` stored by `sh a4,74(s3)` at +0xbe (Rocq's
-`cr_trunc16_one`) -/
-theorem create_trunc16_one : BitVec.extractLsb' 0 16 (1#64) = 1#16 := by decide
-
-/-- the `sh zero,74(s3)` at +0x146 (Rocq's `cr_trunc16_zero`) -/
-theorem create_trunc16_zero : BitVec.extractLsb' 0 16 (0#64) = 0#16 := by decide
-
 /-- THE RECORD THE THREE `sh`s LEAVE (Rocq's `cr_setf_fresh_made`): over ANY
 record with ialloc's `freshShape` and the gate's type, it is
 `createMade`. -/
@@ -634,12 +607,6 @@ theorem create_alloc_dlneed (nc : Nat) (crb ind : Bool) (h : 8 ≤ nc) : dlNeed 
   have := dlNeed_le crb ind
   unfold dirlinkUnits at this
   omega
-
-/-- Rocq's `cr_alloc_ip`. -/
-theorem create_alloc_ip (nc n' : Nat) (crb crd cru al ind : Bool) (h : 8 ≤ nc)
-    (hn : nc - wi16Spend crb crd cru al ind ≤ n') : iputUnits ≤ n' := by
-  have := wi16Spend_le4 crb crd cru al ind
-  unfold iputUnits; omega
 
 /-- ...AND ONE UNIT SHARPER, what the `fail:` arm's SECOND `iunlockput`
 needs (Rocq's `cr_alloc_ip4`, D0-c). -/
@@ -722,12 +689,6 @@ theorem create_delta_eq (ty major minor : BitVec 16) (dnc : Dinode) (nl : BitVec
   · rw [if_neg h]
     have : ty.toNat ≠ iregDirTy := fun hc => h (BitVec.eq_of_toNat_eq (by rw [hc]; rfl))
     simp [this]
-
-/-- the NLINK_MAX gate's constant: `c.lui a4,0xffff8; c.addi a4,a4,1` at
-+0x30 / +0x32 leave `-32767` (xv6 117c0e7). -/
-theorem create_nlmax_const :
-    BitVec.signExtend 64 (0xffff8#20 ++ 0#12) + BitVec.signExtend 64 1#12 =
-      0xFFFFFFFFFFFF8001#64 := by decide
 
 /-- +0x36, the nlink test (Rocq's `cr_nlmax_eq` / `_ne`): the `c.bnez` on
 `nlink - NLINK_MAX` decides the halfword the `lh` read against `32767`. -/
@@ -899,76 +860,11 @@ theorem create_n3_lo (u q2 : Nat) (w : Bool) (hu : createUnits ≤ u)
   simp at hn
   omega
 
-/-- the FIRST interior link's spend (Rocq's `cr_mkdir_dl1`): `cru` true and
-a DIRECT window, so at most two. -/
-theorem create_mkdir_dl1 (nc n' : Nat) (crb crd al : Bool)
-    (h : nc - wi16Spend crb crd true al false ≤ n') : nc - 2 ≤ n' := by
-  unfold wi16Spend bmapCost at h
-  cases crb <;> cases crd <;> cases al <;> simp at h <;> omega
-
-/-- Rocq's `cr_mkdir_dl3_need`. -/
-theorem create_mkdir_dl3_need (n3 n4 n5 : Nat) (crb1 crd1 crb2 crd2 al2 crb3 ind3 : Bool)
-    (h3 : 8 ≤ n3) (hw : crb1 = false → 9 ≤ n3)
-    (h4 : n3 - wi16Spend crb1 crd1 true true false ≤ n4)
-    (h5 : n4 - wi16Spend crb2 crd2 true al2 false ≤ n5) (hb2 : crb2 = true) (hb3 : crb3 = true) :
-    dlNeed crb3 ind3 ≤ n5 := by
-  subst hb2 hb3
-  unfold wi16Spend bmapCost dlNeed wi16Need bmapNeed iputUnits at *
-  cases crb1
-  · have := hw rfl
-    cases crd1 <;> cases crd2 <;> cases al2 <;> cases ind3 <;> simp at * <;> omega
-  · cases crd1 <;> cases crd2 <;> cases al2 <;> cases ind3 <;> simp at * <;> omega
-
-/-- Rocq's `cr_mkdir_ip`: the arm closes at EXACTLY `iputUnits`. -/
-theorem create_mkdir_ip (n3 n4 n5 n6 : Nat)
-    (crb1 crd1 crb2 crd2 al2 crb3 crd3 cru3 al3 ind3 : Bool)
-    (h3 : 8 ≤ n3) (hw : crb1 = false → 9 ≤ n3)
-    (h4 : n3 - wi16Spend crb1 crd1 true true false ≤ n4)
-    (h5 : n4 - wi16Spend crb2 crd2 true al2 false ≤ n5)
-    (h6 : n5 - wi16Spend crb3 crd3 cru3 al3 ind3 ≤ n6) (hb2 : crb2 = true) (hb3 : crb3 = true) :
-    iputUnits ≤ n6 ∧ 1 ≤ n6 := by
-  subst hb2 hb3
-  unfold wi16Spend bmapCost iputUnits at *
-  cases crb1
-  · have := hw rfl
-    cases crd1 <;> cases crd2 <;> cases al2 <;> cases crd3 <;> cases cru3 <;> cases al3 <;>
-      cases ind3 <;> simp at * <;> omega
-  · cases crd1 <;> cases crd2 <;> cases al2 <;> cases crd3 <;> cases cru3 <;> cases al3 <;>
-      cases ind3 <;> simp at * <;> omega
-
-/-- Rocq's `cr_mkdir_n5`. -/
-theorem create_mkdir_n5 (n3 n4 n5 : Nat) (crb1 crd1 crb2 crd2 al2 : Bool)
-    (h3 : 8 ≤ n3) (hw : crb1 = false → 9 ≤ n3)
-    (h4 : n3 - wi16Spend crb1 crd1 true true false ≤ n4)
-    (h5 : n4 - wi16Spend crb2 crd2 true al2 false ≤ n5) (hb2 : crb2 = true) : 6 ≤ n5 := by
-  subst hb2
-  unfold wi16Spend bmapCost at *
-  cases crb1
-  · have := hw rfl
-    cases crd1 <;> cases crd2 <;> cases al2 <;> simp at * <;> omega
-  · cases crd1 <;> cases crd2 <;> cases al2 <;> simp at * <;> omega
-
 /-- the three FAIL exits' readings (Rocq's `cr_mkdir_fail1`). -/
 theorem create_mkdir_fail1 (n3 n' : Nat) (crb crd al : Bool) (h3 : 8 ≤ n3)
     (h : n3 - wi16Spend crb crd true al false ≤ n') : iputUnits ≤ n' ∧ iputUnits + 1 ≤ n' := by
   unfold wi16Spend bmapCost iputUnits at *
   cases crb <;> cases crd <;> cases al <;> simp at * <;> omega
-
-/-- Rocq's `cr_mkdir_fail2`. -/
-theorem create_mkdir_fail2 (n3 n4 n' : Nat) (crb1 crd1 crb2 crd2 al2 : Bool) (h3 : 8 ≤ n3)
-    (h4 : n3 - wi16Spend crb1 crd1 true true false ≤ n4)
-    (h5 : n4 - wi16Spend crb2 crd2 true al2 false ≤ n') (hb2 : crb2 = true) :
-    iputUnits ≤ n' ∧ iputUnits + 1 ≤ n' := by
-  subst hb2
-  unfold wi16Spend bmapCost iputUnits at *
-  cases crb1 <;> cases crd1 <;> cases crd2 <;> cases al2 <;> simp at * <;> omega
-
-/-- Rocq's `cr_mkdir_fail3`. -/
-theorem create_mkdir_fail3 (n5 n' : Nat) (crb3 crd3 cru3 al3 ind3 : Bool) (h5 : 6 ≤ n5)
-    (hb3 : crb3 = true) (h : n5 - wi16Spend crb3 crd3 cru3 al3 ind3 ≤ n') : iputUnits ≤ n' := by
-  subst hb3
-  unfold wi16Spend bmapCost iputUnits at *
-  cases crd3 <;> cases cru3 <;> cases al3 <;> cases ind3 <;> simp at * <;> omega
 
 /-! ## §2 preamble  The record-only facts -/
 

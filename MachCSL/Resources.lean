@@ -695,14 +695,6 @@ theorem ramBytes_of_readBytes {m : FlatMem} (hm : memRam m) {ag : Agent} {tv : N
   | none => rw [hg] at hr; simp at hr
   | some H => exact ⟨H, rfl⟩
 
-theorem ramBytes_of_topBytes {m : FlatMem} (hm : memRam m) {pa : PAddr} {n : Nat}
-    {w : BitVec (8 * n)} (h : m.topBytes pa n w) : ramBytes pa n := by
-  refine ramBytes_of_cells hm (fun j hj => ?_)
-  have hr := h j hj
-  cases hg : m[pa + BitVec.ofNat 64 j]? with
-  | none => rw [hg] at hr; simp at hr
-  | some H => exact ⟨H, rfl⟩
-
 /-- A store into a DRAM footprint keeps the histories inside DRAM. -/
 theorem memRam_writeBytes {m : FlatMem} {pa : PAddr} {n : Nat} {w : BitVec (8 * n)} {t : Nat}
     {h : Agent} (hram : ramBytes pa n) (hm : memRam m) : memRam (m.writeBytes pa n w t h) := by
@@ -1121,30 +1113,6 @@ theorem obsAuth_lb (h : List Obs) : obsAuth (GF := GF) h ⊢ obsAuth h ∗ obsHi
   iintro ⟨Hv, Ha⟩
   ihave #Hlb := MonoList.lb_own_get _ _ h $$ Ha
   iframe Hv Ha Hlb
-
-/-- A snapshot and the authority together order the two histories. -/
-theorem obsHistLb_prefix (h h0 : List Obs) :
-    obsAuth (GF := GF) h ∗ obsHistLb h0 ⊢ ⌜h0 <+: h⌝ := by
-  unfold obsAuth obsHistAuth obsHistLb
-  iintro ⟨⟨_, Ha⟩, Hlb⟩
-  ihave %hv := MonoList.auth_lb_own_valid _ _ h h0 $$ Ha Hlb
-  ipureintro; exact hv.2
-
-/-- TWO LOWER BOUNDS ON ONE MONOTONE HISTORY ARE COMPARABLE: the one fact
-that lets a writer's view shift place its byte's history against the one a
-claim is read at, without either side holding the authority. -/
-theorem obsHistLb_cmp (h1 h2 : List Obs) :
-    obsHistLb (GF := GF) h1 ∗ obsHistLb h2 ⊢ ⌜h1 <+: h2 ∨ h2 <+: h1⌝ := by
-  unfold obsHistLb
-  iintro ⟨H1, H2⟩
-  iapply MonoList.lb_own_valid _ h1 h2 $$ H1 H2
-
-/-- A bound weakens to any prefix of itself. -/
-theorem obsHistLb_mono (h0 h1 : List Obs) (hp : h0 <+: h1) :
-    obsHistLb (GF := GF) h1 ⊢ obsHistLb h0 := by
-  unfold obsHistLb
-  iintro H
-  iapply MonoList.lb_own_le _ h0 hp $$ H
 
 /-- THE TRIVIAL TAG FAMILY: what an application that claims nothing about its
 input fills the tag slot with. -/

@@ -490,46 +490,4 @@ theorem IALLOC.wp_ialloc_sconf (IA : IALLOC) {hlc : HasLC} {GF : BundledGFunctor
     · ipureintro; exact hp
     · iapply logOpS_op icfgLog u _ $$ HopS Hltx
 
-theorem IALLOC.wp_ialloc_sconf_eb (IA : IALLOC) {hlc : HasLC} {GF : BundledGFunctors}
-    [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
-    [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
-    [FsTopG GF] [FsLinkG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
-    (ty : BitVec 16) (u : Nat) (t : Nat) (qt : Qp)
-    (pidv : BitVec 32) (dqp dqs dqn : DFrac)
-    hj hproc hK hnoff htier hgeom hblk hn1 hnnib hn31 hty htyk hpd ha0 ha1 :
-    wp_ialloc_sconf_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl pd pav pu j ty u t qt
-      pidv dqp dqs dqn
-      hj hproc hK hnoff htier hgeom hblk hn1 hnnib hn31 hty htyk hpd ha0 ha1 := by
-  unfold wp_ialloc_sconf_eb_body
-  iintro ⟨Hk, Hpc, Hpi, Hte, Hce, Hpe, Hbc, Hlc, Hdc, Hsn, Hsi, Hinv, Hopen, Hpid, Hsl,
-    Hit2, Hiti, Hiref, Hop, Htx, Hnext⟩
-  icases logOp_openS icfgLog (u + 1) $$ Hop with ⟨%Sb, HopS, Hltx⟩
-  have h := IA.wp_ialloc_gen_eb (hlc := hlc) (GF := GF) Γ cpu k γl pd pav pu j ty u Sb t qt
-    pidv dqp dqs dqn hj hproc hK hnoff htier hgeom hblk hn1 hnnib hn31 hty htyk
-    hpd ha0 ha1
-  unfold wp_ialloc_gen_eb_body at h
-  iapply h
-  iframe Hk Hpc Hpi Hte Hce Hpe Hbc Hlc Hdc Hsn Hsi Hinv Hopen Hpid Hsl Hit2 Hiti Hiref
-    HopS Htx
-  iapply wpNext_mono _ _ _ _ _ $$ Hnext
-  iintro %c' HΦ %spie %spp %R' %alloc %kslot %q %inum %dn' %hcs Hk Hpc Hte Hce Hsn Hsi
-    Hpid Hsl Harm
-  iapply HΦ $$ %spie %spp %R' %alloc %kslot %q %inum %dn' %hcs Hk Hpc Hte Hce Hsn Hsi
-    Hpid Hsl
-  cases alloc
-  · simp only [Bool.false_eq_true, if_false]
-    icases Harm with ⟨%h0, Hiref, Htx, HopS⟩
-    iframe Hiref Htx
-    isplitl []
-    · ipureintro; exact h0
-    · iapply logOpS_op icfgLog (u + 1) Sb $$ HopS Hltx
-  · simp only [if_true]
-    icases Harm with ⟨%hp, Hcl, HopS⟩
-    iframe Hcl
-    isplitl []
-    · ipureintro; exact hp
-    · iapply logOpS_op icfgLog u _ $$ HopS Hltx
-
 end Xv6

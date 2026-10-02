@@ -390,13 +390,6 @@ def rdRegs (k : KCtx) (ip : BitVec 64) (N : Nat) (R : RegMap) (tot pos : Nat) : 
   R 20#5 = k.regs 12#5 + BitVec.ofNat 64 tot ∧ R 21#5 = BitVec.ofNat 64 N ∧
   R 22#5 = ip ∧ R 23#5 = k.regs 11#5 ∧ R 24#5 = 0xFFFFFFFFFFFFFFFF#64 ∧ R 25#5 = 1024#64
 
-theorem rdRegs_cs (k : KCtx) (ip : BitVec 64) (N : Nat) (R R' : RegMap) (tot pos : Nat)
-    (h : rdRegs k ip N R tot pos) (hcs : calleeSaved R R') : rdRegs k ip N R' tot pos := by
-  obtain ⟨a2, a8, a9, a19, a20, a21, a22, a23, a24, a25⟩ := h
-  obtain ⟨c2, c8, c9, c18, c19, c20, c21, c22, c23, c24, c25, c26, c27⟩ := hcs
-  exact ⟨c2.trans a2, c8.trans a8, c9.trans a9, c19.trans a19, c20.trans a20, c21.trans a21,
-    c22.trans a22, c23.trans a23, c24.trans a24, c25.trans a25⟩
-
 section
 variable {GF : BundledGFunctors}
 

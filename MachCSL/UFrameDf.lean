@@ -55,10 +55,6 @@ theorem ufCellsD_congr (cpu : CPU) (Df : Register → DFrac) (L : List Register)
   intro k r hk
   rw [h r (List.mem_of_getElem? hk)]
 
-theorem ufCells_set_other (cpu : CPU) (L : List Register) (f : RegFile) (r : Register) (v : RegisterType r)
-    (h : r ∉ L) : ufCells (GF := GF) cpu L f ⊢ ufCells cpu L (f.set r v) :=
-  ufCells_congr cpu L f _ (fun r' hr' => RegFile.set_other f r r' v (fun e => h (e ▸ hr')))
-
 theorem ufCellsD_set_other (cpu : CPU) (Df : Register → DFrac) (L : List Register) (f : RegFile) (r : Register)
     (v : RegisterType r) (h : r ∉ L) : ufCellsD (GF := GF) cpu Df L f ⊢ ufCellsD cpu Df L (f.set r v) :=
   ufCellsD_congr cpu Df L f _ (fun r' hr' => RegFile.set_other f r r' v (fun e => h (e ▸ hr')))

@@ -267,14 +267,6 @@ def sysSbrkPins (k : KCtx) (R : RegMap) : Prop :=
   R 21#5 = k.regs 21#5 ∧ R 22#5 = k.regs 22#5 ∧ R 23#5 = k.regs 23#5 ∧ R 24#5 = k.regs 24#5 ∧
   R 25#5 = k.regs 25#5 ∧ R 26#5 = k.regs 26#5 ∧ R 27#5 = k.regs 27#5
 
-/-- A callee returned with the callee-saved registers of `R` intact: the pins carry. -/
-theorem sysSbrkPins_cs (k : KCtx) (R R' : RegMap) (h : sysSbrkPins k R) (hcs : calleeSaved R R') :
-    sysSbrkPins k R' := by
-  obtain ⟨a2, a8, a18, a19, a20, a21, a22, a23, a24, a25, a26, a27⟩ := h
-  obtain ⟨c2, c8, c9, c18, c19, c20, c21, c22, c23, c24, c25, c26, c27⟩ := hcs
-  exact ⟨c2.trans a2, c8.trans a8, c18.trans a18, c19.trans a19, c20.trans a20, c21.trans a21,
-    c22.trans a22, c23.trans a23, c24.trans a24, c25.trans a25, c26.trans a26, c27.trans a27⟩
-
 set_option maxHeartbeats 2000000 in
 /-- **The join point** `+0x64`: `mv a0,s1` and the epilogue, then the
 specification's post with the result `s1`. -/

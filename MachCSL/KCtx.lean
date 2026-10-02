@@ -395,10 +395,6 @@ interrupt arm: the enabled arm owns it, a trap hands it to the handler and
 `sret` takes it back. -/
 def cpuClaim (cpu : CPU) (p : BitVec 64) : IProp GF := MachGS.claimP cpu p
 
-/-- The idle claim is free. -/
-theorem cpuClaim_idle (cpu : CPU) : ⊢ cpuClaim (hlc := hlc) (GF := GF) cpu 0#64 :=
-  MachGS.claim_idle cpu
-
 /-- The running-thread context token (the prototype's `own_context cur_ctx`
 inside `sie_cap_gpr`): the ambient context's running token on this hart,
 with the hart's reservation fragment -- what every memory access of the
@@ -582,36 +578,6 @@ theorem cpuField_toNat [KernelGeom] (cpu : CPU) (off : Nat) (hoff : off ≤ 128)
   rw [BitVec.toNat_add, BitVec.toNat_ofNat, ha]
   rw [Nat.mod_eq_of_lt (by omega : off < 2 ^ 64)]
   exact Nat.mod_eq_of_lt (by omega)
-
-theorem aCpuProc_ok [KernelGeom] (cpu : CPU) : inRam (aCpuProc cpu) 8 ∧ (aCpuProc cpu).toNat % 8 = 0 := by
-  have hr := KernelGeom.cpus_ram
-  have hal := KernelGeom.cpus_al
-  have hc := cpu.isLt
-  have h := cpuField_toNat cpu procOff (by unfold procOff; omega)
-  have hp : procOff = 0 := rfl
-  unfold aCpuProc
-  unfold inRam ramBase ramEnd NCPU at *
-  omega
-
-theorem aCpuNoff_ok [KernelGeom] (cpu : CPU) : inRam (aCpuNoff cpu) 4 ∧ (aCpuNoff cpu).toNat % 4 = 0 := by
-  have hr := KernelGeom.cpus_ram
-  have hal := KernelGeom.cpus_al
-  have hc := cpu.isLt
-  have h := cpuField_toNat cpu noffOff (by unfold noffOff; omega)
-  have hp : noffOff = 120 := rfl
-  unfold aCpuNoff
-  unfold inRam ramBase ramEnd NCPU at *
-  omega
-
-theorem aCpuIntena_ok [KernelGeom] (cpu : CPU) : inRam (aCpuIntena cpu) 4 ∧ (aCpuIntena cpu).toNat % 4 = 0 := by
-  have hr := KernelGeom.cpus_ram
-  have hal := KernelGeom.cpus_al
-  have hc := cpu.isLt
-  have h := cpuField_toNat cpu intenaOff (by unfold intenaOff; omega)
-  have hp : intenaOff = 124 := rfl
-  unfold aCpuIntena
-  unfold inRam ramBase ramEnd NCPU at *
-  omega
 
 /-- The CSRs the kernel owns but never reads while it runs: `sscratch`
 (scratch; the trampoline writes it).  (The state-enable pins `mstateen0`/

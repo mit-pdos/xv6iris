@@ -102,15 +102,6 @@ theorem snapNodeDet (S S' : FsStateRec) (D : BlockMap) (i : Nat) (n n' : FsNode)
   simp only at hr he hbk
   subst hr he hbk; rfl
 
-/-- ...and the certificate is therefore unambiguous (Rocq's
-`dur_node_agree`). -/
-theorem durNode_agree (D : BlockMap) (i : Nat) (n n' : FsNode) (hD : snapHolds D)
-    (h1 : durNode D i n) (h2 : durNode D i n') : n = n' := by
-  obtain ⟨S, hS⟩ := hD
-  have g1 := h1 S hS
-  rw [h2 S hS] at g1
-  exact (Option.some.inj g1).symm
-
 /-- THE CERTIFICATE OFF A SNAPSHOT ONE ALREADY HOLDS (Rocq's
 `dur_node_of_snap`; deviation 1). -/
 theorem durNode_of_snap (S : FsStateRec) (D : BlockMap) (i : Nat) (n : FsNode) (hS : snapOk S D)

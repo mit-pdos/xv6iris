@@ -135,35 +135,6 @@ theorem kxc_magic_word :
 (deviation 1: Rocq's threading clause, as an explicit list). -/
 def kxcKeeps (k : KCtx) (R : RegMap) (rs : List (BitVec 5)) : Prop := ∀ r ∈ rs, R r = k.regs r
 
-theorem kxcKeeps_set (k : KCtx) (R : RegMap) (rs : List (BitVec 5)) (r : BitVec 5) (v : BitVec 64)
-    (h : kxcKeeps k R rs) (hr : r ∉ rs) : kxcKeeps k (R.set r v) rs := by
-  intro x hx
-  have hne : x ≠ r := fun e => hr (e ▸ hx)
-  rw [RegMap.set_other _ _ _ _ hne]
-  exact h x hx
-
-theorem kxcKeeps_cs (k : KCtx) (R R' : RegMap) (rs : List (BitVec 5)) (h : kxcKeeps k R rs)
-    (hcs : calleeSaved R R') (hsub : ∀ r ∈ rs, r ∈ [19#5, 20#5, 21#5, 22#5, 23#5, 24#5, 25#5, 26#5, 27#5]) :
-    kxcKeeps k R' rs := by
-  intro x hx
-  obtain ⟨-, -, -, -, c19, c20, c21, c22, c23, c24, c25, c26, c27⟩ := hcs
-  have hm := hsub x hx
-  simp only [List.mem_cons, List.not_mem_nil, or_false] at hm
-  rcases hm with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl
-  · exact c19.trans (h _ hx)
-  · exact c20.trans (h _ hx)
-  · exact c21.trans (h _ hx)
-  · exact c22.trans (h _ hx)
-  · exact c23.trans (h _ hx)
-  · exact c24.trans (h _ hx)
-  · exact c25.trans (h _ hx)
-  · exact c26.trans (h _ hx)
-  · exact c27.trans (h _ hx)
-
-theorem kxcKeeps_sub (k : KCtx) (R : RegMap) (rs rs' : List (BitVec 5)) (h : kxcKeeps k R rs)
-    (hsub : ∀ r ∈ rs', r ∈ rs) : kxcKeeps k R rs' :=
-  fun r hr => h r (hsub r hr)
-
 section Frame
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 
@@ -327,14 +298,6 @@ theorem kxc_low55_join [CurCtx] (sp0 w64 w65 w66 w67 w68 : BitVec 64) :
   isplitl [H5]
   · iexists w68; iexact H5
   iempintro
-
-/-- **Rocq `kxc_frameA6_weaken`**. -/
-theorem kxcFrameA6_weaken [CurCtx] (sp0 ra0 s00 s10 s20 pv av w6 : BitVec 64) :
-    kxcFrameA6 (GF := GF) sp0 ra0 s00 s10 s20 pv av w6 ⊢ kxcFrameA sp0 ra0 s00 s10 s20 pv av := by
-  unfold kxcFrameA6 kxcFrameA
-  iintro ⟨H1, H2, H3, H4, H5, H6, H7, H8, H9, H10, H11, H12, H13, Hm, H64, H65, H66, H67, H68⟩
-  iframe H1 H2 H3 H4 H5 H7 H8 H9 H10 H11 H12 H13 Hm H64 H65 H66 H67 H68
-  iexists w6; iexact H6
 
 /-- **Rocq `kxc_frameA6x_fold`**: the way back to the landed frame (phase A's
 own `bad:` tail takes it: `kxc_bad64` wants `kxcFrameA6`). -/

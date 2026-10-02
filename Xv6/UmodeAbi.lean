@@ -43,14 +43,6 @@ def raIdx : BitVec 5 := 1#5
 def spIdx : BitVec 5 := 2#5
 def a0Idx : BitVec 5 := 10#5
 def a1Idx : BitVec 5 := 11#5
-def a2Idx : BitVec 5 := 12#5
-def a3Idx : BitVec 5 := 13#5
-
-/-! ## §2 Image inclusion (Rocq `uimg_sub`, landed as `KexecBuilt.uimgSub`) -/
-
-/-- Rocq `uimg_sub_lookup`. -/
-theorem uimgSub_lookup {img M : ElfMem} {a : Nat} {b : BitVec 8} (hs : uimgSub img M)
-    (hl : img a = some b) : M a = some b := hs a b hl
 
 /-! ## §4 C strings -/
 
@@ -120,28 +112,6 @@ possibly changed, and no key lost. -/
 def uMOnly (M M' : ElfMem) (a n : Nat) : Prop :=
   (∀ k, (M k).isSome → (M' k).isSome) ∧ (∀ k, k < a ∨ a + n ≤ k → M' k = M k)
 
-theorem uMOnly_refl (M : ElfMem) (a n : Nat) : uMOnly M M a n := ⟨fun _ h => h, fun _ _ => rfl⟩
-
-theorem uMOnly_trans {M1 M2 M3 : ElfMem} {a n : Nat} (h12 : uMOnly M1 M2 a n) (h23 : uMOnly M2 M3 a n) :
-    uMOnly M1 M3 a n :=
-  ⟨fun k h => h23.1 k (h12.1 k h), fun k hk => (h23.2 k hk).trans (h12.2 k hk)⟩
-
-theorem uMOnly_widen {M M' : ElfMem} {a n a' n' : Nat} (h : uMOnly M M' a n) (hlo : a' ≤ a)
-    (hhi : a + n ≤ a' + n') : uMOnly M M' a' n' :=
-  ⟨h.1, fun k hk => h.2 k (by omega)⟩
-
-/-- Rocq `uM_only_cstr`. -/
-theorem uMOnly_cstr {M M' : ElfMem} {b len a n : Nat} (h : uMOnly M M' a n)
-    (hdisj : a + n ≤ b ∨ b + len + 1 ≤ a) (hs : Ucstr M b len) : Ucstr M' b len :=
-  ⟨fun j hj => by rw [h.2 (b + j) (by omega)]; exact hs.body j hj,
-   by rw [h.2 (b + len) (by omega)]; exact hs.nul⟩
-
-/-- Rocq `uM_only_img`: an image inclusion whose keys all sit BELOW the
-disturbed range (the program TEXT, against any stack write). -/
-theorem uMOnly_img {img M M' : ElfMem} {a n : Nat} (hkeys : ∀ k b, img k = some b → k < a)
-    (h : uMOnly M M' a n) (hs : uimgSub img M) : uimgSub img M' := fun k b hk => by
-  rw [h.2 k (Or.inl (hkeys k b hk))]; exact hs k b hk
-
 /-! ## §8 The callee-saved register set -/
 
 /-- **Rocq `ucallee_saved_idx`**: sp, gp, tp, s0/s1, s2..s11. -/
@@ -186,11 +156,6 @@ where
   uMBytesW (M : ElfMem) (a : Nat) (w : BitVec 64) : Prop :=
     ∀ j, j < 8 → M (a + j) = some (nthByte (n := 8) w j)
 
-/-- **Rocq `uexec_args`**: THE observable content of an exec -- which
-program, with which arguments. -/
-def uexecArgs (M : ElfMem) (pa pv : Nat) (path : List (BitVec 8)) (args : List (List (BitVec 8))) : Prop :=
-  ustrAt M pa path ∧ uargvAt M pv args
-
 /-! ## §11 Several disturbed windows -/
 
 /-- Rocq `uM_in_windows`. -/
@@ -199,44 +164,5 @@ def uMInWindows (ws : List (Nat × Nat)) (k : Nat) : Prop := ∃ w ∈ ws, w.1 �
 /-- **Rocq `uM_only_in`**. -/
 def uMOnlyIn (M M' : ElfMem) (ws : List (Nat × Nat)) : Prop :=
   (∀ k, (M k).isSome → (M' k).isSome) ∧ (∀ k, ¬ uMInWindows ws k → M' k = M k)
-
-/-- Rocq `uM_only_in_one`. -/
-theorem uMOnlyIn_one (M M' : ElfMem) (a n : Nat) : uMOnly M M' a n ↔ uMOnlyIn M M' [(a, n)] := by
-  constructor
-  · rintro ⟨hd, he⟩
-    refine ⟨hd, fun k hk => he k ?_⟩
-    by_cases h1 : k < a
-    · exact Or.inl h1
-    · right
-      refine Classical.byContradiction fun h2 => hk ⟨(a, n), List.mem_singleton.2 rfl, ?_⟩
-      simp only; omega
-  · rintro ⟨hd, he⟩
-    refine ⟨hd, fun k hk => he k ?_⟩
-    rintro ⟨w, hw, hin⟩
-    rw [List.mem_singleton] at hw; subst hw
-    simp only at hin; omega
-
-theorem uMOnlyIn_trans {M1 M2 M3 : ElfMem} {ws : List (Nat × Nat)} (h12 : uMOnlyIn M1 M2 ws)
-    (h23 : uMOnlyIn M2 M3 ws) : uMOnlyIn M1 M3 ws :=
-  ⟨fun k h => h23.1 k (h12.1 k h), fun k hk => (h23.2 k hk).trans (h12.2 k hk)⟩
-
-theorem uMOnlyIn_weaken {M M' : ElfMem} {ws ws' : List (Nat × Nat)} (h : uMOnlyIn M M' ws)
-    (hsub : ∀ w ∈ ws, w ∈ ws') : uMOnlyIn M M' ws' :=
-  ⟨h.1, fun k hk => h.2 k (fun ⟨w, hw, hin⟩ => hk ⟨w, hsub w hw, hin⟩)⟩
-
-/-- Rocq `uM_only_in_img`. -/
-theorem uMOnlyIn_img {img M M' : ElfMem} {ws : List (Nat × Nat)} {lim : Nat}
-    (hkeys : ∀ k b, img k = some b → k < lim) (hdisj : ∀ k, k < lim → ¬ uMInWindows ws k)
-    (h : uMOnlyIn M M' ws) (hs : uimgSub img M) : uimgSub img M' := fun k b hk => by
-  rw [h.2 k (hdisj k (hkeys k b hk))]; exact hs k b hk
-
-/-- **Rocq `uM_only_in_out`**: the ELIMINATOR, one goal per window. -/
-theorem uMOnlyIn_out {M M' : ElfMem} {ws : List (Nat × Nat)} {k : Nat} (h : uMOnlyIn M M' ws)
-    (hout : ∀ w ∈ ws, ¬ (w.1 ≤ k ∧ k < w.1 + w.2)) : M' k = M k :=
-  h.2 k (fun ⟨w, hw, hin⟩ => hout w hw hin)
-
-/-- Rocq `uM_in_windows_here`. -/
-theorem uMInWindows_here {ws : List (Nat × Nat)} {a n k : Nat} (hw : (a, n) ∈ ws) (hk : a ≤ k ∧ k < a + n) :
-    uMInWindows ws k := ⟨(a, n), hw, hk⟩
 
 end Xv6

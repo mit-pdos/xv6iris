@@ -47,18 +47,6 @@ def initprocIs [CurCtx] (ip : BitVec 64) : IProp GF :=
 instance initprocIs_persistent [CurCtx] (ip : BitVec 64) : Persistent (initprocIs (GF := GF) ip) := by
   unfold initprocIs; infer_instance
 
-/-- The payload, opened. -/
-theorem waitRes_elim [CurCtx] (ξ : CtxId) (parents : Nat → BitVec 64) :
-    waitResAt (GF := GF) ξ parents ⊢
-      [∗list] j ∈ List.range NPROC, wordAtN ξ (pParent (procAddr j)) 8 (DFrac.own 1) (parents j) := by
-  unfold waitResAt; iintro H; iexact H
-
-/-- ...and built. -/
-theorem waitRes_intro [CurCtx] (ξ : CtxId) (parents : Nat → BitVec 64) :
-    ([∗list] j ∈ List.range NPROC, wordAtN ξ (pParent (procAddr j)) 8 (DFrac.own 1) (parents j)) ⊢
-      waitResAt (GF := GF) ξ parents := by
-  unfold waitResAt; iintro H; iexact H
-
 /-- The payload transports (it is a big-op of context-parametric cells), so
 `ACQUIRE`/`RELEASE` apply to `wait_lock`. -/
 instance instCtxMorphWaitResAt [CurCtx] (parents : Nat → BitVec 64) :

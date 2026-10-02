@@ -50,24 +50,6 @@ def strImg (pv n : Nat) (f : Nat → BitVec 8) : ElfMem := fun a =>
   if a = pv + n then some ubyte0
   else if pv ≤ a ∧ a < pv + n then some (f (a - pv)) else none
 
-/-- **Rocq `str_cells_keys`**: the cells are at distinct addresses. -/
-theorem strCells_keys (pv n : Nat) (f : Nat → BitVec 8) :
-    ((strCells pv n f).map Prod.fst).Nodup := by
-  unfold strCells
-  rw [List.map_map]
-  refine List.pairwise_map.2 (List.nodup_range.imp ?_)
-  intro x y hxy h
-  exact hxy (by simp only [Function.comp_apply] at h; omega)
-
-/-- **Rocq `str_cells_key_ne`**: the terminator's address is not a cell's. -/
-theorem strCells_key_ne (pv n : Nat) (f : Nat → BitVec 8) :
-    pv + n ∉ (strCells pv n f).map Prod.fst := by
-  unfold strCells
-  simp only [List.map_map, List.mem_map, List.mem_range, Function.comp_apply, not_exists,
-    not_and]
-  intro j hj h
-  omega
-
 /-- Rocq `str_img_lookup`: every cell the image holds is a byte of the string
 or its terminator. -/
 theorem strImg_lookup (pv n : Nat) (f : Nat → BitVec 8) (a : Nat) (b : BitVec 8)

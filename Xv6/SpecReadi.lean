@@ -162,12 +162,6 @@ theorem rdNwmappedEntry {szv : BitVec 64} {P Pc : UPtd} {va : Nat}
     (hext : P.extSz szv Pc) (hn : ¬ uvaWmapped Pc va) : ¬ uvaWmapped P va :=
   fun hc => hn (UMemL.uvaWmapped_mono (UMemL.extSz_ext hext) hc)
 
-/-- Rocq's `rd_fail_why_entry`. -/
-theorem rdFailWhy_entry {szv : BitVec 64} {P Pc : UPtd} {dst : BitVec 64} {n : Nat}
-    (hext : P.extSz szv Pc) (h : rdFailWhy Pc dst n) : rdFailWhy P dst n := by
-  obtain ⟨d, hd, hn⟩ := h
-  exact ⟨d, hd, rdNwmappedEntry hext hn⟩
-
 /-- Rocq's `rd_fail_why_refute`: THE REFUTATION -- a whole destination
 buffer writable-mapped in the table the reason is stated at has no copyout
 fault to answer for. -/
@@ -320,34 +314,5 @@ structure READI : Prop where
       γkl γk ip bm data dn user off n olds pidv Vp M dqp dq dqd
       hj hproc hK hnoff htier hgeom hwf hcov hsz hoff hjoint hdev hcl hdt hpd
       ha0 huser ha3 ha4 holds
-
-/-- The interrupts-off instance of `wp_readi_eb` (the complement is the whole
-bundle): the contract every not-yet-generalized caller states. -/
-theorem READI.wp_readi (A : READI) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-    [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (cpu : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
-    (pd pav pu : BitVec 64) (j : Nat) (γfs : FsNames) (logstart : Nat) (dev : BitVec 32)
-    (γkl : GName) (γk : KmemNames)
-    (ip : BitVec 64) (bm : Blkmap) (data : Nat → List (BitVec 8)) (dn : Dinode)
-    (user : Bool) (off n : Nat) (olds : List (BitVec 8))
-    (pidv : BitVec 32) (Vp : ProcPriv) (M : Nat → List (BitVec 8)) (dqp dq dqd : DFrac)
-    hj hproc hK hsie hnoff hlocks htier hgeom hwf hcov hsz hoff hjoint hdev hcl hdt hpd
-    ha0 huser ha3 ha4 holds :
-    wp_readi_body (hlc := hlc) (GF := GF) Γ cpu k γl γb V γdl pd pav pu j γfs logstart dev
-      γkl γk ip bm data dn user off n olds pidv Vp M dqp dq dqd
-      hj hproc hK hsie hnoff hlocks htier hgeom hwf hcov hsz hoff hjoint hdev hcl hdt hpd
-      ha0 huser ha3 ha4 holds := by
-  have h := A.wp_readi_eb (hlc := hlc) (GF := GF) (Γ := Γ) (cpu := cpu) (k := k) (γl := γl) (γb := γb) (V := V) (γdl := γdl) (pd := pd) (pav := pav) (pu := pu) (j := j) (γfs := γfs) (logstart := logstart) (dev := dev) (γkl := γkl) (γk := γk) (ip := ip) (bm := bm) (data := data) (dn := dn) (user := user) (off := off) (n := n) (olds := olds) (pidv := pidv) (Vp := Vp) (M := M) (dqp := dqp) (dq := dq) (dqd := dqd) (hj := hj) (hproc := hproc) (hK := hK) (hnoff := hnoff) (htier := htier) (hgeom := hgeom) (hwf := hwf) (hcov := hcov) (hsz := hsz) (hoff := hoff) (hjoint := hjoint) (hdev := hdev) (hcl := hcl) (hdt := hdt) (hpd := hpd) (ha0 := ha0) (huser := huser) (ha3 := ha3) (ha4 := ha4) (holds := holds)
-  unfold wp_readi_eb_body at h
-  unfold wp_readi_body
-  rw [hsie] at h
-  simp only [trapCsrsExt_false, cpuClaimExt_false] at h
-  iintro ⟨H0, H1, H2, Htc, Hcl, Hir, H6, H7, H8, H9, H10, H11, H12, H13, H14, H15, H16, H17, Hnext⟩
-  iapply h
-  iframe H0 H1 H2 Htc Hcl Hir H6 H7 H8 H9 H10 H11 H12 H13 H14 H15 H16 H17
-  iapply wpNext_mono $$ Hnext
-  iintro %cpu' HK %spie %spp %R' %tot %p0 %p1 %p2 H3 H4 ⟨Htc, Hir⟩ Hcl H8 H9 H10 H11 H12 H13
-  iapply HK $$ %spie %spp %R' %tot %p0 %p1 %p2 H3 H4 Htc Hcl Hir H8 H9 H10 H11 H12 H13
 
 end Xv6

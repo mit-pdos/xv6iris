@@ -384,18 +384,4 @@ theorem consHistOk_step (H : ConsHist) (ev : ConsEv)
     -- only `chDl` moves
     exact ⟨hlog, harm⟩
 
-/-- The log only ever grows, and only at `evClose`. -/
-theorem consStep_log (H : ConsHist) (ev : ConsEv) :
-    ∃ suf, (consStep H ev).chLog = H.chLog ++ suf := by
-  cases ev with
-  | evByte b =>
-    unfold consStep
-    rcases H.chArm with _ | ⟨⟨h, c, cs⟩, j⟩ <;> exact ⟨[], by simp⟩
-  | evClose =>
-    unfold consStep
-    rcases H.chArm with _ | ⟨⟨h, c, cs⟩, j⟩
-    · exact ⟨[], by simp⟩
-    · exact ⟨[(h, c, cs.take j)], rfl⟩
-  | _ => exact ⟨[], by simp [consStep]⟩
-
 end Xv6

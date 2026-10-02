@@ -208,12 +208,6 @@ theorem fsDirOk_inums (P : Nat → List (BitVec 8)) (sb : FsSb) (i : Nat) (dn : 
   have := (hok.fdoEnt k hk hlive).1.2
   omega
 
-/-- ...and `nodeRep` for a directory node (Rocq's `fs_dir_ok_node`). -/
-theorem fsDirOk_node (P : Nat → List (BitVec 8)) (sb : FsSb) (i : Nat) (dn : Dinode)
-    (hok : FsDirOk P sb i dn) (hty : dn.diType.toNat = T_DIR_z) :
-    nodeRep (nodeOf dn (fsDataOf P dn)) dn (fsDataOf P dn) :=
-  nodeRep_of _ _ (by rw [hty]; unfold T_DIR_z; omega) hok.fdoUnique
-
 /-- W6 (Rocq's `fs_dirs_wf`). -/
 def fsDirsWf (P : Nat → List (BitVec 8)) (sb : FsSb) : Bool :=
   (List.range sb.sbNinodes).all (fun i =>
@@ -443,21 +437,5 @@ def fsRootNoSelf (P : Nat → List (BitVec 8)) (sb : FsSb) : Bool :=
       (let s := dirBname data k
        if s = DOT then true else decide (s = DOTDOT))
     else true)
-
-/-- Rocq's `fs_root_no_self_at`. -/
-theorem fsRootNoSelf_at (P : Nat → List (BitVec 8)) (sb : FsSb) (k : Nat)
-    (h : fsRootNoSelf P sb = true)
-    (hk : k < dirNrec (fsDinode P sb ROOTINO).diSize.toNat)
-    (hlv : dirLive (fsDataOf P (fsDinode P sb ROOTINO)) k)
-    (hin : (dirInum (fsDataOf P (fsDinode P sb ROOTINO)) k).toNat = ROOTINO) :
-    dirBname (fsDataOf P (fsDinode P sb ROOTINO)) k = DOT ∨
-      dirBname (fsDataOf P (fsDinode P sb ROOTINO)) k = DOTDOT := by
-  have hq := forallb_range _ _ k h hk
-  simp only at hq
-  rw [if_neg hlv, if_pos hin] at hq
-  by_cases hd : dirBname (fsDataOf P (fsDinode P sb ROOTINO)) k = DOT
-  · exact Or.inl hd
-  · rw [if_neg hd, decide_eq_true_eq] at hq
-    exact Or.inr hq
 
 end Xv6

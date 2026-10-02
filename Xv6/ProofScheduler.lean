@@ -51,13 +51,6 @@ theorem sc_aCpuIntena (cpu : CPU) :
   generalize (KA.«pid_lock» : BitVec 64) = q
   bv_omega
 
-theorem sc_cpuCtxAddr (cpu : CPU) :
-    BitVec.ofNat 64 (128 * cpu.val) + (KA.«cpus» + 0x8#64) = cpuCtxAddr cpu := by
-  unfold cpuCtxAddr cpuAddr
-  show _ = (cpusAddr + BitVec.ofNat 64 (cpuSize * cpu.val)) + 8#64
-  unfold cpusAddr cpuSize
-  bv_omega
-
 theorem sc_schedBase (cpu : CPU) :
     scPidLockAddr + BitVec.ofNat 64 (128 * cpu.val) = schedBase cpu := rfl
 
@@ -77,13 +70,6 @@ theorem headRegs_of_calleeSaved {cpu : CPU} {R R' : RegMap} (h : headRegs cpu R)
   obtain ⟨_, _, _, _, _, h20, h21, h22, h23, h24, _, _, _⟩ := hc
   exact ⟨h20.trans h.1, h21.trans h.2.1, h22.trans h.2.2.1, h23.trans h.2.2.2.1,
     h24.trans h.2.2.2.2⟩
-
-theorem scanRegs_of_calleeSaved {cpu : CPU} {R R' : RegMap} {n : Nat} (h : scanRegs cpu R n)
-    (hc : calleeSaved R R') : scanRegs cpu R' n := by
-  have h9 := hc.2.2.1
-  have h18 := hc.2.2.2.1
-  have h19 := hc.2.2.2.2.1
-  exact ⟨headRegs_of_calleeSaved h.1 hc, h9.trans h.2.1, h18.trans h.2.2.1, h19.trans h.2.2.2⟩
 
 /-! ## The prologue and the constant setup -/
 
@@ -589,11 +575,7 @@ theorem scheduler_tail_last [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] 
 
 theorem sc_pState (pa : BitVec 64) : pa + 24#64 = pState pa := rfl
 
-theorem sc_running_val : BitVec.extractLsb' 0 32 (4#64) = RUNNING := by decide
-
 theorem sc_needsCtx_RUNNABLE : needsCtx RUNNABLE := Or.inl rfl
-
-theorem sc_parkOk_RUNNABLE : parkOk RUNNABLE := ⟨Or.inl sc_needsCtx_RUNNABLE, by decide⟩
 
 theorem sc_unclaimed_RUNNABLE : unclaimed RUNNABLE := ⟨by decide, by decide⟩
 

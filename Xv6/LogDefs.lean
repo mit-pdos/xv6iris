@@ -277,38 +277,6 @@ theorem lmCommitted_of_clean (M : LogMirror) (cov : Std.ExtTreeSet Nat compare) 
   rw [h]
   rfl
 
-/-- The clean picture's committed view IS the logged view (Rocq's
-`lm_committed_clean`): row (b) of the log invariant at the empty batch. -/
-theorem lmCommitted_clean (M : LogMirror) (L : BlockMap)
-    (cov : Std.ExtTreeSet Nat compare) (ls : Nat) (hhdr : lmHdr M ls = (0, []))
-    (hrow : ∀ b, fsHome cov ls b → PartialMap.get? L b = some (M.view b)) :
-    lmCommitted M cov ls = lmLogged L cov ls := by
-  rw [lmCommitted_of_clean M cov ls hhdr]
-  unfold lmLogged
-  symm
-  apply fsRestrict_ext
-  intro b hb
-  unfold dvOfD
-  rw [hrow b ((mem_fsHomeList cov ls b).1 hb)]
-  rfl
-
-/-- ...and it is blind to a write outside the home set (Rocq's
-`lm_committed_upd_ne`): the copy loop's fills go to log SLOTS. -/
-theorem lmCommitted_upd_ne (M : LogMirror) (cov : Std.ExtTreeSet Nat compare) (ls b : Nat)
-    (bs : List (BitVec 8)) (hhdr : lmHdr M ls = (0, [])) (hne : b ≠ logHdrBno ls)
-    (hnh : ¬ fsHome cov ls b) :
-    lmCommitted (lmUpd M b bs) cov ls = lmCommitted M cov ls := by
-  have hhdr' : lmHdr (lmUpd M b bs) ls = (0, []) := by
-    unfold lmHdr
-    rw [lmUpd_view_ne M b (logHdrBno ls) bs (Ne.symm hne)]
-    exact hhdr
-  rw [lmCommitted_of_clean _ cov ls hhdr', lmCommitted_of_clean M cov ls hhdr]
-  apply fsRestrict_ext
-  intro c hc
-  refine lmUpd_view_ne M b c bs ?_
-  intro hbad
-  exact hnh (hbad ▸ (mem_fsHomeList cov ls c).1 hc)
-
 /-- The logged view is blind to a write outside the home set for the same
 reason (Rocq's `lm_logged_insert_ne`). -/
 theorem lmLogged_insert_ne (L : BlockMap) (cov : Std.ExtTreeSet Nat compare)
@@ -319,24 +287,6 @@ theorem lmLogged_insert_ne (L : BlockMap) (cov : Std.ExtTreeSet Nat compare)
   intro c hc
   unfold dvOfD
   rw [get?_insert_ne (fun (hbad : b = c) => hb (hbad ▸ (mem_fsHomeList cov ls c).1 hc))]
-
-/-- The case that DOES move the reading: a `log_write` at a home block
-(Rocq's `lm_logged_insert_home`). -/
-theorem lmLogged_insert_home (L : BlockMap) (cov : Std.ExtTreeSet Nat compare)
-    (ls b : Nat) (bs : List (BitVec 8)) (hb : fsHome cov ls b) :
-    lmLogged (PartialMap.insert L b bs) cov ls =
-      PartialMap.insert (lmLogged L cov ls) b bs := by
-  refine equiv_iff_eq.1 (fun c => ?_)
-  unfold lmLogged dvOfD
-  by_cases hc : c = b
-  · subst hc
-    rw [fsRestrict_lookup, if_pos ((mem_fsHomeList cov ls c).2 hb), get?_insert_eq rfl,
-      get?_insert_eq rfl]
-    rfl
-  · rw [get?_insert_ne (Ne.symm hc), fsRestrict_lookup, fsRestrict_lookup]
-    by_cases hm : c ∈ fsHomeList cov ls
-    · rw [if_pos hm, if_pos hm, get?_insert_ne (Ne.symm hc)]
-    · rw [if_neg hm, if_neg hm]
 
 /-! ## The install pass's picture
 
@@ -361,13 +311,6 @@ theorem lmInstall_miss (M : LogMirror) (Ws : List Nat) (Lw : Nat → List (BitVe
     show (lmUpd (lmInstall M Ws Lw t) (Ws[t]!) (Lw t)).view c = M.view c
     rw [hbang, lmUpd_view_ne _ _ _ _ (fun hc => hne t _ (by omega) hb hc.symm)]
     exact ih (by omega) (fun i b hi hib => hne i b (by omega) hib)
-
-theorem lmInstall_hdr (M : LogMirror) (Ws : List Nat) (Lw : Nat → List (BitVec 8))
-    (ls : Nat) (t : Nat) (ht : t ≤ Ws.length)
-    (hne : ∀ i b, i < t → Ws[i]? = some b → b ≠ logHdrBno ls) :
-    lmHdr (lmInstall M Ws Lw t) ls = lmHdr M ls := by
-  unfold lmHdr
-  rw [lmInstall_miss M Ws Lw t _ ht hne]
 
 /-- The duplicate-freedom premise is the INJECTIVITY it is used through,
 exactly as in Rocq. -/

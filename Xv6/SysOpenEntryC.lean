@@ -92,11 +92,6 @@ theorem sys_open_ec_br_create : KA.«sys_open» + 0xfffffffffffffa9e#64 = KA.«c
 theorem sys_open_ec_ret_46 : jumpPc (KA.«sys_open» + 0x46#64) = KA.«sys_open» + 0x46#64 := by
   decide
 
-/-- `c.li a1,2` leaves create's `ty` argument, SIGN-extended (`T_FILE`). -/
-theorem sys_open_ec_a1 : BitVec.signExtend 64 (2#12) = BitVec.signExtend 64 T_FILE_w := by decide
-/-- `c.li a2,0` / `c.li a3,0`: `major = minor = 0`. -/
-theorem sys_open_ec_a23 : BitVec.signExtend 64 (0#12) = BitVec.signExtend 64 (0#16) := by decide
-
 theorem sys_open_ec_tfile_nz : T_FILE_w.toNat ≠ 0 := by decide
 
 /-- The path buffer at create's length (deviation 5). -/

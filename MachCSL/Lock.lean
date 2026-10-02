@@ -536,13 +536,6 @@ instance lkFloor_timeless (ξ : CtxId) (t : Nat) : Timeless (lkFloor (GF := GF) 
 
 theorem lkFloor_0 (ξ : CtxId) : ⊢@{IProp GF} lkFloor ξ 0 := keyAt_0 _ ξ
 
-/-- A floor proper is a lock floor. -/
-theorem lkFloor_of_ctxFloor (ξ : CtxId) (t : Nat) : ctxFloor (GF := GF) ξ t ⊢ lkFloor ξ t := by
-  unfold lkFloor keyAt
-  iintro H
-  ileft
-  iexact H
-
 /-- A lock floor of the running context is cashed into a view receipt and
 an authorship bundle: the entries at the floor are visible to the hart
 (the Rocq `lk_floor_vis`). -/

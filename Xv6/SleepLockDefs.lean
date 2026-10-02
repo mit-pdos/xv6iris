@@ -153,10 +153,6 @@ theorem sleeplockedQ_elim [CurCtx] (γ : GName) (q : Qp) (slk : BitVec 64) (pid 
     sleeplockedQ (GF := GF) γ q slk pid ⊢ slHtok γ q ∗ wordPointsTo (slPid slk) 4 (DFrac.own 1) pid := by
   unfold sleeplockedQ; iintro H; iexact H
 
-theorem sleeplocked_of_q [CurCtx] (γ : GName) (q : Qp) (slk : BitVec 64) (pid : BitVec 32) :
-    sleeplockedQ (GF := GF) γ q slk pid ⊢ sleeplocked γ slk pid := by
-  unfold sleeplocked; iintro H; iexists q; iexact H
-
 /-! ## The resource the inner spinlock protects -/
 
 /-- The free arm's holder-shaped form: the idle token pair and the pid field
@@ -223,10 +219,6 @@ instance isSleeplockGen_persistent [CurCtx] (γl γ : GName) (slk : BitVec 64) (
 instance isSleeplock_persistent [CurCtx] (γl γ : GName) (slk : BitVec 64) (R : CtxId → IProp GF) :
     Persistent (isSleeplock (GF := GF) γl γ slk R) := by
   unfold isSleeplock; infer_instance
-
-theorem isSleeplockGen_lock [CurCtx] (γl γ : GName) (slk : BitVec 64) (R : CtxId → IProp GF) (H : Qp → IProp GF) :
-    isSleeplockGen (GF := GF) γl γ slk R H ⊢ isLock γl (slLk slk) "sleep lock" (slBody γ slk R H) := by
-  unfold isSleeplockGen; iintro H; iexact H
 
 /-! ## Opening and closing the payload inside the inner critical section -/
 

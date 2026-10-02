@@ -27,12 +27,6 @@ theorem flatMap_eq_of_mem {α β : Type} (l : List α) (f g : α → List β)
   | cons a t ih =>
     simp only [List.flatMap_cons, h a (by simp), ih (fun x hx => h x (by simp [hx]))]
 
-theorem flatMap_nil_of_nil {α β : Type} (l : List α) (f : α → List β) (h : ∀ x, f x = []) :
-    l.flatMap f = [] := by
-  induction l with
-  | nil => rfl
-  | cons a t ih => simp only [List.flatMap_cons, h a, ih, List.nil_append]
-
 /-- A `flatMap` over a list without duplicates, where one entry gained an
 extra block: the whole flattening gains that block. -/
 theorem flatMap_perm_upd {α β : Type} [DecidableEq α] (l : List α) (F F' : α → List β) (i : α)
@@ -61,10 +55,6 @@ theorem flatMap_perm_upd {α β : Type} [DecidableEq α] (l : List α) (F F' : �
 /-! ## Zero nodes -/
 
 /-! ## Paths -/
-
-theorem path_setKid_self (lvl : Nat) (t c : PTree) (vpn : BitVec 27) :
-    (t.setKid (vpnIdx vpn (lvl+1)) c).path (lvl+1) vpn = vpnIdx vpn (lvl+1) :: c.path lvl vpn := by
-  simp only [PTree.path, PTree.setKid, PTree.kids_node, ite_true]
 
 theorem complete_succ_iff (lvl : Nat) (t : PTree) (vpn : BitVec 27) :
     t.complete (lvl+1) vpn ↔ ∃ c, t.kids (vpnIdx vpn (lvl+1)) = some c ∧ c.complete lvl vpn := by

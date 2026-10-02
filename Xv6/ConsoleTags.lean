@@ -200,17 +200,6 @@ theorem consGtop_snoc (R : List (List Obs × BitVec 8)) (p : List Obs × BitVec 
     consGtop (R ++ [p]) = some p.1 := by
   simp [consGtop]
 
-theorem consGtop_elem (R : List (List Obs × BitVec 8)) (g : List Obs)
-    (hg : consGtop R = some g) : ∃ c : BitVec 8, (g, c) ∈ R := by
-  unfold consGtop at hg
-  cases hx : R[R.length - 1]? with
-  | none => rw [hx] at hg; cases hg
-  | some x =>
-    rw [hx] at hg
-    obtain ⟨g', c⟩ := x
-    cases hg
-    exact ⟨c, List.mem_of_getElem? hx⟩
-
 /-- Every history the ring holds is at or below its top -- the chain says so. -/
 theorem consChain_below_gtop (R : List (List Obs × BitVec 8)) (i : Nat) (h : List Obs)
     (c : BitVec 8) (hch : consChain R) (hi : R[i]? = some (h, c)) :

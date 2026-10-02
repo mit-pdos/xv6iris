@@ -299,13 +299,6 @@ theorem swp_ret (cpu : CPU) {X : Type} (x : X) (Φ : X → IProp GF) :
   iintro HΦ %C %_ H
   iapply H $$ HΦ
 
-theorem swp_use (cpu : CPU) {X : Type} (m : SailM X) (Φ : X → IProp GF)
-    (C : SailM X → SailM Unit) (hC : MCtx C) :
-    swp cpu m Φ ∗ (∀ v : X, Φ v -∗ wpHart cpu (C (pure v))) ⊢ wpHart cpu (C m) := by
-  unfold swp
-  iintro ⟨Hswp, H⟩
-  iapply Hswp $$ %C %hC H
-
 theorem swp_mono (cpu : CPU) {X : Type} (m : SailM X) (Φ Ψ : X → IProp GF) :
     (∀ v, Φ v -∗ Ψ v) ∗ swp cpu m Φ ⊢ swp cpu m Ψ := by
   unfold swp
@@ -636,34 +629,6 @@ theorem swp_silent (cpu : CPU) (o : Outcome Register RegisterType) (u : o.ret)
   iframe Hσ
   iapply swp_ret
   iexact HΦ
-
-theorem swp_sail_cache_op (cpu : CPU) (op : Unit) (Φ : Unit → IProp GF) :
-    ▷ Φ () ⊢ swp cpu (ConcurrencyInterfaceV1.sail_cache_op op) Φ :=
-  swp_silent cpu (.cacheOp op) () (fun _ _ _ => ⟨fun h => ⟨rfl, h⟩, fun h => h.2⟩) (fun _ _ h => h) Φ
-
-theorem swp_sail_tlbi (cpu : CPU) (op : Unit) (Φ : Unit → IProp GF) :
-    ▷ Φ () ⊢ swp cpu (ConcurrencyInterfaceV1.sail_tlbi op) Φ :=
-  swp_silent cpu (.tlbi op) () (fun _ _ _ => ⟨fun h => ⟨rfl, h⟩, fun h => h.2⟩) (fun _ _ h => h) Φ
-
-theorem swp_sail_translation_start (cpu : CPU) (ts : Unit) (Φ : Unit → IProp GF) :
-    ▷ Φ () ⊢ swp cpu (ConcurrencyInterfaceV1.sail_translation_start ts) Φ :=
-  swp_silent cpu (.translationStart ts) () (fun _ _ _ => ⟨fun h => ⟨rfl, h⟩, fun h => h.2⟩)
-    (fun _ _ h => h) Φ
-
-theorem swp_sail_translation_end (cpu : CPU) (te : Unit) (Φ : Unit → IProp GF) :
-    ▷ Φ () ⊢ swp cpu (ConcurrencyInterfaceV1.sail_translation_end te) Φ :=
-  swp_silent cpu (.translationEnd te) () (fun _ _ _ => ⟨fun h => ⟨rfl, h⟩, fun h => h.2⟩)
-    (fun _ _ h => h) Φ
-
-theorem swp_sail_take_exception (cpu : CPU) (f : Unit) (Φ : Unit → IProp GF) :
-    ▷ Φ () ⊢ swp cpu (ConcurrencyInterfaceV1.sail_take_exception f) Φ :=
-  swp_silent cpu (.takeException f) () (fun _ _ _ => ⟨fun h => ⟨rfl, h⟩, fun h => h.2⟩)
-    (fun _ _ h => h) Φ
-
-theorem swp_sail_return_exception (cpu : CPU) (pa : BitVec 64) (Φ : Unit → IProp GF) :
-    ▷ Φ () ⊢ swp cpu (ConcurrencyInterfaceV1.sail_return_exception pa) Φ :=
-  swp_silent cpu (.returnException pa) () (fun _ _ _ => ⟨fun h => ⟨rfl, h⟩, fun h => h.2⟩)
-    (fun _ _ h => h) Φ
 
 theorem swp_cycle_count (cpu : CPU) (Φ : Unit → IProp GF) :
     ▷ Φ () ⊢ swp cpu (cycle_count ()) Φ :=

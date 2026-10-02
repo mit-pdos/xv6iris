@@ -98,11 +98,6 @@ theorem kcatTp_wr (N : UkNames GF) (fd : Int) (bs : Bytes) (k : Int → Proc) :
       wrObl (hlc := hlc) N (catProg N) fd bs (fun r => treePay (hlc := hlc) N (catProg N) (k r)) := by
   rw [treePay_vis]; exact .rfl
 
-theorem kcatTp_op (N : UkNames GF) (p : Bytes) (mode : Int) (k : Int → Proc) :
-    treePay (hlc := hlc) N (catProg N) (.vis (.EOpen p mode) k) ⊢
-      opObl (hlc := hlc) N (catProg N) p mode (fun r => treePay (hlc := hlc) N (catProg N) (k r)) := by
-  rw [treePay_vis]; exact .rfl
-
 theorem kcatTp_files (N : UkNames GF) (p : Bytes) (ps : List Bytes) (rest : Proc) :
     treePay (hlc := hlc) N (catProg N) (catFiles (p :: ps) rest) ⊢
       opObl (hlc := hlc) N (catProg N) p 0 (fun fd => treePay (hlc := hlc) N (catProg N)

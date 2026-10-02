@@ -19,26 +19,6 @@ open LeanRV64D LeanRV64D.Functions
 
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 
-set_option maxHeartbeats 4000000 in
-/-- In machine mode with every interrupt disabled (`mie = 0`), no interrupt is
-dispatched, whatever is pending. -/
-theorem swp_dispatchInterrupt_m (cpu : CPU) (dq : DFrac) (ip ms : BitVec 64)
-    (Φ : Option (InterruptType × Privilege) → IProp GF) :
-    hwConfig cpu ∗
-    Register.mideleg ↦ᵣ[cpu]{dq} 0#64 ∗
-    Register.mip ↦ᵣ[cpu] ip ∗
-    Register.mie ↦ᵣ[cpu]{dq} 0#64 ∗
-    Register.mstatus ↦ᵣ[cpu]{dq} ms ∗
-    ▷ (Register.mideleg ↦ᵣ[cpu]{dq} 0#64 -∗
-       Register.mip ↦ᵣ[cpu] ip -∗
-       Register.mie ↦ᵣ[cpu]{dq} 0#64 -∗
-       Register.mstatus ↦ᵣ[cpu]{dq} ms -∗ Φ none)
-    ⊢ swp cpu (dispatchInterrupt Privilege.Machine) Φ := by
-  iintro ⟨#Hhw, Hmideleg, Hmip, Hmie, Hmstatus, HΦ⟩
-  unfold dispatchInterrupt
-  swp_run 40
-  iapply HΦ $$ Hmideleg Hmip Hmie Hmstatus
-
 -- The clock tick (`swp_tick_clock_m` and its generalisations) lives in `MachCSL.WpTick`.
 
 /-! ### Aligned RAM reads in machine mode -/
@@ -80,55 +60,6 @@ macro "checked_mem_read_ram_load_proof" pa:ident n:num hram:ident hal:ident : ta
     iintro Hpmpcfg_n Hpmpaddr_n
     swp_run 80
     iapply HΦ $$ Hpmpcfg_n Hpmpaddr_n Htok Hbytes))
-
-set_option maxHeartbeats 4000000 in
-/-- A 4-byte aligned instruction fetch from RAM returns the image bytes. -/
-theorem swp_checked_mem_read_ifetch4 (cpu : CPU) (dq : DFrac) (pa : BitVec 64)
-    (w : BitVec (8 * 4)) (hram : inRam pa 4) (hal : pa.toNat % 4 = 0)
-    (Φ : Result ((BitVec (8 * 4)) × Unit) (physaddr × ExceptionType) → IProp GF) :
-    hwConfig cpu ∗
-    Register.pmpcfg_n ↦ᵣ[cpu]{dq} bootPmpcfg ∗
-    Register.pmpaddr_n ↦ᵣ[cpu]{dq} bootPmpaddr ∗
-    imgBytes pa 4 w ∗
-    ▷ (Register.pmpcfg_n ↦ᵣ[cpu]{dq} bootPmpcfg -∗
-        Register.pmpaddr_n ↦ᵣ[cpu]{dq} bootPmpaddr -∗
-        imgBytes pa 4 w -∗ Φ (.Ok (w, ())))
-    ⊢ swp cpu (checked_mem_read (MemoryAccessType.InstructionFetch ()) page_based_mem_type.PBMT_PMA
-        Privilege.Machine (physaddr.Physaddr pa) 4 false false false false) Φ := by
-  checked_mem_read_ram_proof pa 4 hram hal
-
-set_option maxHeartbeats 4000000 in
-/-- A 2-byte aligned instruction fetch from RAM returns the image bytes. -/
-theorem swp_checked_mem_read_ifetch2 (cpu : CPU) (dq : DFrac) (pa : BitVec 64)
-    (w : BitVec (8 * 2)) (hram : inRam pa 2) (hal : pa.toNat % 2 = 0)
-    (Φ : Result ((BitVec (8 * 2)) × Unit) (physaddr × ExceptionType) → IProp GF) :
-    hwConfig cpu ∗
-    Register.pmpcfg_n ↦ᵣ[cpu]{dq} bootPmpcfg ∗
-    Register.pmpaddr_n ↦ᵣ[cpu]{dq} bootPmpaddr ∗
-    imgBytes pa 2 w ∗
-    ▷ (Register.pmpcfg_n ↦ᵣ[cpu]{dq} bootPmpcfg -∗
-        Register.pmpaddr_n ↦ᵣ[cpu]{dq} bootPmpaddr -∗
-        imgBytes pa 2 w -∗ Φ (.Ok (w, ())))
-    ⊢ swp cpu (checked_mem_read (MemoryAccessType.InstructionFetch ()) page_based_mem_type.PBMT_PMA
-        Privilege.Machine (physaddr.Physaddr pa) 2 false false false false) Φ := by
-  checked_mem_read_ram_proof pa 2 hram hal
-
-set_option maxHeartbeats 4000000 in
-/-- An 8-byte aligned data load from RAM returns the bytes owned (by the
-running context). -/
-theorem swp_checked_mem_read_load8 [CurCtx] (cpu : CPU) (dq dq' : DFrac) (pa : BitVec 64)
-    (w : BitVec (8 * 8)) (hram : inRam pa 8) (hal : pa.toNat % 8 = 0)
-    (Φ : Result ((BitVec (8 * 8)) × Unit) (physaddr × ExceptionType) → IProp GF) :
-    hwConfig cpu ∗
-    Register.pmpcfg_n ↦ᵣ[cpu]{dq} bootPmpcfg ∗
-    Register.pmpaddr_n ↦ᵣ[cpu]{dq} bootPmpaddr ∗
-    ctxTok cpu curCtx ∗ bytesPointsTo pa 8 dq' w ∗
-    ▷ (Register.pmpcfg_n ↦ᵣ[cpu]{dq} bootPmpcfg -∗
-        Register.pmpaddr_n ↦ᵣ[cpu]{dq} bootPmpaddr -∗
-        ctxTok cpu curCtx -∗ bytesPointsTo pa 8 dq' w -∗ Φ (.Ok (w, ())))
-    ⊢ swp cpu (checked_mem_read (MemoryAccessType.Load mem_payload.Data) page_based_mem_type.PBMT_PMA
-        Privilege.Machine (physaddr.Physaddr pa) 8 false false false false) Φ := by
-  checked_mem_read_ram_load_proof pa 8 hram hal
 
 -- The fetch results `fetched4` / `fetched2` live in `MachCSL.FetchedDefs`.
 

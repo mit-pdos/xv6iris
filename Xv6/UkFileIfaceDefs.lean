@@ -356,12 +356,6 @@ theorem fifFds_open (fdm : Fdmap) :
         fifPoolOwn X.γreg (fifDom vs) w ∗ ([∗map] d ↦ v ∈ vs, fifTok X.γreg d (1 : Qp).half v) ∗
         fifHdls X.N.fd fdm vs ∗ X.fifDq ∗ X.fifEnv) ∗ X.fifExitK := .rfl
 
-/-- `fifCore`, opened. -/
-theorem fifCore_open (fdm : Fdmap) (l : List FdState) (vs : FifVs) (w : Nat → Fdev) :
-    X.fifCore fdm l vs w ⊢ ustd X.N.fd l ∗ ucwd X.N.cwd ROOTINO ∗ ⌜fifOk X.D0 X.w0 fdm l vs⌝ ∗
-        fifPoolOwn X.γreg (fifDom vs) w ∗ ([∗map] d ↦ v ∈ vs, fifTok X.γreg d (1 : Qp).half v) ∗
-        fifHdls X.N.fd fdm vs ∗ X.fifDq ∗ X.fifEnv := .rfl
-
 /-- **Rocq `fif_fds_of`**: the core and the wand, reassembled. -/
 theorem fif_fds_of (fdm : Fdmap) (l : List FdState) (vs : FifVs) (w : Nat → Fdev)
     (hok : fifOk X.D0 X.w0 fdm l vs) :

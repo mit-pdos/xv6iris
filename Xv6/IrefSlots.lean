@@ -240,12 +240,6 @@ theorem irefFrac_op (q1 q2 : Qp) :
       ((some ⟨q1⟩ : Option UFrac) • (some ⟨q2⟩ : Option UFrac)) from rfl, Auth.frag_op]
   exact iOwn_op
 
-theorem irefFrac_split (q1 q2 : Qp) :
-    irefFrac (GF := GF) (q1 + q2) ⊢ irefFrac q1 ∗ irefFrac q2 := (irefFrac_op q1 q2).1
-
-theorem irefFrac_combine (q1 q2 : Qp) :
-    irefFrac (GF := GF) q1 ∗ irefFrac q2 ⊢ irefFrac (q1 + q2) := (irefFrac_op q1 q2).2
-
 instance irefFrac_fractional : Fractional (PROP := IProp GF) (fun q => irefFrac q) :=
   ⟨irefFrac_op⟩
 
@@ -290,41 +284,6 @@ theorem irefSlots_no_overflow (n : Nat) :
 Stated exactly as `FdSlots`', and for the same reason: the proc layer parks
 units in `proc_dormant` and the file table parks one per entry, and both
 want the parcelled-out form. -/
-
-theorem irefSlots_split_n (n m : Nat) :
-    irefSlots (GF := GF) (n * m) ⊢ [∗list] _j ∈ List.range n, irefSlots m := by
-  induction n with
-  | zero =>
-    iintro -
-    simp only [List.range_zero]
-    iapply BigSepL.bigSepL_nil.2
-    itrivial
-  | succ n ih =>
-    iintro H
-    rw [List.range_succ]
-    rw [show (n + 1) * m = n * m + m by rw [Nat.succ_mul]]
-    icases irefSlots_split (n * m) m $$ H with ⟨Hn, Hm⟩
-    iapply BigSepL.bigSepL_append.2
-    isplitl [Hn]
-    · iapply ih $$ Hn
-    · iapply BigSepL.bigSepL_singleton.2
-      iexact Hm
-
-theorem irefSlots_to_any {A : Type _} (l : List A) :
-    irefSlots (GF := GF) l.length ⊢ [∗list] _x ∈ l, irefSlot := by
-  induction l with
-  | nil =>
-    iintro -
-    iapply BigSepL.bigSepL_nil.2
-    itrivial
-  | cons x l ih =>
-    iintro H
-    rw [List.length_cons]
-    icases irefSlots_split l.length 1 $$ H with ⟨Hl, H1⟩
-    iapply BigSepL.bigSepL_cons.2
-    isplitl [H1]
-    · unfold irefSlot; iexact H1
-    · iapply ih $$ Hl
 
 theorem irefSlots_to_list (n : Nat) :
     irefSlots (GF := GF) n ⊢ [∗list] _j ∈ List.range n, irefSlot := by

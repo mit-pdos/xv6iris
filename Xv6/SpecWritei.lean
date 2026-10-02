@@ -200,11 +200,6 @@ def wi16Need (crb ind : Bool) : Nat := bmapNeed crb ind + 2
 
 theorem wi16Need_value_dir : wi16Need false false = 4 := rfl
 
-/-- Rocq's `wi16_need_matches_landed`. -/
-theorem wi16Need_matches_landed (off : Nat) (h : wiBlocks off 16 = 1) :
-    wi16Need false false = wiCostBmonly off 16 := by
-  unfold wi16Need bmapNeed wiCostBmonly; rw [h]; rfl
-
 /-- The disk block the single-block window lands on, as `log_write` names
 it in the ledger (Rocq's `wi_tgt_blk`). -/
 def wiTgtBlk (bm : Blkmap) (off : Nat) : Nat := (blkmapGet bm (off / BSIZE)).toNat

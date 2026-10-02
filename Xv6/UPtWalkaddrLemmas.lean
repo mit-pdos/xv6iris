@@ -95,12 +95,6 @@ theorem pteAD_and17 {w v : BitVec 64} (h : pteAD w v) : v &&& 17#64 = w &&& 17#6
     Sail.BitVec.updateSubrange', BitVec.extractLsb, _update_PTE_Flags_A, _update_PTE_Flags_D]
   bv_decide
 
-theorem pteAD_and1 {w v : BitVec 64} (h : pteAD w v) : v &&& 1#64 = w &&& 1#64 := by
-  obtain ⟨a, d, rfl⟩ := h
-  simp only [pteSetAD, Sail.BitVec.extractLsb, Sail.BitVec.updateSubrange,
-    Sail.BitVec.updateSubrange', BitVec.extractLsb, _update_PTE_Flags_A, _update_PTE_Flags_D]
-  bv_decide
-
 theorem pteAD_pte2pa {w v : BitVec 64} (h : pteAD w v) : (v >>> 10) <<< 12 = pte2pa w := by
   obtain ⟨a, d, rfl⟩ := h
   simp only [pte2pa, pteSetAD, Sail.BitVec.extractLsb, Sail.BitVec.updateSubrange,

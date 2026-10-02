@@ -221,27 +221,6 @@ theorem elfParsePhdr_all (l : ElfBytes) (o : Nat) (p : ElfPhdr) (hp : elfParsePh
   simp only [Option.bind_some, Option.some.injEq] at hp
   exact hp.symm
 
-/-- **Rocq `ph_fields_of_phdr`, THE PROGRAM-HEADER BRIDGE**: `g` is the
-56-byte `struct proghdr` kexec `readi`d out of the file at offset `o`;
-`phOff` is the FOUR-byte read, so it needs `ep_offset p < 2^31`. -/
-theorem phFields_of_phdr (g l : ElfBytes) (o : Nat) (p : ElfPhdr) (hp : elfParsePhdr l o = some p)
-    (hag : ∀ j, j < 56 → g[j]! = l[o + j]!) :
-    phType g = p.type ∧ phFlags g = p.flags ∧ phVaddr g = p.vaddr ∧ phFilesz g = p.filesz ∧
-      phMemsz g = p.memsz ∧ (p.offset < 2 ^ 31 → phOff g = p.offset) := by
-  obtain ⟨-, h1, h2, h3, h4, h6, h7⟩ := elfParsePhdr_fields l o p hp
-  have hsh : ∀ a n : Nat, a + n ≤ 56 → leAt g a n = leAt l (o + a) n := fun a n han =>
-    leAt_shift_of_list g l o a n fun j hj => by
-      rw [Nat.add_assoc o a j]; exact hag (a + j) (by omega)
-  unfold phType phFlags phVaddr phFilesz phMemsz phOff
-  rw [hsh 0 4 (by omega), hsh 4 4 (by omega), hsh 16 8 (by omega), hsh 32 8 (by omega),
-    hsh 40 8 (by omega), hsh 8 4 (by omega)]
-  refine ⟨by simpa using h1.symm, h2.symm, h4.symm, h6.symm, h7.symm, fun hlt => ?_⟩
-  rw [h3]
-  apply leAt_trunc_small l (o + 8) 4 8 (by omega)
-  rw [← h3]
-  have : (2 : Nat) ^ 31 < 2 ^ (8 * 4) := by decide
-  omega
-
 /-! ## 5.  THE TABLE, AS THE PHDR LOOP WALKS IT -/
 
 /-- Rocq `elf_wf_phentsize`. -/
@@ -287,22 +266,6 @@ theorem phAt_of_ehdr (g l : ElfBytes) (e : ElfEhdr) (i : Nat) (he : elfParseEhdr
     phAt g i = e.phoff + 56 * i := by
   unfold phAt
   rw [(ehFields_of_ehdr g l e he hag).2.2 hlt]
-
-/-- Rocq `elf_loads_elem`: a PT_LOAD entry of the table is a member of
-`elfLoads`. -/
-theorem elfLoads_elem (l : ElfBytes) (ps : List ElfPhdr) (i : Nat) (p : ElfPhdr)
-    (hps : elfPhdrs l = some ps) (hi : ps[i]? = some p) (hty : p.type = 1) : p ∈ elfLoads l := by
-  unfold elfLoads
-  rw [hps]
-  exact List.mem_filter.2 ⟨List.mem_of_getElem? hi, by simp [hty]⟩
-
-/-- Rocq `elf_loads_sub`: every member of `elfLoads` is a table entry. -/
-theorem elfLoads_sub (l : ElfBytes) (ps : List ElfPhdr) (p : ElfPhdr)
-    (hps : elfPhdrs l = some ps) (hp : p ∈ elfLoads l) : p ∈ ps ∧ p.type = 1 := by
-  unfold elfLoads at hp
-  rw [hps] at hp
-  obtain ⟨h1, h2⟩ := List.mem_filter.1 hp
-  exact ⟨h1, by simpa using h2⟩
 
 /-! ## 6.  THE `readi` WINDOW: the bytes kexec reads ARE the abstract file -/
 

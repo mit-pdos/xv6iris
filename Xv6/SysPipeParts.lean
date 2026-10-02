@@ -505,14 +505,6 @@ theorem sys_pipe_frame_close (sp ra s0 s1 fa rf wf : BitVec 64) (w0 w1 : BitVec 
   · iexists wf; iexact Hwf
   iexists w; iexact Hslot
 
-theorem sys_pipe_frame_al (sp ra s0 s1 fa : BitVec 64) (w0 w1 : BitVec 32) :
-    sysPipeFrame (GF := GF) sp ra s0 s1 fa w0 w1 ⊢
-      ⌜(sp + 0xFFFFFFFFFFFFFFC0#64).toNat % 8 = 0⌝ ∗ sysPipeFrame sp ra s0 s1 fa w0 w1 := by
-  unfold sysPipeFrame
-  iintro ⟨%hal, H⟩
-  iframe H
-  isplitl [] <;> ipureintro <;> exact hal
-
 /-- The `fdarray` cell, read and put back. -/
 theorem sys_pipe_frame_fa (sp ra s0 s1 fa : BitVec 64) (w0 w1 : BitVec 32) :
     sysPipeFrame (GF := GF) sp ra s0 s1 fa w0 w1 ⊢
@@ -671,21 +663,6 @@ theorem sys_pipe_core_ext (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P' 
   isplitl []
   · ipureintro; exact ⟨hf.1, UMemL.umBelow_extSz hf.2.1 hext, hf.2.2.1, hf.2.2.2⟩
   · ipureintro; exact fun h => LazyFree.lazyFree_extSz hext (hlz h)
-
-/-- Close at the entry space (no copyout ran). -/
-theorem sys_pipe_core_join (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
-    (hf : V.sz.toNat ≤ uvmMaxsz ∧ umBelow V.sz V.upt ∧ V.pagetable = pageAddr V.upt.root ∧
-      V.trapframe = pageAddr V.upt.tfp) :
-    @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pSz pa) 8 (DFrac.own 1) V.sz ∗
-    @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPagetable pa) 8 (DFrac.own 1) V.pagetable ∗
-    @procPtAt hlc GF _ ⟨curCtx, KTier.kpt⟩ V.upt M ∗ sysPipeCoreRest pa pid V ⊢
-      procPrivCoreNoctxAt curCtx pa pid V M := by
-  unfold procPrivCoreNoctxAt procPrivBareAt sysPipeCoreRest ecRest procFieldsNoOfile
-  iintro ⟨Hsz, Hpg, Hpt, ⟨Hpid, Hks, Htf, Hcwd, Hnm, Hsc, Hrt, Htfp, %hlz, Hev⟩, Hcw⟩
-  iframe Hsz Hpg Hpt Hpid Hks Htf Hcwd Hnm Hsc Hrt Htfp Hcw Hev
-  isplitl []
-  · ipureintro; exact hf
-  · ipureintro; exact hlz
 
 /-! ## The exit: `mv a0,a5` and the epilogue at `sys_pipe+0xdc` -/
 

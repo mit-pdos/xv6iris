@@ -140,15 +140,6 @@ theorem consKey_seal_False (r : EchoNames) :
   iintro ⟨H1, H2⟩
   iapply MonoList.auth_own_exclusive r.n2 ([] : List Nat) [0] $$ H1 H2
 
-/-- The seal's snapshot (Rocq `cons_seal_never`). -/
-theorem consSeal_never (r : EchoNames) :
-    consSealTok (GF := GF) r ⊢ consSealTok r ∗ consNever r := by
-  unfold consSealTok consNever
-  iintro H
-  ihave #H' := MonoList.lb_own_get r.n2 (DFrac.own 1) [0] $$ H
-  iframe H
-  iexact H'
-
 /-- THE SEAL STEP (Rocq `cons_seal`). -/
 theorem consSeal (r : EchoNames) :
     consKey (GF := GF) r ⊢ |==> (consSealTok r ∗ consNever r) := by

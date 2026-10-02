@@ -181,60 +181,6 @@ theorem fresh_insert {V : Type} (m : RegMapF V) (nx : Nat) (v : V)
   rw [get?_insert_ne (by omega : nx ≠ i)]
   exact hfresh i (by omega)
 
-/-! ## The pending block set
-
-Rocq's `op_pending_elem_of` is this port's DEFINITION (`Xv6.opPending`), so
-each law below is the corresponding Rocq lemma read through it. -/
-
-/-- Rocq `op_pending_empty`. -/
-theorem opPending_empty (b : Nat) : ¬ opPending (∅ : RegMapF OpEntry) b := by
-  rintro ⟨i, e, hi, -⟩
-  rw [get?_empty (M := RegMapF) i] at hi
-  simp at hi
-
-/-- Rocq `op_pending_lookup`: a live entry's set is pending. -/
-theorem opPending_lookup (om : RegMapF OpEntry) (i : Nat) (e : OpEntry)
-    (hi : PartialMap.get? om i = some e) (b : Nat) (hb : b ∈ e.set) : opPending om b :=
-  ⟨i, e, hi, hb⟩
-
-/-- Rocq `op_pending_insert_mono`: the law the three GROWING transitions use
-(`begin_op`'s mint, both of `log_write`'s ledger steps). -/
-theorem opPending_insert_mono (om : RegMapF OpEntry) (i : Nat) (e' : OpEntry)
-    (hgrow : ∀ e, PartialMap.get? om i = some e → ∀ x ∈ e.set, x ∈ e'.set) (b : Nat)
-    (hb : opPending om b) : opPending (PartialMap.insert om i e') b := by
-  obtain ⟨j, e, hj, hbe⟩ := hb
-  by_cases hji : j = i
-  · subst hji
-    exact ⟨j, e', get?_insert_eq rfl, hgrow e hj b hbe⟩
-  · exact ⟨j, e, by rw [get?_insert_ne (fun h => hji h.symm)]; exact hj, hbe⟩
-
-/-- Rocq `op_pending_delete`: the SHRINKING law (`end_op`'s retire), as the
-exact split. -/
-theorem opPending_delete (om : RegMapF OpEntry) (i : Nat) (e : OpEntry)
-    (hi : PartialMap.get? om i = some e) (b : Nat) (hb : opPending om b) :
-    b ∈ e.set ∨ opPending (PartialMap.delete om i) b := by
-  obtain ⟨j, e', hj, hbe⟩ := hb
-  by_cases hji : j = i
-  · subst hji
-    rw [hi] at hj
-    cases hj
-    exact Or.inl hbe
-  · refine Or.inr ⟨j, e', ?_, hbe⟩
-    rw [get?_delete_ne (fun h => hji h.symm)]
-    exact hj
-
-/-- Rocq `op_pending_delete_subseteq`. -/
-theorem opPending_delete_subseteq (om : RegMapF OpEntry) (i : Nat) (b : Nat)
-    (hb : opPending (PartialMap.delete om i) b) : opPending om b := by
-  obtain ⟨j, e, hj, hbe⟩ := hb
-  refine ⟨j, e, ?_, hbe⟩
-  by_cases hji : j = i
-  · subst hji
-    rw [get?_delete_eq rfl] at hj
-    simp at hj
-  · rw [get?_delete_ne (fun h => hji h.symm)] at hj
-    exact hj
-
 /-! ## `begin_op`'s guard, as the ledger's premise
 
 Rocq `LogInv.log_reserve_ok`: the code's CONSERVATIVE test
@@ -256,10 +202,6 @@ theorem logReserveOk (n out : Nat) (om : RegMapF OpEntry)
 theorem boGuardSum (out n : Nat) (h : 10 * (out + 1) + n ≤ 30) :
     n + (out + 1) * MAXOPBLOCKS ≤ LOGBLOCKS := by
   unfold MAXOPBLOCKS LOGBLOCKS; omega
-
-/-- ...and it also bounds the NEW outstanding count, which is `logRes`'s
-`out ≤ 3`. -/
-theorem boGuardOut3 (out n : Nat) (h : 10 * (out + 1) + n ≤ 30) : out + 1 ≤ 3 := by omega
 
 /-! ## The guard, as the IMAGE computes it
 
@@ -313,10 +255,5 @@ theorem bo_bge30 (v : Nat) (h : v < 2 ^ 63) :
     bcond bop.BGE 30#64 (BitVec.ofNat 64 v) = decide (v ≤ 30) := by
   have := bo_bge_nat 30 v (by decide) h
   simpa using this
-
-/-- `bnez a5` at `+0x3c`, on the `committing` cell. -/
-theorem bo_bnez_cmt (cmt : Bool) :
-    bcond bop.BNE (BitVec.signExtend 64 (if cmt then 1#32 else 0#32)) 0#64 = cmt := by
-  cases cmt <;> decide
 
 end Xv6

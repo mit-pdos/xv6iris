@@ -893,16 +893,6 @@ theorem sysExecArgvFrom_intro (sp0 : BitVec 64) (pg : Nat → BitVec 64) (t : Na
   ipureintro
   exact ⟨sysExecArgvL_length pg t, fun j _ hj => sysExecArgvL_get pg t j hj⟩
 
-/-- Both free-loop exits leave the array whole (Rocq `sx_argv_done`). -/
-theorem sysExecArgvFrom_free (sp0 : BitVec 64) (m t : Nat) (pg : Nat → BitVec 64) :
-    sysExecArgvFrom (GF := GF) sp0 m t pg ⊢ sysExecArgvFree sp0 := by
-  unfold sysExecArgvFrom sysExecArgvFree
-  iintro ⟨%ws, %h, H⟩
-  iexists ws
-  iframe H
-  ipureintro
-  exact h.1
-
 /-- **What the tails hand the join point** (Rocq `sx_carry_open` +
 `sx_rest_build`): the carry, the freed array and the two out-parameter
 cells ARE the ra / s0 cells and the rest of the frame. -/

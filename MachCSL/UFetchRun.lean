@@ -172,22 +172,9 @@ theorem uftRun_bind_some {X Y : Type} (m : SailM X) (f : X → SailM Y) (orc orc
     uftRun D orc s (m >>= f) = uftRun D orc' s' (f x) := by
   rw [uftRun_bind, h]; rfl
 
-/-- A known `runRW` sub-walk, then the continuation. -/
-theorem uftRun_bind_runRW {X Y : Type} (m : SailM X) (f : X → SailM Y) (orc orc' : UOrc) (s s' : UWSt)
-    (x : X) (h : runRW D orc s m = some (x, s', orc')) :
-    uftRun D orc s (m >>= f) = uftRun D orc' s' (f x) :=
-  uftRun_bind_some D m f orc orc' s s' x (uftRun_of_runRW D m orc s _ h)
-
 theorem uftRun_bind_none {X Y : Type} (m : SailM X) (f : X → SailM Y) (orc : UOrc) (s : UWSt)
     (h : uftRun D orc s m = none) : uftRun D orc s (m >>= f) = none := by
   rw [uftRun_bind, h]; rfl
-
-/-- A register read in the footprint. -/
-theorem uftRun_readReg (orc : UOrc) (s : UWSt) (r : Register) (h : D.Dr r = true) :
-    uftRun D orc s (readReg r) = some (s.file r, s, orc) :=
-  uftRun_of_runRW D _ orc s _ (by
-    show runRW D orc s (FreeM.impure (.ok (.regRead r)) FreeM.pure) = _
-    rw [runRW_regRead_dr D orc s r _ h]; rfl)
 
 /-- **A fetch leaf, as a walk**: `n` owned bytes, the oracle's answer. -/
 theorem uftRun_sail_mem_read_ifetch (orc : UOrc) (s : UWSt) {n vasize : Nat}
@@ -333,21 +320,6 @@ theorem swp_uftRun {X : Type} (m : SailM X) :
       isplitl [HF HB Hc Hr]
       · unfold uFr; iframe
       iapply uftPost_step RF BF s s' _ _ Φ hre $$ HP
-
-/-- The Rocq shape: the frames in, a fetch-walk equation and the landing
-frames out. -/
-theorem swp_uftRun_frames {X : Type} (m : SailM X) (s : UWSt)
-    (hok : ∀ orc, (uftRun D orc s m).isSome = true) :
-    uFr RF BF s ⊢ swp cpu m (fun x => iprop(∃ (orc : UOrc) (s' : UWSt) (orc' : UOrc),
-      ⌜uftRun D orc s m = some (x, s', orc')⌝ ∗ uFr RF BF s')) := by
-  iintro Hfr
-  iapply swp_uftRun RF BF m s hok
-  iframe Hfr
-  unfold uftPost
-  iintro %orc %x %s' %orc' %h Hfr
-  iexists orc, s', orc'
-  iframe
-  ipureintro; exact h
 
 /-- **A fetch-walk with a described landing** (the form the cycle's fetch
 obligation is discharged in): every oracle's walk lands on a result and a

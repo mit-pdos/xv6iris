@@ -50,9 +50,6 @@ def walkPres (R R' : RegMap) : Prop :=
   R' 22#5 = R 22#5 ∧ R' 23#5 = R 23#5 ∧ R' 24#5 = R 24#5 ∧ R' 25#5 = R 25#5 ∧
   R' 26#5 = R 26#5 ∧ R' 27#5 = R 27#5
 
-theorem walkPres_refl (R : RegMap) : walkPres R R :=
-  ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩
-
 theorem walkPres_trans {R R' R'' : RegMap} (h : walkPres R R') (h' : walkPres R' R'') :
     walkPres R R'' := by
   obtain ⟨a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11⟩ := h
@@ -69,9 +66,6 @@ theorem w_kPtr_of_page (p : BitVec 64) (h : pageValid p) :
   simp only [kPtr, mkPte, ptrFlags]
   revert h1 h3
   bv_decide
-
-
-theorem w_zero_invalid : (0#64 &&& 1#64) = 0#64 := by decide
 
 
 /-- `bne` as a conditional on equality. -/
@@ -92,9 +86,6 @@ theorem w_ret_f8a : jumpPc (KA.«walk» + 0x7a#64) = (KA.«walk» + 0x7a#64) := 
 
 theorem w_ret_f96 : jumpPc (KA.«walk» + 0x86#64) = (KA.«walk» + 0x86#64) := by
   decide
-
-theorem w_lui_4096 : BitVec.signExtend 64 (1#20 ++ 0#12) = BitVec.ofNat 64 4096 := by decide
-
 
 theorem availSub_one (on : Option Nat) : availSub on 1 = availDec on := rfl
 

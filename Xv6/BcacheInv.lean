@@ -106,9 +106,6 @@ def bnode (k : Nat) : BitVec 64 := bufAddr k
 /-- The head sentinel `&bcache.head` -- node `NBUF`, one past the array. -/
 def bhead : BitVec 64 := bcacheHeadAddr
 
-theorem bnode_NBUF : bnode NBUF = bhead := by
-  unfold bnode bhead bufAddr bcacheHeadAddr NBUF; decide
-
 /-- `&b->prev`, in the form the instructions compute. -/
 def bPrev (a : BitVec 64) : BitVec 64 := a + 72#64
 /-- `&b->next`. -/
@@ -121,9 +118,6 @@ theorem bNext_sext (a : BitVec 64) : a + BitVec.signExtend 64 80#12 = bNext a :=
 theorem bPrev_eq' (a : BitVec 64) : a + 72#64 = bPrev a := rfl
 theorem bNext_eq' (a : BitVec 64) : a + 80#64 = bNext a := rfl
 
-/-- `&b->refcnt`, as `aBufRefcnt` and as the `lw a5,64(s1)` form. -/
-theorem aBufRefcnt_sext (a : BitVec 64) : a + BitVec.signExtend 64 64#12 = aBufRefcnt a := by
-  unfold aBufRefcnt bOffRefcnt; congr 1
 theorem aBufRefcnt_eq (a : BitVec 64) : aBufRefcnt a = a + BitVec.signExtend 64 64#12 := by
   unfold aBufRefcnt bOffRefcnt; congr 1
 theorem aBufRefcnt_eq' (a : BitVec 64) : a + 64#64 = aBufRefcnt a := by
@@ -385,17 +379,6 @@ theorem bsegAt_succ_prev (ξ : CtxId) (h a : BitVec 64) (l2 : List (BitVec 64)) 
 
 /-! ### The cycle's two operations -/
 
-/-- The state `binit`'s two pre-loop stores leave: an empty cycle, head
-pointing at itself both ways. -/
-theorem bcacheLru_nil (ξ : CtxId) (h : BitVec 64) :
-    wordAtN (GF := GF) ξ (bNext h) 8 (DFrac.own 1) h ∗
-    wordAtN ξ (bPrev h) 8 (DFrac.own 1) h ⊢ bcacheLruAt ξ h [] := by
-  unfold bcacheLruAt
-  simp only [bhd_nil, blast_nil]
-  iintro ⟨Hn, Hp⟩
-  iframe Hn Hp
-  iempintro
-
 /-- **THE SPLICE**: putting a node `a` in right after the head touches
 exactly four cells -- the head's `next`, the `prev` of whatever the head
 currently points at (the head itself when the cycle is empty), and `a`'s own
@@ -650,15 +633,6 @@ theorem bioPay_clean_elim (γ : BcacheNames) (V : BioView GF) (k : Nat) (dev bno
   isplitr [H]
   · ipureintro; exact he
   · iexact H
-
-/-- The DIRTY arm, folded: the pin IS a real reference to the buffer. -/
-theorem bioPay_dirty (γ : BcacheNames) (V : BioView GF) (k : Nat) (dev bno : BitVec 32)
-    (bsl bsd : List (BitVec 8)) :
-    V.dirty bno.toNat bsl ∗ bref γ k dev bno ⊢
-      bioPay (GF := GF) γ V k dev bno bsl bsd true := by
-  unfold bioPay
-  simp only [if_true]
-  iintro H; iexact H
 
 /-- ...and unfolded. -/
 theorem bioPay_dirty_elim (γ : BcacheNames) (V : BioView GF) (k : Nat) (dev bno : BitVec 32)
@@ -1035,13 +1009,6 @@ theorem bnode_ne_bhead (k : Nat) (hk : k < NBUF) : bnode k ≠ bhead := by
   have hk' : k < 30 := by unfold NBUF at hk; exact hk
   omega
 
-/-- ...and distinct buffers are distinct addresses. -/
-theorem bnode_inj (i j : Nat) (hi : i < NBUF) (hj : j < NBUF) (h : bnode i = bnode j) : i = j := by
-  have h1 := bnode_toNat i hi
-  have h2 := bnode_toNat j hj
-  rw [h] at h1
-  omega
-
 /-- Any field of buffer `k` is kernel read-write data: `bcache` is a `.bss`
 object inside the kernel's identity window and the array's stride is 1112. -/
 theorem bnode_off_toNat (k m : Nat) (hk : k < NBUF) (hm : m < 1112) :
@@ -1096,13 +1063,6 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 /-- Buffer `k`'s CHECKOUT token (Rocq's `bown`): what its sleeplock protects,
 and the key a holder presents.  Exclusive. -/
 def bufTok (γ : BcacheNames) (k : Nat) : IProp GF := (γ.own k) ↪VAR{.own (1 : Qp)} ()
-
-theorem bufTok_excl (γ : BcacheNames) (k : Nat) :
-    bufTok (GF := GF) γ k ∗ bufTok γ k ⊢ False := by
-  unfold bufTok
-  iintro ⟨H1, H2⟩
-  ihave %hv := ghost_var_valid_2 _ _ _ _ _ $$ H1 H2
-  exact absurd (DFrac.valid_own_op hv.1) (by simp)
 
 instance wordAtN_timeless (ξ : CtxId) (a : BitVec 64) (n : Nat) (dq : DFrac)
     (w : BitVec (8 * n)) : Timeless (wordAtN (GF := GF) ξ a n dq w) := by
@@ -1277,10 +1237,6 @@ def bioCtx (γl : GName) (γ : BcacheNames) (V : BioView GF) : IProp GF := iprop
 instance bioCtx_persistent (γl : GName) (γ : BcacheNames) (V : BioView GF) :
     Persistent (bioCtx (GF := GF) γl γ V) := by
   unfold bioCtx; infer_instance
-
-theorem bioCtx_lock (γl : GName) (γ : BcacheNames) (V : BioView GF) :
-    bioCtx (GF := GF) γl γ V ⊢ isBcache γl γ V := by
-  unfold bioCtx; iintro ⟨H, -, -⟩; iexact H
 
 theorem bioCtx_buf (γl : GName) (γ : BcacheNames) (V : BioView GF) (k : Nat) (hk : k < NBUF) :
     bioCtx (GF := GF) γl γ V ⊢ isBufSlk γ k := by
@@ -1595,39 +1551,6 @@ theorem bkey_upd_acc_mono (γ : BcacheNames) (ξ : CtxId) (tl : Nat) (devs bnos 
       rw [updAtF_self devs k dev', updAtF_self bnos k bno']) $$ Hk'
     iexact Hk'
 
-/-- Borrow buffer `k`'s key row to put it back AT A NEW KEY -- what `bread`'s
-recycler needs (Rocq's `bio_slot_devbno_acc2`). -/
-theorem bkey_upd_acc (γ : BcacheNames) (ξ : CtxId) (tl : Nat) (devs bnos : Nat → BitVec 32)
-    (k : Nat) (hk : k < NBUF) :
-    bkeyAll (GF := GF) γ ξ tl devs bnos ⊢
-      bkeyAt γ ξ tl k (devs k) (bnos k) ∗
-      (∀ dev' : BitVec 32, ∀ bno' : BitVec 32, bkeyAt γ ξ tl k dev' bno' -∗
-        bkeyAll γ ξ tl (updAtF devs k dev') (updAtF bnos k bno')) := by
-  have hget : (List.range NBUF)[k]? = some k := by rw [List.getElem?_range hk]
-  unfold bkeyAll
-  iintro H
-  icases BigSepL.bigSepL_lookup_acc_impl
-    (Φ := fun _ j => bkeyAt (GF := GF) γ ξ tl j (devs j) (bnos j)) hget $$ H
-    with ⟨Hk, Hcl⟩
-  iframe Hk
-  iintro %dev' %bno' Hk'
-  iapply Hcl $$ %(fun _ j => bkeyAt (GF := GF) γ ξ tl j
-    (updAtF devs k dev' j) (updAtF bnos k bno' j)) [] [Hk']
-  · imodintro
-    iintro %i %y %hy %hne Hy
-    have hik : y ≠ k := by
-      by_cases hi : i < NBUF
-      · rw [List.getElem?_range hi] at hy; cases hy; exact hne
-      · rw [List.getElem?_eq_none (by simp; omega)] at hy; cases hy
-    ihave Hy := (show bkeyAt (GF := GF) γ ξ tl y (devs y) (bnos y) ⊢
-        bkeyAt γ ξ tl y (updAtF devs k dev' y) (updAtF bnos k bno' y) from by
-      rw [updAtF_ne devs k y dev' hik, updAtF_ne bnos k y bno' hik]) $$ Hy
-    iexact Hy
-  · ihave Hk' := (show bkeyAt (GF := GF) γ ξ tl k dev' bno' ⊢
-        bkeyAt γ ξ tl k (updAtF devs k dev' k) (updAtF bnos k bno' k) from by
-      rw [updAtF_self devs k dev', updAtF_self bnos k bno']) $$ Hk'
-    iexact Hk'
-
 /-- Borrow slot `k` out of the cache's big-sep, to put it back with a NEW
 list. -/
 theorem bslot_upd_acc (γ : BcacheNames) (ξ : CtxId) (Ls : Nat → List Nat) (k : Nat) (hk : k < NBUF) :
@@ -1816,14 +1739,6 @@ theorem bref_free_step (γ : BcacheNames) (M : RegMapF Nat) (s t : List Nat) (id
   imodintro
   iframe Ha
   iapply BigSepL.bigSepL_append.2; iframe Hs Ht
-
-/-- The authority knows a holder's id. -/
-theorem bref_lookup (γ : BcacheNames) (M : RegMapF Nat) (id k : Nat) :
-    (γ.ref ↪●MAP M) ∗ (γ.ref ↪◯MAP[id]{.own (1 : Qp).half} k) ⊢@{IProp GF}
-      ⌜PartialMap.get? M id = some k⌝ := by
-  iintro ⟨Ha, He⟩
-  ihave %h := ghost_map_lookup $$ Ha He
-  ipureintro; exact h
 
 end
 

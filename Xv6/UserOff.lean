@@ -130,13 +130,6 @@ def foffPub (om : OffMode) (γo : GName) : IProp GF :=
   | .parked => iprop(emp)
   | .held => uoff γo 0
 
-/-- Rocq's `foff_pub_parked`. -/
-theorem foffPub_parked (γo : GName) : ⊢@{IProp GF} foffPub .parked γo := by
-  unfold foffPub; iempintro
-
-/-- Rocq's `foff_pub_held`. -/
-theorem foffPub_held (γo : GName) : uoff (GF := GF) γo 0 ⊢ foffPub .held γo := .rfl
-
 /-- Rocq's `foff_pub_of_held`. -/
 theorem foffPub_of_held (γo : GName) : foffPub (GF := GF) .held γo ⊢ uoff γo 0 := .rfl
 
@@ -151,10 +144,6 @@ def foffPubT (om : OffMode) (t : FdType) : IProp GF :=
 /-- Rocq's `foff_pub_t_dev`. -/
 theorem foffPubT_dev (om : OffMode) (mj : Nat) : ⊢@{IProp GF} foffPubT om (.device mj) := by
   unfold foffPubT; iempintro
-
-/-- Rocq's `foff_pub_t_inode`. -/
-theorem foffPubT_inode (om : OffMode) (i : Nat) (γo : GName) (m : OffMode) :
-    foffPub (GF := GF) om γo ⊢ foffPubT om (.inode i γo m) := .rfl
 
 /-- ...and back (the arms read the type-keyed half at the inode they built). -/
 theorem foffPubT_inode_elim (om : OffMode) (i : Nat) (γo : GName) (m : OffMode) :
@@ -259,21 +248,6 @@ theorem off_pub_park (E : CoPset) (γo : GName) (z : Int) :
   imod offUserInv_alloc E γo z $$ Hu with #Hinv
   imodintro
   iframe Hk Hinv
-
-/-! ## 4.  The box's arm (Rocq lane OFF-LINK, L0/L3)
-
-`offLink` and its two arms live in `OffGv` (the nodes' LEND is stated at
-them).  Rocq's `off_settle` is gone: `offSupply`'s own output is the box's
-arm. -/
-
-/-- ...AND THE THIRD CASE NEEDS NO PAYER AT ALL (Rocq's `off_link_advanced`):
-a node whose closure held `uoff γo off` advanced BOTH halves inside its own
-phase 2 and handed the kernel's back at `off + d`, which IS the box's
-coupled arm. -/
-theorem offLink_advanced (γo : GName) (off d : Nat) :
-    offGv (GF := GF) γo (1 : Qp).half ((off + d : Nat) : Int) ⊢
-      offLink (hlc := hlc) γo ((off + d : Nat) : Int) :=
-  offLink_of γo _
 
 /-! ## 5.  The vacuity check (Rocq design/app-file.md SS3.6)
 

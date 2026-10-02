@@ -158,11 +158,6 @@ theorem createMkdir_n6 (n5 n6 : Nat) (crd cru al ind : Bool) (h5 : 6 ≤ n5)
 theorem createMkdir_dlneed5 (ind : Bool) (n : Nat) (h : 6 ≤ n) : dlNeed true ind ≤ n := by
   cases ind <;> (have := dlNeed_values; simp only [dlNeed] at *; omega)
 
-/-- the `".."` link's need: the bitmap block is in the set and the window is
-direct. -/
-theorem createMkdir_dlneed4 (n : Nat) (h : 6 ≤ n) : dlNeed true false ≤ n :=
-  createMkdir_dlneed5 false n h
-
 /-! ## 1.  The callees at create's environment, hart-free (the `SysLinkCalls`
 pattern) -/
 

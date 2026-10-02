@@ -72,25 +72,6 @@ theorem namex_loaded_open (ik : Nat) (inum : BitVec 32) (dn : Dinode) (bm : Blkm
   ipureintro
   exact ⟨hok, hrl, hdok, hddix, hdoc, hduq⟩
 
-/-- The found arm's reference, as the walk's currency. -/
-theorem namex_found_held (data : Nat → List (BitVec 8)) (dn : Dinode) (kd kslot : Nat) (qq : Qp)
-    (s : List (BitVec 8)) (hty : dn.diType = T_DIR) (hdok : dirOk icfgNib dn data)
-    (hf : dirFirst data (dirNrec dn.diSize.toNat) s = some kd) (hks : kslot < NINODE) :
-    inodeRef (GF := GF) kslot qq icfgDev (BitVec.setWidth 32 (dirInum data kd)) ∗
-      runitAny (BitVec.setWidth 32 (dirInum data kd)).toNat ⊢ inodeHeld (ientry kslot) := by
-  have hinums := dirOk_dir icfgNib dn data hty hdok
-  have hlt := dirFirst_lt _ _ _ _ hf
-  have hlive := dirFirst_live _ _ _ _ hf
-  have hnib : (BitVec.setWidth 32 (dirInum data kd)).toNat < 16 * icfgNib := by
-    rw [MachCSL.zext32_toNat]; exact hinums kd hlt hlive
-  have hpos := Xv6.dirlookup_live_pos data kd hlive
-  iintro ⟨Href, Hru⟩
-  unfold inodeHeld inodeRefp
-  iexists kslot, qq, BitVec.setWidth 32 (dirInum data kd)
-  iframe Href Hru
-  ipureintro
-  exact ⟨rfl, hks, hnib, hpos⟩
-
 /-- The level's facts: the walk's pure invariant at the element just
 consumed (`el`, ending before `o2`) with the parent directory held at slot
 `ik`. -/

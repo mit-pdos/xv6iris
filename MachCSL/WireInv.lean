@@ -93,19 +93,6 @@ instance wireBody_timeless : Timeless (wireBody (GF := GF)) := by
 instance wireInv_persistent : Persistent (wireInv (GF := GF)) := by
   unfold wireInv; infer_instance
 
-/-- Allocate the invariant from the owned pin cells, at any levels. -/
-theorem wireInv_alloc (E : CoPset) (seip meip : CPU → BitVec 1) :
-    ([∗list] cpu ∈ cpus,
-        (Register.sig_seip ↦ᵣ[cpu] seip cpu ∗ Register.sig_meip ↦ᵣ[cpu] meip cpu))
-      ⊢@{IProp GF} |={E}=> wireInv := by
-  iintro Hcells
-  unfold wireInv
-  iapply inv_alloc wireN E (wireBody (GF := GF))
-  inext
-  unfold wireBody
-  iexists seip, meip
-  iexact Hcells
-
 /-- Take hart `cpu`'s two pin cells out of the body, with a closing wand
 that accepts them back at ANY levels. -/
 theorem wireBody_take (cpu : CPU) :

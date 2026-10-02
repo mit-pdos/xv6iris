@@ -109,27 +109,4 @@ structure SYSPAUSE : Prop where
     wp_sys_pause_eb_body (hlc := hlc) (GF := GF) Γ cpu k γt j tfp ws v dqt
       hj hproc hws hK hnoff htier
 
-/-- The interrupts-off instance of `wp_sys_pause_eb` (the complement is the
-whole bundle). -/
-theorem SYSPAUSE.wp_sys_pause (A : SYSPAUSE) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
-    [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (cpu : CPU) (k : KCtx) (γt : GName) (j : Nat)
-    (tfp : BitVec 44) (ws : List (BitVec 64)) (v : BitVec 64) (dqt : DFrac)
-    hj hproc hws hK hsie hnoff hlocks htier :
-    wp_sys_pause_body (hlc := hlc) (GF := GF) Γ cpu k γt j tfp ws v dqt
-      hj hproc hws hK hsie hnoff hlocks htier := by
-  have h := A.wp_sys_pause_eb (hlc := hlc) (GF := GF) Γ cpu k γt j tfp ws v dqt
-    hj hproc hws hK hnoff htier
-  unfold wp_sys_pause_eb_body at h
-  unfold wp_sys_pause_body
-  rw [hsie] at h
-  simp only [trapCsrsExt_false, cpuClaimExt_false] at h
-  iintro ⟨H0, H1, H2, Htc, Hcl, Hir, H6, H7, H8, Hnext⟩
-  iapply h
-  iframe H0 H1 H2 Htc Hcl Hir H6 H7 H8
-  iapply wpNext_mono $$ Hnext
-  iintro %cpu' HK %spie %spp %R' %p0 H1 H2 ⟨Htc, Hir⟩ Hcl H6 H7
-  iapply HK $$ %spie %spp %R' %p0 H1 H2 Htc Hcl Hir H6 H7
-
 end Xv6

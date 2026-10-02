@@ -414,12 +414,6 @@ theorem gopTurn_agree (v : EraPins) (P P' : Nat) :
   iapply turn_agree v P P' $$ [H1 H2]
   iframe H1 H2
 
-theorem gopCsLb_prefix (v : EraPins) (l l' : List Nat) :
-    ⊢ csAuth (GF := GF) v l -∗ csLb v l' -∗ ⌜l' <+: l⌝ := by
-  iintro H1 H2
-  iapply csLb_prefix v l l' $$ [H1 H2]
-  iframe H1 H2
-
 theorem gopPsLb_prefix (v : EraPins) (l l' : List Nat) :
     ⊢ psAuth (GF := GF) v l -∗ psLb v l' -∗ ⌜l' <+: l⌝ := by
   iintro H1 H2

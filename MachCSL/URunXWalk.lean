@@ -192,12 +192,6 @@ theorem uxw_bind_none {X Y : Type} (m : SailM X) (f : X → SailM Y) (orc : UOrc
     (h : uxRun D T orc s m = none) : uxRun D T orc s (m >>= f) = none := by
   rw [uxw_bind, h]; rfl
 
-/-- The unit-sequencing form. -/
-theorem uxw_seq_some {Y : Type} (m : SailM Unit) (n : SailM Y) (orc orc' : UOrc) (s s' : UWSt)
-    (h : uxRun D T orc s m = some ((), s', orc')) :
-    uxRun D T orc s (m >>= fun _ => n) = uxRun D T orc' s' n :=
-  uxw_bind_some D T m (fun _ => n) orc orc' s s' () h
-
 /-- A known `runRW` sub-walk (from a state missing the text map), then the
 continuation. -/
 theorem uxw_bind_runRW {X Y : Type} (m : SailM X) (f : X → SailM Y) (orc orc' : UOrc) (s s' : UWSt)

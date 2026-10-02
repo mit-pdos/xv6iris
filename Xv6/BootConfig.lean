@@ -161,8 +161,6 @@ def bootConfRegs : List Register :=
   [.cur_privilege, .hart_state, .mstatus, .mie, .mideleg, .medeleg, .mepc, .satp,
    .menvcfg, .mcounteren, .mtimecmp, .stimecmp, .pmpcfg_n, .pmpaddr_n] ++ hwRegs
 
-theorem bootConfRegs_nodup : bootConfRegs.Nodup := by decide
-
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 

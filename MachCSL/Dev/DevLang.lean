@@ -181,12 +181,6 @@ def fork (t : T) : DevM S T TaskId := lift (.fork t)
 /-- Wait for a task. -/
 def join (tid : TaskId) : DevM S T Unit := lift (.join tid)
 
-/-- Fork every task of a list, then join them all: the parallel phase of a
-request, whose transactions complete in any order. -/
-def forkJoinAll (ts : List T) : DevM S T Unit := do
-  let tids ← ts.mapM fork
-  tids.forM join
-
 /-- Run `p` until it yields `false`: a bounded device loop. -/
 def loopFuel (fuel : Nat) (p : DevM S T Bool) : DevM S T Unit :=
   match fuel with

@@ -981,29 +981,6 @@ theorem diskRes_slot_acc (γ : DiskNames) [CurCtx] (pd pav pu : PAddr) (ξ : Ctx
   iapply diskRes_close γ pd pav pu ξ np nr stg ring
   iframe Hp Hr Hrl Hs Hlb Hwmp Hu Hidx Hring Hsl
 
-/-- **Any slot the caller has a QUARTER of**: its state is the caller's,
-by agreement, and the two quarters join into the driver's whole half.
-This is the member's version of `Xv6.diskRes_slot_of_quarter` -- a chain's
-middle and tail come back the same way its head does. -/
-theorem diskRes_slotQ_acc (γ : DiskNames) [CurCtx] (pd pav pu : PAddr) (i : Nat) (s : HState)
-    (hi : i < NUM) :
-    diskRes (GF := GF) γ pd pav pu curCtx ∗ headTokQ γ i s ⊢
-      headTok γ i s ∗ slotBody γ curCtx pd i s ∗
-      (∀ s' : HState, slotTok γ i s' -∗ slotBody γ curCtx pd i s' -∗
-        diskRes γ pd pav pu curCtx) := by
-  iintro ⟨HR, Hq⟩
-  icases diskRes_slot_acc γ pd pav pu curCtx i hi $$ HR with ⟨Hsl, Hback⟩
-  unfold slotRes
-  icases Hsl with ⟨%s0, Ht, Hb⟩
-  icases slotTok_quarter_join γ i s0 s $$ [Ht Hq] with ⟨%hq, Ht⟩
-  · iframe Ht Hq
-  subst hq
-  iframe Ht Hb
-  iintro %s' Ht Hb
-  iapply Hback
-  iexists s'
-  iframe Ht Hb
-
 /-- **The slot of a head the caller has a QUARTER of.**  What the woken
 publisher of a chain does when it re-acquires `vdisk_lock`: its own
 quarter of `γ.head c.hd`, kept across the park inside `sleep`, AGREES
@@ -1130,38 +1107,6 @@ theorem dmaOwnT_ctxBytes (ξ : CtxId) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)
     ileft
     rw [het]
     iexact Hfl2
-
-/-- **The chain's four windows, taken back whole.**  The invariant's
-halves (`Xv6.chainLease`, minus the data buffer, which the device WROTE
-and which therefore comes back through `Xv6.dmaOwnT_ctxBytes` instead)
-and the driver's halves (`Xv6.claimRes`) are the same ghost elements, so
-the collect joins them into the `own 1` windows `free_desc` needs.  This
-is the exact inverse of what `Xv6.disk_publish` splits. -/
-theorem chainLease_claim_join {γ : DiskNames} [CurCtx] (ξ : CtxId) (pd : PAddr) (c : Chain) :
-    iprop(chainLease (GF := GF) pd c ∗ claimRes γ ξ pd c) ⊢
-      ctxBytes ξ (descAt pd c.hd) 16 (DFrac.own 1) c.d0 ∗
-      ctxBytes ξ (descAt pd c.md) 16 (DFrac.own 1) c.d1 ∗
-      ctxBytes ξ (descAt pd c.tl) 16 (DFrac.own 1) c.d2 ∗
-      ctxBytes ξ c.hdrAddr 16 (DFrac.own 1) c.hdr ∗
-      wordAtN ξ (aInfoB c.hd) 8 (DFrac.own 1) c.bp ∗ bufW c ∗
-      (∃ d : BitVec 32, wordAtN ξ (aBufDisk c.bp) 4 (DFrac.own 1) d ∗ claimDone γ c d) := by
-  unfold chainLease claimRes
-  iintro ⟨⟨Hr0, Hr1, Hr2, Hh0, Hh1, Hh2, Hbw⟩, Hc0, Hc1, Hc2, Hch, Hib, Hdsk⟩
-  iframe Hib Hbw Hdsk
-  isplitl [Hr0 Hc0]
-  · iapply ctxBytes_join_dma ξ (descAt pd c.hd) 16 c.d0
-    iframe Hr0 Hc0
-  isplitl [Hr1 Hc1]
-  · iapply ctxBytes_join_dma ξ (descAt pd c.md) 16 c.d1
-    iframe Hr1 Hc1
-  isplitl [Hr2 Hc2]
-  · iapply ctxBytes_join_dma ξ (descAt pd c.tl) 16 c.d2
-    iframe Hr2 Hc2
-  · iapply ctxBytes_join_dma ξ c.hdrAddr 16 c.hdr
-    isplitl [Hh0 Hh1 Hh2]
-    · iapply dmaHalfAt_hdr_join c.hdrAddr c
-      iframe Hh0 Hh1 Hh2
-    · iexact Hch
 
 /-- **The chain's windows, taken back whole, at a KNOWN `b->disk`.** -/
 theorem chainLease_claimD_join {γ : DiskNames} [CurCtx] (ξ : CtxId) (pd : PAddr) (c : Chain) (d : BitVec 32) :

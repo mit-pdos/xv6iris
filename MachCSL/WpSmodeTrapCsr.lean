@@ -46,42 +46,6 @@ theorem and_lsb0_of_even (pc : BitVec 64) (h : pc.toNat % 2 = 0) : pc &&& 0xFFFF
   have h0 : pc.getLsbD 0 = false := (lsb0_iff_even pc).2 h
   bv_decide
 
-/-! ## The leaves -/
-
-set_option maxHeartbeats 4000000 in
-/-- `csrr sepc`: the model aligns the value it returns (`get_xepc`). -/
-theorem swp_read_CSR_sepc (cpu : CPU) (dq : DFrac) (e : BitVec 64) (Φ : BitVec 64 → IProp GF) :
-    hwConfig cpu ∗ Register.sepc ↦ᵣ[cpu] e ∗
-    ▷ (Register.sepc ↦ᵣ[cpu] e -∗
-        Φ (e &&& 0xFFFFFFFFFFFFFFFE#64))
-    ⊢ swp cpu (read_CSR 0x141#12) Φ := by
-  iintro ⟨#Hhw, Hsepc, HΦ⟩
-  swp_run 40
-  simp only [update_bit0_eq]
-  iapply HΦ $$ Hsepc
-
-set_option maxHeartbeats 4000000 in
-/-- `csrr scause`: a plain register read. -/
-theorem swp_read_CSR_scause (cpu : CPU) (c : BitVec 64) (Φ : BitVec 64 → IProp GF) :
-    Register.scause ↦ᵣ[cpu] c ∗ ▷ (Register.scause ↦ᵣ[cpu] c -∗ Φ c)
-    ⊢ swp cpu (read_CSR 0x142#12) Φ := by
-  iintro ⟨Hscause, HΦ⟩
-  swp_run 40
-  iapply HΦ $$ Hscause
-
-set_option maxHeartbeats 4000000 in
-/-- `csrw sepc, v`: the cell takes `legalize_xepc v` (bit 0 cleared). -/
-theorem swp_write_CSR_sepc (cpu : CPU) (e v : BitVec 64)
-    (Φ : Result (BitVec 64) Unit → IProp GF) :
-    hwConfig cpu ∗ Register.sepc ↦ᵣ[cpu] e ∗
-    ▷ (Register.sepc ↦ᵣ[cpu] (v &&& 0xFFFFFFFFFFFFFFFE#64) -∗ Φ (.Ok (v &&& 0xFFFFFFFFFFFFFFFE#64)))
-    ⊢ swp cpu (write_CSR 0x141#12 v) Φ := by
-  iintro ⟨#Hhw, Hsepc, HΦ⟩
-  have hz : hartSupports extension.Ext_Zca = true := LeanRV64D.Functions.hartSupports_Ext_Zca
-  swp_run 40
-  simp only [legalize_xepc, hz, ite_true, update_bit0_eq]
-  iapply HΦ $$ Hsepc
-
 /-! ## The execute stages -/
 
 set_option maxHeartbeats 4000000 in

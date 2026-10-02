@@ -27,10 +27,6 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 theorem sie0_and2 (v : BitVec 64) (h : BitVec.extractLsb' 1 1 v = 0#1) : v &&& 2#64 = 0#64 := by
   bv_decide
 
-/-- With `SIE = 0`, `(sstatus >> 1) & 1 = 0`. -/
-theorem sie0_shr_and1 (v : BitVec 64) (h : BitVec.extractLsb' 1 1 v = 0#1) : (v >>> 1) &&& 1#64 = 0#64 := by
-  bv_decide
-
 theorem ofNat64_eq_zero_iff (n : Nat) (hn : n < 2 ^ 64) : BitVec.ofNat 64 n = 0#64 ↔ n = 0 := by
   constructor
   · intro h
@@ -39,14 +35,6 @@ theorem ofNat64_eq_zero_iff (n : Nat) (hn : n < 2 ^ 64) : BitVec.ofNat 64 n = 0#
     rw [Nat.mod_eq_of_lt (by omega)] at this
     exact this
   · intro h; subst h; rfl
-
-theorem bcond_beq_ofNat (n : Nat) (hn : n < 2 ^ 64) :
-    bcond bop.BEQ (BitVec.ofNat 64 n) 0#64 = decide (n = 0) := by
-  simp only [bcond]
-  by_cases h : n = 0
-  · subst h; rfl
-  · have : BitVec.ofNat 64 n ≠ 0#64 := fun e => h ((ofNat64_eq_zero_iff n hn).mp e)
-    simp [this, h]
 
 /-- `blez` on a positive count is not taken. -/
 theorem bcond_bge_zero_pos (n : Nat) (h1 : 1 ≤ n) (h2 : n < 2 ^ 31) :

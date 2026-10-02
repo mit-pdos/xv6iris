@@ -225,22 +225,6 @@ theorem unlinkUent_inst (Γ : FsViewNames GF) (M : Nat → List (BitVec 8)) (pv 
   · iapply (nparCur_out M pv pl P hpl)
   · iapply (nparCur_in M pv pl P hpl)
 
-/-- Rocq's `unlink_au_at_inst`. -/
-theorem unlinkAuAt_inst (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat)
-    (M : Nat → List (BitVec 8)) (pv : Nat) (pl : List (BitVec 8))
-    (P Pmiss : Nat → Nat → IProp GF)
-    (Fent : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
-    (Ftgt : Pfam GF (Aview → Nat → IProp GF))
-    (Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
-    (Fmiss : Pfam GF (Aview → Nat → Fname → IProp GF)) (hpl : argPathOf M pv pl) :
-    unlinkAuAt (hlc := hlc) Γ γfs rt cw M pv P Pmiss Fent Ftgt Fex Fmiss ⊢
-      unlinkAuPre (hlc := hlc) Γ γfs rt cw pl P Pmiss Fent Ftgt Fex Fmiss := by
-  unfold unlinkAuAt unlinkAuPre
-  iintro ⟨Hw, Hent, Htgt, Hex, Hmiss⟩
-  ihave Hent := unlinkUent_inst Γ M pv pl P Fent hpl $$ Hent
-  iframe Hent Htgt Hex Hmiss
-  iapply Hw $$ %pl %hpl
-
 /-- THE GENERIC SUPPLIER'S ONE LINE (Rocq's `unlink_au_at_of_all`). -/
 theorem unlinkAuAt_of_all (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat)
     (M : Nat → List (BitVec 8)) (pv : Nat) (P Pmiss : Nat → Nat → IProp GF)

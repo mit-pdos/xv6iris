@@ -431,16 +431,10 @@ def iLock (ip : BitVec 64) : BitVec 64 := ip + 16#64
 /-- `&ip->valid` (`lw a5,64(s1)`). -/
 def iValid (ip : BitVec 64) : BitVec 64 := ip + 64#64
 
-theorem iDev_sext (ip : BitVec 64) : ip + BitVec.signExtend 64 0#12 = iDev ip := by
-  unfold iDev; congr 1
-theorem iInum_sext (ip : BitVec 64) : ip + BitVec.signExtend 64 4#12 = iInum ip := by
-  unfold iInum; congr 1
 theorem iRef_sext (ip : BitVec 64) : ip + BitVec.signExtend 64 8#12 = iRef ip := by
   unfold iRef; congr 1
 theorem iLock_sext (ip : BitVec 64) : ip + BitVec.signExtend 64 16#12 = iLock ip := by
   unfold iLock; congr 1
-theorem iValid_sext (ip : BitVec 64) : ip + BitVec.signExtend 64 64#12 = iValid ip := by
-  unfold iValid; congr 1
 
 /-- `&ip->dev` is `ip` itself. -/
 theorem iDev_eq (ip : BitVec 64) : iDev ip = ip := by

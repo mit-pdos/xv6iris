@@ -57,10 +57,6 @@ theorem ms_cpuid_br : KA.«main» + 2682#64 = KA.«cpuid» := by decide
 theorem ms_ret_0c : jumpPc (KA.«main» + 12#64) = KA.«main» + 0xc#64 := by decide
 theorem ms_started_addr : KA.«main» + 38194#64 = KA.«started» := by decide
 
-/-- `cpuid()` returns nonzero exactly off the primary. -/
-theorem ms_cpuidRet_ne (cpu : CPU) (h : cpu ≠ startedPrimary) : cpuidRet (hartId cpu) ≠ 0#64 := by
-  revert cpu h; decide
-
 /-- The `beqz a0` at +0x14 falls through off the primary. -/
 theorem ms_beqz_fall (cpu : CPU) (h : cpu ≠ startedPrimary) :
     bcond bop.BEQ (cpuidRet (hartId cpu)) 0#64 = false := by

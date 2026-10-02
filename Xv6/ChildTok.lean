@@ -169,12 +169,6 @@ instance shotPending_timeless (gk : GName) : Timeless (shotPending (GF := GF) gk
 instance shotDone_timeless (gk : GName) : Timeless (shotDone (GF := GF) gk) := by
   unfold shotDone; infer_instance
 
-theorem shotPending_excl (gk : GName) : shotPending (GF := GF) gk ∗ shotPending gk ⊢ False := by
-  unfold shotPending
-  iintro ⟨H1, H2⟩
-  icombine H1 H2 gives %Hv
-  exact Hv.elim
-
 /-- the two states are incompatible: this is what refutes the zero arm -/
 theorem shotPending_done (gk : GName) : shotPending (GF := GF) gk ∗ shotDone gk ⊢ False := by
   unfold shotPending shotDone
@@ -449,14 +443,6 @@ theorem killPend_of (γ gk : GName) : genShotn (GF := GF) γ gk ∗ shotPending 
   · iexact Hg
   · iexact H
 
-theorem killShot_of (γ gk : GName) : genShotn (GF := GF) γ gk ∗ shotDone gk ⊢ killShot γ := by
-  unfold killShot
-  iintro ⟨#Hg, #H⟩
-  iexists gk
-  isplitr
-  · iexact Hg
-  · iexact H
-
 /-- WHAT A WRITER OF `p->killed` DOES, and the only producer of the shot
 state there is. -/
 theorem killPend_fire (γ : GName) : killPend (GF := GF) γ ⊢ |==> killShot γ := by
@@ -504,20 +490,6 @@ theorem killOwed_of (γ : GName) (Q : Int → IProp GF) : myPay γ Q ∗ Q (-1) 
   isplitr
   · iexact Hmy
   · iexact H
-
-/-- ...AND WHAT IT COSTS TO CASH IT AT A NAMED PAYLOAD: one LATER (the two
-readings agree only up to the saved predicate's own later). -/
-theorem killOwed_pay (γ : GName) (Q : Int → IProp GF) : myPay γ Q ∗ killOwed γ ⊢ ▷ Q (-1) := by
-  unfold killOwed
-  iintro ⟨#Hmy, ⟨%Q', #Hmy', HQ⟩⟩
-  ihave #Heq := myPay_agree γ Q Q' $$ [Hmy Hmy']
-  · isplitl []
-    · iexact Hmy
-    · iexact Hmy'
-  iapply genPay_rewrite Q Q' (-1)
-  isplitr
-  · iexact Heq
-  · iexact HQ
 
 /-- the ESCROW names the pid it is keyed at, off the discarded half it
 carries beside the kernel's quarter -/

@@ -57,17 +57,6 @@ theorem wrap16_mod8 (n : Nat) : (wrap16 n).toNat % NUM = n % NUM := by
   rw [wrap16_toNat]
   exact Nat.mod_mod_of_dvd n (by unfold NUM; omega)
 
-theorem usedElem_wrap (pu : PAddr) (n : Nat) :
-    usedElemAt pu ((wrap16 n).toNat % NUM) = usedElemAt pu (n % NUM) := by
-  rw [wrap16_mod8]
-
-theorem availRing_wrap (pav : PAddr) (n : Nat) :
-    availRingAt pav ((wrap16 n).toNat % NUM) = availRingAt pav (n % NUM) := by
-  rw [wrap16_mod8]
-
-theorem wrap16_mod_lt (n : Nat) : (wrap16 n).toNat % NUM < NUM := by
-  apply Nat.mod_lt; unfold NUM; omega
-
 /-- **Sixteen bits identify a counter inside a window of `2^16`.**  The
 queue's counters never run more than `NUM` apart, so the driver's and the
 device's 16-bit indices determine the natural numbers behind them --
@@ -77,17 +66,6 @@ theorem wrap16_inj_window (a b : Nat) (hab : a ≤ b) (hw : b - a < 65536)
     (h : wrap16 a = wrap16 b) : a = b := by
   have h' : a % 65536 = b % 65536 := by rw [← wrap16_toNat, ← wrap16_toNat, h]
   omega
-
-theorem wrap16_ne_of_lt (a b : Nat) (hab : a < b) (hw : b - a < 65536) :
-    wrap16 a ≠ wrap16 b := fun h => absurd (wrap16_inj_window a b (by omega) hw h) (by omega)
-
-/-- The contrapositive, as a pop or a handler loop uses it: two counters
-inside one window that disagree at sixteen bits disagree. -/
-theorem lt_of_wrap16_ne (a b : Nat) (hab : a ≤ b) (hw : b - a < 65536)
-    (h : wrap16 a ≠ wrap16 b) : a < b := by
-  rcases Nat.lt_or_ge a b with hlt | hge
-  · exact hlt
-  · exact absurd (by rw [show a = b from by omega]) h
 
 /-! ## The per-descriptor receipt -/
 
@@ -171,9 +149,6 @@ def Ok (q : VQ) : Prop :=
   (∀ p, q.nc ≤ p → p < q.np → q.ring p < NUM ∧ (q.head (q.ring p)).isActive = true) ∧
   (∀ p, q.nc ≤ p → p < q.np → q.slot p = .pending)
 
-theorem init_Ok : Ok init := by
-  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;> simp [Ok, init, NUM, HState.isActive]
-
 /-! ### The driver's moves -/
 
 /-- PUBLISH: arm head `i` with the chain `c` and hand position `np` to the
@@ -199,66 +174,6 @@ def pop (q : VQ) : VQ := { q with lo := q.lo + 1 }
 `used->idx`. -/
 def complete (q : VQ) : VQ :=
   { q with nc := q.nc + 1, slot := fun p => if p = q.nc then .done else q.slot p }
-
-/-! ### What the moves preserve -/
-
-theorem publish_ring (q : VQ) (i : Nat) (c : Chain) : (q.publish i c).ring q.np = i := by
-  simp [publish]
-
-theorem pop_le (q : VQ) (h : q.Ok) (hlt : q.lo < q.np) : q.pop.lo ≤ q.pop.np := by
-  simp [pop]; omega
-
-theorem readAt_Ok (q : VQ) (h : q.Ok) (hlt : q.nr < q.nc) : q.readAt.Ok := by
-  obtain ⟨h1, h2, h3, h4, h5, h6, h7⟩ := h
-  exact ⟨by simp [readAt]; omega, h2, h3, h4, h5, h6, h7⟩
-
-theorem reclaim_Ok (q : VQ) (h : q.Ok) (i : Nat) (hi : i < NUM)
-    (hfree : ∀ p, q.nc ≤ p → p < q.np → q.ring p ≠ i) : (q.reclaim i).Ok := by
-  obtain ⟨h1, h2, h3, h4, h5, h6, h7⟩ := h
-  refine ⟨h1, h2, h3, h4, ?_, ?_, h7⟩
-  · intro j hj
-    by_cases hji : j = i
-    · omega
-    · exact h5 j (by simpa [reclaim, hji] using hj)
-  · intro p hp hp'
-    have hne := hfree p hp hp'
-    simpa [reclaim, hne] using h6 p hp hp'
-
-theorem publish_Ok (q : VQ) (h : q.Ok) (i : Nat) (c : Chain) (hi : i < NUM)
-    (hroom : q.np < q.nc + NUM) : (q.publish i c).Ok := by
-  obtain ⟨h1, h2, h3, h4, h5, h6, h7⟩ := h
-  refine ⟨h1, h2, by simp [publish]; omega, by simp [publish]; omega, ?_, ?_, ?_⟩
-  · intro j hj
-    by_cases hji : j = i
-    · omega
-    · exact h5 j (by simpa [publish, hji] using hj)
-  · intro p hp hp'
-    by_cases hpn : p = q.np
-    · simp [publish, hpn, hi, HState.isActive]
-    · have hp'' : p < q.np := by simp [publish] at hp'; omega
-      obtain ⟨hr1, hr2⟩ := h6 p hp hp''
-      by_cases hri : q.ring p = i
-      · exact ⟨by simpa [publish, hpn, hri] using hi, by simp [publish, hpn, hri, HState.isActive]⟩
-      · exact ⟨by simpa [publish, hpn] using hr1, by simpa [publish, hpn, hri] using hr2⟩
-  · intro p hp hp'
-    by_cases hpn : p = q.np
-    · simp [publish, hpn]
-    · have hp'' : p < q.np := by simp [publish] at hp'; omega
-      simpa [publish, hpn] using h7 p hp hp''
-
-theorem complete_Ok (q : VQ) (h : q.Ok) (hlt : q.nc < q.lo) : q.complete.Ok := by
-  obtain ⟨h1, h2, h3, h4, h5, h6, h7⟩ := h
-  refine ⟨by simp [complete]; omega, by simp [complete]; omega, h3,
-    by simp [complete]; omega, h5, ?_, ?_⟩
-  · intro p hp hp'
-    exact h6 p (by simp [complete] at hp; omega) (by simpa [complete] using hp')
-  · intro p hp hp'
-    have hpn : p ≠ q.nc := by simp [complete] at hp; omega
-    simpa [complete, hpn] using h7 p (by simp [complete] at hp; omega) (by simpa [complete] using hp')
-
-theorem pop_Ok (q : VQ) (h : q.Ok) (hlt : q.lo < q.np) : q.pop.Ok := by
-  obtain ⟨h1, h2, h3, h4, h5, h6, h7⟩ := h
-  exact ⟨h1, by simp [pop]; omega, by simp [pop]; omega, h4, h5, h6, h7⟩
 
 end VQ
 
@@ -362,10 +277,6 @@ armed descriptor, and distinct positions name distinct descriptors. -/
 def queueOk (st : Nat → HState) (ring : Nat → Nat) (lo np : Nat) : Prop :=
   (∀ p, lo ≤ p → p < np → ring (p % NUM) < NUM ∧ (st (ring (p % NUM))).isActive = true) ∧
   (∀ p q, lo ≤ p → p < np → lo ≤ q → q < np → ring (p % NUM) = ring (q % NUM) → p = q)
-
-theorem queueOk_window (st : Nat → HState) (ring : Nat → Nat) (lo np : Nat)
-    (h : queueOk st ring lo np) : np ≤ lo + NUM :=
-  window_le_of_inj lo np (fun p => ring (p % NUM)) (fun p h1 h2 => (h.1 p h1 h2).1) h.2
 
 /-- The armed head of the position the device is about to pop. -/
 theorem queueOk_head (st : Nat → HState) (ring : Nat → Nat) (lo np : Nat)
@@ -648,13 +559,6 @@ theorem phase_complete_other' (v : VirtioState) (h k : BitVec 16) (hk : k ≠ h)
   unfold Virtio.phase Virtio.complete
   rw [Alist.get_del_ne _ _ _ hk]
 
-theorem noInflight_complete (v : VirtioState) (h : BitVec 16) (hn : noInflight v) :
-    noInflight (Virtio.complete v h) := by
-  intro k
-  by_cases hk : k = h
-  · rw [hk]; exact phase_complete_self' v h
-  · rw [phase_complete_other' v h k hk]; exact hn k
-
 /-! ## The image the driver sees -/
 
 theorem SPB_eq : SPB = 2 := rfl
@@ -835,27 +739,5 @@ theorem uncached_of_not_inFlight (v : VirtioState) (st : Nat → HState) (k : Na
     by_cases hb : bs = []
     · rw [hb]
     · exact absurd (hc (k, bs) (Alist.get_mem _ _ _ hg) hb) hk
-
-/-- Caching an EMPTY sector whose block is not in flight moves nothing:
-such a sector held no data to begin with. -/
-theorem blockView_set_nil (v : VirtioState) (st : Nat → HState) (k bno : Nat)
-    (hcd : cachedOk v st) (hnf : ¬ inFlightBlk st (k / SPB)) :
-    blockView { v with cache := Virtio.alistSet v.cache k [] } bno = blockView v bno := by
-  unfold blockView Virtio.diskRead
-  apply List.map_congr_left
-  intro j hj
-  by_cases hs : (BSIZE * bno + j) / Virtio.sectorSize = k
-  · have h1 : Virtio.cacheView { v with cache := Virtio.alistSet v.cache k [] }
-        (BSIZE * bno + j) = v.disk (BSIZE * bno + j) := by
-      rw [cacheView_some _ _ [] (by
-        show Virtio.alistGet (Virtio.alistSet v.cache k []) _ = _
-        rw [hs]; exact Alist.get_set_eq _ _ _)]
-      rfl
-    have h2 : Virtio.cacheView v (BSIZE * bno + j) = v.disk (BSIZE * bno + j) := by
-      apply cacheView_of_uncached
-      rw [hs]
-      exact uncached_of_not_inFlight v st k hcd hnf
-    rw [h1, h2]
-  · exact cacheView_set_ne v k [] _ hs
 
 end Xv6

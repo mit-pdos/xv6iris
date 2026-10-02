@@ -351,12 +351,6 @@ theorem pd_printk (PK : PRINTK) [CurCtx]
 
 /-! ## The varargs of the two calls -/
 
-/-- No varargs: `printk("\n")`. -/
-theorem pd_descs0 [CurCtx] (R : RegMap) : emp ⊢ pkDescs (GF := GF) R [] := by
-  unfold pkDescs
-  simp only [Iris.Algebra.BigOpL.bigOpL_nil]
-  iintro H; iexact H
-
 /-- The three of `printk("%d %s %s", p->pid, state, p->name)`. -/
 theorem pd_descs3 [CurCtx] (R : RegMap) (dq1 dq2 : DFrac) (s1 s2 : List (BitVec 8))
     (h1 : R 12#5 ≠ 0#64) (h2 : R 13#5 ≠ 0#64) :
@@ -502,11 +496,6 @@ theorem pd_name_fold [CurCtx] (pa : BitVec 64) (dq : DFrac) (bs : List (BitVec 8
 theorem pd_name_unfold [CurCtx] (pa : BitVec 64) (dq : DFrac) (bs : List (BitVec 8)) :
     cstr (GF := GF) (pName pa) dq bs ⊢ cstr (pa + 352#64) dq bs := by
   unfold pName; iintro H; iexact H
-
-theorem pdKept_of_calleeSaved {R R' : RegMap} (h : calleeSaved R R') : pdKept R R' :=
-  ⟨h.1, h.2.1, h.2.2.2.1, h.2.2.2.2.1, h.2.2.2.2.2.1, h.2.2.2.2.2.2.1, h.2.2.2.2.2.2.2.1,
-    h.2.2.2.2.2.2.2.2.1, h.2.2.2.2.2.2.2.2.2.1, h.2.2.2.2.2.2.2.2.2.2.1,
-    h.2.2.2.2.2.2.2.2.2.2.2.1, h.2.2.2.2.2.2.2.2.2.2.2.2⟩
 
 theorem procdump_br_ffffffffffffe114 : KA.«procdump» + 0xffffffffffffe114#64 = KA.«printk» := by decide
 

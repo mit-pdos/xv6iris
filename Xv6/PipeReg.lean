@@ -86,19 +86,6 @@ theorem pipeReg_not_free (γ : GName) :
   ihave %he := pipeQueue_agree γ (pstClose true pst0) pst0 $$ Ha Hf
   exact absurd he (by decide)
 
-/-- ...and the positive half: the fragment's holder buys ONE payment, at the
-cost of the fragment -- which is why a program cannot carry the registry by
-holding the fragment (Rocq `pipe_cpay_of_frag`). -/
-theorem pipeCpay_of_frag (γ : GName) (w : Bool) (s : PipeSt) :
-    pipeQfrag (GF := GF) γ s ⊢ pipeCpay (hlc := hlc) γ w iprop(emp) := by
-  unfold pipeCpay
-  iintro Hf
-  ileft
-  iapply pipeClink_of_frag γ w iprop(emp) s $$ Hf
-  iintro -
-  imodintro
-  iempintro
-
 /-! ## 3.  THE TWO INTROS -/
 
 /-- THE TAINT STILL BUYS IT (Rocq `pipe_reg_of_taint`). -/
@@ -109,16 +96,6 @@ theorem pipeReg_of_taint (γp : PipeNames) :
   imodintro
   iintro %w
   iapply pipeCpay_taint $$ Ht
-
-/-- Rocq `pipe_row_reg_of_taint`. -/
-theorem pipeRowReg_of_taint (st : FdState) :
-    MachFixedGS.killCred (hlc := hlc) (GF := GF) ⊢ pipeRowReg (hlc := hlc) st := by
-  unfold pipeRowReg
-  rcases st with _ | ⟨_, _, γp | _ | _⟩
-  · iintro -; iempintro
-  · exact pipeReg_of_taint γp
-  · iintro -; iempintro
-  · iintro -; iempintro
 
 /-- ...AND A ROW THAT IS NOT A PIPE REGISTERS ITSELF (Rocq
 `pipe_row_reg_nopipe`): a program that never calls pipe(2) pays nothing. -/

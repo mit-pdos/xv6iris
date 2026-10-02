@@ -68,20 +68,4 @@ theorem pipePair_eof (w : WrOut) (D : List (BitVec 8)) (h : pipePair w (RdEof D)
   | WrHalt _ => exact h.elim
   | WrNone => exact Or.inr ⟨rfl, h⟩
 
-/-- Rocq `pipe_pair_gone`. -/
-theorem pipePair_gone (w : WrOut) : pipePair w RdGone := by
-  cases w <;> trivial
-
-/-- Rocq `pipe_pair_halt`. -/
-theorem pipePair_halt (D : List (BitVec 8)) (r : RdOut) (h : pipePair (WrHalt D) r) :
-    r = RdGone := by
-  cases r with
-  | RdEof _ => exact h.elim
-  | RdGone => rfl
-
-/-- Rocq `pipe_pair_all_line`: echo wrote the whole line and cat saw it, so
-what cat saw IS the line. -/
-theorem pipePair_all_line (L D : List (BitVec 8)) (h : pipePair (WrAll L) (RdEof D)) :
-    D = L := h
-
 end Xv6

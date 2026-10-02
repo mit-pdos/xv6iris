@@ -264,16 +264,6 @@ theorem udepw_of_sup_exit (PSx : UprogSG GF) (N : UkNames GF) (m : RegMap) (pc :
       udepw (hlc := hlc) (SG := uexecSGXv6) (PS := PSx) N m pc USYS_exit :=
   udepw_of_row PSx N m pc USYS_exit _ (fun W => xv6Sbundle_exit_taint _ _ W)
 
-/-- **Rocq `udepw_law_of_sup_exit`**. -/
-theorem udepwLaw_of_sup_exit (PSx : UprogSG GF) :
-    □ uKillCred (hlc := hlc) (GF := GF) ⊢
-      udepwLaw (hlc := hlc) (SG := uexecSGXv6) (PS := PSx) USYS_exit := by
-  unfold udepwLaw
-  iintro #H
-  imodintro
-  iintro %N %m %pc
-  iapply udepw_of_sup_exit PSx N m pc $$ H
-
 end UexecExecMintW
 
 end Xv6

@@ -292,12 +292,6 @@ theorem plicSlot_congr (γ0 γ1 : UartNames) (p p' : PlicState) (i : Nat)
 def plicSlots (γ0 γ1 : UartNames) (p : PlicState) : IProp GF := iprop(
   plicSlot γ0 γ1 p 10 ∗ plicSlot γ0 γ1 p 12)
 
-/-- ...which is the design's big-op over `plicTracked`. -/
-theorem plicSlots_bigop (γ0 γ1 : UartNames) (p : PlicState) :
-    ([∗list] i ∈ plicTracked, plicSlot (GF := GF) γ0 γ1 p i) ⊣⊢ plicSlots γ0 γ1 p := by
-  unfold plicSlots plicTracked
-  exact BigSepL.bigSepL_cons.trans (BI.sep_congr .rfl BigSepL.bigSepL_singleton)
-
 /-- **The ghost state beside the mirror**: the chip invariant of
 `Xv6.PlicPlan`, and the two slots. -/
 def plicGhosts (γ0 γ1 : UartNames) (p : PlicState) : IProp GF := iprop(

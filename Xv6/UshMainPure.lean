@@ -174,10 +174,6 @@ theorem ushLcl_rows (l : List FdState) (h : ushLcl l 3) : ushFd0c l ∧ ushFd1p 
 /-- **Rocq `ush_line_echo`**: the echo era admits `LEcho` lines alone. -/
 def ushLineEcho (l : Uline) : Prop := ∃ ws, l = .LEcho ws
 
-/-- **Rocq `ush_line_at_echo`** (by conversion). -/
-theorem ushLineAt_echo (ws : List (List (BitVec 8))) (f : Nat → BitVec 8) (k len : Nat) :
-    ushLineAt (.LEcho ws) f k len ↔ ushLineIs ws f k len := Iff.rfl
-
 /-! ## §4 runcmd's jump table (deviation 3) -/
 
 /-- **Rocq `SH_JTAB`**: the jump table at 0x1398 (.rodata). -/

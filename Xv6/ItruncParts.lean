@@ -110,24 +110,6 @@ def itPins4 (k : KCtx) (R : RegMap) : Prop :=
   R 21#5 = k.regs 21#5 ∧ R 22#5 = k.regs 22#5 ∧ R 23#5 = k.regs 23#5 ∧
   R 24#5 = k.regs 24#5 ∧ R 25#5 = k.regs 25#5 ∧ R 26#5 = k.regs 26#5 ∧ R 27#5 = k.regs 27#5
 
-theorem itPins_cs (k : KCtx) (R R' : RegMap) (h : itPins k R) (hcs : calleeSaved R R') :
-    itPins k R' := by
-  obtain ⟨a2, a20, a21, a22, a23, a24, a25, a26, a27⟩ := h
-  obtain ⟨c2, -, -, -, -, c20, c21, c22, c23, c24, c25, c26, c27⟩ := hcs
-  exact ⟨c2.trans a2, c20.trans a20, c21.trans a21, c22.trans a22, c23.trans a23,
-    c24.trans a24, c25.trans a25, c26.trans a26, c27.trans a27⟩
-
-theorem itPins4_cs (k : KCtx) (R R' : RegMap) (h : itPins4 k R) (hcs : calleeSaved R R') :
-    itPins4 k R' := by
-  obtain ⟨a2, a21, a22, a23, a24, a25, a26, a27⟩ := h
-  obtain ⟨c2, -, -, -, -, -, c21, c22, c23, c24, c25, c26, c27⟩ := hcs
-  exact ⟨c2.trans a2, c21.trans a21, c22.trans a22, c23.trans a23,
-    c24.trans a24, c25.trans a25, c26.trans a26, c27.trans a27⟩
-
-theorem itPins_4 (k : KCtx) (R : RegMap) (h : itPins k R) : itPins4 k R := by
-  obtain ⟨a2, -, a21, a22, a23, a24, a25, a26, a27⟩ := h
-  exact ⟨a2, a21, a22, a23, a24, a25, a26, a27⟩
-
 /-- `itPins` survives a write to any register it does not name. -/
 theorem itPins_set (k : KCtx) (R : RegMap) (r : BitVec 5) (v : BitVec 64)
     (hr : r ≠ 2#5 ∧ r ≠ 20#5 ∧ r ≠ 21#5 ∧ r ≠ 22#5 ∧ r ≠ 23#5 ∧ r ≠ 24#5 ∧ r ≠ 25#5 ∧

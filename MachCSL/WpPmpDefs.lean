@@ -24,10 +24,6 @@ a `BitVec 1` pattern leaves one behind). -/
 @[sail_facts] theorem eq_rec_const.{u, v} {α : Sort u} {a a' : α} {β : Sort v} (y : β) (h : a = a') :
     (@Eq.rec α a (fun _ _ => β) y a' h) = y := by subst h; rfl
 
-/-- The boot PMP tables at an integer index (the model indexes them with `Int`). -/
-@[sail_facts] theorem bootPmpcfg_getInt (i : Int) : bootPmpcfg[i]! = 0#8 := by
-  show (bootPmpcfg[i.toNat]! : BitVec 8) = 0#8
-  exact bootPmpcfg_get _
 @[sail_facts] theorem bootPmpaddr_getInt (i : Int) : bootPmpaddr[i]! = 0#64 := by
   show (bootPmpaddr[i.toNat]! : BitVec 64) = 0#64
   exact bootPmpaddr_get _

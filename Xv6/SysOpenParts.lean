@@ -187,14 +187,6 @@ def sysOpenPath (sp0 : BitVec 64) : BitVec 64 := sp0 + 0xFFFFFFFFFFFFFF50#64
 /-- `int omode`: `s0 - 180`, the UPPER word of slot 23 (Rocq `so_omode`). -/
 def sysOpenOmode (sp0 : BitVec 64) : BitVec 64 := sp0 + 0xFFFFFFFFFFFFFF4C#64
 
-theorem sys_open_path_addr (x : BitVec 64) :
-    x + BitVec.signExtend 64 3920#12 = sysOpenPath x := by
-  unfold sysOpenPath; bv_decide
-
-theorem sys_open_omode_addr (x : BitVec 64) :
-    x + BitVec.signExtend 64 3916#12 = sysOpenOmode x := by
-  unfold sysOpenOmode; bv_decide
-
 theorem sysOpenSlots_24 (a : Nat) (h : sysOpenSlots ≤ a) : 24 ≤ a := by
   rw [sysOpenSlots_eq] at h; omega
 
@@ -234,10 +226,6 @@ theorem sys_open_bltz_fd (fd : Nat) (h : fd < NOFILE) :
 ALL are `beq`/`bne` against a sign-extended `lh` of `ip->type` and a `li`
 literal: T_DIR = 1 (+0xf2), T_FILE = 2 (+0xb4), T_DEVICE = 3 (+0x50, +0x7a)
 (Rocq `so_sext16_inj` / `so_sext_lit` / `so_ty_eq` / `so_ty_ne`). -/
-
-/-- `lh` of the type, against `li a5,1` (T_DIR). -/
-theorem sys_open_ty_dir (t : BitVec 16) : BitVec.signExtend 64 t = 1#64 ↔ t = 1#16 := by
-  bv_decide
 
 /-- ...against `li a5,2` (T_FILE). -/
 theorem sys_open_ty_file (t : BitVec 16) : BitVec.signExtend 64 t = 2#64 ↔ t = 2#16 := by
@@ -479,27 +467,6 @@ theorem sys_open_trunc_rec_local (dn : Dinode) (hrl : inodeRecLocal dn) :
 section Trunc
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IcacheG GF]
   [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF]
-
-/-- the open direction, one unfolding (Rocq `so_loaded_open`): `icLoaded`'s
-`inodeAddrs ∗ indRes` is itrunc's `inodeMap`. -/
-theorem sys_open_loaded_open [Icfg] [CurCtx] (γfs : FsNames) (γi : GName)
-    (cov : Std.ExtTreeSet Nat compare) (logstart k : Nat) (inum : BitVec 32) (dn : Dinode)
-    (bm : Blkmap) :
-    icLoaded (GF := GF) γfs γi cov logstart k inum dn bm ⊢
-      ∃ data : Nat → List (BitVec 8),
-        ⌜inodeOk cov logstart dn bm data⌝ ∗ ⌜inodeRecLocal dn⌝ ∗ ⌜dirOk icfgNib dn data⌝ ∗
-        dlinks γfs inum.toNat dn bm data ∗ dinodeAt γi inum dn ∗ inodeMeta (ientry k) dn ∗
-        inodeMap γfs (ientry k) bm ∗ inodeBlocks γfs bm data ∗
-        topFrag (fsGammaL γfs) inum.toNat (eraNode dn bm data) := by
-  iintro H
-  ihave H := icLoaded_open γfs γi cov logstart k inum dn bm $$ H
-  unfold icLoadedFlatBody
-  icases H with
-    ⟨%data, %hok, %hrl, %hdir, -, -, -, Hl, Hd, Hm, Ha, Hr, Hb, Ht⟩
-  iexists data
-  unfold inodeMap
-  iframe Hl Hd Hm Ha Hr Hb Ht
-  ipureintro; exact ⟨hok, hrl, hdir⟩
 
 /-- ...and the close direction at itrunc's outputs (Rocq
 `so_trunc_loaded`). -/

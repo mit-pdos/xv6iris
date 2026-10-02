@@ -763,35 +763,6 @@ theorem lw_res_intro_f (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
   lw_res_intro γ γb γfs cov ls ξ out false nc om E X T nxo nxt nxl hlen
     ⟨hbud, hout3, by simp⟩ hfresho hE hfreshl hlive hcap hfresht hTlen
 
-/-- The `committing = 1` re-close (the batch is checked out by the
-committer, so there is nothing to give back but the cells). -/
-theorem lw_res_intro_t (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
-    (cov : Std.ExtTreeSet Nat compare) (ls : Nat) (ξ : CtxId)
-    (out : Nat) (nc : BitVec 32) (om : RegMapF OpEntry) (E : Nat)
-    (X : RegMapF (Nat × Nat)) (T : RegMapF Unit) (nxo nxt nxl : Nat)
-    (hlen : (FiniteMap.toList om).length = out)
-    (hbud : ∀ i e, PartialMap.get? om i = some e → e.bud ≤ MAXOPBLOCKS)
-    (hout3 : out ≤ 3) (hout0 : out = 0)
-    (hfresho : ∀ i, nxo ≤ i → PartialMap.get? om i = none)
-    (hE : 1 ≤ E)
-    (hfreshl : ∀ i, nxl ≤ i → PartialMap.get? X i = none)
-    (hlive : ∀ i e, PartialMap.get? om i = some e → e.ep = E)
-    (hcap : ∀ i p, PartialMap.get? X i = some p → p.1 ≤ E)
-    (hfresht : ∀ i, nxt ≤ i → PartialMap.get? T i = none)
-    (hTlen : (FiniteMap.toList T).length = (FiniteMap.toList om).length) :
-    wordAtN ξ lOut 4 (DFrac.own 1) (BitVec.ofNat 32 out) ∗
-    wordAtN ξ lCmt 4 (DFrac.own 1) (1#32 : BitVec 32) ∗
-    wordAtN ξ lNcommit 4 (DFrac.own 1) nc ∗
-    (γ.ops ↪●MAP om) ∗ logEpochAuth γ E ∗ logRegAuth γ X ∗ logTxAuth γ T ∗
-    logHelp (hlc := hlc) γ nc out true
-    ⊢ logResAt (GF := GF) γ γb γfs cov ls ξ := by
-  iintro ⟨Hout, Hcmt, Hnc, Hops, Hep, Hreg, Htx, Hhelp⟩
-  iapply (lw_res_intro γ γb γfs cov ls ξ out true nc om E X T nxo nxt nxl hlen
-    ⟨hbud, hout3, fun _ => hout0⟩ hfresho hE hfreshl hlive hcap hfresht hTlen)
-  isimp only [if_true]
-  iframe Hout Hcmt Hnc Hops Hep Hreg Htx Hhelp
-
-
 /-- The header's block cells, one borrowed and put back. -/
 theorem lw_blk_restore (W : List (BitVec 32)) (i : Nat) (hi : i < W.length) :
     ([∗list] j ↦ w ∈ W.set i (W[i]'hi), wordPointsTo (GF := GF) (lhBlock j) 4 (DFrac.own 1) w) ⊢

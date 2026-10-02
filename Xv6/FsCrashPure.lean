@@ -143,21 +143,6 @@ theorem hdrWf_sector0 (P P' : Nat → List (BitVec 8)) (cov : ExtTreeSet Nat com
     (hwf : hdrWf P cov logstart) : hdrWf P' cov logstart :=
   hdrWf_hdrDec P P' cov logstart (hdrDec_sector0_eq _ _ hwf.1 heq) hwf
 
-/-- A whole-block write anywhere else preserves it (Rocq `hdr_wf_wr_out`). -/
-theorem hdrWf_wr_out (cov : ExtTreeSet Nat compare) (logstart b : Nat) (bs : List (BitVec 8))
-    (dk : Nat → BitVec 8) (hlen : bs.length = BSIZE) (hb : b ≠ logHdrBno logstart) :
-    hdrWf (fsBlocks dk) cov logstart →
-      hdrWf (fsBlocks (Virtio.diskWrite dk (b * BSIZE) bs)) cov logstart :=
-  hdrWf_ext _ _ cov logstart (fsBlocks_write_ne dk b _ bs hlen (Ne.symm hb))
-
-/-- ...and the SECTOR form (Rocq `hdr_wf_sub_out`). -/
-theorem hdrWf_sub_out (cov : ExtTreeSet Nat compare) (logstart b o : Nat)
-    (sbs : List (BitVec 8)) (dk : Nat → BitVec 8) (hfit : o + sbs.length ≤ BSIZE)
-    (hb : b ≠ logHdrBno logstart) :
-    hdrWf (fsBlocks dk) cov logstart →
-      hdrWf (fsBlocks (Virtio.diskWrite dk (b * BSIZE + o) sbs)) cov logstart :=
-  hdrWf_ext _ _ cov logstart (fsBlocks_sub_ne dk b _ o sbs hfit (Ne.symm hb))
-
 /-! ## §1c The recovery relation -/
 
 theorem fsInstallStep_some (P : Nat → List (BitVec 8)) (logstart : Nat) (W : List Nat)
@@ -228,21 +213,6 @@ theorem logMirrorOk_hdr (M : LogMirror) (P : Nat → List (BitVec 8))
     lmHdr M ls = hdrDec (P (logHdrBno ls)) := by
   unfold lmHdr; rw [hok _ (logHdr_in_ext cov ls)]
 
-/-- One block write moves the picture and the disk in step (Rocq
-`log_mirror_ok_upd`). -/
-theorem logMirrorOk_upd (M : LogMirror) (dk : Nat → BitVec 8) (cov : ExtTreeSet Nat compare)
-    (ls blk : Nat) (bs : List (BitVec 8)) (hlen : bs.length = BSIZE)
-    (hok : logMirrorOk M (fsBlocks dk) cov ls) :
-    logMirrorOk (lmUpd M blk bs) (fsBlocks (Virtio.diskWrite dk (blk * BSIZE) bs)) cov ls := by
-  intro b hb
-  by_cases h : b = blk
-  · subst h; rw [lmUpd_view_eq, fsBlocks_write_eq _ _ _ hlen]
-  · rw [lmUpd_view_ne _ _ _ _ h, fsBlocks_write_ne _ _ _ _ hlen h]; exact hok b hb
-
-theorem logRegion_not_home (cov : ExtTreeSet Nat compare) (ls b : Nat)
-    (hb : logRegion ls b = true) : ¬ fsHome cov ls b := by
-  intro h; rw [h.2] at hb; exact Bool.false_ne_true hb
-
 /-- The two disequalities a HOME-block write needs (Rocq `home_ne_slot`). -/
 theorem home_ne_slot (ls b j : Nat) (hb : logRegion ls b = false) (hj : j < LOGBLOCKS) :
     b ≠ logSlotBno ls j := by
@@ -253,9 +223,6 @@ theorem home_ne_hdr (ls b : Nat) (hb : logRegion ls b = false) : b ≠ logHdrBno
 
 theorem homeSet_ne_hdr (cov : ExtTreeSet Nat compare) (ls b : Nat) (h : fsHome cov ls b) :
     b ≠ logHdrBno ls := home_ne_hdr ls b h.2
-
-theorem homeSet_not_region (cov : ExtTreeSet Nat compare) (ls b : Nat) (h : fsHome cov ls b) :
-    logRegion ls b = false := h.2
 
 /-- A write OUTSIDE the restricted set does not move the restriction (Rocq
 `fs_restrict_upd_out`). -/
@@ -394,9 +361,6 @@ def fsRecView (P : Nat → List (BitVec 8)) (D : BlockMap) (b : Nat) : List (Bit
 install, which is `FsBlocks`' exception set (Rocq `hdr_wset`). -/
 def hdrWset (P : Nat → List (BitVec 8)) (ls : Nat) : List Nat :=
   (hdrDec (P (logHdrBno ls))).2
-
-theorem mem_hdrWset (P : Nat → List (BitVec 8)) (ls b : Nat) :
-    b ∈ hdrWset P ls ↔ b ∈ (hdrDec (P (logHdrBno ls))).2 := Iff.rfl
 
 /-- The write set is a set of home blocks (Rocq `hdr_wset_home`). -/
 theorem hdrWset_home (P : Nat → List (BitVec 8)) (cov : ExtTreeSet Nat compare) (ls : Nat)
@@ -656,18 +620,6 @@ theorem lmHdr_sector0 (M M' : LogMirror) (ls : Nat) (hn : (lmHdr M ls).1 ≤ LOG
       (M.view (logHdrBno ls)).take Virtio.sectorSize) :
     lmHdr M' ls = lmHdr M ls :=
   hdrDec_sector0_eq _ _ hn heq
-
-/-- THE COMMIT IS ATOMIC, at the mirror (Rocq `lm_hdr_upd_sector1`). -/
-theorem lmHdr_upd_sector1 (M : LogMirror) (dk : Nat → BitVec 8)
-    (cov : ExtTreeSet Nat compare) (ls : Nat) (bs : List (BitVec 8))
-    (hn : (lmHdr M ls).1 ≤ LOGBLOCKS) (hlen : bs.length = Virtio.sectorSize)
-    (hok : logMirrorOk M (fsBlocks dk) cov ls) :
-    lmHdr (lmUpd M (logHdrBno ls)
-        (fsBlocks (Virtio.diskWrite dk (logHdrBno ls * BSIZE + Virtio.sectorSize) bs)
-          (logHdrBno ls))) ls = lmHdr M ls := by
-  apply lmHdr_sector0 M _ ls hn
-  rw [lmUpd_view_eq, fsBlocks_sector1 dk (logHdrBno ls) bs hlen,
-    hok (logHdrBno ls) (logHdr_in_ext cov ls)]
 
 /-- Rocq `lm_hdr_upd_ne`. -/
 theorem lmHdr_upd_ne (M : LogMirror) (ls blk : Nat) (bs : List (BitVec 8))

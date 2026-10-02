@@ -369,7 +369,6 @@ def reqSpan (r : VioReq) : Nat := sectorCount r.len.toNat
 def reqKey (r : VioReq) (i : Nat) : Nat := r.sector.toNat + i
 /-- The bytes of the request's sector `i`: a full sector, or the tail. -/
 def reqSectorLen (r : VioReq) (i : Nat) : Nat := min sectorSize (r.len.toNat - sectorSize * i)
-def reqSectorAddr (r : VioReq) (i : Nat) : PAddr := r.buf + BitVec.ofNat 64 (sectorSize * i)
 
 /-- Is one of the request's sectors still in the cache? -/
 def reqCached (v : VirtioState) (r : VioReq) : Bool :=

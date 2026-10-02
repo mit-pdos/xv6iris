@@ -318,10 +318,6 @@ theorem treePay_unfold_mp (N : UkNames GF) (P : Uprog GF) (t : Proc) :
     treePay (hlc := hlc) N P t ⊢ treeF (hlc := hlc) N P (treePay (hlc := hlc) N P) t :=
   greatest_fixpoint_unfold_mp _
 
-theorem treePay_unfold_mpr (N : UkNames GF) (P : Uprog GF) (t : Proc) :
-    treeF (hlc := hlc) N P (treePay (hlc := hlc) N P) t ⊢ treePay (hlc := hlc) N P t :=
-  greatest_fixpoint_unfold_mpr _
-
 /-- **Rocq `tree_pay_tau`**. -/
 theorem treePay_tau (N : UkNames GF) (P : Uprog GF) (t : Proc) :
     treePay (hlc := hlc) N P (.tau t) = treePay (hlc := hlc) N P t := by

@@ -370,14 +370,4 @@ theorem fsLogClean_spec (P : Nat → List (BitVec 8)) (sb : FsSb) :
     fsLogClean P sb = true ↔ hdrN (P sb.sbLogstart) = 0 := by
   unfold fsLogClean; exact beq_iff_eq
 
-/-- ...and the same fact at the BYTES, which is what "the header says
-zero" means on a disk (Rocq's `fs_log_clean_bytes`). -/
-theorem fsLogClean_bytes (P : Nat → List (BitVec 8)) (sb : FsSb) (j : Nat)
-    (v : BitVec 8) (hc : fsLogClean P sb = true) (hj : j < 4)
-    (hv : (P sb.sbLogstart)[j]? = some v) : v = 0#8 := by
-  rw [fsLogClean_spec] at hc
-  refine leAssemble_zero_byte ((P sb.sbLogstart).take 4) j v hc ?_
-  rw [List.getElem?_take, if_pos hj]
-  exact hv
-
 end Xv6

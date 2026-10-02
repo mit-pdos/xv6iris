@@ -180,8 +180,6 @@ ONCE, here, in an empty context (Rocq's `logN_top`: a `set_solver` inside a
 syscall-altitude proof walks the whole context). -/
 theorem logN_top : (↑logN : CoPset) ⊆ ⊤ := CoPset.subseteq_top
 
-theorem fsbN_top : (↑fsbN : CoPset) ⊆ ⊤ := CoPset.subseteq_top
-
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF] [FsBytesG GF]
 
@@ -235,14 +233,6 @@ instance fsblockQ_timeless (gL : GName) (dq : DFrac) (b : Nat) (bs : List (BitVe
 
 instance fsblock_timeless (gL : GName) (b : Nat) (bs : List (BitVec 8)) :
     Timeless (fsblock (GF := GF) gL b bs) := by unfold fsblock; infer_instance
-
-theorem fsblock_length (gL : GName) (b : Nat) (bs : List (BitVec 8)) :
-    fsblock (GF := GF) gL b bs ⊢ ⌜bs.length = BSIZE⌝ := by
-  unfold fsblock; iintro ⟨%h, -⟩; ipureintro; exact h
-
-theorem fsblockQ_length (gL : GName) (dq : DFrac) (b : Nat) (bs : List (BitVec 8)) :
-    fsblockQ (GF := GF) gL dq b bs ⊢ ⌜bs.length = BSIZE⌝ := by
-  unfold fsblockQ; iintro ⟨%h, -⟩; ipureintro; exact h
 
 /-- One byte out of a run (the tool every exclusivity reading below uses). -/
 theorem byteRangeQ_elem (gL : GName) (dq : DFrac) (b off : Nat) (bs : List (BitVec 8))
@@ -335,13 +325,6 @@ theorem fsblock_ne_full (gL : GName) (dq : DFrac) (b1 b2 : Nat)
   rw [fsblock_1]
   exact fsblockQ_ne gL _ dq b1 b2 bs1 bs2 (blkDfrac_full_nvalid _)
 
-/-- ...and two three-quarter owners cannot alias, which is why a reader's
-share is a QUARTER. -/
-theorem fsblock_ne_34 (gL : GName) (b1 b2 : Nat) (bs1 bs2 : List (BitVec 8)) :
-    fsblockQ (GF := GF) gL (DFrac.own Qp.threeQuarters) b1 bs1 ⊢
-      fsblockQ gL (DFrac.own Qp.threeQuarters) b2 bs2 -∗ ⌜b1 ≠ b2⌝ :=
-  fsblockQ_ne gL _ _ b1 b2 bs1 bs2 blkDfrac_34_nvalid
-
 /-- THE FORM A SUB-BLOCK WRITER'S REFUTATION NEEDS (Rocq's
 `fsblock_byte_range_ne`): `log_write`'s byte-range atomic update surrenders
 a RUN INSIDE a block, not the whole block, so a whole-block owner has to be
@@ -404,14 +387,6 @@ theorem fsblockQ_split (gL : GName) (q1 q2 : Qp) (b : Nat) (bs : List (BitVec 8)
     isplitl []
     · ipureintro; exact hl
     iframe H1 H2
-
-theorem fsblock_split34 (gL : GName) (b : Nat) (bs : List (BitVec 8)) :
-    fsblock (GF := GF) gL b bs ⊣⊢
-      fsblockQ gL (DFrac.own Qp.threeQuarters) b bs ∗
-      fsblockQ gL (DFrac.own Qp.quarter) b bs := by
-  rw [fsblock_1, show ((1 : Qp)) = Qp.threeQuarters + Qp.quarter from by
-    rw [← Qp.quarter_add_threeQuarters]; exact Subtype.ext (Rat.add_comm ..)]
-  exact fsblockQ_split gL _ _ b bs
 
 end
 

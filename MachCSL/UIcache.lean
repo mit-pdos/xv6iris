@@ -89,14 +89,6 @@ theorem ctxBytesX_forget (ξ : CtxId) (K : Nat) (pa : PAddr) (n : Nat) (dq : DFr
   intro _ j _
   exact ctxByteX_forget ξ K _ dq _
 
-theorem ctxBytesX_mono (ξ : CtxId) (K K' : Nat) (pa : PAddr) (n : Nat) (dq : DFrac)
-    (w : BitVec (8 * n)) (h : K ≤ K') :
-    ctxBytesX ξ K pa n dq w ⊢@{IProp GF} ctxBytesX ξ K' pa n dq w := by
-  unfold ctxBytesX
-  apply BigSepL.bigSepL_mono
-  intro _ j _
-  exact ctxByteX_mono ξ K K' _ dq _ h
-
 /-! ## A5: the fetch gate -/
 
 /-- **Rocq `ctx_phys_xfetch_ok`**: a stamped byte is read, by every agent, at

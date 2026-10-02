@@ -140,10 +140,6 @@ Rocq's accessors in the forms the Lean contracts state the premises. -/
 theorem FsGeomOk.size [Fscfg] [Icfg] (h : FsGeomOk) : 0 < fscSize ∧ fscSize ≤ BPB :=
   ⟨h.fgoBitmap.1, h.fgoBitmap.2.1⟩
 
-/-- Rocq `fgo_bm_cov`. -/
-theorem FsGeomOk.bmCov [Fscfg] [Icfg] (h : FsGeomOk) : fscBmapstart ∈ fscCov :=
-  h.fgoBitmap.2.2.1
-
 /-- Rocq `fgo_bm_out`. -/
 theorem FsGeomOk.bmOut [Fscfg] [Icfg] (h : FsGeomOk) : logRegion fscLogst fscBmapstart = false :=
   h.fgoBitmap.2.2.2
@@ -374,13 +370,6 @@ theorem fsReady_geom [Fscfg] [Icfg] [CurCtx] :
   unfold fsReady
   iintro ⟨-, -, -, -, -, -, -, -, -, -, %h, -⟩
   ipureintro; exact h
-
-/-- Rocq `fs_ready_sb`. -/
-theorem fsReady_sb [Fscfg] [Icfg] [CurCtx] :
-    fsReady (hlc := hlc) (GF := GF) ⊢ fsSbCells := by
-  unfold fsReady
-  iintro ⟨-, -, -, -, -, -, -, -, -, -, -, H, -⟩
-  iexact H
 
 /-- Rocq `fs_ready_sb_four`: the four cells spelled one by one, the form
 every fs contract states them in, at `dq := DFrac.discard`. -/

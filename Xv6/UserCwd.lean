@@ -74,13 +74,6 @@ def ucwdAny (γc : GName) : IProp GF := iprop(∃ c : Nat, ucwd γc c)
 instance ucwdAny_timeless (γc : GName) : Timeless (ucwdAny (GF := GF) γc) := by
   unfold ucwdAny; infer_instance
 
-/-- Rocq `ucwd_any_of`. -/
-theorem ucwdAny_of (γc : GName) (c : Nat) : ucwd (GF := GF) γc c ⊢ ucwdAny γc := by
-  unfold ucwdAny
-  iintro H
-  iexists c
-  iexact H
-
 end UserCwd
 
 end Xv6

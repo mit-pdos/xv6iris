@@ -285,18 +285,6 @@ def ehPhnum (f : List (BitVec 8)) : Nat := leAt f 56 2
 /-- The constant kexec's `lui 0x464c4 ; addi 1407` builds (Rocq `ELF_MAGIC`). -/
 def ELF_MAGIC : Nat := 0x464C457F
 
-/-- Rocq `eh_magic_ok`. -/
-def ehMagicOk (f : List (BitVec 8)) : Prop := ehMagic f = ELF_MAGIC
-
-theorem ehMagic_bound (f : List (BitVec 8)) : ehMagic f < 2 ^ 32 :=
-  leAt_bound_lit f 0 4 _ rfl
-
-theorem ehEntry_bound (f : List (BitVec 8)) : ehEntry f < 2 ^ 64 :=
-  leAt_bound_lit f 24 8 _ rfl
-
-theorem ehPhoff_bound (f : List (BitVec 8)) : ehPhoff f < 2 ^ 32 :=
-  leAt_bound_lit f 32 4 _ rfl
-
 /-- The loop bound `i < elf.phnum` is a zero-extended halfword. -/
 theorem ehPhnum_bound (f : List (BitVec 8)) : ehPhnum f < 65536 :=
   leAt_bound_lit f 56 2 _ rfl
@@ -323,13 +311,6 @@ def phMemsz (f : List (BitVec 8)) : Nat := leAt f 40 8
 /-- The constant kexec's `li a4,1 ; bne` tests `ph.type` against (Rocq
 `ELF_PROG_LOAD`). -/
 def ELF_PROG_LOAD : Nat := 1
-
-theorem phType_bound (f : List (BitVec 8)) : phType f < 2 ^ 32 := leAt_bound_lit f 0 4 _ rfl
-theorem phFlags_bound (f : List (BitVec 8)) : phFlags f < 2 ^ 32 := leAt_bound_lit f 4 4 _ rfl
-theorem phOff_bound (f : List (BitVec 8)) : phOff f < 2 ^ 32 := leAt_bound_lit f 8 4 _ rfl
-theorem phVaddr_bound (f : List (BitVec 8)) : phVaddr f < 2 ^ 64 := leAt_bound_lit f 16 8 _ rfl
-theorem phFilesz_bound (f : List (BitVec 8)) : phFilesz f < 2 ^ 64 := leAt_bound_lit f 32 8 _ rfl
-theorem phMemsz_bound (f : List (BitVec 8)) : phMemsz f < 2 ^ 64 := leAt_bound_lit f 40 8 _ rfl
 
 /-! ## Where the i-th program header sits in the file -/
 

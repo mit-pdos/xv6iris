@@ -42,10 +42,6 @@ def UclExecOk (C : UCfg) (P : UPtd) (t0 : PTree) (mm0 : BMap) (s : UWSt) (m : Sa
   ∀ orc : UOrc, ∃ (res : ExecutionResult) (s' : UWSt) (orc' : UOrc),
     runRW ufFoot orc s m = some (res, s', orc') ∧ UstResOk C P t0 mm0 res s'
 
-theorem ustExecOk_iff (C : UCfg) (P : UPtd) (t0 : PTree) (mm0 : BMap) (s : UWSt) (i : instruction)
-    (len : Int) : UstExecOk C P t0 mm0 s i len ↔ UclExecOk C P t0 mm0 (ucNpcS s len) (uxaExecAs i) :=
-  Iff.rfl
-
 variable {C : UCfg} {P : UPtd} {t0 : PTree} {mm0 : BMap}
 
 /-- An admissible result is never a redirect. -/

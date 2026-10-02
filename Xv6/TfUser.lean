@@ -63,11 +63,6 @@ theorem tfUeq_set_r {tf tf' : List (BitVec 64)} (i : Nat) (v : BitVec 64) (hne :
   · rw [tfW_set_ne _ _ _ _ hne]; exact h.1
   · rw [tfW_set_ne _ _ _ _ (by omega)]; exact h.2 j h5 h35
 
-/-- Rocq `tf_ueq_insert_l`. -/
-theorem tfUeq_set_l {tf tf' : List (BitVec 64)} (i : Nat) (v : BitVec 64) (hne : i ≠ tfEpcIdx)
-    (hout : i < 5 ∨ 35 < i) (h : tfUeq tf tf') : tfUeq (tf.set i v) tf' :=
-  tfUeq_symm (tfUeq_set_r i v hne hout (tfUeq_symm h))
-
 /-! ## The projection congruences (Rocq's, placed here: see the header) -/
 
 /-- Rocq `UexecSlot.tf_ueq_resume_pc`. -/

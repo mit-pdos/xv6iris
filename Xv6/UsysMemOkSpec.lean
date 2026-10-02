@@ -70,16 +70,6 @@ theorem syscMemOk_usys (V V' : ProcPriv) (M M' : ElfMem) (r : BitVec 64)
   · rw [if_pos hf]; exact ⟨hfk hf, H, hp, hs, hlz⟩
   · rw [if_neg hf]; exact ⟨H, hp, hs, hlz⟩
 
-/-- THE DESCRIPTOR BRIDGE, an identity -- which is the point: if either side
-grows a row the other cannot express, this stops compiling (Rocq
-`sysc_fd_ok_usys`). -/
-theorem syscFdOk_usys (V : ProcPriv) (r : BitVec 64) (sts sts' : List FdState)
-    (H : syscFdOk V r sts sts') : usysFdOk (syscNum V) V.tf r sts sts' := H
-
-/-- Rocq `usys_fd_ok_sysc`. -/
-theorem usysFdOk_sysc (V : ProcPriv) (r : BitVec 64) (sts sts' : List FdState)
-    (H : usysFdOk (syscNum V) V.tf r sts sts') : syscFdOk V r sts sts' := H
-
 /-- sbrk: the dispatcher's row (Rocq `sysc_mem_ok_sbrk_row`). -/
 theorem syscMemOk_sbrkRow {V V' : ProcPriv} {M M' : ElfMem} (hn : syscNum V = USYS_sbrk)
     (H : syscMemOk V V' M M') : syscSbrkOk V.upt V'.upt V.sz V'.sz M M' := by

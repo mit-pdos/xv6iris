@@ -98,25 +98,6 @@ def consPDead (T K : IProp GF) (d0 k d : Nat) : IProp GF :=
 /-- **Rocq `cons_Pmiss`**: the miss family hands the credential back. -/
 def consPmiss (T K : IProp GF) (_k _d : Nat) : IProp GF := iprop(K ∨ T)
 
-/-- **Rocq `cons_hop_dead_hi`**: EVERY LATER HOP, reached only under the
-taint -- the cursor at `k ≠ 0` IS the taint, and the hop opens nothing. -/
-theorem consHopDead_hi (γfs : FsNames) (rt : Nat) (T K : IProp GF) (d0 k : Nat) (s : Fname)
-    (hk : k ≠ 0) :
-    ⊢ exHop (hlc := hlc) rt γfs (consPDead T K d0) (consPmiss T K) k s := by
-  unfold exHop axHop consPDead consPmiss
-  iintro %d %ents %dqv HP HF
-  icases HP with (⟨%hpd, -⟩ | HT)
-  · exact absurd hpd.1 hk
-  · imodintro
-    iframe HF
-    by_cases hsr : s = DOTDOT ∧ d = rt
-    · rw [axHopAns_self rt _ _ k d s ents hsr.1 hsr.2]
-      iright; iexact HT
-    rw [axHopAns_rec rt _ _ k d s ents hsr]
-    cases ents[s]? with
-    | some c => simp only [axHopNext]; iright; iexact HT
-    | none => simp only [axHopNext]; iright; iexact HT
-
 end UConsOpen
 
 /-! ## 4.  THE LEDGER ARM, READ -/

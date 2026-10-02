@@ -230,40 +230,6 @@ theorem offRet_of_link (γo : GName) (off d : Nat) :
   · iexact H
   · ipureintro; exact Or.inl rfl
 
-/-- Rocq `off_ret_taint`: the disconnected node's answer. -/
-theorem offRet_taint (γo : GName) (off d : Nat) :
-    MachFixedGS.killCred (hlc := hlc) (GF := GF) ⊢ offRet (hlc := hlc) γo off d := by
-  unfold offRet
-  iintro H
-  iexists (off : Int)
-  isplitl [H]
-  · iapply offLink_taint $$ H
-  · ipureintro; exact Or.inl rfl
-
-/-- Rocq `off_ret_adv`: the linked node's answer, advanced by the count. -/
-theorem offRet_adv (γo : GName) (off d : Nat) :
-    offGv (GF := GF) γo (1 : Qp).half ((off + d : Nat) : Int) ⊢ offRet (hlc := hlc) γo off d := by
-  unfold offRet
-  iintro H
-  iexists ((off + d : Nat) : Int)
-  isplitl [H]
-  · iapply offLink_of $$ H
-  · ipureintro; exact Or.inr rfl
-
-/-- Rocq `off_ret_case`: THE FIRE'S CASE SPLIT -- the half back unmoved, or
-the box's arm at the advanced value. -/
-theorem offRet_case (γo : GName) (off d : Nat) :
-    offRet (hlc := hlc) (GF := GF) γo off d ⊢
-      iprop(offGv γo (1 : Qp).half (off : Int) ∨ offLink (hlc := hlc) γo ((off + d : Nat) : Int)) := by
-  unfold offRet
-  iintro ⟨%v, Hk, %hv⟩
-  rcases hv with rfl | rfl
-  · unfold offLink
-    icases Hk with (Hk | #Ht)
-    · ileft; iexact Hk
-    · iright; iright; iexact Ht
-  · iright; iexact Hk
-
 end OffUser
 
 end Xv6

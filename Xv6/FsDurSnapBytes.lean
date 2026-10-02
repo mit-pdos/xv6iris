@@ -390,19 +390,4 @@ theorem snapCovBelow (S : FsStateRec) (P : Nat → List (BitVec 8)) (cov : ExtTr
     apply hb.skDombelow b
     exact ⟨P b, by rw [fsRestrict_lookup, if_pos hh]⟩
 
-/-! ## The recovery's reading of block 1 (Rocq `FsCrash.v` :815; deviation 7) -/
-
-/-- THE MINT'S READING: the snapshot's two superblock clauses read at `D`'s
-block 1, which recovery leaves equal to the raw one (Rocq's
-`fs_recovery_sb_parse`). -/
-theorem fsRecovery_sbParse (P : Nat → List (BitVec 8)) (D : BlockMap)
-    (cov : ExtTreeSet Nat compare) (logstart : Nat) (S : FsStateRec)
-    (hrec : fsRecovery P D cov logstart) (hwf : hdrWf P cov logstart)
-    (hhome : fsHome cov logstart SB_BNO) (hb : SnapBytes S D) :
-    P SB_BNO = S.fssSbb ∧ fsParseSb (fun _ => P SB_BNO) = some S.fssSb := by
-  have h1 := fsRecovery_sb_raw P D cov logstart hrec hwf hhome
-  rw [hb.skSb] at h1
-  have heq : P SB_BNO = S.fssSbb := (Option.some.inj h1).symm
-  exact ⟨heq, by rw [heq]; exact hb.skParse⟩
-
 end Xv6

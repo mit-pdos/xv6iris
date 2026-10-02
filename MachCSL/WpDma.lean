@@ -168,22 +168,6 @@ def dmaCell (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) : IProp GF := iprop%
 theorem headsAre_pushed (Hs : Nat → Hist) (t : Nat) (h : Agent) (n : Nat) (w : BitVec (8 * n)) :
     headsAre (pushed Hs t h w) n w := fun _ _ => rfl
 
-/-- The value form of `machInterp_storeDma`. -/
-theorem machInterp_storeDma_val (σ : MState) (pa : PAddr) (n : Nat) (old w : BitVec (8 * n))
-    (hno : ¬ anyReserve σ.resv pa n) :
-    machInterp (GF := GF) σ ∗ dmaCell pa n old ⊢ |==>
-      (machInterp (σ.storeDma pa n w) ∗ dmaCell pa n w ∗
-       authoredBy (σ.top + 1) diskAgent ∗ topLb (σ.top + 1)) := by
-  unfold dmaCell
-  iintro ⟨Hσ, ⟨%Hs, Hb, %_⟩⟩
-  imod machInterp_storeDma σ pa n Hs w hno $$ [$Hσ $Hb] with ⟨Hσ, Hb, #Hau, #Htop⟩
-  imodintro
-  iframe Hσ Hau Htop
-  iexists (pushed Hs (σ.top + 1) diskAgent w)
-  iframe Hb
-  ipureintro
-  exact headsAre_pushed Hs (σ.top + 1) diskAgent n w
-
 /-! ## What a DMA read may answer -/
 
 /-- Cells over the whole footprint, at any fractions, pin every byte the

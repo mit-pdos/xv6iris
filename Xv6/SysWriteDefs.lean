@@ -164,12 +164,6 @@ theorem wrFailWhy_entry {P Pc : UPtd} (hext : P.ext Pc) {src : BitVec 64} {n : N
   obtain ⟨d, hd, hn⟩ := h
   exact ⟨d, hd, fun hc => hn (UMemL.uvaRmapped_mono hext hc)⟩
 
-/-- the reason survives a WIDER request (Rocq's `wr_fail_why_mono`). -/
-theorem wrFailWhy_mono (P : UPtd) (src : BitVec 64) {n n' : Nat} (hle : n ≤ n')
-    (h : wrFailWhy P src n) : wrFailWhy P src n' := by
-  obtain ⟨d, hd, hn⟩ := h
-  exact ⟨d, by omega, hn⟩
-
 /-- THE REASON, MOVED TO THE WHOLE RUN'S BASE (Rocq's `wr_fail_why_shift`):
 a chunk's failing byte is a byte of the request the chunk sits inside.  No
 no-wrap side condition: the addition composes modulo 2^64. -/

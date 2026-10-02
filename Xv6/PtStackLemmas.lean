@@ -141,15 +141,6 @@ theorem pasUpd_lt (pas : Nat → BitVec 44) (i : Nat) (p : BitVec 44) (j : Nat) 
 theorem pasUpd_self (pas : Nat → BitVec 44) (i : Nat) (p : BitVec 44) : pasUpd pas i p i = p := by
   simp only [pasUpd, if_pos]
 
-theorem map_range_succ_pasUpd (pas : Nat → BitVec 44) (i : Nat) (p : BitVec 44) :
-    (List.range (i+1)).map (pasUpd pas i p) = (List.range i).map pas ++ [p] := by
-  rw [List.range_succ, List.map_append]
-  simp only [List.map_cons, List.map_nil, pasUpd_self]
-  refine congrArg (fun l => l ++ [p]) (List.map_congr_left ?_)
-  intro j hj
-  rw [List.mem_range] at hj
-  exact pasUpd_lt pas i p j hj
-
 /-- What `proc_mapstacks` keeps across an iteration: the tree built so far
 is the `mapStacks` of the supply consumed so far, of the shape the count
 `missingStacks` is taken over, with distinct valid pages. -/

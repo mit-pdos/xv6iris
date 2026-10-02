@@ -33,10 +33,6 @@ variable {GF : BundledGFunctors} [CtokG GF] [UexecSG GF]
 theorem utA_sCause_ne (sc : BitVec 64) (h : sCauseOk sc) : sc ≠ uecallScause := by
   rcases h with h | h <;> subst h <;> decide
 
-/-- A device cause is not a cause usertrap kills at. -/
-theorem utA_sCause_nokill (sc : BitVec 64) (h : sCauseOk sc) : ¬ ukillSc sc := by
-  rcases h with h | h <;> subst h <;> decide
-
 /-- **The prologue's record carries the round's rows** (Rocq's
 `ut_round_entry` plus the quiet rows) off the ecall. -/
 theorem utA_rows_entry {Γ : SchedNames} (A : UtArgs GF) (hok : UtOk Γ A) (hne : A.sc ≠ uecallScause) :
@@ -50,13 +46,6 @@ theorem utA_live_ne (A : UtArgs GF) (V2 : ProcPriv) (cs2 : ExtTreeSet GName comp
   utLiveOut_ne _ _ _ _ _ _ hne
 
 theorem utA_decide_False : (decide False = true) = False := by simp
-
-theorem utA_bcond_bne_sext (kl : BitVec 32) :
-    bcond bop.BNE (BitVec.signExtend 64 kl) 0#64 = !decide (kl = 0#32) := by
-  by_cases h : kl = 0#32
-  · subst h; decide
-  · have : BitVec.signExtend 64 kl ≠ 0#64 := by bv_decide
-    simp [bcond, h, this]
 
 end Pure
 

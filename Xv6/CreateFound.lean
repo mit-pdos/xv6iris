@@ -127,9 +127,6 @@ set_option linter.unusedSimpArgs false
 
 theorem createFound_caller1 : createCaller 1#5 := by unfold createCaller; decide
 theorem createFound_caller10 : createCaller 10#5 := by unfold createCaller; decide
-theorem createFound_caller11 : createCaller 11#5 := by unfold createCaller; decide
-theorem createFound_caller12 : createCaller 12#5 := by unfold createCaller; decide
-theorem createFound_caller14 : createCaller 14#5 := by unfold createCaller; decide
 theorem createFound_caller15 : createCaller 15#5 := by unfold createCaller; decide
 
 /-- +0x6c: the `bltu 1,a5` on the word the three ALU leaves leave, at the

@@ -67,9 +67,6 @@ theorem ka_lock_b2c :
     KA.«kalloc» + 0x11962#64 = kmemLockAddr := by
   decide
 
-/-- `lui a2,0x1` is `4096`. -/
-theorem ka_lui_4096 : BitVec.signExtend 64 (1#20 ++ 0#12) = BitVec.ofNat 64 4096 := by decide
-
 /-- The link registers of the calls. -/
 theorem ka_ret_b20 : jumpPc (KA.«kalloc» + 0x40#64) = (KA.«kalloc» + 0x40#64) := by
   decide

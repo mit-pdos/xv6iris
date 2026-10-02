@@ -399,42 +399,4 @@ theorem BFREE.wp_bfree_sconf (BF : BFREE) {hlc : HasLC} {GF : BundledGFunctors}
   iapply HΦ $$ %spie %spp %R' [] Hk Hpc Htc Hcl Hir Hpid Hsb Hsl Hop
   ipureintro; exact hcs
 
-theorem BFREE.wp_bfree_sconf_eb (BF : BFREE) {hlc : HasLC} {GF : BundledGFunctors}
-    [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF]
-    [CurCtx] (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (cpu : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
-    (pd pav pu : BitVec 64) (j : Nat) (γ : LogNames) (γfs : FsNames)
-    (logstart bmapstart size : Nat) (dev bno : BitVec 32) (bs : List (BitVec 8))
-    (u : Nat) (pidv : BitVec 32) (dqp dqb : DFrac)
-    (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : bfreeSlots ≤ k.avail)
-    (hnoff : k.noff = 0)
-    (htier : k.tier = KTier.kpt)
-    (hgeom : logGeomOk V.cov logstart) (hbg : bitmapGeomOk V.cov logstart bmapstart size)
-    (hdev : dev = V.dev) (hcl : V.clean = fsMclean γfs) (hdt : V.dirty = fsMdirty γfs)
-    (hbno : bno.toNat < size) (hbs : bs.length = BSIZE) (hpd : descPageRw pd)
-    (ha0 : k.regs 10#5 = BitVec.signExtend 64 dev)
-    (ha1 : k.regs 11#5 = BitVec.signExtend 64 bno) :
-    wp_bfree_sconf_eb_body Γ cpu k γl γb V γdl pd pav pu j γ γfs logstart bmapstart size dev bno
-      bs u pidv dqp dqb hj hproc hK hnoff htier hgeom hbg hdev hcl hdt hbno hbs hpd
-      ha0 ha1 := by
-  unfold wp_bfree_sconf_eb_body
-  iintro ⟨Hk, Hpc, #Hpi, Hte, Hce, #Hbio, #Hdc, #Hpe, #Hlctx, Hsb, #Hbmi, Hfsb, Hpid,
-    Hsl, Hop, Hnext⟩
-  icases logOp_openS γ (u + 1) $$ Hop with ⟨%Sb, HopS, Htx⟩
-  icases logOpS_named γ (u + 1) Sb $$ HopS with ⟨%e0, Hope⟩
-  ihave #Hcred := logCredit_own (GF := GF) γ false Sb e0 bmapstart (fun h => absurd h (by simp))
-  have h := BF.wp_bfree_eb Γ cpu k γl γb V γdl pd pav pu j γ γfs logstart bmapstart size dev bno
-    bs u false Sb e0 pidv dqp dqb hj hproc hK hnoff htier hgeom hbg hdev hcl hdt
-    hbno hbs hpd ha0 ha1
-  unfold wp_bfree_eb_body at h
-  iapply h
-  iframe Hk Hpc Hpi Hte Hce Hbio Hdc Hpe Hlctx Hsb Hbmi Hfsb Hpid Hsl Hcred Hope
-  iapply wpNext_mono _ _ _ _ _ $$ Hnext
-  iintro %c HΦ %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid Hsb Hsl Hope
-  isimp only [Bool.false_eq_true, if_false] at Hope
-  ihave HopS := logOpSe_opS γ u (bmapstart :: Sb) e0 $$ Hope
-  ihave Hop := logOpS_op γ u (bmapstart :: Sb) $$ HopS Htx
-  iapply HΦ $$ %spie %spp %R' [] Hk Hpc Hte Hce Hpid Hsb Hsl Hop
-  ipureintro; exact hcs
-
 end Xv6

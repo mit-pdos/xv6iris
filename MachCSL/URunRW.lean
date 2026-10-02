@@ -499,10 +499,6 @@ walk's bookkeeping bit `rv` says. -/
 def uResvTok (cpu : CPU) (_rv : Bool) : IProp GF :=
   iprop(∃ r : Option Resv, resvFragAny cpu r)
 
-theorem uResvTok_rv (cpu : CPU) (rv rv' : Bool) : uResvTok (GF := GF) cpu rv ⊢ uResvTok cpu rv' := by
-  unfold uResvTok
-  iintro H; iexact H
-
 theorem uResvTok_of (cpu : CPU) (rv : Bool) (r : Option Resv) (b : Bool) :
     resvFrag cpu r b ⊢@{IProp GF} uResvTok cpu rv := by
   unfold uResvTok
@@ -932,21 +928,6 @@ theorem swp_runRW {X : Type} (m : SailM X) (s : UWSt)
     (hok : ∀ orc, (runRW D orc s m).isSome = true) (Φ : X → IProp GF) :
     uFr RF BF s ∗ uPost RF BF s m Φ ⊢ swp cpu m Φ :=
   swp_runRW_gen RF BF m s hok Φ
-
-/-- The Rocq shape (`swp_hmrun`): the frames in, a walk equation and the
-landing frames out. -/
-theorem swp_runRW_frames {X : Type} (m : SailM X) (s : UWSt)
-    (hok : ∀ orc, (runRW D orc s m).isSome = true) :
-    uFr RF BF s ⊢ swp cpu m (fun x => iprop(∃ (orc : UOrc) (s' : UWSt) (orc' : UOrc),
-      ⌜runRW D orc s m = some (x, s', orc')⌝ ∗ uFr RF BF s')) := by
-  iintro Hfr
-  iapply swp_runRW RF BF m s hok
-  iframe Hfr
-  unfold uPost uFr
-  iintro %orc %x %s' %orc' %h HF HB Hc Hr
-  iexists orc, s', orc'
-  iframe
-  ipureintro; exact h
 
 end cases
 

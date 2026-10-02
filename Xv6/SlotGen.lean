@@ -420,19 +420,6 @@ def actCnt (pa : BitVec 64) (k : Nat) : IProp GF :=
 instance actCnt_timeless (pa : BitVec 64) (k : Nat) : Timeless (actCnt (GF := GF) pa k) := by
   unfold actCnt; infer_instance
 
-/-- Rocq `act_cnt_excl`. -/
-theorem actCnt_excl (pa : BitVec 64) (k k' : Nat) :
-    actCnt (GF := GF) pa k ∗ actCnt pa k' ⊢ False := by
-  unfold actCnt actOne sgOne
-  iintro ⟨H1, H2⟩
-  icombine H1 H2 gives %Hv
-  rw [Heap.singleton_op_singleton, Heap.singleton_valid_iff] at Hv
-  obtain ⟨hd, -⟩ := DFracAgree.op_valid.mp Hv
-  exact absurd hd (by
-    intro hv
-    have := DFrac.valid_own_op hv
-    simp at this)
-
 /-- Rocq `act_cnt_update`: the holder moves the count anywhere. -/
 theorem actCnt_update (pa : BitVec 64) (k k' : Nat) :
     actCnt (GF := GF) pa k ⊢ |==> actCnt pa k' := by
@@ -869,11 +856,6 @@ theorem initPidIs_agree (p p' : BitVec 32) : initPidIs (GF := GF) p ∗ initPidI
   unfold initPidIs
   exact (ipid_valid2 _ _ _ p p').trans (pure_mono And.right)
 
-/-- ...and the form a child spends it in: its own pid is not init's -/
-theorem initPidIs_ne (p p' : BitVec 32) (hne : p ≠ p') :
-    initPidIs (GF := GF) p ∗ initPidIs p' ⊢ False :=
-  (initPidIs_agree p p').trans (pure_elim' fun h => absurd h hne)
-
 theorem ipid_one_valid (p : BitVec 32) :
     ✓ (some (DFracAgree.mk (.own 1) (⟨p⟩ : DiscreteO (BitVec 32))) : IpidUR) :=
   DFracAgree.mk_valid.mpr DFrac.valid_own_one
@@ -887,14 +869,6 @@ theorem initPid_set (p p' : BitVec 32) : initPidTok (GF := GF) p ⊢ |==> initPi
 theorem initPid_seal (p : BitVec 32) : initPidTok (GF := GF) p ⊢ |==> initPidIs p := by
   unfold initPidTok initPidIs
   exact iOwn_update (Update.option _ _ DFracAgree.persist)
-
-/-- the token is EXCLUSIVE, which is what keeps the seal a one-shot -/
-theorem initPidTok_excl (p p' : BitVec 32) : initPidTok (GF := GF) p ∗ initPidTok p' ⊢ False := by
-  unfold initPidTok
-  refine (ipid_valid2 _ _ _ p p').trans (pure_elim' fun h => absurd h.1 ?_)
-  intro hv
-  have := DFrac.valid_own_op hv
-  simp at this
 
 /-! ## The pid counter's boot-era token (lane TRAP-ROWS-4, B1b)
 
@@ -973,29 +947,6 @@ def pidLedLb (h : List Pev) : IProp GF := WchG.wplName GF ↪◯ML h
 instance pidLedLb_persistent (h : List Pev) : Persistent (pidLedLb (GF := GF) h) := by
   unfold pidLedLb; infer_instance
 
-theorem pidLedAuth_lb (h : List Pev) :
-    pidLedAuth (GF := GF) h ⊢ pidLedAuth h ∗ pidLedLb h := by
-  unfold pidLedAuth pidLedLb
-  iintro Ha
-  ihave #Hb := MonoList.lb_own_get (WchG.wplName GF) _ h $$ Ha
-  isplitl [Ha]
-  · iexact Ha
-  · iexact Hb
-
-theorem pidLedLb_prefix (h h' : List Pev) :
-    pidLedAuth (GF := GF) h ⊢ pidLedLb h' -∗ ⌜h' <+: h⌝ := by
-  unfold pidLedAuth pidLedLb
-  iintro Ha Hb
-  ihave %hv := MonoList.auth_lb_own_valid (WchG.wplName GF) _ h h' $$ Ha Hb
-  ipureintro; exact hv.2
-
-/-- Two lower bounds of the one ledger are comparable (Rocq `pid_led_lb_lb`). -/
-theorem pidLedLb_lb (h h' : List Pev) :
-    pidLedLb (GF := GF) h ⊢ pidLedLb h' -∗ ⌜h <+: h' ∨ h' <+: h⌝ := by
-  unfold pidLedLb
-  iintro Ha Hb
-  iapply MonoList.lb_own_valid (WchG.wplName GF) h h' $$ Ha Hb
-
 theorem pidLedAuth_grow (h : List Pev) (e : Pev) :
     pidLedAuth (GF := GF) h ⊢ |==> (pidLedAuth (h ++ [e]) ∗ pidLedLb (h ++ [e])) := by
   unfold pidLedAuth pidLedLb
@@ -1032,10 +983,6 @@ def genHalvesPriv (pa : BitVec 64) (pid : BitVec 32) (g : GName) : IProp GF :=
 theorem genHalvesPriv_nz (pa : BitVec 64) (pid : BitVec 32) (g : GName) :
     genHalvesPriv (GF := GF) pa pid g ⊢ ⌜pid.toNat ≠ 0⌝ :=
   sep_elim_left.trans (genHalvesAt_nz pa pid g)
-
-theorem genHalvesPriv_rng (pa : BitVec 64) (pid : BitVec 32) (g : GName) :
-    genHalvesPriv (GF := GF) pa pid g ⊢ ⌜1 ≤ pid.toNat ∧ pid.toNat ≤ genPidMax⌝ :=
-  sep_elim_left.trans (genHalvesAt_rng pa pid g)
 
 /-- how the two sites that BUILD one discharge it: both hold allocproc's
 range and the marker the mint handed out -/
@@ -1077,12 +1024,6 @@ theorem genHalvesPriv_sg (pa : BitVec 64) (pid : BitVec 32) (g : GName) :
   isplitl [Hback Hsg]
   · iapply Hback $$ Hsg
   · iexact Ht
-
-/-- THE SPLIT `kexit` TAKES: the marker out, the rest into the park
-(`genHalvesDorm` at ZOMBIE is exactly `genHalvesAt`). -/
-theorem genHalvesPriv_split (pa : BitVec 64) (pid : BitVec 32) (g : GName) :
-    genHalvesPriv (GF := GF) pa pid g ⊢ genHalvesAt pa pid g ∗ takenAt g := by
-  unfold genHalvesPriv; exact .rfl
 
 end SlotGenTok
 

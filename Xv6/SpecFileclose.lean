@@ -388,13 +388,6 @@ theorem filecloseCpost_of_fired (q : Qp) (st : FdState) (Φc : IProp GF) (r w : 
   · iright; ileft; iframe Ht Hp
   · exact absurd hf (by decide)
 
-/-- ...and its INPUT, at the same key: what the closer hands pipeclose (Rocq
-`fileclose_cpay_pipe`). -/
-theorem filecloseCpay_pipe (st : FdState) (Φc : IProp GF) (r w : Bool) (γp : PipeNames)
-    (hst : st = .open r w (.pipe γp)) :
-    filecloseCpay (hlc := hlc) st Φc ⊢ pipeCpay (hlc := hlc) γp.pnQueue w Φc := by
-  subst hst; exact .rfl
-
 /-- ...and a state that is not a pipe pays and gets back nothing (Rocq
 `fileclose_cpost_nonpipe`, at the state rather than the content). -/
 theorem filecloseCpost_nopipe (q : Qp) (st : FdState) (Φc : IProp GF) (h : fdstNopipe st) :

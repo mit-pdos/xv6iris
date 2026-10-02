@@ -156,14 +156,6 @@ theorem memModel_read_excl (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w :
       · simp only [hc, if_false] at hr
         exact h3 c r hr
 
-theorem hartViews_store_excl (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
-    (c : CPU) (hc : c ≠ cpu) : hartViewsAt (GF := GF) E (σ.store cpu pa n w true) c = hartViewsAt E σ c := by
-  unfold hartViewsAt
-  have e1 : (σ.store cpu pa n w true).tv c = σ.tv c := by simp [updCpu, hc]
-  have e2 : (σ.store cpu pa n w true).itv c = σ.itv c := rfl
-  have e3 : ((σ.store cpu pa n w true).hr c).rv = (σ.hr c).rv := by simp [updCpu, hc]
-  rw [e1, e2, e3]
-
 /-- The write half of an exclusive pair (the store consumes the
 reservation and the acquire bit; an acquire pair's floor passes its own
 append). -/

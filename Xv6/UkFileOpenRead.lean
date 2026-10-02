@@ -26,23 +26,6 @@ open HfpFileClaimsP UkFileOpen
 open Std (ExtTreeSet)
 open Iris.Std (get?)
 
-namespace UkFileOpen
-
-/-- A write-mapped byte of a table's lazy view reads its page. -/
-theorem umemByte_of_lazy (Pt : UPtd) (sz : Nat) (Mv : Nat → List (BitVec 8)) (va : Nat) (b : BitVec 8)
-    (hw : uvaWmapped Pt va) (h : umemLazy Pt sz Mv va = some b) : umemByte Mv va = b := by
-  obtain ⟨vpn, w, j, hget, -, -, hj, rfl⟩ := hw
-  have hd : (vpn * 4096 + j) / 4096 = vpn := by omega
-  have hm : (vpn * 4096 + j) % 4096 = j := by omega
-  unfold umemLazy at h
-  rw [hd, hm, hget] at h
-  simp only [Option.isSome_some, ↓reduceIte] at h
-  unfold umemByte
-  rw [hd, hm, h]
-  rfl
-
-end UkFileOpen
-
 section Read
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [DiskG GF] [EchoOutG GF] [FileAppG GF] [PS : UprogSG GF]

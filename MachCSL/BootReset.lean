@@ -105,15 +105,6 @@ theorem resetRegsRun_of_bootPost (cpu : CPU) (f : RegFile) (h : bootPost (bootHi
   split at hv <;> (try simp only [Option.some.injEq, reduceCtorEq] at hv) <;> subst hv <;>
     first | assumption | exact False.elim hv
 
-/-- **THE THEOREM** (Rocq `reset_regs_of_run`): for EVERY hart and EVERY
-power-on register file, the boot program runs to completion, and the file it
-lands in satisfies every reset fact of Rocq's `reset_regs` -- the seventeen
-exact pins of `resetValRun` and `pmpAllOff` -- with nothing taken on trust. -/
-theorem bootProg_resetRegsRun (cpu : CPU) (f₀ : RegFile) :
-    ∃ f, bootRun (bootProg (bootHid cpu) bootPMA) f₀ = some ((), f) ∧ resetRegsRun cpu f := by
-  obtain ⟨_, f, h, hp⟩ := bootFin_bootProg (bootHid cpu) f₀
-  exact ⟨f, h, resetRegsRun_of_bootPost cpu f hp⟩
-
 /-- Rocq `reset_regs_of_run`, at a given run: the landing file of ANY run of
 the boot program satisfies `resetRegsRun`. -/
 theorem resetRegsRun_of_run (cpu : CPU) (f₀ f : RegFile)

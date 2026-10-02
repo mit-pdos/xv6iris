@@ -400,14 +400,6 @@ instance ciPay_persistent (γ : UartNames) (hb : List Obs) (cb : BitVec 8) :
     Persistent (ciPay (GF := GF) γ hb cb) := by
   unfold ciPay outLb; infer_instance
 
-/-- The two era facts, read back off the bundle (Rocq `ct_pay_facts`). -/
-theorem ciPay_facts (γ : UartNames) (hb : List Obs) (cb : BitVec 8) :
-    ciPay (GF := GF) γ hb cb ⊢
-      ⌜traceShape hb true ∧ obsBoots hb = genId (hlc := hlc) (GF := GF) + 1⌝ := by
-  unfold ciPay
-  iintro ⟨%a, %b, -⟩
-  ipureintro; exact ⟨a, b⟩
-
 /-- The era stamp is spent here, once (Rocq `ct_mk_pay`). -/
 theorem ciMkPay (γ : UartNames) (hb : List Obs) (cb : BitVec 8) (hends : obsEndsIn .uart0 hb cb)
     (hbts : obsBoots hb = genId (hlc := hlc) (GF := GF) + 1) (hshb : traceShape hb true) :

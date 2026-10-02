@@ -84,11 +84,6 @@ noncomputable def pviewUnion (adm : Pline' → Bool) (admS : List (List (BitVec 
     rw [uv_dec]
     cases p <;> rfl
 
-/-- the round's content at a well-formed state is a word line's -/
-theorem pviewUnion_fcOk (adm : Pline' → Bool) (admS : List (List (BitVec 8)) → Bool)
-    (s : Fstate) (hs : fstateOk s) : fcOk ((pviewUnion adm admS).pvFc s) :=
-  filesOf_fcOk s hs
-
 /-- a body byte is not NUL -/
 theorem body_byte_not_nul (b : BitVec 8) (hb : wlBodyByte b) : b ≠ cNul := by
   rintro rfl

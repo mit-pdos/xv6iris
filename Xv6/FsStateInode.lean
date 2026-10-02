@@ -264,12 +264,6 @@ theorem fnBare_naddr (n : FsNode) (k : Nat) (h : fnBare n) (hk : k < MAXFILE) :
       (by unfold MAXFILE NDIRECT NINDIRECT at *; omega)]
     rfl
 
-theorem fnBare_orphan (n : FsNode) (h : fnBare n) : fnOrphan n = true := by
-  obtain ⟨_, _, _, _, hnl⟩ := h
-  unfold fnOrphan
-  rw [hnl]
-  rfl
-
 /-- The all-zero record: the mkfs image's free inode, and the node the boot
 allocation starts every inum at (Rocq's `fn_zero`). -/
 def fnZero : FsNode :=
@@ -353,15 +347,6 @@ theorem nodeDirLocal_free (i nib : Nat) (n : FsNode) (h0 : n.fnRec.diType.toNat 
   ⟨dirOk_free nib n.fnRec (fnData n) h0,
    dirDotsIx_not_dir i n.fnRec (fnData n) (by rw [h0]; decide),
    dirOrphanClean_free n.fnRec (fnData n) h0⟩
-
-theorem nodeDirLocal_ok {i nib : Nat} {n : FsNode} (h : nodeDirLocal i nib n) :
-    dirOk nib n.fnRec (fnData n) := h.1
-
-theorem nodeDirLocal_ix {i nib : Nat} {n : FsNode} (h : nodeDirLocal i nib n) :
-    dirDotsIx i n.fnRec (fnData n) := h.2.1
-
-theorem nodeDirLocal_orph {i nib : Nat} {n : FsNode} (h : nodeDirLocal i nib n) :
-    dirOrphanClean n.fnRec (fnData n) := h.2.2
 
 /-- THE F3 READING, spelled out: a slot the node OWNS need not be below the
 size.  `inlBlkDom` is an iff with the ADDRESS, never with the size (Rocq's

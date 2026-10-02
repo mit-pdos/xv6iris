@@ -73,18 +73,6 @@ def syscallEpi : BitVec 64 := syscallAddr + 0x6c#64
 (offset `0x1e`) both land on the fallback. -/
 theorem syscall_bltu_tgt : syscallAddr + 0x22#64 + BitVec.signExtend 64 (0x32#13) = syscallFallback := by
   unfold syscallFallback syscallAddr; decide
-theorem syscall_beqz_tgt : syscallAddr + 0x36#64 + BitVec.signExtend 64 (0x1e#13) = syscallFallback := by
-  unfold syscallFallback syscallAddr; decide
-/-- The mask's `beqz a5` at `+0x42` (offset `0xa`) lands on the blocked arm. -/
-theorem syscall_mask_tgt : syscallAddr + 0x42#64 + BitVec.signExtend 64 (0xa#13) = syscallBlocked := by
-  unfold syscallBlocked syscallAddr; decide
-
-/-- `c.j` at `+0x4a` (offset `0x22`) and the blocked arm's `c.j` at `+0x52`
-(offset `0x1a`) land on the epilogue. -/
-theorem syscall_j_tgt : syscallAddr + 0x4a#64 + BitVec.signExtend 64 (0x22#21) = syscallEpi := by
-  unfold syscallEpi syscallAddr; decide
-theorem syscall_jblk_tgt : syscallAddr + 0x52#64 + BitVec.signExtend 64 (0x1a#21) = syscallEpi := by
-  unfold syscallEpi syscallAddr; decide
 
 /-- `auipc a5,0x5 ; addi a5,a5,-532` at `+0x2a`/`+0x2e` is the table's base
 (Rocq's `syscalls` fold). -/
@@ -92,13 +80,6 @@ theorem syscall_tbl_addr :
     syscallAddr + 0x2a#64 + BitVec.signExtend 64 (5#20 ++ 0#12) + BitVec.signExtend 64 (0xdd0#12) =
       syscallsTbl := by
   unfold syscallsTbl syscallAddr; decide
-
-/-- `auipc a0,0x5 ; addi a0,a0,-1632` at `+0x5a`/`+0x5e`: the fallback's
-format string (Rocq `sysc_fmt_a`, 0x80007390). -/
-theorem syscall_fmt_addr :
-    syscallAddr + 0x5a#64 + BitVec.signExtend 64 (5#20 ++ 0#12) + BitVec.signExtend 64 (0x9a0#12) =
-      0x80007390#64 := by
-  unfold syscallAddr; decide
 
 /-- The entries are the entry Specs' addresses (reflexivity, one per arm):
 an arm rewrites its `pcIs cpu (syscTarget n)` with its own. -/

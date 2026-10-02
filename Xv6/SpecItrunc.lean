@@ -618,49 +618,4 @@ theorem ITRUNC.wp_itrunc_sconf (IT : ITRUNC) {hlc : HasLC} {GF : BundledGFunctor
       omega
   · iexact Hop
 
-theorem ITRUNC.wp_itrunc_sconf_eb (IT : ITRUNC) {hlc : HasLC} {GF : BundledGFunctors}
-    [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-    [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
-    [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
-    (ip : BitVec 64) (inum : BitVec 32) (dn dn0 : Dinode) (bm : Blkmap)
-    (data : Nat → List (BitVec 8)) (u : Nat)
-    (pidv : BitVec 32) (dqp dqd dqn dqb dqs : DFrac)
-    hj hproc hK hnoff htier hgeom hbg hcov hlog hnib hnz hstab hnl hwf hbel
-    hsz hda hpd ha0 :
-    wp_itrunc_sconf_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl pd pav pu j ip inum dn dn0 bm data
-      u pidv dqp dqd dqn dqb dqs
-      hj hproc hK hnoff htier hgeom hbg hcov hlog hnib hnz hstab hnl hwf hbel
-      hsz hda hpd ha0 := by
-  unfold wp_itrunc_sconf_eb_body
-  iintro ⟨Hk, Hpc, #Hpi, Hte, Hce, #Hpe, #Hbc, #Hlc, #Hdc, Hidev, Hinum, Hmeta, Hmap, Hblk,
-    Hsb, Hsi, #Hbmi, #Hinv, Hdn, Hpid, Hsl, Hop, Hnext⟩
-  icases logOp_openS icfgLog (u + 2) $$ Hop with ⟨%Sb, HopS, Htx⟩
-  icases logOpS_named icfgLog (u + 2) Sb $$ HopS with ⟨%e0, Hope⟩
-  ihave #Hcred := logCredit_own (GF := GF) icfgLog false Sb e0 (IBLOCK inum icfgIst)
-    (fun h => absurd h (by simp))
-  ihave Hope := (show logOpSe (GF := GF) icfgLog (u + 2) Sb e0 ⊢
-      logOpSe icfgLog (itEntry false u) Sb e0 from .rfl) $$ Hope
-  have h := IT.wp_itrunc_gen_eb (hlc := hlc) (GF := GF) Γ cpu k γl pd pav pu j ip inum dn dn0 bm
-    data u Sb false false e0 pidv dqp dqd dqn dqb dqs hj hproc hK hnoff htier
-    (fun h => absurd h (by simp)) hgeom hbg hcov hlog hnib hnz hstab hnl hwf hbel hsz hda hpd ha0
-  unfold wp_itrunc_gen_eb_body at h
-  iapply h
-  iframe Hk Hpc Hpi Hte Hce Hpe Hbc Hlc Hdc Hidev Hinum Hmeta Hmap Hblk Hsb Hsi Hbmi Hinv
-    Hdn Hpid Hsl Hcred Hope
-  iapply wpNext_mono _ _ _ _ _ $$ Hnext
-  iintro %c HΦ %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid Hidev Hinum Hsb Hsi Hmeta Hmap Hblk
-    Hdn Hsl ⟨%w, %u', %Sb', %hf, HopS⟩
-  obtain ⟨-, -, -, -, hlo, hhi⟩ := hf
-  ihave Hop := logOpS_op icfgLog u' Sb' $$ HopS Htx
-  iapply HΦ $$ %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid Hidev Hinum Hsb Hsi Hmeta Hmap Hblk
-    Hdn Hsl [Hop]
-  iexists u'
-  isplitl []
-  · ipureintro
-    cases w <;> simp only [itEntry, itBm, itIu, Bool.false_eq_true, if_false, if_true] at hlo hhi <;>
-      omega
-  · iexact Hop
-
 end Xv6

@@ -70,10 +70,6 @@ theorem eflOf_out (h : List Obs) (i : UartId) (b : BitVec 8) (hs : traceShape h 
 theorem eflOf_snoc (h : List Obs) (e : Obs) : eflOf h <+: eflOf (h ++ [e]) :=
   eflLines_snoc h e
 
-/-- Rocq `efl_of_echof`: the ledger's redirect lines are the history's. -/
-theorem eflOf_echof (h : List Obs) : flRedirs (eflOf h) = echofLinesOf h :=
-  eflLines_echof h
-
 /-- Rocq `echof_lines_of_power`. -/
 theorem echofLinesOf_power (h : List Obs) (on : Bool) :
     echofLinesOf (h ++ [powerEv on]) = echofLinesOf h := by

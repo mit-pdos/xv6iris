@@ -158,9 +158,6 @@ def ucEpi (retired : Bool) (s : UWSt) : UWSt :=
 theorem ucTickS_file_other (s : UWSt) (x : Register) (h : x ≠ .PC) : (ucTickS s).file x = s.file x :=
   UWSt.setR_file_other _ _ _ _ h
 
-theorem ucEpi_false (s : UWSt) : ucEpi false s = ucTickS s := by
-  simp [ucEpi]
-
 @[simp] theorem ucEpi_mm (r : Bool) (s : UWSt) : (ucEpi r s).mm = s.mm := by
   unfold ucEpi ucTickS; split <;> rfl
 
@@ -244,23 +241,6 @@ theorem uc_finish_fetchFail (hD : UcFoot D) (orc orc2 : UOrc) (s s2 : UWSt) (va 
     (e : ExceptionType) (hh : runRW D orc s (handle_exception (bits_of_virtaddr va) e) = some ((), s2, orc2))
     (hact : s2.file .hart_state = .HART_ACTIVE ()) :
     runRW D orc s (ucFinish (Step_Fetch_Failure (va, e))) = some (false, ucEpi false s2, orc2) :=
-  uc_finish_of_arm hD _ orc orc2 s s2 hh hact
-
-/-- **Arm: execute trap** (`Step_Execute (Trap (p, exc, pc), ib)`), from the
-tower's walk (`exception_handler … >>= set_next_pc`). -/
-theorem uc_finish_trap (hD : UcFoot D) (orc orc2 : UOrc) (s s2 : UWSt) (p : Privilege)
-    (exc : sync_exception) (pc : BitVec 64) (ib : BitVec 32)
-    (hh : runRW D orc s (exception_handler p exc pc >>= set_next_pc) = some ((), s2, orc2))
-    (hact : s2.file .hart_state = .HART_ACTIVE ()) :
-    runRW D orc s (ucFinish (Step_Execute (Trap (p, exc, pc), ib))) = some (false, ucEpi false s2, orc2) :=
-  uc_finish_of_arm hD _ orc orc2 s s2 hh hact
-
-/-- **Arm: illegal instruction** (`Step_Execute (Illegal_Instruction, ib)`),
-from the handler's walk (`stval` = the instruction bits). -/
-theorem uc_finish_illegal (hD : UcFoot D) (orc orc2 : UOrc) (s s2 : UWSt) (ib : BitVec 32)
-    (hh : runRW D orc s (handle_exception (zero_extend (m := 64) ib) (E_Illegal_Instr ())) = some ((), s2, orc2))
-    (hact : s2.file .hart_state = .HART_ACTIVE ()) :
-    runRW D orc s (ucFinish (Step_Execute (Illegal_Instruction (), ib))) = some (false, ucEpi false s2, orc2) :=
   uc_finish_of_arm hD _ orc orc2 s s2 hh hact
 
 /-- The model's `wait_is_nop` is `false` for every wait reason. -/
@@ -398,15 +378,6 @@ theorem uc_exec_direct (orc orc' : UOrc) (s s' : UWSt) (i : instruction) (r : Ex
   rw [runRW_bind_some D _ _ orc orc' s s' r h]
   cases r <;> first | rfl | exact absurd rfl (hr _)
 
-/-- **Execute, redirected once** (`ExecuteAs j`: the model runs `j`). -/
-theorem uc_exec_redirect (orc orc' orc'' : UOrc) (s s' s'' : UWSt) (i j : instruction)
-    (r : ExecutionResult) (h : runRW D orc s (execute i) = some (ExecuteAs j, s', orc'))
-    (h' : runRW D orc' s' (execute j) = some (r, s'', orc'')) :
-    runRW D orc s (uxaExecAs i) = some (r, s'', orc'') := by
-  unfold uxaExecAs
-  rw [runRW_bind_some D _ _ orc orc' s s' _ h]
-  exact h'
-
 /-- The landing pad is never expected: `elp` holds `NO_LP_EXPECTED`
 (`hw_config`'s pin). -/
 theorem uc_lpad {X : Type} (orc : UOrc) (s : UWSt) (hrd : D.Dr .elp = true) (hv : s.file .elp = 0#1)
@@ -452,22 +423,6 @@ theorem uc_afterFetch_error (orc : UOrc) (s : UWSt) (e : ExceptionType) (a : Bit
     runRW D orc s (ucAfterFetch (F_Error (e, a))) = some (Step_Fetch_Failure (virtaddr.Virtaddr a, e), s, orc) :=
   rfl
 
-/-- The decode is a closed read-only walk (UDecode): every 32-bit word
-decodes, at any state agreeing with `drefU`, to an instruction of
-`decodableU`, without moving the state. -/
-theorem uc_decode32 (orc : UOrc) (s : UWSt)
-    (hd : ∀ r v, drefU r = some v → D.Dr r = true ∧ s.file r = v) (w : BitVec 32) :
-    ∃ i, decodableU i = true ∧ runRW D orc s (ext_decode w) = some (i, s, orc) := by
-  obtain ⟨i, b, h, hi⟩ := decodeU_total32 w
-  exact ⟨i, hi, runRW_of_runRead D drefU orc s hd _ _ _ h⟩
-
-/-- The same for a 16-bit halfword (`decodableUC`). -/
-theorem uc_decode16 (orc : UOrc) (s : UWSt)
-    (hd : ∀ r v, drefU r = some v → D.Dr r = true ∧ s.file r = v) (h : BitVec 16) :
-    ∃ i, decodableUC i = true ∧ runRW D orc s (ext_decode_compressed h) = some (i, s, orc) := by
-  obtain ⟨i, b, h', hi⟩ := decodeU_total16 h
-  exact ⟨i, hi, runRW_of_runRead D drefU orc s hd _ _ _ h'⟩
-
 /-! ## §6 Whole cycles of an ACTIVE hart -/
 
 theorem UcMisa.preS {s : UWSt} (h : UcMisa D s) : UcMisa D (ucPreS s) :=
@@ -494,61 +449,5 @@ theorem uc_tryStep_active_eq (hD : UcFoot D) (orc : UOrc) (s : UWSt)
     runRW D orc s (try_step 0 false) = runRW D orc (ucPreS s) (run_hart_active 0 >>= ucFinish) := by
   rw [uc_tryStep_eq, runRW_bind_some D _ _ orc orc s (ucPreS s) _ (uc_prelude hD orc s), hact]
   rfl
-
-/-- **The interrupt cycle** (Rocq's `Step_Pending_Interrupt` arm, whole):
-the dispatch fires on the oracle's wire answers, the handler runs from the
-prelude's state, then the tick. -/
-theorem uc_tryStep_interrupt (hD : UcFoot D) (hDd : UcDispFoot D) (orc orc2 : UOrc) (s s2 : UWSt)
-    (hm : UcMisa D s) (hact : s.file .hart_state = .HART_ACTIVE ())
-    (hpriv : s.file .cur_privilege = Privilege.User)
-    (hmm : s.file .mie &&& ~~~(s.file .mideleg) = 0#64) (i : InterruptType) (p : Privilege)
-    (hdisp : dispatchU (s.file .mie) (s.file .mideleg)
-      (ucIp (s.file .mip) ((orc 0).reg .sig_meip) ((orc 1).reg .sig_seip)) = some (i, p))
-    (hh : runRW D orc.tail.tail (ucPreS s) (handle_interrupt i p) = some ((), s2, orc2))
-    (hact2 : s2.file .hart_state = .HART_ACTIVE ()) :
-    runRW D orc s (try_step 0 false) = some (false, ucEpi false s2, orc2) := by
-  rw [uc_tryStep_active_eq hD orc s hact, uc_runHartActive_eq, bind_assoc,
-    runRW_bind_some D _ _ orc _ _ _ _ (uc_dispatch_preS hDd orc s hm hpriv hmm), hdisp]
-  exact uc_finish_pending hD _ orc2 _ s2 i p hh hact2
-
-/-- **The no-interrupt cycle, composed** (the rest of Rocq's six arms, whole):
-the dispatch declines, the fetch lands on `fr`, and the tail and the finish
-run from there.  Every piece is a hypothesis about its own walk -- in
-particular the fetch, which is a walk only when it faults before its
-instruction read (a fetch that reads instruction bytes is a node rule; see
-`UCycleSwp`). -/
-theorem uc_tryStep_noIntr (hD : UcFoot D) (hDd : UcDispFoot D) (orc orcf orc3 : UOrc)
-    (s sf s3 : UWSt) (hm : UcMisa D s) (hact : s.file .hart_state = .HART_ACTIVE ())
-    (hpriv : s.file .cur_privilege = Privilege.User)
-    (hmm : s.file .mie &&& ~~~(s.file .mideleg) = 0#64)
-    (hdisp : dispatchU (s.file .mie) (s.file .mideleg)
-      (ucIp (s.file .mip) ((orc 0).reg .sig_meip) ((orc 1).reg .sig_seip)) = none)
-    (fr : FetchResult) (b : Bool)
-    (hfetch : runRW D orc.tail.tail (ucPreS s) (fetch ()) = some (fr, sf, orcf))
-    (htail : runRW D orcf sf (ucAfterFetch fr >>= ucFinish) = some (b, s3, orc3)) :
-    runRW D orc s (try_step 0 false) = some (b, s3, orc3) := by
-  rw [uc_tryStep_active_eq hD orc s hact, uc_runHartActive_eq, bind_assoc,
-    runRW_bind_some D _ _ orc _ _ _ _ (uc_dispatch_preS hDd orc s hm hpriv hmm), hdisp]
-  show runRW D _ _ ((fetch () >>= ucAfterFetch) >>= ucFinish) = _
-  rw [bind_assoc, runRW_bind_some D _ _ _ _ _ _ _ hfetch]
-  exact htail
-
-/-- The tail of a faulting fetch: `Step_Fetch_Failure`, the handler, the
-tick (Rocq's `Step_Fetch_Failure` arm). -/
-theorem uc_tail_fetchFail (hD : UcFoot D) (orc orc2 : UOrc) (s s2 : UWSt) (e : ExceptionType)
-    (a : BitVec 64) (hh : runRW D orc s (handle_exception a e) = some ((), s2, orc2))
-    (hact : s2.file .hart_state = .HART_ACTIVE ()) :
-    runRW D orc s (ucAfterFetch (F_Error (e, a)) >>= ucFinish) = some (false, ucEpi false s2, orc2) := by
-  rw [runRW_bind_some D _ _ orc orc s s _ (uc_afterFetch_error orc s e a)]
-  exact uc_finish_fetchFail hD orc orc2 s s2 _ e hh hact
-
-/-- The tail of an executed step: the step value, then its arm.  (The arm's
-walk is one of `uc_finish_*`.) -/
-theorem uc_tail_exec (orc orc1 orc3 : UOrc) (s s1 s3 : UWSt) (fr : FetchResult) (st : Step) (b : Bool)
-    (ht : runRW D orc s (ucAfterFetch fr) = some (st, s1, orc1))
-    (hf : runRW D orc1 s1 (ucFinish st) = some (b, s3, orc3)) :
-    runRW D orc s (ucAfterFetch fr >>= ucFinish) = some (b, s3, orc3) := by
-  rw [runRW_bind_some D _ _ orc orc1 s s1 st ht]
-  exact hf
 
 end MachCSL

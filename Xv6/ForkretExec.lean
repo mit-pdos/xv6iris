@@ -258,8 +258,6 @@ theorem fkr_panic [CurCtx] (PA : PANIC) (c : CPU) (k' : KCtx)
 
 theorem fkr_panic_slots : panicSlots ≤ 416 := by decide
 theorem fkr_kexec_slots : kexecSlots ≤ 416 := by decide
-theorem fkr_beq_tgt : KA.«forkret» + 0x50#64 + BitVec.signExtend 64 58#13 = KA.«forkret» + 0x8a#64 := by
-  decide
 theorem fkr_bcond_m1 : bcond bop.BEQ 18446744073709551615#64 18446744073709551615#64 = true := by
   decide
 theorem fkr_bcond_1 : bcond bop.BEQ 1#64 18446744073709551615#64 = false := by decide

@@ -51,10 +51,6 @@ def ushcmdOfTree (s0 : Nat) (g : Nat → BitVec 8) : UshpCmd → Ushcmd
   | .list l r => .list (ushcmdOfTree s0 g l) (ushcmdOfTree s0 g r)
   | .back c => .back (ushcmdOfTree s0 g c)
 
-/-- The type word agrees. -/
-theorem ushTy_ofTree (s0 : Nat) (g : Nat → BitVec 8) (t : UshpCmd) : ushTy (ushcmdOfTree s0 g t) = ushpTy t := by
-  cases t <;> rfl
-
 section UshSeam
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]

@@ -130,12 +130,6 @@ theorem kexecOk_iff (V V' : ProcPriv) (r entry spv szv' : BitVec 64) (na : Nat) 
       ((r = 0xFFFFFFFFFFFFFFFF#64 ∧ evAfter V V') ∨ kexecOkWin V V' r entry spv szv' na alen) :=
   Iff.rfl
 
-/-- The success arm does not read the event count (permit sweep L1a). -/
-theorem kexecOkWin_updEv (V V' : ProcPriv) (k : Nat) (r entry spv szv' : BitVec 64) (na : Nat)
-    (alen : Nat → Nat) :
-    kexecOkWin (V.updEv k) V' r entry spv szv' na alen ↔ kexecOkWin V V' r entry spv szv' na alen :=
-  Iff.rfl
-
 /-- **Rocq `kexec_ok_q`**: `kexecOk` with the caller's claim `Q entry` added to
 the success arm. -/
 def kexecOkQ (Q : BitVec 64 → Prop) (V V' : ProcPriv) (r entry spv szv' : BitVec 64) (na : Nat)
@@ -155,14 +149,6 @@ theorem kexecOkQ_True (V V' : ProcPriv) (r entry spv szv' : BitVec 64) (na : Nat
   · rintro (h | h)
     · exact Or.inl h
     · exact Or.inr ⟨trivial, h⟩
-
-/-- Rocq `kexec_ok_q_weaken`. -/
-theorem kexecOkQ_weaken (Q : BitVec 64 → Prop) (V V' : ProcPriv) (r entry spv szv' : BitVec 64)
-    (na : Nat) (alen : Nat → Nat) (h : kexecOkQ Q V V' r entry spv szv' na alen) :
-    kexecOk V V' r entry spv szv' na alen := by
-  rcases h with h | ⟨-, h⟩
-  · exact Or.inl h
-  · exact Or.inr h
 
 /-- Rocq `kexec_ok_q_of_True`. -/
 theorem kexecOkQ_of_True (V V' : ProcPriv) (r entry spv szv' : BitVec 64) (na : Nat)
@@ -209,15 +195,6 @@ theorem kexecOkQf_mono (Q Q' : BitVec 64 → Prop) (QF QF' : KxfCause → Prop) 
   · exact Or.inl ⟨hr, hV, c, hF c hc⟩
   · exact Or.inr ⟨hQ _ hq, h⟩
 
-/-- Rocq `kexec_ok_q_of_qf`: dropping only the cause. -/
-theorem kexecOkQ_of_qf (Q : BitVec 64 → Prop) (QF : KxfCause → Prop) (V V' : ProcPriv)
-    (r entry spv szv' : BitVec 64) (na : Nat) (alen : Nat → Nat)
-    (h : kexecOkQf Q QF V V' r entry spv szv' na alen) :
-    kexecOkQ Q V V' r entry spv szv' na alen := by
-  rcases h with ⟨hr, hV, -⟩ | h
-  · exact Or.inl ⟨hr, hV⟩
-  · exact Or.inr h
-
 /-- Rocq `kexec_ok_qf_of_q`: at the vacuous cause plug every `bad:` tail pays
 with `noMem`. -/
 theorem kexecOkQf_of_q (Q : BitVec 64 → Prop) (V V' : ProcPriv) (r entry spv szv' : BitVec 64)
@@ -226,12 +203,6 @@ theorem kexecOkQf_of_q (Q : BitVec 64 → Prop) (V V' : ProcPriv) (r entry spv s
   rcases h with ⟨hr, hV⟩ | h
   · exact Or.inl ⟨hr, hV, .noMem, trivial⟩
   · exact Or.inr h
-
-/-- Rocq `kexec_ok_qf_True`. -/
-theorem kexecOkQf_True (V V' : ProcPriv) (r entry spv szv' : BitVec 64) (na : Nat)
-    (alen : Nat → Nat) (h : kexecOk V V' r entry spv szv' na alen) :
-    kexecOkQf (fun _ => True) (fun _ => True) V V' r entry spv szv' na alen :=
-  kexecOkQf_of_q _ V V' r entry spv szv' na alen (kexecOkQ_of_True V V' r entry spv szv' na alen h)
 
 /-- THE FAILURE ARM, as the one `-1` return proves it (`kxc_exit_m1`'s pure
 step, named): nothing moved, and the tail's cause pays the plug. -/
@@ -330,18 +301,6 @@ def kexecCloser (Q : BitVec 64 → ProcPriv → (Nat → List (BitVec 8)) → Pr
     kxcBufs k A -∗
     bslots 3 -∗ irefSlots 2 -∗ wpLoop cpu')
 
-/-- The closer is monotone in both plugs. -/
-theorem kexecCloser_mono (Q Q' : BitVec 64 → ProcPriv → (Nat → List (BitVec 8)) → Prop)
-    (QF QF' : KxfCause → Prop) (k : KCtx) (A : KexecArgs) (cpu' : CPU)
-    (hQ : ∀ e V' M', Q e V' M' → Q' e V' M') (hF : ∀ c, QF c → QF' c) :
-    kexecCloser (GF := GF) Q' QF' k A cpu' ⊢ kexecCloser Q QF k A cpu' := by
-  unfold kexecCloser
-  iintro H %spie %spp %R' %V' %M' %entry %spv %szv' %hcs %hok
-  iapply H $$ %spie %spp %R' %V' %M' %entry %spv %szv' %hcs
-  ipureintro
-  exact kexecOkQf_mono _ _ _ _ _ _ _ _ _ _ _ _ (fun e h => hQ e V' M' h)
-    (fun c h => ⟨hF c h.1, h.2⟩) hok
-
 /-- **THE LANDED EXIT, CONVERTED** (Rocq `ProofKexecTail.kxc_exit_qgen`): a
 continuation over the landed `kexecOk` relays as the closer at every plug
 (the generic relation implies the landed one, to the left of a wand). -/
@@ -402,19 +361,5 @@ def kxqHdrOk (HD : Option (List (BitVec 8))) (ef : List (BitVec 8)) : Prop :=
   match HD with
   | none => True
   | some h => ∀ j, j < 64 → ef[j]! = h[j]!
-
-theorem kxqHdrOk_none (ef : List (BitVec 8)) : kxqHdrOk none ef := trivial
-
-/-- Rocq `kxq_hdr_ok_ext`: transport along agreement below 64. -/
-theorem kxqHdrOk_ext (HD : Option (List (BitVec 8))) (ef ef' : List (BitVec 8))
-    (hj : ∀ j, j < 64 → ef[j]! = ef'[j]!) (h : kxqHdrOk HD ef') : kxqHdrOk HD ef := by
-  cases HD with
-  | none => trivial
-  | some hd => intro j hlt; rw [hj j hlt]; exact h j hlt
-
-/-- Rocq `kxq_entry_of_hdr`. -/
-theorem kxqEntry_of_hdr (h ef : List (BitVec 8)) (hh : kxqHdrOk (some h) ef) :
-    kxqEntry ef = kxqEntry h :=
-  kxqEntry_ext ef h hh
 
 end Xv6

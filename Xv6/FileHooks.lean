@@ -40,20 +40,6 @@ namespace Xv6
 /-- the line the last COMPLETE body of `I` parses to -/
 noncomputable def fline (I : List (BitVec 8)) : Uline := ulineOf ((bodiesOf I)[nlines I - 1]!)
 
-/-- ...and when that line is a redirect, its words are among the input's
-redirect lines -/
-theorem fline_echofIn (I : List (BitVec 8)) (ws : List (List (BitVec 8))) (N : List (BitVec 8))
-    (hp : 0 < nlines I) (hf : fline I = .LEchoF ws N) : (N, ws) ∈ echofLinesIn I := by
-  unfold echofLinesIn
-  rw [List.mem_filterMap]
-  refine ⟨.LEchoF ws N, ?_, rfl⟩
-  rw [← hf]
-  unfold linesOf fline
-  apply List.mem_map_of_mem
-  unfold nlines at hp
-  rw [List.getElem!_eq_getElem?_getD, List.getElem?_eq_getElem (by unfold nlines; omega)]
-  exact List.getElem_mem _
-
 /-- the alternatives whose console output is a function of the LINE alone.
 `RCRan` is the only one that reads the file's state. -/
 def fstateFree : Ralt → Bool

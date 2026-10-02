@@ -75,14 +75,6 @@ def dirlookupRegs (k : KCtx) (ip : BitVec 64) (R : RegMap) (i : Nat) : Prop :=
   R 22#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFA2#64 ∧ R 23#5 = k.regs 12#5 ∧
   R 24#5 = k.regs 24#5 ∧ R 25#5 = k.regs 25#5 ∧ R 26#5 = k.regs 26#5 ∧ R 27#5 = k.regs 27#5
 
-theorem dirlookupRegs_cs (k : KCtx) (ip : BitVec 64) (R R' : RegMap) (i : Nat)
-    (h : dirlookupRegs k ip R i) (hcs : calleeSaved R R') : dirlookupRegs k ip R' i := by
-  obtain ⟨a2, a8, a9, a18, a19, a20, a21, a22, a23, a24, a25, a26, a27⟩ := h
-  obtain ⟨c2, c8, c9, c18, c19, c20, c21, c22, c23, c24, c25, c26, c27⟩ := hcs
-  exact ⟨c2.trans a2, c8.trans a8, c9.trans a9, c18.trans a18, c19.trans a19, c20.trans a20,
-    c21.trans a21, c22.trans a22, c23.trans a23, c24.trans a24, c25.trans a25, c26.trans a26,
-    c27.trans a27⟩
-
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]

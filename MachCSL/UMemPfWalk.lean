@@ -35,8 +35,6 @@ def umePfAcc : cbop_zicbop → MemoryAccessType mem_payload
   | .PREFETCH_W => .Store .Data
   | .PREFETCH_I => .InstructionFetch ()
 
-theorem umePfAcc_utrAcc (c : cbop_zicbop) : utrAcc (umePfAcc c) = true := by cases c <;> rfl
-
 /-- **A prefetch sets no `A`/`D` bit.** -/
 theorem ume_upd_pf (w : BitVec 64) (c : cbop_zicbop) : update_PTE_Bits w (umoPf c) = none := by
   unfold update_PTE_Bits

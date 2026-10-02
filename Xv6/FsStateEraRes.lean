@@ -452,27 +452,6 @@ theorem inodeOwnedEra_to (γfs : FsNames) (γi : GName) (inum : BitVec 32) (n : 
   · iexact Hb
   · iexact Ht
 
-/-- `inodeOwnedEra_to` at an arbitrary share.  What crosses is the
-`InodeInv` vocabulary at `dq`; the record proxy does NOT take a share
-(records park region-side at fraction 1 always, plan section 2).  Rocq's
-`inode_owned_era_to_q`. -/
-theorem inodeOwnedEra_toQ (γfs : FsNames) (dq : DFrac) (γi : GName) (inum : BitVec 32)
-    (n : FsNode) :
-    inodeOwnedEraQ (GF := GF) γfs dq γi inum n ⊢
-      dinodeAt γi inum n.fnRec ∗ indResQ γfs dq (bmOf n)
-        ∗ inodeBlocksQ γfs dq (bmOf n) (fnData n) ∗ topFragQ (fsGammaL γfs) dq inum.toNat n := by
-  unfold inodeOwnedEraQ inodeDatQ
-  iintro ⟨Hd, ⟨Hb, Hi⟩, Ht, %hl⟩
-  ihave Hb := (inodeBlocksEraQ γfs dq inum.toNat n hl).2 $$ Hb
-  ihave Hi := (indResEraQ γfs dq n).2 $$ Hi
-  isplitl [Hd]
-  · iexact Hd
-  isplitl [Hi]
-  · iexact Hi
-  isplitl [Hb]
-  · iexact Hb
-  · iexact Ht
-
 /-! ### THE READER'S QUARTER, IN THE `InodeInv` VOCABULARY
 
 `ilock` without a transaction withdraws exactly the DATA LEG at a quarter,

@@ -344,13 +344,6 @@ instance bitmapInv_persistent (γfs : FsNames) (bms : Nat) (cov : ExtTreeSet Nat
     (ls size : Nat) : Persistent (bitmapInv (GF := GF) γfs bms cov ls size) := by
   unfold bitmapInv; infer_instance
 
-theorem bitmapInv_reg (γfs : FsNames) (bms : Nat) (cov : ExtTreeSet Nat compare)
-    (ls size : Nat) :
-    bitmapInv (GF := GF) γfs bms cov ls size ⊢ bitmapReg γfs bms cov ls size := by
-  unfold bitmapInv bitmapReg fsBytesAnyAt
-  iintro ⟨H1, H2, -⟩
-  iframe H1 H2
-
 theorem bitmapInv_of (γfs : FsNames) (bms : Nat) (cov : ExtTreeSet Nat compare)
     (ls size : Nat) :
     bitmapReg (GF := GF) γfs bms cov ls size ⊢ excSealed γfs.exc -∗
@@ -381,14 +374,6 @@ theorem bitmapInv_bytes_at (γfs : FsNames) (bms : Nat) (cov : ExtTreeSet Nat co
     (ls size : Nat) :
     bitmapReg (GF := GF) γfs bms cov ls size ⊢ fsBytesAt γfs (fsHomeList cov ls) := by
   unfold bitmapReg; iintro ⟨-, H⟩; iexact H
-
-/-- Rocq's `bitmap_inv_bytes`. -/
-theorem bitmapInv_bytes (γfs : FsNames) (bms : Nat) (cov : ExtTreeSet Nat compare)
-    (ls size : Nat) :
-    bitmapInv (GF := GF) γfs bms cov ls size ⊢ fsBytesAny γfs := by
-  unfold bitmapInv
-  iintro ⟨-, Hb⟩
-  iapply fsBytesAnyAt_any γfs (fsHomeList cov ls) $$ Hb
 
 /-! ## `bitmapOk`, READ OFF THE POOL -/
 

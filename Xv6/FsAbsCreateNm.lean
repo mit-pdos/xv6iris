@@ -248,16 +248,6 @@ theorem aunarmOfArm_of_nd (Γ : FsViewNames GF) (E : CoPset) (Nd : Absnode → P
   ihave Hu := H $$ %i Harm
   iapply (aunarmCommitAt_of_nd (hlc := hlc) Γ E i Nd Φ hNd) $$ Hu
 
-/-- Rocq `aunarm_of_arm_nd_mono`. -/
-theorem aunarmOfArmNd_mono (Γ : FsViewNames GF) (E : CoPset) (Nd Nd' : Absnode → Prop)
-    (Farm : Pfam GF (Aview → Nat → IProp GF)) (Φ : Aview → Nat → IProp GF)
-    (hle : ∀ c : Absnode, Nd' c → Nd c) :
-    aunarmOfArmNd (hlc := hlc) Γ E Nd Farm Φ ⊢ aunarmOfArmNd (hlc := hlc) Γ E Nd' Farm Φ := by
-  unfold aunarmOfArmNd
-  iintro H %i Harm
-  ihave Hu := H $$ %i Harm
-  iapply (aunarmCommitAtNd_mono (hlc := hlc) Γ E i Nd Nd' Φ hle) $$ Hu
-
 /-- Rocq `cre_child_unfired_nd`: THE CHILD'S TWO LEGS, with the unarm
 PINNED at the node the arm placed. -/
 def creChildUnfiredNd (Γ : FsViewNames GF) (c : Absnode)

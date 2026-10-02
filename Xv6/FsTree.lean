@@ -389,10 +389,6 @@ def dirZeroedAt (data data' : Nat → List (BitVec 8)) (k0 : Nat) : Prop :=
   ∧ (∀ q, q ≠ k0 → dirInum data' q = dirInum data q)
   ∧ (∀ q, q ≠ k0 → dirBname data' q = dirBname data q)
 
-theorem dirZeroed_dead (data data' : Nat → List (BitVec 8)) (k0 : Nat) :
-    dirZeroedAt data data' k0 → ¬ dirLive data' k0 :=
-  fun h hl => hl h.1
-
 /-- uniqueness is preserved trivially: zeroing only REMOVES a live name -/
 theorem dirNamesUnique_zero (data data' : Nat → List (BitVec 8)) (nrec k0 : Nat) :
     dirZeroedAt data data' k0 → dirNamesUnique data nrec → dirNamesUnique data' nrec := by
@@ -525,37 +521,6 @@ theorem nodeRep_inj (n1 n2 : Fsnode) (dn : Dinode) (data : Nat → List (BitVec 
   intro h1 h2
   rw [nodeRep_nodeOf n1 dn data h1, nodeRep_nodeOf n2 dn data h2]
 
-/-- the node's type, read back off the representation -/
-theorem nodeRep_dir (ents : Std.ExtTreeMap Fname Nat compare) (dn : Dinode)
-    (data : Nat → List (BitVec 8)) :
-    nodeRep (.NDir ents) dn data → dn.diType.toNat = T_DIR_z :=
-  fun h => h.1
-
-theorem nodeRep_alloc (n : Fsnode) (dn : Dinode) (data : Nat → List (BitVec 8)) :
-    nodeRep n dn data → dn.diType.toNat ≠ 0 := by
-  cases n with
-  | NFile bs => exact fun h => h.1
-  | NDir ents => intro h; rw [h.1]; decide
-
-/-- THE ENTRY BRIDGE: a name in `ents` IS a live record of the bytes, at the
-index dirlookup stops on. -/
-theorem nodeRep_ent (ents : Std.ExtTreeMap Fname Nat compare) (dn : Dinode)
-    (data : Nat → List (BitVec 8)) (s : Fname) (z : Nat) :
-    nodeRep (.NDir ents) dn data → ents[s]? = some z →
-    ∃ k, dirFirst data (dirNrec dn.diSize.toNat) s = some k ∧ dirLive data k
-      ∧ dirBname data k = s ∧ (dirInum data k).toNat = z := by
-  rintro ⟨_, _, rfl⟩ h
-  obtain ⟨k, hk, hz⟩ := (dirView_lookup_Some _ _ _ _).mp h
-  exact ⟨k, hk, dirFirst_live _ _ _ _ hk, dirFirst_name _ _ _ _ hk, hz⟩
-
-/-- ...and back: under the invariant every live record IS an entry -/
-theorem nodeRep_ent_of (ents : Std.ExtTreeMap Fname Nat compare) (dn : Dinode)
-    (data : Nat → List (BitVec 8)) (k : Nat) :
-    nodeRep (.NDir ents) dn data → k < dirNrec dn.diSize.toNat → dirLive data k →
-    ents[dirBname data k]? = some (dirInum data k).toNat := by
-  rintro ⟨_, hu, rfl⟩ hk hl
-  exact dirView_live data _ k hu hk hl
-
 /-! ## 7.  PATHS -/
 
 /-- one step: follow name `f` out of node `i`.  A file has no out-edges,
@@ -615,23 +580,6 @@ def pathChain (t : Fstree) (i : Nat) : List Fname → List Nat
                      | some j => pathChain t j p'
                      | none => [])
 
-theorem pathChain_last (t : Fstree) (i j : Nat) (p : List Fname) :
-    pathAt t i p = some j → j ∈ pathChain t i p := by
-  induction p generalizing i with
-  | nil =>
-    intro h
-    have : i = j := Option.some.inj h
-    subst this; exact List.mem_singleton_self _
-  | cons f p ih =>
-    intro h
-    rw [pathAt_cons] at h
-    unfold pathChain
-    cases hte : treeEnt t i f with
-    | none => rw [hte] at h; cases h
-    | some k =>
-      rw [hte] at h
-      exact List.mem_cons_of_mem _ (ih k h)
-
 /-! ## 8.  WELL-FORMEDNESS -/
 
 /-- Every key is a legal inum -- what makes the 32-bit coercion at
@@ -641,8 +589,6 @@ def fsInumsOk (t : Fstree) : Prop := ∀ i n, t.fsNodes[i]? = some n → i < 2 ^
 
 def fsRootDir (t : Fstree) : Prop :=
   ∃ ents : Std.ExtTreeMap Fname Nat compare, t.fsNodes[t.fsRoot]? = some (.NDir ents)
-
-def fsWf (t : Fstree) : Prop := fsInumsOk t ∧ fsRootDir t
 
 /-! ## 9.  THE RECORD DELTAS THE FRIENDLY LAYER READS ITS TREE DELTAS OFF -/
 

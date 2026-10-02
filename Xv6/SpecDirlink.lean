@@ -151,10 +151,6 @@ def dirlinkUnits : Nat := 7
 /-! ## What a dirlink spends, and what it needs (Rocq's, moved out of
 `CreateBudget` because the contract exposes the figures) -/
 
-/-- Rocq's `dl_spend`: IS `wi16Spend` (dirlink's one writei is the
-sixteen-byte window; dirlookup, readi and the scan log nothing). -/
-def dlSpend (crb crd cru al ind : Bool) : Nat := wi16Spend crb crd cru al ind
-
 /-- Rocq's `dl_need`: the append's `wi16Need` or the found arm's
 `iputUnits`, whichever is larger. -/
 def dlNeed (crb ind : Bool) : Nat := max (wi16Need crb ind) iputUnits
@@ -176,14 +172,6 @@ theorem dlNeed_iput (crb ind : Bool) : iputUnits ≤ dlNeed crb ind := by
 theorem dlNeed_wi (crb ind : Bool) : 4 ≤ dlNeed crb ind := by
   cases crb <;> cases ind <;> decide
 
-/-- Rocq's `dl_need_crb`: the need FALLS when the bitmap block is logged. -/
-theorem dlNeed_crb (crb ind : Bool) : dlNeed crb ind ≤ dlNeed false ind := by
-  cases crb <;> cases ind <;> decide
-
-/-- Rocq's `dl_need_ind`: ...and RISES through the indirect block. -/
-theorem dlNeed_ind (crb ind : Bool) : dlNeed crb ind ≤ dlNeed crb true := by
-  cases crb <;> cases ind <;> decide
-
 /-- Rocq's `dl0_spend`: the coarse constant for a FAILING append (see
 Rocq's header: kept for `CreateBudget`, which is stated at it). -/
 def dl0Spend : Nat := 4
@@ -199,9 +187,6 @@ theorem dl0Spend_covers (crb crd cru al ind : Bool) :
 theorem dl0_of_spend (ncount n' : Nat) (crb crd cru al ind : Bool) :
     ncount - wi16Spend crb crd cru al ind ≤ n' → ncount - dl0Spend ≤ n' := by
   have := dl0Spend_covers crb crd cru al ind; omega
-
-/-- Rocq's `dl0_spend_lt`. -/
-theorem dl0Spend_lt : dl0Spend < dirlinkUnits := by decide
 
 /-- **THE SIXTEEN-BYTE SEAM AT dirlink's OWN WINDOW** (Rocq's `dl16_post`):
 guarded by the APPEND arm alone; the credit-aware spend UNGUARDED (writei's

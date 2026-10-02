@@ -84,9 +84,6 @@ def subf (F : Nat → Filt) (j m : Nat) : List Filt := (List.range' j (m + 1)).m
 
 theorem subf_0 (F : Nat → Filt) (j : Nat) : subf F j 0 = [F j] := rfl
 
-theorem subf_S (F : Nat → Filt) (j m : Nat) : subf F j (m + 1) = F j :: subf F (j + 1) m := by
-  simp [subf, List.range'_succ]
-
 theorem subf_fs (fs : List Filt) (hne : fs ≠ []) : fs = subf (sfilt fs) 1 (fs.length - 1) := by
   have hl : fs.length - 1 + 1 = fs.length := by
     cases fs with

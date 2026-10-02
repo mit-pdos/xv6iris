@@ -27,10 +27,6 @@ theorem delete_id {V : Type} (m : RegMapF V) (i : Nat) (h : get? m i = none) :
   · rw [get?_delete_eq hij, ← hij, h]
   · rw [get?_delete_ne hij]
 
-theorem delete_empty {V : Type} (i : Nat) :
-    delete (∅ : RegMapF V) i = (∅ : RegMapF V) :=
-  delete_id _ i (get?_empty i)
-
 /-! ## `delRunL`: a run of keys removed -/
 
 /-- A key past the deleted prefix is untouched. -/

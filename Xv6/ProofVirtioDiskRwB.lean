@@ -74,9 +74,6 @@ def vdrwPin (R R' : RegMap) : Prop :=
   R' 20#5 = R 20#5 ∧ R' 21#5 = R 21#5 ∧ R' 22#5 = R 22#5 ∧ R' 23#5 = R 23#5 ∧
   R' 24#5 = R 24#5 ∧ R' 25#5 = R 25#5 ∧ R' 26#5 = R 26#5 ∧ R' 27#5 = R 27#5
 
-theorem vdrwPin_refl (R : RegMap) : vdrwPin R R :=
-  ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩
-
 theorem vdrwPin_trans {R R' R'' : RegMap} (h1 : vdrwPin R R') (h2 : vdrwPin R' R'') :
     vdrwPin R R'' := by
   obtain ⟨a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12⟩ := h1
@@ -114,19 +111,6 @@ theorem vdrw2_beq3_end' (i : Nat) (h : i + 1 = 3) :
     bcond bop.BEQ (BitVec.ofNat 64 i + 1#64) 3#64 = true := by
   have hc : i = 2 := by omega
   subst hc; decide
-
-/-- Re-entering `virtio_disk_rw`'s critical section after the park: the
-context `acquire` hands back is `vdrwK` again, at the `SPIE`/`SPP` the
-thread was resumed with. -/
-theorem vdrw2_reenter (k : KCtx) (a b : Bool) (hsie : k.sie = false) (hnoff : k.noff = 0)
-    (hlocks : k.locks = []) :
-    (((((vdrwK k).popExit false).withLocks []).withSpie a b).pushOffAt a b).withLocks
-      ["virtio_disk"] = vdrwK (k.withSpie a b) := by
-  obtain ⟨regs, sie, spie, spp, avail, noff, intena, locks, tier, root, proc⟩ := k
-  simp only at hsie hnoff hlocks
-  subst hsie; subst hnoff; subst hlocks
-  simp [vdrwK, KCtx.pushOffAt, KCtx.pushed, KCtx.withLocks, KCtx.withSpie, KCtx.popExit,
-    KCtx.popOff, trapRes]
 
 theorem vdrw2_filter : (["virtio_disk"] : List String).filter (fun x => x ≠ "virtio_disk") = [] := by
   decide

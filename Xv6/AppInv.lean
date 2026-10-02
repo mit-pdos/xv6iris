@@ -187,39 +187,6 @@ theorem appXferRaw_triv {N : Type} (A : N → Aview → IProp GF)
     iapply (htriv r av).2
     ipureintro; trivial
 
-/-- a PURE claim duplicates outright -/
-theorem appXferRaw_pure {N : Type} (P : Aview → Prop) :
-    ⊢ appXferRaw (GF := GF) (fun (_ : N) (av : Aview) => iprop(⌜P av⌝)) := by
-  unfold appXferRaw
-  imodintro
-  iintro %r %av #H
-  imodintro
-  isplitr
-  · iexact H
-  · iexists r
-    iexact H
-
-/-- ...and the general law the pure one is an instance of: a claim that is
-PERSISTENT AT EVERY INSTANCE AND EVERY VIEW duplicates, so the copy at
-"fresh" names is the claim itself at the instance handed in.  This is a
-lemma about the TRANSPORT, not about any application: it covers a pure
-claim, a claim made of invariants, and -- what the echo application's
-`taint ∨ pins` is -- a disjunction of a persistent credential with a pure
-fact.  The later is stripped by nothing: `▷ P` is persistent whenever `P`
-is. -/
-theorem appXferRaw_pers_or_pure {N : Type} (A : N → Aview → IProp GF)
-    (hP : ∀ (r : N) (av : Aview), Persistent (A r av)) : ⊢ appXferRaw A := by
-  unfold appXferRaw
-  imodintro
-  iintro %r %av H
-  have := hP r av
-  icases H with #H
-  imodintro
-  isplitr
-  · iexact H
-  · iexists r
-    iexact H
-
 end AppCredsRaw
 
 /-! ### 1c.  THE MERGE (Rocq `app_merge_raw`, SY3-K2 / SY3-A1 / SY3-A3b) -/
@@ -395,17 +362,6 @@ theorem appRdcred_of_rdwild [MachGS hlc GF] [Appcfg GF] :
   iright
   iexact H
 
-/-- Rocq `app_rdcred_elim`: its elimination at a meta-level reading of each
-arm, the shape the shell tier's dirty arm spends it at. -/
-theorem appRdcred_elim [MachGS hlc GF] [Appcfg GF] (T : IProp GF)
-    (hs : ⊢ appSup (GF := GF) -∗ T)
-    (hw : ⊢ MachFixedGS.rdwild (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF) + 1) -∗ T) :
-    ⊢ appRdcred (hlc := hlc) (GF := GF) -∗ T := by
-  unfold appRdcred
-  iintro (H | H)
-  · iapply hs $$ H
-  · iapply hw $$ H
-
 /-- THE ERA'S DURABILITY LAWS, PINNED, AS ONE PACKAGE (Rocq's `app_merge`,
 main): the merge and the sync runner at the era's token, hook family and
 generation, both at ONE record predicate `Ok` the era's running record
@@ -542,22 +498,6 @@ theorem appTopUpdate [MachGS hlc GF] [FsTopG GF] [Appcfg GF] [Icfg]
   imodintro
   iframe Hk Hf
 
-/-- `_same`: the reading is unchanged, so the claim is (Rocq's
-`app_top_update_same`) -/
-theorem appTopUpdate_same [MachGS hlc GF] [FsTopG GF] [Appcfg GF] [Icfg]
-    (E : CoPset) (γfs : FsNames) (I : RegMapF FsNode) (i : Nat) (n n' : FsNode)
-    (hE : (↑appN : CoPset) ⊆ E) (habs : absOf n = absOf n') :
-    ⊢@{IProp GF} appInv (hlc := hlc) γfs -∗
-      (γfs.top ↪●MAP{DFrac.own (1 : Qp).half} I) -∗ (γfs.top ↪◯MAP[i] n) -∗
-      |={E}=> ((γfs.top ↪●MAP{DFrac.own (1 : Qp).half} (PartialMap.insert I i n')) ∗
-        (γfs.top ↪◯MAP[i] n')) := by
-  iintro #Hinv Hk Hf
-  iapply (appTopUpdate E γfs I i n n' hE) $$ Hinv [] Hk Hf
-  iintro %hi Hp
-  rw [absView_insert_same I i n n' hi habs]
-  imodintro
-  iexact Hp
-
 /-- `_step`: the caller pays, with a plain wand -- it lifts under the later
 (Rocq's `app_top_update_step`) -/
 theorem appTopUpdate_step [MachGS hlc GF] [FsTopG GF] [Appcfg GF] [Icfg]
@@ -605,19 +545,6 @@ theorem appStep_at [Appcfg GF] (i : Nat) (I : RegMapF FsNode) (av' : Aview) (n' 
   iintro Hstep Hp
   unfold appStep
   iapply Hstep $$ %n' %heq Hp
-
-/-- THE IDENTITY STEP (E2-V2; Rocq's `app_step_id`): a move that leaves the
-view where it is owes the application nothing.  It is the arm every counted
-commit takes at a row the view does not have -- the write to, the
-truncation of, an unlinked-but-open file -- and it needs nothing from the
-application: the reading is the same map. -/
-theorem appStep_id [Appcfg GF] (i : Nat) (I : RegMapF FsNode) :
-    ⊢@{IProp GF} appStep i I (absView I) := by
-  unfold appStep
-  iintro %n' %heq Hp
-  rw [heq]
-  imodintro
-  iexact Hp
 
 /-- AN UPDATE OF THE CLAIM THAT DOES NOT MOVE THE MAP (lane E2 / SH-OPEN;
 Rocq's `app_claim_update`).  `appTopUpdate` is for a party that HOLDS half

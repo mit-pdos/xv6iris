@@ -116,9 +116,6 @@ def freeBitmapAt (Γ : FsViewNames GF) (bms nb : Nat) (u : BitSet) : IProp GF :=
 def freeBitmap (Γ : FsViewNames GF) (sb : FsSb) (u : BitSet) : IProp GF :=
   freeBitmapAt Γ sb.sbBmapstart sb.sbSize u
 
-theorem freeBitmap_unfold (Γ : FsViewNames GF) (sb : FsSb) (u : BitSet) :
-    freeBitmap Γ sb u ⊣⊢ freeBitmapAt Γ sb.sbBmapstart sb.sbSize u := .rfl
-
 /-- Rocq's `free_bitmap_at_gname` (deviation 4): the bitmap piece of a
 view depends on `phi` alone. -/
 theorem freeBitmapAt_gname (Γ : FsViewNames GF) (g t : GName) (bms nb : Nat) (u : BitSet) :
@@ -303,41 +300,6 @@ theorem freePool_shed (Γ Γ1 Γ2 : FsViewNames GF) (Hs : FsView.viewShed Γ Γ1
     isplitl [H1]
     · iexists bs; iexact H1
     · iexists bs; iexact H2
-
-/-! ## The two movers, at the whole predicate -/
-
-/-- Rocq's `bitmap_alloc`. -/
-theorem bitmapAlloc (Γ : FsViewNames GF) (bms nb : Nat) (u : BitSet) (b : Nat)
-    (hb : b < nb) (hnu : b ∉ u) :
-    freeBitmapAt Γ bms nb u ⊢ iprop(
-      (∃ bs, FsView.blkOwned Γ b bs) ∗
-      FsView.blkOwned Γ bms (bmBytes BSIZE u) ∗
-      (FsView.blkOwned Γ bms (bmBytes BSIZE (u ∪ {b})) -∗
-        freeBitmapAt Γ bms nb (u ∪ {b}))) := by
-  unfold freeBitmapAt
-  iintro ⟨Hbm, Hpool⟩
-  ihave ⟨Hblk, Hpool⟩ := freePool_take Γ nb u b hb hnu $$ Hpool
-  iframe Hblk Hbm
-  iintro Hbm'
-  iframe Hbm' Hpool
-
-/-- Rocq's `bitmap_free`. -/
-theorem bitmapFree (Γ : FsViewNames GF) (Hex : phiExcl Γ) (bms nb : Nat) (u : BitSet)
-    (b : Nat) (bs : List (BitVec 8)) (hb : b < nb) :
-    freeBitmapAt Γ bms nb u ⊢ FsView.blkOwned Γ b bs -∗ iprop(
-      ⌜b ∈ u⌝ ∗
-      FsView.blkOwned Γ bms (bmBytes BSIZE u) ∗
-      (FsView.blkOwned Γ bms (bmBytes BSIZE (u \ {b})) -∗
-        freeBitmapAt Γ bms nb (u \ {b}))) := by
-  unfold freeBitmapAt
-  iintro ⟨Hbm, Hpool⟩ Hin
-  ihave %hin := freePool_used Γ Hex nb u b bs hb $$ Hpool Hin
-  isplitr [Hbm Hpool Hin]
-  · ipureintro; exact hin
-  iframe Hbm
-  iintro Hbm'
-  iframe Hbm'
-  iapply freePool_give Γ Hex nb u b bs hb $$ Hin Hpool
 
 end
 

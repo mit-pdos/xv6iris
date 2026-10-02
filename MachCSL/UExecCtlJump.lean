@@ -113,26 +113,6 @@ theorem uxc_jalr_gen (hD : UxcFoot D) (orc : UOrc) (s : UWSt) (imm : BitVec 12) 
   simp only [RETIRE_SUCCESS, uxa_wX hD.alu, runRW_bind, Option.bind]
   rfl
 
-/-- **JALR, the misaligned-target trap**: `Zca` off and bit 1 of the target
-set. -/
-theorem uxc_jalr_misaligned (hD : UxcFoot D) (orc : UOrc) (s : UWSt) (imm : BitVec 12)
-    (rs1 rd : regidx)
-    (hlp : runRW D orc s (currentlyEnabled extension.Ext_Zicfilp) = some (false, s, orc))
-    (hz : runRW D orc s (currentlyEnabled extension.Ext_Zca) = some (false, s, orc))
-    (h1 : (uxcTgtR s imm rs1).getLsbD 1 = true) :
-    runRW D orc s (execute (.JALR (imm, rs1, rd))) =
-      some (.Trap (s.file .cur_privilege, make_sync_exception (.E_Fetch_Addr_Align ()) (uxcTgtR s imm rs1),
-        s.file .PC), s, orc) := by
-  have h0 := uxc_lsb0_update (uxaXget s.file (uxaIdx rs1) + sign_extend (m := 64) imm)
-  cases rs1 with | Regidx i1 =>
-  cases rd with | Regidx i2 =>
-  show runRW D orc s (execute_JALR imm _ _) = _
-  unfold uxcTgtR at h1 ⊢
-  simp only [uxaIdx] at h0 h1 ⊢
-  simp only [execute_JALR, update_elp_state, runRW_bind, hlp, Option.bind, Bool.false_eq_true,
-    ↓reduceIte, runRW_pure, get_next_pc, MachCSL.utr_readReg D orc s _ hD.npcR, uxa_rX hD.alu,
-    uxc_jump_to_misaligned D orc s _ hz h0 h1 hD.priv hD.pc]
-
 /-- **JALR at the user tier**: the jump retires. -/
 theorem uxc_jalr (hD : UxcFoot D) (orc : UOrc) (s : UWSt) (hU : UxcCfg s) (imm : BitVec 12)
     (rs1 rd : regidx) :
@@ -191,19 +171,6 @@ theorem uxc_btype_gen (hD : UxcFoot D) (orc : UOrc) (s : UWSt) (imm : BitVec 13)
   split
   · exact uxc_btype_arm hD orc s imm z hz h0 hok
   · rfl
-
-/-- **BTYPE, the misaligned-target trap**: taken, `Zca` off, bit 1 of the
-target set. -/
-theorem uxc_btype_misaligned (hD : UxcFoot D) (orc : UOrc) (s : UWSt) (imm : BitVec 13)
-    (rs2 rs1 : regidx) (op : bop)
-    (ht : uxcBTaken op (uxaXget s.file (uxaIdx rs1)) (uxaXget s.file (uxaIdx rs2)) = true)
-    (hz : runRW D orc s (currentlyEnabled extension.Ext_Zca) = some (false, s, orc))
-    (h0 : (uxcTgt s imm).getLsbD 0 = false) (h1 : (uxcTgt s imm).getLsbD 1 = true) :
-    runRW D orc s (execute (.BTYPE (imm, rs2, rs1, op))) =
-      some (.Trap (s.file .cur_privilege, make_sync_exception (.E_Fetch_Addr_Align ()) (uxcTgt s imm),
-        s.file .PC), s, orc) := by
-  rw [uxc_btype_body op imm rs2 rs1 s D hD orc, ht, if_pos rfl]
-  exact uxc_btype_arm_misaligned hD orc s imm hz h0 h1
 
 /-- **BTYPE at the user tier**: an even offset (decode invariant) and a
 2-aligned `PC`: the branch retires, jumping iff taken. -/

@@ -144,11 +144,6 @@ theorem namexEraHops_cons (A : NamexArgs) (P Pmiss : Nat → Nat → IProp GF)
       exHop A.rti fscFs P Pmiss es0.length el ∗ namexEraHops A P Pmiss (es0.length + 1) :=
   axHopsFrom_cons A.rti _ P Pmiss _ es0.length el _ (namexEra_ps_drop A es0 el R hes hR)
 
-/-- The family past its end is `emp`. -/
-theorem namexEraHops_done (A : NamexArgs) (P Pmiss : Nat → Nat → IProp GF) (kk : Nat)
-    (hk : (namexEraPs A).length ≤ kk) : ⊢ namexEraHops A P Pmiss kk :=
-  axHopsFrom_done A.rti _ P Pmiss _ kk hk
-
 /-- THE ONE-SHOT START at the root inum `A.rti` (an absolute path) or the
 cwd inum `A.cwi` (`exStart` / `epStart`). -/
 def namexEraStart (A : NamexArgs) (P Pmiss : Nat → Nat → IProp GF) : IProp GF :=

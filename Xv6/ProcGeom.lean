@@ -47,8 +47,6 @@ def MAXVA : Nat := 2 ^ 38
 /-- `&proc[i]` (Rocq `proc_addr`). -/
 def procAddr (i : Nat) : BitVec 64 := procsAddr + BitVec.ofNat 64 (procSize * i)
 
-/-- `&p->lock` (offset 0; `locked` at 0, `name` at 8, `cpu` at 16). -/
-def pLock (pa : BitVec 64) : BitVec 64 := pa
 def pState (pa : BitVec 64) : BitVec 64 := pa + 24#64
 def pChan (pa : BitVec 64) : BitVec 64 := pa + 32#64
 def pKilled (pa : BitVec 64) : BitVec 64 := pa + 40#64
@@ -164,9 +162,6 @@ theorem procAddr_ne_end {m : Nat} (h : m < NPROC) : procAddr m ≠ KA.«ticksloc
   rw [h2, h3] at h1
   unfold NPROC at h
   omega
-
-theorem secc_addr (x : BitVec 64) : x + BitVec.signExtend 64 368#12 = pSecc x := by
-  unfold pSecc; rfl
 
 /-- A state cell whose sign-extension is `2` holds SLEEPING. -/
 theorem sext_sleeping (st : BitVec 32) (h : BitVec.signExtend 64 st = 2#64) : st = SLEEPING := by

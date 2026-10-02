@@ -35,9 +35,6 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 
 /-! ## Arithmetic facts -/
 
-/-- The 12-bit immediate `-1`, sign-extended. -/
-theorem ss_negone : BitVec.signExtend 64 (4095#12) = 0xFFFFFFFFFFFFFFFF#64 := by decide
-
 /-- The same, right-associated: the form `k_norm` leaves after `BitVec.add_assoc`. -/
 theorem ss_succ' (b : BitVec 64) (k : Nat) :
     b + (BitVec.ofNat 64 k + 1#64) = b + BitVec.ofNat 64 (k + 1) := by bv_omega

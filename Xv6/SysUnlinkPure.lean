@@ -134,42 +134,8 @@ theorem sys_unlink_dots_only_scan (self : Nat) (dn : Dinode) (data : Nat → Lis
   | 1 => exact Or.inr hn1
   | k' + 2 => exact absurd (hdead (k' + 2) (by omega) hk) hlive
 
-/-- `rdClamp` at n = 16: never more (Rocq's `su_clamp_le16`) -/
-theorem sys_unlink_clamp_le16 (szw : BitVec 32) (off : Nat) : rdClamp szw off 16 ≤ 16 :=
-  rdClamp_le szw off 16
-
-/-- ...and 16 exactly means the whole record sits inside the file (Rocq's
-`su_clamp16_in`) -/
-theorem sys_unlink_clamp16_in (szw : BitVec 32) (off : Nat) (h : rdClamp szw off 16 = 16) :
-    off + 16 ≤ szw.toNat := by
-  unfold rdClamp at h; split at h <;> omega
-
-/-- `dirNrec` against the byte bound (Rocq's `su_nrec_le`) -/
-theorem sys_unlink_nrec_le (sz j : Nat) (hj : sz ≤ 16 * j) : dirNrec sz ≤ j := by
-  unfold dirNrec; omega
-
 /-- Rocq's `su_nrec16` -/
 theorem sys_unlink_nrec16 (sz : Nat) : 16 * dirNrec sz ≤ sz := (dirNrec_range sz).1
-
-/-- the two inum bytes of a record (Rocq's `su_half_bytes_eq`) -/
-theorem sys_unlink_half_bytes_eq (data : Nat → List (BitVec 8)) (i j : Nat) (hj : j < 2) :
-    nthByte (n := 2) (dirInum data i) j = fileByte data (16 * i + j) := by
-  match j, hj with
-  | 0, _ => exact dirInum_byte0 data i
-  | 1, _ => exact dirInum_byte1 data i
-
-/-- ...and its fourteen name bytes (Rocq's `su_name_shift`) -/
-theorem sys_unlink_name_shift (data : Nat → List (BitVec 8)) (i j : Nat) :
-    fileByte data (16 * i + (2 + j)) = dirName data i j := by
-  unfold dirName; congr 1; omega
-
-/-- readi's delivered byte at `tot = 16` is the file's byte (Rocq's
-`su_rdd_eq`) -/
-theorem sys_unlink_rdd_eq (data : Nat → List (BitVec 8)) (olds : List (BitVec 8)) (off jj : Nat)
-    (hj : jj < 16) : (rdDelivered data olds off 16)[jj]? = some (fileByte data (off + jj)) := by
-  unfold rdDelivered
-  rw [List.getElem?_append_left (by simp; omega)]
-  simp [rdBytes, hj]
 
 /-! ## W5's pure layer: the zeroing writei's cost, the zero record, the decrement -/
 
@@ -197,23 +163,5 @@ theorem sys_unlink_dz_inum : direntZero.inum = 0#16 := rfl
 /-- ...and each of its sixteen bytes (Rocq's `su_dz_byte`) -/
 theorem sys_unlink_dz_byte (j : Nat) (hj : j < 16) : (direntBytes direntZero)[j]? = some 0#8 := by
   rw [direntBytes_zero, List.getElem?_replicate]; simp [hj]
-
-/-- the decrement arithmetic (Rocq's `su_decr_pay`; deviation 3) -/
-theorem sys_unlink_decr_pay (x y : Nat) (bb : Bool) (h : y = x + 1) :
-    x + (if bb then 1 else 0) ≤ y := by
-  cases bb <;> simp <;> omega
-
-/-- Rocq's `su_dec_short` -/
-theorem sys_unlink_dec_short (a c : Nat) (h : c = a + 1) (hc : c ≤ 32767) : a ≤ 32767 := by omega
-
-/-- Rocq's `su_decr_pos` -/
-theorem sys_unlink_decr_pos (x y z : Nat) (h1 : y = x + 1) (h2 : y = z) (h3 : 2 ≤ z) : x ≠ 0 := by
-  omega
-
-/-- Rocq's `su_le1_nz_eq1` -/
-theorem sys_unlink_le1_nz_eq1 (x : Nat) (h1 : x ≤ 1) (h2 : x ≠ 0) : x = 1 := by omega
-
-/-- Rocq's `su_decr_zero` -/
-theorem sys_unlink_decr_zero (x y : Nat) (h1 : y = x + 1) (h2 : y = 1) : x = 0 := by omega
 
 end Xv6

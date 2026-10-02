@@ -82,22 +82,16 @@ theorem needsCtx_not_isRunning {st : BitVec 32} (h : needsCtx st) : ¬ isRunning
 theorem needsCtx_not_invDormant {st : BitVec 32} (h : needsCtx st) : ¬ invDormant st := by
   rcases h with h | h | h <;> subst h <;> decide
 
-theorem needsCtx_unclaimed {st : BitVec 32} (h : needsCtx st) : st ≠ USED → unclaimed st :=
-  fun hu => ⟨needsCtx_notRunning h, hu⟩
-
-theorem notRunning_of_not_isRunning {st : BitVec 32} (h : ¬ isRunning st) : notRunning st := h
 theorem isRunning_of_not_notRunning {st : BitVec 32} (h : ¬ notRunning st) : isRunning st := by
   unfold notRunning at h; unfold isRunning
   by_cases hc : st = RUNNING
   · exact hc
   · exact absurd hc h
 
-theorem parkOk_cases {st : BitVec 32} (h : parkOk st) : needsCtx st ∨ st = ZOMBIE := h.1
 theorem parkOk_notRunning {st : BitVec 32} (h : parkOk st) : notRunning st := by
   rcases h.1 with h' | h'
   · exact needsCtx_notRunning h'
   · subst h'; decide
-theorem parkOk_unclaimed {st : BitVec 32} (h : parkOk st) : unclaimed st := ⟨parkOk_notRunning h, h.2⟩
 theorem parkOk_not_RUNNING {st : BitVec 32} (h : parkOk st) : st ≠ RUNNING := parkOk_notRunning h
 
 @[simp] theorem needsCtx_RUNNING : ¬ needsCtx RUNNING := by decide
@@ -283,19 +277,6 @@ theorem pstate_split (Γ : SchedNames) (j : Nat) (st : BitVec 32) :
   have e := pstateOwn_split (GF := GF) Γ j (1 : Qp).half (1 : Qp).half st
   rw [Qp.half_add_half] at e
   exact e
-
-theorem pstate_join (Γ : SchedNames) (j : Nat) (st : BitVec 32) :
-    pstateHlf (GF := GF) Γ j st ∗ pstateHlf Γ j st ⊢ pstateFull Γ j st := by
-  have e := pstateOwn_join (GF := GF) Γ j (1 : Qp).half (1 : Qp).half st
-  rw [Qp.half_add_half] at e
-  exact e
-
-/-- Both halves step together. -/
-theorem pstate_update (Γ : SchedNames) (j : Nat) (st st' : BitVec 32) :
-    pstateHlf (GF := GF) Γ j st ∗ pstateHlf Γ j st ⊢ |==> (pstateHlf Γ j st' ∗ pstateHlf Γ j st') := by
-  unfold pstateHlf pstateOwn
-  iintro ⟨H1, H2⟩
-  iapply ghost_var_update_halves _ _ _ _ $$ H1 H2
 
 /-- The mirror, keyed by the proc's address. -/
 def pstateAt (Γ : SchedNames) (pa : BitVec 64) (q : Qp) (st : BitVec 32) : IProp GF := iprop%
@@ -1066,15 +1047,6 @@ instance instCtxMorphProcCtxAt (Γ : SchedNames) (pa : BitVec 64) :
   unfold procCtxAt
   exact @instCtxMorphExists hlc GF _ _ _
     (fun ξp => @instCtxMorphSep hlc GF _ _ _ (instCtxMorphParked ξp) (instCtxMorphConst _))
-
-/-- A migratable record at the holder's own context IS what `swtch` wants of
-its target. -/
-theorem procCtx_resume_tok (Γ : SchedNames) (ξl : CtxId) (pa : BitVec 64) :
-    procCtxAt (GF := GF) Γ ξl pa ⊢
-      ∃ ξt : CtxId, parkTokAt ξl none ξt ∗ ▷ validCtx (pSched Γ) ⟨none, pContext pa 0, pa, ξt⟩ := by
-  unfold procCtxAt
-  simp only [parkTokAt_none]
-  iintro H; iexact H
 
 /-- ...and what a park hands the resumed scheduler IS the slot. -/
 theorem procCtx_of_tok (Γ : SchedNames) (ξl ξo : CtxId) (pa : BitVec 64) :

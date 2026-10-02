@@ -355,12 +355,6 @@ def SyscSpostEmp : Prop :=
 
 variable (f : sfam GF) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState)
 
-/-- Rocq `sysc_fork_in_ne`. -/
-theorem syscForkIn_ne (h : syscNum V ≠ USYS_fork) : ⊢ syscForkIn (hlc := hlc) f V M sts := by
-  unfold syscForkIn
-  iintro %hc
-  exact absurd hc h
-
 /-- Rocq `sysc_fork_out_ne`. -/
 theorem syscForkOut_ne (r : BitVec 64) (cs cs' : ExtTreeSet GName compare)
     (h : syscNum V ≠ USYS_fork) : ⊢ syscForkOut f V r cs cs' := by

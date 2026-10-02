@@ -140,17 +140,6 @@ theorem outLink_mono (i : UartId) (k : Nat) (b : BitVec 8) (Φ Φ' : IProp GF) :
   iframe Hlb' Hres'
   iapply HΦ $$ HP
 
-theorem outChain_mono (i : UartId) (k : Nat) (bs : List (BitVec 8)) (Φ Φ' : IProp GF) :
-    (Φ -∗ Φ') ⊢ outChain i k bs Φ -∗ outChain i k bs Φ' := by
-  induction bs generalizing Φ Φ' with
-  | nil => unfold outChain; iintro HΦ H; iapply HΦ $$ H
-  | cons b bs ih =>
-    unfold outChain
-    iintro HΦ H
-    iapply outLink_mono i k b _ _ $$ [HΦ] H
-    iintro H
-    iapply ih Φ Φ' $$ HΦ H
-
 /-- THE LICENCE AT ONE ERA, FOR THE PROCESS EVENTS (Rocq `cons_licence_at`,
 seccomp design §9/§10.2, lane S0): the `∀ k` of `consLicence` instantiated,
 at the two events a process steps the claim by (`wildEv`) and under the
@@ -228,24 +217,6 @@ theorem outChain_triv (k : Nat) (bs : List (BitVec 8)) (Φ : IProp GF) :
     iapply outLink_triv k b _
     iapply ih $$ HΦ
 
-theorem outRun_stop (i : UartId) (k : Nat) (bs : List (BitVec 8)) (Q : Nat → IProp GF) :
-    outRun i k bs Q ⊢ Q 0 := by
-  cases bs with
-  | nil => exact .rfl
-  | cons b bs => unfold outRun; exact and_elim_l
-
-theorem outRun_chain (i : UartId) (k : Nat) (bs : List (BitVec 8)) (Q : Nat → IProp GF) :
-    outRun i k bs Q ⊢ outChain i k bs (Q bs.length) := by
-  induction bs generalizing Q with
-  | nil => exact .rfl
-  | cons b bs ih =>
-    unfold outRun outChain
-    iintro H
-    ihave H := (and_elim_r (P := Q 0)) $$ H
-    iapply outLink_mono i k b _ _ $$ [] H
-    iintro H
-    iapply ih (fun j => Q (j + 1)) $$ H
-
 /-! ## The echo's and the reader's links -/
 
 /-- THE ECHO'S BYTE REACHING THE WIRE (Rocq `echo_link`): the `evByte`
@@ -262,25 +233,9 @@ theorem echoLink_mono (k : Nat) (h : List Obs) (b : BitVec 8) (Φ Φ' : IProp GF
   unfold echoLink
   exact consLink_mono .uart0 k (.evByte b) Φ Φ'
 
-theorem echoChain_mono (k : Nat) (h : List Obs) (bs : List (BitVec 8)) (Φ Φ' : IProp GF) :
-    (Φ -∗ Φ') ⊢ echoChain k h bs Φ -∗ echoChain k h bs Φ' := by
-  induction bs generalizing Φ Φ' with
-  | nil => unfold echoChain; iintro HΦ H; iapply HΦ $$ H
-  | cons b bs ih =>
-    unfold echoChain
-    iintro HΦ H
-    iapply echoLink_mono k h b _ _ $$ [HΦ] H
-    iintro H
-    iapply ih Φ Φ' $$ HΦ H
-
 /-- THE READ (Rocq `read_link`): the `evRead` link. -/
 def readLink (k : Nat) (ws : List (List Obs × BitVec 8)) (Φ : IProp GF) : IProp GF :=
   consLink .uart0 k (.evRead ws) Φ
-
-theorem readLink_of_licence (k : Nat) (ws : List (List Obs × BitVec 8)) (Φ : IProp GF) :
-    consLicence ⊢ Φ -∗ readLink k ws Φ := by
-  unfold readLink
-  exact consLink_of_licence k (.evRead ws) Φ
 
 /-- WHAT A CONSOLE READ CARRIES IN (Rocq `cons_read_pay`): one link
 quantified over the window. -/
@@ -434,13 +389,6 @@ theorem storeChain_uart1 (γ : UartNames) (bs : List (BitVec 8)) (Φ : IProp GF)
   iintro HΦ
   iapply storeChain_of_outChain .uart1 γ bs Φ
   iapply outChain_triv $$ HΦ
-
-/-- A licensed writer at the console port. -/
-theorem storeChain_of_licence (γ : UartNames) (bs : List (BitVec 8)) (Φ : IProp GF) :
-    consLicence (hlc := hlc) (GF := GF) ⊢ Φ -∗ storeChain .uart0 γ bs Φ := by
-  iintro #Hlic HΦ
-  iapply storeChain_of_outChain .uart0 γ bs Φ
-  iapply outChain_of_licence $$ Hlic HΦ
 
 /-- THE ECHO'S STORE (Rocq `store_ob_of_echo_link`): the arm says which byte
 is next, the event steps the history, and both halves of the arm advance. -/

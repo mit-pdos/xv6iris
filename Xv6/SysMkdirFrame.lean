@@ -86,11 +86,6 @@ theorem sys_mkdir_K (a : Nat) (h : sysMkdirSlots ≤ a) :
 
 /-! ## The sign cluster (the `bltz` at +0x1a) and the `beqz` at +0x2c -/
 
-/-- `c.li a1,1` leaves create's `ty` argument, SIGN-extended (`T_DIR`). -/
-theorem sys_mkdir_a1 : 0#64 + BitVec.signExtend 64 1#12 = BitVec.signExtend 64 T_DIR := by decide
-/-- `c.li a2,0` / `c.li a3,0`: `major = minor = 0`. -/
-theorem sys_mkdir_a23 : 0#64 + BitVec.signExtend 64 0#12 = BitVec.signExtend 64 (0#16) := by decide
-
 theorem sys_mkdir_tdir_nz : T_DIR.toNat ≠ 0 := by decide
 theorem sys_mkdir_tdir_ne_file : T_DIR ≠ T_FILE_w := by decide
 

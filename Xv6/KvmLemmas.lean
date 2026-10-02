@@ -59,11 +59,6 @@ theorem vpn_add_eq (v : BitVec 27) (i : Nat) (h : v.toNat + i < 2 ^ 27) :
   simp only [BitVec.toNat_ofNat]
   omega
 
-theorem vpn_ofNat_toNat (v : BitVec 27) : BitVec.ofNat 27 v.toNat = v := by
-  apply BitVec.eq_of_toNat_eq
-  have := v.isLt
-  simp only [BitVec.toNat_ofNat]; omega
-
 /-! ## `mapRun`, step by step -/
 
 theorem mapRun_succ_eq (t : PTree) (vpn : BitVec 27) (ppn : BitVec 44) (perm : KPerm) (n : Nat)
@@ -264,20 +259,6 @@ theorem complete_two_congr (t : PTree) (v w : BitVec 27) (h2 : vpnIdx v 2 = vpnI
   exact h
 
 /-! ## The same shape: transferring the node count to a dummy tree -/
-
-theorem complete_congr (lvl : Nat) (t u : PTree) (vpn : BitVec 27) (h : sameShape lvl t u)
-    (hc : t.complete lvl vpn) : u.complete lvl vpn := by
-  induction lvl generalizing t u with
-  | zero => exact MachCSL.PTree.complete_zero u vpn
-  | succ lvl ih =>
-    obtain ⟨c, hk, hcc⟩ := (complete_succ_iff lvl t vpn).mp hc
-    have hi := h (vpnIdx vpn (lvl+1))
-    rw [hk] at hi
-    cases hk' : u.kids (vpnIdx vpn (lvl+1)) with
-    | none => rw [hk'] at hi; exact absurd hi (by simp)
-    | some d =>
-      rw [hk'] at hi
-      exact (complete_succ_iff lvl u vpn).mpr ⟨d, hk', ih c d hi hcc⟩
 
 theorem sameShape_fill' (lvl : Nat) (t u : PTree) (vpn : BitVec 27) (fr gr : List (BitVec 44))
     (h : sameShape lvl t u) (hf : t.missingOn lvl vpn ≤ fr.length)
@@ -498,16 +479,6 @@ theorem complete_stacks (t : PTree) (h : t.complete 2 0x3FFFFFF#27) (i : Nat) (h
     t.complete 2 (kstackVpn i) :=
   complete_two_congr t 0x3FFFFFF#27 (kstackVpn i) (kstackVpn_idx2 i hi).symm
     (kstackVpn_idx1 i hi).symm h
-
-/-- A page outside a run, in range form. -/
-theorem walk_out (n : Nat) (t : PTree) (v : BitVec 27) (ppn : BitVec 44) (perm : KPerm)
-    (fr : List (BitVec 44)) (hwf : t.wf 2) (w : BitVec 27) (m i : Nat) (hi : i < m)
-    (hw : w.toNat + m ≤ 2 ^ 27) (hv : v.toNat + n ≤ 2 ^ 27)
-    (hdis : w.toNat + m ≤ v.toNat ∨ v.toNat + n ≤ w.toNat) :
-    (t.mapRun v ppn (permBits perm) n fr).1.walk 2 (w + BitVec.ofNat 27 i)
-      = t.walk 2 (w + BitVec.ofNat 27 i) :=
-  walk_mapRun_outside n t v ppn perm fr hwf _
-    (fun j hj => vpn_ne w v i j (by omega) (by omega) (by omega))
 
 /-- A mapping outside a run survives it. -/
 theorem mapsTo_out (n : Nat) (t : PTree) (v : BitVec 27) (ppn : BitVec 44) (perm : KPerm)

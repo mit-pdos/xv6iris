@@ -1014,25 +1014,6 @@ theorem spostAt_sync_intro_xv6 (X : Uvis → IProp GF) (f : Xfam GF) (W : Uvis) 
   simp only [Int.reduceEq, if_false, if_true]
   exact .rfl
 
-/-- **Rocq `spost_at_sync_elim`**. -/
-theorem spostAt_sync_elim_xv6 (X : Uvis → IProp GF) (f : Xfam GF) (W : Uvis) (r : BitVec 64)
-    (M' : ElfMem) (fdv' : List FdState) (cw' : Nat) (cs' : ExtTreeSet GName compare) :
-    @UexecSG.spostAt GF _ uexecSGXv6 X 22 f W r M' fdv' cw' cs' ⊢ qOpt f.syOQ := by
-  show xv6Spost (hlc := hlc) X 22 f W r M' fdv' cw' cs' ⊢ _
-  unfold xv6Spost USYS_exec USYS_pipe
-  simp only [Int.reduceEq, if_false, if_true]
-  exact .rfl
-
-/-- **Rocq `xv6_sbundle_exit_nopipe`**: at a pipe-free table the exit row is
-minted from nothing. -/
-theorem sbundleAt_exit_nopipe_xv6 (X : Uvis → IProp GF) (f : Xfam GF) (W : Uvis)
-    (h : ∀ st ∈ W.fd, fdstNopipe st) :
-    ⊢ @UexecSG.sbundleAt GF _ uexecSGXv6 X USYS_exit f W := by
-  show ⊢ xv6Sbundle (hlc := hlc) X USYS_exit f W
-  unfold xv6Sbundle xv6SbundleRest USYS_exec USYS_exit
-  simp only [Int.reduceEq, if_false, if_true]
-  exact filecloseCpays_nopipe W.fd h
-
 /-- **Rocq `sbundle_at_kill_elim`** / `sysc_dep_kill`: row 6 is the kill
 credential (no out). -/
 theorem syscDepKill_xv6 (X : Uvis → IProp GF) (f : Xfam GF) (W : Uvis) :

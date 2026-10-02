@@ -192,23 +192,6 @@ end
 
 /-! ## The context the epilogue runs in -/
 
-/-- After the `release`, `virtio_disk_rw`'s context is its entry context
-with the twelve-slot frame still up. -/
-theorem vdrw6_popctx (k : KCtx) (hsie : k.sie = false) (hlocks : k.locks = [])
-    (hwf : k.wf) :
-    ((vdrwK k).popExit false).withLocks ([] : List String) = k.pushed 12 := by
-  have h0 : (k.pushOffAt k.spie k.spp).popExit false = k := by
-    rw [show (false : Bool) = k.sie from hsie.symm,
-      KCtx.pushOffAt_popExit k k.spie k.spp hwf]
-    rfl
-  have h1 : (vdrwK k).popExit false = (k.withLocks ("virtio_disk" :: k.locks)).pushed 12 := by
-    show ((((k.pushOffAt k.spie k.spp).withLocks ("virtio_disk" :: k.locks)).pushed 12).popExit
-      false) = _
-    rw [KCtx.popExit_pushed, KCtx.popExit_withLocks, h0]
-  rw [h1, KCtx.pushed_withLocks, KCtx.withLocks_withLocks,
-    show k.withLocks ([] : List String) = k from by
-      rw [← hlocks]; exact KCtx.withLocks_self k]
-
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
 

@@ -17,9 +17,6 @@ open LeanRV64D LeanRV64D.Functions
 
 /-! ## Layout -/
 
-/-- Bit `i` of a flags byte. -/
-def flagBit (i : Nat) (f : BitVec 8) : Bool := f.getLsbD i
-
 /-- A kernel mapping's permission: text is read/execute, everything else
 the kernel maps is read/write. -/
 inductive KPerm where
@@ -213,28 +210,6 @@ theorem update_PTE_Bits_pteSetAD (p : BitVec 64) (a d : BitVec 1)
   | _ =>
     simp_all [update_PTE_Bits, Mk_PTE_Flags, A_of_pteSetAD, D_of_pteSetAD,
       updateSubrange_pteSetAD, accWrites, is_prefetch_access, Functions.not]
-
-/-- Nothing to do on a kernel leaf once `A` is set and, for a write, `D` is
-set. -/
-theorem update_PTE_Bits_kLeaf_none (ppn : BitVec 44) (perm : KPerm) (d : BitVec 1)
-    (acc : MemoryAccessType mem_payload) (hpl : accPlain acc)
-    (hd : accWrites acc = false ∨ d = 1#1) :
-    update_PTE_Bits (kLeaf ppn perm 1#1 d) acc = none := by
-  simp only [kLeaf]
-  rw [update_PTE_Bits_pteSetAD _ _ _ _ hpl]
-  rcases hd with hw | rfl <;> simp_all
-
-/-- Otherwise the hardware writes back the same leaf with `A` set, and `D`
-set if the access is a write. -/
-theorem update_PTE_Bits_kLeaf_some (ppn : BitVec 44) (perm : KPerm) (a d : BitVec 1)
-    (acc : MemoryAccessType mem_payload) (hpl : accPlain acc)
-    (h : a = 0#1 ∨ (accWrites acc = true ∧ d = 0#1)) :
-    update_PTE_Bits (kLeaf ppn perm a d) acc =
-      some (kLeaf ppn perm 1#1 (if accWrites acc then 1#1 else d)) := by
-  simp only [kLeaf]
-  rw [update_PTE_Bits_pteSetAD _ _ _ _ hpl]
-  rcases bv1_cases a with rfl | rfl <;> rcases bv1_cases d with rfl | rfl <;>
-    cases hw : accWrites acc <;> simp_all
 
 /-- A leaf's page and permission are determined by its value, at any A/D. -/
 theorem kLeaf_inj {ppn ppn' : BitVec 44} {perm perm' : KPerm} {a d a' d' : BitVec 1}

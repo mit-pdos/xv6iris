@@ -227,7 +227,6 @@ def clean (b : BitVec 8) : Prop := b ≠ wlNl ∧ b ≠ cNul
 
 theorem bdec_true (a b : BitVec 8) (h : a = b) : bdec a b = true := by simp [bdec, h]
 theorem bdec_false (a b : BitVec 8) (h : a ≠ b) : bdec a b = false := by simp [bdec, h]
-theorem bdec_spec (a b : BitVec 8) : bdec a b = true ↔ a = b := by simp [bdec]
 
 theorem scan_clean_app (pat : Bytes) (skip : Bool) (cur x y : Bytes) (hx : ∀ b ∈ x, clean b) :
     scan pat skip cur (x ++ y) = scan pat skip (cur ++ x) y := by

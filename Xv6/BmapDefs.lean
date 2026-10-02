@@ -395,13 +395,6 @@ theorem bmPins_set (k : KCtx) (R : RegMap) (r : BitVec 5) (v : BitVec 64)
       | (rw [if_neg (Ne.symm n26)]; assumption)
       | (rw [if_neg (Ne.symm n27)]; assumption)
 
-theorem bmPins_cs (k : KCtx) (R R' : RegMap) (h : bmPins k R) (hcs : calleeSaved R R') :
-    bmPins k R' := by
-  obtain ⟨a21, a22, a23, a24, a25, a26, a27⟩ := h
-  obtain ⟨-, -, -, -, -, -, c21, c22, c23, c24, c25, c26, c27⟩ := hcs
-  exact ⟨c21.trans a21, c22.trans a22, c23.trans a23, c24.trans a24, c25.trans a25,
-    c26.trans a26, c27.trans a27⟩
-
 /-- The epilogue's `calleeSaved`: the frame restores `ra`, `s0`..`s3` and
 `sp`; `s4` was restored (or never written) and `s5..s11` never touched. -/
 theorem bm_calleeSaved_epi (KR R : RegMap) (v : BitVec 64) (h20 : R 20#5 = KR 20#5)

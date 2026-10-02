@@ -373,35 +373,4 @@ structure INSTALL_TRANS : Prop where
       hj hproc hK hnoff htier hgeom hdev hcl hdt ha0 hn hnodup hhome hlen hcommit hpin
       hxexc hpd
 
-/-- The interrupts-off instance of `wp_install_trans_eb` (the complement is the whole
-bundle): the contract every not-yet-generalized caller states. -/
-theorem INSTALL_TRANS.wp_install_trans (A : INSTALL_TRANS) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-    [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (cpu : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
-    (γfs : FsNames) (pd pav pu : BitVec 64) (j : Nat) (logstart : Nat) (dev : BitVec 32)
-    (recovering : Bool) (n : Nat) (W : List (BitVec 32)) (Lw : Nat → List (BitVec 8))
-    (L : BlockMap) (D : RegMapF Bool) (pidv : BitVec 32) (dqp : DFrac)
-    (homeL : List Nat) (Xv : Nat → List (BitVec 8)) (Xexc : List Nat) (Rt : Nat → IProp GF)
-    hj hproc hK hsie hnoff hlocks htier hgeom hdev hcl hdt ha0 hn hnodup hhome hlen hcommit hpin
-    hxexc hpd :
-    wp_install_trans_body (hlc := hlc) (GF := GF) Γ cpu k γl γb V γdl γfs pd pav pu j
-      logstart dev recovering n W Lw L D pidv dqp homeL Xv Xexc Rt
-      hj hproc hK hsie hnoff hlocks htier hgeom hdev hcl hdt ha0 hn hnodup hhome hlen hcommit hpin
-      hxexc hpd := by
-  have h := A.wp_install_trans_eb (hlc := hlc) (GF := GF) (Γ := Γ) (cpu := cpu) (k := k) (γl := γl) (γb := γb) (V := V) (γdl := γdl) (γfs := γfs) (pd := pd) (pav := pav) (pu := pu) (j := j) (logstart := logstart) (dev := dev) (recovering := recovering) (n := n) (W := W) (Lw := Lw) (L := L) (D := D) (pidv := pidv) (dqp := dqp) (homeL := homeL) (Xv := Xv) (Xexc := Xexc) (Rt := Rt) (hj := hj) (hproc := hproc) (hK := hK) (hnoff := hnoff) (htier := htier) (hgeom := hgeom) (hdev := hdev) (hcl := hcl) (hdt := hdt) (ha0 := ha0) (hn := hn) (hnodup := hnodup) (hhome := hhome) (hlen := hlen) (hcommit := hcommit) (hpin := hpin) (hxexc := hxexc) (hpd := hpd)
-  unfold wp_install_trans_eb_body at h
-  unfold wp_install_trans_body
-  rw [hsie] at h
-  simp only [trapCsrsExt_false, cpuClaimExt_false] at h
-  iintro ⟨H0, H1, H2, Htc, Hcl, Hir, H6, H7, H8, H9, H10, H11, H12, H13, H14, H15, H16, H17, H18,
-    #Hgen, HR0, Hnext⟩
-  iapply h
-  iframe H0 H1 H2 Htc Hcl Hir H6 H7 H8 H9 H10 H11 H12 H13 H14 H15 H16 H17 H18 HR0
-  isplitr
-  · iexact Hgen
-  iapply wpNext_mono $$ Hnext
-  iintro %cpu' HK %spie %spp %R' %p0 H1 H2 ⟨Htc, Hir⟩ Hcl H6 H7 H8 H9 H10 H11 H12 H13 HR
-  iapply HK $$ %spie %spp %R' %p0 H1 H2 Htc Hcl Hir H6 H7 H8 H9 H10 H11 H12 H13 HR
-
 end Xv6

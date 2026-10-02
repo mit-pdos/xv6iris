@@ -165,9 +165,6 @@ macro_rules
 
 /-! ## Addresses -/
 
-def kfork_filedupAddr : BitVec 64 := KA.«filedup»
-def kfork_idupAddr : BitVec 64 := KA.«idup»
-
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 
@@ -196,30 +193,11 @@ immediate exactly as `wp_s_branch`/`wp_s_j` take it (`BitVec 13` / `BitVec
 21`), and the auipc/addi lemmas the `auipc` `imm20 ++ 0#12` shift plus the
 `addi` sign-extended 12-bit immediate. -/
 
-/-- `auipc a0,0x10 ; addi a0,a0,1626` at `0x80001dea`: `&wait_lock`. -/
-theorem kf_waitlock_addr1 :
-    (KA.«kfork» + 0xdc#64) + (BitVec.signExtend 64 (16#20 ++ (0#12 : BitVec 12)) +
-      BitVec.signExtend 64 (1830#12)) = KA.«wait_lock» := by decide
-
-/-- `auipc a0,0x10 ; addi a0,a0,1610` at `0x80001dfa`: `&wait_lock`. -/
-theorem kf_waitlock_addr2 :
-    (KA.«kfork» + 0xec#64) + (BitVec.signExtend 64 (16#20 ++ (0#12 : BitVec 12)) +
-      BitVec.signExtend 64 (1814#12)) = KA.«wait_lock» := by decide
-
 /-- `beq a0,zero,0x80001e2c` at `0x80001d2c` (allocproc failed). -/
 theorem kf_br_allocfail : (KA.«kfork» + 0x16#64) + BitVec.signExtend 64 (264#13) = (KA.«kfork» + 0x11e#64) := by decide
 
 /-- `blt a0,zero,0x80001d92` at `0x80001d42` (uvmcopy failed). -/
 theorem kf_br_uvmfail : (KA.«kfork» + 0x2c#64) + BitVec.signExtend 64 (80#13) = (KA.«kfork» + 0x7c#64) := by decide
-
-/-- `bne a5,a3,0x80001d60` at `0x80001d78` (trapframe copy back-edge). -/
-theorem kf_br_tfloop : (KA.«kfork» + 0x62#64) + BitVec.signExtend 64 (-24#13) = (KA.«kfork» + 0x4a#64) := by decide
-
-/-- `beq s1,s3,0x80001dba` at `0x80001da8` (ofile loop exit). -/
-theorem kf_br_ofexit : (KA.«kfork» + 0x92#64) + BitVec.signExtend 64 (18#13) = (KA.«kfork» + 0xa4#64) := by decide
-
-/-- `c.beqz a0,0x80001da4` at `0x80001dae` (ofile slot empty, skip). -/
-theorem kf_br_ofskip : (KA.«kfork» + 0x98#64) + BitVec.signExtend 64 (-10#13) = (KA.«kfork» + 0x8e#64) := by decide
 
 /-- `c.j 0x80001dac` at `0x80001d90` (into the ofile loop). -/
 theorem kf_j_intoof : (KA.«kfork» + 0x7a#64) + BitVec.signExtend 64 (28#21) = (KA.«kfork» + 0x96#64) := by decide
@@ -253,10 +231,6 @@ theorem kf_tf_cursor_step (base : BitVec 64) (i : Nat) :
   have hse : BitVec.signExtend 64 (BitVec.ofNat 12 32) = BitVec.ofNat 64 32 := by decide
   rw [hse]; bv_omega_g
 
-/-- The cursor after the ninth chunk IS the end pointer. -/
-theorem kf_tf_cursor_end (base : BitVec 64) :
-    base + BitVec.ofNat 64 (32 * (8 + 1)) = base + 288#64 := by bv_omega_g
-
 /-- Before the last chunk the cursor has not reached the end pointer. -/
 theorem kf_tf_cursor_ne (base : BitVec 64) (i : Nat) (hi : i < 8) :
     base + BitVec.ofNat 64 (32 * (i + 1)) ≠ base + 288#64 := by
@@ -287,15 +261,6 @@ theorem kf_merge_set_step {α} (P C : List α) (n : Nat) (hn : n < P.length) (hn
 theorem kf_merge_len {α} (P C : List α) (n : Nat) (hn : n ≤ P.length) (hlen : P.length = C.length) :
     (List.take n P ++ List.drop n C).length = P.length := by
   simp only [List.length_append, List.length_take, List.length_drop]; omega
-
-/-- Below the boundary a merged read still returns the destination word. -/
-theorem kf_merge_get {α} (P C : List α) (n i : Nat) (hn : n ≤ i) (hi : i < C.length) (hnp : n ≤ P.length) :
-    (List.take n P ++ List.drop n C)[i]? = C[i]? := by
-  rw [List.getElem?_append_right (by rw [List.length_take]; omega), List.getElem?_drop]
-  congr 1; rw [List.length_take]; omega
-
-/-- At `n = 0` the merged list is the destination. -/
-theorem kf_merge_zero {α} (P C : List α) : List.take 0 P ++ List.drop 0 C = C := by simp
 
 /-- At the full length the merged list is the source. -/
 theorem kf_merge_full {α} (P C : List α) (hlen : P.length = C.length) :
@@ -900,18 +865,6 @@ theorem kf_ofile_ro_acc [CurCtx] (pa : BitVec 64) (L : List (BitVec 64)) (idx : 
       = ([∗list] j ↦ w ∈ L, wordPointsTo (GF := GF) (pOfile pa j) 8 (DFrac.own 1) w) := by rw [heq]
   rw [← hbig]
   iapply Hb $$ %x Hc
-
-/-- **Read-write ofile accessor** (`pOfile` form). -/
-theorem kf_ofile_rw_acc [CurCtx] (pa : BitVec 64) (L : List (BitVec 64)) (idx : Nat) (x : BitVec 64)
-    (hx : L[idx]? = some x) :
-    ([∗list] j ↦ w ∈ L, wordPointsTo (GF := GF) (pOfile pa j) 8 (DFrac.own 1) w) ⊢
-      wordPointsTo (GF := GF) (pOfile pa idx) 8 (DFrac.own 1) x ∗
-      (∀ y : BitVec 64, wordPointsTo (GF := GF) (pOfile pa idx) 8 (DFrac.own 1) y -∗
-        [∗list] j ↦ w ∈ L.set idx y, wordPointsTo (GF := GF) (pOfile pa j) 8 (DFrac.own 1) w) := by
-  iintro H
-  icases (BigSepL.bigSepL_insert_acc (Φ := fun (j : Nat) (w : BitVec 64) =>
-      iprop(wordPointsTo (GF := GF) (pOfile pa j) 8 (DFrac.own 1) w)) hx) $$ H with ⟨Hc, Hb⟩
-  iframe Hc Hb
 
 theorem kfork_br_257a : KA.«kfork» + 0x257a#64 = KA.«filedup» := by decide
 

@@ -415,11 +415,6 @@ the `p->kstack` cell it just wrote. -/
 def procDormantPrestk (pa : BitVec 64) : IProp GF := iprop%
   procDormantNofd pa ∗ fdSlots (NOFILE + FDSPARE) ∗ irefSlots (IREFHOME + IREFSPARE) ∗ bslots 3
 
-/-- Rocq `proc_dormant_prestk_intro`. -/
-theorem procDormantPrestk_intro (pa : BitVec 64) :
-    procDormantNofd (GF := GF) pa ∗ fdSlots (NOFILE + FDSPARE) ∗ irefSlots (IREFHOME + IREFSPARE) ∗
-      bslots 3 ⊢ procDormantPrestk pa := .rfl
-
 /-- **The seal** (Rocq `proc_dormant_prestk_seal`): the pre-stack block, the
 `p->kstack` cell procinit wrote (Lean's block owns it; Rocq's `is_kstack`),
 the slot's kernel stack below it, and boot's children row, slot
@@ -469,12 +464,6 @@ theorem procDormantPrestk_seal (pa : BitVec 64) (ks : BitVec 64) (γ0 g : GName)
   iframe Hstk
   ipureintro; exact ⟨hpg, htf, hsz, hpid⟩
 
-/-- What slot `i` owes at state `st` besides the lock-protected part
-(Rocq `proc_slots`): the dormant block at UNUSED/ZOMBIE, nothing else yet
-(the running/parked contexts of `SchedCtx.v` are not ported). -/
-def procSlot (i : Nat) (st : BitVec 32) : IProp GF :=
-  if st = UNUSED ∨ st = ZOMBIE then procDormant (procAddr i) st else iprop(True)
-
 end Dormant
 
 /-! ## The current process (Rocq `ProcGeom.cur_proc`) -/
@@ -484,16 +473,6 @@ end Dormant
 `CpuId`).  `myproc()` returns exactly this value. -/
 def curProc [KernelGeom] (cpu : CPU) (p : BitVec 64) : IProp GF :=
   wordPointsTo (aCpuProc cpu) 8 (DFrac.own 1) p
-
-/-- `cur_proc` is the first cell of the per-cpu bundle (Rocq `cpu_cells`). -/
-theorem cpuCells_curProc [KernelGeom] (cpu : CPU) (lent sie : Bool) (noff : Nat) (intena : Bool) (p : BitVec 64) :
-    cpuCells (GF := GF) cpu lent sie noff intena p ⊢
-      curProc cpu p ∗ (curProc cpu p -∗ cpuCells cpu lent sie noff intena p) := by
-  unfold cpuCells curProc
-  iintro ⟨Hp, Hn, Hi⟩
-  iframe Hp
-  iintro Hp
-  iframe
 
 /-- Setting one byte of a 16-byte buffer to `0` makes it a well-formed name. -/
 theorem pnameWf_set (cur : List (BitVec 8)) (p : Nat) (hlen : cur.length = 16) (hp : p ≤ 15) :

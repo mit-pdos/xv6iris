@@ -83,9 +83,6 @@ theorem pms_h5 (i : Nat) (_hi : i < 64) :
   rw [BitVec.extractLsb'_toNat, Xv6.bcOfNatToNat (8192 * i) (by omega), Nat.shiftRight_zero,
     BitVec.toNat_ofNat]
 
-theorem pms_h6 : BitVec.extractLsb' 0 32 (BitVec.signExtend 64 (2#20 ++ 0#12)) = 8192#32 := by
-  bv_decide
-
 theorem pms_h7 (i : Nat) (_hi : i < 64) :
     BitVec.ofNat 32 (8192 * i) + 8192#32 = BitVec.ofNat 32 (8192 * (i + 1)) := by
   apply BitVec.eq_of_toNat_eq
@@ -216,11 +213,6 @@ def pmsKept (R R' : RegMap) : Prop :=
   R' 2#5 = R 2#5 ∧ R' 8#5 = R 8#5 ∧ R' 18#5 = R 18#5 ∧ R' 19#5 = R 19#5 ∧
   R' 20#5 = R 20#5 ∧ R' 21#5 = R 21#5 ∧ R' 22#5 = R 22#5 ∧ R' 23#5 = R 23#5 ∧
   R' 24#5 = R 24#5 ∧ R' 25#5 = R 25#5 ∧ R' 26#5 = R 26#5 ∧ R' 27#5 = R 27#5
-
-theorem pmsKept_of_calleeSaved {R R' : RegMap} (h : calleeSaved R R') : pmsKept R R' :=
-  ⟨h.1, h.2.1, h.2.2.2.1, h.2.2.2.2.1, h.2.2.2.2.2.1, h.2.2.2.2.2.2.1, h.2.2.2.2.2.2.2.1,
-    h.2.2.2.2.2.2.2.2.1, h.2.2.2.2.2.2.2.2.2.1, h.2.2.2.2.2.2.2.2.2.2.1,
-    h.2.2.2.2.2.2.2.2.2.2.2.1, h.2.2.2.2.2.2.2.2.2.2.2.2⟩
 
 theorem pmsKept_trans {R R' R'' : RegMap} (h : pmsKept R R') (h' : pmsKept R' R'') :
     pmsKept R R'' :=

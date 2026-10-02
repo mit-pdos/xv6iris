@@ -88,23 +88,6 @@ theorem slhAuth_none_no_tok (γ : GName) (q : Qp) :
   · cases h
   · cases hb
 
-/-- ...and the general bound, for a client that keeps a running total. -/
-theorem slhAuth_tok_le (γ : GName) (t q : Qp) :
-    slhAuth (GF := GF) γ (some t) ∗ slhTok γ q ⊢ ⌜q ≤ t⌝ := by
-  unfold slhAuth slhTok
-  simp only [slhOf_some]
-  iintro ⟨Ha, Ht⟩
-  icombine Ha Ht gives %Hv
-  have h := (Auth.auth_both_valid_discrete.mp Hv).1
-  ipureintro
-  rcases Option.inc_iff.mp h with h | ⟨a, b, ha, hb, hab⟩
-  · cases h
-  · simp only [Option.some.injEq] at ha hb
-    subst ha; subst hb
-    rcases hab with h | h
-    · simp only [UFrac.ext_iff] at h; rw [h]; exact Rat.le_refl
-    · exact UFrac.le_of_inc h
-
 /-- Minting the first share from the zero. -/
 theorem slh_mint_none (γ : GName) (q : Qp) :
     slhAuth (GF := GF) γ none ⊢ |==> (slhAuth γ (some q) ∗ slhTok γ q) := by

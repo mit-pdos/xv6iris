@@ -336,37 +336,6 @@ theorem PTree.fresh_of_pagesNodup (lvl : Nat) (t : PTree) (vpn : BitVec 27)
   rw [List.nodup_append] at h
   exact ⟨h.2.1, fun b hb hc => h.2.2 b hc b hb rfl⟩
 
-/-- How much of the supply `fill` consumes. -/
-theorem PTree.fill_leftover (lvl : Nat) (t : PTree) (vpn : BitVec 27) (fr : List (BitVec 44))
-    (h : t.missingOn lvl vpn ≤ fr.length) :
-    (t.fill lvl vpn fr).2 = fr.drop (t.missingOn lvl vpn) := by
-  induction lvl generalizing t fr with
-  | zero => rfl
-  | succ l ih =>
-    simp only [PTree.fill, PTree.missingOn]
-    cases hk : t.kids (vpnIdx vpn (l+1)) with
-    | some c =>
-      have h' : c.missingOn l vpn ≤ fr.length := by simpa only [PTree.missingOn, hk] using h
-      exact ih c fr h'
-    | none =>
-      have h' : l + 1 ≤ fr.length := by simpa only [PTree.missingOn, hk] using h
-      cases fr with
-      | nil => simp at h'
-      | cons b fr' =>
-        simp only [List.length_cons] at h'
-        rw [ih _ fr' (by rw [PTree.zeroNode_missingOn]; omega), PTree.zeroNode_missingOn]
-        rfl
-
-theorem PTree.missingOn_le (lvl : Nat) (t : PTree) (vpn : BitVec 27) :
-    t.missingOn lvl vpn ≤ lvl := by
-  induction lvl generalizing t with
-  | zero => exact Nat.le_refl 0
-  | succ l ih =>
-    simp only [PTree.missingOn]
-    cases t.kids (vpnIdx vpn (l+1)) with
-    | some c => exact Nat.le_succ_of_le (ih c)
-    | none => exact Nat.le_refl _
-
 /-! ## Entry addresses -/
 
 theorem pteAddr_eq_pageAddr_shl (b : BitVec 44) (i : BitVec 9) :
@@ -640,29 +609,6 @@ theorem ptreeOwn_read_acc [CurCtx] (lvl : Nat) (dq : DFrac) (t : PTree) (i : Bit
   isplitl [Hnc Hw]
   · iapply Hnc $$ Hw
   · iapply Hkc $$ %c' Hc'
-
-/-- Creating a child behind a missing pointer: the entry word, and the way
-back with the new entry and the new subtree. -/
-theorem ptreeOwn_alloc_acc [CurCtx] (lvl : Nat) (dq : DFrac) (t : PTree) (i : BitVec 9)
-    (_h : t.kids i = none) :
-    ptreeOwn (GF := GF) (lvl+1) dq t ⊢
-      wordPointsTo (pteAddr t.base i) 8 dq (t.ents i) ∗
-      (∀ (v : BitVec 64) (c : PTree), wordPointsTo (pteAddr t.base i) 8 dq v -∗
-        ptreeOwn lvl dq c -∗ ptreeOwn (lvl+1) dq ((t.setEnt i v).setKid i c)) := by
-  rw [ptreeOwn_succ']
-  iintro ⟨Hn, Hk⟩
-  icases nodeOwn_acc dq t i $$ Hn with ⟨Hw, Hnc⟩
-  icases kidsOwn_acc lvl dq t i $$ Hk with ⟨_, Hkc⟩
-  iframe Hw
-  iintro %v %c Hv Hc
-  rw [ptreeOwn_succ',
-    show nodeOwn (GF := GF) dq ((t.setEnt i v).setKid i c) = nodeOwn dq (t.setEnt i v) from rfl,
-    show kidsOwn (GF := GF) lvl dq ((t.setEnt i v).setKid i c) = kidsOwn lvl dq (t.setKid i c)
-      from rfl]
-  isplitl [Hnc Hv]
-  · ihave Hnc := Hnc $$ %v Hv
-    iexact Hnc
-  · iapply Hkc $$ %c Hc
 
 /-! ## A freshly zeroed page is a zero node -/
 

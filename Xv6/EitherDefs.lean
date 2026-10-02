@@ -237,9 +237,6 @@ theorem ec_ret_2d0 : jumpPc (KA.«either_copyout» + 0x1c#64) = (KA.«either_cop
 theorem ec_ret_2e0 : jumpPc (KA.«either_copyout» + 0x2c#64) = (KA.«either_copyout» + 0x2c#64) := by
   decide
 
-theorem ec_ret_32c : jumpPc (KA.«either_copyin» + 0x2c#64) = (KA.«either_copyin» + 0x2c#64) := by
-  decide
-
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 

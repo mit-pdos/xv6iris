@@ -64,10 +64,6 @@ theorem histBytes_of_wordBytes (ξ : CtxId) (pa : PAddr) (n : Nat) (dq : DFrac)
 theorem pt_cong (a b : PAddr) (dq : DFrac) (Hh : Hist) (h : a = b) :
     a ↦ₕ{dq} Hh ⊢@{IProp GF} b ↦ₕ{dq} Hh := by subst h; iintro H; iexact H
 
-/-- Address congruence for a valued byte. -/
-theorem ctxByte_cong (ξ : CtxId) (a b : PAddr) (dq : DFrac) (v : BitVec 8) (h : a = b) :
-    ctxByte (GF := GF) ξ a dq v ⊢ ctxByte ξ b dq v := by subst h; iintro H; iexact H
-
 /-- History congruence for the history cell. -/
 theorem pt_hist_cong (a : PAddr) (dq : DFrac) (H1 H2 : Hist) (h : H1 = H2) :
     a ↦ₕ{dq} H1 ⊢@{IProp GF} a ↦ₕ{dq} H2 := by subst h; iintro x; iexact x
@@ -212,10 +208,6 @@ theorem byteBuf_snoc_one [CurCtx] (a : PAddr) (bs : List (BitVec 8)) (c : BitVec
     rw [show (a + BitVec.ofNat 64 bs.length + BitVec.ofNat 64 0)
           = a + BitVec.ofNat 64 bs.length from by simp]
     iexact Hc
-
-/-- List congruence for a valued buffer. -/
-theorem byteBuf_list_cong [CurCtx] (a : PAddr) (bs bs' : List (BitVec 8)) (dq : DFrac) (h : bs = bs') :
-    byteBuf (GF := GF) a dq bs ⊢ byteBuf a dq bs' := by subst h; iintro x; iexact x
 
 /-- The empty buffer is `emp`. -/
 @[simp] theorem byteBuf_nil_eq [CurCtx] (a : PAddr) (dq : DFrac) :

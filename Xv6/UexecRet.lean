@@ -277,18 +277,6 @@ def trappedMachine [xi : CurCtx] (cpu : CPU) (C : UCfg) (pt : UPtd) (Rut : UPtd 
   iprop(∃ ms : BitVec 64, ⌜W.tf.length = 36⌝ ∗
     userTrapFrameAtm cpu C pt Rut sz W.M ms sc stv (tfW W.tf tfEpcIdx) (tfResumeGpr0 W.tf))
 
-/-- Rocq `trapped_machine_intro`. -/
-theorem trappedMachine_intro [CurCtx] (cpu : CPU) (C : UCfg) (pt : UPtd) (Rut : UPtd → IProp GF)
-    (sz : Nat) (sc stv : BitVec 64) (W : Uvis) (ms : BitVec 64) (hlen : W.tf.length = 36) :
-    userTrapFrameAtm cpu C pt Rut sz W.M ms sc stv (tfW W.tf tfEpcIdx) (tfResumeGpr0 W.tf) ⊢
-      trappedMachine (GF := GF) cpu C pt Rut sz sc stv W := by
-  unfold trappedMachine
-  iintro H
-  iexists ms
-  isplitr
-  · ipureintro; exact hlen
-  · iexact H
-
 /-- **Rocq `user_trap_frame_trapped`**: the old existential frame is a trapped
 machine at the key uservec saves, at the components the caller names. -/
 theorem userTrapFrame_trapped [CurCtx] (cpu : CPU) (C : UCfg) (pt : UPtd) (Rut : UPtd → IProp GF)
@@ -488,44 +476,6 @@ theorem uwaitAnsAt_neg1 (cs : ExtTreeSet GName compare) (gn : GName) (b : Bool) 
   · ipureintro; exact sext_neg1_64.symm
   · iapply waitAns_neg 0 cs gn b pidv $$ Hwhy
 
-/-- Rocq `uwait_ans_neg1`. -/
-theorem uwaitAns_neg1 (cs : ExtTreeSet GName compare) : ⊢ uwaitAns (GF := GF) (-1#64) cs cs := by
-  refine BI.Entails.trans ?_ (uwaitAns_of (-1#64) cs cs 0 false 0#32)
-  refine BI.Entails.trans ?_ (uwaitAnsAt_neg1 cs 0 false 0#32)
-  unfold waitWhy
-  iintro -
-  ileft
-  ipureintro; rfl
-
-/-- Rocq `uwait_ans_reaped`. -/
-theorem uwaitAns_reaped (r : BitVec 64) (cs cs' : ExtTreeSet GName compare) :
-    uwaitAns (GF := GF) r cs cs' ⊢ ⌜chReaped cs cs'⌝ := by
-  unfold uwaitAns uwaitAnsPid uwaitAnsAt
-  iintro ⟨%pidv, %gn, %b, %rv, %xs, -, Ha⟩
-  iapply waitAns_reaped rv xs cs cs' gn b pidv $$ Ha
-
-/-- **Rocq `uwait_ans_pid_mine`**: a process that knows it is not init reads
-the reaping arm as "the generation I reaped was MY child". -/
-theorem uwaitAnsPid_mine (r : BitVec 64) (cs cs' : ExtTreeSet GName compare) (pidv : BitVec 32)
-    (hne : pidv ≠ 1#32) (hm1 : r ≠ -1#64) :
-    uwaitAnsPid (GF := GF) r cs cs' pidv ⊢
-      ∃ (γ' : GName) (rv : BitVec 32) (xs : Int),
-        ⌜r = BitVec.signExtend 64 rv ∧ cs' = cs \ {γ'} ∧ γ' ∈ cs ∧ 1 ≤ rv.toNat ∧ rv.toNat ≤ genPidMax⌝ ∗
-        exitTok γ' rv xs ∗ genUniq cs rv γ' := by
-  unfold uwaitAnsPid uwaitAnsAt waitAns
-  iintro ⟨%gn, %b, %rv, %xs, %hr, (⟨%hf, -⟩ | ⟨%γ', %hrng, %hoci, Hesc, Huniq⟩)⟩
-  · exfalso; apply hm1; rw [hr, hf.1]; exact sext_neg1_64
-  · iexists γ', rv, xs
-    isplitr
-    · ipureintro
-      refine ⟨hr, hrng.1, ?_, hrng.2.1, hrng.2.2⟩
-      rcases hoci with h | h
-      · exact h
-      · exact absurd h hne
-    · isplitl [Hesc]
-      · iexact Hesc
-      · iexact Huniq
-
 /-! ### Fork's two slots -/
 
 /-- **Rocq `uexec_fork_parent_F`**: the parent's arm -- a NONZERO return, its
@@ -668,10 +618,6 @@ theorem ukillCredAt_of_owed (X : Uvis → IProp GF) (gn : GName) (sc : BitVec 64
   · iintro H; iright; iexact H
   · iintro -; iempintro
 
-theorem ukillCredAt_ecall (X : Uvis → IProp GF) (gn : GName) (W : Uvis) (f : sfam GF) :
-    ⊢ ukillCredAt (GF := GF) X gn uecallScause W f :=
-  ukillCredAt_not X gn _ W f (fun h => h.1 rfl)
-
 theorem ukillCredAt_ne (k : Nat) (X Y : Uvis → IProp GF) (HX : ∀ W, X W ≡{k}≡ Y W) (gn : GName)
     (sc : BitVec 64) (W : Uvis) (f : sfam GF) :
     ukillCredAt X gn sc W f ≡{k}≡ ukillCredAt Y gn sc W f := by
@@ -789,13 +735,6 @@ theorem uexecForkParentF_ne (W : Uvis) (Q : Int → IProp GF) (Rc : IProp GF) :
   unfold uexecForkParentF
   refine BI.forall_ne (fun _ => BI.forall_ne (fun _ => BI.forall_ne (fun _ => BI.forall_ne (fun _ => ?_))))
   exact BI.wand_ne.ne .rfl (BI.wand_ne.ne .rfl (BI.wand_ne.ne .rfl (BI.wand_ne.ne .rfl (HX _))))
-
-theorem uexecForkChildF_ne (W : Uvis) (Q : Int → IProp GF) (Rc : IProp GF) :
-    uexecForkChildF X W Q Rc ≡{k}≡ uexecForkChildF Y W Q Rc := by
-  unfold uexecForkChildF
-  refine BI.sep_ne.ne .rfl (BI.sep_ne.ne .rfl ?_)
-  refine BI.forall_ne (fun _ => BI.forall_ne (fun _ => ?_))
-  exact BI.wand_ne.ne .rfl (BI.wand_ne.ne .rfl (BI.wand_ne.ne .rfl (HX _)))
 
 theorem uexecForkF_ne (W : Uvis) (f : sfam GF) : uexecForkF X W f ≡{k}≡ uexecForkF Y W f := by
   unfold uexecForkF
@@ -1036,10 +975,6 @@ theorem uexecArm_transparent (sc : BitVec 64) (W : Uvis) (f : sfam GF) (h : sc �
 /-- Rocq `uexec_kill_arm_not`. -/
 theorem uexecKillArm_not (sc : BitVec 64) (W : Uvis) (f : sfam GF) (h : ¬ ukillSc sc) :
     uslot W ⊢ uexecKillArm sc W f := uexecKillArmF_not uslot sc W f h
-
-/-- Rocq `uexec_kill_arm_of_cred`. -/
-theorem uexecKillArm_of_cred (sc : BitVec 64) (W : Uvis) (f : sfam GF) :
-    □ uKillCred ∗ uslot W ⊢ uexecKillArm sc W f := uexecKillArmF_of_cred uslot sc W f
 
 /-- Rocq `uexec_kill_arm_slot`. -/
 theorem uexecKillArm_slot (sc : BitVec 64) (W : Uvis) (f : sfam GF) :

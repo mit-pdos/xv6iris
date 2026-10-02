@@ -71,11 +71,6 @@ theorem frd_jump_cr : jumpPc KA.«consoleread» = KA.«consoleread» := by decid
 
 /-! ## 2.  The pure arithmetic -/
 
-/-- `lw a3,32(s1)`: a wf offset, sign-extended, is its own value. -/
-theorem frd_lw_off (v : BitVec 32) (h : v.toNat < 2 ^ 31) :
-    BitVec.signExtend 64 v = BitVec.signExtend 64 (BitVec.ofNat 32 v.toNat) := by
-  simp
-
 /-- The count register, as readi's `uint` argument (Rocq `fr_sext_moi32`). -/
 theorem frd_n_arg (n : Int) (h0 : 0 ≤ n) (h1 : n < 2 ^ 31) :
     BitVec.ofInt 64 n = BitVec.signExtend 64 (BitVec.ofNat 32 n.toNat) := by

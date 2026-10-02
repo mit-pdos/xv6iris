@@ -442,11 +442,6 @@ theorem dirRecord_ofName (data : Nat → List (BitVec 8)) (k : Nat)
 def dirWinAgree (data data' : Nat → List (BitVec 8)) (k : Nat) : Prop :=
   ∀ j, j < 16 → fileByte data' (16 * k + j) = fileByte data (16 * k + j)
 
-theorem dirWinAgree_below (data data' : Nat → List (BitVec 8)) (n k : Nat) :
-    (∀ j, j < 16 * n → fileByte data' j = fileByte data j) →
-    k < n → dirWinAgree data data' k :=
-  fun h hk j hj => h _ (by omega)
-
 theorem dirInum_agree (data data' : Nat → List (BitVec 8)) (k : Nat) :
     dirWinAgree data data' k → dirInum data' k = dirInum data k := by
   intro h
@@ -547,9 +542,6 @@ Granularity is NOT a system invariant (fs-icache.md §15(b)), so the two
 directory proofs carry that turn as a live panic arm rather than refuting
 it. -/
 def dirNrec (sz : Nat) : Nat := sz / 16
-
-theorem dirNrec_exact (sz : Nat) : 16 ∣ sz → 16 * dirNrec sz = sz := by
-  intro h; unfold dirNrec; omega
 
 theorem dirNrec_bound (sz i : Nat) : 16 ∣ sz → (i * 16 < sz ↔ i < dirNrec sz) := by
   intro h; unfold dirNrec; omega

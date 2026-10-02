@@ -237,11 +237,6 @@ theorem hdrDec_sector0 (bs : List (BitVec 8)) (hn : (hdrDec bs).1 ≤ LOGBLOCKS)
   show _ ≤ 512
   omega
 
-/-- The tight form: `4 + 4 * LOGBLOCKS = 124` bytes (Rocq `hdr_dec_hdr_bytes`). -/
-theorem hdrDec_hdr_bytes (bs : List (BitVec 8)) (hn : (hdrDec bs).1 ≤ LOGBLOCKS) :
-    hdrDec (bs.take (4 * (LOGBLOCKS + 1))) = hdrDec bs := by
-  apply hdrDec_take; omega
-
 /-- THE FORM EVERY COROLLARY USES: two block contents that agree on sector 0
 decode to the same header (Rocq `hdr_dec_sector0_eq`). -/
 theorem hdrDec_sector0_eq (bs bs' : List (BitVec 8)) (hn : (hdrDec bs).1 ≤ LOGBLOCKS)
@@ -277,16 +272,6 @@ def blkSec0 (old bs : List (BitVec 8)) : List (BitVec 8) :=
 /-- The block picture after sector 1 lands (Rocq `blk_sec1`). -/
 def blkSec1 (old bs : List (BitVec 8)) : List (BitVec 8) :=
   old.take Virtio.sectorSize ++ bs.drop Virtio.sectorSize
-
-theorem blkSec0_len (old bs : List (BitVec 8)) (ho : old.length = BSIZE)
-    (hb : bs.length = BSIZE) : (blkSec0 old bs).length = BSIZE := by
-  unfold blkSec0
-  rw [List.length_append, List.length_take, List.length_drop, ho, hb, bsize_two_sectors]; omega
-
-theorem blkSec1_len (old bs : List (BitVec 8)) (ho : old.length = BSIZE)
-    (hb : bs.length = BSIZE) : (blkSec1 old bs).length = BSIZE := by
-  unfold blkSec1
-  rw [List.length_append, List.length_take, List.length_drop, ho, hb, bsize_two_sectors]; omega
 
 /-- Sector 1's landing leaves the first 512 bytes, hence the decode, where it
 was (Rocq `blk_sec1_take0`). -/

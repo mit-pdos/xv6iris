@@ -62,8 +62,6 @@ set_option linter.unusedSimpArgs false
 
 /-! ## Pure helpers -/
 
-theorem sys_unlink_li128 : BitVec.signExtend 64 128#12 = 128#64 := by decide
-
 /-- the entry context, the frame's `withSpie` at the entry's own bits -/
 theorem sys_unlink_ctx_entry {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
     [KernelGeom] [KernelImage GF] (c : CPU) (k : KCtx) (R : RegMap) :

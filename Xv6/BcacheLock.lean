@@ -17,19 +17,6 @@ theorem bc_filter_bcache (l : List String) (h : "bcache" ∉ l) :
   rw [List.filter_cons_of_neg (by simp)]
   exact List.filter_eq_self.2 (fun x hx => by simp; intro e; subst e; exact h hx)
 
-theorem bc_calleeSaved_mk (KR R : RegMap)
-    (h18 : R 18#5 = KR 18#5) (h19 : R 19#5 = KR 19#5) (h20 : R 20#5 = KR 20#5)
-    (h21 : R 21#5 = KR 21#5) (h22 : R 22#5 = KR 22#5) (h23 : R 23#5 = KR 23#5)
-    (h24 : R 24#5 = KR 24#5) (h25 : R 25#5 = KR 25#5) (h26 : R 26#5 = KR 26#5)
-    (h27 : R 27#5 = KR 27#5) :
-    calleeSaved KR (((R.set 2#5 (KR 2#5)).set 8#5 (KR 8#5)).set 9#5 (KR 9#5)) := by
-  unfold calleeSaved
-  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
-    simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] <;>
-    first
-      | rfl
-      | assumption
-
 /-- The epilogue's register map is callee-saved against the entry map. -/
 theorem bc_calleeSaved_epi (KR R : RegMap)
     (h18 : R 18#5 = KR 18#5) (h19 : R 19#5 = KR 19#5) (h20 : R 20#5 = KR 20#5)

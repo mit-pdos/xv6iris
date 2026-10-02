@@ -278,12 +278,6 @@ theorem ushqPtree_cat (a : List (Nat × Nat)) (rest : List (List (Nat × Nat))) 
   | nil => trivial
   | cons b rest ih => exact ⟨trivial, ih b⟩
 
-theorem ushqPtree_walked (a : List (Nat × Nat)) (rest : List (List (Nat × Nat))) :
-    ushpWalked (ushqPtree a rest) := by
-  induction rest generalizing a with
-  | nil => trivial
-  | cons b rest ih => exact ⟨trivial, ih b⟩
-
 /-- one allocation per node: `2·|rest| + 1`. -/
 theorem ushqPtree_nodes (a : List (Nat × Nat)) (rest : List (List (Nat × Nat))) :
     ushpNodes (ushqPtree a rest) = 2 * rest.length + 1 := by
@@ -296,20 +290,6 @@ theorem ushqPtree_ht (a : List (Nat × Nat)) (rest : List (List (Nat × Nat))) :
   induction rest generalizing a with
   | nil => rfl
   | cons b rest ih => simp only [ushqPtree, ushpHt, ih, List.length_cons]; omega
-
-theorem ushqPtree_bounded (len : Nat) (f : Nat → BitVec 8) :
-    ∀ (c : Nat) (a : List (Nat × Nat)) (rest : List (List (Nat × Nat))), UshqBars len f c a rest →
-      ushpBounded len (ushqPtree a rest) := by
-  intro c a rest h
-  have tokle : ∀ {stop off : Nat} {toks : List (Nat × Nat)}, UshsToks len f stop off toks →
-      ∀ tk ∈ toks, refTokLe len tk := by
-    intro stop off toks ht tk htk
-    obtain ⟨i, hi⟩ := List.mem_iff_getElem?.1 htk
-    have := ushsToks_in ht i tk hi
-    exact ⟨by omega, this.2.2⟩
-  induction h with
-  | last c toks _ _ htoks hlen => exact ⟨hlen, tokle htoks⟩
-  | cons c gp toks b rest _ _ htoks _ hlen _ ih => exact ⟨⟨hlen, tokle htoks⟩, ih⟩
 
 theorem ushPpRoom_ptree (a : List (Nat × Nat)) (rest : List (List (Nat × Nat))) :
     ushPpRoom (ushqPtree a rest) = 46 + 6 * rest.length := by

@@ -300,22 +300,6 @@ theorem procsAvailAt_tok (Γ : SchedNames) (on : Option Nat) (t : Bool) :
 def pavSpent (Γ : SchedNames) (on : Option Nat) : IProp GF :=
   iprop(procsAvail Γ on ∗ nextpidShot)
 
-/-- Rocq `pav_of_spent`. -/
-theorem pavOfSpent (Γ : SchedNames) (on : Option Nat) :
-    initReg (GF := GF) ∗ pavSpent Γ on ⊢ procsAvailAt Γ on false := by
-  unfold pavSpent procsAvailAt npidDone
-  cases on <;> simp only [Bool.false_eq_true, ite_false] <;>
-  · iintro ⟨#Hir, Hc, #Hs⟩
-    iframe Hc
-    isplitr
-    · iexact Hs
-    · iexact Hir
-
-/-- The sealed ledger at its (ignored) index. -/
-theorem procsAvailAt_none (Γ : SchedNames) (t : Bool) :
-    procsAvailAt (GF := GF) Γ none t ⊢ procsAvail Γ none ∗ npidDone := by
-  unfold procsAvailAt; exact .rfl
-
 /-- Rocq `procs_avail_seal_spent`: userinit's seal. -/
 theorem procsAvail_seal_spent (Γ : SchedNames) (n : Nat) :
     initReg (GF := GF) ∗ pavSpent Γ (some n) ⊢ |={⊤}=> procsAvailAt Γ none false := by

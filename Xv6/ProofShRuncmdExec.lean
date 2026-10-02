@@ -112,11 +112,6 @@ theorem shExecXAt_holds (UL : UK_LEAVES) (SX : SH_EXEC_AT_CWD) (Fd1 : List FdSta
     (dg : List (BitVec 8)) (Q : Int → IProp GF) (Cr Cd : IProp GF) : wpShExecXAtBody E Fd1 ws dg Q Cr Cd :=
   shExecXAtGen_holds E UL SX _ (fun _ _ => .rfl) Fd1 ws dg Q Cr Cd
 
-/-- **Rocq `wp_kshr_exec_x_at_v_holds`**. -/
-theorem shExecXAtV_holds (UL : UK_LEAVES) (SX : SH_EXEC_AT_CWD) (Fd1 : List FdState → Prop) (ws : List (List (BitVec 8)))
-    (dg : List (BitVec 8)) (Q : Int → IProp GF) (Cr Cd : IProp GF) : wpShExecXAtVBody E Fd1 ws dg Q Cr Cd :=
-  fun v => shExecXAtGen_holds E UL SX _ (fun γ ld => ustdAt_ustd γ ld v) Fd1 ws dg Q Cr Cd
-
 /-- **Rocq `wp_kshr_exec_echo_at_holds`**: the general arm at echo's
 alternative, by conversion (with the head word read as `cmdEcho` the law's
 index `13 + 4` is the landed 17). -/

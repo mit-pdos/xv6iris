@@ -239,13 +239,6 @@ instance fsBytesAnyAt_persistent (γ : FsNames) (homeL : List Nat) :
 theorem fsBytesAny_row (γ : FsNames) : fsBytesAny (GF := GF) γ ⊢ fsBytesRow γ := by
   unfold fsBytesAny; iintro ⟨H, -⟩; iexact H
 
-theorem fsBytesAny_seal (γ : FsNames) : fsBytesAny (GF := GF) γ ⊢ excSealed γ.exc := by
-  unfold fsBytesAny; iintro ⟨-, H⟩; iexact H
-
-theorem fsBytesAny_of (γ : FsNames) :
-    fsBytesRow (GF := GF) γ ⊢ excSealed γ.exc -∗ fsBytesAny γ := by
-  unfold fsBytesAny; iintro H1 H2; iframe H1 H2
-
 theorem fsBytesAnyAt_at (γ : FsNames) (homeL : List Nat) :
     fsBytesAnyAt (GF := GF) γ homeL ⊢ fsBytesAt γ homeL := by
   unfold fsBytesAnyAt; iintro ⟨H, -⟩; iexact H
@@ -351,15 +344,6 @@ theorem fsblock_install_exc_at (E : CoPset) (γ : FsNames) (homeL : List Nat)
   iintro #Hinv Hxo Ha Hm
   iapply fsblock_install_exc E γ.bytes γ.cache γ.exc homeL Xv L X b bsm hE hb hlen
     $$ Hinv Hxo Ha Hm
-
-/-- ...and the home-block reading, at the row. -/
-theorem fsblock_home_any (E : CoPset) (γ : FsNames) (homeL : List Nat) (b : Nat)
-    (bs : List (BitVec 8)) (hE : (↑logN : CoPset) ⊆ E) :
-    fsBytesAt (GF := GF) γ homeL -∗ fsblock γ.bytes b bs -∗
-      |={E}=> (⌜b ∈ homeL⌝ ∗ fsblock γ.bytes b bs) := by
-  unfold fsBytesAt
-  iintro ⟨%Xv, #Hinv⟩ Hfb
-  iapply fsblock_home_open E γ.bytes γ.cache γ.exc homeL Xv b bs hE $$ Hinv Hfb
 
 end
 

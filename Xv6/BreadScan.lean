@@ -55,11 +55,6 @@ theorem bdOther_set (R0 R : RegMap) (h : bdOther R0 R) (i : BitVec 5) (v : BitVe
     refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
       simp only [RegMap.set_apply, BitVec.reduceEq, ite_false] <;> assumption
 
-/-- A call's callee-saved guarantee is enough. -/
-theorem bdOther_of_cs (R0 R : RegMap) (h : calleeSaved R0 R) : bdOther R0 R := by
-  obtain ⟨c2, c8, c9, c18, c19, c20, c21, c22, c23, c24, c25, c26, c27⟩ := h
-  exact ⟨c2, c18, c19, c20, c21, c22, c23, c24, c25, c26, c27⟩
-
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF]
 variable [SleepLockG GF] [DiskG GF] [CurCtx]

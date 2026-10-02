@@ -153,29 +153,16 @@ here, once, so neither proof does modular arithmetic inline. -/
 
 theorem consBufz : INPUT_BUF_SIZE = 128 := rfl
 
-theorem consUrange (x : BitVec 32) : x.toNat < 2 ^ 32 := x.isLt
-
-theorem consSubz (x y : BitVec 32) : (x - y).toNat = (2 ^ 32 - y.toNat + x.toNat) % 2 ^ 32 :=
-  BitVec.toNat_sub x y
-
-theorem consAddz (x y : BitVec 32) : (x + y).toNat = (x.toNat + y.toNat) % 2 ^ 32 :=
-  BitVec.toNat_add x y
-
 theorem consU1 : (1#32).toNat = 1 := rfl
 
 /-- The `addiw ...,-1` spelling of a decrement is the subtraction. -/
 theorem consDec_eq (x : BitVec 32) : x + 4294967295#32 = x - 1#32 := by bv_omega
-
-theorem consSub_range (x y : BitVec 32) : (x - y).toNat < 2 ^ 32 := (x - y).isLt
 
 theorem consSub_self (x : BitVec 32) : (x - x).toNat = 0 := by simp
 
 /-- The counters are 32 bits wide, so equal DISTANCES from a common base are
 equal words -- which is how `cons.e != cons.w` becomes `w - r < e - r`. -/
 theorem consSub_inj (y x1 x2 : BitVec 32) (h : (x1 - y).toNat = (x2 - y).toNat) : x1 = x2 := by
-  bv_omega
-
-theorem consSub_eq0 (x y : BitVec 32) (h : (x - y).toNat = 0) : x = y := by
   bv_omega
 
 theorem consSub_ne (x y : BitVec 32) (h : x ≠ y) : 1 ≤ (x - y).toNat := by

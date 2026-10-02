@@ -145,17 +145,6 @@ theorem axHop_nodot (rt : Nat) (F : Nat → DFrac → Std.ExtTreeMap Fname Nat c
   rw [axHopAns_rec rt P Pmiss k d s ents (fun h => hs h.1)]
   iapply H $$ %d %ents %dqv HP HF
 
-/-- ...and its lift over a family whose names are all not `..` (Rocq's
-`ax_hops_nodot`). -/
-theorem axHops_nodot (rt : Nat) (F : Nat → DFrac → Std.ExtTreeMap Fname Nat compare → IProp GF)
-    (P Pmiss : Nat → Nat → IProp GF) (ps : List Fname) (n : Nat)
-    (hnd : ∀ s ∈ ps.drop n, s ≠ DOTDOT) :
-    axHopsEntFrom F P Pmiss ps n ⊢ axHopsFrom rt F P Pmiss ps n := by
-  unfold axHopsEntFrom axHopsFrom
-  apply BigSepL.bigSepL_mono
-  intro j s hj
-  exact axHop_nodot rt F P Pmiss (n + j) s (hnd s (List.mem_of_getElem? hj))
-
 end FsAbsWalk
 
 end Xv6

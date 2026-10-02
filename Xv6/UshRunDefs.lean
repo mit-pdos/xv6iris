@@ -66,9 +66,6 @@ def ushHt : Ushcmd → Nat
   | .list l r => max (ushHt l) (ushHt r) + 1
   | .back c1 => ushHt c1 + 1
 
-/-- Rocq `ush_ht_pos`. -/
-theorem ushHt_pos (c : Ushcmd) : 1 ≤ ushHt c := by cases c <;> simp [ushHt]
-
 /-- **Rocq `ush_simple`**: no REDIRECT and no PIPE node. -/
 def ushSimple : Ushcmd → Prop
   | .exec _ => True
@@ -84,9 +81,6 @@ def ushTy : Ushcmd → Int
   | .pipe .. => 3
   | .list .. => 4
   | .back _ => 5
-
-/-- Rocq `ush_ty_range`. -/
-theorem ushTy_range (c : Ushcmd) : 1 ≤ ushTy c ∧ ushTy c ≤ 5 := by cases c <;> simp [ushTy]
 
 /-- **Rocq `ush_jarm`**: the pc the dispatch's `jr` lands on. -/
 def ushJarm : Ushcmd → Nat

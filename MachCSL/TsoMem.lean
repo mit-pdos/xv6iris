@@ -61,13 +61,6 @@ def diskAgent : Agent := NCPU
 def ifetchAgent (c : CPU) : Agent := NCPU + 1 + c.val
 
 theorem hartAgent_lt (c : CPU) : hartAgent c < NCPU := c.isLt
-theorem ifetchAgent_ne_hart (c c' : CPU) : ifetchAgent c ≠ hartAgent c' := by
-  intro h
-  have h1 := c'.isLt
-  unfold hartAgent at h
-  rw [← h] at h1
-  unfold ifetchAgent at h1
-  omega
 
 /-! ## Byte histories -/
 
@@ -116,16 +109,6 @@ def ramBytes (pa : PAddr) (n : Nat) : Prop := ∀ j, j < n → inRam (pa + BitVe
 theorem ramBytes_head {pa : PAddr} {n : Nat} (h : ramBytes pa n) (hn : 0 < n) : inRam pa 1 := by
   have := h 0 hn
   simpa using this
-
-theorem ramBytes_of_inRam {pa : PAddr} {n : Nat} (h : inRam pa n) : ramBytes pa n := by
-  obtain ⟨h1, h2⟩ := h
-  intro j hj
-  have hlt : pa.toNat + j < 2 ^ 64 := by
-    simp only [ramEnd] at h2; omega
-  have he : (pa + BitVec.ofNat 64 j).toNat = pa.toNat + j := by
-    rw [BitVec.toNat_add, BitVec.toNat_ofNat, Nat.mod_eq_of_lt (by omega),
-      Nat.mod_eq_of_lt (by omega)]
-  refine ⟨?_, ?_⟩ <;> rw [he] <;> omega
 
 /-- An entry is visible to agent `h` at view `tv`: at or below the view, or
 the agent's own. -/
@@ -434,24 +417,6 @@ theorem histOk_append (log : List Agent) (l : List Agent) (H : Hist) (h : histOk
     obtain ⟨hlt, -⟩ := List.getElem?_eq_some_iff.1 h2
     rw [List.getElem?_append_left hlt]
     exact h2
-
-theorem histOk_push (log : List Agent) (h : Agent) (H : Hist) (v : BitVec 8)
-    (hH : histOk log H) :
-    histOk (log ++ [h]) (⟨log.length + 1, h, v⟩ :: H) := by
-  have hH' := histOk_append log [h] H hH
-  obtain ⟨hs, hb⟩ := hH'
-  obtain ⟨_, hb0⟩ := hH
-  refine ⟨?_, ?_⟩
-  · rw [List.pairwise_cons]
-    refine ⟨fun e he => ?_, hs⟩
-    have := (hb0 e he).1
-    simp only; omega
-  · intro e he
-    simp only [List.mem_cons] at he
-    rcases he with rfl | he
-    · refine ⟨by simp, Or.inr ?_⟩
-      simp
-    · exact hb e he
 
 theorem histOk_top_visible (log : List Agent) (H : Hist) (e : HEnt) (hH : histOk log H)
     (he : e ∈ H) (h : Agent) : e.visible h log.length = true :=

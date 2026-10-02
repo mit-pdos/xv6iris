@@ -129,10 +129,6 @@ variable {lent : Bool}
 
 /-! ## The 55 low slots, and the three carves -/
 
-theorem kxc_split_addr (a : BitVec 64) (m : Nat) (c : BitVec 64) (h : c = 8#64 * BitVec.ofNat 64 m) :
-    a - 8#64 * BitVec.ofNat 64 m = a + -c := by
-  subst h; bv_omega_g
-
 /-- The 55 low slots are the four regions: `ustack` (33), `elf` (8), `ph`
 (7) and the spilled locals (7) (deviation 3). -/
 theorem kxc_rest_split [CurCtx] (sp0 : BitVec 64) :

@@ -148,12 +148,6 @@ theorem sys_unlink_bufpath (x : BitVec 64) :
 /-- `name` at s0-80. -/
 theorem sys_unlink_bufname (x : BitVec 64) :
     x + BitVec.signExtend 64 4016#12 = x + 0xFFFFFFFFFFFFFFB0#64 := by bv_decide
-/-- writei's `de` at s0-64. -/
-theorem sys_unlink_bufde (x : BitVec 64) :
-    x + BitVec.signExtend 64 4032#12 = x + 0xFFFFFFFFFFFFFFC0#64 := by bv_decide
-/-- isdirempty's `de` at s0-232. -/
-theorem sys_unlink_bufdel (x : BitVec 64) :
-    x + BitVec.signExtend 64 3864#12 = x + 0xFFFFFFFFFFFFFF18#64 := by bv_decide
 /-- `uint off` at s0-212: the UPPER word of slot 27 (deviation 6). -/
 theorem sys_unlink_offcell (x : BitVec 64) :
     x + BitVec.signExtend 64 3884#12 = x + 0xFFFFFFFFFFFFFF2C#64 := by bv_decide

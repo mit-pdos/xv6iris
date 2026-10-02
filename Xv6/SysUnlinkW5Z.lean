@@ -190,8 +190,6 @@ def sysUnlinkAtAe (Γ : SchedNames) (cpu : CPU) (k : KCtx) (A : SysUnlinkArgs GF
   A.P (npElems pl).length dinum.toNat ∗
   bslots 3 ∗ logOpS icfgLog nw Sbw ∗ sysUnlinkCommits A pl
 
-theorem sys_unlink_li0' : BitVec.signExtend 64 0#12 = 0#64 := by decide
-
 theorem sys_unlink_sext_off (kk : Nat) (h : 16 * kk < 2 ^ 31) :
     BitVec.signExtend 64 (BitVec.ofNat 32 (16 * kk)) = BitVec.ofNat 64 (16 * kk) :=
   MachCSL.signExtend_ofNat32 _ h

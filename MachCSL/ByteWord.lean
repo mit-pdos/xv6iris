@@ -131,12 +131,6 @@ theorem bytesToWord_wordToBytes (w : BitVec 64) : bytesToWord (wordToBytes w) = 
   simp only [bytesToWord, wordToBytes, nthByte, List.foldr_cons, List.foldr_nil]
   bv_decide
 
-theorem wordToBytes_bytesToWord (bs : List (BitVec 8)) (h : bs.length = 8) :
-    wordToBytes (bytesToWord bs) = bs := by
-  obtain ⟨b0, b1, b2, b3, b4, b5, b6, b7, rfl⟩ := list8 bs h
-  obtain ⟨e0, e1, e2, e3, e4, e5, e6, e7⟩ := nthByte_bytesToWord b0 b1 b2 b3 b4 b5 b6 b7
-  simp only [wordToBytes, e0, e1, e2, e3, e4, e5, e6, e7]
-
 /-! ## Splitting a buffer -/
 
 theorem byteBuf_append [CurCtx] (a : BitVec 64) (dq : DFrac) (bs1 bs2 : List (BitVec 8)) :

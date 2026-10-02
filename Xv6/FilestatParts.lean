@@ -80,16 +80,6 @@ theorem filestat_bltu (t : BitVec 32) :
     revert h2 h3
     bv_decide
 
-/-- `sraiw a0,a0,31` on copyout's two answers (Rocq's `fst_sraiw_0` /
-`fst_sraiw_m1`). -/
-theorem filestat_sraiw_0 :
-    BitVec.signExtend 64 ((BitVec.extractLsb' 0 32 (0#64)).sshiftRight (31#5).toNat) = 0#64 := by
-  decide
-theorem filestat_sraiw_m1 :
-    BitVec.signExtend 64 ((BitVec.extractLsb' 0 32 (-1#64)).sshiftRight (31#5).toNat)
-      = 0xFFFFFFFFFFFFFFFF#64 := by
-  decide
-
 /-! ## The frame -/
 
 section

@@ -149,18 +149,6 @@ theorem boK_popExit (k : KCtx) (hnoff : k.noff = 0) (hint : k.intena = k.sie) (h
       KCtx.mk.injEq, trapRes, kvFrameSlots, ite_true, ite_false, Bool.false_eq_true,
       _root_.true_and, _root_.and_true] <;> omega
 
-/-- The re-acquire after a park lands back in `boK`, at the `SPIE`/`SPP`
-the park resumed with. -/
-theorem boK_fold (k : KCtx) (a b : Bool) (hK : 4 ≤ k.avail) :
-    (((k.pushed 4).withSpie a b).pushOffAt a b).withLocks ("log" :: k.locks) =
-      boK (k.withSpie a b) := by
-  unfold boK
-  obtain ⟨regs, sie, spie, spp, avail, noff, intena, locks, tier, root, proc⟩ := k
-  simp only at hK ⊢
-  simp only [KCtx.pushed, KCtx.withSpie, KCtx.pushOffAt, KCtx.withLocks, KCtx.mk.injEq,
-    _root_.true_and, _root_.and_true]
-  omega
-
 /-! ## The guard's 32-bit chain
 
 `out ≤ 3` and `n ≤ LOGBLOCKS` keep every intermediate tiny; the bridges

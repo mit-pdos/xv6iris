@@ -157,9 +157,6 @@ has its two dots by then, naming the child (`DOT`) and the parent
 def creChild (tyz ma mi d i : Nat) : Absnode :=
   if tyz = T_DIR_z then .ADir (dotsEnts true i d) else creC0 tyz ma mi
 
-theorem creC0_dir (ma mi : Nat) : creC0 T_DIR_z ma mi = .ADir ∅ := by
-  simp [creC0]
-
 theorem creChild_dir (ma mi d i : Nat) : creChild T_DIR_z ma mi d i = .ADir (dotsEnts true i d) := by
   simp [creChild]
 
@@ -513,15 +510,6 @@ theorem aunarmOfArm_unit [Appcfg GF] [FsBytesG GF] (γfs : FsNames) (E : CoPset)
   unfold aunarmOfArm
   iintro #Hsup %i _
   iapply (aunarmCommitAt_unit (hlc := hlc) γfs E i) $$ Hsup
-
-/-- THE BRIDGE: a caller that can answer at EVERY nlink-1 row can answer at
-the armed one (Rocq's `aunarm_of_arm_of_all`). -/
-theorem aunarmOfArm_of_all [Appcfg GF] (Γ : FsViewNames GF) (E : CoPset)
-    (Farm : Pfam GF (Aview → Nat → IProp GF)) (Φ : Aview → Nat → IProp GF) :
-    iprop(∀ i : Nat, aunarmCommitAt (hlc := hlc) Γ E i Φ) ⊢ aunarmOfArm (hlc := hlc) Γ E Farm Φ := by
-  unfold aunarmOfArm
-  iintro H %i _
-  iapply H $$ %i
 
 /-- THE OPEN: the one move an unarm fire site takes -- it holds the arm's
 receipt and SPENDS it for the unarm's AU AT THAT INUM (Rocq's

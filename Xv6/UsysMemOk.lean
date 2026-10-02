@@ -108,12 +108,6 @@ def usysSbrkRet (tf : List (BitVec 64)) (r : BitVec 64) (szv szv' : Nat) : Prop 
   (r = -1#64 ∧ szv' = szv) ∨
   (r = BitVec.ofNat 64 szv ∧ (0 ≤ (usysSbrkArg tf).toInt → (szv' : Int) = szv + (usysSbrkArg tf).toInt))
 
-/-- Rocq `usys_sbrk_ret_arg`. -/
-theorem usysSbrkRet_argCong (tf tf' : List (BitVec 64)) (r : BitVec 64) (szv szv' : Nat)
-    (h0 : tfW tf (tfArgIdx 0) = tfW tf' (tfArgIdx 0)) (h : usysSbrkRet tf r szv szv') :
-    usysSbrkRet tf' r szv szv' := by
-  unfold usysSbrkRet usysSbrkArg at *; rw [← h0]; exact h
-
 /-- The live zeros up to `PGROUNDUP(sz)`. -/
 def umemZeros (sz : Nat) : ElfMem := fun x => if x < pgRoundUpN sz then some 0#8 else none
 
@@ -324,30 +318,6 @@ theorem usysMemOk_forkNz {tf : List (BitVec 64)} {r : BitVec 64} {M M' : ElfMem}
   · exact absurd h (by decide)
   · simp at h
 
-/-- The permission view moves only at sbrk (Rocq `usys_mem_ok_perm`). -/
-theorem usysMemOk_perm {n : Int} {tf : List (BitVec 64)} {r : BitVec 64} {M M' : ElfMem}
-    {π π' : Nat → Option UPerm} {szv szv' : Nat} {lz lz' : Bool}
-    (h12 : n ≠ USYS_sbrk) (H : usysMemOk n tf r M π szv lz M' π' szv' lz') : π' = π := by
-  unfold usysMemOk at H
-  by_cases h7 : n = USYS_exec
-  · rw [if_pos h7] at H; exact H.2.2.1
-  rw [if_neg h7, if_neg h12] at H
-  by_cases h3 : n = USYS_wait
-  · rw [if_pos h3] at H; exact H.2.1
-  rw [if_neg h3] at H
-  by_cases h4 : n = USYS_pipe
-  · rw [if_pos h4] at H; exact H.2.1
-  rw [if_neg h4] at H
-  by_cases h5 : n = USYS_read
-  · rw [if_pos h5] at H; exact H.2.1
-  rw [if_neg h5] at H
-  by_cases h8 : n = USYS_fstat
-  · rw [if_pos h8] at H; exact H.2.1
-  rw [if_neg h8] at H
-  by_cases hf : n = USYS_fork
-  · rw [if_pos hf] at H; exact H.2.2.1
-  · rw [if_neg hf] at H; exact H.2.1
-
 /-! ## §2b The descriptor table's rows -/
 
 /-- **The lowest closed slot**, the `fdalloc` scan as a function (Rocq
@@ -495,31 +465,6 @@ theorem usysFdOk_epc {n : Int} {tf : List (BitVec 64)} {w r : BitVec 64} {sts st
     (H : usysFdOk n (tf.set tfEpcIdx w) r sts sts') : usysFdOk n tf r sts sts' :=
   usysFdOk_argCong (tfW_set_ne tf tfEpcIdx (tfArgIdx 0) w (by decide)) H
 
-/-- THE LENGTH SURVIVES EVERY ROW (Rocq `usys_fd_ok_length`). -/
-theorem usysFdOk_length {n : Int} {tf : List (BitVec 64)} {r : BitVec 64} {sts sts' : List FdState}
-    (H : usysFdOk n tf r sts sts') : sts'.length = sts.length := by
-  unfold usysFdOk at H
-  by_cases hc : n = USYS_close
-  · rw [if_pos hc] at H
-    obtain ⟨H, -⟩ := H
-    split at H <;> subst H <;> simp
-  rw [if_neg hc] at H
-  by_cases hd : n = USYS_dup
-  · rw [if_pos hd] at H
-    rcases H with ⟨_, -, -, -, rfl⟩ | ⟨-, rfl, -⟩ <;> simp
-  rw [if_neg hd] at H
-  by_cases ho : n = USYS_open
-  · rw [if_pos ho] at H
-    rcases H with ⟨_, _, _, _, -, -, rfl, -⟩ | ⟨-, rfl⟩ <;> simp
-  rw [if_neg ho] at H
-  by_cases hp : n = USYS_pipe
-  · rw [if_pos hp] at H
-    split at H
-    · obtain ⟨_, _, _, -, -, -, rfl⟩ := H; simp
-    · rw [H.2]
-  rw [if_neg hp] at H
-  subst H; rfl
-
 /- Rocq's `usys_fd_ok_parked` (and here its two list helpers) is DELETED
 (Rocq lane OFF-LINK-2, L6, 378b23778): it carried the generic tier's PARKED
 DISCIPLINE -- "no descriptor in this table has had its offset half handed
@@ -529,34 +474,6 @@ offsets.  The OPEN row above no longer pins `fdstParked` either (Rocq L4,
 abe94870d): an open installs the descriptor at the mode its caller's family
 asked for, and nothing in the tier reads all-parkedness off it any more. -/
 
-
-/-- **...AND THE SAME FOR "NO PIPE ROW"** (Rocq `usys_fd_ok_nopipe`,
-`4fab0298e`), at every number but pipe(2), the one call that installs one:
-what lets a program that never calls pipe(2) carry `FileDefs.fdvNopipe` of
-its table across every trap. -/
-theorem usysFdOk_nopipe {n : Int} {tf : List (BitVec 64)} {r : BitVec 64} {sts sts' : List FdState}
-    (hnp : n ≠ USYS_pipe) (H : usysFdOk n tf r sts sts') (hpk : fdvNopipe sts) : fdvNopipe sts' := by
-  unfold usysFdOk at H
-  by_cases hc : n = USYS_close
-  · rw [if_pos hc] at H
-    obtain ⟨H, -⟩ := H
-    split at H <;> subst H
-    · exact fdvNopipe_insert _ _ _ hpk fdstNopipe_closed
-    · exact hpk
-  rw [if_neg hc] at H
-  by_cases hd : n = USYS_dup
-  · rw [if_pos hd] at H
-    rcases H with ⟨_, -, -, -, rfl⟩ | ⟨-, rfl, -⟩
-    · exact fdvNopipe_insert _ _ _ hpk (fdvNopipe_lookup_total _ _ hpk)
-    · exact hpk
-  rw [if_neg hd] at H
-  by_cases ho : n = USYS_open
-  · rw [if_pos ho] at H
-    rcases H with ⟨_, _, _, _, -, -, rfl, hop⟩ | ⟨-, rfl⟩
-    · exact fdvNopipe_insert _ _ _ hpk hop
-    · exact hpk
-  rw [if_neg ho, if_neg hnp] at H
-  subst H; exact hpk
 
 /-! ## §2c Pipe's two rows, joined -/
 
@@ -603,10 +520,6 @@ theorem usysCwdOk_refl_at (n k : Int) (r : BitVec 64) (c : Nat) (hk : n = k) (h 
     usysCwdOk n r c c := by
   subst hk; unfold usysCwdOk; rw [if_neg h]
 
-theorem usysCwdOk_chdir (r : BitVec 64) (c c' : Nat) (h : r.toNat ≠ 0 → c' = c) :
-    usysCwdOk USYS_chdir r c c' := by
-  unfold usysCwdOk; rw [if_pos rfl]; exact h
-
 /-! ## §2e The generation row: no entry re-incarnates the caller -/
 
 /-- Rocq `usys_gen_ok`. -/
@@ -633,9 +546,6 @@ theorem usysRetPid_ne (n : Int) (r : BitVec 64) (pid : BitVec 32) (h : n ≠ USY
 
 theorem usysRetPid_of (n : Int) (r : BitVec 64) (pid : BitVec 32) (h : r = BitVec.signExtend 64 pid) :
     usysRetPid n r pid := fun _ => h
-
-theorem usysRetPid_getpid {r : BitVec 64} {pid : BitVec 32} (H : usysRetPid USYS_getpid r pid) :
-    r = BitVec.signExtend 64 pid := H rfl
 
 /-! ## §2h The mask (xv6 7b2c1b1b's seccomp): the EFFECTIVE number, and the
 one entry that moves the mask (Rocq UsysMemOk SS2h)
@@ -708,12 +618,6 @@ not in UexecSlot, because Lean's UsysMemOk sits above UexecSlot): every
 row of the trap contract is keyed on it, not on the raw reading. -/
 def uvisNum (W : Uvis) : Int := usysEff W.secc W.tf
 
-/-- Rocq `uvis_num_full0`: at a key whose mask allows everything (every
-verified program's), a number in `[0, 64)` is its own. -/
-theorem uvisNum_full (W : Uvis) (hs : W.secc = seccAll) (h0 : 0 ≤ usysNum W.tf)
-    (h1 : usysNum W.tf < 64) : uvisNum W = usysNum W.tf := by
-  unfold uvisNum; rw [hs]; exact usysEff_all W.tf h0 h1
-
 /-- Rocq `usys_eff_secc_all`. -/
 theorem usysEff_seccAll (tf : List (BitVec 64)) (h0 : 0 ≤ usysNum tf) (h1 : usysNum tf < 64) :
     usysEff seccAll tf = usysNum tf := usysEff_all tf h0 h1
@@ -752,9 +656,6 @@ the ecall, `a0 := r`. -/
 def bumpTf (tf : List (BitVec 64)) (r : BitVec 64) : List (BitVec 64) :=
   (tf.set tfEpcIdx (tfW tf tfEpcIdx + 4#64)).set (tfArgIdx 0) r
 
-theorem bumpTf_length (tf : List (BitVec 64)) (r : BitVec 64) : (bumpTf tf r).length = tf.length := by
-  simp [bumpTf]
-
 theorem bumpTf_epc (tf : List (BitVec 64)) (r : BitVec 64) (h : tfEpcIdx < tf.length) :
     tfW (bumpTf tf r) tfEpcIdx = tfW tf tfEpcIdx + 4#64 := by
   unfold bumpTf
@@ -769,10 +670,6 @@ theorem bumpTf_other (tf : List (BitVec 64)) (r : BitVec 64) (i : Nat) (ha : i �
     (he : i ≠ tfEpcIdx) : tfW (bumpTf tf r) i = tfW tf i := by
   unfold bumpTf
   rw [tfW_set_ne _ _ _ _ (Ne.symm ha), tfW_set_ne _ _ _ _ (Ne.symm he)]
-
-/-- The number is not moved by the bump (Rocq `bump_tf_num`). -/
-theorem bumpTf_num (tf : List (BitVec 64)) (r : BitVec 64) : usysNum (bumpTf tf r) = usysNum tf :=
-  usysNum_argCong _ _ (bumpTf_other tf r _ (by decide) (by decide))
 
 /-! ## §3b The table is blind to every word but 14, 15, 16 and 21 -/
 
@@ -794,14 +691,6 @@ theorem usysMemOk_argCong {n : Int} {tf tf' : List (BitVec 64)} {r : BitVec 64} 
 theorem usysEff_epc (secc : BitVec 64) (tf : List (BitVec 64)) (v : BitVec 64) :
     usysEff secc (tf.set tfEpcIdx v) = usysEff secc tf :=
   usysEff_numCong _ _ _ (usysNum_epc tf v)
-
-/-- Rocq `usys_mem_ok_epc`. -/
-theorem usysMemOk_epc {n : Int} {tf : List (BitVec 64)} {v r : BitVec 64} {M M' : ElfMem}
-    {π π' : Nat → Option UPerm} {szv szv' : Nat} {lz lz' : Bool}
-    (H : usysMemOk n (tf.set tfEpcIdx v) r M π szv lz M' π' szv' lz') :
-    usysMemOk n tf r M π szv lz M' π' szv' lz' :=
-  usysMemOk_argCong (tfW_set_ne _ _ _ _ (by decide)) (tfW_set_ne _ _ _ _ (by decide))
-    (tfW_set_ne _ _ _ _ (by decide)) H
 
 /-! ## §4 The ecall's `scause` -/
 

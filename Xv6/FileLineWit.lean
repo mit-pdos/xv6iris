@@ -70,17 +70,4 @@ theorem consumed_ins_last (k : Nat) (E : List (List Obs × BitVec 8)) (h : List 
   rw [segOf_length] at hle
   rw [hby, List.take_of_length_le (by omega)]
 
-/-- ...AND THE WITNESS: the `echo ... > f` lines of the consumed input are
-lines of the history its last byte is tagged with -/
-theorem echofLinesOf_consumed (k : Nat) (E : List (List Obs × BitVec 8)) (h : List Obs)
-    (b : BitVec 8) (w : List (BitVec 8) × List (List (BitVec 8)))
-    (hidx : eIndex (segOf E)) (hch : histChain E) (hb : ∀ x ∈ E, obsBoots x.1 = k)
-    (hlast : E.getLast? = some (h, b)) (hsh : traceShape h true)
-    (hw : w ∈ echofLinesIn (E.map Prod.snd)) : w ∈ echofLinesOf h := by
-  rw [← consumed_ins_last k E h b hidx hch hb hlast hsh] at hw
-  obtain ⟨cs, hcs, _⟩ := cyclesOf_io h [] hsh (by simp)
-  simp only [echofLinesOf, hcs, List.map_append, List.flatten_append, List.map_cons,
-    List.map_nil, List.flatten_cons, List.flatten_nil, List.append_nil]
-  exact List.mem_append_right _ hw
-
 end Xv6

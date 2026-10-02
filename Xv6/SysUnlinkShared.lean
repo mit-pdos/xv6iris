@@ -476,11 +476,6 @@ theorem sys_unlink_tx_join (γ : LogNames) (t : Nat) (q1 q2 : Qp) :
   unfold txPin
   exact ((ghost_map_elem_fractional (GF := GF) γ.tx t ()).fractional q1 q2).2
 
-theorem sys_unlink_tx_split (γ : LogNames) (t : Nat) (q1 q2 : Qp) :
-    txPin (GF := GF) γ t (q1 + q2) ⊢ txPin γ t q1 ∗ txPin γ t q2 := by
-  unfold txPin
-  exact ((ghost_map_elem_fractional (GF := GF) γ.tx t ()).fractional q1 q2).1
-
 /-- The two quarters and the residue half are the whole token again. -/
 theorem sys_unlink_tx_whole (γ : LogNames) (t : Nat) :
     txPin (GF := GF) γ t (1 : Qp).half.half ∗ txPin γ t (1 : Qp).half.half ∗

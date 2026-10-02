@@ -109,11 +109,6 @@ theorem ushPexRegs_cs {m m' : RegMap} {fp t0 argc ps es p : Nat}
     by rw [hk _ rfl]; exact h22, by rw [hk _ rfl]; exact h23, by rw [hk _ rfl]; exact h24,
     by rw [hk _ rfl]; exact h25, by rw [hk _ rfl]; exact h26, by rw [hk _ rfl]; exact h27⟩
 
-/-- A caller-saved write keeps the callee-saved file. -/
-theorem ush_cs_wrs (m : RegMap) (rd : BitVec 5) (v : BitVec 64) (hd : ucalleeSavedIdx rd = false) :
-    ∀ r, ucalleeSavedIdx r = true → (ukWr m rd v).get r = m.get r :=
-  fun r hr => ush_cs_wr m rd r v hr hd
-
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]

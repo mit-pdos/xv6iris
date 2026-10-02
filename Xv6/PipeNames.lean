@@ -75,11 +75,6 @@ theorem pstWrite_ws (b : BitVec 8) (s : PipeSt) : (pstWrite b s).ws = s.ws ++ [b
 theorem pstWrite_rp (b : BitVec 8) (s : PipeSt) : (pstWrite b s).rp = s.rp := rfl
 theorem pstRead_ws (s : PipeSt) : (pstRead s).ws = s.ws := rfl
 theorem pstRead_rp (s : PipeSt) : (pstRead s).rp = s.rp + 1 := rfl
-theorem pstClose_open (w : Bool) (s : PipeSt) : pstOpen w (pstClose w s) = false := by
-  cases w <;> rfl
-theorem pstClose_other (w : Bool) (s : PipeSt) :
-    pstOpen (!w) (pstClose w s) = pstOpen (!w) s := by
-  cases w <;> rfl
 theorem pstClose_ws (w : Bool) (s : PipeSt) : (pstClose w s).ws = s.ws := by cases w <;> rfl
 theorem pstClose_rp (w : Bool) (s : PipeSt) : (pstClose w s).rp = s.rp := by cases w <;> rfl
 

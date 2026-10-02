@@ -59,20 +59,6 @@ theorem snapGamma_agree (g gl gt : GName) (B : RegMapF (BitVec 8)) :
   iintro ⟨Ha, Hv⟩
   iapply ghost_map_lookup $$ Ha Hv
 
-/-- WHERE THE INSTALL'S PURE PREMISES COME FROM: all three are READ off the
-durable source (its footprint and its byte authority); the source is not
-moved (Rocq's `fs_footprint_install_facts`). -/
-theorem fsFootprint_installFacts (g gl gt : GName) (B : RegMapF (BitVec 8)) (S : FsStateRec) :
-    (g ↪●MAP B) ⊢ fsFootprint (snapGamma (GF := GF) g gl gt) (DFrac.own 1) S -∗
-      ∃ PM, ⌜xfShape S PM ∧ xrDisj (xrFs S PM) ∧ xrUnion (xrFs S PM) ⊆ B⌝ := by
-  iintro Hba Hf
-  ihave ⟨%PM, %hs, Hr⟩ := fsFootprint_runs _ S $$ Hf
-  ihave ⟨%hd, Hr⟩ := fsDurKeep (phiRuns_disj _ (snapGamma_excl g gl gt) _) $$ Hr
-  ihave %hin := phiRuns_in _ _ B (snapGamma_agree g gl gt B) _ hd $$ Hba Hr
-  iexists PM
-  ipureintro
-  exact ⟨hs, hd, hin⟩
-
 /-- THE MINT: the allocation half alone, over the three pure facts and no
 resource at all (Rocq's `fs_footprint_mint`). -/
 theorem fsFootprint_mint (S : FsStateRec) (PM : BlockMap) (gl gt : GName)

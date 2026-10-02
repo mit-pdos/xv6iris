@@ -117,30 +117,6 @@ theorem eo_dec32 (out : Nat) (h1 : 1 ≤ out) (h2 : out ≤ 3) :
     BitVec.extractLsb' 0 32 (BitVec.ofNat 64 (out - 1)) = BitVec.ofNat 32 (out - 1) :=
   Xv6.fw_w32 _ (by omega)
 
-/-- `addw a1,a1,s2` at `+0xb8`. -/
-theorem eo_addw (a b : Nat) (h : a + b < 2 ^ 31) :
-    BitVec.signExtend 64 (BitVec.extractLsb' 0 32 (BitVec.ofNat 64 a) +
-      BitVec.extractLsb' 0 32 (BitVec.ofNat 64 b)) = BitVec.ofNat 64 (a + b) := by
-  rw [Xv6.fw_w32 a (by omega), Xv6.fw_w32 b (by omega)]
-  rw [show BitVec.ofNat 32 a + BitVec.ofNat 32 b = BitVec.ofNat 32 (a + b) from by
-    apply BitVec.eq_of_toNat_eq
-    simp only [BitVec.toNat_add, BitVec.toNat_ofNat]
-    omega]
-  exact MachCSL.signExtend_ofNat32 (a + b) (by omega)
-
-/-- The block number the two `bread`s compute: `log.start + tail + 1`. -/
-theorem eo_slotaddr (ls t : Nat) (hls : ls < 2 ^ 31) (ht : t < 2 ^ 31)
-    (hb : logSlotBno ls t < 2 ^ 31) :
-    BitVec.signExtend 64 (BitVec.extractLsb' 0 32 (BitVec.ofNat 64 (ls + t) + 1#64)) =
-      BitVec.signExtend 64 (BitVec.ofNat 32 (logSlotBno ls t)) := by
-  unfold logSlotBno at hb ⊢
-  rw [show BitVec.ofNat 64 (ls + t) + 1#64 = BitVec.ofNat 64 (ls + t + 1) from by
-    show _ + BitVec.ofNat 64 1 = _
-    rw [← ofNat64_add]]
-  rw [Xv6.fw_w32 _ (by omega), MachCSL.signExtend_ofNat32 _ (by omega)]
-  rw [show ls + 1 + t = ls + t + 1 from by omega]
-  rw [MachCSL.signExtend_ofNat32 _ (by omega)]
-
 /-! ## The eight-slot frame
 
 `addi sp,sp,-64 ; sd ra,56 ; sd s0,48 ; sd s1,40 ; sd s2,32 ; addi s0,sp,64`.
@@ -171,18 +147,6 @@ def eoFrameS (sp s3 s4 s5 : BitVec 64) : IProp GF := iprop%
   wordPointsTo (sp + 0xFFFFFFFFFFFFFFD0#64) 8 (DFrac.own 1) s4 ∗
   wordPointsTo (sp + 0xFFFFFFFFFFFFFFC8#64) 8 (DFrac.own 1) s5 ∗
   (∃ w : BitVec 64, wordPointsTo (sp + 0xFFFFFFFFFFFFFFC0#64) 8 (DFrac.own 1) w)
-
-theorem eoFrameS_J (sp s3 s4 s5 : BitVec 64) :
-    eoFrameS (GF := GF) sp s3 s4 s5 ⊢ eoFrameJ sp := by
-  unfold eoFrameS eoFrameJ
-  iintro ⟨H1, H2, H3, H4⟩
-  isplitl [H1]
-  · iexists s3; iexact H1
-  isplitl [H2]
-  · iexists s4; iexact H2
-  isplitl [H3]
-  · iexists s5; iexact H3
-  iexact H4
 
 set_option maxHeartbeats 4000000 in
 /-- The prologue at `+0x00 .. +0x0a`. -/
@@ -321,45 +285,9 @@ def eoK (k : KCtx) : KCtx :=
 
 theorem eoKF_avail (k : KCtx) (hK : 8 ≤ k.avail) : (eoKF k).avail = k.avail - 8 := rfl
 
-theorem eoK_avail (k : KCtx) (h : k.sie = false) : (eoK k).avail = k.avail - 8 := by
-  simp only [eoK, KCtx.pushed_avail, KCtx.withLocks_avail, KCtx.pushOffAt_avail, h]
-  simp only [trapRes, Bool.false_eq_true, ite_false, Nat.zero_add]
-
-/-- The `acquire` inside the frame. -/
-theorem eoK_fold (k : KCtx) (hK : 8 ≤ k.avail) :
-    ((k.pushed 8).pushOffAt k.spie k.spp).withLocks ("log" :: k.locks) = eoK k := by
-  unfold eoK
-  obtain ⟨regs, sie, spie, spp, avail, noff, intena, locks, tier, root, proc⟩ := k
-  simp only at hK ⊢
-  simp only [KCtx.pushed, KCtx.pushOffAt, KCtx.withLocks, KCtx.mk.injEq,
-    _root_.true_and, _root_.and_true]
-  omega
-
-/-- ...and the matching `release`. -/
-theorem eoK_popExit (k : KCtx) (hsie : k.sie = false) (hlk : "log" ∉ k.locks) :
-    ((eoK k).popExit false).withLocks (("log" :: k.locks).filter (fun x => x ≠ "log")) =
-      k.pushed 8 := by
-  rw [eo_filter k.locks hlk]
-  unfold eoK KCtx.pushed KCtx.withLocks KCtx.popExit KCtx.popOff KCtx.pushOffAt
-  obtain ⟨regs, sie, spie, spp, avail, noff, intena, locks, tier, root, proc⟩ := k
-  simp only at hsie ⊢
-  subst hsie
-  simp [trapRes]
-
 /-- The locked context's budget at either entry `SIE`: the acquire's
 `trapRes k.sie` reserve on top of the frame. -/
 @[simp] theorem eoK_avail' (k : KCtx) : (eoK k).avail = trapRes k.sie + k.avail - 8 := rfl
-
-/-- The `acquire` inside the frame, at either entry `SIE`: the pushed bits
-are whatever the acquire's exit says (`k.withSpie a b` is the base). -/
-theorem eoK_fold_ws (k : KCtx) (a b : Bool) (hK : 8 ≤ k.avail) :
-    ((k.pushed 8).pushOffAt a b).withLocks ("log" :: k.locks) = eoK (k.withSpie a b) := by
-  unfold eoK
-  obtain ⟨regs, sie, spie, spp, avail, noff, intena, locks, tier, root, proc⟩ := k
-  simp only at hK ⊢
-  simp only [KCtx.pushed, KCtx.pushOffAt, KCtx.withLocks, KCtx.withSpie, KCtx.mk.injEq,
-    _root_.true_and, _root_.and_true]
-  omega
 
 /-- ...and the matching `release`, re-enabling interrupts exactly when the
 entry had them on (`reen = k.sie`, `KCtx.wf` at depth 0). -/
@@ -442,18 +370,6 @@ theorem eoPins_set18 (k : KCtx) (R : RegMap) (r9 r18 r19 r20 r21 v : BitVec 64)
 
 theorem eoPins_set19 (k : KCtx) (R : RegMap) (r9 r18 r19 r20 r21 v : BitVec 64)
     (h : eoPins k R r9 r18 r19 r20 r21) : eoPins k (R.set 19#5 v) r9 r18 v r20 r21 := by
-  obtain ⟨a2, a8, a9, a18, a19, a20, a21, a22, a23, a24, a25, a26, a27⟩ := h
-  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
-    simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] <;> assumption
-
-theorem eoPins_set20 (k : KCtx) (R : RegMap) (r9 r18 r19 r20 r21 v : BitVec 64)
-    (h : eoPins k R r9 r18 r19 r20 r21) : eoPins k (R.set 20#5 v) r9 r18 r19 v r21 := by
-  obtain ⟨a2, a8, a9, a18, a19, a20, a21, a22, a23, a24, a25, a26, a27⟩ := h
-  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
-    simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] <;> assumption
-
-theorem eoPins_set21 (k : KCtx) (R : RegMap) (r9 r18 r19 r20 r21 v : BitVec 64)
-    (h : eoPins k R r9 r18 r19 r20 r21) : eoPins k (R.set 21#5 v) r9 r18 r19 r20 v := by
   obtain ⟨a2, a8, a9, a18, a19, a20, a21, a22, a23, a24, a25, a26, a27⟩ := h
   refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
     simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] <;> assumption
@@ -928,10 +844,6 @@ theorem eoPost_elim (k : KCtx) (pidv : BitVec 32) (dqp : DFrac) (cpu' : CPU) :
 
 theorem eoPost_ws (k : KCtx) (a b : Bool) (pidv : BitVec 32) (dqp : DFrac) :
     eoPost (GF := GF) (k.withSpie a b) pidv dqp = eoPost k pidv dqp := rfl
-
-theorem eo_kctx_ws (cpu : CPU) (k : KCtx) (R : RegMap) :
-    kctx (GF := GF) cpu (k.withRegs R) ⊢ kctx cpu ((k.withSpie k.spie k.spp).withRegs R) := by
-  rw [KCtx.withSpie_self' k k.spie k.spp rfl rfl]
 
 /-- The `cmt = false` arm of `logResAt`, named, at the outstanding count
 `out` (its quiescence clause reads it, sync K1). -/

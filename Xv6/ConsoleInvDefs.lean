@@ -128,23 +128,10 @@ def consWAddr : BitVec 64 := KA.«cons» + 156#64
 /-- `&cons.e`. -/
 def consEAddr : BitVec 64 := KA.«cons» + 160#64
 
-/-- `&cons.r` is the sleep channel; it is a static address, so it is not
-null -- which refutes sleep's zero-channel panic. -/
-theorem aConsRNz : consRAddr ≠ 0#64 := by decide
-
-theorem aConsNz : consAddr ≠ 0#64 := by decide
-
 /-- THE CONSOLE'S OWN NAMESPACE, and the ONE invariant at it: the credential
 escrow `consCredInv`. -/
 def consN : Namespace := ndot nroot "cons"
 def consE : CoPset := ↑consN
-
-/-- The address the code forms for a ring byte (`add` of the index to
-`&cons`, then the load's `24` displacement) is the buffer's byte. -/
-theorem consByteAddr (i : Nat) :
-    consAddr + BitVec.ofNat 64 i + 24#64 = consBufAddr + BitVec.ofNat 64 i := by
-  unfold consAddr consBufAddr
-  rw [BitVec.add_assoc, BitVec.add_comm (BitVec.ofNat 64 i), ← BitVec.add_assoc]
 
 /-! ## devsw[] -- the device function table
 
@@ -335,18 +322,6 @@ theorem consCursor_update (cn : ConsNames) (n n' : Nat) :
   iintro H1 H2
   iapply ghost_var_update_halves n' cn.rd n n $$ H1 H2
 
-theorem consDeliv_agree (cn : ConsNames) (dv dv' : List (List Obs × BitVec 8)) :
-    consDeliv (GF := GF) cn dv ⊢ consDeliv cn dv' -∗ ⌜dv = dv'⌝ := by
-  unfold consDeliv uartDeliv
-  iintro H1 H2
-  iapply ghost_var_agree cn.uart.deliv _ _ _ _ $$ H1 H2
-
-theorem consLogm_agree (cn : ConsNames) (L L' : List LogEntry) :
-    consLogm (GF := GF) cn L ⊢ consLogm cn L' -∗ ⌜L = L'⌝ := by
-  unfold consLogm uartLogm
-  iintro H1 H2
-  iapply ghost_var_agree cn.uart.logm _ _ _ _ $$ H1 H2
-
 theorem consStoredLb_get (cn : ConsNames) (st : List (List Obs × BitVec 8)) :
     consStoredAuth (GF := GF) cn st ⊢ consStoredAuth cn st ∗ consStoredLb cn st := by
   unfold consStoredAuth consStoredLb
@@ -431,12 +406,6 @@ theorem consSwallow_eq (cn : ConsNames) (fault : Prop) (sl : List (List Obs × B
   unfold consSwallow
   ileft; ipureintro; rfl
 
-/-- ...and the bound it carries. -/
-theorem consSwallow_range (cn : ConsNames) (fault : Prop) (sl : List (List Obs × BitVec 8))
-    (d dc : Nat) : consSwallow (GF := GF) cn fault sl d dc ⊢ ⌜d ≤ dc ∧ dc ≤ d + 1⌝ := by
-  unfold consSwallow
-  iintro (%he | ⟨%he, -⟩) <;> ipureintro <;> omega
-
 /-- THE SWALLOWED BYTE ON A MARKED RING (Rocq `cons_swallow_placed`, seccomp
 S2k3).  The marked arm has no window, so `consSwallow`'s "the next element of
 the sequence" is not available; what IS is where the popped byte sat: every
@@ -459,21 +428,6 @@ theorem consSwallowPlaced_eq (sl : List (List Obs × BitVec 8)) (lo k d : Nat) :
     ⊢ consSwallowPlaced (GF := GF) sl lo k d d := by
   unfold consSwallowPlaced
   ileft; ipureintro; rfl
-
-/-- The bound only grows (Rocq `cons_swallow_placed_prefix`). -/
-theorem consSwallowPlaced_prefix (sl sl' : List (List Obs × BitVec 8)) (lo k d dc : Nat)
-    (hp : sl <+: sl') :
-    consSwallowPlaced (GF := GF) sl lo k d dc ⊢ consSwallowPlaced sl' lo k d dc := by
-  unfold consSwallowPlaced
-  iintro (%he | ⟨%he, %q, %h, %b, %hq, #Ht⟩)
-  · ileft; ipureintro; exact he
-  · iright
-    isplitr
-    · ipureintro; exact he
-    iexists q, h, b
-    iframe Ht
-    ipureintro
-    exact ⟨hq.1, consPrefix_lookup _ _ _ _ hp hq.2.1, hq.2.2⟩
 
 /-- The era, restated where a caller knows which era the ring is (Rocq
 `cons_swallow_placed_era`). -/
@@ -532,16 +486,6 @@ instance consDl_timeless (cn : ConsNames) (n : Nat) : Timeless (consDl (GF := GF
 instance consReader_timeless (cn : ConsNames) (n : Nat) : Timeless (consReader (GF := GF) cn n) := by
   unfold consReader; infer_instance
 
-theorem consReader_split (cn : ConsNames) (n : Nat) :
-    consReader (GF := GF) cn n ⊢ consRdtok cn n ∗ consDl cn n := by
-  unfold consReader; exact .rfl
-
-theorem consReader_join (cn : ConsNames) (n : Nat) :
-    consRdtok (GF := GF) cn n ⊢ consDl cn n -∗ consReader cn n := by
-  unfold consReader
-  iintro H1 H2
-  iframe H1 H2
-
 /-- The arm a read that found the ring MARKED rejoins on. -/
 theorem consDl_dirty (cn : ConsNames) (n m : Nat) :
     consDirtyLb (GF := GF) cn ⊢ consDl cn n -∗ consDl cn m := by
@@ -550,20 +494,6 @@ theorem consDl_dirty (cn : ConsNames) (n m : Nat) :
   iexists dv
   iframe Hdv Hlb
   iright; iexact Hdt
-
-theorem consDl_clean (cn : ConsNames) (n : Nat) :
-    consCleanTok (GF := GF) cn ⊢ consDl cn n -∗
-      consCleanTok cn ∗ ∃ dv : List (List Obs × BitVec 8),
-        consDeliv cn dv ∗ consStoredLb cn dv ∗ ⌜dv.length = n⌝ := by
-  unfold consDl
-  iintro Htok ⟨%dv, Hdv, #Hlb, Hor⟩
-  icases Hor with (%hl | #Hdt)
-  · iframe Htok
-    iexists dv
-    iframe Hdv Hlb
-    ipureintro; exact hl
-  · iexfalso
-    iapply consDirtyLb_clean cn $$ Htok Hdt
 
 /-- THE ESCROW's body: clean (nobody has paid) or dirty (the marker is out
 and the credential is here). -/
@@ -839,12 +769,6 @@ theorem isConslock_cred [X : CurCtx] (cn : ConsNames) (Wd : IProp GF) (γ : GNam
   iintro ⟨-, #H⟩
   iexact H
 
-theorem isConslock_intro [X : CurCtx] (cn : ConsNames) (Wd : IProp GF) (γ : GName) :
-    isLock (GF := GF) γ consAddr "cons" (consResAt cn) ⊢ consCredInv cn Wd -∗ isConslock cn Wd γ := by
-  unfold isConslock
-  iintro #H1 #H2
-  iframe H1 H2
-
 /-! ## The console invariant: the lock handle plus the WHOLE devsw table
 
 The table is written once, by consoleinit, and never again, so its cells
@@ -979,70 +903,6 @@ theorem devswTable_of_rest [X : CurCtx] :
     imod consWord_persist _ 8 _ _ $$ Hzw with #Hzw
     imodintro
     iframe Hzr Hzw
-
-/-- THE BOOT-SIDE CONSTRUCTOR: the twenty cells at full ownership are given
-up for good and become the table. -/
-theorem devswTable_alloc [X : CurCtx] :
-    iprop([∗list] i ∈ List.range (NDEV_max + 1),
-      wordPointsTo (GF := GF) (aDevswRead i) 8 (DFrac.own 1) (devswReadVal i) ∗
-      wordPointsTo (aDevswWrite i) 8 (DFrac.own 1) (devswWriteVal i)) ⊢ |==> devswTable := by
-  unfold devswTable
-  iintro H
-  iapply BigSepL.bigSepL_bupd
-  iapply BigSepL.bigSepL_impl $$ H
-  imodintro
-  iintro %k %i %_ ⟨Hr, Hw⟩
-  imod consWord_persist _ 8 _ _ $$ Hr with #Hr
-  imod consWord_persist _ 8 _ _ $$ Hw with #Hw
-  imodintro
-  iframe Hr Hw
-
-/-! ## Reading and writing one ring byte -/
-
-theorem consData_acc [X : CurCtx] (bs : List (BitVec 8)) (i : Nat) (b : BitVec 8)
-    (hlk : bs[i]? = some b) :
-    consData (GF := GF) bs ⊢
-      wordPointsTo (consBufAddr + BitVec.ofNat 64 i) 1 (DFrac.own 1) b ∗
-      (wordPointsTo (consBufAddr + BitVec.ofNat 64 i) 1 (DFrac.own 1) b -∗ consData bs) :=
-  byteBuf_acc consBufAddr (DFrac.own 1) bs i b hlk
-
-/-- consoleintr's `cons.buf[cons.e++ % INPUT_BUF_SIZE] = c`. -/
-theorem consData_upd [X : CurCtx] (bs : List (BitVec 8)) (i : Nat) (b b' : BitVec 8)
-    (hlk : bs[i]? = some b) :
-    consData (GF := GF) bs ⊢
-      wordPointsTo (consBufAddr + BitVec.ofNat 64 i) 1 (DFrac.own 1) b ∗
-      (wordPointsTo (consBufAddr + BitVec.ofNat 64 i) 1 (DFrac.own 1) b' -∗ consData (bs.set i b')) := by
-  unfold consData
-  iintro H
-  icases byteBuf_upd consBufAddr bs i b hlk $$ H with ⟨Hb, Hcl⟩
-  iframe Hb
-  iintro Hb
-  iapply Hcl $$ %b' Hb
-
-/-- The boot carve's shape: a run indexed by a FUNCTION over `range n` is the
-ring at `f <$> range n`. -/
-theorem consData_of_run [X : CurCtx] (f : Nat → BitVec 8) :
-    iprop([∗list] j ∈ List.range INPUT_BUF_SIZE,
-      wordPointsTo (GF := GF) (consBufAddr + BitVec.ofNat 64 j) 1 (DFrac.own 1) (f j)) ⊢
-      ∃ bs : List (BitVec 8), ⌜bs.length = INPUT_BUF_SIZE⌝ ∗ consData bs := by
-  iintro H
-  iexists (List.range INPUT_BUF_SIZE).map f
-  isplitr
-  · ipureintro; simp
-  unfold consData byteBuf
-  rw [BigSepL.bigSepL_map]
-  iapply BigSepL.bigSepL_mono ?_ $$ H
-  intro k j hk
-  have hjk : j = k := by
-    have := (List.getElem?_eq_some_iff.mp hk)
-    simp at this; omega
-  subst hjk
-  exact .rfl
-
-/-- A ring index is always in range, so a byte is always there to be read. -/
-theorem consData_lookup_lt (bs : List (BitVec 8)) (i : Nat) (hlen : bs.length = INPUT_BUF_SIZE)
-    (hlt : i < INPUT_BUF_SIZE) : ∃ b, bs[i]? = some b :=
-  ⟨bs[i]'(by omega), List.getElem?_eq_getElem _⟩
 
 end
 

@@ -61,17 +61,6 @@ theorem DevM.KeepsDisk.lift {S T : Type} {dk : S → Nat → BitVec 8} (o : DevO
   .op o _ (fun g h => absurd h (hs g)) (fun g pa n w h => absurd h (hw g pa n w))
     (fun r => .pure r)
 
-theorem DevM.KeepsDisk.step' {S T : Type} {dk : S → Nat → BitVec 8}
-    (g : S → Option (S × List DevObs)) (hg : ∀ s s' os, g s = some (s', os) → dk s' = dk s) :
-    DevM.KeepsDisk dk (DevM.step (T := T) g) :=
-  .op _ _ (fun g' h => by cases h; exact hg) (fun _ _ _ _ h => by cases h) (fun _ => .pure ())
-
-theorem DevM.KeepsDisk.dmaWrite' {S T : Type} {dk : S → Nat → BitVec 8}
-    (g : S → Option S) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
-    (hg : ∀ s s', g s = some s' → dk s' = dk s) :
-    DevM.KeepsDisk dk (DevM.dmaWriteStep (T := T) g pa n w) :=
-  .op _ _ (fun _ h => by cases h) (fun g' pa' n' w' h => by cases h; exact hg) (fun _ => .pure ())
-
 /-! ## The lend -/
 
 section

@@ -310,21 +310,6 @@ theorem uartArm_update (γ : UartNames) (a1 a2 a' : Option ConsArm) :
   iintro ⟨H1, H2⟩
   iapply ghost_var_update_halves a' γ.arm a1 a2 $$ H1 H2
 
-theorem inLogLb_get (γ : UartNames) (L : List LogEntry) :
-    inLogAuth (GF := GF) γ L ⊢ inLogAuth γ L ∗ inLogLb γ L := by
-  unfold inLogAuth inLogLb
-  iintro H
-  ihave #H' := MonoList.lb_own_get γ.log _ L $$ H
-  iframe H H'
-
-theorem inLogLb_valid (γ : UartNames) (L L' : List LogEntry) :
-    inLogAuth (GF := GF) γ L ∗ inLogLb γ L' ⊢ ⌜L' <+: L⌝ ∗ inLogAuth γ L := by
-  unfold inLogAuth inLogLb
-  iintro ⟨H1, #H2⟩
-  ihave %h := MonoList.auth_lb_own_valid γ.log _ L L' $$ H1 H2
-  iframe H1
-  ipureintro; exact h.2
-
 theorem inLogAuth_snoc (γ : UartNames) (L : List LogEntry) (e : LogEntry) :
     inLogAuth (GF := GF) γ L ⊢ |==> inLogAuth γ (L ++ [e]) := by
   unfold inLogAuth
@@ -822,11 +807,6 @@ def uartFlushed (k : Nat) (i : UartId) (hl : Option (List Obs)) : Prop :=
   ∀ h' : List Obs, ohistExt hl h' → traceShape h' true → obsBoots h' = k →
     insLen i hl = 0 ∨
     ∃ sf : List Obs, sf <+: openSeg h' ∧ obsWire i sf = [] ∧ (obsIns i sf).length = insLen i hl
-
-/-- Rocq `uart_flushed_none`: before the first pop there is nothing to have
-lost. -/
-theorem uartFlushed_none (k : Nat) (i : UartId) : uartFlushed k i none :=
-  fun _ _ _ _ => Or.inl rfl
 
 /-- Rocq `uart_flushed_cons`: at the CONSOLE port it IS `flushLost`. -/
 theorem uartFlushed_cons (k : Nat) (hl : Option (List Obs)) (h' : List Obs)

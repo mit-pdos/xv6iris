@@ -285,18 +285,6 @@ theorem utr_translateAddr_err (D : UFoot) (orc orc' : UOrc) (s s' : UWSt) (hp : 
   rw [utr_translateAddr_canon D orc s hp va acc hacc hc, htr]
   rfl
 
-/-- A refused walk refuses the translation (and a total walk gives a total
-translation: `utr_translateAddr_canon` maps `some` to `some`). -/
-theorem utr_translateAddr_isSome (D : UFoot) (orc : UOrc) (s : UWSt) (hp : UtrPins D s) (va : BitVec 64)
-    (acc : MemoryAccessType mem_payload) (hacc : utrAcc acc = true)
-    (htr : utrCanon va → (runRW D orc s (utrTranslate s va acc)).isSome = true) :
-    (runRW D orc s (translateAddr (.Virtaddr va) acc)).isSome = true := by
-  by_cases hc : utrCanon va
-  · rw [utr_translateAddr_canon D orc s hp va acc hacc hc, Option.isSome_map]
-    exact htr hc
-  · rw [utr_translateAddr_noncanon D orc s hp va acc hacc hc]
-    rfl
-
 /-- `translate` is the TLB lookup, then the hit or the miss (the split lane
 U1-P1's `UTlb` facts are stated over). -/
 theorem utr_translate_split (D : UFoot) (orc : UOrc) (s : UWSt) (asid : BitVec 16) (root : BitVec 44)

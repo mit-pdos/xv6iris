@@ -217,8 +217,6 @@ theorem cmdSync_word : wlWord cmdSync :=
 
 theorem cmdSync_ne_echo : cmdSync ≠ cmdEcho := by decide
 
-theorem cmdSync_ne_cat : cmdSync ≠ fdWCat := by decide
-
 theorem cmdSync_ne_secc : cmdSync ≠ cmdSeccomp := by decide
 
 /-- `'>'` is not a file-name word -/

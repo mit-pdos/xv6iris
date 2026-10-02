@@ -276,12 +276,6 @@ theorem creChildUnfiredNdp_pin (Γ : FsViewNames GF) (c : Absnode)
     creChildUnfiredNd (hlc := hlc) Γ c Farm Fun ⊢
       creChildUnfiredNdp (hlc := hlc) Γ c (fun c' : Absnode => c' = c) Farm Fun := .rfl
 
-/-- Rocq's `cre_child_unfired_nd_of_ndp`. -/
-theorem creChildUnfiredNd_of_ndp (Γ : FsViewNames GF) (c : Absnode)
-    (Farm Fun : Pfam GF (Aview → Nat → IProp GF)) :
-    creChildUnfiredNdp (hlc := hlc) Γ c (fun c' : Absnode => c' = c) Farm Fun ⊢
-      creChildUnfiredNd (hlc := hlc) Γ c Farm Fun := .rfl
-
 /-- `FsAbsCreateFire.acreCommitAtGen_ext` at the NAME-PREDICATE commit
 (Rocq's `acre_commit_at_gen_nm_ext`, stated in its `SpecCreate`). -/
 theorem acreCommitAtGenNm_ext (Γ : FsViewNames GF) (E : CoPset)
@@ -341,28 +335,6 @@ theorem creCommits_unit [FsBytesG GF] (γfs : FsNames) (tyz ma mi : Nat)
   · iapply pfAt_triv
     iapply (acreCommitAtGenNm_of (hlc := hlc) (fsGammaL γfs) appE _ Nm Pd _ _)
     iapply (acreCommitAtGen_unit (hlc := hlc) γfs appE _ Pd _) $$ Hsup
-
-/-- THE CURSOR IS A WEAKENING AT THE BUNDLE (Rocq's `cre_commits_cur`,
-TL-3K). -/
-theorem creCommits_cur (Γ : FsViewNames GF) (tyz ma mi : Nat) (Nm : Fname → Prop)
-    (Nd : Absnode → Prop) (Pd : Nat → IProp GF)
-    (Farm : Pfam GF (Aview → Nat → IProp GF))
-    (Fdots : Pfam GF (Aview → Nat → Nat → Bool → IProp GF))
-    (Fun : Pfam GF (Aview → Nat → IProp GF))
-    (Fok : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) :
-    creCommits (hlc := hlc) Γ tyz ma mi Nm Nd (fun _ => iprop(True)) Farm Fdots Fun Fok ⊢
-      creCommits (hlc := hlc) Γ tyz ma mi Nm Nd Pd Farm Fdots Fun Fok := by
-  unfold creCommits
-  iintro ⟨Ha, Hd, Hu, Hac⟩
-  iframe Ha Hd Hu
-  iapply (pfAt_mono
-    (acreCommitAtGenNm (hlc := hlc) Γ appE (creChild tyz ma mi) Nm (fun _ => iprop(True)) Farm)
-    (acreCommitAtGenNm (hlc := hlc) Γ appE (creChild tyz ma mi) Nm Pd Farm) Fok) $$ [] Hac
-  unfold acreCommitAtGenNm
-  iintro H %I %d %i %nm %ents %nl %hpre %hnm %hNm Harm HPd Ha
-  imod H $$ %I %d %i %nm %ents %nl %hpre %hnm %hNm Harm %trivial Ha with ⟨Ha, -, Hstep, Hph2⟩
-  imodintro
-  iframe Ha HPd Hstep Hph2
 
 /-- ...AND THE CURSOR MOVES ALONG AN ISO AT THE BUNDLE (Rocq's
 `cre_commits_mono`, TL-3C): the path-fixed `P (nparElems pl).length` and the

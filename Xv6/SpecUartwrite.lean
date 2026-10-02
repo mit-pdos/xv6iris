@@ -103,26 +103,4 @@ structure UARTWRITE : Prop where
     (bs cs : List (BitVec 8)) (dq : DFrac) (n : Nat) (Φ : IProp GF) hj hproc hK hnoff htier hid hn hn' hcs,
     wp_uartwrite_eb_body (hlc := hlc) (GF := GF) Γ cpu k i γl γ j bs cs dq n Φ hj hproc hK hnoff htier hid hn hn' hcs
 
-/-- The interrupts-off instance of `wp_uartwrite_eb` (the complement is the
-whole bundle). -/
-theorem UARTWRITE.wp_uartwrite (A : UARTWRITE) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-    [CurCtx] (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (cpu : CPU) (k : KCtx) (i : UartId) (γl : GName) (γ : UartNames) (j : Nat)
-    (bs cs : List (BitVec 8)) (dq : DFrac) (n : Nat) (Φ : IProp GF) hj hproc hK hsie hnoff hlocks htier
-    hid hn hn' hcs :
-    wp_uartwrite_body (hlc := hlc) (GF := GF) Γ cpu k i γl γ j bs cs dq n Φ hj hproc hK hsie hnoff hlocks htier
-      hid hn hn' hcs := by
-  have h := A.wp_uartwrite_eb (hlc := hlc) (GF := GF) Γ cpu k i γl γ j bs cs dq n Φ hj hproc hK hnoff htier
-    hid hn hn' hcs
-  unfold wp_uartwrite_eb_body at h
-  unfold wp_uartwrite_body
-  rw [hsie] at h
-  simp only [trapCsrsExt_false, cpuClaimExt_false] at h
-  iintro ⟨H0, H1, H2, Htc, Hcl, Hir, H6, H7, H8, H9, Hnext⟩
-  iapply h
-  iframe H0 H1 H2 Htc Hcl Hir H6 H7 H8 H9
-  iapply wpNext_mono $$ Hnext
-  iintro %cpu' HK %spie %spp %R' %p0 H1 H2 ⟨Htc, Hir⟩ Hcl H6 H7 H8
-  iapply HK $$ %spie %spp %R' %p0 H1 H2 Htc Hcl Hir H6 H7 H8
-
 end Xv6

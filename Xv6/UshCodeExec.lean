@@ -202,26 +202,6 @@ theorem ushI_5c8 (γt : GName) :
     ushCode (GF := GF) γt ⊢ uinstrIs γt (BitVec.ofNat 64 0x5c8) true (.JAL (54#21, .Regidx 0#5)) :=
   ushm_uisK γt 0x5c8 _ _ (by kernel_rfl) (by decide)
 
-/-- `0x5ca  mv a1,s5` -/
-theorem ushI_5ca (γt : GName) :
-    ushCode (GF := GF) γt ⊢ uinstrIs γt (BitVec.ofNat 64 0x5ca) true (.RTYPE (.Regidx 21#5, .Regidx 0#5, .Regidx 11#5, .ADD)) :=
-  ushm_uisK γt 0x5ca _ _ (by kernel_rfl) (by decide)
-
-/-- `0x5cc  mv a0,s4` -/
-theorem ushI_5cc (γt : GName) :
-    ushCode (GF := GF) γt ⊢ uinstrIs γt (BitVec.ofNat 64 0x5cc) true (.RTYPE (.Regidx 20#5, .Regidx 0#5, .Regidx 10#5, .ADD)) :=
-  ushm_uisK γt 0x5cc _ _ (by kernel_rfl) (by decide)
-
-/-- `0x5ce  jal 746 <parseblock>` -/
-theorem ushI_5ce (γt : GName) :
-    ushCode (GF := GF) γt ⊢ uinstrIs γt (BitVec.ofNat 64 0x5ce) false (.JAL (376#21, .Regidx 1#5)) :=
-  ushm_uisK γt 0x5ce _ _ (by kernel_rfl) (by decide)
-
-/-- `0x5d2  mv s1,a0` -/
-theorem ushI_5d2 (γt : GName) :
-    ushCode (GF := GF) γt ⊢ uinstrIs γt (BitVec.ofNat 64 0x5d2) true (.RTYPE (.Regidx 10#5, .Regidx 0#5, .Regidx 9#5, .ADD)) :=
-  ushm_uisK γt 0x5d2 _ _ (by kernel_rfl) (by decide)
-
 /-- `0x5d4  mv a0,s1` -/
 theorem ushI_5d4 (γt : GName) :
     ushCode (GF := GF) γt ⊢ uinstrIs γt (BitVec.ofNat 64 0x5d4) true (.RTYPE (.Regidx 9#5, .Regidx 0#5, .Regidx 10#5, .ADD)) :=
@@ -261,21 +241,6 @@ theorem ushI_5e0 (γt : GName) :
 theorem ushI_5e2 (γt : GName) :
     ushCode (GF := GF) γt ⊢ uinstrIs γt (BitVec.ofNat 64 0x5e2) true (.JALR (0#12, .Regidx 1#5, .Regidx 0#5)) :=
   ushm_uisK γt 0x5e2 _ _ (by kernel_rfl) (by decide)
-
-/-- `0x5e4  auipc a0,0x1` -/
-theorem ushI_5e4 (γt : GName) :
-    ushCode (GF := GF) γt ⊢ uinstrIs γt (BitVec.ofNat 64 0x5e4) false (.UTYPE (1#20, .Regidx 10#5, .AUIPC)) :=
-  ushm_uisK γt 0x5e4 _ _ (by kernel_rfl) (by decide)
-
-/-- `0x5e8  addi a0,a0,-740 # 1300 <malloc+0x188>` -/
-theorem ushI_5e8 (γt : GName) :
-    ushCode (GF := GF) γt ⊢ uinstrIs γt (BitVec.ofNat 64 0x5e8) false (.ITYPE (3356#12, .Regidx 10#5, .Regidx 10#5, .ADDI)) :=
-  ushm_uisK γt 0x5e8 _ _ (by kernel_rfl) (by decide)
-
-/-- `0x5ec  jal 4a <panic>` -/
-theorem ushI_5ec (γt : GName) :
-    ushCode (GF := GF) γt ⊢ uinstrIs γt (BitVec.ofNat 64 0x5ec) false (.JAL (2095710#21, .Regidx 1#5)) :=
-  ushm_uisK γt 0x5ec _ _ (by kernel_rfl) (by decide)
 
 /-- `0x5f0  addi s3,s3,8` -/
 theorem ushI_5f0 (γt : GName) :
@@ -396,21 +361,6 @@ theorem ushI_62c (γt : GName) :
 theorem ushI_62e (γt : GName) :
     ushCode (GF := GF) γt ⊢ uinstrIs γt (BitVec.ofNat 64 0x62e) false (.BTYPE (8130#13, .Regidx 25#5, .Regidx 18#5, .BNE)) :=
   ushm_uisK γt 0x62e _ _ (by kernel_rfl) (by decide)
-
-/-- `0x632  auipc a0,0x1` -/
-theorem ushI_632 (γt : GName) :
-    ushCode (GF := GF) γt ⊢ uinstrIs γt (BitVec.ofNat 64 0x632) false (.UTYPE (1#20, .Regidx 10#5, .AUIPC)) :=
-  ushm_uisK γt 0x632 _ _ (by kernel_rfl) (by decide)
-
-/-- `0x636  addi a0,a0,-810 # 1308 <malloc+0x190>` -/
-theorem ushI_636 (γt : GName) :
-    ushCode (GF := GF) γt ⊢ uinstrIs γt (BitVec.ofNat 64 0x636) false (.ITYPE (3286#12, .Regidx 10#5, .Regidx 10#5, .ADDI)) :=
-  ushm_uisK γt 0x636 _ _ (by kernel_rfl) (by decide)
-
-/-- `0x63a  jal 4a <panic>` -/
-theorem ushI_63a (γt : GName) :
-    ushCode (GF := GF) γt ⊢ uinstrIs γt (BitVec.ofNat 64 0x63a) false (.JAL (2095632#21, .Regidx 1#5)) :=
-  ushm_uisK γt 0x63a _ _ (by kernel_rfl) (by decide)
 
 /-- `0x63e  slli s2,s2,0x3` -/
 theorem ushI_63e (γt : GName) :

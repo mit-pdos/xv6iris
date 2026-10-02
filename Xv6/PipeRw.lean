@@ -236,8 +236,6 @@ theorem pw_data_addr' (pi : BitVec 64) (x : BitVec 64) (hx : x < 512#64) :
     x + pi + 24#64 = pi + BitVec.ofNat 64 (pipeDataOff + x.toNat) := by
   rw [← pw_data_addr pi x hx]; rfl
 
-theorem pw_idx_lt' (nw : BitVec 32) :
-    (BitVec.signExtend 64 nw &&& BitVec.signExtend 64 511#12) < 512#64 := by bv_decide
 theorem pw_idx_lt'' (nw : BitVec 32) :
     (BitVec.signExtend 64 nw &&& 511#64) < 512#64 := by bv_decide
 
@@ -303,7 +301,6 @@ theorem pw_m1_lit : (-1#64 : BitVec 64) = 0xFFFFFFFFFFFFFFFF#64 := by decide
 theorem pw_sext3999 : BitVec.signExtend 64 3999#12 = 0xFFFFFFFFFFFFFF9F#64 := by decide
 theorem pw_sext4095 : BitVec.signExtend 64 4095#12 = 0xFFFFFFFFFFFFFFFF#64 := by decide
 theorem pw_sext1 : BitVec.signExtend 64 1#12 = 1#64 := by decide
-theorem pw_sext24 : BitVec.signExtend 64 24#12 = 24#64 := by decide
 theorem pw_sext72 : BitVec.signExtend 64 72#12 = 72#64 := by decide
 theorem pw_sext80 : BitVec.signExtend 64 80#12 = 80#64 := by decide
 theorem pw_sext512 : BitVec.signExtend 64 512#12 = 512#64 := by decide

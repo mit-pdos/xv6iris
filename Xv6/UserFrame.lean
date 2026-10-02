@@ -639,32 +639,6 @@ theorem uf_swp_decode32 (cpu : CPU) (C : UCfg) (P : UPtd) (f : RegFile) (hc : Uf
   iframe HF
   iapply HΦ $$ %ast %b %h %hd
 
-/-- **The decode bridge, 16-bit** (`decodeU_total16`). -/
-theorem uf_swp_decode16 (cpu : CPU) (C : UCfg) (P : UPtd) (f : RegFile) (hc : UfCfg C P f)
-    (hpriv : f .cur_privilege = Privilege.User) (w : BitVec 16) (Φ : instruction → IProp GF) :
-    (ufRegF cpu C).F f ∗
-      (∀ (ast : instruction) (b : Bool), ⌜runRead drefU (ext_decode_compressed w) = some (ast, b)⌝ -∗
-        ⌜decodableUC ast = true⌝ -∗ laterIf b iprop((ufRegF cpu C).F f -∗ Φ ast))
-    ⊢ swp cpu (ext_decode_compressed w) Φ := by
-  obtain ⟨ast, b, h, hd⟩ := decodeU_total16 w
-  iintro ⟨HF, HΦ⟩
-  iapply swp_runRead cpu drefU _ (uf_drefU_acc cpu C P f hc hpriv) _ ast b h Φ
-  iframe HF
-  iapply HΦ $$ %ast %b %h %hd
-
 end decode
-
-/-- **The walker keeps the configuration pins** (the pinned cells are off
-the written list). -/
-theorem uf_cfg_walk (C : UCfg) (P : UPtd) {X : Type} (m : SailM X) (orc : UOrc) (s : UWSt) (x : X)
-    (s' : UWSt) (orc' : UOrc) (h : runRW ufFoot orc s m = some (x, s', orc')) (hc : UfCfg C P s.file) :
-    UfCfg C P s'.file := by
-  refine ufCfg_of_ro C P s.file s'.file hc (fun r hr => runRW_file_ro ufFoot m orc s x s' orc' h r ?_)
-  have hn : r ∉ ufRwList := by
-    intro hw
-    have := List.nodup_append.1 ufLists_nodup
-    exact this.2.2 r hw r hr rfl
-  simp only [ufFoot, uFootL]
-  simpa using hn
 
 end Xv6

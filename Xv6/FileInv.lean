@@ -109,8 +109,6 @@ theorem fc_bgtz' (n : Nat) (h1 : 1 ≤ n) (h : n < 2 ^ 31) :
 
 theorem aFtype_eq (k : Nat) : aFtype k = fnode k + BitVec.signExtend 64 0#12 := by
   unfold aFtype; simp
-theorem aFtype_eq' (k : Nat) : fnode k + 0#64 = aFtype k := by
-  unfold aFtype; simp
 theorem aFreadable_eq (k : Nat) : aFreadable k = fnode k + BitVec.signExtend 64 8#12 := by
   unfold aFreadable; rfl
 theorem aFreadable_eq' (k : Nat) : fnode k + 8#64 = aFreadable k := rfl
@@ -208,14 +206,6 @@ theorem fslot_intro (γ : FileNames) (k : Nat) (L : List (Nat × Qp)) (C : FCont
   iexists C, pn, q'
   iframe H1 H2 H3 H4
   ipureintro; exact ⟨hnd, hlt⟩
-
-/-- The authority knows every holder's id. -/
-theorem fref_lookup (γ : FileNames) (M : RegMapF (Nat × Qp)) (id k : Nat) (q : Qp) :
-    (γ.ref ↪●MAP M) ∗ (γ.ref ↪◯MAP[id]{.own (1 : Qp).half} (k, q)) ⊢@{IProp GF}
-      ⌜PartialMap.get? M id = some (k, q)⌝ := by
-  iintro ⟨Ha, He⟩
-  ihave %h := ghost_map_lookup $$ Ha He
-  ipureintro; exact h
 
 /-- `updAt` at the list a slot already has changes nothing. -/
 theorem updAt_same (Ls : Nat → List (Nat × Qp)) (k : Nat) (L : List (Nat × Qp)) (h : Ls k = L) :

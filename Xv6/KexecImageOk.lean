@@ -214,26 +214,6 @@ theorem kexecImageOk_below (h : kexecImageOk f na alen afun sts W') :
     kxbPermBelow W'.sz W'.perm :=
   h.2.2.2.2.2.2.2.2.2.1
 
-/-- Rocq `kexec_image_ok_perm`: THE TEXT READER -- a page of PT_LOAD header
-`i` carries that header's bits. -/
-theorem kexecImageOk_perm (h : kexecImageOk f na alen afun sts W') {i : Nat} {p : ElfPhdr}
-    {b : Nat} (hi : (elfLoads f)[i]? = some p) (hb : kexecSegPages (elfLoads f) i p b) :
-    W'.perm (kexecPg b) = some (kexecSegPerm p) :=
-  h.2.2.2.2.2.2.2.2.1.1 i p hi b hb
-
-/-- Rocq `kexec_image_ok_argv`: THE ARGV READER -- what main sees. -/
-theorem kexecImageOk_argv (h : kexecImageOk f na alen afun sts W') :
-    tfW W'.tf (tfArgIdx 1) = BitVec.ofInt 64 (kxcSpFinal (kexecSz f : Int) alen na) ∧
-    tfW W'.tf (tfArgIdx 0) = BitVec.ofNat 64 na ∧
-    (∀ (i k : Nat), i ≤ na → k < 8 →
-      memAtZ W'.M (kxcSpFinal (kexecSz f : Int) alen na + 8 * (i : Int) + (k : Int)) =
-        some (nthByte (n := 8) (BitVec.ofInt 64 (kexecUstack (kexecSz f : Int) alen na i)) k)) ∧
-    (∀ i j, i < na → j < alen i →
-      memAtZ W'.M (kxcSp (kexecSz f : Int) alen (i + 1) + (j : Int)) = some (afun i j)) ∧
-    (∀ i, i < na → memAtZ W'.M (kxcSp (kexecSz f : Int) alen (i + 1) + (alen i : Int)) = some 0#8) := by
-  obtain ⟨-, -, -, ha1, ha0, -, ⟨hstr, hnul, hvec⟩, -⟩ := h
-  exact ⟨ha1, ha0, hvec, hstr, hnul⟩
-
 end ImageOk
 
 end Xv6

@@ -183,9 +183,6 @@ def bmapNeed (cr ind : Bool) : Nat :=
 theorem bmapCost_le3 (cr al ind : Bool) : bmapCost cr al ind ≤ 3 := by
   cases cr <;> cases al <;> cases ind <;> decide
 
-theorem bmapNeed_le4 (cr ind : Bool) : bmapNeed cr ind ≤ 4 := by
-  cases cr <;> cases ind <;> decide
-
 /-- balloc's own two units are wanted on every allocating arm. -/
 theorem bmapNeed_ge2 (cr ind : Bool) : 2 ≤ bmapNeed cr ind := by
   cases cr <;> cases ind <;> decide

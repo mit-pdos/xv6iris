@@ -70,15 +70,6 @@ def panicEnv : IProp GF := iprop%
 instance panicEnv_persistent : Persistent (panicEnv (GF := GF)) := by
   unfold panicEnv; infer_instance
 
-/-- The shape a call site has in hand: the three credentials loose. -/
-theorem panicEnv_of (γpr γl : GName) (γd : UartNames) :
-    isLock (GF := GF) γpr prLock "pr" (fun _ => emp) ∗ isTxLock γl γd ∗ uartSentSub γd [] ⊢
-      panicEnv := by
-  unfold panicEnv
-  iintro H
-  iexists γpr, γl, γd
-  iexact H
-
 end
 
 /-- **WP of `panic(s = a0)`**, with no continuation. -/

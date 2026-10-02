@@ -93,9 +93,6 @@ def FdState.isClosed : FdState → Bool
 theorem FdState.isClosed_eq_false {st : FdState} : st.isClosed = false ↔ st ≠ .closed := by
   cases st <;> simp [FdState.isClosed]
 
-theorem FdState.isClosed_eq_true {st : FdState} : st.isClosed = true ↔ st = .closed := by
-  cases st <;> simp [FdState.isClosed]
-
 /-! ## §1 The map a descriptor list denotes -/
 
 /-- The filter: every slot below `NSTD`, and above it only the open ones. -/
@@ -153,11 +150,6 @@ theorem ufdMap_lookup (fdv : List FdState) (fd : Nat) (st : FdState) :
 theorem ufdMap_lookup_1 {fdv : List FdState} {fd : Nat} {st : FdState}
     (h : get? (ufdMap fdv) fd = some st) : fdv[fd]? = some st :=
   ((ufdMap_lookup fdv fd st).1 h).1
-
-/-- Rocq `ufd_map_std`: a std slot is present WHATEVER its state. -/
-theorem ufdMap_std {fdv : List FdState} {fd : Nat} {st : FdState} (hlt : fd < NSTD)
-    (hl : fdv[fd]? = some st) : get? (ufdMap fdv) fd = some st :=
-  (ufdMap_lookup fdv fd st).2 ⟨hl, .inl hlt⟩
 
 /-- Rocq `ufd_map_lookup_None`: a closed slot ABOVE the prefix is absent, which
 is what makes minting a handle for it an insert. -/
@@ -327,24 +319,6 @@ theorem ushViewOk_dup {fdv v : List FdState} (fd i : Nat) (st : FdState)
   rcases List.mem_or_eq_of_mem_set hs with h | h
   · exact hf s h
   · subst h; exact hf _ (List.mem_of_getElem? hi)
-
-/-- Rocq `tab_le_take`: the standard streams are never closed behind the
-view's back. -/
-theorem tabLe_take {fdv v : List FdState} (h : tabLe fdv v) : fdv.take NSTD = v.take NSTD := by
-  apply List.ext_getElem?
-  intro i
-  rw [List.getElem?_take, List.getElem?_take]
-  by_cases hi : i < NSTD
-  · rw [if_pos hi, if_pos hi]
-    cases hf : fdv[i]? with
-    | none =>
-      exact (List.getElem?_eq_none (show v.length ≤ i by
-        have := List.getElem?_eq_none_iff.1 hf; have := h.1; omega)).symm
-    | some st =>
-      rcases h.2 i st hf with h' | ⟨_, h'⟩
-      · exact h'.symm
-      · exact absurd h' (by omega)
-  · rw [if_neg hi, if_neg hi]
 
 /-! ### The one ghost map (Rocq `ufd_gm`) -/
 
@@ -668,13 +642,6 @@ theorem ufd_ge (γf : GName) (fd : Nat) (st : FdState) : ufd (GF := GF) γf fd s
   iintro ⟨_, %h⟩
   ipureintro; exact h.2
 
-/-- Rocq `ufd_shut_agree`. -/
-theorem ufdShut_agree (γf : GName) (fdv : List FdState) (fd : Nat) :
-    ⊢@{IProp GF} ufdAuth γf fdv -∗ ufdShut γf fd -∗ ⌜fdv[fd]? = some .closed⌝ := by
-  unfold ufdShut
-  iintro Ha Hf
-  iapply ufd_slot_agree $$ Ha Hf
-
 /-- Rocq `ufd_slot_excl`: the map is at the full fraction, so a fragment is
 exclusive. -/
 theorem ufd_slot_excl (γf : GName) (fd : Nat) (st st' : FdState) :
@@ -723,20 +690,6 @@ theorem ustd_acc (γf : GName) (l : List FdState) (k : Nat) (st : FdState) (hk :
     ustd (GF := GF) γf l ⊢
       ufdSlot γf k st ∗ ∀ st' : FdState, ufdSlot γf k st' -∗ ustd γf (l.set k st') := by
   unfold ustd
-  iintro ⟨Hr, Ht⟩
-  icases ustdRaw_acc γf l k st hk $$ Hr with ⟨Hk, Hback⟩
-  iframe Hk
-  iintro %st' Hs
-  isplitl [Hback Hs]
-  · iapply Hback $$ Hs
-  · iexact Ht
-
-/-- Rocq `ustd_at_acc`: at a named view, a slot move leaves the view where
-it was. -/
-theorem ustdAt_acc (γf : GName) (l v : List FdState) (k : Nat) (st : FdState) (hk : l[k]? = some st) :
-    ustdAt (GF := GF) γf l v ⊢
-      ufdSlot γf k st ∗ ∀ st' : FdState, ufdSlot γf k st' -∗ ustdAt γf (l.set k st') v := by
-  unfold ustdAt
   iintro ⟨Hr, Ht⟩
   icases ustdRaw_acc γf l k st hk $$ Hr with ⟨Hk, Hback⟩
   iframe Hk
@@ -854,12 +807,6 @@ theorem ufdOwn_agree (γf : GName) (fdv l : List FdState) (fd : Nat) (st : FdSta
   · ihave %hi := ufd_agree γf fdv fd st $$ Ha Hh
     ipureintro
     exact ⟨hi, by rw [← hlen]; exact (List.getElem?_eq_some_iff.1 hi).1⟩
-
-/-- Rocq `ufd_own_hi_ge`. -/
-theorem ufdOwn_hi_ge (γf : GName) (l : List FdState) (fd : Nat) (st : FdState) :
-    ⊢@{IProp GF} ustd γf l -∗ ufd γf fd st -∗ ⌜NSTD ≤ fd⌝ := by
-  iintro _ Hh
-  iapply ufd_ge $$ Hh
 
 /-! ### §3½ What an allocation hands back -/
 
@@ -1183,18 +1130,6 @@ def ustdAny (γf : GName) : IProp GF := iprop(∃ l : List FdState, ustd γf l)
 
 /-- Rocq `ufd_state`: the authority together with a ledger nobody reads. -/
 def ufdState (γf : GName) (fdv : List FdState) : IProp GF := iprop(ufdAuth γf fdv ∗ ustdAny γf)
-
-/-- Rocq `ufd_state_len`. -/
-theorem ufdState_len (γf : GName) (fdv : List FdState) :
-    ufdState (GF := GF) γf fdv ⊢ ⌜fdv.length = NOFILE⌝ := by
-  unfold ufdState
-  iintro ⟨Ha, _⟩
-  iapply ufdAuth_len $$ Ha
-
-/-- Rocq `ufd_auth_quiet`. -/
-theorem ufdAuth_quiet (γf : GName) (fdv fdv' : List FdState) (h : fdv' = fdv) :
-    ufdAuth (GF := GF) γf fdv ⊢ ufdAuth γf fdv' := by
-  subst h; exact .rfl
 
 /-- Rocq `ufd_alloc_least_any`: AN ALLOCATION NOBODY IS WATCHING. -/
 theorem ufd_alloc_least_any (γf : GName) (fdv l : List FdState) (fd : Nat) (st : FdState)

@@ -144,19 +144,6 @@ theorem mergeAll_one (x u : List α) : MergeAll [x] u ↔ u = x := by
     | nil => exact .done _ (by simp)
     | cons y x ih => exact .take _ 0 y x x rfl (by simpa using ih)
 
-/-- Rocq `merge_all_block`: one stream taken as a block, anywhere. -/
-theorem mergeAll_block (ss : List (List α)) (i : Nat) (x y u : List α)
-    (hi : ss[i]? = some (x ++ y)) (hm : MergeAll (ss.set i y) u) : MergeAll ss (x ++ u) := by
-  induction x generalizing ss with
-  | nil =>
-    have hi' : ss[i]? = some y := by simpa using hi
-    rw [pmerge_set_id ss i y hi'] at hm
-    simpa using hm
-  | cons z x ih =>
-    have hlt : i < ss.length := (List.getElem?_eq_some_iff.1 hi).1
-    refine .take _ i z (x ++ y) _ hi (ih _ (pmerge_get_set _ _ _ hlt) ?_)
-    simpa [List.set_set] using hm
-
 /-- **Rocq `shuf2`** (PipesDisc): the textbook shuffle of two streams. -/
 inductive Shuf2 : List α → List α → List α → Prop where
   | nil : Shuf2 [] [] []

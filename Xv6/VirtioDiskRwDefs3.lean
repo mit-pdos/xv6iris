@@ -157,16 +157,6 @@ theorem opsSec_facts (i : Nat) (hi : i < NUM) :
       kmapClass (vpnOf (aOps i + 8#64)).toNat = some .rw := by
   rcases lt8_cases i hi with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> exact ⟨by decide, by decide, by decide⟩
 
-theorem infoB_facts (i : Nat) (hi : i < NUM) :
-    inRam (aInfoB i) 8 ∧ (aInfoB i).toNat % 8 = 0 ∧
-      kmapClass (vpnOf (aInfoB i)).toNat = some .rw := by
-  rcases lt8_cases i hi with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> exact ⟨by decide, by decide, by decide⟩
-
-theorem infoStatus_facts (i : Nat) (hi : i < NUM) :
-    inRam (aInfoStatus i) 1 ∧ (aInfoStatus i).toNat % 1 = 0 ∧
-      kmapClass (vpnOf (aInfoStatus i)).toNat = some .rw := by
-  rcases lt8_cases i hi with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> exact ⟨by decide, by decide, by decide⟩
-
 /-! ## `disk.ops[i]`, as the three cells the driver stores through -/
 
 section ops
@@ -484,12 +474,6 @@ theorem vdrwCaps_perm (γ : DiskNames) (γl : GName) (pd pav pu : BitVec 64) :
   iintro ⟨#H1, #H2, #H3, #H4⟩
   iexact H4
 
-theorem vdrwCaps_lock (γ : DiskNames) (γl : GName) (pd pav pu : BitVec 64) :
-    vdrwCaps (GF := GF) γ γl pd pav pu ⊢ isLock γl aVdiskLock "virtio_disk" (diskRes γ pd pav pu) := by
-  unfold vdrwCaps
-  iintro ⟨#H1, #H2, #H3, #H4⟩
-  iexact H3
-
 end caps
 
 /-! ## The seams -/
@@ -749,9 +733,6 @@ theorem vdrw4_availRing (pav : PAddr) (j : Nat) :
   unfold availRingAt
   rw [← MachCSL.ofNat64_add, show 2 * j + 4 = 4 + 2 * j from by omega]
 
-/-- `*R(QUEUE_NOTIFY)`, out of `lui a5,0x10001; sw zero,80(a5)`. -/
-theorem vdrw4_notify_addr : 0x10001000#64 + 80#64 = 0x10001050#64 := by decide
-
 /-! ## The arithmetic of the two phases -/
 
 /-- `snez a2,s6`: the C `write` as a `0`/`1` word. -/
@@ -787,20 +768,8 @@ theorem vdrw3_type (wr : Bool) :
 /-- `sd` of the sector. -/
 theorem vdrw3_sector (bno : BitVec 32) : sectorOf bno = sectorOf bno := rfl
 
-/-- `sw a4,8(a6)` with `a4 = 16`: the header descriptor's length. -/
-theorem vdrw3_len16 : BitVec.extractLsb' 0 32 (16#64) = BitVec.ofNat 32 opsSize := by decide
-/-- `sw a2,8(a4)` with `a2 = 1024`. -/
-theorem vdrw3_len1024 : BitVec.extractLsb' 0 32 (1024#64) = BitVec.ofNat 32 BSIZE := by decide
 /-- `sw a1,8(a4)` with `a1 = 1`: the status descriptor's length. -/
 theorem vdrw3_len1 : BitVec.extractLsb' 0 32 (1#64) = 1#32 := by decide
-/-- `sh a1,12(a6)` with `a1 = 1`: `VRING_DESC_F_NEXT`. -/
-theorem vdrw3_flNext : BitVec.extractLsb' 0 16 (1#64) = BitVec.ofNat 16 Virtio.descFNext := by
-  decide
-/-- `sh a3,12(a4)` with `a3 = 2`: `VRING_DESC_F_WRITE`. -/
-theorem vdrw3_flWrite : BitVec.extractLsb' 0 16 (2#64) = BitVec.ofNat 16 Virtio.descFWrite := by
-  decide
-/-- `sh zero,14(a4)`: the chain ends. -/
-theorem vdrw3_next0 : BitVec.extractLsb' 0 16 (0#64) = 0#16 := by decide
 
 /-- `seqz a2,s6 ; slliw a2,a2,1 ; or a2,a2,a1`: the data descriptor's flags. -/
 theorem vdrw3_flData (wr : Bool) :

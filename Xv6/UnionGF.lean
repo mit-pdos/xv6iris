@@ -304,25 +304,4 @@ example : (DiskG.mlPosG : MonoListG unionGF Nat) = ugfMlPos := rfl
     diskImg_pre := inferInstance
     mirror_pre := inferInstance }
 
-/-- **JOINT INSTANTIABILITY** of the union theorem's capacity classes at ONE
-concrete functor list. -/
-theorem unionGF_capacityClasses (hlc : HasLC) :
-    Nonempty (MachGpreS hlc unionGF) ∧
-    Nonempty (Xv6G unionGF) ∧ Nonempty (WchGpre unionGF) ∧ Nonempty (CtokG unionGF) ∧
-    Nonempty (DiskG unionGF) ∧ Nonempty (IcacheG unionGF) ∧ Nonempty (IcboxG unionGF) ∧
-    Nonempty (LogG unionGF) ∧ Nonempty (FsBytesG unionGF) ∧ Nonempty (FsBlocksG unionGF) ∧
-    Nonempty (IregG unionGF) ∧ Nonempty (FsTopG unionGF) ∧ Nonempty (FsLinkG unionGF) ∧
-    Nonempty (SleepLockG unionGF) ∧ Nonempty (BcacheG unionGF) ∧ Nonempty (OffboxG unionGF) ∧
-    Nonempty (OffboxBoxG unionGF) ∧ Nonempty (FileG unionGF) ∧ Nonempty (CrashPermG unionGF) ∧
-    Nonempty (CInvG unionGF) ∧ Nonempty (EchoOutG unionGF) ∧ Nonempty (FileAppG unionGF) ∧
-    Nonempty (FileOutG unionGF) ∧ Nonempty (PipeOutG unionGF) ∧ Nonempty (PipeProtoG unionGF) ∧
-    Nonempty (PnsRegG unionGF) ∧ Nonempty (PipesNG unionGF) ∧ Nonempty (CifRegG unionGF) ∧
-    Nonempty (FifRegG unionGF) :=
-  ⟨⟨unionGF_machGpreS hlc 0⟩, ⟨inferInstance⟩, ⟨inferInstance⟩, ⟨inferInstance⟩, ⟨inferInstance⟩,
-    ⟨inferInstance⟩, ⟨inferInstance⟩, ⟨inferInstance⟩, ⟨inferInstance⟩, ⟨inferInstance⟩,
-    ⟨inferInstance⟩, ⟨inferInstance⟩, ⟨inferInstance⟩, ⟨inferInstance⟩, ⟨inferInstance⟩,
-    ⟨inferInstance⟩, ⟨inferInstance⟩, ⟨inferInstance⟩, ⟨inferInstance⟩, ⟨inferInstance⟩,
-    ⟨inferInstance⟩, ⟨inferInstance⟩, ⟨inferInstance⟩, ⟨inferInstance⟩, ⟨inferInstance⟩,
-    ⟨inferInstance⟩, ⟨inferInstance⟩, ⟨inferInstance⟩, ⟨inferInstance⟩⟩
-
 end Xv6

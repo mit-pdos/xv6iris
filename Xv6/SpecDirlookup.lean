@@ -449,34 +449,4 @@ structure DIRLOOKUP : Prop where
       hj hproc hK hnoff htier htype hgeom hwf hcov hsz hholes hinums hdisj horph
       hdrnz hdrnl hpd ha0 hkd hkdn hpoff
 
-/-- The interrupts-off instance of `wp_dirlookup_eb` (the complement is the whole
-bundle): the contract every not-yet-generalized caller states. -/
-theorem DIRLOOKUP.wp_dirlookup (A : DIRLOOKUP) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
-    [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
-    [FsTopG GF] [FsLinkG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
-    (γkl : GName) (γk : KmemNames)
-    (ip : BitVec 64) (dinum : BitVec 32) (bm : Blkmap) (data : Nat → List (BitVec 8))
-    (dn dr : Dinode) (fn : Nat → BitVec 8) (hasp : Bool) (pofv : BitVec 32)
-    (pidv : BitVec 32) (dqp dqd dqn : DFrac)
-    (kd : Nat) (sd : Qp) (rootv : BitVec 64) (rti : Nat) (dqr : DFrac)
-    hj hproc hK hsie hnoff hlocks htier htype hgeom hwf hcov hsz hholes hinums hdisj horph
-    hdrnz hdrnl hpd ha0 hkd hkdn hpoff :
-    wp_dirlookup_body (hlc := hlc) (GF := GF) Γ cpu k γl pd pav pu j γkl γk ip dinum bm data
-      dn dr fn hasp pofv pidv dqp dqd dqn kd sd rootv rti dqr
-      hj hproc hK hsie hnoff hlocks htier htype hgeom hwf hcov hsz hholes hinums hdisj horph
-      hdrnz hdrnl hpd ha0 hkd hkdn hpoff := by
-  have h := A.wp_dirlookup_eb (hlc := hlc) (GF := GF) (Γ := Γ) (cpu := cpu) (k := k) (γl := γl) (pd := pd) (pav := pav) (pu := pu) (j := j) (γkl := γkl) (γk := γk) (ip := ip) (dinum := dinum) (bm := bm) (data := data) (dn := dn) (dr := dr) (fn := fn) (hasp := hasp) (pofv := pofv) (pidv := pidv) (dqp := dqp) (dqd := dqd) (dqn := dqn) (kd := kd) (sd := sd) (rootv := rootv) (rti := rti) (dqr := dqr) (hj := hj) (hproc := hproc) (hK := hK) (hnoff := hnoff) (htier := htier) (htype := htype) (hgeom := hgeom) (hwf := hwf) (hcov := hcov) (hsz := hsz) (hholes := hholes) (hinums := hinums) (hdisj := hdisj) (horph := horph) (hdrnz := hdrnz) (hdrnl := hdrnl) (hpd := hpd) (ha0 := ha0) (hkd := hkd) (hkdn := hkdn) (hpoff := hpoff)
-  unfold wp_dirlookup_eb_body at h
-  unfold wp_dirlookup_body
-  rw [hsie] at h
-  simp only [trapCsrsExt_false, cpuClaimExt_false] at h
-  iintro ⟨H0, H1, H2, Htc, Hcl, Hir, H6, H7, H8, H9, H10, H11, H12, H13, H14, Hs1, Hs2, H15, H16, H17, Hr1, Hr2, H18, H19, H20, H21, H22, H23, H24, Hnext⟩
-  iapply h
-  iframe H0 H1 H2 Htc Hcl Hir H6 H7 H8 H9 H10 H11 H12 H13 H14 Hs1 Hs2 H15 H16 H17 Hr1 Hr2 H18 H19 H20 H21 H22 H23 H24
-  iapply wpNext_mono $$ Hnext
-  iintro %cpu' HK %spie %spp %R' %found %kk %kslot %q %self %p0 H1 H2 ⟨Htc, Hir⟩ Hcl H6 H7 H8 H9 Hs1 Hs2 H10 H11 Hr1 Hr2 H12 H13 H14 H15
-  iapply HK $$ %spie %spp %R' %found %kk %kslot %q %self %p0 H1 H2 Htc Hcl Hir H6 H7 H8 H9 Hs1 Hs2 H10 H11 Hr1 Hr2 H12 H13 H14 H15
-
 end Xv6

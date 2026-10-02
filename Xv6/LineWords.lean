@@ -827,8 +827,6 @@ theorem fnByte_val (b : BitVec 8) (h : fnByte b) :
   · exact Or.inr h
   · exact Or.inl rfl
 
-theorem fnByte_of_alnum (b : BitVec 8) (h : wlAlnum b) : fnByte b := Or.inl h
-
 theorem fnByte_ne_sp (b : BitVec 8) (h : fnByte b) : b ≠ wlSp := by
   rintro rfl
   have := fnByte_val _ h

@@ -14,7 +14,6 @@ namespace MachCSL
 of physical memory), R/W/X, unlocked. -/
 def xv6Pmpcfg : Vector (BitVec 8) 64 := Sail.vectorUpdate bootPmpcfg 0 0x0f#8
 def xv6Pmpaddr : Vector (BitVec 64) 64 := Sail.vectorUpdate bootPmpaddr 0 0x3fffffffffffff#64
-theorem xv6Pmpaddr_0 : xv6Pmpaddr[0]! = 0x3fffffffffffff#64 := by decide
 
 /-! ### What `start()`'s two PMP writes leave, over ANY tables (Rocq
 `WpStartNew.st_pmpcfg1` / `st_pmpaddr1`)

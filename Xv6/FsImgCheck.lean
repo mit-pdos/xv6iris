@@ -104,34 +104,6 @@ theorem fsimgDots (i : Nat) (hi : i < fsimgSb.sbNinodes)
     dirDotsIx i (fsDinode fsimgP fsimgSb i) (fsDataOf fsimgP (fsDinode fsimgP fsimgSb i)) :=
   fsimgWf_dots fsimgP fsimgSb i fsimgWfOk hi hty
 
-/-- Rocq `fsimg_root_dots`. -/
-theorem fsimgRootDots :
-    dirDotsIx ROOTINO (fsDinode fsimgP fsimgSb ROOTINO)
-      (fsDataOf fsimgP (fsDinode fsimgP fsimgSb ROOTINO)) :=
-  fsimgDots ROOTINO (by decide)
-    (fsRootWf_type fsimgP fsimgSb (fsimgWf_root fsimgP fsimgSb fsimgWfOk))
-
-/-- Rocq `fsimg_link_le`. -/
-theorem fsimgLinkLe (z : Nat) :
-    fsLinkCount fsimgP fsimgSb z ≤ (fsDinode fsimgP fsimgSb z).diNlink.toNat :=
-  fsimgWf_linkLe fsimgP fsimgSb z fsimgWfOk
-
-/-- Rocq `fsimg_link_dir`. -/
-theorem fsimgLinkDir (z : Nat) (hty : (fsDinode fsimgP fsimgSb z).diType.toNat = T_DIR_z) :
-    fsLinkCount fsimgP fsimgSb z = 0 :=
-  fsimgWf_linkDir fsimgP fsimgSb z fsimgWfOk hty
-
-/-- Rocq `fsimg_dir_nlink`. -/
-theorem fsimgDirNlink (z : Nat) (hz : z < fsimgSb.sbNinodes)
-    (hty : (fsDinode fsimgP fsimgSb z).diType.toNat = T_DIR_z) :
-    (fsDinode fsimgP fsimgSb z).diNlink.toNat = 1 :=
-  fsimgWf_dirNlink fsimgP fsimgSb z fsimgWfOk hz hty
-
-/-- Rocq `fsimg_dir_root`. -/
-theorem fsimgDirRoot (z : Nat) (hz : z < fsimgSb.sbNinodes)
-    (hty : (fsDinode fsimgP fsimgSb z).diType.toNat = T_DIR_z) : z = ROOTINO :=
-  fsimgWf_dirRoot fsimgP fsimgSb z fsimgWfOk hz hty
-
 /-- Rocq `fsimg_root_link`. -/
 theorem fsimgRootLink :
     fsLinkCount fsimgP fsimgSb ROOTINO = 0 ∧ (fsDinode fsimgP fsimgSb ROOTINO).diNlink.toNat = 1 :=
@@ -146,20 +118,9 @@ theorem fsimgLinksEq : fsLinksEq fsimgP fsimgSb = true := by
 theorem fsimgRootNoSelf : fsRootNoSelf fsimgP fsimgSb = true := by
   rw [fsimgP_eq]; exact fsimgRootNoSelfB
 
-/-- W4 reindexed (Rocq `fsimg_slot_inj`). -/
-theorem fsimgSlotInj (i : Nat) (hi : i < fsimgSb.sbNinodes)
-    (hnz : (fsDinode fsimgP fsimgSb i).diType.toNat ≠ 0) :
-    fsSlotInj fsimgP (fsDinode fsimgP fsimgSb i) :=
-  fsimgWf_slotInj fsimgP fsimgSb i fsimgWfOk hi hnz
-
 /-- The region's tail is free (Rocq `fsimg_region_free`). -/
 theorem fsimgRegionFree : fsRegionFree fsimgP fsimgSb fsimgNib = true := by
   rw [fsimgP_eq]; exact fsimgRegionFreeB
-
-/-- Rocq `fsimg_region_tail_free`. -/
-theorem fsimgRegionTailFree (z : Nat) (h1 : 200 ≤ z) (h2 : z < 208) :
-    (fsDinode fsimgP fsimgSb z).diType.toNat = 0 :=
-  fsRegionFree_spec fsimgP fsimgSb fsimgNib z fsimgRegionFree h1 h2
 
 /-- L3/L4 over the whole region (Rocq `fsimg_region_nlink`). -/
 theorem fsimgRegionNlink : fsRegionNlink fsimgP fsimgSb fsimgNib = true := by
@@ -173,17 +134,6 @@ theorem fsimgRegionBare : fsRegionBare fsimgP fsimgSb fsimgNib = true := by
 /-- Rocq `fsimg_region_wf`. -/
 theorem fsimgRegionWf : fsRegionWf fsimgP fsimgSb fsimgNib = true := by
   unfold fsRegionWf; rw [fsimgRegionFree, fsimgRegionNlink, Bool.and_self]
-
-/-- Rocq `fsimg_free_nlink`. -/
-theorem fsimgFreeNlink (z : Nat) (hz : z < 208)
-    (hty : (fsDinode fsimgP fsimgSb z).diType.toNat = 0) :
-    (fsDinode fsimgP fsimgSb z).diNlink.toNat = 0 :=
-  fsRegionNlink_free fsimgP fsimgSb fsimgNib z fsimgRegionNlink hz hty
-
-/-- Rocq `fsimg_nlink_short`. -/
-theorem fsimgNlinkShort (z : Nat) (hz : z < 208) :
-    (fsDinode fsimgP fsimgSb z).diNlink.toNat ≤ 32767 :=
-  fsRegionNlink_short fsimgP fsimgSb fsimgNib z fsimgRegionNlink hz
 
 /-- The live records are exactly `1 .. 24`, as one sweep (Rocq
 `fsimg_live_set`, deviation 3). -/
@@ -271,14 +221,5 @@ at the image's own geometry. -/
 theorem fsimgImageWf_of (dk : Nat → BitVec 8) (h : dk = fsImgDisk) :
     fsBootImageWf dk XV6_DISK_BYTES fsimgSb fsimgNib fsimgCov := by
   rw [h]; exact fsimgImageWf
-
-/-- THE NON-VACUITY WITNESS FOR THE DURABLE SNAPSHOT (Rocq
-`SystemAdequacy.fsimg_snap_ok`): the mkfs image denotes an abstract
-file-system state whose encoding is its own committed home blocks.  No
-computation: `imgSnapOk` at `fsimgImageWf`. -/
-theorem fsimgSnapOk :
-    snapOk (imgState fsimgP fsimgSb fsimgNib)
-      (fsRestrict fsimgP (fsHomeList fsimgCov fsimgSb.sbLogstart)) :=
-  imgSnapOk fsImgDisk XV6_DISK_BYTES fsimgSb fsimgNib fsimgCov fsimgImageWf
 
 end Xv6

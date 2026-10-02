@@ -218,8 +218,6 @@ end Head
 /-- `first`'s address, as the `auipc`/`lw` pair computes it. -/
 theorem fkr_first_addr : KA.«forkret» + 35282#64 = firstAddr := by decide
 theorem fkr_first_addr' : KA.«forkret» + 36884#64 + 18446744073709550014#64 = firstAddr := by decide
-theorem fkr_beqz_taken : KA.«forkret» + 0x1c#64 + BitVec.signExtend 64 56#13 = KA.«forkret» + 0x54#64 := by
-  decide
 theorem fkr_beqz_tgt : KA.«forkret» + 84#64 = KA.«forkret» + 0x54#64 := rfl
 
 /-- `FkrAfter` does not read `a5` (nor any register but `sp`, `s0`, `s1`). -/

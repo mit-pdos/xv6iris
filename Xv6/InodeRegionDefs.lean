@@ -618,10 +618,6 @@ theorem diNlinkStable_eq (dn' dn : Dinode) (heq : dn'.diNlink = dn.diNlink)
 theorem diNlinkStable_refl (dn : Dinode) (hnz : dn.diType.toNat ≠ 0) : diNlinkStable dn dn :=
   diNlinkStable_eq dn dn rfl hnz
 
-/-- The side condition the link arithmetic takes (deviation 2: at `Nat`
-it is `Nat.zero_le`; kept because `IcacheEscrow.v` cites it). -/
-theorem diNlink_nonneg (d : Dinode) : 0 ≤ d.diNlink.toNat := Nat.zero_le _
-
 /-! ### THE ROOT INUM AND THE TYPE NAMES, AT THE REGION'S OWN TYPES
 
 Literals, for Rocq's reason: `ROOTINO` / `T_DIR` / `T_FILE` / `T_DEVICE`
@@ -668,12 +664,6 @@ theorem iregNlink_step (h : BitVec 16) (hne : h.toNat ≠ 65535) :
   have := h.isLt
   rw [BitVec.toNat_add, Nat.mod_eq_of_lt (by simp; omega)]
   rfl
-
-/-- THE MACHINE'S `++`, CROSSED WITH NO GUARD AT ALL: a sixteen-bit
-increment raises the value by at most one (the wrap lands at zero). -/
-theorem nlink_add1_le (h : BitVec 16) : (h + 1#16).toNat ≤ h.toNat + 1 := by
-  rw [BitVec.toNat_add]
-  exact Nat.le_trans (Nat.mod_le _ _) (by simp)
 
 /-- ...AND ITS EXACT FORM UNDER A NONZERO READ-BACK: an increment whose
 result is known nonzero did not wrap. -/

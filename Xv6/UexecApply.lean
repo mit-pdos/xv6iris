@@ -95,10 +95,6 @@ theorem uvisRun_num (W : Uvis) : usysNum (uvisRun W).tf = usysNum W.tf :=
 /-- Rocq `uvis_run_secc`. -/
 theorem uvisRun_secc (W : Uvis) : (uvisRun W).secc = W.secc := rfl
 
-/-- Rocq `uvis_run_eff`: the run projection's effective number is the key's. -/
-theorem uvisRun_eff (W : Uvis) : uvisNum (uvisRun W) = uvisNum W :=
-  usysEff_numCong _ _ _ (uvisRun_num W)
-
 /-- **The eleven readings a slot sees** (Rocq `uslot_key_cong`'s premises,
 bundled: deviation 2). -/
 def ukeyEq (W W' : Uvis) : Prop :=
@@ -221,14 +217,6 @@ theorem uexecArmF_key_cong (S : Uvis → IProp GF) (HS : UKeyCong S) (sc : BitVe
     uexecArmF S sc W f ⊣⊢ uexecArmF S sc W' f :=
   ⟨uexecArmF_key_mono S HS sc W W' f hl hl' hn ha0 ha1 ha2 hk,
    uexecArmF_key_mono S HS sc W' W f hl' hl hn.symm ha0.symm ha1.symm ha2.symm (ukeyEq_symm hk)⟩
-
-/-- Rocq `uexec_arm_key_cong`. -/
-theorem uexecArm_key_cong (sc : BitVec 64) (W W' : Uvis) (f : sfam GF) (hl : W.tf.length = 36)
-    (hl' : W'.tf.length = 36) (hn : usysNum W.tf = usysNum W'.tf)
-    (ha0 : tfW W.tf (tfArgIdx 0) = tfW W'.tf (tfArgIdx 0)) (ha1 : tfW W.tf (tfArgIdx 1) = tfW W'.tf (tfArgIdx 1))
-    (ha2 : tfW W.tf (tfArgIdx 2) = tfW W'.tf (tfArgIdx 2)) (hk : ukeyEq W W') :
-    uexecArm sc W f ⊣⊢ uexecArm sc W' f :=
-  uexecArmF_key_cong uslot uslot_keyCong sc W W' f hl hl' hn ha0 ha1 ha2 hk
 
 /-- **Rocq `uexec_arm_F_run`**: THE INSTANCE THE LOOP USES -- the trapped key
 and its own run projection. -/

@@ -312,10 +312,6 @@ theorem kernelAccess_plain (acc : MemoryAccessType mem_payload) (hacc : kernelAc
     accPlain acc := by
   rcases hacc with rfl | rfl | rfl | rfl | rfl | rfl <;> rfl
 
-/-- The cast the model puts on an entry it read (`BitVec (8 * 8)` to
-`BitVec 64`) is the identity. -/
-theorem setWidth_64 (x : BitVec (8 * 8)) : BitVec.setWidth 64 x = x := BitVec.setWidth_eq x
-
 /-- What the write-back may report: nothing, or some variant of the leaf. -/
 def pteOptVariant (ppn : BitVec 44) (perm : KPerm) : Option (BitVec 64) → Prop
   | none => True
@@ -327,25 +323,9 @@ def pteOptVariant (ppn : BitVec 44) (perm : KPerm) : Option (BitVec 64) → Prop
 theorem pteAddr_setWidth (b : BitVec 44) (i : BitVec 9) :
     BitVec.setWidth 64 (b +++ (i +++ 0#3)) = pteAddr b i := rfl
 
-/-- The cast the model puts on the entry it read (`BitVec (8 * 2^3)` to
-`BitVec 64`) is the identity. -/
-theorem setWidth_pow (x : BitVec (8 * ((2 : Int) ^ (3 : Int)).toNat)) :
-    BitVec.setWidth 64 x = x := BitVec.setWidth_eq x
-
 theorem vpnIdx_two' (vpn : BitVec 27) : BitVec.extractLsb' 18 9 vpn = vpnIdx vpn 2 := rfl
 theorem vpnIdx_one' (vpn : BitVec 27) : BitVec.extractLsb' 9 9 vpn = vpnIdx vpn 1 := rfl
 theorem vpnIdx_zero' (vpn : BitVec 27) : BitVec.extractLsb' 0 9 vpn = vpnIdx vpn 0 := rfl
-/-- `read_pte` at the width the walk spells (`2 ^ log_pte_size_bytes`). -/
-theorem swp_read_pte_pow (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Bool)
-    (hok : SConfPhys (GF := GF) c sie)
-    (pa : BitVec 64) (hram : inRam pa 8) (hal : pa.toNat % 8 = 0) (K : Nat)
-    (ts : List (Nat × Agent))
-    (Ψ : BitVec (8 * ((2 : Int) ^ (3 : Int)).toNat) → IProp GF)
-    (Φ : Result (BitVec (8 * ((2 : Int) ^ (3 : Int)).toNat)) (physaddr × ExceptionType) → IProp GF) :
-    confCells cpu dq Privilege.Supervisor c ∗ viewLb cpu K ∗ readAU cpu pa 8 K ts Ψ ∗
-    ▷ (confCells cpu dq Privilege.Supervisor c -∗ ∀ w, Ψ w -∗ Φ (.Ok w))
-    ⊢ swp cpu (read_pte (physaddr.Physaddr pa) ((2 : Int) ^ (3 : Int)).toNat) Φ :=
-  swp_read_pte cpu dq c sie hok pa hram hal K ts Ψ Φ
 
 /-- `pt_walk` at Sv39 with the root typed plainly. -/
 noncomputable def pt_walk39 (vpn : BitVec 27) (acc : MemoryAccessType mem_payload) (priv : Privilege)
@@ -646,17 +626,6 @@ theorem swp_add_to_TLB_kpt (cpu : CPU) (tlb : Tlb) (vpn : BitVec 27) (ppn : BitV
   reduce_closed_widths
   rw [tlbEntryOf_mk']
   unfold tlb_add_callback
-  iapply HΦ $$ Htlb
-
-set_option maxHeartbeats 4000000 in
-/-- Refreshing a cached entry. -/
-theorem swp_write_TLB (cpu : CPU) (tlb : Tlb) (i : Nat) (ent : TLB_Entry) (Φ : Unit → IProp GF) :
-    Register.tlb ↦ᵣ[cpu] tlb ∗
-    ▷ (Register.tlb ↦ᵣ[cpu] (vectorUpdate tlb i (some ent)) -∗ Φ ())
-    ⊢ swp cpu (write_TLB i ent) Φ := by
-  iintro ⟨Htlb, HΦ⟩
-  unfold write_TLB
-  swp_run 20
   iapply HΦ $$ Htlb
 
 /-! ## The configuration at the kernel page table -/

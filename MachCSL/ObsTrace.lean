@@ -665,12 +665,6 @@ theorem ohistLe_trans (a b c : Option (List Obs)) (hab : ohistLe a b) (hbc : ohi
   | none, _, _, _, _ => trivial
   | some x, some y, some z, hab, hbc => exact List.IsPrefix.trans hab hbc
 
-theorem ohistLe_ext (a : Option (List Obs)) (h h' : List Obs) (hx : ohistExt a h)
-    (hy : histExt h h') : ohistLe a (some h') := by
-  cases a with
-  | none => trivial
-  | some g => exact (histExt_trans g h h' hx hy).1
-
 def traceShape (h : List Obs) (on : Bool) : Prop :=
   h.foldl obsStep (some false) = some on
 

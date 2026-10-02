@@ -50,10 +50,6 @@ def uxcCtlUC : instruction → Bool
   | .C_EBREAK _ | .C_NTL _ | .ZCMOP _ | .C_ILLEGAL _ => true
   | _ => false
 
-theorem uxcCtlUC_decodable (ast : instruction) (h : uxcCtlUC ast = true) :
-    decodableUC ast = true := by
-  cases ast <;> first | exact absurd h Bool.false_ne_true | rfl
-
 /-! ## The outcome -/
 
 /-- The results a control instruction can have at User: retire, a trap at

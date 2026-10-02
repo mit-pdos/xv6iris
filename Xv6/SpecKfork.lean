@@ -126,8 +126,6 @@ frame over the deepest callee, `allocproc` (48; `uvmcopy` 42, `freeproc` 44,
 `filedup` / `idup` 14 apiece, acquire/release 10, safestrcpy 2). -/
 def kforkSlots : Nat := 8 + allocprocSlots
 
-theorem kforkSlots_eq : kforkSlots = 56 := by decide
-
 /-- What `kfork` answered: `-1` (no free slot, no memory), or the child's
 pid, which `allocproc` minted in `[1, PIDMAX]`. -/
 def kforkAns (rv : BitVec 32) : Prop :=

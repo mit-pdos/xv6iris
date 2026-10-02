@@ -159,24 +159,6 @@ theorem write_nil (fdm : Fdmap) (fd : Int) (d : Nat) (x : Dspec) (K : Int → IP
       iapply HK $$ [Hstd Hcwd Hpool Htoks Hhs Hdq Hxk] Hd
       iapply E.fds_of fdm l vs wv hok $$ Hstd Hcwd Hpool Htoks Hhs Hdq He Hxk
 
-/-- **Rocq `cif_in_file_in`**: the deed lent to an input's leaf. -/
-theorem in_file_in (d : Nat) (S : List (BitVec 8)) :
-    ⊢ E.inDev d S -∗ fdq E.rf E.qf E.sf -∗
-      ∃ (s : Bool) (nm : List (BitVec 8)) (i : Nat) (γo : GName) (content : List (BitVec 8)),
-        ⌜E.sf[nm]? = some (i, content)⌝ ∗ cifTok E.γreg d (1 : Qp).half (.UDIn s nm i γo) ∗
-        E.DEV.fileIn E.rf E.sf nm i γo E.qf content S := by
-  unfold inDev
-  iintro ⟨%s, %nm, %i, %γo, %p, Htk, %hc, Hu⟩ Hd
-  obtain ⟨content, hsf, hS⟩ := hc
-  iexists s, nm, i, γo, content
-  isplitr
-  · ipureintro; exact hsf
-  iframe Htk
-  rw [E.DEV.fileIn_eq]
-  iexists p
-  iframe Hu Hd
-  ipureintro; exact ⟨hS, hsf⟩
-
 /-- **Rocq `cif_in_of_file_in`**: ...and back. -/
 theorem in_of_file_in (d : Nat) (S content : List (BitVec 8)) (s : Bool) (nm : List (BitVec 8)) (i : Nat)
     (γo : GName) (hsf : E.sf[nm]? = some (i, content)) :

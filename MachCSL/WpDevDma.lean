@@ -468,18 +468,6 @@ theorem wpDev_dma (N : Namespace) (d : DevId) [DevDiskInert d] (hsil : DevSilent
           iexact HC
         · exact BigSepL.bigSepL_nil_intro
 
-/-- The root thread of a bus-mastering device, as the power thread forks it. -/
-theorem wpDev_dma_root (N : Namespace) (d : DevId) [DevDiskInert d] (hsil : DevSilent d) (rel : DevSt d → DevSt d → Prop)
-    (R : DevSt d → IProp GF) [∀ s, Timeless (R s)] (hloc : DevSig.Lease d rel R)
-    (hR : ∀ s s', rel s s' → R s ⊢@{IProp GF} |==> R s') :
-    devInvR N d R ∗ genCert ⊢@{IProp GF}
-      devWP (genId (hlc := hlc) (GF := GF)) d rootTask (DevM.pure ()) := by
-  iintro H
-  iapply wpDev_dma N d hsil rel R hloc hR $$ H %rootTask %(DevM.pure ()) %iprop(True)
-    %(DevM.Lease.pure _ ())
-  imodintro
-  itrivial
-
 /-! ## Worked sanity checks
 
 The first shows the `.dmaWrite` arm in isolation: a one-instruction toy

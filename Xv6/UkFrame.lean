@@ -262,17 +262,6 @@ theorem userPtInvX_forget [CurCtx] (cpu : CPU) (P : UPtd) (M : Nat → List (Bit
   iframe
   ipureintro; exact ht
 
-/-- **Rocq `user_ptm_inv_x_forget`**. -/
-theorem userPtmInvX_forget [CurCtx] (cpu : CPU) (P : UPtd) (sz : Nat) (M : ElfMem) :
-    kmapStatic (GF := GF) ⊢ userPtmInvX cpu P sz M -∗ userPtmInv cpu P sz M := by
-  iintro #HS H
-  unfold userPtmInvX userPtmInv
-  icases H with ⟨%Mp, H, %hM⟩
-  iexists Mp
-  ihave H := userPtInvX_forget cpu P Mp $$ HS H
-  iframe
-  ipureintro; exact hM
-
 end frames
 
 end Xv6

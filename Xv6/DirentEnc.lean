@@ -232,10 +232,6 @@ theorem dirblkBytes_length : ∀ (ds : List Dirent), (∀ d ∈ ds, direntWf d) 
     simp [Nat.mul_succ]
     omega
 
-theorem dirblkBytes_length_64 (ds : List Dirent) (hwf : dirblkWf ds) :
-    (dirblkBytes ds).length = 1024 := by
-  rw [dirblkBytes_length ds hwf.2, hwf.1]
-
 theorem dirblkBytes_lookup : ∀ (ds : List Dirent) (k j : Nat), (∀ d ∈ ds, direntWf d) →
     k < ds.length → j < 16 →
     (dirblkBytes ds)[16 * k + j]? = (direntBytes ds[k]!)[j]? := by
@@ -270,10 +266,6 @@ theorem direntWf_set (ds : List Dirent) (k : Nat) (d : Dirent)
   · exact hall x hx
   · exact hd
 
-theorem dirblkWf_set (ds : List Dirent) (k : Nat) (d : Dirent)
-    (hwf : dirblkWf ds) (hd : direntWf d) : dirblkWf (ds.set k d) := by
-  refine ⟨by rw [List.length_set]; exact hwf.1, direntWf_set ds k d hwf.2 hd⟩
-
 theorem dirblkBytes_set_same (ds : List Dirent) (k : Nat) (d : Dirent) (j : Nat)
     (hall : ∀ x ∈ ds, direntWf x) (hd : direntWf d) (hk : k < ds.length) (hj : j < 16) :
     (dirblkBytes (ds.set k d))[16 * k + j]? = (direntBytes d)[j]? := by
@@ -300,49 +292,6 @@ theorem dirblkBytes_set_other (ds : List Dirent) (k : Nat) (d : Dirent) (i : Nat
       getElem!_pos ds q hq, List.getElem_set_ne (by omega : k ≠ q)]
   · rw [dirblkBytes_lookup_none (ds.set k d) _ hall' (by rw [List.length_set]; exact hge),
       dirblkBytes_lookup_none ds _ hall hge]
-
-/-! ## The same readings in TOTAL-lookup form
-
-A `ByteBuf` window is named by a FUNCTION, so every consumer wants `[i]!`,
-not `[i]?`. -/
-
-theorem dirblkWf_slot (ds : List Dirent) (k : Nat) (hall : ∀ d ∈ ds, direntWf d)
-    (hk : k < ds.length) : direntWf ds[k]! := by
-  rw [getElem!_pos ds k hk]; exact hall _ (List.getElem_mem hk)
-
-theorem dirblkBytes_lookup_t (ds : List Dirent) (k j : Nat) (hall : ∀ d ∈ ds, direntWf d)
-    (hk : k < ds.length) (hj : j < 16) :
-    (dirblkBytes ds)[16 * k + j]! = (direntBytes ds[k]!)[j]! :=
-  getElem!_congr (dirblkBytes_lookup ds k j hall hk hj)
-
-theorem dirblkBytes_set_same_t (ds : List Dirent) (k : Nat) (d : Dirent) (j : Nat)
-    (hall : ∀ x ∈ ds, direntWf x) (hd : direntWf d) (hk : k < ds.length) (hj : j < 16) :
-    (dirblkBytes (ds.set k d))[16 * k + j]! = (direntBytes d)[j]! :=
-  getElem!_congr (dirblkBytes_set_same ds k d j hall hd hk hj)
-
-theorem dirblkBytes_set_other_t (ds : List Dirent) (k : Nat) (d : Dirent) (i : Nat)
-    (hall : ∀ x ∈ ds, direntWf x) (hd : direntWf d) (hk : k < ds.length)
-    (hi : i < 16 * k ∨ 16 * k + 16 ≤ i) :
-    (dirblkBytes (ds.set k d))[i]! = (dirblkBytes ds)[i]! :=
-  getElem!_congr (dirblkBytes_set_other ds k d i hall hd hk hi)
-
-/-! ## The two PER-BYTE readings straight out of the block image
-
-At the offsets dirlookup's `lhu ...,-96(s0)` and its `de.name` pointer
-name. -/
-
-theorem dirblkBytes_inum (ds : List Dirent) (k j : Nat) (hall : ∀ d ∈ ds, direntWf d)
-    (hk : k < ds.length) (hj : j < 2) :
-    (dirblkBytes ds)[16 * k + j]? = some (nthByte (n := 2) ds[k]!.inum j) := by
-  rw [dirblkBytes_lookup ds k j hall hk (by omega)]
-  exact direntBytes_inum _ _ hj
-
-theorem dirblkBytes_name (ds : List Dirent) (k j : Nat) (hall : ∀ d ∈ ds, direntWf d)
-    (hk : k < ds.length) (hj : j < 14) :
-    (dirblkBytes ds)[16 * k + 2 + j]? = ds[k]!.name[j]? := by
-  rw [show 16 * k + 2 + j = 16 * k + (2 + j) from by omega]
-  rw [dirblkBytes_lookup ds k (2 + j) hall hk (by omega)]
-  exact direntBytes_name _ _
 
 /-! ## ZERO records: what a bzero'd directory block decodes to
 
@@ -376,17 +325,6 @@ theorem dirblkBytes_replicate (n : Nat) :
       show 16 * (n + 1) = 16 + 16 * n from by omega, ← List.replicate_append_replicate]
 
 def dirblkZero : List Dirent := List.replicate 64 direntZero
-
-theorem dirblkZero_wf : dirblkWf dirblkZero := by
-  exact ⟨by simp [dirblkZero], forall_replicate_de _ 64 _ direntZero_wf⟩
-
-theorem dirblkBytes_zero : dirblkBytes dirblkZero = List.replicate 1024 0#8 := by
-  rw [dirblkZero, dirblkBytes_replicate]
-
-/-- Rocq `de_free_inum_bytes`: a free record contributes two zero bytes at
-its inum, which is exactly what dirlookup's `lhu` reads. -/
-theorem deFree_inum_bytes (d : Dirent) (hd : deFree d) : halfBytes d.inum = [0#8, 0#8] := by
-  rw [show d.inum = 0#16 from hd]; exact halfBytes_zero
 
 /-! ## THE ENCODING IS INJECTIVE ON WELL-FORMED RECORDS
 
@@ -427,10 +365,6 @@ theorem dirblkBytes_inj_aux : ∀ (ds1 ds2 : List Dirent), ds1.length = ds2.leng
       rw [direntBytes_inj d1 d2 hd1 hd2 hh]
       rw [ih ds2 (by simpa using hlen) (fun x hx => hw1 x (by simp [hx]))
         (fun x hx => hw2 x (by simp [hx])) ht]
-
-theorem dirblkBytes_inj (ds1 ds2 : List Dirent) (hw1 : dirblkWf ds1) (hw2 : dirblkWf ds2)
-    (h : dirblkBytes ds1 = dirblkBytes ds2) : ds1 = ds2 :=
-  dirblkBytes_inj_aux ds1 ds2 (by rw [hw1.1, hw2.1]) hw1.2 hw2.2 h
 
 /-! # THE NAME MODEL -/
 
@@ -578,9 +512,6 @@ theorem cutNul_id : ∀ l : List (BitVec 8), nonul l → cutNul l = l
     rw [cutNul_cons_ne b l (h b (by simp)),
       cutNul_id l (fun x hx => h x (by simp [hx]))]
 
-theorem cutNul_idem (l : List (BitVec 8)) : cutNul (cutNul l) = cutNul l :=
-  cutNul_id _ (cutNul_nonul l)
-
 theorem cutNul_append : ∀ (l1 l2 : List (BitVec 8)), nonul l1 →
     cutNul (l1 ++ l2) = l1 ++ cutNul l2
   | [], _, _ => rfl
@@ -642,13 +573,6 @@ theorem dePadded_namePad (l : List (BitVec 8)) (hlen : l.length = 14) (hpad : de
     rw [forall_eq_replicate _ 0#8 hpad, List.length_drop, hlen]
   rw [namePad_eq _ hk, ← hdrop, cutNul_append_drop]
 
-/-- Rocq `de_name_faithful`: canonical equality determines the bytes, which is
-what makes the directory's `name -> inum` view well defined. -/
-theorem deName_faithful (d1 d2 : Dirent) (h1 : direntWf d1) (h2 : direntWf d2)
-    (p1 : dePadded d1) (p2 : dePadded d2) (hc : cutNul d1.name = cutNul d2.name) :
-    d1.name = d2.name := by
-  rw [dePadded_namePad _ h1 p1, dePadded_namePad _ h2 p2, hc]
-
 /-- Rocq `de_name_str`: the canonical name of a record. -/
 def deNameStr (d : Dirent) : List (BitVec 8) := cutNul d.name
 
@@ -657,10 +581,6 @@ def deOfName (i : BitVec 16) (s : List (BitVec 8)) : Dirent := ⟨i, namePad s�
 
 theorem deOfName_wf (i : BitVec 16) (s : List (BitVec 8)) : direntWf (deOfName i s) :=
   namePad_length s
-
-theorem deOfName_padded (i : BitVec 16) (s : List (BitVec 8)) (hlen : s.length ≤ 14)
-    (hs : nonul s) : dePadded (deOfName i s) :=
-  namePad_padded s hlen hs
 
 theorem deOfName_str (i : BitVec 16) (s : List (BitVec 8)) (hlen : s.length ≤ 14)
     (hs : nonul s) : deNameStr (deOfName i s) = s :=

@@ -39,34 +39,9 @@ abbrev seccLitOk (base len : Nat) : Bool := litOk code.byte base len
 
 /-- Rocq `secc_lit_usage_ok`. -/
 theorem seccLit_usage_ok : seccLitOk 0x960 30 = true := by decide +kernel
-theorem seccLit_usage_codes :
-    litCodes code.byte 0x960 30 = "usage: seccomp prog [args...]\n".toList.map Char.toNat := by
-  decide +kernel
 
 /-- Rocq `secc_lit_fork_ok`. -/
 theorem seccLit_fork_ok : seccLitOk 0x988 21 = true := by decide +kernel
-theorem seccLit_fork_codes :
-    litCodes code.byte 0x988 21 = "seccomp: fork failed\n".toList.map Char.toNat := by decide +kernel
-
-/-- Rocq `secc_lit_secc_ok`. -/
-theorem seccLit_secc_ok : seccLitOk 0x9a0 24 = true := by decide +kernel
-theorem seccLit_secc_codes :
-    litCodes code.byte 0x9a0 24 = "seccomp: seccomp failed\n".toList.map Char.toNat := by
-  decide +kernel
-
-/-- Rocq `secc_lit_exec_pre`: the prefix before the `%s`. -/
-theorem seccLit_exec_pre : litCodes code.byte 0x9c0 14 = "seccomp: exec ".toList.map Char.toNat := by
-  decide +kernel
-/-- Rocq `secc_lit_exec_pct`: `%` then `s`. -/
-theorem seccLit_exec_pct : (seccLit 0x9c0 14).toNat = 37 ∧ (seccLit 0x9c0 15).toNat = 115 := by
-  decide +kernel
-/-- Rocq `secc_lit_exec_post`. -/
-theorem seccLit_exec_post : litCodes code.byte (0x9c0 + 16) 7 = " failed".toList.map Char.toNat := by
-  decide +kernel
-/-- Rocq `secc_lit_exec_nl`. -/
-theorem seccLit_exec_nl : (seccLit 0x9c0 23).toNat = 10 := by decide +kernel
-/-- Rocq `secc_lit_exec_nul`. -/
-theorem seccLit_exec_nul : code.byte (0x9c0 + 24) = some 0#8 := by decide +kernel
 
 /-! ## The mask -/
 
@@ -74,9 +49,6 @@ theorem seccLit_exec_nul : code.byte (0x9c0 + 24) = some 0#8 := by decide +kerne
 `lui a0,0xffe18 ; addi a0,a0,-65` leaves in `a0`. -/
 def seccMaskLit : BitVec 64 :=
   BitVec.signExtend 64 (0xffe18#20 ++ 0#12) + BitVec.signExtend 64 0xfbf#12
-
-/-- Rocq `secc_mask_lit_val`. -/
-theorem seccMaskLit_val : seccMaskLit.toNat = 0xffffffffffe17fbf := by decide
 
 /-- The two words at main+0x1c/0x20 ARE that `lui`/`addi` pair, at those
 immediates (`imm[31:12]` of the `lui`, `imm[31:20]` of the `addi`, both

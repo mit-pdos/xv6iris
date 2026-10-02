@@ -82,16 +82,6 @@ theorem echoPathElems : pathElems echoPl = echoPath := by decide
 /-- **Rocq `echo_pl_len`**. -/
 theorem echoPlLen : echoPl.length = 4 := rfl
 
-/-- **Rocq `echo_pl_line`**: the bytes are the command name. -/
-theorem echoPlLine (j : Nat) (hj : j < 4) : echoPl[j]! = cmdEcho[j]! := by
-  have h : ∀ j, j < 4 → echoPl[j]! = cmdEcho[j]! := by decide
-  exact h j hj
-
-/-- **Rocq `echo_pl_shape`**. -/
-theorem echoPlShape : argPathShape echoPl := by
-  have hall : ∀ b ∈ echoPl, b ≠ 0#8 := by decide
-  exact ⟨by decide, fun _ b hj => hall b (List.mem_of_getElem? hj)⟩
-
 /-! ## 2. The pin resolves, at the child's cwd -/
 
 /-- **Rocq `sh_echo_pin_resolves`**. -/
@@ -224,14 +214,6 @@ def shEchoPathOf (ws : List (List (BitVec 8))) : Prop :=
   lineOk ws →
   ∀ (M : ElfMem) (s0 t : Nat) (g : Nat → BitVec 8), echoNodeImg ws M s0 t g → ushEchoArgvBytes ws g →
     ∀ Mv : Nat → List (BitVec 8), imgAgrees M Mv → argPathOf Mv (BitVec.ofNat 64 s0).toNat echoPl
-
-/-- **Rocq `sh_echo_path_of_holds`** (deviation 2: through the `_x` form). -/
-theorem shEchoPathOf_holds (ws : List (List (BitVec 8))) : shEchoPathOf ws := by
-  intro hok M s0 t g himg hbytes Mv hag
-  have h := shExecPathOfX_holds ws (lineOk_execOk hok) M s0 t g himg hbytes Mv hag
-  have e : ws[0]! = cmdEcho := by simp [List.getElem!_eq_getElem?_getD, lineOk_head ws hok]
-  have hhead : ws[0]! = echoPl := e.trans (by decide)
-  rwa [hhead] at h
 
 /-! ## 5. The room, off the argument reading, and the key's own reading -/
 

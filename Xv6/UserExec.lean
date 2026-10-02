@@ -391,15 +391,6 @@ theorem userTrapFrameAtm_at [CurCtx] (cpu : CPU) (C : UCfg) (pt : UPtd) (Rut : U
   iframe
   ipureintro; exact Hok
 
-/-- Rocq `user_trap_frame_at_frame`: the named frame is a frame. -/
-theorem userTrapFrameAt_frame [CurCtx] (cpu : CPU) (C : UCfg) (pt : UPtd) (Rut : UPtd → IProp GF)
-    (ms sc stv sep : BitVec 64) (g : RegMap) :
-    userTrapFrameAt (GF := GF) cpu C pt Rut ms sc stv sep g ⊢ userTrapFrame cpu C pt Rut := by
-  unfold userTrapFrameAt userTrapFrame
-  iintro H
-  iexists ms, sc, stv, sep, g
-  iexact H
-
 /-- **Rocq `UmodeRegs.uv_regs`**: the per-step CSR cells with their values
 swallowed, plus the clock riders (UserExec deviation 2). -/
 def uvRegs (cpu : CPU) : IProp GF := iprop%

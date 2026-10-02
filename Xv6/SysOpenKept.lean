@@ -57,11 +57,6 @@ O_TRUNC, the cursor otherwise. -/
 def curKept (vom : BitVec 64) (P : Nat → Nat → IProp GF) (k d : Nat) : IProp GF :=
   if omTrunc vom then iprop(emp) else P k d
 
-/-- Rocq `cur_kept_none`. -/
-theorem curKept_none (vom : BitVec 64) (P : Nat → Nat → IProp GF) (k d : Nat)
-    (hv : omTrunc vom = true) : ⊢ curKept vom P k d := by
-  unfold curKept; rw [if_pos hv]; exact .rfl
-
 /-- Rocq `cur_kept_of`. -/
 theorem curKept_of (vom : BitVec 64) (P : Nat → Nat → IProp GF) (k d : Nat) :
     P k d ⊢ curKept vom P k d := by

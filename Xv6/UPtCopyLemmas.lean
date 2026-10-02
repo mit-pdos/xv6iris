@@ -68,15 +68,6 @@ theorem pteAD_leafOf (ppn : BitVec 44) {w v : BitVec 64} (h : pteAD w v) :
 theorem leafOf_isLeafPte (ppn : BitVec 44) (perm : BitVec 64) (h : perm &&& 0xE#64 ≠ 0#64) :
     isLeafPte (leafOf ppn perm) := (Xv6.isLeafPte_iff _).mpr (leafOf_valid ppn perm h)
 
-/-- An aligned address below `2 ^ 56` is the base of its page. -/
-theorem pageAddr_of_aligned (p : BitVec 64) (hal : p &&& 0xfff#64 = 0#64)
-    (hlt : p.toNat < 2 ^ 56) : pageAddr (BitVec.extractLsb' 12 44 p) = p := by
-  have hb : p < 0x100000000000000#64 := by
-    rw [BitVec.lt_def]; simpa using hlt
-  unfold pageAddr pteAddr zero_extend Sail.BitVec.zeroExtend
-  revert hal hb
-  bv_decide
-
 /-- The page a fresh leaf names is the page `kalloc` returned. -/
 theorem pte2pa_leafOf (p : BitVec 64) (perm : BitVec 64) (hal : p &&& 0xfff#64 = 0#64)
     (hlt : p.toNat < 2 ^ 56) (hperm : perm &&& ~~~0x3FF#64 = 0#64) :

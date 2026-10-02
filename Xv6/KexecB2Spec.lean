@@ -282,19 +282,6 @@ theorem kxcB2_ph_join [CurCtx] (sp0 w : BitVec 64) :
   rw [e]
   iexists w; iexact H
 
-/-- **Rocq `kxc_frameBpin_of_B`**. -/
-theorem kxcFrameBp_of_B [CurCtx] (sp0 ra0 s00 s10 s20 pv av : BitVec 64)
-    (w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 : BitVec 64) :
-    kxcFrameB (GF := GF) sp0 ra0 s00 s10 s20 pv av w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ⊢
-      ∃ w63 w65 : BitVec 64,
-        kxcFrameBp sp0 ra0 s00 s10 s20 pv av w5 w6 w7 w8 w9 w10 w11 w12 w13 w63 w65 w67 := by
-  unfold kxcFrameB kxcFrameBp
-  iintro ⟨A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, Au, Ap, A64, ⟨%w65, A65⟩, A66,
-    A67, A68⟩
-  icases kxcB2_slot63_split sp0 $$ Ap with ⟨Ap, ⟨%w63, A63⟩⟩
-  iexists w63, w65
-  iframe
-
 /-- **Rocq `kxc_frameB_of_Bpin`**. -/
 theorem kxcFrameB_of_Bp [CurCtx] (sp0 ra0 s00 s10 s20 pv av : BitVec 64)
     (w5 w6 w7 w8 w9 w10 w11 w12 w13 w63 w65 w67 : BitVec 64) :

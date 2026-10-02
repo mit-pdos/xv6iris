@@ -222,18 +222,6 @@ theorem uservecTf_reg (ws : List (BitVec 64)) (g : RegMap) (hlen : ws.length = 3
     rw [if_neg h0, uvSaveSeq_hi _ _ _ i l3, if_neg hC, uvSaveSeq_hi _ _ _ i l2, if_neg hB,
       uvSaveSeq_hi _ _ _ i l1, if_pos h]; rfl
 
-/-- **Rocq's save-walk fact** (`tf_ueq … (tf_of g …)`): the saved frame is
-the running machine's (`tfOf g`) at its own `epc` word, on the user-visible
-words. -/
-theorem uservecTf_ueq (ws : List (BitVec 64)) (g : RegMap) (hlen : ws.length = 36) :
-    tfUeq (uservecTf ws g) (tfOf g (tfW ws tfEpcIdx)) := by
-  refine ⟨?_, fun i h5 h35 => ?_⟩
-  · rw [tfOf_epc, uservecTf_lo ws g tfEpcIdx (by decide)]
-  · have hr : 4 + (BitVec.ofNat 5 (i - 4)).toNat = i := by simp; omega
-    have hr0 : BitVec.ofNat 5 (i - 4) ≠ 0#5 := by
-      intro h; have := congrArg BitVec.toNat h; simp at this; omega
-    rw [← hr, uservecTf_reg ws g hlen _ hr0, tfOf_reg g _ _ hr0]
-
 /-! ## §3 The trapped machine, opened -/
 
 section

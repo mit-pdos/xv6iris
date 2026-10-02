@@ -106,10 +106,6 @@ theorem KCtx.wf_intrOff (k : KCtx) (a b : Bool) (h : k.wf) : (k.intrOff a b).wf 
   · simp only [ite_false, Bool.false_eq_true]; rw [← w1 hn, hs]
   · rfl
 
-/-- With interrupts already off, `intr_off` is the identity. -/
-theorem KCtx.intrOff_off (k : KCtx) (hs : k.sie = false) : k.intrOff k.spie k.spp = k := by
-  cases k; simp only [KCtx.intrOff] at *; simp [hs, trapRes]
-
 /-- The context after `intr_on` (from interrupts off): the trap reserve
 taken back out of the free slots, the depth-0 ghost `intena` canonical. -/
 def KCtx.intrOn (k : KCtx) : KCtx :=
@@ -359,25 +355,6 @@ theorem wp_s_csrsi_sstatus_x0 [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU)
   · ipureintro; rfl
   · iexact Hro
 
-/-- `csrsi sstatus, SIE` with interrupts already on: a no-op. -/
-theorem wp_s_csrsi_sstatus_x0_on [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = true)
-    (pc : BitVec 64) (is_rvc : Bool) :
-    instr (GF := GF) pc is_rvc (instruction.CSRImm (0x100#12, 2#5, regidx.Regidx 0#5, csrop.CSRRS)) ∗
-    kctxL lent cpu k ∗ pcIs cpu pc ∗
-    ▷ wpNext k.sie k.proc cpu (fun cpu' =>
-        iprop(kctxL lent cpu' k -∗ pcIs cpu' (pc + instrLen is_rvc) -∗ wpLoop cpu'))
-    ⊢ wpLoop cpu :=
-  wpLoop_k_keep0 cpu k pc _ is_rvc _
-    (fun cpu' c _ hok _ => by
-      have e := execSpecF_csrsi_sstatus_x0 (GF := GF) cpu' c k.sie hok.phys pc (pc + instrLen is_rvc)
-        (tpPin cpu' k.regs)
-      have h1 : BitVec.extractLsb' 1 1 c.mstatus = 1#1 := by
-        have := hok.phys.2.1.1; rw [hsie] at this; simpa using this
-      have hc : { c with mstatus := c.mstatus ||| 2#64 } = c := by rw [ms_or_sie_self c.mstatus h1]
-      rw [hc] at e
-      exact e)
-
-
 /-! ## The push_off contexts -/
 
 /-- `push_off`'s exit from a context whose saved enable state is `b` (the
@@ -425,13 +402,6 @@ def KCtx.pushOffAt (k : KCtx) (spie spp : Bool) : KCtx :=
 @[simp] theorem KCtx.pushOffAt_root (k : KCtx) (a b : Bool) : (k.pushOffAt a b).root = k.root := rfl
 @[simp] theorem KCtx.pushOffAt_proc (k : KCtx) (a b : Bool) : (k.pushOffAt a b).proc = k.proc := rfl
 @[simp] theorem KCtx.pushOffAt_sp (k : KCtx) (a b : Bool) : (k.pushOffAt a b).sp = k.sp := rfl
-
-/-- `push_off`'s exit is well-formed. -/
-theorem KCtx.wf_pushOffAt (k : KCtx) (a b : Bool) (h : k.wf) (hn : k.noff + 1 < 2 ^ 31) :
-    (k.pushOffAt a b).wf := by
-  obtain ⟨-, -, -, w4, -⟩ := h
-  exact ⟨fun h0 => absurd h0 (Nat.succ_ne_zero _), fun _ => rfl, fun h' => absurd h' Bool.false_ne_true,
-    Nat.le_succ_of_le w4, hn⟩
 
 /-- With interrupts already off, `push_off`'s exit is `pushOff`. -/
 theorem KCtx.pushOffAt_off' (k : KCtx) (a b : Bool) (hs : k.sie = false) (ha : a = k.spie) (hb : b = k.spp) :

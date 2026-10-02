@@ -68,19 +68,6 @@ theorem uslotMint :
   iintro %W #Hpay
   iapply (Xv6.uexecWp_uslot_triv (hlc := hlc) W) $$ Hs Hkc Hgen Hpay
 
-/-- **Rocq `uslot_mint_pay`**: THE MINT AT A CONSTANT PAYLOAD (GENERIC-PAY),
-the payload as the persistent carrier `□ (killCred -∗ R)` (Rocq's
-`□ (app_taint -∗ R)`, UexecExecInst deviation 3). -/
-theorem uslotMint_pay (R : IProp GF) :
-    ⊢ appSup (GF := GF) -∗ uKillCred (hlc := hlc) -∗ consLicence (hlc := hlc) (GF := GF) -∗
-      □ uexecWp (hlc := hlc) (GF := GF) -∗
-      □ (∀ W : Uvis, myPay W.gen (fun _ => R) -∗ □ (uKillCred (hlc := hlc) -∗ R) -∗ uslot (hlc := hlc) W) := by
-  iintro #Hsup #Hkc #Hlic #Hgen
-  ihave #Hs := xv6Ssupply_intro (hlc := hlc) (GF := GF) $$ Hsup Hkc Hlic
-  imodintro
-  iintro %W #Hpay #HR
-  iapply (Xv6.uexecWp_uslot (hlc := hlc) R W) $$ Hs Hkc Hgen Hpay HR
-
 /-- **Rocq `uslot_mint_all`**: the same with the payload under the box. -/
 theorem uslotMint_all :
     ⊢ appSup (GF := GF) -∗ uKillCred (hlc := hlc) -∗ consLicence (hlc := hlc) (GF := GF) -∗

@@ -179,10 +179,6 @@ structure FsGeomOk [Fscfg] [Icfg] : Prop where
 bundle (`Xv6.covOk` is `logGeomOk`'s first clause). -/
 theorem FsGeomOk.covOk [Fscfg] [Icfg] (h : FsGeomOk) : covOk fscCov := h.fgoLog.1
 
-/-- ...and the log region is covered. -/
-theorem FsGeomOk.logCov [Fscfg] [Icfg] (h : FsGeomOk) :
-    ∀ b, logRegion fscLogst b = true → b ∈ fscCov := h.fgoLog.2
-
 /-- The allocator's names at the ambient pair (`Xv6/FsReady.lean` deviation 6; here so
 `FsCfgKits` does not wait for `FsReady`). -/
 def fsReadyKmem [Fscfg] : KmemNames := ⟨fscKpages.1, fscKpages.2⟩

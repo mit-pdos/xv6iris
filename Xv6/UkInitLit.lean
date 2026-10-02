@@ -21,12 +21,8 @@ abbrev initLitOk (base len : Nat) : Bool := litOk code.byte base len
 
 /-- `"init: fork failed\n"` at 0x9a0 (UkInitMain `Hokdf`). -/
 theorem lit_fork_ok : initLitOk 0x9a0 18 = true := by decide +kernel
-theorem lit_fork_codes : litCodes code.byte 0x9a0 18 = "init: fork failed\n".toList.map Char.toNat := by
-  decide +kernel
 
 /-- `"init: exec sh failed\n"` at 0x9c0 (UkInitMain `Hokde`). -/
 theorem lit_exec_ok : initLitOk 0x9c0 21 = true := by decide +kernel
-theorem lit_exec_codes :
-    litCodes code.byte 0x9c0 21 = "init: exec sh failed\n".toList.map Char.toNat := by decide +kernel
 
 end Xv6.User.Init

@@ -338,9 +338,6 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 theorem fdNone_ne_pipe : FD_NONE ≠ FD_PIPE := by decide
 theorem fdNone_ne_inode : FD_NONE ≠ FD_INODE := by decide
 theorem fdNone_ne_device : FD_NONE ≠ FD_DEVICE := by decide
-theorem fdPipe_ne_inode : FD_PIPE ≠ FD_INODE := by decide
-theorem fdPipe_ne_device : FD_PIPE ≠ FD_DEVICE := by decide
-theorem fdDevice_ne_inode : FD_DEVICE ≠ FD_INODE := by decide
 
 /-- The pipe arm (the reading `fileclose`'s pipe arm takes). -/
 theorem fileCoreNoff_pipe (q : Qp) (pn : FPNames) (C : FContent) (h : C.type = FD_PIPE) :

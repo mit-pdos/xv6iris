@@ -100,26 +100,6 @@ theorem claimCtx_sclaim (h : Nat) (hh : h < NCPU) :
   · congr 1; omega
   · rename_i hc; exact absurd ⟨by omega, by omega, by omega⟩ hc
 
-/-- The three offsets that are NOT the claim register: `write_outside_claim`
-applies to each of them. -/
-theorem claimCtx_prio (i : Nat) (hi : i < Plic.nsrc) : Plic.claimCtx (prioOff i) = none := by
-  unfold Plic.claimCtx prioOff Plic.nsrc at *
-  rw [if_neg]
-  rintro ⟨h1, -, -⟩
-  omega
-
-theorem claimCtx_senable (h : Nat) (hh : h < NCPU) : Plic.claimCtx (senableOff h) = none := by
-  unfold Plic.claimCtx senableOff NCPU at *
-  rw [if_neg]
-  rintro ⟨h1, -, -⟩
-  omega
-
-theorem claimCtx_sthresh (h : Nat) (hh : h < NCPU) : Plic.claimCtx (sthreshOff h) = none := by
-  unfold Plic.claimCtx sthreshOff NCPU at *
-  rw [if_neg]
-  rintro ⟨-, h2, -⟩
-  omega
-
 /-! ## `best`: what a claim may return -/
 
 /-- One step of `Plic.best`'s fold. -/
@@ -172,12 +152,6 @@ theorem best_spec (p : PlicState) (c i : Nat) (h : Plic.best p c = some i) :
     i ∈ Plic.srcs ∧ Plic.cand p c i = true := by
   rw [best_eq] at h
   exact best_foldl p c (· ∈ Plic.srcs) Plic.srcs (fun _ hi => hi) none (fun j hj => by cases hj) i h
-
-theorem mem_srcs {i : Nat} (h : i ∈ Plic.srcs) : 1 ≤ i ∧ i < Plic.nsrc := by
-  unfold Plic.srcs Plic.nsrc at *
-  simp only [List.mem_map, List.mem_range] at h
-  obtain ⟨k, hk, rfl⟩ := h
-  omega
 
 theorem cand_pending {p : PlicState} {c i : Nat} (h : Plic.cand p c i = true) :
     p.pending i = true := by
@@ -265,18 +239,6 @@ theorem plic_claim_other_claimed (p : PlicState) (c j : Nat) (hj : Plic.best p c
     rintro rfl
     exact hj h
 
-theorem plic_claim_pending (p : PlicState) (c j : Nat) :
-    (Plic.claim p c).2.pending j = true → p.pending j = true := by
-  unfold Plic.claim
-  cases h : Plic.best p c with
-  | none => exact id
-  | some i =>
-    show Plic.upd p.pending i false j = true → _
-    unfold Plic.upd
-    split
-    · exact fun hf => absurd hf (by simp)
-    · exact id
-
 /-- **`claim_ret_ok`**: under `plicOk` a claim answers `0`, `1`, `10` or
 `12` -- nothing else.  This is what kills `devintr`'s
 "unexpected interrupt" arm. -/
@@ -292,15 +254,6 @@ theorem plic_claim_ret_ok (p : PlicState) (c : Nat) (hok : plicOk p) :
     · exact Or.inr (Or.inl rfl)
     · exact Or.inr (Or.inr (Or.inl rfl))
     · exact Or.inr (Or.inr (Or.inr rfl))
-
-theorem plic_claim_ret_toNat (p : PlicState) (c : Nat) (hok : plicOk p) :
-    (Plic.claim p c).1.toNat = 0 ∨ (Plic.claim p c).1.toNat = 1 ∨
-    (Plic.claim p c).1.toNat = 10 ∨ (Plic.claim p c).1.toNat = 12 := by
-  rcases plic_claim_ret_ok p c hok with h | h | h | h <;> rw [h]
-  · exact Or.inl rfl
-  · exact Or.inr (Or.inl rfl)
-  · exact Or.inr (Or.inr (Or.inl rfl))
-  · exact Or.inr (Or.inr (Or.inr rfl))
 
 /-- **`claim_ok`**: a claim preserves the chip invariant. -/
 theorem plic_claim_ok (p : PlicState) (c : Nat) (hok : plicOk p) : plicOk (Plic.claim p c).2 := by
@@ -389,24 +342,6 @@ theorem plic_latch_ok (p : PlicState) (i : Nat) (hok : plicOk p) : plicOk (Plic.
     · exact hok.2 j hj
 
 /-! ## MMIO writes -/
-
-/-- **`write_outside_claim`**: any write that does not land on a claim
-register leaves every source's service state alone. -/
-theorem plic_write_outside_claim (p : PlicState) (off : Nat) (v : BitVec 32) (p' : PlicState)
-    (hoff : Plic.claimCtx off = none) (hw : Plic.write p off v = some p') :
-    ∀ j, p'.claimed j = p.claimed j := by
-  intro j
-  unfold Plic.write at hw
-  simp only [hoff] at hw
-  split at hw
-  · cases hw; split <;> rfl
-  · split at hw
-    · cases hw; rfl
-    · split at hw
-      · cases hw; rfl
-      · split at hw
-        · cases hw; rfl
-        · exact absurd hw (by simp)
 
 /-- Every write the kernel makes preserves the chip invariant: the only one
 that could break it is a write to an ENABLE word, and `hen` is exactly the

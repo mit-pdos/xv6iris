@@ -72,10 +72,6 @@ theorem ush_retPc (x : Nat) (hx : x % 2 = 0) (hlt : x < 2 ^ 64) :
   · have : (1#64).getLsbD i = false := by simp [BitVec.getLsbD_one, h0]
     simp [this]
 
-/-- A jump target at `Nat` pcs. -/
-theorem ush_tgt {w : Nat} (x t : Nat) (imm : BitVec w) (h : BitVec.ofNat 64 x + BitVec.signExtend 64 imm = BitVec.ofNat 64 t) :
-    BitVec.ofNat 64 x + BitVec.signExtend 64 imm = BitVec.ofNat 64 t := h
-
 /-- `addi rd, rs, -d` at a `Nat` value (a local's address off the frame
 pointer). -/
 theorem ush_addi_neg (x d : Nat) (imm : BitVec 12) (h : BitVec.signExtend 64 imm = BitVec.ofInt 64 (-(d : Int)))
@@ -83,10 +79,6 @@ theorem ush_addi_neg (x d : Nat) (imm : BitVec 12) (h : BitVec.signExtend 64 imm
   show BitVec.ofNat 64 x + BitVec.signExtend 64 imm = _
   rw [h, ← umoi_natCast, umoi_add, show ((x : Nat) : Int) + -(d : Int) = ((x - d : Nat) : Int) by omega]
   rfl
-
-/-- The signed reading of a negative 12-bit displacement. -/
-theorem ush_imm_neg (imm : BitVec 12) (d : Nat) (h : imm.toInt = -(d : Int)) (x : Nat) (hd : d ≤ x) :
-    (x : Int) + imm.toInt = ((x - d : Nat) : Int) := by rw [h]; omega
 
 /-- The callee-saved registers, enumerated. -/
 theorem ush_cs_regs (r : BitVec 5) (hr : ucalleeSavedIdx r = true) :
@@ -684,10 +676,6 @@ theorem ush_frame_pro (UL : UK_LEAVES) (N : UkNames GF) (k : Nat) (rs : List (Bi
     hpe $$ HC Hrun
   iintro %h3 Hrun
   iapply Hk $$ %⟨hal, hroom⟩ Hsv Hloc %h3 Hrun
-
-/-- The pop's immediate. -/
-theorem ush_pop_sx (k : Nat) (imm : BitVec 12) (h : BitVec.signExtend 64 imm = BitVec.ofNat 64 (8 * k)) :
-    BitVec.signExtend 64 imm = BitVec.ofNat 64 (8 * k) := h
 
 /-- **THE WHOLE EPILOGUE** (Rocq `wp_kshp_frame_epi`): the restores, the
 pop, the `ret`.  The register file is the restore tower with sp back at

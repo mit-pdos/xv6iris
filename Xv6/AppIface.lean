@@ -320,9 +320,6 @@ def appTrivOk {CT N : Type} (_ : CT) (_ : Nat) (_ : N) : Prop := True
 /-- Rocq `app_triv_okc`: the durable-copy predicate that says nothing. -/
 def appTrivOkc {CT N : Type} (_ : CT) (_ : N) : Prop := True
 
-/-- Rocq `app_triv_tk_intro`. -/
-theorem appTrivTk_intro {CT : Type} (c : CT) (k : Nat) : ⊢@{IProp GF} appTrivTk c k :=
-  BI.true_intro
 /-- Rocq `app_triv_cls_intro`. -/
 theorem appTrivCls_intro {CT : Type} (c : CT) : ⊢@{IProp GF} appTrivCls c :=
   BI.true_intro

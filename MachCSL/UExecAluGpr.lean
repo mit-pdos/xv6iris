@@ -280,8 +280,6 @@ def uxaIdx : regidx → BitVec 5
 /-- The index of a compressed register payload (`x8`…`x15`). -/
 def uxaCIdx (c : cregidx) : BitVec 5 := uxaIdx (creg2reg_idx c)
 
-theorem uxa_regidx_eta (r : regidx) : regidx.Regidx (uxaIdx r) = r := by cases r; rfl
-
 theorem uxa_creg2reg_idx (c : cregidx) : creg2reg_idx c = regidx.Regidx (uxaCIdx c) := by
   cases c; rfl
 

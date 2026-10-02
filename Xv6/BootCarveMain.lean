@@ -58,16 +58,6 @@ theorem bootBss_cellAt [CurCtx] (ξ : CtxId)
   subst this
   exact bootImg_wordAtN_bss ξ A n hn hlo hend hal
 
-/-- ...at an existential value (the fields a callee re-initialises). -/
-theorem bootBss_cellAt_ex [CurCtx] (ξ : CtxId)
-    (va : PAddr) (n A hi : Nat) (hva : va.toNat = A) (hhi : hi = A + n)
-    (hlo : MachCSL.KernelSyms.«_bss» ≤ A) (hend : A + n ≤ MachCSL.KernelSyms.«end»)
-    (hal : A % n = 0) (hn : 0 < n := by decide) :
-    kmapStatic (GF := GF) ⊢ bootRan (imgFlat bootImage) A hi -∗ ∃ w : BitVec (8 * n), wordAtN ξ va n (DFrac.own 1) w := by
-  iintro #Hk H
-  iexists 0#(8 * n)
-  iapply bootBss_cellAt ξ va n A hi hva hhi hlo hend hal hn $$ Hk H
-
 /-! ## MAIN: the buffer cache -/
 
 /-- `&bcache.buf[i]`, as a number. -/

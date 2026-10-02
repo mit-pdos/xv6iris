@@ -132,9 +132,6 @@ theorem kevOf_null (p : BitVec 64) : kevOf p 0#64 = .KNull p := by
 theorem kevOf_page (p r : BitVec 64) (hr : r ≠ 0#64) : kevOf p r = .KAlloc p := by
   simp [kevOf, hr]
 
-theorem kevOf_actor (p r : BitVec 64) : (kevOf p r).actor = p := by
-  unfold kevOf; split <;> rfl
-
 /-! ## 4. The tie steps
 
 `npages + allocs h = frees h` across birth, the three appends, and the
@@ -163,10 +160,6 @@ theorem tie_empty (h : List Kev) (ht : 0 + allocs h = frees h) : poolEmpty h := 
 
 theorem tie_nonempty (npages : Nat) (h : List Kev) (ht : (npages + 1) + allocs h = frees h) :
     ¬ poolEmpty h := by
-  unfold poolEmpty; omega
-
-theorem poolEmpty_iff (npages : Nat) (h : List Kev) (ht : npages + allocs h = frees h) :
-    npages = 0 ↔ poolEmpty h := by
   unfold poolEmpty; omega
 
 end Xv6

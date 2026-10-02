@@ -1102,16 +1102,6 @@ def vdiKept (R R' : RegMap) : Prop :=
   R' 23#5 = R 23#5 ∧ R' 24#5 = R 24#5 ∧ R' 25#5 = R 25#5 ∧ R' 26#5 = R 26#5 ∧
   R' 27#5 = R 27#5
 
-theorem vdiKept_rfl (R : RegMap) : vdiKept R R :=
-  ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩
-
-theorem vdiKept_trans {R R' R'' : RegMap} (h : vdiKept R R') (h' : vdiKept R' R'') :
-    vdiKept R R'' :=
-  ⟨h'.1.trans h.1, h'.2.1.trans h.2.1, h'.2.2.1.trans h.2.2.1, h'.2.2.2.1.trans h.2.2.2.1,
-    h'.2.2.2.2.1.trans h.2.2.2.2.1, h'.2.2.2.2.2.1.trans h.2.2.2.2.2.1,
-    h'.2.2.2.2.2.2.1.trans h.2.2.2.2.2.2.1, h'.2.2.2.2.2.2.2.1.trans h.2.2.2.2.2.2.2.1,
-    h'.2.2.2.2.2.2.2.2.trans h.2.2.2.2.2.2.2.2⟩
-
 theorem vdiKept_of_cs {R R' : RegMap} (h : calleeSaved R R') : vdiKept R R' :=
   ⟨h.2.2.2.2.1, h.2.2.2.2.2.1, h.2.2.2.2.2.2.1, h.2.2.2.2.2.2.2.1, h.2.2.2.2.2.2.2.2.1,
     h.2.2.2.2.2.2.2.2.2.1, h.2.2.2.2.2.2.2.2.2.2.1, h.2.2.2.2.2.2.2.2.2.2.2.1,
@@ -1162,7 +1152,6 @@ theorem vdi_ret_20 : jumpPc (KA.«virtio_disk_init» + 0x20#64) = KA.«virtio_di
 theorem vdi_aDescPtr : aDescPtr = KA.«disk» := by decide
 theorem vdi_aAvailPtr : aAvailPtr = KA.«disk» + 8#64 := by decide
 theorem vdi_aUsedPtr : aUsedPtr = KA.«disk» + 16#64 := by decide
-theorem vdi_aVdiskLock : aVdiskLock = KA.«disk» + 296#64 := by decide
 
 theorem vdi_beqz_page (p : BitVec 64) (h : pageValid p) : bcond bop.BEQ p 0#64 = false := by
   have hne : p ≠ 0#64 := Xv6.PtRun.pageValid_ne_zero p h

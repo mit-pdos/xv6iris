@@ -104,13 +104,6 @@ theorem sys_open_create_zero (vom : BitVec 64) (hc : omCreate vom = false) :
     soAnd (BitVec.extractLsb' 0 32 vom) 512 = 0#64 := by
   rw [sys_open_and512_iff, ← sys_open_om_bit vom 9 (by decide)]; exact hc
 
-/-- Rocq's `soau_create_nonzero`. -/
-theorem sys_open_create_nonzero (vom : BitVec 64)
-    (hne : soAnd (BitVec.extractLsb' 0 32 vom) 512 ≠ 0#64) : omCreate vom = true := by
-  cases hc : omCreate vom
-  · exact absurd (sys_open_create_zero vom hc) hne
-  · rfl
-
 /-- O_TRUNC (bit 10): the +0xa8 `andi a5,a5,1024` (Rocq's
 `soau_trunc_zero_iff`). -/
 theorem sys_open_trunc_zero_iff (vom : BitVec 64) :
@@ -151,18 +144,6 @@ theorem sys_open_wr_byte (vom : BitVec 64) :
 theorem sys_open_bit_inj (b1 b2 : Bool) (v : BitVec 8) (h1 : v = if b1 then 1#8 else 0#8)
     (h2 : v = if b2 then 1#8 else 0#8) : b1 = b2 := by
   rw [h1] at h2; cases b1 <;> cases b2 <;> first | rfl | exact absurd h2 (by decide)
-
-/-- the readable byte, read as its boolean (Rocq's `soau_rb_is`) -/
-theorem sys_open_rb_is (vom : BitVec 64) (rb : Bool)
-    (h : BitVec.extractLsb' 0 8 (soRdWord (BitVec.extractLsb' 0 32 vom)) = if rb then 1#8 else 0#8) :
-    rb = omReadable vom :=
-  sys_open_bit_inj rb (omReadable vom) _ h (sys_open_rd_byte vom)
-
-/-- the writable byte, read as its boolean (Rocq's `soau_wb_is`) -/
-theorem sys_open_wb_is (vom : BitVec 64) (wb : Bool)
-    (h : BitVec.extractLsb' 0 8 (soWrWord (BitVec.extractLsb' 0 32 vom)) = if wb then 1#8 else 0#8) :
-    wb = omWritable vom :=
-  sys_open_bit_inj wb (omWritable vom) _ h (sys_open_wr_byte vom)
 
 /-! ## 3.  The major bound -/
 

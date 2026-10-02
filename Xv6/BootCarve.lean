@@ -662,16 +662,6 @@ theorem bootImg_wordAtN [CurCtx] (ξ : CtxId) (image : Mem) (A n : Nat) (w : Bit
   ihave Hb := bootImg_ctxBytes ξ image A n w hA himg $$ Hr
   iapply bc_wordAtN_intro ξ _ n _ w (bcInRam_inRam hA) (by rw [ht]; exact hal) $$ Hid Hb
 
-/-- ...at SOME value (the image's), when only its presence is known. -/
-theorem bootImg_wordAtN_ex [CurCtx] (ξ : CtxId)
-    (A n : Nat) (hn : 0 < n) (hA : bcInRam A n) (hlo : 0x80007000 ≤ A) (hal : A % n = 0) :
-    kmapStatic (GF := GF) ⊢ bootRan (imgFlat bootImage) A (A + n) -∗
-      ∃ w : BitVec (8 * n), wordAtN ξ (BitVec.ofNat 64 A) n (DFrac.own 1) w := by
-  obtain ⟨w, hw⟩ := bootImgHas_exists bootImage A n hA bootImage_wf.ram
-  iintro #Hk H
-  iexists w
-  iapply bootImg_wordAtN ξ bootImage A n w hn hA hlo hal hw $$ Hk H
-
 /-- ...and at ZERO inside `.bss` (Rocq `boot_ran_cell*_bss`). -/
 theorem bootImg_wordAtN_bss [CurCtx] (ξ : CtxId)
     (A n : Nat) (hn : 0 < n) (hlo : MachCSL.KernelSyms.«_bss» ≤ A) (hhi : A + n ≤ MachCSL.KernelSyms.«end»)
@@ -731,11 +721,6 @@ theorem bootImg_bytes_ex [CurCtx] (ξ : CtxId)
   iapply bc_wordAtN_intro ξ _ 1 _ _ (bcInRam_byte hA hj) (Nat.mod_one _) $$ Hid Hb
 
 /-! ## Cuts and families -/
-
-/-- Take the first `k` bytes of a range. -/
-theorem bootRan_take (m : MemF Hist) (A k hi : Nat) (h : A + k ≤ hi) :
-    bootRan (GF := GF) m A hi ⊢ bootRan m A (A + k) ∗ bootRan m (A + k) hi :=
-  (bootRan_split m A (A + k) hi (by omega) h).1
 
 /-- **An index family out of one range** (Rocq `boot_stride_family`): `N`
 consecutive `stride`-byte records from `base`. -/

@@ -351,17 +351,6 @@ theorem wp_m_ori_same (cpu : CPU) (dq : DFrac) (c : MConf) (hok : MConf.ok (GF :
     ⊢ wpLoop cpu :=
   wpLoop_m_instr cpu dq c c hok pc _ is_rvc _ _ _ (execSpec_ori_same cpu dq c pc _ imm rd hrd v)
 
-/-- `andi rd, rd, imm` (also `c.andi`). -/
-theorem wp_m_andi_same (cpu : CPU) (dq : DFrac) (c : MConf) (hok : MConf.ok (GF := GF) c)
-    (pc : BitVec 64) (is_rvc : Bool)
-    (imm : BitVec 12) (rd : BitVec 5) (hrd : rd ≠ 0#5) (v : BitVec 64) :
-    instr (GF := GF) pc is_rvc (instruction.ITYPE (imm, regidx.Regidx rd, regidx.Regidx rd, iop.ANDI)) ∗
-    mConf cpu dq c ∗ clockCells cpu ∗ pcIs cpu pc ∗ gpr cpu rd (DFrac.own 1) v ∗
-    ▷ (mConf cpu dq c -∗ clockCells cpu -∗ pcIs cpu (pc + instrLen is_rvc) -∗
-        gpr cpu rd (DFrac.own 1) (v &&& BitVec.signExtend 64 imm) -∗ wpLoop cpu)
-    ⊢ wpLoop cpu :=
-  wpLoop_m_instr cpu dq c c hok pc _ is_rvc _ _ _ (execSpec_andi_same cpu dq c pc _ imm rd hrd v)
-
 /-- `srli rd, rd, shamt` (also `c.srli`). -/
 theorem wp_m_srli_same (cpu : CPU) (dq : DFrac) (c : MConf) (hok : MConf.ok (GF := GF) c)
     (pc : BitVec 64) (is_rvc : Bool)
@@ -398,27 +387,6 @@ theorem wp_m_addiw_same (cpu : CPU) (dq : DFrac) (c : MConf) (hok : MConf.ok (GF
         wpLoop cpu)
     ⊢ wpLoop cpu :=
   wpLoop_m_instr cpu dq c c hok pc _ is_rvc _ _ _ (execSpec_addiw_same cpu dq c pc _ imm rd hrd v)
-
-/-- `add rd, rs1, rs2`, three distinct registers. -/
-theorem wp_m_add (cpu : CPU) (dq : DFrac) (c : MConf) (hok : MConf.ok (GF := GF) c)
-    (pc : BitVec 64) (is_rvc : Bool)
-    (rd rs1 rs2 : BitVec 5) (hrd : rd ≠ 0#5) (hrs1 : rs1 ≠ 0#5) (hrs2 : rs2 ≠ 0#5)
-    (v v1 v2 : BitVec 64) :
-    instr (GF := GF) pc is_rvc
-      (instruction.RTYPE (regidx.Regidx rs2, regidx.Regidx rs1, regidx.Regidx rd, rop.ADD)) ∗
-    mConf cpu dq c ∗ clockCells cpu ∗ pcIs cpu pc ∗ gpr cpu rd (DFrac.own 1) v ∗
-    gpr cpu rs1 (DFrac.own 1) v1 ∗ gpr cpu rs2 (DFrac.own 1) v2 ∗
-    ▷ (mConf cpu dq c -∗ clockCells cpu -∗ pcIs cpu (pc + instrLen is_rvc) -∗
-        gpr cpu rd (DFrac.own 1) (v1 + v2) -∗ gpr cpu rs1 (DFrac.own 1) v1 -∗
-        gpr cpu rs2 (DFrac.own 1) v2 -∗ wpLoop cpu)
-    ⊢ wpLoop cpu := by
-  iintro ⟨HI, HmConf, Hclock, Hpc, Hrd, Hrs1, Hrs2, HΦ⟩
-  iapply wpLoop_m_instr cpu dq c c hok pc _ is_rvc _ _ _
-    (execSpec_add cpu dq c pc _ rd rs1 rs2 hrd hrs1 hrs2 v v1 v2)
-  iframe
-  inext
-  iintro HmConf Hclock Hpc ⟨Hrd, Hrs1, Hrs2⟩
-  iapply HΦ $$ HmConf Hclock Hpc Hrd Hrs1 Hrs2
 
 /-- `mv rd, rs2` (`add rd, x0, rs2`; also `c.mv`). -/
 theorem wp_m_mv (cpu : CPU) (dq : DFrac) (c : MConf) (hok : MConf.ok (GF := GF) c)

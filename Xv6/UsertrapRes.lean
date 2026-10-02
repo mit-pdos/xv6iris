@@ -280,10 +280,6 @@ kernel-table `satp` at `root`, the stack top `ksp`, usertrap, this hart. -/
 def utKWords (cpu : CPU) (root : BitVec 44) (ksp : BitVec 64) (ws : List (BitVec 64)) : Prop :=
   tfW ws 0 = satpOf KTier.kpt root ∧ tfW ws 1 = ksp ∧ tfW ws 2 = usertrapPc ∧ tfW ws 4 = hartId cpu
 
-/-- ...and it is uservec's premise at a context rooted there, on that stack. -/
-theorem utKWords_uservec (cpu : CPU) (k : KCtx) (ws : List (BitVec 64))
-    (h : utKWords cpu k.root k.sp ws) : uservecKWords cpu k ws := h
-
 /-- The four kernel words, read off a word list. -/
 theorem tfW_of_getElem? {ws : List (BitVec 64)} {i : Nat} {w : BitVec 64} (h : ws[i]? = some w) :
     tfW ws i = w := by
@@ -318,14 +314,6 @@ theorem uservecTf_low (ws : List (BitVec 64)) (g : RegMap) (i : Nat) (hi : i < 5
   unfold uservecTf
   rw [uvSaveSeq_low _ (by simp) g _ i hi, uvSaveSeq_low _ (by simp [uvSavesC]) g _ i hi,
     uvSaveSeq_low _ (by simp [uvSavesB]) g _ i hi, uvSaveSeq_low _ (by simp [uvSavesA]) g _ i hi]
-
-theorem utKWords_uservecTf (cpu : CPU) (root : BitVec 44) (ksp : BitVec 64)
-    (ws : List (BitVec 64)) (g : RegMap) (h : utKWords cpu root ksp ws) :
-    utKWords cpu root ksp (uservecTf ws g) := by
-  have hlow : ∀ i, i < 5 → tfW (uservecTf ws g) i = tfW ws i := uservecTf_low ws g
-  obtain ⟨h0, h1, h2, h4⟩ := h
-  exact ⟨(hlow 0 (by omega)).trans h0, (hlow 1 (by omega)).trans h1,
-    (hlow 2 (by omega)).trans h2, (hlow 4 (by omega)).trans h4⟩
 
 section Tfk
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
@@ -661,14 +649,6 @@ theorem utResBare_split (h : curTier = KTier.kpt) (cpu : CPU) (Rsys : UtNames �
   iexists N
   iframe Htfk Hcl Hcaps Hown
   ipureintro; exact ⟨rfl, hk, hw⟩
-
-/-- The running form, opened (usertrap's stages work on the rows). -/
-theorem utResRun_open (cpu : CPU) (Rsys : UtNames → BitVec 32 → IProp GF) (P : UPtd) (ksp : BitVec 64)
-    (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) (cs : ExtTreeSet GName compare)
-    (pid : BitVec 32) :
-    utResRun (GF := GF) cpu Rsys P ksp V M sts cs pid ⊣⊢
-      ∃ N : UtNames, ⌜V.upt = P ∧ V.kstack + 4096#64 = ksp ∧ utWf N⌝ ∗
-        utTfk cpu ksp V ∗ cpuClaim cpu N.pj ∗ utCaps N ∗ utOwn Rsys N V M sts cs pid := .rfl
 
 /-- The kernel words, copied out (uservec's `hkw` via `utTfk_uservec`). -/
 theorem utResBare_tfk (cpu : CPU) (Rsys : UtNames → BitVec 32 → IProp GF) (P : UPtd) (ksp : BitVec 64)

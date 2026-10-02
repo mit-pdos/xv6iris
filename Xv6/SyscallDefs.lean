@@ -232,8 +232,4 @@ theorem syscall_idx (w : BitVec 64) (h1 : 1 ≤ (BitVec.extractLsb' 0 32 w).toIn
 `tfArgIdx 7`). -/
 theorem syscRaw_eq (V : ProcPriv) : syscRaw V = (BitVec.extractLsb' 0 32 (tfW V.tf (tfArgIdx 7))).toInt := rfl
 
-/-- A nonzero effective number is the raw one. -/
-theorem syscNum_raw {V : ProcPriv} {n : Int} (h : syscNum V = n) (hn : n ≠ 0) : syscRaw V = n :=
-  usysEff_raw h hn
-
 end Xv6

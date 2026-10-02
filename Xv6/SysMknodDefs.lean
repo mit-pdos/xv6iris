@@ -71,9 +71,6 @@ the record field reads back unsigned -- so the abstract child's number is
 the low sixteen bits of the trapframe word, read unsigned. -/
 def devArg (v : BitVec 64) : Nat := v.toNat % 2 ^ 16
 
-theorem devArg_range (v : BitVec 64) : devArg v < 2 ^ 16 :=
-  Nat.mod_lt _ (by decide)
-
 /-- the abstract child create's non-directory success arm leaves behind:
 `createMade` read through `absOf` (Rocq's `abs_of_create_dev`). -/
 theorem absOf_create_dev (n : FsNode) (major minor : BitVec 16)

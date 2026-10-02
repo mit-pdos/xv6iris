@@ -127,10 +127,6 @@ theorem grepMmPost_step (d i : Nat) (f : Nat → BitVec 8) (j : Nat) (hd : 0 < d
 
 /-! ## §2 Byte facts at the leaves' values (deviation 2) -/
 
-theorem kgrep_setWidth_toNat (b : BitVec 8) : (BitVec.setWidth 64 b).toNat = b.toNat := by
-  simp only [BitVec.toNat_setWidth]
-  exact Nat.mod_eq_of_lt (Nat.lt_trans b.isLt (by decide))
-
 /-- `beq` of two loaded bytes (Rocq `moi_byte_eq`). -/
 theorem kgrep_beq_byte (a b : BitVec 8) :
     ukBtaken .BEQ (BitVec.setWidth 64 a) (BitVec.setWidth 64 b) = decide (a = b) := by

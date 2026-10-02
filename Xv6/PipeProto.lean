@@ -474,11 +474,6 @@ theorem pipeBody_P4U (pn : PNames) (γp : PipeNames) (L : List (BitVec 8)) (U : 
     · iexfalso; iapply eofPending_shot $$ Hp Hs0
     · iexfalso; iapply roPending_shot $$ Hp Hs
 
-/-- Rocq `pipe_body_P4`. -/
-theorem pipeBody_P4 (pn : PNames) (γp : PipeNames) (L : List (BitVec 8)) (s : PipeSt) :
-    pipeBody (GF := GF) pn γp L ⊢ roShot pn -∗ pipeQauth γp.pnQueue s -∗ ⌜s.ro = false⌝ :=
-  pipeBody_P4U pn γp L iprop(True) s
-
 /-- (P6) THE TWO ENDERS ARE EXCLUSIVE (Rocq `pipe_body_P6U`): the snapshot
 arm holds (P4)'s pending token, and `roShot` refutes it.  No authority. -/
 theorem pipeBody_P6U (pn : PNames) (γp : PipeNames) (L : List (BitVec 8)) (U : IProp GF)

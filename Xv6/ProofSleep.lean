@@ -124,29 +124,6 @@ end
 
 theorem sleep_br_ffffffffffffecd0 : KA.«sleep» + 0xffffffffffffecd0#64 = KA.«release» := by decide
 
-/-- The locked context sleep runs its critical section in: its own
-acquire's exit from the entry context `k` (depth 0), four slots pushed. -/
-theorem sl_ctx_locked (k : KCtx) (a0 b0 a b : Bool) (R2 R3 : RegMap) (h4 : 4 ≤ k.avail) (hl : k.locks = []) :
-    (((((k.withSpie a0 b0).pushed 4).withRegs R2).pushOffAt a b).withRegs R3).withLocks
-        ("proc" :: (((k.withSpie a0 b0).pushed 4).withRegs R2).locks) =
-      (((k.pushOffAt a b).pushed 4).withRegs R3).withLocks ["proc"] := by
-  obtain ⟨regs, sie, spie, spp, avail, noff, intena, locks, tier, root, proc⟩ := k
-  simp only at h4 hl
-  subst hl
-  simp only [KCtx.withSpie, KCtx.pushed, KCtx.withRegs, KCtx.pushOffAt, KCtx.withLocks, KCtx.mk.injEq,
-    _root_.true_and, _root_.and_true]
-  omega
-
-/-- What sched resumes is the locked context at the resuming hart's bits. -/
-theorem sl_ctx_resumed (k : KCtx) (j : Nat) (a b : Bool) (R9 : RegMap) (hnoff : k.noff = 0)
-    (hl : k.locks = []) (htier : k.tier = KTier.kpt) (hproc : k.proc = procAddr j) (h4 : 4 ≤ k.avail) :
-    resumedK R9 a b (trapRes k.sie + k.avail - 4) k.intena k.root (procAddr j) =
-      (((k.pushOffAt a b).pushed 4).withRegs R9).withLocks ["proc"] := by
-  obtain ⟨regs, sie, spie, spp, avail, noff, intena, locks, tier, root, proc⟩ := k
-  simp only at hnoff htier hproc h4 hl
-  subst hnoff htier hproc hl
-  simp only [resumedK, KCtx.pushed, KCtx.withRegs, KCtx.pushOffAt, KCtx.withLocks]
-
 /-- The exit of the balanced pair. -/
 theorem sl_ctx_exit (k : KCtx) (a b : Bool) (hwf : k.wf) (hnoff : k.noff = 0) (hl : k.locks = []) :
     ((k.pushOffAt a b).popExit k.sie).withLocks ([] : List String) = k.withSpie a b := by

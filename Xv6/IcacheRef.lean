@@ -164,15 +164,6 @@ theorem credFloor_of_ctx [CurCtx] (lo tl : Nat) :
   ileft
   iexact H
 
-/-- Rocq `cred_floor_of_wrote`: the fresh arm's own store, at any `tl`. -/
-theorem credFloor_of_wrote [CurCtx] (lo tl : Nat) (h : CPU) :
-    dirtyIn (GF := GF) curCtx lo h ∗ authoredBy lo (hartAgent h) ⊢ credFloor lo tl := by
-  unfold credFloor
-  iintro H
-  iright
-  iexists h
-  iexact H
-
 /-- The arm store's mint (`MachCSL.wp_s_sw_mint` returns `lkFloor curCtx t`)
 is a credential at `(t, t)`. -/
 theorem credFloor_of_lk [CurCtx] (lo : Nat) :
@@ -498,14 +489,6 @@ def inodeRefGen [Icfg] [CurCtx] (k : Nat) (q : Qp) (dev inum : BitVec 32) (g : G
   iprop(irefFrag k q ∗ liveGen k q g ∗ inodeIdent k (.own q) dev inum ∗
     slhTok (icfgIsl k) q ∗ icRefStamps k dev inum 1)
 
-/-- THE SHARE WITHOUT ITS SLEEPLOCK SLICE AND ITS STAMPS: the holder
-deposits the `slhTok` slice into the tracked lock and the stamps into the
-box at the checkout (F15/M-4).  The bare form is the cells and the liveness
-slice, what the holder has in hand across its hold (`IcacheEscrow.ic_body`). -/
-def inodeShrGenloBare [Icfg] [CurCtx] (k : Nat) (s : Qp) (dev inum : BitVec 32) (g : GName)
-    (lo : Nat) : IProp GF :=
-  iprop(inodeIdent k (.own s) dev inum ∗ liveGenlo k s g lo)
-
 /-- A6.145: the LO-EXPOSED forms, for the racy read and the floored intro
 equivalences.  `_genlo` names the epoch floor; the floor-FREE `_gen` forms
 above are unchanged (they park in the escrow). -/
@@ -638,26 +621,6 @@ theorem inodeRefShort_gen_forget [Icfg] [CurCtx] (k : Nat) (qt qi : Qp) (dev inu
   · ipureintro; exact hle
   · iexact Hfl
 
-/-- THE POST-RETURN MOVE (A6.145). -/
-theorem inodeShr_gen_forget_on_keep [Icfg] [CurCtx] (k : Nat) (s qt qi : Qp)
-    (dev inum d2 n2 : BitVec 32) (g gk : GName) (lo tl : Nat) (hle : lo ≤ tl) :
-    credFloor (GF := GF) lo tl ∗ inodeRefShortGenlo k qt qi d2 n2 gk lo ∗
-        inodeShrGen k s dev inum g ⊢
-      inodeRefShortGenlo k qt qi d2 n2 gk lo ∗ inodeShr k s dev inum := by
-  unfold inodeRefShortGenlo inodeShrGen liveGen inodeShr liveFracc
-  iintro ⟨#Hfl, ⟨Hkf, Hklv, Hkid, Hksl, Hkst⟩, ⟨Hid, ⟨%lo2, Hlv⟩, Hsl, Hst⟩⟩
-  icases liveGenlo_agree_keep' k s g lo2 qi gk lo $$ [Hlv Hklv] with ⟨⟨Hlv, Hklv⟩, %he⟩
-  · iframe
-  obtain ⟨rfl, rfl⟩ := he
-  isplitl [Hkf Hklv Hkid Hksl Hkst]
-  · iframe
-  · iframe Hid Hsl Hst
-    iexists g, lo2, tl
-    iframe
-    isplitr
-    · ipureintro; exact hle
-    · iexact Hfl
-
 theorem inodeRefShort_shr_genlo_agree [Icfg] [CurCtx] (k : Nat) (qt qi s : Qp)
     (dev inum d2 n2 : BitVec 32) (g1 : GName) (lo1 : Nat) (g2 : GName) (lo2 : Nat) :
     inodeRefShortGenlo (GF := GF) k qt qi dev inum g1 lo1 ∗ inodeShrGenlo k s d2 n2 g2 lo2 ⊢
@@ -679,14 +642,6 @@ theorem inodeShrGenlo_split [Icfg] [CurCtx] (k : Nat) (s1 s2 : Qp) (dev inum : B
     iframe
   · iintro ⟨⟨Hi1, Hl1, Hs1, Ht1⟩, ⟨Hi2, Hl2, Hs2, Ht2⟩⟩
     iframe
-
-theorem inodeShrGenlo_halve [Icfg] [CurCtx] (k : Nat) (s : Qp) (dev inum : BitVec 32)
-    (g : GName) (lo : Nat) :
-    inodeShrGenlo (GF := GF) k s dev inum g lo ⊣⊢
-      inodeShrGenlo k s.half dev inum g lo ∗ inodeShrGenlo k s.half dev inum g lo := by
-  have h := inodeShrGenlo_split (GF := GF) k s.half s.half dev inum g lo
-  rw [Qp.half_add_half] at h
-  exact h
 
 /-- THE LO-EXPOSED SHED (A6.145). -/
 theorem inodeRefGenlo_shed [Icfg] [CurCtx] (k : Nat) (q : Qp) (dev inum : BitVec 32)
@@ -748,46 +703,6 @@ theorem inodeRef_gather_genlo [Icfg] [CurCtx] (k : Nat) (qi s : Qp) (dev inum : 
   ihave Hst := (icRefStamps_carve k qi s dev inum hle).2 $$ [Hst1 Hst2]
   · iframe
   iframe
-
-/-- The generation-named SHARE SPLIT (the home of the per-proof copies). -/
-theorem inodeShrGen_split [Icfg] [CurCtx] (k : Nat) (s1 s2 : Qp) (dev inum : BitVec 32)
-    (g : GName) :
-    inodeShrGen (GF := GF) k (s1 + s2) dev inum g ⊣⊢
-      inodeShrGen k s1 dev inum g ∗ inodeShrGen k s2 dev inum g := by
-  unfold inodeShrGen
-  rw [(inodeIdent_split k s1 s2 dev inum).to_eq, (liveGen_split k s1 s2 g).to_eq,
-    (slhTok_split (icfgIsl k) s1 s2).to_eq, (icRefStamps_split k dev inum s1 s2).to_eq]
-  constructor
-  · iintro ⟨⟨Hi1, Hi2⟩, ⟨Hl1, Hl2⟩, ⟨Hs1, Hs2⟩, ⟨Ht1, Ht2⟩⟩
-    iframe
-  · iintro ⟨⟨Hi1, Hl1, Hs1, Ht1⟩, ⟨Hi2, Hl2, Hs2, Ht2⟩⟩
-    iframe
-
-/-- The generation-named CARVE. -/
-theorem inodeRef_carve_gen [Icfg] [CurCtx] (k : Nat) (q s : Qp) (dev inum : BitVec 32)
-    (g : GName) :
-    inodeRefGen (GF := GF) k (q + s) dev inum g ⊣⊢
-      inodeRefShortGen k (q + s) q dev inum g ∗ inodeShrGen k s dev inum g := by
-  unfold inodeRefGen inodeRefShortGen inodeShrGen
-  constructor
-  · iintro ⟨Hf, Hl, Hid, Hs, Hst⟩
-    ihave %hle := liveGen_le1 k (q + s) g $$ Hl
-    icases (liveGen_split k q s g).1 $$ Hl with ⟨Hl1, Hl2⟩
-    icases (inodeIdent_split k q s dev inum).1 $$ Hid with ⟨Hid1, Hid2⟩
-    icases (slhTok_split (icfgIsl k) q s).1 $$ Hs with ⟨Hs1, Hs2⟩
-    icases (icRefStamps_carve k q s dev inum hle).1 $$ Hst with ⟨Hst1, Hst2⟩
-    iframe
-  · iintro ⟨⟨Hf, Hl1, Hid1, Hs1, Hst1⟩, ⟨Hid2, Hl2, Hs2, Hst2⟩⟩
-    ihave Hl := liveGen_join k q s g $$ [Hl1 Hl2]
-    · iframe
-    ihave %hle := liveGen_le1 k (q + s) g $$ Hl
-    ihave Hid := (inodeIdent_split k q s dev inum).2 $$ [Hid1 Hid2]
-    · iframe
-    ihave Hs := slhTok_join (icfgIsl k) q s $$ [Hs1 Hs2]
-    · iframe
-    ihave Hst := (icRefStamps_carve k q s dev inum hle).2 $$ [Hst1 Hst2]
-    · iframe
-    iframe
 
 /-- THE CARVE, and its inverse.  Pure resource algebra: the liveness slice,
 the identity slice and (R3) the stamps mass split together, and the count

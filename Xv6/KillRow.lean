@@ -263,42 +263,6 @@ theorem killPaid_reg_keep (pid : BitVec 32) (dq : DFrac) (gn gn' : GName) :
       ⌜gn = gn'⌝ ∗ (pidReg pid dq gn ∗ pidReg pid (.own qeighth) gn') :=
   (and_intro (pidReg_agree pid pid dq _ gn gn' rfl) .rfl).trans persistent_and_sep_mp
 
-/-- ...AND THE SAME STEP FOR A WRITER THAT PAYS OUT OF ITS OWN POCKET (a
-process that faults ON PURPOSE deposits its OWN `Q (-1)`; Rocq
-`kill_paid_kill_owed`). -/
-theorem killPaid_kill_owed (Wk : IProp GF) (pid : BitVec 32) (kl kl' : BitVec 32) (dq : DFrac)
-    (gn : GName) (hpnz : pid.toNat ≠ 0) (hknz : kl' ≠ 0#32) :
-    pidReg pid dq gn ∗ □ Wk ∗ killOwed gn ∗ killPaidAt Wk pid kl ⊢
-      |==> (pidReg pid dq gn ∗ killPaidAt Wk pid kl') := by
-  unfold killPaidAt
-  iintro ⟨Hmine, #Hsup, Howed, (⟨%hz, -⟩ | ⟨%hnz, ⟨%gn', %Q, Hr, #Hmy, #Hw, Hrow⟩⟩)⟩
-  · exact absurd hz hpnz
-  icases killPaid_reg_keep pid dq gn gn' $$ [Hmine Hr] with ⟨%e, Hmine, Hr⟩
-  · isplitl [Hmine]
-    · iexact Hmine
-    · iexact Hr
-  subst e
-  imod killRow_fire Wk gn kl $$ Hrow with #Hs
-  imodintro
-  isplitl [Hmine]
-  · iexact Hmine
-  iright
-  isplitr
-  · ipureintro; exact hnz
-  iexists gn, Q
-  isplitl [Hr]
-  · iexact Hr
-  isplitr
-  · iexact Hmy
-  isplitr
-  · iexact Hw
-  iapply killRow_of_owed Wk gn kl' hknz
-  isplitr
-  · iexact Hs
-  isplitr
-  · iexact Hsup
-  · iexact Howed
-
 /-- ...AND THE TWO SIDES AS ONE STEP (setkilled, on `myproc()`; Rocq
 `kill_paid_kill_two`): the process is killed by a party holding the
 credential, or kills ITSELF -- bringing its OWN death payload beside the

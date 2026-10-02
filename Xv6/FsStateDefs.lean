@@ -197,14 +197,6 @@ instance blkOwned_timeless (Γ : FsViewNames GF) [GTimeless Γ] (b : Nat)
     (bs : List (BitVec 8)) : Timeless (blkOwned Γ b bs) := by
   unfold blkOwned; infer_instance
 
-theorem blkOwnedQ_length (Γ : FsViewNames GF) (dq : DFrac) (b : Nat) (bs : List (BitVec 8)) :
-    blkOwnedQ Γ dq b bs ⊢ ⌜bs.length = BSIZE⌝ := by
-  unfold blkOwnedQ; iintro ⟨%h, -⟩; ipureintro; exact h
-
-theorem blkOwned_length (Γ : FsViewNames GF) (b : Nat) (bs : List (BitVec 8)) :
-    blkOwned Γ b bs ⊢ ⌜bs.length = BSIZE⌝ := by
-  unfold blkOwned; iintro ⟨%h, -⟩; ipureintro; exact h
-
 theorem byteRangeQ_nil (Γ : FsViewNames GF) (dq : DFrac) (b off : Nat) :
     byteRangeQ Γ dq b off [] ⊣⊢ emp := by
   unfold byteRangeQ; exact BigSepL.bigSepL_nil
@@ -287,10 +279,6 @@ quantifies over), so exclusivity is always read at `Γ` with a
 
 def gammaQ (Γ : FsViewNames GF) (dq : DFrac) : FsViewNames GF :=
   { Γ with phi := fun _ a v => Γ.phi dq a v }
-
-theorem gammaQ_byteRange (Γ : FsViewNames GF) (dq : DFrac) (b off : Nat)
-    (bs : List (BitVec 8)) :
-    byteRange (gammaQ Γ dq) b off bs ⊣⊢ byteRangeQ Γ dq b off bs := .rfl
 
 theorem gammaQ_blkOwned (Γ : FsViewNames GF) (dq : DFrac) (b : Nat) (bs : List (BitVec 8)) :
     blkOwned (gammaQ Γ dq) b bs ⊣⊢ blkOwnedQ Γ dq b bs := .rfl
@@ -410,11 +398,6 @@ theorem byteRangeQ_excl (Γ : FsViewNames GF) (Hex : phiExcl Γ) (dq1 dq2 : DFra
   iintro H H'
   ihave %hval := byteRangeQ_valid Γ Hex dq1 dq2 b off bs bs' hl hl' $$ H H'
   exact absurd hval hnv
-
-theorem byteRange_excl (Γ : FsViewNames GF) (Hex : phiExcl Γ) (b off : Nat)
-    (bs bs' : List (BitVec 8)) (hl : 0 < bs.length) (hl' : 0 < bs'.length) :
-    byteRange Γ b off bs ⊢ byteRange Γ b off bs' -∗ False :=
-  byteRangeQ_excl Γ Hex _ _ b off bs bs' (dfracFullNvalid _) hl hl'
 
 theorem blkOwnedQ_excl (Γ : FsViewNames GF) (Hex : phiExcl Γ) (dq1 dq2 : DFrac)
     (b : Nat) (bs bs' : List (BitVec 8)) (hnv : ¬ ✓ (dq1 • dq2)) :

@@ -37,10 +37,6 @@ open Sail LeanRV64D LeanRV64D.Functions
 def UftLeavesValid (P : UPtd) : Prop :=
   ∀ k w, Iris.Std.PartialMap.get? P.um k = some w → uwkInv w = false
 
-/-- `utlbOk` is MachCSL's `utlbOk` (`ptePpn` is `ptePpn`, `pteAD` is
-`pteAD`). -/
-theorem uft_utlbOk_iff (t : PTree) (tlb : Tlb) : utlbOk t tlb ↔ utlbOk t tlb := Iff.rfl
-
 /-! ## §1 The class of a leaf -/
 
 /-- The class facts the walk/TLB lemmas ask of a leaf word. -/

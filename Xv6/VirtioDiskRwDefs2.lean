@@ -572,25 +572,10 @@ theorem vdrw2_addiw1 (n : Nat) (h : n < NUM) :
 
 theorem vdrw2_bnez_1 : bcond bop.BNE 1#64 0#64 = true := by decide
 
-/-- `bne a5,s1` with `s1 = NUM`. -/
-theorem vdrw2_bne_num (n : Nat) (h : n < NUM) :
-    bcond bop.BNE (BitVec.ofNat 64 n) 8#64 = true := by
-  rcases lt8_cases n h with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide
-
-theorem vdrw2_bne_num_end : bcond bop.BNE (BitVec.ofNat 64 8) 8#64 = false := by decide
-
 /-- `bltz a5` on a small index: never taken. -/
 theorem vdrw2_bltz (n : Nat) (h : n < NUM) :
     bcond bop.BLT (BitVec.ofNat 64 n) 0#64 = false := by
   rcases lt8_cases n h with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide
-
-/-- `beq s2,s4` with `s4 = 3`. -/
-theorem vdrw2_beq3 (n : Nat) (h : n < 3) :
-    bcond bop.BEQ (BitVec.ofNat 64 n) 3#64 = false := by
-  have : n = 0 ∨ n = 1 ∨ n = 2 := by omega
-  rcases this with rfl|rfl|rfl <;> decide
-
-theorem vdrw2_beq3_end : bcond bop.BEQ (BitVec.ofNat 64 3) 3#64 = true := by decide
 
 theorem sp_idx2 (sp : BitVec 64) :
     sp + 0xFFFFFFFFFFFFFFA4#64 + 4#64 = sp + 0xFFFFFFFFFFFFFFA8#64 := by
@@ -612,16 +597,5 @@ theorem vdrw2_blez1 : bcond bop.BGE 0#64 1#64 = false := by decide
 theorem vdrw2_blez2 : bcond bop.BGE 0#64 2#64 = false := by decide
 theorem vdrw2_bge11 : bcond bop.BGE 1#64 1#64 = true := by decide
 theorem vdrw2_bge12 : bcond bop.BGE 1#64 2#64 = false := by decide
-
-/-- `blez s2` and `bge a5,s2` of the failure ladder. -/
-theorem vdrw2_blez (n : Nat) (h : n < 3) :
-    bcond bop.BGE 0#64 (BitVec.ofNat 64 n) = decide (n = 0) := by
-  have : n = 0 ∨ n = 1 ∨ n = 2 := by omega
-  rcases this with rfl|rfl|rfl <;> decide
-
-theorem vdrw2_bge1 (n : Nat) (h : n < 3) :
-    bcond bop.BGE 1#64 (BitVec.ofNat 64 n) = decide (n ≤ 1) := by
-  have : n = 0 ∨ n = 1 ∨ n = 2 := by omega
-  rcases this with rfl|rfl|rfl <;> decide
 
 end Xv6

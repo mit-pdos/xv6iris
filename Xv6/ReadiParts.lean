@@ -194,8 +194,6 @@ theorem rd_zext32 (x : Nat) (h : x < 2 ^ 32) :
   rw [h1]
   simp
 
-/-- `li a5,-1 ; beq a0,a5`: the either_copyout answer against `-1`. -/
-theorem rd_beq_m1_t : bcond bop.BEQ (-1#64) 0xFFFFFFFFFFFFFFFF#64 = true := by decide
 theorem rd_beq_m1_f : bcond bop.BEQ 0#64 0xFFFFFFFFFFFFFFFF#64 = false := by decide
 
 /-- The largest file, in bytes. -/

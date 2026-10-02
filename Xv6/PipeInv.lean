@@ -183,16 +183,6 @@ theorem p4_paOf_addN4 (ppn : BitVec 44) (a : BitVec 64) (hal : a.toNat % 4 = 0) 
     paOf ppn (a + BitVec.ofNat 64 j) = paOf ppn a + BitVec.ofNat 64 j :=
   p4_paOf_add4 ppn a _ (p4_align4_extract hal) (p4_ofNat_lt4 hj)
 
-theorem p4_tierPin_addN4 (t : KTier) (ppn : BitVec 44) (a : BitVec 64) (hal : a.toNat % 4 = 0)
-    (h : tierPin t ppn a) (j : Nat) (hj : j < 4) : tierPin t ppn (a + BitVec.ofNat 64 j) := by
-  cases t
-  · simp only [tierPin] at h ⊢; rw [p4_paOf_addN4 ppn a hal j hj, h]
-  · trivial
-
-theorem p4_toNat_addN4 (a : BitVec 64) (j : Nat) (hj : j < 4) (hlt : a.toNat + j < 2 ^ 64) :
-    (a + BitVec.ofNat 64 j).toNat = a.toNat + j := by
-  rw [BitVec.toNat_add]; simp only [BitVec.toNat_ofNat]; omega
-
 end
 
 /-! ## The page reassembly -/

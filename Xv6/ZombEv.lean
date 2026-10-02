@@ -97,29 +97,11 @@ theorem zombiesOf_snoc (h : List Zev) (e : Zev) :
     zombiesOf (h ++ [e]) = zombStep (zombiesOf h) e := by
   unfold zombiesOf; rw [List.foldl_append]; rfl
 
-theorem zombiesOf_snoc_exit (h : List Zev) (a : BitVec 64) (p : BitVec 32) (xs : Int) :
-    zombiesOf (h ++ [.ZExit a p xs]) = fun k => k = (p.toNat : Int) ∨ zombiesOf h k := by
-  rw [zombiesOf_snoc]; rfl
-
-theorem zombiesOf_snoc_reap (h : List Zev) (a : BitVec 64) (p : BitVec 32) :
-    zombiesOf (h ++ [.ZReap a p]) = fun k => zombiesOf h k ∧ k ≠ (p.toNat : Int) := by
-  rw [zombiesOf_snoc]; rfl
-
 theorem statusOf_nil : statusOf [] = fun _ => none := rfl
 
 theorem statusOf_snoc (h : List Zev) (e : Zev) :
     statusOf (h ++ [e]) = statusStep (statusOf h) e := by
   unfold statusOf; rw [List.foldl_append]; rfl
-
-theorem statusOf_snoc_exit (h : List Zev) (a : BitVec 64) (p : BitVec 32) (xs : Int) :
-    statusOf (h ++ [.ZExit a p xs]) =
-      fun k => if k = (p.toNat : Int) then some xs else statusOf h k := by
-  rw [statusOf_snoc]; rfl
-
-theorem statusOf_snoc_reap (h : List Zev) (a : BitVec 64) (p : BitVec 32) :
-    statusOf (h ++ [.ZReap a p]) =
-      fun k => if k = (p.toNat : Int) then none else statusOf h k := by
-  rw [statusOf_snoc]; rfl
 
 /-! ## 4. The status map's domain is the zombie set -/
 

@@ -266,24 +266,4 @@ def rpLen (s : String) : Nat := s.length
 /-- Rocq `rp_parse`. -/
 def rpParse (s : String) : Option UshpCmd := refParsecmd (rpLen s) (rpBytes s)
 
-/-- the echo line: one EXEC node whose argv are the words -/
-theorem rp_demo_echo : rpParse "echo hello world\n" = some (.exec [(0, 4), (5, 10), (11, 16)]) := by
-  decide +kernel
-
-/-- the redirect line: a REDIR onto fd 1 at `O_WRONLY|O_CREATE|O_TRUNC` -/
-theorem rp_demo_redir :
-    rpParse "echo hello world > f\n" = some (.redir (.exec [(0, 4), (5, 10), (11, 16)]) 19 20 1537 1) := by
-  decide +kernel
-
-/-- the pipe line: a PIPE of two EXEC nodes -/
-theorem rp_demo_pipe :
-    rpParse "echo hello world | cat\n" = some (.pipe (.exec [(0, 4), (5, 10), (11, 16)]) (.exec [(19, 22)])) := by
-  decide +kernel
-
-/-- ...and the reference REFUSES what sh refuses -/
-theorem rp_demo_block : rpParse "(echo hi)\n" = none := by decide +kernel
-theorem rp_demo_missing : rpParse "echo hi >\n" = none := by decide +kernel
-theorem rp_demo_toomany : rpParse "a b c d e f g h i j\n" = none := by decide +kernel
-theorem rp_demo_leftover : rpParse "echo hi )\n" = none := by decide +kernel
-
 end Xv6

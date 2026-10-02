@@ -259,27 +259,6 @@ theorem sys_open_arm_dead (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsNames)
   ileft
   iframe Hdead Hoc Htc
 
-/-- Rocq `so_arm_unspent`: the ARGSTR arm (ARM 0): nothing fs-visible
-happened at all. -/
-theorem sys_open_arm_unspent (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat) (γ : FileNames)
-    (pa : BitVec 64) (pid : BitVec 32) (Mim : Nat → List (BitVec 8)) (pv : Nat) (vom : BitVec 64)
-    (P Pmiss : Nat → Nat → IProp GF) (Fo : Pfam GF (Aview → Nat → Anode → IProp GF))
-    (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)) (sts : List FdState)
-    (VW : ProcPriv) (MW : Nat → List (BitVec 8)) (r : BitVec 64)
-    (hr : r = 0xFFFFFFFFFFFFFFFF#64) :
-    procPrivFd (GF := GF) γ pa pid VW MW ⊢ fdFrags VW.fdg sts -∗ fdSlot -∗
-      openAuPlainAt (hlc := hlc) Γ γfs rt cw Mim pv vom P Pmiss Fo Ft -∗
-      openArmsPlain (hlc := hlc) omo Γ γfs rt cw γ pa pid Mim pv vom P Pmiss Fo Ft sts VW MW r := by
-  iintro Hpriv Hfrag Hfds Hpre
-  unfold openArmsPlain openPostFailPlain
-  iframe Hfds
-  ileft
-  iframe Hpriv Hfrag
-  isplitr
-  · ipureintro; exact hr
-  ileft
-  iexact Hpre
-
 /-! ### 4a.  The three success arms, as wands from the descriptor receipt
 
 Which arm fires is decided by `ip->type`, which the STORE block reads and the

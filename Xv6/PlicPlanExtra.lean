@@ -131,10 +131,6 @@ macro_rules
 
 /-! ## The offsets the kernel touches, as legal word accesses -/
 
-theorem prioOff_ok (i : Nat) (hi : i < Plic.nsrc) : prioOff i % 4 = 0 ∧ prioOff i < plicSize := by
-  unfold prioOff Plic.nsrc plicSize at *
-  omega
-
 theorem senableOff_ok (h : Nat) (hh : h < NCPU) :
     senableOff h % 4 = 0 ∧ senableOff h < plicSize := by
   unfold senableOff plicSize NCPU at *

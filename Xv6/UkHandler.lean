@@ -1049,16 +1049,6 @@ theorem treePay_of_conforms_p (I : EpIfaceP (hlc := hlc) N P Dp) (E : Penv) (ds 
 
 end UkHandler
 
-/-- **Rocq `tree_pay_of_conforms`** (the record at no protected device;
-deviation 6). -/
-theorem treePay_of_conforms {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [UexecSG GF]
-    [UprogSG GF] [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
-    [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int] {N : UkNames GF} {P : Uprog GF}
-    (I : EpIface (hlc := hlc) N P) (E : Penv) (ds : ExtTreeSet Nat compare) (t : Proc)
-    (hc : Conforms E t) (hs : SafeFds (fdDom E.fd) t) :
-    ⊢ envRes I E ds -∗ treePay (hlc := hlc) N P t :=
-  treePay_of_conforms_p I E ds t hc hs (fun _ h => absurd h (List.not_mem_nil))
-
 /-- **Rocq `cif_not_shared`**. -/
 theorem not_shared (fdm : Fdmap) (fd : Int) (d : Nat) (hns : ¬ fdShared fdm fd d) :
     ∀ fd', fd' ≠ fd → fdm fd' ≠ some d := fun fd' hne h => hns ⟨fd', hne, h⟩

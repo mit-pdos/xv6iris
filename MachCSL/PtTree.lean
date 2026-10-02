@@ -434,13 +434,6 @@ theorem PTree.path_ne_of_addr_ne (lvl : Nat) (t : PTree) (vpn vpn' : BitVec 27)
   have hs := (of_path_eq lvl t vpn vpn' hc).1
   rw [← h1, ← h2, hs]
 
-/-- The same, phrased on the addresses the two walks end at. -/
-theorem PTree.walk_setLeaf_ne_addr (lvl : Nat) (t : PTree) (vpn vpn' : BitVec 27) (v : BitVec 64)
-    (addr pv addr' pv' : BitVec 64) (h : t.walk lvl vpn = some (addr, pv))
-    (h' : t.walk lvl vpn' = some (addr', pv')) (hne : addr ≠ addr') :
-    (t.setLeaf lvl vpn v).walk lvl vpn' = t.walk lvl vpn' :=
-  walk_setLeaf_other lvl t vpn vpn' v (path_ne_of_addr_ne lvl t vpn vpn' addr pv addr' pv' h h' hne)
-
 /-- The tree's pages are untouched. -/
 theorem PTree.pages_setLeaf (lvl : Nat) (t : PTree) (vpn : BitVec 27) (v : BitVec 64) :
     (t.setLeaf lvl vpn v).pages lvl = t.pages lvl := by
@@ -460,56 +453,6 @@ theorem PTree.pages_setLeaf (lvl : Nat) (t : PTree) (vpn : BitVec 27) (v : BitVe
 theorem PTree.pagesNodup_setLeaf (lvl : Nat) (t : PTree) (vpn : BitVec 27) (v : BitVec 64)
     (h : t.pagesNodup lvl) : (t.setLeaf lvl vpn v).pagesNodup lvl := by
   simpa [pagesNodup, pages_setLeaf] using h
-
-/-- Writing back `A`/`D` on the leaf a walk reaches keeps the tree well formed. -/
-theorem PTree.wf_setLeaf (lvl : Nat) (t : PTree) (vpn : BitVec 27) (addr : BitVec 64)
-    (ppn : BitVec 44) (perm : KPerm) (a d a' d' : BitVec 1) (hwf : t.wf lvl)
-    (hw : t.walk lvl vpn = some (addr, kLeaf ppn perm a d)) :
-    (t.setLeaf lvl vpn (kLeaf ppn perm a' d')).wf lvl := by
-  induction lvl generalizing t addr with
-  | zero =>
-    intro j
-    refine ⟨(hwf j).1, ?_⟩
-    simp only [setLeaf, setEnt, PTree.ents_node]
-    by_cases hj : j = vpnIdx vpn 0
-    · rw [if_pos hj]; exact Or.inr ⟨ppn, perm, a', d', rfl⟩
-    · rw [if_neg hj]; exact (hwf j).2
-  | succ lvl ih =>
-    simp only [setLeaf, walk] at hw ⊢
-    cases h : t.kids (vpnIdx vpn (lvl+1)) with
-    | none =>
-      have hz := hwf (vpnIdx vpn (lvl+1))
-      rw [h] at hz hw
-      rw [if_pos hz] at hw
-      exact absurd hw (by simp)
-    | some c =>
-      have hc := hwf (vpnIdx vpn (lvl+1))
-      rw [h] at hc hw
-      intro j
-      simp only [setKid, PTree.kids_node, PTree.ents_node]
-      by_cases hj : j = vpnIdx vpn (lvl+1)
-      · rw [if_pos hj, hj, hc.1]
-        exact ⟨by rw [PTree.base_setLeaf], ih c addr hc.2 hw⟩
-      · rw [if_neg hj]; exact hwf j
-
-/-! ## `maps` under an A/D write-back -/
-
-theorem PTree.maps_setLeaf (t : PTree) (vpn : BitVec 27) (addr : BitVec 64) (ppn : BitVec 44)
-    (perm : KPerm) (a d a' d' : BitVec 1) (hw : t.walk 2 vpn = some (addr, kLeaf ppn perm a d)) :
-    (t.setLeaf 2 vpn (kLeaf ppn perm a' d')).maps vpn addr ppn perm :=
-  ⟨a', d', walk_setLeaf_self 2 t vpn _ (kLeaf_ne_zero _ _ _ _) addr _ hw⟩
-
-theorem PTree.maps_setLeaf_other (t : PTree) (vpn vpn' : BitVec 27) (v : BitVec 64)
-    (addr' : BitVec 64) (ppn' : BitVec 44) (perm' : KPerm)
-    (hne : t.path 2 vpn ≠ t.path 2 vpn') (h : t.maps vpn' addr' ppn' perm') :
-    (t.setLeaf 2 vpn v).maps vpn' addr' ppn' perm' := by
-  obtain ⟨a, d, h⟩ := h
-  exact ⟨a, d, by rw [walk_setLeaf_other 2 t vpn vpn' v hne]; exact h⟩
-
-theorem PTree.blocks_setLeaf_other (t : PTree) (vpn vpn' : BitVec 27) (v : BitVec 64)
-    (hne : t.path 2 vpn ≠ t.path 2 vpn') (h : t.blocks vpn') :
-    (t.setLeaf 2 vpn v).blocks vpn' := by
-  rw [PTree.blocks, walk_setLeaf_other 2 t vpn vpn' v hne]; exact h
 
 /-! ## The entry list -/
 
@@ -708,38 +651,6 @@ theorem PTree.walk_zero_none (t : PTree) (vpn : BitVec 27) (hw : t.walk 0 vpn = 
   · rename_i h; exact h
   · exact absurd hw (by simp)
 
-/-- A blocked Sv39 walk of a well-formed kernel table: the level at which the
-zero entry sits, together with the pointer entries above it. -/
-theorem PTree.walk_none_levels (t : PTree) (vpn : BitVec 27) (hwf : t.wf 2)
-    (hw : t.walk 2 vpn = none) :
-    (pteAddr t.base (vpnIdx vpn 2), 0#64) ∈ t.entries 2 ∨
-    (∃ b1 : BitVec 44,
-      (pteAddr t.base (vpnIdx vpn 2), kPtr b1) ∈ t.entries 2 ∧
-      (pteAddr b1 (vpnIdx vpn 1), 0#64) ∈ t.entries 2) ∨
-    (∃ b1 b0 : BitVec 44,
-      (pteAddr t.base (vpnIdx vpn 2), kPtr b1) ∈ t.entries 2 ∧
-      (pteAddr b1 (vpnIdx vpn 1), kPtr b0) ∈ t.entries 2 ∧
-      (pteAddr b0 (vpnIdx vpn 0), 0#64) ∈ t.entries 2) := by
-  rcases walk_succ_none 1 t vpn hwf hw with h2 | ⟨c1, hk2, he2, hwf1, hw1⟩
-  · refine Or.inl ?_
-    have h := self_mem_entries 2 t (vpnIdx vpn 2); rwa [h2] at h
-  · have m2 : (pteAddr t.base (vpnIdx vpn 2), kPtr c1.base) ∈ t.entries 2 := by
-      have h := self_mem_entries 2 t (vpnIdx vpn 2); rwa [he2] at h
-    rcases walk_succ_none 0 c1 vpn hwf1 hw1 with h1 | ⟨c0, hk1, he1, hwf0, hw0⟩
-    · refine Or.inr (Or.inl ⟨c1.base, m2, ?_⟩)
-      have h := self_mem_entries 1 c1 (vpnIdx vpn 1)
-      rw [h1] at h
-      exact kid_mem_entries 1 t c1 (vpnIdx vpn 2) hk2 _ h
-    · have m1 : (pteAddr c1.base (vpnIdx vpn 1), kPtr c0.base) ∈ t.entries 2 := by
-        have h := self_mem_entries 1 c1 (vpnIdx vpn 1)
-        rw [he1] at h
-        exact kid_mem_entries 1 t c1 (vpnIdx vpn 2) hk2 _ h
-      refine Or.inr (Or.inr ⟨c1.base, c0.base, m2, m1, ?_⟩)
-      have h := self_mem_entries 0 c0 (vpnIdx vpn 0)
-      rw [walk_zero_none c0 vpn hw0] at h
-      exact kid_mem_entries 1 t c1 (vpnIdx vpn 2) hk2 _
-        (kid_mem_entries 0 c1 c0 (vpnIdx vpn 1) hk1 _ h)
-
 /-! ## The TLB -/
 
 /-- The `tlb` register: 64 slots (`num_tlb_entries_exp = 6`). -/
@@ -772,20 +683,6 @@ theorem and_not_zero_27 (x : BitVec 27) : x &&& Complement.complement (0#27) = x
   rw [show Complement.complement (0#27) = BitVec.allOnes 27 from rfl, BitVec.and_allOnes]
 theorem and_not_zero_44 (x : BitVec 44) : x &&& Complement.complement (0#44) = x := by
   rw [show Complement.complement (0#44) = BitVec.allOnes 44 from rfl, BitVec.and_allOnes]
-
-/-- `tlbEntryOf` is literally the record `add_to_TLB` builds at level 0. -/
-theorem tlbEntryOf_mk (asid : BitVec 16) (vpn : BitVec 27) (ppn : BitVec 44) (pte addr : BitVec 64) :
-    ({ asid := asid, global := false, pte := zero_extend (m := 64) pte,
-       pteAddr := physaddr.Physaddr addr,
-       levelMask := zero_extend (m := 45) (ones (n := 0)),
-       vpn := sign_extend (m := 45)
-         (vpn &&& Complement.complement (zero_extend (m := 27) (ones (n := 0)))),
-       ppn := zero_extend (m := 44)
-         (ppn &&& Complement.complement (zero_extend (m := 44) (ones (n := 0)))) } : TLB_Entry)
-      = tlbEntryOf asid vpn ppn pte addr := by
-  rw [zextOnes45, zextOnes27, zextOnes44, and_not_zero_27, and_not_zero_44, zext64_self,
-    zext44_self]
-  rfl
 
 /-! ### What the model reads off a cached entry -/
 
@@ -856,39 +753,6 @@ theorem tlbOk_write (t : PTree) (tlb : Tlb) (hok : tlbOk t tlb) (vpn : BitVec 27
   · rename_i heq
     exact ⟨vpn, addr, ppn, perm, a, d, a', d', heq, hw, (Option.some.inj h).symm⟩
   · exact hok i hi ent h
-
-/-- A TLB hit is sound: the cached entry is the one the tree's walk reaches. -/
-theorem tlbOk_hit (t : PTree) (tlb : Tlb) (hok : tlbOk t tlb) (vpn : BitVec 27) (ent : TLB_Entry)
-    (h : tlb[tlbHash vpn]'(tlbHash_lt vpn) = some ent)
-    (hm : match_TLB_Entry ent 0#16 (sign_extend (m := 45) vpn) = true) :
-    ∃ (addr : BitVec 64) (ppn : BitVec 44) (perm : KPerm) (a d a' d' : BitVec 1),
-      t.walk 2 vpn = some (addr, kLeaf ppn perm a d) ∧
-      ent = tlbEntryOf 0#16 vpn ppn (kLeaf ppn perm a' d') addr := by
-  obtain ⟨vpn₁, addr, ppn, perm, a, d, a', d', -, hw, hent⟩ :=
-    hok (tlbHash vpn) (tlbHash_lt vpn) ent h
-  subst hent
-  rw [match_tlbEntryOf, decide_eq_true_eq] at hm
-  subst hm
-  exact ⟨addr, ppn, perm, a, d, a', d', hw, rfl⟩
-
-/-- An `A`/`D` write-back into the table keeps the TLB sound. -/
-theorem tlbOk_setLeaf (t : PTree) (tlb : Tlb) (hok : tlbOk t tlb) (vpn : BitVec 27)
-    (addr : BitVec 64) (ppn : BitVec 44) (perm : KPerm) (a d a' d' : BitVec 1)
-    (hw : t.walk 2 vpn = some (addr, kLeaf ppn perm a d)) :
-    tlbOk (t.setLeaf 2 vpn (kLeaf ppn perm a' d')) tlb := by
-  intro i hi ent h
-  obtain ⟨vpn₁, addr₁, ppn₁, perm₁, a₁, d₁, a₁', d₁', hh, hw₁, hent⟩ := hok i hi ent h
-  by_cases hp : t.path 2 vpn = t.path 2 vpn₁
-  · have heq : t.walk 2 vpn₁ = some (addr, kLeaf ppn perm a d) :=
-      (PTree.walk_of_path_eq 2 t vpn vpn₁ hp).symm.trans hw
-    rw [hw₁, Option.some.injEq, Prod.mk.injEq] at heq
-    obtain ⟨hppn, hperm⟩ := kLeaf_inj heq.2
-    subst hppn; subst hperm
-    refine ⟨vpn₁, addr₁, ppn₁, perm₁, a', d', a₁', d₁', hh, ?_, hent⟩
-    exact PTree.walk_setLeaf_path_eq 2 t vpn vpn₁ _ (kLeaf_ne_zero _ _ _ _) hp addr₁ _ hw₁
-  · refine ⟨vpn₁, addr₁, ppn₁, perm₁, a₁, d₁, a₁', d₁', hh, ?_, hent⟩
-    rw [PTree.walk_setLeaf_other 2 t vpn vpn₁ _ hp]
-    exact hw₁
 
 /-- Refreshing a cached entry's `A`/`D` bits keeps the TLB sound. -/
 theorem tlbOk_setPte (t : PTree) (tlb : Tlb) (hok : tlbOk t tlb) (i : Nat) (hi : i < 2 ^ 6)

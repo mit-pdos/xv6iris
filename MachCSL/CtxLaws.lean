@@ -91,9 +91,6 @@ theorem get?_punion (m₁ m₂ : RegMapF CPU) (k : Nat) :
 theorem topLb_le (K K' : Nat) (h : K' ≤ K) : topLb (GF := GF) K ⊢ topLb K' :=
   topLbAt_le _ K K' h
 
-theorem viewLb_le (cpu : CPU) (K K' : Nat) (h : K' ≤ K) : viewLb (GF := GF) cpu K ⊢ viewLb cpu K' :=
-  viewLbAt_le _ cpu K K' h
-
 theorem topLb_max (K K' : Nat) : topLb (GF := GF) K ∗ topLb K' ⊢ topLb (max K K') := by
   iintro ⟨H1, H2⟩
   by_cases h : K ≤ K'

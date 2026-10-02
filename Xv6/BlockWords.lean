@@ -88,12 +88,6 @@ theorem indBytes_length (e : List (BitVec 32)) :
     rw [indBytes_cons, List.length_append, wordToBytes4_length, ih, List.length_cons]
     omega
 
-/-- The shape the inode layer uses it at: `NINDIRECT` entries fill a
-block (Rocq's `ind_bytes_length_256`). -/
-theorem indBytes_length_256 (e : List (BitVec 32)) (he : e.length = 256) :
-    (indBytes e).length = 1024 := by
-  rw [indBytes_length, he]
-
 /-! ## Lookup -/
 
 theorem indBytes_lookup (e : List (BitVec 32)) (i j : Nat)

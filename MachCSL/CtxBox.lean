@@ -503,11 +503,6 @@ theorem qsum_insert (m : StampMap Id) (p : Id × Nat) (q : UFrac) (hp : get? m p
     qsum (PartialMap.insert m p q) = q.frac.val + qsum m := by
   rw [Heap.insert_eq_singleton_op_singleton hp, qsum_singleton_op]
 
-theorem qsum_delete (m : StampMap Id) (p : Id × Nat) (q : UFrac) (hp : get? m p = some q) :
-    qsum m = q.frac.val + qsum (PartialMap.delete m p) := by
-  conv => lhs; rw [← LawfulPartialMap.insert_delete_cancel hp]
-  exact qsum_insert _ p q (LawfulPartialMap.get?_delete_eq rfl)
-
 /-- Inclusion, as the witness equation (iris-lean's `≼` is Leibniz). -/
 theorem stamps_incl_eq {m1 m2 : StampMap Id} (h : m1 ≼ m2) : ∃ z, m2 = m1 • z := h
 
@@ -591,10 +586,6 @@ theorem maxStamp_op (m1 m2 : StampMap Id) :
 theorem maxStamp_singleton_op (m : StampMap Id) (p : Id × Nat) (q : UFrac) :
     maxStamp ((PartialMap.singleton p q : StampMap Id) • m) = max p.2 (maxStamp m) := by
   rw [maxStamp_op, maxStamp_singleton]
-
-theorem maxStamp_insert (m : StampMap Id) (p : Id × Nat) (q : UFrac) (hp : get? m p = none) :
-    maxStamp (PartialMap.insert m p q) = max p.2 (maxStamp m) := by
-  rw [Heap.insert_eq_singleton_op_singleton hp, maxStamp_singleton_op]
 
 /-- Every key of the fragment is at this identity (Rocq's `keyed`). -/
 def keyed (m : StampMap Id) (i : Id) : Prop := ∀ p, (get? m p).isSome → p.1 = i
@@ -1098,19 +1089,6 @@ def l1Row (γ : BoxNames) (r : SlotReg Id X) (ξ : CtxId) : IProp GF := iprop%
 instance l1Row_morph (γ : BoxNames) (r : SlotReg Id X) :
     CtxMorph (GF := GF) (l1Row γ r) := by unfold l1Row; infer_instance
 
-/-- L1's row, folded (Rocq's `l1_row_fold`). -/
-theorem l1Row_fold (γ : BoxNames) (r : SlotReg Id X) (ξ : CtxId)
-    (hw : r.win = false) (hx : r.x = none) :
-    slotdHalf (GF := GF) γ r ∗ ctxFloor ξ r.td ∗ topLb r.td ⊢ l1Row γ r ξ := by
-  unfold l1Row
-  iintro ⟨Hr, #Hfl, #Ht⟩
-  iframe Hr
-  isplit
-  · ipureintro; exact ⟨hw, hx⟩
-  isplit
-  · iexact Hfl
-  · iexact Ht
-
 /-! ## The arms -/
 
 /-- The L1 out-window's ghost (Rocq's `hdr_out`): the withdrawer's whole
@@ -1263,13 +1241,6 @@ theorem boxArm_shut (P : BoxPay GF Id X) (γ : BoxNames) (T : Nat) (ξb : CtxId)
     isplit
     · ipureintro; exact hw'
     · iexact H
-
-/-- The body, opened: its prefix named. -/
-theorem boxBody_open (P : BoxPay GF Id X) (γ : BoxNames) :
-    boxBody P γ ⊢ ∃ (T : Nat) (ξb : CtxId) (m : StampMap Id) (c : Nat) (r : SlotReg Id X)
-      (s : L2Reg Id), ctxStamped ξb T ∗ stampsAuth γ m ∗ cntHalf γ c ∗ slotdHalf γ r ∗
-        slotpHalf γ s ∗ ⌜boxRows T m c r s⌝ ∗ boxArm P γ T ξb m c r s := by
-  unfold boxBody; iintro H; iexact H
 
 /-- The body, opened under the invariant's later. -/
 theorem boxBody_open_later (P : BoxPay GF Id X) (γ : BoxNames) :

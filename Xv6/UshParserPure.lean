@@ -73,8 +73,6 @@ def ushPexDeep (t : UshpCmd) : Nat := if refHasRedir t then 42 else 22
 
 theorem ushPexDeep_ge (t : UshpCmd) : 22 ≤ ushPexDeep t := by unfold ushPexDeep; split <;> omega
 
-theorem ushPexDeep_le (t : UshpCmd) : ushPexDeep t ≤ 42 := by unfold ushPexDeep; split <;> omega
-
 theorem ushPexDeep_has (t : UshpCmd) (h : refHasRedir t = true) : ushPexDeep t = 42 := by
   unfold ushPexDeep; rw [h]; rfl
 
@@ -82,13 +80,6 @@ theorem ushPexDeep_has (t : UshpCmd) (h : refHasRedir t = true) : ushPexDeep t =
 def ushPpDeep : UshpCmd → Nat
   | .pipe l r => 6 + max (ushPexDeep l) (ushPpDeep r)
   | t => 6 + ushPexDeep t
-
-theorem ushPpDeep_ge : ∀ t : UshpCmd, 28 ≤ ushPpDeep t
-  | .pipe l r => by simp only [ushPpDeep]; have := ushPexDeep_ge l; omega
-  | .exec toks => by simp only [ushPpDeep]; have := ushPexDeep_ge (.exec toks); omega
-  | .redir c q e mode fd => by simp only [ushPpDeep]; have := ushPexDeep_ge (.redir c q e mode fd); omega
-  | .list l r => by simp only [ushPpDeep]; have := ushPexDeep_ge (.list l r); omega
-  | .back c => by simp only [ushPpDeep]; have := ushPexDeep_ge (.back c); omega
 
 /-- **Rocq `ushp_pex_deep_le_room`**. -/
 theorem ushPexDeep_le_room (t : UshpCmd) : ushPexDeep t ≤ ushPexRoom t := by
@@ -117,10 +108,6 @@ def ushPlDeep (t : UshpCmd) : Nat := 6 + ushPpDeep t
 
 /-- **Rocq `ushp_deep`**. -/
 def ushDeep (t : UshpCmd) : Nat := 8 + ushPlDeep t
-
-/-- **Rocq `ushp_deep_le_room`**. -/
-theorem ushDeep_le_room (t : UshpCmd) : ushDeep t ≤ ushRoom t := by
-  unfold ushDeep ushPlDeep ushRoom ushPlRoom; have := ushPpDeep_le_room t; omega
 
 /-! ## The cut (Rocq (5a)) -/
 

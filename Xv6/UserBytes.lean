@@ -77,12 +77,6 @@ theorem ub_sepL_wand {X : Type} (P : IProp GF) [Persistent P] (l : List X) (Φ �
   iintro %k %x %hk HΦ
   iapply (h x (List.mem_of_getElem? hk)) $$ HP HΦ
 
-/-- A big separating conjunction, converted element-wise (both ways). -/
-theorem ub_sepL_equiv {X : Type} (l : List X) (Φ Ψ : X → IProp GF) (h : ∀ x ∈ l, Φ x ⊣⊢ Ψ x) :
-    ([∗list] x ∈ l, Φ x) ⊣⊢ [∗list] x ∈ l, Ψ x :=
-  ⟨BigSepL.bigSepL_mono (fun hk => (h _ (List.mem_of_getElem? hk)).1),
-   BigSepL.bigSepL_mono (fun hk => (h _ (List.mem_of_getElem? hk)).2)⟩
-
 /-- An indexed big separating conjunction over a list, as one over its
 indices. -/
 theorem ub_sepL_idx (Φ : Nat → BitVec 8 → IProp GF) : ∀ bs : List (BitVec 8),

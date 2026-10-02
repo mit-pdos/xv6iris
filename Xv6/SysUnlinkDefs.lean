@@ -158,19 +158,6 @@ theorem deltaUnlink_last_file (av : Aview) (d : Nat) (nm : Fname)
   obtain ⟨hd, _, _, _, _, ht, _, _⟩ := hp
   exact deltaUnlink_last av d nm ents nl t _ hd ht rfl
 
-/-- the dir arm: the child's row leaves too -- there is no orphan dir in the
-view -- while the parent pays its own count down one and keeps its row
-(Rocq's `delta_unlink_last_dir`). -/
-theorem deltaUnlink_last_dir (av : Aview) (d : Nat) (nm : Fname)
-    (ents : Std.ExtTreeMap Fname Nat compare) (nl t : Nat) (es : Std.ExtTreeMap Fname Nat compare)
-    (hp : unlPre av d nm ents nl t ⟨.ADir es, 1⟩) :
-    PartialMap.get? (deltaUnlink d nm t av) t = none ∧
-      PartialMap.get? (deltaUnlink d nm t av) d = some ⟨.ADir (ents.erase nm), nl - 1⟩ := by
-  have hne := unlPre_ne av d nm ents nl t _ hp
-  obtain ⟨hd, _, _, _, _, ht, _, _⟩ := hp
-  exact ⟨deltaUnlink_last av d nm ents nl t _ hd ht rfl,
-    deltaUnlink_parent av d nm ents nl t _ hd ht hne⟩
-
 /-! ## 2.  The commits -/
 
 section UnlinkDefs
@@ -212,18 +199,6 @@ theorem uentCommitAt_mono [Appcfg GF] (Γ : FsViewNames GF) (E : CoPset) (Pd Pd'
   ihave HPd := Hin $$ %d HPd
   imod H $$ %I %d %t %nm %ents %nl %a %hpre HPd Ha with ⟨Ha, HPd, Hstep, Hph2⟩
   ihave HPd := Hout $$ %d HPd
-  imodintro
-  iframe Ha HPd Hstep Hph2
-
-/-- the cursor is a WEAKENING, exactly as at create (Rocq's
-`uent_commit_at_cur`; `FsAbsCreateFire.acreCommitAtGen_cur`). -/
-theorem uentCommitAt_cur [Appcfg GF] (Γ : FsViewNames GF) (E : CoPset) (Pd : Nat → IProp GF)
-    (Φ : Aview → Nat → Fname → Nat → IProp GF) :
-    uentCommitAt (hlc := hlc) Γ E (fun _ => iprop(True)) Φ ⊢
-      uentCommitAt (hlc := hlc) Γ E Pd Φ := by
-  unfold uentCommitAt
-  iintro H %I %d %t %nm %ents %nl %a %hpre HPd Ha
-  imod H $$ %I %d %t %nm %ents %nl %a %hpre %trivial Ha with ⟨Ha, -, Hstep, Hph2⟩
   imodintro
   iframe Ha HPd Hstep Hph2
 

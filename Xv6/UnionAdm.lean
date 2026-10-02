@@ -284,20 +284,10 @@ theorem uadm_shrink (ls : List Uline) (r r' : Srec) (s : Fstate) (hle : srecLe l
 theorem srecLe_refl (ls : List Uline) (r : Srec) : srecLe ls r r :=
   ⟨Nat.le_refl _, uadm_self ls r⟩
 
-/-- Rocq `srec_le_trans`. -/
-theorem srecLe_trans (ls : List Uline) (r r' r'' : Srec) (h1 : srecLe ls r r')
-    (h2 : srecLe ls r' r'') : srecLe ls r r'' :=
-  ⟨Nat.le_trans h1.1 h2.1, uadm_shrink ls r r' _ h1 h2.2⟩
-
 /-- Rocq `srec_le_mono`. -/
 theorem srecLe_mono (ls ls' : List Uline) (r r' : Srec) (hp : ls <+: ls')
     (h : srecLe ls r r') : srecLe ls' r r' :=
   ⟨h.1, uadm_mono ls ls' r _ hp h.2⟩
-
-/-- Rocq `srec_le_0`: every record is above `srec0` once its state is
-admissible there. -/
-theorem srecLe_0 (ls : List Uline) (r : Srec) (h : uadm ls srec0 r.2) : srecLe ls srec0 r :=
-  ⟨Nat.zero_le _, h⟩
 
 /-- Rocq `uadm_shrink_chain`: THE SHRINK AT A COUNTER (design section 4's
 form) -- records numbered by the sync counter, each above the one before;

@@ -73,13 +73,6 @@ theorem offWf_zero : offWf 0#32 := by
   unfold offWf MAXFILE BSIZE
   decide
 
-/-- An offset in range is BELOW int range, which is what makes the `lw` that
-loads it read the literal (and readi's `off + n < 2^31` premise
-dischargeable from a bound on `n` alone).  Rocq `off_wf_lt31`. -/
-theorem offWf_lt31 (v : BitVec 32) (h : offWf v) : v.toNat < 2 ^ 31 := by
-  unfold offWf MAXFILE BSIZE at h
-  omega
-
 section FileOffCell
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [OffboxG GF]
 

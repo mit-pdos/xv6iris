@@ -155,25 +155,6 @@ theorem execSpecF_fence_rw_rw_pub (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Bo
   iframe HF
   iexact Hv
 
-/-- **`fence rw,rw`, the DRAIN rule**: the hart's floor absorbs any
-position it has itself written.  The premise is the store's own
-`MachCSL.authoredBy` receipt -- `MachCSL.writeAU` and
-`MachCSL.machInterp_store` hand it out with every store.  Interrupts are
-off, so the fence runs on this hart. -/
-theorem wp_s_fence_rw_rw_pub [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx)
-    (hsie : k.sie = false) (pc : BitVec 64) (is_rvc : Bool) (rs rd : BitVec 5) (T : Nat) :
-    instr (GF := GF) pc is_rvc
-      (instruction.FENCE (0#4, 3#4, 3#4, regidx.Regidx rs, regidx.Regidx rd)) ∗
-    kctxL lent cpu k ∗ pcIs cpu pc ∗ authoredBy T (hartAgent cpu) ∗
-    ▷ wpNext k.sie k.proc cpu (fun cpu' =>
-        iprop(kctxL lent cpu' k -∗ pcIs cpu' (pc + instrLen is_rvc) -∗ viewLb cpu T -∗ wpLoop cpu'))
-    ⊢ wpLoop cpu :=
-  wpLoop_k_keep cpu k pc _ is_rvc _ (authoredBy T (hartAgent cpu)) (fun _ => viewLb cpu T)
-    (fun cpu' c hpin hok hmenv => by
-      obtain rfl : cpu' = cpu := hpin (Or.inl hsie)
-      exact execSpecF_fence_rw_rw_pub cpu' (DFrac.own 1) c k.sie hok.phys hmenv pc _ rs rd
-        (tpPin cpu' k.regs) T)
-
 set_option maxHeartbeats 4000000 in
 /-- `fence iorw,iorw`, absorbing a position the hart has written. -/
 theorem execSpecF_fence_iorw_iorw_pub (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Bool)

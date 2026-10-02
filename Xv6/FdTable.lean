@@ -123,13 +123,6 @@ instance fdStAt_timeless (γd : GName) (fd : Nat) (dq : DFrac) (st : FdState) :
     Timeless (fdStAt (GF := GF) γd fd dq st) := by
   unfold fdStAt; infer_instance
 
-/-- Two shares of one key combine (Rocq `fd_st_at_op`). -/
-theorem fdStAt_op (γd : GName) (fd : Nat) (dq1 dq2 : DFrac) (st : FdState) :
-    fdStAt (GF := GF) γd fd (dq1 • dq2) st ⊣⊢ fdStAt γd fd dq1 st ∗ fdStAt γd fd dq2 st := by
-  unfold fdStAt
-  rw [DFracAgree.mk_op, ← Heap.singleton_op_singleton]
-  exact iOwn_op
-
 /-- Two shares of one key agree (Rocq `fd_st_at_agree`). -/
 theorem fdStAt_agree (γd : GName) (fd : Nat) (dq1 dq2 : DFrac) (st st' : FdState) :
     fdStAt (GF := GF) γd fd dq1 st ∗ fdStAt γd fd dq2 st' ⊢ ⌜st = st'⌝ := by
@@ -250,14 +243,6 @@ theorem foffRow_closed : ⊢ foffRow (GF := GF) .closed := by
   unfold foffRow; iintro; ipureintro; trivial
 theorem foffRow_pipe (r w : Bool) (γp : PipeNames) : ⊢ foffRow (GF := GF) (.open r w (.pipe γp)) := by
   unfold foffRow; iintro; ipureintro; trivial
-theorem foffRow_dev (r w : Bool) (mj : Nat) : ⊢ foffRow (GF := GF) (.open r w (.device mj)) := by
-  unfold foffRow; iintro; ipureintro; trivial
-theorem foffRow_inode (r w : Bool) (i : Nat) (γo : GName) :
-    offUserInv γo ⊢ foffRow (GF := GF) (.open r w (.inode i γo .parked)) := by
-  unfold foffRow; iintro H; iexact H
-theorem foffRow_inode_held (r w : Bool) (i : Nat) (γo : GName) :
-    ⊢ foffRow (GF := GF) (.open r w (.inode i γo .held)) := by
-  unfold foffRow; iintro; iempintro
 
 /-- The reading a walk needs at a state it holds through an EQUATION (Rocq
 `foff_row_inode_of`). -/
@@ -318,12 +303,6 @@ theorem fdFrags_len (γd : GName) (sts : List FdState) :
   iintro ⟨%h, H, #Hr⟩
   iframe H Hr
   isplitl [] <;> ipureintro <;> exact h
-
-theorem fdFrags_rows (γd : GName) (sts : List FdState) :
-    fdFrags (GF := GF) γd sts ⊢ foffRows sts := by
-  unfold fdFrags
-  iintro ⟨-, -, #Hr⟩
-  iexact Hr
 
 /-- Open one descriptor's fragment and close it back at a new state (Rocq
 `fd_frags_acc`): the row's offset entry comes out with the fragment
@@ -874,21 +853,6 @@ theorem procOfilesOwe_cells_acc (γ : FileNames) (γd : GName) (pa : BitVec 64) 
   isplitl []
   · ipureintro; exact hl
   iapply BigSepL.bigSepL_wand $$ Hc Hw
-
-/-- The array, payloads dropped: its cells. -/
-theorem procOfilesOwe_cells (γ : FileNames) (γd : GName) (pa : BitVec 64) (fs : List (BitVec 64))
-    (D : List Nat) :
-    procOfilesOwe (GF := GF) γ γd pa fs D ⊢ ofileCells pa (DFrac.own 1) fs := by
-  unfold procOfilesOwe ofileCells
-  iintro ⟨%hl, H⟩
-  isplitl []
-  · ipureintro; exact hl
-  iapply BigSepL.bigSepL_mono_of_forall (Φ := fun fd v => ofileLentOrSlot (GF := GF) γ γd pa D fd v)
-    (Ψ := fun fd v => wordPointsTo (GF := GF) (pOfile pa fd) 8 (DFrac.own 1) v) (fun {fd v} => by
-      unfold ofileLentOrSlot
-      split
-      · iintro ⟨-, H⟩; iexact H
-      · unfold ofileSlot; iintro ⟨H, -⟩; iexact H) $$ H
 
 /-! ## The null table a fresh incarnation is born with (Rocq
 `ProcInv.proc_dormant_unused`'s mint, `proc_ofiles_null_split`) -/

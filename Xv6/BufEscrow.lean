@@ -196,44 +196,6 @@ theorem bufTravel_travelV (γ : BcacheNames) (V : BioView GF) (k : Nat) (qd qb :
     iapply bufPay_of_valid γ V k dev bno v bsl bsd d hcov hdev hv hlen.2.1
     iframe Hblk Hpay
 
-/-- The reverse: a COVERED buffer's travelling content has the fragment and
-the payload, and naming them is what `bread`'s fill arm does before calling
-`virtio_disk_rw`. -/
-theorem bufTravelV_travel (γ : BcacheNames) (V : BioView GF) (k : Nat) (qd qb : Qp)
-    (dev bno v : BitVec 32) (bs : List (BitVec 8)) (hcov : bno.toNat ∈ V.cov) :
-    bufTravelV (GF := GF) γ V k qd qb dev bno v bs ⊢
-      ⌜dev = V.dev⌝ ∗ ∃ (bsl bsd : List (BitVec 8)) (d : Bool),
-        ⌜(v ≠ 0#32 → bsl = bs) ∧ (v = 0#32 → d = false)⌝ ∗
-        bufTravel γ V k qd qb dev bno v bs bsl bsd d := by
-  unfold bufTravel bufTravelV
-  iintro ⟨%hlen, Hv, Hd, Hb, Hdk, Hdata, Hpay⟩
-  by_cases hv : v = 0#32
-  · icases bufPay_invalid γ V k dev bno v bs hcov hv $$ Hpay with ⟨%hdev, Hpay⟩
-    isplitr [Hv Hd Hb Hdk Hdata Hpay]
-    · ipureintro; exact hdev
-    unfold poolBlk
-    icases Hpay with ⟨%bsd, %hbl, Hblk, Hcl⟩
-    iexists bsd, bsd, false
-    isplitl []
-    · ipureintro
-      exact ⟨fun h => absurd hv h, fun _ => rfl⟩
-    isplit
-    · ipureintro; exact ⟨hlen.1, hbl, hlen.2⟩
-    iframe Hv Hd Hb Hdk Hdata Hblk
-    iapply bioPay_clean γ V k dev bno bsd
-    iexact Hcl
-  · icases bufPay_valid γ V k dev bno v bs hcov hv $$ Hpay with
-      ⟨%hdev, %bsd, %d, %hbl, Hblk, Hpay⟩
-    isplitr [Hv Hd Hb Hdk Hdata Hblk Hpay]
-    · ipureintro; exact hdev
-    iexists bs, bsd, d
-    isplitl []
-    · ipureintro
-      exact ⟨fun _ => rfl, fun h => absurd h hv⟩
-    isplit
-    · ipureintro; exact ⟨hlen.1, hbl, hlen.2⟩
-    iframe Hv Hd Hb Hdk Hdata Hblk Hpay
-
 /-- The content, folded into the box's `IN` arm at the holder's context. -/
 theorem bufTravelV_inArm (γ : BcacheNames) (V : BioView GF) (k : Nat) (qd qb : Qp) (dev bno v : BitVec 32)
     (bs : List (BitVec 8)) :
@@ -340,21 +302,6 @@ theorem bufSlotRegs_elim (γbk : BoxNames) (tl : Nat) (dev bno : BitVec 32) :
   · ipureintro; exact ⟨hr, htl⟩
   iframe Hrd
   iexact Htd
-
-/-- The sleeplock payload, built from the park register's half AND the
-floor over its stamp; a releaser that has only the `MachCSL.topLb` builds
-`Xv6.bufSlpDep` instead and lets the lock hook finish it. -/
-theorem bufSlpBox_intro (γ : BcacheNames) (k T' : Nat) :
-    bufTok (GF := GF) γ k ∗ slotpHalf (γ.box k) (⟨T', none⟩ : L2Reg BufId) ∗ ctxFloor curCtx T' ⊢
-      bufSlpBox γ k curCtx := by
-  unfold bufSlpBox
-  iintro ⟨Htok, Hrp, #Htp⟩
-  iframe Htok
-  iexists (⟨T', none⟩ : L2Reg BufId)
-  iframe Hrp
-  isplit
-  · ipureintro; rfl
-  · iexact Htp
 
 theorem bufSlpDep_intro (γ : BcacheNames) (k T' : Nat) (ξ : CtxId) :
     bufTok (GF := GF) γ k ∗ slotpHalf (γ.box k) (⟨T', none⟩ : L2Reg BufId) ⊢

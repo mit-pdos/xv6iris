@@ -340,17 +340,6 @@ def ushPosw (N : UkNames GF) (X : UshCtx GF) (l : List FdState) (ws : List (List
   iprop((∃ I : List (BitVec 8), ⌜restOf I = [] ∧ lastWs I = ws ∧ flineOk (ushLastbody I)⌝ ∗ X.Pm I ∗
       ushWcp X l I 3) ∨ (X.T ∗ ushPos (hlc := hlc) N X))
 
-/-- **Rocq `ush_posb_of_posw`**. -/
-theorem ushPosb_of_posw (N : UkNames GF) (X : UshCtx GF) (l : List FdState) (ws : List (List (BitVec 8))) :
-    ushPosw (hlc := hlc) N X l ws ⊢ ushPosb (hlc := hlc) N X l 3 := by
-  unfold ushPosw ushPosb
-  iintro (⟨%I, %h, H, Hc⟩ | H)
-  · ileft
-    iexists I
-    iframe H Hc
-    ipureintro; exact h.1
-  · iright; iexact H
-
 /-- **Rocq `ush_posw_taint`**. -/
 theorem ushPosw_taint (N : UkNames GF) (X : UshCtx GF) (l : List FdState) (ws : List (List (BitVec 8))) :
     ⊢ X.T -∗ ushPos (hlc := hlc) N X -∗ ushPosw (hlc := hlc) N X l ws := by

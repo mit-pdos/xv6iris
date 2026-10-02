@@ -155,10 +155,6 @@ def iSize (ip : BitVec 64) : BitVec 64 := ip + 76#64
 
 theorem iType_sext (ip : BitVec 64) : ip + BitVec.signExtend 64 68#12 = iType ip := by
   unfold iType; congr 1
-theorem iMajor_sext (ip : BitVec 64) : ip + BitVec.signExtend 64 70#12 = iMajor ip := by
-  unfold iMajor; congr 1
-theorem iMinor_sext (ip : BitVec 64) : ip + BitVec.signExtend 64 72#12 = iMinor ip := by
-  unfold iMinor; congr 1
 theorem iNlink_sext (ip : BitVec 64) : ip + BitVec.signExtend 64 74#12 = iNlink ip := by
   unfold iNlink; congr 1
 theorem iSize_sext (ip : BitVec 64) : ip + BitVec.signExtend 64 76#12 = iSize ip := by
@@ -177,13 +173,6 @@ theorem iAddr_indexed (ip : BitVec 64) (j : Nat) :
   have h80 : (BitVec.signExtend 64 80#12).toNat = 80 := by decide
   simp only [BitVec.toNat_add, BitVec.toNat_ofNat, h80]
   omega
-
-/-- The literal form: `lw s1,128(a0)` / `sw a0,128(s2)` reach
-`addrs[NDIRECT]` (Rocq's `i_addr_ndirect`). -/
-theorem iAddr_ndirect (ip : BitVec 64) :
-    ip + BitVec.signExtend 64 128#12 = iAddr ip NDIRECT := by
-  unfold iAddr NDIRECT
-  congr 1
 
 /-- `ip->addrs[j]` sits at `ip->addrs + 4*j` -- the form the `memmove`
 SOURCE bridge needs, so a run of cells can be re-anchored at one base
@@ -303,25 +292,6 @@ theorem blkmapWf_ind_cov {cov : ExtTreeSet Nat compare} {ls : Nat} {bm : Blkmap}
   rw [bmSlot_top bm] at this
   exact this hnz
 
-theorem blkmapWf_get_inj {cov : ExtTreeSet Nat compare} {ls : Nat} {bm : Blkmap} {i j : Nat}
-    (h : blkmapWf cov ls bm) (hi : i < MAXFILE) (hj : j < MAXFILE)
-    (hnz : (blkmapGet bm i).toNat ≠ 0) (heq : blkmapGet bm i = blkmapGet bm j) : i = j := by
-  refine h.2.2.2.2 i j (by omega) (by omega) ?_ ?_
-  · rw [bmSlot_lt bm i hi]; exact hnz
-  · rw [bmSlot_lt bm i hi, bmSlot_lt bm j hj]; exact heq
-
-/-- The indirect block is none of the file's data blocks (Rocq's
-`blkmap_wf_ind_ne`). -/
-theorem blkmapWf_ind_ne {cov : ExtTreeSet Nat compare} {ls : Nat} {bm : Blkmap} {i : Nat}
-    (h : blkmapWf cov ls bm) (hi : i < MAXFILE) (hnz : (blkmapGet bm i).toNat ≠ 0) :
-    bm.bmInd ≠ blkmapGet bm i := by
-  intro heq
-  have hij : i = MAXFILE := by
-    refine h.2.2.2.2 i MAXFILE (by omega) (Nat.le_refl _) ?_ ?_
-    · rw [bmSlot_lt bm i hi]; exact hnz
-    · rw [bmSlot_lt bm i hi, bmSlot_top bm]; exact heq.symm
-  omega
-
 /-- An ALLOCATED indirect ENTRY forces the indirect BLOCK to exist (Rocq's
 `blkmap_wf_ind_nz`).  This is the "no indirect block => no entries"
 conjunct read backwards, and it is what saves a no-allocation caller from
@@ -406,12 +376,6 @@ flat view (`Xv6.fileByte`, `Xv6/InodeDefs.lean`) is defined ONCE and both
 `writei`'s range clause and `readi`'s delivered-bytes clause are stated on
 it. -/
 
-/-- Two `data`s that agree block by block agree byte by byte -- the step
-every "nothing else moved" argument takes (Rocq's `file_byte_block`). -/
-theorem fileByte_block (data data' : Nat → List (BitVec 8)) (k : Nat)
-    (h : data' (k / BSIZE) = data (k / BSIZE)) : fileByte data' k = fileByte data k := by
-  unfold fileByte; rw [h]
-
 /-- stdpp's `<[i := bs]>` on a FUNCTION (deviation 6). -/
 def dataUpd (data : Nat → List (BitVec 8)) (i : Nat) (bs : List (BitVec 8)) :
     Nat → List (BitVec 8) :=
@@ -458,17 +422,6 @@ theorem inodeSized_insert (data : Nat → List (BitVec 8)) (i : Nat) (bs : List 
   by_cases hji : j = i
   · rw [hji, dataUpd_eq]; exact hbs
   · rw [dataUpd_ne data i j bs hji]; exact hs j hj
-
-/-- A HOLE is sized for free, so a producer only ever has to think about the
-ALLOCATED indices (`blkHolesZero` is already an `inodeOk` conjunct). -/
-theorem inodeSized_of_alloc (bm : Blkmap) (data : Nat → List (BitVec 8))
-    (hholes : blkHolesZero bm data)
-    (halloc : ∀ i, i < MAXFILE → (blkmapGet bm i).toNat ≠ 0 → (data i).length = BSIZE) :
-    inodeSized data := by
-  intro i hi
-  by_cases hz : (blkmapGet bm i).toNat = 0
-  · rw [hholes i hi hz]; exact List.length_replicate ..
-  · exact halloc i hi hz
 
 /-! ## THE EMPTIED MAP: what `itrunc` leaves behind
 
@@ -530,16 +483,6 @@ theorem bmBlocks_spec (bm : Blkmap) (b : Nat) :
     refine ⟨fun h => hnz (by simpa using (Nat.compare_eq_eq.1 h).symm), ?_⟩
     rw [List.contains_iff_mem, List.mem_map]
     exact ⟨i, List.mem_range.2 (by omega), hb⟩
-
-theorem bmBlocks_empty : bmBlocks bmEmpty = ∅ := by
-  apply ExtTreeSet.ext_mem
-  intro b
-  rw [bmBlocks_spec]
-  constructor
-  · rintro ⟨hnz, i, _, hb⟩
-    exact absurd (by rw [← hb]; exact bmEmpty_slot0 i) hnz
-  · intro hb
-    exact absurd hb (by simp)
 
 /-! ## INSTALLING ONE BLOCK: the pure half of what `bmap`'s three stores do
 
@@ -687,10 +630,6 @@ gets this from `cbn [bm_dir bm_ind bm_ent]`.) -/
 theorem indResQ_dir (γfs : FsNames) (dq : DFrac) (bm : Blkmap) (d : List (BitVec 32)) :
     indResQ (GF := GF) γfs dq ⟨d, bm.bmInd, bm.bmEnt⟩ = indResQ γfs dq bm := rfl
 
-theorem indBlkQ_1_of (γfs : FsNames) (dq : DFrac) (bm : Blkmap) (h : dq = DFrac.own 1) :
-    indBlkQ (GF := GF) γfs dq bm ⊢ indBlk γfs bm := by
-  subst h; unfold indBlk; iintro H; iexact H
-
 theorem indBlkQ_1_to (γfs : FsNames) (dq : DFrac) (bm : Blkmap) (h : dq = DFrac.own 1) :
     indBlk (GF := GF) γfs bm ⊢ indBlkQ γfs dq bm := by
   subst h; unfold indBlk; iintro H; iexact H
@@ -729,15 +668,6 @@ theorem indBlkQ_nz (γfs : FsNames) (dq : DFrac) (bm : Blkmap) (hnz : bm.bmInd.t
 theorem indBlk_nz (γfs : FsNames) (bm : Blkmap) (hnz : bm.bmInd.toNat ≠ 0) :
     indBlk (GF := GF) γfs bm ⊣⊢ fsblock γfs.bytes bm.bmInd.toNat (indBytes bm.bmEnt) :=
   (indBlk_run γfs bm _ hnz rfl).symm
-
-/-- Rocq's `ind_blk_q_split`. -/
-theorem indBlkQ_split (γfs : FsNames) (q1 q2 : Qp) (bm : Blkmap) :
-    indBlkQ (GF := GF) γfs (DFrac.own (q1 + q2)) bm
-      ⊣⊢ iprop(indBlkQ γfs (DFrac.own q1) bm ∗ indBlkQ γfs (DFrac.own q2) bm) := by
-  unfold indBlkQ
-  split
-  · exact (sep_emp (P := (emp : IProp GF))).symm
-  · exact FsView.blkOwnedQ_split _ (fsGammaL_frac γfs) q1 q2 _ _
 
 /-! ## `blkRes` / `inodeBlocks`: one byte run per allocated file index -/
 
@@ -823,20 +753,6 @@ theorem blkResQ_split (γfs : FsNames) (q1 q2 : Qp) (w : BitVec 32) (bs : List (
   split
   · exact (sep_emp (P := (emp : IProp GF))).symm
   · exact FsView.blkOwnedQ_split _ (fsGammaL_frac γfs) q1 q2 _ _
-
-/-- Rocq's `inode_blocks_q_split`. -/
-theorem inodeBlocksQ_split (γfs : FsNames) (q1 q2 : Qp) (bm : Blkmap)
-    (data : Nat → List (BitVec 8)) :
-    inodeBlocksQ (GF := GF) γfs (DFrac.own (q1 + q2)) bm data
-      ⊣⊢ iprop(inodeBlocksQ γfs (DFrac.own q1) bm data ∗ inodeBlocksQ γfs (DFrac.own q2) bm data) := by
-  unfold inodeBlocksQ
-  constructor
-  · refine (BigSepL.bigSepL_mono ?_).trans BigSepL.bigSepL_sep_eqv.1
-    intro k i _
-    exact (blkResQ_split γfs q1 q2 (blkmapGet bm i) (data i)).1
-  · refine BigSepL.bigSepL_sep_eqv.2.trans (BigSepL.bigSepL_mono ?_)
-    intro k i _
-    exact (blkResQ_split γfs q1 q2 (blkmapGet bm i) (data i)).2
 
 end
 
@@ -1115,16 +1031,6 @@ theorem inodeBlocksQ_insert (γfs : FsNames) (dq : DFrac) (bm bm' : Blkmap)
       iexact Hfs
   · iexact Hrest
 
-/-- Rocq's `inode_blocks_insert`. -/
-theorem inodeBlocks_insert (γfs : FsNames) (bm bm' : Blkmap)
-    (data : Nat → List (BitVec 8)) (bn : Nat) (b : BitVec 32) (bs : List (BitVec 8))
-    (hbn : bn < MAXFILE) (hz : (blkmapGet bm bn).toNat = 0)
-    (hb : blkmapGet bm' bn = b)
-    (hag : ∀ i, i < MAXFILE → i ≠ bn → blkmapGet bm' i = blkmapGet bm i) :
-    inodeBlocks (GF := GF) γfs bm data ⊢
-      iprop(fsblock γfs.bytes b.toNat bs -∗ inodeBlocks γfs bm' (dataUpd data bn bs)) :=
-  inodeBlocksQ_insert γfs (DFrac.own 1) bm bm' data bn b bs hbn hz hb hag
-
 /-! ### FRESHNESS: what re-establishes `blkmapWf`'s injectivity
 
 THE lemma the three install sites want.  Holding the EXCLUSIVE byte run of a
@@ -1173,14 +1079,6 @@ theorem inodeFreshQ_at (γfs : FsNames) (dq : DFrac) (bm : Blkmap)
     ihave %hne := fsblock_ne_full γfs.bytes dq b (blkmapGet bm i).toNat bsb (data i) $$ Ho Hb
     ipureintro
     exact fun hc => hne hc.symm
-
-/-- Rocq's `inode_fresh_at`. -/
-theorem inodeFresh_at (γfs : FsNames) (bm : Blkmap) (data : Nat → List (BitVec 8))
-    (b : Nat) (bsb : List (BitVec 8)) (i : Nat)
-    (hi : i ≤ MAXFILE) (hnz : (bmSlot bm i).toNat ≠ 0) :
-    fsblock (GF := GF) γfs.bytes b bsb ⊢
-      iprop(indBlk γfs bm -∗ inodeBlocks γfs bm data -∗ ⌜(bmSlot bm i).toNat ≠ b⌝) :=
-  inodeFreshQ_at γfs (DFrac.own 1) bm data b bsb i hi hnz
 
 /-- The quantified form the `blkmapWf_slot_upd` premise is stated at
 (Rocq's `inode_fresh_q`).  The `∀` is a Lean quantifier over a PURE
@@ -1433,15 +1331,6 @@ The naming list is `Xv6.indBytes` of the cell list -- the same
 little-endian word-array encoding the indirect block uses, which is also
 `Xv6.dinodeBytes`'s `addrs` field encoding, so the byte image `memmove`
 copies IS the `dinodeBytes` tail with no conversion. -/
-
-/-- One cell IS its four bytes; the alignment comes out of the cell itself
-(deviation 4). -/
-theorem wordPointsTo4_toBytes [CurCtx] (a : BitVec 64) (dq : DFrac) (w : BitVec 32) :
-    wordPointsTo (GF := GF) a 4 dq w ⊢ byteBuf a dq (wordToBytes4 w) := by
-  iintro H
-  ihave %hal := wordPointsTo_alignP a 4 dq w $$ H
-  iapply (wordPointsTo_to_bytes4 a dq w hal)
-  iexact H
 
 /-- The run of cells, at an arbitrary base: the induction's shape (Rocq's
 `ia_cells_bytes`; deviation 5 collapses its `bb_split3` / re-anchoring

@@ -198,12 +198,6 @@ theorem writei_ker_step (user : Bool) (sbs : List (BitVec 8)) (wroteI : Nat → 
     rw [if_pos (by omega)]
     congr 2; omega
 
-/-- The accumulated user run does not shrink (Rocq's `wi_usr_le`). -/
-theorem writei_usr_le (P0 P' : UPtd) (M : Nat → List (BitVec 8)) (src : BitVec 64)
-    (wrote : Nat → BitVec 8) (t tot : Nat) (hle : t ≤ tot)
-    (h : wiUsrGot P0 P' M src tot wrote) : wiUsrGot P0 P' M src t wrote :=
-  ⟨by have := h.1; omega, fun i hi => h.2 i (by omega)⟩
-
 /-- ...and it survives a later extension of the descriptor. -/
 theorem writei_usr_ext (P0 P' P'' : UPtd) (M : Nat → List (BitVec 8)) (src : BitVec 64)
     (wrote : Nat → BitVec 8) (tot : Nat) (hx : P'.ext P'')

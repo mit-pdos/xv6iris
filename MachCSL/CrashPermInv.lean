@@ -109,15 +109,6 @@ def crashPermReceipt (γq : GName) (Q : IProp GF) : IProp GF := saved_prop_own �
 instance (γq : GName) (Q : IProp GF) : Persistent (PROP := IProp GF) (crashPermReceipt γq Q) := by
   unfold crashPermReceipt; infer_instance
 
-/-- Two tokens for one key cannot both exist (Rocq `perm_tok_excl`). -/
-theorem crashPermTok_excl (γP : GName) (k : Nat) (b1 b2 : Bool) (γq1 γq2 : GName)
-    (w1 w2 : DiskWr) (t1 t2 : List Nat) :
-    crashPermTok γP k b1 γq1 w1 t1 ∗ crashPermTok γP k b2 γq2 w2 t2 ⊢@{IProp GF} False := by
-  unfold crashPermTok
-  iintro ⟨H1, H2⟩
-  ihave %hne := ghost_map_elem_ne γP k k (DFrac.own 1) _ _ $$ H1 H2
-  exact absurd rfl hne
-
 /-! ## Allocation -/
 
 /-- The empty channel (Rocq `perm_ghost_alloc`). -/

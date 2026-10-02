@@ -74,38 +74,10 @@ open Std (ExtTreeSet)
 
 /-! ## 2.  THE REBASE: a node read field by field -/
 
-/-- **Rocq `big_sepL_Forall2_equiv`**. -/
-theorem bigSepLForall2Equiv {PROP : Type _} [BI PROP] {A : Type _} (R : A → A → Prop)
-    (Φ : Nat → A → PROP) (l l' : List A) (hΦ : ∀ i x y, R x y → (Φ i x ⊣⊢ Φ i y))
-    (h : List.Forall₂ R l l') : ([∗list] i ↦ x ∈ l, Φ i x) ⊣⊢ [∗list] i ↦ x ∈ l', Φ i x := by
-  induction h generalizing Φ with
-  | nil => exact .rfl
-  | cons hxy _ ih =>
-    exact BigSepL.bigSepL_cons.trans
-      ((sep_congr (hΦ 0 _ _ hxy) (ih (fun i => Φ (i + 1)) (fun i => hΦ (i + 1)))).trans
-        BigSepL.bigSepL_cons.symm)
-
 section UshExecPinExt
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
-
-/-- **Rocq `ustr_ext`**. -/
-theorem ustrExt (g : GName) (dq : DFrac) (a n : Nat) (f f' : Nat → BitVec 8) (hf : ∀ j, f j = f' j) :
-    ustr (GF := GF) g dq a n f ⊣⊢ ustr g dq a n f' := by
-  obtain rfl : f = f' := funext hf
-  exact .rfl
-
-/-- **Rocq `ush_str_ext`**. -/
-theorem ushStrExt (g : GName) (x y : UArg) (h : uargEqv x y) : ushStr (GF := GF) g x ⊣⊢ ushStr g y := by
-  obtain rfl := uargEqv_eq h
-  exact .rfl
-
-/-- **Rocq `uargv_ext`**. -/
-theorem uargvExt (g : GName) (av : Nat) (args args' : List UArg) (h : List.Forall₂ uargEqv args args') :
-    uargv (GF := GF) g av args ⊣⊢ uargv g av args' := by
-  obtain rfl := uargEqv_forall2_eq h
-  exact .rfl
 
 /-- **Rocq `ush_cmd_exec_ext`**: THE NODE IS READ FIELD BY FIELD. -/
 theorem ushCmdExecExt (g : GName) (t : Nat) (args args' : List UArg) (h : List.Forall₂ uargEqv args args') :
@@ -208,29 +180,12 @@ theorem shPinSlotCat (T : IProp GF) : ⊢ P.sh_cat_slot T -∗ shPinSlot (hlc :=
 /-- **Rocq `sh_grep_slot`**: grep's slot. -/
 def shGrepSlot (T : IProp GF) : IProp GF := shPinSlot (hlc := hlc) era0GrepPins T
 
-/-- **Rocq `sh_grep_slot_of_fs_pure_holds`**: the claim's fixed part pins
-grep. -/
-theorem shGrepSlotOfFsPureHolds (T : IProp GF) :
-    ⊢ P.sh_cat_slot_of_fs_pure T -∗ shGrepSlot (hlc := hlc) T := by
-  iintro H
-  ihave H := (P.sh_cat_slot_of_fs_pure_unfold T).1 $$ H
-  unfold shGrepSlot
-  iapply shPinSlot_mono fileFsPure era0GrepPins T fileFsPure_grep $$ H
-
 /-- **Rocq `sh_secc_slot`**: /seccomp's (seccomp lane S4). -/
 def shSeccSlot (T : IProp GF) : IProp GF := shPinSlot (hlc := hlc) era0SeccPins T
 
 /-- Rocq `sh_secc_slot_persistent`. -/
 instance shSeccSlot_persistent (T : IProp GF) : Persistent (shSeccSlot (hlc := hlc) T) := by
   unfold shSeccSlot; infer_instance
-
-/-- **Rocq `sh_secc_slot_of_fs_pure_holds`**. -/
-theorem shSeccSlotOfFsPureHolds (T : IProp GF) :
-    ⊢ P.sh_cat_slot_of_fs_pure T -∗ shSeccSlot (hlc := hlc) T := by
-  iintro H
-  ihave H := (P.sh_cat_slot_of_fs_pure_unfold T).1 $$ H
-  unfold shSeccSlot
-  iapply shPinSlot_mono fileFsPure era0SeccPins T fileFsPure_secc $$ H
 
 /-- **Rocq `sh_sync_slot`** (drift SY2): /sync's -- the claim's fixed part
 pins it too. -/
@@ -239,14 +194,6 @@ def shSyncSlot (T : IProp GF) : IProp GF := shPinSlot (hlc := hlc) era0SyncPins 
 /-- Rocq `sh_sync_slot_persistent`. -/
 instance shSyncSlot_persistent (T : IProp GF) : Persistent (shSyncSlot (hlc := hlc) T) := by
   unfold shSyncSlot; infer_instance
-
-/-- **Rocq `sh_sync_slot_of_fs_pure_holds`**. -/
-theorem shSyncSlotOfFsPureHolds (T : IProp GF) :
-    ⊢ P.sh_cat_slot_of_fs_pure T -∗ shSyncSlot (hlc := hlc) T := by
-  iintro H
-  ihave H := (P.sh_cat_slot_of_fs_pure_unfold T).1 $$ H
-  unfold shSyncSlot
-  iapply shPinSlot_mono fileFsPure era0SyncPins T fileFsPure_sync $$ H
 
 /-- `sh_filt_slot` at the two pins' slots. -/
 theorem shFiltSlot_pin (F : Filt) (T : IProp GF) :
@@ -258,14 +205,6 @@ theorem shFiltSlot_pin (F : Filt) (T : IProp GF) :
   · iintro - #Hg
     iexact Hg
 
-/-- **Rocq `sh_filt_slot`**: a stage's program's slot, from the two. -/
-theorem shFiltSlot (F : Filt) (T : IProp GF) :
-    ⊢ P.sh_cat_slot T -∗ shGrepSlot (hlc := hlc) T -∗ shPinSlot (hlc := hlc) (filtPins F) T := by
-  unfold shGrepSlot
-  iintro Hc Hg
-  ihave Hc := shPinSlotCat P T $$ Hc
-  iapply shFiltSlot_pin F T $$ Hc Hg
-
 /-- **Rocq `sh_stage_slots`**: the pin of every filter stage's program. -/
 def shStageSlots (fs : List Filt) (T : IProp GF) : IProp GF :=
   iprop(□ ∀ F : Filt, ⌜F ∈ fs⌝ -∗ shPinSlot (hlc := hlc) (filtPins F) T)
@@ -273,16 +212,6 @@ def shStageSlots (fs : List Filt) (T : IProp GF) : IProp GF :=
 /-- Rocq `sh_stage_slots_persistent`. -/
 instance shStageSlots_persistent (fs : List Filt) (T : IProp GF) : Persistent (shStageSlots (hlc := hlc) fs T) := by
   unfold shStageSlots; infer_instance
-
-/-- **Rocq `sh_stage_slots_of`**. -/
-theorem shStageSlotsOf (fs : List Filt) (T : IProp GF) :
-    ⊢ P.sh_cat_slot T -∗ shGrepSlot (hlc := hlc) T -∗ shStageSlots (hlc := hlc) fs T := by
-  unfold shGrepSlot shStageSlots
-  iintro Hc #Hg
-  ihave #Hc := shPinSlotCat P T $$ Hc
-  imodintro
-  iintro %F -
-  iapply shFiltSlot_pin F T $$ Hc Hg
 
 /-- **Rocq `sh_stage_slot_at`**. -/
 theorem shStageSlotAt (fs : List Filt) (F : Filt) (T : IProp GF) (hF : F ∈ fs) :

@@ -479,10 +479,6 @@ theorem lookup_segFileMap (f : ElfBytes) (p : ElfPhdr) (a : Nat) (b : BitVec 8) 
     rw [segFileBytes_lookup f p _ (by omega)]
     exact hl
 
-/-- Rocq `seg_zero_bytes_length`. -/
-theorem segZeroBytes_length (p : ElfPhdr) : (segZeroBytes p).length = p.memsz - p.filesz := by
-  simp [segZeroBytes]
-
 /-- Rocq `lookup_seg_zero_map`. -/
 theorem lookup_segZeroMap (p : ElfPhdr) (a : Nat) (b : BitVec 8) (hm : p.filesz ≤ p.memsz) :
     segZeroMap p a = some b ↔
@@ -703,20 +699,6 @@ theorem elfImage_split (f : ElfBytes) (hwf : elfWf f = true) :
       (fun p q hp hq => elfWf_fileZero_disjoint f p q hwf hp hq)
   · exact segsUnion_disjoint _ _ _ _ (fun p q hp hq => elfWf_fileZero_disjoint f p q hwf hp hq)
 
-/-- **Rocq `elf_image_lookup`**: every byte of the image is either a file byte
-at the segment's file offset, or a zero of the segment's .bss tail. -/
-theorem elfImage_lookup (f : ElfBytes) (a : Nat) (b : BitVec 8) (hwf : elfWf f = true) :
-    elfImage f a = some b ↔ ∃ p, p ∈ elfLoads f ∧
-      (((p.vaddr ≤ a ∧ a < p.vaddr + p.filesz) ∧ f[p.offset + (a - p.vaddr)]? = some b) ∨
-       ((p.vaddr + p.filesz ≤ a ∧ a < p.vaddr + p.memsz) ∧ b = elfZeroByte)) := by
-  unfold elfImage
-  rw [segsUnion_lookup _ _ a b (fun p q hp hq hne => elfWf_segMap_disjoint f p q hwf hp hq hne)]
-  constructor
-  · rintro ⟨p, hp, hg⟩
-    exact ⟨p, hp, (lookup_segMap f p a b (elfWf_phdrOk f p hwf hp)).1 hg⟩
-  · rintro ⟨p, hp, hc⟩
-    exact ⟨p, hp, (lookup_segMap f p a b (elfWf_phdrOk f p hwf hp)).2 hc⟩
-
 /-- A file window's union is disjoint pairwise (Rocq's inline
 `map_disjoint_weaken` in `elf_file_image_lookup`). -/
 theorem elfWf_segFileMap_disjoint (f : ElfBytes) (p q : ElfPhdr) (hwf : elfWf f = true)
@@ -725,46 +707,5 @@ theorem elfWf_segFileMap_disjoint (f : ElfBytes) (p q : ElfPhdr) (hwf : elfWf f 
   elfDisj_weaken (elfWf_segMap_disjoint f p q hwf hp hq hne)
     (fun x hx => by unfold segMap; rw [elfUnion_isSome]; exact Or.inl hx)
     (fun x hx => by unfold segMap; rw [elfUnion_isSome]; exact Or.inl hx)
-
-/-- Rocq `elf_file_image_lookup`. -/
-theorem elfFileImage_lookup (f : ElfBytes) (a : Nat) (b : BitVec 8) (hwf : elfWf f = true) :
-    elfFileImage f a = some b ↔ ∃ p, p ∈ elfLoads f ∧
-      (p.vaddr ≤ a ∧ a < p.vaddr + p.filesz) ∧ f[p.offset + (a - p.vaddr)]? = some b := by
-  unfold elfFileImage
-  rw [segsUnion_lookup _ _ a b (fun p q hp hq hne => elfWf_segFileMap_disjoint f p q hwf hp hq hne)]
-  constructor
-  · rintro ⟨p, hp, hg⟩
-    exact ⟨p, hp, (lookup_segFileMap f p a b (elfWf_phdrOk f p hwf hp)).1 hg⟩
-  · rintro ⟨p, hp, hc⟩
-    exact ⟨p, hp, (lookup_segFileMap f p a b (elfWf_phdrOk f p hwf hp)).2 hc⟩
-
-/-- Rocq `elf_zero_image_lookup`. -/
-theorem elfZeroImage_lookup (f : ElfBytes) (a : Nat) (b : BitVec 8) (hwf : elfWf f = true) :
-    elfZeroImage f a = some b ↔ ∃ p, p ∈ elfLoads f ∧
-      (p.vaddr + p.filesz ≤ a ∧ a < p.vaddr + p.memsz) ∧ b = elfZeroByte := by
-  unfold elfZeroImage
-  have hd : ∀ p q, p ∈ elfLoads f → q ∈ elfLoads f → p ≠ q → elfDisj (segZeroMap p) (segZeroMap q) :=
-    fun p q hp hq hne => elfDisj_weaken (elfWf_segMap_disjoint f p q hwf hp hq hne)
-      (fun x hx => by unfold segMap; rw [elfUnion_isSome]; exact Or.inr hx)
-      (fun x hx => by unfold segMap; rw [elfUnion_isSome]; exact Or.inr hx)
-  rw [segsUnion_lookup _ _ a b hd]
-  constructor
-  · rintro ⟨p, hp, hg⟩
-    exact ⟨p, hp, (lookup_segZeroMap p a b (elfWf_phdrOk f p hwf hp).poMemsz).1 hg⟩
-  · rintro ⟨p, hp, hc⟩
-    exact ⟨p, hp, (lookup_segZeroMap p a b (elfWf_phdrOk f p hwf hp).poMemsz).2 hc⟩
-
-/-- Rocq `elf_image_dom`: the image's DOMAIN is exactly the union of the
-PT_LOAD memory ranges (`filesz` plays no role, which is the point of
-`memsz`). -/
-theorem elfImage_dom (f : ElfBytes) (a : Nat) (hwf : elfWf f = true) :
-    (elfImage f a).isSome ↔ ∃ p, p ∈ elfLoads f ∧ inSeg p a := by
-  unfold elfImage
-  rw [segsUnion_isSome]
-  constructor
-  · rintro ⟨p, hp, h⟩
-    exact ⟨p, hp, (segMap_inSeg f p a (elfWf_phdrOk f p hwf hp)).1 h⟩
-  · rintro ⟨p, hp, h⟩
-    exact ⟨p, hp, (segMap_inSeg f p a (elfWf_phdrOk f p hwf hp)).2 h⟩
 
 end Xv6

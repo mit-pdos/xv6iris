@@ -922,8 +922,6 @@ theorem uoom_free : ufree (ualtDec uoom) = true := by rw [uoom_dec]; rfl
 
 theorem uoom_nopanic : upanic (ualtDec uoom) = false := by rw [uoom_dec]; rfl
 
-theorem uoom_term : uterm (ualtDec uoom) = false := by rw [uoom_dec]; rfl
-
 theorem uoom_cont (s : Fstate) (l : Uline) : ucont s l (ualtDec uoom) = altOom := by
   rw [uoom_dec]; rfl
 

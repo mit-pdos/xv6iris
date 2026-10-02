@@ -100,12 +100,6 @@ theorem ll_proOf_open_snoc_eq (ps : List Nat) (a : Nat) (hnd : ¬ proDone ps) :
 
 /-! ## §1 The hooks: what the shell's own code names in a model -/
 
-/-- **Rocq `lmh_noc_some`**: an instance whose silent round is TOTAL (`some`
-at every line) proves the `lmhNoc` laws from its landed per-line ones through
-this. -/
-theorem lmhNoc_some (P : Nat → Prop) (x c : Nat) (hP : P x) (hc : some x = some c) : P c := by
-  cases hc; exact hP
-
 structure LmHooks (M : LModel) where
   /-- the alternatives whose output is a function of the LINE alone -/
   lmhFree : M.lmAlt → Bool
@@ -569,16 +563,6 @@ theorem lmAb_exf (I : List (BitVec 8)) :
 
 theorem lmApr_exf (I : List (BitVec 8)) : lmApr M K I (K.lmhExf (lmLineAt M I)) :=
   ⟨K.lmhExfOk _ _, K.lmhExfFree _, K.lmhExfNopanic _⟩
-
-/-- ...and the silent round, at a line whose model has one -/
-theorem lmAb_noc (I : List (BitVec 8)) (c : Nat) (hc : K.lmhNoc (lmLineAt M I) = some c) :
-    lmAb M K I c = uPrompt := by
-  rw [lmAb_is M K I _ (K.lmhNocOk _ _ _ hc) (K.lmhNocFree _ _ hc)]
-  exact K.lmhNocCont _ _ _ hc
-
-theorem lmApr_noc (I : List (BitVec 8)) (c : Nat) (hc : K.lmhNoc (lmLineAt M I) = some c) :
-    lmApr M K I c :=
-  ⟨K.lmhNocOk _ _ _ hc, K.lmhNocFree _ _ hc, K.lmhNocNopanic _ _ hc⟩
 
 theorem lmWrBlk_nonnil (ps cs : List Nat) (s0 : M.lmSt) (I : List (BitVec 8)) (P : Nat)
     (h : lmWrBlk M ps cs s0 I P) : I ≠ [] := by

@@ -63,15 +63,6 @@ theorem kexecTop_mod (f : ElfBytes) : kexecTop f % 4096 = 0 := by
   obtain ⟨q, hq⟩ := UPtAlloc.pgRoundUpN_dvd (kexecSzAfter (elfLoads f))
   omega
 
-theorem kexecSz_mod (f : ElfBytes) : kexecSz f % 4096 = 0 := by
-  have := kexecTop_mod f; unfold kexecSz; omega
-
-theorem kexecSz_ge (f : ElfBytes) : 2 * 4096 ≤ kexecSz f := by
-  unfold kexecSz; omega
-
-theorem kexecSzAfter_take_all (ps : List ElfPhdr) : kexecSzAfter (ps.take ps.length) = kexecSzAfter ps := by
-  rw [List.take_length]
-
 /-! ## The phdr walk's guard, from `kexecLoadable` -/
 
 /-- Rocq `kxb_walk_ok_of_loadable`: the ONE row the composition needs to

@@ -67,8 +67,6 @@ def nameiparentAddr : BitVec 64 := KA.«nameiparent»
 `K_nameiparent = 118`). -/
 def nameiparentSlots : Nat := 2 + namexSlots
 
-theorem nameiparentSlots_eq : nameiparentSlots = 118 := by decide
-
 section Post
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]

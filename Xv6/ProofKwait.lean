@@ -141,11 +141,6 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 
 /-! ## Pure facts -/
 
-/-- The four `xstate` bytes, `take`n to `d`, at length `d ≤ 4`. -/
-theorem kw_xstateBytes_take_len (xw : BitVec 32) (d : Nat) (hd : d ≤ 4) :
-    ((xstateBytes xw).take d).length = d := by
-  rw [List.length_take, xstateBytes_length]; omega
-
 /-- `kwaitAns (-1)` on the no-child / killed arms (nothing copied) and on
 copyout's failure arm (a real pointer). -/
 theorem kw_ans_neg (addr : BitVec 64) (d : Nat) (hnull : addr = 0#64 → d = 0) :
@@ -200,9 +195,6 @@ theorem kw_cursor_eq (i : Nat) (hi : i < NPROC) :
   · intro he
     rw [he]
     exact kw_sentinel
-
-/-- `&proc[0]`. -/
-theorem kw_procAddr_zero : procAddr 0 = KA.«proc» := by decide
 
 /-! ## A 4-byte-aligned word / `byteBuf` bridge for `&pp->xstate`
 
@@ -449,15 +441,6 @@ theorem kw_wait_pay_intro (ξ : CtxId) (parents : Nat → BitVec 64) :
   isplitl [Hps]
   · iexact Hps
   iframe Hch Ho Hci Hzl
-
-/-- The proc-lock payload as a λ. -/
-theorem kw_proc_pay_elim (Γ : SchedNames) (ξ : CtxId) (j : Nat) :
-    procLockPay (GF := GF) Γ j ξ ⊢ procLockResAt Γ ξ (procAddr j) := by
-  unfold procLockPay; iintro H; iexact H
-
-theorem kw_proc_pay_intro (Γ : SchedNames) (ξ : CtxId) (j : Nat) :
-    procLockResAt (GF := GF) Γ ξ (procAddr j) ⊢ procLockPay Γ j ξ := by
-  unfold procLockPay; iintro H; iexact H
 
 /-! ### The caller's D8 rows and the post
 
@@ -797,24 +780,6 @@ theorem kw_acquire (AC : ACQUIRE) (c : CPU) (k' : KCtx) (γ : GName) (s : String
   exact h
 
 set_option maxHeartbeats 1000000 in
-/-- `release`'s contract at its entry. -/
-theorem kw_release (RE : RELEASE) (c : CPU) (k' : KCtx) (γ : GName) (s : String)
-    (Rp : CtxId → IProp GF) [CtxMorph Rp]
-    (hsie' : k'.sie = false) (hnoff' : 1 ≤ k'.noff) (hK' : 10 ≤ k'.avail)
-    (reen : Bool) (hreen : reen = (decide (k'.noff = 1) && k'.intena))
-    (hon : reen = true → k'.tier = .kpt ∧ trapRes true + 6 ≤ k'.avail) :
-    kctx c k' ∗ pcIs c KA.«release» ∗ isLock γ (k'.regs 10#5) s Rp ∗
-    locked γ c ∗ Rp curCtx ∗ popArm c k' reen ∗
-    wpNext (k'.popExit reen).sie k'.proc c (fun cpu' => iprop(∀ R' : RegMap,
-      kctx cpu' (((k'.popExit reen).withRegs R').withLocks (k'.locks.filter (fun x => x ≠ s))) -∗
-      pcIs cpu' (jumpPc (k'.regs 1#5)) -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
-    ⊢ wpLoop (GF := GF) c := by
-  have h := RE.wp_release (hlc := hlc) (GF := GF) c k' γ s Rp hsie' hnoff' hK' reen hreen hon
-  unfold wp_release_body at h
-  simp only [releaseAddr] at h
-  exact h
-
-set_option maxHeartbeats 1000000 in
 /-- `myproc`'s contract at its entry. -/
 theorem kw_myproc (MP : MYPROC) (c : CPU) (k' : KCtx)
     (hnoff' : k'.noff + 1 < 2 ^ 31) (hK' : 10 ≤ k'.avail) :
@@ -1127,13 +1092,11 @@ theorem kwj_2206 : jumpPc (KA.«kwait» + 0x5c#64) = (KA.«kwait» + 0x5c#64) :=
 theorem kwj_2214 : jumpPc (KA.«kwait» + 0x6a#64) = (KA.«kwait» + 0x6a#64) := by decide
 theorem kwj_221a : jumpPc (KA.«kwait» + 0x70#64) = (KA.«kwait» + 0x70#64) := by decide
 theorem kwj_2226 : jumpPc (KA.«kwait» + 0x7c#64) = (KA.«kwait» + 0x7c#64) := by decide
-theorem kw_filter_proc : (["proc", "wait_lock"].filter (fun x => x ≠ "proc")) = ["wait_lock"] := by decide
 theorem kw_filter_wait : (["wait_lock"].filter (fun x => x ≠ "wait_lock")) = ([] : List String) := by decide
 theorem kw_pushOffAt_withSpie (k0 : KCtx) (a b c d : Bool) :
     (k0.pushOffAt a b).withSpie c d = k0.pushOffAt c d := rfl
 theorem kw_blt_zero_false : bcond bop.BLT 0#64 0#64 = false := by decide
 theorem kw_blt_neg1_true : bcond bop.BLT (-1#64) 0#64 = true := by decide
-theorem kwj_2206' : jumpPc (KA.«kwait» + 0x5c#64) = (KA.«kwait» + 0x5c#64) := by decide
 theorem kwj_2244 : jumpPc (KA.«kwait» + 0x9a#64) = (KA.«kwait» + 0x9a#64) := by decide
 theorem kwj_2250 : jumpPc (KA.«kwait» + 0xa6#64) = (KA.«kwait» + 0xa6#64) := by decide
 theorem kw_neg1_ext : (18446744073709551615#64 : BitVec 64) = BitVec.signExtend 64 (-1#32) := by decide
@@ -1794,7 +1757,6 @@ theorem kw_bcond_zombie (st : BitVec 32) :
     exact h (by revert he; bv_decide)
 
 theorem kwj_2268 : jumpPc (KA.«kwait» + 0xbe#64) = (KA.«kwait» + 0xbe#64) := by decide
-theorem kwj_2274 : jumpPc (KA.«kwait» + 0xca#64) = (KA.«kwait» + 0xca#64) := by decide
 
 /-! ### the scan invariant on registers -/
 def kwFix [CurCtx] (k : KCtx) (R : RegMap) : Prop :=
@@ -1818,8 +1780,6 @@ theorem kwFix_cs [CurCtx] (k : KCtx) (R R' : RegMap) (h : kwFix k R) (hcs : call
   · rw [hcs.2.2.2.2.2.2.2.2.2.2.2.1, a26]
   · rw [hcs.2.2.2.2.2.2.2.2.2.2.2.2, a27]
 
-theorem kwj_2254 : jumpPc (KA.«kwait» + 0xaa#64) = (KA.«kwait» + 0xaa#64) := by decide
-
 theorem kwf_wl_pathA :
     KA.«kwait» + 0x102a8#64 = waitLockAddr := by
   unfold waitLockAddr; decide
@@ -1830,18 +1790,6 @@ theorem kwj_2292 : jumpPc (KA.«kwait» + 0xe8#64) = (KA.«kwait» + 0xe8#64) :=
 theorem kwj_2298 : jumpPc (KA.«kwait» + 0xee#64) = (KA.«kwait» + 0xee#64) := by decide
 theorem kwj_22b0 : jumpPc (KA.«kwait» + 0x106#64) = (KA.«kwait» + 0x106#64) := by decide
 theorem kwj_2274b : jumpPc (KA.«kwait» + 0xca#64) = (KA.«kwait» + 0xca#64) := by decide
-
-theorem kw_cs_trans {A B C : RegMap} (h1 : calleeSaved A B) (h2 : calleeSaved B C) :
-    calleeSaved A C := by
-  unfold calleeSaved at *
-  exact ⟨h2.1.trans h1.1, h2.2.1.trans h1.2.1, h2.2.2.1.trans h1.2.2.1,
-    h2.2.2.2.1.trans h1.2.2.2.1, h2.2.2.2.2.1.trans h1.2.2.2.2.1,
-    h2.2.2.2.2.2.1.trans h1.2.2.2.2.2.1, h2.2.2.2.2.2.2.1.trans h1.2.2.2.2.2.2.1,
-    h2.2.2.2.2.2.2.2.1.trans h1.2.2.2.2.2.2.2.1, h2.2.2.2.2.2.2.2.2.1.trans h1.2.2.2.2.2.2.2.2.1,
-    h2.2.2.2.2.2.2.2.2.2.1.trans h1.2.2.2.2.2.2.2.2.2.1,
-    h2.2.2.2.2.2.2.2.2.2.2.1.trans h1.2.2.2.2.2.2.2.2.2.2.1,
-    h2.2.2.2.2.2.2.2.2.2.2.2.1.trans h1.2.2.2.2.2.2.2.2.2.2.2.1,
-    h2.2.2.2.2.2.2.2.2.2.2.2.2.trans h1.2.2.2.2.2.2.2.2.2.2.2.2⟩
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [X : CurCtx]

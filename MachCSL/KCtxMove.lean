@@ -199,17 +199,6 @@ theorem kctx_rehome (tier : KTier) (ξ ξ' : CtxId) [KernelGeom] [KernelImage GF
     iframe Hξ' Hfrag
   · iexact Hro
 
-/-- `kctx_rehome` between two ambient instances at the same tier. -/
-theorem kctx_rehome' (X X' : CurCtx) (ht : X.curTier = X'.curTier) [KernelGeom] [KernelImage GF]
-    {lent : Bool} (cpu : CPU) (k : KCtx) :
-    ownCtx cpu X'.curCtx ∗ @kctxL hlc GF _ X _ _ lent cpu k ⊢
-      |==> (ownCtx cpu X.curCtx ∗ @kctxL hlc GF _ X' _ _ lent cpu k) := by
-  obtain ⟨ξ, t⟩ := X
-  obtain ⟨ξ', t'⟩ := X'
-  simp only at ht
-  subst ht
-  exact kctx_rehome t ξ ξ' cpu k
-
 /-! ## The stack and register accessors -/
 
 /-- The context with a different free-stack depth: the bundle's stack

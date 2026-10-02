@@ -65,16 +65,6 @@ def skeyEq (W W' : Uvis) : Prop :=
   W.fd = W'.fd ∧ W.cwd = W'.cwd ∧ W.gen = W'.gen ∧ W.ch = W'.ch ∧ W.pid = W'.pid ∧
   W.perm = W'.perm ∧ W.sz = W'.sz ∧ W.lazy = W'.lazy ∧ W.secc = W'.secc
 
-/-- Rocq `skey_eq_refl`. -/
-theorem skeyEq_refl (W : Uvis) : skeyEq W W :=
-  ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩
-
-/-- Rocq `skey_eq_sym`. -/
-theorem skeyEq_symm {W W' : Uvis} (h : skeyEq W W') : skeyEq W' W := by
-  obtain ⟨hM, h0, h1, h2, hfd, hcw, hg, hch, hpid, hpi, hsz, hlz, hsc⟩ := h
-  exact ⟨hM.symm, h0.symm, h1.symm, h2.symm, hfd.symm, hcw.symm, hg.symm, hch.symm, hpid.symm,
-    hpi.symm, hsz.symm, hlz.symm, hsc.symm⟩
-
 /-! ## The class -/
 
 /-- **Rocq `uexecSG`**, indexed by `CtokG` (the generic-family law hands a

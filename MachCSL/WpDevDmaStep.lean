@@ -541,20 +541,6 @@ theorem wpDev_dmaL (N : Namespace) (d : DevId) [DevDiskInert d] (hsil : DevSilen
         · iapply hmk _ _ hm' $$ IH HC
         · exact BigSepL.bigSepL_nil_intro
 
-/-- The root thread of a bus-mastering device, as the power thread forks it:
-it starts at the end of an (empty) iteration, so the client must hand it the
-loop's own resource `Cr` once, at power-on. -/
-theorem wpDev_dmaL_root (N : Namespace) (d : DevId) [DevDiskInert d] (hsil : DevSilent d) (R : DevSt d → IProp GF)
-    [∀ s, Timeless (R s)] (Lt : DevTask d → IProp GF) (Cr : IProp GF)
-    (hloc : DevSig.LeaseL d R Lt Cr) :
-    devInvR N d R ∗ genCert ∗ Cr ⊢@{IProp GF}
-      devWP (genId (hlc := hlc) (GF := GF)) d rootTask (DevM.pure ()) := by
-  iintro ⟨Hinv, Hcert, HCr⟩
-  ihave H := wpDev_dmaL N d hsil R Lt Cr hloc $$ [Hinv Hcert]
-  case' _ => iframe Hinv Hcert
-  iapply H $$ %rootTask %(DevM.pure ()) %Cr
-    %(by rw [if_pos rfl]; exact DevM.LeaseL.pure _ () .rfl) HCr
-
 /-! ## `DevM.Lease` embeds
 
 An old derivation with the persistent context `C` is a new one with any
@@ -698,18 +684,6 @@ theorem leaseL_root_ghostVar (γ : GName) (R : S → IProp GF) (Lt : T → IProp
   iframe HR
   iexists ()
   iexact HC
-
-/-- ... and therefore the whole device is derivable at `Cr := ∃ l, γ ↪VAR{½} l`
-whenever its body is that iteration: the root holds the half across every
-iteration of its loop. -/
-theorem leaseL_root_ghostVar_sig (d : DevId) (γ : GName) (R : DevSt d → IProp GF)
-    (Lt : DevTask d → IProp GF)
-    (hbody : (devSig d).body = .op .get (fun _ => .pure ()))
-    (htask : ∀ t, DevM.LeaseL R Lt iprop(True) (Lt t) ((devSig d).task t)) :
-    DevSig.LeaseL d R Lt (rootHalf (A := A) γ) := by
-  refine ⟨?_, htask⟩
-  rw [hbody]
-  exact leaseL_root_ghostVar γ R Lt
 
 end RootLinear
 

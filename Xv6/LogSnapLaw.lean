@@ -54,13 +54,6 @@ def snapLawOut (G : GName → IProp GF) (T : IProp GF) (gd : Nat) (C : BlockMap)
     (home : List Nat) : IProp GF :=
   durPair (hlc := hlc) G T gd (fsRestrict (dvOfD C) home)
 
-/-- THE PAIR'S RIGHT ARM (Rocq `snap_law_out_tok`, sync K3-3): a commit that
-writes no header -- the EMPTY-LOG commit -- never applies the merge, and
-takes the token back out of the pair instead. -/
-theorem snapLawOut_tok (G : GName → IProp GF) (T : IProp GF) (gd : Nat) (C : BlockMap)
-    (home : List Nat) : snapLawOut (hlc := hlc) (GF := GF) G T gd C home ⊢ T :=
-  durPair_tok G T gd _
-
 /-- THE LAW, at a NAMED mask and a NAMED guest (Rocq `snap_law_at`). -/
 def snapLawAt (γ : LogNames) (γfs : FsNames) (cov : ExtTreeSet Nat compare) (logstart : Nat)
     (N : CoPset) (G : GName → IProp GF) (T : IProp GF) (gd : Nat) : IProp GF :=

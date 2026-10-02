@@ -193,18 +193,6 @@ theorem WordHist.read_cases_floor (W : WordHist n) (Hold : Nat → Hist) (h : Ag
     (fun j hj e H hH => HEnt.visible_of_le h tvn e (by
       rw [(tailOk_head htail j hj e H hH).2]; exact hlo)) hrd
 
-/-- The reader AUTHORED the tails' entries: they are visible to it at every
-view (store-to-load forwarding). -/
-theorem WordHist.read_cases_own (W : WordHist n) (Hold : Nat → Hist) (h : Agent) (tvn lo : Nat)
-    (v0 w : BitVec (8 * n)) (hn : 0 < n) (htail : tailOk n lo v0 Hold)
-    (hown : ∀ j, j < n → ∀ e H, Hold j = e :: H → e.tid = h)
-    (hrd : readsAre h tvn (W.hist Hold) n w) :
-    (∃ W1 e W2, W = W1 ++ e :: W2 ∧ e.visible h tvn = true ∧ (∀ x ∈ W1, x.visible h tvn = false) ∧
-      w = e.v) ∨
-    ((∀ x ∈ W, x.visible h tvn = false) ∧ w = v0) :=
-  WordHist.read_cases W Hold h tvn lo v0 w hn htail
-    (fun j hj e H hH => HEnt.visible_of_own h tvn e (hown j hj e H hH)) hrd
-
 /-- The tail heads are visible to a reader that either has a view past the
 tails' position or AUTHORED the entries there -- the two arms of a lock
 floor (`MachCSL.lkFloor`), as the read accessor's authorship bundle `ts`
@@ -382,17 +370,6 @@ theorem wordCellT_push (pa : PAddr) (n : Nat) (ts : Nat → Nat) (v0 : BitVec (8
       wordCellT pa n ts v0 (⟨t, h, w⟩ :: W) := by
   rw [WordHist.hist_push]
   exact wordCellT_intro pa n ts v0 _ Hold htail
-
-/-- A word cell at one position is a word cell at the constant per-byte
-positions. -/
-theorem wordCell_toT (pa : PAddr) (n lo : Nat) (v0 : BitVec (8 * n)) (W : WordHist n) :
-    wordCell (GF := GF) pa n lo v0 W ⊢ wordCellT pa n (fun _ => lo) v0 W := by
-  unfold wordCell wordCellT
-  iintro ⟨%Hold, H, %htail⟩
-  iexists Hold
-  iframe H
-  ipureintro
-  exact tailOk_toT htail
 
 /-- A window never written since the image is a word cell at floor `0`. -/
 theorem WordHist.hist_nil (Hold : Nat → Hist) : WordHist.hist ([] : WordHist n) Hold = Hold := by

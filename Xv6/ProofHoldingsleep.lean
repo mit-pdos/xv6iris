@@ -56,9 +56,6 @@ theorem hsl_sub_self (x : BitVec 64) : x - x = 0#64 := by bv_decide
 theorem hsl_addneg_self (x : BitVec 64) : x + -x = 0#64 := by bv_decide
 theorem hsl_ult01 : (0#64 : BitVec 64).ult (BitVec.signExtend 64 1#12) = true := by decide
 theorem hsl_ult01' : (0#64 : BitVec 64).ult 1#64 = true := by decide
-theorem hsl_seqz0 :
-    (if (0#64 : BitVec 64).ult (BitVec.signExtend 64 1#12) then (1#64 : BitVec 64) else 0#64) = 1#64 := by
-  decide
 
 theorem hsl_filter_sleep (l : List String) (h : "sleep lock" ∉ l) :
     ("sleep lock" :: l).filter (fun x => x ≠ "sleep lock") = l := by

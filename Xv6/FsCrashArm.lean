@@ -84,22 +84,6 @@ theorem fsHist_alloc (l : List BlockMap) :
   unfold fsHistAuth fsHistLb
   iapply MonoList.own_alloc
 
-/-- Rocq `fs_hist_snapshot`. -/
-theorem fsHist_snapshot (γ : GName) (l : List BlockMap) :
-    fsHistAuth (GF := GF) γ l ⊢ fsHistAuth γ l ∗ fsHistLb γ l := by
-  unfold fsHistAuth fsHistLb
-  iintro H
-  ihave #Hlb := MonoList.lb_own_get $$ H
-  iframe H Hlb
-
-/-- Rocq `fs_hist_valid`. -/
-theorem fsHist_valid (γ : GName) (l l' : List BlockMap) :
-    fsHistAuth (GF := GF) γ l ⊢ fsHistLb γ l' -∗ ⌜l' <+: l⌝ := by
-  unfold fsHistAuth fsHistLb
-  iintro Ha Hf
-  ihave %h := MonoList.auth_lb_own_valid $$ Ha Hf
-  ipureintro; exact h.2
-
 /-- Rocq `fs_hist_update`. -/
 theorem fsHist_update (γ : GName) (l l' : List BlockMap) (h : l <+: l') :
     fsHistAuth (GF := GF) γ l ⊢ |==> fsHistAuth γ l' := by

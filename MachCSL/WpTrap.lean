@@ -140,26 +140,10 @@ theorem swp_dispatchInterrupt_S (cpu : CPU) (dq : DFrac) (c : MConf) (hmie : c.m
 
 /-! ## The trap -/
 
-theorem SConfPhys_trapConf (c : MConf) (sie : Bool) (h : SConfPhys (GF := GF) c sie) :
-    SConfPhys (GF := GF) (trapConf c) false := by
-  obtain ⟨hpmp, hsm, hpmm, hlpe⟩ := h
-  exact ⟨hpmp, smFacts_trapMs _ _ hsm, hpmm, hlpe⟩
-
 /-- A direct-mode `stvec` is its base. -/
 theorem stvecDirect_base (h : BitVec 64) (hd : stvecDirect h) :
     (BitVec.extractLsb' 2 62 h ++ 0#2 : BitVec 64) = h := by
   unfold stvecDirect at hd
-  bv_decide
-
-/-- The mode bits and the base of a direct-mode `stvec`. -/
-theorem tvec_addr_direct (h c : BitVec 64) (hd : stvecDirect h) : tvec_addr h c = some h := by
-  unfold tvec_addr _get_Mtvec_Mode _get_Mtvec_Base
-  simp only [Sail.BitVec.extractLsb, BitVec.extractLsb]
-  unfold stvecDirect at hd
-  have hm : BitVec.extractLsb' 0 (1 - 0 + 1) h = 0#2 := hd
-  rw [hm]
-  simp only [trapVectorMode_forwards]
-  congr 1
   bv_decide
 
 /-- The trap writes `scause` in full. -/

@@ -46,7 +46,6 @@ theorem fa_s1_40d0 : KA.«filealloc» + 0x1e7fe#64 = fnode 0 := by
 theorem fa_end_40d8 : KA.«filealloc» + 0x1f79e#64 = fnode NFILE := by
   rw [fnode_end]; decide
 theorem fa_ext1 : BitVec.extractLsb' 0 32 (0#64 + BitVec.signExtend 64 1#12) = 1#32 := by decide
-theorem fa_sext4 : BitVec.signExtend 64 4#12 = 4#64 := by decide
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]

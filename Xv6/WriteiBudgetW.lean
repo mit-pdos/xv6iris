@@ -70,26 +70,11 @@ theorem wiBlocks_dirlink (k : Nat) (hk : k < 64) : wiBlocks (16 * k) 16 = 1 := b
 
 theorem wiCost_loose_value : wiCost 1023 fwMax = 25 := rfl
 
-theorem wiCost_loose_busts : MAXOPBLOCKS < wiCost 1023 fwMax := by decide
-
 /-! ## 4. The tight budget (the parked two-credit figure) -/
 
 def wiCostTight (off n : Nat) : Nat := wiBlocks off n + 3
 
-theorem wiCostTight_fits (off n : Nat) (hn : n ≤ fwMax) : wiCostTight off n ≤ MAXOPBLOCKS := by
-  have := wiBlocks_le4 off n hn
-  unfold wiCostTight MAXOPBLOCKS; omega
-
 theorem wiCostTight_worst : wiCostTight 1023 fwMax = 7 := rfl
-
-theorem wiCostTight_dirlink (k : Nat) (hk : k < 64) : wiCostTight (16 * k) 16 = 4 := by
-  unfold wiCostTight; rw [wiBlocks_dirlink k hk]
-
-theorem wiCostTight_le_loose (off n : Nat) (h : 1 ≤ wiBlocks off n) :
-    wiCostTight off n ≤ wiCost off n := by
-  unfold wiCostTight wiCost; omega
-
-theorem wiCostTight_incomparable : wiCost 0 0 < wiCostTight 0 0 := by decide
 
 /-! ## 5. All three absorptions are load-bearing -/
 
@@ -97,15 +82,9 @@ def wiCostArmaware (off n : Nat) : Nat := 4 * wiBlocks off n + 3
 
 theorem wiCostArmaware_value : wiCostArmaware 1023 fwMax = 19 := rfl
 
-theorem wiCostArmaware_busts : MAXOPBLOCKS < wiCostArmaware 1023 fwMax := by decide
-
 def wiCostNoabs (off n : Nat) : Nat := 2 * wiBlocks off n + 3
 
 theorem wiCostNoabs_value : wiCostNoabs 1023 fwMax = 11 := rfl
-
-theorem wiCostNoabs_busts : MAXOPBLOCKS < wiCostNoabs 1023 fwMax := by decide
-
-theorem wiCostNoabs_three_fits : wiCostNoabs 0 fwMax ≤ MAXOPBLOCKS := by decide
 
 /-! ## 8. The per-iteration cost, as a function of bmap's arms -/
 
@@ -115,20 +94,6 @@ def bmIterCost (crb cri ai ad ind : Bool) : Nat :=
   (if ai || ad then (if crb then 0 else 1) else 0) + (if ai then 1 else 0) +
   (if ad then 1 else 0) + (if ad && ind && !ai then (if cri then 0 else 1) else 0) +
   (if ad then 0 else 1)
-
-theorem bmIterCost_max (crb cri ai ad ind : Bool) : bmIterCost crb cri ai ad ind ≤ 4 := by
-  cases crb <;> cases cri <;> cases ai <;> cases ad <;> cases ind <;> decide
-
-/-- NET OF THE TWO CREDITS AND THE ONE-TIME INDIRECT ALLOCATION, EVERY ARM
-COSTS EXACTLY ONE (Rocq's `bm_iter_cost_one`). -/
-theorem bmIterCost_one (crb cri ai ad ind : Bool) :
-    bmIterCost crb cri ai ad ind =
-      1 + (if crb then 0 else 1) * (if ai || ad then 1 else 0) +
-      (if ad && ind && !ai then (if cri then 0 else 1) else 0) + (if ai then 1 else 0) := by
-  cases crb <;> cases cri <;> cases ai <;> cases ad <;> cases ind <;> decide
-
-theorem bmIterCost_credited (ad ind : Bool) : bmIterCost true true false ad ind = 1 := by
-  cases ad <;> cases ind <;> decide
 
 /-! ## 9. Which credits are actually load-bearing -/
 
@@ -277,12 +242,5 @@ theorem wiIterNoallocBound (bms : Nat) (nI nB nL : Nat) (SI : List Nat) (crlw in
     (h2 : nB ≤ nL + (if crlw then 0 else 1)) : nI ≤ nL + 1 := by
   unfold bmapCost at h1
   cases crlw <;> simp at h1 h2 <;> omega
-
-/-- Entering at `MAXOPBLOCKS` covers every chunk filewrite can ask for
-(Rocq's `wi_inv_enter_maxop`). -/
-theorem wiInvEnter_maxop (bms : Nat) (off n : Nat) (S : List Nat) (hn : n ≤ fwMax) :
-    wiInvBud bms (wiBlocks off n) MAXOPBLOCKS S ∧
-      wiInvSpent bms MAXOPBLOCKS MAXOPBLOCKS (wiBlocks off n) (wiBlocks off n) S :=
-  wiInvEnter bms MAXOPBLOCKS off n S (wiCostBmonly_fits off n hn)
 
 end Xv6

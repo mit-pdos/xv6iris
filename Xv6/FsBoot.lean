@@ -73,14 +73,6 @@ theorem fsCovIn_lt (cov : ExtTreeSet Nat compare) (ndisk : Nat) (h : fsCovIn cov
   rw [hB]
   omega
 
-/-- Rocq `log_geom_cov_ok`. -/
-theorem logGeom_covOk (cov : ExtTreeSet Nat compare) (ls : Nat) (h : logGeomOk cov ls) :
-    covOk cov := h.1
-
-/-- Rocq `log_geom_region_sub`. -/
-theorem logGeom_region_sub (cov : ExtTreeSet Nat compare) (ls : Nat) (h : logGeomOk cov ls) :
-    ∀ b, logRegion ls b = true → b ∈ cov := h.2
-
 /-- Rocq `log_slot_list_nodup` (Rocq `log_slot_bno_inj` is `Xv6.logSlotBno_inj`,
 FsCrashPure). -/
 theorem logSlotList_nodup (ls : Nat) : ((List.range LOGBLOCKS).map (logSlotBno ls)).Nodup :=
@@ -120,18 +112,6 @@ theorem fsC0_lookup_Some (dk : Nat → BitVec 8) (cov : ExtTreeSet Nat compare) 
   obtain ⟨z, hz, hzb, hg⟩ := foldIns_get_some (M := RegMapF) id (fsBlocks dk) cov.toList b bs h
   cases hzb
   exact ⟨ExtTreeSet.mem_toList.1 hz, hg.symm⟩
-
-/-- Rocq `fs_C0_lengths`. -/
-theorem fsC0_lengths (dk : Nat → BitVec 8) (cov : ExtTreeSet Nat compare) (b : Nat)
-    (bs : List (BitVec 8)) (h : PartialMap.get? (fsC0 dk cov) b = some bs) : bs.length = BSIZE := by
-  rw [(fsC0_lookup_Some dk cov b bs h).2]
-  exact fsBlocks_length dk b
-
-/-- Rocq `fs_D0_lookup`. -/
-theorem fsD0_lookup (cov : ExtTreeSet Nat compare) (b : Nat) (hb : b ∈ cov) :
-    PartialMap.get? (fsD0 cov) b = some false :=
-  foldIns_get_mem (M := RegMapF) id (fun _ => false) cov.toList b (fun _ _ h => h)
-    (ExtTreeSet.mem_toList.2 hb)
 
 /-! ## §2 The carve, and §3 the splits -/
 

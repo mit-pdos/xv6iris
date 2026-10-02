@@ -44,10 +44,6 @@ theorem read_rhr (u : UartState) (b : BitVec 8) (rx' : List (BitVec 8)) (hdlab :
     Uart.readN u 0 1 = some (b, { u with rx := rx' }) := by
   rw [readN_one]; simp [Uart.read, hdlab, hrx]
 
-theorem read_rhr_empty (u : UartState) (hdlab : Uart.dlab u = false) (hrx : u.rx = []) :
-    Uart.readN u 0 1 = some ((if Uart.fifoEn u then 0#8 else u.rbr), u) := by
-  rw [readN_one]; simp [Uart.read, hdlab, hrx]
-
 /-- Every byte register answers a one-byte read. -/
 theorem readN_one_isSome (u : UartState) (off : Nat) (hoff : off < 8) : (Uart.readN u off 1).isSome := by
   rw [readN_one]
@@ -117,12 +113,6 @@ theorem lsr_thre_bit (u : UartState) :
   unfold Uart.lsr
   cases hr : Uart.rxReady u <;> cases ht : Uart.thre u <;> simp <;> decide
 
-/-- `ReadReg(LSR) & LSR_RX_READY`: bit 0 of LSR is data-ready. -/
-theorem lsr_dr_bit (u : UartState) :
-    (BitVec.setWidth 64 (Uart.lsr u) &&& 1#64 = 0#64) ↔ Uart.rxReady u = false := by
-  unfold Uart.lsr
-  cases hr : Uart.rxReady u <;> cases ht : Uart.thre u <;> simp <;> decide
-
 theorem rxReady_iff (u : UartState) : Uart.rxReady u = true ↔ u.rx ≠ [] := by
   unfold Uart.rxReady; cases u.rx <;> simp
 
@@ -186,9 +176,6 @@ theorem uartRel_rxArm (i : UartId) (b : BitVec 8) (u u' : UartState) (os : List 
   split at h
   · simp only [Option.some.injEq, Prod.mk.injEq] at h; rw [← h.1]; exact uartRel_recv u b
   · simp only [Option.some.injEq, Prod.mk.injEq] at h; rw [← h.1]; exact uartRel_refl u
-
-theorem uartRel_loopback (u u' : UartState) (h : uartRel u u') : Uart.loopback u' = Uart.loopback u := by
-  unfold Uart.loopback; rw [h.2.2.1]
 
 theorem uartRel_dlab (u u' : UartState) (h : uartRel u u') : Uart.dlab u' = Uart.dlab u := by
   unfold Uart.dlab; rw [h.2.2.2.1]

@@ -581,23 +581,6 @@ theorem sys_unlink_core_open (hct : curTier = KTier.kpt) (A : SysUnlinkArgs GF) 
   iframe Hof
   iapply Hcl $$ Hpid Hcwd Hcwr
 
-/-- The block's pid cell, borrowed and returned (entry-side: the bare block
-at any view). -/
-theorem sys_unlink_bare_pid (hct : curTier = KTier.kpt) (pa : BitVec 64) (pid : BitVec 32)
-    (V : ProcPriv) (M : Nat → List (BitVec 8)) :
-    procPrivBareAt (GF := GF) curCtx pa pid V M ⊢
-      wordPointsTo (pPid pa) 4 pidPriv pid ∗
-      (wordPointsTo (pPid pa) 4 pidPriv pid -∗ procPrivBareAt curCtx pa pid V M) := by
-  unfold procPrivBareAt
-  rw [sysfile_cur_kpt hct]
-  iintro ⟨%h, Hpid, Hflds, Hpt, Htfp, %hlz, Hev⟩
-  iframe Hpid
-  iintro Hpid
-  iframe Hpid Hflds Hpt Htfp Hev
-  isplitl []
-  · ipureintro; exact h
-  · ipureintro; exact hlz
-
 /-- THE ROOT'S TWO ROWS, borrowed out of the hole (chroot: dirlookup's self
 test reads `p->root` and the root's inum): the hole is refilled with the pid
 cell, the root cell and reference come out, and the hole re-forms around
@@ -691,10 +674,6 @@ theorem sys_unlink_exit (cpu : CPU) (k : KCtx) (A : SysUnlinkArgs GF)
   iapply HΦ $$ %spie %spp %_ %P' %A.V.ev %hcs %hP' %(Nat.le_refl _) Hk Hpc Hte Hce Hbs Hir Hblk
   simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
   iexact Harms
-
-/-- The reference ledger's regroupings. -/
-theorem sys_unlink_ir_split :
-    irefSlots (GF := GF) sysUnlinkSlots ⊢ irefSlot ∗ irefSlot := (irefSlots_op 1 1).1
 
 theorem sys_unlink_ir_11 : irefSlot (GF := GF) ∗ irefSlot ⊢ irefSlots sysUnlinkSlots :=
   (irefSlots_op 1 1).2

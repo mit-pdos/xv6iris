@@ -119,12 +119,6 @@ def tfResumeGpr (b : RegMap) (tf : List (BitVec 64)) : RegMap :=
 /-- Rocq `tf_resume_gpr0`. -/
 def tfResumeGpr0 (tf : List (BitVec 64)) : RegMap := tfResumeGpr zeroRf tf
 
-/-- Rocq `tf_resume_gpr_x0`: the base only matters at x0. -/
-theorem tfResumeGpr_x0 (b : RegMap) (tf : List (BitVec 64)) (hb : b 0#5 = 0#64) :
-    tfResumeGpr b tf = tfResumeGpr0 tf := by
-  funext i; unfold tfResumeGpr0 tfResumeGpr zeroRf
-  by_cases hi : i = 0#5 <;> simp [hi, hb]
-
 /-- Rocq `tf_resume_gpr0_x0`. -/
 theorem tfResumeGpr0_x0 (tf : List (BitVec 64)) : tfResumeGpr0 tf 0#5 = 0#64 := rfl
 

@@ -52,14 +52,8 @@ theorem utd_bd0b : KA.«usertrap» + 0x52#64 + BitVec.signExtend 64 126#13 = KA.
 
 theorem utd_bne_ne (v : BitVec 64) (h : v ≠ 0#64) : bcond bop.BNE v 0#64 = true := by simp [bcond, h]
 
-theorem utd_ext_ne8 (sc : BitVec 64) (h : sCauseOk sc) : sc ≠ 8#64 := by
-  unfold sCauseOk at h; rcases h with rfl | rfl <;> decide
-
 theorem utd_ukill (sc : BitVec 64) (h8 : sc ≠ 8#64) (hs : ¬ sCauseOk sc) : ukillSc sc := by
   refine ⟨h8, fun he => hs (Or.inr (by rw [he]; decide)), fun he => hs (Or.inl (by rw [he]; decide))⟩
-
-theorem utd_13_ok : ¬ sCauseOk 13#64 := by unfold sCauseOk; decide
-theorem utd_15_ok : ¬ sCauseOk 15#64 := by unfold sCauseOk; decide
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]

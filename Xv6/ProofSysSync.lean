@@ -146,27 +146,6 @@ theorem ssK_popExit (k : KCtx) (hnoff : k.noff = 0) (hint : k.intena = k.sie) (h
       KCtx.mk.injEq, trapRes, kvFrameSlots, ite_true, ite_false, Bool.false_eq_true,
       _root_.true_and, _root_.and_true] <;> omega
 
-/-- `sys_sync`'s own `acquire`, at the entry. -/
-theorem ssK_fold0 (k : KCtx) (hK : 4 ≤ k.avail) :
-    ((k.pushed 4).pushOffAt k.spie k.spp).withLocks ("log" :: k.locks) = ssK k := by
-  unfold ssK
-  obtain ⟨regs, sie, spie, spp, avail, noff, intena, locks, tier, root, proc⟩ := k
-  simp only at hK ⊢
-  simp only [KCtx.pushed, KCtx.pushOffAt, KCtx.withLocks, KCtx.mk.injEq,
-    _root_.true_and, _root_.and_true]
-  omega
-
-/-- The re-acquire after a park lands back in `ssK`. -/
-theorem ssK_fold (k : KCtx) (a b : Bool) (hK : 4 ≤ k.avail) :
-    (((k.pushed 4).withSpie a b).pushOffAt a b).withLocks ("log" :: k.locks) =
-      ssK (k.withSpie a b) := by
-  unfold ssK
-  obtain ⟨regs, sie, spie, spp, avail, noff, intena, locks, tier, root, proc⟩ := k
-  simp only at hK ⊢
-  simp only [KCtx.pushed, KCtx.withSpie, KCtx.pushOffAt, KCtx.withLocks, KCtx.mk.injEq,
-    _root_.true_and, _root_.and_true]
-  omega
-
 /-- The register pins the wait loop maintains: the frame pointers,
 `s1 = &log`, `s2` the saved `log.ncommit`, and the callee-saved registers
 the function never touches (`s3`..`s11`). -/
@@ -271,14 +250,6 @@ theorem ssRegs_setup (k : KCtx) (R : RegMap) (h : ssRegsE k R) (nv v1 v2 : BitVe
       | exact a25
       | exact a26
       | exact a27
-
-theorem ss_cs_trans (R R' R'' : RegMap) (h1 : calleeSaved R R') (h2 : calleeSaved R' R'') :
-    calleeSaved R R'' := by
-  obtain ⟨a2, a8, a9, a18, a19, a20, a21, a22, a23, a24, a25, a26, a27⟩ := h1
-  obtain ⟨b2, b8, b9, b18, b19, b20, b21, b22, b23, b24, b25, b26, b27⟩ := h2
-  exact ⟨b2.trans a2, b8.trans a8, b9.trans a9, b18.trans a18, b19.trans a19, b20.trans a20,
-    b21.trans a21, b22.trans a22, b23.trans a23, b24.trans a24, b25.trans a25, b26.trans a26,
-    b27.trans a27⟩
 
 theorem ss_a0_epi (KR R : RegMap) (h10 : R 10#5 = 0#64) :
     (((R.set 1#5 (KR 1#5)).set 8#5 (KR 8#5)).set 2#5 (KR 2#5)) 10#5 = 0#64 := by
@@ -598,15 +569,6 @@ callee-saved map is back at the caller's. -/
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 variable [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
-
-theorem ss_frame_weaken (sp ra s0 s1 s2 : BitVec 64) :
-    frame4s2 (GF := GF) sp ra s0 s1 s2 ⊢ frame4s0 sp ra s0 := by
-  unfold frame4s2 frame4s0 frame4s0rest
-  iintro ⟨H1, H2, H3, H4⟩
-  iframe H1 H2
-  isplitl [H3]
-  · iexists s1; iexact H3
-  · iexists s2; iexact H4
 
 set_option maxHeartbeats 8000000 in
 /-- The exit, at either entry `SIE`: the release re-splits the bundle (the

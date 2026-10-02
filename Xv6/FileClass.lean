@@ -128,29 +128,4 @@ this says which six to try. -/
 def txtSfx : List (List (BitVec 8)) :=
   [txtExt.drop 4, txtExt.drop 3, txtExt.drop 2, txtExt.drop 1, txtExt, txtA]
 
-theorem txt_prefix_complete (w g : List (BitVec 8)) (hg : txtName g) (hp : w <+: g) :
-    ∃ z, z ∈ txtSfx ∧ txtName (w ++ z) := by
-  obtain ⟨stem, rfl, ⟨hne, hw⟩, hl⟩ := hg
-  obtain ⟨r, hr⟩ := hp
-  have hwt : w = (stem ++ txtExt).take w.length := by rw [← hr, List.take_left]
-  have hlen : w.length ≤ stem.length + 4 := by
-    have := congrArg List.length hr; simp [txtExt] at this; omega
-  rw [List.take_append] at hwt
-  by_cases hle : w.length ≤ stem.length
-  · rw [show w.length - stem.length = 0 by omega, List.take_zero, List.append_nil] at hwt
-    cases w with
-    | nil => exact ⟨txtA, by simp [txtSfx], txtA_name⟩
-    | cons b w' =>
-      refine ⟨txtExt, by simp [txtSfx], b :: w', rfl, ⟨by simp, ?_⟩, by omega⟩
-      rw [hwt]; exact fun x hx => hw x (List.mem_of_mem_take hx)
-  · rw [List.take_of_length_le (by omega)] at hwt
-    refine ⟨txtExt.drop (w.length - stem.length), ?_, stem, ?_, ⟨hne, hw⟩, hl⟩
-    · have hk : 1 ≤ w.length - stem.length ∧ w.length - stem.length ≤ 4 := by omega
-      obtain ⟨h1, h4⟩ := hk
-      generalize w.length - stem.length = k at h1 h4
-      rcases (show k = 1 ∨ k = 2 ∨ k = 3 ∨ k = 4 by omega) with rfl | rfl | rfl | rfl <;>
-        simp [txtSfx]
-    · have e := congrArg (· ++ txtExt.drop (w.length - stem.length)) hwt
-      rw [e, List.append_assoc, List.take_append_drop]
-
 end Xv6

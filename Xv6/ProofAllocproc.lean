@@ -163,9 +163,6 @@ theorem ap_bcond_state (st : BitVec 32) :
     intro he
     exact h (by revert he; bv_decide)
 
-/-- `lui a4,0x1` is `4096`. -/
-theorem ap_lui_4096 : BitVec.signExtend 64 (1#20 ++ 0#12) = 4096#64 := by decide
-
 /-- The link registers of the calls. -/
 theorem ap_ret_b02 : jumpPc (KA.«allocproc» + 0x22#64) = (KA.«allocproc» + 0x22#64) := by decide
 theorem ap_ret_b0c : jumpPc (KA.«allocproc» + 0x2c#64) = (KA.«allocproc» + 0x2c#64) := by decide
@@ -1063,18 +1060,6 @@ theorem apNewPid_bounds (cand : BitVec 32) (h1 : 1 ≤ cand.toNat) (h2 : cand.to
       rw [Nat.mod_eq_of_lt (by omega), Nat.mod_eq_of_lt (by omega)]
     rw [he]; omega
 
-/-- The register `a1` holds at the loop's exit (either wrap value `1` or
-`pid + 1`), as a sign-extended `apNewPid`. -/
-theorem apNewPid_reg (cand : BitVec 32) :
-    (if cand = 1000#32 then (1#64 : BitVec 64)
-     else BitVec.signExtend 64
-       (BitVec.extractLsb' 0 32 (BitVec.signExtend 64 cand + BitVec.signExtend 64 (1#12))))
-      = BitVec.signExtend 64 (apNewPid cand) := by
-  unfold apNewPid
-  by_cases h : cand = 1000#32
-  · rw [if_pos h, if_pos h]; subst h; decide
-  · rw [if_neg h, if_neg h, ap_addiw_succ]
-
 /-! ## The registers the `allocpid` loop leaves outside `a0..a6` -/
 
 /-- The registers untouched by the whole `allocpid` retry loop (everything
@@ -1084,12 +1069,6 @@ def apKeepPid (R R' : RegMap) : Prop :=
     R' i = R i
 
 theorem apKeepPid_refl (R : RegMap) : apKeepPid R R := fun _ _ _ _ _ _ _ _ => rfl
-
-theorem apKeepPid_trans {R R' R'' : RegMap} (h1 : apKeepPid R R') (h2 : apKeepPid R' R'') :
-    apKeepPid R R'' := fun i a b c d e f g => (h2 i a b c d e f g).trans (h1 i a b c d e f g)
-
-theorem apKeep_apKeepPid {R R' : RegMap} (h : apKeep R R') : apKeepPid R R' :=
-  fun i _ _ _ _ h14 h15 _ => h i h14 h15
 
 theorem apKeepPid_set (R R' : RegMap) (i : BitVec 5) (v : BitVec 64)
     (hi : i = 10#5 ∨ i = 11#5 ∨ i = 12#5 ∨ i = 13#5 ∨ i = 14#5 ∨ i = 15#5 ∨ i = 16#5)

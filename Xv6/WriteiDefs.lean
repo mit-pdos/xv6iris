@@ -137,12 +137,6 @@ def wiPins5 (k : KCtx) (R : RegMap) : Prop :=
   R 9#5 = k.regs 9#5 ∧ R 24#5 = k.regs 24#5 ∧ R 25#5 = k.regs 25#5 ∧ R 26#5 = k.regs 26#5 ∧
   R 27#5 = k.regs 27#5
 
-theorem wiPins5_cs (k : KCtx) (R R' : RegMap) (h : wiPins5 k R) (hcs : calleeSaved R R') :
-    wiPins5 k R' := by
-  obtain ⟨a9, a24, a25, a26, a27⟩ := h
-  obtain ⟨-, -, c9, -, -, -, -, -, -, c24, c25, c26, c27⟩ := hcs
-  exact ⟨c9.trans a9, c24.trans a24, c25.trans a25, c26.trans a26, c27.trans a27⟩
-
 /-- The epilogue's `calleeSaved`: the return block restores `ra`, `s0`,
 `s2`, `s4`..`s7` and `sp`; `s1`, `s3`, `s8`..`s11` are already back. -/
 theorem writei_calleeSaved_epi (KR R : RegMap) (h9 : R 9#5 = KR 9#5) (h19 : R 19#5 = KR 19#5)

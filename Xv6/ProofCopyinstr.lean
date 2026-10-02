@@ -218,11 +218,6 @@ def csKeep (R R2 : RegMap) : Prop :=
   R2 21#5 = R 21#5 ∧ R2 22#5 = R 22#5 ∧ R2 23#5 = R 23#5 ∧ R2 24#5 = R 24#5 ∧
   R2 25#5 = R 25#5 ∧ R2 26#5 = R 26#5 ∧ R2 27#5 = R 27#5
 
-theorem csKeep_of_calleeSaved {R R' : RegMap} (h : calleeSaved R R') : csKeep R R' :=
-  ⟨h.1, h.2.2.1, h.2.2.2.2.1, h.2.2.2.2.2.1, h.2.2.2.2.2.2.1, h.2.2.2.2.2.2.2.1,
-    h.2.2.2.2.2.2.2.2.1, h.2.2.2.2.2.2.2.2.2.1, h.2.2.2.2.2.2.2.2.2.2.1,
-    h.2.2.2.2.2.2.2.2.2.2.2.1, h.2.2.2.2.2.2.2.2.2.2.2.2⟩
-
 /-! ## No NUL among the first `d` bytes -/
 
 def csNoNul (view : Nat → List (BitVec 8)) (A d : Nat) : Prop :=
@@ -967,8 +962,6 @@ theorem cs_noNul_of_read_eq (V1 V2 : Nat → List (BitVec 8)) (A d : Nat)
 
 /-! ## Tail arithmetic -/
 
-theorem cs_sext_neg1 : BitVec.signExtend 64 (4095#12) = -1#64 := by decide
-
 theorem cs_a4adv (dst0 : BitVec 64) (L d : Nat) (h1 : 1 ≤ L) (hd : d ≤ L) (hL : L < 2 ^ 64) :
     BitVec.ofNat 64 (L - d) + -1#64 + (dst0 + BitVec.ofNat 64 d)
       = dst0 + BitVec.ofNat 64 (L - 1) := by
@@ -977,13 +970,6 @@ theorem cs_a4adv (dst0 : BitVec 64) (L d : Nat) (h1 : 1 ≤ L) (hd : d ≤ L) (h
   have h3 : BitVec.ofNat 64 L - 1#64 = BitVec.ofNat 64 (L - 1) := by
     have := co_ofNat_sub L 1 h1 hL; simpa using this
   rw [← h3, ← h2]
-  bv_omega
-
-theorem cs_s4adv (dst0 : BitVec 64) (L D2 : Nat) (h1 : 1 ≤ D2) (hD2 : D2 ≤ L) (hL : L < 2 ^ 64) :
-    dst0 + BitVec.ofNat 64 (L - 1) - (dst0 + BitVec.ofNat 64 (D2 - 1)) = BitVec.ofNat 64 (L - D2) := by
-  have h3 : BitVec.ofNat 64 (L - 1) - BitVec.ofNat 64 (D2 - 1) = BitVec.ofNat 64 (L - D2) := by
-    rw [co_ofNat_sub (L - 1) (D2 - 1) (by omega) (by omega)]; congr 1; omega
-  rw [← h3]
   bv_omega
 
 theorem cs_s1adv (v : Nat) : BitVec.ofNat 64 v + 4096#64 = BitVec.ofNat 64 (v + 4096) := by

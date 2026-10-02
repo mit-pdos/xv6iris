@@ -127,9 +127,6 @@ off the C: `f->readable = !(omode & O_WRONLY)`,
 def omReadable (v : BitVec 64) : Bool := !omWronly v
 def omWritable (v : BitVec 64) : Bool := omWronly v || omRdwr v
 
-theorem omArg_range (v : BitVec 64) : omArg v < 2 ^ 32 :=
-  Nat.mod_lt _ (by decide)
-
 /-- the dir arm's key is the WHOLE-int equality `omode = O_RDONLY = 0`;
 under it the stored modes are read-only-read-write-not (Rocq's
 `om_rdonly_modes`) -/
@@ -149,17 +146,6 @@ theorem omRdwr_plain (v : BitVec 64) (h : omArg v = 2) :
     omCreate v = false ∧ omTrunc v = false := by
   simp only [omCreate, omTrunc, h]
   decide
-
-/-- THE MINT JUSTIFICATION (Rocq's `delta_write_no_shrink`): the write delta
-cannot express truncation -- a splice never shrinks the file -- so the
-trunc delta (`FsAbsDelta.deltaTrunc`) is a NEW total function in
-`deltaWrite`'s mold, not a reuse refused. -/
-theorem deltaWrite_no_shrink (av : Aview) (i off : Nat) (new bs0 : List (BitVec 8)) (nl : Nat)
-    (hi : PartialMap.get? av i = some ⟨.AFile bs0, nl⟩) (hoff : off ≤ bs0.length) :
-    ∃ bs1, PartialMap.get? (deltaWrite i off new av) i = some ⟨.AFile bs1, nl⟩ ∧
-      bs0.length ≤ bs1.length :=
-  ⟨blkSplice off new bs0, deltaWrite_lookup av i off new bs0 nl hi, by
-    rw [blkSplice_length_grow off new bs0 hoff]; omega⟩
 
 /-! ## 2.  The commits -/
 
@@ -293,14 +279,6 @@ theorem atruncCommitI_of_at (Γ : FsViewNames GF) (E : CoPset) (i : Nat)
   iintro H %I %bs0 %nl %hpre Hka
   iapply H $$ %I %i %bs0 %nl %hpre Hka
 
-/-- Rocq `atrunc_commit_at_of_i`. -/
-theorem atruncCommitAt_of_i (Γ : FsViewNames GF) (E : CoPset)
-    (Φ : Aview → Nat → List (BitVec 8) → IProp GF) :
-    iprop(∀ i : Nat, atruncCommitI Γ E i Φ) ⊢ atruncCommitAt Γ E Φ := by
-  unfold atruncCommitAt atruncCommitI
-  iintro H %I %i %bs0 %nl %hpre Hka
-  iapply H $$ %i %I %bs0 %nl %hpre Hka
-
 /-- Rocq `atrunc_of_permit`: THE KEYED PIECE, on `aunarmOfArm`'s mould. -/
 def atruncOfPermit (Γ : FsViewNames GF) (E : CoPset) (Kt : Nat → IProp GF)
     (Φ : Aview → Nat → List (BitVec 8) → IProp GF) : IProp GF :=
@@ -314,18 +292,6 @@ theorem atruncOfPermit_of_all (Γ : FsViewNames GF) (E : CoPset) (Kt : Nat → I
   unfold atruncOfPermit
   iintro H %i _
   iapply (atruncCommitI_of_at Γ E i Φ) $$ H
-
-/-- Rocq `atrunc_of_permit_unit` (at any `Γ`, deviation 3). -/
-theorem atruncOfPermit_unit (Γ : FsViewNames GF) (E : CoPset) (Kt : Nat → IProp GF) :
-    appSup (GF := GF) ⊢ atruncOfPermit Γ E Kt (fun _ _ _ => iprop(True)) := by
-  iintro #Hsup
-  iapply (atruncOfPermit_of_all Γ E Kt _)
-  iapply (atruncCommitAt_unit Γ E) $$ Hsup
-
-/-- Rocq `trunc_permit_cre`: THE CREATE'S OWN RECEIPT, AS A PERMIT. -/
-def truncPermitCre (Fok : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) (i : Nat) :
-    IProp GF :=
-  iprop(∃ (d : Nat) (nm : Fname), creAcreFired Fok d nm i (.AFile []))
 
 end TruncPermit
 
@@ -462,18 +428,6 @@ def openTruncPiece (Γ : FsViewNames GF) (vom : BitVec 64) (Kt : Nat → IProp G
     (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)) : IProp GF :=
   if omTrunc vom then pfAt (atruncOfPermit (hlc := hlc) Γ appE Kt) Ft else iprop(emp)
 
-/-- Rocq's `open_trunc_piece_true` -/
-theorem openTruncPiece_true (Γ : FsViewNames GF) (vom : BitVec 64) (Kt : Nat → IProp GF)
-    (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)) (hv : omTrunc vom = true) :
-    openTruncPiece (hlc := hlc) Γ vom Kt Ft ⊣⊢ pfAt (atruncOfPermit (hlc := hlc) Γ appE Kt) Ft := by
-  unfold openTruncPiece; rw [if_pos hv]; exact .rfl
-
-/-- Rocq's `open_trunc_piece_false` -/
-theorem openTruncPiece_false (Γ : FsViewNames GF) (vom : BitVec 64) (Kt : Nat → IProp GF)
-    (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)) (hv : omTrunc vom = false) :
-    openTruncPiece (hlc := hlc) Γ vom Kt Ft ⊣⊢ iprop(emp) := by
-  unfold openTruncPiece; rw [if_neg (by simp [hv])]; exact .rfl
-
 /-- ...and the free one (Rocq's `open_trunc_piece_none`): at
 `omTrunc vom = false` nothing is owed, so the piece is available out of thin
 air -- the whole content of the tightening for init's
@@ -537,26 +491,6 @@ theorem openTruncPiece_arg_to_at (Γ : FsViewNames GF) (vom : BitVec 64)
   iintro %d %nm HT
   iapply (truncTieArg_of_at M pv pl P d nm hpl) $$ HT
 
-/-- Rocq's `open_trunc_piece_at_to_arg`. -/
-theorem openTruncPiece_at_to_arg (Γ : FsViewNames GF) (vom : BitVec 64)
-    (M : Nat → List (BitVec 8)) (pv : Nat) (pl : List (BitVec 8)) (P : Nat → Nat → IProp GF)
-    (Farm : Pfam GF (Aview → Nat → IProp GF))
-    (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
-    (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)) (hpl : argPathOf M pv pl) :
-    openTruncPiece (hlc := hlc) Γ vom
-        (truncPermitOf (hlc := hlc) Γ (truncTieAt pl P) Farm Fok Fex) Ft ⊢
-      openTruncPiece (hlc := hlc) Γ vom
-        (truncPermitOf (hlc := hlc) Γ (truncTieArg M pv P) Farm Fok Fex) Ft := by
-  iintro H
-  iapply (openTruncPiece_mono (hlc := hlc) Γ vom _ _ Ft) $$ [] H
-  imodintro
-  iintro %i Hk
-  iapply (truncPermitOf_mono (hlc := hlc) Γ (truncTieArg M pv P) (truncTieAt pl P) Farm Fok Fex i)
-    $$ [] Hk
-  imodintro
-  iintro %d %nm HT
-  iapply (truncTieAt_of_arg M pv pl P d nm hpl) $$ HT
-
 /-- ...and the PLAIN surface's pair, one permit over (Rocq's
 `open_trunc_piece_term_arg_to_at`). -/
 theorem openTruncPiece_term_arg_to_at (Γ : FsViewNames GF) (vom : BitVec 64)
@@ -569,18 +503,6 @@ theorem openTruncPiece_term_arg_to_at (Γ : FsViewNames GF) (vom : BitVec 64)
   imodintro
   iintro %i Hk
   iapply (truncTermArg_of_at M pv pl P i hpl) $$ Hk
-
-/-- Rocq's `open_trunc_piece_term_at_to_arg`. -/
-theorem openTruncPiece_term_at_to_arg (Γ : FsViewNames GF) (vom : BitVec 64)
-    (M : Nat → List (BitVec 8)) (pv : Nat) (pl : List (BitVec 8)) (P : Nat → Nat → IProp GF)
-    (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)) (hpl : argPathOf M pv pl) :
-    openTruncPiece (hlc := hlc) Γ vom (truncTermAt pl P) Ft ⊢
-      openTruncPiece (hlc := hlc) Γ vom (truncTermArg M pv P) Ft := by
-  iintro H
-  iapply (openTruncPiece_mono (hlc := hlc) Γ vom _ _ Ft) $$ [] H
-  imodintro
-  iintro %i Hk
-  iapply (truncTermAt_of_arg M pv pl P i hpl) $$ Hk
 
 /-! ### The piece once the inum is known
 
@@ -617,18 +539,6 @@ theorem openTruncAt_true (Γ : FsViewNames GF) (vom : BitVec 64) (i : Nat)
     (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)) (hv : omTrunc vom = true) :
     openTruncAt (hlc := hlc) Γ vom i Ft ⊣⊢ pfAt (atruncCommitI (hlc := hlc) Γ appE i) Ft := by
   unfold openTruncAt; rw [if_pos hv]; exact .rfl
-
-/-- Rocq `open_trunc_at_false`. -/
-theorem openTruncAt_false (Γ : FsViewNames GF) (vom : BitVec 64) (i : Nat)
-    (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)) (hv : omTrunc vom = false) :
-    openTruncAt (hlc := hlc) Γ vom i Ft ⊣⊢ iprop(emp) := by
-  unfold openTruncAt; rw [if_neg (by simp [hv])]; exact .rfl
-
-/-- Rocq `open_trunc_at_none`. -/
-theorem openTruncAt_none (Γ : FsViewNames GF) (vom : BitVec 64) (i : Nat)
-    (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)) (hv : omTrunc vom = false) :
-    ⊢ openTruncAt (hlc := hlc) Γ vom i Ft := by
-  unfold openTruncAt; rw [if_neg (by simp [hv])]; exact .rfl
 
 /-- PAYING THE PERMIT (Rocq `open_trunc_at_of_permit`): the piece keyed at
 one inum, the permit kept on the refund side. -/
@@ -988,33 +898,6 @@ theorem openAuPrePlain_of_all (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Na
   · isplitl [Ho]
     · iexact Ho
     · iexact Ht
-
-/-- Rocq's `open_au_pre_create_of_all`. -/
-theorem openAuPreCreate_of_all (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat)
-    (pl : List (BitVec 8)) (Nm : Fname → Prop) (vom : BitVec 64) (P Pmiss : Nat → Nat → IProp GF)
-    (Farm Fun : Pfam GF (Aview → Nat → IProp GF))
-    (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
-    (Fo : Pfam GF (Aview → Nat → Anode → IProp GF))
-    (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)) :
-    ⊢@{IProp GF} nparWalkPreEra (hlc := hlc) γfs rt cw P Pmiss -∗
-      pfAt (acreCommitAt (hlc := hlc) Γ appE (.AFile []) (P (nparElems pl).length) Farm) Fok -∗
-      pfAt (dlookupCommitAt (hlc := hlc) Γ appE) Fex -∗
-      pfAt (aopenCommitAt (hlc := hlc) Γ appE) Fo -∗
-      openTruncPiece (hlc := hlc) Γ vom (truncPermitOf (hlc := hlc) Γ (truncTieAt pl P) Farm Fok Fex) Ft -∗
-      creChildUnfired (hlc := hlc) Γ (.AFile []) Farm Fun -∗
-      openAuPreCreate (hlc := hlc) Γ γfs rt cw pl Nm vom P Pmiss Farm Fun Fok Fex Fo Ft := by
-  unfold openAuPreCreate
-  iintro Hw Hok Hex Ho Ht Hch
-  ihave Hok := (pfAt_mono
-    (acreCommitAt (hlc := hlc) Γ appE (.AFile []) (P (nparElems pl).length) Farm)
-    (acreCommitAtNm (hlc := hlc) Γ appE (.AFile []) Nm (P (nparElems pl).length) Farm) Fok)
-    $$ [] Hok
-  · iintro H
-    iapply (acreCommitAtNm_of (hlc := hlc) Γ appE (.AFile []) Nm (P (nparElems pl).length) Farm
-      Fok.pfRecv) $$ H
-  isplitl [Hw]
-  · iapply (npStart_of_mknod γfs rt cw P Pmiss pl) $$ Hw
-  · iframe Hok Hex Ho Ht Hch
 
 end OpenWalk
 

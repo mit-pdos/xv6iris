@@ -29,8 +29,6 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 
 attribute [sail_facts] Nat.reducePow
 
-/-- The xv6 PMP tables at the entries the check reads (integer and natural indices). -/
-@[sail_facts] theorem xv6Pmpcfg_getInt0 : xv6Pmpcfg[(0 : Int)]! = 0x0f#8 := by decide
 @[sail_facts] theorem xv6Pmpcfg_getInt1 : xv6Pmpcfg[(1 : Int)]! = 0#8 := by decide
 @[sail_facts] theorem xv6Pmpaddr_getInt0 : xv6Pmpaddr[(0 : Int)]! = 0x3fffffffffffff#64 := by decide
 @[sail_facts] theorem xv6Pmpcfg_getNat0 : xv6Pmpcfg[(0 : Nat)]! = 0x0f#8 := by decide
@@ -152,10 +150,6 @@ theorem pmpPassesM_off_any (cpu : CPU) (dq : DFrac) (c : MConf) (hcfg : c.pmpcfg
   rw [hcfg]
   exact swp_pmpCheck_off_any cpu dq addr width acc Φ c.pmpaddr
 
-theorem MConf.ok_xv6 (c : MConf) (hm : c.mok) (hcfg : c.pmpcfg = xv6Pmpcfg)
-    (haddr : c.pmpaddr = xv6Pmpaddr) : MConf.ok (GF := GF) c :=
-  ⟨hm, fun cpu dq => pmpPassesM_xv6 cpu dq c hcfg haddr⟩
-
 theorem MConf.ok_ent0 (c : MConf) (hm : c.mok) (h0 : pmpEnt0Ok c.pmpcfg c.pmpaddr) :
     MConf.ok (GF := GF) c :=
   ⟨hm, fun cpu dq => pmpPassesM_ent0 cpu dq c h0⟩
@@ -163,9 +157,5 @@ theorem MConf.ok_ent0 (c : MConf) (hm : c.mok) (h0 : pmpEnt0Ok c.pmpcfg c.pmpadd
 theorem MConf.ok_allOff (c : MConf) (hm : c.mok) (hcfg : pmpAllOff c.pmpcfg) :
     MConf.ok (GF := GF) c :=
   ⟨hm, fun cpu dq => pmpPassesM_allOff cpu dq c hcfg⟩
-
-theorem MConf.ok_off_any (c : MConf) (hm : c.mok) (hcfg : c.pmpcfg = bootPmpcfg) :
-    MConf.ok (GF := GF) c :=
-  ⟨hm, fun cpu dq => pmpPassesM_off_any cpu dq c hcfg⟩
 
 end MachCSL

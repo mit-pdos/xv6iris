@@ -75,10 +75,6 @@ theorem kxcC_pgru (x : BitVec 64) (h : x.toNat + 4095 < 2 ^ 64) :
     rw [this, BitVec.add_comm]
   rw [e1, MachCSL.lui_mask, UPtAlloc.pgRoundUp_bv x h]
 
-theorem kxcC_pgru_lt (n : Nat) (h : n ≤ uvmMaxsz) : pgRoundUpN n ≤ uvmMaxsz := by
-  have := UPtAlloc.pgRoundUpN_le h
-  rwa [UPtAlloc.pgRoundUpN_uvmMaxsz] at this
-
 /-- The block's size bound through the table: a covered size is at most
 `uvmMaxsz` (every page below it is a user leaf, and those lie below the
 trapframe page, `uptWf`). -/
@@ -149,10 +145,6 @@ theorem kxcC_bltu (x y : Int) (hx0 : 0 ≤ x) (hx1 : x < 2 ^ 64) (hy0 : 0 ≤ y)
   have := kxcC_toNat_ofInt x hx0 hx1
   have := kxcC_toNat_ofInt y hy0 hy1
   omega
-
-/-- **Rocq `kxc_sp_final_mono`** (with `kxc_round16_mono`). -/
-theorem kxcC_round16_mono (x y : Int) (h : x ≤ y) : kxcRound16 x ≤ kxcRound16 y := by
-  unfold kxcRound16; omega
 
 /-! ## §2 THE COVERAGE ROWS ACROSS uvmclear (Rocq `kxc_um_below_insert`,
 `kxc_um_covered_insert`, deviation 3) -/

@@ -119,9 +119,6 @@ theorem kcat_nthByte0_ofNat (b : BitVec 8) : nthByte (n := 8) (BitVec.ofNat 64 b
     apply BitVec.eq_of_toNat_eq; simp [BitVec.toNat_setWidth]]
   exact kcat_nthByte0_zext b
 
-/-- **Rocq `moi_of_sint`**: a word is its own signed reading put back. -/
-theorem kcat_ofInt_toInt (r : BitVec 64) : BitVec.ofInt 64 r.toInt = r := BitVec.ofInt_toInt
-
 /-- A nonnegative signed reading is the word's `Nat` value put back. -/
 theorem kcat_ofNat_of_toInt (r : BitVec 64) (nb : Nat) (h : r.toInt = nb) : BitVec.ofNat 64 nb = r := by
   rw [← BitVec.ofInt_natCast, ← h, BitVec.ofInt_toInt]
@@ -424,19 +421,6 @@ def cvInv (m0 m : RegMap) (sp0 fdv : BitVec 64) : Prop :=
   m.get 18#5 = BitVec.ofNat 64 User.Cat.Sym.«buf» ∧ m.get 19#5 = fdv ∧
   m.get 20#5 = BitVec.ofNat 64 512 ∧ m.get 21#5 = BitVec.ofNat 64 1 ∧
   (∀ r : BitVec 5, ucalleeSavedIdx r = true → kcatFree r → m.get r = m0.get r)
-
-/-- **Rocq `cv_inv_call`**: a callee that honours the ABI keeps it. -/
-theorem cvInv_call (m0 m m' : RegMap) (sp0 fdv : BitVec 64) (hcs : ucalleeSaved m m')
-    (h : cvInv m0 m sp0 fdv) : cvInv m0 m' sp0 fdv := by
-  obtain ⟨h2, h8, h18, h19, h20, h21, hfr⟩ := h
-  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
-  · rw [hcs 2#5 (by decide)]; exact h2
-  · rw [hcs 8#5 (by decide)]; exact h8
-  · rw [hcs 18#5 (by decide)]; exact h18
-  · rw [hcs 19#5 (by decide)]; exact h19
-  · rw [hcs 20#5 (by decide)]; exact h20
-  · rw [hcs 21#5 (by decide)]; exact h21
-  · intro r hr hf; rw [hcs r hr]; exact hfr r hr hf
 
 /-- **Rocq `cv_writable`**: the registers a step may write without
 disturbing the invariant. -/

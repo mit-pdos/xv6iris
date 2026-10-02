@@ -175,8 +175,6 @@ window nothing moved. -/
 def umeFr (mm m : BMap) (pa : PAddr) (n : Nat) : Prop :=
   ummSameDom mm m ∧ ∀ a, a ∉ ubWin pa n → m a = mm a
 
-theorem umeFr_refl (mm : BMap) (pa : PAddr) (n : Nat) : umeFr mm mm pa n := ⟨ummSameDom_refl mm, fun _ _ => rfl⟩
-
 /-- A same-domain change of the window, put back into its map, is framed. -/
 theorem umeFr_union (mm mw : BMap) (pa : PAddr) (n : Nat) (h : ummSameDom (umeWin mm pa n) mw) :
     umeFr mm (umeUnion mw mm) pa n := by

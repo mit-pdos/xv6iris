@@ -129,13 +129,6 @@ theorem syncRegAuth_insert (c : FileFixed) (M : RegMapF GName) (k : Nat) (γ : G
   iintro H
   iapply (ghost_map_insert_persist (γ := c.ffReg) (m := M) k γ hk) $$ H
 
-/-- A registered era is in the authority's map. -/
-theorem syncRegAuth_lookup (c : FileFixed) (M : RegMapF GName) (k : Nat) (γ : GName) :
-    ⊢@{IProp GF} syncRegAuth c M -∗ syncReg c k γ -∗ ⌜Std.PartialMap.get? M k = some γ⌝ := by
-  unfold syncRegAuth syncReg
-  iintro Ha Hl
-  iapply ghost_map_lookup $$ Ha Hl
-
 /-! ## The run registry: era ↦ the running claim's position and deed names -/
 
 /-- PERSISTENT: era `k`'s running claim has position `p` and deed `d` (Rocq

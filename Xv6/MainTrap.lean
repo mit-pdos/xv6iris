@@ -49,13 +49,6 @@ theorem mn_ret_8e : jumpPc (KA.«main» + 142#64) = KA.«main» + 142#64 := by d
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
 
-theorem mn_ticksLock_kmap [CurCtx] :
-    kmapStatic (GF := GF) ⊢ kmapId tickslockAddr ∗ kmapId (tickslockAddr + 16#64) := by
-  iintro #HS
-  isplit
-  · iapply kmapStatic_rw tickslockAddr (by decide) $$ HS
-  · iapply kmapStatic_rw (tickslockAddr + 16#64) (by decide) $$ HS
-
 set_option maxHeartbeats 4000000 in
 /-- **+0x7e → +0x82**: `trapinit()` (`initlock(&tickslock, "time")`), then
 the ticks lock is born at `γt` over `ticks`. -/

@@ -164,13 +164,6 @@ def iputPins (KR R : RegMap) : Prop :=
   R 21#5 = KR 21#5 ∧ R 22#5 = KR 22#5 ∧ R 23#5 = KR 23#5 ∧ R 24#5 = KR 24#5 ∧
   R 25#5 = KR 25#5 ∧ R 26#5 = KR 26#5 ∧ R 27#5 = KR 27#5
 
-theorem iputPins_cs (KR R R' : RegMap) (h : iputPins KR R) (hcs : calleeSaved R R') :
-    iputPins KR R' := by
-  obtain ⟨a21, a22, a23, a24, a25, a26, a27⟩ := h
-  obtain ⟨-, -, -, -, -, -, c21, c22, c23, c24, c25, c26, c27⟩ := hcs
-  exact ⟨c21.trans a21, c22.trans a22, c23.trans a23, c24.trans a24, c25.trans a25,
-    c26.trans a26, c27.trans a27⟩
-
 /-- A register write outside `s5`..`s11` keeps the pins. -/
 theorem iputPins_set (KR R : RegMap) (h : iputPins KR R) (r : BitVec 5) (v : BitVec 64)
     (hr : r.toNat < 21 ∨ 27 < r.toNat) : iputPins KR (R.set r v) := by

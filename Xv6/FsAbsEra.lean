@@ -169,14 +169,6 @@ theorem npRemovelast_len_ge {A : Type _} (ps es rest : List A) (hps : ps = es ++
   rw [List.dropLast_append_of_ne_nil hne, List.length_append]
   omega
 
-/-- Rocq's `np_removelast_len_gt`. -/
-theorem npRemovelast_len_gt {A : Type _} (ps es : List A) (x : A) (rest : List A)
-    (hps : ps = (es ++ [x]) ++ rest) (hne : rest ≠ []) : es.length < ps.dropLast.length := by
-  subst hps
-  rw [List.dropLast_append_of_ne_nil hne, List.length_append, List.length_append]
-  simp only [List.length_singleton]
-  omega
-
 /-- The parent prefix: every path element but the last (Rocq's
 `np_elems`; `SysMknodDefs.npar_elems` is the same list). -/
 def npElems (pl : List (BitVec 8)) : List Fname := (pathElems pl).dropLast
@@ -476,14 +468,6 @@ theorem epHops_is_axHops (rt : Nat) (γfs : FsNames) (P Pmiss : Nat → Nat → 
       = axHopsFrom rt (elend (fsGammaL γfs)) P Pmiss (npElems pl) n :=
   rfl
 
-/-- Rocq's `ep_hops_cons`. -/
-theorem epHops_cons (rt : Nat) (γfs : FsNames) (P Pmiss : Nat → Nat → IProp GF)
-    (pl : List (BitVec 8)) (k : Nat) (s : Fname) (rest : List Fname)
-    (hd : (npElems pl).drop k = s :: rest) :
-    epHopsFrom rt γfs P Pmiss pl k ⊢
-      epHop rt γfs P Pmiss k s ∗ epHopsFrom rt γfs P Pmiss pl (k + 1) :=
-  axHopsFrom_cons rt _ P Pmiss _ k s rest hd
-
 /-- the family past its end is `emp`: what the success exit and the
 "nameiparent of /" exit hand back (Rocq's `ep_hops_done`). -/
 theorem epHops_done (rt : Nat) (γfs : FsNames) (P Pmiss : Nat → Nat → IProp GF)
@@ -527,16 +511,6 @@ theorem npDead_missed (rt : Nat) (γfs : FsNames) (P Pmiss : Nat → Nat → IPr
     · iexact HP
     · iexact Hh
 
-/-- "nameiparent of /": no elements, so the cursor at 0 IS the whole
-refund (Rocq's `np_dead_noelems`). -/
-theorem npDead_noelems (rt : Nat) (γfs : FsNames) (P Pmiss : Nat → Nat → IProp GF)
-    (pl : List (BitVec 8)) (d : Nat) (hnil : pathElems pl = []) :
-    ⊢@{IProp GF} P 0 d -∗ npDead rt γfs P Pmiss pl := by
-  have hlen : (npElems pl).length ≤ 0 := by simp [npElems, hnil]
-  iintro HP
-  iapply (npDead_unfired rt γfs P Pmiss pl 0 d (Nat.zero_le _)) $$ HP
-  iapply (epHops_done rt γfs P Pmiss pl 0 hlen)
-
 /-! ## 7.  The deferred start (was FsAbsStart.v) -/
 
 /-- THE NAMEI SIDE (Rocq's `ex_start`): one shot, at the start inum
@@ -550,33 +524,6 @@ parent prefix. -/
 def epStart (γfs : FsNames) (rt cw : Nat) (P Pmiss : Nat → Nat → IProp GF)
     (pl : List (BitVec 8)) : IProp GF :=
   iprop(∀ r : Nat, ⌜r = umStartOf rt cw pl⌝ ={⊤}=∗ P 0 r ∗ epHopsFrom rt γfs P Pmiss pl 0)
-
-/-- THE RECEIPT: the absolute pair is a start at ANY root, once its cursor
-is at `rt` (Rocq's `ex_start_of_pair`; deviation 2). -/
-theorem exStart_ofPair (γfs : FsNames) (rt cw : Nat) (P Pmiss : Nat → Nat → IProp GF)
-    (pl : List (BitVec 8)) (hsl : pl[0]? = some SLASH) :
-    ⊢@{IProp GF} P 0 rt -∗ exHopsFrom rt γfs P Pmiss pl 0 -∗ exStart γfs rt cw P Pmiss pl := by
-  iintro HP Hh
-  unfold exStart
-  iintro %r %hr
-  rw [hr, umStartOf_slash rt cw pl hsl]
-  imodintro
-  isplitl [HP]
-  · iexact HP
-  · iexact Hh
-
-/-- Rocq's `ep_start_of_pair`. -/
-theorem epStart_ofPair (γfs : FsNames) (rt cw : Nat) (P Pmiss : Nat → Nat → IProp GF)
-    (pl : List (BitVec 8)) (hsl : pl[0]? = some SLASH) :
-    ⊢@{IProp GF} P 0 rt -∗ epHopsFrom rt γfs P Pmiss pl 0 -∗ epStart γfs rt cw P Pmiss pl := by
-  iintro HP Hh
-  unfold epStart
-  iintro %r %hr
-  rw [hr, umStartOf_slash rt cw pl hsl]
-  imodintro
-  isplitl [HP]
-  · iexact HP
-  · iexact Hh
 
 /-- the trivial start: every hop says yes and every cursor is `True`
 (Rocq's `ep_start_triv`; SpecCreate's bundle unit). -/

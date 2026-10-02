@@ -82,7 +82,6 @@ theorem utrapMs_SIE (e : BitVec 1) (ms : BitVec 64) : BitVec.extractLsb' 1 1 (ut
 theorem utrapMs_SPP (e : BitVec 1) (ms : BitVec 64) : BitVec.extractLsb' 8 1 (utrapMs e ms) = 0#1 := by utrap_bits
 theorem utrapMs_SPIE (e : BitVec 1) (ms : BitVec 64) :
     BitVec.extractLsb' 5 1 (utrapMs e ms) = BitVec.extractLsb' 1 1 ms := by utrap_bits
-theorem utrapMs_SPELP (e : BitVec 1) (ms : BitVec 64) : BitVec.extractLsb' 23 1 (utrapMs e ms) = e := by utrap_bits
 theorem utrapMs_MPRV (e : BitVec 1) (ms : BitVec 64) :
     BitVec.extractLsb' 17 1 (utrapMs e ms) = BitVec.extractLsb' 17 1 ms := by utrap_bits
 theorem utrapMs_MXR (e : BitVec 1) (ms : BitVec 64) :

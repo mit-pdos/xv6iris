@@ -119,12 +119,7 @@ theorem cr_ret_108 : jumpPc (KA.«consoleread» + 0x108#64) = KA.«consoleread»
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
 
-theorem cr_sext127 : BitVec.signExtend 64 127#12 = 127#64 := by decide
-theorem cr_sext152 : BitVec.signExtend 64 152#12 = 152#64 := by decide
-theorem cr_sext156 : BitVec.signExtend 64 156#12 = 156#64 := by decide
-theorem cr_sext392 : BitVec.signExtend 64 392#12 = 392#64 := by decide
 theorem cr_sext4015 : BitVec.signExtend 64 4015#12 = 0xFFFFFFFFFFFFFFAF#64 := by decide
-theorem cr_sext0 : BitVec.signExtend 64 0#12 = 0#64 := by decide
 
 /-- The `cbuf` byte: byte 7 of the spare frame cell at `sp-88`. -/
 theorem cr_cbuf_addr (sp : BitVec 64) :
@@ -173,15 +168,6 @@ theorem cr_beq_lit_f (b v8 : BitVec 8) (v : BitVec 64) (hv : BitVec.setWidth 64 
 
 theorem cr_lit4 : BitVec.setWidth 64 (4#8) = 4#64 := by decide
 theorem cr_lit10 : BitVec.setWidth 64 (10#8) = 10#64 := by decide
-
-/-- `beq s5,a3` against a byte literal, with `s5` a zero-extended byte. -/
-theorem cr_beq_byte (b v : BitVec 8) :
-    bcond bop.BEQ (BitVec.setWidth 64 b) (BitVec.setWidth 64 v) = decide (b = v) := by
-  show (BitVec.setWidth 64 b == BitVec.setWidth 64 v) = decide (b = v)
-  by_cases h : b = v
-  · subst h; simp
-  · rw [decide_eq_false h, beq_eq_false_iff_ne]
-    exact fun e => h (cr_setWidth8_inj b v e)
 
 /-- `signExtend` of a 32-bit value that represents `m`. -/
 theorem cr_sextw32 (w : BitVec 32) (m : Nat) (hm : m < 2 ^ 31) (hw : w.toNat = m) :

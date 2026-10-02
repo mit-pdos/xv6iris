@@ -367,7 +367,6 @@ theorem gp_ret_c4e : jumpPc (KA.«growproc» + 0x32#64) = (KA.«growproc» + 0x3
   decide
 theorem gp_ret_c72 : jumpPc (KA.«growproc» + 0x56#64) = (KA.«growproc» + 0x56#64) := by
   decide
-theorem gp_minus_one : BitVec.signExtend 64 (4095#12) = -1#64 := by decide
 theorem gp_uvmMaxsz_toNat : (0x3FFFFFE000#64).toNat = uvmMaxsz := by decide
 
 theorem growproc_br_fffffffffffff636 : KA.«growproc» + 0xfffffffffffff636#64 = KA.«uvmdealloc» := by decide

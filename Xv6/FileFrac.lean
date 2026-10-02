@@ -120,20 +120,6 @@ theorem filePaySt_split (γ : FileNames) (k : Nat) (q1 q2 : Qp) (C : FContent) (
   · iexists pn; iframe Ht1 Hc1; ipureintro; exact hok
   · iexists pn; iframe Ht2 Hc2; ipureintro; exact hok
 
-theorem filePaySt_merge (γ : FileNames) (k : Nat) (q1 q2 : Qp) (C : FContent) (st1 st2 : FdState) :
-    filePaySt (GF := GF) γ k q1 C st1 ∗ filePaySt γ k q2 C st2 ⊢
-      filePaySt γ k (q1 + q2) C st1 ∗ ⌜st1 = st2⌝ := by
-  unfold filePaySt
-  iintro ⟨⟨%pn, %hok1, Ht1, Hc1⟩, ⟨%pn', %hok2, Ht2, Hc2⟩⟩
-  icases fpayTok_merge γ k q1 q2 pn pn' $$ [Ht1 Ht2] with ⟨Ht, %he⟩
-  · iframe
-  subst he
-  ihave Hc := fileCore_merge k q1 q2 pn C $$ [Hc1 Hc2]
-  · iframe
-  isplitl [Ht Hc]
-  · iexists pn; iframe Ht Hc; ipureintro; exact hok1
-  · ipureintro; exact fdstateOk_inj _ _ _ _ _ _ _ hok1 hok2
-
 /-- A reference's content at `q1 + q2` is two references' worth. -/
 theorem fileBody_split (γ : FileNames) (k : Nat) (q1 q2 : Qp) (C : FContent) (st : FdState) :
     fileFieldsAt (GF := GF) curCtx k (q1 + q2) C ∗ filePaySt γ k (q1 + q2) C st ⊢

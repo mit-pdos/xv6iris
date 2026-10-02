@@ -31,9 +31,7 @@ namespace Xv6
 /-- Rocq `ushq_bar`: `'|'`. -/
 def ushqBar : BitVec 8 := 124#8
 
-theorem ushqBar_sym : ushpIsSym ushqBar = true := by decide
 theorem ushqBar_not_ws : ushpIsWs ushqBar = false := by decide
-theorem ushqBar_not_gt : ushqBar ≠ ushsGt := by decide
 
 /-! ## §2 At most one symbol byte, and it is a `|` -/
 

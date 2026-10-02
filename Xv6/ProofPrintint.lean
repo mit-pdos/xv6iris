@@ -362,12 +362,6 @@ theorem dlKept_refl (R : RegMap) : dlKept R R := fun _ _ _ _ _ _ _ => rfl
 theorem dlKept_trans {R R' R'' : RegMap} (h : dlKept R R') (h' : dlKept R' R'') : dlKept R R'' :=
   fun r a b c d e f => (h' r a b c d e f).trans (h r a b c d e f)
 
-theorem dlKept_body (R : RegMap) (v17 v12 v14 v15a v15b v15c v10 v13 : BitVec 64) :
-    dlKept R (((((((R.set 17#5 v17).set 12#5 v12).set 14#5 v14).set 15#5 v15a).set 15#5 v15b).set 10#5
-      v10).set 13#5 v13) := by
-  intro r h10 h12 h13 h14 h15 h17
-  simp only [RegMap.set_apply, h10, h12, h13, h14, h15, h17, if_false]
-
 set_option maxHeartbeats 4000000 in
 /-- ONE iteration of the digit loop, `+0x22 .. +0x3e`, handing over at the
 back-edge branch. -/
@@ -547,11 +541,6 @@ theorem plKept_trans {R R' R'' : RegMap} (h : plKept R R') (h' : plKept R' R'') 
   obtain ⟨b2, b8, b18, b19, b20, b21, b22, b23, b24, b25, b26, b27⟩ := h'
   exact ⟨b2.trans a2, b8.trans a8, b18.trans a18, b19.trans a19, b20.trans a20, b21.trans a21,
     b22.trans a22, b23.trans a23, b24.trans a24, b25.trans a25, b26.trans a26, b27.trans a27⟩
-
-/-- A callee's `calleeSaved` is `plKept` (it keeps `s1` too). -/
-theorem plKept_of_calleeSaved {R R' : RegMap} (h : calleeSaved R R') : plKept R R' := by
-  obtain ⟨a2, a8, _, a18, a19, a20, a21, a22, a23, a24, a25, a26, a27⟩ := h
-  exact ⟨a2, a8, a18, a19, a20, a21, a22, a23, a24, a25, a26, a27⟩
 
 /-- The descending cursor, in the form `k_norm` leaves it. -/
 theorem pi_pred' (b : BitVec 64) (n : Nat) :

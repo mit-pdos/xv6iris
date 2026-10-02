@@ -426,10 +426,6 @@ end FsPool
 section FsFoot
 variable {GF : BundledGFunctors}
 
-/-- Rocq's `phi_runs_cons_range`. -/
-theorem phiRuns_consRange (Γ : FsViewNames GF) (r : XRun) (l : List XRun) :
-    phiRuns Γ (r :: l) ⊣⊢ FsView.byteRange Γ (xrBlk r) (xrOff r) (xrBs r) ∗ phiRuns Γ l := .rfl
-
 /-- A literal run at the head (helper; stated at variables so no concrete
 byte list is ever unfolded by unification). -/
 theorem phiRuns_consLit (Γ : FsViewNames GF) (b off : Nat) (bs : List (BitVec 8))

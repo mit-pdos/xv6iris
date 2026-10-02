@@ -212,27 +212,6 @@ structure ACQUIRESLEEP_LLB : Prop where
     wp_acquiresleep_gen_llb_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl γ R H q j pid dqp tl
       hj hproc hK hnoff htier
 
-/-- The interrupts-off store-order instance. -/
-theorem ACQUIRESLEEP_LLB.wp_acquiresleep_gen_llb (A : ACQUIRESLEEP_LLB) {hlc : HasLC} {GF : BundledGFunctors}
-    [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF]
-    [CurCtx] (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (cpu : CPU) (k : KCtx) (γl γ : GName) (R : CtxId → IProp GF) [CtxMorph R] (H : Qp → IProp GF) (q : Qp)
-    (j : Nat) (pid : BitVec 32) (dqp : DFrac) (tl : Nat) hj hproc hK hsie hnoff hlocks htier :
-    wp_acquiresleep_gen_llb_body (hlc := hlc) (GF := GF) Γ cpu k γl γ R H q j pid dqp tl
-      hj hproc hK hsie hnoff hlocks htier := by
-  have h := A.wp_acquiresleep_gen_llb_eb (hlc := hlc) (GF := GF) Γ cpu k γl γ R H q j pid dqp tl
-    hj hproc hK hnoff htier
-  unfold wp_acquiresleep_gen_llb_eb_body at h
-  unfold wp_acquiresleep_gen_llb_body
-  rw [hsie] at h
-  simp only [trapCsrsExt_false, cpuClaimExt_false] at h
-  iintro ⟨Hk, Hpc, Hpi, Htc, Hcl, Hir, Hsl, HH, Htl, Hpid, Hnext⟩
-  iapply h
-  iframe Hk Hpc Hpi Htc Hcl Hir Hsl HH Htl Hpid
-  iapply wpNext_mono $$ Hnext
-  iintro %cpu' HK %spie %spp %R' %hcs Hk Hpc ⟨Htc, Hir⟩ Hcl Ht HR Hfl Hpid
-  iapply HK $$ %spie %spp %R' %hcs Hk Hpc Htc Hcl Hir Ht HR Hfl Hpid
-
 /-- `ACQUIRESLEEP` is the `tl := 0` instance. -/
 theorem ACQUIRESLEEP_LLB.toACQUIRESLEEP (A : ACQUIRESLEEP_LLB) : ACQUIRESLEEP := ⟨by
   intro hlc GF _ _ _ _ _ _ _ _ _ Γ _ cpu k γl γ R _ H q j pid dqp hj hproc hK hnoff htier

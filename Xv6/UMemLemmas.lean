@@ -463,12 +463,6 @@ theorem pteAD_W (w v : BitVec 64) (h : pteAD w v) : v &&& PTE_W = w &&& PTE_W :=
   revert hl
   bv_decide
 
-theorem pteAD_U (w v : BitVec 64) (h : pteAD w v) : v &&& PTE_U = w &&& PTE_U := by
-  have hl := pteAD_low w v h
-  simp only [PTE_U]
-  revert hl
-  bv_decide
-
 /-- The trapframe mapping has no `U`. -/
 theorem tfLeaf_not_vu (tfp : BitVec 44) : ¬ pteVU (tfLeaf tfp) := by
   intro h
@@ -482,8 +476,6 @@ theorem trampLeaf_not_vu : ¬ pteVU trampLeaf := by
   refine h.2 ?_
   simp only [trampLeaf, leafOf, PTE_U, PTE_R, PTE_X, trampPpn]
   bv_decide
-
-theorem tfVpn_ne_trampVpn : trampVpn.toNat ≠ tfVpn.toNat := by decide
 
 /-- A leaf of the table with `U` set is a user leaf. -/
 theorem um_of_leaves_vu (P : UPtd) (k : Nat) (w : BitVec 64)
@@ -584,11 +576,6 @@ theorem extSz_trans {sz : BitVec 64} {P Q R : UPtd} (h1 : P.extSz sz Q) (h2 : Q.
       subst e
       exact hl1 k w' hn hq
     | none => exact hl2 k w hq hs
-
-/-- A weaker break is still a bound. -/
-theorem extSz_mono {sz sz' : BitVec 64} {P P' : UPtd} (hle : sz.toNat ≤ sz'.toNat)
-    (h : P.extSz sz P') : P.extSz sz' P' :=
-  ⟨h.1, fun k w hn hs => Nat.lt_of_lt_of_le (h.2.1 k w hn hs) hle, h.2.2⟩
 
 /-- `vmfault`'s move, the only way a table grows under a user copy. -/
 theorem extSz_insertLeaf (sz : BitVec 64) (P : UPtd) (vpn : Nat) (r : BitVec 64)

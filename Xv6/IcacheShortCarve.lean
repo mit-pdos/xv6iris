@@ -90,11 +90,6 @@ theorem inodeRefShort_carve [Icfg] [CurCtx] (k : Nat) (qt qi s : Qp) (dev inum :
     · iframe
     iframe
 
-theorem inodeRefShort_gather [Icfg] [CurCtx] (k : Nat) (qt qi s : Qp) (dev inum : BitVec 32) :
-    inodeRefShort (GF := GF) k qt qi dev inum ∗ inodeShr k s dev inum ⊢
-      inodeRefShort k qt (qi + s) dev inum :=
-  (inodeRefShort_carve k qt qi s dev inum).2
-
 /-- ...and the generation-named forms: the share is carved at the SAME
 generation and floor as the parent, so it gathers back without a pin (Rocq
 `inode_ref_short_genlo_carve`). -/
@@ -123,12 +118,6 @@ theorem inodeRefShortGenlo_carve [Icfg] [CurCtx] (k : Nat) (qt qi s : Qp) (dev i
     · iframe
     iframe
 
-theorem inodeRefShortGenlo_gather [Icfg] [CurCtx] (k : Nat) (qt qi s : Qp)
-    (dev inum : BitVec 32) (g : GName) (lo : Nat) :
-    inodeRefShortGenlo (GF := GF) k qt qi dev inum g lo ∗ inodeShrGenlo k s dev inum g lo ⊢
-      inodeRefShortGenlo k qt (qi + s) dev inum g lo :=
-  (inodeRefShortGenlo_carve k qt qi s dev inum g lo).2
-
 /-- Halving the part a short parent still holds, the usual carve size (Rocq
 `inode_ref_short_genlo_halve`). -/
 theorem inodeRefShortGenlo_halve [Icfg] [CurCtx] (k : Nat) (qt qi : Qp) (dev inum : BitVec 32)
@@ -136,13 +125,6 @@ theorem inodeRefShortGenlo_halve [Icfg] [CurCtx] (k : Nat) (qt qi : Qp) (dev inu
     inodeRefShortGenlo (GF := GF) k qt qi dev inum g lo ⊣⊢
       inodeRefShortGenlo k qt qi.half dev inum g lo ∗ inodeShrGenlo k qi.half dev inum g lo := by
   have h := inodeRefShortGenlo_carve (GF := GF) k qt qi.half qi.half dev inum g lo
-  rw [Qp.half_add_half] at h
-  exact h
-
-theorem inodeRefShort_halve [Icfg] [CurCtx] (k : Nat) (qt qi : Qp) (dev inum : BitVec 32) :
-    inodeRefShort (GF := GF) k qt qi dev inum ⊣⊢
-      inodeRefShort k qt qi.half dev inum ∗ inodeShr k qi.half dev inum := by
-  have h := inodeRefShort_carve (GF := GF) k qt qi.half qi.half dev inum
   rw [Qp.half_add_half] at h
   exact h
 

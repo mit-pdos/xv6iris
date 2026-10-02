@@ -125,11 +125,6 @@ theorem ushmKeep_mono {ws ws' : List (BitVec 5)} {m m' : RegMap} (h : ushmKeep w
     (hs : ws.all (fun r => ws'.contains r) = true) : ushmKeep ws' m m' := fun r hr =>
   h r (fun hm => hr (by have := List.all_eq_true.1 hs r hm; simpa using this))
 
-/-- A write after a keep. -/
-theorem ushmKeep_wr' {ws : List (BitVec 5)} {m m' : RegMap} (h : ushmKeep ws m m') (rd : BitVec 5)
-    (v : BitVec 64) : ushmKeep (ws ++ [rd]) m (ukWr m' rd v) :=
-  ushmKeep_trans h (ushmKeep_wr m' rd v)
-
 /-- **The callee-saved post from a keep**: registers outside `ws` kept
 theirs, and every callee-saved one inside `ws` was restored. -/
 theorem ushm_cs_of_keep {ws : List (BitVec 5)} {m m' : RegMap} (hk : ushmKeep ws m m')
@@ -343,10 +338,6 @@ def ushmMallocTyLe (N : UkNames GF) (B : Nat) (UM UM' : IProp GF) : Prop :=
 /-- **Rocq `UkShParse.ushp_malloc_ty`**: the capability at the allocator's
 whole range. -/
 def ushmMallocTy (N : UkNames GF) (UM UM' : IProp GF) : Prop := ushmMallocTyLe (hlc := hlc) N 65504 UM UM'
-
-/-- **Rocq `ushp_malloc_ty_le_top`**. -/
-theorem ushmMallocTyLe_top (N : UkNames GF) (UM UM' : IProp GF) (H : ushmMallocTy (hlc := hlc) N UM UM') :
-    ushmMallocTyLe (hlc := hlc) N 65504 UM UM' := H
 
 /-- **Rocq `ushp_malloc_ty_le_mono`**. -/
 theorem ushmMallocTyLe_mono (N : UkNames GF) (B B' : Nat) (UM UM' : IProp GF) (hB : B' ≤ B)

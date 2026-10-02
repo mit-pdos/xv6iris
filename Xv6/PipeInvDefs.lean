@@ -264,15 +264,6 @@ theorem pipeRef_split (γp : PipeNames) (w : Bool) (q1 q2 : Qp) :
     pipeRef (GF := GF) γp w (q1 + q2) ⊣⊢ pipeRef γp w q1 ∗ pipeRef γp w q2 :=
   (ghost_var_fractional (GF := GF) (pnEnd γp w) ()).fractional q1 q2
 
-theorem pipeRef_valid (γp : PipeNames) (w : Bool) (q : Qp) :
-    pipeRef (GF := GF) γp w q ⊢ ⌜q.val ≤ 1⌝ := by
-  unfold pipeRef ghost_var
-  iintro H
-  ihave Hv := iOwn_cmraValid $$ H
-  icases internalCmraValid_discrete $$ Hv with %Hv
-  ipureintro
-  exact DFrac.valid_own.mp (DFracAgree.mk_valid.mp Hv)
-
 /-- The whole point of the `q = 1` state: nobody else holds any of this end. -/
 theorem pipeEndFull_excl (γp : PipeNames) (w : Bool) (q : Qp) :
     pipeEndFull (GF := GF) γp w -∗ pipeRef γp w q -∗ False := by
@@ -280,9 +271,6 @@ theorem pipeEndFull_excl (γp : PipeNames) (w : Bool) (q : Qp) :
   iintro H1 H2
   ihave %hv := ghost_var_valid_2 _ _ _ _ _ $$ H1 H2
   exact absurd (DFrac.valid_own_op hv.1) (by simp)
-
-theorem pipeRef_full_excl (γp : PipeNames) (w : Bool) (q : Qp) :
-    pipeRef (GF := GF) γp w 1 -∗ pipeRef γp w q -∗ False := pipeEndFull_excl γp w q
 
 /-! ### The per-end coupling between the flag and the ghost
 
@@ -386,12 +374,6 @@ theorem pipeEndstate_closed (γp : PipeNames) (w : Bool) (v : BitVec 32) (hcl : 
       · unfold pipeEndFull; iframe Hfull Hs
     · iexact Hs
 
-/-- The two receipts, in the order `pipeResDead` wants them. -/
-theorem pipeShut_both (γp : PipeNames) (w : Bool) :
-    pipeShut (GF := GF) γp w -∗ pipeShut γp (!w) -∗
-    pipeShut γp false ∗ pipeShut γp true := by
-  cases w <;> simp only [Bool.not_false, Bool.not_true] <;> · iintro H1 H2; iframe
-
 /-! ### THE BYTE QUEUE'S AUTHORITY, COUPLED OR DISCONNECTED (Rocq `pipe_qres`)
 
 The COUPLED arm: the ghost state IS the physical one -- the written sequence
@@ -426,11 +408,6 @@ instance pipeQres_timeless (γp : PipeNames) (nr nw ro wo : BitVec 32) (bs : Lis
     Timeless (pipeQres (hlc := hlc) (GF := GF) γp nr nw ro wo bs) := by
   unfold pipeQres; infer_instance
 
-/-- The disconnect, at the taint's price (Rocq `pipe_qres_taint`). -/
-theorem pipeQres_taint (γp : PipeNames) (nr nw ro wo : BitVec 32) (bs : List (BitVec 8)) :
-    MachFixedGS.killCred (hlc := hlc) (GF := GF) ⊢ pipeQres (hlc := hlc) γp nr nw ro wo bs := by
-  unfold pipeQres; exact or_intro_r
-
 end
 
 /-! ## The page bytes, the lock payload, the dead state -/
@@ -441,9 +418,6 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Kernel
 /-- `pi->data[0..PIPESIZE)`, contents tracked, over an EXPLICIT context. -/
 def pipeDataAt (ξ : CtxId) (pi : BitVec 64) (bs : List (BitVec 8)) : IProp GF := iprop%
   [∗list] j ↦ b ∈ bs, wordAtN ξ (pi + BitVec.ofNat 64 (pipeDataOff + j)) 1 (DFrac.own 1) b
-
-/-- The data bytes at the ambient context. -/
-def pipeData (pi : BitVec 64) (bs : List (BitVec 8)) : IProp GF := pipeDataAt curCtx pi bs
 
 instance instCtxMorphPipeDataAt (pi : BitVec 64) (bs : List (BitVec 8)) :
     CtxMorph (GF := GF) (fun ξ => pipeDataAt ξ pi bs) := by
@@ -565,18 +539,6 @@ theorem lockedCore_dead (γl : GName) (γp : PipeNames) (i : CPU) :
   iintro ⟨%B, Hf, _⟩ Hd
   iapply (lockHalf_some_dead γl γp i true B) $$ Hf Hd
 
-theorem locked_dead (γl : GName) (γp : PipeNames) (i : CPU) :
-    locked (GF := GF) γl i -∗ pipeDead γl γp -∗ False := by
-  unfold locked
-  iintro ⟨Hc, _⟩ Hd
-  iapply (lockedCore_dead γl γp i) $$ Hc Hd
-
-theorem lockedPre_dead (γl : GName) (γp : PipeNames) (i : CPU) :
-    lockedPre (GF := GF) γl i -∗ pipeDead γl γp -∗ False := by
-  unfold lockedPre
-  iintro ⟨%B, Hf, _⟩ Hd
-  iapply (lockHalf_some_dead γl γp i false B) $$ Hf Hd
-
 /-- THE reclamation step.  The last closer arrives with a receipt for each end
 and the lock's free-state half; the receipts say both flags are `0`, so both
 references are inside `pipeRes`; out come the dead state and every byte. -/
@@ -635,16 +597,6 @@ theorem isPipe_kmaps (γl : GName) (γp : PipeNames) (pi : BitVec 64) :
   iintro ⟨_, _, #H1, #H2, _⟩
   iframe H1 H2
 
-/-- The lock's FLOOR rides inside `isPipe`, exactly as it rides inside
-`isLock`; no client of the pipe ever names `lo`/`lc`. -/
-theorem isPipe_inv (γl : GName) (γp : PipeNames) (pi : BitVec 64) :
-    isPipe (GF := GF) γl γp pi -∗ ∃ lo lc : Nat,
-      inv lockN (iprop(lockBody γl pi "pipe" (pipeResAt γp pi) lo lc ∨ pipeDead γl γp)) ∗
-      lkFloor curCtx lo ∗ lkFloor curCtx lc := by
-  unfold isPipe
-  iintro ⟨_, _, _, _, H⟩
-  iexact H
-
 /-- What acquire / holding / release take.  The credential is left to the
 caller: a reference for acquire, the holder token for release. -/
 theorem isPipe_openable (γl : GName) (γp : PipeNames) (pi : BitVec 64) :
@@ -654,12 +606,6 @@ theorem isPipe_openable (γl : GName) (γp : PipeNames) (pi : BitVec 64) :
   iintro ⟨%hok, %_, #Hm1, #Hm2, %lo, %lc, #Hinv, #Hflo, #Hflc⟩
   iapply (lockOpenable_of_dead γl pi "pipe" (pipeResAt γp pi) (pipeDead γl γp) lo lc hok)
     $$ Hm1 Hm2 Hinv Hflo Hflc
-
-/-- What a `struct file` of type FD_PIPE carries, ADDRESS-KEYED: the pipe
-itself (persistent) plus the share of the end the file's `writable` flag
-selects, with the ghost names quantified away. -/
-def pipeHeld (pi : BitVec 64) (w : Bool) (q : Qp) : IProp GF := iprop%
-  ∃ (γl : GName) (γp : PipeNames), isPipe γl γp pi ∗ pipeRef γp w q
 
 end
 

@@ -103,15 +103,6 @@ theorem umm_vmem_read_addr_inpage_ok (D : UFoot) (orc : UOrc) (s : UWSt) (hp : U
   obtain ⟨v', rfl⟩ := hok pa v rfl
   exact ⟨v', h⟩
 
-/-- **In-page, fault**: the part's fault is the load's. -/
-theorem umm_vmem_read_addr_inpage_err (D : UFoot) (orc : UOrc) (s : UWSt) (hp : UtrPins D s) (va : BitVec 64)
-    (w : Nat) (h0 : 0 < w) (h8 : w ≤ 8) (hpg : ummInPage va w) (e : ExecutionResult) (s' : UWSt) (orc' : UOrc)
-    (htr : runRW D orc s (translate_and_read_value (.Virtaddr va) w (.Load .Data) false false false) =
-      some (.Err e, s', orc')) :
-    runRW D orc s (vmem_read_addr (.Virtaddr va) w (.Load .Data) false false false) = some (.Err e, s', orc') := by
-  obtain ⟨r', h, herr, _⟩ := umm_vmem_read_addr_inpage D orc s hp va w h0 h8 hpg _ s' orc' htr
-  rw [h, herr e rfl]
-
 /-! ## §2 Across a page boundary -/
 
 /-- The high part's address and width, as the model computes them. -/

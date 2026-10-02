@@ -265,14 +265,6 @@ theorem uxc_jump_to_misaligned (orc : UOrc) (s : UWSt) (t : BitVec 64)
     uxc_trap D orc s _ hp hpc]
   rfl
 
-/-- **`jump_to`, an odd target**: the model's assertion fails, so the walk
-refuses (a decode invariant, not a trap: JAL/BTYPE offsets are even and the
-`PC` is 2-aligned; JALR clears bit 0). -/
-theorem uxc_jump_to_odd (orc : UOrc) (s : UWSt) (t : BitVec 64) (h0 : t.getLsbD 0 = true) :
-    runRW D orc s (jump_to t) = none := by
-  simp only [jump_to, ext_control_check_pc, uxc_access0, h0, uxc_runME_liftBind]
-  rfl
-
 end jump
 
 /-! ## Evenness of targets (bit facts, `bv_decide`) -/

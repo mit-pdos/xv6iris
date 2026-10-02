@@ -42,21 +42,10 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 
 set_option linter.unusedSimpArgs false
 
-/-- The pc at offset `o` of forkret. -/
-abbrev fkrPc (o : BitVec 64) : BitVec 64 := KA.«forkret» + o
-
 theorem fkr_br_prepare_return : KA.«forkret» + 2994#64 = KA.«prepare_return» := by
   decide
 
-theorem fkr_ret58 : jumpPc (KA.«forkret» + 0x54#64 + 4#64) = KA.«forkret» + 0x58#64 := by decide
 theorem fkr_ret58' : jumpPc (KA.«forkret» + 88#64) = KA.«forkret» + 0x58#64 := by decide
-
-/-- The `jalr`'s target: `TRAMPOLINE + (userret - trampoline)`. -/
-theorem fkr_userret_va :
-    jumpPc ((KA.«forkret» + 0x64#64 + BitVec.signExtend 64 (4#20 ++ 0#12) + BitVec.signExtend 64 1674#12) -
-      (KA.«forkret» + 0x6c#64 + BitVec.signExtend 64 (4#20 ++ 0#12) + BitVec.signExtend 64 1510#12) +
-      ((BitVec.signExtend 64 (16384#20 ++ 0#12) + BitVec.signExtend 64 4095#12) <<< 12)) = userretVa := by
-  decide
 
 theorem fkr_userret_va' :
     jumpPc (KA.«forkret» + (18158#64 + (-(KA.«forkret» + 18002#64) + 274877902848#64))) = userretVa := by

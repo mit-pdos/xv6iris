@@ -1353,7 +1353,4 @@ def admEcho : Pline' → Bool
   | LPipes (.PrEcho _) fs => allCats fs
   | _ => false
 
-/-- **Rocq `pipes_lmE`**: the pipeline application's model. -/
-noncomputable def pipesLmE : LModel := pipesLm (fun _ => none) admEcho
-
 end Xv6

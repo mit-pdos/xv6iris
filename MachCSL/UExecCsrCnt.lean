@@ -67,9 +67,6 @@ def uxrRes (f : RegFile) (c : BitVec 12) (acc : CSRAccessType) : CSRCheckResult 
 theorem uxrCntB_lo (i : BitVec 5) : uxrCntB (uxrCntLo i) = true := by
   simp only [uxrCntB, uxrCntLo, beq_iff_eq]; bv_decide
 
-theorem uxrCntHB_hi (i : BitVec 5) : uxrCntHB (uxrCntHi i) = true := by
-  simp only [uxrCntHB, uxrCntHi, beq_iff_eq]; bv_decide
-
 theorem uxrCntB_hi (i : BitVec 5) : uxrCntB (uxrCntHi i) = false := by
   simp only [uxrCntB, uxrCntHi, beq_eq_false_iff_ne, ne_eq]; bv_decide
 

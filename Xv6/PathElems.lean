@@ -456,11 +456,6 @@ theorem pathElems_slashes (n : Nat) : pathElems (List.replicate n SLASH) = [] :=
 
 theorem pathElems_root : pathElems [SLASH] = [] := pathElems_slashes 1
 
-/-- leading separators are absorbed, one at a time (hence any number) -/
-theorem pathElems_slash (p : List (BitVec 8)) :
-    pathElems (SLASH :: p) = pathElems p := by
-  rw [pathElems_unfold (SLASH :: p), skipelem_slash, ← pathElems_unfold]
-
 /-- a path IS the elements of its normalisation -/
 theorem pathElems_skip (p : List (BitVec 8)) : pathElems (peSkip p) = pathElems p := by
   rw [pathElems_unfold (peSkip p), pathElems_unfold p]
@@ -484,10 +479,6 @@ theorem pathElems_nil_norm (p : List (BitVec 8)) (hn : peNorm p) :
   constructor
   · intro h; exact peNorm_nil p hn h
   · intro h; subst h; rfl
-
-theorem skipelem_rest_nil_iff (p e r : List (BitVec 8)) (h : skipelem p = some (e, r)) :
-    (r = [] ↔ pathElems r = []) :=
-  (pathElems_nil_norm r (skipelem_rest_norm p e r h)).symm
 
 /-! ## A trailing separator changes nothing -/
 
@@ -578,10 +569,6 @@ theorem pathElems_snoc_slash_aux : ∀ (n : Nat) (p : List (BitVec 8)), p.length
           have hd := skipelem_decr p _ _ (skipelem_some p hs)
           exact ih _ (by omega)
 
-theorem pathElems_snoc_slash (p : List (BitVec 8)) :
-    pathElems (p ++ [SLASH]) = pathElems p :=
-  pathElems_snoc_slash_aux p.length p (Nat.le_refl _)
-
 /-! ## AN ELEMENT AT MOST 14 LONG IS COPIED WHOLE
 
 a longer one is TRUNCATED and the rest still resumes after all of it. -/
@@ -590,17 +577,6 @@ theorem skipelem_short (u v : List (BitVec 8)) (hu : noslash u) (hne : u ≠ [])
     (hlen : u.length ≤ 14) (hv : peAtSep v) :
     skipelem (u ++ v) = some (u, peSkip v) := by
   rw [skipelem_split u v hu hne hv, List.take_of_length_le hlen]
-
-theorem skipelem_exact14 (u v : List (BitVec 8)) (hu : noslash u) (hlen : u.length = 14)
-    (hv : peAtSep v) : skipelem (u ++ v) = some (u, peSkip v) := by
-  refine skipelem_short u v hu ?_ (by omega) hv
-  intro hc; rw [hc] at hlen; simp at hlen
-
-theorem skipelem_long (u v : List (BitVec 8)) (hu : noslash u) (hlen : 14 ≤ u.length)
-    (hv : peAtSep v) :
-    skipelem (u ++ v) = some (u.take 14, peSkip v) ∧ (u.take 14).length = 14 := by
-  have hne : u ≠ [] := by intro hc; rw [hc] at hlen; simp at hlen
-  exact ⟨skipelem_split u v hu hne hv, by rw [List.length_take]; omega⟩
 
 /-! ## namei vs nameiparent: all the elements, or all but the last plus it -/
 
@@ -618,12 +594,6 @@ unique (`nameiparent_uniq`). -/
 def nameiparentOf (p : List (BitVec 8)) (es : List (List (BitVec 8)))
     (e : List (BitVec 8)) : Prop := pathElems p = es ++ [e]
 
-theorem nameiparent_exists (p : List (BitVec 8)) (h : pathElems p ≠ []) :
-    ∃ es e, nameiparentOf p es e := by
-  rcases list_snoc_inv (pathElems p) with hnil | ⟨es, e, he⟩
-  · exact absurd hnil h
-  · exact ⟨es, e, he⟩
-
 theorem nameiparent_uniq (p : List (BitVec 8)) (es1 es2 : List (List (BitVec 8)))
     (e1 e2 : List (BitVec 8)) (h1 : nameiparentOf p es1 e1) (h2 : nameiparentOf p es2 e2) :
     es1 = es2 ∧ e1 = e2 := by
@@ -639,12 +609,6 @@ is the one whose REST is empty -/
 theorem skipelem_is_last (p e r : List (BitVec 8)) (h : skipelem p = some (e, r))
     (hr : r = []) : pathElems p = [e] := by
   rw [pathElems_some p e r h, hr, pathElems_nil]
-
-theorem skipelem_not_last (p e r : List (BitVec 8)) (h : skipelem p = some (e, r))
-    (hr : r ≠ []) : pathElems p = e :: pathElems r ∧ pathElems r ≠ [] := by
-  refine ⟨pathElems_some p e r h, ?_⟩
-  intro hc
-  exact hr ((pathElems_nil_norm r (skipelem_rest_norm p e r h)).mp hc)
 
 /-! ## The bridge to the NAME buffer: what namex's memmove leaves behind
 

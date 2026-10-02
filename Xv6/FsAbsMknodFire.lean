@@ -131,12 +131,6 @@ theorem mkfParent_row (dn dn' : Dinode) (bm bm' : Blkmap) (data data' : Nat → 
   rw [Xv6.absOf_dir _ hdir' (Xv6.eraNlink_nz dn' bm' data' (by rw [hnl']; exact hnl)), hents,
     Xv6.cafEra_nlink, Xv6.cafEra_nlink, hnl']
 
-/-- ITEM 4: THE MINTED CHILD'S ROW (Rocq's `mkf_child_dev`). -/
-theorem mkfChild_dev (dn : Dinode) (bm : Blkmap) (data : Nat → List (BitVec 8))
-    (major minor : BitVec 16) (h : dn = createMade T_DEVICE_w major minor) :
-    absOf (eraNode dn bm data) = some ⟨.ADev major.toNat minor.toNat, 1⟩ :=
-  absOf_create_dev _ major minor (by rw [eraNode_rec, h])
-
 /-! ## 3.  The read-only fire point, `ftopN` opened and closed -/
 
 section MknodFire
@@ -357,16 +351,6 @@ theorem cafAcreBump_nondir (c : Absnode) (hc : ∀ e, c ≠ .ADir e) : acreBump 
   | ADir e => exact absurd rfl (hc e)
   | _ => rfl
 
-/-- `deltaCreate_dev` with the device-ness dropped (Rocq's
-`caf_delta_create_nondir`): under `crePre` at a NON-DIRECTORY child the
-fused delta IS the one-row parent insert. -/
-theorem cafDeltaCreate_nondir (av : Aview) (d : Nat) (nm : Fname)
-    (ents : Std.ExtTreeMap Fname Nat compare) (nl i : Nat) (c : Absnode)
-    (hc : ∀ e, c ≠ .ADir e) (hp : crePre av d nm ents nl i c) :
-    deltaCreate d nm i c av = PartialMap.insert av d ⟨.ADir (ents.insert nm i), nl⟩ := by
-  rw [deltaCreate_armed av d nm ents nl i c hp (crePre_ne av d nm ents nl i c hp hc),
-    cafAcreBump_nondir c hc, Nat.add_zero]
-
 /-! ### 7.2  The minted child's row at `T_FILE` -/
 
 /-- `absOf_create_dev`'s twin (Rocq's `caf_abs_of_create_file`): the size
@@ -380,12 +364,6 @@ theorem cafAbs_of_create_file (n : FsNode) (major minor : BitVec 16)
   have hb : fnFileBytes n = [] := by
     unfold fnFileBytes fnSize; rw [hr]; rfl
   rw [absOf_file n hnd hfl (by rw [hnl]; decide), hb, hnl]
-
-/-- ...and at the era node (Rocq's `caf_child_file`). -/
-theorem cafChild_file (dn : Dinode) (bm : Blkmap) (data : Nat → List (BitVec 8))
-    (major minor : BitVec 16) (h : dn = createMade T_FILE_w major minor) :
-    absOf (eraNode dn bm data) = some ⟨.AFile [], 1⟩ :=
-  cafAbs_of_create_file _ major minor (by rw [eraNode_rec, h])
 
 /-- THE MINTED CHILD'S ROW AT ANY TYPE (Rocq's `caf_made_row_node`):
 `createMade` at a nonzero type reads as `creC0` of the type and the two
@@ -536,30 +514,6 @@ theorem cafAcre_fire [Icfg] (γfs : FsNames) (E : CoPset) (cf : Nat → Nat → 
       Fok.pfRecv) $$ H
   iapply (cafAcre_fire_nm γfs E cf (fun _ => True) Pd Farm Fok d i nm dqc np np' nc hE trivial
     hloc hdir hnl hnone hpnm habsp' habsc) $$ Hi Hai Hcm Harm HPd Hfp Hfc
-
-/-- the `AFile []` instance, the one the T_FILE create-AU fires (Rocq's
-`caf_acre_fire_file`). -/
-theorem cafAcre_fire_file [Icfg] (γfs : FsNames) (E : CoPset)
-    (Pd : Nat → IProp GF)
-    (Farm : Pfam GF (Aview → Nat → IProp GF))
-    (Fok : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
-    (d i : Nat) (nm : Fname) (dqc : DFrac) (np np' nc : FsNode)
-    (hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ E) (hloc : InodeLocal d np')
-    (hdir : fnIsDir np = true) (hnl : fnNlink np ≠ 0) (hnone : (dirEntries np)[nm]? = none)
-    (hpnm : nm ≠ DOT ∧ nm ≠ DOTDOT)
-    (habsp' : absOf np' = some ⟨.ADir ((dirEntries np).insert nm i), fnNlink np⟩)
-    (habsc : absOf nc = some ⟨.AFile [], 1⟩) :
-    ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗ appInv (hlc := hlc) γfs -∗
-      pfAt (acreCommitAt (hlc := hlc) (fsGammaL γfs) appE (.AFile []) Pd Farm) Fok -∗
-      creArmFired Farm i -∗
-      Pd d -∗
-      topFrag (fsGammaL γfs) d np -∗
-      topFragQ (fsGammaL γfs) dqc i nc ={E}=∗
-        topFrag (fsGammaL γfs) d np' ∗ topFragQ (fsGammaL γfs) dqc i nc ∗ Pd d ∗
-        ∃ av : Aview, ⌜crePre av d nm (dirEntries np) (fnNlink np) i (.AFile [])⌝ ∗
-          Fok.pfRecv av d nm i :=
-  cafAcre_fire γfs E (fun _ _ => .AFile []) Pd Farm Fok d i nm dqc np np' nc hE hloc hdir hnl hnone
-    hpnm habsp' habsc
 
 end CreateFire2
 

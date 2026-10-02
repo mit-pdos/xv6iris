@@ -47,17 +47,4 @@ theorem bootFin_boardInit (hid : BitVec 64) (pma : List PMA_Region) (f : BootReg
   all_goals boot_lk
   all_goals first | rfl | decide
 
-/-! ## §2 The configuration assert -/
-
-/-- Rocq `exec_config_is_valid`: at the board's PMA table the assert holds and
-nothing moves. -/
-theorem bootRun_config_is_valid (f : BootRegs) (hpma : f .pma_regions = bootPMA) :
-    bootRun (config_is_valid ()) f = some (true, f) := by
-  have h : BootFin (fun b f' => b = true ∧ f' = f) (config_is_valid ()) f := by
-    boot_peel
-    refine bootFin_pure _ _ _ ⟨?_, rfl⟩
-    decide +kernel
-  obtain ⟨b, f', h1, rfl, rfl⟩ := h
-  exact h1
-
 end MachCSL

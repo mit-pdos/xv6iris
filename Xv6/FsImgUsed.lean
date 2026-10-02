@@ -274,15 +274,6 @@ theorem fsInodeBlocksSet_mem (P : Nat → List (BitVec 8)) (sb : FsSb) (i b : Na
     b ∈ fsInodeBlocksSet P sb i ↔ b ∈ fsInodeBlocks P (fsDinode P sb i) := by
   unfold fsInodeBlocksSet; rw [← LawfulSet.mem_ofList]
 
-/-- Rocq's `fs_inode_blocks_set_sub` (pointwise; deviation 3). -/
-theorem fsInodeBlocksSet_sub (P : Nat → List (BitVec 8)) (sb : FsSb) (i : Nat)
-    (X : ExtTreeSet Nat compare) (hok : FsInodeOk P sb (fsDinode P sb i))
-    (hX : ∀ b, fsDataStart sb ≤ b → b < sb.sbSize → b ∈ X) :
-    ∀ b, b ∈ fsInodeBlocksSet P sb i → b ∈ X := by
-  intro b hb
-  have := fsInodeBlocks_range P sb _ b hok ((fsInodeBlocksSet_mem P sb i b).1 hb)
-  exact hX b this.1 this.2
-
 /-- **THE CARVE'S OTHER PREMISE** (Rocq's `fs_inode_blocks_disjoint`): W4,
 per PAIR of live inums (pointwise; deviation 3). -/
 theorem fsInodeBlocks_disjoint (P : Nat → List (BitVec 8)) (sb : FsSb) (i j : Nat)
@@ -302,13 +293,6 @@ theorem fsInodeBlocks_disjoint (P : Nat → List (BitVec 8)) (sb : FsSb) (i j : 
 SET bit means IN USE (Rocq's `fs_bit`; deviation 4). -/
 def fsBit (bmb : List (BitVec 8)) (b : Nat) : Bool :=
   (bmb[b / 8]!).getLsbD (b % 8)
-
-/-- ...tied to that encoder (Rocq's `fs_bit_bm_bytes`). -/
-theorem fsBit_bmBytes (n : Nat) (u : BitSet) (b : Nat) (hb : b < 8 * n) :
-    fsBit (bmBytes n u) b = decide (b ∈ u) := by
-  unfold fsBit
-  rw [getElem!_of_getElem? (bmBytes_lookup n u (b / 8) (bit_byte_lt n b hb)),
-    bmByte_getLsbD u (b / 8) (b % 8) (bit_off_range b), bit_split]
 
 /-- W5 (Rocq's `fs_bitmap_wf`): below `size`, a bit is set exactly at the
 metadata blocks and the used blocks. -/

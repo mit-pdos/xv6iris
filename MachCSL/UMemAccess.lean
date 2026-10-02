@@ -123,17 +123,6 @@ theorem uma_utrTranslate_hit (D : UFoot) (orc : UOrc) (s : UWSt) (va : BitVec 64
     runRW D orc s (utrTranslate s va acc) = r :=
   utlb_translate_of_hit D orc s _ _ acc .User _ _ i ent r hl hh
 
-/-- **Lane U1-P1's TLB miss** (`UTlb.utlb_translate_of_miss`; the miss itself
-is `utlb_miss_ok`/`_err` over `UWalk.uwk_pt_walk`). -/
-theorem uma_utrTranslate_miss (D : UFoot) (orc : UOrc) (s : UWSt) (va : BitVec 64)
-    (acc : MemoryAccessType mem_payload)
-    (r : Option (Result (BitVec 44 × page_based_mem_type × Unit) (PTW_Error × Unit) × UWSt × UOrc))
-    (hl : runRW D orc s (lookup_TLB 39 0#16 (vpnOf va)) = some (none, s, orc))
-    (hm : runRW D orc s (translate_TLB_miss 39 0#16 (utrRoot (s.file .satp)) (vpnOf va) acc .User
-      (utrMxr (s.file .mstatus)) (utrSum (s.file .mstatus)) ()) = r) :
-    runRW D orc s (utrTranslate s va acc) = r :=
-  utlb_translate_of_miss D orc s _ _ acc .User _ _ r hl hm
-
 /-! ## §3 `vmem_read_addr` (LOAD, LR) -/
 
 /-- The translated read (Rocq `exec_translate_and_read_value_gen`). -/

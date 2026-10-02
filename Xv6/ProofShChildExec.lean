@@ -116,13 +116,6 @@ theorem shChildX_holds (UL : UK_LEAVES) (SP : SH_PARSECMD) (HM : SH_MALLOC) (SE 
     wpShChildXBody E Fd1 ws dg Q Cr Cd :=
   shChildXGen_holds E UL SP HM SE hps _ (fun _ _ => .rfl) Fd1 ws dg Q Cr Cd
 
-/-- **Rocq `wp_kshm_child_x_v_holds`**. -/
-theorem shChildXV_holds (UL : UK_LEAVES) (SP : SH_PARSECMD) (HM : SH_MALLOC) (SE : SH_RUNCMD_EXEC)
-    (hps : ∀ k : Int, freeNum k → UprogSG.psok (GF := GF) k) (Fd1 : List FdState → Prop)
-    (ws : List (List (BitVec 8))) (dg : List (BitVec 8)) (Q : Int → IProp GF) (Cr Cd : IProp GF) :
-    wpShChildXVBody E Fd1 ws dg Q Cr Cd :=
-  fun v => shChildXGen_holds E UL SP HM SE hps _ (fun γ ld => ustdAt_ustd γ ld v) Fd1 ws dg Q Cr Cd
-
 /-- **Rocq `wp_kshm_child_echo_holds`**: the general walk at echo's
 alternative, by conversion. -/
 theorem shChildEcho_holds (UL : UK_LEAVES) (SP : SH_PARSECMD) (HM : SH_MALLOC) (SE : SH_RUNCMD_EXEC)

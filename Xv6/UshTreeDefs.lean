@@ -183,13 +183,6 @@ def ushRedirsRes (N : UkNames GF) (rs : List Rredir) (dv : DFrac) (Pex : IProp G
   | [] => iprop(emp)
   | _ :: _ => iprop(ustr N.d dv ushSymA 7 ushpSymF ∗ Pex ∗ ushpOom (hlc := hlc) N Pex K)
 
-/-- **Rocq `UkShArgs.ushp_pex_res`** (main): the exit lend and its law, when
-redirects are consumed. -/
-def ushPexRes (N : UkNames GF) (rs : List Rredir) (Pex : IProp GF) (K : Nat) : IProp GF :=
-  match rs with
-  | [] => iprop(emp)
-  | _ :: _ => iprop(Pex ∗ ushpOom (hlc := hlc) N Pex K)
-
 /-- **Rocq `ushp_atree`**: the tree at `p` with every child pointer NAMED by
 `a` and the constructors' bounds kept. -/
 def ushATree (N : UkNames GF) (s0 : Nat) : Nat → UshpCmd → UshPtr → IProp GF

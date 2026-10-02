@@ -422,13 +422,6 @@ theorem vdisPres_set (k : KCtx) (R : RegMap) (rd : BitVec 5) (v : BitVec 64) (h 
   rcases hne with rfl | rfl | rfl | rfl | rfl | rfl <;>
     simp only [RegMap.set_apply, BitVec.reduceEq, ite_false] <;> exact h
 
-theorem vdisPres_call (k : KCtx) (R R' : RegMap) (h : vdisPres k R) (hcs : calleeSaved R R') :
-    vdisPres k R' := by
-  obtain ⟨h2, h18, h19, h20, h21, h22, h23, h24, h25, h26, h27⟩ := h
-  obtain ⟨c2, -, -, c18, c19, c20, c21, c22, c23, c24, c25, c26, c27⟩ := hcs
-  exact ⟨c2.trans h2, c18.trans h18, c19.trans h19, c20.trans h20, c21.trans h21,
-    c22.trans h22, c23.trans h23, c24.trans h24, c25.trans h25, c26.trans h26, c27.trans h27⟩
-
 /-! ## The exit: `release(&disk.vdisk_lock)` and the epilogue -/
 
 section

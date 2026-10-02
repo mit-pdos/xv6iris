@@ -62,10 +62,6 @@ def spOf (cpu : CPU) : BitVec 64 := bootSp KA.«stack0» (hartId cpu)
 theorem spOf_toNat (cpu : CPU) : (spOf cpu).toNat = 0x8000a420 + 4096 * (cpu.val + 1) := by
   revert cpu; decide
 
-/-- `sp₀` is 16-aligned (the RISC-V ABI's stack alignment). -/
-theorem spOf_align (cpu : CPU) : (spOf cpu).toNat % 16 = 0 := by
-  rw [spOf_toNat]; omega
-
 /-- The number of 8-byte slots of the hart's 4096-byte `stack0` slice below
 `main`'s entry `sp` (`sp₀ - 16`; the 16 bytes above it are `start`'s dead
 frame). -/
@@ -80,19 +76,6 @@ theorem bootStack_slot_toNat (cpu : CPU) (i : Nat) (hi : i < bootStackSlots) :
   unfold bootStackSlots NCPU at *
   generalize spOf cpu = s at *
   bv_omega
-
-/-- Every slot of the boot stack is in RAM, 8-aligned. -/
-theorem bootStack_inRam (cpu : CPU) (i : Nat) (hi : i < bootStackSlots) :
-    inRam (spOf cpu - 16#64 - 8#64 * BitVec.ofNat 64 (i + 1)) 8 ∧
-      (spOf cpu - 16#64 - 8#64 * BitVec.ofNat 64 (i + 1)).toNat % 8 = 0 := by
-  have h := bootStack_slot_toNat cpu i hi
-  have hc := cpu.isLt
-  unfold bootStackSlots NCPU at *
-  unfold inRam ramBase ramEnd
-  rw [h]
-  constructor
-  · constructor <;> omega
-  · omega
 
 /-- **Every slot of the boot stack is a read-write static kernel page**: the
 `stack0` array lies in the kernel's data window, so the static map's identity

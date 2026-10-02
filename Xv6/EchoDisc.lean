@@ -498,34 +498,6 @@ theorem lineAlts_len1 (ws : List (List (BitVec 8))) : ((lineAltsOf ws)[1]!).leng
 theorem lineAlts_len2_ (ws : List (List (BitVec 8))) : ((lineAltsOf ws)[2]!).length = 2 := rfl
 theorem lineAlts_len3 (ws : List (List (BitVec 8))) : ((lineAltsOf ws)[3]!).length = 5 := rfl
 
-theorem lineAlts_len_ge2 (ws : List (List (BitVec 8))) (a : Nat) (ha : a < 3) :
-    2 ≤ ((lineAltsOf ws)[a]!).length := by
-  match a, ha with
-  | 0, _ => rw [lineAltsOf_0_length]; omega
-  | 1, _ => rw [lineAlts_len1]; omega
-  | 2, _ => rw [lineAlts_len2_]; omega
-
-/-- ...and its last two bytes ARE the prompt. -/
-theorem lineAlts_dollar (ws : List (List (BitVec 8))) (a : Nat) (ha : a < 3) :
-    ((lineAltsOf ws)[a]!)[((lineAltsOf ws)[a]!).length - 2]? = some (uPrompt[0]!) := by
-  match a, ha with
-  | 0, _ =>
-    rw [lineAltsOf_0_length, lineAltsOf_0, Nat.add_sub_cancel,
-      List.getElem?_append_right (Nat.le_refl _), Nat.sub_self]
-    rfl
-  | 1, _ => rfl
-  | 2, _ => rfl
-
-theorem lineAlts_space (ws : List (List (BitVec 8))) (a : Nat) (ha : a < 3) :
-    ((lineAltsOf ws)[a]!)[((lineAltsOf ws)[a]!).length - 1]? = some (uPrompt[1]!) := by
-  match a, ha with
-  | 0, _ =>
-    rw [lineAltsOf_0_length, lineAltsOf_0, show (wlLine (ws.drop 1)).length + 2 - 1
-        = (wlLine (ws.drop 1)).length + 1 by omega, lookup_app_shift]
-    rfl
-  | 1, _ => rfl
-  | 2, _ => rfl
-
 theorem proOf_snoc_head (ps : List Nat) (a : Nat) (b : BitVec 8) (hnd : ¬ proDone ps)
     (hb : (proAlts[a]!)[0]? = some b) : proOf ps ++ [b] <+: proOf (ps ++ [a]) := by
   rw [proOf_open_app ps [a] hnd, proOf_singleton]
@@ -720,10 +692,6 @@ theorem nstarted_strict (J I : List (BitVec 8)) (hp : J <+: I) (hne : J ≠ I) :
     by_cases hb : b = wlNl
     · subst hb; rw [nstarted_snoc_nl] at hle; omega
     · rw [nstarted_snoc_other J b hb] at hle; omega
-
-theorem prefix_take_le {A : Type} (l : List A) (n m : Nat) (h : n ≤ m) : l.take n <+: l.take m := by
-  have : l.take n = (l.take m).take n := by rw [List.take_take, Nat.min_eq_left h]
-  rw [this]; exact List.take_prefix _ _
 
 /-! ## §3 The wire the user had seen at each input -/
 
