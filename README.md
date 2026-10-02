@@ -87,7 +87,7 @@ so build on a machine sized for it.
 toolchain files, the manifest and the fetched packages agree; CI runs it first.
 
 **Images.** The kernel image, the user programs and `fs.img` are xv6-riscv `b72cbac1` (branch
-`chroot` of [zeldovich/xv6-riscv](https://github.com/zeldovich/xv6-riscv)).  The dumps (`tools/dump_kernel.py`, `tools/dump_elf_image.py`,
+`verified`).  The dumps (`tools/dump_kernel.py`, `tools/dump_elf_image.py`,
 `tools/dump_user_elf.py`, `tools/gen_*`) are checked in with their source revision and md5 in their
 headers; `make check-gen` regenerates everything derivable without an ELF or `sail` and fails on any
 difference, and `make check-gen-kernel KERNEL=…` re-dumps the kernel from the pinned ELF.  Proofs name

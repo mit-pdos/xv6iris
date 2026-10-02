@@ -5,7 +5,7 @@
 `claude-notes/projects/noninterference.md` "PORT TO LEAN"; what remains is Rocq's never-landed L3 and T).  The Rocq tree is no longer maintained; this tree and its `claude-notes/` are
 the development now:
 
-**2026-10-02.**  The kernel is xv6-riscv `b72cbac1` (zeldovich/xv6-riscv `chroot`): a per-process
+**2026-10-02.**  The kernel is xv6-riscv `b72cbac1` (branch `verified`): a per-process
 root (`p->root`, `sys_chroot`, `igetroot`, `dirlookup`'s self arm at the root, the root-aware walk
 vocabulary); design in `claude-notes/design/chroot.md`; the gate (build, audit, tcb, coverage, vtest)
 is green.
