@@ -130,7 +130,7 @@ theorem createFound_caller10 : createCaller 10#5 := by unfold createCaller; deci
 theorem createFound_caller15 : createCaller 15#5 := by unfold createCaller; decide
 
 /-- +0x6c: the `bltu 1,a5` on the word the three ALU leaves leave, at the
-shape the Lean rules produce (`CreateParts.create_bltu_trange`, restated). -/
+shape the Lean rules produce. -/
 theorem createFound_bltu (t : BitVec 16) :
     bcond bop.BLTU 1#64 ((BitVec.signExtend 64 (BitVec.extractLsb' 0 32
         (BitVec.setWidth 64 t + 18446744073709551614#64)) <<< 48) >>> 48) =

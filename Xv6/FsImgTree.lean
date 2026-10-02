@@ -43,9 +43,8 @@ open MachCSL
 
 /-! ## 4.  NODES -/
 
-/-- A free record (`type = 0`) represents no node at all -- `FsTree`'s
-`nodeRep` demands a nonzero type, so the tree never contains one (Rocq's
-`node_at`). -/
+/-- A free record (`type = 0`) represents no node at all -- a tree node has
+a nonzero type, so the tree never contains one (Rocq's `node_at`). -/
 def nodeAt (P : Nat → List (BitVec 8)) (sb : FsSb) (i : Nat) : Option Fsnode :=
   let dn := fsDinode P sb i
   if dn.diType.toNat = 0 then none else some (nodeOf dn (fsDataOf P dn))

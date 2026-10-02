@@ -28,7 +28,7 @@ port takes only its bare part (`procPrivExt` = `FdTable.procPrivBareAt` at
 the kernel-page-table tier, Rocq `proc_priv_bare` + the lazy claim), a
 strictly weaker premise: fetchaddr touches neither the array nor the cwd
 reference, and its one caller (`sys_exec`) carves the bare part out of the
-whole block and re-closes it (`SysfileCalls.sysfile_blk_bare`).  The size
+whole block and re-closes it.  The size
 bound `p->sz ≤ uvmMaxsz` is NOT a premise: it lives in the block, and the
 proof pays `copyin`'s `psz ≤ 2^38` out of it (Rocq: likewise).
 

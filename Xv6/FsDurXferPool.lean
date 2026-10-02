@@ -20,7 +20,7 @@ THE BOOT DOES NOT MINT; IT INSTALLS (§3e, durable-disk BT-0).  The era's
 byte authority already exists and its elements are in hand as ONE FLAT MAP;
 `phiRuns_union` is an `⊣⊢`, so the flat map splits into the footprint and
 a REMAINDER at a map value the durable source determines, at no allocation
-and no carve (`fsFootprint_install`).
+and no carve.
 
 ## DEVIATIONS from Rocq
 
@@ -38,8 +38,6 @@ and no carve (`fsFootprint_install`).
 5. **DIFFERENCE IS `PartialMap.difference`** and union `PartialMap.union`
    (Lean's `\` / `∪` at `RegMapF` resolve to `Std.ExtTreeMap`'s own
    instances; `Xv6/FsDurBytes.lean`).
-6. **`phiMap_setBlocks` TAKES `home.Nodup`** (`fsDbytes_setBlocks`'s
-   deviation 3: home sets are lists).
 
 ## Dropped/simplified vs Rocq (crash brief D36; grepped over ALL of
 `iris/*.v`, comments included)
@@ -48,6 +46,8 @@ and no carve (`fsFootprint_install`).
   witness; nothing cites it).
 * `fs_home_install` -- uses checked: none (FsDurSnap composes
   `phi_map_set_blocks` and `fs_footprint_install` itself, :1773/:1797).
+* `fs_footprint_install`, `phi_map_set_blocks` -- not ported (nothing uses
+  them).
 -/
 import Xv6.FsDurXferRuns
 import Xv6.FsState
@@ -494,38 +494,6 @@ theorem fsFootprint_ofRunsQ (Γ : FsViewNames GF) (dq : DFrac) (S : FsStateRec) 
     (hs : xfShape S PM) : phiRunsQ Γ (xqAt dq (xrFs S PM)) ⊢ fsFootprint Γ dq S := by
   rw [fsFootprint_gq]
   exact (phiRunsQ_at Γ dq _).1.trans (fsFootprint_ofRuns (FsView.gammaQ Γ dq) S PM hs)
-
-/-! ## 3e.  THE INSTALL (durable-disk BT-0, the boot-side transport) -/
-
-/-- The era's flat map, split at a submap: `map_difference_union` and
-nothing else (Rocq's `phi_map_install`; deviation 5). -/
-theorem phiMap_install (Γ : FsViewNames GF) (M Mh : RegMapF (BitVec 8)) (hsub : M ⊆ Mh) :
-    phiMap Γ Mh ⊣⊢ phiMap Γ M ∗ phiMap Γ (PartialMap.difference Mh M) := by
-  have hd : M ##ₘ PartialMap.difference Mh M := LawfulPartialMap.disjoint_difference_right
-  have hu : PartialMap.union M (PartialMap.difference Mh M) = Mh :=
-    LawfulPartialMap.union_difference_cancel hsub
-  unfold phiMap
-  rw [← hu]
-  refine (BigSepM.bigSepM_union hd).trans ?_
-  rw [hu]
-  exact .rfl
-
-/-- Rocq's `fs_footprint_install`. -/
-theorem fsFootprint_install (Γ : FsViewNames GF) (S : FsStateRec) (PM : BlockMap)
-    (Mh : RegMapF (BitVec 8)) (hs : xfShape S PM) (hd : xrDisj (xrFs S PM))
-    (hsub : xrUnion (xrFs S PM) ⊆ Mh) :
-    phiMap Γ Mh ⊢ fsFootprint Γ (DFrac.own 1) S ∗
-      phiMap Γ (PartialMap.difference Mh (xrUnion (xrFs S PM))) := by
-  refine (phiMap_install Γ _ Mh hsub).1.trans (sep_mono_left ?_)
-  exact (phiRuns_union Γ _ hd).2.trans (fsFootprint_ofRuns Γ S PM hs)
-
-/-- THE ERA'S HOME BLOCKS AS ONE FLAT MAP, in `phiMap`'s spelling (Rocq's
-`phi_map_set_blocks`; deviation 6). -/
-theorem phiMap_setBlocks (Γ : FsViewNames GF) (Pb : Nat → List (BitVec 8)) (home : List Nat)
-    (hnd : home.Nodup) (hlen : ∀ b, b ∈ home → (Pb b).length = BSIZE) :
-    phiMap Γ (fsDbytes (fsRestrict Pb home)) ⊣⊢
-      [∗list] b ∈ home, FsView.blkOwned Γ b (Pb b) :=
-  fsDbytes_setBlocks Γ Pb home hnd hlen
 
 end FsFoot
 

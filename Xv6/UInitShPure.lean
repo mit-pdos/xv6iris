@@ -23,7 +23,7 @@ closed arithmetic (`kxcSpFinal 0x5000 alen 1 = 0x4FE0`).
 `init_argv_args`, `init_argv_args_length`, `init_argv_args_lookup`,
 `init_argv_shape`, `init_ro_sh_bytes_bool`, `init_argv_img`,
 `init_args_det`, `sh_tbl_ok`, `sh_tbl_ok_true`, `sh_tbl_parts`,
-`sh_dat_img`, `sh_bss_img`, `moi0_bv0_64`, `Xv6.ush_nthByte_zero`,
+`sh_dat_img`, `sh_bss_img`, `Xv6.ush_nthByte_zero`,
 `umap_win_lookup`, `umap_win_lookup_out`, `init_sh_sp_final`,
 `init_sh_room`, `init_sh_path_of`, `ufd_l0_lcl`.
 
@@ -60,8 +60,7 @@ ported in `UInitShSlot` anyway: the `#` patterns need them),
    predicate.
 5. Addresses and sizes are `Nat` (UserHeap deviation 1); the exec geometry
    stays `Int` (`kxcSpFinal`, the `kexecSz` cast), as UshKernel has it.
-   `PGSIZE` is `4096`.  `moi0_bv0_64` is the `Int`-to-word reading
-   `BitVec.ofInt 64 0 = 0#64`.
+   `PGSIZE` is `4096`.  `moi0_bv0_64` is not ported (nothing uses it).
 6. `ufd_l0_lcl` is stated at sh-main's `ushLcl` (Rocq `UkSh.ush_lcl`).
 
 ## Parameters taken
@@ -259,9 +258,6 @@ theorem sh_bss_img (a : Nat) (h1 : 0x2010 ≤ a) (h2 : a < 0x2098) : elfImage Us
     rfl
   · rw [elfUnion_r _ _ _ (shCode_none a (by omega)), elfUnion_r _ _ _ hd]
     rfl
-
-/-- **Rocq `moi0_bv0_64`** (deviation 5). -/
-theorem moi0_bv0_64 : BitVec.ofInt 64 0 = 0#64 := by decide
 
 /-- **Rocq `umap_win_lookup`**: a WINDOW of a map, in. -/
 theorem umap_win_lookup (D : RegMapF (BitVec 8)) (lo hi a : Nat) (b : BitVec 8) (ha : lo ≤ a ∧ a < hi)

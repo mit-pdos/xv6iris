@@ -36,8 +36,7 @@ The keyed-piece readers (`plain_trunc_key`, `cre_fail_kept`,
    `plainTruncKey`, `plain_cur_of_kept` → `plainCur_of_kept`,
    `plain_trunc_kept_forget` → `plainTruncKept_forget`,
    `cre_trunc_kept_of_ex` → `creTruncKept_of_ex`, `cre_rcpt_kept` →
-   `creRcptKept`, `cre_child_kept_of` → `creChildKept_of`, `cre_fail_kept`
-   → `creFailKept`, …).
+   `creRcptKept`, `cre_fail_kept` → `creFailKept`, …).
 
 ## Dropped/simplified vs Rocq
 
@@ -287,19 +286,6 @@ theorem creFailKept_of_at (Γ : FsViewNames GF) (vom : BitVec 64) (pl : List (Bi
     iintro _ Hcl
     ileft
     iexact Hcl
-
-/-- Rocq `cre_child_kept_of`. -/
-theorem creChildKept_of (Γ : FsViewNames GF) (vom : BitVec 64)
-    (Farm Fun : Pfam GF (Aview → Nat → IProp GF)) :
-    creChildUnfired (hlc := hlc) Γ (.AFile []) Farm Fun ⊢ creChildKept (hlc := hlc) Γ vom Farm Fun := by
-  unfold creChildKept
-  by_cases hv : omTrunc vom = true
-  · simp only [if_pos hv]
-    unfold creChildUnfired
-    iintro ⟨-, H⟩
-    iexact H
-  · simp only [if_neg hv]
-    exact .rfl
 
 end OpenKept
 

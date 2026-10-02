@@ -139,23 +139,6 @@ def inodeHeldTy [Icfg] [CurCtx] (v : BitVec 64) (ty : BitVec 16) : IProp GF :=
     ⌜lo ≤ tl⌝ ∗ credFloor lo tl ∗
     inodeRefGenlo k q icfgDev inum g lo ∗ ityShot g ty ∗ runitAny inum.toNat)
 
-theorem inodeHeldTy_forget [Icfg] [CurCtx] (v : BitVec 64) (ty : BitVec 16) :
-    inodeHeldTy (GF := GF) v ty ⊢ inodeHeld v := by
-  unfold inodeHeldTy inodeHeld inodeRefp
-  iintro ⟨%k, %q, %inum, %g, %lo, %tl, %hv, %hk, %hb, %hp, %hle, #Hfl, Href, -, Hru⟩
-  iexists k, q, inum
-  isplitr; · ipureintro; exact hv
-  isplitr; · ipureintro; exact hk
-  isplitr; · ipureintro; exact hb
-  isplitr; · ipureintro; exact hp
-  iframe Hru
-  iapply (inodeRef_gen_intro k q icfgDev inum).2
-  iexists g, lo, tl
-  iframe Href
-  isplitr
-  · ipureintro; exact hle
-  · iexact Hfl
-
 instance inodeHeldTy_timeless [Icfg] [CurCtx] (v : BitVec 64) (ty : BitVec 16) :
     Timeless (inodeHeldTy (GF := GF) v ty) := by
   unfold inodeHeldTy; infer_instance
@@ -172,8 +155,7 @@ theorem inodeHeld_ne_zero [Icfg] [CurCtx] (v : BitVec 64) :
 
 /-- `inodeHeld` WITH THE INUM EXPOSED -- the pinned package.  Same four
 conjuncts, one new pure tie; `inodeHeldAt_held` recovers the landed shape so
-every existing consumer composes unchanged, and `inodeHeld_zi` is the
-∃-introduction the other way.  (The process block's cwd tie
+every existing consumer composes unchanged.  (The process block's cwd tie
 `ProcInv.cwd_ref_at` and idup's contract both speak it.)  Deviation 3: `z`
 is a `Nat` inum. -/
 def inodeHeldAt [Icfg] [CurCtx] (v : BitVec 64) (z : Nat) : IProp GF :=
@@ -190,18 +172,6 @@ theorem inodeHeldAt_held [Icfg] [CurCtx] (v : BitVec 64) (z : Nat) :
   isplitr; · ipureintro; exact hk
   isplitr; · ipureintro; exact hb
   isplitr; · ipureintro; exact hp
-  iexact Hr
-
-theorem inodeHeld_zi [Icfg] [CurCtx] (v : BitVec 64) :
-    inodeHeld (GF := GF) v ⊢ ∃ z : Nat, inodeHeldAt v z := by
-  unfold inodeHeld inodeHeldAt
-  iintro ⟨%k, %q, %inum, %hv, %hk, %hb, %hp, Hr⟩
-  iexists inum.toNat, k, q, inum
-  isplitr; · ipureintro; exact hv
-  isplitr; · ipureintro; exact hk
-  isplitr; · ipureintro; exact hb
-  isplitr; · ipureintro; exact hp
-  isplitr; · ipureintro; rfl
   iexact Hr
 
 theorem inodeHeldAt_ne_zero [Icfg] [CurCtx] (v : BitVec 64) (z : Nat) :

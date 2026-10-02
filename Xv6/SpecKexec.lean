@@ -9,8 +9,8 @@ arms, the frame and the seal); its pure §1 is `Xv6/KexecLoad.lean` +
 ## Rocq's header, in short (every clause about content kept)
 
 * THE ONLY CONTRACT kexec has.  A caller that wants nothing of the abstract
-  state instantiates `S` at `emp` and the bundle at `execAuPre_triv`, and
-  reads `kexecOk` back off the arms with `execArms_landed`.
+  state instantiates `S` at `emp` and the bundle at `execAuPre_triv_at`,
+  and reads `kexecOk` back off the arms with `execArms_landed`.
 * IN (`execAuPre`): (1) THE WALK PREMISE, `FsAbsEra.exStart` AT THE PATH IN
   THE BUFFER (`bview plen pfun`, not every `pl`: a cursor fixed before the
   path is known can say nothing about the inums THIS walk visits); (2) THE
@@ -178,19 +178,6 @@ theorem execAuPre_triv_at (S : Uvis → IProp GF) (Γ : FsViewNames GF) (γfs : 
       · iintro %av %i %a %W' - - %_ %_ %_ %_ %_ %_ %_ Hp
         iapply HS $$ Hp
     · itrivial
-
-/-- **Rocq `exec_au_pre_triv`**: the one a caller that wants nothing back
-hands in -- the slot predicate at `emp`. -/
-theorem execAuPre_triv (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat) (secc : BitVec 64) (pl : List (BitVec 8))
-    (na : Nat) (alen : Nat → Nat) (afun : Nat → Nat → BitVec 8) (sts : List FdState)
-    (cs : Std.ExtTreeSet GName compare) (pidv : BitVec 32) :
-    ⊢ execAuPre (hlc := hlc) ⟨fun _ => iprop(emp), iprop(True)⟩ Γ γfs rt cw secc (fun _ => iprop(True))
-        (fun _ _ => iprop(True)) (fun _ _ => iprop(True)) (pfamTriv (fun _ _ _ => iprop(True)))
-        pl na alen afun sts cs pidv := by
-  iapply (execAuPre_triv_at (hlc := hlc) (fun _ => iprop(emp)) Γ γfs rt cw secc pl na alen afun sts cs pidv)
-  imodintro
-  iintro %W -
-  iempintro
 
 /-- **Rocq `exec_post_ok`**: ret = argc -- the walk completed at `i`, a node
 `a` was observed there, and the slot is the caller's, through the first wand

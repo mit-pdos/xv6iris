@@ -12,7 +12,7 @@
     +0x20  li a4,23
     +0x22  bltu a4,a5,+0x54      THE DATA-DEPENDENT SPLIT     (syscall_bltu)
     +0x26  slli a4,a3,3                                      (syscall_idx)
-    +0x2a  auipc a5,0x5 ; addi a5,a5,-532                    (syscall_tbl_addr)
+    +0x2a  auipc a5,0x5 ; addi a5,a5,-532
     +0x32  add a5,a5,a4
     +0x34  ld a4,0(a5)           syscalls[num]               (syscall_tbl_word)
     +0x36  beqz a4,+0x54         dead                         (syscTarget_ne_zero)

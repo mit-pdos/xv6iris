@@ -60,8 +60,7 @@ is BALANCED and generic in the entry interrupt index (`wp_kfork_eb_body`: no
 trap bundle, crossing `k.sie`).  Each of its three lock windows --
 allocproc's `np->lock` (whose arm allocproc hands back), `wait_lock`, the
 second `np->lock` -- releases at `reen = k.sie`, paying back the arm its
-acquire minted.  The old interrupts-off, trap-bundle-threading contract
-`KFORK.wp_kfork` is derived.
+acquire minted.
 
 THE PARENT'S BLOCK IS ROCQ'S WHOLE `proc_priv` (`procPrivFd`, the core with
 `p->cwd`'s reference, and the descriptor array with its payloads) BESIDE ITS
@@ -270,29 +269,5 @@ structure KFORK : Prop where
     (Q : Int → IProp GF) (csP : ExtTreeSet GName compare) (Rc : IProp GF) hj hproc hK hnoff htier,
     wp_kfork_eb_body (hlc := hlc) (GF := GF) Γ cpu k γw γp γl γk γft γ j pid V M stsP Q csP Rc
       hj hproc hK hnoff htier
-
-/-- The interrupts-off instance of `wp_kfork_eb`: the hart is pinned, so the
-trap bundle frames across the call. -/
-theorem KFORK.wp_kfork (A : KFORK) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
-    [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
-    [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-    [Appcfg GF] [FileG GF] [SG : UexecSG GF] [Fscfg] [Icfg] [CurCtx] (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (cpu : CPU) (k : KCtx) (γw γp γl : GName) (γk : KmemNames) (γft : GName) (γ : FileNames)
-    (j : Nat) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (stsP : List FdState)
-    (Q : Int → IProp GF) (csP : ExtTreeSet GName compare) (Rc : IProp GF) hj hproc hK hsie hnoff hlocks htier :
-    wp_kfork_body (hlc := hlc) (GF := GF) Γ cpu k γw γp γl γk γft γ j pid V M stsP Q csP Rc
-      hj hproc hK hsie hnoff hlocks htier := by
-  have h := A.wp_kfork_eb (hlc := hlc) (GF := GF) Γ cpu k γw γp γl γk γft γ j pid V M stsP Q csP Rc hj hproc hK hnoff htier
-  unfold wp_kfork_eb_body at h
-  unfold wp_kfork_body
-  iintro ⟨H0, H1, H2, Htc, Hcl, Hir, H6, H7, H8, H9, H10, H11, H12, H13, H14, H15, H16, H17, H18, H19, H20, Hnext⟩
-  iapply h
-  iframe H0 H1 H2 H6 H7 H8 H9 H10 H11 H12 H13 H14 H15 H16 H17 H18 H19 H20
-  rw [hsie]
-  iapply wpNext_off_intro
-  unfold kforkPost kforkPostB
-  iintro %spie %spp %R' %rv %hpost Hk Hpc Hret
-  ihave Hn := wpNext_at true k.proc cpu cpu _ (fun _ => rfl) $$ Hnext
-  iapply Hn $$ %spie %spp %R' %rv %hpost Hk Hpc Htc Hcl Hir Hret
 
 end Xv6

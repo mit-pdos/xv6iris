@@ -227,11 +227,11 @@ theorem uservecTf_reg (ws : List (BitVec 64)) (g : RegMap) (hlen : ws.length = 3
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 
-/-- **The trapped machine, opened** (uservec's entry; `userTrapFrame_open`
-at the named data): the kernel's supervisor configuration cells over the
-user root (interrupts off, `SPIE = 1`, `SPP = U`), the pc at the handler,
-the file, the trap cells, `stvec`, the installed user table, the pages at a
-page view `Mp` whose lazy view is `M`, and the residue. -/
+/-- **The trapped machine, opened** (uservec's entry, at the named data):
+the kernel's supervisor configuration cells over the user root (interrupts
+off, `SPIE = 1`, `SPP = U`), the pc at the handler, the file, the trap
+cells, `stvec`, the installed user table, the pages at a page view `Mp`
+whose lazy view is `M`, and the residue. -/
 theorem uservec_frame_open [CurCtx] (cpu : CPU) (C : UCfg) (P : UPtd) (Rut : UPtd → IProp GF) (sz : Nat)
     (M : ElfMem) (ms sc tv sep : BitVec 64) (g : RegMap)
     (hdq : C.dqc = DFrac.own 1) (hmie : C.mie = MIE_S) (hmed : C.medeleg = MEDELEG_S) :

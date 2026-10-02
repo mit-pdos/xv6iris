@@ -27,9 +27,9 @@ the written block).
    `Xv6/LogDefs.lean` are `Nat`-indexed); Rocq's `Z.of_nat` casts vanish.
    Rocq's `virtio_sector_bytes` (nat) and `virtio_sector_size` (Z) are both
    `MachCSL.Virtio.sectorSize`.
-2. Rocq's `VirtioModel.disk_read_write` / `disk_write_in` are not in the Lean
-   machine layer; they are proved here as `diskRead_diskWrite` /
-   `diskWrite_in` (pure, about `MachCSL.Virtio.diskRead`/`diskWrite`).
+2. Rocq's `VirtioModel.disk_write_in` is not in the Lean machine layer; it
+   is proved here as `diskWrite_in` (pure, about `MachCSL.Virtio.diskWrite`).
+   `disk_read_write` is not ported (nothing uses it).
 3. NOT HERE: `wr_nsectors_block`, `wr_sector_blk0`, `wr_sector_blk1` (FsCrash.v
    :1257-1283).  They are stated over `RiscvPtsto.wr_nsectors`/`wr_sector`,
    the permit layer's sector split, which the Lean tree gets from batch C-M
@@ -73,38 +73,12 @@ theorem diskWrite_in (dk : Nat → BitVec 8) (off : Nat) (bs : List (BitVec 8)) 
   unfold Virtio.diskWrite
   rw [if_pos hle, hx]
 
-/-- Reading back a write (Rocq `VirtioModel.disk_read_write`). -/
-theorem diskRead_diskWrite (dk : Nat → BitVec 8) (off : Nat) (bs : List (BitVec 8)) :
-    Virtio.diskRead (Virtio.diskWrite dk off bs) off bs.length = bs := by
-  apply List.ext_getElem?
-  intro j
-  unfold Virtio.diskRead
-  rw [List.getElem?_map]
-  by_cases hj : j < bs.length
-  · rw [List.getElem?_range hj]
-    obtain ⟨x, hx⟩ : ∃ x, bs[j]? = some x := ⟨bs[j], List.getElem?_eq_getElem hj⟩
-    rw [hx]
-    simp only [Option.map_some]
-    congr 1
-    exact diskWrite_in dk off bs (off + j) x (by omega) (by simpa using hx)
-  · rw [List.getElem?_eq_none (by simpa using hj), List.getElem?_eq_none (by omega)]
-    rfl
-
 /-- One byte of the view (Rocq `fs_blocks_lookup`). -/
 theorem fsBlocks_lookup (dk : Nat → BitVec 8) (b k : Nat) (hk : k < BSIZE) :
     (fsBlocks dk b)[k]? = some (dk (b * BSIZE + k)) := by
   unfold fsBlocks Virtio.diskRead
   rw [List.getElem?_map, List.getElem?_range hk]
   rfl
-
-/-- A one-block write moves exactly that block (Rocq `fs_blocks_write_eq`). -/
-theorem fsBlocks_write_eq (dk : Nat → BitVec 8) (b : Nat) (bs : List (BitVec 8))
-    (hlen : bs.length = BSIZE) :
-    fsBlocks (Virtio.diskWrite dk (b * BSIZE) bs) b = bs := by
-  unfold fsBlocks
-  have h := diskRead_diskWrite dk (b * BSIZE) bs
-  rw [hlen] at h
-  exact h
 
 /-- Byte `j < BSIZE` of block `c ≠ b` is outside `[b*BSIZE + o, b*BSIZE + o + n)`
 whenever `o + n ≤ BSIZE`. -/
@@ -134,13 +108,6 @@ theorem fsBlocks_sub_ne (dk : Nat → BitVec 8) (b c o : Nat) (bs : List (BitVec
     exact diskWrite_out dk _ bs _ (fsCrash_blk_disjoint b c o bs.length j hfit hne hj)
   · rw [List.getElem?_eq_none (by rw [fsBlocks_length]; omega),
       List.getElem?_eq_none (by rw [fsBlocks_length]; omega)]
-
-/-- ...the whole-block form (Rocq `fs_blocks_write_ne`). -/
-theorem fsBlocks_write_ne (dk : Nat → BitVec 8) (b c : Nat) (bs : List (BitVec 8))
-    (hlen : bs.length = BSIZE) (hne : c ≠ b) :
-    fsBlocks (Virtio.diskWrite dk (b * BSIZE) bs) c = fsBlocks dk c := by
-  have h := fsBlocks_sub_ne dk b c 0 bs (by omega) hne
-  simpa using h
 
 /-- ...and a sub-block write SPLICES the block it does write (Rocq
 `fs_blocks_splice`). -/

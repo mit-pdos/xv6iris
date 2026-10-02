@@ -172,8 +172,7 @@ theorem toList_length_delete {V : Type} (m : RegMapF V) (k : Nat) (v : V)
   rw [(toListP_delete m k v h).length_eq]
   rfl
 
-/-- The watermark moves with the mint (the shape of `Xv6.logReg_fresh`, for
-any value type). -/
+/-- The watermark moves with the mint, for any value type. -/
 theorem fresh_insert {V : Type} (m : RegMapF V) (nx : Nat) (v : V)
     (hfresh : ∀ i, nx ≤ i → PartialMap.get? m i = none) :
     ∀ i, nx + 1 ≤ i → PartialMap.get? (PartialMap.insert m nx v) i = none := by

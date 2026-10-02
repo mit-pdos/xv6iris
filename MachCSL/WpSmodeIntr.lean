@@ -674,26 +674,6 @@ theorem cpuClaimExt_move (cpu c : CPU) (sie : Bool) (p : BitVec 64) (h : sie = f
   · rw [h rfl]
   · simp only [cpuClaimExt_true]; exact .rfl
 
-/-- The pair moved by one hart-pinning fact (the shape `wpNext_intro_pin`
-hands a step's continuation). -/
-theorem armExt_move (cpu c : CPU) (sie : Bool) (p q : BitVec 64) (h : sie = false ∨ q = 0#64 → c = cpu) :
-    trapCsrsExt (GF := GF) cpu sie ∗ cpuClaimExt cpu sie p ⊢ trapCsrsExt c sie ∗ cpuClaimExt c sie p := by
-  iintro ⟨Ht, Hc⟩
-  isplitl [Ht]
-  · iapply trapCsrsExt_move cpu c sie (fun h' => h (Or.inl h')) $$ Ht
-  · iapply cpuClaimExt_move cpu c sie p (fun h' => h (Or.inl h')) $$ Hc
-
-/-- At a balanced pair's release: the arm the entry acquire paid out, and
-the complement, re-split from the bundle so the release takes its share
-(`popArm_sie`). -/
-theorem armExt_popArm (cpu : CPU) (k k' : KCtx) (hp : k'.proc = k.proc) :
-    trapCsrs (GF := GF) cpu ∗ cpuClaim cpu k.proc ∗ intrRes cpu ⊢
-      popArm cpu k' k.sie ∗ trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc := by
-  iintro H
-  icases armExt_split cpu k.sie k.proc $$ H with ⟨Ha, Ht, Hc⟩
-  iframe Ht Hc
-  iapply popArm_sie cpu k k' hp $$ Ha
-
 end
 
 

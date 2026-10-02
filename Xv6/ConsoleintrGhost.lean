@@ -20,7 +20,7 @@ THE MOVES: `ciGh_pop` (the erase arms' `cons.e--`, legal only while the
 erase character is owed), `ciGh_commit` (the wake tail's `cons.w =
 cons.e`), `ciGh_push` (the store: the byte joins the window, its tag the
 column, the mark moves to it, and the log entry is filed IN THE SAME GHOST
-STEP), `ciGh_drop`/`ciRes_drop` (a dropped byte is logged at `[]`),
+STEP), `ciGh_drop` (a dropped byte is logged at `[]`),
 `ciGh_owe` (an erase arm owes its character before it pops), `ciGh_pay`
 (...and pays it at exactly what went out).
 
@@ -33,15 +33,15 @@ that may go on), `ciKillRun` (the kill loop's accumulator).
 Ported one-to-one (Rocq → Lean): `ct_gh` → `ciGh`, `ct_gh_res` →
 `ciGh_res`, `ct_res_gh` → `ciRes_gh`, `ct_gh_pop` → `ciGh_pop`,
 `ct_gh_commit` → `ciGh_commit`, `ct_append` → `ciAppend`, `ct_gh_push` →
-`ciGh_push`, `ct_gh_drop` → `ciGh_drop`, `ct_res_drop` → `ciRes_drop`,
-`ct_gh_owe` → `ciGh_owe`, `ct_gh_pay` → `ciGh_pay`, `ct_hi_out` →
+`ciGh_push`, `ct_gh_drop` → `ciGh_drop`, `ct_gh_owe` → `ciGh_owe`, `ct_gh_pay` → `ciGh_pay`, `ct_hi_out` →
 `ciHiOut`, `ct_hi_kill` → `ciHiKill` (+`_out`), `ct_pay` → `ciPay`,
 `ct_mk_pay` → `ciMkPay`, `ct_mark` → `ciMark`, `ct_owed` → `ciOwed`,
 `ct_append_nil` → `ciAppend_nil`, `ct_gh_pay_owed` → `ciGh_payOwed`,
-`ct_owed_nil` → `ciOwed_nil`, `ct_ch_full` → `ciChFull`, `ct_ch_bs` →
+`ct_ch_full` → `ciChFull`, `ct_ch_bs` →
 `ciChBs`, `ct_pay_erase` → `ciPayErase`, `ct_mk_pay_erase` →
 `ciMkPayErase`, `ct_bs_snoc` → `ciBs_snoc`, `ct_kill_run` → `ciKillRun`,
 `ct_mk_kill_run` → `ciMkKillRun`, `ct_kill_owed` → `ciKillOwed`.
+Not ported (nothing uses them): `ct_res_drop`, `ct_owed_nil`.
 
 RELAX-D2 (Rocq's relaxed discipline, ported with `ConsLog.consEvOk`'s K1/K2/K3):
 `ciGh` carries the ring's half of the DELIVERED COUNT (`consDlcnt`,
@@ -286,26 +286,6 @@ theorem ciGh_drop (cn : ConsNames) (γ : UartNames) (r w e : BitVec 32) (bs : Li
   ipureintro
   exact ⟨hst, hpd, hch, hbl, her, hnc, consLogOk_snoc_nil L0 _ gp (h, c, []) rfl hlog, hdn⟩
 
-/-- ...and the same at the SEALED ring (Rocq `ct_res_drop`). -/
-theorem ciRes_drop [CurCtx] (cn : ConsNames) (γ : UartNames) (h : List Obs) (c : BitVec 8)
-    (hg : Option (List Obs)) (cs : List (BitVec 8)) (j : Nat) (Φ : IProp GF)
-    (hcn : cn.uart = γ) (hxg : ohistExt hg h) (hes : cs.take j = [])
-    (hk3 : cs = [echoOf c] → j = 1) (hk1 : k1Next hg h) :
-    uartInv (GF := GF) .uart0 γ ∗ logHi γ (1 : Qp).half hg ∗ ciAppend γ h c cs j Φ ∗
-      consResCur cn ⊢
-      |={⊤}=> logHi γ (1 : Qp).half (some h) ∗ uartArm γ (1 : Qp).half none ∗ Φ ∗
-        consResCur cn := by
-  iintro ⟨#Hinv, Hlgh, Hap, Hres⟩
-  icases ciRes_gh cn $$ Hres with ⟨%r, %w, %e, %bs, %ts, %hlb, %hlt, %hok, %hrow, Hr, Hw, He, Hd,
-    #Hts, Hgh⟩
-  imod ciGh_drop cn γ r w e bs ts h c hg cs j Φ hcn hxg hes hk3 hk1 $$ [Hinv Hlgh Hap Hgh]
-    with ⟨Hlgh, Harm, HΦ, Hgh⟩
-  · iframe Hinv Hlgh Hap Hgh
-  imodintro
-  iframe Hlgh Harm HΦ
-  iapply ciGh_res cn r w e bs ts hlb hlt hok hrow
-  iframe Hr Hw He Hd Hts Hgh
-
 /-- AN ERASE, BEFORE IT POPS: the character is OWED (Rocq `ct_gh_owe`). -/
 theorem ciGh_owe (cn : ConsNames) (γ : UartNames) (r w e : BitVec 32) (bs : List (BitVec 8))
     (ts : List (Option (List Obs))) (h : List Obs) (c : BitVec 8) (hh : Option (List Obs))
@@ -470,26 +450,6 @@ theorem ciGh_payOwed (cn : ConsNames) (γ : UartNames) (r w e : BitVec 32) (bs :
   · iframe Hinv Hlgh Hap Hgh
   imodintro
   iframe Hlgh Harm Hgh
-
-/-- Rocq `ct_owed_nil`: this arm files a DROP, so it owes the reason (K2). -/
-theorem ciOwed_nil (γ : UartNames) (hb : List Obs) (cb : BitVec 8) (hends : obsEndsIn .uart0 hb cb)
-    (hk2 : cb.toNat = 0 ∨ cb.toNat = 16 ∨ consErase cb = true) :
-    uartInv (GF := GF) .uart0 γ ∗ ciPay γ hb cb ∗ ciMark γ hb ⊢ |={⊤}=> ciOwed γ hb cb := by
-  unfold ciMark
-  iintro ⟨#Hinv, #Hpy, ⟨%hg, %hx, %hk1, Hlgh, Harm⟩⟩
-  imod ciAppend_nil γ hb cb hg iprop(emp) hx hends hk1 $$ [Hinv Hpy Hlgh Harm] with ⟨Hlgh, -, Hap⟩
-  · iframe Hinv Hpy Hlgh Harm
-    unfold consDropPay
-    ileft
-    isplitr
-    · ipureintro; exact fun _ => hk2
-    · iempintro
-  imodintro
-  unfold ciOwed
-  iexists [], [], 0, hg
-  iframe Hlgh Hap
-  ipureintro
-  exact ⟨Or.inl rfl, rfl, hx, fun hc => absurd hc (by simp), hk1⟩
 
 /-- WHAT AN ARM HANDS consputc for a run it spends WHOLE (Rocq `ct_ch_full`):
 the arm is OPENED here. -/

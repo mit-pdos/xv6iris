@@ -13,8 +13,9 @@ what the reached cone uses.
 
 CONE (re-walked on the pinned globs: 10/28 reached): `sh_prompt_pv`
 (abbrev; it is `UshMainPure.shPromptPv`, not restated), `sh_dollar_b`,
-`sh_space_b`, `sh_dollar_ro`, `sh_space_ro`, `sh_fd2_signed`, `sh_count2`,
-`Xv6.paAddToNat'`, `ksh_fam`, `shk_rodata_byte`.
+`sh_space_b`, `sh_fd2_signed`, `Xv6.paAddToNat'`, `ksh_fam`.  Of the
+reached ones, `sh_dollar_ro`, `sh_space_ro`, `sh_count2` and
+`shk_rodata_byte` are not ported (nothing uses them).
 DROPPED (unreached): `sh_dollar_pro`, `pro_alts_len3`, `sh_pro_stage`,
 `sh_space_stream`, `sh_pro_open`, `sh_pro_lines`, `sh_pro_rest`,
 `sh_pro_pin`, the notations `a0_idx`/`a1_idx`/`a2_idx`/`a7_idx`, `ushpr`
@@ -45,34 +46,12 @@ open Iris Iris.BI Iris.ProofMode MachCSL
 
 /-! ## S0 THE PURE HALF -/
 
-/-- **Rocq `sh_dollar_b`**: '$'. -/
-def shDollarB : BitVec 8 := 0x24#8
-
-/-- **Rocq `sh_space_b`**: ' '. -/
-def shSpaceB : BitVec 8 := 0x20#8
-
-/-- **Rocq `sh_dollar_ro`**: the '$' sits at `shPromptPv` in sh's image. -/
-theorem sh_dollar_ro : User.Sh.code.byte shPromptPv = some shDollarB := by decide
-
-/-- **Rocq `sh_space_ro`**: ...and the ' ' after it. -/
-theorem sh_space_ro : User.Sh.code.byte (shPromptPv + 1) = some shSpaceB := by decide
-
 /-- **Rocq `sh_fd2_signed`**: fd 2, as the kernel narrows it. -/
 theorem sh_fd2_signed : (BitVec.setWidth 32 (BitVec.ofNat 64 2)).toInt = ((2 : Nat) : Int) := by decide
-
-/-- **Rocq `sh_count2`**: the count 2, as the kernel reads it. -/
-theorem sh_count2 : argZ (BitVec.ofNat 64 2) = ((2 : Nat) : Int) := by decide
 
 /-! ## S4 THE CALL'S FAMILY AND ITS LITERALS -/
 
 /-- **Rocq `ksh_fam`** (deviation 3): row 16 at sh's own cursor family. -/
 abbrev kshFam {GF : BundledGFunctors} (N : UkNames GF) (Q : Nat → IProp GF) : Xfam GF := xfamWr Q N.pay
-
-/-- **Rocq `shk_rodata_byte`** (deviation 1): a byte of sh's image, off its
-text. -/
-theorem shk_rodata_byte {GF : BundledGFunctors} [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat]
-    (g : GName) (a : Nat) (b : BitVec 8) (h : User.Sh.code.byte a = some b) :
-    ushCode (GF := GF) g ⊢ utext g a b :=
-  User.utextImg_byte (utext g) User.Sh.code.byte a b h
 
 end Xv6

@@ -12,8 +12,7 @@ round resumed.  Everything here is what that re-keying needs:
   only through those plus the number and the three argument words.
   `uexecArm_run` is the instance the loop uses: the trapped key and the RUN
   key it projects to (`uvisRun`) are the same key.
-* §3 the one frame mover that is free (`trappedMachine_frame`).
-* §4 THE ROUND'S TAIL, AS NAMED LEMMAS (Rocq milestone J, S5): the returned
+* §3 THE ROUND'S TAIL, AS NAMED LEMMAS (Rocq milestone J, S5): the returned
   arm re-keyed at the resume state (`uexecRet_roundSlot`/`_of`), the bundle
   built row by row and the continuation applied (`ukc_apply`,
   `uslot_applyLoop`).  NOTHING IS MINTED: every arm is the process's own.
@@ -233,32 +232,7 @@ theorem uexecArm_run (sc : BitVec 64) (W : Uvis) (f : sfam GF) (hl : W.tf.length
 
 end Apply
 
-/-! ## §3 THE ONE FRAME MOVER THAT IS FREE -/
-
-section Frame
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
-
-/-- **Rocq `trapped_machine_frame`**: forget the image. -/
-theorem trappedMachine_frame [CurCtx] (cpu : CPU) (C : UCfg) (pt : UPtd) (Rut : UPtd → IProp GF)
-    (sz : Nat) (sc stv : BitVec 64) (W : Uvis) :
-    trappedMachine (GF := GF) cpu C pt Rut sz sc stv W ⊢
-      ∃ ms : BitVec 64, ⌜trapMstatusOk ms⌝ ∗
-        userTrapFrameAt cpu C pt Rut ms sc stv (tfW W.tf tfEpcIdx) (tfResumeGpr0 W.tf) := by
-  unfold trappedMachine
-  iintro ⟨%ms, -, H⟩
-  iexists ms
-  ihave H := userTrapFrameAtm_at cpu C pt Rut sz W.M ms sc stv _ _ $$ H
-  unfold userTrapFrameAt
-  icases H with ⟨%hto, Hrest⟩
-  isplitr
-  · ipureintro; exact hto
-  isplitr
-  · ipureintro; exact hto
-  · iexact Hrest
-
-end Frame
-
-/-! ## §4 THE ROUND'S TAIL, AS NAMED LEMMAS -/
+/-! ## §3 THE ROUND'S TAIL, AS NAMED LEMMAS -/
 
 section LoopApply
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF]

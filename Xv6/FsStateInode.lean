@@ -32,25 +32,20 @@ to other inodes are carried as tokens, never as an equation.
   `inlRecWf` .. `inlBareFree`, incl. `inlType`), `nodeDirLocal`,
   `nodeDirLocal_free` / `_ok` / `_ix` / `_orph`, `inodeLocal_beyondSize`.
 * §2a bare node: `dirNrec_zero`, `fnBare_wf` / `_indb` / `_naddr` /
-  `_nrec` / `_orphan`, `dirEntries_bare`, `fnZero`, `fnBare_zero`,
-  **`inodeLocal_bare`**.
-* §2b dirent bridge: `dirEntries_zero`, `dirEntries_write`,
-  `dirEntries_fresh`.
+  `_nrec` / `_orphan`, **`inodeLocal_bare`**.
 * §3/3b record ownership (`Section RecOwned`): `recOwned`, `recOwnedAt`,
   `recOwnedQ`, `recOwnedAtQ`, `recOwnedAtQ_1`, `gammaQ_recOwned`,
-  `gammaQ_recOwnedAt`, `recOwnedAtQ_split`, `recOwnedAt_split34`,
+  `recOwnedAtQ_split`, `recOwnedAt_split34`,
   `recOwned_sb`, `recOwnedAt_shedTo`, `recOwned_sbQ`, `bigSepL_seq0`,
   `bigSepL_seqChunks`, `bigSepL_lenIrrel`, `byteRange_diblk`,
   `recOwnedAt_slot`, `recOwnedAt_diblk`, and the `Timeless` instances.
 * §3c/3d/3f the rest of the bytes: `indOwnedQ`, `indOwned`, `indOwned_1`,
   `indOwnedQ_split`, `inodeDatQ`, `inodeDat`, `inodeDat_1`,
-  `inodeDat_blksSplit`, `inodeDatQ_split`, `inodeDatQ_blkAcc`, `inodePhi`,
-  `inodePhi_dat`, `inodePhiAt`, `inodePhi_sb`, `gammaQ_indOwned`,
-  `gammaQ_inodeDat`, `indOwned_shed`, `inodePhi_shed`, `gammaQ_inodePhi`,
+  `inodeDat_blksSplit`, `inodeDatQ_split`, `inodePhi`, `inodePhi_dat`,
+  `inodePhiAt`, `gammaQ_indOwned`, `gammaQ_inodeDat`, `gammaQ_inodePhi`,
   and §5's `Timeless` instances (`recOwned`, `indOwned`, `inodePhi`, ...).
-* §7 encode lemmas: `recOwned_acc`, `fnAddrsKept`, `inodePhi_recMove`,
-  `fnSetBlk`, `fnNaddr_setBlk`.
-* §4 / §4b / §8 PURE link-accounting readings: `fnMult`, `fnMult_zero`,
+* §7 encode lemmas: `fnSetBlk`, `fnNaddr_setBlk`.
+* §4 / §4b / §8 PURE link-accounting readings: `fnMult`,
   `entTokenless`, `fnDd`, `entDsetOk`, `nodeExact`, `entDsetOk_grow`,
   `entDsetOk_delete`, `nodeExact_cong`, `nodeExact_bump`,
   `entDsetOk_empty`, `nodeExact_notDir`, `dot_ne_dotdot`,
@@ -155,9 +150,8 @@ Everything else in the file is ported with Rocq's statement.
    its fields camelCase (`inl_rec_wf` -> `inlRecWf`), read by dot
    notation (`hl.inlBlkDom`).  `node_dir_local_ok` / `_ix` / `_orph` are
    Rocq `Definition`s (projections) and are theorems here.
-12. `InodeLocal` is declared AFTER `fnBare`'s lemmas and `fnZero` (Rocq
-   puts the record between `fn_bare` and them); nothing depends on the
-   order.
+12. `InodeLocal` is declared AFTER `fnBare`'s lemmas (Rocq puts the
+   record between `fn_bare` and them); nothing depends on the order.
 -/
 import Xv6.FsNode
 import Xv6.FsTree
@@ -264,18 +258,6 @@ theorem fnBare_naddr (n : FsNode) (k : Nat) (h : fnBare n) (hk : k < MAXFILE) :
       (by unfold MAXFILE NDIRECT NINDIRECT at *; omega)]
     rfl
 
-/-- The all-zero record: the mkfs image's free inode, and the node the boot
-allocation starts every inum at (Rocq's `fn_zero`). -/
-def fnZero : FsNode :=
-  ⟨⟨0, 0, 0, 0, 0, List.replicate 13 0⟩, List.replicate NINDIRECT 0, ∅⟩
-
-theorem fnBare_zero : fnBare fnZero := by
-  unfold fnBare fnZero
-  refine ⟨rfl, rfl, rfl, ?_, ?_⟩
-  · decide
-  · decide
-
-
 /-! ## 2.  The local clauses -/
 
 /-- Rocq's `inode_local`: the SIXTEEN per-object clauses every inode
@@ -374,15 +356,6 @@ theorem fnBare_nrec (n : FsNode) (h : fnBare n) : fnNrec n = 0 := by
   rw [hsz]
   rfl
 
-/-- A bare node's entry map is EMPTY at either type (Rocq's
-`dir_entries_bare`). -/
-theorem dirEntries_bare (n : FsNode) (h : fnBare n) : dirEntries n = ∅ := by
-  unfold dirEntries
-  by_cases hd : fnIsDir n = true
-  · rw [if_pos hd, fnBare_nrec n h]
-    exact dirView_nil _
-  · rw [if_neg hd]
-
 theorem inodeLocal_bare (i : Nat) (n : FsNode) (hb : fnBare n)
     (hty : fnType n = 0 ∨ fnType n = T_DIR_z ∨ fnType n = T_FILE ∨ fnType n = T_DEVICE) :
     InodeLocal i n := by
@@ -419,46 +392,6 @@ theorem inodeLocal_bare (i : Nat) (n : FsNode) (hb : fnBare n)
     exact absurd hnl hne
   · intro _ hne
     exact absurd hnl hne
-
-/-! ### 2b.  The PURE bridge from the tree's dirent vocabulary
-
-`FsTree` states an unlink as `dirZeroedAt` and a dirlink as `dirInsertAt`
-and proves BOTH view deltas outright (`dirView_zero`, `dirView_insert`).
-These read them at `FsNode`; the token moves take the record delta as their
-premise and go through them, so nothing assumes an entry-map delta. -/
-
-theorem dirEntries_zero (n n' : FsNode) (k0 : Nat) (hd : fnIsDir n = true)
-    (hd' : fnIsDir n' = true) (hsz : fnSize n' = fnSize n)
-    (hu : dirNamesUnique (fnData n) (fnNrec n)) (hk : k0 < fnNrec n)
-    (hlive : dirLive (fnData n) k0) (hz : dirZeroedAt (fnData n) (fnData n') k0) :
-    dirEntries n' = (dirEntries n).erase (dirBname (fnData n) k0) := by
-  unfold dirEntries
-  rw [if_pos hd, if_pos hd']
-  unfold fnNrec at *
-  rw [hsz]
-  exact dirView_zero (fnData n) (fnData n') (dirNrec (fnSize n)) k0 hu hk hlive hz
-
-/-- The dirlink twin.  `dirInsertAt` carries the record-count arithmetic and
-the liveness side conditions; the ONE guard left over is dirlink's own, `s`
-not already a live name. -/
-theorem dirEntries_write (n n' : FsNode) (k0 : Nat) (s : Fname) (z : BitVec 16)
-    (hd : fnIsDir n = true) (hd' : fnIsDir n' = true)
-    (hnone : dirFirst (fnData n) (fnNrec n) s = none)
-    (hins : dirInsertAt (fnData n) (fnData n') (fnNrec n) (fnNrec n') k0 s z) :
-    dirEntries n' = (dirEntries n).insert s z.toNat := by
-  unfold dirEntries
-  rw [if_pos hd, if_pos hd']
-  exact dirView_insert (fnData n) (fnData n') (fnNrec n) (fnNrec n') k0 s z hnone hins
-
-/-- ...and the freshness the map insert needs, off the same guard. -/
-theorem dirEntries_fresh (n : FsNode) (s : Fname)
-    (hnone : dirFirst (fnData n) (fnNrec n) s = none) : (dirEntries n)[s]? = none := by
-  unfold dirEntries
-  by_cases hd : fnIsDir n = true
-  · rw [if_pos hd]
-    exact (dirView_lookup_None _ _ s).2 hnone
-  · rw [if_neg hd]
-    exact Std.ExtTreeMap.getElem?_empty
 
 /-! ## 3.  The node's byte ownership
 
@@ -520,9 +453,6 @@ instance recOwnedAtQ_timeless (Γ : FsViewNames GF) [GTimeless Γ] (dq : DFrac)
 
 theorem gammaQ_recOwned (Γ : FsViewNames GF) (dq : DFrac) (sb : FsSb) (i : Nat) (dn : Dinode) :
     recOwned (FsView.gammaQ Γ dq) sb i dn ⊣⊢ recOwnedQ Γ dq sb i dn := .rfl
-
-theorem gammaQ_recOwnedAt (Γ : FsViewNames GF) (dq : DFrac) (istart z : Nat) (dn : Dinode) :
-    recOwnedAt (FsView.gammaQ Γ dq) istart z dn ⊣⊢ recOwnedAtQ Γ dq istart z dn := .rfl
 
 /-- The region's fraction-1 record, shed to the share the collection hands
 the transport (durable-disk EV-X). -/
@@ -751,24 +681,6 @@ theorem inodeDatQ_split (Γ : FsViewNames GF) (Hfr : phiFrac Γ) (q1 q2 : Qp) (n
       · iexact Hi1
       · iexact Hi2
 
-/-- ONE BLOCK OUT AND BACK, the leg untouched otherwise (Rocq's
-`inode_dat_q_blk_acc`). -/
-theorem inodeDatQ_blkAcc (Γ : FsViewNames GF) (dq : DFrac) (n : FsNode) (k : Nat)
-    (bs : List (BitVec 8)) (hbs : PartialMap.get? n.fnBlk k = some bs) :
-    inodeDatQ Γ dq n ⊢
-      FsView.blkOwnedQ Γ dq (fnNaddr n k) bs ∗
-      (FsView.blkOwnedQ Γ dq (fnNaddr n k) bs -∗ inodeDatQ Γ dq n) := by
-  unfold inodeDatQ
-  iintro ⟨Hb, Hi⟩
-  ihave ⟨Hk, Hback⟩ := (BigSepM.bigSepM_lookup_acc hbs).1 $$ Hb
-  isplitl [Hk]
-  · iexact Hk
-  · iintro Hk
-    isplitl [Hk Hback]
-    · iapply Hback
-      iexact Hk
-    · iexact Hi
-
 /-- The Φ-only part of an inode: exactly its footprint (Rocq's
 `inode_phi`). -/
 def inodePhi (Γ : FsViewNames GF) (sb : FsSb) (i : Nat) (n : FsNode) : IProp GF :=
@@ -782,21 +694,13 @@ theorem inodePhi_dat (Γ : FsViewNames GF) (sb : FsSb) (i : Nat) (n : FsNode) :
 
 /-- THE GEOMETRY-FREE READING, the `recOwnedAt` pattern: the collection that
 rebuilds a state out of the region's records and the payloads' data legs
-assembles THIS, and `inodePhi_sb` puts the superblock back (Rocq's
-`inode_phi_at`). -/
+assembles THIS (Rocq's `inode_phi_at`). -/
 def inodePhiAt (Γ : FsViewNames GF) (istart z : Nat) (n : FsNode) : IProp GF :=
   iprop(recOwnedAt Γ istart z n.fnRec ∗ inodeDat Γ n)
 
 instance inodePhiAt_timeless (Γ : FsViewNames GF) [GTimeless Γ] (istart z : Nat) (n : FsNode) :
     Timeless (inodePhiAt Γ istart z n) := by
   unfold inodePhiAt; infer_instance
-
-/-- The range premise is `recOwned_sb`'s, and real for the same reason. -/
-theorem inodePhi_sb (Γ : FsViewNames GF) (sb : FsSb) (i : Nat) (n : FsNode) (hi : i < 2 ^ 32) :
-    inodePhiAt Γ sb.sbInodestart i n ⊣⊢ inodePhi Γ sb i n := by
-  rw [inodePhi_dat]
-  unfold inodePhiAt
-  exact sep_congr (recOwned_sb Γ sb i n.fnRec hi).symm .rfl
 
 /-! ### 3f.  The same shapes at the constant-share view (durable-disk EV-X)
 
@@ -814,38 +718,6 @@ theorem gammaQ_inodeDat (Γ : FsViewNames GF) (dq : DFrac) (n : FsNode) :
     inodeDat (FsView.gammaQ Γ dq) n ⊣⊢ inodeDatQ Γ dq n := by
   unfold inodeDat inodeDatQ
   exact sep_congr .rfl (gammaQ_indOwned Γ dq n)
-
-theorem indOwned_shed (Γ Γ1 Γ2 : FsViewNames GF) (Hs : FsView.viewShed Γ Γ1 Γ2) (n : FsNode) :
-    indOwned Γ n ⊢ indOwned Γ1 n ∗ indOwned Γ2 n := by
-  unfold indOwned
-  split
-  · exact emp_sep.2
-  · exact FsView.blkOwned_shed Γ Γ1 Γ2 Hs _ _
-
-theorem inodePhi_shed (Γ Γ1 Γ2 : FsViewNames GF) (Hs : FsView.viewShed Γ Γ1 Γ2) (sb : FsSb)
-    (i : Nat) (n : FsNode) :
-    inodePhi Γ sb i n ⊢ inodePhi Γ1 sb i n ∗ inodePhi Γ2 sb i n := by
-  have hB : ([∗map] k ↦ bs ∈ n.fnBlk, FsView.blkOwned Γ (fnNaddr n k) bs) ⊢
-      ([∗map] k ↦ bs ∈ n.fnBlk, FsView.blkOwned Γ1 (fnNaddr n k) bs) ∗
-      ([∗map] k ↦ bs ∈ n.fnBlk, FsView.blkOwned Γ2 (fnNaddr n k) bs) := by
-    rw [← BigSepM.bigSepM_sep_eq]
-    exact BigSepM.bigSepM_mono fun _ => FsView.blkOwned_shed Γ Γ1 Γ2 Hs _ _
-  unfold inodePhi recOwned
-  iintro ⟨Hr, Hb, Hi⟩
-  ihave ⟨Hr1, Hr2⟩ := FsView.byteRange_shed Γ Γ1 Γ2 Hs _ _ _ $$ Hr
-  ihave ⟨Hi1, Hi2⟩ := indOwned_shed Γ Γ1 Γ2 Hs n $$ Hi
-  ihave ⟨Hb1, Hb2⟩ := hB $$ Hb
-  isplitl [Hr1 Hb1 Hi1]
-  · isplitl [Hr1]
-    · iexact Hr1
-    · isplitl [Hb1]
-      · iexact Hb1
-      · iexact Hi1
-  · isplitl [Hr2]
-    · iexact Hr2
-    · isplitl [Hb2]
-      · iexact Hb2
-      · iexact Hi2
 
 theorem gammaQ_inodePhi (Γ : FsViewNames GF) (dq : DFrac) (sb : FsSb) (i : Nat) (n : FsNode) :
     inodePhi (FsView.gammaQ Γ dq) sb i n ⊣⊢
@@ -868,50 +740,6 @@ instance inodePhi_timeless (Γ : FsViewNames GF) [GTimeless Γ] (sb : FsSb) (i :
 Every one is an ACCESSOR: it hands the writer the byte range the log is
 about to move and takes it back at the new bytes.  None updates anything
 itself -- at an abstract `phi` there is no update to make. -/
-
-/-- (a) the record's bytes move -- iupdate, ialloc, ifree (Rocq's
-`rec_owned_acc`). -/
-theorem recOwned_acc (Γ : FsViewNames GF) (sb : FsSb) (i : Nat) (dn dn' : Dinode) :
-    recOwned Γ sb i dn ⊢
-      FsView.byteRange Γ (IBLOCK (BitVec.ofNat 32 i) sb.sbInodestart)
-        (64 * islot (BitVec.ofNat 32 i)) (dinodeBytes dn) ∗
-      (FsView.byteRange Γ (IBLOCK (BitVec.ofNat 32 i) sb.sbInodestart)
-        (64 * islot (BitVec.ofNat 32 i)) (dinodeBytes dn') -∗ recOwned Γ sb i dn') := by
-  unfold recOwned
-  iintro H
-  isplitl [H]
-  · iexact H
-  · iintro H
-    iexact H
-
-/-- The record write inside a whole inode: the addresses may move, as long
-as no slot the node ALREADY owns changes address (Rocq's `fn_addrs_kept`). -/
-def fnAddrsKept (n n' : FsNode) : Prop :=
-  ∀ k, (∃ bs, PartialMap.get? n.fnBlk k = some bs) → fnNaddr n' k = fnNaddr n k
-
-theorem inodePhi_recMove (Γ : FsViewNames GF) (sb : FsSb) (i : Nat) (n n' : FsNode)
-    (hblk : n'.fnBlk = n.fnBlk) (hent : n'.fnEnt = n.fnEnt) (hind : fnIndb n' = fnIndb n)
-    (hkept : fnAddrsKept n n') :
-    inodePhi Γ sb i n ⊢
-      recOwned Γ sb i n.fnRec ∗ (recOwned Γ sb i n'.fnRec -∗ inodePhi Γ sb i n') := by
-  have hb : ([∗map] k ↦ bs ∈ n'.fnBlk, FsView.blkOwned Γ (fnNaddr n' k) bs) =
-      ([∗map] k ↦ bs ∈ n.fnBlk, FsView.blkOwned Γ (fnNaddr n k) bs) := by
-    rw [hblk]
-    exact BigSepM.bigSepM_eq fun h => by rw [hkept _ ⟨_, h⟩]
-  have hi : indOwned Γ n' = indOwned Γ n := by
-    unfold indOwned
-    rw [hind, hent]
-  unfold inodePhi
-  rw [hb, hi]
-  iintro ⟨Hr, Hb, Hi⟩
-  isplitl [Hr]
-  · iexact Hr
-  · iintro Hr
-    isplitl [Hr]
-    · iexact Hr
-    · isplitl [Hb]
-      · iexact Hb
-      · iexact Hi
 
 /-- (b) one data block's contents move -- writei (Rocq's `fn_set_blk`). -/
 def fnSetBlk (n : FsNode) (k : Nat) (bs : List (BitVec 8)) : FsNode :=
@@ -936,14 +764,6 @@ tokenless, so its multiplicity is its count, namely zero (Rocq's
 `fn_mult`). -/
 def fnMult (n : FsNode) : Nat :=
   fnNlink n + if fnIsDir n && !fnOrphan n then 1 else 0
-
-/-- At `nlink = 0` there is no bonus WHATEVER the type is, so an orphan's --
-and a free record's -- register is empty (Rocq's `fn_mult_zero`). -/
-theorem fnMult_zero (n : FsNode) (hz : fnNlink n = 0) : fnMult n = 0 := by
-  have ho : fnOrphan n = true := by unfold fnOrphan; rw [hz]; rfl
-  unfold fnMult
-  rw [ho, hz]
-  simp
 
 /-- TWO EXEMPTIONS, each the kernel's own arithmetic (Rocq's
 `ent_tokenless`):

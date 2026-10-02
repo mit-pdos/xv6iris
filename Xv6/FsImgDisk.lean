@@ -77,12 +77,4 @@ theorem fsimgP_eq : fsimgP = fsImgBlock := by
     rw [List.mem_range] at hj
     rw [fsImgDisk_eq, if_neg (by rw [hs]; rw [hB] at hj ⊢; omega)]
 
-/-! ## 2.  THE LOG IS CLEAN -/
-
-/-- mkfs writes a zero log header at `logstart = 2` (the superblock says so:
-`FsImgCheck.fsimgParseSb`).  The ONE computation on the adequacy cone, and
-it reads four bytes (Rocq `fsimg_log_clean`). -/
-theorem fsimgLogClean : hdrN (fsimgP 2) = 0 := by
-  rw [fsimgP_eq]; decide +kernel
-
 end Xv6

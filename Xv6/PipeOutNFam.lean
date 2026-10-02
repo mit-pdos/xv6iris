@@ -5,7 +5,7 @@
 the N-writer family (`PipeBothN`) asks of the claim, PROVED at `peclV`
 (`pblkV_ecl_holds`); the filing through a view (`pwcBlkV_file`); the silent
 run (`widsFrom_silent`, `sfxRunV_silent`, `runN_silent`); the console claim
-a pipeline round writes through (`consClaimV`, `consClaimV_peclV`); and
+a pipeline round writes through (`consClaimV`); and
 section 4a/4b -- `PipeBothN`'s laws at the round of a model with a pipeline
 view (`pipesV_alloc` / `_cstep` / `_fire` / `_file`) and their pure
 premises at the pipeline's terminal sources (`pwitV_true`, `tokV_wit`,
@@ -269,14 +269,6 @@ def consClaimV (g : PipeGn) (M : LModel) (V : PView M) (G : GenCparams hlc GF M)
     ∧ ∀ (v : EraPins) (I : List (BitVec 8)) (sR : M.lmSt) (lR : Pline'),
         V.pvLine (lineV M I) = some lR →
         ⊢ eclN CL (pwcBlkV g M G.gcPIN G.gcW G.gcT v I sR) (ptkV G.gcT v I) (pwitV M I sR)
-
-theorem consClaimV_peclV (g : PipeGn) (M : LModel) (V : PView M) (G : GenCparams hlc GF M)
-    (sd : M.lmSt) (WA : GenWa M G sd) (hext : ∀ k l, WA.gext k l = pext g k l)
-    (hfree : ∀ v I lR k a, V.pvLine (lineV M I) = some lR → ⊢ WA.gpr k v I a)
-    (hc : MachFixedGS.consRes (hlc := hlc) (GF := GF) = peclV g M G sd WA) :
-    consClaimV g M V G sd WA :=
-  ⟨peclV g M G sd WA, hc, fun v I sR lR hlR =>
-    pblkV_ecl_holds g M G sd WA hext v I sR (fun k a => hfree v I lR k a hlR)⟩
 
 /-! ## The family at a pipeline round of any model (section 4a) -/
 

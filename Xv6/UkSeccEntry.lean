@@ -29,9 +29,8 @@ CONE (re-walked on the pinned glob, 4/4 reached): `secc_rows_tab_le`,
    licence in place of the interface record's two slot equations; the
    `…OfWild` forms are derived from it), and
    `secc_univ_of_mint` takes the payer (`useccompMintOfCons`) in place of
-   the two credentials.  `seccLic_of_iface` recovers the premise from an
-   `AppIface` (the landed deviation-4 form); the union discharges it from
-   `useccTok` (`UshURoundSecc.consLicenceAt_of_useccTok`).
+   the two credentials.  The union discharges the premise from `useccTok`
+   (`UshURoundSecc.consLicenceAt_of_useccTok`).
 2. **Two images** (UkTreeEntryStmt deviation 1): the node at the key image
    `M : ElfMem`, the argument reading at the page view `Mv`, `imgAgrees M Mv`
    between them.  `s0 t : Nat`; `mword_of_int (t + 8)` is
@@ -131,14 +130,6 @@ theorem seccUniv_of_mint (sts : List FdState) :
   isplitl []
   · ipureintro; exact hm
   · iapply seccRows_tabLe W.fd sts hle $$ Hr
-
-/-- The licence premise from an application interface whose two slots are
-the machine's (the landed deviation-4 form, `consLicenceAt_of_wild`). -/
-theorem seccLic_of_iface (Ai : AppIface GF)
-    (hw : MachFixedGS.wild (hlc := hlc) (GF := GF) = Ai.wild)
-    (hc : MachFixedGS.consRes (hlc := hlc) (GF := GF) = Ai.cons) :
-    ∀ k, MachFixedGS.wild (hlc := hlc) (GF := GF) k ⊢ consLicenceAt (hlc := hlc) (GF := GF) k :=
-  fun k => consLicenceAt_of_wild Ai k hw hc
 
 end UkSeccRows
 

@@ -57,9 +57,9 @@ s0,sp,544`), epilogue `+0x72 .. +0x86` (`ld ra/s0/s1/s2` at 536..512(sp);
    here, landing on exactly `kxcFrame`.
 3. **The frame cells are at the `k_addr` normal form** `sp0 + <literal>`
    (Rocq `pa_stk sp0 k`), and the 55 low slots are `stackOwn (sp0 - 104) 55`
-   (Rocq `stack_own (pa_stk sp0 13) 55`).  `kxc_rest_split` splits them into
-   the four regions (ustack, elf, ph, the spilled locals) -- Rocq does this
-   inline at each carve site.
+   (Rocq `stack_own (pa_stk sp0 13) 55`), split into the four regions
+   (ustack, elf, ph, the spilled locals) inline at each carve site, as Rocq
+   does.
 4. **The carves are over `byteBuf` / `stackOwn`** (the NameiFrame precedent),
    not `bytes_own` / `slotsn_bytes_own`: `kxc_slots_elf` hands the 64 bytes
    out as `∃ bs, byteBuf (kxcElfBuf sp0) bs` with the base's alignment (Rocq
@@ -116,32 +116,6 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 variable {lent : Bool}
 
 /-! ## The 55 low slots, and the three carves -/
-
-/-- The 55 low slots are the four regions: `ustack` (33), `elf` (8), `ph`
-(7) and the spilled locals (7) (deviation 3). -/
-theorem kxc_rest_split [CurCtx] (sp0 : BitVec 64) :
-    stackOwn (GF := GF) (sp0 + 0xFFFFFFFFFFFFFF98#64) 55 ⊣⊢
-      stackOwn (sp0 + 0xFFFFFFFFFFFFFF98#64) 33 ∗ stackOwn (kxcUstackBuf sp0) 8 ∗
-        stackOwn (kxcElfBuf sp0) 7 ∗ stackOwn (kxcPhBuf sp0) 7 := by
-  have e1 : sp0 + 0xFFFFFFFFFFFFFF98#64 - 8#64 * BitVec.ofNat 64 33 = kxcUstackBuf sp0 := by
-    unfold kxcUstackBuf; bv_omega_g
-  have e2 : kxcUstackBuf sp0 - 8#64 * BitVec.ofNat 64 8 = kxcElfBuf sp0 := by
-    unfold kxcUstackBuf kxcElfBuf; bv_omega_g
-  have e3 : kxcElfBuf sp0 - 8#64 * BitVec.ofNat 64 7 = kxcPhBuf sp0 := by
-    unfold kxcElfBuf kxcPhBuf; bv_omega_g
-  constructor
-  · refine (stackOwn_split (sp0 + 0xFFFFFFFFFFFFFF98#64) 33 22).trans ?_
-    rw [e1]
-    refine sep_mono_right ((stackOwn_split (kxcUstackBuf sp0) 8 14).trans ?_)
-    rw [e2]
-    refine sep_mono_right ((stackOwn_split (kxcElfBuf sp0) 7 7).trans ?_)
-    rw [e3]
-  · refine Entails.trans ?_ (stackOwn_join (sp0 + 0xFFFFFFFFFFFFFF98#64) 33 22)
-    rw [e1]
-    refine sep_mono_right (Entails.trans ?_ (stackOwn_join (kxcUstackBuf sp0) 8 14))
-    rw [e2]
-    refine sep_mono_right (Entails.trans ?_ (stackOwn_join (kxcElfBuf sp0) 7 7))
-    rw [e3]
 
 /-- **The carve, generically** (deviation 4): `n + 1` slots below
 `a + 8 (n + 1)` are `8 (n + 1)` bytes at `a`, and `a` is 8-aligned. -/

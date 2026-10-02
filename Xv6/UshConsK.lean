@@ -27,7 +27,7 @@ credential `K` whose law is `shConsNeverLaw` (owner's ruling (A):
   instance is what the `□`-shaped premise needs), `sh_cons_console_echo`,
   `sh_cons_absent_echo`.
 * The local notations `ra_idx`, `a0_idx`, `a1_idx`, `a7_idx` (reached):
-  Lean spells registers `1#5`, `10#5`, … (`UmodeAbi.raIdx`/`a0Idx`/…
+  Lean spells registers `1#5`, `10#5`, … (`UmodeAbi.a0Idx`/`a1Idx`
   exist; UshMainDefs deviation 4) -- no declaration to port.
 
 ## Parameters taken (unlanded prerequisites) -- `ShConsOpenCalls`

@@ -37,8 +37,8 @@ in short (every clause kept):
    (`ElfEnc.le_at`'s body over `l !!!`) IS `Xv6.leAt l o n` here, because the
    Lean buffer is a list too.  So this file imports `Xv6.ElfEnc` (Rocq's does
    not) and has no `elf_le_at`; `elf_le_bytes_length` is `leBytes_length`,
-   `elf_le_bytes_take_drop` is `leBytes_eq_take_drop`, `elf_map_is_fmap` is
-   vacuous.
+   `elf_le_bytes_take_drop` is not ported (nothing uses it), `elf_map_is_fmap`
+   is vacuous.
 2. **`Nat`, NOT `Z`**, for every field, offset and address (ElfEnc
    deviation 2).  Consequences, each a vacuous conjunct dropped:
    `elf_read`'s `0 <=? o` test; `elf_wf`'s `0 <=? ee_phoff`/`ee_phnum` and
@@ -51,8 +51,8 @@ in short (every clause kept):
    `range_disj_b`'s `ep_memsz p <=? 0` is `p.memsz = 0`.
 3. **`elf_avail` IS DROPPED.**  It is an O(o+n) `vm_compute` device
    (checking only the last byte); `elfRead` tests `o + n ≤ f.length`
-   directly and `elfRead_some` is Rocq's `elf_read_Some` without the
-   `0 < n` premise (which only `elf_avail`'s `n = 0` case needed).  Consumers
+   directly, with no `0 < n` premise (which only `elf_avail`'s `n = 0` case
+   needed); Rocq's `elf_read_Some` is not ported (nothing uses it).  Consumers
    (grep): `elf_avail`/`elf_avail_spec` have none outside this file.
 4. **THE IMAGE IS A PARTIAL FUNCTION `Nat → Option (BitVec 8)`** (`ElfMem`),
    not a `gmap Z (bv 8)`: `map_seqZ` is `elfSeq`, `∪` is the left-biased
@@ -85,18 +85,6 @@ def elfReadU8 (f : ElfBytes) (o : Nat) : Option Nat := elfRead f o 1
 def elfReadU16 (f : ElfBytes) (o : Nat) : Option Nat := elfRead f o 2
 def elfReadU32 (f : ElfBytes) (o : Nat) : Option Nat := elfRead f o 4
 def elfReadU64 (f : ElfBytes) (o : Nat) : Option Nat := elfRead f o 8
-
-/-- Rocq `elf_read_Some`. -/
-theorem elfRead_some (f : ElfBytes) (o n v : Nat) :
-    elfRead f o n = some v ↔ o + n ≤ f.length ∧ v = leAt f o n := by
-  unfold elfRead
-  split
-  · constructor
-    · intro h; exact ⟨by assumption, (Option.some.inj h).symm⟩
-    · rintro ⟨-, rfl⟩; rfl
-  · constructor
-    · intro h; cases h
-    · rintro ⟨h, -⟩; contradiction
 
 /-! ## The three header records -/
 

@@ -14,9 +14,8 @@ CROSSES HERE (`initConsSup`), and THE WORKING DIRECTORY IS A PREMISE
 premise from `kexecImageOk User.Init.elf …` exactly as sh's does.  init's
 image is one page of text plus one of data, so `kexecTop` is 0x2000,
 `kexecSz` 0x4000, and the stack page is `[0x3000, 0x4000)`.  The generic
-entry geometry (`uimgSub_union_l`, `shPagePerm`, `udataLo_isSome`,
-`uwAddr_of_perm`, `kxcSpFinal_mod8`, `kexecTop_of_memEnd`, `kexecSz_of_top`,
-`shKeySp`) is `UshKernel`'s, reused verbatim.
+entry geometry (`uimgSub_union_l`, `udataLo_isSome`, `kxcSpFinal_mod8`,
+`kexecTop_of_memEnd`, `kexecSz_of_top`, `shKeySp`) is `UshKernel`'s, reused verbatim.
 
 ## Ported (reached from `union_adequacy_closed`)
 

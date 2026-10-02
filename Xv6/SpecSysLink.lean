@@ -46,7 +46,7 @@ contract.
   interface in either direction.
 * THE ORPHAN GUARD (`dp->nlink == 0`, +0x84) is what makes the deposit
   legal; THE NLINK_MAX GUARD (+0x58) is what makes the mint legal
-  (`wp_iupdate_link`'s `dn0.diNlink ≠ 32767#16`).
+  (the mint's side condition `dn0.diNlink ≠ 32767#16`).
 * THE REFERENCE LEDGER CLOSES AT THREE ON EVERY ARM (`sysLinkIrefs`): the
   second resolve (nameiparent) runs while `ip` is still held.
 * THE LOG LEDGER IS THE SET FORM, AND IT HAS TO BE: two unbounded walks in

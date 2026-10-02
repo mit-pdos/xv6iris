@@ -5,8 +5,8 @@ to the drain (crash_layer.md D40; Rocq `WpUart.wp_disk_loop` with
 
 Of the whole machine only the disk's own steps move the durable image
 (`Virtio.drain`), so the disk cannot go through the device-generic rules
-(`wpDev_dmaV` and friends need `DevDiskInert`).  This file is `wpDev_dmaV`
-for the disk, over `DevM.LeaseD`: `DevM.LeaseV` with
+(they need `DevDiskInert`, as `wpDev_lift_obs` does).  This file is the
+bus-master loop for the disk, over `DevM.LeaseD`: `DevM.LeaseV` with
 
 * its state-moving arms (`step`, `dmaWrite`) additionally proving that the
   move keeps the durable image (`hdk`), which is how the rule frames the
@@ -213,8 +213,9 @@ local macro "disk_first_leg" : tactic => `(tactic| (
   imod Hmask))
 
 set_option maxHeartbeats 4000000 in
-/-- **The disk's tasks are safe** (D40, Rocq `wp_disk_loop`): `wpDev_dmaV`
-for the disk, over `LeaseD`, with the durable disk lent to `stepD`. -/
+/-- **The disk's tasks are safe** (D40, Rocq `wp_disk_loop`): the
+bus-master loop for the disk, over `LeaseD`, with the durable disk lent to
+`stepD`. -/
 theorem wpDev_dmaD (N : Namespace) (Env : IProp GF) [Persistent Env]
     (R : DevSt .virtio → IProp GF) [∀ s, Timeless (R s)]
     (Lt : DevTask .virtio → IProp GF) (Cr : IProp GF)

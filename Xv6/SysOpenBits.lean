@@ -34,18 +34,17 @@ image (`KA.«sys_open»` = 0x800052c6):
    the Sail-`Z` route to "a low bit survives the sign extension"; in Lean
    each concrete mask is one `bv_decide` over `BitVec.getLsbD`
    (`sys_open_and512_iff`, `sys_open_and1024_iff`, `sys_open_rd_word`,
-   `sys_open_wr_word`), and `soau_testbit_low` is `sys_open_testbit_low`
-   (kept: it is the one fact the chain needs, now over `toNat.testBit`).
+   `sys_open_wr_word`); `soau_testbit_low` is not ported (nothing uses
+   it).
    `soau_om_arg` is `sys_open_om_bit` (the per-bit form every consumer
    uses) plus `sys_open_om_arg` (the value form).
 3. `trunc8` is `BitVec.extractLsb' 0 8` (`wp_s_sb`); Rocq's
    `if b then mword_of_int 1 else mword_of_int 0` is `if b then 1#8 else
-   0#8` (FileDefs' `fdstateOk` spelling), and `FileInvDefs.fdstate_bit_inj`
-   is inlined (`sys_open_bit_inj`).
+   0#8` (FileDefs' `fdstateOk` spelling); `FileInvDefs.fdstate_bit_inj` is
+   not ported (nothing uses it).
 4. `soau_major_bound` is stated at the literal `9`: Rocq's
    `ConsoleInv.NDEV_max` has no Lean counterpart yet (grep: no `NDEV` in
-   Xv6/ or MachCSL/); a `bltu` reading (`sys_open_major_bltu`) is added,
-   since the Lean branch rule states the condition as `bcond`.
+   Xv6/ or MachCSL/).
 5. Names: Rocq's `soau_` prefix is `sys_open_` (the `sys_pipe_` precedent).
 -/
 import Xv6.SysOpenDefs
@@ -72,12 +71,6 @@ def soWrWord (om : BitVec 32) : BitVec 64 :=
   if (0#64).ult (soAnd om 3) then 1#64 else 0#64
 
 /-! ## 1.  A low bit survives the sign extension -/
-
-/-- THE ONE FACT THE CHAIN NEEDS (Rocq's `soau_testbit_low`). -/
-theorem sys_open_testbit_low (w : BitVec 32) (k : Nat) (hk : k < 32) :
-    (soOmv w).toNat.testBit k = w.toNat.testBit k := by
-  rw [BitVec.testBit_toNat, BitVec.testBit_toNat, soOmv, BitVec.getLsbD_signExtend]
-  simp [hk, show k < 64 by omega]
 
 /-- the argint'd word's bits ARE `omArg`'s (Rocq's `soau_om_arg`, per bit). -/
 theorem sys_open_om_bit (vom : BitVec 64) (k : Nat) (hk : k < 32) :
@@ -139,25 +132,5 @@ theorem sys_open_wr_byte (vom : BitVec 64) :
       if omWritable vom then 1#8 else 0#8 := by
   rw [sys_open_wr_word, omWritable, omWronly, omRdwr, sys_open_om_bit vom 0 (by decide),
     sys_open_om_bit vom 1 (by decide)]
-
-/-- Rocq's `FileInvDefs.fdstate_bit_inj` (deviation 3). -/
-theorem sys_open_bit_inj (b1 b2 : Bool) (v : BitVec 8) (h1 : v = if b1 then 1#8 else 0#8)
-    (h2 : v = if b2 then 1#8 else 0#8) : b1 = b2 := by
-  rw [h1] at h2; cases b1 <;> cases b2 <;> first | rfl | exact absurd h2 (by decide)
-
-/-! ## 3.  The major bound -/
-
-/-- Rocq's `soau_major_bound` (deviation 4: at the literal `9`). -/
-theorem sys_open_major_bound (h : BitVec 16) (hle : ¬ 9 < h.toNat) : h.toNat ≤ 9 := by
-  omega
-
-/-- the `bltu a5,a4` at +0x5a not taken, with a4 = `lhu` of the major
-(deviation 4). -/
-theorem sys_open_major_bltu (h : BitVec 16)
-    (hb : bcond bop.BLTU 9#64 (BitVec.setWidth 64 h) = false) : h.toNat ≤ 9 := by
-  simp only [bcond, BitVec.ult, BitVec.toNat_setWidth, decide_eq_false_iff_not] at hb
-  have := h.isLt
-  simp at hb
-  omega
 
 end Xv6

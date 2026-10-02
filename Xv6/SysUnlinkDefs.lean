@@ -1,8 +1,8 @@
 /-
-**THE UNLINK FAMILY'S STATEMENT LEAF: the fused delta's side conditions,
-its two-instant split, and the THREE commit steps sys_unlink owns.**  A port
+**THE UNLINK FAMILY'S STATEMENT LEAF: the fused delta's side conditions
+and the THREE commit steps sys_unlink owns.**  A port
 of Rocq `SysUnlinkDefs.v` (`iris/SysUnlinkDefs.v`, 355
-lines), WHOLE.  Definitions and small structural lemmas only -- no bundle,
+lines).  Definitions and small structural lemmas only -- no bundle,
 no arms, no frame.  sys_unlink's ONE contract is `SpecSysUnlink`'s
 `SYSUNLINK` (wave 7b, not yet ported), which states its bundle and arms
 over these pieces.
@@ -17,7 +17,7 @@ Rocq's header, kept because the reasons are the content:
 > its row algebra: FsAbsUnlinkFire, FsAbsLinkFire.
 >
 > THE DELTA IS TWO INSTANTS, AND THAT IS A MACHINE FACT.  The fused delta
-> is stated (`deltaUnlink`, total, side conditions in `unlPre`) -- but IT
+> has its side conditions stated (`unlPre`) -- but IT
 > IS NOT REALIZABLE AT ONE COMMIT, and the walk is the evidence.  Its
 > success arms fire TWO `iregTopRetag_*` steps:
 >
@@ -42,8 +42,8 @@ Rocq's header, kept because the reasons are the content:
 > WHAT MAKES THE PAIR READ LIKE ONE DELTA ANYWAY: `ip`'s lock is taken at
 > W3, BEFORE instant 1, and held through instant 2 -- the target's fragment
 > is in the walk's custody the whole way, so its row cannot move between
-> the instants.  `deltaUnlink_split` is the machine-checked composition:
-> under `unlPre` the fused delta IS `deltaUnlTgt ∘ deltaUnlEnt`.
+> the instants: under `unlPre` the fused delta IS
+> `deltaUnlTgt ∘ deltaUnlEnt`.
 >
 > THE SIDE CONDITIONS, AND THE TWO KERNEL READINGS.  `unlPre` is what the
 > kernel has established at instant 1, restated abstractly: the parent is a
@@ -52,13 +52,11 @@ Rocq's header, kept because the reasons are the content:
 > `DirView.dirOrphanClean`); the target's row is `a` with `1 ≤ anNlink a`
 > (the kernel's `ip->nlink < 1` panic guard); and a DIRECTORY target's
 > entry map is dots-only (`dotsOnly` -- THE ISDIREMPTY READING).
-> `unlPre_ne` derives `d ≠ t` from these.
 >
 > NOTHING ABOUT DURABILITY, AND NOTHING ABOUT `δ_free` -- THE VIEW IS THE
 > LIVE NAMESPACE (owner ruling Q-d).  A successful unlink of a target with
 > prior nlink 1 takes the row OUT of the view at instant 2 (`deltaUnlTgt`
-> deletes at count 0); `deltaUnlink_last_file` / `_last_dir` state the
-> rows.
+> deletes at count 0).
 >
 > THE MISS COMMIT.  `dmissCommitAt` is new in `dlookup_commit_at`'s
 > single-phase mold: unlink's miss is a failure the kernel OBSERVED, so it
@@ -79,15 +77,14 @@ Rocq's header, kept because the reasons are the content:
    `appStep`) and `[FsBytesG GF]` (the `_unit`s' `fsGammaL`).  The
    `` `{XI : CurCtx} `` binder is read by nothing and is dropped.
 3. Rocq's `Require Export FsAbsDelta` is `import Xv6.FsAbsDelta`.
-4. Names: `dots_only` → `dotsOnly`, `unl_pre(_ne)` → `unlPre(_ne)`,
-   `delta_unlink_split/last_file/last_dir` → `deltaUnlink_split/
-   last_file/last_dir`, `uent/utgt/dmiss_commit_at(_unit)` →
-   `uent/utgt/dmissCommitAt(_unit)`.
+4. Names: `dots_only` → `dotsOnly`, `unl_pre` → `unlPre`,
+   `uent/utgt/dmiss_commit_at(_unit)` → `uent/utgt/dmissCommitAt(_unit)`.
 
 ## Dropped/simplified vs Rocq
 
-Nothing.  (The fused delta and its row algebra were hoisted to
-`FsAbsDelta` in Rocq already; `deltaUnlink_split` stayed here, as in Rocq.)
+Not ported, because nothing uses them: `unl_pre_ne`, `delta_unlink_split`,
+`delta_unlink_last_file`, `delta_unlink_last_dir`.  (The row algebra,
+`deltaUnlEnt` / `deltaUnlTgt`, lives in `FsAbsDelta`, as in Rocq.)
 -/
 import Xv6.FsAbsDelta
 import Xv6.AppInv
@@ -119,45 +116,6 @@ def unlPre (av : Aview) (d : Nat) (nm : Fname) (ents : Std.ExtTreeMap Fname Nat 
   ∧ 1 ≤ a.anNlink
   ∧ (∀ es, a.anNode = .ADir es → dotsOnly es)
 
-/-- the parent is never the target: a dir target's dots-only map cannot
-carry the non-dot name its self-row would need (Rocq's `unl_pre_ne`) -/
-theorem unlPre_ne (av : Aview) (d : Nat) (nm : Fname) (ents : Std.ExtTreeMap Fname Nat compare)
-    (nl t : Nat) (a : Anode) (h : unlPre av d nm ents nl t a) : d ≠ t := by
-  obtain ⟨hd, hnm, hnD, hnDD, _, ht, _, hdots⟩ := h
-  intro heq
-  subst heq
-  rw [hd] at ht
-  cases ht
-  rcases hdots ents rfl nm (by rw [hnm]; rfl) with hc | hc
-  · exact hnD hc
-  · exact hnDD hc
-
-/-! ### The composition (what makes the pair one delta) -/
-
-/-- Rocq's `delta_unlink_split`: under `unlPre` the fused delta IS the
-target leg after the parent leg. -/
-theorem deltaUnlink_split (av : Aview) (d : Nat) (nm : Fname)
-    (ents : Std.ExtTreeMap Fname Nat compare) (nl t : Nat) (a : Anode)
-    (hp : unlPre av d nm ents nl t a) :
-    deltaUnlink d nm t av = deltaUnlTgt t (deltaUnlEnt d nm (unlDec a.anNode) av) := by
-  have hne := unlPre_ne av d nm ents nl t a hp
-  obtain ⟨hd, _, _, _, _, ht, _, _⟩ := hp
-  have ht' : PartialMap.get? (deltaUnlEnt d nm (unlDec a.anNode) av) t = some a := by
-    rw [deltaUnlEnt_other av d nm _ t (Ne.symm hne), ht]
-  rw [deltaUnlink_unfold av d nm ents nl t a hd ht, deltaUnlTgt_unfold _ t a ht']
-  simp only [deltaUnlEnt, hd]
-
-/-! ### The last-link family (E2-V2: the view is the live namespace) -/
-
-/-- a file target whose only link this was: the row LEAVES the view (Rocq's
-`delta_unlink_last_file`). -/
-theorem deltaUnlink_last_file (av : Aview) (d : Nat) (nm : Fname)
-    (ents : Std.ExtTreeMap Fname Nat compare) (nl t : Nat) (bs : List (BitVec 8))
-    (hp : unlPre av d nm ents nl t ⟨.AFile bs, 1⟩) :
-    PartialMap.get? (deltaUnlink d nm t av) t = none := by
-  obtain ⟨hd, _, _, _, _, ht, _, _⟩ := hp
-  exact deltaUnlink_last av d nm ents nl t _ hd ht rfl
-
 /-! ## 2.  The commits -/
 
 section UnlinkDefs
@@ -188,8 +146,7 @@ def uentCommitAt [Appcfg GF] (Γ : FsViewNames GF) (E : CoPset) (Pd : Nat → IP
         (Γ.top ↪●MAP{DFrac.own (1 : Qp).half} I') ={E}=∗
         (Γ.top ↪●MAP{DFrac.own (1 : Qp).half} I') ∗ Φ (absView I) d nm t))
 
-/-- ...and the cursor's ISO (Rocq's `uent_commit_at_mono`,
-`FsAbsCreateFire.acreCommitAtGen_mono`'s twin). -/
+/-- ...and the cursor's ISO (Rocq's `uent_commit_at_mono`). -/
 theorem uentCommitAt_mono [Appcfg GF] (Γ : FsViewNames GF) (E : CoPset) (Pd Pd' : Nat → IProp GF)
     (Φ : Aview → Nat → Fname → Nat → IProp GF) :
     ⊢ iprop(□ (∀ d : Nat, Pd' d -∗ Pd d)) -∗ iprop(□ (∀ d : Nat, Pd d -∗ Pd' d)) -∗

@@ -27,8 +27,7 @@ the phase composed).
    `wp_next_chain` after it); those transports are gone (KexecTail
    deviation 8).
 2. **Rocq's `mword`/`Z` bridges are Lean `BitVec` lemmas**:
-   `kxc_pgu_bridge` is `UPtAlloc.pgRoundUp_bv` at the setup's own
-   instruction sequence (`kxcC_pgru`); `add_neg8192_eq_sub`,
+   `kxc_pgu_bridge` is not ported (nothing uses it); `add_neg8192_eq_sub`,
    `kxc_wrap_add3'`, `kxc_addv_moi_moi`, `avi_moi`, `neq_vec64_true`,
    `eq_vec64_false`, `zero_reg64`, `uvm_maxsz_lit`, `kxc_pa_stk_add`,
    `kxc_ustack_slot_addr` are Lean-trivial (`bv_omega` / `decide` at the
@@ -63,17 +62,6 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 set_option linter.unusedSimpArgs false
 
 /-! ## §1 PURE ARITHMETIC -/
-
-/-- **Rocq `kxc_pgu_bridge`, at the instructions** (+0x1b8 .. +0x1c0: `lui
-s8,0x1 ; addi s8,s8,-1 ; add s8,s8,s2 ; lui a5,0xfffff ; and s8,s8,a5`):
-the machine's `PGROUNDUP(sz)`. -/
-theorem kxcC_pgru (x : BitVec 64) (h : x.toNat + 4095 < 2 ^ 64) :
-    (BitVec.signExtend 64 (1#20 ++ 0#12) + BitVec.signExtend 64 4095#12 + x) &&&
-        BitVec.signExtend 64 (0xfffff#20 ++ 0#12) = BitVec.ofNat 64 (pgRoundUpN x.toNat) := by
-  have e1 : BitVec.signExtend 64 (1#20 ++ 0#12) + BitVec.signExtend 64 4095#12 + x = x + 4095#64 := by
-    have : BitVec.signExtend 64 (1#20 ++ 0#12) + BitVec.signExtend 64 4095#12 = 4095#64 := by decide
-    rw [this, BitVec.add_comm]
-  rw [e1, MachCSL.lui_mask, UPtAlloc.pgRoundUp_bv x h]
 
 /-- The block's size bound through the table: a covered size is at most
 `uvmMaxsz` (every page below it is a user leaf, and those lie below the

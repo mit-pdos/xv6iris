@@ -17,11 +17,11 @@ CONE (re-walked on the pinned globs: 10/35 reached): `a0_idx`, `a1_idx`
 
 ## The rest: `Xv6/ExecRunSup.lean`
 
-`exec_walk_of`, `exec_walk_of_pin`, `sbundle_pay_refR_of_exec`,
-`uexec_sup_run`, `uexec_sup_run_ids`, `udepw_at_refR_of_sup(_ids)` (once
+`exec_walk_of`, `exec_walk_of_pin`, `sbundle_pay_refR_of_exec` (once
 deferred here on ExecBundle/ExecEntry/PinnedExec and K4) are ported there as
-`execWalkOf`, `execWalkOf_pin`, `sbundlePayRefR_of_exec`, `uexecSupRun`,
-`uexecSupRunIds`, `udepwAtRefR_of_sup`, `udepwAtRefRIds_of_supIds`.
+`execWalkOf`, `execWalkOf_pin`, `sbundlePayRefR_of_exec`;
+`uexec_sup_run(_ids)` and `udepw_at_refR_of_sup(_ids)` are not ported
+(nothing uses them).
 
 ## Deviations from Rocq
 

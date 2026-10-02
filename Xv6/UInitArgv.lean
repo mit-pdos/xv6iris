@@ -13,7 +13,7 @@ exec deposit reads them back.
 ## Ported (reached from `union_adequacy_closed`)
 
 `init_argv_map` (`initArgvMap`), `init_argv_map_range`
-(`initArgvMap_range`), `init_argv_map_data` (`initArgvMap_data`).
+(`initArgvMap_range`).  `init_argv_map_data` is not ported (nothing uses it).
 `init_argv` is ALREADY ported as `UkInitDefs.initArgv` (UkInitDefs
 deviation 3, a `ubytesq` over the data rows); this file adds the map's
 reading of its bytes (`initArgvMap_byte`) that ties the two.
@@ -56,14 +56,6 @@ theorem initArgvMap_range (a : Nat) (b : BitVec 8) (h : initArgvMap a = some b) 
   split at h
   · omega
   · cases h
-
-/-- **Rocq `init_argv_map_data`** (deviation 2): its bytes are `initArgv`'s. -/
-theorem initArgvMap_data (a : Nat) (b : BitVec 8) (h : initArgvMap a = some b) :
-    ∃ j, j < 16 ∧ a = 0x1000 + j ∧ b = initArgvByte j := by
-  have hr := initArgvMap_range a b h
-  unfold initArgvMap User.USeg.byte at h
-  rw [initData_vaddr, initData_size, if_pos (by omega)] at h
-  exact ⟨a - 0x1000, by omega, by omega, (Option.some.inj h).symm⟩
 
 /-- NEW (deviation 3): the map at `initArgv`'s `j`-th byte. -/
 theorem initArgvMap_byte (j : Nat) (hj : j < 16) : initArgvMap (0x1000 + j) = some (initArgvByte j) := by

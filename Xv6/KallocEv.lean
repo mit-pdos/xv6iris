@@ -26,8 +26,8 @@ Design: `claude-notes/design/ni-kalloc-ledger.md` (§2, D2 and D4).
 
 ## Deviations from Rocq
 
-1. Names: `kev`/`kev_actor`/`pool_empty`/`kev_of` are
-   `Kev`/`Kev.actor`/`poolEmpty`/`kevOf`; the constructors keep Rocq's
+1. Names: `kev`/`pool_empty`/`kev_of` are `Kev`/`poolEmpty`/`kevOf`
+   (`kev_actor` is not ported: nothing uses it); the constructors keep Rocq's
    spelling (`Kev.KAlloc`, ...).  `mword 64` is `BitVec 64`; `nullp` is
    `0#64` (the tree's spelling of the null page, `kallocPost`).
 2. No `Countable` instance: iris-lean's `MonoList` camera is over
@@ -50,10 +50,6 @@ inductive Kev where
   /-- a `kfree` by `p` -/
   | KFree (p : BitVec 64)
   deriving DecidableEq, Repr
-
-/-- The label: the actor that ran the call (Rocq `kev_actor`). -/
-def Kev.actor : Kev → BitVec 64
-  | .KAlloc p | .KNull p | .KFree p => p
 
 /-! ## 2. The counts, emptiness, and the outcome map
 
@@ -114,18 +110,6 @@ theorem frees_snoc_null (h : List Kev) (p : BitVec 64) :
 theorem frees_snoc_free (h : List Kev) (p : BitVec 64) :
     frees (h ++ [.KFree p]) = frees h + 1 := by rw [frees_append]; rfl
 
-theorem allocs_replicate_free (n : Nat) (p : BitVec 64) :
-    allocs (List.replicate n (.KFree p)) = 0 := by
-  induction n with
-  | zero => rfl
-  | succ n ih => simp only [List.replicate_succ, allocs, ih]
-
-theorem frees_replicate_free (n : Nat) (p : BitVec 64) :
-    frees (List.replicate n (.KFree p)) = n := by
-  induction n with
-  | zero => rfl
-  | succ n ih => simp only [List.replicate_succ, frees, ih]
-
 theorem kevOf_null (p : BitVec 64) : kevOf p 0#64 = .KNull p := by
   simp [kevOf]
 
@@ -136,10 +120,6 @@ theorem kevOf_page (p r : BitVec 64) (hr : r ≠ 0#64) : kevOf p r = .KAlloc p :
 
 `npages + allocs h = frees h` across birth, the three appends, and the
 reading of emptiness off the history. -/
-
-theorem tie_birth (n : Nat) (p : BitVec 64) :
-    n + allocs (List.replicate n (.KFree p)) = frees (List.replicate n (.KFree p)) := by
-  rw [allocs_replicate_free, frees_replicate_free]; rfl
 
 theorem tie_alloc (npages : Nat) (h : List Kev) (p : BitVec 64)
     (ht : (npages + 1) + allocs h = frees h) :

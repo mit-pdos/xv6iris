@@ -12,7 +12,7 @@ Rocq `FsStateLink.v`) or the register's value type `Ity`
 * §4 the fragments an inode's entries carry: `fnItyOk`, `entTyOk`,
   `entTokAt`, `entTok`, `entToks`, `entToksNodot`, `entElem`,
   `linkElemNode`, `nodeEntOk`, `entToksX`, `inodeGhost`, `inodeOwned`,
-  `gammaQ_inodeGhost`, `inodeGhost_of`.
+  `gammaQ_inodeGhost`.
 * §5 timelessness: `entTokAt_timeless`, `entTok_timeless`,
   `entToks_timeless`, `entToksX_timeless`, `inodeGhost_timeless`,
   `inodeOwned_timeless`; the congruences `entToks_congEnt`,
@@ -242,24 +242,6 @@ and entry tokens at the constant-share view are the SAME proposition they
 are at `Γ` (Rocq's `gamma_q_inode_ghost`). -/
 theorem gammaQ_inodeGhost (Γ : FsViewNames GF) (dq : DFrac) (i : Nat) (n : FsNode) :
     inodeGhost (FsView.gammaQ Γ dq) i n = inodeGhost Γ i n := rfl
-
-/-- THE RE-JOIN.  In the era the two halves of `inodeGhost` are held by two
-different parties -- the AUTHORITY behind `iregN` (`InodeRegion.ireg_lnk_at`)
-and the TOKENS in the checked-out payload (`IcacheEscrow.dlinks`, which IS
-`entToksX`) -- so the collection that rebuilds an `fs_state` at a commit
-meets them in two hands, and this is the one step that puts them back
-together.  The two pure facts are premises because the collection has them
-from elsewhere (Rocq's `inode_ghost_of`). -/
-theorem inodeGhost_of (Γ : FsViewNames GF) (i : Nat) (n : FsNode) (v : Ity)
-    (hv : fnItyOk n v) (hl : InodeLocal i n) :
-    linkAuth Γ (i : Int) (fnMult n) v ∗ entToksX Γ i n ⊢ inodeGhost Γ i n := by
-  iintro ⟨Ha, Ht⟩
-  unfold inodeGhost
-  iexists v
-  iframe Ha Ht
-  isplitr
-  · ipureintro; exact hv
-  · ipureintro; exact hl
 
 /-! ### the two arms of the `if` -/
 
@@ -550,8 +532,8 @@ theorem inodeGhost_iff (Γ : FsViewNames GF) (i : Nat) (n : FsNode) :
 
 The BYTES of a dirent write move by `FsStateInode`'s encode lemmas; what is
 left is the token that rides with the entry.  The DELETE is stated at the
-entry-map delta (the caller holds `dirEntries_zero`'s conclusion in that
-shape anyway). -/
+entry-map delta (the caller holds the zeroed entry in that shape
+anyway). -/
 
 /-- Rocq's `ent_toks_delete` (`D ∖ {[s]}` is `D.erase s`, deviation 3). -/
 theorem entToks_delete (Γ : FsViewNames GF) (i : Nat) (n n' : FsNode)

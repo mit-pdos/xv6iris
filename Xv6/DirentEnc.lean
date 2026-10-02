@@ -394,14 +394,6 @@ theorem namePad_cut (s : List (BitVec 8)) (hlen : s.length ≤ 14) (hs : nonul s
     cutNul (namePad s) = s := by
   rw [namePad_eq s hlen, cutNul_append s _ hs, cutNul_replicate, List.append_nil]
 
-/-- Rocq `de_padded_l`: "once NUL, always NUL", what strncpy leaves behind,
-stated as a property of the STORED bytes rather than of the caller's
-argument. -/
-def dePaddedL (l : List (BitVec 8)) : Prop := ∀ b ∈ l.drop (cutNul l).length, b = 0#8
-
-/-- Rocq `de_padded`. -/
-def dePadded (d : Dirent) : Prop := dePaddedL d.name
-
 /-- Rocq `de_name_str`: the canonical name of a record. -/
 def deNameStr (d : Dirent) : List (BitVec 8) := cutNul d.name
 
@@ -647,16 +639,6 @@ theorem ncZero_iff (f g : Nat → BitVec 8) (n : Nat) :
       have hjl : j < (bname n f).length := by
         have := bname_length_le n f; omega
       exact ⟨heq j hjl, hnonul j hjl⟩
-
-/-- Rocq `namecmp_bridge`: namecmp's contract, at the width the code uses.
-`f` is the SEARCH name (dirlookup passes `name` in a0), `g` the record's
-field (a1). -/
-theorem namecmp_bridge (f : Nat → BitVec 8) (d : Dirent) (hd : direntWf d) :
-    (((∃ k, ncStop f (fun j => d.name[j]!) 14 k ∧ f k = d.name[k]!)
-      ∨ ncRun f (fun j => d.name[j]!) 14)
-     ↔ bname 14 f = deNameStr d) := by
-  rw [← de_bname_name d hd]
-  exact ncZero_iff f _ 14
 
 /-- Rocq `bname_of_buf`: the buffer shape skipelem's two branches leave
 behind -- a name shorter than 14 terminated by a NUL, or exactly 14 bytes

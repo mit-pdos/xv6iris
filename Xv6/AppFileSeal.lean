@@ -29,10 +29,10 @@ lists).
 
 ## DEVIATIONS from Rocq
 
-1. `file_xfer_boot` is stated at `SystemSlot.appCloneRaw (filePred c)
-   (fileBoot c k)` (Rocq states the unfolded `□ ∀ r av, …`; its use site
-   `union_al_xfer` rewrites `app_xfer_boot_raw` away), i.e. exactly
-   `AppLaws.AppLaws.al_xfer`'s shape at `AppFileBoot`'s `filePred`/`fileBoot`.
+1. `file_xfer_boot` (`AppFileXfer.fileXferBoot`) is stated at
+   `AppFileClaim.filePred` and `AppFileBoot.fileBootAt` (Rocq states the
+   unfolded `□ ∀ r av, …`; its use site `union_al_xfer` rewrites
+   `app_xfer_boot_raw` away).
 2. Rocq's curried `A -∗ B -∗ C` lemmas are stated `⊢ A -∗ B -∗ C`
    (`AppFileNames` deviation 4); the getter `fl_auth_lb` is `A ⊢ A ∗ B`.
 3. Inums are `Nat`; `fnames_alloc` is `AppFileEscrow.fnamesAlloc`.

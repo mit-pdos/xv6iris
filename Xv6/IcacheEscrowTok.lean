@@ -145,8 +145,8 @@ Uses checked by `grep -rnw <name>` over comment-stripped
 * `IcacheEscrowPool` (2105--3360): `ipoolOrd`, `ipoolExt`, `ipoolAlloc`,
   `ipoolShapeNp`, `poolAwait` (and the `Timeless` instances; `ipoolExt` is
   NOT Timeless -- `escAInv` is an `inv` -- so open its arm without `>`).
-* `IcacheBoxAmb` / `IcacheBox`: `icInodeLeg_local` / `_shedTo` / `_rdAgree`
-  / `_shedOf` (the inline shed/join at Rocq 3795--3824), `icRdArm`,
+* `IcacheBoxAmb` / `IcacheBox`: `icInodeLeg_shedTo` / `_rdAgree` /
+  `_shedOf` (the inline shed/join at Rocq 3795--3824), `icRdArm`,
   `icRdHeld`, `icDeposit_agree` (4584, 4623, 5152, 5324), `icDepPark`
   (5169, 5341), `icId_flip` (4863).  Rocq's `(XI := ξ)` re-instantiation
   of the ambient context is `(self := ⟨ξ, _⟩)` on the `[CurCtx]` binder, or
@@ -552,17 +552,6 @@ theorem icInodeLeg_eraIntro (γfs : FsNames) (dq : DFrac) (γi : GName) (inum : 
   iintro H1 H2
   iframe H1 H2
 
-/-- The leg's own pure reading: `InodeLocal` is the era bundle's last
-conjunct, and a consumer that only wants it should not have to open the
-pair (Rocq's `ic_inode_leg_local`). -/
-theorem icInodeLeg_local (γfs : FsNames) (dq : DFrac) (γi : GName) (inum : BitVec 32)
-    (n : FsNode) :
-    icInodeLeg (GF := GF) γfs dq γi inum n ⊢ ⌜InodeLocal inum.toNat n⌝ := by
-  unfold icInodeLeg inodeOwnedEraQ
-  iintro ⟨_, _, _, _, %hl⟩
-  ipureintro
-  exact hl
-
 /-- THE READER'S QUARTER, AT THE LEG.  The entry TOKENS do not split (they
 are the Φ-free half and stay whole on the arm), so the leg's shed is the
 bundle's beside an untouched token conjunct (Rocq's
@@ -749,7 +738,7 @@ share.  So its withdrawal is a SHARE: it takes a quarter of the byte legs
 and of the abstract fragment and leaves the rest here, and the collection
 reads the residue off the open escrow.  The quarter (not a half) is what
 makes 3/4 + 3/4 invalid, i.e. what keeps cross-inode block disjointness
-pure separation logic (`FsView.blkOwned_ne_34`).
+pure separation logic.
 
 WHAT STAYS: the record proxy `dinodeAt` (a read-locker cannot move a
 record), three quarters of the byte legs and of `topFrag`, the link tokens

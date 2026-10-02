@@ -470,7 +470,7 @@ theorem usysFdOk_epc {n : Int} {tf : List (BitVec 64)} {w r : BitVec 64} {sts st
 DISCIPLINE -- "no descriptor in this table has had its offset half handed
 out" -- across a round, the precondition design/app-file.md SS3.5's
 principle retires; the generic tier pays the TAINT and is told nothing about
-offsets.  The OPEN row above no longer pins `fdstParked` either (Rocq L4,
+offsets.  The OPEN row above does not pin parkedness either (Rocq L4,
 abe94870d): an open installs the descriptor at the mode its caller's family
 asked for, and nothing in the tier reads all-parkedness off it any more. -/
 

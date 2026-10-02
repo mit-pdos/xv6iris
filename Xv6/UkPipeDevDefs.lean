@@ -23,7 +23,7 @@ early; a zero-length write is its own law; the source run must reach the
 deposit (`udepwfKs`); the stub hands the return to the caller.
 
 CONE (re-walked on the pinned globs: 32/48 reached).  Ported: `pdev_signed_nat`,
-`Xv6.fh_m1`, `pdev_signed_uint0`, `pdev_stub_next`, `pdev_rd_ans`,
+`Xv6.fh_m1`, `pdev_signed_uint0`, `pdev_rd_ans`,
 `pdev_map_seq`, `pdev_chunk_byte`, `pdev_qh`, the notations `γt γd γfd a0_idx
 a1_idx a2_idx a7_idx` (as `N.t` / `N.d` / `N.fd` / `10#5` / `11#5` / `12#5` /
 `17#5`), `pipe_out`, `pipe_halt`, `pipe_in`, `pipe_in_eof`, `udepwf_Ks` (this
@@ -32,7 +32,7 @@ file); `wp_uk_ecall_write_src`, `wp_pdev_write_std` (`UkPipeDevWalk`);
 `pipe_write`, `pipe_write_halt`, `pipe_write_nil` (`UkPipeDevWrite`);
 `pdev_ecall_read`, `pdev_ubytes_bnd`, `pipe_close` (`UkPipeDevRead`); the
 section context at the xv6 instance, `pipeDevK_xv6` (`UkPipeDevXv6`).
-DROPPED (unreached): `pdev_rd_ans_m1`, `pipe_out_payL`, `pipe_halt_payL`,
+NOT PORTED (nothing uses it): `pdev_stub_next`.  DROPPED (unreached): `pdev_rd_ans_m1`, `pipe_out_payL`, `pipe_halt_payL`,
 `pipe_in_eof_payR`, `pipe_read_at`, `pipe_read`, `pipe_read_eof`,
 `pipe_close_fd`, and §7's instances `echo_uprog`, `cat_uprog`,
 `pipe_write_echo`, `pipe_write_halt_echo`, `pipe_write_nil_echo`,
@@ -102,10 +102,6 @@ theorem pdev_signed_nat (n : Nat) (h : (n : Int) < 2 ^ 31) : (BitVec.ofNat 64 n)
 theorem pdev_signed_uint0 (r : BitVec 64) (h : r.toNat = 0) : r.toInt = 0 := by
   have : r = 0#64 := BitVec.eq_of_toNat_eq (by simpa using h)
   subst this; rfl
-
-/-- **Rocq `pdev_stub_next`**. -/
-theorem pdev_stub_next (a : Nat) : BitVec.ofNat 64 (a + 2) + 4#64 = BitVec.ofNat 64 (a + 6) := by
-  rw [stub_pc4]
 
 /-- **Rocq `pdev_rd_ans`**: a read's answer at a count the kernel
 delivered. -/

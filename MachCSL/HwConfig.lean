@@ -16,8 +16,8 @@ counter configuration (`scounteren`, and the four cells the cycle reads:
 values (`hwVal`) are the values a run of the boot program derives
 (`MachCSL.resetValRun`).  The counter
 cells are EXISTENTIAL (`HwCounters`, Rocq `counter_caps` +
-`HartMCycle.mcycle_inc_flag`): the boot program never writes them
-(`MachCSL.bootProg_keeps`), so they hold power-on garbage, and the rules are
+`HartMCycle.mcycle_inc_flag`): the boot program never writes them,
+so they hold power-on garbage, and the rules are
 generic in them -- a read is answered at an arbitrary value
 (`swp_readReg_hwAny_bind`), so the minstret/mcycle increment flags are
 symbolic, and `scounteren` (Rocq `counter_caps`' `scen`) is symbolic too: a

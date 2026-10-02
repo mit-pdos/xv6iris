@@ -5,8 +5,7 @@ Specification of `myproc` (kernel/proc.c):
 
 Rocq `SpecMyproc.wp_myproc_sconf_body`: THE current-process contract.
 `myproc()` returns exactly the process the current-process resource says
-is assigned to this cpu (`curProc cpu k.proc`, inside the context's
-`cpuOwn`), reading the cell under its own push_off/pop_off.  Because
+is assigned to this cpu (`k.proc`, inside the context's `cpuOwn`), reading the cell under its own push_off/pop_off.  Because
 only its interior runs with interrupts off, the whole-function contract
 is interrupt-generic in Rocq: `p` is a THREAD-dependent quantity (which
 process `cpus[cid].proc` names once the thread resumes), not a hart-

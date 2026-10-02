@@ -306,19 +306,10 @@ def iregMult (d : Dinode) : Nat :=
 theorem iregMultAt_zero (ty : Nat) : iregMultAt 0 ty = 0 := by
   simp [iregMultAt]
 
-theorem iregMultAt_ge (n ty : Nat) : n ≤ iregMultAt n ty := by
-  unfold iregMultAt; split <;> omega
-
-theorem iregMultAt_le (n ty : Nat) : iregMultAt n ty ≤ n + 1 := by
-  unfold iregMultAt; split <;> omega
-
 theorem iregMult_zero (d : Dinode) (hz : d.diNlink.toNat = 0) : iregMult d = 0 := by
   unfold iregMult iregNl
   rw [hz]
   exact iregMultAt_zero _
-
-theorem iregMult_nl (d : Dinode) : iregNl d ≤ iregMult d ∧ iregMult d ≤ iregNl d + 1 :=
-  ⟨iregMultAt_ge _ _, iregMultAt_le _ _⟩
 
 /-- HOW MANY FRAGMENTS A `nlink`-BY-ONE MOVE MOVES: one for the record that
 pays, plus -- when a DIRECTORY crosses the live boundary -- the `"."`.  TWO

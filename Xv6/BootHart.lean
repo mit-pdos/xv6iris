@@ -17,10 +17,11 @@ image alone, and that both the chain (`BootChain`) and the shared allocation
   cells become exactly the register-side inputs of `Xv6.wp_boot_body`
   (Rocq `boot_entry_pre`), with the remainder of the file handed back for the
   bridge (`Xv6.bootGprRest` takes the other 23 GPRs out of it).
-* AT THE ERA (`Xv6.bootEntryPre_ofEra`): the same, stated at the instance
-  `MachCSL.riscvPowerAdequacy`'s `Hboot` client runs its harts at
-  (`MachCSL.MachGS.ofEra E gen …`), off `powerBootRes`'s per-hart register
-  row and the `bootFacts` `wp_power` hands over.
+* AT THE ERA: `MachCSL.riscvPowerAdequacy`'s `Hboot` (through
+  `MachCSL.wp_power`) hands the client `powerBootRes E gen σ` with
+  `bootFacts σ`; the client runs its harts at `MachCSL.MachGS.ofEra E gen …`,
+  whose `regName` IS `E.regName`, so `Xv6.bootEntryPre` applies to
+  `powerBootRes`'s per-hart register row verbatim.
 
 DEVIATIONS from Rocq (none process-layer):
 1. The GOT word (`entry_got_bytes`, "the eight image bytes at the slot ARE
@@ -174,35 +175,6 @@ theorem bootGprRest (cpu : CPU) (f : RegFile) :
       ([∗list] r ∈ bootGprRestRegs, regPointsTo (GF := GF) cpu r (DFrac.own 1) (f r)) ∗
       regCellsEx (regName (hlc := hlc) (GF := GF) cpu) f (bootGprRestRegs.reverse ++ bootEntryTaken) :=
   regCellsEx_takeListAt cpu f bootGprRestRegs bootEntryTaken (by decide) (by decide)
-
-end
-
-/-! ## At the era the power thread mints
-
-`MachCSL.riscvPowerAdequacy`'s `Hboot` (through `MachCSL.wp_power`) hands the
-client `powerBootRes E gen σ` with `bootFacts σ`; the client runs its
-harts at `MachCSL.MachGS.ofEra E gen …`, whose `regName` IS `E.regName`.  So
-`Xv6.bootEntryPre` applies to `powerBootRes`'s per-hart row verbatim. -/
-
-section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF]
-
-/-- `Xv6.bootEntryPre` at the instance `Hboot`'s client runs at, off the
-power thread's per-hart register row and its `bootFacts`. -/
-theorem bootEntryPre_ofEra (E : EraGS) (gen : Nat) (cP : CPU → BitVec 64 → IProp GF)
-    (cI : ∀ cpu : CPU, ⊢ cP cpu 0#64)
-    (σ : MState) (hbf : bootFacts σ) (cpu : CPU) :
-    letI : MachGS hlc GF := MachGS.ofEra E gen cP cI
-    regCellsNoPins (GF := GF) (E.regName cpu) (σ.regs cpu) ⊢ |==>
-      (mBoot cpu (DFrac.own 1) ∗
-      Register.mhartid ↦ᵣ[cpu] hartId cpu ∗ clockCells cpu ∗ pcIs cpu KA.«_entry» ∗
-      Register.x1 ↦ᵣ[cpu] σ.regs cpu .x1 ∗ Register.x2 ↦ᵣ[cpu] σ.regs cpu .x2 ∗
-      Register.x4 ↦ᵣ[cpu] σ.regs cpu .x4 ∗ Register.x8 ↦ᵣ[cpu] σ.regs cpu .x8 ∗
-      Register.x10 ↦ᵣ[cpu] σ.regs cpu .x10 ∗ Register.x11 ↦ᵣ[cpu] σ.regs cpu .x11 ∗
-      Register.x14 ↦ᵣ[cpu] σ.regs cpu .x14 ∗ Register.x15 ↦ᵣ[cpu] σ.regs cpu .x15 ∗
-      regCellsEx (E.regName cpu) (σ.regs cpu) bootEntryTaken) :=
-  letI : MachGS hlc GF := MachGS.ofEra E gen cP cI
-  bootEntryPre cpu (σ.regs cpu) (bootFacts_resetRegsRun hbf cpu)
 
 end
 

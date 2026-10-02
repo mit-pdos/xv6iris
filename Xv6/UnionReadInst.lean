@@ -14,10 +14,12 @@ bound).  Only the record: sh's read leaf at it is the union round's.
 ## DEVIATIONS from Rocq
 
 1. **Scope: the reached declarations** (UnionReadInst 11/12).  Not ported
-   (unreached): `union_read_inst_disc` (a `reflexivity` reading).
+   (unreached): `union_read_inst_disc` (a `reflexivity` reading).  The record
+   `union_read_inst` itself is not ported either (nothing uses it); its
+   arms' pieces are.
 2. Rocq's section parameters are explicit: `ug`, and the tag equation
    `Htag : riscv_rx_tag = utag ug` as `htag : MachFixedGS.rxTag = utag ug`
-   (only where a proof reads it: `uri_arms`, `unionReadInst`); `GenId` /
+   (only where a proof reads it: `uri_arms`); `GenId` /
    `fscfg` are `genId` / `[Fscfg]`; `ucons_swallow` / `ucons_stored_lb` are
    the kernel's `consSwallow` / `consStoredLb` (ReadRec deviation 1).
 3. Rocq's `Local Lemma`s `uri_rd`, `uri_rd_taint`, `uri_last_tag`,
@@ -287,16 +289,6 @@ theorem uri_arms (ug : UnionGn)
     exact rrByteOfRows (lmDiscInput ulmG) sl sl' ws dl hs pops I J dd dc g0
       lmDiscInput_U_no_cr hdd0 hddc hwinf hpre2 hwsj hpref hdl hJ.symm hJdisc (by omega)
   iframe HEn Hresn Hwn Hwtn
-
-/-- THE UNION ERA'S READ RECORD (Rocq `union_read_inst`). -/
-noncomputable def unionReadInst (ug : UnionGn)
-    (htag : MachFixedGS.rxTag (hlc := hlc) (GF := GF) = utag (hlc := hlc) ug) :
-    ReadRec (unionLinkInst (hlc := hlc) (GF := GF) ug) where
-  rkDisc := lmDiscInput ulmG
-  rkRd := uri_rd ug
-  rkRdTaint := uri_rd_taint ug
-  rkArms := fun v I ws sl sl' hs dd dc g0 hddc hlws hwin hpre hwsj =>
-    uri_arms ug htag v I ws sl sl' hs dd dc g0 hddc hlws hwin hpre hwsj
 
 end UnionReadInst
 

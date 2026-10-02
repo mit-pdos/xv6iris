@@ -486,8 +486,8 @@ theorem machInterp_acc_dev (σ : MState) (d : DevId) :
   · show iprop(devAuth d s' ⊢ devAuthAt MachGS.era d ((σ.devs.set d s').st d))
     rw [DevStates.set_same]
 
-/-- `devOpStep_local`, with the state-moving arm exposing the update that
-moved it. -/
+/-- The step of a local device op (no DMA write, no pin change), with the
+state-moving arm exposing the update that moved it. -/
 theorem devOpStep_localR (gen : Nat) (d : DevId) (o : DevOp (DevSt d) (DevTask d)) (σ : MState)
     (v : o.ret) (σ' : MState) (obs : List Obs) (efs : List Expr)
     (hw : ∀ g pa n w, o ≠ .dmaWrite g pa n w) (hp : ∀ c mm b, o ≠ .setPin c mm b)
@@ -552,7 +552,7 @@ def DevSig.Local (d : DevId) : Prop :=
 
 /-- A local program whose every atomic state update stays inside `rel`:
 what a client's ghost state (kept beside the mirror in an invariant) has
-to be preserved by (`wpDev_localR`). -/
+to be preserved by. -/
 inductive DevM.LocalR {S T : Type} (rel : S → S → Prop) : DevM S T Unit → Prop
   | pure (a : Unit) : LocalR rel (.pure a)
   | op (o : DevOp S T) (k : o.ret → DevM S T Unit)
@@ -576,147 +576,6 @@ def devInv (N : Namespace) (d : DevId) : IProp GF := inv N (∃ s : DevSt d, dev
 instance devInv_persistent (N : Namespace) (d : DevId) : Persistent (devInv (GF := GF) N d) := by
   unfold devInv; infer_instance
 
-/-- What a local primitive does: moves the device's own state, or nothing,
-or forks one named task. -/
-theorem devOpStep_local (gen : Nat) (d : DevId) (o : DevOp (DevSt d) (DevTask d)) (σ : MState)
-    (v : o.ret) (σ' : MState) (obs : List Obs) (efs : List Expr)
-    (hw : ∀ g pa n w, o ≠ .dmaWrite g pa n w) (hp : ∀ c mm b, o ≠ .setPin c mm b)
-    (hop : devOpStep gen d o σ v σ' obs efs) :
-    (∃ s' : DevSt d, σ' = σ.setDev d s' ∧ efs = []) ∨
-    (σ' = σ ∧ efs = []) ∨
-    (∃ (rt : DevRt) (t : DevTask d) (tid' : TaskId),
-      0 < rt.next ∧ σ' = σ.setRt d rt ∧ efs = [.dev gen d tid' ((devSig d).task t)]) := by
-  cases o with
-  | step g =>
-    obtain ⟨s', os, _, _, rfl, _, rfl⟩ := hop
-    exact Or.inl ⟨s', rfl, rfl⟩
-  | get => obtain ⟨_, rfl, _, rfl⟩ := hop; exact Or.inr (Or.inl ⟨rfl, rfl⟩)
-  | choose => obtain ⟨rfl, _, rfl⟩ := hop; exact Or.inr (Or.inl ⟨rfl, rfl⟩)
-  | dmaRead pa n => obtain ⟨_, rfl, _, rfl⟩ := hop; exact Or.inr (Or.inl ⟨rfl, rfl⟩)
-  | dmaWrite g pa n w => exact absurd rfl (hw g pa n w)
-  | sample src => obtain ⟨_, rfl, _, rfl⟩ := hop; exact Or.inr (Or.inl ⟨rfl, rfl⟩)
-  | setPin c mm b => exact absurd rfl (hp c mm b)
-  | fork t =>
-    obtain ⟨_, _, rfl, rfl⟩ := hop
-    exact Or.inr (Or.inr ⟨_, t, _, Nat.succ_pos _, rfl, rfl⟩)
-  | join tid => obtain ⟨_, rfl, _, rfl⟩ := hop; exact Or.inr (Or.inl ⟨rfl, rfl⟩)
-
-set_option maxHeartbeats 4000000 in
-/-- Every task of a local device is safe under its mirror invariant. -/
-theorem wpDev_local (N : Namespace) (d : DevId) [DevDiskInert d] (hsil : DevSilent d) (hloc : DevSig.Local d) :
-    devInv N d ∗ genCert ⊢@{IProp GF} ∀ (tid : TaskId) (m : DevProg d), ⌜DevM.Local m⌝ →
-      devWP (genId (hlc := hlc) (GF := GF)) d tid m := by
-  unfold devInv
-  iintro ⟨#Hinv, #Hcert⟩
-  iloeb as IH
-  iintro %tid %m %hm
-  iapply wpDev_elim d tid m
-  iframe Hcert
-  iapply wpDev_lift d hsil tid m
-  iintro %σ Hσ
-  iinv Hinv with Hbody Hclose
-  icases Hbody with ⟨%s, >Hfrag⟩
-  icases machInterp_acc_dev σ d $$ Hσ with ⟨Hauth, Hσclose⟩
-  ihave %hs := devAgreeAt _ d (σ.devs.st d) s $$ [Hauth Hfrag]
-  case' _ => iframe
-  subst hs
-  iapply fupd_mask_intro LawfulSet.empty_subset
-  iintro Hmask
-  isplit
-  · ipureintro
-    exact devStep_total _ d tid m σ
-  inext
-  iintro %obs %m' %σ' %efs %hstep Hcred
-  imod Hmask
-  -- the continuation, once the interpretation is back at `σ'`
-  have hmk : ∀ (m'' : DevProg d), DevM.Local m'' →
-      ⊢@{IProp GF} (∀ (tid : TaskId) (m : DevProg d), ⌜DevM.Local m⌝ →
-        devWP (genId (hlc := hlc) (GF := GF)) d tid m) -∗ wpDev d tid m'' := by
-    intro m'' hm''
-    iintro IH
-    unfold wpDev
-    iintro _
-    iapply IH $$ %tid %m'' %hm'' 
-  cases m with
-  | pure a =>
-    obtain ⟨rfl, rfl, h⟩ := hstep
-    ihave Hcl := Hclose $$ [Hfrag]
-    case' _ => inext; iexists (σ.devs.st d); iexact Hfrag
-    imod Hcl
-    imodintro
-    ihave Hσ := machInterp_acc_dev_self σ d $$ [Hσclose Hauth]
-    case' _ => iframe
-    rcases h with ⟨_, rfl, rfl⟩ | ⟨_, rfl, hσ'⟩
-    · iframe Hσ
-      isplitl []
-      · iapply hmk _ hloc.1 $$ IH
-      · exact BigSepL.bigSepL_nil_intro
-    · rw [hσ']
-      isplitl [Hσ]
-      · split
-        · iexact Hσ
-        · iapply machInterp_setRt_done _ _ _ $$ Hσ
-      isplitl []
-      · iapply hmk _ (DevM.Local.pure ()) $$ IH
-      · exact BigSepL.bigSepL_nil_intro
-  | op o k =>
-    have hm' := hm
-    cases hm with
-    | op _ _ hw hp hk =>
-    rcases hstep with ⟨v, rfl, hop⟩ | ⟨hb, rfl, hσ, rfl, rfl⟩
-    · rcases devOpStep_local _ d o σ v σ' obs efs hw hp hop with
-        ⟨s', rfl, rfl⟩ | ⟨hσ, rfl⟩ | ⟨rt, t, tid', hrt, rfl, rfl⟩
-      · -- the device's own state moved: both halves follow
-        imod (devUpdateAt _ d (σ.devs.st d) (σ.devs.st d) s') $$ [Hauth Hfrag] with ⟨Hauth, Hfrag⟩
-        · iframe
-        ihave Hcl := Hclose $$ [Hfrag]
-        case' _ => inext; iexists s'; iexact Hfrag
-        imod Hcl
-        imodintro
-        isplitl [Hauth Hσclose]
-        · iapply Hσclose $$ %s' Hauth
-        isplitl []
-        · iapply hmk _ (hk v) $$ IH
-        · exact BigSepL.bigSepL_nil_intro
-      · -- nothing moved
-        rw [hσ]
-        ihave Hcl := Hclose $$ [Hfrag]
-        case' _ => inext; iexists (σ.devs.st d); iexact Hfrag
-        imod Hcl
-        imodintro
-        ihave Hσ := machInterp_acc_dev_self σ d $$ [Hσclose Hauth]
-        case' _ => iframe
-        iframe Hσ
-        isplitl []
-        · iapply hmk _ (hk v) $$ IH
-        · exact BigSepL.bigSepL_nil_intro
-      · -- a task forked: its program is one of the device's own
-        ihave Hcl := Hclose $$ [Hfrag]
-        case' _ => inext; iexists (σ.devs.st d); iexact Hfrag
-        imod Hcl
-        imodintro
-        ihave Hσ := machInterp_acc_dev_self σ d $$ [Hσclose Hauth]
-        case' _ => iframe
-        isplitl [Hσ]
-        · iapply machInterp_setRt _ _ rt (fun _ => hrt) $$ Hσ
-        isplitl []
-        · iapply hmk _ (hk v) $$ IH
-        · iapply BigSepL.bigSepL_singleton.2
-          unfold devWP
-          iapply IH $$ %tid' %((devSig d).task t) %(hloc.2 t)
-    · -- blocked: retried
-      rw [hσ]
-      ihave Hcl := Hclose $$ [Hfrag]
-      case' _ => inext; iexists (σ.devs.st d); iexact Hfrag
-      imod Hcl
-      imodintro
-      ihave Hσ := machInterp_acc_dev_self σ d $$ [Hσclose Hauth]
-      case' _ => iframe
-      iframe Hσ
-      isplitl []
-      · iapply hmk _ hm' $$ IH
-      · exact BigSepL.bigSepL_nil_intro
-
 /-- The mirror invariant with a client's ghost state `R` beside the mirror. -/
 def devInvR (N : Namespace) (d : DevId) (R : DevSt d → IProp GF) : IProp GF :=
   inv N iprop(∃ s : DevSt d, devFrag d s ∗ R s)
@@ -732,8 +591,7 @@ wires, the era stamp -- and the client's ghosts AFTER the step in hand, move
 the history by the events.  It runs inside the device's invariant (hence
 the mask), so a client's trace predicate may relate the history to the
 device ghosts.  A client that files an input TAG (Rocq `uart_tag_of`) does
-so into its own `R s'`.  `devObsPermit_silent` discharges it for a device
-that never observes; `devObsPermit_triv` for the trivial trace predicate. -/
+so into its own `R s'`. -/
 def devObsPermit (N : Namespace) (d : DevId) (R : DevSt d → IProp GF) : IProp GF := iprop%
   □ ∀ (h : List Obs) (ds : DevStates) (s' : DevSt d) (os : List DevObs),
     ⌜devObsOk d (ds.st d) s' os ∧ traceShape h true ∧
@@ -744,41 +602,6 @@ def devObsPermit (N : Namespace) (d : DevId) (R : DevSt d → IProp GF) : IProp 
 instance devObsPermit_persistent (N : Namespace) (d : DevId) (R : DevSt d → IProp GF) :
     Persistent (devObsPermit N d R) := by
   unfold devObsPermit; infer_instance
-
-/-- A device that never observes needs no consent. -/
-theorem devObsPermit_silent (N : Namespace) (d : DevId) (R : DevSt d → IProp GF)
-    (hsil : DevSilent d) : ⊢@{IProp GF} devObsPermit N d R := by
-  unfold devObsPermit
-  iintro !> %h %ds %s' %os %hf HR Ha
-  rw [hsil _ _ _ hf.1, List.map_nil, List.append_nil]
-  imodintro
-  iframe HR Ha
-
-/-- THE PERMIT OF THE TRIVIAL TRACE PREDICATE (Rocq `uart_obs_permit_triv`):
-a client that states no trace property moves the ghost and ignores the
-events. -/
-theorem devObsPermit_triv (N : Namespace) (d : DevId) (R : DevSt d → IProp GF)
-    (hN : (↑obsN : CoPset) ⊆ ⊤ \ ↑N)
-    (heq : MachFixedGS.obsPred (hlc := hlc) (GF := GF) = obsPredTriv) :
-    obsInv ⊢@{IProp GF} devObsPermit N d R := by
-  unfold devObsPermit
-  iintro #Hoinv !> %h %ds %s' %os %_ HR Ha
-  unfold obsInv
-  rw [heq]
-  imod (inv_acc_timeless (E := ⊤ \ ↑N) (N := obsN) (P := obsPredTriv (GF := GF)) hN) $$ Hoinv
-    with ⟨HP, Hclose⟩
-  unfold obsPredTriv
-  icases HP with ⟨%h', Hfrag⟩
-  ihave %he := obsAgree h h' $$ [Ha Hfrag]
-  · iframe Ha Hfrag
-  subst he
-  imod obsUpdate h (h ++ os.map Obs.dev) (List.prefix_append _ _) $$ [Ha Hfrag] with ⟨Ha, Hfrag⟩
-  · iframe Ha Hfrag
-  imod Hclose $$ [Hfrag]
-  · iexists (h ++ os.map Obs.dev)
-    iexact Hfrag
-  imodintro
-  iframe HR Ha
 
 /-- A local program whose every atomic state update is a move of `rel`,
 the relation naming the move's EVENTS as well as its two states: what an
@@ -795,17 +618,11 @@ inductive DevM.LocalO {S T : Type} (rel : S → S → List DevObs → Prop) : De
 def DevSig.LocalO (d : DevId) (rel : DevSt d → DevSt d → List DevObs → Prop) : Prop :=
   DevM.LocalO rel (devSig d).body ∧ ∀ t, DevM.LocalO rel ((devSig d).task t)
 
-theorem DevM.LocalR.localO {S T : Type} {rel : S → S → Prop} {m : DevM S T Unit}
-    (h : DevM.LocalR rel m) : DevM.LocalO (fun s s' _ => rel s s') m := by
-  induction h with
-  | pure a => exact .pure a
-  | op o k hw hp hs _ ih => exact .op o k hw hp (fun g hg s s' os h => hs g hg s s' os h) ih
-
 /-- THE STEP PERMIT: the client's whole ghost step at a device move, from the
 ghosts BEFORE it to the ghosts after, with the history ghost in hand ACROSS
 the move (the Rocq `wp_uart_loop`'s arms, device-generic).  `devObsPermit`
 is the special case of a client whose ghosts follow the device by a plain
-update and whose trace predicate moves after it (`devStepPermit_of_obs`);
+update and whose trace predicate moves after it;
 a client that files the history an event happened AT (the UARTs' receive
 column: the arrival's history, its tag, its lower bound) needs the auth on
 both sides of the move, and states its step here. -/
@@ -822,17 +639,7 @@ instance devStepPermit_persistent (N : Namespace) (d : DevId)
     Persistent (devStepPermit N d rel R) := by
   unfold devStepPermit; infer_instance
 
-/-- The observation permit, preceded by the client's plain update along
-`rel`, is a step permit. -/
-theorem devStepPermit_of_obs (N : Namespace) (d : DevId) (rel : DevSt d → DevSt d → Prop)
-    (R : DevSt d → IProp GF) (hR : ∀ s s', rel s s' → R s ⊢@{IProp GF} |==> R s') :
-    devObsPermit N d R ⊢@{IProp GF} devStepPermit N d (fun s s' _ => rel s s') R := by
-  unfold devObsPermit devStepPermit
-  iintro #Hp !> %h %ds %s' %os %⟨hrel, hok, hf⟩ HR Ha
-  imod (hR _ _ hrel) $$ HR with HR
-  iapply Hp $$ %h %ds %s' %os %⟨hok, hf⟩ HR Ha
-
-/-- `wpDev_local` for an invariant carrying `R`: every move of the device is
+/-- A local device's WP at an invariant carrying `R`: every move of the device is
 a move of `rel`, and the client's step permit carries its ghosts (and the
 history) across it. -/
 theorem wpDev_localO (N : Namespace) (d : DevId) [DevDiskInert d] (rel : DevSt d → DevSt d → List DevObs → Prop)
@@ -960,20 +767,5 @@ theorem wpDev_localO (N : Namespace) (d : DevId) [DevDiskInert d] (rel : DevSt d
       isplitl []
       · iapply hmk _ hm' $$ IH
       · exact BigSepL.bigSepL_nil_intro
-
-/-- `wpDev_local` for an invariant carrying `R`: the device's own updates
-stay inside `rel`, along which the client updates `R`; its observed moves are
-authorised by the client's permit. -/
-theorem wpDev_localR (N : Namespace) (d : DevId) [DevDiskInert d] (rel : DevSt d → DevSt d → Prop)
-    (R : DevSt d → IProp GF) [∀ s, Timeless (R s)] (hloc : DevSig.LocalR d rel)
-    (hR : ∀ s s', rel s s' → R s ⊢@{IProp GF} |==> R s') :
-    devInvR N d R ∗ devObsPermit N d R ∗ genCert ⊢@{IProp GF}
-      ∀ (tid : TaskId) (m : DevProg d), ⌜DevM.LocalR rel m⌝ →
-      devWP (genId (hlc := hlc) (GF := GF)) d tid m := by
-  iintro ⟨Hinv, #Hperm, Hcert⟩ %tid %m %hm
-  ihave #Hstep := devStepPermit_of_obs N d rel R hR $$ Hperm
-  iapply wpDev_localO N d (fun s s' _ => rel s s') R ⟨hloc.1.localO, fun t => (hloc.2 t).localO⟩
-    $$ [Hinv Hcert] %tid %m %hm.localO
-  iframe Hinv Hstep Hcert
 
 end MachCSL

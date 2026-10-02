@@ -152,11 +152,4 @@ theorem fsimgLinksEqB : fsLinksEq fsImgBlock fsimgSb = true := by
   fsimg_decide [fsDataOf, fsIndEnts, fsDinode, fsDinodeBytes, dirLiveb, dirFreeb, dirInum,
     fileByte]
 
-/-- The live records are exactly `1 .. 24` (Rocq `fsimg_live_set`'s sweep). -/
-theorem fsimgLiveSweepB :
-    (List.range 200).all (fun z =>
-      (!decide ((fsDinode fsImgBlock fsimgSb z).diType.toNat = 0)) ==
-        decide (1 ≤ z ∧ z ≤ 24)) = true := by
-  fsimg_decide [fsDinode, fsDinodeBytes]
-
 end Xv6

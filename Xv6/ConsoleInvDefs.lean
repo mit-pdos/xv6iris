@@ -36,7 +36,7 @@ marker rides in the ring and the credential does not, because the ring is a
 lock payload (timeless) and `Wd` is an arbitrary application proposition.
 
 Ported one-to-one (Rocq → Lean, camelCased): `a_cons_r_nz`, `a_cons_nz`,
-`consN`, `consE`, `cons_data` (+`_timeless`), `cons_tags` (+`_none`, `_upd`, `_get`),
+`consN`, `cons_data` (+`_timeless`), `cons_tags` (+`_none`, `_upd`, `_get`),
 `cons_stored_auth`, `cons_stored_lb` (+`_get`, `_prefix`, `_agree`,
 `_weaken`), `cons_cursor` (+`_agree`, `_update`), `cons_rdtok`,
 `cons_deliv` (+`_agree`), `cons_logm` (+`_agree`), `cons_hi`,
@@ -131,7 +131,6 @@ def consEAddr : BitVec 64 := KA.«cons» + 160#64
 /-- THE CONSOLE'S OWN NAMESPACE, and the ONE invariant at it: the credential
 escrow `consCredInv`. -/
 def consN : Namespace := ndot nroot "cons"
-def consE : CoPset := ↑consN
 
 /-! ## devsw[] -- the device function table
 
@@ -157,10 +156,6 @@ def devswWriteVal (mj : Nat) : BitVec 64 := if mj = CONSOLE then KA.«consolewri
 theorem devswReadVal_cases (mj : Nat) :
     devswReadVal mj = 0#64 ∨ devswReadVal mj = KA.«consoleread» := by
   unfold devswReadVal; split <;> simp
-
-theorem devswWriteVal_cases (mj : Nat) :
-    devswWriteVal mj = 0#64 ∨ devswWriteVal mj = KA.«consolewrite» := by
-  unfold devswWriteVal; split <;> simp
 
 theorem devswReadVal_console : devswReadVal CONSOLE = KA.«consoleread» := by
   simp [devswReadVal]

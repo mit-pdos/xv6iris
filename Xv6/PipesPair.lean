@@ -16,8 +16,8 @@ Pure; nothing but core `List`.
 ## Names
 
 Rocq `rd_out`/`wr_out`/`pipe_pair`/`wr_in`/`rd_in` are `RdOut`/`WrOut`/
-`pipePair`/`wrIn`/`rdIn`; the lemmas keep Rocq's suffixes
-(`pipe_pair_eof` → `pipePair_eof`).  Rocq's ``D `prefix_of` L`` is
+`pipePair`/`wrIn`/`rdIn`; `pipe_pair_eof` is not ported (nothing uses
+it).  Rocq's ``D `prefix_of` L`` is
 `D <+: L`.  No deviation.
 -/
 
@@ -59,13 +59,5 @@ def wrIn (L : List (BitVec 8)) : WrOut → Prop
 def rdIn (L : List (BitVec 8)) : RdOut → Prop
   | RdEof D => D <+: L
   | RdGone => True
-
-/-- Rocq `pipe_pair_eof`. -/
-theorem pipePair_eof (w : WrOut) (D : List (BitVec 8)) (h : pipePair w (RdEof D)) :
-    w = WrAll D ∨ (w = WrNone ∧ D = []) := by
-  cases w with
-  | WrAll D' => exact Or.inl (by simp only [pipePair] at h; rw [h])
-  | WrHalt _ => exact h.elim
-  | WrNone => exact Or.inr ⟨rfl, h⟩
 
 end Xv6

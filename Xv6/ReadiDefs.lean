@@ -13,7 +13,7 @@ contract at its call site.
    deviation 5's `rdImg` equation).  Rocq's `rd_q` (the vestigial pid fraction) is `rdQ`, and
    now names a real fraction: the user arm's pid share IS `pidPriv`, the
    one inside the running block.
-2. bread / brelse are called through the shared `Xv6.bread_call` /
+2. bread / brelse are called through the shared `Xv6.bread_call_eb` /
    `Xv6.brelse_call` (FsCallSites).  `rd_copyout` is the whole
    either_copyout step on both arms (the kernel arm's window split and
    spliced back, the user arm's `rdImg` advanced by the chunk it wrote).

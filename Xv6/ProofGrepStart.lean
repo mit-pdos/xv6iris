@@ -1,12 +1,10 @@
 /-
-**Proof of grep's `start`** (Rocq `UkGrepTree.wp_kgrep_start_tree`,
-`wp_kgrep_start_env`, pinned `1900b8a43`): push, spill ra/s0, `jal main`.
-main always exits, so the `jal exit` after it is never reached.
+**Proof of grep's `start`** (Rocq `UkGrepTree.wp_kgrep_start_tree`, pinned
+`1900b8a43`): push, spill ra/s0, `jal main`.  main always exits, so the
+`jal exit` after it is never reached.
 
-The entry at a handler (`grepStart_env`) is the same walk with the tree
-paid by an ENVIRONMENT (`UkHandler.treePay_of_conforms_p`), less cat's
-`SafeFds` premise: grep's tree is safe at every held set
-(`GrepTree.grepTree_safe`), so it is discharged here.
+Rocq's entry at a handler, `wp_kgrep_start_env`, is not ported (nothing
+uses it).
 
 Deviations from Rocq: as `SpecGrepStart`.
 -/
@@ -87,21 +85,6 @@ theorem wp_grepStart (UL : UK_LEAVES) (GM : GREP_MAIN) (N : UkNames GF) (h : CPU
 /-- **grep's `start` holds** (at the engine `UL`, over main's interface). -/
 theorem grepStart_holds (UL : UK_LEAVES) (GM : GREP_MAIN) : GREP_START :=
   ⟨fun N h m av args f n hptr ha0 ha1 hn => wp_grepStart UL GM N h m av args f n hptr ha0 ha1 hn⟩
-
-/-- **Rocq `wp_kgrep_start_env`**: the entry at a handler -- the tree paid
-by an environment that conforms to it. -/
-theorem grepStart_env (GS : GREP_START) {N : UkNames GF} {Dp : List Nat}
-    (I : EpIfaceP (hlc := hlc) N (grepProg N.t) Dp) (E : Penv) (ds : ExtTreeSet Nat compare)
-    (h : CPU) (m : RegMap) (av : Nat) (args : List UArg) (f : Nat → BitVec 8) (n : Nat)
-    (hc : Conforms E (grepTree (args.map uargBytes))) (hdp : dpIn Dp ds)
-    (hptr : ∀ (j : Nat) (g : UArg), args[j]? = some g → g.ptr ≠ 0)
-    (ha0 : m.get 10#5 = BitVec.ofNat 64 args.length) (ha1 : m.get 11#5 = BitVec.ofNat 64 av)
-    (hn : grepStack args ≤ n) :
-    ⊢ envRes I E ds -∗ grepCode N.t -∗ uargv N.d av args -∗ ubytes N.d User.Grep.Sym.«buf» 1024 f -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Grep.Sym.«start») n -∗ wpLoop h := by
-  iintro Henv #Hc #Hargv Hbuf Hrun
-  iapply GS.wp_grepStart N h m av args f n hptr ha0 ha1 hn $$ [Henv] Hc Hargv Hbuf Hrun
-  iapply treePay_of_conforms_p I E ds _ hc (grepTree_safe _ _) hdp $$ Henv
 
 end
 

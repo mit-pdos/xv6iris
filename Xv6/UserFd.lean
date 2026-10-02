@@ -685,19 +685,6 @@ theorem ustdRaw_acc (γf : GName) (l : List FdState) (k : Nat) (st : FdState) (h
   · ipureintro; rw [List.length_set]; exact hlen
   · rw [hins st']; iapply Hback $$ Hs
 
-/-- Rocq `ustd_acc`. -/
-theorem ustd_acc (γf : GName) (l : List FdState) (k : Nat) (st : FdState) (hk : l[k]? = some st) :
-    ustd (GF := GF) γf l ⊢
-      ufdSlot γf k st ∗ ∀ st' : FdState, ufdSlot γf k st' -∗ ustd γf (l.set k st') := by
-  unfold ustd
-  iintro ⟨Hr, Ht⟩
-  icases ustdRaw_acc γf l k st hk $$ Hr with ⟨Hk, Hback⟩
-  iframe Hk
-  iintro %st' Hs
-  isplitl [Hback Hs]
-  · iapply Hback $$ Hs
-  · iexact Ht
-
 /-- The ledger's slots read the view. -/
 theorem ustdRaw_agree (γf : GName) (fdv l : List FdState) :
     ⊢@{IProp GF} ufdAuth γf fdv -∗ ustdRaw γf l -∗ ⌜fdv.take NSTD = l⌝ := by

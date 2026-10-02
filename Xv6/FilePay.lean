@@ -10,8 +10,7 @@ definitional `Xv6/FilePay.lean`"); the predicates are `Xv6/FileDefs.lean`'s.
   LAST CLOSER'S MOVE: fraction one is a whole `inodeHeld` for iput -- the
   cinv gives back the parent short by `Q`, the closer's own side and share
   are `1 * Q`, the exact complement; `inodeRef_gather_genlo` restores the
-  canonical pairing), `inodePay_alloc` (sys_open's publish), and
-  `inodePay_notDev` (the fifth conjunct against a caller's own one-shot);
+  canonical pairing), and `inodePay_alloc` (sys_open's publish);
 * the off conjunct: `offFree_split`, `offFree_one` (`offFree k 1` IS
   `offLastClose`'s free word), `offFd_split`, `offFdAt_qsum`,
   `fileOffReclaim` (Rocq `file_off_reclaim`: the last close's off step);
@@ -190,20 +189,6 @@ theorem inodePay_alloc [Icfg] [CurCtx] (E : CoPset) (k : Nat) (Q : Qp) (g : GNam
     iframe Hty
     isplitr; · ipureintro; exact hwr
     ipureintro; exact hdv
-
-/-- The fifth conjunct against a caller's own copy of the generation's
-one-shot (Rocq `inode_pay_not_dev`): behind an `FD_INODE` descriptor the
-inode is not a device.  Pure conclusion; the payload is kept. -/
-theorem inodePay_notDev [Icfg] [CurCtx] (γx : GName) (Q : Qp) (g : GName) (inum : BitVec 32)
-    (v : BitVec 64) (wr : Bool) (q : Qp) (ty : BitVec 16) :
-    inodePay (GF := GF) γx Q g inum v FD_INODE wr q ∗ ityShot g ty ⊢ ⌜ty.toNat ≠ T_DEVICE⌝ := by
-  unfold inodePay
-  iintro ⟨⟨-, -, -, -, %ty', #Hs, -, %hdv⟩, #Hshot⟩
-  ihave %he := ityShot_agree g ty' ty $$ [Hs Hshot]
-  · iframe Hs Hshot
-  ipureintro
-  subst he
-  exact hdv rfl
 
 end InodePay
 

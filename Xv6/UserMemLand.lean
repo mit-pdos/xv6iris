@@ -13,8 +13,7 @@ pins, the `finish_*` closers of the memory rows).
   address;
 * §3 the LANDING of a store: a write confined to a window of a data page
   (`umeFr`) is a `UbMemStep` (Rocq R7, the disjointness payoff:
-  `ume_ubMemStep_fr`, the framed form of `ubMemStep_write`), so the machine
-  stays a user machine (`ume_land_fr`);
+  `ume_ubMemStep_fr`), so the machine stays a user machine (`ume_land_fr`);
 * §4 the result closer of a faulting access (`umaTrap` of a user exception).
 -/
 import Xv6.UserMemTr
@@ -97,9 +96,8 @@ theorem ume_pa_al {t : PTree} {mm : BMap} (hwf : UbMemWf P t mm) {ppn : BitVec 4
 
 /-! ## §3 The landing of a store -/
 
-/-- **A write confined to a data window is a step** (Rocq R7; the framed
-`ubMemStep_write`): the window lies in a data page, off the tree, so the
-tree's bytes did not move. -/
+/-- **A write confined to a data window is a step** (Rocq R7): the window
+lies in a data page, off the tree, so the tree's bytes did not move. -/
 theorem ume_ubMemStep_fr (t : PTree) (mm : BMap) (hwf : UbMemWf P t mm) (k : Nat) (lw : BitVec 64)
     (hk : Iris.Std.PartialMap.get? P.um k = some lw) (off n : Nat) (hn : off + n ≤ 4096) (m : BMap)
     (hfr : umeFr mm m (pte2pa lw + BitVec.ofNat 64 off) n) : UbMemStep P t t mm m := by

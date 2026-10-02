@@ -31,7 +31,7 @@ FsCfgKits / FsCfgSnap / ProofMain).
   `newlock_at_llb` → `newlockAt_llb` (the hooked `MachCSL.newlock_written` birth with its
   `lockHalf_alloc` taken out, the fold being `MachCSL.lockHook_llb`, exactly
   Rocq's proof), `big_sepL_fupd_thread` → `bigSepL_fupd_thread`,
-  `sl_fresh_new_genl` → `slFresh_newGenl` (`Xv6.kctx_newSleeplock`'s body at
+  `sl_fresh_new_genl` → `slFresh_newGenl` (a fresh sleeplock's birth at
   `ownCtx` and any mask).  NO framework gap remains: every step of Rocq's
   proof has a Lean counterpart.  They were first ported in this file and
   now live in their homes: `MachCSL/LockBornHook.lean` (the first three),
@@ -551,8 +551,8 @@ region.  The last conjunct IS `icSleeplocks cn`.
 The itable lock's gname and the whole escrow-name record are GIVEN rather
 than returned, so a caller that had to write `isItable2 fscItlock fscIc …`
 before this fupd ran (the era fupd of the boot kit, whose reason to exist
-is that an ambient class field cannot be an existential) can: `newlock`
-becomes `newlockAt_llb γl` against `lockFreeTok γl`, and `icNamesAlloc`
+is that an ambient class field cannot be an existential) can: the lock's
+birth is `newlockAt_llb γl` against `lockFreeTok γl`, and `icNamesAlloc`
 becomes the three families as PREMISES, the identification one at
 ARBITRARY recorded values, re-tagged per slot by `icId_set`.
 

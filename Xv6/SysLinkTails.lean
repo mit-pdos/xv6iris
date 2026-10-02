@@ -247,7 +247,7 @@ theorem sys_link_tail_c (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames) [Clai
 set_option maxHeartbeats 16000000 in
 /-- **ARM D** (+0xd6): `ip->nlink == NLINK_MAX` -- ARM C's six instructions
 at a shifted address (the arm the kernel gained in 117c0e7, whose
-FALL-THROUGH makes `wp_iupdate_link`'s `≠ 32767` premise suppliable). -/
+FALL-THROUGH makes `wp_iupdate_link_eb`'s `≠ 32767` premise suppliable). -/
 theorem sys_link_tail_d (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (A : SysLinkArgs GF) (P2 : UPtd) (spie spp : Bool) (R : RegMap)
     (w₄ : BitVec 64) (kk : Nat) (q : Qp) (g : GName) (lo tl : Nat) (γil γisl : GName)
@@ -359,7 +359,7 @@ under the generation the caller's `ityShot` names (so the record it hands
 back is pinned NOT a directory), read the count's positivity off the
 walk's own link token (`iregInv_tok_nz`), `ip->nlink--` + `iupdate(ip)`
 spending that token, THE UNDO FIRES (`ufUtgt_fire`, unlink's target fire,
-`deltaLinkUntgt` = `deltaUnlTgt`), `iunlockput(ip)`, `end_op`, `a5 = -1`,
+at `deltaUnlTgt`), `iunlockput(ip)`, `end_op`, `a5 = -1`,
 both reloads, and the join point with the do-then-undo pair
 (`linkArms_undone`). -/
 theorem sys_link_tail_bad (IL : ILOCK) (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : END_OP)

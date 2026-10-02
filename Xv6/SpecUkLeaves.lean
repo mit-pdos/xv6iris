@@ -61,8 +61,8 @@ key components the leaf threads unchanged (`fdv cw gn cs pidv`) are `UkKey`.
    a page in `π` is below `MAXVA` (the user leaves sit below `TRAPFRAME`,
    `uptWf`; the fill below `pgRoundUpN sz`, `uszOk`), so the engine derives
    it.  `UkInstr` likewise drops `ui_canon` and `ui_leaf`: the text clause
-   `upermAt π pc = some ⟨true, false⟩` is read at every table realizing `π`
-   by `UserPerm.permOf_X_mapped`, which is Rocq's `uk_instr`'s ∀-table form.
+   `upermAt π pc = some ⟨true, false⟩` is read at every table realizing `π`,
+   which is Rocq's `uk_instr`'s ∀-table form.
 7. **The U-mode decode fact** is the pure walk `runRead udrefU (ext_decode
    w)` (MachCSL `DecodeBridge`'s form) at the reference map `udrefU` --
    Rocq's `dstateU` / `D_u` (`DecodeTotalU.v`): User, `misa`, `menvcfg =

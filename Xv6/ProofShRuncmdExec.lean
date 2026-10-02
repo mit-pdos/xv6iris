@@ -107,24 +107,6 @@ theorem shExecXAtGen_holds (UL : UK_LEAVES) (SX : SH_EXEC_AT_CWD) (TabF : GName 
     rw [hpeq]
     iapply Hcd $$ Hd
 
-/-- **Rocq `wp_kshr_exec_x_at_holds`**. -/
-theorem shExecXAt_holds (UL : UK_LEAVES) (SX : SH_EXEC_AT_CWD) (Fd1 : List FdState → Prop) (ws : List (List (BitVec 8)))
-    (dg : List (BitVec 8)) (Q : Int → IProp GF) (Cr Cd : IProp GF) : wpShExecXAtBody E Fd1 ws dg Q Cr Cd :=
-  shExecXAtGen_holds E UL SX _ (fun _ _ => .rfl) Fd1 ws dg Q Cr Cd
-
-/-- **Rocq `wp_kshr_exec_echo_at_holds`**: the general arm at echo's
-alternative, by conversion (with the head word read as `cmdEcho` the law's
-index `13 + 4` is the landed 17). -/
-theorem shExecEchoAt_holds (UL : UK_LEAVES) (SX : SH_EXEC_AT_CWD) (Fd1 : List FdState → Prop) (ws : List (List (BitVec 8)))
-    (Q : Int → IProp GF) (Cr Cd : IProp GF) : wpShExecEchoAtBody E Fd1 ws Q Cr Cd := by
-  intro N hc h m t szv s0 g ld n hok hpeq ha0 hbytes hfd1 hfd2
-  have hhd : ws[0]! = cmdEcho := by
-    rw [List.getElem!_eq_getElem?_getD, lineOk_head ws hok]; rfl
-  have H := shExecXAt_holds E UL SX Fd1 ws altExecfail Q Cr Cd N hc h m t szv s0 g ld n (lineOk_execOk hok)
-    (by rw [hhd]; exact E.echo_execfail_bytes) hpeq ha0 hbytes hfd1 hfd2
-  rw [hhd] at H
-  exact H
-
 end
 
 /-- The interface, at the engine and the exec stub. -/

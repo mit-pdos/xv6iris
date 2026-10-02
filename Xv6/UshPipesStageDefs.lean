@@ -31,7 +31,7 @@ and the pure lemmas.  The family writer's diagnostic law is
 ## Ported here (reached)
 
 `echo_raw`, `prod_cr`, `mid_alts`, `mid_alts_short`, `cons_short_A2`,
-`dg_app_lookup`, `dg_execL_len`, `dg_execR_len`, `dg_st_filt`, `mid_raw`,
+`dg_app_lookup`, `dg_execL_len`, `dg_st_filt`, `mid_raw`,
 `mid_fd0`, `last_raw`, `last_fd0`, `wsub_last`; the abbrevs `T`, `fcR`,
 `nc`, `wsN`, `RUNN`, `PWN`, `WITN`, `TOKN`, `pdepR`, `FAM`, `pkitR`, `QcR`,
 `a0_idx` are `UshPipesDefs.PdRound`'s projections (`D.T`, …, `pdep D`,
@@ -42,6 +42,7 @@ Dropped: the local instances `stg_T_pers0`, `stg_T_tl0`, `stg_exf_pers0`
 `stg_kit_pers0` (unreached) -- Lean's instances `GenCparams.gcT_*`,
 `ushExecfailLawAt_persistent`, `pnsKit_persistent` are found by
 resolution instead; `prod_stage_law_persistent` is ported in `UshPipesStageLaw`.
+`dg_execR_len` is not ported (nothing uses it).
 
 ## Deviations from Rocq
 
@@ -73,9 +74,6 @@ theorem dg_app_lookup (s u : List (BitVec 8)) (p : Nat) (b : BitVec 8) (hp : p <
 
 /-- **Rocq `dg_execL_len`**. -/
 theorem dg_execL_len : dgExecL.length = 17 := by decide
-
-/-- **Rocq `dg_execR_len`**. -/
-theorem dg_execR_len : dgExecR.length = 16 := by decide
 
 /-- **Rocq `cons_short_A2`**. -/
 theorem cons_short_A2 : consShort [[], catDgWrite] := by

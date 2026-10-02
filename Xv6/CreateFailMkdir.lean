@@ -21,7 +21,7 @@ the body's `dirDotsOnly`), so its `dlinks` are rebuilt from nothing
 (`createSetf` moves only the count) or discharged by the orphan
 (`dirDotsIx_orphan`, `dirOrphanClean_of_only`).  THE UNARM FIRES after the
 flush (Rocq's site #13b): the row disappears, the registry arm comes home
-with the transaction's half (`create_dirty_clear_unarm`).  The two
+with the transaction's half (`create_dirty_clear_unarm_nd`).  The two
 `iunlockput`s hand back a quarter each; with the half they make `logTx`.
 
 ## Deviations from Rocq

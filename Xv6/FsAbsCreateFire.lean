@@ -69,14 +69,11 @@ Rocq's header, kept because the reasons are the content:
    open `ftopN` with `inv_acc_timeless`, run `appTopUpdate` at `E \ ↑ftopN`
    and lift each of the caller's phases from `appE` by `fupd_mask_mono`
    (Rocq: `fupd_mask_subseteq appE` around the three).  Same instant.
-5. `acre_commit_at_gen_ext`'s proof is `funext` (Rocq rewrites pointwise
-   because its two functions are only convertible; the Lean statement is
-   the same).
+5. `acre_commit_at_gen_ext` is not ported (nothing uses it).
 6. Names: camel head, Rocq's snake tail (`create_made` → `createMade`,
    `cre_c0` → `creC0`, `caf_era_row_nl1` → `cafEra_row_nl1`,
-   `acre_commit_at_gen` → `acreCommitAtGen`, `aunarm_of_arm_open` →
-   `aunarmOfArm_open`, `caf_armed_retag` → `cafArmedRetag`, `caf_arm_fire`
-   → `cafArm_fire`, and so on).
+   `acre_commit_at_gen` → `acreCommitAtGen`, `caf_armed_retag` →
+   `cafArmedRetag`, `caf_arm_fire` → `cafArm_fire`, and so on).
 
 ## Deferred (not dropped): section 1c (D15)
 
@@ -294,38 +291,6 @@ def acreCommitAt [Appcfg GF] (Γ : FsViewNames GF) (E : CoPset) (c : Absnode)
     (Φ : Aview → Nat → Fname → Nat → IProp GF) : IProp GF :=
   acreCommitAtGen (hlc := hlc) Γ E (fun _ _ => c) Pd Farm Φ
 
-/-- the child-content index is used POINTWISE, so a pointwise equality moves
-the commit (Rocq's `acre_commit_at_gen_ext`; deviation 5). -/
-theorem acreCommitAtGen_ext [Appcfg GF] (Γ : FsViewNames GF) (E : CoPset)
-    (cf cf' : Nat → Nat → Absnode) (Pd : Nat → IProp GF)
-    (Farm : Pfam GF (Aview → Nat → IProp GF))
-    (Φ : Aview → Nat → Fname → Nat → IProp GF) (hext : ∀ d i, cf d i = cf' d i) :
-    acreCommitAtGen (hlc := hlc) Γ E cf Pd Farm Φ ⊢
-      acreCommitAtGen (hlc := hlc) Γ E cf' Pd Farm Φ := by
-  have : cf = cf' := funext fun d => funext fun i => hext d i
-  subst this
-  exact .rfl
-
-/-- ...and the cursor MOVES ALONG AN ISO (Rocq's `acre_commit_at_gen_mono`,
-TL-3K): two readings of the same cursor (the one-path form
-`P (nparElems pl).length` and the syscall tier's guarded form,
-`SysMknodDefs.nparCur`) carry the commit between them.  BOTH directions are
-needed because the commit READS the premise and HANDS IT BACK. -/
-theorem acreCommitAtGen_mono [Appcfg GF] (Γ : FsViewNames GF) (E : CoPset)
-    (cf : Nat → Nat → Absnode) (Pd Pd' : Nat → IProp GF)
-    (Farm : Pfam GF (Aview → Nat → IProp GF))
-    (Φ : Aview → Nat → Fname → Nat → IProp GF) :
-    ⊢ iprop(□ (∀ d : Nat, Pd' d -∗ Pd d)) -∗ iprop(□ (∀ d : Nat, Pd d -∗ Pd' d)) -∗
-      acreCommitAtGen (hlc := hlc) Γ E cf Pd Farm Φ -∗
-      acreCommitAtGen (hlc := hlc) Γ E cf Pd' Farm Φ := by
-  unfold acreCommitAtGen
-  iintro #Hin #Hout H %I %d %i %nm %ents %nl %hpre %hnm Harm HPd Ha
-  ihave HPd := Hin $$ %d HPd
-  imod H $$ %I %d %i %nm %ents %nl %hpre %hnm Harm HPd Ha with ⟨Ha, HPd, Hstep, Hph2⟩
-  ihave HPd := Hout $$ %d HPd
-  imodintro
-  iframe Ha HPd Hstep Hph2
-
 /-- THE ARM (Rocq's `aarm_commit_at`): the row APPEARS.  The view has no row
 at `i` (the claim box is at count 0) but the MAP has one.  The `isSome`
 premise is the MOVER's, not the step's. -/
@@ -495,18 +460,6 @@ theorem aunarmOfArm_unit [Appcfg GF] [FsBytesG GF] (γfs : FsNames) (E : CoPset)
   unfold aunarmOfArm
   iintro #Hsup %i _
   iapply (aunarmCommitAt_unit (hlc := hlc) γfs E i) $$ Hsup
-
-/-- THE OPEN: the one move an unarm fire site takes -- it holds the arm's
-receipt and SPENDS it for the unarm's AU AT THAT INUM (Rocq's
-`aunarm_of_arm_open`). -/
-theorem aunarmOfArm_open [Appcfg GF] (Γ : FsViewNames GF) (E : CoPset)
-    (Farm Fun : Pfam GF (Aview → Nat → IProp GF)) (i : Nat) :
-    ⊢@{IProp GF} creArmFired Farm i -∗ pfAt (aunarmOfArm (hlc := hlc) Γ E Farm) Fun -∗
-      aunarmCommitAt (hlc := hlc) Γ E i Fun.pfRecv := by
-  iintro Ha Hp
-  ihave Hp := pfAt_au _ _ $$ Hp
-  unfold aunarmOfArm
-  iapply Hp $$ %i Ha
 
 end CreateCommit
 
@@ -681,71 +634,6 @@ theorem cafDots_fire [Icfg] (γfs : FsNames) (E : CoPset) (k t : Nat) (q : Qp)
   iframe Ha
   unfold creDotsFired
   iexists absView I
-  iframe HΦ
-  ipureintro; exact hav
-
-/-- THE UNARM under the registry (Rocq's `caf_unarm_fire_armed`; site #13b,
-mkdir's fail tail): the dotless or half-dotted directory at count 1
-DISAPPEARS. -/
-theorem cafUnarm_fire_armed [Icfg] (γfs : FsNames) (E : CoPset) (k t : Nat) (q : Qp)
-    (S : Std.ExtTreeSet Nat compare) (i : Nat) (c : Absnode)
-    (Fun : Pfam GF (Aview → Nat → IProp GF)) (n n' : FsNode)
-    (hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ E) (hin : i ∈ S)
-    (hrow : absOf n = some ⟨c, 1⟩) (hnone : absOf n' = none) :
-    ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗ appInv (hlc := hlc) γfs -∗ iregArmed k t q S -∗
-      aunarmCommitAt (hlc := hlc) (fsGammaL γfs) appE i Fun.pfRecv -∗
-      topFrag (fsGammaL γfs) i n ={E}=∗
-        iregArmed k t q S ∗ topFrag (fsGammaL γfs) i n' ∗ creUnarmFired Fun i := by
-  iintro #Hi #Hai Hrec Hcm Hf
-  iapply (cafArmedRetag γfs E k t q S i n n' (creUnarmFired Fun i) hE hin) $$ Hi Hai Hrec [Hcm] Hf
-  iintro %I %hlk Ha
-  have hav : PartialMap.get? (absView I) i = some ⟨c, 1⟩ := by
-    rw [absView_lookup_of I i n hlk, hrow]
-  have hdelta : absView (PartialMap.insert I i n') = deltaUnarm i (absView I) :=
-    absView_insert_none I i n' hnone
-  unfold aunarmCommitAt
-  imod Hcm $$ %I %c %hav Ha with ⟨Ha, Hstep, Hph2⟩
-  imodintro
-  rw [hdelta]
-  iframe Ha Hstep
-  iintro Ha
-  imod Hph2 $$ %(PartialMap.insert I i n') %hdelta Ha with ⟨Ha, HΦ⟩
-  imodintro
-  iframe Ha
-  unfold creUnarmFired
-  iexists absView I, c
-  iframe HΦ
-  ipureintro; exact hav
-
-/-- ...and at a PLAIN fragment (Rocq's `caf_unarm_fire`; sites #16/#21/#26,
-the non-directory child's fail arm: the row was never suspended) -- the
-zeroed record owes `InodeLocal`, which the site's re-pack proves anyway. -/
-theorem cafUnarm_fire [Icfg] (γfs : FsNames) (E : CoPset) (i : Nat) (c : Absnode)
-    (Fun : Pfam GF (Aview → Nat → IProp GF)) (n n' : FsNode)
-    (hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ E) (hloc : InodeLocal i n')
-    (hrow : absOf n = some ⟨c, 1⟩) (hnone : absOf n' = none) :
-    ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗ appInv (hlc := hlc) γfs -∗
-      aunarmCommitAt (hlc := hlc) (fsGammaL γfs) appE i Fun.pfRecv -∗
-      topFrag (fsGammaL γfs) i n ={E}=∗
-        topFrag (fsGammaL γfs) i n' ∗ creUnarmFired Fun i := by
-  iintro #Hi #Hai Hcm Hf
-  iapply (cafRetag γfs E i n n' (creUnarmFired Fun i) hE hloc) $$ Hi Hai [Hcm] Hf
-  iintro %I %hlk Ha
-  have hav : PartialMap.get? (absView I) i = some ⟨c, 1⟩ := by
-    rw [absView_lookup_of I i n hlk, hrow]
-  have hdelta : absView (PartialMap.insert I i n') = deltaUnarm i (absView I) :=
-    absView_insert_none I i n' hnone
-  unfold aunarmCommitAt
-  imod Hcm $$ %I %c %hav Ha with ⟨Ha, Hstep, Hph2⟩
-  imodintro
-  rw [hdelta]
-  iframe Ha Hstep
-  iintro Ha
-  imod Hph2 $$ %(PartialMap.insert I i n') %hdelta Ha with ⟨Ha, HΦ⟩
-  imodintro
-  iframe Ha
-  unfold creUnarmFired
-  iexists absView I, c
   iframe HΦ
   ipureintro; exact hav
 

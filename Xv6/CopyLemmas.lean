@@ -211,14 +211,6 @@ theorem co_ite_bne {α : Type _} (x y : BitVec 64) (p q : α) :
     (if bcond bop.BNE x y then p else q) = if x = y then q else p := by
   by_cases h : x = y <;> simp [bcond, h]
 
-theorem co_ite_bltu {α : Type _} (x y : BitVec 64) (p q : α) :
-    (if bcond bop.BLTU x y then p else q) = if x.toNat < y.toNat then p else q := by
-  by_cases h : x.toNat < y.toNat <;> simp [bcond, BitVec.ult, h]
-
-theorem co_ite_bgeu {α : Type _} (x y : BitVec 64) (p q : α) :
-    (if bcond bop.BGEU x y then p else q) = if x.toNat < y.toNat then q else p := by
-  by_cases h : x.toNat < y.toNat <;> simp [bcond, BitVec.ult, h]
-
 /-! ## Why the `-1` arm failed, as a fact about the ENTRY table
 
 Rocq `ProofCopyin.ci_fault_vpn` / `ci_fault_leaf` (lane TRAP-ROWS, T1):

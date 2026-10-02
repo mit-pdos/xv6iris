@@ -12,15 +12,7 @@ landing privilege.  The next pc is `sepc` with bit 0 cleared.
 
 What this file provides:
 
-* `execSpecF_sretU` -- the execute stage (S → U);
-* `wpLoop_s_sretU` -- one supervisor cycle executing `sret` with `SPP = U`
-  at `SIE = 0` (no interrupt can be taken at the instruction itself), over
-  an ABSTRACT translation resource `T` (the fetch obligation is the
-  caller's `fetchSpecS`): the continuation receives the hart in USER mode,
-  its configuration cells at `User`, the pc at `sepc & ~1`.  What runs
-  next is user code, which the kernel does not verify: the caller hands
-  the continuation to the user-execution contract (`Xv6.SpecUser.USER`,
-  D24).
+* `execSpecF_sretU` -- the execute stage (S → U).
 -/
 import MachCSL.WpSmodeSret
 import MachCSL.WpSmodeCycleT
@@ -63,34 +55,5 @@ theorem execSpecF_sretU (cpu : CPU) (c : MConf) (sie : Bool) (hok : SConfPhys (G
     iexact Hhw
   iapply HΦ $$ HmConf HPC HnextPC [HF Hsepc]
   iframe HF Hsepc
-
-/-- **`sret` into user mode, one cycle** (interrupts off, the fetch through
-the caller's abstract translation `T`): the continuation runs in USER mode
-at `sepc & ~1`, with the configuration cells at `User` and `mstatus`
-transformed by `sretMs` (`SIE := SPIE`, `SPIE := 1`, `SPP := U`,
-`MPRV := 0`).  Everything else -- the translation resource, the file,
-`sepc` -- is handed back unchanged. -/
-theorem wpLoop_s_sretU (cpu : CPU) (c : MConf) (hok : SConfPhys (GF := GF) c false)
-    (hmie : c.mie &&& ~~~c.mideleg = 0#64) (hspp : BitVec.extractLsb' 8 1 c.mstatus = 0#1)
-    (pc epc : BitVec 64) (w : BitVec 32) (T R : IProp GF) (G : RegMap)
-    (hfetch : fetchSpecS cpu (DFrac.own 1) c pc T R (FetchResult.F_Base w))
-    (hdec : decodes32P (GF := GF) cpu (DFrac.own 1) Privilege.Supervisor c w (instruction.SRET ())) :
-    confCells cpu (DFrac.own 1) Privilege.Supervisor c ∗ clockCells cpu ∗ pcIs cpu pc ∗ T ∗ R ∗
-    gprFile cpu G ∗ Register.sepc ↦ᵣ[cpu] epc ∗
-    ▷ (confCells cpu (DFrac.own 1) Privilege.User { c with mstatus := sretMs c.mstatus } -∗ clockCells cpu -∗
-        pcIs cpu (epc &&& 0xFFFFFFFFFFFFFFFE#64) -∗ R -∗ T -∗ gprFile cpu G -∗ Register.sepc ↦ᵣ[cpu] epc -∗
-        wpLoop cpu)
-    ⊢ wpLoop cpu := by
-  iintro ⟨HmConf, Hclock, Hpc, HT, HR, HF, Hsepc, HΦ⟩
-  iapply (wpLoop_sT_base cpu c _ hok hmie Privilege.User (Or.inr rfl) pc _ w _ T R
-    iprop(gprFile cpu G ∗ Register.sepc ↦ᵣ[cpu] epc)
-    iprop(T ∗ gprFile cpu G ∗ Register.sepc ↦ᵣ[cpu] epc) hfetch hdec
-    ((execSpecF_sretU cpu c false hok hspp pc (pc + 4#64) epc G).frameL T).clk)
-  iframe HmConf Hclock Hpc HT HR
-  isplitl [HF Hsepc]
-  · iframe HF Hsepc
-  inext
-  iintro HmConf Hclock Hpc HR ⟨HT, HF, Hsepc⟩
-  iapply HΦ $$ HmConf Hclock Hpc HR HT HF Hsepc
 
 end MachCSL

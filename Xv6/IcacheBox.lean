@@ -136,8 +136,8 @@ KEPT and checked live: `ic_q_side` / `ic_dep_id` / `ic_q_recycle` / `ic_q1`
 * **`IcacheCover`**: `icHdr` / `icRest` (the view's arm, unfold to
   `icHdrAmb` under the `letI`), `icQSide` / `icDepId` / `icQRecycle` /
   `icQ1` / `icQ2` / `icQ1_0` / `icQ1_S`, and Rocq's `ic_box` is `icEscrow`
-  (its `CtxBox.box_view` call is `MachCSL.boxView (icBoxPay …) (ndot icBoxN
-  k) (icfgBox k)`; its `ic_escrow_body` equation is `isBox`'s `inv`).
+  (its `CtxBox.box_view` call is `MachCSL.isBox (icBoxPay …) (ndot icBoxN k)
+  (icfgBox k)`; its `ic_escrow_body` equation is `isBox`'s `inv`).
 * **`IcacheBoot`**: `icBoxAllocAt` (`IcacheBoxSites`), `icHdr` / `icRest` at
   `none` / `.icRaw`, `icRegd` / `icCnt` / `icRegp`, `icEscrows`, `icSlp`,
   `icSlotRow`.

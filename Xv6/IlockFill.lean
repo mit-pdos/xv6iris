@@ -116,7 +116,7 @@ def ilFillOut [Icfg] (γfs : FsNames) (γi : GName) (cov : ExtTreeSet Nat compar
         topFrag (fsGammaL γfs) inum.toNat (eraNode dn bm data))
     ∨ ⌜dn.diType.toNat = 0⌝)
 
-/-- `inodeOwnedEra_local`, keeping the bundle. -/
+/-- The node's `InodeLocal`, read off `inodeOwnedEra`, keeping the bundle. -/
 private theorem il_era_localKeep (γfs : FsNames) (γi : GName) (inum : BitVec 32) (n : FsNode) :
     inodeOwnedEra (GF := GF) γfs γi inum n ⊢
       ⌜InodeLocal inum.toNat n⌝ ∗ inodeOwnedEra γfs γi inum n := by

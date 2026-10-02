@@ -128,8 +128,7 @@ current values and the cells hold junk until saved.
    stage needs are stated here at the Lean shapes (`sys_open_bltz_*`,
    `Xv6.dirlookup_beqz`, `sys_open_ty_*`, `sys_open_omode_eqz`,
    `sys_open_wr_rdonly`), the byte readings are `SysOpenBits`'
-   `sys_open_rd_byte` / `sys_open_wr_byte`, the major test
-   `sys_open_major_bound` / `_bltu`.
+   `sys_open_rd_byte` / `sys_open_wr_byte`.
 9. `so_word_half_join` / `so_ip_split` (the `f->ip` cell's halves) are not
    needed: Lean's `fileFieldsAt` holds `f->ip` WHOLE at fraction one.
    `flive_tok` has no Lean counterpart (FileDefs deviation 2).
@@ -879,8 +878,7 @@ abbrev sysOpenOm {GF : BundledGFunctors} (A : SysOpenArgs GF) : BitVec 32 := Bit
 
 /-- THE IMAGE THE PATH IS READ AT (Rocq's `us_M U` at entry): the entry view
 with every lazy page read as zeros (`UMemLazy.viewLazy`), which is where
-argstr reads its string.  `A.M` itself when the block has no lazy page
-(`UMemL.viewLazy_of_lazyFree`). -/
+argstr reads its string.  `A.M` itself when the block has no lazy page. -/
 abbrev sysOpenIm {GF : BundledGFunctors} (A : SysOpenArgs GF) : Nat → List (BitVec 8) := viewLazy A.V.upt A.V.sz A.M
 
 section Vocab
@@ -924,19 +922,6 @@ theorem sys_open_post_pin (k : KCtx) (A : SysOpenArgs GF) (hS : SysOpenStatic k 
   iintro H %c
   iapply (wpNext_at true k.proc cpu c _ (fun h => h.elim (fun h => absurd h (by decide))
     (fun h => absurd h (by rw [hS.hproc]; exact procAddr_nonzero hS.hj)))) $$ H
-
-/-- THE CONTINUATION IS MONOTONE IN ITS ARMS: what `SysOpenCreArm`'s shim
-needs (the create entry reaches the plain-arm bodies at the shim's families
-and converts their arms back into the create arms). -/
-theorem sysOpenK_mono (k : KCtx) (ns : Nat) (V : ProcPriv) (M : Nat → List (BitVec 8))
-    (ARMS ARMS' : ProcPriv → (Nat → List (BitVec 8)) → BitVec 64 → IProp GF) (c : CPU) :
-    sysOpenK (hlc := hlc) k ns V M ARMS c ⊢
-      (∀ (VW : ProcPriv) (MW : Nat → List (BitVec 8)) (r : BitVec 64), ARMS' VW MW r -∗ ARMS VW MW r) -∗
-      sysOpenK (hlc := hlc) k ns V M ARMS' c := by
-  unfold sysOpenK
-  iintro H Hw %spie %spp %R' %P' %k' %hcs %hext %hk' Hk Hpc Hte Hce Hbs Hir Harms
-  ihave Harms := Hw $$ %_ %_ %_ Harms
-  iapply H $$ %spie %spp %R' %P' %k' %hcs %hext %hk' Hk Hpc Hte Hce Hbs Hir Harms
 
 /-- THE CONTINUATION AT A RAISED COUNT (permit sweep L1b, Rocq's `UA` in
 `ProofSysOpen`): argstr hands the block back at `V.updEv kv`, and the rest

@@ -11,8 +11,7 @@ function proof that RETURNS wants it.
 1. `Regidx r <> Regidx q` is `r ≠ q` (Lean's register file is indexed by the
    `BitVec 5` itself, `MachCSL.RegMap`), so Rocq's `uidx_ne`/`uidx_eq` (the
    `Regidx` injectivity bridges) are the plain `BitVec.ne_of_toNat_ne` /
-   `BitVec.eq_of_toNat_eq`, restated here under Rocq's names for the
-   program files.
+   `BitVec.eq_of_toNat_eq`.
 -/
 import Xv6.UmodeAbi
 
@@ -30,12 +29,5 @@ theorem ucs_cases (r : BitVec 5) (h : ucalleeSavedIdx r = true) :
   unfold ucalleeSavedIdx at h
   simp only [Bool.or_eq_true, beq_iff_eq, Bool.and_eq_true, decide_eq_true_eq] at h
   omega
-
-/-- Rocq `uidx_ne`: a register disequality is an index one. -/
-theorem uidx_ne (r q : BitVec 5) (h : r.toNat ≠ q.toNat) : r ≠ q := fun he => h (he ▸ rfl)
-
-/-- Rocq `uidx_eq`. -/
-theorem uidx_eq (r : BitVec 5) (z : Nat) (q : BitVec 5) (h1 : r.toNat = z) (h2 : q.toNat = z) : r = q :=
-  BitVec.eq_of_toNat_eq (h1.trans h2.symm)
 
 end Xv6

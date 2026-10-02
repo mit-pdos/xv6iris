@@ -468,12 +468,6 @@ end Dormant
 
 /-! ## The current process (Rocq `ProcGeom.cur_proc`) -/
 
-/-- The current-process resource: `cpus[cpu].proc` holds `p` (Rocq
-`cur_proc p`; the hart is explicit here where Rocq's is the ambient
-`CpuId`).  `myproc()` returns exactly this value. -/
-def curProc [KernelGeom] (cpu : CPU) (p : BitVec 64) : IProp GF :=
-  wordPointsTo (aCpuProc cpu) 8 (DFrac.own 1) p
-
 /-- Setting one byte of a 16-byte buffer to `0` makes it a well-formed name. -/
 theorem pnameWf_set (cur : List (BitVec 8)) (p : Nat) (hlen : cur.length = 16) (hp : p ≤ 15) :
     pnameWf (cur.set p 0#8) := by

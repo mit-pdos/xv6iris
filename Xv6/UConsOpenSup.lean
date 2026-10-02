@@ -12,9 +12,7 @@ is not the caller's lives here and the two programs are two instantiations
 
 ## Ported here (reached from `union_adequacy_closed`)
 
-`init_cons_elems_len`, `init_cons_elems_hd`, `cons_hop_dead`,
-`cons_walk_dead`, `cons_open_bundle_dead`, `cons_open_dead_recv`,
-`init_cons_absent_fam`, `cons_sup_absent`, `init_cons_console_fam`,
+`cons_open_bundle_dead`, `cons_open_dead_recv`, `init_cons_absent_fam`, `cons_sup_absent`, `init_cons_console_fam`,
 `cons_sup_console`; and, as helpers, `UInitCons.init_cons_path_elems_ne`
 (unreached at the pin: its Rocq consumer is the unreached
 `init_cons_open_recv_absent`; `pinned_open_dead_lin` takes it here),
@@ -33,9 +31,8 @@ landed: `xfam_open` is `UkFileOpen.xfamOpen`, `sbundle_at_open_intro_at` /
 
 1. **The dead walk is `PinnedObs` §8a's.** `cons_P_dead`/`cons_Pmiss` are
    DEFINITIONALLY `pobsPDeadLin`/`pobsPmissRef` (`consPDead_eq`,
-   `consPmiss_eq`, both `rfl`), so `cons_hop_dead`, `cons_walk_dead`,
-   `cons_open_bundle_dead` and `cons_open_dead_recv` are the landed
-   `pobs_hop_dead_lin`, `pobs_walk_dead_lin`,
+   `consPmiss_eq`, both `rfl`), so `cons_open_bundle_dead` and
+   `cons_open_dead_recv` are the landed
    `pinned_open_bundle_dead_lin_notrunc` and `pinned_open_dead_lin` at the
    console's missing pin (`UInitCons.cons_pin_misses_at`), not re-proofs.
    `cons_open_dead_recv` keeps Rocq's (weaker) `K ∨ T` in its failure arm.
@@ -57,14 +54,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Std (ExtTreeSet)
 
 /-! ## 1.  The path's one element -/
-
-/-- **Rocq `init_cons_elems_len`**. -/
-theorem init_cons_elems_len : (pathElems initConsPl).length = 1 := by
-  rw [init_cons_path_elems]; rfl
-
-/-- **Rocq `init_cons_elems_hd`**. -/
-theorem init_cons_elems_hd : (pathElems initConsPl)[0]? = some fnameConsole := by
-  rw [init_cons_path_elems]; rfl
 
 theorem init_cons_path_elems_ne : pathElems initConsPl ≠ [] := by
   rw [init_cons_path_elems]; exact List.cons_ne_nil _ _
@@ -99,33 +88,6 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
-
-/-- **Rocq `cons_hop_dead`**: HOP 0 -- the claim says `console` is not an
-entry of the root, so the hop takes the MISS branch and pays it with the
-very credential the cursor handed it. -/
-theorem cons_hop_dead (γfs : FsNames) (rt : Nat) (T K : IProp GF) [Persistent T] [Timeless T] [Timeless K] :
-    ⊢ initConsAbsLaw T K -∗ appInv (hlc := hlc) γfs -∗
-      exHop (hlc := hlc) rt γfs (consPDead T K ROOTINO) (consPmiss T K) 0 fnameConsole := by
-  iintro #Hcl #Hinv
-  rw [consPDead_eq]
-  unfold initConsAbsLaw initConsPinLaw
-  iapply (pobs_hop_dead_lin γfs consAbsent T K (consPmiss T K) rt ROOTINO initConsPl ROOTINO fnameConsole
-    (cons_pin_misses_at rt) init_cons_elems_hd) $$ Hcl [] [] Hinv
-  · iapply consPmiss_taint
-  · iapply consPmiss_hold
-
-/-- **Rocq `cons_walk_dead`**: the whole walk, the credential riding the
-cursor. -/
-theorem cons_walk_dead (γfs : FsNames) (rt : Nat) (T K : IProp GF) [Persistent T] [Timeless T] [Timeless K] :
-    ⊢ initConsAbsLaw T K -∗ appInv (hlc := hlc) γfs -∗ K -∗
-      exStart (hlc := hlc) γfs rt ROOTINO (consPDead T K ROOTINO) (consPmiss T K) initConsPl := by
-  iintro #Hcl #Hinv HK
-  rw [consPDead_eq]
-  unfold initConsAbsLaw initConsPinLaw
-  iapply (pobs_walk_dead_lin γfs consAbsent T K (consPmiss T K) rt ROOTINO initConsPl ROOTINO
-    (cons_pin_misses_at rt)) $$ Hcl [] [] Hinv HK
-  · iapply consPmiss_taint
-  · iapply consPmiss_hold
 
 /-- **Rocq `cons_open_bundle_dead`**: /init's own bundle for an open it
 expects to fail, the credential inside the walk's families. -/

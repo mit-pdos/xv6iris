@@ -16,10 +16,7 @@ Names (Rocq → Lean): `efl_of` → `eflLines`, `efl_of_echof` → `eflLines_ech
 `efl_of_snoc` → `eflLines_snoc`, `efl_of_power` → `eflLines_power`.
 
 DEVIATIONS from Rocq:
-1. `efl_of` is `eflLines` here, because the landed `FileOutClaim.eflOf`
-   (the pre-drift `echof_lines_of` reading, over `Fwline`) still exists; the
-   file-application lane retypes the ledger at `FlLine` (= `Uline`) and makes
-   `eflOf := eflLines` (or renames).  `efl_of` is a section definition in
+1. `efl_of` is `eflLines` here.  `efl_of` is a section definition in
    Rocq's `FileOut.v` but reads no section variable.
 2. Spelling as `UnionAdm.lean` (`omap` is `List.filterMap`, `concat` is
    `List.flatten`, `ins` is `consIns`).

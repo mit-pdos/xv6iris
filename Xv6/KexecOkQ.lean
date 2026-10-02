@@ -31,9 +31,8 @@ header, in short (every clause that is about content is kept):
 
 1. **The success arm is spelled ONCE** (`kexecOkWin`), and `kexecOkQ` /
    `kexecOkQf` are `(fail) ∨ (Q entry ∧ kexecOkWin …)`.  Rocq writes the
-   seventeen conjuncts three times (kexec_ok, kexec_ok_q, kexec_ok_qf);
-   `kexecOk_iff` is `Iff.rfl`, so the landed `KexecDefs.kexecOk` is
-   untouched and the equivalence costs nothing.  The Lean success arm is the
+   seventeen conjuncts three times (kexec_ok, kexec_ok_q, kexec_ok_qf); the
+   landed `KexecDefs.kexecOk` is untouched.  The Lean success arm is the
    landed `kexecOk`'s, i.e. it carries KexecDefs deviation 4's two
    Lean-only rows (`kstack`, `context`).
 2. **PROCESS-LAYER (flagged): Rocq's `U' : ustate` is the Lean pair
@@ -124,12 +123,6 @@ def kexecOkWin (V V' : ProcPriv) (r entry spv szv' : BitVec 64) (na : Nat) (alen
   V'.context = V.context ∧
   V'.pvSecc = V.pvSecc
 
-/-- The landed relation IS `fail ∨ win` (definitional). -/
-theorem kexecOk_iff (V V' : ProcPriv) (r entry spv szv' : BitVec 64) (na : Nat) (alen : Nat → Nat) :
-    kexecOk V V' r entry spv szv' na alen ↔
-      ((r = 0xFFFFFFFFFFFFFFFF#64 ∧ evAfter V V') ∨ kexecOkWin V V' r entry spv szv' na alen) :=
-  Iff.rfl
-
 /-- **Rocq `kexec_ok_q`**: `kexecOk` with the caller's claim `Q entry` added to
 the success arm. -/
 def kexecOkQ (Q : BitVec 64 → Prop) (V V' : ProcPriv) (r entry spv szv' : BitVec 64) (na : Nat)
@@ -156,14 +149,6 @@ def kexecOkQf (Q : BitVec 64 → Prop) (QF : KxfCause → Prop) (V V' : ProcPriv
     (r entry spv szv' : BitVec 64) (na : Nat) (alen : Nat → Nat) : Prop :=
   (r = 0xFFFFFFFFFFFFFFFF#64 ∧ evAfter V V' ∧ ∃ c, QF c) ∨
   (Q entry ∧ kexecOkWin V V' r entry spv szv' na alen)
-
-/-- Rocq `kexec_ok_qf_weaken`: the landed reading, dropping both holes. -/
-theorem kexecOkQf_weaken (Q : BitVec 64 → Prop) (QF : KxfCause → Prop) (V V' : ProcPriv)
-    (r entry spv szv' : BitVec 64) (na : Nat) (alen : Nat → Nat)
-    (h : kexecOkQf Q QF V V' r entry spv szv' na alen) : kexecOk V V' r entry spv szv' na alen := by
-  rcases h with ⟨hr, hV, -⟩ | ⟨-, h⟩
-  · exact Or.inl ⟨hr, hV⟩
-  · exact Or.inr h
 
 /-- THE FAILURE ARM, as the one `-1` return proves it (`kxc_exit_m1`'s pure
 step, named): nothing moved, and the tail's cause pays the plug. -/
@@ -261,27 +246,6 @@ def kexecCloser (Q : BitVec 64 → ProcPriv → (Nat → List (BitVec 8)) → Pr
     procPrivFd A.γ k.proc A.pidv V' M' -∗
     kxcBufs k A -∗
     bslots 3 -∗ irefSlots 2 -∗ wpLoop cpu')
-
-/-- **THE LANDED EXIT, CONVERTED** (Rocq `ProofKexecTail.kxc_exit_qgen`): a
-continuation over the landed `kexecOk` relays as the closer at every plug
-(the generic relation implies the landed one, to the left of a wand). -/
-theorem kexecCloser_of_ok (Q : BitVec 64 → ProcPriv → (Nat → List (BitVec 8)) → Prop)
-    (QF : KxfCause → Prop) (k : KCtx) (A : KexecArgs) (cpu' : CPU) :
-    iprop(∀ (spie spp : Bool) (R' : RegMap) (V' : ProcPriv) (M' : Nat → List (BitVec 8))
-        (entry spv szv' : BitVec 64),
-      ⌜calleeSaved k.regs R'⌝ -∗
-      ⌜kexecOk A.V V' (R' 10#5) entry spv szv' A.na A.alen⌝ -∗
-      kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
-      trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
-      procPrivFd A.γ k.proc A.pidv V' M' -∗
-      kxcBufs k A -∗
-      bslots 3 -∗ irefSlots 2 -∗ wpLoop cpu') ⊢
-    kexecCloser (GF := GF) Q QF k A cpu' := by
-  unfold kexecCloser
-  iintro H %spie %spp %R' %V' %M' %entry %spv %szv' %hcs %hok
-  iapply H $$ %spie %spp %R' %V' %M' %entry %spv %szv' %hcs
-  ipureintro
-  exact kexecOkQf_weaken _ _ _ _ _ _ _ _ _ _ hok
 
 /-- **Rocq `kexec_closer_after_next`: THE CLOSER AT A LATER COUNT** (permit
 sweep L1a).  A phase that lent the block's counter holds the block at a

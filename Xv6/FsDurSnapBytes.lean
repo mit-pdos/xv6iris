@@ -8,8 +8,7 @@ step -- is `Xv6/FsDurSnap.lean`).
 WHAT THE TIE SAYS.  An abstract state `S` (`FsStateRec`) and a committed
 block map `D` agree at `S`'s FOOTPRINT, and the state's own blocks are laid
 out DISJOINTLY inside the bitmap's used set (`SnapBytes`); every inode obeys
-its local clauses (`snapLocal`).  `snapOk S D` is the conjunction, and
-`snapHolds D` names the state existentially -- the word the log banks.
+its local clauses (`snapLocal`).  `snapOk S D` is the conjunction.
 
 NOTHING MAINTAINS THE COUPLING (Rocq's section 1b header): at a snapshot it
 is READ off the epoch's own `∗` (`FsDurSnap.fsSnap_readOk`), and the ONE
@@ -227,10 +226,6 @@ theorem skLocal {S : FsStateRec} {D : BlockMap} (h : snapOk S D) : snapLocal S :
 /-- Rocq's `snap_ok_intro`. -/
 theorem snapOk_intro (S : FsStateRec) (D : BlockMap) (hb : SnapBytes S D) (hl : snapLocal S) :
     snapOk S D := ⟨hb, hl⟩
-
-/-- WHAT A COMMIT LEAVES BEHIND: the committed map really is a file system,
-the state left nameless (Rocq's `snap_holds`). -/
-def snapHolds (D : BlockMap) : Prop := ∃ S : FsStateRec, snapOk S D
 
 /-! ## 1c'.  The geometry -- the one half of the tie no resource pins -/
 

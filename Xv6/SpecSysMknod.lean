@@ -36,7 +36,7 @@ leaves a0, so no callee-saved register beyond ra and s0 is touched.
 
 * ONE CONTRACT: the frame plus ONE caller INPUT (`mknodAuAt`, the bundle at
   the path the caller passed) and ONE armed OUTPUT (`mknodArms`, keyed on
-  a0); the blanket `sysMknodRet` is a CONSEQUENCE (`mknodArms_ret`).
+  a0); the blanket `sysMknodRet` is a CONSEQUENCE of the arms.
 * WHAT THE CALLER HANDS IN (`mknodAuPre`, at the commit mask `appE`):
   `epStart` AT THE PATH -- nameiparent's PARENT PREFIX (`nparElems`), the
   last element being the created NAME -- whose start is `umStartOf rt cw pl`
@@ -110,7 +110,7 @@ leaves a0, so no callee-saved register beyond ra and s0 is touched.
    table does not map, so Rocq's `us_M` is `viewLazy V.upt V.sz M`
    (`Xv6/UMemLazy.lean`: the entry view, every page below the break that
    the table does not map read as zeros; `M` itself for a block with no
-   lazy page, `UMemL.viewLazy_of_lazyFree`).  argstr reads the string at
+   lazy page).  argstr reads the string at
    that image (`SpecFetchstr`: copyinstr's `umMapped` conjunct and
    `UMemL.umemStr_viewLazy`), so the input wand, both arms and the failure
    fold are all at `argPathOf (viewLazy V.upt V.sz M) pv pl` -- Rocq's
@@ -130,10 +130,11 @@ leaves a0, so no callee-saved register beyond ra and s0 is touched.
    deviation 2).
 8. Names: `K_sys_mknod` → `sysMknodSlots`, `sys_mknod_ret` →
    `sysMknodRet`, `mknod_au_pre` / `_at` → `mknodAuPre` / `mknodAuAt`
-   (`_inst`, `_of_all` → `mknodAuAt_inst`, `mknodAuAt_of_all`,
-   `mknodAuPre_of_all`), `mknod_post_ok` / `_fail` → `mknodPostOk` /
-   `mknodPostFail`, `mknod_arms` → `mknodArms`, `mknod_arms_ret` →
-   `mknodArms_ret`, `wp_sys_mknod_frame` + `wp_sys_mknod_body` → ONE
+   (`_inst`, `_of_all` → `mknodAuAt_inst`, `mknodAuAt_of_all`; the
+   `mknod_au_pre` `_of_all` is not ported, nothing uses it),
+   `mknod_post_ok` / `_fail` → `mknodPostOk` / `mknodPostFail`, `mknod_arms`
+   → `mknodArms` (`mknod_arms_ret` is not ported: nothing uses it),
+   `wp_sys_mknod_frame` + `wp_sys_mknod_body` → ONE
    `wp_sys_mknod_eb_body` (the frame's `EXTRA`/`ARMS` abstraction has one
    instance in the port -- the stable body is deferred -- and Lean states
    that instance; the continuation is named `sysMknodK`), `SYSMKNOD` kept.
@@ -288,29 +289,6 @@ theorem mknodAuAt_of_all (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat)
   iintro %pl %_
   iapply (npStart_of_mknod (hlc := hlc) γfs rt cw P Pmiss pl) $$ Hw
 
-/-- Rocq's `mknod_au_pre_of_all`. -/
-theorem mknodAuPre_of_all (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat) (pl : List (BitVec 8))
-    (Nm : Fname → Prop) (ma mi : Nat) (P Pmiss : Nat → Nat → IProp GF)
-    (Farm Fun : Pfam GF (Aview → Nat → IProp GF))
-    (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) :
-    nparWalkPreEra (hlc := hlc) γfs rt cw P Pmiss ⊢
-      pfAt (acreCommitAt (hlc := hlc) Γ appE (.ADev ma mi) (P (nparElems pl).length) Farm) Fok -∗
-      pfAt (dlookupCommitAt (hlc := hlc) Γ appE) Fex -∗
-      creChildUnfired (hlc := hlc) Γ (.ADev ma mi) Farm Fun -∗
-      mknodAuPre Γ γfs rt cw pl Nm ma mi P Pmiss Farm Fun Fok Fex := by
-  unfold mknodAuPre
-  iintro Hw Hok Hex Hch
-  ihave Hch := creChildUnfiredNd_of (hlc := hlc) Γ (.ADev ma mi) Farm Fun $$ Hch
-  ihave Hok := (pfAt_mono
-    (acreCommitAt (hlc := hlc) Γ appE (.ADev ma mi) (P (nparElems pl).length) Farm)
-    (acreCommitAtNm (hlc := hlc) Γ appE (.ADev ma mi) Nm (P (nparElems pl).length) Farm) Fok)
-    $$ [] Hok
-  · iintro H
-    iapply (acreCommitAtNm_of (hlc := hlc) Γ appE (.ADev ma mi) Nm (P (nparElems pl).length)
-      Farm Fok.pfRecv) $$ H
-  iframe Hok Hex Hch
-  iapply (npStart_of_mknod (hlc := hlc) γfs rt cw P Pmiss pl) $$ Hw
-
 /-- ret 0's real arm (Rocq's `mknod_post_ok`): create's ARM C-OK read at
 `T_DEVICE` at the fetched path -- `pl` IS the caller's own argument 0, read
 in the image `M` (the entry image, deviation 5) -- beside the region
@@ -370,17 +348,6 @@ def mknodArms [Icfg] (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat)
     (⌜r = 0xFFFFFFFFFFFFFFFF#64⌝ ∗
       mknodPostFail Γ γfs rt cw M pv ma mi P Pmiss Farm Fun Fok Fex))
 
-/-- THE RETURN BLANKET, READ OFF THE ARMS (Rocq's `mknod_arms_ret`). -/
-theorem mknodArms_ret [Icfg] (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat)
-    (M : Nat → List (BitVec 8)) (pv : Nat) (ma mi : Nat) (P Pmiss : Nat → Nat → IProp GF)
-    (Farm Fun : Pfam GF (Aview → Nat → IProp GF))
-    (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) (r : BitVec 64) :
-    mknodArms Γ γfs rt cw M pv ma mi P Pmiss Farm Fun Fok Fex r ⊢ ⌜sysMknodRet r⌝ := by
-  unfold mknodArms sysMknodRet
-  iintro (⟨%hr, -⟩ | ⟨%hr, -⟩)
-  · ipureintro; exact Or.inl hr
-  · ipureintro; exact Or.inr hr
-
 end Arms
 
 section
@@ -413,7 +380,7 @@ def sysMknodK (k : KCtx) (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V 
     -- THE LEDGER CLOSES, EXACTLY
     irefSlots ns -∗
     procPrivFd γ pa pid { V.updEv k' with upt := P' } (viewFaulted V.upt P' M) -∗
-    -- the armed post (implies `sysMknodRet`, through `mknodArms_ret`)
+    -- the armed post (implies `sysMknodRet`)
     mknodArms (hlc := hlc) (fsGammaL fscFs) fscFs V.rti V.cwi (viewLazy V.upt V.sz M) pv
       ma mi P Pmiss Farm Fun Fok Fex (R' 10#5) -∗
     wpLoop cpu')

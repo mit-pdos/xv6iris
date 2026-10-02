@@ -149,7 +149,7 @@ set_option maxHeartbeats 64000000 in
 set_option maxRecDepth 20000 in
 /-- **THE TARGET, `+0x42 .. +0x7e`** (Rocq `ProofSysLink.v` 1330-2300): ilock(ip),
 the type test (ARM C) and the NLINK_MAX guard (ARM D), s2's late save, THE
-MINT (`ip->nlink++` + `wp_iupdate_link` at the TOKEN arm of the freeze pin)
+MINT (`ip->nlink++` + `wp_iupdate_link_eb` at the TOKEN arm of the freeze pin)
 with INSTANT 1's fire, `iunlock(ip)`, `nameiparent(new, name)`, and ARM E
 (`bad:`) or the parent (`sys_link_walk_dp`). -/
 theorem sys_link_walk_ip (IL : ILOCK) (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : END_OP)

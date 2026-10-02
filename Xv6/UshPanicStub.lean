@@ -17,7 +17,7 @@ prompt as one call and its law), `UshPanicLaws` (S6-S7, the diagnostic laws
 with a linear frame).
 
 CONE of `UShPanic` (re-walked on the pinned globs: 31/38 reached).  Here:
-`shp_write`, `alt_panic_len`, `alt_execfail_len`, `ubyte_halves`,
+`alt_panic_len`, `alt_execfail_len`, `ubyte_halves`,
 `ubyte_split`, `ubyte_join`, `ubytesq_one`, `ubytesq_of_one`,
 `ubytesq_to_one`, `wp_ksh_write_chain_buf`; the notations `a0_idx`,
 `a1_idx`, `a2_idx`, `a7_idx`, `ra_idx`, `sh_prompt_pv` are Lean's register
@@ -63,9 +63,6 @@ open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 
 /-! ## S0 THE PINS -/
-
-/-- **Rocq `shp_write`**: sh's `write` stub. -/
-theorem shp_write : User.Sh.Sym.«write» = 0xc82 := by decide
 
 /-- **Rocq `alt_execfail_len`** (deviation 1): "exec echo failed\n$ ". -/
 theorem altExecfail_len : altExecfail.length = 19 := by decide

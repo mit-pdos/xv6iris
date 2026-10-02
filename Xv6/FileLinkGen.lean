@@ -16,7 +16,7 @@ reads the same name back): the head `fheadAt` and the turn `fturnPreAt` over
 * `f0preAt`, `fheadAt`, `fturnPreAt` (§0);
 * `f0bwk` (the reader's witness at an era, no index pin) and its laws
   `f0bwk_agree`, `f0w_bwk`, `f0w_bwk0`; the head's two readings
-  `fhead_cur`/`fhead_inp`; the parameters `fileParams` (§1);
+  `fhead_cur`/`fhead_inp` (§1);
 * `f0wAt` (the witness at a named state), `fheadAt_cur`/`fheadAt_inp`,
   `f0wAt_cw`, `fheadAt_boot` (§5).
 
@@ -150,39 +150,6 @@ theorem fhead_inp (g : FileGn) (k : Nat) (v : EraPins) (I : List (BitVec 8)) :
   · isplit
     · ipureintro; exact hI
     · iexact HE
-
-/-- THE FILE TIER'S GENERIC PARAMETERS (Rocq `file_params`). -/
-noncomputable def fileParams (g : FileGn) : GenParams hlc GF fileLm where
-  gL := fileLm_laws
-  gK := fileHooks
-  gT := fileTaint g.fgnCl
-  gT_pers := inferInstance
-  gT_tl := inferInstance
-  gPIN := eraPin (fgnEcho g)
-  gPIN_pers := fun _ _ => inferInstance
-  gPIN_tl := fun _ _ => inferInstance
-  gPIN_agree := fileOut_eraPin_agree (fgnEcho g)
-  gW := f0w g
-  gW_pers := fun _ _ => inferInstance
-  gW_tl := fun _ _ => inferInstance
-  gWb := f0bwk g
-  gWb_pers := fun _ _ => inferInstance
-  gWb_tl := fun _ _ => inferInstance
-  gk0 := genId (hlc := hlc) (GF := GF) + 1
-  gW_bw := f0w_bwk g
-  gW_bw0 := f0w_bwk0 g
-  gWb_agree := f0bwk_agree g
-  gH := fhead g
-  gH_tl := fun _ _ _ => inferInstance
-  gH_cur := fhead_cur g
-  gH_inp := fhead_inp g
-  gwild := fun _ => False
-  gR := fun _ _ _ _ => iprop(emp)
-  gR_pers := fun _ _ _ _ => inferInstance
-  gR_tl := fun _ _ _ _ => inferInstance
-  gR_0 := fun _ _ _ => lkEmp_valid
-  gR_pan := fun _ _ _ => lkEmp_valid
-  gR_exf := fun _ _ _ => lkEmp_valid
 
 /-! ## 5. The same section at a named boot state -/
 

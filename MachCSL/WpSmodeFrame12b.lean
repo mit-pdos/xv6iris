@@ -12,8 +12,6 @@ scratch ones are existentially closed where a lemma hands them out.
 
 Because `idx[]` is written a WORD at a time this file also supplies
 
-* `wordPointsTo_hi4_acc`, the companion of `MachCSL.wordPointsTo_lo4_acc`
-  (the top half of a doubleword cell, as the word at `a + 4`);
 * the two-byte owned memory leaves and their execute stages
   (`swp_checked_mem_read_load2_S`, `swp_checked_mem_write_store2_S`,
   `execSpecF_lhu`, `execSpecF_sh`) and the `wpLoop` rules `wp_s_lhu` /
@@ -24,10 +22,6 @@ Because `idx[]` is written a WORD at a time this file also supplies
   siblings `execSpecF_srliw` / `wp_s_srliw` (fs.c: `iupdate`/`ilock`/`iput`
   divide by `IPB`, `readi`/`writei` by `BSIZE`, `bfree` by `BPB`) and
   `execSpecF_sraiw` / `wp_s_sraiw` (fs.c: `balloc`'s `b / BPB` and `bi % 8`).
-
-The `fence rw,rw` of the publication needs no new rule:
-`MachCSL.wp_s_fence_rw_rw` (MachCSL/WpLock.lean) is already the
-kctx-level one.
 -/
 import MachCSL.WpSmodeFrame12
 
@@ -38,94 +32,6 @@ open Sail Sail.ConcurrencyInterfaceV1
 open LeanRV64D LeanRV64D.Functions
 
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
-
-/-! ## The top half of a doubleword cell -/
-
-/-- The high four bytes of a doubleword window, as a window at `a + 4`. -/
-theorem bytesPointsTo_hi4_acc [CurCtx] (a : BitVec 64) (dq : DFrac) (w : BitVec 64) :
-    bytesPointsTo (GF := GF) a 8 dq w ⊢
-      bytesPointsTo (a + 4#64) 4 dq (BitVec.extractLsb' 32 32 w) ∗
-      (bytesPointsTo (a + 4#64) 4 dq (BitVec.extractLsb' 32 32 w) -∗ bytesPointsTo a 8 dq w) := by
-  have e0 : nthByte (n := 4) (BitVec.extractLsb' 32 32 w) 0 = nthByte (n := 8) w 4 := by
-    unfold nthByte; bv_decide
-  have e1 : nthByte (n := 4) (BitVec.extractLsb' 32 32 w) 1 = nthByte (n := 8) w 5 := by
-    unfold nthByte; bv_decide
-  have e2 : nthByte (n := 4) (BitVec.extractLsb' 32 32 w) 2 = nthByte (n := 8) w 6 := by
-    unfold nthByte; bv_decide
-  have e3 : nthByte (n := 4) (BitVec.extractLsb' 32 32 w) 3 = nthByte (n := 8) w 7 := by
-    unfold nthByte; bv_decide
-  have a0 : a + 4#64 + BitVec.ofNat 64 0 = a + BitVec.ofNat 64 4 := by bv_omega
-  have a1 : a + 4#64 + BitVec.ofNat 64 1 = a + BitVec.ofNat 64 5 := by bv_omega
-  have a2 : a + 4#64 + BitVec.ofNat 64 2 = a + BitVec.ofNat 64 6 := by bv_omega
-  have a3 : a + 4#64 + BitVec.ofNat 64 3 = a + BitVec.ofNat 64 7 := by bv_omega
-  unfold bytesPointsTo ctxBytes
-  simp only [List.range_succ, List.range_zero, List.nil_append, List.cons_append,
-    Iris.Algebra.BigOpL.bigOpL_cons, Iris.Algebra.BigOpL.bigOpL_nil, e0, e1, e2, e3,
-    a0, a1, a2, a3]
-  iintro ⟨H0, H1, H2, H3, H4, H5, H6, H7, _⟩
-  iframe H4 H5 H6 H7
-  iintro ⟨H4, H5, H6, H7, _⟩
-  iframe
-  all_goals try iempintro
-
-/-- The high half of a doubleword is a word at `a + 4` (`sw`/`lw` of the
-top half of a stack cell). -/
-theorem wordPointsTo_hi4_acc [CurCtx] (a : BitVec 64) (dq : DFrac) (w : BitVec 64) :
-    wordPointsTo (GF := GF) a 8 dq w ⊢
-      wordPointsTo (a + 4#64) 4 dq (BitVec.extractLsb' 32 32 w) ∗
-      (wordPointsTo (a + 4#64) 4 dq (BitVec.extractLsb' 32 32 w) -∗ wordPointsTo a 8 dq w) := by
-  unfold wordPointsTo
-  iintro ⟨%ppn, #Hcl, %⟨hpin, hlt, hram, hal⟩, H⟩
-  have h3 : BitVec.extractLsb' 0 3 a = 0#3 := by
-    apply BitVec.eq_of_toNat_eq
-    simp only [BitVec.extractLsb'_toNat, Nat.shiftRight_zero, BitVec.toNat_ofNat, Nat.reducePow]
-    omega
-  have hpa4 : paOf ppn (a + 4#64) = paOf ppn a + 4#64 := by
-    unfold paOf; revert h3; bv_decide
-  have hvpn : vpnOf (a + 4#64) = vpnOf a := by
-    unfold vpnOf; revert h3; bv_decide
-  have ha4 : (a + 4#64).toNat = a.toNat + 4 := by
-    rw [BitVec.toNat_add]
-    simp only [BitVec.toNat_ofNat, Nat.reducePow]
-    omega
-  have hpp4 : (paOf ppn a + 4#64).toNat = (paOf ppn a).toNat + 4 := by
-    unfold inRam ramEnd at hram
-    rw [BitVec.toNat_add]
-    simp only [BitVec.toNat_ofNat, Nat.reducePow]
-    omega
-  have hram4 : inRam (paOf ppn (a + 4#64)) 4 := by
-    rw [hpa4]; unfold inRam ramEnd at hram ⊢; omega
-  have hal4 : (a + 4#64).toNat % 4 = 0 := by omega
-  have hlt4 : (a + 4#64).toNat < 2 ^ 38 := by omega
-  have hpin4 : tierPin curTier ppn (a + 4#64) := by
-    revert hpin
-    cases curTier with
-    | bare => simp only [tierPin]; intro h; rw [hpa4, h]
-    | kpt => simp only [tierPin]; intro _; trivial
-  icases bytesPointsTo_hi4_acc (paOf ppn a) dq w $$ H with ⟨Hhi, Hclose⟩
-  isplitl [Hhi]
-  · iexists ppn
-    rw [hvpn, hpa4]
-    iframe Hhi
-    isplit
-    · iexact Hcl
-    · ipureintro; exact ⟨hpin4, hlt4, by rw [← hpa4]; exact hram4, hal4⟩
-  · iintro ⟨%ppn', #Hcl', %_, Hhi⟩
-    isimp only [hvpn] at Hcl'
-    icases kmapAt_agree (vpnOf a) (kLeaf ppn .rw 0#1 0#1) (kLeaf ppn' .rw 0#1 0#1) $$ [Hcl Hcl']
-      with %heq
-    · isplit
-      · iexact Hcl
-      · iexact Hcl'
-    obtain ⟨h, -⟩ := kLeaf_inj heq
-    subst h
-    isimp only [hpa4] at Hhi
-    ihave H := Hclose $$ Hhi
-    iexists ppn
-    iframe H
-    isplit
-    · iexact Hcl
-    · ipureintro; exact ⟨hpin, hlt, hram, hal⟩
 
 /-! ## The two-byte owned accesses (`lhu`, `sh`) -/
 

@@ -3516,7 +3516,7 @@ theorem disk_leaseD (γ : DiskNames) :
       (leaseV_of_leaseL _ _ _ _ _ (leaseL_serve γ h)) (Virtio.serve_keepsDisk h)
 
 /-- **The disk's device thread is safe under its invariant**, with no
-assumption left -- the instance of `MachCSL.wpDev_dmaV` the adequacy
+assumption left -- the instance of `MachCSL.wpDev_dmaD_root` the adequacy
 theorem forks.  `diskRoot γ` is what the boot client hands the root task
 once, at power-on: the other half of the pop counter, whose invariant half
 sits beside `⌜v.seen = wrap16 lo⌝`. -/

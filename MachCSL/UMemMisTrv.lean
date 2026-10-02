@@ -135,19 +135,4 @@ theorem umm_translate_and_read_value_ram (D : UFoot) (orc : UOrc) (s : UWSt) (va
   exact ⟨v, umm_translate_and_read_value_ok D orc s va W pa .PBMT_PMA s' o' v htr
     (umm_mem_read_U D o' s' W pa .PBMT_PMA v hp.dms hp.dcp hp.mprv hp.cp hc)⟩
 
-/-- **A write part in owned RAM**: the translation to `pa`, then the chunked
-write; the map keeps its domain. -/
-theorem umm_translate_and_write_value_ram (D : UFoot) (orc : UOrc) (s : UWSt) (va : BitVec 64) (W : Nat)
-    (v : BitVec (8 * W)) (h0 : 0 < W) (hW : W ≤ 8) (pa : BitVec 64) (s' : UWSt) (o' : UOrc)
-    (htr : runRW D orc s (translateAddr (.Virtaddr va) (.Store .Data)) =
-      some (.Ok (.Physaddr pa, .PBMT_PMA, ()), s', o'))
-    (hp : UmaPhys D s') (hram : inRam pa W) (hown : ummOwned s'.mm pa W) :
-    ∃ m, ummSameDom s'.mm m ∧
-      runRW D orc s (translate_and_write_value (.Virtaddr va) W v (.Store .Data) false false false) =
-        some (.Ok true, ⟨s'.pin, s'.rs, m, false⟩, o') := by
-  obtain ⟨m, hm, hc⟩ := umm_checked_mem_write_ram D o' s' hp pa W v h0 hW hram hown
-  refine ⟨m, hm, umm_translate_and_write_value_ok D orc s va W pa .PBMT_PMA v s' o' _ o' true htr
-    (umm_mem_write_ea_ram D o' s' hp pa W h0 hW hram)
-    (umm_mem_write_value_U D o' s' W pa .PBMT_PMA v true _ hp.dms hp.dcp hp.mprv hp.cp hc)⟩
-
 end MachCSL

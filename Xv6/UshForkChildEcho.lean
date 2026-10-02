@@ -10,8 +10,7 @@ era's guard `D`.
 
 1. sh-exec's walk is taken through its interface `SH_CHILD_EXEC`
    (`wp_shChildXGen` at the ledger and fd 1's row, echo's instance derived
-   here as `ProofShChildExec.shChildEcho_holds` does: a stage file may not
-   import a Proof file), at the record `ushExecEnvOf` (`UshExecEnvRun`).
+   here: a stage file may not import a Proof file), at the record `ushExecEnvOf` (`UshExecEnvRun`).
 2. The child's two identity rows (`uch ∅`, `ushPid`) are dropped (Rocq:
    "free for this prover"), the set weakened to `uchAny`, the ledger read
    through `ushStd_ustd`.

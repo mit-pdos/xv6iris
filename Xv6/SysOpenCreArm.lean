@@ -52,7 +52,7 @@ Rocq's header, kept (the reasons are the content):
 2. The residues and families take the view names `Γ` as a parameter (Rocq
    fixes `fs_gamma_L fsc_fs`); every use is at `fsGammaL fscFs`.
 3. ADDED (the Lean continuation is NAMED, `SysOpenParts.sysOpenK`):
-   `sysOpenK_mono_fupd` (the fupd twin of `SysOpenParts.sysOpenK_mono`),
+   `sysOpenK_mono_fupd` (the continuation's monotonicity under a fupd),
    the shimmed record `sysOpenCrA` (with `sysOpenCrA_static`, its static
    premises for the seal's join instance; it now overrides `Ft` too, the
    tail running at `sysOpenCrFt` / `sysOpenCrFtEx`), and the two
@@ -759,7 +759,7 @@ theorem sys_open_cr_arms_exists (omo : OffMode) (Γ : FsViewNames GF) (γfs : Fs
 /-! ## 7.  THE CONTINUATION SHIMS (deviation 3) -/
 
 /-- THE CONTINUATION IS MONOTONE IN ITS ARMS, under a fupd (the loop pays
-it; `SysOpenParts.sysOpenK_mono`'s twin). -/
+it). -/
 theorem sysOpenK_mono_fupd (k : KCtx) (ns : Nat) (V : ProcPriv) (M : Nat → List (BitVec 8))
     (ARMS ARMS' : ProcPriv → (Nat → List (BitVec 8)) → BitVec 64 → IProp GF) (c : CPU) :
     sysOpenK (hlc := hlc) k ns V M ARMS c ⊢

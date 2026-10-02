@@ -197,15 +197,6 @@ def udepw (N : UkNames GF) (m : RegMap) (pc : BitVec 64) (n : Int) : IProp GF :=
       (⌜UprogSG.psok (GF := GF) n ∧ n ≠ USYS_exec⌝ ∨
         sbundlePay (uslot (hlc := hlc)) n N.pay (uvisOfRun m pc M pm sz fdv cw gn cs pidv false seccAll)))
 
-/-- **Rocq `udepwf`**: the FAMILY-NAMED explicit deposit. -/
-def udepwf (N : UkNames GF) (m : RegMap) (pc : BitVec 64) (n : Int) (fdep : UexecSG.sfam GF) : IProp GF :=
-  iprop(⌜UexecSG.sexitPay fdep = N.pay⌝ ∗
-    ∀ (M : ElfMem) (pm : Nat → Option UPerm) (sz : Nat) (fdv : List FdState) (cw : Nat) (gn : GName)
-      (cs : ExtTreeSet GName compare) (pidv : BitVec 32),
-    myPay gn N.pay -∗ uheap N.t N.d N.s M pm sz -∗ ufdAuth N.fd fdv -∗
-    uheap N.t N.d N.s M pm sz ∗ ufdAuth N.fd fdv ∗
-      UexecSG.sbundleAt (uslot (hlc := hlc)) n fdep (uvisOfRun m pc M pm sz fdv cw gn cs pidv false seccAll))
-
 /-- Rocq `udepw_of_psok`: the GENERIC route's supplier. -/
 theorem udepw_of_psok (N : UkNames GF) (m : RegMap) (pc : BitVec 64) (n : Int)
     (hok : UprogSG.psok (GF := GF) n) (hne : n ≠ USYS_exec) : ⊢ udepw (hlc := hlc) N m pc n := by
@@ -491,14 +482,6 @@ theorem udepw_of_uxsupAt (N : UkNames GF) (m : RegMap) (pc : BitVec 64) :
   iapply Hx
 
 /-! ### The cwd-pinned deposit -/
-
-/-- **Rocq `udepw_at_ref`**: the exec deposit with its refund's consequence. -/
-def udepwAtRef (N : UkNames GF) (m : RegMap) (pc : BitVec 64) (c : Nat) : IProp GF :=
-  iprop(∀ (M : ElfMem) (pm : Nat → Option UPerm) (sz : Nat) (fdv : List FdState) (gn : GName)
-      (cs : ExtTreeSet GName compare) (pidv : BitVec 32),
-    myPay gn N.pay -∗ uheap N.t N.d N.s M pm sz -∗ ufdAuth N.fd fdv -∗
-    uheap N.t N.d N.s M pm sz ∗ ufdAuth N.fd fdv ∗
-      sbundlePayRef (uslot (hlc := hlc)) N.pay (uvisOfRun m pc M pm sz fdv c gn cs pidv false seccAll))
 
 /-- **Rocq `udepwf_at`**: the family-named deposit at ONE working directory. -/
 def udepwfAt (N : UkNames GF) (m : RegMap) (pc : BitVec 64) (n : Int) (fdep : UexecSG.sfam GF) (c : Nat) :

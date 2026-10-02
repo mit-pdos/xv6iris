@@ -32,8 +32,9 @@ computing form `fsImgBlock`; this file rewrites the block view to it
    has `DecidableEq` in Lean too) and REWRITES `node_at_file` to reach the
    node, so no `Fsnode` equality is ever decided.  `fsimgFileBytes` /
    `fsimgNodeFile` below are that reduction, ready for an `ElfUser` port.
-3. `fsimg_live_set`'s set EQUALITY (`ExtTreeSet` has no `DecidableEq`) is
-   stated as its membership law directly (`fsimgLiveSetMem`), off one sweep.
+3. `fsimg_live_set`'s set EQUALITY (`ExtTreeSet` has no `DecidableEq`) and
+   its membership law (`fsimg_live_set_elem`) are not ported (nothing uses
+   them).
 -/
 import Xv6.FsImgCheckSweeps
 import Xv6.FsBootParams
@@ -82,15 +83,10 @@ theorem fsimgWfOk : fsimgWf fsimgP fsimgSb = true := by
     fsimgLinksWfB]
   simp only [hu2, Bool.and_self]
 
-/-- Rocq `fsimg_root_dir`. -/
-theorem fsimgRootDir : fsRootDir (treeOfDisk fsimgP fsimgSb) :=
-  fsimgWf_treeRoot fsimgP fsimgSb fsimgWfOk
-
 /-- Rocq `fsimg_blocks_full`. -/
 theorem fsimgBlocksFull : fsBlocksFull fsimgP := fun b => fsBlocks_length _ b
 
-/-- W2 IS `FsImgDisk.fsimgLogClean` (Rocq `fsimg_wf_log_clean`): the two
-image files do not drift. -/
+/-- W2 (Rocq `fsimg_wf_log_clean`): the image's log header is zero. -/
 theorem fsimgWfLogClean : hdrN (fsimgP (logHdrBno fsimgSb.sbLogstart)) = 0 :=
   fsimgWf_log fsimgP fsimgSb fsimgWfOk
 
@@ -128,37 +124,6 @@ theorem fsimgRegionBare : fsRegionBare fsimgP fsimgSb fsimgNib = true := by
 /-- Rocq `fsimg_region_wf`. -/
 theorem fsimgRegionWf : fsRegionWf fsimgP fsimgSb fsimgNib = true := by
   unfold fsRegionWf; rw [fsimgRegionFree, fsimgRegionNlink, Bool.and_self]
-
-/-- The live records are exactly `1 .. 24`, as one sweep (Rocq
-`fsimg_live_set`, deviation 3). -/
-theorem fsimgLiveSweep :
-    (List.range 200).all (fun z =>
-      (!decide ((fsDinode fsimgP fsimgSb z).diType.toNat = 0)) == decide (1 ≤ z ∧ z ≤ 24)) =
-      true := by
-  rw [fsimgP_eq]; exact fsimgLiveSweepB
-
-/-- Rocq `fsimg_live_iff`. -/
-theorem fsimgLiveIff (z : Nat) :
-    (1 ≤ z ∧ z ≤ 24) ↔
-      z < fsimgSb.sbNinodes ∧ (fsDinode fsimgP fsimgSb z).diType.toNat ≠ 0 := by
-  have hn : fsimgSb.sbNinodes = 200 := rfl
-  rw [hn]
-  by_cases hz : z < 200
-  · have := List.all_eq_true.1 fsimgLiveSweep z (List.mem_range.2 hz)
-    rw [beq_iff_eq] at this
-    by_cases h0 : (fsDinode fsimgP fsimgSb z).diType.toNat = 0
-    · rw [h0] at this ⊢
-      simp only [decide_true, Bool.not_true] at this
-      have := (decide_eq_false_iff_not.1 this.symm)
-      omega
-    · simp only [h0, decide_false, Bool.not_false] at this
-      have := of_decide_eq_true this.symm
-      omega
-  · omega
-
-/-- Rocq `fsimg_live_set_elem`. -/
-theorem fsimgLiveSetMem (z : Nat) : z ∈ fsLiveSet fsimgP fsimgSb ↔ 1 ≤ z ∧ z ≤ 24 := by
-  rw [fsLiveSet_mem, fsimgLiveIff]
 
 /-! ## 3.  PATHS OUT OF THE ROOT -/
 

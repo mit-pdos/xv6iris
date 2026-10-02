@@ -45,7 +45,7 @@ config-class dependency):
 1. **`fs_view_names` carries Rocq's two abstract-state gnames** (`link`,
    `top` = Rocq `γlink`/`γtop`) since wave 0d (they were dropped at first;
    restored with the abstract-state layer).  Nothing stated over the byte
-   view ALONE reads them (`freeBitmapAt_gname` is that fact).
+   view ALONE reads them.
 2. **BYTE AND BLOCK ADDRESSES ARE `Nat`**, not `Z` (the port's standing
    log-layer deviation, `Xv6/LogDefs.lean`).
 3. **THE SHAPES LIVE IN THE `Xv6.FsView` NAMESPACE.**  Rocq's
@@ -317,11 +317,6 @@ def viewShed (Γ Γ1 Γ2 : FsViewNames GF) : Prop :=
   ∀ (a : Nat) (v : BitVec 8),
     Γ.phi (DFrac.own 1) a v ⊢ Γ1.phi (DFrac.own 1) a v ∗ Γ2.phi (DFrac.own 1) a v
 
-theorem gammaQ_shed (Γ : FsViewNames GF) (Hfr : phiFrac Γ) (q1 q2 : Qp) :
-    viewShed (gammaQ Γ (DFrac.own (q1 + q2))) (gammaQ Γ (DFrac.own q1))
-      (gammaQ Γ (DFrac.own q2)) :=
-  fun a v => (Hfr a v q1 q2).1
-
 /-- ...and the one every fraction-1 owner runs: a WHOLE object shed into
 two constant-share views whose shares sum to one. -/
 theorem gammaShed_full (Γ : FsViewNames GF) (Hfr : phiFrac Γ) (q1 q2 : Qp)
@@ -439,16 +434,6 @@ theorem blkOwned_ne_full (Γ : FsViewNames GF) (Hex : phiExcl Γ) (dq : DFrac)
     blkOwned Γ b bs ⊢ blkOwnedQ Γ dq b' bs' -∗ ⌜b ≠ b'⌝ := by
   rw [blkOwned_1]
   exact blkOwnedQ_ne Γ Hex _ dq b b' bs bs' (dfracFullNvalid _)
-
-/-- ...and two THREE-QUARTER owners cannot alias, because `3/4 + 3/4 > 1`.
-That is the reason the reader's share is a quarter: the commit's
-collection lemma reads cross-inode block disjointness off the `∗` between
-two read-locked inodes' escrow residues. -/
-theorem blkOwned_ne_34 (Γ : FsViewNames GF) (Hex : phiExcl Γ) (b b' : Nat)
-    (bs bs' : List (BitVec 8)) :
-    blkOwnedQ Γ (DFrac.own Qp.threeQuarters) b bs ⊢
-      blkOwnedQ Γ (DFrac.own Qp.threeQuarters) b' bs' -∗ ⌜b ≠ b'⌝ :=
-  blkOwnedQ_ne Γ Hex _ _ b b' bs bs' dfrac34Nvalid
 
 end FsView
 

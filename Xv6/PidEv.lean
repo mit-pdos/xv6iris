@@ -25,10 +25,10 @@ Design: `claude-notes/design/ni-pid-ledger.md` (§2 D1, §3 W1).
 
 ## Deviations from Rocq
 
-1. Names: `pev`/`pev_actor`/`pev_pid`/`live_of`/`next_of` are
-   `Pev`/`Pev.actor`/`Pev.pid`/`liveOf`/`nextOf`; the constructors keep
-   Rocq's spelling (`Pev.PAlloc`, `Pev.PFree`).  `mword 64` / `mword 32`
-   are `BitVec 64` / `BitVec 32`.
+1. Names: `pev`/`pev_pid`/`live_of`/`next_of` are
+   `Pev`/`Pev.pid`/`liveOf`/`nextOf` (`pev_actor` is not ported: nothing
+   uses it); the constructors keep Rocq's spelling (`Pev.PAlloc`,
+   `Pev.PFree`).  `mword 64` / `mword 32` are `BitVec 64` / `BitVec 32`.
 2. **The live set is a PREDICATE on `Int`** (`Int → Prop`; Rocq: `gset Z`):
    it is compared with the pid register's domain, which in this tree is
    `PartialMap.dom R : Int → Prop` over `R : IntMapF GName` (the register
@@ -53,10 +53,6 @@ inductive Pev where
   /-- freeproc's `p->pid = 0`, run by `act`, released `pid` -/
   | PFree (act : BitVec 64) (pid : BitVec 32)
   deriving DecidableEq, Repr
-
-/-- The label: the actor that ran the call (Rocq `pev_actor`). -/
-def Pev.actor : Pev → BitVec 64
-  | .PAlloc a _ | .PFree a _ => a
 
 /-- The pid the event carries (Rocq `pev_pid`). -/
 def Pev.pid : Pev → BitVec 32

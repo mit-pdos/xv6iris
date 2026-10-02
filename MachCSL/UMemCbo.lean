@@ -5,8 +5,7 @@ MachCSL: **the cache-block operations at User privilege** (Zicboz
 `notes/design-rulings.md` §2.1 G9).  Rocq `UserMemClassifyAmo.v` (the
 ZICBOP arm `arm_ZICBOP_u`) and `UserTotalU.v`'s CBO rows.
 
-**`cbo.*` are Illegal at xv6's configuration** (`umo_cbo_zero`,
-`umo_cbo_mgmt`).  What the model does at User: `cbo.zero` asks
+**`cbo.*` are Illegal at xv6's configuration.**  What the model does at User: `cbo.zero` asks
 `feature_enabled_for_priv User menvcfg.CBZE senvcfg.CBZE`, `cbo.clean` and
 `cbo.flush` the same with `CBCFE`, and `cbo.inval` `cbop_priv_check User`
 over `menvcfg.CBIE` / `senvcfg.CBIE`.  xv6 runs user code with
@@ -39,39 +38,6 @@ namespace MachCSL
 open Sail Sail.ConcurrencyInterfaceV1
 open Sail.ArchSem (FreeM)
 open LeanRV64D LeanRV64D.Functions
-
-/-! ## §1 `cbo.zero`, `cbo.clean`, `cbo.flush`, `cbo.inval`: Illegal -/
-
-set_option maxHeartbeats 4000000 in
-set_option maxRecDepth 100000 in
-/-- `cbo.zero` at the reference state: Illegal. -/
-theorem umo_cbo_zero_ref (orc : UOrc) (rs : RegFile) (mm : BMap) (rv : Bool) (i : BitVec 5) :
-    runRW uxcCfgFoot orc ⟨drefU, rs, mm, rv⟩ (execute (.ZICBOZ (.Regidx i))) =
-      some (.Illegal_Instruction (), ⟨drefU, rs, mm, rv⟩, orc) := by
-  kernel_rfl
-
-set_option maxHeartbeats 4000000 in
-set_option maxRecDepth 100000 in
-/-- `cbo.clean`/`cbo.flush`/`cbo.inval` at the reference state: Illegal. -/
-theorem umo_cbo_mgmt_ref (orc : UOrc) (rs : RegFile) (mm : BMap) (rv : Bool) (c : cbop_zicbom)
-    (i : BitVec 5) :
-    runRW uxcCfgFoot orc ⟨drefU, rs, mm, rv⟩ (execute (.ZICBOM (c, .Regidx i))) =
-      some (.Illegal_Instruction (), ⟨drefU, rs, mm, rv⟩, orc) := by
-  cases c <;> kernel_rfl
-
-/-- **`cbo.zero` at User is Illegal** (Rocq `UserTotalU`'s ZICBOZ row):
-`menvcfg.CBZE = 0` (and `senvcfg.CBZE = 0`); nothing is read beyond the
-configuration, nothing moves. -/
-theorem umo_cbo_zero {D : UFoot} (hD : UxcFoot D) (orc : UOrc) (s : UWSt) (hU : UxcCfg s) (i : BitVec 5) :
-    runRW D orc s (execute (.ZICBOZ (.Regidx i))) = some (.Illegal_Instruction (), s, orc) :=
-  uxc_cfg_walk hD _ _ orc s hU (umo_cbo_zero_ref orc s.rs s.mm s.rv i)
-
-/-- **`cbo.clean`/`cbo.flush`/`cbo.inval` at User are Illegal** (Rocq
-`UserTotalU`'s ZICBOM rows): `menvcfg.CBCFE = 0`, `menvcfg.CBIE = 00`. -/
-theorem umo_cbo_mgmt {D : UFoot} (hD : UxcFoot D) (orc : UOrc) (s : UWSt) (hU : UxcCfg s)
-    (c : cbop_zicbom) (i : BitVec 5) :
-    runRW D orc s (execute (.ZICBOM (c, .Regidx i))) = some (.Illegal_Instruction (), s, orc) :=
-  uxc_cfg_walk hD _ _ orc s hU (umo_cbo_mgmt_ref orc s.rs s.mm s.rv c i)
 
 /-! ## §2 `prefetch.r/.w/.i`: Retire -/
 

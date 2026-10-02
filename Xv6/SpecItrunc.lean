@@ -92,8 +92,8 @@ the literal `true`.  NOT ITS BUSINESS: `ip->lock` (iput holds it).
    data-length premise is `Xv6.inodeSized data` (the same statement).
 4. The list-as-set deviation (`Xv6/LogDefs.lean`): `Sb ⊆ Sb'` is
    `∀ x ∈ Sb, x ∈ Sb'`; `Sb ∪ {[b]}` is `b :: Sb`.
-5. The contract is the field `ITRUNC.wp_itrunc_gen` (Rocq's name kept, the
-   one iput and sys_open call).
+5. The contract is the field `ITRUNC.wp_itrunc_gen_eb` (Rocq's
+   `wp_itrunc_gen`, the one iput and sys_open call).
 
 **Dropped/simplified vs Rocq.**
 
@@ -102,12 +102,10 @@ the literal `true`.  NOT ITS BUSINESS: `ip->lock` (iput holds it).
   iris/*.v` finds them only in SpecItrunc.v /
   ProofItruncParts.v and a `WriteiBudget.v` comment -- reason: superseded by
   the set-indexed `bmPaidS`, which is what the proof threads.
-* `it_spend` is KEPT (as `itSpend`), although the brief listed it as dead:
-  `SysOpenBudget.v` (`so_trunc_spend_two`) and `ProofIput.v` cite it.
-* `wp_itrunc_sconf` is not a field: it is DERIVED below
-  (`ITRUNC.wp_itrunc_sconf`, Rocq's own ProofItrunc.v 3008–3058 derivation
-  at the `logOp` existential's witness, `crb = cru = false`) -- uses
-  checked: no Rocq file outside SpecItrunc/ProofItrunc applies it.
+* `it_spend` is not ported (nothing uses it).
+* `wp_itrunc_sconf` is not a field (Rocq derives it, ProofItrunc.v
+  3008–3058, at the `logOp` existential's witness, `crb = cru = false`) and
+  is not ported (nothing uses it).
 
 Imports only definitional files and callee `Spec*` files.
 -/
@@ -158,10 +156,6 @@ def itIu (cru : Bool) : Nat := if cru then 0 else 1
 /-- THE BITMAP UNIT, AS A REPORT (Rocq's `it_bm`): `w` is "the bitmap block
 was logged BY THIS CALL". -/
 def itBm (w : Bool) : Nat := if w then 1 else 0
-
-/-- What itrunc spends AT MOST (Rocq's `it_spend`; `SysOpenBudget.v` cites
-it). -/
-def itSpend (crb cru : Bool) : Nat := (if crb then 0 else 1) + itIu cru
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
@@ -404,7 +398,7 @@ def wp_itrunc_gen_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] 
   ⊢ wpLoop (GF := GF) cpu
 
 /-- The interface of `itrunc` (Rocq's `Module Type ITRUNC`, less
-`wp_itrunc_sconf`, derived below). -/
+`wp_itrunc_sconf`, which is not ported). -/
 structure ITRUNC : Prop where
   /-- the credited set-form contract -/
   wp_itrunc_gen_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
@@ -422,35 +416,6 @@ structure ITRUNC : Prop where
       u Sb crb cru e0 pidv dqp dqd dqn dqb dqs
       hj hproc hK hnoff htier hcrb hgeom hbg hcov hlog hnib hnz hstab hnl hwf hbel
       hsz hda hpd ha0
-
-/-- The interrupts-off instance of `wp_itrunc_gen_eb` (the complement is the whole
-bundle): the contract every not-yet-generalized caller states. -/
-theorem ITRUNC.wp_itrunc_gen (A : ITRUNC) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-    [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
-    [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
-    (ip : BitVec 64) (inum : BitVec 32) (dn dn0 : Dinode) (bm : Blkmap)
-    (data : Nat → List (BitVec 8))
-    (u : Nat) (Sb : List Nat) (crb cru : Bool) (e0 : Nat)
-    (pidv : BitVec 32) (dqp dqd dqn dqb dqs : DFrac)
-    hj hproc hK hsie hnoff hlocks htier hcrb hgeom hbg hcov hlog hnib hnz hstab hnl hwf hbel
-    hsz hda hpd ha0 :
-    wp_itrunc_gen_body (hlc := hlc) (GF := GF) Γ cpu k γl pd pav pu j ip inum dn dn0 bm data
-      u Sb crb cru e0 pidv dqp dqd dqn dqb dqs
-      hj hproc hK hsie hnoff hlocks htier hcrb hgeom hbg hcov hlog hnib hnz hstab hnl hwf hbel
-      hsz hda hpd ha0 := by
-  have h := A.wp_itrunc_gen_eb (hlc := hlc) (GF := GF) (Γ := Γ) (cpu := cpu) (k := k) (γl := γl) (pd := pd) (pav := pav) (pu := pu) (j := j) (ip := ip) (inum := inum) (dn := dn) (dn0 := dn0) (bm := bm) (data := data) (u := u) (Sb := Sb) (crb := crb) (cru := cru) (e0 := e0) (pidv := pidv) (dqp := dqp) (dqd := dqd) (dqn := dqn) (dqb := dqb) (dqs := dqs) (hj := hj) (hproc := hproc) (hK := hK) (hnoff := hnoff) (htier := htier) (hcrb := hcrb) (hgeom := hgeom) (hbg := hbg) (hcov := hcov) (hlog := hlog) (hnib := hnib) (hnz := hnz) (hstab := hstab) (hnl := hnl) (hwf := hwf) (hbel := hbel) (hsz := hsz) (hda := hda) (hpd := hpd) (ha0 := ha0)
-  unfold wp_itrunc_gen_eb_body at h
-  unfold wp_itrunc_gen_body
-  rw [hsie] at h
-  simp only [trapCsrsExt_false, cpuClaimExt_false] at h
-  iintro ⟨H0, H1, H2, Htc, Hcl, Hir, H6, H7, H8, H9, H10, H11, H12, H13, H14, H15, H16, H17, H18, H19, H20, H21, H22, H23, Hnext⟩
-  iapply h
-  iframe H0 H1 H2 Htc Hcl Hir H6 H7 H8 H9 H10 H11 H12 H13 H14 H15 H16 H17 H18 H19 H20 H21 H22 H23
-  iapply wpNext_mono $$ Hnext
-  iintro %cpu' HK %spie %spp %R' %p0 H1 H2 ⟨Htc, Hir⟩ Hcl H6 H7 H8 H9 H10 H11 H12 H13 H14 H15 H16
-  iapply HK $$ %spie %spp %R' %p0 H1 H2 Htc Hcl Hir H6 H7 H8 H9 H10 H11 H12 H13 H14 H15 H16
 
 /-- **THE COUNTED CONTRACT** (Rocq's `wp_itrunc_sconf_body`): the plain budget
 `logOp γ (u + 2)` in -- one unit for the bitmap block, one for iupdate --
@@ -566,56 +531,5 @@ def wp_itrunc_sconf_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF
     -- SPEND AT MOST TWO, AT LEAST ONE
     (∃ u' : Nat, ⌜u ≤ u' ∧ u' ≤ u + 1⌝ ∗ logOp icfgLog u') -∗ wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
-
-/-- The counted contract, derived at `crb = cru = false` (Rocq's
-`wp_itrunc_sconf`, ProofItrunc.v 3008–3058): the counted reservation opens
-at its own set and birth epoch (`Xv6.logOp_openS`, `Xv6.logOpS_named`), the
-credit is the empty one (`Xv6.logCredit_own` at `false`), and on the way out
-the grown set is forgotten again (`Xv6.logOpS_op`); the range collapses to
-`u ≤ u' ≤ u + 1`. -/
-theorem ITRUNC.wp_itrunc_sconf (IT : ITRUNC) {hlc : HasLC} {GF : BundledGFunctors}
-    [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-    [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
-    [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
-    (ip : BitVec 64) (inum : BitVec 32) (dn dn0 : Dinode) (bm : Blkmap)
-    (data : Nat → List (BitVec 8)) (u : Nat)
-    (pidv : BitVec 32) (dqp dqd dqn dqb dqs : DFrac)
-    hj hproc hK hsie hnoff hlocks htier hgeom hbg hcov hlog hnib hnz hstab hnl hwf hbel
-    hsz hda hpd ha0 :
-    wp_itrunc_sconf_body (hlc := hlc) (GF := GF) Γ cpu k γl pd pav pu j ip inum dn dn0 bm data
-      u pidv dqp dqd dqn dqb dqs
-      hj hproc hK hsie hnoff hlocks htier hgeom hbg hcov hlog hnib hnz hstab hnl hwf hbel
-      hsz hda hpd ha0 := by
-  unfold wp_itrunc_sconf_body
-  iintro ⟨Hk, Hpc, #Hpi, Htc, Hcl, Hir, #Hpe, #Hbc, #Hlc, #Hdc, Hidev, Hinum, Hmeta, Hmap, Hblk,
-    Hsb, Hsi, #Hbmi, #Hinv, Hdn, Hpid, Hsl, Hop, Hnext⟩
-  icases logOp_openS icfgLog (u + 2) $$ Hop with ⟨%Sb, HopS, Htx⟩
-  icases logOpS_named icfgLog (u + 2) Sb $$ HopS with ⟨%e0, Hope⟩
-  ihave #Hcred := logCredit_own (GF := GF) icfgLog false Sb e0 (IBLOCK inum icfgIst)
-    (fun h => absurd h (by simp))
-  ihave Hope := (show logOpSe (GF := GF) icfgLog (u + 2) Sb e0 ⊢
-      logOpSe icfgLog (itEntry false u) Sb e0 from .rfl) $$ Hope
-  have h := IT.wp_itrunc_gen (hlc := hlc) (GF := GF) Γ cpu k γl pd pav pu j ip inum dn dn0 bm
-    data u Sb false false e0 pidv dqp dqd dqn dqb dqs hj hproc hK hsie hnoff hlocks htier
-    (fun h => absurd h (by simp)) hgeom hbg hcov hlog hnib hnz hstab hnl hwf hbel hsz hda hpd ha0
-  unfold wp_itrunc_gen_body at h
-  iapply h
-  iframe Hk Hpc Hpi Htc Hcl Hir Hpe Hbc Hlc Hdc Hidev Hinum Hmeta Hmap Hblk Hsb Hsi Hbmi Hinv
-    Hdn Hpid Hsl Hcred Hope
-  iapply wpNext_mono _ _ _ _ _ $$ Hnext
-  iintro %c HΦ %spie %spp %R' %hcs Hk Hpc Htc Hcl Hir Hpid Hidev Hinum Hsb Hsi Hmeta Hmap Hblk
-    Hdn Hsl ⟨%w, %u', %Sb', %hf, HopS⟩
-  obtain ⟨-, -, -, -, hlo, hhi⟩ := hf
-  ihave Hop := logOpS_op icfgLog u' Sb' $$ HopS Htx
-  iapply HΦ $$ %spie %spp %R' %hcs Hk Hpc Htc Hcl Hir Hpid Hidev Hinum Hsb Hsi Hmeta Hmap Hblk
-    Hdn Hsl [Hop]
-  iexists u'
-  isplitl []
-  · ipureintro
-    cases w <;> simp only [itEntry, itBm, itIu, Bool.false_eq_true, if_false, if_true] at hlo hhi <;>
-      omega
-  · iexact Hop
 
 end Xv6

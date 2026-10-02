@@ -41,10 +41,10 @@ Lean namex takes the two cells it touches (pid, `p->cwd`) and
 `inodeHeldAt cwdv cwi` as rows of their own (SpecNamex deviation 3); this
 contract threads exactly those rows (frame rule: stating it over less than
 the block is strictly more general).  THE BRIDGE from the cwd-bearing block
-(`ProcInv.procPrivCwd`, Rocq's `proc_priv_bare ∗ cwd_ref_at`) is
-`namei_procPrivCwd_rows` below: the block gives the pid cell (at `pidPriv`),
-the `p->cwd` cell (whole) and `cwdRefAt V.cwd V.cwi` (= `inodeHeldAt`, by
-`rfl`), and takes the three back.  A caller instantiates `dqp := pidPriv`,
+(`ProcInv.procPrivCwd`, Rocq's `proc_priv_bare ∗ cwd_ref_at`): the block
+gives the pid cell (at `pidPriv`), the `p->cwd` cell (whole) and
+`cwdRefAt V.cwd V.cwi` (= `inodeHeldAt`, by `rfl`), and takes the three
+back.  A caller instantiates `dqp := pidPriv`,
 `dqc := DFrac.own 1`, `cwdv := V.cwd`, `cwi := V.cwi` (and nameiparent's
 callers the same, `Xv6/SpecNameiparent.lean`).
 
@@ -201,34 +201,6 @@ structure NAMEI : Prop where
 section Bridge
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [IcacheG GF]
   [SleepLockG GF] [IcboxG GF] [Icfg] [CurCtx]
-
-/-- **The cwd-bearing block as namex's / namei's / nameiparent's five
-rows** (Rocq: a caller's `proc_priv_bare` + `cwd_ref_at_held_at` +
-`root_ref_at`): the pid cell at `pidPriv`, the `p->cwd` cell whole and the
-cwd reference, the `p->root` cell whole and the root reference (chroot);
-the five come back and re-form the block.  Stated at the kernel tier
-of the ambient context, as `ProcInv.procPrivCwd_cwd` is (a caller that has
-learned `curTier = KTier.kpt` from `kctx_tier` reads it at its own
-instance). -/
-theorem namei_procPrivCwd_rows (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
-    (M : Nat → List (BitVec 8)) :
-    procPrivCwd (GF := GF) pa pid V M ⊢
-      @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPid pa) 4 pidPriv pid ∗
-      @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pCwd pa) 8 (DFrac.own 1) V.cwd ∗
-      inodeHeldAt V.cwd V.cwi ∗
-      @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pRoot pa) 8 (DFrac.own 1) V.root ∗
-      inodeHeldAt V.root V.rti ∗
-      (@wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPid pa) 4 pidPriv pid -∗
-        @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pCwd pa) 8 (DFrac.own 1) V.cwd -∗
-        inodeHeldAt V.cwd V.cwi -∗
-        @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pRoot pa) 8 (DFrac.own 1) V.root -∗
-        inodeHeldAt V.root V.rti -∗ procPrivCwd pa pid V M) := by
-  unfold procPrivCwd procPrivNoctxAt procFieldsNoctx cwdRefAt rootRefAt
-  iintro ⟨⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hof, Hcwd, Hnm, Hsc, Hrt⟩, Hpt, Htfp, %hlz, Hev⟩, Hc, Hr⟩
-  iframe Hpid Hcwd Hc Hrt Hr
-  iintro Hpid Hcwd Hc Hrt Hr
-  iframe Hpid Hk Hs Hpg Htf Hof Hcwd Hnm Hsc Hrt Hpt Htfp Hc Hr Hev
-  ipureintro; exact ⟨h, hlz⟩
 
 end Bridge
 

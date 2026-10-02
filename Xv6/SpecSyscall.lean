@@ -97,8 +97,7 @@ fallback (+0x40..+0x56) and the shared epilogue (+0x58..+0x62).
    `kstack_closer pj sp (trap_res b + av)`).
 9. `syscallSlots = 4 + sysExecSlots` (Rocq `K_syscall = 4 + K_sys_exec`):
    exec IS the deepest entry (248 of the 22 Specs' constants; the printk
-   fallback's 52 and myproc's 10 are below it), checked against each Spec
-   by `syscallSlots_entries`.
+   fallback's 52 and myproc's 10 are below it).
 
 Imports only definitional files and the 22 entries' Spec files (the slot
 check).
@@ -142,25 +141,6 @@ deepest table entry, sys_exec. -/
 def syscallSlots : Nat := syscallFrame + sysExecSlots
 
 theorem syscallSlots_val : syscallSlots = 252 := by decide
-
-/-- **THE CHECK AGAINST EVERY ENTRY'S SPEC**: syscall's frame over each of
-the 22 entries (and over the two direct callees, myproc and the printk
-fallback) fits the budget. -/
-theorem syscallSlots_entries :
-    syscallFrame + sysForkSlots ≤ syscallSlots ∧ syscallFrame + sysExitSlots ≤ syscallSlots ∧
-    syscallFrame + sysWaitSlots ≤ syscallSlots ∧ syscallFrame + sysPipeSlots ≤ syscallSlots ∧
-    syscallFrame + sysReadSlots ≤ syscallSlots ∧ syscallFrame + sysKillSlots ≤ syscallSlots ∧
-    syscallFrame + sysExecSlots ≤ syscallSlots ∧ syscallFrame + sysFstatSlots ≤ syscallSlots ∧
-    syscallFrame + sysChdirSlots ≤ syscallSlots ∧ syscallFrame + sysDupSlots ≤ syscallSlots ∧
-    syscallFrame + sysGetpidSlots ≤ syscallSlots ∧ syscallFrame + sysSbrkSlots ≤ syscallSlots ∧
-    syscallFrame + sysPauseSlots ≤ syscallSlots ∧ syscallFrame + sysUptimeSlots ≤ syscallSlots ∧
-    syscallFrame + sysOpenSlots ≤ syscallSlots ∧ syscallFrame + sysWriteSlots ≤ syscallSlots ∧
-    syscallFrame + sysMknodSlots ≤ syscallSlots ∧ syscallFrame + sysUnlinkK ≤ syscallSlots ∧
-    syscallFrame + sysLinkSlots ≤ syscallSlots ∧ syscallFrame + sysMkdirSlots ≤ syscallSlots ∧
-    syscallFrame + sysCloseSlots ≤ syscallSlots ∧ syscallFrame + sysSyncSlots ≤ syscallSlots ∧
-    syscallFrame + sysSeccompSlots ≤ syscallSlots ∧
-    syscallFrame + 10 ≤ syscallSlots ∧ syscallFrame + 52 ≤ syscallSlots := by
-  decide
 
 /-! ## §1 The pure rows Lean's landed tables lack (deviations 4, 5) -/
 

@@ -35,8 +35,7 @@ hart has a thread of control, out of the owned half of the boot image
   `sstateen0 = 0` derived by the boot run, `MachCSL.resetValRun` -- BootHart deviation 3
   and BootBridge deviation 4 are resolved), `mainHartRaw`'s rows at the
   reset `tlb`, the empty held-lock set, the GOT row and `bootHartBss`.
-  `bootHartRes_intro` builds it from `regCellsNoPins`; `bootHartRes_ofEra`
-  states that at `Hboot`'s era instance, off `powerBootRes`'s rows.
+  `bootHartRes_intro` builds it from `regCellsNoPins`.
 
 DEVIATIONS from Rocq (none process-layer):
 1. CONTEXT-FREEDOM BY RAWNESS.  Rocq's per-hart rows are `∀ ξ` typed cells
@@ -547,20 +546,6 @@ theorem ctxTokAt_viewLb0_list (E : EraGS) (l : List CPU) :
   iframe Hv
   iexists ξ
   iexact H
-
-/-- **The bundle at `Hboot`'s era** (Rocq `boot_hart_pre` at
-`power_boot_res`'s rows): the power thread's per-hart register row and
-held-lock set, at the instance the client runs its harts at
-(`MachCSL.MachGS.ofEra`), with the carve's per-hart rows, are
-`bootHartRes` at the booted file. -/
-theorem bootHartRes_ofEra (E : EraGS) (gen : Nat) (cP : CPU → BitVec 64 → IProp GF)
-    (cI : ∀ cpu : CPU, ⊢ cP cpu 0#64)
-    (σ : MState) (hbf : bootFacts σ) (c : CPU) :
-    letI : MachGS hlc GF := MachGS.ofEra E gen cP cI
-    regCellsNoPins (GF := GF) (E.regName c) (σ.regs c) ∗ lockSetAt E c [] ∗
-      bootGotRo ∗ bootHartBss c ⊢ |==> bootHartRes (σ.regs c) c :=
-  letI : MachGS hlc GF := MachGS.ofEra E gen cP cI
-  bootHartRes_intro (σ.regs c) c (bootFacts_resetRegsRun hbf c)
 
 end era
 

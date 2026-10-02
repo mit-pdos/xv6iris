@@ -43,7 +43,7 @@ descriptor discipline under ANY answer.  This file is the logic's half:
    fields (definitionally Rocq's `dev_of`).
 3. **The record** is `EpIfaceP N P Dp` with `Dp` an explicit parameter (Rocq:
    an implicit section variable); Rocq's notations `ep_iface`/`MkEI` (the
-   record at `Dp = []`) are `EpIface N P` / `EpIfaceP.mk` at `[]`.  Field
+   record at `Dp = []`) are `EpIfaceP N P []` / `EpIfaceP.mk` at `[]`.  Field
    names are Rocq's camelCased (`ei_fds` ↦ `eiFds`, …); `bs `prefix_of` a`
    is `bs <+: a`, `flt_new F` is `F.new`, `Z.of_nat (length bs)` is
    `(bs.length : Int)`.
@@ -56,8 +56,8 @@ descriptor discipline under ANY answer.  This file is the logic's half:
    A device resource is handed to and taken from the laws through an
    explicit entailment (`devRes_take'`, `cfInv_moveK`'s `hR`), because
    `devOf I d (.DOut l)` is `I.eiOut d l` only up to unfolding.
-6. `tree_pay_of_conforms` (Rocq's `Dp = []` corollary, UNREACHED) is ported
-   anyway as the one-line specialisation every `EpIface` caller uses.
+6. `tree_pay_of_conforms` (Rocq's `Dp = []` corollary, UNREACHED) is not
+   ported (nothing uses it).
 -/
 import Xv6.UkTree
 
@@ -410,9 +410,6 @@ structure EpIfaceP (N : UkNames GF) (P : Uprog GF) (Dp : List Nat) where
       ((eiFds fdm -∗ eiProdHalt d [a.drop bs.length] -∗ K (bs.length : Int)) ∧
        (∀ x, eiTaint (fdDom fdm) -∗ K x)) -∗
       wrObl (hlc := hlc) N P fd bs K
-
-/-- **Rocq `ep_iface`** (a notation): the record at no protected device. -/
-abbrev EpIface (N : UkNames GF) (P : Uprog GF) := EpIfaceP (hlc := hlc) N P []
 
 /-! ## §2 The environment's resources -/
 

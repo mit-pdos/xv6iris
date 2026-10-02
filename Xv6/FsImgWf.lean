@@ -18,8 +18,8 @@ proof file evaluates it.
    `assemble_bytes (take 4 (P logstart)) = 0` is `hdrN (P logstart) = 0`,
    the form `fsLogClean_spec` already states (`Xv6/FsImg.lean`, "what is
    reused", bullet 2).
-2. The W9 readings at EVERY `z` (`fsimgWf_linkLe`, `fsimgWf_linkDir`) take
-   no range premise, as Rocq's; the `0 <= z` half of Rocq's `decide` split
+2. The W9 reading at EVERY `z` (`fsimgWf_linkDir`) takes no range premise,
+   as Rocq's; the `0 <= z` half of Rocq's `decide` split
    vanishes with `Nat`.
 3. `fsimgWf_parts` (new, no Rocq counterpart) is the one destructuring every
    reading below shares -- Rocq repeats `unfold fsimg_wf; rewrite
@@ -119,13 +119,6 @@ theorem fsimgWf_links (P : Nat → List (BitVec 8)) (sb : FsSb) (h : fsimgWf P s
 
 /-! ### W9's three readings, at EVERY `z` (no range side condition) -/
 
-/-- Rocq's `fsimg_wf_link_le`. -/
-theorem fsimgWf_linkLe (P : Nat → List (BitVec 8)) (sb : FsSb) (z : Nat)
-    (h : fsimgWf P sb = true) : fsLinkCount P sb z ≤ (fsDinode P sb z).diNlink.toNat := by
-  by_cases hin : 0 < z ∧ z < sb.sbNinodes
-  · exact (fsLinksWf_at P sb z (fsimgWf_links P sb h) hin.2).1
-  · rw [fsLinkCount_out P sb z (fsimgWf_dirs P sb h) hin]; omega
-
 /-- No record of a mkfs image names a DIRECTORY (Rocq's
 `fsimg_wf_link_dir`). -/
 theorem fsimgWf_linkDir (P : Nat → List (BitVec 8)) (sb : FsSb) (z : Nat)
@@ -154,10 +147,5 @@ theorem fsimgWf_rootLink (P : Nat → List (BitVec 8)) (sb : FsSb) (h : fsimgWf 
   have hty := fsRootWf_type P sb (fsimgWf_root P sb h)
   have hn := (fsimgWf_sb P sb h).sboNinodes
   exact ⟨fsimgWf_linkDir P sb ROOTINO h hty, fsimgWf_dirNlink P sb ROOTINO h hn hty⟩
-
-/-- THE HEADLINE READING (Rocq's `fsimg_wf_tree_root`). -/
-theorem fsimgWf_treeRoot (P : Nat → List (BitVec 8)) (sb : FsSb) (h : fsimgWf P sb = true) :
-    fsRootDir (treeOfDisk P sb) :=
-  fsRootWf_tree P sb (fsimgWf_root P sb h) (fsimgWf_sb P sb h).sboNinodes
 
 end Xv6

@@ -134,7 +134,7 @@ set_option maxHeartbeats 4000000 in
 /-- From `0x80002030` on hart `cpu`, holding `p->lock` with the slot's
 contents out at RUNNING, inside the balanced pair's critical section
 (`k.pushOffAt a b`, `k` the entry context at either `SIE`): re-form the
-claim, split it against the complement (`armExt_popArm`), release, return. -/
+claim, split it against the complement, release, return. -/
 theorem sleep_tail (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [X : CurCtx] (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (a b : Bool) (j : Nat) (hj : j < NPROC)

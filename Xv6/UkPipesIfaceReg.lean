@@ -34,7 +34,7 @@ predicates, which read `UkPipeDev`'s devices, are in `UkPipesIfaceDev`.)
    `ukSysFH_holds` at the engine `UL`.  `HPc`/`HNc` are instance arguments.
 2. **The registry** is `HfpReg` at `Pdev` (UkPipesIfaceDefs deviation 1):
    `pns_tok d q x` is `HfpReg.tok R.γreg d q x`, and Rocq's six token lemmas
-   are `HfpReg.tok_agree` … `HfpReg.toks_agree` at it.
+   are `HfpReg.tok_agree_keep` … `HfpReg.toks_agree` at it.
 3. **`app_taint` / `app_sup`**: the taint's two readings are the kill
    credential `MachFixedGS.killCred` (UkPipesIfaceKit deviation 3) and the
    free handler's abstract supply `Sup` (UkFreeHandler deviation 2), with

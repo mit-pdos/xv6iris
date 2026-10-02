@@ -59,8 +59,7 @@ the one field of `PipeProtoG` (a new xv6GF/unionGF slot, U4).
    `pipeProtoΣ`/`subG_pipeProtoΣ` have no Lean analogue (the slot is U4's).
 2. **`pipe_roR` is ChildTok's `KshotR`** (header): `roPending pn :=
    shotPending pn.pnRo`, `roShot pn := shotDone pn.pnRo`; `roPending_shot`
-   is `shotPending_done`, `roShoot` is `shot_fire`.  `PipeRoR` is an
-   abbreviation of `KshotR`.
+   is `shotPending_done`, `roShoot` is `shot_fire`.
 3. **The body's two one-shot clauses are NAMED** (`pipeEofArm` = (P3),
    `pipeRoArm` = (P4)); `pipeBodyU` is Rocq's conjunction with those two
    conjuncts folded.  Their per-step preservation lemmas
@@ -91,10 +90,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 end-of-file has been observed" (exclusive, in the body), `Csum.inr` the
 frozen contents (PERSISTENT: it rides the reader's exit payload). -/
 abbrev PipeEofR : Type := Csum (Excl Unit) (Agree (DiscreteO (List (BitVec 8))))
-
-/-- THE WRITER'S "THE READ END WAS SEEN SHUT" ONE-SHOT (Rocq `pipe_roR`):
-ChildTok's kill-shot camera (deviation 2). -/
-abbrev PipeRoR : Type := KshotR
 
 /-- THE PROTOCOL'S ONE NEW CAMERA (Rocq `pipeProtoG`'s `ppg_eof`); the other
 four components are shared cameras (header, "Camera classes"). -/

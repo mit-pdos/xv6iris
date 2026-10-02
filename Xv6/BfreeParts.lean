@@ -2,7 +2,7 @@
 `bfree`'s own vocabulary (Rocq `ProofBfree.v` 66–545): the pure arithmetic
 of the block number and the bit, the constants the code computes, the
 payload's machinery half, and `log_write` restated at its call site
-(`bread` / `brelse` are the shared `Xv6.bread_call` / `Xv6.brelse_call`,
+(`bread` / `brelse` are the shared `Xv6.bread_call_eb` / `Xv6.brelse_call`,
 `Xv6/FsCallSites.lean`).  Everything here is closed over plain `Nat` / `BitVec` facts or is
 a one-screen ghost move; the instruction walks are in
 `Xv6/ProofBfree.lean` (`+0x00 .. +0x1c`), `Xv6/BfreeMid.lean`

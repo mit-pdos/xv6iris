@@ -49,9 +49,8 @@ DEVIATIONS from Rocq.
 * `Forall dinode_wf ds` is spelled `∀ d ∈ ds, dinodeWf d` (this toolchain
   has the membership lemmas, not stdpp's `Forall_insert`), `<[k := d]> ds`
   is `ds.set k d`, `!!` is `[·]?` and `!!!` is `[·]!`.
-* The two `ind_bytes` cons readings Rocq parks here (`indBytes_cons_lo` /
-  `indBytes_cons_hi`) stay here for the same reason Rocq gives: this is
-  the file that reuses `indBytes` as the `addrs` field encoder.
+* The two `ind_bytes` cons readings Rocq parks here are not ported
+  (nothing uses them).
 -/
 import Xv6.BlockWords
 import MachCSL.ByteWord2
@@ -122,21 +121,6 @@ theorem halfBytes_lookup (w : BitVec 16) (j : Nat) (hj : j < 2) :
   · rfl
   · rfl
   · omega
-
-/-- The two `indBytes` cons readings the addrs-cells bridge peels a word
-run with.  They belong beside `Xv6/BlockWords.lean`'s own `indBytes_*`
-laws, but this is the file that reuses `indBytes` as the `addrs` field
-encoder, which is the home Rocq chose too. -/
-theorem indBytes_cons_lo (w : BitVec 32) (l : List (BitVec 32)) (i : Nat) (hi : i < 4) :
-    (indBytes (w :: l))[i]! = nthByte (n := 4) w i := by
-  apply getElem!_of_getElem?
-  rw [indBytes_cons, getElem?_append_lt _ _ 4 i (wordToBytes4_length w) hi]
-  exact wordToBytes4_lookup w i hi
-
-theorem indBytes_cons_hi (w : BitVec 32) (l : List (BitVec 32)) (i : Nat) :
-    (indBytes (w :: l))[4 + i]! = (indBytes l)[i]! := by
-  rw [List.getElem!_eq_getElem?_getD, List.getElem!_eq_getElem?_getD, indBytes_cons,
-      getElem?_append_shift _ _ 4 i (wordToBytes4_length w)]
 
 theorem dinodeBytes_length (d : Dinode) (hd : dinodeWf d) :
     (dinodeBytes d).length = 64 := by

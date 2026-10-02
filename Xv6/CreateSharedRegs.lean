@@ -51,7 +51,7 @@ the pinned registers; `createThr` / `createThr3` are `cr_thr` / `cr_thr3`
    `cr_a2_halfword`, `cr_add_inv`, `cr_ninner`, `cr_nbump_bv`,
    `cr_nbump_unsigned` are internal steps and collapse into the `bv_decide`
    of their consumers (`create_a2_low16`, `create_bnez_nlmax`,
-   `create_beqz_tym1`, `create_nlink_incr`).
+   `create_beqz_tym1`).
 4. `gset Z` is `List Nat` (`∀ x ∈ A, x ∈ B`); `S ns' = ns` is `ns' + 1 = ns`;
    `Z` inums are `Nat`; `Ity`'s `TDir` parent is an `Int` (`Xv6.Ity.tDir`).
 
@@ -659,7 +659,7 @@ theorem create_delta_file (ty : BitVec 16) (h : ty ≠ T_DIR) : createDelta ty =
 
 /-- THE FILL's PREMISE at create's own record (Rocq's `cr_fill_choice_ok`):
 the claim box stands at multiplicity zero, and the chosen value matches the
-type the fill writes -- `wp_iupdate_link`'s `hup` at `oty := some
+type the fill writes -- `iu_step_link`'s `hup` at `oty := some
 (createIty ty dind)`. -/
 theorem create_fill_choice_ok (ty major minor : BitVec 16) (dnc : Dinode) (dind : Int)
     (hnl : dnc.diNlink.toNat = 0) (hty : dnc.diType = ty) :
@@ -725,14 +725,6 @@ theorem create_wi_size_max (dn : Dinode) (bm' : Blkmap) (off tot : Nat) (h : off
   · omega
 
 /-! ## (viii)  The mkdir sub-branch (+0x11e .. +0x144) -/
-
-/-- THE `++` (Rocq's `cr_nlink_incr`): `lhu a5,74(s1)` zero-extends,
-`c.addiw a5,a5,1` wraps at 32 and sign-extends, `sh a5,74(s1)` commits the
-low sixteen bits -- which IS the sixteen-bit increment. -/
-theorem create_nlink_incr (h : BitVec 16) :
-    BitVec.extractLsb' 0 16 (BitVec.signExtend 64
-      (BitVec.extractLsb' 0 32 (BitVec.setWidth 64 h + BitVec.signExtend 64 1#12))) = h + 1#16 := by
-  bv_decide
 
 theorem create_nrec_16 : dirNrec 16 = 1 := rfl
 

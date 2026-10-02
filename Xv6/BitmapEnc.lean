@@ -52,8 +52,8 @@ DEVIATIONS from Rocq.
   `BitVec.ofBoolListLE`, whose `getLsbD` law (`getLsbD_ofBoolListLE`) is
   exactly what `bits_to_Z_testbit` was proved for.  `bool_decide_iff_eq`
   is `decide_eq_decide`.
-* Rocq's `bm_byte_testbit` / `_testbit_high` are `bmByte_getLsbD` /
-  `bmByte_getLsbD_high`, and the mask `2 ^ k` is `bitMask k = 1#8 <<< k`
+* Rocq's `bm_byte_testbit` is `bmByte_getLsbD` (`_testbit_high` is not
+  ported; nothing uses it), and the mask `2 ^ k` is `bitMask k = 1#8 <<< k`
   (`BitVec.twoPow 8 k`), which is the value `li a4,1; sllw a4,a4,a5`
   leaves in the register.
 
@@ -124,11 +124,6 @@ theorem bmByte_getLsbD (u : BitSet) (j k : Nat) (hk : k < 8) :
   rw [bmByte, BitVec.getLsbD_cast, BitVec.getLsbD_ofBoolListLE,
       List.getD_eq_getElem?_getD, byteBits_lookup u j k hk]
   rfl
-
-/-- Rocq's `bm_byte_testbit_high`. -/
-theorem bmByte_getLsbD_high (u : BitSet) (j k : Nat) (hk : 8 ≤ k) :
-    (bmByte u j).getLsbD k = false :=
-  BitVec.getLsbD_of_ge _ k hk
 
 /-- Rocq's `bm_byte_ext`. -/
 theorem bmByte_ext (u u' : BitSet) (j : Nat)
@@ -330,35 +325,21 @@ theorem bmBytes_clear (n : Nat) (u : BitSet) (bi : Nat) (hn : bi / 8 < n) :
 `balloc` and `bfree` compute the byte as `bi / 8` and the mask as
 `1 << (bi % 8)`, never as a separate `(j, k)` pair. -/
 
-/-- Rocq's `bm_bit_test`. -/
-theorem bmBit_test (u : BitSet) (bi : Nat) :
-    bmByte u (bi / 8) &&& bitMask (bi % 8)
-      = if bi ∈ u then bitMask (bi % 8) else 0#8 := by
-  rw [bmByte_and_pow2 u (bi / 8) (bi % 8) (bit_off_range bi), bit_split]
-
-/-- Rocq's `bm_bit_set`. -/
-theorem bmBit_set (u : BitSet) (bi : Nat) :
-    bmByte u (bi / 8) ||| bitMask (bi % 8) = bmByte (u ∪ {bi}) (bi / 8) := by
-  rw [bmByte_lor_pow2 u (bi / 8) (bi % 8) (bit_off_range bi), bit_split]
-
-/-- Rocq's `bm_bit_clear`. -/
-theorem bmBit_clear (u : BitSet) (bi : Nat) :
-    bmByte u (bi / 8) &&& ~~~(bitMask (bi % 8)) = bmByte (u \ {bi}) (bi / 8) := by
-  rw [bmByte_ldiff_pow2 u (bi / 8) (bi % 8) (bit_off_range bi), bit_split]
-
-/-- The 64-bit form of `bmBit_test`. -/
+/-- `balloc`'s test, at a bit index and at 64 bits: the masked byte is the
+mask iff `bi ∈ u`, else `0`. -/
 theorem bmBit_test_64 (u : BitSet) (bi : Nat) :
     BitVec.setWidth 64 (bmByte u (bi / 8)) &&& (1#64 <<< (bi % 8))
       = if bi ∈ u then (1#64 <<< (bi % 8)) else 0#64 := by
   rw [bmByte_and_pow2_64 u (bi / 8) (bi % 8) (bit_off_range bi), bit_split]
 
-/-- The 64-bit form of `bmBit_set`. -/
+/-- Setting bit `bi`, at 64 bits: the or-ed byte is the byte of `u ∪ {bi}`. -/
 theorem bmBit_set_64 (u : BitSet) (bi : Nat) :
     BitVec.setWidth 64 (bmByte u (bi / 8)) ||| (1#64 <<< (bi % 8))
       = BitVec.setWidth 64 (bmByte (u ∪ {bi}) (bi / 8)) := by
   rw [bmByte_lor_pow2_64 u (bi / 8) (bi % 8) (bit_off_range bi), bit_split]
 
-/-- The 64-bit form of `bmBit_clear`. -/
+/-- Clearing bit `bi`, at 64 bits: the and-not-ed byte is the byte of
+`u \ {bi}`. -/
 theorem bmBit_clear_64 (u : BitSet) (bi : Nat) :
     BitVec.setWidth 64 (bmByte u (bi / 8)) &&& ~~~(1#64 <<< (bi % 8))
       = BitVec.setWidth 64 (bmByte (u \ {bi}) (bi / 8)) := by

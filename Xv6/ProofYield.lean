@@ -24,7 +24,7 @@ own context -- at the dispatching hart.
 
 THE ROOT is `sched`'s business now: its contract returns the caller's own
 `k.root`, because there is exactly ONE kernel page table
-(`Xv6.SchedCtx.kctx_root_agree` over `MachCSL.kptOn_root_agree`).
+(`MachCSL.kptOn_root_agree`).
 -/
 import MachCSL.WpSmodeFrame
 import Xv6.SpecYield

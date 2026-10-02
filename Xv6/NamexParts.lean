@@ -293,7 +293,7 @@ theorem namex_elems_step (off a e o2 plen : Nat) (f : Nat → BitVec 8)
     h2]
 
 /-- The element's canonical name, both memmove shapes (Rocq's use of
-`bname_of_buf` through `skipelem_name_view`). -/
+`bname_of_buf` through Rocq's `skipelem_name_view`). -/
 theorem namex_bname (u : List (BitVec 8)) (nf : Nat → BitVec 8) (hne : nonul u)
     (hf : ∀ j, j < (u.take 14).length → nf j = (u.take 14)[j]!)
     (hstop : (u.take 14).length < 14 → nf (u.take 14).length = 0#8) :

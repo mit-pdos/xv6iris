@@ -37,16 +37,17 @@ honest source is the process's own block.
 | `first_fsinit_pures` (§2) | `firstFsinitPures` |
 | `first_fsinit` / `_open` (§3) | `firstFsinit` / `firstFsinit_open` |
 | `first_boot`, `first_tok`, `first_done` (§4) | `firstBoot`, `firstTok`, `firstDone` |
-| `first_tok_done`, `first_tok_of_done`, `first_tok_open`, `first_tok_boot`, `first_boot_intro`, `first_boot_open`, `first_tok_of_boot` | same, camelCased with `_` suffixes |
+| `first_tok_of_done`, `first_boot_intro`, `first_boot_open` | same, camelCased with `_` suffixes |
 | `first_persist_pre` | `firstPersistPre` (deviation 5) |
-| `first_tok_boot_excl`, `first_boot_done_excl` | `firstTok_boot_excl`, `firstBoot_done_excl` |
+| `first_tok_done`, `first_tok_open`, `first_tok_boot`, `first_tok_of_boot`, `first_tok_boot_excl`, `first_boot_done_excl` | not ported (nothing uses them) |
 
 ## DEVIATIONS from Rocq
 
 1. (RETIRED by crash batch C-4, D37.)  `fsabs_env` is back: `fsabsEnv :=
    appInv fscFs` is the third conjunct of `firstDone` and of `firstTok`'s
-   steady arm, `firstFsinit_open` hands it out of kit 2, and
-   `first_done_fsabs` is `firstDone_fsabs` (plus `firstDone_ready`).
+   steady arm and `firstFsinit_open` hands it out of kit 2;
+   `first_done_fsabs` is not ported (nothing uses it).  `firstDone_ready`
+   projects the sealed file system.
 2. (RETIRED by crash batch C-4, D38.)  The crash layer is Rocq's:
    `firstBootPersist` carries `fsCrashSeam fscCov fscLogst ∗ genCert` (its
    LAST two rows, as `fsReady`'s -- Rocq has them fourth/fifth), and
@@ -94,8 +95,8 @@ honest source is the process's own block.
    first_boot_persist` has no Lean counterpart**: Lean `iframe` matches by
    head symbol and never unfolds a `def`, so the correctness reason Rocq
    records (a broad `iFrame` eating `kernel_text` out of the boot arm) does
-   not arise.  Consumers still go through the destructors
-   (`firstTok_open`, `firstBoot_open`) by convention.
+   not arise.  Consumers still go through the destructor `firstBoot_open`
+   by convention.
 8. (PARTLY RETIRED by crash batch C-4.)  The producers
    `fs_extent_of_image` / `col_geom_of_config` are `fsExtent_ofImage` /
    `colGeom_ofConfig` (§6).  `fs_geom_ok_of_snap` and
@@ -111,11 +112,11 @@ honest source is the process's own block.
 
 ## What the kernel proofs will consume
 
-* **userinit** (Rocq ProofUserinit): `firstTok_boot` (or `firstBoot_intro`
-  + `firstTok_of_boot`) to deposit the exclusive arm into `<init>`'s block,
+* **userinit** (Rocq ProofUserinit): `firstBoot_intro` to deposit the
+  exclusive arm into `<init>`'s block,
   out of the boot bundle's `firstBootPersist`, `kallocAvail fsReadyKmem
   none` (the seal allocproc's last counted draw leaves) and `firstFsinit`.
-* **forkret** (W8-P2's proof): `firstTok_open`; boot arm →
+* **forkret** (W8-P2's proof): `firstBoot_open`; boot arm →
   `firstFsinit_open` feeds `wp_fsinit_eb` (premises by `FsGeomOk`
   projections), then `fsReady_seal` + `firstPersistPre` build `fsReady`,
   the store of 0 is persisted and `firstDone` is formed; steady arm →
@@ -153,48 +154,6 @@ def firstSbImage (magic fssize nblocks ninodes nlog logstart inodestart bmapstar
   wordToBytes4 magic ++ wordToBytes4 fssize ++ wordToBytes4 nblocks ++
   wordToBytes4 ninodes ++ wordToBytes4 nlog ++ wordToBytes4 logstart ++
   wordToBytes4 inodestart ++ wordToBytes4 bmapstart
-
-/-! ## 0.  The two cell states are incompatible -/
-
-section Cells
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
-
-/-- Two 4-byte cells at one address, one of them WHOLE, cannot coexist
-(the 4-byte twin of `Xv6.wordPointsTo_excl`). -/
-theorem firstWord4_excl [CurCtx] (a : BitVec 64) (dq : DFrac) (w w' : BitVec 32) :
-    iprop(wordPointsTo (GF := GF) a 4 (DFrac.own 1) w ∗ wordPointsTo a 4 dq w') ⊢
-      (False : IProp GF) := by
-  have hb : ∀ (ppn : BitVec 44) (dq' : DFrac) (u : BitVec 32),
-      bytesPointsTo (GF := GF) (paOf ppn a) 4 dq' u ⊢
-        ctxByte curCtx (paOf ppn a + BitVec.ofNat 64 0) dq' (nthByte (n := 4) u 0) := by
-    intro ppn dq' u
-    exact BigSepL.bigSepL_lookup (Φ := fun (_ : Nat) (j : Nat) =>
-      iprop(ctxByte (GF := GF) curCtx (paOf ppn a + BitVec.ofNat 64 j) dq' (nthByte (n := 4) u j)))
-      (l := List.range 4) (i := 0) (x := 0) (by simp)
-  unfold wordPointsTo
-  iintro ⟨⟨%ppn, #Hcl, %_, Hb1⟩, ⟨%ppn', #Hcl', %_, Hb2⟩⟩
-  icases kmapAt_agree (vpnOf a) (kLeaf ppn .rw 0#1 0#1) (kLeaf ppn' .rw 0#1 0#1) $$ [Hcl Hcl']
-    with %heq
-  · isplit
-    · iexact Hcl
-    · iexact Hcl'
-  have hp : ppn = ppn' := kLeaf_rw_ppn_inj _ _ heq
-  subst hp
-  ihave Hb1 := hb ppn (DFrac.own 1) w $$ Hb1
-  ihave Hb2 := hb ppn dq w' $$ Hb2
-  iapply ctxByte_excl
-  isplitl [Hb1]
-  · iexact Hb1
-  · iexact Hb2
-
-/-- **THE TWO ARMS ARE MUTUALLY EXCLUSIVE** (Rocq `first_tok_boot_excl`):
-the boot arm runs at most once. -/
-theorem firstTok_boot_excl [CurCtx] :
-    iprop(wordPointsTo (GF := GF) firstAddr 4 (DFrac.own 1) 1#32 ∗
-      wordPointsTo firstAddr 4 DFrac.discard 0#32) ⊢ (False : IProp GF) :=
-  firstWord4_excl firstAddr DFrac.discard 1#32 0#32
-
-end Cells
 
 theorem firstSbImage_eq (a b c d e f g h : BitVec 32) :
     firstSbImage a b c d e f g h =
@@ -424,14 +383,6 @@ def firstTok [Fscfg] [Icfg] [CurCtx] : IProp GF := iprop(
   firstBoot (hlc := hlc) ∨
     (wordPointsTo firstAddr 4 DFrac.discard 0#32 ∗ fsReady (hlc := hlc) ∗ fsabsEnv (hlc := hlc)))
 
-/-- Rocq `first_done_fsabs`: the application's environment, off the steady
-arm. -/
-theorem firstDone_fsabs [Fscfg] [Icfg] [CurCtx] :
-    firstDone (hlc := hlc) (GF := GF) ⊢ fsabsEnv (hlc := hlc) := by
-  unfold firstDone
-  iintro ⟨-, -, H⟩
-  iexact H
-
 /-- The sealed file system, off the steady arm. -/
 theorem firstDone_ready [Fscfg] [Icfg] [CurCtx] :
     firstDone (hlc := hlc) (GF := GF) ⊢ fsReady (hlc := hlc) := by
@@ -446,32 +397,6 @@ theorem firstTok_of_done [Fscfg] [Icfg] [CurCtx] :
   iintro H
   iright
   iexact H
-
-/-- Rocq `first_tok_open`: the destructor, the two arms by name. -/
-theorem firstTok_open [Fscfg] [Icfg] [CurCtx] :
-    firstTok (hlc := hlc) (GF := GF) ⊢
-      (wordPointsTo firstAddr 4 (DFrac.own 1) 1#32 ∗
-        firstBootPersist (hlc := hlc) ∗ kallocAvail fsReadyKmem none ∗ firstFsinit (hlc := hlc)) ∨
-      firstDone (hlc := hlc) := by
-  unfold firstTok firstBoot firstDone
-  iintro H
-  iexact H
-
-/-- Rocq `first_tok_boot`. -/
-theorem firstTok_boot [Fscfg] [Icfg] [CurCtx] :
-    wordPointsTo (GF := GF) firstAddr 4 (DFrac.own 1) 1#32 ⊢
-      firstBootPersist (hlc := hlc) -∗ kallocAvail fsReadyKmem none -∗ firstFsinit (hlc := hlc) -∗
-      firstTok (hlc := hlc) := by
-  unfold firstTok firstBoot
-  iintro H P K F
-  ileft
-  isplitl [H]
-  · iexact H
-  isplitl [P]
-  · iexact P
-  isplitl [K]
-  · iexact K
-  · iexact F
 
 /-- Rocq `first_boot_intro`. -/
 theorem firstBoot_intro [Fscfg] [Icfg] [CurCtx] :
@@ -496,25 +421,6 @@ theorem firstBoot_open [Fscfg] [Icfg] [CurCtx] :
   unfold firstBoot
   iintro H
   iexact H
-
-/-- Rocq `first_tok_of_boot`. -/
-theorem firstTok_of_boot [Fscfg] [Icfg] [CurCtx] :
-    firstBoot (hlc := hlc) (GF := GF) ⊢ firstTok (hlc := hlc) := by
-  unfold firstTok
-  iintro H
-  ileft
-  iexact H
-
-/-- **Rocq `first_boot_done_excl`**, THE MODE SEAM'S REFUTATION: a boot
-record and a steady resume are the same address at incompatible values. -/
-theorem firstBoot_done_excl [Fscfg] [Icfg] [CurCtx] :
-    firstBoot (hlc := hlc) (GF := GF) ⊢ firstDone (hlc := hlc) -∗ False := by
-  unfold firstBoot firstDone
-  iintro ⟨H1, -⟩ ⟨H0, -⟩
-  iapply firstTok_boot_excl
-  isplitl [H1]
-  · iexact H1
-  · iexact H0
 
 /-! ## 5.  THE SEAL SITE'S fs ASSEMBLY -/
 

@@ -221,12 +221,6 @@ theorem fdstateOk_inj (inum : BitVec 32) (γo : GName) (om : OffMode) (γp : Pip
           obtain ⟨-, h2'⟩ := h'
           subst h2; subst h2'; rfl
 
-/-- "Nobody in this row has been handed an offset half" (FdSlots.v
-`fdst_parked`). -/
-def fdstParked : FdState → Prop
-  | .open _ _ (.inode _ _ .held) => False
-  | _ => True
-
 /- Rocq's `fdstate_ok_parked` is DELETED (Rocq lane OFF-LINK, bb7d140b3): it
 read `fdstateOk`'s pin as "every live row is parked" for a generic tier that
 is no longer told anything about offsets; it had no consumer. -/

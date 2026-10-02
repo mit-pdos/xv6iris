@@ -81,30 +81,6 @@ theorem wp_kshd_die_chain (UL : UK_LEAVES) (HS : UK_SYS_P) (HF : USH_FPRINTF) (N
   iapply wp_ksh_exit UL HS N h6 _ _ $$ Hc [Hpay HC3] Hrun
   iapply Hpay $$ HC3
 
-/-- **Rocq `wp_kshd_die`**: the block on the flagged deposit, the three
-families trivial. -/
-theorem wp_kshd_die (UL : UK_LEAVES) (HS : UK_SYS_P) (HF : USH_FPRINTF) (N : UkNames GF) [UknConst N]
-    (tx : Bool) (dqs : DFrac) (p0 : Nat) (hi : BitVec 20) (lo : BitVec 12) (j3 j5 : BitVec 21) (kx : BitVec 12)
-    (fa flen fq sa slen : Nat) (sf : Nat → BitVec 8) (h : CPU) (m : RegMap) (n : Nat)
-    (hl : shdDieLits p0 hi lo j3 j5 fa flen fq) (hsa : sa ≠ 0) (ha2 : m.get 12#5 = BitVec.ofNat 64 sa)
-    (hi0 : ushCode (GF := GF) N.t ⊢ uinstrIs N.t (BitVec.ofNat 64 p0) false (.UTYPE (hi, .Regidx 11#5, .AUIPC)))
-    (hi1 : ushCode (GF := GF) N.t ⊢ uinstrIs N.t (BitVec.ofNat 64 (p0 + 4)) false (.ITYPE (lo, .Regidx 11#5, .Regidx 11#5, .ADDI)))
-    (hi2 : ushCode (GF := GF) N.t ⊢ uinstrIs N.t (BitVec.ofNat 64 (p0 + 8)) true (.ITYPE (2#12, .Regidx 0#5, .Regidx 10#5, .ADDI)))
-    (hi3 : ushCode (GF := GF) N.t ⊢ uinstrIs N.t (BitVec.ofNat 64 (p0 + 10)) false (.JAL (j3, .Regidx 1#5)))
-    (hi4 : ushCode (GF := GF) N.t ⊢ uinstrIs N.t (BitVec.ofNat 64 (p0 + 14)) true (.ITYPE (kx, .Regidx 0#5, .Regidx 10#5, .ADDI)))
-    (hi5 : ushCode (GF := GF) N.t ⊢ uinstrIs N.t (BitVec.ofNat 64 (p0 + 16)) false (.JAL (j5, .Regidx 1#5))) :
-    ⊢ shDeps (hlc := hlc) -∗ ushCode N.t -∗ ushSstr N tx dqs sa slen sf -∗ N.pay (-1) -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 p0) (10 + (12 + (4 + n))) -∗ wpLoop h := by
-  iintro #Hdp #Hc Hsstr Hpay Hrun
-  iapply wp_kshd_die_chain UL HS HF N tx dqs p0 hi lo j3 j5 kx fa flen fq sa slen sf
-    (fun _ => iprop(emp)) (fun _ => iprop(emp)) (fun _ => iprop(emp)) h m n hl hsa ha2 rfl rfl
-    hi0 hi1 hi2 hi3 hi4 hi5 $$ [] [] [] [] Hc Hsstr [Hpay] Hrun
-  · imodintro; iintro %p -; iapply kshW1_of_law UL HS N _ _ $$ Hdp
-  · imodintro; iintro %p -; iapply kshW1_of_law UL HS N _ _ $$ Hdp
-  · imodintro; iintro %p -; iapply kshW1_of_law UL HS N _ _ $$ Hdp
-  · iempintro
-  · iintro -; iexact Hpay
-
 end
 
 end Xv6

@@ -6,22 +6,21 @@ relation `unionPhiSync`, its body and the ledger's pure steps.  Pure.
 Rocq: `FileDisc.file_phi` at the union, each cycle carrying its
 resolution's last completed sync (`UnionAdm.lmGoodSync`), each later boot
 state admissible AT THE LAST COMPLETED SYNC OF THE EARLIER CYCLES
-(`uadm` at `ulastBefore`; with no sync, the landed `fadmBoot`,
-`uadm_srec0`).  It is the union's conclusion (`LinkUInitUnion.
+(`uadm` at `ulastBefore`; with no sync, the landed `fadmBoot`).  It is the union's conclusion (`LinkUInitUnion.
 unionAdequacyClosed`); the landed `unionPhi` and its body lemmas are retired
 (Rocq 1fe9e7618).  Sections 1-2 of Rocq's file (the first drain's
 fact, `union_st_ok`) are landed in `UnionOutPureSeal.lean`.
 
 Names (Rocq → Lean): `union_phi_sync` → `unionPhiSync`,
 `union_phi_sync_body` → `unionPhiSyncBody`, `union_phi_sync_of_body` →
-`unionPhiSync_of_body`, `union_phi_sync_body_good` →
-`unionPhiSyncBody_good`, `union_phi_sync_body_nil` → `unionPhiSyncBody_nil`,
+`unionPhiSync_of_body`, `union_phi_sync_body_nil` → `unionPhiSyncBody_nil`,
 `ulines_of_first_out_u` → `ulinesOf_first_out_u`, `take_snd_snoc` →
 `takeSnd_snoc`, `take_cycles_io` → `takeCycles_io`,
 `union_phi_sync_body_step_io/_off/_on/_last_adm/_out/_drain` →
 `unionPhiSyncBody_step_io/_off/_on/_last_adm/_out/_drain`, `union_rec_now`
 → `unionRecNow`, `uadm_nil_srec0` → `uadm_nil_srec0`, `ulast_before_0` →
-`ulastBefore_0`.
+`ulastBefore_0`.  `union_phi_sync_body_good` is not ported (nothing uses
+it).
 
 DEVIATIONS from Rocq: spelling as `UnionOutPure.lean` (`!!` is `[·]?`,
 `Forall2` is `List.Forall₂`, `S k` is `k + 1`, `snd <$> W` is
@@ -57,16 +56,6 @@ def unionPhiSyncBody (h : List Obs) (W : List (Fstate × Option Srec)) : Prop :=
 theorem unionPhiSync_of_body (h : List Obs) (W : List (Fstate × Option Srec))
     (hb : lmDisc ulmG h → unionPhiSyncBody h W) : unionPhiSync h :=
   fun hd => ⟨W, hb hd⟩
-
-/-- Rocq `union_phi_sync_body_good`: ...and the per-cycle output claim the
-top theorem used to state. -/
-theorem unionPhiSyncBody_good (h : List Obs) (W : List (Fstate × Option Srec))
-    (hb : unionPhiSyncBody h W) : List.Forall₂ (lmGoodOut ulmG) (W.map Prod.fst) (cyclesOf h) := by
-  obtain ⟨-, -, -, hF⟩ := hb
-  generalize cyclesOf h = segs at hF
-  induction hF with
-  | nil => exact List.Forall₂.nil
-  | cons hw _ ih => exact List.Forall₂.cons (lmGoodSync_out _ _ _ hw) ih
 
 /-- Rocq `union_phi_sync_body_nil`. -/
 theorem unionPhiSyncBody_nil : unionPhiSyncBody [] [] :=

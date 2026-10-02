@@ -30,8 +30,9 @@ the file's byte literal is never entered by conversion.
    `fsimgInitNlink` are `Xv6/FsImgFiles.lean`'s (the literal sweeps live
    beside the other programs'), not re-proved here.
 3. **Name**: FsInitPin's `fsimg_root_dir` (the root's NODE is a directory)
-   is `fsimgRootNodeDir`, since `Xv6.fsimgRootDir` is FsImgCheck's (the
-   TREE's root is a directory, Rocq `FsImgCheck.fsimg_root_dir`).
+   is `fsimgRootNodeDir`, to keep it apart from Rocq's
+   `FsImgCheck.fsimg_root_dir` (the TREE's root is a directory; not ported,
+   nothing uses it).
 4. CONE TRIM: `era0_snap_holds` and section `Era0Live`
    (`astate_era0_init_path`, `nview_era0_init`) are unreached.
 -/

@@ -30,8 +30,7 @@ producer (echo's is `stage_echo_law`; `cat f`'s is R-prog's
 As `UshPipesStageMid`; plus: sh-exec's echo arm (Rocq
 `wp_kshr_exec_echo_at_holds`) is the general `S.RX.wp_shExecXAtGen` at
 echo's diagnostic (`altExecfail`, bytes `UshExecEnvRun.ushEchoExecfailBytes`,
-the law's index `13 + 4 = 17` read off `lineOk_head`), as
-`ProofShRuncmdExec.shExecEchoAt_holds` converts; `prod_stage_law` is stated
+the law's index `13 + 4 = 17` read off `lineOk_head`); `prod_stage_law` is stated
 at sh's concrete rows (`ushJtab`, `ushCmd`, `ushFd2p`, `ushDg`, which ARE
 `S.E`'s fields by `rfl`), fd 1 R-prog's `ushFd1pipe`.
 -/

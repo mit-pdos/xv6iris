@@ -63,7 +63,7 @@ def tailVals (n : Nat) (v0 : BitVec (8 * n)) (Hold : Nat → Hist) : Prop :=
 /-- The tails with a position PER BYTE: nonempty, byte `j`'s head spelling
 byte `j` of `v0` at EXACTLY the position `ts j`.  A word zeroed by a byte
 loop (`memset`) has eight different positions, one per store; `tailOk n lo`
-is the constant case (`tailOk_toT`). -/
+is the constant case. -/
 def tailOkT (n : Nat) (ts : Nat → Nat) (v0 : BitVec (8 * n)) (Hold : Nat → Hist) : Prop :=
   ∀ j, j < n → ∃ e H, Hold j = e :: H ∧ e.v = nthByte v0 j ∧ e.t = ts j
 
@@ -74,11 +74,6 @@ theorem tailOk_vals {n lo : Nat} {v0 : BitVec (8 * n)} {Hold : Nat → Hist}
 theorem tailOkT_vals {n : Nat} {ts : Nat → Nat} {v0 : BitVec (8 * n)} {Hold : Nat → Hist}
     (h : tailOkT n ts v0 Hold) : tailVals n v0 Hold :=
   fun j hj => let ⟨e, H, h1, h2, _⟩ := h j hj; ⟨e, H, h1, h2⟩
-
-/-- A word under one discipline position is a word under the constant
-per-byte positions. -/
-theorem tailOk_toT {n lo : Nat} {v0 : BitVec (8 * n)} {Hold : Nat → Hist}
-    (h : tailOk n lo v0 Hold) : tailOkT n (fun _ => lo) v0 Hold := h
 
 /-- The head of a tail: its value and its (exact) per-byte position. -/
 theorem tailOkT_head {n : Nat} {ts : Nat → Nat} {v0 : BitVec (8 * n)} {Hold : Nat → Hist}

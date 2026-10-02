@@ -8,8 +8,7 @@ head; pinned `1900b8a43`).  See `UshPipesStageDefs` for the file split.
 first byte fires the family (`PipeOutNFam.pipesV_fire`), every further one
 steps it (`pipesV_cstep`), each through one console byte of sh
 (`UshPanicByte.kshW1_of_step`, the two-predicate form of
-`UShPipeLeaves.ksh_w1_of_step`: lane rpipes-a's `kshW1_of_stepF` IS it at
-`F i`, `F (i + 1)`); the end hands the halves at the cursor the law stops
+`UShPipeLeaves.ksh_w1_of_step`); the end hands the halves at the cursor the law stops
 at, with what the fire learnt of the flag.
 
 ## Ported (reached)

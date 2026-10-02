@@ -20,7 +20,7 @@ file, per the layering rule), right to left as Rocq enters them:
   `Xv6/IlockFin.lean` -- the uncached arm `+0x36 .. +0xaa` (`il_load`,
   Rocq 732-2234), ending in the LIVE panic "ilock: no type".
 
-The transactional form is not re-proved: `ILOCK.wp_ilock_tx` derives it in
+The transactional form is not re-proved: `ILOCK.wp_ilock_tx_eb` derives it in
 the Spec file, as Rocq's `wp_ilock_tx_of_dep` does.
 -/
 import Xv6.IlockMain

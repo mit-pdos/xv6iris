@@ -27,9 +27,9 @@ always taken (`Xv6.ba_bgeu_exhaust`).  Both dead arms are refuted, not
 proved.
 
 **Deviations from Rocq.**  The two dead arms are refuted exactly as Rocq
-does.  Rocq's `wp_balloc_sconf` proof (`log_op_openS` + `log_opS_op`) is the
-Spec file's `BALLOC.wp_balloc_sconf`.  The rest is the stage decomposition
-of `Xv6/BallocDefs.lean`'s header.
+does.  Rocq's `wp_balloc_sconf` (`log_op_openS` + `log_opS_op`) is not
+ported (nothing uses it).  The rest is the stage decomposition of
+`Xv6/BallocDefs.lean`'s header.
 -/
 import Xv6.BallocMain
 
@@ -67,8 +67,7 @@ a level-0 stretch: steps are `k_step_e` (the complement `Hte`/`Hce` follows
 the thread), `bread` is called at its eb contract, and the scan's loop
 invariant (`Xv6.baScanPre`) carries the complement at the loop's current
 hart, the induction being over that hart too.  ONE core for the credited
-and the counted forms (Rocq Round 13): `wp_balloc_sconf_eb` is derived in
-the Spec. -/
+and the counted forms (Rocq Round 13), by `cr`. -/
 theorem ba_entry (BR : BREAD) (LW : LOG_WRITE) (BE : BRELSE) (MS : MEMSET) (PK : PRINTK)
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (c0 : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)

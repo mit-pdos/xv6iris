@@ -1,7 +1,7 @@
 /-
 **THE LOCK, BORN THROUGH ITS HOOK** (Rocq `WpLock.newlock_delayed_llb`).
 
-`MachCSL.newlock` deposits the payload at the CREATOR's context, so a
+`MachCSL.newlock_written` deposits the payload at the CREATOR's context, so a
 payload row that asks for a `MachCSL.ctxFloor` above the creator's own view
 -- the buffer cache's `Xv6.bcacheResAt`, whose floor slot covers the boot
 stamps of thirty escrows -- cannot be presented there at all.  The release

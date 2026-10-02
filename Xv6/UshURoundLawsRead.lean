@@ -12,16 +12,17 @@ residue handing over the era's wild token (`uWcu_read`, seccomp design 10.4,
 10.10).  The reader's pieces are `UshLineDefs.ushMidAt` at the record's
 residue (Rocq's section notation `Pm`).
 
-CONE (UShURoundLaws S2, reached): `umid_flw`, `umid_pin`, `umid_wild`,
+CONE (UShURoundLaws S2, reached): `umid_flw`, `umid_pin`,
 `uwild_read_absurd`, `uWcl2_rest`, `ush_pre_of_done_u`, `uHwc_f`,
-`uterm_read_law`, `uWcu_read`.
+`uterm_read_law`, `uWcu_read` (`umid_wild` is not ported, nothing uses it;
+its core `umid_wild0` is).
 
 ## Deviations from Rocq
 
-1. **Persistent cores.**  `umid_flw`/`umid_pin`/`umid_wild`/`uWcl2_rest`
-   are `UshURoundLawsInp.uinp_of0` of a core entailment into their
-   (persistent) reading (`umid_flw0`, `umid_pin0`, `umid_wild0`,
-   `uWcl2_rest0`), instead of Rocq's destruct-and-re-frame.
+1. **Persistent cores.**  `umid_flw`/`umid_pin`/`uWcl2_rest` are
+   `UshURoundLawsInp.uinp_of0` of a core entailment into their (persistent)
+   reading (`umid_flw0`, `umid_pin0`, `uWcl2_rest0`), instead of Rocq's
+   destruct-and-re-frame.
 2. **Helpers** (new, lane prefix): `ufi_rres`, `ufi_lpr2` (the record's
    residue / open family read by `rfl`, UshURoundDefs deviation 4);
    `uDeed_elim` (the deed opened without unfolding the goal);
@@ -146,7 +147,7 @@ theorem umid_pin (γp : GName) (J : List (BitVec 8)) :
         ∗ ∃ v : EraPins, eraPin (fgnEcho ug.ugnFile) (genId (hlc := hlc) (GF := GF) + 1) v :=
   uinp_of0 (umid_pin0 ug s0 γp J)
 
-/-- The core of `umid_wild` (deviation 1). -/
+/-- The core of Rocq's `umid_wild` (deviation 1). -/
 theorem umid_wild0 (γp : GName) (J : List (BitVec 8)) :
     ushMidAt (hlc := hlc) (GF := GF) (unionLinkInstAt (hlc := hlc) ug s0).lkRres (fgnEcho ug.ugnFile) γp J ⊢
       iprop((⌜uwildAt J⌝ → (useccTokAt (hlc := hlc) ug (genId (hlc := hlc) (GF := GF) + 1) J
@@ -165,18 +166,6 @@ theorem umid_wild0 (γp : GName) (J : List (BitVec 8)) :
     isplitr
     · iexact Hpin
     · iexact Hlb
-
-/-- **Rocq `umid_wild`**: ...and THE TRANSITION'S RECEIPT: at a `seccomp x`
-line the read completed, the era's wild token at that line (or the taint),
-and the reader's position at `J` (seccomp S5b). -/
-theorem umid_wild (γp : GName) (J : List (BitVec 8)) :
-    ⊢ ushMidAt (hlc := hlc) (GF := GF) (unionLinkInstAt (hlc := hlc) ug s0).lkRres (fgnEcho ug.ugnFile) γp J -∗
-      ushMidAt (hlc := hlc) (GF := GF) (unionLinkInstAt (hlc := hlc) ug s0).lkRres (fgnEcho ug.ugnFile) γp J
-        ∗ ((⌜uwildAt J⌝ → (useccTokAt (hlc := hlc) ug (genId (hlc := hlc) (GF := GF) + 1) J
-            ∗ uringAt (hlc := hlc) J) ∨ fileTaint (hlc := hlc) ug.ugnFile.fgnCl)
-          ∗ ∃ v : EraPins, eraPin (fgnEcho ug.ugnFile) (genId (hlc := hlc) (GF := GF) + 1) v
-            ∗ rposLb v J.length) :=
-  uinp_of0 (umid_wild0 ug s0 γp J)
 
 /-- The residue's wild arm at a wild line (deviation 2). -/
 theorem umid_wild_at (γp : GName) (J : List (BitVec 8)) (hw : uwildAt J) :

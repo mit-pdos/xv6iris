@@ -95,13 +95,12 @@ than handed in.  A port of Rocq `SpecSysExec.v`
    the bundle exactly as in Rocq (`ChildTok.myPay`).
 3. **THE READING IS AT ROCQ'S SINGLE IMAGE `us_M U`, which is the Lean
    `viewLazy V.upt V.sz M`** (`Xv6/UMemLazy.lean`: the entry view with every
-   lazy page zeroed; `M` itself for a lazy-free block,
-   `UMemL.viewLazy_of_lazyFree`) -- exactly where the restated argstr /
-   fetchstr read their strings (`SpecSysOpen` deviation 10), and where
-   `SpecFetchaddr` reads its word (`fetchaddrAns` at `viewLazy P V.sz M`,
-   copyin's success arm saying the word's pages are mapped in `P'`); the
-   fill loop moves each round's reading to the entry image by
-   `SysExecParts.sysExec_viewLazy_faulted`.
+   lazy page zeroed; `M` itself for a lazy-free block) -- exactly where the
+   restated argstr / fetchstr read their strings (`SpecSysOpen` deviation
+   10), and where `SpecFetchaddr` reads its word (`fetchaddrAns` at
+   `viewLazy P V.sz M`, copyin's success arm saying the word's pages are
+   mapped in `P'`); the fill loop moves each round's reading to the entry
+   image by `SysExecParts.sysExec_viewLazy_faulted`.
 4. **The frame is KexecOkQ's / SpecKexec's** (their deviation 4 / 3): no
    `kalloc_env`, `sb_bmapstart`/`sb_inodestart ↦{dqb/dqs}`, `bitmap_inv`
    rows in or out -- `KexecDefs.fsFabric` (Rocq's `fs_fabric`) holds them
@@ -114,9 +113,9 @@ than handed in.  A port of Rocq `SpecSysExec.v`
 5. **Names.**  `exec_path_shape` / `exec_path_of` / `_shape` / `_bview` /
    `_uniq` (Rocq's six parsing-only ALIASES of `ArgPath`) are not
    re-introduced: the contract states `argPathOf` (the shared name a Rocq
-   goal prints anyway).  `exec_args_shape` / `exec_args_of` /
-   `exec_args_of_shape` → `execArgsShape` / `execArgsOf` /
-   `execArgsOf_shape`; `sys_exec_slot_pre` / `sys_exec_au_pre` /
+   goal prints anyway).  `exec_args_shape` / `exec_args_of` →
+   `execArgsShape` / `execArgsOf` (`exec_args_of_shape` is not ported:
+   nothing uses it); `sys_exec_slot_pre` / `sys_exec_au_pre` /
    `sys_exec_post_fail(_refund)` / `sys_exec_arms(_landed)` →
    `sysExecSlotPre` / `sysExecAuPre` / `sysExecPostFail(_refund)` /
    `sysExecArms(_landed)`; `wp_sys_exec_sconf_body` → `wp_sys_exec_eb_body`
@@ -171,11 +170,6 @@ def execArgsOf (M : Nat → List (BitVec 8)) (av : BitVec 64) (na : Nat) (alen :
     (∀ i, i ≤ na → bytesToWord (umemRead M (av + BitVec.ofNat 64 (8 * i)).toNat 8) = avf i) ∧
     (∀ i, i < na → avf i ≠ 0#64) ∧ avf na = 0#64 ∧
     (∀ i, i < na → ∀ q, q ≤ alen i → umemByte M ((avf i).toNat + q) = afun i q)
-
-/-- Rocq `exec_args_of_shape`. -/
-theorem execArgsOf_shape (M : Nat → List (BitVec 8)) (av : BitVec 64) (na : Nat) (alen : Nat → Nat)
-    (afun : Nat → Nat → BitVec 8) (h : execArgsOf M av na alen afun) :
-    execArgsShape na alen afun := h.1
 
 /-! ## 2.  THE BUNDLE AND THE ARMS AT THE SYSCALL BOUNDARY -/
 

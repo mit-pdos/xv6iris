@@ -54,9 +54,9 @@ that names a descriptor state can name a queue.
 4. Names: `pipe_qauth` → `pipeQauth`, `pipe_{o,wo,ro,w,r,c}link` →
    `pipe{O,Wo,Ro,W,R,C}link`, `pipe_{w,r}chain` → `pipe{W,R}chain`,
    `pipe_{w,r,c}pay` → `pipe{W,R,C}pay`, `pipe_cpost`/`pipe_wpost`/
-   `pipe_rstop(_noobs)`/`pipe_rpost(_img)` → `pipeCpost`/`pipeWpost`/
-   `pipeRstop(Noobs)`/`pipeRpost(Img)`; lemma suffixes kept
-   (`pipeQueue_agree`, `pipeWlink_of_frag`, …).
+   `pipe_rstop_noobs`/`pipe_rpost(_img)` → `pipeCpost`/`pipeWpost`/
+   `pipeRstopNoobs`/`pipeRpost(Img)`; lemma suffixes kept
+   (`pipeQueue_agree`, `pipeClink_of_frag`, …).
 -/
 import Xv6.UMemLemmas
 
@@ -155,18 +155,6 @@ def pipeClink (γ : GName) (w : Bool) (Φ : IProp GF) : IProp GF :=
   iprop(∀ s : PipeSt, pipeQauth γ s ={⊤}=∗ pipeQauth γ (pstClose w s) ∗ Φ)
 
 /-! ### The holder's constructors: a link out of the fragment -/
-
-/-- Rocq `pipe_wlink_of_frag`. -/
-theorem pipeWlink_of_frag (γ : GName) (b : BitVec 8) (Φ : IProp GF) (s0 : PipeSt) :
-    pipeQfrag γ s0 -∗ (pipeQfrag γ (pstWrite b s0) ={⊤}=∗ Φ) -∗ pipeWlink γ b Φ := by
-  unfold pipeWlink
-  iintro Hf Hk %s %_ %_ Ha
-  ihave %he := pipeQueue_agree γ s s0 $$ Ha Hf
-  subst he
-  imod pipeQueue_update γ s0 s0 (pstWrite b s0) $$ Ha Hf with ⟨Ha, Hf⟩
-  imod Hk $$ Hf with HΦ
-  imodintro
-  iframe Ha HΦ
 
 /-- Rocq `pipe_clink_of_frag`. -/
 theorem pipeClink_of_frag (γ : GName) (w : Bool) (Φ : IProp GF) (s0 : PipeSt) :
@@ -416,17 +404,6 @@ def pipeRstopNoobs (P : UPtd) (addr : BitVec 64) (Rk : IProp GF) (n d : Nat) (r 
       ((0 < d ∧ r = BitVec.ofNat 64 d) ∨ (d = 0 ∧ r = -1#64))⌝ ∨
     (⌜d = 0 ∧ r = -1#64⌝ ∗ Rk) ∨
     ⌜d = 0 ∧ n = 0 ∧ r = -1#64⌝)
-
-/-- A READ'S STOP (Rocq `pipe_rstop`): the dequeued bytes are EXACTLY the
-delivered ones, and the reason -- the ring ran dry, OBSERVED at node `acc`
-(when nothing was delivered the write end is shut too), or one of the four
-non-observing reasons. -/
-def pipeRstop (P : UPtd) (addr : BitVec 64) (Qe : List (BitVec 8) → PipeSt → IProp GF)
-    (Rk : IProp GF) (n : Nat) (acc : List (BitVec 8)) (d : Nat) (r : BitVec 64) : IProp GF :=
-  iprop(⌜acc.length = d⌝ ∗
-    ((⌜d < n ∧ r = BitVec.ofNat 64 d⌝ ∗
-        ∃ s : PipeSt, ⌜pstEmpty s ∧ (d = 0 → s.wo = false)⌝ ∗ Qe acc s) ∨
-      pipeRstopNoobs P addr Rk n d r))
 
 /-- A READ'S POST (Rocq `pipe_rpost`): the stop, the window `bs` holding the
 delivered bytes, and the chain at `acc` wherever the stop did not spend

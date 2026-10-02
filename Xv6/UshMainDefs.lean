@@ -52,8 +52,9 @@ abstract continuation `ushRestLAt` that takes the loop head as a premise.
    unreached predicates, and the echo-instance aliases `ush_gline_p`,
    `ush_gets_line(_split/_0/_of_posb)`, `ush_gets_done(_0/_line_t/_taint/_set)`,
    `ush_read_ans_1`, `ush_rest_line(_taint)`, `ush_rest_l` are UNREACHED
-   from `union_adequacy_closed` (U0-X cone walk) and not ported; the
-   reached echo aliases `ushReadAns`, `ushReadRecvLeaf` are.
+   from `union_adequacy_closed` (U0-X cone walk) and not ported; neither
+   are the echo aliases `ush_read_ans` and `ush_read_recv_leaf` (nothing
+   uses them).
 6. UkShLoop's `ushl_dat` names `freep`/`base` by sh-malloc's
    `ushmFreep`/`ushmBase` (Rocq's literals 8208/8328); `ush_line_lexable_redir_shape`
    is `UkShRedirLine.ushsLineIs_redir` (re-exported below).
@@ -386,11 +387,6 @@ def ushReadAnsAt (N : UkNames GF) (X : UshCtx GF) (Dsc : List (BitVec 8) → Pro
     (⌜r = BitVec.ofInt 64 (-1)⌝ ∗ ⌜l[0]? = some .closed⌝ ∗ X.Pm I) ∨
     (X.T ∗ ushPos (hlc := hlc) N X))
 
-/-- **Rocq `ush_read_ans`**: the echo era's instance. -/
-abbrev ushReadAns (N : UkNames GF) (X : UshCtx GF) (cn : ConsNames) (l : List FdState) (r : BitVec 64)
-    (cap : Nat) (I : List (BitVec 8)) (g : Nat → BitVec 8) : IProp GF :=
-  ushReadAnsAt (hlc := hlc) N X discInput cn l r cap I g
-
 /-- **Rocq `ush_swallow_taint`**: a zero-length delivery that moved the
 cursor is the ^D swallow, which the tag law reads as the taint. -/
 theorem ushSwallowTaint (X : UshCtx GF) (cn : ConsNames) (sl : List (List Obs × BitVec 8)) (dc : Nat)
@@ -556,10 +552,6 @@ def ushReadRecvLeafAt (N : UkNames GF) (X : UshCtx GF) (Dsc : List (BitVec 8) �
       ushReadAnsAt (hlc := hlc) N X Dsc cn l r cap I g -∗ ubytes N.d a k g -∗
       urun (hlc := hlc) N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') -∗
     wpLoop h)
-
-/-- **Rocq `ush_read_recv_leaf`**: the echo era's instance. -/
-abbrev ushReadRecvLeaf (N : UkNames GF) (X : UshCtx GF) (cn : ConsNames) (l : List FdState) : IProp GF :=
-  ushReadRecvLeafAt (hlc := hlc) N X discInput cn l
 
 /-! ## §10 The entry's rows, the taint's continuation, the console open -/
 
@@ -785,12 +777,6 @@ def ushJtab (γ : GName) : IProp GF :=
 
 instance ushJtab_persistent (γ : GName) : Persistent (ushJtab (GF := GF) γ) := by
   unfold ushJtab; infer_instance
-
-/-- **Rocq `ush_jtab_ro`**. -/
-theorem ushJtab_ro (γ : GName) : ushJtab (GF := GF) γ ⊢ ushCode γ := by
-  unfold ushJtab
-  iintro ⟨-, -, -, -, -, H⟩
-  iexact H
 
 /-- **Rocq `ush_jtab_of_rodata`**: the table off sh's own image. -/
 theorem ushJtab_of_rodata (γ : GName) : ushCode (GF := GF) γ ⊢ ushJtab γ := by

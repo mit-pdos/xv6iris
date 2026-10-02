@@ -79,8 +79,8 @@ relative start is NOT refuted; both walks fire it.)
    `np_len_removelast` = `List.length_dropLast`,
    `np_removelast_app` = `List.dropLast_append_of_ne_nil` (argument order
    swapped), `np_removelast_snoc` = `List.dropLast_concat`.  The two index
-   bounds (`np_removelast_len_ge`/`_gt`) are kept as
-   `npRemovelast_len_ge`/`_gt` (the walk's convenience form).
+   bounds (`np_removelast_len_ge`/`_gt`) are not ported (nothing uses
+   them).
 4. **ONE generic hop-peel.**  Rocq proves `ex_hops_cons` and `ep_hops_cons`
    by the same six lines at two lists; here the peel is proved once over
    `axHopsFrom` (`axHopsFrom_cons`, with `axHopsFrom_done`) and the two
@@ -96,7 +96,7 @@ relative start is NOT refuted; both walks fire it.)
 6. Rocq's curried `A -∗ B -∗ C` pure-conclusion lemmas are kept curried
    under `⊢@{IProp GF}` for the fupd ones (the FsAbsReadFire idiom), and
    stated as entailments where the Rocq lemma is one (`elend_frag`,
-   `elend_intro`, `elend_ofEra`, `exHops_cons`).
+   `elend_intro`, `elend_ofEra`).
 7. `bview_head_slash_intro`'s premise `bb_cstr pfun plen` is the one half
    it reads, `pfun plen = 0#8` (`hterm`, the form `SpecNamex` states;
    `Xv6/ArgPath.lean` deviation 3).
@@ -105,7 +105,7 @@ relative start is NOT refuted; both walks fire it.)
    `np_dead_unfired` → `npDead_unfired`, `um_start_of_slash` →
    `umStartOf_slash`, `bview_head_slash` → `bview_headSlash`, …);
    `dir_entries_era_ok` → `dirEntries_eraOk`, `era_nlink_nz` →
-   `eraNlink_nz`, `abs_of_era_dir` → `absOf_eraDir`.  `S k` is `k + 1`.
+   `eraNlink_nz`.  `S k` is `k + 1`.
 
 9. **The chroot bump** (design/chroot.md section 3): every hop family,
    start and death arm takes the walking process's root `rt` (before
@@ -148,26 +148,10 @@ theorem dirEntries_eraOk (cov : Std.ExtTreeSet Nat compare) (logstart : Nat) (dn
 theorem eraNlink_nz (dn : Dinode) (bm : Blkmap) (data : Nat → List (BitVec 8))
     (hnz : dn.diNlink.toNat ≠ 0) : fnNlink (eraNode dn bm data) ≠ 0 := hnz
 
-/-- ...and the same fact as the ABSTRACT NODE's arm (Rocq's
-`abs_of_era_dir`). -/
-theorem absOf_eraDir (cov : Std.ExtTreeSet Nat compare) (logstart : Nat) (dn : Dinode)
-    (bm : Blkmap) (data : Nat → List (BitVec 8)) (hok : inodeOk cov logstart dn bm data)
-    (hd : fnIsDir (eraNode dn bm data) = true) (hnl : dn.diNlink.toNat ≠ 0) :
-    absOf (eraNode dn bm data)
-      = some ⟨.ADir (dirView data (dirNrec dn.diSize.toNat)), fnNlink (eraNode dn bm data)⟩ := by
-  rw [absOf_dir _ hd (eraNlink_nz dn bm data hnl), dirEntries_eraOk cov logstart dn bm data hok hd]
-
 /-! ## 6.0  Two index bounds about `dropLast` (Rocq's `removelast`)
 
 Hoisted, as Rocq hoists them, so the walk never subtracts inside the proof
 mode (deviation 3 for the three list facts core already has). -/
-
-/-- Rocq's `np_removelast_len_ge`. -/
-theorem npRemovelast_len_ge {A : Type _} (ps es rest : List A) (hps : ps = es ++ rest)
-    (hne : rest ≠ []) : es.length ≤ ps.dropLast.length := by
-  subst hps
-  rw [List.dropLast_append_of_ne_nil hne, List.length_append]
-  omega
 
 /-- The parent prefix: every path element but the last (Rocq's
 `np_elems`; `SysMknodDefs.npar_elems` is the same list). -/
@@ -341,14 +325,6 @@ theorem exHops_is_axHops (rt : Nat) (γfs : FsNames) (P Pmiss : Nat → Nat → 
     exHopsFrom rt γfs P Pmiss pl n
       = axHopsFrom rt (elend (fsGammaL γfs)) P Pmiss (pathElems pl) n :=
   rfl
-
-/-- PEEL THE HEAD HOP (Rocq's `ex_hops_cons`). -/
-theorem exHops_cons (rt : Nat) (γfs : FsNames) (P Pmiss : Nat → Nat → IProp GF)
-    (pl : List (BitVec 8)) (k : Nat) (s : Fname) (rest : List Fname)
-    (hd : (pathElems pl).drop k = s :: rest) :
-    exHopsFrom rt γfs P Pmiss pl k ⊢
-      exHop rt γfs P Pmiss k s ∗ exHopsFrom rt γfs P Pmiss pl (k + 1) :=
-  axHopsFrom_cons rt _ P Pmiss _ k s rest hd
 
 /-! ## 4.  The producer at the fire, and the two fire lemmas -/
 
@@ -524,18 +500,6 @@ parent prefix. -/
 def epStart (γfs : FsNames) (rt cw : Nat) (P Pmiss : Nat → Nat → IProp GF)
     (pl : List (BitVec 8)) : IProp GF :=
   iprop(∀ r : Nat, ⌜r = umStartOf rt cw pl⌝ ={⊤}=∗ P 0 r ∗ epHopsFrom rt γfs P Pmiss pl 0)
-
-/-- the trivial start: every hop says yes and every cursor is `True`
-(Rocq's `ep_start_triv`; SpecCreate's bundle unit). -/
-theorem epStart_triv (γfs : FsNames) (rt cw : Nat) (pl : List (BitVec 8)) :
-    ⊢ epStart (GF := GF) γfs rt cw (fun _ _ => iprop(True)) (fun _ _ => iprop(True)) pl := by
-  unfold epStart
-  iintro %r _
-  imodintro
-  isplitr
-  · ipureintro; trivial
-  · unfold epHopsFrom
-    iapply (axHops_triv (hlc := hlc) (GF := GF) rt (elend (fsGammaL γfs)) (npElems pl) 0)
 
 end FsAbsEra
 

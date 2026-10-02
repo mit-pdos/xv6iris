@@ -10,13 +10,12 @@ Rocq's header, kept because the reasons are the content:
 > THERE ARE THREE INSTANTS AND ONLY TWO NEW FIRES.  sys_link moves the
 > abstract state three times: the target's count UP before any name exists,
 > the parent's entry, and -- on every route to `bad:` -- the target's count
-> back DOWN.  The third is `deltaLinkUntgt`, which IS `deltaUnlTgt` on the
-> nose, so its commit is `utgtCommitAt` and its fire is
+> back DOWN.  The third is `deltaUnlTgt` on the nose, so its commit is `utgtCommitAt` and its fire is
 > `FsAbsUnlinkFire.ufUtgt_fire`, REUSED VERBATIM at the `bad:` tail's
 > retag.  Nothing about the undo is restated here.
 >
 >   `lfTgt_fire`  INSTANT 1, fused with the retag the walk performs after
->      `wp_iupdate_link`.  `ufUtgt_fire`'s mold at `+1`.  The row it reports
+>      `wp_iupdate_link_eb`.  `ufUtgt_fire`'s mold at `+1`.  The row it reports
 >      is COUNTED (`arowAt`): sys_link has no `ip->nlink == 0` guard, so the
 >      target may be an unlinked-but-open file with no row at all and the
 >      bump RESURRECTS it -- one insert either way.
@@ -74,7 +73,7 @@ theorem lfInum_nz (v : BitVec 16) (hnz : v.toNat ≠ 0) : v ≠ 0#16 := by
   rw [hc]
   rfl
 
-/-- THE COUNT-RAISED ROW AT `wp_iupdate_link` (Rocq's `lf_nlink_row`):
+/-- THE COUNT-RAISED ROW AT `wp_iupdate_link_eb` (Rocq's `lf_nlink_row`):
 `ufNlink_row` at `+1`. -/
 theorem lfNlink_row (dn dn' : Dinode) (bm : Blkmap) (data : Nat → List (BitVec 8))
     (hnz : dn.diType.toNat ≠ 0) (hty : dn'.diType = dn.diType) (hsz : dn'.diSize = dn.diSize)

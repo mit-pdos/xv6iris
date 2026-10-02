@@ -53,12 +53,13 @@ Rocq's, over the same algebra.
 
 ## DEVIATIONS from Rocq
 
-1. **`positive` IS `Nat`** in `Xv6.irefSlots_bound` / `irefSlots_no_overflow`.
-   Rocq states both at `n : positive` (the icache count column's type) with
-   `iref_slots (Pos.to_nat n)`; here they take `n : Nat` and the premise
-   `irefSlots n`.  The conclusions are Rocq's (`n <= IREFSLOTS`;
-   `n < 2^31 /\ n + 1 < 2^31`), and the lemmas are STRONGER (no positivity
-   premise); a caller holding the icache's `PosNat` count passes `.val`.
+1. **`positive` IS `Nat`** in `Xv6.irefSlots_bound`.  Rocq states it at
+   `n : positive` (the icache count column's type) with
+   `iref_slots (Pos.to_nat n)`; here it takes `n : Nat` and the premise
+   `irefSlots n`.  The conclusion is Rocq's (`n <= IREFSLOTS`), and the
+   lemma is STRONGER (no positivity premise); a caller holding the icache's
+   `PosNat` count passes `.val`.  Rocq's `iref_slots_no_overflow` is not
+   ported (nothing uses it).
 2. **`pos_to_Qp (Pos.of_succ_nat k)` is `natQp k`**, the rational `k + 1`
    as a `Qp`, since iris-lean's `Qp` is `{q : Rat // 0 < q}`.
 3. **THE CAMERA IS SHARED WITH THE SLEEPLOCK'S COUNTER.**
@@ -266,18 +267,6 @@ theorem irefSlots_bound (n : Nat) :
   icombine Ha Hf gives %Hv
   ipureintro
   exact natUfrac_incl n IREFSLOTS (Auth.auth_both_valid_discrete.mp Hv).1
-
-/-- ...and its consequence, the one idup needs: a count backed by iref
-slots is far below what an `int` can hold, so incrementing it is safe.
-This is where "there are only so many places to keep an inode" turns into
-"ip->ref++ does not overflow".  Deviation 1: `n : Nat`. -/
-theorem irefSlots_no_overflow (n : Nat) :
-    irefSlotsAuth (GF := GF) ∗ irefSlots n ⊢ ⌜n < 2 ^ 31 ∧ n + 1 < 2 ^ 31⌝ := by
-  iintro H
-  ihave %hle := irefSlots_bound n $$ H
-  ipureintro
-  have EI : IREFSLOTS = 486 := rfl
-  omega
 
 /-! ### The boot-time distribution
 

@@ -22,8 +22,7 @@ context at `k.intrOff true false` (`sie = false`, `SPIE = 1`, `SPP = U`),
 the raw trap cells (`sepc` at the resume pc prepare_return wrote, `scause`,
 `stval`), `stvec` at uservec (`uservecTvec`), and -- out of the running
 block `procPrivFd γ` -- the address space `procPtAt P M` and the
-trapframe page `tfPageAt P.tfp ws` (`userret_priv_acc` in `UserretDefs`
-splits them off and puts them back).  `a0` holds the user `satp`
+trapframe page `tfPageAt P.tfp ws`.  `a0` holds the user `satp`
 (usertrap's `MAKE_SATP(p->pagetable)`).
 
 THE CONTINUATION RECEIVES A USER-MODE MACHINE, in the shape the

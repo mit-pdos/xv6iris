@@ -167,57 +167,11 @@ theorem peElem_rest_length (p : List (BitVec 8)) :
   rw [List.length_append] at h
   exact h
 
-theorem peElem_noslash : ∀ p : List (BitVec 8), noslash (peElem p)
-  | [] => by intro b hb; simp [peElem] at hb
-  | b :: p => by
-    rw [peElem]
-    by_cases hb : b = SLASH
-    · simp only [hb, if_pos]; intro c hc; simp at hc
-    · simp only [hb, if_false]
-      intro c hc
-      rcases List.mem_cons.mp hc with rfl | hc
-      · exact hb
-      · exact peElem_noslash p c hc
-
 theorem peElem_ne (b : BitVec 8) (p : List (BitVec 8)) (hb : b ≠ SLASH) :
     peElem (b :: p) = b :: peElem p := by rw [peElem]; simp [hb]
 
 theorem peRest_ne (b : BitVec 8) (p : List (BitVec 8)) (hb : b ≠ SLASH) :
     peRest (b :: p) = peRest p := by rw [peRest]; simp [hb]
-
-/-- a sub-list property (in practice "contains no NUL") passes to both -/
-theorem peElem_forall (P : BitVec 8 → Prop) : ∀ p : List (BitVec 8),
-    (∀ x ∈ p, P x) → ∀ x ∈ peElem p, P x
-  | [], _ => by intro x hx; simp [peElem] at hx
-  | b :: p, h => by
-    rw [peElem]
-    by_cases hb : b = SLASH
-    · simp only [hb, if_pos]; intro x hx; simp at hx
-    · simp only [hb, if_false]
-      intro x hx
-      rcases List.mem_cons.mp hx with rfl | hx
-      · exact h x (by simp)
-      · exact peElem_forall P p (fun y hy => h y (by simp [hy])) x hx
-
-theorem peRest_forall (P : BitVec 8 → Prop) : ∀ p : List (BitVec 8),
-    (∀ x ∈ p, P x) → ∀ x ∈ peRest p, P x
-  | [], _ => by intro x hx; simp [peRest] at hx
-  | b :: p, h => by
-    rw [peRest]
-    by_cases hb : b = SLASH
-    · rw [if_pos hb]; exact h
-    · simp only [hb, if_false]
-      exact peRest_forall P p (fun y hy => h y (by simp [hy]))
-
-theorem peSkip_forall (P : BitVec 8 → Prop) : ∀ p : List (BitVec 8),
-    (∀ x ∈ p, P x) → ∀ x ∈ peSkip p, P x
-  | [], _ => by intro x hx; simp [peSkip] at hx
-  | b :: p, h => by
-    rw [peSkip]
-    by_cases hb : b = SLASH
-    · simp only [hb, if_pos]
-      exact peSkip_forall P p (fun y hy => h y (by simp [hy]))
-    · simp only [hb, if_false]; exact h
 
 /-! ## Scanning past a separator-free prefix -/
 
@@ -298,37 +252,6 @@ theorem skipelem_inv (p e r : List (BitVec 8)) (h : skipelem p = some (e, r)) :
   · rw [skipelem_some p hs] at h
     have h' := Option.some.inj h
     exact ⟨hs, (congrArg Prod.fst h').symm, (congrArg Prod.snd h').symm⟩
-
-/-- the element is nonempty, at most DIRSIZ long, and separator free -/
-theorem skipelem_elem_wf (p e r : List (BitVec 8)) (h : skipelem p = some (e, r)) :
-    e ≠ [] ∧ e.length ≤ 14 ∧ noslash e := by
-  obtain ⟨hne, he, _⟩ := skipelem_inv p e r h
-  cases hq : peSkip p with
-  | nil => exact absurd hq hne
-  | cons b q =>
-    rw [hq, peElem_ne b q (peSkip_head p b q hq)] at he
-    refine ⟨?_, ?_, ?_⟩
-    · rw [he]; simp
-    · rw [he, List.length_take]; omega
-    · rw [he]
-      intro x hx
-      have hx' := List.mem_of_mem_take hx
-      rcases List.mem_cons.mp hx' with rfl | hx'
-      · exact peSkip_head p x q hq
-      · exact peElem_noslash q x hx'
-
-/-- a NUL-free path yields a NUL-free element: the hypothesis that carries the
-C-string model through to `Xv6/DirentEnc.lean`'s name vocabulary -/
-theorem skipelem_nonul (p e r : List (BitVec 8)) (hp : nonul p)
-    (h : skipelem p = some (e, r)) : nonul e ∧ nonul r := by
-  obtain ⟨_, he, hr⟩ := skipelem_inv p e r h
-  have hq : ∀ x ∈ peSkip p, x ≠ 0#8 := peSkip_forall _ p hp
-  constructor
-  · rw [he]
-    intro x hx
-    exact peElem_forall _ _ hq x (List.mem_of_mem_take hx)
-  · rw [hr]
-    exact peSkip_forall _ _ (peRest_forall _ _ hq)
 
 /-- **THE MEASURE** the loop induction needs -/
 theorem skipelem_decr (p e r : List (BitVec 8)) (h : skipelem p = some (e, r)) :
@@ -440,39 +363,14 @@ theorem pathElems_nil_iff (p : List (BitVec 8)) : pathElems p = [] ↔ peSkip p 
 /-- nameiparent's split -- all the elements but the last, plus the last, which
 is the name namex leaves in the caller's buffer.  Stated as a RELATION rather
 than computed: the decomposition itself is all a proof needs, and it is
-unique (`nameiparent_uniq`). -/
+unique. -/
 def nameiparentOf (p : List (BitVec 8)) (es : List (List (BitVec 8)))
     (e : List (BitVec 8)) : Prop := pathElems p = es ++ [e]
-
-theorem nameiparent_uniq (p : List (BitVec 8)) (es1 es2 : List (List (BitVec 8)))
-    (e1 e2 : List (BitVec 8)) (h1 : nameiparentOf p es1 e1) (h2 : nameiparentOf p es2 e2) :
-    es1 = es2 ∧ e1 = e2 := by
-  unfold nameiparentOf at h1 h2
-  rw [h1] at h2
-  have hlen : es1.length = es2.length := by
-    have := congrArg List.length h2; simp at this; omega
-  obtain ⟨hes, he⟩ := List.append_inj h2 hlen
-  exact ⟨hes, (List.cons.inj he).1⟩
 
 /-- the loop's two exits, in the form the induction consumes: the last element
 is the one whose REST is empty -/
 theorem skipelem_is_last (p e r : List (BitVec 8)) (h : skipelem p = some (e, r))
     (hr : r = []) : pathElems p = [e] := by
   rw [pathElems_some p e r h, hr, pathElems_nil]
-
-/-! ## The bridge to the NAME buffer: what namex's memmove leaves behind
-
-skipelem's two branches -- `memmove(name, s, 14)` with no terminator, and
-`memmove(name, s, len); name[len] = 0` -- have the SAME canonical view, and it
-is the element.  This is what makes namecmp's contract
-(`Xv6.namecmp_bridge`) speak about the path element rather than about
-bytes. -/
-theorem skipelem_name_view (p e r : List (BitVec 8)) (f : Nat → BitVec 8)
-    (hp : nonul p) (hs : skipelem p = some (e, r))
-    (hf : ∀ j, j < e.length → f j = e[j]!)
-    (hstop : e.length < 14 → f e.length = 0#8) : bname 14 f = e := by
-  obtain ⟨_, hlen, _⟩ := skipelem_elem_wf p e r hs
-  obtain ⟨hne, _⟩ := skipelem_nonul p e r hp hs
-  exact bname_of_buf f e hlen hne hf hstop
 
 end Xv6

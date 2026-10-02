@@ -106,12 +106,12 @@ Z.of_nat nib` is `(inum.toNat : Int) < 16 * (nib : Int)` (what
   function as `IcacheRefDefs.frzIspre` (Rocq `frz_ispre`): the two are
   Rocq's two names, `frz_bit` appears in the statements of
   `ireg_icnt_frz_acc` and of IcacheInvStore's movers, and ProofIput's
-  `cbn [frz_close frz_bit]` steps read it.  `frzBit_eq_frzIspre` bridges.
+  `cbn [frz_close frz_bit]` steps read it.
 * The two `Global Instance … Timeless` are instances.
 
 ## Added (Rocq's inline steps, named; no statement moves)
 
-* `frzBit_eq_frzIspre` (the bridge above), `iregFrzmOk_of_bit` (Rocq's
+* `iregFrzmOk_of_bit` (Rocq's
   inline `assert (Hmok' : ireg_frzm_ok (frz_bit ph') …)`),
   `iregClaimOk_frz_step` (Rocq's inline `assert (Hclm' : …)` in
   `ireg_icnt_frz_acc`: the claim clause across a phase step).
@@ -180,9 +180,6 @@ def frzBit (ph : Frz) : Bool :=
   match ph with
   | .frzPre _ => true
   | _ => false
-
-theorem frzBit_eq_frzIspre (ph : Frz) : frzBit ph = frzIspre ph := by
-  cases ph <;> rfl
 
 /-- The region's mirror clause READ OFF the slot: `iregFrzmOk` at a known
 phase IS "`b` is `frzBit ph`". -/

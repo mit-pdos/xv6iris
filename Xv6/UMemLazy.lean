@@ -17,9 +17,6 @@ extension `P'` of `P` under `sz` (`UPtd.extSz`) agrees with it on the pages
 (`umMapped P' …`, what copyinstr now says of its string) is the same read at
 `viewLazy P sz M` (`umemStr_viewLazy`).
 
-For a block with no lazy page (`lazyFree`), `viewLazy` is `M` itself
-(`viewLazy_of_lazyFree`).
-
 Also the two shape facts about a fetched string every path-taking caller
 reads (`umemStr_nul`, `umemStr_length_le`), one copy each.
 
@@ -157,17 +154,6 @@ theorem umemStr_length_le (M : Nat → List (BitVec 8)) (va max : Nat) (s : List
     simp only [Option.some.injEq] at h
     rw [← h, List.length_take, umemRead_length]
     omega
-
-/-- A block with no lazy page reads its own image. -/
-theorem viewLazy_of_lazyFree {P : UPtd} {sz : BitVec 64} (M : Nat → List (BitVec 8))
-    (h : lazyFree P.um sz) : viewLazy P sz M = M := by
-  funext k
-  unfold viewLazy
-  by_cases hk : k * 4096 < sz.toNat
-  · have hge : sz.toNat ≤ pgRoundUpN sz.toNat := by unfold pgRoundUpN; omega
-    have := h k (by omega)
-    simp [Option.isSome_iff_ne_none.mp this]
-  · simp [hk]
 
 end UMemL
 

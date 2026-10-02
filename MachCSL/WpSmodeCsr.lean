@@ -6,8 +6,7 @@ file: `csrr rd, sstatus` and `csrrci rd, sstatus, SIE` (the kernel's
 
 The write goes through `legalize_sstatus` = `legalize_mstatus` of the
 lifted value; `mstatusLegalize` is that function with the platform's
-answers filled in (what the executor produces), and
-`sstatus_clear_sie_id` is the identity.
+answers filled in (what the executor produces).
 -/
 import MachCSL.KCtxGpr
 import MachCSL.WpCsrS
@@ -24,14 +23,6 @@ open Sail Sail.ConcurrencyInterfaceV1
 open LeanRV64D LeanRV64D.Functions
 
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
-
-/-- Clearing `SIE` in `sstatus` when it is already clear (and `mstatus` is as
-`start` left it) is the identity. -/
-theorem sstatus_clear_sie_id (o : BitVec 64) (hsm : smFacts o false) :
-    mstatusLegalize o (lift_sstatus o (Mk_Sstatus (zero_extend (m := 64) (lower_mstatus o &&& 0xFFFFFFFFFFFFFFFD#64)))) = o := by
-  obtain ⟨hSIE, hMPRV, hSXL, hMXR, hTSR, hTVM, hFS, hXS, hVS, hSD, hMPP⟩ := hsm
-  simp only [ite_false, Bool.false_eq_true] at hSIE
-  exact sstatus_clear_sie_id' o hSIE hSXL hFS hXS hVS hSD hMPP
 
 /-- The `SIE` bit of the supervisor view is `mstatus`'s. -/
 theorem lower_mstatus_sie (m : BitVec 64) :

@@ -120,7 +120,7 @@ THE PIPE'S IN-MEMORY BUFFER IS EXACTLY THE WRITTEN SEQUENCE MINUS THE READ
 PREFIX.  `ws` is every byte ever written, `rp` the read pointer: the two
 free-running counters are the two lengths mod 2^32, at most `PIPESIZE` bytes
 are live, and every live byte sits in the ring at its index mod `PIPESIZE`.
-It subsumes `pipeCountOk` (`pipeQueueOk_count`); the two guarded steps are
+It subsumes `pipeCountOk`; the two guarded steps are
 keyed on the same failed full/empty tests as `pipeCount_incr_w` /
 `pipeCount_decr_r`, and they also say which ring index the code's
 `%PIPESIZE` computes. -/
@@ -136,17 +136,6 @@ def pipeQueueOk (ws : List (BitVec 8)) (rp : Nat) (nr nw : BitVec 32) (bs : List
 theorem pipeQueueOk_00 (bs : List (BitVec 8)) : pipeQueueOk [] 0 0#32 0#32 bs := by
   refine ⟨Nat.le_refl 0, Nat.zero_le _, rfl, rfl, ?_⟩
   intro k _ hk; exact absurd hk (Nat.not_lt_zero k)
-
-/-- Rocq `pipe_queue_ok_count`. -/
-theorem pipeQueueOk_count (ws : List (BitVec 8)) (rp : Nat) (nr nw : BitVec 32)
-    (bs : List (BitVec 8)) (h : pipeQueueOk ws rp nr nw bs) : pipeCountOk nr nw := by
-  obtain ⟨h1, h2, rfl, rfl, -⟩ := h
-  have hP : PIPESIZE = 512 := rfl
-  rw [hP] at h2
-  unfold pipeCountOk pipeCount
-  rw [BitVec.le_def, BitVec.toNat_sub]
-  simp only [BitVec.toNat_ofNat]
-  omega
 
 /-- The ring index the code computes (`andi ..,511` on the counter) (Rocq
 `pipe_queue_widx`). -/

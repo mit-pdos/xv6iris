@@ -17,9 +17,8 @@ application's, `UInitConsFile`.)
 
 `init_cons_ro_bytes_bool`, `init_cons_ro_byte`, `init_cons_ro_nul_bool`,
 `init_cons_path_of`, `init_cons_dev_major`, `init_cons_dev_minor`,
-`init_rodata_img`, `xfam_mknod`, `sbundle_at_mknod_intro_at`,
-`spost_at_mknod_elim_at`, `init_cons_sup_absent`, `init_cons_sup_console`,
-`init_cons_mknod_fam`, `init_cons_sup_mknod`, `init_open_absent_leaf_holds`,
+`xfam_mknod`, `sbundle_at_mknod_intro_at`, `spost_at_mknod_elim_at`,
+`init_cons_mknod_fam`, `init_open_absent_leaf_holds`,
 `init_open_console_leaf_holds`, `init_mknod_leaf_holds`.
 
 ## Dropped
@@ -27,6 +26,8 @@ application's, `UInitConsFile`.)
 * UNREACHED: `init_cons_never_abs_law`, `init_cons_seal_law_echo`,
   `init_cons_seal_out_echo`, `init_cons_leaves_echo`,
   `init_cons_cred_made_echo`, `init_cons_hit_echo`.
+* NOT PORTED (nothing uses them): `init_rodata_img`,
+  `init_cons_sup_absent`, `init_cons_sup_console`, `init_cons_sup_mknod`.
 * `init_cons_ro_sub` (reached): it is `UConsOpenSup.consOpen_uimgView_keep`
   at /init's code (`uimgView_text` supplies the view).
 * The local notations `ra_idx`..`a7_idx`: Lean spells registers `1#5`,
@@ -35,8 +36,8 @@ application's, `UInitConsFile`.)
 ## Deviations from Rocq
 
 1. **DU3**: `UCodeInit.init_ro` is `User.Init.code.byte` (init's R-X
-   segment holds `.rodata`), so `init_rodata γ` is `initCode γ` and
-   `init_rodata_img` is the identity (UkInitDefs deviation 1).
+   segment holds `.rodata`), so `init_rodata γ` is `initCode γ` (UkInitDefs
+   deviation 1).
 2. **The two open leaves go through `UConsOpenCalls`' cores**
    (`open_console_call_any` / `open_absent_call_any`: Rocq's inline
    composition of `wp_uk_ecall_open_recv_img_at`, `cons_sup_*`,
@@ -163,9 +164,6 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
-/-- **Rocq `init_rodata_img`** (deviation 1): the identity. -/
-theorem init_rodata_img (γ : GName) : initCode (GF := GF) γ ⊢ ukCode γ User.Init.code.byte := .rfl
-
 /-! ## S3  THE MKNOD ROWS, IN THE PROCESS'S DIRECTION -/
 
 /-- **Rocq `sbundle_at_mknod_intro_at`** (deviation 3). -/
@@ -194,32 +192,6 @@ theorem spostAt_mknod_elim_at (X : Uvis → IProp GF) (f : Xfam GF) (W : Uvis) (
   iexact H
 
 /-! ## S4  THE SUPPLIERS -/
-
-/-- **Rocq `init_cons_sup_absent`**: /init's instance of `cons_sup_absent`,
-at its own literal. -/
-theorem init_cons_sup_absent (N : UkNames GF) (T K : IProp GF) [Persistent T] [Timeless T] [Timeless K]
-    (m : RegMap) (pc : BitVec 64) (ha0 : m.get 10#5 = 0x980#64) (ha1 : m.get 11#5 = 2#64) :
-    ⊢ initConsAbsLaw T K -∗ appInv (hlc := hlc) fscFs -∗ initCode N.t -∗ K -∗
-      udepwfAt (hlc := hlc) N m pc USYS_open (initConsAbsentFam T K N.pay) ROOTINO := by
-  iintro #Habs #Hinv #Hc HK
-  ihave #Hv := uimgView_text N User.Init.code.byte $$ Hc
-  iapply (cons_sup_absent N T K User.Init.code.byte 0x980 m pc
-    (fun Mv hag => init_cons_path_of User.Init.code.byte Mv (fun _ _ h => h) hag) (by rw [ha0]; rfl) ha1)
-    $$ Habs Hinv Hv HK
-
-/-- **Rocq `init_cons_sup_console`**: /init's instance of
-`cons_sup_console`. -/
-theorem init_cons_sup_console (N : UkNames GF) (Pv : Aview → Prop) (T K : IProp GF) [Persistent T] [Timeless T]
-    (r : EchoNames) (i : Nat) (m : RegMap) (pc : BitVec 64) (ha0 : m.get 10#5 = 0x980#64)
-    (ha1 : m.get 11#5 = 2#64) :
-    ⊢ initConsLawsAt echoFsPure (consMade r) Pv T K -∗ consMade r i -∗ appInv (hlc := hlc) fscFs -∗
-      initCode N.t -∗
-      udepwfAt (hlc := hlc) N m pc USYS_open (initConsConsoleFam T i N.pay) ROOTINO := by
-  iintro #Hlaws #Hmade #Hinv #Hc
-  ihave #Hv := uimgView_text N User.Init.code.byte $$ Hc
-  iapply (cons_sup_console N echoFsPure (consMade r) Pv T K i User.Init.code.byte 0x980 m pc
-    (fun Mv hag => init_cons_path_of User.Init.code.byte Mv (fun _ _ h => h) hag) (by rw [ha0]; rfl) ha1)
-    $$ Hlaws Hmade Hinv Hv
 
 /-- **Rocq `init_cons_mknod_fam`**. -/
 def initConsMknodFam (Pv : Aview → Prop) (T K : IProp GF) (r : EchoNames) (Q : Int → IProp GF) : Xfam GF :=
@@ -267,15 +239,6 @@ theorem cons_sup_mknod_gen (N : UkNames GF) (Pv : Aview → Prop) (T K : IProp G
   rw [f1, f2, f3, f4, f5, f6, show (0x980#64 : BitVec 64).toNat = 0x980 from rfl]
   iapply (init_cons_laws_mknod_bundle fscFs rt echoFsPure (consMade r) Pv T K Mv 0x980
     (hpath M Mv hsro hag)) $$ Hlaws Hinv HK
-
-/-- **Rocq `init_cons_sup_mknod`**: THE MKNOD's supplier at /init's own
-literal, out of the laws and the credential. -/
-theorem init_cons_sup_mknod (N : UkNames GF) (Pv : Aview → Prop) (T K : IProp GF) [Persistent T] [Timeless T]
-    [Timeless K] [HTL : ∀ v : Aview, Timeless (appPred (GF := GF) appRun v)] (r : EchoNames) (m : RegMap)
-    (pc : BitVec 64) (ha0 : m.get 10#5 = 0x980#64) (ha1 : m.get 11#5 = 1#64) (ha2 : m.get 12#5 = 0#64) :
-    ⊢ initConsLawsAt echoFsPure (consMade r) Pv T K -∗ appInv (hlc := hlc) fscFs -∗ initCode N.t -∗ K -∗
-      udepwfAt (hlc := hlc) N m pc 17 (initConsMknodFam Pv T K r N.pay) ROOTINO :=
-  cons_sup_mknod_gen N Pv T K r User.Init.code.byte init_cons_path_of m pc ha0 ha1 ha2
 
 /-! ## S5  THE THREE LEAF DISCHARGES -/
 

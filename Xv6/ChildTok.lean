@@ -342,15 +342,6 @@ theorem genPid_agree (γ : GName) (pid pid' : BitVec 32) :
   ihave %h := gen_agree_pure γ _ _ pa pid ga gk Q pa' pid' ga' gk' Q' $$ [$H1 $H2]
   ipureintro; exact h.2.1
 
-/-- THE ESCROW'S QUARTER NAMES THE PID ITS GENERATION WAS GIVEN, at the
-derived forms (the quarter survives: the conclusion is pure). -/
-theorem genPid_kq_agree (γ : GName) (pa : BitVec 64) (pid pid' : BitVec 32) (Q : Int → IProp GF) :
-    genPid γ pid' ∗ genKq γ pa pid Q ⊢ ⌜pid' = pid⌝ := by
-  unfold genPid genKq
-  iintro ⟨⟨%pa1, %ga1, %gk1, %Q1, H1⟩, ⟨%ga2, %gk2, H2⟩⟩
-  ihave %h := gen_agree_pure γ _ _ pa1 pid' ga1 gk1 Q1 pa pid ga2 gk2 Q $$ [$H1 $H2]
-  ipureintro; exact h.2.1
-
 /-- ...AND THE TWO PERSISTENT READINGS AT THE NAMED SLOT AND PID: the
 kernel's quarter names them, and comes back. -/
 theorem myPay_kq_readings (γ : GName) (pa : BitVec 64) (pid : BitVec 32) (Q : Int → IProp GF) :

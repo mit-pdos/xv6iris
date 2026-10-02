@@ -20,8 +20,8 @@ left, plus one induction:
   `1 < ninodes`), the lazy saves of `s1..s6`, and the loop constants.
 
 **Deviations from Rocq.**  Rocq's `wp_ialloc_sconf` derivation
-(ProofIalloc 3355–3400: `log_op_openS`, the set form, `log_opS_op`) is the
-Spec file's `IALLOC.wp_ialloc_sconf`.  The functor parameter `PRINTK_GEN`
+(ProofIalloc 3355–3400: `log_op_openS`, the set form, `log_opS_op`) is not
+ported (nothing uses it).  The functor parameter `PRINTK_GEN`
 is Lean's `PRINTK` (its general-varargs form); `MemsetArray` is `MEMSET`.
 The rest is the stage decomposition of `Xv6/IallocDefs.lean`'s header.
 

@@ -13,12 +13,9 @@ of its own:
   index `4*i+j`, which is exactly the address the code computes
   (`bp->data + 4*(bn-NDIRECT)` plus the byte offset).
 
-The four consumer-facing laws are LENGTH (`indBytes_length`,
-`indBytes_insert_length`) and LOOKUP (`indBytes_lookup`, and the two
-insert laws `indBytes_insert_same` / `indBytes_insert_other` that say
-installing a new entry rewrites its own four bytes and disturbs nothing
-else).  Together they are what lets `bmap`'s `log_write` of a whole block
-be related to a one-entry update of the pure entry list.
+The consumer-facing laws are LENGTH (`indBytes_length`) and LOOKUP
+(`indBytes_lookup`).  Together they are what lets a whole indirect block's
+bytes be related to the pure entry list.
 
 DEVIATIONS from Rocq.
 
@@ -116,40 +113,6 @@ theorem indBytes_lookup_None (e : List (BitVec 32)) (k : Nat)
     (hk : 4 * e.length ≤ k) : (indBytes e)[k]? = none := by
   apply List.getElem?_eq_none
   rw [indBytes_length]; omega
-
-/-! ## Installing one entry -/
-
-theorem indBytes_insert_same (e : List (BitVec 32)) (i : Nat) (v : BitVec 32) (j : Nat)
-    (hi : i < e.length) (hj : j < 4) :
-    (indBytes (e.set i v))[4 * i + j]? = some (nthByte (n := 4) v j) := by
-  rw [indBytes_lookup (e.set i v) i j (by rw [List.length_set]; exact hi) hj]
-  have hv : (e.set i v)[i]! = v := getElem!_of_getElem? (List.getElem?_set_self hi)
-  rw [hv]
-
-/-- Rocq keeps `i < length e` as a premise even though the Lean proof does
-not need it; the statement is the one consumers quote. -/
-theorem indBytes_insert_other (e : List (BitVec 32)) (i : Nat) (v : BitVec 32) (k : Nat)
-    (hi : i < e.length) (hk : k < 4 * i ∨ 4 * i + 4 ≤ k) :
-    (indBytes (e.set i v))[k]? = (indBytes e)[k]? := by
-  rcases Nat.lt_or_ge k (4 * e.length) with hlt | hge
-  · -- inside the image: both sides are entry `k / 4`'s byte `k % 4`
-    obtain ⟨q, r, hr, rfl⟩ : ∃ q r, r < 4 ∧ k = 4 * q + r :=
-      ⟨k / 4, k % 4, Nat.mod_lt _ (by decide), (Nat.div_add_mod k 4).symm⟩
-    have hq : q < e.length := by omega
-    have hqi : i ≠ q := by omega
-    rw [indBytes_lookup (e.set i v) q r (by rw [List.length_set]; exact hq) hr,
-        indBytes_lookup e q r hq hr]
-    have hv : (e.set i v)[q]! = e[q]! := by
-      rw [List.getElem!_eq_getElem?_getD, List.getElem!_eq_getElem?_getD,
-          List.getElem?_set_ne hqi]
-    rw [hv]
-  · -- past the image: both sides are `none`
-    rw [indBytes_lookup_None (e.set i v) k (by rw [List.length_set]; exact hge),
-        indBytes_lookup_None e k hge]
-
-theorem indBytes_insert_length (e : List (BitVec 32)) (i : Nat) (v : BitVec 32) :
-    (indBytes (e.set i v)).length = (indBytes e).length := by
-  rw [indBytes_length, indBytes_length, List.length_set]
 
 /-! ## The ALL-ZERO entry list
 

@@ -26,9 +26,7 @@ boolean, against the PURE NAME MODEL rather than against the bytes:
 before the first NUL, capped at `n`), and the equivalence is
 `DirentEnc.ncZero_iff`, which needs NO padding or well-formedness hypothesis
 on either side, so the law is honest for namex's UNPADDED name buffer as
-well as for a dirent's strncpy-padded field.  dirlookup pairs it with
-`DirentEnc.namecmp_bridge` to read the right-hand side as
-`bname 14 f = deNameStr d`.
+well as for a dirent's strncpy-padded field.
 
 namecmp does not sleep, lock, or touch memory outside its own frame, so, like
 `SpecStrncmp`, it is stated at either interrupt index and has no process or

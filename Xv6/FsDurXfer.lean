@@ -10,7 +10,7 @@ not one decode:
   runs.  The fresh elements come out already in the source's `∗` shape,
   because the map they are allocated at IS that `∗` flattened, and the
   flattening is a bijection exactly where the source's own exclusivity says
-  the objects do not overlap (`phiRuns_disj` / `phiRunsQ_disj`).
+  the objects do not overlap (`phiRunsQ_disj`).
 * the LINK family: ONE `own_alloc` at the SOURCE's own element (read off by
   `fsLinks_valid_tok`) plus the spare root fragment
   (`fsBootAlloc_rootSlack`).
@@ -106,20 +106,6 @@ end XferBytes
 section Xfer
 variable {GF : BundledGFunctors} [GhostMapG GF Nat (BitVec 8) RegMapF] [FsLinkG GF] [FsTopG GF]
 open FsStateLink
-
-/-- ...AND THE WHOLE INSTANCE, installed: the ghost half is HANDED IN (it
-mentions no `phi`), the byte half is carved off the era's flat map (Rocq's
-`fs_state_install`). -/
-theorem fsState_install (Γ : FsViewNames GF) (S : FsStateRec) (PM : BlockMap)
-    (Mh : RegMapF (BitVec 8)) (hs : xfShape S PM) (hd : xrDisj (xrFs S PM))
-    (hsub : xrUnion (xrFs S PM) ⊆ Mh) :
-    phiMap Γ Mh ∗ fsGhost Γ S ⊢
-      fsState Γ (DFrac.own 1) S ∗ phiMap Γ (PartialMap.difference Mh (xrUnion (xrFs S PM))) := by
-  refine (sep_mono_left (fsFootprint_install Γ S PM Mh hs hd hsub)).trans ?_
-  iintro ⟨⟨Hf, Hr⟩, Hg⟩
-  iframe Hr
-  iapply (fsState_split Γ (DFrac.own 1) S).2
-  iframe Hf Hg
 
 /-- THE TRANSPORT, WITH THE ROOT'S SPARE LINK FRAGMENT RIDING ALONG (the
 inode region's keep-alive token: no directory entry accounts for it, so it

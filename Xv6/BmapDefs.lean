@@ -38,7 +38,7 @@ any").  Three things hang off it:
    once over their own small contexts (Rocq's own reason for naming them:
    `set_solver` in a proof-mode context costs minutes).
 5. The callee wrappers `bread` / `brelse` / `log_write` are the shared
-   `Xv6.bread_call` / `Xv6.brelse_call` / `Xv6.log_write_gen_call`
+   `Xv6.bread_call_eb` / `Xv6.brelse_call` / `Xv6.log_write_gen_call`
    (`Xv6/FsCallSites.lean`; formerly `bm_bread` / `bm_brelse` /
    `bm_log_write_gen`, copies of BallocDefs').  `bm_balloc` and the view
    lemma `Xv6.bioView_eq_fsView` (a copy of `Xv6/BallocDefs.lean`'s
@@ -66,7 +66,7 @@ def bmBmsset : Option BmAlloc → List Nat
   | some a => [a.baBms]
   | none => []
 
-/-- THE LEDGER CLAUSE, once (Rocq's `bm_ledger_ok`): `wp_bmap_gen`'s budget
+/-- THE LEDGER CLAUSE, once (Rocq's `bm_ledger_ok`): `wp_bmap_gen_body`'s budget
 conjunct with `bmapstart` replaced by `bmBmsset ak`. -/
 def bmLedgerOk (ak : Option BmAlloc) (cr : Bool) (bm bm' : Blkmap) (fbn : Nat) (n n' : Nat)
     (Sb Sb' : List Nat) : Prop :=

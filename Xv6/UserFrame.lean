@@ -28,9 +28,8 @@ X4).
   `userTrapFrame` from the frames at any landing file satisfying the pins.
 * §5 the SEAMS the other lanes asked for: `uf_trapCells` (the frame opened
   into exactly UTrap's cells, and closed at the tower's post-values),
-  `uf_utrPins` (U1-P2's `UtrPins`), `uf_drefU` (U1-X2's `UxcCfg`: the file
-  agrees with `drefU`), and the decode bridge `uf_swp_decode32/16`
-  (`swp_runRead` at `drefU` from `decodeU_total32/16`).
+  `uf_utrPins` (U1-P2's `UtrPins`), and `uf_drefU` (U1-X2's `UxcCfg`: the
+  file agrees with `drefU`).
 
 ## Deviations from Rocq
 
@@ -607,38 +606,5 @@ theorem uf_drefU (C : UCfg) (P : UPtd) (f : RegFile) (hc : UfCfg C P f)
 theorem uf_uxcCfg (C : UCfg) (P : UPtd) (s : UWSt) (hc : UfCfg C P s.file)
     (hpriv : s.file .cur_privilege = Privilege.User) : UxcCfg s :=
   uf_drefU C P s.file hc hpriv
-
-section decode
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
-
-/-- The decoder's registers, off the user frame (`swp_runRead`'s accessor at
-`drefU`). -/
-theorem uf_drefU_acc (cpu : CPU) (C : UCfg) (P : UPtd) (f : RegFile) (hc : UfCfg C P f)
-    (hpriv : f .cur_privilege = Privilege.User) :
-    ∀ (r : Register) (v : RegisterType r), drefU r = some v →
-      (ufRegF (GF := GF) cpu C).F f ⊢ ∃ dq : DFrac, r ↦ᵣ[cpu]{dq} v ∗ (r ↦ᵣ[cpu]{dq} v -∗ (ufRegF cpu C).F f) := by
-  intro r v h
-  have hv := uf_drefU C P f hc hpriv r v h
-  have hd : ufFoot.Dr r = true := by
-    cases r <;> simp only [drefU, reduceCtorEq] at h <;> exact ufFoot_rd _ (by decide)
-  subst hv
-  exact (ufRegF cpu C).rd f r hd
-
-/-- **The decode bridge, 32-bit** (`swp_runRead` at `drefU` from
-`decodeU_total32`): a user frame decodes any word to an instruction of
-`decodableU`. -/
-theorem uf_swp_decode32 (cpu : CPU) (C : UCfg) (P : UPtd) (f : RegFile) (hc : UfCfg C P f)
-    (hpriv : f .cur_privilege = Privilege.User) (w : BitVec 32) (Φ : instruction → IProp GF) :
-    (ufRegF cpu C).F f ∗
-      (∀ (ast : instruction) (b : Bool), ⌜runRead drefU (ext_decode w) = some (ast, b)⌝ -∗
-        ⌜decodableU ast = true⌝ -∗ laterIf b iprop((ufRegF cpu C).F f -∗ Φ ast))
-    ⊢ swp cpu (ext_decode w) Φ := by
-  obtain ⟨ast, b, h, hd⟩ := decodeU_total32 w
-  iintro ⟨HF, HΦ⟩
-  iapply swp_runRead cpu drefU _ (uf_drefU_acc cpu C P f hc hpriv) _ ast b h Φ
-  iframe HF
-  iapply HΦ $$ %ast %b %h %hd
-
-end decode
 
 end Xv6

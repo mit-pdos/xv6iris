@@ -26,7 +26,7 @@ Rocq); the walk is `SysUnlinkW1..W5D` (not yet written).
    by `getElem?`; `su_dz_byte` likewise reads `direntBytes direntZero`.
 3. The decrement arithmetic (`su_decr_pay`, `su_dec_short`, `su_decr_pos`,
    `su_le1_nz_eq1`, `su_decr_zero`) is over `Nat`: the Lean contracts state
-   the counts as `toNat` (`wp_iupdate_unlink`'s `hdec`), where Rocq's are
+   the counts as `toNat` (`wp_iupdate_unlink_eb`'s `hdec`), where Rocq's are
    `Z` (`bv_unsigned`).  `su_le1_nz_eq1`'s `0 ≤ x` is vacuous and dropped.
 4. `su_upd_upt_idem` / `su_cwd_upt` / `su_upd_cwd_upt` (PROCESS-LAYER,
    FLAGGED): Rocq's `upd_upt` / `upd_cwd` setters are Lean record updates
@@ -53,8 +53,7 @@ iris/*.v, comments stripped)
   model) -- uses: ProofSysUnlinkW4-era loop only.
 * `su_moi32_id`, `su_neq_of_eq_true/_false`, `su_noff0`'s `Z` form,
   `su_pn_noff`: Sail `mword_of_int` / `eq_vec` / `neq_vec` bookkeeping that
-  the Lean `bcond` readings of `SysUnlinkParts` subsume (`sys_unlink_noff0`
-  is kept in `Nat`).
+  the Lean `bcond` readings of `SysUnlinkParts` subsume.
 * `su_pn_below`: `locks_below` has no Lean counterpart (no lock ranks;
   brief fs1 §1 vocabulary table).
 * `su_dummyV`: DEAD by Rocq's own comment ("kept only until the last
@@ -78,9 +77,6 @@ theorem sys_unlink_cwd_upt (V : ProcPriv) (P : UPtd) : ({ V with upt := P } : Pr
 
 theorem sys_unlink_upd_cwd_upt (V : ProcPriv) (P : UPtd) :
     ({ ({ V with upt := P }) with cwd := V.cwd } : ProcPriv) = { V with upt := P } := rfl
-
-/-- argstr's `noff` premise at the walk's own depth, which is zero. -/
-theorem sys_unlink_noff0 : 0 + 1 < 2 ^ 31 := by decide
 
 /-! ## The two name literals the two `namecmp` refusals compare against -/
 

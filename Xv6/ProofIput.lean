@@ -3,9 +3,8 @@ Proof of `iput`'s specification (`SpecIput.IPUT`), given the interfaces of
 `acquire` (store-order tier), the hooked `release`, the non-blocking
 `acquiresleep`, the hooked `releasesleep`, `itrunc`, `bread`, `log_write`
 and `brelse`.  A port of Rocq `ProofIput.v`
-(`iris/ProofIput.v`, `wp_iput_gen` 5076--5654, the seal
-`wp_iput_sconf` 5656--5713 -- here `SpecIput.IPUT.wp_iput_sconf`) against
-the Lean image (`KA.«iput»`).
+(`iris/ProofIput.v`, `wp_iput_gen` 5076--5654; the seal `wp_iput_sconf`
+5656--5713 is not ported, nothing uses it) against the Lean image (`KA.«iput»`).
 
     +0x00  prologue (frame6s1: ra/s0/s1)      +0x0a  mv s1,a0
     +0x0c  auipc/addi a0 = &itable            +0x14  jal acquire

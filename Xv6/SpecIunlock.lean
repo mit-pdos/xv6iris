@@ -81,8 +81,7 @@ through, as in `SpecBrelse`.
 6. **Shape of the interface.**  Rocq's `Module Type IUNLOCK` has two
    Parameters, the second DEFINED by `wp_iunlock_tx_of_dep`; here
    `structure IUNLOCK` has the dep field only, and the tx form is the
-   theorem `IUNLOCK.wp_iunlock_tx` (the `ACQUIRESLEEP.wp_acquiresleep`
-   pattern, brief §3.6).  `wp_iunlock_tx_of_dep` is ported as stated, in
+   theorem `IUNLOCK.wp_iunlock_tx` (brief §3.6).  `wp_iunlock_tx_of_dep` is ported as stated, in
    this file, as in Rocq.
 7. **`⌜lo ≤ tl⌝` is a Lean hypothesis `hle`** (Rocq: a pure premise
    `⌜(lo <= tl)%nat⌝ -∗`), the shape the sibling `SpecIlock` uses for the

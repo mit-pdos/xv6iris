@@ -115,7 +115,6 @@ complement it is the whole bundle `sched` takes at the ZOMBIE park.  The
 stack closer is Rocq's `kstack_closer pj sp (trap_res b + av)`: at
 `sie = true` the trap reserve below the budget is the thread's too, and it
 is handed back by that same acquire (`pushOffAt`), so the park owns it.
-The `sie = false` contract `KEXIT.wp_kexit` is the derived instance.
 
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
@@ -206,26 +205,5 @@ structure KEXIT : Prop where
     hj hproc hK hnoff htier,
     wp_kexit_eb_body (hlc := hlc) (GF := GF) Γ cpu k γw γl γ γkl γk on j pid V M ip cs sts Q
       hj hproc hK hnoff htier
-
-/-- The interrupts-off instance of `wp_kexit_eb` (the complement is the
-whole bundle, the trap reserve is empty). -/
-theorem KEXIT.wp_kexit (A : KEXIT) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
-    [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
-    [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-    [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx] (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (cpu : CPU) (k : KCtx) (γw γl : GName) (γ : FileNames) (γkl : GName) (γk : KmemNames)
-    (on : Option Nat) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
-    (M : Nat → List (BitVec 8)) (ip : BitVec 64) (cs : ExtTreeSet GName compare) (sts : List FdState) (Q : Int → IProp GF)
-    hj hproc hK hsie hnoff hlocks htier :
-    wp_kexit_body (hlc := hlc) (GF := GF) Γ cpu k γw γl γ γkl γk on j pid V M ip cs sts Q
-      hj hproc hK hsie hnoff hlocks htier := by
-  have h := A.wp_kexit_eb (hlc := hlc) (GF := GF) Γ cpu k γw γl γ γkl γk on j pid V M ip cs sts Q hj hproc hK hnoff htier
-  unfold wp_kexit_eb_body at h
-  unfold wp_kexit_body
-  rw [hsie, trapRes_off] at h
-  simp only [trapCsrsExt_false, cpuClaimExt_false] at h
-  iintro ⟨Hk, Hpc, Hpi, Htc, Hcl, Hir, Hwl, Hin, Hft, Hpe, Hkl, Hav, Hrdy, Hbs, Hfs, Hirs, Hpr, Hfr, Hcp, Hch, Hmy, Hpay, Hcl2⟩
-  iapply h
-  iframe Hk Hpc Hpi Htc Hcl Hir Hwl Hin Hft Hpe Hkl Hav Hrdy Hbs Hfs Hirs Hpr Hfr Hcp Hch Hmy Hpay Hcl2
 
 end Xv6

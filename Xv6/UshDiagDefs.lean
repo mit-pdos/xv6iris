@@ -34,10 +34,8 @@ and `ushExecfailLawAt` ("exec %s failed\n").
    signExtend lo = ofNat fa`, the jumps land on `fprintf` / `exit`; Rocq's
    `ret_pc p4 = p4` is `ush_retPc` at an even `p0`.  `shd_die_solve` is
    `decide`.
-4. `shd_nth_byte0_moi` is `Xv6.kcat_nthByte0_ofNat` at `BitVec.ofNat 64 b.toNat`
-   (Rocq `mword_of_int (bv_unsigned b)`); `urun_shd_sb_bnd`/`_str_bnd` read
-   the bound off `urun` (`UkEchoDefs.urun_ubyte_bnd` and `UserHeap`'s text
-   row).
+4. `shd_nth_byte0_moi`, `urun_shd_sb_bnd` and `urun_shd_str_bnd` are not
+   ported (nothing uses them).
 5. `alt_panic` / `alt_execfail` / `cmd_echo` are `EchoDisc.altPanic` /
    `altExecfail` / `cmdEcho`; `l !! p` is `l[p]?`, `l !!! p` is `l[p]!`.
 6. Classes: `UshMainDefs`' set (the program tier plus `[Xv6G GF]`).
@@ -141,38 +139,12 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : 
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int] [Xv6G GF]
 
-/-! ## §3 Bounds off the run (deviation 4) -/
-
-/-- **Rocq `urun_shd_sb_bnd`**. -/
-theorem urun_shd_sb_bnd (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64) (avail : Nat) (tx : Bool)
-    (dq : DFrac) (a : Nat) (b : BitVec 8) :
-    ⊢ urun (hlc := hlc) N h m pc avail -∗ ushSbq N tx dq a b -∗ ⌜a < 2 ^ 38⌝ := by
-  cases tx
-  · unfold ushSbq
-    simp only [Bool.false_eq_true, if_false]
-    iintro Hrun Hb
-    iapply urun_ubyte_bnd N h m pc avail dq a b $$ Hrun Hb
-  · unfold ushSbq
-    simp only [if_true]
-    unfold urun
-    iintro ⟨%xi, %C, %pt, %Rfd, %Rut, %sz, %M, %pm, %fdv, %cw, %gn, %cs, %pidv, -, -, -, -, -, Hh, -⟩ #Hb
-    ihave %hb := uheap_text N.t N.d N.s M pm sz a b $$ Hh Hb
-    ipureintro; exact hb.2.2
-
 /-! ## §4 One byte of a diagnostic (Rocq §2a) -/
 
 /-- **Rocq `ksh_w1`**: one `write(fdv, &c, 1)` whose buffer (putc's frame
 byte) is quantified, the byte threaded through. -/
 def kshW1 (N : UkNames GF) (fdv : BitVec 64) (b : BitVec 8) (Ci Co : IProp GF) : IProp GF :=
   iprop(∀ ua : BitVec 64, kshW (hlc := hlc) N fdv ua 1 iprop(ubyte N.d ua.toNat b ∗ Ci) iprop(ubyte N.d ua.toNat b ∗ Co))
-
-/-- **Rocq `ksh_w1_of_law`**: the flagged deposit pays row 16. -/
-theorem kshW1_of_law (UL : UK_LEAVES) (HS : UK_SYS_P) (N : UkNames GF) (fdv : BitVec 64) (b : BitVec 8) :
-    ⊢ shDeps (hlc := hlc) -∗ kshW1 (hlc := hlc) N fdv b iprop(emp) iprop(emp) := by
-  iintro #Hdp
-  unfold kshW1
-  iintro %ua
-  iapply kshW_of_law UL HS N fdv ua 1 _ _ .rfl $$ Hdp
 
 /-! ## §5 The paid laws -/
 

@@ -12,7 +12,9 @@ here and the two programs are two instantiations.
 
 ## The rest of the file: `Xv6/UConsOpenSup.lean`, `Xv6/UConsOpenAny.lean`
 
-Everything listed below (once waiting here) is ported: the `UInitCons` /
+Everything listed below (once waiting here) is ported, except
+`init_cons_elems_len`, `init_cons_elems_hd`, `cons_hop_dead` and
+`cons_walk_dead`, which nothing uses: the `UInitCons` /
 `FsConsPin` part and `fupd_wp_triv` / `cons_ro_sub` / `xfam_open` /
 `sbundle_at_open_*` in `UConsOpenSup` (its header maps each name), the K3
 table-view part (`uk_open_fd_arm_at`, `init_cons_fail_std_at`, here;

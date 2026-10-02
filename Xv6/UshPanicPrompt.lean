@@ -26,8 +26,8 @@ ported/dropped lists.
    is `genId + 1`; `u_prompt !! p` is `uPrompt[p]?`, `!!!` is `[p]!`.
 2. **`shk_rodata` is not a separate premise** (DU3; UshMainDefs deviation
    3): the two literal bytes are read off the `ushCode N.t` the hole
-   `kshW` already hands the call (`UserText.utextImg_run` at
-   `UshOut.sh_dollar_ro`/`sh_space_ro`'s image), so
+   `kshW` already hands the call (`UserText.utextImg_run` at the two
+   bytes' image), so
    `kshW_of_link_prompt_fam` / `kshW_of_link_lcred_at` drop Rocq's
    `shk_rodata (ukn_t N) -∗`; `shPromptLaw` keeps it (UshPromptLaw).
 3. **THE IMAGE GUARD** (`UkWriteLeaf` deviation 2): `prompt_chain` is at a

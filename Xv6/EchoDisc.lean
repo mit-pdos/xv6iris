@@ -10,7 +10,7 @@ line's first byte only after the `"$ "` prompt); each round types its own
 line, read through `LineWords`' parser.  What survives the union cone here is
 the VOCABULARY the line model (`LineModel`) is built from:
 
-* §1 the admissible line (`lineOk`, `bodyOk`, `discInput`) and the parse
+* §1 the admissible line (`lineOk`, `bodyOk`) and the parse
   counters' small laws;
 * §2 the PROLOGUE alphabet (`proAlts`: the prompt, init's exec/fork
   failures, init's banner), its resolution (`proOf`, `proDone`, `proTail`,
@@ -111,10 +111,6 @@ theorem lineOk_at (ws : List (List (BitVec 8))) (i : Nat) (_ : lineOk ws) (hi : 
 
 /-- A BODY IS A WELL-FORMED JOIN OF ITS OWN WORDS. -/
 def bodyOk (l : List (BitVec 8)) : Prop := wlBody (wlWords l) = l ∧ lineOk (wlWords l)
-
-/-- D3: the input parses as admissible lines plus a started one. -/
-def discInput (I : List (BitVec 8)) : Prop :=
-  (∀ l ∈ bodiesOf I, bodyOk l) ∧ (∀ b ∈ restOf I, wlBodyByte b) ∧ (restOf I).length + 1 < lineMax
 
 theorem join_elem_of (bs : List (List (BitVec 8))) (b : BitVec 8) (hb : b ∈ wlJoin bs) :
     b = wlNl ∨ ∃ l, l ∈ bs ∧ b ∈ l := by

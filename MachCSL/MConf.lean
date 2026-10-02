@@ -67,7 +67,7 @@ def bootConf : MConf where
 
 /-- The configuration cells the boot program leaves at their POWER-ON
 values (Rocq: `wp_entry_boot` / `wp_start` take them at ANY value -- the
-boot program (`MachCSL.bootProg`) never writes them, `MachCSL.bootProg_keeps`).
+boot program (`MachCSL.bootProg`) never writes them).
 `start()` overwrites `medeleg`, `mepc`, `satp` and `stimecmp` before reading
 them; it never writes `mtimecmp`, ORs `TM` into `mcounteren`, and writes only
 entry 0 of the PMP address table and the first eight entries of the
@@ -175,24 +175,6 @@ theorem mConf_cases (cpu : CPU) (dq : DFrac) (c : MConf) :
     hwConfig cpu := by
   unfold mConf confCells; exact .rfl
 
-theorem mConf_intro (cpu : CPU) (dq : DFrac) (c : MConf) :
-    Register.cur_privilege ↦ᵣ[cpu]{dq} Privilege.Machine ∗
-    Register.hart_state ↦ᵣ[cpu]{dq} HartState.HART_ACTIVE () ∗
-    Register.mstatus ↦ᵣ[cpu]{dq} c.mstatus ∗
-    Register.mie ↦ᵣ[cpu]{dq} c.mie ∗
-    Register.mideleg ↦ᵣ[cpu]{dq} c.mideleg ∗
-    Register.medeleg ↦ᵣ[cpu]{dq} c.medeleg ∗
-    Register.mepc ↦ᵣ[cpu]{dq} c.mepc ∗
-    Register.satp ↦ᵣ[cpu]{dq} c.satp ∗
-    Register.menvcfg ↦ᵣ[cpu]{dq} c.menvcfg ∗
-    Register.mcounteren ↦ᵣ[cpu]{dq} c.mcounteren ∗
-    Register.mtimecmp ↦ᵣ[cpu]{dq} c.mtimecmp ∗
-    Register.stimecmp ↦ᵣ[cpu]{dq} c.stimecmp ∗
-    Register.pmpcfg_n ↦ᵣ[cpu]{dq} c.pmpcfg ∗
-    Register.pmpaddr_n ↦ᵣ[cpu]{dq} c.pmpaddr ∗
-    hwConfig cpu ⊢ mConf (GF := GF) cpu dq c := by
-  unfold mConf confCells; exact .rfl
-
 theorem confCells_cases (cpu : CPU) (dq : DFrac) (p : Privilege) (c : MConf) :
     confCells (GF := GF) cpu dq p c ⊢
     Register.cur_privilege ↦ᵣ[cpu]{dq} p ∗
@@ -253,7 +235,7 @@ theorem confCells_introW (cpu : CPU) (dq : DFrac) (p : Privilege) (c : MConf) :
   unfold confCells
   iframe
 
-/-- `mConf_intro` curried (see `confCells_introW`). -/
+/-- `confCells_introW` at machine mode: the cells of `mConf`, curried. -/
 theorem mConf_introW (cpu : CPU) (dq : DFrac) (c : MConf) :
     ⊢ Register.cur_privilege ↦ᵣ[cpu]{dq} Privilege.Machine -∗
     Register.hart_state ↦ᵣ[cpu]{dq} HartState.HART_ACTIVE () -∗

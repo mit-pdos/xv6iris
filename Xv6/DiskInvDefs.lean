@@ -1326,8 +1326,7 @@ iteration of its loop to the next.  It is MINTED by the read of
 `used->idx` itself (`Xv6.disk_used_idx_read`, over `MachCSL.readAUr`,
 whose continuation names the view the load read at) and CASHED by the
 reads that follow the loop body's `__sync_synchronize()`, which is what
-turns that read watermark into a floor
-(`MachCSL.wp_s_fence_rw_rw_floor`). -/
+turns that read watermark into a floor. -/
 def diskWm (γ : DiskNames) (n F : Nat) : IProp GF := iprop%
   (∃ b : Nat, diskBaseFrozen γ b ∗ ⌜b ≤ F⌝) ∗
   (⌜n = 0⌝ ∨ ∃ (k m t hd ep : Nat), doneRec γ k (m, t, hd, ep) ∗ ⌜n ≤ m ∧ t ≤ F⌝)
@@ -2231,24 +2230,6 @@ theorem p3Ok_complete (v : VirtioState) (pm : RegMapF PermVal) (dl : List UsedRe
     refine h.1 hh hs (fun hx => hnw ?_) e he hlt
     exact (wroteAt_delete_other pm key x0 hh hget (by rw [h0]; exact hhh)).2 hx
 
-/-- **THE WINDOW BOUND** `dl.length - nr ≤ NUM`: the unread entries sit at
-counters `nr+1 .. dl.length` (strict counters), their heads are distinct
-and are descriptors of the queue, and there are eight of those. -/
-theorem unread_window (pm : RegMapF PermVal) (dl : List UsedRec) (nr nc : Nat)
-    (hc : cntOk pm dl nc) (hi : unreadInj dl nr) : dl.length ≤ nr + NUM := by
-  refine window_le_of_inj nr dl.length (fun k => (dl[k]?.getD ((0, 0, 0, 0) : UsedRec)).hd)
-    (fun p hp1 hp2 => ?_) (fun p q hp1 hp2 hq1 hq2 he => ?_)
-  · simp only [List.getElem?_eq_getElem hp2, Option.getD_some]
-    exact hi.1 (dl[p]'hp2) (List.getElem_mem hp2)
-      (by show nr < (dl[p]'hp2).1; rw [hc.1 p hp2]; omega)
-  · simp only [List.getElem?_eq_getElem hp2, List.getElem?_eq_getElem hq2,
-      Option.getD_some] at he
-    have := hi.2 (dl[p]'hp2) (List.getElem_mem hp2) (dl[q]'hq2) (List.getElem_mem hq2)
-      (by show nr < (dl[p]'hp2).1; rw [hc.1 p hp2]; omega)
-      (by show nr < (dl[q]'hq2).1; rw [hc.1 q hq2]; omega) he
-    have hthis : p + 1 = q + 1 := by rw [← hc.1 p hp2, ← hc.1 q hq2]; exact this
-    omega
-
 /-- **The pigeonhole with one value EXCLUDED.**  An injection of a window
 into the descriptors that AVOIDS one of them bounds the window strictly. -/
 theorem window_lt_of_inj_excl (lo np : Nat) (f : Nat → Nat) (x : Nat) (hx : x < NUM)
@@ -2316,15 +2297,6 @@ theorem unread_window_lt (v : VirtioState) (pm : RegMapF PermVal) (dl : List Use
       (by show nr < (dl[q]'hq2).1; rw [hc.1 q hq2]; omega) he
     have hthis : p + 1 = q + 1 := by rw [← hc.1 p hp2, ← hc.1 q hq2]; exact hx
     omega
-
-/-- **The entry at a counter.**  With strict counters, an index into the
-log IS its counter minus one. -/
-theorem cntOk_mem (pm : RegMapF PermVal) (dl : List UsedRec) (nc k : Nat)
-    (h : cntOk pm dl nc) (hk : k < dl.length) : ((k + 1, (dl[k]'hk).2) : UsedRec) ∈ dl := by
-  have he : ((k + 1, (dl[k]'hk).2) : UsedRec) = dl[k]'hk := by
-    rw [← h.1 k hk]
-  rw [he]
-  exact List.getElem_mem hk
 
 theorem pushedUniq_none (v : VirtioState) (h : noInflight v) : pushedUniq v := by
   intro hh hh' r r' hp _
@@ -2795,18 +2767,9 @@ theorem statusRes_own (γ : DiskNames) (c : Chain) (b : SByte) (hb : b ≠ .lent
     iframe Hq
     iapply bufDone_dmaOwn c ts $$ Hbuf
 
-/-- **Two full footprints over one byte are one too many**: what says a
-slot whose byte the serving task holds is `.lent` in the invariant. -/
-theorem dmaOwn_excl1 (pa : PAddr) : dmaOwn (GF := GF) pa 1 ∗ dmaOwn pa 1 ⊢ False := by
-  unfold dmaOwn
-  iintro ⟨⟨%Hs, H1⟩, ⟨%Hs', H2⟩⟩
-  ihave H1 := histBytes_one_l pa (DFrac.own 1) Hs $$ H1
-  ihave H2 := histBytes_one_l pa (DFrac.own 1) Hs' $$ H2
-  icases pointsTo_ne (L := PAddr) (V := Hist) (H := MemF) $$ H1 H2 with %hne
-  exact absurd rfl hne
-
-/-- **Two full footprints over one WINDOW are one too many**, at any
-nonzero width: the width-generic `Xv6.dmaOwn_excl1`. -/
+/-- One byte's full history out of a full footprint, at any nonzero width:
+what makes two full footprints over one WINDOW one too many
+(`Xv6.dmaOwn_excl`). -/
 theorem dmaOwn_byte0 (pa : PAddr) (n : Nat) (hn : 0 < n) :
     dmaOwn (GF := GF) pa n ⊢ ∃ H : Hist, pa ↦ₕ{DFrac.own 1} H := by
   unfold dmaOwn histBytes
@@ -3957,8 +3920,8 @@ hence disjoint sectors.  A DRAIN only removes cache entries, and
 `Virtio.complete` takes the `.pushed` head out of flight altogether.
 
 `Xv6.diskLive` still carries it, and it is still the write-through gate's
-own statement; what CASHES it is no longer the collect, which since
-`Xv6.cachedOk` retired has no cache obligation at all, but the record of
+own statement; what CASHES it is not the collect, which has no cache
+obligation at all, but the record of
 what `MachCSL.Virtio.completeOk` guarantees at the `.pushed` install. -/
 def dryOk (v : VirtioState) : Prop :=
   ∀ (h : BitVec 16) (r : VioReq), Virtio.phase v h = some (.pushed r) →
@@ -4703,7 +4666,7 @@ whole driver half -- nobody else holds a piece of it -- and an IN-FLIGHT
 slot's QUARTER: the publisher of the chain keeps the other quarter from
 `Xv6.disk_publish` to `Xv6.disk_collect`, across its park inside `sleep`,
 and agreement with it is what tells the woken publisher that the slot it
-is about to collect is still ITS chain (`Xv6.diskRes_slot_of_quarter`).
+is about to collect is still ITS chain.
 
 A member's quarter travels with the head's: `disk_collect` re-assembles
 all three driver halves out of the payload's quarters and its own. -/

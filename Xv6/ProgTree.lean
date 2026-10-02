@@ -3,9 +3,8 @@
 (Rocq `ProgTree.v`, 1584 lines, pinned `1900b8a43`; design
 program-specs.md).  Pure.
 
-* `PEv` (Rocq `ev`; renamed because `MachCSL.Ev` is the Sail effect type) is
-  what a process does that the world can see (open, close, read, write,
-  exit); `Ans e` is the kernel's answer type.
+* `PEv` (Rocq `ev`) is what a process does that the world can see (open,
+  close, read, write, exit); `Ans e` is the kernel's answer type.
 * `ITree R` is the interaction tree; a process never returns (`Proc :=
   ITree Empty`).
 * `echoTree`/`catTree` are the two programs' specs at SYSCALL granularity
@@ -24,7 +23,7 @@ path (`ITree.ext`).  The Rocq vocabulary is recovered as:
 * constructors `ITree.ret`/`ITree.tau`/`ITree.vis` (Rocq `Ret`/`Tau`/`Vis`);
 * `ITree.observe t : ITreeF R (ITree R)` is Rocq's `force`/pattern match,
   with `observe_ret`/`observe_tau`/`observe_vis` and `ITree.eta : t = ofF
-  (observe t)` (Rocq `force_eq`); `ITree.vis_inj`/... are the injectivities;
+  (observe t)` (Rocq `force_eq`);
 * `ITree.corec` builds a tree from a one-step coalgebra that may hand back a
   finished tree (`Sum.inl`) or a new state (`Sum.inr`) at each child; its
   unfolding is `ITree.corec_eq` (Rocq's cofixpoint unfolding);
@@ -263,10 +262,6 @@ theorem eta (t : ITree R) : t = ofF t.observe := by
       cases hs : stepAns e st with
       | none => exact t.canon _ (by simp [rawValid, hr, hs])
       | some a => rw [stepAns_some hs]; rfl
-
-theorem vis_inj {e e' : PEv} {k : Ans e → ITree R} {k' : Ans e' → ITree R} (h : vis e k = vis e' k') :
-    e = e' ∧ HEq k k' := by
-  have := congrArg observe h; simp only [observe_vis, ITreeF.vis.injEq] at this; exact this
 
 /-! ### Corecursion -/
 

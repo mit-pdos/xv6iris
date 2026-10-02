@@ -7,11 +7,9 @@ ghost step it runs.
 
 Merged here (old names, all deleted):
 
-* `bread_callF`  -- `iu_bread` (IupdateSteps), `ialloc_bread` (IallocDefs),
-  `itrunc_bread` (ItruncArm): `Xv6.bread_call` at the ambient view.
 * `brelse_callF` -- `iu_brelse`, `ialloc_brelse`, `itrunc_brelse`.
-  (`itrunc_bread` / `itrunc_brelse` spelt the bcache slot `bslots 1`,
-  which is `bslot` by definition.)
+  (`itrunc_brelse` spelt the bcache slot `bslots 1`, which is `bslot` by
+  definition.)
 * `dislotWriteAu` -- `iuRegionAu` (IupdateSteps; Rocq's `iu_region_au`)
   and `iallocClaimAu` (IallocDefs), which was `iuRegionAu` at
   `dn = iallocFresh ty` restated.  Exactly
@@ -40,34 +38,6 @@ open LeanRV64D
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [CurCtx]
-
-set_option maxHeartbeats 1000000 in
-/-- `bread(ip->dev, bno)` at the ambient view. -/
-theorem bread_callF [Fscfg] [Icfg] (BD : BREAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (c : CPU) (k' : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
-    (pidv bno : BitVec 32) (dqp : DFrac) (pj : BitVec 64) (hpj : k'.proc = pj)
-    (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hK : breadSlots ≤ k'.avail)
-    (hsie : k'.sie = false) (hnoff : k'.noff = 0) (hlocks : k'.locks = [])
-    (htier : k'.tier = KTier.kpt)
-    (hbno : bno.toNat < 2 ^ 31) (hcov : bno.toNat ∈ fscCov) (hpd : descPageRw pd)
-    (ha0 : k'.regs 10#5 = BitVec.signExtend 64 icfgDev)
-    (ha1 : k'.regs 11#5 = BitVec.signExtend 64 bno) :
-    kctx c k' ∗ pcIs c KA.«bread» ∗ procsInv Γ ∗
-    trapCsrs c ∗ cpuClaim c pj ∗ intrRes c ∗
-    bioCtx γl fscBio (fsView fscFs fscDisk icfgDev fscCov) ∗
-    diskCaps fscDisk fscDlock pd pav pu ∗ panicEnv ∗
-    wordPointsTo (pPid pj) 4 dqp pidv ∗ bslot ∗
-    wpNext true pj c (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (kk : Nat)
-        (bs bsd : List (BitVec 8)) (d : Bool),
-      ⌜calleeSaved k'.regs R' ∧ R' 10#5 = bnode kk⌝ -∗
-      kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
-      trapCsrs cpu' -∗ cpuClaim cpu' pj -∗ intrRes cpu' -∗
-      wordPointsTo (pPid pj) 4 dqp pidv -∗
-      bioLocked fscBio (fsView fscFs fscDisk icfgDev fscCov) kk pidv icfgDev bno bs bsd d -∗
-      wpLoop cpu'))
-    ⊢ wpLoop (GF := GF) c :=
-  bread_call BD Γ c k' γl fscBio (fsView fscFs fscDisk icfgDev fscCov) fscDlock pd pav pu j
-    pidv icfgDev bno dqp pj hpj hj hproc hK hsie hnoff hlocks htier hbno hcov rfl hpd ha0 ha1
 
 set_option maxHeartbeats 1000000 in
 /-- `bread(ip->dev, bno)` at the ambient view, at EITHER entry `SIE`. -/

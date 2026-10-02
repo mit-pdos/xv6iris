@@ -37,7 +37,7 @@ contract's own continuation `createPost`.
 * `create_alloc_afail`: ARM A-FAIL from +0xec (Rocq :1780–1994).
 * `create_alloc_repark`: the ghost moves of ARM C-OK-FILE between the
   `bltz` and +0xe0 -- the parent's `dlinks` re-parked at the appended record
-  with the +0xc4 mint's unit, and the parent leg fired (`cafAcre_fire`)
+  with the +0xc4 mint's unit, and the parent leg fired (`cafAcre_fire_nm`)
   (Rocq :1134–1378).
 * `create_alloc_cok`: ARM C-OK-FILE from +0xe0 (Rocq :1379–1662).
 * `create_alloc_file`: the non-directory path from +0xca's fall-through:
@@ -442,7 +442,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 /-- **THE PARENT'S RE-PARK AND THE PARENT LEG** (Rocq :1161–1378): the unit
 the `+0xc4` flush minted goes into the parent's `dlinks` at the name the
 appended record carries (`entToks_dirlinkArm`), and the parent leg fires at
-the written row (`cafAcre_fire`, which performs the retag). -/
+the written row (`cafAcre_fire_nm`, which performs the retag). -/
 theorem create_alloc_repark (dind cinum : BitVec 32) (dn dn' : Dinode) (bm bm' : Blkmap)
     (data data' : Nat → List (BitVec 8)) (nf : Nat → BitVec 8) (ty major minor : BitVec 16)
     (dnc : Dinode) (bmc : Blkmap) (datc : Nat → List (BitVec 8))

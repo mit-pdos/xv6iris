@@ -1,9 +1,8 @@
 /-
 **Program-generic user-space ABI vocabulary** of the verified user tier
 (Rocq `UmodeAbi.v`, 986 lines, pinned `1900b8a43`): the RISC-V ABI register
-indices contracts speak about, C strings, what a call leaves behind in the
-image (`uMOnly`, `uMOnlyIn`), the callee-saved register set, the contents of
-an exec argument vector, and the stack/slot arithmetic.  Everything here is
+indices contracts speak about, C strings, the callee-saved register set, the
+contents of an exec argument vector, and the stack/slot arithmetic.  Everything here is
 PURE (a `Prop` about the image `M` and registers); nothing is about any one
 program.
 
@@ -16,8 +15,9 @@ program.
    union's run layer states them on the KEY instead (`UkAbi.ukRd`,
    `UkAbi.ukArgs`, `UkAbi.ukStack`, Rocq's own re-cut), and the old tier's
    only other readers are the generated `UCode*` catalogs, which DU3
-   replaces.  Their pure arithmetic (`uv_avi_neg`, `uz_mod4096_of_mod16/8`,
-   `uv_slot8_facts`, `uv_slot4_facts`) is kept.
+   replaces.  Their pure arithmetic `uv_avi_neg` is kept;
+   `uz_mod4096_of_mod16/8`, `uv_slot8_facts` and `uv_slot4_facts` are not
+   ported (nothing uses them).
 2. `uimg_sub` is `KexecBuilt.uimgSub` (already landed over `ElfMem`); only
    its transports are here.
 3. Addresses are `Nat` (the image is `ElfMem`, Nat-keyed; UexecSlot deviation
@@ -39,7 +39,6 @@ open MachCSL
 
 /-! ## §1 ABI register indices (a7, the syscall number, is `17#5`) -/
 
-def raIdx : BitVec 5 := 1#5
 def spIdx : BitVec 5 := 2#5
 def a0Idx : BitVec 5 := 10#5
 def a1Idx : BitVec 5 := 11#5
@@ -67,17 +66,6 @@ instance ucstr_dec (M : ElfMem) (a len : Nat) : Decidable (Ucstr M a len) := by
 
 /-! ## §6 The stack's arithmetic -/
 
-/-- Rocq `uz_mod4096_of_mod16`: a 16-aligned page offset leaves at least
-`4080 - r` room. -/
-theorem uz_mod4096_of_mod16 (V r : Nat) (hm : V % 16 = r) : V % 4096 ≤ 4080 + r := by omega
-
-/-- Rocq `uz_mod4096_of_mod8`: an 8-aligned address leaves a whole 8-byte
-access on its page. -/
-theorem uz_mod4096_of_mod8 (V : Nat) (hm : V % 8 = 0) : V % 4096 ≤ 4088 := by omega
-
-/-- ...and the 4-aligned twin. -/
-theorem uz_mod4096_of_mod4 (V : Nat) (hm : V % 4 = 0) : V % 4096 ≤ 4092 := by omega
-
 /-- **Rocq `uv_avi_neg`**: a NEGATIVE displacement, as unsigned arithmetic. -/
 theorem uv_avi_neg (a : BitVec 64) (d : Nat) (hd : d ≤ a.toNat) :
     (a + BitVec.ofInt 64 (-(d : Int))).toNat = a.toNat - d := by
@@ -85,26 +73,6 @@ theorem uv_avi_neg (a : BitVec 64) (d : Nat) (hd : d ≤ a.toNat) :
   have h0 : (0 : Int) ≤ (a.toNat : Int) + -(d : Int) := by omega
   have h1 : (a.toNat : Int) + -(d : Int) < 2 ^ 64 := by have := a.isLt; omega
   rw [umoi_toNat_nat h0 h1]; omega
-
-/-- **Rocq `uv_slot8_facts`**: every side condition an 8-byte access needs at
-an 8-aligned address below `MAXVA` (the argument area's pointer dereference). -/
-theorem uv_slot8_facts (a : Nat) (va : BitVec 64) (h8 : a % 8 = 0) (hhi : a + 8 ≤ 2 ^ 38)
-    (hva : va = BitVec.ofNat 64 a) : va.toNat = a ∧ va.toNat % 4096 ≤ 4088 ∧ va.toNat % 8 = 0 := by
-  have hu : va.toNat = a := by subst hva; simp; omega
-  exact ⟨hu, hu ▸ uz_mod4096_of_mod8 a h8, hu ▸ h8⟩
-
-/-- **Rocq `uv_slot4_facts`**: the 4-byte twin (the K&R allocator's `size`). -/
-theorem uv_slot4_facts (a : Nat) (va : BitVec 64) (h4 : a % 4 = 0) (hhi : a + 4 ≤ 2 ^ 38)
-    (hva : va = BitVec.ofNat 64 a) : va.toNat = a ∧ va.toNat % 4096 ≤ 4092 ∧ va.toNat % 4 = 0 := by
-  have hu : va.toNat = a := by subst hva; simp; omega
-  exact ⟨hu, hu ▸ uz_mod4096_of_mod4 a h4, hu ▸ h4⟩
-
-/-! ## §7 What a call leaves behind -/
-
-/-- **Rocq `uM_only`**: `M'` is `M` with only the bytes in `[a, a+n)`
-possibly changed, and no key lost. -/
-def uMOnly (M M' : ElfMem) (a n : Nat) : Prop :=
-  (∀ k, (M k).isSome → (M' k).isSome) ∧ (∀ k, k < a ∨ a + n ≤ k → M' k = M k)
 
 /-! ## §8 The callee-saved register set -/
 
@@ -131,14 +99,5 @@ theorem ucs_caller (m : RegMap) (r : BitVec 5) (v : BitVec 64) (hr : ucalleeSave
   by_cases h0 : r' = 0#5
   · simp [h0]
   · simp [h0, RegMap.set_other _ _ _ _ hne]
-
-/-! ## §11 Several disturbed windows -/
-
-/-- Rocq `uM_in_windows`. -/
-def uMInWindows (ws : List (Nat × Nat)) (k : Nat) : Prop := ∃ w ∈ ws, w.1 ≤ k ∧ k < w.1 + w.2
-
-/-- **Rocq `uM_only_in`**. -/
-def uMOnlyIn (M M' : ElfMem) (ws : List (Nat × Nat)) : Prop :=
-  (∀ k, (M k).isSome → (M' k).isSome) ∧ (∀ k, ¬ uMInWindows ws k → M' k = M k)
 
 end Xv6

@@ -28,7 +28,7 @@ makes the jump table's default row dead.  The runner's tree is
    `ushCode` where Rocq's carries `shk_rodata`.
 3. **UkSh's vocabulary is sh-main's** (`UshMainPure`/`UshMainDefs`, lane
    sh-main, in flight beside this one): the jump table `ushJtabA`/`ushJent`/
-   `ushJrow`/`ushJtab`/`ushJtab_ro`/`ushJtab_of_rodata` (its rows at `Nat`
+   `ushJrow`/`ushJtab`/`ushJtab_of_rodata` (its rows at `Nat`
    indexes, so a node selects row `(ushTy c).toNat`), `shDeps` (Rocq
    `sh_deps`) and `ushPid` (Rocq `ush_pid`) are imported from there.
 4. `ush_diag_leaf` (a Rocq SECTION HYPOTHESIS of `UkShRun`) is the `Prop`

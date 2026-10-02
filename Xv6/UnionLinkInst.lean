@@ -10,8 +10,7 @@ Rocq's header, abridged: `GenLinksLine.gen_link_inst ulmG union_params`:
   (`urresw`: the generic residue and `FileLinksLine.flw`);
 - the N-writer arm `X := union_X`: an N-writer round's block complete and
   handed back by the family, not yet filed, at the ROUND'S STATE `sR` --
-  whose prompt step is the filing link;
-- `union_links_gl`: the links entail the generic interface.
+  whose prompt step is the filing link.
 
 ## DEVIATIONS from Rocq
 
@@ -166,106 +165,6 @@ theorem uf0w_cw (ug : UnionGn) (k : Nat) (s : Fstate) :
   iintro ⟨-, H⟩
   iexact H
 
-/-- The head gives the claim its boot evidence (Rocq `ufhead_boot`). -/
-theorem ufhead_boot (ug : UnionGn) (k : Nat) (v : EraPins) (I : List (BitVec 8)) :
-    ⊢ fhead (hlc := hlc) (GF := GF) ug.ugnFile k v I -∗
-      turn v 0 ∗ psLb v [] ∗ csLb v [] ∗ inpLb v []
-      ∗ ∃ s0 : Fstate, ⌜fstateOk s0⌝ ∗ (f0boot ug.ugnFile k s0 ∨ fileTaint (hlc := hlc) ug.ugnFile.fgnCl)
-          ∗ (f0cw ug.ugnFile k s0 -∗ f0w (hlc := hlc) ug.ugnFile k s0) := by
-  unfold fhead f0pre f0bw
-  iintro ⟨-, %hk, Htn, #Hps, #Hcs, #HE, ⟨%vf, #Hvf⟩, %s0, %hok, Hty, -, %vf', #Hvf', #Hbl⟩
-  subst hk
-  ihave %he := fileEraPin_agree $$ [Hvf Hvf']
-  · isplitl [Hvf]
-    · iexact Hvf
-    · iexact Hvf'
-  subst he
-  iframe Htn Hps Hcs HE
-  iexists s0
-  isplitr
-  · ipureintro; exact hok
-  · isplitl [Hty]
-    · icases Hty with (#Hty | #HT)
-      · ileft
-        unfold f0boot
-        iexists vf
-        iframe Hvf Hbl Hty
-      · iright
-        iexact HT
-    · iintro Hw
-      unfold f0w f0cw
-      isplitr
-      · ipureintro; rfl
-      · iexact Hw
-
-/-- The links are the claim's: the bundle is the record equation (Rocq
-`union_links_gl`; the block-first byte refuses the wild line, seccomp design
-10.7). -/
-theorem union_links_gl (ug : UnionGn) :
-    ⊢ unionLinks (hlc := hlc) (GF := GF) ug -∗ glinks (unionParams (hlc := hlc) ug) := by
-  iintro Hlk
-  ihave %hc := unionLinks_eq ug $$ Hlk
-  unfold glinks glW glBlk glPro glHead glTaint
-  simp only [unionParams_gT, unionParams_gPIN, unionParams_gW, unionParams_gH, unionParams_gwild, unionParams_gR]
-  isplitr
-  · imodintro
-    iintro %k %v %P0 %b %ps0 %cs0 %s0 %I0 %Φ %h1 %h2 %h3 #Hpin #Hw Ht #Hps #Hcs #HE HΦ
-    ihave #Hcw := uf0w_cw ug k s0 $$ Hw
-    iapply union_write_link ug hc k v P0 b ps0 cs0 s0 I0 Φ h1 h2 h3 $$ Hpin Ht Hps Hcs HE Hcw
-    iintro Hr
-    iapply HΦ
-    icases Hr with (⟨Ht, Hps', Hcs', HE', -⟩ | #HT)
-    · ileft
-      iframe Ht Hps' Hcs' HE'
-    · iright
-      iexact HT
-  isplitr
-  · imodintro
-    -- the round's payload `HR` (sync SY3-A4)
-    iintro %k %v %P0 %a %b %ps0 %cs0 %s0 %I0 %Φ %h0 %h1 %h2 %h3 %h4 %h5 %h6 %h7 %h8 #Hpin #Hw Ht
-      #Hps #Hcs #HE #HR HΦ
-    ihave #Hcw := uf0w_cw ug k s0 $$ Hw
-    iapply union_write_link_blk ug hc k v P0 a b ps0 cs0 s0 I0 Φ
-      (Bool.eq_false_iff.mpr h0) h1 h2 h3 h4 h5 h6 h7 h8 $$ Hpin Ht Hps Hcs HE Hcw HR
-    iintro Hr
-    iapply HΦ
-    icases Hr with (⟨Ht, Hps', Hcs', HE', -⟩ | #HT)
-    · ileft
-      iframe Ht Hps' Hcs' HE'
-    · iright
-      iexact HT
-  isplitr
-  · imodintro
-    iintro %k %v %P0 %a %b %ps0 %cs0 %s0 %I0 %Φ %h1 %h2 %h3 %h4 %h5 %h6 %h7 %h8 #Hpin #Hw Ht
-      #Hps #Hcs #HE HΦ
-    ihave #Hcw := uf0w_cw ug k s0 $$ Hw
-    iapply union_write_link_pro ug hc k v P0 a b ps0 cs0 s0 I0 Φ h1 h2 h3 h4 h5 h6 h7 h8
-      $$ Hpin Ht Hps Hcs HE Hcw
-    iintro Hr
-    iapply HΦ
-    icases Hr with (⟨Ht, Hps', Hcs', HE', -⟩ | #HT)
-    · ileft
-      iframe Ht Hps' Hcs' HE'
-    · iright
-      iexact HT
-  isplitr
-  · imodintro
-    iintro %k %v %I %a %b %Φ %h1 %h2 #Hpin Hh HΦ
-    ihave ⟨Ht, #Hps, #Hcs, #HE, %s0, %hok, Hbt, Hwb⟩ := ufhead_boot ug k v I $$ Hh
-    iapply union_write_link_first ug hc k v a b s0 Φ hok h1 h2 $$ Hpin Ht Hps Hcs HE Hbt
-    iintro Hr
-    iapply HΦ
-    icases Hr with (⟨Ht, Hps', Hcs', HE', Hw⟩ | #HT)
-    · ileft
-      iexists s0
-      iframe Ht Hps' Hcs' HE'
-      iapply Hwb $$ Hw
-    · iright
-      iexact HT
-  · imodintro
-    iintro %k %v %b %Φ - #HT HΦ
-    iapply union_write_link_taint ug hc k b Φ $$ HT HΦ
-
 /-! ## 3. The read receipt, the turn, the residue -/
 
 /-- The receipt exposes the generic residue where something was read (Rocq
@@ -298,36 +197,6 @@ theorem uread_ret_res (ug : UnionGn) :
   iframe Hvf
   iapply f0Lb_bl $$ Hlb
 
-/-- Rocq `uturn0`. -/
-theorem uturn0 (ug : UnionGn) (k : Nat) :
-    ⊢ fturnPre (hlc := hlc) (GF := GF) ug.ugnFile k -∗
-      (∃ v : EraPins, eraPin (fgnEcho ug.ugnFile) k v ∗ dlCnt v (1 : Qp).half 0 ∗ inpLb v []
-        ∗ rposAuth v 0)
-      ∗ (∃ v : EraPins, eraPin (fgnEcho ug.ugnFile) k v
-          ∗ gwcBan (unionParams (hlc := hlc) ug) k v [] 0) := by
-  unfold fturnPre fturnCore
-  iintro ⟨%hk, ⟨%v, %vf, #Hpin, #Hvf, Htn, Hdl, #Hcs, #Hps, #HE, Hrp⟩, Hpre⟩
-  isplitl [Hdl Hrp]
-  · iexists v
-    iframe Hpin Hdl HE Hrp
-  · iexists v
-    isplitr
-    · iexact Hpin
-    unfold gwcBan
-    simp only [unionParams_gH]
-    iright
-    ileft
-    isplitr
-    · ipureintro; simp
-    unfold fhead
-    isplitr
-    · ipureintro; simp
-    isplitr
-    · ipureintro; exact hk
-    iframe Htn Hps Hcs HE Hpre
-    iexists vf
-    iexact Hvf
-
 /-- THE RING'S STORED NEWLINE (Rocq `uring_at`; seccomp design 10.12, lane
 S5b): position `length I - 1` of the console ring's stored sequence, its
 push trace's era input the line's own input. -/
@@ -358,13 +227,6 @@ instance urresw_persistent (ug : UnionGn) (v : EraPins) (I : List (BitVec 8)) :
 instance urresw_timeless (ug : UnionGn) (v : EraPins) (I : List (BitVec 8)) :
     Timeless (urresw (hlc := hlc) (GF := GF) ug v I) := by
   unfold urresw gwcRres; infer_instance
-
-/-- Rocq `urresw_res`. -/
-theorem urresw_res (ug : UnionGn) (v : EraPins) (I : List (BitVec 8)) :
-    ⊢ urresw (hlc := hlc) (GF := GF) ug v I -∗ gwcRres (unionParams (hlc := hlc) ug) v I := by
-  unfold urresw
-  iintro ⟨H, -⟩
-  iexact H
 
 /-! ## 4. The N-writer round's line arm, and its prompt step -/
 
@@ -416,14 +278,6 @@ theorem union_X_dollar (ug : UnionGn) (k : Nat) (v : EraPins) (I : List (BitVec 
     · iexact HW
   · iright
     iexact HT
-
-/-! ## 5. The record -/
-
-/-- THE UNION'S LINK RECORD (Rocq `union_link_inst`). -/
-noncomputable def unionLinkInst (ug : UnionGn) : LinkRec hlc GF :=
-  genLinkInst (unionParams ug) (unionX ug) (unionLinks ug) (union_links_gl ug)
-    (fun k v I b Φ hb => union_X_dollar ug k v I b Φ hb) (ureadRet ug) (uread_ret_res ug)
-    (fturnPre ug.ugnFile) (uturn0 ug) (urresw ug) (urresw_res ug)
 
 end UnionLinkInst
 

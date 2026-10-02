@@ -273,29 +273,6 @@ theorem create_dirty_clear_dots (E : CoPset) (t i d : Nat) (full : Bool)
   imodintro
   iframe Htx Hf Hr
 
-/-- UNARM, disarm, hand the half back (Rocq's `cr_dirty_clear_unarm`;
-mkdir's `fail:` tail). -/
-theorem create_dirty_clear_unarm (E : CoPset) (t i : Nat) (c : Absnode)
-    (Fun : Pfam GF (Aview → Nat → IProp GF)) (n n' : FsNode)
-    (hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ E) (hloc : InodeLocal i n')
-    (hrow : absOf n = some ⟨c, 1⟩) (hnone : absOf n' = none) :
-    ⊢@{IProp GF} ftopInv (hlc := hlc) fscFs -∗ appInv (hlc := hlc) fscFs -∗ createDirty t i -∗
-      aunarmCommitAt (hlc := hlc) (fsGammaL fscFs) appE i Fun.pfRecv -∗
-      topFrag (fsGammaL fscFs) i n ={E}=∗
-        txPin icfgLog t (1 : Qp).half ∗ topFrag (fsGammaL fscFs) i n' ∗ creUnarmFired Fun i := by
-  iintro #Hi #Hai Hd Hcm Hf
-  unfold createDirty
-  icases Hd with ⟨%k, Harm⟩
-  imod (cafUnarm_fire_armed (hlc := hlc) fscFs E k t (1 : Qp).half {i} i c Fun n n' hE
-    (create_single_mem i) hrow hnone) $$ Hi Hai Harm Hcm Hf with ⟨Harm, Hf, Hr⟩
-  imod (iregDisarm (hlc := hlc) E fscFs k t (1 : Qp).half {i} i n' (ftopN_sub_app E hE) hloc)
-    $$ Hi Harm Hf with ⟨Harm, Hf⟩
-  rw [create_single_diff i]
-  imod (iregRelease (hlc := hlc) E fscFs k t (1 : Qp).half (ftopN_sub_app E hE)) $$ Hi Harm
-    with Htx
-  imodintro
-  iframe Htx Hf Hr
-
 /-! ### The two unarm fires at a node predicate (Rocq `ProofCreateShared`,
 INIT-FILE's UNARM ruling, `1a1b4633d`)
 

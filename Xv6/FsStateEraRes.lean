@@ -256,7 +256,7 @@ era-vocabulary unification).  A read-locking `ilock` withdraws exactly
 `inodeDatQ (fsGammaL γfs) (DFrac.own (1/4)) n` and the escrow's "out for
 reading" arm keeps the bundle at three quarters -- which is what makes
 cross-inode block disjointness at the commit's collection pure separation
-logic (3/4 + 3/4 > 1, `FsView.blkOwned_ne_34`).  The record is NOT in the
+logic (3/4 + 3/4 > 1).  The record is NOT in the
 leg: records park region-side at fraction 1 always (plan section 2, ruling
 (i)), which is exactly why `inodeDatQ` is `inodePhi` MINUS its record.
 
@@ -400,14 +400,6 @@ theorem inodeOwnedEra_shedOf (γfs : FsNames) (γi : GName) (inum : BitVec 32) (
   isplitl [H1]
   · iexact H1
   · iexact H2
-
-/-- Rocq's `inode_owned_era_local`. -/
-theorem inodeOwnedEra_local (γfs : FsNames) (γi : GName) (inum : BitVec 32) (n : FsNode) :
-    inodeOwnedEra (GF := GF) γfs γi inum n ⊢ ⌜InodeLocal inum.toNat n⌝ := by
-  unfold inodeOwnedEra
-  iintro ⟨_, _, _, %hl⟩
-  ipureintro
-  exact hl
 
 /-! ### THE OLD PAYLOAD SHAPE, BOTH WAYS
 

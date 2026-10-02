@@ -61,8 +61,9 @@ Rocq's header on the record, kept because the reasons are the content:
    `ai_wild`/`ai_rdwild`; the machine's record gets two slots
    (`MachFixedGS.wild`/`rdwild`, deviation 1) fed from here.  The law
    `wild_lic` stays on this record (it names Xv6's `ConsEv`), so the kernel's
-   `consLicenceAt_of_wild` (Rocq `cons_licence_at_of_wild`) takes the two
-   slot equations where Rocq reads `riscvF_app_iface`.  `wildNone` (Rocq
+   licence lemmas (`consLicence_of_taint`) take the two slot equations where
+   Rocq reads `riscvF_app_iface`; Rocq's `cons_licence_at_of_wild` is not
+   ported (nothing uses it).  `wildNone` (Rocq
    `wild_none`) is MachCSL's, beside `consResTriv`; its law `wildNone_lic`
    is here.
 -/
@@ -198,20 +199,9 @@ end AppIfaceInst
 section AppIfaceWild
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
 
-/-- **Rocq `WpUart.cons_licence_at_of_wild`**: the WILD credential buys the
-era's licence, off the interface's `wild_lic`, at a record whose two slots
-are the interface's (deviation 5: Rocq reads `riscvF_app_iface`). -/
-theorem consLicenceAt_of_wild (Ai : AppIface GF) (k : Nat)
-    (hw : MachFixedGS.wild (hlc := hlc) (GF := GF) = Ai.wild)
-    (hc : MachFixedGS.consRes (hlc := hlc) (GF := GF) = Ai.cons) :
-    MachFixedGS.wild (hlc := hlc) (GF := GF) k ⊢ consLicenceAt (hlc := hlc) (GF := GF) k := by
-  unfold consLicenceAt
-  rw [hw, hc]
-  exact Ai.wild_lic k
-
 /-- **Rocq `WpUart.cons_licence_of_taint`**: the TAINT buys the licence, off
 the interface's `lic`, at a record whose two slots are the interface's
-(deviation 5, as `consLicenceAt_of_wild`; lane gaps). -/
+(deviation 5; lane gaps). -/
 theorem consLicence_of_taint (Ai : AppIface GF)
     (hk : MachFixedGS.killCred (hlc := hlc) (GF := GF) = Ai.kill)
     (hc : MachFixedGS.consRes (hlc := hlc) (GF := GF) = Ai.cons) :

@@ -47,11 +47,10 @@ Rocq's comment on the hop, kept:
    cannot unify two of them; the named form is the same term everywhere
    (the era fires state their conclusion through it).
 
-5. **The chroot bump** (design/chroot.md section 3): the record-only hop
-   is `axHopEnt`/`axHopsEntFrom` (the old `axHop`/`axHopsFrom`), and
-   `axHop rt`/`axHopsFrom rt` add the root's self rule, whose answer is
-   NAMED `axHopAns` (deviation 4's reason; `axHopAns_self`/`_rec` read
-   it).  Rocq's `decide` is the `Decidable` instance of `s = DOTDOT ∧
+5. **The chroot bump** (design/chroot.md section 3): `axHop rt`/
+   `axHopsFrom rt` are the record-only hop plus the root's self rule,
+   whose answer is NAMED `axHopAns` (deviation 4's reason;
+   `axHopAns_self`/`_rec` read it).  Rocq's `decide` is the `Decidable` instance of `s = DOTDOT ∧
    d = rt` (`Fname` has `DecidableEq`).  `ax_hops_nodot`'s `Forall` is
    `∀ s ∈ ps.drop n, s ≠ DOTDOT`.
 
@@ -82,24 +81,6 @@ theorem axHopNext_some (P Pmiss : Nat → Nat → IProp GF) (k d c : Nat) :
 theorem axHopNext_none (P Pmiss : Nat → Nat → IProp GF) (k d : Nat) :
     axHopNext P Pmiss k d none = Pmiss k d := rfl
 
-/-- ONE caller-supplied atomic step, THE RECORD-ONLY FORM (Rocq's
-`ax_hop_ent`; this was `axHop` until the chroot bump): given the cursor
-`P k d` and the lent fragment `F d dqv ents` at the directory `d`, the
-caller hands the fragment back at the SAME share and steps the cursor --
-to `P (k+1) c` if `s` is an entry of `d` (at child `c`), to `Pmiss k d`
-otherwise. -/
-def axHopEnt (F : Nat → DFrac → Std.ExtTreeMap Fname Nat compare → IProp GF)
-    (P Pmiss : Nat → Nat → IProp GF) (k : Nat) (s : Fname) : IProp GF :=
-  iprop(∀ (d : Nat) (ents : Std.ExtTreeMap Fname Nat compare) (dqv : DFrac),
-    P k d -∗ F d dqv ents ={⊤}=∗
-      F d dqv ents ∗ axHopNext P Pmiss k d ents[s]?)
-
-/-- The record-only hops still owed from index `n` on (Rocq's
-`ax_hops_ent_from`). -/
-def axHopsEntFrom (F : Nat → DFrac → Std.ExtTreeMap Fname Nat compare → IProp GF)
-    (P Pmiss : Nat → Nat → IProp GF) (ps : List Fname) (n : Nat) : IProp GF :=
-  iprop([∗list] j ↦ s ∈ ps.drop n, axHopEnt F P Pmiss (n + j) s)
-
 /-- WHAT THE HOP AT THE PROCESS'S ROOT `rt` HANDS BACK (the `if` inside
 Rocq's `ax_hop`, named for the same reason as `axHopNext`, deviation 4):
 `..` at the root steps the cursor IN PLACE, whatever the record says
@@ -121,9 +102,7 @@ theorem axHopAns_rec (rt : Nat) (P Pmiss : Nat → Nat → IProp GF) (k d : Nat)
 
 /-- THE HOP THE WALK FIRES, AT THE PROCESS'S ROOT `rt` (Rocq's `ax_hop`,
 design/chroot.md section 3): the record-only hop plus the root's self rule.
-Every kernel contract instantiates `rt` at its block's `V.rti`; a caller
-whose names are never `..` builds it from the record-only form
-(`axHop_nodot`). -/
+Every kernel contract instantiates `rt` at its block's `V.rti`. -/
 def axHop (rt : Nat) (F : Nat → DFrac → Std.ExtTreeMap Fname Nat compare → IProp GF)
     (P Pmiss : Nat → Nat → IProp GF) (k : Nat) (s : Fname) : IProp GF :=
   iprop(∀ (d : Nat) (ents : Std.ExtTreeMap Fname Nat compare) (dqv : DFrac),
@@ -134,16 +113,6 @@ def axHop (rt : Nat) (F : Nat → DFrac → Std.ExtTreeMap Fname Nat compare →
 def axHopsFrom (rt : Nat) (F : Nat → DFrac → Std.ExtTreeMap Fname Nat compare → IProp GF)
     (P Pmiss : Nat → Nat → IProp GF) (ps : List Fname) (n : Nat) : IProp GF :=
   iprop([∗list] j ↦ s ∈ ps.drop n, axHop rt F P Pmiss (n + j) s)
-
-/-- THE BRIDGE (Rocq's `ax_hop_nodot`): at a name that is not `..` the self
-rule cannot fire, so the record-only hop IS the hop at every root. -/
-theorem axHop_nodot (rt : Nat) (F : Nat → DFrac → Std.ExtTreeMap Fname Nat compare → IProp GF)
-    (P Pmiss : Nat → Nat → IProp GF) (k : Nat) (s : Fname) (hs : s ≠ DOTDOT) :
-    axHopEnt F P Pmiss k s ⊢ axHop rt F P Pmiss k s := by
-  unfold axHopEnt axHop
-  iintro H %d %ents %dqv HP HF
-  rw [axHopAns_rec rt P Pmiss k d s ents (fun h => hs h.1)]
-  iapply H $$ %d %ents %dqv HP HF
 
 end FsAbsWalk
 

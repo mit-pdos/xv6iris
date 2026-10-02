@@ -14,8 +14,7 @@ hook's record over sh's line lower bound.
 
 Names (Rocq → Lean): `usync_at` → `usyncAt`, `usyncs` → `usyncs`,
 `usync_last` → `usyncLast`, `lm_good_sync` → `lmGoodSync`,
-`lm_good_sync_out` → `lmGoodSync_out`, `lm_good_sync_nil` →
-`lmGoodSync_nil`, `cs_prefix_total` → `csPrefix_total`, `usync_at_ext` →
+`lm_good_sync_nil` → `lmGoodSync_nil`, `cs_prefix_total` → `csPrefix_total`, `usync_at_ext` →
 `usyncAt_ext`, `usync_at_new` → `usyncAt_new`, `usyncs_ext` → `usyncs_ext`,
 `lm_good_sync_step` → `lmGoodSync_step`, `ulast_from` → `ulastFrom`,
 `ulast_before` → `ulastBefore`, `ulast_from_take` → `ulastFrom_take`,
@@ -23,7 +22,8 @@ Names (Rocq → Lean): `usync_at` → `usyncAt`, `usyncs` → `usyncs`,
 `ulast_from_app` → `ulastFrom_app`, `ulines_before_length_take` →
 `ulinesBefore_length_take`, `ulast_before_snoc_some` →
 `ulastBefore_snoc_some`, `ulast_before_snoc_none` → `ulastBefore_snoc_none`,
-`usync_bridge` → `usync_bridge`.
+`usync_bridge` → `usync_bridge`.  `lm_good_sync_out` is not ported (nothing
+uses it).
 
 DEVIATIONS from Rocq:
 1. Spelling as `UnionAdm.lean`; `seq 0 n` is `List.range n`, `last` is
@@ -70,12 +70,6 @@ def lmGoodSync (s : Fstate) (seg : List Obs) (o : Option Srec) : Prop :=
     ∧ lmAltsOk ulmG s (consIns seg) cs
     ∧ obsWire .uart0 seg <+: lmSess ulmG ps cs s (consIns seg)
     ∧ o = usyncLast ps cs s (consIns seg) (obsWire .uart0 seg)
-
-/-- Rocq `lm_good_sync_out`. -/
-theorem lmGoodSync_out (s : Fstate) (seg : List Obs) (o : Option Srec) (h : lmGoodSync s seg o) :
-    lmGoodOut ulmG s seg := by
-  obtain ⟨ps, cs, h1, h2, h3, _⟩ := h
-  exact ⟨ps, cs, h1, h2, h3⟩
 
 /-- Rocq `lm_good_sync_nil`. -/
 theorem lmGoodSync_nil (s : Fstate) : lmGoodSync s [] none := by
@@ -171,8 +165,7 @@ theorem consIns_one (e : Obs) : consIns [e] = [] ∨ ∃ b, consIns [e] = [b] :=
       · exact Or.inl (by simp [obsIns, hj])
 
 /-- Rocq `lm_good_sync_step`: AN EVENT THAT PUTS NOTHING ON THE CONSOLE'S
-WIRE keeps the cycle good with the same record (`lmGoodOut_step`'s
-resolution, padded). -/
+WIRE keeps the cycle good with the same record. -/
 theorem lmGoodSync_step (s : Fstate) (seg : List Obs) (e : Obs) (o : Option Srec)
     (he : obsWire .uart0 [e] = []) (h : lmGoodSync s seg o) : lmGoodSync s (seg ++ [e]) o := by
   obtain ⟨ps, cs, ⟨hpsb, hlt⟩, hao, hwire, rfl⟩ := h

@@ -109,27 +109,6 @@ theorem shChildXGen_holds (UL : UK_LEAVES) (SP : SH_PARSECMD) (HM : SH_MALLOC) (
     E.UExec (ushArgs s0 (ushpNulfold (ushEchoToks ws) (ushpExt len f)) (ushEchoToks ws)) from rfl] at harm
   iapply harm $$ Hc Hexs Hxl Hcd Hjt Hcmd HM' Hstd Hcwd Hch Hcr Hrun
 
-/-- **Rocq `wp_kshm_child_x_holds`**. -/
-theorem shChildX_holds (UL : UK_LEAVES) (SP : SH_PARSECMD) (HM : SH_MALLOC) (SE : SH_RUNCMD_EXEC)
-    (hps : ∀ k : Int, freeNum k → UprogSG.psok (GF := GF) k) (Fd1 : List FdState → Prop)
-    (ws : List (List (BitVec 8))) (dg : List (BitVec 8)) (Q : Int → IProp GF) (Cr Cd : IProp GF) :
-    wpShChildXBody E Fd1 ws dg Q Cr Cd :=
-  shChildXGen_holds E UL SP HM SE hps _ (fun _ _ => .rfl) Fd1 ws dg Q Cr Cd
-
-/-- **Rocq `wp_kshm_child_echo_holds`**: the general walk at echo's
-alternative, by conversion. -/
-theorem shChildEcho_holds (UL : UK_LEAVES) (SP : SH_PARSECMD) (HM : SH_MALLOC) (SE : SH_RUNCMD_EXEC)
-    (hps : ∀ k : Int, freeNum k → UprogSG.psok (GF := GF) k) (ws : List (List (BitVec 8))) (Q : Int → IProp GF)
-    (Cr Cd : IProp GF) : wpShChildEchoBody E ws Q Cr Cd := by
-  intro N hc h m dw dv s0 len f sz ld n hpeq hs1 hline hs0 hs64 hs38 hszlo hszal hszok hfd1 hfd2
-  have hhd : ws[0]! = cmdEcho := by
-    rw [List.getElem!_eq_getElem?_getD, lineOk_head ws hline.1]; rfl
-  have H := shChildX_holds E UL SP HM SE hps E.ush_fd1p ws altExecfail Q Cr Cd N hc h m dw dv s0 len f sz ld n
-    hpeq hs1 (ushXlineIs_of_line ws f 0 len hline) (by rw [hhd]; exact E.echo_execfail_bytes)
-    hs0 hs64 hs38 hszlo hszal hszok hfd1 hfd2
-  rw [hhd] at H
-  exact H
-
 end
 
 /-- The interface, at the engine, the parser, the allocator and the arm. -/

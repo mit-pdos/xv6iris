@@ -18,8 +18,8 @@ header, in short:
 > `AFile (fn_file_bytes (era_node dn bm data))`, and `fn_file_bytes` is
 > `file_bytes data (fn_size n)`.  So the missing pure link is
 > index-by-index: `file_bytes`' total lookup at `k` IS `file_byte` at `k`,
-> below the size (`fileBytes_lookup`).  The two halves compose into
-> `leAt_of_fileBytes`, the shape a proof with a `readi`-filled buffer wants.
+> below the size (`fileBytes_lookup`).  The two halves compose into the
+> shape a proof with a `readi`-filled buffer wants.
 >
 > THE TWO TRUNCATIONS ARE THE ONLY REAL CONTENT.  `eh_phoff` and `ph_off` are
 > FOUR-byte loads of EIGHT-byte fields, so they equal `ee_phoff` /
@@ -254,16 +254,5 @@ theorem phAt_of_ehdr (g l : ElfBytes) (e : ElfEhdr) (i : Nat) (he : elfParseEhdr
     phAt g i = e.phoff + 56 * i := by
   unfold phAt
   rw [(ehFields_of_ehdr g l e he hag).2.2 hlt]
-
-/-! ## 6.  THE `readi` WINDOW: the bytes kexec reads ARE the abstract file -/
-
-/-- **Rocq `le_at_of_file_bytes`, THE COMPOSITE the exec proof applies**: a
-buffer filled by `readi` from file offset `base` reads exactly as the
-abstract byte list `fileBytes data sz` does. -/
-theorem leAt_of_fileBytes (g : ElfBytes) (data : Nat → List (BitVec 8)) (sz base o n : Nat)
-    (hg : ∀ j, j < n → g[o + j]! = fileByte data (base + o + j)) (hsz : base + o + n ≤ sz) :
-    leAt g o n = leAt (fileBytes data sz) (base + o) n :=
-  leAt_shift_of_list g _ base o n fun j hj => by
-    rw [hg j hj, fileBytes_lookup data sz _ (by omega)]
 
 end Xv6

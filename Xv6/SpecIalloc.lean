@@ -89,9 +89,10 @@ ialloc SLEEPS (bread), so it threads the running-process bundle exactly as
 5. The post's `∀ mf alloc kslot q inum dn'` with `callee_saved m mf` is the
    `∀ spie spp R'` of every pinned contract here plus Rocq's own
    `∀ alloc kslot q inum dn'` binders, verbatim.
-6. `wp_ialloc_sconf` is DERIVED below (`IALLOC.wp_ialloc_sconf`), not a
-   field: Rocq's `ProofIalloc.v` derives it the same way (`log_op_openS`,
-   the credited form, `log_opS_op`); the `BALLOC.wp_balloc_sconf` pattern.
+6. `wp_ialloc_sconf` is not a field: Rocq's `ProofIalloc.v` derives it
+   (`log_op_openS`, the credited form, `log_opS_op`), and that derived
+   contract is not ported (nothing uses it); its body
+   `wp_ialloc_sconf_body` is stated below, as SpecBalloc's.
 
 **Stale in Rocq** (the code is the reference): the SpecIalloc header's
 "`wp_log_write_au` … `Φfsb := True`" (the code uses the range form with
@@ -419,75 +420,5 @@ structure IALLOC : Prop where
     wp_ialloc_gen_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl pd pav pu j ty u Sb t qt
       pidv dqp dqs dqn
       hj hproc hK hnoff htier hgeom hblk hn1 hnnib hn31 hty htyk hpd ha0 ha1
-
-/-- The interrupts-off instance of `wp_ialloc_gen_eb` (the complement is the whole
-bundle): the contract every not-yet-generalized caller states. -/
-theorem IALLOC.wp_ialloc_gen (A : IALLOC) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
-    [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
-    [FsTopG GF] [FsLinkG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
-    (ty : BitVec 16) (u : Nat) (Sb : List Nat) (t : Nat) (qt : Qp)
-    (pidv : BitVec 32) (dqp dqs dqn : DFrac)
-    hj hproc hK hsie hnoff hlocks htier hgeom hblk hn1 hnnib hn31 hty htyk hpd ha0 ha1 :
-    wp_ialloc_gen_body (hlc := hlc) (GF := GF) Γ cpu k γl pd pav pu j ty u Sb t qt
-      pidv dqp dqs dqn
-      hj hproc hK hsie hnoff hlocks htier hgeom hblk hn1 hnnib hn31 hty htyk hpd ha0 ha1 := by
-  have h := A.wp_ialloc_gen_eb (hlc := hlc) (GF := GF) (Γ := Γ) (cpu := cpu) (k := k) (γl := γl) (pd := pd) (pav := pav) (pu := pu) (j := j) (ty := ty) (u := u) (Sb := Sb) (t := t) (qt := qt) (pidv := pidv) (dqp := dqp) (dqs := dqs) (dqn := dqn) (hj := hj) (hproc := hproc) (hK := hK) (hnoff := hnoff) (htier := htier) (hgeom := hgeom) (hblk := hblk) (hn1 := hn1) (hnnib := hnnib) (hn31 := hn31) (hty := hty) (htyk := htyk) (hpd := hpd) (ha0 := ha0) (ha1 := ha1)
-  unfold wp_ialloc_gen_eb_body at h
-  unfold wp_ialloc_gen_body
-  rw [hsie] at h
-  simp only [trapCsrsExt_false, cpuClaimExt_false] at h
-  iintro ⟨H0, H1, H2, Htc, Hcl, Hir, H6, H7, H8, H9, H10, H11, H12, H13, H14, H15, H16, H17, H18, H19, H20, Hnext⟩
-  iapply h
-  iframe H0 H1 H2 Htc Hcl Hir H6 H7 H8 H9 H10 H11 H12 H13 H14 H15 H16 H17 H18 H19 H20
-  iapply wpNext_mono $$ Hnext
-  iintro %cpu' HK %spie %spp %R' %alloc %kslot %q %inum %dn' %p0 H1 H2 ⟨Htc, Hir⟩ Hcl H6 H7 H8 H9 H10
-  iapply HK $$ %spie %spp %R' %alloc %kslot %q %inum %dn' %p0 H1 H2 Htc Hcl Hir H6 H7 H8 H9 H10
-
-/-- **THE COUNTED FORM, DERIVED** (Rocq's `wp_ialloc_sconf`, proved in
-`ProofIalloc.v` exactly so): open the op's set (`Xv6.logOp_openS`), run the
-set form, and close each arm (`Xv6.logOpS_op`). -/
-theorem IALLOC.wp_ialloc_sconf (IA : IALLOC) {hlc : HasLC} {GF : BundledGFunctors}
-    [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
-    [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
-    [FsTopG GF] [FsLinkG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
-    (ty : BitVec 16) (u : Nat) (t : Nat) (qt : Qp)
-    (pidv : BitVec 32) (dqp dqs dqn : DFrac)
-    hj hproc hK hsie hnoff hlocks htier hgeom hblk hn1 hnnib hn31 hty htyk hpd ha0 ha1 :
-    wp_ialloc_sconf_body (hlc := hlc) (GF := GF) Γ cpu k γl pd pav pu j ty u t qt
-      pidv dqp dqs dqn
-      hj hproc hK hsie hnoff hlocks htier hgeom hblk hn1 hnnib hn31 hty htyk hpd ha0 ha1 := by
-  unfold wp_ialloc_sconf_body
-  iintro ⟨Hk, Hpc, Hpi, Htc, Hcl, Hir, Hpe, Hbc, Hlc, Hdc, Hsn, Hsi, Hinv, Hopen, Hpid, Hsl,
-    Hit2, Hiti, Hiref, Hop, Htx, Hnext⟩
-  icases logOp_openS icfgLog (u + 1) $$ Hop with ⟨%Sb, HopS, Hltx⟩
-  have h := IA.wp_ialloc_gen (hlc := hlc) (GF := GF) Γ cpu k γl pd pav pu j ty u Sb t qt
-    pidv dqp dqs dqn hj hproc hK hsie hnoff hlocks htier hgeom hblk hn1 hnnib hn31 hty htyk
-    hpd ha0 ha1
-  unfold wp_ialloc_gen_body at h
-  iapply h
-  iframe Hk Hpc Hpi Htc Hcl Hir Hpe Hbc Hlc Hdc Hsn Hsi Hinv Hopen Hpid Hsl Hit2 Hiti Hiref
-    HopS Htx
-  iapply wpNext_mono _ _ _ _ _ $$ Hnext
-  iintro %c' HΦ %spie %spp %R' %alloc %kslot %q %inum %dn' %hcs Hk Hpc Htc Hcl Hir Hsn Hsi
-    Hpid Hsl Harm
-  iapply HΦ $$ %spie %spp %R' %alloc %kslot %q %inum %dn' %hcs Hk Hpc Htc Hcl Hir Hsn Hsi
-    Hpid Hsl
-  cases alloc
-  · simp only [Bool.false_eq_true, if_false]
-    icases Harm with ⟨%h0, Hiref, Htx, HopS⟩
-    iframe Hiref Htx
-    isplitl []
-    · ipureintro; exact h0
-    · iapply logOpS_op icfgLog (u + 1) Sb $$ HopS Hltx
-  · simp only [if_true]
-    icases Harm with ⟨%hp, Hcl, HopS⟩
-    iframe Hcl
-    isplitl []
-    · ipureintro; exact hp
-    · iapply logOpS_op icfgLog u _ $$ HopS Hltx
 
 end Xv6

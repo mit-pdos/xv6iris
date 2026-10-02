@@ -1,7 +1,7 @@
 /-
 **The user/kernel trap contract, as user execution holds it** (Rocq
 `UexecRet.v`): what a process hands back at a trap (`uexecRet`), what the
-kernel owes it (`ukont`), the bundle it runs under (`uvb`), and the
+kernel owes it (`ukontF`), the bundle it runs under (`uvb`), and the
 trapframe-keyed slot restated on that bundle (`uslot`).
 
 Rocq's header, kept point for point:
@@ -20,7 +20,7 @@ Rocq's header, kept point for point:
     the parent's and the child's slot, every other ecall a slot at the bumped
     key for every return value and image `usysMemOk` allows, and a non-ecall
     trap is transparent;
-  - `ukont`: the kernel obligation `▷ (∀ W' sc stv, trappedMachine ∗
+  - `ukontF`: the kernel obligation `▷ (∀ W' sc stv, trappedMachine ∗
     uexecRet -∗ wpLoop)`, the guard of the fixpoint;
   - `uvb`: everything user execution owns while it runs, keyed on the
     natural user-space state;
@@ -28,7 +28,7 @@ Rocq's header, kept point for point:
 * THE KEY'S IMAGE IS THE LAZY VIEW (Rocq owner's ruling 2026-08-28): a
   process cannot tell a faulted-in page from an untouched one.  `uvb` also
   carries `⌜uszOk sz⌝` (`p->sz ≤ MAXVA - 2 pages`).
-* `uslot` is MUTUALLY RECURSIVE with `uexecRet` through `ukont`'s `▷`: a
+* `uslot` is MUTUALLY RECURSIVE with `uexecRet` through `ukontF`'s `▷`: a
   guarded `fixpoint` over `Uvis → IProp GF` (the `UexecWp.uexecF` pattern).
 * x0, DECIDED: the file the slot restores is `tfResumeGpr0 tf :=
   tfResumeGpr zeroRf tf` (x0 = 0).
@@ -52,7 +52,7 @@ Rocq's header, kept point for point:
    that `UserExec.lean` (W8-C) did not port, is §0 below: `uszOk`,
    `userPtmInv`/`userPtmInvX` (the lazy-view twin of `userPtInv`: the page
    view `Mp` with `umemLazy P sz Mp = M`, UexecSlot's own lazy view),
-   `userTrapFrameAt`/`userTrapFrameAtm`, `uvRegs`, `uvAmb`.  `uvAmb cpu` is
+   `userTrapFrameAtm`, `uvRegs`, `uvAmb`.  `uvAmb cpu` is
    `hwConfig cpu ∗ kmapStatic ∗ wireInv` (Rocq `uv_amb`; `minstret_inv` is
    `emp`; `kmapStatic` is not in Rocq, UserExec deviation 9);
    `uvRegs` carries `clockCells` (UserExec deviation 2).  Candidates to move
@@ -79,7 +79,7 @@ open Iris Iris.BI Iris.ProofMode Std MachCSL LeanRV64D
 
 /-! ## §0 The U-tier vocabulary the contract is stated over (deviation 3)
 
-`userPtmInv`/`userPtmInvX`, `userTrapFrameAt(m)`, `uvRegs`/`uvAmb` and
+`userPtmInv`/`userPtmInvX`, `userTrapFrameAtm`, `uvRegs`/`uvAmb` and
 `MachCSL.gprFile_ext` live in `Xv6/UserExec.lean` (batch 8-P, the 8-M
 review); the register file `zeroRf`/`tfResumeGpr*` in `Xv6/UexecSlot.lean`;
 `exitXs` in `Xv6/ProcGeom.lean` (Rocq `ProcGeom.exit_xs`, shared with
@@ -808,12 +808,6 @@ abbrev ukb [xi : CurCtx] (cpu : CPU) (C : UCfg) (pt : UPtd) (Rfd : List FdState 
     (Rut : UPtd → IProp GF) (sz : Nat) (π : Nat → Option UPerm) (fdv : List FdState) (cw : Nat)
     (g : GName) (cs : ExtTreeSet GName compare) (pidv : BitVec 32) (lz : Bool) (secc : BitVec 64) : IProp GF :=
   ukbF uslot cpu C pt Rfd Rut sz π fdv cw g cs pidv lz secc
-
-/-- Rocq `ukont`. -/
-abbrev ukont [xi : CurCtx] (cpu : CPU) (C : UCfg) (pt : UPtd) (Rfd : List FdState → IProp GF)
-    (Rut : UPtd → IProp GF) (sz : Nat) (π : Nat → Option UPerm) (fdv : List FdState) (cw : Nat)
-    (g : GName) (cs : ExtTreeSet GName compare) (pidv : BitVec 32) (lz : Bool) (secc : BitVec 64) : IProp GF :=
-  ukontF uslot cpu C pt Rfd Rut sz π fdv cw g cs pidv lz secc
 
 /-- Rocq `uvb`. -/
 abbrev uvb [xi : CurCtx] (cpu : CPU) (C : UCfg) (pt : UPtd) (Rfd : List FdState → IProp GF)

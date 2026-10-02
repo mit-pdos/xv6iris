@@ -1,9 +1,8 @@
 /-
 The interface of `sys_unlink` (kernel/sysfile.c).  A port of Rocq
-`SpecSysUnlink.v` (`iris/SpecSysUnlink.v`, 681 lines): the
-bundle (`unlinkAuPre`), the arms (`unlinkPostOk` / `unlinkPostFail` /
-`unlinkArms`, `unlinkArms_ret`), the named return continuation, the frame and
-the `SYSUNLINK` contract.  The delta's side conditions and the four commits
+`SpecSysUnlink.v` (`iris/SpecSysUnlink.v`, 681 lines): the arms
+(`unlinkPostOk` / `unlinkPostFail` / `unlinkArms`), the named return
+continuation, the frame and the `SYSUNLINK` contract.  The delta's side conditions and the four commits
 are `Xv6/SysUnlinkDefs.lean`; the reference allowance is
 `SysUnlinkBudget.sysUnlinkSlots` (reused, as that file's header asks).
 
@@ -45,7 +44,7 @@ three LIVE panics (+0xf4 "unlink: nlink < 1", +0x136 "isdirempty: readi",
 * THE ZEROING RELEASES A FRAGMENT: `memset` + `writei(dp,…,off,16)` is the
   exact inverse of dirlink's append (`FsStateEraResB.entToks_unlink` fires
   caller-side and releases one link token at `ip`, which `ip->nlink--;
-  iupdate(ip)` then CONSUMES through `wp_iupdate_unlink`).
+  iupdate(ip)` then CONSUMES).
 * THE HOME-LIVE PREMISE COMES FROM THE PAYLOAD (`DirView.dirOrphanClean` and
   the two namecmp refusals), not from a guard.
 * THE T_DIR ARM's `dp->nlink--` SPENDS THE CHILD's ".." FRAGMENT
@@ -61,7 +60,7 @@ three LIVE panics (+0xf4 "unlink: nlink < 1", +0x136 "isdirempty: readi",
 * DETERMINISM: none; the post is the honest disjunction on a0.
 * ONE CONTRACT, ONE RETURN CONTINUATION (`sysUnlinkPost`, Rocq's
   `sys_unlink_closer`), which takes the ARMED post; the landed return blanket
-  `sysUnlinkRet` is a consequence (`unlinkArms_ret`).
+  `sysUnlinkRet` is a consequence.
 * THE ARMS: ret 0 -- the fetched path, the cursor at the parent, `unlPre`
   restated purely at instant 1, BOTH fired receipts, the instant-2 pin, the
   region bound, the two observation commits refunded.  ret -1 -- (i) the
@@ -110,10 +109,10 @@ three LIVE panics (+0xf4 "unlink: nlink < 1", +0x136 "isdirempty: readi",
    `sysUnlinkSlots` is the reference allowance, `SysUnlinkBudget`),
    `sys_unlink_slots` → `sysUnlinkSlots` (reused), `sys_unlink_ret` →
    `sysUnlinkRet`, `sys_unlink_closer` → `sysUnlinkPost` (+ its `wpNext`
-   wrapper `sysUnlinkCont`), `unlink_au_pre` → `unlinkAuPre`,
-   `unlink_post_ok/fail` → `unlinkPostOk/Fail`, `unlink_arms(_ret)` →
-   `unlinkArms(_ret)`, `wp_sys_unlink_body` → `wp_sys_unlink_eb_body`,
-   `SYSUNLINK` kept.
+   wrapper `sysUnlinkCont`), `unlink_post_ok/fail` → `unlinkPostOk/Fail`,
+   `unlink_arms` → `unlinkArms`, `wp_sys_unlink_body` →
+   `wp_sys_unlink_eb_body`, `SYSUNLINK` kept.  `unlink_au_pre` and
+   `unlink_arms_ret` are not ported (nothing uses them).
 8. Rocq's frame/body split (`wp_sys_unlink_frame` abstracted over `EXTRA` /
    `ARMS`, then `wp_sys_unlink_body` instantiating it) is ONE definition
    here: the frame has exactly one instance and nothing else states it.
@@ -174,24 +173,6 @@ section Arms
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [FsTopG GF] [FsBytesG GF]
   [Appcfg GF] [Icfg]
 
-/-- Everything the caller hands in, AT ONE FETCHED PATH, at the commit mask
-`appE` (Rocq's `unlink_au_pre`, path-fixed by TL-3C item (M), `88cc6612c`):
-the parent-prefix walk one-shot there (`FsAbsEra.epStart`, what
-`nparWalkPreEra` instantiates to) and `SysUnlinkDefs`' four commits, the
-entry leg at the walk's terminal cursor `P (nparElems pl).length`.  The
-other three commits are keyed by an inum and a view, never by a string. -/
-def unlinkAuPre (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat) (pl : List (BitVec 8))
-    (P Pmiss : Nat → Nat → IProp GF)
-    (Fent : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
-    (Ftgt : Pfam GF (Aview → Nat → IProp GF))
-    (Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
-    (Fmiss : Pfam GF (Aview → Nat → Fname → IProp GF)) : IProp GF :=
-  iprop(epStart (hlc := hlc) γfs rt cw P Pmiss pl ∗
-    pfAt (uentCommitAt (hlc := hlc) Γ appE (P (nparElems pl).length)) Fent ∗
-    pfAt (utgtCommitAt (hlc := hlc) Γ appE) Ftgt ∗
-    pfAt (dlookupCommitAt (hlc := hlc) Γ appE) Fex ∗
-    pfAt (dmissCommitAt (hlc := hlc) Γ appE) Fmiss)
-
 /-- ...AND THE SYSCALL TIER (Rocq's `unlink_au_at`): the same bundle under
 the reading of trapframe argument 0.  THE COMMITS STAY OUTSIDE THE WALK'S
 WAND (argstr can fail, and then no `pl` satisfies the reading); the cursor
@@ -224,25 +205,6 @@ theorem unlinkUent_inst (Γ : FsViewNames GF) (M : Nat → List (BitVec 8)) (pv 
     Fent.pfRecv) $$ [] [] H
   · iapply (nparCur_out M pv pl P hpl)
   · iapply (nparCur_in M pv pl P hpl)
-
-/-- THE GENERIC SUPPLIER'S ONE LINE (Rocq's `unlink_au_at_of_all`). -/
-theorem unlinkAuAt_of_all (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat)
-    (M : Nat → List (BitVec 8)) (pv : Nat) (P Pmiss : Nat → Nat → IProp GF)
-    (Fent : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
-    (Ftgt : Pfam GF (Aview → Nat → IProp GF))
-    (Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
-    (Fmiss : Pfam GF (Aview → Nat → Fname → IProp GF)) :
-    nparWalkPreEra (hlc := hlc) γfs rt cw P Pmiss ⊢
-      pfAt (uentCommitAt (hlc := hlc) Γ appE (nparCur M pv P)) Fent -∗
-      pfAt (utgtCommitAt (hlc := hlc) Γ appE) Ftgt -∗
-      pfAt (dlookupCommitAt (hlc := hlc) Γ appE) Fex -∗
-      pfAt (dmissCommitAt (hlc := hlc) Γ appE) Fmiss -∗
-      unlinkAuAt (hlc := hlc) Γ γfs rt cw M pv P Pmiss Fent Ftgt Fex Fmiss := by
-  unfold unlinkAuAt
-  iintro Hw Hent Htgt Hex Hmiss
-  iframe Hent Htgt Hex Hmiss
-  iintro %pl %_
-  iapply (npStart_of_mknod (hlc := hlc) γfs rt cw P Pmiss pl) $$ Hw
 
 /-- ret 0 (Rocq's `unlink_post_ok`): the fetched path, the cursor at the
 parent, `unlPre` restated purely at instant 1, BOTH fired receipts, the
@@ -323,19 +285,6 @@ def unlinkArms (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat)
     (⌜r = 0xFFFFFFFFFFFFFFFF#64⌝ ∗
       unlinkPostFail (hlc := hlc) Γ γfs rt cw M pv P Pmiss Fent Ftgt Fex Fmiss))
 
-/-- The return blanket, read off the arms (Rocq's `unlink_arms_ret`). -/
-theorem unlinkArms_ret (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat)
-    (M : Nat → List (BitVec 8)) (pv : Nat) (P Pmiss : Nat → Nat → IProp GF)
-    (Fent : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
-    (Ftgt : Pfam GF (Aview → Nat → IProp GF))
-    (Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
-    (Fmiss : Pfam GF (Aview → Nat → Fname → IProp GF)) (r : BitVec 64) :
-    unlinkArms (hlc := hlc) Γ γfs rt cw M pv P Pmiss Fent Ftgt Fex Fmiss r ⊢ ⌜sysUnlinkRet r⌝ := by
-  unfold unlinkArms sysUnlinkRet
-  iintro (⟨%hr, -⟩ | ⟨%hr, -⟩)
-  · ipureintro; exact Or.inr hr
-  · ipureintro; exact Or.inl hr
-
 end Arms
 
 /-! ## The return continuation, named -/
@@ -351,7 +300,7 @@ returning hart: THE IMAGE DOES NOT MOVE -- this syscall only READS user
 memory (argstr) -- so the block comes back at the image it was handed, the
 page table perhaps GROWN (argstr's fetchstr faults pages in; `extSz` is
 argstr's own report, relayed); the two allowances whole; and the ARMED post
-on the returned a0 (which implies `sysUnlinkRet`, `unlinkArms_ret`). -/
+on the returned a0 (which implies `sysUnlinkRet`). -/
 def sysUnlinkPost (k : KCtx) (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32)
     (V : ProcPriv) (M : Nat → List (BitVec 8)) (pv : Nat)
     (P Pmiss : Nat → Nat → IProp GF)

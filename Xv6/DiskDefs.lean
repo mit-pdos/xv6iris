@@ -31,9 +31,10 @@ Three address families.
 A `Chain` is one formatted request: the three descriptor indices, the
 direction flag (`dwr`: the data descriptor is device-WRITABLE, i.e. the
 transfer is a disk READ), the sector, and the `struct buf`.  Its three
-descriptor words and its 16-byte header are `Chain.d0/d1/d2/hdr`, and
-`chain_parse` says the model's parser turns exactly those bytes into
-`Chain.req` -- the request record the device's `fetch` would build.
+descriptor words and its 16-byte header are `Chain.d0/d1/d2/hdr`;
+`chain_d0`/`_d1`/`_d2` and `chain_hdr_type`/`_sector` say what the model's
+parser reads off exactly those bytes, and `Chain.req` is the request record
+the device's `fetch` would build.
 -/
 import MachCSL.Resources
 import Xv6.KernelImage
@@ -382,17 +383,6 @@ theorem chain_hdr_type (c : Chain) : c.hdr.extractLsb' 0 32 = c.req.type := by
 theorem chain_hdr_sector (c : Chain) : c.hdr.extractLsb' 64 64 = c.req.sector := by
   simp only [Chain.hdr, Chain.req]
   cases c.dwr <;> bv_decide
-
-/-- **The device parses the chain the driver formatted.**  Given the three
-descriptor words and the header of `c` on the bus, the record the model's
-`fetch` assembles is exactly `c.req`. -/
-theorem chain_parse (c : Chain) :
-    ({ head := c.req.head, type := c.hdr.extractLsb' 0 32, sector := c.hdr.extractLsb' 64 64,
-       buf := (Virtio.descOf c.d1).addr, len := (Virtio.descOf c.d1).len,
-       status := (Virtio.descOf c.d2).addr,
-       wr := (Virtio.descOf c.d1).has Virtio.descFWrite } : VioReq) = c.req := by
-  rw [chain_hdr_type, chain_hdr_sector, chain_d1_wr, chain_d1, chain_d2]
-  rfl
 
 /-- `&b->blockno`. -/
 theorem bno_addr (b : BitVec 64) : b + 12#64 = aBufBlockno b := rfl

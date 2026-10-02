@@ -13,8 +13,7 @@ block-number functions (`logHdrBno`, `logSlotBno`, `logRegion`), the home
 set, the header decoder (`hdrN`, `leWord`, `hdrDec`) with its four
 bridging lemmas, the total block view a crash recovers to (`dvOfD`,
 `fsRestrict`, `fsInstallStep`, `fsInstall`), the era's PICTURE of the
-durable disk (`LogMirror`, `lmUpd`, `lmHdr`, `lmCommitted`, `lmLogged`,
-`lmInstall`) and every pure lemma Rocq proves about them, the `LogNames`
+durable disk (`LogMirror`, `lmUpd`, `lmHdr`, `lmLogged`, `lmInstall`) and every pure lemma Rocq proves about them, the `LogNames`
 record, the epoch lower bound, the append registry and the free-state
 bundle `logFreeTok` with its allocation.
 
@@ -260,10 +259,6 @@ theorem lmUpd_idem (M : LogMirror) (b : Nat) (x y : List (BitVec 8)) :
   funext c
   by_cases h : c = b <;> simp [h]
 
-/-- The committed view a picture recovers to (Rocq's `lm_committed`). -/
-def lmCommitted (M : LogMirror) (cov : Std.ExtTreeSet Nat compare) (ls : Nat) : BlockMap :=
-  fsInstall M.view ls (lmHdr M ls).2 (fsRestrict M.view (fsHomeList cov ls))
-
 /-- ...and the committed view a LOGGED view yields on the home set. -/
 def lmLogged (L : BlockMap) (cov : Std.ExtTreeSet Nat compare) (ls : Nat) : BlockMap :=
   fsRestrict (dvOfD L) (fsHomeList cov ls)
@@ -453,19 +448,6 @@ instance loggedAt_persistent (γ : LogNames) (e b : Nat) :
 
 instance loggedAt_timeless (γ : LogNames) (e b : Nat) :
     Timeless (loggedAt (GF := GF) γ e b) := by unfold loggedAt; infer_instance
-
-/-- **THE REGISTRY'S FRESHNESS WATERMARK.**  Rocq mints a registry row by
-`own_update` into a union, which a `gset` authority admits with no side
-condition.  A Lean ghost map needs a key nobody holds, and this port's
-`LawfulFiniteMap` has no fresh-key lemma, so the log invariant carries a
-next-free-id watermark and mints there -- exactly as `Xv6/BcacheInv.lean`
-does for the buffer cache's reference map (`bpin_fresh`). -/
-theorem logReg_fresh (X : RegMapF (Nat × Nat)) (nx : Nat)
-    (hfresh : ∀ i, nx ≤ i → PartialMap.get? X i = none) :
-    ∀ i, nx + 1 ≤ i → PartialMap.get? (PartialMap.insert X nx ((0, 0) : Nat × Nat)) i = none := by
-  intro i hi
-  rw [get?_insert_ne (by omega : nx ≠ i)]
-  exact hfresh i (by omega)
 
 /-- The registry's two operations: minting (Rocq's `log_mint_logged`)... -/
 theorem logMintLogged (γ : LogNames) (X : RegMapF (Nat × Nat)) (nx e b : Nat)

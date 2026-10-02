@@ -42,9 +42,7 @@ bundles at `main`'s altitude are `Xv6.BootCarveMain`.
   them): `bootCarve_image` -- the raw histories with the static claims
   become `kernelText ∗ kernelData ∗ kmapStatic` (the `KernelImage.ro` copy
   `kctx` owns) and the owned half `[_data, PHYSTOP)`; `bootCarve_owned`
-  cuts that at `.data` / `.bss` / free RAM; `bootCarve_got` is BootHart's
-  deviation 1 (the GOT slot's `&stack0`); `bootCarve_era` states the carve
-  at `Hboot`'s era instance (`MachCSL.MachGS.ofEra`).
+  cuts that at `.data` / `.bss` / free RAM.
 
 Rocq §1 (`kmap_static_claims_intro`) is not here: Lean's power thread
 already persists the static claims (`MachCSL.kmapStatic_persist`) and hands
@@ -57,7 +55,7 @@ DEVIATIONS from Rocq (none process-layer):
    image argument.
 2. `.data` (`first`, `nextpid`, `uarts`), `.got` and `.got.plt` are in
    `BootImage.data` (`Kernel.dataInit`, 136 bytes, emitted by
-   tools/gen_kernel_data.py; `bc_dataInit_addrs`: exactly `[_data, _bss)`).
+   tools/gen_kernel_data.py, spanning `[_data, _bss)`).
    Its consumers are `main`'s bundles (SpecMain).  `.eh_frame` (read-only,
    never read) is not in `BootImage`.
 3. Rocq §9/§11-§12 (the LEDGER element half `boot_led_*`, `boot_cran*`)
@@ -369,12 +367,6 @@ structure BootImage (image : Mem) : Prop where
   /-- `.bss` is zero-filled -/
   bss : ∀ a : PAddr, MachCSL.KernelSyms.«_bss» ≤ a.toNat → a.toNat < MachCSL.KernelSyms.«end» →
     image[a]? = some 0#8
-
-/-- `Kernel.dataInit` is exactly the bytes `[_data, _bss)`, in order. -/
-theorem bc_dataInit_addrs :
-    Kernel.dataInit.map Prod.fst =
-      List.range' MachCSL.KernelSyms.«_data» (MachCSL.KernelSyms.«_bss» - MachCSL.KernelSyms.«_data») := by
-  decide
 
 /-! ### THE IMAGE IS THE ELF (Rocq: `boot_image` is a definition, so this is
 by computation there too)
@@ -774,42 +766,6 @@ theorem bootCarve_owned (m : MemF Hist) :
   icases (bootRan_split (GF := GF) m _ 0x80024000 ramEnd (by decide) (by decide)).1 $$ H with ⟨-, Hf⟩
   iframe Hd Hb Hf
 
-/-- **The GOT word** `_entry` loads `&stack0` from (BootHart deviation 1),
-out of `.data`/`.got`, as the M-mode physical cell `wp_boot_body` takes (at any
-fraction: the shared allocation discards it and gives each hart a copy). -/
-theorem bootCarve_got [CurCtx] :
-    bootRan (GF := GF) (imgFlat bootImage) MachCSL.KernelSyms.«_data» MachCSL.KernelSyms.«_bss» ⊢
-      pwordPointsTo stack0Slot 8 (DFrac.own 1) KA.«stack0» := by
-  have hs : stack0Slot = BitVec.ofNat 64 0x8000a3e8 := by decide
-  have hA : bcInRam 0x8000a3e8 8 := by unfold bcInRam ramBase ramEnd; omega
-  iintro H
-  icases (bootRan_split (GF := GF) (imgFlat bootImage) _ 0x8000a3e8 _ (by decide) (by decide)).1 $$ H with ⟨-, H⟩
-  icases (bootRan_split (GF := GF) (imgFlat bootImage) _ (0x8000a3e8 + 8) _ (by decide) (by decide)).1 $$ H with ⟨H, -⟩
-  rw [hs]
-  ihave H := bootImg_ctxBytes (GF := GF) curCtx bootImage 0x8000a3e8 8 _ hA (hs ▸ bootImage_wf.got) $$ H
-  iapply pwordPointsTo_intro _ 8 _ _ (bcInRam_inRam hA) (by decide) $$ H
-
 end
-
-/-! ## At the era the power thread mints -/
-
-section era
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF]
-
-/-- **THE CARVE AT `Hboot`'s ERA** (Rocq `riscv_system_adequacy`'s use of
-§1-§5): `powerBootRes`'s static claims and byte histories, at the instance
-the client runs its harts at (`MachCSL.MachGS.ofEra`), at the language's
-boot image, are the kernel's read-only image and the owned half. -/
-theorem bootCarve_era (E : EraGS) (gen : Nat) (cP : CPU → BitVec 64 → IProp GF)
-    (cI : ∀ cpu : CPU, ⊢ cP cpu 0#64)
-    (σ : MState) (hbf : bootFacts σ) :
-    letI : MachGS hlc GF := MachGS.ofEra E gen cP cI
-    kmapStaticAt E ∗ memCells E σ.mem ⊢@{IProp GF}
-      |==> ((kernelText ∗ kernelData ∗ kmapStatic) ∗ bootRan (imgFlat bootImage) bcRoHi ramEnd) := by
-  letI : MachGS hlc GF := MachGS.ofEra E gen cP cI
-  rw [hbf.1]
-  exact bootCarve_image
-
-end era
 
 end Xv6

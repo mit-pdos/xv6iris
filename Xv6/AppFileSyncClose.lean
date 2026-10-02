@@ -4,10 +4,6 @@
 design §4.5 "The merge", "The hook", "The round position", "PowerOn",
 "Birth").  The shares and the claim are `Xv6/AppFileSync.lean`.
 
-* `unionMerge_closes` (Rocq `union_merge_closes`): THE MERGE -- the old copy
-  at ANY era, the running claim at `gen + 1`, the token, the loan; the
-  counters pin the eras, the registry the lists, the shares agree; the half
-  and the counter move into the new copy.
 * `unionHook_closes` (Rocq `union_hook_closes`): THE HOOK -- ½ + ¼ + ¼ is the
   whole list: append `(length ls', s)`, both witnesses at the new record.
 * `syncClaim_redirStep`, `syncRedir`, `syncClaim_redir` (Rocq
@@ -56,53 +52,6 @@ theorem syncClaim_same (c : FileFixed) (r : FileAppNames) (av av' : Aview)
     syncClaim (hlc := hlc) (GF := GF) c r av ⊢ syncClaim (hlc := hlc) c r av' := by
   unfold syncClaim syncBody
   rw [he]
-
-/-- THE MERGE (Rocq `union_merge_closes`). -/
-theorem unionMerge_closes (c : FileFixed) (r_o r : FileAppNames) (av_o av : Aview) (gen : Nat)
-    (ho : r_o.fnRole = true) (hr : r.fnRole = false) (he : r.fnEra = gen + 1) :
-    ⊢@{IProp GF} syncClaim (hlc := hlc) c r_o av_o -∗ syncClaim (hlc := hlc) c r av -∗
-      unionTkb (hlc := hlc) c gen -∗ syncStAuth (hlc := hlc) c (gen + 1) ==∗
-      syncClaim (hlc := hlc) c (toCopy r) av ∗ syncClaim (hlc := hlc) c r av
-      ∗ unionTkb (hlc := hlc) c gen ∗ syncStAuth (hlc := hlc) c (gen + 1) := by
-  rcases r_o with ⟨oc, od, ot, oe, oγ, ok, ob, op⟩
-  rcases r with ⟨rc, rd, rt, re, rγ, rk, rb, rp⟩
-  dsimp only at ho hr he
-  subst ho hr he
-  iintro Ho Hr Ht Hst
-  icases syncClaim_elim c _ av_o $$ Ho with ⟨%ls_o, %Ls_o, Ho⟩
-  icases syncClaim_elim c _ av $$ Hr with ⟨%ls, %Ls, Hr⟩
-  icases unionTkb_elim c gen $$ Ht with ⟨%γ, %Lt, #Hregt, Hqt, #Hcmt⟩
-  icases syncBody_elim c _ av_o ls_o Ls_o $$ Ho with ⟨#Hrego, -, -, -, Hro⟩
-  icases syncBody_elim c _ av ls Ls $$ Hr with ⟨#Hreg, #Hlb, %hch, %hw, Hrr⟩
-  icases syncRole_copy_elim c ⟨oc, od, ot, oe, oγ, ok, true, op⟩ Ls_o rfl $$ Hro
-    with ⟨Ho, Hcmo, #Hsto, Hho, Hra⟩
-  icases syncRole_run_elim c ⟨rc, rd, rt, re, rγ, gen + 1, false, rp⟩ Ls rfl $$ Hrr
-    with ⟨Hq, #Hcml, Hpos, #Hrr⟩
-  ihave %h1 := syncCm_le c ok (gen + 1) $$ Hcmo Hcml
-  ihave %h2 := syncSt_le c (gen + 1) ok $$ Hst Hsto
-  have hk : ok = gen + 1 := by omega
-  subst hk
-  ihave %hγ1 := syncReg_agree c _ oγ rγ $$ Hrego Hreg
-  subst hγ1
-  ihave %hγ2 := syncReg_agree c _ oγ γ $$ Hreg Hregt
-  subst hγ2
-  ihave %hL1 := slAuth_agree oγ oγ _ _ Ls_o Ls rfl $$ Ho Hq
-  subst hL1
-  ihave %hL2 := slAuth_agree oγ oγ _ _ Ls_o Lt rfl $$ Hq Hqt
-  subst hL2
-  imodintro
-  isplitl [Ho Hcmo Hho Hra]
-  · iapply syncClaim_intro c ⟨rc, rd, rt, re, oγ, gen + 1, true, rp⟩ av ls Ls_o hch hw $$ Hreg Hlb
-    iapply syncRole_copy_intro c ⟨rc, rd, rt, re, oγ, gen + 1, true, rp⟩ Ls_o rfl
-      $$ Ho Hcmo Hsto Hho Hra
-  isplitl [Hq Hpos]
-  · iapply syncClaim_intro c ⟨rc, rd, rt, re, oγ, gen + 1, false, rp⟩ av ls Ls_o hch hw
-      $$ Hreg Hlb
-    icases Hpos with ⟨%n, Hpos, %hb⟩
-    iapply syncRole_run_intro c ⟨rc, rd, rt, re, oγ, gen + 1, false, rp⟩ Ls_o n rfl hb
-      $$ Hq Hcml Hpos Hrr
-  iframe Hst
-  iapply unionTkb_intro c gen oγ Ls_o $$ Hregt Hqt Hcmt
 
 /-- THE HOOK (Rocq `union_hook_closes`). -/
 theorem unionHook_closes (c : FileFixed) (r' r : FileAppNames) (av : Aview) (gen : Nat)

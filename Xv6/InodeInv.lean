@@ -85,8 +85,8 @@ reads it.
 7. **THE `True` ARM OF `indBlk` / `blkRes` IS `emp`.**  `IProp` is affine,
    so the two are equivalent, and this port's own free pool already spells
    the empty arm `emp` (`Xv6.poolElt`, `Xv6/FsStateBitmap.lean`).
-8. **`bmBlocks` IS AN `ExtTreeSet Nat compare`**, Rocq's `gset Z` at this
-   port's set type; `∖ {[0]}` is `.erase 0`.
+8. **Rocq's `gset Z` IS AN `ExtTreeSet Nat compare`**, this port's set
+   type.
 9. **THE CONTEXT TRANSPORTS ARE STATED OVER `_At` FORMS.**  Rocq varies the
    ambient `CurCtx` instance inside `CtxMorph (λ ξ, inode_meta (XI := ξ) …)`;
    this port's idiom (`Xv6.wordAtN`, `Xv6/KallocDefs.lean`;
@@ -462,21 +462,13 @@ theorem bmEmpty_holes (data : Nat → List (BitVec 8))
     (h : ∀ i, data i = List.replicate BSIZE 0) : blkHolesZero bmEmpty data :=
   fun i _ _ => h i
 
-/-- THE BLOCKS AN INODE NAMES, as a set: what `itrunc` returns to the free
-pool (Rocq's `bm_blocks`).  Indexed over `MAXFILE + 1` so the indirect
-block -- slot `MAXFILE` -- is included; it is freed too. -/
-def bmBlocks (bm : Blkmap) : ExtTreeSet Nat compare :=
-  (ExtTreeSet.ofList ((List.range (MAXFILE + 1)).map (fun i => (bmSlot bm i).toNat))
-    compare).erase 0
-
 /-! ## INSTALLING ONE BLOCK: the pure half of what `bmap`'s three stores do
 
 All three of `bmap`'s installs -- `ip->addrs[bn]`, `ip->addrs[NDIRECT]` and
 `a[bn-NDIRECT]` inside the indirect block -- change exactly one slot of the
 map, so ONE general well-formedness lemma covers them, parameterised by the
 position and driven by the three `bmSlot_insert_*` readings below.  The
-freshness premise is what the caller gets from `inodeFresh`; everything
-else is bookkeeping. -/
+freshness premise is the caller's; everything else is bookkeeping. -/
 
 theorem bmSlot_insert_dir (bm : Blkmap) (j : Nat) (w : BitVec 32) (i : Nat)
     (hlen : bm.bmDir.length = NDIRECT) (hj : j < NDIRECT) (hi : i ≤ MAXFILE) :
@@ -582,9 +574,8 @@ THE INDIRECT BLOCK'S RESOURCE IS ITS RUN, AND NOTHING BESIDE IT.  There
 used to be a second conjunct, an exclusive per-block token, for
 disjointness -- necessary while the content resource was the block-keyed
 HALF, since two halves at one key are consistent and carry no disjointness
-at all.  The run is EXCLUSIVE, so `Xv6.fsblock_ne` re-establishes
-`blkmapWf`'s injectivity on its own (`inodeFresh` below) and the token is
-gone (durable-disk 2b). -/
+at all.  The run is EXCLUSIVE, which re-establishes `blkmapWf`'s
+injectivity on its own, and the token is gone (durable-disk 2b). -/
 
 /-- Rocq's `ind_blk_q`: the shape at a share (durable-fs-plan §4, §6, lane
 B''-blk). -/
@@ -1076,14 +1067,6 @@ theorem inodeFreshQ (γfs : FsNames) (dq : DFrac) (bm : Blkmap)
     · ihave %hne := inodeFreshQ_at γfs dq bm data b bsb i hi hnz $$ Ho Ht Hd
       ipureintro; intro _ _; exact hne
   · ipureintro; intro hc; exact absurd hc hi
-
-/-- Rocq's `inode_fresh`. -/
-theorem inodeFresh (γfs : FsNames) (bm : Blkmap) (data : Nat → List (BitVec 8))
-    (b : Nat) (bsb : List (BitVec 8)) :
-    fsblock (GF := GF) γfs.bytes b bsb ⊢
-      iprop(indBlk γfs bm -∗ inodeBlocks γfs bm data -∗
-        ⌜∀ i, i ≤ MAXFILE → (bmSlot bm i).toNat ≠ 0 → (bmSlot bm i).toNat ≠ b⌝) :=
-  inodeFreshQ γfs (DFrac.own 1) bm data b bsb
 
 end
 

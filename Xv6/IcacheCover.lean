@@ -31,10 +31,11 @@ quiescence.
 ## WHAT IS PORTED (Rocq name → Lean name)
 
 `ic_pin_tx_quiet` → `icPinTx_quiet`, `icEscN` → `icEscN`,
-`ic_escrow_ns_sub` → `icEscrow_nsSub`, `ic_escrow_body` → `icEscrowBody`,
+`ic_escrow_body` → `icEscrowBody`,
 `ic_escrow_is_inv` → `icEscrow_isInv`, `ic_escrow_body_timeless` →
 `icEscrowBody_timeless`, `ic_lend` → `icLend`, `ic_slot_cover` →
 `icSlotCover`, `ic_escrow_body_cover` → `icEscrowBody_cover`.
+`ic_escrow_ns_sub` is not ported (nothing uses it).
 
 ## DEVIATIONS from Rocq
 
@@ -114,10 +115,6 @@ theorem icPinTx_quiet [Icfg] (k : Nat) :
 
 /-- Rocq's `icEscN` (the box's namespace: the fifty slots sit at `icEscN .@ k`). -/
 def icEscN : Namespace := icBoxN
-
-/-- Rocq's `ic_escrow_ns_sub`. -/
-theorem icEscrow_nsSub (k : Nat) : (↑(ndot icEscN k) : CoPset) ⊆ (↑icEscN : CoPset) :=
-  nclose_subseteq icEscN k
 
 variable [IcboxG GF]
 

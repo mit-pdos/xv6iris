@@ -35,7 +35,7 @@ theorem swp_dispatchInterrupt_conf (cpu : CPU) (dq : DFrac) (c : MConf) (hok : c
   mconf_intro HmConf
   iapply HΦ $$ HmConf Hmip
 
--- The clock tick (`swp_tick_clock_cells`, `swp_tick_clock_conf`) lives in `MachCSL.WpTick`.
+-- The clock tick (`swp_tick_clock_cells`) lives in `MachCSL.WpTick`.
 
 /-! ### Aligned RAM reads -/
 

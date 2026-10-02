@@ -46,9 +46,7 @@ the rest at `X.toKpt`, SpecMain deviation 5):
   (what `BootCarveHart.bootCarve_gotRo` hands back) into `first` /
   `nextpid` / `uarts[0]` / `uarts[1]`; `bootCarveProc_mainGlobalsRaw`
   places this file's rows (`bcpProcRows`) among the other agents' in
-  `mainGlobalsRaw`'s order (`bootCarveProc_mainGlobalsRaw`);
-* §9 THE TIER SPLIT (`bootCarveProc_tiers`, SpecMain deviation 5): the
-  Bare rows at the entry context `X`, the rest at `X.toKpt`.
+  `mainGlobalsRaw`'s order (`bootCarveProc_mainGlobalsRaw`).
 
 Deviations (none process-layer):
 1. (Retired, D47.) The boot image is the language constant `bootImage`; `BootImage` is the theorem `bootImage_wf`.
@@ -828,58 +826,5 @@ theorem bootCarveProc_mainGlobalsRaw [CurCtx] (cn : ConsNames) :
   iframe H1 H2 H3 H4 Hfd Hir Hfe Hirf Hbs Hi Ht Hhd Hbi Hbd Hsl Hie Hc1 Hc2 Hc3
 
 end rows
-
-/-! ## §9 At SpecMain's tiers -/
-
-section tiers
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
-  [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-
-/-- **THE TIER SPLIT** (SpecMain deviation 5): the rows spent before
-`kvminithart` (`mainLocksBare`, `mainGlobalsBare`, both ports' `.data`
-cells) at the entry context `X`, and this file's other rows
-(`bcpProcRows`, `first`, `nextpid`) at `X.toKpt`, out of their windows
-(`bcpBssWindows` / `bcpDataWindows`). -/
-theorem bootCarveProc_tiers (X : CurCtx) (cn : ConsNames) :
-    kmapStatic (GF := GF) ⊢
-      bootRan (imgFlat bootImage) MachCSL.KernelSyms.«cons» (MachCSL.KernelSyms.«cons» + 24) -∗
-      bootRan (imgFlat bootImage) MachCSL.KernelSyms.«pr» (MachCSL.KernelSyms.«pr» + 24) -∗
-      bootRan (imgFlat bootImage) MachCSL.KernelSyms.«kmem» (MachCSL.KernelSyms.«kmem» + 24) -∗
-      bootRan (imgFlat bootImage) (MachCSL.KernelSyms.«kmem» + 24) (MachCSL.KernelSyms.«kmem» + 32) -∗
-      bootRan (imgFlat bootImage) MachCSL.KernelSyms.«devsw» (MachCSL.KernelSyms.«devsw» + 16 * 10) -∗
-      bootRan (imgFlat bootImage) MachCSL.KernelSyms.«kernel_pagetable» (MachCSL.KernelSyms.«kernel_pagetable» + 8) -∗
-      bootRan (imgFlat bootImage) (bcpUart .uart0) (bcpUart .uart0 + 40) -∗
-      bootRan (imgFlat bootImage) (bcpUart .uart1) (bcpUart .uart1 + 40) -∗
-      bootRan (imgFlat bootImage) MachCSL.KernelSyms.«proc» (MachCSL.KernelSyms.«proc» + 376 * NPROC) -∗
-      bootRan (imgFlat bootImage) MachCSL.KernelSyms.«initproc» (MachCSL.KernelSyms.«initproc» + 8) -∗
-      bootRan (imgFlat bootImage) MachCSL.KernelSyms.«ticks» (MachCSL.KernelSyms.«ticks» + 4) -∗
-      bootRan (imgFlat bootImage) (MachCSL.KernelSyms.«cons» + 24) (MachCSL.KernelSyms.«cons» + 164) -∗
-      bootRan (imgFlat bootImage) MachCSL.KernelSyms.«first_1» (MachCSL.KernelSyms.«first_1» + 4) -∗
-      bootRan (imgFlat bootImage) MachCSL.KernelSyms.«nextpid» (MachCSL.KernelSyms.«nextpid» + 4) -∗
-      consGhostsBoot cn -∗
-      |==> (mainLocksBare (Y := X) ∗ mainGlobalsBare (Y := X) ∗
-        bcpUartCells (Y := X) .uart0 ∗ bcpUartCells (Y := X) .uart1 ∗
-        bcpProcRows (Y := X.toKpt) cn ∗
-        @wordPointsTo hlc GF _ X.toKpt firstAddr 4 (DFrac.own 1) 1#32 ∗
-        @wordPointsTo hlc GF _ X.toKpt nextpidAddr 4 (DFrac.own 1) 1#32) := by
-  have hL := (letI : CurCtx := X; bootCarveProc_locksBare (GF := GF))
-  have hG := (letI : CurCtx := X; bootCarveProc_globalsBare (GF := GF))
-  have hU0 := (letI : CurCtx := X; bootCarveProc_uartCells (GF := GF) .uart0)
-  have hU1 := (letI : CurCtx := X; bootCarveProc_uartCells (GF := GF) .uart1)
-  have hR := (letI : CurCtx := X.toKpt; bootCarveProc_rows (GF := GF) cn)
-  have hF := (letI : CurCtx := X.toKpt; bootCarveProc_first (GF := GF))
-  have hN := (letI : CurCtx := X.toKpt; bootCarveProc_nextpid (GF := GF))
-  iintro #Hk Hc Hp Hm Hf Hd Hkp Hu0 Hu1 Hpr Hi Ht Hring H1 H2 Hg
-  ihave HL := hL $$ Hk Hc Hp Hm
-  ihave HG := hG $$ Hk Hd Hf Hkp
-  ihave HR := hR $$ Hk Hpr Hi Ht Hring Hg
-  ihave HF := hF $$ Hk H1
-  ihave HN := hN $$ Hk H2
-  imod hU0 $$ Hk Hu0 with HU0
-  imod hU1 $$ Hk Hu1 with HU1
-  imodintro
-  iframe HL HG HU0 HU1 HR HF HN
-
-end tiers
 
 end Xv6

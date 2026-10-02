@@ -67,10 +67,9 @@ kernel's result spine, every closed datum evaluated to a literal and the
 symbolic ones left as the walk built them; `bv_decide`/`simp` then finish.
 
 The bind toolkit (Rocq `gm_bind`, `gm_bind0`, `gm_bind_nest`) is
-`runRW_bind` and its corollaries (`runRW_bind_some`, `runRW_bind_none`,
-`runRW_seq_some`, `runRW_bind_nest`): a walk of `m >>= f` is the walk of `m`
-followed by the walk of `f` from where `m` landed, on what `m` left of the
-oracle.  It is how a fact over a symbolic ADDRESS or register INDEX is
+`runRW_bind` and its corollaries (`runRW_bind_some`, `runRW_bind_none`): a
+walk of `m >>= f` is the walk of `m` followed by the walk of `f` from where
+`m` landed, on what `m` left of the oracle.  It is how a fact over a symbolic ADDRESS or register INDEX is
 built: a sub-lemma per branch, composed (`URunRWDemo.urwDemo_add_sym`).
 -/
 import MachCSL.DecodeBridge
@@ -473,18 +472,6 @@ theorem runRW_bind_some {X Y : Type} (m : SailM X) (f : X → SailM Y) (orc orc'
 theorem runRW_bind_none {X Y : Type} (m : SailM X) (f : X → SailM Y) (orc : UOrc) (s : UWSt)
     (h : runRW D orc s m = none) : runRW D orc s (m >>= f) = none := by
   rw [runRW_bind, h]; rfl
-
-/-- The unit-sequencing form (Rocq `gm_bind0`). -/
-theorem runRW_seq_some {Y : Type} (m : SailM Unit) (n : SailM Y) (orc orc' : UOrc) (s s' : UWSt)
-    (h : runRW D orc s m = some ((), s', orc')) :
-    runRW D orc s (m >>= fun _ => n) = runRW D orc' s' n :=
-  runRW_bind_some D m (fun _ => n) orc orc' s s' () h
-
-/-- The left-nested form (Rocq `gm_bind_nest`): `(m >>= f) >>= g`. -/
-theorem runRW_bind_nest {X Y Z : Type} (m : SailM X) (f : X → SailM Y) (g : Y → SailM Z)
-    (orc : UOrc) (s : UWSt) :
-    runRW D orc s ((m >>= f) >>= g) = runRW D orc s (m >>= fun x => f x >>= g) := by
-  rw [bind_assoc]
 
 end toolkit
 

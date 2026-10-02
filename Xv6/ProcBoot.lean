@@ -29,7 +29,7 @@ DEVIATIONS from Rocq:
    has no `NPROC`, so the names live in the client's `SchedNames` and are
    minted here, before the boot fixes `claimP := procClaim Γ`.  The rows are
    the same proposition at every `MachGS.ofEra` choice of claim
-   payload (`procBootRows_ofEra`, by `rfl`).
+   payload.
 2. Name TABLES, not lists: `SchedNames` fields are total functions (of the
    index, or of the slot address for `used`), so the mint builds functions
    (`procBoot_names`, updated pointwise; injectivity of the key on
@@ -155,19 +155,5 @@ theorem procBoot_availAt (Γ : SchedNames) :
   exact .rfl
 
 end
-
-/-! ## Transport between era instances -/
-
-section ofEra
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF] [Xv6G GF]
-
-theorem procBootRows_ofEra (E : EraGS) (gen : Nat)
-    (cP cP' : CPU → BitVec 64 → IProp GF) (cI : ∀ cpu : CPU, ⊢ cP cpu 0#64)
-    (cI' : ∀ cpu : CPU, ⊢ cP' cpu 0#64)
-    (Γ : SchedNames) (c : CPU) :
-    @procBootRows hlc GF (MachGS.ofEra E gen cP cI) _ Γ c ⊢
-      @procBootRows hlc GF (MachGS.ofEra E gen cP' cI') _ Γ c := .rfl
-
-end ofEra
 
 end Xv6

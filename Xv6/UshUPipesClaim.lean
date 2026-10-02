@@ -6,8 +6,7 @@ pinned `1900b8a43`; cut C9f2, design union.md §3, review B3).
 `UShUPipes.v` (namespace `Xv6.UShUPipes`) is split:
 
 * `UshUPipesPure`   -- S0, the pure section (sibling a);
-* `UshUPipesClaim`  -- this file: `ucons_claim`, `usup`, `uup_fupd_mwp`,
-  `udeed_typed`, the stage lists (`pc0 RT GS STG REST`, `uup_um_usz`,
+* `UshUPipesClaim`  -- this file: `ucons_claim`, `usup`, `udeed_typed`, the stage lists (`pc0 RT GS STG REST`, `uup_um_usz`,
   `urt_len`, `ustg_len`, `ustg_fs_rb`);
 * `UshUPipesFin`    -- `ufin`, `uopen`, `uup_genw`, `uup_pin0`,
   `pls_nodes_alloc` (and the union's round `uD`);
@@ -154,9 +153,6 @@ theorem usup (ug : UnionGn) (r : FileAppNames)
   rw [e']
   iintro !> #Ht
   iapply h $$ Ht
-
-/-- **Rocq `uup_fupd_mwp`**. -/
-theorem uup_fupd_mwp (h : CPU) : (|={⊤}=> wpLoop (GF := GF) h) ⊢ wpLoop h := wpLoop_fupd h
 
 /-- **Rocq `udeed_typed`**: the deed's typing -- a well-formed state, and a
 short content. -/

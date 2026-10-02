@@ -6,7 +6,6 @@ mirroring the spinlock layer one level up:
                                  the holder's ghost token carrying the
                                  fraction it deposited, AND the lock's `pid`
                                  field, at `pid`
-    sleeplocked γ slk pid     -- the same with the fraction forgotten
     slBody γ slk R H ξ        -- the payload of the INNER spinlock:
                                  ∃ v, locked word ↦ v ∗
                                    (v = 0 ∗ slFreeHoldAt ξ γ slk ∗ R ξ
@@ -129,10 +128,6 @@ def sleeplockedQ [CurCtx] (γ : GName) (q : Qp) (slk : BitVec 64) (pid : BitVec 
 
 theorem sleeplockedQAt_cur [CurCtx] (γ : GName) (q : Qp) (slk : BitVec 64) (pid : BitVec 32) :
     sleeplockedQAt (GF := GF) curCtx γ q slk pid = sleeplockedQ γ q slk pid := rfl
-
-/-- The holder token with the fraction forgotten. -/
-def sleeplocked [CurCtx] (γ : GName) (slk : BitVec 64) (pid : BitVec 32) : IProp GF := iprop%
-  ∃ q : Qp, sleeplockedQ γ q slk pid
 
 /-- The field, opened for a store and closed at the new value. -/
 theorem sleeplockedQ_pid [CurCtx] (γ : GName) (q : Qp) (slk : BitVec 64) (pid : BitVec 32) :
@@ -364,44 +359,11 @@ theorem slh_ghost_alloc :
   iexists γ
   iapply slH_halves γ 1 $$ H
 
-/-- A sleeplock is born from `initsleeplock`'s output (the identity-map
-claims of the inner lock's two words are persistent and come from the
-`sleepLockIn` the caller started with), the resource, and a fresh ghost. -/
-theorem kctx_newSleeplock [CurCtx] {lent : Bool} (cpu : CPU) (k : KCtx) (slk name : BitVec 64)
-    (R : CtxId → IProp GF) [CtxMorph R] (H : Qp → IProp GF) :
-    kctxL lent cpu k ∗ sleepLockInited slk name ∗
-    kmapId (slLk slk) ∗ kmapId (slLk slk + 16#64) ∗ R curCtx
-    ⊢ |={⊤}=> (kctxL (GF := GF) lent cpu k ∗ ∃ γl γ : GName, isSleeplockGen γl γ slk R H) := by
-  unfold sleepLockInited lockInited
-  iintro ⟨Hk, ⟨Hw, ⟨Hnm, Hfresh⟩, Hn, Hpid⟩, #Hcl, #Hcl', HR⟩
-  imod slh_ghost_alloc (GF := GF) with ⟨%γ, Ha, Ht⟩
-  ihave Hpid := (show wordPointsTo (GF := GF) (slk + 40#64) 4 (DFrac.own 1) 0#32 ⊢
-      wordPointsTo (slPid slk) 4 (DFrac.own 1) 0#32 from by unfold slPid; iintro H; iexact H) $$ Hpid
-  ihave Htq := sleeplockedQ_intro γ 1 slk 0#32 $$ [Ht Hpid]
-  case' _ => iframe
-  ihave Hnm := (show wordPointsTo (GF := GF) (slk + 8#64 + 8#64) 8 (DFrac.own 1) sleepLockNameAddr ⊢
-      wordPointsTo (slLk slk + 8#64) 8 (DFrac.own 1) sleepLockNameAddr from by unfold slLk; iintro H; iexact H) $$ Hnm
-  ihave Hn := (show wordPointsTo (GF := GF) (slk + 32#64) 8 (DFrac.own 1) name ⊢
-      wordPointsTo (slNameField slk) 8 (DFrac.own 1) name from by unfold slNameField; iintro H; iexact H) $$ Hn
-  ihave Hbody := slBody_intro_free γ slk R H sleepLockNameAddr name 1 $$ [Hnm Hn Hw Htq Ha HR]
-  case' _ => iframe
-  ihave Hfresh := (show lkFresh (GF := GF) (slk + 8#64) ⊢ lkFresh (slLk slk) from by unfold slLk; iintro H; iexact H) $$ Hfresh
-  imod kctx_newlock cpu k (slLk slk) "sleep lock" (slBody γ slk R H) $$ [Hk Hbody Hfresh] with ⟨Hk, ⟨%γl, #Hlk⟩⟩
-  · iframe Hk Hbody Hfresh
-    isplit
-    · iexact Hcl
-    · iexact Hcl'
-  imodintro
-  iframe Hk
-  iexists γl, γ
-  unfold isSleeplockGen
-  iexact Hlk
-
 set_option maxHeartbeats 1000000 in
 /-- Rocq `SleepLock.sl_fresh_new_genl` (at `own_context`, any mask): a
 sleeplock is born from `initsleeplock`'s output, the resource at the
-creator's context, and a fresh ghost -- `Xv6.kctx_newSleeplock`'s body at
-`ownCtx` (`MachCSL.newlock_of_fresh`) rather than at the kernel context.
+creator's context, and a fresh ghost, at `ownCtx`
+(`MachCSL.newlock_of_fresh`) rather than at the kernel context.
 Rocq's `sl_fresh slk s` is `sleepLockInited slk name` beside the inner
 lock's two identity claims; its returned `slh_auth γ None` (the tracked
 end, which `icache_boot_at` discards) has no counterpart: Lean's tracked

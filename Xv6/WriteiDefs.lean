@@ -33,7 +33,7 @@ instruction stream computes, and each callee's contract at its call site.
    read-only cells bundled (`Xv6.wiCells`) and the source at `wiSrc`; the
    entry lemma converts once.
 6. The callee call sites: `bread`/`brelse` are the shared
-   `Xv6.bread_callF`/`brelse_callF` (`Xv6/FsCallSitesF.lean`), `log_write`
+   `Xv6.bread_callF_eb`/`brelse_callF` (`Xv6/FsCallSitesF.lean`), `log_write`
    the shared `Xv6.log_write_gen_call` at the ambient view
    (`Xv6.writei_log_writeF`).  `writei_bmap_eb` (BMAP has no shared call site
    yet), `writei_either_copyin` and `writei_iupdate_eb` (a copy of

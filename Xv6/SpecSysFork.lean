@@ -37,9 +37,7 @@ refunded on the `-1` arm, `kforkRet`).
 `kfork` does not sleep (`filedup`/`idup` are non-blocking):
 like `kfork`'s, the contract is BALANCED and generic in the entry interrupt
 index (`wp_sys_fork_eb_body`: no trap bundle, crossing `k.sie`, the post
-`kforkPost` restated at sys_fork's own entry context).  The old
-interrupts-off, trap-bundle-threading contract `SYSFORK.wp_sys_fork` is
-derived.
+`kforkPost` restated at sys_fork's own entry context).
 
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
@@ -123,30 +121,5 @@ structure SYSFORK : Prop where
     (Q : Int → IProp GF) (csP : ExtTreeSet GName compare) (Rc : IProp GF) hj hproc hK hnoff htier,
     wp_sys_fork_eb_body (hlc := hlc) (GF := GF) Γ cpu k γw γp γl γk γft γ j pid V M stsP Q csP Rc
       hj hproc hK hnoff htier
-
-/-- The interrupts-off instance of `wp_sys_fork_eb`: the hart is pinned, so
-the trap bundle frames across the call. -/
-theorem SYSFORK.wp_sys_fork (A : SYSFORK) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
-    [Xv6G GF] [FdslotG GF] [BioslotG GF]
-    [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
-    [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-    [Appcfg GF] [FileG GF] [SG : UexecSG GF] [Fscfg] [Icfg] [CurCtx] (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (cpu : CPU) (k : KCtx) (γw γp γl : GName) (γk : KmemNames) (γft : GName) (γ : FileNames)
-    (j : Nat) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (stsP : List FdState)
-    (Q : Int → IProp GF) (csP : ExtTreeSet GName compare) (Rc : IProp GF) hj hproc hK hsie hnoff hlocks htier :
-    wp_sys_fork_body (hlc := hlc) (GF := GF) Γ cpu k γw γp γl γk γft γ j pid V M stsP Q csP Rc
-      hj hproc hK hsie hnoff hlocks htier := by
-  have h := A.wp_sys_fork_eb (hlc := hlc) (GF := GF) Γ cpu k γw γp γl γk γft γ j pid V M stsP Q csP Rc hj hproc hK hnoff htier
-  unfold wp_sys_fork_eb_body at h
-  unfold wp_sys_fork_body
-  iintro ⟨H0, H1, H2, Htc, Hcl, Hir, H6, H7, H8, H9, H10, H11, H12, H13, H14, H15, H16, H17, H18, H19, H20, Hnext⟩
-  iapply h
-  iframe H0 H1 H2 H6 H7 H8 H9 H10 H11 H12 H13 H14 H15 H16 H17 H18 H19 H20
-  rw [hsie]
-  iapply wpNext_off_intro
-  unfold kforkPost kforkPostB
-  iintro %spie %spp %R' %rv %hpost Hk Hpc Hret
-  ihave Hn := wpNext_at true k.proc cpu cpu _ (fun _ => rfl) $$ Hnext
-  iapply Hn $$ %spie %spp %R' %rv %hpost Hk Hpc Htc Hcl Hir Hret
 
 end Xv6

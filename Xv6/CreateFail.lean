@@ -18,7 +18,7 @@ THE GHOST MOVES (Rocq's, kept):
 * THE UNARM FIRES between the flush and the put (round E2, site #16): the
   child was armed at +0xc4 and the parent's `dirlink` failed, so its row
   DISAPPEARS (ruling Q-h, the do-then-undo PAIR).  The child is NOT under the
-  registry on this arm, so the PLAIN fire (`cafUnarm_fire`) applies; the
+  registry on this arm, so the PLAIN fire applies; the
   zeroed record owes `InodeLocal`, which a non-directory record at
   `nlink = 0` is.
 * THE PARENT'S RE-PARK: `tot = 0`, nothing written, so the entry tokens

@@ -190,7 +190,7 @@ theorem uartInv_consOpen (γ : UartNames) (h : List Obs) (c : BitVec 8) (cs : Li
 /-- CLOSING THE ARM (Rocq `uart_inv_cons_close`): what is filed is what
 actually went out.  K3 (relax-d2): a STORE arm (plan = its one glyph) closes
 only after that glyph went out; the erase arms plan a run of triples and
-discharge it vacuously (`ConsLog.consBsJoin_not_single`).  K1: which
+discharge it vacuously.  K1: which
 keystroke this arm is filing -- the entry's input number becomes the log's
 clause (`consLogIns_snoc`). -/
 theorem uartInv_consClose (γ : UartNames) (h : List Obs) (c : BitVec 8) (cs : List (BitVec 8))

@@ -287,7 +287,7 @@ class MachFixedGS (hlc : outParam HasLC) (GF : BundledGFunctors) where
   the taint.  Persistent and timeless (fields).  Its LAW -- the era's
   licence for the two process events -- names Xv6's console events, so it
   lives on the Xv6-level record (`Xv6.AppIface.wild_lic`), read back at a
-  record whose slots are the interface's (`Xv6.consLicenceAt_of_wild`).
+  record whose slots are the interface's.
   `wildNone` (`False`) for an application with no masked program. -/
   wild : Nat → IProp GF
   wild_persistent : ∀ k, Persistent (wild k)

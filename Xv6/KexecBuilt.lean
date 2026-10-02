@@ -51,9 +51,10 @@ The view is the MAPPED one; Rocq's `us_M` is the lazy view.  They agree under
   only because Rocq's kernel stages could not import SpecKexec).
 * `umem_wr_write`, `kx_wr_linear`, `mword0_bv0`, `elf_zero_byte_bv0`,
   `umem_write_ext_kxb`: Lean-trivial (Nat-keyed list writes; one zero).
-* `kx_str_at_step`, `kxb_args_at_intro`, `kxb_stack_at_intro`: subsumed by
-  `kx_argv_push` / `kx_argv_vec` / `kexec_stack_at_intro` (their only
-  consumers were the argv rows, ProofKexecC).
+* `kx_str_at_step`, `kxb_args_at_intro`: subsumed by `kx_argv_push` /
+  `kx_argv_vec` (their only consumers were the argv rows, ProofKexecC);
+  `kxb_stack_at_intro` and `kexec_stack_at_intro` are not ported (nothing
+  uses them).
 * `load_win_step` (the file-named instance), `load_win_write_out`: subsumed
   by `loadWin_step` (Rocq's `_step_g`) / unused (no Rocq consumer).
 * `uimg_sub_umem_write`/`_umem_wr`: `uimgSub_write` (a covered copyout is a
@@ -447,10 +448,6 @@ theorem kx_str_at_0 (top : Int) (alen : Nat → Nat) (afun : Nat → Nat → Bit
     kxStrAt top alen afun 0 Mv :=
   ⟨fun _ _ h => absurd h (by omega), fun _ h => absurd h (by omega)⟩
 
-theorem kexec_stack_at_intro {top : Int} {alen : Nat → Nat} {na : Nat} {Mv : ElfMem}
-    (hok : kxcStackOk top (top - 4096) alen na) (hz : kxZeroExcept top (kexecArgAddr top alen na) Mv) :
-    kexecStackAt top alen na Mv := ⟨hok, hz⟩
-
 /-- ONE PUSH (Rocq `kx_argv_push`): the copyout of string `k` and its NUL at
 `kxcSp top alen (k+1)`, the destination bytes defined (the stack page is
 mapped); both halves of the argv loop's invariant step together.  Rocq's
@@ -731,16 +728,6 @@ theorem kexecSzAfter_memEnd (f : ElfBytes) :
     rw [show max 0 x = x by omega]
 
 /-! ### Ascending segments (Rocq `kxb_ascending*`, stated at `loadsAscending`) -/
-
-theorem loadsAscending_app_l (ps qs : List ElfPhdr) (h : loadsAscending (ps ++ qs)) : loadsAscending ps := by
-  induction ps with
-  | nil => trivial
-  | cons p ps ih =>
-    obtain ⟨hstep, hrest⟩ := h
-    refine ⟨?_, ih hrest⟩
-    cases ps with
-    | nil => trivial
-    | cons q ps => exact hstep
 
 theorem loadsAscending_adj : ∀ (ps : List ElfPhdr) (i : Nat) (p q : ElfPhdr), loadsAscending ps →
     ps[i]? = some p → ps[i + 1]? = some q → p.vaddr + p.memsz ≤ q.vaddr

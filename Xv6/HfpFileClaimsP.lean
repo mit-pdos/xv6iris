@@ -16,8 +16,8 @@ spell their section equation with:
   (`FileOpenDeed`), `fdeed`, `ftkt`, `fown` (`AppFileDeed`), `escTok`,
   `escKey` (`AppFileEscrow`), `filePred` (`AppFileClaim`), `fileConsCred`
   (`AppFileCons`, its console flag an `Option Nat`), `fileCur`
-  (`FileWriteCur`), `fecl` (`FileOutClaim`), `fileParams` (`FileLinkGen`),
-  `fescRes`, `fileUnarmFam`, `fileOpenPay`,
+  (`FileWriteCur`), `fecl` (`FileOutClaim`), `fescRes`, `fileUnarmFam`,
+  `fileOpenPay`,
   `fileOpenFdK` (`FileOpenFams`);
 * the lemmas `fdq_split`, `fdq_join` (`FileOpenDeed`), `fileSup_of_taint`
   (`AppFileSteps`), `fileEscrowPark` (`AppFileEra`; it takes `fown r s`, =

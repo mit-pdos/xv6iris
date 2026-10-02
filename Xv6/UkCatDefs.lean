@@ -113,12 +113,6 @@ theorem kcat_nthByte0_zext (b : BitVec 8) : nthByte (n := 8) (BitVec.setWidth 64
     | (simp [BitVec.toNat_setWidth]; omega)
     | simp [BitVec.toNat_setWidth]
 
-/-- **Rocq `nth_byte0_moi`**: the low byte of a byte's value as a word. -/
-theorem kcat_nthByte0_ofNat (b : BitVec 8) : nthByte (n := 8) (BitVec.ofNat 64 b.toNat) 0 = b := by
-  rw [show BitVec.ofNat 64 b.toNat = BitVec.setWidth 64 b from by
-    apply BitVec.eq_of_toNat_eq; simp [BitVec.toNat_setWidth]]
-  exact kcat_nthByte0_zext b
-
 /-- A nonnegative signed reading is the word's `Nat` value put back. -/
 theorem kcat_ofNat_of_toInt (r : BitVec 64) (nb : Nat) (h : r.toInt = nb) : BitVec.ofNat 64 nb = r := by
   rw [← BitVec.ofInt_natCast, ← h, BitVec.ofInt_toInt]

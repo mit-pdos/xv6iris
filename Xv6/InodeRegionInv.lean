@@ -16,7 +16,7 @@ What is here, in Rocq order:
   `iregBody`;
 * 2976-3270  THE ERA's TOP MAP: `iregParked`, `iregArmed`, `ftopClean`
   (+ `_empty`), `ftopBody`, `ftopInv`, `ftopAlloc`, `iregArm`,
-  `iregDisarm`, `iregRelease`, `iregClean_acc`;
+  `iregDisarm`, `iregRelease`;
 * 3272-3339  THE BUNDLES: `iregReg`, `iregInv` and their projections,
   `appN_sub_ftop`, `ftopN_sub_app`;
 * 3341-3490  THE RETAGS `iregTopRetag_gen` / `_same`,
@@ -46,8 +46,7 @@ surrender ONE record -- and the sixteen `iregSlot`s.
 abstract map names is well-formed (`InodeLocal`) except the ones some open
 transaction has ARMED; an arm parks a SHARE of its transaction's `ln_tx`
 element (`iregParked`), keyed by a fresh ARM ID, so at a commit (the WAL's
-`ln_tx` authority EMPTY) nothing is armed and the whole map is well-formed
-(`iregClean_acc`).
+`ln_tx` authority EMPTY) nothing is armed and the whole map is well-formed.
 
 ## THE KEY-TYPE SEAM
 
@@ -83,18 +82,15 @@ are `Nat`-keyed.  Block `bi`'s slot `i` is the inum `16 * bi + i : Nat`
 5. `seq 0 n` is `List.range n`; `ds !!! i` is `ds[i]!`; `<[i := d']> ds`
    on a list is `ds.set i d'`; `m !! k` is `PartialMap.get? m k`;
    `fresh (dom A)` is `Iris.Std.List.fresh` over `A`'s key list.
-6. `iregClean_acc`'s emptiness step is `TxPin.txPins_noOps` at the
-   projected map `PartialMap.map (fun e => (e.1, e.2.1)) A` (Rocq
-   `fst <$> A`), whose big-op is `iregParked`'s by `bigOpM_map_eq`.
-7. Rocq's curried wands are kept curried (`⊢ A -∗ B -∗ |={E}=> C`).
-8. Class binders are per section, only where used (the port's rule):
+6. Rocq's curried wands are kept curried (`⊢ A -∗ B -∗ |={E}=> C`).
+7. Class binders are per section, only where used (the port's rule):
    the byte unit needs `[FsBytesG GF]` alone; the block/body sections
    `iregSlot`'s binders; the top map `[IcacheG] [LogG] [FsTopG]
    [FsBytesG]` and `MachGS` (for `inv`); the bundles add `[FsBlocksG GF]`
    (for `fsBytesAny`/`fsBytesRow`, whose `FsBytesG` is `FsBlocksG`'s
    parent -- the bundle sections bind `FsBlocksG` INSTEAD of `FsBytesG`,
    so there is one instance path) and `[Appcfg GF]`.
-9. `iregRecs_acc_upd` / `iregSlots_acc_upd` keep Rocq's
+8. `iregRecs_acc_upd` / `iregSlots_acc_upd` keep Rocq's
    `length ds = 16` premise (unused by the proof, as in Rocq) so their
    callers' arity is Rocq's.
 
@@ -106,17 +102,15 @@ are `Nat`-keyed.  Block `bi`'s slot `i` is the inum `16 * bi + i : Nat`
   `iregInv_app` is the live projection.
 * `ireg_top_retag_step`, `ireg_top_retag_armed_step` -- uses checked: same
   grep, none -- dead (brief §5).  They were the plain-wand readings of the
-  `_gen` forms; a caller with a plain wand lifts it under the later itself
-  (`AppInv.appTopUpdate_step` is the same move one layer down).
+  `_gen` forms; a caller with a plain wand lifts it under the later itself.
 * `ireg_bytes` -- a `Notation` (deviation 3).
 
 NEW helpers (no Rocq counterpart, each a one-liner Rocq gets from stdpp or
 does inline): `getElem!_set_self` / `getElem!_set_ne` (Rocq
 `list_lookup_total_insert(_ne)`), `range_getElem?` (`lookup_seq`),
 `iregArm_fresh` (`is_fresh (dom A)`), `iregParked_retag` /
-`iregParked_elem` / `iregParked_txPins` / `map_eq_empty_inv` (the inline
-big-op and `fmap_empty_inv` steps of `ireg_disarm` / `ireg_release` /
-`ireg_clean_acc`), `ftopN_appN_disj` (`solve_ndisj`); `iregSlotKey` (`Hkey`
+`iregParked_elem` (the inline big-op steps of `ireg_disarm` /
+`ireg_release`), `ftopN_appN_disj` (`solve_ndisj`); `iregSlotKey` (`Hkey`
 at `Nat`), `logN_sub_diff_iregN` (`subseteq_difference_r` +
 `logN_iregN_disj`), `iregCouple_lookup` (`Hdeq`), `iregCouple_set`
 (`lookup_insert(_ne)` + `ireg_key_inj` at a mover's re-close) -- the per-inum
@@ -409,8 +403,7 @@ by DISARMING, which is where it re-proves the row -- free at the natural
 place, because a walk that re-packs its payload has
 `FsStateEra.inode_owned_era`'s `inode_local` in hand anyway.  So at a
 COMMIT, where no transaction is open at all, no token can be parked, no inum
-can be armed, and the row is `FsDurSnap.snap_local` of the whole map
-(`iregClean_acc`).
+can be armed, and the row is `FsDurSnap.snap_local` of the whole map.
 
 WHY THE REGISTRY IS KEYED BY AN ARM ID.  An arm has to prove its key is not
 already taken.  Keyed by INUM that is the fact nobody can produce ("no other
@@ -628,71 +621,6 @@ theorem iregRelease [Icfg] (E : CoPset) (γfs : FsNames) (k t : Nat) (q : Qp)
   imodintro
   iapply (iregParked_elem t q _).1
   iexact Ht
-
-/-! ### THE COMMIT'S READING (lane A item 5) -/
-
-/-- The projection that turns the registry's rows into a `TxPin.txPins`
-ledger (Rocq `fst <$> A`). -/
-theorem iregParked_txPins [Icfg] (A : RegMapF IregArmEnt) :
-    ([∗map] _k ↦ e ∈ A, iregParked (GF := GF) e) ⊢
-      txPins icfgLog (Iris.Std.PartialMap.map (fun e : IregArmEnt => (e.1, e.2.1)) A) := by
-  unfold txPins
-  rw [show ([∗map] _k ↦ p ∈ Iris.Std.PartialMap.map (fun e : IregArmEnt => (e.1, e.2.1)) A,
-      txPin (GF := GF) icfgLog p.1 p.2) = [∗map] _k ↦ e ∈ A, iregParked (GF := GF) e from
-    BigOpM.bigOpM_map_eq _ _ A]
-
-theorem map_eq_empty_inv {V V' : Type} (f : V → V') (A : RegMapF V)
-    (h : Iris.Std.PartialMap.map f A = (∅ : RegMapF V')) : A = ∅ := by
-  rw [LawfulPartialMap.eq_empty_iff] at h ⊢
-  intro k
-  have hk := h k
-  rw [LawfulPartialMap.get?_map] at hk
-  cases hA : PartialMap.get? A k with
-  | none => rfl
-  | some v => rw [hA] at hk; cases hk
-
-/-- No open transaction means no armed inum means the whole abstract map is
-well-formed -- `FsDurSnap.snap_local` of any state whose inodes are `I`.
-The committer holds the log's own transaction AUTHORITY (a conjunct of
-`LogInv.log_res`; `LogInv.log_tx_empty_of_ops` turns "the ledger is empty"
-into "the authority is empty"), so the reading costs it nothing but this
-accessor.  THE REGISTRY'S ROWS ARE A `TxPin.txPins` LEDGER at the arm ids,
-once the entry's inum set is projected away: the refutation is
-`txPins_noOps`, not another copy of the `lookup_empty` idiom. -/
-theorem iregClean_acc [Icfg] (E : CoPset) (γfs : FsNames) (hE : (↑ftopN : CoPset) ⊆ E) :
-    ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗ logTxAuth icfgLog (∅ : RegMapF Unit) -∗
-      |={E, E \ ↑ftopN}=> ∃ I : RegMapF FsNode,
-        (γfs.top ↪●MAP{DFrac.own (1 : Qp).half} I) ∗
-        ⌜∀ i n, PartialMap.get? I i = some n → InodeLocal i n⌝ ∗
-        logTxAuth icfgLog (∅ : RegMapF Unit) ∗
-        ((γfs.top ↪●MAP{DFrac.own (1 : Qp).half} I) ={E \ ↑ftopN, E}=∗ True) := by
-  iintro #Hi Htxa
-  unfold ftopInv
-  imod (inv_acc_timeless (E := E) (N := ftopN) (P := ftopBody (GF := GF) γfs) hE) $$ Hi
-    with ⟨Hb, Hclose⟩
-  unfold ftopBody
-  icases Hb with ⟨%I, %A, Hta, Hla, Hpark, %hcl⟩
-  ihave Hpins := iregParked_txPins A $$ Hpark
-  ihave %hemp := txPins_noOps icfgLog _ $$ [Htxa Hpins]
-  · iframe Htxa Hpins
-  have hA : A = ∅ := map_eq_empty_inv _ A hemp
-  subst hA
-  imodintro
-  iexists I
-  iframe Hta Htxa
-  isplitr
-  · ipureintro
-    intro i n hi
-    refine hcl i n hi fun k' t' q' S' hk' => ?_
-    rw [get?_empty] at hk'; cases hk'
-  · iintro Hta
-    iapply Hclose
-    iexists I, ∅
-    iframe Hta Hla
-    isplitl []
-    · iapply BigSepM.bigSepM_empty.2
-      iempintro
-    · ipureintro; exact hcl
 
 end Top
 

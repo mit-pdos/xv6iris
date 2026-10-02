@@ -48,7 +48,7 @@ Rocq's header, kept because the reasons are the content:
 2. Names are camelCased (`delta_create` → `deltaCreate`, `cre_pre` →
    `crePre`, `acre_bump` → `acreBump`, `unl_dec` → `unlDec`, `dots_ents` →
    `dotsEnts`, ...); lemma names are camel-headed with Rocq's snake tail
-   (`deltaCreate_parent`, `blkSplice_nil`, ...).  `blk_splice` is the
+   (`deltaCreate_dev`, `blkSplice_nil`, ...).  `blk_splice` is the
    landed `Xv6.blkSplice` (`Xv6/FsBytes.lean`).
 3. Rocq's `decide ((an_nlink a - 1)%nat = 0%nat)` is Lean's `if a.anNlink
    - 1 = 0`.
@@ -93,14 +93,6 @@ def deltaCreate (d : Nat) (nm : Fname) (i : Nat) (c : Absnode) (av : Aview) : Av
         (PartialMap.insert av d ⟨.ADir (ents.insert nm i), a.anNlink + acreBump c⟩) i ⟨c, 1⟩
     | _ => av
   | none => av
-
-theorem deltaCreate_parent (av : Aview) (d : Nat) (nm : Fname)
-    (ents : Std.ExtTreeMap Fname Nat compare) (nl i : Nat) (c : Absnode)
-    (hd : PartialMap.get? av d = some ⟨.ADir ents, nl⟩) (hne : d ≠ i) :
-    PartialMap.get? (deltaCreate d nm i c av) d =
-      some ⟨.ADir (ents.insert nm i), nl + acreBump c⟩ := by
-  simp only [deltaCreate, hd]
-  rw [get?_insert_ne (Ne.symm hne), get?_insert_eq rfl]
 
 /-- THE SIDE CONDITIONS (Rocq's `cre_pre`): the parent is a directory whose
 map lacks the name, and the child's row already reads as the freshly-minted
@@ -340,34 +332,6 @@ def deltaUnlTgt (t : Nat) (av : Aview) : Aview :=
     else PartialMap.insert av t ⟨a.anNode, a.anNlink - 1⟩
   | none => av
 
-/-- THE FUSED DELTA (Rocq's `delta_unlink`, the quiescent reading). -/
-def deltaUnlink (d : Nat) (nm : Fname) (t : Nat) (av : Aview) : Aview :=
-  match PartialMap.get? av d with
-  | some p =>
-    match PartialMap.get? av t with
-    | some a =>
-      match p.anNode with
-      | .ADir ents =>
-        if a.anNlink - 1 = 0 then
-          PartialMap.delete
-            (PartialMap.insert av d ⟨.ADir (ents.erase nm), p.anNlink - unlDec a.anNode⟩) t
-        else
-          PartialMap.insert
-            (PartialMap.insert av d ⟨.ADir (ents.erase nm), p.anNlink - unlDec a.anNode⟩)
-            t ⟨a.anNode, a.anNlink - 1⟩
-      | _ => av
-    | none => av
-  | none => av
-
-theorem deltaUnlEnt_other (av : Aview) (d : Nat) (nm : Fname) (dec j : Nat) (hj : j ≠ d) :
-    PartialMap.get? (deltaUnlEnt d nm dec av) j = PartialMap.get? av j := by
-  unfold deltaUnlEnt
-  split
-  · split
-    · rw [get?_insert_ne (Ne.symm hj)]
-    · rfl
-  · rfl
-
 /-- the target's row after the halves, spelled out (Rocq's
 `delta_unl_tgt_unfold`) -/
 theorem deltaUnlTgt_unfold (av : Aview) (t : Nat) (a : Anode) (ht : PartialMap.get? av t = some a) :
@@ -375,28 +339,6 @@ theorem deltaUnlTgt_unfold (av : Aview) (t : Nat) (a : Anode) (ht : PartialMap.g
       if a.anNlink - 1 = 0 then PartialMap.delete av t
       else PartialMap.insert av t ⟨a.anNode, a.anNlink - 1⟩ := by
   simp only [deltaUnlTgt, ht]
-
-/-- the fused delta at a parent row and a target row, spelled out (Rocq's
-`delta_unlink_unfold`) -/
-theorem deltaUnlink_unfold (av : Aview) (d : Nat) (nm : Fname)
-    (ents : Std.ExtTreeMap Fname Nat compare) (nl t : Nat) (a : Anode)
-    (hd : PartialMap.get? av d = some ⟨.ADir ents, nl⟩) (ht : PartialMap.get? av t = some a) :
-    deltaUnlink d nm t av =
-      if a.anNlink - 1 = 0 then
-        PartialMap.delete (PartialMap.insert av d ⟨.ADir (ents.erase nm), nl - unlDec a.anNode⟩) t
-      else
-        PartialMap.insert (PartialMap.insert av d ⟨.ADir (ents.erase nm), nl - unlDec a.anNode⟩)
-          t ⟨a.anNode, a.anNlink - 1⟩ := by
-  simp only [deltaUnlink, hd, ht]
-
-/-- the LAST link: the target's row leaves the view (Rocq's
-`delta_unlink_last`; E2-V2) -/
-theorem deltaUnlink_last (av : Aview) (d : Nat) (nm : Fname)
-    (ents : Std.ExtTreeMap Fname Nat compare) (nl t : Nat) (a : Anode)
-    (hd : PartialMap.get? av d = some ⟨.ADir ents, nl⟩) (ht : PartialMap.get? av t = some a)
-    (hnl : a.anNlink = 1) :
-    PartialMap.get? (deltaUnlink d nm t av) t = none := by
-  rw [deltaUnlink_unfold av d nm ents nl t a hd ht, if_pos (by omega), get?_delete_eq rfl]
 
 /-! ## 4b.  Link (round E2, lane E2-D) -/
 
@@ -416,54 +358,10 @@ def deltaLinkEnt (d : Nat) (nm : Fname) (t : Nat) (av : Aview) : Aview :=
     | _ => av
   | none => av
 
-/-- THE FAILURE ARM'S UNDO (Rocq's `delta_link_untgt`): `deltaUnlTgt` on the
-nose. -/
-def deltaLinkUntgt (t : Nat) : Aview → Aview := deltaUnlTgt t
-
-/-- THE FUSED DELTA (Rocq's `delta_link`): the target leg, then the
-parent's. -/
-def deltaLink (d : Nat) (nm : Fname) (t : Nat) (a : Anode) (av : Aview) : Aview :=
-  deltaLinkEnt d nm t (deltaLinkTgt t a av)
-
-theorem deltaLinkTgt_lookup_at (av : Aview) (t : Nat) (a : Anode) :
-    PartialMap.get? (deltaLinkTgt t a av) t = some ⟨a.anNode, a.anNlink + 1⟩ := by
-  unfold deltaLinkTgt; rw [get?_insert_eq rfl]
-
-theorem deltaLinkTgt_lookup_same (av : Aview) (t : Nat) (a : Anode) (j : Nat) (hj : j ≠ t) :
-    PartialMap.get? (deltaLinkTgt t a av) j = PartialMap.get? av j := by
-  unfold deltaLinkTgt; rw [get?_insert_ne (Ne.symm hj)]
-
 theorem deltaLinkEnt_dir (av : Aview) (d : Nat) (nm : Fname) (t : Nat)
     (ents : Std.ExtTreeMap Fname Nat compare) (nl : Nat)
     (hd : PartialMap.get? av d = some ⟨.ADir ents, nl⟩) :
     deltaLinkEnt d nm t av = PartialMap.insert av d ⟨.ADir (ents.insert nm t), nl⟩ := by
   simp only [deltaLinkEnt, hd]
-
-/-- THE UNDO IS EXACT (Rocq's `delta_link_untgt_tgt`): at the row the
-machine read -- present at a nonzero count, absent at zero -- the failure
-arm's count-down restores the pre-view, in both arms. -/
-theorem deltaLinkUntgt_tgt (av : Aview) (t : Nat) (a : Anode) (hrow : arowAt av t a) :
-    deltaLinkUntgt t (deltaLinkTgt t a av) = av := by
-  unfold deltaLinkUntgt
-  rw [deltaUnlTgt_unfold _ t ⟨a.anNode, a.anNlink + 1⟩ (deltaLinkTgt_lookup_at av t a)]
-  unfold deltaLinkTgt
-  dsimp only
-  rcases arowAt_cases av t a hrow with ⟨hz, hnone⟩ | ⟨hnz, hsome⟩
-  · rw [if_pos (by omega)]
-    exact LawfulPartialMap.delete_insert_cancel hnone
-  · rw [if_neg (by omega), LawfulPartialMap.insert_insert_same,
-      show a.anNlink + 1 - 1 = a.anNlink by omega]
-    exact LawfulPartialMap.insert_get? hsome
-
-/-- THE SPLIT, spelled out (Rocq's `delta_link_split`). -/
-theorem deltaLink_split (av : Aview) (d : Nat) (nm : Fname) (t : Nat) (a : Anode)
-    (ents : Std.ExtTreeMap Fname Nat compare) (nl : Nat)
-    (hd : PartialMap.get? av d = some ⟨.ADir ents, nl⟩) (hne : d ≠ t) :
-    deltaLink d nm t a av =
-      PartialMap.insert (PartialMap.insert av t ⟨a.anNode, a.anNlink + 1⟩) d
-        ⟨.ADir (ents.insert nm t), nl⟩ := by
-  unfold deltaLink
-  rw [deltaLinkEnt_dir _ d nm t ents nl (by rw [deltaLinkTgt_lookup_same _ _ _ _ hne]; exact hd)]
-  rfl
 
 end Xv6

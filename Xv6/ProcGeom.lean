@@ -41,8 +41,6 @@ def procsAddr : BitVec 64 := KA.«proc»
 def procSize : Nat := 376
 /-- `sizeof (p->name)` (Rocq `PNAMELEN`). -/
 def PNAMELEN : Nat := 16
-/-- `MAXVA` (kernel/riscv.h): `1 << 38`. -/
-def MAXVA : Nat := 2 ^ 38
 
 /-- `&proc[i]` (Rocq `proc_addr`). -/
 def procAddr (i : Nat) : BitVec 64 := procsAddr + BitVec.ofNat 64 (procSize * i)

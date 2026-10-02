@@ -20,8 +20,8 @@ The stages: `Xv6/IallocTail.lean` (epilogue, no-inodes arm),
    convention).
 2. `iallocArms`' claim arm carries the receipt as the ONE row
    `Xv6.inodeClaimed` (Rocq packs its three constituents in `ia_cont`,
-   after the epilogue; `inodeClaimed_intro` is `.rfl`, so the pack point
-   moves nothing).
+   after the epilogue; packing them is `.rfl`, so the pack point moves
+   nothing).
 3. Rocq's ProofIalloc restates iupdate's `log_write` call at
    `dn = iallocFresh ty`; this port once did too (`ialloc_log_write`,
    `iallocClaimAu`), and both are now the shared

@@ -25,8 +25,7 @@ Rocq's header, point for point:
 * THE DEPOSIT'S FAMILIES are ONE RECORD (`Xfam`), bound once in front of
   both legs; `xfamPt` is the trivial record every supply law hands back.
 * THE DESCRIPTOR KEY IS `fdStOfKey`, NOT `SpecArgfd.sysFdSt` (which reads
-  the kernel's `ofile` pointer array, a reading no process has);
-  `sysFdSt_ofKey` is the equation, and its premises are the DISPATCHER's.
+  the kernel's `ofile` pointer array, a reading no process has).
 * NOTHING HERE READS A `CurCtx` -- a requirement (the slot rides the park
   and every place two proofs at two contexts meet).
 * THE SUPPLY `ssupply` is the application's claim at every view
@@ -114,30 +113,6 @@ in the view `sts`, read as a C `int`, closed out of range.  A function of
 what a user process holds. -/
 def fdStOfKey (v : BitVec 64) (sts : List FdState) : FdState :=
   if 0 ≤ argZ v ∧ argZ v < (NOFILE : Int) then (sts[(argZ v).toNat]?).getD .closed else .closed
-
-/-- **Rocq `SpecArgfd.sys_fd_st_of_key`**: argfd's reading of the kernel's
-`ofile` array IS the key's reading, given the two lengths and the pointer /
-state agreement (the dispatcher's facts). -/
-theorem sysFdSt_ofKey (v : BitVec 64) (fs : List (BitVec 64)) (sts : List FdState)
-    (hfs : fs.length = NOFILE) (hsts : sts.length = NOFILE)
-    (hag : ∀ (j : Nat) (w : BitVec 64) (st : FdState), fs[j]? = some w → sts[j]? = some st →
-      (w = 0#64 ↔ st = .closed)) :
-    sysFdSt v fs sts = fdStOfKey v sts := by
-  unfold sysFdSt fdStOfKey argFd
-  by_cases hr : 0 ≤ argZ v ∧ argZ v < (NOFILE : Int)
-  · have hk : (argZ v).toNat < NOFILE := by omega
-    obtain ⟨w, hw⟩ : ∃ w, fs[(argZ v).toNat]? = some w :=
-      ⟨_, List.getElem?_eq_getElem (by omega)⟩
-    obtain ⟨st, hst⟩ : ∃ st, sts[(argZ v).toNat]? = some st :=
-      ⟨_, List.getElem?_eq_getElem (by omega)⟩
-    have hr' : 0 ≤ argZ v ∧ argZ v < ((NOFILE : Nat) : Int) := hr
-    simp only [if_pos hr', hw, hst, Option.getD_some]
-    by_cases hz : w = 0#64
-    · simp only [if_pos hz]
-      exact ((hag _ w st hw hst).1 hz).symm
-    · simp only [if_neg hz, hst, Option.getD_some]
-  · have hr' : ¬ (0 ≤ argZ v ∧ argZ v < ((NOFILE : Nat) : Int)) := hr
-    simp only [if_neg hr']
 
 /-- **THE IMAGE GUARD** (deviation 1): the page view `Mv` agrees with the key
 image `E` on every byte `E` defines. -/
@@ -892,9 +867,6 @@ instance uexecSGXv6 : UexecSG GF where
   srowReg_nopipe := fun st h => pipeRowReg_nopipe st h
 
 /-! ### The generic program's deposit data (deviation 7) -/
-
-/-- **Rocq `uprogSG_gen`**: the supply itself, every number admitted. -/
-@[reducible] def uprogSGGen : UprogSG GF := ⟨xv6Ssupply (hlc := hlc), fun _ => True⟩
 
 /-- **Rocq `uprogSG_free`**: no supplier, the free numbers. -/
 @[reducible] def uprogSGFree : UprogSG GF := ⟨iprop(True), freeNum⟩

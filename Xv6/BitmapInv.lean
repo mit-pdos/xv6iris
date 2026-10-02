@@ -48,7 +48,7 @@ else.  There is no per-block ownership token:
 
 * `balloc` hands out the block's EXCLUSIVE run, so a caller that keeps one
   per block its own structures name concludes the new block is none of
-  them (`Xv6.fsblock_excl`) -- the fact that re-establishes the inode
+  them -- the fact that re-establishes the inode
   block map's injectivity;
 * `bfree`'s `panic("freeing free block")` is DEAD, and
   `Xv6.freePool_used` is the proof: the caller arrives holding the block's
@@ -65,11 +65,11 @@ names.
 
 **DEVIATIONS from Rocq, with reasons.**
 
-1. **`BPB` / `BBLOCK` / `BBLOCK_single` / `BPB_value` ARE NOT DEFINED
-   HERE.**  They are already `Xv6/FsGeom.lean`'s, which collects the
-   `fs.h` / `param.h` constants that Rocq scatters across the files that
-   need them first; this file imports them.  `FSSIZE_lt_BPB` and
-   `BBLOCK_of_lt_FSSIZE` live there too.
+1. **`BPB` / `BPB_value` ARE NOT DEFINED HERE.**  They are already
+   `Xv6/FsGeom.lean`'s, which collects the `fs.h` / `param.h` constants
+   that Rocq scatters across the files that need them first; this file
+   imports them.  `BBLOCK`, `BBLOCK_single`, `FSSIZE_lt_BPB` and
+   `BBLOCK_of_lt_FSSIZE` are not ported (nothing uses them).
 2. **BLOCK NUMBERS ARE `Nat` AND SETS OF THEM ARE NOT `gset Z`**: `cov` is
    the `Std.ExtTreeSet Nat compare` the log layer already threads, the
    home set is the `List Nat` `Xv6.fsHomeList`, and the bitmap's index set

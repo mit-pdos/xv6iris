@@ -105,14 +105,6 @@ theorem permOf_lookup_some {um : RegMapF (BitVec 64)} {sz k : Nat} {q : UPerm}
     · exact Or.inr ⟨hw, (Option.some.inj h).symm⟩
     · cases h
 
-/-- Rocq `perm_of_X_mapped`: an X page is a mapped user page. -/
-theorem permOf_X_mapped {um : RegMapF (BitVec 64)} {sz k : Nat} {q : UPerm}
-    (h : permOf um sz k = some q) (hx : q.X = true) :
-    ∃ w, get? um k = some w ∧ pteBit w 4 = true ∧ pteBit w 1 = true ∧ pteBit w 3 = true := by
-  rcases permOf_lookup_some h with ⟨w, hw, hu, hr, rfl⟩ | ⟨-, rfl⟩
-  · exact ⟨w, hw, hu, hr, hx⟩
-  · cases hx
-
 /-- Rocq `perm_of_of_leaf` (KexecBuilt §3e(d)). -/
 theorem permOf_of_leaf {um : RegMapF (BitVec 64)} (sz : Nat) {k : Nat} {w : BitVec 64} {q : UPerm}
     (hl : get? um k = some w) (hp : permLeaf w = some q) : permOf um sz k = some q := by

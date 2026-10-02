@@ -23,7 +23,7 @@ carry the same record" would be false.  The cure is an invariant: the on-disk
 header's decoded write set is bounded by the region, duplicate-free, and
 names covered HOME blocks other than block 1 only.  Block 1's clause rides
 LAST in the third conjunct (Rocq's reason: `hdr_wf`'s top-level arity must not
-move); `fsRecovery_sb_raw` consumes it.
+move).
 
 **THE MIRROR'S MEANING (`logMirrorOk`).**  `Xv6.LogMirror` is the shape;
 this is what makes a recorded picture true of a disk: POINTWISE, TOTAL
@@ -37,8 +37,8 @@ record).
 runs (log fill, commit, install, clear), and each re-establishes
 `fsRecovery` at the post-write image.  Each is proved ONCE about an abstract
 post-image `P'` constrained pointwise (`P' <written> = <new>`,
-`∀ c ≠ <written>, P' c = P c`), which is exactly what `fsBlocks_write_eq` /
-`fsBlocks_write_ne` give at a call site.  Torn writes: a header write landing
+`∀ c ≠ <written>, P' c = P c`), which is exactly what a single block write
+gives at a call site.  Torn writes: a header write landing
 only sector 1 is invisible to recovery (`fsRecovery_hdr_sector0`), and a
 torn write moves the mirror's row to whatever the disk holds
 (`logMirrorOk_upd_pt`, `_upd_sector`).
@@ -338,15 +338,6 @@ theorem fsRecovery_untouched (P : Nat → List (BitVec 8)) (D : BlockMap)
     PartialMap.get? D b = some (P b) := by
   rw [hrec, fsInstall_miss _ _ _ _ b hout, fsRestrict_lookup,
     if_pos ((mem_fsHomeList cov logstart b).2 hhome)]
-
-/-- ...AND AT BLOCK 1, with nothing left to assume (Rocq
-`fs_recovery_sb_raw`). -/
-theorem fsRecovery_sb_raw (P : Nat → List (BitVec 8)) (D : BlockMap)
-    (cov : ExtTreeSet Nat compare) (logstart : Nat) (hrec : fsRecovery P D cov logstart)
-    (hwf : hdrWf P cov logstart) (hhome : fsHome cov logstart SB_BNO) :
-    PartialMap.get? D SB_BNO = some (P SB_BNO) :=
-  fsRecovery_untouched P D cov logstart SB_BNO hrec hhome
-    (fun hmem => (hwf.2.2 _ hmem).2.2 rfl)
 
 /-! ## §1c''' The committed view as a block view -/
 

@@ -38,8 +38,8 @@ quotes pre-gate offsets in places; the code is the reference.
    leaves' `signExtend` / `extractLsb'` / `setWidth` / shifts.  Rocq's
    `cr_sext_two`, `cr_inner`, `cr_inner_unsigned`, `cr_trange_bv`,
    `cr_trange_unsigned`, `cr_range_Z` (the Sail cast layer and the `Z`
-   arithmetic under it) collapse into ONE `bv_decide` identity,
-   `createTrange_eq`.  The type literals are read as `toNat` against
+   arithmetic under it) are not ported (nothing uses the range test's
+   reading).  The type literals are read as `toNat` against
    `FsImg.T_FILE` / `T_DEVICE` (`Nat`; `FsAbsCreateFire.T_FILE_w_value`
    bridges to the sixteen-bit literals).
 2. THE FRAME (Rocq's `cr_push`, `cr_pop`, `cr_fp`, `cr_name_addr`,
@@ -63,9 +63,9 @@ quotes pre-gate offsets in places; the code is the reference.
   `cr_setf_compose`, `cr_setf_clear`, `cr_made_clear`, `cr_setf_wf`,
   `cr_dot_window` (KT0), `cr_sext_two`, `cr_range_Z`, `cr_inner_unsigned`,
   `cr_trange_bv`, `cr_trange_unsigned` -- no user outside this file (the
-  last six are internal steps of `cr_trange_in`, replaced by deviation 1) --
-  reason: dead.  `cr_trange_out` is kept (`create_trange_out`): it is
-  `cr_trange_in`'s converse and F-BAD's branch decision.
+  last six are internal steps of `cr_trange_in`, deviation 1) -- reason:
+  dead.  `cr_trange_in` and its converse `cr_trange_out` are not ported
+  (nothing uses them).
 * `cr_K_value` is `CreateDefs.createSlots_val`.
 -/
 import Xv6.CreateDefs
@@ -227,8 +227,8 @@ end Windows
 
 The FIRST is namex's shape at a different literal: the argument reached
 create SIGN-extended, and `signExtend 64` is injective on sixteen bits.  The
-SECOND is a zero-extended RANGE test: `createTrange` NAMES the word the three
-ALU leaves leave in a5, at their own output shapes. -/
+SECOND is a zero-extended RANGE test on the word the three ALU leaves leave
+in a5. -/
 
 /-- +0x5c: the `bne` decides the requested type against `T_FILE` exactly
 (Rocq's `cr_tfile_ne` / `cr_tfile_eq`). -/
@@ -241,34 +241,6 @@ theorem create_bne_tfile (t : BitVec 16) :
   · have hn : t.toNat ≠ 2 := fun he => h (BitVec.eq_of_toNat_eq (by simpa using he))
     simp only [hn, ne_eq, not_false_eq_true, decide_true, bne_iff_ne]
     intro he; apply h; bv_decide
-
-/-- THE WORD THE THREE ALU LEAVES LEAVE IN a5 (Rocq's `cr_trange`): `lhu`
-gives `setWidth 64 t`, `addiw -2` sign-extends the low word of the sum, and
-the `slli 48; srli 48` pair keeps the low sixteen bits. -/
-def createTrange (t : BitVec 16) : BitVec 64 :=
-  (BitVec.signExtend 64 (BitVec.extractLsb' 0 32 (BitVec.setWidth 64 t + BitVec.signExtend 64 4094#12))
-      <<< 48) >>> 48
-
-/-- The whole Sail cast layer of Rocq's four-step chain, as one identity:
-the word is `(t - 2) mod 2^16`, zero-extended. -/
-theorem createTrange_eq (t : BitVec 16) : createTrange t = BitVec.setWidth 64 (t - 2#16) := by
-  unfold createTrange; bv_decide
-
-/-- The `bltu 1,a5` at +0x6c, decided: it is TAKEN exactly off
-`{T_FILE, T_DEVICE}`. -/
-theorem create_bltu_trange (t : BitVec 16) :
-    bcond bop.BLTU 1#64 (createTrange t) = !(t == 2#16 || t == 3#16) := by
-  rw [createTrange_eq]; simp only [bcond]; bv_decide
-
-/-- +0x6c TAKEN: the found inode is neither a file nor a device, ARM F-BAD
-(Rocq's `cr_trange_out`). -/
-theorem create_trange_out (t : BitVec 16) (h2 : t.toNat ≠ T_FILE) (h3 : t.toNat ≠ T_DEVICE) :
-    bcond bop.BLTU 1#64 (createTrange t) = true := by
-  rw [create_bltu_trange]
-  unfold T_FILE T_DEVICE at *
-  have h2' : t ≠ 2#16 := fun he => h2 (by subst he; rfl)
-  have h3' : t ≠ 3#16 := fun he => h3 (by subst he; rfl)
-  simp [h2', h3']
 
 /-! ## §4  The K split (Rocq's `cr_kb`) -/
 

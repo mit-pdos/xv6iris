@@ -18,12 +18,12 @@ Rocq's header, abridged (the reasons are the content):
 > is era 0, the boot at `gen_id` era `S gen_id`); the running claim's is read
 > from the record predicate `file_ok`.
 
-* the record moves `fnWithPos`, `fnWith`, `fnRun`, `toCopy` (Rocq
-  `fn_with_pos`, `fn_with`, `fn_run`, `to_copy`) and the era predicate
+* the record moves `fnWithPos`, `fnWith`, `fnRun` (Rocq `fn_with_pos`,
+  `fn_with`, `fn_run`) and the era predicate
   `fileOk` (Rocq `file_ok`, the union's `App.app_ok`);
 * the registry `syncReg` (Rocq `sync_reg`), `syncReg_agree`;
 * the run registry `runReg`/`runAuth` (Rocq `run_reg`/`run_auth`),
-  `runReg_agree`, `runAuth_mono`, `runAuth_register`, `runAuth_0`;
+  `runReg_agree`, `runAuth_register`, `runAuth_0`;
 * the counters `syncCmAuth`, `syncCmLb`, `syncStLb`, `syncStAuth` (Rocq
   `sync_cm_auth`, `sync_cm_lb`, `sync_st_lb`, `sync_st_auth`).
 
@@ -64,10 +64,6 @@ console, ticket and escrow names, a fresh deed `d` and position `γp`, the
 era's list (Rocq `fn_run`, sync SY3-A4). -/
 abbrev fnRun (r : FileAppNames) (d γ : GName) (k : Nat) (γp : GName) : FileAppNames :=
   ⟨r.fnCons, d, r.fnTkt, r.fnEsc, γ, k, false, γp⟩
-
-/-- The running claim's instance as the new durable copy's (Rocq
-`to_copy`). -/
-abbrev toCopy (r : FileAppNames) : FileAppNames := fnWith r r.fnSync r.fnEra true
 
 /-- THE ERA'S RECORD PREDICATE (Rocq `file_ok`; `App.app_ok` for the
 union). -/
@@ -164,18 +160,6 @@ def runAuth (c : FileFixed) (k : Nat) : IProp GF :=
 
 instance runAuth_timeless (c : FileFixed) (k : Nat) : Timeless (runAuth (GF := GF) c k) := by
   unfold runAuth; infer_instance
-
-/-- Rocq `run_auth_mono`. -/
-theorem runAuth_mono (c : FileFixed) (k k' : Nat) (hk : k ≤ k') :
-    runAuth (GF := GF) c k ⊢ runAuth c k' := by
-  unfold runAuth
-  iintro ⟨%M, HM, %hM⟩
-  iexists M
-  iframe HM
-  ipureintro
-  intro j hj
-  have := hM j hj
-  omega
 
 /-- The transport's registration of the new era's running claim (Rocq
 `run_auth_register`). -/

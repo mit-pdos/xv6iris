@@ -3,8 +3,8 @@
 `SleepLockAt.v`'s `sl_free_pair` / `sl_pair_ghost_alloc` /
 `sl_fresh_new_genl_at2`).
 
-`Xv6.kctx_newSleeplock` mints both of a sleeplock's gnames (the inner
-spinlock's and the holder pair's) and returns them existentially.  A client
+Building a sleeplock from `initsleeplock`'s output fresh mints both of its
+gnames (the inner spinlock's and the holder pair's), existentially.  A client
 whose names record is PUBLISHED before the lock exists -- the buffer cache
 at the ambient `Fscfg.fscBio`, whose `BcacheNames.slk k` carries each
 buffer's pair -- needs the construction at a pair it already holds.  So:
@@ -12,12 +12,12 @@ buffer's pair -- needs the construction at a pair it already holds.  So:
 * `slFreePair p` -- the unbuilt pair (Rocq `sl_free_pair`): the inner
   spinlock's `lockFreeTok p.1` and the idle holder halves at `p.2`;
 * `slPairGhostAlloc` -- pick the pair (a plain `bupd`);
-* `kctx_newSleeplockAt p` -- `kctx_newSleeplock` with nothing minted.
+* `kctx_newSleeplockAt p` -- the construction with nothing minted.
 
 **DEVIATION.**  Rocq's `sl_free_tok p.2` is Lean's `slHauth p.2 1 ∗
 slHtok p.2 1` (the two halves `Xv6.slh_ghost_alloc` returns), and the
 construction runs under `kctx` (the Lean boot lemmas' context) rather than
-at `own_context` -- the `kctxL` form of `Xv6.kctx_newSleeplock`.
+at `own_context`.
 -/
 import Xv6.SleepLockDefs
 import MachCSL.LockBornHook
@@ -43,9 +43,9 @@ theorem slPairGhostAlloc : ⊢@{IProp GF} |==> ∃ p : GName × GName, slFreePai
   unfold slFreePair
   iframe Hl Ha Ht
 
-/-- **Rocq `sl_fresh_new_genl_at2`**, under `kctx`: `Xv6.kctx_newSleeplock`
-at the pair `p` the caller already holds -- nothing minted, so the
-conclusion is not existential. -/
+/-- **Rocq `sl_fresh_new_genl_at2`**, under `kctx`: a sleeplock built at
+the pair `p` the caller already holds -- nothing minted, so the conclusion
+is not existential. -/
 theorem kctx_newSleeplockAt [CurCtx] {lent : Bool} (cpu : CPU) (k : KCtx) (p : GName × GName)
     (slk name : BitVec 64) (R : CtxId → IProp GF) [CtxMorph R] (H : Qp → IProp GF) :
     kctxL lent cpu k ∗ slFreePair p ∗ sleepLockInited slk name ∗

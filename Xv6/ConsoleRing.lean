@@ -46,19 +46,19 @@ its wake tail `cons.w = cons.e` (`consOk_set_w`, `consStored_commit`,
 `consPend_commit`), and consoleread's `cons.r++` under `r != w`
 (`consOk_inc_r`, `consRow_shift`, `consStored_pop`, `consPend_shift`).
 
-Ported one-to-one (Rocq → Lean): `INPUT_BUF_SIZE`, `cons_buf_off` →
-`consBufOff`, `cons_xlate` → `consXlate` (+`_cr`, `_other`), `cons_ok` →
-`consOk`, `cons_slot` → `consSlot`, `cons_row` → `consRow`, `cons_stored` →
-`consStored`, `cons_pend` → `consPend`; the kit `cons_bufz`, `cons_urange`,
-`cons_subz`, `cons_addz`, `cons_u1`, `cons_sub_range`, `cons_sub_self`,
-`cons_sub_inj`, `cons_sub_eq0`, `cons_sub_ne`, `cons_sub_inc`,
-`cons_sub_dec`, `cons_sub_shiftr`; the slot lemmas `cons_slot_lt`,
+Ported one-to-one (Rocq → Lean): `INPUT_BUF_SIZE`, `cons_xlate` →
+`consXlate` (+`_cr`, `_other`), `cons_ok` → `consOk`, `cons_slot` →
+`consSlot`, `cons_row` → `consRow`, `cons_stored` → `consStored`,
+`cons_pend` → `consPend`; the kit `cons_bufz`, `cons_urange`, `cons_subz`,
+`cons_addz`, `cons_u1`, `cons_sub_range`, `cons_sub_self`, `cons_sub_eq0`,
+`cons_sub_ne`, `cons_sub_inc`, `cons_sub_dec`, `cons_sub_shiftr`; the slot lemmas `cons_slot_lt`,
 `cons_slot_inj`, `cons_slot_shift`, `cons_slot_of_and`, `cons_slot_end`;
 the moves `cons_ok_inc_e`, `cons_ok_dec_e`, `cons_ok_set_w`,
 `cons_ok_inc_r`, `cons_row_mono`, `cons_row_shift`, `cons_row_push`,
 `cons_stored_commit`, `cons_pend_commit`, `cons_stored_ins`,
 `cons_pend_push`, `cons_pend_pop`, `cons_stored_pop`, `cons_pend_shift`
-(same names, camelCased: `consOk_inc_e`, `consSub_inj`, ...).
+(same names, camelCased: `consOk_inc_e`, `consSub_ne`, ...).  Not ported
+(nothing uses them): `cons_buf_off`, `cons_sub_inj`.
 
 Deviations from Rocq (spelling; every statement is Rocq's):
 1. `bv_unsigned (sub_vec x y)` (a `Z`) is `(x - y).toNat` (a `Nat`); the
@@ -88,10 +88,6 @@ open MachCSL
 
 /-- `#define INPUT_BUF_SIZE 128`. -/
 def INPUT_BUF_SIZE : Nat := 128
-
-/-- `sizeof(struct spinlock)`: the ring starts right after the lock, which is
-the first member (so `&cons.lock = &cons`). -/
-def consBufOff : Nat := 24
 
 /-! ## The coupling, as pure arithmetic -/
 
@@ -159,11 +155,6 @@ theorem consU1 : (1#32).toNat = 1 := rfl
 theorem consDec_eq (x : BitVec 32) : x + 4294967295#32 = x - 1#32 := by bv_omega
 
 theorem consSub_self (x : BitVec 32) : (x - x).toNat = 0 := by simp
-
-/-- The counters are 32 bits wide, so equal DISTANCES from a common base are
-equal words -- which is how `cons.e != cons.w` becomes `w - r < e - r`. -/
-theorem consSub_inj (y x1 x2 : BitVec 32) (h : (x1 - y).toNat = (x2 - y).toNat) : x1 = x2 := by
-  bv_omega
 
 theorem consSub_ne (x y : BitVec 32) (h : x ≠ y) : 1 ≤ (x - y).toNat := by
   bv_omega

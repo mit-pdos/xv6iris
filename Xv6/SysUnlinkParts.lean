@@ -43,7 +43,7 @@ uses (never Rocq's comments):
 4. The loop arithmetic (`su_li32`, `su_uint_moi`, `su_u31_range`,
    `su_loop_entry_taken/_fall`, `su_loop_back_taken/_fall`,
    `su_inum_zero/_nz`) is `sys_unlink_loop_entry`, `sys_unlink_loop_back`,
-   `sys_unlink_loop_bump`, `sys_unlink_bnez_inum`, stated -- as Rocq's --
+   `sys_unlink_bnez_inum`, stated -- as Rocq's --
    over `BitVec.ofNat 64 sz` (the `lw` of `ip->size` is rewritten to that
    by `SysUnlinkPure.sys_unlink_size_sext`), each as ONE `decide`-valued
    reading instead of a taken/fall pair; the landed `FsWords.fw_bgeu_nat`
@@ -226,15 +226,6 @@ theorem sys_unlink_loop_back (off sz : Nat) (hoff : off < 2 ^ 31) (hsz : sz < 2 
   simp only [BitVec.ult, BitVec.toNat_ofNat, Nat.mod_eq_of_lt (show off < 2 ^ 64 by omega),
     Nat.mod_eq_of_lt (show sz < 2 ^ 64 by omega)]
 
-/-- the bump at +0x122: `c.addiw s3,s3,16` on a small offset. -/
-theorem sys_unlink_loop_bump (off : Nat) (h : off + 16 < 2 ^ 31) :
-    BitVec.signExtend 64 (BitVec.extractLsb' 0 32 (BitVec.ofNat 64 off + BitVec.signExtend 64 16#12))
-      = BitVec.ofNat 64 (off + 16) := by
-  have e : BitVec.ofNat 64 off + BitVec.signExtend 64 16#12 = BitVec.ofNat 64 (off + 16) := by
-    rw [sys_unlink_li16]; apply BitVec.eq_of_toNat_eq
-    simp only [BitVec.toNat_add, BitVec.toNat_ofNat]; omega
-  rw [e, fw_w32 _ h, MachCSL.signExtend_ofNat32 _ h]
-
 /-- the `c.bnez a5` at +0x120 on the ZERO-extended `de.inum`: taken exactly
 when the record is LIVE (Rocq's `su_inum_zero` / `su_inum_nz`). -/
 theorem sys_unlink_bnez_inum (w : BitVec 16) :
@@ -257,7 +248,7 @@ def sysUnlinkDec16 (h : BitVec 16) : BitVec 16 :=
 theorem sys_unlink_dec16_eq (h : BitVec 16) : sysUnlinkDec16 h = h - 1#16 := by
   unfold sysUnlinkDec16; bv_decide
 
-/-- THE CLAUSE `wp_iupdate_unlink` TAKES (Rocq's `su_nlink_decr`): the OLD
+/-- THE CLAUSE `wp_iupdate_unlink_eb` TAKES (Rocq's `su_nlink_decr`): the OLD
 count is the new one plus one.  Sound at BOTH flushes because the `blez`
 at +0x7c is walked before either. -/
 theorem sys_unlink_nlink_decr (h : BitVec 16) (hnz : h.toNat ≠ 0) :

@@ -7,8 +7,8 @@ kernel-side obligations built from them.
 * `consLink i k ev Φ` -- the one wand per boundary event: fired by the
   kernel with the port's invariant open, having proved the event's pure
   premise (`consEvOk`) from its own state;
-* `outLink`/`outChain`/`outRun` -- a process byte reaching the wire
-  (`evOut`), one link per byte, and the stoppable chain;
+* `outLink`/`outChain` -- a process byte reaching the wire (`evOut`), and
+  one link per byte;
 * `echoLink`/`echoChain` -- the echo's byte (`evByte`), `readLink` and
   `consReadPay` -- a read (`evRead`), `consRun` -- a consoleintr arm's run;
 * `consLicence` -- "any holder of the supply may move the resource by any
@@ -124,12 +124,6 @@ def outChain (i : UartId) (k : Nat) : List (BitVec 8) → IProp GF → IProp GF
   | [], Φ => Φ
   | b :: bs, Φ => outLink i k b (outChain i k bs Φ)
 
-/-- THE STOPPABLE CHAIN (Rocq `out_run`): `Q j` is the payload after `j`
-bytes, cashable at any prefix. -/
-def outRun (i : UartId) (k : Nat) : List (BitVec 8) → (Nat → IProp GF) → IProp GF
-  | [], Q => Q 0
-  | b :: bs, Q => iprop(Q 0 ∧ outLink i k b (outRun i k bs (fun j => Q (j + 1))))
-
 theorem outLink_mono (i : UartId) (k : Nat) (b : BitVec 8) (Φ Φ' : IProp GF) :
     (Φ -∗ Φ') ⊢ outLink i k b Φ -∗ outLink i k b Φ' := by
   unfold outLink
@@ -146,7 +140,7 @@ at the two events a process steps the claim by (`wildEv`) and under the
 event's validity premise `consEvOk` (`True` at `evOut`, so `outLink` pays it
 with no premise of its own).  The general licence buys it at every era by
 ignoring both premises (`consLicenceAt_of_licence`); the WILD credential buys
-it at its own (`consLicenceAt_of_wild`, AppIface).  The write link and the
+it at its own.  The write link and the
 read payment have their era-`k` forms at this; the echo arm's `consRun` does
 not (its events are the interrupt's). -/
 def consLicenceAt (k : Nat) : IProp GF := iprop%

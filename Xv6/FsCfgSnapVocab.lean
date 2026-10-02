@@ -58,8 +58,7 @@ WHAT IS HERE, bottom up (Rocq name → Lean name):
    and the mint's top-map routing) are iris-lean's `BigSepM.bigSepM_dom` +
    `BigSepS.bigSepS_subseteq` after re-keying the values by `fpNode_of`
    (`snapLinks_toSet` here, `snapBigSepM_toSet` in `Xv6/FsCfgSnap.lean`).
-5. `snapBitmapSpent` is `LawfulSet.ofList (bmapstart :: freeSet size used)`,
-   the landed image twin `fsBitmapSpent`'s shape.
+5. `snapBitmapSpent` is `LawfulSet.ofList (bmapstart :: freeSet size used)`.
 6. `ipool_alloc`'s Lean counterpart is `Xv6.ipoolAllocRows`
    (`Xv6/IcacheBootRegion.lean`), stated at the pool's
    `(BitVec.ofNat 32 z).toNat` keys; the ledger columns are shifted with

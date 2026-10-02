@@ -21,8 +21,8 @@ whose halves meet, and this file is the two of them:
   slot's ADDRESS (what `procDormant` / `procPriv` are stated at).  A
   fractional agreement with NO AUTHORITY: the whole updates on its own
   (allocproc, at the mint), two fractions agree, and the whole excludes
-  every other fraction (`slotGen_whole_excl`, which is how kfork proves the
-  slot it just took has no entry in the wait-lock invariant).
+  every other fraction (which is how kfork proves the slot it just took
+  has no entry in the wait-lock invariant).
 * `pidReg pid dq γ` -- PID `pid` is registered to generation γ.  Here there
   IS an authority (`pidRegAuth`, in `pid_lock`'s payload), because a pid is
   CHOSEN: allocproc's scan proves the key fresh, under that lock.  Two
@@ -123,10 +123,6 @@ party that threads a lock's gname.
    returned lend, then the tail -- Lean's ring-one contracts take the lend
    back right after the return pc (Rocq: as the third premise, after
    `sie_cap_gpr` and `cpu_own`, which Lean's `kctx` bundles).
-   Two more shapes (permit sweep L2): `actLend_cont_frame_x`, the same
-   with a fourth bound value after `R'` (`mappages`' `fresh`), and
-   `actLend_cont_frame_r`, `∀ R'` with two premises (`uvmunmap`'s raw
-   form, which keeps the interrupt bits).
 11. **`actLend_step` / `actLend_ret_step` / `actLend_cont_give` (permit
    sweep L3b, no Rocq counterpart: Rocq never landed L3).**  The step the
    allocator's led forms take (`|==>`, the left disjunct kept, the counter
@@ -339,17 +335,6 @@ theorem slotGen_agree (pa : BitVec 64) (dq dq' : DFrac) (g g' : GName) :
     slotGen (GF := GF) pa dq g ∗ slotGen pa dq' g' ⊢ ⌜g = g'⌝ :=
   (slotGen_valid2 pa dq dq' g g').trans (pure_mono And.right)
 
-/-- ...AND THE WHOLE EXCLUDES EVERYTHING.  kfork holds the whole for the
-slot allocproc just gave it -- the freshness the deposit needs, as a
-resource fact and not a pure one. -/
-theorem slotGen_whole_excl (pa : BitVec 64) (dq : DFrac) (g g' : GName) :
-    slotGen (GF := GF) pa (.own 1) g ∗ slotGen pa dq g' ⊢ False := by
-  refine (slotGen_valid2 pa _ dq g g').trans (pure_elim' fun h => ?_)
-  exact absurd h.1 (by
-    intro hv
-    have := DFrac.valid_own_op hv
-    simp at this)
-
 theorem slotGen_split (pa : BitVec 64) (q1 q2 : Qp) (g : GName) :
     slotGen (GF := GF) pa (.own (q1 + q2)) g ⊣⊢ slotGen pa (.own q1) g ∗ slotGen pa (.own q2) g := by
   unfold slotGen
@@ -546,39 +531,6 @@ theorem actLend_cont_frame_ret (sie : Bool) (p : BitVec 64) (cpu : CPU) (p' : Bi
   unfold wpNext
   iintro H Hl %cpu' %h %spie %spp %R' HA HB HC
   iapply H $$ %cpu' %h %spie %spp %R' HA HB HC Hl
-
-/-- `actLend_cont_frame` at a continuation that binds one more value after
-`R'` (`mappages`' freshly allocated pages, permit sweep L2). -/
-theorem actLend_cont_frame_x {α : Type} (sie : Bool) (p : BitVec 64) (cpu : CPU) (p' : BitVec 64)
-    (ke : Nat) (A B C T : CPU → Bool → Bool → RegMap → α → IProp GF) :
-    wpNext sie p cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (x : α),
-      A cpu' spie spp R' x -∗ B cpu' spie spp R' x -∗ C cpu' spie spp R' x -∗
-      (∃ k' : Nat, ⌜ke ≤ k'⌝ ∗ actLend p' k') -∗ T cpu' spie spp R' x)) ⊢
-    actLend p' ke -∗
-    wpNext sie p cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (x : α),
-      A cpu' spie spp R' x -∗ B cpu' spie spp R' x -∗ C cpu' spie spp R' x -∗
-      T cpu' spie spp R' x)) := by
-  unfold wpNext
-  iintro H Hl %cpu' %h %spie %spp %R' %x HA HB HC
-  iapply H $$ %cpu' %h %spie %spp %R' %x HA HB HC
-  iexists ke
-  iframe Hl
-  ipureintro; exact Nat.le_refl ke
-
-/-- `actLend_cont_frame` at a continuation `∀ R'` with two premises (the
-context and the return pc; `uvmunmap`'s raw form, permit sweep L2). -/
-theorem actLend_cont_frame_r (sie : Bool) (p : BitVec 64) (cpu : CPU) (p' : BitVec 64) (ke : Nat)
-    (A B T : CPU → RegMap → IProp GF) :
-    wpNext sie p cpu (fun cpu' => iprop(∀ (R' : RegMap),
-      A cpu' R' -∗ B cpu' R' -∗ (∃ k' : Nat, ⌜ke ≤ k'⌝ ∗ actLend p' k') -∗ T cpu' R')) ⊢
-    actLend p' ke -∗
-    wpNext sie p cpu (fun cpu' => iprop(∀ (R' : RegMap), A cpu' R' -∗ B cpu' R' -∗ T cpu' R')) := by
-  unfold wpNext
-  iintro H Hl %cpu' %h %R' HA HB
-  iapply H $$ %cpu' %h %R' HA HB
-  iexists ke
-  iframe Hl
-  ipureintro; exact Nat.le_refl ke
 
 /-- **THE STEP** (permit sweep L3b, no Rocq counterpart; design
 ni-strong-instance.md §7): what an allocator event costs.  At `p = 0` (the

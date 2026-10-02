@@ -454,29 +454,6 @@ theorem iregFsh_post_acc [Icfg] (rg : Frzidx) :
   unfold iregFsh
   exact .rfl
 
-/-- THE REFUTATION THE COMMIT READS (durable-disk C-6).  Both window phases
-park a positive share of an open transaction's element, so at a commit --
-where the WAL's authority for that map is empty -- no slot can be inside a
-freeze window.  `iregFrzOk` rules out the absent column and `invalid`. -/
-theorem iregFsh_no_ops [Icfg] (f : FrzUR) (n : Nat) (d : Dinode) (hfrz : iregFrzOk f n d) :
-    logTxAuth (GF := GF) icfgLog (∅ : RegMapF Unit) ⊢ iregFsh f -∗ ⌜f = some (.excl .frzOff)⌝ := by
-  rcases f with _ | (_ | rg | rg) | _
-  · exact hfrz.elim
-  · iintro _ _
-    ipureintro
-    rfl
-  · unfold iregFsh iregFpin
-    iintro Ha ⟨-, Hp⟩
-    iexfalso
-    iapply txPin_noOps $$ [Ha Hp]
-    iframe Ha Hp
-  · unfold iregFsh iregFpin
-    iintro Ha ⟨-, Hp⟩
-    iexfalso
-    iapply txPin_noOps $$ [Ha Hp]
-    iframe Ha Hp
-  · exact hfrz.elim
-
 /-- THE REFUTATION §2.3 BUILT THE CLAUSE FOR (fs-fragments.md §7.12), at the
 index: ireclaim's exclusive boot token kills EITHER arm, so a boot thread
 that reaches a slot learns its column is unfrozen.  This is
@@ -914,39 +891,6 @@ theorem iregLnk_root_alive (γfs : FsNames) (d : Dinode) :
     have h3 : iregMultAt (iregNl d) d.diType.toNat = 0 := iregMult_zero d hz
     omega
   · exact hpos
-
-/-- ...AND THE ROOT'S MINIMUM AT A HELD PILE.  The keep-alive is a fragment
-the caller's pile does not include, so `k` fragments in hand put the root's
-own count at `k` -- hence a directory whose count is ONE and which two held
-fragments stand at is not the root (S7-unlink's dir arm, (D1) step 2).
-Vacuous elsewhere: at any other inum `iregKeep` is `emp`. -/
-theorem iregLnk_root_le (γfs : FsNames) (z : Nat) (d : Dinode) (k : Nat) (v : Ity) :
-    iregLnk (GF := GF) γfs z d ⊢
-      FsStateLink.linkToks (fsGammaL γfs) z (FsStateLink.linkReps k v) -∗
-      ⌜(z : Int) = iregRoot → k ≤ d.diNlink.toNat⌝ := by
-  unfold iregLnk iregLnkAt iregKeep
-  by_cases hr : (z : Int) = iregRoot
-  · simp only [if_pos hr, FsStateLink.linkTok]
-    iintro ⟨%v0, -, Ha, Hkeep⟩ Htk
-    ihave Htks := (FsStateLink.linkToks_split (fsGammaL γfs) z ({v0} : ItyMS)
-      (FsStateLink.linkReps k v)).2 $$ [Hkeep Htk]
-    · iframe Hkeep Htk
-    ihave %h := FsStateLink.linkAuth_toks_le _ _ _ _ _ $$ [Ha Htks]
-    · iframe Ha Htks
-    ipureintro
-    intro _
-    have hle := h.1
-    rw [FiniteMultiSet.size_disjUnion, FiniteMultiSet.size_singleton,
-      FsStateLink.linkReps_size] at hle
-    have hhi := (iregMult_nl d).2
-    unfold iregMult iregNl at hhi
-    unfold iregNl at hle
-    omega
-  · simp only [if_neg hr]
-    iintro _ _
-    ipureintro
-    intro hc
-    exact absurd hc hr
 
 end Lnk
 

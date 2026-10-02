@@ -6,16 +6,16 @@ and sys_exec consume, over the ONE block `FdTable.procPrivFd` = Rocq
 
 | Rocq (ProcInv.v unless noted) | Lean |
 |---|---|
-| `proc_priv_trapframe` :2218 | `procPrivFd_trapframe` |
+| `proc_priv_trapframe` :2218 | not ported (nothing uses it) |
 | `proc_priv_tf` :2429 | `procPrivFd_tf` |
 | `proc_priv_tf_upd` :2463 | `procPrivFd_tfUpd` |
-| `proc_priv_cwd` :2246 | `procPrivFd_cwd` |
+| `proc_priv_cwd` :2246 | not ported (nothing uses it) |
 | `proc_priv_cwd_pid` :2310 | `procPrivFd_cwdPid` |
-| `proc_priv_root` (chroot) | `procPrivFd_root` |
+| `proc_priv_root` (chroot) | not ported (nothing uses it) |
 | `proc_priv_root_pid` (chroot) | `procPrivFd_rootPid` |
-| `proc_priv_sz_maxsz` / `_um_below` / `_lazy` / `_pt_wf` :2367–2420 | `procPrivFd_facts` (one projection) + `procPrivFd_lazy` |
+| `proc_priv_sz_maxsz` / `_um_below` / `_lazy` / `_pt_wf` :2367–2420 | `procPrivFd_facts` (one projection) |
 | `ProofKforkParts.proc_priv_tfp_valid` :555 | `procPrivFd_tfpValid` |
-| `proc_priv_lazy_true` :2395 | `procPrivFd_lazyTrue` |
+| `proc_priv_lazy_true` :2395 | not ported (nothing uses it) |
 | `proc_priv_addrspace` :2508 | `procPrivFd_addrspace` |
 | `proc_priv_copy` :2576 | `procPrivFd_copy` |
 | `proc_priv_newspace` :2804 | `procPrivFd_newspace` |
@@ -56,7 +56,7 @@ sibling, one layer up.  Definitional: no `wp`.
    no persistent-conclusion `iDestruct` that leaves the hypothesis in place
    (`ProcInv` deviation 5).  Rocq's four separate pure projections
    (`sz_maxsz`, `um_below`, `lazy`, `pt_wf`) are ONE, `procPrivFd_facts`
-   (plus `procPrivFd_lazy` / `procPrivFd_tfpValid`, the two by name).
+   (plus `procPrivFd_tfpValid`, by name).
 7. **`procPrivFd_settle`'s deficit is `[fd]`** (Rocq `{[fd]} ∪ ∅`; the Lean
    deficit is a list, `FdTable`).
 
@@ -120,15 +120,6 @@ theorem procPrivFd_facts (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V 
     · ipureintro; exact hlz
   · ipureintro; exact ⟨h.1, h.2.1, hlz, hwf⟩
 
-/-- **What the lazy bit claims** (Rocq `proc_priv_lazy`). -/
-theorem procPrivFd_lazy (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
-    (M : Nat → List (BitVec 8)) :
-    procPrivFd (GF := GF) γ pa pid V M ⊢
-      procPrivFd γ pa pid V M ∗ ⌜V.pvLazy = false → lazyFree V.upt.um V.sz⌝ := by
-  iintro H
-  icases procPrivFd_facts γ pa pid V M $$ H with ⟨H, %h⟩
-  iframe H; ipureintro; exact h.2.2.1
-
 /-- **The trapframe page is a kalloc page** (Rocq
 `ProofKforkParts.proc_priv_tfp_valid`): `uptWf`'s last conjunct. -/
 theorem procPrivFd_tfpValid (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
@@ -138,18 +129,6 @@ theorem procPrivFd_tfpValid (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) 
   iintro H
   icases procPrivFd_facts γ pa pid V M $$ H with ⟨H, %h⟩
   iframe H; ipureintro; exact h.2.2.2.2.2.1
-
-/-- **Raising the lazy bit is free** (Rocq `proc_priv_lazy_true`): `true`
-claims nothing. -/
-theorem procPrivFd_lazyTrue (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
-    (M : Nat → List (BitVec 8)) :
-    procPrivFd (GF := GF) γ pa pid V M ⊢ procPrivFd γ pa pid { V with pvLazy := true } M := by
-  unfold procPrivFd procPrivCoreNoctxAt procPrivBareAt procFieldsNoOfile
-  iintro ⟨⟨⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hcwd, Hnm, Hsc, Hrt⟩, Hpt, Htfp, -, Hev⟩, Hc⟩, Ho⟩
-  iframe Hpid Hk Hs Hpg Htf Hcwd Hnm Hsc Hrt Hpt Htfp Hc Ho Hev
-  isplitl []
-  · ipureintro; exact h
-  · ipureintro; intro hf; cases hf
 
 /-! ## The event counter (permit sweep G, design ni-strong-instance.md §7) -/
 
@@ -203,33 +182,6 @@ theorem procPrivFd_evAfter_of (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32
   ipureintro; exact evAfter_refl V
 
 /-! ## The trapframe -/
-
-/-- **The read-only trapframe-POINTER quarter** (Rocq `proc_priv_trapframe`):
-what `p->trapframe->aN` reads first. -/
-theorem procPrivFd_trapframe (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
-    (M : Nat → List (BitVec 8)) :
-    procPrivFd (GF := GF) γ pa pid V M ⊢
-      @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pTrapframe pa) 8 (DFrac.own (1 : Qp).half.half)
-        (pageAddr V.upt.tfp) ∗
-      (@wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pTrapframe pa) 8 (DFrac.own (1 : Qp).half.half)
-          (pageAddr V.upt.tfp) -∗
-        procPrivFd γ pa pid V M) := by
-  unfold procPrivFd procPrivCoreNoctxAt procPrivBareAt procFieldsNoOfile
-  iintro ⟨⟨⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hcwd, Hnm, Hsc, Hrt⟩, Hpt, Htfp, %hlz, Hev⟩, Hc⟩, Ho⟩
-  ihave Htf := procPrivAcc_eq curCtx _ 8 _ _ _ h.2.2.2 $$ Htf
-  icases procPrivAcc_split curCtx _ 8 1 _ $$ Htf with ⟨Htf, Htf2⟩
-  icases procPrivAcc_split curCtx _ 8 (1 : Qp).half _ $$ Htf with ⟨Htf, Htf1⟩
-  iframe Htf
-  iintro Htf
-  ihave Htf := procPrivAcc_join curCtx _ 8 (1 : Qp).half _ $$ [Htf Htf1]
-  · iframe
-  ihave Htf := procPrivAcc_join curCtx _ 8 1 _ $$ [Htf Htf2]
-  · iframe
-  ihave Htf := procPrivAcc_eq curCtx _ 8 _ _ _ h.2.2.2.symm $$ Htf
-  iframe Hpid Hk Hs Hpg Htf Hcwd Hnm Hsc Hrt Hpt Htfp Hc Ho Hev
-  isplitl []
-  · ipureintro; exact h
-  · ipureintro; exact hlz
 
 /-- **The trapframe-pointer quarter AND the event counter** (Rocq
 `kxc_priv_tf_ev`, permit sweep L2): kexec's proc_pagetable reads the cell
@@ -313,27 +265,6 @@ theorem procPrivFd_tfUpd (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V 
 
 /-! ## The working directory -/
 
-/-- **The working directory, borrowed and replaced** (Rocq `proc_priv_cwd`),
-at the block: the cell and the reference out, a matching pair back at any
-`(v', z')` (sys_chdir, kexit). -/
-theorem procPrivFd_cwd (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
-    (M : Nat → List (BitVec 8)) :
-    procPrivFd (GF := GF) γ pa pid V M ⊢
-      @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pCwd pa) 8 (DFrac.own 1) V.cwd ∗
-      @cwdRefAt hlc GF _ _ _ _ _ ⟨curCtx, KTier.kpt⟩ V.cwd V.cwi ∗
-      (∀ (v' : BitVec 64) (z' : Nat),
-        @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pCwd pa) 8 (DFrac.own 1) v' -∗
-        @cwdRefAt hlc GF _ _ _ _ _ ⟨curCtx, KTier.kpt⟩ v' z' -∗
-        procPrivFd γ pa pid { V with cwd := v', cwi := z' } M) := by
-  unfold procPrivFd procPrivCoreNoctxAt procPrivBareAt procFieldsNoOfile
-  iintro ⟨⟨⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hcwd, Hnm, Hsc, Hrt⟩, Hpt, Htfp, %hlz, Hev⟩, Hc, Hg⟩, Ho⟩
-  iframe Hcwd Hc
-  iintro %v' %z' Hcwd Hc
-  iframe Hpid Hk Hs Hpg Htf Hcwd Hnm Hsc Hrt Hpt Htfp Hc Hg Ho Hev
-  isplitl []
-  · ipureintro; exact h
-  · ipureintro; exact hlz
-
 /-- **The working directory and the pid quarter together** (Rocq
 `proc_priv_cwd_pid`): kexit / sys_chdir hold the cwd cell out across
 `begin_op`/`iput`/`end_op`, which each take a share of `p->pid`. -/
@@ -360,28 +291,7 @@ theorem procPrivFd_cwdPid (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V
   · ipureintro; exact h
   · ipureintro; exact hlz
 
-/-! ## The root (chroot, `procPrivFd_cwd`'s twins at the other cell) -/
-
-/-- **The root, borrowed and replaced** (Rocq `proc_priv_root`), at the
-block: the `p->root` cell and the root's reference out, a matching pair back
-at any `(v', z')` (sys_chroot, kexit). -/
-theorem procPrivFd_root (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
-    (M : Nat → List (BitVec 8)) :
-    procPrivFd (GF := GF) γ pa pid V M ⊢
-      @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pRoot pa) 8 (DFrac.own 1) V.root ∗
-      @rootRefAt hlc GF _ _ _ _ _ ⟨curCtx, KTier.kpt⟩ V.root V.rti ∗
-      (∀ (v' : BitVec 64) (z' : Nat),
-        @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pRoot pa) 8 (DFrac.own 1) v' -∗
-        @rootRefAt hlc GF _ _ _ _ _ ⟨curCtx, KTier.kpt⟩ v' z' -∗
-        procPrivFd γ pa pid { V with root := v', rti := z' } M) := by
-  unfold procPrivFd procPrivCoreNoctxAt procPrivBareAt procFieldsNoOfile
-  iintro ⟨⟨⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hcwd, Hnm, Hsc, Hrt⟩, Hpt, Htfp, %hlz, Hev⟩, Hc, Hr, Hg⟩, Ho⟩
-  iframe Hrt Hr
-  iintro %v' %z' Hrt Hr
-  iframe Hpid Hk Hs Hpg Htf Hcwd Hnm Hsc Hrt Hpt Htfp Hc Hr Hg Ho Hev
-  isplitl []
-  · ipureintro; exact h
-  · ipureintro; exact hlz
+/-! ## The root (chroot, `procPrivFd_cwdPid`'s twins at the other cell) -/
 
 /-- **The root and the pid quarter together** (Rocq `proc_priv_root_pid`):
 kexit's second `begin_op; iput; end_op` stage and sys_chroot's hold the root

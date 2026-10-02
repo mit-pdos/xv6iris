@@ -117,11 +117,4 @@ theorem catWords_execOk (nm : List (BitVec 8)) (hu : uname nm) : execOk [fdWCat,
   simp [wlLine, wlBody, wlTail, fdWCat, lineMax]
   omega
 
-/-- cat's diagnostic at a class name is short (L2) -/
-theorem catopen_short (nm : List (BitVec 8)) (hu : uname nm) :
-    (dgCatopenN nm).length < 2 ^ 31 := by
-  have hl := uname_len nm hu
-  simp [dgCatopenN, dgCatopenPre, nlb]
-  omega
-
 end Xv6

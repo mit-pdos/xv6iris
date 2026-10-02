@@ -40,7 +40,7 @@ list (`Xv6/NamexParts.lean` deviation 4), not Rocq's `bytes_own` /
    `proc_priv_bare_acc`, a fraction of the same row), the trapframe
    quarter and page through `ProcPrivAcc.procPrivFd_tf` (Rocq
    `proc_priv_tf`), and argstr takes the bare block by `procPrivFd`'s own
-   definition (`SysfileCalls.sysfile_blk_bare`).
+   definition.
 4. The fetched string's shape is `UMemL.umemStr_nul`; the path buffer and
    the slots↔bytes carve are the shared `Xv6/SysfileCalls.lean` helpers;
    the fold is the landed `KstackMap.byteBuf_stackOwn`.

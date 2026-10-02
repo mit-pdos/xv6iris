@@ -14,7 +14,7 @@ Rocq's header, abridged:
 
 * `f0cw` (the writer's witness), `fileCparams` (the claim's parameters at
   `fileLm`), `f0wa` / `f0boot` and their laws, `fileWa` (the `GenWa`
-  record), `fecl` (the claim), `eflOf` (the history's line list);
+  record), `fecl` (the claim);
 * the credential /init is handed at its era's first instruction,
   `fturnCore` / `fturn`, and `fturnFile`;
 * the ledger's second per-era map `f0Map`, the era's pin in the ledger
@@ -25,11 +25,12 @@ Rocq's header, abridged:
 1. **Scope: the reached declarations only** (FileOut 45/95), plus the
    `Persistent`/`Timeless` instances of the reached predicates.  Not ported
    (unreached; the union's claim and ledger are `UnionOut`'s): `ftag`.  The
-   rest of the first trim -- `f0_map_step`/`f0_map_on`, the `efl_of`/
-   `echof_lines_of` motion lemmas, `f0_pinned_undrained`/`_io`/`_drained`/
-   `_drain`, `f0_typed_adm`, `fl_auth_grow_pre`, `file_birth_all` -- IS
-   reached, through the instance `union_laws_at` (the glob walk cannot see typeclass resolution), and is
-   ported in `FileOutSeal.lean` (U4).
+   rest of the first trim -- `f0_map_step`/`f0_map_on`,
+   `f0_pinned_undrained`/`_io`/`_drained`/`_drain`, `fl_auth_grow_pre`,
+   `file_birth_all` -- IS reached, through the instance `union_laws_at` (the
+   glob walk cannot see typeclass resolution), and is ported in
+   `FileOutSeal.lean` (U4); the `efl_of`/`echof_lines_of` motion lemmas and
+   `f0_typed_adm` are not ported (nothing uses them).
 2. The laws that are FIELDS of `GenCparams`/`GenWa` (`f0wa_agree`,
    `f0wa_agree_d`, `f0wa_W`, `f0wa_file`, `file_gext_grow`) keep Rocq's
    curried `⊢ A -∗ B -∗ C` form (`GenLinksLine` deviation 6).
@@ -201,12 +202,6 @@ noncomputable def fecl (g : FileGn) (k : Nat) (ho : List Obs) (H : ConsHist) : I
 instance fecl_timeless (g : FileGn) (k : Nat) (ho : List Obs) (H : ConsHist) :
     Timeless (fecl (hlc := hlc) (GF := GF) g k ho H) := by
   unfold fecl; infer_instance
-
-/-- THE LINE LIST the console has received, as a pure function of the history:
-every complete line, in order, as the file model parses it (Rocq `efl_of`,
-sync SY3-A2: `EflLines.eflLines`); its redirect lines are `echofLinesOf h`
-(`eflLines_echof`). -/
-noncomputable def eflOf (h : List Obs) : List FlLine := eflLines h
 
 /-! ## The credential /init is handed at its era's first instruction -/
 

@@ -11,15 +11,11 @@ addresses are the ones main's auipc/addi pairs compute:
 
 THE MASK is the value `lui a0,0xffe18 ; addi a0,a0,-65` at main+0x1c/0x20
 builds, spelled at the very immediates (Rocq `secc_mask_lit`, over
-`luival`), and `seccLit_mask_words` pins those two words in the binary's
-text.  Rocq's `secc_mask_masked` -- THE ONE PLACE THE BINARY'S LITERAL ENTERS
-the seccomp proof: row 23 ANDs it into the full mask, and the result clears
-all six numbers of `UexecSecc.secc_B` -- is `seccLit_mask_clears` below.
+`luival`).  Rocq's `secc_mask_masked` -- THE ONE PLACE THE BINARY'S LITERAL
+ENTERS the seccomp proof: row 23 ANDs it into the full mask, and the result
+clears all six numbers of `UexecSecc.secc_B` -- is
+`UkSeccDefs.seccMask_masked`, over `UexecSeccMasked.seccMasked`.
 
-Deviation: `seccLit_mask_clears` states the six bits directly at
-`secc_all = allOnes 64` (this file predates K3's `UexecSeccMasked`); Rocq's
-`secc_mask_masked` itself is `UkSeccDefs.seccMask_masked`, over
-`UexecSeccMasked.seccMasked`.  Cleanup:
 Rocq's `secc_lit*` are the generic kit (`seccLit`/`seccLitOk` name it).
 -/
 import Xv6.UserLit
@@ -49,20 +45,5 @@ theorem seccLit_fork_ok : seccLitOk 0x988 21 = true := by decide +kernel
 `lui a0,0xffe18 ; addi a0,a0,-65` leaves in `a0`. -/
 def seccMaskLit : BitVec 64 :=
   BitVec.signExtend 64 (0xffe18#20 ++ 0#12) + BitVec.signExtend 64 0xfbf#12
-
-/-- The two words at main+0x1c/0x20 ARE that `lui`/`addi` pair, at those
-immediates (`imm[31:12]` of the `lui`, `imm[31:20]` of the `addi`, both
-into `a0`). -/
-theorem seccLit_mask_words :
-    tree.find? 0x1c = some ⟨0x1c, 4, 0xffe18537⟩ ∧ tree.find? 0x20 = some ⟨0x20, 4, 0xfbf50513⟩ ∧
-      0xffe18537 >>> 12 = 0xffe18 ∧ 0xffe18537 % 0x1000 = 0x537 ∧
-      0xfbf50513 >>> 20 = 0xfbf ∧ 0xfbf50513 % 0x100000 = 0x50513 := by
-  decide +kernel
-
-/-- Rocq `secc_mask_masked` at `secc_all = allOnes 64`: ANDed into the full
-mask, the literal clears all six numbers of `secc_B = [6, 15, 17, 18, 19, 20]`. -/
-theorem seccLit_mask_clears :
-    ∀ n ∈ [6, 15, 17, 18, 19, 20], (BitVec.allOnes 64 &&& seccMaskLit).getLsbD n = false := by
-  decide
 
 end Xv6.User.Seccomp

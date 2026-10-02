@@ -65,9 +65,9 @@ Rocq's header, kept because the reasons are the content:
    `0 ≤ rv ∧ rv ≤ n`.
 3. `seq off r` is `List.range' off r`; `file_byte data <$> _` is
    `List.map (fileByte data) _`; `take`/`drop` are `List.take`/`List.drop`.
-4. The two local word lemmas `moi64_lit_inj` / `moi64_lit_ne_m1` are
-   `srd_ofNat_inj` / `srd_ofNat_ne_m1` (over `BitVec.ofNat`, the spelling of
-   deviation 2).
+4. The local word lemma `moi64_lit_ne_m1` is `srd_ofNat_ne_m1` (over
+   `BitVec.ofNat`, the spelling of deviation 2); `moi64_lit_inj` is not
+   ported (nothing uses it).
 5. `length_file_bytes` is `fileBytes_length'` (primed: no landed
    `fileBytes_length` exists, but the name is kept distinct from FsTree's
    namespace in case one is added there).
@@ -155,13 +155,6 @@ theorem ardRetTie_ret (n : Int) (a : Anode) (off : Nat) (r : BitVec 64) (hn : 0 
     exact ⟨rv, hr, h0, by omega⟩
 
 /-! ## 1b.  The exact-count join: the return tie meets the window's length -/
-
-/-- Rocq's (local) `moi64_lit_inj`. -/
-theorem srd_ofNat_inj (x y : Nat) (hx : x < 2 ^ 64) (hy : y < 2 ^ 64)
-    (h : BitVec.ofNat 64 x = BitVec.ofNat 64 y) : x = y := by
-  have := congrArg BitVec.toNat h
-  simp only [BitVec.toNat_ofNat] at this
-  rwa [Nat.mod_eq_of_lt hx, Nat.mod_eq_of_lt hy] at this
 
 /-- Rocq's (local) `moi64_lit_ne_m1`. -/
 theorem srd_ofNat_ne_m1 (x : Nat) (hx : x < 2 ^ 64 - 1) : BitVec.ofNat 64 x ≠ -1#64 := by

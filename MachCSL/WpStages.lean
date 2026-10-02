@@ -19,7 +19,7 @@ open LeanRV64D LeanRV64D.Functions
 
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 
--- The clock tick (`swp_tick_clock_m` and its generalisations) lives in `MachCSL.WpTick`.
+-- The clock tick (`swp_tick_clock_core` and its forms) lives in `MachCSL.WpTick`.
 
 /-! ### Aligned RAM reads in machine mode -/
 

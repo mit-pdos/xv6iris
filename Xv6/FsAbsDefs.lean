@@ -301,21 +301,6 @@ theorem dirEntries_size_0 (n : FsNode) (hsz : fnSize n = 0) : dirEntries n = ∅
     exact dirView_nil _
   · rw [if_neg hd]
 
-/-! ### 1a.  THE BRIDGE TO `FsTree.Fsnode` -- WALK-ONLY, AND SAID SO
-
-`absFsnode` forgets nlink and the device numbers; it exists for ONE
-purpose, to inherit FsTree's path algebra (`pathAt_app`, `pathChain`, ...)
-at the abstract state instead of re-proving it.  It is never a state: a
-device node lands on `NFile []` because a device has no out-edges, which is
-all a walk asks of it. -/
-
-/-- Rocq's `abs_fsnode`. -/
-def absFsnode (a : Anode) : Fsnode :=
-  match a.anNode with
-  | .ADir ents => .NDir ents
-  | .AFile bs => .NFile bs
-  | .ADev _ _ => .NFile []
-
 /-! ## 2.  `apathAt`: THE HOP-BY-HOP FIRST-MATCH LOOKUP
 
 One hop out of a node.  A file, a device and an inum with no row all have

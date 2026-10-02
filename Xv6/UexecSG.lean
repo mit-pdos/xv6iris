@@ -162,12 +162,6 @@ open UexecSG
 def sbundlePay (X : Uvis → IProp GF) (n : Int) (Q : Int → IProp GF) (W : Uvis) : IProp GF :=
   iprop(∃ f : sfam GF, ⌜sexitPay f = Q⌝ ∗ sbundleAt X n f W)
 
-/-- **Rocq `sbundle_pay_ref`**: the exec deposit with its refund's one
-consequence -- whatever the refund is, it pays this record's own exit at the
-kill status. -/
-def sbundlePayRef (X : Uvis → IProp GF) (Q : Int → IProp GF) (W : Uvis) : IProp GF :=
-  iprop(∃ f : sfam GF, ⌜sexitPay f = Q⌝ ∗ □ (sexecRefund f -∗ Q (-1)) ∗ sbundleAt X USYS_exec f W)
-
 end SBundle
 
 /-! ## The program's own deposit data -/

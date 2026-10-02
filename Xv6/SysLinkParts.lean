@@ -35,13 +35,13 @@ uses (never Rocq's comments):
      one `bcond` reading per test (`sysfile_beq_tdir`,
      `Xv6.namex_beqz_half`, `sys_link_beq_nmax`) plus `sys_link_li_nmax`;
    * the `++` chain (`sl_uns16`, `sl_sext16_low`, `sl_ninner*`,
-     `sl_nbump_*`, `sl_nlink_incr`) is ONE `bv_decide` (`sys_link_nlink_incr`),
-     at the shape `SpecIupdate.wp_iupdate_link` takes
-     (`dn.diNlink = dn0.diNlink + 1#16`);
+     `sl_nbump_*`, `sl_nlink_incr`) is ONE `bv_decide`
+     (`SysLinkWalkA.sys_link_inc_store`), at the shape
+     `SpecIupdate.wp_iupdate_link_body` takes (`dn.diNlink = dn0.diNlink + 1#16`);
    * the `--` chain (`sl_dinner*`, `sl_dbump_*`, `sl_nlink_decr`, `sl_ndec`,
      `sl_ndec_decr`) is `sysLinkNdec` + `sys_link_ndec_eq` (`= h - 1#16`) +
-     `sys_link_ndec_decr`, the `toNat` form `wp_iupdate_unlink`'s `hdec`
-     takes.
+     `sys_link_ndec_decr`, the `toNat` form `wp_iupdate_unlink_body`'s
+     `hdec` takes.
 2. `sl_setnl` is the record update `{ dn with diNlink := nl }`
    (`sysfileSetnl`); `sl_setnl_ddix` goes through the landed
    `DirView.dirDotsIx_eq`.
@@ -164,14 +164,6 @@ BOTH sixteen-bit, and they do NOT share a lemma: the `++` reuses the
 SIGN-extended `lh` the NLINK_MAX guard already loaded, while the `--` does
 its own ZERO-extended `lhu` (Rocq's header, kept). -/
 
-/-- THE `++` (Rocq's `sl_nlink_incr`): `lh` (sign), `c.addiw +1`, `sh` stores
-the halfword plus one, which is `wp_iupdate_link`'s `hbump`. -/
-theorem sys_link_nlink_incr (h : BitVec 16) :
-    BitVec.extractLsb' 0 16 (BitVec.signExtend 64
-      (BitVec.extractLsb' 0 32 (BitVec.signExtend 64 h + BitVec.signExtend 64 1#12))) =
-      h + 1#16 := by
-  bv_decide
-
 /-- the halfword the `sh` at +0x102 commits (Rocq's `sl_ndec`): `lhu`
 (zero), `c.addiw -1`. -/
 def sysLinkNdec (h : BitVec 16) : BitVec 16 :=
@@ -181,7 +173,7 @@ def sysLinkNdec (h : BitVec 16) : BitVec 16 :=
 theorem sys_link_ndec_eq (h : BitVec 16) : sysLinkNdec h = h - 1#16 := by
   unfold sysLinkNdec; bv_decide
 
-/-- THE CLAUSE `wp_iupdate_unlink` TAKES (Rocq's `sl_nlink_decr` /
+/-- THE CLAUSE `wp_iupdate_unlink_body` TAKES (Rocq's `sl_nlink_decr` /
 `sl_ndec_decr`): the OLD count is the new one plus one -- sound because the
 walk's own `++` put `h` at least one. -/
 theorem sys_link_ndec_decr (h : BitVec 16) (hnz : h.toNat ≠ 0) :

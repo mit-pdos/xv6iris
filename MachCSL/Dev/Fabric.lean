@@ -68,8 +68,8 @@ events are faithful by construction (`ObsTrace.uart_step_wire`); here the
 language enforces the same thing (`devOpStep`): a device move is taken only
 if it is FAITHFUL to its events -- a port's events are its own, and its wire
 grows by exactly its output events; no other device observes anything.
-Every answer of the board's own programs is faithful (`MachCSL.ObsTrace`:
-`Uart.txArm_ok`, `Uart.rxArm_ok`; the PLIC and the disk never emit), so on
+Every answer of the board's own programs is faithful (the UART's transmit
+and receive arms; the PLIC and the disk never emit), so on
 them the restriction is vacuous.  It is what makes the observation history's
 well-formedness (`MachCSL.obsWf`) a STEP INVARIANT of the semantics, as in
 Rocq. -/

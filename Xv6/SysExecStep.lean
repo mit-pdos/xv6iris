@@ -39,7 +39,7 @@ THEOREM, the frozen `sysExecStepBody`).
    1-3): the callees' complement is carried by the `SysExecStepCalls`
    wrappers.
 2. fetchaddr and fetchstr both take the bare block at the round's
-   descriptor (`sysfile_blk_bare`; fetchaddr's ambient `procPrivExt` form
+   descriptor (`sysfile_blk_bare_ev`; fetchaddr's ambient `procPrivExt` form
    by `EitherDefs.procPrivExt_conv`): Rocq hands fetchaddr the whole
    `proc_priv γf … (us_upt U P)` and fetchstr `proc_priv_core`.  PROCESS LAYER (flagged, as `SysExecParts` deviation 4):
    the block is `procPrivFd` at `sysExecV2 A P` / `sysExecM2 A P`.

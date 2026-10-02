@@ -50,7 +50,7 @@ def isLeafPte (w : BitVec 64) : Prop := w &&& PTE_V ≠ 0#64 ∧ w &&& 0xE#64 �
 `pte_pbmt0`, plus `G = 0`): the leaf is not global (`G`, bit 5), not a NAPOT
 leaf (`N`, bit 63) and has `PBMT = 0` (bits 61–62), so the walk at U is the
 plain Sv39 walk and its TLB entry is `tlbEntryOf`'s (`global := false`).  The
-`A`/`D` bits the hardware sets do not touch them (`uLeafPins_setAD`). -/
+`A`/`D` bits the hardware sets do not touch them. -/
 def uLeafPins (w : BitVec 64) : Prop := w &&& 0xE000000000000020#64 = 0#64
 
 /-- `PGROUNDUP` on sizes. -/
@@ -109,14 +109,6 @@ def uptWf (P : UPtd) : Prop :=
   pageValid (pageAddr P.tfp) ∧
   (∀ k w, Iris.Std.PartialMap.get? P.um k = some w → uLeafPins w) ∧
   (∀ k w, Iris.Std.PartialMap.get? P.um k = some w → uwkInv w = false)
-
-/-- The pins survive the hardware's `A`/`D` write-back. -/
-theorem uLeafPins_setAD (w : BitVec 64) (a d : BitVec 1) (h : uLeafPins w) : uLeafPins (pteSetAD w a d) := by
-  unfold uLeafPins at *
-  simp only [pteSetAD, 
-    Sail.BitVec.extractLsb, Sail.BitVec.updateSubrange, Sail.BitVec.updateSubrange', BitVec.extractLsb,
-    LeanRV64D.Functions._update_PTE_Flags_A, LeanRV64D.Functions._update_PTE_Flags_D]
-  revert h; bv_decide
 
 /-- `mappages`' leaf is pinned when its permission word is. -/
 theorem uLeafPins_uLeaf (ppn : BitVec 44) (perm : BitVec 64) (h : perm &&& ~~~0x3DF#64 = 0#64) :

@@ -27,9 +27,9 @@ pure model `ushpFind`, and the parse tree `UshpCmd`.
    kept as the "apply-shaped" forms Rocq uses.
 4. `bv_unsigned` is `BitVec.toNat` (cast to `Int` where a code is an `Int`);
    `Z_to_bv 8 n` is `n#8`; `toks !! i` is `toks[i]?`.
-5. `ushp_len_app1`/`Xv6.epuApp_snoc`/`ushp_len_app_cons`/`ushp_lookup_app_*`
-   are kept under their Rocq names (walks cite them) although each is one
-   `simp` in Lean.
+5. `Xv6.epuApp_snoc`/`ushp_lookup_app_*` are kept under their Rocq names
+   (walks cite them) although each is one `simp` in Lean; `ushp_len_app1` /
+   `ushp_len_app_cons` are not ported (nothing uses them).
 -/
 import Xv6.UmodeAbi
 
@@ -334,11 +334,6 @@ theorem ushpTokens_cons_inv' (len i j q : Nat) (f : Nat → BitVec 8) (tk : Nat 
     (rest : List (Nat × Nat)) (hj : j = i + ushpSkipws (len - i) i f) (hq : q = ushpToklen (len - j) j f)
     (h : UshpTokens len f i (tk :: rest)) : 0 < q ∧ tk = (j, j + q) ∧ UshpTokens len f (j + q) rest := by
   subst hj hq; exact ushpTokens_cons_inv len i f tk rest h
-
-theorem ushp_len_app1 {A : Type} (l : List A) (x : A) : (l ++ [x]).length = l.length + 1 := by simp
-
-theorem ushp_len_app_cons {A : Type} (l : List A) (x : A) (r : List A) :
-    (l ++ x :: r).length = l.length + r.length + 1 := by simp; omega
 
 /-- **Rocq `ushpTokens_skip`**: the invariant survives a blank skip. -/
 theorem ushpTokens_skip (len : Nat) (f : Nat → BitVec 8) (off : Nat) (toks : List (Nat × Nat))

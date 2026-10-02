@@ -10,7 +10,7 @@ MachCSL: **the pure toolkit of the text-map walker** `uxRun`
   map and the text map are disjoint (then no read `runRW` answers is a text
   read, and the disjointness is kept since a walk keeps its map's domain);
 * `uxw_bind` & co. -- the bind toolkit;
-* `uxw_readReg`, `uxw_sail_mem_read_text` -- the two leaves.
+* `uxw_sail_mem_read_text` -- the text-read leaf.
 -/
 import MachCSL.URunX
 import MachCSL.URunRWMono
@@ -198,14 +198,6 @@ theorem uxw_bind_runRW {X Y : Type} (m : SailM X) (f : X → SailM Y) (orc orc' 
     (x : X) (hd : UxwDisj T s) (h : runRW D orc s m = some (x, s', orc')) :
     uxRun D T orc s (m >>= f) = uxRun D T orc' s' (f x) :=
   uxw_bind_some D T m f orc orc' s s' x (uxw_of_runRW' D T m orc s _ hd h)
-
-/-- A register read in the footprint. -/
-theorem uxw_readReg (orc : UOrc) (s : UWSt) (r : Register) (h : D.Dr r = true) :
-    uxRun D T orc s (readReg r) = some (s.file r, s, orc) := by
-  show uxRun D T orc s (FreeM.impure (.ok (.regRead r)) FreeM.pure) = _
-  rw [uxw_node D T orc s _ _ rfl]
-  show (runRW D orc s (FreeM.impure (.ok (.regRead r)) FreeM.pure)).bind _ = _
-  rw [runRW_regRead_dr D orc s r _ h]; rfl
 
 end walker
 

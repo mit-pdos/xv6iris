@@ -21,8 +21,7 @@ parses, at the reference parser, to the parser's own RIGHT SPINE
   the N-stage statement reserved and the general room does not need).
 
 The induction is on the bars: at a stage the argument loop stops at the
-stage's bar (`refArgs_of_toks_stage`, the one-bar `refArgs_of_toks_at`
-with its whole-line `ushqOne` premise replaced by the stage's own: no
+stage's bar (`refArgs_of_toks_stage`, whose premise is the stage's own: no
 symbol from the stage's cursor to the bar -- which its token scan
 `UshsToks … gp c toks` already implies, `ushsToks_nosym`), the bar's
 `gettoken` lands one blank past it, and the recursion is the induction
@@ -99,7 +98,7 @@ theorem refAt_notin_stage (len : Nat) (f : Nat → BitVec 8) (lo p s : Nat) (tok
     subst this; rw [hbar] at hin; exact hnb hin
 
 /-- the argument loop on a stage stops at the stage's bar, having consumed
-the stage's tokens (the one-bar `refArgs_of_toks_at`, stage-local). -/
+the stage's tokens. -/
 theorem refArgs_of_toks_stage (len : Nat) (f : Nat → BitVec 8) (lo p : Nat) (hnn : refNonnul len f)
     (hbelow : ∀ j, lo ≤ j → j < p → ushpIsSym (f j) = false) (hp : p < len) (hbar : f p = rbBar) :
     ∀ (off : Nat) (toks acc : List (Nat × Nat)) (rs : List Rredir) (n : Nat), lo ≤ off → off ≤ p →

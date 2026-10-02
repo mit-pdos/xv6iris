@@ -71,9 +71,10 @@ FsAbsOpenFire precedent):
    (stdpp's list insert is a no-op out of range, as `List.set` is).
 6. Names camelCased (`om_arg` → `omArg`, `aopen_commit_at` →
    `aopenCommitAt`, `open_trunc_piece` → `openTruncPiece`,
-   `namei_walk_pre_era` → `nameiWalkPreEra`, `open_au_pre_plain` →
-   `openAuPrePlain`, `open_au_plain_at_inst` → `openAuPlainAt_inst`,
-   `open_fd_rcpt` → `openFdRcpt`); lemma names camel head, Rocq snake tail.
+   `namei_walk_pre_era` → `nameiWalkPreEra`, `open_fd_rcpt` →
+   `openFdRcpt`); lemma names camel head, Rocq snake tail.
+   `open_au_pre_plain` / `open_au_plain_at_inst` are not ported (nothing
+   uses them).
 7. **2d': the image and the pointer are `ArgPath`'s.**  Rocq's
    `open_au_plain_at`/`_create_at` take `M : gmap Z (bv 8)` and
    `pv : mword 64`; here `M : Nat → List (BitVec 8)` (the per-page user view)
@@ -96,7 +97,7 @@ FsAbsOpenFire precedent):
    `<[fd := s]> sts` is `sts.set fd s` (deviation 5).
 10. **`open_fd_frags_any`: `FdSlots.fd_frags_any γ` has no Lean
    definition** (no Lean consumer names it); it is spelled inline as
-   `∃ sts', fdFrags γ sts'` (`openFdFragsAny`).
+   `∃ sts', fdFrags γ sts'`.
 
 ## Dropped/simplified vs Rocq
 
@@ -678,42 +679,10 @@ arrives as its AU conjoined with its own refund (`PieceFam.pfAt`); the
 walk's cursor pair `P`/`Pmiss` stays BARE.  THE WALK IS AT ONE PATH
 (`FsAbsEra.exStart` at `pl`), not at every path: a caller whose cursor is
 PINNED -- a pin is sound at one path -- can hand this in; the `∀ pl` form it
-could not.  `FsAbsOpenFire.opfStart_of_open` and `openAuPrePlain_of_all`
-below are the one-line bridges from the `∀ pl` form. -/
+could not.  `FsAbsOpenFire.opfStart_of_open` is the one-line bridge from
+the `∀ pl` form. -/
 
 variable [Appcfg GF]
-
-/-- the PLAIN caller's bundle (Rocq's `open_au_pre_plain`). -/
-def openAuPrePlain (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat) (pl : List (BitVec 8))
-    (vom : BitVec 64) (P Pmiss : Nat → Nat → IProp GF)
-    (Fo : Pfam GF (Aview → Nat → Anode → IProp GF))
-    (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)) : IProp GF :=
-  iprop(exStart (hlc := hlc) γfs rt cw P Pmiss pl ∗
-    pfAt (aopenCommitAt (hlc := hlc) Γ appE) Fo ∗
-    -- THE TRUNCATE'S PERMIT is the walk's own terminal cursor (Rocq lane
-    -- TRUNC-PERMIT): paid where the kernel holds it, at the join
-    openTruncPiece (hlc := hlc) Γ vom (truncTermAt pl P) Ft)
-
-/-- ...and the O_CREATE caller's (Rocq's `open_au_pre_create`): the
-parent-prefix one-shot at that same path (`FsAbsEra.epStart`), create's
-fused delta at the child `AFile []`, the exists observation, open's own two
-commits, and create's CHILD legs. -/
-def openAuPreCreate (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat) (pl : List (BitVec 8))
-    (Nm : Fname → Prop) (vom : BitVec 64) (P Pmiss : Nat → Nat → IProp GF)
-    (Farm Fun : Pfam GF (Aview → Nat → IProp GF))
-    (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
-    (Fo : Pfam GF (Aview → Nat → Anode → IProp GF))
-    (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)) : IProp GF :=
-  iprop(epStart (hlc := hlc) γfs rt cw P Pmiss pl ∗
-    -- ...AND THE NAME PREDICATE (Rocq RULING NM, `8438e5583`, the open half):
-    -- create files exactly the name argument 0's last element spells
-    pfAt (acreCommitAtNm (hlc := hlc) Γ appE (.AFile []) Nm (P (nparElems pl).length) Farm) Fok ∗
-    pfAt (dlookupCommitAt (hlc := hlc) Γ appE) Fex ∗
-    pfAt (aopenCommitAt (hlc := hlc) Γ appE) Fo ∗
-    -- THE TRUNCATE'S PERMIT is create's own payout at this path (Rocq lane
-    -- F-OPEN-3): the walk's tie beside whichever of the two arms ran
-    openTruncPiece (hlc := hlc) Γ vom (truncPermitOf (hlc := hlc) Γ (truncTieAt pl P) Farm Fok Fex) Ft ∗
-    creChildUnfired (hlc := hlc) Γ (.AFile []) Farm Fun)
 
 /-! ## 2d'.  The syscall tier: the same bundle under the reading of the
 caller's argument 0
@@ -751,24 +720,6 @@ def openAuCreateAt (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat) (M : Nat
     openTruncPiece (hlc := hlc) Γ vom (truncPermitOf (hlc := hlc) Γ (truncTieArg M pv P) Farm Fok Fex) Ft ∗
     creChildUnfired (hlc := hlc) Γ (.AFile []) Farm Fun)
 
-/-- THE INSTANCE: at the path the syscall actually read, the walk wand
-fires and the bundle is the one-path one (Rocq's `open_au_plain_at_inst`). -/
-theorem openAuPlainAt_inst (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat)
-    (M : Nat → List (BitVec 8)) (pv : Nat) (vom : BitVec 64) (pl : List (BitVec 8))
-    (P Pmiss : Nat → Nat → IProp GF) (Fo : Pfam GF (Aview → Nat → Anode → IProp GF))
-    (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)) (hpl : argPathOf M pv pl) :
-    openAuPlainAt (hlc := hlc) Γ γfs rt cw M pv vom P Pmiss Fo Ft ⊢
-      openAuPrePlain (hlc := hlc) Γ γfs rt cw pl vom P Pmiss Fo Ft := by
-  unfold openAuPlainAt openAuPrePlain
-  iintro ⟨Hw, Ho, Ht⟩
-  isplitl [Hw]
-  · iapply Hw $$ %pl %hpl
-  · isplitl [Ho]
-    · iexact Ho
-    -- the permit at this path: the cursor stands bare once the reading has
-    -- answered
-    · iapply (openTruncPiece_term_arg_to_at (hlc := hlc) Γ vom M pv pl P Ft hpl) $$ Ht
-
 /-- THE CURSOR'S TWO READINGS, as one move (Rocq's `open_acre_inst`, TL-3K;
 `SpecSysMknod.mknodAcre_inst`'s twin at the file child). -/
 theorem openAcre_inst (Γ : FsViewNames GF) (M : Nat → List (BitVec 8)) (pv : Nat)
@@ -790,26 +741,6 @@ theorem openAcre_inst (Γ : FsViewNames GF) (M : Nat → List (BitVec 8)) (pv : 
     (nparCur M pv P) (P (nparElems pl).length) Farm Fok.pfRecv) $$ [] [] H
   · iapply (nparCur_out M pv pl P hpl)
   · iapply (nparCur_in M pv pl P hpl)
-
-/-- Rocq's `open_au_create_at_inst`. -/
-theorem openAuCreateAt_inst (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat)
-    (M : Nat → List (BitVec 8)) (pv : Nat) (vom : BitVec 64) (pl : List (BitVec 8))
-    (P Pmiss : Nat → Nat → IProp GF) (Farm Fun : Pfam GF (Aview → Nat → IProp GF))
-    (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
-    (Fo : Pfam GF (Aview → Nat → Anode → IProp GF))
-    (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)) (hpl : argPathOf M pv pl) :
-    openAuCreateAt (hlc := hlc) Γ γfs rt cw M pv vom P Pmiss Farm Fun Fok Fex Fo Ft ⊢
-      openAuPreCreate (hlc := hlc) Γ γfs rt cw pl (nparNm M pv) vom P Pmiss Farm Fun Fok Fex Fo Ft :=
-        by
-  unfold openAuCreateAt openAuPreCreate
-  iintro ⟨Hw, Hok, Hex, Ho, Ht, Hch⟩
-  ihave Hok := openAcre_inst Γ M pv pl P Farm Fok hpl $$ Hok
-  -- THE PERMIT, at this path: the tie's two facts stand bare once the
-  -- reading has answered (`truncTieArg_of_at`)
-  ihave Ht := openTruncPiece_arg_to_at (hlc := hlc) Γ vom M pv pl P Farm Fok Fex Ft hpl $$ Ht
-  isplitl [Hw]
-  · iapply Hw $$ %pl %hpl
-  · iframe Hok Hex Ho Ht Hch
 
 omit [Appcfg GF] in
 /-- the `∀ pl` walk premise specialised at one path: `exStart` there
@@ -872,23 +803,6 @@ theorem openAuCreateAt_of_all (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Na
     iapply (npStart_of_mknod γfs rt cw P Pmiss pl) $$ Hw
   · iframe Hok Hex Ho Ht Hch
 
-/-- Rocq's `open_au_pre_plain_of_all`. -/
-theorem openAuPrePlain_of_all (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat)
-    (pl : List (BitVec 8)) (vom : BitVec 64) (P Pmiss : Nat → Nat → IProp GF)
-    (Fo : Pfam GF (Aview → Nat → Anode → IProp GF))
-    (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)) :
-    ⊢@{IProp GF} nameiWalkPreEra (hlc := hlc) γfs rt cw P Pmiss -∗
-      pfAt (aopenCommitAt (hlc := hlc) Γ appE) Fo -∗
-      openTruncPiece (hlc := hlc) Γ vom (truncTermAt pl P) Ft -∗
-      openAuPrePlain (hlc := hlc) Γ γfs rt cw pl vom P Pmiss Fo Ft := by
-  unfold openAuPrePlain
-  iintro Hw Ho Ht
-  isplitl [Hw]
-  · iapply (openWalk_start γfs rt cw P Pmiss pl) $$ Hw
-  · isplitl [Ho]
-    · iexact Ho
-    · iexact Ht
-
 end OpenWalk
 
 /-! ## 2e'.  The descriptor receipt (pure) -/
@@ -911,16 +825,8 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
   [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF]
   [BcacheG GF] [DiskG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
 
-/-- the sharpened success post implies the landed bundle shape (Rocq's
-`open_fd_frags_any`; deviation 10: `fd_frags_any` inline). -/
-theorem openFdFragsAny (γd : GName) (sts : List FdState) :
-    fdFrags (GF := GF) γd sts ⊢ ∃ sts' : List FdState, fdFrags γd sts' := by
-  iintro H
-  iexists sts
-  iexact H
-
 /-- THE SUCCESS ARMS' SHARED TAIL (Rocq's `open_fd_ok`):
-`SpecSysOpen.sysOpenPost`'s success arm with the bundle SHARPENED -- the
+the blanket post's success arm with the bundle SHARPENED -- the
 LEAST free descriptor now names the new file (`r` = that descriptor; which
 file-table slot is existential, the table is not the caller's to name), the
 block comes back with the cell written, and the fragment bundle comes back

@@ -235,8 +235,8 @@ end ops
 
 `Xv6.diskResA` is `Xv6.diskRes` with some slots taken, so it has the
 same counters, the same `avail->idx` half and the same eight ring cells;
-these four lemmas are `Xv6.diskRes_open`, `diskRes_close`,
-`diskRes_availIdx_acc` and `diskRes_ring_acc` at that payload. -/
+`diskResA_open` / `diskResA_close` are `Xv6.diskRes_open` / `diskRes_close`
+at that payload. -/
 
 section payloadA
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
@@ -530,8 +530,7 @@ payload one QUARTER of each of the three receipts and hands the other
 back here (`Xv6.headTokQ`): they are what the publisher carries across
 its park inside `sleep`, and agreement with the payload's quarters is
 what says, when it wakes and re-acquires the lock, that the slots it is
-about to collect are still ITS chain
-(`Xv6.diskRes_slot_of_quarter`). -/
+about to collect are still ITS chain. -/
 def vdrwP4Exit (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γ : DiskNames) (γl : GName) (pd pav pu : BitVec 64)
     (bno : BitVec 32) (dataBuf dataDisk : List (BitVec 8)) (wr : Bool)

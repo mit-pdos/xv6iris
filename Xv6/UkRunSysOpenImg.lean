@@ -10,7 +10,7 @@ program's cwd (`udepwfAt`, the family the receipt comes back at), the
 program's half of its cwd, its ledger, and a persistent view of a piece of
 its own image -- the path argument, off whichever half of the heap holds it
 (`uimgView`: the TEXT half for a literal, `uimgView_text`; the DATA half
-for a malloc'd or argv string, `uimgView_data`).  Beside the post the
+for a malloc'd or argv string).  Beside the post the
 continuation gets the rows only this leaf can state: the image row (the
 view is a submap of the trapping key's image), the table's length, the two
 argument words, the cwd, the ledger, and the ledger's two arms.
@@ -97,24 +97,6 @@ theorem uimgView_text (N : UkNames GF) (Img : ElfMem) :
       ipureintro; exact h.1)
   isplitr [Hh]
   · iexact Ht
-  · iexact Hh
-
-/-- **Rocq `uimg_view_data`** (deviation 2): ...AND SO DOES THE DATA HALF,
-at the discarded fraction. -/
-theorem uimgView_data (N : UkNames GF) (Img : ElfMem) :
-    User.utextImg (ubyteq N.d DFrac.discard) Img ⊢ uimgView N Img := by
-  unfold uimgView
-  iintro #Hd
-  imodintro
-  iintro %M %pm %sz Hh
-  iapply uimgView_pure iprop(User.utextImg (ubyteq N.d DFrac.discard) Img ∗ uheap N.t N.d N.s M pm sz) Img M
-    (fun a b hb => by
-      iintro ⟨#Hd, Hh⟩
-      ihave Hb := User.utextImg_byte (ubyteq N.d DFrac.discard) Img a b hb $$ Hd
-      ihave %h := uheap_ubyte N.t N.d N.s M pm sz DFrac.discard a b $$ Hh Hb
-      ipureintro; exact h.1)
-  isplitr [Hh]
-  · iexact Hd
   · iexact Hh
 
 /-! ## The open, the receipt kept -/

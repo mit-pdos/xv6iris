@@ -19,8 +19,8 @@ parts 3--6 are `IcacheEscrowPool` (2105--3360), `IcacheBoxAmb`
   `ic_pin_enter` → `icPinEnter`, `ic_pin_exit` → `icPinExit`.
 * `ic_dep_shr` → `icDepShr`, `ic_dep_side_tx` → `icDepSideTx`,
   `ic_dep_side` → `icDepSide` (+ Timeless), `ic_dep_side_of_tx` →
-  `icDepSide_ofTx`, `ic_dep_gname_of_shr` → `icDepGname_ofShr`,
-  `ic_dep_rd_shr` → `icDepRd_shr`.
+  `icDepSide_ofTx`, `ic_dep_rd_shr` → `icDepRd_shr`
+  (`ic_dep_gname_of_shr` is not ported: nothing uses it).
 * `ic_dep_held` → `icDepHeld`.
 * `ic_mk_loaded` → `icMkLoaded`, `ic_loaded_flat_body` →
   `icLoadedFlatBody`, `ic_loaded_bm_len` → `icLoaded_bmLen`,
@@ -42,7 +42,7 @@ parts 3--6 are `IcacheEscrowPool` (2105--3360), `IcacheBoxAmb`
 4. **`icLoaded_open` takes the era bundle's `InodeLocal` keeping the
    bundle** (the private helper `inodeOwnedEra_localKeep`): Rocq's
    `iDestruct (inode_owned_era_local with "Hn") as %Hloc` keeps `"Hn"`
-   (pure conclusion); `inodeOwnedEra_local` in Lean consumes it.
+   (pure conclusion), and so does the helper.
 5. **Section binders**: each declaration takes only the camera classes it
    names (`Xv6/IcacheEscrowTok.lean` deviation 8).  The pin section takes
    `[IcacheG GF] [Xv6G GF] [LogG GF]` (Rocq: `hpn` is an `icacheG` member;
@@ -99,16 +99,15 @@ the box files, where the live rows restate it.
 * Downstream fs proofs (not 0d): `icPayload` (ProofIlock), `icPinEnter` /
   `icPinExit` (ProofIput), `icDepSide` (Spec/ProofIlock, Iunlock,
   Iunlockput, Filestat, Fileread, CreateFound/FreshTy, SysUnlinkW2/W3,
-  SysOpenWalk), `icDepSide_ofTx` (ProofIunlockput), `icDepGname_ofShr`
-  (ProofIlock, ProofIunlock), `icDepRd_shr` (ProofIlock), `icDepHeld`
-  (SpecIlock and its callers), `icMkLoaded` (ProofCreate*, FsLookup,
+  SysOpenWalk), `icDepSide_ofTx` (ProofIunlockput), `icDepRd_shr`
+  (ProofIlock), `icDepHeld` (SpecIlock and its callers), `icMkLoaded` (ProofCreate*, FsLookup,
   ProofSysLink, ProofSysOpen*, ProofKexecTail), `icLoaded_open` /
   `icLoaded_flat` / `icLoadedFlatBody` (~20 files: FsAbsEra, Proof*),
   `ipoolShapeAwait` (ProofIput).
 
 ## Reused from landed Lean (not re-ported)
 
-`IcDep`, `icDepGname`, `icDepRd`, `ientry`, `Icfg.icfgLog` / `icfgNib`
+`IcDep`, `icDepRd`, `ientry`, `Icfg.icfgLog` / `icfgNib`
 (Xv6/IcacheRefDefs.lean); `hpnFull`, `hpnH`, `hpn_split`, `hpn_join`,
 `hpn_agree`, `hpnFull_update`, `ifreezeOff`, `icntHalf`, `frzmH`
 (Xv6/IcacheRefLink.lean); `txPin`, `txPinO` (Xv6/TxPin.lean);
@@ -152,7 +151,7 @@ arm.
 
 WHAT IT BUYS (RULING A-prime): `SpecIlock`'s post hands the holder
 `ifreezeOff z` beside the payload, so create's fresh child and sys_link's
-`ip->nlink++` can pay `wp_iupdate_link`'s freeze-pin premise with the token
+`ip->nlink++` can pay `wp_iupdate_link_body`'s freeze-pin premise with the token
 arm, where the pure arm `diNlink dn0 ≠ 0` is FALSE at the one and
 unavailable at the other. -/
 
@@ -292,11 +291,6 @@ instance icDepSide_timeless [Icfg] (d : IcDep) : Timeless (icDepSide (GF := GF) 
 
 end Side
 
-/-- Rocq's `ic_dep_gname_of_shr`. -/
-theorem icDepGname_ofShr (d : IcDep) (s : Qp) (dev inum : BitVec 32) (g : GName) (lo : Nat)
-    (h : icDepShr d = some (s, dev, inum, g, lo)) : icDepGname d = some g := by
-  cases d <;> simp_all [icDepShr, icDepGname]
-
 /-- Rocq's `ic_dep_rd_shr`. -/
 theorem icDepRd_shr (d : IcDep) (s : Qp) (dev inum : BitVec 32) (g : GName) (lo : Nat)
     (h : icDepShr d = some (s, dev, inum, g, lo)) (hrd : icDepRd d = true) :
@@ -394,7 +388,7 @@ theorem icLoaded_bmLen [Icfg] [CurCtx] (γfs : FsNames) (γi : GName) (cov : Ext
   simp [bmCells, blkmapWf_dir_len hok.1, NDIRECT]
 
 omit [IcacheG GF] [FsLinkG GF] in
-/-- `inodeOwnedEra_local`, keeping the bundle (deviation 4). -/
+/-- The era bundle's `InodeLocal`, keeping the bundle (deviation 4). -/
 private theorem inodeOwnedEra_localKeep (γfs : FsNames) (γi : GName) (inum : BitVec 32)
     (n : FsNode) :
     inodeOwnedEra (GF := GF) γfs γi inum n ⊢

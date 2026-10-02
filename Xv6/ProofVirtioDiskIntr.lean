@@ -92,10 +92,9 @@ variable {lent : Bool}
 /-! ## `fence iorw,iorw`, the floor rule
 
 `__sync_synchronize()` is emitted as `0ff0000f`, i.e. `FENCE (0, iorw,
-iorw)`, not the `FENCE (0, rw, rw)` of `MachCSL.wp_s_fence_rw_rw_floor`:
-the two decode to the same `Barrier_RISCV_rw_rw`, because the Sail model
-looks only at the low two bits of each set.  Both encodings now have their
-rules in `MachCSL/WpSmodeFenceFloor2.lean`
+iorw)`, not `FENCE (0, rw, rw)`: the two decode to the same
+`Barrier_RISCV_rw_rw`, because the Sail model looks only at the low two bits
+of each set.  Its rules are in `MachCSL/WpSmodeFenceFloor2.lean`
 (`MachCSL.wp_s_fence_iorw_iorw`, `MachCSL.wp_s_fence_iorw_iorw_floor`);
 the proofs that used to live here were moved there verbatim. -/
 

@@ -10,14 +10,13 @@ same Rocq file's gap -- `era_full`, `pin_*`, `Elist_auth_grow`,
 
 Added (Rocq → Lean, the landed convention): `ch_arm_E_open` →
 `chArmE_open`, `ch_E_byte` → `chE_byte`, `ch_E_byte_echo` →
-`chE_byte_echo`, `ch_E_close` → `chE_close`, `ch_E_close_len` →
-`chE_close_len`, `ch_E_open` → `chE_open`, `ch_dl_byte` → `chDl_byte`,
+`chE_byte_echo`, `ch_E_close` → `chE_close`, `ch_E_open` → `chE_open`, `ch_dl_byte` → `chDl_byte`,
 `ch_dl_close` → `chDl_close`, `echoed_nil`, `echoed_snoc_no`,
 `echoed_snoc_yes`, `echoed_all_len` (same names), `seg_echoed_snoc` →
 `segEchoed_snoc`, `epu_lookup_nil_absurd` → `epuLookup_nil_absurd`,
-`epu_removelast_take` → `Xv6.pop_removelast_take`, `fmap_snd_snoc` →
-`fmapSnd_snoc`, `log_echoed_echo` → `logEchoed_echo`, `log_ok_nil` →
-`logOk_nil`.
+`epu_removelast_take` → `Xv6.pop_removelast_take`, `log_echoed_echo` →
+`logEchoed_echo`, `log_ok_nil` → `logOk_nil`.  `ch_E_close_len` and
+`fmap_snd_snoc` are not ported (nothing uses them).
 
 Deviations: spelling only (Rocq's arm `(h, c, cs, j)` is Lean's
 `((h, c, cs), j)`, EchoOut.lean; `LogEntryDefs.ch_dl H` is `H.chDl`;
@@ -89,14 +88,6 @@ theorem chE_close (H : ConsHist) : chE (consStep H .evClose) = chE H := by
     · simp [chArmE, logEchoed, leEcho, leByte, leHist, hk]
     · simp [chArmE, logEchoed, leEcho, leByte, hk]
 
-/-- Rocq `ch_E_close_len`. -/
-theorem chE_close_len (H : ConsHist) :
-    (echoed (consStep H .evClose).chLog).length = (chE H).length := by
-  rw [← chE_close H]
-  rcases ha : H.chArm with _ | ⟨⟨h, c, cs⟩, j⟩
-  · simp [chE, consStep, ha, chArmE, segOf_length]
-  · simp [chE, consStep, ha, chArmE, segOf_length]
-
 /-- Rocq `ch_E_open`. -/
 theorem chE_open (H : ConsHist) (h : List Obs) (c : BitVec 8) (cs : List (BitVec 8))
     (hn : H.chArm = none) : chE (consStep H (.evOpen h c cs)) = chE H := by
@@ -114,11 +105,6 @@ theorem chDl_close (H : ConsHist) : (consStep H .evClose).chDl = H.chDl := by
 theorem epuLookup_nil_absurd {A : Type} (j : Nat) (x : A) (h : ([] : List A)[j]? = some x) :
     False := by
   simp at h
-
-/-- Rocq `fmap_snd_snoc`. -/
-theorem fmapSnd_snoc (E : List (List Obs × BitVec 8)) (x : List Obs × BitVec 8) :
-    (E ++ [x]).map Prod.snd = E.map Prod.snd ++ [x.2] := by
-  simp
 
 /-- Rocq `log_echoed_echo`. -/
 theorem logEchoed_echo (h : List Obs) (c : BitVec 8) : logEchoed (h, c, [echoOf c]) := rfl

@@ -19,13 +19,11 @@ credential and the generic user-execution WP: no `appSup`, no taint
    deviation 1) -- the slot wands do not read the view, so nothing changes.
 3. **`spost_at_pipe_elim`** (Rocq UexecExecInst, not in Lean) is proved
    here, at the instance, as `spostAt_pipe_elim_xv6`.
-4. **The wild credential's licence takes the interface record**
-   (`AppIface.consLicenceAt_of_wild`'s two slot equations, K3's form: Rocq
-   reads `riscvF_app_iface`): `seccConsRdOfWild`, `seccConsWrOfWild`,
-   `seccConsPayOfWild` and `useccompMint` take `(Ai : AppIface GF)`,
-   `hw : MachFixedGS.wild = Ai.wild`, `hc : MachFixedGS.consRes = Ai.cons`.
-   `riscv_wild (S gen_id)` / `riscv_rdwild (S gen_id)` are
-   `MachFixedGS.wild (genId + 1)` / `MachFixedGS.rdwild (genId + 1)`.
+4. **The wild-credential forms are not ported**: `secc_cons_rd_of_wild`,
+   `secc_cons_wr_of_wild`, `secc_cons_pay_of_wild` and `useccomp_mint`
+   (nothing uses them); the licence forms below are.  `riscv_wild (S
+   gen_id)` / `riscv_rdwild (S gen_id)` are `MachFixedGS.wild (genId + 1)` /
+   `MachFixedGS.rdwild (genId + 1)`.
 5. `seccRetGo` is a proof-local helper (Rocq's inline `"Hgo"` assertion).
 6. **Kernel-cost helpers** (no Rocq counterpart, proof engineering only):
    `uexecRetContGen_quiet`/`_post`, `uexecKillArm_exists` and
@@ -485,7 +483,7 @@ theorem useccompMintOfCons :
 /-! ## 8.  THE ERA CREDENTIAL PAYS THE CONSOLE ROWS -/
 
 /-- READ at a console row, out of the era's licence (the body of Rocq
-`secc_cons_rd_of_wild` after its `consLicenceAt_of_wild` step) -/
+`secc_cons_rd_of_wild` after its licence step) -/
 theorem seccConsRdOfLic :
     consLicenceAt (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF) + 1) ⊢
       MachFixedGS.rdwild (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF) + 1) -∗
@@ -507,19 +505,6 @@ theorem seccConsRdOfLic :
         iframe HP
     · iapply (consReadPay_trivAt (hlc := hlc) (GF := GF) _) $$ Hlic
   · iexact HP
-
-/-- READ at a console row (Rocq `secc_cons_rd_of_wild`, deviation 4) -/
-theorem seccConsRdOfWild (Ai : AppIface GF)
-    (hw : MachFixedGS.wild (hlc := hlc) (GF := GF) = Ai.wild)
-    (hc : MachFixedGS.consRes (hlc := hlc) (GF := GF) = Ai.cons) :
-    MachFixedGS.wild (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF) + 1) ⊢
-      MachFixedGS.rdwild (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF) + 1) -∗
-      □ (∀ (wb : Bool) (mj : Nat) (n : Int) (P : IProp GF),
-        filereadIn (hlc := hlc) (.open true wb (.device mj)) n (pfamTriv (fun _ _ _ _ => iprop(True)))
-          (fun _ _ => iprop(True)) (fun _ => iprop(True)) (fun _ => iprop(True)) (fun _ _ => iprop(True)) P) := by
-  iintro #Hw #Hrw
-  ihave #Hlic := consLicenceAt_of_wild Ai (genId (hlc := hlc) (GF := GF) + 1) hw hc $$ Hw
-  iapply seccConsRdOfLic $$ Hlic Hrw
 
 /-- WRITE at a console row: the output chain at the trivial cursor (Rocq
 `secc_cons_out_chain`) -/
@@ -550,19 +535,6 @@ theorem seccConsWrOfLic :
   unfold filewriteIn
   iapply seccConsOutChain _ M ua n.toNat 0 $$ Hlic
 
-/-- Rocq `secc_cons_wr_of_wild` (deviation 4) -/
-theorem seccConsWrOfWild (Ai : AppIface GF)
-    (hw : MachFixedGS.wild (hlc := hlc) (GF := GF) = Ai.wild)
-    (hc : MachFixedGS.consRes (hlc := hlc) (GF := GF) = Ai.cons) :
-    MachFixedGS.wild (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF) + 1) ⊢
-      □ (∀ (rb : Bool) (mj : Nat) (n : Int) (pmv : Nat → Option UPerm) (sz : Nat) (lz : Bool)
-          (M : Nat → List (BitVec 8)) (ua : BitVec 64),
-        filewriteIn (hlc := hlc) pmv sz lz (.open rb true (.device mj)) n M ua (fun _ => iprop(True))
-          (fun _ _ => iprop(True))) := by
-  iintro #Hw
-  ihave #Hlic := consLicenceAt_of_wild Ai (genId (hlc := hlc) (GF := GF) + 1) hw hc $$ Hw
-  iapply seccConsWrOfLic $$ Hlic
-
 /-- **Rocq `secc_cons_pay_of_wild`, at the licence** (UkSeccEntry deviation 1:
 the era's licence in place of the interface record's two slot equations) -/
 theorem seccConsPayOfLic :
@@ -577,34 +549,6 @@ theorem seccConsPayOfLic :
   isplit
   · iexact Hr
   · iexact Hwr
-
-/-- Rocq `secc_cons_pay_of_wild` (deviation 4) -/
-theorem seccConsPayOfWild (Ai : AppIface GF)
-    (hw : MachFixedGS.wild (hlc := hlc) (GF := GF) = Ai.wild)
-    (hc : MachFixedGS.consRes (hlc := hlc) (GF := GF) = Ai.cons) :
-    MachFixedGS.wild (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF) + 1) ⊢
-      MachFixedGS.rdwild (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF) + 1) -∗
-      seccConsPay (hlc := hlc) (GF := GF) := by
-  iintro #Hw #Hrw
-  ihave #Hlic := consLicenceAt_of_wild Ai (genId (hlc := hlc) (GF := GF) + 1) hw hc $$ Hw
-  iapply seccConsPayOfLic $$ Hlic Hrw
-
-/-! ## 9.  THE MINTER -/
-
-/-- The universe's slot at every key in the universe, out of the era
-credential and the generic user-execution WP (Rocq `useccomp_mint`,
-deviation 4). -/
-theorem useccompMint (Ai : AppIface GF)
-    (hw : MachFixedGS.wild (hlc := hlc) (GF := GF) = Ai.wild)
-    (hc : MachFixedGS.consRes (hlc := hlc) (GF := GF) = Ai.cons) :
-    MachFixedGS.wild (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF) + 1) ⊢
-      MachFixedGS.rdwild (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF) + 1) -∗
-      □ uexecWp (hlc := hlc) (GF := GF) -∗
-      □ (∀ W : Uvis, □ seccKey (hlc := hlc) W -∗ myPay W.gen (fun _ => iprop(True)) -∗
-        uslot (hlc := hlc) W) := by
-  iintro #Hw #Hrw #Hwp
-  ihave #Hc := seccConsPayOfWild Ai hw hc $$ Hw Hrw
-  iapply useccompMintOfCons $$ Hc Hwp
 
 end UexecSeccMint
 

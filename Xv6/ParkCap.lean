@@ -78,8 +78,8 @@ Both occurrences of the token inside its own definition are under `▷`
    `own_context ξp ==∗ own_context ξp ∗ proc_ctx γs pa` at the Lean record.
 5. The channel quantifies no parker context (UsertrapRes deviation 8: the
    parker's rows are ghost).
-6. The cap's `K_usertrap ≤ av` premise is Lean's `usertrapSlots_le_page`
-   (the parked stack is the whole page).
+6. The cap's `K_usertrap ≤ av` premise holds because the parked stack is
+   the whole page (`forkretStack`).
 
 Imports only definitional files.
 -/

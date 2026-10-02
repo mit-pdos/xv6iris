@@ -73,7 +73,7 @@ at `+0x90 .. +0x96` (`addi a0,a0,-16; snez a0,a0; negw a0,a0`), i.e.
    `SIE`, and is what the interface proves.  Depth 0 implies no spinlock
    held (`KCtx.wf`), Lean's reading of Rocq's `locks_below lks "log"`.  The
    crossing is the literal `true` (as Rocq).  The `sie = false` body is kept
-   as a DERIVED instance (`DIRLINK.wp_dirlink_gen`).
+   (`wp_dirlink_gen_body`).
 2. THE AMBIENT NAMES are the `Fscfg`/`Icfg` fields; the kalloc environment
    (`kalloc_env fsc_kalloc None`) is `isLock γkl kmemLockAddr "kmem"
    (kmemRes γk) ∗ kallocAvail γk none` with `γkl`/`γk` parameters (as
@@ -458,46 +458,5 @@ structure DIRLINK : Prop where
       data dn dn0 fn inum ncount Sb tid qtx pidv dqp dqd dqf dqn dqs dqbs dqb kd sd rootv rti dqr
       hj hproc hK hnoff htier htype hcovs hszb hinums hdisj horph hstab hnl hgeom hwf hholes
       hda hsz31 hdcov hdlog hdnib hinib hbg hbel hiregb hneed hpd ha0 ha2 hkd hkdn
-
-/-- The interrupts-off instance of `wp_dirlink_gen_eb` (the complement is the
-whole bundle). -/
-theorem DIRLINK.wp_dirlink_gen (A : DIRLINK) {hlc : HasLC} {GF : BundledGFunctors}
-    [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
-    [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
-    [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-    [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
-    (γkl : GName) (γk : KmemNames)
-    (ip : BitVec 64) (dinum : BitVec 32) (bm : Blkmap) (data : Nat → List (BitVec 8))
-    (dn dn0 : Dinode) (fn : Nat → BitVec 8) (inum : BitVec 16)
-    (ncount : Nat) (Sb : List Nat) (tid : Nat) (qtx : Qp)
-    (pidv : BitVec 32) (dqp dqd dqf dqn dqs dqbs dqb : DFrac)
-    (kd : Nat) (sd : Qp) (rootv : BitVec 64) (rti : Nat) (dqr : DFrac)
-    hj hproc hK hsie hnoff hlocks htier htype hcovs hszb hinums hdisj horph hstab hnl hgeom
-    hwf hholes hda hsz31 hdcov hdlog hdnib hinib hbg hbel hiregb hneed hpd ha0 ha2 hkd hkdn :
-    wp_dirlink_gen_body (hlc := hlc) (GF := GF) Γ cpu k γl pd pav pu j γkl γk ip dinum bm
-      data dn dn0 fn inum ncount Sb tid qtx pidv dqp dqd dqf dqn dqs dqbs dqb kd sd rootv rti dqr
-      hj hproc hK hsie hnoff hlocks htier htype hcovs hszb hinums hdisj horph hstab hnl hgeom
-      hwf hholes hda hsz31 hdcov hdlog hdnib hinib hbg hbel hiregb hneed hpd ha0 ha2 hkd hkdn := by
-  have h := A.wp_dirlink_gen_eb (hlc := hlc) (GF := GF) Γ cpu k γl pd pav pu j γkl γk ip dinum
-    bm data dn dn0 fn inum ncount Sb tid qtx pidv dqp dqd dqf dqn dqs dqbs dqb kd sd rootv rti dqr
-    hj hproc hK hnoff htier htype hcovs hszb hinums hdisj horph hstab hnl hgeom hwf hholes
-    hda hsz31 hdcov hdlog hdnib hinib hbg hbel hiregb hneed hpd ha0 ha2 hkd hkdn
-  unfold wp_dirlink_gen_eb_body at h
-  unfold wp_dirlink_gen_body
-  rw [hsie] at h
-  simp only [trapCsrsExt_false, cpuClaimExt_false] at h
-  iintro ⟨H0, H1, H2, Htc, Hcl, Hir, H6, H7, H8, H9, H10, H11, H12, H13, H14, H15, H16, H17,
-    H18, H19, H20, H21, H22, H23, H24, H25, Hsh, Hru, Hrt, Hrh, H26, H27, H28, H29, H30, H31, H32,
-    H33, Hnext⟩
-  iapply h
-  iframe H0 H1 H2 Htc Hcl Hir H6 H7 H8 H9 H10 H11 H12 H13 H14 H15 H16 H17 H18 H19 H20 H21
-    H22 H23 H24 H25 Hsh Hru Hrt Hrh H26 H27 H28 H29 H30 H31 H32 H33
-  iapply wpNext_mono $$ Hnext
-  iintro %cpu' HK %spie %spp %R' %found %bm' %data' %dn' %dn0' %n' %Sb' %tot %p0 %p1 H2 H3
-    ⟨Htc, Hir⟩ Hcl H7 H8 H9 H10 H11 H12 H13 H14 H15 H16 H17 Hsh Hru Hrt Hrh H18 H19 H20 H21 H22
-  iapply HK $$ %spie %spp %R' %found %bm' %data' %dn' %dn0' %n' %Sb' %tot %p0 %p1 H2 H3 Htc Hcl
-    Hir H7 H8 H9 H10 H11 H12 H13 H14 H15 H16 H17 Hsh Hru Hrt Hrh H18 H19 H20 H21 H22
 
 end Xv6

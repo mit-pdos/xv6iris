@@ -93,8 +93,8 @@ untouched); the `n < 0` test (+0x1c); the three-way dispatch; FD_PIPE
      `sysc_fwrite_names`): `ConsoleInvDefs.devswWriteVal` at
      `DFrac.discard`, the cells of the persistent `devswTable`.  So
      `filewriteDevEnv γl γu mj` is the cell at `aDevswWrite mj` (`KA.«devsw»
-     + 16 mj + 8`) holding `devswWriteVal mj` (null or consolewrite:
-     `devswWriteVal_cases`, Rocq's disjunct) beside `uartPort .uart0 γl γu`
+     + 16 mj + 8`) holding `devswWriteVal mj` (null or consolewrite,
+     Rocq's disjunct) beside `uartPort .uart0 γl γu`
      (Rocq `filewrite_dev_caps`: `dev_inv` ∗ `is_txlock` ∗
      `uart_base_word Uart0`), and Rocq's DEVSW PIN premise (`Hconw`) is the
      theorem `devswWriteVal_console`.  Consequence: at a non-console major
@@ -155,9 +155,8 @@ untouched); the `n < 0` test (+0x1c); the three-way dispatch; FD_PIPE
 10. Names: `filewrite_ret` → `filewriteRet`, `write_post_ok_at` →
    `writePostOkAt`, `write_post_fail_at` → `writePostFailAt`,
    `write_arms_at` → `writeArmsAt`, `filewrite_in/_extra/_arms` →
-   `filewriteIn/Extra/Arms`, `fw_chunk_joint` → `fwrChunkJoint`,
-   `fw_off_advance` → `fwrOffAdvance` (the `fw_` prefix is taken:
-   FsWords / freewalk).
+   `filewriteIn/Extra/Arms`; `fw_chunk_joint` and `fw_off_advance` are not
+   ported (nothing uses them).
 11. (retired: the FD_PIPE arms are Rocq's -- `filewriteIn`'s is `pipe_wpay`,
     `filewriteExtra`'s is `pipe_wpost` at the key's generation.)  Formerly:
     the FD_PIPE arm of `filewriteExtra` was `⌜pipeWpostR P ua n.toNat r⌝`
@@ -215,20 +214,6 @@ theorem filewriteRet_m1 (n : Int) : filewriteRet n (-1#64) := Or.inl rfl
 /-- Rocq `filewrite_ret_all`. -/
 theorem filewriteRet_all (n : Int) (hn : 0 ≤ n) : filewriteRet n (BitVec.ofInt 64 n) :=
   Or.inr ⟨n, rfl, hn, by omega⟩
-
-/-- THE CHUNKING'S ARITHMETIC (Rocq `fw_chunk_joint`): writei's joint
-premise is a CLOSED FACT here. -/
-theorem fwrChunkJoint (off n1 : Nat) (hoff : off ≤ MAXFILE * BSIZE) (hn1 : (n1 : Int) ≤ FW_MAX) :
-    off + n1 < 2 ^ 31 := by
-  unfold FW_MAX at hn1
-  have : MAXFILE * BSIZE = 274432 := rfl
-  omega
-
-/-- ...and the offset's own induction step (Rocq `fw_off_advance`): writei
-refuses rather than writes past the capacity. -/
-theorem fwrOffAdvance (off tot n1 : Nat) (hle : ¬ MAXFILE * BSIZE < off + n1) (htot : tot ≤ n1) :
-    off + tot ≤ MAXFILE * BSIZE := by
-  omega
 
 /-! ## The environment, keyed on the descriptor's state -/
 

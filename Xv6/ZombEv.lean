@@ -20,17 +20,16 @@ LEFT FOLDS, and the snoc equations are `List.foldl_append` one-liners:
   `statusOf h`  -- the readable status per zombie pid: exits record the
                    status, reaps forget it.
 
-`statusOf_dom` ties the two: the map's domain IS the zombie set.  No fork
-event (ruling R3: the pid ledger's `PAlloc parent pid` is the fork).  No
-Iris, no ghost state, no gname.
+No fork event (ruling R3: the pid ledger's `PAlloc parent pid` is the
+fork).  No Iris, no ghost state, no gname.
 
 Design: `claude-notes/design/ni-zombie-ledger.md` (§2 D1, §3 W1).
 
 ## Deviations from Rocq
 
-1. Names: `zev`/`zev_actor`/`zev_pid`/`zombies_of`/`status_of` are
-   `Zev`/`Zev.actor`/`Zev.pid`/`zombiesOf`/`statusOf`; the constructors keep
-   Rocq's spelling (`Zev.ZExit`, `Zev.ZReap`).  `mword 64` / `mword 32` are
+1. Names: `zev`/`zev_pid`/`zombies_of`/`status_of` are
+   `Zev`/`Zev.pid`/`zombiesOf`/`statusOf` (`zev_actor` is not ported:
+   nothing uses it); the constructors keep Rocq's spelling (`Zev.ZExit`, `Zev.ZReap`).  `mword 64` / `mword 32` are
    `BitVec 64` / `BitVec 32`; the status `Z` is `Int`; `bv_unsigned p` is
    `(p.toNat : Int)` (as `PidEv`).
 2. **The zombie set is a PREDICATE on `Int`** (`Int → Prop`; Rocq: `gset Z`),
@@ -38,9 +37,7 @@ Design: `claude-notes/design/ni-zombie-ledger.md` (§2 D1, §3 W1).
    k`, `S ∖ {[x]}` is `fun k => S k ∧ k ≠ x`, `∅` is `fun _ => False`.
 3. **The status map is a FUNCTION `Int → Option Int`** (Rocq: `gmap Z Z`):
    `<[x := v]> m` is `fun k => if k = x then some v else m k`, `delete x m`
-   is `fun k => if k = x then none else m k`, `∅` is `fun _ => none`; its
-   domain is `statusDom m := fun k => (m k).isSome` (Rocq `dom`), and
-   `statusOf_dom` is an equality of predicates (`funext`/`propext`).
+   is `fun k => if k = x then none else m k`, `∅` is `fun _ => none`.
 4. No `Countable` / `EqDecision` instance: iris-lean's `MonoList` camera is
    over `DiscreteO Zev` and asks nothing of the element type (as `PidEv`
    deviation 4).  `DecidableEq` is derived.
@@ -58,10 +55,6 @@ inductive Zev where
   /-- kwait's reap, run by `act` (the parent), of the zombie with `pid` -/
   | ZReap (act : BitVec 64) (pid : BitVec 32)
   deriving DecidableEq, Repr
-
-/-- The label: the actor that ran the transition (Rocq `zev_actor`). -/
-def Zev.actor : Zev → BitVec 64
-  | .ZExit a _ _ | .ZReap a _ => a
 
 /-- The pid the event carries (Rocq `zev_pid`). -/
 def Zev.pid : Zev → BitVec 32
@@ -86,43 +79,10 @@ def statusStep (m : Int → Option Int) : Zev → Int → Option Int
 deviation 3). -/
 def statusOf (h : List Zev) : Int → Option Int := h.foldl statusStep (fun _ => none)
 
-/-- The domain of a status map (Rocq `dom`, deviation 3). -/
-def statusDom (m : Int → Option Int) : Int → Prop := fun k => (m k).isSome
-
 /-! ## 3. The snoc equations -/
 
 theorem zombiesOf_nil : zombiesOf [] = fun _ => False := rfl
 
 theorem statusOf_nil : statusOf [] = fun _ => none := rfl
-
-/-! ## 4. The status map's domain is the zombie set -/
-
-/-- The two folds keep the tie from any start that has it (the forward
-induction Rocq's `rev_ind` proof is, read left to right). -/
-theorem foldl_status_zomb_dom (h : List Zev) (m : Int → Option Int) (S : Int → Prop)
-    (hm : statusDom m = S) :
-    statusDom (h.foldl statusStep m) = h.foldl zombStep S := by
-  induction h generalizing m S with
-  | nil => exact hm
-  | cons e h ih =>
-    simp only [List.foldl_cons]
-    apply ih
-    funext k
-    have hk' := congrFun hm k
-    unfold statusDom at hk' ⊢
-    cases e with
-    | ZExit a p xs =>
-      simp only [statusStep, zombStep]
-      by_cases hk : k = (p.toNat : Int)
-      · simp [hk]
-      · simp [hk, hk']
-    | ZReap a p =>
-      simp only [statusStep, zombStep]
-      by_cases hk : k = (p.toNat : Int)
-      · simp [hk]
-      · simp [hk, hk']
-
-theorem statusOf_dom (h : List Zev) : statusDom (statusOf h) = zombiesOf h :=
-  foldl_status_zomb_dom h _ _ (by funext k; simp [statusDom])
 
 end Xv6

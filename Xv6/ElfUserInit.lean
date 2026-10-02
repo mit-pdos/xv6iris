@@ -35,27 +35,15 @@ theorem elf_length : elf.length = elfSize := rowsBytes_length elfRows elfSize el
 theorem elf_wf : elfWf elf = true := by
   rw [elfWf_eqR, elf_read, elf_length]; decide +kernel
 
-/-- Rocq `init_elf_sections_wf`. -/
-theorem elf_sections_wf : elfSectionsWf elf = true := by
-  rw [elfSectionsWf_eqR, elf_read, elf_length]; decide +kernel
-
 /-! Geometry: the ELF's own numbers are the dump's constants. -/
 
 /-- Rocq `init_elf_entry` (`start`, not the lowest text address). -/
 theorem elf_entry : elfEntry elf = some entry := by
   rw [elfEntry_eqR, elf_read]; decide +kernel
 
-/-- Rocq `init_elf_segments`: two entries, the other two program headers filtered out. -/
-theorem elf_segments : elfSegments elf = some segments := by
-  rw [elfSegments_eqR, elf_read]; decide +kernel
-
 /-- Rocq `init_elf_end`. -/
 theorem elf_end : elfMemEnd elf = some memEnd := by
   rw [elfMemEnd_eqR, elf_read]; decide +kernel
-
-/-- Rocq `init_elf_rodata_end` (read off the SECTION table). -/
-theorem elf_rodata_end : elfRodataEnd elf = some rodataEnd := by
-  rw [elfRodataEnd_eqR, elf_read]; decide +kernel
 
 /-- The PT_LOAD headers. -/
 theorem elf_loads : elfLoads elf = elfLoadsLit := by

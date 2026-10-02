@@ -12,10 +12,10 @@ they are carved here out of the owned half's `.bss` and free RAM:
   BioInit's `bdBss` premise (wave-8 deviation 17; the other half,
   `0 ∉ V.cov`, is `Xv6.fsCovIn_0` in FsCfgBoot);
 * `bootCarve_lockWords`: any static spinlock's input words;
-* `bootCarve_kmem` / `bootCarve_kinitRun` (Rocq `boot_kinit_run` /
-  `boot_pg_run_own`): `kinit`'s `kmem` cells and its `pageRange kinitBase
-  kinitPages` (the whole `[PGROUNDUP(end), PHYSTOP)` run, by the stride
-  family: no enumeration of its 32732 pages).
+* `bootCarve_kinitRun` (Rocq `boot_pg_run_own`): `kinit`'s `pageRange
+  kinitBase kinitPages` (the whole `[PGROUNDUP(end), PHYSTOP)` run, by the
+  stride family: no enumeration of its 32732 pages).  Rocq's
+  `boot_kinit_run` (`kinit`'s `kmem` cells) is not ported (nothing uses it).
 
 BLOCKED (not stated here): everything keyed on `SpecMain` (W8-I, not
 started) -- Rocq's `boot_main_locks_raw`, `boot_cons_res`, `boot_disk_slots`,
@@ -258,23 +258,6 @@ theorem bootCarve_kinitRun [CurCtx] :
   unfold pageOwn byteBuf
   simp only [← wordAtN_cur]
   iexact Hb
-
-/-- **kinit's `kmem` cells** (Rocq `main_globals_raw`'s kmem row): the lock's
-words and the empty freelist, at their `.bss` zeros. -/
-theorem bootCarve_kmem [CurCtx] :
-    kmapStatic (GF := GF) ⊢
-      bootRan (imgFlat bootImage) MachCSL.KernelSyms.«kmem» (MachCSL.KernelSyms.«kmem» + 0x20) -∗
-      lockWords kmemLockAddr 0#32 0#64 0#64 ∗ wordPointsTo kmemFreelistAddr 8 (DFrac.own 1) 0#64 := by
-  have hK : MachCSL.KernelSyms.«kmem» = 0x800124e0 := rfl
-  have hlk : kmemLockAddr.toNat = 0x800124e0 := rfl
-  have hfl : kmemFreelistAddr.toNat = 0x800124e0 + 0x18 := rfl
-  rw [hK]
-  iintro #Hk H
-  icases (bootRan_split (GF := GF) (imgFlat bootImage) 0x800124e0 (0x800124e0 + 24) (0x800124e0 + 0x20)
-    (by omega) (by omega)).1 $$ H with ⟨Hl, Hf⟩
-  ihave Hl := bootCarve_lockWords (GF := GF) kmemLockAddr _ hlk (by omega) (by omega) (by omega) $$ Hk Hl
-  ihave Hf := bootBss_wordAt (GF := GF) _ 8 _ _ hfl (by omega) (by omega) (by omega) (by omega) $$ Hk Hf
-  iframe Hl Hf
 
 end
 end Xv6

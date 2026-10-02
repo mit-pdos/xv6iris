@@ -12,7 +12,7 @@ the round lends, as the record's `envRes` in its components
 
 CONE (this file): `fif_exit_dev0_g`, `fif_exit_k_cons_g`,
 `fif_exit_k_redir_g`, `fif_env_res_g` (component form; the record form is
-`UkFileIfaceRec.fif_env_res_g_rec`), `fif_dp0`, `fif_cat_env_pure`.
+`UkFileIfaceRec.fif_env_res_g_rec`), `fif_cat_env_pure`.
 
 ## Deviations from Rocq
 
@@ -232,14 +232,6 @@ theorem fif_env_res_g (E : Penv) (l : List FdState) (hD0 : X.D0 = [0])
     · ipureintro; exact hfiles
   iapply (BigSepS.bigSepS_singleton (Φ := fun d => X.fifDev d (E.dev d))).2
   iapply Hdev $$ Htk2
-
-/-- **Rocq `fif_dp0`**. -/
-theorem fif_dp0 (hD0 : X.D0 = [0]) : dpIn X.D0 ({0} : ExtTreeSet Nat compare) := by
-  intro d hd
-  rw [hD0] at hd
-  simp at hd
-  subst hd
-  exact mem_singleton.2 rfl
 
 /-- **Rocq `fif_cat_env_pure`**: the two-descriptor console environment's
 pure side, once. -/

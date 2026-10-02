@@ -30,8 +30,7 @@ the state at +0x36 (`sysOpenAt36`), whose proof per side is in
 2. **PROCESS LAYER (flagged).**  argint is lent the trapframe quarter and
    page (`ProcPrivAcc.procPrivFd_tf`, Rocq `proc_priv_tf`); argstr takes the
    bare block by `procPrivFd`'s own definition and hands it back at the
-   grown page table (`SysfileCalls.sysfile_blk_bare`;
-   Rocq's `proc_priv` is threaded whole there); begin_op is lent the pid
+   grown page table (Rocq's `proc_priv` is threaded whole there); begin_op is lent the pid
    cell at the block's share `pidPriv` (`SysOpenParts.sysOpen_pid_fd`; Rocq
    `proc_priv_bare_acc`'s `1/4`).  Rocq's `proc_priv_tfp_valid` premise of
    argint is not needed (the Lean argint reads through `tfPageAt`).

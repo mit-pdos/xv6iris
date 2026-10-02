@@ -8,8 +8,9 @@ supplier and its ecall leaves' deposit premises (`UkRun.udep`,
 
 Rocq's header, point for point:
 
-* `udep_gen`: THE GENERIC SLOT'S SUPPLIER IS THE SUPPLY (`uprogSGGen`), and
-  the key-free minting law is the instance's `sbundleOfSupplyNe`.
+* `udep_gen`: THE GENERIC SLOT'S SUPPLIER IS THE SUPPLY, and the key-free
+  minting law is the instance's `sbundleOfSupplyNe`.  Not ported (nothing
+  uses it).
 * `udep_free`: THE VERIFIED PROGRAM'S SUPPLIER IS NOTHING (`uprogSGFree`):
   every number `freeNum` admits is minted from nothing
   (`xv6Sbundle_free`).  Since the byte queue's close payments (Rocq lane
@@ -18,11 +19,12 @@ Rocq's header, point for point:
 * `udepw_of_sup` (open 15 / mknod 17), `_read` (5), `_write` (16): a flagged
   deposit paid out of the application's supply (`appSup`, the console
   licence), for a program that walks the generic stub on a tainted arm.
-* `udepw_of_sup_close` (21) and `udepw_of_sup_exit` (2): THE CLOSE PAYMENTS
-  OUT OF THE TAINT, at every key (Rocq design/pipe.md "The byte queue",
-  "The exit path"): a program that cannot state its table's types pays its
-  close/exit deposits, like write's, out of the application's credential
-  (`SpecFileclose.filecloseCpay_taint` / `filecloseCpays_taint`).
+* `udepw_of_sup_close` (21): THE CLOSE PAYMENT OUT OF THE TAINT, at every
+  key (Rocq design/pipe.md "The byte queue"): a program that cannot state
+  its table's types pays its close deposit, like write's, out of the
+  application's credential (`SpecFileclose.filecloseCpay_taint` /
+  `filecloseCpays_taint`).  Its exit twin `udepw_of_sup_exit` (2) is not
+  ported (nothing uses it).
 
 ## Deviations from Rocq
 
@@ -30,8 +32,8 @@ Rocq's header, point for point:
    `app_sup ∗ app_taint` (with the console licence read off the taint) is
    Lean's `appSup`, `uKillCred`, `consLicence`, so `_read` / `_write` take
    the licence explicitly.
-2. (Retired, U1-R: `udep` carries Rocq's four laws and `udep_gen` /
-   `udep_free` prove them -- close's off `xv6Sbundle_close_nonpipe`, exit's
+2. (Retired, U1-R: `udep` carries Rocq's four laws and `udep_free`
+   proves them -- close's off `xv6Sbundle_close_nonpipe`, exit's
    off `xv6Sbundle_exit_regs` / `_taint`.)  NOT PORTED (unreached):
    `udepw_row_of_reg_close`, `udepw_cl_of_reg_close`.
 3. A separate file (Rocq keeps these in `UexecExecMint.v`), so the generic
@@ -110,26 +112,6 @@ theorem udepw_of_row (PSx : UprogSG GF) (N : UkNames GF) (m : RegMap) (pc : BitV
 
 /-! ## The suppliers -/
 
-/-- A law that does not read its second premise. -/
-theorem udepLaw_drop {P R Q : IProp GF} (h : ⊢ P ==∗ Q) : ⊢ P -∗ R -∗ |==> Q := by
-  iintro HP -
-  iapply h $$ HP
-
-/-- **Rocq `udep_gen`**: the generic slot's supplier is the supply. -/
-theorem udep_gen :
-    ⊢ □ xv6Ssupply (hlc := hlc) (GF := GF) -∗
-      udep (hlc := hlc) (SG := uexecSGXv6) (PS := uprogSGGen (hlc := hlc)) := by
-  iintro #Hs
-  unfold udep
-  isplitr
-  · iexact Hs
-  ipureintro
-  refine ⟨fun n W Q _ hne => xv6SbundleOfSupplyNe (hlc := hlc) uslot n W Q hne,
-    fun W Q _ => xv6SbundleOfSupplyNe (hlc := hlc) uslot 21 W Q (by unfold USYS_exec; decide),
-    fun W Q => ?_, fun W Q => ?_⟩
-  · exact udepLaw_drop (xv6SbundleOfSupplyNe (hlc := hlc) uslot USYS_exit W Q (by unfold USYS_exit USYS_exec; decide))
-  · exact udepLaw_drop (xv6SbundleOfSupplyNe (hlc := hlc) uslot USYS_exit W Q (by unfold USYS_exit USYS_exec; decide))
-
 /-- **Rocq `udep_free`**: the verified program's supplier is nothing. -/
 theorem udep_free : ⊢ udep (hlc := hlc) (GF := GF) (SG := uexecSGXv6) (PS := uprogSGFree) := by
   unfold udep
@@ -161,12 +143,6 @@ theorem udep_free : ⊢ udep (hlc := hlc) (GF := GF) (SG := uexecSGXv6) (PS := u
     isplitr
     · ipureintro; rfl
     iapply xv6Sbundle_exit_taint (hlc := hlc) uslot (xfamAt Q xfamPt) W $$ Ht
-
-/-- **Rocq `udepw_free`**: the generic-route leaf's premise at the free
-instance. -/
-theorem udepw_free (N : UkNames GF) (m : RegMap) (pc : BitVec 64) (n : Int) (hn : freeNum n) :
-    ⊢ udepw (hlc := hlc) (GF := GF) (SG := uexecSGXv6) (PS := uprogSGFree) N m pc n :=
-  udepw_of_psok (PS := uprogSGFree) N m pc n hn hn.1
 
 /-- **Rocq `udepw_of_sup`**: open's and mknod's deposit out of the supply. -/
 theorem udepw_of_sup (PSx : UprogSG GF) (N : UkNames GF) (m : RegMap) (pc : BitVec 64) (n : Int)
@@ -255,14 +231,6 @@ theorem udepwLaw_of_sup_close (PSx : UprogSG GF) :
   imodintro
   iintro %N %m %pc
   iapply udepw_of_sup_close PSx N m pc $$ H
-
-/-- **Rocq `udepw_of_sup_exit`**: exit's deposit -- the close payment of
-every row of the key's table -- at every key, out of the taint
-(design/pipe.md, "The exit path"). -/
-theorem udepw_of_sup_exit (PSx : UprogSG GF) (N : UkNames GF) (m : RegMap) (pc : BitVec 64) :
-    □ uKillCred (hlc := hlc) (GF := GF) ⊢
-      udepw (hlc := hlc) (SG := uexecSGXv6) (PS := PSx) N m pc USYS_exit :=
-  udepw_of_row PSx N m pc USYS_exit _ (fun W => xv6Sbundle_exit_taint _ _ W)
 
 end UexecExecMintW
 

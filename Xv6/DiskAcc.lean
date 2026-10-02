@@ -6,7 +6,7 @@ the driver makes, each of the form
     <credentials>  ⊢  readAU / writeAU ...              (queue memory)
 
 so that a driver proof discharges an instruction rule
-(`MachCSL.wp_s_lw_dev`, `wp_s_sw_dev`, `wp_s_lhu_au`, `wp_s_sh_au`, ...)
+(`MachCSL.wp_s_lw_dev`, `wp_s_sw_dev`, `wp_s_sh_au`, ...)
 by handing it the accessor as the rule's `Ψ`-argument -- exactly the way
 `Xv6/UartInv.lean`'s `lsr_read_au` / `thr_write_au` serve the console.
 
@@ -24,8 +24,7 @@ cell, `avail->idx`) is split in halves: the invariant's half is a
 `dmaHalfAt`, the driver's half a `ctxBytes ... (own ½)`.  So
 
 * a driver READ of a shared cell needs only the driver's half, and goes
-  through the ordinary points-to rules -- no accessor (see
-  `diskRes_availIdx_acc`);
+  through the ordinary points-to rules -- no accessor;
 * a driver WRITE of a shared cell needs BOTH halves, so it opens the
   invariant: `writeAU`, with `MachCSL.rawHalf_ctxHalf_join` to fuse the
   two halves into the `own 1` raw window the accessor must hand out, and
@@ -913,108 +912,6 @@ theorem diskRes_close (γ : DiskNames) [CurCtx] (pd pav pu : PAddr) (ξ : CtxId)
   iexists np, nr, stg, ring
   iexact H
 
-/-- **`disk.avail->idx`, read out of the payload** (the `lhu` of
-`virtio_disk_rw`): the driver's own half of the cell pins the value to
-`wrap16 np`, so this read needs NO accessor -- the ordinary load rule at
-the fraction `½` does it.  This lemma is the borrow. -/
-theorem diskRes_availIdx_acc (γ : DiskNames) [CurCtx] (pd pav pu : PAddr) (ξ : CtxId) :
-    diskRes (GF := GF) γ pd pav pu ξ ⊢ ∃ np : Nat,
-      diskPub γ np ∗ ctxBytes ξ (availIdxAt pav) 2 (DFrac.own (1 : Qp).half) (wrap16 np) ∗
-      (∀ np' : Nat, diskPub γ np' -∗
-        ctxBytes ξ (availIdxAt pav) 2 (DFrac.own (1 : Qp).half) (wrap16 np') -∗
-        diskRes γ pd pav pu ξ) := by
-  iintro HR
-  icases diskRes_open γ pd pav pu ξ $$ HR with ⟨%np, %nr, %stg, %ring, Hp, Hr, Hrl, Hs, Hlb, Hwmp, Hu, Hidx, Hring, Hsl⟩
-  iexists np
-  iframe Hp Hidx
-  iintro %np' Hp' Hidx'
-  iapply diskRes_close γ pd pav pu ξ np' nr stg ring
-  iframe Hp' Hr Hrl Hs Hlb Hwmp Hu Hidx' Hring Hsl
-
-/-- One ring cell of the payload, borrowed and put back at a new value
-(the `sh` of `virtio_disk_rw` writes through it; the invariant's half goes
-through `disk_ring_write`). -/
-theorem diskRes_ring_acc (γ : DiskNames) [CurCtx] (pd pav pu : PAddr) (ξ : CtxId)
-    (j : Nat) (hj : j < NUM) :
-    diskRes (GF := GF) γ pd pav pu ξ ⊢ ∃ (np : Nat) (x : Nat),
-      diskPub γ np ∗ ctxBytes ξ (availRingAt pav j) 2 (DFrac.own (1 : Qp).half) (BitVec.ofNat 16 x) ∗
-      (∀ y : Nat, diskPub γ np -∗
-        ctxBytes ξ (availRingAt pav j) 2 (DFrac.own (1 : Qp).half) (BitVec.ofNat 16 y) -∗
-        diskRes γ pd pav pu ξ) := by
-  iintro HR
-  icases diskRes_open γ pd pav pu ξ $$ HR with ⟨%np, %nr, %stg, %ring, Hp, Hr, Hrl, Hs, Hlb, Hwmp, Hu, Hidx, Hring, Hsl⟩
-  icases bigSepL_upd_acc (GF := GF) (List.range NUM) j j (by rw [List.getElem?_range hj])
-      (fun k => ctxBytes ξ (availRingAt pav k) 2 (DFrac.own (1 : Qp).half) (BitVec.ofNat 16 (ring k)))
-      (fun (y : Nat) k =>
-        ctxBytes ξ (availRingAt pav k) 2 (DFrac.own (1 : Qp).half)
-          (BitVec.ofNat 16 (updN ring j y k)))
-      (fun y k jj hjj hne => by
-        have : jj ≠ j := by
-          by_cases hk : k < NUM
-          · rw [List.getElem?_range hk] at hjj; cases hjj; exact hne
-          · rw [List.getElem?_eq_none (by simp; omega)] at hjj; cases hjj
-        rw [updN_ne ring j y jj this]) $$ Hring with ⟨Hc, Hback⟩
-  iexists np, (ring j)
-  iframe Hp Hc
-  iintro %y Hp' Hc'
-  ihave Hc' := (show ctxBytes (GF := GF) ξ (availRingAt pav j) 2 (DFrac.own (1 : Qp).half)
-      (BitVec.ofNat 16 y) ⊢
-      ctxBytes ξ (availRingAt pav j) 2 (DFrac.own (1 : Qp).half)
-        (BitVec.ofNat 16 (updN ring j y j)) from by rw [updN_self]) $$ Hc'
-  ihave Hring := Hback $$ %y Hc'
-  iapply diskRes_close γ pd pav pu ξ np nr stg (updN ring j y)
-  iframe Hp' Hr Hrl Hs Hlb Hwmp Hu Hidx Hring Hsl
-
-/-- One descriptor slot of the payload, borrowed and put back (the `free[]`
-byte, the receipt and the chain's context cells). -/
-theorem diskRes_slot_acc (γ : DiskNames) [CurCtx] (pd pav pu : PAddr) (ξ : CtxId)
-    (i : Nat) (hi : i < NUM) :
-    diskRes (GF := GF) γ pd pav pu ξ ⊢
-      slotRes γ ξ pd i ∗ (slotRes γ ξ pd i -∗ diskRes γ pd pav pu ξ) := by
-  iintro HR
-  icases diskRes_open γ pd pav pu ξ $$ HR with ⟨%np, %nr, %stg, %ring, Hp, Hr, Hrl, Hs, Hlb, Hwmp, Hu, Hidx, Hring, Hsl⟩
-  icases BigSepL.bigSepL_mem_acc (Φ := fun i => slotRes (GF := GF) γ ξ pd i)
-      (range_mem i NUM hi) $$ Hsl with ⟨Hi, Hback⟩
-  iframe Hi
-  iintro Hi'
-  ihave Hsl := Hback $$ Hi'
-  iapply diskRes_close γ pd pav pu ξ np nr stg ring
-  iframe Hp Hr Hrl Hs Hlb Hwmp Hu Hidx Hring Hsl
-
-/-- **The slot of a head the caller has a QUARTER of.**  What the woken
-publisher of a chain does when it re-acquires `vdisk_lock`: its own
-quarter of `γ.head c.hd`, kept across the park inside `sleep`, AGREES
-with the payload's quarter, so the slot it opens is still ITS chain --
-`.active c` at the very `c` it published -- and its cells come out as
-`Xv6.claimRes`.  The two quarters join into the whole driver half, which
-is what `Xv6.disk_collect` needs to flip the receipt `.inactive`.
-
-The wand puts a slot back at any state, taking whatever fraction of the
-receipt the payload keeps there (`Xv6.slotTok`): the whole half for the
-`.inactive` the collect leaves behind, a quarter for a slot still in
-flight. -/
-theorem diskRes_slot_of_quarter (γ : DiskNames) [CurCtx] (pd pav pu : PAddr) (c : Chain)
-    (hi : c.hd < NUM) :
-    diskRes (GF := GF) γ pd pav pu curCtx ∗ headTokQ γ c.hd (.active c) ⊢
-      headTok γ c.hd (.active c) ∗
-      wordAtN curCtx (aFree c.hd) 1 (DFrac.own 1) 0#8 ∗ claimRes γ curCtx pd c ∗
-      (∀ s : HState, slotTok γ c.hd s -∗ slotBody γ curCtx pd c.hd s -∗
-        diskRes γ pd pav pu curCtx) := by
-  iintro ⟨HR, Hq⟩
-  icases diskRes_slot_acc γ pd pav pu curCtx c.hd hi $$ HR with ⟨Hsl, Hback⟩
-  unfold slotRes
-  icases Hsl with ⟨%s, Ht, Hb⟩
-  icases slotTok_quarter_join γ c.hd s (.active c) $$ [Ht Hq] with ⟨%hq, Ht⟩
-  · iframe Ht Hq
-  subst hq
-  rw [slotBody_active]
-  icases Hb with ⟨Hf, Hcl⟩
-  iframe Ht Hf Hcl
-  iintro %s Ht Hb
-  iapply Hback
-  iexists s
-  iframe Ht Hb
-
 /-! ## The live flip
 
 `virtio_disk_init`'s last MMIO store -- `*R(STATUS) = ... | DRIVER_OK` --
@@ -1665,7 +1562,7 @@ beside `Xv6.unwritten`: an IN-FLIGHT head that has not made its
 used-index write has NO unread completion.  At the pop that is (P2); the
 used-index write is the only step that can break it, and it SETS the
 witness bit at the same moment, so the clause goes vacuous at that head
-instead of false.  `Xv6.unread_window` is the pigeonhole that follows:
+instead of false.  The pigeonhole that follows is the window bound
 `dl.length ≤ nr + NUM`.
 
 -------------------------------------------------------------------------
@@ -1675,7 +1572,7 @@ monotone, proved from `Xv6.dlTops_max` (the per-entry `topLb`s fused into
 one) through the lease's `Kb`.  And `Xv6.cntOk` carries the COUNTERS'
 strictness, `dl[k].cnt = k + 1`, so an index into the log IS its counter
 minus one and a reader with a lower bound on the count finds the entry it
-is looking for (`Xv6.cntOk_mem`).
+is looking for.
 
 HOW THE STRICTNESS IS GOT.  `Xv6.PermVal`'s latched used index is an
 `Option (BitVec 16 × Bool)`: the `Bool` is the WITNESS BIT, `false` from
@@ -1723,7 +1620,7 @@ the read, through `MachCSL/WpSmodeFenceFloor.lean`:
   `disk_used_idx_read` can hand out `diskWm γ m tvn` beside its answer:
   the log entry the answer came from sits at a position at or below `tvn`
   (the disk is not this hart, so nothing above `tvn` is visible to it);
-* `MachCSL.wp_s_fence_rw_rw_floor` then turns that `rviewLb cpu tvn` into
+* the `fence rw,rw` then turns that `rviewLb cpu tvn` into
   a floor `MachCSL.viewLb cpu tvn`, which is exactly what the loop body's
   `__sync_synchronize()` is there for.
 
@@ -1757,7 +1654,7 @@ descriptor's own words are the HEAD's `Xv6.claimRes`.
 Every pure clause of `diskLive` survives because a FREE head is named by
 nothing: no pending position (`Xv6.queueOk_arm'`), no serve permit (a
 permit records an ARMED chain, `Xv6.permOk_arm`), no in-flight request and
-no cached sector (`Xv6.inflightOk_arm`, `Xv6.cachedOk_arm`).  The
+no cached sector (`Xv6.inflightOk_arm`).  The
 SUB-RANGE tier arithmetic -- the 4/4/8 split of the header, the 512/512
 split of `b->data`, the `byteBuf`/`wordPointsTo` bridge to the raw tier --
 is `Xv6/DiskTier.lean` and `MachCSL/WpDmaCtx2.lean`. -/
@@ -2120,7 +2017,7 @@ answer came from is at a position at or below `F` -- the disk is not this
 hart, so an entry above `F` is invisible to it.  So `diskWm γ m F` comes
 out beside the answer, and the `__sync_synchronize()` of the loop body
 turns the `rviewLb cpu F` into the floor `MachCSL.viewLb cpu F` that the
-element and status reads need (`MachCSL.wp_s_fence_rw_rw_floor`). -/
+element and status reads need. -/
 theorem disk_used_idx_read [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) (cpu : CPU)
     (K nr : Nat) :
     diskInv (GF := GF) γ ∗ diskGeom γ pd pav pu ∗ diskReadAt γ nr ∗ diskWm γ nr K ⊢
@@ -2394,7 +2291,7 @@ The TSO credential for the next loop test does NOT come from here: since
 `MachCSL.readAUr`, `Xv6.disk_used_idx_read` hands out the next iteration's
 `Xv6.diskWm` at the READ itself, at the very view the load read at, and
 the `__sync_synchronize()` that follows turns that view receipt into a
-floor (`MachCSL.wp_s_fence_rw_rw_floor`).  See the section head below. -/
+floor.  See the section head below. -/
 theorem disk_deposit [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) (nr : Nat) :
     diskInv (GF := GF) γ ∗ diskGeom γ pd pav pu ∗ diskReadAt γ nr ⊢
       |={⊤}=> diskReadAt γ (nr + 1) := by

@@ -249,8 +249,7 @@ def fsDataStart (sb : FsSb) : Nat := sb.sbBmapstart + 1
 /-! ## 6.  W1 -- the superblock is mkfs's
 
 Every consumer's block geometry is read off these fields --
-`Xv6.IBLOCK` off `inodestart`, `Xv6.BBLOCK_single` off `bmapstart` and
-`size`, `Xv6.logRegion` off `logstart`.  The equations are mkfs.c's own
+`Xv6.IBLOCK` off `inodestart`, `Xv6.logRegion` off `logstart`.  The equations are mkfs.c's own
 (mkfs/mkfs.c, `main`):
 
     nlog = LOGBLOCKS + 1;  logstart = 2;  inodestart = 2 + nlog;
@@ -259,8 +258,7 @@ Every consumer's block geometry is read off these fields --
 
 `ninodes / 16 + 1` is mkfs's own inode-block count, NOT a ceiling: the two
 coincide except when 16 divides `ninodes`, where mkfs leaves one spare
-block.  `fsSbOk_inodes_fit` is the weaker fact consumers want (the region
-covers every inum).  `size ≤ 8 * BSIZE` is the single-bitmap-block
+block.  `size ≤ 8 * BSIZE` is the single-bitmap-block
 simplification the whole tree stands on (`FSSIZE = 2000 < BPB = 8192`, so
 `BBLOCK` collapses and balloc's outer loop runs once).
 `ROOTINO < ninodes` is what lets the tree conjunct speak at all -- the
@@ -314,15 +312,6 @@ theorem fsSbWf_ok (sb : FsSb) (h : fsSbWf sb = true) : FsSbOk sb := by
   exact { sboMagic := h1, sboLogstart := h2, sboNlog := h3, sboInodestart := h4,
           sboBmapstart := h5, sboSize := h6, sboNinodes := h7, sboNblocks := h8,
           sboOneBitmap := h9, sboUshort := h10 }
-
-/-- What a consumer actually wants out of W1: the inode region covers
-every inum and stops below the bitmap (Rocq's `fs_sb_ok_inodes_fit`). -/
-theorem fsSbOk_inodes_fit (sb : FsSb) (h : FsSbOk sb) :
-    sb.sbInodestart + (sb.sbNinodes + 15) / 16 ≤ sb.sbBmapstart := by
-  have hb := h.sboBmapstart
-  have hn := h.sboNinodes
-  unfold ROOTINO at hn
-  omega
 
 /-- ...and the data region is what is left (Rocq's `fs_sb_ok_meta`). -/
 theorem fsSbOk_meta (sb : FsSb) (h : FsSbOk sb) :

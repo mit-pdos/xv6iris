@@ -10,11 +10,10 @@ a STAGE file (no `Proof` prefix; the one seal is `ProofKexec.lean`).  The
 seams it produces are FROZEN in `KexecTail` (`kxcAtA2` at +0x032, `kxcAt90`
 at +0x090; kc_interfaces.txt §3/§5):
 
-* `kxc_a1`     (Rocq `kxc_a1`)    : entry → `kxcAtA2` | the namei-null `-1` exit;
 * `kxc_a2_r`   (Rocq `kxc_a2_r`)  : `kxcAtA2` → `kxcAt90` | `kxc_bad64`, AT THE
-                                    HEADER ORACLE (the AU phase A's, `KexecA`);
-* `kxc_a2`     (Rocq `kxc_a2`)    : its corollary at the trivial header claim;
-* `kxc_phaseA` (Rocq `kxc_phaseA`): `kxc_a1` ∘ `kxc_a2`.
+                                    HEADER ORACLE (the AU phase A's, `KexecA`).
+
+Rocq's `kxc_a1`, `kxc_a2` and `kxc_phaseA` are not ported (nothing uses them).
 
      +0x000 .. +0x01c  prologue + spills         (KexecTail.kxc_prologueA)
      +0x020  jal  myproc          +0x024  c.mv s1,a0
@@ -36,10 +35,8 @@ at +0x090; kc_interfaces.txt §3/§5):
    `∀ c', kexecCloser Q QF k A c'`, relayed linearly and HANDED BACK to the
    fall-through continuation (Rocq's `kfk_prologue` idiom).  `kxc_sie_b_agree`,
    the `wp_next` transports and `cpu_own_zero_empty` are gone (`kctx`).
-2. **`kxc_a2_r` at the header oracle; `kxc_a2` its corollary** (Rocq:
-   "the landed `kxc_a2` is now that lemma's corollary at the header
-   claim").  `kxc_a2_r` fires ONE ghost step at the instant ilock's payload
-   is open and readi has not run (`kxcA_fire`): the client gets the locked
+2. **`kxc_a2_r` at the header oracle.**  `kxc_a2_r` fires ONE ghost step
+   at the instant ilock's payload is open and readi has not run (`kxcA_fire`): the client gets the locked
    inode's era leg with the payload's `inodeOk`, gives it back unchanged
    beside its claim `Rr`; `RX` is `Rr` re-read at the buffer readi filled.
    The exit travels OPAQUE as `KEX` (Rocq's `wp_next true pj KEX` is `∀ c,
@@ -47,8 +44,7 @@ at +0x090; kc_interfaces.txt §3/§5):
    which is also handed the tail's CAUSE (`kxcBadCause`) and the receipt.
    The fall-through is the frozen seam `kxcAt90` plus `RX` and the exit,
    not Rocq's twenty-row `kxc_a2_exit1_r`; `kxc_exit_open_r` is the
-   three-line `ihave` at each tail.  `kxc_a2` is `kxc_a2_r` at `Rr := True`,
-   `RX := True`, `KEX := kexecCloser Q QF k A`.  `kxc_bad_cause`'s
+   three-line `ihave` at each tail.  `kxc_bad_cause`'s
    `le_at ef 0 4 <> 1179403647` is `leAt ef 0 4 ≠ ELF_MAGIC`.
 3. **The call sites are local wrappers** (`kxcA_call_*`, the
    `KexecTail.kxc_call_iup` precedent): `jal` + the callee's eb-generic
@@ -147,30 +143,6 @@ theorem kxcA_priv_rows [X : CurCtx] (hct : X.curTier = KTier.kpt) (γ : FileName
   iframe Hpid Hcwd Hc Hev
   iintro Hpid Hcwd Hc
   iframe Hpid Hk Hs Hpg Htf Hcwd Hnm Hsc Hrt Hpt Htfp Hc Hg Hof
-  isplitl []
-  · ipureintro; exact hf
-  · ipureintro; exact hlz
-
-/-- ...and the five rows the SET-FORM walk lends (chroot: the root's cell
-and reference beside the cwd's). -/
-theorem kxcA_priv_rows5 [X : CurCtx] (hct : X.curTier = KTier.kpt) (γ : FileNames) (pa : BitVec 64)
-    (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) :
-    procPrivFd (GF := GF) γ pa pid V M ⊢
-      wordPointsTo (pPid pa) 4 pidPriv pid ∗ wordPointsTo (pCwd pa) 8 (DFrac.own 1) V.cwd ∗
-      inodeHeldAt V.cwd V.cwi ∗ wordPointsTo (pRoot pa) 8 (DFrac.own 1) V.root ∗
-      inodeHeldAt V.root V.rti ∗
-      (wordPointsTo (pPid pa) 4 pidPriv pid -∗ wordPointsTo (pCwd pa) 8 (DFrac.own 1) V.cwd -∗
-        inodeHeldAt V.cwd V.cwi -∗ wordPointsTo (pRoot pa) 8 (DFrac.own 1) V.root -∗
-        inodeHeldAt V.root V.rti -∗ procPrivFd γ pa pid V M) := by
-  obtain ⟨ξ, t⟩ := X
-  simp only at hct
-  subst hct
-  unfold procPrivFd procPrivCoreNoctxAt procPrivBareAt procFieldsNoOfile cwdRefAt rootRefAt
-  iintro ⟨⟨⟨%hf, Hpid, ⟨Hk, Hs, Hpg, Htf, Hcwd, Hnm, Hsc, Hrt⟩, Hpt, Htfp, %hlz, Hev⟩, Hc, Hr, Hg⟩,
-    Hof⟩
-  iframe Hpid Hcwd Hc Hrt Hr Hev
-  iintro Hpid Hcwd Hc Hrt Hr
-  iframe Hpid Hk Hs Hpg Htf Hcwd Hnm Hsc Hrt Hpt Htfp Hc Hr Hg Hof
   isplitl []
   · ipureintro; exact hf
   · ipureintro; exact hlz
@@ -325,90 +297,6 @@ theorem kxcA_call_beginop (BO : BEGIN_OP) (Γ : SchedNames) [ClaimIs (hlc := hlc
   iapply HK $$ %c %spie' %spp' %R' [] Hk Hpc Hte Hce Hpid Hop
   ipureintro
   simpa using hcs
-
-set_option maxHeartbeats 8000000 in
-/-- **`jal namei` at `X`** (+0x02c; Rocq `Namei.wp_namei_gen`, THE SET FORM):
-the path at kexec's own `a0`, the block's cwd, the whole transaction; back:
-at most two units spent, the answer's arm. -/
-theorem kxcA_call_namei (NI : NAMEI) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (cpu : CPU) (k : KCtx) (A : KexecArgs) (spie spp : Bool) (R : RegMap)
-    (X : BitVec 64) (imm : BitVec 21) (hX : X + BitVec.signExtend 64 imm = KA.«namei»)
-    (hret : jumpPc (X + 4#64) = X + 4#64)
-    (hK : kexecSlots ≤ k.avail) (hnoff : k.noff = 0) (htier : k.tier = KTier.kpt)
-    (hj : A.j < NPROC) (hproc : k.proc = procAddr A.j)
-    (hnn : ∀ i, i < A.plen → A.pfun i ≠ 0#8) (hterm : A.pfun A.plen = 0#8)
-    (hplen : A.plen < 2 ^ 31) (ha0 : R 10#5 = k.regs 10#5) :
-    instr X false (instruction.JAL (imm, regidx.Regidx 1#5)) ∗
-    kctx cpu (((k.withSpie spie spp).pushed 68).withRegs R) ∗ pcIs cpu X ∗
-    trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    fsFabric (hlc := hlc) Γ A.pd A.pav A.pu ∗ wordPointsTo (pPid k.proc) 4 pidPriv A.pidv ∗
-    wordPointsTo (pCwd k.proc) 8 (DFrac.own 1) A.V.cwd ∗ inodeHeldAt A.V.cwd A.V.cwi ∗
-    wordPointsTo (pRoot k.proc) 8 (DFrac.own 1) A.V.root ∗ inodeHeldAt A.V.root A.V.rti ∗
-    byteBuf (k.regs 10#5) A.dqpv (bview (A.plen + 1) A.pfun) ∗
-    bslots 3 ∗ irefSlots 2 ∗ logOp icfgLog MAXOPBLOCKS ∗
-    (∀ (c : CPU) (spie' spp' : Bool) (R' : RegMap) (n' : Nat) (ok : Bool) (ipv : BitVec 64),
-      ⌜calleeSaved (R.set 1#5 (X + 4#64)) R' ∧ (ok = true → iputUnits ≤ n')⌝ -∗
-      kctx c (((k.withSpie spie' spp').pushed 68).withRegs R') -∗ pcIs c (X + 4#64) -∗
-      trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗
-      wordPointsTo (pPid k.proc) 4 pidPriv A.pidv -∗
-      wordPointsTo (pCwd k.proc) 8 (DFrac.own 1) A.V.cwd -∗ inodeHeldAt A.V.cwd A.V.cwi -∗
-      wordPointsTo (pRoot k.proc) 8 (DFrac.own 1) A.V.root -∗ inodeHeldAt A.V.root A.V.rti -∗
-      byteBuf (k.regs 10#5) A.dqpv (bview (A.plen + 1) A.pfun) -∗
-      bslots 3 -∗ logOp icfgLog n' -∗
-      (if ok then iprop(⌜R' 10#5 = ipv⌝ ∗ inodeHeld ipv ∗ irefSlots 1)
-       else iprop(⌜R' 10#5 = 0#64⌝ ∗ irefSlots 2)) -∗
-      wpLoop c)
-    ⊢ wpLoop (GF := GF) cpu := by
-  have hK' : nameiSlots ≤ k.avail - 68 := by
-    rw [nameiSlots_eq]; rw [kxc_slots_val] at hK; omega
-  iintro ⟨#Hi, Hk, Hpc, Hte, Hce, #Hfab, Hpid, Hcwd, Hcwr, Hrtc, Hrtr, Hpath, Hbs, Hir, Hlog, HK⟩
-  unfold fsFabric
-  icases Hfab with ⟨#Hrdy, #Hpe, #Hpi, #Hdc0⟩
-  ihave %hg := fsReady_geom $$ Hrdy
-  icases fsReady_bio $$ Hrdy with ⟨%γbl, #Hbc⟩
-  ihave #Hlc := fsReady_log $$ Hrdy
-  icases fsReady_disk $$ Hrdy with ⟨%pd, %pav, %pu, #Hdc, %hpd⟩
-  icases fsReady_kmem $$ Hrdy with ⟨#Hkl, #Hav⟩
-  icases fsReady_icache $$ Hrdy with ⟨#Hit2, #Hiti, #Hslks⟩
-  icases fsReady_region $$ Hrdy with ⟨#Hinv, #Hopen⟩
-  icases fsReady_sb_four $$ Hrdy with ⟨-, #Hsi, -, #Hsb⟩
-  ihave #Hbmi := fsReady_bitmap $$ Hrdy
-  unfold logOp logOpb
-  icases Hlog with ⟨⟨%Sb, Hop⟩, Htx⟩
-  k_step_e (wp_s_jal cpu _ X false imm 1#5 (by decide)) $$ [- $Hk $Hpc $Hi] with [hX]
-  iintro Hk Hpc
-  have h := NI.wp_namei_gen_eb (hlc := hlc) (GF := GF) Γ cpu
-    ((((k.withSpie spie spp).pushed 68).withRegs R).setReg 1#5 (X + 4#64)) γbl pd pav pu A.j
-    fscKalloc fsReadyKmem A.plen A.pfun MAXOPBLOCKS Sb A.pidv A.V.cwd A.V.cwi pidPriv (DFrac.own 1)
-    DFrac.discard DFrac.discard A.dqpv A.V.root A.V.rti (DFrac.own 1) hj (by k_norm_g; exact hproc) (by k_norm_g; exact hK')
-    (by k_norm_g; exact hnoff) (by k_norm_g; exact htier) hg.fgoRootdev hg.fgoNibPos hg.fgoLog
-    hg.fgoBitmap hg.fgoCovBelow hg.fgoIreg hnn hterm hplen (kxcA_walkNeed _) hpd
-  unfold wp_namei_gen_eb_body at h
-  iapply h
-  k_norm_g [ha0]
-  iframe Hk Hpc Hte Hce Hpid Hcwd Hcwr Hrtc Hrtr Hpath Hbs Hir Hop Htx
-  iframe #
-  iapply wpNext_intro_pin
-  iintro %c %_
-  unfold nameiPost
-  iintro %spie' %spp' %R' %n' %Sb' %ok %ipv %w %hcs Hk Hpc Hte Hce - - Hpid Hcwd Hcwr Hrtc Hrtr Hpath
-    Hbs %hf Hop Htx Harm
-  k_norm_g [hret, ha0]
-  ihave Hk := kctx_eq_mono c _ (((k.withSpie spie' spp').pushed 68).withRegs R')
-    (kxc_ctx_ret k spie spp spie' spp' R') $$ Hk
-  iapply HK $$ %c %spie' %spp' %R' %n' %ok %ipv [] Hk Hpc Hte Hce Hpid Hcwd Hcwr Hrtc Hrtr Hpath Hbs
-    [Hop Htx] Harm
-  · ipureintro
-    refine ⟨by simpa using hcs, fun hok => ?_⟩
-    obtain ⟨-, -, h1, -⟩ := hf
-    subst hok
-    have : walkSpend w ≤ 1 := by unfold walkSpend; split <;> omega
-    simp only [if_true] at h1
-    unfold MAXOPBLOCKS iputUnits at *
-    omega
-  · iframe Htx
-    iexists Sb'
-    iexact Hop
 
 set_option maxHeartbeats 8000000 in
 /-- **`jal ilock` at `X`** (+0x036; Rocq `Ilock.wp_ilock_tx_sconf`, THE WRITE
@@ -580,160 +468,6 @@ theorem kxcA_ite_t (X Y : IProp GF) : (if true = true then X else Y) ⊢ X := by
   simp only [ite_true]; exact .rfl
 theorem kxcA_ite_f (X Y : IProp GF) : (if false = true then X else Y) ⊢ Y := by
   simp only [Bool.false_eq_true, ite_false]; exact .rfl
-
-set_option maxHeartbeats 16000000 in
-/-- **Rocq `kxc_a1`: +0x000 .. +0x030, plus the namei-null tail at +0x088**
-(`jal end_op ; c.li a0,-1 ; c.j +0x72` → `kxc_exit_m1`).  The fall-through
-is the +0x032 seam `kxcAtA2`, handed the exit back. -/
-theorem kxc_a1 (MP : MYPROC) (BO : BEGIN_OP) (NI : NAMEI) (EO : END_OP)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (Q : BitVec 64 → ProcPriv → (Nat → List (BitVec 8)) → Prop) (QF : KxfCause → Prop)
-    (cpu : CPU) (k : KCtx) (A : KexecArgs)
-    (hqf : ∃ c, QF c) (hK : kexecSlots ≤ k.avail) (hnoff : k.noff = 0) (htier : k.tier = KTier.kpt)
-    (hj : A.j < NPROC) (hproc : k.proc = procAddr A.j)
-    (hnn : ∀ i, i < A.plen → A.pfun i ≠ 0#8) (hterm : A.pfun A.plen = 0#8)
-    (hplen : A.plen < 2 ^ 31) :
-    kctx cpu k ∗ pcIs cpu KA.«kexec» ∗ trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    fsFabric (hlc := hlc) Γ A.pd A.pav A.pu ∗
-    procPrivFd A.γ k.proc A.pidv A.V A.M ∗ kxcBufs k A ∗ bslots 3 ∗ irefSlots 2 ∗
-    (∀ c' : CPU, kexecCloser Q QF k A c') ∗
-    (∀ (c : CPU) (spie spp : Bool) (R : RegMap) (ipv : BitVec 64) (zi n1 : Nat),
-      kxcAtA2 k A c spie spp R ipv zi n1 -∗ (∀ c' : CPU, kexecCloser Q QF k A c') -∗ wpLoop c)
-    ⊢ wpLoop (GF := GF) cpu := by
-  have hK68 : 68 ≤ k.avail := by rw [kxc_slots_val] at hK; omega
-  iintro ⟨Hk, Hpc, Hte, Hce, #Hfab, Hpriv, Hbufs, Hbs, Hirs, Hcl, HK⟩
-  icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
-  icases kctx_tier _ _ $$ Hk with ⟨%hct, Hk⟩
-  icases kxcA_priv_rows5 (hct.symm.trans htier) A.γ k.proc A.pidv A.V A.M $$ Hpriv
-    with ⟨Hpid, Hcwd, Hcwr, Hrtc, Hrtr, Hpriv⟩
-  -- +0x000 .. +0x01c
-  iapply (kxc_prologueA cpu k hK68)
-  iframe Hk Hpc Hte Hce
-  iintro %cpu %R %⟨hR2, hR8, hR18, hR10, hR11, hRk⟩ Hk Hpc Hte Hce Hfr
-  ihave Hk := kctx_eq_mono cpu _ (((k.withSpie k.spie k.spp).pushed 68).withRegs R)
-    (by kctx_ext) $$ Hk
-  -- +0x020  jal myproc
-  iapply (kxcA_call_myproc MP cpu k k.spie k.spp R (KA.«kexec» + 0x20#64) 2084844#21 kxcA_br_myproc
-      kxcA_ret_24 hK hnoff) $$ [- $Hk $Hpc $Hte $Hce]
-  isplitr
-  · iapply (text_instr _ _ _ _ rfl rfl); iexact Htext
-  iintro %cpu %spie1 %spp1 %R1 %⟨hcs1, h1a0⟩ Hk Hpc Hte Hce
-  k_norm_g
-  -- +0x024  c.mv s1,a0
-  k_step_e (wp_s_add cpu _ (KA.«kexec» + 0x24#64) true 9#5 0#5 10#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h1a0]
-  iintro Hk Hpc
-  -- +0x026  jal begin_op
-  iapply (kxcA_call_beginop BO Γ cpu k A spie1 spp1 _ (KA.«kexec» + 0x26#64) 2094214#21
-      kxcA_br_beginop kxcA_ret_2a hK hnoff htier hj hproc) $$ [- $Hk $Hpc $Hte $Hce $Hfab $Hpid]
-  isplitr
-  · iapply (text_instr _ _ _ _ rfl rfl); iexact Htext
-  iintro %cpu %spie2 %spp2 %R2 %hcs2 Hk Hpc Hte Hce Hpid Hlog
-  k_norm_g
-  -- +0x02a  c.mv a0,s2
-  k_step_e (wp_s_add cpu _ (KA.«kexec» + 0x2a#64) true 10#5 0#5 18#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-  iintro Hk Hpc
-  -- the register chain so far
-  obtain ⟨a2, a8, -, a18, a19, a20, a21, a22, a23, a24, a25, a26, a27⟩ := hcs1
-  obtain ⟨b2, b8, b9, b18, b19, b20, b21, b22, b23, b24, b25, b26, b27⟩ := hcs2
-  simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] at a2 a8 a18 a19 a20 a21 a22 a23 a24 a25 a26 a27 b2 b8 b9 b18 b19 b20 b21 b22 b23 b24 b25 b26 b27
-  have e18 : R2 18#5 = k.regs 10#5 := by rw [b18, a18, hR18]
-  -- +0x02c  jal namei
-  iapply (kxcA_call_namei NI Γ cpu k A spie2 spp2 _ (KA.«kexec» + 0x2c#64) 2093706#21
-      kxcA_br_namei kxcA_ret_30 hK hnoff htier hj hproc hnn hterm hplen
-      (by simp [RegMap.set_apply, e18]))
-    $$ [- $Hk $Hpc $Hte $Hce $Hfab $Hpid $Hcwd $Hcwr $Hrtc $Hrtr $Hbs $Hirs $Hlog]
-  isplitr
-  · iapply (text_instr _ _ _ _ rfl rfl); iexact Htext
-  unfold kxcBufs
-  icases Hbufs with ⟨Hpath, Hargv, Hargs⟩
-  iframe Hpath
-  iintro %cpu %spie3 %spp3 %R3 %n1 %ok %ipv %⟨hcs3, hn1⟩ Hk Hpc Hte Hce Hpid Hcwd Hcwr Hrtc Hrtr
-    Hpath Hbs Hlog Harm
-  k_norm_g
-  obtain ⟨c2, c8, c9, c18, c19, c20, c21, c22, c23, c24, c25, c26, c27⟩ := hcs3
-  simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] at c2 c8 c9 c18 c19 c20 c21 c22 c23 c24 c25 c26 c27
-  have f2 : R3 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFDE0#64 := by rw [c2, b2, a2, hR2]
-  have fk : kxcKeeps k R3 [19#5, 20#5, 21#5, 22#5, 23#5, 24#5, 25#5, 26#5, 27#5] := by
-    intro r hr
-    simp only [List.mem_cons, List.not_mem_nil, _root_.or_false] at hr
-    rcases hr with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl
-    · rw [c19, b19, a19]; exact hRk _ (by decide)
-    · rw [c20, b20, a20]; exact hRk _ (by decide)
-    · rw [c21, b21, a21]; exact hRk _ (by decide)
-    · rw [c22, b22, a22]; exact hRk _ (by decide)
-    · rw [c23, b23, a23]; exact hRk _ (by decide)
-    · rw [c24, b24, a24]; exact hRk _ (by decide)
-    · rw [c25, b25, a25]; exact hRk _ (by decide)
-    · rw [c26, b26, a26]; exact hRk _ (by decide)
-    · rw [c27, b27, a27]; exact hRk _ (by decide)
-  cases ok with
-  | true =>
-    -- ============ namei SUCCEEDED: fall through to +0x032 ============
-    ihave Harm := kxcA_ite_t _ _ $$ Harm
-    icases Harm with ⟨%h10, Hheld, Hirs⟩
-    ihave %hnz := inodeHeld_ne_zero ipv $$ Hheld
-    icases inodeHeld_zi ipv $$ Hheld with ⟨%zi, Hheld⟩
-    have hd : decide (ipv = 0#64) = false := by simp [hnz]
-    k_step_e (wp_s_branch cpu _ (KA.«kexec» + 0x30#64) true 88#13 10#5 0#5 (by decide) bop.BEQ)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, Xv6.dirlookup_beqz, hd]
-    iintro Hk Hpc
-    ihave Hpriv := Hpriv $$ Hpid Hcwd Hcwr Hrtc Hrtr
-    iapply HK $$ %cpu %spie3 %spp3 %R3 %ipv %zi %n1 [- Hcl] Hcl
-    unfold kxcAtA2 kxcBufs
-    iframe
-    ipureintro
-    refine ⟨⟨f2, by rw [c8, b8, a8, hR8], by simp [c9, b9, h1a0], by rw [c18, b18, a18, hR18], h10, hnz, fk⟩,
-      hn1 rfl⟩
-  | false =>
-    -- ============ namei FAILED: the +0x088 tail ============
-    ihave Harm := kxcA_ite_f _ _ $$ Harm
-    icases Harm with ⟨%h10, Hirs⟩
-    k_step_e (wp_s_branch cpu _ (KA.«kexec» + 0x30#64) true 88#13 10#5 0#5 (by decide) bop.BEQ)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, MachCSL.beqz_zero, kxcA_br_30]
-    iintro Hk Hpc
-    -- +0x088  jal end_op
-    iapply (kxc_call_endop EO Γ cpu k A spie3 spp3 R3 (KA.«kexec» + 0x88#64) 2094256#21 kxcA_br_eo_88
-        kxcA_ret_8c n1 hK hnoff htier hj hproc) $$ [- $Hk $Hpc $Hte $Hce $Hfab $Hlog $Hpid]
-    isplitr
-    · iapply (text_instr _ _ _ _ rfl rfl); iexact Htext
-    iintro %cpu %spie4 %spp4 %R4 %hcs4 Hk Hpc Hte Hce Hpid
-    k_norm_g
-    -- +0x08c  c.li a0,-1
-    k_step_e (wp_s_addi cpu _ (KA.«kexec» + 0x8c#64) true 4095#12 10#5 0#5 (by decide))
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    iintro Hk Hpc
-    -- +0x08e  c.j +0x72
-    k_step_e (wp_s_j cpu _ (KA.«kexec» + 0x8e#64) true 2097124#21)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kxcA_j_72]
-    iintro Hk Hpc
-    obtain ⟨d2, -, -, -, d19, d20, d21, d22, d23, d24, d25, d26, d27⟩ := hcs4
-    simp only [RegMap.set_apply, BitVec.reduceEq, ite_false] at d2 d19 d20 d21 d22 d23 d24 d25 d26 d27
-    ihave Hpriv := Hpriv $$ Hpid Hcwd Hcwr Hrtc Hrtr
-    ihave Hfr := kxcFrameA_epi (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5)
-      (k.regs 10#5) (k.regs 11#5) $$ Hfr
-    ihave Hbufs : kxcBufs k A $$ [Hpath Hargv Hargs]
-    · unfold kxcBufs; iframe
-    iapply (kxc_exit_m1 Q QF cpu k A spie4 spp4 _ hqf hK68 ?x2 ?x10 ?xk)
-      $$ [$Hk $Hpc $Hte $Hce $Hfr $Hpriv $Hbufs $Hbs $Hirs $Hcl]
-    case x2 => simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; rw [d2, f2]
-    case x10 => simp [RegMap.set_apply]
-    case xk =>
-      intro r hr
-      simp only [List.mem_cons, List.not_mem_nil, _root_.or_false] at hr
-      rcases hr with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl <;>
-        simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] <;>
-        first
-          | (rw [d19]; exact fk _ (by decide))
-          | (rw [d20]; exact fk _ (by decide))
-          | (rw [d21]; exact fk _ (by decide))
-          | (rw [d22]; exact fk _ (by decide))
-          | (rw [d23]; exact fk _ (by decide))
-          | (rw [d24]; exact fk _ (by decide))
-          | (rw [d25]; exact fk _ (by decide))
-          | (rw [d26]; exact fk _ (by decide))
-          | (rw [d27]; exact fk _ (by decide))
 
 /-- **THE HEADER ORACLE, as a premise** (Rocq `kxc_a2_r`'s `Horacle`): handed
 the locked inode's era leg at the walk's inum and the payload's `inodeOk`,
@@ -1071,74 +805,6 @@ theorem kxc_a2_r (IL : ILOCK) (RD : READI) (IUP : IUNLOCKPUT) (EO : END_OP)
     · rw [b25, a25]; exact hkeep _ (by decide)
     · rw [b26, a26]; exact hkeep _ (by decide)
     · rw [b27, a27]; exact hkeep _ (by decide)
-
-set_option maxHeartbeats 8000000 in
-/-- **Rocq `kxc_a2`: +0x032 .. +0x08e, the corollary of `kxc_a2_r` at the
-trivial header claim** (deviation 2): `Rr := True`, `RX := True`, the exit
-the closer itself; the oracle hands the leg straight back. -/
-theorem kxc_a2 (IL : ILOCK) (RD : READI) (IUP : IUNLOCKPUT) (EO : END_OP)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (Q : BitVec 64 → ProcPriv → (Nat → List (BitVec 8)) → Prop) (QF : KxfCause → Prop)
-    (cpu : CPU) (k : KCtx) (A : KexecArgs) (spie spp : Bool) (R : RegMap) (ipv : BitVec 64)
-    (zi n1 : Nat)
-    (hqf : ∃ c, QF c) (hK : kexecSlots ≤ k.avail) (hnoff : k.noff = 0) (htier : k.tier = KTier.kpt)
-    (hj : A.j < NPROC) (hproc : k.proc = procAddr A.j) :
-    kxcAtA2 k A cpu spie spp R ipv zi n1 ∗ fsFabric (hlc := hlc) Γ A.pd A.pav A.pu ∗
-    (∀ c' : CPU, kexecCloser Q QF k A c') ∗
-    (∀ (c : CPU) (spie spp : Bool) (R : RegMap) (kf : Nat) (qf sf : Qp) (gyf : GName)
-        (loyf tlyf : Nat) (inumf : BitVec 32) (dnf : Dinode) (bmf : Blkmap)
-        (data : Nat → List (BitVec 8)) (gilf gislf : GName) (n2 : Nat) (ef : List (BitVec 8)),
-      kxcAt90 k A c spie spp R kf qf sf gyf loyf tlyf inumf dnf bmf data gilf gislf n2 ef -∗
-      (∀ c' : CPU, kexecCloser Q QF k A c') -∗ wpLoop c)
-    ⊢ wpLoop (GF := GF) cpu := by
-  iintro ⟨Hs, #Hfab, Hcl, HK⟩
-  iapply (kxc_a2_r IL RD IUP EO Γ Q QF (fun _ _ _ => iprop(True)) (fun _ _ _ _ => iprop(True))
-    (kexecCloser Q QF k A) cpu k A spie spp R ipv zi n1 hqf hK hnoff htier hj hproc)
-  iframe Hs Hfab Hcl
-  isplitl []
-  · unfold kxcOracle
-    iintro %dn %bm %data %_ Htop
-    imodintro
-    iframe
-  isplitl []
-  · iintro %_ %_ %_ %_ %_ _
-    ipureintro; trivial
-  isplitl []
-  · imodintro
-    iintro %c %_ %_ %_ %_ %_ Hx _
-    iexact Hx
-  iintro %c %spie %spp %R %kf %qf %sf %gyf %loyf %tlyf %inumf %dnf %bmf %data %gilf %gislf %n2 %ef
-    Hs _ Hcl
-  iapply HK $$ Hs Hcl
-
-set_option maxHeartbeats 8000000 in
-/-- **Rocq `kxc_phaseA`: PHASE A** = `kxc_a1` ∘ `kxc_a2`: kexec's entry to
-the +0x090 seam (or its own `-1` exits). -/
-theorem kxc_phaseA (MP : MYPROC) (BO : BEGIN_OP) (NI : NAMEI) (IL : ILOCK) (RD : READI)
-    (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (Q : BitVec 64 → ProcPriv → (Nat → List (BitVec 8)) → Prop) (QF : KxfCause → Prop)
-    (cpu : CPU) (k : KCtx) (A : KexecArgs)
-    (hqf : ∃ c, QF c) (hK : kexecSlots ≤ k.avail) (hnoff : k.noff = 0) (htier : k.tier = KTier.kpt)
-    (hj : A.j < NPROC) (hproc : k.proc = procAddr A.j)
-    (hnn : ∀ i, i < A.plen → A.pfun i ≠ 0#8) (hterm : A.pfun A.plen = 0#8)
-    (hplen : A.plen < 2 ^ 31) :
-    kctx cpu k ∗ pcIs cpu KA.«kexec» ∗ trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    fsFabric (hlc := hlc) Γ A.pd A.pav A.pu ∗
-    procPrivFd A.γ k.proc A.pidv A.V A.M ∗ kxcBufs k A ∗ bslots 3 ∗ irefSlots 2 ∗
-    (∀ c' : CPU, kexecCloser Q QF k A c') ∗
-    (∀ (c : CPU) (spie spp : Bool) (R : RegMap) (kf : Nat) (qf sf : Qp) (gyf : GName)
-        (loyf tlyf : Nat) (inumf : BitVec 32) (dnf : Dinode) (bmf : Blkmap)
-        (data : Nat → List (BitVec 8)) (gilf gislf : GName) (n2 : Nat) (ef : List (BitVec 8)),
-      kxcAt90 k A c spie spp R kf qf sf gyf loyf tlyf inumf dnf bmf data gilf gislf n2 ef -∗
-      (∀ c' : CPU, kexecCloser Q QF k A c') -∗ wpLoop c)
-    ⊢ wpLoop (GF := GF) cpu := by
-  iintro ⟨Hk, Hpc, Hte, Hce, #Hfab, Hpriv, Hbufs, Hbs, Hirs, Hcl, HK⟩
-  iapply (kxc_a1 MP BO NI EO Γ Q QF cpu k A hqf hK hnoff htier hj hproc hnn hterm hplen)
-  iframe Hk Hpc Hte Hce Hpriv Hbufs Hbs Hirs Hcl
-  iframe #
-  iintro %c %spie %spp %R %ipv %zi %n1 Hs Hcl
-  iapply (kxc_a2 IL RD IUP EO Γ Q QF c k A spie spp R ipv zi n1 hqf hK hnoff htier hj hproc)
-    $$ [$Hs $Hfab $Hcl $HK]
 
 end
 

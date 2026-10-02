@@ -36,7 +36,7 @@ is the caller's ghost step (`Xv6/ProcsInvAlloc.lean`, Rocq
 DEVIATION (Lean block shape, not process layer): Lean's dormant block owns
 the `p->kstack` cell (Rocq persists it into `is_kstack`), so the seal takes
 the cell rather than a persistent reading; and the lock's two identity
-claims (`kmapId`), which Lean's `newlock` takes beside `lkFresh`, ride
+claims (`kmapId`), which Lean's `newlock_of_fresh` takes beside `lkFresh`, ride
 `procReady` (Rocq's `lk_fresh` carries what its `newlock` needs).
 
 Imports only definitional files (never a `Code*` or `Proof*` file).

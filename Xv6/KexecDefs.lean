@@ -100,10 +100,6 @@ open Iris Iris.BI Iris.ProofMode Std MachCSL
 /-- `param.h` `MAXARG` (the `li s8,32` the argument loop compares against). -/
 def MAXARG : Nat := 32
 
-/-- `param.h` `USERSTACK` (inside the `lui a2,0x2` that makes
-`(USERSTACK + 1) * PGSIZE = 8192`). -/
-def USERSTACK : Nat := 1
-
 /-- kexec's own 68-slot frame over namei's 120, the tallest callee
 (deviation 1; Rocq `K_kexec`). -/
 def kexecSlots : Nat := 188

@@ -29,7 +29,7 @@ bundle costs phase A:
    Rocq's.  Rocq's `kxc_sie_b_agree` / `cpu_own_zero_empty` /
    `cpu_own_transport` steps are gone (`kctx`).
 2. **The era call site is a local wrapper** (`kxcA_call_namei_era`, the
-   `KexecACode.kxcA_call_namei` twin over `SpecNameiEra.wp_namei_era_eb`),
+   namei call over `SpecNameiEra.wp_namei_era_eb`),
    and the block is taken apart TWICE: for the pid cell around begin_op
    (`kxcA_priv_rows`), then as `procPrivFd`'s own `core ∗ ofiles` around
    namei (the era contract takes the core, Rocq `proc_priv_bare_cref`).

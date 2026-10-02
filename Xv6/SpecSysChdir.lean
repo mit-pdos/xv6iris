@@ -55,8 +55,7 @@ frame: ra @ `sp0-8`, s0 @ `sp0-16` (the frame pointer, = the entry sp), s1
 * DETERMINISM: none is claimed; the postcondition is the honest
   disjunction keyed by the returned a0.
 * ONE CONTRACT: the frame plus ONE caller INPUT (`chdirAuPre`) and ONE armed
-  OUTPUT (`chdirArms`, keyed on a0); the blanket `sysChdirPost` is a
-  CONSEQUENCE (`chdirArms_landed`).  sys_chdir MINTS NO VOCABULARY OF ITS
+  OUTPUT (`chdirArms`, keyed on a0).  sys_chdir MINTS NO VOCABULARY OF ITS
   OWN: every piece it names is the open family's (`SysOpenDefs`).
 * THE START: the walk premise is `nameiWalkPreEra` at `V.rti` / `V.cwi`, the
   calling process's root and cwd inums at entry (design/chroot.md section 3).
@@ -110,11 +109,11 @@ frame: ra @ `sp0-8`, s0 @ `sp0-16` (the frame pointer, = the entry sp), s1
    a directory's entry map is `Std.ExtTreeMap Fname Nat compare`, `-1` is
    `0xFFFFFFFFFFFFFFFF#64` and `zero_reg` is `0#64`; `MkAnode (ADir e) nl`
    is `⟨.ADir e, nl⟩`.
-7. Names: `K_sys_chdir` → `sysChdirSlots`, `sys_chdir_post` →
-   `sysChdirPost`, `chdir_au_pre` → `chdirAuPre`, `chdir_post_fail` /
-   `_ok` → `chdirPostFail` / `chdirPostOk`, `chdir_arms` → `chdirArms`,
-   `chdir_receipt` → `chdirReceipt`, `chdir_arms_split` /
-   `chdir_arms_landed` → `chdirArms_split` / `chdirArms_landed`,
+7. Names: `K_sys_chdir` → `sysChdirSlots`, `chdir_au_pre` → `chdirAuPre`,
+   `chdir_post_fail` / `_ok` → `chdirPostFail` / `chdirPostOk`,
+   `chdir_arms` → `chdirArms`, `chdir_receipt` → `chdirReceipt`,
+   `chdir_arms_split` → `chdirArms_split`; `sys_chdir_post` and
+   `chdir_arms_landed` are not ported (nothing uses them);
    `wp_sys_chdir_frame` + `wp_sys_chdir_body` → ONE `wp_sys_chdir_eb_body`
    (the frame's `EXTRA`/`ARMS` abstraction has exactly one instance, the
    body, and Lean states that instance; the continuation is named
@@ -153,17 +152,6 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
-
-/-- sys_chdir's result, keyed by the returned a0 (Rocq's `sys_chdir_post`):
-the -1 arm gives the block back at the working directory it came in with;
-the 0 arm gives it back with a NEW one, at the pointer AND its inum (`z`,
-the REAL inum of the installed inode -- the one `cwdRefAt` ties the pointer
-to; the arms name it). -/
-def sysChdirPost (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
-    (M : Nat → List (BitVec 8)) (r : BitVec 64) : IProp GF :=
-  iprop((⌜r = 0xFFFFFFFFFFFFFFFF#64⌝ ∗ procPrivFd γ pa pid V M) ∨
-    (∃ (ipv : BitVec 64) (z : Nat), ⌜r = 0#64⌝ ∗
-      procPrivFd γ pa pid { V with cwd := ipv, cwi := z } M))
 
 /-- EVERYTHING THE CALLER HANDS IN, at the commit mask `appE` (Rocq's
 `chdir_au_pre`): open's walk premise at the process's cwd inum, and open's
@@ -255,23 +243,6 @@ theorem chdirArms_split (Γ : FsViewNames GF) (γfs : FsNames) (γ : FileNames) 
         · ipureintro; rfl
         · ipureintro; exact harow
 
-/-- THE RETURN BLANKET, READ OFF THE ARMS (Rocq's `chdir_arms_landed`): a
-consequence, not a second conjunct. -/
-theorem chdirArms_landed (Γ : FsViewNames GF) (γfs : FsNames) (γ : FileNames) (pa : BitVec 64)
-    (pid : BitVec 32) (rt cw : Nat) (P Pmiss : Nat → Nat → IProp GF)
-    (Fo : Pfam GF (Aview → Nat → Anode → IProp GF)) (V : ProcPriv) (M : Nat → List (BitVec 8))
-    (r : BitVec 64) :
-    chdirArms Γ γfs γ pa pid rt cw P Pmiss Fo V M r ⊢ sysChdirPost γ pa pid V M r := by
-  unfold chdirArms chdirPostOk sysChdirPost
-  iintro (⟨%hr, Hpriv, -⟩ | ⟨%hr, ⟨%ipv, %pl, %i, %e, %nl, %av, -, -, -, Hpriv⟩⟩)
-  · ileft
-    iframe Hpriv
-    ipureintro; exact hr
-  · iright
-    iexists ipv, i
-    iframe Hpriv
-    ipureintro; exact hr
-
 end Arms
 
 section
@@ -301,7 +272,7 @@ def sysChdirK (k : KCtx) (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V 
     bslots 3 -∗
     -- the allowance, whole: the header's reference ledger
     irefSlots 2 -∗
-    -- the armed post (implies `sysChdirPost`, through `chdirArms_landed`)
+    -- the armed post
     chdirArms (hlc := hlc) (fsGammaL fscFs) fscFs γ pa pid V.rti V.cwi P Pmiss Fo
       { V.updEv k' with upt := P' } (viewFaulted V.upt P' M) (R' 10#5) -∗
     wpLoop cpu')

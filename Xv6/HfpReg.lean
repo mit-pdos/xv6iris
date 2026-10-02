@@ -145,15 +145,6 @@ def tok (γ : GName) (d : Nat) (q : Qp) (x : X) : IProp GF := iOwn (F := RegF X)
 instance tok_timeless (γ : GName) (d : Nat) (q : Qp) (x : X) : Timeless (tok (GF := GF) γ d q x) := by
   unfold tok; infer_instance
 
-/-- **Rocq `*_tok_agree`**. -/
-theorem tok_agree (γ : GName) (d : Nat) (q1 q2 : Qp) (x1 x2 : X) :
-    ⊢ tok (GF := GF) γ d q1 x1 -∗ tok γ d q2 x2 -∗ ⌜x1 = x2⌝ := by
-  unfold tok
-  iintro H1 H2
-  icombine H1 H2 gives %Hv
-  ipureintro
-  exact single_agree d q1 q2 x1 x2 Hv
-
 /-- `*_tok_agree`, keeping both tokens. -/
 theorem tok_agree_keep (γ : GName) (d : Nat) (q1 q2 : Qp) (x1 x2 : X) :
     ⊢ tok (GF := GF) γ d q1 x1 -∗ tok γ d q2 x2 -∗ ⌜x1 = x2⌝ ∗ tok γ d q1 x1 ∗ tok γ d q2 x2 := by

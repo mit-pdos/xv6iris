@@ -23,13 +23,9 @@ content:
 >      +0x9c).  `deltaLinkEnt`: the parent gains `nm ↦ t`; link is for
 >      files and devices only, so no count moves.
 >   instant 3 -- THE UNDO, on every route to `bad:` (`ip->nlink--;
->      iupdate(ip)` at +0xfa..+0x106).  `deltaLinkUntgt` IS `deltaUnlTgt`,
+>      iupdate(ip)` at +0xfa..+0x106).  Its delta IS `deltaUnlTgt`,
 >      so ITS COMMIT IS `SysUnlinkDefs.utgtCommitAt`, REUSED VERBATIM
 >      rather than cloned.
->
-> `FsAbsDelta.deltaLink_split` is the machine-checked composition and
-> `deltaLinkUntgt_tgt` is the fact that instant 3 restores the pre-view
-> exactly, in BOTH arms of the target row.
 >
 > THE TARGET'S ROW IS A PARAMETER, not a lookup: sys_link has NO
 > `ip->nlink == 0` guard, so the target may be an unlinked-but-open file

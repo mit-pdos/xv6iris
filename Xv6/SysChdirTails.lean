@@ -25,7 +25,7 @@ Rocq's header points, kept:
 >
 > THE BLOCK IS REBUILT at the `sd s1,336(s2)` with the reference namei made
 > -- `iunlock` having handed the carved share back and `inodeRef_gather`
-> having re-formed it -- AT ITS INUM, which is what `sysChdirPost`'s `z` is.
+> having re-formed it -- AT ITS INUM, which is what the post's `z` is.
 
 **Deviations from Rocq.**
 

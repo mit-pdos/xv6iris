@@ -520,8 +520,9 @@ instance icRdHeldGhost_timeless (γfs : FsNames) (cov : ExtTreeSet Nat compare)
   unfold icRdHeldGhost; infer_instance
 
 omit [IcacheG GF] [LogG GF] in
-/-- `icInodeLeg_local`, keeping the leg (Rocq's `iDestruct … as %` keeps
-the hypothesis). -/
+/-- The leg's own pure reading (`InodeLocal`, the era bundle's last
+conjunct), keeping the leg (Rocq's `iDestruct … as %` keeps the
+hypothesis). -/
 private theorem icInodeLeg_localKeep (γfs : FsNames) (dq : DFrac) (γi : GName)
     (inum : BitVec 32) (n : FsNode) :
     icInodeLeg (GF := GF) γfs dq γi inum n ⊢

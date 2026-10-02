@@ -23,7 +23,7 @@ epilogue `+0xf4 .. +0x100` restores the eager five and pops.
 3. Names carry the `fwr` prefix (`fw_` is FsWords' / freewalk's).
 4. Permit sweep L1b (Rocq b69bd0fab): the loop and its stages carry the
    block at SOME raised count (`EitherDefs.procPrivExtEv`, `∃ kv ≥ V.ev`;
-   `fwr_priv_congrEv` / `fwr_priv_backEv`), so their statements need not
+   `fwr_priv_backEv`), so their statements need not
    name the count (Rocq threads it explicitly).
 -/
 import MachCSL.WpSmodeFrame12
@@ -403,18 +403,6 @@ theorem fwr_priv_congr (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P : UP
   isplitl [Hpt]
   · iapply procPtAt_congr P M M' h $$ Hpt
   · ipureintro; exact hlz
-
-/-- ...at the block's raised event count (permit sweep L1b). -/
-theorem fwr_priv_congrEv (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P : UPtd)
-    (M M' : Nat → List (BitVec 8))
-    (h : ∀ kp w, Iris.Std.PartialMap.get? P.um kp = some w → M kp = M' kp) :
-    procPrivExtEv (GF := GF) pa pid V P M ⊢ procPrivExtEv pa pid V P M' := by
-  unfold procPrivExtEv
-  iintro ⟨%kv, %hkv, H⟩
-  iexists kv
-  isplitl []
-  · ipureintro; exact hkv
-  · iapply fwr_priv_congr pa pid (V.updEv kv) P M M' h $$ H
 
 /-- THE ENTRY NORMALISATION: the block's view read at the writer's image
 (free: `umPages` owns only the mapped pages). -/

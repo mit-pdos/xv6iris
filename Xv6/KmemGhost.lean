@@ -7,7 +7,7 @@ The allocator's ghosts, born: the count at zero, tracked by the client
 THE EVENT LEDGER (NI-LEDGER-KALLOC, Rocq bed7ee0dd) is born here too, at
 the empty history (Rocq: `replicate n (KFree nullp)` at the statement's
 `n`, and the one caller passes `0`; Lean's statement is at `0`, so the
-birth is `[]` and `tie_birth` is `rfl`).  The ledger lives at the seal's
+birth is `[]` and its tie holds by `rfl`).  The ledger lives at the seal's
 own name `γk.pend`, in the `Kev` mono-list camera (KallocDefs deviation 1):
 the seal's token and the ledger are allocated together at one name fresh in
 both cameras (`MachCSL.iOwn_alloc_same_name`).  The statement of

@@ -5,13 +5,13 @@ into the step block at `+0x6e`.
 
 * THE SET-FORM RESERVATION at iput (Rocq 1938–1948): ireclaim is the one
   caller that freezes under the BOOT regime, so it reads the indexed
-  `IPUT.wp_iput_gen` at `rg = false` (`iregRegime false = iregBoot`, lent and
+  `IPUT.wp_iput_gen_eb` at `rg = false` (`iregRegime false = iregBoot`, lent and
   returned) and uncredited (`crb = cru = crz = false`).  The reservation's
   set is the `logOp` existential's own (opened in `Xv6/IreclaimOrphanB.lean`),
   its birth epoch `logOpS_named`'s, and the transaction token HALVES
   (`logTx_halve`): one half is the gen contract's named share, the other
   waits for the join after the call (`logTx_join`, `logOpS_op`), exactly as
-  `IPUT.wp_iput_sconf` derives the counted seal.
+  Rocq's `wp_iput_sconf` derives the counted seal.
 * `iputUnits = 3 ≤ MAXOPBLOCKS = 10` is a closed numeric fact.
 * `end_op` retires the reservation at whatever `n'` iput left.
 

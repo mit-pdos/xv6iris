@@ -20,7 +20,7 @@ three `jal` targets changed.
 
 ## Rocq's header, in short (every clause kept)
 
-* NO NUMERIC PREMISE: filewrite chunks its writes (`fwrChunkJoint`), and
+* NO NUMERIC PREMISE: filewrite chunks its writes, and
   its own `n < 0` test (XV6_REV 31f115a) makes the sign a fact of the
   code, so the count is whatever the user put in `a2`: `argZ v2` (Rocq
   `sys_rw_count v2`), in range by `argZ_range` (Rocq

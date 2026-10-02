@@ -4,7 +4,7 @@ arithmetic, the deposit's ghost step as log_write's atomic update, and the
 three callees at their call sites.  A stage file of iput's proof.
 
 The three callees are the shared call sites of `Xv6/FsCallSitesF.lean`
-(`bread_callF`, `brelse_callF`, `dislot_log_write` over `dislotWriteAu`).
+(`bread_callF_eb`, `brelse_callF`, `dislot_log_write` over `dislotWriteAu`).
 The small record-arithmetic lemmas (`Xv6.iu_bno` / `_slot_align` /
 `_andi15` / `_slli6` / `_hold_open`) restate iupdate's stage-file ones
 (`iu_bno`, `iu_slot_align`, `iu_andi15`, `iu_slli6`, `iu_hold_open`) with

@@ -27,8 +27,8 @@ Rocq.
    `0 <= z` premise vanish.  `nb - NDIRECT` truncates at `0`, which gives
    the SAME boolean (`j < max (nb - 12) 0`) Rocq's `Z` subtraction gives.
 2. `gset` is `Std.ExtTreeSet Nat compare` (the port's `cov` type), built
-   with `insert` (`gsetNodup`) or `LawfulSet.ofList` (`fsLiveSet`, as
-   `Xv6.iregBlkSet` is).  `gsetNodup` is stated at `Nat`: its one consumer
+   with `insert` (`gsetNodup`) or `LawfulSet.ofList` (as `Xv6.iregBlkSet`
+   is).  `gsetNodup` is stated at `Nat`: its one consumer
    (`fsUsedSet`, W4) collects block numbers, and Rocq's `A`-generic form
    has no second instance.
 3. `forallb P (seq 0 n)` is `(List.range n).all P`, peeled with
@@ -283,18 +283,5 @@ theorem fsRegionWf_free (P : Nat → List (BitVec 8)) (sb : FsSb) (nib : Nat)
 theorem fsRegionWf_nlink (P : Nat → List (BitVec 8)) (sb : FsSb) (nib : Nat)
     (h : fsRegionWf P sb nib = true) : fsRegionNlink P sb nib = true := by
   unfold fsRegionWf at h; simp only [Bool.and_eq_true] at h; exact h.2
-
-/-- **THE LIVE SET, AS AN OBJECT** (Rocq's `fs_live_set`): the allocated
-inums, one set with a membership law. -/
-def fsLiveSet (P : Nat → List (BitVec 8)) (sb : FsSb) : ExtTreeSet Nat compare :=
-  LawfulSet.ofList ((List.range sb.sbNinodes).filter
-    (fun z => !decide ((fsDinode P sb z).diType.toNat = 0)))
-
-/-- Rocq's `fs_live_set_elem_of`. -/
-theorem fsLiveSet_mem (P : Nat → List (BitVec 8)) (sb : FsSb) (z : Nat) :
-    z ∈ fsLiveSet P sb ↔ z < sb.sbNinodes ∧ (fsDinode P sb z).diType.toNat ≠ 0 := by
-  unfold fsLiveSet
-  rw [← LawfulSet.mem_ofList, List.mem_filter, List.mem_range]
-  simp
 
 end Xv6

@@ -47,10 +47,10 @@ DROPPED (unreached): `sh_stage_slots_cats` (and so `FileDisc.cats`).
    (`⌜imgAgrees M Mv⌝`), and `sh_exec_path_of_x_holds` concludes
    `argPathOf Mv s0 ws[0]!` at every such view (Rocq `exec_path_of M s0`).
 3. The deposit is built by unfolding `udepwAtRefR` and applying
-   `ExecRunSup.sbundlePayRefR_of_exec` (the body of `udepwAtRefR_of_sup`),
-   because `uexecSupRun` lends no pipe rows (ExecRunSup deviation 2) and the
-   entry premise keeps Rocq's `urun_nopipe sts` (read off the deposit's
-   `urunRows` lend, `urunRows_nopipe`).
+   `ExecRunSup.sbundlePayRefR_of_exec`, because the supply lends no pipe rows
+   (ExecRunSup deviation 2) and the entry premise keeps Rocq's
+   `urun_nopipe sts` (read off the deposit's `urunRows` lend,
+   `urunRows_nopipe`).
 4. The rebase's right side is the concrete node
    `.exec (ushArgs (s0 + c) … (ushEchoToks ws))`, which is
    `ushEchoCmd (ushExecEnvOf …) ws (s0 + c) …` by `rfl` (Rocq

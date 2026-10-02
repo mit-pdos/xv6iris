@@ -523,25 +523,4 @@ theorem transSpecX_kpt [CurCtx] (cpu : CPU) (c : MConf) (sie : Bool) (root : Bit
   · iframe Htrans Htok
   · iexact Hcl
 
-/-! ## `fence.i` (userret's first instruction) -/
-
-set_option maxHeartbeats 4000000 in
-/-- `fence.i`: an instruction-fetch barrier event; no resources move (the
-machine model has no separate instruction view, so the barrier is the
-memory model's `Barrier_RISCV_i`, which the fence lemma absorbs). -/
-theorem execSpecF_fencei (cpu : CPU) (c : MConf) (sie : Bool) (hok : SConfPhys (GF := GF) c sie)
-    (pc npc₀ : BitVec 64) (imm : BitVec 12) (rs rd : BitVec 5) (R : RegMap) :
-    execSpecPP (GF := GF) cpu (DFrac.own 1) Privilege.Supervisor c Privilege.Supervisor c
-      (instruction.FENCEI (imm, regidx.Regidx rs, regidx.Regidx rd)) pc npc₀ npc₀
-      (gprFile cpu R) (gprFile cpu R) := by
-  intro Φ
-  iintro ⟨HmConf, HPC, HnextPC, HF, HΦ⟩
-  conf_cases HmConf
-  obtain ⟨hpmp, hms, hpmm, hlpe⟩ := hok
-  obtain ⟨hSIE, hMPRV, hSXL, hMXR, hTSR, hTVM, hFS, hXS, hVS, hSD, hMPP⟩ := hms
-  unfold execute
-  swp_run 80
-  conf_intro HmConf
-  iapply HΦ $$ HmConf HPC HnextPC HF
-
 end MachCSL

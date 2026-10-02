@@ -148,10 +148,6 @@ def publish (q : VQ) (i : Nat) (c : Chain) : VQ :=
            slot := fun p => if p = q.np then .pending else q.slot p,
            head := fun j => if j = i then .active c else q.head j }
 
-/-- RECLAIM: `free_chain` gives head `i` back to the driver. -/
-def reclaim (q : VQ) (i : Nat) : VQ :=
-  { q with head := fun j => if j = i then .inactive else q.head j }
-
 /-! ### The device's moves -/
 
 /-- POP: the device takes the entry at position `lo`. -/
@@ -410,7 +406,7 @@ The device's in-flight map records a `VioReq` per head; this says that
 record is exactly what the driver formatted there -- `h` is a descriptor
 index, the receipt at that index is `.active c`, and the request is
 `c.req` (the record `MachCSL.Virtio.fetch` assembles out of `c`'s
-descriptor words, by `Xv6.chain_parse`). -/
+descriptor words). -/
 def inflightOk (v : VirtioState) (st : Nat → HState) : Prop :=
   ∀ (h : BitVec 16) (r : VioReq), Virtio.reqOf v h = some r →
     h.toNat < NUM ∧ ∃ c : Chain, st h.toNat = .active c ∧ c.hd = h.toNat ∧ r = c.req
@@ -675,7 +671,7 @@ def blkInj (st : Nat → HState) : Prop :=
     st i = .active c → st j = .active c' → c.blk ≠ c'.blk
 
 /-- **Freeing one armed head leaves every other block in flight.**  This
-is the step `Xv6.cachedOk` and `Xv6.imgOk` need at the collect: a cached
+is the step `Xv6.imgOk` needs at the collect: a cached
 sector or an exempt fragment whose block is not the collected chain's is
 still named by the head that named it before. -/
 theorem inFlightBlk_free (st : Nat → HState) (i : Nat) (c : Chain) (bno : Nat)
@@ -690,20 +686,5 @@ theorem inFlightBlk_free (st : Nat → HState) (i : Nat) (c : Chain) (bno : Nat)
     cases hstj
     exact hne hblk.symm
   exact ⟨j, c', hj, by simp only [hji, if_false]; exact hstj, hdw, hblk⟩
-
-/-- Every sector the write-back cache holds with DATA belongs to a block
-that is in flight.  (An EMPTY entry is not data: `cacheView` falls through
-to the durable image for it, so it constrains nothing.)  It made a capture
-at a sector OUTSIDE the request's span harmless.
-
-RETIRED: `Xv6.diskLive` no longer carries it.  `MachCSL.Virtio.capture`
-caches exactly the sectors `Virtio.reqSpan` names, and `Xv6.capture_blk`
-puts every one of them in the capturing chain's own block, so the case it
-was there for does not arise -- and dropping it is what lets
-`Xv6.disk_collect` free a receipt without having to show that the
-block's sectors have drained.  The definition and its preservation
-lemmas are kept for the record. -/
-def cachedOk (v : VirtioState) (st : Nat → HState) : Prop :=
-  ∀ e ∈ v.cache, e.2 ≠ [] → inFlightBlk st (e.1 / SPB)
 
 end Xv6

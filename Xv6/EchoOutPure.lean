@@ -29,7 +29,7 @@ Name map (Rocq → Lean): `lines_bytes` → `linesBytes`, `lines_bytes_nlines`
 `read_window_prefix` → `readWindow_prefix`, `open_seg_ends_in` →
 `openSeg_ends_in`,
 `ins_prefix_of` → `Xv6.consIns_prefix`; the `epu_` helpers keep the prefix
-(`epuElem_of_rev_head`, `epuApp_snoc`, `epuApp_cons_ne`, `epuFmap_prefix`,
+(`epuElem_of_rev_head`, `epuApp_snoc`, `epuApp_cons_ne`,
 `epuFilter_cons_T/F`, `epuRemovelast_snoc`).
 
 Deviations from Rocq:
@@ -119,9 +119,6 @@ theorem epuApp_cons_ne {A : Type} (l : List A) (a : A) (r : List A) : l ≠ l ++
 def eIndex (E : List (List Obs × BitVec 8)) : Prop :=
   ∀ (j : Nat) (x : List Obs × BitVec 8), E[j]? = some x →
     obsEndsIn .uart0 x.1 x.2 ∧ (consIns x.1).length = j + 1
-
-theorem epuFmap_prefix {A B : Type} (f : A → B) (l l' : List A) (h : l <+: l') : l.map f <+: l'.map f :=
-  h.map f
 
 theorem eLength_le_hist (E : List (List Obs × BitVec 8)) (Sg : List Obs) (hidx : eIndex E)
     (hpre : ∀ (j : Nat) (x : List Obs × BitVec 8), E[j]? = some x → x.1 <+: Sg) : E.length ≤ (consIns Sg).length := by

@@ -498,23 +498,6 @@ theorem appTopUpdate [MachGS hlc GF] [FsTopG GF] [Appcfg GF] [Icfg]
   imodintro
   iframe Hk Hf
 
-/-- `_step`: the caller pays, with a plain wand -- it lifts under the later
-(Rocq's `app_top_update_step`) -/
-theorem appTopUpdate_step [MachGS hlc GF] [FsTopG GF] [Appcfg GF] [Icfg]
-    (E : CoPset) (γfs : FsNames) (I : RegMapF FsNode) (i : Nat) (n n' : FsNode)
-    (hE : (↑appN : CoPset) ⊆ E) :
-    ⊢@{IProp GF} appInv (hlc := hlc) γfs -∗
-      (appPred appRun (absView I) -∗ appPred appRun (absView (PartialMap.insert I i n'))) -∗
-      (γfs.top ↪●MAP{DFrac.own (1 : Qp).half} I) -∗ (γfs.top ↪◯MAP[i] n) -∗
-      |={E}=> ((γfs.top ↪●MAP{DFrac.own (1 : Qp).half} (PartialMap.insert I i n')) ∗
-        (γfs.top ↪◯MAP[i] n')) := by
-  iintro #Hinv Hstep Hk Hf
-  iapply (appTopUpdate E γfs I i n n' hE) $$ Hinv [Hstep] Hk Hf
-  iintro %_ Hp
-  imodintro
-  inext
-  iapply Hstep $$ Hp
-
 /-! ## 4.  THE CALLER'S STEP, AS THE AU COMMIT SHAPES CARRY IT -/
 
 /-- "my claim about the view of `I` survives the move of row `i` to the

@@ -53,8 +53,7 @@ instantiate).
    `blkNGvJoin`, `blkNMask`).  Not ported (unreached): `compatN_ext`,
    `blkN_fire_t`, `pprompt_forkN`.
 2. **Names camelCased throughout** (`blkN_body` → `blkNBody`, `wstN_frame`
-   → `wstNFrame`, `chist_at0_N` → `chistAt0N`, `pprompt_forkN_h` →
-   `ppromptForkNH`, …).
+   → `wstNFrame`, `pprompt_forkN_h` → `ppromptForkNH`, …).
 3. **`blkNCstep` is `blkNCstepH` at `hs = []`** (Rocq proves the two
    separately, with identical scripts).  The fire, the byte step and the
    silence each factor their PURE case analysis into one lemma
@@ -132,12 +131,6 @@ variable (TOK : (W → Option (List (BitVec 8))) → List W → Prop)
 -- THE DEPOSITS
 variable (dep : W → List (BitVec 8) → IProp GF)
   [dep_tl : ∀ (w : W) (s : List (BitVec 8)), Timeless (dep w s)]
-
-/-- Rocq `chist_at0_N`. -/
-theorem chistAt0N (hcons : MachFixedGS.consRes (hlc := hlc) (GF := GF) = CL)
-    (kk : Nat) (hh : List Obs) (HH : ConsHist) :
-    chistAt (hlc := hlc) (GF := GF) .uart0 kk hh HH = CL kk hh HH := by
-  simp only [chistAt, hcons]
 
 /-! ## 1. The pure state -/
 

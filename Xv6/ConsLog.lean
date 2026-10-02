@@ -129,14 +129,6 @@ theorem consBsJoin_length (n : Nat) :
     rw [List.replicate_succ, List.flatten_cons, List.length_append, ih]
     simp [consputcBs]; omega
 
-/-- Rocq `cons_bs_join_not_single`. -/
-theorem consBsJoin_not_single (n : Nat) (x : BitVec 8) :
-    (List.replicate n consputcBs).flatten ≠ [x] := by
-  intro he
-  have := congrArg List.length he
-  rw [consBsJoin_length] at this
-  simp at this; omega
-
 /-- ...and the same for a run SPLIT at the arm's position, the shape the kill
 loop's early stop is in (Rocq `cons_bs_join_app_not_single`). -/
 theorem consBsJoin_app_not_single (i n : Nat) (x : BitVec 8) :

@@ -18,11 +18,8 @@ this port are the Lean image's, `KA.«create»` = 0x80004d64, 356 bytes.)
 
 * `creOkArms` / `creFailArms` (:631 / :657) -- the two arms' application
   payloads (the walk cursor, the legs' receipts, the exists observation).
-* `creStart_unit` (:743) -- the walk's input at the trivial families
-  (`creDlookup_unit`, :751, is `CreateDefs`').
 * the pinned readings (:822–1028): `creOkArms_dev`, `creFailArms_dev`,
-  `creOkArms_file`, `creOkFile_fresh`, `creOkFile_exists`,
-  `creFailArms_file`.
+  `creOkFile_fresh`, `creOkFile_exists`, `creFailArms_file`.
 * `createPost` -- the contract's continuation, NAMED (Rocq spells it inline
   under `wp_next`; `ProofCreateShared.cr_cont_body` is the same term named
   once more on the proof side -- here it is named once, here).
@@ -91,8 +88,8 @@ this port are the Lean image's, `KA.«create»` = 0x80004d64, 356 bytes.)
 
 * the `γf` / `dq`-less `wp_create_sconf_body` binders `γs`, `b`, `lks`,
   `m`, `K`, `eb` -- the landed `kctx` idiom (deviation 3).
-* `cre_start_unit` is kept as `creStart_unit` (sys_mkdir / sys_mknod /
-  sys_open consume it); nothing else of the Rocq file is dropped.
+* `cre_start_unit` and `cre_ok_arms_file` are not ported (nothing uses
+  them); nothing else of the Rocq file is dropped.
 
 Imports only definitional files and callee `Spec*` files.
 -/
@@ -171,15 +168,6 @@ def creFailArms (Γ : FsViewNames GF) (γfs : FsNames) (rt : Nat) (tyz ma mi : N
         (∃ i : Nat,
           ((∃ full : Bool, creDotsFired Fdots i d full) ∨ creDotsLeg (hlc := hlc) Γ tyz Fdots) ∗
           creUnarmFired Fun i))))
-
-/-! ### The input bundle at the trivial families (Rocq :736–757) -/
-
-/-- The whole of what a caller hands create's walk, for a caller that tracks
-nothing: every hop says yes, every cursor is `True` (Rocq's
-`cre_start_unit`). -/
-theorem creStart_unit (γfs : FsNames) (rt cw : Nat) (pl : List (BitVec 8)) :
-    ⊢ epStart (hlc := hlc) (GF := GF) γfs rt cw (fun _ _ => iprop(True)) (fun _ _ => iprop(True)) pl :=
-  epStart_triv γfs rt cw pl
 
 /-! ### The two pinned readings of the arms (Rocq :812–1028)
 
@@ -265,59 +253,6 @@ theorem creFailArms_dev (Γ : FsViewNames GF) (γfs : FsNames) (rt : Nat) (ma mi
       · iright
         iexists i
         iexact Hu
-
-/-- sys_open's O_CREATE success payout (Rocq's `cre_ok_arms_file`): both
-arms survive the pin, keyed on `made`, with the cursor and the name tie
-SHARED (both ran nameiparent). -/
-theorem creOkArms_file (Γ : FsViewNames GF) (ma mi : Nat) (Nm : Fname → Prop) (Nd : Absnode → Prop) (P : Nat → Nat → IProp GF)
-    (Farm : Pfam GF (Aview → Nat → IProp GF))
-    (Fdots : Pfam GF (Aview → Nat → Nat → Bool → IProp GF))
-    (Fun : Pfam GF (Aview → Nat → IProp GF))
-    (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
-    (pl : List (BitVec 8)) (made : Bool) (i : Nat) :
-    creOkArms (hlc := hlc) Γ T_FILE_w.toNat ma mi Nm Nd P Farm Fdots Fun Fok Fex pl made i ⊢
-      ∃ (d : Nat) (nm : Fname),
-        ⌜(pathElems pl).getLast? = some nm⌝ ∗
-        P (nparElems pl).length d ∗
-        ((∃ (av : Aview) (ents : Std.ExtTreeMap Fname Nat compare) (nl : Nat),
-            ⌜crePre av d nm ents nl i (.AFile [])⌝ ∗
-            Fok.pfRecv av d nm i ∗
-            pfAt (dlookupCommitAt Γ appE) Fex ∗
-            pfAt (aunarmOfArmNd (hlc := hlc) Γ appE Nd Farm) Fun) ∨
-          (∃ (av : Aview) (ents : Std.ExtTreeMap Fname Nat compare) (nl : Nat),
-            ⌜PartialMap.get? av d = some ⟨.ADir ents, nl⟩⌝ ∗
-            ⌜ents[nm]? = some i⌝ ∗
-            Fex.pfRecv av d nm i ∗
-            pfAt (acreCommitAtNm (hlc := hlc) Γ appE (.AFile []) Nm (P (nparElems pl).length) Farm) Fok ∗
-            creChildUnfiredNdp (hlc := hlc) Γ (.AFile []) Nd Farm Fun)) := by
-  unfold creOkArms
-  iintro ⟨%d, %nm, %hlast, HP, Hrest⟩
-  iexists d, nm
-  iframe HP
-  isplitr
-  · ipureintro; exact hlast
-  cases made
-  · simp only [Bool.false_eq_true, if_false]
-    unfold creCommits creChildUnfiredNdp acreCommitAtNm
-    simp only [creC0_file, creChild_file_fun]
-    icases Hrest with ⟨Hex, Ha, -, Hu, Hac⟩
-    unfold creExFired
-    icases Hex with ⟨%av, %ents, %nl, %hrow, %hent, HΦ⟩
-    iright
-    iexists av, ents, nl
-    iframe HΦ Hac Ha Hu
-    ipureintro
-    exact ⟨hrow, hent⟩
-  · simp only [↓reduceIte]
-    icases Hrest with ⟨-, Hacre, Hun, Hdl⟩
-    unfold creAcreFired
-    icases Hacre with ⟨%av, %ents, %nl, %hpre, HΦ⟩
-    rw [creChild_file] at hpre
-    ileft
-    iexists av, ents, nl
-    iframe HΦ Hdl Hun
-    ipureintro
-    exact hpre
 
 /-- ...and the two PROJECTIONS sys_open's prover takes, so it destructs
 `made` once and frames (Rocq's `cre_ok_file_fresh`). -/

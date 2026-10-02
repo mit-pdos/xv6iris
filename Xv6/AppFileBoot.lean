@@ -3,7 +3,7 @@
 and §7 of Rocq `AppFile.v` (`iris/AppFile.v`, pinned
 1900b8a43, l.1250-1353), the reached part.
 
-* `fileBoot` (Rocq `file_boot`): WHAT /init IS HANDED AT THE ERA MINT --
+* `fileBootAt` (Rocq `file_boot_at`): WHAT /init IS HANDED AT THE ERA MINT --
   echo's (the console key or flag) and THE DEED, both halves the process
   chain owns, at the clone's content, beside the typed witness of that
   content (under ONE later), or the taint;
@@ -14,7 +14,8 @@ and §7 of Rocq `AppFile.v` (`iris/AppFile.v`, pinned
   shape (`AppLaws.xv6AppAdequacy`'s `Happ_init`).
 
 * SYNC (Rocq main 456141b5b): `fileBootAt` (Rocq `file_boot_at`) names the
-  deed's state and pins the era (`⌜r.fnEra = k⌝`); `fileBoot` is `∃ s`;
+  deed's state and pins the era (`⌜r.fnEra = k⌝`); Rocq's `file_boot` (its
+  `∃ s`) is not ported (nothing uses it);
   `fileInit`/`fileInit_img` take the birth's slot share (era-0 list half,
   its registration, the commit counter at 0, the run-long history, the run
   registry, `flLb c []`) and return a COPY (`⌜r.fnRole = true⌝`).
@@ -47,10 +48,6 @@ ONE later. -/
 def fileBootAt (c : FileFixed) (k : Nat) (r : FileAppNames) (s : Dst) : IProp GF :=
   iprop(echoBoot (GF := GF) c.ffEcho k r.fnCons ∗ ⌜r.fnEra = k⌝
     ∗ fown r s ∗ ▷ (fTyped c s ∨ fileTaint (hlc := hlc) c))
-
-/-- ...at SOME deed state (Rocq `file_boot`). -/
-def fileBoot (c : FileFixed) (k : Nat) (r : FileAppNames) : IProp GF :=
-  iprop(∃ s : Dst, fileBootAt (hlc := hlc) c k r s)
 
 /-- The empty ledger is all spent. -/
 theorem escRecs_nil : ⊢@{IProp GF} escRecs (hlc := hlc) ([] : List EscRec) := by

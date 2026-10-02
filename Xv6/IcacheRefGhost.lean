@@ -47,7 +47,7 @@ in the wave brief's file plan beside this section, is Rocq line 162, in
    each proof): `LiveVal`/`liveVal` (the pool's per-slot value
    `(s, to_agree (g, lo))`), `liveVal_op`, `liveVal_op_valid`,
    `liveVal_singleton_op_valid`, `liveVal_one_update`, `frzname_inj`, and
-   the private `liveGenlo_agree_keep` / `liveElem_frac0`.
+   the private `liveElem_frac0`.
 
 ## Dropped/simplified vs Rocq (uses grep-checked over
 ## `iris/*.v`, comments, `Ltac` and `Hint` bodies included)
@@ -194,18 +194,6 @@ theorem liveGenlo_halve [Icfg] (k : Nat) (q : Qp) (g : GName) (lo : Nat) :
   have h := (liveGenlo_split (GF := GF) k q.half q.half g lo).1
   rw [Qp.half_add_half] at h
   exact h
-
-/-- The agreement, keeping both slices (the shape every proof below uses). -/
-private theorem liveGenlo_agree_keep [Icfg] (k : Nat) (s1 : Qp) (g1 : GName) (lo1 : Nat)
-    (s2 : Qp) (g2 : GName) (lo2 : Nat) :
-    liveGenlo (GF := GF) k s1 g1 lo1 ∗ liveGenlo k s2 g2 lo2 ⊢
-      ⌜g1 = g2 ∧ lo1 = lo2⌝ ∗ liveGenlo k s1 g1 lo1 ∗ liveGenlo k s2 g2 lo2 := by
-  unfold liveGenlo
-  iintro ⟨H1, H2⟩
-  icombine H1 H2 gives %Hv
-  isplitr
-  · ipureintro; exact (liveVal_singleton_op_valid Hv).1
-  · iframe H1 H2
 
 theorem liveGenlo_bound [Icfg] (k : Nat) (s1 : Qp) (g1 : GName) (lo1 : Nat)
     (s2 : Qp) (g2 : GName) (lo2 : Nat) :

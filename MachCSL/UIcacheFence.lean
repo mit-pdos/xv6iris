@@ -15,7 +15,6 @@ under the new instruction view.
   and the hart's own last store, and its receipt) handed to `Q`;
 * `swp_sail_barrier_fencei` -- the barrier leaf running it, handing out
   `iviewLb cpu K`;
-* `ifenceStep_id`, `ifenceStep_frame`, `ifenceStep_mono` -- combinators;
 * `ifenceStep_stamp` -- **the mint**: owned context bytes become stamped.
 -/
 import MachCSL.UIcache
@@ -37,33 +36,6 @@ def ifenceStep (cpu : CPU) (P : IProp GF) (Q : Nat → IProp GF) : IProp GF := i
   ∀ (σ : MState) (K : Nat), ⌜σ.tv cpu ≤ K⌝ -∗ ⌜ownPub (hartAgent cpu) σ.log ≤ K⌝ -∗
     iviewLb cpu K -∗ genHeapInterp σ.mem -∗ memModel σ -∗ P -∗
     |==> (genHeapInterp σ.mem ∗ memModel σ ∗ Q K)
-
-theorem ifenceStep_id (cpu : CPU) (P : IProp GF) : ⊢ ifenceStep cpu P (fun _ => P) := by
-  unfold ifenceStep
-  dsimp only
-  iintro %σ %K %_ %_ _ Hmem Hmm HP
-  imodintro
-  iframe Hmem Hmm HP
-
-theorem ifenceStep_frame (cpu : CPU) (P : IProp GF) (Q : Nat → IProp GF) (R : IProp GF) :
-    ifenceStep cpu P Q ⊢ ifenceStep cpu iprop(P ∗ R) (fun K => iprop(Q K ∗ R)) := by
-  unfold ifenceStep
-  dsimp only
-  iintro Hs %σ %K %h1 %h2 #Hiv Hmem Hmm ⟨HP, HR⟩
-  imod Hs $$ %σ %K %h1 %h2 Hiv Hmem Hmm HP with ⟨Hmem, Hmm, HQ⟩
-  imodintro
-  iframe Hmem Hmm HQ HR
-
-theorem ifenceStep_mono (cpu : CPU) (P P' : IProp GF) (Q Q' : Nat → IProp GF)
-    (hP : P' ⊢ P) (hQ : ∀ K, Q K ⊢ Q' K) :
-    ifenceStep cpu P Q ⊢ ifenceStep cpu P' Q' := by
-  unfold ifenceStep
-  iintro Hs %σ %K %h1 %h2 #Hiv Hmem Hmm HP
-  ihave HP := hP $$ HP
-  imod Hs $$ %σ %K %h1 %h2 Hiv Hmem Hmm HP with ⟨Hmem, Hmm, HQ⟩
-  imodintro
-  iframe Hmem Hmm
-  iapply hQ $$ HQ
 
 /-! ## The barrier leaf -/
 

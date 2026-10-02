@@ -25,8 +25,8 @@ tree paid by the environment closes it.
 * `GS : GREP_START` -- grep's `start` walk (`SpecGrepStart`; proved by
   `ProofGrepStart.grepStart_holds UL GM` from the engine and `GREP_MAIN`,
   which a `Link` file applies: a non-`Link` file may not import a `Proof`
-  file).  Rocq's `wp_kgrep_start_env` is `ProofGrepStart.grepStart_env`,
-  whose two-line proof is inlined here for the same layering reason.
+  file).  Rocq's `wp_kgrep_start_env` is not ported as a lemma: its
+  two-line proof is inlined here for the same layering reason.
   `grepImageEntryEnvC_of_leaves UL` discharges it through the landed
   `LinkGrep.grep_linked UL` (as echo's `echoImageEntryEnvC_of_leaves` and
   cat's `catImageEntryEnvC_holds` do through their link files).
@@ -123,7 +123,7 @@ theorem grepImageEntryEnvC_holds (GS : GREP_START) : GrepImageEntryEnvC (hlc := 
   · rw [hfd]
     iexact Hnpw
   iintro %N' %h %hpayeq Hstd Hcwf #Hcode #Hargv - Hbuf' Hrun
-  -- grep's start at the tree paid by the environment (`grepStart_env`)
+  -- grep's start at the tree paid by the environment
   iapply GS.wp_grepStart N' h (tfResumeGpr0 W'.tf) (uvisAv W') (grepArgs W') (fun _ => ubyte0) (grepNeed ws)
     hptr ha0 ha1 hneed $$ [Hstd Hcwf HPay] Hcode Hargv Hbuf' Hrun
   iapply treePay_of_conforms_p (I N' hpayeq) E ds _ hc' (grepTree_safe _ _) hdp

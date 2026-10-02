@@ -22,8 +22,7 @@ THE FOUR MOMENTS.
   sectors still to land.  The only moment the durable image moves.
 - CONSUMPTION (`crashPerm_consume`, the disk thread at the completion): the
   leaf is spent for the client's `Q`; the cell goes to DONE.
-- COLLECTION (`crashPerm_collect_body` / `crashPerm_collect`, the enqueuer
-  after its wake): identification of "which `Q` is mine" is saved-prop
+- COLLECTION (`crashPerm_collect`, the enqueuer after its wake): identification of "which `Q` is mine" is saved-prop
   agreement, which costs ONE `▷`; opening the invariant costs a second one
   unless the caller has a step.  Hence Rocq's two forms, `▷ Q` and `▷ ▷ Q`.
 
@@ -306,36 +305,6 @@ theorem crashPerm_rewrite (P Q : IProp GF) :
     ▷ internalEq P Q ∗ ▷ P ⊢@{IProp GF} ▷ Q := by
   refine (sep_mono_left (internalEq_rewrite_contractive P Q (fun X => iprop(▷ X)))).trans ?_
   exact sep_and.trans imp_elim_left
-
-/-- Over the stripped body: ONE later, the agreement's (Rocq
-`perm_collect_body`). -/
-theorem crashPerm_collect_body (gd : Nat) (γP : GName) (k : Nat) (γq : GName) (w : DiskWr)
-    (Q : IProp GF) :
-    crashPermInvBody gd γP ∗ crashPermReceipt γq Q ∗ crashPermTok γP k false γq w [] ⊢@{IProp GF}
-      |==> (crashPermInvBody gd γP ∗ ▷ Q) := by
-  unfold crashPermInvBody crashPermTok crashPermReceipt
-  iintro ⟨⟨%m, %nx, Hauth, %hfr, Hents⟩, #Hrc, Htok⟩
-  ihave %hk := ghost_map_lookup $$ Hauth Htok
-  icases (BigSepM.bigSepM_delete hk).1 $$ Hents with ⟨Hent, Hents⟩
-  unfold crashPermSlot
-  icases Hent with ⟨%Q', #Hsp, HQ⟩
-  simp only [Bool.false_eq_true, ite_false]
-  ihave #Heq := saved_prop_agree γq DFrac.discard DFrac.discard Q' Q $$ [Hsp Hrc]
-  · iframe Hsp Hrc
-  imod ghost_map_delete k _ $$ Hauth Htok with Hauth
-  imodintro
-  isplitr [HQ]
-  · iexists (delete m k), nx
-    iframe Hauth Hents
-    ipureintro
-    intro k' hk'
-    by_cases h : k = k'
-    · exact get?_delete_eq h
-    · rw [get?_delete_ne h]; exact hfr k' hk'
-  · iapply crashPerm_rewrite Q' Q
-    iframe Heq
-    inext
-    iexact HQ
 
 /-- Over the invariant, in a plain fupd: TWO laters (Rocq `perm_collect`). -/
 theorem crashPerm_collect (gd : Nat) (γP : GName) (k : Nat) (γq : GName) (w : DiskWr)

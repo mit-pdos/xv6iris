@@ -34,9 +34,9 @@ read off it, and FREEZES THE ARM INTERFACE:
 2. Rocq's `sysc_exit_retarget` (re-keying the slot at a new `CpuId`
    section) is `syscall_post_at` (Lean's hart is a value, not a section
    variable: `wpNext true p c0 K ⊢ K c` for every `c` when `p ≠ 0`).
-3. Rocq's per-number `sysc_num_ne*` / `*_range` lemmas are one decidable
-   fact, `syscall_num_ne`: at a literal index the arm gets every
-   `syscNum V ≠ USYS_x` by `decide` after rewriting `hnum`.
+3. Rocq's per-number `sysc_num_ne*` / `*_range` lemmas are not ported: at a
+   literal index the arm gets every `syscNum V ≠ USYS_x` by `decide` after
+   rewriting `hnum`.
 4. Rocq's `sysc_trap_ext_true` / `sysc_claim_ext_true` (the complement is
    `emp` at `true`) have no use: D32 carries the complement at `k.sie`.
 5. `sysc_tfp_valid` is the landed `ProcPrivAcc.procPrivFd_tfpValid`.
@@ -73,13 +73,6 @@ def syscallBlocked : BitVec 64 := syscallAddr + 0x4c#64
 theorem syscall_bltu_tgt : syscallAddr + 0x22#64 + BitVec.signExtend 64 (0x32#13) = syscallFallback := by
   unfold syscallFallback syscallAddr; decide
 
-/-- `auipc a5,0x5 ; addi a5,a5,-532` at `+0x2a`/`+0x2e` is the table's base
-(Rocq's `syscalls` fold). -/
-theorem syscall_tbl_addr :
-    syscallAddr + 0x2a#64 + BitVec.signExtend 64 (5#20 ++ 0#12) + BitVec.signExtend 64 (0xdd0#12) =
-      syscallsTbl := by
-  unfold syscallsTbl syscallAddr; decide
-
 /-- The entries are the entry Specs' addresses (reflexivity, one per arm):
 an arm rewrites its `pcIs cpu (syscTarget n)` with its own. -/
 theorem syscTarget_fork : syscTarget 1 = sysForkAddr := rfl
@@ -108,12 +101,6 @@ theorem syscTarget_seccomp : syscTarget 23 = sysSeccompAddr := rfl
 theorem syscTarget_chroot : syscTarget 24 = sysChrootAddr := rfl
 
 /-! ## §2 The number -/
-
-/-- **Rocq `sysc_num_ne*`** (deviation 3): at the arm's own index every other
-number is refuted by `decide`. -/
-theorem syscall_num_ne (V : ProcPriv) (n : Nat) (m : Int) (hnum : syscNum V = (n : Int))
-    (h : (n : Int) ≠ m) : syscNum V ≠ m := by
-  rw [hnum]; exact h
 
 /-- **The fall-through fixes the RAW number**: the dispatch reached slot `n`
 of the table (`1 ≤ n ≤ 24`) iff the low word of `a7` read as an `int` is `n`

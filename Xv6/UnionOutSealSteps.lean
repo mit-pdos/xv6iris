@@ -21,7 +21,7 @@ DEVIATIONS from Rocq:
    (`UnionLinksSeal.union_happ_echo`) passes its projections.
 3. (sync SY3-A4, drift D3-app/G) `ucl_drain` keeps its pre-drift receipt
    `udrainRet` (Rocq main's `udrain_ret` is lane U's): it reads the generic
-   receipt's padded resolution back as `lmGoodOut` (`lmGoodOut_of_pad`) and
+   receipt's padded resolution back as `lmGoodOut` and
    drops the round items; `pwclV_drain`'s `HWfree` is `upr_wild`.
 -/
 import Xv6.UnionOut

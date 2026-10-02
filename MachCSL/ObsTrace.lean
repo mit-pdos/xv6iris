@@ -16,13 +16,12 @@ proves it a STEP INVARIANT of the semantics, with no Iris in it:
                 ∧ (g.pow → ∀ i, obsIns i (openSeg h) = g.m.devs.recvd i)
                                                          -- INPUT TIE, per port
 
-`primStep_obsWf` re-establishes it across every arm of `primStep`, and
-`nsteps_obsWf` lifts that to a whole run (`run_obsWf`).  The Iris side
-(`MachCSL.Resources`: `obsInterp`) carries `obsWf h g` as a pure conjunct of
-the state interpretation, where `h` is the history so far: the alternation
-is what lets a client segment `h` into power cycles, and the wire tie is how
-a client that owns a UART's state learns which bytes of the interleaved
-current cycle are the ones the host actually saw.
+`primStep_obsWf` re-establishes it across every arm of `primStep`.  The
+Iris side (`MachCSL.Resources`: `obsInterp`) carries `obsWf h g` as a pure
+conjunct of the state interpretation, where `h` is the history so far: the
+alternation is what lets a client segment `h` into power cycles, and the
+wire tie is how a client that owns a UART's state learns which bytes of the
+interleaved current cycle are the ones the host actually saw.
 
 Deviations from Rocq (each forced by the Lean language, none by taste):
 
@@ -31,10 +30,8 @@ Deviations from Rocq (each forced by the Lean language, none by taste):
   generic PROGRAMS of the device language, so the language itself enforces
   the faithfulness (`MachCSL.devObsOk`, a side condition of `devOpStep`'s
   `step` and `dmaWrite` arms; an unfaithful answer is BLOCKED).  The Rocq
-  lemmas about the fixed relation become lemmas about the board's own
-  answers (`Uart.txArm_ok`, `Uart.rxArm_ok`: the restriction is vacuous on
-  them) and about any step (`devStep_obs`: the wire grows by exactly the
-  step's output events).  `uart_step_io` becomes `devStep_obs`'s
+  lemmas about the fixed relation become a lemma about any step
+  (`devStep_obs`: the wire grows by exactly the step's output events).  `uart_step_io` becomes `devStep_obs`'s
   `obs = os.map Obs.dev` (every device event is console I/O by type).
 * Rocq's `mnode_step_u_wire` / `disk_step_duart` (a hart / the disk never
   move a wire) are `hartStep_wire` and the `virtio` arm of `devStep_obs`.
@@ -133,19 +130,6 @@ namespace Uart
 /-- The receiver never touches `SOUT`. -/
 theorem recv_wire (u : UartState) (b : BitVec 8) : (recv u b).wire = u.wire := rfl
 
-/-- What the drain step puts ON THE WIRE: the popped byte in normal mode,
-nothing under LOOP (the byte goes back into this port's own receiver).  The
-pure fact behind the UART's output observation. -/
-theorem txPop_wire (u : UartState) (b : BitVec 8) (u' : UartState) (h : txPop u = some (b, u')) :
-    u'.wire = if loopback u then u.wire else u.wire ++ [b] := by
-  unfold txPop at h
-  split at h
-  · exact absurd h (by simp)
-  · rename_i b0 tx' _
-    simp only [Option.some.injEq, Prod.mk.injEq] at h
-    obtain ⟨rfl, rfl⟩ := h
-    cases hl : loopback u <;> simp [recv]
-
 /-- No MMIO read transmits anything. -/
 theorem read_wire (u : UartState) (off : Nat) (b : BitVec 8) (u' : UartState)
     (h : read u off = some (b, u')) : u'.wire = u.wire := by
@@ -200,15 +184,6 @@ theorem recv_recvd (u : UartState) (b : BitVec 8) : (recv u b).recvd = u.recvd :
 
 theorem accept_recvd (u : UartState) (b : BitVec 8) : (accept u b).recvd = u.recvd ++ [b] := rfl
 
-theorem txPop_recvd (u : UartState) (b : BitVec 8) (u' : UartState) (h : txPop u = some (b, u')) :
-    u'.recvd = u.recvd := by
-  unfold txPop at h
-  split at h
-  · exact absurd h (by simp)
-  · simp only [Option.some.injEq, Prod.mk.injEq] at h
-    obtain ⟨rfl, rfl⟩ := h
-    cases loopback u <;> rfl
-
 theorem read_recvd (u : UartState) (off : Nat) (b : BitVec 8) (u' : UartState)
     (h : read u off = some (b, u')) : u'.recvd = u.recvd := by
   have key : ∀ r, read u off = some r → r.2.recvd = u.recvd := by
@@ -252,41 +227,6 @@ theorem writeN_recvd (u : UartState) (off n : Nat) (w : BitVec (8 * n)) (u' : Ua
   split at h
   · exact write_recvd u off _ u' h
   · exact absurd h (by simp)
-
-/-- THE BOARD'S DRAIN IS FAITHFUL: the transmit arm's events are exactly the
-wire's growth (the Rocq `uart_step_wire`, tx arm). -/
-theorem txArm_ok (i : UartId) (u u' : UartState) (os : List DevObs) (h : txArm i u = some (u', os)) :
-    devObsOk (.uart i) u u' os := by
-  unfold txArm at h
-  split at h
-  · simp only [Option.some.injEq, Prod.mk.injEq] at h
-    obtain ⟨rfl, rfl⟩ := h
-    exact ⟨by simp, by simp [devObsOut], by simp [devObsIns]⟩
-  · rename_i b u'' hp
-    simp only [Option.some.injEq, Prod.mk.injEq] at h
-    obtain ⟨hu, hos⟩ := h
-    subst hos hu
-    have hw := txPop_wire u b u'' hp
-    have hr := txPop_recvd u b u'' hp
-    refine ⟨?_, ?_, ?_⟩
-    · cases hl : loopback u <;> simp [DevObs.port]
-    · show u''.wire = u.wire ++ devObsOut i (if loopback u = true then [] else [.uartOut i b])
-      cases hl : loopback u <;> simp_all [devObsOut]
-    · show u''.recvd = u.recvd ++ devObsIns i (if loopback u = true then [] else [.uartOut i b])
-      cases hl : loopback u <;> simp_all [devObsIns]
-
-/-- ...and so is the receive arm: an accepted byte is an observation and
-touches no wire (the Rocq `uart_step_wire`, rx arm, and `uart_rx_push_wire`). -/
-theorem rxArm_ok (i : UartId) (b : BitVec 8) (u u' : UartState) (os : List DevObs)
-    (h : rxArm i b u = some (u', os)) : devObsOk (.uart i) u u' os := by
-  unfold rxArm at h
-  split at h
-  · simp only [Option.some.injEq, Prod.mk.injEq] at h
-    obtain ⟨rfl, rfl⟩ := h
-    exact ⟨by simp [DevObs.port], by simp [devObsOut, accept, recv], by simp [devObsIns, accept]⟩
-  · simp only [Option.some.injEq, Prod.mk.injEq] at h
-    obtain ⟨rfl, rfl⟩ := h
-    exact ⟨by simp, by simp [devObsOut], by simp [devObsIns]⟩
 
 end Uart
 
@@ -883,29 +823,6 @@ theorem primStep_obsWf (e : Expr) (g : GState) (κ : List Obs) (e' : Expr) (g' :
       · rw [hpw', hgen, obsBoots_app]; simpa [obsBoots] using hbt
       · rw [openSeg_power h _ rfl, hdevs, DevStates.wire_reset]; rfl
       · rw [openSeg_power h _ rfl, hdevs, DevStates.recvd_reset]; rfl
-
-/-! ## 4. THE WHOLE RUN, with no Iris: a machine that starts powered off
-emits a well-formed history, whatever the schedule.  What the adequacy
-theorem adds is the per-cycle CONTENT, which only the logic can supply; the
-shape is the semantics' own. -/
-
-theorem step_obsWf (ρ₁ ρ₂ : List Expr × GState) (κ : List Obs) (h : List Obs)
-    (hstep : Language.Step ρ₁ κ ρ₂) (hwf : obsWf h ρ₁.2) : obsWf (h ++ κ) ρ₂.2 := by
-  cases hstep with
-  | atomic H t₁ t₂ => exact primStep_obsWf _ _ _ _ _ _ H h hwf
-
-theorem nsteps_obsWf (n : Nat) (ρ₁ ρ₂ : List Expr × GState) (κs : List Obs) (h : List Obs)
-    (hn : Language.NSteps n ρ₁ κs ρ₂) (hwf : obsWf h ρ₁.2) : obsWf (h ++ κs) ρ₂.2 := by
-  induction hn generalizing h with
-  | refl => simpa using hwf
-  | cons hs _ ih =>
-    rw [← List.append_assoc]
-    exact ih _ (step_obsWf _ _ _ h hs hwf)
-
-theorem run_obsWf (n : Nat) (t t₂ : List Expr) (g g₂ : GState) (κs : List Obs)
-    (hpw : g.pow = false) (hgen : g.gen = 0) (hn : Language.NSteps n (t, g) κs (t₂, g₂)) :
-    obsWf κs g₂ := by
-  simpa using nsteps_obsWf n (t, g) (t₂, g₂) κs [] hn (obsWf_init g hpw hgen)
 
 /-! ## 5. THE PER-CYCLE VIEW.  A trace property is stated over the WHOLE
 interleaved history; this is the derived reading a client uses when its

@@ -50,7 +50,7 @@ and the quiet row `utEvQuiet` (deviation 11);
 the deposit / answer channels are SpecSyscall's `sysc*` rows guarded by the
 cause and keyed at the record `syscall()` is called with (`utSysRec`: the
 prologue's `epc` store plus the `+= 4`); the payment and the kill pair are
-Rocq's (`utPayIn`, `utKillIn`, `utKillOut`, `utResumeIn`).
+Rocq's (`utPayIn`, `utKillIn`, `utKillOut`).
 
 ## Deviations from Rocq
 
@@ -293,11 +293,6 @@ def utKillIn (f : sfam GF) (sc : BitVec 64) (W : Uvis) (gn : GName) (sts : List 
 take. -/
 def utKillOut (sc : BitVec 64) (W : Uvis) : IProp GF :=
   if sc = uecallScause then iprop(emp) else uslot (hlc := hlc) W
-
-/-- **Rocq `ut_resume_in`**: what an arm on the way to the resume holds --
-the slot, or the fired one-shot that forbids the resume. -/
-def utResumeIn (sc : BitVec 64) (W : Uvis) (gn : GName) : IProp GF :=
-  if sc = uecallScause then iprop(emp) else iprop(uslot (hlc := hlc) W ∨ killShot gn)
 
 /-- Rocq `ut_kill_out_ecall`. -/
 theorem utKillOut_ecall (W : Uvis) : ⊢ utKillOut (hlc := hlc) (GF := GF) uecallScause W := by

@@ -41,9 +41,7 @@ block.
    `s.insert x`.
 2. `(16 | sz)` is `16 ∣ sz`; `is_Some` is `Option.isSome = true`; `omap` is
    `List.filterMap`; `mjoin` is `List.flatten`.
-3. `fs_dir_ok_node` concludes `nodeRep (nodeOf …)`, `FsTree.nodeRep_of`'s
-   shape, exactly as Rocq; `fs_root_wf_tree` needs no `ROOTINO < ninodes`
-   cast.
+3. `fs_root_wf_tree` needs no `ROOTINO < ninodes` cast.
 -/
 import Xv6.FsImgTree
 
@@ -276,15 +274,6 @@ theorem fsRootWf_type (P : Nat → List (BitVec 8)) (sb : FsSb) (h : fsRootWf P 
   simp only [Bool.and_eq_true, decide_eq_true_eq] at h
   exact h.1
 
-/-- Rocq's `fs_root_wf_node`. -/
-theorem fsRootWf_node (P : Nat → List (BitVec 8)) (sb : FsSb) (h : fsRootWf P sb = true) :
-    nodeAt P sb ROOTINO = some (.NDir (dirView (fsFileData P sb ROOTINO)
-      (dirNrec (fsDinode P sb ROOTINO).diSize.toNat))) := by
-  have hty := fsRootWf_type P sb h
-  rw [nodeAt_live P sb ROOTINO (by rw [hty]; unfold T_DIR_z; omega)]
-  unfold nodeOf
-  rw [if_pos hty]
-
 /-- Rocq's `fs_root_wf_dotdot`. -/
 theorem fsRootWf_dotdot (P : Nat → List (BitVec 8)) (sb : FsSb) (h : fsRootWf P sb = true) :
     (dirView (fsFileData P sb ROOTINO) (dirNrec (fsDinode P sb ROOTINO).diSize.toNat))[DOTDOT]? =
@@ -300,13 +289,6 @@ theorem fsRootWf_dotdot (P : Nat → List (BitVec 8)) (sb : FsSb) (h : fsRootWf 
     simp only [decide_eq_true_eq] at h2
     simp [h2]
   · cases h2
-
-/-- `fsRootDir` outright (Rocq's `fs_root_wf_tree`). -/
-theorem fsRootWf_tree (P : Nat → List (BitVec 8)) (sb : FsSb) (h : fsRootWf P sb = true)
-    (hn : ROOTINO < sb.sbNinodes) : fsRootDir (treeOfDisk P sb) := by
-  unfold fsRootDir
-  rw [treeOfDisk_root, treeOfDisk_lookup P sb ROOTINO hn, fsRootWf_node P sb h]
-  exact ⟨_, rfl⟩
 
 /-! ## 11b.  W9 -- THE PER-INUM COUNT OF LINK FRAGMENTS THE IMAGE DEMANDS -/
 

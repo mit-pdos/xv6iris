@@ -30,9 +30,8 @@ Three lemmas, one per call site (each a few seconds):
    `sysExecHeadOuts` names that `∧` (it is `sysExecHeadBody`'s own).
 3. PROCESS LAYER (flagged, as `SysExecParts` deviation 4): argaddr reads the
    trapframe quarter out of the block's core (`SysfileCalls.sysfile_core_tf`,
-   the sys_read idiom); argstr runs over the bare block split off `procPrivFd`
-   (`SysfileCalls.sysfile_blk_bare`), which
-   comes back at `{A.V with upt := P'}` / `viewFaulted A.V.upt P' A.M`
+   the sys_read idiom); argstr runs over the bare block split off
+   `procPrivFd`, which comes back at `{A.V with upt := P'}` / `viewFaulted A.V.upt P' A.M`
    (Rocq `us_upt U P'`).
 4. Rocq's `copyinstr_got (us_M U) v0 pfun plen` / `bb_cstr` are the body's
    `argPathOf (sysExecIm A) A.v0.toNat pl` (`ArgPath.argPathOf_umemStr`) and

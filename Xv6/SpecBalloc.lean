@@ -30,7 +30,7 @@ arms, on the returned `a0`:
   storage blocks (`Xv6.fsHome`), plus the block's EXCLUSIVE byte run at all
   zeroes: bzero has already `log_write`n it as a zero block.  THE FRESHNESS
   CLAIM IS THE RUN ITSELF: a caller that also holds one run per block its
-  own structures name learns, by exclusivity (`Xv6.fsblock_excl`), that
+  own structures name learns, by exclusivity, that
   this block is none of them -- what re-establishes the inode block map's
   injectivity.  Two log units are spent (the bitmap's `log_write` and
   bzero's), less the bitmap's if the caller presents the credit
@@ -85,9 +85,10 @@ as `Xv6/SpecBread.lean` does, and its crossing is the literal `true`.
 5. THE PRINTK CREDENTIALS ARE `Xv6.panicEnv` (Rocq: `kernel_data` +
    `printk_env γpr γu γd`): this port's `panicEnv` is exactly `printk`'s
    three persistent credentials, and `kernel_data` is carried by `kctx`.
-6. `wp_balloc_sconf` is DERIVED (`BALLOC.wp_balloc_sconf`) below from the field,
-   not a second field: Rocq's own proof derives it the same way
-   (`ProofBalloc.v`'s `wp_balloc_sconf`: `log_op_openS` then `log_opS_op`).
+6. `wp_balloc_sconf` is not a second field: Rocq's own proof derives it
+   from the general one (`ProofBalloc.v`'s `wp_balloc_sconf`: `log_op_openS`
+   then `log_opS_op`).  Its body `wp_balloc_sconf_body` is stated below; the
+   derivation is not ported (nothing uses it).
    Stale in Rocq: the header's "PRINTK as a hypothesis" and "a THIRD dead
    arm" (there are two).
 
@@ -317,109 +318,5 @@ structure BALLOC : Prop where
     wp_balloc_gen_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl γb V γdl pd pav pu j γ γfs
       logstart bmapstart size dev u cr Sb pidv dqp dqb dqs
       hj hproc hK hnoff htier hgeom hbm hcredit hdev hcl hdt hpd ha0
-
-/-- The interrupts-off instance of `wp_balloc_gen_eb` (the complement is the whole
-bundle): the contract every not-yet-generalized caller states. -/
-theorem BALLOC.wp_balloc_gen (A : BALLOC) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-    [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (cpu : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
-    (pd pav pu : BitVec 64) (j : Nat) (γ : LogNames) (γfs : FsNames)
-    (logstart bmapstart size : Nat) (dev : BitVec 32)
-    (u : Nat) (cr : Bool) (Sb : List Nat) (pidv : BitVec 32) (dqp dqb dqs : DFrac)
-    hj hproc hK hsie hnoff hlocks htier hgeom hbm hcredit hdev hcl hdt hpd ha0 :
-    wp_balloc_gen_body (hlc := hlc) (GF := GF) Γ cpu k γl γb V γdl pd pav pu j γ γfs
-      logstart bmapstart size dev u cr Sb pidv dqp dqb dqs
-      hj hproc hK hsie hnoff hlocks htier hgeom hbm hcredit hdev hcl hdt hpd ha0 := by
-  have h := A.wp_balloc_gen_eb (hlc := hlc) (GF := GF) (Γ := Γ) (cpu := cpu) (k := k) (γl := γl) (γb := γb) (V := V) (γdl := γdl) (pd := pd) (pav := pav) (pu := pu) (j := j) (γ := γ) (γfs := γfs) (logstart := logstart) (bmapstart := bmapstart) (size := size) (dev := dev) (u := u) (cr := cr) (Sb := Sb) (pidv := pidv) (dqp := dqp) (dqb := dqb) (dqs := dqs) (hj := hj) (hproc := hproc) (hK := hK) (hnoff := hnoff) (htier := htier) (hgeom := hgeom) (hbm := hbm) (hcredit := hcredit) (hdev := hdev) (hcl := hcl) (hdt := hdt) (hpd := hpd) (ha0 := ha0)
-  unfold wp_balloc_gen_eb_body at h
-  unfold wp_balloc_gen_body
-  rw [hsie] at h
-  simp only [trapCsrsExt_false, cpuClaimExt_false] at h
-  iintro ⟨H0, H1, H2, Htc, Hcl, Hir, H6, H7, H8, H9, H10, H11, H12, H13, H14, H15, Hnext⟩
-  iapply h
-  iframe H0 H1 H2 Htc Hcl Hir H6 H7 H8 H9 H10 H11 H12 H13 H14 H15
-  iapply wpNext_mono $$ Hnext
-  iintro %cpu' HK %spie %spp %R' %p0 H1 H2 ⟨Htc, Hir⟩ Hcl H6 H7 H8 H9 H10
-  iapply HK $$ %spie %spp %R' %p0 H1 H2 Htc Hcl Hir H6 H7 H8 H9 H10
-
-/-- **THE COUNTED FORM, DERIVED** (Rocq's `wp_balloc_sconf`, proved in
-`ProofBalloc.v` exactly so): open the op's set (`Xv6.logOp_openS`), run the
-credited form at `cr = false`, and close each arm (`Xv6.logOpS_op`). -/
-theorem BALLOC.wp_balloc_sconf (B : BALLOC) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
-    [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (cpu : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
-    (pd pav pu : BitVec 64) (j : Nat) (γ : LogNames) (γfs : FsNames)
-    (logstart bmapstart size : Nat) (dev : BitVec 32)
-    (u : Nat) (pidv : BitVec 32) (dqp dqb dqs : DFrac)
-    hj hproc hK hsie hnoff hlocks htier hgeom hbm hdev hcl hdt hpd ha0 :
-    wp_balloc_sconf_body (hlc := hlc) (GF := GF) Γ cpu k γl γb V γdl pd pav pu j γ γfs
-      logstart bmapstart size dev u pidv dqp dqb dqs
-      hj hproc hK hsie hnoff hlocks htier hgeom hbm hdev hcl hdt hpd ha0 := by
-  unfold wp_balloc_sconf_body
-  iintro ⟨Hk, Hpc, Hpi, Htc, Hcl, Hir, Hbc, Hdc, Hpe, Hlc, Hpid, Hsz, Hbms, Hbi, Hsl, Hop,
-    Hnext⟩
-  icases logOp_openS γ (2 + u) $$ Hop with ⟨%Sb, HopS, Htx⟩
-  have h := B.wp_balloc_gen (hlc := hlc) (GF := GF) Γ cpu k γl γb V γdl pd pav pu j γ γfs
-    logstart bmapstart size dev u false Sb pidv dqp dqb dqs
-    hj hproc hK hsie hnoff hlocks htier hgeom hbm (fun h => absurd h (by decide))
-    hdev hcl hdt hpd ha0
-  unfold wp_balloc_gen_body at h
-  iapply h
-  iframe Hk Hpc Hpi Htc Hcl Hir Hbc Hdc Hpe Hlc Hpid Hsz Hbms Hbi Hsl HopS
-  iapply wpNext_mono _ _ _ _ _ $$ Hnext
-  iintro %c' HΦ %spie %spp %R' %hcs Hk Hpc Htc Hcl Hir Hpid Hsz Hbms Hsl Harms
-  iapply HΦ $$ %spie %spp %R' %hcs Hk Hpc Htc Hcl Hir Hpid Hsz Hbms Hsl
-  icases Harms with (⟨%h0, HopS⟩ | ⟨%blk, %hblk, Hfsb, HopS⟩)
-  · ileft
-    isplitl []
-    · ipureintro; exact h0
-    · iapply logOpS_op γ (2 + u) Sb $$ HopS Htx
-  · iright
-    iexists blk
-    isplitl []
-    · ipureintro; exact hblk
-    iframe Hfsb
-    simp only [Bool.false_eq_true, if_false]
-    iapply logOpS_op γ u _ $$ HopS Htx
-
-theorem BALLOC.wp_balloc_sconf_eb (B : BALLOC) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
-    [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (cpu : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
-    (pd pav pu : BitVec 64) (j : Nat) (γ : LogNames) (γfs : FsNames)
-    (logstart bmapstart size : Nat) (dev : BitVec 32)
-    (u : Nat) (pidv : BitVec 32) (dqp dqb dqs : DFrac)
-    hj hproc hK hnoff htier hgeom hbm hdev hcl hdt hpd ha0 :
-    wp_balloc_sconf_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl γb V γdl pd pav pu j γ γfs
-      logstart bmapstart size dev u pidv dqp dqb dqs
-      hj hproc hK hnoff htier hgeom hbm hdev hcl hdt hpd ha0 := by
-  unfold wp_balloc_sconf_eb_body
-  iintro ⟨Hk, Hpc, Hpi, Hte, Hce, Hbc, Hdc, Hpe, Hlc, Hpid, Hsz, Hbms, Hbi, Hsl, Hop,
-    Hnext⟩
-  icases logOp_openS γ (2 + u) $$ Hop with ⟨%Sb, HopS, Htx⟩
-  have h := B.wp_balloc_gen_eb (hlc := hlc) (GF := GF) Γ cpu k γl γb V γdl pd pav pu j γ γfs
-    logstart bmapstart size dev u false Sb pidv dqp dqb dqs
-    hj hproc hK hnoff htier hgeom hbm (fun h => absurd h (by decide))
-    hdev hcl hdt hpd ha0
-  unfold wp_balloc_gen_eb_body at h
-  iapply h
-  iframe Hk Hpc Hpi Hte Hce Hbc Hdc Hpe Hlc Hpid Hsz Hbms Hbi Hsl HopS
-  iapply wpNext_mono _ _ _ _ _ $$ Hnext
-  iintro %c' HΦ %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid Hsz Hbms Hsl Harms
-  iapply HΦ $$ %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid Hsz Hbms Hsl
-  icases Harms with (⟨%h0, HopS⟩ | ⟨%blk, %hblk, Hfsb, HopS⟩)
-  · ileft
-    isplitl []
-    · ipureintro; exact h0
-    · iapply logOpS_op γ (2 + u) Sb $$ HopS Htx
-  · iright
-    iexists blk
-    isplitl []
-    · ipureintro; exact hblk
-    iframe Hfsb
-    simp only [Bool.false_eq_true, if_false]
-    iapply logOpS_op γ u _ $$ HopS Htx
 
 end Xv6

@@ -8,8 +8,8 @@ every law stated at the family must admit a linear conjunct.  The panic line
 and the exec-failed diagnostic write only to the CONSOLE, so the conjunct
 rides through untouched; what that needs of the write obligation is that it
 THREAD a frame from its input to its output, which `UshMainDefs.kshW_frame`
-does not do (it SPENDS the frame) -- hence the three structural rules
-(`kshW_mono_in`, `kshW_thread`, `kshW1_hold`).  Then:
+does not do (it SPENDS the frame) -- hence the structural rule
+`kshW1_hold`.  Then:
 
 * `ushPanicLaw_hold_at`: sh's own `panic("fork")` (`UshDiagDefs.ushPanicLaw`),
   paid out of the block credential the fork meant to lend
@@ -60,24 +60,6 @@ section Rules
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int] [Xv6G GF]
-
-/-- **Rocq `ksh_w_mono_in`**: the hole is contravariant in its input. -/
-theorem kshW_mono_in (N : UkNames GF) (fdw ua : BitVec 64) (nb : Nat) (Ci Ci' Co : IProp GF) :
-    ⊢ (Ci' -∗ Ci) -∗ kshW (hlc := hlc) N fdw ua nb Ci Co -∗ kshW (hlc := hlc) N fdw ua nb Ci' Co := by
-  unfold kshW
-  iintro Hm Hw %h %m %avail %h0 %h1 %h2 #Hc HCi Hrun Hcont
-  ihave HCi := Hm $$ HCi
-  iapply Hw $$ %h %m %avail %h0 %h1 %h2 Hc HCi Hrun Hcont
-
-/-- **Rocq `ksh_w_thread`**: a frame rides from the input to the output. -/
-theorem kshW_thread (N : UkNames GF) (fdw ua : BitVec 64) (nb : Nat) (Ci Co K : IProp GF) :
-    ⊢ kshW (hlc := hlc) N fdw ua nb Ci Co -∗ kshW (hlc := hlc) N fdw ua nb iprop(Ci ∗ K) iprop(Co ∗ K) := by
-  unfold kshW
-  iintro Hw %h %m %avail %h0 %h1 %h2 #Hc ⟨HCi, HK⟩ Hrun Hcont
-  iapply Hw $$ %h %m %avail %h0 %h1 %h2 Hc HCi Hrun
-  iintro %h' %ret HCo Hrun
-  iapply Hcont $$ %h' %ret [HCo HK] Hrun
-  iframe HCo HK
 
 /-- **Rocq `ksh_w1_hold`** (deviation 2): one diagnostic byte threads a
 frame beside its cursor. -/

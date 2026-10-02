@@ -1,6 +1,6 @@
 /-
-MachCSL: what a walk of `runRW` cannot change (lane U1-F): the cells off
-the written footprint (`runRW_file_ro`) and the owned map's domain
+MachCSL: what a walk of `runRW` cannot change (lane U1-F): any state
+property every node preserves (`runRW_preserves`) and the owned map's domain
 (`runRW_dom`; Rocq `HartMemRun`'s `dom mm' = dom mm` obligation, the
 `u_mem_step_dom` of `UserBytes`).  These are what a closer of the user
 tier needs to carry the loop-constant configuration pins
@@ -61,16 +61,6 @@ theorem runRW_preserves (D : UFoot) (R : UWSt → UWSt → Prop) (hrefl : ∀ s,
       | readRam => simp [runRW] at h
       | writeRam => simp [runRW] at h
       | _ => simp only [runRW] at h; exact ih _ _ _ _ _ _ h
-
-/-- **A walk writes only the written footprint.** -/
-theorem runRW_file_ro (D : UFoot) {X : Type} (m : SailM X) (orc : UOrc) (s : UWSt) (x : X) (s' : UWSt)
-    (orc' : UOrc) (h : runRW D orc s m = some (x, s', orc')) (r : Register) (hr : D.Dw r = false) :
-    s'.file r = s.file r := by
-  refine runRW_preserves D (fun s s' => s'.file r = s.file r) (fun _ => rfl) (fun _ _ _ h1 h2 => h2.trans h1)
-    ?_ (fun _ => rfl) (fun _ _ _ _ _ _ => rfl) m orc s x s' orc' h
-  intro s r' v hd
-  rw [UWSt.file_setPin, RegFile.set_other]
-  intro e; subst e; rw [hr] at hd; cases hd
 
 /-- **A walk keeps the owned map's domain.** -/
 theorem runRW_dom (D : UFoot) {X : Type} (m : SailM X) (orc : UOrc) (s : UWSt) (x : X) (s' : UWSt)

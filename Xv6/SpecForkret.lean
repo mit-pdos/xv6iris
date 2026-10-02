@@ -39,7 +39,7 @@ the CLOSED trap loop.
   a boot-mode record carries `firstBoot`'s rows beside a block without its
   token (`ParkCap.parkBootBlock`), a steady-mode one the block whole plus
   `firstDone` (`ParkCap.parkBlock`, `parkMode`).  At `steady = true` the
-  boot arm is REFUTED (`FirstTok.firstBoot_done_excl`) and the steady arm
+  boot arm is REFUTED and the steady arm
   PROVES the run key it is asked for; at `false` forkret walks the boot arm.
 * **THE ENTRY IS THE SCHEDULER'S HAND-OFF**: swtch lands here with `p->lock`
   STILL HELD from scheduler() -- a resumed kernel context
@@ -69,7 +69,7 @@ the CLOSED trap loop.
    `cpu_own 1 eb p false {["proc"]}`), the calling convention `R sp =
    V.kstack + PGSIZE` (Rocq `is_kstack` + the `sp` register fact).  Rocq's
    `trap_res eb + av2 = av - 6`, `K_kexec ≤ av2`, `K_usertrap ≤ av` budget
-   premises are the whole page (`forkretStack = 512`, `usertrapSlots_le_page`).
+   premises are the whole page (`forkretStack = 512`).
 2. **The globals are Lean's park rows** (ParkCap deviation 2):
    `parkGlobals` (which carries `procsInv Γ`) and `utSysParkRows`;
    `kernel_text` is `kctx`'s, `wire_inv` / the trampoline claim ride

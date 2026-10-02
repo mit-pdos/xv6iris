@@ -13,7 +13,7 @@ floor IS the slice's -- and THIS file is the read's obligation:
 
 - the slice's floor (carried by `IcacheRef.liveFracc` in every
   `inodeRef`/`inodeShr` bundle) cashes through the running context into the
-  hart's view bound (`ownCtx_credFloor_vis`);
+  hart's view bound;
 - the window then reads a WHOLE member of `irefSet` at every view the load
   may choose -- a word in `[1, IREFSLOTS]`, never 0, never torn
   (`iref_readAU`).
@@ -54,9 +54,9 @@ window's head, so the read is the LATEST value, exactly `irefWord M k`
    as premises: the sie-generic load leaf (design §5.1,
    `wp_s_lw_au_key`) cashes the credential IN-STEP on the running hart, so
    `cpu`, `K`, `ts` are parameters here, as in `kpt_readAU`'s `readAU`.
-3. **`cred_floor_vis` is `ownCtx_credFloor_vis`** (`credFloor_lk` +
-   `MachCSL.ownCtx_lkFloor_vis`; design §3).  Rocq's `own_context cur_ctx`
-   is `MachCSL.ownCtx cpu curCtx`.
+3. **`cred_floor_vis` is not ported** (nothing uses it; its cash-in is
+   `credFloor_lk` + `MachCSL.ownCtx_lkFloor_vis`, design §3).  Rocq's
+   `own_context cur_ctx` is `MachCSL.ownCtx cpu curCtx`.
 4. **The exact read takes the FLOOR arm only** (`tst ≤ K`), as Rocq's
    `iref_read_locked_obl` does (`ctx_floor cur_ctx tl`, `tst ≤ tl`; its
    only caller, ProofIget 1857, passes `tl := tstj` off the payload's
@@ -100,19 +100,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
 section IcachePinwObl
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 
-/-- A6.146, Rocq `cred_floor_vis`: the credential's cash-in -- either arm of
-`credFloor` buys the two-armed read licence at `lo` (deviations 2, 3). -/
-theorem ownCtx_credFloor_vis [CurCtx] (cpu : CPU) (lo tl : Nat) (hle : lo ≤ tl) :
-    ownCtx (GF := GF) cpu curCtx ∗ credFloor lo tl ⊢
-      ownCtx cpu curCtx ∗ ∃ (K : Nat) (ts : List (Nat × Agent)),
-        viewLb cpu K ∗ ([∗list] p ∈ ts, authoredBy p.1 p.2) ∗
-        ⌜lo ≤ K ∨ (lo, hartAgent cpu) ∈ ts⌝ := by
-  iintro ⟨Hctx, #Hfl⟩
-  ihave #Hlk := credFloor_lk lo tl hle $$ Hfl
-  iapply ownCtx_lkFloor_vis cpu lo
-  iframe Hctx
-  iexact Hlk
-
 /-- The racy read's pure half: a read of a window whose every entry (and
 floor value) is a member, at a view the floor is visible to, is a member's
 bound. -/
@@ -131,7 +118,7 @@ variable [IcacheG GF]
 
 /-- A6.145/A6.146, Rocq `iref_read_obl ∘ iref_load_pinw_au` (deviation 1):
 THE LOCK-FREE GUARD READ.  A slice holder whose floor `lo` is visible to the
-reading hart (the `(K, ts)` licence `ownCtx_credFloor_vis` returns) reads,
+reading hart (the `(K, ts)` licence of `hvis`) reads,
 at every view the load may choose, a whole member of `irefSet`: `0 < ref <
 2^31`, never 0, never torn.  The slice comes back untouched. -/
 theorem iref_readAU [Icfg] (cpu : CPU) (k : Nat) (s : Qp) (g : GName) (lo K : Nat)

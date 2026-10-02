@@ -33,10 +33,10 @@ literally `LOG_WRITE.wp_log_write_au_range`'s atomic-update premise at
 
 **Dropped/simplified vs Rocq.**
 * Rocq's `iui_*` instruction facts, `pcw`/`nz`/`regne` tactics and the
-  `iu_andi15`/`iu_slli6`/`iu_srliw4`/`iu_addw_ibl`/`Xv6.dsDisp`/`iu_off0` bridge
+  `iu_andi15`/`iu_slli6`/`iu_srliw4`/`iu_addw_ibl`/`iu_off0` bridge
   lemmas are `Xv6.text_instr` and the `Xv6/DinodeSlot.lean` group-1/2
   lemmas (`dsSrliw4`, `dsAddwIbl`, `dsAndi15`, `dsSext_mod16`, `dsSlli6`,
-  `dsDataAddr`, `dsDisp`, `dsOff0`, `dsAddrs0`, `dsAlign`) -- uses checked:
+  `dsDataAddr`, `dsOff0`, `dsAlign`) -- uses checked:
   all are `Local` to ProofIupdate.v or ported in DinodeSlot.
 * Rocq's `iu_slots_split`/`iu_slots_join` are `Xv6.dsSlots_split`/`_join`.
 -/

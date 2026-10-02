@@ -16,8 +16,7 @@ works at is `BitVec.ofNat 32 n`, whose `toNat` is `n`.  Rocq threads an
 (`ialloc_srli4`, `ialloc_addw_ibl`, `ialloc_andi15`, `ialloc_succ`,
 `ialloc_sextw`, `ialloc_bgeu_dead`, `ialloc_bno`), restated here at
 ireclaim's registers because a stage file belongs to ONE function (the
-`Xv6/DinodeSlot.lean` group-1 lemmas `dsSrli4`/`dsAddwIbl`/`dsAndi15`/
-`dsSlli6` and `Xv6/FsWords.lean`'s `fw_*` do the work; these are one-line
+`Xv6/DinodeSlot.lean` group-1 lemmas `dsAddwIbl`/`dsAndi15`/`dsSlli6` and `Xv6/FsWords.lean`'s `fw_*` do the work; these are one-line
 wrappers -- candidates to hoist into DinodeSlot together with ialloc's).
 -/
 import Xv6.SpecIreclaim

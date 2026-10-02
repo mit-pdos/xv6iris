@@ -82,22 +82,6 @@ theorem ctxBytes_of_pushed (cpu : CPU) (ξ : CtxId) (pa : PAddr) (n : Nat) (dq :
   iframe Hb
   iexact Hkey
 
-/-- **Rebuilding a context window out of a raw window another agent wrote**
--- the disk, say: a DMA-written buffer reaches the driver once the
-running context's FLOOR has passed the write's position (`ctx_absorb`
-raises the floor to the hart's view, `ctxFloor_le` lowers it to `t`). -/
-theorem ctxBytes_of_pushedFloor (ξ : CtxId) (pa : PAddr) (n : Nat) (dq : DFrac)
-    (t : Nat) (ag : Agent) (Hs : Nat → Hist) (w : BitVec (8 * n)) :
-    ctxFloor (GF := GF) ξ t ∗ histBytes pa n (fun _ => dq) (pushed Hs t ag w) ⊢
-      ctxBytes ξ pa n dq w := by
-  iintro ⟨#Hfl, Hb⟩
-  unfold ctxBytes histBytes
-  iapply ctxBytes_of_keyed ξ pa dq t ag Hs (nthByte w) n
-  iframe Hb
-  unfold keyAt
-  ileft
-  iexact Hfl
-
 end ambient
 
 end MachCSL

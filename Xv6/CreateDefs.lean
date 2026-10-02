@@ -220,7 +220,7 @@ theorem creDotsLeg_nodir (Γ : FsViewNames GF) (tyz : Nat)
 (Rocq `SpecCreate.v`, INIT-FILE's UNARM ruling, `1a1b4633d`)
 
 `FsAbsCreateNm` is the ruling's bottom layer, so the readings create's own
-proof takes -- `aunarmOfArm_open`'s twin and the child's two legs at a
+proof takes -- the arm's unarm opening and the child's two legs at a
 GENERAL node predicate -- are stated here.  `FsAbsCreateNm.creChildUnfiredNd`
 is the instance of the pair at `fun c' => c' = c`, the one sys_mknod pins;
 every other caller is at `fun _ => True` and takes the bridges below. -/
@@ -276,7 +276,7 @@ theorem creChildUnfiredNdp_pin (Γ : FsViewNames GF) (c : Absnode)
     creChildUnfiredNd (hlc := hlc) Γ c Farm Fun ⊢
       creChildUnfiredNdp (hlc := hlc) Γ c (fun c' : Absnode => c' = c) Farm Fun := .rfl
 
-/-- `FsAbsCreateFire.acreCommitAtGen_ext` at the NAME-PREDICATE commit
+/-- The NAME-PREDICATE commit is extensional in its node map `cf`
 (Rocq's `acre_commit_at_gen_nm_ext`, stated in its `SpecCreate`). -/
 theorem acreCommitAtGenNm_ext (Γ : FsViewNames GF) (E : CoPset)
     (cf cf' : Nat → Nat → Absnode) (Nm : Fname → Prop) (Pd : Nat → IProp GF)

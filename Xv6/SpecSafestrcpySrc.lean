@@ -25,7 +25,7 @@ run off the end of the caller's buffer.  Rocq's contract says what is enough
 
 So this contract is the landed one with `hls : bss.length = 16` widened to
 `sscSrcOk bss` (at `n = 16`: `15 ≤ bss.length`, or a NUL inside `bss`).  The
-landed `SAFESTRCPY` is its instance (`sscSrcOk_16`).  The postcondition is
+landed `SAFESTRCPY` is its instance.  The postcondition is
 the landed one (a `pnameWf` destination, the source unchanged, `a0 = dst`,
 callee-saved preserved): the only consumers (kfork, kexec) want exactly that.
 
@@ -37,7 +37,7 @@ callee-saved preserved): the only consumers (kfork, kexec) want exactly that.
 2. **A SECOND contract for one function** (a main-tree agent may not edit the
    landed `SpecSafestrcpy.lean`).  The intended cleanup is to REPLACE the
    landed `SAFESTRCPY`'s `hls : bss.length = 16` by `hsrc : sscSrcOk bss`
-   (kfork passes `sscSrcOk_16 hls`), and retire this file.
+   and retire this file.
 
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
@@ -54,10 +54,6 @@ open LeanRV64D
 budget (15 bytes) can reach, or a NUL inside what it owns. -/
 def sscSrcOk (bss : List (BitVec 8)) : Prop :=
   15 ≤ bss.length ∨ ∃ j : Nat, bss[j]? = some 0#8
-
-/-- Rocq `ssc_src_ok_full`: kfork's sixteen bytes. -/
-theorem sscSrcOk_16 {bss : List (BitVec 8)} (h : bss.length = 16) : sscSrcOk bss := by
-  unfold sscSrcOk; exact Or.inl (by omega)
 
 /-- **WP of `safestrcpy`** (`n = 16`), the source owned per `sscSrcOk`. -/
 def wp_safestrcpy_src_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]

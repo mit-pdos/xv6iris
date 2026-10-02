@@ -84,7 +84,7 @@ Rocq's header on the laws, kept because the reasons are the content:
    over a `MachFixedGS` (Rocq: a `riscvGS`).  `al_xfer` is at
    `MachGpreS.mono_pre` (Rocq `riscv_pre_genGS`).  The triv lemmas are
    `appBirth_ofValidCls`, `appBack_id` (its premise is `∀ k, turn'' c k =
-   turn' c k`), `appInit_ofValid`, `appInit_ofValidOkc`, `appTriv_init`.
+   turn' c k`), `appTriv_init`.
 -/
 import Xv6.SystemAdequacy
 
@@ -254,24 +254,6 @@ theorem appBack_id (A : Xv6App GF) (c : A.fixed) (h : List Obs)
   iintro HR HT
   imodintro
   iframe HR HT
-
-/-- Rocq `app_init_of_valid`. -/
-theorem appInit_ofValid (A : Xv6App GF) (P : A.fixed → IProp GF) (hP : ∀ c, ⊢@{IProp GF} P c)
-    (c : A.fixed) : A.cls c ⊢@{IProp GF} P c := by
-  iintro _
-  iapply hP c
-
-/-- ...at an application whose durable-copy predicate holds of every record
-(Rocq `app_init_of_valid_okc`, SY3-A3b). -/
-theorem appInit_ofValidOkc (A : Xv6App GF) (av : Aview) (hok : ∀ c r, A.okc c r)
-    (hP : ∀ c : A.fixed, ⊢@{IProp GF} |==> ∃ r : A.names, A.pred c r av) (c : A.fixed) :
-    A.cls c ⊢@{IProp GF} |==> ∃ r : A.names, ⌜A.okc c r⌝ ∗ A.pred c r av := by
-  iintro _
-  imod hP c with ⟨%r, Hp⟩
-  imodintro
-  iexists r
-  iframe Hp
-  ipureintro; exact hok c r
 
 /-- ERA 0 at the generic application (Rocq `app_triv_init`). -/
 theorem appTriv_init (c : (appTriv GF).fixed) (av : Aview) :

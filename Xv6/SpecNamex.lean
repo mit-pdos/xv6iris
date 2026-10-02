@@ -36,7 +36,7 @@ so the loop is namex's own and `Xv6/PathElems.lean` models it directly.
 * THE NAME BUFFER is 14 caller-owned bytes at `a2`, WRITTEN (full
   ownership); it comes back at an unspecified naming function `nf`, with
   `bname 14 nf = e` on the nameiparent success arm, `e` the last element
-  (`skipelem_name_view`, both memmove shapes).
+  (both memmove shapes).
 * THE POSTCONDITION IS RESOURCE-SHAPED: success is `a0 = ip` with the held
   reference (bundled with its directory type on a nameiparent walk,
   `inodeHeldTy`), failure is `a0 = 0` with everything back and NO inode
@@ -120,8 +120,8 @@ so the loop is namex's own and `Xv6/PathElems.lean` models it directly.
   (comment-stripped grep of `iris/*.v`): no caller outside
   SpecNamex.v / ProofNamex.v (namei and nameiparent call `wp_namex_gen`;
   ProofNparEra.v's header records it has no twin) -- reason: dead.  The
-  budget bridge `walkNeed_counted` / `walkSpend_counted` that the counted
-  callers (ProofNamei.v:644/656) use is KEPT.
+  budget bridge the counted callers (ProofNamei.v:644/656) use is not ported
+  either (nothing uses it).
 * `ic_escrows fsc_ic …` -- following SpecIget/SpecDirlookup (isItable2
   carries the family) -- uses checked: ProofNamex.v frames it into iget,
   dirlookup, ilock, iunlockput and iput only -- reason: redundant.
@@ -173,20 +173,6 @@ def walkNeed (L : Nat) : Nat :=
   match L with
   | 0 => iputUnits
   | _ + 1 => iputUnits + 1
-
-/-- Rocq's `walk_need_counted`: the counted premise implies the priced one. -/
-theorem walkNeed_counted (L n : Nat) (h : (L + 1) * iputUnits ≤ n) : walkNeed L ≤ n := by
-  cases L with
-  | zero => unfold walkNeed iputUnits at *; omega
-  | succ L => show iputUnits + 1 ≤ n; unfold iputUnits at *; rw [Nat.succ_mul] at h; omega
-
-/-- Rocq's `walk_spend_counted`: the priced interval implies the counted one. -/
-theorem walkSpend_counted (L n n' : Nat) (w ok : Bool) (h : (L + 1) * iputUnits ≤ n)
-    (h' : n - (walkSpend w + (if ok then 0 else 1)) ≤ n') :
-    n - (L + 1) * iputUnits ≤ n' := by
-  have h3 : 3 ≤ (L + 1) * iputUnits := by
-    unfold iputUnits; rw [Nat.succ_mul]; omega
-  cases w <;> cases ok <;> unfold walkSpend at h' <;> simp at h' <;> omega
 
 section Post
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]

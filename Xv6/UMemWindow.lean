@@ -45,13 +45,4 @@ theorem umemWrote_refl (P : UPtd) (M : Nat → List (BitVec 8)) (a : BitVec 64) 
     umemWrote P M a 0 P M :=
   ⟨[], rfl, by rw [viewFaulted_self, umemWrite_nil], umMapped_zero P _⟩
 
-/-- A later extension that writes nothing keeps the run. -/
-theorem umemWrote_view {P P1 P2 : UPtd} {M M1 : Nat → List (BitVec 8)} {a : BitVec 64} {m : Nat}
-    (h0 : P.ext P1) (h1 : P1.ext P2) (hr : umemWrote P M a m P1 M1) :
-    umemWrote P M a m P2 (viewFaulted P1 P2 M1) := by
-  obtain ⟨bs, hl, rfl, hm⟩ := hr
-  subst hl
-  exact ⟨bs, rfl, by rw [viewFaulted_umemWrite _ _ _ hm, viewFaulted_trans M h0 h1],
-    umMapped_ext h1 hm⟩
-
 end Xv6.UMemL

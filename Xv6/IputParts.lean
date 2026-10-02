@@ -360,7 +360,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 
 set_option maxHeartbeats 4000000 in
 /-- **THE EPILOGUE** (Rocq's `ip_epilogue` and the post hand-off of
-`ip_tail_exit` / `wp_iput_gen`'s Exit B seam): `ld ra/s0/s1`, `addi
+`ip_tail_exit` / `wp_iput_gen_eb`'s Exit B seam): `ld ra/s0/s1`, `addi
 sp,48`, `ret`, then the contract's continuation.  Every arm reaches it --
 the two close arms as release's return address, the free path from the
 off-lock tail's `j +0x30`.  A LEVEL-0 stretch (depth 0, the caller's

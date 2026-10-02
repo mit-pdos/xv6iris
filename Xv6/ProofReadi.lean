@@ -22,7 +22,7 @@ Rocq: `+0x26` (xv6's `off + n < off`) by the guarded joint bound, and `+0x88`
 1. The frame is one fourteen-value predicate (`Xv6.rdFrame`, ReadiFrame).
 2. The fuel is `N - tot` (ReadiParts deviation 3).
 3. Rocq's twice-emitted restore block is two lemmas (ReadiExit).
-4. bread / brelse go through the shared `Xv6.bread_call` /
+4. bread / brelse go through the shared `Xv6.bread_call_eb` /
    `Xv6.brelse_call`; `rd_pay_contentQ` / `rd_view_eq` are copies of
    BmapDefs' `bm_pay_contentQ` / `bm_view_eq` (promotion candidates).
 

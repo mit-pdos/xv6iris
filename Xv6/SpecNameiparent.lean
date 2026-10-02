@@ -31,8 +31,8 @@ so this is what closes fs-sysfile's Blocker B).  Everything else is
 returns at noff 0.
 
 THE CWD: namex's three rows, exactly as `SpecNamei` (see its header); a
-caller holding the cwd-bearing block `ProcInv.procPrivCwd` opens them with
-`SpecNamei.namei_procPrivCwd_rows` (Rocq's sys_link hands the same
+caller holding the cwd-bearing block `ProcInv.procPrivCwd` opens them as
+there (Rocq's sys_link hands the same
 `proc_priv_bare` / `inode_held_at` pair to both namei and nameiparent).
 
 ## DEVIATIONS from Rocq

@@ -17,7 +17,7 @@ geometry (`ientry` and its laws); the reference-count algebra's CAMERAS
 (Rocq `Xv6Cameras.v` §11, which this port has no file for), CONSTRUCTORS
 and BOOT LITERALS (the `lelem*` layering, `icntBootMap`, `frzmBootMap`,
 `linkBootMap`, `liveBootMap`, `hpnBootMap` and their validity); the
-descriptor accessors (`icDepGname`, `icDepLo`, `icDepRd`); `class Icfg` --
+descriptor accessor `icDepRd`; `class Icfg` --
 THE inode cache's global constants -- and `structure IcNames`; the boot
 allocation (`icfgAlloc` and the family allocators it runs on); the
 per-generation type one-shot's vocabulary (`ityPending` / `ityShot`); and
@@ -94,7 +94,7 @@ its class `Xv6.OffboxBoxG`.  See deviation 6.
    sleeplock keeps the holder token and the counting half at ONE gname, so
    `isl_fun_alloc` mints `sl_free_tok (f k) ∗ slh_auth (f k) None`.  This
    port's sleeplock keeps them at two (`Xv6.slHtok` / `Xv6.slhAuth`), and
-   the holder gname is minted by `Xv6.kctx_newSleeplock` itself.  Only the
+   the holder gname is minted when the lock itself is created.  Only the
    counter is slot-keyed, so `icfgIsl k` names it and `islFunAlloc` mints
    `slhAuth (f k) none`.  Checked downstream: `IcacheBoot.v:1436-1440`
    drops the `sl_free_tok`s explicitly ("this cache does not [build a lock
@@ -643,26 +643,6 @@ theorem linkBootMap_valid (P : ExtTreeSet Nat compare) : ✓ linkBootMap P :=
   gsetToGmap_valid _ (Auth.auth_both_valid_2 lelemBoot_valid (CMRA.inc_refl _)) P
 
 /-! ### The checkout deposit's descriptor accessors (design §14.8) -/
-
-/-- The descriptor's generation, where it has one.  `depNone` is the
-sleeplock's neutral value and names no slot state at all, which is why
-`IcacheEscrow.ic_dep_res` is `False` there; `depFrz` is `none` for the same
-reason, and that is ALSO what refutes it at every ordinary parker and
-borrower: they all name a `d` with a generation. -/
-def icDepGname (d : IcDep) : Option GName :=
-  match d with
-  | .depNone => none
-  | .depFrz .. => none
-  | .depTx _ _ _ g _ _ _ => some g
-  | .depRd _ _ _ g _ => some g
-
-/-- The credential's EPOCH (tso-flip A6.145), where the descriptor has one. -/
-def icDepLo (d : IcDep) : Option Nat :=
-  match d with
-  | .depNone => none
-  | .depFrz .. => none
-  | .depTx _ _ _ _ lo _ _ => some lo
-  | .depRd _ _ _ _ lo => some lo
 
 /-- IS THIS DESCRIPTOR THE READ ARM (durable-disk B''-join)?  The escrow's
 OUT arm at `depRd` keeps three quarters of the inode's bundle; at every

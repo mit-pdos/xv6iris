@@ -9,13 +9,13 @@ whose address is not aligned to its width raises no misaligned exception
 proceeds to the page split:
 
 * **in one page** (`ummInPage`): one `translate_and_read_value` of the full
-  width (`umm_vmem_read_addr_inpage_ok/_err`; this also covers an aligned
+  width (`umm_vmem_read_addr_inpage`; this also covers an aligned
   access);
 * **across a page boundary**: the low part (`ummLo va` bytes, up to the
   boundary) then the high part (the rest, from the boundary), each with its
   own translation, in increasing order (`sys_misaligned_order_decreasing =
   false`); a fault of either part is the load's fault
-  (`umm_vmem_read_addr_straddle_ok/_err1/_err2`).
+  (`umm_vmem_read_addr_straddle/_err1/_err2`).
 
 The parts' `translate_and_read_value` walks are HYPOTHESES in the
 `runRW … = some (r, s', orc')` shape; `umm_translate_and_read_value_ok/_err`
@@ -91,18 +91,6 @@ theorem umm_vmem_read_addr_inpage (D : UFoot) (orc : UOrc) (s : UWSt) (hp : UtrP
     subst h
     rfl
 
-/-- **In-page, success.** -/
-theorem umm_vmem_read_addr_inpage_ok (D : UFoot) (orc : UOrc) (s : UWSt) (hp : UtrPins D s) (va : BitVec 64)
-    (w : Nat) (h0 : 0 < w) (h8 : w ≤ 8) (hpg : ummInPage va w) (pa : physaddr) (v : BitVec (8 * w))
-    (s' : UWSt) (orc' : UOrc)
-    (htr : runRW D orc s (translate_and_read_value (.Virtaddr va) w (.Load .Data) false false false) =
-      some (.Ok (pa, v), s', orc')) :
-    ∃ v', runRW D orc s (vmem_read_addr (.Virtaddr va) w (.Load .Data) false false false) =
-      some (.Ok v', s', orc') := by
-  obtain ⟨r', h, _, hok⟩ := umm_vmem_read_addr_inpage D orc s hp va w h0 h8 hpg (.Ok (pa, v)) s' orc' htr
-  obtain ⟨v', rfl⟩ := hok pa v rfl
-  exact ⟨v', h⟩
-
 /-! ## §2 Across a page boundary -/
 
 /-- The high part's address and width, as the model computes them. -/
@@ -145,21 +133,6 @@ theorem umm_vmem_read_addr_straddle (D : UFoot) (orc : UOrc) (s : UWSt) (hp : Ut
       injection h with h
       subst h
       rfl
-
-/-- **Across a page, success**: both parts load. -/
-theorem umm_vmem_read_addr_straddle_ok (D : UFoot) (orc : UOrc) (s : UWSt) (hp : UtrPins D s) (va : BitVec 64)
-    (w : Nat) (h8 : w ≤ 8) (hpg : ¬ ummInPage va w)
-    (pa1 : physaddr) (v1 : BitVec (8 * ummLo va)) (s1 : UWSt) (o1 : UOrc)
-    (htr1 : runRW D orc s (translate_and_read_value (.Virtaddr va) (ummLo va) (.Load .Data) false false false) =
-      some (.Ok (pa1, v1), s1, o1))
-    (pa2 : physaddr) (v2 : BitVec (8 * ((w : Int) - (ummLo va : Int)).toNat)) (s2 : UWSt) (o2 : UOrc)
-    (htr2 : runRW D o1 s1 (translate_and_read_value (.Virtaddr (va + BitVec.ofNat 64 (ummLo va))) ((w : Int) - (ummLo va : Int)).toNat
-      (.Load .Data) false false false) = some (.Ok (pa2, v2), s2, o2)) :
-    ∃ v, runRW D orc s (vmem_read_addr (.Virtaddr va) w (.Load .Data) false false false) =
-      some (.Ok v, s2, o2) := by
-  obtain ⟨r', h, _, hok⟩ := umm_vmem_read_addr_straddle D orc s hp va w h8 hpg _ s1 o1 htr1
-  rw [h]
-  exact (hok pa1 v1 rfl _ s2 o2 htr2).2 pa2 v2 rfl
 
 /-- **Across a page, the low part faults** (Rocq `_err1`). -/
 theorem umm_vmem_read_addr_straddle_err1 (D : UFoot) (orc : UOrc) (s : UWSt) (hp : UtrPins D s) (va : BitVec 64)

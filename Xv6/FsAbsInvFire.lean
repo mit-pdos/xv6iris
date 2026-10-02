@@ -316,7 +316,7 @@ theorem fsabsLinkPre (γfs : FsNames) :
 
 /-- **Rocq `fsabs_unlink_pre`**, AT THE SYSCALL TIER (TL-3C item (M)):
 unlink's bundle is path-fixed under the reading of argument 0, and the
-generic family owes the walk at EVERY string (`unlinkAuAt_of_all`). -/
+generic family owes the walk at EVERY string. -/
 theorem fsabsUnlinkPre (γfs : FsNames) (rt cw : Nat) (M : Nat → List (BitVec 8)) (pv : Nat) :
     appSup (GF := GF) ⊢
       unlinkAuAt (hlc := hlc) (fsGammaL γfs) γfs rt cw M pv (fun _ _ => iprop(True))

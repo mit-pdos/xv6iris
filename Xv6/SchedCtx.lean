@@ -1477,19 +1477,6 @@ theorem kctx_kptOn {lent : Bool} (cpu : CPU) (k : KCtx) (ht : k.tier = KTier.kpt
   iapply kctx_intro' cpu k hwf
   iframe HC HF Hst Htr Ha Hc Htok Hcl Hro
 
-/-- Two Kpt bundles run the same kernel table, hence the same root. -/
-theorem kctx_root_agree {lent lent' : Bool} (cpu cpu' : CPU) (k k' : KCtx)
-    (ht : k.tier = KTier.kpt) (ht' : k'.tier = KTier.kpt) :
-    kctxL (GF := GF) lent cpu k ∗ kctxL lent' cpu' k' ⊢
-      ⌜k'.root = k.root⌝ ∗ kctxL lent cpu k ∗ kctxL lent' cpu' k' := by
-  iintro ⟨Hk, Hk'⟩
-  icases kctx_kptOn cpu k ht $$ Hk with ⟨⟨%t, %M, %hb, #Hkpt⟩, Hk⟩
-  icases kctx_kptOn cpu' k' ht' $$ Hk' with ⟨⟨%t', %M', %hb', #Hkpt'⟩, Hk'⟩
-  ihave %hbb := kptOn_root_agree t t' M M' $$ [$Hkpt $Hkpt']
-  iframe Hk Hk'
-  ipureintro
-  rw [← hb', ← hbb]; exact hb
-
 end
 
 /-! ## THE HANDLER ENVIRONMENT (Rocq `SpecKernelvec.kernelvec_env`)

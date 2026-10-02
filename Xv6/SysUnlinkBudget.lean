@@ -39,9 +39,8 @@ Rocq's header, kept because the reasons are the content:
 > parent's inode block.  Only `ip`'s own flush is uncredited.
 >
 > THE VERDICT.  EVERY ARM CLOSES.  Unlike sys_link, sys_unlink needs NO
-> correlation clause: `suOk_uncorrelated` checks the success arm at the
-> corner a correlation clause would have excluded, and it closes there too
-> -- exactly, at `iputUnits`.  `suOk_corner_is_exact` is that corner.
+> correlation clause: the success arm, at the corner a correlation clause
+> would have excluded, closes there too -- exactly, at `iputUnits`.
 
 ## Deviations from Rocq
 
@@ -52,8 +51,8 @@ Rocq's header, kept because the reasons are the content:
    is `decide` (every statement is closed after the boolean case split).
 2. Names: `su_iu` → `suIu`, `su_u0/u1/u1f/u2` → `suU0/U1/U1f/U2`,
    `sys_unlink_slots` → `sysUnlinkSlots`, and the theorems camel-headed with
-   Rocq's snake tail (`su_u1_ge9` → `suU1_ge9`, `su_bad_early_closes` →
-   `suBad_early_closes`, `su_ok_dir_closes` → `suOk_dir_closes`, ...).
+   Rocq's snake tail (`su_walk_need_closes` → `suWalk_need_closes`, ...).
+   The other corner theorems are not ported (nothing uses them).
    `SpecSysUnlink` (not yet ported) must reuse `sysUnlinkSlots` rather than
    define its own (Rocq has both; ProofSysUnlinkPure's comment records the
    duplication).
@@ -84,9 +83,6 @@ theorem suU0_value : suU0 = 10 := rfl
 /-- nameiparent, success arm (Rocq's `su_u1`). -/
 def suU1 (w1 : Bool) : Nat := suU0 - walkSpend w1
 
-theorem suU1_ge9 (w1 : Bool) : 9 ≤ suU1 w1 := by
-  revert w1; decide
-
 /-- THE WALK'S OWN ENTRY REQUIREMENT: `walkNeed L ≤ 4` at every depth,
 against ten (Rocq's `su_walk_need_closes`). -/
 theorem suWalk_need_closes (L : Nat) : walkNeed L ≤ suU0 := by
@@ -94,48 +90,12 @@ theorem suWalk_need_closes (L : Nat) : walkNeed L ≤ suU0 := by
   | zero => decide
   | succ L => show iputUnits + 1 ≤ suU0; decide
 
-/-! ## 3.  The four failure arms -/
-
-/-- ARMS C and D, the two namecmp guards and `dirlookup` returning 0:
-`bad:`'s `iunlockput(dp)` wants its three (Rocq's `su_bad_early_closes`). -/
-theorem suBad_early_closes (w1 : Bool) : iputUnits ≤ suU1 w1 := by
-  revert w1; decide
-
 /-! ## 4.  The success arm -/
 
 /-- after the writei (Rocq's `su_u2`) -/
 def suU2 (w1 crb crd cru al ind : Bool) : Nat := suU1 w1 - wi16Spend crb crd cru al ind
 
-/-- THE T_DIR TAIL, the longer of the two (Rocq's `su_ok_dir_closes`). -/
-theorem suOk_dir_closes (w1 crb crd cru al ind wd wp : Bool) :
-    let u2 := suU2 w1 crb crd cru al ind
-    let u3 := u2 - suIu true
-    let u4 := u3 - ipSpendW wd true false
-    let u5 := u4 - suIu false
-    1 ≤ u2 ∧ iputUnits ≤ u3 ∧ 1 ≤ u4 ∧ iputUnits ≤ u5 ∧ 0 ≤ u5 - ipSpendW wp true false := by
-  revert w1 crb crd cru al ind wd wp; decide
-
 /-! ## 5.  The corners, and what they pin -/
-
-/-- NO CORRELATION CLAUSE IS NEEDED (Rocq's `su_ok_uncorrelated`): the
-T_DIR arm closes at `crb = false` TOGETHER WITH `w1 = true`.  (`wp` is
-Rocq's binder, unused by the statement.) -/
-theorem suOk_uncorrelated (crd cru al ind wd _wp : Bool) :
-    let u2 := suU2 true false crd cru al ind
-    let u3 := u2 - suIu true
-    let u4 := u3 - ipSpendW wd true false
-    let u5 := u4 - suIu false
-    iputUnits ≤ u5 := by
-  revert crd cru al ind wd; decide
-
-/-- THE WORST CORNER IS EXACT (Rocq's `su_ok_corner_is_exact`). -/
-theorem suOk_corner_is_exact :
-    let u2 := suU2 true false false false true true
-    let u3 := u2 - suIu true
-    let u4 := u3 - ipSpendW true true false
-    let u5 := u4 - suIu false
-    u5 = iputUnits := by
-  decide
 
 /-- THE REFUTATION THIS LEDGER DOES NOT NEED, RECORDED AS A NEGATIVE (Rocq's
 `su_ok_busts_without_the_membership_trio`): had the zeroing not put

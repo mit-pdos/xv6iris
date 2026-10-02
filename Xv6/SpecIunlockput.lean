@@ -38,12 +38,12 @@ caller to supply it: the share the WRITE ARM parked comes home at iunlock
 * `wp_iunlockput_dep_gen_body` -- the PRIMITIVE, the credited set form with
   the descriptor chosen by the caller (the `IUNLOCKPUT` field);
 * `wp_iunlockput_dep_sconf_body` -- its counted reading (`logOpb` in and
-  out), derived (`IUNLOCKPUT.wp_iunlockput_dep_sconf`; Rocq's is a `Local
+  out), derived (`IUNLOCKPUT.wp_iunlockput_dep_sconf_eb`; Rocq's is a `Local
   Lemma` of ProofIunlockput, here exported: see deviation 5);
 * `wp_iunlockput_tx_gen_body` / `wp_iunlockput_tx_sconf_body` -- the
   transactional readings, the descriptor at the write arm closed over the
-  transaction (`icTxDep`), derived by `wp_iunlockput_tx_of_dep_gen` /
-  `_sconf` exactly as Rocq's `Section IunlockputOfDep`.
+  transaction (`icTxDep`), derived by `wp_iunlockput_tx_of_dep_gen_eb` /
+  `_sconf_eb` exactly as Rocq's `Section IunlockputOfDep`.
 
 Rocq's callers: `wp_iunlockput_tx_gen` (ProofNamex / ProofNamexEra /
 ProofNparEra / ProofSysLinkTails), `wp_iunlockput_tx_sconf` (ProofSysOpenTails
@@ -69,7 +69,7 @@ ProofNparEra / ProofSysLinkTails), `wp_iunlockput_tx_sconf` (ProofSysOpenTails
 4. Rocq's dead binders `dq`, `m`/`K`/`eb`/`b`/`lks`/`Upr`/`gs`/`gl` are
    dropped or inside `k`/`Γ` (SpecIunlock deviation 5, SpecIput).
 5. Shape of the interface: `structure IUNLOCKPUT` has the ONE primitive
-   field `wp_iunlockput_dep_gen`; the other three forms are theorems
+   field `wp_iunlockput_dep_gen_eb`; the other three forms are theorems
    (Rocq: `tx_sconf`/`tx_gen` are Parameters DEFINED by the derivations;
    `dep_sconf` is a `Local Lemma` of the proof -- exported here since it is
    a derivation from the field and costs nothing).
@@ -709,52 +709,6 @@ theorem iunlockput_txDep_open {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc 
   iexists t
   iexact H
 
-/-- **The credited transactional form from the generic one** (Rocq
-`wp_iunlockput_tx_of_dep_gen`). -/
-theorem wp_iunlockput_tx_of_dep_gen {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
-    [Xv6G GF] [FdslotG GF] [BioslotG GF]
-    [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
-    [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-    [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
-    (γil γisl : GName) (kk : Nat) (qi s : Qp) (g : GName) (lo tl : Nat)
-    (inum : BitVec 32) (dn : Dinode) (bm : Blkmap)
-    (n : Nat) (Sb : List Nat) (crb cru crz : Bool) (e0 : Nat)
-    (pidv : BitVec 32) (dqp dqb dqs : DFrac)
-    hj hproc hK hsie hnoff hlocks htier hkk hcrb hcru hgeom hbg hcov hlog hnib hbel hn hpd ha0 hle
-    (Hgen : ∀ (d : IcDep) (tid : Nat) (qtx : Qp)
-      (hshr : icDepShr d = some (s, icfgDev, inum, g, lo))
-      (hside : icDepSideTx d = some (tid, qtx)),
-      wp_iunlockput_dep_gen_body (hlc := hlc) (GF := GF) Γ cpu k γl pd pav pu j γil γisl kk
-        qi s g lo tl d inum dn bm n Sb crb cru crz e0 tid qtx pidv dqp dqb dqs
-        hj hproc hK hsie hnoff hlocks htier hshr hkk hcrb hcru hgeom hbg hcov hlog hnib hbel hn
-        hpd ha0 hside hle) :
-    wp_iunlockput_tx_gen_body (hlc := hlc) (GF := GF) Γ cpu k γl pd pav pu j γil γisl kk
-      qi s g lo tl inum dn bm n Sb crb cru crz e0 pidv dqp dqb dqs
-      hj hproc hK hsie hnoff hlocks htier hkk hcrb hcru hgeom hbg hcov hlog hnib hbel hn hpd ha0
-      hle := by
-  unfold wp_iunlockput_tx_gen_body
-  iintro ⟨Hk, Hpc, #Hpi, Htc, Hcl, Hir, #Hpe, #Hbc, #Hlc, #Hdc, #Hit, #Hinv, #Hesc, #Hireg,
-    #Hopen, #Hslk, Hsl, #Hfl, #Hcla, Hdep, Hoff, Hdev, Hinum, Hval, Hload, Hshot, Hfrz, Hpar,
-    Hsb, Hsi, #Hbmi, Hpid, Hbs, Hnlz, Hop, Hnext⟩
-  icases iunlockput_txDep_open fscIc kk s icfgDev inum g lo $$ Hdep with ⟨%t, Hdep, Ht2⟩
-  have h := Hgen (.depTx s icfgDev inum g lo t (1 : Qp).half) t (1 : Qp).half rfl rfl
-  unfold wp_iunlockput_dep_gen_body at h
-  iapply h
-  iframe Hk Hpc Hpi Htc Hcl Hir Hpe Hbc Hlc Hdc Hit Hinv Hesc Hireg Hopen Hslk Hsl Hfl Hcla Hdep
-    Hoff Hdev Hinum Hval Hshot Hfrz Hpar Hsb Hsi Hbmi Hpid Hbs Hnlz Hop
-  isplitl [Hload]
-  · simp only [icDepHeld, icDepRd, Bool.false_eq_true, ↓reduceIte]
-    iexact Hload
-  iapply wpNext_mono _ _ _ _ _ $$ Hnext
-  iintro %c' HΦ %spie %spp %R' %n' %Sb' %w %hcs Hk Hpc Htc Hcl Hir Hpid Hsb Hsi Hbs %hf Hops
-    Hslot Ht1
-  rw [icDepSide_ofTx _ t (1 : Qp).half rfl]
-  ihave Htx := logTx_join icfgLog t $$ Ht1 Ht2
-  iapply HΦ $$ %spie %spp %R' %n' %Sb' %w %hcs Hk Hpc Htc Hcl Hir Hpid Hsb Hsi Hbs %hf Hops Htx
-    Hslot
-
 theorem wp_iunlockput_tx_of_dep_gen_eb {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
     [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
@@ -798,52 +752,6 @@ theorem wp_iunlockput_tx_of_dep_gen_eb {hlc : HasLC} {GF : BundledGFunctors} [Ma
   ihave Htx := logTx_join icfgLog t $$ Ht1 Ht2
   iapply HΦ $$ %spie %spp %R' %n' %Sb' %w %hcs Hk Hpc Hte Hce Hpid Hsb Hsi Hbs %hf Hops Htx
     Hslot
-
-/-- **The counted transactional form from the generic counted one** (Rocq
-`wp_iunlockput_tx_of_dep_sconf`): the side share rejoins the residue
-(`logTx_join`) and the budget half rejoins the token (`logOpb_op`). -/
-theorem wp_iunlockput_tx_of_dep_sconf {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
-    [Xv6G GF] [FdslotG GF] [BioslotG GF]
-    [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
-    [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-    [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
-    (γil γisl : GName) (kk : Nat) (qi s : Qp) (g : GName) (lo tl : Nat)
-    (inum : BitVec 32) (dn : Dinode) (bm : Blkmap)
-    (n : Nat)
-    (pidv : BitVec 32) (dqp dqb dqs : DFrac)
-    hj hproc hK hsie hnoff hlocks htier hkk hgeom hbg hcov hlog hnib hbel hn hpd ha0 hle
-    (Hgen : ∀ (d : IcDep) (tid : Nat) (qtx : Qp)
-      (hshr : icDepShr d = some (s, icfgDev, inum, g, lo))
-      (hside : icDepSideTx d = some (tid, qtx)),
-      wp_iunlockput_dep_sconf_body (hlc := hlc) (GF := GF) Γ cpu k γl pd pav pu j γil γisl kk
-        qi s g lo tl d inum dn bm n tid qtx pidv dqp dqb dqs
-        hj hproc hK hsie hnoff hlocks htier hshr hkk hgeom hbg hcov hlog hnib hbel hn
-        hpd ha0 hside hle) :
-    wp_iunlockput_tx_sconf_body (hlc := hlc) (GF := GF) Γ cpu k γl pd pav pu j γil γisl kk
-      qi s g lo tl inum dn bm n pidv dqp dqb dqs
-      hj hproc hK hsie hnoff hlocks htier hkk hgeom hbg hcov hlog hnib hbel hn hpd ha0
-      hle := by
-  unfold wp_iunlockput_tx_sconf_body
-  iintro ⟨Hk, Hpc, #Hpi, Htc, Hcl, Hir, #Hpe, #Hbc, #Hlc, #Hdc, #Hit, #Hinv, #Hesc, #Hireg,
-    #Hopen, #Hslk, Hsl, #Hfl, #Hcla, Hdep, Hoff, Hdev, Hinum, Hval, Hload, Hshot, Hfrz, Hpar,
-    Hsb, Hsi, #Hbmi, Hpid, Hbs, Hop, Hnext⟩
-  icases iunlockput_txDep_open fscIc kk s icfgDev inum g lo $$ Hdep with ⟨%t, Hdep, Ht2⟩
-  have h := Hgen (.depTx s icfgDev inum g lo t (1 : Qp).half) t (1 : Qp).half rfl rfl
-  unfold wp_iunlockput_dep_sconf_body at h
-  iapply h
-  iframe Hk Hpc Hpi Htc Hcl Hir Hpe Hbc Hlc Hdc Hit Hinv Hesc Hireg Hopen Hslk Hsl Hfl Hcla Hdep
-    Hoff Hdev Hinum Hval Hshot Hfrz Hpar Hsb Hsi Hbmi Hpid Hbs Hop
-  isplitl [Hload]
-  · simp only [icDepHeld, icDepRd, Bool.false_eq_true, ↓reduceIte]
-    iexact Hload
-  iapply wpNext_mono _ _ _ _ _ $$ Hnext
-  iintro %c' HΦ %spie %spp %R' %n' %hcs Hk Hpc Htc Hcl Hir Hpid Hsb Hsi Hbs %hf Hopb Hslot Ht1
-  rw [icDepSide_ofTx _ t (1 : Qp).half rfl]
-  ihave Htx := logTx_join icfgLog t $$ Ht1 Ht2
-  ihave Hop := logOpb_op icfgLog n' $$ Hopb Htx
-  iapply HΦ $$ %spie %spp %R' %n' %hcs Hk Hpc Htc Hcl Hir Hpid Hsb Hsi Hbs %hf Hop Hslot
 
 theorem wp_iunlockput_tx_of_dep_sconf_eb {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
     [Xv6G GF] [FdslotG GF] [BioslotG GF]
@@ -910,84 +818,6 @@ structure IUNLOCKPUT : Prop where
       hj hproc hK hnoff htier hshr hkk hcrb hcru hgeom hbg hcov hlog hnib hbel hn
       hpd ha0 hside hle
 
-/-- The interrupts-off instance of `wp_iunlockput_dep_gen_eb` (the complement is the whole
-bundle): the contract every not-yet-generalized caller states. -/
-theorem IUNLOCKPUT.wp_iunlockput_dep_gen (A : IUNLOCKPUT) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
-    [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
-    [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-    [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
-    (γil γisl : GName) (kk : Nat) (qi s : Qp) (g : GName) (lo tl : Nat) (d : IcDep)
-    (inum : BitVec 32) (dn : Dinode) (bm : Blkmap)
-    (n : Nat) (Sb : List Nat) (crb cru crz : Bool) (e0 : Nat) (tid : Nat) (qtx : Qp)
-    (pidv : BitVec 32) (dqp dqb dqs : DFrac)
-    hj hproc hK hsie hnoff hlocks htier hshr hkk hcrb hcru hgeom hbg hcov hlog hnib hbel hn hpd
-    ha0 hside hle :
-    wp_iunlockput_dep_gen_body (hlc := hlc) (GF := GF) Γ cpu k γl pd pav pu j γil γisl kk
-      qi s g lo tl d inum dn bm n Sb crb cru crz e0 tid qtx pidv dqp dqb dqs
-      hj hproc hK hsie hnoff hlocks htier hshr hkk hcrb hcru hgeom hbg hcov hlog hnib hbel hn
-      hpd ha0 hside hle := by
-  have h := A.wp_iunlockput_dep_gen_eb (hlc := hlc) (GF := GF) (Γ := Γ) (cpu := cpu) (k := k) (γl := γl) (pd := pd) (pav := pav) (pu := pu) (j := j) (γil := γil) (γisl := γisl) (kk := kk) (qi := qi) (s := s) (g := g) (lo := lo) (tl := tl) (d := d) (inum := inum) (dn := dn) (bm := bm) (n := n) (Sb := Sb) (crb := crb) (cru := cru) (crz := crz) (e0 := e0) (tid := tid) (qtx := qtx) (pidv := pidv) (dqp := dqp) (dqb := dqb) (dqs := dqs) (hj := hj) (hproc := hproc) (hK := hK) (hnoff := hnoff) (htier := htier) (hshr := hshr) (hkk := hkk) (hcrb := hcrb) (hcru := hcru) (hgeom := hgeom) (hbg := hbg) (hcov := hcov) (hlog := hlog) (hnib := hnib) (hbel := hbel) (hn := hn) (hpd := hpd) (ha0 := ha0) (hside := hside) (hle := hle)
-  unfold wp_iunlockput_dep_gen_eb_body at h
-  unfold wp_iunlockput_dep_gen_body
-  rw [hsie] at h
-  simp only [trapCsrsExt_false, cpuClaimExt_false] at h
-  iintro ⟨H0, H1, H2, Htc, Hcl, Hir, H6, H7, H8, H9, H10, H11, H12, H13, H14, H15, H16, H17, H18, H19, H20, H21, H22, H23, H24, H25, H26, H27, H28, H29, H30, H31, H32, H33, H34, Hnext⟩
-  iapply h
-  iframe H0 H1 H2 Htc Hcl Hir H6 H7 H8 H9 H10 H11 H12 H13 H14 H15 H16 H17 H18 H19 H20 H21 H22 H23 H24 H25 H26 H27 H28 H29 H30 H31 H32 H33 H34
-  iapply wpNext_mono $$ Hnext
-  iintro %cpu' HK %spie %spp %R' %n' %Sb' %w %p0 H1 H2 ⟨Htc, Hir⟩ Hcl H6 H7 H8 H9 %p10 H11 H12 H13
-  iapply HK $$ %spie %spp %R' %n' %Sb' %w %p0 H1 H2 Htc Hcl Hir H6 H7 H8 H9 %p10 H11 H12 H13
-
-/-- **THE COUNTED SEAL at a caller-chosen descriptor** (Rocq's `Local Lemma
-wp_iunlockput_dep_sconf`): the budget half opens at its set and birth epoch,
-the generic form runs uncredited (`crb = cru = crz = false`), and the grown
-set is forgotten again (`logOpS_opb`). -/
-theorem IUNLOCKPUT.wp_iunlockput_dep_sconf (A : IUNLOCKPUT) {hlc : HasLC}
-    {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
-    [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
-    [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-    [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
-    (γil γisl : GName) (kk : Nat) (qi s : Qp) (g : GName) (lo tl : Nat) (d : IcDep)
-    (inum : BitVec 32) (dn : Dinode) (bm : Blkmap)
-    (n : Nat) (tid : Nat) (qtx : Qp)
-    (pidv : BitVec 32) (dqp dqb dqs : DFrac)
-    hj hproc hK hsie hnoff hlocks htier hshr hkk hgeom hbg hcov hlog hnib hbel hn hpd ha0
-    hside hle :
-    wp_iunlockput_dep_sconf_body (hlc := hlc) (GF := GF) Γ cpu k γl pd pav pu j γil γisl kk
-      qi s g lo tl d inum dn bm n tid qtx pidv dqp dqb dqs
-      hj hproc hK hsie hnoff hlocks htier hshr hkk hgeom hbg hcov hlog hnib hbel hn
-      hpd ha0 hside hle := by
-  unfold wp_iunlockput_dep_sconf_body
-  iintro ⟨Hk, Hpc, #Hpi, Htc, Hcl, Hir, #Hpe, #Hbc, #Hlc, #Hdc, #Hit, #Hinv, #Hesc, #Hireg,
-    #Hopen, #Hslk, Hsl, #Hfl, #Hcla, Hdep, Hoff, Hdev, Hinum, Hval, Hload, Hshot, Hfrz, Hpar,
-    Hsb, Hsi, #Hbmi, Hpid, Hbs, Hopb, Hnext⟩
-  icases (show logOpb (GF := GF) icfgLog n ⊢ ∃ Sb, logOpS icfgLog n Sb from .rfl) $$ Hopb
-    with ⟨%Sb0, Hops⟩
-  icases logOpS_named icfgLog n Sb0 $$ Hops with ⟨%e00, Hope⟩
-  have h := A.wp_iunlockput_dep_gen (hlc := hlc) (GF := GF) Γ cpu k γl pd pav pu j γil γisl kk
-    qi s g lo tl d inum dn bm n Sb0 false false false e00 tid qtx pidv dqp dqb dqs
-    hj hproc hK hsie hnoff hlocks htier hshr hkk (fun h => absurd h (by simp))
-    (fun h => absurd h (by simp)) hgeom hbg hcov hlog hnib hbel hn hpd ha0 hside hle
-  unfold wp_iunlockput_dep_gen_body at h
-  iapply h
-  iframe Hk Hpc Hpi Htc Hcl Hir Hpe Hbc Hlc Hdc Hit Hinv Hesc Hireg Hopen Hslk Hsl Hfl Hcla Hdep
-    Hoff Hdev Hinum Hval Hload Hshot Hfrz Hpar Hsb Hsi Hbmi Hpid Hbs Hope
-  isplitl []
-  · simp only [Bool.false_eq_true, if_false]
-    iempintro
-  iapply wpNext_mono _ _ _ _ _ $$ Hnext
-  iintro %c' HΦ %spie %spp %R' %n' %Sb' %w %hcs Hk Hpc Htc Hcl Hir Hpid Hsb Hsi Hbs %hf Hops
-    Hslot Hside
-  obtain ⟨-, -, -, hlo, hhi⟩ := hf
-  ihave Hopb := logOpS_opb icfgLog n' Sb' $$ Hops
-  iapply HΦ $$ %spie %spp %R' %n' %hcs Hk Hpc Htc Hcl Hir Hpid Hsb Hsi Hbs [] Hopb Hslot Hside
-  ipureintro
-  exact ⟨Xv6.ipSpendW_uncredited w n n' hlo, hhi⟩
-
 theorem IUNLOCKPUT.wp_iunlockput_dep_sconf_eb (A : IUNLOCKPUT) {hlc : HasLC}
     {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
@@ -1032,33 +862,6 @@ theorem IUNLOCKPUT.wp_iunlockput_dep_sconf_eb (A : IUNLOCKPUT) {hlc : HasLC}
   ipureintro
   exact ⟨Xv6.ipSpendW_uncredited w n n' hlo, hhi⟩
 
-/-- The credited transactional form (Rocq `wp_iunlockput_tx_gen`, defined by
-`wp_iunlockput_tx_of_dep_gen`). -/
-theorem IUNLOCKPUT.wp_iunlockput_tx_gen (A : IUNLOCKPUT) {hlc : HasLC} {GF : BundledGFunctors}
-    [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
-    [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
-    [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-    [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
-    (γil γisl : GName) (kk : Nat) (qi s : Qp) (g : GName) (lo tl : Nat)
-    (inum : BitVec 32) (dn : Dinode) (bm : Blkmap)
-    (n : Nat) (Sb : List Nat) (crb cru crz : Bool) (e0 : Nat)
-    (pidv : BitVec 32) (dqp dqb dqs : DFrac)
-    hj hproc hK hsie hnoff hlocks htier hkk hcrb hcru hgeom hbg hcov hlog hnib hbel hn hpd ha0
-    hle :
-    wp_iunlockput_tx_gen_body (hlc := hlc) (GF := GF) Γ cpu k γl pd pav pu j γil γisl kk
-      qi s g lo tl inum dn bm n Sb crb cru crz e0 pidv dqp dqb dqs
-      hj hproc hK hsie hnoff hlocks htier hkk hcrb hcru hgeom hbg hcov hlog hnib hbel hn hpd ha0
-      hle :=
-  wp_iunlockput_tx_of_dep_gen Γ cpu k γl pd pav pu j γil γisl kk qi s g lo tl inum dn bm
-    n Sb crb cru crz e0 pidv dqp dqb dqs
-    hj hproc hK hsie hnoff hlocks htier hkk hcrb hcru hgeom hbg hcov hlog hnib hbel hn hpd ha0 hle
-    (fun d tid qtx hshr hside => A.wp_iunlockput_dep_gen Γ cpu k γl pd pav pu j γil γisl kk
-      qi s g lo tl d inum dn bm n Sb crb cru crz e0 tid qtx pidv dqp dqb dqs
-      hj hproc hK hsie hnoff hlocks htier hshr hkk hcrb hcru hgeom hbg hcov hlog hnib hbel hn
-      hpd ha0 hside hle)
-
 theorem IUNLOCKPUT.wp_iunlockput_tx_gen_eb (A : IUNLOCKPUT) {hlc : HasLC} {GF : BundledGFunctors}
     [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
@@ -1082,31 +885,6 @@ theorem IUNLOCKPUT.wp_iunlockput_tx_gen_eb (A : IUNLOCKPUT) {hlc : HasLC} {GF : 
     (fun d tid qtx hshr hside => A.wp_iunlockput_dep_gen_eb Γ cpu k γl pd pav pu j γil γisl kk
       qi s g lo tl d inum dn bm n Sb crb cru crz e0 tid qtx pidv dqp dqb dqs
       hj hproc hK hnoff htier hshr hkk hcrb hcru hgeom hbg hcov hlog hnib hbel hn
-      hpd ha0 hside hle)
-
-/-- The counted transactional form (Rocq `wp_iunlockput_tx_sconf`, defined by
-`wp_iunlockput_tx_of_dep_sconf`). -/
-theorem IUNLOCKPUT.wp_iunlockput_tx_sconf (A : IUNLOCKPUT) {hlc : HasLC}
-    {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
-    [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
-    [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-    [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
-    (γil γisl : GName) (kk : Nat) (qi s : Qp) (g : GName) (lo tl : Nat)
-    (inum : BitVec 32) (dn : Dinode) (bm : Blkmap)
-    (n : Nat)
-    (pidv : BitVec 32) (dqp dqb dqs : DFrac)
-    hj hproc hK hsie hnoff hlocks htier hkk hgeom hbg hcov hlog hnib hbel hn hpd ha0 hle :
-    wp_iunlockput_tx_sconf_body (hlc := hlc) (GF := GF) Γ cpu k γl pd pav pu j γil γisl kk
-      qi s g lo tl inum dn bm n pidv dqp dqb dqs
-      hj hproc hK hsie hnoff hlocks htier hkk hgeom hbg hcov hlog hnib hbel hn hpd ha0 hle :=
-  wp_iunlockput_tx_of_dep_sconf Γ cpu k γl pd pav pu j γil γisl kk qi s g lo tl inum dn bm
-    n pidv dqp dqb dqs
-    hj hproc hK hsie hnoff hlocks htier hkk hgeom hbg hcov hlog hnib hbel hn hpd ha0 hle
-    (fun d tid qtx hshr hside => A.wp_iunlockput_dep_sconf Γ cpu k γl pd pav pu j γil γisl kk
-      qi s g lo tl d inum dn bm n tid qtx pidv dqp dqb dqs
-      hj hproc hK hsie hnoff hlocks htier hshr hkk hgeom hbg hcov hlog hnib hbel hn
       hpd ha0 hside hle)
 
 theorem IUNLOCKPUT.wp_iunlockput_tx_sconf_eb (A : IUNLOCKPUT) {hlc : HasLC}

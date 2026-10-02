@@ -9,8 +9,8 @@ by `kexecSz`, which is `0x4000` for both images.  So the chain is stated
 here ONCE, over an image `E` with `kexecSz E = 0x4000` and a frame `frame`
 in words:
 
-1. the push helpers (`uscan_nul`, `ukSlen_nul`, `bvLe8_isSome`,
-   `kexecVecBytes`, `ukArgvP_of_bytes`, `kxcSpan_le_line`);
+1. the push helpers (`uscan_nul`, `ukSlen_nul`, `kexecVecBytes`,
+   `ukArgvP_of_bytes`, `kxcSpan_le_line`);
 2. the room: `imgArgvFits frame` (the push leaves `8 * frame` bytes of the
    stack page), `imgRoom`, and that every admissible line earns it at any
    frame up to 370 words (`imgArgvFits_of_ok_x`);
@@ -42,8 +42,8 @@ Ported: every reached declaration.  Dropped (UNREACHED from
    `uvisArgc` (already `Nat`), so Rocq's `Z.to_nat (uvis_argc W')` is
    `uvisArgc W'`.  `PGSIZE` is `4096`.
 2. **A word's bytes are `nthByte`** (total; Rocq `bv_to_little_endian 8 8 z
-   !! k`, a partial list lookup): `bvLe8_isSome` is the trivial totality
-   fact, and `ukArgvP_of_bytes` takes the word as a `BitVec 64` (Rocq a `Z`
+   !! k`, a partial list lookup), so no totality fact is needed, and
+   `ukArgvP_of_bytes` takes the word as a `BitVec 64` (Rocq a `Z`
    in range); `Xv6.ubyte0_bv0` is `ubyte0 = BitVec.ofNat 8 0`.
 3. `UkAbi.UkArgsC` is Lean's (UkAbi deviations 1-3: alignment with `%`,
    `UkRd`'s bundle); `imgKexecArgsc` fills its fields.
@@ -115,11 +115,6 @@ length bound clears. -/
 theorem ukSlen_nul (M : ElfMem) (a n : Nat) (hn : n < 2 ^ 31) (hex : ∀ j, j < n → (M (a + j)).isSome)
     (hnul : M (a + n) = some ubyte0) : ukSlen M a ≤ n ∧ Ucstr M a (ukSlen M a) :=
   uscan_nul M n ukSlenFuel a (by unfold ukSlenFuel; omega) hex hnul
-
-/-- **Rocq `bv_le8_is_Some`** (deviation 2): a word's eight little-endian
-bytes are all there. -/
-theorem bvLe8_isSome (z : BitVec 64) (k : Nat) (_hk : k < 8) : ∃ b : BitVec 8, nthByte (n := 8) z k = b :=
-  ⟨_, rfl⟩
 
 /-- `memAtZ` at a non-negative address is the image's byte. -/
 theorem memAtZ_nonneg (M : ElfMem) (x : Int) (h : 0 ≤ x) : memAtZ M x = M x.toNat := by

@@ -42,7 +42,7 @@ proved from the `fail:` twin `createFailMkdirBody` as a PREMISE.
   flush (`nlink_add1_nz_eq`).
 * THE APPLICATION: the DOTS fire first (`create_dirty_clear_dots`: the
   child's row moves `ADir ∅ → dotsEnts true`, its registry arm comes home),
-  then the PARENT LEG (`cafAcre_fire` at `creChild`).  The three `fail:`
+  then the PARENT LEG (`cafAcre_fire_nm` at `creChild`).  The three `fail:`
   entries fire the dots as far as they landed (entry 1: none, the retag is
   view-preserving; entry 2: `"."` alone; entry 3: both) and hand the child
   over WITHOUT its `dlinks`, with the fill's pile WHOLE again (the `"."`

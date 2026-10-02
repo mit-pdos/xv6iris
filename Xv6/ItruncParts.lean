@@ -55,7 +55,7 @@ iris/*.v`):
 
 **Copied from other functions' stage files (promotion candidates):**
 none left.  (The former copies `itrunc_bread` / `itrunc_brelse` are the shared
-`Xv6.bread_callF` / `Xv6.brelse_callF`, `Xv6/FsCallSitesF.lean`;
+`Xv6.bread_callF_eb` / `Xv6.brelse_callF`, `Xv6/FsCallSitesF.lean`;
 `itrunc_calleeSaved_epi`, bread's `bd_calleeSaved_epi` restated, is the
 shared `MachCSL.calleeSaved_epi6s3`, `MachCSL/WpSmodeFrame6c.lean`; the
 `rfl` projections `itrunc_view_gd` / `_cov` are `Xv6.fsView_gd` / `_cov`,

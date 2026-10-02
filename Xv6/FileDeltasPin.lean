@@ -32,8 +32,8 @@ composite create `FileDeltasStep`.
    `redir_name_ok(_ne_console)`, `uname_ne_dot`,
    `name_absent_cons`, `name_absent_f` (the `FsFPin` readings; Lean has no
    `FsFPin`, which the cone audit found unreached).
-3. `uname_ne_console` / `uname_ne_dotdot` are `FileNamePins.nl_ne_console`
-   / `nl_ne_dotdot` at `txtLaws` (Rocq's proofs, verbatim); `FileDisc.uname` is `FileDiscLine.uname` (= `txtName`).
+3. `uname_ne_console` is `FileNamePins.nl_ne_console` at `txtLaws` (Rocq's
+   proof, verbatim; `uname_ne_dotdot` is not ported, nothing uses it); `FileDisc.uname` is `FileDiscLine.uname` (= `txtName`).
 -/
 import Xv6.AppFilePure
 import Xv6.FileNamePins
@@ -47,10 +47,6 @@ open Iris.Std
 /-- Rocq `uname_ne_console`. -/
 theorem uname_ne_console (nm : Fname) (h : uname nm) : nm ≠ fnameConsole :=
   nl_ne_console txtName txtLaws nm h
-
-/-- Rocq `uname_ne_dotdot`. -/
-theorem uname_ne_dotdot (nm : Fname) (h : uname nm) : nm ≠ DOTDOT :=
-  nl_ne_dotdot txtName txtLaws nm h
 
 /-! ## §1 The readings -/
 

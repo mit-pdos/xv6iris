@@ -29,8 +29,8 @@ site); what needs one is a SYMBOLIC value.
    lemmas are stated at the Lean `BitVec` operations the leaves' value
    functions unfold to (`SpecUkLeaves` §4); `nw_unsigned`/`shift_amount_bv`
    (Rocq's `N_to_word` plumbing) have no Lean counterpart.
-3. `zext8_unsigned`/`zext8_moi` are one lemma (`uzext8_moi`); `add_vec_zero_l`
-   is `BitVec.zero_add` (not restated).
+3. `zext8_unsigned`/`zext8_moi` are not ported (nothing uses them);
+   `add_vec_zero_l` is `BitVec.zero_add` (not restated).
 -/
 import Std.Tactic.BVDecide
 
@@ -174,11 +174,5 @@ theorem umoi_zext_scale {z : Int} (k : Nat) (h0 : 0 ≤ z) (h1 : z < 2 ^ 32) (hk
 
 /-- Rocq `zero_reg_moi`. -/
 theorem uzero_moi : (0#64 : BitVec 64) = BitVec.ofInt 64 0 := rfl
-
-/-- Rocq `zext8_unsigned` / `zext8_moi`: an unsigned byte load leaves its
-byte ZERO-extended. -/
-theorem uzext8_moi (b : BitVec 8) : BitVec.setWidth 64 b = BitVec.ofInt 64 (b.toNat : Int) := by
-  apply BitVec.eq_of_toNat_eq
-  simp
 
 end Xv6

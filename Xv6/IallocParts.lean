@@ -14,7 +14,7 @@ sign-extended into `s2`; here `s2 = BitVec.ofNat 64 n` for a natural
 `BitVec.ofNat 32 n`, whose `toNat` is `n`.  The Rocq lemmas `ia_sext_small`,
 `ia_srli4`, `ia_add_vec32_comm`, `ia_andi15`, `ia_uint64_moi`, `ia_bgeu_moi`,
 `ia_bltu_moi` become the `ialloc_*` facts below at that shape (the
-`Xv6/DinodeSlot.lean` group-1 lemmas `dsSext_small`, `dsSrli4`, `dsAddwIbl`,
+`Xv6/DinodeSlot.lean` group-1 lemmas `dsSext_small`, `dsAddwIbl`,
 `dsAndi15`, `dsSlli6`, `dsBltu` are reused where they apply verbatim).
 `ia_type_zero`/`_nonzero`/`ia_sext64_16_inj` ARE `dsType_zero`/
 `dsType_nonzero`/`dsSext64_16_inj`.  `ia_cbyte`/`ia_cbyte_zero` vanish:

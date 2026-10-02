@@ -156,14 +156,4 @@ theorem ushCycles_snoc_in (h : List Obs) (b : BitVec 8) :
   | nil => exact ⟨[], by simp [cycStep]⟩
   | cons c cs => exact ⟨c, by simp [cycStep]⟩
 
-/-- **Rocq `ush_narrow_count_le`**: the signed 32-bit reading of a count is
-at most its unsigned value. -/
-theorem ushNarrow_count_le (w : BitVec 64) (k : Nat) (hu : w.toNat = k) :
-    (BitVec.setWidth 32 w).toInt.toNat ≤ k := by
-  have h1 : (BitVec.setWidth 32 w).toNat = w.toNat % 2 ^ 32 := by simp [BitVec.toNat_setWidth]
-  have h2 := BitVec.toInt_eq_toNat_cond (BitVec.setWidth 32 w)
-  have h3 : w.toNat % 2 ^ 32 ≤ w.toNat := Nat.mod_le _ _
-  rw [Int.toNat_le]
-  split at h2 <;> omega
-
 end Xv6

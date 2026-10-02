@@ -99,7 +99,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
 
 /-- sys_chroot's result, keyed by the returned a0 (Rocq's
-`sys_chroot_post`, SpecSysChdir's `sysChdirPost` at the other cell).  `ipv`
+`sys_chroot_post`, Rocq's `sys_chdir_post` at the other cell).  `ipv`
 and `z` are existential: the entry the path resolves to is not something
 the caller named, and `z` is the REAL inum of the installed inode, the one
 `ProcInv.rootRefAt` ties the pointer to. -/

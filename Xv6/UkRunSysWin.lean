@@ -228,37 +228,6 @@ theorem wp_uk_ecall_window (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegM
   iapply Hcont $$ %h' %r %d %g %(by omega) %(fun j hj _ => by show (if j < d then _ else f j) = f j; rw [if_neg (by omega)])
     %hrd Hrun Hbuf
 
-/-- **Rocq `wp_uk_ecall_read_win`**: THE READ ROW'S INSTANCE OF THE WINDOW
-LEAF -- sh's `getcmd` shape: the buffer is a1, the count a2 as a C `int`,
-the caller owns AT LEAST the count, and gets back the written prefix's
-length `d` with the tail pinned unchanged, and what the call answered. -/
-theorem wp_uk_ecall_read_win (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64)
-    (cnt : Int) (k : Nat) (f : Nat → BitVec 8) (avail : Nat) (hn : usysno m = USYS_read)
-    (hcnt : (BitVec.setWidth 32 (m.get 12#5)).toInt = cnt) (hck : cnt.toNat ≤ k)
-    (hal4 : (pc + 4#64) &&& 1#64 = 0#64) :
-    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun (hlc := hlc) N h m pc avail -∗
-      udepw (hlc := hlc) N m pc USYS_read -∗ ubytes N.d (m.get 11#5).toNat k f -∗
-      (∀ (h' : CPU) (r : BitVec 64) (d : Nat) (g : Nat → BitVec 8),
-        ⌜d ≤ cnt.toNat⌝ -∗ ⌜∀ j, d ≤ j → j < k → g j = f j⌝ -∗
-        ⌜r.toInt = -1 ∨ (0 ≤ r.toInt ∧ r.toInt ≤ max 0 cnt)⌝ -∗
-        urun (hlc := hlc) N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ ubytes N.d (m.get 11#5).toNat k g -∗
-        wpLoop h') -∗
-      wpLoop h := by
-  have hwin : usyswin m USYS_read = some (m.get 11#5, cnt.toNat) := by
-    unfold usyswin
-    rw [if_neg (by decide), if_neg (by decide), if_pos rfl, ukSys_lo32, hcnt]
-  iintro #Hi Hrun Hsb Hbuf Hcont
-  iapply wp_uk_ecall_window UL N h m pc USYS_read (m.get 11#5) cnt.toNat k f avail hn hwin hck
-    (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) hal4 $$ Hi Hrun Hsb Hbuf
-  iintro %h' %r %d %g %hd %hgf %hrd Hrun Hbuf
-  have hr := hrd rfl
-  unfold usysReadRet usysRdcount at hr
-  rw [tfOf_aget m pc 2 (by decide)] at hr
-  have e : (BitVec.extractLsb' 0 32 (m.get (BitVec.ofNat 5 (10 + 2)))).toInt = cnt := by
-    rw [ukSys_lo32]; exact hcnt
-  rw [e] at hr
-  iapply Hcont $$ %h' %r %d %g %hd %hgf %hr Hrun Hbuf
-
 /-- **Rocq `urun_ubytes_run`**, the bound half: a run the program owns is
 below MAXVA. -/
 theorem urun_ubytes_bound (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64) (avail a n : Nat)

@@ -50,7 +50,7 @@ iunlockput's argument is already in place).
 * DETERMINISM: none; the post is the honest disjunction on a0, refined by
   the legs' receipts (`mkdirArms`).
 * THE FAMILIES ARE THE CALLER'S: the walk's cursor pair and the exists
-  observation come in beside the four legs (`mkdirAuPre`, at `T_DIR` with
+  observation come in beside the four legs (`mkdirAuAt`, at `T_DIR` with
   both device halfwords zero) and the arms report them.
 
 ## Deviations from Rocq
@@ -96,11 +96,11 @@ iunlockput's argument is already in place).
    `bv_unsigned T_DIR` / `bv_unsigned (mword_of_int 0)` is `T_DIR.toNat` /
    `0`; `-1` is `0xFFFFFFFFFFFFFFFF#64`, `zero_reg` is `0#64`.
 7. Names: `K_sys_mkdir` → `sysMkdirSlots`, `sys_mkdir_ret` → `sysMkdirRet`,
-   `mkdir_au_pre` → `mkdirAuPre`, `mkdir_au_at(_inst, _of_all, _unit)` →
-   `mkdirAuAt(_inst, _of_all, _unit)`, `mkdir_cre_inst` → `mkdirCre_inst`,
-   `mkdir_arms` → `mkdirArms`,
+   `mkdir_au_at(_unit)` → `mkdirAuAt(_unit)`, `mkdir_cre_inst` →
+   `mkdirCre_inst`, `mkdir_arms` → `mkdirArms`,
    `wp_sys_mkdir_sconf_body` → `wp_sys_mkdir_eb_body` (continuation named
-   `sysMkdirK`), `SYSMKDIR` kept.
+   `sysMkdirK`), `SYSMKDIR` kept.  `mkdir_au_pre` and
+   `mkdir_au_at_{inst,of_all}` are not ported (nothing uses them).
 
 8. **THE PATH READING IS AT THE LAZY IMAGE** (TL-3C, `3e3a157ae`), as
    `SpecSysMknod` deviation 5: Rocq's `mkdir_au_at (us_M U) v` is
@@ -151,25 +151,11 @@ TL-3K threaded the walk's terminal cursor into the parent leg's commit and
 found that mkdir COULD NOT CARRY ONE: its bundle took the `∀ pl` one-shot
 (`nparWalkPreEra`), so there was no ONE path for a cursor to name.  So mkdir
 now takes the bundle AT THE PATH ARGUMENT 0 NAMES, exactly as sys_mknod and
-open(O_CREATE) do: `mkdirAuPre` at ONE fetched path (the walk one-shot there
-and the four legs at `P (nparElems pl).length`), and `mkdirAuAt` at the
-SYSCALL tier (under the reading of trapframe argument 0, the cursor under the
-SAME guard, `nparCur`).  THE COMMITS STAY OUTSIDE THE WALK'S WAND: argstr can
+open(O_CREATE) do: `mkdirAuAt`, at the SYSCALL tier, holds the walk one-shot
+at every path trapframe argument 0 reads as, and the four legs at the cursor
+under the SAME guard (`nparCur`, which `mkdirCre_inst` turns into
+`P (nparElems pl).length` at the fetched path).  THE COMMITS STAY OUTSIDE THE WALK'S WAND: argstr can
 fail, and then no `pl` satisfies the reading. -/
-
-/-- EVERYTHING THE CALLER HANDS IN, AT ONE PATH, at the commit mask `appE`
-(Rocq's `mkdir_au_pre`): the walk one-shot at the path, the exists
-observation and create's four commits at `T_DIR` with both device halfwords
-zero, at the walk's terminal cursor. -/
-def mkdirAuPre (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat) (pl : List (BitVec 8))
-    (P Pmiss : Nat → Nat → IProp GF)
-    (Farm : Pfam GF (Aview → Nat → IProp GF))
-    (Fdots : Pfam GF (Aview → Nat → Nat → Bool → IProp GF))
-    (Fun : Pfam GF (Aview → Nat → IProp GF))
-    (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) : IProp GF :=
-  iprop(epStart (hlc := hlc) γfs rt cw P Pmiss pl ∗
-    pfAt (dlookupCommitAt (hlc := hlc) Γ appE) Fex ∗
-    creCommits (hlc := hlc) Γ T_DIR.toNat 0 0 (fun _ => True) (fun _ => True) (P (nparElems pl).length) Farm Fdots Fun Fok)
 
 /-- ...AND THE SYSCALL TIER (Rocq's `mkdir_au_at`; the contract reads it at
 the entry image, as sys_mknod's). -/

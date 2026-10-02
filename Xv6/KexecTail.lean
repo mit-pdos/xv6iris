@@ -73,8 +73,7 @@ a STAGE file (no `Proof` prefix, brief rule 2; the one seal is
    unfolding wand is `□ (∀ c, KEX c -∗ kexecCloser Q QF k A c)` in the port.
 9. **DROPPED single-slot accessors** `kxa_esc_acc` (= `FsReady.fsReady_escrow`),
    `kxa_bs3_split/join` (= `bslots` arithmetic at the call site).
-10. **`kxc_exit_qgen` is `KexecOkQ.kexecCloser_of_ok`** (it states no
-    functor argument; it lives with the closer).
+10. **`kxc_exit_qgen` is not ported** (nothing uses it).
 11. **ADDED: the call-site wrappers** `kxc_call_iup` / `kxc_call_endop` /
     `kxc_call_pfp` (the `NamexExit.namex_call_iup` precedent): `jal` +
     the callee's eb-generic (iunlockput `tx_sconf_eb`, end_op `_eb`) or
@@ -543,7 +542,7 @@ entry map: the frame is pushed, s0 is the frame pointer, s1 the running
 process and s2 the path; the callee-saved registers this stretch has NOT
 written (s3..s11) still hold their entry values.  The process block travels
 WHOLE (Rocq convention 2, D16).  `zi` is the inum the walk returned
-(N-5.2B: `inodeHeldAt`, the landed walk publishes it by `inodeHeld_zi`). -/
+(N-5.2B: `inodeHeldAt`, the landed walk publishes it). -/
 def kxcAtA2 (k : KCtx) (A : KexecArgs) (c : CPU) (spie spp : Bool) (R : RegMap) (ipv : BitVec 64)
     (zi n1 : Nat) : IProp GF := iprop%
   ⌜R 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFDE0#64 ∧ R 8#5 = k.regs 2#5 ∧ R 9#5 = k.proc ∧

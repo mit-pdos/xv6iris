@@ -9,12 +9,10 @@ whole, the deed PEND at `RFRan sel`), the exec FAILED after the open
 truncated `f` (`RFExec`), or the open FAILED with `f` as the round found it
 (`RFOpenU`) or created empty at an absent `f` (`RFOpenM`).  Each exit folds
 to the position-0 file credential `uWcf I 0`; the three diagnostics are read
-at the union's codes (`uab_redir_alts`), and the diagnostic's law is
-monotone in its conclusion (`uexecfail_law_at_wand`).
+at the union's codes (`uab_redir_alts`).
 
 CONE (UShURound S3, reached): `uredir_ran_exit`, `uredir_execfail_exit`,
-`uredir_openfail_exit_u`, `uredir_openfail_exit_m`, `uexecfail_law_at_wand`,
-`uab_redir_alts`.  (`uredir_exec_sup` is `UshURoundRedirSup`,
+`uredir_openfail_exit_u`, `uredir_openfail_exit_m`, `uab_redir_alts`.  (`uredir_exec_sup` is `UshURoundRedirSup`,
 `uHchild_redir` is `UshURoundRedir`.)
 
 ## Deviations from Rocq
@@ -24,9 +22,7 @@ CONE (UShURound S3, reached): `uredir_ran_exit`, `uredir_execfail_exit`,
    `lkPin`, `lk_post FI` is `lkPost (unionLinkInstAt ug s0)`, `lk_ab FI` its
    field `lkAb`; `FileWrite.file_wq` is `fileWq`, `f_typed` is `fTyped`,
    `ualt_code (UR a)` is `ualtCode (.UR a)`; `S gen_id` is `genId + 1`.
-2. `uexecfail_law_at_wand` is at sh-main's `ushExecfailLawAt` (Rocq
-   `UkShDiag.ush_execfail_law_at` at `uprogSG_free`/`offbox_offG`: the ambient
-   instances).
+2. `uexecfail_law_at_wand` is not ported (nothing uses it).
 3. The deed is rebuilt through `UshURoundFold.ushDeed_intro` (Rocq's inline
    `iExists`/`iFrame` at the unfolded deed).
 -/
@@ -185,23 +181,6 @@ theorem uredir_openfail_exit_m (I : List (BitVec 8)) (ws : Wordline) (nm : List 
   uWcf0_of_post_alt ug r s0 I _ v v' cs _
     (ulm_apr_R I .RFOpenM (uredir_nopipe I ws nm hul) (by rw [hul]; trivial) rfl rfl)
     (uredir_nw I ws nm hul) (ucode_nsync .RFOpenM (by decide)) htp.1 hpos (uredir_openm_step s0 I ws nm i cs sp hul htp hsN)
-
-/-- **Rocq `uexecfail_law_at_wand`**: the diagnostic's law is monotone in
-its conclusion (deviation 2). -/
-theorem uexecfail_law_at_wand (dg : List (BitVec 8)) (n : Nat) (Cr Cd Cd' : IProp GF) :
-    ⊢ ushExecfailLawAt (hlc := hlc) dg n Cr Cd -∗ □ (Cd -∗ Cd') -∗
-      ushExecfailLawAt (hlc := hlc) dg n Cr Cd' := by
-  iintro #Hl #Hw
-  unfold ushExecfailLawAt
-  imodintro
-  iintro %N %l %hfd Hc
-  icases Hl $$ %N %l %hfd Hc with ⟨%Pf, H0, #Hs, #He⟩
-  iexists Pf
-  iframe H0 Hs
-  imodintro
-  iintro Hp
-  iapply Hw
-  iapply He $$ Hp
 
 /-- **Rocq `uexecfail_law_at_conv`**: an exec-failure law read at a
 stronger hold and a weaker residue. -/

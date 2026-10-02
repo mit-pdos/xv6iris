@@ -24,8 +24,7 @@ FsImgCheck's: no kernel proof file imports this one; the pin files do.
 2. `fsimg_sync_path` is ported since drift SY2 (the union runs /sync);
    `fname_sync` was already (FileName's `sys_names` reads it).
 3. `fsimg_root_data` / `fsimg_root_nrec` are named here; `fsimgPathRoot`
-   (landed) is stated unfolded, and `fsimgPathRoot_named` restates it at
-   the two names.
+   (landed) is stated unfolded.
 4. `fsimgRootData` / `fsimgRootNrec` are `@[irreducible]`, as the image
    literals are (`FsImgDisk` deviation 2): an elaborator `whnf` of either
    (e.g. `Nat` literal arithmetic at `16 * fsimgRootNrec`) would otherwise
@@ -65,12 +64,6 @@ def fnameSeccomp : Fname :=
 /-- The root's record count (Rocq `fsimg_root_nrec`; `@[irreducible]`,
 deviation 4). -/
 @[irreducible] def fsimgRootNrec : Nat := dirNrec (fsDinode fsimgP fsimgSb ROOTINO).diSize.toNat
-
-/-- `fsimgPathRoot` at the two names (deviation 3). -/
-theorem fsimgPathRoot_named (f : Fname) :
-    pathAt (treeOfDisk fsimgP fsimgSb) ROOTINO [f] =
-      (fun k => (dirInum fsimgRootData k).toNat) <$> dirFirst fsimgRootData fsimgRootNrec f :=
-  by unfold fsimgRootData fsimgRootNrec; exact fsimgPathRoot f
 
 /-- Rocq `fsimg_echo_path`. -/
 theorem fsimgEchoPath : pathAt (treeOfDisk fsimgP fsimgSb) ROOTINO [fnameEcho] = some 4 := by

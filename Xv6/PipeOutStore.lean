@@ -7,10 +7,11 @@ the claim (`GenOut.gcsAuth`); and the frozen choices with their store, for
 the union's wild era.
 
 Names (Rocq → Lean): `gopen` → `gopen`, `gpcs` → `gpcs`, `gpcs_lb_prefix` →
-`gpcsLb_prefix`, `gpcs_lb_get` → `gpcsLb_get`, `gpcs_open`, `gpcs_store`,
-`gcs_of_gpcs`, `gpcs_of_gcs`, `gpcs_file`, `gcs_frozen` → `gcsFrozen`,
-`gcs_frozen_prefix` → `gcsFrozen_prefix`, `gcs_frozen_cs` → `gcsFrozen_cs`,
-`gcs_frozen_store` → `gcsFrozen_store`, `gcs_freeze`, `gpcs_freeze`.
+`gpcsLb_prefix`, `gpcs_lb_get` → `gpcsLb_get`, `gpcs_of_gcs`, `gpcs_file`,
+`gcs_frozen` → `gcsFrozen`, `gcs_frozen_prefix` → `gcsFrozen_prefix`,
+`gcs_frozen_cs` → `gcsFrozen_cs`, `gcs_frozen_store` → `gcsFrozen_store`,
+`gcs_freeze`, `gpcs_freeze`; `gpcs_open` / `gpcs_store` are `gpcs_store_open`
+together, and `gcs_of_gpcs` is not ported (nothing uses it).
 
 ## DEVIATIONS from Rocq
 
@@ -84,20 +85,6 @@ theorem gpcsLb_get (k : Nat) (v : EraPins) (l : List Nat) (fz : Bool) :
   ihave ⟨H, #Hl⟩ := pcs_lb_get v l fz $$ H
   iframe H Hs Ho Hl
 
-/-- Rocq `gpcs_open`. -/
-theorem gpcs_open (k : Nat) (v : EraPins) (l : List Nat) (fz : Bool) :
-    gpcs R k v l fz ⊢ gopen R k v l := by
-  unfold gpcs
-  iintro ⟨-, -, Ho⟩
-  iexact Ho
-
-/-- Rocq `gpcs_store`. -/
-theorem gpcs_store (k : Nat) (v : EraPins) (l : List Nat) (fz : Bool) :
-    gpcs R k v l fz ⊢ gstore R k v l := by
-  unfold gpcs
-  iintro ⟨-, Hs, -⟩
-  iexact Hs
-
 /-- the authority hands out its store and the open round's payload (the
 drain's reading, Rocq's `gpcs_store` / `gpcs_open` on a kept hypothesis) -/
 theorem gpcs_store_open [∀ k v I a, Persistent (R k v I a)] (k : Nat) (v : EraPins)
@@ -109,14 +96,6 @@ theorem gpcs_store_open [∀ k v I a, Persistent (R k v I a)] (k : Nat) (v : Era
   iframe H Hs Ho
   unfold gopen
   iexact Ho
-
-/-- Rocq `gcs_of_gpcs`. -/
-theorem gcs_of_gpcs (k : Nat) (v : EraPins) (l : List Nat) (fz : Bool) (hf : fz = false) :
-    gpcs R k v l fz ⊢ gcsAuth R k v l := by
-  unfold gpcs gcsAuth
-  iintro ⟨H, Hs, -⟩
-  ihave H := pcs_auth v l fz hf $$ H
-  iframe H Hs
 
 /-- Rocq `gpcs_of_gcs`. -/
 theorem gpcs_of_gcs (k : Nat) (v : EraPins) (l : List Nat) (fz : Bool) (hf : fz = false) :

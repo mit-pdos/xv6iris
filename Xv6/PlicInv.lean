@@ -7,11 +7,10 @@ invariant `plicOk` and what each transition does to it.  This file puts the
 mirror inside an Iris invariant and hangs a SLOT on each of the two
 interrupt sources whose handler needs a resource:
 
-* source 10 is UART0's, source 12 is UART1's (`plicTracked`,
-  `plicNames`); the resource is the port's receive token,
-  `plicPayload i = plicPayloadUart γ` (`Xv6.UartInv`: the receive token
-  with the console's high-water halves and the arm's half, Rocq
-  `uart_rx_writer`);
+* source 10 is UART0's, source 12 is UART1's (`plicNames`); the resource
+  is the port's receive token, `plicPayload i = plicPayloadUart γ`
+  (`Xv6.UartInv`: the receive token with the console's high-water halves
+  and the arm's half, Rocq `uart_rx_writer`);
 * a slot is in one of two regimes (`plicSlot`).  Before `uartinit` the port
   has no token at all and the slot holds the port's one-shot
   `uartPreinit`; after it, the slot holds the persistent `uartInited` and
@@ -27,8 +26,8 @@ paid for by the claim.
 The chip's own thread -- the gateway that latches a sampled source, and the
 wire that drives a hart's external-interrupt pin -- moves the state inside
 `plicRel`: it preserves `plicOk` and never touches `claimed`.  Because it
-DRIVES A PIN it needs `MachCSL.WpWire`'s `wpDev_wireR` rather than
-`wpDev_localR`, and hence the wire invariant beside its own
+DRIVES A PIN it is not `DevM.LocalR` and needs `MachCSL.WpWire`'s
+`wpDev_wireR`, and hence the wire invariant beside its own
 (`wpDev_plic_inv`).
 
 The five accessors at the end are what the driver proofs (`plicinit`,
@@ -234,11 +233,6 @@ def plicN : Namespace := ndot nroot "xv6plic"
 theorem plicN_wireN : plicN ## wireN := ndot_ne_disjoint nroot (by decide)
 
 /-! ## The slots -/
-
-/-- The sources the kernel wires that carry a RESOURCE: UART0's and
-UART1's.  (Source 1, the disk's, carries none: `virtio_disk_intr` works
-off the disk lock, not off the claim.) -/
-def plicTracked : List Nat := [10, 12]
 
 /-- The port whose receive column source `i` feeds. -/
 def plicNames (γ0 γ1 : UartNames) (i : Nat) : UartNames := if i = 10 then γ0 else γ1

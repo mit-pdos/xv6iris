@@ -35,8 +35,7 @@ THE TRANSITIONS (Rocq's seven, with their hooked forms): (a)
 `boxWithdrawL1`(`Hook`/`Free`), (b) `boxDepositL1`(`Hook`/`Shape`), (c)
 `boxRefIncr`, (d) `boxRefDecr`, (e) `boxCheckout`(`Hook`/`Split`), (f)
 `boxPark`(`Hook`/`Join`), (g) `boxL1ToL2`(`Hook`); the accessors
-`boxQUpdate` / `boxQ1Update` / `boxView`; boot `boxAlloc` / `boxAllocAt` /
-`boxAllocAtHalves`.
+`boxQUpdate` / `boxQ1Update`; boot `boxAllocAt` / `boxAllocAtHalves`.
 
 **Porting notes** (spelling, not design):
 
@@ -2043,36 +2042,6 @@ theorem boxQ1Update (P : BoxPay GF Id X) [BoxPayOk P] (N : Namespace) (γ : BoxN
     rw [hw2] at hw
     exact absurd hw (by simp)
 
-/-- Rocq's `box_view`: a read-only view for a NON-OWNER (holding no lock of
-the box's): the registers' values with the four rows and the ARM, closed
-again with what was opened. -/
-theorem boxView (P : BoxPay GF Id X) [BoxPayOk P] (N : Namespace) (γ : BoxNames)
-    (E : CoPset) (hE : ↑N ⊆ E) :
-    isBox P N γ ⊢ |={E, E \ ↑N}=> ∃ (T : Nat) (ξb : CtxId) (m : StampMap Id) (c : Nat)
-      (r : SlotReg Id X) (s : L2Reg Id),
-      ⌜boxRows T m c r s⌝ ∗ boxArm P γ T ξb m c r s ∗
-      (boxArm P γ T ξb m c r s ={E \ ↑N, E}=∗ True) := by
-  iintro #Hbox
-  unfold isBox inv
-  ihave Hacc := Hbox $$ %E %hE
-  icases Hacc with #Hacc
-  imod Hacc with ⟨Hbody, Hclose⟩
-  icases boxBody_open_later P γ $$ Hbody with
-    ⟨%T, %ξb, %m, %c1, %r1, %s1, >Hpk, >Hst, >Hc, >Hrd, >Hrp, >%hrows, >Harm⟩
-  imodintro
-  iexists T, ξb, m, c1, r1, s1
-  isplit
-  · ipureintro; exact hrows
-  isplitl [Harm]
-  · iexact Harm
-  iintro Harm
-  imod Hclose $$ [Hpk Hst Hc Hrd Hrp Harm]
-  · inext
-    iapply boxBody_close P γ T ξb m c1 r1 s1 hrows
-    iframe
-  imodintro
-  itrivial
-
 /-! ## Boot: the box is born IN, at the boot deposit's stamp -/
 
 /-- Rocq's `box_alloc_at`: the box is built at names already allocated, out
@@ -2157,29 +2126,6 @@ theorem boxAllocAtHalves (P : BoxPay GF Id X) [BoxPayOk P] (N : Namespace)
   isplit
   · iexact Hinv
   · iexact HtopTb
-
-/-- Rocq's `box_alloc`: the names are allocated too. -/
-theorem boxAlloc (P : BoxPay GF Id X) [BoxPayOk P] (N : Namespace)
-    (cpu : CPU) (ξ : CtxId) (i0 : Id) (E : CoPset) :
-    ownCtx cpu ξ ∗ inArm P i0 ξ ⊢
-      |={E}=> (ownCtx cpu ξ ∗ ∃ (γ : BoxNames) (Tb : Nat), isBox P N γ ∗
-        slotdHalf γ (⟨Tb, false, i0, none⟩ : SlotReg Id X) ∗ topLb Tb ∗ cntHalf γ 0 ∗
-        slotpHalf γ (⟨0, none⟩ : L2Reg Id)) := by
-  iintro ⟨Hrun, Hin⟩
-  imod stampsAuth_alloc (GF := GF) (Id := Id) with ⟨%g1, Hst⟩
-  imod ghost_var_alloc (GF := GF) (0 : Nat) with ⟨%g2, Hcnt⟩
-  imod ghost_var_alloc (GF := GF) (default : SlotReg Id X) with ⟨%g3, Hrd⟩
-  imod ghost_var_alloc (GF := GF) (⟨0, none⟩ : L2Reg Id) with ⟨%g4, Hrp⟩
-  imod boxAllocAt P N ⟨g1, g2, g3, g4⟩ cpu ξ i0 E
-    $$ [Hst Hcnt Hrd Hrp Hrun Hin] with ⟨Hrun, ⟨%Tb, H⟩⟩
-  · unfold stampsAuth
-    iframe Hst Hcnt Hrp Hrun Hin
-    iexists (default : SlotReg Id X)
-    iexact Hrd
-  imodintro
-  iframe Hrun
-  iexists ⟨g1, g2, g3, g4⟩, Tb
-  iexact H
 
 end inh
 

@@ -10,7 +10,7 @@ invariant actually asks for:
 * `dmaOwn` / `dmaHalfAt` / `dmaOwnAt` split and join at a byte offset;
 * the request header, which the driver formats as ONE sixteen-byte value
   (`Chain.hdr`) and the device reads as `type:4`, `reserved:4`, `sector:8`
-  (`ctxBytes_hdr_split` / `_join`);
+  (`ctxBytes_hdr_join`);
 * the data buffer, which the driver owns as a `byteBuf` of `BSIZE` bytes
   and the invariant keeps either as one raw window (`byteBuf_bufLease`,
   a READ chain's) or as one CONTEXT window at a value
@@ -102,27 +102,6 @@ theorem hdr_off4 (a : PAddr) : a + BitVec.ofNat 64 4 + BitVec.ofNat 64 4 = a + 8
 
 section hdr
 variable [CurCtx]
-
-theorem ctxBytes_hdr_split (ξ : CtxId) (a : PAddr) (dq : DFrac) (c : Chain) :
-    ctxBytes (GF := GF) ξ a 16 dq c.hdr ⊢
-      ctxBytes ξ a 4 dq c.req.type ∗ ctxBytes ξ (a + 4#64) 4 dq (0#32) ∗
-      ctxBytes ξ (a + 8#64) 8 dq c.sector := by
-  have e1 : (BitVec.extractLsb' 0 (8 * 4) c.hdr : BitVec (8 * 4)) = c.req.type :=
-    chain_hdr_type c
-  have e2 : (BitVec.extractLsb' 0 (8 * 4)
-      (BitVec.extractLsb' (8 * 4) (8 * 12) c.hdr) : BitVec (8 * 4)) = 0#32 := by
-    rw [extractLsb'_extractLsb' c.hdr (8 * 4) (8 * 12) 0 (8 * 4) (by omega)]
-    exact chain_hdr_reserved c
-  have e3 : (BitVec.extractLsb' (8 * 4) (8 * 8)
-      (BitVec.extractLsb' (8 * 4) (8 * 12) c.hdr) : BitVec (8 * 8)) = c.sector := by
-    rw [extractLsb'_extractLsb' c.hdr (8 * 4) (8 * 12) (8 * 4) (8 * 8) (by omega)]
-    exact chain_hdr_sector c
-  rw [← e1, ← e2, ← e3, ← hdr_off4 a]
-  iintro H
-  icases ctxBytes_split_at ξ a 4 12 dq c.hdr $$ H with ⟨H1, H2⟩
-  icases ctxBytes_split_at ξ (a + BitVec.ofNat 64 4) 4 8 dq
-      (BitVec.extractLsb' (8 * 4) (8 * 12) c.hdr) $$ H2 with ⟨H2a, H2b⟩
-  iframe H1 H2a H2b
 
 theorem ctxBytes_hdr_join (ξ : CtxId) (a : PAddr) (dq : DFrac) (c : Chain) :
     ctxBytes (GF := GF) ξ a 4 dq c.req.type ∗ ctxBytes ξ (a + 4#64) 4 dq (0#32) ∗
@@ -242,9 +221,9 @@ theorem byteBuf_ctxIdx (a : BitVec 64) (bs : List (BitVec 8))
 /-- **Back from the raw tier**: a context window at a kernel address, with
 its identity claim and the two facts a memory access needs, is the
 driver's word cell again.  This is the shape `disk_collect` will take the
-chain's cells back in -- `MachCSL.ctxBytes_of_pushedFloor` turns the
-device-written raw window into a `ctxBytes` once the payload's floor has
-passed the DMA position, and this turns that into a `wordAtN`.
+chain's cells back in -- once the payload's floor has passed the DMA
+position the device-written raw window is a `ctxBytes`, and this turns that
+into a `wordAtN`.
 
 `inRam` is a hypothesis rather than a consequence: a read-write kernel
 page may be MMIO, so `kmapClass = some .rw` does not imply it.  The
@@ -443,10 +422,6 @@ theorem inFlightBlk_arm (st : Nat → HState) (i : Nat) (c : Chain) (hfree : st 
   refine ⟨i0, c0, h1, ?_, h3⟩
   have hne : i0 ≠ i := by intro e; rw [e, hfree] at h2; exact absurd h2 (by simp)
   rw [armSt_ne st i c i0 hne]; exact h2
-
-theorem cachedOk_arm (v : VirtioState) (st : Nat → HState) (i : Nat) (c : Chain)
-    (hfree : st i = .inactive) (h : cachedOk v st) : cachedOk v (armSt st i c) :=
-  fun e he hne => inFlightBlk_arm st i c hfree _ (h e he hne)
 
 theorem inflightOk_arm (v : VirtioState) (st : Nat → HState) (i : Nat) (c : Chain)
     (hfree : st i = .inactive) (h : inflightOk v st) : inflightOk v (armSt st i c) := by

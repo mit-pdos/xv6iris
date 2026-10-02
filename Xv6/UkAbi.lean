@@ -16,7 +16,7 @@ header, point for point:
 * THE LENGTHS ARE AN EXPLICIT PARAMETER (`alen`), which is what makes the
   gate DECIDABLE, and there is a CANONICAL choice (`ukSlen`, a NUL scan with
   fuel `2^31`), so "some assignment works" and "the canonical one works" are
-  the same claim (`ukArgs_canon`).
+  the same claim.
 * THE ARRAY'S NULL TERMINATOR is a separate, named conjunct (`UkArgvNull`).
 * The stack BUDGET on the key (`UkStack`), with its split and slot lemmas.
 * §0 carries the byte-window readings of `SpecUkLeaves.uMWord` (Rocq
@@ -224,14 +224,6 @@ def UkArgsC (π : Nat → Option UPerm) (M : ElfMem) (av argc lo : Nat) : Prop :
 
 instance ukArgsC_dec (π : Nat → Option UPerm) (M : ElfMem) (av argc lo : Nat) :
     Decidable (UkArgsC π M av argc lo) := ukArgs_dec π M av argc lo _
-
-/-- **Rocq `uk_args_canon`**. -/
-theorem ukArgs_canon {π : Nat → Option UPerm} {M : ElfMem} {av argc lo : Nat} {alen : Nat → Nat}
-    (h : UkArgs π M av argc lo alen) : UkArgsC π M av argc lo :=
-  ⟨h.al, h.lo_le, h.argc_lt, h.rd, fun i hi => by
-    obtain ⟨hp, hl, hs, hr⟩ := h.ptr i hi
-    unfold ukSlens; rw [ukSlen_ucstr hl hs]
-    exact ⟨hp, hl, hs, hr⟩⟩
 
 /-! ## §4 The array's NULL terminator -/
 

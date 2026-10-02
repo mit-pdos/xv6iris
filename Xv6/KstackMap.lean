@@ -13,8 +13,6 @@ the `kpt` tier needs the map to say so: `kmapAt (kstackVpn i) (kLeaf (pas i)
   `insert` lemma; the static map is never evaluated);
 * `kvmTableOk_kptFacts_stacks`: `kvmmake`'s table satisfies `kptFacts`
   for that map (the stack leaves are mapped by `kvmTableOk`);
-* `kctx_kptOn_seal_stacks`: the seal of `Xv6.KvmSeal` publishing `kvmMap
-  pas` and handing back the 64 stack claims `kstackMapAt pas`;
 * `kstackOwn_of_page`: at the `kpt` tier a stack claim plus the kalloc'd
   page (owned at its physical address, any 4096 bytes) is `stackOwn
   (kstackVa i + 4096) 512`: the whole kernel stack of process `i`, as the scheduler and
@@ -157,36 +155,6 @@ theorem kmap_insert_stacks [CurCtx] (pas : Nat → BitVec 44) :
     (MachGS.kmapName (hlc := hlc) (GF := GF) ↪●MAP KernelMap.static) ⊢
       |==> ((MachGS.kmapName (hlc := hlc) (GF := GF) ↪●MAP kvmMap pas) ∗ kstackMapAt (GF := GF) pas) :=
   kmap_insert_stacksN pas 64 (Nat.le_refl _)
-
-/-- **The seal with the stacks**: `kvmmake`'s output becomes `kptOn` for
-the map with the 64 stack leaves, and the stack claims are handed back. -/
-theorem kctx_kptOn_seal_stacks [CurCtx] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] {lent : Bool} (cpu : CPU) (k : KCtx)
-    (t : PTree) (pas : Nat → BitVec 44) (r0 : BitVec 44) (hct : curTier = KTier.bare)
-    (hok : kvmTableOk t pas) :
-    kctxL (GF := GF) lent cpu k ∗ ptreeOwn 2 (DFrac.own 1) t ∗
-      (MachGS.kmapName (hlc := hlc) (GF := GF) ↪●MAP KernelMap.static) ∗
-      (MachGS.kptRootName (hlc := hlc) (GF := GF) ↪VAR r0)
-    ⊢ |={⊤}=> (kctxL lent cpu k ∗ kptOn t (kvmMap pas) ∗ kstackMapAt pas) := by
-  iintro ⟨Hk, Ht, Hauth, Hroot⟩
-  imod kmap_insert_stacks pas $$ Hauth with ⟨Hauth, #Hs⟩
-  icases kctx_cases cpu k $$ Hk with
-    ⟨%hwf, HConf, HF, Hstack, Htrans, Harm, Hcpu, Htok, Hclock, #Hro⟩
-  icases ctxTok_cases cpu curCtx $$ Htok with ⟨Hctx, %r, Hfrag⟩
-  ihave Hents := (ptreeOwn_entries (DFrac.own 1) 2 t).1 $$ Ht
-  imod kptOn_seal cpu t (kvmMap pas) r0 hct (kvmTableOk_kptFacts_stacks t pas hok)
-    $$ [Hctx Hents Hauth Hroot] with ⟨Hctx, #Hkpt⟩
-  · iframe Hctx Hents Hauth Hroot
-  imodintro
-  isplitl [HConf HF Hstack Htrans Harm Hcpu Hctx Hfrag Hclock]
-  · iapply kctx_intro' cpu k hwf
-    iframe HConf HF Hstack Htrans Harm Hcpu Hclock
-    isplitl [Hctx Hfrag]
-    · iapply ctxTok_intro cpu curCtx r
-      iframe Hctx Hfrag
-    · iexact Hro
-  · isplit
-    · iexact Hkpt
-    · iexact Hs
 
 /-! ## The stack of process `i` at its virtual address -/
 

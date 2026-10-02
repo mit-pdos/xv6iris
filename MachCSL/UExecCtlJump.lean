@@ -65,22 +65,6 @@ theorem uxc_jal_gen (hD : UxcFoot D) (orc : UOrc) (s : UWSt) (imm : BitVec 21) (
   simp only [RETIRE_SUCCESS, uxa_wX hD.alu, runRW_bind, Option.bind]
   rfl
 
-/-- **JAL, the misaligned-target trap**: `Zca` off and bit 1 of the target
-set: the trap, no link written. -/
-theorem uxc_jal_misaligned (hD : UxcFoot D) (orc : UOrc) (s : UWSt) (imm : BitVec 21) (rd : regidx)
-    (hz : runRW D orc s (currentlyEnabled extension.Ext_Zca) = some (false, s, orc))
-    (h0 : (uxcTgt s imm).getLsbD 0 = false) (h1 : (uxcTgt s imm).getLsbD 1 = true) :
-    runRW D orc s (execute (.JAL (imm, rd))) =
-      some (.Trap (s.file .cur_privilege, make_sync_exception (.E_Fetch_Addr_Align ()) (uxcTgt s imm),
-        s.file .PC), s, orc) := by
-  cases rd with | Regidx i =>
-  show runRW D orc s (execute_JAL imm (regidx.Regidx i)) = _
-  unfold uxcTgt at h0 h1 ⊢
-  simp only [execute_JAL, get_next_pc, uxa_readReg_bind D orc s _ _ hD.npcR,
-    uxa_readReg_bind D orc s _ _ hD.pc, runRW_bind,
-    uxc_jump_to_misaligned D orc s _ hz h0 h1 hD.priv hD.pc, Option.bind]
-  rfl
-
 /-- **JAL at the user tier**: `Zca` on, an even offset (the decode invariant
 `decodableU`) and a 2-aligned `PC`: the jump retires. -/
 theorem uxc_jal (hD : UxcFoot D) (orc : UOrc) (s : UWSt) (hU : UxcCfg s) (imm : BitVec 21)

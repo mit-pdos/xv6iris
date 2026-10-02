@@ -1154,8 +1154,7 @@ theorem lw_append (BP : BPIN) (c : CPU) (k : KCtx) (a b : Bool) (R : RegMap) (kk
   repeat refine MachCSL.cs_set _ _ ?_ _ _ (by decide)
   exact ⟨g2, g8, g9, g18, g19, g20, g21, g22, g23, g24, g25, g26, g27⟩
 
-/-- The held buffer's width, off the handle (what `Xv6.fsblock_update_any`
-asks of the new content). -/
+/-- The held buffer's width, off the handle. -/
 theorem lw_hold_len (γ : BcacheNames) (V : BioView GF) (kk : Nat)
     (pidv dev bno : BitVec 32) (bs bsd : List (BitVec 8)) :
     bufHold0 (GF := GF) γ V kk pidv dev bno bs bsd ⊢ ⌜bs.length = BSIZE⌝ := by

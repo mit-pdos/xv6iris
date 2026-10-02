@@ -5,10 +5,10 @@ allocation lemmas at the end of its `FsBytes` section (`byte_map_grow`,
 `fs_bytes_alloc`, `fs_alloc`).
 
 **THE ROWS.**  The home set is BOUND in `Xv6.fsBytesRow` because no consumer
-needs to name it: holding a block's byte run IS being a home block
-(`Xv6.fsblock_home_open`), and the byte map's AUTH -- of which there is
-exactly one -- is inside the invariant, so two invariants at `Xv6.fsbN`
-over one `γfs.bytes` cannot disagree about it.  What a consumer needs is
+needs to name it: holding a block's byte run IS being a home block, and the
+byte map's AUTH -- of which there is exactly one -- is inside the invariant,
+so two invariants at `Xv6.fsbN` over one `γfs.bytes` cannot disagree about
+it.  What a consumer needs is
 only that SOME such invariant exists, which is what the row says.
 
 `Xv6.fsBytesAny` is the row a RUNTIME reader needs: the row plus the SEAL.
@@ -285,24 +285,6 @@ theorem fsBytes_agree_any (E : CoPset) (γ : FsNames) (b : Nat)
         (γ.cache ↪◯MAP[b]{DFrac.own (1 : Qp).half} bsm)) := by
   rw [fsblock_1]
   exact fsBytes_agree_any_q E γ (DFrac.own 1) b bs bsm hE
-
-/-- **THE DROP-IN FOR `Xv6.fsCache_update` AT A HOME BLOCK** (Rocq's
-`fsblock_update`, read at the row `Xv6.logCtx` carries).  The shape is
-`fsCache_update`'s with `fsChalf` replaced by `fsblock`, `|==>` by
-`|={E}=>`, and the persistent row added -- which is why the call sites are
-one-line edits. -/
-theorem fsblock_update_any (E : CoPset) (γ : FsNames) (L : BlockMap) (b : Nat)
-    (bs bsNew bs' : List (BitVec 8)) (hE : (↑logN : CoPset) ⊆ E)
-    (hlnew : bsNew.length = BSIZE) :
-    fsBytesAny (GF := GF) γ -∗ fsCacheAuth γ L -∗ fsblock γ.bytes b bs -∗
-      (γ.cache ↪◯MAP[b]{DFrac.own (1 : Qp).half} bs') -∗
-      |={E}=> (⌜bs' = bs ∧ PartialMap.get? L b = some bs⌝ ∗
-        fsCacheAuth γ (PartialMap.insert L b bsNew) ∗ fsblock γ.bytes b bsNew ∗
-        (γ.cache ↪◯MAP[b]{DFrac.own (1 : Qp).half} bsNew)) := by
-  unfold fsBytesAny fsBytesRow fsBytesAt fsCacheAuth
-  iintro ⟨⟨%homeL, %Xv, #Hinv⟩, #Hseal⟩ Ha Hfb Hm
-  iapply fsblock_update E γ.bytes γ.cache γ.exc homeL Xv L b bs bsNew bs' hE hlnew
-    $$ Hinv Hseal Ha Hfb Hm
 
 /-- **...AND AT BYTE-RANGE GRANULARITY** (Rocq's `byte_range_log_update`,
 read at the row `Xv6.logCtx` carries): `log_write`'s ghost step for a

@@ -1,8 +1,8 @@
 /-
 MachCSL: **a misaligned user load in owned RAM, end to end** (lane U2-M2):
 `UMemMisVmemR`'s page-split composition, with each part discharged by its
-translation (lane U2-M1's shapes: a success is `utrTranslate`'s walk, from
-`uma_utrTranslate_hit/_miss`; a fault is a `translateAddr` fault) and the
+translation (lane U2-M1's shapes: a success is `utrTranslate`'s walk; a
+fault is a `translateAddr` fault) and the
 chunked RAM read (`umm_translate_and_read_value_ram`).  A page-crossing load
 translates the high part from the state the low part's translation left
 (a load writes no byte, so that is the only move).

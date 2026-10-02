@@ -9,8 +9,7 @@
 * The IMAGE READINGS (Rocq §2, over `Xv6/FsImgDinode`...`FsImgBridge`):
   `imgNode`/`imgNodes`, `imgNode_rec`/`_ent`/`_blk`/`_bare`,
   `imgInodeLocal_free`/`imgInodeOk_at`/`imgInodeLocal_live`/`imgInodeLocal`,
-  `imgNodes_lookup`/`_lookup_inv`, `bigSepM_imgNodes`; `fsBitmapSpent`;
-  `imageDinode_fsDinode`; `fsTickCount_cons`; and **`fsBootImageWf`**
+  `imgNodes_lookup`/`_lookup_inv`; `imageDinode_fsDinode`; `fsTickCount_cons`; and **`fsBootImageWf`**
   (Rocq `fs_boot_image_wf`, all fifteen conjuncts in Rocq's order).
   Consumers: `FsDurImg` (CF), `FsCfgSnap` (CL), `SpecMain`/`SystemAdequacy`.
 
@@ -37,7 +36,7 @@ their own `Local` copies), the empty `FsCfgBootBitmap` section.
 **DEVIATIONS.**
 1. `Nat` block numbers and inums; sets are `Std.ExtTreeSet Nat compare`
    built with `LawfulSet.ofList`, exactly as `regionInums` is
-   (`iregBlkSet`, `fsBitmapSpent`); `Z.of_nat nib = ...` is `nib = ...`.
+   (`iregBlkSet`); `Z.of_nat nib = ...` is `nib = ...`.
 2. `imgNodes` is `foldIns` over `List.range (16 * nib)` (the port's
    boot-map idiom, `IcacheBootRegion` deviation 2, as `iregM0`) instead of
    `list_to_map` over `elements (region_inums nib)`.  So Rocq's
@@ -50,8 +49,7 @@ their own `Local` copies), the empty `FsCfgBootBitmap` section.
    because `fsBootImageWf` needs it and `FsBoot.lean` (W8-H) does not exist
    yet: W8-H should import it, not restate it.
 4. `image_dinode_fs_dinode`'s `Forall diblk_wf dss` is `∀ ds ∈ dss, diblkWf
-   ds` (the `IcacheBootDecode` convention); `fs_bitmap_spent` gets a
-   membership lemma `fsBitmapSpent_mem`.
+   ds` (the `IcacheBootDecode` convention).
 -/
 import Xv6.IcacheBootRegion
 import Xv6.FsImgBridge
@@ -215,28 +213,6 @@ theorem imgNodes_lookup (P : Nat → List (BitVec 8)) (sb : FsSb) (nib z : Nat)
     PartialMap.get? (imgNodes P sb nib) z = some (imgNode P sb z) :=
   foldIns_get_mem (M := RegMapF) id (imgNode P sb) _ z (fun _ _ h => h)
     (List.mem_range.2 ((regionInums_spec nib z).1 hz))
-
-/-- The era's initial top map as a big-op over the region's inums (Rocq
-`big_sepM_img_nodes`). -/
-theorem bigSepM_imgNodes {PROP : Type _} [BI PROP] (Φ : Nat → FsNode → PROP)
-    (P : Nat → List (BitVec 8)) (sb : FsSb) (nib : Nat) :
-    ([∗map] i ↦ n ∈ imgNodes P sb nib, Φ i n) ⊣⊢
-      [∗set] z ∈ regionInums nib, Φ z (imgNode P sb z) :=
-  (foldIns_bigSepM (M := RegMapF) id (imgNode P sb) _ List.nodup_range (fun _ _ _ _ h => h) Φ).trans
-    (regionInums_bigSep nib (fun z => Φ z (imgNode P sb z))).symm
-
-/-! ## The bitmap block and the free pool -/
-
-/-- The blocks the producer takes OUT of the remainder: the bitmap block and
-the whole free pool (Rocq `fs_bitmap_spent`; its consumer is the kit layer). -/
-def fsBitmapSpent (P : Nat → List (BitVec 8)) (sb : FsSb) : ExtTreeSet Nat compare :=
-  LawfulSet.ofList (sb.sbBmapstart :: freeSet sb.sbSize (fsBmapSet BSIZE (P sb.sbBmapstart)))
-
-theorem fsBitmapSpent_mem (P : Nat → List (BitVec 8)) (sb : FsSb) (b : Nat) :
-    b ∈ fsBitmapSpent P sb ↔
-      b = sb.sbBmapstart ∨ (b < sb.sbSize ∧ b ∉ fsBmapSet BSIZE (P sb.sbBmapstart)) := by
-  unfold fsBitmapSpent
-  rw [← LawfulSet.mem_ofList, List.mem_cons, mem_freeSet]
 
 /-! ## The dinode bridge -/
 

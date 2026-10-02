@@ -510,7 +510,7 @@ theorem kw_ans_neg_ghost (j : Nat) (pid : BitVec 32) (V : ProcPriv) (cs : ExtTre
   iapply waitAnsLed_of (-1#32) (xstateVal xw) cs cs V.gen nullst pid (procAddr j) $$ Hn
   ileft; ipureintro; rfl
 
-/-- A `keep` form of `genPid_kq_agree` against an escrow. -/
+/-- `genPid` agrees with an escrow's `exitTok` on the pid. -/
 theorem kw_genPid_exitTok (g : GName) (pide pid0 : BitVec 32) (xs : Int) :
     genPid (GF := GF) g pide ∗ exitTok g pid0 xs ⊢ ⌜pide = pid0⌝ := by
   iintro ⟨#Hgp, Hesc⟩

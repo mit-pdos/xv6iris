@@ -814,12 +814,6 @@ def inodeClaimed [Icfg] [CurCtx] (ty : BitVec 16) (k : Nat) (q : Qp) (dev inum :
     (t : Nat) (qt : Qp) : IProp GF :=
   iprop(inodeRef k q dev inum ∗ runitClaim inum.toNat ∗ iclaim inum.toNat ty t qt)
 
-/-- SAT: exactly `SpecIalloc`'s three receipt rows. -/
-theorem inodeClaimed_intro [Icfg] [CurCtx] (ty : BitVec 16) (k : Nat) (q : Qp)
-    (dev inum : BitVec 32) (t : Nat) (qt : Qp) :
-    inodeRef (GF := GF) k q dev inum ∗ runitClaim inum.toNat ∗ iclaim inum.toNat ty t qt ⊢
-      inodeClaimed ty k q dev inum t qt := .rfl
-
 instance inodeRefpShort_timeless [Icfg] [CurCtx] (k : Nat) (qt qi : Qp) (dev inum : BitVec 32) :
     Timeless (inodeRefpShort (GF := GF) k qt qi dev inum) := by
   unfold inodeRefpShort; infer_instance

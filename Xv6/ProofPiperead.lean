@@ -971,8 +971,7 @@ theorem prResI_succ (γp : PipeNames) (pi : BitVec 64) (m : Nat) :
   iapply prResI_intro γp pi (m + 1) nr nw ro wo vname bs (Or.inl (Nat.succ_pos m)) hcnt hlen
   iframe
 
-/-- A later extension that writes nothing keeps the window (the explicit
-form of `UMemL.umemWrote_view`). -/
+/-- A later extension that writes nothing keeps the window. -/
 theorem pr_view_step {P P1 P2 : UPtd} (M : Nat → List (BitVec 8)) (a : BitVec 64) (acc : List (BitVec 8))
     (h0 : P.ext P1) (h1 : P1.ext P2) (hm : umMapped P1 a.toNat acc.length) :
     viewFaulted P1 P2 (umemWrite (viewFaulted P P1 M) a.toNat acc) =

@@ -16,9 +16,8 @@ they are not the same map:
 
 The re-keying is what lets the layer above the log own a SUB-BLOCK object
 (an inode record's 64 bytes, a dirent's 16) and what makes "two owners of
-one block is `False`" a resource fact -- `fsblock_excl` -- rather than a
-maintained clause.  The price is that the bio layer may hold no share of
-this map at all; the two maps are tied inside `Xv6.fsBytesInv`
+one block is `False`" a resource fact rather than a maintained clause.
+The price is that the bio layer may hold no share of this map at all; the two maps are tied inside `Xv6.fsBytesInv`
 (`Xv6/FsBytesInv.lean`), which is also where the home blocks' PARKED cache
 halves go.
 
@@ -295,11 +294,6 @@ theorem fsblockQ_excl (gL : GName) (dq1 dq2 : DFrac) (b : Nat) (bs bs' : List (B
     (by rw [hl]; exact BSIZE_pos) (by rw [hl']; exact BSIZE_pos) $$ H H'
   exact absurd hv hnv
 
-theorem fsblock_excl (gL : GName) (b : Nat) (bs bs' : List (BitVec 8)) :
-    fsblock (GF := GF) gL b bs -∗ fsblock gL b bs' -∗ False := by
-  rw [fsblock_1, fsblock_1]
-  exact fsblockQ_excl gL _ _ b bs bs' (blkDfrac_full_nvalid _)
-
 theorem fsblockQ_ne (gL : GName) (dq1 dq2 : DFrac) (b1 b2 : Nat)
     (bs1 bs2 : List (BitVec 8)) (hnv : ¬ ✓ (dq1 • dq2)) :
     fsblockQ (GF := GF) gL dq1 b1 bs1 ⊢ fsblockQ gL dq2 b2 bs2 -∗ ⌜b1 ≠ b2⌝ := by
@@ -309,13 +303,6 @@ theorem fsblockQ_ne (gL : GName) (dq1 dq2 : DFrac) (b1 b2 : Nat)
     iexfalso
     iapply fsblockQ_excl gL dq1 dq2 b1 bs1 bs2 hnv $$ H1 H2
   · ipureintro; exact heq
-
-/-- Rocq's `fsblock_ne`, THE lemma the inode layer needs: two owned blocks
-are distinct. -/
-theorem fsblock_ne (gL : GName) (b1 b2 : Nat) (bs1 bs2 : List (BitVec 8)) :
-    fsblock (GF := GF) gL b1 bs1 ⊢ fsblock gL b2 bs2 -∗ ⌜b1 ≠ b2⌝ := by
-  rw [fsblock_1, fsblock_1]
-  exact fsblockQ_ne gL _ _ b1 b2 bs1 bs2 (blkDfrac_full_nvalid _)
 
 /-- A full owner excludes ANY other share: the resource reading of "a
 read-locker cannot write". -/

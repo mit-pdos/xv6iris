@@ -21,7 +21,7 @@ moves the pipe's AUTHORITY, and a link at the trivial payload gives nothing
 back, so a link conjured from `emp` would move the authority away from a
 fragment that did not move -- which `pipeQueue_agree` refutes at any state
 whose flag the close actually clears.  The two real sources are the taint
-(`pipeReg_of_taint`) and an invariant that owns the fragment (lane
+and an invariant that owns the fragment (lane
 PIPE-PROTO, the union's).
 
 NOT TIMELESS, and deliberately so: `pipeCpay` is a disjunction whose left
@@ -87,15 +87,6 @@ theorem pipeReg_not_free (γ : GName) :
   exact absurd he (by decide)
 
 /-! ## 3.  THE TWO INTROS -/
-
-/-- THE TAINT STILL BUYS IT (Rocq `pipe_reg_of_taint`). -/
-theorem pipeReg_of_taint (γp : PipeNames) :
-    MachFixedGS.killCred (hlc := hlc) (GF := GF) ⊢ pipeReg (hlc := hlc) γp := by
-  unfold pipeReg
-  iintro #Ht
-  imodintro
-  iintro %w
-  iapply pipeCpay_taint $$ Ht
 
 /-- ...AND A ROW THAT IS NOT A PIPE REGISTERS ITSELF (Rocq
 `pipe_row_reg_nopipe`): a program that never calls pipe(2) pays nothing. -/
