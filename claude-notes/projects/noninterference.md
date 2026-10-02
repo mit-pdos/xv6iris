@@ -94,7 +94,7 @@ each, integrated on `lean-m2`:
 | **M2-W3 = M0 functional rows** | `usysDet n W ι : Uvis` for the private class (§4's list: sbrk, fork's parent, wait, exit, getpid, uptime, console write; the transparent arm is already functional) and the loop's `round_det` discharge at `UexecApply.uexecRet_roundSlot` from the kernel's `SyscRows` plus the ledger RECEIPTS (`ledReceipt`, `pidReceipt`, `zombReceipt`, `tickLb`): the round's actual `(r, M', …)` equals `usysDet` at the round's ι-prefix. `uexecRetF`'s ecall arm is re-cut on it for those `n` (the program proves the functional arm; the kernel instantiates it). | — (parallel with W1) |
 | **M2-W4 the theorem** | `events h` (the actor-labelled event history read off the boundary trace: each round's number and arguments at `uExit`, its result at `uEnter`, the fault cause for lazy allocations), `canon k ι` (the abstract process machine: `usysDet` folded over ι), `phi g h := ∀ s, utrace s h ⊑ canon (firstKey s h) (events h)`, `xv6NiAdequacy` := `xv6PowerAdequacyGen` at that `phi` (a new root in `tools/ci/roots.txt` and `tools/audit/baseline.json`), and the PURE two-run corollaries: general (equal ι ⇒ equal traces) and the strong instance (a process with no rounds before its first ecall generates no events: T's `utRoundQuiet` lifted to the trace). | W2, W3 |
 
-- [x] M2-W1 (ef6f784b5; the permit lives in wireInv; one Spec moved: SpecUserret.wp_userret_body gains wireInv)  - [ ] M2-W2  - [x] M2-W3 (M0) (38c39d26f: class = {exit, getpid, uptime}; sbrk, fork, wait, write NOT functional -- see its as-landed note; owner decision pending)  - [ ] M2-W4
+- [x] M2-W1 (ef6f784b5; the permit lives in wireInv; one Spec moved: SpecUserret.wp_userret_body gains wireInv)  - [ ] M2-W2 (DESIGNED 2026-10-02, "M2-W2 design" below; awaiting rulings O1-O6)  - [x] M2-W3 (M0) (38c39d26f: class = {exit, getpid, uptime}; sbrk, fork, wait, write NOT functional -- see its as-landed note; owner decision pending)  - [ ] M2-W4
 
 **Owner ruling after W3 (2026-10-02): land M2 at the HONEST class, then grow it.** W2 and W4 proceed with
 `canon` over the class {exit, getpid, uptime} plus the transparent rounds; the strong instance (a process before its
@@ -208,6 +208,226 @@ Statements moved: `SyscRows` (+`uptime`, last), `usysMemOk` (+ the uptime branch
 `syscMemOk_usys` (+`hup`), `syscRows_keep` (+`h14`, defaulted), the `SyscallArmsFdDefs`/`Path` row builders
 (+`h14 : n ≠ 14`, defaulted).  Byte-identical: `uexecRetF`, `uexecRetContGen`, `uroundOk`, `uexecRet_roundSlot(_of)`,
 every Spec but `SpecSyscall`, every `Uk*`/`User*` file.
+
+### M2-W2 design (2026-10-02)
+
+Design pass on `lane/m2w2` (based on `lean-m2`, which has W1 and W3). No code was landed. Rulings O1–O6 at the
+end are needed before the lanes start. Short version: the permit carries **pure evidence plus one
+machine receipt**. The machine layer gains a *read frame* at the privilege write, so it can say which event was
+emitted, and a receipt that says where the event sits in the history. The client's half is a **pure filing
+ledger**. Incarnations are identified by filing, not by `satp`.
+
+**Four findings that shape the design.**
+- **F1 (content needs a read frame).** `hartObsStep` receives `g`, and `g.m.regs cpu` *is* the event's
+  content. But the permit cannot connect that file to anything the caller knows, because the rule
+  (`swp_writeReg_priv`) holds only the `cur_privilege` cell. The values the event reads (`satp`, `scause`/`sepc`,
+  `x1..x31`) are held by the caller. On U→S the arm's `uFr` holds them, plus the tower's `scause`/`sepc` it
+  just wrote. On S→U `execSpecF_sretU` already frames `gprFile cpu R ∗ sepc ↦ epc`, and `satp` is in
+  `confCells`. So the only way to tie "the event at position i" to "the registers this proof holds" is a rule
+  that takes those cells as a read frame and proves `hartObsPriv cpu (g.m.regs cpu) p' = [e]` for an `e` built
+  from them. The same holds for options (i) and (ii) of the brief. A Rut-lent permit (i) still needs it,
+  because the residue knows the key but not the file.
+- **F2 (the kernel has to construct something the client defines).** Until now every fixed-layer family
+  (`rxTag`, `killCred`, `consRes`) is *minted by the client and carried opaquely by the kernel*. NI
+  evidence runs the other way: only the kernel's loop knows the round and the key, and the ledger has to be
+  told something whose meaning is Xv6's (`roundOkKeys`, the trap frame's layout). The kernel's proofs see an
+  abstract `MachFixedGS`, so they need the field's definition as an equation. This coupling is unavoidable.
+  The alternatives (a rider through `wireInv`, a sealed "factory", a global instance) all fail the same way:
+  using an opaque field needs its equation, and a global-instance trick does not reach the user tier,
+  which imports nothing that knows `Uvis`. The cheapest carrier is a Prop-class equation, modelled on
+  `ClaimIs` (O2).
+- **F3 (`satp` is not an identity).** A root is freed when a process exits, is killed, or runs a successful
+  `exec`, and a later `kalloc` can hand the same page to a new process. `exec` also changes the root in the
+  middle of an incarnation. A killed process's last `uExit` is never followed by its own `uEnter`. If the
+  root is reused, the newcomer's first `uEnter` reads, by `satp`, as the "resume" of that exit. So
+  `utrace s h` keyed by `satp` is false of real runs: `phi` would claim a transparent resume whose registers
+  belong to another process. The fix is that the ledger *files* each enter against a round or an origin, and
+  traces are read per filing (O1).
+- **F4 (honest accounting needs an authority).** With persistent evidence, an enter can always be filed as an
+  "origin", because "some key fits these registers" is always satisfiable. A run could then hide a round's law
+  by declaring its resume a fresh incarnation. Closing this needs one-shot claims minted by the ledger:
+  each exit claimable once as a round, each fork exit once more as a child's origin, each power-on once as
+  initproc's origin. That is plumbing through `kfork`/`userinit` (W2d, O4). The core below is sound but has this
+  loophole, so W4 must not publish the per-incarnation theorem before W2d.
+
+**1. The ledger (where).** It lives in the existing trace slot (`obsPred`), not in a third fixed-layer slot.
+Ruling 2 of `uart-trace.md` only keeps trace state out of `Pc`. The history ghost has exactly two halves
+(machine / slot), so a third holder would re-split `obsName` and add a hook family at every power arm. It is
+also not the app's `R`: the console ledgers are blind to user events (`cyclesOf_user`), and NI is a property
+of the kernel, not of an application. So **`AppLaws` stays byte-identical** (`al_user` stays blind). The NI
+ledger is a *second conjunct beside the app's `R`*, which W4's theorem composes as
+`obsLedgerAt (fun h => A.R c h ∗ niR h)`. Every other slot, including the trivial `obsPredAt`, discharges the
+enter hook by ignoring the evidence. In the core the ledger is **pure** (`Xv6/NiLedger.lean`, new, after
+`UsysDet`):
+
+    inductive NiEntry | origin (j : Nat) (W0 : Uvis) | round (i j : Nat) (sc : BitVec 64) (W W' : Uvis)
+    def tfGprs (tf) : List (BitVec 64) := (List.range 31).map (fun k => tfW tf (5 + k))   -- = x1..x31 of tfResumeGpr0 tf
+    def exitFits  (x : Obs) (sc) (W : Uvis) : Prop := ∃ cpu s, x = .uExit cpu s sc (tfW W.tf tfEpcIdx) (tfGprs W.tf)
+    def enterFits (e : Obs) (W : Uvis) : Prop :=
+      ∃ cpu s ep, e = .uEnter cpu s ep (tfGprs W.tf) ∧ retPc ep = tfResumePc W.tf
+    def niFit : Option (Nat × Obs) → Obs → Prop               -- the evidence's meaning (O2's equation target)
+      | none,        e => ∃ W0, enterFits e W0                 -- origin (W2d tightens: see F4)
+      | some (_, x), e => ∃ sc W W', exitFits x sc W ∧ enterFits e W' ∧ roundOkKeys sc W W' ∧ W'.pid = W.pid
+    def niOk (h : List Obs) (F : List NiEntry) : Prop :=
+      (∀ f ∈ F, match f with
+        | .origin j W0        => ∃ e, h[j]? = some e ∧ enterFits e W0
+        | .round i j sc W W'  => i < j ∧ (∃ x, h[i]? = some x ∧ exitFits x sc W) ∧
+                                 (∃ e, h[j]? = some e ∧ enterFits e W') ∧ roundOkKeys sc W W' ∧ W'.pid = W.pid) ∧
+      (∀ j e, h[j]? = some e → isUEnter e → ∃! f ∈ F, f.j = j)          -- coverage: every enter is filed, once
+    def niR (h : List Obs) : IProp GF := ⌜∃ F, niOk h F⌝
+    theorem niR_snoc  : isUEnter e = false → niR h ⊢ niR (h ++ [e])                   -- exits, power, UART: blind
+    theorem niR_enter : isUEnter e → niFit ox e → (∀ i x, ox = some (i, x) → i < h.length ∧ h[i]? = some x) →
+                        niR h ⊢ niR (h ++ [e])                                          -- the filing
+
+*Per user event in `h`:* every `uEnter` at position `j` has exactly one filing. A `round` filing names the exit at
+`i < j`, the cause, and the trapped and resumed keys with `roundOkKeys`. An `origin` filing names the
+incarnation's first key `W0`. Exits carry no filing: an exit is either cited by a round or is a final or
+pending exit (a kill, `exit`, or a round still in flight). *At the end of the trace*, `niR h` gives
+`∃ F, niOk h F`, which is all W4 needs (§4). The facts are monotone in `h` (prefix), so power, UART and exit
+events step `niR` by `niR_snoc`. `niR` is timeless (pure). **`uhist` is not used**: `roundOkKeys` comes
+straight from `urc_roundOkKeys` at `urc_exit`, ni-uhist's D5 append stays as it is, and R3 still holds.
+`uhist` is the natural carrier for W2d's per-incarnation claims.
+
+**2. The evidence at each boundary, and who has it.**
+- **(a) S→U (kernel).** The event is `e = .uEnter cpu (satpOf .kpt P.root) sep (tfGprs ws)`.
+  - `satp`: `userret`'s `csrw satp, a0` with `ha0 : k.regs 10 = satpOf .kpt P.root` (`wp_userret_body`).
+  - The GPRs: `userret_exit`'s file `(urLoadSeq … R).set 10 (tfW ws 14)` equals `tfResumeGpr0 ws` off x0.
+    The lemma is `UserretDefs.urLoadSeq_resume`, used today through `gprFile_ext` in
+    `ProofUserret.userret_user_run`; the read-frame rule needs it *before* the `sret`, at `userret_exit`.
+  - The pc: `UserretClosedResume.urc_resume`'s `hsep : retPc sep = tfResumePc V.tf`.
+  - With `ws = V'.tf` and the slot key `uvisOf V' M' sts' gn cs' pid`, this is `enterFits e W'`.
+  - `roundOkKeys sc W W'` is `UserretClosedRows.urc_roundOkKeys`, already called in `urc_exit`.
+  - The pid tie is `hpid : W.pid = pid` plus `uvisOf`'s pid.
+  - The origin path is forkret's first resume (`fkr_close` → `USERRET_CLOSED` → `urc_resume`, with no pending
+    round), filed as `origin` at `W0 = uvisOf V M sts gn cs pid`.
+- **(b) U→S (user tier).** The user frame holds the cells, so with the read-frame rule the arm learns exactly
+  `x = .uExit cpu (satpOf .kpt pt.root) sc' sep' gs` and gets the machine receipt `uRcpt (i, x)`. The KEY is
+  not needed at the exit. The trapped key `W` is *defined* by the slot from the trap frame
+  (`UexecRet.trappedMachine` = `userTrapFrameAtm … (tfW W.tf tfEpcIdx) (tfResumeGpr0 W.tf)`), and the round's
+  law is only known at the next enter. The options:
+  - **(i) Rut lends a keyed exit permit.** It still needs F1's read frame, it changes `wpUserExecClosedBody`'s
+    accessor premise, and it gains nothing, because the residue has no key-level fact about the exit. Rejected.
+  - **(ii) A neutral witness, converted by the kernel.** Adopted, with the witness being the **machine's**
+    receipt rather than a client tag: `uRcpt (i, x) := ∃ h0, ⌜h0.length = i⌝ ∗ obsHistLb (h0 ++ [x])`. It is
+    persistent, unforgeable (the machine's own mono-list), and needs no client field. It travels **in
+    `userTrapFrame`** (one more persistent conjunct over its existentials: `uRcpt (i, .uExit cpu (satpOf .kpt
+    pt.root) sc sep (gprs g))`) to `urc_round`, where `trappedMachine` puts it at `W`. From there it is kept
+    in the `□` context through `UV`/`UT` to `urc_exit` → `urc_resume`. "Converted" here means *cited* at the
+    next enter's filing, not re-minted at `uservec`.
+  - **(iii) Nothing cheaper exists:** F1 forces the frame, and the receipt has to reach the kernel through
+    some USER-visible object. Of those, `userTrapFrame` is the one that already carries exactly the trap's
+    values.
+- **Every Spec or structure text that moves:**
+  - `USER`, through `userTrapFrame`, which is referenced by `stvecHandlerWp`. The accessor premise is unchanged.
+  - `userTrapFrameAt`/`Atm`, and so `UexecRet.trappedMachine` and the engine's `uexecF`/`ukb`. The *spelling* is
+    byte-identical; the *meaning* changes through the definition.
+  - `USERRET`: `wp_userret_body` gains a persistent `uRcptOpt ox ∗ ⌜MachFixedGS.uFit ox (.uEnter cpu
+    (satpOf .kpt P.root) sep (tfGprs ws))⌝` beside `wireInv`.
+  - `USERRET_CLOSED`, `FORKRET`, `FORKRET_PARK_PAID`, `USERINIT` and `MAIN`'s quantifiers gain `[NiFitIs]` (O2).
+  - `xv6PowerAdequacyGen`: `Huser` → `HuserExit` / `HuserEnter`.
+  - `AppLaws`: unchanged.
+
+**3. The machine change (`MachCSL`).**
+
+    -- Resources.lean
+    def hartStep (e : Obs) (Out : IProp GF) : IProp GF :=          -- consent for EXACTLY e (replaces hartObsStep)
+      ∀ h g, ⌜obsWf h g ∧ g.pow = true⌝ -∗ obsAuth h ={⊤}=∗ obsAuth (h ++ [e]) ∗ Out
+    def uRcpt (ix : Nat × Obs) : IProp GF := ∃ h0, ⌜h0.length = ix.1⌝ ∗ obsHistLb (h0 ++ [ix.2])   -- persistent
+    -- MachFixedGS: one new Prop field beside rxTag
+      uFit : Option (Nat × Obs) → Obs → Prop        -- an enter's justification; Xv6 sets it to niFit
+    def hartObsPermit : IProp GF :=
+      □ ((∀ e, ⌜isUExit e⌝ -∗ hartStep e emp) ∧
+         (∀ e ox, ⌜isUEnter e ∧ MachFixedGS.uFit ox e⌝ -∗ uRcptOpt ox -∗ hartStep e emp))
+    theorem hartObsPermit_of_hook
+      (HuserExit  : ∀ h e, isUExit e → ▷ obsPred ∗ obsHalf h ⊢ |==> ◇ (▷ obsPred ∗ obsHalf (h ++ [e])))
+      (HuserEnter : ∀ h e ox, isUEnter e → MachFixedGS.uFit ox e →
+                      (∀ i x, ox = some (i, x) → i < h.length ∧ h[i]? = some x) →
+                      ▷ obsPred ∗ obsHalf h ⊢ |==> ◇ (▷ obsPred ∗ obsHalf (h ++ [e]))) : obsInv ⊢ hartObsPermit
+    -- Wp.lean: the read-frame rules (swp_writeReg_priv retires; _quiet stays)
+    theorem swp_writeReg_uexit (cpu) (s sc ep : BitVec 64) (gs : List (BitVec 64)) (Out Φ) :
+      hartStep (.uExit cpu s sc ep gs) Out ∗ cur_privilege ↦ᵣ User ∗ hartRdX cpu s sc ep gs ∗
+      ▷ (cur_privilege ↦ᵣ Supervisor -∗ hartRdX cpu s sc ep gs -∗ Out -∗
+           (∃ i, uRcpt (i, .uExit cpu s sc ep gs)) -∗ Φ ()) ⊢ swp cpu (writeReg .cur_privilege .Supervisor) Φ
+    theorem swp_writeReg_uenter (cpu) (p) (hp : privUser p = false) (s ep gs Out Φ) :   -- dual, hartRdE = satp, sepc, gprs
+
+`hartRdX cpu s sc ep gs := satp ↦ s ∗ scause ↦ sc ∗ sepc ↦ ep ∗ gprCells cpu gs`, with
+`gprFile cpu G ⊣⊢ gprCells cpu (gprList G)`. The proofs use `reg_valid` on the frame, then
+`MonoList.lb_own_get` on the stepped authority for the receipt. The permit body validates the receipt against
+`obsHistAuth` (`auth_lb_own_valid`), so hooks only ever see pure facts and no hook is lent the authority.
+
+**Where it moves:**
+- `UTrap`'s five towers: `hartObsStep cpu User Supervisor` → `hartStep (.uExit cpu s sc' sep' gs) Out ∗ satp ↦ s
+  ∗ gprCells cpu gs`, with `Out` and the receipt passed to `Φ`. `Out` is generic so W2d does not touch the towers
+  again.
+- `execSpecF_sretU` / `wpLoop_s_sretU`: the consent is at `.uEnter cpu c.satp epc (gprList R)`.
+- `wireInv(At)`: the text is unchanged (the permit's definition changes). `wireInv_step` splits into
+  `wireInv_exit` / `wireInv_enter`.
+- `Power.lean`: sealing from the two hooks. `riscvPowerAdequacy`: `Huser` → `HuserExit`/`HuserEnter`, and
+  `bootFixedGS` gains the `uFit` argument. `riscvTraceAdequacy` and its blind R: both hooks via
+  `obsLedgerAt_uexit`/`_uenter`, with `uFit := fun _ _ => True`.
+- `obsLedgerAt_user` splits the same way.
+- The hartObsPermit_triv / `obsPredAt` instance discharges both hooks blindly. `al_user` keeps its shape and
+  is now used for both arms by the app's `R` part.
+
+**4. How W4 consumes it.** Everything is pure, over `h` and the filing `F` from `niR`'s end-of-trace
+reading (`obsLedgerAt_phi` at `fun h => ∃ F, niOk h F`):
+- **The incarnation.** `inc h F j` is the era (`obsBoots (h.take j)`) and pid of filing `j`: `W0.pid`, or
+  `W'.pid` of a round. Pids are not reused within an era (`nextpid` only grows; wrap-around is M2-G2's counter
+  tie). Across eras they restart, hence the era.
+- **The trace.** `utrace q h F` is the positions of incarnation `q`'s filings with their cited exits, in
+  order, mapped to `h`. It replaces `utrace s h` (F3, O1). `firstKey q F` is the origin's `W0`.
+- **`events h F`.** For the class it is only the uptime readings: per round filing with `scause = uecallScause`
+  and effective number `usysEff W.secc tf = SYS_uptime`, the enter's `a0`. getpid needs nothing (its answer is
+  `sext W.pid`, fixed per incarnation), and exit has no resume. Transparent rounds (`scause ≠ uecallScause`, the
+  interrupt and lazy-fault rows) contribute nothing: `uroundOk`'s non-ecall branch is
+  `uroundIdOk tf tf' ∧ <the rest unchanged>`. *Caution:* the class is decided by `usysEff W.secc`, and the
+  seccomp mask lives in the key, not in `h`. So the Obs-level law reads `a7` through the incarnation's mask,
+  which is a first-key datum like pid, constant until a (non-class) seccomp round.
+- **The tick's source.** Read the delivered answer as the event; do not export `clockintr`. The tick is a
+  software increment on cpu 0 in S-mode, with no hardware event to hang an observation on, and exporting a
+  memory write would be a new language semantics. §6's argument is met because the reading *is* in `h`. Its
+  honesty rests on §5: the clock is part of the schedule, which ι declassifies. The weakness is that the
+  readings' cross-process monotonicity is not exported. W2c+ can add it by carrying the uptime round's `tickLb`
+  into `niFit` (per era).
+- **`phi`.** `phi g h := ∃ F, niOk h F ∧ ∀ q, NiClassLaw q (utrace q h F)`. Per round of `q`:
+  - `scause ≠ ecall` → `uroundIdOk`, i.e. the enter replays the exit's GPRs and pc.
+  - getpid → the same with `a0 := sext pid_q` and pc + 4.
+  - uptime → `a0 := reading`, the rest kept.
+  - Other ecalls: unconstrained.
+  
+  The proof is `usysDet_of_rows`/`uexecRet_roundDet` over `roundOkKeys`, which is in `niOk`. The two-run
+  corollary is pure: equal `firstKey`, equal readings and equal exits imply equal enters. The strong instance
+  in trace form: before its first ecall, `q`'s rounds are all transparent, so its enters replay its exits.
+  T's "no ledger events" half stays in-logic, because the ledgers are not in `h`.
+- **Precondition:** without W2d's claims, origins are free (F4) and `∃ F` admits filing a round as an origin.
+  W4 may *develop* on the core but publishes after W2d.
+
+**5. Lanes** (on `lean-m2`, one `lake` at a time, `lake build Xv6 MachCSL` + `tools/ci/lint.sh`, no `sorry`):
+
+| Lane | Content | Moves | Gate |
+|---|---|---|---|
+| **W2a machine** | §3: `hartStep`, `uRcpt`, `uFit` field (+`bootFixedGS`), read-frame rules, permit split + sealing, the five towers, sretU, adequacy hooks; Xv6 kept green with `uFit` at `True` in `xv6FixedGS` and receipts dropped at the callers (`uf_trapCells` lends `satp` + GPR cells; `ProofUserret` takes `wireInv_enter` at `none`) | MachCSL statements above; `xv6PowerAdequacyGen` hooks; `UstTower`/`ust_*` signatures | full `run_all.sh` (device suite, `check-gen`), TCB: `Lang`-adjacent `Resources`/`Wp` |
+| **W2b user receipt** | the receipt from the tower to `userTrapFrame` (rider `ustR`/engine rider, `UserStepClose`, `UserFrame:454`, `UkArms`/`UkFetchArm`/`UkEngine`/`UkLand`/`UkBundle`), `userTrapFrame(At/Atm)` + `trappedMachine_frame`, `userTrapFrame_open` | `USER` (via `userTrapFrame`) | full; audit baseline (USER is a root) |
+| **W2c the ledger + kernel filing** | `NiLedger.lean` (§1), `NiFitIs` class + instance at `SystemBootEra` (beside `hClaim`), `xv6FixedGS` sets `uFit := niFit`; `urc_round` keeps the receipt, `urc_exit`/`urc_resume` take `ox` and file (round or origin), `wp_userret_body` premise; `[NiFitIs]` through the cone (UserretClosed*, ForkretClose, Spec/ProofUserretClosed, Spec/ProofForkret, Spec/ProofForkretPark, Spec/ProofUserinit, ProofMain, MainFs, Link*) | `USERRET`, 5 structures' quantifiers | full |
+| **W2d claims (owner, O4)** | ledger-minted one-shot claims: exit consent `Out := MachFixedGS.uClaim e` carried in `userTrapFrame`; fork exits yield a second claim routed through `SpecKfork` to the child's park; power-on yields initproc's claim through the era turn; `niR` becomes `∃ F, ⌜niOk⌝ ∗ claimAuth γni …` at a birth-allocated name | `SpecKfork`, `SpecUserinit`, `xv6PowerAdequacyGen`'s birth, `USER` (a second conjunct) | full |
+
+W2a and W2b can go in sequence in one Opus lane (each about 15–25 files, mechanical). W2c is the content.
+W2d is gated on O4.
+
+**Owner rulings requested.**
+- **O1.** Incarnations by filing (era, pid), not `satp` (F3). The alternative, a `satp`-keyed trace truncated
+  at the first non-class exit, is pure but drops every later incarnation on a reused root and still misreads
+  a kill.
+- **O2.** The kernel's equation carrier: a Prop-class `NiFitIs` (`MachFixedGS.uFit = niFit`) bound in the
+  forkret/userret-closed cone (about 20 files, 5 structure quantifiers), recommended. It cannot ride
+  `ClaimIs`, because `SchedCtx` sits below `Uvis`. The alternative hosts the class law
+  (`scause`/`a7`/`a0` rules) in MachCSL as a pure def: no class, but MachCSL learns xv6's ABI and every G-lane
+  edits it.
+- **O3.** USER's text moves by one persistent conjunct in `userTrapFrame` (unavoidable by F1, §2(iii)).
+- **O4.** W2d (claims) before W4 publishes (F4), or accept a per-round-only W4 statement.
+- **O5.** The uptime reading as the tick event, with optional per-era monotonicity.
+- **O6.** `phi` is `∃ F`. The filing is part of the run's witness, the same way first keys are. The two-run
+  corollary is stated per incarnation at equal first key and readings.
 
 Not ported: 42666b2b7 (`tools/intr_cone.py`, a Rocq-module cone audit; the Lean counterpart is a
 `tools/` item for when T lands).  Rocq's L3 and T were never landed; they stay future work.
