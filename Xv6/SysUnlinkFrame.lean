@@ -600,6 +600,33 @@ theorem sys_unlink_bare_pid (hct : curTier = KTier.kpt) (pa : BitVec 64) (pid : 
   · ipureintro; exact h
   · ipureintro; exact hlz
 
+/-- THE ROOT'S TWO ROWS, borrowed out of the hole (chroot: dirlookup's self
+test reads `p->root` and the root's inum): the hole is refilled with the pid
+cell, the root cell and reference come out, and the hole re-forms around
+them. -/
+theorem sys_unlink_hole_root (hct : curTier = KTier.kpt) (A : SysUnlinkArgs GF) (P2 : UPtd) :
+    sysUnlinkHole (GF := GF) A (procAddr A.j) P2 ∗ wordPointsTo (pPid (procAddr A.j)) 4 pidPriv A.pid ⊢
+      wordPointsTo (pPid (procAddr A.j)) 4 pidPriv A.pid ∗
+      wordPointsTo (pRoot (procAddr A.j)) 8 (DFrac.own 1) A.V.root ∗
+      inodeHeldAt A.V.root A.V.rti ∗
+      (wordPointsTo (pRoot (procAddr A.j)) 8 (DFrac.own 1) A.V.root -∗
+        inodeHeldAt A.V.root A.V.rti -∗ sysUnlinkHole A (procAddr A.j) P2) := by
+  unfold sysUnlinkHole procPrivFd procPrivCoreNoctxAt procPrivBareAt procFieldsNoOfile rootRefAt
+  rw [sysfile_cur_kpt hct]
+  iintro ⟨⟨%hP2, Hw⟩, Hpid⟩
+  ihave B := Hw $$ Hpid
+  icases B with ⟨⟨⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hcwd, Hnm, Hsc, Hrt⟩, Hpt, Htfp, %hlz, Hev⟩, Hc, Hr,
+    Hg⟩, Hof⟩
+  iframe Hpid Hrt Hr
+  iintro Hrt Hr
+  isplitr
+  · ipureintro; exact hP2
+  iintro Hpid
+  iframe Hpid Hk Hs Hpg Htf Hcwd Hnm Hsc Hrt Hpt Htfp Hc Hr Hg Hof Hev
+  isplitl []
+  · ipureintro; exact h
+  · ipureintro; exact hlz
+
 /-- ...and back into the out bundle's block. -/
 theorem sys_unlink_block_close (A : SysUnlinkArgs GF) (pa : BitVec 64) (P2 : UPtd) :
     sysUnlinkHole (GF := GF) A pa P2 ⊢ wordPointsTo (pPid pa) 4 pidPriv A.pid -∗

@@ -153,6 +153,30 @@ theorem kxcA_priv_rows [X : CurCtx] (hct : X.curTier = KTier.kpt) (γ : FileName
   · ipureintro; exact hf
   · ipureintro; exact hlz
 
+/-- ...and the five rows the SET-FORM walk lends (chroot: the root's cell
+and reference beside the cwd's). -/
+theorem kxcA_priv_rows5 [X : CurCtx] (hct : X.curTier = KTier.kpt) (γ : FileNames) (pa : BitVec 64)
+    (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) :
+    procPrivFd (GF := GF) γ pa pid V M ⊢
+      wordPointsTo (pPid pa) 4 pidPriv pid ∗ wordPointsTo (pCwd pa) 8 (DFrac.own 1) V.cwd ∗
+      inodeHeldAt V.cwd V.cwi ∗ wordPointsTo (pRoot pa) 8 (DFrac.own 1) V.root ∗
+      inodeHeldAt V.root V.rti ∗
+      (wordPointsTo (pPid pa) 4 pidPriv pid -∗ wordPointsTo (pCwd pa) 8 (DFrac.own 1) V.cwd -∗
+        inodeHeldAt V.cwd V.cwi -∗ wordPointsTo (pRoot pa) 8 (DFrac.own 1) V.root -∗
+        inodeHeldAt V.root V.rti -∗ procPrivFd γ pa pid V M) := by
+  obtain ⟨ξ, t⟩ := X
+  simp only at hct
+  subst hct
+  unfold procPrivFd procPrivCoreNoctxAt procPrivBareAt procFieldsNoOfile cwdRefAt rootRefAt
+  iintro ⟨⟨⟨%hf, Hpid, ⟨Hk, Hs, Hpg, Htf, Hcwd, Hnm, Hsc, Hrt⟩, Hpt, Htfp, %hlz, Hev⟩, Hc, Hr, Hg⟩,
+    Hof⟩
+  iframe Hpid Hcwd Hc Hrt Hr Hev
+  iintro Hpid Hcwd Hc Hrt Hr
+  iframe Hpid Hk Hs Hpg Htf Hcwd Hnm Hsc Hrt Hpt Htfp Hc Hr Hg Hof
+  isplitl []
+  · ipureintro; exact hf
+  · ipureintro; exact hlz
+
 end Pid
 
 
@@ -324,6 +348,7 @@ theorem kxcA_call_namei (NI : NAMEI) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF 
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     fsFabric (hlc := hlc) Γ A.pd A.pav A.pu ∗ wordPointsTo (pPid k.proc) 4 pidPriv A.pidv ∗
     wordPointsTo (pCwd k.proc) 8 (DFrac.own 1) A.V.cwd ∗ inodeHeldAt A.V.cwd A.V.cwi ∗
+    wordPointsTo (pRoot k.proc) 8 (DFrac.own 1) A.V.root ∗ inodeHeldAt A.V.root A.V.rti ∗
     byteBuf (k.regs 10#5) A.dqpv (bview (A.plen + 1) A.pfun) ∗
     bslots 3 ∗ irefSlots 2 ∗ logOp icfgLog MAXOPBLOCKS ∗
     (∀ (c : CPU) (spie' spp' : Bool) (R' : RegMap) (n' : Nat) (ok : Bool) (ipv : BitVec 64),
@@ -332,6 +357,7 @@ theorem kxcA_call_namei (NI : NAMEI) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF 
       trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗
       wordPointsTo (pPid k.proc) 4 pidPriv A.pidv -∗
       wordPointsTo (pCwd k.proc) 8 (DFrac.own 1) A.V.cwd -∗ inodeHeldAt A.V.cwd A.V.cwi -∗
+      wordPointsTo (pRoot k.proc) 8 (DFrac.own 1) A.V.root -∗ inodeHeldAt A.V.root A.V.rti -∗
       byteBuf (k.regs 10#5) A.dqpv (bview (A.plen + 1) A.pfun) -∗
       bslots 3 -∗ logOp icfgLog n' -∗
       (if ok then iprop(⌜R' 10#5 = ipv⌝ ∗ inodeHeld ipv ∗ irefSlots 1)
@@ -340,7 +366,7 @@ theorem kxcA_call_namei (NI : NAMEI) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF 
     ⊢ wpLoop (GF := GF) cpu := by
   have hK' : nameiSlots ≤ k.avail - 68 := by
     rw [nameiSlots_eq]; rw [kxc_slots_val] at hK; omega
-  iintro ⟨#Hi, Hk, Hpc, Hte, Hce, #Hfab, Hpid, Hcwd, Hcwr, Hpath, Hbs, Hir, Hlog, HK⟩
+  iintro ⟨#Hi, Hk, Hpc, Hte, Hce, #Hfab, Hpid, Hcwd, Hcwr, Hrtc, Hrtr, Hpath, Hbs, Hir, Hlog, HK⟩
   unfold fsFabric
   icases Hfab with ⟨#Hrdy, #Hpe, #Hpi, #Hdc0⟩
   ihave %hg := fsReady_geom $$ Hrdy
@@ -359,24 +385,24 @@ theorem kxcA_call_namei (NI : NAMEI) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF 
   have h := NI.wp_namei_gen_eb (hlc := hlc) (GF := GF) Γ cpu
     ((((k.withSpie spie spp).pushed 68).withRegs R).setReg 1#5 (X + 4#64)) γbl pd pav pu A.j
     fscKalloc fsReadyKmem A.plen A.pfun MAXOPBLOCKS Sb A.pidv A.V.cwd A.V.cwi pidPriv (DFrac.own 1)
-    DFrac.discard DFrac.discard A.dqpv hj (by k_norm_g; exact hproc) (by k_norm_g; exact hK')
+    DFrac.discard DFrac.discard A.dqpv A.V.root A.V.rti (DFrac.own 1) hj (by k_norm_g; exact hproc) (by k_norm_g; exact hK')
     (by k_norm_g; exact hnoff) (by k_norm_g; exact htier) hg.fgoRootdev hg.fgoNibPos hg.fgoLog
     hg.fgoBitmap hg.fgoCovBelow hg.fgoIreg hnn hterm hplen (kxcA_walkNeed _) hpd
   unfold wp_namei_gen_eb_body at h
   iapply h
   k_norm_g [ha0]
-  iframe Hk Hpc Hte Hce Hpid Hcwd Hcwr Hpath Hbs Hir Hop Htx
+  iframe Hk Hpc Hte Hce Hpid Hcwd Hcwr Hrtc Hrtr Hpath Hbs Hir Hop Htx
   iframe #
   iapply wpNext_intro_pin
   iintro %c %_
   unfold nameiPost
-  iintro %spie' %spp' %R' %n' %Sb' %ok %ipv %w %hcs Hk Hpc Hte Hce - - Hpid Hcwd Hcwr Hpath Hbs %hf
-    Hop Htx Harm
+  iintro %spie' %spp' %R' %n' %Sb' %ok %ipv %w %hcs Hk Hpc Hte Hce - - Hpid Hcwd Hcwr Hrtc Hrtr Hpath
+    Hbs %hf Hop Htx Harm
   k_norm_g [hret, ha0]
   ihave Hk := kctx_eq_mono c _ (((k.withSpie spie' spp').pushed 68).withRegs R')
     (kxc_ctx_ret k spie spp spie' spp' R') $$ Hk
-  iapply HK $$ %c %spie' %spp' %R' %n' %ok %ipv [] Hk Hpc Hte Hce Hpid Hcwd Hcwr Hpath Hbs [Hop Htx]
-    Harm
+  iapply HK $$ %c %spie' %spp' %R' %n' %ok %ipv [] Hk Hpc Hte Hce Hpid Hcwd Hcwr Hrtc Hrtr Hpath Hbs
+    [Hop Htx] Harm
   · ipureintro
     refine ⟨by simpa using hcs, fun hok => ?_⟩
     obtain ⟨-, -, h1, -⟩ := hf
@@ -583,8 +609,8 @@ theorem kxc_a1 (MP : MYPROC) (BO : BEGIN_OP) (NI : NAMEI) (EO : END_OP)
   iintro ⟨Hk, Hpc, Hte, Hce, #Hfab, Hpriv, Hbufs, Hbs, Hirs, Hcl, HK⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   icases kctx_tier _ _ $$ Hk with ⟨%hct, Hk⟩
-  icases kxcA_priv_rows (hct.symm.trans htier) A.γ k.proc A.pidv A.V A.M $$ Hpriv
-    with ⟨Hpid, Hcwd, Hcwr, Hpriv⟩
+  icases kxcA_priv_rows5 (hct.symm.trans htier) A.γ k.proc A.pidv A.V A.M $$ Hpriv
+    with ⟨Hpid, Hcwd, Hcwr, Hrtc, Hrtr, Hpriv⟩
   -- +0x000 .. +0x01c
   iapply (kxc_prologueA cpu k hK68)
   iframe Hk Hpc Hte Hce
@@ -622,14 +648,14 @@ theorem kxc_a1 (MP : MYPROC) (BO : BEGIN_OP) (NI : NAMEI) (EO : END_OP)
   iapply (kxcA_call_namei NI Γ cpu k A spie2 spp2 _ (KA.«kexec» + 0x2c#64) 2093706#21
       kxcA_br_namei kxcA_ret_30 hK hnoff htier hj hproc hnn hterm hplen
       (by simp [RegMap.set_apply, e18]))
-    $$ [- $Hk $Hpc $Hte $Hce $Hfab $Hpid $Hcwd $Hcwr $Hbs $Hirs $Hlog]
+    $$ [- $Hk $Hpc $Hte $Hce $Hfab $Hpid $Hcwd $Hcwr $Hrtc $Hrtr $Hbs $Hirs $Hlog]
   isplitr
   · iapply (text_instr _ _ _ _ rfl rfl); iexact Htext
   unfold kxcBufs
   icases Hbufs with ⟨Hpath, Hargv, Hargs⟩
   iframe Hpath
-  iintro %cpu %spie3 %spp3 %R3 %n1 %ok %ipv %⟨hcs3, hn1⟩ Hk Hpc Hte Hce Hpid Hcwd Hcwr Hpath Hbs Hlog
-    Harm
+  iintro %cpu %spie3 %spp3 %R3 %n1 %ok %ipv %⟨hcs3, hn1⟩ Hk Hpc Hte Hce Hpid Hcwd Hcwr Hrtc Hrtr
+    Hpath Hbs Hlog Harm
   k_norm_g
   obtain ⟨c2, c8, c9, c18, c19, c20, c21, c22, c23, c24, c25, c26, c27⟩ := hcs3
   simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] at c2 c8 c9 c18 c19 c20 c21 c22 c23 c24 c25 c26 c27
@@ -658,7 +684,7 @@ theorem kxc_a1 (MP : MYPROC) (BO : BEGIN_OP) (NI : NAMEI) (EO : END_OP)
     k_step_e (wp_s_branch cpu _ (KA.«kexec» + 0x30#64) true 88#13 10#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, Xv6.dirlookup_beqz, hd]
     iintro Hk Hpc
-    ihave Hpriv := Hpriv $$ Hpid Hcwd Hcwr
+    ihave Hpriv := Hpriv $$ Hpid Hcwd Hcwr Hrtc Hrtr
     iapply HK $$ %cpu %spie3 %spp3 %R3 %ipv %zi %n1 [- Hcl] Hcl
     unfold kxcAtA2 kxcBufs
     iframe
@@ -689,7 +715,7 @@ theorem kxc_a1 (MP : MYPROC) (BO : BEGIN_OP) (NI : NAMEI) (EO : END_OP)
     iintro Hk Hpc
     obtain ⟨d2, -, -, -, d19, d20, d21, d22, d23, d24, d25, d26, d27⟩ := hcs4
     simp only [RegMap.set_apply, BitVec.reduceEq, ite_false] at d2 d19 d20 d21 d22 d23 d24 d25 d26 d27
-    ihave Hpriv := Hpriv $$ Hpid Hcwd Hcwr
+    ihave Hpriv := Hpriv $$ Hpid Hcwd Hcwr Hrtc Hrtr
     ihave Hfr := kxcFrameA_epi (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5)
       (k.regs 10#5) (k.regs 11#5) $$ Hfr
     ihave Hbufs : kxcBufs k A $$ [Hpath Hargv Hargs]

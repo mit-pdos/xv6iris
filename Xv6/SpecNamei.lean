@@ -102,6 +102,7 @@ namex's (`namexPost`) at `npar = false`, without the name buffer and without
 its (vacuous) nameiparent clause. -/
 def nameiPost (k : KCtx) (plen : Nat) (pfun : Nat → BitVec 8) (n : Nat) (Sb : List Nat)
     (pidv : BitVec 32) (cwdv : BitVec 64) (cwi : Nat) (dqp dqc dqb dqs dqpv : DFrac)
+    (rootv : BitVec 64) (rti : Nat) (dqr : DFrac)
     (cpu' : CPU) : IProp GF :=
   iprop(∀ (spie spp : Bool) (R' : RegMap) (n' : Nat) (Sb' : List Nat) (ok : Bool)
       (ipv : BitVec 64) (w : Bool),
@@ -113,6 +114,7 @@ def nameiPost (k : KCtx) (plen : Nat) (pfun : Nat → BitVec 8) (n : Nat) (Sb : 
     wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) -∗
     wordPointsTo (pPid k.proc) 4 dqp pidv -∗
     wordPointsTo (pCwd k.proc) 8 dqc cwdv -∗ inodeHeldAt cwdv cwi -∗
+    wordPointsTo (pRoot k.proc) 8 dqr rootv -∗ inodeHeldAt rootv rti -∗
     byteBuf (k.regs 10#5) dqpv (bview (plen + 1) pfun) -∗
     bslots 3 -∗
     -- THE SET ONLY GROWS; THE PAID-BITMAP REPORT; THE PRICED INTERVAL
@@ -137,6 +139,7 @@ def wp_namei_gen_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
     (γkl : GName) (γk : KmemNames)
     (plen : Nat) (pfun : Nat → BitVec 8) (n : Nat) (Sb : List Nat)
     (pidv : BitVec 32) (cwdv : BitVec 64) (cwi : Nat) (dqp dqc dqb dqs dqpv : DFrac)
+    (rootv : BitVec 64) (rti : Nat) (dqr : DFrac)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : nameiSlots ≤ k.avail)
     (hnoff : k.noff = 0) (htier : k.tier = KTier.kpt)
     (hroot : icfgDev = BitVec.ofNat 32 ROOTDEV) (hnib0 : 0 < icfgNib)
@@ -168,13 +171,14 @@ def wp_namei_gen_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
   -- ---- the caller's pid cell, and THE WORKING DIRECTORY (namex's rows) ----
   wordPointsTo (pPid k.proc) 4 dqp pidv ∗
   wordPointsTo (pCwd k.proc) 8 dqc cwdv ∗ inodeHeldAt cwdv cwi ∗
+  wordPointsTo (pRoot k.proc) 8 dqr rootv ∗ inodeHeldAt rootv rti ∗
   -- ---- THE PATH, at the caller's fraction (only READ) ----
   byteBuf (k.regs 10#5) dqpv (bview (plen + 1) pfun) ∗
   bslots 3 ∗
   irefSlots 2 ∗
   logOpS icfgLog n Sb ∗ logTx icfgLog ∗
   -- THE CROSSING IS THE LITERAL `true`: namei parks (through namex)
-  wpNext true k.proc cpu (nameiPost k plen pfun n Sb pidv cwdv cwi dqp dqc dqb dqs dqpv)
+  wpNext true k.proc cpu (nameiPost k plen pfun n Sb pidv cwdv cwi dqp dqc dqb dqs dqpv rootv rti dqr)
   ⊢ wpLoop (GF := GF) cpu
 
 /-- The interface of `namei` (Rocq's `Module Type NAMEI`, its `wp_namei_gen`
@@ -189,9 +193,10 @@ structure NAMEI : Prop where
     (γkl : GName) (γk : KmemNames)
     (plen : Nat) (pfun : Nat → BitVec 8) (n : Nat) (Sb : List Nat)
     (pidv : BitVec 32) (cwdv : BitVec 64) (cwi : Nat) (dqp dqc dqb dqs dqpv : DFrac)
+    (rootv : BitVec 64) (rti : Nat) (dqr : DFrac)
     hj hproc hK hnoff htier hroot hnib0 hgeom hbg hbel hireg hnn hterm hplen hbud hpd,
     wp_namei_gen_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl pd pav pu j γkl γk plen pfun
-      n Sb pidv cwdv cwi dqp dqc dqb dqs dqpv
+      n Sb pidv cwdv cwi dqp dqc dqb dqs dqpv rootv rti dqr
       hj hproc hK hnoff htier hroot hnib0 hgeom hbg hbel hireg hnn hterm hplen hbud hpd
 
 /-! ## THE CWD BRIDGE -/
@@ -200,10 +205,11 @@ section Bridge
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [IcacheG GF]
   [SleepLockG GF] [IcboxG GF] [Icfg] [CurCtx]
 
-/-- **The cwd-bearing block as namex's / namei's / nameiparent's three
-rows** (Rocq: a caller's `proc_priv_bare` + `cwd_ref_at_held_at`): the pid
-cell at `pidPriv`, the `p->cwd` cell whole, and the reference at the block's
-inum; the three come back and re-form the block.  Stated at the kernel tier
+/-- **The cwd-bearing block as namex's / namei's / nameiparent's five
+rows** (Rocq: a caller's `proc_priv_bare` + `cwd_ref_at_held_at` +
+`root_ref_at`): the pid cell at `pidPriv`, the `p->cwd` cell whole and the
+cwd reference, the `p->root` cell whole and the root reference (chroot);
+the five come back and re-form the block.  Stated at the kernel tier
 of the ambient context, as `ProcInv.procPrivCwd_cwd` is (a caller that has
 learned `curTier = KTier.kpt` from `kctx_tier` reads it at its own
 instance). -/
@@ -213,17 +219,19 @@ theorem namei_procPrivCwd_rows (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
       @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPid pa) 4 pidPriv pid ∗
       @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pCwd pa) 8 (DFrac.own 1) V.cwd ∗
       inodeHeldAt V.cwd V.cwi ∗
+      @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pRoot pa) 8 (DFrac.own 1) V.root ∗
+      inodeHeldAt V.root V.rti ∗
       (@wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPid pa) 4 pidPriv pid -∗
         @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pCwd pa) 8 (DFrac.own 1) V.cwd -∗
-        inodeHeldAt V.cwd V.cwi -∗ procPrivCwd pa pid V M) := by
-  unfold procPrivCwd procPrivNoctxAt procFieldsNoctx cwdRefAt
+        inodeHeldAt V.cwd V.cwi -∗
+        @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pRoot pa) 8 (DFrac.own 1) V.root -∗
+        inodeHeldAt V.root V.rti -∗ procPrivCwd pa pid V M) := by
+  unfold procPrivCwd procPrivNoctxAt procFieldsNoctx cwdRefAt rootRefAt
   iintro ⟨⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hof, Hcwd, Hnm, Hsc, Hrt⟩, Hpt, Htfp, %hlz, Hev⟩, Hc, Hr⟩
-  iframe Hpid Hcwd Hc Hev
-  iintro Hpid Hcwd Hc
-  iframe Hpid Hk Hs Hpg Htf Hof Hcwd Hnm Hsc Hrt Hpt Htfp Hc Hr
-  isplitl []
-  · ipureintro; exact h
-  · ipureintro; exact hlz
+  iframe Hpid Hcwd Hc Hrt Hr
+  iintro Hpid Hcwd Hc Hrt Hr
+  iframe Hpid Hk Hs Hpg Htf Hof Hcwd Hnm Hsc Hrt Hpt Htfp Hc Hr Hev
+  ipureintro; exact ⟨h, hlz⟩
 
 end Bridge
 

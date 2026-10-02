@@ -93,7 +93,7 @@ theorem namexEra_main (MP : MYPROC) (ID : IDUP) (IG : IGET) (MM : MEMMOVE) (IL :
       hj hproc hK hnoff htier hroot hnib0 hgeom hbg hbel hireg hnn hterm hplen hbud ha1 hpd := by
   unfold wp_namex_era_eb_body
   let A : NamexArgs := ⟨γl, pd, pav, pu, j, γkl, γk, plen, pfun, false, n, Sb, pid, V.cwd, V.cwi,
-    pidPriv, DFrac.own 1, dqb, dqs, dqpv⟩
+    pidPriv, DFrac.own 1, dqb, dqs, dqpv, V.root, V.rti, DFrac.own 1⟩
   have hK12 := namex_slots_12 _ hK
   iintro ⟨Hk, Hpc, #Hpi, Hte, Hce, #Hpe, #Hbc, #Hlc, #Hdc, #Hkl, #Hav, #Hit2, #Hiti, #Hslks,
     #Hinv, #Hopen, Hsb, Hsi, #Hbmi, Hcore, Hpath, Hnm, Hbs, Hs2, Hop, Htx, Hstart, Hnext⟩
@@ -106,17 +106,17 @@ theorem namexEra_main (MP : MYPROC) (ID : IDUP) (IG : IGET) (MM : MEMMOVE) (IL :
     { hj := hj, hproc := hproc, hK := hK, hnoff := hnoff, hlocks := hlocks, htier := htier,
       hroot := hroot, hnib0 := hnib0, hgeom := hgeom, hbg := hbg, hbel := hbel, hireg := hireg,
       hnn := hnn, hterm := hterm, hplen := hplen, hnpar := ha1, hpd := hpd }
-  -- THE PROCESS BLOCK'S CORE, AS THE WALK'S THREE ROWS
-  icases namexEra_core_rows hct k.proc pid V M $$ Hcore with ⟨Hpid, Hcwd, Hcwr, Hcl⟩
+  -- THE PROCESS BLOCK'S CORE, AS THE WALK'S FIVE ROWS
+  icases namexEra_core_rows5 hct k.proc pid V M $$ Hcore with ⟨Hpid, Hcwd, Hcwr, Hrtc, Hrtr, Hcl⟩
   ihave Hcl : namexEraClose (GF := GF) k pid V M $$ [Hcl]
   · unfold namexEraClose; iexact Hcl
   ihave Hnext := namexEra_post_of_spec k A P Pmiss pid V M cpu hj hproc rfl
-    ⟨rfl, rfl, rfl, rfl, rfl⟩ $$ [$Hnext $Hcl]
+    ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩ $$ [$Hnext $Hcl]
   -- THE DEFERRED START, at the record
   ihave Hst := namexEraStart_ex A P Pmiss rfl $$ Hstart
   ihave #Henv : namexEnv (hlc := hlc) Γ A $$ []
   · unfold namexEnv; iframe #
-  ihave Hpre : namexPre k A nfun $$ [Hsb Hsi Hpid Hcwd Hcwr Hpath Hnm Hbs Hs2 Hop Htx]
+  ihave Hpre : namexPre k A nfun $$ [Hsb Hsi Hpid Hcwd Hcwr Hrtc Hrtr Hpath Hnm Hbs Hs2 Hop Htx]
   · unfold namexPre namexKeep namexPath; iframe
   simp only [namexAddr]
   -- +0x00 .. +0x1a  the prologue

@@ -82,6 +82,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 namex's (`namexPost`) at `npar = true`, the name buffer at the caller's a1. -/
 def nameiparentPost (k : KCtx) (plen : Nat) (pfun : Nat → BitVec 8) (n : Nat) (Sb : List Nat)
     (pidv : BitVec 32) (cwdv : BitVec 64) (cwi : Nat) (dqp dqc dqb dqs dqpv : DFrac)
+    (rootv : BitVec 64) (rti : Nat) (dqr : DFrac)
     (cpu' : CPU) : IProp GF :=
   iprop(∀ (spie spp : Bool) (R' : RegMap) (n' : Nat) (Sb' : List Nat) (ok : Bool)
       (nf : Nat → BitVec 8) (ipv : BitVec 64) (w : Bool),
@@ -93,6 +94,7 @@ def nameiparentPost (k : KCtx) (plen : Nat) (pfun : Nat → BitVec 8) (n : Nat) 
     wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) -∗
     wordPointsTo (pPid k.proc) 4 dqp pidv -∗
     wordPointsTo (pCwd k.proc) 8 dqc cwdv -∗ inodeHeldAt cwdv cwi -∗
+    wordPointsTo (pRoot k.proc) 8 dqr rootv -∗ inodeHeldAt rootv rti -∗
     byteBuf (k.regs 10#5) dqpv (bview (plen + 1) pfun) -∗
     -- the caller's name buffer, at an UNSPECIFIED naming function
     byteBuf (k.regs 11#5) (DFrac.own 1) (bview 14 nf) -∗
@@ -121,6 +123,7 @@ def wp_nameiparent_gen_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc
     (γkl : GName) (γk : KmemNames)
     (plen : Nat) (pfun nfun : Nat → BitVec 8) (n : Nat) (Sb : List Nat)
     (pidv : BitVec 32) (cwdv : BitVec 64) (cwi : Nat) (dqp dqc dqb dqs dqpv : DFrac)
+    (rootv : BitVec 64) (rti : Nat) (dqr : DFrac)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : nameiparentSlots ≤ k.avail)
     (hnoff : k.noff = 0) (htier : k.tier = KTier.kpt)
     (hroot : icfgDev = BitVec.ofNat 32 ROOTDEV) (hnib0 : 0 < icfgNib)
@@ -152,6 +155,7 @@ def wp_nameiparent_gen_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc
   -- ---- the caller's pid cell, and THE WORKING DIRECTORY (namex's rows) ----
   wordPointsTo (pPid k.proc) 4 dqp pidv ∗
   wordPointsTo (pCwd k.proc) 8 dqc cwdv ∗ inodeHeldAt cwdv cwi ∗
+  wordPointsTo (pRoot k.proc) 8 dqr rootv ∗ inodeHeldAt rootv rti ∗
   -- ---- THE PATH, at the caller's fraction (only READ) ----
   byteBuf (k.regs 10#5) dqpv (bview (plen + 1) pfun) ∗
   -- ---- THE CALLER'S NAME BUFFER, WRITTEN: full ownership ----
@@ -160,7 +164,7 @@ def wp_nameiparent_gen_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc
   irefSlots 2 ∗
   logOpS icfgLog n Sb ∗ logTx icfgLog ∗
   -- THE CROSSING IS THE LITERAL `true`: nameiparent parks (through namex)
-  wpNext true k.proc cpu (nameiparentPost k plen pfun n Sb pidv cwdv cwi dqp dqc dqb dqs dqpv)
+  wpNext true k.proc cpu (nameiparentPost k plen pfun n Sb pidv cwdv cwi dqp dqc dqb dqs dqpv rootv rti dqr)
   ⊢ wpLoop (GF := GF) cpu
 
 /-- The interface of `nameiparent` (Rocq's `Module Type NAMEIPARENT`, its
@@ -175,9 +179,10 @@ structure NAMEIPARENT : Prop where
     (γkl : GName) (γk : KmemNames)
     (plen : Nat) (pfun nfun : Nat → BitVec 8) (n : Nat) (Sb : List Nat)
     (pidv : BitVec 32) (cwdv : BitVec 64) (cwi : Nat) (dqp dqc dqb dqs dqpv : DFrac)
+    (rootv : BitVec 64) (rti : Nat) (dqr : DFrac)
     hj hproc hK hnoff htier hroot hnib0 hgeom hbg hbel hireg hnn hterm hplen hbud hpd,
     wp_nameiparent_gen_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl pd pav pu j γkl γk plen pfun
-      nfun n Sb pidv cwdv cwi dqp dqc dqb dqs dqpv
+      nfun n Sb pidv cwdv cwi dqp dqc dqb dqs dqpv rootv rti dqr
       hj hproc hK hnoff htier hroot hnib0 hgeom hbg hbel hireg hnn hterm hplen hbud hpd
 
 theorem slots_namex (a : Nat) (h : nameiparentSlots ≤ a) : namexSlots ≤ a - 2 := by

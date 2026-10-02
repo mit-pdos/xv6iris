@@ -1,13 +1,13 @@
 /-
-`dirlookup`'s FOUND arm `+0x7e .. +0x92` (Rocq `ProofDirlookup.v`
+`dirlookup`'s FOUND arm `+0xbc .. +0xd0` (Rocq `ProofDirlookup.v`
 1927–2266):
 
-    +0x7e  beqz s7,+0x86           -- if(poff)
-    +0x82  sw s1,0(s7)             --   *poff = off;
-    +0x86  lhu a1,-96(s0)          -- inum = de.inum
-    +0x8a  lw a0,0(s2)             -- dp->dev
-    +0x8e  jal iget
-    +0x92  c.j +0x96               -- into the tail
+    +0xbc  beqz s7,+0xc4           -- if(poff)
+    +0xc0  sw s1,0(s7)             --   *poff = off;
+    +0xc4  lhu a1,-96(s0)          -- inum = de.inum
+    +0xc8  lw a0,0(s2)             -- dp->dev
+    +0xcc  jal iget
+    +0xd0  ld s3/s4/s6; c.j +0xe0  -- the lazy restores, into the tail
 
 and THE LICENCE (Rocq 2097–2197, increment C'-lite): the one step where an
 inum that came off a disk block becomes a REFERENCE.  At a hit the
@@ -158,7 +158,7 @@ theorem dirlookup_refb (l : Ilic) (hl : isClaim l = false) (kk : Nat) (q : Qp)
   iapply runitAny_intro $$ Hu
 
 set_option maxHeartbeats 16000000 in
-/-- **`+0x86 .. +0x92`: the inum, the device, THE LICENCE and iget**, then
+/-- **`+0xc4 .. +0xd0`: the inum, the device, THE LICENCE and iget**, then
 the tail on the found arm. -/
 theorem dirlookup_found_iget (IG : IGET) (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap)
     (j : Nat) (ip : BitVec 64) (dinum : BitVec 32) (bm : Blkmap) (data : Nat → List (BitVec 8))
@@ -167,7 +167,7 @@ theorem dirlookup_found_iget (IG : IGET) (cpu : CPU) (k : KCtx) (spie spp : Bool
     (hs : DirlookupStatic k j bm data dn dr fn hasp) (hr : dirlookupRegs k ip R i)
     (hlive : dirLive data i)
     (hsome : dirFirst data (dirNrec dn.diSize.toNat) (bname 14 fn) = some i) :
-    kctx cpu (((k.withSpie spie spp).pushed 12).withRegs R) ∗ pcIs cpu (KA.«dirlookup» + 0x86#64) ∗
+    kctx cpu (((k.withSpie spie spp).pushed 12).withRegs R) ∗ pcIs cpu (KA.«dirlookup» + 0xc4#64) ∗
     dirlookupFrame (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)
       (k.regs 20#5) (k.regs 21#5) (k.regs 22#5) (k.regs 23#5) v10 ∗
     wordPointsTo (dirlookupDeAddr (k.regs 2#5)) 2 (DFrac.own 1) (dirInum data i) ∗
@@ -197,22 +197,22 @@ theorem dirlookup_found_iget (IG : IGET) (cpu : CPU) (k : KCtx) (spie spp : Bool
     Hnext⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   ihave #Hreg := iregInv_reg (hlc := hlc) fscIreg fscFs icfgIst icfgNib $$ Hinv
-  -- +0x86  lhu a1,-96(s0)
-  k_step_e (wp_s_lhu cpu _ (KA.«dirlookup» + 0x86#64) false 4000#12 11#5 8#5 (by decide) (by decide)
+  -- +0xc4  lhu a1,-96(s0)
+  k_step_e (wp_s_lhu cpu _ (KA.«dirlookup» + 0xc4#64) false 4000#12 11#5 8#5 (by decide) (by decide)
       (DFrac.own 1) (dirInum data i))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [r8]
   iintro Hk Hpc Hhalf
-  -- +0x8a  lw a0,0(s2)
+  -- +0xc8  lw a0,0(s2)
   unfold dirlookupKeep
   icases Hkeep with ⟨Hdev, Hmeta, Hmap, Hblk, Hnm, Hpid, Hbsl, Hlk, Hdi⟩
-  k_step_e (wp_s_lw cpu _ (KA.«dirlookup» + 0x8a#64) false 0#12 10#5 18#5 (by decide) (by decide)
+  k_step_e (wp_s_lw cpu _ (KA.«dirlookup» + 0xc8#64) false 0#12 10#5 18#5 (by decide) (by decide)
       dqd icfgDev)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [r18, iDev]
   iintro Hk Hpc Hdev
   ihave Hdev := (show wordPointsTo (GF := GF) ip 4 dqd icfgDev ⊢
     wordPointsTo (iDev ip) 4 dqd icfgDev by rw [hdev0]) $$ Hdev
-  -- +0x8e  jal iget, under the licence
-  k_step_e (wp_s_jal cpu _ (KA.«dirlookup» + 0x8e#64) false 2094572#21 1#5 (by decide))
+  -- +0xcc  jal iget, under the licence
+  k_step_e (wp_s_jal cpu _ (KA.«dirlookup» + 0xcc#64) false 2094510#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [dirlookup_br_iget]
   iintro Hk Hpc
   icases dirlookup_licence dinum bm data dn dr i hty hnl hfirst hs.hholes hs.hsz hs.hdrnz
@@ -222,7 +222,7 @@ theorem dirlookup_found_iget (IG : IGET) (cpu : CPU) (k : KCtx) (spie spp : Bool
       ?ga1 ?git ?gpr ?guart)
     $$ [- $Hk $Hpc $Hit2 $Hiti $Hreg $Hpe $Hsl $Hname']
   rotate_right 1
-  k_norm_g [dirlookup_ret_92]
+  k_norm_g [dirlookup_ret_d0]
   iframe #
   case gK => k_norm_g; exact dirlookup_slots_iget _ hs.hK
   case gnoff => k_norm_g; simp only [hs.hnoff]; omega
@@ -234,16 +234,13 @@ theorem dirlookup_found_iget (IG : IGET) (cpu : CPU) (k : KCtx) (spie spp : Bool
   -- back from iget
   k_next_e
   iintro %spie1 %spp1 %R1 %hsp1 Hk Hpc %hcs1 %kslot %q %hkq Hrefb Hname'
-  k_norm_g [dirlookup_ret_92, hww, hpsw]
+  k_norm_g [dirlookup_ret_d0, hww, hpsw]
   unfold calleeSaved at hcs1
   k_norm_g at hcs1
   obtain ⟨b2, b8, b9, b18, b19, b20, b21, b22, b23, b24, b25, b26, b27⟩ := hcs1
   ihave ⟨Hlk, Hdi⟩ := Hback $$ Hname'
   icases dirlookup_refb l hlc kslot q icfgDev _ $$ Hrefb with ⟨Href, Hru⟩
-  -- +0x92  c.j +0x96
-  k_step_e (wp_s_j cpu _ (KA.«dirlookup» + 0x92#64) true 4#21)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-  iintro Hk Hpc
+  -- +0xd0  the lazy restores, then the tail
   ihave Hde := dirlookup_de_join (k.regs 2#5) (dirInum data i) (dirName data i) hs.hal
     $$ [Hhalf Hname]
   · iframe
@@ -258,7 +255,7 @@ theorem dirlookup_found_iget (IG : IGET) (cpu : CPU) (k : KCtx) (spie spp : Bool
     $$ [Hdev Hmeta Hmap Hblk Hnm Hpid Hbsl Hlk Hdi]
   · unfold dirlookupKeep; iframe
   iapply (dirlookup_tail cpu k spie1 spp1 _ ip dinum bm data dn dr fn hasp pofv pidv dqp dqd dqn
-      true i kslot q v10 _ (ientry kslot)
+      true i kslot q v10 _ (ientry kslot) _ (Or.inr (Or.inl rfl))
       (by have := hs.hK; unfold dirlookupSlots at this; omega) hs.hal ?t2 ?t10 ?t24 ?t25
       ?t26 ?t27)
     $$ [$Hk $Hpc $Hframe $Hde $Hte $Hce $Hkeep $Harm $Hnext]
@@ -270,7 +267,7 @@ theorem dirlookup_found_iget (IG : IGET) (cpu : CPU) (k : KCtx) (spie spp : Bool
   case t27 => rw [b27]; exact r27
 
 set_option maxHeartbeats 16000000 in
-/-- **`+0x7e .. +0x82`: the optional `*poff = off`**, then
+/-- **`+0xbc .. +0xc0`: the optional `*poff = off`**, then
 `dirlookup_found_iget`. -/
 theorem dirlookup_found (IG : IGET) (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap)
     (j : Nat) (ip : BitVec 64) (dinum : BitVec 32) (bm : Blkmap) (data : Nat → List (BitVec 8))
@@ -279,7 +276,7 @@ theorem dirlookup_found (IG : IGET) (cpu : CPU) (k : KCtx) (spie spp : Bool) (R 
     (hs : DirlookupStatic k j bm data dn dr fn hasp) (hr : dirlookupRegs k ip R i)
     (hlive : dirLive data i)
     (hsome : dirFirst data (dirNrec dn.diSize.toNat) (bname 14 fn) = some i) :
-    kctx cpu (((k.withSpie spie spp).pushed 12).withRegs R) ∗ pcIs cpu (KA.«dirlookup» + 0x7e#64) ∗
+    kctx cpu (((k.withSpie spie spp).pushed 12).withRegs R) ∗ pcIs cpu (KA.«dirlookup» + 0xbc#64) ∗
     dirlookupFrame (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)
       (k.regs 20#5) (k.regs 21#5) (k.regs 22#5) (k.regs 23#5) v10 ∗
     wordPointsTo (dirlookupDeAddr (k.regs 2#5)) 2 (DFrac.own 1) (dirInum data i) ∗
@@ -305,9 +302,9 @@ theorem dirlookup_found (IG : IGET) (cpu : CPU) (k : KCtx) (spie spp : Bool) (R 
   unfold dirlookupIn
   icases Hin with ⟨Hsl, Hpf⟩
   cases hasp
-  · -- no poff: +0x7e beqz s7 TAKEN
+  · -- no poff: +0xbc beqz s7 TAKEN
     simp only [Bool.false_eq_true, if_false] at hpoff ⊢
-    k_step_e (wp_s_branch cpu _ (KA.«dirlookup» + 0x7e#64) false 8#13 23#5 0#5 (by decide) bop.BEQ)
+    k_step_e (wp_s_branch cpu _ (KA.«dirlookup» + 0xbc#64) false 8#13 23#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [r23, hpoff, (show bcond bop.BEQ 0#64 0#64 = true by decide)]
     iintro Hk Hpc
@@ -316,13 +313,13 @@ theorem dirlookup_found (IG : IGET) (cpu : CPU) (k : KCtx) (spie spp : Bool) (R 
       $$ [$Hk $Hpc $Hframe $Hhalf $Hname $Hte $Hce $Hkeep $Hsl $Hit2 $Hiti $Hinv $Hpe $Hnext]
     simp only [Bool.false_eq_true, if_false]
     iempintro
-  · -- poff: +0x7e falls, +0x82 sw s1,0(s7)
+  · -- poff: +0xbc falls, +0xc0 sw s1,0(s7)
     simp only [if_true] at hpoff ⊢
-    k_step_e (wp_s_branch cpu _ (KA.«dirlookup» + 0x7e#64) false 8#13 23#5 0#5 (by decide) bop.BEQ)
+    k_step_e (wp_s_branch cpu _ (KA.«dirlookup» + 0xbc#64) false 8#13 23#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [r23, dirlookup_beqz, decide_eq_false hpoff]
     iintro Hk Hpc
-    k_step_e (wp_s_sw cpu _ (KA.«dirlookup» + 0x82#64) false 0#12 23#5 9#5 (by decide) pofv)
+    k_step_e (wp_s_sw cpu _ (KA.«dirlookup» + 0xc0#64) false 0#12 23#5 9#5 (by decide) pofv)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [r23]
     iintro Hk Hpc Hpf
     iapply (dirlookup_found_iget IG cpu k spie spp R j ip dinum bm data dn dr fn true pofv pidv

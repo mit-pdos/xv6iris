@@ -171,15 +171,20 @@ theorem namex_look (IUP : IUNLOCKPUT) (DL : DIRLOOKUP) (Γ : SchedNames) [ClaimI
   unfold namexLk
   icases Hlk with ⟨#Hslk, #Hesc, #Hfl, Hsl, Hdep, Hoff, Hdev, Hinum, Hval, #Hshot, Hfrz, Hpar, Hru⟩
   unfold namexKeep
-  icases Hkeep with ⟨Hsb, Hsi, Hpid, Hcwd, Hcwr⟩
+  icases Hkeep with ⟨Hsb, Hsi, Hpid, Hcwd, Hcwr, Hrtc, Hrtr⟩
   icases namex_bslots3_split fscBio $$ Hbs with ⟨Hb1, Hb2⟩
   ihave Hs1 := (show irefSlots (GF := GF) 1 ⊢ irefSlot from .rfl) $$ Hs1
-  iapply (namex_dirlookup DL Γ cpu _ A ik inum bm data dn nf hs.hj ?gp ?gK ?gn ?gt hty hnl hs.hgeom
-      hok hdok hdoc hs.hpd ?ga0 ?ga2)
+  -- THE SELF ARM'S SHARE (chroot.md §2.2): dp is LOCKED, so the walk holds a
+  -- SHORT parent; half of what it still holds is lent (forgotten) with the unit
+  icases inodeRefShortGenlo_lend ik (q.half + q.half) q.half icfgDev inum g lo tl hle
+    $$ [Hfl Hpar] with ⟨Hpar, Hshr⟩
+  · iframe Hpar; iexact Hfl
+  iapply (namex_dirlookup DL Γ cpu _ A ik inum bm data dn nf q.half.half hs.hj ?gp ?gK ?gn ?gt hty
+      hnl hs.hgeom hok hdok hdoc hf.hik hf.hnib hf.hpos hs.hpd ?ga0 ?ga2)
     $$ [- $Hk $Hpc]
   rotate_right 1
   k_norm_g [r20, r21]
-  iframe Hte Hce Hdev Hmeta Hmap Hblk Hnm Hpid Hb1 Hs1 Hdl Hdi
+  iframe Hte Hce Hdev Hmeta Hmap Hblk Hshr Hru Hnm Hpid Hrtc Hrtr Hb1 Hs1 Hdl Hdi
   iframe #
   case gp => k_norm_g; try exact hs.hproc
   case gK => k_norm_g; try exact namex_slots_sub _ hs.hK
@@ -188,8 +193,12 @@ theorem namex_look (IUP : IUNLOCKPUT) (DL : DIRLOOKUP) (Γ : SchedNames) [ClaimI
   case ga0 => k_norm_g; try exact r20
   case ga2 => k_norm_g
   unfold namexDlK
-  iintro %c %spie' %spp' %R' %found %kd %kslot %qq %hcs Hk Hpc Hte Hce Hdev Hmeta Hmap Hblk Hnm
-    Hpid Hb1 Hdl Hdi Harm
+  iintro %c %spie' %spp' %R' %found %kslot %qq %hcs Hk Hpc Hte Hce Hdev Hmeta Hmap Hblk Hshr Hru
+    Hnm Hpid Hrtc Hrtr Hb1 Hdl Hdi Harm
+  -- the lent share, re-pinned to the parent's generation and gathered back
+  ihave Hpar := inodeRefShortGenlo_regather ik (q.half + q.half) q.half icfgDev inum g lo
+    $$ [Hpar Hshr]
+  · iframe
   let cpu := c
   k_norm_g [namex_ret_e8, r20, r21]
   ihave Hk := kctx_eq_mono c _ (((k.withSpie spie' spp').pushed 12).withRegs R')
@@ -209,7 +218,7 @@ theorem namex_look (IUP : IUNLOCKPUT) (DL : DIRLOOKUP) (Γ : SchedNames) [ClaimI
   ihave Hbs := namex_bslots3_join fscBio $$ [$Hb1 $Hb2]
   ihave Hlk : namexLk A ik q g lo tl inum dn γil γisl $$ [Hsl Hdep Hoff Hdev Hinum Hval Hfrz Hpar Hru]
   · unfold namexLk; iframe; iframe #
-  ihave Hkeep : namexKeep k A $$ [Hsb Hsi Hpid Hcwd Hcwr]
+  ihave Hkeep : namexKeep k A $$ [Hsb Hsi Hpid Hcwd Hcwr Hrtc Hrtr]
   · unfold namexKeep; iframe
   -- +0xe8  c.mv s2,a0
   k_step_e (wp_s_add cpu _ (KA.«namex» + 0xec#64) true 18#5 0#5 10#5 (by decide))
@@ -219,7 +228,7 @@ theorem namex_look (IUP : IUNLOCKPUT) (DL : DIRLOOKUP) (Γ : SchedNames) [ClaimI
   cases found
   · -- ===== MISS: +0xea c.beqz a0 TAKEN, L_miss =====
     simp only [Bool.false_eq_true, if_false]
-    icases Harm with ⟨%⟨hnone, ha0⟩, Hs1'⟩
+    icases Harm with ⟨%⟨-, hnone, ha0⟩, Hs1'⟩
     have hd : decide (R' 10#5 = 0#64) = true := by simp [ha0]
     k_step_e (wp_s_branch cpu _ (KA.«namex» + 0xee#64) true 8098#13 10#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hbz, hd]
@@ -234,14 +243,14 @@ theorem namex_look (IUP : IUNLOCKPUT) (DL : DIRLOOKUP) (Γ : SchedNames) [ClaimI
     case f18 => simp [RegMap.set_apply, ha0]
   · -- ===== FOUND =====
     simp only [if_true]
-    icases Harm with ⟨%⟨hsome, hks, ha0⟩, Href, Hru2⟩
+    icases Harm with ⟨%inum2, %self, %kd, %⟨hks, ha0⟩, %harm, Href, Hru2⟩
+    ihave Hip := namex_dl_found_held data dn inum A.rti kd kslot ik qq (bname 14 nf) self inum2 hty
+      hdok hf.hnib hf.hpos hks harm $$ [$Href $Hru2]
     have hne := ientry_ne_zero kslot (Nat.le_of_lt hks)
     have hd : decide (R' 10#5 = 0#64) = false := by simp [ha0, hne]
     k_step_e (wp_s_branch cpu _ (KA.«namex» + 0xee#64) true 8098#13 10#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hbz, hd]
     iintro Hk Hpc
-    ihave Hip := namex_found_held data dn kd kslot qq (bname 14 nf) hty hdok hsome hks
-      $$ [$Href $Hru2]
     -- +0xec  c.mv a0,s4
     k_step_e (wp_s_add cpu _ (KA.«namex» + 0xf0#64) true 10#5 0#5 20#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]

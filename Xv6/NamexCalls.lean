@@ -25,6 +25,8 @@ import Xv6.SpecIunlock
 import Xv6.SpecIunlockput
 import Xv6.SpecIlock
 import Xv6.NamexDefs
+import Xv6.IcacheShortCarve
+import Xv6.DirlookupParts
 
 namespace Xv6
 
@@ -305,25 +307,61 @@ theorem namex_iput (IP : IPUT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
 
 /-- The dirlookup continuation, hart-free (Rocq's arms at `poff = 0`). -/
 def namexDlK (k' : KCtx) (A : NamexArgs) (ik : Nat) (inum : BitVec 32) (bm : Blkmap)
-    (data : Nat → List (BitVec 8)) (dn : Dinode) (nf : Nat → BitVec 8) : IProp GF := iprop(
-  ∀ (c : CPU) (spie spp : Bool) (R' : RegMap) (found : Bool) (kd kslot : Nat) (qq : Qp),
+    (data : Nat → List (BitVec 8)) (dn : Dinode) (nf : Nat → BitVec 8) (sd : Qp) : IProp GF := iprop(
+  ∀ (c : CPU) (spie spp : Bool) (R' : RegMap) (found : Bool) (kslot : Nat) (qq : Qp),
     ⌜calleeSaved k'.regs R'⌝ -∗
     kctx c ((k'.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k'.regs 1#5)) -∗
     trapCsrsExt c k'.sie -∗ cpuClaimExt c k'.sie k'.proc -∗
     wordPointsTo (iDev (ientry ik)) 4 (DFrac.own (1 : Qp).half) icfgDev -∗
     inodeMeta (ientry ik) dn -∗ inodeMap fscFs (ientry ik) bm -∗ inodeBlocks fscFs bm data -∗
+    inodeShr ik sd icfgDev inum -∗ runitAny inum.toNat -∗
     byteBuf (k'.regs 11#5) (DFrac.own 1) (bview 14 nf) -∗
-    wordPointsTo (pPid k'.proc) 4 A.dqp A.pidv -∗ bslot -∗
+    wordPointsTo (pPid k'.proc) 4 A.dqp A.pidv -∗
+    wordPointsTo (pRoot k'.proc) 8 A.dqr A.rootv -∗ inodeHeldAt A.rootv A.rti -∗ bslot -∗
     dlinks fscFs inum.toNat dn bm data -∗ dinodeAt fscIreg inum dn -∗
     (if found then
-      iprop(⌜dirFirst data (dirNrec dn.diSize.toNat) (bname 14 nf) = some kd ∧
-          kslot < NINODE ∧ R' 10#5 = ientry kslot⌝ ∗
-        inodeRef kslot qq icfgDev (BitVec.setWidth 32 (dirInum data kd)) ∗
-        runitAny (BitVec.setWidth 32 (dirInum data kd)).toNat)
+      iprop(∃ (inum2 : BitVec 32) (self : Bool) (kd : Nat),
+        ⌜kslot < NINODE ∧ R' 10#5 = ientry kslot⌝ ∗
+        ⌜if self then dlSelf (bname 14 nf) inum A.rti ∧ inum2 = inum ∧ ientry kslot = ientry ik
+         else ¬ dlSelf (bname 14 nf) inum A.rti ∧
+           dirFirst data (dirNrec dn.diSize.toNat) (bname 14 nf) = some kd ∧
+           inum2 = BitVec.setWidth 32 (dirInum data kd)⌝ ∗
+        inodeRef kslot qq icfgDev inum2 ∗ runitAny inum2.toNat)
      else
-      iprop(⌜dirFirst data (dirNrec dn.diSize.toNat) (bname 14 nf) = none ∧ R' 10#5 = 0#64⌝ ∗
+      iprop(⌜¬ dlSelf (bname 14 nf) inum A.rti ∧
+          dirFirst data (dirNrec dn.diSize.toNat) (bname 14 nf) = none ∧ R' 10#5 = 0#64⌝ ∗
         irefSlot)) -∗
     wpLoop c)
+
+/-- dirlookup's found arm, as the walk's currency: the self arm hands back
+dp's own inum (whose bounds the walk holds), the record arm a record's
+(`dirOk`'s inum bound, positivity off liveness). -/
+theorem namex_dl_found_held (data : Nat → List (BitVec 8)) (dn : Dinode) (dinum : BitVec 32)
+    (rti kk kslot ik : Nat) (qq : Qp) (s : List (BitVec 8)) (self : Bool) (inum2 : BitVec 32)
+    (hty : dn.diType = T_DIR) (hdok : dirOk icfgNib dn data)
+    (hib : dinum.toNat < 16 * icfgNib) (hip : 0 < dinum.toNat) (hks : kslot < NINODE)
+    (harm : if self then dlSelf s dinum rti ∧ inum2 = dinum ∧ ientry kslot = ientry ik
+      else ¬ dlSelf s dinum rti ∧ dirFirst data (dirNrec dn.diSize.toNat) s = some kk ∧
+        inum2 = BitVec.setWidth 32 (dirInum data kk)) :
+    inodeRef (GF := GF) kslot qq icfgDev inum2 ∗ runitAny inum2.toNat ⊢ inodeHeld (ientry kslot) := by
+  have hb : inum2.toNat < 16 * icfgNib ∧ 0 < inum2.toNat := by
+    cases self
+    · simp only [Bool.false_eq_true, if_false] at harm
+      obtain ⟨-, hf, rfl⟩ := harm
+      have hinums := dirOk_dir icfgNib dn data hty hdok
+      have hlt := dirFirst_lt _ _ _ _ hf
+      have hlive := dirFirst_live _ _ _ _ hf
+      refine ⟨?_, Xv6.dirlookup_live_pos data kk hlive⟩
+      rw [MachCSL.zext32_toNat]; exact hinums kk hlt hlive
+    · simp only [if_true] at harm
+      obtain ⟨-, rfl, -⟩ := harm
+      exact ⟨hib, hip⟩
+  iintro ⟨Href, Hru⟩
+  unfold inodeHeld inodeRefp
+  iexists kslot, qq, inum2
+  iframe Href Hru
+  ipureintro
+  exact ⟨rfl, hks, hb.1, hb.2⟩
 
 set_option maxHeartbeats 8000000 in
 /-- `dirlookup(dp, name, 0)` at +0xe4, on the directory the walk holds
@@ -332,53 +370,59 @@ fell through (fs-fragments §7.5.6, TRACE G), the borrowed region record is
 the in-core one (premise (6')). -/
 theorem namex_dirlookup (DL : DIRLOOKUP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k' : KCtx) (A : NamexArgs) (ik : Nat) (inum : BitVec 32) (bm : Blkmap)
-    (data : Nat → List (BitVec 8)) (dn : Dinode) (nf : Nat → BitVec 8)
+    (data : Nat → List (BitVec 8)) (dn : Dinode) (nf : Nat → BitVec 8) (sd : Qp)
     (hj : A.j < NPROC) (hproc : k'.proc = procAddr A.j) (hK : dirlookupSlots ≤ k'.avail)
     (hnoff : k'.noff = 0) (htier : k'.tier = KTier.kpt)
     (htype : dn.diType = T_DIR) (hnl : dn.diNlink.toNat ≠ 0)
     (hgeom : logGeomOk fscCov fscLogst) (hok : inodeOk fscCov fscLogst dn bm data)
     (hdok : dirOk icfgNib dn data) (horph : dirOrphanClean dn data)
+    (hik : ik < NINODE) (hib : inum.toNat < 16 * icfgNib) (hip : 0 < inum.toNat)
     (hpd : descPageRw A.pd) (ha0 : k'.regs 10#5 = ientry ik) (ha2 : k'.regs 12#5 = 0#64) :
     kctx cpu k' ∗ pcIs cpu KA.«dirlookup» ∗
     trapCsrsExt cpu k'.sie ∗ cpuClaimExt cpu k'.sie k'.proc ∗ namexEnv (hlc := hlc) Γ A ∗
     wordPointsTo (iDev (ientry ik)) 4 (DFrac.own (1 : Qp).half) icfgDev ∗
     inodeMeta (ientry ik) dn ∗ inodeMap fscFs (ientry ik) bm ∗ inodeBlocks fscFs bm data ∗
+    inodeShr ik sd icfgDev inum ∗ runitAny inum.toNat ∗
     byteBuf (k'.regs 11#5) (DFrac.own 1) (bview 14 nf) ∗
-    wordPointsTo (pPid k'.proc) 4 A.dqp A.pidv ∗ bslot ∗ irefSlot ∗
+    wordPointsTo (pPid k'.proc) 4 A.dqp A.pidv ∗
+    wordPointsTo (pRoot k'.proc) 8 A.dqr A.rootv ∗ inodeHeldAt A.rootv A.rti ∗ bslot ∗ irefSlot ∗
     dlinks fscFs inum.toNat dn bm data ∗ dinodeAt fscIreg inum dn ∗
-    namexDlK k' A ik inum bm data dn nf
+    namexDlK k' A ik inum bm data dn nf sd
     ⊢ wpLoop (GF := GF) cpu := by
   obtain ⟨hwf, hcov, -, hty0, hsz, hholes, -⟩ := hok
   have hty : dn.diType.toNat = T_DIR_z := by rw [htype]; rfl
   have hinums := dirOk_dir icfgNib dn data htype hdok
   have h := DL.wp_dirlookup_eb (hlc := hlc) (GF := GF) Γ cpu k' A.γl A.pd A.pav A.pu A.j A.γkl
     A.γk (ientry ik) inum bm data dn dn nf false 0#32 A.pidv A.dqp (DFrac.own (1 : Qp).half)
-    (DFrac.own 1) hj hproc hK hnoff htier htype hgeom hwf hcov hsz hholes hinums (Or.inl hnl)
-    horph hty0 rfl hpd ha0 (by simp only [Bool.false_eq_true, if_false]; exact ha2)
+    (DFrac.own 1) ik sd A.rootv A.rti A.dqr hj hproc hK hnoff htier htype hgeom hwf hcov hsz hholes
+    hinums (Or.inl hnl) horph hty0 rfl hpd ha0 rfl hik
+    (by simp only [Bool.false_eq_true, if_false]; exact ha2)
   unfold wp_dirlookup_eb_body at h
   simp only [dirlookupAddr, Bool.false_eq_true, if_false] at h
-  iintro ⟨Hk, Hpc, Hte, Hce, #Henv, Hdev, Hmeta, Hmap, Hblk, Hnm, Hpid, Hbs, Hslot, Hlk, Hdi, HK⟩
+  iintro ⟨Hk, Hpc, Hte, Hce, #Henv, Hdev, Hmeta, Hmap, Hblk, Hshr, Hru, Hnm, Hpid, Hrc, Hrr, Hbs,
+    Hslot, Hlk, Hdi, HK⟩
   icases namexEnv_open (hlc := hlc) Γ A $$ Henv with
     ⟨#Hpi, #Hpe, #Hbc, #Hlc, #Hdc, #Hkl, #Hav, #Hit2, #Hiti, #Hslks, #Hinv, #Hopen, #Hbmi⟩
   iapply h
-  iframe Hk Hpc Hte Hce Hdev Hmeta Hmap Hblk Hnm Hpid Hbs Hslot Hlk Hdi
+  iframe Hk Hpc Hte Hce Hdev Hmeta Hmap Hblk Hshr Hru Hnm Hpid Hrc Hrr Hbs Hslot Hlk Hdi
   iframe #
   iapply wpNext_intro_pin
-  iintro %c %_ %spie %spp %R' %found %kd %kslot %qq %hcs Hk Hpc Hte Hce Hdev Hmeta Hmap Hblk Hnm
-    Hpid Hbs Hlk Hdi Harm
+  iintro %c %_ %spie %spp %R' %found %kd %kslot %qq %self %hcs Hk Hpc Hte Hce Hdev Hmeta Hmap
+    Hblk Hshr Hru Hnm Hpid Hrc Hrr Hbs Hlk Hdi Harm
   unfold namexDlK
-  iapply HK $$ %c %spie %spp %R' %found %kd %kslot %qq %hcs Hk Hpc Hte Hce Hdev Hmeta Hmap Hblk
-    Hnm Hpid Hbs Hlk Hdi
+  iapply HK $$ %c %spie %spp %R' %found %kslot %qq %hcs Hk Hpc Hte Hce Hdev Hmeta Hmap Hblk
+    Hshr Hru Hnm Hpid Hrc Hrr Hbs Hlk Hdi
   cases found
   · simp only [Bool.false_eq_true, if_false]
     icases Harm with ⟨%hf, Hslot, -⟩
     iframe Hslot
     ipureintro; exact hf
   · simp only [if_true]
-    icases Harm with ⟨%hf, Href, Hru, -⟩
-    iframe Href Hru
-    ipureintro; exact hf
-
+    icases Harm with ⟨%inum2, %hks, %harm, Href, Hru2, -⟩
+    iexists inum2, self, kd
+    iframe Href Hru2
+    ipureintro
+    exact ⟨hks, harm⟩
 end
 
 end Xv6

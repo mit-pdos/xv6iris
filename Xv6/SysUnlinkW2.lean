@@ -253,11 +253,29 @@ theorem sys_unlink_w2_look (DL : DIRLOOKUP) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ
   icases Hlk with ⟨#Hslk, #Hfl, Hsl, Hdep, Hoffr, Hdev, Hinum, Hval, Hshot, Hfrz, Hkeep, Hru⟩
   icases bslots_uncons 2 $$ Hbs with ⟨Hb1, Hb2⟩
   ihave Hir := (show irefSlots (GF := GF) 1 ⊢ irefSlot from .rfl) $$ Hir
+  -- THE SELF TEST'S ROWS (chroot): dp's share carved off the short parent, its
+  -- unit, and the root's cell and reference out of the block's hole
+  icases inodeRefShortGenlo_lend kd (q.half + q.half) q.half icfgDev dinum g lo tl hle
+    $$ [Hfl Hkeep] with ⟨Hkeep, Hshr⟩
+  · iframe Hkeep; iexact Hfl
+  icases kctx_tier cpu _ $$ Hk with ⟨%hct, Hk⟩
+  have ht0 : curTier = KTier.kpt := by rw [← hct]; exact ok.htier
+  ihave Hhole := (show sysUnlinkHole (GF := GF) A k.proc P2 ⊢ sysUnlinkHole A (procAddr A.j) P2 by
+    rw [ok.hproc]) $$ Hhole
+  ihave Hpid := (show wordPointsTo (GF := GF) (pPid k.proc) 4 pidPriv A.pid ⊢
+    wordPointsTo (pPid (procAddr A.j)) 4 pidPriv A.pid by rw [ok.hproc]) $$ Hpid
+  icases sys_unlink_hole_root ht0 A P2 $$ [Hhole Hpid] with ⟨Hpid, Hrc, Hrr, Hhcl⟩
+  · iframe
+  ihave Hpid := (show wordPointsTo (GF := GF) (pPid (procAddr A.j)) 4 pidPriv A.pid ⊢
+    wordPointsTo (pPid k.proc) 4 pidPriv A.pid by rw [ok.hproc]) $$ Hpid
+  ihave Hrc := (show wordPointsTo (GF := GF) (pRoot (procAddr A.j)) 8 (DFrac.own 1) A.V.root ⊢
+    wordPointsTo (pRoot k.proc) 8 (DFrac.own 1) A.V.root by rw [ok.hproc]) $$ Hrc
   iapply (sys_unlink_dirlookup DL Γ cpu _ k.sie (by k_norm_g) k.proc (by k_norm_g) A.j A.pid kd
       dinum bmd datd dnd nf ov ok.hj ?dp ?dK ?dn ?dt hty hnd hndd hok hdok hdoc ?da0
       (sysUnlinkName (k.regs 2#5)) (sysUnlinkOff (k.regs 2#5)) ?dnb ?dpa
-      (sys_unlink_off_nonnull _ ok.hsp))
-    $$ [- $Hk $Hpc $Hte $Hce $Henv $Hdev $Hmeta $Hnm $Hoff $Hpid $Hb1 $Hir $Hdl $Hdi]
+      (sys_unlink_off_nonnull _ ok.hsp) hkd q.half.half A.V.root A.V.rti)
+    $$ [- $Hk $Hpc $Hte $Hce $Henv $Hdev $Hmeta $Hshr $Hru $Hnm $Hoff $Hpid $Hrc $Hrr $Hb1 $Hir $Hdl
+      $Hdi]
   rotate_right 1
   k_norm_g [sys_unlink_ret_6c]
   case dp => k_norm_g; exact ok.hproc
@@ -271,8 +289,16 @@ theorem sys_unlink_w2_look (DL : DIRLOOKUP) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ
   isplitl [Hadd Hind]
   · unfold inodeMap; iframe
   unfold sysUnlinkDlK
-  iintro %cpu %spie1 %spp1 %R1 %found %kk %ks %qq %hcs1 Hk Hpc Hte Hce Hdev Hmeta Hmap Hblk Hnm
-    Hpid Hb1 Hdl Hdi Harm
+  iintro %cpu %spie1 %spp1 %R1 %found %kk %ks %qq %hcs1 Hk Hpc Hte Hce Hdev Hmeta Hmap Hblk Hshr
+    Hru Hnm Hpid Hrc Hrr Hb1 Hdl Hdi Harm
+  ihave Hkeep := inodeRefShortGenlo_regather kd (q.half + q.half) q.half icfgDev dinum g lo
+    $$ [Hkeep Hshr]
+  · iframe
+  ihave Hrc := (show wordPointsTo (GF := GF) (pRoot k.proc) 8 (DFrac.own 1) A.V.root ⊢
+    wordPointsTo (pRoot (procAddr A.j)) 8 (DFrac.own 1) A.V.root by rw [ok.hproc]) $$ Hrc
+  ihave Hhole := Hhcl $$ Hrc Hrr
+  ihave Hhole := (show sysUnlinkHole (GF := GF) A (procAddr A.j) P2 ⊢ sysUnlinkHole A k.proc P2 by
+    rw [ok.hproc]) $$ Hhole
   k_norm_g [sys_unlink_ret_6c, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp1 := sysUnlinkPins_cs k _ R1 (ientry kd) (k.regs 18#5) (k.regs 19#5)
     (sysUnlinkPins_set k _ _ _ _ 1#5 _ (sysUnlinkPins_set k _ _ _ _ 10#5 _

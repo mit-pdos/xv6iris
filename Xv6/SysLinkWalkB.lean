@@ -337,7 +337,9 @@ theorem sys_link_to_bad (IL : ILOCK) (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : END
     (hbudA : crb = true → 4 ≤ n) (hbudB : crb = false → 5 ≤ n) :
     sysLinkCells (GF := GF) (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) ∗
     sysLinkBufs (k.regs 2#5) ∗ sysfileEnv (hlc := hlc) Γ ∗
-    wordPointsTo (pCwd k.proc) 8 (DFrac.own 1) A.V.cwd ∗ inodeHeldAt A.V.cwd A.V.cwi ∗
+    wordPointsTo (pCwd k.proc) 8 (DFrac.own 1) A.V.cwd ∗
+    (inodeHeldAt A.V.cwd A.V.cwi ∗ wordPointsTo (pRoot k.proc) 8 (DFrac.own 1) A.V.root ∗
+      inodeHeldAt A.V.root A.V.rti) ∗
     sysLinkHole A k.proc P2 ∗ (∀ c : CPU, sysLinkPostA k A c) ∗
     sysLinkIpHeld kk q g lo tl γil γisl inum ∗ ityShot g ty ∗
     FsStateLink.linkTok (fsGammaL fscFs) (inum.toNat : Int) .tFile ∗
