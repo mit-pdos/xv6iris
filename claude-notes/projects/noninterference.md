@@ -630,6 +630,98 @@ three new `emp` arguments, `xv6Era_run`'s new `uClaimO` premise (and its use in 
 `xv6PowerAdequacyGen` proof's call (three `emp` families, the three hook wrappers) plus the
 `xv6TraceHook` call's three `emp`s in `xv6FsAdequacy`.
 
+### M2-W4 as landed (2026-10-02)
+
+Lane `lane/m2w4` (rebased on `lean-m2` 38f8e4e02, W2d absorbed): the trace-level NI theorem, registered as roots.
+Three new files and one generalization.
+
+**`Xv6/NiTrace.lean` (pure; imports `NiLedger`, `UsysDet`).**  `NiEntry.pid`, `incOf h f := (obsBoots (h.take
+f.j), f.pid)`, `inc h F j : Option NiInc` (`NiInc := Nat × BitVec 32`), `niFilingAt F j := F.find? (·.j == j)`;
+`NiStep := origin (W0 : Uvis) (e : Obs) | round (secc : BitVec 64) (x e : Obs)`, `niStepOf h f`, `utrace q h F`
+(the steps of `q`'s filings, in enter order), `firstKey q h F` (the trace's head origin's key); `exitView` (cause,
+epc, `x1..x31`), `enterView` (resume pc, `x1..x31`), `gprsNum secc gs` (the effective number of an exit's
+registers through a mask), `NiStep.reading` / `events q h F` (the uptime ecalls' `a0`: THE READINGS),
+`NiStep.input` / `.output` / `.ecall` / `.replays`.  The law, verbatim:
+
+    def niRoundLaw (secc : BitVec 64) (pid : BitVec 32) (x e : Obs) : Prop :=
+      ∃ (sc ep : BitVec 64) (xg : List (BitVec 64)) (pc' : BitVec 64) (eg : List (BitVec 64)),
+        exitView x = some (sc, ep, xg) ∧ enterView e = some (pc', eg) ∧
+        (sc ≠ uecallScause → pc' = retPc ep ∧ eg = xg) ∧
+        (sc = uecallScause → gprsNum secc xg ≠ USYS_exit) ∧
+        (sc = uecallScause → usysDetResumes (gprsNum secc xg) →
+          pc' = retPc (retPc ep + 4#64) ∧ eg = xg.set 9 (gprsA0 eg) ∧
+          (gprsNum secc xg = USYS_getpid → gprsA0 eg = BitVec.signExtend 64 pid) ∧
+          (gprsNum secc xg = USYS_uptime → usysUptimeRet (gprsA0 eg)))
+    def NiStep.law (pid : BitVec 32) : NiStep → Prop
+      | .origin W0 e => enterView e = some (tfResumePc W0.tf, tfGprs W0.tf)
+      | .round secc x e => niRoundLaw secc pid x e
+    def NiClassLaw (q : NiInc) (tr : List NiStep) : Prop := ∀ s ∈ tr, s.law q.2
+    theorem niOk_classLaw {h : List Obs} {F : List NiEntry} (hF : niOk h F) :
+        ∀ q, NiClassLaw q (utrace q h F)
+    theorem niTwoRun {h₁ h₂ : List Obs} {F₁ F₂ : List NiEntry} (hF₁ : niOk h₁ F₁) (hF₂ : niOk h₂ F₂)
+        (q : NiInc) (hcls : NiInClass (utrace q h₁ F₁))
+        (hin : (utrace q h₁ F₁).map NiStep.input = (utrace q h₂ F₂).map NiStep.input)
+        (hev : events q h₁ F₁ = events q h₂ F₂) :
+        (utrace q h₁ F₁).map NiStep.output = (utrace q h₂ F₂).map NiStep.output
+    theorem niStrongInstance {h : List Obs} {F : List NiEntry} (hF : niOk h F) (q : NiInc) :
+        ∀ s ∈ (utrace q h F).takeWhile (fun s => !s.ecall), s.replays
+
+The getpid row is W2d's pid row (`niPidRow` + `usysRetPid_getpid`) at the filing's pid, which `utrace q` makes
+`q.2`; so `NiClassLaw` takes `q` and the getpid answer is a function of the incarnation (no reading).
+
+**`Xv6/NiAdequacy.lean`.**  `def xv6NiPhi (_ : GState) (h : List Obs) : Prop := ∃ F, niOk h F ∧ niOneShot h F ∧
+∀ q, NiClassLaw q (utrace q h F)`; `niLedgerR A c γ h := A.R c h ∗ niR γ h` and its laws (`niBirth`: the
+application's birth plus `niR_alloc`, the name kept in the fixed part; `niLedger_R0`, `_pow` (a power-on mints
+initproc's claim, `niR_powerOn` + `initClaim_ticket`, yielded beside the turn), `_back`, `_tx`, `_rx`, and THE
+TWO HOOK DISCHARGES `niLedger_exit` (`al_user` + `niR_exit`: the mint) / `niLedger_enter` (`al_user` +
+`niR_enter`: the filing, spending `niSpend`)); `xv6NiAppAdequacy` = `xv6PowerAdequacyGenU` at the fixed part
+`A.fixed × GName`, `Uf := niFit` (`hUf := fun _ _ h => h`), `Ucr/Ucx/Uco := roundClaim γ / niExitMint γ /
+niOriginTicket γ` (`hUfork := niExitMint_fork`), the slot `obsLedgerAt (niLedgerR A c γ)`, hooks
+`obsLedgerAt_uexitM`/`obsLedgerAt_uenterS`, `Hphi` from `obsLedgerAt_phi` + `niR_pure` + `niOk_classLaw`.
+(Elaboration note: the four record-dependent arguments are closed as separate goals after `refine`, by
+`intro`-ing `EraInitBoot`/`EraEcho`'s binders; passed inline, the `fun p => A.pred p.1` vs `A.pred` unification
+times out.)  **`Xv6/LinkNiAdequacy.lean`** (a Link file: it imports `ProofUser`), verbatim:
+
+    theorem xv6NiAdequacy {hlc : HasLC}
+        (g : GState) (Hgen0 : g.gen = 0) (Hpow : g.pow = false) (Hdisk : diskOf g.m.devs = fsImgDisk)
+        (n : Nat) (κs : List Obs) (t2 : List Expr) (g2 : GState)
+        (hsteps : ([Expr.power], g) -<κs>->ₜₚ^[n] (t2, g2)) :
+        (∀ e2, e2 ∈ t2 → Reducible (e2, g2)) ∧ xv6NiPhi g2 κs
+    theorem xv6NiTwoRun {hlc : HasLC}
+        (g₁ g₂ : GState) (Hgen₁ : g₁.gen = 0) (Hpow₁ : g₁.pow = false) (Hdisk₁ : diskOf g₁.m.devs = fsImgDisk)
+        (Hgen₂ : g₂.gen = 0) (Hpow₂ : g₂.pow = false) (Hdisk₂ : diskOf g₂.m.devs = fsImgDisk)
+        (n₁ n₂ : Nat) (κs₁ κs₂ : List Obs) (t₁ t₂ : List Expr) (g₁' g₂' : GState)
+        (hsteps₁ : ([Expr.power], g₁) -<κs₁>->ₜₚ^[n₁] (t₁, g₁'))
+        (hsteps₂ : ([Expr.power], g₂) -<κs₂>->ₜₚ^[n₂] (t₂, g₂')) :
+        ∃ F₁ F₂, niOk κs₁ F₁ ∧ niOneShot κs₁ F₁ ∧ niOk κs₂ F₂ ∧ niOneShot κs₂ F₂ ∧ ∀ q : NiInc,
+          NiInClass (utrace q κs₁ F₁) →
+          (utrace q κs₁ F₁).map NiStep.input = (utrace q κs₂ F₂).map NiStep.input →
+          events q κs₁ F₁ = events q κs₂ F₂ →
+          (utrace q κs₁ F₁).map NiStep.output = (utrace q κs₂ F₂).map NiStep.output
+    theorem xv6NiStrongInstance {hlc : HasLC}
+        (g : GState) (Hgen0 : g.gen = 0) (Hpow : g.pow = false) (Hdisk : diskOf g.m.devs = fsImgDisk)
+        (n : Nat) (κs : List Obs) (t2 : List Expr) (g2 : GState)
+        (hsteps : ([Expr.power], g) -<κs>->ₜₚ^[n] (t2, g2)) :
+        ∃ F, niOk κs F ∧ niOneShot κs F ∧ ∀ q : NiInc, ∀ s ∈ (utrace q κs F).takeWhile (fun s => !s.ecall),
+          s.replays
+
+**The generalization (outside the new files, on top of W2d's edits).**  `SystemBootEra.xv6FixedGSU … Uf Ucr Ucx
+Uco` (the literal at the record's enter justification and claim slots; `xv6FixedGS` := it at `True`/`emp`, text of
+every statement naming it unchanged); `xv6BootEra` takes `Uf hUf Ucr Ucx Uco hUfork` and builds `NiFitIs` from
+`hUf`/`hUfork`; `SystemAdequacy.xv6PowerAdequacyGenU` (the proof, `Uf hUf Ucr Ucx Uco hUfork` before `Pt`, the
+hooks at `riscvPowerAdequacy`'s shape) and `xv6PowerAdequacyGen` (statement byte-identical) := it at
+`True`/`emp` with W2d's wrappers (`powerHook_emp`, `uexitHook_emp`, `uenterHook_drop`).  No existing root's
+statement, axioms or TCB moved.
+
+**Honest scope.**  (1) The class is {exit, getpid, uptime}; other ecalls' enters are free; the two-run corollary
+assumes `q`'s ecalls are in the class (`NiInClass`).  (2) Origins are honest by `niOneShot` (in the conclusion):
+every filing spent a distinct claim minted before its enter (a round's at its exit, an origin's at a fork exit or a
+power-on); that an origin's first KEY is the forked child's is not stated.  (3) THE MASK IS CARRIED PER FILING:
+"constant within an incarnation until a seccomp round" is NOT provable from `niOk` (nothing ties a round's trapped
+key to the previous round's resumed key), so each round step carries its trapped key's `secc` and the two-run
+inputs include it.  (4) The uptime reading is the tick (O5); the law adds that it is a tick count's word.
+(5) The filing `F` is existential (O6).
+
 Each lane's as-landed line goes under its row's design note (the Rocq notes' rule), and this table's
 checkbox below flips when the lane is on `lean-ni`:
 

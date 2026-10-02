@@ -31,6 +31,18 @@
     { "name": "Xv6.unionResults",
       "axioms": ["propext", "Classical.choice", "Quot.sound"],
       "opaques": ["LeanRV64D.Functions.xv6_resv_is_valid", "LeanRV64D.Functions.xv6_resv_matches",
+                  "MachCSL.bootImageSealed"] },
+    { "name": "Xv6.xv6NiAdequacy",
+      "axioms": ["propext", "Classical.choice", "Quot.sound"],
+      "opaques": ["LeanRV64D.Functions.xv6_resv_is_valid", "LeanRV64D.Functions.xv6_resv_matches",
+                  "MachCSL.bootImageSealed"] },
+    { "name": "Xv6.xv6NiTwoRun",
+      "axioms": ["propext", "Classical.choice", "Quot.sound"],
+      "opaques": ["LeanRV64D.Functions.xv6_resv_is_valid", "LeanRV64D.Functions.xv6_resv_matches",
+                  "MachCSL.bootImageSealed"] },
+    { "name": "Xv6.xv6NiStrongInstance",
+      "axioms": ["propext", "Classical.choice", "Quot.sound"],
+      "opaques": ["LeanRV64D.Functions.xv6_resv_is_valid", "LeanRV64D.Functions.xv6_resv_matches",
                   "MachCSL.bootImageSealed"] }
   ],
   "platform_hooks": {

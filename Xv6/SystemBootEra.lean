@@ -74,6 +74,14 @@ predicate's lend), every hart's `hartWP` and every device's `devWP`.
 5. The era's disk image is block-granular (DiskBoot deviation 1); the
    register side of `MachCSL.bootFacts` is a run of the boot program, as in
    Rocq (no reset table); no SIE ghost (D27).
+6. (NI M2-W4) **The record's enter justification and filing claims are
+   parameters**: `xv6FixedGSU … Uf Ucr Ucx Uco` is the literal at `uFit :=
+   Uf` and the three claim slots, and `xv6FixedGS` is it at `True`/`emp`
+   (the system record, `NiLedger` deviation 1).  `xv6BootEra` is stated at
+   `xv6FixedGSU` for any `Uf` accepting the NI filing's evidence (`hUf`) and
+   claims whose fork mint is an origin ticket (`hUfork`) -- its `NiFitIs`
+   instance: the system theorem passes `True`/`emp`, the NI theorem
+   (`NiAdequacy`) `niFit` and the ledger's claims.
 
 Imports only the boot-chain/allocation files and the device invariants.
 -/
@@ -378,19 +386,30 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGpreS hlc GF] [Xv6G GF] [Wch
 /-- THE MACHINE'S RECORD at the system's crash slot (Rocq: `boot_fixedGS …
 (xv6_slot …) … Ai …`, the literal `xv6_power_adequacy_gen` substitutes into
 the era). -/
+@[reducible] def xv6FixedGSU {CT : Type} (N : Type) (appFs : CT → N → Aview → IProp GF)
+    (appOkc : CT → N → Prop) (cov : ExtTreeSet Nat compare) (ls : Nat) (Ai : AppIface GF) (Hinv : InvGS_gen hlc GF)
+    (γgen γstart γreg γd γsw γobs γhist : GName) (c : CT) (T : List Obs) (Ptp : IProp GF)
+    (Tkp : Nat → IProp GF) (Hkp : Nat → IProp GF → IProp GF)
+    -- the enter's justification and the one-shot filing claims (NI M2-W2a /
+    -- M2-W2d's `uFit`/`uClaimR`/`uClaimX`/`uClaimO`): blind (`True`, `emp`) in
+    -- the system record `xv6FixedGS`, `niFit` and the ledger's claims in the
+    -- NI theorem's (NI M2-W4)
+    (Uf : Option (Nat × Obs) → Obs → Prop) (Ucr : Nat → IProp GF) (Ucx : Nat → Obs → IProp GF)
+    (Uco : IProp GF) :
+    MachFixedGS hlc GF :=
+  Ai.bootFixedGS Hinv γgen γstart γreg γd XV6_DISK_BYTES γsw
+    (xv6Slot N appFs appOkc cov ls γd γsw γreg γstart c) Tkp Hkp γobs T Ptp γhist Uf Ucr Ucx Uco
+
+/-- THE SYSTEM'S RECORD: `xv6FixedGSU` blind -- the enter's justification
+`True` (the kernel's evidence reaches it through `NiFitIs`'s implication,
+NI M2-W2c) and no filing claims (`emp`, NI M2-W2d). -/
 @[reducible] def xv6FixedGS {CT : Type} (N : Type) (appFs : CT → N → Aview → IProp GF)
     (appOkc : CT → N → Prop) (cov : ExtTreeSet Nat compare) (ls : Nat) (Ai : AppIface GF) (Hinv : InvGS_gen hlc GF)
     (γgen γstart γreg γd γsw γobs γhist : GName) (c : CT) (T : List Obs) (Ptp : IProp GF)
     (Tkp : Nat → IProp GF) (Hkp : Nat → IProp GF → IProp GF) :
     MachFixedGS hlc GF :=
-  Ai.bootFixedGS Hinv γgen γstart γreg γd XV6_DISK_BYTES γsw
-    (xv6Slot N appFs appOkc cov ls γd γsw γreg γstart c) Tkp Hkp γobs T Ptp γhist
-    -- the enter's justification: blind (NI M2-W2c: the kernel's evidence
-    -- reaches it through `NiFitIs`'s implication)
-    (fun _ _ => True)
-    -- the one-shot filing claims: none at the system record (NI M2-W2d; the
-    -- NI record mints them)
-    (fun _ => iprop(emp)) (fun _ _ => iprop(emp)) iprop(emp)
+  xv6FixedGSU N appFs appOkc cov ls Ai Hinv γgen γstart γreg γd γsw γobs γhist c T Ptp Tkp Hkp
+    (fun _ _ => True) (fun _ => iprop(emp)) (fun _ _ => iprop(emp)) iprop(emp)
 
 set_option maxHeartbeats 800000 in
 /-- **ONE ERA** (Rocq `SystemAdequacy.xv6_boot_era`): at the machine's record
@@ -406,6 +425,13 @@ theorem xv6BootEra {CT : Type} (N : Type) (appFs : CT → N → Aview → IProp 
     (c : CT) (T : List Obs) (Ptp : IProp GF)
     -- THE TWO SYNC SLOTS of the record (Rocq sync K3-2)
     (Tkp : Nat → IProp GF) (Hkp : Nat → IProp GF → IProp GF)
+    -- THE RECORD'S ENTER JUSTIFICATION AND FILING CLAIMS (NI M2-W4): any
+    -- justification that accepts the NI filing's evidence, any claims whose
+    -- fork mint is an origin ticket (`True`/`emp` for the system theorem,
+    -- `niFit` and the ledger's claims for the NI one)
+    (Uf : Option (Nat × Obs) → Obs → Prop) (hUf : ∀ ox e, niFit ox e → Uf ox e)
+    (Ucr : Nat → IProp GF) (Ucx : Nat → Obs → IProp GF) (Uco : IProp GF)
+    (hUfork : ∀ (i : Nat) (x : Obs), niForkExit x = true → Ucx i x ⊢@{IProp GF} Uco)
     -- THE ERA'S RECORD PREDICATE (Rocq `Ok`/`Hbok`, SY3-A1 re-cut), read off
     -- the boot resource, at the era's number
     (Ok : Nat → N → Prop) (Hbok : ∀ (k : Nat) (r : N), appBoot c k r ⊢@{IProp GF} ⌜Ok k r⌝)
@@ -413,39 +439,39 @@ theorem xv6BootEra {CT : Type} (N : Type) (appFs : CT → N → Aview → IProp 
     (appOkc : CT → N → Prop)
     -- THE MERGE (Rocq `Happ_merge`, SY3-K2; its wand lent the started auth at
     -- the era's `gen + 1`, SY3-A1), at the record literal
-    (Happ_merge : letI : MachFixedGS hlc GF := (xv6FixedGS N appFs appOkc cov sb.sbLogstart Ai Hinv
-      γgen γstart γreg γd γsw γobs γhist c T Ptp Tkp Hkp)
+    (Happ_merge : letI : MachFixedGS hlc GF := (xv6FixedGSU N appFs appOkc cov sb.sbLogstart Ai Hinv
+      γgen γstart γreg γd γsw γobs γhist c T Ptp Tkp Hkp Uf Ucr Ucx Uco)
       ∀ k : Nat, ⊢@{IProp GF} appMergeRaw (hlc := hlc) (appFs c) (Ok (k + 1)) (appOkc c) (Tkp k) k)
     -- THE FOUNDING (Rocq `Hfound`, SY3-A1): the era's sync token out of the
     -- turn, the rest for `<init>`
     (Hfound : ∀ k : Nat, ⊢@{IProp GF} Tn c (k + 1) -∗ |==> (Tkp k ∗ TnInit c (k + 1)))
     -- THE SYNC RUNNER (Rocq `Happ_sync_run`, K3-3), at the record's slots
-    (Happ_sync_run : letI : MachFixedGS hlc GF := (xv6FixedGS N appFs appOkc cov sb.sbLogstart Ai Hinv
-      γgen γstart γreg γd γsw γobs γhist c T Ptp Tkp Hkp)
+    (Happ_sync_run : letI : MachFixedGS hlc GF := (xv6FixedGSU N appFs appOkc cov sb.sbLogstart Ai Hinv
+      γgen γstart γreg γd γsw γobs γhist c T Ptp Tkp Hkp Uf Ucr Ucx Uco)
       ∀ k : Nat, ⊢@{IProp GF} appSyncRunRaw (hlc := hlc) (appFs c) (Ok (k + 1)) (appOkc c) (Tkp k)
         (Hkp k))
-    (Hinit_boot : letI : MachFixedGS hlc GF := (xv6FixedGS N appFs appOkc cov sb.sbLogstart Ai Hinv γgen
-      γstart γreg γd γsw γobs γhist c T Ptp Tkp Hkp)
+    (Hinit_boot : letI : MachFixedGS hlc GF := (xv6FixedGSU N appFs appOkc cov sb.sbLogstart Ai Hinv γgen
+      γstart γreg γd γsw γobs γhist c T Ptp Tkp Hkp Uf Ucr Ucx Uco)
       EraInitBoot (hlc := hlc) N appFs appBoot TnInit c)
-    (Hecho : letI : MachFixedGS hlc GF := (xv6FixedGS N appFs appOkc cov sb.sbLogstart Ai Hinv γgen γstart
-      γreg γd γsw γobs γhist c T Ptp Tkp Hkp)
+    (Hecho : letI : MachFixedGS hlc GF := (xv6FixedGSU N appFs appOkc cov sb.sbLogstart Ai Hinv γgen γstart
+      γreg γd γsw γobs γhist c T Ptp Tkp Hkp Uf Ucr Ucx Uco)
       EraEcho (hlc := hlc) (GF := GF))
-    (Hperm : letI : MachFixedGS hlc GF := (xv6FixedGS N appFs appOkc cov sb.sbLogstart Ai Hinv γgen γstart
-      γreg γd γsw γobs γhist c T Ptp Tkp Hkp)
+    (Hperm : letI : MachFixedGS hlc GF := (xv6FixedGSU N appFs appOkc cov sb.sbLogstart Ai Hinv γgen γstart
+      γreg γd γsw γobs γhist c T Ptp Tkp Hkp Uf Ucr Ucx Uco)
       EraPerm (hlc := hlc) (GF := GF))
     (E : EraGS) (gen : Nat) (σ : MState) (hbf : bootFacts σ)
     (hdv : ∃ ds0 : DevStates, σ.devs = ds0.reset)
     (hpure : fsBootPure cov sb.sbLogstart (diskOf σ.devs))
     (hcovin : fsCovIn cov XV6_DISK_BYTES)
     (hlogsub : ∀ b, logRegion sb.sbLogstart b = true → b ∈ cov) (hls2 : sb.sbLogstart = 2) :
-    letI : MachFixedGS hlc GF := (xv6FixedGS N appFs appOkc cov sb.sbLogstart Ai Hinv γgen γstart γreg γd
-      γsw γobs γhist c T Ptp Tkp Hkp)
+    letI : MachFixedGS hlc GF := (xv6FixedGSU N appFs appOkc cov sb.sbLogstart Ai Hinv γgen γstart γreg γd
+      γsw γobs γhist c T Ptp Tkp Hkp Uf Ucr Ucx Uco)
     obsInv ∗ powerBootRes (fun dk => mirrorOf (fsBlocks dk))
         (xv6Lend N appFs appBoot cov sb.sbLogstart c) (Tn c) E gen σ ⊢@{IProp GF} |={⊤}=>
       ([∗list] cpu ∈ cpus, hartWP gen cpu (pure ())) ∗
       ([∗list] d ∈ DevId.all, devWP gen d rootTask (pure ())) := by
-  letI F : MachFixedGS hlc GF := xv6FixedGS N appFs appOkc cov sb.sbLogstart Ai Hinv γgen γstart γreg γd
-    γsw γobs γhist c T Ptp Tkp Hkp
+  letI F : MachFixedGS hlc GF := xv6FixedGSU N appFs appOkc cov sb.sbLogstart Ai Hinv γgen γstart γreg γd
+    γsw γobs γhist c T Ptp Tkp Hkp Uf Ucr Ucx Uco
   obtain ⟨-, D, hrec, hhwf, -⟩ := hpure
   obtain ⟨ds0, hds⟩ := hdv
   iintro ⟨#Hoinv, Hres⟩
@@ -497,10 +523,11 @@ theorem xv6BootEra {CT : Type} (N : Type) (appFs : CT → N → Aview → IProp 
   letI : Appcfg GF := ⟨N, appFs c, r⟩
   let M1 : MachGS hlc GF := MachGS.ofEra E gen (procClaim Γ) (fun cpu => procClaim_idle Γ cpu)
   have hClaim : @ClaimIs hlc GF M1 _ Γ := @ClaimIs.mk hlc GF M1 _ Γ (fun _ _ => rfl)
-  -- ...and the record accepts the NI filing's evidence (NI M2-W2c): the
-  -- system record's `uFit` is blind (`True`), so by `trivial`; its filing
-  -- claims are `emp` (NI M2-W2d), so the fork law is `emp ⊢ emp`
-  have hNi : @NiFitIs hlc GF M1 := @NiFitIs.mk hlc GF M1 (fun _ _ _ => trivial) (fun _ _ _ => .rfl)
+  -- ...and the record accepts the NI filing's evidence (NI M2-W2c) and its
+  -- fork mint is an origin ticket (NI M2-W2d): `hUf`/`hUfork` (the system
+  -- record's `True`/`emp` by `trivial`/`.rfl`, the NI record's by `id` and
+  -- `niExitMint_fork`; NI M2-W4)
+  have hNi : @NiFitIs hlc GF M1 := @NiFitIs.mk hlc GF M1 hUf hUfork
   ihave Hout := bootSharedOut_ofEra E gen (fun _ _ => iprop(True)) (procClaim Γ)
     (fun _ => BI.true_intro) (fun cpu => procClaim_idle Γ cpu) σ ξ0 Γ γ0 γ1 γc γl0 γl1 γt cn γd ξd (diskOf σ.devs) S.fssSb (fsNib S)
     cov (fsRecView (fsBlocks (diskOf σ.devs)) D) (snapSpent S (fsNib S)) $$ Hout

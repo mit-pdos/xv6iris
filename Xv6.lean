@@ -1107,6 +1107,7 @@ import Xv6.UexecRound
 import Xv6.UsysDet
 import Xv6.UhistDefs
 import Xv6.NiLedger
+import Xv6.NiTrace
 import Xv6.UexecApply
 import Xv6.UexecCond
 import Xv6.ProofUexecWp
@@ -1620,6 +1621,8 @@ import Xv6.ExecArgs
 import Xv6.ExecRun
 import Xv6.ProofUser
 import Xv6.LinkSystemAdequacyClosed
+import Xv6.NiAdequacy
+import Xv6.LinkNiAdequacy
 import Xv6.UkCatTree
 import Xv6.ExecEntry
 import Xv6.ExecBundle

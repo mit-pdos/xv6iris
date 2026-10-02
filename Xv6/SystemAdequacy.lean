@@ -73,6 +73,14 @@ no table of reset values is trusted (`MachCSL.BootReset`).
 5. D48's trace corollaries (`xv6_trace_adequacy`, `xv6_obs_wf_xv6Σ`) are not
    ported here: the user's target is union adequacy through the generic
    theorem (D48 ruling).
+7. (NI M2-W4) **`xv6PowerAdequacyGenU`** is the theorem at a record whose
+   enter justification `Uf` (accepting the NI filing's evidence, `hUf`) and
+   filing claims `Ucr`/`Ucx`/`Uco` (fork mint an origin ticket, `hUfork`) are
+   parameters (SystemBootEra deviation 6), its trace-slot hooks at
+   `riscvPowerAdequacy`'s shape; `xv6PowerAdequacyGen` (statement unchanged)
+   is it at `True`/`emp` with the hooks wrapped (`powerHook_emp`,
+   `uexitHook_emp`, `uenterHook_drop`), and the NI theorem (`NiAdequacy`) at
+   `niFit` and the ledger's claims.
 -/
 import Xv6.SystemBootEra
 import Xv6.UexecExecMint
@@ -94,6 +102,155 @@ section gen
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGpreS hlc GF] [Xv6G GF] [WchGpre GF]
   [CtokG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF]
   [IcboxG GF] [SleepLockG GF] [BcacheG GF] [OffboxG GF] [OffboxBoxG GF] [FileG GF]
+
+/-- **THE SYSTEM THEOREM AT A RECORD'S ENTER JUSTIFICATION AND FILING
+CLAIMS** (NI M2-W4): `xv6PowerAdequacyGen` with the record's `uFit` a
+parameter `Uf` accepting the NI filing's evidence (`hUf`) and its claim slots
+`Ucr`/`Ucx`/`Uco` parameters whose fork mint is an origin ticket (`hUfork`),
+the trace-slot hooks stated as `riscvPowerAdequacy`'s (the power-on yields
+`Uco c`, the exit hook mints `Ucr`/`Ucx`, the entry hook is handed `Uf ox e`
+and the claim it spends).  The system theorem is it at `True`/`emp`; the NI
+theorem at `niFit` and the ledger's claims.  At a generic application: its fixed part `CT` (born by `Hbirth`), its names
+`N`, its claim `appFs` on the abstract view, its per-era boot resource
+`appBoot`, its console interface `Ai`, its per-era turn `Tnn`, its trace
+slot `Pt` and conclusion `phi` -- the components of an `Xv6App` record, positionally. -/
+theorem xv6PowerAdequacyGenU (g : GState) (sb : FsSb) (nib : Nat) (cov : ExtTreeSet Nat compare)
+    -- THE BIRTH (Rocq SY3-A1): its yield split between the crash slot's era-0
+    -- copy (`Cls`) and the trace slot (`Clt`); handed the machine's four fixed
+    -- gnames, `Born` what it says of where it kept them
+    (CT : Type) (Cls Clt : CT → IProp GF)
+    (Born : GName → GName → GName → GName → CT → Prop)
+    (Hbirth : ∀ γd γsw γreg γst : GName,
+      ⊢@{IProp GF} |==> ∃ c : CT, ⌜Born γd γsw γreg γst c⌝ ∗ Cls c ∗ Clt c)
+    (N : Type) (appFs : CT → N → Aview → IProp GF)
+    (appBoot : CT → Nat → N → IProp GF)
+    -- THE DURABLE-COPY PREDICATE (Rocq `app_okc`, SY3-A3b)
+    (appOkc : CT → N → Prop)
+    (Ai : CT → AppIface GF)
+    -- THE ERA'S TURN IN FOUR STAGES (Rocq SY3-A1): the power-on step's yield
+    -- `Tnn`, the swap's `Tnn'`, the return path's `Tnn''`, `<init>`'s `TnnInit`
+    (Tnn Tnn' Tnn'' TnnInit : CT → Nat → IProp GF)
+    -- THE TWO SYNC SLOTS (Rocq sync K3-2), at the fixed part alone
+    (Tk : CT → Nat → IProp GF) (Hk : CT → Nat → IProp GF → IProp GF)
+    -- THE FOUNDING (Rocq `Hfound`, SY3-A1)
+    (Hfound : ∀ (c : CT) (k : Nat),
+      ⊢@{IProp GF} Tnn'' c (k + 1) -∗ |==> (Tk c k ∗ TnnInit c (k + 1)))
+    -- THE ERA'S RECORD PREDICATE (Rocq `Ok`/`Hboot_ok`, SY3-A1 re-cut)
+    (Ok : CT → Nat → N → Prop)
+    (Hboot_ok : ∀ (c : CT) (k : Nat) (r : N), appBoot c k r ⊢@{IProp GF} ⌜Ok c k r⌝)
+    -- THE MERGE (Rocq `Happ_merge`, SY3-K2 / SY3-A1): at any machine record
+    -- whose generation counter is the pre-structure's, at a fixed part born at
+    -- that record's own four gnames
+    (Happ_merge : ∀ [F : MachFixedGS hlc GF] (c : CT) (k : Nat),
+      MachFixedGS.mono (hlc := hlc) (GF := GF) = MachGpreS.mono_pre (hlc := hlc) →
+      Born (MachFixedGS.diskName (hlc := hlc) (GF := GF)) (MachFixedGS.swapName (hlc := hlc) (GF := GF))
+        (MachFixedGS.registryName (hlc := hlc) (GF := GF))
+        (MachFixedGS.startName (hlc := hlc) (GF := GF)) c →
+      ⊢@{IProp GF} appMergeRaw (hlc := hlc) (appFs c) (Ok c (k + 1)) (appOkc c) (Tk c k) k)
+    -- THE SYNC RUNNER (Rocq `Happ_sync_run`, K3-3), at any machine record
+    (Happ_sync_run : ∀ [F : MachFixedGS hlc GF] (c : CT) (k : Nat),
+      ⊢@{IProp GF} appSyncRunRaw (hlc := hlc) (appFs c) (Ok c (k + 1)) (appOkc c) (Tk c k) (Hk c k))
+    -- THE POWER-ON TRANSPORT (Rocq `Happ_boot`, SY3-A1 / SY3-A3bc)
+    (Happ_boot : ∀ (c : CT) (gen : Nat) (γd γsw γreg γst : GName), Born γd γsw γreg γst c →
+      ⊢@{IProp GF} appXferBootRaw (MachGpreS.mono_pre (hlc := hlc)) (appFs c) (appOkc c)
+        (appBoot c (gen + 1)) (Tnn c (gen + 1)) (Tnn' c (gen + 1)) γst gen)
+    -- ERA 0, out of the birth's crash-slot part (Rocq SY3-A1)
+    (Happ_init : ∀ c : CT, Cls c ⊢@{IProp GF} |==> ∃ r : N, ⌜appOkc c r⌝ ∗
+      appFs c r (absView (imgState (fsBlocks (diskOf g.m.devs)) sb nib).fssInodes))
+    -- THE RECORD'S ENTER JUSTIFICATION AND FILING CLAIMS (NI M2-W4)
+    (Uf : Option (Nat × Obs) → Obs → Prop) (hUf : ∀ ox e, niFit ox e → Uf ox e)
+    (Ucr : CT → Nat → IProp GF) (Ucx : CT → Nat → Obs → IProp GF) (Uco : CT → IProp GF)
+    (hUfork : ∀ (c : CT) (i : Nat) (x : Obs), niForkExit x = true → Ucx c i x ⊢@{IProp GF} Uco c)
+    (Pt : GName → CT → IProp GF)
+    (Hinit_boot : ∀ (Hinv : InvGS_gen hlc GF) (γgen γstart γreg γd γsw γobs γhist : GName) (c : CT)
+        (T : List Obs),
+      letI : MachFixedGS hlc GF := (xv6FixedGSU N appFs appOkc cov sb.sbLogstart (Ai c) Hinv γgen
+        γstart γreg γd γsw γobs γhist c T (Pt γobs c) (Tk c) (Hk c) Uf (Ucr c) (Ucx c) (Uco c))
+      EraInitBoot (hlc := hlc) N appFs appBoot TnnInit c)
+    (Happ_echo : ∀ (Hinv : InvGS_gen hlc GF) (γgen γstart γreg γd γsw γobs γhist : GName) (c : CT)
+        (T : List Obs),
+      letI : MachFixedGS hlc GF := (xv6FixedGSU N appFs appOkc cov sb.sbLogstart (Ai c) Hinv γgen
+        γstart γreg γd γsw γobs γhist c T (Pt γobs c) (Tk c) (Hk c) Uf (Ucr c) (Ucx c) (Uco c))
+      EraEcho (hlc := hlc) (GF := GF))
+    (HPt : ∀ (γobs : GName) (c : CT),
+      Clt c ∗ (γobs ↪VAR{.own (1 : Qp).half} ([] : List Obs)) ⊢@{IProp GF} |==> Pt γobs c)
+    (Hobs : ∀ (γd γobs : GName) (c : CT) (h : List Obs) (on : Bool) (dk : Nat → BitVec 8),
+      traceShape h on →
+      diskImgAuthSized γd XV6_DISK_BYTES dk ∗ ▷ Pt γobs c ∗ (γobs ↪VAR{.own (1 : Qp).half} h)
+        ⊢@{IProp GF} |==> ◇ (diskImgAuthSized γd XV6_DISK_BYTES dk ∗ ▷ Pt γobs c ∗
+          (γobs ↪VAR{.own (1 : Qp).half} (h ++ [powerEv on])) ∗
+          (if on then iprop(emp)
+           else iprop((Ai c).cons (obsBoots h + 1) [] ⟨[], [], [], none⟩ ∗
+             Tnn c (obsBoots h + 1) ∗ Uco c))))
+    -- THE RETURN PATH (Rocq `Hback`, SY3-A1 re-cut)
+    (Hback : ∀ (γobs : GName) (c : CT) (h : List Obs),
+      ▷ Pt γobs c ∗ (γobs ↪VAR{.own (1 : Qp).half} (h ++ [Obs.powerOn])) ∗
+          Tnn' c (obsBoots h + 1) ⊢@{IProp GF}
+        |==> ◇ (▷ Pt γobs c ∗ (γobs ↪VAR{.own (1 : Qp).half} (h ++ [Obs.powerOn])) ∗
+          Tnn'' c (obsBoots h + 1)))
+    -- THE USER-EVENT HOOKS (NI M2-W1, split by M2-W2a): the trace slot
+    -- accepts a hart's user exit, and a user entry with the cited receipt's
+    -- reading (`MachCSL.riscvPowerAdequacy`'s `HuserExit`/`HuserEnter`; the
+    -- system record's `uFit` is blind -- the kernel files its evidence
+    -- against it through `NiFitIs` (NI M2-W2c) -- so the entry hook is handed
+    -- no justification)
+    (HuserExit : ∀ (γobs : GName) (c : CT) (h : List Obs) (e : Obs), isUExit e = true →
+      ▷ Pt γobs c ∗ (γobs ↪VAR{.own (1 : Qp).half} h) ⊢@{IProp GF}
+        |==> ◇ (▷ Pt γobs c ∗ (γobs ↪VAR{.own (1 : Qp).half} (h ++ [e])) ∗
+          Ucr c h.length ∗ Ucx c h.length e))
+    (HuserEnter : ∀ (γobs : GName) (c : CT) (h : List Obs) (e : Obs) (ox : Option (Nat × Obs)),
+      isUEnter e = true → Uf ox e → (∀ i x, ox = some (i, x) → i < h.length ∧ h[i]? = some x) →
+      uClaimForRaw (Ucr c) (Uco c) ox ∗ ▷ Pt γobs c ∗ (γobs ↪VAR{.own (1 : Qp).half} h) ⊢@{IProp GF}
+        |==> ◇ (▷ Pt γobs c ∗ (γobs ↪VAR{.own (1 : Qp).half} (h ++ [e]))))
+    (Hperm : ∀ (Hinv : InvGS_gen hlc GF) (γgen γstart γreg γd γsw γobs γhist : GName) (c : CT)
+        (T : List Obs),
+      letI : MachFixedGS hlc GF := (xv6FixedGSU N appFs appOkc cov sb.sbLogstart (Ai c) Hinv γgen
+        γstart γreg γd γsw γobs γhist c T (Pt γobs c) (Tk c) (Hk c) Uf (Ucr c) (Ucx c) (Uco c))
+      EraPerm (hlc := hlc) (GF := GF))
+    (phi : GState → List Obs → Prop)
+    (Hphi : ∀ (Hinv : InvGS_gen hlc GF) (γgen γstart γreg γd γsw γobs γhist : GName) (c : CT)
+        (T : List Obs) (g' : GState) (h : List Obs),
+      @powerInterp hlc GF (xv6FixedGSU N appFs appOkc cov sb.sbLogstart (Ai c) Hinv γgen γstart γreg
+          γd γsw γobs γhist c T (Pt γobs c) (Tk c) (Hk c) Uf (Ucr c) (Ucx c) (Uco c)) g' ∗
+        (γobs ↪VAR{.own (1 : Qp).half} h) ∗ ⌜obsWf h g'⌝ ∗
+        ▷ xv6Slot N appFs appOkc cov sb.sbLogstart γd γsw γreg γstart c ∗ ▷ Pt γobs c ⊢@{IProp GF}
+        ◇ ⌜phi g' h⌝)
+    (Hgen0 : g.gen = 0) (Hpow : g.pow = false)
+    (Himg : fsBootImageWf (diskOf g.m.devs) XV6_DISK_BYTES sb nib cov)
+    (n : Nat) (κs : List Obs) (t2 : List Expr) (g2 : GState)
+    (hsteps : ([Expr.power], g) -<κs>->ₜₚ^[n] (t2, g2)) :
+    (∀ e2, e2 ∈ t2 → Reducible (e2, g2)) ∧ phi g2 κs := by
+  obtain ⟨hcovin, hlogsub, hls2⟩ := covFacts_ofImage _ _ sb nib cov Himg
+  refine riscvPowerAdequacy (hlc := hlc) (GF := GF) XV6_DISK_BYTES g CT Cls Clt Born Hbirth
+    (fun γd γsw γreg γst c => xv6Slot N appFs appOkc cov sb.sbLogstart γd γsw γreg γst c)
+    (xv6Slot_alloc N appFs appOkc Cls (diskOf g.m.devs) sb nib cov Himg Happ_init)
+    Tk Hk
+    (fsBootPure cov sb.sbLogstart)
+    (xv6Slot_project N appFs appOkc cov sb.sbLogstart)
+    (fun dk => mirrorOf (fsBlocks dk))
+    (fun c gen dk => xv6Lend N appFs appBoot cov sb.sbLogstart c gen dk)
+    Tnn Tnn' Tnn''
+    (xv6Slot_swap N appFs appOkc appBoot cov sb.sbLogstart Born Tnn Tnn' Happ_boot)
+    Pt (fun c => (Ai c).tag) (fun c h => (Ai c).tag_persistent h) (fun c h => (Ai c).tag_timeless h)
+    (fun c => (Ai c).kill) (fun c => (Ai c).kill_persistent) (fun c => (Ai c).kill_timeless)
+    (fun c => (Ai c).cons) (fun c k h H => (Ai c).cons_timeless k h H)
+    (fun c => (Ai c).wild) (fun c k => (Ai c).wild_persistent k) (fun c k => (Ai c).wild_timeless k)
+    (fun c => (Ai c).rdwild) (fun c k => (Ai c).rdwild_persistent k)
+    (fun c k => (Ai c).rdwild_timeless k)
+    Uf Ucr Ucx Uco HPt Hobs Hback HuserExit HuserEnter
+    phi Hphi Hgen0 Hpow ?_ n κs t2 g2 hsteps
+  intro F Hinv γgen γstart γreg γd γsw γobs γhist c T hF hborn E gen σ hbf hdv hpp
+  -- the merge and the runner at the record literal, read off the equations
+  -- the literal satisfies by `rfl` (Rocq's `Hmergefix`/`Hrunfix`)
+  have hmerge := fun k => @Happ_merge F c k (by rw [hF]) (by rw [hF]; exact hborn)
+  have hrun := fun k => @Happ_sync_run F c k
+  subst hF
+  exact xv6BootEra N appFs appBoot Tnn'' TnnInit sb cov (Ai c) Hinv γgen γstart γreg γd γsw γobs
+    γhist c T (Pt γobs c) (Tk c) (Hk c) Uf hUf (Ucr c) (Ucx c) (Uco c) (hUfork c) (Ok c) (Hboot_ok c) appOkc hmerge (Hfound c) hrun
+    (Hinit_boot Hinv γgen γstart γreg γd γsw γobs γhist c T)
+    (Happ_echo Hinv γgen γstart γreg γd γsw γobs γhist c T)
+    (Hperm Hinv γgen γstart γreg γd γsw γobs γhist c T)
+    E gen σ hbf hdv hpp hcovin hlogsub hls2
 
 /-- **THE SYSTEM THEOREM** (Rocq `SystemAdequacy.xv6_power_adequacy_gen`),
 at a generic application: its fixed part `CT` (born by `Hbirth`), its names
@@ -200,43 +357,17 @@ theorem xv6PowerAdequacyGen (g : GState) (sb : FsSb) (nib : Nat) (cov : ExtTreeS
     (Himg : fsBootImageWf (diskOf g.m.devs) XV6_DISK_BYTES sb nib cov)
     (n : Nat) (κs : List Obs) (t2 : List Expr) (g2 : GState)
     (hsteps : ([Expr.power], g) -<κs>->ₜₚ^[n] (t2, g2)) :
-    (∀ e2, e2 ∈ t2 → Reducible (e2, g2)) ∧ phi g2 κs := by
-  obtain ⟨hcovin, hlogsub, hls2⟩ := covFacts_ofImage _ _ sb nib cov Himg
-  refine riscvPowerAdequacy (hlc := hlc) (GF := GF) XV6_DISK_BYTES g CT Cls Clt Born Hbirth
-    (fun γd γsw γreg γst c => xv6Slot N appFs appOkc cov sb.sbLogstart γd γsw γreg γst c)
-    (xv6Slot_alloc N appFs appOkc Cls (diskOf g.m.devs) sb nib cov Himg Happ_init)
-    Tk Hk
-    (fsBootPure cov sb.sbLogstart)
-    (xv6Slot_project N appFs appOkc cov sb.sbLogstart)
-    (fun dk => mirrorOf (fsBlocks dk))
-    (fun c gen dk => xv6Lend N appFs appBoot cov sb.sbLogstart c gen dk)
-    Tnn Tnn' Tnn''
-    (xv6Slot_swap N appFs appOkc appBoot cov sb.sbLogstart Born Tnn Tnn' Happ_boot)
-    Pt (fun c => (Ai c).tag) (fun c h => (Ai c).tag_persistent h) (fun c h => (Ai c).tag_timeless h)
-    (fun c => (Ai c).kill) (fun c => (Ai c).kill_persistent) (fun c => (Ai c).kill_timeless)
-    (fun c => (Ai c).cons) (fun c k h H => (Ai c).cons_timeless k h H)
-    (fun c => (Ai c).wild) (fun c k => (Ai c).wild_persistent k) (fun c k => (Ai c).wild_timeless k)
-    (fun c => (Ai c).rdwild) (fun c k => (Ai c).rdwild_persistent k)
-    (fun c k => (Ai c).rdwild_timeless k)
-    (fun _ _ => True)
-    -- the system record mints no filing claims (NI M2-W2d)
-    (fun _ _ => iprop(emp)) (fun _ _ _ => iprop(emp)) (fun _ => iprop(emp))
-    HPt (fun γd γobs c h on dk hs => powerHook_emp on _ _ _ _ _ _ (Hobs γd γobs c h on dk hs)) Hback
+    (∀ e2, e2 ∈ t2 → Reducible (e2, g2)) ∧ phi g2 κs :=
+  xv6PowerAdequacyGenU (hlc := hlc) (GF := GF) g sb nib cov CT Cls Clt Born Hbirth N appFs appBoot appOkc Ai
+    Tnn Tnn' Tnn'' TnnInit Tk Hk Hfound Ok Hboot_ok Happ_merge Happ_sync_run Happ_boot Happ_init
+    -- the system record is blind and mints no filing claims (NI M2-W2d)
+    (fun _ _ => True) (fun _ _ _ => trivial)
+    (fun _ _ => iprop(emp)) (fun _ _ _ => iprop(emp)) (fun _ => iprop(emp)) (fun _ _ _ _ => .rfl)
+    Pt Hinit_boot Happ_echo HPt
+    (fun γd γobs c h on dk hs => powerHook_emp on _ _ _ _ _ _ (Hobs γd γobs c h on dk hs)) Hback
     (fun γobs c h e he => uexitHook_emp _ _ _ (HuserExit γobs c h e he))
     (fun γobs c h e ox he _ hv => uenterHook_drop _ _ _ _ (HuserEnter γobs c h e ox he hv))
-    phi Hphi Hgen0 Hpow ?_ n κs t2 g2 hsteps
-  intro F Hinv γgen γstart γreg γd γsw γobs γhist c T hF hborn E gen σ hbf hdv hpp
-  -- the merge and the runner at the record literal, read off the equations
-  -- the literal satisfies by `rfl` (Rocq's `Hmergefix`/`Hrunfix`)
-  have hmerge := fun k => @Happ_merge F c k (by rw [hF]) (by rw [hF]; exact hborn)
-  have hrun := fun k => @Happ_sync_run F c k
-  subst hF
-  exact xv6BootEra N appFs appBoot Tnn'' TnnInit sb cov (Ai c) Hinv γgen γstart γreg γd γsw γobs
-    γhist c T (Pt γobs c) (Tk c) (Hk c) (Ok c) (Hboot_ok c) appOkc hmerge (Hfound c) hrun
-    (Hinit_boot Hinv γgen γstart γreg γd γsw γobs γhist c T)
-    (Happ_echo Hinv γgen γstart γreg γd γsw γobs γhist c T)
-    (Hperm Hinv γgen γstart γreg γd γsw γobs γhist c T)
-    E gen σ hbf hdv hpp hcovin hlogsub hls2
+    Hperm phi Hphi Hgen0 Hpow Himg n κs t2 g2 hsteps
 
 end gen
 
