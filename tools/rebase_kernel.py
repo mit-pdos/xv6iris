@@ -20,16 +20,30 @@ This tool rewrites, in every non-generated `Xv6/*.lean`:
   rule line.
 
 Everything it cannot map is reported (functions whose instruction stream
-changed, symbols that disappeared, ambiguous strings).
+changed, symbols that disappeared, ambiguous strings).  Functions whose
+instructions sit at the same offsets and differ only in immediates
+(struct strides, displacements, constants) are listed apart, as
+"immediates only": their pcs map by offset.
 
-Usage: tools/rebase_kernel.py OLD_ELF NEW_ELF [--objdump OBJDUMP] [--dry-run] [FILES...]
+Usage: tools/rebase_kernel.py OLD_ELF NEW_ELF [--objdump OBJDUMP] [--dry-run] [--intervals FILE] [FILES...]
+       tools/rebase_kernel.py --fixup OLD_ELF NEW_ELF [--intervals FILE] ...
+       tools/rebase_kernel.py --symbolic OLD_ELF NEW_ELF [--intervals FILE]
+                              [--proc-array SYM:COUNT] [--proc-fields +START:DELTA,...] ...
+       tools/rebase_kernel.py --symbolize NEW_ELF ... / --bridge NEW_ELF ...
+
+--intervals FILE routes the pcs inside a RESHAPED function (one that gained
+or lost instructions) by per-function shift intervals instead of the plain
+offset, in the literal, --fixup and --symbolic passes (format: see
+parse_intervals).  --symbolic is the pass for the symbolic tree (see its
+section below).
 
 The full pipeline for a new kernel build (the generated files first):
   1. tools/dump_kernel.py --kernel NEW_ELF --rev REV   (Xv6/KernelImage.lean, KernelTree)
   2. tools/gen_kernel_data.py --kernel NEW_ELF         (Xv6/KernelData.lean byte lists)
   3. tools/dump_elf_image.py --kernel NEW_ELF --rev REV (MachCSL/KernelElf.lean: the
      language's boot image, MachCSL.bootImage; Xv6.bootImage_wf checks 1-2 against it)
-  4. this tool (literal pass, then --fixup once), then the manual residue.
+  4. this tool (literal pass, then --fixup once, then --symbolic once, each with
+     the same --intervals), then the manual residue.
 """
 import argparse, os, re, subprocess, sys, glob
 
@@ -98,21 +112,60 @@ def norm(name, start, ins):
         res.append(t)
     return res
 
+def norm_imm(name, start, ins):
+    """`norm` with every immediate and displacement blanked (jump targets kept), keyed by offset:
+    equal for two functions whose instructions differ only in stride/displacement/constant fields"""
+    res = []
+    for t, (a, mn, ops, cm) in zip(norm(name, start, ins), ins):
+        k = t.find('<')
+        head, tail = (t, '') if k < 0 else (t[:k], t[k:])
+        res.append((a - start, re.sub(r'(?<![\w.])-?(?:0x[0-9a-f]+|\d+)(?![\w])', 'N', head) + tail))
+    return res
+
+def parse_intervals(path):
+    """--intervals FILE: per reshaped function its old-offset -> new-offset map, one line each,
+    `f:+START:DELTA[,+START:DELTA...]` (`#` starts a comment).  DELTA (`+N`/`-N`, hex or decimal)
+    applies from old offset START up to the next START; `x` marks the old offsets from START on as
+    unmapped (the replaced region: rewritten by hand, reported).  Offsets below the first START map
+    to themselves."""
+    iv = {}
+    with open(path) as fh:
+        text = fh.read()
+    for raw in text.split('\n'):
+        line = raw.split('#', 1)[0].strip()
+        if not line: continue
+        f, rest = line.split(':', 1)
+        for item in rest.split(','):
+            item = item.strip()
+            if not item: continue
+            st, d = item.rsplit(':', 1)
+            iv.setdefault(f.strip(), []).append((int(st.strip().lstrip('+'), 0),
+                                                 None if d.strip() in ('x', 'X') else int(d.strip(), 0)))
+    for f in iv: iv[f].sort()
+    return iv
+
 class Rebase:
-    def __init__(self, old, new):
-        self.so, self.sn = symbols(old), symbols(new)
-        self.fo, self.fn = functions(old), functions(new)
-        self.ro_base, self.ro = section_bytes(old, '.rodata')
-        self.rn_base, self.rn = section_bytes(new, '.rodata')
+    def __init__(self, old, new, intervals=None, tables=None):
+        """`tables` (tests): (symbols, symbols, functions, functions, rodata, rodata) of old and new
+        in place of reading the two ELFs"""
+        if tables is None:
+            tables = (symbols(old), symbols(new), functions(old), functions(new),
+                      section_bytes(old, '.rodata'), section_bytes(new, '.rodata'))
+        self.so, self.sn, self.fo, self.fn, (self.ro_base, self.ro), (self.rn_base, self.rn) = tables
+        self.iv = intervals or {}
         self.changed = set()
+        self.imm_only = set()   # same instructions at the same offsets, only immediates differ
         self.first_diff = {}
         for f, (s, ins) in self.fo.items():
             if f not in self.fn: self.changed.add(f); self.first_diff[f] = 0; continue
             a, b = norm(f, s, ins), norm(f, *self.fn[f])
-            if a != b:
+            oa = [x[0] - s for x in ins]; ob = [x[0] - self.fn[f][0] for x in self.fn[f][1]]
+            if a != b or oa != ob:
+                if oa == ob and norm_imm(f, s, ins) == norm_imm(f, *self.fn[f]):
+                    self.imm_only.add(f); continue
                 self.changed.add(f)
                 k = 0
-                while k < min(len(a), len(b)) and a[k] == b[k]: k += 1
+                while k < min(len(a), len(b)) and a[k] == b[k] and oa[k] == ob[k]: k += 1
                 self.first_diff[f] = ins[k][0] if k < len(ins) else s + 0x100000
         self.text_lo = min(s for s, _ in self.fo.values())
         self.text_hi = max(s + sum(0 for _ in ins) for s, ins in self.fo.values())
@@ -123,6 +176,14 @@ class Rebase:
         for f, (s, ins) in self.fo.items():
             for a, mn, ops, cm in ins: self.old_ins[a] = (f, mn, ops, cm)
         self.report = []
+
+    def newoff(self, f, o):
+        """old offset `o` in text function `f` -> its new offset (None: inside a replaced region)"""
+        d = 0
+        for st, dd in self.iv.get(f, ()):
+            if o >= st: d = dd
+            else: break
+        return None if d is None else o + d
 
     def func_of(self, a):
         best = None
@@ -138,6 +199,12 @@ class Rebase:
             f, s = fb
             if f not in self.fn:
                 self.report.append('%s: %#x in %s, which is gone' % (where, a, f)); return None
+            if f in self.iv:
+                n = self.newoff(f, a - s)
+                if n is None:
+                    self.report.append('%s: %#x in %s at old +%#x: inside a replaced interval, left' % (where, a, f, a - s))
+                    return None
+                return self.fn[f][0] + n
             if f in self.changed and a >= self.first_diff[f]:
                 self.report.append('%s: %#x in %s at/after its first changed instruction (%#x); mapped by offset' %
                                    (where, a, f, self.first_diff[f]))
@@ -281,11 +348,13 @@ def main():
     ap.add_argument('old'); ap.add_argument('new')
     ap.add_argument('--objdump', default=OBJ)
     ap.add_argument('--dry-run', action='store_true')
+    ap.add_argument('--intervals', metavar='FILE', help='per-function shift intervals for reshaped functions')
     ap.add_argument('files', nargs='*')
     a = ap.parse_args()
     OBJ = a.objdump
-    rb = Rebase(a.old, a.new)
+    rb = Rebase(a.old, a.new, parse_intervals(a.intervals) if a.intervals else None)
     print('functions whose instruction stream changed:', sorted(rb.changed))
+    if rb.imm_only: print('functions whose immediates only changed:', sorted(rb.imm_only))
     files = a.files or [f for f in sorted(glob.glob('Xv6/*.lean'))
                         if os.path.basename(f) not in ('KernelImage.lean', 'KernelTree.lean', 'KernelText.lean')]
     changed = []
@@ -294,7 +363,7 @@ def main():
     print('rewritten %d files' % len(changed))
     for r in rb.report: print('REPORT', r)
 
-if __name__ == '__main__' and not (len(sys.argv) > 1 and sys.argv[1] in ('--fixup', '--symbolize', '--bridge')):
+if __name__ == '__main__' and not (len(sys.argv) > 1 and sys.argv[1] in ('--fixup', '--symbolize', '--bridge', '--symbolic')):
     main()
 
 # ---------------------------------------------------------------------------
@@ -429,10 +498,11 @@ def fixup_main():
     ap.add_argument('old'); ap.add_argument('new')
     ap.add_argument('--objdump', default=OBJ)
     ap.add_argument('--dry-run', action='store_true')
+    ap.add_argument('--intervals', metavar='FILE', help='per-function shift intervals for reshaped functions')
     ap.add_argument('files', nargs='*')
     a = ap.parse_args(sys.argv[2:])
     OBJ = a.objdump
-    rb = Rebase(a.old, a.new)
+    rb = Rebase(a.old, a.new, parse_intervals(a.intervals) if a.intervals else None)
     files = a.files or [f for f in sorted(glob.glob('Xv6/*.lean'))
                         if os.path.basename(f) not in ('KernelImage.lean', 'KernelTree.lean', 'KernelText.lean', 'KernelData.lean')]
     changed = [f for f in files if fixup_file(rb, f, a.dry_run)]
@@ -711,3 +781,340 @@ def bridge_main():
 
 if __name__ == '__main__' and len(sys.argv) > 1 and sys.argv[1] == '--bridge':
     bridge_main()
+
+# ---------------------------------------------------------------------------
+# The symbolic pass: the tree after --symbolize names text pcs and data
+# addresses relative to a symbol, and the literal pass cannot see those.
+# `--symbolic OLD_ELF NEW_ELF` rewrites, symbol-relative:
+#
+# * the offset of `KA.«s» + N#64`, `KA.«s» + (N#64 ...`, `<alias> + N#64`
+#   (`def xAddr : BitVec 64 := KA.«s»`), `<palias> N#64` / `<palias> (N#64`
+#   (`abbrev p (o : BitVec 64) : BitVec 64 := KA.«s» + o`) and the Nat
+#   `KernelSyms.«s» + N`:
+#   - inside text function s (its extent from the disassembly, so size-0
+#     assembler labels such as kernelvec count): by --intervals, else kept;
+#   - inside the process table (--proc-array SYM:COUNT, default proc:64): by
+#     slot and field, the stride being each image's table size / COUNT and the
+#     field map --proc-fields (`+START:DELTA,...`, the --intervals syntax);
+#   - inside any other data object: kept;
+#   - outside s, a text symbol, equal to `o + sext(U<<12)` for an old auipc at
+#     +o of s: the auipc intermediate, re-derived from the new auipc;
+#   - otherwise (folded jal/auipc targets): the absolute old address mapped as
+#     the literal pass maps it, re-expressed relative to s's new start;
+# * the immediate right after a text pc (`pc) true|false IMM`, `pc) IMM#w`,
+#   `pc + BitVec.signExtend 64 IMM#w`, and the I part of an auipc fold
+#   `pc + (BitVec.signExtend 64 (U#20 ++ 0#12) + I)`), but only where the
+#   literal equals the OLD instruction's immediate at the old pc and the
+#   mnemonic is unchanged (anything else is reported, not guessed);
+# * `theorem X_br_<hex>` names whose hex is the first literal on their line:
+#   renamed after the new literal, everywhere (collisions reported).
+#
+# Lines folding two literals onto one symbol (`KA.«f» + A#64 + B#64`, B not a
+# 2/4 step) are reported and left.  The pass is one-shot like every address
+# sweep: run it once per bump (on an unchanged image it proposes nothing).
+
+M64 = (1 << 64) - 1
+SNUM = r'(0x[0-9a-fA-F]+|\d+)'
+SDBL_RE = re.compile(r'KA\.«[^»]+» \+ \S+#64 \+ (?!4#64|2#64)(?:0x[0-9a-f]+|\d+)#64')
+SIMM_AFTER = re.compile(r'\)?\s+(?:true|false)\s+\(?(?:BitVec\.ofNat (\d+) (\d+)|(-?)(0x[0-9a-fA-F]+|\d+)#(\d+))')
+SIMM_POS = re.compile(r'\)?\s+\(?(-?)(0x[0-9a-fA-F]+|\d+)#(12|13|20|21)(?![\w#])')
+SIMM_SE = re.compile(r'\)?\s*\+\s*\(?BitVec\.signExtend 64 \(?(-?)(0x[0-9a-fA-F]+|\d+)#(\d+)')
+SP1_I = re.compile(r'#20\s*\+\+\s*(?:0#12|\(0#12 : BitVec 12\))\)\s*\)?\s*\+\s*(?:BitVec\.signExtend 64 \(?(-?)(0x[0-9a-fA-F]+|\d+)#12|(-?)(0x[0-9a-fA-F]+|\d+)#64)')
+SP1_TAIL = re.compile(r'#20\s*\+\+\s*(?:0#12|\(0#12 : BitVec 12\))\)\s*\)?\s*\+\s*$')
+SP1_NEXT = re.compile(r'\s*(?:BitVec\.signExtend 64 \(?(-?)(0x[0-9a-fA-F]+|\d+)#12|(-?)(0x[0-9a-fA-F]+|\d+)#64)')
+SKS_RE = re.compile(r'KernelSyms\.«([^»]+)» \+ ' + SNUM + r'(?![#\w])')
+SBR_RE = re.compile(r'\s*(?:private\s+)?theorem\s+(\S+_br_)([0-9a-f]+)\s*:')
+
+def sxu(u):
+    v = u << 12
+    return v - (1 << 32) if v & 0x80000000 else v
+
+def imm_w(ins, pc, W):
+    """the W-bit immediate field of instruction `ins` = (mn, ops, cm) at pc, or None"""
+    mn, ops = ins[0], ins[1]
+    if W in (13, 21):
+        m = re.search(r'([0-9a-f]+) <', ops)
+        return ((int(m.group(1), 16) - pc) & ((1 << W) - 1)) if m else None
+    if W == 20:
+        return (int(ops.split(',')[1].split()[0], 16) & 0xfffff) if mn in ('auipc', 'lui') else None
+    if mn in ('jal', 'j', 'auipc', 'lui', 'ret') or mn.startswith('b'): return None
+    if mn in ('mv', 'nop', 'sext.w'): return 0
+    if mn == 'seqz': return 1
+    if mn == 'not': return (1 << W) - 1
+    for r, base in ((r'(-?\d+)\(', 10), (r',(-?\d+)$', 10), (r',(0x[0-9a-f]+)$', 16)):
+        m = re.search(r, ops)
+        if m: return int(m.group(1), base) & ((1 << W) - 1)
+    return None
+
+def fmt_like(tok, v):
+    """v in the spelling of literal token `tok` (hex/decimal, case)"""
+    if not tok.startswith('0x'): return str(v)
+    return ('0x%X' if any(c in 'ABCDEF' for c in tok[2:]) else '0x%x') % v
+
+class Symbolic:
+    def __init__(self, rb, proc_array='proc:64', proc_fields=None, got=(None, None)):
+        self.rb = rb
+        self.got = got   # the .got section (vma, size) of each image: its slots move with it
+        self.report = rb.report
+        self.stats = {'offsets': 0, 'nat_offsets': 0, 'immediates': 0, 'intermediates': 0, 'renames': 0}
+        self.ln = {}
+        for k in list(rb.so) + list(rb.sn) + list(rb.fo) + list(rb.fn):
+            self.ln.setdefault(k.replace('.', '_').replace('$', '_'), k)
+        # text extents from the disassembly (size-0 labels included)
+        self.ext = {f: (ins[-1][0] - s + 4 if ins else 0) for f, (s, ins) in rb.fo.items()}
+        self.auipcs = {f: [(a - s, int(ops.split(',')[1].split()[0], 16) & 0xfffff)
+                           for a, mn, ops, cm in ins if mn == 'auipc'] for f, (s, ins) in rb.fo.items()}
+        self.proc = None
+        if proc_array:
+            sym, cnt = proc_array.rsplit(':', 1); cnt = int(cnt, 0)
+            if sym in rb.so and sym in rb.sn and rb.so[sym][1] and rb.sn[sym][1]:
+                so_, sn_ = rb.so[sym][1], rb.sn[sym][1]
+                if so_ % cnt or sn_ % cnt:
+                    self.report.append('--proc-array %s: size %#x / %#x not a multiple of %d' % (sym, so_, sn_, cnt))
+                else:
+                    fields = []
+                    if proc_fields:
+                        for item in proc_fields.split(','):
+                            st, d = item.strip().rsplit(':', 1)
+                            fields.append((int(st.strip().lstrip('+'), 0), int(d.strip(), 0)))
+                    self.proc = (sym, so_ // cnt, sn_ // cnt, sorted(fields))
+                    if so_ != sn_ and not fields:
+                        self.report.append('--proc-array %s: stride %d -> %d with no --proc-fields: fields kept' %
+                                           (sym, so_ // cnt, sn_ // cnt))
+        self.pending = []
+        self.renames = {}
+
+    def text_newoff(self, f, o, where):
+        rb = self.rb
+        n = rb.newoff(f, o)
+        if n is None:
+            self.report.append('%s: %s+%#x inside a replaced interval, left' % (where, f, o)); return None
+        if f not in rb.iv and f in rb.changed and rb.fo[f][0] + o >= rb.first_diff[f]:
+            self.report.append('%s: %s+%#x at/after its first changed instruction (%#x); mapped by offset' %
+                               (where, f, o, rb.first_diff[f]))
+        return n
+
+    def remap(self, lf, off, where):
+        """(new offset, (old, new) offsets if a pc inside text function f else None, f)"""
+        rb = self.rb
+        f = self.ln.get(lf, lf)
+        if f in rb.fo:
+            if f not in rb.fn:
+                self.report.append('%s: text symbol %s is gone' % (where, f)); return off, None, f
+            if 0 <= off <= self.ext[f]:
+                n = self.text_newoff(f, off, where)
+                return (off, None, f) if n is None else (n, (off, n), f)
+        elif f in rb.so and f in rb.sn:
+            s, sz, sec = rb.so[f]
+            if self.proc and f == self.proc[0] and 0 <= off <= sz:
+                _, os_, ns_, fields = self.proc
+                slot, fld = divmod(off, os_)
+                d = 0
+                for st, dd in fields:
+                    if fld >= st: d = dd
+                return slot * ns_ + fld + d, None, f
+            if (sec in ('.data', '.bss', '.rodata') and 0 <= off <= sz) or (sec == '.bss' and sz == 0):
+                return off, None, f
+        elif f == '_GLOBAL_OFFSET_TABLE_':
+            return off, None, f
+        else:
+            self.report.append('%s: %s is not a text/data/bss/rodata symbol of both images: +%#x kept' % (where, f, off))
+            return off, None, f
+        if f in rb.fo:
+            for o, u in self.auipcs[f]:
+                if (o + sxu(u)) & M64 == off:
+                    n = self.text_newoff(f, o, where)
+                    ni = rb.new_ins.get(rb.fn[f][0] + n) if n is not None else None
+                    if ni is None or ni[0] != 'auipc':
+                        self.report.append('%s: %s+%#x: auipc intermediate at +%#x with no new auipc' % (where, f, off, o))
+                        return off, None, f
+                    v = (n + sxu(int(ni[1].split(',')[1].split()[0], 16) & 0xfffff)) & M64
+                    if v != off: self.stats['intermediates'] += 1
+                    return v, None, f
+        so_ = rb.fo[f][0] if f in rb.fo else rb.so[f][0]
+        sn_ = rb.fn[f][0] if f in rb.fn else rb.sn[f][0]
+        a = (so_ + off) & M64
+        go, gn = self.got
+        if go and gn and go[0] <= a < go[0] + go[1]:
+            b = a - go[0] + gn[0]
+        else:
+            b = rb.map_addr(a, where)
+        if b is None: return off, None, f
+        return (b - sn_) & M64, None, f
+
+    def ins_pair(self, f, oo, no):
+        rb = self.rb
+        pco, pcn = rb.fo[f][0] + oo, rb.fn[f][0] + no
+        o, n = rb.old_ins.get(pco), rb.new_ins.get(pcn)
+        return (pco, o[1:] if o else None, pcn, n)
+
+    def fix_i(self, text, m2, f, oo, no, where):
+        """the I part of an auipc fold: the immediate of the instruction after the auipc"""
+        pco, o2, pcn, n2 = self.ins_pair(f, oo + 4, no + 4)
+        if not o2 or not n2: return text
+        io2, in2 = imm_w(o2, pco, 12), imm_w(n2, pcn, 12)
+        if io2 is None or in2 is None: return text
+        if m2.group(2) is not None: ng, dg, a, b, sty = m2.group(1), m2.group(2), m2.start(1), m2.end(2), 12
+        else: ng, dg, a, b, sty = m2.group(3), m2.group(4), m2.start(3), m2.end(4), 64
+        dv = int(dg, 0)
+        if ((-dv if ng else dv) & 0xfff) != io2:
+            self.report.append('%s: auipc fold I part at %s+%#x is not the old immediate %d' % (where, f, no + 4, io2))
+            return text
+        if in2 == io2: return text
+        sv = in2 - 4096 if in2 >= 2048 else in2
+        tok = fmt_like(dg, in2) if (sty == 12 and not ng) else ('-' if sv < 0 else '') + fmt_like(dg, abs(sv))
+        self.stats['immediates'] += 1
+        return text[:a] + tok + text[b:]
+
+    def fix_imm_at(self, line, pos, f, oo, no, where):
+        pco, o, pcn, n = self.ins_pair(f, oo, no)
+        if not o or not n: return line
+        kind = m = None
+        for k, R in (('after', SIMM_AFTER), ('se', SIMM_SE), ('pos', SIMM_POS)):
+            m = R.match(line, pos)
+            if m: kind = k; break
+        if not kind: return line
+        if kind == 'after' and m.group(1):
+            W, digits, neg, s0, e0 = int(m.group(1)), m.group(2), '', m.start(2), m.end(2)
+        elif kind == 'after':
+            neg, digits, W, s0, e0 = m.group(3), m.group(4), int(m.group(5)), m.start(3), m.end(4)
+        else:
+            neg, digits, W, s0, e0 = m.group(1), m.group(2), int(m.group(3)), m.start(1), m.end(2)
+        if W not in (6, 12, 13, 20, 21): return line
+        if o[0] != n[0]:
+            self.report.append('%s: %s+%#x mnemonic changed %s -> %s' % (where, f, no, o[0], n[0])); return line
+        v = int(digits, 16) if digits.startswith('0x') else int(digits)
+        v = (-v if neg else v) & ((1 << W) - 1)
+        io, inew = imm_w(o, pco, W), imm_w(n, pcn, W)
+        if io is None or inew is None: return line
+        if v != io:
+            if v != inew and kind != 'pos':
+                self.report.append('%s: %s+%#x immediate %d#%d is neither the old %d nor the new %d' %
+                                   (where, f, no, v, W, io, inew))
+            return line
+        out = line
+        if inew != io:
+            if neg:
+                sv = inew - (1 << W) if inew >= (1 << (W - 1)) else inew
+                tok = ('-' if sv < 0 else '') + fmt_like(digits, abs(sv))
+            else:
+                tok = fmt_like(digits, inew)
+            out = line[:s0] + tok + line[e0:]
+            self.stats['immediates'] += 1
+        if W == 20 and o[0] == 'auipc' and kind == 'se':
+            e_u = e0 + len(out) - len(line)
+            m2 = SP1_I.match(out, e_u)
+            if m2: out = self.fix_i(out, m2, f, oo, no, where)
+            elif SP1_TAIL.match(out, e_u): self.pending.append((f, oo, no))
+            else: self.report.append('%s: auipc fold at %s+%#x: I part not recognised' % (where, f, no))
+        return out
+
+    def patterns(self, srcs):
+        alias, palias = {}, {}
+        for src in srcs:
+            for m in re.finditer(r'^(?:noncomputable )?(?:def|abbrev) (\S+) : BitVec 64 := \(?KA\.«([^»]+)»\)?\s*$', src, re.M):
+                alias.setdefault(m.group(1), set()).add(m.group(2))
+            for m in re.finditer(r'^(?:noncomputable )?(?:def|abbrev) (\S+) \((\w+) : BitVec 64\) : BitVec 64 := KA\.«([^»]+)» \+ (\w+)\s*$', src, re.M):
+                if m.group(2) == m.group(4): palias.setdefault(m.group(1), set()).add(m.group(3))
+        alias = {k: next(iter(v)) for k, v in alias.items() if len(v) == 1}
+        palias = {k: next(iter(v)) for k, v in palias.items() if len(v) == 1}
+        res = [(re.compile(r'KA\.«([^»]+)» \+ ' + SNUM + r'#64'), lambda m: m.group(1), 'ka'),
+               (re.compile(r'KA\.«([^»]+)» \+ \(' + SNUM + r'#64'), lambda m: m.group(1), 'kap')]
+        alt = lambda d: '|'.join(sorted(map(re.escape, d), key=len, reverse=True))
+        if alias:
+            res.append((re.compile(r'(?<![\w.\'«])(' + alt(alias) + r') \+ ' + SNUM + r'#64'), lambda m: alias[m.group(1)], 'alias'))
+        if palias:
+            res.append((re.compile(r'(?<![\w.\'])(' + alt(palias) + r') \(?' + SNUM + r'#64'), lambda m: palias[m.group(1)], 'palias'))
+        return res
+
+    def process(self, path, src, pats):
+        lines = src.split('\n')
+        for i, line in enumerate(lines):
+            where = '%s:%d' % (path, i + 1)
+            if self.pending:
+                f, oo, no = self.pending.pop()
+                m2 = SP1_NEXT.match(line)
+                if m2: line = self.fix_i(line, m2, f, oo, no, where)
+                else: self.report.append('%s: the auipc fold\'s I part not found on this line' % where)
+            if SDBL_RE.search(line) and not line.lstrip().startswith('--'):
+                self.report.append('%s: double-literal fold, left for hand' % where); lines[i] = line; continue
+            occ = []
+            for R, symf, kind in pats:
+                for m in R.finditer(line): occ.append((m.start(2), m.end(2), m.end(), symf(m), m.group(2), kind))
+            occ.sort(key=lambda x: x[0])
+            for s2, e2, me, f, tok, kind in reversed(occ):
+                off = int(tok, 16) if tok.startswith('0x') else int(tok)
+                n, pc, f2 = self.remap(f, off, where)
+                if pc and kind != 'kap': line = self.fix_imm_at(line, me, f2, pc[0], pc[1], where)
+                if n != off:
+                    line = line[:s2] + fmt_like(tok, n) + line[e2:]; self.stats['offsets'] += 1
+            for m in reversed(list(SKS_RE.finditer(line))):
+                tok = m.group(2)
+                off = int(tok, 16) if tok.startswith('0x') else int(tok)
+                n, _, _ = self.remap(m.group(1), off, where)
+                if n != off:
+                    line = line[:m.start(2)] + fmt_like(tok, n) + line[m.end(2):]; self.stats['nat_offsets'] += 1
+            mt = SBR_RE.match(lines[i])
+            if mt and occ:
+                R0 = pats[0][0]
+                mo, mn = R0.search(lines[i]), R0.search(line)
+                if mo and mn:
+                    oo, nn = int(mo.group(2), 0), int(mn.group(2), 0)
+                    if mt.group(2) == '%x' % oo and oo != nn:
+                        self.renames[mt.group(1) + mt.group(2)] = mt.group(1) + '%x' % nn
+            lines[i] = line
+        return '\n'.join(lines)
+
+    def run(self, files):
+        srcs = {}
+        for p in files:
+            with open(p) as fh: srcs[p] = fh.read()
+        pats = self.patterns(srcs.values())
+        out = {p: self.process(p, s, pats) for p, s in srcs.items()}
+        if self.renames:
+            names = set()
+            for t in out.values(): names.update(re.findall(r'theorem\s+(\S+)', t))
+            for k, v in sorted(self.renames.items()):
+                if v in names and v not in self.renames: self.report.append('RENAME COLLISION %s -> %s' % (k, v))
+            pat = re.compile(r'(?<![\w.\'])(' + '|'.join(re.escape(k) for k in sorted(self.renames, key=len, reverse=True)) + r')(?![\w\'])')
+            out = {p: pat.sub(lambda m: self.renames[m.group(1)], t) for p, t in out.items()}
+            self.stats['renames'] = len(self.renames)
+        return srcs, out
+
+def section_range(elf, sec):
+    """(vma, size) of section `sec`, or None"""
+    for l in run([OBJ, '-h', elf]).splitlines():
+        p = l.split()
+        if len(p) > 3 and p[1] == sec: return int(p[3], 16), int(p[2], 16)
+    return None
+
+def symbolic_main():
+    global OBJ
+    ap = argparse.ArgumentParser(prog='rebase_kernel.py --symbolic')
+    ap.add_argument('old'); ap.add_argument('new')
+    ap.add_argument('--objdump', default=OBJ)
+    ap.add_argument('--dry-run', action='store_true')
+    ap.add_argument('--intervals', metavar='FILE', help='per-function shift intervals for reshaped functions')
+    ap.add_argument('--proc-array', default='proc:64', metavar='SYM:COUNT',
+                    help='the table mapped by slot and field (stride = size / COUNT in each image); "" for none')
+    ap.add_argument('--proc-fields', metavar='+START:DELTA,...', help='field-offset shifts inside one slot')
+    ap.add_argument('files', nargs='*')
+    a = ap.parse_args(sys.argv[2:])
+    OBJ = a.objdump
+    rb = Rebase(a.old, a.new, parse_intervals(a.intervals) if a.intervals else None)
+    print('functions whose instruction stream changed:', sorted(rb.changed))
+    if rb.imm_only: print('functions whose immediates only changed:', sorted(rb.imm_only))
+    files = a.files or [f for f in sorted(glob.glob('Xv6/*.lean'))
+                        if os.path.basename(f) not in ('KernelImage.lean', 'KernelTree.lean', 'KernelText.lean', 'KernelData.lean')]
+    sp = Symbolic(rb, a.proc_array or None, a.proc_fields, (section_range(a.old, '.got'), section_range(a.new, '.got')))
+    srcs, out = sp.run(files)
+    changed = [p for p in files if out[p] != srcs[p]]
+    if not a.dry_run:
+        for p in changed:
+            with open(p, 'w') as fh: fh.write(out[p])
+    print('symbolic: %d files %s; %s' % (len(changed), 'would change' if a.dry_run else 'rewritten',
+                                         ', '.join('%s %d' % kv for kv in sp.stats.items())))
+    for r in rb.report: print('REPORT', r)
+
+if __name__ == '__main__' and len(sys.argv) > 1 and sys.argv[1] == '--symbolic':
+    symbolic_main()

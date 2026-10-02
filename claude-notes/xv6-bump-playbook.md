@@ -254,6 +254,8 @@ function's own body changed. Their `.rodata` message strings permute with them.
 
 ## 3. The relayout (the cheap 90%)
 
+On the Lean tree the relayout is `tools/rebase_kernel.py` (literal pass, `--fixup`, `--symbolic`, all with one `--intervals` file for the reshaped functions): `notes/design/kernel-rebase-pipeline.md`.
+
 | | `relayout_map.py` | `relayout_shift.py` |
 |---|---|---|
 | compares | same offset, old vs new | difflib-aligned streams |
