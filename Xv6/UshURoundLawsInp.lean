@@ -25,8 +25,8 @@ CONE (UShURoundLaws S0-S1, reached): `ustep_pipe`, `uwr_blk_dollar_at`,
    lemma `<name>0 : F ⊢ R` into the (persistent) reading `R`, and the
    reading itself is `persistent_entails_left` of the core (`uinp_of0`), so
    no credential is ever rebuilt; `uWbf_inp` goes through `uWbl_inp0`
-   rather than `UShLineHold.ush_wb_inp_hold` (whose Lean twin
-   `ushWbInpHold` is not needed).  Same statements.
+   rather than `UShLineHold.ush_wb_inp_hold` (not needed, so
+   not ported).  Same statements.
 2. `ulpr_inp` is split by index (`ulpr_inp_line`, `ulpr_inp`) and reads the
    record's families at `unionParamsAt ug s0` / `unionXAt ug s0` directly
    (Rocq's `cbn [gwc_lpr ...]`); the X arm is unfolded to
@@ -37,7 +37,7 @@ CONE (UShURoundLaws S0-S1, reached): `ustep_pipe`, `uwr_blk_dollar_at`,
    `uptermShape ug`/`updoneShape ug`.
 -/
 import Xv6.UshURoundShapes
-import Xv6.UshLineHold
+import Xv6.UshLineDefs
 
 namespace Xv6
 

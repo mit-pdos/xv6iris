@@ -187,7 +187,6 @@ import MachCSL.UCycle
 import MachCSL.UWait
 import MachCSL.UTick
 import MachCSL.UCycleSwp
-import MachCSL.UCycleExec
 import MachCSL.ArchReset
 import MachCSL.BootRun
 import MachCSL.BootPeel
@@ -211,7 +210,6 @@ import MachCSL.UMemPhys
 import MachCSL.UMemRam
 import MachCSL.UMemAccess
 import MachCSL.UMemStore
-import MachCSL.UMemAddr
 import MachCSL.BvEnumSatp
 import MachCSL.UMemMisPlan
 import MachCSL.UMemMisBytes

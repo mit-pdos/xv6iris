@@ -27,16 +27,15 @@ Rocq's header, point for point:
    their statements are over `UkRun.udep`/`udepw`/`udepw_law`/`uk_names`,
    the wave-9 program tier (D24), which does not exist in Lean; they return
    with it.  `filewrite_in_of_sup` is `FsAbsInvFire.fsabsFilewriteIn`.
-3. **`uslot_mint` is not gated** (UexecCond deviation 1: the verified-program
-   gate chain is empty until wave 9), and its all-parked key narrowing
-   (lane OFF-HAND-2) is vacuous here (Lean's generic fires need no offset
-   supplier, FsAbsInvFire deviation 2).
+3. **`uslot_mint` is not gated** (the verified-program gate chain is empty
+   until wave 9), and its all-parked key narrowing (lane OFF-HAND-2) is
+   vacuous here (Lean's generic fires need no offset supplier, FsAbsInvFire
+   deviation 2).
 4. `initBootBundle_of_mint` (Rocq `SystemAdequacy.init_boot_of_triv` +
    `InitBoot.init_boot_bundle_triv` at this mint) lives here, beside the
    mint it composes, for the generic application's `Hinit_boot`.
 -/
 import Xv6.UexecExecInst
-import Xv6.UexecCond
 
 namespace Xv6
 

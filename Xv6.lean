@@ -551,7 +551,6 @@ import Xv6.ProofEndOp
 import Xv6.LinkEndOp
 import Xv6.ArrCursor
 import Xv6.ByteCursor
-import Xv6.ByteBuf
 import Xv6.FsGeom
 import Xv6.BlockWords
 import Xv6.BlkmapDefs
@@ -571,10 +570,8 @@ import Xv6.FsCfgDefs
 import Xv6.FsStateDefs
 import Xv6.FsBytesGamma
 import Xv6.SbPark
-import Xv6.WriteiBudget
 import Xv6.FsStateBitmap
 import Xv6.BitmapInv
-import Xv6.WriteiBudgetBitmap
 import Xv6.FsNode
 import Xv6.FsStateInode
 import Xv6.InodeInv
@@ -841,7 +838,6 @@ import Xv6.FsReady
 import Xv6.PieceFam
 import Xv6.UserOff
 import Xv6.FsAbsDelta
-import Xv6.FsAbsState
 import Xv6.SysReadDefs
 import Xv6.SysWriteDefs
 import Xv6.FsAbsOpenFire
@@ -871,7 +867,6 @@ import Xv6.ProofFilestat
 import Xv6.LinkFilestat
 import Xv6.FsAbsWalk
 import Xv6.FsAbsEra
-import Xv6.FsAbsEraState
 import Xv6.FsAbsCreateFire
 import Xv6.FsAbsCreateNm
 import Xv6.SysMknodDefs
@@ -881,7 +876,6 @@ import Xv6.FsAbsUnlinkFire
 import Xv6.SysLinkDefs
 import Xv6.FsAbsLinkFire
 import Xv6.SysUnlinkBudget
-import Xv6.SysLinkBudget
 import Xv6.SysOpenDefs
 import Xv6.SysOpenKept
 import Xv6.SysOpenBits
@@ -907,8 +901,6 @@ import Xv6.IregClaimPlain
 import Xv6.CreateDefs
 import Xv6.CreateParts
 import Xv6.CreateFreshTy
-import Xv6.CreateBudget
-import Xv6.SysOpenBudget
 import Xv6.SpecNamexEra
 import Xv6.SpecNparEra
 import Xv6.SpecNameiEra
@@ -1113,7 +1105,6 @@ import Xv6.UexecRet
 import Xv6.UexecRound
 import Xv6.UhistDefs
 import Xv6.UexecApply
-import Xv6.UexecCond
 import Xv6.ProofUexecWp
 import Xv6.BootConfig
 import Xv6.BootHart
@@ -1177,7 +1168,6 @@ import Xv6.SyscallTable
 import Xv6.SyscallRet
 import Xv6.UtResFits
 import Xv6.SpecUsertrap
-import Xv6.UtRoundQuiet
 import Xv6.SyscallArmsPath
 import Xv6.SyscallArmsChroot
 import Xv6.SyscallArmsExec
@@ -1375,7 +1365,6 @@ import Xv6.GrepFilt
 import Xv6.PipesDisc
 import Xv6.PipesUline
 import Xv6.PipesView
-import Xv6.PipesDiscDec
 import Xv6.PipeBothNPure
 import Xv6.PipesFire
 import Xv6.UnionDisc
@@ -1620,7 +1609,6 @@ import Xv6.GrepPrintfLink
 import Xv6.UkTree
 import Xv6.UkHandler
 import Xv6.UkFreeHandler
-import Xv6.UkTreeRead
 import Xv6.UkTreeEntry
 import Xv6.ExecArgs
 import Xv6.ExecRun
@@ -1752,7 +1740,6 @@ import Xv6.UshRedirBody
 import Xv6.UshForkTwin
 import Xv6.UshCatForkTwin
 import Xv6.UshDiagLeaf
-import Xv6.UshDiagFinal
 import Xv6.UshSeam
 import Xv6.UshExecEnvRun
 import Xv6.UshForkChildEcho
@@ -1809,7 +1796,6 @@ import Xv6.FileOutEra
 import Xv6.FileOutClaim
 import Xv6.FileLinksLine
 import Xv6.FileLinkGen
-import Xv6.FileLinks
 import Xv6.FileOpenDeed
 import Xv6.FileOpenFams
 import Xv6.FileOpenClaim
@@ -1907,11 +1893,9 @@ import Xv6.UkUnionEntriesEcho
 import Xv6.UkUnionEntriesFile
 import Xv6.UshLineDefs
 import Xv6.UshLineLease
-import Xv6.UshLineHold
 import Xv6.UshLineRead
 import Xv6.UshOut
 import Xv6.UshPromptLaw
-import Xv6.UshPanicHold
 import Xv6.UshPanicStub
 import Xv6.UshPanicByte
 import Xv6.UshPanicPrompt

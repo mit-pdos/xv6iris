@@ -17,7 +17,7 @@ spell their section equation with:
   `escKey` (`AppFileEscrow`), `filePred` (`AppFileClaim`), `fileConsCred`
   (`AppFileCons`, its console flag an `Option Nat`), `fileCur`
   (`FileWriteCur`), `fecl` (`FileOutClaim`), `fileParams` (`FileLinkGen`),
-  `fileLinks` (`FileLinks`), `fescRes`, `fileUnarmFam`, `fileOpenPay`,
+  `fescRes`, `fileUnarmFam`, `fileOpenPay`,
   `fileOpenFdK` (`FileOpenFams`);
 * the lemmas `fdq_split`, `fdq_join` (`FileOpenDeed`), `fileSup_of_taint`
   (`AppFileSteps`), `fileEscrowPark` (`AppFileEra`; it takes `fown r s`, =
@@ -46,7 +46,6 @@ import Xv6.AppFileCons
 import Xv6.FileOpenDeed
 import Xv6.FileOpenFams
 import Xv6.FileWriteCur
-import Xv6.FileLinks
 import Xv6.FileLinkGen
 
 namespace Xv6
