@@ -126,9 +126,6 @@ def itRecLUpto (W : List (BitVec 32)) (Lw : Nat → List (BitVec 8)) (L : BlockM
 def itRecL (W : List (BitVec 32)) (Lw : Nat → List (BitVec 8)) (L : BlockMap) : BlockMap :=
   itRecLUpto W Lw L W.length
 
-theorem itRecLUpto_zero (W : List (BitVec 32)) (Lw : Nat → List (BitVec 8)) (L : BlockMap) :
-    itRecLUpto W Lw L 0 = L := rfl
-
 theorem itRecLUpto_succ (W : List (BitVec 32)) (Lw : Nat → List (BitVec 8)) (L : BlockMap)
     (t : Nat) (w : BitVec 32) (hw : W[t]? = some w) :
     itRecLUpto W Lw L (t + 1) = PartialMap.insert (itRecLUpto W Lw L t) w.toNat (Lw t) := by

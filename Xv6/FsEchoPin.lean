@@ -42,9 +42,6 @@ def echoPath : List Fname := [fnameEcho]
 /-- The tracked raw (Rocq `echo_bytes`). -/
 def echoBytes : List (BitVec 8) := Xv6.User.Echo.elf
 
-/-- THE TIE TO THE ELF LAYER (Rocq `echo_bytes_elf`). -/
-theorem echoBytes_elf : echoBytes = Xv6.User.Echo.elf := rfl
-
 /-- Rocq `era0_dur_echo`. -/
 theorem era0DurEcho : durNode era0D ECHO_INO (imgNode fsimgP fsimgSb ECHO_INO) :=
   imgDurNode fsImgDisk XV6_DISK_BYTES fsimgSb fsimgNib fsimgCov ECHO_INO fsimgImageWf (by decide)

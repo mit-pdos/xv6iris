@@ -95,14 +95,6 @@ theorem ustg_len (pw : List (List (BitVec 8))) (fs : List Filt) (len : Nat) (gb 
     (uSTG pw fs len gb sa).length = fs.length + 1 := by
   simp [uSTG, uRT, ushqRtoksWs_length]
 
-/-- `REST` is the tail of the stages below the first filter's. -/
-theorem uSTG_cons (pw : List (List (BitVec 8))) (F : Filt) (fs' : List Filt) (len : Nat) (gb : Nat → BitVec 8)
-    (sa : Nat) :
-    uSTG pw (F :: fs') len gb sa =
-      ushArgs sa (uGS pw (F :: fs') len gb) (wlToks pw)
-        :: ushArgs sa (uGS pw (F :: fs') len gb) (ushqRebase (pc0 pw) (wlToks (filtWords F)))
-        :: uREST pw F fs' len gb sa := rfl
-
 /-- **Rocq `ustg_fs_rb`**: ...READ AS THE NODE's STAGE ARGV (the node's
 `Hstc`, cut G8): stage `k`'s words at its offset in the line, the stage
 program's argv, at ANY admissible stage list. -/

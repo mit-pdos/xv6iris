@@ -440,11 +440,6 @@ def procPubRest (pa : BitVec 64) (killed xstate pid : BitVec 32) : IProp GF := i
   wordPointsTo (pPid pa) 4 pidPub pid ∗
   killPaidAt (MachFixedGS.killCred (hlc := hlc) (GF := GF)) pid killed
 
-theorem procPub_eq (pa : BitVec 64) (st : BitVec 32) (chan : BitVec 64) (kl xs pid : BitVec 32) :
-    procPub (GF := GF) pa st chan kl xs pid =
-      iprop(wordPointsTo (pState pa) 4 (DFrac.own 1) st ∗
-        wordPointsTo (pChan pa) 8 (DFrac.own 1) chan ∗ procPubRest pa kl xs pid) := rfl
-
 end PubRest
 
 /-! ## The dormant block, minus its context cells (Rocq `proc_dormant_noctx`)
@@ -511,9 +506,6 @@ theorem ctxCells_to_contextCells (pa : BitVec 64) (ws : List (BitVec 64)) :
 the block's resources. -/
 theorem procFieldsNoctx_pvLazy (pa : BitVec 64) (dq : DFrac) (V : ProcPriv) (b : Bool) :
     procFieldsNoctx (GF := GF) pa dq { V with pvLazy := b } = procFieldsNoctx pa dq V := rfl
-
-theorem procFields_pvLazy (pa : BitVec 64) (dq : DFrac) (V : ProcPriv) (b : Bool) :
-    procFields (GF := GF) pa dq { V with pvLazy := b } = procFields pa dq V := rfl
 
 theorem dormantSpace_pvLazy (st : BitVec 32) (V : ProcPriv) (b : Bool) (pid : BitVec 32) :
     dormantSpace (GF := GF) st { V with pvLazy := b } pid = dormantSpace st V pid := rfl

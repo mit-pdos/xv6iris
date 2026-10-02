@@ -111,8 +111,6 @@ abbrev ushmBase : Nat := User.Sh.Sym.«base»
 /-- Every register not in `ws` kept its value from `m` to `m'`. -/
 def ushmKeep (ws : List (BitVec 5)) (m m' : RegMap) : Prop := ∀ r, r ∉ ws → m'.get r = m.get r
 
-theorem ushmKeep_refl (ws : List (BitVec 5)) (m : RegMap) : ushmKeep ws m m := fun _ _ => rfl
-
 theorem ushmKeep_wr (m : RegMap) (rd : BitVec 5) (v : BitVec 64) : ushmKeep [rd] m (ukWr m rd v) :=
   fun r hr => ukWr_get_other _ _ _ _ (fun he => hr (he ▸ List.mem_singleton_self r))
 

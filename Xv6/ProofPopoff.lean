@@ -65,11 +65,9 @@ def _root_.MachCSL.KCtx.popOffZ (k : KCtx) : KCtx :=
 @[simp] theorem KCtx.popOffZ_sie (k : KCtx) : k.popOffZ.sie = k.sie := rfl
 @[simp] theorem KCtx.popOffZ_avail (k : KCtx) : k.popOffZ.avail = k.avail := rfl
 @[simp] theorem KCtx.popOffZ_noff (k : KCtx) : k.popOffZ.noff = 0 := rfl
-@[simp] theorem KCtx.popOffZ_intena (k : KCtx) : k.popOffZ.intena = false := rfl
 @[simp] theorem KCtx.popOffZ_locks (k : KCtx) : k.popOffZ.locks = k.locks := rfl
 @[simp] theorem KCtx.popOffZ_tier (k : KCtx) : k.popOffZ.tier = k.tier := rfl
 @[simp] theorem KCtx.popOffZ_proc (k : KCtx) : k.popOffZ.proc = k.proc := rfl
-@[simp] theorem KCtx.popOffZ_sp (k : KCtx) : k.popOffZ.sp = k.sp := rfl
 
 theorem withCpu_popOff2_z (k : KCtx) (R : RegMap) :
     ((k.pushed 2).withRegs R).withCpu R 0 false = (k.popOffZ.pushed 2).withRegs R := rfl

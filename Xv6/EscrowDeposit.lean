@@ -62,7 +62,7 @@ Exactly Rocq's nesting, with Rocq's left-nested `E ∖ A ∖ B` written
    nib` is `(inum.toNat : Int) < 16 * (nib : Int)`; `cov : gset Z` is
    `ExtTreeSet Nat compare` (`IcacheEscrowPool` deviation 1).
 2. The returned `t ↪[ln_tx icfg_log]{#q} tt` is `txPin icfgLog t q`
-   (`IcacheEscrowDep` deviation 2; `txPin_elem` is `rfl`), which is what
+   (`IcacheEscrowDep` deviation 2; the two are equal by `rfl`), which is what
    `ipoolDepositCorpse` hands out.
 3. Rocq's curried `ireg_inv -∗ escA_inv -∗ … -∗ |={E, E∖iregN}=> …` is
    `⊢ iregInv -∗ escAInv -∗ … -∗ |={E, E \ ↑iregN}=> …` (Movers' shape).

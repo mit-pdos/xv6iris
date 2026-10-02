@@ -16,8 +16,7 @@ pin that MISSES; the two SPEC-TIGHTEN legs are no longer premises; and
 
 ## Ported (reached from `union_adequacy_closed`)
 
-`init_cons_pl`, `init_cons_path_elems`, `init_cons_pl_len`,
-`cons_pin_resolves_at`, `cons_pin_misses_at`, `init_cons_npar_elems`,
+`init_cons_pl`, `init_cons_path_elems`, `cons_pin_resolves_at`, `cons_pin_misses_at`, `init_cons_npar_elems`,
 `init_cons_npar_len`, `init_cons_np_elems`, `init_cons_start`,
 `init_cons_last`, `init_cons_open_bundle`, `init_cons_open_bundle_rdwr`,
 `init_cons_recv`, `init_cons_pin_law`, `init_cons_abs_law`, `init_mk_Farm`,
@@ -50,7 +49,7 @@ dischargers: the union's era is the FILE application's, `UInitConsFile`).
    `M : Nat → List (BitVec 8)`, `SpecSysOpen`/`SpecSysMknod` deviations);
    `-1` is `0xFFFFFFFFFFFFFFFF#64`; `<[fd := st]> sts` is `sts.set fd st`.
 2. `init_cons_pl` is `FsConsPin.fnameConsole` (Rocq's own definition), so
-   `init_cons_pl_len` is `rfl`.
+   Rocq's `init_cons_pl_len` is `rfl` here, and not stated.
 3. Lean's `mknodAuAt` carries the parent cursor under the syscall's guard
    (`SysMknodDefs.nparCur`, TL-3K) in the commit: the parent leg reads it
    back at `init_cons_pl` (`nparCur_elim`) where Rocq reads `P` directly.
@@ -75,9 +74,6 @@ abbrev initConsPl : List (BitVec 8) := fnameConsole
 
 /-- **Rocq `init_cons_path_elems`**. -/
 theorem init_cons_path_elems : pathElems initConsPl = consPath := by decide
-
-/-- **Rocq `init_cons_pl_len`**. -/
-theorem init_cons_pl_len : initConsPl.length = 7 := rfl
 
 /-- **Rocq `init_cons_pl_rel`**: the path is RELATIVE, so the walk starts at
 the cwd at EVERY root. -/

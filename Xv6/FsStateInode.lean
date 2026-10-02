@@ -39,12 +39,11 @@ to other inodes are carried as tokens, never as an equation.
   `recOwned_sb`, `recOwnedAt_shedTo`, `recOwned_sbQ`, `bigSepL_seq0`,
   `bigSepL_seqChunks`, `bigSepL_lenIrrel`, `byteRange_diblk`,
   `recOwnedAt_slot`, `recOwnedAt_diblk`, and the `Timeless` instances.
-* §3c/3d/3f the rest of the bytes: `indOwnedQ`, `indOwned`, `indOwned_1`,
-  `indOwnedQ_split`, `inodeDatQ`, `inodeDat`, `inodeDat_1`,
-  `inodeDat_blksSplit`, `inodeDatQ_split`, `inodePhi`, `inodePhi_dat`,
+* §3c/3d/3f the rest of the bytes: `indOwnedQ`, `indOwned`,
+  `indOwnedQ_split`, `inodeDatQ`, `inodeDat`, `inodeDat_blksSplit`, `inodeDatQ_split`, `inodePhi`, `inodePhi_dat`,
   `inodePhiAt`, `gammaQ_indOwned`, `gammaQ_inodeDat`, `gammaQ_inodePhi`,
   and §5's `Timeless` instances (`recOwned`, `indOwned`, `inodePhi`, ...).
-* §7 encode lemmas: `fnSetBlk`, `fnNaddr_setBlk`.
+* §7 encode lemmas: `fnSetBlk`.
 * §4 / §4b / §8 PURE link-accounting readings: `fnMult`,
   `entTokenless`, `fnDd`, `entDsetOk`, `nodeExact`, `entDsetOk_grow`,
   `entDsetOk_delete`, `nodeExact_cong`, `nodeExact_bump`,
@@ -601,9 +600,6 @@ def indOwnedQ (Γ : FsViewNames GF) (dq : DFrac) (n : FsNode) : IProp GF :=
 def indOwned (Γ : FsViewNames GF) (n : FsNode) : IProp GF :=
   if fnIndb n = 0 then emp else FsView.blkOwned Γ (fnIndb n) (indBytes n.fnEnt)
 
-theorem indOwned_1 (Γ : FsViewNames GF) (n : FsNode) :
-    indOwned Γ n = indOwnedQ Γ (DFrac.own 1) n := rfl
-
 instance indOwnedQ_timeless (Γ : FsViewNames GF) [GTimeless Γ] (dq : DFrac) (n : FsNode) :
     Timeless (indOwnedQ Γ dq n) := by
   unfold indOwnedQ; split <;> infer_instance
@@ -635,9 +631,6 @@ def inodeDatQ (Γ : FsViewNames GF) (dq : DFrac) (n : FsNode) : IProp GF :=
 /-- Rocq's `inode_dat`. -/
 def inodeDat (Γ : FsViewNames GF) (n : FsNode) : IProp GF :=
   iprop(([∗map] k ↦ bs ∈ n.fnBlk, FsView.blkOwned Γ (fnNaddr n k) bs) ∗ indOwned Γ n)
-
-theorem inodeDat_1 (Γ : FsViewNames GF) (n : FsNode) :
-    inodeDat Γ n = inodeDatQ Γ (DFrac.own 1) n := rfl
 
 instance inodeDatQ_timeless (Γ : FsViewNames GF) [GTimeless Γ] (dq : DFrac) (n : FsNode) :
     Timeless (inodeDatQ Γ dq n) := by
@@ -744,9 +737,6 @@ itself -- at an abstract `phi` there is no update to make. -/
 /-- (b) one data block's contents move -- writei (Rocq's `fn_set_blk`). -/
 def fnSetBlk (n : FsNode) (k : Nat) (bs : List (BitVec 8)) : FsNode :=
   ⟨n.fnRec, n.fnEnt, PartialMap.insert n.fnBlk k bs⟩
-
-theorem fnNaddr_setBlk (n : FsNode) (k : Nat) (bs : List (BitVec 8)) :
-    fnNaddr (fnSetBlk n k bs) = fnNaddr n := rfl
 
 end InodeOwned
 

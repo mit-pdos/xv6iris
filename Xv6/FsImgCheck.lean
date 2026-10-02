@@ -50,10 +50,6 @@ open Std
 theorem fsimgParseSb : fsParseSb fsimgP = some fsimgSb := by
   rw [fsimgP_eq]; exact fsimgParseSbB
 
-/-- Rocq `fsimg_sb_logstart`: the `2` `FsImgDisk` is stated at is the
-image's own. -/
-theorem fsimgSb_logstart : fsimgSb.sbLogstart = 2 := rfl
-
 /-! ## 2.  THE IMAGE IS WELL FORMED -/
 
 /-- W1-W9 (Rocq `fsimg_wf_ok`). -/

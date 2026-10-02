@@ -295,9 +295,6 @@ variable {GF : BundledGFunctors} [GhostMapG GF Nat (BitVec 8) RegMapF]
 def snapGamma (g gl gt : GName) : FsViewNames GF :=
   { phi := fun dq a v => g ↪◯MAP[a]{dq} v, link := gl, top := gt }
 
-theorem snapGamma_phi (g gl gt : GName) (dq : DFrac) (a : Nat) (v : BitVec 8) :
-    (snapGamma (GF := GF) g gl gt).phi dq a v = (g ↪◯MAP[a]{dq} v) := rfl
-
 instance snapGamma_gtimeless (g gl gt : GName) : GTimeless (snapGamma (GF := GF) g gl gt) where
   gtimeless := fun _ _ _ => by unfold snapGamma; infer_instance
 

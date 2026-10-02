@@ -110,8 +110,7 @@ as `(z : Int) = iregRoot`.
 3. Rocq's curried wands are kept curried (`P ⊢ Q -∗ R`), as
    `Xv6/InodeRegion.lean` does for this Rocq file; `==∗` is `⊢ |==>`.
 4. `ireg_cpin_some` is stated over `txPin icfgLog v.2.1 v.2.2`, which
-   `TxPin.txPin_elem` makes the raw element `icfgLog.tx ↪◯MAP[v.2.1]{…} ()`
-   by `rfl` (Rocq states the raw element and unfolds `tx_pin`).
+   is the raw element `icfgLog.tx ↪◯MAP[v.2.1]{…} ()` by `rfl` (Rocq states the raw element and unfolds `tx_pin`).
 5. `ireg_lnk_root_alive` is stated at `iregRoot.toNat` (the root's `Nat`
    key, `1`), `ireg_lnk_root_le`'s implication at `(z : Int) = iregRoot`,
    and its bound `Z.of_nat k ≤ bv_unsigned …` is `k ≤ ….toNat` (`Nat`).

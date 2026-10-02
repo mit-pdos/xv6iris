@@ -33,10 +33,6 @@ theorem pteAddr_inj {b b' : BitVec 44} {i i' : BitVec 9} (h : pteAddr b i = pteA
 /-- The 9 index bits `vpn[9*lvl+8 : 9*lvl]` the walk uses at level `lvl`. -/
 def vpnIdx (vpn : BitVec 27) (lvl : Nat) : BitVec 9 := BitVec.extractLsb' (lvl * 9) 9 vpn
 
-theorem vpnIdx_zero (vpn : BitVec 27) : vpnIdx vpn 0 = Sail.BitVec.extractLsb vpn 8 0 := rfl
-theorem vpnIdx_one (vpn : BitVec 27) : vpnIdx vpn 1 = Sail.BitVec.extractLsb vpn 17 9 := rfl
-theorem vpnIdx_two (vpn : BitVec 27) : vpnIdx vpn 2 = Sail.BitVec.extractLsb vpn 26 18 := rfl
-
 /-! ## The 512 indices of a page -/
 
 /-- All indices of a page-table page. -/

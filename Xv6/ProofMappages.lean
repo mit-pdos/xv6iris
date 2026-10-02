@@ -178,8 +178,6 @@ theorem mp_last_val (size va : BitVec 64) (n : Nat) (hs : size = BitVec.ofNat 64
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
 
-theorem mp_availSub (nb g : Nat) : availSub (some nb) g = some (nb - g) := rfl
-
 /-! ## The call to `walk` -/
 
 set_option maxHeartbeats 1000000 in

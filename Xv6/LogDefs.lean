@@ -137,8 +137,6 @@ def leWord (bs : List (BitVec 8)) (i : Nat) : Nat :=
 (Rocq's `hdr_n`). -/
 def hdrN (bs : List (BitVec 8)) : Nat := leWord bs 0
 
-theorem leWord_zero (bs : List (BitVec 8)) : leWord bs 0 = hdrN bs := rfl
-
 /-- Rocq's `hdr_n_lt`: the field is a 32-bit word. -/
 theorem hdrN_lt (bs : List (BitVec 8)) : hdrN bs < 2 ^ 32 := by
   have h := leAssemble_lt ((bs.drop (4 * 0)).take 4)
@@ -222,9 +220,6 @@ def fsInstallStep (P : Nat → List (BitVec 8)) (logstart : Nat) (W : List Nat)
 def fsInstall (P : Nat → List (BitVec 8)) (logstart : Nat) (W : List Nat)
     (D : BlockMap) : BlockMap :=
   (List.range W.length).foldr (fsInstallStep P logstart W) D
-
-theorem fsInstall_nil (P : Nat → List (BitVec 8)) (logstart : Nat) (D : BlockMap) :
-    fsInstall P logstart [] D = D := rfl
 
 /-! ## The era's picture of the durable disk
 

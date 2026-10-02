@@ -51,9 +51,6 @@ theorem sc_aCpuIntena (cpu : CPU) :
   generalize (KA.«pid_lock» : BitVec 64) = q
   bv_omega
 
-theorem sc_schedBase (cpu : CPU) :
-    scPidLockAddr + BitVec.ofNat 64 (128 * cpu.val) = schedBase cpu := rfl
-
 /-- The constants `scheduler` sets up before its loop and keeps in
 callee-saved registers: `s4`, `s5`, `s6`, `s7`, `s8`. -/
 def headRegs (cpu : CPU) (R : RegMap) : Prop :=

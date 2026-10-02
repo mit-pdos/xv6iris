@@ -19,10 +19,10 @@ Names (Rocq → Lean): `usync_at` → `usyncAt`, `usyncs` → `usyncs`,
 `lm_good_sync_step` → `lmGoodSync_step`, `ulast_from` → `ulastFrom`,
 `ulast_before` → `ulastBefore`, `ulast_from_take` → `ulastFrom_take`,
 `ulast_before_ext` → `ulastBefore_ext`, `usync_last_pad` → `usyncLast_pad`,
-`ulast_from_app` → `ulastFrom_app`, `ulines_before_length_take` →
-`ulinesBefore_length_take`, `ulast_before_snoc_some` →
+`ulast_from_app` → `ulastFrom_app`, `ulast_before_snoc_some` →
 `ulastBefore_snoc_some`, `ulast_before_snoc_none` → `ulastBefore_snoc_none`,
-`usync_bridge` → `usync_bridge`.  `lm_good_sync_out` is not ported (nothing
+`usync_bridge` → `usync_bridge`.  `ulines_before_length_take` is `rfl` here,
+so not stated.  `lm_good_sync_out` is not ported (nothing
 uses it).
 
 DEVIATIONS from Rocq:
@@ -301,10 +301,6 @@ theorem ulastFrom_app (off : Nat) (r : Srec) (segs segs' : List (List Obs))
       congr 1
       simp only [List.map_cons, List.flatten_cons, List.length_append, ulinesCyc, ulinesIn_length]
       omega
-
-/-- Rocq `ulines_before_length_take`. -/
-theorem ulinesBefore_length_take (h : List Obs) (n : Nat) :
-    (ulinesBefore h n).length = ((((cyclesOf h).take n).map ulinesCyc).flatten).length := rfl
 
 /-- Rocq `ulast_before_snoc_some`: the open cycle's record `some r'`, at its
 GLOBAL position. -/

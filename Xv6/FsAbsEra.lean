@@ -435,15 +435,6 @@ def epHopsFrom (rt : Nat) (γfs : FsNames) (P Pmiss : Nat → Nat → IProp GF)
     (pl : List (BitVec 8)) (n : Nat) : IProp GF :=
   axHopsFrom rt (elend (fsGammaL γfs)) P Pmiss (npElems pl) n
 
-theorem epHop_is_axHop (rt : Nat) (γfs : FsNames) (P Pmiss : Nat → Nat → IProp GF) (k : Nat)
-    (s : Fname) : epHop rt γfs P Pmiss k s = axHop rt (elend (fsGammaL γfs)) P Pmiss k s := rfl
-
-theorem epHops_is_axHops (rt : Nat) (γfs : FsNames) (P Pmiss : Nat → Nat → IProp GF)
-    (pl : List (BitVec 8)) (n : Nat) :
-    epHopsFrom rt γfs P Pmiss pl n
-      = axHopsFrom rt (elend (fsGammaL γfs)) P Pmiss (npElems pl) n :=
-  rfl
-
 /-- the family past its end is `emp`: what the success exit and the
 "nameiparent of /" exit hand back (Rocq's `ep_hops_done`). -/
 theorem epHops_done (rt : Nat) (γfs : FsNames) (P Pmiss : Nat → Nat → IProp GF)

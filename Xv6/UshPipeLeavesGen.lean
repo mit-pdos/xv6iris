@@ -5,7 +5,7 @@ lines, pinned `1900b8a43`).  The file is split in three Lean files, all in
 namespace `Xv6.UShPipeLeaves`:
 
 * `UshPipeLeavesGen`   -- `wp_kshr_exit0_paid` (this file);
-* `UshPipeLeavesProto` -- `pipe_pre`, `pipe_names_alloc`, `alt_execfail_app`;
+* `UshPipeLeavesProto` -- `pipe_pre`, `pipe_names_alloc`;
 * `UshPipeLeavesRound` -- `ush_fork_ans_grows`, `pipe_redeem`,
   `pipe_round_answers`.
 

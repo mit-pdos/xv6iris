@@ -27,9 +27,6 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 theorem pki_u6 : BitVec.signExtend 64 (6#20 ++ 0#12) = 0x6000#64 := by decide
 theorem pki_u12 : BitVec.signExtend 64 (0x12#20 ++ 0#12) = 0x12000#64 := by decide
 
-/-- `&pr.lock`, as the two address instructions compute it. -/
-theorem pki_prLock : prLock = KA.«pr» := rfl
-
 /-- `ret` out of `initlock` lands on the instruction after the `jal`. -/
 theorem pki_ret_086a : jumpPc (KA.«printkinit» + 0x1c#64) = (KA.«printkinit» + 0x1c#64) := by
   decide

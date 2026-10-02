@@ -88,8 +88,6 @@ variable (ug : UnionGn) (v : EraPins) (I : List (BitVec 8)) (sR : Fstate) (lR : 
   (L : List (BitVec 8)) (pr : Producer) (Rd : IProp GF) (γc γm : Wid → GName) (P : Nat → PNames)
   (gF gG : Nat → GName)
 
-theorem uD_T : (uD ug v I sR lR L pr Rd γc γm P gF gG).T = fileTaint (hlc := hlc) ug.ugnFile.fgnCl := rfl
-
 theorem uD_FAM : (uD ug v I sR lR L pr Rd γc γm P gF gG).FAM =
     blkNInv (hlc := hlc) (wids (lcats lR)) (runN (filesOf sR) lR) (pwcBlkU ug v I sR) termw (tokN (filesOf sR) lR)
       (pdep (uD ug v I sR lR L pr Rd γc γm P gF gG)) pnsN (genId (hlc := hlc) (GF := GF) + 1) γc γm := rfl

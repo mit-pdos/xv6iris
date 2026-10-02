@@ -136,8 +136,6 @@ def ushpFind : Nat → Nat → (Nat → BitVec 8) → BitVec 8 → Option Nat
   | 0, _, _, _ => none
   | n + 1, i, f, c => if f i = c then some i else ushpFind n (i + 1) f c
 
-theorem ushpFind_0 (i : Nat) (f : Nat → BitVec 8) (c : BitVec 8) : ushpFind 0 i f c = none := rfl
-
 theorem ushpFind_S_hit (n i : Nat) (f : Nat → BitVec 8) (c : BitVec 8) (h : f i = c) :
     ushpFind (n + 1) i f c = some i := by simp [ushpFind, h]
 

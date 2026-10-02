@@ -208,11 +208,6 @@ def bump (W : Uvis) (r : BitVec 64) (M' : ElfMem) (π' : Nat → Option UPerm) (
     (secc' : BitVec 64) : Uvis :=
   bumpAt W r M' π' szv' fdv' cw' g' cs' W.pid lz' secc'
 
-/-- Rocq `bump_pid`: THE PID IS KEPT. -/
-@[simp] theorem bump_pid (W : Uvis) (r : BitVec 64) (M' : ElfMem) (π' : Nat → Option UPerm)
-    (szv' : Nat) (fdv' : List FdState) (cw' : Nat) (g' : GName) (cs' : ExtTreeSet GName compare)
-    (lz' : Bool) (secc' : BitVec 64) : (bump W r M' π' szv' fdv' cw' g' cs' lz' secc').pid = W.pid := rfl
-
 /-- Rocq `bump_run_gpr` (at `bumpAt`, fork's child's key). -/
 theorem bumpRun_gpr (m : RegMap) (pc : BitVec 64) (M M' : ElfMem) (π π' : Nat → Option UPerm)
     (szv szv' : Nat) (fdv fdv' : List FdState) (cw cw' : Nat) (g g' : GName)

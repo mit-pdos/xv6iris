@@ -345,8 +345,6 @@ theorem bd_blast_map (l : List Nat) (a : Nat) (d : BitVec 64) :
   simp only [List.map_append, List.map_cons, List.map_nil]
   rw [blast_app]; rfl
 
-theorem bd_blast_nil (d : BitVec 64) : blast (([] : List Nat).map bnode) d = d := rfl
-
 theorem bd_ext_zero : BitVec.extractLsb' 0 32 (0#64 : BitVec 64) = 0#32 := by decide
 theorem bd_ext_one : BitVec.extractLsb' 0 32 (BitVec.signExtend 64 (1#12 : BitVec 12))
     = BitVec.ofNat 32 1 := by decide

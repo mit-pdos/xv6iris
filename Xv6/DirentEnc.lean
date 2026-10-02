@@ -180,11 +180,6 @@ def dirblkBytes : List Dirent → List (BitVec 8)
   | [] => []
   | d :: ds => direntBytes d ++ dirblkBytes ds
 
-theorem dirblkBytes_nil : dirblkBytes [] = [] := rfl
-
-theorem dirblkBytes_cons (d : Dirent) (ds : List Dirent) :
-    dirblkBytes (d :: ds) = direntBytes d ++ dirblkBytes ds := rfl
-
 /-! ## One record: length, and the two field readings -/
 
 theorem direntBytes_inum (d : Dirent) (j : Nat) (hj : j < 2) :
@@ -217,8 +212,6 @@ theorem halfBytes_zero : halfBytes 0#16 = [0#8, 0#8] := by
   simp [halfBytes, nthByte]
 
 def direntZero : Dirent := ⟨0#16, List.replicate 14 0#8⟩
-
-theorem direntZero_free : deFree direntZero := rfl
 
 theorem direntBytes_zero : direntBytes direntZero = List.replicate 16 0#8 := by
   show halfBytes 0#16 ++ List.replicate 14 0#8 = _
@@ -254,8 +247,6 @@ theorem cutNul_eq_bytesString : ∀ l : List (BitVec 8), cutNul l = bytesString 
     by_cases hb : b = 0#8
     · simp [hb]
     · simp only [hb, if_false]; rw [cutNul_eq_bytesString l]
-
-theorem cutNul_nil : cutNul [] = [] := rfl
 
 theorem cutNul_cons_nul (l : List (BitVec 8)) : cutNul (0#8 :: l) = [] := by
   rw [cutNul]; simp

@@ -283,15 +283,6 @@ def gammaQ (Γ : FsViewNames GF) (dq : DFrac) : FsViewNames GF :=
 theorem gammaQ_blkOwned (Γ : FsViewNames GF) (dq : DFrac) (b : Nat) (bs : List (BitVec 8)) :
     blkOwned (gammaQ Γ dq) b bs ⊣⊢ blkOwnedQ Γ dq b bs := .rfl
 
-/-- THE FULL-SHARE READING IS THE THING ITSELF, on the nose: `byteRange`
-hands `DFrac.own 1` down, and that is what the constant view then
-ignores. -/
-theorem gammaQ_1_byteRange (Γ : FsViewNames GF) (b off : Nat) (bs : List (BitVec 8)) :
-    byteRange (gammaQ Γ (DFrac.own 1)) b off bs = byteRange Γ b off bs := rfl
-
-theorem gammaQ_1_blkOwned (Γ : FsViewNames GF) (b : Nat) (bs : List (BitVec 8)) :
-    blkOwned (gammaQ Γ (DFrac.own 1)) b bs = blkOwned Γ b bs := rfl
-
 instance gammaQ_gtimeless (Γ : FsViewNames GF) [GTimeless Γ] (dq : DFrac) :
     GTimeless (gammaQ Γ dq) where
   gtimeless := fun _ a v => GTimeless.gtimeless (Γ := Γ) dq a v

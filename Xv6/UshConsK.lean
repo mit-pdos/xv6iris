@@ -100,10 +100,6 @@ theorem shConsRo_byte (k : Nat) (hk : k < 7) : User.Sh.code.byte (shConsPv + k) 
 /-- **Rocq `sh_cons_ro_nul_bool`**: ...and its NUL. -/
 theorem shConsRo_nul_bool : User.Sh.code.byte (shConsPv + 7) = some 0#8 := by decide
 
-/-- **Rocq `sh_open_pc`**: sh's own open stub, at the address its symbol
-table pins. -/
-theorem shOpen_pc : User.Sh.Sym.«open» = 0xca2 := rfl
-
 theorem fnameConsole_length : fnameConsole.length = 7 := rfl
 
 theorem fnameConsole_nonul : ∀ j, j < 7 → fnameConsole[j]! ≠ 0#8 := by decide

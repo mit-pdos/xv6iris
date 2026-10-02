@@ -730,11 +730,6 @@ theorem procPrivCoreNoctxAt_pidLend (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 
   · ipureintro; exact hf
   · ipureintro; exact hlz
 
-/-- The core does not mention the array, so it survives any store into it. -/
-theorem procPrivCoreNoctxAt_ofile (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
-    (M : Nat → List (BitVec 8)) (fs : List (BitVec 64)) :
-    procPrivCoreNoctxAt (GF := GF) ξ pa pid V M = procPrivCoreNoctxAt ξ pa pid { V with ofile := fs } M := rfl
-
 /-- **The private block** (Rocq `proc_priv`, ProcInv.v:1430, the ONE block
 form of wave 7 P2): the core at the ambient context, and the descriptor
 array with every descriptor's payload, its states named by the block's

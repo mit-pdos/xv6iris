@@ -65,13 +65,6 @@ theorem echo_nl_ro : User.Echo.code.byte echoNlPtr = some wlNl := by decide
 
 /-! `echoWords`' two unfoldings (deviation 4). -/
 
-theorem echoWords_one (w : Bytes) (rest : Proc) :
-    echoWords [w] rest = .vis (.EWrite 1 w) (fun _ => .vis (.EWrite 1 [wlNl]) (fun _ => rest)) := rfl
-
-theorem echoWords_cons2 (w w' : Bytes) (r : List Bytes) (rest : Proc) :
-    echoWords (w :: w' :: r) rest =
-      .vis (.EWrite 1 w) (fun _ => .vis (.EWrite 1 [wlSp]) (fun _ => echoWords (w' :: r) rest)) := rfl
-
 section UkEchoTree
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]

@@ -199,8 +199,6 @@ theorem utFdKept_refl (sc : BitVec 64) (sts : List FdState) : utFdKept sc sts st
 theorem utChKept_refl (sc secc : BitVec 64) (tf : List (BitVec 64)) (cs : ExtTreeSet GName compare) :
     utChKept sc secc tf cs cs := fun _ => rfl
 
-theorem utEvQuiet_refl (sc : BitVec 64) (V : ProcPriv) : utEvQuiet sc V V := fun _ _ => rfl
-
 /-- A record whose counter equals the entry's carries the quiet row. -/
 theorem utEvQuiet_of_ev (sc : BitVec 64) (V V' : ProcPriv) (h : V'.ev = V.ev) : utEvQuiet sc V V' :=
   fun _ _ => h

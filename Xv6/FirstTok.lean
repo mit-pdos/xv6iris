@@ -148,17 +148,12 @@ def firstAddr : BitVec 64 := KA.«first_1»
 
 /-- `struct superblock`'s 32-byte image, DUPLICATED from `Xv6.sbImage`
 (deviation 9): a token definition must not pull fsinit's Spec cone.
-Definitionally equal to `sbImage` (`firstSbImage_eq`). -/
+Definitionally equal to `sbImage`. -/
 def firstSbImage (magic fssize nblocks ninodes nlog logstart inodestart bmapstart : BitVec 32) :
     List (BitVec 8) :=
   wordToBytes4 magic ++ wordToBytes4 fssize ++ wordToBytes4 nblocks ++
   wordToBytes4 ninodes ++ wordToBytes4 nlog ++ wordToBytes4 logstart ++
   wordToBytes4 inodestart ++ wordToBytes4 bmapstart
-
-theorem firstSbImage_eq (a b c d e f g h : BitVec 32) :
-    firstSbImage a b c d e f g h =
-      wordToBytes4 a ++ wordToBytes4 b ++ wordToBytes4 c ++ wordToBytes4 d ++
-      wordToBytes4 e ++ wordToBytes4 f ++ wordToBytes4 g ++ wordToBytes4 h := rfl
 
 section FirstTok
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]

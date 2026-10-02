@@ -78,10 +78,6 @@ theorem UxcCfg.priv {s : UWSt} (h : UxcCfg s) : s.file .cur_privilege = Privileg
 /-- The walker state after `nextPC := t`. -/
 def uxcNpc (s : UWSt) (t : BitVec 64) : UWSt := { s with pin := s.pin.set .nextPC t }
 
-@[simp] theorem uxcNpc_mm (s : UWSt) (t : BitVec 64) : (uxcNpc s t).mm = s.mm := rfl
-@[simp] theorem uxcNpc_rv (s : UWSt) (t : BitVec 64) : (uxcNpc s t).rv = s.rv := rfl
-@[simp] theorem uxcNpc_rs (s : UWSt) (t : BitVec 64) : (uxcNpc s t).rs = s.rs := rfl
-
 theorem uxcNpc_file (s : UWSt) (t : BitVec 64) : (uxcNpc s t).file = s.file.set .nextPC t :=
   UWSt.file_setPin s .nextPC t
 
@@ -160,9 +156,6 @@ theorem uxc_runME_liftBind {A R : Type} (orc : UOrc) (s : UWSt) (m : SailM A) (f
     simp only [SailME.run, PreSail.PreSailME.run, ExceptT.run_bind, liftM, monadLift,
       MonadLift.monadLift, ExceptT.lift, ExceptT.run_mk, bind_assoc, map_eq_pure_bind, pure_bind]
   rw [this, runRW_bind]
-
-theorem uxc_runME_pure {R : Type} (orc : UOrc) (s : UWSt) (x : R) :
-    runRW D orc s (SailME.run (pure x : SailME R R)) = some (x, s, orc) := rfl
 
 /-- A form that `execute`s to a redirect walks as its target (the one
 `ExecuteAs` of `run_hart_active`, U1-X1's `uxaExecAs`). -/

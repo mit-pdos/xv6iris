@@ -58,7 +58,7 @@ the only one that loses a Rocq lemma.**
    `leAssemble ((bs.drop o).take n)`, which truncates instead of padding.
    The two agree on every list: a missing high byte contributes
    `0 * 256 ^ k`.  The spelling is chosen so that `fsLeAt bs (4 * i) 4` is
-   `leWord bs i` BY `rfl` (`fsLeAt_leWord`), which is what lets the
+   `leWord bs i` BY `rfl`, which is what lets the
    superblock's eight fields and the log header's words share one reader.
    The price is that Rocq's `fs_le_at_2` / `fs_le_at_4` -- `reflexivity`
    there -- become the "the bytes are really there" forms `fsLeAt_2` /
@@ -98,11 +98,6 @@ def T_DEVICE : Nat := 3
 of `bs`. -/
 def fsLeAt (bs : List (BitVec 8)) (o n : Nat) : Nat :=
   leAssemble ((bs.drop o).take n)
-
-/-- The whole point of deviation 2: a 4-aligned field is the log header's
-own word reader. -/
-theorem fsLeAt_leWord (bs : List (BitVec 8)) (i : Nat) :
-    fsLeAt bs (4 * i) 4 = leWord bs i := rfl
 
 /-- `take` of a `drop`, one element at a time. -/
 theorem drop_take_succ {α : Type _} (l : List α) (o k : Nat) (h : o < l.length) :

@@ -58,8 +58,8 @@ cursor (`nparElems`, `nparWalkDeadEra`, `epStart`) or the slot supplies.
 
 ## Dropped/simplified vs Rocq
 
-* `cr_K_value` / `cr_slots_value` (ProofCreateParts) are `createSlots_val` /
-  `createIrefSlots_val` here, beside their definitions.
+* `cr_K_value` (ProofCreateParts) is `createSlots_val` here, beside its
+  definition; `cr_slots_value` is `rfl` here, so not stated.
 -/
 import Xv6.SpecNameiparent
 import Xv6.FsAbsCreateNm
@@ -87,8 +87,6 @@ NET ZERO but wants one in hand for the iget its dirlookup may run.  Every
 iunlockput returns one.  So the peak is THREE, and a success arm keeps
 exactly one out -- the reference to the inode it returns. -/
 def createIrefSlots : Nat := 3
-
-theorem createIrefSlots_val : createIrefSlots = 3 := rfl
 
 /-- THE WHOLE TRANSACTION (Rocq's `create_units`): the distinct-block set is
 at most six (IBLOCK ip, IBLOCK dp, the bitmap block, ip's block 0, dp's

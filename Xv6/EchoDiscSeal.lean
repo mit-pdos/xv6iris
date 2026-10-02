@@ -14,8 +14,8 @@ Added (Rocq → Lean, the landed file's convention):
 `pro_of_dollar_prompt` → `proOf_dollar_prompt`, `pro_of_open_head` →
 `proOf_open_head`, `pro_rounds_from` → `proRounds_from`,
 `pro_rounds_replicate_0` → `proRounds_replicate_0`.
-Already landed: `ins_obs_ins` is `consIns_obsIns` (EchoDisc.lean);
-ObsTrace's `obs_ins_out` is `obsIns_out`.
+Already landed: ObsTrace's `obs_ins_out` is `obsIns_out`; `ins_obs_ins` is
+`rfl` here, so not stated.
 
 Helpers (no Rocq counterpart; Rocq gets them by `cbn` on the constructor):
 `notConsIn_or`, `inPres_cons_in`, `inPres_cons_other`, `consIns_cons_in`,

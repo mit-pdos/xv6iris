@@ -51,7 +51,7 @@ Rocq's file header (WHAT THE BUNDLE IS / THE DICTIONARY / WHAT
    (`inodeBlocksEra` := `inodeBlocksEraQ _ (.own 1)`, same for `indResEra`
    and `inodeBlocks_dataExt`): Rocq proves each twice, verbatim; in Lean
    `inodeBlocks`/`indRes`/`blkOwned` ARE their `_q` readings at 1 by `rfl`
-   (InodeInv `inodeBlocks_1`, FsStateDefs `blkOwned_1`), so the second copy
+   (FsStateDefs `blkOwned_1`), so the second copy
    is a one-line instance.  Statements unchanged.
 5. `indResEraQ` is `.rfl`: Rocq peels two `case_decide`s because the two
    guards reach the goal through two files' `Decision` instances ("two

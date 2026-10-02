@@ -120,7 +120,6 @@ def ssK (k : KCtx) : KCtx :=
 @[simp] theorem ssK_locks (k : KCtx) : (ssK k).locks = "log" :: k.locks := rfl
 @[simp] theorem ssK_tier (k : KCtx) : (ssK k).tier = k.tier := rfl
 @[simp] theorem ssK_proc (k : KCtx) : (ssK k).proc = k.proc := rfl
-@[simp] theorem ssK_regs (k : KCtx) : (ssK k).regs = k.regs := rfl
 @[simp] theorem ssK_spie (k : KCtx) : (ssK k).spie = k.spie := rfl
 @[simp] theorem ssK_spp (k : KCtx) : (ssK k).spp = k.spp := rfl
 
@@ -163,9 +162,6 @@ theorem ssRegs_cs (k : KCtx) (nv : BitVec 64) (R R' : RegMap) (h : ssRegs k nv R
   exact ⟨b2.trans a2, b8.trans a8, b9.trans a9, b18.trans a18, b19.trans a19, b20.trans a20,
     b21.trans a21, b22.trans a22, b23.trans a23, b24.trans a24, b25.trans a25, b26.trans a26,
     b27.trans a27⟩
-
-theorem ssRegs_ws (k : KCtx) (nv : BitVec 64) (R : RegMap) (a b : Bool) :
-    ssRegs (k.withSpie a b) nv R = ssRegs k nv R := rfl
 
 theorem ssRegs_set (k : KCtx) (nv : BitVec 64) (R : RegMap) (h : ssRegs k nv R)
     (i : BitVec 5) (v : BitVec 64)
@@ -226,9 +222,6 @@ theorem ssRegsE_set (k : KCtx) (R : RegMap) (h : ssRegsE k R) (i : BitVec 5) (v 
   · rw [RegMap.set_apply, if_neg (Ne.symm n25)]; exact a25
   · rw [RegMap.set_apply, if_neg (Ne.symm n26)]; exact a26
   · rw [RegMap.set_apply, if_neg (Ne.symm n27)]; exact a27
-
-theorem ssRegsE_ws (k : KCtx) (R : RegMap) (a b : Bool) :
-    ssRegsE (k.withSpie a b) R = ssRegsE k R := rfl
 
 /-- The pins at the loop head, after the wait arm's set-up writes `s2`
 (twice: the `auipc` and the `lw`) and `s1` (twice: the `auipc` and the

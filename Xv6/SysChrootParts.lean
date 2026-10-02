@@ -86,10 +86,6 @@ theorem sys_chroot_pins_entry (k : KCtx) :
   refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
     simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
 
-/-- The two frames are the same twenty slots (sys_chdir's lemmas over the
-budget apply verbatim). -/
-theorem sysChrootSlots_chdir : sysChrootSlots = sysChdirSlots := rfl
-
 /-! ## The arguments, the root seam, the out bundle, the join point -/
 
 /-- The contract's parameters, as one record (`SysChdirArgs` without the

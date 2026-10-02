@@ -82,8 +82,6 @@ def killRow (Wk : IProp GF) (gn : GName) (kl : BitVec 32) : IProp GF :=
 /-- THE FREE ARM'S FLAG (Rocq `kill_free`): an UNUSED slot's flag is zero. -/
 def killFree (kl : BitVec 32) : Prop := kl = 0#32
 
-theorem killFree_zero : killFree 0#32 := rfl
-
 /-- the row's three arms -/
 theorem killRow_zero (Wk : IProp GF) (gn : GName) : killPend (GF := GF) gn ⊢ killRow Wk gn 0#32 := by
   unfold killRow

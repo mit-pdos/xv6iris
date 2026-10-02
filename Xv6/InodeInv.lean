@@ -48,7 +48,7 @@ reads it.
 ## DEVIATIONS from Rocq, all deliberate
 
 1. **THE `fs.h` CONSTANTS ARE NOT REDEFINED.**  `NDIRECT`, `NINDIRECT`,
-   `MAXFILE`, `maxfile_split`, `ROOTDEV`, `ROOTINO` are already
+   `MAXFILE`, `ROOTDEV`, `ROOTINO` are already
    `Xv6/FsGeom.lean`'s (that file's header records the collection rule).
    Rocq's `ROOTDEV` / `ROOTINO` are `mword 32`; `Xv6.ROOTDEV` /
    `Xv6.ROOTINO` are the NUMBERS and a contract writes
@@ -92,7 +92,7 @@ reads it.
    this port's idiom (`Xv6.wordAtN`, `Xv6/KallocDefs.lean`;
    `Xv6.slBody`, `Xv6/SleepLockDefs.lean`) is an explicitly
    context-indexed twin, so `inodeMetaAt` / `inodeAddrsAt` carry the
-   instances and `inodeMetaAt_cur` / `inodeAddrsAt_cur` are `rfl`.
+   instances, and at `curCtx` they are the ambient forms by `rfl`.
 10. **`bm_covers_nonpos` IS `bmCovers_zero`.**  Rocq's takes `sz <= 0`;
     at `Nat` the only such size is `0`, so the lemma is stated there and
     the hypothesis disappears.
@@ -593,12 +593,6 @@ def indResQ (γfs : FsNames) (dq : DFrac) (bm : Blkmap) : IProp GF := indBlkQ γ
 /-- Rocq's `ind_res`. -/
 def indRes (γfs : FsNames) (bm : Blkmap) : IProp GF := indBlk γfs bm
 
-theorem indBlk_1 (γfs : FsNames) (bm : Blkmap) :
-    indBlk (GF := GF) γfs bm = indBlkQ γfs (DFrac.own 1) bm := rfl
-
-theorem indRes_1 (γfs : FsNames) (bm : Blkmap) :
-    indRes (GF := GF) γfs bm = indResQ γfs (DFrac.own 1) bm := rfl
-
 /-- The indirect resource depends on the indirect ENTRY and the entry
 ARRAY alone, so a change to the DIRECT entries leaves it alone --
 syntactically, which is what `iframe` needs at `inodeMapQ_dir_acc`.  (Rocq
@@ -656,9 +650,6 @@ def blkResQ (γfs : FsNames) (dq : DFrac) (w : BitVec 32) (bs : List (BitVec 8))
 def blkRes (γfs : FsNames) (w : BitVec 32) (bs : List (BitVec 8)) : IProp GF :=
   blkResQ γfs (DFrac.own 1) w bs
 
-theorem blkRes_1 (γfs : FsNames) (w : BitVec 32) (bs : List (BitVec 8)) :
-    blkRes (GF := GF) γfs w bs = blkResQ γfs (DFrac.own 1) w bs := rfl
-
 instance blkResQ_timeless (γfs : FsNames) (dq : DFrac) (w : BitVec 32) (bs : List (BitVec 8)) :
     Timeless (blkResQ (GF := GF) γfs dq w bs) := by
   unfold blkResQ; split <;> infer_instance
@@ -672,9 +663,6 @@ def inodeBlocksQ (γfs : FsNames) (dq : DFrac) (bm : Blkmap)
 /-- Rocq's `inode_blocks`. -/
 def inodeBlocks (γfs : FsNames) (bm : Blkmap) (data : Nat → List (BitVec 8)) : IProp GF :=
   inodeBlocksQ γfs (DFrac.own 1) bm data
-
-theorem inodeBlocks_1 (γfs : FsNames) (bm : Blkmap) (data : Nat → List (BitVec 8)) :
-    inodeBlocks (GF := GF) γfs bm data = inodeBlocksQ γfs (DFrac.own 1) bm data := rfl
 
 instance inodeBlocksQ_timeless (γfs : FsNames) (dq : DFrac) (bm : Blkmap)
     (data : Nat → List (BitVec 8)) : Timeless (inodeBlocksQ (GF := GF) γfs dq bm data) := by
@@ -1097,9 +1085,6 @@ def inodeAddrsAt [CurCtx] (ξ : CtxId) (ip : BitVec 64) (l : List (BitVec 32)) :
 def inodeAddrs [CurCtx] (ip : BitVec 64) (l : List (BitVec 32)) : IProp GF :=
   iprop([∗list] j ↦ a ∈ l, wordPointsTo (iAddr ip j) 4 (DFrac.own 1) a)
 
-theorem inodeAddrsAt_cur [CurCtx] (ip : BitVec 64) (l : List (BitVec 32)) :
-    inodeAddrsAt (GF := GF) curCtx ip l = inodeAddrs ip l := rfl
-
 /-- Rocq's `inode_addrs_morph`. -/
 instance instCtxMorphInodeAddrsAt [CurCtx] (ip : BitVec 64) (l : List (BitVec 32)) :
     CtxMorph (GF := GF) (fun ξ => inodeAddrsAt ξ ip l) :=
@@ -1116,9 +1101,6 @@ def inodeMapQ [CurCtx] (γfs : FsNames) (dq : DFrac) (ip : BitVec 64)
 /-- Rocq's `inode_map`. -/
 def inodeMap [CurCtx] (γfs : FsNames) (ip : BitVec 64) (bm : Blkmap) : IProp GF :=
   iprop(inodeAddrs ip (bmCells bm) ∗ indRes γfs bm)
-
-theorem inodeMap_1 [CurCtx] (γfs : FsNames) (ip : BitVec 64) (bm : Blkmap) :
-    inodeMap (GF := GF) γfs ip bm = inodeMapQ γfs (DFrac.own 1) ip bm := rfl
 
 theorem inodeMapQ_1_of [CurCtx] (γfs : FsNames) (dq : DFrac) (ip : BitVec 64)
     (bm : Blkmap) (h : dq = DFrac.own 1) :
@@ -1261,9 +1243,6 @@ def inodeMeta [CurCtx] (ip : BitVec 64) (d : Dinode) : IProp GF := iprop%
   wordPointsTo (iMinor ip) 2 (DFrac.own 1) d.diMinor ∗
   wordPointsTo (iNlink ip) 2 (DFrac.own 1) d.diNlink ∗
   wordPointsTo (iSize ip) 4 (DFrac.own 1) d.diSize
-
-theorem inodeMetaAt_cur [CurCtx] (ip : BitVec 64) (d : Dinode) :
-    inodeMetaAt (GF := GF) curCtx ip d = inodeMeta ip d := rfl
 
 /-- Rocq's `inode_meta_morph`. -/
 instance instCtxMorphInodeMetaAt [CurCtx] (ip : BitVec 64) (d : Dinode) :

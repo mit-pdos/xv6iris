@@ -162,15 +162,9 @@ theorem ProcPriv.updEv_id (V : ProcPriv) : V.updEv V.ev = V := rfl
 installers' `sd …,344(…)`. -/
 abbrev ProcPriv.updRoot (V : ProcPriv) (v : BitVec 64) : ProcPriv := { V with root := v }
 
-/-- Rocq `upd_root_id`. -/
-theorem ProcPriv.updRoot_id (V : ProcPriv) : V.updRoot V.root = V := rfl
-
 /-- The root inum's ghost write (Rocq `upd_rti`): it moves with the
 reference the cell names. -/
 abbrev ProcPriv.updRti (V : ProcPriv) (z : Nat) : ProcPriv := { V with rti := z }
-
-/-- Rocq `upd_rti_id`. -/
-theorem ProcPriv.updRti_id (V : ProcPriv) : V.updRti V.rti = V := rfl
 
 omit [CurCtx] in
 /-- **THE EVENT COUNT ONLY ROSE** (Rocq `ProcInv.ev_after`, permit sweep L1a,

@@ -127,8 +127,6 @@ def usysWrN (M : ElfMem) (a : BitVec 64) (bs : List (BitVec 8)) : Nat → ElfMem
 /-- **`bs` written at `a`** (Rocq `umem_wr M a (length bs) bs`). -/
 def usysWr (M : ElfMem) (a : BitVec 64) (bs : List (BitVec 8)) : ElfMem := usysWrN M a bs bs.length
 
-theorem usysWr_nil (M : ElfMem) (a : BitVec 64) : usysWr M a [] = M := rfl
-
 theorem usysWrN_out (M : ElfMem) (a : BitVec 64) (bs : List (BitVec 8)) (x : Nat) :
     ∀ k, (∀ j, j < k → (a + BitVec.ofNat 64 j).toNat ≠ x) → usysWrN M a bs k x = M x
   | 0, _ => rfl
@@ -186,8 +184,6 @@ empty. -/
 def usysLazyKeep (lz lz' : Bool) : Prop := lz = false → lz' = false
 
 theorem usysLazyKeep_refl (lz : Bool) : usysLazyKeep lz lz := id
-
-theorem usysLazyKeep_false (lz : Bool) : usysLazyKeep lz false := fun _ => rfl
 
 /-- `t == SBRK_EAGER` on argument 1 (Rocq `usys_sbrk_eager`). -/
 def usysSbrkEager (tf : List (BitVec 64)) : Prop :=
@@ -525,15 +521,10 @@ theorem usysCwdOk_refl_at (n k : Int) (r : BitVec 64) (c : Nat) (hk : n = k) (h 
 /-- Rocq `usys_gen_ok`. -/
 def usysGenOk (_n : Int) (g g' : Iris.GName) : Prop := g' = g
 
-theorem usysGenOk_refl (n : Int) (g : Iris.GName) : usysGenOk n g g := rfl
-
 /-! ## §2f The children row: quiet on every returning arm -/
 
 /-- Rocq `usys_ch_ok` (fork's and wait's moves are their own arms'). -/
 def usysChOk (_n : Int) (_r : BitVec 64) (cs cs' : Std.ExtTreeSet Iris.GName compare) : Prop := cs' = cs
-
-theorem usysChOk_refl (n : Int) (r : BitVec 64) (cs : Std.ExtTreeSet Iris.GName compare) :
-    usysChOk n r cs cs := rfl
 
 /-! ## §2g The pid row: what getpid answers -/
 

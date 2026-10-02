@@ -40,8 +40,8 @@ quotes pre-gate offsets in places; the code is the reference.
    `cr_trange_unsigned`, `cr_range_Z` (the Sail cast layer and the `Z`
    arithmetic under it) are not ported (nothing uses the range test's
    reading).  The type literals are read as `toNat` against
-   `FsImg.T_FILE` / `T_DEVICE` (`Nat`; `FsAbsCreateFire.T_FILE_w_value`
-   bridges to the sixteen-bit literals).
+   `FsImg.T_FILE` / `T_DEVICE` (`Nat`; the sixteen-bit literals' `toNat` is
+   that `Nat` by `rfl`).
 2. THE FRAME (Rocq's `cr_push`, `cr_pop`, `cr_fp`, `cr_name_addr`,
    `cr_frm1..8`, stack-address equations over `pa_stk`) is NOT ported here:
    in Lean the frame is a prologue/epilogue lemma pair over a `frameN` bundle
@@ -155,12 +155,6 @@ theorem createSetf_dirOk (nib : Nat) (dn : Dinode) (data : Nat → List (BitVec 
 `imark` on the TYPE, so the fail arm's nlink := 0 does NOT move it. -/
 theorem createSetf_type_nz (dn : Dinode) (mj mn nl : BitVec 16) (h : dn.diType.toNat ≠ 0) :
     (createSetf dn mj mn nl).diType.toNat ≠ 0 := h
-
-/-- Rocq's `cr_made_setf`: `createSetf` over ialloc's claim IS
-`FsAbsCreateFire.createMade` -- the identity that ties the allocate arm to
-the walk. -/
-theorem create_made_setf (ty mj mn : BitVec 16) :
-    createSetf (iallocFresh ty) mj mn 1#16 = createMade ty mj mn := rfl
 
 /-! ## §2  The two name literals -/
 

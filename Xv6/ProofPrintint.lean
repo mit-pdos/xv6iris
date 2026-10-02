@@ -357,8 +357,6 @@ come, and `i + f ≤ 20` keeps every write inside `buf`. -/
 def dlKept (R R' : RegMap) : Prop :=
   ∀ r : BitVec 5, r ≠ 10#5 → r ≠ 12#5 → r ≠ 13#5 → r ≠ 14#5 → r ≠ 15#5 → r ≠ 17#5 → R' r = R r
 
-theorem dlKept_refl (R : RegMap) : dlKept R R := fun _ _ _ _ _ _ _ => rfl
-
 theorem dlKept_trans {R R' R'' : RegMap} (h : dlKept R R') (h' : dlKept R' R'') : dlKept R R'' :=
   fun r a b c d e f => (h' r a b c d e f).trans (h r a b c d e f)
 

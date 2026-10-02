@@ -92,8 +92,8 @@ their own: `NINODE`/`ISLOTSZ`/`ientry` are `Xv6/FsGeom.lean` /
    the definition's prefix camelCased (`icMWf_count`, `irefSet_count`,
    `irefSet_read`, `islSlot_none`, `islPool_acc_upd`, `itableHalf_agree`,
    `irefFrag_lookup`), or Rocq's name verbatim when it has no definition
-   prefix (`blkmap_slot_inrange`, `ic_pos_op_add`, `ic_incr_lu`,
-   `ic_incr_upd`, `ic_alloc_upd`, `seq_ninode_lookup`).
+   prefix (`blkmap_slot_inrange`, `ic_incr_lu`, `ic_incr_upd`, `ic_alloc_upd`,
+   `seq_ninode_lookup`).
 
 ## Dropped/simplified vs Rocq (uses grep-checked over ALL of
 ## `iris/*.v` -- defs, `Spec*`, `Proof*`, `Link*`, the
@@ -139,8 +139,8 @@ their own: `NINODE`/`ISLOTSZ`/`ientry` are `Xv6/FsGeom.lean` /
   `blkmap_slot_inrange` (ProofItrunc), `iref_word` (IcacheInv §5/§5b,
   IcacheBoot, ProofIget/Idup/Iput), `icM_wf` (IcacheEscrow, IcacheBoot,
   ProofIput, IcacheInv §5), `icM_wf_count` (ProofIget, ProofIput),
-  `ic_pos_op_add` (§5b 3230/3953), `ic_incr_upd` (§5b 3143/3585),
-  `ic_alloc_upd` (§5b 3793), `seq_ninode_lookup` (§5), `iref_set` (§5,
+  `ic_pos_op_add` (§5b 3230/3953; `rfl` here, so not stated), `ic_incr_upd`
+  (§5b 3143/3585), `ic_alloc_upd` (§5b 3793), `seq_ninode_lookup` (§5), `iref_set` (§5,
   IcachePinwObl, ProofIget/Idup/Iput), `iref_set_count` (ProofIget/Idup/
   Iput), `iref_set_read` (IcachePinwObl), `isl_slot` (§5b, ProofIget/Idup/
   Iput), `isl_slot_none`/`_some` (§5b, ProofIput), `isl_pool` (IcacheEscrow,
@@ -233,10 +233,6 @@ theorem icMWf_count (M : RegMapF (Qp × PosNat)) (k : Nat) (q : Qp) (n : PosNat)
   have h := hwf.2 k q n hM
   have EI : IREFSLOTS = 486 := rfl
   omega
-
-/-- The count component's `•` IS `+`; naming it lets `omega` see the
-arithmetic in the local-update side conditions. -/
-theorem ic_pos_op_add (a b : PosNat) : a • b = a + b := rfl
 
 /-- The pair element's `•`, componentwise. -/
 private theorem ic_pair_op (q1 q2 : Qp) (n1 n2 : PosNat) :

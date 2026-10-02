@@ -198,8 +198,6 @@ theorem sys_unlink_de_addr (x : BitVec 64) :
     x + BitVec.signExtend 64 4032#12 = sysUnlinkDe x := by
   simp only [sysUnlinkDe]; bv_decide
 
-theorem sys_unlink_ret_16a : BitVec.ofNat 64 16 = (16#64 : BitVec 64) := rfl
-
 set_option maxHeartbeats 64000000 in
 /-- **+0x8a .. +0xae**: the memset, the zeroing writei, its two refusals
 (one live panic), and the +0xae seam. -/

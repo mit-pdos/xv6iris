@@ -147,10 +147,6 @@ Every clause above is a statement about `(_ - _).toNat` at width 32, and
 every move either maintainer makes shifts ONE endpoint by one.  The kit is
 here, once, so neither proof does modular arithmetic inline. -/
 
-theorem consBufz : INPUT_BUF_SIZE = 128 := rfl
-
-theorem consU1 : (1#32).toNat = 1 := rfl
-
 /-- The `addiw ...,-1` spelling of a decrement is the subtraction. -/
 theorem consDec_eq (x : BitVec 32) : x + 4294967295#32 = x - 1#32 := by bv_omega
 

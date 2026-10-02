@@ -19,7 +19,7 @@ because it is a fact about a FILE SYSTEM, readable at BOTH instances.
 `fsState` TAKES A `DFrac` (durable-disk EV-X): every BYTE rides at that
 share -- it is written at the constant-share view `FsView.gammaQ Γ dq` --
 while the ghost column (the link authority, the type register, a
-directory's entry tokens) stays WHOLE (`gammaQ_inodeGhost` is `rfl`).
+directory's entry tokens) stays WHOLE (by `rfl`).
 `fsState Γ (DFrac.own 1) S` is the fraction-1 predicate on the nose.
 
 THE MINT IS THE TRANSPORT (`Xv6/FsDurXfer.lean`, `fsState_xfer_tok`), which

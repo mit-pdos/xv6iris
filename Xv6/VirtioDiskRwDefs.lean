@@ -303,12 +303,8 @@ def vdrwK (k : KCtx) : KCtx :=
 @[simp] theorem vdrwK_locks (k : KCtx) : (vdrwK k).locks = "virtio_disk" :: k.locks := rfl
 @[simp] theorem vdrwK_tier (k : KCtx) : (vdrwK k).tier = k.tier := rfl
 @[simp] theorem vdrwK_proc (k : KCtx) : (vdrwK k).proc = k.proc := rfl
-@[simp] theorem vdrwK_regs (k : KCtx) : (vdrwK k).regs = k.regs := rfl
 @[simp] theorem vdrwK_spie (k : KCtx) : (vdrwK k).spie = k.spie := rfl
 @[simp] theorem vdrwK_spp (k : KCtx) : (vdrwK k).spp = k.spp := rfl
-
-theorem vdrwK_fold (k : KCtx) :
-    ((k.pushOffAt k.spie k.spp).withLocks ("virtio_disk" :: k.locks)).pushed 12 = vdrwK k := rfl
 
 theorem vdrwK_withSpie (k : KCtx) : (vdrwK k).withSpie k.spie k.spp = vdrwK k := rfl
 
@@ -441,15 +437,7 @@ The code builds `&disk.X[i]` as `slli a,i,4; addi a,a,<off>; add a,a,s5`
 with `s5 = &disk`, so what the normaliser leaves is
 `ofNat (16 i) + ofNat off + KA.«disk»`. -/
 
-theorem aFree_eq (i : Nat) : aFree i = KA.«disk» + BitVec.ofNat 64 (24 + i) := rfl
 theorem aInfoB_eq (i : Nat) : aInfoB i = KA.«disk» + BitVec.ofNat 64 (40 + 16 * i) := rfl
-theorem aInfoStatus_eq (i : Nat) :
-    aInfoStatus i = KA.«disk» + BitVec.ofNat 64 (40 + 16 * i + 8) := rfl
-theorem aOps_eq (i : Nat) : aOps i = KA.«disk» + BitVec.ofNat 64 (168 + 16 * i) := rfl
-theorem aOpsReserved_eq (i : Nat) :
-    aOpsReserved i = KA.«disk» + BitVec.ofNat 64 (168 + 16 * i + 4) := rfl
-theorem aOpsSector_eq (i : Nat) :
-    aOpsSector i = KA.«disk» + BitVec.ofNat 64 (168 + 16 * i + 8) := rfl
 
 /-- `(16 i + off) + &disk` is `&disk + (off + 16 i)`. -/
 theorem diskIdx_addr (off i : Nat) :

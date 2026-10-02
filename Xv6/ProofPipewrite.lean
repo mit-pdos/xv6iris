@@ -1855,9 +1855,6 @@ def pwPre (k : KCtx) (j : Nat) (n : Int) (R : RegMap) : Prop :=
   R 22#5 = k.regs 22#5 ∧ R 23#5 = k.regs 23#5 ∧ R 24#5 = k.regs 24#5 ∧ R 25#5 = k.regs 25#5 ∧
   R 26#5 = k.regs 26#5 ∧ R 27#5 = k.regs 27#5
 
-theorem pw_wr_ws_wr (X : KCtx) (R : RegMap) (s s' : Bool) (R' : RegMap) :
-    ((X.withRegs R).withSpie s s').withRegs R' = (X.withSpie s s').withRegs R' := rfl
-
 /-- The spec's continuation is `pwPost`. -/
 theorem pw_post_of_spec (cpu : CPU) (k : KCtx) (γp : PipeNames) (w : Bool) (q : Qp) (j : Nat)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (n : Int)

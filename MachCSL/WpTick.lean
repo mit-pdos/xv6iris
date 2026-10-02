@@ -131,10 +131,6 @@ def confCellsHS (cpu : CPU) (dq : DFrac) (p : Privilege) (c : MConf) (hs : HartS
   Register.pmpaddr_n ↦ᵣ[cpu]{dq} c.pmpaddr ∗
   hwConfig cpu
 
-/-- At `HART_ACTIVE` the family is `confCells` itself. -/
-theorem confCellsHS_active (cpu : CPU) (dq : DFrac) (p : Privilege) (c : MConf) :
-    confCellsHS (GF := GF) cpu dq p c (HartState.HART_ACTIVE ()) = confCells cpu dq p c := rfl
-
 theorem confCellsHS_cases (cpu : CPU) (dq : DFrac) (p : Privilege) (c : MConf) (hs : HartState) :
     confCellsHS (GF := GF) cpu dq p c hs ⊢
     Register.cur_privilege ↦ᵣ[cpu]{dq} p ∗

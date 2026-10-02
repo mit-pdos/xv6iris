@@ -154,12 +154,6 @@ theorem uxw_of_runRW {X : Type} (m : SailM X) (orc : UOrc) (s : UWSt) (r : X × 
     runRW D orc s m = some r → uxRun D T orc s m = some r :=
   uxw_of_runRW' D T m orc s r hdisj
 
-@[simp] theorem uxw_pure {X : Type} (orc : UOrc) (s : UWSt) (x : X) :
-    uxRun D T orc s (pure x : SailM X) = some (x, s, orc) := rfl
-
-@[simp] theorem uxw_freeM_pure {X : Type} (orc : UOrc) (s : UWSt) (x : X) :
-    uxRun D T orc s (FreeM.pure x : SailM X) = some (x, s, orc) := rfl
-
 /-- **The bind law.** -/
 theorem uxw_bind {X Y : Type} (m : SailM X) (f : X → SailM Y) :
     ∀ (orc : UOrc) (s : UWSt), uxRun D T orc s (m >>= f) =

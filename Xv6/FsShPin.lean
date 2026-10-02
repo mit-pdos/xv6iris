@@ -42,9 +42,6 @@ def shPath : List Fname := [fnameSh]
 /-- The tracked raw (Rocq `sh_bytes`). -/
 def shBytes : List (BitVec 8) := Xv6.User.Sh.elf
 
-/-- THE TIE TO THE ELF LAYER (Rocq `sh_bytes_elf`). -/
-theorem shBytes_elf : shBytes = Xv6.User.Sh.elf := rfl
-
 /-- Rocq `era0_dur_sh`. -/
 theorem era0DurSh : durNode era0D SH_INO (imgNode fsimgP fsimgSb SH_INO) :=
   imgDurNode fsImgDisk XV6_DISK_BYTES fsimgSb fsimgNib fsimgCov SH_INO fsimgImageWf (by decide)

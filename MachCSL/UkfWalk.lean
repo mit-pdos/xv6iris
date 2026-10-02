@@ -35,9 +35,6 @@ open LeanRV64D LeanRV64D.Functions
 /-- `uxRun` with the text map as the first argument. -/
 def ukfRun (T : BMap) {X : Type} (D : UFoot) : UOrc → UWSt → SailM X → Option (X × UWSt × UOrc) := uxRun D T
 
-theorem ukfRun_eq (T : BMap) {X : Type} (D : UFoot) (orc : UOrc) (s : UWSt) (m : SailM X) :
-    ukfRun T D orc s m = uxRun D T orc s m := rfl
-
 /-! ## The `ukfRun` twins of `UWalkRun`'s step lemmas (`T`, then the same binders) -/
 
 theorem ukf_pure (T : BMap) (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (x : X) :

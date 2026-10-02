@@ -14,7 +14,7 @@ two slot counts and the calls to `copyout` / `copyin` is common to them.
 THE DESCRIPTOR FORM: the user arm takes and returns the block as
 `procPrivExt pa pid V P`, the running block with its table named
 EXPLICITLY (`P`) rather than read off `V.upt` -- the same resource as
-`procPrivRun pa pid { V with upt := P }` (`procPrivExt_eq_run`, by `rfl`), so
+`procPrivRun pa pid { V with upt := P }` (by `rfl`), so
 a caller that copies in a loop re-enters with the table the last call
 grew.  `COPYOUT`/`COPYIN` promise `P.extSz psz P'` (Rocq
 `ProcPtOwn.uptd_ext_sz`): every gained leaf lies below the break, so the
@@ -22,7 +22,7 @@ block comes back WHOLE -- `umBelow V.sz P'` included -- as Rocq's
 `SpecEitherCopyin` hands back `proc_priv_core p pid (us_upt U P')`.
 
 THE RUNNING BLOCK IS BARE (`procPrivRun` = `FdTable.procPrivBareAt` at the
-ambient context, `procPrivRun_eq`): Rocq's `proc_priv_bare` plus the lazy
+ambient context, by `rfl`): Rocq's `proc_priv_bare` plus the lazy
 claim -- no context save area (a running thread's is owned by its
 `p->lock` RUNNING arm), no descriptor array, no cwd reference, no
 generation row.  Rocq's `SpecEitherCopyin` asks for `proc_priv_core`
@@ -34,10 +34,9 @@ generation ghosts this layer cannot see.
 
 THE EVENT COUNTER (permit sweep G+G', design ni-strong-instance.md §7.2):
 both twins end, as the bare block does, in `SlotGen.actCnt pa V.ev`, so the
-two `rfl` bridges (`procPrivRun_eq`, `procPrivExt_eq`) keep their
-statements; the section takes `[WchG GF]` for it.  Permit sweep L1b (Rocq
-b69bd0fab): `copyin` takes the lend, so `ec_copyin_call` does too, and the
-user arms lend the counter out of the opened block (`ecRest_lend`) and close
+`rfl` bridge `procPrivExt_eq` keeps its statement; the section takes
+`[WchG GF]` for it.  Permit sweep L1b (Rocq b69bd0fab): `copyin` takes
+the lend, so `ec_copyin_call` does too, and the user arms lend the counter out of the opened block (`ecRest_lend`) and close
 it at the count that came back.
 
 Imports only definitional and Spec files (never a `Code*`, `Proof*` or
@@ -84,11 +83,6 @@ def procPrivRun (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
   ⌜V.pvLazy = false → lazyFree V.upt.um V.sz⌝ ∗
   actCnt pa V.ev
 
-/-- `procPrivRun` is `procPrivBareAt` at the kernel-page-table context. -/
-theorem procPrivRun_eq (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
-    (M : Nat → List (BitVec 8)) :
-    @procPrivRun hlc GF _ ⟨ξ, KTier.kpt⟩ _ pa pid V M = procPrivBareAt (GF := GF) ξ pa pid V M := rfl
-
 /-- The private block of a running process at the descriptor `P'` (the
 table the lazy pages `vmfault` filled in under `copyout`/`copyin` grew
 to): `procPrivRun` with the table named explicitly (bare, like it). -/
@@ -103,11 +97,6 @@ def procPrivExt (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P' : UPtd)
   ⌜V.pvLazy = false → lazyFree P'.um V.sz⌝ ∗
   actCnt pa V.ev
 
-/-- ... which IS the running block at the new descriptor. -/
-theorem procPrivExt_eq_run (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P' : UPtd)
-    (M' : Nat → List (BitVec 8)) :
-    procPrivExt (GF := GF) pa pid V P' M' = procPrivRun pa pid { V with upt := P' } M' := rfl
-
 /-- ... and, at the kernel-page-table context, `procPrivBareAt` there. -/
 theorem procPrivExt_eq (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P' : UPtd)
     (M' : Nat → List (BitVec 8)) :
@@ -118,10 +107,6 @@ theorem procPrivExt_eq (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (V : Proc
 theorem procPriv_to_ext (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) :
     procPrivRun (GF := GF) pa pid V M ⊢ procPrivExt pa pid V V.upt M := .rfl
-
-/-- The fields do not mention the address space. -/
-theorem procFields_upt (pa : BitVec 64) (dq : DFrac) (V : ProcPriv) (P' : UPtd) :
-    procFieldsNoOfile (GF := GF) pa dq { V with upt := P' } = procFieldsNoOfile pa dq V := rfl
 
 /-- The block's table facts, kept (what a chunked copy needs to chain its
 chunks without a 64-bit wrap: `UMemL.umMapped_bound`). -/

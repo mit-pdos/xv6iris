@@ -155,9 +155,6 @@ def inodeRaw [CurCtx] (ip : BitVec 64) : IProp GF := iprop%
   (∃ d : Dinode, inodeMeta ip d) ∗
   (∃ l : List (BitVec 32), ⌜l.length = 13⌝ ∗ inodeAddrs ip l)
 
-theorem inodeRawAt_cur [CurCtx] (ip : BitVec 64) :
-    inodeRawAt (GF := GF) curCtx ip = inodeRaw ip := rfl
-
 /-- Rocq's `inode_raw_morph`: `inodeRaw` is the two cell bundles, hence
 transportable rather than context-constant. -/
 instance instCtxMorphInodeRawAt [CurCtx] (ip : BitVec 64) :

@@ -141,8 +141,6 @@ def xrUnion (l : List XRun) : RegMapF (BitVec 8) :=
 def xrDisj (l : List XRun) : Prop :=
   ∀ (k j : Nat) r1 r2, k ≠ j → l[k]? = some r1 → l[j]? = some r2 → xrMap r1 ##ₘ xrMap r2
 
-theorem xrUnion_nil : xrUnion [] = ∅ := rfl
-
 theorem xrUnion_cons (r : XRun) (l : List XRun) :
     xrUnion (r :: l) = PartialMap.union (xrMap r) (xrUnion l) := rfl
 

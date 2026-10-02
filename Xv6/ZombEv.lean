@@ -79,10 +79,4 @@ def statusStep (m : Int → Option Int) : Zev → Int → Option Int
 deviation 3). -/
 def statusOf (h : List Zev) : Int → Option Int := h.foldl statusStep (fun _ => none)
 
-/-! ## 3. The snoc equations -/
-
-theorem zombiesOf_nil : zombiesOf [] = fun _ => False := rfl
-
-theorem statusOf_nil : statusOf [] = fun _ => none := rfl
-
 end Xv6

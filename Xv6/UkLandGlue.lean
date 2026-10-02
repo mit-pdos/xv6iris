@@ -63,10 +63,6 @@ theorem uke_land_ucNpcS {C : UCfg} {P : UPtd} {T : BMap} {s : UWSt} (h : UkLand 
     (len : Int) : UkLand C P T (ucNpcS s len) :=
   uke_land_setNpc h _
 
-theorem uke_uxcNpc_eq (s : UWSt) (t : BitVec 64) : uxcNpc s t = s.setR .nextPC t := rfl
-
-@[simp] theorem uke_ucNpcS_mm (s : UWSt) (len : Int) : (ucNpcS s len).mm = s.mm := rfl
-
 theorem uke_ucNpcS_npc (s : UWSt) (len : Int) :
     (ucNpcS s len).file .nextPC = BitVec.addInt (s.file .PC) len :=
   UWSt.setR_file_same _ _ _

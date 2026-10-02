@@ -9,7 +9,7 @@ Rocq passes the round's section variables and hypotheses to
 siblings b and c (`PdRoundOk`, `StgEnv`/`StgOk`, `NodeOk`, `LawOk`), built at
 the union's round `uD` by the constructors below (`uPdOk`, `uStgEnv`,
 `uStgOk`).  Not in Rocq (helpers): `UPipesEng`, `uPdOk`, `uStgEnv`, `uStgOk`,
-`uD_pdep`, `uD_FAM_alloc`, `ush_stage_slots`.
+`ush_stage_slots`.
 
 ## The engines (`UPipesEng`, parameters)
 
@@ -86,18 +86,6 @@ end UPipesEng
 variable (ug : UnionGn) (v : EraPins) (I : List (BitVec 8)) (sR : Fstate) (lR : Pline')
   (L : List (BitVec 8)) (pr : Producer) (Rd : IProp GF) (γc γm : Wid → GName) (P : Nat → PNames)
   (gF gG : Nat → GName)
-
-/-- The deposits do not read the family's names. -/
-theorem uD_pdep (γc' γm' : Wid → GName) (Rd' : IProp GF) :
-    pdep (uD ug v I sR lR L pr Rd γc γm P gF gG) = pdep (uD ug v I sR lR L pr Rd' γc' γm' P gF gG) := rfl
-
-/-- The family, as `pipesV_alloc` hands it out. -/
-theorem uD_FAM_alloc (γc' γm' : Wid → GName) (Rd' : IProp GF) :
-    (uD ug v I sR lR L pr Rd γc γm P gF gG).FAM =
-      blkNInv (hlc := hlc) (wids (lcats lR)) (runN (pviewUnionU.pvFc sR) lR)
-        (pwcBlkV (ugnPipe ug) ulmG (ucparams (hlc := hlc) (GF := GF) ug).gcPIN (ucparams ug).gcW
-          (ucparams ug).gcT v I sR) termw (tokN (pviewUnionU.pvFc sR) lR)
-        (pdep (uD ug v I sR lR L pr Rd' γc' γm' P gF gG)) pnsN (genId (hlc := hlc) (GF := GF) + 1) γc γm := rfl
 
 /-- The family, from `pipesV_alloc`'s names (a cast). -/
 theorem uD_FAM_of_alloc (γc' γm' : Wid → GName) (Rd' : IProp GF) :

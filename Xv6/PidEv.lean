@@ -78,8 +78,6 @@ def nextOf (pidmax : Nat) (h : List Pev) : Nat := h.foldl (nextStep pidmax) 1
 
 /-! ## 3. The snoc equations -/
 
-theorem liveOf_nil : liveOf [] = fun _ => False := rfl
-
 theorem liveOf_snoc (h : List Pev) (e : Pev) : liveOf (h ++ [e]) = liveStep (liveOf h) e := by
   unfold liveOf; rw [List.foldl_append]; rfl
 
@@ -90,8 +88,6 @@ theorem liveOf_snoc_alloc (h : List Pev) (a : BitVec 64) (p : BitVec 32) :
 theorem liveOf_snoc_free (h : List Pev) (a : BitVec 64) (p : BitVec 32) :
     liveOf (h ++ [.PFree a p]) = fun k => liveOf h k ∧ k ≠ (p.toNat : Int) := by
   rw [liveOf_snoc]; rfl
-
-theorem nextOf_nil (pidmax : Nat) : nextOf pidmax [] = 1 := rfl
 
 /-! ## 5. The rewrite forms the invariant's tie uses -/
 

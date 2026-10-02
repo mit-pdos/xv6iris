@@ -11,8 +11,7 @@ Rocq `FsStateLink.v`) or the register's value type `Ity`
 
 * §4 the fragments an inode's entries carry: `fnItyOk`, `entTyOk`,
   `entTokAt`, `entTok`, `entToks`, `entToksNodot`, `entElem`,
-  `linkElemNode`, `nodeEntOk`, `entToksX`, `inodeGhost`, `inodeOwned`,
-  `gammaQ_inodeGhost`.
+  `linkElemNode`, `nodeEntOk`, `entToksX`, `inodeGhost`, `inodeOwned`.
 * §5 timelessness: `entTokAt_timeless`, `entTok_timeless`,
   `entToks_timeless`, `entToksX_timeless`, `inodeGhost_timeless`,
   `inodeOwned_timeless`; the congruences `entToks_congEnt`,
@@ -235,13 +234,6 @@ def inodeGhost (Γ : FsViewNames GF) (i : Nat) (n : FsNode) : IProp GF :=
 /-- Rocq's `inode_owned`. -/
 def inodeOwned (Γ : FsViewNames GF) (sb : FsSb) (i : Nat) (n : FsNode) : IProp GF :=
   iprop(inodePhi Γ sb i n ∗ inodeGhost Γ i n)
-
-/-- THE Φ-FREE HALF DOES NOT MOVE AT A SHARE, and this is the EV-X ruling in
-one line: `gammaQ` copies `link` and `top`, so an inode's link authority
-and entry tokens at the constant-share view are the SAME proposition they
-are at `Γ` (Rocq's `gamma_q_inode_ghost`). -/
-theorem gammaQ_inodeGhost (Γ : FsViewNames GF) (dq : DFrac) (i : Nat) (n : FsNode) :
-    inodeGhost (FsView.gammaQ Γ dq) i n = inodeGhost Γ i n := rfl
 
 /-! ### the two arms of the `if` -/
 

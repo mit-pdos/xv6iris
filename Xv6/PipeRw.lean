@@ -115,8 +115,6 @@ def wordBytes8 (w : BitVec 64) : List (BitVec 8) :=
   [nthByte (n := 8) w 0, nthByte (n := 8) w 1, nthByte (n := 8) w 2, nthByte (n := 8) w 3,
    nthByte (n := 8) w 4, nthByte (n := 8) w 5, nthByte (n := 8) w 6, nthByte (n := 8) w 7]
 
-@[simp] theorem wordBytes8_length (w : BitVec 64) : (wordBytes8 w).length = 8 := rfl
-
 /-- **An 8-aligned word to its eight bytes** (`copyin`/`copyout`'s stack buffer). -/
 theorem pw_word8_to_bytes (a : BitVec 64) (dq : DFrac) (w : BitVec 64) (hal : a.toNat % 8 = 0) :
     wordPointsTo (GF := GF) a 8 dq w ⊢ byteBuf a dq (wordBytes8 w) := by

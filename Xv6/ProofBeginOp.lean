@@ -123,7 +123,6 @@ def boK (k : KCtx) : KCtx :=
 @[simp] theorem boK_locks (k : KCtx) : (boK k).locks = "log" :: k.locks := rfl
 @[simp] theorem boK_tier (k : KCtx) : (boK k).tier = k.tier := rfl
 @[simp] theorem boK_proc (k : KCtx) : (boK k).proc = k.proc := rfl
-@[simp] theorem boK_regs (k : KCtx) : (boK k).regs = k.regs := rfl
 @[simp] theorem boK_spie (k : KCtx) : (boK k).spie = k.spie := rfl
 @[simp] theorem boK_spp (k : KCtx) : (boK k).spp = k.spp := rfl
 

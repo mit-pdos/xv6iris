@@ -250,13 +250,6 @@ end gpr
 
 /-! ## What a GPR write leaves alone -/
 
-@[simp] theorem uxaWr_mm (s : UWSt) (i : BitVec 5) (v : BitVec 64) : (uxaWr s i v).mm = s.mm := rfl
-@[simp] theorem uxaWr_rv (s : UWSt) (i : BitVec 5) (v : BitVec 64) : (uxaWr s i v).rv = s.rv := rfl
-@[simp] theorem uxaWr_rs (s : UWSt) (i : BitVec 5) (v : BitVec 64) : (uxaWr s i v).rs = s.rs := rfl
-
-/-- A write to `x0` is discarded. -/
-@[simp] theorem uxaWr_zero (s : UWSt) (v : BitVec 64) : uxaWr s 0 v = s := rfl
-
 /-- Every non-GPR register (`PC`, `nextPC`, the CSRs, ...) reads as before. -/
 theorem uxaWr_file_other (s : UWSt) (i : BitVec 5) (v : BitVec 64) (r : Register)
     (hr : r ∉ uxaGprs) : (uxaWr s i v).file r = s.file r := by

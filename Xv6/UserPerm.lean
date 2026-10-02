@@ -73,12 +73,6 @@ def upermAt (π : Nat → Option UPerm) (va : BitVec 64) : Option UPerm := π (v
 
 namespace UserPerm
 
-/-- Rocq `perm_of_lookup`. -/
-theorem permOf_lookup (um : RegMapF (BitVec 64)) (sz k : Nat) :
-    permOf um sz k = match get? um k with
-      | some w => permLeaf w
-      | none => if k * 4096 < pgRoundUpN sz then some upermRw else none := rfl
-
 /-- A mapped page reads its own leaf (Rocq `perm_of_of_leaf`'s core). -/
 theorem permOf_mapped {um : RegMapF (BitVec 64)} (sz : Nat) {k : Nat} {w : BitVec 64}
     (h : get? um k = some w) : permOf um sz k = permLeaf w := by

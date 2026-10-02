@@ -79,12 +79,6 @@ def wrSectorBytes (w : DiskWr) (i : Nat) : List (BitVec 8) :=
   | some ob => ob.2
   | none => []
 
-/-- DRAINED BYTES = CAPTURED BYTES: writing sector `i`'s cached payload at the
-sector's own offset IS the sector-`i` piece of the whole write. -/
-theorem wrSector_write (off : Nat) (bs : List (BitVec 8)) (i : Nat) (dk : Nat → BitVec 8) :
-    Virtio.diskWrite dk (off + Virtio.sectorSize * i) (wrSectorBytes (some (off, bs)) i) =
-      wrApply (wrSector (some (off, bs)) i) dk := rfl
-
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF]
 

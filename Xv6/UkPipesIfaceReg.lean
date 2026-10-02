@@ -102,8 +102,6 @@ kinds. -/
 def pnsKdsOk (kds : List (Nat × Pdev)) (vs : RegMapF Pdev) : Prop :=
   ∀ dk, dk ∈ kds → get? vs dk.1 = some dk.2
 
-theorem pnsNSTD : NSTD = 3 := rfl
-
 /-- **Rocq `pns_ok_lookup`**. -/
 theorem pns_ok_lookup (Dp : List Nat) (fdm : Fdmap) (l : List FdState) (vs : RegMapF Pdev) (fd : Int)
     (d : Nat) (hok : pnsOk Dp fdm l vs) (hfd : fdm fd = some d) : ∃ x, get? vs d = some x := by

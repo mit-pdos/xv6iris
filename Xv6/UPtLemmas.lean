@@ -136,8 +136,6 @@ theorem umBelow_mono (sz sz' : BitVec 64) (P : UPtd) (hle : sz.toNat ≤ sz'.toN
     exact Nat.mul_le_mul_right 4096 (Nat.div_le_div_right (by omega))
   omega
 
-theorem mappedIn_zero (P : UPtd) (v0 : Nat) : P.mappedIn v0 0 = 0 := rfl
-
 /-! ## The resources: `umPages`, `ptOwnRep`, `procPtAt` -/
 
 section

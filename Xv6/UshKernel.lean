@@ -116,9 +116,6 @@ theorem shSz_ok : uszOk (kexecSz User.Sh.elf + 65536) := by rw [shKexecSz]; unfo
 theorem shStart_pc : retPc (BitVec.ofNat 64 User.Sh.entry) = BitVec.ofNat 64 User.Sh.Sym.«start» := by
   decide
 
-/-- **Rocq `csp_rs1_eq`**: the stack pointer's register index. -/
-theorem cspRs1_eq : spIdx = 2#5 := rfl
-
 /-- **Rocq `kxc_sp_final_mod8`**: the final sp is 16-rounded, hence
 8-aligned. -/
 theorem kxcSpFinal_mod8 (top : Int) (alen : Nat → Nat) (na : Nat) : kxcSpFinal top alen na % 8 = 0 := by

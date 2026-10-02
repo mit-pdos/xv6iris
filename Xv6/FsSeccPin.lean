@@ -42,9 +42,6 @@ def seccPath : List Fname := [fnameSeccomp]
 /-- The tracked raw (Rocq `secc_bytes`). -/
 def seccBytes : List (BitVec 8) := Xv6.User.Seccomp.elf
 
-/-- THE TIE TO THE ELF LAYER (Rocq `secc_bytes_elf`). -/
-theorem seccBytes_elf : seccBytes = Xv6.User.Seccomp.elf := rfl
-
 /-- Rocq `era0_dur_secc`. -/
 theorem era0DurSecc : durNode era0D SECC_INO (imgNode fsimgP fsimgSb SECC_INO) :=
   imgDurNode fsImgDisk XV6_DISK_BYTES fsimgSb fsimgNib fsimgCov SECC_INO fsimgImageWf (by decide)

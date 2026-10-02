@@ -41,9 +41,8 @@ children and the pid.  Rocq's header, point for point:
    carries `urunRows N fdv` (Rocq `urun_rows`, the registrations or the
    taint) beside `udep`, so `urun_close(_wr)` and the entries take it.
    `ukFdStOfKey` is Rocq `FdSlots.fd_st_of_key` restated here (Lean's
-   `UexecExecInst.fdStOfKey` sits above the file-system tower;
-   `UexecExecMintW.ukFdStOfKey_eq` is the bridge, by `rfl`).  The taint is
-   `□ uKillCred` (Rocq `app_taint`).  NOT PORTED (unreached): `ukey_table_nopipe`,
+   `UexecExecInst.fdStOfKey` sits above the file-system tower; the two are
+   equal by `rfl`).  The taint is `□ uKillCred` (Rocq `app_taint`).  NOT PORTED (unreached): `ukey_table_nopipe`,
    `udep_exit_dep`, `urun_nopipe_closed`/`_taint`/`_quiet`/`_step`,
    `urun_rows_intro`/`_closed`/`_taint`/`_step`/`_quiet`.
 3. **The whole-table view (seccomp S3 ruling G2, K3)**: the primitive entry

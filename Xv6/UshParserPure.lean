@@ -100,8 +100,6 @@ def ushDeep (t : UshpCmd) : Nat := 8 + ushPlDeep t
 def ushZeroAt (js : List Nat) (g : Nat → BitVec 8) : Nat → BitVec 8 :=
   js.foldl (fun g' j => ushpSetb g' j ubyte0) g
 
-theorem ushZeroAt_nil (g : Nat → BitVec 8) : ushZeroAt [] g = g := rfl
-
 theorem ushZeroAt_app (l1 l2 : List Nat) (g : Nat → BitVec 8) :
     ushZeroAt (l1 ++ l2) g = ushZeroAt l2 (ushZeroAt l1 g) := by
   unfold ushZeroAt; rw [List.foldl_append]

@@ -90,13 +90,6 @@ theorem frees_append (h1 h2 : List Kev) : frees (h1 ++ h2) = frees h1 + frees h2
   | nil => simp
   | cons e h1 ih => cases e <;> simp only [List.cons_append, frees, ih] <;> omega
 
-theorem allocs_alloc (p : BitVec 64) : allocs [.KAlloc p] = 1 := rfl
-theorem allocs_null (p : BitVec 64) : allocs [.KNull p] = 0 := rfl
-theorem allocs_free (p : BitVec 64) : allocs [.KFree p] = 0 := rfl
-theorem frees_alloc (p : BitVec 64) : frees [.KAlloc p] = 0 := rfl
-theorem frees_null (p : BitVec 64) : frees [.KNull p] = 0 := rfl
-theorem frees_free (p : BitVec 64) : frees [.KFree p] = 1 := rfl
-
 theorem allocs_snoc_alloc (h : List Kev) (p : BitVec 64) :
     allocs (h ++ [.KAlloc p]) = allocs h + 1 := by rw [allocs_append]; rfl
 theorem allocs_snoc_null (h : List Kev) (p : BitVec 64) :

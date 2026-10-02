@@ -116,10 +116,6 @@ abbrev machInterp (σ : MState) : IProp GF := iprop%
 theorem eraInterp_ambient (σ : MState) :
     eraInterp (GF := GF) (MachGS.era (hlc := hlc) (GF := GF)) σ = machInterp σ := rfl
 
-/-- The mirrors do not mention the registers. -/
-theorem memModel_regs (σ : MState) (f : CPU → RegFile) :
-    memModel (GF := GF) { σ with regs := f } = memModel σ := rfl
-
 /-- Re-assemble the interpretation after a register update. -/
 theorem machInterp_of_regs (σ : MState) (f : CPU → RegFile) :
     ([∗list] cpu ∈ cpus, regInterp cpu (f cpu)) ∗ genHeapInterp σ.mem ∗ memModel σ ∗
@@ -139,8 +135,6 @@ def wpHart (cpu : CPU) (m : SailM Unit) : IProp GF := iprop%
 
 /-- The paper's `wp CpuLoop`: it is safe to run hart `cpu` from a cycle boundary. -/
 def wpLoop (cpu : CPU) : IProp GF := wpHart (GF := GF) cpu (pure ())
-
-theorem wpLoop_eq (cpu : CPU) : wpLoop (GF := GF) cpu = wpHart (GF := GF) cpu (pure ()) := rfl
 
 /-- A ghost update before the loop (the WP absorbs the basic update). -/
 theorem wpLoop_bupd (cpu : CPU) : (|==> wpLoop (GF := GF) cpu) ⊢ wpLoop cpu := by
@@ -907,9 +901,6 @@ end memmodel
 
 section bytes
 variable [MachGS hlc GF]
-
-theorem mem_get?_eq {V : Type} (m : MemF V) (k : PAddr) :
-    Iris.Std.PartialMap.get? (M := MemF) m k = m[k]? := rfl
 
 theorem mem_insert_eq {V : Type} (m : MemF V) (k : PAddr) (v : V) :
     Iris.Std.PartialMap.insert (M := MemF) m k v = m.insert k v := by

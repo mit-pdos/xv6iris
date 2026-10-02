@@ -50,9 +50,6 @@ def imgF (P : Nat → List (BitVec 8)) (sb : FsSb) : LinkChoice :=
     | some t => imgV P sb t
     | none => .tFile))
 
-theorem imgF_v (P : Nat → List (BitVec 8)) (sb : FsSb) (z : Nat) :
-    lcV (imgF P sb) z = imgV P sb z := rfl
-
 theorem imgF_tyf (P : Nat → List (BitVec 8)) (sb : FsSb) (z : Nat) (s : Fname) :
     lcTyf (imgF P sb) z s = match (dirEntries (imgNode P sb z))[s]? with
       | some t => imgV P sb t

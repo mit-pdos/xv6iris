@@ -551,9 +551,6 @@ theorem sys_link_walk_ip (IL : ILOCK) (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : EN
       $$ [$Hk $Hpc $Hcells $Hnm $Hnew $Hold $Hte $Hce $Henv $Hrows $Hhole $HΦ $Hip $Hshot $Htok $Hfld
         $Hrefd $Hshotd $Hrud $Hltgt $Hlent $Hcmu $Hbs $Hir $Hop $Htx]
 
-theorem sys_link_upt_upt (V : ProcPriv) (P1 P2 : UPtd) :
-    ({ { V with upt := P1 } with upt := P2 } : ProcPriv) = { V with upt := P2 } := rfl
-
 set_option maxHeartbeats 64000000 in
 set_option maxRecDepth 20000 in
 /-- **`+0x30 .. +0x40`** (Rocq `ProofSysLink.v` 1165-1335): s1's late save,

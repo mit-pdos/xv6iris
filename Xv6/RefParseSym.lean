@@ -36,8 +36,6 @@ def refNonnul (len : Nat) (f : Nat → BitVec 8) : Prop := ∀ j, j < len → f 
 
 /-! ## §0 The cursor lemmas -/
 
-theorem rb_gt_is_ushs : ushsGt = rbGt := rfl
-
 theorem rtWord_ne_0 : rtWord ≠ 0 := by decide
 
 theorem refAt_lt (len : Nat) (f : Nat → BitVec 8) (i : Nat) (h : i < len) : refAt len f i = f i := by

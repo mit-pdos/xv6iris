@@ -30,7 +30,7 @@ IProp`, `MachCSL.nonul : List (BitVec 8) -> Prop`), which is why
 | `PrintkFmt.nonul (s : string)`   | `MachCSL.nonul (s : List (BitVec 8))` |
 | `PrintkFmt.pk_nul`               | `0#8` |
 | `CstringInv.byte_ascii`          | `Xv6.byteAscii` = the identity |
-| `CstringInv.byte_ascii_roundtrip`| `Xv6.byteAscii_roundtrip` (`rfl`) |
+| `CstringInv.byte_ascii_roundtrip`| `rfl` here, so not stated |
 | `CstringInv.byte_ascii_nonul`    | not ported (nothing uses it) |
 | `CstringInv.bytes_string`        | `Xv6.bytesString` |
 | `CstringInv.bytes_string_nonul`  | `Xv6.bytesString_nonul` |
@@ -82,10 +82,6 @@ def bytesString : List (BitVec 8) → List (BitVec 8)
 
 theorem bytesString_cons (b : BitVec 8) (bs : List (BitVec 8)) :
     bytesString (b :: bs) = if b = 0#8 then [] else b :: bytesString bs := rfl
-
-/-- Rocq `byte_ascii_roundtrip`: `bv 8` is exactly the range `ascii_of_N` and
-`N_of_ascii` are inverse on.  Here the round trip is definitional. -/
-theorem byteAscii_roundtrip (b : BitVec 8) : byteAscii b = b := rfl
 
 /-- Rocq `bytes_string_nonul`: the prefix before the first NUL has no NUL. -/
 theorem bytesString_nonul (bs : List (BitVec 8)) : nonul (bytesString bs) := by

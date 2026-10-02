@@ -432,8 +432,6 @@ payload carries, so that the payload is a transport family (Rocq's
 abbrev pipeSlackAt (ξ : CtxId) (pi : BitVec 64) : IProp GF :=
   @pipeSlack hlc GF _ ⟨ξ, curTier⟩ pi
 
-theorem pipeSlackAt_cur (pi : BitVec 64) : pipeSlackAt (GF := GF) curCtx pi = pipeSlack pi := rfl
-
 instance instCtxMorphPipeSlackAt (pi : BitVec 64) :
     CtxMorph (GF := GF) (fun ξ => pipeSlackAt ξ pi) := by
   unfold pipeSlackAt pipeSlack byteBuf

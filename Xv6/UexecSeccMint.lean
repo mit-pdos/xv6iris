@@ -108,8 +108,6 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FsTopG
 `secc_fam`). -/
 def seccFam : Xfam GF := xfamAt (fun _ => iprop(True)) xfamPt
 
-theorem seccFamXpay :
-    @UexecSG.sexitPay GF _ (uexecSGXv6 (hlc := hlc)) seccFam = fun _ => iprop(True) := rfl
 theorem seccFamFpay :
     @UexecSG.sforkPay GF _ (uexecSGXv6 (hlc := hlc)) seccFam = fun _ => iprop(True) := rfl
 theorem seccFamLend :

@@ -39,8 +39,6 @@ theorem ki_ret_ad8 : jumpPc (KA.«kinit» + 0x2c#64) = (KA.«kinit» + 0x2c#64) 
 theorem ki_availAdd0 : availAdd (some 0) kinitPages = some kinitPages := by
   simp only [availAdd, Option.map_some, Nat.zero_add]
 
-theorem ki_stop_toNat : (0x88000000#64).toNat = 0x88000000 := rfl
-
 /-- The arguments `kinit` hands `freerange`: `end` and `PHYSTOP` delimit
 exactly `kinitPages` whole pages from `PGROUNDUP(end) = kinitBase`.  Every
 conjunct is a closed fact about the kernel's symbols, so `decide` settles

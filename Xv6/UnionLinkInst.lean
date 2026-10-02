@@ -139,22 +139,14 @@ noncomputable def unionParams (ug : UnionGn) : GenParams hlc GF ulmG where
   gR_pan := upr_pan ug
   gR_exf := upr_exf ug
 
-theorem unionParams_gR (ug : UnionGn) :
-    (unionParams (hlc := hlc) (GF := GF) ug).gR = upr ug := rfl
 theorem unionParams_gT (ug : UnionGn) :
     (unionParams (hlc := hlc) (GF := GF) ug).gT = fileTaint (hlc := hlc) ug.ugnFile.fgnCl := rfl
-theorem unionParams_gPIN (ug : UnionGn) :
-    (unionParams (hlc := hlc) (GF := GF) ug).gPIN = eraPin (fgnEcho ug.ugnFile) := rfl
 theorem unionParams_gW (ug : UnionGn) :
     (unionParams (hlc := hlc) (GF := GF) ug).gW = f0w ug.ugnFile := rfl
 theorem unionParams_gWb (ug : UnionGn) :
     (unionParams (hlc := hlc) (GF := GF) ug).gWb = uf0bwk ug := rfl
 theorem unionParams_gk0 (ug : UnionGn) :
     (unionParams (hlc := hlc) (GF := GF) ug).gk0 = genId (hlc := hlc) (GF := GF) + 1 := rfl
-theorem unionParams_gH (ug : UnionGn) :
-    (unionParams (hlc := hlc) (GF := GF) ug).gH = fhead ug.ugnFile := rfl
-theorem unionParams_gwild (ug : UnionGn) :
-    (unionParams (hlc := hlc) (GF := GF) ug).gwild = fun I => uwild (lmLineAt ulmG I) = true := rfl
 
 /-! ## 2. The links entail the interface -/
 

@@ -91,18 +91,6 @@ Each is a function of the CONFIGURATION alone (the identification
 registers are constants), which is what makes the driver's tracker
 `diskCfgOwn` enough to predict the value. -/
 
-theorem vread_magic (v : VirtioState) :
-    Virtio.read v Virtio.offMagicValue = some (BitVec.ofNat 32 Virtio.magicValue) := rfl
-
-theorem vread_version (v : VirtioState) :
-    Virtio.read v Virtio.offVersion = some (BitVec.ofNat 32 Virtio.version) := rfl
-
-theorem vread_deviceId (v : VirtioState) :
-    Virtio.read v Virtio.offDeviceId = some (BitVec.ofNat 32 Virtio.blkDeviceId) := rfl
-
-theorem vread_vendorId (v : VirtioState) :
-    Virtio.read v Virtio.offVendorId = some (BitVec.ofNat 32 Virtio.vendorId) := rfl
-
 theorem vread_deviceFeatures (v : VirtioState) :
     Virtio.read v Virtio.offDeviceFeatures =
       some (BitVec.ofNat 32 (if v.cfg.devfsel = 0#32 then Virtio.deviceFeatures
@@ -130,14 +118,6 @@ theorem vwrite_status_set (v : VirtioState) (w : BitVec 32) (hw : w ≠ 0#32) :
     Virtio.write v Virtio.offStatus w = some { v with cfg := { v.cfg with status := w } } := by
   show (if w = 0#32 then _ else _) = _
   rw [if_neg hw]
-
-theorem vwrite_devFeatSel (v : VirtioState) (w : BitVec 32) :
-    Virtio.write v Virtio.offDeviceFeaturesSel w =
-      some { v with cfg := { v.cfg with devfsel := w } } := rfl
-
-theorem vwrite_drvFeatSel (v : VirtioState) (w : BitVec 32) :
-    Virtio.write v Virtio.offDriverFeaturesSel w =
-      some { v with cfg := { v.cfg with dfsel := w } } := rfl
 
 theorem vwrite_drvFeat0 (v : VirtioState) (w : BitVec 32) (h : v.cfg.dfsel = 0#32) :
     Virtio.write v Virtio.offDriverFeatures w =
@@ -266,13 +246,13 @@ theorem diskProto_dead_open (γ : DiskNames) (v : VirtioState) (c : VirtioCfg)
 `virtio_disk_init` runs against the DEAD arm: it holds `diskCfgOwn γ c`,
 and every register it reads is a function of `c` alone, so the accessor
 returns the value as a PURE equation.  Each of the six `unreachable`
-panics of the function is refuted by instantiating `hrd` with one of the
-`vread_*` lemmas above. -/
+panics of the function is refuted by instantiating `hrd` with that
+register's `Virtio.read` equation (one of the `vread_*` lemmas above, or
+`rfl` for the identification registers). -/
 
 /-- **A 4-byte MMIO read before the device is live** (every
 `*R(...)` load of `virtio_disk_init`).  `hrd` says the register's value is
 a function of the configuration the driver's tracker holds -- see
-`vread_magic`, `vread_version`, `vread_deviceId`, `vread_vendorId`,
 `vread_deviceFeatures`, `vread_status`, `vread_queueReady`,
 `vread_queueNumMax`. -/
 theorem disk_reg_read_dead (γ : DiskNames) (c : VirtioCfg) (off : Nat) (w : BitVec 32)

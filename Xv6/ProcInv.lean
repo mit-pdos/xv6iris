@@ -61,7 +61,7 @@ reference (`procPrivCwd` here, `FdTable.procPrivCoreNoctxAt` /
 `procPrivCoreUnmarkedAt`).  No null arm either: the deficit block lacks BOTH
 references (`procPrivNoctxAt`), and every dormant shape pins `V.root = 0`
 beside `V.cwd = 0`.  The lemma family is the cwd's at the other cell:
-`rootRefAt_heldAt` / `_ofHeldAt` and `procPrivNoctx_rti`.
+`rootRefAt_heldAt` / `_ofHeldAt`.
 
 Imports only definitional files.
 -/
@@ -115,23 +115,6 @@ userinit's install, sys_chdir, sys_chroot and the path walks hold. -/
 def procPrivCwd (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) : IProp GF := iprop%
   procPrivNoctxAt curCtx pa pid V M ∗ cwdRefAt V.cwd V.cwi ∗ rootRefAt V.root V.rti
-
-/-- **The deficit block does not mention the inum** (Rocq
-`proc_priv_nocwd_cwi`): nothing in it ties `p->cwd` to anything, so the
-installer (userinit, kfork's child) picks the inum the reference it installs
-carries, and rejoins `procPrivCwd` at that inum. -/
-theorem procPrivNoctx_cwi (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
-    (M : Nat → List (BitVec 8)) (z : Nat) :
-    procPrivNoctxAt (GF := GF) ξ pa pid { V with cwi := z } M = procPrivNoctxAt ξ pa pid V M :=
-  rfl
-
-/-- **...nor the root's** (Rocq `proc_priv_nocwd_rti`): the installer
-(userinit, kfork's child) picks the inum the root reference it installs
-carries. -/
-theorem procPrivNoctx_rti (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
-    (M : Nat → List (BitVec 8)) (z : Nat) :
-    procPrivNoctxAt (GF := GF) ξ pa pid { V with rti := z } M = procPrivNoctxAt ξ pa pid V M :=
-  rfl
 
 end
 

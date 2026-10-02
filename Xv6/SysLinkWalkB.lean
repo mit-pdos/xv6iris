@@ -65,11 +65,6 @@ set_option linter.unusedSimpArgs false
 theorem sys_link_wi16_credited (crd cru al ind : Bool) : wi16Spend true crd cru al ind ≤ 3 := by
   cases crd <;> cases cru <;> cases al <;> cases ind <;> decide
 
-theorem sys_link_wi_type (dn : Dinode) (bm' : Blkmap) (off tot : Nat) :
-    (wiDinode dn bm' off tot).diType = dn.diType := rfl
-theorem sys_link_wi_nlink (dn : Dinode) (bm' : Blkmap) (off tot : Nat) :
-    (wiDinode dn bm' off tot).diNlink = dn.diNlink := rfl
-
 /-- `lw a2,4(s1)` SIGN-extends the 32-bit `ip->inum`; dirlink wants the
 halfword ZERO-extended: they agree below `2^16` (Rocq `sl_a2_low16`). -/
 theorem sys_link_a2 (inum : BitVec 32) (h : inum.toNat < 2 ^ 16) :

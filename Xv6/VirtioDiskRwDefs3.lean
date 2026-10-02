@@ -50,19 +50,6 @@ device's direction bit `dwr` is the NEGATION of the C parameter `write`
 def vdrwChain (b : BitVec 64) (bno : BitVec 32) (wr : Bool) (h m t : Nat) : Chain :=
   { hd := h, md := m, tl := t, dwr := !wr, sector := sectorOf bno, bp := b }
 
-@[simp] theorem vdrwChain_hd (b : BitVec 64) (bno : BitVec 32) (wr : Bool) (h m t : Nat) :
-    (vdrwChain b bno wr h m t).hd = h := rfl
-@[simp] theorem vdrwChain_md (b : BitVec 64) (bno : BitVec 32) (wr : Bool) (h m t : Nat) :
-    (vdrwChain b bno wr h m t).md = m := rfl
-@[simp] theorem vdrwChain_tl (b : BitVec 64) (bno : BitVec 32) (wr : Bool) (h m t : Nat) :
-    (vdrwChain b bno wr h m t).tl = t := rfl
-@[simp] theorem vdrwChain_dwr (b : BitVec 64) (bno : BitVec 32) (wr : Bool) (h m t : Nat) :
-    (vdrwChain b bno wr h m t).dwr = !wr := rfl
-@[simp] theorem vdrwChain_sector (b : BitVec 64) (bno : BitVec 32) (wr : Bool) (h m t : Nat) :
-    (vdrwChain b bno wr h m t).sector = sectorOf bno := rfl
-@[simp] theorem vdrwChain_bp (b : BitVec 64) (bno : BitVec 32) (wr : Bool) (h m t : Nat) :
-    (vdrwChain b bno wr h m t).bp = b := rfl
-
 /-- **The chain's payload**, as the publication stamps it: the bytes the
 block holds once the transfer is over -- the DISK's for a read
 (`c.dwr`), the BUFFER's for a write.  It is what `Xv6.disk_collect` hands
@@ -161,8 +148,6 @@ theorem opsSec_facts (i : Nat) (hi : i < NUM) :
 
 section ops
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
-
-theorem aOps_off4 (i : Nat) : aOps i + BitVec.ofNat 64 4 = aOps i + 4#64 := rfl
 
 /-- **The request-header window, opened**: `type` (4), `reserved` (4),
 `sector` (8). -/
@@ -660,8 +645,6 @@ theorem vdrw3_disk_off' (off i k : Nat) :
     ← BitVec.add_assoc (BitVec.ofNat 64 (16 * i)), ← BitVec.add_assoc]
   exact vdrw3_disk_off off i k
 
-theorem vdrw3_diskAddr (off : Nat) : KA.«disk» + BitVec.ofNat 64 off = diskAddr off := rfl
-
 /-- The three cells of `disk.ops[h]`, as `+0xe2`, `+0xe4` and `+0xe8` name them. -/
 theorem vdrw3_ops0 (i : Nat) : KA.«disk» + BitVec.ofNat 64 (160 + 16 * i + 8) = aOps i := by
   unfold aOps diskAddr dOffOps opsSize
@@ -701,10 +684,6 @@ theorem vdrw3_opsVal (i : Nat) :
   rw [diskIdx_addr' 168 i]
   rfl
 
-/-- The descriptor at `pd + 16 i`, as `add rd,pd,a3` computes it. -/
-theorem vdrw3_descAt (pd : PAddr) (i k : Nat) :
-    pd + BitVec.ofNat 64 (16 * i) + BitVec.ofNat 64 k = descAt pd i + BitVec.ofNat 64 k := rfl
-
 theorem vdrw3_desc0 (pd : PAddr) (i : Nat) :
     pd + BitVec.ofNat 64 (16 * i) = descAt pd i := rfl
 theorem vdrw3_desc8 (pd : PAddr) (i : Nat) :
@@ -720,10 +699,6 @@ theorem vdrw3_desc14 (pd : PAddr) (i : Nat) :
 /-- `&b->data` and `&b->disk`, as `addi a6,s3,88` and `sw a1,4(s3)` name them. -/
 theorem vdrw3_bufData (b : BitVec 64) : b + 88#64 = aBufData b := rfl
 theorem vdrw3_bufDisk (b : BitVec 64) : b + 4#64 = aBufDisk b := rfl
-
-/-- `&disk.desc`, `&disk.avail`: `ld a4,0(a5)`, `ld a3,8(a5)` with `a5 = &disk`. -/
-theorem vdrw3_descPtr : KA.«disk» = aDescPtr := rfl
-theorem vdrw4_availPtr : KA.«disk» + 8#64 = aAvailPtr := rfl
 
 /-- `disk.avail->idx` and one ring cell, as `+0x178` and `+0x182` name them. -/
 theorem vdrw4_availIdx (pav : PAddr) : pav + 2#64 = availIdxAt pav := rfl
@@ -763,9 +738,6 @@ theorem vdrw3_type (wr : Bool) :
     BitVec.extractLsb' 0 32 (if wr then 1#64 else 0#64) =
       (if !wr then BitVec.ofNat 32 Virtio.blkTIn else BitVec.ofNat 32 Virtio.blkTOut) := by
   cases wr <;> decide
-
-/-- `sd` of the sector. -/
-theorem vdrw3_sector (bno : BitVec 32) : sectorOf bno = sectorOf bno := rfl
 
 /-- `sw a1,8(a4)` with `a1 = 1`: the status descriptor's length. -/
 theorem vdrw3_len1 : BitVec.extractLsb' 0 32 (1#64) = 1#32 := by decide

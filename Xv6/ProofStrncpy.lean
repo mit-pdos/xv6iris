@@ -151,8 +151,6 @@ theorem syKept_set14 (R : RegMap) (v : BitVec 64) : syKept R (R.set 14#5 v) := b
 def syPadKept (R R' : RegMap) : Prop :=
   ∀ r : BitVec 5, r ≠ 13#5 → r ≠ 14#5 → R' r = R r
 
-theorem syPadKept_refl (R : RegMap) : syPadKept R R := fun _ _ _ => rfl
-
 theorem syPadKept_trans {R R' R'' : RegMap} (h : syPadKept R R') (h' : syPadKept R' R'') :
     syPadKept R R'' := fun r a b => (h' r a b).trans (h r a b)
 

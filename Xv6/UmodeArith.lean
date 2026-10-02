@@ -170,9 +170,4 @@ theorem umoi_zext_scale {z : Int} (k : Nat) (h0 : 0 ≤ z) (h1 : z < 2 ^ 32) (hk
     rw [← Int.pow_add]; congr 1; omega
   rw [e, ← Int.mul_assoc, Int.mul_ediv_cancel _ (Int.ne_of_gt (Int.pow_pos (by decide)))]
 
-/-! ## §6 x0, byte loads, immediates -/
-
-/-- Rocq `zero_reg_moi`. -/
-theorem uzero_moi : (0#64 : BitVec 64) = BitVec.ofInt 64 0 := rfl
-
 end Xv6

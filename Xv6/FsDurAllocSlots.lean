@@ -110,15 +110,6 @@ def fpMap (S : FsStateRec) (D : BlockMap) (x : FpSlot) : RegMapF (BitVec 8) :=
 /-! The six slots' three components, READ OUT (Rocq's `fp_*_blk` /
 `fp_*_off` / `fp_*_bs`). -/
 
-theorem fpSb_blk (S : FsStateRec) : fpBlk S .sb = SB_BNO := rfl
-theorem fpSb_off : fpOff .sb = 0 := rfl
-theorem fpSb_bs (S : FsStateRec) (D : BlockMap) : fpBs S D .sb = S.fssSbb := rfl
-
-theorem fpBmap_blk (S : FsStateRec) : fpBlk S .bmap = S.fssSb.sbBmapstart := rfl
-theorem fpBmap_off : fpOff .bmap = 0 := rfl
-theorem fpBmap_bs (S : FsStateRec) (D : BlockMap) :
-    fpBs S D .bmap = bmBytes BSIZE S.fssUsed := rfl
-
 theorem fpRec_blk (S : FsStateRec) (i : Nat) :
     fpBlk S (.recd i) = S.fssSb.sbInodestart + i / 16 := rfl
 theorem fpRec_off (i : Nat) : fpOff (.recd i) = 64 * (i % 16) := rfl

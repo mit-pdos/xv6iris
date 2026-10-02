@@ -447,7 +447,7 @@ section raw
 variable [MachGpreS hlc GF]
 
 /-- The trivial trace predicate at a raw gname (Rocq `obs_pred_at`);
-convertible with `obsPredTriv` at the literal (`bootFixedGS_obsPredTriv`). -/
+convertible with `obsPredTriv` at the literal (by `rfl`). -/
 def obsPredAt (γ : GName) : IProp GF := iprop% ∃ h : List Obs, γ ↪VAR{.own (1 : Qp).half} h
 
 theorem obsPredAt_alloc (γ : GName) :
@@ -492,7 +492,7 @@ theorem obsPredAt_step (ndisk : Nat) (C : Nat → List Obs → ConsHist → IPro
   · simp only [↓reduceIte]; itrivial
 
 /-- The ledger at a raw gname (Rocq `obs_ledger_at`); convertible with
-`obsLedger R` at the literal (`bootFixedGS_obsLedger`). -/
+`obsLedger R` at the literal (by `rfl`). -/
 def obsLedgerAt (R : List Obs → IProp GF) (γ : GName) : IProp GF :=
   iprop% ∃ h : List Obs, (γ ↪VAR{.own (1 : Qp).half} h) ∗ R h
 
@@ -576,37 +576,6 @@ theorem obsLedgerAt_phi (R : List Obs → IProp GF) [∀ h, Timeless (R h)]
   imodintro
   ipureintro
   exact hp
-
-/-- At the literal, the trivial trace predicate IS `obsPredAt`. -/
-theorem bootFixedGS_obsPredTriv (Hinv : InvGS_gen hlc GF)
-    (γgen γstart γreg γdisk : GName) (ndisk : Nat) (γswap : GName) (Pcp : IProp GF)
-    (Tkp : Nat → IProp GF) (Hkp : Nat → IProp GF → IProp GF)
-    (γobs : GName) (T : List Obs) (γhist : GName)
-    (Tg : List Obs → IProp GF) (HTg : ∀ h, Persistent (Tg h)) (HTgt : ∀ h, Timeless (Tg h))
-    (Kc : IProp GF) (HKc : Persistent Kc) (HKct : Timeless Kc)
-    (Cres : Nat → List Obs → ConsHist → IProp GF) (HCrest : ∀ k h H, Timeless (Cres k h H))
-    (Wd : Nat → IProp GF) (HWd : ∀ k, Persistent (Wd k)) (HWdt : ∀ k, Timeless (Wd k))
-    (Rw : Nat → IProp GF) (HRw : ∀ k, Persistent (Rw k)) (HRwt : ∀ k, Timeless (Rw k)) :
-    @MachFixedGS.obsPred hlc GF (bootFixedGS Hinv γgen γstart γreg γdisk ndisk γswap Pcp Tkp Hkp γobs T (obsPredAt γobs) γhist
-        Tg HTg HTgt Kc HKc HKct Cres HCrest Wd HWd HWdt Rw HRw HRwt) =
-      @obsPredTriv hlc GF (bootFixedGS Hinv γgen γstart γreg γdisk ndisk γswap Pcp Tkp Hkp γobs T (obsPredAt γobs) γhist
-        Tg HTg HTgt Kc HKc HKct Cres HCrest Wd HWd HWdt Rw HRw HRwt) := rfl
-
-/-- ...and the ledger IS `obsLedger`. -/
-theorem bootFixedGS_obsLedger (R : List Obs → IProp GF)
-    (Hinv : InvGS_gen hlc GF)
-    (γgen γstart γreg γdisk : GName) (ndisk : Nat) (γswap : GName) (Pcp : IProp GF)
-    (Tkp : Nat → IProp GF) (Hkp : Nat → IProp GF → IProp GF)
-    (γobs : GName) (T : List Obs) (γhist : GName)
-    (Tg : List Obs → IProp GF) (HTg : ∀ h, Persistent (Tg h)) (HTgt : ∀ h, Timeless (Tg h))
-    (Kc : IProp GF) (HKc : Persistent Kc) (HKct : Timeless Kc)
-    (Cres : Nat → List Obs → ConsHist → IProp GF) (HCrest : ∀ k h H, Timeless (Cres k h H))
-    (Wd : Nat → IProp GF) (HWd : ∀ k, Persistent (Wd k)) (HWdt : ∀ k, Timeless (Wd k))
-    (Rw : Nat → IProp GF) (HRw : ∀ k, Persistent (Rw k)) (HRwt : ∀ k, Timeless (Rw k)) :
-    @MachFixedGS.obsPred hlc GF (bootFixedGS Hinv γgen γstart γreg γdisk ndisk γswap Pcp Tkp Hkp γobs T (obsLedgerAt R γobs) γhist
-        Tg HTg HTgt Kc HKc HKct Cres HCrest Wd HWd HWdt Rw HRw HRwt) =
-      @obsLedger hlc GF (bootFixedGS Hinv γgen γstart γreg γdisk ndisk γswap Pcp Tkp Hkp γobs T (obsLedgerAt R γobs) γhist
-        Tg HTg HTgt Kc HKc HKct Cres HCrest Wd HWd HWdt Rw HRw HRwt) R := rfl
 
 end raw
 

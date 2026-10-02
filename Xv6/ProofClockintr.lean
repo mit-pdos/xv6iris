@@ -94,13 +94,10 @@ held, the two-slot frame pushed. -/
 def ckK (k : KCtx) : KCtx :=
   ((k.pushOffAt k.spie k.spp).withLocks ("time" :: k.locks)).pushed 2
 
-@[simp] theorem ckK_sie (k : KCtx) : (ckK k).sie = false := rfl
 @[simp] theorem ckK_noff (k : KCtx) : (ckK k).noff = k.noff + 1 := rfl
 @[simp] theorem ckK_intena (k : KCtx) : (ckK k).intena = k.intena := rfl
 @[simp] theorem ckK_locks (k : KCtx) : (ckK k).locks = "time" :: k.locks := rfl
 @[simp] theorem ckK_tier (k : KCtx) : (ckK k).tier = k.tier := rfl
-@[simp] theorem ckK_proc (k : KCtx) : (ckK k).proc = k.proc := rfl
-@[simp] theorem ckK_regs (k : KCtx) : (ckK k).regs = k.regs := rfl
 @[simp] theorem ckK_spie (k : KCtx) : (ckK k).spie = k.spie := rfl
 @[simp] theorem ckK_spp (k : KCtx) : (ckK k).spp = k.spp := rfl
 

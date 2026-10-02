@@ -268,22 +268,8 @@ def eoK (k : KCtx) : KCtx :=
 @[simp] theorem eoK_intena (k : KCtx) : (eoK k).intena = k.intena := rfl
 @[simp] theorem eoK_locks (k : KCtx) : (eoK k).locks = "log" :: k.locks := rfl
 @[simp] theorem eoK_tier (k : KCtx) : (eoK k).tier = k.tier := rfl
-@[simp] theorem eoK_proc (k : KCtx) : (eoK k).proc = k.proc := rfl
-@[simp] theorem eoK_regs (k : KCtx) : (eoK k).regs = k.regs := rfl
 @[simp] theorem eoK_spie (k : KCtx) : (eoK k).spie = k.spie := rfl
 @[simp] theorem eoK_spp (k : KCtx) : (eoK k).spp = k.spp := rfl
-
-@[simp] theorem eoKF_sie (k : KCtx) : (eoKF k).sie = k.sie := rfl
-@[simp] theorem eoKF_noff (k : KCtx) : (eoKF k).noff = k.noff := rfl
-@[simp] theorem eoKF_intena (k : KCtx) : (eoKF k).intena = k.intena := rfl
-@[simp] theorem eoKF_locks (k : KCtx) : (eoKF k).locks = k.locks := rfl
-@[simp] theorem eoKF_tier (k : KCtx) : (eoKF k).tier = k.tier := rfl
-@[simp] theorem eoKF_proc (k : KCtx) : (eoKF k).proc = k.proc := rfl
-@[simp] theorem eoKF_regs (k : KCtx) : (eoKF k).regs = k.regs := rfl
-@[simp] theorem eoKF_spie (k : KCtx) : (eoKF k).spie = k.spie := rfl
-@[simp] theorem eoKF_spp (k : KCtx) : (eoKF k).spp = k.spp := rfl
-
-theorem eoKF_avail (k : KCtx) (hK : 8 ≤ k.avail) : (eoKF k).avail = k.avail - 8 := rfl
 
 /-- The locked context's budget at either entry `SIE`: the acquire's
 `trapRes k.sie` reserve on top of the frame. -/
@@ -329,9 +315,6 @@ theorem eoPins_cs (k : KCtx) (R R' : RegMap) (r9 r18 r19 r20 r21 : BitVec 64)
   exact ⟨b2.trans a2, b8.trans a8, b9.trans a9, b18.trans a18, b19.trans a19, b20.trans a20,
     b21.trans a21, b22.trans a22, b23.trans a23, b24.trans a24, b25.trans a25, b26.trans a26,
     b27.trans a27⟩
-
-theorem eoPins_ws (k : KCtx) (R : RegMap) (r9 r18 r19 r20 r21 : BitVec 64) (a b : Bool) :
-    eoPins (k.withSpie a b) R r9 r18 r19 r20 r21 = eoPins k R r9 r18 r19 r20 r21 := rfl
 
 /-- A write to a register none of the pins name. -/
 theorem eoPins_set (k : KCtx) (R : RegMap) (r9 r18 r19 r20 r21 : BitVec 64)
@@ -841,9 +824,6 @@ theorem eoPost_elim (k : KCtx) (pidv : BitVec 32) (dqp : DFrac) (cpu' : CPU) :
       trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
       wordPointsTo (pPid k.proc) 4 dqp pidv -∗ wpLoop cpu' := by
   unfold eoPost; iintro H; iexact H
-
-theorem eoPost_ws (k : KCtx) (a b : Bool) (pidv : BitVec 32) (dqp : DFrac) :
-    eoPost (GF := GF) (k.withSpie a b) pidv dqp = eoPost k pidv dqp := rfl
 
 /-- The `cmt = false` arm of `logResAt`, named, at the outstanding count
 `out` (its quiescence clause reads it, sync K1). -/

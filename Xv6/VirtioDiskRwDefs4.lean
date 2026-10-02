@@ -91,9 +91,6 @@ theorem vdrwRegs6_call (k : KCtx) (R R' : RegMap) (h : vdrwRegs6 k R) (hc : call
   obtain ⟨c2, c8, -, -, -, -, -, -, -, -, c25, c26, c27⟩ := hc
   exact ⟨by rw [c2, h2], by rw [c8, h8], by rw [c25, h25], by rw [c26, h26], by rw [c27, h27]⟩
 
-theorem vdrwRegs6_ws (k : KCtx) (a b : Bool) (R : RegMap) :
-    vdrwRegs6 (k.withSpie a b) R = vdrwRegs6 k R := rfl
-
 /-! ## Two marking identities -/
 
 theorem updB_nil (i : Nat) : updB (fun _ => false) i false = (fun _ => false) := by

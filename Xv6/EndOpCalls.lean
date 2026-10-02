@@ -327,8 +327,6 @@ section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 variable [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
 
-theorem eoK_withSpie (k : KCtx) : (eoK k).withSpie k.spie k.spp = eoK k := rfl
-
 set_option maxHeartbeats 16000000 in
 theorem eo_fast (RE : RELEASE) (WK : WAKEUP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (a b : Bool) (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)

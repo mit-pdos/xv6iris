@@ -568,10 +568,6 @@ theorem pc_sext548 : BitVec.signExtend 64 548#12 = 548#64 := by decide
 theorem pc_withSpie_canon (k : KCtx) (l : List String) (a b : Bool) :
     (((k.pushOffAt a b).withLocks l).pushed 4).withSpie a b = ((k.pushOffAt a b).withLocks l).pushed 4 := rfl
 
-theorem pc_withSpie_tail (k : KCtx) (R : RegMap) (l : List String) (a b : Bool) :
-    ((((k.pushOffAt a b).pushed 4).withRegs R).withLocks l).withSpie a b =
-      (((k.pushOffAt a b).pushed 4).withRegs R).withLocks l := rfl
-
 /-- THE CLOSE STEP'S RECEIPT, folded into the caller's continuation: the
 continuation that takes the fired post, with the post in hand, is the plain
 one the shared tail threads. -/

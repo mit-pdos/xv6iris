@@ -91,9 +91,6 @@ theorem uvisRun_arg (W : Uvis) (k : Nat) (hk : k < 8) :
 theorem uvisRun_num (W : Uvis) : usysNum (uvisRun W).tf = usysNum W.tf :=
   usysNum_argCong _ _ (uvisRun_arg W 7 (by decide))
 
-/-- Rocq `uvis_run_secc`. -/
-theorem uvisRun_secc (W : Uvis) : (uvisRun W).secc = W.secc := rfl
-
 /-- **The eleven readings a slot sees** (Rocq `uslot_key_cong`'s premises,
 bundled: deviation 2). -/
 def ukeyEq (W W' : Uvis) : Prop :=

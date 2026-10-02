@@ -38,10 +38,6 @@ theorem ii_ret_3094 : jumpPc (KA.«iinit» + 0x22#64) = (KA.«iinit» + 0x22#64)
 theorem ii_ret_30b4 : jumpPc (KA.«iinit» + 0x42#64) = (KA.«iinit» + 0x42#64) := by
   decide
 
-/-- `&itable.inode[i]`, unfolded. -/
-theorem ii_inodeAddr_eq (i : Nat) :
-    inodeAddr i = (KA.«itable» + 0x28#64) + BitVec.ofNat 64 (136 * i) := rfl
-
 /-- The cursor one inode on (`sizeof(struct inode) = 136`). -/
 theorem ii_cursor (i : Nat) :
     KA.«itable» + (0x28#64 + (BitVec.ofNat 64 (136 * i) + 136#64))

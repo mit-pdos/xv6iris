@@ -5,8 +5,8 @@ of `UShUPipes.v` (S1 the branch) is a sibling's (`UshUPipes*`).
 
 Ported (walk.txt: all of S0 is reached): `uline_of_u_pipe`, `ul_pipe`,
 `upv_line_pipe`, `pls_fd_lowest_none`, `nlines_pos_of_ws`, `unlines_pos`,
-`catf_content`, `catf_ds`, `catf_case`, `catf_short`; the notation
-`U := ulmG` is spelled out.  Dropped from S0: nothing.
+`catf_ds`, `catf_case`, `catf_short`; the notation `U := ulmG` is spelled
+out.  Dropped from S0: `catf_content` (`rfl` here, so not stated).
 
 ## Deviations from Rocq
 
@@ -111,11 +111,6 @@ theorem unlines_pos (I : List (BitVec 8)) (p : Producer) (n : List Filt) (hp : p
   simp only [ulineWs]
   intro hq
   exact prodWords_ne p hp (List.append_eq_nil_iff.1 hq).1
-
-/-- **Rocq `catf_content`**: the `cat N` producer's content at the round's
-state, at any name of the class. -/
-theorem catf_content (sR : Fstate) (nm : List (BitVec 8)) :
-    prodContent (filesOf sR) (.PrCatF nm) = (sR[nm]?).getD [] := rfl
 
 /-- **Rocq `catf_ds`**: the reports a `cat N` producer may give -- the write
 error only when `N` is there. -/

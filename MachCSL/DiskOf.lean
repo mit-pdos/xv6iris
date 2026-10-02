@@ -44,8 +44,6 @@ theorem diskOf_set_virtio (ds : DevStates) (s : DevSt .virtio) :
   unfold diskOf
   rw [DevStates.set_same]
 
-theorem diskOf_reset (ds : DevStates) : diskOf ds.reset = diskOf ds := rfl
-
 /-! ## The virtio window keeps the image -/
 
 /-- A result preserved by both branches of an `if` is preserved by the `if`. -/

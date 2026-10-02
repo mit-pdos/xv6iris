@@ -78,12 +78,6 @@ variable {X Y : Type}
 theorem bootRun_regRead (r : Register) (k : RegisterType r → SailM X) (f : BootRegs) :
     bootRun (FreeM.impure (.ok (.regRead r)) k) f = bootRun (k (f r)) f := rfl
 
-theorem bootRun_regWrite (r : Register) (v : RegisterType r) (k : PUnit → SailM X) (f : BootRegs) :
-    bootRun (FreeM.impure (.ok (.regWrite r v)) k) f = bootRun (k PUnit.unit) (f.set r v) := rfl
-
-theorem bootRun_message (s : String) (k : Unit → SailM X) (f : BootRegs) :
-    bootRun (FreeM.impure (.ok (.message s)) k) f = bootRun (k ()) f := rfl
-
 /-- Composition (Rocq `exec_bind_Some`). -/
 theorem bootRun_bind (m : SailM X) (g : X → SailM Y) (f f₁ : BootRegs) (x : X)
     (h : bootRun m f = some (x, f₁)) : bootRun (FreeM.bind m g) f = bootRun (g x) f₁ := by

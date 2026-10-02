@@ -176,9 +176,6 @@ theorem dlNeed_wi (crb ind : Bool) : 4 ≤ dlNeed crb ind := by
 Rocq's header: kept for `CreateBudget`, which is stated at it). -/
 def dl0Spend : Nat := 4
 
-/-- Rocq's `dl0_spend_bmonly`: it IS writei's allowance for one block. -/
-theorem dl0Spend_bmonly : dl0Spend = wiCostBmonly 0 16 := rfl
-
 /-- **THE SIXTEEN-BYTE SEAM AT dirlink's OWN WINDOW** (Rocq's `dl16_post`):
 guarded by the APPEND arm alone; the credit-aware spend UNGUARDED (writei's
 `wi16SpendAny`), the atomicity (`wi16Atomic`), and the membership trio

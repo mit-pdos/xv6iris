@@ -13,8 +13,8 @@ reference AT ITS INUM, not `inodeHeld`), the cursor `P (length es0) dcur` and
 the UNFIRED suffix of the hop family from `length es0`.  The family is over
 `pathElems pl` on the namei side (`FsAbsEra.exHopsFrom`) and over the parent
 prefix `npElems pl` on the nameiparent side (`FsAbsEra.epHopsFrom`); both ARE
-`FsAbsWalk.axHopsFrom` at the era lend (`exHops_is_axHops`/
-`epHops_is_axHops`), so ONE family `namexEraHops` over the list
+`FsAbsWalk.axHopsFrom` at the era lend (`exHops_is_axHops`, and
+by `rfl` on the nameiparent side), so ONE family `namexEraHops` over the list
 `namexEraPs A` (selected by `A.npar`) serves both, and the peel is one lemma.
 
 * `namexEraPs`, `namexEraHops`, `namexEraStart`: the hop list, the family,

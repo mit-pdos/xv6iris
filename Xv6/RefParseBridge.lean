@@ -27,8 +27,6 @@ import Xv6.UkShPipeLex
 
 namespace Xv6
 
-theorem rb_bar_is_ushq : ushqBar = rbBar := rfl
-
 /-! ## §2 The symbol-free line -/
 
 theorem ushpTokens_len_le {len : Nat} {f : Nat → BitVec 8} {off : Nat} {toks : List (Nat × Nat)}

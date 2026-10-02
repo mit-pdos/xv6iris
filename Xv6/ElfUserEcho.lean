@@ -13,9 +13,6 @@ namespace Xv6.User.Echo
 
 open Xv6 Xv6.User
 
-/-- The file as the ELF semantics reads it: its rows, `elfSize` bytes. -/
-theorem elf_eq : elf = rowsBytes elfRows elfSize := rfl
-
 theorem elf_rows_len : elfSize ≤ 32 * elfRows.length := by decide +kernel
 
 theorem elfTree_wf : elfTree.wf = true := by decide +kernel

@@ -58,9 +58,6 @@ def ufdL3 (st : FdState) : List FdState := (ufdL2 st).set 2 st
 /-- Rocq `ufd_l0_row0`. -/
 theorem ufdL0_row0 : ufdL0[0]? = some FdState.closed := rfl
 
-/-- Rocq `ufd_l0_row2`. -/
-theorem ufdL0_row2 : ufdL0[2]? = some FdState.closed := rfl
-
 /-- Rocq `ufd_l1_row0`. -/
 theorem ufdL1_row0 (st : FdState) : (ufdL1 st)[0]? = some st := rfl
 

@@ -125,8 +125,6 @@ normaliser does not take apart (`BitVec.ofNat_add` would split every
 `i + 1` back into a sum and no loop invariant would survive). -/
 def lwIx (i : Nat) : BitVec 64 := BitVec.ofNat 64 i
 
-theorem lwIx_zero : lwIx 0 = 0#64 := rfl
-
 /-- `slli rd,rs,0x2` on a small index. -/
 theorem lw_shl2 (i : Nat) (h : i ≤ LOGBLOCKS) :
     (lwIx i) <<< 2 = BitVec.ofNat 64 (4 * i) := by
@@ -233,15 +231,11 @@ def lwK (k : KCtx) (a b : Bool) : KCtx :=
 
 @[simp] theorem lwK_sie (k : KCtx) (a b : Bool) : (lwK k a b).sie = false := rfl
 @[simp] theorem lwK_noff (k : KCtx) (a b : Bool) : (lwK k a b).noff = k.noff + 1 := rfl
-@[simp] theorem lwK_intena (k : KCtx) (a b : Bool) : (lwK k a b).intena = k.intena := rfl
 @[simp] theorem lwK_locks (k : KCtx) (a b : Bool) : (lwK k a b).locks = "log" :: k.locks := rfl
 @[simp] theorem lwK_tier (k : KCtx) (a b : Bool) : (lwK k a b).tier = k.tier := rfl
 @[simp] theorem lwK_proc (k : KCtx) (a b : Bool) : (lwK k a b).proc = k.proc := rfl
-@[simp] theorem lwK_regs (k : KCtx) (a b : Bool) : (lwK k a b).regs = k.regs := rfl
 @[simp] theorem lwK_avail (k : KCtx) (a b : Bool) :
     (lwK k a b).avail = trapRes k.sie + k.avail - 4 := rfl
-@[simp] theorem lwK_spie (k : KCtx) (a b : Bool) : (lwK k a b).spie = a := rfl
-@[simp] theorem lwK_spp (k : KCtx) (a b : Bool) : (lwK k a b).spp = b := rfl
 
 /-- What `acquire` hands back, folded. -/
 theorem lwK_fold (k : KCtx) (a b : Bool) :

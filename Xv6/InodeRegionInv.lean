@@ -510,7 +510,7 @@ theorem iregParked_retag [Icfg] (A : RegMapF IregArmEnt) (k t : Nat) (q : Qp)
     (BigSepM.bigSepM_insert_delete (Φ := fun _ e => iregParked (GF := GF) e)
       (x := ((t, q, S') : IregArmEnt))).2
 
-/-- The parked row IS the transaction pin (the raw `ln_tx` element, `TxPin.txPin_elem`). -/
+/-- The parked row IS the transaction pin (the raw `ln_tx` element). -/
 theorem iregParked_elem [Icfg] (t : Nat) (q : Qp) (S : Std.ExtTreeSet Nat compare) :
     iregParked (GF := GF) ((t, q, S) : IregArmEnt) ⊣⊢ txPin icfgLog t q :=
   .rfl

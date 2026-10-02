@@ -301,9 +301,6 @@ def memAtZ (Mv : ElfMem) (a : Int) : Option (BitVec 8) := if 0 ≤ a then Mv a.t
 
 namespace KexecBuilt
 
-theorem umemView_eq (P : UPtd) (M : Nat → List (BitVec 8)) : umemView P M = memAtZ (umemGet P M) :=
-  rfl
-
 theorem memAtZ_ofNat (Mv : ElfMem) (n : Nat) : memAtZ Mv (n : Int) = Mv n := by
   simp [memAtZ]
 

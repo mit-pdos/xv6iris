@@ -377,10 +377,7 @@ def vdisK (k : KCtx) : KCtx :=
 @[simp] theorem vdisK_intena (k : KCtx) : (vdisK k).intena = k.intena := rfl
 @[simp] theorem vdisK_locks (k : KCtx) : (vdisK k).locks = "virtio_disk" :: k.locks := rfl
 @[simp] theorem vdisK_tier (k : KCtx) : (vdisK k).tier = k.tier := rfl
-@[simp] theorem vdisK_proc (k : KCtx) : (vdisK k).proc = k.proc := rfl
 @[simp] theorem vdisK_regs (k : KCtx) : (vdisK k).regs = k.regs := rfl
-@[simp] theorem vdisK_spie (k : KCtx) : (vdisK k).spie = k.spie := rfl
-@[simp] theorem vdisK_spp (k : KCtx) : (vdisK k).spp = k.spp := rfl
 
 theorem vdisK_fold (k : KCtx) :
     ((k.pushOffAt k.spie k.spp).withLocks ("virtio_disk" :: k.locks)).pushed 4 = vdisK k := rfl

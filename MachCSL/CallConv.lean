@@ -128,9 +128,6 @@ theorem KCtx.rget_setReg' (cpu : CPU) (k : KCtx) (i j : BitVec 5) (v : BitVec 64
       · simp [KCtx.rget_setReg_same _ _ _ _ h0 h4, h0, h4]
   · simp [KCtx.rget_setReg_other _ _ _ _ _ hj, hj]
 
-theorem KCtx.rget_withRegs (cpu : CPU) (k : KCtx) (R : RegMap) (i : BitVec 5) :
-    (k.withRegs R).rget cpu i = RegMap.get (tpPin cpu R) i := rfl
-
 /-- A read out of a context, as a map application (`x0`, `tp` aside). -/
 theorem KCtx.rget_eq (cpu : CPU) (k : KCtx) (i : BitVec 5) :
     k.rget cpu i = if i = 0#5 then 0#64 else if i = 4#5 then hartId cpu else k.regs i := by

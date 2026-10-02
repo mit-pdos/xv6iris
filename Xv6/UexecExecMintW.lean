@@ -69,9 +69,6 @@ theorem xv6Sbundle_exit_taint (X : Uvis → IProp GF) (f : Xfam GF) (W : Uvis) :
   simp only [Int.reduceEq, if_false, if_true]
   exact filecloseCpays_taint _
 
-/-- `UkRun.ukFdStOfKey` IS the instance's `fdStOfKey` (UkRun deviation 2). -/
-theorem ukFdStOfKey_eq (v : BitVec 64) (sts : List FdState) : ukFdStOfKey v sts = fdStOfKey v sts := rfl
-
 /-- **Rocq `xv6_sbundle_close_nonpipe`**: row 21 at a key whose argument 0 is
 not a pipe end is `emp`. -/
 theorem xv6Sbundle_close_nonpipe (X : Uvis → IProp GF) (f : Xfam GF) (W : Uvis) (h : ukeyNonpipe W) :

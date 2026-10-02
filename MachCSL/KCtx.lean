@@ -907,14 +907,6 @@ def intrRes [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) : IProp GF := int
 def sieArm [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (sie : Bool) (p : BitVec 64) : IProp GF :=
   sieArmP ihs cpu sie p
 
-/-- The arm and the installed handler mention the context only through the
-environment: the tier is irrelevant. -/
-theorem intrResP_toKpt (X : CurCtx) (S : IhsIx GF → IProp GF) (cpu : CPU) :
-    @intrResP hlc GF _ X S cpu = @intrResP hlc GF _ ⟨X.curCtx, KTier.kpt⟩ S cpu := rfl
-
-theorem intrRes_toKpt (X : CurCtx) [KernelGeom] [KernelImage GF] (cpu : CPU) :
-    @intrRes hlc GF _ X _ _ cpu = @intrRes hlc GF _ ⟨X.curCtx, KTier.kpt⟩ _ _ cpu := rfl
-
 /-- The kernel execution context resource of hart `cpu` (see `kctxP`), with
 the `c->intena` cell lent out when `lent` (see `intenaCell`). -/
 def kctxL [X : CurCtx] [KernelGeom] [KernelImage GF] (lent : Bool) (cpu : CPU) (k : KCtx) : IProp GF :=

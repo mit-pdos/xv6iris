@@ -46,15 +46,6 @@ theorem PTree.setKid_setKid (t : PTree) (i : BitVec 9) (c c' : PTree) :
   funext j
   by_cases hj : j = i <;> simp [hj]
 
-@[simp] theorem PTree.base_setEnt (t : PTree) (i : BitVec 9) (v : BitVec 64) :
-    (t.setEnt i v).base = t.base := rfl
-@[simp] theorem PTree.kids_setEnt (t : PTree) (i : BitVec 9) (v : BitVec 64) :
-    (t.setEnt i v).kids = t.kids := rfl
-@[simp] theorem PTree.base_setKid (t : PTree) (i : BitVec 9) (c : PTree) :
-    (t.setKid i c).base = t.base := rfl
-@[simp] theorem PTree.ents_setKid (t : PTree) (i : BitVec 9) (c : PTree) :
-    (t.setKid i c).ents = t.ents := rfl
-
 /-! ## A freshly zeroed node -/
 
 @[simp] theorem PTree.zeroNode_base (b : BitVec 44) : (PTree.zeroNode b).base = b := rfl

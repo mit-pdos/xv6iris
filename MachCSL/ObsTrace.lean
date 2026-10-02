@@ -127,9 +127,6 @@ theorem obsIns_map_dev (i : UartId) (os : List DevObs) :
 
 namespace Uart
 
-/-- The receiver never touches `SOUT`. -/
-theorem recv_wire (u : UartState) (b : BitVec 8) : (recv u b).wire = u.wire := rfl
-
 /-- No MMIO read transmits anything. -/
 theorem read_wire (u : UartState) (off : Nat) (b : BitVec 8) (u' : UartState)
     (h : read u off = some (b, u')) : u'.wire = u.wire := by
@@ -179,10 +176,6 @@ theorem writeN_wire (u : UartState) (off n : Nat) (w : BitVec (8 * n)) (u' : Uar
 
 /-! ### The cumulative input `recvd`, one lemma per transition (Rocq
 `DevModel.uart_*_recv`, relax-d2 lane K1): only the accept arm grows it. -/
-
-theorem recv_recvd (u : UartState) (b : BitVec 8) : (recv u b).recvd = u.recvd := rfl
-
-theorem accept_recvd (u : UartState) (b : BitVec 8) : (accept u b).recvd = u.recvd ++ [b] := rfl
 
 theorem read_recvd (u : UartState) (off : Nat) (b : BitVec 8) (u' : UartState)
     (h : read u off = some (b, u')) : u'.recvd = u.recvd := by

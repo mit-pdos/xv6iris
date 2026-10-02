@@ -65,7 +65,7 @@ names.
 
 **DEVIATIONS from Rocq, with reasons.**
 
-1. **`BPB` / `BPB_value` ARE NOT DEFINED HERE.**  They are already
+1. **`BPB` IS NOT DEFINED HERE.**  It is already
    `Xv6/FsGeom.lean`'s, which collects the `fs.h` / `param.h` constants
    that Rocq scatters across the files that need them first; this file
    imports them.  `BBLOCK`, `BBLOCK_single`, `FSSIZE_lt_BPB` and

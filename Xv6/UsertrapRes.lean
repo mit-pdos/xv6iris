@@ -397,10 +397,6 @@ def utBlock (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) :
   procGenAt curCtx pa pid V.gen ∗
   procOfiles γ V.fdg pa V.ofile
 
-/-- The block does not read the trapframe's words. -/
-theorem utBlock_tf (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
-    (ws : List (BitVec 64)) : utBlock (GF := GF) γ pa pid { V with tf := ws } = utBlock γ pa pid V := rfl
-
 /-- **Rocq `proc_priv_split_pt` + `proc_priv_tf_open`**: the block is the
 parked part, the address space and the trapframe page. -/
 theorem utBlock_join (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)

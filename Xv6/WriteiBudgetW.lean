@@ -58,38 +58,21 @@ theorem wiBlocks_le4 (off n : Nat) (hn : n ≤ fwMax) : wiBlocks off n ≤ 4 := 
   have := Nat.mod_lt off (show 0 < 1024 by decide)
   omega
 
-/-- ...and four IS reached. -/
-theorem wiBlocks_four_reached : wiBlocks 1023 fwMax = 4 := rfl
-
-theorem wiCost_loose_value : wiCost 1023 fwMax = 25 := rfl
-
 /-! ## 4. The tight budget (the parked two-credit figure) -/
 
 def wiCostTight (off n : Nat) : Nat := wiBlocks off n + 3
-
-theorem wiCostTight_worst : wiCostTight 1023 fwMax = 7 := rfl
 
 /-! ## 5. All three absorptions are load-bearing -/
 
 def wiCostArmaware (off n : Nat) : Nat := 4 * wiBlocks off n + 3
 
-theorem wiCostArmaware_value : wiCostArmaware 1023 fwMax = 19 := rfl
-
 def wiCostNoabs (off n : Nat) : Nat := 2 * wiBlocks off n + 3
 
-theorem wiCostNoabs_value : wiCostNoabs 1023 fwMax = 11 := rfl
-
 /-! ## 9. Which credits are actually load-bearing -/
-
-theorem wiCostBmonly_value : wiCostBmonly 1023 fwMax = 10 := rfl
 
 theorem wiCostBmonly_fits (off n : Nat) (hn : n ≤ fwMax) : wiCostBmonly off n ≤ MAXOPBLOCKS := by
   have := wiBlocks_le4 off n hn
   unfold wiCostBmonly MAXOPBLOCKS; omega
-
-theorem wiCostBmonly_no_slack : wiCostBmonly 1023 fwMax = MAXOPBLOCKS := rfl
-
-theorem wiCostTight_slack : wiCostTight 1023 fwMax + 3 = MAXOPBLOCKS := rfl
 
 /-! ## 10. writei's loop invariant against the one-credit bmap -/
 

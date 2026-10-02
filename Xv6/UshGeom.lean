@@ -44,7 +44,7 @@ Ported: every reached declaration.  Dropped (UNREACHED from
 2. **A word's bytes are `nthByte`** (total; Rocq `bv_to_little_endian 8 8 z
    !! k`, a partial list lookup), so no totality fact is needed, and
    `ukArgvP_of_bytes` takes the word as a `BitVec 64` (Rocq a `Z`
-   in range); `Xv6.ubyte0_bv0` is `ubyte0 = BitVec.ofNat 8 0`.
+   in range); `ubyte0` is `BitVec.ofNat 8 0` by `rfl`.
 3. `UkAbi.UkArgsC` is Lean's (UkAbi deviations 1-3: alignment with `%`,
    `UkRd`'s bundle); `imgKexecArgsc` fills its fields.
 4. The page rows take `a < 2^64`-free forms: `imgKexecPages`' readable-page
@@ -68,9 +68,6 @@ open Iris Iris.Std MachCSL
 open Iris.Std.PartialMap
 
 /-! ## 1. The push helpers -/
-
-/-- **Rocq `ubyte0_bv0`**. -/
-theorem ubyte0_bv0 : ubyte0 = 0#8 := rfl
 
 /-- **Rocq `uscan_nul`**: THE CANONICAL STRING LENGTH, OUT OF A TERMINATOR
 ALONE -- a NUL at `n` and present bytes below it bound the scan and make

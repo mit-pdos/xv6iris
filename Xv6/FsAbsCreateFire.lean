@@ -110,12 +110,6 @@ def T_FILE_w : BitVec 16 := 2#16
 /-- the device type, as a halfword (Rocq's `T_DEVICE : mword 16`). -/
 def T_DEVICE_w : BitVec 16 := 3#16
 
-/-- Rocq's `T_FILE_value`. -/
-theorem T_FILE_w_value : T_FILE_w.toNat = T_FILE := rfl
-
-/-- Rocq's `T_DEVICE_value`. -/
-theorem T_DEVICE_w_value : T_DEVICE_w.toNat = T_DEVICE := rfl
-
 /-- (L5) at the file literal (Rocq's `T_FILE_ty_ok`). -/
 theorem T_FILE_w_tyOk : iregTyOkW T_FILE_w := Or.inr (Or.inr (Or.inl rfl))
 
@@ -128,17 +122,6 @@ theorem T_DEVICE_w_tyOk : iregTyOkW T_DEVICE_w := Or.inr (Or.inr (Or.inr rfl))
 size or addrs, and on the non-directory arm no dirlink runs on `ip`. -/
 def createMade (ty major minor : BitVec 16) : Dinode :=
   ⟨ty, major, minor, 1#16, 0#32, List.replicate 13 0#32⟩
-
-theorem createMade_type (ty major minor : BitVec 16) : (createMade ty major minor).diType = ty :=
-  rfl
-
-theorem createMade_nlink (ty major minor : BitVec 16) :
-    (createMade ty major minor).diNlink.toNat = 1 := rfl
-
-theorem createMade_size (ty major minor : BitVec 16) :
-    (createMade ty major minor).diSize.toNat = 0 := rfl
-
-theorem createMade_wf (ty major minor : BitVec 16) : dinodeWf (createMade ty major minor) := rfl
 
 /-! ## 0.  The child's content, by type (pure) -/
 

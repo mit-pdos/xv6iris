@@ -31,8 +31,9 @@ Deviations from Rocq:
    `BitVec 8` lists, each with its string in the doc comment; the lengths and
    lookups Rocq gets by `vm_compute` are `rfl`/`decide`.
 2. Rocq's `ins h := obs_ins Uart0 h` is `consIns h := obsIns .uart0 h`
-   (the name `ins` is too short to stand unprefixed); `consIns_obsIns`/
-   `consIns_app`/`consIns_in` are Rocq's `ins_obs_ins`/`ins_app`/`ins_in`.
+   (the name `ins` is too short to stand unprefixed); `consIns_app`/`consIns_in`
+   are Rocq's `ins_app`/`ins_in`, and Rocq's `ins_obs_ins` is `rfl` here, so
+   not stated.
 3. Bytes are `BitVec 8` (`bv_unsigned` is `toNat`); `l !! i` is `l[i]?`,
    `l !!! i` is `l[i]!`, `prefix_of` is `<+:`, `Forall P l` is `∀ x ∈ l,
    P x`, `Exists P l` is `∃ x ∈ l, P x`, `concat` is `flatten`.
@@ -60,7 +61,7 @@ Deviations from Rocq:
    `pro_alts_head_dollar`, `pro_of_dollar_prompt`, `pro_of_open_head`,
    `pro_rounds_from`, `pro_rounds_replicate_0` ARE reached, through the
    instance `union_laws_at`, and are ported in `EchoDiscSeal.lean`
-   (`ins_obs_ins` is `consIns_obsIns` here).  The kernel-term re-audit,
+   (`ins_obs_ins` is `rfl` here, so not stated).  The kernel-term re-audit,
    notes/cone_reaudit.md, finds the rest unreached, except the candidate
    enumerations and `obs_wire_length`, which are reached only through the
    DU9 deciders (`UnionDecU`).)
@@ -145,9 +146,6 @@ theorem nlines_pos_of_rest_nil (I : List (BitVec 8)) (hne : I ≠ []) (hr : rest
 /-- The console's INPUT bytes of an observation list, in order (Rocq
 `ins h := obs_ins Uart0 h`; deviation 2). -/
 def consIns (h : List Obs) : List (BitVec 8) := obsIns .uart0 h
-
-/-- Rocq `ins_obs_ins`. -/
-theorem consIns_obsIns (h : List Obs) : consIns h = obsIns .uart0 h := rfl
 
 theorem consIns_app (h k : List Obs) : consIns (h ++ k) = consIns h ++ consIns k :=
   obsIns_app .uart0 h k
@@ -480,10 +478,6 @@ theorem outCur_lt (ws : List (List (BitVec 8))) (i : Nat) (w : List (BitVec 8)) 
     (hi : 1 ≤ i) (hw : ws[i]? = some w) (hj : j ≤ w.length) :
     outCur ws i + j < (wlLine (ws.drop 1)).length :=
   wlOff_lt_line (ws.drop 1) (i - 1) w j (by rw [ws_drop ws i hi]; exact hw) hj
-
-theorem lineAlts_len1 (ws : List (List (BitVec 8))) : ((lineAltsOf ws)[1]!).length = 19 := rfl
-theorem lineAlts_len2_ (ws : List (List (BitVec 8))) : ((lineAltsOf ws)[2]!).length = 2 := rfl
-theorem lineAlts_len3 (ws : List (List (BitVec 8))) : ((lineAltsOf ws)[3]!).length = 5 := rfl
 
 theorem proOf_snoc_head (ps : List Nat) (a : Nat) (b : BitVec 8) (hnd : ¬ proDone ps)
     (hb : (proAlts[a]!)[0]? = some b) : proOf ps ++ [b] <+: proOf (ps ++ [a]) := by

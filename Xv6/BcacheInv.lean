@@ -1161,13 +1161,10 @@ def bufSlpBox (γ : BcacheNames) (k : Nat) : CtxId → IProp GF := fun ξ => ipr
 payload names buffer `k`'s checkout token and its escrow -- so those ghosts
 are allocated FIRST, as bare `Nat → _` functions, the locks are sealed over
 the raw form, and only then is `Xv6.BcacheNames` assembled.  The two forms
-are the same proposition (`Xv6.bufSlpBox_raw`). -/
+are the same proposition (by `rfl`). -/
 def bufSlpRaw (γo : GName) (γbk : BoxNames) : CtxId → IProp GF := fun ξ => iprop(
   (γo ↪VAR{.own (1 : Qp)} ()) ∗
   ∃ s : L2Reg BufId, slotpHalf γbk s ∗ ⌜s.hold = none⌝ ∗ ctxFloor ξ s.tp)
-
-theorem bufSlpBox_raw (γ : BcacheNames) (k : Nat) :
-    bufSlpBox (GF := GF) γ k = bufSlpRaw (γ.own k) (γ.box k) := rfl
 
 instance instCtxMorphBufSlpRaw (γo : GName) (γbk : BoxNames) :
     CtxMorph (GF := GF) (bufSlpRaw γo γbk) := by

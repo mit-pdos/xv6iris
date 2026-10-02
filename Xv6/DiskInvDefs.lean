@@ -494,9 +494,6 @@ lock payload, holds only a QUARTER. -/
 def headTokF (γ : DiskNames) (q : Qp) (i : Nat) (s : HState) : IProp GF :=
   γ.head i ↪VAR{.own q} s
 
-theorem headTok_eq (γ : DiskNames) (i : Nat) (s : HState) :
-    headTok (GF := GF) γ i s = headTokF γ (1 : Qp).half i s := rfl
-
 /-- **A QUARTER of the driver's half.**  From `Xv6.disk_publish` to
 `Xv6.disk_collect` the driver's half of an in-flight slot's receipt is
 split: the lock payload keeps one quarter beside the slot's cells, and
@@ -4773,9 +4770,6 @@ instance instCtxMorphPayFl (nr T : Nat) : CtxMorph (GF := GF) (fun ξ => diskPay
 
 theorem diskPayFl_zero (ξ : CtxId) (T : Nat) :
     diskPayFl (GF := GF) 0 ξ T = keyAt (MachGS.era (hlc := hlc) (GF := GF)) ξ T := rfl
-
-theorem diskPayFl_succ (n : Nat) (ξ : CtxId) (T : Nat) :
-    diskPayFl (GF := GF) (n + 1) ξ T = ctxFloor ξ T := rfl
 
 /-- A floor is a key. -/
 theorem diskPayFl_key (nr : Nat) (ξ : CtxId) (T : Nat) :

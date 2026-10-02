@@ -82,11 +82,6 @@ def wireBody : IProp GF := iprop%
 /-- The pins of every hart, at unspecified levels. -/
 def wireInv : IProp GF := inv wireN (wireBody (GF := GF))
 
-/-- In the ambient era the two forms agree. -/
-theorem wireBody_eq : wireBody (GF := GF) = wireBodyAt (MachGS.era (hlc := hlc) (GF := GF)) := rfl
-
-theorem wireInv_eq : wireInv (GF := GF) = wireInvAt (MachGS.era (hlc := hlc) (GF := GF)) := rfl
-
 instance wireBody_timeless : Timeless (wireBody (GF := GF)) := by
   unfold wireBody regPointsTo regPointsToAt; infer_instance
 

@@ -112,7 +112,6 @@ theorem ulibUkL_to : (ulibUkL (hlc := hlc) UL N γ I).toUlibRun = UlibRun.ofUkRu
 theorem ulibUkL_urun : (UlibRun.ofUkRun (hlc := hlc) UL N γ I.t I.img I.hok).urun = ulibUkRun (hlc := hlc) N γ := rfl
 theorem ulibUkL_goal : (UlibRun.ofUkRun (hlc := hlc) UL N γ I.t I.img I.hok).goal = ulibUkGoal (hlc := hlc) γ := rfl
 theorem ulibUkL_ubyte : (UlibRun.ofUkRun (hlc := hlc) UL N γ I.t I.img I.hok).ubyte = ubyte N.d := rfl
-theorem ulibUkL_uwordq : (ulibUkL (hlc := hlc) UL N γ I).uwordq = uwordq N.d := rfl
 
 /-- The program's code gives any code resource its text gives. -/
 theorem ulibUk_code (C : UlibRun GF → IProp GF) (hC : ∀ L : UlibRun GF, L.utext I.t ⊢ C L) :

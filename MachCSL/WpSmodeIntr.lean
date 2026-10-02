@@ -372,7 +372,6 @@ def KCtx.pushOffB (k : KCtx) (b : Bool) : KCtx :=
 @[simp] theorem KCtx.pushOffB_root (k : KCtx) (b : Bool) : (k.pushOffB b).root = k.root := rfl
 @[simp] theorem KCtx.pushOffB_proc (k : KCtx) (b : Bool) : (k.pushOffB b).proc = k.proc := rfl
 @[simp] theorem KCtx.pushOffB_sp (k : KCtx) (b : Bool) : (k.pushOffB b).sp = k.sp := rfl
-theorem KCtx.pushOffB_self (k : KCtx) : k.pushOffB k.intena = k.pushOff := by cases k; rfl
 
 /-- `push_off`'s exit at either `SIE`: interrupts off with `SPIE`/`SPP`
 pinned, the trap reserve free, the depth incremented; `intena` is the

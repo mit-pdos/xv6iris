@@ -22,7 +22,7 @@ path (`ITree.ext`).  The Rocq vocabulary is recovered as:
 
 * constructors `ITree.ret`/`ITree.tau`/`ITree.vis` (Rocq `Ret`/`Tau`/`Vis`);
 * `ITree.observe t : ITreeF R (ITree R)` is Rocq's `force`/pattern match,
-  with `observe_ret`/`observe_tau`/`observe_vis` and `ITree.eta : t = ofF
+  with `observe_tau`/`observe_vis` and `ITree.eta : t = ofF
   (observe t)` (Rocq `force_eq`);
 * `ITree.corec` builds a tree from a one-step coalgebra that may hand back a
   finished tree (`Sum.inl`) or a new state (`Sum.inr`) at each child; its
@@ -220,8 +220,6 @@ def ofF : ITreeF R (ITree R) → ITree R
   | .ret r => ret r
   | .tau t => tau t
   | .vis e k => vis e k
-
-theorem observe_ret (r : R) : (ret r).observe = .ret r := rfl
 
 theorem observe_tau (t : ITree R) : (tau t).observe = .tau t := rfl
 
@@ -864,8 +862,6 @@ end Intro
 
 theorem envSetDev_dev (E : Penv) (d : Nat) (x : Dspec) : (envSetDev E d x).dev d = x := by
   simp [envSetDev]
-
-theorem envSetDev_fd (E : Penv) (d : Nat) (x : Dspec) : (envSetDev E d x).fd = E.fd := rfl
 
 theorem envSetDev_set_dev (E : Penv) (d : Nat) (x y : Dspec) :
     envSetDev (envSetDev E d x) d y = envSetDev E d y := by

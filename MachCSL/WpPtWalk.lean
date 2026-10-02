@@ -660,10 +660,6 @@ noncomputable def translate39 (asid : BitVec 16) (base : BitVec 44) (vpn : BitVe
     SailM (Result (BitVec 44 × page_based_mem_type × Unit) (PTW_Error × Unit)) :=
   translate 39 asid base vpn acc priv mxr do_sum u
 
-theorem translate39_eq (asid : BitVec 16) (base : BitVec 44) (vpn : BitVec 27)
-    (acc : MemoryAccessType mem_payload) (priv : Privilege) (mxr do_sum : Bool) (u : Unit) :
-    translate 39 asid base vpn acc priv mxr do_sum u = translate39 asid base vpn acc priv mxr do_sum u := rfl
-
 /-- The memory type a cached kernel leaf reports. -/
 theorem tlb_get_pbmt_kLeaf (asid : BitVec 16) (vpn : BitVec 27) (ppn ppn' : BitVec 44) (perm : KPerm)
     (a d : BitVec 1) (addr : BitVec 64) :

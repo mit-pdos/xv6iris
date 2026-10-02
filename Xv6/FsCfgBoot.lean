@@ -102,9 +102,6 @@ def imgNodes (P : Nat → List (BitVec 8)) (sb : FsSb) (nib : Nat) : RegMapF FsN
 theorem imgNode_rec (P : Nat → List (BitVec 8)) (sb : FsSb) (z : Nat) :
     (imgNode P sb z).fnRec = fsDinode P sb z := rfl
 
-theorem imgNode_ent (P : Nat → List (BitVec 8)) (sb : FsSb) (z : Nat) :
-    (imgNode P sb z).fnEnt = (imgBlkmap P (fsDinode P sb z)).bmEnt := rfl
-
 theorem imgNode_blk (P : Nat → List (BitVec 8)) (sb : FsSb) (z : Nat) :
     (imgNode P sb z).fnBlk =
       nodeBlk (imgBlkmap P (fsDinode P sb z)) (fsDataOf P (fsDinode P sb z)) := rfl

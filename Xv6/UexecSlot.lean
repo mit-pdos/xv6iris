@@ -88,8 +88,6 @@ def uvisOf (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) (g 
 /-- Rocq `uvis_lz`: the key with its lazy bit replaced. -/
 def uvisLz (W : Uvis) (lz : Bool) : Uvis := { W with lazy := lz }
 
-theorem uvisLz_id (W : Uvis) : uvisLz W W.lazy = W := rfl
-
 /-! ## §1 The trapframe as a word reader -/
 
 /-- Rocq `tf_w` (total: `pv_tf` has 36 words, so the default is never read). -/
@@ -125,18 +123,5 @@ theorem tfResumeGpr0_x0 (tf : List (BitVec 64)) : tfResumeGpr0 tf 0#5 = 0#64 := 
 /-- Rocq `UexecApply.tf_resume_gpr0_a0` (and `tf_resume_gpr_a0`). -/
 theorem tfResumeGpr_a0 (b : RegMap) (tf : List (BitVec 64)) :
     tfResumeGpr b tf 10#5 = tfW tf (tfArgIdx 0) := rfl
-
-theorem tfResumeGpr_a1 (b : RegMap) (tf : List (BitVec 64)) :
-    tfResumeGpr b tf 11#5 = tfW tf (tfArgIdx 1) := rfl
-
-theorem tfResumeGpr_a2 (b : RegMap) (tf : List (BitVec 64)) :
-    tfResumeGpr b tf 12#5 = tfW tf (tfArgIdx 2) := rfl
-
-theorem tfResumeGpr_a7 (b : RegMap) (tf : List (BitVec 64)) :
-    tfResumeGpr b tf 17#5 = tfW tf (tfArgIdx 7) := rfl
-
-/-- Rocq `UexecSlot.tf_resume_gpr_sp`. -/
-theorem tfResumeGpr_sp (b : RegMap) (tf : List (BitVec 64)) :
-    tfResumeGpr b tf 2#5 = tfW tf 6 := rfl
 
 end Xv6

@@ -396,12 +396,10 @@ theorem PdRoundOk.toPns (OK : PdRoundOk D)
 
 variable (D)
 
-/-- Rocq `FAM`: THE FAMILY, at the round (`= D.toPns.FAM`, `FAM_toPns`). -/
+/-- Rocq `FAM`: THE FAMILY, at the round (`= D.toPns.FAM` by `rfl`). -/
 noncomputable abbrev PdRound.FAM : IProp GF :=
   blkNInv (hlc := hlc) D.wsN D.RUNN D.PWN termw D.TOKN (pdep D) pnsN (genId (hlc := hlc) (GF := GF) + 1)
     D.γc D.γm
-
-theorem FAM_toPns : D.toPns.FAM = D.FAM := rfl
 
 end RoundOk
 

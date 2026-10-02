@@ -103,9 +103,6 @@ theorem Xu_initShCtx (ug : UnionGn) (r : FileAppNames) (s0 : Fstate) (γp : GNam
     Xu (hlc := hlc) (GF := GF) ug r s0 γp =
       initShCtx (unionCc (hlc := hlc) (GF := GF) ug r s0) γp (fileTaint (hlc := hlc) ug.ugnFile.fgnCl) := rfl
 
-/-- The record's residue and links (casts). -/
-theorem unionLinkInstAt_lkRres (ug : UnionGn) (s0 : Fstate) :
-    (unionLinkInstAt (hlc := hlc) (GF := GF) ug s0).lkRres = urresw (hlc := hlc) ug := rfl
 theorem urresw_lkRres (ug : UnionGn) (s0 : Fstate) (v : EraPins) (I : List (BitVec 8)) :
     ⊢ urresw (hlc := hlc) (GF := GF) ug v I -∗ (unionLinkInstAt (hlc := hlc) (GF := GF) ug s0).lkRres v I :=
   BI.entails_wand .rfl

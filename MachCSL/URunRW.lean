@@ -222,8 +222,6 @@ def UOrc.cons (a : UAns) (o : UOrc) : UOrc
 @[simp] theorem UOrc.tail_cons (a : UAns) (o : UOrc) : (UOrc.cons a o).tail = o := rfl
 @[simp] theorem UOrc.cons_zero (a : UAns) (o : UOrc) : UOrc.cons a o 0 = a := rfl
 @[simp] theorem UOrc.drop_zero (o : UOrc) : o.drop 0 = o := rfl
-theorem UOrc.drop_tail (o : UOrc) (k : Nat) : o.tail.drop k = o.drop (k + 1) := by
-  funext i; simp only [UOrc.drop, UOrc.tail]; congr 1
 
 /-- The owned byte map. -/
 abbrev BMap := PAddr → Option (BitVec 8)

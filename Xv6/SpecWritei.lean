@@ -198,8 +198,6 @@ theorem wi16Spend_le4 (crb crd cru al ind : Bool) : wi16Spend crb crd cru al ind
 /-- What must be IN HAND on entry (Rocq's `wi16_need`). -/
 def wi16Need (crb ind : Bool) : Nat := bmapNeed crb ind + 2
 
-theorem wi16Need_value_dir : wi16Need false false = 4 := rfl
-
 /-- The disk block the single-block window lands on, as `log_write` names
 it in the ledger (Rocq's `wi_tgt_blk`). -/
 def wiTgtBlk (bm : Blkmap) (off : Nat) : Nat := (blkmapGet bm (off / BSIZE)).toNat

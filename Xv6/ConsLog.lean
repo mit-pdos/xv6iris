@@ -115,10 +115,6 @@ what `consDropOk`'s full-ring disjunct counts, as a name. -/
 def echoedCount (L : List LogEntry) : Nat :=
   (L.filter (fun e => decide (logEchoed e))).length
 
-/-- Rocq `echoed_count_eq`. -/
-theorem echoedCount_eq (L : List LogEntry) :
-    echoedCount L = (L.filter (fun e => decide (logEchoed e))).length := rfl
-
 /-- THE ERASE RUN IS NEVER ONE GLYPH (Rocq `cons_bs_join_length`, relax-d2
 K3): an erase arm's echo is a whole number of `consputcBs` triples. -/
 theorem consBsJoin_length (n : Nat) :

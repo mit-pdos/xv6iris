@@ -61,9 +61,6 @@ def UWSt.setR (s : UWSt) (r : Register) (v : RegisterType r) : UWSt :=
     (s.setR r v).file = s.file.set r v :=
   UWSt.file_setPin s r v
 
-@[simp] theorem UWSt.setR_mm (s : UWSt) (r : Register) (v : RegisterType r) : (s.setR r v).mm = s.mm := rfl
-@[simp] theorem UWSt.setR_rv (s : UWSt) (r : Register) (v : RegisterType r) : (s.setR r v).rv = s.rv := rfl
-
 theorem UWSt.setR_file_same (s : UWSt) (r : Register) (v : RegisterType r) : (s.setR r v).file r = v := by
   simp []
 
@@ -159,9 +156,6 @@ theorem ucTickS_file_other (s : UWSt) (x : Register) (h : x ≠ .PC) : (ucTickS 
   UWSt.setR_file_other _ _ _ _ h
 
 @[simp] theorem ucEpi_mm (r : Bool) (s : UWSt) : (ucEpi r s).mm = s.mm := by
-  unfold ucEpi ucTickS; split <;> rfl
-
-@[simp] theorem ucEpi_rv (r : Bool) (s : UWSt) : (ucEpi r s).rv = s.rv := by
   unfold ucEpi ucTickS; split <;> rfl
 
 theorem ucEpi_file_other (r : Bool) (s : UWSt) (x : Register) (h1 : x ≠ .PC) (h2 : x ≠ .minstret) :

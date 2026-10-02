@@ -107,10 +107,6 @@ theorem treeOfDisk_lookup (P : Nat → List (BitVec 8)) (sb : FsSb) (i : Nat)
     (hi : i < sb.sbNinodes) : (treeOfDisk P sb).fsNodes[i]? = nodeAt P sb i :=
   fsNodesUpto_lookup P sb _ i hi
 
-/-- Rocq's `tree_of_disk_root`. -/
-theorem treeOfDisk_root (P : Nat → List (BitVec 8)) (sb : FsSb) :
-    (treeOfDisk P sb).fsRoot = ROOTINO := rfl
-
 /-! ### the path reduction -/
 
 /-- Rocq's `tree_ent_of_disk`. -/

@@ -17,8 +17,8 @@ routine's load address, width, encoding, compressed?, expanded AST):
   every entry to its AST (checked ONCE per table, address-free) and that the
   offsets stay below `sz` with `base + sz < 2^64`, the text gives the code.
 
-`ulibPutcCode L base` is `ulibTabCode L ulibPutcTab base` by definition
-(`ulibPutcCode_eq`), so `putc`'s code composes with the tables below.
+`ulibPutcCode L base` is `ulibTabCode L ulibPutcTab base` by definition,
+so `putc`'s code composes with the tables below.
 -/
 import Xv6.UlibPutcCode
 
@@ -36,10 +36,6 @@ def ulibTabCode (L : UlibRun GF) (tab : List UlibIns) (base : BitVec 64) : IProp
 instance (L : UlibRun GF) (tab : List UlibIns) (base : BitVec 64) :
     Persistent (ulibTabCode L tab base) := by
   unfold ulibTabCode; infer_instance
-
-/-- `putc`'s code is its table's. -/
-theorem ulibPutcCode_eq (L : UlibRun GF) (base : BitVec 64) :
-    ulibPutcCode L base = ulibTabCode L ulibPutcTab base := rfl
 
 /-- One instruction of the code. -/
 theorem ulibTabCode_instr (L : UlibRun GF) (tab : List UlibIns) (base : BitVec 64) (k : Nat)

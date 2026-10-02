@@ -183,16 +183,8 @@ theorem ialloc_bgeu_dead (nin : Nat) (h1 : 1 < nin) (hnin : nin < 2 ^ 31) :
 /-- The all-zero record `memset(dip,0,64)` leaves. -/
 def iallocDzero : Dinode := ⟨0#16, 0#16, 0#16, 0#16, 0#32, List.replicate 13 0#32⟩
 
-theorem iallocDzero_wf : dinodeWf iallocDzero := rfl
-
 /-- ...whose 64 bytes ARE 64 zero bytes. -/
 theorem iallocDzero_bytes : dinodeBytes iallocDzero = List.replicate 64 0#8 := by decide
-
-/-- `iallocFresh ty` IS `iallocDzero` with the type halfword replaced -- exactly
-what the `sh` does to `dislot`'s first cell. -/
-theorem ialloc_fresh_of_zero (ty : BitVec 16) :
-    iallocFresh ty = ⟨ty, iallocDzero.diMajor, iallocDzero.diMinor, iallocDzero.diNlink, iallocDzero.diSize,
-      iallocDzero.diAddrs⟩ := rfl
 
 /-! ## The no-inodes message -/
 

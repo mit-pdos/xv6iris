@@ -41,8 +41,8 @@ Rocq's comment on the hop, kept:
 3. `S k` is `k + 1`; the big separating conjunction is iris-lean's
    `[∗list] j ↦ s ∈ ps.drop n, …` (index-first, as Rocq's).
 4. The `match ents !! s with Some c => P (S k) c | None => Pmiss k d`
-   inside the hop is NAMED, `axHopNext P Pmiss k d (ents[s]?)` (with
-   `axHopNext_some`/`_none`, both `rfl`).  An inline `match` elaborates to
+   inside the hop is NAMED, `axHopNext P Pmiss k d (ents[s]?)` (both
+   arms reduce by `rfl`).  An inline `match` elaborates to
    a fresh matcher at every statement that restates it, and the proof mode
    cannot unify two of them; the named form is the same term everywhere
    (the era fires state their conclusion through it).
@@ -74,12 +74,6 @@ miss (the `match` inside Rocq's `ax_hop`, named; deviation 4). -/
 def axHopNext (P Pmiss : Nat → Nat → IProp GF) (k d : Nat) : Option Nat → IProp GF
   | some c => P (k + 1) c
   | none => Pmiss k d
-
-theorem axHopNext_some (P Pmiss : Nat → Nat → IProp GF) (k d c : Nat) :
-    axHopNext P Pmiss k d (some c) = P (k + 1) c := rfl
-
-theorem axHopNext_none (P Pmiss : Nat → Nat → IProp GF) (k d : Nat) :
-    axHopNext P Pmiss k d none = Pmiss k d := rfl
 
 /-- WHAT THE HOP AT THE PROCESS'S ROOT `rt` HANDS BACK (the `if` inside
 Rocq's `ax_hop`, named for the same reason as `axHopNext`, deviation 4):

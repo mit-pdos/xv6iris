@@ -106,12 +106,6 @@ instance : Monad (DevM S T) where
   pure := DevM.pure
   bind := DevM.bind
 
-theorem bind_pure_left {α β : Type} (a : α) (f : α → DevM S T β) :
-    (DevM.pure a).bind f = f a := rfl
-
-theorem bind_op {α β : Type} (o : DevOp S T) (k : o.ret → DevM S T α) (f : α → DevM S T β) :
-    (DevM.op o k).bind f = .op o (fun r => (k r).bind f) := rfl
-
 /-- One primitive, as a program. -/
 def lift (o : DevOp S T) : DevM S T o.ret := .op o .pure
 

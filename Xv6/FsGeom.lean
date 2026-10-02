@@ -36,8 +36,8 @@ DEVIATIONS from Rocq, all deliberate.
 The literals matter.  As `DinodeEnc.v` says of its own constants: a
 consumer's offsets come out of the instruction stream as literals, so
 every law below is stated so that both the folded constant and its value
-are available (`NINDIRECT = 256` by `rfl`, and `NINDIRECT_eq` for the
-`BSIZE`-relative reading).
+are available (`NINDIRECT = 256` and the `BSIZE`-relative reading
+`NINDIRECT = BSIZE / 4`, both by `rfl`).
 -/
 import Xv6.DiskDefs
 
@@ -61,31 +61,16 @@ def NDIRECT : Nat := 12
 block. -/
 def NINDIRECT : Nat := 256
 
-theorem NINDIRECT_eq : NINDIRECT = BSIZE / 4 := rfl
-
 /-- `MAXFILE = NDIRECT + NINDIRECT` (fs.h): `bmap`'s dead-panic bound is
 `bn < MAXFILE`. -/
 def MAXFILE : Nat := 268
 
-theorem maxfile_split : MAXFILE = NDIRECT + NINDIRECT := rfl
-
-/-- `itrunc` makes `NDIRECT + NINDIRECT + 1 = 269` `bfree` calls (the
-twelve direct entries, the 256 indirect ones, and the indirect block
-itself). -/
-theorem itrunc_bfree_count : NDIRECT + NINDIRECT + 1 = 269 := rfl
-
 /-- `sizeof(struct dinode)` = `2*4 + 4 + 13*4`. -/
 def DISIZE : Nat := 64
-
-theorem DISIZE_eq : DISIZE = 2 * 4 + 4 + (NDIRECT + 1) * 4 := rfl
 
 /-- `IPB = BSIZE / sizeof(struct dinode)` (fs.h).  Shows up in the proofs
 as the premise `bv_unsigned ROOTINO < 16 * nib` (`SpecNamex.v`). -/
 def IPB : Nat := 16
-
-theorem IPB_eq : IPB = BSIZE / DISIZE := rfl
-
-theorem IPB_DISIZE : IPB * DISIZE = BSIZE := rfl
 
 /-- `IBLOCK(i, sb) = i / IPB + sb.inodestart` (fs.h): the block holding
 inode `inum`.  The code computes the quotient as `srliw a5,a5,0x4` and
@@ -104,8 +89,6 @@ theorem islot_lt (inum : BitVec 32) : islot inum < 16 :=
 
 /-- `BPB = BSIZE * 8` (fs.h): allocation bits in one bitmap block. -/
 def BPB : Nat := 8 * BSIZE
-
-theorem BPB_value : BPB = 8192 := rfl
 
 /-! ## `param.h` -/
 
@@ -136,12 +119,8 @@ def DIRSIZ : Nat := 14
 /-- `sizeof(struct dirent)` (Rocq's `DirentEnc.DESIZE`). -/
 def DESIZE : Nat := 16
 
-theorem DESIZE_eq : DESIZE = 2 + DIRSIZ := rfl
-
 /-- Directory entries per block (Rocq's `DirentEnc.DPB`). -/
 def DPB : Nat := 64
-
-theorem DPB_eq : DPB = BSIZE / DESIZE := rfl
 
 /-! ## The in-memory `struct inode`
 
@@ -166,8 +145,5 @@ def ISLOTSZ : Nat := 136
 /-- The offset of `itable.inode[0]` inside `struct itable` (the leading
 `struct spinlock`). -/
 def ITABLE_OFF : Nat := 24
-
-/-- `sizeof(itable)` = `24 + 50*136 = 0x1aa8`. -/
-theorem itable_size : ITABLE_OFF + NINODE * ISLOTSZ = 0x1aa8 := rfl
 
 end Xv6

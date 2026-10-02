@@ -451,18 +451,9 @@ theorem utr_pmaCheck_ram (D : UFoot) (orc : UOrc) (s : UWSt) (pa : BitVec 64) (w
   utr_pmaCheck_ok D orc s pa w acc pbmt res ramRegion hD
     (by rw [hpma]; exact matching_pma_ram pa w hram hw hw') hok halign
 
-/-- The RAM region allows every non-atomic user access kind (at the
-reservation flag the model asserts), under the table's own memory type. -/
-theorem utrPmaOk_ram_fetch (w : Nat) (u : Unit) :
-    utrPmaOk (override_PMA ramRegion.attributes .PBMT_PMA) (.InstructionFetch u) w false = true := rfl
 theorem utrPmaOk_ram_load (w : Nat) :
     utrPmaOk (override_PMA ramRegion.attributes .PBMT_PMA) (.Load .Data) w false = true := rfl
 theorem utrPmaOk_ram_store (w : Nat) :
     utrPmaOk (override_PMA ramRegion.attributes .PBMT_PMA) (.Store .Data) w false = true := rfl
-theorem utrPmaOk_ram_lr (w : Nat) (aq rl : Bool) :
-    utrPmaOk (override_PMA ramRegion.attributes .PBMT_PMA) (.LoadReserved (aq, rl, .Data)) w true = true := rfl
-theorem utrPmaOk_ram_sc (w : Nat) (aq rl : Bool) :
-    utrPmaOk (override_PMA ramRegion.attributes .PBMT_PMA) (.StoreConditional (aq, rl, .Data)) w true = true :=
-  rfl
 
 end MachCSL

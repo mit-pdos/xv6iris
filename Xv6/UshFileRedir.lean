@@ -15,7 +15,7 @@ section parameter (here the explicit `heq : fileAppIs g.fgnCl r`).
 `fsm_panic`, `ush_line_len`, the local notation `T` (spelled
 `fileTaint g.fgnCl`), `redir_K` (`UshFileRedir.redirK`), `redir_Kf`
 (`UshFileRedir.redirKf`), `redir_K_inum` (`UshFileRedir.redirK_inum`),
-`Xv6.shOpen_pc`, `ucallee_saved_a0a7`, `Hopen_hand`
+`ucallee_saved_a0a7`, `Hopen_hand`
 (`UshFileRedir.hopen_hand`), `redir_K'` (`UshFileRedir.redirK'`).
 
 ## Dropped

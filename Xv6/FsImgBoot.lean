@@ -10,8 +10,7 @@ REPLACES `Himg`, which is derived from it (Rocq's two `assert`s).
 fsBootImageWf (diskOf g.m.devs) XV6_DISK_BYTES sb nib cov` for arbitrary
 `sb nib cov`; its literal-image corollary is its theorem at `fsimgSb
 fsimgNib fsimgCov` with `Himg := fsimgHimg g Hdisk`, so its conclusion reads
-`xv6TracePure fsimgCov fsimgSb.sbLogstart g2` (`fsimgSb.sbLogstart = 2`,
-`fsimgSb_logstart`).
+`xv6TracePure fsimgCov fsimgSb.sbLogstart g2` (`fsimgSb.sbLogstart = 2`).
 
 Leaf rule: only the system theorem's file may import this one.
 -/

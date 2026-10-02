@@ -81,10 +81,6 @@ def fdt0 : List FdState := List.replicate NOFILE .closed
 
 theorem fdt0_length : fdt0.length = NOFILE := by simp [fdt0]
 
-/-- Rocq `fdt0_take`: a fresh process's standard streams are three closed
-slots, which is what makes init's first `open` land on descriptor 0. -/
-theorem fdt0_take : fdt0.take NSTD = List.replicate NSTD .closed := rfl
-
 /-- The Boolean the map's filter tests (deviation 1). -/
 def FdState.isClosed : FdState → Bool
   | .closed => true

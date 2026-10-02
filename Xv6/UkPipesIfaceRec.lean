@@ -22,7 +22,7 @@ and the record forms of `pns_copy_env_res`, `pns_copy_env_res_m`,
    (UkPipesIfaceCtx), `HNc` an instance argument.
 2. `pns_dev_of` is an equation per spec: Lean's `devSel` is UkHandler's
    deviation 2 (Rocq's inline match); `pns_ei_fds` / `pns_ei_files` are
-   `rfl`.
+   `rfl` here, so not stated.
 3. The environments' device sets `{[0; 1]}` / `{[0]}` are `{0} ∪ {1}` /
    `{0}` over `ExtTreeSet Nat compare`.
 -/
@@ -119,13 +119,6 @@ def pipesIface (CK : PnsCtxOk C) [UknConst C.Q.N] : EpIfaceP (hlc := hlc) C.Q.N 
   eiWriteProdErr := by intros; iintro - Hf -; icases Hf with ⟨⟩
   eiWriteProdFail := by intros; iintro - Hf -; icases Hf with ⟨⟩
   eiWriteProdHaltErr := by intros; iintro - Hf -; icases Hf with ⟨⟩
-
-/-- **Rocq `pns_ei_fds`**. -/
-theorem pns_ei_fds (CK : PnsCtxOk C) [UknConst C.Q.N] : (C.pipesIface CK).eiFds = pnsFds C.R C.Q := rfl
-
-/-- **Rocq `pns_ei_files`**. -/
-theorem pns_ei_files (CK : PnsCtxOk C) [UknConst C.Q.N] :
-    (C.pipesIface CK).eiFiles = pnsFilesr (GF := GF) := rfl
 
 /-- `devOf` at the record is the device predicate (Rocq `pns_dev_of` at
 `dev_of`). -/

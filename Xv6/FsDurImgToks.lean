@@ -43,10 +43,6 @@ half of `linkElemNode` (Rocq's `ent_ops`). -/
 def entOps (i : Nat) (n : FsNode) (tyf : Fname → Ity) : FsLinkUR :=
   bigOpM (M' := FnameMapF) CMRA.op (fun s t => entElem i (fnOrphan n) s t (tyf s)) (dirEntries n)
 
-/-- `linkElemNode` IS the authority beside `entOps` (helper; `rfl`). -/
-theorem linkElemNode_entOps (i : Nat) (n : FsNode) (v : Ity) (tyf : Fname → Ity) :
-    linkElemNode i n v tyf = linkAuthElem (i : Int) (fnMult n) v • entOps i n tyf := rfl
-
 /-- Rocq's `link_auths`. -/
 def linkAuths (I : RegMapF FsNode) (fv : Nat → Ity) : FsLinkUR :=
   [^ CMRA.op map] i ↦ n ∈ I, linkAuthElem ((i : Nat) : Int) (fnMult n) (fv i)

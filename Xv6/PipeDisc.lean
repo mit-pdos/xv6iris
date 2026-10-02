@@ -65,10 +65,6 @@ def altExecR : List (BitVec 8) := dgExecR ++ uPrompt
 /-- **Rocq `alt_forkc`**: the runcmd child's fork panic, then the prompt. -/
 def altForkc : List (BitVec 8) := wlLine dgFork ++ uPrompt
 
-/-- Rocq `alt_execL_echo`: `alt_execL` IS the echo application's exec
-alternative. -/
-theorem altExecL_echo : altExecL = altExecfail := rfl
-
 /-- Rocq `pd_wl_line_shape`: '$' is not a byte of any word line, and a word
 line's one newline is its last byte. -/
 theorem pd_wlLine_shape (ws : List (List (BitVec 8))) (hwf : wlWf ws) :

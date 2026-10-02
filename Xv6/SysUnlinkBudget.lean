@@ -78,8 +78,6 @@ def suIu (cru : Bool) : Nat := if cru then 0 else 1
 /-- Rocq's `su_u0`. -/
 def suU0 : Nat := MAXOPBLOCKS
 
-theorem suU0_value : suU0 = 10 := rfl
-
 /-- nameiparent, success arm (Rocq's `su_u1`). -/
 def suU1 (w1 : Bool) : Nat := suU0 - walkSpend w1
 
@@ -116,7 +114,5 @@ already held, sys_unlink runs its ONLY resolve holding nothing.  The peak is
 
 /-- Rocq's `sys_unlink_slots`. -/
 def sysUnlinkSlots : Nat := 2
-
-theorem sysUnlinkSlots_value : sysUnlinkSlots = 2 := rfl
 
 end Xv6

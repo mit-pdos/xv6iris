@@ -60,7 +60,6 @@ def ushWsA : Nat := 0x2008
 def ushSymA : Nat := 0x2000
 
 theorem ushWsA_eq : (ushWsA : Int) = ushpWhitespace := rfl
-theorem ushSymA_eq : (ushSymA : Int) = ushpSymbols := rfl
 
 /-- **Rocq `UkShParseLex.ushp_lit`**: a `.rodata` literal as the index
 function a string carries (off sh's R-X segment). -/

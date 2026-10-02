@@ -183,10 +183,6 @@ theorem kxcB2_zext (x : Nat) (h : x < 2 ^ 32) :
 theorem kxcB2_zext' (x : Nat) (h : x < 2 ^ 32) :
     (kxcSx32 x <<< 32) >>> 32 = BitVec.ofNat 64 x := kxcB2_zext x h
 
-/-- `lw` then the ABI word: the loaded low word IS the ABI word of its value. -/
-theorem kxcB2_lw (x : Nat) (h : x < 2 ^ 32) :
-    BitVec.signExtend 64 (BitVec.ofNat 32 x) = kxcSx32 x := rfl
-
 /-! ## THE FRAME WITH SLOTS 63 AND 65 PINNED -/
 
 section Frames

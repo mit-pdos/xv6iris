@@ -42,9 +42,6 @@ def grepPath : List Fname := [fnameGrep]
 /-- The tracked raw (Rocq `grep_bytes`). -/
 def grepBytes : List (BitVec 8) := Xv6.User.Grep.elf
 
-/-- THE TIE TO THE ELF LAYER (Rocq `grep_bytes_elf`). -/
-theorem grepBytes_elf : grepBytes = Xv6.User.Grep.elf := rfl
-
 /-- Rocq `era0_dur_grep`. -/
 theorem era0DurGrep : durNode era0D GREP_INO (imgNode fsimgP fsimgSb GREP_INO) :=
   imgDurNode fsImgDisk XV6_DISK_BYTES fsimgSb fsimgNib fsimgCov GREP_INO fsimgImageWf (by decide)

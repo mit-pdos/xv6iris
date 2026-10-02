@@ -19,8 +19,8 @@ exactly the arm file's statement, beside `SyscSpostEmp`
    deviation 5 is retired -- the callees report the bound -- so
    `syscDepWrite_holds` is unconditional, as Rocq's `sysc_dep_write`.)
 2. `syscFdKey` (SyscallArmsFdDefs) and `fdStOfKey` (UexecExecInst) are the
-   same definition (Rocq `fd_st_of_key`), equal by `rfl`
-   (`fdStOfKey_eq_syscFdKey`); recommended cleanup: keep one.
+   same definition (Rocq `fd_st_of_key`), equal by `rfl`;
+   recommended cleanup: keep one.
 -/
 import Xv6.UexecExecInst
 import Xv6.SyscallArmsFdDefs
@@ -31,9 +31,6 @@ import Xv6.SyscallArmsExec
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Std MachCSL
-
-theorem fdStOfKey_eq_syscFdKey (v : BitVec 64) (sts : List FdState) : fdStOfKey v sts = syscFdKey v sts :=
-  rfl
 
 section Laws
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]

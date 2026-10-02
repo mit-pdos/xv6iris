@@ -32,10 +32,6 @@ variable {lent : Bool}
 
 /-! ## `csrr rd, satp` -/
 
-/-- The CSR read dispatch at `satp` (a leaf of `read_CSR`'s match; without
-it the executor walks the whole match, ~15 s). -/
-@[local sail_facts] theorem prepare_return_read_CSR_satp : read_CSR 0x180#12 = readReg Register.satp := rfl
-
 set_option maxHeartbeats 4000000 in
 /-- `csrr rd, satp`: the configuration's `satp` into `rd`. -/
 theorem prepare_return_execSpecF_csrr_satp (cpu : CPU) (c : MConf) (sie : Bool)

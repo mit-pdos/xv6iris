@@ -297,12 +297,6 @@ theorem npDead_to_mknod (rt : Nat) (γfs : FsNames) (P Pmiss : Nat → Nat → I
     · iright
       iframe HP Hh
 
-omit [FsTopG GF] [FsBytesG GF] in
-/-- ...and the SUCCESS side needs no lemma at all (Rocq's
-`np_ok_is_mknod_ok`). -/
-theorem npOk_is_mknodOk (P : Nat → Nat → IProp GF) (pl : List (BitVec 8)) (iL : Nat) :
-    P (npElems pl).length iL = P (nparElems pl).length iL := rfl
-
 end NparMknod
 
 /-! ## 7.  Fire 2, at the armed child (was Rocq iris/FsAbsCreateFire.v) -/

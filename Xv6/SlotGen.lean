@@ -69,11 +69,8 @@ party that threads a lock's gname.
 2. **`qeighth` is `Qp.quarter.half`** (Rocq `(1/4)/2`, a notation because
    stdpp's `Qp` numerals stop at 4).
 3. **`PIDMAX` is `genPidMax`, a literal `1000`** (Rocq `ProcGeom.PIDMAX`).
-   Lean's `PIDMAX` lives in `Xv6/PidLock.lean`, which will have to IMPORT
-   this file (Rocq `PidLock.nextpid_res_at` carries `pid_reg_auth`), so this
-   file cannot import it.  `genPidMax_eq : genPidMax = PIDMAX := rfl` belongs
-   wherever both are in scope; better, `PIDMAX` moves down into the
-   geometry (Rocq `ProcGeom.v`) -- see the report.
+   Lean's `PIDMAX` is `Xv6/ProcGeom.lean`'s, which this file imports;
+   `genPidMax = PIDMAX` holds by `rfl`.
 4. **The pid register's domain fact (`pidRegDom`) is over the FUNCTION
    `pids : Nat → BitVec 32`** (Rocq: over `list (mword 32)`), because the
    Lean `pid_lock` payload (`PidLock.pidLockResAt`) and allocproc's scan
@@ -239,10 +236,6 @@ abbrev qeighth : Qp := Qp.quarter.half
 
 /-- Rocq `PIDMAX` (deviation 3). -/
 def genPidMax : Nat := 1000
-
-/-- ...and it IS the geometry's `PIDMAX` (now that `Xv6/ProcGeom.lean` sits
-below this file). -/
-theorem genPidMax_eq : genPidMax = PIDMAX := rfl
 
 /-! ## The element, and the map the boot mint hands out -/
 

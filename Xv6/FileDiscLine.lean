@@ -262,8 +262,6 @@ def lineBody : Uline → List (BitVec 8)
 /-- ...and the LINE the user typed: the body and the newline `gets` stops at. -/
 def lineBytes (l : Uline) : List (BitVec 8) := lineBody l ++ [wlNl]
 
-theorem lineBytes_echo (ws : List (List (BitVec 8))) : lineBytes (.LEcho ws) = wlLine ws := rfl
-
 theorem lineBytes_body (l : Uline) : lineBytes l = lineBody l ++ [wlNl] := rfl
 
 def ulineOk : Uline → Prop

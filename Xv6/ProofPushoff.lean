@@ -91,10 +91,6 @@ the new depth is the pushed one. -/
 theorem withCpu_pushOff4B (k : KCtx) (R : RegMap) (b : Bool) :
     ((k.pushed 4).withRegs R).withCpu R (k.noff + 1) b = ((k.pushOffB b).pushed 4).withRegs R := rfl
 
-/-- A store that leaves the depth and the saved enable state alone. -/
-theorem withCpu_self4 (k : KCtx) (R : RegMap) :
-    ((k.pushed 4).withRegs R).withCpu R k.noff k.intena = (k.pushed 4).withRegs R := rfl
-
 set_option maxHeartbeats 4000000 in
 /-- The common tail from `80000c36`: `mycpu()`, `noff += 1`, the epilogue.
 `R` is the body's map; its callee-saved registers other than `s1` (restored

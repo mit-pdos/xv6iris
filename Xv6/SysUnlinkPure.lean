@@ -30,9 +30,8 @@ Rocq); the walk is `SysUnlinkW1..W5D` (not yet written).
    `Z` (`bv_unsigned`).  `su_le1_nz_eq1`'s `0 ≤ x` is vacuous and dropped.
 4. `su_upd_upt_idem` / `su_cwd_upt` / `su_upd_cwd_upt` (PROCESS-LAYER,
    FLAGGED): Rocq's `upd_upt` / `upd_cwd` setters are Lean record updates
-   on `ProcPriv` (`{ V with upt := P }`), so the three are `rfl` facts
-   (`sys_unlink_upd_upt_idem`, `sys_unlink_cwd_upt`,
-   `sys_unlink_upd_cwd_upt`).  They say nothing about the block's
+   on `ProcPriv` (`{ V with upt := P }`), so the three hold by `rfl` and
+   are not stated.  They say nothing about the block's
    resources; no deviation of the process abstraction is introduced.
 5. Names: Rocq's `su_` prefix is `sys_unlink_`; `su_dot_list` →
    `sysUnlinkDotList`, `su_dot_f` → `sysUnlinkDotF`, and so on.
@@ -66,17 +65,6 @@ import Xv6.SpecIput
 namespace Xv6
 
 open MachCSL LeanRV64D
-
-/-! ## The record-shape identities across argstr (deviation 4) -/
-
-theorem sys_unlink_upd_upt_idem (V : ProcPriv) (P1 P2 : UPtd) :
-    ({ ({ V with upt := P1 }) with upt := P2 } : ProcPriv) = { V with upt := P2 } := rfl
-
-theorem sys_unlink_cwd_upt (V : ProcPriv) (P : UPtd) : ({ V with upt := P } : ProcPriv).cwd = V.cwd :=
-  rfl
-
-theorem sys_unlink_upd_cwd_upt (V : ProcPriv) (P : UPtd) :
-    ({ ({ V with upt := P }) with cwd := V.cwd } : ProcPriv) = { V with upt := P } := rfl
 
 /-! ## The two name literals the two `namecmp` refusals compare against -/
 
@@ -152,9 +140,6 @@ theorem sys_unlink_wi_cost (k : Nat) : wiCostBmonly (16 * k) 16 = 4 := by
 theorem sys_unlink_iunlockput_from5 (w : Bool) (n n' : Nat) (h5 : 5 ≤ n)
     (h : n - ipSpendW w true false ≤ n') : 4 ≤ n' := by
   cases w <;> simp [ipSpendW, ipBm] at h <;> omega
-
-/-- the zero record's inum field (Rocq's `su_dz_inum`) -/
-theorem sys_unlink_dz_inum : direntZero.inum = 0#16 := rfl
 
 /-- ...and each of its sixteen bytes (Rocq's `su_dz_byte`) -/
 theorem sys_unlink_dz_byte (j : Nat) (hj : j < 16) : (direntBytes direntZero)[j]? = some 0#8 := by

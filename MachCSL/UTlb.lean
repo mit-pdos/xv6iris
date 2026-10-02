@@ -116,8 +116,6 @@ theorem utlb_hit_refresh (D : UFoot) (orc orc' : UOrc) (s s' : UWSt) (hp : UwkPi
     pteAddr_tlbEntryOf, tlb_get_ppn_tlbEntryOf, utlb_pte_tlbEntryOf]
   simp only [tlb_get_ppn_tlbEntryOf, BitVec.setWidth_eq, tlb_set_pte_tlbEntryOf]
 
-theorem utlb_w0 : ((0 : Int) * 9).toNat = 0 := rfl
-
 /-! ## §3 The miss (Rocq `exec_translate_TLB_miss_user`,
 `exec_translate_TLB_miss_user_walk_err`, `exec_add_to_TLB_user`) -/
 

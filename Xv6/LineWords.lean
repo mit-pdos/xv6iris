@@ -811,8 +811,6 @@ theorem wlRaw_line_prefix_det (l l' t t' : List (BitVec 8)) (hl : wlNl ∉ l) (h
 
 def fnDot : BitVec 8 := 46#8
 
-theorem fnDot_val : fnDot.toNat = 46 := rfl
-
 def fnByte (b : BitVec 8) : Prop := wlAlnum b ∨ b = fnDot
 
 def fnWord (w : List (BitVec 8)) : Prop := w ≠ [] ∧ ∀ b ∈ w, fnByte b

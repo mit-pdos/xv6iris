@@ -120,16 +120,6 @@ frame pushed. -/
 def ciK (k : KCtx) (a b : Bool) : KCtx :=
   ((k.pushOffAt a b).withLocks ("cons" :: k.locks)).pushed 6
 
-@[simp] theorem ciK_sie (k : KCtx) (a b : Bool) : (ciK k a b).sie = false := rfl
-@[simp] theorem ciK_noff (k : KCtx) (a b : Bool) : (ciK k a b).noff = k.noff + 1 := rfl
-@[simp] theorem ciK_intena (k : KCtx) (a b : Bool) : (ciK k a b).intena = k.intena := rfl
-@[simp] theorem ciK_locks (k : KCtx) (a b : Bool) : (ciK k a b).locks = "cons" :: k.locks := rfl
-@[simp] theorem ciK_tier (k : KCtx) (a b : Bool) : (ciK k a b).tier = k.tier := rfl
-@[simp] theorem ciK_proc (k : KCtx) (a b : Bool) : (ciK k a b).proc = k.proc := rfl
-@[simp] theorem ciK_regs (k : KCtx) (a b : Bool) : (ciK k a b).regs = k.regs := rfl
-@[simp] theorem ciK_spie (k : KCtx) (a b : Bool) : (ciK k a b).spie = a := rfl
-@[simp] theorem ciK_spp (k : KCtx) (a b : Bool) : (ciK k a b).spp = b := rfl
-theorem ciK_withSpie (k : KCtx) (a b : Bool) : (ciK k a b).withSpie a b = ciK k a b := rfl
 theorem ciK_avail (k : KCtx) (a b : Bool) : (ciK k a b).avail = trapRes k.sie + k.avail - 6 := rfl
 
 theorem ciK_avail_ge (k : KCtx) (a b : Bool) : k.avail - 6 ≤ (ciK k a b).avail := by

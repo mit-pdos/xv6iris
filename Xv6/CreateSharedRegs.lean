@@ -726,8 +726,6 @@ theorem create_wi_size_max (dn : Dinode) (bm' : Blkmap) (off tot : Nat) (h : off
 
 /-! ## (viii)  The mkdir sub-branch (+0x11e .. +0x144) -/
 
-theorem create_nrec_16 : dirNrec 16 = 1 := rfl
-
 /-- the empty child's first link lands at slot 0 (Rocq's `cr_slot_0`) -/
 theorem create_slot_0 (data : Nat → List (BitVec 8)) : dirSlot data 0 = 0 := by
   unfold dirSlot dirFreeFirst; rw [dfirst_0]

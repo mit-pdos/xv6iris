@@ -330,8 +330,6 @@ def apathAt (av : Aview) (d : Nat) : List Fname → Option Nat
     | some c => apathAt av c ps'
     | none => none
 
-theorem apathAt_nil (av : Aview) (d : Nat) : apathAt av d [] = some d := rfl
-
 theorem apathAt_cons (av : Aview) (d : Nat) (s : Fname) (ps : List Fname) :
     apathAt av d (s :: ps) = match astep av d s with
       | some c => apathAt av c ps

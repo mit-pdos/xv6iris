@@ -141,9 +141,6 @@ theorem uftRun_of_runRW {X : Type} (m : SailM X) :
         obtain ⟨v, s', o'⟩ := p
         exact ih v o' s' r
 
-@[simp] theorem uftRun_pure {X : Type} (orc : UOrc) (s : UWSt) (x : X) :
-    uftRun D orc s (pure x : SailM X) = some (x, s, orc) := rfl
-
 /-- **The bind law.** -/
 theorem uftRun_bind {X Y : Type} (m : SailM X) (f : X → SailM Y) :
     ∀ (orc : UOrc) (s : UWSt), uftRun D orc s (m >>= f) =
