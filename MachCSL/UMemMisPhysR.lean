@@ -20,7 +20,6 @@ import MachCSL.UMemMisPlan
 import MachCSL.UMemMisBytes
 import MachCSL.UMemMisLoop
 import MachCSL.UMemPhys
-import MachCSL.Tactics
 
 namespace MachCSL
 

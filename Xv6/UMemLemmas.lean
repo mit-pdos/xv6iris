@@ -9,10 +9,7 @@ another page (`viewFaulted` / `viewZero`), the byte-wise facts of
 Kept in its own namespace (`Xv6.UMemL`).
 -/
 import Xv6.UMem
-import Xv6.PtOwnLemmas
 import Xv6.PtRunLemmas
-import Xv6.KvmLemmas
-import Xv6.UPtLemmas
 
 namespace Xv6.UMemL
 

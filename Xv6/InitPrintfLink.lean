@@ -13,7 +13,6 @@ address and pins `a1` to it.  At putc's call site they agree:
 into the other at the instance.
 -/
 import Xv6.UlibUkProg
-import Xv6.UkInitDefs
 import Xv6.LinkInit
 
 namespace Xv6

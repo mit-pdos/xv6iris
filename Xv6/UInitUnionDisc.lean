@@ -12,9 +12,7 @@ line constructor `ush_line_union`.
    three section hypotheses (UInitShSlot header).
 2. Rocq's `decide (fbody_ok J)` is `by_cases` (DU9).
 -/
-import Xv6.UshMainDefs
 import Xv6.UshURoundPure
-import Xv6.PipesUline
 
 namespace Xv6
 

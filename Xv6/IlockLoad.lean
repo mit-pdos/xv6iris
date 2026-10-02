@@ -7,7 +7,6 @@ region (`Xv6.il_blk_open`); then `Xv6.il_mid`.  `il_load` is the proof of
 the interface `Xv6.IlLoadEb` the main walk was checked against.
 -/
 import Xv6.IlockMid
-import Xv6.FsCallSitesF
 
 namespace Xv6
 

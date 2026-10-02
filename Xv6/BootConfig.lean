@@ -46,7 +46,6 @@ Imports only definitional files.
 import MachCSL.Power
 import MachCSL.MConf
 import Xv6.KernelImage
-import MachCSL.MConfBoot
 
 namespace Xv6
 

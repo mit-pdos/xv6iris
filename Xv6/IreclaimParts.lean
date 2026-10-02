@@ -21,18 +21,13 @@ ireclaim's registers because a stage file belongs to ONE function (the
 wrappers -- candidates to hoist into DinodeSlot together with ialloc's).
 -/
 import Xv6.SpecIreclaim
-import Xv6.DinodeSlot
 import Xv6.SpecBeginOp
-import Xv6.SpecBrelse
 import Xv6.SpecIunlock
 import Xv6.SpecIput
-import Xv6.FsWords
 import Xv6.SpecIlock
 import Xv6.SpecIget
-import MachCSL.WpSmodeFrame8
 import Xv6.BallocParts
 import Xv6.BfreeParts
-import Xv6.IupdateSteps
 
 namespace Xv6
 

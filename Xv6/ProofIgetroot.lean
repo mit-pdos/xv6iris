@@ -22,8 +22,6 @@ fact shifts the contract's `wpNext` along (`k_step_ig`, the former
 import Xv6.SpecIgetroot
 import Xv6.IallocDefs
 import Xv6.CodeTactics
-import Xv6.KernelTac
-import MachCSL.WpSmodeFrame
 
 namespace Xv6
 

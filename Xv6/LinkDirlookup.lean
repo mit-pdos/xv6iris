@@ -19,7 +19,6 @@ import Xv6.ProofDirlookup
 import Xv6.LinkReadi
 import Xv6.LinkNamecmp
 import Xv6.LinkIget
-import Xv6.LinkMyproc
 import Xv6.LinkIdup
 
 namespace Xv6

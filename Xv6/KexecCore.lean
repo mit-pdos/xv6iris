@@ -48,7 +48,6 @@ conversion.  A STAGE file (no `Proof` prefix).
    `Q := True`, `QF := True` is kexec at the landed `kexecOk`.
 -/
 import Xv6.KexecACode
-import Xv6.KexecB
 import Xv6.KexecB3
 import Xv6.KexecC
 import Xv6.KexecD

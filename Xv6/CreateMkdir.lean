@@ -118,6 +118,7 @@ import Xv6.IcacheShortCarve
 import Xv6.ProcPrivAcc
 import Xv6.FsStateEraResB
 import Xv6.KexecCArgv
+import Xv6.SysUnlinkShared
 
 namespace Xv6
 

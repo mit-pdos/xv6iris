@@ -49,7 +49,6 @@ instance (`rd_res`, `echo_link_inst`) and the plain-ledger twins.
    where it fixes the implicit `L`); it is kept so a call names the record.
 -/
 import Xv6.UkReadCons
-import Xv6.UshMainDefs
 import Xv6.ReadRec
 import Xv6.UkInitDefs
 

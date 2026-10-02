@@ -33,7 +33,6 @@ stubs are `UkSeccStubs`').
    instance `uexecSGXv6` (the kernel-cost split of UexecSeccMint deviation 6).
 -/
 import Xv6.UkSeccStubs
-import Xv6.UkRunSysWrite
 import Xv6.UkWriteClosed
 import Xv6.UexecSecc
 

@@ -18,10 +18,8 @@ The `int` local rides in the top half of an 8-byte frame slot
 -/
 import Xv6.SpecArgfd
 import Xv6.ArgLemmas
-import MachCSL.WpSmodeFrame6
 import Xv6.CopyLemmas
 import Xv6.DinodeSlot
-import Xv6.FsWords
 import MachCSL.BvLemmas
 
 namespace Xv6

@@ -28,11 +28,7 @@ Deviations from Rocq:
 2. Register facts per register (`ushPexRegs`), `Nat` addresses.
 3. The node lemmas are `UshNodes`' (`ush_slots_upd`, `ush_slots_cap`).
 -/
-import Xv6.SpecShPeek
-import Xv6.SpecShGettoken
-import Xv6.SpecShExeccmd
 import Xv6.SpecShParseredirs
-import Xv6.UshLits
 import Xv6.UshNodes
 import Xv6.UshRedirsWalk
 import Xv6.UlibVprintfInv

@@ -87,6 +87,7 @@ import Xv6.FsWords
 import Xv6.InitlogHead
 import Xv6.PrintkDefs
 import MachCSL.BvLemmas
+import Xv6.BallocParts
 
 namespace Xv6
 

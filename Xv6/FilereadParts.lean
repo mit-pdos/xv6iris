@@ -41,7 +41,6 @@ eager three and pops.
 import Xv6.SpecFileread
 import MachCSL.WpSmodeFrame6c
 import Xv6.FilePay
-import Xv6.DirlookupParts
 
 namespace Xv6
 

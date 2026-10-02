@@ -46,7 +46,6 @@ import MachCSL.ByteWord
 import Xv6.SpecPrintint
 import Xv6.SpecPrputc
 import Xv6.CodeTactics
-import Xv6.KernelTac
 
 namespace Xv6
 

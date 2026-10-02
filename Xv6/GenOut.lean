@@ -69,7 +69,6 @@ Rocq's header, abridged:
    `iAssert` over `big_sepL_lookup`).
 -/
 import Xv6.GenOutHist
-import Xv6.PipeOutPure
 
 namespace Xv6
 

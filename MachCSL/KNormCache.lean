@@ -5,7 +5,6 @@ own because the cache is an `initialize`d reference, which the module that
 declares it cannot use.
 -/
 import Lean
-import MachCSL.SimpAttr
 
 namespace MachCSL
 

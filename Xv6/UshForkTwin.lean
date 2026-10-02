@@ -44,6 +44,7 @@ import Xv6.UshDiagPanic
 import Xv6.UshPipeWait
 import Xv6.UshPipeArmBase
 import Xv6.UshMainBytes
+import Xv6.SpecShFork1
 
 namespace Xv6
 

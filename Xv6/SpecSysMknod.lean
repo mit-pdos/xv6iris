@@ -158,7 +158,6 @@ is not derivable stays in Rocq.
 
 Imports only definitional files and callee `Spec*` files.
 -/
-import Xv6.ArgPath
 import Xv6.FdTable
 import Xv6.UMemLazy
 import Xv6.FsAbsMknodFire

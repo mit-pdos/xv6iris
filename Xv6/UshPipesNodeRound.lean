@@ -53,7 +53,6 @@ instance resolution, which the glob walk cannot see; notes/cone_reaudit.md) and
 3. `Hfire` is stated as sibling b's Prop `UShPipesStage.HfireP D` (its
    statement verbatim).
 -/
-import Xv6.UshPipesDefsPay
 import Xv6.UshPipesDefsFam
 import Xv6.UshPipesDefsFire
 import Xv6.UshPipesStageDefs

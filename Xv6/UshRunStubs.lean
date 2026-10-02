@@ -7,9 +7,6 @@ evaluation (DU3).  Stage file of `ProofShSys*`.
 Deviation from Rocq: the stubs are walked once by `UkStub.stub_run`, not
 inline per lemma (the `ProofShSysSbrk` precedent).
 -/
-import Xv6.UshRunDefs
-import Xv6.UkStub
-import Xv6.UshExecCode
 import Xv6.UshMainStubs
 
 namespace Xv6

@@ -78,6 +78,7 @@ non-committer's arm), `Xv6/EndOpTail.lean`, `Xv6/EndOpCommit.lean`,
 `Xv6/EndOpLoop.lean`; the crash vocabulary is `Xv6/EndOpCrash.lean`.
 -/
 import Xv6.EndOpLoop
+import MachCSL.LockFacts
 
 namespace Xv6
 

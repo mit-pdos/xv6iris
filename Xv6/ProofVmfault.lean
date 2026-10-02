@@ -24,6 +24,7 @@ where that conjunct is vacuous (`vf_lend_alloc`).
 -/
 import Xv6.SpecVmfault
 import Xv6.VmfaultDefs
+import MachCSL.BvLemmas
 
 namespace Xv6
 

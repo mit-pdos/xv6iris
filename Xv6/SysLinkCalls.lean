@@ -40,7 +40,6 @@ projection family); the superblock cells are the persistent
 -/
 import Xv6.SysLinkFrame
 import Xv6.SpecNamecmp
-import Xv6.SysUnlinkCalls
 
 namespace Xv6
 

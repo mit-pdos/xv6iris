@@ -33,7 +33,6 @@ The stages: `Xv6/IallocTail.lean` (epilogue, no-inodes arm),
 import Xv6.SpecIget
 import Xv6.SpecIalloc
 import Xv6.FsCallSitesF
-import Xv6.BallocDefs
 
 namespace Xv6
 

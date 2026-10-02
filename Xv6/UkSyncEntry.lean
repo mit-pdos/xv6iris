@@ -36,7 +36,6 @@ its ledger, working directory, children and pid are dropped.
    is Rocq's 38 + 4 = the key's 42 words.
 -/
 import Xv6.ExecEntry
-import Xv6.ElfUser
 import Xv6.UshEchoArgs
 import Xv6.UshSync
 import Xv6.LinkSync

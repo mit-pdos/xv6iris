@@ -18,7 +18,6 @@ rules chained -- no symbolic execution.  Modelled on `Xv6/ProofMemcmp.lean`.
 -/
 import Xv6.SpecStrncmp
 import Xv6.CodeTactics
-import Xv6.FsWords
 import Xv6.StepLemmas
 import MachCSL.BvLemmas
 

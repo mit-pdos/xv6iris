@@ -11,6 +11,7 @@ and the change would have to be paid for; xv6 never does it there.)
 import MachCSL.CallConv
 import MachCSL.WpSmodeCycle
 import MachCSL.WpSmodeMem
+import MachCSL.WpSmodeMemSd
 
 namespace MachCSL
 

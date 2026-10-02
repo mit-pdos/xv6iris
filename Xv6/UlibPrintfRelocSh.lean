@@ -11,6 +11,9 @@ import Xv6.SpecUlibPutc
 import Xv6.UlibPrintfDefs
 import Xv6.User.ShImage
 import Xv6.User.ShTree
+import Xv6.UlibVprintfCode
+import Xv6.UlibFprintfCode
+import Xv6.UlibPrintfCode
 
 namespace Xv6
 

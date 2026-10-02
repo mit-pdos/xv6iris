@@ -50,11 +50,8 @@ re-instantiated over the same slots.
 2. `unionLineΣ` / `subG_unionLineΣ` have no counterpart (above).
 -/
 import Xv6.Xv6GF
-import Xv6.EchoOut
-import Xv6.AppFileNames
 import Xv6.FileOutEra
 import Xv6.PipeOut
-import Xv6.PipeProto
 import Xv6.UkPipesIfaceDefs
 import Xv6.UkCatFIfaceReg
 import Xv6.UkFileIfaceReg

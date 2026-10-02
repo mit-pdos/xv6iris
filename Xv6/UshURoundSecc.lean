@@ -45,11 +45,8 @@ lambda `fun ld => ushFd0c ld ∧ ushFd1p ld ∧ ushFd2p ld` (deviation 5).
    body is inlined, so that the cat sub-lane's definition does not clash.
 -/
 import Xv6.UshURoundEcho
-import Xv6.UexecSecc
-import Xv6.UshSecc
 import Xv6.LinkUexecWp
 import Xv6.UkSeccEntry
-import Xv6.UshOomPaid
 
 namespace Xv6
 

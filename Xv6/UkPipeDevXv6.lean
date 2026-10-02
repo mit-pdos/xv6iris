@@ -36,7 +36,6 @@ So the xv6 pipe device takes exactly the engine `UL : UK_LEAVES` (tip
 -/
 import Xv6.UkPipeDevRead
 import Xv6.UkRunSysClose
-import Xv6.UexecExecMintW
 import Xv6.UkWritePipe
 
 namespace Xv6

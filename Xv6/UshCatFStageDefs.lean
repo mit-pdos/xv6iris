@@ -88,6 +88,7 @@ import Xv6.UshExecPin
 import Xv6.SpecShRuncmdExec
 import Xv6.UNamePath
 import Xv6.UNamePathCat
+import Xv6.AppFileNames
 
 namespace Xv6
 

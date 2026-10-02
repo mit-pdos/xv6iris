@@ -30,7 +30,6 @@ fileclose everything is at its return hart.
 import Xv6.SpecSysClose
 import Xv6.SysfileCalls
 import Xv6.ArgLemmas
-import MachCSL.WpSmodeFrame6
 import Xv6.CopyLemmas
 import Xv6.DinodeSlot
 import Xv6.SysFstatParts

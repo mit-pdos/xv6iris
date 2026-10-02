@@ -5,9 +5,6 @@ of `MachCSL.WpCsr` (whose header describes them) so the supervisor-mode CSR
 rules, which use only these, do not wait for the machine-mode CSR stage lemmas
 or for `WpGpr`.
 -/
-import MachCSL.PlatformFacts
-import MachCSL.PmpXv6Defs
-import MachCSL.ModelFacts
 import MachCSL.WpPmp
 
 namespace MachCSL

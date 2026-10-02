@@ -30,7 +30,6 @@ Deviations from Rocq: as `Xv6/IupdateTail.lean`; the four-stage cut
 -/
 import Xv6.IupdateTail
 import MachCSL.WpSmodeLh
-import Xv6.FsWords
 
 namespace Xv6
 

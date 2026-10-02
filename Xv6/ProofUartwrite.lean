@@ -37,7 +37,6 @@ import Xv6.SpecSleepPrepare
 import Xv6.CodeTactics
 import MachCSL.WpSmodeFrame8b
 import Xv6.PrintkDefs
-import Xv6.StepLemmas
 import MachCSL.BvLemmas
 import MachCSL.WpSmodeDev
 

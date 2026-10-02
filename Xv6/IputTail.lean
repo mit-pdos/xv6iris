@@ -40,8 +40,6 @@ The close splits on the count, which is what lets its entries share it:
 -/
 import MachCSL.WpDmaCtx
 import Xv6.IputStages
-import Xv6.IcacheInvStore
-import Xv6.IcacheBoxSites
 import Xv6.IgetHit
 
 namespace Xv6

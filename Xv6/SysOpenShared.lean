@@ -65,9 +65,7 @@ Rocq's header, kept (the reason is the content):
 Imports `SysOpenParts` and the shared `SysfileCalls`.
 -/
 import Xv6.SysOpenParts
-import Xv6.SysfileCalls
 import Xv6.FsAbsOpenFire
-import Xv6.CreateFound
 
 namespace Xv6
 

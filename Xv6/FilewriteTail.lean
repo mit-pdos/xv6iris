@@ -19,7 +19,6 @@ offset row's invariant).
 -/
 import Xv6.FilewriteChain
 import Xv6.FilewriteParts
-import Xv6.ReadiDefs
 
 namespace Xv6
 

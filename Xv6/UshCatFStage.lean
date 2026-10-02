@@ -38,7 +38,6 @@ import Xv6.UshCatFStageDefs
 import Xv6.SpecShRuncmdExec
 import Xv6.AppFileNames
 import Xv6.UkCatFIfaceReg
-import Xv6.UshExecPin
 
 namespace Xv6
 

@@ -38,7 +38,6 @@ THE EVENT COUNTER (permit sweep L1a, Rocq f344a089a): the post
 with `V.ev ≤ kc` -- growproc's on the eager path, `V.ev` on the lazy and
 failing ones.
 -/
-import MachCSL.WpSmodeFrame6
 import Xv6.SpecSysSbrk
 import Xv6.ArgLemmas
 import Xv6.ProcPrivAcc

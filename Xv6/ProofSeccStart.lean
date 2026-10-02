@@ -4,7 +4,6 @@
 -/
 import Xv6.SpecSeccMain
 import Xv6.SpecSeccStart
-import Xv6.UkRunMem
 
 namespace Xv6
 

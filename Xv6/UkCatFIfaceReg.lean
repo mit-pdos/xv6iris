@@ -47,6 +47,7 @@ import Xv6.SysOpenDefs
 import Xv6.ConsoleInvDefs
 import Xv6.UserFd
 import Xv6.UkHandler
+import Xv6.PipeProto
 
 namespace Xv6
 

@@ -22,6 +22,7 @@ function).
 -/
 import Xv6.UshPipesSeam
 import Xv6.UshSeamChild
+import Xv6.UshPipesCmd
 
 namespace Xv6
 

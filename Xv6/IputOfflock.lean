@@ -27,6 +27,7 @@ comes back with them; the three shares rejoin into the caller's
 -/
 import Xv6.IputOfflockTail
 import Xv6.IputStages
+import Xv6.IupdateMain
 
 namespace Xv6
 

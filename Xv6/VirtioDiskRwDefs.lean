@@ -23,7 +23,6 @@ from `kalloc`).
 -/
 import MachCSL.Frame12Defs
 import MachCSL.WpSmodeFrame
-import MachCSL.WpSmodeCtl
 import Xv6.DiskInvDefs
 import Xv6.SchedCtx
 import Xv6.BufDefs

@@ -47,6 +47,7 @@ import Xv6.UkConsOut
 import Xv6.UEchoFile
 import Xv6.UexecExecInst
 import Xv6.UkFileOpenDefs
+import Xv6.FileOutEra
 
 namespace Xv6
 

@@ -20,6 +20,7 @@ PROVED, lane NIL-RET).
 import Xv6.UkFileIfaceWriteCons
 import Xv6.UkFileIfaceDevP
 import Xv6.UkFileIfaceHdls
+import Xv6.UkFileDevNil
 
 namespace Xv6
 

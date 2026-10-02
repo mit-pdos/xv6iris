@@ -5,8 +5,6 @@ vocabulary split from `WpSmodeFrame12`/`WpSmodeFrame12b` so the disk
 driver's definitions (`Xv6.VirtioDiskRwDefs`) do not wait for the
 supervisor-mode accessor and store rules those files import.
 -/
-import MachCSL.WordPointsTo
-import MachCSL.KMap
 import MachCSL.WpDmaCtx2
 
 namespace MachCSL

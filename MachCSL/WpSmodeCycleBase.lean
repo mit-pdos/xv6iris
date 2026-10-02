@@ -8,7 +8,6 @@ import MachCSL.SConfAtDefs
 import MachCSL.WpCycleDefs
 import MachCSL.KCtx
 import MachCSL.Tactics
-import MachCSL.MConf
 
 namespace MachCSL
 

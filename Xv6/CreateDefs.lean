@@ -62,7 +62,6 @@ cursor (`nparElems`, `nparWalkDeadEra`, `epStart`) or the slot supplies.
   `createIrefSlots_val` here, beside their definitions.
 -/
 import Xv6.SpecNameiparent
-import Xv6.FsAbsCreateFire
 import Xv6.FsAbsCreateNm
 
 namespace Xv6

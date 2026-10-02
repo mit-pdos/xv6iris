@@ -17,10 +17,8 @@ fetch and any text load):
 -/
 import Xv6.UkArms
 import Xv6.UkBundle
-import Xv6.SpecUkLeaves
 import Xv6.UkLandGlue
 import MachCSL.URunXSwp
-import Xv6.UserFrameFoot
 
 namespace Xv6
 

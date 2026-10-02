@@ -17,7 +17,6 @@ import Xv6.SpecBwrite
 import Xv6.SpecHoldingsleep
 import Xv6.BcacheLock
 import Xv6.CodeTactics
-import MachCSL.WpSmodeRegOps
 
 namespace Xv6
 

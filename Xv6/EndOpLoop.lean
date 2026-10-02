@@ -4,6 +4,8 @@
 -/
 import Xv6.EndOpCommit
 import Xv6.FsCallSites
+import Xv6.VirtioDiskRwDefs3
+import Xv6.InitlogHead
 
 namespace Xv6
 

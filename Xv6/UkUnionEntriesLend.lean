@@ -28,7 +28,6 @@ CONE (this file): `uecho_lend`, `ucat_lend` (and `ucat_alts`, pure, in
 -/
 import Xv6.UkUnionEntriesPure
 import Xv6.UnionLinkInstAt
-import Xv6.UexecExecInst
 
 namespace Xv6
 

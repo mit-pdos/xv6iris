@@ -9,7 +9,6 @@ so the other `vm.c` proofs of this wave can be checked in parallel.
 -/
 import Xv6.UPtDefs
 import Xv6.PtRunLemmas
-import Xv6.PtOwnLemmas
 
 namespace Xv6.UPtFault
 

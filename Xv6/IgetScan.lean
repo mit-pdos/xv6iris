@@ -45,6 +45,8 @@ import Xv6.IgetRecycle
 import Xv6.IgetHit
 import Xv6.IcachePinwObl
 import MachCSL.LockFacts
+import Xv6.BreadDefs
+import Xv6.InitlogHead
 
 namespace Xv6
 

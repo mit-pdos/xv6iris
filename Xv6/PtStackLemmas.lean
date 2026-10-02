@@ -12,7 +12,6 @@ page of the caller's tree.
 -/
 import Xv6.PtRunLemmas
 import Xv6.KvmDefs
-import Xv6.PtOwnLemmas
 
 namespace Xv6.PtStack
 

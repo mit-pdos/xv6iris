@@ -15,7 +15,6 @@ Deviations: spelling only.  As in the landed file, Rocq's right-nested
 left-associative: `(u ++ uPrompt) ++ Y`; equal as lists).
 -/
 import Xv6.LineBytes
-import Xv6.LineWordsSeal
 import Xv6.EchoDiscSeal
 
 namespace Xv6

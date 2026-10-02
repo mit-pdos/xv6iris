@@ -80,11 +80,8 @@ reached -- `fdev_signed_small`, `fdev_m1`, `fdev_cint_lt`,
 -/
 import Xv6.UEchoFile
 import Xv6.UshMainBytes
-import Xv6.UkSysP
 import Xv6.UkTree
 import Xv6.UkReadRows
-import Xv6.FileOpenDeed
-import Xv6.HfpFileClaimsP
 import Xv6.UkFileOpenDefs
 
 namespace Xv6

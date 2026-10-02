@@ -20,6 +20,8 @@ composed back to `ke`.
 import Xv6.SpecProcPagetable
 import Xv6.ProcPagetableDefs
 import Xv6.CodeTactics
+import Xv6.KvmLemmas
+import Xv6.UPtAllocLemmas
 
 namespace Xv6
 

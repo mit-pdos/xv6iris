@@ -33,7 +33,6 @@ import Xv6.UkUnionEntriesDefs
 import Xv6.LinkShExec
 import Xv6.SpecUser
 import Xv6.UshPipesStageCtx
-import Xv6.UshUPipesClaim
 
 namespace Xv6
 

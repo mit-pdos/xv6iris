@@ -89,10 +89,8 @@ continuation takes the block at any record `evAfter` the swap's, and
 the success arm does not read the count.
 -/
 import Xv6.KexecSeam
-import Xv6.ProcPrivAcc
 import Xv6.SpecSafestrcpySrc
 import Xv6.PrepareReturnStores
-import Xv6.KernelTac
 
 namespace Xv6
 

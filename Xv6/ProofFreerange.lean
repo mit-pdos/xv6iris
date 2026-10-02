@@ -12,7 +12,6 @@ on, and the exit `spie`/`spp` are the last call's.
 import Xv6.SpecFreerange
 import Xv6.SpecKfree
 import Xv6.CodeTactics
-import Xv6.StepLemmas
 import MachCSL.WpSmodeFrame6
 import Xv6.ByteCursor
 import Xv6.UvmallocDefs

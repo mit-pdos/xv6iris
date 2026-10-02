@@ -21,8 +21,6 @@ single-block receipt `wi16Pre` / `wi16Fresh`.
    deviation 5): the chunk's view composes by `Xv6.viewFaulted_trans`.
 -/
 import Xv6.WriteiBudgetW
-import Xv6.DinodeSlot
-import Xv6.FsWords
 
 namespace Xv6
 

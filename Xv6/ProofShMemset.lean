@@ -30,8 +30,6 @@ unwritten suffix.
 -/
 import Xv6.UshTreeDefs
 import Xv6.UshMainCode
-import Xv6.UkEchoDefs
-import MachCSL.ByteWord
 import Xv6.UkGrepDefs
 
 namespace Xv6

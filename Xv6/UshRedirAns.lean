@@ -26,7 +26,6 @@ ledger's lowest closed slot 1, and the deed `Dd a` handed AT the call.
 -/
 import Xv6.UshArmDefs
 import Xv6.UStrImg
-import Xv6.FsAbsEra
 
 namespace Xv6
 

@@ -46,13 +46,11 @@ The scan-failure arm appends nothing and steps nothing.  The contract
 import Xv6.SpecAllocproc
 import Xv6.SpecAcquire
 import Xv6.SpecRelease
-import Xv6.SpecKalloc
 import Xv6.UvmCallSites
 import Xv6.SpecMemset
 import Xv6.SpecFreeproc
 import Xv6.UPtLemmas
 import Xv6.CodeTactics
-import Xv6.FsWords
 
 namespace Xv6
 

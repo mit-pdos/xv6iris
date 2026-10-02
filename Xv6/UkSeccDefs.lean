@@ -62,6 +62,7 @@ import Xv6.UkSysP
 import Xv6.UkSeccLit
 import Xv6.UexecSeccMasked
 import Xv6.User.SeccompText
+import Xv6.UkForkHeap
 
 namespace Xv6
 

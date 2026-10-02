@@ -23,7 +23,6 @@ slot before the switch consumed it) and the image.
 import Xv6.UserretEntryPt
 import Xv6.UserretPt
 import Xv6.UkOpen
-import MachCSL.UIcacheFence
 
 namespace Xv6
 

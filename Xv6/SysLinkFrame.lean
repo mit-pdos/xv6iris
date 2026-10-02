@@ -35,7 +35,6 @@ THE CARVE (Rocq `sl_frame_carve`): the thirty-eight slots below the entry
    came in at.
 -/
 import Xv6.SpecSysLink
-import Xv6.KstackMap
 import Xv6.SpecIunlock
 import Xv6.SpecIupdate
 import Xv6.SysfileCalls

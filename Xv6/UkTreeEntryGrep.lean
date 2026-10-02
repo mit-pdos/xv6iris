@@ -45,7 +45,6 @@ import Xv6.UkTreeEntryStmt
 import Xv6.UkTreeEntry
 import Xv6.UshGrepEntry
 import Xv6.LinkGrep
-import Xv6.UshGrep
 
 namespace Xv6
 

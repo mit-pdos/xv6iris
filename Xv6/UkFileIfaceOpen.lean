@@ -16,6 +16,7 @@ mode that does not create: -1, or the taint.
 -/
 import Xv6.UkFileIfaceDevP
 import Xv6.UkFileIfaceHdls
+import Xv6.UkFileDevOpen
 
 namespace Xv6
 

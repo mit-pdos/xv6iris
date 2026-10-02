@@ -16,7 +16,6 @@ with `dirFirst data (i + 1) s = none` (`dirFirst_step_miss`); a hit goes to
 the found arm with `dirFirst data nrec s = some i` (`dirFirst_step_hit` +
 `dirFirst_mono`).
 -/
-import MachCSL.WpSmodeFrame12b
 import Xv6.DirlookupLatch
 import Xv6.DirlookupHit
 

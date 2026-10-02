@@ -16,6 +16,7 @@ import Xv6.SpecUvmunmap
 import Xv6.UPtAllocLemmas
 import Xv6.UvmallocDefs
 import Xv6.CodeTactics
+import MachCSL.BvLemmas
 
 namespace Xv6
 

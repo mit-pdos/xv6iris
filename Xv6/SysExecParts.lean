@@ -141,10 +141,7 @@ Imports only definitional files, callee Specs and shared call-site files.
 -/
 import Xv6.SpecSysExec
 import Xv6.SpecFetchaddr
-import Xv6.SysfileCalls
-import Xv6.KstackMap
 import Xv6.SysMknodFrame
-import Xv6.KernelTac
 
 namespace Xv6
 

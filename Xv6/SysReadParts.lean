@@ -18,13 +18,8 @@ epilogue at `+0x40`.
   (the error return is hoisted).
 -/
 import Xv6.ArgLemmas
-import MachCSL.WpSmodeFrame6
 import MachCSL.StackOwnBounds
 import Xv6.SpecFileread
-import Xv6.CopyLemmas
-import Xv6.ReadiDefs
-import Xv6.SysFstatParts
-import MachCSL.BvLemmas
 
 namespace Xv6
 

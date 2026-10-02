@@ -19,8 +19,6 @@ registered and with the handler, only the ledger's slot closes.
 3. `dom fdm ∖ {[fd]}` is `fun z => fdDom fdm z ∧ z ≠ fd`; `<[k := FdClosed]>
    l` is `l.set k .closed`.
 -/
-import Xv6.UkFileIfaceDevP
-import Xv6.UkFileIfaceHdls
 import Xv6.UkFileIfaceWrite
 import Xv6.UkFileIfaceRead
 

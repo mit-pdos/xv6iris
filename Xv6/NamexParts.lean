@@ -44,6 +44,7 @@ import Xv6.SpecIdup
 import Xv6.DinodeSlot
 import Xv6.DirlookupParts
 import MachCSL.BvLemmas
+import Xv6.SpecIget
 
 namespace Xv6
 

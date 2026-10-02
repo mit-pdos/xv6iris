@@ -98,7 +98,6 @@ Rocq's header, in short:
    and are instantiated at the moved record unchanged.
 -/
 import Xv6.KexecSeam
-import Xv6.ProcPrivAcc
 import Xv6.UPtPptLemmas
 
 namespace Xv6

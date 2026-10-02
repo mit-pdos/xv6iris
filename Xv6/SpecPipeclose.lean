@@ -40,7 +40,6 @@ the proof frames it through for now.
 -/
 import Xv6.PipeInvDefs
 import Xv6.SchedCtx
-import Xv6.SlotGen
 import MachCSL.WpSmodeIntr
 
 namespace Xv6

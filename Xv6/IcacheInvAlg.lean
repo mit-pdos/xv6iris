@@ -152,7 +152,6 @@ their own: `NINODE`/`ISLOTSZ`/`ientry` are `Xv6/FsGeom.lean` /
 -/
 import Xv6.IcacheRefGhost
 import Xv6.InodeInv
-import Xv6.LogDefs
 
 namespace Xv6
 

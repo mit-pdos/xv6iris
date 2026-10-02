@@ -44,6 +44,7 @@ import Xv6.UkReadPipe
 import Xv6.UkPipeDevXv6
 import Xv6.UshArmDefs
 import Xv6.UshStep
+import Xv6.UshRunCode
 
 namespace Xv6
 

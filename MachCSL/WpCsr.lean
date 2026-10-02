@@ -13,7 +13,6 @@ import MachCSL.PlatformFacts
 import MachCSL.WpGpr
 import MachCSL.PmpXv6Defs
 import MachCSL.ModelFacts
-import MachCSL.WpPmp
 import MachCSL.WpCsrFacts
 
 namespace MachCSL

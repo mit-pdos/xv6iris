@@ -25,6 +25,8 @@ strips it (Rocq: `gen_pay_timeless` after it).
 import Xv6.InitMainDie
 import Xv6.InitMainFork
 import Xv6.InitMainBanner
+import Xv6.ConsoleintrArms
+import Xv6.UkRunBr
 
 namespace Xv6
 

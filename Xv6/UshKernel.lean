@@ -62,7 +62,6 @@ payload is applied at (`shPayKey`).
 -/
 import Xv6.ElfUserSh
 import Xv6.KexecImageOk
-import Xv6.UkRun
 import Xv6.UshMainPure
 
 namespace Xv6

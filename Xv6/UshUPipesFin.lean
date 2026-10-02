@@ -26,6 +26,8 @@ import Xv6.UshUPipesClaim
 import Xv6.UshPipesNodeDefs
 import Xv6.UshPipesFork
 import Xv6.UexecRet
+import Xv6.UshURoundShapes
+import Xv6.UshURoundBody
 
 namespace Xv6
 

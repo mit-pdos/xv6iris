@@ -98,7 +98,6 @@ Rocq's header, kept because the reasons are the content:
 `np_rootino_agree` (section 6): the absolute fetch starts at `rt`
 (deviation 7) and Lean has one `ROOTINO : Nat` anyway.  Nothing else.
 -/
-import Xv6.SysMknodDefs
 import Xv6.FsAbsEra
 import Xv6.FsAbsCreateNm
 

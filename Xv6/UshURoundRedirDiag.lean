@@ -30,7 +30,6 @@ CONE: the bullets of `uHchild_redir` (Rocq inline; no Rocq names).
    of the era's pin off the lend).
 -/
 import Xv6.UshURoundRedirSup
-import Xv6.UshURoundEcho
 
 namespace Xv6
 

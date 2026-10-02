@@ -24,7 +24,6 @@ import Xv6.FilePay
 import Xv6.FtableLock
 import MachCSL.WpSmodeFrame8
 import Xv6.CodeTactics
-import Xv6.CopyLemmas
 
 namespace Xv6
 

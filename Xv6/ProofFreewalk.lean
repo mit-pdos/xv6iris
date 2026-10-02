@@ -24,7 +24,6 @@ and the stepped lend is framed into the continuation
 (`SlotGen.actLend_cont_frame_step`).
 -/
 import Xv6.SpecFreewalk
-import Xv6.SpecKfree
 import Xv6.UvmCallSites
 import Xv6.UPtFreeLemmas
 import Xv6.CodeTactics

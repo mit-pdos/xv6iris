@@ -79,7 +79,6 @@ a STAGE file (no `Proof` prefix).  Rocq's header, in short:
    (`ProcPrivAcc.procPrivFd_evLend`).
 -/
 import Xv6.KexecTail
-import Xv6.LazyFree
 import Xv6.KexecBuilt
 
 namespace Xv6

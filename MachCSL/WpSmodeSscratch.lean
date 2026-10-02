@@ -15,7 +15,6 @@ kernel-context schemas both consume them.
 import MachCSL.KCtxGpr
 import MachCSL.SConfPhysDefs
 import MachCSL.WpCsr
-import MachCSL.KCtx
 import MachCSL.WpMmodeAlu
 
 namespace MachCSL

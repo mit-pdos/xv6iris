@@ -36,7 +36,6 @@ Reached from the H-io cone: `wp_uk_ecall_read_recv_at` (UkReadCons),
    port, reused).
 -/
 import Xv6.UshSysP
-import Xv6.UkRunSysWrite
 
 namespace Xv6
 

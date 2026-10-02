@@ -49,7 +49,6 @@ and the dot-name credential (`84090c137`).
 
 Nothing.
 -/
-import Xv6.FsAbsCreateFire
 import Xv6.SysMknodDefs
 
 namespace Xv6

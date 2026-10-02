@@ -30,6 +30,3 @@ UkPipesEntriesDefs' (the context record, the program entries as
 parameters, the two images).  `take NSTD sts !! k` is
 `(sts.take NSTD)[k]?`; the empty file table is `fun _ => none`.
 -/
-import Xv6.UkPipesEntriesEcho
-import Xv6.UkPipesEntriesCat
-import Xv6.UkPipesEntriesGrep

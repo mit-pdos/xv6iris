@@ -30,8 +30,6 @@ Namespace `UshSysP`, so nothing here can clash with the eventual port
    against the UkRunSys port.
 -/
 import Xv6.UkSysP
-import Xv6.UPtDefs
-import Xv6.UserPerm
 
 namespace Xv6
 

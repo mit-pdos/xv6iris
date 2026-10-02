@@ -1,7 +1,6 @@
 /-
 Proof of `sched`'s contract (`SpecSched.SCHED`).
 -/
-import MachCSL.WpSmodeFrame
 import MachCSL.WpSmodeTrapCsr
 import Xv6.SpecSched
 import Xv6.SpecMyproc

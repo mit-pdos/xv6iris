@@ -46,6 +46,9 @@ import Xv6.UexecExecInst
 import Xv6.ConsoleInvDefs
 import Xv6.SysOpenDefs
 import Xv6.UkPipeDevDefs
+import Xv6.AppFileCons
+import Xv6.FileOpenDeed
+import Xv6.PipeOut
 
 namespace Xv6
 

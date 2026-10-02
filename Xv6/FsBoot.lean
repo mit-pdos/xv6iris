@@ -51,7 +51,6 @@ DEVIATIONS from Rocq:
 Imports only definitional files.
 -/
 import Xv6.FsCfgBoot
-import Xv6.LogDefs
 
 namespace Xv6
 

@@ -38,7 +38,6 @@ makes the jump table's default row dead.  The runner's tree is
    through its segment's run (`ushCode_run`, the `UkSeccDefs.secc_code_run`
    pattern).
 -/
-import Xv6.UshRunCode
 import Xv6.UkFork
 import Xv6.UshMainDefs
 

@@ -17,8 +17,6 @@ import Xv6.SpecMappages
 import Xv6.SpecUvmunmap
 import Xv6.SpecUvmfree
 import Xv6.UPtPptLemmas
-import Xv6.UPtLemmas
-import Xv6.UvmallocDefs
 
 namespace Xv6
 

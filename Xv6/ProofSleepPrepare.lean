@@ -18,11 +18,8 @@ The chan cell is one of the flat cells of the per-proc lock payload
 overwrite `chan`, close it again", and the four `procSlotsAt` arms travel
 untouched.
 -/
-import MachCSL.WpSmodeFrame
 import Xv6.SpecSleepPrepare
 import Xv6.SpecMyproc
-import Xv6.SpecAcquire
-import Xv6.SpecRelease
 import Xv6.CodeTactics
 import Xv6.KilledDefs
 

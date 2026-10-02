@@ -56,6 +56,7 @@ import Xv6.IdupCore
 import Xv6.FtableLock
 import Xv6.CodeTactics
 import Xv6.IcachePinwObl
+import MachCSL.WpSmodeAuRules
 
 namespace Xv6
 

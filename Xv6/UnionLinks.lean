@@ -35,7 +35,6 @@ holds is the record equation itself, as a pure persistent fact
    instance search does not unfold a plain `def`).
 -/
 import Xv6.UnionOut
-import Xv6.UartLinks
 
 namespace Xv6
 

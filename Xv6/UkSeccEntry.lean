@@ -53,15 +53,12 @@ CONE (re-walked on the pinned glob, 4/4 reached): `secc_rows_tab_le`,
    two tables (Rocq's `big_sepL_intro`).
 -/
 import Xv6.ExecEntry
-import Xv6.ElfUser
 import Xv6.UshEchoArgs
 import Xv6.UshSecc
 import Xv6.UexecSeccMint
 import Xv6.UkSeccWdep
-import Xv6.SpecSeccStart
 import Xv6.SeccPrintfLink
 import Xv6.UkSysPHolds
-import Xv6.UEchoKernel
 
 namespace Xv6
 

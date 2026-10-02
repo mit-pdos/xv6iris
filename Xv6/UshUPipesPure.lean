@@ -26,13 +26,10 @@ Ported (walk.txt: all of S0 is reached): `uline_of_u_pipe`, `ul_pipe`,
    `(c.length : Int) < 2 ^ 31` (`pnsShort`'s own form).
 -/
 import Xv6.UnionView
-import Xv6.PipesUline
-import Xv6.LineModelLinks
 import Xv6.PipeOutNDefs
 import Xv6.UkPipesIfaceDefs
 import Xv6.AppFilePure
 import Xv6.UshMainPure
-import Xv6.ProgTree
 
 namespace Xv6
 

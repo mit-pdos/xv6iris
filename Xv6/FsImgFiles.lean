@@ -46,10 +46,3 @@ Xv6.User.<P>.elf` (`Xv6/User/<P>ElfRaw.lean`).
 5. `fsimg<P>RowsLen` restates `ElfUser`'s `elf_rows_len` (that file is a
    leaf and may not be imported).
 -/
-import Xv6.FsImgFilesCat
-import Xv6.FsImgFilesEcho
-import Xv6.FsImgFilesGrep
-import Xv6.FsImgFilesInit
-import Xv6.FsImgFilesSh
-import Xv6.FsImgFilesSeccomp
-import Xv6.FsImgFilesSync

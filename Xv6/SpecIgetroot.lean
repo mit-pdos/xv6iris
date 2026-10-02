@@ -54,7 +54,6 @@ The post is the reference, AT ROOTINO: the inum userinit installs in both
 Imports only definitional files and callee `Spec*` files.
 -/
 import Xv6.SpecIget
-import Xv6.IcacheHeld
 
 namespace Xv6
 

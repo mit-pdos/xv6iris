@@ -31,9 +31,7 @@ notation `Pm`).  Unreached, NOT ported: `ush_pipes_branch`.
 -/
 import Xv6.UshURoundWide
 import Xv6.UshURoundPure
-import Xv6.UshForkTwin
 import Xv6.UshCatForkTwin
-import Xv6.UshRedirBody
 import Xv6.LinkShRun
 import Xv6.UshLineDefs
 

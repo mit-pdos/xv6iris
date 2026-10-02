@@ -46,6 +46,7 @@ import Xv6.SysLinkCalls
 import Xv6.IregLinkNz
 import Xv6.FsAbsLinkFire
 import Xv6.SysLinkParts
+import Xv6.SysUnlinkCalls
 
 namespace Xv6
 

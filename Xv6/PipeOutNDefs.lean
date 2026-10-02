@@ -39,7 +39,6 @@ pays the N-writer family and the family's laws at a pipeline round in
    and holds `gpcs R` (`Xv6/PipeOutStore.lean`) where it held `pcs`.
 -/
 import Xv6.PipeOutNPure
-import Xv6.PipeOut
 import Xv6.PipeOutStore
 import Xv6.PipesView
 import Xv6.PipeBothNPure

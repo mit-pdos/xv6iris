@@ -30,7 +30,6 @@ and §7 of Rocq `AppFile.v` (`iris/AppFile.v`, pinned
 -/
 import Xv6.AppFileSteps
 import Xv6.FileNamePins
-import Xv6.FsDurImg
 
 namespace Xv6
 

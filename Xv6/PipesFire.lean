@@ -39,7 +39,6 @@ own short names are kept (`real`, `realP`, `realN`, `realT`, `upok`,
    instances above are not ported.
 -/
 import Xv6.PipeBothNPure
-import Xv6.PipesCut
 
 namespace Xv6
 

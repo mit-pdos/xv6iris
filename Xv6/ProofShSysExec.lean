@@ -11,6 +11,7 @@ Deviations from Rocq: as in `SpecShSysExec`; the three instructions are
 import Xv6.SpecShSysExec
 import Xv6.UshRunStubs
 import Xv6.UshRunSysP
+import Xv6.UshExecCode
 
 namespace Xv6
 

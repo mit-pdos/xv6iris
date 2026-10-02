@@ -58,6 +58,7 @@ with the transaction's half (`create_dirty_clear_unarm`).  The two
 import MachCSL.WpSmodeFrame12b
 import Xv6.CreateCalls
 import Xv6.FsStateEraResB
+import Xv6.NamexParts
 
 namespace Xv6
 

@@ -28,9 +28,7 @@ diagnostic `ldg`).
 As `UshPipesStageMid`.
 -/
 import Xv6.UshPipesStageCtx
-import Xv6.UshExecPin
 import Xv6.UshExecPinHolds
-import Xv6.UshEchoPipePay
 import Xv6.UshPipesStageW
 
 namespace Xv6

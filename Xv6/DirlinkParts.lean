@@ -40,13 +40,8 @@ record is the two bottom cells (`&de = s0-80 = sp`, `&de.name = s0-78`).
    `wiCostBmonly` (`Xv6.sys_unlink_wi_cost`).
 -/
 import Xv6.SpecDirlink
-import Xv6.FsWords
-import Xv6.DinodeSlot
 import Xv6.SpecStrncpy
-import Xv6.DirlookupParts
 import Xv6.IcacheBootDecode
-import Xv6.ReadiParts
-import Xv6.SysUnlinkPure
 import MachCSL.BvLemmas
 
 namespace Xv6

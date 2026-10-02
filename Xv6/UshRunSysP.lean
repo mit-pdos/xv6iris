@@ -17,7 +17,6 @@ USH_RUN_SYS_P`, over the port `UkRunSysExec.wp_uk_ecall_exec`.
 register write is `ukWr m 10#5 (-1#64)`.
 -/
 import Xv6.UkSysP
-import Xv6.UshRunDefs
 
 namespace Xv6
 

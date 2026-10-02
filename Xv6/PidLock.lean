@@ -28,7 +28,6 @@ tie and the scan's first-ness are not stated (ruling R2(a)).
    instance (the Lean payload has none to keep).
 -/
 import Xv6.ProcDefs
-import Xv6.PidEv
 
 namespace Xv6
 

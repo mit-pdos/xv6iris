@@ -21,6 +21,7 @@ import Xv6.SpecShChildExec
 import Xv6.SpecShParsecmd
 import Xv6.UkShMallocCap
 import Xv6.RefParseBridge
+import Xv6.UshExecCode
 
 namespace Xv6
 

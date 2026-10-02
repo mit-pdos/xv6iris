@@ -11,11 +11,8 @@ carry the same facts under their own names.
 -/
 import Xv6.UPtDefs
 import Xv6.PtRunLemmas
-import Xv6.PtOwnLemmas
 import MachCSL.WpSmodeCtl
 import Xv6.ByteCursor
-import Xv6.CodeTactics
-import MachCSL.BvLemmas
 
 namespace Xv6.UPtAlloc
 

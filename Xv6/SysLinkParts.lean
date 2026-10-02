@@ -76,7 +76,6 @@ are read only by ProofSysLink.v's `Z` side conditions, which the `Nat`
 statements above discharge directly).
 -/
 import Xv6.SysfileCalls
-import Xv6.NamexParts
 
 namespace Xv6
 

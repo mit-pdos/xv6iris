@@ -71,7 +71,6 @@ the one pure conjunct `SnapShape`); the GUEST half `snapGuest`; the pair
 import Xv6.FsDurSnapBytes
 import Xv6.FsDurRead
 import Xv6.FsDurXfer
-import MachCSL.Resources
 
 namespace Xv6
 

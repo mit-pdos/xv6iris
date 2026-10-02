@@ -62,8 +62,6 @@ HOLES the caller funds (Rocq's program-specs cut 3):
 -/
 import Xv6.UkEchoDefs
 import Xv6.UkCatLit
-import Xv6.UkProgAbi
-import Xv6.SlotSupply
 
 namespace Xv6
 

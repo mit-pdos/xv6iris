@@ -47,7 +47,6 @@ header, in short:
    `kxcB2_sx32_inj` over `kxcSx32`.
 -/
 import Xv6.KexecSeam
-import Xv6.SpecReadi
 
 namespace Xv6
 

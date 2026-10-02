@@ -22,11 +22,9 @@
    `uwaitAns`, its pid instance takes sh-main's `ushPid` and answers
    `UshArmDefs.ushWaitPidAns`.
 -/
-import Xv6.SpecShRuncmd
 import Xv6.SpecShSysWait
 import Xv6.SpecShSysClose
 import Xv6.SpecShSysDup
-import Xv6.UshStep
 
 namespace Xv6
 

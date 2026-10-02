@@ -25,7 +25,6 @@ import Xv6.SpecShParseline
 import Xv6.SpecShParsepipe
 import Xv6.SpecShPeek
 import Xv6.UshLits
-import Xv6.UshRedirsWalk
 import Xv6.UshCodeLine
 
 namespace Xv6

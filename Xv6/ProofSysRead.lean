@@ -37,6 +37,10 @@ import Xv6.SysReadParts
 import Xv6.UMemWindow
 import Xv6.SysfileCalls
 import Xv6.SpecSysRead
+import Xv6.ReadiDefs
+import Xv6.SysFstatParts
+import MachCSL.BvLemmas
+import Xv6.CopyLemmas
 
 namespace Xv6
 

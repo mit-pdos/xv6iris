@@ -14,6 +14,7 @@ deed is lent from the core to UkFileDev's `file_read(_std)` and comes back.
 -/
 import Xv6.UkFileIfaceDevP
 import Xv6.UkFileIfaceHdls
+import Xv6.UkFileDevRead
 
 namespace Xv6
 

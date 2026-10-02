@@ -28,7 +28,6 @@ past proc_freepagetable down to `fp_pid` (`fp_after_pt` / `fp_pid` take
 The contract (`SpecFreeproc`) is unchanged: its post was `∃ k' ≥ ke` already.
 -/
 import Xv6.SpecFreeproc
-import Xv6.SpecKfree
 import Xv6.UvmCallSites
 import Xv6.SpecProcFreepagetable
 import Xv6.SpecAcquire

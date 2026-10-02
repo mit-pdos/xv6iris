@@ -49,7 +49,6 @@ import Xv6.SpecSleep
 import Xv6.SpecKilled
 import MachCSL.LockFacts
 import Xv6.PipeQstep
-import Xv6.KillRow
 import Xv6.WordFrac
 
 namespace Xv6

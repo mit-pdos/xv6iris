@@ -23,7 +23,6 @@ and is what `Xv6/ProofBeginOp.lean` (and, later, the `log_write` / `end_op`
 proofs) reads the ledger through.
 -/
 import Xv6.LogInv
-import Xv6.BallocParts
 import Xv6.FsWords
 import MachCSL.BvLemmas
 

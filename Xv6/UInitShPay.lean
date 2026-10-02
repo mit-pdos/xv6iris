@@ -61,6 +61,7 @@ None.
 -/
 import Xv6.UInitShPure
 import Xv6.UshMainDefs
+import Xv6.UshNodes
 
 namespace Xv6
 

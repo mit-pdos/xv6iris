@@ -17,7 +17,6 @@ walk left it.
 -/
 import MachCSL.UMemMisRam
 import MachCSL.UMemAccess
-import MachCSL.Tactics
 
 namespace MachCSL
 

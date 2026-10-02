@@ -40,7 +40,6 @@ the engine `UL`.
    `bv_signed (trunc32 a0)`); `uint a0 = 0` is `(m.get 10#5).toNat = 0`.
 -/
 import Xv6.UkRunLeaf
-import Xv6.UkFork
 
 namespace Xv6
 

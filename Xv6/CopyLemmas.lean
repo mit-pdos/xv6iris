@@ -12,10 +12,6 @@ import Xv6.SpecWalkaddr
 import Xv6.SpecVmfault
 import Xv6.SpecMemmove
 import Xv6.UMemLemmas
-import MachCSL.WpSmodeFrame12
-import Xv6.ByteCursor
-import Xv6.UPtAllocLemmas
-import MachCSL.BvLemmas
 
 namespace Xv6
 

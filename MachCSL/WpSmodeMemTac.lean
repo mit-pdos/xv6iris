@@ -6,10 +6,6 @@ per-instruction modules `MachCSL.WpSmodeMem{Lbu,Ld,Lw,Sb,Sd,Sw}` (and
 every name resolves at the use site), so this module does not import
 `MachCSL.Translate`, whose lemmas the scripts apply: it builds beside it.
 -/
-import MachCSL.KCtxGpr
-import MachCSL.SmodeMemFacts
-import MachCSL.KCtx
-import MachCSL.WpCycleDefs
 import MachCSL.WpSmodeMemPhys
 
 

@@ -12,8 +12,6 @@ granule otherwise), and which one does not matter downstream
 its proof splits the (symbolic) granule condition into its two closed cases.
 -/
 import MachCSL.UTranslate
-import MachCSL.PlatformFacts
-import MachCSL.Tactics
 
 namespace MachCSL
 

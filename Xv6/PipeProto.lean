@@ -80,8 +80,6 @@ the one field of `PipeProtoG` (a new xv6GF/unionGF slot, U4).
    `A -∗ B -∗ C` is kept (`⊢ A -∗ B -∗ C`).
 -/
 import Xv6.PipeReg
-import Xv6.ChildTok
-import Xv6.IcacheRefDefs
 
 namespace Xv6
 

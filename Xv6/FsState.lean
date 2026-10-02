@@ -84,7 +84,6 @@ Everything else is ported with Rocq's statement (modulo the deviations).
 -/
 import Xv6.FsStateTop
 import Xv6.FsStateInodeOwned
-import Xv6.FsStateBitmap
 
 namespace Xv6
 

@@ -25,6 +25,7 @@ leaf) is `UshStep.ushS_ld` at `DFrac.discard`; `uint s1 mod 8 = 0` is
 import Xv6.UshDiagPanic
 import Xv6.UshDiagDie
 import Xv6.UshRunDefs
+import Xv6.UshRunCode
 
 namespace Xv6
 

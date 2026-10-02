@@ -14,6 +14,7 @@ import MachCSL.WpLock
 import Xv6.SpecHolding
 import Xv6.SpecMycpu
 import Xv6.CodeTactics
+import MachCSL.LockFacts
 
 namespace Xv6
 

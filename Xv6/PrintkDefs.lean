@@ -5,7 +5,6 @@ constants, and pure facts about the format language.  Definitional only
 -/
 import Xv6.SpecPrintk
 import Xv6.StepLemmas
-import MachCSL.WpSmodeBits
 import MachCSL.KApply
 
 namespace Xv6

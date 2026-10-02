@@ -76,7 +76,7 @@ Imports `SysOpenParts` and the shared call-site files `FsCallSitesOp`, `SysfileC
 -/
 import Xv6.SysOpenParts
 import Xv6.FsCallSitesOp
-import Xv6.SysfileCalls
+import MachCSL.BvLemmas
 
 namespace Xv6
 

@@ -34,7 +34,6 @@ import Xv6.DiskTier
 import Xv6.LogInv
 import Xv6.BlkmapBuf
 import Xv6.FileInv
-import Xv6.FsWords
 import Xv6.VirtioDiskRwDefs2
 
 namespace Xv6

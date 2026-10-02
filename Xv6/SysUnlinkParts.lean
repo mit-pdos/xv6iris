@@ -72,7 +72,6 @@ Nothing beyond deviation 1's `Z`-only bookkeeping (uses checked: read only
 by the W1..W5 walks' `Z` side conditions).
 -/
 import Xv6.SysfileCalls
-import Xv6.FsWords
 
 namespace Xv6
 

@@ -25,7 +25,6 @@ import Xv6.SpecIunlock
 import Xv6.SpecIunlockput
 import Xv6.SpecIlock
 import Xv6.NamexDefs
-import Xv6.IcacheShortCarve
 import Xv6.DirlookupParts
 
 namespace Xv6

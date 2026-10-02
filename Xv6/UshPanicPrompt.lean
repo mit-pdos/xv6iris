@@ -48,6 +48,7 @@ import Xv6.UshPanicByte
 import Xv6.UshPromptLaw
 import Xv6.UshSysPHolds
 import Xv6.UkWriteClosed
+import Xv6.UkConsOut
 
 namespace Xv6
 

@@ -25,6 +25,7 @@ import Xv6.SpecCatCat
 import Xv6.CatCatDie
 import Xv6.UkRunBr
 import Xv6.UkRunMem
+import Xv6.UkProgAbi
 
 namespace Xv6
 

@@ -15,6 +15,7 @@ import MachCSL.SConfPhysDefs
 import MachCSL.WpCsrFacts
 import MachCSL.AluFacts
 import MachCSL.WpCycleDefs
+import MachCSL.ModelFacts
 
 namespace MachCSL
 

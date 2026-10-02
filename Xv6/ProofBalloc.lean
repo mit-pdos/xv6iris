@@ -32,7 +32,6 @@ Spec file's `BALLOC.wp_balloc_sconf`.  The rest is the stage decomposition
 of `Xv6/BallocDefs.lean`'s header.
 -/
 import Xv6.BallocMain
-import MachCSL.BvLemmas
 
 namespace Xv6
 

@@ -23,8 +23,6 @@ block).  State the FORM TO COMPUTE WITH, never the naive one.
    (`treeG` is not in the union's bundle) and not ported.
 -/
 import Xv6.FsImgNames
-import Xv6.FsDurImgView
-import Xv6.FsStateEraPure
 
 namespace Xv6
 

@@ -92,7 +92,6 @@ Five groups, as in Rocq:
 import Xv6.InodeInv
 import Xv6.BcacheInv
 import Xv6.FsBytesMint
-import Xv6.ByteCursor
 import Xv6.FsWords
 import Xv6.StepLemmas
 

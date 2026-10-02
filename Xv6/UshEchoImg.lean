@@ -22,7 +22,6 @@ lanes'; `HfpProgP`'s temporary `echoNodeImg` folded into it).
    `ushEchoAlen`.
 -/
 import Xv6.UshEchoPure
-import Xv6.UmodeAbi
 
 namespace Xv6
 

@@ -75,6 +75,7 @@ import Xv6.SysfileCalls
 import Xv6.FsAbsOpenFire
 import Xv6.KexecACode
 import Xv6.SysOpenShared
+import Xv6.SysMknodFrame
 
 namespace Xv6
 

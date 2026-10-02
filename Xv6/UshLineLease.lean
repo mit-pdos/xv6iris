@@ -34,6 +34,7 @@ reached and ported; their echo-era twins (`ush_mid_of_at`,
    `lk_pin_epin`, `lk_epin_agr` are the record's fields.
 -/
 import Xv6.UshLineDefs
+import Xv6.UshMainDefs
 
 namespace Xv6
 

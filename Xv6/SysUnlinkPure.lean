@@ -63,9 +63,6 @@ iris/*.v, comments stripped)
 import Xv6.SpecDirlookup
 import Xv6.SpecWritei
 import Xv6.SpecIput
-import Xv6.FsWords
-import Xv6.DinodeSlot
-import MachCSL.BvLemmas
 
 namespace Xv6
 

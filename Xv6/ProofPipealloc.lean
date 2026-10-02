@@ -44,12 +44,8 @@ import Xv6.SpecFilealloc
 import Xv6.SpecInitlock
 import Xv6.FileFrac
 import Xv6.PipeRw
-import Xv6.KstackMap
-import MachCSL.WpSmodeFrame6
 import Xv6.PipeBirth
-import Xv6.SpecKalloc
 import Xv6.UvmCallSites
-import Xv6.CopyLemmas
 import Xv6.DinodeSlot
 import Xv6.KmemTier
 import Xv6.VirtioDiskRwDefs3

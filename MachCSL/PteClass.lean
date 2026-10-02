@@ -5,7 +5,6 @@ hardware-set `A`/`D` bits (`pteAD`), and the user TLB fact (`utlbOk`) -- vocabul
 so the process page-table definitions (`Xv6.UPtDefs`) do not wait for the
 walk proofs.
 -/
-import MachCSL.Pte
 import MachCSL.PtTree
 import Std.Tactic.BVDecide
 

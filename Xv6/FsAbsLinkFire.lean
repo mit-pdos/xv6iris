@@ -58,7 +58,6 @@ Nothing.  (Section 2c, the undo, is a comment in Rocq too: the fire is
 import Xv6.FsAbsUnlinkFire
 import Xv6.SysLinkDefs
 import Xv6.FsStateEraResB
-import Xv6.FsStateEraRes
 
 namespace Xv6
 

@@ -18,6 +18,7 @@ diagnostic arms take the plain ledger (`UkSeccDefs` deviation 4).
 import Xv6.SpecSeccMain
 import Xv6.SeccMainArms
 import Xv6.UkProgAbi
+import Xv6.UkFork
 
 namespace Xv6
 

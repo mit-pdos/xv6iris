@@ -4,15 +4,10 @@ interfaces of `bread`, `bwrite` and `brelse`.
 -/
 import Xv6.SpecWriteHead
 import Xv6.BcacheLock
-import Xv6.CodeTactics
 import Xv6.FsCallSites
 import Xv6.SpecBwrite
-import Xv6.BlkmapBuf
 import Xv6.EndOpDefs
-import Xv6.FileInv
-import Xv6.FsWords
 import Xv6.InitlogHead
-import Xv6.VirtioDiskRwDefs2
 
 namespace Xv6
 

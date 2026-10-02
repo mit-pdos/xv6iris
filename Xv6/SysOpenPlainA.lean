@@ -56,9 +56,6 @@ the state at +0x36 (`sysOpenAt36`), whose proof per side is in
    `sys_open_args` / `sys_open_entry` take the +0x36 body for every `kv`.
 -/
 import Xv6.SysOpenParts
-import Xv6.SysfileCalls
-import Xv6.ProcPrivAcc
-import Xv6.ReadiDefs
 import Xv6.SysLinkParts
 import Xv6.SysMknodFrame
 

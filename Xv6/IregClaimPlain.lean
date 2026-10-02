@@ -27,7 +27,6 @@ A LEAF FILE (`InodeRegion*` has hundreds of dependents).
 Dropped/simplified vs Rocq: none.
 -/
 import Xv6.InodeRegionMovers
-import Xv6.IcacheRefLink
 
 namespace Xv6
 

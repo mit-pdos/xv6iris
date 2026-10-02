@@ -24,6 +24,7 @@ agree at putc's call site: `UlibUkProg.ulibUkW1_ulib` turns `kinit_w1`
 into `ulibPutcWb` at the instance (`InitPrintfLink.kinitW1_ulib`).
 -/
 import Xv6.SpecUlibVprintf
+import Xv6.UlibPrintfCode
 
 namespace Xv6
 

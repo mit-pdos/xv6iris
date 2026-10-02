@@ -5,7 +5,6 @@ program's sanity check is its own module (`Xv6/ElfUser<P>.lean`) so the seven
 kernel evaluations build in parallel and a client waits only for its program.
 -/
 import Xv6.ElfRows
-import Xv6.UserTextDefs
 
 namespace Xv6.User
 

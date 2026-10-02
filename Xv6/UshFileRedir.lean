@@ -58,10 +58,7 @@ None new: `FO` is the landed `UkFileOpen` record (deviation 3).
 import Xv6.UkFileOpenCallsCreate
 import Xv6.UshRedirAns
 import Xv6.UshMainStubs
-import Xv6.FileHooks
-import Xv6.UkEchoDefs
 import Xv6.FileOutEra
-import Xv6.UshConsK
 
 namespace Xv6
 

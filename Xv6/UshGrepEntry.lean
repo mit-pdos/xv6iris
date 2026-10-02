@@ -46,7 +46,6 @@ buffer, and `urun` at start with `K` words of stack.
 -/
 import Xv6.UshGrep
 import Xv6.UshEchoArgs
-import Xv6.UEchoKernel
 
 namespace Xv6
 

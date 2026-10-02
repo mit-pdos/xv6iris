@@ -41,7 +41,6 @@ Rocq's header, kept because the reasons are the content:
    everything past the second at `A.raise kv2` (SysLinkFrame deviation 3).
 -/
 import Xv6.SysLinkWalkB
-import Xv6.ArgPath
 
 namespace Xv6
 

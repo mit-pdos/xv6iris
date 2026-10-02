@@ -30,7 +30,6 @@ refutes the allocating fault (`VmfaultQuiet.vmfaultQuiet`), so vmfault's
 quiet conjunct gives `kv = ev` on the failure route, and the fill route is
 impossible; at `pvLazy = true` the row is vacuous.
 -/
-import MachCSL.WpSmodeTrapCsr
 import Xv6.SpecVmfault
 import Xv6.VmfaultQuiet
 import Xv6.UsysMemOkSpec

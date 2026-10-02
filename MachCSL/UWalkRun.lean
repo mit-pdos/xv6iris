@@ -38,9 +38,6 @@ result `r` and leaves `r = rhs` (closed by `rfl` when it can);
 `uwk_walk h : runRW D orc s m [l₁, …]` adds `h : runRW D orc s m = r`.
 -/
 import MachCSL.URunRW
-import MachCSL.Tactics
-import MachCSL.ModelFacts
-import MachCSL.PlatformFacts
 import Std.Tactic.BVDecide
 
 namespace MachCSL

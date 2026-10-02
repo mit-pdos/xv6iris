@@ -23,6 +23,10 @@ CONE (this file): `uecho_cons_image_entry`.
 3. The key image is a page view (UkUnionEntriesDefs deviation 2).
 -/
 import Xv6.UkUnionEntriesDefs
+import Xv6.UkSysFHHolds
+import Xv6.UkSysPHolds
+import Xv6.UkFileEntries
+import Xv6.UkTreeEntryEcho
 
 namespace Xv6
 

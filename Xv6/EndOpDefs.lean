@@ -20,14 +20,7 @@ lazily), exactly as `Xv6/ProofInstallTrans.lean` carries its own ten-slot
 pair.
 -/
 import Xv6.LogLedger
-import MachCSL.WpLock
 import MachCSL.WpSmodeFrame8
-import Xv6.FsWords
-import Xv6.IcacheEscrowPool
-import Xv6.InitlogHead
-import Xv6.VirtioDiskRwDefs2
-import Xv6.VirtioDiskRwDefs3
-import MachCSL.BvLemmas
 
 namespace Xv6
 

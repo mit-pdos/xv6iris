@@ -51,12 +51,6 @@ round position `urpos` (`urpos_mono`); the sync round's record `usyncPay` /
 -/
 import Xv6.UshURoundTies
 import Xv6.UnionLinkInstAt
-import Xv6.UnionOut
-import Xv6.AppFileTyped
-import Xv6.AppFileDeed
-import Xv6.AppFilePos
-import Xv6.AppFileSyncReg
-import Xv6.AppFileSync
 
 namespace Xv6
 

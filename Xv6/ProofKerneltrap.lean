@@ -22,7 +22,6 @@ import Xv6.SpecKerneltrap
 import Xv6.SpecMyproc
 import Xv6.SpecYield
 import Xv6.CodeTactics
-import Xv6.StepLemmas
 import MachCSL.WpSmodeFrame6
 import MachCSL.LockFacts
 

@@ -18,6 +18,7 @@ The caller's run then becomes the pool entry (`Xv6.freeBlk_intro`) that
 -/
 import Xv6.BfreeTail
 import MachCSL.WpSmodeLh
+import Xv6.BallocParts
 
 namespace Xv6
 

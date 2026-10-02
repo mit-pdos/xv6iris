@@ -4,8 +4,6 @@ module of its own (it was in `Xv6.UkPipesIfaceDevU`) so that
 `Xv6.UkPipesIfaceDev`, which uses only it, does not wait for the device-side
 write rules.
 -/
-import Iris.ProofMode
-import Iris.Algebra.IProp
 import Iris.Instances.UPred.Instance
 
 namespace Xv6

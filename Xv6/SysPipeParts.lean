@@ -16,12 +16,7 @@ import Xv6.ArgLemmas
 import Xv6.UMemWindow
 import MachCSL.WpSmodeFrame8
 import Xv6.SpecCopyout
-import Xv6.CopyLemmas
-import Xv6.DinodeSlot
-import Xv6.SysFstatParts
 import Xv6.SysfileCalls
-import Xv6.VirtioDiskRwDefs2
-import MachCSL.BvLemmas
 import Xv6.SpecFdalloc
 
 namespace Xv6

@@ -18,7 +18,6 @@ post's two arms are folded by `sysChrootPost_split` into one record `V1`
 with its field equalities, Rocq's `iAssert (∃ V', …)`.
 -/
 import Xv6.SyscallArmsPath
-import Xv6.SpecSysChroot
 
 namespace Xv6
 

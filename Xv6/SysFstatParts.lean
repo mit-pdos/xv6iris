@@ -23,9 +23,6 @@ import Xv6.CodeTactics
 import MachCSL.WpSmodeFrame6
 import MachCSL.StackOwnBounds
 import Xv6.SpecFilestat
-import Xv6.CopyLemmas
-import Xv6.ReadiDefs
-import MachCSL.BvLemmas
 
 namespace Xv6
 

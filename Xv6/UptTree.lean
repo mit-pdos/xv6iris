@@ -13,7 +13,6 @@ states the table that way), so the spec-level lemmas of `UptTree.v`
 the A/D-exact view (`upt_ad_view*`, §2b) is not needed on the kernel side
 and is not ported.
 -/
-import Xv6.UserExec
 import Xv6.UPtPptLemmas
 import Xv6.UPtAllocLemmas
 import MachCSL.WpPtWalkOwn

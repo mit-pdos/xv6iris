@@ -48,6 +48,7 @@ import Xv6.UInitFdHead
 import Xv6.UkInitLit
 import Xv6.User.InitText
 import Xv6.FsGeom
+import Xv6.UkForkHeap
 
 namespace Xv6
 

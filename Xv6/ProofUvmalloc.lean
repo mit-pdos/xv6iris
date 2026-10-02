@@ -19,8 +19,6 @@ back to `ke`; the arms that call neither hand it back at `ke`.  Since L3b
 -/
 import Xv6.SpecUvmalloc
 import Xv6.SpecUvmdealloc
-import Xv6.SpecKalloc
-import Xv6.SpecKfree
 import Xv6.UvmCallSites
 import Xv6.SpecMemset
 import Xv6.SpecMappages

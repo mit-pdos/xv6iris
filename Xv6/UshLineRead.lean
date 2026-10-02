@@ -45,6 +45,7 @@ CONE: all three reached and ported; the echo instances
    `ushExtraCore_closed` below.
 -/
 import Xv6.UshLineDefs
+import Xv6.UshMainDefs
 
 namespace Xv6
 

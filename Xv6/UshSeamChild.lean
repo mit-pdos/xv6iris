@@ -32,6 +32,7 @@ import Xv6.UshSeam
 import Xv6.SpecShRuncmd
 import Xv6.SpecShParsecmd
 import Xv6.UshStep
+import Xv6.UshRunCode
 
 namespace Xv6
 

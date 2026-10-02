@@ -18,7 +18,6 @@ namex has no panic of its own: every panic in the cone belongs to a callee
 read"; dirlookup's "not DIR" arm is refuted by namex's own type test).
 -/
 import Xv6.ProofNamex
-import Xv6.LinkIdup
 import Xv6.LinkIlock
 import Xv6.LinkIunlockput
 import Xv6.LinkDirlookup

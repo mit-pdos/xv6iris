@@ -10,7 +10,6 @@ address `base + 0x16` survives `retPc` because `base` is even.
 Nothing else in the proof mentions `base`.
 -/
 import Xv6.SpecUlibPutc
-import MachCSL.WpMmodeAlu
 import Xv6.UlibStep
 
 namespace Xv6

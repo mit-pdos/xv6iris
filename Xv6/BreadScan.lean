@@ -18,6 +18,7 @@ exits through, which is what lets the exit facts be STATEMENTS ABOUT
 -/
 import Xv6.BreadTail
 import Xv6.BcacheLock
+import Xv6.VirtioDiskRwDefs3
 
 namespace Xv6
 

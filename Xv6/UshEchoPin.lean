@@ -65,7 +65,6 @@ import Xv6.UshGeom
 import Xv6.ElfLoadable
 import Xv6.EchoFsPure
 import Xv6.PinnedExec
-import Xv6.ArgPath
 
 namespace Xv6
 

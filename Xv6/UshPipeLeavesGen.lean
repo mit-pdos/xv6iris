@@ -36,8 +36,6 @@ Nothing dropped.
    `HS : UK_SYS_P` (DU2; sh-run's).
 -/
 import Xv6.UshPanicByte
-import Xv6.UshMainStubs
-import Xv6.UshStep
 
 namespace Xv6
 

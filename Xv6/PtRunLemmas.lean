@@ -10,7 +10,6 @@ Everything here is about the tree, except the last section, which opens
 is written.  Kept in its own namespace (`Xv6.PtRun`) so that other files
 may prove the same facts under their own names.
 -/
-import Xv6.PtOwn
 import Xv6.KallocDefs
 import Xv6.PtOwnLemmas
 

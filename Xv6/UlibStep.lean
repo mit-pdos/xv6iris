@@ -11,7 +11,6 @@ Rocq has no counterpart file: its walks run at concrete addresses and fold
 each `add_vec_int pc k` by `vm_compute`.  (Stage file of the printf cone.)
 -/
 import Xv6.UlibRunPrintf
-import MachCSL.Instr
 
 namespace Xv6
 

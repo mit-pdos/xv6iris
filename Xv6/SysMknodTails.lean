@@ -35,6 +35,8 @@ Rocq's header points, kept:
    `pidPriv` share through `sys_mknod_pid` (SysMknodFrame deviation 3).
 -/
 import Xv6.SysMknodFrame
+import MachCSL.BvLemmas
+import Xv6.CopyLemmas
 
 namespace Xv6
 

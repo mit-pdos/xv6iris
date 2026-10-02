@@ -30,7 +30,6 @@ Deviations: none beyond SpecFileread's.
 import Xv6.FilereadCalls
 import Xv6.FileOffProto
 import Xv6.FileRwShared
-import Xv6.ReadiDefs
 
 namespace Xv6
 

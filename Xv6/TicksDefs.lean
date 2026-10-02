@@ -38,7 +38,6 @@ seals from trapinit's `lkFresh`.
    through `MainTrap.mn_trapinit`); main's raise is `ticksLed_boot` here
    (Rocq inlined it in `ProofMain`).
 -/
-import Xv6.KallocDefs
 import Xv6.SpecTrapinit
 import Xv6.WaitInv
 

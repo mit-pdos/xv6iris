@@ -45,7 +45,6 @@ DEVIATIONS from Rocq:
    stated against those.
 3. `uadm_ustep`'s `uok adm_u_g` is `uok admUG`.
 -/
-import Xv6.FileDisc
 import Xv6.UnionDisc
 
 namespace Xv6

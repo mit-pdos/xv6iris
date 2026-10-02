@@ -38,15 +38,12 @@ fence drains).  `Xv6.vdis_payWm_mk` puts one back at the new watermark when the
 handler releases.
 -/
 import MachCSL.WpSmodeFrame12b
-import MachCSL.WpSmodeDev4
 import MachCSL.WpSmodeFenceFloor2
 import MachCSL.WpSmodeFencePub
 import Xv6.SpecVirtioDiskIntr
 import Xv6.SpecAcquire
 import Xv6.SpecRelease
-import Xv6.DiskAcc
 import Xv6.CodeTactics
-import Xv6.VirtioDiskRwDefs2
 import Xv6.VirtioDiskRwDefs3
 import MachCSL.LockFacts
 

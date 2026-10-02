@@ -11,7 +11,6 @@ Built on `Xv6/PtRunLemmas.lean` (namespace `Xv6.PtRun`) and
 `Xv6/PtOwnLemmas.lean`; nothing here mentions the machine.
 -/
 import Xv6.PtRunLemmas
-import Xv6.PtOwnLemmas
 import Xv6.KvmDefs
 
 namespace Xv6.Kvm

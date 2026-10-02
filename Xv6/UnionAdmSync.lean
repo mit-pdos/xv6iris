@@ -35,7 +35,6 @@ DEVIATIONS from Rocq:
 import Xv6.UnionAdm
 import Xv6.UnionDiscDec
 import Xv6.GenOutPureSeal
-import Xv6.LineModelLinksSeal
 import Xv6.PipesLedPure
 
 namespace Xv6

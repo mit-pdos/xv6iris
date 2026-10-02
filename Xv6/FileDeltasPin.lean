@@ -36,7 +36,6 @@ composite create `FileDeltasStep`.
    / `nl_ne_dotdot` at `txtLaws` (Rocq's proofs, verbatim); `FileDisc.uname` is `FileDiscLine.uname` (= `txtName`).
 -/
 import Xv6.AppFilePure
-import Xv6.FsConsPin
 import Xv6.FileNamePins
 
 namespace Xv6

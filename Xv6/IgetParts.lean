@@ -38,8 +38,6 @@ import MachCSL.WpSmodeFrame6
 import Xv6.IcacheInvRef
 import Xv6.IcacheEscrowPool
 import Xv6.SpecPanic
-import Xv6.BreadDefs
-import Xv6.InitlogHead
 
 namespace MachCSL
 

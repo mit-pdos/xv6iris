@@ -11,7 +11,6 @@ paid by an ENVIRONMENT (`UkHandler.treePay_of_conforms_p`), less cat's
 Deviations from Rocq: as `SpecGrepStart`.
 -/
 import Xv6.SpecGrepStart
-import Xv6.UkGrepDefs
 import Xv6.UkHandler
 
 namespace Xv6

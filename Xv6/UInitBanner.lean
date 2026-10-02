@@ -59,7 +59,6 @@ PORTED THOUGH THE WALK MARKS IT UNREACHED: `kinit_ban_timeless_at`
 -/
 import Xv6.UshPanicByte
 import Xv6.UkWriteClosed
-import Xv6.UkInitDefs
 
 namespace Xv6
 

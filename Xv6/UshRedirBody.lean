@@ -32,6 +32,7 @@ import Xv6.UkShRedirCut
 import Xv6.UkShRedirLine
 import Xv6.UkShWords
 import Xv6.UNameBytes
+import Xv6.UshRunCode
 
 namespace Xv6
 

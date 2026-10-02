@@ -36,6 +36,7 @@ Deviations from Rocq: the inum is a `Nat` `n` with `s2 = ofNat 64 n` and
 -/
 import Xv6.IallocClaim
 import MachCSL.WpSmodeLh
+import Xv6.IupdateSteps
 
 namespace Xv6
 

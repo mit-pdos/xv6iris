@@ -21,7 +21,6 @@ re-spec, no not-init premise: init's exit ends in the live
   whole table (`SyscDepExit`, `filecloseCpays sts`) -- and sys_exit relays
   them to kexit at the dispatch's own table.
 -/
-import Xv6.SyscallRet
 import Xv6.SyscallArmsFdDefs
 
 namespace Xv6

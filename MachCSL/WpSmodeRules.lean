@@ -14,6 +14,12 @@ import MachCSL.WpSmodeCtl
 import MachCSL.WpSmodeCsr
 import MachCSL.WpSmodeCycle
 import MachCSL.WpAluFile
+import MachCSL.WpSmodeMemLbu
+import MachCSL.WpSmodeMemLd
+import MachCSL.WpSmodeMemLw
+import MachCSL.WpSmodeMemSb
+import MachCSL.WpSmodeMemSd
+import MachCSL.WpSmodeMemSw
 
 
 namespace MachCSL

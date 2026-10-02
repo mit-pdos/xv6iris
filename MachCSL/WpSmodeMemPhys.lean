@@ -4,11 +4,8 @@ stage lemmas `WpSmodeMem`'s loads and stores call after translating).  Split
 from `WpSmodeMem`: nothing here translates, so this file does not wait for
 `Translate`.
 -/
-import MachCSL.SmodeMemFacts
 import MachCSL.SConfPhysDefs
 import MachCSL.WpPmpXv6
-import MachCSL.PlatformFacts
-import MachCSL.ModelFacts
 
 namespace MachCSL
 

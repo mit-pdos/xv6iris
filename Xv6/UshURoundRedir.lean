@@ -43,6 +43,7 @@ import Xv6.UshRedirChild
 import Xv6.HfpFileOpenHolds
 import Xv6.LinkShExec
 import Xv6.LinkShParse
+import Xv6.UshURoundEcho
 
 namespace Xv6
 

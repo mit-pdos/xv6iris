@@ -43,6 +43,8 @@ shared `FileOffProto`).
    one ghost lemma (`fwr_post_ghost`).
 -/
 import Xv6.FilewriteArms
+import Xv6.ReadiDefs
+import Xv6.NamexParts
 
 namespace Xv6
 

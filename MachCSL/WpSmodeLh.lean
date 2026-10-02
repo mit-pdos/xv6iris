@@ -15,7 +15,6 @@ W1-M1 and W1-M3):
   `sllwAmt_toNat`) so that the mask arithmetic is `omega`/`bv_decide`
   friendly.
 -/
-import MachCSL.KCtxGpr
 import MachCSL.WpSmodeFrame12b
 
 namespace MachCSL

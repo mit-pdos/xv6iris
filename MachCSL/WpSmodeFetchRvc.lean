@@ -5,7 +5,6 @@ parallel.
 -/
 import MachCSL.TranslateAddr
 import MachCSL.WpSmode
-import MachCSL.FetchedDefs
 import MachCSL.Instr
 
 namespace MachCSL

@@ -41,7 +41,6 @@ Rocq's header, abridged:
 5. Rocq's `g : file_gn` section parameter is an explicit first argument.
 -/
 import Xv6.FileOutEra
-import Xv6.FileHooks
 import Xv6.GenOut
 import Xv6.EflLines
 

@@ -17,7 +17,6 @@ import Xv6.SpecInitlock
 import Xv6.CodeTactics
 import MachCSL.WpSmodeFrame8
 import Xv6.ByteCursor
-import MachCSL.BvLemmas
 
 namespace Xv6
 

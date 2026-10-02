@@ -20,11 +20,8 @@ of Rocq `UnionOut.v` §5-§7 reached through the instance `union_laws`:
 import Xv6.UnionOutLed
 import Xv6.UnionOutSealSteps
 import Xv6.FileOutSeal
-import Xv6.UnionOutPureSeal
-import Xv6.EchoOutSealEra
 import Xv6.PipeOutSeal
 import Xv6.AppFileHook
-import Xv6.AppFileSeal
 
 namespace Xv6
 

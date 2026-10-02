@@ -40,7 +40,6 @@ import Xv6.SpecMyproc
 import Xv6.SpecUvmdealloc
 import Xv6.CodeTactics
 import Xv6.UPtPptLemmas
-import Xv6.UvmallocDefs
 
 namespace Xv6
 

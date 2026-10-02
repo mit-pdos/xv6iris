@@ -45,7 +45,6 @@ THE PAYLOAD IS THE TRIVIAL ONE: `<init>` has no parent.
 import Xv6.InitBoot
 import Xv6.PinnedExecBundle
 import Xv6.FsInitPinBoot
-import Xv6.KexecLoad
 import Xv6.UInitKernel
 
 namespace Xv6

@@ -24,6 +24,7 @@
 Deviations from Rocq: as `Xv6/IreclaimOrphanC.lean`.
 -/
 import Xv6.IreclaimOrphanB
+import Xv6.IupdateSteps
 
 namespace Xv6
 

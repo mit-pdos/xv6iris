@@ -39,6 +39,7 @@ Rocq's header, kept because the reasons are the content:
    `_dotdot_window` (persistent, `DFrac.discard`).
 -/
 import Xv6.SysUnlinkW1
+import Xv6.IcacheShortCarve
 
 namespace Xv6
 

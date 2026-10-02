@@ -41,10 +41,8 @@ instance (the quiet leaf); the xv6 instance discharges it at every `oQ`
    `UshURoundSync` (drift D3-app).
 -/
 import Xv6.UkStub
-import Xv6.UkRunMem
 import Xv6.UkSysP
 import Xv6.User.SyncText
-import Xv6.SyncHook
 
 namespace Xv6
 

@@ -28,7 +28,6 @@ does not wait on, or import, the pure layer.
 -/
 import Xv6.EchoOut
 import Xv6.EchoOutPure
-import Xv6.LineModelLinks
 
 namespace Xv6
 

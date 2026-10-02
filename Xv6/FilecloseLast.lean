@@ -17,6 +17,7 @@ hart each arm leaves from (Rocq's `trap_csrs_ext_transport` over
 `ext_chain`), as does the caller's `true` crossing (`fc_next_shift`).
 -/
 import Xv6.FilecloseInode
+import Xv6.CopyLemmas
 
 namespace Xv6
 

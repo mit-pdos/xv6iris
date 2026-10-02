@@ -56,7 +56,6 @@ and `ushExecfailLawAt` ("exec %s failed\n").
 import Xv6.UshMainStubs
 import Xv6.UshLits
 import Xv6.LineBytes
-import Xv6.UkCatDefs
 
 namespace Xv6
 

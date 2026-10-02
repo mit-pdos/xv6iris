@@ -25,6 +25,7 @@ handed into node `k+1`'s bundle, under a fancy update.
 3. `fupd_mwp_ps` is MachCSL's `wpLoop_fupd`.
 -/
 import Xv6.UshPipeArmBase
+import Xv6.SpecShRuncmd
 
 namespace Xv6
 

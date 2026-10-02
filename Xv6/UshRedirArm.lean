@@ -29,6 +29,7 @@ sub-tree, the ledger the open left and the application's receipt.
 import Xv6.SpecShRuncmd
 import Xv6.SpecShSysClose
 import Xv6.UshNulParts
+import Xv6.UshRunCode
 
 namespace Xv6
 

@@ -56,6 +56,7 @@ Nothing else: the file has 22 declarations, 21 reached + the instance.
 -/
 import Xv6.UInitConsK
 import Xv6.FileOpenClaim
+import Xv6.FileOutEra
 
 namespace Xv6
 

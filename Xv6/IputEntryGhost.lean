@@ -18,7 +18,6 @@
   freeze of the slot's liveness (`frz_slot_freeze_pinw`), the FROZEN PARK
   (`frzPark_intro_on`) and the table's rows back.
 -/
-import Xv6.IcacheBoxSites
 import Xv6.IputParts
 import Xv6.IdupCore
 

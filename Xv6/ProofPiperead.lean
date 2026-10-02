@@ -50,7 +50,6 @@ import Xv6.SpecCopyout
 import MachCSL.LockFacts
 import Xv6.UMemWindow
 import Xv6.PipeQstep
-import Xv6.KillRow
 import Xv6.WordFrac
 
 namespace Xv6

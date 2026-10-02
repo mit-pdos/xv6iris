@@ -36,6 +36,8 @@ contract's continuation as a hart-free `frdK`.  The stage files are
 -/
 import Xv6.FilereadDev
 import Xv6.FilereadInodeArm
+import Xv6.ReadiDefs
+import Xv6.NamexParts
 
 namespace Xv6
 

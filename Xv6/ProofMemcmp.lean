@@ -6,7 +6,6 @@ instruction rules chained -- no symbolic execution.
 import Xv6.SpecMemcmp
 import Xv6.CodeTactics
 import Xv6.StepLemmas
-import Xv6.ByteCursor
 import MachCSL.BvLemmas
 
 namespace Xv6

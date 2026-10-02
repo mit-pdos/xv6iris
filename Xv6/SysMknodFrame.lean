@@ -52,8 +52,6 @@ list (`Xv6/NamexParts.lean` deviation 4), not Rocq's `bytes_own` /
 import Xv6.SysfileCalls
 import Xv6.SpecSysMknod
 import Xv6.ProcPrivAcc
-import Xv6.KstackMap
-import Xv6.CopyLemmas
 import Xv6.KexecParts
 
 namespace Xv6

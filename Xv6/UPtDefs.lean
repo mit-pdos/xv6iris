@@ -15,7 +15,6 @@ bits (`pteAD`).
 import Xv6.PtOwn
 import Xv6.KallocDefs
 import MachCSL.PteClass
-import MachCSL.PtTree
 
 namespace Xv6
 

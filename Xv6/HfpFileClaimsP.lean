@@ -34,19 +34,7 @@ The rename map from the old record is `lane-hfp/scratch/file_swap_map.txt`.
    FileAppNames, appPred := filePred c, appRun := r }`), so a `heq` passes
    straight through.
 -/
-import Xv6.GenLinksLine
-import Xv6.FileDisc
-import Xv6.FileState
-import Xv6.AppInv
-import Xv6.UserOff
-import Xv6.FsCfgDefs
-import Xv6.PieceFam
 import Xv6.AppFileEra
-import Xv6.AppFileCons
-import Xv6.FileOpenDeed
-import Xv6.FileOpenFams
-import Xv6.FileWriteCur
-import Xv6.FileLinkGen
 
 namespace Xv6
 

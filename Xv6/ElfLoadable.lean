@@ -31,7 +31,6 @@ their Rocq homes, `UShEcho`/`UShCat`/`UShGrep`/`UShSecc`).  §2 (lane U4):
    the ascent are decided over the four-field literal, never over the file.
 -/
 import Xv6.KexecLoad
-import Xv6.ElfRows
 import Xv6.ElfUserInit
 import Xv6.ElfUserSh
 

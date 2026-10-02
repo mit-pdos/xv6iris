@@ -11,9 +11,6 @@ wait answer `signExtend 64 p` at `1 ≤ p.toNat ≤ PIDMAX` is a positive
 `Z` inequalities and rewrites through `sext32_small`/`moi_lt_s`).
 -/
 import Xv6.UkInitStubs
-import Xv6.UmodeArith
-import Xv6.UkRunBr
-import Xv6.ConsoleintrArms
 
 namespace Xv6
 

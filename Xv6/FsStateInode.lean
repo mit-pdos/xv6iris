@@ -161,8 +161,6 @@ Everything else in the file is ported with Rocq's statement.
 -/
 import Xv6.FsNode
 import Xv6.FsTree
-import Xv6.FsImg
-import Xv6.FsStateDefs
 import Xv6.FsStateBitmap
 
 namespace Xv6

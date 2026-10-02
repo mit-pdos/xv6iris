@@ -61,7 +61,6 @@ view's `fsbN`.
 -/
 import Xv6.FsCollectAllBodies
 import Xv6.AppDur
-import Xv6.IcacheEscrowPoolMove
 import Xv6.IputOfflockParts
 
 namespace Xv6

@@ -32,8 +32,6 @@ import Xv6.SpecBfree
 import Xv6.DinodeSlot
 import Xv6.SpecBrelse
 import Xv6.SpecLogWrite
-import Xv6.BallocParts
-import Xv6.FsWords
 
 namespace Xv6
 

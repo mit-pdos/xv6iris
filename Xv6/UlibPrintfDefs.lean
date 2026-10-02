@@ -17,10 +17,6 @@ every image (the obligation names the image's `write` stub through `base`).
 contract (see `SpecUlibPrintf`).
 -/
 import Xv6.SpecUlibPutc
-import Xv6.UlibRunPrintf
-import Xv6.UlibVprintfCode
-import Xv6.UlibFprintfCode
-import Xv6.UlibPrintfCode
 
 namespace Xv6
 

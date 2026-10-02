@@ -103,7 +103,6 @@ FsAbsOpenFire precedent):
 Nothing dropped; everything not listed as ported is DEFERRED above.
 -/
 import Xv6.FsAbsMknodFire
-import Xv6.SlotSupply
 import Xv6.FdTable
 
 namespace Xv6

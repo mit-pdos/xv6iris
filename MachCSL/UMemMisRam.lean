@@ -14,7 +14,6 @@ it holds at every state the write loop passes through: `umm_umaPhys_sameRegs`).
 import MachCSL.UMemMisPhysR
 import MachCSL.UMemMisPhysW
 import MachCSL.UMemMisPma
-import MachCSL.UMemPhys
 
 namespace MachCSL
 

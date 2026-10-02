@@ -17,6 +17,7 @@ register file is `UkStub.stubRet m 3 ret`; `ukn_const` is not needed.
 import Xv6.UkRunSysWait
 import Xv6.UshRunDefs
 import Xv6.UkStub
+import Xv6.UshRunCode
 
 namespace Xv6
 

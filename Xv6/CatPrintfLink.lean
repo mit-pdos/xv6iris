@@ -10,7 +10,6 @@ cat's own chain `kcatPaySeq` IS `UlibUkProg.ulibUkPaySeq` at cat's image
 `ulibPaySeq` (`kcatPaySeq_ulib`, via `ulibUkPaySeq_ulib`).
 -/
 import Xv6.UlibUkProg
-import Xv6.UkCatDefs
 import Xv6.LinkCat
 
 namespace Xv6

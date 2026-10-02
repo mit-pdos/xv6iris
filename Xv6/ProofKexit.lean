@@ -120,7 +120,6 @@ import Xv6.CodeTactics
 import MachCSL.WpSmodeFrame6
 import Xv6.CopyLemmas
 import Xv6.DinodeSlot
-import Xv6.KernelTac
 
 namespace Xv6
 

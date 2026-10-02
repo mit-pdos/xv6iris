@@ -25,6 +25,7 @@ the rest is split by pc into `SysPipeAlloc` (`+0x26`, `+0x38`),
 -/
 import Xv6.SysPipeAlloc
 import Xv6.SysfileCalls
+import Xv6.SysFstatParts
 
 namespace Xv6
 

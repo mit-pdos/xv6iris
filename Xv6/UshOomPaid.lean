@@ -23,7 +23,6 @@ the message, as `UshPipePaid.wp_kshd_panic_paid_at` is for "fork"/"pipe");
 2. `ushp_oom_of_diag` lives here, beside the walk it is built from (Rocq:
    `UkShEcho`), so the child tier imports one file for both.
 -/
-import Xv6.UshPipePaid
 import Xv6.FileDisc
 import Xv6.SpecShPanic
 import Xv6.UshTreeDefs

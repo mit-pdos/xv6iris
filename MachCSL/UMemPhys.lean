@@ -44,11 +44,7 @@ arm's check.
 
 Everything is stated over a `UFoot` and `UWSt.file`.
 -/
-import MachCSL.UTranslate
 import MachCSL.UWalk
-import MachCSL.PlatformFacts
-import MachCSL.WpPmpXv6
-import MachCSL.Tactics
 
 namespace MachCSL
 

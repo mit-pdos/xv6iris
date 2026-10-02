@@ -39,6 +39,7 @@ import Xv6.UshPipeLeavesGen
 import Xv6.UshPipeLeavesRound
 import Xv6.UshPipeCall
 import Xv6.UshPipesLaw
+import Xv6.UshForkDefs
 
 namespace Xv6
 

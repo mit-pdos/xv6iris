@@ -21,6 +21,7 @@ arm's freshness `γc ∉ Sc`, which /init's round does not read and drops
 `∅` (init holds none).
 -/
 import Xv6.InitMainParts
+import Xv6.UkFork
 
 namespace Xv6
 

@@ -20,6 +20,7 @@ import Xv6.UInitUnionCC
 import Xv6.UInitShSlot
 import Xv6.UInitCons
 import Xv6.ElfLoadable
+import Xv6.UInitUnionDisc
 
 namespace Xv6
 

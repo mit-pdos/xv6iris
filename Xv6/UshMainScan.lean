@@ -22,7 +22,6 @@ the distance to that NUL (Rocq's echo-strlen mould).
 -/
 import Xv6.UshMainStubs
 import Xv6.UshMainCode
-import Xv6.UshMainBytes
 import Xv6.UshGettokScan
 
 namespace Xv6

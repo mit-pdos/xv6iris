@@ -26,7 +26,6 @@ lands on the known post state.  It runs on the same walker frames
 `ukView`); §3 the stamped address space (`userPtInvX`, `userPtmInvX`).
 -/
 import Xv6.UserFrame
-import Xv6.UserPerm
 import MachCSL.URunX
 import MachCSL.UCycle
 

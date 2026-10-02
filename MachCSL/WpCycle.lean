@@ -12,7 +12,6 @@ import MachCSL.WpCycleDefs
 import MachCSL.WpStagesM
 import MachCSL.WpTick
 import MachCSL.Instr
-import MachCSL.Boot
 
 namespace MachCSL
 

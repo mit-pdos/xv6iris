@@ -27,7 +27,6 @@ by the `UmaRam` hypothesis.
   because the model's `match_reservation` said so).
 -/
 import MachCSL.UMemPhys
-import MachCSL.Tactics
 
 namespace MachCSL
 

@@ -28,7 +28,6 @@ import Xv6.SpecFiledup
 import Xv6.CodeTactics
 import MachCSL.WpSmodeFrame6
 import Xv6.CopyLemmas
-import Xv6.DinodeSlot
 import MachCSL.BvLemmas
 import Xv6.SpecFdalloc
 

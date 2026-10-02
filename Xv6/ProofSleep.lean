@@ -25,12 +25,9 @@ over a base context `kb`: the caller's own on the no-op path, and
 `sleepExitK` (the resuming hart's `SPIE`/`SPP` and kernel root) on the park
 path.
 -/
-import MachCSL.WpSmodeFrame
 import Xv6.SpecSleep
 import Xv6.SpecSched
 import Xv6.SpecMyproc
-import Xv6.SpecAcquire
-import Xv6.SpecRelease
 import Xv6.CodeTactics
 import Xv6.KilledDefs
 

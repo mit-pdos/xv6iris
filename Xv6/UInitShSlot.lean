@@ -66,7 +66,6 @@ import Xv6.UshKernelSlot
 import Xv6.UshPromptLaw
 import Xv6.ExecRunSup
 import Xv6.EchoFsPure
-import Xv6.UserChildren
 
 namespace Xv6
 

@@ -42,7 +42,6 @@ import Xv6.SysOpenWalk
 import Xv6.SysOpenJoin
 import Xv6.SysOpenAlloc
 import Xv6.SysOpenStores
-import Xv6.SysOpenTails
 import Xv6.SysOpenPub
 
 namespace Xv6

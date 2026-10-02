@@ -23,6 +23,7 @@ the lemma reopens it (`namex_loaded_open`, the flat body with a closing
 wand) and re-closes it for the iunlockput.
 -/
 import Xv6.NamexExit
+import Xv6.IcacheShortCarve
 
 namespace Xv6
 

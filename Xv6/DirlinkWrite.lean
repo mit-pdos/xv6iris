@@ -26,6 +26,7 @@ import Xv6.DirlinkTail
 import Xv6.FsCallSitesI
 import MachCSL.WpSmodeSltu
 import Xv6.DirlinkDefs
+import Xv6.SysUnlinkPure
 
 namespace Xv6
 

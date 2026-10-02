@@ -11,13 +11,9 @@ epilogue.  Stated at either interrupt index and at any lock depth, as
 `acquire`/`release` are: the pair is balanced, so `noff` and `locks` come back
 unchanged.
 -/
-import MachCSL.WpSmodeFrame
 import Xv6.SpecWakeup
-import Xv6.SpecAcquire
-import Xv6.SpecRelease
 import Xv6.CodeTactics
 import MachCSL.WpSmodeFrame8
-import Xv6.ByteCursor
 import Xv6.KilledDefs
 import Xv6.UvmallocDefs
 

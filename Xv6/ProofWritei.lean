@@ -49,7 +49,6 @@ gone (balloc's printk is behind `BMAP`, and writei calls none itself --
 uses checked: ProofWritei.v only).
 -/
 import Xv6.WriteiMain
-import Xv6.ReadiFrame
 
 namespace Xv6
 

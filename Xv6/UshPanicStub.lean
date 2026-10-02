@@ -54,8 +54,6 @@ DROPPED from `UShPanic` (unreached): `ksh_w_of_link_prompt_post_at`,
    6 s kernel check per walk.
 -/
 import Xv6.UshMainStubs
-import Xv6.UkRunSysWrite
-import Xv6.UkConsOut
 import Xv6.UshSysPHolds
 
 namespace Xv6

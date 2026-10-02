@@ -6,7 +6,6 @@ but that the union laws reach (U4 seal wave, walk3.txt).  Pure.
 Added: `nodollar_prompt_head` (Rocq's name kept, as the landed file keeps
 its `pop_*` names).  Deviation: `Z_to_bv 8 36` is `36#8`.
 -/
-import Xv6.PipeOutPure
 import Xv6.LineBytes
 
 namespace Xv6

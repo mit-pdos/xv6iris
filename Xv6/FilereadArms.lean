@@ -21,7 +21,6 @@
   fault arm on readi's `-1`).
 -/
 import Xv6.FilereadInode
-import Xv6.UMemWindow
 
 namespace Xv6
 

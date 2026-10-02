@@ -26,9 +26,7 @@ tables whose user leaves are valid (`UftLeavesValid`, Rocq's pin); adding
 valid) discharges it once.
 -/
 import Xv6.UserFetch
-import Xv6.UptTree
 import MachCSL.UTlb
-import MachCSL.BvEnumSatp
 
 namespace Xv6
 

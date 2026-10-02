@@ -19,6 +19,7 @@ facts take `s.file .cur_privilege = User` (a consequence of `UxcCfg s`,
 user tier by `uxc_fiom`).  The compressed forms are stated on `uxaExecAs`.
 -/
 import MachCSL.UExecCtlBase
+import MachCSL.UTranslate
 
 namespace MachCSL
 

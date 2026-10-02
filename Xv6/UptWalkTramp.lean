@@ -26,6 +26,7 @@ physical.
 import Xv6.UptTree
 import Xv6.KstackMap
 import MachCSL.WpSmodeSatpU
+import Xv6.UserExec
 
 namespace Xv6
 

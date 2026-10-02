@@ -24,7 +24,6 @@ devintr is called at EVERY cause but the ecall, through its one contract
 import Xv6.UsertrapBlocks
 import MachCSL.WpSmodeTrapCsr
 import Xv6.BreadDefs
-import Xv6.ConsoleintrParts
 import MachCSL.LockFacts
 
 namespace Xv6

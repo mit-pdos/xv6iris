@@ -35,7 +35,6 @@ credential pays (`UexecSeccMint`).
 -/
 import Xv6.UexecSeccMasked
 import Xv6.UexecExecInst
-import Xv6.PipeReg
 import Xv6.UserFd
 
 namespace Xv6

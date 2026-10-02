@@ -41,6 +41,7 @@ step rule.
 -/
 import Xv6.SysOpenShared
 import MachCSL.WpSmodeLh
+import Xv6.SysMknodFrame
 
 namespace Xv6
 

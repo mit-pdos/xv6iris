@@ -55,7 +55,6 @@ and then takes `Panic`; it is a module (the short-read arm calls it).
 -/
 import Xv6.DirlookupRead
 import MachCSL.WpSmodeLh
-import Xv6.SpecMyproc
 import Xv6.SpecIdup
 
 namespace Xv6

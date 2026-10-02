@@ -41,7 +41,6 @@ forms), `uargv_exec_of_cmd`, `echo_uargv_exec_of_cmd(_x)`.
 import Xv6.UshEchoImg
 import Xv6.ExecArgs
 import Xv6.UshMainLine
-import Xv6.BootCarve
 
 namespace Xv6
 

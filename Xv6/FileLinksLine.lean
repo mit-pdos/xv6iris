@@ -35,7 +35,6 @@ Rocq's header of §S8, abridged:
 5. `alt_panic_len5` is `LineBytes.lbPanic_len` (Rocq proves it the same way).
 -/
 import Xv6.FileOutClaim
-import Xv6.LineBytes
 
 namespace Xv6
 

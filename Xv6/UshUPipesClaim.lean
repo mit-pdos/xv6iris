@@ -47,24 +47,10 @@ pc0 RT GS STG REST PWC Pm` are spelled out, or are the abbreviations below.
 3. `Z.of_nat (length c) < 2 ^ 31` is `(c.length : Int) < 2 ^ 31` (sibling
    a's `catf_short`); `usz`'s `sz` is a `Nat`.
 -/
-import Xv6.UshURoundBody
 import Xv6.UshURoundWide
-import Xv6.UshURoundShapes
-import Xv6.UshURoundPure
-import Xv6.UshRedirBody
-import Xv6.UshLineDefs
-import Xv6.UshCatPay
-import Xv6.UshEchoSlot
 import Xv6.UkPipesIfaceDefs
-import Xv6.HfpFileClaimsP
-import Xv6.UshKernel
-import Xv6.PipeOutNFam
-import Xv6.UshUPipesPure
 import Xv6.UshPipesChild
-import Xv6.UexecExecInst
 import Xv6.PipesCutEcho
-import Xv6.AppFileTyped
-import Xv6.FileDeltasLen
 
 namespace Xv6
 

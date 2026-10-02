@@ -5,7 +5,6 @@ results.  Stated with the bits as `if p then 1 else 0` values: normalising
 it) sends the kernel into deep recursion, so the conjunction form is the
 rule's contract instead.
 -/
-import MachCSL.WpSmodeCycle
 import MachCSL.WpSmodeRegOps
 
 namespace MachCSL

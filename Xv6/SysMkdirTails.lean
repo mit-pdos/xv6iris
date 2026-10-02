@@ -34,6 +34,7 @@ Rocq's header points, kept:
 -/
 import Xv6.SysMkdirFrame
 import Xv6.CopyLemmas
+import MachCSL.BvLemmas
 
 namespace Xv6
 

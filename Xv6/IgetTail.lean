@@ -24,7 +24,6 @@ import Xv6.IgetParts
 import Xv6.SpecRelease
 import Xv6.CodeTactics
 import Xv6.SpecIget
-import Xv6.FsWords
 
 namespace Xv6
 

@@ -6,6 +6,7 @@ epilogue (`IputParts.iput_epi`).  A stage file of iput's proof.
 -/
 import Xv6.IputOfflockParts
 import Xv6.IputParts
+import Xv6.IupdateSteps
 
 namespace Xv6
 

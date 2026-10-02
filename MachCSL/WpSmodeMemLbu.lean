@@ -6,6 +6,9 @@ MachCSL: `execSpecF_lbu`, the supervisor-mode `lbu` over the register file (scri
 -/
 import MachCSL.WpSmodeMemTac
 import MachCSL.Translate
+import MachCSL.WpCycleDefs
+import MachCSL.KCtxGpr
+import MachCSL.SmodeMemFacts
 
 
 namespace MachCSL

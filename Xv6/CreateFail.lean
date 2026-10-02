@@ -71,6 +71,7 @@ THE GHOST MOVES (Rocq's, kept):
 import MachCSL.WpSmodeFrame12b
 import Xv6.CreateCalls
 import Xv6.FsStateEraResB
+import Xv6.NamexParts
 
 namespace Xv6
 

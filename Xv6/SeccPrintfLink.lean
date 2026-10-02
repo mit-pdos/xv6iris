@@ -6,7 +6,6 @@ stated over `urun` in `UkSeccDefs`) from `LinkUlibPrintf` through
 seccomp's chain `kseccPaySeq` is `ulibUkPaySeq` at its image.
 -/
 import Xv6.UlibUkProg
-import Xv6.UkSeccDefs
 import Xv6.LinkSecc
 
 namespace Xv6

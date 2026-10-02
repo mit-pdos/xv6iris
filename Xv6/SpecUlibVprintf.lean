@@ -34,6 +34,8 @@ is vacuous over `Nat`.
 -/
 import Xv6.UlibPrintfDefs
 import MachCSL.Resources
+import Xv6.UlibRunPrintf
+import Xv6.UlibVprintfCode
 
 namespace Xv6
 

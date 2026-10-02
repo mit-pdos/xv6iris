@@ -8,7 +8,6 @@ import Xv6.FileDefs
 import Xv6.StepLemmas
 import Xv6.BcacheInv
 import Xv6.BmapParts
-import Xv6.VirtioQueue
 
 namespace Xv6
 

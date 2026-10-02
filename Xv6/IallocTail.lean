@@ -17,6 +17,7 @@ rows, which `iallocArms` already carries packed (its deviation 2).
 import Xv6.IallocDefs
 import Xv6.CodeTactics
 import Xv6.IallocParts
+import MachCSL.WpSmodeFrame8
 
 namespace Xv6
 

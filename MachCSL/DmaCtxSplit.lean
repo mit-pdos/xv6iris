@@ -5,7 +5,6 @@ MachCSL: the fraction and tier-split arithmetic of a byte window
 disk invariant's vocabulary (`Xv6.DiskInvDefs`) does not wait for the
 supervisor-mode store rules `WpDmaCtx` imports for `ctx_key_mint`.
 -/
-import MachCSL.WpAtomic
 import MachCSL.BytesFree
 
 namespace MachCSL

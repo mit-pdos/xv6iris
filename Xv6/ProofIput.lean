@@ -46,7 +46,6 @@ import Xv6.IputTail
 import Xv6.IputOfflock
 import Xv6.IputLocked
 import Xv6.IputEntry
-import Xv6.IdupCore
 
 namespace Xv6
 

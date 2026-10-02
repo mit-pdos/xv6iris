@@ -36,7 +36,6 @@ cells at `sp₀-72`, `sp₀-64`, `sp₀-56`; the cell at `sp₀-80` is unused.
    call sites; `fst_noff0`/`fst_len24` likewise.
 -/
 import Xv6.SpecFilestat
-import Xv6.DinodeSlot
 import Xv6.EitherDefs
 import Xv6.SpecStati
 import MachCSL.BvLemmas

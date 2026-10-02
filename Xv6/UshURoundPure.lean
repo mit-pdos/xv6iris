@@ -40,7 +40,6 @@ Unported: none.  (The local notations `U`/`K` are `ulmG`/`ulmGHooks`.)
    only uses its pipeline half, as Rocq's.
 -/
 import Xv6.UshURoundTies
-import Xv6.UshExecPinPure
 import Xv6.UshCatPay
 import Xv6.UNamePathCat
 

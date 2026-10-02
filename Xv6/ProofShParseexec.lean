@@ -25,6 +25,7 @@ Deviations from Rocq: as in `SpecShParseexec` and `UshArgsWalk`.
 import Xv6.SpecShParseexec
 import Xv6.UshArgsWalk
 import Xv6.UshCodeExec
+import Xv6.SpecShExeccmd
 
 namespace Xv6
 

@@ -17,7 +17,6 @@ the key's facts to the table's:
   after it (`uMStore` vs `ukViewStore`).
 -/
 import Xv6.UkLeafWrap
-import Xv6.UkAbi
 
 namespace Xv6
 

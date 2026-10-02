@@ -182,8 +182,6 @@ import Xv6.SpecReadi
 import Xv6.InodeRegionInv
 import Xv6.FsCfgDefs
 import Xv6.IcacheTable
-import Xv6.IcacheHeld
-import Xv6.ProcGeom
 
 namespace Xv6
 

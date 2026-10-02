@@ -10,7 +10,6 @@ over the landing predicate and the rider (`UserStepTrap.ust_trapArmGen`, the one
 tower both tiers use); `uk_armOb_interrupt` / `uk_armOb_trap` /
 `uk_armOb_retire` are the three arms a verified instruction's cycle can take.
 -/
-import Xv6.UkLand
 import Xv6.UserStepTrap
 
 namespace Xv6

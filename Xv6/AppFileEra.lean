@@ -40,7 +40,6 @@ Rocq's header, abridged (the reasons are the content):
    the escrow fire spends a one-shot token (`esc_spend`).
 -/
 import Xv6.AppFileSteps
-import Xv6.AppInv
 
 namespace Xv6
 

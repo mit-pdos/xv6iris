@@ -16,6 +16,8 @@ re-nulls spend the unit and closed authority `fdalloc` released
 caller's proof that it IS the `-1` post).
 -/
 import Xv6.SysPipeParts
+import MachCSL.BvLemmas
+import Xv6.DinodeSlot
 
 namespace Xv6
 

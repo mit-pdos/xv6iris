@@ -103,7 +103,6 @@ import Xv6.AppCfg
 import Xv6.FsStateTop
 import Xv6.FsBlocks
 import Xv6.IcacheRefDefs
-import Xv6.SyncHook
 
 namespace Xv6
 

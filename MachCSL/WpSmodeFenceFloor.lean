@@ -52,7 +52,6 @@ away:
     memModel_fence_acq  →  swp_sail_barrier_view
                         →  execSpecF_fence_rw_rw_floor  →  wp_s_fence_rw_rw_floor
 -/
-import MachCSL.SmodeMemFacts
 import MachCSL.ReadAUr
 import MachCSL.WpLockSchema
 import MachCSL.WpSmodeAtomic

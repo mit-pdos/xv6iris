@@ -53,7 +53,6 @@ the number but not the list.  The ghost steps (`kmemAuth_dec`,
    from `kmemAuth_inc` before it).
 -/
 import Xv6.UartTrace
-import Xv6.KallocEv
 import MachCSL.BytesFree
 
 namespace Xv6

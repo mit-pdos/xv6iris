@@ -11,6 +11,7 @@ import Xv6.SpecRelease
 import Xv6.SpecPopoff
 import Xv6.SpecHolding
 import Xv6.CodeTactics
+import MachCSL.LockFacts
 
 namespace Xv6
 

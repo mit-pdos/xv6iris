@@ -22,6 +22,8 @@ descriptor (`sys_pipe_core_ext`); the `int` locals are its source bytes
 those cells pin the ambient context to the kernel tier first (`hct`).
 -/
 import Xv6.SysPipeTails
+import Xv6.VirtioDiskRwDefs2
+import Xv6.CopyLemmas
 
 namespace Xv6
 

@@ -8,7 +8,6 @@ longer wait for the lock rules' proofs.
 -/
 import MachCSL.CallConv
 import MachCSL.WpSmodeCycle
-import MachCSL.Lock
 
 namespace MachCSL
 

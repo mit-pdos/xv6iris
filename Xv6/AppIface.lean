@@ -66,7 +66,6 @@ Rocq's header on the record, kept because the reasons are the content:
    `wild_none`) is MachCSL's, beside `consResTriv`; its law `wildNone_lic`
    is here.
 -/
-import Xv6.ConsLog
 import Xv6.UartLinks
 import Xv6.FsAbsDefs
 import MachCSL.Adequacy

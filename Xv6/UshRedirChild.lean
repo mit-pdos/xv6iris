@@ -27,7 +27,6 @@ import Xv6.UshRedirBody
 import Xv6.UshRedirPaid
 import Xv6.UshExecEnvRun
 import Xv6.SpecShRuncmdExec
-import Xv6.UShLexRedir
 
 namespace Xv6
 

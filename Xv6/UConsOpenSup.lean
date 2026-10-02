@@ -50,7 +50,6 @@ landed: `xfam_open` is `UkFileOpen.xfamOpen`, `sbundle_at_open_intro_at` /
 -/
 import Xv6.UInitCons
 import Xv6.UkFileOpenDefs
-import Xv6.UkRunSysOpenImg
 
 namespace Xv6
 

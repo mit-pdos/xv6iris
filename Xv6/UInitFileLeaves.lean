@@ -55,7 +55,6 @@ Nothing else (15 declarations: 14 reached + the instance).
 -/
 import Xv6.UInitConsFile
 import Xv6.FileLinkGen
-import Xv6.FileOutClaim
 import Xv6.UexecExecMintW
 import Xv6.UkWriteClosed
 import Xv6.LinkUexecWp

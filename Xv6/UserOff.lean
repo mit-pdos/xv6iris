@@ -66,7 +66,6 @@ Nothing.  (`uoff_park`, `off_pub_park`, `off_pub_hand(_0)`,
 sys_open's publish (wave 7b) and the U tier -- but they are a few lines
 each and are the file's stated API, so they are kept.)
 -/
-import Xv6.OffGv
 import Xv6.FileDefs
 
 namespace Xv6

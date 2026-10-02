@@ -9,11 +9,3 @@ run in parallel rather than in sequence in one 9 s file.  Under xv6's PMP
 tables every kernel access inside RAM passes; at `satp = Bare` virtual =
 physical.
 -/
-import MachCSL.WpSmodeMemTac
-import MachCSL.WpSmodeMemLbu
-import MachCSL.WpSmodeMemLd
-import MachCSL.WpSmodeMemLw
-import MachCSL.WpSmodeMemSb
-import MachCSL.WpSmodeMemSd
-import MachCSL.WpSmodeMemSw
-import MachCSL.WpStages

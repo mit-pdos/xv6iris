@@ -22,6 +22,8 @@ CONE (this file): `ucat_image_entry`.
 3. The key image is a page view (UkUnionEntriesDefs deviation 2).
 -/
 import Xv6.UkUnionEntriesDefs
+import Xv6.UkSysFHHolds
+import Xv6.UkSysPHolds
 
 namespace Xv6
 

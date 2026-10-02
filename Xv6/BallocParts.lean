@@ -21,7 +21,6 @@ Rocq's `ba_sext_zero`, `ba_sext32` and this file's former `ba_w32`,
 import Xv6.BitmapEnc
 import Xv6.FsGeom
 import Xv6.FsWords
-import Xv6.StepLemmas
 
 namespace Xv6
 

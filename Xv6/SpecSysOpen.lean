@@ -203,7 +203,6 @@ reaches this contract.
 Imports only definitional files and callee `Spec*` files.
 -/
 import Xv6.SpecCreate
-import Xv6.SysOpenDefs
 import Xv6.SysOpenKept
 import Xv6.ConsoleInvDefs
 import Xv6.UMemLazy

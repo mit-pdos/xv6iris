@@ -45,6 +45,9 @@ import Xv6.ElfUser
 import Xv6.EchoDisc
 import Xv6.UshEchoPure
 import Xv6.UshEchoImg
+import Xv6.User.CatElfRaw
+import Xv6.User.EchoElfRaw
+import Xv6.User.GrepElfRaw
 
 namespace Xv6
 

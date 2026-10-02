@@ -7,6 +7,7 @@ Deviations from Rocq: as `SpecSyncMain`.
 -/
 import Xv6.SpecSyncMain
 import Xv6.UkSyncStubs
+import Xv6.UkRunMem
 
 namespace Xv6
 

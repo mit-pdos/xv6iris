@@ -26,7 +26,6 @@ DEVIATIONS from Rocq:
 -/
 import Xv6.UnionOut
 import Xv6.PipeOutWSeal
-import Xv6.UnionAdmSync
 
 namespace Xv6
 

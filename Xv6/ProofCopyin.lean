@@ -16,6 +16,11 @@ THE LEND (permit sweep L1b, Rocq b69bd0fab; threaded by L2, Rocq
 import Xv6.SpecCopyin
 import Xv6.CodeTactics
 import Xv6.CopyLemmas
+import Xv6.KvmLemmas
+import Xv6.UPtLemmas
+import Xv6.UPtAllocLemmas
+import MachCSL.WpSmodeFrame12
+import MachCSL.BvLemmas
 
 namespace Xv6
 

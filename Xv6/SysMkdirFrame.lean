@@ -42,7 +42,6 @@ path[128]` at `sp0-144`.  The buffer is a `byteBuf` list
 import Xv6.SysfileCalls
 import Xv6.SpecSysMkdir
 import Xv6.ProcPrivAcc
-import Xv6.KstackMap
 import Xv6.KexecParts
 
 namespace Xv6

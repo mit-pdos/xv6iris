@@ -8,7 +8,6 @@ The taint arm of the entry's row (`ushFd0`) goes generic at once
 Deviations from Rocq: as `SpecShStart`; the prologue is
 `UshStep.ush_frame_pro`; main enters as its interface `SH_MAIN`.
 -/
-import Xv6.UshMainStubs
 import Xv6.UshMainCode
 import Xv6.SpecShMain
 import Xv6.SpecShStart

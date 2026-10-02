@@ -24,7 +24,6 @@ the leftovers peek is taken at the reference's `refPeek len f s []` directly
 import Xv6.SpecShParsecmd
 import Xv6.SpecShStrlen
 import Xv6.SpecShParseline
-import Xv6.SpecShPeek
 import Xv6.SpecShNulterminate
 import Xv6.UshRedirsWalk
 import Xv6.UshATree

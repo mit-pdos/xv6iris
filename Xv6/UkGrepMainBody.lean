@@ -12,7 +12,6 @@ as `GREP_GREP`; the failure arm is `grepMain_die`.
 Deviations from Rocq: `UkGrepMainDefs`'s.
 -/
 import Xv6.UkGrepMainArms
-import Xv6.UkRunBr
 
 namespace Xv6
 

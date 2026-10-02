@@ -12,12 +12,8 @@ states), `printk("%d %s %s", ...)`, `printk("\n")` -- and the epilogue.
 Stated at either interrupt index; `procdump` takes no lock of its own, so
 `noff` and `locks` are unchanged end to end.
 -/
-import MachCSL.WpSmodeFrame
 import Xv6.SpecProcdump
 import Xv6.CodeTactics
-import MachCSL.ByteWord
-import Xv6.ByteCursor
-import Xv6.UvmallocDefs
 import Xv6.WalkaddrDefs
 import MachCSL.BvLemmas
 

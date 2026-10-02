@@ -12,18 +12,13 @@ Imports only definitional and Spec files (never a `Code*`, `Proof*` or
 `Link*` file).
 -/
 import Xv6.SpecUvmclear
-import Xv6.SpecWalk
 import Xv6.SpecIsmapped
-import Xv6.SpecKalloc
-import Xv6.SpecKfree
 import Xv6.SpecMemset
 import Xv6.SpecMappages
 import Xv6.UPtFaultLemmas
 import Xv6.CodeTactics
 import MachCSL.WpSmodeFrame6
 import Xv6.UvmCallSites
-import Xv6.WalkaddrDefs
-import MachCSL.BvLemmas
 
 namespace Xv6
 

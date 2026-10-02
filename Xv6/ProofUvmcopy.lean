@@ -24,8 +24,6 @@ Since L3b (no Rocq counterpart) `kalloc` and the mappages-failure arm's
 `uc_kfree_call` over `uc_kfree_lend_call`).
 -/
 import Xv6.SpecUvmcopy
-import Xv6.SpecWalk
-import Xv6.SpecKfree
 import Xv6.SpecMemmove
 import Xv6.SpecMappages
 import Xv6.SpecUvmunmap

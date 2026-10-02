@@ -18,7 +18,6 @@ import Xv6.UkGrepMainDefs
 import Xv6.SpecGrepGrep
 import Xv6.GrepPrintfLink
 import Xv6.UkCatTreePure
-import Xv6.UkPipeDevDefs
 
 namespace Xv6
 

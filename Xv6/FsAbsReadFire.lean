@@ -104,8 +104,6 @@ import Xv6.SysReadDefs
 import Xv6.PieceFam
 import Xv6.UserOff
 import Xv6.FdTable
-import Xv6.InodeRegionInv
-import Xv6.FsStateEraNode
 
 namespace Xv6
 

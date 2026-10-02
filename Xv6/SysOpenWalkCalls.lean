@@ -31,6 +31,7 @@ cut here is `sys_open_walk_buf_split` / `_join`.
 -/
 import Xv6.SpecNameiEra
 import Xv6.SysOpenParts
+import Xv6.DirlookupParts
 
 namespace Xv6
 

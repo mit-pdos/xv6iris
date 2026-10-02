@@ -11,7 +11,6 @@ zero is a whole page, ready for `kfree`.
 (The shared `Xv6/UPtLemmas.lean` belongs to another proof; this file is
 `freewalk`'s and `uvmfree`'s own.)
 -/
-import Xv6.PtOwnLemmas
 import Xv6.UPtDefs
 import MachCSL.WpSmodeFrame
 import Xv6.PtRunLemmas

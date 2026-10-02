@@ -62,7 +62,6 @@ import Xv6.FsCallSites
 import Xv6.SpecInitlock
 import Xv6.SpecWriteHead
 import Xv6.BallocDefs
-import Xv6.FsWords
 
 namespace Xv6
 

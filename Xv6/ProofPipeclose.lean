@@ -128,8 +128,6 @@ import Xv6.SpecAcquire
 import Xv6.SpecRelease
 import Xv6.SpecWakeup
 import Xv6.SpecKfree
-import Xv6.CodeTactics
-import Xv6.StepLemmas
 import Xv6.PipeQstep
 import Xv6.PipeRw
 

@@ -17,10 +17,8 @@ lets the exit context depend on the value read.
 -/
 import MachCSL.WpSmodeAtomic
 import MachCSL.WpSmodeRules
-import MachCSL.CallConv
 import MachCSL.Lock
 import MachCSL.WpLockSchema
-import MachCSL.LockFacts
 
 namespace MachCSL
 

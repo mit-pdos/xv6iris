@@ -15,9 +15,6 @@ import Xv6.DinodeSlot
 import Xv6.FsCallSitesF
 import Xv6.SpecIput
 import Xv6.EscrowDeposit
-import Xv6.ByteCursor
-import Xv6.IupdateMain
-import Xv6.IupdateSteps
 
 namespace Xv6
 

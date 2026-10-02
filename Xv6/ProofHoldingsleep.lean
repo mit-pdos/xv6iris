@@ -28,6 +28,7 @@ import MachCSL.WpSmodeFrame6
 import MachCSL.WpLock
 import Xv6.SpecMyproc
 import Xv6.KilledDefs
+import MachCSL.LockFacts
 
 namespace Xv6
 

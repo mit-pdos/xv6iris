@@ -70,6 +70,7 @@ import Xv6.SysOpenWalkCalls
 import MachCSL.WpSmodeLh
 import Xv6.SysOpenShared
 import Xv6.KexecACode
+import Xv6.SysChdirFrame
 
 namespace Xv6
 

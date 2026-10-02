@@ -20,8 +20,6 @@ the authority and the caller's `R curCtx`.  `H q` is kept and handed to the
 caller.  `release` deposits the rebuilt payload.
 -/
 import Xv6.SpecReleasesleep
-import Xv6.SpecAcquire
-import Xv6.SpecRelease
 import Xv6.CodeTactics
 import Xv6.KilledDefs
 

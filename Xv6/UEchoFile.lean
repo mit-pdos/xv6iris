@@ -51,7 +51,6 @@ register notations `a0_idx`..`a7_idx`.
 -/
 import Xv6.FileWritePart
 import Xv6.UkRunSysWrite
-import Xv6.FsCfgDefs
 
 namespace Xv6
 

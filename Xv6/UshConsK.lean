@@ -76,8 +76,6 @@ cons_absent T K`).
 -/
 import Xv6.UshMainStubs
 import Xv6.UStrImg
-import Xv6.AppEcho
-import Xv6.AppInv
 import Xv6.UInitCons
 
 namespace Xv6

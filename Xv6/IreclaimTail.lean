@@ -20,6 +20,7 @@ deviation 1.
 import Xv6.IreclaimDefs
 import Xv6.CodeTactics
 import Xv6.FsCallSitesF
+import MachCSL.WpSmodeFrame8
 
 namespace Xv6
 

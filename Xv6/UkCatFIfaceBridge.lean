@@ -23,7 +23,6 @@ the defined fields are the owners' definitions (their equations `rfl`).
    directly, and the laws call lane hfp-P2's `pns_cons_nil`.
 -/
 import Xv6.UkCatFIfaceDeps
-import Xv6.UkFileDevRead
 import Xv6.UkFileDevNil
 import Xv6.UkFileDevOpen
 import Xv6.UkFileDevClose

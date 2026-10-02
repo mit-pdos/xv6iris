@@ -21,7 +21,6 @@ Nothing here is PLIC-specific state: no Iris ghosts, no invariant.
 -/
 import Xv6.PlicPlan
 import Xv6.SpecCpuid
-import MachCSL.WpSmodeFrame
 import MachCSL.WpSmodeFrame12b
 
 namespace Xv6

@@ -19,6 +19,10 @@ import Xv6.CopyLemmas
 import Xv6.ByteCursor
 import Xv6.PrintkDefs
 import MachCSL.BvLemmas
+import Xv6.KvmLemmas
+import Xv6.UPtLemmas
+import Xv6.UPtAllocLemmas
+import MachCSL.WpSmodeFrame12
 
 namespace Xv6
 

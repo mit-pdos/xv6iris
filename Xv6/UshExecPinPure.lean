@@ -40,8 +40,6 @@ import Xv6.FsGrepPin
 import Xv6.FsSeccPin
 import Xv6.FsSyncPin
 import Xv6.PinnedExec
-import Xv6.KexecLoad
-import Xv6.PipeDisc
 import Xv6.PipesDisc
 import Xv6.UshDiagDefs
 import Xv6.UkShPipesLex

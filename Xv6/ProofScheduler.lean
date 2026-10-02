@@ -1,7 +1,6 @@
 /-
 Proof of `scheduler`'s contract (`SpecScheduler.SCHEDULER`).
 -/
-import MachCSL.WpSmodeFrame
 import MachCSL.WpSmodeProc
 import MachCSL.WpSmodeWait
 import Xv6.SpecScheduler

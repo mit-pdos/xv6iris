@@ -15,7 +15,6 @@ misses `T`).
 -/
 import Xv6.UkLoad
 import MachCSL.UkfWalk
-import MachCSL.UFetch
 
 namespace Xv6
 

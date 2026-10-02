@@ -56,6 +56,7 @@ import Xv6.ArgLemmas
 import Xv6.SysMknodCalls
 import Xv6.ReadiDefs
 import Xv6.SysLinkParts
+import Xv6.DirlookupParts
 
 namespace Xv6
 

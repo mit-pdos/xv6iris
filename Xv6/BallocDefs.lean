@@ -21,7 +21,6 @@ import Xv6.DinodeSlot
 import Xv6.SpecPrintk
 import Xv6.BitmapInv
 import Xv6.SpecLogWrite
-import Xv6.FsWords
 
 namespace Xv6
 

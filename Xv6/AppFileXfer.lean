@@ -45,7 +45,6 @@ Rocq's notes, abridged (the reasons are the content):
 -/
 import Xv6.AppFileSeal
 import Xv6.AppFileHook
-import Xv6.SystemSlot
 
 namespace Xv6
 

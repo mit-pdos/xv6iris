@@ -9,7 +9,6 @@ import MachCSL.Translate
 import MachCSL.WpCycleDefs
 import MachCSL.KCtxGpr
 import MachCSL.SmodeMemFacts
-import MachCSL.WpSmodeMemPhys
 
 
 namespace MachCSL

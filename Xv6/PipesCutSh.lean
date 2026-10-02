@@ -20,7 +20,6 @@ here (via `ushpNulfold_zeroAt`/`ushZeroAt_miss`); `concat` is
 -/
 import Xv6.PipesCut
 import Xv6.RefParseBars
-import Xv6.UkShWords
 
 namespace Xv6
 

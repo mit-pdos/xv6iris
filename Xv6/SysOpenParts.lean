@@ -159,23 +159,14 @@ Imports only definitional files, callee Specs and the landed stage pure
 leaves (`SysOpenBits`, `SysOpenBudget`).
 -/
 import Xv6.SpecSysOpen
-import Xv6.SysOpenBits
-import Xv6.KstackMap
 import Xv6.FileFrac
-import Xv6.SpecArgstr
-import Xv6.SpecArgint
 import Xv6.SpecIunlock
-import Xv6.SpecIunlockput
 import Xv6.SpecFileclose
 import Xv6.SpecIlock
 import Xv6.SpecNamei
-import Xv6.DirlookupParts
 import Xv6.KexecParts
 import Xv6.PrintkDefs
-import Xv6.SysChdirFrame
-import Xv6.SysMknodFrame
 import Xv6.SysfileCalls
-import MachCSL.BvLemmas
 import Xv6.SpecFdalloc
 
 namespace Xv6

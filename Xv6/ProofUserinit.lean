@@ -63,7 +63,6 @@ so allocproc's lend is `actLend_zero` and the one it hands back is
 dropped (`ui_allocproc`).
 -/
 import Xv6.SpecUserinit
-import Xv6.SpecIgetroot
 import Xv6.SpecIdup
 import Xv6.SpecRelease
 import Xv6.SpecForkretParkPaid

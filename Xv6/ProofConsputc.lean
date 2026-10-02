@@ -9,7 +9,6 @@ arms leave through the same epilogue at `+0x18`, so the tail is shared
 (`consputc_finish`).  Interrupts are off throughout (the caller's
 `hsie`), so the thread stays on this hart.
 -/
-import MachCSL.WpSmodeFrame
 import Xv6.SpecConsputc
 import Xv6.SpecUartputcSync
 import Xv6.CodeTactics

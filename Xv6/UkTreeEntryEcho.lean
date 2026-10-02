@@ -40,8 +40,6 @@ is read.  Unreached: `echo_image_entry_env` (the equation-free corollary).
 import Xv6.UkTreeEntryStmt
 import Xv6.UkTreeEntry
 import Xv6.UshEchoOut
-import Xv6.UshEchoPin
-import Xv6.UEchoKernel
 import Xv6.LinkEcho
 
 namespace Xv6

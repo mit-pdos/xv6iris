@@ -20,10 +20,7 @@ record take ONE argument.  The program's four stub laws are UkFileDev's
    `UkFileDevSysP` (`UkFileDevSysP.ofLanded UL`), each owned as listed in
    `UkFileDevDefs`' header.
 -/
-import Xv6.UkFileIfaceDefs
 import Xv6.UkFileDevClose
-import Xv6.UkFileDevNil
-import Xv6.UkFileDevOpen
 
 namespace Xv6
 

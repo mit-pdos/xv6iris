@@ -66,7 +66,6 @@ Deviations from Rocq:
    DU9 deciders (`UnionDecU`).)
 -/
 import Xv6.LineWords
-import MachCSL.Lang
 import MachCSL.ObsTrace
 
 namespace Xv6

@@ -25,7 +25,6 @@ The image's `first` is read NON-atomically, with no fence (xv6 3e9926ea).
 A stage file: it imports Spec and definitional files only.
 -/
 import Xv6.SpecRelease
-import MachCSL.WpSmodeFrame6
 import Xv6.ParkCap
 import MachCSL.LockFacts
 

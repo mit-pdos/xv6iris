@@ -25,13 +25,10 @@ which the cursor loop threads unchanged; at each freed page
 (`unFreeL_intro`) and hands back what the loop returns (`unFreeL_elim`).
 -/
 import Xv6.SpecUvmunmap
-import Xv6.SpecWalk
-import Xv6.SpecKfree
 import Xv6.UvmCallSites
 import Xv6.UPtUnmapLemmas
 import Xv6.CodeTactics
 import MachCSL.WpSmodeFrame8
-import Xv6.ByteCursor
 import Xv6.UvmallocDefs
 import Xv6.WalkaddrDefs
 import MachCSL.BvLemmas

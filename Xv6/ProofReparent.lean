@@ -15,7 +15,6 @@ import Xv6.SpecReparent
 import Xv6.SpecWakeup
 import Xv6.CodeTactics
 import MachCSL.WpSmodeFrame6
-import Xv6.ByteCursor
 import Xv6.UvmallocDefs
 
 namespace Xv6

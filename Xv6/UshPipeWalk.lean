@@ -20,7 +20,6 @@ import Xv6.SpecShParseexec
 import Xv6.SpecShPeek
 import Xv6.UshATree
 import Xv6.UshLits
-import Xv6.UshRedirsWalk
 import Xv6.UshCodePipe
 
 namespace Xv6

@@ -19,6 +19,7 @@ configuration every jump retires.  A branch always retires; whether it jumps
 is the data-level Boolean `uxcBTaken op a b` in the result state.
 -/
 import MachCSL.UExecCtlBase
+import MachCSL.UTranslate
 
 namespace MachCSL
 

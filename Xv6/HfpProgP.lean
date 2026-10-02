@@ -29,9 +29,3 @@ were identical.)
 3. The UEchoFile names (`efany`, `efcur`, `ef_chain`, ...) are landed in
    `Xv6/UEchoFile` (38812aaaa).
 -/
-import Xv6.UkTree
-import Xv6.UkEchoTree
-import Xv6.UshEchoPure
-import Xv6.User.EchoImage
-import Xv6.UshEchoImg
-import Xv6.UkRunMem

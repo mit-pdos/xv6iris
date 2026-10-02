@@ -22,12 +22,6 @@ values of the walker state (`UwkPins`), never as register rules (D52).
 import MachCSL.PteClass
 import MachCSL.UWalkRun
 import MachCSL.UTranslate
-import MachCSL.WpPtWalkOwn
-import MachCSL.WpPmpXv6
-import MachCSL.PlatformFacts
-import MachCSL.PtTree
-import MachCSL.Pte
-import MachCSL.MConf
 
 namespace MachCSL
 

@@ -44,6 +44,7 @@ import Xv6.InitlogHead
 import Xv6.VirtioDiskRwDefs2
 import Xv6.VirtioDiskRwDefs3
 import MachCSL.BvLemmas
+import MachCSL.LockFacts
 
 namespace Xv6
 

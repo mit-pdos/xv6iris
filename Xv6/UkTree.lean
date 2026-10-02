@@ -61,7 +61,6 @@ binary's addresses).
 -/
 import Xv6.UkStub
 import Xv6.ProgTree
-import Iris.BI.Lib.Fixpoint
 
 namespace Xv6
 

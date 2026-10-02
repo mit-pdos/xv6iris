@@ -58,7 +58,6 @@ import Xv6.SpecIlock
 import Xv6.SpecWritei
 import Xv6.SpecNamecmp
 import Xv6.SpecNparWrapEra
-import Xv6.IcacheShortCarve
 
 namespace Xv6
 

@@ -19,10 +19,8 @@ import Xv6.SpecKkill
 import Xv6.KilledDefs
 import Xv6.CodeTactics
 import MachCSL.WpSmodeFrame6
-import Xv6.ByteCursor
 import Xv6.UvmallocDefs
 import Xv6.WalkaddrDefs
-import Xv6.KernelTac
 
 namespace Xv6
 

@@ -37,6 +37,7 @@ import Xv6.UshPanicStub
 import Xv6.UshDiagDefs
 import Xv6.UshOut
 import Xv6.LinkRec
+import Xv6.UEchoOut
 
 namespace Xv6
 

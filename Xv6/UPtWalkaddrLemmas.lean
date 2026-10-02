@@ -5,7 +5,6 @@ reading — without changing — the level-0 entry a completed walk reaches, wha
 leaf survive the `A`/`D` bits the hardware may have set (`pteAD`).
 -/
 import Xv6.UPtDefs
-import Xv6.PtOwnLemmas
 import Xv6.PtRunLemmas
 
 namespace Xv6.UPtWalkaddr

@@ -43,11 +43,8 @@ the union discipline: a disciplined history never ends in ^D, so
 -/
 import Xv6.UnionReadInst
 import Xv6.UnionLinkInstAt
-import Xv6.UshMainDefs
 import Xv6.UshMainLine
 import Xv6.UshLineRead
-import Xv6.UexecExecInst
-import Xv6.AppInv
 
 namespace Xv6
 

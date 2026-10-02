@@ -25,7 +25,6 @@ Deviations: spelling only (Rocq's arm `(h, c, cs, j)` is Lean's
 ConsLog's `logEchoed_dec`).
 -/
 import Xv6.EchoOutLine
-import Xv6.PipeOutPure
 
 namespace Xv6
 

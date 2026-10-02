@@ -46,7 +46,6 @@ entered at slot 0 with `NINODE - 1` units of fuel.
    `wp_next_chain`).
 -/
 import Xv6.IgetScan
-import Xv6.SpecAcquire
 
 namespace Xv6
 

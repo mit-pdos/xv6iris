@@ -30,8 +30,6 @@ takes them); `shp_code`/`shp_rodata`/`shk_code` are `ushCode`; Rocq's
 `8344 ≤ sz` is kept (`= SH_BASE + 16`).
 -/
 import Xv6.SpecShRuncmdExec
-import Xv6.UkShMallocDefs
-import Xv6.UshTreeDefs
 
 namespace Xv6
 

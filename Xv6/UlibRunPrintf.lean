@@ -25,7 +25,6 @@ The real instance, from `UkRun.urun` and `UK_LEAVES`, is
 `UlibRunUk.UlibRunP.ofUkRun`.
 -/
 import Xv6.UlibRun
-import Xv6.SpecUkLeaves
 import Xv6.UmodeAbi
 
 namespace Xv6

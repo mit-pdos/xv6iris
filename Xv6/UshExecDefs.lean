@@ -59,10 +59,8 @@ dropped from its continuation (so Rocq's statement implies it), and
    `ush_pstate_of_at`, `ush_echo_round_carry`.
 -/
 import Xv6.UshEchoPure
-import Xv6.UshExecCode
 import Xv6.UshTreeDefs
 import Xv6.UkRunExecRef
-import Xv6.FsGeom
 
 namespace Xv6
 

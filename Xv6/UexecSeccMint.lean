@@ -39,7 +39,6 @@ credential and the generic user-execution WP: no `appSup`, no taint
 -/
 import Xv6.UexecSecc
 import Xv6.AppIface
-import Xv6.AppInv
 
 namespace Xv6
 

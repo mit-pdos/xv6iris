@@ -32,7 +32,6 @@ pure model `ushpFind`, and the parse tree `UshpCmd`.
    `simp` in Lean.
 -/
 import Xv6.UmodeAbi
-import Xv6.EchoOutPure
 
 namespace Xv6
 

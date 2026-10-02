@@ -33,7 +33,6 @@ import MachCSL.WpSmodeLh
 import Xv6.KexecACode
 import Xv6.NamexParts
 import Xv6.ReadiDefs
-import Xv6.SysUnlinkPure
 
 namespace Xv6
 

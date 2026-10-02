@@ -48,6 +48,7 @@ import Xv6.SysLinkTails
 import Xv6.IcacheShortCarve
 import MachCSL.WpSmodeLh
 import Xv6.CreateSharedRegs
+import Xv6.NamexParts
 
 namespace Xv6
 

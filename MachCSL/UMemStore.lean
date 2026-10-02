@@ -28,7 +28,6 @@ in a later cycle than its LR, one whose reservation a store spent, or an
 reserves the bytes; the walker's bookkeeping bit drops.
 -/
 import MachCSL.UMemAccess
-import MachCSL.UWalkRun
 
 namespace MachCSL
 

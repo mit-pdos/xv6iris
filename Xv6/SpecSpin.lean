@@ -18,8 +18,6 @@ every machine-mode contract of this port).
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
 import MachCSL.KCtx
-import MachCSL.MConf
-import MachCSL.Boot
 import Xv6.KernelText
 
 namespace Xv6

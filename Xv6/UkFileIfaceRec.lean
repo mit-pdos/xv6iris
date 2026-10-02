@@ -22,8 +22,6 @@ are vacuous.  The taint pays any disciplined tree by the free handler
 2. `fif_dev_of` is an equation per spec: Lean's `devSel` is UkHandler's
    deviation 2 (Rocq's inline match).
 -/
-import Xv6.UkFileIfaceRead
-import Xv6.UkFileIfaceWrite
 import Xv6.UkFileIfaceOpen
 import Xv6.UkFileIfaceClose
 import Xv6.UkFileIfaceGlue

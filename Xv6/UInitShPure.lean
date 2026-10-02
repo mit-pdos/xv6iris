@@ -73,14 +73,7 @@ import Xv6.FsShPin
 import Xv6.PinnedExec
 import Xv6.UkInitDefs
 import Xv6.UshKernel
-import Xv6.UshMainPure
 import Xv6.UshParseDefs
-import Xv6.UkShParsePure
-import Xv6.UkShMallocDefs
-import Xv6.ArgPath
-import Xv6.UexecExecInst
-import Xv6.UInitFd
-import Xv6.UshNodes
 
 namespace Xv6
 

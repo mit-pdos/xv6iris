@@ -134,7 +134,6 @@ Imports only definitional files and callee `Spec*` files.
 import Xv6.SpecDirlookup
 import Xv6.PathElems
 import Xv6.SpecIput
-import Xv6.SpecIget
 
 namespace Xv6
 

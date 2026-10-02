@@ -17,6 +17,7 @@ entry sp (with the empty local run `ustack … 0`), and the epilogue is
 -/
 import Xv6.UshRunDefs
 import Xv6.UshStep
+import Xv6.UshRunCode
 
 namespace Xv6
 

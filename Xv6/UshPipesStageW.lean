@@ -27,6 +27,7 @@ at, with what the fire learnt of the flag.
 -/
 import Xv6.UshPipesStageDefs
 import Xv6.UshPanicByte
+import Xv6.UshPipesDefsFam
 
 namespace Xv6
 

@@ -53,7 +53,6 @@ import Xv6.SpecUartwrite
 import Xv6.FsWords
 import Xv6.UmodeArith
 import MachCSL.BvLemmas
-import Xv6.KernelTac
 
 namespace Xv6
 

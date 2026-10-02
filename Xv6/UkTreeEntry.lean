@@ -45,7 +45,6 @@ Unreached (not ported): the equation-free corollaries `echo_image_entry_env`,
    `(lineAltsOf ws)[0]!`.
 -/
 import Xv6.UkTree
-import Xv6.EchoDisc
 import Xv6.UEchoOut
 
 namespace Xv6

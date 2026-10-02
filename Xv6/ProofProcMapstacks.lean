@@ -13,7 +13,6 @@ THE BOOT LENDS NOTHING (permit sweep L2, Rocq 78f9234b8): the loop carries
 -/
 import MachCSL.WpSmodeAlu4
 import Xv6.SpecProcMapstacks
-import Xv6.SpecKalloc
 import Xv6.SpecKvmmap
 import Xv6.PtStackLemmas
 import Xv6.CodeTactics

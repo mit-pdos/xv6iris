@@ -75,8 +75,6 @@ SpecSys*.v, ProofSys*.v), ProofCreateShared.v excluded.
 -/
 import Xv6.CreateFreshTy
 import Xv6.SpecNamecmp
-import Xv6.NamexParts
-import Xv6.SysUnlinkShared
 import MachCSL.BvLemmas
 
 namespace Xv6

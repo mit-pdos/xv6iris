@@ -30,6 +30,9 @@ import Xv6.User.InitImage
 import Xv6.User.InitTree
 import Xv6.User.SeccompImage
 import Xv6.User.SeccompTree
+import Xv6.UlibVprintfCode
+import Xv6.UlibFprintfCode
+import Xv6.UlibPrintfCode
 
 namespace Xv6
 

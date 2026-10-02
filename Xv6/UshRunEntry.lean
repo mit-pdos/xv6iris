@@ -29,6 +29,7 @@ pinned `1900b8a43`).
 -/
 import Xv6.SpecShRuncmd
 import Xv6.UshNulParts
+import Xv6.UshRunCode
 
 namespace Xv6
 

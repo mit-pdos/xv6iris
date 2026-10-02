@@ -40,7 +40,6 @@ split on explicitly (premises on `t.getLsbD 0`/`t.getLsbD 1`, or an
 -/
 import MachCSL.UExecAluGpr
 import MachCSL.UDecode
-import MachCSL.UTranslate
 
 namespace MachCSL
 

@@ -12,8 +12,6 @@ same facts under their own names.
 -/
 import Xv6.UPtLemmas
 import MachCSL.WpSmodeCtl
-import Xv6.KvmLemmas
-import Xv6.UPtAllocLemmas
 
 namespace Xv6.UPtPpt
 

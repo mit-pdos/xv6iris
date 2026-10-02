@@ -22,6 +22,7 @@ import Xv6.UkRetireCtl
 import Xv6.UkLoad
 import Xv6.UkLoadText
 import Xv6.UkStoreX
+import Xv6.UkAbi
 
 namespace Xv6
 
