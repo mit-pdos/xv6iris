@@ -172,7 +172,11 @@ and in each file's "Deviations from Rocq" header.
   proved by compiled evaluation behind a proved link to the step relation.  This suite trusts the Lean
   compiler (`native_decide`, confined to `vtest-lean/`); the proofs above do not.  See
   [`tools/vtest/README.md`](tools/vtest/README.md).
-- **test-tools**: the unit tests of the Python tools; **dead-imports**: an informational report.
+- **test-tools**: the unit tests of the Python tools.
+
+A separate nightly job, `.github/workflows/lean-dead-imports.yml`, deletes the dead `import` lines of
+`Xv6/` and `MachCSL/` (`tools/ci/dead_imports.sh --apply`) and pushes the result to `lean` when the
+whole CI sequence passes on it.
 
 CI does not build the xv6 ELFs, re-dump the images, regenerate the Sail model or run QEMU: all of those
 outputs are checked in, and CI compiles them and re-derives only what needs neither an ELF nor `sail`.

@@ -1,0 +1,176 @@
+name: Dead imports (Lean)
+
+# Nightly dead-import sweep for Xv6/ and MachCSL/: find the `import` lines
+# that can go, delete them, and push the deletions to `lean`.  The Lean
+# counterpart of the Rocq tree's dead-imports.yml (on the `rocq` branch).
+#
+# `tools/ci/dead_imports.sh --apply` needs the tree BUILT: its needs analysis
+# (tools/ImportNeeds.lean) runs over the elaborated environment, so this job
+# first repeats lean-ci.yml's build (same toolchain probe, same caches).  The
+# script's header says how a dead import is decided.  As in Rocq, nothing is
+# applied that a build has not confirmed: --apply rebuilds the edited tree and
+# backs off whatever fails, until `lake build Xv6 MachCSL` is green
+# (tools/ci/dead_imports_verify.py).  Besides deleting, the edits re-add
+# whatever a module loses because an upstream module stopped importing it, so
+# the commit can show `import` lines added as well.
+#
+# WHY THE FULL CI RUN BELOW IS NOT OPTIONAL.  It is the ONLY gate on what
+# lands: a push made with GITHUB_TOKEN deliberately does not trigger other
+# workflows, so lean-ci.yml will NOT run on the commit this job creates.  And
+# the analysis covers the `Xv6` and `MachCSL` libraries only: whatever else
+# imports them (vtest-lean/, tools/ci/envfacts/) is checked by nothing but
+# that run.  So after the deletions the job runs the whole CI sequence
+# (`tools/ci/run_all.sh`, exactly what lean-ci.yml runs step by step) and
+# pushes only if it is green.
+#
+# `schedule` fires only from the DEFAULT branch's copy of a workflow; `lean`
+# is the default branch, so this file is the one that runs.
+
+on:
+  schedule:
+    # 08:00 UTC nightly (4am US/Eastern), as the Rocq sweep ran.
+    - cron: "0 8 * * *"
+  workflow_dispatch:
+
+# Never cancel a run in progress: a cancelled one lands nothing.  A second run
+# just queues behind the first.
+concurrency:
+  group: dead-imports-lean
+  cancel-in-progress: false
+
+# For pushing the deletions back to `lean`.
+permissions:
+  contents: write
+
+jobs:
+  sweep:
+    runs-on: coqdev
+    # Two full builds and a CI run; lean-ci.yml allows 180 minutes for one.
+    timeout-minutes: 360
+
+    # `bash` selects `bash --noprofile --norc -eo pipefail {0}`: GitHub's
+    # default shell has no pipefail, so a piped command would exit with tee's
+    # status.  See lean-ci.yml.
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: lean
+          # Full history so the pre-push rebase onto `lean` can work.
+          fetch-depth: 0
+
+      # ---- Toolchain and caches: identical to lean-ci.yml, so they are shared ----
+      - name: Probe for the pinned Lean toolchain
+        id: elan
+        run: |
+          tc=$(tr -d '[:space:]' < lean-toolchain)
+          dir=$(printf '%s' "$tc" | sed -e 's|/|--|g' -e 's|:|---|g')
+          echo "dir=$dir" >> "$GITHUB_OUTPUT"
+          if [ -x "$HOME/.elan/bin/elan" ] && [ -x "$HOME/.elan/toolchains/$dir/bin/lean" ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Cache elan + the pinned toolchain (only when the runner lacks it)
+        if: steps.elan.outputs.present != 'true'
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.elan/bin
+            ~/.elan/settings.toml
+            ~/.elan/toolchains/${{ steps.elan.outputs.dir }}
+          key: ${{ runner.os }}-${{ runner.name }}-elan-${{ hashFiles('lean-toolchain') }}
+
+      - name: Cache lake packages + model build
+        uses: actions/cache@v5
+        with:
+          path: |
+            .lake/packages
+            model/Lean_RV64D/.lake
+            vendor/lean-sail/.lake
+          key: ${{ runner.os }}-${{ runner.name }}-lake-deps-${{ hashFiles('lean-toolchain', 'lake-manifest.json', 'lakefile.toml', 'model/**', 'vendor/lean-sail/**') }}
+
+      - name: Install toolchain (elan, Lean per lean-toolchain) and fetch packages
+        run: tools/ci/run_all.sh toolchain
+
+      # ---- Build, so that the environment the analysis reads exists ----
+      - name: Build Sail model + lean-sail + iris-lean (no regen)
+        run: tools/ci/run_all.sh build-deps
+
+      - name: Build proofs (lake build Xv6 MachCSL)
+        run: tools/ci/run_all.sh build
+
+      # ---- Find and delete the dead imports ----
+      - name: Remove dead imports
+        id: apply
+        run: |
+          out=.lake/ci/imports
+          tools/ci/dead_imports.sh --apply "$out" 2>&1 | tee "$RUNNER_TEMP/apply.log"
+
+          edits="$out/edits_verified.txt"
+          removed=0; readded=0; files=0
+          if [ -s "$edits" ]; then
+            removed=$(grep -c ' -' "$edits" || true)
+            readded=$(grep -c ' +' "$edits" || true)
+            files=$(awk '{print $1}' "$edits" | sort -u | wc -l)
+          fi
+          summary="removed $removed import(s) across $files file(s)"
+          [ "$readded" -eq 0 ] || summary="$summary, re-added $readded"
+          echo "summary=$summary" >> "$GITHUB_OUTPUT"
+
+          {
+            echo "## Dead imports (Lean)"
+            echo
+            grep -E '^dead-imports: [0-9]+ dead' "$RUNNER_TEMP/apply.log" | sed 's/^dead-imports: //' || true
+            echo
+            grep -E '^dead-imports: (verified|  )' "$RUNNER_TEMP/apply.log" | sed 's/^dead-imports: *//' || true
+            echo
+            echo "<details><summary>The edits applied (<code>Module -Import</code> / <code>Module +Import</code>)</summary>"
+            echo
+            echo '```'
+            cat "$edits" 2>/dev/null || true
+            echo '```'
+            echo
+            echo "</details>"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Any deletions?
+        id: changed
+        run: |
+          if [ -z "$(git status --porcelain -- Xv6 MachCSL)" ]; then
+            echo "any=false" >> "$GITHUB_OUTPUT"
+            echo "No dead imports found; nothing to do."
+          else
+            echo "any=true" >> "$GITHUB_OUTPUT"
+            git status --porcelain -- Xv6 MachCSL
+          fi
+
+      # Only the two source trees: the build drops .lake/ everywhere
+      # (gitignored, but be explicit rather than trusting that).
+      - name: Commit the deletions
+        if: steps.changed.outputs.any == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- Xv6 MachCSL
+          git commit -m "Xv6, MachCSL: ${{ steps.apply.outputs.summary }} (nightly dead-import sweep)" \
+                     -m "A removed import provided nothing the module needs (tools/ImportNeeds.lean: no constant it mentions and nothing the elaborator recorded as used comes from the import or its closure), or was reachable through another import anyway; a re-added one is a module that had been reaching this one only through an import an upstream module dropped. Every edit the rebuild refuted was backed off (tools/ci/dead_imports_verify.py), and the whole CI sequence (tools/ci/run_all.sh) then ran green on the result. Generated by .github/workflows/lean-dead-imports.yml."
+
+      # Rebase BEFORE the gate, so what gets checked is exactly what gets
+      # pushed -- `lean` can move during a run this long.
+      - name: Rebase onto current lean
+        if: steps.changed.outputs.any == 'true'
+        run: git pull --rebase origin lean
+
+      # ---- The gate: the whole CI sequence must pass, or nothing is pushed ----
+      - name: Full CI run on the result (tools/ci/run_all.sh)
+        if: steps.changed.outputs.any == 'true'
+        run: tools/ci/run_all.sh
+
+      - name: Push to lean
+        if: steps.changed.outputs.any == 'true'
+        run: git push origin HEAD:lean
