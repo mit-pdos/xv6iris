@@ -74,16 +74,6 @@ inductive UshqBars (len : Nat) (f : Nat → BitVec 8) : Nat → List (Nat × Nat
 
 /-! ## §4 The application's line (one word per stage) -/
 
-/-- **Rocq `ushq_tail_is`**. -/
-def ushqTailIs (g : Nat → BitVec 8) : Nat → Nat → List (List (BitVec 8)) → Prop
-  | _, _, [] => False
-  | c, len, r :: rs' =>
-    wlWord r ∧ (∀ j, j < r.length → g (c + j) = r[j]!) ∧
-      match rs' with
-      | [] => len = c + r.length + 1 ∧ g (c + r.length) = wlNl
-      | _ :: _ => g (c + r.length) = wlSp ∧ g (c + r.length + 1) = ushqBar ∧ g (c + r.length + 2) = wlSp ∧
-          ushqTailIs g (c + r.length + 3) len rs'
-
 /-- Rocq `ushq_ws_ok`. -/
 def ushqWsOk (ws : List (List (BitVec 8))) : Prop := fnWf ws ∧ 0 < ws.length ∧ ws.length < 10
 

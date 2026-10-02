@@ -268,15 +268,6 @@ def lmCommitted (M : LogMirror) (cov : Std.ExtTreeSet Nat compare) (ls : Nat) : 
 def lmLogged (L : BlockMap) (cov : Std.ExtTreeSet Nat compare) (ls : Nat) : BlockMap :=
   fsRestrict (dvOfD L) (fsHomeList cov ls)
 
-/-- With the on-disk header clean nothing is installed, so the committed
-view is the picture on the home blocks (Rocq's `lm_committed_of_clean`). -/
-theorem lmCommitted_of_clean (M : LogMirror) (cov : Std.ExtTreeSet Nat compare) (ls : Nat)
-    (h : lmHdr M ls = (0, [])) :
-    lmCommitted M cov ls = fsRestrict M.view (fsHomeList cov ls) := by
-  unfold lmCommitted
-  rw [h]
-  rfl
-
 /-- The logged view is blind to a write outside the home set for the same
 reason (Rocq's `lm_logged_insert_ne`). -/
 theorem lmLogged_insert_ne (L : BlockMap) (cov : Std.ExtTreeSet Nat compare)

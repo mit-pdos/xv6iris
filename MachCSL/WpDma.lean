@@ -158,13 +158,6 @@ theorem machInterp_storeDma (σ : MState) (pa : PAddr) (n : Nat) (Hs : Nat → H
 
 /-! ## The value form of a lease -/
 
-/-- A DMA lease at a value: the footprint at full ownership whose heads
-spell `w`.  Sugar over the primitive history form -- the disk invariant
-usually wants the history form, because it wants the *position* of each
-write in its per-slot rows. -/
-def dmaCell (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) : IProp GF := iprop%
-  ∃ Hs : Nat → Hist, histBytes pa n (fun _ => DFrac.own 1) Hs ∗ ⌜headsAre Hs n w⌝
-
 theorem headsAre_pushed (Hs : Nat → Hist) (t : Nat) (h : Agent) (n : Nat) (w : BitVec (8 * n)) :
     headsAre (pushed Hs t h w) n w := fun _ _ => rfl
 

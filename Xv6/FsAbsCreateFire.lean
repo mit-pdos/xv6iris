@@ -326,21 +326,6 @@ theorem acreCommitAtGen_mono [Appcfg GF] (Γ : FsViewNames GF) (E : CoPset)
   imodintro
   iframe Ha HPd Hstep Hph2
 
-/-- THE CURSOR IS A WEAKENING (Rocq's `acre_commit_at_gen_cur`, TL-3K), and
-this is the one line every GENERIC supplier takes: a commit that holds at
-every `d` with no cursor at all holds a fortiori when one is handed in. -/
-theorem acreCommitAtGen_cur [Appcfg GF] (Γ : FsViewNames GF) (E : CoPset)
-    (cf : Nat → Nat → Absnode) (Pd : Nat → IProp GF)
-    (Farm : Pfam GF (Aview → Nat → IProp GF))
-    (Φ : Aview → Nat → Fname → Nat → IProp GF) :
-    acreCommitAtGen (hlc := hlc) Γ E cf (fun _ => iprop(True)) Farm Φ ⊢
-      acreCommitAtGen (hlc := hlc) Γ E cf Pd Farm Φ := by
-  unfold acreCommitAtGen
-  iintro H %I %d %i %nm %ents %nl %hpre %hnm Harm HPd Ha
-  imod H $$ %I %d %i %nm %ents %nl %hpre %hnm Harm %trivial Ha with ⟨Ha, -, Hstep, Hph2⟩
-  imodintro
-  iframe Ha HPd Hstep Hph2
-
 /-- THE ARM (Rocq's `aarm_commit_at`): the row APPEARS.  The view has no row
 at `i` (the claim box is at count 0) but the MAP has one.  The `isSome`
 premise is the MOVER's, not the step's. -/

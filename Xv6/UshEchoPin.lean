@@ -209,12 +209,6 @@ theorem shExecPathOfX_holds (ws : List (List (BitVec 8))) : shExecPathOfX ws := 
     rw [← hal]
     exact hag _ _ e
 
-/-- **Rocq `sh_echo_path_of`**: argv[0]'s string IS "echo", terminated. -/
-def shEchoPathOf (ws : List (List (BitVec 8))) : Prop :=
-  lineOk ws →
-  ∀ (M : ElfMem) (s0 t : Nat) (g : Nat → BitVec 8), echoNodeImg ws M s0 t g → ushEchoArgvBytes ws g →
-    ∀ Mv : Nat → List (BitVec 8), imgAgrees M Mv → argPathOf Mv (BitVec.ofNat 64 s0).toNat echoPl
-
 /-! ## 5. The room, off the argument reading, and the key's own reading -/
 
 /-- **Rocq `echo_room_of_det`**: echo's twelve words below the entry sp, off

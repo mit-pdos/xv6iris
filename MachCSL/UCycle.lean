@@ -227,22 +227,6 @@ theorem uc_finish_retire (hD : UcFoot D) (orc : UOrc) (s : UWSt) (ib : BitVec 32
   simp only [ucArm, MachCSL.uxa_readReg_bind D _ _ _ _ hD.rd_hs, hact]
   rfl
 
-/-- **Arm: interrupt** (`Step_Pending_Interrupt (i, p)`), from the
-handler's walk. -/
-theorem uc_finish_pending (hD : UcFoot D) (orc orc2 : UOrc) (s s2 : UWSt) (i : InterruptType)
-    (p : Privilege) (hh : runRW D orc s (handle_interrupt i p) = some ((), s2, orc2))
-    (hact : s2.file .hart_state = .HART_ACTIVE ()) :
-    runRW D orc s (ucFinish (Step_Pending_Interrupt (i, p))) = some (false, ucEpi false s2, orc2) :=
-  uc_finish_of_arm hD _ orc orc2 s s2 hh hact
-
-/-- **Arm: fetch fault** (`Step_Fetch_Failure (va, e)`), from the handler's
-walk. -/
-theorem uc_finish_fetchFail (hD : UcFoot D) (orc orc2 : UOrc) (s s2 : UWSt) (va : virtaddr)
-    (e : ExceptionType) (hh : runRW D orc s (handle_exception (bits_of_virtaddr va) e) = some ((), s2, orc2))
-    (hact : s2.file .hart_state = .HART_ACTIVE ()) :
-    runRW D orc s (ucFinish (Step_Fetch_Failure (va, e))) = some (false, ucEpi false s2, orc2) :=
-  uc_finish_of_arm hD _ orc orc2 s s2 hh hact
-
 /-- The model's `wait_is_nop` is `false` for every wait reason. -/
 theorem uc_waitIsNop (wr : WaitReason) : wait_is_nop wr = false := by
   cases wr <;> rfl
@@ -427,27 +411,5 @@ theorem uc_afterFetch_error (orc : UOrc) (s : UWSt) (e : ExceptionType) (a : Bit
 
 theorem UcMisa.preS {s : UWSt} (h : UcMisa D s) : UcMisa D (ucPreS s) :=
   ⟨h.rd, by rw [ucPreS_file_other _ _ (by decide), h.val]⟩
-
-/-- The dispatch as the active cycle meets it (after the prelude). -/
-theorem uc_dispatch_preS (hDd : UcDispFoot D) (orc : UOrc) (s : UWSt) (hm : UcMisa D s)
-    (hpriv : s.file .cur_privilege = Privilege.User)
-    (hmm : s.file .mie &&& ~~~(s.file .mideleg) = 0#64) :
-    runRW D orc (ucPreS s) ucDispatch =
-      some (dispatchU (s.file .mie) (s.file .mideleg)
-          (ucIp (s.file .mip) ((orc 0).reg .sig_meip) ((orc 1).reg .sig_seip)),
-        ucPreS s, orc.tail.tail) := by
-  have e := uc_dispatch hDd orc (ucPreS s) hm.preS
-    (by rw [ucPreS_file_other _ _ (by decide), hpriv])
-    (by rw [ucPreS_file_other _ _ (by decide), ucPreS_file_other _ _ (by decide), hmm])
-  rw [ucPreS_file_other _ _ (by decide), ucPreS_file_other _ _ (by decide),
-    ucPreS_file_other _ _ (by decide)] at e
-  exact e
-
-/-- The active cycle up to the step value: prelude, then the body. -/
-theorem uc_tryStep_active_eq (hD : UcFoot D) (orc : UOrc) (s : UWSt)
-    (hact : s.file .hart_state = .HART_ACTIVE ()) :
-    runRW D orc s (try_step 0 false) = runRW D orc (ucPreS s) (run_hart_active 0 >>= ucFinish) := by
-  rw [uc_tryStep_eq, runRW_bind_some D _ _ orc orc s (ucPreS s) _ (uc_prelude hD orc s), hact]
-  rfl
 
 end MachCSL

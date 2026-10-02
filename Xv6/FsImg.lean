@@ -201,22 +201,6 @@ theorem fsLeHalfAt (bs : List (BitVec 8)) (o : Nat) (w : BitVec 16)
   rw [fsLeAt_2 bs o _ _ (by simpa using h 0 (by omega)) (h 1 (by omega))]
   exact halfBytes_dec w
 
-/-- Rocq's `assemble_bytes_zero_byte`: a byte of an all-zero
-little-endian value is zero (W2's byte reading). -/
-theorem leAssemble_zero_byte : ∀ (bs : List (BitVec 8)) (j : Nat) (v : BitVec 8),
-    leAssemble bs = 0 → bs[j]? = some v → v = 0#8
-  | [], j, v, _, hv => by simp at hv
-  | b :: bs, j, v, hz, hv => by
-    have hb : b.toNat + 256 * leAssemble bs = 0 := hz
-    have hb0 : b = 0#8 := by
-      have : b.toNat = 0 := by omega
-      exact BitVec.eq_of_toNat_eq (by simpa using this)
-    match j with
-    | 0 => simp only [List.getElem?_cons_zero, Option.some.injEq] at hv; rw [← hv]; exact hb0
-    | j + 1 =>
-      rw [List.getElem?_cons_succ] at hv
-      exact leAssemble_zero_byte bs j v (by omega) hv
-
 /-- Rocq's `forallb_seq`: the `seq`/`forallb` bridge every W-conjunct's
 spec lemma peels with (deviation 4). -/
 theorem forallb_range (f : Nat → Bool) (n k : Nat) (h : (List.range n).all f = true)

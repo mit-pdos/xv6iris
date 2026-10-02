@@ -1012,9 +1012,4 @@ theorem lineBytes_bytes (l : Uline) (hok : ulineOk l) :
     | LSync => exact Or.inl (Or.inl (Or.inl (cmdSync_word.2 b hb)))
   · simp at hb; exact Or.inr (Or.inr hb)
 
-/-- D3: every COMPLETE body parses to an admissible line, and the partial
-line is body bytes short enough that its newline still fits. -/
-def discInputF (I : List (BitVec 8)) : Prop :=
-  (∀ b ∈ bodiesOf I, fbodyOk b) ∧ (∀ b ∈ restOf I, fbodyByte b) ∧ (restOf I).length + 1 < lineMax
-
 end Xv6

@@ -84,9 +84,6 @@ theorem suU0_value : suU0 = 10 := rfl
 /-- nameiparent, success arm (Rocq's `su_u1`). -/
 def suU1 (w1 : Bool) : Nat := suU0 - walkSpend w1
 
-/-- nameiparent, failure arm (Rocq's `su_u1f`). -/
-def suU1f (w1 : Bool) : Nat := suU0 - (walkSpend w1 + 1)
-
 theorem suU1_ge9 (w1 : Bool) : 9 ≤ suU1 w1 := by
   revert w1; decide
 
@@ -138,6 +135,17 @@ theorem suOk_corner_is_exact :
     let u4 := u3 - ipSpendW true true false
     let u5 := u4 - suIu false
     u5 = iputUnits := by
+  decide
+
+/-- THE REFUTATION THIS LEDGER DOES NOT NEED, RECORDED AS A NEGATIVE (Rocq's
+`su_ok_busts_without_the_membership_trio`): had the zeroing not put
+`IBLOCK dp` in the set, the worst corner would bust by one. -/
+theorem suOk_busts_without_the_membership_trio :
+    let u2 := suU2 true false false false true true
+    let u3 := u2 - suIu false
+    let u4 := u3 - ipSpendW true false false
+    let u5 := u4 - suIu false
+    u5 < iputUnits := by
   decide
 
 /-! ## 6.  The reference ledger

@@ -233,17 +233,6 @@ theorem filestat_env_out_of_env (st : FdState) :
   unfold filestatEnv filestatEnvOut
   rcases st with _ | ⟨r, w, _ | ⟨n, g, om⟩ | mj⟩ <;> first | exact .rfl | exact filestat_fs_env_out
 
-/-- Rocq `filestat_env_none`: a file that carries no inode costs its
-stat-er nothing. -/
-theorem filestat_env_none (st : FdState) (h : ¬ fstatStInode st) :
-    ⊢ filestatEnv (hlc := hlc) (GF := GF) st := by
-  unfold filestatEnv
-  rcases st with _ | ⟨r, w, _ | ⟨n, g, om⟩ | mj⟩
-  · exact .rfl
-  · exact .rfl
-  · exact absurd trivial h
-  · exact absurd trivial h
-
 /-- The inode arm's environment, opened (Rocq ProofFilestat's
 `fst_env_in`). -/
 theorem filestat_env_in (st : FdState) (h : fstatStInode st) :

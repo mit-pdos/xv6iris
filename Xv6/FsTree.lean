@@ -582,11 +582,6 @@ def pathChain (t : Fstree) (i : Nat) : List Fname → List Nat
 
 /-! ## 8.  WELL-FORMEDNESS -/
 
-/-- Every key is a legal inum -- what makes the 32-bit coercion at
-`FsRep.inum_of` round-trip.  Range against the region's capacity is
-`dirInumsOk`'s business and stays there. -/
-def fsInumsOk (t : Fstree) : Prop := ∀ i n, t.fsNodes[i]? = some n → i < 2 ^ 32
-
 def fsRootDir (t : Fstree) : Prop :=
   ∃ ents : Std.ExtTreeMap Fname Nat compare, t.fsNodes[t.fsRoot]? = some (.NDir ents)
 

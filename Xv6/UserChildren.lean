@@ -159,9 +159,6 @@ end UserPid
 AT MOST ONE generation leaves it -- the one that was reaped -- and every
 failing arm leaves it alone. -/
 
-def chReaped (cs cs' : ExtTreeSet GName compare) : Prop :=
-  cs' = cs ∨ ∃ γ' : GName, cs' = cs \ {γ'}
-
 /-- THE TWO ARMS ARE DISJOINT AT THE RETURN VALUE, as a pure fact about the
 word: a pid in `[1, PIDMAX]` sign-extends to a small POSITIVE 64-bit word,
 while a failing wait returns the all-ones one. -/
@@ -226,16 +223,6 @@ def waitAns (rv : BitVec 32) (xs : Int) (cs cs' : ExtTreeSet GName compare) (gn 
       ⌜cs' = cs \ {γ'} ∧ 1 ≤ rv.toNat ∧ rv.toNat ≤ genPidMax⌝ ∗
       ⌜γ' ∈ cs ∨ pidv = 1#32⌝ ∗
       exitTok γ' rv xs ∗ genUniq cs rv γ')
-
-/-- the pure row, which is all the relays between kwait and the program
-ever look at -/
-theorem waitAns_reaped (rv : BitVec 32) (xs : Int) (cs cs' : ExtTreeSet GName compare) (gn : GName)
-    (nullst : Bool) (pidv : BitVec 32) :
-    waitAns (GF := GF) rv xs cs cs' gn nullst pidv ⊢ ⌜chReaped cs cs'⌝ := by
-  unfold waitAns
-  iintro (⟨%h, -⟩ | ⟨%γ', %h, -, -, -⟩)
-  · ipureintro; exact Or.inl h.2
-  · ipureintro; exact Or.inr ⟨γ', h.1⟩
 
 /-- ...AND THE ARM A -1 RETURN IS ON: the whole answer is persistent there. -/
 theorem waitAns_m1 (rv : BitVec 32) (xs : Int) (cs cs' : ExtTreeSet GName compare) (gn : GName)

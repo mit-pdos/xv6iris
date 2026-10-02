@@ -207,18 +207,6 @@ theorem execSpecF_or (cpu : CPU) (dq : DFrac) (c : MConf) (pc npc₀ : BitVec 64
   alu_file_r2 hrd
 
 set_option maxHeartbeats 4000000 in
-/-- `xor rd, rs1, rs2` (also `c.xor`). -/
-theorem execSpecF_xor (cpu : CPU) (dq : DFrac) (c : MConf) (pc npc₀ : BitVec 64) (rd rs1 rs2 : BitVec 5)
-    (hrd : rd ≠ 0#5) (R : RegMap) (p : Privilege := Privilege.Supervisor) :
-    execSpecPP (GF := GF) cpu dq p c p c
-      (instruction.RTYPE (regidx.Regidx rs2, regidx.Regidx rs1, regidx.Regidx rd, rop.XOR))
-      pc npc₀ npc₀ (gprFile cpu R) (gprFile cpu (RegMap.set R rd (RegMap.get R rs1 ^^^ RegMap.get R rs2))) := by
-  intro Φ
-  iintro ⟨HmConf, HPC, HnextPC, HF, HΦ⟩
-  conf_cases HmConf
-  alu_file_r2 hrd
-
-set_option maxHeartbeats 4000000 in
 /-- `mul rd, rs1, rs2`. -/
 theorem execSpecF_mul (cpu : CPU) (dq : DFrac) (c : MConf) (pc npc₀ : BitVec 64) (rd rs1 rs2 : BitVec 5)
     (hrd : rd ≠ 0#5) (R : RegMap) (p : Privilege := Privilege.Supervisor) :

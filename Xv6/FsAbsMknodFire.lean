@@ -342,28 +342,7 @@ end NparMknod
 
 /-! ## 7.  Fire 2, at the armed child (was Rocq iris/FsAbsCreateFire.v) -/
 
-/-! ### 7.1  The delta's collapse at a non-directory child (pure) -/
-
-/-- `acreBump` is zero at everything but a directory (Rocq's
-`caf_acre_bump_nondir`). -/
-theorem cafAcreBump_nondir (c : Absnode) (hc : ∀ e, c ≠ .ADir e) : acreBump c = 0 := by
-  cases c with
-  | ADir e => exact absurd rfl (hc e)
-  | _ => rfl
-
 /-! ### 7.2  The minted child's row at `T_FILE` -/
-
-/-- `absOf_create_dev`'s twin (Rocq's `caf_abs_of_create_file`): the size
-is zero, so the byte list is `fileBytes _ 0 = []`; the count is one. -/
-theorem cafAbs_of_create_file (n : FsNode) (major minor : BitVec 16)
-    (hr : n.fnRec = createMade T_FILE_w major minor) : absOf n = some ⟨.AFile [], 1⟩ := by
-  have hnd : fnIsDir n = false := by
-    unfold fnIsDir fnType; rw [hr]; rfl
-  have hfl : fnType n = T_FILE := by unfold fnType; rw [hr]; rfl
-  have hnl : fnNlink n = 1 := by unfold fnNlink; rw [hr]; rfl
-  have hb : fnFileBytes n = [] := by
-    unfold fnFileBytes fnSize; rw [hr]; rfl
-  rw [absOf_file n hnd hfl (by rw [hnl]; decide), hb, hnl]
 
 /-- THE MINTED CHILD'S ROW AT ANY TYPE (Rocq's `caf_made_row_node`):
 `createMade` at a nonzero type reads as `creC0` of the type and the two

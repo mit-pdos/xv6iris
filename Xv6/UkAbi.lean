@@ -142,11 +142,6 @@ instance ukRd_dec (π : Nat → Option UPerm) (M : ElfMem) (a n : Nat) : Decidab
       ∀ j, j < n → (M (a + j)).isSome = true)
     ⟨fun ⟨h1, h2, h3⟩ => ⟨h1, h2, h3⟩, fun ⟨h1, h2, h3⟩ => ⟨h1, h2, h3⟩⟩
 
-/-- Rocq `uk_rd_above`. -/
-theorem ukRd_above {π : Nat → Option UPerm} {M M' : ElfMem} {a n lo : Nat}
-    (heq : ∀ k, lo ≤ k → M' k = M k) (hlo : lo ≤ a) (h : UkRd π M a n) : UkRd π M' a n :=
-  ⟨h.hi, h.page, fun j hj => by rw [heq _ (by omega)]; exact h.bytes j hj⟩
-
 /-! ## §2 C strings: the canonical length -/
 
 /-- Rocq `ucstr_shift`. -/
@@ -251,39 +246,6 @@ instance ukArgvNull_dec (π : Nat → Option UPerm) (M : ElfMem) (av argc : Nat)
       ∀ j, j < 8 → M (av + 8 * argc + j) = some (nthByte (n := 8) 0#64 j))
     ⟨fun ⟨h1, h2⟩ => ⟨h1, h2⟩, fun ⟨h1, h2⟩ => ⟨h1, h2⟩⟩
 
-/-! ## §5 Frame lemmas: the area survives everything a program does below it -/
-
-/-- **Rocq `uk_argv_w_ext`**. -/
-theorem ukArgvW_ext {M M' : ElfMem} {av i : Nat}
-    (heq : ∀ j, j < 8 → M' (av + 8 * i + j) = M (av + 8 * i + j)) :
-    ukArgvW M' av i = ukArgvW M av i := by
-  unfold ukArgvW
-  apply MachCSL.bv_eq_of_bytes
-  intro j hj
-  rw [uMWord_nthByte _ _ _ _ hj, uMWord_nthByte _ _ _ _ hj, heq j hj]
-
-/-! ## §6 The readers -- the argument area in the shape the LEAVES consume -/
-
-/-- **Rocq `uk_rd_byte`**: one byte anywhere in a readable window. -/
-theorem ukRd_byte {π : Nat → Option UPerm} {M : ElfMem} {a n k : Nat} {va : BitVec 64}
-    (h : UkRd π M a n) (hk : a ≤ k ∧ k < a + n) (hva : va = BitVec.ofNat 64 k) :
-    va.toNat = k ∧ ukLoadOk π va ∧ (M va.toNat).isSome := by
-  have hhi := h.hi
-  have hu : va.toNat = k := by subst hva; simp; omega
-  refine ⟨hu, ?_, ?_⟩
-  · have hp := h.page (k - a) (by omega)
-    have e : a + (k - a) = k := by omega
-    rw [e] at hp; subst hva; exact hp
-  · have hb := h.bytes (k - a) (by omega)
-    have e : a + (k - a) = k := by omega
-    rw [e] at hb; rw [hu]; exact hb
-
-/-- Rocq `uk_args_str`: THE STRING at `argv[i]`. -/
-theorem ukArgs_str {π : Nat → Option UPerm} {M : ElfMem} {av argc lo : Nat} {alen : Nat → Nat}
-    {i : Nat} (h : UkArgs π M av argc lo alen) (hi : i < argc) :
-    lo ≤ ukArgvP M av i ∧ alen i < 2 ^ 31 ∧ Ucstr M (ukArgvP M av i) (alen i) ∧
-      UkRd π M (ukArgvP M av i) (alen i + 1) := h.ptr i hi
-
 /-! ## §7 The stack budget, on the key -/
 
 /-- **Rocq `uk_stack`**: the contiguous, 16-aligned, in-page run of writable
@@ -304,12 +266,5 @@ instance ukStack_dec (π : Nat → Option UPerm) (M : ElfMem) (sp0 : BitVec 64) 
       ∀ j, j < n → (M (sp0.toNat - n + j)).isSome = true)
     ⟨fun ⟨h1, h2, h3, h4, h5, h6, h7⟩ => ⟨h1, h2, h3, h4, h5, h6, h7⟩,
      fun ⟨h1, h2, h3, h4, h5, h6, h7⟩ => ⟨h1, h2, h3, h4, h5, h6, h7⟩⟩
-
-/-- Two addresses on one page share its permission. -/
-theorem upermAt_samePage {π : Nat → Option UPerm} {a b : Nat}
-    (h : a / 4096 = b / 4096) (ha : a < 2 ^ 64) (hb : b < 2 ^ 64) :
-    upermAt π (BitVec.ofNat 64 a) = upermAt π (BitVec.ofNat 64 b) := by
-  unfold upermAt
-  rw [BitVec.toNat_ofNat, BitVec.toNat_ofNat, Nat.mod_eq_of_lt ha, Nat.mod_eq_of_lt hb, h]
 
 end Xv6

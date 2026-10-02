@@ -67,11 +67,6 @@ theorem seccElfLoadable : kexecLoadable User.Seccomp.elf :=
   kexecLoadable_of_rows _ _ User.Seccomp.elf_wf User.Seccomp.elf_loads
     (by rw [User.Seccomp.elf_read]; decide +kernel) (by decide) (by decide)
 
-/-- **Rocq `secc_argv_fits`**: the push and forty-two words below it fit the
-one stack page. -/
-def seccArgvFits (ws : List (List (BitVec 8))) (alen : Nat → Nat) : Prop :=
-  kxcSpan alen ws.length + (8 * ((ws.length : Int) + 1) + 16) ≤ 4096 - 336
-
 /-! ## 2. The two PT_LOADs and the entry -/
 
 /-- **Rocq `secc_start_pc`** (deviation 4). -/

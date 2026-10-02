@@ -295,17 +295,6 @@ theorem fdSlots_to_list {A : Type _} : ∀ (l : List A),
     iframe H1
     iapply fdSlots_to_list l $$ H
 
-theorem fdSlots_of_list {A : Type _} : ∀ (l : List A),
-    ([∗list] _x ∈ l, fdSlot) ⊢ fdSlots (GF := GF) l.length
-  | [] => by iintro -; iapply fdSlots_zero
-  | _ :: l => by
-    iintro H
-    icases BigSepL.bigSepL_cons.1 $$ H with ⟨H1, H⟩
-    ihave H := fdSlots_of_list l $$ H
-    rw [List.length_cons]
-    iapply fdSlots_cons l.length
-    iframe H1 H
-
 end Fd
 
 section Bio

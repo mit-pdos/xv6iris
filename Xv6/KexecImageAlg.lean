@@ -58,11 +58,6 @@ theorem kexecSz_of_szAfter (f : ElfBytes) :
     kexecSz f = pgRoundUpN (kexecSzAfter (elfLoads f)) + 2 * 4096 := by
   unfold kexecSz; rw [kexecTop_of_szAfter]
 
-theorem kexecTop_mod (f : ElfBytes) : kexecTop f % 4096 = 0 := by
-  rw [kexecTop_of_szAfter]
-  obtain ⟨q, hq⟩ := UPtAlloc.pgRoundUpN_dvd (kexecSzAfter (elfLoads f))
-  omega
-
 /-! ## The phdr walk's guard, from `kexecLoadable` -/
 
 /-- Rocq `kxb_walk_ok_of_loadable`: the ONE row the composition needs to

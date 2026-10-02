@@ -159,14 +159,6 @@ theorem urun_shd_sb_bnd (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64)
     ihave %hb := uheap_text N.t N.d N.s M pm sz a b $$ Hh Hb
     ipureintro; exact hb.2.2
 
-/-- **Rocq `urun_shd_str_bnd`**. -/
-theorem urun_shd_str_bnd (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64) (avail : Nat) (tx : Bool)
-    (dq : DFrac) (a len : Nat) (f : Nat → BitVec 8) :
-    ⊢ urun (hlc := hlc) N h m pc avail -∗ ushSstr N tx dq a len f -∗ ⌜a + len < 2 ^ 38⌝ := by
-  iintro Hrun Hs
-  icases ushSstr_nul N tx dq a len f $$ Hs with ⟨Hn, -⟩
-  iapply urun_shd_sb_bnd N h m pc avail tx dq (a + len) ubyte0 $$ Hrun Hn
-
 /-! ## §4 One byte of a diagnostic (Rocq §2a) -/
 
 /-- **Rocq `ksh_w1`**: one `write(fdv, &c, 1)` whose buffer (putc's frame

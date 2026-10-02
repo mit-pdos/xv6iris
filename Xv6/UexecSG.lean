@@ -158,69 +158,15 @@ section SBundle
 variable {GF : BundledGFunctors} [CtokG GF] [SG : UexecSG GF]
 open UexecSG
 
-/-- **Rocq `sbundle`**: a bundle for `n` at this key, at SOME families. -/
-def sbundle (X : Uvis → IProp GF) (n : Int) (W : Uvis) : IProp GF :=
-  iprop(∃ f : sfam GF, sbundleAt X n f W)
-
 /-- **Rocq `sbundle_pay`**: the same at a NAMED payload. -/
 def sbundlePay (X : Uvis → IProp GF) (n : Int) (Q : Int → IProp GF) (W : Uvis) : IProp GF :=
   iprop(∃ f : sfam GF, ⌜sexitPay f = Q⌝ ∗ sbundleAt X n f W)
-
-/-- Rocq `sbundle_of_pay`. -/
-theorem sbundle_of_pay (X : Uvis → IProp GF) (n : Int) (Q : Int → IProp GF) (W : Uvis) :
-    sbundlePay X n Q W ⊢ sbundle X n W := by
-  unfold sbundlePay sbundle
-  iintro ⟨%f, _, Hb⟩
-  iexists f
-  iexact Hb
 
 /-- **Rocq `sbundle_pay_ref`**: the exec deposit with its refund's one
 consequence -- whatever the refund is, it pays this record's own exit at the
 kill status. -/
 def sbundlePayRef (X : Uvis → IProp GF) (Q : Int → IProp GF) (W : Uvis) : IProp GF :=
   iprop(∃ f : sfam GF, ⌜sexitPay f = Q⌝ ∗ □ (sexecRefund f -∗ Q (-1)) ∗ sbundleAt X USYS_exec f W)
-
-/-- Rocq `sbundle_pay_of_ref`. -/
-theorem sbundlePay_of_ref (X : Uvis → IProp GF) (Q : Int → IProp GF) (W : Uvis) :
-    sbundlePayRef X Q W ⊢ sbundlePay X USYS_exec Q W := by
-  unfold sbundlePayRef sbundlePay
-  iintro ⟨%f, %hp, _, Hb⟩
-  iexists f
-  isplitr
-  · ipureintro; exact hp
-  · iexact Hb
-
-/-- Rocq `sbundle_pay_of_sbundle`: re-keyed to the caller's payload for free at
-every number but read and exec. -/
-theorem sbundlePay_of_sbundle (X : Uvis → IProp GF) (n : Int) (Q : Int → IProp GF) (W : Uvis)
-    (hne : n ≠ USYS_read) (hnx : n ≠ USYS_exec) : sbundle X n W ⊢ sbundlePay X n Q W := by
-  unfold sbundle sbundlePay
-  iintro ⟨%f, Hb⟩
-  iexists (sfamAt Q f)
-  rw [sbundleAt_at X n Q f W hne hnx]
-  isplitr
-  · ipureintro; exact sexitPay_at Q f
-  · iexact Hb
-
-/-- Rocq `sbundle_ne`. -/
-theorem sbundle_ne (k : Nat) (X Y : Uvis → IProp GF) (h : ∀ W, X W ≡{k}≡ Y W) (n : Int) (W : Uvis) :
-    sbundle X n W ≡{k}≡ sbundle Y n W := by
-  unfold sbundle
-  exact BI.exists_ne (fun f => sbundleAt_ne k X Y h n f W)
-
-/-- Rocq `sbundle_cong`. -/
-theorem sbundle_cong (X : Uvis → IProp GF) (n : Int) (W W' : Uvis) (hk : skeyEq W W') :
-    sbundle X n W ⊣⊢ sbundle X n W' := by
-  unfold sbundle
-  exact BI.exists_congr (fun f => sbundleAt_cong X n f W W' hk)
-
-/-- Rocq `sbundle_mono`. -/
-theorem sbundle_mono (X Y : Uvis → IProp GF) (n : Int) (W : Uvis) :
-    ⊢ □ (∀ W' : Uvis, X W' -∗ Y W') -∗ sbundle X n W -∗ sbundle Y n W := by
-  unfold sbundle
-  iintro #Hup ⟨%f, Hb⟩
-  iexists f
-  iapply sbundleAt_mono X Y n f W $$ Hup Hb
 
 end SBundle
 

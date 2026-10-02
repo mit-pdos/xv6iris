@@ -61,13 +61,6 @@ theorem wiBlocks_le4 (off n : Nat) (hn : n ≤ fwMax) : wiBlocks off n ≤ 4 := 
 /-- ...and four IS reached. -/
 theorem wiBlocks_four_reached : wiBlocks 1023 fwMax = 4 := rfl
 
-/-- dirlink's site: sixteen bytes at a sixteen-aligned offset never leave
-one block (Rocq's `wi_blocks_dirlink`). -/
-theorem wiBlocks_dirlink (k : Nat) (hk : k < 64) : wiBlocks (16 * k) 16 = 1 := by
-  unfold wiBlocks BSIZE
-  rw [Nat.mod_eq_of_lt (by omega)]
-  omega
-
 theorem wiCost_loose_value : wiCost 1023 fwMax = 25 := rfl
 
 /-! ## 4. The tight budget (the parked two-credit figure) -/
@@ -85,15 +78,6 @@ theorem wiCostArmaware_value : wiCostArmaware 1023 fwMax = 19 := rfl
 def wiCostNoabs (off n : Nat) : Nat := 2 * wiBlocks off n + 3
 
 theorem wiCostNoabs_value : wiCostNoabs 1023 fwMax = 11 := rfl
-
-/-! ## 8. The per-iteration cost, as a function of bmap's arms -/
-
-/-- What ONE iteration of writei's loop costs the ledger (Rocq's
-`bm_iter_cost`). -/
-def bmIterCost (crb cri ai ad ind : Bool) : Nat :=
-  (if ai || ad then (if crb then 0 else 1) else 0) + (if ai then 1 else 0) +
-  (if ad then 1 else 0) + (if ad && ind && !ai then (if cri then 0 else 1) else 0) +
-  (if ad then 0 else 1)
 
 /-! ## 9. Which credits are actually load-bearing -/
 

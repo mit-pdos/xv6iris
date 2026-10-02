@@ -350,11 +350,6 @@ theorem toNat_mod8 (x : BitVec 64) (h : BitVec.extractLsb' 0 3 x = 0#3) : x.toNa
   have h2 := congrArg BitVec.toNat h
   simpa [BitVec.extractLsb'_toNat] using h2
 
-theorem pte2pa_mod8 (w : BitVec 64) : (pte2pa w).toNat % 8 = 0 := by
-  refine toNat_mod8 _ ?_
-  unfold pte2pa
-  bv_decide
-
 theorem pageValid_mod8 (r : BitVec 64) (h : pageValid r) : r.toNat % 8 = 0 := by
   refine toNat_mod8 _ ?_
   obtain ⟨h1, -, -⟩ := h

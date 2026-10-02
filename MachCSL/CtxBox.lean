@@ -499,10 +499,6 @@ theorem qsum_singleton_op (m : StampMap Id) (p : Id × Nat) (q : UFrac) :
     qsum ((PartialMap.singleton p q : StampMap Id) • m) = q.frac.val + qsum m := by
   rw [qsum_op, qsum_singleton]
 
-theorem qsum_insert (m : StampMap Id) (p : Id × Nat) (q : UFrac) (hp : get? m p = none) :
-    qsum (PartialMap.insert m p q) = q.frac.val + qsum m := by
-  rw [Heap.insert_eq_singleton_op_singleton hp, qsum_singleton_op]
-
 /-- Inclusion, as the witness equation (iris-lean's `≼` is Leibniz). -/
 theorem stamps_incl_eq {m1 m2 : StampMap Id} (h : m1 ≼ m2) : ∃ z, m2 = m1 • z := h
 
@@ -582,10 +578,6 @@ theorem maxStamp_op (m1 m2 : StampMap Id) :
     have h2 := (maxStamp_le_iff m2 (maxStamp (m1 • m2))).2
       (fun p hp => maxStamp_ge _ p ((isSome_sop m1 m2 p).2 (Or.inr hp)))
     omega
-
-theorem maxStamp_singleton_op (m : StampMap Id) (p : Id × Nat) (q : UFrac) :
-    maxStamp ((PartialMap.singleton p q : StampMap Id) • m) = max p.2 (maxStamp m) := by
-  rw [maxStamp_op, maxStamp_singleton]
 
 /-- Every key of the fragment is at this identity (Rocq's `keyed`). -/
 def keyed (m : StampMap Id) (i : Id) : Prop := ∀ p, (get? m p).isSome → p.1 = i

@@ -87,10 +87,6 @@ cfg0`). -/
 def pmpEnt0Ok (cfg : Vector (BitVec 8) 64) (paddr : Vector (BitVec 64) 64) : Prop :=
   cfg[0]! = 0x0f#8 ∧ paddr[0]! = 0x3fffffffffffff#64
 
-/-- The tables `xv6Pmpcfg`/`xv6Pmpaddr` (the reset tables after `start()`'s
-two writes) are one instance. -/
-theorem pmpEnt0Ok_xv6 : pmpEnt0Ok xv6Pmpcfg xv6Pmpaddr := ⟨by decide, by decide⟩
-
 /-- `start()`'s two writes establish it, over any tables. -/
 theorem pmpEnt0Ok_start (cfg : Vector (BitVec 8) 64) (paddr : Vector (BitVec 64) 64) :
     pmpEnt0Ok (pmpcfgStart cfg) (pmpaddrStart paddr) :=

@@ -410,27 +410,6 @@ theorem arfRead_fire [Icfg] (γfs : FsNames) (E : CoPset) (dq : DFrac)
   imodintro
   iframe Hf Hg Hav
 
-/-- SUPPLIER 2 -- THE HELD PATH (Rocq's `arf_read_fire_held`, RD-1): the
-caller owns its file position and says so.  No invariant is opened. -/
-theorem arfRead_fire_held [Icfg] (γfs : FsNames) (E : CoPset) (dq : DFrac)
-    (F : Pfam GF (Aview → Nat → Anode → Nat → IProp GF)) (i : Nat) (γo : GName)
-    (off d : Nat) (n : FsNode)
-    (hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ E) (hoff : off ≤ MAXFILE * BSIZE)
-    (hsz : anodeSizeOk (absRow n)) (hnz : fnType n ≠ 0) :
-    ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗ uoff γo off -∗
-      pfAt (areadCommitAt (fsGammaL γfs) appE i γo) F -∗
-      topFragQ (fsGammaL γfs) dq i n -∗
-      offLink (hlc := hlc) γo (off : Int) ={E}=∗
-        topFragQ (fsGammaL γfs) dq i n ∗
-        offLink (hlc := hlc) γo ((off + d : Nat) : Int) ∗
-        (uoff γo (off + d) ∨ (uoff γo off ∗ MachFixedGS.killCred (hlc := hlc) (GF := GF))) ∗
-        ∃ av : Aview, ⌜arowAt av i (absRow n)⌝ ∗ F.pfRecv av off (absRow n) d := by
-  iintro #Hi Hu Hcm Hf Hg
-  ihave Hsup := offSupply_held E γo off d $$ Hu
-  iapply arfRead_fire_gen γfs E dq
-    iprop(uoff γo (off + d) ∨ (uoff γo off ∗ MachFixedGS.killCred (hlc := hlc) (GF := GF)))
-    F i γo off d n hE hoff hsz hnz $$ Hi Hsup Hcm Hf Hg
-
 /-- THE FIRE WITH NO SUPPLIER AT ALL (Rocq's `arf_read_fire_adv`, lane
 OFF-LINK-5): a HELD row's read.  The client's commit hands the box's arm
 back ALREADY ADVANCED, so the lemma has no user-side premise. -/

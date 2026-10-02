@@ -298,10 +298,6 @@ theorem fileread_env_out_of_env (st : FdState) :
   · exact fileread_fs_env_out
   · exact .rfl
 
-/-- Rocq `fileread_env_none`. -/
-theorem fileread_env_none : ⊢ filereadEnv (hlc := hlc) (GF := GF) .closed := by
-  unfold filereadEnv; exact .rfl
-
 /-- THE SYSCALL'S SPLIT (Rocq SpecSysRead's `read_env_frame`): the
 content-independent file system and the console bundle, both owned by the
 caller, open the state-keyed environment and come back from its output. -/
@@ -486,12 +482,6 @@ def filereadArms (gn : GName) (pt : UPtd) (st : FdState) (n : Int) (F : Pfam GF 
 variable (gn : GName) (pt : UPtd) (F : Pfam GF (Aview → Nat → Anode → Nat → IProp GF))
   (Rd : Nat → Nat → IProp GF) (Rin : List (List Obs × BitVec 8) → IProp GF) (P : IProp GF)
   (Rp : List (BitVec 8) → IProp GF) (Rpe : List (BitVec 8) → PipeSt → IProp GF)
-
-/-- Rocq `fileread_extra_pay`. -/
-theorem filereadExtra_pay (st : FdState) (n : Int) (r : BitVec 64) (M' : Nat → List (BitVec 8))
-    (addr : BitVec 64) :
-    filereadExtra (hlc := hlc) gn pt st n F Rd Rin Rp Rpe P r M' addr ⊢
-      P ∗ filereadExtraCore (hlc := hlc) gn pt st n F Rd Rin Rp Rpe r M' addr := .rfl
 
 /-- **The console arm's `-1` reason, read off the payout without spending
 it** (Rocq `fileread_extra_core_m1_why`): the sign guard, or the kill shot. -/

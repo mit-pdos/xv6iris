@@ -39,10 +39,6 @@ theorem smFacts_set (ms : BitVec 64) (sie : Bool) (h : smFacts ms sie) : smFacts
   simp only [ite_true]
   bv_decide
 
-/-- Setting an already-set `SIE` is the identity. -/
-theorem ms_or_sie_self (ms : BitVec 64) (h : BitVec.extractLsb' 1 1 ms = 1#1) : ms ||| 2#64 = ms := by
-  bv_decide
-
 /-- The `SPIE`/`SPP` bits a clear pins. -/
 def spieOf (ms : BitVec 64) : Bool := decide (BitVec.extractLsb' 5 1 ms = 1#1)
 def sppOf (ms : BitVec 64) : Bool := decide (BitVec.extractLsb' 8 1 ms = 1#1)

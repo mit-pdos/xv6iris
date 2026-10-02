@@ -88,10 +88,6 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 /-- `p->cwd`'s reference, AT its inum (Rocq `cwd_ref_at`). -/
 def cwdRefAt (v : BitVec 64) (z : Nat) : IProp GF := inodeHeldAt v z
 
-/-- ... and its ∃-form, for the consumers that only ever wanted the
-reference (Rocq `cwd_ref`). -/
-def cwdRef (v : BitVec 64) : IProp GF := iprop(∃ z : Nat, cwdRefAt v z)
-
 /-- The two directions, kept as NAMES so consumers do not unfold (Rocq's
 reason: the call sites read better for saying which way they are going). -/
 theorem cwdRefAt_heldAt (v : BitVec 64) (z : Nat) :
@@ -99,9 +95,6 @@ theorem cwdRefAt_heldAt (v : BitVec 64) (z : Nat) :
 
 theorem cwdRefAt_ofHeldAt (v : BitVec 64) (z : Nat) :
     inodeHeldAt (GF := GF) v z ⊢ cwdRefAt v z := .rfl
-
-theorem cwdRefAt_held (v : BitVec 64) (z : Nat) :
-    cwdRefAt (GF := GF) v z ⊢ inodeHeld v := inodeHeldAt_held v z
 
 /-- ... and the projection the missing null arm buys. -/
 theorem cwdRefAt_nonzero (v : BitVec 64) (z : Nat) :

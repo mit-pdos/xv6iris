@@ -300,17 +300,6 @@ theorem bootImg_ctxBytes (ξ : CtxId) (image : Mem) (A n : Nat) (w : BitVec (8 *
   intro _ j _
   exact histByte_img_ctx ξ _ _ 0 _
 
-/-- Every RAM byte of the image is present (so any run has SOME value). -/
-theorem bootImgHas_exists (image : Mem) (A n : Nat) (hA : bcInRam A n)
-    (hram : ∀ a : PAddr, inRam a 1 → ∃ v, image[a]? = some v) :
-    ∃ w : BitVec (8 * n), bootImgHas image (BitVec.ofNat 64 A) n w := by
-  obtain ⟨w, hw⟩ := exists_bv_of_bytes n
-    (fun j => (image[BitVec.ofNat 64 A + BitVec.ofNat 64 j]?).getD 0#8)
-  refine ⟨w, fun j hj => ?_⟩
-  rw [hw j hj]
-  obtain ⟨v, hv⟩ := hram _ (bcInRam_byte hA hj)
-  rw [hv]; rfl
-
 /-! ## The read-only half: persisted -/
 
 /-- The range, persisted: every history DISCARDED. -/

@@ -369,25 +369,6 @@ theorem byteRangeQ_split (gL : GName) (q1 q2 : Qp) (b off : Nat) (bs : List (Bit
     intro k v _
     exact ((ghost_map_elem_fractional gL (b * BSZ + off + k) v).fractional q1 q2).2
 
-theorem fsblockQ_split (gL : GName) (q1 q2 : Qp) (b : Nat) (bs : List (BitVec 8)) :
-    fsblockQ (GF := GF) gL (DFrac.own (q1 + q2)) b bs ⊣⊢
-      fsblockQ gL (DFrac.own q1) b bs ∗ fsblockQ gL (DFrac.own q2) b bs := by
-  unfold fsblockQ
-  rw [BiEntails.to_eq (byteRangeQ_split gL q1 q2 b 0 bs)]
-  constructor
-  · iintro ⟨%hl, H1, H2⟩
-    isplitl [H1]
-    · isplitl []
-      · ipureintro; exact hl
-      · iexact H1
-    · isplitl []
-      · ipureintro; exact hl
-      · iexact H2
-  · iintro ⟨⟨%hl, H1⟩, ⟨-, H2⟩⟩
-    isplitl []
-    · ipureintro; exact hl
-    iframe H1 H2
-
 end
 
 end Xv6

@@ -275,13 +275,6 @@ theorem liveGenlo_le1_keep [Icfg] (k : Nat) (s : Qp) (g : GName) (lo : Nat) :
     liveGenlo (GF := GF) k s g lo ⊢ liveGenlo k s g lo ∗ ⌜s.val ≤ 1⌝ :=
   persistent_entails_left (liveGenlo_le1 k s g lo)
 
-theorem liveGen_le1 [Icfg] (k : Nat) (s : Qp) (g : GName) :
-    liveGen (GF := GF) k s g ⊢ ⌜s.val ≤ 1⌝ := by
-  unfold liveGen
-  iintro ⟨%lo, H⟩
-  iapply liveGenlo_le1 k s g lo
-  iexact H
-
 /-- A6.145/A6.146: THE FLOORED SLICE -- a liveness slice at a NAMED epoch
 floor, carrying the reader's receipt for it.  At the invariant open the
 slice AGREES `(g, lo)` with the body's, so the floor covers the CURRENT

@@ -469,21 +469,6 @@ def bmBlocks (bm : Blkmap) : ExtTreeSet Nat compare :=
   (ExtTreeSet.ofList ((List.range (MAXFILE + 1)).map (fun i => (bmSlot bm i).toNat))
     compare).erase 0
 
-theorem bmBlocks_spec (bm : Blkmap) (b : Nat) :
-    b ∈ bmBlocks bm ↔ b ≠ 0 ∧ ∃ i, i ≤ MAXFILE ∧ (bmSlot bm i).toNat = b := by
-  unfold bmBlocks
-  rw [ExtTreeSet.mem_erase, ExtTreeSet.mem_ofList]
-  constructor
-  · rintro ⟨hne, hin⟩
-    refine ⟨fun h => hne (by rw [h]; rfl), ?_⟩
-    rw [List.contains_iff_mem, List.mem_map] at hin
-    obtain ⟨i, hi, hb⟩ := hin
-    exact ⟨i, by rw [List.mem_range] at hi; omega, hb⟩
-  · rintro ⟨hnz, i, hi, hb⟩
-    refine ⟨fun h => hnz (by simpa using (Nat.compare_eq_eq.1 h).symm), ?_⟩
-    rw [List.contains_iff_mem, List.mem_map]
-    exact ⟨i, List.mem_range.2 (by omega), hb⟩
-
 /-! ## INSTALLING ONE BLOCK: the pure half of what `bmap`'s three stores do
 
 All three of `bmap`'s installs -- `ip->addrs[bn]`, `ip->addrs[NDIRECT]` and
@@ -744,15 +729,6 @@ theorem inodeBlocksQ_1_to (γfs : FsNames) (dq : DFrac) (bm : Blkmap)
     (data : Nat → List (BitVec 8)) (h : dq = DFrac.own 1) :
     inodeBlocks (GF := GF) γfs bm data ⊢ inodeBlocksQ γfs dq bm data := by
   subst h; unfold inodeBlocks; iintro H; iexact H
-
-/-- Rocq's `blk_res_q_split`. -/
-theorem blkResQ_split (γfs : FsNames) (q1 q2 : Qp) (w : BitVec 32) (bs : List (BitVec 8)) :
-    blkResQ (GF := GF) γfs (DFrac.own (q1 + q2)) w bs
-      ⊣⊢ iprop(blkResQ γfs (DFrac.own q1) w bs ∗ blkResQ γfs (DFrac.own q2) w bs) := by
-  unfold blkResQ
-  split
-  · exact (sep_emp (P := (emp : IProp GF))).symm
-  · exact FsView.blkOwnedQ_split _ (fsGammaL_frac γfs) q1 q2 _ _
 
 end
 

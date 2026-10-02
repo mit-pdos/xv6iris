@@ -119,13 +119,4 @@ def txtA : List (BitVec 8) := 97#8 :: txtExt
 
 theorem txtA_name : txtName txtA := (txtNameb_spec _).1 (by decide)
 
-/-! ## 4.  EVERY PREFIX OF A CLASS NAME COMPLETES IN THE CLASS
-
-by one of six fixed suffixes.  The union's decider reads a name only as far
-as a wire shows it: a diagnostic cut off mid-name is some class name's, and
-this says which six to try. -/
-
-def txtSfx : List (List (BitVec 8)) :=
-  [txtExt.drop 4, txtExt.drop 3, txtExt.drop 2, txtExt.drop 1, txtExt, txtA]
-
 end Xv6

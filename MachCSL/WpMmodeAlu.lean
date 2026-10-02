@@ -101,26 +101,6 @@ theorem execSpec_ori_same (cpu : CPU) (dq : DFrac) (c : MConf) (pc npc₀ : BitV
   iapply HΦ $$ HmConf HPC HnextPC Hrd
 
 set_option maxHeartbeats 4000000 in
-/-- `andi rd, rd, imm` (`rd ≠ 0`); also `c.andi`. -/
-theorem execSpec_andi_same (cpu : CPU) (dq : DFrac) (c : MConf) (pc npc₀ : BitVec 64) (imm : BitVec 12)
-    (rd : BitVec 5) (hrd : rd ≠ 0#5) (v : BitVec 64) (p : Privilege := Privilege.Machine) :
-    execSpecPP (GF := GF) cpu dq p c p c (instruction.ITYPE (imm, regidx.Regidx rd, regidx.Regidx rd, iop.ANDI))
-      pc npc₀ npc₀ (gpr cpu rd (DFrac.own 1) v)
-      (gpr cpu rd (DFrac.own 1) (v &&& BitVec.signExtend 64 imm)) := by
-  intro Φ
-  iintro ⟨HmConf, HPC, HnextPC, Hrd, HΦ⟩
-  conf_cases HmConf
-  alu_run_r1 hrd
-  iapply swp_bind
-  iapply swp_wX_bits (hrd := hrd)
-  iframe
-  inext
-  iintro Hrd
-  swp_run 10
-  conf_intro HmConf
-  iapply HΦ $$ HmConf HPC HnextPC Hrd
-
-set_option maxHeartbeats 4000000 in
 /-- `srli rd, rd, shamt` (`rd ≠ 0`); also `c.srli`. -/
 theorem execSpec_srli_same (cpu : CPU) (dq : DFrac) (c : MConf) (pc npc₀ : BitVec 64) (shamt : BitVec 6)
     (rd : BitVec 5) (hrd : rd ≠ 0#5) (v : BitVec 64) (p : Privilege := Privilege.Machine) :
@@ -208,23 +188,6 @@ macro "alu_run_r3" hrs1:term "," hrs2:term "," hrd:term : tactic =>
              iintro Hrd
              swp_run 10
              conf_intro HmConf))
-
-set_option maxHeartbeats 4000000 in
-/-- `add rd, rs1, rs2`, three distinct registers, all `≠ 0`. -/
-theorem execSpec_add (cpu : CPU) (dq : DFrac) (c : MConf) (pc npc₀ : BitVec 64) (rd rs1 rs2 : BitVec 5)
-    (hrd : rd ≠ 0#5) (hrs1 : rs1 ≠ 0#5) (hrs2 : rs2 ≠ 0#5) (v v1 v2 : BitVec 64) (p : Privilege := Privilege.Machine) :
-    execSpecPP (GF := GF) cpu dq p c p c
-      (instruction.RTYPE (regidx.Regidx rs2, regidx.Regidx rs1, regidx.Regidx rd, rop.ADD))
-      pc npc₀ npc₀
-      iprop(gpr cpu rd (DFrac.own 1) v ∗ gpr cpu rs1 (DFrac.own 1) v1 ∗ gpr cpu rs2 (DFrac.own 1) v2)
-      iprop(gpr cpu rd (DFrac.own 1) (v1 + v2) ∗ gpr cpu rs1 (DFrac.own 1) v1 ∗
-        gpr cpu rs2 (DFrac.own 1) v2) := by
-  intro Φ
-  iintro ⟨HmConf, HPC, HnextPC, ⟨Hrd, Hrs1, Hrs2⟩, HΦ⟩
-  conf_cases HmConf
-  alu_run_r3 hrs1, hrs2, hrd
-  iapply HΦ $$ HmConf HPC HnextPC [Hrd Hrs1 Hrs2]
-  iframe
 
 set_option maxHeartbeats 4000000 in
 /-- `mv rd, rs2` = `add rd, x0, rs2` (`rd ≠ rs2`, both `≠ 0`); also `c.mv`. -/

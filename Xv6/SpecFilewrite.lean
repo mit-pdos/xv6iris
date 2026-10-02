@@ -322,12 +322,6 @@ theorem filewrite_env_out_of_env (γl : GName) (γu : UartNames) (st : FdState) 
   · exact filewrite_fs_env_out
   · exact .rfl
 
-/-- Rocq `filewrite_env_none`: a file that is neither a pipe, a device nor
-an inode costs its writer nothing (the arm is the panic). -/
-theorem filewrite_env_none (γl : GName) (γu : UartNames) :
-    ⊢ filewriteEnv (hlc := hlc) (GF := GF) γl γu .closed := by
-  unfold filewriteEnv; exact .rfl
-
 /-- ... and closed. -/
 theorem filewrite_env_out_inode (γl : GName) (γu : UartNames) (r w : Bool) (i : Nat) (γo : GName)
     (om : OffMode) :
@@ -511,6 +505,11 @@ free.  The KERNEL discharges it (`fwrSt_init`), off the block's own
 `uptWf`, the lazy bit's claim and one reflexivity. -/
 def wrTb (pmv : Nat → Option UPerm) (sz : Nat) (lz : Bool) (P : UPtd) : Prop :=
   uptWf P ∧ permOf P.um sz = pmv ∧ (lz = false → lazyFree P.um (BitVec.ofNat 64 sz))
+
+/-- Rocq's `vacuity_wr_tb_not_empty`: the guard is inhabited at the key's own
+values, so no client can instantiate it at `False`. -/
+theorem wrTb_vacuity (P : UPtd) (sz : Nat) (hwf : uptWf P) : wrTb (permOf P.um sz) sz true P :=
+  ⟨hwf, rfl, fun h => absurd h (by decide)⟩
 
 /-- ...and at a running block's own values (what the kernel's dispatch
 discharges it with). -/

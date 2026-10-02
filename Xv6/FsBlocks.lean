@@ -292,10 +292,6 @@ theorem fsDirty_flip (γfs : FsNames) (D : RegMapF Bool) (b : Nat) (v v' vNew : 
   · ipureintro; exact ⟨heq, hlk⟩
   iframe Ha Hc Hm
 
-/-- The genesis bundle: both authorities born empty. -/
-def fsFreeTok (γfs : FsNames) : IProp GF :=
-  iprop(fsCacheAuth γfs ∅ ∗ fsDirtyAuth γfs ∅)
-
 end
 
 end Xv6

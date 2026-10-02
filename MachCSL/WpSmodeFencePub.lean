@@ -125,37 +125,6 @@ theorem swp_sail_barrier_pub (cpu : CPU) (b : barrier_kind) (hdrain : fenceDrain
 /-! ## The two encodings -/
 
 set_option maxHeartbeats 4000000 in
-/-- `fence rw,rw`, absorbing a position the hart has written. -/
-theorem execSpecF_fence_rw_rw_pub (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Bool)
-    (hok : SConfPhys (GF := GF) c sie) (hmenv : c.menvcfg = menvcfgS)
-    (pc npc₀ : BitVec 64) (rs rd : BitVec 5) (R : RegMap) (T : Nat) :
-    execSpecPP (GF := GF) cpu dq Privilege.Supervisor c Privilege.Supervisor c
-      (instruction.FENCE (0#4, 3#4, 3#4, regidx.Regidx rs, regidx.Regidx rd)) pc npc₀ npc₀
-      iprop(gprFile cpu R ∗ authoredBy T (hartAgent cpu))
-      iprop(gprFile cpu R ∗ viewLb cpu T) := by
-  intro Φ
-  have hfiom : _get_MEnvcfg_FIOM c.menvcfg = 0#1 := by rw [hmenv]; rfl
-  clear hmenv
-  iintro ⟨HmConf, HPC, HnextPC, ⟨HF, #Hau⟩, HΦ⟩
-  conf_cases HmConf
-  obtain ⟨hpmp, hms, hpmm, hlpe⟩ := hok
-  obtain ⟨hSIE, hMPRV, hSXL, hMXR, hTSR, hTVM, hFS, hXS, hVS, hSD, hMPP⟩ := hms
-  unfold execute
-  swp_to_barrier 40
-  iapply swp_bind
-  iapply (swp_sail_barrier_pub cpu _ (by decide) T)
-  isplit
-  · iexact Hau
-  inext
-  iintro #Hv
-  iapply swp_ret
-  swp_run 80
-  conf_intro HmConf
-  iapply HΦ $$ HmConf HPC HnextPC [HF Hv]
-  iframe HF
-  iexact Hv
-
-set_option maxHeartbeats 4000000 in
 /-- `fence iorw,iorw`, absorbing a position the hart has written. -/
 theorem execSpecF_fence_iorw_iorw_pub (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Bool)
     (hok : SConfPhys (GF := GF) c sie) (hmenv : c.menvcfg = menvcfgS)

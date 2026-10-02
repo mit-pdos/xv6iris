@@ -37,9 +37,6 @@ namespace Xv6
 
 /-! ## S0  THE LINE, ITS ALTERNATIVES' OUTPUT, AND STATE-FREEDOM -/
 
-/-- the line the last COMPLETE body of `I` parses to -/
-noncomputable def fline (I : List (BitVec 8)) : Uline := ulineOf ((bodiesOf I)[nlines I - 1]!)
-
 /-- the alternatives whose console output is a function of the LINE alone.
 `RCRan` is the only one that reads the file's state. -/
 def fstateFree : Ralt → Bool

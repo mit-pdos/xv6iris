@@ -207,26 +207,6 @@ private theorem liveGenlo_agree_keep [Icfg] (k : Nat) (s1 : Qp) (g1 : GName) (lo
   · ipureintro; exact (liveVal_singleton_op_valid Hv).1
   · iframe H1 H2
 
-theorem liveGen_split [Icfg] (k : Nat) (s1 s2 : Qp) (g : GName) :
-    liveGen (GF := GF) k (s1 + s2) g ⊣⊢ liveGen k s1 g ∗ liveGen k s2 g := by
-  unfold liveGen
-  constructor
-  · iintro ⟨%lo, H⟩
-    icases (liveGenlo_split k s1 s2 g lo).1 $$ H with ⟨H1, H2⟩
-    isplitl [H1]
-    · iexists lo; iexact H1
-    · iexists lo; iexact H2
-  · iintro ⟨⟨%lo1, H1⟩, ⟨%lo2, H2⟩⟩
-    icases liveGenlo_agree_keep k s1 g lo1 s2 g lo2 $$ [$H1 $H2] with ⟨⟨%-, %hlo⟩, H1, H2⟩
-    subst hlo
-    iexists lo1
-    iapply liveGenlo_join
-    iframe H1 H2
-
-theorem liveGen_join [Icfg] (k : Nat) (s1 s2 : Qp) (g : GName) :
-    liveGen (GF := GF) k s1 g ∗ liveGen k s2 g ⊢ liveGen k (s1 + s2) g :=
-  (liveGen_split k s1 s2 g).2
-
 theorem liveGenlo_bound [Icfg] (k : Nat) (s1 : Qp) (g1 : GName) (lo1 : Nat)
     (s2 : Qp) (g2 : GName) (lo2 : Nat) :
     liveGenlo (GF := GF) k s1 g1 lo1 ∗ liveGenlo k s2 g2 lo2 ⊢ ⌜(s1 + s2).val ≤ 1⌝ := by

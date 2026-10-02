@@ -106,18 +106,6 @@ def kxcPhBuf (sp0 : BitVec 64) : BitVec 64 := sp0 + 0xFFFFFFFFFFFFFE18#64
 /-- `uint64 ustack[33]` at `s0-368` (slots 46 down to 14). -/
 def kxcUstackBuf (sp0 : BitVec 64) : BitVec 64 := sp0 + 0xFFFFFFFFFFFFFE90#64
 
-/-- Rocq `kxc_elf_base`: `addi _,s0,-432` computes the ELF buffer's base. -/
-theorem kxc_elf_base (sp0 : BitVec 64) : sp0 + BitVec.signExtend 64 3664#12 = kxcElfBuf sp0 := by
-  simp only [BitVec.reduceSignExtend, kxcElfBuf]
-
-/-- Rocq `kxc_ph_base`: `addi _,s0,-488`. -/
-theorem kxc_ph_base (sp0 : BitVec 64) : sp0 + BitVec.signExtend 64 3608#12 = kxcPhBuf sp0 := by
-  simp only [BitVec.reduceSignExtend, kxcPhBuf]
-
-/-- Rocq `kxc_ustack_base`: `addi _,s0,-368`. -/
-theorem kxc_ustack_base (sp0 : BitVec 64) : sp0 + BitVec.signExtend 64 3728#12 = kxcUstackBuf sp0 := by
-  simp only [BitVec.reduceSignExtend, kxcUstackBuf]
-
 /-- The 55 low slots' top: slot 13's address, `sp0 - 104`. -/
 theorem kxc_rest_addr (sp0 : BitVec 64) :
     sp0 - 8#64 * BitVec.ofNat 64 13 = sp0 + 0xFFFFFFFFFFFFFF98#64 := by
@@ -241,27 +229,6 @@ theorem kxc_bytes_ph [CurCtx] (sp0 : BitVec 64) (bs : List (BitVec 8))
     unfold kxcPhBuf kxcElfBuf; bv_omega_g
   rw [← e]
   exact byteBuf_stackOwn (kxcPhBuf sp0) hal 7 bs hl
-
-/-- **Rocq `kxc_slots_ustack`**: the 33 `ustack` slots are 264 bytes (no
-slack above: slot 14 abuts s11's spill). -/
-theorem kxc_slots_ustack [CurCtx] (sp0 : BitVec 64) :
-    stackOwn (GF := GF) (sp0 + 0xFFFFFFFFFFFFFF98#64) 33 ⊢
-      ∃ bs : List (BitVec 8), ⌜bs.length = 264 ∧ (kxcUstackBuf sp0).toNat % 8 = 0⌝ ∗
-        byteBuf (kxcUstackBuf sp0) (DFrac.own 1) bs := by
-  have e : kxcUstackBuf sp0 + BitVec.ofNat 64 (8 * (32 + 1)) = sp0 + 0xFFFFFFFFFFFFFF98#64 := by
-    unfold kxcUstackBuf; bv_omega_g
-  rw [← e]
-  exact kxc_stackOwn_byteBuf (kxcUstackBuf sp0) 32
-
-/-- **Rocq `kxc_bytes_ustack`**. -/
-theorem kxc_bytes_ustack [CurCtx] (sp0 : BitVec 64) (bs : List (BitVec 8))
-    (hal : (kxcUstackBuf sp0).toNat % 8 = 0) (hl : bs.length = 264) :
-    byteBuf (GF := GF) (kxcUstackBuf sp0) (DFrac.own 1) bs ⊢
-      stackOwn (sp0 + 0xFFFFFFFFFFFFFF98#64) 33 := by
-  have e : kxcUstackBuf sp0 + BitVec.ofNat 64 (8 * 33) = sp0 + 0xFFFFFFFFFFFFFF98#64 := by
-    unfold kxcUstackBuf; bv_omega_g
-  rw [← e]
-  exact byteBuf_stackOwn (kxcUstackBuf sp0) hal 33 bs hl
 
 /-! ## THE FRAME, as every exit presents it
 

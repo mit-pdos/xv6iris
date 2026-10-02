@@ -222,23 +222,6 @@ theorem ushm_w32_of_ubytes (γd : GName) (a : Nat) (f : Nat → BitVec 8) :
   simp only [BitVec.extractLsb'_toNat, BitVec.toNat_ofNat, Nat.shiftRight_eq_div_pow]
   rcases (show j = 0 ∨ j = 1 ∨ j = 2 ∨ j = 3 by omega) with rfl | rfl | rfl | rfl <;> omega
 
-/-- **Rocq `ushm_hdr_of_ubytes`**: a sixteen-byte cell IS a header (what
-turns the .bss cell `base` into something the allocator talks about). -/
-theorem ushm_hdr_of_ubytes (γd : GName) (a : Nat) (f : Nat → BitVec 8) :
-    ubytes (GF := GF) γd a 16 f ⊢ ∃ (nxt : BitVec 64) (nu : Nat), ushmHdr γd a nxt nu := by
-  iintro H
-  icases (ubytes_app γd a 8 8 f).1 $$ H with ⟨H0, H8⟩
-  icases (ubytes_app γd (a + 8) 4 4 _).1 $$ H8 with ⟨H8, H12⟩
-  icases uword_of_ubytes γd a f $$ H0 with ⟨%w0, H0⟩
-  icases ushm_w32_of_ubytes γd (a + 8) _ $$ H8 with ⟨%w8, H8⟩
-  iexists w0, w8.toNat
-  unfold ushmHdr
-  rw [BitVec.ofNat_toNat, BitVec.setWidth_eq]
-  iframe H0 H8
-  iexists _
-  rw [show a + 8 + 4 = a + 12 by omega]
-  iexact H12
-
 /-- A chunk's first sixteen bytes, split as a header's three fields. -/
 theorem ushm_split16 (γd : GName) (a n : Nat) (f : Nat → BitVec 8) (hn : 16 ≤ n) :
     ubytes (GF := GF) γd a n f ⊢

@@ -97,30 +97,14 @@ abbrev usysno (m : RegMap) : Int := (BitVec.extractLsb' 0 32 (m 17#5)).toInt
 read as a signed 32-bit word. -/
 abbrev uexitst (m : RegMap) : Int := (BitVec.setWidth 32 (m.get 10#5)).toInt
 
-/-- **Rocq `ukn_triv`**: THE TRIVIAL PAYLOAD, as a class. -/
-class UknTriv {GF : BundledGFunctors} (N : UkNames GF) : Prop where
-  eq : N.pay = fun _ => iprop(True)
-
 /-- **Rocq `ukn_const`**: the payload does not read the status. -/
 class UknConst {GF : BundledGFunctors} (N : UkNames GF) : Prop where
   eq : ∀ x y : Int, N.pay x = N.pay y
-
-/-- Rocq `ukn_pay_free_of_triv`. -/
-theorem ukn_pay_free_of_triv {GF : BundledGFunctors} (N : UkNames GF) [h : UknTriv N] : ⊢ N.pay (-1) := by
-  rw [h.eq]; exact BI.true_intro
-
-/-- Rocq `ukn_const_of_triv` (a lemma, not an instance, as in Rocq). -/
-theorem ukn_const_of_triv {GF : BundledGFunctors} (N : UkNames GF) (h : UknTriv N) : UknConst N :=
-  ⟨fun x y => by rw [h.eq]⟩
 
 /-- Rocq `ukn_const_of_eq`. -/
 theorem ukn_const_of_eq {GF : BundledGFunctors} (N : UkNames GF) (Q : Int → IProp GF) (heq : N.pay = Q)
     (hQ : ∀ x y, Q x = Q y) : UknConst N :=
   ⟨fun x y => by rw [heq]; exact hQ x y⟩
-
-/-- Rocq `ukn_pay_const`. -/
-theorem ukn_pay_const {GF : BundledGFunctors} (N : UkNames GF) [h : UknConst N] :
-    N.pay = fun _ => N.pay (-1) := funext fun x => h.eq x (-1)
 
 section UkRun
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
@@ -221,19 +205,6 @@ def udepwf (N : UkNames GF) (m : RegMap) (pc : BitVec 64) (n : Int) (fdep : Uexe
     myPay gn N.pay -∗ uheap N.t N.d N.s M pm sz -∗ ufdAuth N.fd fdv -∗
     uheap N.t N.d N.s M pm sz ∗ ufdAuth N.fd fdv ∗
       UexecSG.sbundleAt (uslot (hlc := hlc)) n fdep (uvisOfRun m pc M pm sz fdv cw gn cs pidv false seccAll))
-
-/-- Rocq `udepwf_udepw`: the forgetful direction. -/
-theorem udepwf_udepw (N : UkNames GF) (m : RegMap) (pc : BitVec 64) (n : Int) (fdep : UexecSG.sfam GF) :
-    ⊢ udepwf (hlc := hlc) N m pc n fdep -∗ udepw N m pc n := by
-  unfold udepwf udepw
-  iintro ⟨%hpay, H⟩ %M %pm %sz %fdv %cw %gn %cs %pidv Hp Hh Hf
-  icases H $$ %M %pm %sz %fdv %cw %gn %cs %pidv Hp Hh Hf with ⟨Hh, Hf, Hb⟩
-  iframe Hh Hf
-  iright
-  unfold sbundlePay
-  iexists fdep
-  iframe Hb
-  ipureintro; exact hpay
 
 /-- Rocq `udepw_of_psok`: the GENERIC route's supplier. -/
 theorem udepw_of_psok (N : UkNames GF) (m : RegMap) (pc : BitVec 64) (n : Int)
@@ -510,16 +481,6 @@ def uxsup : IProp GF := uxsupAt (hlc := hlc) (fun _ => iprop(True))
 instance uxsup_persistent : Persistent (uxsup (hlc := hlc) (GF := GF)) := by
   unfold uxsup; infer_instance
 
-/-- Rocq `udepw_of_uxsup`. -/
-theorem udepw_of_uxsup (N : UkNames GF) [ht : UknTriv N] (m : RegMap) (pc : BitVec 64) :
-    ⊢ uxsup (hlc := hlc) (GF := GF) -∗ udepw N m pc USYS_exec := by
-  unfold uxsup uxsupAt udepw
-  iintro #Hx %M %pm %sz %fdv %cw %gn %cs %pidv _ Hh Hf
-  iframe Hh Hf
-  iright
-  rw [ht.eq]
-  iapply Hx
-
 /-- Rocq `udepw_of_uxsup_at`. -/
 theorem udepw_of_uxsupAt (N : UkNames GF) (m : RegMap) (pc : BitVec 64) :
     ⊢ uxsupAt (hlc := hlc) N.pay -∗ udepw N m pc USYS_exec := by
@@ -530,16 +491,6 @@ theorem udepw_of_uxsupAt (N : UkNames GF) (m : RegMap) (pc : BitVec 64) :
   iapply Hx
 
 /-! ### The cwd-pinned deposit -/
-
-/-- **Rocq `udepw_at`**: `udepw` at ONE working directory `c`, with the
-same loan of the two authorities. -/
-def udepwAt (N : UkNames GF) (m : RegMap) (pc : BitVec 64) (n : Int) (c : Nat) : IProp GF :=
-  iprop(∀ (M : ElfMem) (pm : Nat → Option UPerm) (sz : Nat) (fdv : List FdState) (gn : GName)
-      (cs : ExtTreeSet GName compare) (pidv : BitVec 32),
-    myPay gn N.pay -∗ uheap N.t N.d N.s M pm sz -∗ ufdAuth N.fd fdv -∗
-    uheap N.t N.d N.s M pm sz ∗ ufdAuth N.fd fdv ∗
-      (⌜UprogSG.psok (GF := GF) n ∧ n ≠ USYS_exec⌝ ∨
-        sbundlePay (uslot (hlc := hlc)) n N.pay (uvisOfRun m pc M pm sz fdv c gn cs pidv false seccAll)))
 
 /-- **Rocq `udepw_at_ref`**: the exec deposit with its refund's consequence. -/
 def udepwAtRef (N : UkNames GF) (m : RegMap) (pc : BitVec 64) (c : Nat) : IProp GF :=
@@ -612,16 +563,6 @@ def urun (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64) (avail : Nat) 
     uheap N.t N.d N.s M pm sz ∗ ustack N.d (m.get spIdx) avail ∗ ufdAuth N.fd fdv ∗ ucwdAuth N.cwd cw ∗
     urunIds N cs pidv ∗ myPay gn N.pay ∗ udep (hlc := hlc) ∗ urunRows (hlc := hlc) N fdv ∗
     @uvb hlc GF _ _ _ xi h C pt Rfd Rut sz pm fdv cw gn cs pidv false seccAll M m pc)
-
-/-- Rocq `ucwd_move`: the mover, for a chdir leaf. -/
-theorem ucwd_move (N : UkNames GF) (c c' : Nat) :
-    ucwdAuth (GF := GF) N.cwd c ∗ ucwd N.cwd c ⊢ |==> (ucwdAuth N.cwd c' ∗ ucwd N.cwd c') :=
-  ucwd_update N.cwd c c c'
-
-/-- Rocq `uch_move`. -/
-theorem uch_move (N : UkNames GF) (S S' : ExtTreeSet GName compare) :
-    uchAuth (GF := GF) N.ch S ∗ uch N.ch S ⊢ |==> (uchAuth N.ch S' ∗ uch N.ch S') :=
-  uch_update N.ch S S S'
 
 end UkRun
 
@@ -718,23 +659,6 @@ theorem urun_stack (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64) (ava
   unfold ustack
   icases Hstk with ⟨%h, -⟩
   ipureintro; exact h
-
-/-- **Rocq `uheap_uword_at`**: THE DATA WORD AT AN ADDRESS -- in range, and
-WRITABLE (the store leaf's `ukStoreOk` without naming a page). -/
-theorem uheap_uword_at (γt γd γs : GName) (M : ElfMem) (pm : Nat → Option UPerm) (sz : Nat) (dq : DFrac)
-    (a : Nat) (w : BitVec 64) :
-    ⊢@{IProp GF} uheap γt γd γs M pm sz -∗ uwordq γd dq a w -∗ ⌜a < uCap ∧ uwAddr pm a⌝ := by
-  unfold uwordq
-  iintro Hh Hw
-  ihave %hb := uheap_ubytes_at γt γd γs M pm sz dq a 8 (nthByte (n := 8) w) $$ Hh Hw
-  ipureintro
-  obtain ⟨-, hw, hc⟩ := hb 0 (by decide)
-  exact ⟨hc, hw⟩
-
-/-- **Rocq `ustack_nowrap`**: the moved sp's word does not wrap (with the
-room in the predicate, a direct reading). -/
-theorem ustack_nowrap (γd : GName) (sp : BitVec 64) (k : Nat) :
-    ustack (GF := GF) γd sp k ⊢ ⌜8 * k ≤ sp.toNat⌝ := ustack_room γd sp k
 
 end UkRunLeaf
 

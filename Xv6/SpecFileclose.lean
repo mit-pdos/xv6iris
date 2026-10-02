@@ -405,20 +405,6 @@ payload -- the process never resumes to be told anything (Rocq
 def filecloseCpays (sts : List FdState) : IProp GF :=
   iprop([∗list] st ∈ sts, filecloseCpay (hlc := hlc) st iprop(emp))
 
-/-- ...at a table that holds no pipe row, every payment is `emp` (Rocq
-`fileclose_cpays_nopipe`). -/
-theorem filecloseCpays_nopipe (sts : List FdState) (h : ∀ st ∈ sts, fdstNopipe st) :
-    ⊢ filecloseCpays (hlc := hlc) (GF := GF) sts := by
-  unfold filecloseCpays
-  refine BigSepL.bigSepL_intro (P := iprop(emp)) (fun k st hk => ?_)
-  have hn := h st (List.mem_of_getElem? hk)
-  unfold filecloseCpay
-  rcases st with _ | ⟨_, w, _ | _ | _⟩
-  · exact .rfl
-  · exact hn.elim
-  · exact .rfl
-  · exact .rfl
-
 /-- Rocq `fileclose_cpays_taint`. -/
 theorem filecloseCpays_taint (sts : List FdState) :
     □ MachFixedGS.killCred (hlc := hlc) (GF := GF) ⊢ filecloseCpays (hlc := hlc) sts := by

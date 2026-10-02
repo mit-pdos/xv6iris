@@ -35,10 +35,6 @@ def tfUeq (tf tf' : List (BitVec 64)) : Prop :=
 /-- Rocq `tf_ueq_refl`. -/
 theorem tfUeq_refl (tf : List (BitVec 64)) : tfUeq tf tf := ⟨rfl, fun _ _ _ => rfl⟩
 
-/-- Rocq `tf_ueq_sym`. -/
-theorem tfUeq_symm {tf tf' : List (BitVec 64)} (h : tfUeq tf tf') : tfUeq tf' tf :=
-  ⟨h.1.symm, fun i h5 h35 => (h.2 i h5 h35).symm⟩
-
 /-- Rocq `tf_ueq_trans`. -/
 theorem tfUeq_trans {tf tf' tf'' : List (BitVec 64)} (h : tfUeq tf tf') (h' : tfUeq tf' tf'') :
     tfUeq tf tf'' :=

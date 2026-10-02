@@ -41,19 +41,6 @@ section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 variable {lent : Bool}
 
-/-! ## Arithmetic -/
-
-/-- `dstva - PGROUNDDOWN(dstva)`. -/
-theorem co_off (x : BitVec 64) :
-    x - (x &&& 0xFFFFFFFFFFFFF000#64) = BitVec.ofNat 64 (x.toNat % 4096) := by
-  have h : x - (x &&& 0xFFFFFFFFFFFFF000#64) = BitVec.setWidth 64 (BitVec.extractLsb' 0 12 x) := by
-    bv_decide
-  have hx := x.isLt
-  rw [h]
-  apply BitVec.eq_of_toNat_eq
-  rw [BitVec.toNat_setWidth, BitVec.toNat_ofNat, BitVec.extractLsb'_toNat]
-  simp only [Nat.shiftRight_zero, Nat.reducePow]
-
 /-! ## Return addresses -/
 
 theorem co_ret_1578 : jumpPc (KA.«copyout» + 0x64#64) = (KA.«copyout» + 0x64#64) := by

@@ -115,12 +115,6 @@ theorem fileBytes_length' (data : Nat → List (BitVec 8)) (len : Nat) :
 theorem fnFileBytes_length (n : FsNode) : (fnFileBytes n).length = fnSize n := by
   simp [fnFileBytes, fileBytes]
 
-/-- THE SLICE IS EXACT ON BOTH ENDS (Rocq's `ard_slice_length`). -/
-theorem ardSlice_length (off r : Nat) (bs : List (BitVec 8)) (hr : r ≤ bs.length - off) :
-    ((bs.drop off).take r).length = r := by
-  simp only [List.length_take, List.length_drop]
-  omega
-
 /-! ## 1a.  The observation's side conditions, and the return tie -/
 
 /-- the one row-shaped cap the machine realizes: a FILE's bytes fit the size
@@ -177,24 +171,5 @@ theorem srd_ofNat_ne_m1 (x : Nat) (hx : x < 2 ^ 64 - 1) : BitVec.ofNat 64 x ≠ 
   rw [Nat.mod_eq_of_lt (by omega)] at this
   have hm : (-1#64).toNat = 2 ^ 64 - 1 := by decide
   omega
-
-/-- the ok arm's value is never the -1 literal, so the relayed disjunction
-collapses: THE ANSWER IS THE WINDOW'S LENGTH, on every row (Rocq's
-`ard_ret_tie_pos`) -/
-theorem ardRetTie_pos (n : Int) (a : Anode) (off d : Nat) (r : BitVec 64)
-    (hn : 0 ≤ n ∧ n < 2 ^ 31) (htie : ardRetTie n a off r)
-    (hor : r = BitVec.ofNat 64 d ∨ r = -1#64) : r = BitVec.ofNat 64 d := by
-  rcases hor with hd | hm1
-  · exact hd
-  exfalso
-  unfold ardRetTie at htie
-  split at htie
-  · rename_i bs _
-    rw [htie] at hm1
-    have := ardCount_le n.toNat off bs.length
-    exact srd_ofNat_ne_m1 _ (by omega) hm1
-  · obtain ⟨rv, hr, h0, h1⟩ := htie
-    rw [hr, show rv = ((rv.toNat : Nat) : Int) by omega, BitVec.ofInt_natCast] at hm1
-    exact srd_ofNat_ne_m1 _ (by omega) hm1
 
 end Xv6

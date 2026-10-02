@@ -114,13 +114,6 @@ theorem RegMap.set_apply (m : RegMap) (i j : BitVec 5) (v : BitVec 64) :
     m.set i v j = if j = i then v else m j := by
   simp [RegMap.set]
 
-/-- `rget` through a `setReg`, decided on literal indices. -/
-theorem KCtx.rget_setReg (cpu : CPU) (k : KCtx) (i j : BitVec 5) (v : BitVec 64) (h0 : i ≠ 0#5) (h4 : i ≠ 4#5) :
-    (k.setReg i v).rget cpu j = if j = i then v else k.rget cpu j := by
-  by_cases h : j = i
-  · subst h; simp [KCtx.rget_setReg_same _ _ _ _ h0 h4]
-  · simp [KCtx.rget_setReg_other _ _ _ _ _ h, h]
-
 /-- `rget` through a `setReg`, unconditionally (for `simp`; the inner
 conditionals decide on literal indices). -/
 theorem KCtx.rget_setReg' (cpu : CPU) (k : KCtx) (i j : BitVec 5) (v : BitVec 64) :

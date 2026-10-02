@@ -51,13 +51,6 @@ theorem ucwd_agree (γc : GName) (c c' : Nat) : ucwdAuth (GF := GF) γc c ∗ uc
   iintro ⟨H1, H2⟩
   iapply ghost_var_agree $$ H1 H2
 
-/-- **Rocq `ucwd_update`**: BOTH halves move it (what chdir spends). -/
-theorem ucwd_update (γc : GName) (c c' c'' : Nat) :
-    ucwdAuth (GF := GF) γc c ∗ ucwd γc c' ⊢ |==> (ucwdAuth γc c'' ∗ ucwd γc c'') := by
-  unfold ucwdAuth ucwd
-  iintro ⟨H1, H2⟩
-  iapply ghost_var_update_halves c'' γc c c' $$ H1 H2
-
 /-- **Rocq `ucwd_alloc`**: the mint, at the cwd the key carries. -/
 theorem ucwd_alloc (c : Nat) : ⊢@{IProp GF} |==> ∃ γc : GName, ucwdAuth γc c ∗ ucwd γc c := by
   imod ghost_var_alloc (GF := GF) c with ⟨%γc, Hc⟩

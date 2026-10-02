@@ -60,12 +60,6 @@ abbrev Fstate : Type := Std.ExtTreeMap (List (BitVec 8)) (List (BitVec 8)) compa
 `FileDisc`'s `fnameF` is this constant.  (Rocq `fname_m`.) -/
 def fnameM : List (BitVec 8) := [102#8]
 
-/-- the one-name state an option content denotes: the bridge from the
-deed's `Option` to the model's map (Rocq `fst_of`) -/
-def fstOf : Option (List (BitVec 8)) → Fstate
-  | none => ∅
-  | some bs => (∅ : Fstate).insert fnameM bs
-
 /-! ## 2.  ECHO'S CHUNKS -/
 
 /-- `echoArgsChunks args` for the arguments AFTER the command name:

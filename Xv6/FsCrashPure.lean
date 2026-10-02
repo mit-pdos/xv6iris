@@ -614,13 +614,6 @@ theorem logMirrorOk_upd_sector (M : LogMirror) (dk : Nat → BitVec 8)
   logMirrorOk_upd_pt M (fsBlocks dk) _ cov ls blk
     (fun c hc => fsBlocks_sub_ne dk blk c o bs hfit hc) hok
 
-/-- The header's reading is a sector-0 reading (Rocq `lm_hdr_sector0`). -/
-theorem lmHdr_sector0 (M M' : LogMirror) (ls : Nat) (hn : (lmHdr M ls).1 ≤ LOGBLOCKS)
-    (heq : (M'.view (logHdrBno ls)).take Virtio.sectorSize =
-      (M.view (logHdrBno ls)).take Virtio.sectorSize) :
-    lmHdr M' ls = lmHdr M ls :=
-  hdrDec_sector0_eq _ _ hn heq
-
 /-- Rocq `lm_hdr_upd_ne`. -/
 theorem lmHdr_upd_ne (M : LogMirror) (ls blk : Nat) (bs : List (BitVec 8))
     (hne : blk ≠ logHdrBno ls) : lmHdr (lmUpd M blk bs) ls = lmHdr M ls := by

@@ -582,23 +582,6 @@ theorem segsUnion_lookup_inv (g : α → ElfMem) (ps : List α) (a : Nat) (b : B
     · obtain ⟨p, hp, hg⟩ := ih h
       exact ⟨p, List.mem_cons_of_mem _ hp, hg⟩
 
-/-- `segsUnion`'s domain (Rocq's `dom` reading, pointwise). -/
-theorem segsUnion_isSome (g : α → ElfMem) (ps : List α) (a : Nat) :
-    (segsUnion g ps a).isSome ↔ ∃ p, p ∈ ps ∧ (g p a).isSome := by
-  induction ps with
-  | nil => simp [segsUnion, elfEmpty]
-  | cons c ps ih =>
-    simp only [segsUnion, List.foldr_cons] at ih ⊢
-    rw [elfUnion_isSome, ih]
-    constructor
-    · rintro (h | ⟨p, hp, h⟩)
-      · exact ⟨c, List.mem_cons_self .., h⟩
-      · exact ⟨p, List.mem_cons_of_mem _ hp, h⟩
-    · rintro ⟨p, hp, h⟩
-      rcases List.mem_cons.1 hp with rfl | hp
-      · exact Or.inl h
-      · exact Or.inr ⟨p, hp, h⟩
-
 /-- Rocq `segs_union_disjoint_l`. -/
 theorem segsUnion_disjoint_l (g1 g2 : α → ElfMem) (p : α) (qs : List α)
     (h : ∀ q, q ∈ qs → elfDisj (g1 p) (g2 q)) : elfDisj (g1 p) (segsUnion g2 qs) := by
@@ -627,28 +610,6 @@ theorem segsUnion_disjoint (g1 g2 : α → ElfMem) (ps qs : List α)
     · rw [h'] at hg; cases hg
     · exact Or.inr h'
 
-/-- Rocq `segs_union_lookup`. -/
-theorem segsUnion_lookup [DecidableEq α] (g : α → ElfMem) (ps : List α) (a : Nat) (b : BitVec 8)
-    (hdisj : ∀ p q, p ∈ ps → q ∈ ps → p ≠ q → elfDisj (g p) (g q)) :
-    segsUnion g ps a = some b ↔ ∃ p, p ∈ ps ∧ g p a = some b := by
-  refine ⟨segsUnion_lookup_inv g ps a b, ?_⟩
-  induction ps with
-  | nil => rintro ⟨p, hp, -⟩; cases hp
-  | cons c ps ih =>
-    rintro ⟨p, hp, hg⟩
-    simp only [segsUnion, List.foldr_cons] at ih ⊢
-    rw [elfUnion_some_raw]
-    rcases List.mem_cons.1 hp with rfl | hp
-    · exact Or.inl hg
-    · by_cases hcp : c = p
-      · subst hcp; exact Or.inl hg
-      · right
-        refine ⟨?_, ih (fun x y hx hy hne => hdisj x y (List.mem_cons_of_mem _ hx)
-          (List.mem_cons_of_mem _ hy) hne) ⟨p, hp, hg⟩⟩
-        rcases hdisj c p (List.mem_cons_self ..) (List.mem_cons_of_mem _ hp) hcp a with h | h
-        · exact h
-        · rw [h] at hg; cases hg
-
 /-- Rocq `segs_union_split`. -/
 theorem segsUnion_split (g1 g2 : α → ElfMem) (ps : List α)
     (h : ∀ p q, p ∈ ps → q ∈ ps → elfDisj (g1 p) (g2 q)) :
@@ -674,12 +635,6 @@ end segs
 
 /-! ## THE ABSTRACT LAWS -- what an exec() spec consumes -/
 
-/-- Rocq `elf_wf_seg_map_disjoint`. -/
-theorem elfWf_segMap_disjoint (f : ElfBytes) (p q : ElfPhdr) (hwf : elfWf f = true)
-    (hp : p ∈ elfLoads f) (hq : q ∈ elfLoads f) (hne : p ≠ q) : elfDisj (segMap f p) (segMap f q) :=
-  segMap_disjoint f p q (elfWf_phdrOk f p hwf hp) (elfWf_phdrOk f q hwf hq)
-    (fun a => elfWf_loadsDisj f p q a hwf hp hq hne)
-
 /-- Rocq `elf_wf_file_zero_disjoint`. -/
 theorem elfWf_fileZero_disjoint (f : ElfBytes) (p q : ElfPhdr) (hwf : elfWf f = true)
     (hp : p ∈ elfLoads f) (hq : q ∈ elfLoads f) : elfDisj (segFileMap f p) (segZeroMap q) := by
@@ -698,14 +653,5 @@ theorem elfImage_split (f : ElfBytes) (hwf : elfWf f = true) :
     exact segsUnion_split (segFileMap f) segZeroMap _
       (fun p q hp hq => elfWf_fileZero_disjoint f p q hwf hp hq)
   · exact segsUnion_disjoint _ _ _ _ (fun p q hp hq => elfWf_fileZero_disjoint f p q hwf hp hq)
-
-/-- A file window's union is disjoint pairwise (Rocq's inline
-`map_disjoint_weaken` in `elf_file_image_lookup`). -/
-theorem elfWf_segFileMap_disjoint (f : ElfBytes) (p q : ElfPhdr) (hwf : elfWf f = true)
-    (hp : p ∈ elfLoads f) (hq : q ∈ elfLoads f) (hne : p ≠ q) :
-    elfDisj (segFileMap f p) (segFileMap f q) :=
-  elfDisj_weaken (elfWf_segMap_disjoint f p q hwf hp hq hne)
-    (fun x hx => by unfold segMap; rw [elfUnion_isSome]; exact Or.inl hx)
-    (fun x hx => by unfold segMap; rw [elfUnion_isSome]; exact Or.inl hx)
 
 end Xv6

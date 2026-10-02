@@ -149,14 +149,6 @@ theorem ite_beq_zext {α : Type} (c n : BitVec 8) (x y : α) :
   · have : BitVec.setWidth 64 c ≠ BitVec.setWidth 64 n := fun e => h ((setWidth64_inj c n).1 e)
     simp [h, this]
 
-theorem ite_beq_zext' {α : Type} (n c : BitVec 8) (x y : α) :
-    (if bcond bop.BEQ (BitVec.setWidth 64 n) (BitVec.setWidth 64 c) then x else y) = if c = n then x else y := by
-  rw [bcond_beq_eq]
-  by_cases h : c = n
-  · subst h; simp
-  · have : BitVec.setWidth 64 n ≠ BitVec.setWidth 64 c := fun e => h ((setWidth64_inj c n).1 e.symm)
-    simp [h, this]
-
 theorem ite_bne_zext {α : Type} (c n : BitVec 8) (x y : α) :
     (if bcond bop.BNE (BitVec.setWidth 64 c) (BitVec.setWidth 64 n) then x else y) = if c = n then y else x := by
   rw [bcond_bne_eq]

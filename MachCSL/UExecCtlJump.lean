@@ -133,17 +133,6 @@ theorem uxc_btype_arm (hD : UxcFoot D) (orc : UOrc) (s : UWSt) (imm : BitVec 13)
   simp only [uxa_readReg_bind D orc s _ _ hD.pc]
   exact uxc_jump_to D orc s _ z hz h0 hok hD.npcW
 
-/-- The taken arm of a branch, the misaligned-target trap. -/
-theorem uxc_btype_arm_misaligned (hD : UxcFoot D) (orc : UOrc) (s : UWSt) (imm : BitVec 13)
-    (hz : runRW D orc s (currentlyEnabled extension.Ext_Zca) = some (false, s, orc))
-    (h0 : (uxcTgt s imm).getLsbD 0 = false) (h1 : (uxcTgt s imm).getLsbD 1 = true) :
-    runRW D orc s (do jump_to ((← readReg .PC) + sign_extend (m := 64) imm)) =
-      some (.Trap (s.file .cur_privilege, make_sync_exception (.E_Fetch_Addr_Align ()) (uxcTgt s imm),
-        s.file .PC), s, orc) := by
-  unfold uxcTgt at h0 h1 ⊢
-  simp only [uxa_readReg_bind D orc s _ _ hD.pc]
-  exact uxc_jump_to_misaligned D orc s _ hz h0 h1 hD.priv hD.pc
-
 /-- The body of a branch, after the two source reads. -/
 theorem uxc_btype_body (op : bop) (imm : BitVec 13) (rs2 rs1 : regidx) (s : UWSt) (D : UFoot)
     (hD : UxcFoot D) (orc : UOrc) :

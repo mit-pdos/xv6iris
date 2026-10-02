@@ -57,16 +57,6 @@ theorem wrap16_mod8 (n : Nat) : (wrap16 n).toNat % NUM = n % NUM := by
   rw [wrap16_toNat]
   exact Nat.mod_mod_of_dvd n (by unfold NUM; omega)
 
-/-- **Sixteen bits identify a counter inside a window of `2^16`.**  The
-queue's counters never run more than `NUM` apart, so the driver's and the
-device's 16-bit indices determine the natural numbers behind them --
-which is what turns `avail->idx != seen` and `used->idx != disk.used_idx`
-into `lo < np` and `nr < nc`. -/
-theorem wrap16_inj_window (a b : Nat) (hab : a ≤ b) (hw : b - a < 65536)
-    (h : wrap16 a = wrap16 b) : a = b := by
-  have h' : a % 65536 = b % 65536 := by rw [← wrap16_toNat, ← wrap16_toNat, h]
-  omega
-
 /-! ## The per-descriptor receipt -/
 
 /-- What a descriptor slot is: free (the driver owns and has zeroed it),
@@ -157,9 +147,6 @@ def publish (q : VQ) (i : Nat) (c : Chain) : VQ :=
   { q with np := q.np + 1, ring := fun p => if p = q.np then i else q.ring p,
            slot := fun p => if p = q.np then .pending else q.slot p,
            head := fun j => if j = i then .active c else q.head j }
-
-/-- READ: the interrupt handler consumes the used element at `nr`. -/
-def readAt (q : VQ) : VQ := { q with nr := q.nr + 1 }
 
 /-- RECLAIM: `free_chain` gives head `i` back to the driver. -/
 def reclaim (q : VQ) (i : Nat) : VQ :=
@@ -718,26 +705,5 @@ block's sectors have drained.  The definition and its preservation
 lemmas are kept for the record. -/
 def cachedOk (v : VirtioState) (st : Nat → HState) : Prop :=
   ∀ e ∈ v.cache, e.2 ≠ [] → inFlightBlk st (e.1 / SPB)
-
-theorem cacheView_of_uncached (v : VirtioState) (a : Nat)
-    (h : Virtio.alistGet v.cache (a / Virtio.sectorSize) = none ∨
-         Virtio.alistGet v.cache (a / Virtio.sectorSize) = some []) :
-    Virtio.cacheView v a = v.disk a := by
-  rcases h with h | h
-  · exact cacheView_none v a h
-  · rw [cacheView_some v a [] h]; rfl
-
-/-- The cache holds nothing (or nothing but an empty entry) at a sector
-whose block is not in flight. -/
-theorem uncached_of_not_inFlight (v : VirtioState) (st : Nat → HState) (k : Nat)
-    (hc : cachedOk v st) (hk : ¬ inFlightBlk st (k / SPB)) :
-    Virtio.alistGet v.cache k = none ∨ Virtio.alistGet v.cache k = some [] := by
-  cases hg : Virtio.alistGet v.cache k with
-  | none => exact Or.inl rfl
-  | some bs =>
-    right
-    by_cases hb : bs = []
-    · rw [hb]
-    · exact absurd (hc (k, bs) (Alist.get_mem _ _ _ hg) hb) hk
 
 end Xv6

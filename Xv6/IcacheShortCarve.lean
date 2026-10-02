@@ -65,31 +65,6 @@ theorem icLentStamps_carve [Icfg] (k : Nat) (qt qi s : Qp) (dev inum : BitVec 32
   rw [(icStamps_mass_eq k _ _ (P + s).val e1).to_eq]
   exact h
 
-/-- THE CARVE of a short parent (Rocq `inode_ref_short_carve`). -/
-theorem inodeRefShort_carve [Icfg] [CurCtx] (k : Nat) (qt qi s : Qp) (dev inum : BitVec 32) :
-    inodeRefShort (GF := GF) k qt (qi + s) dev inum ⊣⊢
-      inodeRefShort k qt qi dev inum ∗ inodeShr k s dev inum := by
-  unfold inodeRefShort inodeShr
-  constructor
-  · iintro ⟨Hf, Hlv, Hid, Hs, Hst⟩
-    icases persistent_entails_left (irefFrag_le1 k qt) $$ Hf with ⟨Hf, %hle⟩
-    icases (liveFracc_split k qi s).1 $$ Hlv with ⟨Hl1, Hl2⟩
-    icases (inodeIdent_split k qi s dev inum).1 $$ Hid with ⟨Hid1, Hid2⟩
-    icases (slhTok_split (icfgIsl k) qi s).1 $$ Hs with ⟨Hs1, Hs2⟩
-    icases (icLentStamps_carve k qt qi s dev inum hle).1 $$ Hst with ⟨Hst1, Hst2⟩
-    iframe
-  · iintro ⟨⟨Hf, Hl1, Hid1, Hs1, Hst1⟩, ⟨Hid2, Hl2, Hs2, Hst2⟩⟩
-    icases persistent_entails_left (irefFrag_le1 k qt) $$ Hf with ⟨Hf, %hle⟩
-    ihave Hlv := (liveFracc_split k qi s).2 $$ [Hl1 Hl2]
-    · iframe
-    ihave Hid := (inodeIdent_split k qi s dev inum).2 $$ [Hid1 Hid2]
-    · iframe
-    ihave Hs := slhTok_join (icfgIsl k) qi s $$ [Hs1 Hs2]
-    · iframe
-    ihave Hst := (icLentStamps_carve k qt qi s dev inum hle).2 $$ [Hst1 Hst2]
-    · iframe
-    iframe
-
 /-- ...and the generation-named forms: the share is carved at the SAME
 generation and floor as the parent, so it gathers back without a pin (Rocq
 `inode_ref_short_genlo_carve`). -/

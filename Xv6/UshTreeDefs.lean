@@ -214,15 +214,6 @@ theorem ushMallocChain_split (N : UkNames GF) :
     obtain ⟨UM2, h3, h4⟩ := ushMallocChain_split N k k' UM1 UM' h2
     exact ⟨UM2, ⟨UM1, h1, h3⟩, h4⟩
 
-/-- **Rocq `ushp_malloc_chain_app`**. -/
-theorem ushMallocChain_app (N : UkNames GF) :
-    ∀ (k k' : Nat) (UM UM1 UM' : IProp GF), ushMallocChain (hlc := hlc) N k UM UM1 →
-      ushMallocChain (hlc := hlc) N k' UM1 UM' → ushMallocChain (hlc := hlc) N (k + k') UM UM'
-  | 0, k', UM, UM1, UM', h1, h2 => by simp only [ushMallocChain] at h1; subst h1; simpa using h2
-  | k + 1, k', UM, UM1, UM', ⟨UM2, h1, h3⟩, h2 => by
-    rw [Nat.add_right_comm]
-    exact ⟨UM2, h1, ushMallocChain_app N k k' UM2 UM1 UM' h3 h2⟩
-
 /-- **Rocq `UkSh.wp_ksh_memset`**: memset writes the byte `a1` holds over the
 `Nb`-byte buffer at `a0`. -/
 def wpUshMemsetBody : Prop :=

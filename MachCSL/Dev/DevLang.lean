@@ -181,14 +181,6 @@ def fork (t : T) : DevM S T TaskId := lift (.fork t)
 /-- Wait for a task. -/
 def join (tid : TaskId) : DevM S T Unit := lift (.join tid)
 
-/-- Run `p` until it yields `false`: a bounded device loop. -/
-def loopFuel (fuel : Nat) (p : DevM S T Bool) : DevM S T Unit :=
-  match fuel with
-  | 0 => pure ()
-  | n + 1 => do
-    let c ← p
-    if c then loopFuel n p else pure ()
-
 end DevM
 
 /-! ## Bytes and words -/

@@ -221,13 +221,4 @@ theorem imgDir_orphanClean (P : Nat → List (BitVec 8)) (sb : FsSb) (dn : Dinod
     (hok : FsInodeOk P sb dn) : dirOrphanClean dn (fsDataOf P dn) :=
   dirOrphanClean_live dn _ (by have := hok.fioNlink; omega)
 
-/-! ## F.  THE SLOT-TO-BLOCK-LIST BRIDGE -/
-
-/-- A nonzero SLOT is in the inode's block list (Rocq's
-`img_slot_in_inode_blocks`; deviation 3). -/
-theorem imgSlot_in_inodeBlocks (P : Nat → List (BitVec 8)) (sb : FsSb) (dn : Dinode) (i : Nat)
-    (hok : FsInodeOk P sb dn) (hi : i ≤ MAXFILE) (hnz : fsSlot P dn i ≠ 0) :
-    fsSlot P dn i ∈ fsInodeBlocks P dn :=
-  List.mem_of_getElem? (fsInodeBlocks_lookup P sb dn i hok hi hnz)
-
 end Xv6

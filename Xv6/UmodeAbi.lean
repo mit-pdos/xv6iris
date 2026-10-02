@@ -55,12 +55,6 @@ structure Ucstr (M : ElfMem) (a len : Nat) : Prop where
   body : ∀ j, j < len → ∃ b, M (a + j) = some b ∧ b ≠ ubyte0
   nul : M (a + len) = some ubyte0
 
-/-- Rocq `ucstr_above`: an update that leaves every byte at or above `lo`
-alone keeps a string that lives there. -/
-theorem ucstr_above {M M' : ElfMem} {a len lo : Nat} (heq : ∀ k, lo ≤ k → M' k = M k) (hlo : lo ≤ a)
-    (h : Ucstr M a len) : Ucstr M' a len :=
-  ⟨fun j hj => by rw [heq (a + j) (by omega)]; exact h.body j hj, by rw [heq (a + len) (by omega)]; exact h.nul⟩
-
 instance ucstr_dec (M : ElfMem) (a len : Nat) : Decidable (Ucstr M a len) := by
   have e : Ucstr M a len ↔ ((∀ j, j < len → ∃ b, M (a + j) = some b ∧ b ≠ ubyte0) ∧ M (a + len) = some ubyte0) :=
     ⟨fun h => ⟨h.body, h.nul⟩, fun h => ⟨h.1, h.2⟩⟩
@@ -137,24 +131,6 @@ theorem ucs_caller (m : RegMap) (r : BitVec 5) (v : BitVec 64) (hr : ucalleeSave
   by_cases h0 : r' = 0#5
   · simp [h0]
   · simp [h0, RegMap.set_other _ _ _ _ hne]
-
-/-! ## §10 The exec argument vector, by CONTENTS -/
-
-/-- **Rocq `ustr_at`**: a NUL-terminated string at `a` whose bytes are
-exactly `bs`. -/
-def ustrAt (M : ElfMem) (a : Nat) (bs : List (BitVec 8)) : Prop :=
-  (∀ j b, bs[j]? = some b → M (a + j) = some b) ∧ M (a + bs.length) = some ubyte0
-
-/-- **Rocq `uargv_at`**: a NULL-terminated pointer array at `pv`, the `i`-th
-pointing at the string `args[i]` (exec's second argument). -/
-def uargvAt (M : ElfMem) (pv : Nat) (args : List (List (BitVec 8))) : Prop :=
-  (∀ i bs, args[i]? = some bs →
-    ∃ p : Nat, uMBytesW M (pv + 8 * i) (BitVec.ofNat 64 p) ∧ ustrAt M p bs) ∧
-  uMBytesW M (pv + 8 * args.length) 0#64
-where
-  /-- Rocq `uM_bytes M a 8 w` at a 64-bit word. -/
-  uMBytesW (M : ElfMem) (a : Nat) (w : BitVec 64) : Prop :=
-    ∀ j, j < 8 → M (a + j) = some (nthByte (n := 8) w j)
 
 /-! ## §11 Several disturbed windows -/
 

@@ -328,32 +328,6 @@ map, which is what every byte tie is later read through. -/
 def phiAgree (Γ : FsViewNames GF) (A : IProp GF) (M : RegMapF (BitVec 8)) : Prop :=
   ∀ (dq : DFrac) (a : Nat) (v : BitVec 8), A ∗ Γ.phi dq a v ⊢ ⌜get? M a = some v⌝
 
-/-- Rocq's `phi_map_in`. -/
-theorem phiMap_in (Γ : FsViewNames GF) (A : IProp GF) (M : RegMapF (BitVec 8))
-    (hag : phiAgree Γ A M) (N : RegMapF (BitVec 8)) :
-    A ⊢ phiMap Γ N -∗ ⌜N ⊆ M⌝ := by
-  refine wand_intro (fsDurPureForall2 fun (k : Nat) (v : BitVec 8) => ?_)
-  by_cases hk : get? N k = some v
-  · unfold phiMap
-    iintro ⟨HA, HN⟩
-    ihave Hk := (BigSepM.bigSepM_lookup_acc hk).1 $$ HN
-    icases Hk with ⟨Hk, -⟩
-    ihave %h := hag (DFrac.own 1) k v $$ [HA Hk]
-    · iframe HA Hk
-    ipureintro
-    exact fun _ => h
-  · iintro -
-    ipureintro
-    exact fun h => absurd h hk
-
-/-- Rocq's `phi_runs_in`. -/
-theorem phiRuns_in (Γ : FsViewNames GF) (A : IProp GF) (M : RegMapF (BitVec 8))
-    (hag : phiAgree Γ A M) (l : List XRun) (hd : xrDisj l) :
-    A ⊢ phiRuns Γ l -∗ ⌜xrUnion l ⊆ M⌝ := by
-  iintro HA Hl
-  ihave Hl := (phiRuns_union Γ l hd).1 $$ Hl
-  iapply phiMap_in Γ A M hag $$ HA Hl
-
 end Runs
 
 /-! ## 2d.  THE RUNS AT MIXED SHARES

@@ -71,47 +71,6 @@ theorem execSpecF_csrr_sstatus (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Bool)
   iapply HΦ $$ HmConf HPC HnextPC HF
 
 set_option maxHeartbeats 4000000 in
-/-- `csrrci rd, sstatus, SIE` with `SIE = 0`: reads `sstatus`, leaves
-`mstatus` as it is. -/
-theorem execSpecF_csrrci_sstatus (cpu : CPU) (c : MConf) (hok : SConfPhys (GF := GF) c false)
-    (pc npc₀ : BitVec 64) (rd : BitVec 5) (hrd : rd ≠ 0#5) (R : RegMap) :
-    execSpecPP (GF := GF) cpu (DFrac.own 1) Privilege.Supervisor c Privilege.Supervisor c
-      (instruction.CSRImm (0x100#12, 2#5, regidx.Regidx rd, csrop.CSRRC)) pc npc₀ npc₀
-      (gprFile cpu R) (gprFile cpu (RegMap.set R rd (lower_mstatus c.mstatus))) := by
-  intro Φ
-  iintro ⟨HmConf, HPC, HnextPC, HF, HΦ⟩
-  conf_cases HmConf
-  have hsm := hok.2.1
-  obtain ⟨hpmp, hms, hpmm, hlpe⟩ := hok
-  obtain ⟨hSIE, hMPRV, hSXL, hMXR, hTSR, hTVM, hFS, hXS, hVS, hSD, hMPP⟩ := hms
-  have hid := sstatus_clear_sie_id c.mstatus hsm
-  unfold execute
-  dsimp only
-  try unfold execute_CSRImm
-  try unfold doCSR
-  -- keep `write_CSR` opaque (the short-circuit check is walked in few steps)
-  generalize hW : write_CSR 0x100#12 = W
-  swp_run 30
-  swp_run 300
-  subst hW
-  iapply swp_bind
-  iapply swp_write_CSR_sstatus (hmpp := hMPP)
-  iframe; iframe Hhw
-  inext
-  iintro Hmstatus
-  simp only [hid]
-  swp_run 30
-  iapply swp_bind
-  iapply swp_wX_file (hrd := hrd)
-  iframe
-  inext
-  iintro HF
-  swp_run 20
-  conf_intro HmConf
-  iapply HΦ $$ HmConf HPC HnextPC HF
-
-
-set_option maxHeartbeats 4000000 in
 /-- `csrrci rd, sstatus, SIE` at either `SIE`: reads `sstatus` (the old
 value) and clears `SIE` in `mstatus` (push_off's `csrrci`). -/
 theorem execSpecF_csrrci_sstatus_flip (cpu : CPU) (c : MConf) (sie : Bool) (hok : SConfPhys (GF := GF) c sie)

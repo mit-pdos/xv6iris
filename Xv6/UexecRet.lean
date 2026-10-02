@@ -459,22 +459,8 @@ theorem uwaitAns_of_pid (r : BitVec 64) (cs cs' : ExtTreeSet GName compare) (pid
     uwaitAnsPid (GF := GF) r cs cs' pidv ⊢ uwaitAns r cs cs' := by
   unfold uwaitAns; iintro H; iexists pidv; iexact H
 
-theorem uwaitAns_of (r : BitVec 64) (cs cs' : ExtTreeSet GName compare) (gn : GName) (b : Bool)
-    (pidv : BitVec 32) : uwaitAnsAt (GF := GF) r cs cs' gn b pidv ⊢ uwaitAns r cs cs' := by
-  unfold uwaitAns uwaitAnsPid; iintro H; iexists pidv, gn, b; iexact H
-
 /-- Rocq `sext_neg1_64`. -/
 theorem sext_neg1_64 : BitVec.signExtend 64 (-1#32) = -1#64 := by decide
-
-/-- Rocq `uwait_ans_at_neg1`: the failing arm, at the word `li -1` leaves. -/
-theorem uwaitAnsAt_neg1 (cs : ExtTreeSet GName compare) (gn : GName) (b : Bool) (pidv : BitVec 32) :
-    waitWhy (GF := GF) cs gn b ⊢ uwaitAnsAt (-1#64) cs cs gn b pidv := by
-  unfold uwaitAnsAt
-  iintro #Hwhy
-  iexists -1#32, 0
-  isplitr
-  · ipureintro; exact sext_neg1_64.symm
-  · iapply waitAns_neg 0 cs gn b pidv $$ Hwhy
 
 /-! ### Fork's two slots -/
 

@@ -75,20 +75,6 @@ theorem umoi_add_l (a : BitVec 64) (d : Int) : a + BitVec.ofInt 64 d = BitVec.of
   conv => lhs; rw [← umoi_of_toNat a]
   exact umoi_add _ _
 
-/-! ## §3 Comparisons (the branch leaf's `ukBtaken` arguments) -/
-
-/-- Rocq `moi_eq_vec`. -/
-theorem umoi_beq {x y : Int} (hx0 : 0 ≤ x) (hx1 : x < 2 ^ 64) (hy0 : 0 ≤ y) (hy1 : y < 2 ^ 64) :
-    (BitVec.ofInt 64 x == BitVec.ofInt 64 y) = decide (x = y) := by
-  by_cases h : x = y
-  · subst h; simp
-  · have hne : BitVec.ofInt 64 x ≠ BitVec.ofInt 64 y := by
-      intro he
-      have := congrArg BitVec.toNat he
-      have := umoi_small hx0 hx1; have := umoi_small hy0 hy1
-      omega
-    simp [h, hne]
-
 /-! ## §4 The 32-bit truncating operations: addiw / subw
 
 Both are "compute in 32 bits, sign-extend to 64".  On a value whose 32-bit
@@ -189,26 +175,10 @@ theorem umoi_zext_scale {z : Int} (k : Nat) (h0 : 0 ≤ z) (h1 : z < 2 ^ 32) (hk
 /-- Rocq `zero_reg_moi`. -/
 theorem uzero_moi : (0#64 : BitVec 64) = BitVec.ofInt 64 0 := rfl
 
-/-- Rocq `moi_eq_zero`. -/
-theorem umoi_beq_zero {x : Int} (h0 : 0 ≤ x) (h1 : x < 2 ^ 64) :
-    (BitVec.ofInt 64 x == 0#64) = decide (x = 0) := by
-  rw [uzero_moi]; exact umoi_beq h0 h1 (Int.le_refl _) (by decide)
-
 /-- Rocq `zext8_unsigned` / `zext8_moi`: an unsigned byte load leaves its
 byte ZERO-extended. -/
 theorem uzext8_moi (b : BitVec 8) : BitVec.setWidth 64 b = BitVec.ofInt 64 (b.toNat : Int) := by
   apply BitVec.eq_of_toNat_eq
   simp
-
-/-- Rocq `sext6_12_64`: sign extension composes. -/
-theorem usext6_12_64 (imm : BitVec 6) :
-    BitVec.signExtend 64 (BitVec.signExtend 12 imm) = BitVec.signExtend 64 imm := by
-  bv_decide
-
-/-- Rocq `uimm6_norm`: the compressed-immediate chain as the leaves consume
-it (`0 + sext64 (sext12 imm)`). -/
-theorem uimm6_norm (imm : BitVec 6) :
-    (0#64 : BitVec 64) + BitVec.signExtend 64 (BitVec.signExtend 12 imm) = BitVec.signExtend 64 imm := by
-  rw [BitVec.zero_add, usext6_12_64]
 
 end Xv6

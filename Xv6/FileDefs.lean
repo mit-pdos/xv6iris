@@ -265,33 +265,6 @@ instance fdvNopipe_dec (l : List FdState) : Decidable (fdvNopipe l) := by
 /-- Rocq `fdst_nopipe_closed`. -/
 theorem fdstNopipe_closed : fdstNopipe .closed := trivial
 
-/-- Rocq `fdst_nopipe_ne`: what the predicate says of a row, in the shape the
-exit row's mint reads. -/
-theorem fdstNopipe_ne (st : FdState) (h : fdstNopipe st) :
-    ∀ (rb wb : Bool) (gp : PipeNames), st ≠ .open rb wb (.pipe gp) := by
-  intro rb wb gp he; subst he; exact h
-
-/-- Rocq `fdv_nopipe_lookup`. -/
-theorem fdvNopipe_lookup (l : List FdState) (k : Nat) (st : FdState) (hl : fdvNopipe l)
-    (hk : l[k]? = some st) : fdstNopipe st :=
-  hl st (List.mem_of_getElem? hk)
-
-/-- Rocq `fdv_nopipe_lookup_total`. -/
-theorem fdvNopipe_lookup_total (l : List FdState) (k : Nat) (hl : fdvNopipe l) :
-    fdstNopipe (l.getD k .closed) := by
-  rw [List.getD_eq_getElem?_getD]
-  cases h : l[k]? with
-  | none => trivial
-  | some st => exact fdvNopipe_lookup l k st hl h
-
-/-- Rocq `fdv_nopipe_insert`. -/
-theorem fdvNopipe_insert (l : List FdState) (k : Nat) (st : FdState) (hl : fdvNopipe l)
-    (hst : fdstNopipe st) : fdvNopipe (l.set k st) := by
-  intro y hy
-  rcases List.mem_or_eq_of_mem_set hy with h | rfl
-  · exact hl y h
-  · exact hst
-
 /-- Rocq `fdv_nopipe_replicate`. -/
 theorem fdvNopipe_replicate (n : Nat) (st : FdState) (hst : fdstNopipe st) :
     fdvNopipe (List.replicate n st) := by

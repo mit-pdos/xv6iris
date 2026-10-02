@@ -186,16 +186,6 @@ theorem outLink_of_licence (k : Nat) (b : BitVec 8) (Φ : IProp GF) :
   iapply outLink_of_licenceAt k b Φ
   iapply consLicenceAt_of_licence k $$ Hlic
 
-theorem outChain_of_licence (k : Nat) (bs : List (BitVec 8)) (Φ : IProp GF) :
-    consLicence ⊢ Φ -∗ outChain .uart0 k bs Φ := by
-  induction bs with
-  | nil => unfold outChain; iintro _ HΦ; iexact HΦ
-  | cons b bs ih =>
-    unfold outChain
-    iintro #Hlic HΦ
-    iapply outLink_of_licence k b _ $$ Hlic
-    iapply ih $$ Hlic HΦ
-
 /-- The KERNEL'S PORT owes nothing (Rocq `out_link_triv`). -/
 theorem outLink_triv (k : Nat) (b : BitVec 8) (Φ : IProp GF) :
     Φ ⊢ outLink .uart1 k b Φ := by
@@ -227,11 +217,6 @@ def echoLink (k : Nat) (_h : List Obs) (b : BitVec 8) (Φ : IProp GF) : IProp GF
 def echoChain (k : Nat) (h : List Obs) : List (BitVec 8) → IProp GF → IProp GF
   | [], Φ => Φ
   | b :: bs, Φ => echoLink k h b (echoChain k h bs Φ)
-
-theorem echoLink_mono (k : Nat) (h : List Obs) (b : BitVec 8) (Φ Φ' : IProp GF) :
-    (Φ -∗ Φ') ⊢ echoLink k h b Φ -∗ echoLink k h b Φ' := by
-  unfold echoLink
-  exact consLink_mono .uart0 k (.evByte b) Φ Φ'
 
 /-- THE READ (Rocq `read_link`): the `evRead` link. -/
 def readLink (k : Nat) (ws : List (List Obs × BitVec 8)) (Φ : IProp GF) : IProp GF :=

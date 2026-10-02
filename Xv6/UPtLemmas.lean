@@ -33,10 +33,6 @@ theorem ptePpn_uLeaf (ppn : BitVec 44) (perm : BitVec 64) (hp : perm &&& ~~~0x3F
   unfold ptePpn leafOf
   revert hp; bv_decide
 
-/-- `perm` with its `A` (bit 6) and `D` (bit 7) bits set to `a`/`d`. -/
-def permAD (perm : BitVec 64) (a d : BitVec 1) : BitVec 64 :=
-  (perm &&& ~~~0xC0#64) ||| (BitVec.setWidth 64 a <<< 6) ||| (BitVec.setWidth 64 d <<< 7)
-
 /-! ## The `A`/`D` slack -/
 
 /-- `A`/`D` are bits 6 and 7: the page and the low six flag bits survive. -/
@@ -47,21 +43,6 @@ theorem pteAD_pte2pa {c v : BitVec 64} (h : pteAD c v) :
     (simp only [pte2pa, pteFlags, pteSetAD, Sail.BitVec.extractLsb, Sail.BitVec.updateSubrange,
       Sail.BitVec.updateSubrange', BitVec.extractLsb, _update_PTE_Flags_A, _update_PTE_Flags_D]
      bv_decide)
-
-theorem pteAD_isLeafPte {c v : BitVec 64} (h : pteAD c v) (hc : isLeafPte c) : isLeafPte v := by
-  obtain ⟨a, d, rfl⟩ := h
-  obtain ⟨h1, h2⟩ := hc
-  refine ⟨?_, ?_⟩
-  · have : pteSetAD c a d &&& PTE_V = c &&& PTE_V := by
-      simp only [PTE_V, pteSetAD, Sail.BitVec.extractLsb, Sail.BitVec.updateSubrange,
-        Sail.BitVec.updateSubrange', BitVec.extractLsb, _update_PTE_Flags_A, _update_PTE_Flags_D]
-      bv_decide
-    rw [this]; exact h1
-  · have : pteSetAD c a d &&& 0xE#64 = c &&& 0xE#64 := by
-      simp only [pteSetAD, Sail.BitVec.extractLsb, Sail.BitVec.updateSubrange,
-        Sail.BitVec.updateSubrange', BitVec.extractLsb, _update_PTE_Flags_A, _update_PTE_Flags_D]
-      bv_decide
-    rw [this]; exact h2
 
 /-! ## The leaf map of a table -/
 

@@ -105,14 +105,6 @@ theorem fsC0_lookup (dk : Nat → BitVec 8) (cov : ExtTreeSet Nat compare) (b : 
   foldIns_get_mem (M := RegMapF) id (fsBlocks dk) cov.toList b (fun _ _ h => h)
     (ExtTreeSet.mem_toList.2 hb)
 
-/-- Rocq `fs_C0_lookup_Some`. -/
-theorem fsC0_lookup_Some (dk : Nat → BitVec 8) (cov : ExtTreeSet Nat compare) (b : Nat)
-    (bs : List (BitVec 8)) (h : PartialMap.get? (fsC0 dk cov) b = some bs) :
-    b ∈ cov ∧ bs = fsBlocks dk b := by
-  obtain ⟨z, hz, hzb, hg⟩ := foldIns_get_some (M := RegMapF) id (fsBlocks dk) cov.toList b bs h
-  cases hzb
-  exact ⟨ExtTreeSet.mem_toList.1 hz, hg.symm⟩
-
 /-! ## §2 The carve, and §3 the splits -/
 
 section

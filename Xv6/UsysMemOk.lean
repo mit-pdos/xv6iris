@@ -567,10 +567,6 @@ def usysEff (secc : BitVec 64) (tf : List (BitVec 64)) : Int :=
 /-- kernel/syscall.h (Rocq `USYS_seccomp`). -/
 def USYS_seccomp : Int := 23
 
-/-- kernel/syscall.h (Rocq `USYS_chroot`, upstream b72cbac1).  No row of the
-program tier's contract reads it: every row is quiet at 24 (chroot.md §4). -/
-def USYS_chroot : Int := 24
-
 /-- Rocq `usys_eff_num_cong`. -/
 theorem usysEff_numCong (secc : BitVec 64) (tf1 tf2 : List (BitVec 64)) (h : usysNum tf1 = usysNum tf2) :
     usysEff secc tf1 = usysEff secc tf2 := by
@@ -605,13 +601,6 @@ theorem usysEff_argCong (secc : BitVec 64) (tf1 tf2 : List (BitVec 64))
 theorem usysEff_cases (secc : BitVec 64) (tf : List (BitVec 64)) :
     usysEff secc tf = usysNum tf ∨ usysEff secc tf = 0 := by
   unfold usysEff; split <;> simp
-
-/-- A nonzero effective number IS the raw one. -/
-theorem usysEff_raw {secc : BitVec 64} {tf : List (BitVec 64)} {n : Int} (h : usysEff secc tf = n)
-    (hn : n ≠ 0) : usysNum tf = n := by
-  rcases usysEff_cases secc tf with e | e
-  · rw [← e, h]
-  · exact absurd (e.symm.trans h).symm hn
 
 /-- **The effective number of a key** (Rocq `UexecSlot.uvis_num`; here,
 not in UexecSlot, because Lean's UsysMemOk sits above UexecSlot): every

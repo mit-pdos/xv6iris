@@ -199,18 +199,6 @@ theorem elfTable_lookup {α : Type} (parse : Nat → Option α) (o step n : Nat)
           rw [show o + step * (j + 1) = o + step + step * j by rw [Nat.mul_succ]; omega]
           exact this
 
-/-- Rocq `elf_parse_phdr_fields` (the six fields the code reads; `0 <= o`
-vacuous, deviation 2). -/
-theorem elfParsePhdr_fields (l : ElfBytes) (o : Nat) (p : ElfPhdr) (hp : elfParsePhdr l o = some p) :
-    o + 56 ≤ l.length ∧ p.type = leAt l o 4 ∧ p.flags = leAt l (o + 4) 4 ∧
-      p.offset = leAt l (o + 8) 8 ∧ p.vaddr = leAt l (o + 16) 8 ∧
-      p.filesz = leAt l (o + 32) 8 ∧ p.memsz = leAt l (o + 40) 8 := by
-  simp only [elfParsePhdr, elfReadU64, elfReadU32, elfRead, bind, pure] at hp
-  repeat (split at hp <;> try (simp at hp; done))
-  simp only [Option.bind_some, Option.some.injEq] at hp
-  subst hp
-  exact ⟨by omega, rfl, rfl, rfl, rfl, rfl, rfl⟩
-
 /-- Rocq `elf_parse_phdr_all`: ALL EIGHT FIELDS, which identifies the parsed
 record with the TOTAL reader the phdr loop's invariant is stated on. -/
 theorem elfParsePhdr_all (l : ElfBytes) (o : Nat) (p : ElfPhdr) (hp : elfParsePhdr l o = some p) :

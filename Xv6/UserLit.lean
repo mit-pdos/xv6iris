@@ -82,8 +82,4 @@ theorem litOk_str {GF : BundledGFunctors} (T : Nat → BitVec 8 → IProp GF) (r
     iexact H
   · iapply (utextImg_byte T ro _ _ (litOk_nul ro base len h)); iexact H
 
-/-- The literal's bytes, as character codes (a content pin). -/
-def litCodes (ro : ElfMem) (base len : Nat) : List Nat :=
-  (List.range len).map fun j => (litByte ro base j).toNat
-
 end Xv6.User

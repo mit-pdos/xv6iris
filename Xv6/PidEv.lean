@@ -97,30 +97,6 @@ theorem liveOf_snoc_free (h : List Pev) (a : BitVec 64) (p : BitVec 32) :
 
 theorem nextOf_nil (pidmax : Nat) : nextOf pidmax [] = 1 := rfl
 
-theorem nextOf_snoc (pidmax : Nat) (h : List Pev) (e : Pev) :
-    nextOf pidmax (h ++ [e]) = nextStep pidmax (nextOf pidmax h) e := by
-  unfold nextOf; rw [List.foldl_append]; rfl
-
-/-! ## 4. The counter stays in `[1, pidmax]` when every pid does -/
-
-/-- The fold's step keeps the bound, from any start inside it. -/
-theorem foldl_nextStep_bound (pidmax : Nat) (h : List Pev) (n : Nat)
-    (hn : 1 ≤ n ∧ n ≤ pidmax)
-    (hin : ∀ e, e ∈ h → 1 ≤ e.pid.toNat ∧ e.pid.toNat ≤ pidmax) :
-    1 ≤ h.foldl (nextStep pidmax) n ∧ h.foldl (nextStep pidmax) n ≤ pidmax := by
-  induction h generalizing n with
-  | nil => exact hn
-  | cons e h ih =>
-    simp only [List.foldl_cons]
-    refine ih _ ?_ (fun e' he' => hin e' (List.mem_cons_of_mem _ he'))
-    have he := hin e List.mem_cons_self
-    cases e with
-    | PAlloc a p =>
-      simp only [Pev.pid] at he
-      simp only [nextStep]
-      split <;> omega
-    | PFree a p => exact hn
-
 /-! ## 5. The rewrite forms the invariant's tie uses -/
 
 theorem liveOf_snoc_alloc_dom (S : Int → Prop) (h : List Pev) (a : BitVec 64) (p : BitVec 32)

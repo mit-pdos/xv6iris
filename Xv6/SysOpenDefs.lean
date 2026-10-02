@@ -352,16 +352,6 @@ theorem truncTieArg_of_at (M : Nat → List (BitVec 8)) (pv : Nat) (pl : List (B
     exact hlast
   · iapply (nparCur_intro M pv pl P d hpl) $$ HP
 
-/-- Rocq `trunc_tie_at_of_arg`. -/
-theorem truncTieAt_of_arg (M : Nat → List (BitVec 8)) (pv : Nat) (pl : List (BitVec 8))
-    (P : Nat → Nat → IProp GF) (d : Nat) (nm : Fname) (hpl : argPathOf M pv pl) :
-    truncTieArg M pv P d nm ⊢ truncTieAt pl P d nm := by
-  unfold truncTieAt truncTieArg
-  iintro ⟨Hl, HP⟩
-  isplitl [Hl]
-  · iapply Hl $$ %pl %hpl
-  · iapply (nparCur_elim M pv pl P d hpl) $$ HP
-
 end TruncCursor
 
 /-! ### The O_CREATE surface's permit -/

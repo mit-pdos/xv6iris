@@ -98,12 +98,6 @@ theorem fsimgWfLogClean : hdrN (fsimgP (logHdrBno fsimgSb.sbLogstart)) = 0 :=
 
 Each is ONE sweep or a citation of `fsimgWfOk` (Rocq's cost rule). -/
 
-/-- Rocq `fsimg_dots`. -/
-theorem fsimgDots (i : Nat) (hi : i < fsimgSb.sbNinodes)
-    (hty : (fsDinode fsimgP fsimgSb i).diType.toNat = T_DIR_z) :
-    dirDotsIx i (fsDinode fsimgP fsimgSb i) (fsDataOf fsimgP (fsDinode fsimgP fsimgSb i)) :=
-  fsimgWf_dots fsimgP fsimgSb i fsimgWfOk hi hty
-
 /-- Rocq `fsimg_root_link`. -/
 theorem fsimgRootLink :
     fsLinkCount fsimgP fsimgSb ROOTINO = 0 ∧ (fsDinode fsimgP fsimgSb ROOTINO).diNlink.toNat = 1 :=
@@ -221,5 +215,14 @@ at the image's own geometry. -/
 theorem fsimgImageWf_of (dk : Nat → BitVec 8) (h : dk = fsImgDisk) :
     fsBootImageWf dk XV6_DISK_BYTES fsimgSb fsimgNib fsimgCov := by
   rw [h]; exact fsimgImageWf
+
+/-- THE NON-VACUITY WITNESS FOR THE DURABLE SNAPSHOT (Rocq
+`SystemAdequacy.fsimg_snap_ok`): the mkfs image denotes an abstract
+file-system state whose encoding is its own committed home blocks.  No
+computation: `imgSnapOk` at `fsimgImageWf`. -/
+theorem fsimgSnapOk :
+    snapOk (imgState fsimgP fsimgSb fsimgNib)
+      (fsRestrict fsimgP (fsHomeList fsimgCov fsimgSb.sbLogstart)) :=
+  imgSnapOk fsImgDisk XV6_DISK_BYTES fsimgSb fsimgNib fsimgCov fsimgImageWf
 
 end Xv6

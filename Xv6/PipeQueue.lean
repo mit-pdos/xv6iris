@@ -124,10 +124,6 @@ THE MASK IS ⊤, and unlike the console's it is not forced: the pipe's payload
 is HELD by the thread that steps it (the lock is taken), so no invariant is
 open at the step.  A holder's fupd may open anything of its own. -/
 
-/-- AN OBSERVATION: the state is read and not moved (Rocq `pipe_olink`). -/
-def pipeOlink (γ : GName) (Φ : PipeSt → IProp GF) : IProp GF :=
-  iprop(∀ s : PipeSt, pipeQauth γ s ={⊤}=∗ pipeQauth γ s ∗ Φ s)
-
 /-- THE WRITER'S observation (lane PIPE-RO): fired at a shut READ end, it
 carries `s.wo = true` -- the caller's own credential, a share of the write
 end (Rocq `pipe_wolink`). -/

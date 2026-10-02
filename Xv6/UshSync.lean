@@ -49,11 +49,6 @@ theorem syncElfLoadable : kexecLoadable User.Sync.elf :=
   kexecLoadable_of_rows _ _ User.Sync.elf_wf User.Sync.elf_loads
     (by rw [User.Sync.elf_read]; decide +kernel) (by decide) (by decide)
 
-/-- **Rocq `sync_argv_fits`**: the push and forty-two words below it fit the
-one stack page. -/
-def syncArgvFits (ws : List (List (BitVec 8))) (alen : Nat → Nat) : Prop :=
-  kxcSpan alen ws.length + (8 * ((ws.length : Int) + 1) + 16) ≤ 4096 - 336
-
 /-! ## 2. The two PT_LOADs and the entry -/
 
 /-- **Rocq `sync_start_pc`** (deviation 4). -/

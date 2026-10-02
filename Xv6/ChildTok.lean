@@ -376,16 +376,6 @@ theorem childTok_pid (γ : GName) (pid pid' : BitVec 32) (Q : Int → IProp GF) 
   ihave %h := gen_agree_pure γ _ _ pa pid ga gk Q pa' pid' ga' gk' Q' $$ [$H1 $H2]
   ipureintro; exact h.2.1
 
-/-- ...and the child's persistent knowledge is the parent's payload -/
-theorem myPay_agree (γ : GName) (Q Q' : Int → IProp GF) :
-    myPay γ Q ∗ myPay γ Q' ⊢ ▷ (∀ xs, internalEq (Q xs) (Q' xs)) := by
-  unfold myPay
-  iintro ⟨⟨%pa, %pid, %ga, %gk, H1⟩, ⟨%pa', %pid', %ga', %gk', H2⟩⟩
-  iapply (gen_agree γ _ _ pa pid ga gk Q pa' pid' ga' gk' Q').trans sep_elim_right
-  isplitl [H1]
-  · iexact H1
-  · iexact H2
-
 /-- Rewriting a paid payload along the saved predicate's later: the one
 step every consumer of an agreement takes. -/
 theorem genPay_rewrite (Q Q' : Int → IProp GF) (xs : Int) :

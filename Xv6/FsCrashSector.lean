@@ -250,13 +250,6 @@ theorem hdrDec_sector0_eq (bs bs' : List (BitVec 8)) (hn : (hdrDec bs).1 ≤ LOG
 
 /-! ## §1c''' The two sectors of an xv6 block write -/
 
-/-- The two slices reassemble the block (Rocq `sector_split`). -/
-theorem sector_split (bs : List (BitVec 8)) (hlen : bs.length = BSIZE) :
-    bs.take Virtio.sectorSize ++ (bs.drop Virtio.sectorSize).take Virtio.sectorSize = bs := by
-  rw [List.take_of_length_le (l := bs.drop Virtio.sectorSize)
-      (by rw [List.length_drop, hlen, bsize_two_sectors]; omega),
-    List.take_append_drop]
-
 theorem sector0_len (bs : List (BitVec 8)) (hlen : bs.length = BSIZE) :
     (bs.take Virtio.sectorSize).length = Virtio.sectorSize := by
   rw [List.length_take, hlen, bsize_two_sectors]; omega

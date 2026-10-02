@@ -93,15 +93,7 @@ def statusDom (m : Int → Option Int) : Int → Prop := fun k => (m k).isSome
 
 theorem zombiesOf_nil : zombiesOf [] = fun _ => False := rfl
 
-theorem zombiesOf_snoc (h : List Zev) (e : Zev) :
-    zombiesOf (h ++ [e]) = zombStep (zombiesOf h) e := by
-  unfold zombiesOf; rw [List.foldl_append]; rfl
-
 theorem statusOf_nil : statusOf [] = fun _ => none := rfl
-
-theorem statusOf_snoc (h : List Zev) (e : Zev) :
-    statusOf (h ++ [e]) = statusStep (statusOf h) e := by
-  unfold statusOf; rw [List.foldl_append]; rfl
 
 /-! ## 4. The status map's domain is the zombie set -/
 

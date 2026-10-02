@@ -444,14 +444,6 @@ theorem inFlightBlk_arm (st : Nat → HState) (i : Nat) (c : Chain) (hfree : st 
   have hne : i0 ≠ i := by intro e; rw [e, hfree] at h2; exact absurd h2 (by simp)
   rw [armSt_ne st i c i0 hne]; exact h2
 
-theorem imgOk_arm (v : VirtioState) (m : RegMapF (List (BitVec 8))) (st : Nat → HState)
-    (i : Nat) (c : Chain) (hfree : st i = .inactive) (h : imgOk v m (inFlightBlk st)) :
-    imgOk v m (inFlightBlk (armSt st i c)) := by
-  intro bno bs hb
-  rcases h bno bs hb with hp | he
-  · exact Or.inl (inFlightBlk_arm st i c hfree bno hp)
-  · exact Or.inr he
-
 theorem cachedOk_arm (v : VirtioState) (st : Nat → HState) (i : Nat) (c : Chain)
     (hfree : st i = .inactive) (h : cachedOk v st) : cachedOk v (armSt st i c) :=
   fun e he hne => inFlightBlk_arm st i c hfree _ (h e he hne)
@@ -498,18 +490,6 @@ theorem inFlightBlk_mem (st : Nat → HState) (i h : Nat) (hfree : st i = .inact
   refine ⟨i0, c0, h1, ?_, h3⟩
   have hne : i0 ≠ i := by intro e; rw [e, hfree] at h2; exact absurd h2 (by simp)
   rw [memSt_ne st i h i0 hne]; exact h2
-
-theorem imgOk_mem (v : VirtioState) (m : RegMapF (List (BitVec 8))) (st : Nat → HState)
-    (i h : Nat) (hfree : st i = .inactive) (hx : imgOk v m (inFlightBlk st)) :
-    imgOk v m (inFlightBlk (memSt st i h)) := by
-  intro bno bs hb
-  rcases hx bno bs hb with hp | he
-  · exact Or.inl (inFlightBlk_mem st i h hfree bno hp)
-  · exact Or.inr he
-
-theorem cachedOk_mem (v : VirtioState) (st : Nat → HState) (i h : Nat)
-    (hfree : st i = .inactive) (hx : cachedOk v st) : cachedOk v (memSt st i h) :=
-  fun e he hne => inFlightBlk_mem st i h hfree _ (hx e he hne)
 
 theorem inflightOk_mem (v : VirtioState) (st : Nat → HState) (i h : Nat)
     (hfree : st i = .inactive) (hx : inflightOk v st) : inflightOk v (memSt st i h) := by

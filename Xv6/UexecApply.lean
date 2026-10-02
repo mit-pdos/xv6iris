@@ -231,10 +231,6 @@ theorem uexecArm_run (sc : BitVec 64) (W : Uvis) (f : sfam GF) (hl : W.tf.length
     uexecArm sc W f ⊣⊢ uexecArm sc (uvisRun W) f :=
   uexecArmF_run uslot uslot_keyCong sc W f hl
 
-/-- Rocq `uslot_run_cong`: the slot alone across the same step. -/
-theorem uslot_run_cong (W : Uvis) : uslot (GF := GF) W ⊣⊢ uslot (uvisRun W) :=
-  uslot_keyCong W (uvisRun W) (ukeyEq_run W)
-
 end Apply
 
 /-! ## §3 THE ONE FRAME MOVER THAT IS FREE -/

@@ -546,21 +546,6 @@ theorem fsLinkOwn_scatter {K V : Type _} {M : Type _ → Type _} [LawfulFiniteMa
   @bigOpM_iOwn_entail GF (constOF FsLinkUR) OFunctor.constOF_URFunctorContractive
     FsLinkG.fsLinkInG K M V _ γ f m
 
-/-- The family allocated at a valid element (Rocq's `fs_links_alloc`). -/
-theorem fsLinks_alloc (I : RegMapF FsNode) (f : LinkChoice) (hok : linkElemOk I f)
-    (hv : ✓ linkElem I f) : ⊢ |==> ∃ g : GName, fsLinks (GF := GF) g I := by
-  imod (iOwn_alloc (GF := GF) (F := constOF FsLinkUR) (linkElem I f) hv) with ⟨%g, H⟩
-  imodintro
-  iexists g
-  unfold fsLinks fsLinkNode linkElem
-  ihave H := fsLinkOwn_scatter g _ I $$ H
-  iapply (BigSepM.bigSepM_mono fun {i n} hi => ?_) $$ H
-  iintro H
-  iexists (lcD f i), (lcV f i), (lcTyf f i)
-  iframe H
-  ipureintro
-  exact hok i n hi
-
 end FsStateLinks
 
 /-! ## 5b.  THE BOOT ALLOCATION

@@ -67,7 +67,6 @@ mask's `beqz a5` taken, `+0x4c`: `li a5,-1 ; sd a5,112(s2) ; j epilogue`,
 xv6 7b2c1b1b) and the epilogue (`+0x6c`). -/
 def syscallFallback : BitVec 64 := syscallAddr + 0x54#64
 def syscallBlocked : BitVec 64 := syscallAddr + 0x4c#64
-def syscallEpi : BitVec 64 := syscallAddr + 0x6c#64
 
 /-- `bltu a4,a5` at `+0x22` (offset `0x32`) and `beqz a4` at `+0x36`
 (offset `0x1e`) both land on the fallback. -/

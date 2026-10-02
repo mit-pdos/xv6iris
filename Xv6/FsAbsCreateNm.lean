@@ -221,14 +221,6 @@ theorem aunarmCommitAt_of_nd (Γ : FsViewNames GF) (E : CoPset) (i : Nat) (Nd : 
   iintro H %I %c %hrow Ha
   iapply H $$ %I %c %hrow %(hNd c) Ha
 
-/-- Rocq `aunarm_commit_at_nd_mono`. -/
-theorem aunarmCommitAtNd_mono (Γ : FsViewNames GF) (E : CoPset) (i : Nat)
-    (Nd Nd' : Absnode → Prop) (Φ : Aview → Nat → IProp GF) (hle : ∀ c : Absnode, Nd' c → Nd c) :
-    aunarmCommitAtNd (hlc := hlc) Γ E i Nd Φ ⊢ aunarmCommitAtNd (hlc := hlc) Γ E i Nd' Φ := by
-  unfold aunarmCommitAtNd
-  iintro H %I %c %hrow %hNd' Ha
-  iapply H $$ %I %c %hrow %(hle c hNd') Ha
-
 /-- Rocq `aunarm_of_arm_nd_of`. -/
 theorem aunarmOfArmNd_of (Γ : FsViewNames GF) (E : CoPset) (Nd : Absnode → Prop)
     (Farm : Pfam GF (Aview → Nat → IProp GF)) (Φ : Aview → Nat → IProp GF) :

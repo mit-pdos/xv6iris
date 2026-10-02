@@ -59,9 +59,6 @@ flag, pipeclose's own argument; `true` closes the write end. -/
 def pstClose (w : Bool) (s : PipeSt) : PipeSt :=
   if w then ⟨s.ws, s.rp, s.ro, false⟩ else ⟨s.ws, s.rp, false, s.wo⟩
 
-/-- The open flag of end `w` (Rocq `pst_open`). -/
-def pstOpen (w : Bool) (s : PipeSt) : Bool := if w then s.wo else s.ro
-
 /-- The queue is empty: nothing written past the pointer (Rocq `pst_empty`). -/
 def pstEmpty (s : PipeSt) : Prop := s.rp = s.ws.length
 

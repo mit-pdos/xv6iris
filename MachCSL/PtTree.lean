@@ -422,18 +422,6 @@ theorem PTree.walk_setLeaf_other (lvl : Nat) (t : PTree) (vpn vpn' : BitVec 27) 
   obtain ⟨h1, h2⟩ := setLeaf_path_ne lvl t vpn vpn' v hne
   rw [walk_eq, walk_eq, h1, h2]
 
-/-- Walks that end at different addresses follow different paths. -/
-theorem PTree.path_ne_of_addr_ne (lvl : Nat) (t : PTree) (vpn vpn' : BitVec 27)
-    (addr pv addr' pv' : BitVec 64) (h : t.walk lvl vpn = some (addr, pv))
-    (h' : t.walk lvl vpn' = some (addr', pv')) (hne : addr ≠ addr') :
-    t.path lvl vpn ≠ t.path lvl vpn' := by
-  intro hc
-  refine hne ?_
-  have h1 := (walk_addr lvl t vpn addr pv h).1
-  have h2 := (walk_addr lvl t vpn' addr' pv' h').1
-  have hs := (of_path_eq lvl t vpn vpn' hc).1
-  rw [← h1, ← h2, hs]
-
 /-- The tree's pages are untouched. -/
 theorem PTree.pages_setLeaf (lvl : Nat) (t : PTree) (vpn : BitVec 27) (v : BitVec 64) :
     (t.setLeaf lvl vpn v).pages lvl = t.pages lvl := by
@@ -624,33 +612,6 @@ theorem PTree.walk_levels (t : PTree) (vpn : BitVec 27) (addr v : BitVec 64) (hw
     walk_levels_kids t vpn addr v hwf hw
   exact ⟨c1.base, c0.base, m2, m1, haddr, ma, hleaf⟩
 
-/-- One descent step of a blocked walk: either this level's entry is invalid,
-or it is a pointer and the walk is blocked below. -/
-theorem PTree.walk_succ_none (lvl : Nat) (t : PTree) (vpn : BitVec 27)
-    (hwf : t.wf (lvl+1)) (hw : t.walk (lvl+1) vpn = none) :
-    t.ents (vpnIdx vpn (lvl+1)) = 0#64 ∨
-    ∃ c, t.kids (vpnIdx vpn (lvl+1)) = some c ∧ t.ents (vpnIdx vpn (lvl+1)) = kPtr c.base ∧
-      c.wf lvl ∧ c.walk lvl vpn = none := by
-  simp only [walk] at hw
-  cases hk : t.kids (vpnIdx vpn (lvl+1)) with
-  | none =>
-    have hz := hwf (vpnIdx vpn (lvl+1))
-    rw [hk] at hz
-    exact Or.inl hz
-  | some c =>
-    have h := hwf (vpnIdx vpn (lvl+1))
-    rw [hk] at h
-    simp only [hk] at hw
-    exact Or.inr ⟨c, rfl, h.1, h.2, hw⟩
-
-/-- A blocked walk at level 0 met a zero entry. -/
-theorem PTree.walk_zero_none (t : PTree) (vpn : BitVec 27) (hw : t.walk 0 vpn = none) :
-    t.ents (vpnIdx vpn 0) = 0#64 := by
-  simp only [walk] at hw
-  split at hw
-  · rename_i h; exact h
-  · exact absurd hw (by simp)
-
 /-! ## The TLB -/
 
 /-- The `tlb` register: 64 slots (`num_tlb_entries_exp = 6`). -/
@@ -672,12 +633,7 @@ def tlbEntryOf (asid : BitVec 16) (vpn : BitVec 27) (ppn : BitVec 44) (pte : Bit
   { asid := asid, global := false, pte := pte, pteAddr := physaddr.Physaddr addr,
     levelMask := 0#45, vpn := sign_extend (m := 45) vpn, ppn := ppn }
 
-theorem zextOnes45 : (zero_extend (m := 45) (ones (n := 0)) : BitVec 45) = 0#45 := by decide
-theorem zextOnes27 : (zero_extend (m := 27) (ones (n := 0)) : BitVec 27) = 0#27 := by decide
-theorem zextOnes44 : (zero_extend (m := 44) (ones (n := 0)) : BitVec 44) = 0#44 := by decide
 theorem zext64_self (x : BitVec 64) : zero_extend (m := 64) x = x := by
-  unfold zero_extend Sail.BitVec.zeroExtend; simp
-theorem zext44_self (x : BitVec 44) : zero_extend (m := 44) x = x := by
   unfold zero_extend Sail.BitVec.zeroExtend; simp
 theorem and_not_zero_27 (x : BitVec 27) : x &&& Complement.complement (0#27) = x := by
   rw [show Complement.complement (0#27) = BitVec.allOnes 27 from rfl, BitVec.and_allOnes]

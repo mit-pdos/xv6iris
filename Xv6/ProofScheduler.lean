@@ -65,12 +65,6 @@ and the RUNNABLE literal `s3`. -/
 def scanRegs (cpu : CPU) (R : RegMap) (n : Nat) : Prop :=
   headRegs cpu R ∧ R 9#5 = procAddr n ∧ R 18#5 = KA.«tickslock» ∧ R 19#5 = 3#64
 
-theorem headRegs_of_calleeSaved {cpu : CPU} {R R' : RegMap} (h : headRegs cpu R)
-    (hc : calleeSaved R R') : headRegs cpu R' := by
-  obtain ⟨_, _, _, _, _, h20, h21, h22, h23, h24, _, _, _⟩ := hc
-  exact ⟨h20.trans h.1, h21.trans h.2.1, h22.trans h.2.2.1, h23.trans h.2.2.2.1,
-    h24.trans h.2.2.2.2⟩
-
 /-! ## The prologue and the constant setup -/
 
 set_option maxHeartbeats 4000000 in

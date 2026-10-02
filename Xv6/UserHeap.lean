@@ -385,10 +385,6 @@ instance utextStr_persistent (γt : GName) (a len : Nat) (f : Nat → BitVec 8) 
     Persistent (utextStr (GF := GF) γt a len f) := by
   unfold utextStr; infer_instance
 
-theorem utextStr_len (γt : GName) (a len : Nat) (f : Nat → BitVec 8) :
-    utextStr (GF := GF) γt a len f ⊢ ⌜len < 2 ^ 31⌝ := by
-  unfold utextStr; iintro ⟨-, %h, -, -⟩; ipureintro; exact h
-
 theorem utextStr_nonul (γt : GName) (a len : Nat) (f : Nat → BitVec 8) :
     utextStr (GF := GF) γt a len f ⊢ ⌜∀ j, j < len → f j ≠ ubyte0⌝ := by
   unfold utextStr; iintro ⟨%h, -, -, -⟩; ipureintro; exact h
@@ -1022,18 +1018,6 @@ def ustack (γd : GName) (sp : BitVec 64) (n : Nat) : IProp GF :=
 theorem ustack_room (γd : GName) (sp : BitVec 64) (n : Nat) :
     ustack (GF := GF) γd sp n ⊢ ⌜8 * n ≤ sp.toNat⌝ := by
   unfold ustack; iintro ⟨%h, -⟩; ipureintro; exact h.2
-
-/-- Rocq `ustack_0`. -/
-theorem ustack_0 (γd : GName) (sp : BitVec 64) : ustack (GF := GF) γd sp 0 ⊣⊢ ⌜sp.toNat % 8 = 0⌝ := by
-  unfold ustack ustackBody
-  constructor
-  · iintro ⟨%h, -⟩; ipureintro; exact h.1
-  · iintro %h
-    isplitr
-    · ipureintro; exact ⟨h, by omega⟩
-    · simp only [List.range_zero]
-      iapply BigSepL.bigSepL_nil.2
-      iempintro
 
 /-- **Rocq `ustack_body_app`**. -/
 theorem ustackBody_app (γd : GName) (sp sp' : BitVec 64) (k n : Nat) (hsp : sp'.toNat = sp.toNat - 8 * k)

@@ -29,18 +29,6 @@ def kvmRegions : List KvmRegion :=
 under the trampoline (`KSTACK`). -/
 def kstackVpn (i : Nat) : BitVec 27 := BitVec.ofNat 27 (0x3FFFFFF - 2 * (i + 1))
 
-/-- One region mapped (the supply consumed by its nodes). -/
-def _root_.MachCSL.PTree.mapRegion (t : PTree) (r : KvmRegion) (fr : List (BitVec 44)) : PTree × List (BitVec 44) :=
-  let s := t.mapRun r.vpn r.ppn (permBits r.perm) r.n fr
-  (s.1, s.2.1)
-
-/-- The regions mapped in order. -/
-def _root_.MachCSL.PTree.mapRegions : PTree → List KvmRegion → List (BitVec 44) → PTree × List (BitVec 44)
-  | t, [], fr => (t, fr)
-  | t, r :: rs, fr =>
-      let s := t.mapRegion r fr
-      s.1.mapRegions rs s.2
-
 /-- The stacks of processes `0 ..< n` mapped in order to the pages `pas`. -/
 def _root_.MachCSL.PTree.mapStacks : PTree → (Nat → BitVec 44) → Nat → List (BitVec 44) → PTree × List (BitVec 44)
   | t, _, 0, fr => (t, fr)

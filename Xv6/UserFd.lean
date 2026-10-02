@@ -733,36 +733,6 @@ theorem ustdAt_agree (γf : GName) (fdv l v : List FdState) :
   iintro Ha ⟨Hr, _⟩
   iapply ustdRaw_agree $$ Ha Hr
 
-/-- Rocq `ustd_ufd_excl`: the std fragments live IN the ledger. -/
-theorem ustd_ufd_excl (γf : GName) (l : List FdState) (k : Nat) (st : FdState) (hk : k < NSTD) :
-    ⊢@{IProp GF} ustd γf l -∗ ufd γf k st -∗ False := by
-  iintro Hl Hh
-  ihave %hlen := ustd_len γf l $$ Hl
-  obtain ⟨st', hst'⟩ : ∃ st', l[k]? = some st' := by
-    cases h : l[k]? with
-    | none => exact absurd (List.getElem?_eq_none_iff.1 h) (by omega)
-    | some x => exact ⟨x, rfl⟩
-  icases ustd_acc γf l k st' hst' $$ Hl with ⟨Hs', _⟩
-  unfold ufd
-  icases Hh with ⟨Hs, _⟩
-  iapply ufd_slot_excl $$ Hs' Hs
-
-/-- Rocq `ufd_slot_bound`: A FRAGMENT NAMES A DESCRIPTOR A C `int` CAN HOLD. -/
-theorem ufd_slot_bound (γf : GName) (fdv : List FdState) (fd : Nat) (st : FdState) :
-    ⊢@{IProp GF} ufdAuth γf fdv -∗ ufdSlot γf fd st -∗ ⌜fd < NOFILE⌝ := by
-  iintro Ha Hh
-  ihave %hlen := ufdAuth_len γf fdv $$ Ha
-  ihave %hl := ufd_slot_agree γf fdv fd st $$ Ha Hh
-  ipureintro
-  rw [← hlen]; exact (List.getElem?_eq_some_iff.1 hl).1
-
-/-- Rocq `ufd_bound`. -/
-theorem ufd_bound (γf : GName) (fdv : List FdState) (fd : Nat) (st : FdState) :
-    ⊢@{IProp GF} ufdAuth γf fdv -∗ ufd γf fd st -∗ ⌜fd < NOFILE⌝ := by
-  unfold ufd
-  iintro Ha ⟨Hh, _⟩
-  iapply ufd_slot_bound $$ Ha Hh
-
 /-! ## §3 A program's claim on one descriptor, wherever it lives -/
 
 /-- **Rocq `ufd_own`**: a LEDGER ENTRY for a standard stream, a HANDLE for
@@ -1128,9 +1098,6 @@ theorem ufd_alloc_least_closed (γf : GName) (fdv : List FdState) (fd : Nat)
 /-- Rocq `ustd_any`: a ledger at a state the carrier is not tracking. -/
 def ustdAny (γf : GName) : IProp GF := iprop(∃ l : List FdState, ustd γf l)
 
-/-- Rocq `ufd_state`: the authority together with a ledger nobody reads. -/
-def ufdState (γf : GName) (fdv : List FdState) : IProp GF := iprop(ufdAuth γf fdv ∗ ustdAny γf)
-
 /-- Rocq `ufd_alloc_least_any`: AN ALLOCATION NOBODY IS WATCHING. -/
 theorem ufd_alloc_least_any (γf : GName) (fdv l : List FdState) (fd : Nat) (st : FdState)
     (hle : fdLeastClosed fdv fd) (hne : st ≠ .closed) :
@@ -1184,37 +1151,6 @@ theorem ufd_alloc_std_at (fdv v : List FdState) (D : RegMapF FdState) (hlen : fd
   ipureintro
   exact ufdMapHi_open (hsub fd st hst)
 
-/-- **Rocq `ufd_alloc_std`**: the mint at the table's own view, forgotten. -/
-theorem ufd_alloc_std (fdv : List FdState) (D : RegMapF FdState) (hlen : fdv.length = NOFILE)
-    (hsub : D ⊆ ufdMapHi fdv) :
-    ⊢@{IProp GF} |==> ∃ γf : GName,
-      ufdAuth γf fdv ∗ ustd γf (fdv.take NSTD) ∗ ([∗map] fd ↦ st ∈ D, ufd γf fd st) := by
-  imod ufd_alloc_std_at (GF := GF) fdv fdv D hlen hsub (tabLe_refl fdv) with ⟨%γf, Ha, Hl, Hd⟩
-  imodintro
-  iexists γf
-  iframe Ha Hd
-  iapply ustdAt_ustd $$ Hl
-
-/-- Rocq `ufd_alloc_fdt0`: the fresh-process instance. -/
-theorem ufd_alloc_fdt0 :
-    ⊢@{IProp GF} |==> ∃ γf : GName, ufdAuth γf fdt0 ∗ ustd γf (fdt0.take NSTD) := by
-  imod ufd_alloc_std (GF := GF) fdt0 ∅ fdt0_length (LawfulPartialMap.empty_subset _) with ⟨%γf, Ha, Hl, _⟩
-  imodintro
-  iexists γf
-  iframe
-
-/-- Rocq `ufd_sub`: WHAT A SET OF HANDLES SAYS ABOUT THE TABLE. -/
-theorem ufd_sub (γf : GName) (fdv : List FdState) (D : RegMapF FdState) :
-    ⊢@{IProp GF} ufdAuth γf fdv -∗ ([∗map] fd ↦ st ∈ D, ufd γf fd st) -∗ ⌜D ⊆ ufdMap fdv⌝ := by
-  unfold ufdAuth
-  iintro ⟨%v, Ha, _⟩ HD
-  ihave HD := BigSepM.bigSepM_mono (Φ := fun fd st => ufd (GF := GF) γf fd st)
-    (Ψ := fun fd st => ufdSlot (GF := GF) γf fd st) (fun _ => by unfold ufd; exact sep_elim_left) $$ HD
-  ihave HD := (ufdFrags_eq γf D).2 $$ HD
-  ihave %hsub := ghost_map_lookup_big (ufdKm D) $$ Ha HD
-  ipureintro
-  exact ufdKm_sub hsub
-
 /-- Rocq `ufd_sub_hi`: the inclusion a forking parent proves of its handles. -/
 theorem ufd_sub_hi (γf : GName) (fdv : List FdState) (D : RegMapF FdState) :
     ⊢@{IProp GF} ufdAuth γf fdv -∗ ([∗map] fd ↦ st ∈ D, ufd γf fd st) -∗ ⌜D ⊆ ufdMapHi fdv⌝ := by
@@ -1234,13 +1170,6 @@ theorem ufd_sub_hi (γf : GName) (fdv : List FdState) (D : RegMapF FdState) :
   cases hv : get? D k with
   | none => rw [hv] at hk; cases hk
   | some v => exact (hlo k v hv).2
-
-/-- Rocq `ufd_open_at`: pulling ONE inherited handle out of a family. -/
-theorem ufd_open_at (γf : GName) (D : RegMapF FdState) (fd : Nat) (st : FdState)
-    (hl : get? D fd = some st) :
-    ([∗map] k ↦ v ∈ D, ufd (GF := GF) γf k v) ⊢
-      ufd γf fd st ∗ [∗map] k ↦ v ∈ PartialMap.delete D fd, ufd γf k v :=
-  (BigSepM.bigSepM_delete hl).1
 
 end UserFd
 

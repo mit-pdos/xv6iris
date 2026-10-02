@@ -136,26 +136,6 @@ def kexecOkQ (Q : BitVec 64 → Prop) (V V' : ProcPriv) (r entry spv szv' : BitV
     (alen : Nat → Nat) : Prop :=
   (r = 0xFFFFFFFFFFFFFFFF#64 ∧ evAfter V V') ∨ (Q entry ∧ kexecOkWin V V' r entry spv szv' na alen)
 
-/-- **Rocq `kexec_ok_q_True`**: at a vacuous `Q` the two are the same claim. -/
-theorem kexecOkQ_True (V V' : ProcPriv) (r entry spv szv' : BitVec 64) (na : Nat)
-    (alen : Nat → Nat) :
-    kexecOkQ (fun _ => True) V V' r entry spv szv' na alen ↔ kexecOk V V' r entry spv szv' na alen := by
-  unfold kexecOkQ
-  rw [kexecOk_iff]
-  constructor
-  · rintro (h | ⟨-, h⟩)
-    · exact Or.inl h
-    · exact Or.inr h
-  · rintro (h | h)
-    · exact Or.inl h
-    · exact Or.inr ⟨trivial, h⟩
-
-/-- Rocq `kexec_ok_q_of_True`. -/
-theorem kexecOkQ_of_True (V V' : ProcPriv) (r entry spv szv' : BitVec 64) (na : Nat)
-    (alen : Nat → Nat) (h : kexecOk V V' r entry spv szv' na alen) :
-    kexecOkQ (fun _ => True) V V' r entry spv szv' na alen :=
-  (kexecOkQ_True V V' r entry spv szv' na alen).2 h
-
 /-! ## 1b. THE FAILURE ARM'S OWN HOLE (S5) -/
 
 /-- **Rocq `kxf_cause`**: why a `bad:` tail jumped ( `SpecKexec.exec_fail_cause`,
@@ -183,25 +163,6 @@ theorem kexecOkQf_weaken (Q : BitVec 64 → Prop) (QF : KxfCause → Prop) (V V'
     (h : kexecOkQf Q QF V V' r entry spv szv' na alen) : kexecOk V V' r entry spv szv' na alen := by
   rcases h with ⟨hr, hV, -⟩ | ⟨-, h⟩
   · exact Or.inl ⟨hr, hV⟩
-  · exact Or.inr h
-
-/-- Rocq `kexec_ok_qf_mono`: the two holes, monotone. -/
-theorem kexecOkQf_mono (Q Q' : BitVec 64 → Prop) (QF QF' : KxfCause → Prop) (V V' : ProcPriv)
-    (r entry spv szv' : BitVec 64) (na : Nat) (alen : Nat → Nat)
-    (hQ : ∀ e, Q e → Q' e) (hF : ∀ c, QF c → QF' c)
-    (h : kexecOkQf Q QF V V' r entry spv szv' na alen) :
-    kexecOkQf Q' QF' V V' r entry spv szv' na alen := by
-  rcases h with ⟨hr, hV, c, hc⟩ | ⟨hq, h⟩
-  · exact Or.inl ⟨hr, hV, c, hF c hc⟩
-  · exact Or.inr ⟨hQ _ hq, h⟩
-
-/-- Rocq `kexec_ok_qf_of_q`: at the vacuous cause plug every `bad:` tail pays
-with `noMem`. -/
-theorem kexecOkQf_of_q (Q : BitVec 64 → Prop) (V V' : ProcPriv) (r entry spv szv' : BitVec 64)
-    (na : Nat) (alen : Nat → Nat) (h : kexecOkQ Q V V' r entry spv szv' na alen) :
-    kexecOkQf Q (fun _ => True) V V' r entry spv szv' na alen := by
-  rcases h with ⟨hr, hV⟩ | h
-  · exact Or.inl ⟨hr, hV, .noMem, trivial⟩
   · exact Or.inr h
 
 /-- THE FAILURE ARM, as the one `-1` return proves it (`kxc_exit_m1`'s pure
@@ -346,20 +307,5 @@ end
 (`ld a4,-408(s0)`, byte 24 of the frame's `struct elfhdr`) and stores into
 `trapframe->epc` (deviation 7). -/
 def kxqEntry (ef : List (BitVec 8)) : BitVec 64 := BitVec.ofNat 64 (leAt ef 24 8)
-
-/-- Rocq `kxq_entry_ext`: two headers that agree below 64 give the same entry. -/
-theorem kxqEntry_ext (ef ef' : List (BitVec 8)) (h : ∀ j, j < 64 → ef[j]! = ef'[j]!) :
-    kxqEntry ef = kxqEntry ef' := by
-  unfold kxqEntry
-  rw [leAt_ext ef ef' 24 8 (fun j hj => h (24 + j) (by omega))]
-
-/-! ## 3. THE HEADER CLAIM THE WALK CARRIES ACROSS THE +0x090 SEAM -/
-
-/-- **Rocq `kxq_hdr_ok`**: nothing at all for the landed instantiation, "these
-are /init's first 64 bytes" for the pinned one. -/
-def kxqHdrOk (HD : Option (List (BitVec 8))) (ef : List (BitVec 8)) : Prop :=
-  match HD with
-  | none => True
-  | some h => ∀ j, j < 64 → ef[j]! = h[j]!
 
 end Xv6

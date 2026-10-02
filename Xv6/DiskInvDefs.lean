@@ -447,21 +447,6 @@ theorem dmaHalfAt_pin (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (P : IProp GF)
   iframe Hb2
   ipureintro; exact hh
 
-/-- **The lease, framed**: full ownership of the footprint plus the way
-back into the client's state is exactly what a DMA write asks for. -/
-theorem dmaOwn_lease_frame (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (Q : IProp GF) :
-    dmaOwn pa n ∗ (dmaOwn pa n -∗ Q) ⊢ dmaWriteLease pa n w Q := by
-  unfold dmaOwn dmaWriteLease
-  iintro ⟨⟨%Hs, Hb⟩, Hback⟩
-  iexists Hs, 0
-  iframe Hb
-  isplitl []
-  · iapply topLbAt_0
-  iintro %t Hb2 _ _ %_
-  iapply Hback
-  iexists (pushed Hs t diskAgent w)
-  iexact Hb2
-
 /-- The lease's continuation is monotone. -/
 theorem dmaWriteLease_mono (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (P Q : IProp GF)
     (hpq : P ⊢ Q) : dmaWriteLease (GF := GF) pa n w P ⊢ dmaWriteLease pa n w Q := by
@@ -472,24 +457,6 @@ theorem dmaWriteLease_mono (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (P Q : IP
   iintro %t Hb2 Hau Ht %hkb
   iapply hpq
   iapply Hback $$ %t Hb2 Hau Ht %hkb
-
-/-- The empty footprint is free. -/
-theorem dmaOwn_zero (pa : PAddr) : emp ⊢@{IProp GF} dmaOwn pa 0 := by
-  unfold dmaOwn histBytes
-  iintro _
-  iexists (fun _ => ([] : Hist))
-  simp only [List.range_zero]
-  exact BigSepL.bigSepL_nil_intro
-
-/-- Any answer will do: the trivial read obligation. -/
-theorem dmaReadPin_any (pa : PAddr) (n : Nat) (P : IProp GF) :
-    P ⊢ dmaReadPin pa n (fun _ => True) P := by
-  unfold dmaReadPin
-  iintro H
-  ileft
-  iframe H
-  ipureintro
-  intro _; trivial
 
 /-! ## The ghost state -/
 
@@ -1086,51 +1053,6 @@ theorem usedIdxCell_lease (pa : PAddr) (b : Nat) (dl : List UsedRec) (m hd ep Kb
     ipureintro; exact ht
   · iexact HR
 
-/-- **The tails of a context window**, with a bound on their positions:
-what a window the driver hands over whole leaves the invariant to start
-its log from. -/
-theorem ctxBytes_tails (ξ : CtxId) (pa : PAddr) (dq : DFrac) (bs : Nat → BitVec 8) :
-    ∀ n : Nat, ([∗list] j ∈ List.range n, ctxByte ξ (pa + BitVec.ofNat 64 j) dq (bs j))
-      ⊢@{IProp GF} ∃ (Hold : Nat → Hist) (b : Nat), histBytes pa n (fun _ => dq) Hold ∗
-        ⌜∀ j, j < n → ∃ e H, Hold j = e :: H ∧ e.v = bs j ∧ e.t ≤ b⌝
-  | 0 => by
-    iintro H
-    iexists (fun _ => ([] : Hist)), 0
-    unfold histBytes
-    simp only [List.range_zero]
-    isplitl []
-    · exact BigSepL.bigSepL_nil_intro
-    · ipureintro
-      intro j hj; omega
-  | n + 1 => by
-    rw [List.range_succ]
-    iintro H
-    icases BigSepL.bigSepL_snoc.1 $$ H with ⟨H1, H2⟩
-    icases ctxBytes_tails ξ pa dq bs n $$ H1 with ⟨%Hold, %b, Hb, %hh⟩
-    icases ctxByte_cases ξ (pa + BitVec.ofNat 64 n) dq (bs n) $$ H2
-      with ⟨%e, %He, Hpt, %hev, _⟩
-    iexists (fun j => if j = n then e :: He else Hold j), (max b e.t)
-    isplitl [Hb Hpt]
-    · unfold histBytes
-      rw [List.range_succ]
-      iapply BigSepL.bigSepL_snoc.2
-      isplitl [Hb]
-      · rw [BigSepL.bigSepL_eq (l := List.range n)
-          (Φ := fun _ (j : Nat) => iprop((pa + BitVec.ofNat 64 j) ↦ₕ{dq}
-            (if j = n then e :: He else Hold j)))
-          (Ψ := fun _ (j : Nat) => iprop((pa + BitVec.ofNat 64 j) ↦ₕ{dq} Hold j))
-          (fun {_ x} hx => by rw [if_neg (Nat.ne_of_lt (MachCSL.rangeIdx_lt hx))])]
-        iexact Hb
-      · simp only [↓reduceIte]
-        iexact Hpt
-    · ipureintro
-      intro j hj
-      rcases Nat.lt_succ_iff_lt_or_eq.1 hj with h | h
-      · obtain ⟨e', H', h1, h2, h3⟩ := hh j h
-        exact ⟨e', H', by simp only [if_neg (Nat.ne_of_lt h)]; exact h1, h2, by omega⟩
-      · subst h
-        exact ⟨e, He, by simp, hev, by omega⟩
-
 /-! ### What a racy read of `used->idx` returns -/
 
 /-- A used-index entry is visible to a hart exactly when its position is
@@ -1724,13 +1646,6 @@ theorem permOk_dead (v v' : VirtioState) (pm : RegMapF PermVal)
   intro k h c p u hget
   exact absurd hget (permOk_none v pm hok k h c p u)
 
-theorem permOk_delete (v : VirtioState) (pm : RegMapF PermVal) (st : Nat → HState) (k : Nat)
-    (hok : permOk v pm st) : permOk v (PartialMap.delete pm k) st := by
-  intro k' h' c' p' u' hget
-  by_cases hk : k = k'
-  · rw [get?_delete_eq hk] at hget; exact absurd hget (by simp)
-  · exact hok k' h' c' p' u' (by rwa [get?_delete_ne hk] at hget)
-
 /-- Arming a head no permit names keeps every permit honest. -/
 theorem permOk_arm (v : VirtioState) (pm : RegMapF PermVal) (st : Nat → HState) (i : Nat)
     (c : Chain) (hok : permOk v pm st) (hfree : st i = .inactive) :
@@ -2188,20 +2103,6 @@ theorem wroteAt_delete_other (pm : RegMapF PermVal) (k : Nat) (x0 : PermVal) (h 
   · rintro ⟨key, x, hg, hx, hh⟩
     have hk : k ≠ key := by
       rintro rfl; rw [hget] at hg; cases hg; exact hne hh.symm
-    exact ⟨key, x, by rw [get?_delete_ne hk]; exact hg, hx, hh⟩
-
-/-- Deleting a permit that is NOT the witness disturbs no head's bit. -/
-theorem wroteAt_delete_nonwit (pm : RegMapF PermVal) (k : Nat) (x0 : PermVal) (h : BitVec 16)
-    (hget : PartialMap.get? pm k = some x0) (hnw : ¬ isWit x0) :
-    wroteAt (PartialMap.delete pm k) h ↔ wroteAt pm h := by
-  constructor
-  · rintro ⟨key, x, hg, hx, hh⟩
-    have hk : k ≠ key := by
-      intro he; rw [get?_delete_eq he] at hg; exact absurd hg (by simp)
-    exact ⟨key, x, by rwa [get?_delete_ne hk] at hg, hx, hh⟩
-  · rintro ⟨key, x, hg, hx, hh⟩
-    have hk : k ≠ key := by
-      rintro rfl; rw [hget] at hg; cases hg; exact absurd hx hnw
     exact ⟨key, x, by rw [get?_delete_ne hk]; exact hg, hx, hh⟩
 
 /-- **An in-flight head that has not made its used-index write has no
@@ -3581,22 +3482,6 @@ theorem epOk_write_complete (v : VirtioState) (st : Nat → HState) (pm : RegMap
     · have hre : r = ((nc, t, hd.toNat, c.ep) : UsedRec) := by simpa using hr
       have hre' : r' = ((nc, t, hd.toNat, c.ep) : UsedRec) := by simpa using hr'
       rw [hre, hre']
-
-/-- **Dropping a permit that is not the witness** (a task that stalls, or
-hands its permit back before its write). -/
-theorem epOk_drop (v : VirtioState) (st : Nat → HState) (pm : RegMapF PermVal)
-    (dl : List UsedRec) (ring : Nat → Nat) (lo np : Nat) (stg : Option Nat)
-    (key : Nat) (x0 : PermVal) (hget : PartialMap.get? pm key = some x0) (hnw : ¬ isWit x0)
-    (h : epOk v st pm dl ring lo np stg) :
-    epOk v st (PartialMap.delete pm key) dl ring lo np stg := by
-  obtain ⟨hpend, hlow, hperm, hdone, hinj⟩ := h
-  refine ⟨hpend, hlow, ?_, fun hh cc hsc hs r hr hrh => ?_, hinj⟩
-  · intro k' hh cc p u hg
-    have hk : key ≠ k' := by
-      intro he; rw [get?_delete_eq he] at hg; exact absurd hg (by simp)
-    rw [get?_delete_ne hk] at hg
-    exact hperm k' hh cc p u hg
-  · exact hdone hh cc hsc hs r hr hrh
 
 /-! ## The leases -/
 

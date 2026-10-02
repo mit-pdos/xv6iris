@@ -98,11 +98,6 @@ theorem lineOk_len (ws : List (List (BitVec 8))) (h : lineOk ws) : (wlLine ws).l
 theorem lineOk_pos (ws : List (List (BitVec 8))) (h : lineOk ws) : 0 < ws.length := by
   have := lineOk_ge2 ws h; omega
 
-/-- The COMMAND NAME is four bytes. -/
-theorem lineOk_head_len (ws : List (List (BitVec 8))) (h : lineOk ws) : (ws[0]!).length = 4 := by
-  have hh := lineOk_head ws h
-  simp [List.getElem!_eq_getElem?_getD, hh, cmdEcho]
-
 /-- ...and opens with `'e'`. -/
 theorem lineOk_head_byte0 (ws : List (List (BitVec 8))) (h : lineOk ws) :
     ((wlLine ws)[0]!).toNat = 101 := by
@@ -489,10 +484,6 @@ theorem outCur_lt (ws : List (List (BitVec 8))) (i : Nat) (w : List (BitVec 8)) 
     (hi : 1 ≤ i) (hw : ws[i]? = some w) (hj : j ≤ w.length) :
     outCur ws i + j < (wlLine (ws.drop 1)).length :=
   wlOff_lt_line (ws.drop 1) (i - 1) w j (by rw [ws_drop ws i hi]; exact hw) hj
-
-theorem lineAltsOf_0_length (ws : List (List (BitVec 8))) :
-    ((lineAltsOf ws)[0]!).length = (wlLine (ws.drop 1)).length + 2 := by
-  rw [lineAltsOf_0, List.length_append]; rfl
 
 theorem lineAlts_len1 (ws : List (List (BitVec 8))) : ((lineAltsOf ws)[1]!).length = 19 := rfl
 theorem lineAlts_len2_ (ws : List (List (BitVec 8))) : ((lineAltsOf ws)[2]!).length = 2 := rfl

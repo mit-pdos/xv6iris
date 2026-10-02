@@ -49,10 +49,6 @@ theorem elf_entry : elfEntry elf = some entry := by
 theorem elf_segments : elfSegments elf = some segments := by
   rw [elfSegments_eqR, elf_read]; decide +kernel
 
-/-- Rocq `sh_elf_base`. -/
-theorem elf_base : elfMemBase elf = some memBase := by
-  rw [elfMemBase_eqR, elf_read]; decide +kernel
-
 /-- Rocq `sh_elf_end`. -/
 theorem elf_end : elfMemEnd elf = some memEnd := by
   rw [elfMemEnd_eqR, elf_read]; decide +kernel

@@ -179,15 +179,6 @@ def dl0Spend : Nat := 4
 /-- Rocq's `dl0_spend_bmonly`: it IS writei's allowance for one block. -/
 theorem dl0Spend_bmonly : dl0Spend = wiCostBmonly 0 16 := rfl
 
-/-- Rocq's `dl0_spend_covers`. -/
-theorem dl0Spend_covers (crb crd cru al ind : Bool) :
-    wi16Spend crb crd cru al ind ≤ dl0Spend := wi16Spend_le4 crb crd cru al ind
-
-/-- Rocq's `dl0_of_spend`. -/
-theorem dl0_of_spend (ncount n' : Nat) (crb crd cru al ind : Bool) :
-    ncount - wi16Spend crb crd cru al ind ≤ n' → ncount - dl0Spend ≤ n' := by
-  have := dl0Spend_covers crb crd cru al ind; omega
-
 /-- **THE SIXTEEN-BYTE SEAM AT dirlink's OWN WINDOW** (Rocq's `dl16_post`):
 guarded by the APPEND arm alone; the credit-aware spend UNGUARDED (writei's
 `wi16SpendAny`), the atomicity (`wi16Atomic`), and the membership trio

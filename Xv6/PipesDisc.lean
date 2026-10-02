@@ -1344,13 +1344,4 @@ theorem pipesLm_laws_fc (fc : List (BitVec 8) → Option (List (BitVec 8))) (adm
           fun Y ps W hps hcmp => pipes_block_below_panic fc l b Y ps W hfc hl hok hps hcmp⟩
   lmlTermSt s l c hc ht s' := ⟨c, hc, ht⟩
 
-/-! ### The admissions -/
-
-/-- **Rocq `adm_echo`**: every echo pipeline — the pipeline application's
-admission. -/
-def admEcho : Pline' → Bool
-  | LEcho' _ => true
-  | LPipes (.PrEcho _) fs => allCats fs
-  | _ => false
-
 end Xv6

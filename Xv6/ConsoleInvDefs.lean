@@ -462,14 +462,6 @@ instance consDirtyLb_timeless (cn : ConsNames) : Timeless (consDirtyLb (GF := GF
 instance consCleanTok_timeless (cn : ConsNames) : Timeless (consCleanTok (GF := GF) cn) := by
   unfold consCleanTok; infer_instance
 
-theorem consDirtyLb_clean (cn : ConsNames) : consCleanTok (GF := GF) cn ⊢ consDirtyLb cn -∗ False := by
-  unfold consCleanTok consDirtyLb
-  iintro Ha Hlb
-  ihave %h := MonoNat.auth_lb_own_valid cn.dirty _ 0 1 $$ Ha Hlb
-  exfalso
-  have := (MaxNat.le_toNat _ _).mp h.2
-  exact absurd this (by decide)
-
 /-- THE LEASE'S CONSUMED SEQUENCE (ruling F1): `consStoredLb cn dv` with
 `length dv = n` IS "`dv = take n st`" at every later `st`, so the holder
 knows where its window begins without the ring having to say it.  The right

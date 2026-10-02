@@ -85,13 +85,6 @@ def wriPre (av : Aview) (i off : Nat) (bs bs0 : List (BitVec 8)) (nl : Nat) : Pr
 /-- `⌈n / FW_MAX⌉`: at most this many instants fire (Rocq's `wchunks`). -/
 def wchunks (n : Int) : Nat := ((n + FW_MAX - 1) / FW_MAX).toNat
 
-/-- the bundle is big enough for the count (Rocq's `wchunks_covers`) -/
-theorem wchunks_covers (n : Int) (hn : 0 ≤ n) : n ≤ FW_MAX * (wchunks n : Int) := by
-  unfold wchunks FW_MAX
-  have hq : 0 ≤ (n + 3072 - 1) / 3072 := Int.ediv_nonneg (by omega) (by omega)
-  rw [Int.toNat_of_nonneg hq]
-  omega
-
 /-- nothing to hand in when the count is not positive (Rocq's
 `wchunks_nonpos`) -/
 theorem wchunks_nonpos (n : Int) (hn : n ≤ 0) : wchunks n = 0 := by

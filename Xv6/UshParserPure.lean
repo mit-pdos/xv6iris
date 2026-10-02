@@ -81,21 +81,6 @@ def ushPpDeep : UshpCmd → Nat
   | .pipe l r => 6 + max (ushPexDeep l) (ushPpDeep r)
   | t => 6 + ushPexDeep t
 
-/-- **Rocq `ushp_pex_deep_le_room`**. -/
-theorem ushPexDeep_le_room (t : UshpCmd) : ushPexDeep t ≤ ushPexRoom t := by
-  unfold ushPexDeep ushPexRoom ushPexExtra; split <;> omega
-
-/-- **Rocq `ushp_pp_deep_le_room`**. -/
-theorem ushPpDeep_le_room : ∀ t : UshpCmd, ushPpDeep t ≤ ushPpRoom t
-  | .pipe l r => by
-    simp only [ushPpDeep, ushPpRoom]
-    have := ushPexDeep_le_room l; have := ushPpDeep_le_room r; omega
-  | .exec toks => by simp only [ushPpDeep, ushPpRoom]; have := ushPexDeep_le_room (.exec toks); omega
-  | .redir c q e mode fd => by
-    simp only [ushPpDeep, ushPpRoom]; have := ushPexDeep_le_room (.redir c q e mode fd); omega
-  | .list l r => by simp only [ushPpDeep, ushPpRoom]; have := ushPexDeep_le_room (.list l r); omega
-  | .back c => by simp only [ushPpDeep, ushPpRoom]; have := ushPexDeep_le_room (.back c); omega
-
 /-- **Rocq `ushp_pp_deep_wrap`**: parseexec's answer is never a pipe. -/
 theorem ushPpDeep_wrap (toks : List (Nat × Nat)) (rs : List Rredir) :
     ushPpDeep (refWrap (.exec toks) rs) = 6 + ushPexDeep (refWrap (.exec toks) rs) := by

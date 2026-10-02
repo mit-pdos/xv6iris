@@ -881,12 +881,6 @@ theorem ap_bcond_pidmax (x : BitVec 32) :
   have h : (1000#64 : BitVec 64) = BitVec.signExtend 64 (1000#32) := by decide
   rw [h, ap_bcond_pid]
 
-/-- `addiw a1,a3,1` on a sign-extended word. -/
-theorem ap_addiw_succ (x : BitVec 32) :
-    BitVec.signExtend 64 (BitVec.extractLsb' 0 32 (BitVec.signExtend 64 x + BitVec.signExtend 64 (1#12)))
-      = BitVec.signExtend 64 (x + 1#32) := by
-  bv_decide
-
 /-- The registers the pid scan leaves alone. -/
 def apKeep (R R' : RegMap) : Prop := ∀ i : BitVec 5, i ≠ 14#5 → i ≠ 15#5 → R' i = R i
 

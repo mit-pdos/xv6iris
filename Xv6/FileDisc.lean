@@ -674,33 +674,6 @@ noncomputable def sessf (ps cs : List Nat) (s : Fstate) (I : List (BitVec 8)) :
     List (BitVec 8) :=
   proOf ps ++ altSeqF ps cs s (bodiesOf I) (nlines I) ++ restOf I
 
-/-- the side condition `EchoDisc.pro_ok` states, at the panic alternatives of
-all the line shapes -/
-def proOkF (ps cs : List Nat) (q : Nat) : Prop :=
-  (∀ a ∈ ps, a < proAlts.length) ∧ proIdxF cs q < proRounds ps
-
-/-! ## 5.  THE DISCIPLINE, THE CLAIM'S VOCABULARY, AND THE HISTORY -/
-
-/-- D3 over one power cycle's input -/
-noncomputable def discSegF (seg : List Obs) : Prop := discInputF (consIns seg)
-
-/-- D1/D2 AT ONE INPUT POSITION: the expected transcript for the COMPLETE
-LINES typed so far -- read at the era's boot state -- is already on the
-wire (the RELAXED per-line rule, ruled 2026-09-23). -/
-noncomputable def discPtF (ps cs : List Nat) (s : Fstate) (p : List Obs) : Prop :=
-  sessf ps cs s (doneOf (consIns p)) <+: obsWire .uart0 p
-
-/-- the resolution's range condition: every line's alternative is one ITS
-SHAPE admits (`Forall2` also pins the length) -/
-noncomputable def altsOk (I : List (BitVec 8)) (cs : List Nat) : Prop :=
-  List.Forall₂ (fun l c => raltOk l (raltDec c)) (linesOf I) cs
-
-/-- THE PER-CYCLE DISCIPLINE, with the era's BOOT STATE a parameter -/
-noncomputable def discSegF' (s : Fstate) (seg : List Obs) : Prop :=
-  discSegF seg
-  ∧ ∃ ps cs : List Nat, altsOk (consIns seg) cs
-    ∧ ∀ p ∈ inPres seg, proOkF ps cs (nlines (consIns p)) ∧ discPtF ps cs s p
-
 /-! ### The lines the file may hold -/
 
 /-- a redirect line's file and word list -/
