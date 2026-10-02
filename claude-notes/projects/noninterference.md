@@ -96,6 +96,21 @@ each, integrated on `lean-m2`:
 
 - [ ] M2-W1  - [ ] M2-W2  - [x] M2-W3 (M0) (38c39d26f: class = {exit, getpid, uptime}; sbrk, fork, wait, write NOT functional -- see its as-landed note; owner decision pending)  - [ ] M2-W4
 
+**Owner ruling after W3 (2026-10-02): land M2 at the HONEST class, then grow it.** W2 and W4 proceed with
+`canon` over the class {exit, getpid, uptime} plus the transparent rounds; the strong instance (a process before its
+first ecall) is the headline and does not depend on the class. The four non-functional rows are M2's FOLLOW-UP
+lanes, cheapest first (each names a channel §2 says is unnamed, as a ledger or a tie, then re-admits the row to
+the class with its `round_det` discharge):
+
+| Lane | Names the channel | Re-admits |
+|---|---|---|
+| **M2-G1 slot placement** | a slot-placement ledger (allocproc's first-UNUSED choice as an actor-labelled event; the zombie ledger's D3 "nothing under the wait lock knows the slots" is thereby revisited) | `wait` (which child is reaped: the lowest zombie slot), fork's −1 on slot exhaustion |
+| **M2-G2 the pid counter** | the pid ledger's counter tie and first-ness (R2(b)/(c) of `ni-pid-ledger.md`): `nextpid` is `nextOf` of the history | fork's pid |
+| **M2-G3 sbrk** | `sysSbrkOk`'s −1 only when the pool is empty (growproc/uvmalloc functional in the allocator ledger), and the eager grow's page-table pages as events (`Alloc A vpn`-grained, §3 "concedes more") | `sbrk` |
+| **M2-G4 console write** | the kernel's short count stated at the key's permission view `π` (copyin at the key, not the table) and a write row in the trap contract | console `write` |
+
+- [ ] M2-G1  - [ ] M2-G2  - [ ] M2-G3  - [ ] M2-G4
+
 Risk register (honest): W1 changes the language and every lifting lemma -- mechanical but wide, and the device
 suite must not notice; W3 is the proof's content and may find a row that cannot be made functional in `(key,
 ι-prefix)` -- that is a channel not yet named (§2), to be reported, not papered over; W4's `events h` must be a
