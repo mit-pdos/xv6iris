@@ -6,7 +6,7 @@ contract.  A port of Rocq `SpecNamex.v` (`iris/SpecNamex.v`).
     namex(char *path, int nameiparent, char *name)
     {
       struct inode *ip, *next;
-      if(*path == '/') ip = iget(ROOTDEV, ROOTINO);
+      if(*path == '/') ip = idup(myproc()->root);
       else             ip = idup(myproc()->cwd);
       while((path = skipelem(path, name)) != 0){
         ilock(ip);
@@ -56,6 +56,14 @@ so the loop is namex's own and `Xv6/PathElems.lean` models it directly.
   by namex's own type test); the credentials are threaded.
 * namex SLEEPS (ilock / dirlookup / iput), so the crossing is the literal
   `true`; it enters and returns at depth 0.
+* THE ROOT (chroot bump, b72cbac; design/chroot.md §2.1): the absolute arm
+  is the relative arm's twin, `idup(myproc()->root)`, so the contract takes
+  ONE more row in and out beside the cwd's, the root's cell and reference
+  `wordPointsTo (pRoot k.proc) 8 dqr rootv ∗ inodeHeldAt rootv rti`, lent
+  unconditionally (dirlookup's self test reads it at every level).  The
+  ledger figures do not move (`idup` mints from one `irefSlot` exactly as
+  `iget` did); the `icfgDev = ROOTDEV` / `0 < icfgNib` premises no longer
+  pay for anything in namex itself and are kept (a surplus premise is free).
 
 ## DEVIATIONS from Rocq
 
@@ -87,6 +95,9 @@ so the loop is namex's own and `Xv6/PathElems.lean` models it directly.
    `pv_cwi`).  All three come back unchanged.  REPORTED, not invented: a
    caller carves the cwd cell out of `procFields` the way it carves the pid
    cell; where the reference lives is the process layer's open question.
+   The ROOT (chroot) follows the same pattern: Rocq's
+   `inode_held_at (pv_root (us_V Upr)) (pv_rti (us_V Upr))` is the cell row
+   `wordPointsTo (pRoot k.proc) 8 dqr rootv` and `inodeHeldAt rootv rti`.
 4. **THE PATH** is `byteBuf (k.regs 10#5) dqpv (bview (plen + 1) pfun)` and
    Rocq's `bb_cstr pfun plen` is the two premises `hnn` / `hterm` (the
    `Xv6/ArgPath.lean` deviation 3 spelling).  THE NAME BUFFER is
@@ -193,7 +204,8 @@ UNSPECIFIED naming function; the set only grows; the paid-bitmap report
 `w`; the priced interval; and the two arms. -/
 def namexPost [Fscfg] [Icfg] [CurCtx] (k : KCtx) (plen : Nat) (pfun : Nat → BitVec 8)
     (npar : Bool) (n : Nat) (Sb : List Nat) (pidv : BitVec 32) (cwdv : BitVec 64) (cwi : Nat)
-    (dqp dqc dqb dqs dqpv : DFrac) (cpu' : CPU) : IProp GF :=
+    (dqp dqc dqb dqs dqpv : DFrac) (rootv : BitVec 64) (rti : Nat) (dqr : DFrac)
+    (cpu' : CPU) : IProp GF :=
   iprop(∀ (spie spp : Bool) (R' : RegMap) (n' : Nat) (Sb' : List Nat) (ok : Bool)
       (nf : Nat → BitVec 8) (ipv : BitVec 64) (w : Bool),
     ⌜calleeSaved k.regs R'⌝ -∗
@@ -204,6 +216,7 @@ def namexPost [Fscfg] [Icfg] [CurCtx] (k : KCtx) (plen : Nat) (pfun : Nat → Bi
     wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) -∗
     wordPointsTo (pPid k.proc) 4 dqp pidv -∗
     wordPointsTo (pCwd k.proc) 8 dqc cwdv -∗ inodeHeldAt cwdv cwi -∗
+    wordPointsTo (pRoot k.proc) 8 dqr rootv -∗ inodeHeldAt rootv rti -∗
     byteBuf (k.regs 10#5) dqpv (bview (plen + 1) pfun) -∗
     -- the name buffer, at an UNSPECIFIED naming function
     byteBuf (k.regs 12#5) (DFrac.own 1) (bview 14 nf) -∗
@@ -233,6 +246,7 @@ def wp_namex_gen_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
     (γkl : GName) (γk : KmemNames)
     (plen : Nat) (pfun nfun : Nat → BitVec 8) (npar : Bool) (n : Nat) (Sb : List Nat)
     (pidv : BitVec 32) (cwdv : BitVec 64) (cwi : Nat) (dqp dqc dqb dqs dqpv : DFrac)
+    (rootv : BitVec 64) (rti : Nat) (dqr : DFrac)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : namexSlots ≤ k.avail)
     (hnoff : k.noff = 0) (htier : k.tier = KTier.kpt)
     -- (2) the absolute arm's two immediates
@@ -273,6 +287,9 @@ def wp_namex_gen_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
   -- ---- the caller's pid cell, and THE WORKING DIRECTORY (deviation 3) ----
   wordPointsTo (pPid k.proc) 4 dqp pidv ∗
   wordPointsTo (pCwd k.proc) 8 dqc cwdv ∗ inodeHeldAt cwdv cwi ∗
+  -- ---- THE ROOT (chroot): its cell and its reference, lent unconditionally
+  -- (the absolute arm's `idup(p->root)`, dirlookup's self test) ----
+  wordPointsTo (pRoot k.proc) 8 dqr rootv ∗ inodeHeldAt rootv rti ∗
   -- ---- THE PATH, at the caller's fraction (only READ) ----
   byteBuf (k.regs 10#5) dqpv (bview (plen + 1) pfun) ∗
   -- ---- THE NAME BUFFER, WRITTEN: full ownership ----
@@ -285,7 +302,7 @@ def wp_namex_gen_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
   logOpS icfgLog n Sb ∗ logTx icfgLog ∗
   -- THE CROSSING IS THE LITERAL `true`: namex parks
   wpNext true k.proc cpu
-    (namexPost k plen pfun npar n Sb pidv cwdv cwi dqp dqc dqb dqs dqpv)
+    (namexPost k plen pfun npar n Sb pidv cwdv cwi dqp dqc dqb dqs dqpv rootv rti dqr)
   ⊢ wpLoop (GF := GF) cpu
 
 /-- The interface of `namex` (Rocq's `Module Type NAMEX`, its `wp_namex_gen`
@@ -300,9 +317,10 @@ structure NAMEX : Prop where
     (γkl : GName) (γk : KmemNames)
     (plen : Nat) (pfun nfun : Nat → BitVec 8) (npar : Bool) (n : Nat) (Sb : List Nat)
     (pidv : BitVec 32) (cwdv : BitVec 64) (cwi : Nat) (dqp dqc dqb dqs dqpv : DFrac)
+    (rootv : BitVec 64) (rti : Nat) (dqr : DFrac)
     hj hproc hK hnoff htier hroot hnib0 hgeom hbg hbel hireg hnn hterm hplen hbud hnpar hpd,
     wp_namex_gen_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl pd pav pu j γkl γk plen pfun nfun
-      npar n Sb pidv cwdv cwi dqp dqc dqb dqs dqpv
+      npar n Sb pidv cwdv cwi dqp dqc dqb dqs dqpv rootv rti dqr
       hj hproc hK hnoff htier hroot hnib0 hgeom hbg hbel hireg hnn hterm hplen hbud hnpar hpd
 
 end Xv6

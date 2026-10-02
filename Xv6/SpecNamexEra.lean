@@ -238,6 +238,34 @@ theorem namexEra_core_rows [X : CurCtx] (hct : X.curTier = KTier.kpt) (pa : BitV
   · ipureintro; exact h
   · ipureintro; exact hlz
 
+/-- **...and the FIVE rows the walk lends since the chroot bump**: the root's
+cell and reference beside the cwd's (the absolute arm's `idup`, dirlookup's
+self test). -/
+theorem namexEra_core_rows5 [X : CurCtx] (hct : X.curTier = KTier.kpt) (pa : BitVec 64)
+    (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) :
+    procPrivCoreNoctxAt (GF := GF) curCtx pa pid V M ⊢
+      wordPointsTo (pPid pa) 4 pidPriv pid ∗
+      wordPointsTo (pCwd pa) 8 (DFrac.own 1) V.cwd ∗
+      inodeHeldAt V.cwd V.cwi ∗
+      wordPointsTo (pRoot pa) 8 (DFrac.own 1) V.root ∗
+      inodeHeldAt V.root V.rti ∗
+      (wordPointsTo (pPid pa) 4 pidPriv pid -∗
+        wordPointsTo (pCwd pa) 8 (DFrac.own 1) V.cwd -∗
+        inodeHeldAt V.cwd V.cwi -∗
+        wordPointsTo (pRoot pa) 8 (DFrac.own 1) V.root -∗
+        inodeHeldAt V.root V.rti -∗ procPrivCoreNoctxAt curCtx pa pid V M) := by
+  obtain ⟨c, t⟩ := X
+  simp only at hct
+  subst hct
+  unfold procPrivCoreNoctxAt procPrivBareAt procFieldsNoOfile cwdRefAt rootRefAt
+  iintro ⟨⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hcwd, Hnm, Hsc, Hrt⟩, Hpt, Htfp, %hlz, Hev⟩, Hc, Hr, Hg⟩
+  iframe Hpid Hcwd Hc Hrt Hr Hev
+  iintro Hpid Hcwd Hc Hrt Hr
+  iframe Hpid Hk Hs Hpg Htf Hcwd Hnm Hsc Hrt Hpt Htfp Hc Hr Hg
+  isplitl []
+  · ipureintro; exact h
+  · ipureintro; exact hlz
+
 end Bridge
 
 end Xv6

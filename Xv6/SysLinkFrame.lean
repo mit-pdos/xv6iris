@@ -389,12 +389,15 @@ def sysLinkOut (A : SysLinkArgs GF) (r : BitVec 64) : IProp GF := iprop%
     procPrivFd A.γ (procAddr A.j) A.pid { A.V with upt := P' } (viewFaulted A.V.upt P' A.M)) ∗
   linkArms (hlc := hlc) (fsGammaL fscFs) A.Ftgt A.Fent A.Funt r
 
-/-- The three rows the two walks borrow from the block: the pid cell, the
-`p->cwd` cell and the cwd's reference (Rocq: `proc_priv_split_cwd` +
-`cwd_ref_at_held_at`, and the pid quarter). -/
+/-- The five rows the two walks borrow from the block: the pid cell, the
+`p->cwd` cell and the cwd's reference, the `p->root` cell and the root's
+reference (Rocq: `proc_priv_split_cwd` + `cwd_ref_at_held_at` +
+`root_ref_at`, and the pid quarter; the root rows since the chroot bump,
+lent to both walks and to dirlink's inner lookup). -/
 def sysLinkRows (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) : IProp GF := iprop%
   wordPointsTo (pPid pa) 4 pidPriv pid ∗ wordPointsTo (pCwd pa) 8 (DFrac.own 1) V.cwd ∗
-  inodeHeldAt V.cwd V.cwi
+  inodeHeldAt V.cwd V.cwi ∗ wordPointsTo (pRoot pa) 8 (DFrac.own 1) V.root ∗
+  inodeHeldAt V.root V.rti
 
 /-- THE BLOCK AFTER THE TWO ARGSTRS, WITH ITS ROWS OUT: the page table at
 `P2` (grown under the break), the view faulted, and the hole the three rows
@@ -411,13 +414,15 @@ theorem sys_link_block_open (hct : curTier = KTier.kpt) (A : SysLinkArgs GF) (P2
     procPrivFd (GF := GF) A.γ (procAddr A.j) A.pid { A.V with upt := P2 } (viewFaulted A.V.upt P2 A.M) ⊢
       sysLinkRows (procAddr A.j) A.pid A.V ∗ sysLinkHole A (procAddr A.j) P2 := by
   unfold sysLinkHole sysLinkRows procPrivFd procPrivCoreNoctxAt procPrivBareAt procFieldsNoOfile cwdRefAt
+    rootRefAt
   rw [sysfile_cur_kpt hct]
-  iintro ⟨⟨⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hcwd, Hnm, Hsc, Hrt⟩, Hpt, Htfp, %hlz, Hev⟩, Hc, Hg⟩, Hof⟩
-  iframe Hpid Hcwd Hc Hev
+  iintro ⟨⟨⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hcwd, Hnm, Hsc, Hrt⟩, Hpt, Htfp, %hlz, Hev⟩, Hc, Hr, Hg⟩,
+    Hof⟩
+  iframe Hpid Hcwd Hc Hrt Hr Hev
   isplitr
   · ipureintro; exact hP2
-  iintro ⟨Hpid, Hcwd, Hc⟩
-  iframe Hpid Hk Hs Hpg Htf Hcwd Hnm Hsc Hrt Hpt Htfp Hc Hg Hof
+  iintro ⟨Hpid, Hcwd, Hc, Hrt, Hr⟩
+  iframe Hpid Hk Hs Hpg Htf Hcwd Hnm Hsc Hrt Hpt Htfp Hc Hr Hg Hof
   isplitl []
   · ipureintro; exact h
   · ipureintro; exact hlz

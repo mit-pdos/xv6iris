@@ -172,43 +172,54 @@ theorem sys_chroot_hole_close (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32
   iapply Hw $$ %V.root %V.rti Hr
 
 /-- **THE WALK'S ROWS** (deviation 2): the pid cell at the block's half, the
-`p->cwd` cell and the cwd's reference, lent to namei and handed back. -/
+`p->cwd` cell and the cwd's reference, the `p->root` cell and the root's
+reference (namei's absolute arm and dirlookup's self test read them), lent
+to namei and handed back. -/
 theorem sys_chroot_walk_rows0 (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) :
     procPrivFd (GF := GF) γ pa pid V M ⊢
       @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPid pa) 4 pidPriv pid ∗
       @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pCwd pa) 8 (DFrac.own 1) V.cwd ∗
       @cwdRefAt hlc GF _ _ _ _ _ ⟨curCtx, KTier.kpt⟩ V.cwd V.cwi ∗
+      @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pRoot pa) 8 (DFrac.own 1) V.root ∗
+      @rootRefAt hlc GF _ _ _ _ _ ⟨curCtx, KTier.kpt⟩ V.root V.rti ∗
       (@wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPid pa) 4 pidPriv pid -∗
         @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pCwd pa) 8 (DFrac.own 1) V.cwd -∗
         @cwdRefAt hlc GF _ _ _ _ _ ⟨curCtx, KTier.kpt⟩ V.cwd V.cwi -∗
+        @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pRoot pa) 8 (DFrac.own 1) V.root -∗
+        @rootRefAt hlc GF _ _ _ _ _ ⟨curCtx, KTier.kpt⟩ V.root V.rti -∗
         procPrivFd γ pa pid V M) := by
   unfold procPrivFd procPrivCoreNoctxAt procPrivBareAt procFieldsNoOfile
   iintro ⟨⟨⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hcwd, Hnm, Hsc, Hrt⟩, Hpt, Htfp, %hlz, Hev⟩, Hc, Hr, Hg⟩, Ho⟩
-  iframe Hpid Hcwd Hc
-  iintro Hpid Hcwd Hc
+  iframe Hpid Hcwd Hc Hrt Hr
+  iintro Hpid Hcwd Hc Hrt Hr
   iframe Hpid Hk Hs Hpg Htf Hcwd Hnm Hsc Hrt Hpt Htfp Hc Hr Hg Ho Hev
   isplitl []
   · ipureintro; exact h
   · ipureintro; exact hlz
 
-/-- ...at the ambient context, the reference as namei takes it. -/
+/-- ...at the ambient context, the references as namei takes them. -/
 theorem sys_chroot_walk_rows (hct : curTier = KTier.kpt) (γ : FileNames) (pa : BitVec 64)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) :
     procPrivFd (GF := GF) γ pa pid V M ⊢
       wordPointsTo (pPid pa) 4 pidPriv pid ∗ wordPointsTo (pCwd pa) 8 (DFrac.own 1) V.cwd ∗
       inodeHeldAt V.cwd V.cwi ∗
+      wordPointsTo (pRoot pa) 8 (DFrac.own 1) V.root ∗ inodeHeldAt V.root V.rti ∗
       (wordPointsTo (pPid pa) 4 pidPriv pid -∗ wordPointsTo (pCwd pa) 8 (DFrac.own 1) V.cwd -∗
-        inodeHeldAt V.cwd V.cwi -∗ procPrivFd γ pa pid V M) := by
+        inodeHeldAt V.cwd V.cwi -∗
+        wordPointsTo (pRoot pa) 8 (DFrac.own 1) V.root -∗ inodeHeldAt V.root V.rti -∗
+        procPrivFd γ pa pid V M) := by
   have h := sys_chroot_walk_rows0 (GF := GF) γ pa pid V M
   rw [sysfile_cur_kpt hct] at h
   iintro H
-  icases h $$ H with ⟨Hp, Hc, Hr, Hw⟩
+  icases h $$ H with ⟨Hp, Hc, Hr, Hrc, Hrr, Hw⟩
   ihave Hr := cwdRefAt_heldAt _ _ $$ Hr
-  iframe Hp Hc Hr
-  iintro Hp Hc Hr
+  ihave Hrr := rootRefAt_heldAt _ _ $$ Hrr
+  iframe Hp Hc Hr Hrc Hrr
+  iintro Hp Hc Hr Hrc Hrr
   ihave Hr := cwdRefAt_ofHeldAt _ _ $$ Hr
-  iapply Hw $$ Hp Hc Hr
+  ihave Hrr := rootRefAt_ofHeldAt _ _ $$ Hrr
+  iapply Hw $$ Hp Hc Hr Hrc Hrr
 
 /-- What every exit hands the epilogue beside the machine state: the two
 allowances whole and the post on the block the call leaves. -/
@@ -302,13 +313,14 @@ theorem sys_chroot_namei (NI : NAMEI) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF
     sysChrootNameiK k' se pj pv plen pfun n Sb γ pid V M
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hte, Hce, #Henv, Hblk, Hpath, Hbs, Hir, Hop, Htx, HK⟩
-  icases sys_chroot_walk_rows hct γ pj pid V M $$ Hblk with ⟨Hpid, Hcwd, Hcwr, Hback⟩
-  iapply (sys_link_namei NI Γ cpu k' se hs pj hpj j pv hpv plen pfun n Sb pid V.cwd V.cwi
-      hj hproc hK hnoff htier hnn hterm hplen hbud)
-    $$ [$Hk $Hpc $Hte $Hce $Henv $Hpid $Hcwd $Hcwr $Hpath $Hbs $Hir $Hop $Htx HK Hback]
+  icases sys_chroot_walk_rows hct γ pj pid V M $$ Hblk with ⟨Hpid, Hcwd, Hcwr, Hrtc, Hrtr, Hback⟩
+  iapply (sys_link_namei NI Γ cpu k' se hs pj hpj j pv hpv plen pfun n Sb pid V.cwd V.cwi V.root
+      V.rti hj hproc hK hnoff htier hnn hterm hplen hbud)
+    $$ [$Hk $Hpc $Hte $Hce $Henv $Hpid $Hcwd $Hcwr $Hrtc $Hrtr $Hpath $Hbs $Hir $Hop $Htx HK Hback]
   unfold sysLinkNameiK
-  iintro %c %spie %spp %R' %n' %Sb' %ok %ipv %w %hf Hk Hpc Hte Hce Hpid Hcwd Hcwr Hpath Hbs Hop Htx Harm
-  ihave Hblk := Hback $$ Hpid Hcwd Hcwr
+  iintro %c %spie %spp %R' %n' %Sb' %ok %ipv %w %hf Hk Hpc Hte Hce Hpid Hcwd Hcwr Hrtc Hrtr Hpath Hbs
+    Hop Htx Harm
+  ihave Hblk := Hback $$ Hpid Hcwd Hcwr Hrtc Hrtr
   unfold sysChrootNameiK
   iapply HK $$ %c %spie %spp %R' %n' %Sb' %ok %ipv %w %hf Hk Hpc Hte Hce Hblk Hpath Hbs Hop Htx Harm
 

@@ -146,6 +146,36 @@ theorem inodeRefShort_halve [Icfg] [CurCtx] (k : Nat) (qt qi : Qp) (dev inum : B
   rw [Qp.half_add_half] at h
   exact h
 
+/-- THE LEND, as a walk makes it (dirlookup's dp row): half of what a
+generation-named short parent still holds goes out as a FORGOTTEN share
+(`inodeShr`, the form dirlookup's contract states), its floor paid by the
+parent's own credential. -/
+theorem inodeRefShortGenlo_lend [Icfg] [CurCtx] (k : Nat) (qt qi : Qp) (dev inum : BitVec 32)
+    (g : GName) (lo tl : Nat) (hle : lo ≤ tl) :
+    credFloor (GF := GF) lo tl ∗ inodeRefShortGenlo k qt qi dev inum g lo ⊢
+      inodeRefShortGenlo k qt qi.half dev inum g lo ∗ inodeShr k qi.half dev inum := by
+  iintro ⟨#Hfl, H⟩
+  icases (inodeRefShortGenlo_halve k qt qi dev inum g lo).1 $$ H with ⟨Hk, Hs⟩
+  iframe Hk
+  iapply inodeShr_gen_forget k qi.half dev inum g lo tl hle
+  iframe Hfl Hs
+
+/-- ...and THE REGATHER: the share comes back forgotten; the parent's own
+liveness slice re-pins its generation and floor (`inodeShrGen_pin_on_keep_short`)
+and the two halves gather. -/
+theorem inodeRefShortGenlo_regather [Icfg] [CurCtx] (k : Nat) (qt qi : Qp)
+    (dev inum : BitVec 32) (g : GName) (lo : Nat) :
+    inodeRefShortGenlo (GF := GF) k qt qi.half dev inum g lo ∗ inodeShr k qi.half dev inum ⊢
+      inodeRefShortGenlo k qt qi dev inum g lo := by
+  iintro ⟨Hk, Hs⟩
+  icases (inodeShr_gen_intro k qi.half dev inum).1 $$ Hs with ⟨%g', %lo', %tl', %hle', #Hfl', Hs⟩
+  ihave Hs := inodeShrGenlo_gen k qi.half dev inum g' lo' $$ Hs
+  icases inodeShrGen_pin_on_keep_short k qt qi.half qi.half dev inum dev inum g' g lo $$ [Hk Hs]
+    with ⟨Hk, Hs⟩
+  · iframe
+  iapply (inodeRefShortGenlo_halve k qt qi dev inum g lo).2
+  iframe
+
 end IcacheShortCarve
 
 end Xv6

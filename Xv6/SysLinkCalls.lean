@@ -113,7 +113,8 @@ theorem sys_link_argstr (AS : ARGSTR) (Γ : SchedNames) (cpu : CPU) (k' : KCtx) 
 /-- namei's continuation at a sys_link site, hart-free, the superblock cells
 dropped (they are `fsReady`'s persistent ones). -/
 def sysLinkNameiK (k' : KCtx) (se : Bool) (pj : BitVec 64) (pv : BitVec 64) (plen : Nat) (pfun : Nat → BitVec 8) (n : Nat) (Sb : List Nat)
-    (pidv : BitVec 32) (cwdv : BitVec 64) (cwi : Nat) : IProp GF := iprop(
+    (pidv : BitVec 32) (cwdv : BitVec 64) (cwi : Nat) (rootv : BitVec 64) (rti : Nat) :
+    IProp GF := iprop(
   ∀ (c : CPU) (spie spp : Bool) (R' : RegMap) (n' : Nat) (Sb' : List Nat) (ok : Bool)
       (ipv : BitVec 64) (w : Bool),
     ⌜calleeSaved k'.regs R' ∧ (∀ x ∈ Sb, x ∈ Sb') ∧ (w = true → fscBmapstart ∈ Sb') ∧
@@ -122,6 +123,7 @@ def sysLinkNameiK (k' : KCtx) (se : Bool) (pj : BitVec 64) (pv : BitVec 64) (ple
     trapCsrsExt c se -∗ cpuClaimExt c se pj -∗
     wordPointsTo (pPid pj) 4 pidPriv pidv -∗
     wordPointsTo (pCwd pj) 8 (DFrac.own 1) cwdv -∗ inodeHeldAt cwdv cwi -∗
+    wordPointsTo (pRoot pj) 8 (DFrac.own 1) rootv -∗ inodeHeldAt rootv rti -∗
     byteBuf pv (DFrac.own 1) (bview (plen + 1) pfun) -∗
     bslots 3 -∗ logOpS icfgLog n' Sb' -∗ logTx icfgLog -∗
     (if ok then iprop(⌜R' 10#5 = ipv⌝ ∗ inodeHeld ipv ∗ irefSlots 1)
@@ -134,7 +136,7 @@ theorem sys_link_namei (NI : NAMEI) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF �
     (cpu : CPU) (k' : KCtx) (se : Bool) (hs : k'.sie = se) (pj : BitVec 64)
     (hpj : k'.proc = pj) (j : Nat) (pv : BitVec 64) (hpv : k'.regs 10#5 = pv) (plen : Nat)
     (pfun : Nat → BitVec 8) (n : Nat)
-    (Sb : List Nat) (pidv : BitVec 32) (cwdv : BitVec 64) (cwi : Nat)
+    (Sb : List Nat) (pidv : BitVec 32) (cwdv : BitVec 64) (cwi : Nat) (rootv : BitVec 64) (rti : Nat)
     (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hK : nameiSlots ≤ k'.avail)
     (hnoff : k'.noff = 0) (htier : k'.tier = KTier.kpt)
     (hnn : ∀ i, i < plen → pfun i ≠ 0#8) (hterm : pfun plen = 0#8) (hplen : plen < 2 ^ 31)
@@ -143,12 +145,13 @@ theorem sys_link_namei (NI : NAMEI) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF �
     trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗ sysfileEnv (hlc := hlc) Γ ∗
     wordPointsTo (pPid pj) 4 pidPriv pidv ∗
     wordPointsTo (pCwd pj) 8 (DFrac.own 1) cwdv ∗ inodeHeldAt cwdv cwi ∗
+    wordPointsTo (pRoot pj) 8 (DFrac.own 1) rootv ∗ inodeHeldAt rootv rti ∗
     byteBuf pv (DFrac.own 1) (bview (plen + 1) pfun) ∗
     bslots 3 ∗ irefSlots 2 ∗ logOpS icfgLog n Sb ∗ logTx icfgLog ∗
-    sysLinkNameiK k' se pj pv plen pfun n Sb pidv cwdv cwi
+    sysLinkNameiK k' se pj pv plen pfun n Sb pidv cwdv cwi rootv rti
     ⊢ wpLoop (GF := GF) cpu := by
   subst hs hpj hpv
-  iintro ⟨Hk, Hpc, Hte, Hce, #Henv, Hpid, Hcwd, Hcwr, Hpath, Hbs, Hir, Hop, Htx, HK⟩
+  iintro ⟨Hk, Hpc, Hte, Hce, #Henv, Hpid, Hcwd, Hcwr, Hrtc, Hrtr, Hpath, Hbs, Hir, Hop, Htx, HK⟩
   unfold sysfileEnv
   icases Henv with ⟨#Hpi, #Hpe, #Hrdy⟩
   ihave %hg := fsReady_geom $$ Hrdy
@@ -162,26 +165,27 @@ theorem sys_link_namei (NI : NAMEI) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF �
   ihave #Hbmi := fsReady_bitmap $$ Hrdy
   have h := NI.wp_namei_gen_eb (hlc := hlc) (GF := GF) Γ cpu k' γbl pd pav pu j fscKalloc
     fsReadyKmem plen pfun n Sb pidv cwdv cwi pidPriv (DFrac.own 1) DFrac.discard DFrac.discard
-    (DFrac.own 1) hj hproc hK hnoff htier hg.fgoRootdev hg.fgoNibPos hg.fgoLog hg.fgoBitmap
+    (DFrac.own 1) rootv rti (DFrac.own 1) hj hproc hK hnoff htier hg.fgoRootdev hg.fgoNibPos hg.fgoLog hg.fgoBitmap
     hg.fgoCovBelow hg.fgoIreg hnn hterm hplen hbud hpd
   unfold wp_namei_gen_eb_body at h
   iapply h
-  iframe Hk Hpc Hte Hce Hpid Hcwd Hcwr Hpath Hbs Hir Hop Htx
+  iframe Hk Hpc Hte Hce Hpid Hcwd Hcwr Hrtc Hrtr Hpath Hbs Hir Hop Htx
   iframe #
   iapply wpNext_intro_pin
   iintro %c %_
   unfold nameiPost
-  iintro %spie %spp %R' %n' %Sb' %ok %ipv %w %hcs Hk Hpc Hte Hce - - Hpid Hcwd Hcwr Hpath Hbs %hf
+  iintro %spie %spp %R' %n' %Sb' %ok %ipv %w %hcs Hk Hpc Hte Hce - - Hpid Hcwd Hcwr Hrtc Hrtr Hpath Hbs %hf
     Hop Htx Harm
   unfold sysLinkNameiK
-  iapply HK $$ %c %spie %spp %R' %n' %Sb' %ok %ipv %w [] Hk Hpc Hte Hce Hpid Hcwd Hcwr Hpath Hbs
+  iapply HK $$ %c %spie %spp %R' %n' %Sb' %ok %ipv %w [] Hk Hpc Hte Hce Hpid Hcwd Hcwr Hrtc Hrtr Hpath Hbs
     Hop Htx Harm
   ipureintro
   exact ⟨hcs, hf⟩
 
 /-- nameiparent's continuation at +0x78, hart-free. -/
 def sysLinkNpK (k' : KCtx) (se : Bool) (pj : BitVec 64) (pv nb : BitVec 64) (plen : Nat) (pfun : Nat → BitVec 8) (n : Nat) (Sb : List Nat)
-    (pidv : BitVec 32) (cwdv : BitVec 64) (cwi : Nat) : IProp GF := iprop(
+    (pidv : BitVec 32) (cwdv : BitVec 64) (cwi : Nat) (rootv : BitVec 64) (rti : Nat) :
+    IProp GF := iprop(
   ∀ (c : CPU) (spie spp : Bool) (R' : RegMap) (n' : Nat) (Sb' : List Nat) (ok : Bool)
       (nf : Nat → BitVec 8) (ipv : BitVec 64) (w : Bool),
     ⌜calleeSaved k'.regs R' ∧ (∀ x ∈ Sb, x ∈ Sb') ∧ (w = true → fscBmapstart ∈ Sb') ∧
@@ -190,6 +194,7 @@ def sysLinkNpK (k' : KCtx) (se : Bool) (pj : BitVec 64) (pv nb : BitVec 64) (ple
     trapCsrsExt c se -∗ cpuClaimExt c se pj -∗
     wordPointsTo (pPid pj) 4 pidPriv pidv -∗
     wordPointsTo (pCwd pj) 8 (DFrac.own 1) cwdv -∗ inodeHeldAt cwdv cwi -∗
+    wordPointsTo (pRoot pj) 8 (DFrac.own 1) rootv -∗ inodeHeldAt rootv rti -∗
     byteBuf pv (DFrac.own 1) (bview (plen + 1) pfun) -∗
     byteBuf nb (DFrac.own 1) (bview 14 nf) -∗
     bslots 3 -∗ logOpS icfgLog n' Sb' -∗ logTx icfgLog -∗
@@ -205,7 +210,7 @@ theorem sys_link_nameiparent (NP : NAMEIPARENT) (Γ : SchedNames) [ClaimIs (hlc 
     (cpu : CPU) (k' : KCtx) (se : Bool) (hs : k'.sie = se) (pj : BitVec 64)
     (hpj : k'.proc = pj) (j : Nat) (pv nb : BitVec 64) (hpv : k'.regs 10#5 = pv)
     (hnb : k'.regs 11#5 = nb) (plen : Nat) (pfun nfun : Nat → BitVec 8) (n : Nat)
-    (Sb : List Nat) (pidv : BitVec 32) (cwdv : BitVec 64) (cwi : Nat)
+    (Sb : List Nat) (pidv : BitVec 32) (cwdv : BitVec 64) (cwi : Nat) (rootv : BitVec 64) (rti : Nat)
     (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hK : nameiparentSlots ≤ k'.avail)
     (hnoff : k'.noff = 0) (htier : k'.tier = KTier.kpt)
     (hnn : ∀ i, i < plen → pfun i ≠ 0#8) (hterm : pfun plen = 0#8) (hplen : plen < 2 ^ 31)
@@ -214,13 +219,14 @@ theorem sys_link_nameiparent (NP : NAMEIPARENT) (Γ : SchedNames) [ClaimIs (hlc 
     trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗ sysfileEnv (hlc := hlc) Γ ∗
     wordPointsTo (pPid pj) 4 pidPriv pidv ∗
     wordPointsTo (pCwd pj) 8 (DFrac.own 1) cwdv ∗ inodeHeldAt cwdv cwi ∗
+    wordPointsTo (pRoot pj) 8 (DFrac.own 1) rootv ∗ inodeHeldAt rootv rti ∗
     byteBuf pv (DFrac.own 1) (bview (plen + 1) pfun) ∗
     byteBuf nb (DFrac.own 1) (bview 14 nfun) ∗
     bslots 3 ∗ irefSlots 2 ∗ logOpS icfgLog n Sb ∗ logTx icfgLog ∗
-    sysLinkNpK k' se pj pv nb plen pfun n Sb pidv cwdv cwi
+    sysLinkNpK k' se pj pv nb plen pfun n Sb pidv cwdv cwi rootv rti
     ⊢ wpLoop (GF := GF) cpu := by
   subst hs hpj hpv hnb
-  iintro ⟨Hk, Hpc, Hte, Hce, #Henv, Hpid, Hcwd, Hcwr, Hpath, Hnm, Hbs, Hir, Hop, Htx, HK⟩
+  iintro ⟨Hk, Hpc, Hte, Hce, #Henv, Hpid, Hcwd, Hcwr, Hrtc, Hrtr, Hpath, Hnm, Hbs, Hir, Hop, Htx, HK⟩
   unfold sysfileEnv
   icases Henv with ⟨#Hpi, #Hpe, #Hrdy⟩
   ihave %hg := fsReady_geom $$ Hrdy
@@ -234,20 +240,20 @@ theorem sys_link_nameiparent (NP : NAMEIPARENT) (Γ : SchedNames) [ClaimIs (hlc 
   ihave #Hbmi := fsReady_bitmap $$ Hrdy
   have h := NP.wp_nameiparent_gen_eb (hlc := hlc) (GF := GF) Γ cpu k' γbl pd pav pu j fscKalloc
     fsReadyKmem plen pfun nfun n Sb pidv cwdv cwi pidPriv (DFrac.own 1) DFrac.discard DFrac.discard
-    (DFrac.own 1) hj hproc hK hnoff htier hg.fgoRootdev hg.fgoNibPos hg.fgoLog hg.fgoBitmap
+    (DFrac.own 1) rootv rti (DFrac.own 1) hj hproc hK hnoff htier hg.fgoRootdev hg.fgoNibPos hg.fgoLog hg.fgoBitmap
     hg.fgoCovBelow hg.fgoIreg hnn hterm hplen hbud hpd
   unfold wp_nameiparent_gen_eb_body at h
   simp only [nameiparentAddr] at h
   iapply h
-  iframe Hk Hpc Hte Hce Hpid Hcwd Hcwr Hpath Hnm Hbs Hir Hop Htx
+  iframe Hk Hpc Hte Hce Hpid Hcwd Hcwr Hrtc Hrtr Hpath Hnm Hbs Hir Hop Htx
   iframe #
   iapply wpNext_intro_pin
   iintro %c %_
   unfold nameiparentPost
-  iintro %spie %spp %R' %n' %Sb' %ok %nf %ipv %w %hcs Hk Hpc Hte Hce - - Hpid Hcwd Hcwr Hpath Hnm
+  iintro %spie %spp %R' %n' %Sb' %ok %nf %ipv %w %hcs Hk Hpc Hte Hce - - Hpid Hcwd Hcwr Hrtc Hrtr Hpath Hnm
     Hbs %hf Hop Htx Harm
   unfold sysLinkNpK
-  iapply HK $$ %c %spie %spp %R' %n' %Sb' %ok %nf %ipv %w [] Hk Hpc Hte Hce Hpid Hcwd Hcwr Hpath
+  iapply HK $$ %c %spie %spp %R' %n' %Sb' %ok %nf %ipv %w [] Hk Hpc Hte Hce Hpid Hcwd Hcwr Hrtc Hrtr Hpath
     Hnm Hbs Hop Htx Harm
   ipureintro
   exact ⟨hcs, hf⟩
