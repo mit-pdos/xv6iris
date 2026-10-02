@@ -151,11 +151,15 @@ theorem userret_uld [CurCtx] (cpu : CPU) (c : MConf) (P : UPtd) (hc : urConfOk G
 
 set_option maxHeartbeats 1000000 in
 /-- **`sret` into User mode** (Rocq `wp_usret_pt`): fetched through the
-user table, `SPP = U`; the machine lands in user mode at `sepc &&& ~1`. -/
+user table, `SPP = U`; the machine lands in user mode at `sepc &&& ~1`.
+The entry's evidence (NI M2-W2c): the cited receipt `uRcptOpt ox` and the
+justification `uFit ox` of the event the `sret` emits. -/
 theorem userret_usret [CurCtx] (cpu : CPU) (c : MConf) (P : UPtd) (hc : urConfOk GF c P)
     (hspp : BitVec.extractLsb' 8 1 c.mstatus = 0#1) (pc : BitVec 64) (hpc : urPcOk pc) (R : RegMap)
-    (epc : BitVec 64) :
-    instrX (GF := GF) pc (paOf trampPpn pc) false urSret ∗ kmapStatic ∗ wireInv ∗ urSt cpu c P pc R ∗
+    (epc : BitVec 64) (ox : Option (Nat × Obs))
+    (hf : MachFixedGS.uFit (hlc := hlc) (GF := GF) ox (Obs.uEnter cpu c.satp epc (gprList R))) :
+    instrX (GF := GF) pc (paOf trampPpn pc) false urSret ∗ kmapStatic ∗ wireInv ∗ uRcptOpt ox ∗
+    urSt cpu c P pc R ∗
     Register.sepc ↦ᵣ[cpu] epc ∗
     ▷ (confCells cpu (DFrac.own 1) Privilege.User { c with mstatus := sretMs c.mstatus } -∗ clockCells cpu -∗
         pcIs cpu (epc &&& 0xFFFFFFFFFFFFFFFE#64) -∗ uptSlot cpu P -∗ ctxTok cpu curCtx -∗ gprFile cpu R -∗
@@ -165,11 +169,10 @@ theorem userret_usret [CurCtx] (cpu : CPU) (c : MConf) (P : UPtd) (hc : urConfOk
   have hpc' := hpc
   obtain ⟨hlt, hlt2, hv, hv2⟩ := hpc
   unfold urSt
-  iintro ⟨#HI, #HS, #Hwi, ⟨HmConf, Hclock, Hpc, Hslot, Htok, HF⟩, Hsepc, HΦ⟩
+  iintro ⟨#HI, #HS, #Hwi, #Hrc, ⟨HmConf, Hclock, Hpc, Hslot, Htok, HF⟩, Hsepc, HΦ⟩
   -- the user-boundary consent for the `sret`'s privilege write, at the event
-  -- its read frame names (NI M2-W1/W2a)
-  -- M2-W2a interim: W2c removes this (USERRET then carries the evidence)
-  ihave Hpriv := wireInv_enterBlind (Obs.uEnter cpu c.satp epc (gprList R)) rfl $$ Hwi
+  -- its read frame names, with the entry's evidence (NI M2-W1/W2a/W2c)
+  ihave Hpriv := wireInv_enter (Obs.uEnter cpu c.satp epc (gprList R)) ox rfl hf $$ Hwi Hrc
   iapply (wpLoop_sT_instr cpu c { c with mstatus := sretMs c.mstatus } hok.phys hmie hmenv
     Privilege.User (Or.inr rfl) pc (paOf trampPpn pc) (epc &&& 0xFFFFFFFFFFFFFFFE#64) false urSret
     iprop(uptSlot cpu P ∗ □ kmapStatic ∗ ctxTok cpu curCtx)
@@ -517,24 +520,26 @@ set_option maxHeartbeats 2000000 in
 restored last, then user mode at `sepc &&& ~1`. -/
 theorem userret_exit [CurCtx] (cpu : CPU) (c : MConf) (P : UPtd) (hc : urConfOk GF c P)
     (hspp : BitVec.extractLsb' 8 1 c.mstatus = 0#1) (hv : pageValid (pageAddr P.tfp)) (R : RegMap)
-    (ha0 : R 10#5 = TRAPFRAME) (ws : List (BitVec 64)) (epc : BitVec 64) :
-    kernelText ∗ kmapStatic ∗ wireInv ∗ urSt cpu c P (urPc 0x11e#64) R ∗ tfPageAt P.tfp ws ∗
+    (ha0 : R 10#5 = TRAPFRAME) (ws : List (BitVec 64)) (epc : BitVec 64) (ox : Option (Nat × Obs))
+    (hf : MachFixedGS.uFit (hlc := hlc) (GF := GF) ox
+      (Obs.uEnter cpu c.satp epc (gprList (R.set 10#5 (tfW ws (4 + (10#5).toNat)))))) :
+    kernelText ∗ kmapStatic ∗ wireInv ∗ uRcptOpt ox ∗ urSt cpu c P (urPc 0x11e#64) R ∗ tfPageAt P.tfp ws ∗
     Register.sepc ↦ᵣ[cpu] epc ∗
     ▷ (confCells cpu (DFrac.own 1) Privilege.User { c with mstatus := sretMs c.mstatus } -∗ clockCells cpu -∗
         pcIs cpu (epc &&& 0xFFFFFFFFFFFFFFFE#64) -∗ uptSlot cpu P -∗ ctxTok cpu curCtx -∗
         gprFile cpu (R.set 10#5 (tfW ws (4 + (10#5).toNat))) -∗ Register.sepc ↦ᵣ[cpu] epc -∗
         tfPageAt P.tfp ws -∗ wpLoop cpu)
     ⊢ wpLoop (GF := GF) cpu := by
-  iintro ⟨#Htext, #HS, #Hwi, Hst, Hpage, Hsepc, HΦ⟩
+  iintro ⟨#Htext, #HS, #Hwi, #Hrc, Hst, Hpage, Hsepc, HΦ⟩
   iapply (userret_uld cpu c P hc hv (urPc 0x11e#64) (urPc 0x120#64) (by decide) true (by decide) 10#5
     (by decide) R ha0 ws)
   ihave HI := ui_cld_a0 $$ Htext
   iframe HI HS Hst Hpage
   inext
   iintro Hst Hpage
-  iapply (userret_usret cpu c P hc hspp (urPc 0x120#64) (by decide) _ epc)
+  iapply (userret_usret cpu c P hc hspp (urPc 0x120#64) (by decide) _ epc ox hf)
   ihave HI := ui_sret $$ Htext
-  iframe HI HS Hwi Hst Hsepc
+  iframe HI HS Hwi Hrc Hst Hsepc
   inext
   iintro HmConf Hclock Hpc Hslot Htok HF Hsepc
   iapply HΦ $$ HmConf Hclock Hpc Hslot Htok HF Hsepc Hpage

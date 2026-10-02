@@ -62,6 +62,7 @@ theorem urcLoop_of (P : IProp GF) [Persistent P] (PT : SchedNames → IProp GF) 
 the later, is the next round's. -/
 theorem urc_loop (UT : USERTRAP) (UV : USERVEC) (UR : USERRET)
     (PT : SchedNames → IProp GF) [∀ Γ, Persistent (PT Γ)] (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    [NiFitIs (hlc := hlc) GF]
     (hPT0 : PT = parkToken (hlc := hlc) (GF := GF) (SG := uexecSGXv6))
  (j : Nat) (hj : j < NPROC) :
     ⊢ wireInv -∗ kmapAt trampVpn (kLeaf trampPpn .rx 0#1 0#1) -∗ urcLoop (hlc := hlc) PT Γ j := by
@@ -77,15 +78,18 @@ end
 /-- **userret, closed, meets its specification** (Rocq `UserretClosedProof`):
 given usertrap, uservec and userret. -/
 theorem userretClosed_proof (UT : USERTRAP) (UV : USERVEC) (UR : USERRET) : USERRET_CLOSED :=
-  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Γ _
+  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Γ _ _
       j cpu k m P ksp V M sts gn cs pid sep sc tv hj hproc hctx htier hnoff hsp hav ha0 hsep hgn => by
     let PT := parkToken (hlc := hlc) (GF := GF) (SG := uexecSGXv6)
     unfold wp_userret_closed_body
     iintro ⟨#Hw, #Hc, Hk, Hgap, Hpc, Hsep, Hsc, Hstv, Hstvec, Hppt, Htf, Hres, Hslot⟩
     ihave #HL := urc_loop UT UV UR PT Γ rfl j hj $$ Hw Hc
+    -- THE FILING (NI M2-W2c): userret_closed's entry is an incarnation's
+    -- first resume (forkret), filed as an origin at its own key
     have HRS := urc_resume (hlc := hlc) (GF := GF) UR PT Γ j cpu k m P ksp V M sts gn cs pid sep sc tv hproc
-      hctx htier hnoff hsp hav ha0 hsep hgn
+      hctx htier hnoff hsp hav ha0 hsep hgn none (urc_fit_origin cpu P V M sts gn cs pid sep hsep)
     iapply HRS
+    unfold uRcptOpt
     iframe Hw Hc Hk Hgap Hpc Hsep Hsc Hstv Hstvec Hppt Htf Hres Hslot
     inext
     iexact HL⟩

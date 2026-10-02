@@ -98,9 +98,16 @@ whole of the first process -- its block, its kernel stack, its parked
 into `procsInv` at the closing `release` (the park), and the slot is left
 RUNNABLE for the first scheduler that looks.
 
+The structure quantifies `[NiFitIs GF]` (NI M2-W2c, ruling O2): the closed trap loop's userret
+carries the entry's NI evidence (`SpecUserret.wp_userret_body`), which the
+record must accept (`NiLedger.NiFitIs`); the boot instantiates it beside
+`ClaimIs` (`SystemBootEra`).  The body
+is unchanged.
+
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
 import Xv6.UexecExecInst
+import Xv6.NiLedger
 
 namespace Xv6
 
@@ -169,7 +176,7 @@ structure USERINIT : Prop where
   wp_userinit : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF]
     [SleepLockG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [Appcfg GF] [BcacheG GF] [DiskG GF] [OffboxG GF] [OffboxBoxG GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] [NiFitIs (hlc := hlc) GF]
     (cpu : CPU) (k : KCtx) (γp : GName) (γft : GName) (γ : FileNames) (γw γtk : GName) (nb np : Nat)
     hnoff hnoff0 hK hlk hlp hlq hlocks htier hproc hsie hnb hroot hnib0,
     wp_userinit_body (hlc := hlc) (GF := GF) (SG := uexecSGXv6) Γ cpu k γp γft γ γw γtk nb np

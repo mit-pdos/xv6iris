@@ -231,18 +231,22 @@ instance urcLoop_persistent (PT : SchedNames → IProp GF) (Γ : SchedNames) (j 
   unfold urcLoop; infer_instance
 
 /-- The trapped frame, with its residue taken out (Rocq: "uservec must not
-be given it twice"). -/
+be given it twice"), and a copy of the exit's receipt kept (NI M2-W2c: the
+next enter cites it). -/
 theorem urc_frame_rut (cpu : CPU) (C : UCfg) (pt : UPtd) (Rut : UPtd → IProp GF) (sz : Nat) (M : ElfMem)
     (ms sc tv sep : BitVec 64) (g : RegMap) :
     userTrapFrameAtm cpu C pt Rut sz M ms sc tv sep g ⊢
-      userTrapFrameAtm cpu C pt (fun _ => iprop(emp)) sz M ms sc tv sep g ∗ Rut pt := by
+      userTrapFrameAtm cpu C pt (fun _ => iprop(emp)) sz M ms sc tv sep g ∗ Rut pt ∗
+      (∃ i : Nat, uRcpt (i, .uExit cpu (satpOf .kpt pt.root) sc sep (gprList g))) := by
   unfold userTrapFrameAtm
   iintro ⟨%Hok, Hhs, Hpr, Hms, Hsc, Hstv, Hsep, Hpc, Hck, Hg, Hpt, Hcfg, Hrut, #Hrc⟩
   iframe Hhs Hpr Hms Hsc Hstv Hsep Hpc Hck Hg Hpt Hcfg Hrut
   isplitl []
-  · ipureintro; exact Hok
-  isplitl []
-  · iempintro
+  · isplitl []
+    · ipureintro; exact Hok
+    isplitl []
+    · iempintro
+    iexact Hrc
   iexact Hrc
 
 /-- The table the residue is at is the record's own. -/

@@ -61,7 +61,7 @@ set_option maxHeartbeats 4000000 in
 /-- +0x54 on, at a record the arm reached +0x54 with: `fkr_tail`, then
 `fkr_close`. -/
 theorem fkr_tail_close [X : CurCtx] (PR : PREPARE_RETURN) (UC : USERRET_CLOSED) (W : IProp GF)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] [NiFitIs (hlc := hlc) GF]
     (c : CPU) (kb : KCtx) (eb : Bool) (root : BitVec 44) (ksp : BitVec 64) (N : UtNames)
     (Vx : ProcPriv) (Mx : Nat → List (BitVec 8)) (sts : List FdState) (gn : GName)
     (cs : ExtTreeSet GName compare) (Wk : Option Uvis)
@@ -90,7 +90,7 @@ set_option maxHeartbeats 4000000 in
 /-- **The steady arm** (Rocq `wp_forkret`'s `steady = true` case): the block
 whole, `firstDone`; `first` reads 0, the tail. -/
 theorem fkr_steady [X : CurCtx] (PR : PREPARE_RETURN) (UC : USERRET_CLOSED) (W : IProp GF)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] [NiFitIs (hlc := hlc) GF]
     (c1 : CPU) (kr : KCtx) (eb : Bool) (root : BitVec 44) (N : UtNames) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (sts : List FdState) (gn : GName) (cs : ExtTreeSet GName compare)
     (hΓ : N.Γ = Γ) (hj : N.j < NPROC) (hgn : V.gen = gn)
@@ -124,7 +124,7 @@ set_option maxHeartbeats 8000000 in
 `first = 0`, kexec("/init") at the bundle, then the tail at the exec'd
 record and kexec's receipt. -/
 theorem fkr_boot [X : CurCtx] (PR : PREPARE_RETURN) (FS : FSINIT) (KX : KEXEC) (PN : PANIC)
-    (UC : USERRET_CLOSED) (W : IProp GF) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (UC : USERRET_CLOSED) (W : IProp GF) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] [NiFitIs (hlc := hlc) GF]
     (c1 : CPU) (kr : KCtx) (eb : Bool) (root : BitVec 44) (N : UtNames) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (sts : List FdState) (gn : GName) (cs : ExtTreeSet GName compare)
     (hΓ : N.Γ = Γ) (hj : N.j < NPROC) (hgn : V.gen = gn)
@@ -203,7 +203,7 @@ set_option maxHeartbeats 8000000 in
 callees' interfaces and the closed loop. -/
 theorem forkret_proof (MP : MYPROC) (RE : RELEASE) (PR : PREPARE_RETURN) (FS : FSINIT) (KX : KEXEC)
     (PN : PANIC) (UC : USERRET_CLOSED) : FORKRET :=
-  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ X W Γ _ cpu R spie spp eb root N V M sts gn
+  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ X W Γ _ _ cpu R spie spp eb root N V M sts gn
       cs steady hΓ hj hgn hsp => by
     unfold wp_forkret_gen_body
     iintro ⟨Hk, Hpc, #Hglob, #HG, Htc, Hir, Hcl, Hlocked, HR, Hblk, HW, Hmode, Hclose⟩

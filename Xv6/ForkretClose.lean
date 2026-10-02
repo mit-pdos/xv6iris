@@ -82,7 +82,7 @@ set_option maxHeartbeats 4000000 in
 /-- **THE CLOSE**: the park's closer at the record prepare_return re-armed,
 then the closed loop. -/
 theorem fkr_close [X : CurCtx] (UC : USERRET_CLOSED) (W : IProp GF) (Γ : SchedNames)
-    [ClaimIs (hlc := hlc) GF Γ]
+    [ClaimIs (hlc := hlc) GF Γ] [NiFitIs (hlc := hlc) GF]
     (c : CPU) (k : KCtx) (R' : RegMap) (eb : Bool) (root : BitVec 44) (ksp : BitVec 64) (N : UtNames)
     (Vx : ProcPriv) (Mx : Nat → List (BitVec 8)) (sts : List FdState) (gn : GName)
     (cs : ExtTreeSet GName compare) (Wk : Option Uvis)

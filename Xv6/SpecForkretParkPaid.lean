@@ -33,11 +33,16 @@ package's `firstDone`.
 4. **PROCESS LAYER (flagged)**: both fields are at the kernel's deposit
    instance (`uexecSGXv6`) and the park token, as `FORKRET` is (SpecForkret
    deviation 6).
+5. **Both fields quantify `[NiFitIs GF]` (NI M2-W2c, ruling O2): the closed trap loop's userret
+   carries the entry's NI evidence (`SpecUserret.wp_userret_body`), which the
+   record must accept (`NiLedger.NiFitIs`); the boot instantiates it beside
+   `ClaimIs` (`SystemBootEra`).
 
 Imports only definitional files and Spec files.
 -/
 import Xv6.UexecExecInst
 import Xv6.UtResFits
+import Xv6.NiLedger
 
 namespace Xv6
 
@@ -75,7 +80,7 @@ structure FORKRET_PARK_PAID : Prop where
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [Fscfg] [Icfg]
     (W : IProp GF)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] [NiFitIs (hlc := hlc) GF]
     (hp : CPU) (ξp : CtxId) (N : UtNames) (rest : List (BitVec 64)) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (sts : List FdState) (cs : ExtTreeSet GName compare) (steady : Bool),
     forkretParkPaidBody (hlc := hlc) (GF := GF) (SG := uexecSGXv6)
@@ -86,7 +91,7 @@ structure FORKRET_PARK_PAID : Prop where
     [BioslotG GF] [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [Fscfg] [Icfg]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ],
+    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] [NiFitIs (hlc := hlc) GF],
     ⊢ parkToken (hlc := hlc) (GF := GF) (SG := uexecSGXv6) Γ
 
 end Xv6

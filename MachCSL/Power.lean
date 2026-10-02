@@ -477,10 +477,6 @@ theorem wp_power [KernelMap]
       (∀ i x, ox = some (i, x) → i < h.length ∧ h[i]? = some x) →
       ▷ MachFixedGS.obsPred (hlc := hlc) (GF := GF) ∗ obsHalf h ⊢@{IProp GF}
         |==> ◇ (▷ MachFixedGS.obsPred (hlc := hlc) (GF := GF) ∗ obsHalf (h ++ [e])))
-    -- M2-W2a interim: W2c removes this (USERRET then carries the evidence)
-    (HuserEnterBlind : ∀ (h : List Obs) (e : Obs), isUEnter e = true →
-      ▷ MachFixedGS.obsPred (hlc := hlc) (GF := GF) ∗ obsHalf h ⊢@{IProp GF}
-        |==> ◇ (▷ MachFixedGS.obsPred (hlc := hlc) (GF := GF) ∗ obsHalf (h ++ [e])))
     (Hboot : ∀ (E : EraGS) (gen : Nat) (σ : MState),
       bootFacts σ →
       (∃ ds0 : DevStates, σ.devs = ds0.reset) →
@@ -620,8 +616,7 @@ theorem wp_power [KernelMap]
     -- ...beside the user-boundary permit (NI M2-W1), out of the trace
     -- invariant and the client's user-event hook
     ihave #Hhp : hartObsPermit (hlc := hlc) (GF := GF) $$ [Hoinv]
-    · iapply hartObsPermit_of_hook HuserExit HuserEnter HuserEnterBlind
-      -- (M2-W2a interim: W2c removes HuserEnterBlind, USERRET then carries the evidence)
+    · iapply hartObsPermit_of_hook HuserExit HuserEnter
       unfold obsInv
       iexact Hoinv
     imod (wireInvAt_alloc ⟨names, γh, γm, vn, ivn, rvn, γtop, γauth, γresv, lsn, γkmap, γkroot, dn, γmir⟩ ⊤

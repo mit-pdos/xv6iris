@@ -90,11 +90,17 @@ the CLOSED trap loop.
    not over an abstract residue: Rocq's forkret re-exports the closed loop's
    `usertrap_res` (`UC : USERRET_CLOSED`), and the closed loop -- like the
    usertrap / syscall seals -- lives at that instance and token.
+7. **The structure quantifies `[NiFitIs GF]` (NI M2-W2c, ruling O2): the closed trap loop's userret
+   carries the entry's NI evidence (`SpecUserret.wp_userret_body`), which the
+   record must accept (`NiLedger.NiFitIs`); the boot instantiates it beside
+   `ClaimIs` (`SystemBootEra`).  The body is
+   unchanged.
 
 Imports only definitional files.
 -/
 import Xv6.UexecExecInst
 import Xv6.UtResFits
+import Xv6.NiLedger
 
 namespace Xv6
 
@@ -169,7 +175,7 @@ structure FORKRET : Prop where
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
     (W : IProp GF)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] [NiFitIs (hlc := hlc) GF]
     (cpu : CPU) (R : RegMap) (spie spp eb : Bool) (root : BitVec 44) (N : UtNames) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (sts : List FdState) (gn : GName) (cs : ExtTreeSet GName compare)
     (steady : Bool) hΓ hj hgn hsp,

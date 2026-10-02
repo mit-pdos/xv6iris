@@ -161,6 +161,7 @@ theorem xv6Era_secondaries (σ : MState) (Γ : SchedNames) [ClaimIs (hlc := hlc)
 `bootHartPrimary` at the context its supply was carved at, the others
 `bootHartSecondary`. -/
 theorem xv6Era_harts (σ : MState) (ξ0 : CtxId) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    [NiFitIs (hlc := hlc) GF]
     (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γt : GName)
     (cn : ConsNames) (dk : Nat → BitVec 8) (sb : FsSb) (nib : Nat) (cov : ExtTreeSet Nat compare)
     (ndisk : Nat) (S : FsStateRec) (Pb : Nat → List (BitVec 8)) (Rspent : ExtTreeSet Nat compare)
@@ -212,6 +213,7 @@ justification added to the boot hart's supply, the eight hart chains, and the
 four device loops (the ports' permits from the application, at the era's
 console names). -/
 theorem xv6Era_run (σ : MState) (ξ0 : CtxId) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    [NiFitIs (hlc := hlc) GF]
     (γ0 γ1 : UartNames) (γc γl0 γl1 γt : GName) (cn : ConsNames) (γd : DiskNames) (ξd : CtxId)
     (dk : Nat → BitVec 8) (sb : FsSb) (nib : Nat) (cov : ExtTreeSet Nat compare) (ndisk : Nat)
     (S : FsStateRec) (Pb : Nat → List (BitVec 8)) (Rspent : ExtTreeSet Nat compare)
@@ -489,6 +491,9 @@ theorem xv6BootEra {CT : Type} (N : Type) (appFs : CT → N → Aview → IProp 
   letI : Appcfg GF := ⟨N, appFs c, r⟩
   let M1 : MachGS hlc GF := MachGS.ofEra E gen (procClaim Γ) (fun cpu => procClaim_idle Γ cpu)
   have hClaim : @ClaimIs hlc GF M1 _ Γ := @ClaimIs.mk hlc GF M1 _ Γ (fun _ _ => rfl)
+  -- ...and the record accepts the NI filing's evidence (NI M2-W2c): the
+  -- system record's `uFit` is blind (`True`), so by `trivial`
+  have hNi : @NiFitIs hlc GF M1 := @NiFitIs.mk hlc GF M1 (fun _ _ _ => trivial)
   ihave Hout := bootSharedOut_ofEra E gen (fun _ _ => iprop(True)) (procClaim Γ)
     (fun _ => BI.true_intro) (fun cpu => procClaim_idle Γ cpu) σ ξ0 Γ γ0 γ1 γc γl0 γl1 γt cn γd ξd (diskOf σ.devs) S.fssSb (fsNib S)
     cov (fsRecView (fsBlocks (diskOf σ.devs)) D) (snapSpent S (fsNib S)) $$ Hout
@@ -496,7 +501,7 @@ theorem xv6BootEra {CT : Type} (N : Type) (appFs : CT → N → Aview → IProp 
   -- resource and the era's turn
   have hI := Hinit_boot E gen (procClaim Γ) (fun cpu => procClaim_idle Γ cpu) r
   have hR := (letI : MachGS hlc GF := M1; letI : Appcfg GF := ⟨N, appFs c, r⟩;
-    haveI := hClaim;
+    haveI := hClaim; haveI := hNi;
     xv6Era_run (hlc := hlc) (GF := GF) σ ξ0 Γ γ0 γ1 γc γl0 γl1 γt cn γd ξd (diskOf σ.devs) S.fssSb
       (fsNib S) cov XV6_DISK_BYTES S (fsRecView (fsBlocks (diskOf σ.devs)) D) (snapSpent S (fsNib S))
       hwf (fun i γ hu => Hperm E gen (procClaim Γ) (fun cpu => procClaim_idle Γ cpu) i γ hu)

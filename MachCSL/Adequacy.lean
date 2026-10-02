@@ -330,10 +330,6 @@ theorem riscvPowerAdequacy [MachGpreS hlc GF] [KernelMap] (ndisk : Nat) (g : GSt
       isUEnter e = true → Uf ox e → (∀ i x, ox = some (i, x) → i < h.length ∧ h[i]? = some x) →
       ▷ Pt γobs c ∗ (γobs ↪VAR{.own (1 : Qp).half} h) ⊢@{IProp GF}
         |==> ◇ (▷ Pt γobs c ∗ (γobs ↪VAR{.own (1 : Qp).half} (h ++ [e]))))
-    -- M2-W2a interim: W2c removes this (USERRET then carries the evidence)
-    (HuserEnterBlind : ∀ (γobs : GName) (c : CT) (h : List Obs) (e : Obs), isUEnter e = true →
-      ▷ Pt γobs c ∗ (γobs ↪VAR{.own (1 : Qp).half} h) ⊢@{IProp GF}
-        |==> ◇ (▷ Pt γobs c ∗ (γobs ↪VAR{.own (1 : Qp).half} (h ++ [e]))))
     (phi : GState → List Obs → Prop)
     (Hphi : ∀ (Hinv : InvGS_gen hlc GF) (γgen γstart γreg γdisk γswap γobs γhist : GName) (c : CT)
         (T : List Obs) (g' : GState) (h : List Obs),
@@ -425,8 +421,6 @@ theorem riscvPowerAdequacy [MachGpreS hlc GF] [KernelMap] (ndisk : Nat) (g : GSt
       (fun h => Hback γobs c h)
       (fun h e he => HuserExit γobs c h e he)
       (fun h e ox he hf hv => HuserEnter γobs c h e ox he hf hv)
-      -- M2-W2a interim: W2c removes this (USERRET then carries the evidence)
-      (fun h e he => HuserEnterBlind γobs c h e he)
       (fun E gen σ hbf hdv hpp => @Hboot ((bootFixedGS Hinv γgen γstart γreg γdisk ndisk γswap
         (Pc γdisk γswap γreg γstart c)
           (Tk c) (Hk c) γobs T (Pt γobs c) γhist
@@ -596,7 +590,7 @@ theorem obsLedgerAt_back (R : List Obs → IProp GF) [∀ h, Timeless (R h)]
 
 /-- THE USER-EVENT STEP AT THE TRIVIAL PREDICATE (NI M2-W1): the ghost moves,
 nothing is filed.  Evidence-blind, so it discharges every user hook (M2-W2a:
-`HuserExit`, `HuserEnter` and the interim `HuserEnterBlind`). -/
+`HuserExit` and `HuserEnter`). -/
 theorem obsPredAt_user (γ : GName) (h : List Obs) (e : Obs) :
     ▷ obsPredAt γ ∗ (γ ↪VAR{.own (1 : Qp).half} h) ⊢@{IProp GF}
       |==> ◇ (▷ obsPredAt γ ∗ (γ ↪VAR{.own (1 : Qp).half} (h ++ [e]))) := by
@@ -809,8 +803,6 @@ theorem riscvTraceAdequacy [KernelMap] (ndisk : Nat) (g : GState)
     (fun γobs _ h e he => obsLedgerAt_uexit R HuserExit γobs h e he)
     (fun γobs _ h e ox he hf hv =>
       obsLedgerAt_uenter R (fun _ _ => True) (fun h e _ he _ _ => HuserEnter h e he) γobs h e ox he hf hv)
-    -- M2-W2a interim: W2c removes this (USERRET then carries the evidence)
-    (fun γobs _ h e he => obsLedgerAt_userP R (fun _ e => isUEnter e = true) HuserEnter γobs h e he)
     (fun _ h => P h)
     (fun _ _ _ _ _ _ γobs _ _ _ _ h => by
       iintro ⟨_, Hauth, _, _, HPt⟩

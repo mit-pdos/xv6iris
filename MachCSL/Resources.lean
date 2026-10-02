@@ -1363,15 +1363,13 @@ theorem uRcptOpt_valid (h : List Obs) (ox : Option (Nat × Obs)) :
     exact hv
 
 /-- **THE HART'S TRACE PERMIT** (M2-W2a, design §3), persistent: any exit;
-an entry with its justification and the cited receipt.  The THIRD arm is the
-M2-W2a interim blind entry the kernel's `sret` uses until W2c. -/
+an entry with its justification and the cited receipt (since M2-W2c the
+only entry arm: the kernel's `sret` carries the evidence, `USERRET`). -/
 def hartObsPermit : IProp GF := iprop%
   □ ((∀ e : Obs, ⌜isUExit e = true⌝ -∗ hartObsStep e emp) ∧
      (∀ (e : Obs) (ox : Option (Nat × Obs)),
         ⌜isUEnter e = true ∧ MachFixedGS.uFit (hlc := hlc) (GF := GF) ox e⌝ -∗
-        uRcptOpt ox -∗ hartObsStep e emp) ∧
-     -- M2-W2a interim: W2c removes this (USERRET then carries the evidence)
-     (∀ e : Obs, ⌜isUEnter e = true⌝ -∗ hartObsStep e emp))
+        uRcptOpt ox -∗ hartObsStep e emp))
 
 instance hartObsPermit_persistent : Persistent (hartObsPermit (hlc := hlc) (GF := GF)) := by
   unfold hartObsPermit; infer_instance
@@ -1390,17 +1388,8 @@ theorem hartObsPermit_enter (e : Obs) (ox : Option (Nat × Obs)) (he : isUEnter 
     hartObsPermit (hlc := hlc) (GF := GF) ⊢ uRcptOpt ox -∗ hartObsStep e emp := by
   unfold hartObsPermit
   iintro #H
-  icases H with ⟨-, H, -⟩
+  icases H with ⟨-, H⟩
   iapply H $$ %e %ox %⟨he, hf⟩
-
--- M2-W2a interim: W2c removes this (USERRET then carries the evidence)
-/-- The blind entry arm (M2-W2a interim). -/
-theorem hartObsPermit_enterBlind (e : Obs) (he : isUEnter e = true) :
-    hartObsPermit (hlc := hlc) (GF := GF) ⊢ hartObsStep e emp := by
-  unfold hartObsPermit
-  iintro #H
-  icases H with ⟨-, -, H⟩
-  iapply H $$ %e %he
 
 /-- One consent from a hook on the client's half. -/
 theorem hartObsStep_of_hook (e : Obs)
@@ -1426,7 +1415,7 @@ theorem hartObsStep_of_hook (e : Obs)
 accepts any exit; the entry hook accepts an entry given PURE facts only -- its
 justification `uFit ox e` and, for a cited receipt, that the position holds
 the cited event (the permit validates the receipt against the authority
-itself, so no hook is lent it); the blind hook (M2-W2a interim) any entry. -/
+itself, so no hook is lent it). -/
 theorem hartObsPermit_of_hook
     (HuserExit : ∀ (h : List Obs) (e : Obs), isUExit e = true →
       ▷ MachFixedGS.obsPred (hlc := hlc) (GF := GF) ∗ obsHalf h ⊢@{IProp GF}
@@ -1435,10 +1424,6 @@ theorem hartObsPermit_of_hook
       MachFixedGS.uFit (hlc := hlc) (GF := GF) ox e →
       (∀ i x, ox = some (i, x) → i < h.length ∧ h[i]? = some x) →
       ▷ MachFixedGS.obsPred (hlc := hlc) (GF := GF) ∗ obsHalf h ⊢@{IProp GF}
-        |==> ◇ (▷ MachFixedGS.obsPred (hlc := hlc) (GF := GF) ∗ obsHalf (h ++ [e])))
-    -- M2-W2a interim: W2c removes this (USERRET then carries the evidence)
-    (HuserEnterBlind : ∀ (h : List Obs) (e : Obs), isUEnter e = true →
-      ▷ MachFixedGS.obsPred (hlc := hlc) (GF := GF) ∗ obsHalf h ⊢@{IProp GF}
         |==> ◇ (▷ MachFixedGS.obsPred (hlc := hlc) (GF := GF) ∗ obsHalf (h ++ [e]))) :
     obsInv ⊢@{IProp GF} hartObsPermit := by
   unfold hartObsPermit
@@ -1446,7 +1431,6 @@ theorem hartObsPermit_of_hook
   isplit
   · iintro %e %he
     iapply hartObsStep_of_hook e (fun h => HuserExit h e he) $$ Hoinv
-  isplit
   · iintro %e %ox %⟨he, hf⟩ #Hr
     unfold hartObsStep
     iintro %h %g %_ Ha
@@ -1463,8 +1447,6 @@ theorem hartObsPermit_of_hook
     imod obsHistAuth_step h (h ++ [e]) (List.prefix_append _ _) $$ Hhist with Hhist
     imodintro
     iframe Hhalf Hhist
-  · iintro %e %he
-    iapply hartObsStep_of_hook e (fun h => HuserEnterBlind h e he) $$ Hoinv
 
 /-- **THE PERMIT OF THE TRIVIAL TRACE PREDICATE** (the hart's
 `devObsPermit_triv`): a client that states no trace property moves the
@@ -1489,7 +1471,7 @@ theorem hartObsPermit_triv
       iexists _
       iexact Hfrag
     iexact Hauth
-  exact hartObsPermit_of_hook (fun h e _ => Hk h e) (fun h e _ _ _ _ => Hk h e) (fun h e _ => Hk h e)
+  exact hartObsPermit_of_hook (fun h e _ => Hk h e) (fun h e _ _ _ _ => Hk h e)
 
 /-! ### The crash-spanning invariant and the swap counter (Rocq `RiscvPtsto`:
 `crashN`, `crash_inv`, `swap_auth`, `swap_lb`) -/

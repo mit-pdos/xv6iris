@@ -500,6 +500,48 @@ Gates (both commits): full build, `lint.sh`, `tcb.sh` (`expected.json` unchanged
 Not ported: 42666b2b7 (`tools/intr_cone.py`, a Rocq-module cone audit; the Lean counterpart is a
 `tools/` item for when T lands).  Rocq's L3 and T were never landed; they stay future work.
 
+### M2-W2c as landed (2026-10-02)
+
+Lane `lane/m2w2c` (on `lean-m2`), one commit.  **The ledger** (`Xv6/NiLedger.lean`, new, imported after
+`UhistDefs`): §1 as written -- `tfGprs`, `exitFits`, `enterFits`, `niFit`, `NiEntry` (+ `NiEntry.j`), `niOk`,
+`niR h := ⌜∃ F, niOk h F⌝` (timeless, persistent), `niR_nil`, `niR_snoc`, `niR_enter` (pure cores `niOk_nil`,
+`niOk_snoc`, `niOk_enter`) -- plus the bridge `gprList_tfResumeGpr0 : gprList (tfResumeGpr0 ws) = tfGprs ws`.
+`niOk`'s per-entry clause is the named `niEntryOk`, and `∃!` is spelled out (iris-lean's notation shadows it).
+
+**Where each entry is filed.**  `SpecUserret.wp_userret_body` gains `(ox : Option (Nat × Obs))` and, beside
+`wireInv`, `uRcptOpt ox ∗ ⌜MachFixedGS.uFit ox (.uEnter cpu (satpOf .kpt P.root) sep (tfGprs ws))⌝`;
+`ProofUserret` threads it to `UserretPt.userret_exit`/`userret_usret`, whose `sret` now takes
+`wireInv_enter` (the restored file is `tfGprs ws` by `urLoadSeq_resume` + the bridge).
+`UserretClosedResume.urc_resume [NiFitIs]` takes `ox` and `hfit : niFit ox e`:
+- ROUND: `urc_round` keeps the exit receipt out of the trapped frame (`urc_frame_rut` now also returns it),
+  `urc_exit` takes `uRcpt (i, x)` with `exitFits x sc W` and files `some (i, x)` with `urc_roundOkKeys` and the
+  pid tie (`hpid`);
+- ORIGIN: `ProofUserretClosed.userretClosed_proof` (forkret's first resume, hence userinit's too) files `none`
+  at the slot's own key (`urc_fit_origin`).
+`UserKernelBridge.wpLoop_userret_sret` takes the same evidence.
+
+**`[NiFitIs]`** on the five structures (`USERRET_CLOSED`, `FORKRET`, `FORKRET_PARK_PAID` -- both fields --,
+`USERINIT`, `MAIN`) and on: `urc_resume`, `urc_exit`, `urc_round`, `urc_loop`, `fkr_close`,
+`fkr_tail_close`/`fkr_steady`/`fkr_boot`, `forkret_park_paid`/`fkp_cap`/`park_token_intro`,
+`ui_finish`/`ui_publish`, `mn_userinit`, `mn_phaseB`/`mn_phaseC`, `bootHartPrimary`,
+`xv6Era_harts`/`xv6Era_run`; the instance `hNi` beside `hClaim` in `SystemBootEra`.
+
+**Interim removed**: the permit's blind arm, `hartObsPermit_enterBlind`, `wireInv_enterBlind`, the
+`HuserEnterBlind` hooks of `hartObsPermit_of_hook`/`wp_power`/`riscvPowerAdequacy`/`xv6PowerAdequacyGen` and
+their uses (`riscvTraceAdequacy`, `xv6PowerAdequacy`, `xv6AppAdequacy`); `grep 'M2-W2a interim'` is empty.
+
+**DEVIATION (O2's shape).**  `NiFitIs` is an implication, `fit : ∀ ox e, niFit ox e → MachFixedGS.uFit ox e`
+(`uFit_of_niFit`), not `eq : uFit = niFit`, and `xv6FixedGS` keeps `uFit := fun _ _ => True` (the boot
+instance is `trivial`).  Reason: `xv6FixedGS` is named in `xv6PowerAdequacy`'s statement, so `uFit := niFit`
+would pull `NiLedger` and its closure (`UhistDefs`, `UexecRound`, `UsysMemOk`, `UexecSlot`, ...) into that
+root's trusted base, which this lane must not do.  The kernel only ever produces `uFit` from `niFit`, so the
+implication is all it uses; W4's theorem instantiates a record at `uFit := niFit` (instance by `id`) with
+`obsLedgerAt (fun h => A.R c h ∗ niR h)`, its `HuserEnter` hook then receiving `niFit`.  The system and app
+theorems keep their slots (`obsPredAt` / `obsLedgerAt (A.R c)`), `AppLaws` and their statements unchanged
+(`riscvPowerAdequacy`/`xv6PowerAdequacyGen` lose the interim hypothesis).
+
+What remains: W2d (claims), W4.
+
 Each lane's as-landed line goes under its row's design note (the Rocq notes' rule), and this table's
 checkbox below flips when the lane is on `lean-ni`:
 

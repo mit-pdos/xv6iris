@@ -61,17 +61,31 @@ theorem urc_ptm (cpu : CPU) (P : UPtd) (M : Nat → List (BitVec 8)) (sz : Nat) 
   iframe H
   ipureintro; rfl
 
+/-- **An origin filing** (NI M2-W2c, design §2(a)): the enter userret makes
+at its key is `niFit none` -- the key itself is the incarnation's first key
+(forkret's first resume; W2d's claims tighten it, `NiLedger` F4). -/
+theorem urc_fit_origin (cpu : CPU) (P : UPtd) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState)
+    (gn : GName) (cs : ExtTreeSet GName compare) (pid : BitVec 32) (sep : BitVec 64)
+    (hsep : retPc sep = tfResumePc V.tf) :
+    niFit none (.uEnter cpu (satpOf KTier.kpt P.root) sep (tfGprs V.tf)) :=
+  ⟨uvisOf V M sts gn cs pid, cpu, _, sep, rfl, hsep⟩
+
 set_option maxHeartbeats 1000000 in
 /-- **THE RESUME**: userret, run once from its entry, then the process's own
-slot at its key, with the loop hypothesis as the kernel's re-entry. -/
-theorem urc_resume (UR : USERRET) (PT : SchedNames → IProp GF) (Γ : SchedNames) (j : Nat) (cpu : CPU)
+slot at its key, with the loop hypothesis as the kernel's re-entry.  THE
+FILING (NI M2-W2c): the caller supplies the entry's evidence -- a round
+(`ox = some (i, x)`, the exit at `i` with its receipt) or an origin
+(`ox = none`) -- as `niFit`, which the record accepts (`NiFitIs`). -/
+theorem urc_resume (UR : USERRET) [NiFitIs (hlc := hlc) GF] (PT : SchedNames → IProp GF) (Γ : SchedNames)
+    (j : Nat) (cpu : CPU)
     (k : KCtx) (m : Nat) (P : UPtd) (ksp : BitVec 64) (V : ProcPriv) (M : Nat → List (BitVec 8))
     (sts : List FdState) (gn : GName) (cs : ExtTreeSet GName compare) (pid : BitVec 32)
     (sep sc tv : BitVec 64) (hproc : k.proc = procAddr j) (hctx : utCtxOk k) (htier : k.tier = KTier.kpt)
     (hnoff : k.noff = 0) (hsp : k.sp + 8#64 * BitVec.ofNat 64 m = ksp) (hav : k.avail + m = 512)
     (ha0 : k.regs 10#5 = satpOf KTier.kpt P.root) (hsep : retPc sep = tfResumePc V.tf)
-    (hgn : gn = V.gen) :
-    wireInv ∗ kmapAt trampVpn (kLeaf trampPpn .rx 0#1 0#1) ∗
+    (hgn : gn = V.gen) (ox : Option (Nat × Obs))
+    (hfit : niFit ox (.uEnter cpu (satpOf KTier.kpt P.root) sep (tfGprs V.tf))) :
+    wireInv ∗ uRcptOpt ox ∗ kmapAt trampVpn (kLeaf trampPpn .rx 0#1 0#1) ∗
     kctx cpu k ∗ stackOwn ksp m ∗ pcIs cpu userretVa ∗
     Register.sepc ↦ᵣ[cpu] sep ∗ Register.scause ↦ᵣ[cpu] sc ∗ Register.stval ↦ᵣ[cpu] tv ∗
     Register.stvec ↦ᵣ[cpu] uservecTvec ∗
@@ -79,17 +93,19 @@ theorem urc_resume (UR : USERRET) (PT : SchedNames → IProp GF) (Γ : SchedName
     uslot (hlc := hlc) (uvisOf V M sts gn cs pid) ∗ ▷ urcLoop (hlc := hlc) PT Γ j
     ⊢ wpLoop (GF := GF) cpu := by
   obtain ⟨hsie, hspie, hspp⟩ := hctx
-  iintro ⟨#Hwire, #Hcl, Hk, Hgap, Hpc, Hsep, Hsc, Hstv, Hstvec, Hppt, Htf, Hres, Hslot, #Hloop⟩
+  iintro ⟨#Hwire, #Hrc, #Hcl, Hk, Hgap, Hpc, Hsep, Hsc, Hstv, Hstvec, Hppt, Htf, Hres, Hslot, #Hloop⟩
   icases kctx_kmapStatic cpu k $$ Hk with ⟨#Hks, Hk⟩
   icases kctx_hw cpu k $$ Hk with ⟨Hk, #Hhw⟩
   icases urc_res_upt PT Γ j cpu P ksp V sts cs pid $$ Hres with ⟨Hres, %hVP⟩
   icases usertrapResAt_sz PT Γ j cpu P ksp V sts cs pid $$ Hres with ⟨Hres, %hszb⟩
   icases usertrapResAt_lazy PT Γ j cpu P ksp V sts cs pid $$ Hres with ⟨Hres, %hlzf⟩
   icases usertrapResAt_fd_open PT Γ j cpu P ksp V sts cs pid $$ Hres with ⟨Hfrag, Hclose⟩
-  have HUR := UR.wp_userret (hlc := hlc) (GF := GF) cpu k P M V.tf sep sc tv hsie hspie hspp htier ha0
+  have HUR := UR.wp_userret (hlc := hlc) (GF := GF) cpu k P M V.tf sep sc tv ox hsie hspie hspp htier ha0
   unfold wp_userret_body at HUR
   iapply HUR
-  iframe Hk Hwire Hpc Hcl Hsep Hsc Hstv Hstvec Hppt Htf
+  iframe Hk Hwire Hrc Hpc Hcl Hsep Hsc Hstv Hstvec Hppt Htf
+  isplitr
+  · ipureintro; exact uFit_of_niFit ox _ hfit
   inext
   unfold userretPost
   iintro %C %ms %⟨hlo, hms⟩ HU Hpt Hcfg Htf Hleft

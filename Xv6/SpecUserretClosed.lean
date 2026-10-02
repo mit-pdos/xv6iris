@@ -76,11 +76,19 @@ record's own key: `uslot (uvisOf V M sts gn cs pid)`.  The sret lands at
    Rocq's vestigial `UG : UEXEC_GEN` functor argument of
    `UserretClosedProof` is dropped; `USER` enters only at the mint
    (`ProofUexecWp.uexecWp_gen`, InitBoot/UexecExecMint).
+9. **The structure quantifies `[NiFitIs GF]` (NI M2-W2c, ruling O2): the closed trap loop's userret
+   carries the entry's NI evidence (`SpecUserret.wp_userret_body`), which the
+   record must accept (`NiLedger.NiFitIs`); the boot instantiates it beside
+   `ClaimIs` (`SystemBootEra`).  The
+   body is unchanged: the entry is filed as an ORIGIN at its own key
+   (`UserretClosedResume.urc_fit_origin`), each later resume as the ROUND
+   it ends (`UserretClosedRound.urc_exit`).
 
 Imports only definitional and Spec files.
 -/
 import Xv6.UexecExecInst
 import Xv6.UtResFits
+import Xv6.NiLedger
 
 namespace Xv6
 
@@ -126,7 +134,7 @@ structure USERRET_CLOSED : Prop where
     [BioslotG GF] [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF]
     [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
     [CtokG GF] [WchG GF] [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] [NiFitIs (hlc := hlc) GF]
     (j : Nat) (cpu : CPU) (k : KCtx) (m : Nat) (P : UPtd) (ksp : BitVec 64) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (sts : List FdState) (gn : GName) (cs : ExtTreeSet GName compare)
     (pid : BitVec 32) (sep sc tv : BitVec 64)

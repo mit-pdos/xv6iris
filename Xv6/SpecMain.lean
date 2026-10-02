@@ -114,6 +114,11 @@ of its own for it).
 10. `fd_slots_auth` (Rocq `main_globals_raw`) has no Lean counterpart
    (SlotSupply's keyed tokens, FileBoot deviation 1); `flive_own` neither
    (FileDefs deviation 2).
+11. **The structure quantifies `[NiFitIs GF]` (NI M2-W2c, ruling O2): the closed trap loop's userret
+   carries the entry's NI evidence (`SpecUserret.wp_userret_body`), which the
+   record must accept (`NiLedger.NiFitIs`); the boot instantiates it beside
+   `ClaimIs` (`SystemBootEra`).  The
+   body is unchanged.
 
 Requires only Spec files and the definitional layer.
 -/
@@ -366,7 +371,7 @@ structure MAIN : Prop where
     [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF]
     [IcboxG GF] [SleepLockG GF] [Appcfg GF] [BcacheG GF] [OffboxG GF] [OffboxBoxG GF] [FileG GF]
     [Fscfg] [Icfg] (X : CurCtx)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] [NiFitIs (hlc := hlc) GF]
     (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName)
     (cpu : CPU) (k : KCtx) (cn : ConsNames) (l0 l1 : List (BitVec 8)) (c0 : VirtioCfg)
     (dk : Nat → BitVec 8) (sb : FsSb) (nib : Nat) (cov : ExtTreeSet Nat compare) (ndisk : Nat)

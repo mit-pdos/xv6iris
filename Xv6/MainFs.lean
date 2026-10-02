@@ -491,7 +491,7 @@ set_option maxHeartbeats 4000000 in
 /-- **+0x9e → +0xa2**: `userinit()` (W8-P2's park contract, at the
 ambient allocator; it seals the count and assembles `firstBoot`). -/
 theorem mn_userinit (UI : USERINIT) [Fscfg] [Icfg] [FileG GF] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] [NiFitIs (hlc := hlc) GF]
     (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName)
     (cpu : CPU) (k : KCtx) (R0 : RegMap) (hsie : k.sie = false) (hnoff : k.noff = 0)
     (hlocks : k.locks = []) (htier : k.tier = KTier.kpt) (hproc : k.proc = 0#64)

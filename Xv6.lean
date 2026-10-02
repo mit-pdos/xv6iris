@@ -1106,6 +1106,7 @@ import Xv6.UexecRet
 import Xv6.UexecRound
 import Xv6.UsysDet
 import Xv6.UhistDefs
+import Xv6.NiLedger
 import Xv6.UexecApply
 import Xv6.UexecCond
 import Xv6.ProofUexecWp

@@ -46,8 +46,11 @@ set_option maxHeartbeats 4000000 in
 `li`, the three load runs, the exit, over any file. -/
 theorem userret_user_run [CurCtx] (cpu : CPU) (P : UPtd) (ms mdl mepc stc : BitVec 64) (lf : SLeft)
     (hsm : smFacts ms false) (hlf : lf.ok) (hspp : BitVec.extractLsb' 8 1 ms = 0#1) (hmdl : 0x220#64 &&& ~~~mdl = 0#64)
-    (hv : pageValid (pageAddr P.tfp)) (R : RegMap) (ws : List (BitVec 64)) (epc : BitVec 64) :
-    kernelText ∗ kmapStatic ∗ wireInv ∗ urSt cpu (sConfOf KTier.kpt P.root ms mdl mepc stc lf) P (urPc 0xac#64) R ∗
+    (hv : pageValid (pageAddr P.tfp)) (R : RegMap) (ws : List (BitVec 64)) (epc : BitVec 64)
+    (ox : Option (Nat × Obs))
+    (hf : MachFixedGS.uFit (hlc := hlc) (GF := GF) ox (.uEnter cpu (satpOf .kpt P.root) epc (tfGprs ws))) :
+    kernelText ∗ kmapStatic ∗ wireInv ∗ uRcptOpt ox ∗
+    urSt cpu (sConfOf KTier.kpt P.root ms mdl mepc stc lf) P (urPc 0xac#64) R ∗
     tfPageAt P.tfp ws ∗ Register.sepc ↦ᵣ[cpu] epc ∗
     ▷ (confCells cpu (DFrac.own 1) Privilege.User
           { sConfOf KTier.kpt P.root ms mdl mepc stc lf with
@@ -56,7 +59,7 @@ theorem userret_user_run [CurCtx] (cpu : CPU) (P : UPtd) (ms mdl mepc stc : BitV
         gprFile cpu (tfResumeGpr0 ws) -∗ Register.sepc ↦ᵣ[cpu] epc -∗ tfPageAt P.tfp ws -∗ wpLoop cpu)
     ⊢ wpLoop (GF := GF) cpu := by
   have hc := urConfOk_sConfOf (GF := GF) P.root ms mdl mepc stc lf P rfl hsm hlf hmdl
-  iintro ⟨#Htext, #HS, #Hwi, Hst, Hpage, Hsepc, HΦ⟩
+  iintro ⟨#Htext, #HS, #Hwi, #Hrc, Hst, Hpage, Hsepc, HΦ⟩
   iapply (userret_li cpu _ P hc R)
   iframe Htext HS Hst
   inext
@@ -77,8 +80,17 @@ theorem userret_user_run [CurCtx] (cpu : CPU) (P : UPtd) (ms mdl mepc stc : BitV
   iintro Hst Hpage
   iapply (userret_exit cpu _ P hc hspp hv _
     ((urLoadSeq_a0 urLoadsC ws _ (by decide)).trans
-      ((urLoadSeq_a0 urLoadsB ws _ (by decide)).trans ((urLoadSeq_a0 urLoadsA ws _ (by decide)).trans h0))) ws epc)
-  iframe Htext HS Hwi Hst Hpage Hsepc
+      ((urLoadSeq_a0 urLoadsB ws _ (by decide)).trans ((urLoadSeq_a0 urLoadsA ws _ (by decide)).trans h0))) ws epc
+    ox (by
+      -- the event the `sret` emits is the evidence's: the restored file
+      -- reads `tfGprs ws` (`urLoadSeq_resume`, `gprList_tfResumeGpr0`)
+      have hg : gprList ((urLoadSeq urLoadsC ws (urLoadSeq urLoadsB ws (urLoadSeq urLoadsA ws
+          (R.set 10#5 TRAPFRAME)))).set 10#5 (tfW ws (4 + (10#5).toNat))) = tfGprs ws :=
+        (gprList_ext _ (tfResumeGpr0 ws) (fun i hi => urLoadSeq_resume ws (R.set 10#5 TRAPFRAME) i hi)).trans
+          (gprList_tfResumeGpr0 ws)
+      rw [hg]
+      exact hf))
+  iframe Htext HS Hwi Hrc Hst Hpage Hsepc
   inext
   iintro HmConf Hclock Hpc Hslot Htok HF Hsepc Hpage
   ihave HF := MachCSL.gprFile_ext cpu
@@ -92,13 +104,13 @@ end
 set_option maxHeartbeats 4000000 in
 /-- **userret meets its specification.** -/
 theorem userret_proof : USERRET :=
-  ⟨fun {hlc GF} _ _ cpu k P M ws sep sc tv hsie hspie hspp htier ha0 => by
+  ⟨fun {hlc GF} _ _ cpu k P M ws sep sc tv ox hsie hspie hspp htier ha0 => by
   unfold wp_userret_body userretPost
   obtain ⟨regs, sie, spie, spp, avail, noff, intena, locks, tier, root, proc⟩ := k
   simp only at hsie hspie hspp htier ha0
   subst hsie hspie hspp htier
   simp only [userretVa_eq, uservecTvec]
-  iintro ⟨Hk, #Hwi, Hpc, #Hcl, Hsepc, Hsc, Hstv, Hstvec, Hppt, Hpage, HΦ⟩
+  iintro ⟨Hk, #Hwi, #Hrc, %hf, Hpc, #Hcl, Hsepc, Hsc, Hstv, Hstvec, Hppt, Hpage, HΦ⟩
   icases kctx_image _ _ $$ Hk with ⟨⟨#Htext, _, #HS⟩, Hk⟩
   icases kctx_cases _ _ $$ Hk with ⟨%hwf, HConf, HF, Hstack, Htrans, _, Hcpu, Htok, Hclock, #Hro⟩
   icases kConf_cases cpu KTier.kpt root false true false $$ HConf with
@@ -126,8 +138,8 @@ theorem userret_proof : USERRET :=
   iintro Hst ⟨%K, #HK, HX⟩
   ihave Hum := ukPagesX_bwd K P hwfP M hl $$ HS HD HX
   -- the run under the user table
-  iapply (userret_user_run cpu P ms mdl mepc stc lf hsm hlf hspp' hmdl hv (tpPin cpu regs) ws sep)
-  iframe Htext HS Hwi Hst Hpage Hsepc
+  iapply (userret_user_run cpu P ms mdl mepc stc lf hsm hlf hspp' hmdl hv (tpPin cpu regs) ws sep ox hf)
+  iframe Htext HS Hwi Hrc Hst Hpage Hsepc
   inext
   iintro HmConf Hclock Hpc Hslot Htok HF Hsepc Hpage
   -- the user machine, repackaged
