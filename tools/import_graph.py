@@ -17,7 +17,9 @@ Usage:
   --move     hypothetical edit file, lines `Mod -Imp` / `Mod +Imp` /
              `Mod =T` (set Mod's build time to T seconds);  for what-if runs.
   --cores    list-schedule the graph on N cores (default 32 96) and report
-             the simulated makespan.
+             the simulated makespan, longest-path first and in lake's own
+             first-come order (the one a cut has to improve; see
+             claude-notes/optimization.md "Build shape").
 
 Sources: every .lean under MachCSL/, Xv6/, model/Lean_RV64D/LeanRV64D,
 vendor/lean-sail/Sail and the packages in .lake/packages (Iris, Batteries,
@@ -264,6 +266,32 @@ def schedule(g, t, order, rev, cores):
     return now
 
 
+def schedule_fifo(g, t, order, rev, cores):
+    """List scheduling in LAKE's order: a module runs when its imports are
+    built and a core is free, first come first served (lake's jobs all run at
+    one task priority, so its ready queue is FIFO).  In a saturated build a
+    chain waits behind the queue at every link, so this makespan, not the
+    longest-path-first one, is what a cut has to improve."""
+    indeg = {m: len(g[m]) for m in g}
+    seq = 0
+    ready = []
+    for m in order:
+        if indeg[m] == 0:
+            ready.append((0.0, seq, m)); seq += 1
+    heapq.heapify(ready)
+    running, now = [], 0.0
+    while ready or running:
+        while ready and len(running) < cores:
+            _, _, m = heapq.heappop(ready)
+            heapq.heappush(running, (now + t.get(m, 0.0), m))
+        now, m = heapq.heappop(running)
+        for u in rev[m]:
+            indeg[u] -= 1
+            if indeg[u] == 0:
+                heapq.heappush(ready, (now, seq, u)); seq += 1
+    return now
+
+
 def concurrency_profile(g, t, ef, buckets=20):
     """With unbounded cores and ASAP start: how many modules run in each time slice."""
     total = max(ef.values())
@@ -327,7 +355,8 @@ def report(g, t, local, cores, label):
     print(f"modules: {len(g)}  total CPU: {sum(t.get(m,0) for m in g):.0f}s  "
           f"critical path: {total:.1f}s  (ideal parallelism {sum(t.get(m,0) for m in g)/total:.1f})")
     for c in cores:
-        print(f"  list-schedule on {c} cores: {schedule(g, t, order, rev, c):.1f}s")
+        print(f"  list-schedule on {c} cores: {schedule(g, t, order, rev, c):.1f}s"
+              f"  (lake's FIFO order: {schedule_fifo(g, t, order, rev, c):.1f}s)")
     print("critical path:")
     cum = 0.0
     for m in path:
