@@ -5,6 +5,11 @@
 `claude-notes/projects/noninterference.md` "PORT TO LEAN"; what remains is Rocq's never-landed L3 and T).  The Rocq tree is no longer maintained; this tree and its `claude-notes/` are
 the development now:
 
+**2026-10-02.**  The kernel is xv6-riscv `b72cbac1` (zeldovich/xv6-riscv `chroot`): a per-process
+root (`p->root`, `sys_chroot`, `igetroot`, `dirlookup`'s self arm at the root, the root-aware walk
+vocabulary); design in `claude-notes/design/chroot.md`; the gate (build, audit, tcb, coverage, vtest)
+is green.
+
 - `Xv6.xv6FsAdequacy_closed` — the system theorem (hypotheses: generation 0, power off, disk = `fs.img`).
 - `Xv6.userProof : USER` — the user-mode machine layer, no hypotheses.
 - `Xv6.unionAdequacyClosed` — union adequacy for init/sh/cat/grep/echo/seccomp/sync, concluding
