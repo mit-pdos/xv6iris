@@ -96,8 +96,9 @@ theorem urc_deposit (W : Uvis) (V : ProcPriv) (Mp : Nat → List (BitVec 8)) (gn
     (hl : V.tf.length = 36) (hlw : W.tf.length = 36)
     (hM : umemLazy V.upt V.sz.toNat Mp = W.M) (hpi : W.perm = permOf V.upt.um V.sz.toNat)
     (hsz : W.sz = V.sz.toNat) (hcw : W.cwd = V.cwi) (hgn : W.gen = gn) (hch : W.ch = cs)
-    (hpid : W.pid = pid) (hlz : W.lazy = V.pvLazy) (hsc : W.secc = V.pvSecc) (hVgn : V.gen = gn) :
-    uexecDep (hlc := hlc) sc W f ∗ uexecArm sc W f ⊢
+    (hpid : W.pid = pid) (hlz : W.lazy = V.pvLazy) (hsc : W.secc = V.pvSecc) (hVgn : V.gen = gn)
+    [NiFitIs (hlc := hlc) GF] (i : Nat) (x : Obs) (hx : exitFits x sc W) :
+    uexecDep (hlc := hlc) sc W f ∗ uexecArm sc W f ∗ MachFixedGS.uClaimX (hlc := hlc) (GF := GF) i x ⊢
       utSysIn (hlc := hlc) f sc (tfW W.tf tfEpcIdx) (urcV0 V W) Mp W.fd gn cs pid ∗
       utForkIn (hlc := hlc) f sc (tfW W.tf tfEpcIdx) (urcV0 V W) Mp W.fd ∗
       utPayIn f sc (tfW W.tf tfEpcIdx) (urcV0 V W) ∗
@@ -118,17 +119,20 @@ theorem urc_deposit (W : Uvis) (V : ProcPriv) (Mp : Nat → List (BitVec 8)) (gn
   · simp only [if_pos hec]
     by_cases hfk : uvisNum W = USYS_fork
     · simp only [if_pos hfk]
-      iintro ⟨⟨Hpay, Hd⟩, Harm⟩
+      iintro ⟨⟨Hpay, Hd⟩, Harm, HcX⟩
+      -- THE FORK'S CHILD-ORIGIN CLAIM (NI M2-W2d): the exit was a fork
+      -- ecall, so its extra claim is an origin ticket, for the child's park
+      ihave Hco := uClaimO_of_fork (hlc := hlc) i x (niForkExit_of_fits hx hec hfk) $$ HcX
       ihave Hpay := hpay $$ Hpay
       iframe Hpay Harm
       isplitl []
       · iintro %_ %n %⟨hn, hnf⟩
         exfalso; rw [← hn, hnum] at hnf; exact hnf hfk
-      isplitl [Hd]
+      isplitl [Hd Hco]
       · iintro %_ %_
         unfold uexecForkChildF
         icases Hd with ⟨#Hkw, HRc, Hc⟩
-        iframe Hkw HRc
+        iframe Hkw HRc Hco
         iintro %g' %pidc %hne Hp HRc
         iapply (uslot_keyCong _ _ (urc_child_ukey W V Mp g' pidc hl hlw hM hpi hsz hcw hlz hsc)).mp
         iapply Hc $$ %g' %pidc %hne Hp HRc
@@ -136,7 +140,7 @@ theorem urc_deposit (W : Uvis) (V : ProcPriv) (Mp : Nat → List (BitVec 8)) (gn
       · ipureintro; exact hkill
       · iempintro
     · simp only [if_neg hfk]
-      iintro ⟨⟨Hpay, Hd⟩, Harm⟩
+      iintro ⟨⟨Hpay, Hd⟩, Harm, -⟩
       ihave Hpay := hpay $$ Hpay
       iframe Hpay Harm
       isplitl [Hd]
@@ -151,7 +155,7 @@ theorem urc_deposit (W : Uvis) (V : ProcPriv) (Mp : Nat → List (BitVec 8)) (gn
       · ipureintro; exact hkill
       · iempintro
   · simp only [if_neg hec]
-    iintro ⟨⟨Hpay, -⟩, Harm⟩
+    iintro ⟨⟨Hpay, -⟩, Harm, -⟩
     ihave Hpay := hpay $$ Hpay
     ihave Harm := (uexecArm_run sc W f hlw).mp $$ Harm
     iframe Hpay

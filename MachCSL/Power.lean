@@ -356,6 +356,9 @@ def powerBootRes [KernelMap] (Mof : (Nat → BitVec 8) → LogMirror)
   ([∗list] d ∈ DevId.all, devFragAt E d (σ.devs.st d)) ∗
   MachFixedGS.consRes (hlc := hlc) (GF := GF) (gen + 1) [] ⟨[], [], [], none⟩ ∗
   Tn (gen + 1) ∗
+  -- THE ERA'S ORIGIN TICKET (NI M2-W2d): the power-on's third yield, the
+  -- record's `uClaimO` (initproc's one-shot origin claim), on to `<init>`'s park
+  MachFixedGS.uClaimO (hlc := hlc) (GF := GF) ∗
   (E.mirrorName ↪VAR{.own (1 : Qp).half} (Mof (diskOf σ.devs))) ∗
   swapLb (gen + 1) ∗ Rb gen (diskOf σ.devs) ∗ crashInv
 
@@ -394,7 +397,7 @@ history. -/
 def powerYield (Tn : Nat → IProp GF) (on : Bool) (h : List Obs) : IProp GF :=
   if on then iprop(emp)
   else iprop(MachFixedGS.consRes (hlc := hlc) (GF := GF) (obsBoots h + 1) [] ⟨[], [], [], none⟩ ∗
-    Tn (obsBoots h + 1))
+    Tn (obsBoots h + 1) ∗ MachFixedGS.uClaimO (hlc := hlc) (GF := GF))
 
 /-- The power thread is safe, given the client's TRACE HOOK and the boot
 client: at every `PowerOn`, from the boot resources of the fresh era at the
@@ -469,12 +472,17 @@ theorem wp_power [KernelMap]
     -- justification (`MachFixedGS.uFit`) and that the cited receipt's
     -- position holds the cited exit; the permit built from them is sealed
     -- into the wire invariant at every power-on (`hartObsPermit_of_hook`)
+    -- (NI M2-W2d: the exit hook MINTS the exit's one-shot claims at its
+    -- position `h.length`; the entry hook is handed the claim it spends)
     (HuserExit : ∀ (h : List Obs) (e : Obs), isUExit e = true →
       ▷ MachFixedGS.obsPred (hlc := hlc) (GF := GF) ∗ obsHalf h ⊢@{IProp GF}
-        |==> ◇ (▷ MachFixedGS.obsPred (hlc := hlc) (GF := GF) ∗ obsHalf (h ++ [e])))
+        |==> ◇ (▷ MachFixedGS.obsPred (hlc := hlc) (GF := GF) ∗ obsHalf (h ++ [e]) ∗
+          MachFixedGS.uClaimR (hlc := hlc) (GF := GF) h.length ∗
+          MachFixedGS.uClaimX (hlc := hlc) (GF := GF) h.length e))
     (HuserEnter : ∀ (h : List Obs) (e : Obs) (ox : Option (Nat × Obs)), isUEnter e = true →
       MachFixedGS.uFit (hlc := hlc) (GF := GF) ox e →
       (∀ i x, ox = some (i, x) → i < h.length ∧ h[i]? = some x) →
+      uClaimFor (hlc := hlc) (GF := GF) ox ∗
       ▷ MachFixedGS.obsPred (hlc := hlc) (GF := GF) ∗ obsHalf h ⊢@{IProp GF}
         |==> ◇ (▷ MachFixedGS.obsPred (hlc := hlc) (GF := GF) ∗ obsHalf (h ++ [e])))
     (Hboot : ∀ (E : EraGS) (gen : Nat) (σ : MState),
@@ -569,7 +577,7 @@ theorem wp_power [KernelMap]
       CoPset.subseteq_top) $$ Hcinv with ⟨HPc, Hcclose⟩
     imod (Hproj (diskOf g.m.devs)) $$ [Hdisk HPc] with ⟨Hdisk, HPc, %hpure⟩
     · iframe Hdisk HPc
-    icases Hyield with ⟨Hyield, Hturn⟩
+    icases Hyield with ⟨Hyield, Hturn, Huo⟩
     -- THE SWAP, LENT THE ERA'S TURN (Rocq sync SY3-A1)
     imod (Hswap ⟨names, γh, γm, vn, ivn, rvn, γtop, γauth, γresv, lsn, γkmap, γkroot, dn, γmir⟩ g.gen
       (diskOf g.m.devs)) $$ [Hreg Hstarted Hstart Hdisk Hmir HPc Hturn]
@@ -623,14 +631,14 @@ theorem wp_power [KernelMap]
       (fun c => g₂.m.regs c Register.sig_seip) (fun c => g₂.m.regs c Register.sig_meip))
       $$ [Hhp Hpins] with #Hwire
     · iframe Hhp Hpins
-    ihave Hres : powerBootRes Mof Rb Tn'' ⟨names, γh, γm, vn, ivn, rvn, γtop, γauth, γresv, lsn, γkmap, γkroot, dn, γmir⟩ g.gen g₂.m $$ [Hrc Hpts Hctx Hfrags' Hls Hkmap Hkst Hkroot Hdf Hyield Hturn Hmir HRb]
+    ihave Hres : powerBootRes Mof Rb Tn'' ⟨names, γh, γm, vn, ivn, rvn, γtop, γauth, γresv, lsn, γkmap, γkroot, dn, γmir⟩ g.gen g₂.m $$ [Hrc Hpts Hctx Hfrags' Hls Hkmap Hkst Hkroot Hdf Hyield Hturn Huo Hmir HRb]
     · unfold powerBootRes genCertAt memCells kmapStaticAt crashInv
       rw [hdk]
       iframe Hmir HRb Hswlb Hcinv
       isplitl [Hkroot]
       · iexists 0#44
         iexact Hkroot
-      iframe Hrc Hpts Hkmap Hkst Hwire Hdf Hyield Hturn
+      iframe Hrc Hpts Hkmap Hkst Hwire Hdf Hyield Hturn Huo
       isplitr [Hctx Hfrags' Hls]
       · isplit
         · iexact Hborn

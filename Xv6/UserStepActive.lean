@@ -142,12 +142,12 @@ theorem ust_step_active (hF : UstFetchSpec (GF := GF) cpu C P) (hX : UstExecTota
       iframe Hhw Hwi Hfr
   iintro %b Hpost
   unfold ucCyclePost ustR ukRider
-  icases Hpost with ⟨%st, %s2, %hq, Hfr, -, #Hrc⟩
+  icases Hpost with ⟨%st, %s2, %hq, Hfr, -, Hrc⟩
   have hL := ust_land_of_q st s2 hq.1
   iapply ust_tickOpt cpu C (ubFrame curCtx (ubUAddrs P t0)) tick _ (uf_ucMisa C P _ (ust_at_cfg hL))
   iframe Hfr
   iintro %s3 %hag Hfr
-  ihave #Hrc := uxRcpt_land_tick cpu st s2 s3 hag $$ Hrc
+  ihave Hrc := uxRcpt_land_tick cpu st s2 s3 hag $$ Hrc
   iapply HK $$ %s3 %(ust_at_clock hL hag) Hfr Hrc
 
 end active

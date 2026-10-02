@@ -167,19 +167,19 @@ theorem syscall_arm_fork (SF : SYSFORK)
   ihave #Hdone := syscallEnv_first PT Γ γ $$ Henv
   -- fork's deposit: the kill wand, the lend and the child's slot -- the park rows
   unfold syscForkIn
-  icases HfIn $$ %hn1 with ⟨#Hkw, Hlend, Hslotw⟩
+  icases HfIn $$ %hn1 with ⟨#Hkw, Hlend, Hco, Hslotw⟩
   ihave #Hpe := syscallEnv_panic PT Γ γ $$ Henv
   ihave #HG := syscallEnv_parkRows PT Γ γ $$ Henv
   ihave #HT := syscallEnv_token PT Γ γ $$ Henv
   ihave #HT := hPTk Γ $$ HT
   ihave Hpk : kforkPark (hlc := hlc) (SG := SG) Γ V M sts (UexecSG.sforkPay f) (UexecSG.sforkLend f)
-      $$ [Hlend Hslotw]
+      $$ [Hlend Hco Hslotw]
   · unfold kforkPark kforkChild
     unfold syscForkChild at *
     isplitr; · iexact Hpe
     isplitr; · iexact HG
     isplitr; · iexact HT
-    iframe Hlend
+    iframe Hlend Hco
     iexact Hslotw
   have hU := SF.wp_sys_fork_eb (hlc := hlc) (GF := GF) Γ cpu
     (((k.withSpie spie spp).pushed 4).withRegs R) γw γp fscKalloc fsReadyKmem γft γ j pid V M sts

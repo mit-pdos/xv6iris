@@ -190,11 +190,12 @@ the interface's projections in the three application slots (Rocq's
     (Hinv : InvGS_gen hlc GF) (γgen γstart γreg γdisk : GName) (ndisk : Nat)
     (γswap : GName) (Pcp : IProp GF) (Tkp : Nat → IProp GF) (Hkp : Nat → IProp GF → IProp GF)
     (γobs : GName) (T : List Obs) (Ptp : IProp GF)
-    (γhist : GName) (Uf : Option (Nat × Obs) → Obs → Prop) : MachFixedGS hlc GF :=
+    (γhist : GName) (Uf : Option (Nat × Obs) → Obs → Prop)
+    (Ucr : Nat → IProp GF) (Ucx : Nat → Obs → IProp GF) (Uco : IProp GF) : MachFixedGS hlc GF :=
   MachCSL.bootFixedGS Hinv γgen γstart γreg γdisk ndisk γswap Pcp Tkp Hkp γobs T Ptp γhist
     Ai.tag Ai.tag_persistent Ai.tag_timeless Ai.kill Ai.kill_persistent Ai.kill_timeless
     Ai.cons Ai.cons_timeless Ai.wild Ai.wild_persistent Ai.wild_timeless
-    Ai.rdwild Ai.rdwild_persistent Ai.rdwild_timeless Uf
+    Ai.rdwild Ai.rdwild_persistent Ai.rdwild_timeless Uf Ucr Ucx Uco
 
 end AppIfaceInst
 

@@ -75,7 +75,8 @@ set_option maxHeartbeats 1000000 in
 slot at its key, with the loop hypothesis as the kernel's re-entry.  THE
 FILING (NI M2-W2c): the caller supplies the entry's evidence -- a round
 (`ox = some (i, x)`, the exit at `i` with its receipt) or an origin
-(`ox = none`) -- as `niFit`, which the record accepts (`NiFitIs`). -/
+(`ox = none`) -- as `niFit`, which the record accepts (`NiFitIs`), and THE
+ONE-SHOT CLAIM the filing spends (NI M2-W2d: `uClaimFor ox`). -/
 theorem urc_resume (UR : USERRET) [NiFitIs (hlc := hlc) GF] (PT : SchedNames → IProp GF) (Γ : SchedNames)
     (j : Nat) (cpu : CPU)
     (k : KCtx) (m : Nat) (P : UPtd) (ksp : BitVec 64) (V : ProcPriv) (M : Nat → List (BitVec 8))
@@ -85,7 +86,7 @@ theorem urc_resume (UR : USERRET) [NiFitIs (hlc := hlc) GF] (PT : SchedNames →
     (ha0 : k.regs 10#5 = satpOf KTier.kpt P.root) (hsep : retPc sep = tfResumePc V.tf)
     (hgn : gn = V.gen) (ox : Option (Nat × Obs))
     (hfit : niFit ox (.uEnter cpu (satpOf KTier.kpt P.root) sep (tfGprs V.tf))) :
-    wireInv ∗ uRcptOpt ox ∗ kmapAt trampVpn (kLeaf trampPpn .rx 0#1 0#1) ∗
+    wireInv ∗ uRcptOpt ox ∗ uClaimFor (hlc := hlc) (GF := GF) ox ∗ kmapAt trampVpn (kLeaf trampPpn .rx 0#1 0#1) ∗
     kctx cpu k ∗ stackOwn ksp m ∗ pcIs cpu userretVa ∗
     Register.sepc ↦ᵣ[cpu] sep ∗ Register.scause ↦ᵣ[cpu] sc ∗ Register.stval ↦ᵣ[cpu] tv ∗
     Register.stvec ↦ᵣ[cpu] uservecTvec ∗
@@ -93,7 +94,7 @@ theorem urc_resume (UR : USERRET) [NiFitIs (hlc := hlc) GF] (PT : SchedNames →
     uslot (hlc := hlc) (uvisOf V M sts gn cs pid) ∗ ▷ urcLoop (hlc := hlc) PT Γ j
     ⊢ wpLoop (GF := GF) cpu := by
   obtain ⟨hsie, hspie, hspp⟩ := hctx
-  iintro ⟨#Hwire, #Hrc, #Hcl, Hk, Hgap, Hpc, Hsep, Hsc, Hstv, Hstvec, Hppt, Htf, Hres, Hslot, #Hloop⟩
+  iintro ⟨#Hwire, #Hrc, Hclm, #Hcl, Hk, Hgap, Hpc, Hsep, Hsc, Hstv, Hstvec, Hppt, Htf, Hres, Hslot, #Hloop⟩
   icases kctx_kmapStatic cpu k $$ Hk with ⟨#Hks, Hk⟩
   icases kctx_hw cpu k $$ Hk with ⟨Hk, #Hhw⟩
   icases urc_res_upt PT Γ j cpu P ksp V sts cs pid $$ Hres with ⟨Hres, %hVP⟩
@@ -103,7 +104,7 @@ theorem urc_resume (UR : USERRET) [NiFitIs (hlc := hlc) GF] (PT : SchedNames →
   have HUR := UR.wp_userret (hlc := hlc) (GF := GF) cpu k P M V.tf sep sc tv ox hsie hspie hspp htier ha0
   unfold wp_userret_body at HUR
   iapply HUR
-  iframe Hk Hwire Hrc Hpc Hcl Hsep Hsc Hstv Hstvec Hppt Htf
+  iframe Hk Hwire Hrc Hclm Hpc Hcl Hsep Hsc Hstv Hstvec Hppt Htf
   isplitr
   · ipureintro; exact uFit_of_niFit ox _ hfit
   inext

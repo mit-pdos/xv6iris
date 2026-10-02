@@ -46,6 +46,7 @@ def bootPrimarySupply [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG G
   irefSlots IREFBOOT ∗ irefSlotsAuth ∗ bslots mainBslotsFs ∗
   genCert ∗ fsCrashSeam cov sb.sbLogstart ∗ crashInv ∗
   initBootBundle (hlc := hlc) (SG := uexecSGXv6) ROOTINO seccAll (List.replicate NOFILE FdState.closed) ∗
+  MachFixedGS.uClaimO (hlc := hlc) (GF := GF) ∗
   uartInv .uart0 γ0 ∗ uartInv .uart1 γ1 ∗ plicInv γ0 γ1 ∗ diskInv γd ∗ diskCrashCaps γd ∗
   wireInv ∗
   mainUartRaw X .uart0 γ0 l0 ∗ mainUartRaw X .uart1 γ1 l1 ∗

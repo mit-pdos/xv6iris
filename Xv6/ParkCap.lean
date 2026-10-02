@@ -141,11 +141,15 @@ def parkBlock [CurCtx] (steady : Bool) (N : UtNames) (V : ProcPriv) (M : Nat →
 
 /-- **The mode's payload** (Rocq `park_pkg`'s `match Wk`): `firstDone` on the
 steady mode (the evidence the boot arm is dead), the first process's exec
-bundle and the console's reader token on the boot mode. -/
+bundle and the console's reader token on the boot mode -- and on both (NI
+M2-W2d) THE ORIGIN TICKET the record's first resume spends on its origin
+filing (kfork's child: the fork exit's child-origin claim; `<init>`: the
+power-on's). -/
 def parkMode [CurCtx] (cw : Nat) (secc : BitVec 64) (sts : List FdState) (Wk : Option Uvis) : IProp GF :=
   match Wk with
-  | some _ => firstDone (hlc := hlc)
-  | none => iprop(initBootBundle (hlc := hlc) (SG := SG) cw secc sts ∗ consReader fscCons 0)
+  | some _ => iprop(firstDone (hlc := hlc) ∗ MachFixedGS.uClaimO (hlc := hlc) (GF := GF))
+  | none => iprop(initBootBundle (hlc := hlc) (SG := SG) cw secc sts ∗ consReader fscCons 0 ∗
+      MachFixedGS.uClaimO (hlc := hlc) (GF := GF))
 
 /-- The slot a closer yields (Rocq `park_pkg`'s closer's `match Wk`): on the
 steady mode the slot AT THE RECORD THE RESUME LANDS ON, nothing on the boot
@@ -385,27 +389,30 @@ theorem parkToken_park (hp : CPU) (ξ : CtxId) (N : UtNames) (rest : List (BitVe
       slotUsed N.Γ N.pj -∗ parkOwn -∗ utParkCaps N -∗
       fdFrags V.fdg sts -∗ chFrag V.chg N.pj cs -∗
       initBootBundle (hlc := hlc) (SG := SG) V.cwi V.pvSecc sts -∗ consReader fscCons 0 -∗
+      MachFixedGS.uClaimO (hlc := hlc) (GF := GF) -∗
       parkChild (hlc := hlc) ξ N rest V M false -∗
       |==> (ownCtx hp ξ ∗ procCtxAt N.Γ ξ N.pj) := by
-  iintro Hrun #Htok ⟨#Hglob, #HG, Hstk⟩ #Hused Hown #Hcaps Hfr Hch Hbun Hrd Hchild
+  iintro Hrun #Htok ⟨#Hglob, #HG, Hstk⟩ #Hused Hown #Hcaps Hfr Hch Hbun Hrd Hco Hchild
   ihave Htok' := (parkToken_unfold (hlc := hlc) (SG := SG) N.Γ).mp $$ Htok
   unfold parkTokenF
   icases Htok' with ⟨%URB, #Hcap, #Hchan⟩
   unfold parkChan
   ihave Hclose := Hchan $$ %N %rfl %hwf
   ihave Hpkg : parkPkg (hlc := hlc) (SG := SG) URB (parkToken N.Γ) N ξ V.kstack V.fdg V.chg V.cwi V.pvSecc sts
-      V.gen cs (parkKey false V M cs N.pid) $$ [Hstk Hbun Hrd Hclose Hown Hfr Hch]
+      V.gen cs (parkKey false V M cs N.pid) $$ [Hstk Hbun Hrd Hco Hclose Hown Hfr Hch]
   · unfold parkPkg parkKey
     simp only [Bool.false_eq_true, ↓reduceIte]
     isplitr; · iexact Hglob
     isplitr; · iexact HG
     isplitr; · iexact Hused
     isplitl [Hstk]; · iexact Hstk
-    isplitl [Hbun Hrd]
+    isplitl [Hbun Hrd Hco]
     · unfold parkMode
       isplitl [Hbun]
       · iexact Hbun
+      isplitl [Hrd]
       · iexact Hrd
+      · iexact Hco
     inext
     iapply parkCloser_of_chan URB (parkToken N.Γ) N V sts cs none M
       (fun _ _ _ _ => by unfold parkSlotOut; exact .rfl) $$ Hclose Hown Hcaps Hfr Hch
@@ -430,25 +437,28 @@ theorem parkToken_park_steady (hp : CPU) (ξ : CtxId) (N : UtNames) (rest : List
       slotUsed N.Γ N.pj -∗ parkOwn -∗ utParkCaps N -∗
       fdFrags V.fdg sts -∗ chFrag V.chg N.pj cs -∗
       uslot (hlc := hlc) (SG := SG) (uvisOf V M sts V.gen cs N.pid) -∗
+      MachFixedGS.uClaimO (hlc := hlc) (GF := GF) -∗
       parkChild (hlc := hlc) ξ N rest V M true -∗
       |==> (ownCtx hp ξ ∗ procCtxAt N.Γ ξ N.pj) := by
-  iintro Hrun #Htok ⟨#Hglob, #HG, Hstk, #Hdone⟩ #Hused Hown #Hcaps Hfr Hch Hslot Hchild
+  iintro Hrun #Htok ⟨#Hglob, #HG, Hstk, #Hdone⟩ #Hused Hown #Hcaps Hfr Hch Hslot Hco Hchild
   ihave Htok' := (parkToken_unfold (hlc := hlc) (SG := SG) N.Γ).mp $$ Htok
   unfold parkTokenF
   icases Htok' with ⟨%URB, #Hcap, #Hchan⟩
   unfold parkChan
   ihave Hclose := Hchan $$ %N %rfl %hwf
   ihave Hpkg : parkPkg (hlc := hlc) (SG := SG) URB (parkToken N.Γ) N ξ V.kstack V.fdg V.chg V.cwi V.pvSecc sts
-      V.gen cs (parkKey true V M cs N.pid) $$ [Hstk Hslot Hclose Hown Hfr Hch]
+      V.gen cs (parkKey true V M cs N.pid) $$ [Hstk Hslot Hco Hclose Hown Hfr Hch]
   · unfold parkPkg parkKey
     simp only [↓reduceIte]
     isplitr; · iexact Hglob
     isplitr; · iexact HG
     isplitr; · iexact Hused
     isplitl [Hstk]; · iexact Hstk
-    isplitr
+    isplitl [Hco]
     · unfold parkMode
-      iexact Hdone
+      isplitr
+      · iexact Hdone
+      · iexact Hco
     inext
     iapply parkCloser_of_chan URB (parkToken N.Γ) N V sts cs (some (uvisOf V M [] V.gen cs N.pid)) M
       (fun V' M' hrk _ => by

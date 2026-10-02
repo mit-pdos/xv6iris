@@ -107,7 +107,7 @@ theorem ust_obligation_holds (cpu : CPU) (C : UCfg) (pt : UPtd) (Rut : UPtd → 
     iframe Hfr
     inext
     iintro %s3 %h3 Hfr
-    ihave #Hu := uxRcpt_user (GF := GF) cpu s3.file h3.priv
+    ihave Hu := uxRcpt_user (GF := GF) cpu s3.file h3.priv
     iapply ust_close cpu C pt Rut t mm s3 (Or.inl h3) $$ HS Hfr Ha Hres Hu Hk
 
 /-- **Rocq `wp_user_exec_active`**: the loop over the ACTIVE residue. -/
@@ -133,7 +133,7 @@ theorem ust_obligationActive_holds (cpu : CPU) (C : UCfg) (pt : UPtd) (Rut : UPt
   iapply ust_step_active cpu C pt t hF hX v mm hu ha hwf htlb
   iframe Hhw Hwi Hfr
   inext
-  iintro %s3 %h3 Hfr #Hrc
+  iintro %s3 %h3 Hfr Hrc
   iapply ust_close cpu C pt Rut t mm s3 h3 $$ HS Hfr Ha Hres Hrc Hk
 
 /-- **The body of `USER`** (Rocq `wp_user_exec_full`): SpecUser's

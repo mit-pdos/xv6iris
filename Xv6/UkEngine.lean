@@ -194,7 +194,7 @@ theorem uk_engine (π : Nat → Option UPerm) (sz : Nat) (Qp : Int → IProp GF)
   -- AFTER THE CYCLE AND THE TICK
   iintro %b Hpost
   unfold ucCyclePost ukRider
-  icases Hpost with ⟨%st, %s2, %⟨hq, -⟩, Hfr, HX, #Hrc⟩
+  icases Hpost with ⟨%st, %s2, %⟨hq, -⟩, Hfr, HX, Hrc⟩
   obtain ⟨-, hcase⟩ := uk_land_of_q st s2 hq
   have hcfgL : UfCfg C pt (ucLand st s2).2.file := by
     rcases hcase with ⟨⟨-, V', hpost, -⟩, hL⟩ | ⟨sc, stv, htl, -, -⟩
@@ -204,7 +204,7 @@ theorem uk_engine (π : Nat → Option UPerm) (sz : Nat) (Qp : Int → IProp GF)
   iframe Hfr
   iintro %s3 %hag Hfr
   -- the receipt rider, past the landing and the tick (NI M2-W2b)
-  ihave #Hrc := uxRcpt_land_tick h st s2 s3 hag $$ Hrc
+  ihave Hrc := uxRcpt_land_tick h st s2 s3 hag $$ Hrc
   rcases hcase with ⟨⟨hret, V', hpost, hM'⟩, hL⟩ | ⟨sc, stv, htl, hpcL, hwhy⟩
   · -- THE RETIRE: the bundle at the post state, the caller's continuation
     have hfin : UkFinal C pt T m' pc' V' s3 := ukFinal_clock (by rw [hL] at *; exact ukFinal_epi hpost) hag

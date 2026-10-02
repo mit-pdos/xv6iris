@@ -452,7 +452,7 @@ theorem ui_finish [X : CurCtx] (RE : RELEASE) (FP : FORKRET_PARK_PAID)
   icases ui_block rfl γ V.fdg (procAddr j) pid { V with cwd := kf.regs 10#5, pvSecc := seccAll } M hof
     $$ [$Hpriv $Hcref $Hfds $Hkeys] with ⟨Hctxc, ⟨Hbare, Hofs, Hcwr⟩, Hfr⟩
   unfold uiParkRows userinitPark
-  icases Hpk with ⟨⟨#Hwl, #Htk, #Hcons, #Hdev, #Hwire, #Htramp, Hbun, Hrd⟩, #Hpl, #Hpav, #Hft, #Hig⟩
+  icases Hpk with ⟨⟨#Hwl, #Htk, #Hcons, #Hdev, #Hwire, #Htramp, Hbun, Hrd, Hco⟩, #Hpl, #Hpav, #Hft, #Hig⟩
   -- THE PACKAGE'S ROWS, at this context
   ihave Hrows : iprop(parkGlobals Γ γw γft γ (procAddr j) ∗ utSysParkRows Γ ∗
       stackOwn (V.kstack + 4096#64) forkretStack) $$ [Hstack]
@@ -500,7 +500,7 @@ theorem ui_finish [X : CurCtx] (RE : RELEASE) (FP : FORKRET_PARK_PAID)
     iexists γuh
     iexact Huh
   dsimp only [UtNames.pj, utParkCaps] at hup
-  ihave Hup := hup $$ Hown Htok Hrows Hused Hpo Hig Hfr Hch Hbun Hrd Hchildr
+  ihave Hup := hup $$ Hown Htok Hrows Hused Hpo Hig Hfr Hch Hbun Hrd Hco Hchildr
   imod Hup with ⟨Hown, HprocCtx⟩
   ihave Hk := Hback $$ Hown
   imod (pstateWhole_update Γ (procAddr j) USED RUNNABLE) $$ Hwhole with Hwhole

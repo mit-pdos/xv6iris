@@ -170,7 +170,7 @@ instance fkp_parkMode_morph (cw : Nat) (secc : BitVec 64) (sts : List FdState) (
   · unfold parkMode
     exact instCtxMorphConst _
   · unfold parkMode
-    exact firstDone_morph
+    exact @instCtxMorphSep hlc GF _ _ _ firstDone_morph (instCtxMorphConst _)
 
 /-- The record's moved rows, as one payload. -/
 def fkpPay (N : UtNames) (rest : List (BitVec 64)) (V : ProcPriv) (M : Nat → List (BitVec 8))

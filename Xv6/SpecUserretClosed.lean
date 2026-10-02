@@ -119,7 +119,10 @@ def wp_userret_closed_body (PT : SchedNames → IProp GF) (Γ : SchedNames) (j :
   Register.sepc ↦ᵣ[cpu] sep ∗ Register.scause ↦ᵣ[cpu] sc ∗ Register.stval ↦ᵣ[cpu] tv ∗
   Register.stvec ↦ᵣ[cpu] uservecTvec ∗
   procPtAt P M ∗ tfPageAt P.tfp V.tf ∗ usertrapResAt (hlc := hlc) PT Γ j cpu P ksp V sts cs pid ∗
-  uslot (hlc := hlc) (uvisOf V M sts gn cs pid)
+  uslot (hlc := hlc) (uvisOf V M sts gn cs pid) ∗
+  -- THE ORIGIN TICKET (NI M2-W2d): the one-shot claim this first resume's
+  -- origin filing spends (a fork exit's child-origin claim, or initproc's)
+  MachFixedGS.uClaimO (hlc := hlc) (GF := GF)
   ⊢ wpLoop (GF := GF) cpu
 
 end

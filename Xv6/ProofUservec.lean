@@ -144,7 +144,8 @@ theorem uservec_proof : USERVEC :=
   have hv : pageValid (pageAddr P.tfp) := hwfP.2.2.1
   iintro ⟨#Hhw, Hfr, #Hcl, Hpage, ⟨%⟨hkwf, htc⟩, Hstack, Hcpu, Htok, #Hon, #Hro⟩, HΦ⟩
   icases uservec_frame_open cpu C P Rut sz M ms sc tv sep g hdq hmie hmed $$ [Hhw Hfr] with
-    ⟨%mepc, %stc, %lf, %Mp, %⟨⟨hsm, hsr⟩, hM, hlf⟩, HmConf, Hclock, Hpc, HF, Hsep, Hsc, Hstv, Hstvec, %hwf, Hslot, Hum, HR⟩
+    ⟨%mepc, %stc, %lf, %Mp, %⟨⟨hsm, hsr⟩, hM, hlf⟩, HmConf, Hclock, Hpc, HF, Hsep, Hsc, Hstv, Hstvec, %hwf, Hslot, Hum, HR,
+      Hrc⟩
   · isplitl []
     · iexact Hhw
     · iexact Hfr
@@ -207,7 +208,7 @@ theorem uservec_proof : USERVEC :=
       iexact Hss
     · iexact Hro
   rw [hpc]
-  iapply HΦ $$ %Mp %hM Hkc Hpc Hsep Hsc Hstv [Hstvec] [Hfr Hum] Hpage HR
+  iapply HΦ $$ %Mp %hM Hkc Hpc Hsep Hsc Hstv [Hstvec] [Hfr Hum] Hpage HR Hrc
   · unfold uservecTvec; iexact Hstvec
   · unfold procPtAt uptFrame ptOwnRep
     iframe Hfr Hum

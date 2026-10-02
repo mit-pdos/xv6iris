@@ -79,7 +79,7 @@ theorem uk_armOb_retire (Q : Step → UWSt → Prop) (s' : UWSt) (ib : BitVec 32
         (Step.Step_Execute (.Retire_Success (), ib)) := by
   dsimp only [ucArmOb, ucArmBody, ukRider]
   iintro ⟨Hfr, HR⟩
-  ihave #Hu := uxRcpt_user (GF := GF) cpu s'.file hpr
+  ihave Hu := uxRcpt_user (GF := GF) cpu s'.file hpr
   iexists s'
   isplitr
   · ipureintro; exact hq

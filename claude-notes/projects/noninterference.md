@@ -542,6 +542,94 @@ theorems keep their slots (`obsPredAt` / `obsLedgerAt (A.R c)`), `AppLaws` and t
 
 What remains: W2d (claims), W4.
 
+### M2-W2d as landed (2026-10-02)
+
+Lane `lane/m2w2d` (on `lean-m2`, W1, W3, W2a-c), one commit.  F4 is closed: every user entry is
+filed by SPENDING a one-shot claim the trace slot minted.
+
+**The machine (`MachCSL`).**  `MachFixedGS` gains three client slots, carried and never read (as
+`syncTok`): `uClaimR : Nat → IProp` (the round claim of the exit at a position), `uClaimX : Nat → Obs →
+IProp` (what an exit mints beside it: Xv6's ledger puts a fork ecall's child-origin claim there),
+`uClaimO : IProp` (an origin ticket).  `uExitTok x := ∃ i, uRcpt (i, x) ∗ uClaimR i ∗ uClaimX i x`
+(not persistent) and `uClaimFor ox := uClaimForRaw uClaimR uClaimO ox` (`some (i, _)` ↦ `uClaimR i`,
+`none` ↦ `uClaimO`).  The permit's exit arm is `hartObsStep e (uExitTok e)` (the permit adds the
+receipt at `h.length`, `hartObsStep_of_exitHook`); its entry arm takes `uRcptOpt ox -∗ uClaimFor ox -∗`.
+Hooks: `HuserExit` returns `… ∗ uClaimR h.length ∗ uClaimX h.length e`; `HuserEnter` is handed
+`uClaimFor ox ∗ …`; the power-on's yield (`powerYield`) and `powerBootRes` carry `uClaimO` after `Tn`.
+`bootFixedGS`/`AppIface.bootFixedGS` take `Ucr Ucx Uco` after `Uf`; `riscvPowerAdequacy` takes
+`Ucr Ucx Uco : CT → …` and states its hooks at them (`uClaimForRaw (Ucr c) (Uco c) ox` for the entry).
+New helpers: `obsLedgerAt_uexitM` (minting), `obsLedgerAt_uenterS` (spending), `uexitHook_emp`,
+`uenterHook_drop`, `powerHook_emp` (blind hooks at a record minting `emp`), `obsPredAt_uexit/_uenter`.
+
+**The system theorem stays blind.**  `xv6FixedGS` passes `uFit := True` and `emp` for the three
+claim families; `xv6PowerAdequacyGen`'s STATEMENT IS UNCHANGED (its proof hands `riscvPowerAdequacy`
+the `emp` families and wraps `Hobs`/`HuserExit`/`HuserEnter` with `powerHook_emp`/`uexitHook_emp`/
+`uenterHook_drop`); `riscvTraceAdequacy` likewise; `AppLaws` unchanged.  The boot instance `hNi`
+gains `fork := fun _ _ _ => .rfl` (`emp ⊢ emp`).
+
+**How each claim travels.**
+- *Exit → kernel.*  The tower's `Out` is `uExitTok x`; the user tier's rider `uxRcpt` is now
+  `⌜User⌝ ∨ uExitTok (ufExitEv cpu f)` (spatial); `userTrapFrame`/`At`/`Atm`'s last conjunct is
+  `uExitTok (.uExit cpu (satpOf .kpt pt.root) sc sep (gprList g))` (USER's one NI conjunct, now the
+  token).  `urc_frame_rut` leaves it in the frame; USERVEC hands it back (below); `urc_round` splits it:
+  the receipt and `uClaimR i` go to `urc_exit` → `urc_resume`'s ROUND filing (`uClaimFor (some (i,
+  x))`), `uClaimX i x` to `urc_deposit`.
+- *Fork → child park.*  `urc_deposit [NiFitIs] … i x (hx : exitFits x sc W)` turns `uClaimX i x` into
+  `uClaimO` by `NiFitIs.fork` at a fork ecall (`niForkExit_of_fits`, from `uvisNum W = fork`) and puts
+  it into `syscForkIn` (under its `⌜syscNum V = fork⌝ -∗`); `syscall_arm_fork` moves it into
+  `kforkPark` (new row after `Rc`); kfork drops it on `-1` and hands it to `parkToken_park_steady`
+  (new premise), which parks it in `parkMode (some _) = firstDone ∗ uClaimO`; forkret's steady arm
+  passes it through `fkr_steady` → `fkr_tail_close` → `fkr_close` to `USERRET_CLOSED` (new last row),
+  whose ORIGIN filing spends it (`uClaimFor none`).
+- *Power-on → userinit.*  The power hook mints `uClaimO` (NI: `initClaim γ b`, `niR_powerOn`);
+  `powerBootRes_unpack` returns it beside `Tn`; `xv6Era_run` takes it (new premise after `B`) into
+  `bootPrimarySupply` (after `initBootBundle`) → `MAIN`'s pre (after `initBootBundle`) → `ProofMain`'s
+  phases → `userinitPark` (last row) → `parkToken_park` (new premise) → `parkMode none = initBootBundle ∗
+  consReader ∗ uClaimO` → forkret's boot arm (`fkr_boot`) → `USERRET_CLOSED`'s origin filing.
+
+**The NI ledger (`Xv6/NiLedger.lean`).**  Claims live on the shared `Xv6G.gmUnitG` camera
+(`Nat ↦ ()`) at a name `γ`: `roundClaim γ i := γ ↪◯MAP[2 * i] ()`, `originClaim γ i := γ ↪◯MAP[2 * i +
+1] ()`, `initClaim γ b := γ ↪◯MAP[2 * b + 1] ()` (a position is an exit or a power-on, never both).
+`niOriginTicket γ := ∃ p, γ ↪◯MAP[2 * p + 1] ()`, `niExitMint γ i x := if niForkExit x then
+originClaim γ i else emp`, `niSpend γ ox := uClaimForRaw (roundClaim γ) (niOriginTicket γ) ox`.
+`niClaims γ h F := ∃ m, γ ↪●MAP m ∗ ⌜niOneShot h F ∧ ∀ k, get? m k = some () → niKeyOk h k ∧ k ∉
+F.map NiEntry.key⌝`; `niR γ h := ∃ F, ⌜niOk h F⌝ ∗ niClaims γ h F` (timeless, NOT persistent).
+`niOneShot h F` (pure, new): the filings' claim keys (`NiEntry.key`: a round's `2 i`, an origin's
+`2 p + 1`) are pairwise distinct, each minted in `h` (`niKeyOk`: an exit; a fork exit or a power-on)
+strictly before the enter it files.  Steps: `niR_alloc`, `niR_snoc` (non-enter, mints nothing),
+`niR_exit` (mints `roundClaim γ h.length ∗ niExitMint γ h.length e`), `niR_powerOn` (mints
+`initClaim γ h.length`), `niR_enter` (`niSpend γ ox ∗ niR γ h ⊢ |==> niR γ (h ++ [e])`), `niR_pure`
+(`⊢ ⌜∃ F, niOk h F ∧ niOneShot h F⌝`).  `niExitMint_fork`/`initClaim_ticket` are the NI record's
+`NiFitIs.fork` and power-hook conversions.
+
+**W4's request (pid row).**  `niPidRow sc W W' := sc = uecallScause → usysRetPid (usysEff W.secc (tfOf
+(tfResumeGpr0 W.tf) (retPc (tfW W.tf tfEpcIdx)))) (tfW W'.tf (tfArgIdx 0)) W.pid` is a new conjunct of
+`niFit`'s round arm and of `niEntryOk`'s round clause (last); `urc_exit` supplies it
+(`urc_niPidRow`, from usertrap's `utRetPid`).
+
+**Statements that moved beyond the brief's list (flagged).**  (1) `USERVEC`: `uservecPost` gains a
+last premise `uExitTok (.uExit cpu (satpOf .kpt P.root) sc sep (gprList g)) -∗` -- uservec used to drop
+the frame's receipt; with exclusive claims inside it must hand the token back (SpecUservec deviation
+9); the only alternative routes (the residue `Rut`, or a second conjunct beside `trappedMachine` in
+`ukb`) move USER-interface texts instead.  (2) `syscForkIn`'s DEFINITION (hence `SYSCALL`/`USERTRAP`'s
+meaning; their texts are byte-identical) carries `uClaimO`: the only carrier from the round to kfork.
+(3) `USERRET_CLOSED`'s pre (+`uClaimO`), `MAIN`'s pre (+`uClaimO`), `parkMode` (hence `FORKRET`'s
+meaning): the routes the brief describes.
+
+**What W4 must absorb.**  `niR γni h` (the name a parameter, born by `niR_alloc` beside the trace slot;
+`niR` is no longer persistent; `niR_nil` is gone); `NiEntry.origin j W0 p` (new LAST field `p`, the
+spent claim's position); `niFit`/`niEntryOk`'s round arm gains `niPidRow sc W W'` (last conjunct);
+`NiFitIs` gains `fork` (the NI instance: `niExitMint_fork`); the NI record's slots: `uClaimR :=
+roundClaim γni`, `uClaimX := niExitMint γni`, `uClaimO := niOriginTicket γni`; its hooks:
+`HuserExit` by `obsLedgerAt_uexitM` over `niR_exit`, `HuserEnter` by `obsLedgerAt_uenterS` over
+`niR_enter` (`uClaimForRaw` is `niSpend` by `rfl`), the power-on arm minting `uClaimO` from `niR_powerOn`
++ `initClaim_ticket` (yield `cons ∗ Tn ∗ Uco c`); `riscvPowerAdequacy`'s new `Ucr Ucx Uco`; read the
+end of the run with `niR_pure`.  `SystemBootEra`/`SystemAdequacy` edits are confined to `xv6FixedGS`'s
+three new `emp` arguments, `xv6Era_run`'s new `uClaimO` premise (and its use in `xv6BootEra`:
+`powerBootRes_unpack`'s 4th output `Huo`, passed to `hR`), the `hNi` fork field, and the
+`xv6PowerAdequacyGen` proof's call (three `emp` families, the three hook wrappers) plus the
+`xv6TraceHook` call's three `emp`s in `xv6FsAdequacy`.
+
 Each lane's as-landed line goes under its row's design note (the Rocq notes' rule), and this table's
 checkbox below flips when the lane is on `lean-ni`:
 

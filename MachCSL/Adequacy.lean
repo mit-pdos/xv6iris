@@ -168,7 +168,8 @@ trace predicate `Ptp`, and the application's slots. -/
     (Cres : Nat → List Obs → ConsHist → IProp GF) (HCrest : ∀ k h H, Timeless (Cres k h H))
     (Wd : Nat → IProp GF) (HWd : ∀ k, Persistent (Wd k)) (HWdt : ∀ k, Timeless (Wd k))
     (Rw : Nat → IProp GF) (HRw : ∀ k, Persistent (Rw k)) (HRwt : ∀ k, Timeless (Rw k))
-    (Uf : Option (Nat × Obs) → Obs → Prop) :
+    (Uf : Option (Nat × Obs) → Obs → Prop)
+    (Ucr : Nat → IProp GF) (Ucx : Nat → Obs → IProp GF) (Uco : IProp GF) :
     MachFixedGS hlc GF where
   invGS := Hinv
   reg := MachGpreS.reg_pre
@@ -207,6 +208,9 @@ trace predicate `Ptp`, and the application's slots. -/
   rdwild_persistent := HRw
   rdwild_timeless := HRwt
   uFit := Uf
+  uClaimR := Ucr
+  uClaimX := Ucx
+  uClaimO := Uco
   diskImgG := MachGpreS.diskImg_pre
   diskName := γdisk
   diskSize := ndisk
@@ -302,6 +306,10 @@ theorem riscvPowerAdequacy [MachGpreS hlc GF] [KernelMap] (ndisk : Nat) (g : GSt
     (HRwt : ∀ c k, Timeless (Rw c k))
     -- THE ENTER'S JUSTIFICATION (NI M2-W2a): the record's `uFit`
     (Uf : Option (Nat × Obs) → Obs → Prop)
+    -- THE ONE-SHOT FILING CLAIMS (NI M2-W2d): the record's `uClaimR`/`uClaimX`
+    -- (what an exit at a position mints), `uClaimO` (the origin ticket a
+    -- power-on mints)
+    (Ucr : CT → Nat → IProp GF) (Ucx : CT → Nat → Obs → IProp GF) (Uco : CT → IProp GF)
     (HPt : ∀ (γobs : GName) (c : CT),
       Clt c ∗ (γobs ↪VAR{.own (1 : Qp).half} ([] : List Obs)) ⊢@{IProp GF} |==> Pt γobs c)
     (Hobs : ∀ (γdisk γobs : GName) (c : CT) (h : List Obs) (on : Bool) (dk : Nat → BitVec 8),
@@ -310,7 +318,8 @@ theorem riscvPowerAdequacy [MachGpreS hlc GF] [KernelMap] (ndisk : Nat) (g : GSt
         |==> ◇ (diskImgAuthSized γdisk ndisk dk ∗ ▷ Pt γobs c ∗
           (γobs ↪VAR{.own (1 : Qp).half} (h ++ [powerEv on])) ∗
           (if on then iprop(emp)
-           else iprop(Cres c (obsBoots h + 1) [] ⟨[], [], [], none⟩ ∗ Tn c (obsBoots h + 1)))))
+           else iprop(Cres c (obsBoots h + 1) [] ⟨[], [], [], none⟩ ∗ Tn c (obsBoots h + 1) ∗
+             Uco c))))
     -- THE RETURN PATH (Rocq SY3-A1 re-cut): the trace slot's second step at
     -- the power-on, at the history the on-arm left, after the crash slot's swap
     (Hback : ∀ (γobs : GName) (c : CT) (h : List Obs),
@@ -323,11 +332,15 @@ theorem riscvPowerAdequacy [MachGpreS hlc GF] [KernelMap] (ndisk : Nat) (g : GSt
     -- `Uf ox e` and the cited receipt's pure reading (`wp_power`'s
     -- `HuserExit`/`HuserEnter`, sealed into the wire invariant as the hart's
     -- permit)
+    -- (NI M2-W2d: the exit hook mints the exit's claims at `h.length`, the
+    -- entry hook is handed the claim the entry spends)
     (HuserExit : ∀ (γobs : GName) (c : CT) (h : List Obs) (e : Obs), isUExit e = true →
       ▷ Pt γobs c ∗ (γobs ↪VAR{.own (1 : Qp).half} h) ⊢@{IProp GF}
-        |==> ◇ (▷ Pt γobs c ∗ (γobs ↪VAR{.own (1 : Qp).half} (h ++ [e]))))
+        |==> ◇ (▷ Pt γobs c ∗ (γobs ↪VAR{.own (1 : Qp).half} (h ++ [e])) ∗
+          Ucr c h.length ∗ Ucx c h.length e))
     (HuserEnter : ∀ (γobs : GName) (c : CT) (h : List Obs) (e : Obs) (ox : Option (Nat × Obs)),
       isUEnter e = true → Uf ox e → (∀ i x, ox = some (i, x) → i < h.length ∧ h[i]? = some x) →
+      uClaimForRaw (Ucr c) (Uco c) ox ∗
       ▷ Pt γobs c ∗ (γobs ↪VAR{.own (1 : Qp).half} h) ⊢@{IProp GF}
         |==> ◇ (▷ Pt γobs c ∗ (γobs ↪VAR{.own (1 : Qp).half} (h ++ [e]))))
     (phi : GState → List Obs → Prop)
@@ -337,7 +350,7 @@ theorem riscvPowerAdequacy [MachGpreS hlc GF] [KernelMap] (ndisk : Nat) (g : GSt
           (Pc γdisk γswap γreg γstart c)
           (Tk c) (Hk c) γobs T (Pt γobs c) γhist
           (Tg c) (HTg c) (HTgt c) (Kc c) (HKc c) (HKct c) (Cres c) (HCrest c)
-          (Wd c) (HWd c) (HWdt c) (Rw c) (HRw c) (HRwt c) Uf) g' ∗
+          (Wd c) (HWd c) (HWdt c) (Rw c) (HRw c) (HRwt c) Uf (Ucr c) (Ucx c) (Uco c)) g' ∗
         (γobs ↪VAR{.own (1 : Qp).half} h) ∗ ⌜obsWf h g'⌝ ∗
         ▷ Pc γdisk γswap γreg γstart c ∗ ▷ Pt γobs c ⊢@{IProp GF} ◇ ⌜phi g' h⌝)
     (Hgen0 : g.gen = 0) (Hpow : g.pow = false)
@@ -347,7 +360,7 @@ theorem riscvPowerAdequacy [MachGpreS hlc GF] [KernelMap] (ndisk : Nat) (g : GSt
           (Tk c) (Hk c)
           γobs T (Pt γobs c) γhist
           (Tg c) (HTg c) (HTgt c) (Kc c) (HKc c) (HKct c) (Cres c) (HCrest c)
-          (Wd c) (HWd c) (HWdt c) (Rw c) (HRw c) (HRwt c) Uf →
+          (Wd c) (HWd c) (HWdt c) (Rw c) (HRw c) (HRwt c) Uf (Ucr c) (Ucx c) (Uco c) →
       Born γdisk γswap γreg γstart c →
       ∀ (E : EraGS) (gen : Nat) (σ : MState), bootFacts σ →
         (∃ ds0 : DevStates, σ.devs = ds0.reset) →
@@ -386,7 +399,7 @@ theorem riscvPowerAdequacy [MachGpreS hlc GF] [KernelMap] (ndisk : Nat) (g : GSt
     (Tk c) (Hk c)
     γobs T (Pt γobs c) γhist
     (Tg c) (HTg c) (HTgt c) (Kc c) (HKc c) (HKct c) (Cres c) (HCrest c)
-          (Wd c) (HWd c) (HWdt c) (Rw c) (HRw c) (HRwt c) Uf)
+          (Wd c) (HWd c) (HWdt c) (Rw c) (HRw c) (HRwt c) Uf (Ucr c) (Ucx c) (Uco c))
   unfold adeqBirth
   isplitr
   · ipureintro; rfl
@@ -414,7 +427,7 @@ theorem riscvPowerAdequacy [MachGpreS hlc GF] [KernelMap] (ndisk : Nat) (g : GSt
       (Pc γdisk γswap γreg γstart c)
           (Tk c) (Hk c) γobs T (Pt γobs c) γhist
       (Tg c) (HTg c) (HTgt c) (Kc c) (HKc c) (HKct c) (Cres c) (HCrest c)
-          (Wd c) (HWd c) (HWdt c) (Rw c) (HRw c) (HRwt c) Uf).withInv Hinv) _
+          (Wd c) (HWd c) (HWdt c) (Rw c) (HRw c) (HRwt c) Uf (Ucr c) (Ucx c) (Uco c)).withInv Hinv) _
       Ppure (fun dk => Hproj γdisk γswap γreg γstart c dk)
       Mof (Rb c) (Tn c) (Tn' c) (Tn'' c) (fun E gen dk => Hswap γdisk γswap γreg γstart c hborn E gen dk)
       (fun h on dk hs => Hobs γdisk γobs c h on dk hs)
@@ -425,7 +438,7 @@ theorem riscvPowerAdequacy [MachGpreS hlc GF] [KernelMap] (ndisk : Nat) (g : GSt
         (Pc γdisk γswap γreg γstart c)
           (Tk c) (Hk c) γobs T (Pt γobs c) γhist
         (Tg c) (HTg c) (HTgt c) (Kc c) (HKc c) (HKct c) (Cres c) (HCrest c)
-          (Wd c) (HWd c) (HWdt c) (Rw c) (HRw c) (HRwt c) Uf).withInv Hinv)
+          (Wd c) (HWd c) (HWdt c) (Rw c) (HRw c) (HRwt c) Uf (Ucr c) (Ucx c) (Uco c)).withInv Hinv)
         Hinv γgen γstart γreg γdisk γswap γobs γhist c T rfl hborn E gen σ hbf hdv hpp))
     unfold obsInv crashInv
     iframe Hcinv Hoinv
@@ -607,6 +620,25 @@ theorem obsPredAt_user (γ : GName) (h : List Obs) (e : Obs) :
     iexact Hfrag
   iexact Hauth
 
+/-- ...as the slot's `HuserExit` at a record that mints nothing (NI M2-W2d). -/
+theorem obsPredAt_uexit (γ : GName) (h : List Obs) (e : Obs) :
+    ▷ obsPredAt γ ∗ (γ ↪VAR{.own (1 : Qp).half} h) ⊢@{IProp GF}
+      |==> ◇ (▷ obsPredAt γ ∗ (γ ↪VAR{.own (1 : Qp).half} (h ++ [e])) ∗ iprop(emp) ∗ iprop(emp)) := by
+  iintro H
+  imod obsPredAt_user γ h e $$ H with H
+  imodintro
+  imod H with ⟨HP, Hh⟩
+  imodintro
+  iframe HP Hh
+  isplitl [] <;> iempintro
+
+/-- ...and as its `HuserEnter`, the spent claim dropped (NI M2-W2d). -/
+theorem obsPredAt_uenter (Cl : IProp GF) (γ : GName) (h : List Obs) (e : Obs) :
+    Cl ∗ ▷ obsPredAt γ ∗ (γ ↪VAR{.own (1 : Qp).half} h) ⊢@{IProp GF}
+      |==> ◇ (▷ obsPredAt γ ∗ (γ ↪VAR{.own (1 : Qp).half} (h ++ [e]))) := by
+  iintro ⟨-, H⟩
+  iapply obsPredAt_user γ h e $$ H
+
 /-- THE USER-EVENT STEP AT THE LEDGER, generic in the event's side
 condition `P` (NI M2-W1; the two arms below are its instances). -/
 theorem obsLedgerAt_userP (R : List Obs → IProp GF) [∀ h, Timeless (R h)]
@@ -629,8 +661,33 @@ theorem obsLedgerAt_userP (R : List Obs → IProp GF) [∀ h, Timeless (R h)]
     iframe Hfrag HR
   iexact Hauth
 
+/-- THE USER-EXIT STEP AT THE LEDGER, MINTING (NI M2-W2d): the client's
+ledger closed under the user exits, minting the exit's claims at its
+position (`Hu`), is the slot's `HuserExit`. -/
+theorem obsLedgerAt_uexitM (R : List Obs → IProp GF) [∀ h, Timeless (R h)]
+    (Cr : Nat → IProp GF) (Cx : Nat → Obs → IProp GF)
+    (Hu : ∀ (h : List Obs) (e : Obs), isUExit e = true →
+      R h ⊢@{IProp GF} |==> (R (h ++ [e]) ∗ Cr h.length ∗ Cx h.length e))
+    (γ : GName) (h : List Obs) (e : Obs) (he : isUExit e = true) :
+    ▷ obsLedgerAt R γ ∗ (γ ↪VAR{.own (1 : Qp).half} h) ⊢@{IProp GF}
+      |==> ◇ (▷ obsLedgerAt R γ ∗ (γ ↪VAR{.own (1 : Qp).half} (h ++ [e])) ∗ Cr h.length ∗ Cx h.length e) := by
+  unfold obsLedgerAt
+  iintro ⟨⟨%h', >Hfrag, >HR⟩, Hauth⟩
+  ihave %hh := ghost_var_agree γ h' _ h _ $$ Hfrag Hauth
+  subst hh
+  imod ghost_var_update_halves (h' ++ [e]) γ h' h' $$ Hauth Hfrag with ⟨Hauth, Hfrag⟩
+  imod Hu h' e he $$ HR with ⟨HR, Hr, Hx⟩
+  imodintro
+  imodintro
+  isplitl [Hfrag HR]
+  · inext
+    iexists _
+    iframe Hfrag HR
+  iframe Hauth Hr Hx
+
 /-- THE USER-EXIT STEP AT THE LEDGER (NI M2-W2a): the client's ledger closed
-under the user exits (`Hu`) is the slot's `HuserExit`. -/
+under the user exits (`Hu`) is the slot's `HuserExit` (at a record that mints
+nothing; `obsLedgerAt_uexitM` mints, NI M2-W2d). -/
 theorem obsLedgerAt_uexit (R : List Obs → IProp GF) [∀ h, Timeless (R h)]
     (Hu : ∀ (h : List Obs) (e : Obs), isUExit e = true → R h ⊢@{IProp GF} |==> R (h ++ [e]))
     (γ : GName) (h : List Obs) (e : Obs) (he : isUExit e = true) :
@@ -638,9 +695,38 @@ theorem obsLedgerAt_uexit (R : List Obs → IProp GF) [∀ h, Timeless (R h)]
       |==> ◇ (▷ obsLedgerAt R γ ∗ (γ ↪VAR{.own (1 : Qp).half} (h ++ [e]))) :=
   obsLedgerAt_userP R (fun _ e => isUExit e = true) Hu γ h e he
 
+/-- THE USER-ENTRY STEP AT THE LEDGER, SPENDING (NI M2-W2d): the client's
+ledger closed under the user entries with their evidence and the claim they
+spend (`Hu`, handed the justification `uf ox e`, the cited receipt's reading
+and the claim) is the slot's `HuserEnter`. -/
+theorem obsLedgerAt_uenterS (R : List Obs → IProp GF) [∀ h, Timeless (R h)]
+    (uf : Option (Nat × Obs) → Obs → Prop) (Cr : Nat → IProp GF) (Co : IProp GF)
+    (Hu : ∀ (h : List Obs) (e : Obs) (ox : Option (Nat × Obs)), isUEnter e = true → uf ox e →
+      (∀ i x, ox = some (i, x) → i < h.length ∧ h[i]? = some x) →
+      uClaimForRaw Cr Co ox ∗ R h ⊢@{IProp GF} |==> R (h ++ [e]))
+    (γ : GName) (h : List Obs) (e : Obs) (ox : Option (Nat × Obs)) (he : isUEnter e = true)
+    (hf : uf ox e) (hv : ∀ i x, ox = some (i, x) → i < h.length ∧ h[i]? = some x) :
+    uClaimForRaw Cr Co ox ∗ ▷ obsLedgerAt R γ ∗ (γ ↪VAR{.own (1 : Qp).half} h) ⊢@{IProp GF}
+      |==> ◇ (▷ obsLedgerAt R γ ∗ (γ ↪VAR{.own (1 : Qp).half} (h ++ [e]))) := by
+  unfold obsLedgerAt
+  iintro ⟨Hcl, ⟨%h', >Hfrag, >HR⟩, Hauth⟩
+  ihave %hh := ghost_var_agree γ h' _ h _ $$ Hfrag Hauth
+  subst hh
+  imod ghost_var_update_halves (h' ++ [e]) γ h' h' $$ Hauth Hfrag with ⟨Hauth, Hfrag⟩
+  imod Hu h' e ox he hf hv $$ [Hcl HR] with HR
+  · iframe Hcl HR
+  imodintro
+  imodintro
+  isplitl [Hfrag HR]
+  · inext
+    iexists _
+    iframe Hfrag HR
+  iexact Hauth
+
 /-- THE USER-ENTRY STEP AT THE LEDGER (NI M2-W2a): the client's ledger closed
 under the user entries with their evidence (`Hu`, handed the justification
-`uf ox e` and the cited receipt's reading) is the slot's `HuserEnter`. -/
+`uf ox e` and the cited receipt's reading) is the slot's `HuserEnter` (at a
+record that spends nothing; `obsLedgerAt_uenterS` spends, NI M2-W2d). -/
 theorem obsLedgerAt_uenter (R : List Obs → IProp GF) [∀ h, Timeless (R h)]
     (uf : Option (Nat × Obs) → Obs → Prop)
     (Hu : ∀ (h : List Obs) (e : Obs) (ox : Option (Nat × Obs)), isUEnter e = true → uf ox e →
@@ -652,6 +738,44 @@ theorem obsLedgerAt_uenter (R : List Obs → IProp GF) [∀ h, Timeless (R h)]
   obsLedgerAt_userP R (fun h e => isUEnter e = true ∧ uf ox e ∧
       (∀ i x, ox = some (i, x) → i < h.length ∧ h[i]? = some x))
     (fun h e ⟨he, hf, hv⟩ => Hu h e ox he hf hv) γ h e ⟨he, hf, hv⟩
+
+/-- **A blind hook at a record that mints nothing** (NI M2-W2d): an exit
+hook that moves the slot is one that also yields the (empty) claims. -/
+theorem uexitHook_emp (P : IProp GF) (H H' : IProp GF)
+    (Hk : P ∗ H ⊢@{IProp GF} |==> ◇ (P ∗ H')) :
+    P ∗ H ⊢@{IProp GF} |==> ◇ (P ∗ H' ∗ iprop(emp) ∗ iprop(emp)) := by
+  iintro HP
+  imod Hk $$ HP with HP
+  imodintro
+  imod HP with ⟨HP, Hh⟩
+  imodintro
+  iframe HP Hh
+  isplitl [] <;> iempintro
+
+/-- ...and an entry hook that moves the slot is one handed a claim it drops. -/
+theorem uenterHook_drop (Cl P H H' : IProp GF)
+    (Hk : P ∗ H ⊢@{IProp GF} |==> ◇ (P ∗ H')) :
+    Cl ∗ P ∗ H ⊢@{IProp GF} |==> ◇ (P ∗ H') := by
+  iintro ⟨-, HP⟩
+  iapply Hk $$ HP
+
+/-- ...and a power hook that founds the era's claim and turn is one that also
+yields the (empty) origin ticket (NI M2-W2d). -/
+theorem powerHook_emp (on : Bool) (L A B C X Y : IProp GF)
+    (Hk : L ⊢@{IProp GF} |==> ◇ (A ∗ B ∗ C ∗ (if on then iprop(emp) else iprop(X ∗ Y)))) :
+    L ⊢@{IProp GF} |==> ◇ (A ∗ B ∗ C ∗ (if on then iprop(emp) else iprop(X ∗ Y ∗ emp))) := by
+  iintro HL
+  imod Hk $$ HL with HL
+  imodintro
+  imod HL with ⟨Ha, Hb, Hc, Hy⟩
+  imodintro
+  iframe Ha Hb Hc
+  cases on
+  · simp only [Bool.false_eq_true, ↓reduceIte]
+    icases Hy with ⟨Hx, Hy⟩
+    iframe Hx Hy
+  · simp only [↓reduceIte]
+    iexact Hy
 
 /-- ...and a client with nothing to file (Rocq `back_id`): the turn goes
 straight back. -/
@@ -683,11 +807,12 @@ theorem bootFixedGS_obsPredTriv (Hinv : InvGS_gen hlc GF)
     (Cres : Nat → List Obs → ConsHist → IProp GF) (HCrest : ∀ k h H, Timeless (Cres k h H))
     (Wd : Nat → IProp GF) (HWd : ∀ k, Persistent (Wd k)) (HWdt : ∀ k, Timeless (Wd k))
     (Rw : Nat → IProp GF) (HRw : ∀ k, Persistent (Rw k)) (HRwt : ∀ k, Timeless (Rw k))
-    (Uf : Option (Nat × Obs) → Obs → Prop) :
+    (Uf : Option (Nat × Obs) → Obs → Prop)
+    (Ucr : Nat → IProp GF) (Ucx : Nat → Obs → IProp GF) (Uco : IProp GF) :
     @MachFixedGS.obsPred hlc GF (bootFixedGS Hinv γgen γstart γreg γdisk ndisk γswap Pcp Tkp Hkp γobs T (obsPredAt γobs) γhist
-        Tg HTg HTgt Kc HKc HKct Cres HCrest Wd HWd HWdt Rw HRw HRwt Uf) =
+        Tg HTg HTgt Kc HKc HKct Cres HCrest Wd HWd HWdt Rw HRw HRwt Uf Ucr Ucx Uco) =
       @obsPredTriv hlc GF (bootFixedGS Hinv γgen γstart γreg γdisk ndisk γswap Pcp Tkp Hkp γobs T (obsPredAt γobs) γhist
-        Tg HTg HTgt Kc HKc HKct Cres HCrest Wd HWd HWdt Rw HRw HRwt Uf) := rfl
+        Tg HTg HTgt Kc HKc HKct Cres HCrest Wd HWd HWdt Rw HRw HRwt Uf Ucr Ucx Uco) := rfl
 
 /-- ...and the ledger IS `obsLedger`. -/
 theorem bootFixedGS_obsLedger (R : List Obs → IProp GF)
@@ -700,11 +825,12 @@ theorem bootFixedGS_obsLedger (R : List Obs → IProp GF)
     (Cres : Nat → List Obs → ConsHist → IProp GF) (HCrest : ∀ k h H, Timeless (Cres k h H))
     (Wd : Nat → IProp GF) (HWd : ∀ k, Persistent (Wd k)) (HWdt : ∀ k, Timeless (Wd k))
     (Rw : Nat → IProp GF) (HRw : ∀ k, Persistent (Rw k)) (HRwt : ∀ k, Timeless (Rw k))
-    (Uf : Option (Nat × Obs) → Obs → Prop) :
+    (Uf : Option (Nat × Obs) → Obs → Prop)
+    (Ucr : Nat → IProp GF) (Ucx : Nat → Obs → IProp GF) (Uco : IProp GF) :
     @MachFixedGS.obsPred hlc GF (bootFixedGS Hinv γgen γstart γreg γdisk ndisk γswap Pcp Tkp Hkp γobs T (obsLedgerAt R γobs) γhist
-        Tg HTg HTgt Kc HKc HKct Cres HCrest Wd HWd HWdt Rw HRw HRwt Uf) =
+        Tg HTg HTgt Kc HKc HKct Cres HCrest Wd HWd HWdt Rw HRw HRwt Uf Ucr Ucx Uco) =
       @obsLedger hlc GF (bootFixedGS Hinv γgen γstart γreg γdisk ndisk γswap Pcp Tkp Hkp γobs T (obsLedgerAt R γobs) γhist
-        Tg HTg HTgt Kc HKc HKct Cres HCrest Wd HWd HWdt Rw HRw HRwt Uf) R := rfl
+        Tg HTg HTgt Kc HKc HKct Cres HCrest Wd HWd HWdt Rw HRw HRwt Uf Ucr Ucx Uco) R := rfl
 
 /-- THE PACKAGED TRACE THEOREM (Rocq `riscv_trace_adequacy` :2037):
 `riscvPowerAdequacy` at the ledger, the trivial application (`CT := Unit`)
@@ -748,7 +874,8 @@ theorem riscvTraceAdequacy [KernelMap] (ndisk : Nat) (g : GState)
           killCredTriv inferInstance inferInstance
           consResTriv (fun _ _ _ => inferInstance)
           wildNone (fun _ => inferInstance) (fun _ => inferInstance)
-          wildNone (fun _ => inferInstance) (fun _ => inferInstance) (fun _ _ => True) →
+          wildNone (fun _ => inferInstance) (fun _ => inferInstance) (fun _ _ => True)
+          (fun _ => iprop(emp)) (fun _ _ => iprop(emp)) iprop(emp) →
       ∀ (E : EraGS) (gen : Nat) (σ : MState), bootFacts σ →
         (∃ ds0 : DevStates, σ.devs = ds0.reset) →
         Ppure (diskOf σ.devs) →
@@ -788,8 +915,9 @@ theorem riscvTraceAdequacy [KernelMap] (ndisk : Nat) (g : GState)
     (fun _ => wildNone) (fun _ _ => inferInstance) (fun _ _ => inferInstance)
     (fun _ => wildNone) (fun _ _ => inferInstance) (fun _ _ => inferInstance)
     (fun _ _ => True)
+    (fun _ _ => iprop(emp)) (fun _ _ _ => iprop(emp)) (fun _ => iprop(emp))
     (fun γobs _ => obsLedgerAt_alloc_cl R γobs iprop(True) (by iintro _; iapply HR0))
-    (fun γdisk γobs _ h on dk hs => obsLedgerAt_step R consResTriv (fun _ => iprop(emp))
+    (fun γdisk γobs _ h on dk hs => powerHook_emp on _ _ _ _ _ _ <| obsLedgerAt_step R consResTriv (fun _ => iprop(emp))
       (fun h on dk hs => by
         iintro Hr
         imod Hpow h on dk hs $$ Hr with Hr
@@ -800,9 +928,9 @@ theorem riscvTraceAdequacy [KernelMap] (ndisk : Nat) (g : GState)
         · simp only [↓reduceIte]; itrivial)
       ndisk γdisk γobs h on dk hs)
     (fun _ _ _ => backId _ _ _)
-    (fun γobs _ h e he => obsLedgerAt_uexit R HuserExit γobs h e he)
-    (fun γobs _ h e ox he hf hv =>
-      obsLedgerAt_uenter R (fun _ _ => True) (fun h e _ he _ _ => HuserEnter h e he) γobs h e ox he hf hv)
+    (fun γobs _ h e he => uexitHook_emp _ _ _ (obsLedgerAt_uexit R HuserExit γobs h e he))
+    (fun γobs _ h e ox he hf hv => uenterHook_drop _ _ _ _
+      (obsLedgerAt_uenter R (fun _ _ => True) (fun h e _ he _ _ => HuserEnter h e he) γobs h e ox he hf hv))
     (fun _ h => P h)
     (fun _ _ _ _ _ _ γobs _ _ _ _ h => by
       iintro ⟨_, Hauth, _, _, HPt⟩

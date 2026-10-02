@@ -2441,7 +2441,7 @@ theorem kf_publish [X : CurCtx] (AC : ACQUIRE) (RE : RELEASE) (SS : SAFESTRCPY) 
   -- ===== THE STEADY PARK (ParkCap.parkToken_park_steady, D25): the record
   -- the token builds, at the child's run key =====
   unfold kforkPark
-  icases Hpark with ⟨#Hpe, #HG, #Htokp, HRc, Hslotw⟩
+  icases Hpark with ⟨#Hpe, #HG, #Htokp, HRc, Hco, Hslotw⟩
   icases kf_park_ip Γ $$ HG with ⟨%ip, #Hic, #Hig⟩
   -- THE CHILD'S SLOT: the caller's deposit at `kforkChild V`, paid under the
   -- child's own `myPay` and the lend, re-keyed onto the parked record
@@ -2478,7 +2478,7 @@ theorem kf_publish [X : CurCtx] (AC : ACQUIRE) (RE : RELEASE) (SS : SAFESTRCPY) 
     iexists γuh
     iexact Huh
   dsimp only [UtNames.pj, utParkCaps] at hup
-  ihave Hup := hup $$ Hown Htokp Hrows Hused Hpo Hig HcFr Hcch Hsl Hchildr
+  ihave Hup := hup $$ Hown Htokp Hrows Hused Hpo Hig HcFr Hcch Hsl Hco Hchildr
   imod Hup with ⟨Hown, HprocCtx⟩
   ihave Hk := Hback $$ Hown
   imodintro
@@ -3070,7 +3070,7 @@ theorem kfork_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (AL : ALLOCPROC)
         iframe Hrowp
         -- THE LEND IS REFUNDED (no child was built)
         unfold kforkPark
-        icases Hpark with ⟨-, -, -, HRc, -⟩
+        icases Hpark with ⟨-, -, -, HRc, -, -⟩
         iexact HRc
       ihave Hcl := (show wpNext (GF := GF) k.sie k.proc cpu (kforkPost k γ j pid V M stsP Q csP Rc) ⊢
           wpNext k.sie k.proc cpu (kforkPostB k (kforkRet γ j pid V M stsP Q csP Rc)) from .rfl) $$ Hcl
@@ -3434,7 +3434,7 @@ theorem kfork_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (AL : ALLOCPROC)
               iframe Hrowp
               -- THE LEND IS REFUNDED (no child was built)
               unfold kforkPark
-              icases Hpark with ⟨-, -, -, HRc, -⟩
+              icases Hpark with ⟨-, -, -, HRc, -, -⟩
               iexact HRc
             ihave Hcl := (show wpNext (GF := GF) k.sie k.proc cpu (kforkPost k γ j pid V M stsP Q csP Rc) ⊢
           wpNext k.sie k.proc cpu (kforkPostB k (kforkRet γ j pid V M stsP Q csP Rc)) from .rfl) $$ Hcl

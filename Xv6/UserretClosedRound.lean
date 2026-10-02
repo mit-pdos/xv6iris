@@ -83,6 +83,20 @@ theorem urc_left_kpt (cpu : CPU) (k : KCtx) :
   iframe Hs Hc Ht Hk Hro
   ipureintro; exact hw
 
+/-- **getpid's row at the filing** (NI M2-W2d, `niFit`'s round arm): usertrap's
+`utRetPid`, read at the trapped key's run frame (`urc_post`'s `hpidrow`). -/
+theorem urc_niPidRow (W : Uvis) (V : ProcPriv) (sc : BitVec 64) (V' : ProcPriv) (M' : Nat → List (BitVec 8))
+    (sts' : List FdState) (gn : GName) (cs' : ExtTreeSet GName compare) (pid : BitVec 32)
+    (hl : V.tf.length = 36) (hpid : W.pid = pid) (hsc : W.secc = V.pvSecc)
+    (hrp : utRetPid sc V.pvSecc (urcV0 V W).tf V'.tf pid) :
+    niPidRow sc W (uvisOf V' M' sts' gn cs' pid) := by
+  have hnum0 : usysEff V.pvSecc (urcV0 V W).tf = usysEff W.secc (uvisRun W).tf := by
+    rw [← hsc]; exact usysEff_numCong _ _ _ ((urc_num_entry W V hl).trans (uvisRun_num W).symm)
+  intro h
+  have := hrp h
+  rw [hnum0, ← hpid] at this
+  exact this
+
 set_option maxHeartbeats 2000000 in
 /-- **THE ROUND'S EXIT**: usertrap's post, at the record uservec saved, to
 the next round (steps A/B, then the resume). -/
@@ -97,13 +111,14 @@ theorem urc_exit (UR : USERRET) [NiFitIs (hlc := hlc) GF] (PT : SchedNames → I
     (hproc : k.proc = procAddr j) (hsie : k.sie = false) (htier : k.tier = KTier.kpt) (hnoff : k.noff = 0)
     (hsp : (uservecCtx k (tfResumeGpr0 W.tf) V.tf).sp = ksp) (hav : k.avail = 512)
     (i : Nat) (x : Obs) (hx : exitFits x sc W) :
-    wireInv ∗ uRcpt (i, x) ∗ kmapAt trampVpn (kLeaf trampPpn .rx 0#1 0#1) ∗ ▷ urcLoop (hlc := hlc) PT Γ j ∗
+    wireInv ∗ uRcpt (i, x) ∗ MachFixedGS.uClaimR (hlc := hlc) (GF := GF) i ∗
+      kmapAt trampVpn (kLeaf trampPpn .rx 0#1 0#1) ∗ ▷ urcLoop (hlc := hlc) PT Γ j ∗
       (if sc = uecallScause then uexecArm (hlc := hlc) sc W f else iprop(emp)) ⊢
       usertrapPost (hlc := hlc) (fun h => usertrapResAt (hlc := hlc) PT Γ j h)
         (uservecCtx k (tfResumeGpr0 W.tf) V.tf) pt ksp (urcV0 V W) Mp W.fd gn cs pid (tfW W.tf tfEpcIdx) sc f
         (uvisRun W) cpu' := by
   unfold usertrapPost
-  iintro ⟨#Hwire, #Hrc, #Hcl, #Hloop, Harm⟩ %R' %P' %V' %M' %sts' %cs' %uepc %⟨hcs, ha0⟩ %⟨hupt', htfp'⟩ %hround
+  iintro ⟨#Hwire, #Hrc, HcR, #Hcl, #Hloop, Harm⟩ %R' %P' %V' %M' %sts' %cs' %uepc %⟨hcs, ha0⟩ %⟨hupt', htfp'⟩ %hround
     %hfdk %hchk %hgk %hevq %hfde %hpipe %hrp %hpc' %hlive Hk Hpc Hsep ⟨%sc2, Hsc⟩ ⟨%tv2, Hstv⟩ Hstvec Hppt Htf Hres
     Hxo Hfo Hwo Hko Hso
   -- steps A/B: the next slot
@@ -139,14 +154,15 @@ theorem urc_exit (UR : USERRET) [NiFitIs (hlc := hlc) GF] (PT : SchedNames → I
   -- `i`; the trapped key `W`, the key the round left, lawful, same pid
   have hfit : niFit (some (i, x)) (.uEnter cpu' (satpOf KTier.kpt P'.root) uepc (tfGprs V'.tf)) :=
     ⟨sc, W, uvisOf V' M' sts' gn cs' pid, hx, ⟨cpu', _, uepc, rfl, hpc'⟩,
-      urc_roundOkKeys W V Mp sc V' M' sts' gn cs' pid hl hM hpi hsz hcw hlz hsc hround, hpid.symm⟩
+      urc_roundOkKeys W V Mp sc V' M' sts' gn cs' pid hl hM hpi hsz hcw hlz hsc hround, hpid.symm,
+      urc_niPidRow W V sc V' M' sts' gn cs' pid hl hpid hsc hrp⟩
   have HRS := urc_resume (hlc := hlc) (GF := GF) UR PT Γ j cpu'
     (((uservecCtx k (tfResumeGpr0 W.tf) V.tf).intrOff true false).withRegs R') 0
     P' ksp V' M' sts' gn cs' pid uepc sc2 tv2 hproc hctx' htier hnoff hsp' hav' ha0 hpc'
     (hVgn.symm.trans hgk.symm) (some (i, x)) hfit
   iapply HRS
-  unfold uRcptOpt
-  iframe Hwire Hrc Hcl Hk Hgap Hpc Hsep Hsc Hstv Hstvec Hppt Htf Hres Hslot
+  unfold uRcptOpt uClaimFor uClaimForRaw
+  iframe Hwire Hrc HcR Hcl Hk Hgap Hpc Hsep Hsc Hstv Hstvec Hppt Htf Hres Hslot
   inext
   iexact Hloop
 
@@ -168,7 +184,7 @@ theorem urc_round (UT : USERTRAP) (UV : USERVEC) (UR : USERRET)
     ⟨⟨%ms, %hlw, Htm⟩, Hfrag, Hret⟩
   -- the frame, its residue out
   icases urc_frame_rut h C pt _ sz W.M ms sc stv (tfW W.tf tfEpcIdx) (tfResumeGpr0 W.tf) $$ Htm with
-    ⟨Hfr, Hrut, %ir, #Hrc⟩
+    ⟨Hfr, Hrut⟩
   icases urcRut_open PT Γ j h sz γfd cw gn cs pid lz secc pt $$ Hrut with ⟨%k, %ksp, %V, %hp, Hleft, Htf, Hclose⟩
   obtain ⟨hsie, htier, hnoff, hproc, ⟨hksp, hkav⟩, hVsz, hVfdg, hVcwi, hVgen, hVlz, hVsc⟩ := hp
   -- the residue, at the view the process handed back
@@ -191,14 +207,21 @@ theorem urc_round (UT : USERTRAP) (UV : USERVEC) (UR : USERRET)
   iapply HUV
   iframe Hhw Hfr Hcl Htf Hleft
   inext
-  iintro %Mp %hM Hk Hpc Hsep Hsc Hstv Hstvec Hppt Htf -
+  iintro %Mp %hM Hk Hpc Hsep Hsc Hstv Hstvec Hppt Htf - Htok
+  -- THE EXIT'S TOKEN, back from uservec (NI M2-W2d): the receipt the filing
+  -- cites, the round claim it spends, and the fork's child-origin claim
+  unfold uExitTok
+  icases Htok with ⟨%ir, #Hrc, HcR, HcX⟩
+  have hxf : exitFits (.uExit h (satpOf KTier.kpt pt.root) sc (tfW W.tf tfEpcIdx) (gprList (tfResumeGpr0 W.tf)))
+      sc W := ⟨h, satpOf KTier.kpt pt.root, by rw [gprList_tfResumeGpr0]⟩
   -- the residue at the saved frame, the deposit at usertrap's rows
   ihave Hres := usertrapResAt_uservec PT Γ j h pt ksp V W.fd cs pid (tfResumeGpr0 W.tf) $$ Hres
   have hM' : umemLazy V.upt V.sz.toNat Mp = W.M := by rw [hVP, hVsz]; exact hM
   have hpi' : W.perm = permOf V.upt.um V.sz.toNat := by rw [hVP, hVsz]; exact hpe
   icases urc_deposit W V Mp gn cs pid sc f hl hlw hM' hpi' (hsz.trans hVsz.symm) (hcw.trans hVcwi.symm) hgn hch
-    hpid (hlz.trans hVlz.symm) (hsc.trans hVsc.symm) hVgen $$ [Hdep Harm] with ⟨Hsin, Hfin, Hpin, Hkin, Harm⟩
-  · iframe Hdep Harm
+    hpid (hlz.trans hVlz.symm) (hsc.trans hVsc.symm) hVgen ir _ hxf $$ [Hdep Harm HcX] with
+    ⟨Hsin, Hfin, Hpin, Hkin, Harm⟩
+  · iframe Hdep Harm HcX
   -- usertrap
   have hstk : utStackTop (uservecCtx k (tfResumeGpr0 W.tf) V.tf) ksp :=
     ⟨by show uservecRegs (tfResumeGpr0 W.tf) V.tf 2#5 = ksp; rw [urc_uservecRegs_sp, hkw.2.1]; exact hksp, hkav⟩
@@ -214,9 +237,8 @@ theorem urc_round (UT : USERTRAP) (UV : USERVEC) (UR : USERRET)
   iapply (urc_exit UR (parkToken (hlc := hlc) (GF := GF) (SG := uexecSGXv6)) Γ j W V Mp k pt ksp gn cs pid sc f cpu' hl hlw hM' hpi' (hsz.trans hVsz.symm)
     (hcw.trans hVcwi.symm) hgn hch hpid (hlz.trans hVlz.symm) (hsc.trans hVsc.symm) hVgen hproc hsie htier
     hnoff hstk.1 hkav ir
-    (.uExit h (satpOf KTier.kpt pt.root) sc (tfW W.tf tfEpcIdx) (gprList (tfResumeGpr0 W.tf)))
-    ⟨h, satpOf KTier.kpt pt.root, by rw [gprList_tfResumeGpr0]⟩)
-  iframe Hwire Hrc Hcl Hloop Harm
+    (.uExit h (satpOf KTier.kpt pt.root) sc (tfW W.tf tfEpcIdx) (gprList (tfResumeGpr0 W.tf))) hxf)
+  iframe Hwire Hrc HcR Hcl Hloop Harm
 
 end
 

@@ -134,13 +134,14 @@ end rows
 
 section unpack
 
-/-- Pull the second-to-last row (the lend `r`) and the twelfth (the turn `t`)
-of a right-nested chain out to the right. -/
-theorem bs_pull {PROP : Type _} [BI PROP] (a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11 t a12 a13 r c : PROP) :
-    iprop(a1 ∗ a2 ∗ a3 ∗ a4 ∗ a5 ∗ a6 ∗ a7 ∗ a8 ∗ a9 ∗ a10 ∗ a11 ∗ t ∗ a12 ∗ a13 ∗ r ∗ c) ⊢
-      iprop((a1 ∗ a2 ∗ a3 ∗ a4 ∗ a5 ∗ a6 ∗ a7 ∗ a8 ∗ a9 ∗ a10 ∗ a11 ∗ a12 ∗ a13 ∗ c) ∗ r ∗ t) := by
-  iintro ⟨H1, H2, H3, H4, H5, H6, H7, H8, H9, H10, H11, Ht, H12, H13, Hr, Hc⟩
-  iframe Hr Ht H1 H2 H3 H4 H5 H6 H7 H8 H9 H10 H11 H12 H13 Hc
+/-- Pull the second-to-last row (the lend `r`), the twelfth (the turn `t`)
+and the thirteenth (the origin ticket `o`, NI M2-W2d) of a right-nested
+chain out to the right. -/
+theorem bs_pull {PROP : Type _} [BI PROP] (a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11 t o a12 a13 r c : PROP) :
+    iprop(a1 ∗ a2 ∗ a3 ∗ a4 ∗ a5 ∗ a6 ∗ a7 ∗ a8 ∗ a9 ∗ a10 ∗ a11 ∗ t ∗ o ∗ a12 ∗ a13 ∗ r ∗ c) ⊢
+      iprop((a1 ∗ a2 ∗ a3 ∗ a4 ∗ a5 ∗ a6 ∗ a7 ∗ a8 ∗ a9 ∗ a10 ∗ a11 ∗ a12 ∗ a13 ∗ c) ∗ r ∗ t ∗ o) := by
+  iintro ⟨H1, H2, H3, H4, H5, H6, H7, H8, H9, H10, H11, Ht, Ho, H12, H13, Hr, Hc⟩
+  iframe Hr Ht Ho H1 H2 H3 H4 H5 H6 H7 H8 H9 H10 H11 H12 H13 Hc
 
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF]
 
@@ -153,8 +154,8 @@ theorem powerBootRes_unpack (Mof : (Nat → BitVec 8) → LogMirror)
     (cP : CPU → BitVec 64 → IProp GF) (cI : ∀ cpu : CPU, ⊢ cP cpu 0#64) (σ : MState) :
     powerBootRes Mof Rb Tn E gen σ ⊢
       @powerBootRows hlc GF (MachGS.ofEra E gen cP cI) Mof σ ∗ Rb gen (diskOf σ.devs) ∗
-        Tn (gen + 1) :=
-  bs_pull _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+        Tn (gen + 1) ∗ MachFixedGS.uClaimO (hlc := hlc) (GF := GF) :=
+  bs_pull _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
 
 end unpack
 
@@ -456,14 +457,15 @@ theorem bootPrimarySupply_intro [Fscfg] [Icfg] (X : CurCtx)
     (Pb : Nat → List (BitVec 8)) (Rspent : ExtTreeSet Nat compare) :
     consEchoShift (hlc := hlc) (GF := GF) ∗
       initBootBundle (hlc := hlc) (SG := uexecSGXv6) ROOTINO seccAll (List.replicate NOFILE FdState.closed) ∗
+      MachFixedGS.uClaimO (hlc := hlc) (GF := GF) ∗
       bootSupplyCore X Γ γ0 γ1 γc γl0 γl1 γd γt cn l0 l1 c0 dk sb nib cov Pb Rspent ⊢
       bootPrimarySupply X Γ γ0 γ1 γc γl0 γl1 γd γt cn l0 l1 c0 dk sb nib cov Pb Rspent := by
   unfold bootSupplyCore bootPrimarySupply
-  iintro ⟨He, Hi, H1, H2, H3, H4, H5, H6, H7, H8, H9, H10, H11, H12, H13, H14, H15, H16, H17, H18,
+  iintro ⟨He, Hi, Ho, H1, H2, H3, H4, H5, H6, H7, H8, H9, H10, H11, H12, H13, H14, H15, H16, H17, H18,
     H19, H20, H21, H22, H23, H24, H25, H26, H27, H28, H29, H30, H31, H32, H33, H34, H35, H36, H37,
     H38, H39⟩
   iframe He H1 H2 H3 H4 H5 H6 H7 H8 H9 H10 H11 H12 H13 H14 H15 H16 H17 H18 H19 H20 H21 H22 H23 H24
-    H25 Hi H26 H27 H28 H29 H30 H31 H32 H33 H34 H35 H36 H37 H38 H39
+    H25 Hi Ho H26 H27 H28 H29 H30 H31 H32 H33 H34 H35 H36 H37 H38 H39
 
 end supply
 

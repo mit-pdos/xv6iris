@@ -298,7 +298,10 @@ pc at the handler, the trap CSRs freshly written (existential at this JOIN),
 the same table, config and residue.  NI M2-W2b (ruling O3, USER's one
 sanctioned move): and the MACHINE RECEIPT of the trap's `uExit` event -- the
 address space, the cause, the epc and the user GPRs the frame holds sit at
-some position of the history (`MachCSL.uRcpt`, persistent). -/
+some position of the history (`MachCSL.uRcpt`, persistent) -- carried, since
+NI M2-W2d, inside THE EXIT'S TOKEN (`MachCSL.uExitTok`) beside the one-shot
+filing claims minted at that position (exclusive: the kernel's filing at the
+next entry spends the round claim, a fork's child spends the other). -/
 def userTrapFrame [CurCtx] (cpu : CPU) (C : UCfg) (pt : UPtd) (Rut : UPtd → IProp GF) : IProp GF :=
   iprop%
   ∃ (ms sc stv sep : BitVec 64) (g : RegMap),
@@ -308,7 +311,7 @@ def userTrapFrame [CurCtx] (cpu : CPU) (C : UCfg) (pt : UPtd) (Rut : UPtd → IP
     Register.mstatus ↦ᵣ[cpu] ms ∗ Register.scause ↦ᵣ[cpu] sc ∗ Register.stval ↦ᵣ[cpu] stv ∗
     Register.sepc ↦ᵣ[cpu] sep ∗ pcIs cpu (stvecBase C.stvec) ∗ clockCells cpu ∗ gprFile cpu g ∗
     userPtAny cpu pt ∗ userCfg cpu C ∗ Rut pt ∗
-    (∃ i : Nat, uRcpt (i, .uExit cpu (satpOf .kpt pt.root) sc sep (gprList g)))
+    uExitTok (hlc := hlc) (.uExit cpu (satpOf .kpt pt.root) sc sep (gprList g))
 
 /-- **Rocq `stvec_handler_wp`**: the kernel re-entry contract -- the handler
 at stvec (uservec) handles ANY trapped-out-of-user machine. -/
@@ -376,7 +379,7 @@ def userTrapFrameAt [CurCtx] (cpu : CPU) (C : UCfg) (pt : UPtd) (Rut : UPtd → 
   Register.mstatus ↦ᵣ[cpu] ms ∗ Register.scause ↦ᵣ[cpu] sc ∗ Register.stval ↦ᵣ[cpu] stv ∗
   Register.sepc ↦ᵣ[cpu] sep ∗ pcIs cpu (stvecBase C.stvec) ∗ clockCells cpu ∗ gprFile cpu g ∗
   userPtAny cpu pt ∗ userCfg cpu C ∗ Rut pt ∗
-  (∃ i : Nat, uRcpt (i, .uExit cpu (satpOf .kpt pt.root) sc sep (gprList g)))
+  uExitTok (hlc := hlc) (.uExit cpu (satpOf .kpt pt.root) sc sep (gprList g))
 
 /-- **Rocq `UserExec.user_trap_frame_atm`**: the same at the LAZY image `M`. -/
 def userTrapFrameAtm [CurCtx] (cpu : CPU) (C : UCfg) (pt : UPtd) (Rut : UPtd → IProp GF)
@@ -387,7 +390,7 @@ def userTrapFrameAtm [CurCtx] (cpu : CPU) (C : UCfg) (pt : UPtd) (Rut : UPtd →
   Register.mstatus ↦ᵣ[cpu] ms ∗ Register.scause ↦ᵣ[cpu] sc ∗ Register.stval ↦ᵣ[cpu] stv ∗
   Register.sepc ↦ᵣ[cpu] sep ∗ pcIs cpu (stvecBase C.stvec) ∗ clockCells cpu ∗ gprFile cpu g ∗
   userPtmInv cpu pt sz M ∗ userCfg cpu C ∗ Rut pt ∗
-  (∃ i : Nat, uRcpt (i, .uExit cpu (satpOf .kpt pt.root) sc sep (gprList g)))
+  uExitTok (hlc := hlc) (.uExit cpu (satpOf .kpt pt.root) sc sep (gprList g))
 
 /-- The GPR list does not read the map's slot `0` (NI M2-W2b). -/
 theorem gprList_ext (m m' : RegMap) (h : ∀ i, i ≠ 0#5 → m i = m' i) : gprList m = gprList m' := by
@@ -400,11 +403,11 @@ theorem gprList_ext (m m' : RegMap) (h : ∀ i, i ≠ 0#5 → m i = m' i) : gprL
   revert hi
   decide
 
-/-- The receipt at a GPR map is one at any map agreeing off slot `0`. -/
+/-- The exit token at a GPR map is one at any map agreeing off slot `0`. -/
 theorem uRcpt_gprList_ext {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] (cpu : CPU)
     (s sc sep : BitVec 64) (m m' : RegMap) (h : ∀ i, i ≠ 0#5 → m i = m' i) :
-    (∃ i : Nat, uRcpt (GF := GF) (i, .uExit cpu s sc sep (gprList m))) ⊢
-      ∃ i : Nat, uRcpt (i, .uExit cpu s sc sep (gprList m')) := by
+    uExitTok (hlc := hlc) (GF := GF) (.uExit cpu s sc sep (gprList m)) ⊢
+      uExitTok (hlc := hlc) (.uExit cpu s sc sep (gprList m')) := by
   rw [gprList_ext m m' h]
 
 /-- Rocq `user_trap_frame_atm_at`: forget the image. -/
@@ -412,12 +415,10 @@ theorem userTrapFrameAtm_at [CurCtx] (cpu : CPU) (C : UCfg) (pt : UPtd) (Rut : U
     (sz : Nat) (M : ElfMem) (ms sc stv sep : BitVec 64) (g : RegMap) :
     userTrapFrameAtm cpu C pt Rut sz M ms sc stv sep g ⊢ userTrapFrameAt cpu C pt Rut ms sc stv sep g := by
   unfold userTrapFrameAtm userTrapFrameAt
-  iintro ⟨%Hok, Hhs, Hpr, Hms, Hsc, Hstv, Hsep, Hpc, Hck, Hg, Hpt, Hcfg, Hrut, #Hrc⟩
+  iintro ⟨%Hok, Hhs, Hpr, Hms, Hsc, Hstv, Hsep, Hpc, Hck, Hg, Hpt, Hcfg, Hrut, Hrc⟩
   ihave Hany := userPtmInv_any cpu pt sz M $$ Hpt
   iframe
-  isplitl []
-  · ipureintro; exact Hok
-  iexact Hrc
+  ipureintro; exact Hok
 
 /-- Rocq `user_trap_frame_at_frame`: the named frame is a frame. -/
 theorem userTrapFrameAt_frame [CurCtx] (cpu : CPU) (C : UCfg) (pt : UPtd) (Rut : UPtd → IProp GF)

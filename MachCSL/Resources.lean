@@ -265,6 +265,17 @@ class MachFixedGS (hlc : outParam HasLC) (GF : BundledGFunctors) where
   (`hartObsPermit`) lets an entry through only with this fact and the
   receipt; the client reads the meaning (Xv6: `niFit`, from W2c). -/
   uFit : Option (Nat × Obs) → Obs → Prop
+  /-- THE ONE-SHOT FILING CLAIMS (NI M2-W2d, finding F4): client slots, as
+  `syncTok`, that the machine only CARRIES.  The hart's exit permit hands
+  the exit at position `i` of the history the round claim `uClaimR i` and
+  the extra `uClaimX i x` (Xv6's ledger: a fork ecall's child-origin claim,
+  `emp` otherwise); the power-on hands the era's origin ticket `uClaimO`
+  (initproc's); the entry permit SPENDS the claim its evidence cites
+  (`uClaimFor`: `uClaimR i` for a round citing exit `i`, `uClaimO` for an
+  origin).  A record that files nothing takes `emp` in all three. -/
+  uClaimR : Nat → IProp GF
+  uClaimX : Nat → Obs → IProp GF
+  uClaimO : IProp GF
   /-- THE KILL CREDENTIAL (Rocq `riscv_kill_cred`): the ambient price of a
   kill, an application-chosen persistent proposition every party a kill
   touches is handed (the killer, the killed slot's public payload, the trap
@@ -1362,21 +1373,60 @@ theorem uRcptOpt_valid (h : List Obs) (ox : Option (Nat × Obs)) :
     cases hx
     exact hv
 
-/-- **THE HART'S TRACE PERMIT** (M2-W2a, design §3), persistent: any exit;
-an entry with its justification and the cited receipt (since M2-W2c the
-only entry arm: the kernel's `sret` carries the evidence, `USERRET`). -/
+/-- The claim an entry at evidence `ox` spends, at raw claim families (NI
+M2-W2d): the round claim `Cr i` of the cited exit, or the origin ticket
+`Co`.  `uClaimFor` is it at the record's slots; the adequacy states its
+hooks at the raw families. -/
+def uClaimForRaw {GF : BundledGFunctors} (Cr : Nat → IProp GF) (Co : IProp GF) :
+    Option (Nat × Obs) → IProp GF
+  | none => Co
+  | some (i, _) => Cr i
+
+/-- **WHAT AN EXIT HANDS ITS TRAPPER** (NI M2-W2d): the machine receipt of
+the exit at some position `i`, and the one-shot claims the client mints
+there (`MachFixedGS.uClaimR i`, `MachFixedGS.uClaimX i x`).  NOT persistent:
+the claims are exclusive. -/
+def uExitTok (x : Obs) : IProp GF := iprop%
+  ∃ i : Nat, uRcpt (i, x) ∗ MachFixedGS.uClaimR (hlc := hlc) (GF := GF) i ∗
+    MachFixedGS.uClaimX (hlc := hlc) (GF := GF) i x
+
+/-- An exit token at an event equal to another is one at the other. -/
+theorem uExitTok_eq {x x' : Obs} (h : x = x') :
+    uExitTok (hlc := hlc) (GF := GF) x ⊢ uExitTok x' := by
+  subst h; exact .rfl
+
+/-- The receipt inside an exit token. -/
+theorem uExitTok_rcpt (x : Obs) :
+    uExitTok (hlc := hlc) (GF := GF) x ⊢ (∃ i, uRcpt (i, x)) ∗ uExitTok x := by
+  unfold uExitTok
+  iintro ⟨%i, #Hr, Hc, Hx⟩
+  isplitl []
+  · iexists i; iexact Hr
+  iexists i
+  iframe Hr Hc Hx
+
+/-- **THE CLAIM AN ENTRY SPENDS** (NI M2-W2d): a round citing the exit at `i`
+spends its round claim, an origin the origin ticket. -/
+def uClaimFor (ox : Option (Nat × Obs)) : IProp GF :=
+  uClaimForRaw (MachFixedGS.uClaimR (hlc := hlc) (GF := GF)) (MachFixedGS.uClaimO (hlc := hlc) (GF := GF)) ox
+
+/-- **THE HART'S TRACE PERMIT** (M2-W2a, design §3), persistent: any exit,
+handing back the exit's token (NI M2-W2d: its receipt and the claims minted
+at it); an entry with its justification, the cited receipt and the claim it
+spends (since M2-W2c the only entry arm: the kernel's `sret` carries the
+evidence, `USERRET`). -/
 def hartObsPermit : IProp GF := iprop%
-  □ ((∀ e : Obs, ⌜isUExit e = true⌝ -∗ hartObsStep e emp) ∧
+  □ ((∀ e : Obs, ⌜isUExit e = true⌝ -∗ hartObsStep e (uExitTok (hlc := hlc) e)) ∧
      (∀ (e : Obs) (ox : Option (Nat × Obs)),
         ⌜isUEnter e = true ∧ MachFixedGS.uFit (hlc := hlc) (GF := GF) ox e⌝ -∗
-        uRcptOpt ox -∗ hartObsStep e emp))
+        uRcptOpt ox -∗ uClaimFor (hlc := hlc) ox -∗ hartObsStep e emp))
 
 instance hartObsPermit_persistent : Persistent (hartObsPermit (hlc := hlc) (GF := GF)) := by
   unfold hartObsPermit; infer_instance
 
 /-- The exit arm. -/
 theorem hartObsPermit_exit (e : Obs) (he : isUExit e = true) :
-    hartObsPermit (hlc := hlc) (GF := GF) ⊢ hartObsStep e emp := by
+    hartObsPermit (hlc := hlc) (GF := GF) ⊢ hartObsStep e (uExitTok (hlc := hlc) e) := by
   unfold hartObsPermit
   iintro #H
   icases H with ⟨H, -⟩
@@ -1385,7 +1435,7 @@ theorem hartObsPermit_exit (e : Obs) (he : isUExit e = true) :
 /-- The evidence-carrying entry arm. -/
 theorem hartObsPermit_enter (e : Obs) (ox : Option (Nat × Obs)) (he : isUEnter e = true)
     (hf : MachFixedGS.uFit (hlc := hlc) (GF := GF) ox e) :
-    hartObsPermit (hlc := hlc) (GF := GF) ⊢ uRcptOpt ox -∗ hartObsStep e emp := by
+    hartObsPermit (hlc := hlc) (GF := GF) ⊢ uRcptOpt ox -∗ uClaimFor (hlc := hlc) ox -∗ hartObsStep e emp := by
   unfold hartObsPermit
   iintro #H
   icases H with ⟨-, H⟩
@@ -1411,18 +1461,56 @@ theorem hartObsStep_of_hook (e : Obs)
   imodintro
   iframe Hhalf Hhist
 
-/-- **The permit from the client's USER-EVENT HOOKS** (M2-W2a): the exit hook
-accepts any exit; the entry hook accepts an entry given PURE facts only -- its
-justification `uFit ox e` and, for a cited receipt, that the position holds
-the cited event (the permit validates the receipt against the authority
-itself, so no hook is lent it). -/
+/-- **The exit's consent from a minting hook** (NI M2-W2d): the hook moves
+the client's half by the exit and mints the claims at the exit's position
+`h.length`; the permit adds the machine receipt there. -/
+theorem hartObsStep_of_exitHook (e : Obs)
+    (Hk : ∀ h : List Obs,
+      ▷ MachFixedGS.obsPred (hlc := hlc) (GF := GF) ∗ obsHalf h ⊢@{IProp GF}
+        |==> ◇ (▷ MachFixedGS.obsPred (hlc := hlc) (GF := GF) ∗ obsHalf (h ++ [e]) ∗
+          MachFixedGS.uClaimR (hlc := hlc) (GF := GF) h.length ∗
+          MachFixedGS.uClaimX (hlc := hlc) (GF := GF) h.length e)) :
+    obsInv ⊢@{IProp GF} hartObsStep e (uExitTok (hlc := hlc) e) := by
+  unfold hartObsStep
+  iintro #Hoinv %h %g %_ Ha
+  unfold obsAuth
+  icases Ha with ⟨Hhalf, Hhist⟩
+  unfold obsInv
+  imod (inv_acc (E := ⊤) (N := obsN) (P := MachFixedGS.obsPred (hlc := hlc) (GF := GF))
+    CoPset.subseteq_top) $$ Hoinv with ⟨HP, Hoclose⟩
+  imod Hk h $$ [HP Hhalf] with >⟨HP, Hhalf, HcR, HcX⟩
+  · iframe HP Hhalf
+  imod Hoclose $$ HP
+  imod obsHistAuth_step h (h ++ [e]) (List.prefix_append _ _) $$ Hhist with Hhist
+  unfold obsHistAuth
+  ihave #Hlb := MonoList.lb_own_get _ _ (h ++ [e]) $$ Hhist
+  imodintro
+  iframe Hhalf Hhist
+  unfold uExitTok uRcpt obsHistLb
+  iexists h.length
+  iframe HcR HcX
+  iexists h
+  isplitr
+  · ipureintro; rfl
+  iexact Hlb
+
+/-- **The permit from the client's USER-EVENT HOOKS** (M2-W2a; NI M2-W2d:
+the exit hook MINTS the exit's claims, the entry hook is handed the claim
+the entry spends): the exit hook accepts any exit; the entry hook accepts an
+entry given PURE facts only -- its justification `uFit ox e` and, for a
+cited receipt, that the position holds the cited event (the permit validates
+the receipt against the authority itself, so no hook is lent it) -- and the
+spent claim. -/
 theorem hartObsPermit_of_hook
     (HuserExit : ∀ (h : List Obs) (e : Obs), isUExit e = true →
       ▷ MachFixedGS.obsPred (hlc := hlc) (GF := GF) ∗ obsHalf h ⊢@{IProp GF}
-        |==> ◇ (▷ MachFixedGS.obsPred (hlc := hlc) (GF := GF) ∗ obsHalf (h ++ [e])))
+        |==> ◇ (▷ MachFixedGS.obsPred (hlc := hlc) (GF := GF) ∗ obsHalf (h ++ [e]) ∗
+          MachFixedGS.uClaimR (hlc := hlc) (GF := GF) h.length ∗
+          MachFixedGS.uClaimX (hlc := hlc) (GF := GF) h.length e))
     (HuserEnter : ∀ (h : List Obs) (e : Obs) (ox : Option (Nat × Obs)), isUEnter e = true →
       MachFixedGS.uFit (hlc := hlc) (GF := GF) ox e →
       (∀ i x, ox = some (i, x) → i < h.length ∧ h[i]? = some x) →
+      uClaimFor (hlc := hlc) (GF := GF) ox ∗
       ▷ MachFixedGS.obsPred (hlc := hlc) (GF := GF) ∗ obsHalf h ⊢@{IProp GF}
         |==> ◇ (▷ MachFixedGS.obsPred (hlc := hlc) (GF := GF) ∗ obsHalf (h ++ [e]))) :
     obsInv ⊢@{IProp GF} hartObsPermit := by
@@ -1430,8 +1518,8 @@ theorem hartObsPermit_of_hook
   iintro #Hoinv !>
   isplit
   · iintro %e %he
-    iapply hartObsStep_of_hook e (fun h => HuserExit h e he) $$ Hoinv
-  · iintro %e %ox %⟨he, hf⟩ #Hr
+    iapply hartObsStep_of_exitHook e (fun h => HuserExit h e he) $$ Hoinv
+  · iintro %e %ox %⟨he, hf⟩ #Hr Hcl
     unfold hartObsStep
     iintro %h %g %_ Ha
     ihave %hv := uRcptOpt_valid h ox $$ [Ha Hr]
@@ -1441,8 +1529,8 @@ theorem hartObsPermit_of_hook
     unfold obsInv
     imod (inv_acc (E := ⊤) (N := obsN) (P := MachFixedGS.obsPred (hlc := hlc) (GF := GF))
       CoPset.subseteq_top) $$ Hoinv with ⟨HP, Hoclose⟩
-    imod HuserEnter h e ox he hf hv $$ [HP Hhalf] with >⟨HP, Hhalf⟩
-    · iframe HP Hhalf
+    imod HuserEnter h e ox he hf hv $$ [Hcl HP Hhalf] with >⟨HP, Hhalf⟩
+    · iframe Hcl HP Hhalf
     imod Hoclose $$ HP
     imod obsHistAuth_step h (h ++ [e]) (List.prefix_append _ _) $$ Hhist with Hhist
     imodintro
@@ -1452,7 +1540,9 @@ theorem hartObsPermit_of_hook
 `devObsPermit_triv`): a client that states no trace property moves the
 ghost and ignores the event. -/
 theorem hartObsPermit_triv
-    (heq : MachFixedGS.obsPred (hlc := hlc) (GF := GF) = obsPredTriv) :
+    (heq : MachFixedGS.obsPred (hlc := hlc) (GF := GF) = obsPredTriv)
+    (hR : ∀ i, ⊢@{IProp GF} MachFixedGS.uClaimR (hlc := hlc) (GF := GF) i)
+    (hX : ∀ i e, ⊢@{IProp GF} MachFixedGS.uClaimX (hlc := hlc) (GF := GF) i e) :
     obsInv ⊢@{IProp GF} hartObsPermit := by
   have Hk : ∀ (h : List Obs) (e : Obs),
       ▷ MachFixedGS.obsPred (hlc := hlc) (GF := GF) ∗ obsHalf h ⊢@{IProp GF}
@@ -1471,7 +1561,18 @@ theorem hartObsPermit_triv
       iexists _
       iexact Hfrag
     iexact Hauth
-  exact hartObsPermit_of_hook (fun h e _ => Hk h e) (fun h e _ _ _ _ => Hk h e)
+  refine hartObsPermit_of_hook (fun h e _ => ?_) (fun h e _ _ _ _ => ?_)
+  · iintro H
+    imod Hk h e $$ H with H
+    imodintro
+    imod H with ⟨HP, Hh⟩
+    imodintro
+    iframe HP Hh
+    isplitl []
+    · iapply hR
+    · iapply hX
+  · iintro ⟨-, H⟩
+    iapply Hk h e $$ H
 
 /-! ### The crash-spanning invariant and the swap counter (Rocq `RiscvPtsto`:
 `crashN`, `crash_inv`, `swap_auth`, `swap_lb`) -/

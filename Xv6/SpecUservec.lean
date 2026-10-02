@@ -96,6 +96,12 @@ discharges its continuation through `UT.wp_usertrap`.
 8. `GenId` / the process index `j` / `pid` / `gn` / `cs` / `sts` / `f` /
    `Wk` are not binders: nothing in the 44 instructions reads them (they
    key Rocq's chained post).
+9. **The exit's token is handed back** (NI M2-W2d; not in Rocq): the
+   trapped frame's last conjunct is the exit's token (`MachCSL.uExitTok`:
+   its machine receipt and the ONE-SHOT FILING CLAIMS the trace slot minted
+   at the exit), which uservec never reads; since the claims are exclusive
+   and the kernel's filing at the next entry spends them, the post returns
+   the token (`uservecPost`'s last premise) instead of dropping it.
 
 Imports only definitional files.
 -/
@@ -163,7 +169,10 @@ def uservecPost [CurCtx] (cpu : CPU) (k : KCtx) (P : UPtd) (Rut : UPtd → IProp
     kctx cpu (uservecCtx k g ws) -∗ pcIs cpu usertrapPc -∗
     Register.sepc ↦ᵣ[cpu] sep -∗ Register.scause ↦ᵣ[cpu] sc -∗ Register.stval ↦ᵣ[cpu] tv -∗
     Register.stvec ↦ᵣ[cpu] uservecTvec -∗
-    procPtAt P Mp -∗ tfPageAt P.tfp (uservecTf ws g) -∗ Rut P -∗ wpLoop cpu
+    procPtAt P Mp -∗ tfPageAt P.tfp (uservecTf ws g) -∗ Rut P -∗
+    -- THE EXIT'S TOKEN, handed back (NI M2-W2d): the frame's receipt and the
+    -- one-shot claims minted at the exit, which the kernel's filing spends
+    uExitTok (hlc := hlc) (GF := GF) (.uExit cpu (satpOf .kpt P.root) sc sep (gprList g)) -∗ wpLoop cpu
 
 end
 

@@ -342,12 +342,11 @@ def ufExitEv (cpu : CPU) (f : RegFile) : Obs :=
   .uExit cpu (f .satp) (f .scause) (f .sepc) (gprList (uxaXget f))
 
 /-- **The receipt rider** of a cycle's landing: a user file (nothing crossed),
-or the machine receipt of the exit the file names. -/
+or the exit token of the exit the file names (its machine receipt and, NI
+M2-W2d, the one-shot claims minted there -- exclusive, so the rider is no
+longer persistent). -/
 def uxRcpt (cpu : CPU) (f : RegFile) : IProp GF :=
-  iprop(⌜f .cur_privilege = Privilege.User⌝ ∨ ∃ k, uRcpt (k, ufExitEv cpu f))
-
-instance uxRcpt_persistent (cpu : CPU) (f : RegFile) : Persistent (uxRcpt (GF := GF) cpu f) := by
-  unfold uxRcpt; infer_instance
+  iprop(⌜f .cur_privilege = Privilege.User⌝ ∨ uExitTok (hlc := hlc) (ufExitEv cpu f))
 
 /-- The cells the rider reads. -/
 def uxRcptRegs : List Register := [.cur_privilege, .satp, .scause, .sepc] ++ uxaGprs
@@ -372,7 +371,7 @@ theorem uxRcpt_user (cpu : CPU) (f : RegFile) (h : f .cur_privilege = Privilege.
   ipureintro; exact h
 
 theorem uxRcpt_trap (cpu : CPU) (f : RegFile) (h : f .cur_privilege = Privilege.Supervisor) :
-    uxRcpt (GF := GF) cpu f ⊢ ∃ k, uRcpt (k, ufExitEv cpu f) := by
+    uxRcpt (GF := GF) cpu f ⊢ uExitTok (hlc := hlc) (ufExitEv cpu f) := by
   unfold uxRcpt
   iintro H
   icases H with (%hu | H)
@@ -503,9 +502,9 @@ theorem uf_close_trap [CurCtx] (cpu : CPU) (C : UCfg) (pt : UPtd) (Rut : UPtd �
     (hpc : f .PC = stvecBase C.stvec) (hnpc : f .nextPC = stvecBase C.stvec)
     (hwf : UbMemWf pt t mm) (hs : UbMemStep pt t t' mm mm') (htlb : utlbOk t' (f .tlb)) :
     kmapStatic ⊢ (ufRegF (GF := GF) cpu C).F f -∗ (ubFrame curCtx (ubUAddrs pt t)).B mm' -∗ ufAside cpu -∗
-      Rut pt -∗ (∃ k, uRcpt (k, ufExitEv cpu f)) -∗ userTrapFrame cpu C pt Rut := by
-  iintro #HS HF HB Ha Hrut #Hrc
-  ihave #Hrc := uRcptEx_eq (show ufExitEv cpu f =
+      Rut pt -∗ uExitTok (hlc := hlc) (ufExitEv cpu f) -∗ userTrapFrame cpu C pt Rut := by
+  iintro #HS HF HB Ha Hrut Hrc
+  ihave Hrc := uExitTok_eq (show ufExitEv cpu f =
       .uExit cpu (satpOf .kpt pt.root) (f .scause) (f .sepc) (gprList (uxaXget f)) by
     unfold ufExitEv; rw [hc.satp]) $$ Hrc
   icases (uf_F_split cpu C f).1 $$ HF with ⟨H1, H2, H3, H4, H5, -⟩
@@ -536,7 +535,6 @@ theorem uf_close_trap [CurCtx] (cpu : CPU) (C : UCfg) (pt : UPtd) (Rut : UPtd �
   isplitr
   · ipureintro; exact hms
   iframe
-  iexact Hrc
 
 end openclose
 

@@ -321,6 +321,9 @@ def syscForkIn (f : sfam GF) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts :
     IProp GF :=
   iprop(⌜syscNum V = USYS_fork⌝ -∗
     □ (uKillCred (hlc := hlc) -∗ sforkPay f (-1)) ∗ sforkLend f ∗
+    -- THE CHILD'S ORIGIN TICKET (NI M2-W2d): the fork exit's one-shot
+    -- child-origin claim, which kfork parks with the child
+    MachFixedGS.uClaimO (hlc := hlc) (GF := GF) ∗
     ∀ (g' : GName) (pidc : BitVec 32), ⌜pidc ≠ 1#32⌝ -∗ myPay g' (sforkPay f) -∗ sforkLend f -∗
       uslot (hlc := hlc) (uvisOf (syscForkChild V) M sts g' syscNoChildren pidc))
 

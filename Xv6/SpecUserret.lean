@@ -134,16 +134,19 @@ user `satp` in `a0`.  `wireInv` (NI M2-W1): the shared trace bundle, whose
 user-boundary permit the final `sret`'s privilege write consumes (the
 `uEnter` event, `MachCSL.swp_writeReg_uenter`).  THE ENTRY'S EVIDENCE (NI
 M2-W2c), for an `ox` the caller supplies: the cited exit's receipt
-`uRcptOpt ox` (persistent) and the justification `uFit ox` of exactly the
-event the `sret` emits -- the user `satp`, the resume `sepc`, the restored
-registers `tfGprs ws` (`NiLedger`). -/
+`uRcptOpt ox` (persistent), THE ONE-SHOT CLAIM the filing spends (NI
+M2-W2d: `uClaimFor ox`, the cited exit's round claim or an origin ticket)
+and the justification `uFit ox` of exactly the event the `sret` emits -- the
+user `satp`, the resume `sepc`, the restored registers `tfGprs ws`
+(`NiLedger`). -/
 def wp_userret_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (P : UPtd) (M : Nat → List (BitVec 8)) (ws : List (BitVec 64))
     (sep sc tv : BitVec 64) (ox : Option (Nat × Obs))
     (hsie : k.sie = false) (hspie : k.spie = true) (hspp : k.spp = false) (htier : k.tier = KTier.kpt)
     (ha0 : k.regs 10#5 = satpOf KTier.kpt P.root) : Prop :=
   kctx cpu k ∗ wireInv ∗
-  uRcptOpt ox ∗ ⌜MachFixedGS.uFit (hlc := hlc) (GF := GF) ox (.uEnter cpu (satpOf .kpt P.root) sep (tfGprs ws))⌝ ∗
+  uRcptOpt ox ∗ uClaimFor (hlc := hlc) (GF := GF) ox ∗
+  ⌜MachFixedGS.uFit (hlc := hlc) (GF := GF) ox (.uEnter cpu (satpOf .kpt P.root) sep (tfGprs ws))⌝ ∗
   pcIs cpu userretVa ∗ kmapAt trampVpn (kLeaf trampPpn .rx 0#1 0#1) ∗
   Register.sepc ↦ᵣ[cpu] sep ∗ Register.scause ↦ᵣ[cpu] sc ∗ Register.stval ↦ᵣ[cpu] tv ∗
   Register.stvec ↦ᵣ[cpu] uservecTvec ∗

@@ -206,13 +206,13 @@ theorem mn_phaseC (BI : BINIT) (II : IINIT) (FI : FILEINIT) (VD : VIRTIO_DISK_IN
       diskInitCells vl vn vc pd0 pav0 pu0 free0) ∗
     procsAvailAt Γ (some NPROC) true ∗ initPidTok 0#32 ∗
     initBootBundle (hlc := hlc) (SG := uexecSGXv6) ROOTINO seccAll (List.replicate NOFILE FdState.closed) ∗
-    consReader fscCons 0 ∗
+    consReader fscCons 0 ∗ MachFixedGS.uClaimO (hlc := hlc) (GF := GF) ∗
     startedInv γi ξd P ∗ startedPrim γi ∗
     mainDepositRecipe ⟨ξ, KTier.bare⟩ Γ γ0 γ1 γc γl0 γl1 γd γdl γt P ∗
     mnRecipeBare ξ γpr γl1 γ1 rootAddr t M ∗
     Register.stvec ↦ᵣ[startedPrimary] kernelvecAddr ∗ trapCsrs startedPrimary ∗ cpuCtxFree startedPrimary
     ⊢ wpLoop (GF := GF) startedPrimary := by
-  iintro ⟨Hk, Hpc, Hfs, Hboot, #Hw, Hav, #Hdinv, #Hcc, Hcfg, Hgh, Hcells, Hpav, Hipt, Hbundle, Hrdr,
+  iintro ⟨Hk, Hpc, Hfs, Hboot, #Hw, Hav, #Hdinv, #Hcc, Hcfg, Hgh, Hcells, Hpav, Hipt, Hbundle, Hrdr, Hco,
     #Hinv, Hprim, #Hrec, #Hbare, Hstv, Hcsrs, Hfree⟩
   unfold mnKptFs
   icases Hfs with ⟨Hblk, Hhead, Hbin, Hbss, Hilk, Hsin, Hraw, Hflk, Hfent, Hirf, Hinit, Hsb, Hlog, Hfw⟩
@@ -264,9 +264,9 @@ theorem mn_phaseC (BI : BINIT) (II : IINIT) (FI : FILEINIT) (VD : VIRTIO_DISK_IN
       rw [hγd, hdl]
       iexact Hdc
   -- userinit's park rows
-  ihave Hpark : iprop(userinitPark (hlc := hlc) (SG := uexecSGXv6) Γ γw γt) $$ [Hbundle Hrdr]
+  ihave Hpark : iprop(userinitPark (hlc := hlc) (SG := uexecSGXv6) Γ γw γt) $$ [Hbundle Hrdr Hco]
   · unfold userinitPark
-    iframe Hwl Htl Hcready Hwire Htr Hbundle Hrdr
+    iframe Hwl Htl Hcready Hwire Htr Hbundle Hrdr Hco
     iexists γ0, γ1, γc, γl0, γl1, γt, pd, pav, pu
     rw [hγd, hdl]
     iexact Hdev
@@ -366,7 +366,7 @@ theorem mn_phaseB (PR : PROCINIT) (TI : TRAPINIT) (TIH : TRAPINITHART) (PLI : PL
       diskInitCells vl vn vc pd0 pav0 pu0 free0) ∗
     procsAvailAt Γ (some NPROC) true ∗ initPidTok 0#32 ∗
     initBootBundle (hlc := hlc) (SG := uexecSGXv6) ROOTINO seccAll (List.replicate NOFILE FdState.closed) ∗
-    consReader fscCons 0 ∗
+    consReader fscCons 0 ∗ MachFixedGS.uClaimO (hlc := hlc) (GF := GF) ∗
     startedInv γi ξd P ∗ startedPrim γi ∗
     mainDepositRecipe ⟨ξ, KTier.bare⟩ Γ γ0 γ1 γc γl0 γl1 γd γdl γt P ∗
     mnRecipeBare ξ γpr γl1 γ1 rootAddr t M ∗
@@ -374,7 +374,7 @@ theorem mn_phaseB (PR : PROCINIT) (TI : TRAPINIT) (TIH : TRAPINITHART) (PLI : PL
     ⊢ wpLoop (GF := GF) startedPrimary := by
   have hct : Y.curTier = KTier.kpt := by subst hY; rfl
   iintro ⟨Hk, Hpc, HB, Hpb, Htlf, Hclf, Hcfr, Hstk, #Hsmap, #Hw, Hstv, Hfs, Hboot, Hav, Hdinv, Hcc, Hcfg,
-    Hgh, Hcells, Hpav, Hipt, Hbundle, Hrdr, Hinv, Hprim, Hrec, Hbare, Hcsrs, Hfree⟩
+    Hgh, Hcells, Hpav, Hipt, Hbundle, Hrdr, Hco, Hinv, Hprim, Hrec, Hbare, Hcsrs, Hfree⟩
   unfold mnKptB
   icases HB with ⟨Hpl, Hwl, #Ht0, #Ht16, ⟨%tvl, %tvn, %tvc, Htw, Htn, Htc⟩, Hraw, Hpub, Hpq, Hpar, Hfd, Hir,
     Hbs, Htres, Hcres, Hclean, Hnp⟩
@@ -417,7 +417,7 @@ theorem mn_phaseB (PR : PROCINIT) (TI : TRAPINIT) (TIH : TRAPINITHART) (PLI : PL
   iapply (mn_phaseC BI II FI VD UI SCH KV ξ hY Γ γ0 γ1 γc γl0 γl1 γd γdl γt k R4 hsie hK hnoff hlocks
     hproc htier c0 hdead dk sb Rspent Pb hg hpures hcov0 hnib0 hroot hγd hdl γw γp γi ξd P γpr rootAddr t M
     hhi hrt)
-  iframe Hk Hpc Hfs Hboot Hav Hdinv Hcc Hcfg Hgh Hcells Hpav Hipt Hbundle Hrdr Hinv Hprim Hrec Hbare Hstv
+  iframe Hk Hpc Hfs Hboot Hav Hdinv Hcc Hcfg Hgh Hcells Hpav Hipt Hbundle Hrdr Hco Hinv Hprim Hrec Hbare Hstv
     Hcsrs Hfree
   unfold mnWorldC
   iframe Hpinv Htl Hwaitl Hpidl Hcons Hp0 Hp1 Hr0 Hr1 Hi0 Hi1 Hplic Hpe Hkml Htr Hwire Hcert Hseam Hcinv
@@ -471,7 +471,7 @@ theorem main_proof (CI : CPUID) (CN : CONSOLEINIT) (PI : PRINTKINIT) (PK : PRINT
     ⟨#Hc0, #Hc16, ⟨%vcl, %vcn, %vcc, Hcw, Hcn, Hcc⟩, Hpr, #Hkm0, #Hkm16, ⟨%vkl, %vkn, %vkc, Hkw, Hkn, Hkc⟩⟩,
     ⟨⟨%dr, %dw, Hdr, Hdw⟩, Hdrest, Hfl, ⟨%kpt0, Hkpt0⟩⟩, HLraw, HGraw, Hsb, Hlog, Hfw, Hnp,
     Hhart, Hps, Hpav, Hsf, Hchb, Hγc, Hγl0, Hγl1, Hγt, Hlks, Hsup, Hmir, Hirb, Hira, Hbs, #Hcert, #Hseam, #Hcinv,
-    Hbundle, #Hu0, #Hu1, #Hplic, #Hdinv, #Hcrash, #Hwire, Hur0, Hur1, Hcfg, Hgh, Hcells, Hroot, Hauth,
+    Hbundle, Hco, #Hu0, #Hu1, #Hplic, #Hdinv, #Hcrash, #Hwire, Hur0, Hur1, Hcfg, Hgh, Hcells, Hroot, Hauth,
     Hpages⟩
   -- the supply, opened; the ties
   icases fsBootSupply_open dk sb nib cov γ0 γd cn Rspent Pb _ $$ Hsup with ⟨%hties, Hkit1, Hkit2, Hoffa⟩
@@ -599,7 +599,7 @@ theorem main_proof (CI : CPUID) (CN : CONSOLEINIT) (PI : PRINTKINIT) (PK : PRINT
     hcov0 hnib0 hdev hγd hdl γi ξd P fscPrintk (pageAddr t.base) t (kvmMapT pas) (mn_pageAddr_hi t.base)
     (Xv6.kxc_tfp_extract t.base).symm pas hok)
   iframe Hk Hpc HB Hγt Hγc Hcfr Hstk Hsmap HW Hstv HFs Hkav Hdinv Hcrash Hcfg Hgh Hcells Hpav Hipt
-    Hbundle Hrdr Hinv Hprim Hrec Hbare Hcsrs Hfree
+    Hbundle Hrdr Hco Hinv Hprim Hrec Hbare Hcsrs Hfree
   isplitl [Hhart Hps Hsf Hlks Hrows]
   · unfold mnProcBoot
     iframe Hhart Hps Hsf Hlks Hrows

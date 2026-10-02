@@ -71,10 +71,11 @@ theorem fkr_tail_close [X : CurCtx] (PR : PREPARE_RETURN) (UC : USERRET_CLOSED) 
     kctx c kb ∗ pcIs c (KA.«forkret» + 0x54#64) ∗ trapCsrsExt c eb ∗ cpuClaimExt c eb (procAddr N.j) ∗
     procPrivFd N.f (procAddr N.j) N.pid Vx Mx ∗ fkrFrame ksp ∗
     parkGlobals Γ N.w N.ft N.f N.ip ∗ utSysParkRows Γ ∗ firstDone (hlc := hlc) ∗ W ∗
+    MachFixedGS.uClaimO (hlc := hlc) (GF := GF) ∗
     fkrSlotIn (hlc := hlc) Wk Vx Mx sts gn cs N.pid ∗
     fkrCloser W Γ N Vx.fdg Vx.chg Vx.cwi sts gn cs Wk
     ⊢ wpLoop (GF := GF) c := by
-  iintro ⟨Hk, Hpc, Hte, Hce, Hpv, Hfr, #Hglob, #HG, #Hdone, HW, Hsin, Hclose⟩
+  iintro ⟨Hk, Hpc, Hte, Hce, Hpv, Hfr, #Hglob, #HG, #Hdone, HW, Hco, Hsin, Hclose⟩
   icases syscall_tf_len hct N.f (procAddr N.j) N.pid Vx Mx $$ Hpv with ⟨%hlen, Hpv⟩
   have hs := h.sie
   iapply (fkr_tail PR c kb N.f (procAddr N.j) N.pid Vx Mx h.proc h.noff h.tier
@@ -84,7 +85,7 @@ theorem fkr_tail_close [X : CurCtx] (PR : PREPARE_RETURN) (UC : USERRET_CLOSED) 
   iapply wpNext_intro
   iintro %c' %R' %hR Hk Hpc Hsepc Hsc Htv Hstv Hcl Hpv
   iapply (fkr_close UC W Γ c' kb R' eb root ksp N Vx Mx sts gn cs Wk hΓ hj h hksp hR hgn hlen hrk hct)
-  iframe Hk Hpc Hsepc Hsc Htv Hstv Hcl Hpv Hfr Hglob HG Hdone HW Hsin Hclose
+  iframe Hk Hpc Hsepc Hsc Htv Hstv Hcl Hpv Hfr Hglob HG Hdone HW Hco Hsin Hclose
 
 set_option maxHeartbeats 4000000 in
 /-- **The steady arm** (Rocq `wp_forkret`'s `steady = true` case): the block
@@ -99,9 +100,10 @@ theorem fkr_steady [X : CurCtx] (PR : PREPARE_RETURN) (UC : USERRET_CLOSED) (W :
     trapCsrsExt c1 eb ∗ cpuClaimExt c1 eb (procAddr N.j) ∗
     parkGlobals Γ N.w N.ft N.f N.ip ∗ utSysParkRows Γ ∗
     procPrivFd N.f (procAddr N.j) N.pid V M ∗ W ∗ firstDone (hlc := hlc) ∗
+    MachFixedGS.uClaimO (hlc := hlc) (GF := GF) ∗
     fkrCloser W Γ N V.fdg V.chg V.cwi sts gn cs (some (uvisOf V M [] V.gen cs N.pid))
     ⊢ wpLoop (GF := GF) c1 := by
-  iintro ⟨Hk, Hpc, Hfr, Hte, Hce, #Hglob, #HG, Hpv, HW, #Hdone, Hclose⟩
+  iintro ⟨Hk, Hpc, Hfr, Hte, Hce, #Hglob, #HG, Hpv, HW, #Hdone, Hco, Hclose⟩
   ihave #H0 := (show firstDone (hlc := hlc) (GF := GF) ⊢ wordPointsTo firstAddr 4 DFrac.discard 0#32 from by
       unfold firstDone; iintro ⟨H, -⟩; iexact H) $$ Hdone
   iapply (fkr_first_steady c1 kr eb root (procAddr N.j) _ h)
@@ -115,7 +117,7 @@ theorem fkr_steady [X : CurCtx] (PR : PREPARE_RETURN) (UC : USERRET_CLOSED) (W :
   ihave Hce := cpuClaimExt_move c1 c2 eb _ hpin $$ Hce
   iapply (fkr_tail_close PR UC W Γ c2 kr2 eb root _ N V M sts gn cs
     (some (uvisOf V M [] V.gen cs N.pid)) hΓ hj hkr2 rfl hgn (urunEq_of V M [] V.gen cs N.pid) hct)
-  iframe Hk Hpc Hte Hce Hpv Hfr Hglob HG Hdone HW Hclose
+  iframe Hk Hpc Hte Hce Hpv Hfr Hglob HG Hdone HW Hco Hclose
   unfold fkrSlotIn
   iempintro
 
@@ -134,13 +136,14 @@ theorem fkr_boot [X : CurCtx] (PR : PREPARE_RETURN) (FS : FSINIT) (KX : KEXEC) (
     parkGlobals Γ N.w N.ft N.f N.ip ∗ utSysParkRows Γ ∗
     parkBootBlock (hlc := hlc) N V M ∗ W ∗
     initBootBundle (hlc := hlc) (SG := uexecSGXv6) V.cwi V.pvSecc sts ∗ consReader fscCons 0 ∗
+    MachFixedGS.uClaimO (hlc := hlc) (GF := GF) ∗
     fkrCloser W Γ N V.fdg V.chg V.cwi sts gn cs none
     ⊢ wpLoop (GF := GF) c1 := by
   obtain ⟨ξ, t⟩ := X
   simp only at hct
   subst hct
   letI : CurCtx := ⟨ξ, KTier.kpt⟩
-  iintro ⟨Hk, Hpc, Hfr, Hte, Hce, #Hglob, #HG, Hblk, HW, Hbun, Hrd, Hclose⟩
+  iintro ⟨Hk, Hpc, Hfr, Hte, Hce, #Hglob, #HG, Hblk, HW, Hbun, Hrd, Hco, Hclose⟩
   ihave #Hpinv := (show parkGlobals (GF := GF) Γ N.w N.ft N.f N.ip ⊢ procsInv Γ from by
       unfold parkGlobals; iintro ⟨H, -⟩; iexact H) $$ Hglob
   ihave #Hpe := (show parkGlobals (GF := GF) Γ N.w N.ft N.f N.ip ⊢ panicEnv from by
@@ -191,7 +194,7 @@ theorem fkr_boot [X : CurCtx] (PR : PREPARE_RETURN) (FS : FSINIT) (KX : KEXEC) (
   iapply (fkr_tail_close PR UC W Γ c4 kb eb root _ N V' M' sts gn cs none hΓ hj hkb (by rw [hks])
     (hgen.trans hgn) trivial rfl)
   rw [hfdg, hchg, hcwi]
-  iframe Hk Hpc Hte Hce Hpv Hfr Hglob HG Hdone HW Hclose
+  iframe Hk Hpc Hte Hce Hpv Hfr Hglob HG Hdone HW Hco Hclose
   unfold fkrSlotIn
   rw [← hgn]
   iexact Hslot
@@ -220,13 +223,14 @@ theorem forkret_proof (MP : MYPROC) (RE : RELEASE) (PR : PREPARE_RETURN) (FS : F
     | true =>
       unfold parkBlock parkKey parkMode UtNames.pj
       simp only [↓reduceIte]
+      icases Hmode with ⟨#Hdone, Hco⟩
       iapply (fkr_steady PR UC W Γ c1 kr eb root N V M sts gn cs hΓ hj hgn hkr hct)
-      iframe Hk Hpc Hfr Hte Hce Hglob HG Hblk HW Hmode Hclose
+      iframe Hk Hpc Hfr Hte Hce Hglob HG Hblk HW Hdone Hco Hclose
     | false =>
       unfold parkBlock parkKey parkMode UtNames.pj
       simp only [Bool.false_eq_true, ↓reduceIte]
-      icases Hmode with ⟨Hbun, Hrd⟩
+      icases Hmode with ⟨Hbun, Hrd, Hco⟩
       iapply (fkr_boot PR FS KX PN UC W Γ c1 kr eb root N V M sts gn cs hΓ hj hgn hkr hct)
-      iframe Hk Hpc Hfr Hte Hce Hglob HG Hblk HW Hbun Hrd Hclose⟩
+      iframe Hk Hpc Hfr Hte Hce Hglob HG Hblk HW Hbun Hrd Hco Hclose⟩
 
 end Xv6

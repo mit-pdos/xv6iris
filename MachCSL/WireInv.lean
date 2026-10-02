@@ -118,18 +118,20 @@ theorem wireInv_permit : wireInv (GF := GF) ⊢ hartObsPermit := by
   iexact Hp
 
 /-- **An exit's consent**, read off the shared bundle (M2-W2a; W1's
-`wireInv_step` split): any user exit, yielding nothing. -/
+`wireInv_step` split): any user exit, yielding the exit's token (NI
+M2-W2d: its receipt and the claims minted at it). -/
 theorem wireInv_exit (e : Obs) (he : isUExit e = true) :
-    wireInv (GF := GF) ⊢ hartObsStep e emp := by
+    wireInv (GF := GF) ⊢ hartObsStep e (uExitTok (hlc := hlc) e) := by
   iintro #Hw
   iapply hartObsPermit_exit e he
   iapply wireInv_permit $$ Hw
 
 /-- **An entry's consent**, read off the shared bundle (M2-W2a): the entry
-with its justification `uFit ox e` and the cited receipt. -/
+with its justification `uFit ox e`, the cited receipt and (NI M2-W2d) the
+claim it spends. -/
 theorem wireInv_enter (e : Obs) (ox : Option (Nat × Obs)) (he : isUEnter e = true)
     (hf : MachFixedGS.uFit (hlc := hlc) (GF := GF) ox e) :
-    wireInv (GF := GF) ⊢ uRcptOpt ox -∗ hartObsStep e emp := by
+    wireInv (GF := GF) ⊢ uRcptOpt ox -∗ uClaimFor (hlc := hlc) ox -∗ hartObsStep e emp := by
   iintro #Hw
   iapply hartObsPermit_enter e ox he hf
   iapply wireInv_permit $$ Hw

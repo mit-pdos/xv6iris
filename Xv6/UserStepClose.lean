@@ -60,10 +60,10 @@ theorem ust_close_trap (cpu : CPU) (C : UCfg) (P : UPtd) (Rut : UPtd → IProp G
       (ctxToken cpu -∗ Rut P) -∗ uxRcpt cpu s.file -∗ userTrapFrame cpu C P Rut := by
   obtain ⟨t', hst, htlb⟩ := h.mem
   unfold uFr
-  iintro #HS ⟨HF, HB, Hc, Hr⟩ Ha Hres #Hrc
+  iintro #HS ⟨HF, HB, Hc, Hr⟩ Ha Hres Hrc
   ihave Htok := uResvTok_ctxTok cpu curCtx s.rv $$ [$Hc $Hr]
   ihave Hrut := Hres $$ Htok
-  ihave #Hrc := uxRcpt_trap cpu s.file h.priv $$ Hrc
+  ihave Hrc := uxRcpt_trap cpu s.file h.priv $$ Hrc
   iapply uf_close_trap cpu C P Rut s.file t0 t' mm0 s.mm h.cfg h.priv h.hs h.ms h.pc h.npc h.wf hst htlb $$ HS HF HB Ha Hrut Hrc
 
 /-- **The payload closer** (Rocq `u_step_psi`'s body): a landing of either
@@ -73,7 +73,7 @@ theorem ust_close (cpu : CPU) (C : UCfg) (P : UPtd) (Rut : UPtd → IProp GF) (t
     kmapStatic ⊢ uFr (ufRegF cpu C) (ubFrame curCtx (ubUAddrs P t0)) s -∗ ufAside cpu -∗
       (ctxToken cpu -∗ Rut P) -∗ uxRcpt cpu s.file -∗
       ((userInv cpu C P Rut -∗ wpLoop cpu) ∧ (userTrapFrame cpu C P Rut -∗ wpLoop cpu)) -∗ wpLoop cpu := by
-  iintro #HS Hfr Ha Hres #Hrc Hk
+  iintro #HS Hfr Ha Hres Hrc Hk
   rcases h with h | h
   · icases Hk with ⟨Hk, -⟩
     iapply Hk

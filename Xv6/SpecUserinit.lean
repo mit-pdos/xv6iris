@@ -125,8 +125,8 @@ def userinitSlots : Nat := 4 + nameiRootSlots
 /-- **THE PARK ROWS** userinit is the courier of (Rocq SpecUserinit's six
 park rows, the exec bundle and the reader token): the wait lock, the ticks
 lock, the console, the device complement, `wireInv`, the trampoline claim;
-the first process's exec bundle at the root and the all-closed table, and
-the console's reader token. -/
+the first process's exec bundle at the root and the all-closed table, the
+console's reader token, and (NI M2-W2d) the origin ticket. -/
 def userinitPark {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF]
     [SleepLockG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [Appcfg GF] [BcacheG GF] [DiskG GF] [OffboxG GF] [OffboxBoxG GF] [FileG GF] [SG : UexecSG GF] [Fscfg] [Icfg] [CurCtx]
@@ -136,7 +136,10 @@ def userinitPark {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
     devintrCaps Γ γ0 γ1 γc γl0 γl1 fscDisk fscDlock γt pd pav pu) ∗
   wireInv ∗ syscTrampCl ∗
   initBootBundle (hlc := hlc) (SG := SG) ROOTINO seccAll (List.replicate NOFILE FdState.closed) ∗
-  consReader fscCons 0
+  consReader fscCons 0 ∗
+  -- THE ORIGIN TICKET (NI M2-W2d): the power-on's initproc claim, through the
+  -- era turn, parked with `<init>` (its first resume's origin filing spends it)
+  MachFixedGS.uClaimO (hlc := hlc) (GF := GF)
 
 /-- **WP of `userinit`.** -/
 def wp_userinit_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]

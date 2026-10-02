@@ -223,11 +223,13 @@ theorem xv6Era_run (σ : MState) (ξ0 : CtxId) (Γ : SchedNames) [ClaimIs (hlc :
     (hinit : ⊢@{IProp GF} appInv (hlc := hlc) fscFs -∗ B ==∗
         initBootBundle (hlc := hlc) (SG := uexecSGXv6) ROOTINO seccAll (List.replicate NOFILE FdState.closed)) :
     obsInv ⊢@{IProp GF} consEchoShift (hlc := hlc) -∗ B -∗
+      -- the era's origin ticket (NI M2-W2d), on to `<init>`'s park
+      MachFixedGS.uClaimO (hlc := hlc) (GF := GF) -∗
       bootSharedOut σ ξ0 Γ γ0 γ1 γc γl0 γl1 γt cn γd ξd dk sb nib cov Pb Rspent -∗
       |={⊤}=> ([∗list] c ∈ cpus, wpLoop c) ∗
         ([∗list] d ∈ DevId.all, devWP (genId (hlc := hlc) (GF := GF)) d rootTask (pure ())) ∗
         genCert (hlc := hlc) (GF := GF) := by
-  iintro #Hoinv #Hecho Hinit Hout
+  iintro #Hoinv #Hecho Hinit Huo Hout
   unfold bootSharedOut
   icases Hout with ⟨%hcn, %hcne, #Ht, #Hd, Htok, Hb0, Hrest, Hsc, Hstmp, Hcore, #Hai, #Hu0, #Hu1, #Hpl, #Hw,
     #Hcert, #Hdi, #Hci, #Hcc, Hroot⟩
@@ -235,8 +237,8 @@ theorem xv6Era_run (σ : MState) (ξ0 : CtxId) (Γ : SchedNames) [ClaimIs (hlc :
   have hu : fscUart = γ0 := hties.2.2.2.1
   imod hinit $$ Hai Hinit with Hib
   ihave Hsup := bootPrimarySupply_intro (hlc := hlc) (GF := GF) _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
-    $$ [Hecho Hib Hcore]
-  · iframe Hecho Hib Hcore
+    $$ [Hecho Hib Huo Hcore]
+  · iframe Hecho Hib Huo Hcore
   imod bootShared_started (hlc := hlc) (GF := GF) Γ γ0 γ1 γc γl0 γl1 γd fscDlock γt ξd $$ [Hsc Hstmp]
     with ⟨%γi, #Hs, Hprim⟩
   · iframe Hsc Hstmp
@@ -383,8 +385,12 @@ the era). -/
     MachFixedGS hlc GF :=
   Ai.bootFixedGS Hinv γgen γstart γreg γd XV6_DISK_BYTES γsw
     (xv6Slot N appFs appOkc cov ls γd γsw γreg γstart c) Tkp Hkp γobs T Ptp γhist
-    -- the enter's justification: blind until W2c sets `niFit` (NI M2-W2a)
+    -- the enter's justification: blind (NI M2-W2c: the kernel's evidence
+    -- reaches it through `NiFitIs`'s implication)
     (fun _ _ => True)
+    -- the one-shot filing claims: none at the system record (NI M2-W2d; the
+    -- NI record mints them)
+    (fun _ => iprop(emp)) (fun _ _ => iprop(emp)) iprop(emp)
 
 set_option maxHeartbeats 800000 in
 /-- **ONE ERA** (Rocq `SystemAdequacy.xv6_boot_era`): at the machine's record
@@ -446,7 +452,7 @@ theorem xv6BootEra {CT : Type} (N : Type) (appFs : CT → N → Aview → IProp 
   icases powerBootRes_unpack (fun dk => mirrorOf (fsBlocks dk))
     (xv6Lend N appFs appBoot cov sb.sbLogstart c) (Tn c) E gen (fun _ _ => iprop(True))
     (fun _ => BI.true_intro) σ $$ Hres
-    with ⟨Hrows, Hlend, Hturn⟩
+    with ⟨Hrows, Hlend, Hturn, Huo⟩
   imod xv6Era_lend N appFs appBoot c cov sb.sbLogstart gen (diskOf σ.devs) D hrec hhwf hcovin hlogsub
     hls2 $$ Hlend with ⟨%r, %gt, %gsn, %gln, %S, %⟨hlseq, hwf⟩, Hok, Hsnap, Hbres⟩
   -- the seam at the era's superblock, off the slot's value (the literal)
@@ -492,8 +498,9 @@ theorem xv6BootEra {CT : Type} (N : Type) (appFs : CT → N → Aview → IProp 
   let M1 : MachGS hlc GF := MachGS.ofEra E gen (procClaim Γ) (fun cpu => procClaim_idle Γ cpu)
   have hClaim : @ClaimIs hlc GF M1 _ Γ := @ClaimIs.mk hlc GF M1 _ Γ (fun _ _ => rfl)
   -- ...and the record accepts the NI filing's evidence (NI M2-W2c): the
-  -- system record's `uFit` is blind (`True`), so by `trivial`
-  have hNi : @NiFitIs hlc GF M1 := @NiFitIs.mk hlc GF M1 (fun _ _ _ => trivial)
+  -- system record's `uFit` is blind (`True`), so by `trivial`; its filing
+  -- claims are `emp` (NI M2-W2d), so the fork law is `emp ⊢ emp`
+  have hNi : @NiFitIs hlc GF M1 := @NiFitIs.mk hlc GF M1 (fun _ _ _ => trivial) (fun _ _ _ => .rfl)
   ihave Hout := bootSharedOut_ofEra E gen (fun _ _ => iprop(True)) (procClaim Γ)
     (fun _ => BI.true_intro) (fun cpu => procClaim_idle Γ cpu) σ ξ0 Γ γ0 γ1 γc γl0 γl1 γt cn γd ξd (diskOf σ.devs) S.fssSb (fsNib S)
     cov (fsRecView (fsBlocks (diskOf σ.devs)) D) (snapSpent S (fsNib S)) $$ Hout
@@ -508,7 +515,7 @@ theorem xv6BootEra {CT : Type} (N : Type) (appFs : CT → N → Aview → IProp 
       iprop(appBoot c (gen + 1) r ∗ TnInit c (gen + 1)) (by
         iintro Hai ⟨Hb, Ht⟩
         iapply hI $$ Hai Hb Ht))
-  imod hR $$ Hoinv [] [Hbres Hturn] Hout with ⟨Hharts, Hdevs, #Hcert⟩
+  imod hR $$ Hoinv [] [Hbres Hturn] Huo Hout with ⟨Hharts, Hdevs, #Hcert⟩
   · iapply (Hecho E gen (procClaim Γ) (fun cpu => procClaim_idle Γ cpu))
   · isplitl [Hbres]
     · iexact Hbres

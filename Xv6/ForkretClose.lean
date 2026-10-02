@@ -96,6 +96,7 @@ theorem fkr_close [X : CurCtx] (UC : USERRET_CLOSED) (W : IProp GF) (Γ : SchedN
     Register.stvec ↦ᵣ[c] uservecTvec ∗ cpuClaim c (procAddr N.j) ∗
     procPrivFd N.f (procAddr N.j) N.pid (fkrPrep Vx k.root c) Mx ∗ fkrFrame ksp ∗
     parkGlobals Γ N.w N.ft N.f N.ip ∗ utSysParkRows Γ ∗ firstDone (hlc := hlc) ∗ W ∗
+    MachFixedGS.uClaimO (hlc := hlc) (GF := GF) ∗
     fkrSlotIn (hlc := hlc) Wk Vx Mx sts gn cs N.pid ∗
     forkretCloser (hlc := hlc) (GF := GF) (SG := uexecSGXv6)
       (fun j h Xc => usertrapResAt (hlc := hlc) (X := Xc) (parkToken (hlc := hlc) (GF := GF) (SG := uexecSGXv6))
@@ -112,7 +113,7 @@ theorem fkr_close [X : CurCtx] (UC : USERRET_CLOSED) (W : IProp GF) (Γ : SchedN
     cases Wk with
     | none => trivial
     | some W0 => exact urunEq_resume hrk hu rfl rfl rfl rfl rfl rfl
-  iintro ⟨Hk, Hpc, Hsepc, ⟨%sc, Hsc⟩, ⟨%tv, Htv⟩, Hstv, Hcl, Hpv, Hfr, #Hglob, #HG, #Hdone, HW, Hsin, Hclose⟩
+  iintro ⟨Hk, Hpc, Hsepc, ⟨%sc, Hsc⟩, ⟨%tv, Htv⟩, Hstv, Hcl, Hpv, Hfr, #Hglob, #HG, #Hdone, HW, Hco, Hsin, Hclose⟩
   icases ut_kctx_kptOnAt c _ (by simp only [KCtx.withRegs_tier, KCtx.intrOff_tier]; exact h.tier)
     $$ Hk with ⟨#Hkp, Hk⟩
   ihave #Hkp' := (show kptOnAt (GF := GF) ((k.intrOff true false).withRegs R').root ⊢
@@ -171,7 +172,7 @@ theorem fkr_close [X : CurCtx] (UC : USERRET_CLOSED) (W : IProp GF) (Γ : SchedN
   isplitl [Hres]
   · subst hksp
     iexact Hres
-  iexact Hslot
+  iframe Hslot Hco
 
 end Close
 

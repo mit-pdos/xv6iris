@@ -175,6 +175,10 @@ def kforkPark {hlc : HasLC} {GF : BundledGFunctors}
     (Γ : SchedNames) (V : ProcPriv) (M : Nat → List (BitVec 8)) (stsP : List FdState)
     (Q : Int → IProp GF) (Rc : IProp GF) : IProp GF := iprop%
   panicEnv ∗ utSysParkRows Γ ∗ parkToken (hlc := hlc) (SG := SG) Γ ∗ Rc ∗
+  -- THE CHILD'S ORIGIN TICKET (NI M2-W2d): the fork exit's one-shot
+  -- child-origin claim, parked with the child (its first resume spends it);
+  -- dropped on the `-1` arm
+  MachFixedGS.uClaimO (hlc := hlc) (GF := GF) ∗
   (∀ (g' : GName) (pidc : BitVec 32), ⌜pidc ≠ 1#32⌝ -∗ myPay g' Q -∗ Rc -∗
     uslot (hlc := hlc) (SG := SG) (uvisOf (kforkChild V) M stsP g' ∅ pidc))
 

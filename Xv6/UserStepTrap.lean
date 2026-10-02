@@ -176,22 +176,22 @@ theorem ust_trapArmGen (D : List PAddr) (Rr : IProp GF) (Q : Step → UWSt → P
   iapply htow _ _
   iframe Hhw Hpriv Hsatp Hgprs Hp Hms Hsc Hstv Hsep Hstvec Hmd Hpc Hnpc
   inext
-  -- the exit's receipt rides the arm to the landing (NI M2-W2b)
-  iintro Hp Hms Hsc Hstv Hsep Hstvec Hmd Hpc Hnpc Hsatp Hgprs - #Hrcpt
+  -- the exit's token (its receipt and, NI M2-W2d, the claims minted at it)
+  -- rides the arm to the landing (NI M2-W2b)
+  iintro Hp Hms Hsc Hstv Hsep Hstvec Hmd Hpc Hnpc Hsatp Hgprs Hout -
   ihave Hg := (gprFile_gprCells cpu (uxaXget sX.file)).2 $$ Hgprs
   ihave HF := Hcl $$ %Privilege.Supervisor %(utrapMs 0#1 (sX.file .mstatus)) %sc' %stv' %sep' %C.stvec
     Hp Hms Hsc Hstv Hsep Hstvec Hmd Hpc Hnpc Hsatp Hg
-  ihave #Hrc : uxRcpt cpu (ustTrapS sX (utrapMs 0#1 (sX.file .mstatus)) sc' stv' sep' C.stvec).file $$ [Hrcpt]
+  ihave Hrc : uxRcpt cpu (ustTrapS sX (utrapMs 0#1 (sX.file .mstatus)) sc' stv' sep' C.stvec).file $$ [Hout]
   · unfold uxRcpt
     iright
-    iapply uRcptEx_eq (ufExitEv_trapS cpu sX _ sc' stv' sep' C.stvec).symm $$ Hrcpt
+    iapply uExitTok_eq (ufExitEv_trapS cpu sX _ sc' stv' sep' C.stvec).symm $$ Hout
   unfold ukRider
   rw [ustTrapS_mm, ustTrapS_rv, ustTrapS_file]
   isplitr
   · ipureintro
     rw [ufTrapSet_other _ _ _ _ _ _ _ _ (by decide)]; exact hact
   iframe
-  iexact Hrc
 
 /-- **The trapping arm, generic** (Rocq's four trap closers' shared half): a
 tower run from a user machine `sX` lands on `ustTrapS sX …`, which is a
@@ -296,7 +296,7 @@ theorem ust_armOb_exec (res : ExecutionResult) (s' : UWSt) (ib : BitVec 32)
     have hl : UstLand C P t0 mm0 s' := h
     dsimp only [ucArmOb, ucArmBody, ustR, ukRider]
     iintro ⟨-, -, Hfr⟩
-    ihave #Hu := uxRcpt_user (GF := GF) cpu s'.file hl.priv
+    ihave Hu := uxRcpt_user (GF := GF) cpu s'.file hl.priv
     iexists s'
     isplitr
     · ipureintro; exact hl
@@ -309,7 +309,7 @@ theorem ust_armOb_exec (res : ExecutionResult) (s' : UWSt) (ib : BitVec 32)
   | Enter_Wait wr =>
     dsimp only [ucArmOb, ucArmBody, ustR, ukRider]
     iintro ⟨-, -, Hfr⟩
-    ihave #Hu := uxRcpt_user (GF := GF) cpu s'.file h.1.priv
+    ihave Hu := uxRcpt_user (GF := GF) cpu s'.file h.1.priv
     iexists s'
     isplitr
     · ipureintro; exact h

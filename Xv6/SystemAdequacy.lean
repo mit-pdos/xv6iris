@@ -219,7 +219,11 @@ theorem xv6PowerAdequacyGen (g : GState) (sb : FsSb) (nib : Nat) (cov : ExtTreeS
     (fun c => (Ai c).rdwild) (fun c k => (Ai c).rdwild_persistent k)
     (fun c k => (Ai c).rdwild_timeless k)
     (fun _ _ => True)
-    HPt Hobs Hback HuserExit (fun γobs c h e ox he _ hv => HuserEnter γobs c h e ox he hv)
+    -- the system record mints no filing claims (NI M2-W2d)
+    (fun _ _ => iprop(emp)) (fun _ _ _ => iprop(emp)) (fun _ => iprop(emp))
+    HPt (fun γd γobs c h on dk hs => powerHook_emp on _ _ _ _ _ _ (Hobs γd γobs c h on dk hs)) Hback
+    (fun γobs c h e he => uexitHook_emp _ _ _ (HuserExit γobs c h e he))
+    (fun γobs c h e ox he _ hv => uenterHook_drop _ _ _ _ (HuserEnter γobs c h e ox he hv))
     phi Hphi Hgen0 Hpow ?_ n κs t2 g2 hsteps
   intro F Hinv γgen γstart γreg γd γsw γobs γhist c T hF hborn E gen σ hbf hdv hpp
   -- the merge and the runner at the record literal, read off the equations
@@ -394,7 +398,8 @@ theorem xv6FsAdequacy (US : USER) (g : GState) (sb : FsSb) (nib : Nat)
   xv6PowerAdequacy (hlc := hlc) (GF := GF) US g sb nib cov (xv6TracePure cov sb.sbLogstart)
     (fun Hinv γgen γstart γreg γd γsw γobs γhist c T g' =>
       xv6TraceHook Unit (fun _ _ _ => iprop(True)) appTrivOkc cov sb.sbLogstart (appIfaceTriv GF)
-        Hinv γgen γstart γreg γd γsw γobs γhist c T (obsPredAt γobs) (appTrivTk c) (appTrivHk c) (fun _ _ => True) g')
+        Hinv γgen γstart γreg γd γsw γobs γhist c T (obsPredAt γobs) (appTrivTk c) (appTrivHk c) (fun _ _ => True)
+        (fun _ => iprop(emp)) (fun _ _ => iprop(emp)) iprop(emp) g')
     Hgen0 Hpow Himg n κs t2 g2 hsteps
 
 include hlc GF in

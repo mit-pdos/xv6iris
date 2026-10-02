@@ -108,17 +108,17 @@ theorem userTrapFrame_open [CurCtx] (cpu : CPU) (C : UCfg) (P : UPtd) (Rut : UPt
         clockCells cpu ∗ pcIs cpu (stvecBase C.stvec) ∗ gprFile cpu g ∗
         Register.sepc ↦ᵣ[cpu] sep ∗ Register.scause ↦ᵣ[cpu] sc ∗ Register.stval ↦ᵣ[cpu] tv ∗
         Register.stvec ↦ᵣ[cpu] C.stvec ∗ ⌜uptWf P⌝ ∗ uptSlot cpu P ∗ umPages P M ∗ Rut P ∗
-        (∃ i : Nat, uRcpt (i, .uExit cpu (satpOf .kpt P.root) sc sep (gprList g))) := by
+        uExitTok (hlc := hlc) (.uExit cpu (satpOf .kpt P.root) sc sep (gprList g)) := by
   unfold userTrapFrame userPtAny userCfg userHwCells
   rw [hdq, hmie, hmed]
   iintro ⟨#Hhw, %ms, %sc, %stv, %sep, %g, %hms, Hhs, Hcp, Hms, Hsc, Hstv, Hsep, Hpc, Hclock, HF, ⟨%M, HP⟩,
     ⟨Hstvec, Hmie, Hmideleg, Hmedeleg, Hmenvcfg, %mc, %mtc, %htm, Hmcounteren, Hmtimecmp, %mepc, %stc, Hmepc,
-      Hstimecmp⟩, HR, #Hrc⟩
+      Hstimecmp⟩, HR, Hrc⟩
   icases (userPtInv_uptSlot cpu P M).1 $$ HP with ⟨Hsatp, HPm, %hwf, Hslot, Hum⟩
   unfold userPmp
   icases HPm with ⟨%cfg, %paddr, %h0, Hpmpcfg, Hpmpaddr⟩
   iexists ms, mepc, stc, sc, stv, sep, g, M, ⟨mc, mtc, cfg, paddr⟩
-  iframe Hpc Hclock HF Hsep Hsc Hstv Hstvec Hslot Hum HR
+  iframe Hpc Hclock HF Hsep Hsc Hstv Hstvec Hslot Hum HR Hrc
   isplit
   · ipureintro; exact ⟨(trapMstatusOk_smFacts ms hms).1, (trapMstatusOk_smFacts ms hms).2, htm, h0⟩
   isplit
@@ -126,9 +126,7 @@ theorem userTrapFrame_open [CurCtx] (cpu : CPU) (C : UCfg) (P : UPtd) (Rut : UPt
     simp only [MIE_S, MEDELEG_S, MENVCFG_S]
     iframe
     iexact Hhw
-  isplitl []
   · ipureintro; exact hwf
-  iexact Hrc
 
 /-! ## The hand-off -/
 
@@ -165,7 +163,7 @@ theorem wpLoop_userret_sret [CurCtx] (U : USER) (cpu : CPU) (C : UCfg) (P : UPtd
     clockCells cpu ∗ pcIs cpu pc ∗ uptSlot cpu P ∗ □ kmapStatic ∗ ctxTok cpu curCtx ∗ gprFile cpu g ∗
     Register.sepc ↦ᵣ[cpu] epc ∗ Register.scause ↦ᵣ[cpu] sc ∗ Register.stval ↦ᵣ[cpu] tv ∗
     Register.stvec ↦ᵣ[cpu] C.stvec ∗ ⌜uptWf P⌝ ∗ umPages P M ∗ (ctxToken cpu -∗ Rut P) ∗
-    wireInv ∗ uRcptOpt ox ∗ ▷ stvecHandlerWp cpu C P Rut
+    wireInv ∗ uRcptOpt ox ∗ uClaimFor (hlc := hlc) (GF := GF) ox ∗ ▷ stvecHandlerWp cpu C P Rut
     ⊢ wpLoop cpu := by
   have hok : SConfKpt (GF := GF) (sConfOf KTier.kpt P.root ms C.mideleg mepc stc lf) P.root false :=
     SConfAt_sConfOf KTier.kpt P.root ms C.mideleg mepc stc lf false hsm hlf
@@ -174,7 +172,7 @@ theorem wpLoop_userret_sret [CurCtx] (U : USER) (cpu : CPU) (C : UCfg) (P : UPtd
     revert h1
     unfold paOf vpnOf
     bv_decide
-  iintro ⟨#HI, HmConf, Hclock, Hpc, Hslot, #HS, Htok, HF, Hsepc, Hsc, Hstv, Hstvec, %hwf, Hum, HR, #Hwire, #Hrc, Hh⟩
+  iintro ⟨#HI, HmConf, Hclock, Hpc, Hslot, #HS, Htok, HF, Hsepc, Hsc, Hstv, Hstvec, %hwf, Hum, HR, #Hwire, #Hrc, Hcl, Hh⟩
   icases confCells_hw cpu _ _ _ $$ HmConf with ⟨HmConf, #Hhw⟩
   iapply (wpLoop_sT_instr cpu (sConfOf KTier.kpt P.root ms C.mideleg mepc stc lf)
     { sConfOf KTier.kpt P.root ms C.mideleg mepc stc lf with mstatus := sretMs ms } hok.phys hmdl rfl
@@ -190,7 +188,7 @@ theorem wpLoop_userret_sret [CurCtx] (U : USER) (cpu : CPU) (C : UCfg) (P : UPtd
   · iframe Hslot Htok; iexact HS
   -- the user-boundary permit for the `sret`'s privilege write, off the
   -- shared wire bundle, at the entry's evidence (NI M2-W1/W2c)
-  ihave Hpriv := wireInv_enter (Obs.uEnter cpu (sConfOf KTier.kpt P.root ms C.mideleg mepc stc lf).satp epc (gprList g)) ox rfl hf $$ Hwire Hrc
+  ihave Hpriv := wireInv_enter (Obs.uEnter cpu (sConfOf KTier.kpt P.root ms C.mideleg mepc stc lf).satp epc (gprList g)) ox rfl hf $$ Hwire Hrc Hcl
   isplitl [Hpriv HF Hsepc]
   · iframe Hpriv HF Hsepc
   inext
