@@ -60,6 +60,8 @@ theorem echofLinesOf_snoc (h : List Obs) (e : Obs) :
       simp only [cycStep, List.reverse_cons, List.map_append, List.flatten_append,
         List.map_cons, List.map_nil, List.flatten_cons, List.flatten_nil, List.append_nil]
       exact (List.prefix_append_right_inj _).mpr (echofCyc_app c [.dev o])
+  | uEnter => exact List.prefix_refl _
+  | uExit => exact List.prefix_refl _
 
 /-- Rocq `fadm_boot_empty`. -/
 theorem fadmBoot_empty (Ls : List (List (BitVec 8) × List (List (BitVec 8)))) :

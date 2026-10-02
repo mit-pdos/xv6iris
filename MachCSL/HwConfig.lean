@@ -195,13 +195,14 @@ theorem RegFile.set_eq_self (f : RegFile) (r : Register) (v : RegisterType r) (h
   · exact RegFile.set_other f r r' v hr
 
 /-- **A same-value write** (Rocq `reg_interp_set_same`): any fraction of the
-cell suffices, since the register file does not move. -/
+cell suffices, since the register file does not move (and the write is
+silent, NI M2-W1: no privilege crossing). -/
 theorem swp_writeReg_same (cpu : CPU) (r : Register) (dq : DFrac) (v : RegisterType r)
     (Φ : PUnit → IProp GF) :
     r ↦ᵣ[cpu]{dq} v ∗ ▷ (r ↦ᵣ[cpu]{dq} v -∗ Φ ()) ⊢ swp cpu (writeReg r v) Φ := by
   unfold writeReg PreSail.writeReg PreSail.emit
   iintro ⟨Hr, HΦ⟩
-  iapply swp_event cpu (.regWrite r v) (fun v => FreeM.pure v) Φ (fun _ _ h => h)
+  iapply swp_event_dep cpu (.regWrite r v) (fun v => FreeM.pure v) Φ (fun _ _ h => h)
   iintro %σ Hσ
   icases machInterp_acc σ cpu $$ Hσ with ⟨Hregs, Hclose⟩
   ihave %Hv : ⌜σ.regs cpu r = v⌝ $$ [Hregs Hr]
@@ -211,7 +212,7 @@ theorem swp_writeReg_same (cpu : CPU) (r : Register) (dq : DFrac) (v : RegisterT
   iintro Hmask
   isplit
   · ipureintro
-    exact ⟨(), σ.setReg cpu r v, rfl⟩
+    exact ⟨hartObs_regWrite_quiet cpu σ r v (Or.inr Hv), (), σ.setReg cpu r v, rfl⟩
   inext
   iintro %v' %σ' %Hev
   obtain rfl := Hev

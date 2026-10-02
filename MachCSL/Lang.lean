@@ -21,11 +21,23 @@ the current *generation* `gen` and the power bit `pow`; a hart expression
 while the power is on and its generation is current.  A live hart takes real
 steps; a hart of a dead generation only self-loops (the "corpse" arm), so it
 needs no resources and can be dropped from any proof.  The power thread
-`Expr.power` is the one expression with observable arms: `PowerOff` bumps the
+`Expr.power` has two observable arms: `PowerOff` bumps the
 generation and clears the power bit; `PowerOn` resets the machine to the boot
 image and forks the new generation's harts.  Both are observed
 (`Obs.powerOff` / `Obs.powerOn`), so a trace property can segment the run by
 power cycle.
+
+The user boundary (M2-W1, 2026-10-01).  A hart is silent except at ONE
+event: the write of `cur_privilege` that crosses between User and a higher
+privilege (`hartObs`).  Leaving User (a trap) emits `Obs.uExit`, entering it
+(an `sret` to User) emits `Obs.uEnter`; each names the address space
+(`satp`), the epc (and on exit the cause) and the 31 GPRs, read off the
+register file at that write.  The privilege write is the node because the
+model makes it last (after the trap CSRs in `trap_handler`, after `mstatus`
+in `sret`), so the file holds everything the event names, and because it is
+the one event of the cycle that changes which side of the boundary runs.  A
+write of the value already there, or a move between two non-User privileges
+(S→S `sret`, a supervisor trap, M-mode), stays silent.
 
 Shared memory is the TSO machine of `MachCSL.TsoMem` (the Rocq prototype's
 `mnode_step`): per-byte write histories, per-hart data and instruction views,
@@ -217,11 +229,23 @@ def Loop (gen : Nat) (cpu : CPU) : Expr := .hart gen cpu (pure ())
 /-- No expression is a value: the machine runs forever. -/
 abbrev Val := Empty
 
-/-- Observations: the power events, and the devices' wire events. -/
+/-- Observations: the power events (`powerOn`, `powerOff`), the devices'
+wire events (`dev`), and THE USER BOUNDARY (NI M2-W1): `uEnter` when hart
+`cpu` drops into user mode (the `sret` that leaves Supervisor for User) and
+`uExit` when it leaves user mode (a trap out of User).  Each names the
+address space (`satp`), the program counter the user side is resumed at /
+trapped from (`sepc`; the cause register beside it on exit) and the 31
+general-purpose registers `x1..x31` (`hartGprs`), all read off the hart's
+register file at the privilege-crossing write of `cur_privilege` -- the
+model writes that register LAST in `trap_handler` (after the cause and the
+epc) and after `mstatus` in `sret`, so the file already holds what the event
+names (`hartObs`). -/
 inductive Obs where
   | powerOn
   | powerOff
   | dev (o : DevObs)
+  | uEnter (cpu : CPU) (satp epc : BitVec 64) (gprs : List (BitVec 64))
+  | uExit (cpu : CPU) (satp scause epc : BitVec 64) (gprs : List (BitVec 64))
   deriving DecidableEq, Repr
 
 /-! ## The global state -/
@@ -380,6 +404,97 @@ abbrev blockedStep (cpu : CPU) (o : Outcome Register RegisterType) (σ σ' : MSt
   | .memWrite n _ req => othersReserve σ.resv cpu req.pa n ∧ σ' = σ
   | _ => False
 
+/-! ## The user boundary (NI M2-W1)
+
+A hart's event is SILENT except at one node: the write of `cur_privilege`
+that crosses the user boundary.  The two privilege writes the model makes
+there are the last register writes of the crossing (`trap_handler` writes
+the cause, `tval` and `epc`, then `cur_privilege`; `sret` writes `mstatus`,
+then `cur_privilege`, and only later the next pc), so the register file at
+that write (the state BEFORE it) already holds everything the event names.
+The node is the privilege write, not the instruction, because it is the one
+event of the cycle that changes WHO runs: every event before it runs on the
+old side of the boundary and every event after it on the new one. -/
+
+/-- Whether a privilege is user mode. -/
+def privUser : Privilege → Bool
+  | .User => true
+  | _ => false
+
+/-- The 31 general-purpose registers `x1..x31` of a register file, in order. -/
+def hartGprs (f : RegFile) : List (BitVec 64) :=
+  [f .x1, f .x2, f .x3, f .x4, f .x5, f .x6, f .x7, f .x8, f .x9, f .x10, f .x11, f .x12, f .x13,
+   f .x14, f .x15, f .x16, f .x17, f .x18, f .x19, f .x20, f .x21, f .x22, f .x23, f .x24, f .x25,
+   f .x26, f .x27, f .x28, f .x29, f .x30, f .x31]
+
+/-- The event of entering user mode, read off the register file at the
+privilege write: the address space, the resumed pc (`sepc`) and the GPRs. -/
+def uEnterOf (cpu : CPU) (f : RegFile) : Obs :=
+  .uEnter cpu (f .satp) (f .sepc) (hartGprs f)
+
+/-- The event of leaving user mode for privilege `p`, read off the register
+file at the privilege write: the address space, the handling mode's cause
+and epc (`scause`/`sepc` for a trap delegated to Supervisor,
+`mcause`/`mepc` for one taken to Machine) and the GPRs. -/
+def uExitOf (cpu : CPU) (f : RegFile) (p : Privilege) : Obs :=
+  match p with
+  | .Machine => .uExit cpu (f .satp) (f .mcause) (f .mepc) (hartGprs f)
+  | _ => .uExit cpu (f .satp) (f .scause) (f .sepc) (hartGprs f)
+
+/-- What a write of `p` to `cur_privilege` emits, from the file `f` it
+overwrites: `uExit` out of User, `uEnter` into it, nothing otherwise. -/
+def hartObsPriv (cpu : CPU) (f : RegFile) (p : Privilege) : List Obs :=
+  match privUser (f .cur_privilege), privUser p with
+  | true, false => [uExitOf cpu f p]
+  | false, true => [uEnterOf cpu f]
+  | _, _ => []
+
+/-- What a register write emits: only `cur_privilege` can. -/
+def hartObsW (cpu : CPU) (f : RegFile) : (r : Register) → RegisterType r → List Obs
+  | .cur_privilege, p => hartObsPriv cpu f p
+  | _, _ => []
+
+/-- **THE HART'S OBSERVATIONS** at event `o` in state `σ`: the boundary
+event at a privilege-crossing write of `cur_privilege`, nothing at every
+other event. -/
+def hartObs (cpu : CPU) (o : Outcome Register RegisterType) (σ : MState) : List Obs :=
+  match o with
+  | .regWrite r v => hartObsW cpu (σ.regs cpu) r v
+  | _ => []
+
+/-- The observations of hart `cpu`'s next step with `m` left to run: its
+head event's (a blocked step's event is a memory access, which is silent;
+the cycle boundary is silent). -/
+def hartObsM (cpu : CPU) (m : SailM Unit) (σ : MState) : List Obs :=
+  match m with
+  | .impure (.ok o) _ => hartObs cpu o σ
+  | _ => []
+
+/-- A privilege write that stays on one side of the boundary is silent. -/
+theorem hartObsPriv_quiet (cpu : CPU) (f : RegFile) (p : Privilege)
+    (h : privUser (f .cur_privilege) = privUser p) : hartObsPriv cpu f p = [] := by
+  unfold hartObsPriv; rw [h]; cases privUser p <;> rfl
+
+theorem hartObsPriv_same (cpu : CPU) (f : RegFile) (p : Privilege) (h : f .cur_privilege = p) :
+    hartObsPriv cpu f p = [] :=
+  hartObsPriv_quiet cpu f p (by rw [h])
+
+theorem hartObsW_ne (cpu : CPU) (f : RegFile) (r : Register) (v : RegisterType r)
+    (h : r ≠ .cur_privilege) : hartObsW cpu f r v = [] := by
+  cases r <;> first | rfl | exact absurd rfl h
+
+/-- A register write is silent unless it is a crossing write of
+`cur_privilege`: any other register, or the value already there. -/
+theorem hartObs_regWrite_quiet (cpu : CPU) (σ : MState) (r : Register) (w : RegisterType r)
+    (h : r ≠ .cur_privilege ∨ σ.regs cpu r = w) : hartObs cpu (.regWrite r w) σ = [] := by
+  show hartObsW cpu (σ.regs cpu) r w = []
+  rcases h with h | h
+  · exact hartObsW_ne cpu _ r w h
+  · by_cases hr : r = .cur_privilege
+    · subst hr
+      exact hartObsPriv_same cpu _ w h
+    · exact hartObsW_ne cpu _ r w hr
+
 /-- `hartStep cpu m σ m' σ'`: hart `cpu`, with `m` left to run in state `σ`,
 consumes one event (or restarts the cycle at the boundary, or is blocked and
 retries the event) and continues with `m'` in state `σ'`. -/
@@ -469,8 +584,10 @@ def devStep (gen : Nat) (d : DevId) (tid : TaskId) (m : DevProg d) (σ : MState)
 
 /-- The primitive step relation of the language.
 
-* A hart of generation `gen`: if live, one event step of the machine (silent,
-  no forks); otherwise the corpse arm, a pure self-loop.  The two arms
+* A hart of generation `gen`: if live, one event step of the machine (no
+  forks), observed by `hartObsM` -- silent except at the privilege-crossing
+  write of `cur_privilege`, which emits the user-boundary event (NI M2-W1);
+  otherwise the corpse arm, a pure (silent) self-loop.  The two arms
   partition, so the relation is total without a stutter arm, and a dead
   generation's hart can only self-loop.
 * A device task of generation `gen`: if live, one step of its program
@@ -482,10 +599,10 @@ def devStep (gen : Nat) (d : DevId) (tid : TaskId) (m : DevProg d) (σ : MState)
   generation's harts and device roots. -/
 def primStep : Expr × GState → List Obs → Expr × GState × List Expr → Prop
   | (.hart gen cpu m, g), obs, (e', g', efs) =>
-    obs = [] ∧ efs = [] ∧
-    ((threadLive g gen ∧ ∃ m' σ', e' = .hart gen cpu m' ∧ hartStep cpu m g.m m' σ' ∧
-        g' = { g with m := σ' }) ∨
-     (¬ threadLive g gen ∧ e' = .hart gen cpu m ∧ g' = g))
+    efs = [] ∧
+    ((threadLive g gen ∧ obs = hartObsM cpu m g.m ∧ ∃ m' σ', e' = .hart gen cpu m' ∧
+        hartStep cpu m g.m m' σ' ∧ g' = { g with m := σ' }) ∨
+     (¬ threadLive g gen ∧ obs = [] ∧ e' = .hart gen cpu m ∧ g' = g))
   | (.dev gen d tid m, g), obs, (e', g', efs) =>
     (threadLive g gen ∧ ∃ m' σ', e' = .dev gen d tid m' ∧ devStep gen d tid m g.m obs m' σ' efs ∧
         g' = { g with m := σ' }) ∨
@@ -517,21 +634,21 @@ open Iris.ProgramLogic
 theorem primStep_hart_inv {gen : Nat} {cpu : CPU} {m : SailM Unit} {g : GState}
     {obs : List Obs} {e' : Expr} {g' : GState} {efs : List Expr}
     (h : PrimStep.primStep (Expr.hart gen cpu m, g) obs (e', g', efs)) :
-    obs = [] ∧ efs = [] ∧
-    ((threadLive g gen ∧ ∃ m' σ', e' = .hart gen cpu m' ∧ hartStep cpu m g.m m' σ' ∧
-        g' = { g with m := σ' }) ∨
-     (¬ threadLive g gen ∧ e' = .hart gen cpu m ∧ g' = g)) := h
+    efs = [] ∧
+    ((threadLive g gen ∧ obs = hartObsM cpu m g.m ∧ ∃ m' σ', e' = .hart gen cpu m' ∧
+        hartStep cpu m g.m m' σ' ∧ g' = { g with m := σ' }) ∨
+     (¬ threadLive g gen ∧ obs = [] ∧ e' = .hart gen cpu m ∧ g' = g)) := h
 
 theorem primStep_hart_live {gen : Nat} {cpu : CPU} {m m' : SailM Unit} {g : GState}
     {σ' : MState} (hl : threadLive g gen) (h : hartStep cpu m g.m m' σ') :
-    PrimStep.primStep (Expr.hart gen cpu m, g) ([] : List Obs)
+    PrimStep.primStep (Expr.hart gen cpu m, g) (hartObsM cpu m g.m)
       (.hart gen cpu m', { g with m := σ' }, []) :=
-  ⟨rfl, rfl, Or.inl ⟨hl, m', σ', rfl, h, rfl⟩⟩
+  ⟨rfl, Or.inl ⟨hl, rfl, m', σ', rfl, h, rfl⟩⟩
 
 theorem primStep_hart_dead {gen : Nat} {cpu : CPU} {m : SailM Unit} {g : GState}
     (hd : ¬ threadLive g gen) :
     PrimStep.primStep (Expr.hart gen cpu m, g) ([] : List Obs) (.hart gen cpu m, g, []) :=
-  ⟨rfl, rfl, Or.inr ⟨hd, rfl, rfl⟩⟩
+  ⟨rfl, Or.inr ⟨hd, rfl, rfl, rfl⟩⟩
 
 theorem primStep_dev_inv {gen : Nat} {d : DevId} {tid : TaskId} {m : DevProg d} {g : GState}
     {obs : List Obs} {e' : Expr} {g' : GState} {efs : List Expr}

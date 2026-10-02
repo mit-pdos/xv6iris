@@ -31,15 +31,15 @@ theorem uk_armOb_interrupt (Q : Step → UWSt → Prop) (sX : UWSt) (hc : UfCfg 
     (i : InterruptType)
     (hq : Q (Step.Step_Pending_Interrupt (i, Privilege.Supervisor))
       (ustTrapS sX (utrapMs 0#1 (sX.file .mstatus)) (sCause i) 0#64 (sX.file .PC) C.stvec)) :
-    hwConfig (GF := GF) cpu ∗ uFr (ufRegF cpu C) (ubFrame curCtx D) sX ∗ Rr ⊢
+    hwConfig (GF := GF) cpu ∗ wireInv ∗ uFr (ufRegF cpu C) (ubFrame curCtx D) sX ∗ Rr ⊢
       ucArmOb (ufRegF cpu C) (ubFrame curCtx D) Q (fun _ _ => Rr)
         (Step.Step_Pending_Interrupt (i, Privilege.Supervisor)) :=
   ust_trapArmGen cpu C P D Rr Q sX hc hp hact _ (handle_interrupt i Privilege.Supervisor) (sCause i) 0#64 (sX.file .PC)
     (fun Φ => by
-      iintro ⟨#Hhw, Hp, Hms, Hsc, Hstv, Hsep, Hstvec, Hmd, Hpc, Hnpc, HΦ⟩
+      iintro ⟨#Hhw, Hpriv, Hp, Hms, Hsc, Hstv, Hsep, Hstvec, Hmd, Hpc, Hnpc, HΦ⟩
       iapply swp_handle_interrupt_U cpu i (sX.file .PC) (sX.file .nextPC) (sX.file .mstatus) (sX.file .scause)
         (sX.file .stval) (sX.file .sepc) C.stvec C.tvd C.dqc (DFrac.own 1)
-      iframe Hhw Hp Hms Hsc Hstv Hsep Hstvec Hpc Hnpc
+      iframe Hhw Hpriv Hp Hms Hsc Hstv Hsep Hstvec Hpc Hnpc
       inext
       iintro Hp Hms Hsc Hstv Hsep Hstvec Hpc Hnpc
       iapply HΦ $$ Hp Hms Hsc Hstv Hsep Hstvec Hmd Hpc Hnpc)
@@ -53,16 +53,16 @@ theorem uk_armOb_trap (Q : Step → UWSt → Prop) (sX : UWSt) (hc : UfCfg C P s
     (hq : Q (Step.Step_Execute (.Trap (Privilege.User, exc, pc0), ib))
       (ustTrapS sX (utrapMs 0#1 (sX.file .mstatus)) (utrapScause (.Exception exc.trap) (sX.file .scause))
         (tval exc.excinfo) pc0 C.stvec)) :
-    hwConfig (GF := GF) cpu ∗ uFr (ufRegF cpu C) (ubFrame curCtx D) sX ∗ Rr ⊢
+    hwConfig (GF := GF) cpu ∗ wireInv ∗ uFr (ufRegF cpu C) (ubFrame curCtx D) sX ∗ Rr ⊢
       ucArmOb (ufRegF cpu C) (ubFrame curCtx D) Q (fun _ _ => Rr)
         (Step.Step_Execute (.Trap (Privilege.User, exc, pc0), ib)) :=
   ust_trapArmGen cpu C P D Rr Q sX hc hp hact _ (exception_handler Privilege.User exc pc0 >>= set_next_pc)
     (utrapScause (.Exception exc.trap) (sX.file .scause)) (tval exc.excinfo) pc0
     (fun Φ => by
-      iintro ⟨#Hhw, Hp, Hms, Hsc, Hstv, Hsep, Hstvec, Hmd, Hpc, Hnpc, HΦ⟩
+      iintro ⟨#Hhw, Hpriv, Hp, Hms, Hsc, Hstv, Hsep, Hstvec, Hmd, Hpc, Hnpc, HΦ⟩
       iapply ust_swp_exec_trap cpu exc hext pc0 (sX.file .nextPC) (sX.file .mstatus) (sX.file .scause)
         (sX.file .stval) (sX.file .sepc) C.stvec C.medeleg C.tvd C.dqc C.dqc (C.del _ he)
-      iframe Hhw Hp Hms Hsc Hstv Hsep Hstvec Hmd Hnpc
+      iframe Hhw Hpriv Hp Hms Hsc Hstv Hsep Hstvec Hmd Hnpc
       inext
       iintro Hp Hms Hsc Hstv Hsep Hstvec Hmd Hnpc
       iapply HΦ $$ Hp Hms Hsc Hstv Hsep Hstvec Hmd Hpc Hnpc)

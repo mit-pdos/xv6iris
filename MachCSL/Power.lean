@@ -464,6 +464,12 @@ theorem wp_power [KernelMap]
           Tn' (obsBoots h + 1) ⊢@{IProp GF}
         |==> ◇ (▷ MachFixedGS.obsPred (hlc := hlc) (GF := GF) ∗ obsHalf (h ++ [Obs.powerOn]) ∗
           Tn'' (obsBoots h + 1)))
+    -- THE USER-EVENT HOOK (NI M2-W1): the client's trace predicate accepts a
+    -- hart's user-boundary event; the permit built from it is sealed into the
+    -- wire invariant at every power-on (`hartObsPermit_of_hook`)
+    (Huser : ∀ (h : List Obs) (e : Obs), isUser e = true →
+      ▷ MachFixedGS.obsPred (hlc := hlc) (GF := GF) ∗ obsHalf h ⊢@{IProp GF}
+        |==> ◇ (▷ MachFixedGS.obsPred (hlc := hlc) (GF := GF) ∗ obsHalf (h ++ [e])))
     (Hboot : ∀ (E : EraGS) (gen : Nat) (σ : MState),
       bootFacts σ →
       (∃ ds0 : DevStates, σ.devs = ds0.reset) →
@@ -600,9 +606,16 @@ theorem wp_power [KernelMap]
     ihave Hrc := BigSepL.bigSepL_mono
       (fun {_ c} _ => regCells_split_pins (names c) (g₂.m.regs c)) $$ Hrc
     icases BigSepL.bigSepL_sep_eqv.1 $$ Hrc with ⟨Hpins, Hrc⟩
+    -- ...beside the user-boundary permit (NI M2-W1), out of the trace
+    -- invariant and the client's user-event hook
+    ihave #Hhp : hartObsPermit (hlc := hlc) (GF := GF) $$ [Hoinv]
+    · iapply hartObsPermit_of_hook Huser
+      unfold obsInv
+      iexact Hoinv
     imod (wireInvAt_alloc ⟨names, γh, γm, vn, ivn, rvn, γtop, γauth, γresv, lsn, γkmap, γkroot, dn, γmir⟩ ⊤
       (fun c => g₂.m.regs c Register.sig_seip) (fun c => g₂.m.regs c Register.sig_meip))
-      $$ Hpins with #Hwire
+      $$ [Hhp Hpins] with #Hwire
+    · iframe Hhp Hpins
     ihave Hres : powerBootRes Mof Rb Tn'' ⟨names, γh, γm, vn, ivn, rvn, γtop, γauth, γresv, lsn, γkmap, γkroot, dn, γmir⟩ g.gen g₂.m $$ [Hrc Hpts Hctx Hfrags' Hls Hkmap Hkst Hkroot Hdf Hyield Hturn Hmir HRb]
     · unfold powerBootRes genCertAt memCells kmapStaticAt crashInv
       rw [hdk]

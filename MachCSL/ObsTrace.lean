@@ -24,6 +24,18 @@ is what lets a client segment `h` into power cycles, and the wire tie is how
 a client that owns a UART's state learns which bytes of the interleaved
 current cycle are the ones the host actually saw.
 
+The user boundary (M2-W1, 2026-10-01).  The harts' two events `uEnter` /
+`uExit` (`MachCSL.hartObs`, emitted at the privilege-crossing write of
+`cur_privilege`) are ERA-INTERNAL: `obsStep` keeps the power on at them and
+`obsBoots` does not count them, so `traceShape`/the boot count are as for
+console I/O (`traceShape_user`, `obsBoots_user`).  But they are NOT console
+I/O (`isIo` stays the device events'): `obsWire`/`obsIns` ignore them and
+`segStep`/`cycStep` skip them, so the open segment and every power cycle are
+the console I/O alone (`openSeg_user`, `cyclesOf_user`) -- which keeps the
+wire/input ties and every per-cycle console reading (the applications'
+ledgers) blind to them; they live in the history `h` itself.
+`primStep_obsWf`'s hart arm is re-proved from those lemmas.
+
 Deviations from Rocq (each forced by the Lean language, none by taste):
 
 * Rocq's UART step relation (`RiscvLang.uart_step`) is FIXED and its events
@@ -65,6 +77,8 @@ def obsWire (i : UartId) : List Obs → List (BitVec 8)
   | .dev (.uartIn _ _) :: κ => obsWire i κ
   | .powerOn :: κ => obsWire i κ
   | .powerOff :: κ => obsWire i κ
+  | .uEnter .. :: κ => obsWire i κ
+  | .uExit .. :: κ => obsWire i κ
 
 theorem obsWire_app (i : UartId) (κ₁ κ₂ : List Obs) :
     obsWire i (κ₁ ++ κ₂) = obsWire i κ₁ ++ obsWire i κ₂ := by
@@ -76,6 +90,8 @@ theorem obsWire_app (i : UartId) (κ₁ κ₂ : List Obs) :
     | .dev (.uartIn _ _) => simp [obsWire, ih]
     | .powerOn => simp [obsWire, ih]
     | .powerOff => simp [obsWire, ih]
+    | .uEnter .. => simp [obsWire, ih]
+    | .uExit .. => simp [obsWire, ih]
 
 /-- A device's events, as observations: their output projection is the
 device-level one. -/
@@ -97,6 +113,8 @@ def obsIns (i : UartId) : List Obs → List (BitVec 8)
   | .dev (.uartOut _ _) :: κ => obsIns i κ
   | .powerOn :: κ => obsIns i κ
   | .powerOff :: κ => obsIns i κ
+  | .uEnter .. :: κ => obsIns i κ
+  | .uExit .. :: κ => obsIns i κ
 
 /-- Rocq `obs_ins_app`. -/
 theorem obsIns_app (i : UartId) (κ₁ κ₂ : List Obs) :
@@ -109,6 +127,8 @@ theorem obsIns_app (i : UartId) (κ₁ κ₂ : List Obs) :
     | .dev (.uartOut _ _) => simp [obsIns, ih]
     | .powerOn => simp [obsIns, ih]
     | .powerOff => simp [obsIns, ih]
+    | .uEnter .. => simp [obsIns, ih]
+    | .uExit .. => simp [obsIns, ih]
 
 /-- Rocq `obs_ins_in`. -/
 theorem obsIns_in (i : UartId) (b : BitVec 8) : obsIns i [.dev (.uartIn i b)] = [b] := by
@@ -433,6 +453,78 @@ theorem isIo_map_dev (os : List DevObs) : ∀ e ∈ os.map Obs.dev, isIo e = tru
   obtain ⟨o, _, rfl⟩ := List.mem_map.mp he
   rfl
 
+/-- The user-boundary events (NI M2-W1): era-internal like console I/O (the
+power stays on, the boot count does not move), but NOT console I/O -- they
+are in the history and in no power cycle's console segment (`segStep`,
+`cycStep` skip them), so every per-cycle reading of the console is blind to
+them. -/
+def isUser : Obs → Bool
+  | .uEnter .. => true
+  | .uExit .. => true
+  | _ => false
+
+/-- The two power events. -/
+def isPower : Obs → Bool
+  | .powerOn => true
+  | .powerOff => true
+  | _ => false
+
+/-- A hart emits only user-boundary events. -/
+theorem hartObsM_user (cpu : CPU) (m : SailM Unit) (σ : MState) :
+    ∀ e ∈ hartObsM cpu m σ, isUser e = true := by
+  intro e he
+  unfold hartObsM at he
+  split at he
+  · rename_i o _
+    unfold hartObs at he
+    split at he
+    · rename_i r v
+      unfold hartObsW at he
+      split at he
+      · rename_i p
+        unfold hartObsPriv at he
+        split at he
+        · simp only [List.mem_singleton] at he
+          subst he
+          unfold uExitOf
+          split <;> rfl
+        · simp only [List.mem_singleton] at he
+          subst he
+          rfl
+        · simp at he
+      · simp at he
+    · simp at he
+  · simp at he
+
+/-- A privilege write emits nothing or ONE user-boundary event. -/
+theorem hartObsPriv_cases (cpu : CPU) (f : RegFile) (p : Privilege) :
+    hartObsPriv cpu f p = [] ∨ ∃ e, hartObsPriv cpu f p = [e] ∧ isUser e = true := by
+  unfold hartObsPriv
+  split
+  · exact Or.inr ⟨_, rfl, by unfold uExitOf; split <;> rfl⟩
+  · exact Or.inr ⟨_, rfl, rfl⟩
+  · exact Or.inl rfl
+
+/-- User-boundary events move no wire... -/
+theorem obsWire_user (i : UartId) (κ : List Obs) (hκ : ∀ e ∈ κ, isUser e = true) :
+    obsWire i κ = [] := by
+  induction κ with
+  | nil => rfl
+  | cons e κ ih =>
+    have he := hκ e (List.mem_cons_self ..)
+    have ih' := ih (fun e' he' => hκ e' (List.mem_cons_of_mem _ he'))
+    cases e <;> simp_all [isUser, obsWire]
+
+/-- ...and accept no byte. -/
+theorem obsIns_user (i : UartId) (κ : List Obs) (hκ : ∀ e ∈ κ, isUser e = true) :
+    obsIns i κ = [] := by
+  induction κ with
+  | nil => rfl
+  | cons e κ ih =>
+    have he := hκ e (List.mem_cons_self ..)
+    have ih' := ih (fun e' he' => hκ e' (List.mem_cons_of_mem _ he'))
+    cases e <;> simp_all [isUser, obsIns]
+
 /-- A hart node never moves a wire: register effects and RAM accesses do not
 touch the device fabric, and an MMIO transaction goes through
 `devRead`/`devWrite` (the Rocq `mnode_step_u_wire`). -/
@@ -566,6 +658,8 @@ def obsStep : Option Bool → Obs → Option Bool
   | some false, .powerOn => some true
   | some true, .powerOff => some false
   | some true, .dev _ => some true
+  | some true, .uEnter .. => some true
+  | some true, .uExit .. => some true
   | _, _ => none
 
 /-- THE ARRIVAL A HISTORY ENDS WITH.  A byte the environment pushed into the
@@ -694,12 +788,26 @@ theorem traceShape_io (h κ : List Obs) (hs : traceShape h true) (hκ : ∀ e �
       cases e <;> simp_all [isIo, obsStep]
     · exact fun e' he' => hκ e' (List.mem_cons_of_mem _ he')
 
+theorem traceShape_user (h κ : List Obs) (hs : traceShape h true) (hκ : ∀ e ∈ κ, isUser e = true) :
+    traceShape (h ++ κ) true := by
+  induction κ generalizing h with
+  | nil => simpa using hs
+  | cons e κ ih =>
+    rw [show h ++ e :: κ = (h ++ [e]) ++ κ by simp]
+    apply ih
+    · apply traceShape_snoc h e true true hs
+      have := hκ e (List.mem_cons_self ..)
+      cases e <;> simp_all [isUser, obsStep]
+    · exact fun e' he' => hκ e' (List.mem_cons_of_mem _ he')
+
 /-- The boot count: how many times the power came on. -/
 def obsBoots : List Obs → Nat
   | [] => 0
   | .powerOn :: h => obsBoots h + 1
   | .powerOff :: h => obsBoots h
   | .dev _ :: h => obsBoots h
+  | .uEnter .. :: h => obsBoots h
+  | .uExit .. :: h => obsBoots h
 
 theorem obsBoots_app (h1 h2 : List Obs) : obsBoots (h1 ++ h2) = obsBoots h1 + obsBoots h2 := by
   induction h1 with
@@ -714,12 +822,22 @@ theorem obsBoots_io (κ : List Obs) (hκ : ∀ e ∈ κ, isIo e = true) : obsBoo
     have ih' := ih (fun e' he' => hκ e' (List.mem_cons_of_mem _ he'))
     cases e <;> simp_all [isIo, obsBoots]
 
+theorem obsBoots_user (κ : List Obs) (hκ : ∀ e ∈ κ, isUser e = true) : obsBoots κ = 0 := by
+  induction κ with
+  | nil => rfl
+  | cons e κ ih =>
+    have he := hκ e (List.mem_cons_self ..)
+    have ih' := ih (fun e' he' => hκ e' (List.mem_cons_of_mem _ he'))
+    cases e <;> simp_all [isUser, obsBoots]
+
 /-- The CURRENT power cycle's I/O: the events since the last power event.  A
 power event resets it, so with the power off it is empty. -/
 def segStep (seg : List Obs) : Obs → List Obs
   | .powerOn => []
   | .powerOff => []
   | .dev o => seg ++ [.dev o]
+  | .uEnter .. => seg
+  | .uExit .. => seg
 
 def openSeg (h : List Obs) : List Obs := h.foldl segStep []
 
@@ -735,17 +853,46 @@ theorem foldl_seg_io (seg κ : List Obs) (hκ : ∀ e ∈ κ, isIo e = true) :
     have ih' := ih (seg ++ [e]) (fun e' he' => hκ e' (List.mem_cons_of_mem _ he'))
     cases e with
     | dev o => simp only [List.foldl_cons, segStep]; rw [ih']; simp
+    | uEnter => simp [isIo] at he
+    | uExit => simp [isIo] at he
     | powerOn => simp [isIo] at he
     | powerOff => simp [isIo] at he
+
+/-- User-boundary events leave the open segment alone. -/
+theorem foldl_seg_user (seg κ : List Obs) (hκ : ∀ e ∈ κ, isUser e = true) :
+    κ.foldl segStep seg = seg := by
+  induction κ generalizing seg with
+  | nil => rfl
+  | cons e κ ih =>
+    have he := hκ e (List.mem_cons_self ..)
+    have ih' := ih seg (fun e' he' => hκ e' (List.mem_cons_of_mem _ he'))
+    cases e <;> simp_all [isUser, segStep]
+
+theorem openSeg_user (h κ : List Obs) (hκ : ∀ e ∈ κ, isUser e = true) :
+    openSeg (h ++ κ) = openSeg h := by
+  rw [openSeg_app]
+  exact foldl_seg_user _ κ hκ
+
+/-- Console I/O and user-boundary events, mixed: the segment grows by the I/O. -/
+theorem foldl_seg_era (seg κ : List Obs) (hκ : ∀ e ∈ κ, isIo e = true ∨ isUser e = true) :
+    κ.foldl segStep seg = seg ++ κ.filter isIo := by
+  induction κ generalizing seg with
+  | nil => simp
+  | cons e κ ih =>
+    have he := hκ e (List.mem_cons_self ..)
+    have ih' := ih (segStep seg e) (fun e' he' => hκ e' (List.mem_cons_of_mem _ he'))
+    simp only [List.foldl_cons]
+    rw [ih']
+    cases e <;> simp_all [isIo, isUser, segStep, List.filter_cons]
 
 theorem openSeg_io (h κ : List Obs) (hκ : ∀ e ∈ κ, isIo e = true) :
     openSeg (h ++ κ) = openSeg h ++ κ := by
   rw [openSeg_app]
   exact foldl_seg_io _ κ hκ
 
-theorem openSeg_power (h : List Obs) (e : Obs) (he : isIo e = false) : openSeg (h ++ [e]) = [] := by
+theorem openSeg_power (h : List Obs) (e : Obs) (he : isPower e = true) : openSeg (h ++ [e]) = [] := by
   rw [openSeg_app]
-  cases e <;> simp_all [isIo, segStep]
+  cases e <;> simp_all [isPower, segStep]
 
 /-- A history that has died stays dead (Rocq `obs_foldl_step_none`). -/
 theorem obsFoldlStep_none (h : List Obs) : h.foldl obsStep none = none := by
@@ -753,10 +900,11 @@ theorem obsFoldlStep_none (h : List Obs) : h.foldl obsStep none = none := by
   | nil => rfl
   | cons e h ih => simpa [obsStep] using ih
 
-/-- A boot-free suffix ending powered was powered all along and is all I/O
-(Rocq `obs_no_power_of_boots`). -/
+/-- A boot-free suffix ending powered was powered all along and is all I/O and
+user-boundary events (Rocq `obs_no_power_of_boots`). -/
 theorem obsNoPower_of_boots (h : List Obs) (st : Bool) (hb : obsBoots h = 0)
-    (hf : h.foldl obsStep (some st) = some true) : st = true ∧ ∀ e ∈ h, isIo e = true := by
+    (hf : h.foldl obsStep (some st) = some true) :
+    st = true ∧ ∀ e ∈ h, isIo e = true ∨ isUser e = true := by
   induction h generalizing st with
   | nil => simp at hf; exact ⟨hf, by simp⟩
   | cons e h ih =>
@@ -771,7 +919,37 @@ theorem obsNoPower_of_boots (h : List Obs) (st : Bool) (hb : obsBoots h = 0)
         intro x hx
         simp only [List.mem_cons] at hx
         rcases hx with rfl | hx
-        · rfl
+        · exact Or.inl rfl
+        · exact hF x hx
+      | false =>
+        simp only [List.foldl_cons, obsStep, obsFoldlStep_none] at hf
+        simp at hf
+    | uEnter =>
+      simp only [obsBoots] at hb
+      cases st with
+      | true =>
+        simp only [List.foldl_cons, obsStep] at hf
+        obtain ⟨_, hF⟩ := ih true hb hf
+        refine ⟨rfl, ?_⟩
+        intro x hx
+        simp only [List.mem_cons] at hx
+        rcases hx with rfl | hx
+        · exact Or.inr rfl
+        · exact hF x hx
+      | false =>
+        simp only [List.foldl_cons, obsStep, obsFoldlStep_none] at hf
+        simp at hf
+    | uExit =>
+      simp only [obsBoots] at hb
+      cases st with
+      | true =>
+        simp only [List.foldl_cons, obsStep] at hf
+        obtain ⟨_, hF⟩ := ih true hb hf
+        refine ⟨rfl, ?_⟩
+        intro x hx
+        simp only [List.mem_cons] at hx
+        rcases hx with rfl | hx
+        · exact Or.inr rfl
         · exact hF x hx
       | false =>
         simp only [List.foldl_cons, obsStep, obsFoldlStep_none] at hf
@@ -800,7 +978,7 @@ theorem openSeg_prefix_of_boots (h1 h2 : List Obs) (hp : h1 <+: h2)
   | some st =>
     rw [hst] at hsh
     obtain ⟨_, hF⟩ := obsNoPower_of_boots k st hk hsh
-    rw [openSeg_io h1 k hF]
+    rw [openSeg_app, foldl_seg_era _ k hF]
     exact List.prefix_append _ _
 
 /-- THE INPUT NUMBER OF A HISTORY (Rocq `ins_len`, relax-d2 lane K1), with
@@ -844,16 +1022,26 @@ theorem primStep_obsWf (e : Expr) (g : GState) (κ : List Obs) (e' : Expr) (g' :
   obtain ⟨hsh, hbt, hwire, hrecv⟩ := hwf
   cases e with
   | hart gen cpu m =>
-    obtain ⟨rfl, rfl, hc⟩ := primStep_hart_inv hstep
-    rw [List.append_nil]
-    rcases hc with ⟨_, m', σ', rfl, hs, rfl⟩ | ⟨_, rfl, rfl⟩
-    · -- a hart node: silent, and it never moves a wire or a receiver
-      refine ⟨hsh, hbt, fun hpw i => ?_, fun hpw i => ?_⟩
-      · rw [hwire hpw i]
+    obtain ⟨rfl, hc⟩ := primStep_hart_inv hstep
+    rcases hc with ⟨⟨hpw, _⟩, rfl, m', σ', rfl, hs, rfl⟩ | ⟨_, rfl, rfl, rfl⟩
+    · -- a hart node: its events (only ever a user-boundary event) keep the
+      -- power on and the boot count, skip the console segment, and it never
+      -- moves a wire or a receiver
+      have hu := hartObsM_user cpu m g.m
+      rw [hpw] at hsh hbt
+      refine ⟨?_, ?_, fun _ i => ?_, fun _ i => ?_⟩
+      · show traceShape _ g.pow
+        rw [hpw]; exact traceShape_user h _ hsh hu
+      · show _ = g.gen + (if g.pow then 1 else 0)
+        rw [hpw, obsBoots_app, obsBoots_user _ hu]
+        simpa using hbt
+      · show _ = σ'.devs.wire i
+        rw [openSeg_user h _ hu, hwire hpw i]
         exact (hartStep_wire cpu m m' g.m σ' hs i).symm
-      · rw [hrecv hpw i]
+      · show _ = σ'.devs.recvd i
+        rw [openSeg_user h _ hu, hrecv hpw i]
         exact (hartStep_recvd cpu m m' g.m σ' hs i).symm
-    · exact ⟨hsh, hbt, hwire, hrecv⟩
+    · rw [List.append_nil]; exact ⟨hsh, hbt, hwire, hrecv⟩
   | dev gen d tid m =>
     rcases primStep_dev_inv hstep with ⟨⟨hpw, _⟩, m', σ', rfl, hs, rfl⟩ | ⟨_, rfl, rfl, rfl, rfl⟩
     · -- a device: its events extend the open cycle, and by exactly what
@@ -926,6 +1114,8 @@ def cycStep (cs : List (List Obs)) : Obs → List (List Obs)
   | .dev o => match cs with
     | [] => [[.dev o]]
     | c :: cs' => (c ++ [.dev o]) :: cs'
+  | .uEnter .. => cs
+  | .uExit .. => cs
 
 def cyclesRev (h : List Obs) : List (List Obs) := h.foldl cycStep []
 def cyclesOf (h : List Obs) : List (List Obs) := (cyclesRev h).reverse
@@ -949,6 +1139,8 @@ private theorem cycles_aux (h : List Obs) : ∀ (st : Option Bool) (cs0 : List (
     | some true, .dev o, _ =>
       obtain ⟨cs, rfl⟩ := hinv rfl
       exact ⟨cs, rfl⟩
+    | some true, .uEnter .., _ => exact hinv rfl
+    | some true, .uExit .., _ => exact hinv rfl
 
 /-- While the power is on, the most recent cycle IS the open segment. -/
 theorem traceShape_cycles (h : List Obs) (hs : traceShape h true) :
@@ -960,6 +1152,20 @@ theorem cyclesOf_on (h : List Obs) : cyclesOf (h ++ [.powerOn]) = cyclesOf h ++ 
 
 theorem cyclesOf_off (h : List Obs) : cyclesOf (h ++ [.powerOff]) = cyclesOf h := by
   simp [cyclesOf, cyclesRev_app, cycStep]
+
+/-- User-boundary events are in no cycle: the per-cycle view ignores them. -/
+theorem cyclesOf_user (h κ : List Obs) (hκ : ∀ e ∈ κ, isUser e = true) :
+    cyclesOf (h ++ κ) = cyclesOf h := by
+  have hf : ∀ (cs : List (List Obs)) (κ' : List Obs), (∀ e ∈ κ', isUser e = true) →
+      κ'.foldl cycStep cs = cs := by
+    intro cs κ' hκ'
+    induction κ' generalizing cs with
+    | nil => rfl
+    | cons e κ' ih =>
+      have he := hκ' e (List.mem_cons_self ..)
+      have ih' := ih cs (fun e' he' => hκ' e' (List.mem_cons_of_mem _ he'))
+      cases e <;> simp_all [isUser, cycStep]
+  simp [cyclesOf, cyclesRev_app, hf _ κ hκ]
 
 /-- A console event extends the open cycle, and only it. -/
 theorem cyclesOf_io (h κ : List Obs) (hs : traceShape h true) (hκ : ∀ e ∈ κ, isIo e = true) :
@@ -976,6 +1182,8 @@ theorem cyclesOf_io (h κ : List Obs) (hs : traceShape h true) (hκ : ∀ e ∈ 
       have ih' := ih (c ++ [e]) (fun e' he' => hκ' e' (List.mem_cons_of_mem _ he'))
       cases e with
       | dev o => simp only [List.foldl_cons, cycStep]; rw [ih']; simp
+      | uEnter => simp [isIo] at he
+      | uExit => simp [isIo] at he
       | powerOn => simp [isIo] at he
       | powerOff => simp [isIo] at he
   simp [cyclesOf, cyclesRev_app, hcs, hf _ κ hκ]

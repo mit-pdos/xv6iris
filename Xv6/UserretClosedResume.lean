@@ -89,7 +89,7 @@ theorem urc_resume (UR : USERRET) (PT : SchedNames → IProp GF) (Γ : SchedName
   have HUR := UR.wp_userret (hlc := hlc) (GF := GF) cpu k P M V.tf sep sc tv hsie hspie hspp htier ha0
   unfold wp_userret_body at HUR
   iapply HUR
-  iframe Hk Hpc Hcl Hsep Hsc Hstv Hstvec Hppt Htf
+  iframe Hk Hwire Hpc Hcl Hsep Hsc Hstv Hstvec Hppt Htf
   inext
   unfold userretPost
   iintro %C %ms %⟨hlo, hms⟩ HU Hpt Hcfg Htf Hleft

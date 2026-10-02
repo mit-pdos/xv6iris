@@ -21,6 +21,16 @@ What this file provides:
   next is user code, which the kernel does not verify: the caller hands
   the continuation to the user-execution contract (`Xv6.SpecUser.USER`,
   D24).
+
+The user boundary (M2-W1, 2026-10-01).  The `sret`'s write of
+`cur_privilege` from Supervisor to User is the hart's `uEnter` event
+(`MachCSL.hartObs`): the model makes it after `mstatus` and before the next
+pc, so the file holds the user GPRs, `sepc` and `satp` the event names.  It
+is the observed rule `swp_writeReg_priv`, so both statements here take the
+client's one-write permit `hartObsStep cpu Supervisor User` (in the execute
+stage's input frame, and as a premise of the cycle); `swp_run` finds it
+under the name `Hpriv`.  The S→S return (`WpSmodeSret`) writes the
+privilege already there and stays silent.
 -/
 import MachCSL.WpSmodeSret
 import MachCSL.WpSmodeCycleT
@@ -42,9 +52,11 @@ theorem execSpecF_sretU (cpu : CPU) (c : MConf) (sie : Bool) (hok : SConfPhys (G
     (pc npc₀ epc : BitVec 64) (R : RegMap) :
     execSpecPP (GF := GF) cpu (DFrac.own 1) Privilege.Supervisor c Privilege.User
       { c with mstatus := sretMs c.mstatus } (instruction.SRET ()) pc npc₀ (epc &&& 0xFFFFFFFFFFFFFFFE#64)
-      iprop(gprFile cpu R ∗ Register.sepc ↦ᵣ[cpu] epc) iprop(gprFile cpu R ∗ Register.sepc ↦ᵣ[cpu] epc) := by
+      iprop(hartObsStep cpu Privilege.Supervisor Privilege.User ∗ gprFile cpu R ∗
+        Register.sepc ↦ᵣ[cpu] epc)
+      iprop(gprFile cpu R ∗ Register.sepc ↦ᵣ[cpu] epc) := by
   intro Φ
-  iintro ⟨HmConf, HPC, HnextPC, ⟨HF, Hsepc⟩, HΦ⟩
+  iintro ⟨HmConf, HPC, HnextPC, ⟨Hpriv, HF, Hsepc⟩, HΦ⟩
   conf_cases HmConf
   obtain ⟨hpmp, hms, hpmm, hlpe⟩ := hok
   obtain ⟨hSIE, hMPRV, hSXL, hMXR, hTSR, hTVM, hFS, hXS, hVS, hSD, hMPP⟩ := hms
@@ -75,20 +87,21 @@ theorem wpLoop_s_sretU (cpu : CPU) (c : MConf) (hok : SConfPhys (GF := GF) c fal
     (pc epc : BitVec 64) (w : BitVec 32) (T R : IProp GF) (G : RegMap)
     (hfetch : fetchSpecS cpu (DFrac.own 1) c pc T R (FetchResult.F_Base w))
     (hdec : decodes32P (GF := GF) cpu (DFrac.own 1) Privilege.Supervisor c w (instruction.SRET ())) :
+    hartObsStep cpu Privilege.Supervisor Privilege.User ∗
     confCells cpu (DFrac.own 1) Privilege.Supervisor c ∗ clockCells cpu ∗ pcIs cpu pc ∗ T ∗ R ∗
     gprFile cpu G ∗ Register.sepc ↦ᵣ[cpu] epc ∗
     ▷ (confCells cpu (DFrac.own 1) Privilege.User { c with mstatus := sretMs c.mstatus } -∗ clockCells cpu -∗
         pcIs cpu (epc &&& 0xFFFFFFFFFFFFFFFE#64) -∗ R -∗ T -∗ gprFile cpu G -∗ Register.sepc ↦ᵣ[cpu] epc -∗
         wpLoop cpu)
     ⊢ wpLoop cpu := by
-  iintro ⟨HmConf, Hclock, Hpc, HT, HR, HF, Hsepc, HΦ⟩
+  iintro ⟨Hpriv, HmConf, Hclock, Hpc, HT, HR, HF, Hsepc, HΦ⟩
   iapply (wpLoop_sT_base cpu c _ hok hmie Privilege.User (Or.inr rfl) pc _ w _ T R
-    iprop(gprFile cpu G ∗ Register.sepc ↦ᵣ[cpu] epc)
+    iprop(hartObsStep cpu Privilege.Supervisor Privilege.User ∗ gprFile cpu G ∗ Register.sepc ↦ᵣ[cpu] epc)
     iprop(T ∗ gprFile cpu G ∗ Register.sepc ↦ᵣ[cpu] epc) hfetch hdec
     ((execSpecF_sretU cpu c false hok hspp pc (pc + 4#64) epc G).frameL T).clk)
   iframe HmConf Hclock Hpc HT HR
-  isplitl [HF Hsepc]
-  · iframe HF Hsepc
+  isplitl [Hpriv HF Hsepc]
+  · iframe Hpriv HF Hsepc
   inext
   iintro HmConf Hclock Hpc HR ⟨HT, HF, Hsepc⟩
   iapply HΦ $$ HmConf Hclock Hpc HR HT HF Hsepc

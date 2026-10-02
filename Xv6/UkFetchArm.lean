@@ -178,12 +178,12 @@ theorem uk_fetchArm (cpu : CPU) (C : UCfg) (P : UPtd) (D : List PAddr) (T : BMap
     (fr : FetchResult) (len : Int) (i : instruction) (hF : UkFetchFact C P T pc V fr) (hdec : UkDecodes fr len i)
     (Rt : UWSt → Prop) (hRt : ∀ s', Rt s' → s'.file .hart_state = .HART_ACTIVE ()) (Ex : sync_exception → Prop)
     (hX : UkExecOut C P T i len m pc V Rt Ex) :
-    hwConfig (GF := GF) cpu ∗ iviewLb cpu K ∗ uFr (ufRegF cpu C) (ubFrame curCtx D) s ∗
+    hwConfig (GF := GF) cpu ∗ wireInv ∗ iviewLb cpu K ∗ uFr (ufRegF cpu C) (ubFrame curCtx D) s ∗
       uxTextOwn curCtx K (ukTextAddrs P.um) T ⊢
       swp cpu (fetch () >>= ucAfterFetch)
         (ucArmOb (ufRegF cpu C) (ubFrame curCtx D) (ukQ C P T m pc V Rt Ex)
           (fun _ _ => uxTextOwn curCtx K (ukTextAddrs P.um) T)) := by
-  iintro ⟨#Hhw, #HK, Hfr, HX⟩
+  iintro ⟨#Hhw, #Hwi, #HK, Hfr, HX⟩
   iapply swp_bind
   iapply swp_uxRun_of (ufRegF cpu C) (ubFrame curCtx D) K (ukTextAddrs P.um) T (fetch ()) s
     (fun fr' s1 => fr' = fr ∧ UkLand C P T s1 ∧ (∀ r, r ≠ .tlb → s1.file r = s.file r) ∧ ukView P.um s1.mm T = V)
@@ -243,7 +243,7 @@ theorem uk_fetchArm (cpu : CPU) (C : UCfg) (P : UPtd) (D : List PAddr) (T : BMap
       exact ukTrapLand_trapS hl2 hr2 hv2 (utrapScause (.Exception exc.trap) 0#64) (tval exc.excinfo) pc
     iapply uk_armOb_trap cpu C P D (uxTextOwn curCtx K (ukTextAddrs P.um) T) _ s2 hl2.cfg hl2.priv hl2.act exc pc ib
       hext huse hq
-    iframe Hhw Hfr HX
+    iframe Hhw Hwi Hfr HX
 
 end arm
 

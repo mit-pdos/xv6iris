@@ -43,7 +43,7 @@ exception's own `tval` payload, then `nextPC := stvec`. -/
 theorem ust_swp_exec_trap (cpu : CPU) (exc : sync_exception) (hext : exc.ext = none)
     (pc0 npc ms sc stv sep h md : BitVec 64) (hdir : stvecDirect h) (dqs dqd : DFrac)
     (hdel : md.getLsbD (exceptionType_bits_forwards exc.trap).toNat = true) (Φ : Unit → IProp GF) :
-    hwConfig cpu ∗
+    hwConfig cpu ∗ hartObsStep cpu Privilege.User Privilege.Supervisor ∗
     Register.cur_privilege ↦ᵣ[cpu] Privilege.User ∗ Register.mstatus ↦ᵣ[cpu] ms ∗
     Register.scause ↦ᵣ[cpu] sc ∗ Register.stval ↦ᵣ[cpu] stv ∗ Register.sepc ↦ᵣ[cpu] sep ∗
     Register.stvec ↦ᵣ[cpu]{dqs} h ∗ Register.medeleg ↦ᵣ[cpu]{dqd} md ∗ Register.nextPC ↦ᵣ[cpu] npc ∗
@@ -56,7 +56,7 @@ theorem ust_swp_exec_trap (cpu : CPU) (exc : sync_exception) (hext : exc.ext = n
   obtain ⟨ex, info, ext⟩ := exc
   dsimp only at hext hdel ⊢
   subst hext
-  iintro ⟨#Hhw, Hp, Hms, Hsc, Hstv, Hsep, Hstvec, Hmd, Hnpc, HΦ⟩
+  iintro ⟨#Hhw, Hpriv, Hp, Hms, Hsc, Hstv, Hsep, Hstvec, Hmd, Hnpc, HΦ⟩
   iapply swp_bind
   unfold exception_handler
   dsimp only
@@ -69,7 +69,7 @@ theorem ust_swp_exec_trap (cpu : CPU) (exc : sync_exception) (hext : exc.ext = n
   swp_run 10
   subst hT
   iapply swp_trap_handler_U cpu (.Exception ex) pc0 info ms sc stv sep h hdir dqs
-  iframe Hhw Hp Hms Hsc Hstv Hsep Hstvec
+  iframe Hhw Hpriv Hp Hms Hsc Hstv Hsep Hstvec
   inext
   iintro Hp Hms Hsc Hstv Hsep Hstvec
   iapply swp_set_next_pc_U cpu h npc
@@ -84,7 +84,8 @@ variable (cpu : CPU) (C : UCfg) (P : UPtd) (t0 : PTree) (mm0 : BMap)
 the frame opens into, the delivered values back. -/
 abbrev UstTower (sX : UWSt) (m : SailM Unit) (sc' stv' sep' : BitVec 64) : Prop :=
   ∀ Φ : Unit → IProp GF,
-    hwConfig cpu ∗ Register.cur_privilege ↦ᵣ[cpu] Privilege.User ∗
+    hwConfig cpu ∗ hartObsStep cpu Privilege.User Privilege.Supervisor ∗
+    Register.cur_privilege ↦ᵣ[cpu] Privilege.User ∗
     Register.mstatus ↦ᵣ[cpu] sX.file .mstatus ∗ Register.scause ↦ᵣ[cpu] sX.file .scause ∗
     Register.stval ↦ᵣ[cpu] sX.file .stval ∗ Register.sepc ↦ᵣ[cpu] sX.file .sepc ∗
     Register.stvec ↦ᵣ[cpu]{C.dqc} C.stvec ∗ Register.medeleg ↦ᵣ[cpu]{C.dqc} C.medeleg ∗
@@ -107,10 +108,11 @@ theorem ust_trapArmGen (D : List PAddr) (Rr : IProp GF) (Q : Step → UWSt → P
       swp cpu m (fun _ => iprop(⌜s2.file .hart_state = .HART_ACTIVE ()⌝ ∗
         uFr (ufRegF cpu C) (ubFrame curCtx D) s2 ∗ Rr)))
     (hq : Q st (ustTrapS sX (utrapMs 0#1 (sX.file .mstatus)) sc' stv' sep' C.stvec)) :
-    hwConfig (GF := GF) cpu ∗ uFr (ufRegF cpu C) (ubFrame curCtx D) sX ∗ Rr ⊢
+    hwConfig (GF := GF) cpu ∗ wireInv ∗ uFr (ufRegF cpu C) (ubFrame curCtx D) sX ∗ Rr ⊢
       ucArmOb (ufRegF cpu C) (ubFrame curCtx D) Q (fun _ _ => Rr) st := by
   unfold ucArmOb
-  iintro ⟨#Hhw, Hfr, HR⟩
+  iintro ⟨#Hhw, #Hwi, Hfr, HR⟩
+  ihave Hpriv := wireInv_step cpu Privilege.User Privilege.Supervisor $$ Hwi
   iexists ustTrapS sX (utrapMs 0#1 (sX.file .mstatus)) sc' stv' sep' C.stvec
   rw [hb]
   isplitr
@@ -120,7 +122,7 @@ theorem ust_trapArmGen (D : List PAddr) (Rr : IProp GF) (Q : Step → UWSt → P
   icases uf_trapCells cpu C P sX.file hc $$ HF with ⟨Hp, Hms, Hsc, Hstv, Hsep, Hstvec, Hmd, Hpc, Hnpc, Hcl⟩
   rw [hp]
   iapply htow _
-  iframe Hhw Hp Hms Hsc Hstv Hsep Hstvec Hmd Hpc Hnpc
+  iframe Hhw Hpriv Hp Hms Hsc Hstv Hsep Hstvec Hmd Hpc Hnpc
   inext
   iintro Hp Hms Hsc Hstv Hsep Hstvec Hmd Hpc Hnpc
   ihave HF := Hcl $$ %Privilege.Supervisor %(utrapMs 0#1 (sX.file .mstatus)) %sc' %stv' %sep' %C.stvec
@@ -140,24 +142,24 @@ theorem ust_trapArm (sX : UWSt) (hl : UstLand C P t0 mm0 sX) (st : Step) (m : Sa
       swp cpu m (fun _ => iprop(⌜s2.file .hart_state = .HART_ACTIVE ()⌝ ∗
         uFr (ufRegF cpu C) (ubFrame curCtx (ubUAddrs P t0)) s2 ∗ ustR st s2)))
     (hq : ∀ s2, UstTrapped C P t0 mm0 s2 → ustQ C P t0 mm0 st s2) :
-    hwConfig (GF := GF) cpu ∗ uFr (ufRegF cpu C) (ubFrame curCtx (ubUAddrs P t0)) sX ⊢
+    hwConfig (GF := GF) cpu ∗ wireInv ∗ uFr (ufRegF cpu C) (ubFrame curCtx (ubUAddrs P t0)) sX ⊢
       ucArmOb (ufRegF cpu C) (ubFrame curCtx (ubUAddrs P t0)) (ustQ C P t0 mm0) ustR st :=
-  (sep_mono .rfl sep_emp.2).trans
+  (sep_mono .rfl (sep_mono .rfl sep_emp.2)).trans
     (ust_trapArmGen cpu C P (ubUAddrs P t0) iprop(emp) (ustQ C P t0 mm0) sX hl.cfg hl.priv hl.act st m
       sc' stv' sep' htow hb (hq _ (ustTrapped_trapS hl sc' stv' sep')))
 
 /-- **The interrupt arm** (Rocq `swp_handle_interrupt_u`): the dispatch
 picked `(i, Supervisor)`. -/
 theorem ust_armOb_interrupt (sX : UWSt) (hl : UstLand C P t0 mm0 sX) (i : InterruptType) :
-    hwConfig (GF := GF) cpu ∗ uFr (ufRegF cpu C) (ubFrame curCtx (ubUAddrs P t0)) sX ⊢
+    hwConfig (GF := GF) cpu ∗ wireInv ∗ uFr (ufRegF cpu C) (ubFrame curCtx (ubUAddrs P t0)) sX ⊢
       ucArmOb (ufRegF cpu C) (ubFrame curCtx (ubUAddrs P t0)) (ustQ C P t0 mm0) ustR
         (Step.Step_Pending_Interrupt (i, Privilege.Supervisor)) :=
   ust_trapArm cpu C P t0 mm0 sX hl _ (handle_interrupt i Privilege.Supervisor) (sCause i) 0#64 (sX.file .PC)
     (fun Φ => by
-      iintro ⟨#Hhw, Hp, Hms, Hsc, Hstv, Hsep, Hstvec, Hmd, Hpc, Hnpc, HΦ⟩
+      iintro ⟨#Hhw, Hpriv, Hp, Hms, Hsc, Hstv, Hsep, Hstvec, Hmd, Hpc, Hnpc, HΦ⟩
       iapply swp_handle_interrupt_U cpu i (sX.file .PC) (sX.file .nextPC) (sX.file .mstatus) (sX.file .scause)
         (sX.file .stval) (sX.file .sepc) C.stvec C.tvd C.dqc (DFrac.own 1)
-      iframe Hhw Hp Hms Hsc Hstv Hsep Hstvec Hpc Hnpc
+      iframe Hhw Hpriv Hp Hms Hsc Hstv Hsep Hstvec Hpc Hnpc
       inext
       iintro Hp Hms Hsc Hstv Hsep Hstvec Hpc Hnpc
       iapply HΦ $$ Hp Hms Hsc Hstv Hsep Hstvec Hmd Hpc Hnpc)
@@ -166,17 +168,17 @@ theorem ust_armOb_interrupt (sX : UWSt) (hl : UstLand C P t0 mm0 sX) (i : Interr
 /-- **The fetch-fault arm** (Rocq `swp_handle_exception_u` at the fault). -/
 theorem ust_armOb_fetchFail (sX : UWSt) (hl : UstLand C P t0 mm0 sX) (e : ExceptionType) (a : BitVec 64)
     (he : userExc e = true) :
-    hwConfig (GF := GF) cpu ∗ uFr (ufRegF cpu C) (ubFrame curCtx (ubUAddrs P t0)) sX ⊢
+    hwConfig (GF := GF) cpu ∗ wireInv ∗ uFr (ufRegF cpu C) (ubFrame curCtx (ubUAddrs P t0)) sX ⊢
       ucArmOb (ufRegF cpu C) (ubFrame curCtx (ubUAddrs P t0)) (ustQ C P t0 mm0) ustR
         (Step.Step_Fetch_Failure (virtaddr.Virtaddr a, e)) :=
   ust_trapArm cpu C P t0 mm0 sX hl _ (handle_exception a e) (utrapScause (.Exception e) (sX.file .scause))
     (tval (xtval_exception_value e a)) (sX.file .PC)
     (fun Φ => by
-      iintro ⟨#Hhw, Hp, Hms, Hsc, Hstv, Hsep, Hstvec, Hmd, Hpc, Hnpc, HΦ⟩
+      iintro ⟨#Hhw, Hpriv, Hp, Hms, Hsc, Hstv, Hsep, Hstvec, Hmd, Hpc, Hnpc, HΦ⟩
       iapply swp_handle_exception_U cpu e a (sX.file .PC) (sX.file .nextPC) (sX.file .mstatus)
         (sX.file .scause) (sX.file .stval) (sX.file .sepc) C.stvec C.medeleg C.tvd C.dqc C.dqc (DFrac.own 1)
         (C.del e he)
-      iframe Hhw Hp Hms Hsc Hstv Hsep Hstvec Hmd Hpc Hnpc
+      iframe Hhw Hpriv Hp Hms Hsc Hstv Hsep Hstvec Hmd Hpc Hnpc
       inext
       iintro Hp Hms Hsc Hstv Hsep Hstvec Hmd Hpc Hnpc
       iapply HΦ $$ Hp Hms Hsc Hstv Hsep Hstvec Hmd Hpc Hnpc)
@@ -184,18 +186,18 @@ theorem ust_armOb_fetchFail (sX : UWSt) (hl : UstLand C P t0 mm0 sX) (e : Except
 
 /-- **The illegal-instruction arm**. -/
 theorem ust_armOb_illegal (sX : UWSt) (hl : UstLand C P t0 mm0 sX) (ib : BitVec 32) :
-    hwConfig (GF := GF) cpu ∗ uFr (ufRegF cpu C) (ubFrame curCtx (ubUAddrs P t0)) sX ⊢
+    hwConfig (GF := GF) cpu ∗ wireInv ∗ uFr (ufRegF cpu C) (ubFrame curCtx (ubUAddrs P t0)) sX ⊢
       ucArmOb (ufRegF cpu C) (ubFrame curCtx (ubUAddrs P t0)) (ustQ C P t0 mm0) ustR
         (Step.Step_Execute (.Illegal_Instruction (), ib)) :=
   ust_trapArm cpu C P t0 mm0 sX hl _ (handle_exception (zero_extend (m := 64) ib) (.E_Illegal_Instr ()))
     (utrapScause (.Exception (.E_Illegal_Instr ())) (sX.file .scause))
     (tval (xtval_exception_value (.E_Illegal_Instr ()) (zero_extend (m := 64) ib))) (sX.file .PC)
     (fun Φ => by
-      iintro ⟨#Hhw, Hp, Hms, Hsc, Hstv, Hsep, Hstvec, Hmd, Hpc, Hnpc, HΦ⟩
+      iintro ⟨#Hhw, Hpriv, Hp, Hms, Hsc, Hstv, Hsep, Hstvec, Hmd, Hpc, Hnpc, HΦ⟩
       iapply swp_handle_exception_U cpu (.E_Illegal_Instr ()) (zero_extend (m := 64) ib) (sX.file .PC)
         (sX.file .nextPC) (sX.file .mstatus) (sX.file .scause) (sX.file .stval) (sX.file .sepc) C.stvec
         C.medeleg C.tvd C.dqc C.dqc (DFrac.own 1) (C.del _ rfl)
-      iframe Hhw Hp Hms Hsc Hstv Hsep Hstvec Hmd Hpc Hnpc
+      iframe Hhw Hpriv Hp Hms Hsc Hstv Hsep Hstvec Hmd Hpc Hnpc
       inext
       iintro Hp Hms Hsc Hstv Hsep Hstvec Hmd Hpc Hnpc
       iapply HΦ $$ Hp Hms Hsc Hstv Hsep Hstvec Hmd Hpc Hnpc)
@@ -205,16 +207,16 @@ theorem ust_armOb_illegal (sX : UWSt) (hl : UstLand C P t0 mm0 sX) (ib : BitVec 
 cause). -/
 theorem ust_armOb_trap (sX : UWSt) (hl : UstLand C P t0 mm0 sX) (exc : sync_exception) (pc0 : BitVec 64)
     (ib : BitVec 32) (hext : exc.ext = none) (he : userExc exc.trap = true) :
-    hwConfig (GF := GF) cpu ∗ uFr (ufRegF cpu C) (ubFrame curCtx (ubUAddrs P t0)) sX ⊢
+    hwConfig (GF := GF) cpu ∗ wireInv ∗ uFr (ufRegF cpu C) (ubFrame curCtx (ubUAddrs P t0)) sX ⊢
       ucArmOb (ufRegF cpu C) (ubFrame curCtx (ubUAddrs P t0)) (ustQ C P t0 mm0) ustR
         (Step.Step_Execute (.Trap (Privilege.User, exc, pc0), ib)) :=
   ust_trapArm cpu C P t0 mm0 sX hl _ (exception_handler Privilege.User exc pc0 >>= set_next_pc)
     (utrapScause (.Exception exc.trap) (sX.file .scause)) (tval exc.excinfo) pc0
     (fun Φ => by
-      iintro ⟨#Hhw, Hp, Hms, Hsc, Hstv, Hsep, Hstvec, Hmd, Hpc, Hnpc, HΦ⟩
+      iintro ⟨#Hhw, Hpriv, Hp, Hms, Hsc, Hstv, Hsep, Hstvec, Hmd, Hpc, Hnpc, HΦ⟩
       iapply ust_swp_exec_trap cpu exc hext pc0 (sX.file .nextPC) (sX.file .mstatus) (sX.file .scause)
         (sX.file .stval) (sX.file .sepc) C.stvec C.medeleg C.tvd C.dqc C.dqc (C.del _ he)
-      iframe Hhw Hp Hms Hsc Hstv Hsep Hstvec Hmd Hnpc
+      iframe Hhw Hpriv Hp Hms Hsc Hstv Hsep Hstvec Hmd Hnpc
       inext
       iintro Hp Hms Hsc Hstv Hsep Hstvec Hmd Hnpc
       iapply HΦ $$ Hp Hms Hsc Hstv Hsep Hstvec Hmd Hpc Hnpc)
@@ -225,7 +227,7 @@ per-result routing): retire and wait entry hand the frames over; a trap or
 an illegal instruction runs its tower. -/
 theorem ust_armOb_exec (res : ExecutionResult) (s' : UWSt) (ib : BitVec 32)
     (h : UstResOk C P t0 mm0 res s') :
-    hwConfig (GF := GF) cpu ∗ uFr (ufRegF cpu C) (ubFrame curCtx (ubUAddrs P t0)) s' ⊢
+    hwConfig (GF := GF) cpu ∗ wireInv ∗ uFr (ufRegF cpu C) (ubFrame curCtx (ubUAddrs P t0)) s' ⊢
       ucArmOb (ufRegF cpu C) (ubFrame curCtx (ubUAddrs P t0)) (ustQ C P t0 mm0) ustR
         (Step.Step_Execute (res, ib)) := by
   cases res with
@@ -233,7 +235,7 @@ theorem ust_armOb_exec (res : ExecutionResult) (s' : UWSt) (ib : BitVec 32)
     cases u
     have hl : UstLand C P t0 mm0 s' := h
     dsimp only [ucArmOb, ucArmBody, ustR]
-    iintro ⟨-, Hfr⟩
+    iintro ⟨-, -, Hfr⟩
     iexists s'
     isplitr
     · ipureintro; exact hl
@@ -242,7 +244,7 @@ theorem ust_armOb_exec (res : ExecutionResult) (s' : UWSt) (ib : BitVec 32)
     iframe
   | Enter_Wait wr =>
     dsimp only [ucArmOb, ucArmBody, ustR]
-    iintro ⟨-, Hfr⟩
+    iintro ⟨-, -, Hfr⟩
     iexists s'
     isplitr
     · ipureintro; exact h

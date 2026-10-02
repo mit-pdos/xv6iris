@@ -123,14 +123,14 @@ two classification facts): the ACTIVE step obligation holds. -/
 theorem ust_obligationActive_holds (cpu : CPU) (C : UCfg) (pt : UPtd) (Rut : UPtd → IProp GF)
     (hF : UstFetchSpec (GF := GF) cpu C pt) (hX : UstExecTotal C pt)
     (hacc : Rut pt ⊢ ctxToken cpu ∗ (ctxToken cpu -∗ Rut pt)) :
-    ⊢ hwConfig cpu -∗ kmapStatic -∗ ustStepObligationActive cpu C pt Rut := by
+    ⊢ hwConfig cpu -∗ kmapStatic -∗ wireInv -∗ ustStepObligationActive cpu C pt Rut := by
   unfold ustStepObligationActive
-  iintro #Hhw #HS
+  iintro #Hhw #HS #Hwi
   imodintro
   iintro %v %t %mm %hu %ha %hwf %htlb HF HB Ha Hrut Hk
   icases ust_frames cpu C pt Rut hacc v t mm $$ [$HF $HB $Hrut] with ⟨Hfr, Hres⟩
   iapply ust_step_active cpu C pt t hF hX v mm hu ha hwf htlb
-  iframe Hhw Hfr
+  iframe Hhw Hwi Hfr
   inext
   iintro %s3 %h3 Hfr
   iapply ust_close cpu C pt Rut t mm s3 h3 $$ HS Hfr Ha Hres Hk
@@ -143,8 +143,8 @@ theorem ust_body (cpu : CPU) (C : UCfg) (pt : UPtd) (Rut : UPtd → IProp GF)
     (hacc : ∀ pt' : UPtd, Rut pt' ⊢ ctxToken cpu ∗ (ctxToken cpu -∗ Rut pt')) :
     ⊢ hwConfig cpu -∗ kmapStatic -∗ wireInv -∗ userInv cpu C pt Rut -∗ ▷ stvecHandlerWp cpu C pt Rut -∗
       wpLoop cpu := by
-  iintro #Hhw #HS - Hinv Htrap
-  ihave #Hact := ust_obligationActive_holds cpu C pt Rut hF hX (hacc pt) $$ Hhw HS
+  iintro #Hhw #HS #Hwi Hinv Htrap
+  ihave #Hact := ust_obligationActive_holds cpu C pt Rut hF hX (hacc pt) $$ Hhw HS Hwi
   iapply ust_exec_active cpu C pt Rut (hacc pt) $$ Hhw HS Hact Hinv Htrap
 
 end loop

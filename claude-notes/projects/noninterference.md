@@ -116,6 +116,51 @@ suite must not notice; W3 is the proof's content and may find a row that cannot 
 ι-prefix)` -- that is a channel not yet named (§2), to be reported, not papered over; W4's `events h` must be a
 PURE function of the trace or the two-run corollary dies (§6's reason for exporting events).
 
+### M2-W1 as landed (2026-10-01)
+
+Lane `lane/m2w1`.  **Emission.**  `Obs` gains `uEnter cpu satp epc gprs` and `uExit cpu satp scause epc gprs`
+(`gprs` = `hartGprs f` = `[x1..x31]`).  `hartObs cpu o σ` is `[]` except at `.regWrite .cur_privilege p`, where
+`hartObsPriv cpu (σ.regs cpu) p` emits `uExitOf` (old User, new not; `scause`/`sepc`, or `mcause`/`mepc` when `p`
+is Machine) or `uEnterOf` (old not User, new User; `sepc`), read off the file the write overwrites.
+`primStep`'s hart arm: `obs = hartObsM cpu m g.m` (the head event's `hartObs`) when live, `[]` dead; `hartStep`
+byte-identical (no `hartStepO`: a blocked step is a memory access, which is silent).  **Trace theory.**
+`isIo` stays device-only; new `isUser`; `obsStep` keeps the power on, `obsBoots` ignores them, and `segStep` /
+`cycStep` SKIP them (deviation from the row's "appends": the open segment and every cycle stay console I/O, so
+the wire/input ties and every app's per-cycle ledger are blind to user events -- `openSeg_user`,
+`cyclesOf_user`; the events live in `h`).  **Logic.**  `wpHart_lift_obs` (callback gets `obsWf h g ∧ threadLive
+g genId`, `machInterp g.m ∗ obsAuth h`, returns `obsAuth (h ++ hartObsM …)`), `wpHart_lift` derived (callback
+proves `hartObsM cpu m σ = []`).  `swp_writeReg(_bind)` gains `hq : r ≠ .cur_privilege ∨ v = w`;
+`swp_writeReg_priv_quiet` (a privilege write staying on one side, e.g. `mret` M→S); the observed rule
+
+    def hartObsStep (cpu) (p p' : Privilege) : IProp GF :=
+      ∀ h g, ⌜obsWf h g ∧ g.pow = true ∧ g.m.regs cpu .cur_privilege = p⌝ -∗
+        obsAuth h ={⊤}=∗ obsAuth (h ++ hartObsPriv cpu (g.m.regs cpu) p')
+    def hartObsPermit := □ ∀ cpu p p', hartObsStep cpu p p'
+    theorem swp_writeReg_priv : hartObsStep cpu p p' ∗ cur_privilege ↦ᵣ p ∗ ▷ (cur_privilege ↦ᵣ p' -∗ Φ ())
+      ⊢ swp cpu (writeReg .cur_privilege p') Φ
+
+(fixed-layer, `MachCSL/Resources.lean`; `swp_run` finds the one-write permit as `Hpriv`).  The five `UTrap`
+towers take `hartObsStep cpu User Supervisor`; `execSpecF_sretU`'s input frame and `wpLoop_s_sretU` take
+`hartObsStep cpu Supervisor User`.  **Holder (coordinator ruling (b′)).**  `wireInv(At) := inv wireN body ∗
+hartObsPermit`; the power thread seals it at power-on from `obsInv` and the new hook `wp_power.Huser` (the trace
+predicate accepts a user event; `hartObsPermit_of_hook`), which `riscvPowerAdequacy` / `riscvTraceAdequacy` /
+`xv6PowerAdequacyGen` take as a hypothesis (`obsPredAt_user` at the unit instance, `obsLedgerAt_user` at a
+ledger), and `Xv6AppLaws` gains `al_user` (`union_al_user`: the union ledger is unchanged by computation; triv:
+`emp`).  Walker: `UFoot.noPriv` (no walk writes `cur_privilege`; `uFootL`'s `Dw` excludes it); the
+`URunRWDemo` ECALL-through-the-walker facts are retired.
+
+Statements that moved.  MachCSL: `Obs`, `primStep` (+inv/live/dead), `wpHart_lift` (callback),
+`swp_event(_step)` (+defaulted `hsil`), `swp_writeReg(_bind)` (+`hq`), the five `UTrap` towers, `execSpecF_sretU`,
+`wpLoop_s_sretU`, `wireInv(At)`(body) / `wireInv(At)_alloc` (+permit), `wp_power` / `riscvPowerAdequacy` /
+`riscvTraceAdequacy` (+`Huser`), `UFoot` (+`noPriv`), `openSeg_power` (`isPower`), `obsNoPower_of_boots` (I/O or
+user).  Xv6: `xv6PowerAdequacyGen` (+`Huser`), `Xv6AppLaws` (+`al_user`), **`SpecUserret.wp_userret_body`
+(+`wireInv ∗` after `kctx`: userret's own `sret` needs the permit and the spec held no ambient that has it)**,
+`ust_swp_exec_trap`/`UstTower` (+`hartObsStep`), `ust_trapArmGen`/`ust_trapArm`/`ust_armOb_*`/`uk_armOb_interrupt`
+/`uk_armOb_trap`/`ust_fetchArm`/`ust_step_active`/`uk_fetchArm` (+`wireInv ∗` after `hwConfig`),
+`ust_obligationActive_holds` (+`wireInv -∗`), `userret_usret`/`userret_exit`/`userret_user_run` (+`wireInv ∗`),
+`ufFoot_wr` (`ufRwList.erase .cur_privilege`).  Byte-identical: `hartStep`, `SpecUser.USER`, `uexecF`,
+`userInv`, `userTrapFrame`, `uvAmb`, every other Spec.
+
 ### M2-W3 (M0) as landed (2026-10-01)
 
 Lane `lane/m2w3`.  **The class is {exit, getpid, uptime}**; sbrk, fork's parent, wait and console write were

@@ -152,7 +152,7 @@ theorem wpDev_wireR (N : Namespace) (d : DevId) [DevDiskInert d] (hsil : DevSile
       ∀ (tid : TaskId) (m : DevProg d), ⌜DevM.WireR rel m⌝ →
         devWP (genId (hlc := hlc) (GF := GF)) d tid m := by
   unfold devInvR wireInv
-  iintro ⟨#Hinv, #Hwire, #Hcert⟩
+  iintro ⟨#Hinv, ⟨#Hwire, -⟩, #Hcert⟩
   iloeb as IH
   iintro %tid %m %hm
   iapply wpDev_elim d tid m

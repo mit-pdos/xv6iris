@@ -113,8 +113,12 @@ theorem ufFoot_rd (r : Register) (h : r ∈ ufRwList ++ ufRoList) : ufFoot.Dr r 
   simp only [ufFoot, uFootL, Bool.or_eq_true, List.contains_iff_mem]
   exact List.mem_append.1 h
 
-theorem ufFoot_wr (r : Register) (h : r ∈ ufRwList) : ufFoot.Dw r = true := by
-  simp only [ufFoot, uFootL, List.contains_iff_mem]; exact h
+theorem ufFoot_wr (r : Register) (h : r ∈ ufRwList.erase .cur_privilege) : ufFoot.Dw r = true := by
+  have hm : r ∈ ufRwList := List.mem_of_mem_erase h
+  have hne : r ≠ .cur_privilege := by
+    rintro rfl; exact absurd h (by decide)
+  simp only [ufFoot, uFootL, Bool.and_eq_true, List.contains_iff_mem, bne_iff_ne, ne_eq]
+  exact ⟨hm, hne⟩
 
 /-- U1-X1's footprint premise. -/
 theorem ufFoot_uxa : UxaFoot ufFoot :=
@@ -663,6 +667,6 @@ theorem uf_cfg_walk (C : UCfg) (P : UPtd) {X : Type} (m : SailM X) (orc : UOrc) 
     have := List.nodup_append.1 ufLists_nodup
     exact this.2.2 r hw r hr rfl
   simp only [ufFoot, uFootL]
-  simpa using hn
+  simp [hn]
 
 end Xv6

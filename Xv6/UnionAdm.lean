@@ -103,6 +103,8 @@ theorem ulinesOf_snoc (h : List Obs) (e : Obs) : ulinesOf h <+: ulinesOf (h ++ [
       simp only [cycStep, List.reverse_cons, List.map_append, List.flatten_append,
         List.map_cons, List.map_nil, List.flatten_cons, List.flatten_nil, List.append_nil]
       exact (List.prefix_append_right_inj _).2 (ulinesCyc_app c _)
+  | uEnter => exact List.prefix_refl _
+  | uExit => exact List.prefix_refl _
   | powerOn =>
     simp only [cycStep, List.reverse_cons, List.map_append, List.flatten_append]
     exact List.prefix_append _ _

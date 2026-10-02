@@ -34,7 +34,7 @@ def stepAt (i : Nat) (pol : HPol) (ans : Nat) (pool : List Expr) (x : XState) :
   match pool[i]? with
   | some (.hart 0 cpu m) =>
     match hartExec pol cpu m x with
-    | some (m', x') => some (pool.set i (.hart 0 cpu m') ++ [], x', [])
+    | some (m', x') => some (pool.set i (.hart 0 cpu m') ++ [], x', hartObsM cpu m x.abs)
     | none => none
   | some (.dev 0 d tid m) =>
     match devExec 0 d tid ans m x with
@@ -118,8 +118,8 @@ theorem errorNode_noStep (x : XState) (e : Expr) (h : errorNode e = true) :
   unfold errorNode at h
   split at h
   · rename_i cpu err k
-    obtain ⟨-, -, hl | hd⟩ := primStep_hart_inv hp
-    · obtain ⟨-, m', σ', -, hs, -⟩ := hl
+    obtain ⟨-, hl | hd⟩ := primStep_hart_inv hp
+    · obtain ⟨-, -, m', σ', -, hs, -⟩ := hl
       exact hs
     · exact hd.1 (live0 x)
   · exact absurd h (by simp)

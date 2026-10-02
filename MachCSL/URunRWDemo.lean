@@ -6,9 +6,9 @@ MachCSL: the D50 go/no-go spike for `runRW` (brief `notes/design-rulings.md`
   register INDICES through the bind toolkit;
 * one aligned LD (`ld x5, 0(x10)`) at User privilege, through Sv39
   translation (a TLB hit), PMP, PMA, over an owned page of symbolic content;
-* one ECALL through the U→S trap tower (`execute (ECALL ())`, then
-  `exception_handler`/`set_next_pc`, the `Trap` arm of `try_step`; U0-T's
-  tower is not in yet, so the tower is the model's own, run by the walker).
+* (retired by NI M2-W1: one ECALL through the U→S trap tower, run by the
+  walker -- the tower's privilege write is now an observed event, so it is
+  never a walker step; see the section note below).
 
 Each walk fact is ONE equation, closed by `kernel_rfl` (the kernel evaluates
 the walk).  The evaluation rule the spike found: everything the model
@@ -23,7 +23,7 @@ translation, PMP) are pinned too; a symbolic-address fact goes through the
 bind toolkit, a sub-lemma per branch.
 
 The Iris side is one application of `swp_runRW` per fact
-(`urwDemo_swp_add`, `urwDemo_swp_ecall`, `urwDemo_swp_ld`).
+(`urwDemo_swp_add`, `urwDemo_swp_ld`).
 -/
 import MachCSL.URunRW
 import MachCSL.BvEnumSatp
@@ -42,8 +42,9 @@ open LeanRV64D LeanRV64D.Functions
 written; the two wire pins are answered by the oracle. -/
 def urwDemoFoot : UFoot where
   Dr r := !(decide (r = .sig_meip) || decide (r = .sig_seip))
-  Dw r := !(decide (r = .sig_meip) || decide (r = .sig_seip))
+  Dw r := !(decide (r = .sig_meip) || decide (r = .sig_seip) || decide (r = .cur_privilege))
   Dany r := decide (r = .sig_meip) || decide (r = .sig_seip)
+  noPriv := by decide
 
 /-! ## RTYPE: `add x3, x1, x2` -/
 
@@ -162,55 +163,15 @@ theorem urwDemo_add_sym (orc : UOrc) (rs : RegFile) (mm : BMap) (rv : Bool) (rs1
   show runRW urwDemoFoot orc _ (execute_RTYPE _ _ _ rop.ADD) = _
   simp only [execute_RTYPE, runRW_bind, urwDemo_rX, Option.bind, Pure.pure, runRW_freeM_pure, urwDemo_wX]
 
-/-! ## ECALL through the U→S trap tower -/
+/-! ## ECALL through the U→S trap tower: RETIRED (NI M2-W1, 2026-10-01)
 
-/-- The `Trap` arm of `try_step` after `execute (ECALL ())`: the tower
-(`exception_handler`: delegation, `trap_handler` at S, `prepare_trap_vector`)
-and the redirect.  (A stub for U0-T's `UTrap`: the model's own tower.) -/
-noncomputable def urwDemoEcallTower : SailM Unit := do
-  match ← execute (instruction.ECALL ()) with
-  | .Trap (priv, exc, pc) => set_next_pc (← exception_handler priv exc pc)
-  | _ => pure ()
-
-/-- The configuration the tower branches on, at xv6's user-time values:
-User privilege, `misa`, `medeleg = MEDELEG_S`, `stvec = TRAMPOLINE`. -/
-def urwDemoPinU : RegPin
-  | .cur_privilege => some Privilege.User
-  | .medeleg => some 0xb3ff#64
-  | .misa => some 0x800000000014112D#64
-  | .stvec => some 0x3ffffff000#64
-  | _ => none
-
-/-- **ECALL**: the walk succeeds for every oracle. -/
-theorem urwDemo_ecall_ok (orc : UOrc) (rs : RegFile) (mm : BMap) (rv : Bool) :
-    (runRW urwDemoFoot orc ⟨urwDemoPinU, rs, mm, rv⟩ urwDemoEcallTower).isSome = true := by
-  kernel_rfl
-
-/-- **ECALL**: the landing -- at `TRAMPOLINE` in S mode, `sepc` the trapping
-PC, `stval` zero, memory, reservation bit and oracle untouched. -/
-theorem urwDemo_ecall (orc : UOrc) (rs : RegFile) (mm : BMap) (rv : Bool) :
-    (runRW urwDemoFoot orc ⟨urwDemoPinU, rs, mm, rv⟩ urwDemoEcallTower).map
-      (fun r => (r.1, r.2.1.file .nextPC, r.2.1.file .cur_privilege, r.2.1.file .sepc,
-        r.2.1.file .stval, r.2.1.mm, r.2.1.rv, r.2.2)) =
-    some ((), 0x3ffffff000#64, Privilege.Supervisor, rs .PC, 0#64, mm, rv, orc) := by
-  kernel_rfl
-
-/-- The `scause` the tower writes, as the model computes it... -/
-theorem urwDemo_ecall_scause (orc : UOrc) (rs : RegFile) (mm : BMap) (rv : Bool) :
-    (runRW urwDemoFoot orc ⟨urwDemoPinU, rs, mm, rv⟩ urwDemoEcallTower).map
-      (fun r => r.2.1.file .scause) =
-    some (Sail.BitVec.updateSubrange (Sail.BitVec.updateSubrange (rs .scause) 63 63 0#1) 62 0
-      (zero_extend (m := 63) 8#6)) := by
-  kernel_rfl
-
-/-- ... is the user ECALL cause, 8, whatever `scause` held (a data fact on a
-symbolic value: `bv_decide`, not the walk). -/
-theorem urwDemo_scause_8 (x : BitVec 64) :
-    Sail.BitVec.updateSubrange (Sail.BitVec.updateSubrange x 63 63 0#1) 62 0
-      (zero_extend (m := 63) 8#6) = 8#64 := by
-  simp only [Sail.BitVec.updateSubrange, Sail.BitVec.updateSubrange', zero_extend,
-    Sail.BitVec.zeroExtend]
-  bv_decide
+The spike's third fact ran `execute (ECALL ())` and the model's own trap
+tower through the walker.  That tower writes `cur_privilege` from User to
+Supervisor -- since M2-W1 an OBSERVED event (`Obs.uExit`) that needs the
+client's consent (`swp_writeReg_priv`), so no walker footprint may write
+`cur_privilege` (`UFoot.noPriv`) and the walk facts and their `swp` form
+(`urwDemo_ecall_ok`, `urwDemo_ecall`, `urwDemo_ecall_scause`,
+`urwDemo_swp_ecall`) are retired.  The real tower is `MachCSL.UTrap`. -/
 
 /-! ## LD over an owned page, through Sv39 translation -/
 
@@ -313,36 +274,6 @@ theorem urwDemo_swp_add (cpu : CPU) (ξ : CtxId) (dq : DFrac) (f : RegFile)
     obtain ⟨rfl, rfl, rfl⟩ := h
     simp only [uRegFrameLF, UWSt.file_mk_set, urwDemo_noPin_file]
     iapply HΦ $$ HF
-    iapply uResvTok_ctxTok cpu ξ _ $$ [$Hc $Hr]
-
-/-- **ECALL, as a `swp` spec**, over ANY frames for the user footprint
-whose file agrees with the pinned configuration: the hart lands at
-`TRAMPOLINE` in S mode, `sepc` the trapping PC, `scause = 8`; memory as it
-was. -/
-theorem urwDemo_swp_ecall (cpu : CPU) (ξ : CtxId) (RF : URegFrame GF cpu urwDemoFoot)
-    (BF : UByteFrame GF ξ) (f : RegFile) (mm : BMap) (hf : ∀ r v, urwDemoPinU r = some v → f r = v)
-    (Φ : Unit → IProp GF) :
-    RF.F f ∗ BF.B mm ∗ ctxTok cpu ξ ∗
-    (∀ f' : RegFile, ⌜f' .nextPC = 0x3ffffff000#64 ∧ f' .cur_privilege = Privilege.Supervisor ∧
-        f' .sepc = f .PC ∧ f' .scause = 8#64⌝ -∗ RF.F f' -∗ BF.B mm -∗ ctxTok cpu ξ -∗ Φ ())
-    ⊢ swp cpu urwDemoEcallTower Φ := by
-  have hfile := UWSt.file_pin urwDemoPinU f mm false hf
-  iintro ⟨HF, HB, Htok, HΦ⟩
-  icases ctxTok_uResvTok cpu ξ $$ Htok with ⟨Hc, Hr⟩
-  iapply swp_runRW RF BF urwDemoEcallTower ⟨urwDemoPinU, f, mm, false⟩
-    (fun orc => urwDemo_ecall_ok orc f mm false) Φ
-  unfold uFr uPost
-  isplitl [HF HB Hc Hr]
-  · rw [hfile]
-    iframe
-  · iintro %orc %x %s' %orc' %h HF HB Hc Hr
-    have h1 := urwDemo_ecall orc f mm false
-    have h2 := urwDemo_ecall_scause orc f mm false
-    rw [h] at h1 h2
-    simp only [Option.map_some, Option.some.injEq, Prod.mk.injEq] at h1 h2
-    obtain ⟨-, hpc, hpriv, hsepc, -, hmm, -, -⟩ := h1
-    rw [hmm]
-    iapply HΦ $$ %s'.file %⟨hpc, hpriv, hsepc, h2.trans (urwDemo_scause_8 _)⟩ HF HB
     iapply uResvTok_ctxTok cpu ξ _ $$ [$Hc $Hr]
 
 /-- **LD, as a `swp` spec**, over ANY frames for the user footprint whose

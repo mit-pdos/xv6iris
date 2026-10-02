@@ -1281,6 +1281,97 @@ def obsInv : IProp GF := inv obsN (MachFixedGS.obsPred (hlc := hlc) (GF := GF))
 
 instance : Persistent (PROP := IProp GF) obsInv := by unfold obsInv; infer_instance
 
+/-! ### The hart's trace permit (NI M2-W1)
+
+The user boundary (M2-W1, 2026-10-01).  A hart's privilege-crossing write
+of `cur_privilege` emits `Obs.uExit`/`Obs.uEnter` (`MachCSL.hartObs`), so,
+like a UART's observed arm, it moves the history ghost and needs the
+client's consent: `hartObsStep` for one write, `hartObsPermit` its
+persistent, every-write form (the observed rule is
+`MachCSL.swp_writeReg_priv`).  The permit is FIXED-LAYER (it names no era),
+so the power thread can seal it into the wire invariant it allocates at
+power-on (`MachCSL.wireInvAt`), out of the trace invariant and the client's
+user-event hook (`hartObsPermit_of_hook`). -/
+
+/-- **THE HART'S TRACE PERMIT, one write**: the client's consent to a write of
+`p'` to hart `cpu`'s `cur_privilege` over `p`.  Handed what the machine
+layer knows of the history at that write (it is well-formed for the machine
+`g`, the power is on, the privilege it overwrites is `p`) and the machine's
+half of the history, it moves the history by exactly what the write emits:
+`hartObsPriv cpu (g.m.regs cpu) p'` (`= hartObs cpu (.regWrite
+.cur_privilege p') g.m`) -- `uExit`/`uEnter` with the registers of the file
+it is written over at a crossing, nothing otherwise. -/
+def hartObsStep (cpu : CPU) (p p' : Privilege) : IProp GF := iprop%
+  ∀ (h : List Obs) (g : GState),
+    ⌜obsWf h g ∧ g.pow = true ∧ g.m.regs cpu .cur_privilege = p⌝ -∗
+    obsAuth h ={⊤}=∗ obsAuth (h ++ hartObsPriv cpu (g.m.regs cpu) p')
+
+/-- **THE HART'S TRACE PERMIT**, persistent and for every write. -/
+def hartObsPermit : IProp GF := iprop%
+  □ ∀ (cpu : CPU) (p p' : Privilege), hartObsStep cpu p p'
+
+instance hartObsPermit_persistent : Persistent (hartObsPermit (hlc := hlc) (GF := GF)) := by
+  unfold hartObsPermit; infer_instance
+
+theorem hartObsPermit_step (cpu : CPU) (p p' : Privilege) :
+    hartObsPermit (hlc := hlc) (GF := GF) ⊢ hartObsStep cpu p p' := by
+  unfold hartObsPermit
+  iintro #H
+  iapply H
+
+/-- **The permit from the client's USER-EVENT HOOK**: a trace predicate that
+accepts every user-boundary event (`Huser`, the hart's counterpart of
+`wp_power`'s `Hobs`) grants the permit, through the trace invariant. -/
+theorem hartObsPermit_of_hook
+    (Huser : ∀ (h : List Obs) (e : Obs), isUser e = true →
+      ▷ MachFixedGS.obsPred (hlc := hlc) (GF := GF) ∗ obsHalf h ⊢@{IProp GF}
+        |==> ◇ (▷ MachFixedGS.obsPred (hlc := hlc) (GF := GF) ∗ obsHalf (h ++ [e]))) :
+    obsInv ⊢@{IProp GF} hartObsPermit := by
+  unfold hartObsPermit hartObsStep
+  iintro #Hoinv !> %cpu %p %p' %h %g %_ Ha
+  rcases hartObsPriv_cases cpu (g.m.regs cpu) p' with he | ⟨e, he, hu⟩
+  · rw [he, List.append_nil]
+    imodintro
+    iexact Ha
+  rw [he]
+  unfold obsAuth
+  icases Ha with ⟨Hhalf, Hhist⟩
+  unfold obsInv
+  imod (inv_acc (E := ⊤) (N := obsN) (P := MachFixedGS.obsPred (hlc := hlc) (GF := GF))
+    CoPset.subseteq_top) $$ Hoinv with ⟨HP, Hoclose⟩
+  imod Huser h e hu $$ [HP Hhalf] with >⟨HP, Hhalf⟩
+  · iframe HP Hhalf
+  imod Hoclose $$ HP
+  imod obsHistAuth_step h (h ++ [e]) (List.prefix_append _ _) $$ Hhist with Hhist
+  imodintro
+  iframe Hhalf Hhist
+
+/-- **THE PERMIT OF THE TRIVIAL TRACE PREDICATE** (the hart's
+`devObsPermit_triv`): a client that states no trace property moves the
+ghost and ignores the event. -/
+theorem hartObsPermit_triv
+    (heq : MachFixedGS.obsPred (hlc := hlc) (GF := GF) = obsPredTriv) :
+    obsInv ⊢@{IProp GF} hartObsPermit := by
+  unfold hartObsPermit hartObsStep
+  iintro #Hoinv !> %cpu %p %p' %h %g %_ Ha
+  unfold obsInv
+  rw [heq]
+  imod (inv_acc_timeless (E := ⊤) (N := obsN) (P := obsPredTriv (GF := GF)) CoPset.subseteq_top)
+    $$ Hoinv with ⟨HP, Hclose⟩
+  unfold obsPredTriv
+  icases HP with ⟨%h', Hfrag⟩
+  ihave %he := obsAgree h h' $$ [Ha Hfrag]
+  · iframe Ha Hfrag
+  subst he
+  imod obsUpdate h (h ++ hartObsPriv cpu (g.m.regs cpu) p') (List.prefix_append _ _) $$ [Ha Hfrag]
+    with ⟨Ha, Hfrag⟩
+  · iframe Ha Hfrag
+  imod Hclose $$ [Hfrag]
+  · iexists (h ++ hartObsPriv cpu (g.m.regs cpu) p')
+    iexact Hfrag
+  imodintro
+  iexact Ha
+
 /-! ### The crash-spanning invariant and the swap counter (Rocq `RiscvPtsto`:
 `crashN`, `crash_inv`, `swap_auth`, `swap_lb`) -/
 

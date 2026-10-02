@@ -170,6 +170,11 @@ theorem xv6PowerAdequacyGen (g : GState) (sb : FsSb) (nib : Nat) (cov : ExtTreeS
           Tnn' c (obsBoots h + 1) ⊢@{IProp GF}
         |==> ◇ (▷ Pt γobs c ∗ (γobs ↪VAR{.own (1 : Qp).half} (h ++ [Obs.powerOn])) ∗
           Tnn'' c (obsBoots h + 1)))
+    -- THE USER-EVENT HOOK (NI M2-W1): the trace slot accepts a hart's
+    -- user-boundary event (`MachCSL.riscvPowerAdequacy`'s `Huser`)
+    (Huser : ∀ (γobs : GName) (c : CT) (h : List Obs) (e : Obs), isUser e = true →
+      ▷ Pt γobs c ∗ (γobs ↪VAR{.own (1 : Qp).half} h) ⊢@{IProp GF}
+        |==> ◇ (▷ Pt γobs c ∗ (γobs ↪VAR{.own (1 : Qp).half} (h ++ [e]))))
     (Hperm : ∀ (Hinv : InvGS_gen hlc GF) (γgen γstart γreg γd γsw γobs γhist : GName) (c : CT)
         (T : List Obs),
       letI : MachFixedGS hlc GF := (xv6FixedGS N appFs appOkc cov sb.sbLogstart (Ai c) Hinv γgen
@@ -205,7 +210,7 @@ theorem xv6PowerAdequacyGen (g : GState) (sb : FsSb) (nib : Nat) (cov : ExtTreeS
     (fun c => (Ai c).wild) (fun c k => (Ai c).wild_persistent k) (fun c k => (Ai c).wild_timeless k)
     (fun c => (Ai c).rdwild) (fun c k => (Ai c).rdwild_persistent k)
     (fun c k => (Ai c).rdwild_timeless k)
-    HPt Hobs Hback phi Hphi Hgen0 Hpow ?_ n κs t2 g2 hsteps
+    HPt Hobs Hback Huser phi Hphi Hgen0 Hpow ?_ n κs t2 g2 hsteps
   intro F Hinv γgen γstart γreg γd γsw γobs γhist c T hF hborn E gen σ hbf hdv hpp
   -- the merge and the runner at the record literal, read off the equations
   -- the literal satisfies by `rfl` (Rocq's `Hmergefix`/`Hrunfix`)
@@ -349,6 +354,7 @@ theorem xv6PowerAdequacy (US : USER) (g : GState) (sb : FsSb) (nib : Nat)
     (fun γd γobs _ h on dk hs => obsPredAt_step XV6_DISK_BYTES consResTriv (fun _ => iprop(emp))
       (fun _ => .rfl) (fun _ => .rfl) γd γobs h on dk hs)
     (fun _ _ _ => backId _ _ _)
+    (fun γobs _ h e _ => obsPredAt_user γobs h e)
     (fun Hinv γgen γstart γreg γd γsw γobs γhist c T =>
       xv6Triv_perm cov sb.sbLogstart Hinv γgen γstart γreg γd γsw γobs γhist c T)
     (fun g' _ => phi g')

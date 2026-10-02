@@ -314,6 +314,12 @@ theorem riscvPowerAdequacy [MachGpreS hlc GF] [KernelMap] (ndisk : Nat) (g : GSt
           Tn' c (obsBoots h + 1) ⊢@{IProp GF}
         |==> ◇ (▷ Pt γobs c ∗ (γobs ↪VAR{.own (1 : Qp).half} (h ++ [Obs.powerOn])) ∗
           Tn'' c (obsBoots h + 1)))
+    -- THE USER-EVENT HOOK (NI M2-W1): the trace slot accepts a hart's
+    -- user-boundary event (`wp_power`'s `Huser`, sealed into the wire
+    -- invariant as the hart's permit)
+    (Huser : ∀ (γobs : GName) (c : CT) (h : List Obs) (e : Obs), isUser e = true →
+      ▷ Pt γobs c ∗ (γobs ↪VAR{.own (1 : Qp).half} h) ⊢@{IProp GF}
+        |==> ◇ (▷ Pt γobs c ∗ (γobs ↪VAR{.own (1 : Qp).half} (h ++ [e]))))
     (phi : GState → List Obs → Prop)
     (Hphi : ∀ (Hinv : InvGS_gen hlc GF) (γgen γstart γreg γdisk γswap γobs γhist : GName) (c : CT)
         (T : List Obs) (g' : GState) (h : List Obs),
@@ -403,6 +409,7 @@ theorem riscvPowerAdequacy [MachGpreS hlc GF] [KernelMap] (ndisk : Nat) (g : GSt
       Mof (Rb c) (Tn c) (Tn' c) (Tn'' c) (fun E gen dk => Hswap γdisk γswap γreg γstart c hborn E gen dk)
       (fun h on dk hs => Hobs γdisk γobs c h on dk hs)
       (fun h => Hback γobs c h)
+      (fun h e he => Huser γobs c h e he)
       (fun E gen σ hbf hdv hpp => @Hboot ((bootFixedGS Hinv γgen γstart γreg γdisk ndisk γswap
         (Pc γdisk γswap γreg γstart c)
           (Tk c) (Hk c) γobs T (Pt γobs c) γhist
@@ -570,6 +577,45 @@ theorem obsLedgerAt_back (R : List Obs → IProp GF) [∀ h, Timeless (R h)]
     iframe Hfrag HR
   iframe Hauth HT
 
+/-- THE USER-EVENT STEP AT THE TRIVIAL PREDICATE (NI M2-W1): the ghost moves,
+nothing is filed. -/
+theorem obsPredAt_user (γ : GName) (h : List Obs) (e : Obs) :
+    ▷ obsPredAt γ ∗ (γ ↪VAR{.own (1 : Qp).half} h) ⊢@{IProp GF}
+      |==> ◇ (▷ obsPredAt γ ∗ (γ ↪VAR{.own (1 : Qp).half} (h ++ [e]))) := by
+  unfold obsPredAt
+  iintro ⟨⟨%h', >Hfrag⟩, Hauth⟩
+  ihave %he := ghost_var_agree γ h' _ h _ $$ Hfrag Hauth
+  subst he
+  imod ghost_var_update_halves (h' ++ [e]) γ h' h' $$ Hauth Hfrag with ⟨Hauth, Hfrag⟩
+  imodintro
+  imodintro
+  isplitl [Hfrag]
+  · inext
+    iexists _
+    iexact Hfrag
+  iexact Hauth
+
+/-- THE USER-EVENT STEP AT THE LEDGER (NI M2-W1): the client's ledger closed
+under the user-boundary events (`Hu`) is the slot's `Huser`. -/
+theorem obsLedgerAt_user (R : List Obs → IProp GF) [∀ h, Timeless (R h)]
+    (Hu : ∀ (h : List Obs) (e : Obs), isUser e = true → R h ⊢@{IProp GF} |==> R (h ++ [e]))
+    (γ : GName) (h : List Obs) (e : Obs) (he : isUser e = true) :
+    ▷ obsLedgerAt R γ ∗ (γ ↪VAR{.own (1 : Qp).half} h) ⊢@{IProp GF}
+      |==> ◇ (▷ obsLedgerAt R γ ∗ (γ ↪VAR{.own (1 : Qp).half} (h ++ [e]))) := by
+  unfold obsLedgerAt
+  iintro ⟨⟨%h', >Hfrag, >HR⟩, Hauth⟩
+  ihave %hh := ghost_var_agree γ h' _ h _ $$ Hfrag Hauth
+  subst hh
+  imod ghost_var_update_halves (h' ++ [e]) γ h' h' $$ Hauth Hfrag with ⟨Hauth, Hfrag⟩
+  imod Hu h' e he $$ HR with HR
+  imodintro
+  imodintro
+  isplitl [Hfrag HR]
+  · inext
+    iexists _
+    iframe Hfrag HR
+  iexact Hauth
+
 /-- ...and a client with nothing to file (Rocq `back_id`): the turn goes
 straight back. -/
 theorem backId (P G T : IProp GF) : ▷ P ∗ G ∗ T ⊢@{IProp GF} |==> ◇ (▷ P ∗ G ∗ T) := by
@@ -648,6 +694,8 @@ theorem riscvTraceAdequacy [KernelMap] (ndisk : Nat) (g : GState)
     (HR0 : ⊢@{IProp GF} |==> R [])
     (Hpow : ∀ (h : List Obs) (on : Bool) (dk : Nat → BitVec 8), traceShape h on →
       R h ⊢@{IProp GF} |==> R (h ++ [powerEv on]))
+    -- the ledger is closed under the harts' user-boundary events (NI M2-W1)
+    (Huser : ∀ (h : List Obs) (e : Obs), isUser e = true → R h ⊢@{IProp GF} |==> R (h ++ [e]))
     (P : List Obs → Prop) (HR : ∀ h, R h ⊢@{IProp GF} ⌜P h⌝)
     (Hgen0 : g.gen = 0) (Hpow0 : g.pow = false)
     (Hboot : ∀ [F : MachFixedGS hlc GF] (Hinv : InvGS_gen hlc GF)
@@ -710,6 +758,7 @@ theorem riscvTraceAdequacy [KernelMap] (ndisk : Nat) (g : GState)
         · simp only [↓reduceIte]; itrivial)
       ndisk γdisk γobs h on dk hs)
     (fun _ _ _ => backId _ _ _)
+    (fun γobs _ h e he => obsLedgerAt_user R Huser γobs h e he)
     (fun _ h => P h)
     (fun _ _ _ _ _ _ γobs _ _ _ _ h => by
       iintro ⟨_, Hauth, _, _, HPt⟩

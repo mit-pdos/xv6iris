@@ -169,6 +169,29 @@ theorem union_al_back (c : (appUnion (hlc := hlc) (GF := GF)).fixed) (h : List O
         (appUnion (hlc := hlc) (GF := GF)).turn'' c (obsBoots h + 1) :=
   unionLed_back (hlc := hlc) (GF := GF) c h
 
+/-- **THE USER BOUNDARY** (NI M2-W1): the union's ledger reads the history
+only through its power cycles' console segments, the open segment and the
+boot count, none of which a user-boundary event moves (`cyclesOf_user`,
+`openSeg_user`, `obsBoots_user`), so the ledger takes it unchanged. -/
+theorem union_al_user (c : (appUnion (hlc := hlc) (GF := GF)).fixed) (h : List Obs) (e : Obs)
+    (he : isUser e = true) :
+    (appUnion (hlc := hlc) (GF := GF)).R c h ⊢@{IProp GF}
+      |==> (appUnion (hlc := hlc) (GF := GF)).R c (h ++ [e]) := by
+  have hu : ∀ x ∈ [e], isUser x = true := by simpa using he
+  have hc := cyclesOf_user h [e] hu
+  have ho := openSeg_user h [e] hu
+  have hb : obsBoots (h ++ [e]) = obsBoots h := by
+    rw [obsBoots_app, obsBoots_user [e] hu, Nat.add_zero]
+  have hd : lmDisc ulmG (h ++ [e]) = lmDisc ulmG h := by unfold lmDisc; rw [hc]
+  show unionLed (hlc := hlc) c h ⊢ |==> unionLed (hlc := hlc) c (h ++ [e])
+  unfold unionLed unionPhiRes unionReg unionBase pinMap f0Map peraMap f0Pinned ulinesOf ulastCyc
+    unionPhiSyncBody unionRecNow unionRecBase ulastBefore ulinesBefore
+  rw [hd]
+  simp only [hc, ho, hb]
+  iintro H
+  imodintro
+  iexact H
+
 /-- **Rocq `union_al_R0`**. -/
 theorem union_al_R0 (c : (appUnion (hlc := hlc) (GF := GF)).fixed) :
     (appUnion (hlc := hlc) (GF := GF)).cl c ⊢@{IProp GF} |==> (appUnion (hlc := hlc) (GF := GF)).R c [] := by
@@ -333,6 +356,7 @@ theorem unionLaws (Hprog : UnionProgLaw (hlc := hlc) (GF := GF)) :
   -- THE SYNC LAWS (Rocq sync SY3-A3bc/A4)
   al_found := union_al_found
   al_back := union_al_back
+  al_user := union_al_user
   al_boot_ok := union_al_boot_ok
   al_merge := fun c k hm hb => union_al_merge c k hm hb
   al_sync_run := fun c k => union_al_sync_run c k

@@ -174,7 +174,7 @@ theorem wpLoop_userret_sret [CurCtx] (U : USER) (cpu : CPU) (C : UCfg) (P : UPtd
     { sConfOf KTier.kpt P.root ms C.mideleg mepc stc lf with mstatus := sretMs ms } hok.phys hmdl rfl
     Privilege.User (Or.inr rfl) pc (paOf trampPpn pc) (epc &&& 0xFFFFFFFFFFFFFFFE#64) false (instruction.SRET ())
     iprop(uptSlot cpu P ∗ □ kmapStatic ∗ ctxTok cpu curCtx)
-    iprop(gprFile cpu g ∗ Register.sepc ↦ᵣ[cpu] epc)
+    iprop(hartObsStep cpu Privilege.Supervisor Privilege.User ∗ gprFile cpu g ∗ Register.sepc ↦ᵣ[cpu] epc)
     iprop((uptSlot cpu P ∗ □ kmapStatic ∗ ctxTok cpu curCtx) ∗ gprFile cpu g ∗ Register.sepc ↦ᵣ[cpu] epc)
     (uptTransSpecX_tramp cpu _ false P hok pc hlt hvpn)
     (by rw [← hpa2]; exact uptTransSpecX_tramp cpu _ false P hok (pc + 2#64) hlt2 hvpn2)
@@ -182,8 +182,11 @@ theorem wpLoop_userret_sret [CurCtx] (U : USER) (cpu : CPU) (C : UCfg) (P : UPtd
   iframe HI HmConf Hclock Hpc
   isplitl [Hslot Htok]
   · iframe Hslot Htok; iexact HS
-  isplitl [HF Hsepc]
-  · iframe HF Hsepc
+  -- the user-boundary permit for the `sret`'s privilege write, off the
+  -- shared wire bundle (NI M2-W1)
+  ihave Hpriv := wireInv_step cpu Privilege.Supervisor Privilege.User $$ Hwire
+  isplitl [Hpriv HF Hsepc]
+  · iframe Hpriv HF Hsepc
   inext
   iintro HmConf Hclock Hpc ⟨⟨Hslot, _, Htok⟩, HF, Hsepc⟩
   ihave HRut := HR $$ Htok

@@ -194,11 +194,17 @@ elab "kernel_walk " h:ident " : " t:term : tactic => withMainContext do
 /-! ## The pure walker -/
 
 /-- The walker's register footprint: readable, writable, and the wire
-registers answered by the oracle. -/
+registers answered by the oracle.  The user boundary (M2-W1, 2026-10-01):
+`cur_privilege` is never WRITABLE by a walk (`noPriv`) -- a privilege write
+can cross the user boundary, which is an observed event needing the
+client's consent (`MachCSL.swp_writeReg_priv`), so it is never a silent walker
+step; the towers that make it (`MachCSL.UTrap`, `MachCSL.WpSmodeSretU`) run
+outside the walker. -/
 structure UFoot where
   Dr : Register → Bool
   Dw : Register → Bool
   Dany : Register → Bool
+  noPriv : Dw .cur_privilege = false
 
 /-- One oracle answer: a value for every register (the wire pins) and for
 every nondeterministic choice. -/
@@ -656,8 +662,10 @@ theorem urw_regWrite {X : Type} (r : Register) (v : RegisterType r) (k : PUnit �
     unfold uFr
     iintro ⟨⟨HF, HB, Hc, Hr⟩, HP⟩
     icases RF.wr s.file r v hdw $$ HF with ⟨⟨%v0, Hreg⟩, HFc⟩
+    have hne : r ≠ .cur_privilege := by
+      rintro rfl; rw [D.noPriv] at hdw; exact Bool.noConfusion hdw
     have L : iprop(r ↦ᵣ[cpu] v0 ∗ ▷ (r ↦ᵣ[cpu] v -∗ swp cpu (k ()) Φ)) ⊢
-        swp cpu (FreeM.impure (.ok (.regWrite r v)) k) Φ := swp_writeReg_bind cpu r v0 v k Φ
+        swp cpu (FreeM.impure (.ok (.regWrite r v)) k) Φ := swp_writeReg_bind cpu r v0 v (Or.inl hne) k Φ
     iapply L
     iframe Hreg
     inext
@@ -952,11 +960,18 @@ section frames
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 
 /-- The footprint of two register lists (written, read-only) and the wire
-list. -/
+list.  `cur_privilege` is never writable (`UFoot.noPriv`), whichever list
+holds it. -/
 def uFootL (Lw Lr La : List Register) : UFoot where
   Dr r := Lw.contains r || Lr.contains r
-  Dw r := Lw.contains r
+  Dw r := Lw.contains r && r != .cur_privilege
   Dany r := La.contains r
+  noPriv := by simp
+
+theorem uFootL_dw (Lw Lr La : List Register) (r : Register) (h : (uFootL Lw Lr La).Dw r = true) :
+    Lw.contains r = true := by
+  simp only [uFootL, Bool.and_eq_true] at h
+  exact h.1
 
 /-- The register cells of the lists (Rocq `hreg_frame` ∗ `hreg_frame_ro`):
 the written ones in full, the read-only ones at `dq`. -/
@@ -1035,7 +1050,7 @@ def uRegFrameLF (cpu : CPU) (Lw Lr La : List Register) (dq : DFrac) (hnd : (Lw +
     URegFrame GF cpu (uFootL Lw Lr La) where
   F := uRegFrameL cpu Lw Lr dq
   rd := fun f r h => uRegFrameL_rd cpu Lw Lr dq f r h
-  wr := fun f r v h => uRegFrameL_wr cpu Lw Lr dq hnd f r v h
+  wr := fun f r v h => uRegFrameL_wr cpu Lw Lr dq hnd f r v (uFootL_dw Lw Lr La r h)
 
 /-- The empty byte frame (a register-only walk: Rocq's `mm := ∅`, the
 register-writing analogue of `hval_of_goodb`). -/
@@ -1178,7 +1193,8 @@ theorem runRW_ro {X : Type} (Lr : List Register) (D : UFoot) (hD : ∀ r ∈ Lr,
         · simp only [runRW, uFootL, List.contains_nil, Bool.false_or, hc, Bool.false_eq_true,
             if_false, reduceCtorEq] at h
       | regWrite r v =>
-        simp only [runRW, uFootL, List.contains_nil, Bool.false_eq_true, if_false, reduceCtorEq] at h
+        simp only [runRW, uFootL, List.contains_nil, Bool.false_and, Bool.false_eq_true, if_false,
+          reduceCtorEq] at h
       | memRead n vs req =>
         simp only [runRW] at h ⊢
         rw [hm] at h

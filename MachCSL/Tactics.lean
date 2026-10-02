@@ -652,16 +652,25 @@ def swpStepCore (x fn : Lean.Expr) (bind : Bool) : TacticM Unit := do
         let stx ← Lean.Elab.Term.exprToSyntax x
         evalTactic (← `(tactic| rw [show ($stx) = (($stx) >>= pure) from (bind_pure _).symm]))
       let rE := x.getAppArgs[0]!
+      let rStx ← Lean.Elab.Term.exprToSyntax rE
+      let wStx ← Lean.Elab.Term.exprToSyntax x.getAppArgs[1]!
       if isHwReg rE then
         -- a same-value write of a frozen register (the trap's `reset_elp`)
-        let rStx ← Lean.Elab.Term.exprToSyntax rE
-        let wStx ← Lean.Elab.Term.exprToSyntax x.getAppArgs[1]!
         let hw := mkIdent `Hhw
         evalTactic (← `(tactic| first
           | (iapply (swp_writeReg_hw_bind (r := $rStx) (v := $wStx) (h := by rfl)); iframe $hw:ident; try inext)
-          | (iapply swp_writeReg_bind; (first | iframe $h:ident | iframe); try (inext; iintro $h:ident))))
+          | (iapply (swp_writeReg_bind (r := $rStx) (w := $wStx) (hq := Or.inl (by decide))); (first | iframe $h:ident | iframe); try (inext; iintro $h:ident))))
+      else if rE.isAppOf ``LeanRV64D.Register.cur_privilege then
+        -- THE USER BOUNDARY (NI M2-W1): a privilege write that stays on one
+        -- side of the boundary is silent; a crossing write needs the
+        -- client's consent, the one-write permit `Hpriv : hartObsStep cpu p p'`
+        -- in the context
+        let hp := mkIdent `Hpriv
+        evalTactic (← `(tactic| first
+          | (iapply swp_writeReg_priv_quiet_bind; iframe $h:ident; isplitl []; (ipureintro; rfl); try (inext; iintro $h:ident))
+          | (iapply swp_writeReg_priv_bind; iframe $hp:ident $h:ident; try (inext; iintro $h:ident))))
       else
-        evalTactic (← `(tactic| (iapply swp_writeReg_bind; (first | iframe $h:ident | iframe); try (inext; iintro $h:ident))))
+        evalTactic (← `(tactic| (iapply (swp_writeReg_bind (r := $rStx) (w := $wStx) (hq := Or.inl (by decide))); (first | iframe $h:ident | iframe); try (inext; iintro $h:ident))))
     else if n == ``LeanRV64D.ConcurrencyInterfaceV1.sail_mem_read then
       -- normalise the request's address arithmetic so the bytes frame, then
       -- read the access kind off the request: a fetch reads image bytes

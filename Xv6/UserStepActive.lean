@@ -65,10 +65,10 @@ theorem ustExecOk_fn {s : UWSt} {i : instruction} {len : Int} (h : UstExecOk C P
 decode, execute, and the arm of the outcome. -/
 theorem ust_fetchArm (hF : UstFetchSpec (GF := GF) cpu C P) (hX : UstExecTotal C P) (s : UWSt)
     (hl : UstLand C P t0 mm0 s) :
-    hwConfig (GF := GF) cpu ∗ uFr (ufRegF cpu C) (ubFrame curCtx (ubUAddrs P t0)) s ⊢
+    hwConfig (GF := GF) cpu ∗ wireInv ∗ uFr (ufRegF cpu C) (ubFrame curCtx (ubUAddrs P t0)) s ⊢
       swp cpu (fetch () >>= ucAfterFetch)
         (ucArmOb (ufRegF cpu C) (ubFrame curCtx (ubUAddrs P t0)) (ustQ C P t0 mm0) ustR) := by
-  iintro ⟨#Hhw, Hfr⟩
+  iintro ⟨#Hhw, #Hwi, Hfr⟩
   iapply swp_bind
   iapply hF t0 mm0 s _ hl
   iframe Hhw Hfr
@@ -82,7 +82,7 @@ theorem ust_fetchArm (hF : UstFetchSpec (GF := GF) cpu C P) (hX : UstExecTotal C
     iframe Hfr
     iintro Hfr
     iapply ust_armOb_fetchFail cpu C P t0 mm0 s' hl' e a he
-    iframe Hhw Hfr
+    iframe Hhw Hwi Hfr
   | F_Base w =>
     obtain ⟨hl', hal⟩ := hout
     obtain ⟨i, b, hdr, hdi⟩ := decodeU_total32 w
@@ -94,7 +94,7 @@ theorem ust_fetchArm (hF : UstFetchSpec (GF := GF) cpu C P) (hX : UstExecTotal C
     iframe Hfr
     iintro %orc Hfr
     iapply ust_armOb_exec cpu C P t0 mm0 (E orc).1 (E orc).2.1 _ (hE orc)
-    iframe Hhw Hfr
+    iframe Hhw Hwi Hfr
   | F_RVC h =>
     obtain ⟨hl', hal⟩ := hout
     obtain ⟨i, b, hdr, hdi⟩ := decodeU_total16 h
@@ -106,14 +106,14 @@ theorem ust_fetchArm (hF : UstFetchSpec (GF := GF) cpu C P) (hX : UstExecTotal C
     iframe Hfr
     iintro %orc Hfr
     iapply ust_armOb_exec cpu C P t0 mm0 (E orc).1 (E orc).2.1 _ (hE orc)
-    iframe Hhw Hfr
+    iframe Hhw Hwi Hfr
 
 /-- **One machine step of an ACTIVE user hart** (Rocq `wp_user_step_active`
 ∘ `active_class_intro`): the cycle (interrupt or fetch arm), the optional
 tick, and the landing handed to the continuation. -/
 theorem ust_step_active (hF : UstFetchSpec (GF := GF) cpu C P) (hX : UstExecTotal C P) (v : UfVals) (mm : BMap)
     (hu : UfUser v) (ha : v.hs = .HART_ACTIVE ()) (hwf : UbMemWf P t0 mm) (htlb : utlbOk t0 v.tlb) :
-    hwConfig (GF := GF) cpu ∗ uFr (ufRegF cpu C) (ubFrame curCtx (ubUAddrs P t0)) (ustS0 C P v mm) ∗
+    hwConfig (GF := GF) cpu ∗ wireInv ∗ uFr (ufRegF cpu C) (ubFrame curCtx (ubUAddrs P t0)) (ustS0 C P v mm) ∗
       ▷ (∀ s3, ⌜UstUserAt C P t0 mm s3 ∨ UstTrapAt C P t0 mm s3⌝ -∗
         uFr (ufRegF cpu C) (ubFrame curCtx (ubUAddrs P t0)) s3 -∗ wpLoop cpu)
     ⊢ wpLoop cpu := by
@@ -122,7 +122,7 @@ theorem ust_step_active (hF : UstFetchSpec (GF := GF) cpu C P) (hX : UstExecTota
   have hm : UcMisa ufFoot (ustS0 C P v mm) := uf_ucMisa C P _ hl.cfg
   have hmm : (ustS0 C P v mm).file .mie &&& ~~~((ustS0 C P v mm).file .mideleg) = 0#64 := by
     rw [hl.cfg.mie, hl.cfg.mideleg]; exact C.mm
-  iintro ⟨#Hhw, Hfr, HK⟩
+  iintro ⟨#Hhw, #Hwi, Hfr, HK⟩
   iapply wpLoop_ucStep
   iintro %tick
   inext
@@ -136,10 +136,10 @@ theorem ust_step_active (hF : UstFetchSpec (GF := GF) cpu C P) (hX : UstExecTota
     · iintro %meip %seip %i %p %hd Hfr
       obtain rfl := dispatchU_priv _ _ _ i p hd
       iapply ust_armOb_interrupt cpu C P t0 mm _ hlP i
-      iframe Hhw Hfr
+      iframe Hhw Hwi Hfr
     · iintro Hfr
       iapply ust_fetchArm cpu C P t0 mm hF hX _ hlP
-      iframe Hhw Hfr
+      iframe Hhw Hwi Hfr
   iintro %b Hpost
   unfold ucCyclePost
   icases Hpost with ⟨%st, %s2, %hq, Hfr, -⟩

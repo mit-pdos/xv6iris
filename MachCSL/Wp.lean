@@ -18,6 +18,23 @@ The per-event rules (`swp_regRead`, `swp_regWrite`, `swp_memRead`, ...) are
 each proved from one generic lifting lemma (`wpHart_lift`) that specialises
 iris-lean's `wp_lift_step` to `hartStep`.
 
+The user boundary (M2-W1, 2026-10-01).  The hart arm of the language now
+emits `hartObsM` (`Obs.uExit`/`Obs.uEnter` at the privilege-crossing write of
+`cur_privilege`, nothing at any other event), so the lifting is two lemmas:
+`wpHart_lift_obs`, the general one, whose callback is handed the history's
+machine half `obsAuth h` (with `obsWf h g` and liveness) and returns it at
+`h ++ hartObsM …`, re-packed by `obsInterp_close` as the device rule does;
+and `wpHart_lift`, the SILENT one every per-event rule uses, whose callback
+shows the step emits nothing (`hartObsM cpu m σ = []`).  Every event but a
+register write is silent by computation (`swp_event`'s auto-discharged
+`hsil`); a register write is silent unless it is a crossing write of
+`cur_privilege` (`hartObs_regWrite_quiet`), so `swp_writeReg` takes
+`r ≠ .cur_privilege ∨ v = w`, and the crossing write itself is
+`swp_writeReg_priv`, which takes the CLIENT'S CONSENT as a premise
+(`hartObsStep`: move the history by the event; `hartObsPermit` its
+persistent, every-write form; `hartObsPermit_triv` the trivial trace
+predicate's instance).
+
 Eras: `wpHart` is stated at the ambient generation and takes the generation's
 persistent certificate `genCert`.  `wpHart_lift` is the single place that
 dispatches on the era bookkeeping, exactly as the Rocq prototype's
@@ -79,8 +96,8 @@ theorem wp_dead (gen : Nat) (cpu : CPU) (m : SailM Unit) :
     exact ⟨[], .hart gen cpu m, g, [], primStep_hart_dead hnl⟩
   inext
   iintro %e₂ %g₂ %eₜ %Hstep _
-  obtain ⟨rfl, rfl, h⟩ := primStep_hart_inv Hstep
-  rcases h with ⟨hl, _⟩ | ⟨_, rfl, rfl⟩
+  obtain ⟨rfl, h⟩ := primStep_hart_inv Hstep
+  rcases h with ⟨hl, _⟩ | ⟨_, rfl, rfl, rfl⟩
   · exact absurd hl hnl
   imod Hclose
   imodintro
@@ -160,14 +177,23 @@ theorem wpLoop_fupd (cpu : CPU) : (|={⊤}=> wpLoop (GF := GF) cpu) ⊢ wpLoop c
   imodintro
   iapply H $$ Hcert
 
-/-- The generic lifting lemma for one hart event, and the single per-hart
-framing point.  The caller shows, from the ambient era's interpretation, that
-the hart can step, and re-establishes the interpretation at every possible
-successor; the era bookkeeping is dispatched here. -/
-theorem wpHart_lift (cpu : CPU) (m : SailM Unit) :
-    (∀ σ, machInterp σ ={⊤,∅}=∗
-      ⌜∃ m' σ', hartStep cpu m σ m' σ'⌝ ∗
-      ▷ ∀ m' σ', ⌜hartStep cpu m σ m' σ'⌝ -∗ £ 1 ={∅,⊤}=∗ machInterp σ' ∗ wpHart cpu m')
+/-- **The generic lifting lemma for one hart event, OBSERVED** (NI M2-W1),
+and the single per-hart framing point.  The caller is handed the ambient
+era's interpretation at the machine `g.m` AND the machine's half of the
+history `obsAuth h` -- with what the language knows of them: the history is
+well-formed for `g` and the hart is live in it -- shows that the hart can
+step, and re-establishes the interpretation at every possible successor,
+handing the history back extended by the step's own observations
+(`hartObsM`; only a crossing write of `cur_privilege` has any).  The other
+half of the history lives in the client's trace predicate, so a caller
+extending it is a caller with the client's consent (`swp_writeReg_priv`).
+The era bookkeeping is dispatched here. -/
+theorem wpHart_lift_obs (cpu : CPU) (m : SailM Unit) :
+    (∀ (g : GState) (h : List Obs), ⌜obsWf h g ∧ threadLive g (genId (hlc := hlc) (GF := GF))⌝ -∗
+      machInterp g.m ∗ obsAuth h ={⊤,∅}=∗
+      ⌜∃ m' σ', hartStep cpu m g.m m' σ'⌝ ∗
+      ▷ ∀ m' σ', ⌜hartStep cpu m g.m m' σ'⌝ -∗ £ 1 ={∅,⊤}=∗
+        machInterp σ' ∗ obsAuth (h ++ hartObsM cpu m g.m) ∗ wpHart cpu m')
     ⊢@{IProp GF} wpHart cpu m := by
   unfold wpHart hartWP
   iintro H #Hcert
@@ -198,19 +224,25 @@ theorem wpHart_lift (cpu : CPU) (m : SailM Unit) :
       exact Option.some.inj HRg'
     subst hEq
     rw [eraInterp_ambient]
-    imod H $$ %g.m Hera with ⟨%Hred, H⟩
+    -- the history so far, lent to the callback
+    unfold obsInterp
+    icases Hobs with ⟨%h, %htot, %hwf, Ha⟩
+    imod H $$ %g %h %⟨hwf, hl⟩ [Hera Ha] with ⟨%Hred, H⟩
+    · iframe Hera Ha
     imodintro
     isplit
     · ipureintro
       obtain ⟨m', σ', hs⟩ := Hred
-      exact ⟨[], .hart _ cpu m', { g with m := σ' }, [], primStep_hart_live hl hs⟩
+      exact ⟨_, .hart _ cpu m', { g with m := σ' }, [], primStep_hart_live hl hs⟩
     inext
     iintro %e₂ %g₂ %eₜ %Hstep Hcred
-    obtain ⟨rfl, rfl, h⟩ := primStep_hart_inv Hstep
-    rcases h with ⟨_, m', σ', rfl, hs, rfl⟩ | ⟨hnl, _, _⟩
-    · imod H $$ %m' %σ' %hs Hcred with ⟨Hσ', Hwp⟩
+    obtain ⟨rfl, h⟩ := primStep_hart_inv Hstep
+    rcases h with ⟨_, hobs, m', σ', rfl, hs, rfl⟩ | ⟨hnl, _, _⟩
+    · imod H $$ %m' %σ' %hs Hcred with ⟨Hσ', Ha, Hwp⟩
       imodintro
-      ihave Hobs := obsInterp_silent_nil _ _ _ _ _ obs' Hstep $$ Hobs
+      -- the trace conjunct, re-packed at the extended history
+      subst hobs
+      ihave Hobs := obsInterp_close _ _ _ _ _ _ h obs' Hstep hwf htot $$ Ha
       rw [stateInterp_eq]
       unfold powerInterp
       iframe Hobs
@@ -250,8 +282,8 @@ theorem wpHart_lift (cpu : CPU) (m : SailM Unit) :
       exact ⟨[], .hart _ cpu m, g, [], primStep_hart_dead hnl⟩
     inext
     iintro %e₂ %g₂ %eₜ %Hstep _
-    obtain ⟨rfl, rfl, h⟩ := primStep_hart_inv Hstep
-    rcases h with ⟨hl, _⟩ | ⟨_, rfl, rfl⟩
+    obtain ⟨rfl, h⟩ := primStep_hart_inv Hstep
+    rcases h with ⟨hl, _⟩ | ⟨_, rfl, rfl, rfl⟩
     · exact absurd hl hnl
     imod Hclose
     imodintro
@@ -269,6 +301,29 @@ theorem wpHart_lift (cpu : CPU) (m : SailM Unit) :
     · iapply wp_dead
       iexact Hdead
     · exact BigSepL.bigSepL_nil_intro
+
+/-- **The SILENT lifting lemma** (today's `wpHart_lift`, NI M2-W1): for a step
+that emits nothing -- the callback shows `hartObsM cpu m σ = []` at the
+machine it is handed -- the history is framed and the callback never sees
+it.  Every per-event rule but `swp_writeReg_priv` is proved from this. -/
+theorem wpHart_lift (cpu : CPU) (m : SailM Unit) :
+    (∀ σ, machInterp σ ={⊤,∅}=∗
+      ⌜hartObsM cpu m σ = [] ∧ ∃ m' σ', hartStep cpu m σ m' σ'⌝ ∗
+      ▷ ∀ m' σ', ⌜hartStep cpu m σ m' σ'⌝ -∗ £ 1 ={∅,⊤}=∗ machInterp σ' ∗ wpHart cpu m')
+    ⊢@{IProp GF} wpHart cpu m := by
+  iintro H
+  iapply wpHart_lift_obs
+  iintro %g %h %_ ⟨Hσ, Ha⟩
+  imod H $$ %g.m Hσ with ⟨%⟨hsil, Hred⟩, H⟩
+  imodintro
+  isplit
+  · ipureintro; exact Hred
+  inext
+  iintro %m' %σ' %hs Hcred
+  imod H $$ %m' %σ' %hs Hcred with ⟨Hσ', Hwp⟩
+  imodintro
+  rw [hsil, List.append_nil]
+  iframe Hσ' Ha Hwp
 
 /-! ## Sub-computation WPs -/
 
@@ -350,7 +405,7 @@ theorem wpLoop_restart (cpu : CPU) :
   iintro Hclose
   isplit
   · ipureintro
-    exact ⟨riscvStep false, σ, false, rfl, rfl⟩
+    exact ⟨rfl, riscvStep false, σ, false, rfl, rfl⟩
   inext
   iintro %m' %σ' %Hs _
   obtain ⟨tick, rfl, rfl⟩ := Hs
@@ -444,10 +499,13 @@ a later, together with the obligation to continue at each possible successor.
 itself, when a memory event is blocked by another hart's reservation);
 `swp_event` is the common case of an event that is never blocked. -/
 
-theorem swp_event_step (cpu : CPU) {X : Type} (o : Outcome Register RegisterType)
+/-- `swp_event_step` with the silence shown at the machine the callback is
+handed (a register write is silent or not according to the value it
+overwrites: `hartObs_regWrite_quiet`). -/
+theorem swp_event_step_dep (cpu : CPU) {X : Type} (o : Outcome Register RegisterType)
     (k : o.ret → SailM X) (Φ : X → IProp GF) :
     (∀ σ, machInterp σ ={⊤,∅}=∗
-      ⌜(∃ v σ', evStep cpu o σ v σ') ∨ (∃ σ', blockedStep cpu o σ σ')⌝ ∗
+      ⌜hartObs cpu o σ = [] ∧ ((∃ v σ', evStep cpu o σ v σ') ∨ (∃ σ', blockedStep cpu o σ σ'))⌝ ∗
       ▷ ∀ σ', (∀ (v : o.ret), ⌜evStep cpu o σ v σ'⌝ -∗ |={∅,⊤}=> machInterp σ' ∗ swp cpu (k v) Φ) ∧
               (⌜blockedStep cpu o σ σ'⌝ -∗ |={∅,⊤}=> machInterp σ' ∗ swp cpu (.impure (.ok o) k) Φ))
     ⊢ swp cpu (.impure (.ok o) k) Φ := by
@@ -456,10 +514,11 @@ theorem swp_event_step (cpu : CPU) {X : Type} (o : Outcome Register RegisterType
   rw [hC]
   iapply wpHart_lift
   iintro %σ Hσ
-  imod H $$ %σ Hσ with ⟨%Hred, H⟩
+  imod H $$ %σ Hσ with ⟨%⟨hsil, Hred⟩, H⟩
   imodintro
   isplit
   · ipureintro
+    refine ⟨hsil, ?_⟩
     rcases Hred with ⟨v, σ', hs⟩ | ⟨σ', hb⟩
     · exact ⟨C (k v), σ', Or.inl ⟨v, rfl, hs⟩⟩
     · exact ⟨_, σ', Or.inr ⟨hb, rfl⟩⟩
@@ -481,15 +540,60 @@ theorem swp_event_step (cpu : CPU) {X : Type} (o : Outcome Register RegisterType
     rw [← hC]
     iapply Hswp $$ %C %hC Hcont
 
-/-- The per-event rule for an event that is never blocked. -/
-theorem swp_event (cpu : CPU) {X : Type} (o : Outcome Register RegisterType)
+/-- The per-event rule, for an event that is silent at every machine (every
+event but a register write, by computation: `hsil`'s default). -/
+theorem swp_event_step (cpu : CPU) {X : Type} (o : Outcome Register RegisterType)
+    (k : o.ret → SailM X) (Φ : X → IProp GF)
+    (hsil : ∀ σ, hartObs cpu o σ = [] := by intro; rfl) :
+    (∀ σ, machInterp σ ={⊤,∅}=∗
+      ⌜(∃ v σ', evStep cpu o σ v σ') ∨ (∃ σ', blockedStep cpu o σ σ')⌝ ∗
+      ▷ ∀ σ', (∀ (v : o.ret), ⌜evStep cpu o σ v σ'⌝ -∗ |={∅,⊤}=> machInterp σ' ∗ swp cpu (k v) Φ) ∧
+              (⌜blockedStep cpu o σ σ'⌝ -∗ |={∅,⊤}=> machInterp σ' ∗ swp cpu (.impure (.ok o) k) Φ))
+    ⊢ swp cpu (.impure (.ok o) k) Φ := by
+  iintro H
+  iapply swp_event_step_dep cpu o k Φ
+  iintro %σ Hσ
+  imod H $$ %σ Hσ with ⟨%Hred, H⟩
+  imodintro
+  isplit
+  · ipureintro; exact ⟨hsil σ, Hred⟩
+  iexact H
+
+/-- The per-event rule for an event that is never blocked, the silence shown
+at the machine the callback is handed. -/
+theorem swp_event_dep (cpu : CPU) {X : Type} (o : Outcome Register RegisterType)
     (k : o.ret → SailM X) (Φ : X → IProp GF) (hnb : ∀ σ σ', ¬ blockedStep cpu o σ σ') :
+    (∀ σ, machInterp σ ={⊤,∅}=∗
+      ⌜hartObs cpu o σ = [] ∧ ∃ v σ', evStep cpu o σ v σ'⌝ ∗
+      ▷ ∀ (v : o.ret) σ', ⌜evStep cpu o σ v σ'⌝ -∗ |={∅,⊤}=> machInterp σ' ∗ swp cpu (k v) Φ)
+    ⊢ swp cpu (.impure (.ok o) k) Φ := by
+  iintro H
+  iapply swp_event_step_dep cpu o k Φ
+  iintro %σ Hσ
+  imod H $$ %σ Hσ with ⟨%⟨hsil, Hred⟩, H⟩
+  imodintro
+  isplit
+  · ipureintro
+    exact ⟨hsil, Or.inl Hred⟩
+  inext
+  iintro %σ'
+  isplit
+  · iintro %v %hs
+    iapply H $$ %v %σ' %hs
+  · iintro %hb
+    exact absurd hb (hnb σ σ')
+
+/-- The per-event rule for an event that is never blocked (and silent at
+every machine: every event but a register write, `hsil`'s default). -/
+theorem swp_event (cpu : CPU) {X : Type} (o : Outcome Register RegisterType)
+    (k : o.ret → SailM X) (Φ : X → IProp GF) (hnb : ∀ σ σ', ¬ blockedStep cpu o σ σ')
+    (hsil : ∀ σ, hartObs cpu o σ = [] := by intro; rfl) :
     (∀ σ, machInterp σ ={⊤,∅}=∗
       ⌜∃ v σ', evStep cpu o σ v σ'⌝ ∗
       ▷ ∀ (v : o.ret) σ', ⌜evStep cpu o σ v σ'⌝ -∗ |={∅,⊤}=> machInterp σ' ∗ swp cpu (k v) Φ)
     ⊢ swp cpu (.impure (.ok o) k) Φ := by
   iintro H
-  iapply swp_event_step cpu o k Φ
+  iapply swp_event_step cpu o k Φ hsil
   iintro %σ Hσ
   imod H $$ %σ Hσ with ⟨%Hred, H⟩
   imodintro
@@ -582,21 +686,30 @@ theorem swp_readReg_any_bind (cpu : CPU) {X : Type} (r : Register)
   iapply swp_bind
   iapply swp_readReg_any cpu r (fun v => swp cpu (f v) Φ) $$ HΦ
 
-/-- Write a register: needs the full cell, and hands back the updated cell. -/
+/-- Write a register: needs the full cell, and hands back the updated cell.
+A SILENT write (NI M2-W1): any register but `cur_privilege`, or the value
+already there (`hq`); the crossing write of `cur_privilege` is
+`swp_writeReg_priv`. -/
 theorem swp_writeReg (cpu : CPU) (r : Register) (v w : RegisterType r)
-    (Φ : PUnit → IProp GF) :
+    (hq : r ≠ .cur_privilege ∨ v = w) (Φ : PUnit → IProp GF) :
     r ↦ᵣ[cpu] v ∗ ▷ (r ↦ᵣ[cpu] w -∗ Φ ()) ⊢ swp cpu (writeReg r w) Φ := by
   unfold writeReg PreSail.writeReg PreSail.emit
   iintro ⟨Hr, HΦ⟩
-  iapply swp_event cpu (.regWrite r w) (fun v => FreeM.pure v) Φ (fun _ _ h => h)
+  iapply swp_event_dep cpu (.regWrite r w) (fun v => FreeM.pure v) Φ (fun _ _ h => h)
   iintro %σ Hσ
   icases machInterp_acc σ cpu $$ Hσ with ⟨Hregs, Hclose⟩
+  ihave %Hv : ⌜σ.regs cpu r = v⌝ $$ [Hregs Hr]
+  · icases reg_valid cpu (σ.regs cpu) r (DFrac.own 1) v $$ [$Hregs $Hr] with %_
+    itrivial
   imod reg_update cpu (σ.regs cpu) r v w $$ [$Hregs $Hr] with ⟨Hregs, Hr⟩
   iapply fupd_mask_intro LawfulSet.empty_subset
   iintro Hmask
   isplit
   · ipureintro
-    exact ⟨(), σ.setReg cpu r w, rfl⟩
+    refine ⟨hartObs_regWrite_quiet cpu σ r w ?_, (), σ.setReg cpu r w, rfl⟩
+    rcases hq with hq | hq
+    · exact Or.inl hq
+    · exact Or.inr (Hv.trans hq)
   inext
   iintro %v' %σ' %Hev
   obtain rfl := Hev
@@ -608,12 +721,158 @@ theorem swp_writeReg (cpu : CPU) (r : Register) (v w : RegisterType r)
     iapply HΦ $$ Hr
 
 theorem swp_writeReg_bind (cpu : CPU) {X : Type} (r : Register) (v w : RegisterType r)
-    (f : PUnit → SailM X) (Φ : X → IProp GF) :
+    (hq : r ≠ .cur_privilege ∨ v = w) (f : PUnit → SailM X) (Φ : X → IProp GF) :
     r ↦ᵣ[cpu] v ∗ ▷ (r ↦ᵣ[cpu] w -∗ swp cpu (f ()) Φ) ⊢ swp cpu (writeReg r w >>= f) Φ := by
   iintro ⟨Hr, HΦ⟩
   iapply swp_bind
-  iapply swp_writeReg cpu r v w $$ [Hr HΦ]
+  iapply swp_writeReg cpu r v w hq $$ [Hr HΦ]
   iframe Hr HΦ
+
+/-! ## The user boundary: the observed privilege write (NI M2-W1) -/
+
+/-- **The per-event rule, OBSERVED**: the event's callback is handed the
+history's machine half `obsAuth h` (with `obsWf h g` and liveness) beside
+the interpretation at `g.m`, and hands it back extended by the event's own
+observations `hartObs cpu o g.m`. -/
+theorem swp_event_obs (cpu : CPU) {X : Type} (o : Outcome Register RegisterType)
+    (k : o.ret → SailM X) (Φ : X → IProp GF) (hnb : ∀ σ σ', ¬ blockedStep cpu o σ σ') :
+    (∀ (g : GState) (h : List Obs), ⌜obsWf h g ∧ threadLive g (genId (hlc := hlc) (GF := GF))⌝ -∗
+      machInterp g.m ∗ obsAuth h ={⊤,∅}=∗
+      ⌜∃ v σ', evStep cpu o g.m v σ'⌝ ∗
+      ▷ ∀ (v : o.ret) σ', ⌜evStep cpu o g.m v σ'⌝ -∗
+        |={∅,⊤}=> machInterp σ' ∗ obsAuth (h ++ hartObs cpu o g.m) ∗ swp cpu (k v) Φ)
+    ⊢ swp cpu (.impure (.ok o) k) Φ := by
+  unfold swp
+  iintro H %C %hC Hcont
+  rw [hC]
+  iapply wpHart_lift_obs
+  iintro %g %h %hf ⟨Hσ, Ha⟩
+  imod H $$ %g %h %hf [Hσ Ha] with ⟨%Hred, H⟩
+  · iframe Hσ Ha
+  imodintro
+  isplit
+  · ipureintro
+    obtain ⟨v, σ', hs⟩ := Hred
+    exact ⟨C (k v), σ', Or.inl ⟨v, rfl, hs⟩⟩
+  inext
+  iintro %m' %σ' %Hs _
+  unfold hartStep at Hs
+  rcases Hs with ⟨v, rfl, hs⟩ | ⟨hb, _⟩
+  · imod H $$ %v %σ' %hs with ⟨Hσ, Ha, Hswp⟩
+    imodintro
+    have e : hartObsM cpu (FreeM.impure (.ok o) (fun v => C (k v))) g.m = hartObs cpu o g.m := rfl
+    rw [e]
+    iframe Hσ
+    isplitl [Ha]
+    · iexact Ha
+    iapply Hswp $$ %C %hC Hcont
+  · exact absurd hb (hnb _ _)
+
+/-- **The privilege write, OBSERVED** (NI M2-W1): writing `p'` over `p` to
+`cur_privilege`, with the client's consent for exactly that write.  The
+U→S trap (`MachCSL.UTrap`) and the S→U `sret` (`MachCSL.WpSmodeSretU`) are
+its two crossing instances; a same-value write needs no consent
+(`swp_writeReg`). -/
+theorem swp_writeReg_priv (cpu : CPU) (p p' : Privilege) (Φ : PUnit → IProp GF) :
+    hartObsStep cpu p p' ∗ Register.cur_privilege ↦ᵣ[cpu] p ∗
+      ▷ (Register.cur_privilege ↦ᵣ[cpu] p' -∗ Φ ())
+    ⊢ swp cpu (writeReg Register.cur_privilege p') Φ := by
+  unfold writeReg PreSail.writeReg PreSail.emit hartObsStep
+  iintro ⟨Hperm, Hr, HΦ⟩
+  iapply swp_event_obs cpu (.regWrite Register.cur_privilege p') (fun v => FreeM.pure v) Φ
+    (fun _ _ h => h)
+  iintro %g %h %hf ⟨Hσ, Ha⟩
+  icases machInterp_acc g.m cpu $$ Hσ with ⟨Hregs, Hclose⟩
+  ihave %Hv : ⌜g.m.regs cpu Register.cur_privilege = p⌝ $$ [Hregs Hr]
+  · icases reg_valid cpu (g.m.regs cpu) Register.cur_privilege (DFrac.own 1) p $$ [$Hregs $Hr] with %_
+    itrivial
+  imod reg_update cpu (g.m.regs cpu) Register.cur_privilege p p' $$ [$Hregs $Hr] with ⟨Hregs, Hr⟩
+  iapply fupd_mask_intro LawfulSet.empty_subset
+  iintro Hmask
+  isplit
+  · ipureintro
+    exact ⟨(), g.m.setReg cpu Register.cur_privilege p', rfl⟩
+  inext
+  iintro %v' %σ' %Hev
+  obtain rfl := Hev
+  imod Hmask
+  imod Hperm $$ %h %g %⟨hf.1, hf.2.1, Hv⟩ Ha with Ha
+  imodintro
+  have e : hartObs cpu (.regWrite Register.cur_privilege p') g.m =
+      hartObsPriv cpu (g.m.regs cpu) p' := rfl
+  rw [e]
+  isplitl [Hregs Hclose]
+  · iapply Hclose $$ Hregs
+  isplitl [Ha]
+  · iexact Ha
+  · iapply swp_ret
+    iapply HΦ $$ Hr
+
+theorem swp_writeReg_priv_bind (cpu : CPU) {X : Type} (p p' : Privilege) (f : PUnit → SailM X)
+    (Φ : X → IProp GF) :
+    hartObsStep cpu p p' ∗ Register.cur_privilege ↦ᵣ[cpu] p ∗
+      ▷ (Register.cur_privilege ↦ᵣ[cpu] p' -∗ swp cpu (f ()) Φ)
+    ⊢ swp cpu (writeReg Register.cur_privilege p' >>= f) Φ := by
+  iintro ⟨Hperm, Hr, HΦ⟩
+  iapply swp_bind
+  iapply swp_writeReg_priv cpu p p' $$ [Hperm Hr HΦ]
+  iframe Hperm Hr HΦ
+
+/-- **A privilege write that crosses nothing** (NI M2-W1): `p` and `p'` on
+the same side of the user boundary (S→S, M→S, S→M, ...): silent, no
+consent. -/
+theorem swp_writeReg_priv_quiet (cpu : CPU) (p p' : Privilege) (Φ : PUnit → IProp GF) :
+    Register.cur_privilege ↦ᵣ[cpu] p ∗ ⌜privUser p = privUser p'⌝ ∗
+      ▷ (Register.cur_privilege ↦ᵣ[cpu] p' -∗ Φ ())
+    ⊢ swp cpu (writeReg Register.cur_privilege p') Φ := by
+  unfold writeReg PreSail.writeReg PreSail.emit
+  iintro ⟨Hr, %hq, HΦ⟩
+  iapply swp_event_dep cpu (.regWrite Register.cur_privilege p') (fun v => FreeM.pure v) Φ
+    (fun _ _ h => h)
+  iintro %σ Hσ
+  icases machInterp_acc σ cpu $$ Hσ with ⟨Hregs, Hclose⟩
+  ihave %Hv : ⌜σ.regs cpu Register.cur_privilege = p⌝ $$ [Hregs Hr]
+  · icases reg_valid cpu (σ.regs cpu) Register.cur_privilege (DFrac.own 1) p $$ [$Hregs $Hr] with %_
+    itrivial
+  imod reg_update cpu (σ.regs cpu) Register.cur_privilege p p' $$ [$Hregs $Hr] with ⟨Hregs, Hr⟩
+  iapply fupd_mask_intro LawfulSet.empty_subset
+  iintro Hmask
+  isplit
+  · ipureintro
+    exact ⟨hartObsPriv_quiet cpu _ p' (by rw [Hv]; exact hq), (),
+      σ.setReg cpu Register.cur_privilege p', rfl⟩
+  inext
+  iintro %v' %σ' %Hev
+  obtain rfl := Hev
+  imod Hmask
+  imodintro
+  isplitl [Hregs Hclose]
+  · iapply Hclose $$ Hregs
+  · iapply swp_ret
+    iapply HΦ $$ Hr
+
+theorem swp_writeReg_priv_quiet_bind (cpu : CPU) {X : Type} (p p' : Privilege) (f : PUnit → SailM X)
+    (Φ : X → IProp GF) :
+    Register.cur_privilege ↦ᵣ[cpu] p ∗ ⌜privUser p = privUser p'⌝ ∗
+      ▷ (Register.cur_privilege ↦ᵣ[cpu] p' -∗ swp cpu (f ()) Φ)
+    ⊢ swp cpu (writeReg Register.cur_privilege p' >>= f) Φ := by
+  iintro ⟨Hr, %hq, HΦ⟩
+  iapply swp_bind
+  iapply swp_writeReg_priv_quiet cpu p p' $$ [Hr HΦ]
+  iframe Hr HΦ
+  ipureintro; exact hq
+
+/-- An event that leaves the state alone is silent: the only candidate, a
+register write, then writes the value already there. -/
+theorem hartObs_of_evStep_fix (cpu : CPU) (o : Outcome Register RegisterType) (u : o.ret)
+    (h : ∀ σ v σ', evStep cpu o σ v σ' ↔ (v = u ∧ σ' = σ)) (σ : MState) : hartObs cpu o σ = [] := by
+  cases o
+  case regWrite r w =>
+    have hfix := ((h σ () (σ.setReg cpu r w)).1 rfl).2
+    have hr := congrArg (fun s : MState => s.regs cpu r) hfix
+    simp only [if_true, RegFile.set_same] at hr
+    exact hartObs_regWrite_quiet cpu σ r w (Or.inr hr.symm)
+  all_goals rfl
 
 /-- Events that leave the state alone and are answered with a fixed value. -/
 theorem swp_silent (cpu : CPU) (o : Outcome Register RegisterType) (u : o.ret)
@@ -621,7 +880,7 @@ theorem swp_silent (cpu : CPU) (o : Outcome Register RegisterType) (u : o.ret)
     (Φ : o.ret → IProp GF) :
     ▷ Φ u ⊢ swp cpu (FreeM.impure (.ok o) (fun v => FreeM.pure v)) Φ := by
   iintro HΦ
-  iapply swp_event cpu o (fun v => FreeM.pure v) Φ hnb
+  iapply swp_event cpu o (fun v => FreeM.pure v) Φ hnb (hartObs_of_evStep_fix cpu o u h)
   iintro %σ Hσ
   iapply fupd_mask_intro LawfulSet.empty_subset
   iintro Hmask

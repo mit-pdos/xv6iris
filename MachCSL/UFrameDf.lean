@@ -121,7 +121,7 @@ def ufRegFrame (cpu : CPU) (Df : Register → DFrac) (Lw Lr La : List Register) 
     URegFrame GF cpu (uFootL Lw Lr La) where
   F := ufFrameF cpu Df Lw Lr
   rd := fun f r h => ufFrameF_rd cpu Df Lw Lr f r h
-  wr := fun f r v h => ufFrameF_wr cpu Df Lw Lr hnd f r v h
+  wr := fun f r v h => ufFrameF_wr cpu Df Lw Lr hnd f r v (uFootL_dw Lw Lr La r h)
 
 end frames
 

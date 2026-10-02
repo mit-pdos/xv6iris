@@ -184,11 +184,11 @@ theorem uk_engine (π : Nat → Option UPerm) (sz : Nat) (Qp : Int → IProp GF)
         exact e1
       iapply uk_armOb_interrupt h C pt D (uxTextOwn curCtx Kt (ukTextAddrs pt.um) T) _ (ucPreS s0) hl1.cfg
         hl1.priv hl1.act i0 hq
-      iframe Hhw Hfr HX
+      iframe Hhw Hwi Hfr HX
     · iintro Hfr
       iapply uk_fetchArm h C pt D T Kt m pc V (ucPreS s0) (ukOpened_preS hop) fr len i hF hdec
         (ukRt ret C pt T sz m' pc' M') hRtAct (ukEx ret e) hX
-      iframe Hhw HK Hfr HX
+      iframe Hhw Hwi HK Hfr HX
   -- AFTER THE CYCLE AND THE TICK
   iintro %b Hpost
   unfold ucCyclePost

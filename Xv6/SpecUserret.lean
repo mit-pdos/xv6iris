@@ -123,13 +123,15 @@ end
 
 /-- **WP of `userret`** (Rocq `wp_userret_pt_body`): entered at
 `userretVa` on the kernel table, at prepare_return's post shape, with the
-user `satp` in `a0`. -/
+user `satp` in `a0`.  `wireInv` (NI M2-W1): the shared trace bundle, whose
+user-boundary permit the final `sret`'s privilege write consumes (the
+`uEnter` event, `MachCSL.swp_writeReg_priv`). -/
 def wp_userret_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (P : UPtd) (M : Nat → List (BitVec 8)) (ws : List (BitVec 64))
     (sep sc tv : BitVec 64)
     (hsie : k.sie = false) (hspie : k.spie = true) (hspp : k.spp = false) (htier : k.tier = KTier.kpt)
     (ha0 : k.regs 10#5 = satpOf KTier.kpt P.root) : Prop :=
-  kctx cpu k ∗ pcIs cpu userretVa ∗ kmapAt trampVpn (kLeaf trampPpn .rx 0#1 0#1) ∗
+  kctx cpu k ∗ wireInv ∗ pcIs cpu userretVa ∗ kmapAt trampVpn (kLeaf trampPpn .rx 0#1 0#1) ∗
   Register.sepc ↦ᵣ[cpu] sep ∗ Register.scause ↦ᵣ[cpu] sc ∗ Register.stval ↦ᵣ[cpu] tv ∗
   Register.stvec ↦ᵣ[cpu] uservecTvec ∗
   procPtAt P M ∗ tfPageAt P.tfp ws ∗

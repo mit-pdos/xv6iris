@@ -163,6 +163,8 @@ theorem consIns_one (e : Obs) : consIns [e] = [] ∨ ∃ b, consIns [e] = [b] :=
   cases e with
   | powerOn => exact Or.inl rfl
   | powerOff => exact Or.inl rfl
+  | uEnter => exact Or.inl rfl
+  | uExit => exact Or.inl rfl
   | dev o =>
     cases o with
     | uartOut j b => exact Or.inl rfl

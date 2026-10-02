@@ -42,6 +42,8 @@ theorem notConsIn_or (e : Obs) : notConsIn e ∨ ∃ c, e = .dev (.uartIn .uart0
   | .dev (.uartOut _ _) => exact Or.inl trivial
   | .powerOn => exact Or.inl trivial
   | .powerOff => exact Or.inl trivial
+  | .uEnter .. => exact Or.inl trivial
+  | .uExit .. => exact Or.inl trivial
 
 theorem inPres_cons_in (c : BitVec 8) (seg : List Obs) :
     inPres (.dev (.uartIn .uart0 c) :: seg)
@@ -55,6 +57,8 @@ theorem inPres_cons_other (e : Obs) (seg : List Obs) (he : notConsIn e) :
   | .dev (.uartOut _ _) => rfl
   | .powerOn => rfl
   | .powerOff => rfl
+  | .uEnter .. => rfl
+  | .uExit .. => rfl
 
 theorem consIns_cons_in (c : BitVec 8) (seg : List Obs) :
     consIns (.dev (.uartIn .uart0 c) :: seg) = c :: consIns seg := by
@@ -68,6 +72,8 @@ theorem consIns_cons_other (e : Obs) (seg : List Obs) (he : notConsIn e) :
   | .dev (.uartOut _ _) => simp [consIns, obsIns]
   | .powerOn => simp [consIns, obsIns]
   | .powerOff => simp [consIns, obsIns]
+  | .uEnter .. => simp [consIns, obsIns]
+  | .uExit .. => simp [consIns, obsIns]
 
 /-- Rocq `in_pres_in`. -/
 theorem inPres_in (seg : List Obs) (b : BitVec 8) :

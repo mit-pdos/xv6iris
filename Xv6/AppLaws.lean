@@ -33,6 +33,18 @@ Rocq's header on the laws, kept because the reasons are the content:
   `EraInitBoot` states `initBootBundle ROOTINO seccAll fdt0` (the exec's mask
   pin, `SpecKexec.execSlotPre`'s `secc`), and this field follows it by name.
 
+## THE USER BOUNDARY (NI M2-W1, 2026-10-01)
+
+A twelfth law, `al_user`: the ledger takes a hart's user-boundary event
+(`Obs.uEnter`/`Obs.uExit`).  It is what the machine's user-event hook
+(`MachCSL.wp_power`'s `Huser`, `riscvPowerAdequacy`'s) is built from at the
+ledger (`obsLedgerAt_user`); the power thread seals the resulting permit
+into `wireInv`.  The landed ledgers read the history only through its
+power cycles' console segments, the open segment and the boot count, none
+of which a user event moves, so they discharge it unchanged
+(`union_al_user`, the trivial `emp`).  The real per-address-space ledger is
+M2-W2's.
+
 ## DEVIATIONS from Rocq
 
 1. **The laws are a `Prop`-valued `class` over the landed hooks.**
@@ -197,6 +209,13 @@ class Xv6AppLaws {hlc : HasLC} {GF : BundledGFunctors} [MachGpreS hlc GF] [Xv6G 
   al_back : ∀ (c : A.fixed) (h : List Obs),
     ⊢@{IProp GF} A.R c (h ++ [Obs.powerOn]) -∗ A.turn' c (obsBoots h + 1) ==∗
       A.R c (h ++ [Obs.powerOn]) ∗ A.turn'' c (obsBoots h + 1)
+  /-- THE USER BOUNDARY (NI M2-W1): the ledger takes a hart's user-boundary
+  event (`Obs.uEnter`/`Obs.uExit`) -- what seals the hart's permit into the
+  wire invariant at every power-on (`MachCSL.wp_power`'s `Huser`).  The
+  console ledgers read the history through its power cycles, which no
+  user-boundary event enters (`MachCSL.cyclesOf_user`). -/
+  al_user : ∀ (c : A.fixed) (h : List Obs) (e : Obs), isUser e = true →
+    A.R c h ⊢@{IProp GF} |==> A.R c (h ++ [e])
   /-- the era's record predicate, off the boot resource (Rocq `al_boot_ok`) -/
   al_boot_ok : ∀ (c : A.fixed) (k : Nat) (r : A.names), A.boot c k r ⊢@{IProp GF} ⌜A.ok c k r⌝
   /-- THE MERGE (Rocq `al_merge`, SY3-K2 / SY3-A1): the commit's law, at the
@@ -346,6 +365,8 @@ theorem xv6AppAdequacy (g : GState) (sb : FsSb) (nib : Nat) (cov : ExtTreeSet Na
         hs)
     -- THE RETURN PATH: the ledger's own second step (Rocq SY3-A1)
     (fun γobs c h => obsLedgerAt_back (A.R c) _ _ (h ++ [Obs.powerOn]) (AL.al_back c h) γobs)
+    -- THE USER BOUNDARY (NI M2-W1): the ledger's own user-event step
+    (fun γobs c h e he => obsLedgerAt_user (A.R c) (AL.al_user c) γobs h e he)
     -- the permit at the ledger (Rocq's `Hperm` assertion): the application's
     -- two wands at the era's instance, the ledger/tag/claim equations by `rfl`
     -- at the literal
@@ -463,6 +484,9 @@ theorem appTriv_laws (US : USER) : Xv6AppLaws (hlc := hlc) (appTriv GF) where
     exact consEchoShift_triv hcons
   al_found := fun c k => appTriv_found c k _
   al_back := fun c h => appBack_id (appTriv GF) c h (fun _ => rfl)
+  al_user := fun _ _ _ _ => by
+    show iprop(emp) ⊢@{IProp GF} |==> iprop(emp)
+    iintro H; imodintro; iexact H
   al_boot_ok := fun _ _ _ => by iintro _; ipureintro; trivial
   al_merge := fun c k _ _ => appMergeRaw_ofXfer _ _ _ _ _ (fun _ => trivial) (fun _ => trivial)
     (appXferRaw_triv _ (fun _ _ => .rfl))
