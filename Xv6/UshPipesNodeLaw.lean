@@ -42,6 +42,7 @@ is `NodeOk`.
 import Xv6.UshPipesNodeObl
 import Xv6.UshPipesStageEcho
 import Xv6.UshPipesStageLast
+import Xv6.UshPipesStageMid
 
 namespace Xv6
 

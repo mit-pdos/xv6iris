@@ -67,22 +67,11 @@ def midCr (k' : Nat) : IProp GF :=
 noncomputable def midCd (k' : Nat) (F : Filt) : IProp GF :=
   iprop(sideL (D.P (k' + 1)) ∗ pnsWfin D.toPns (WLeft (k' + 1)) (some (filtDgExec F)))
 
-/-- `pflow`, unfolded. -/
-theorem pflow_unfold (j : Nat) : D.pflow j = flowF D.L (fapp (lfilt D.lR j)) (D.prevP j) := rfl
-
 /-- pipe `k' + 1`'s flow parameter, at its writer's filter. -/
 theorem pflow_succ_eq (k' : Nat) (F : Filt) (hF : lfilt D.lR (k' + 1) = F) :
     D.pflow (k' + 1) = flowF D.L (fapp F) (some (D.P k')) := by
   unfold PdRound.pflow PdRound.prevP
   rw [hF]
-
-/-- a failed stage's deposit, made (Rocq inline). -/
-theorem pdep_left_fail_mk (k : Nat) (s : List (BitVec 8)) (hs : s ≠ [])
-    (hf : failSrc D.pr (lfilts D.lR) k s) :
-    D.shotsF k ∗ osS (D.gG k) ∗ wcur (D.P k) 0 ⊢ pdep D (WLeft k) s := by
-  rw [pdep_unfold D (WLeft k) s hs (Or.inl hf)]
-  simp only [PdRound.pdepNe]
-  rw [if_pos hf]
 
 /-- THE MIDDLE STAGE'S LEND, out of its exec lend (the supply's entry
 premise). -/
@@ -192,11 +181,6 @@ theorem mid_lend (K' : PdRoundOk D) (hfire : HfireP D) (k' : Nat) (F : Filt) (gi
     · ipureintro; trivial
     ipureintro
     simp [filterer, rd_pre]
-
-/-- the taint, from the kill credential (Rocq `rewrite Hkill`). -/
-theorem stg_T_of_kill (S : StgEnv D) (K : StgOk D S) : uKillCred (hlc := hlc) (GF := GF) ⊢ D.T := by
-  unfold PdRound.T uKillCred
-  rw [K.hkill]
 
 /-- **Rocq `stage_mid`**: A MIDDLE STAGE, node `k' + 1`'s left child. -/
 theorem stage_mid (S : StgEnv D) (K : StgOk D S) (k' : Nat) (F : Filt) (co s0 : Nat) (gs : Nat → BitVec 8)

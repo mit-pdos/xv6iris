@@ -36,7 +36,8 @@ at sh's concrete rows (`ushJtab`, `ushCmd`, `ushFd2p`, `ushDg`, which ARE
 `S.E`'s fields by `rfl`), fd 1 R-prog's `ushFd1pipe`.
 -/
 import Xv6.UshPipesStageLaw
-import Xv6.UshPipesStageMid
+import Xv6.UshPipesStageCtx
+import Xv6.UkPipesEntriesEcho
 
 namespace Xv6
 
