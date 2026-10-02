@@ -333,6 +333,57 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 /-- What rides aside the frames: `mepc` (not read at User). -/
 def ufAside (cpu : CPU) : IProp GF := iprop(∃ mepc : BitVec 64, Register.mepc ↦ᵣ[cpu] mepc)
 
+/-! ### The exit's receipt, as the user tier carries it (NI M2-W2b) -/
+
+/-- **The exit event a trapped file names**: the address space, the cause,
+the epc and the user GPRs of the file at the trap's privilege write (which
+the tower's later writes and the tick leave alone). -/
+def ufExitEv (cpu : CPU) (f : RegFile) : Obs :=
+  .uExit cpu (f .satp) (f .scause) (f .sepc) (gprList (uxaXget f))
+
+/-- **The receipt rider** of a cycle's landing: a user file (nothing crossed),
+or the machine receipt of the exit the file names. -/
+def uxRcpt (cpu : CPU) (f : RegFile) : IProp GF :=
+  iprop(⌜f .cur_privilege = Privilege.User⌝ ∨ ∃ k, uRcpt (k, ufExitEv cpu f))
+
+instance uxRcpt_persistent (cpu : CPU) (f : RegFile) : Persistent (uxRcpt (GF := GF) cpu f) := by
+  unfold uxRcpt; infer_instance
+
+/-- The cells the rider reads. -/
+def uxRcptRegs : List Register := [.cur_privilege, .satp, .scause, .sepc] ++ uxaGprs
+
+theorem ufExitEv_congr (cpu : CPU) (f f' : RegFile) (h : ∀ r ∈ uxRcptRegs, f' r = f r) :
+    ufExitEv cpu f' = ufExitEv cpu f := by
+  have hg : uxaXget f' = uxaXget f :=
+    funext (uxaXget_congr f f' (fun r hr => h r (List.mem_append_right _ hr)))
+  unfold ufExitEv
+  rw [hg, h .satp (by decide), h .scause (by decide), h .sepc (by decide)]
+
+theorem uxRcpt_congr (cpu : CPU) (f f' : RegFile) (h : ∀ r ∈ uxRcptRegs, f' r = f r) :
+    uxRcpt (GF := GF) cpu f ⊢ uxRcpt cpu f' := by
+  unfold uxRcpt
+  rw [ufExitEv_congr cpu f f' h, h .cur_privilege (by decide)]
+
+theorem uxRcpt_user (cpu : CPU) (f : RegFile) (h : f .cur_privilege = Privilege.User) :
+    ⊢ uxRcpt (GF := GF) cpu f := by
+  unfold uxRcpt
+  iintro
+  ileft
+  ipureintro; exact h
+
+theorem uxRcpt_trap (cpu : CPU) (f : RegFile) (h : f .cur_privilege = Privilege.Supervisor) :
+    uxRcpt (GF := GF) cpu f ⊢ ∃ k, uRcpt (k, ufExitEv cpu f) := by
+  unfold uxRcpt
+  iintro H
+  icases H with (%hu | H)
+  · rw [h] at hu; cases hu
+  · iexact H
+
+/-- A receipt at an event equal to another is one at the other. -/
+theorem uRcptEx_eq {e e' : Obs} (h : e = e') :
+    (∃ k, uRcpt (GF := GF) (k, e)) ⊢ ∃ k, uRcpt (k, e') := by
+  subst h; exact .rfl
+
 set_option maxRecDepth 10000 in
 /-- **The frames of a user machine** (Rocq `wp_user_step_active`'s opening,
 `u_frames_intro` + `user_pt_inv_bytes` + `u_open`): `userInv` is the register
@@ -444,15 +495,19 @@ set_option maxRecDepth 10000 in
 /-- **The trap closer** (Rocq's `user_trap_frame` re-assembly): from the
 frames at a landing file the U→S tower and the tick produced (Supervisor,
 ACTIVE, the delivered `mstatus`, PC and nextPC at the handler), and a
-stepped map, the kernel's trap frame. -/
+stepped map, the kernel's trap frame -- with the receipt of the exit the
+file names (NI M2-W2b). -/
 theorem uf_close_trap [CurCtx] (cpu : CPU) (C : UCfg) (pt : UPtd) (Rut : UPtd → IProp GF) (f : RegFile)
     (t t' : PTree) (mm mm' : BMap) (hc : UfCfg C pt f) (hpriv : f .cur_privilege = Privilege.Supervisor)
     (hhs : f .hart_state = .HART_ACTIVE ()) (hms : trapMstatusOk (f .mstatus))
     (hpc : f .PC = stvecBase C.stvec) (hnpc : f .nextPC = stvecBase C.stvec)
     (hwf : UbMemWf pt t mm) (hs : UbMemStep pt t t' mm mm') (htlb : utlbOk t' (f .tlb)) :
     kmapStatic ⊢ (ufRegF (GF := GF) cpu C).F f -∗ (ubFrame curCtx (ubUAddrs pt t)).B mm' -∗ ufAside cpu -∗
-      Rut pt -∗ userTrapFrame cpu C pt Rut := by
-  iintro #HS HF HB Ha Hrut
+      Rut pt -∗ (∃ k, uRcpt (k, ufExitEv cpu f)) -∗ userTrapFrame cpu C pt Rut := by
+  iintro #HS HF HB Ha Hrut #Hrc
+  ihave #Hrc := uRcptEx_eq (show ufExitEv cpu f =
+      .uExit cpu (satpOf .kpt pt.root) (f .scause) (f .sepc) (gprList (uxaXget f)) by
+    unfold ufExitEv; rw [hc.satp]) $$ Hrc
   icases (uf_F_split cpu C f).1 $$ HF with ⟨H1, H2, H3, H4, H5, -⟩
   icases (uf_trapRw_cells cpu f).1 $$ H1 with ⟨Hpr, Hms, Hsc, Hstv, Hsep, Hpc, Hnpc, -⟩
   icases (uf_rwNamed_cells cpu f).1 $$ H2 with ⟨Hhs, Hmi, Hmst, Hcy, Hti, Hip, Htlb, -⟩
@@ -481,6 +536,7 @@ theorem uf_close_trap [CurCtx] (cpu : CPU) (C : UCfg) (pt : UPtd) (Rut : UPtd �
   isplitr
   · ipureintro; exact hms
   iframe
+  iexact Hrc
 
 end openclose
 

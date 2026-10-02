@@ -128,13 +128,14 @@ theorem uk_trapped [CurCtx] (cpu : CPU) (C : UCfg) (P : UPtd) (Rut : UPtd → IP
     (π : Nat → Option UPerm) (fdv : List FdState) (cw : Nat) (gn : GName) (cs : ExtTreeSet GName compare)
     (pidv : BitVec 32) (lz : Bool) (secc : BitVec 64) :
     kmapStatic (GF := GF) ⊢ uFr (ufRegF cpu C) (ubFrame curCtx D) s -∗ uxTextOwn curCtx K (ukTextAddrs P.um) T -∗
-      iviewLb cpu K -∗ ufAside cpu -∗ (ctxToken cpu -∗ Rut P) -∗
+      iviewLb cpu K -∗ ufAside cpu -∗ (ctxToken cpu -∗ Rut P) -∗ uxRcpt cpu s.file -∗
       trappedMachine cpu C P Rut sz sc stv (uvisOfRun m pc (umemLazy P sz V) π sz fdv cw gn cs pidv lz secc) := by
   obtain ⟨t', hm', htlb'⟩ := h.mem
   obtain rfl := h.sepc
   obtain rfl := h.scause
   obtain rfl := h.stval
-  iintro #HS Hfr HX #HK Ha Hres
+  iintro #HS Hfr HX #HK Ha Hres #Hrc
+  ihave #Hrc := uxRcpt_trap cpu s.file h.priv $$ Hrc
   icases uk_frames_close cpu C P Rut D s $$ [Hfr Hres] with ⟨HF, HB, Hrut⟩
   · iframe
   icases uk_regs_close_trap cpu C P s.file h.cfg h.priv h.act hpc (h.npc) $$ [HF Ha]
@@ -149,6 +150,10 @@ theorem uk_trapped [CurCtx] (cpu : CPU) (C : UCfg) (P : UPtd) (Rut : UPtd → IP
     show m i = (if i = 0#5 then zeroRf 0#5 else tfW (tfOf m (s.file .sepc)) (4 + i.toNat))
     rw [if_neg hi, tfOf_reg m (s.file .sepc) i hi]
   ihave Hg := MachCSL.gprFile_ext cpu (uxaXget s.file) (tfResumeGpr0 (tfOf m (s.file .sepc))) hg $$ Hg
+  ihave #Hrc := uRcptEx_eq (show ufExitEv cpu s.file =
+      .uExit cpu (satpOf .kpt P.root) (s.file .scause) (s.file .sepc) (gprList (uxaXget s.file)) by
+    unfold ufExitEv; rw [h.cfg.satp]) $$ Hrc
+  ihave #Hrc := uRcpt_gprList_ext cpu _ _ _ (uxaXget s.file) (tfResumeGpr0 (tfOf m (s.file .sepc))) hg $$ Hrc
   unfold trappedMachine userTrapFrameAtm userPtmInv
   iexists s.file .mstatus
   isplitr
@@ -159,7 +164,9 @@ theorem uk_trapped [CurCtx] (cpu : CPU) (C : UCfg) (P : UPtd) (Rut : UPtd → IP
   isplitr
   · ipureintro; exact h.ms
   iframe
-  ipureintro; rfl
+  isplitl []
+  · ipureintro; rfl
+  iexact Hrc
 
 end core
 

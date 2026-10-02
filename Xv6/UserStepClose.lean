@@ -57,29 +57,30 @@ theorem ust_close_user (cpu : CPU) (C : UCfg) (P : UPtd) (Rut : UPtd → IProp G
 theorem ust_close_trap (cpu : CPU) (C : UCfg) (P : UPtd) (Rut : UPtd → IProp GF) (t0 : PTree) (mm0 : BMap)
     (s : UWSt) (h : UstTrapAt C P t0 mm0 s) :
     kmapStatic ⊢ uFr (ufRegF cpu C) (ubFrame curCtx (ubUAddrs P t0)) s -∗ ufAside cpu -∗
-      (ctxToken cpu -∗ Rut P) -∗ userTrapFrame cpu C P Rut := by
+      (ctxToken cpu -∗ Rut P) -∗ uxRcpt cpu s.file -∗ userTrapFrame cpu C P Rut := by
   obtain ⟨t', hst, htlb⟩ := h.mem
   unfold uFr
-  iintro #HS ⟨HF, HB, Hc, Hr⟩ Ha Hres
+  iintro #HS ⟨HF, HB, Hc, Hr⟩ Ha Hres #Hrc
   ihave Htok := uResvTok_ctxTok cpu curCtx s.rv $$ [$Hc $Hr]
   ihave Hrut := Hres $$ Htok
-  iapply uf_close_trap cpu C P Rut s.file t0 t' mm0 s.mm h.cfg h.priv h.hs h.ms h.pc h.npc h.wf hst htlb $$ HS HF HB Ha Hrut
+  ihave #Hrc := uxRcpt_trap cpu s.file h.priv $$ Hrc
+  iapply uf_close_trap cpu C P Rut s.file t0 t' mm0 s.mm h.cfg h.priv h.hs h.ms h.pc h.npc h.wf hst htlb $$ HS HF HB Ha Hrut Hrc
 
 /-- **The payload closer** (Rocq `u_step_psi`'s body): a landing of either
 kind, the step obligation's continuation, and the machine goes on. -/
 theorem ust_close (cpu : CPU) (C : UCfg) (P : UPtd) (Rut : UPtd → IProp GF) (t0 : PTree) (mm0 : BMap)
     (s : UWSt) (h : UstUserAt C P t0 mm0 s ∨ UstTrapAt C P t0 mm0 s) :
     kmapStatic ⊢ uFr (ufRegF cpu C) (ubFrame curCtx (ubUAddrs P t0)) s -∗ ufAside cpu -∗
-      (ctxToken cpu -∗ Rut P) -∗
+      (ctxToken cpu -∗ Rut P) -∗ uxRcpt cpu s.file -∗
       ((userInv cpu C P Rut -∗ wpLoop cpu) ∧ (userTrapFrame cpu C P Rut -∗ wpLoop cpu)) -∗ wpLoop cpu := by
-  iintro #HS Hfr Ha Hres Hk
+  iintro #HS Hfr Ha Hres #Hrc Hk
   rcases h with h | h
   · icases Hk with ⟨Hk, -⟩
     iapply Hk
     iapply ust_close_user cpu C P Rut t0 mm0 s h $$ HS Hfr Ha Hres
   · icases Hk with ⟨-, Hk⟩
     iapply Hk
-    iapply ust_close_trap cpu C P Rut t0 mm0 s h $$ HS Hfr Ha Hres
+    iapply ust_close_trap cpu C P Rut t0 mm0 s h $$ HS Hfr Ha Hres Hrc
 
 /-- **The optional tick** after a cycle (the machine picks), over any byte
 frame (the engine's and the safety tier's): only the clock cells move. -/

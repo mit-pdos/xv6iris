@@ -172,17 +172,19 @@ theorem uk_notExecAs {r : ExecutionResult} {pc : BitVec 64}
 set_option maxRecDepth 10000 in
 /-- **The fetch arm** (Rocq `uk_obl_base`/`uk_obl_rvc`): from an opened
 engine machine, the cycle's fetch obligation lands in the arm of the
-execute's outcome, the stamped text riding every arm. -/
+execute's outcome, the stamped text and the receipt rider riding every arm
+(`ukRider`, NI M2-W2b). -/
 theorem uk_fetchArm (cpu : CPU) (C : UCfg) (P : UPtd) (D : List PAddr) (T : BMap) (K : Nat)
     (m : RegMap) (pc : BitVec 64) (V : Nat → List (BitVec 8)) (s : UWSt) (hop : UkOpened C P T m pc V s)
     (fr : FetchResult) (len : Int) (i : instruction) (hF : UkFetchFact C P T pc V fr) (hdec : UkDecodes fr len i)
-    (Rt : UWSt → Prop) (hRt : ∀ s', Rt s' → s'.file .hart_state = .HART_ACTIVE ()) (Ex : sync_exception → Prop)
+    (Rt : UWSt → Prop) (hRt : ∀ s', Rt s' → s'.file .hart_state = .HART_ACTIVE ())
+    (hRtU : ∀ s', Rt s' → s'.file .cur_privilege = Privilege.User) (Ex : sync_exception → Prop)
     (hX : UkExecOut C P T i len m pc V Rt Ex) :
     hwConfig (GF := GF) cpu ∗ wireInv ∗ iviewLb cpu K ∗ uFr (ufRegF cpu C) (ubFrame curCtx D) s ∗
       uxTextOwn curCtx K (ukTextAddrs P.um) T ⊢
       swp cpu (fetch () >>= ucAfterFetch)
         (ucArmOb (ufRegF cpu C) (ubFrame curCtx D) (ukQ C P T m pc V Rt Ex)
-          (fun _ _ => uxTextOwn curCtx K (ukTextAddrs P.um) T)) := by
+          (ukRider cpu (uxTextOwn curCtx K (ukTextAddrs P.um) T))) := by
   iintro ⟨#Hhw, #Hwi, #HK, Hfr, HX⟩
   iapply swp_bind
   iapply swp_uxRun_of (ufRegF cpu C) (ubFrame curCtx D) K (ukTextAddrs P.um) T (fetch ()) s
@@ -233,7 +235,7 @@ theorem uk_fetchArm (cpu : CPU) (C : UCfg) (P : UPtd) (D : List PAddr) (T : BMap
   · have e : RETIRE_SUCCESS = ExecutionResult.Retire_Success () := rfl
     rw [e]
     iapply uk_armOb_retire cpu C D (uxTextOwn curCtx K (ukTextAddrs P.um) T)
-      (ukQ C P T m pc V Rt Ex) s2 ib (hRt s2 hpost) hpost
+      (ukQ C P T m pc V Rt Ex) s2 ib (hRt s2 hpost) (hRtU s2 hpost) hpost
     iframe
   · have hq : ukQ C P T m pc V Rt Ex (Step_Execute (.Trap (Privilege.User, exc, pc), ib))
         (ustTrapS s2 (utrapMs 0#1 (s2.file .mstatus)) (utrapScause (.Exception exc.trap) (s2.file .scause))

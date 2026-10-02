@@ -1,6 +1,8 @@
 /-
 **The engine's cycle arms** (lane LinkUkLeaves; Rocq `UkStep.uk_arm_intr`'s
-cycle half, `WpUmodeStep.uv_psi_trap`, `swp_handle_interrupt_u`).
+cycle half, `WpUmodeStep.uv_psi_trap`, `swp_handle_interrupt_u`).  The
+rider is `ukRider cpu Rr` (NI M2-W2b): the stamped text and the landing's
+receipt rider.
 
 The safety tier's arms (`UserStepTrap`) are fixed to its landing predicate
 `ustQ` and rider `ustR`.  The engine's arms are the same towers at ITS landing
@@ -32,7 +34,7 @@ theorem uk_armOb_interrupt (Q : Step → UWSt → Prop) (sX : UWSt) (hc : UfCfg 
     (hq : Q (Step.Step_Pending_Interrupt (i, Privilege.Supervisor))
       (ustTrapS sX (utrapMs 0#1 (sX.file .mstatus)) (sCause i) 0#64 (sX.file .PC) C.stvec)) :
     hwConfig (GF := GF) cpu ∗ wireInv ∗ uFr (ufRegF cpu C) (ubFrame curCtx D) sX ∗ Rr ⊢
-      ucArmOb (ufRegF cpu C) (ubFrame curCtx D) Q (fun _ _ => Rr)
+      ucArmOb (ufRegF cpu C) (ubFrame curCtx D) Q (ukRider cpu Rr)
         (Step.Step_Pending_Interrupt (i, Privilege.Supervisor)) :=
   ust_trapArmGen cpu C P D Rr Q sX hc hp hact _ (handle_interrupt i Privilege.Supervisor) (sCause i) 0#64 (sX.file .PC)
     (fun Out Φ => by
@@ -54,7 +56,7 @@ theorem uk_armOb_trap (Q : Step → UWSt → Prop) (sX : UWSt) (hc : UfCfg C P s
       (ustTrapS sX (utrapMs 0#1 (sX.file .mstatus)) (utrapScause (.Exception exc.trap) (sX.file .scause))
         (tval exc.excinfo) pc0 C.stvec)) :
     hwConfig (GF := GF) cpu ∗ wireInv ∗ uFr (ufRegF cpu C) (ubFrame curCtx D) sX ∗ Rr ⊢
-      ucArmOb (ufRegF cpu C) (ubFrame curCtx D) Q (fun _ _ => Rr)
+      ucArmOb (ufRegF cpu C) (ubFrame curCtx D) Q (ukRider cpu Rr)
         (Step.Step_Execute (.Trap (Privilege.User, exc, pc0), ib)) :=
   ust_trapArmGen cpu C P D Rr Q sX hc hp hact _ (exception_handler Privilege.User exc pc0 >>= set_next_pc)
     (utrapScause (.Exception exc.trap) (sX.file .scause)) (tval exc.excinfo) pc0
@@ -70,18 +72,21 @@ theorem uk_armOb_trap (Q : Step → UWSt → Prop) (sX : UWSt) (hc : UfCfg C P s
 
 /-- **The retiring arm**: the frames at the execute's landing, handed over. -/
 theorem uk_armOb_retire (Q : Step → UWSt → Prop) (s' : UWSt) (ib : BitVec 32)
-    (hact : s'.file .hart_state = .HART_ACTIVE ()) (hq : Q (Step.Step_Execute (.Retire_Success (), ib)) s') :
+    (hact : s'.file .hart_state = .HART_ACTIVE ()) (hpr : s'.file .cur_privilege = Privilege.User)
+    (hq : Q (Step.Step_Execute (.Retire_Success (), ib)) s') :
     uFr (ufRegF (GF := GF) cpu C) (ubFrame curCtx D) s' ∗ Rr ⊢
-      ucArmOb (ufRegF cpu C) (ubFrame curCtx D) Q (fun _ _ => Rr)
+      ucArmOb (ufRegF cpu C) (ubFrame curCtx D) Q (ukRider cpu Rr)
         (Step.Step_Execute (.Retire_Success (), ib)) := by
-  dsimp only [ucArmOb, ucArmBody]
+  dsimp only [ucArmOb, ucArmBody, ukRider]
   iintro ⟨Hfr, HR⟩
+  ihave #Hu := uxRcpt_user (GF := GF) cpu s'.file hpr
   iexists s'
   isplitr
   · ipureintro; exact hq
   isplitr
   · ipureintro; exact hact
   iframe
+  iexact Hu
 
 end arms
 

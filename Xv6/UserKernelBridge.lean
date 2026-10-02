@@ -97,7 +97,8 @@ theorem userInv_of_sret [CurCtx] (cpu : CPU) (C : UCfg) (P : UPtd) (Rut : UPtd �
 
 /-- **The trap frame, opened** (uservec's entry): the kernel's supervisor
 configuration cells over the user root, interrupts off with `SPIE = 1`,
-`SPP = U`, the pc at the handler, and the rest of the frame. -/
+`SPP = U`, the pc at the handler, and the rest of the frame -- with the
+exit's machine receipt (NI M2-W2b), handed to the kernel. -/
 theorem userTrapFrame_open [CurCtx] (cpu : CPU) (C : UCfg) (P : UPtd) (Rut : UPtd → IProp GF)
     (hdq : C.dqc = DFrac.own 1) (hmie : C.mie = MIE_S) (hmed : C.medeleg = MEDELEG_S) :
     hwConfig cpu ∗ userTrapFrame (GF := GF) cpu C P Rut ⊢
@@ -106,12 +107,13 @@ theorem userTrapFrame_open [CurCtx] (cpu : CPU) (C : UCfg) (P : UPtd) (Rut : UPt
         confCells cpu (DFrac.own 1) Privilege.Supervisor (sConfOf KTier.kpt P.root ms C.mideleg mepc stc lf) ∗
         clockCells cpu ∗ pcIs cpu (stvecBase C.stvec) ∗ gprFile cpu g ∗
         Register.sepc ↦ᵣ[cpu] sep ∗ Register.scause ↦ᵣ[cpu] sc ∗ Register.stval ↦ᵣ[cpu] tv ∗
-        Register.stvec ↦ᵣ[cpu] C.stvec ∗ ⌜uptWf P⌝ ∗ uptSlot cpu P ∗ umPages P M ∗ Rut P := by
+        Register.stvec ↦ᵣ[cpu] C.stvec ∗ ⌜uptWf P⌝ ∗ uptSlot cpu P ∗ umPages P M ∗ Rut P ∗
+        (∃ i : Nat, uRcpt (i, .uExit cpu (satpOf .kpt P.root) sc sep (gprList g))) := by
   unfold userTrapFrame userPtAny userCfg userHwCells
   rw [hdq, hmie, hmed]
   iintro ⟨#Hhw, %ms, %sc, %stv, %sep, %g, %hms, Hhs, Hcp, Hms, Hsc, Hstv, Hsep, Hpc, Hclock, HF, ⟨%M, HP⟩,
     ⟨Hstvec, Hmie, Hmideleg, Hmedeleg, Hmenvcfg, %mc, %mtc, %htm, Hmcounteren, Hmtimecmp, %mepc, %stc, Hmepc,
-      Hstimecmp⟩, HR⟩
+      Hstimecmp⟩, HR, #Hrc⟩
   icases (userPtInv_uptSlot cpu P M).1 $$ HP with ⟨Hsatp, HPm, %hwf, Hslot, Hum⟩
   unfold userPmp
   icases HPm with ⟨%cfg, %paddr, %h0, Hpmpcfg, Hpmpaddr⟩
@@ -124,7 +126,9 @@ theorem userTrapFrame_open [CurCtx] (cpu : CPU) (C : UCfg) (P : UPtd) (Rut : UPt
     simp only [MIE_S, MEDELEG_S, MENVCFG_S]
     iframe
     iexact Hhw
+  isplitl []
   · ipureintro; exact hwf
+  iexact Hrc
 
 /-! ## The hand-off -/
 

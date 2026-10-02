@@ -301,11 +301,12 @@ theorem userTrapFrame_trapped [CurCtx] (cpu : CPU) (C : UCfg) (pt : UPtd) (Rut :
         ⌜W.perm = π ∧ W.sz = sz ∧ W.fd = fdv ∧ W.cwd = cw ∧ W.gen = gn ∧ W.ch = cs ∧ W.pid = pidv ∧
           W.lazy = lz ∧ W.secc = secc⌝ ∗ trappedMachine cpu C pt Rut sz sc stv W := by
   unfold userTrapFrame
-  iintro ⟨%ms, %sc, %stv, %sep, %g, %hto, Hhs, Hpr, Hms, Hsc, Hstv, Hsep, Hpc, Hck, Hg, Hany, Hcfg, Hrut⟩
+  iintro ⟨%ms, %sc, %stv, %sep, %g, %hto, Hhs, Hpr, Hms, Hsc, Hstv, Hsep, Hpc, Hck, Hg, Hany, Hcfg, Hrut, #Hrc⟩
   ihave ⟨%M, Hpt⟩ := userPtmInv_intro cpu pt sz $$ Hany
   let g0 : RegMap := g.set 0#5 0#64
   have hg0 : g0 0#5 = 0#64 := by simp [g0]
   ihave Hg0 := MachCSL.gprFile_ext cpu g g0 (fun i hi => by simp [g0, RegMap.set, hi]) $$ Hg
+  ihave #Hrc := uRcpt_gprList_ext cpu _ sc sep g g0 (fun i hi => by simp [g0, RegMap.set, hi]) $$ Hrc
   iexists uvisOfRun g0 sep M π sz fdv cw gn cs pidv lz secc, sc, stv
   isplitr
   · ipureintro; exact ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩
@@ -318,6 +319,7 @@ theorem userTrapFrame_trapped [CurCtx] (cpu : CPU) (C : UCfg) (pt : UPtd) (Rut :
   isplitr
   · ipureintro; exact hto
   iframe
+  iexact Hrc
 
 end TrappedMachine
 

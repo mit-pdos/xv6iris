@@ -155,6 +155,8 @@ theorem uk_engine (π : Nat → Option UPerm) (sz : Nat) (Qp : Int → IProp GF)
     rw [hl0.cfg.mie, hl0.cfg.mideleg]; exact C.mm
   have hRtAct : ∀ s', ukRt ret C pt T sz m' pc' M' s' → s'.file .hart_state = .HART_ACTIVE () :=
     fun s' h' => h'.2.choose_spec.1.1.act
+  have hRtU : ∀ s', ukRt ret C pt T sz m' pc' M' s' → s'.file .cur_privilege = Privilege.User :=
+    fun s' h' => h'.2.choose_spec.1.1.priv
   unfold ukontF
   iapply wpLoop_ucStep
   iintro %tick
@@ -166,7 +168,7 @@ theorem uk_engine (π : Nat → Option UPerm) (sz : Nat) (Qp : Int → IProp GF)
   · -- THE CYCLE
     iapply swp_ucTryStep_U (ufRegF h C) (ubFrame curCtx D) ufFoot_uc ufFoot_ucDisp s0 hm0 hl0.act hl0.priv hmm
       (ukQ C pt T m pc V (ukRt ret C pt T sz m' pc' M') (ukEx ret e))
-      (fun _ _ => uxTextOwn curCtx Kt (ukTextAddrs pt.um) T)
+      (ukRider h (uxTextOwn curCtx Kt (ukTextAddrs pt.um) T))
     iframe Hfr
     isplit
     · iintro %meip %seip %i0 %p %hd Hfr
@@ -187,12 +189,12 @@ theorem uk_engine (π : Nat → Option UPerm) (sz : Nat) (Qp : Int → IProp GF)
       iframe Hhw Hwi Hfr HX
     · iintro Hfr
       iapply uk_fetchArm h C pt D T Kt m pc V (ucPreS s0) (ukOpened_preS hop) fr len i hF hdec
-        (ukRt ret C pt T sz m' pc' M') hRtAct (ukEx ret e) hX
+        (ukRt ret C pt T sz m' pc' M') hRtAct hRtU (ukEx ret e) hX
       iframe Hhw Hwi HK Hfr HX
   -- AFTER THE CYCLE AND THE TICK
   iintro %b Hpost
-  unfold ucCyclePost
-  icases Hpost with ⟨%st, %s2, %⟨hq, -⟩, Hfr, HX⟩
+  unfold ucCyclePost ukRider
+  icases Hpost with ⟨%st, %s2, %⟨hq, -⟩, Hfr, HX, #Hrc⟩
   obtain ⟨-, hcase⟩ := uk_land_of_q st s2 hq
   have hcfgL : UfCfg C pt (ucLand st s2).2.file := by
     rcases hcase with ⟨⟨-, V', hpost, -⟩, hL⟩ | ⟨sc, stv, htl, -, -⟩
@@ -201,6 +203,8 @@ theorem uk_engine (π : Nat → Option UPerm) (sz : Nat) (Qp : Int → IProp GF)
   iapply ust_tickOpt h C (ubFrame curCtx D) tick _ (uf_ucMisa C pt _ hcfgL)
   iframe Hfr
   iintro %s3 %hag Hfr
+  -- the receipt rider, past the landing and the tick (NI M2-W2b)
+  ihave #Hrc := uxRcpt_land_tick h st s2 s3 hag $$ Hrc
   rcases hcase with ⟨⟨hret, V', hpost, hM'⟩, hL⟩ | ⟨sc, stv, htl, hpcL, hwhy⟩
   · -- THE RETIRE: the bundle at the post state, the caller's continuation
     have hfin : UkFinal C pt T m' pc' V' s3 := ukFinal_clock (by rw [hL] at *; exact ukFinal_epi hpost) hag
@@ -228,7 +232,7 @@ theorem uk_engine (π : Nat → Option UPerm) (sz : Nat) (Qp : Int → IProp GF)
   · -- A TRAP: the kernel's obligation at the trap-out key
     obtain ⟨htl3, hpc3⟩ := ukTrapLand_clock htl hag
     ihave Htm := uk_trapped h C pt Rut sz D T Kt m pc V sc stv s3 htl3 (hpc3.trans hpcL) π K.fdv K.cw K.gn K.cs
-      K.pid false seccAll $$ HS Hfr HX HK Ha Hres
+      K.pid false seccAll $$ HS Hfr HX HK Ha Hres Hrc
     rw [hM]
     -- the slot at the trap-out key, out of the Löb hypothesis (Rocq `uk_arm_intr`)
     have hslot : ukLeafGoal (GF := GF) π sz Qp K M m pc Kc ∗ □ myPay K.gn Qp ∗ Kc ⊢

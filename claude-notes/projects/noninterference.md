@@ -435,6 +435,68 @@ monotonicity later). O6 `phi` is `∃ F`. Lane order: W2a+W2b (one lane, in sequ
 - **O6.** `phi` is `∃ F`. The filing is part of the run's witness, the same way first keys are. The two-run
   corollary is stated per incarnation at equal first key and readings.
 
+### M2-W2a+b as landed (2026-10-02)
+
+Lane `lane/m2w2ab` (on `lean-m2`), two commits.  **W2a (machine).**  §3 as written, with three deviations:
+(1) the exact-event consent is named `hartObsStep (e : Obs) (Out : IProp GF)` (W1's per-write `hartObsStep cpu p p'`
+retires; `MachCSL.hartStep` is the language's step relation and keeps its name);
+(2) RULING P2: the permit carries a TEMPORARY third, blind entry arm, because the kernel's `sret` proofs are
+generic in the `MachGS` instance and cannot know `uFit none e` without the W2c Spec move
+(`USERRET` then carries the evidence);
+(3) the uenter rule also hands back a receipt (`∃ i, uRcpt (i, e)`), as the dual of the exit rule.  Statements:
+
+    def hartObsStep (e : Obs) (Out : IProp GF) : IProp GF :=
+      ∀ h g, ⌜obsWf h g ∧ g.pow = true⌝ -∗ obsAuth h ={⊤}=∗ obsAuth (h ++ [e]) ∗ Out
+    def uRcpt (ix : Nat × Obs) : IProp GF := ∃ h0, ⌜h0.length = ix.1⌝ ∗ obsHistLb (h0 ++ [ix.2])
+    def hartObsPermit : IProp GF :=
+      □ ((∀ e, ⌜isUExit e = true⌝ -∗ hartObsStep e emp) ∧
+         (∀ e ox, ⌜isUEnter e = true ∧ MachFixedGS.uFit ox e⌝ -∗ uRcptOpt ox -∗ hartObsStep e emp) ∧
+         (∀ e, ⌜isUEnter e = true⌝ -∗ hartObsStep e emp))          -- M2-W2a interim
+    swp_writeReg_uexit cpu s sc ep gs Out Φ : hartObsStep (.uExit cpu s sc ep gs) Out ∗ cur_privilege ↦ User ∗
+      hartRdX cpu s sc ep gs ∗ ▷ (cur_privilege ↦ Supervisor -∗ hartRdX … -∗ Out -∗ (∃ i, uRcpt (i, .uExit …)) -∗ Φ ())
+      ⊢ swp cpu (writeReg .cur_privilege .Supervisor) Φ
+    swp_writeReg_uenter cpu p (hp : privUser p = false) s ep gs Out Φ : the dual over `hartRdE cpu s ep gs`
+
+`gprCells cpu gs` (Wp: the explicit `x1..x31` cells, a match on a 31-element list, `False` otherwise),
+`gprList`/`gprFile_gprCells` (KCtx), `isUExit`/`isUEnter` (ObsTrace), `MachFixedGS.uFit` (+ `bootFixedGS`'s last
+argument `Uf`, `AppIface.bootFixedGS`'s last argument; `xv6FixedGS` passes `fun _ _ => True`), `swp_run` through
+`swp_writeReg_uexit_bind`/`_uenter_bind` (names `Hpriv`, `Hsatp`, `Hscause`, `Hsepc`, `Hgprs`; back `Hout`,
+`Hrcpt`).  Towers: `hartObsStep (.uExit cpu s sc' sep' gs) Out ∗ satp ↦ s ∗ gprCells cpu gs`, `Out` and the receipt
+to `Φ`.  sretU: consent at `.uEnter cpu c.satp epc (gprList R)`, `Out` generic, receipt dropped.
+`wireInv_exit`/`wireInv_enter` (+ interim `wireInv_enterBlind`).  Hooks `HuserExit`/`HuserEnter`/`HuserEnterBlind`
+in `wp_power`/`riscvPowerAdequacy`/`xv6PowerAdequacyGen`; `obsLedgerAt_uexit`/`_uenter` (via `obsLedgerAt_userP`);
+`obsPredAt_user` is evidence-blind and discharges all three hooks; `riscvTraceAdequacy` fixes `Uf := True`, and its
+`HuserEnter` is blind.  `al_user`'s text is unchanged and serves every arm.
+
+**The M2-W2a interim items W2c removes** (each one is marked `M2-W2a interim: W2c removes this`):
+the third `hartObsPermit` conjunct and `hartObsPermit_enterBlind` (Resources); `hartObsPermit_of_hook`'s
+`HuserEnterBlind`; `wireInv_enterBlind` (WireInv); `wp_power`'s `HuserEnterBlind` and its use at the sealing
+(Power); `riscvPowerAdequacy`'s `HuserEnterBlind` and its pass-through, plus `riscvTraceAdequacy`'s third hook
+(Adequacy); `xv6PowerAdequacyGen`'s `HuserEnterBlind`, plus its triv instance (SystemAdequacy); the ledger's
+third hook (AppLaws); and the kernel's two `sret`s (`UserretPt.userret_usret`,
+`UserKernelBridge.wpLoop_userret_sret`).
+
+**W2b (user receipt).**  `userTrapFrame`/`userTrapFrameAt`/`userTrapFrameAtm` gain one last conjunct
+`(∃ i : Nat, uRcpt (i, .uExit cpu (satpOf .kpt pt.root) sc sep (gprList g)))`.  USER's text moves only through it.
+`SpecUser.wpUserExecClosedBody`'s text is byte-identical, and no `Spec*.lean` changed in W2b.  The carry runs as
+follows:
+
+- **The rider.** `UserFrame.ufExitEv`/`uxRcpt` (a user file, or the receipt of the exit the file names).
+  `UserStepTrap.ukRider cpu Rr := fun _ s2 => Rr ∗ uxRcpt cpu s2.file`, and `ustR cpu := ukRider cpu emp`.
+  `ust_trapArmGen` mints it from the tower's receipt (`ufExitEv_trapS`); the retire/wait arms mint it from
+  `priv = User`.
+- **Through the landing and the tick.** `ucLand_rcptRegs`, `uxRcpt_land_tick`.
+- **Into the frame.** `UserStepActive.ust_step_active`'s continuation gains `uxRcpt cpu s3.file -∗`, and
+  `ust_close`/`ust_close_trap` take it.  `uf_close_trap` takes `∃ k, uRcpt (k, ufExitEv cpu f)`.
+- **The engine.** The rider is `ukRider h (uxTextOwn …)`; `uk_fetchArm` gains `hRtU` (a retire lands at User);
+  `uk_armOb_retire` gains `hpr`; `uk_trapped` takes `uxRcpt cpu s.file`.
+- **Kernel side.** `userTrapFrame_trapped` re-keys the receipt to `g0` (`gprList_ext`).
+  `UserKernelBridge.userTrapFrame_open` exposes the receipt as its last conjunct; `uservec_frame_open` drops it,
+  since W2c is its first consumer.  `urc_frame_rut` keeps it in the frame.
+
+Gates (both commits): full build, `lint.sh`, `tcb.sh` (`expected.json` unchanged; line counts only),
+`audit.sh` (baseline unchanged), `run_all.sh vtest`.
+
 Not ported: 42666b2b7 (`tools/intr_cone.py`, a Rocq-module cone audit; the Lean counterpart is a
 `tools/` item for when T lands).  Rocq's L3 and T were never landed; they stay future work.
 
