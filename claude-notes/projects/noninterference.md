@@ -414,6 +414,12 @@ reading (`obsLedgerAt_phi` at `fun h => ∃ F, niOk h F`):
 W2a and W2b can go in sequence in one Opus lane (each about 15–25 files, mechanical). W2c is the content.
 W2d is gated on O4.
 
+**RULINGS (2026-10-02; O1/O2/O5/O6 by the coordinator as recommended, O3/O4 by the owner):** O1 incarnations by
+filing (era, pid), not `satp`. O2 the kernel's equation carrier is the Prop-class `NiFitIs`. O3 ACCEPTED: USER's
+text moves by the one persistent receipt conjunct in `userTrapFrame`. O4: W2a–c now; W2d (claims) BEFORE W4
+publishes; W4 may be developed on the core meanwhile. O5 the uptime reading is the tick event (optional per-era
+monotonicity later). O6 `phi` is `∃ F`. Lane order: W2a+W2b (one lane, in sequence) → W2c → W2d → W4.
+
 **Owner rulings requested.**
 - **O1.** Incarnations by filing (era, pid), not `satp` (F3). The alternative, a `satp`-keyed trace truncated
   at the first non-class exit, is pure but drops every later incarnation on a reused root and still misreads
