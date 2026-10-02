@@ -27,8 +27,6 @@ open Iris.Std.PartialMap Iris.Std.FiniteMap
 open Sail LeanRV64D LeanRV64D.Functions
 open UexecSG
 
-set_option linter.unusedSectionVars false
-
 /-- The instruction length the cycle adds to the pc. -/
 def ukLen (isRvc : Bool) : Int := if isRvc then 2 else 4
 

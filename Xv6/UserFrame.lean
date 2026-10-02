@@ -66,8 +66,6 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open Sail LeanRV64D LeanRV64D.Functions
 
-set_option linter.unusedSectionVars false
-
 /-! ## §1 The footprint -/
 
 /-- The cells the U→S trap tower writes (UTrap), and `PC`/`nextPC`. -/
@@ -502,22 +500,22 @@ theorem ufTrapSet_other (f : RegFile) (p : Privilege) (ms sc stv sep npc : BitVe
 
 theorem ufTrapSet_cp (f : RegFile) (p : Privilege) (ms sc stv sep npc : BitVec 64) :
     ufTrapSet f p ms sc stv sep npc .cur_privilege = p := by
-  unfold ufTrapSet; simp [RegFile.set_other, RegFile.set_same]
+  unfold ufTrapSet; simp [RegFile.set_other]
 theorem ufTrapSet_ms (f : RegFile) (p : Privilege) (ms sc stv sep npc : BitVec 64) :
     ufTrapSet f p ms sc stv sep npc .mstatus = ms := by
-  unfold ufTrapSet; simp [RegFile.set_other, RegFile.set_same]
+  unfold ufTrapSet; simp [RegFile.set_other]
 theorem ufTrapSet_sc (f : RegFile) (p : Privilege) (ms sc stv sep npc : BitVec 64) :
     ufTrapSet f p ms sc stv sep npc .scause = sc := by
-  unfold ufTrapSet; simp [RegFile.set_other, RegFile.set_same]
+  unfold ufTrapSet; simp [RegFile.set_other]
 theorem ufTrapSet_stv (f : RegFile) (p : Privilege) (ms sc stv sep npc : BitVec 64) :
     ufTrapSet f p ms sc stv sep npc .stval = stv := by
-  unfold ufTrapSet; simp [RegFile.set_other, RegFile.set_same]
+  unfold ufTrapSet; simp [RegFile.set_other]
 theorem ufTrapSet_sep (f : RegFile) (p : Privilege) (ms sc stv sep npc : BitVec 64) :
     ufTrapSet f p ms sc stv sep npc .sepc = sep := by
-  unfold ufTrapSet; simp [RegFile.set_other, RegFile.set_same]
+  unfold ufTrapSet; simp [RegFile.set_other]
 theorem ufTrapSet_npc (f : RegFile) (p : Privilege) (ms sc stv sep npc : BitVec 64) :
     ufTrapSet f p ms sc stv sep npc .nextPC = npc := by
-  unfold ufTrapSet; simp [RegFile.set_same]
+  unfold ufTrapSet; simp []
 theorem ufTrapSet_pc (f : RegFile) (p : Privilege) (ms sc stv sep npc : BitVec 64) :
     ufTrapSet f p ms sc stv sep npc .PC = f .PC := by
   unfold ufTrapSet; simp [RegFile.set_other]
@@ -587,7 +585,6 @@ theorem uf_trapCells (cpu : CPU) (C : UCfg) (P : UPtd) (f : RegFile) (hc : UfCfg
   · iapply ufCellsD_congr cpu _ hwRegs f _ hhw $$ H6
 
 end seams
-
 
 /-- **U1-P2's translation pins** (`UtrPins`) at any walker state whose file
 is a user file: the footprint reads `mstatus`/`cur_privilege`/`satp`; User

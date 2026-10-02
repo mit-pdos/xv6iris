@@ -52,8 +52,6 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedSectionVars false
-
 /-! ## §1 Addresses -/
 
 /-- The return address every entry answers at: the `jalr a4` at `+0x44`
@@ -208,7 +206,6 @@ theorem syscall_beqz_bit (b : Bool) :
     bcond bop.BEQ (if b then 1#64 else 0#64) 0#64 = !b := by
   cases b <;> decide
 
-
 /-- The sign-extended number `a3`, in range, is the number as a word. -/
 theorem syscall_sext_small (x : BitVec 32) (h1 : 1 ≤ x.toInt) (h2 : x.toInt ≤ 23) :
     BitVec.signExtend 64 x = BitVec.ofNat 64 x.toInt.toNat := by
@@ -248,10 +245,10 @@ theorem syscImg_faulted (P P' : UPtd) (sz : BitVec 64) (M : Nat → List (BitVec
   cases hP : Iris.Std.PartialMap.get? P.um (n / 4096) with
   | some w =>
     rw [hext _ w hP]
-    simp [hP]
+    simp []
   | none =>
     cases hP' : Iris.Std.PartialMap.get? P'.um (n / 4096) with
-    | none => simp [hP']
+    | none => simp []
     | some w =>
       have hk := hlt _ w hP hP'
       have hn : n < pgRoundUpN sz.toNat := by unfold pgRoundUpN; omega
@@ -363,7 +360,6 @@ def syscArmBody (n : Nat) (PT : SchedNames → IProp GF) (Γ : SchedNames) [Clai
     syscallCloser k V)
   ⊢ wpLoop (GF := GF) cpu
 
-
 /-- **WHAT THE PRINTK FALLBACK PROVES** (Rocq `sysc_fallback`'s statement):
 entered at `+0x40` when the `bltu` is taken (the number is out of range --
 `syscNum V < 1 ∨ 23 < syscNum V`; the `beqz` is dead, `syscTarget_ne_zero`),
@@ -390,7 +386,6 @@ def syscFallbackBody (PT : SchedNames → IProp GF) (Γ : SchedNames) [ClaimIs (
   (wpNext true k.proc c0 (syscallPost (hlc := hlc) PT Γ k γ j pid V M sts gn cs ip f) ∧
     syscallCloser k V)
   ⊢ wpLoop (GF := GF) cpu
-
 
 /-- **WHAT THE BLOCKED ARM PROVES** (xv6 7b2c1b1b; Rocq `sysc_blocked`):
 entered at `+0x4c` when the mask's `beqz a5` is taken (the raw number is in

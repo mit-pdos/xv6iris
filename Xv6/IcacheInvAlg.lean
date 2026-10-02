@@ -159,8 +159,6 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
 open Iris.Algebra
 
-set_option linter.unusedSectionVars false
-
 /-! ## 2.  WHERE itrunc's FIRST OWED PREMISE LIVES: `cov` BOUNDS THE FS
 
 `bfree` needs `0 <= b < size` of every block it frees, and `SpecItrunc`

@@ -383,10 +383,10 @@ theorem scheduler_head_step [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] 
   refine ⟨rfl, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
   all_goals
     simp only [KCtx.intrOff_noff, KCtx.intrOff_locks, KCtx.intrOff_tier, KCtx.intrOff_proc,
-      KCtx.intrOff_avail, KCtx.intrOff_regs, KCtx.intrOn_noff, KCtx.intrOn_locks, KCtx.intrOn_tier,
+      KCtx.intrOff_avail, KCtx.intrOn_noff, KCtx.intrOn_locks, KCtx.intrOn_tier,
       KCtx.intrOn_proc, KCtx.intrOn_avail, KCtx.intrOn_sie, KCtx.withRegs_noff, KCtx.withRegs_locks,
       KCtx.withRegs_tier, KCtx.withRegs_proc, KCtx.withRegs_avail, KCtx.withRegs_regs,
-      RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false, trapRes, hsie]
+      RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false, trapRes]
   · exact hnoff
   · exact hlocks
   · exact htier
@@ -484,9 +484,9 @@ theorem scheduler_release [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [C
   all_goals
     simp only [KCtx.withRegs_sie, KCtx.withRegs_noff, KCtx.withRegs_locks, KCtx.withRegs_tier,
       KCtx.withRegs_proc, KCtx.withRegs_avail, KCtx.withRegs_regs, KCtx.popOff_sie, KCtx.popOff_noff,
-      KCtx.popOff_locks, KCtx.popOff_tier, KCtx.popOff_proc, KCtx.popOff_avail, KCtx.popOff_regs,
+      KCtx.popOff_locks, KCtx.popOff_tier, KCtx.popOff_proc, KCtx.popOff_avail, 
       KCtx.withLocks_sie, KCtx.withLocks_noff, KCtx.withLocks_locks, KCtx.withLocks_tier,
-      KCtx.withLocks_proc, KCtx.withLocks_avail, KCtx.withLocks_regs, hsie, hnoff, hproc, htier]
+      KCtx.withLocks_proc, KCtx.withLocks_avail, hsie, hnoff, hproc, htier]
   unfold scanRegs headRegs
   obtain ⟨⟨g20, g21, g22, g23, g24⟩, g9, g18, g19⟩ := hregs
   obtain ⟨-, -, c9, c18, c19, c20, c21, c22, c23, c24, -, -, -⟩ := hcs2
@@ -734,7 +734,7 @@ theorem scheduler_dispatch (SW : SWTCH) [Xv6G GF] [FdslotG GF] [BioslotG GF] [Ir
   subst h
   obtain ⟨f1, f2, f8, f9, f18, f19, f20, f21, f22, f23, f24, f25, f26, f27⟩ :=
     MachCSL.calleeImg_eq hcimg
-  simp only [KCtx.withRegs_regs, KCtx.withProc_regs, RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false] at f1 f2 f8 f9 f18 f19 f20 f21 f22 f23 f24 f25 f26 f27
+  simp only [KCtx.withRegs_regs, RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false] at f1 f2 f8 f9 f18 f19 f20 f21 f22 f23 f24 f25 f26 f27
   icases Hres with ⟨%A', %cret, %back', Hrec', HP'⟩
   icases pSched_at_cpu Γ ξ0 cpu A' n cret (hartId cpu) back' hn $$ HP' with
     ⟨%⟨htp2, hcret, hA'⟩, Htc, Hir, %st, %ch2, %⟨hpark, hback⟩, Hheld2, Htag2, Hpay2⟩
@@ -775,11 +775,11 @@ theorem scheduler_dispatch (SW : SWTCH) [Xv6G GF] [FdslotG GF] [BioslotG GF] [Ir
     from (text_instr _ _ _ _ rfl rfl) Htext2 $$ [- $Hk $Hpc]
     with [MachCSL.KCtx.setReg_eq_withRegs, KCtx.rget_eq, resumedK_regs, resumedK_sie, resumedK_spie, resumedK_spp, resumedK_avail, resumedK_noff, resumedK_intena, resumedK_locks, resumedK_tier, resumedK_root, resumedK_proc, resumedK_sp]
   rotate_right 1
-  case hsI => simp only [KCtx.withRegs_sie, resumedK_regs, resumedK_sie, resumedK_spie, resumedK_spp, resumedK_avail, resumedK_noff, resumedK_intena, resumedK_locks, resumedK_tier, resumedK_root, resumedK_proc, resumedK_sp]
-  case hnI => simp only [KCtx.withRegs_noff, resumedK_regs, resumedK_sie, resumedK_spie, resumedK_spp, resumedK_avail, resumedK_noff, resumedK_intena, resumedK_locks, resumedK_tier, resumedK_root, resumedK_proc, resumedK_sp]; omega
+  case hsI => simp only [KCtx.withRegs_sie, resumedK_sie]
+  case hnI => simp only [KCtx.withRegs_noff, resumedK_noff]; omega
   case haI =>
     simp only [KCtx.rget_eq, KCtx.withRegs_regs, RegMap.set_apply, BitVec.reduceEq, ite_true,
-      ite_false, resumedK_regs, resumedK_sie, resumedK_spie, resumedK_spp, resumedK_avail, resumedK_noff, resumedK_intena, resumedK_locks, resumedK_tier, resumedK_root, resumedK_proc, resumedK_sp]
+      ite_false]
     exact sc_aCpuIntena cpu
   case hvI =>
     simp only [KCtx.rget_eq, BitVec.reduceEq, ite_true]
@@ -791,10 +791,10 @@ theorem scheduler_dispatch (SW : SWTCH) [Xv6G GF] [FdslotG GF] [BioslotG GF] [Ir
     from (text_instr _ _ _ _ rfl rfl) Htext2 $$ [- $Hk $Hpc]
     with [MachCSL.KCtx.setReg_eq_withRegs, resumedK_regs, resumedK_sie, resumedK_spie, resumedK_spp, resumedK_avail, resumedK_noff, resumedK_intena, resumedK_locks, resumedK_tier, resumedK_root, resumedK_proc, resumedK_sp, KCtx.withCpu_regs, KCtx.withCpu_sie, KCtx.withCpu_spie, KCtx.withCpu_spp, KCtx.withCpu_avail, KCtx.withCpu_noff, KCtx.withCpu_intena, KCtx.withCpu_locks, KCtx.withCpu_tier, KCtx.withCpu_root, KCtx.withCpu_proc, KCtx.withCpu_sp]
   rotate_right 1
-  case hsZ => simp only [KCtx.withCpu_sie, KCtx.withRegs_sie, resumedK_regs, resumedK_sie, resumedK_spie, resumedK_spp, resumedK_avail, resumedK_noff, resumedK_intena, resumedK_locks, resumedK_tier, resumedK_root, resumedK_proc, resumedK_sp, KCtx.withCpu_regs, KCtx.withCpu_sie, KCtx.withCpu_spie, KCtx.withCpu_spp, KCtx.withCpu_avail, KCtx.withCpu_noff, KCtx.withCpu_intena, KCtx.withCpu_locks, KCtx.withCpu_tier, KCtx.withCpu_root, KCtx.withCpu_proc, KCtx.withCpu_sp]
+  case hsZ => simp only [KCtx.withCpu_sie, KCtx.withRegs_sie, resumedK_sie, KCtx.withCpu_sie]
   case haZ =>
-    simp only [KCtx.rget_eq, KCtx.withCpu_regs, KCtx.withRegs_regs, RegMap.set_apply,
-      BitVec.reduceEq, ite_true, ite_false, resumedK_regs, resumedK_sie, resumedK_spie, resumedK_spp, resumedK_avail, resumedK_noff, resumedK_intena, resumedK_locks, resumedK_tier, resumedK_root, resumedK_proc, resumedK_sp, f20, g20]
+    simp only [KCtx.rget_eq, KCtx.withCpu_regs, RegMap.set_apply,
+      BitVec.reduceEq, ite_false, f20, g20]
     exact sc_aCpuProc cpu
   case hvZ => simp only [KCtx.rget_eq, BitVec.reduceEq, ite_true]
   iintro Hk Hpc
@@ -815,8 +815,8 @@ theorem scheduler_dispatch (SW : SWTCH) [Xv6G GF] [FdslotG GF] [BioslotG GF] [Ir
   unfold scanRegs headRegs
   refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ⟨?_, ?_, ?_, ?_, ?_⟩, ?_, ?_, ?_⟩
   all_goals
-    simp only [resumedK_regs, resumedK_sie, resumedK_spie, resumedK_spp, resumedK_avail, resumedK_noff, resumedK_intena, resumedK_locks, resumedK_tier, resumedK_root, resumedK_proc, KCtx.withCpu_regs, KCtx.withCpu_sie, KCtx.withCpu_spie, KCtx.withCpu_spp, KCtx.withCpu_avail, KCtx.withCpu_noff, KCtx.withCpu_intena, KCtx.withCpu_locks, KCtx.withCpu_tier, KCtx.withCpu_root, KCtx.withCpu_proc, KCtx.withProc_regs, KCtx.withProc_sie, KCtx.withProc_spie, KCtx.withProc_spp, KCtx.withProc_avail, KCtx.withProc_noff, KCtx.withProc_intena, KCtx.withProc_locks, KCtx.withProc_tier, KCtx.withProc_root, KCtx.withProc_proc, KCtx.withRegs_regs, KCtx.withRegs_sie, KCtx.withRegs_spie, KCtx.withRegs_spp, KCtx.withRegs_avail, KCtx.withRegs_noff, KCtx.withRegs_intena, KCtx.withRegs_locks, KCtx.withRegs_tier, KCtx.withRegs_root, KCtx.withRegs_proc,
-      RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false, hav, f9, f18, f19, f20, f21, f22,
+    simp only [resumedK_sie, resumedK_avail, resumedK_locks, resumedK_tier, KCtx.withCpu_sie, KCtx.withCpu_avail, KCtx.withCpu_noff, KCtx.withCpu_intena, KCtx.withCpu_locks, KCtx.withCpu_tier, KCtx.withProc_sie, KCtx.withProc_avail, KCtx.withProc_noff, KCtx.withProc_intena, KCtx.withProc_locks, KCtx.withProc_tier, KCtx.withProc_proc, KCtx.withRegs_regs, KCtx.withRegs_sie, KCtx.withRegs_avail, KCtx.withRegs_noff, KCtx.withRegs_intena, KCtx.withRegs_locks, KCtx.withRegs_tier, KCtx.withRegs_proc,
+      RegMap.set_apply, BitVec.reduceEq, ite_false, hav, f9, f18, f19, f20, f21, f22,
       f23, f24, g9, g18, g19, g20, g21, g22, g23, g24]
 
 /-! ## The scan body -/
@@ -898,7 +898,7 @@ theorem scheduler_body (SW : SWTCH) (AC : ACQUIRE) [Xv6G GF] [FdslotG GF] [Biosl
   k_norm [hret, hlocks, hint]
   obtain ⟨c2_2, c2_8, c2_9, c2_18, c2_19, c2_20, c2_21, c2_22, c2_23, c2_24, c2_25, c2_26,
     c2_27⟩ := hcs2
-  simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false] at c2_2 c2_8 c2_9 c2_18 c2_19 c2_20 c2_21 c2_22 c2_23 c2_24 c2_25 c2_26 c2_27
+  simp only [RegMap.set_apply, BitVec.reduceEq, ite_false] at c2_2 c2_8 c2_9 c2_18 c2_19 c2_20 c2_21 c2_22 c2_23 c2_24 c2_25 c2_26 c2_27
   ihave HR := (show procLockPay (GF := GF) Γ n curCtx ⊢ procLockResAt Γ ξ0 (procAddr n) from by
     unfold procLockPay; iintro H; iexact H) $$ HR
   icases procLockRes_elim Γ ξ0 (procAddr n) $$ HR with
@@ -923,20 +923,19 @@ theorem scheduler_body (SW : SWTCH) (AC : ACQUIRE) [Xv6G GF] [FdslotG GF] [Biosl
     ipureintro
     refine ⟨rfl, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
     all_goals
-      simp only [KCtx.setReg_sie, KCtx.setReg_noff, KCtx.setReg_locks, KCtx.setReg_tier,
-        KCtx.setReg_proc, KCtx.setReg_avail, KCtx.setReg_intena, KCtx.setReg_regs,
-        KCtx.withLocks_sie, KCtx.withLocks_noff, KCtx.withLocks_locks, KCtx.withLocks_tier,
-        KCtx.withLocks_proc, KCtx.withLocks_avail, KCtx.withLocks_intena, KCtx.withLocks_regs,
+      simp only [
+        
+        KCtx.withLocks_noff, KCtx.withLocks_locks, KCtx.withLocks_tier,
+        KCtx.withLocks_proc, KCtx.withLocks_avail, KCtx.withLocks_intena, 
         KCtx.withRegs_sie, KCtx.withRegs_noff, KCtx.withRegs_locks, KCtx.withRegs_tier,
         KCtx.withRegs_proc, KCtx.withRegs_avail, KCtx.withRegs_intena, KCtx.withRegs_regs,
-        KCtx.pushOffAt_sie, KCtx.pushOffAt_noff, KCtx.pushOffAt_locks, KCtx.pushOffAt_tier,
-        KCtx.pushOffAt_proc, KCtx.pushOffAt_avail, KCtx.pushOffAt_intena, KCtx.pushOffAt_regs,
-        hsie, hnoff, hlocks, htier, hproc, hav, hint, trapRes, RegMap.set_apply, BitVec.reduceEq,
-        ite_true, ite_false]
+        KCtx.pushOffAt_noff, KCtx.pushOffAt_tier,
+        KCtx.pushOffAt_proc, KCtx.pushOffAt_avail, KCtx.pushOffAt_intena, 
+        hsie, hnoff, htier, hproc, hav, hint, trapRes]
     · simp
     · unfold scanRegs headRegs
       refine ⟨⟨?_, ?_, ?_, ?_, ?_⟩, ?_, ?_, ?_⟩ <;>
-        simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false, c2_9, c2_18, c2_19,
+        simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, c2_9, c2_18, c2_19,
           c2_20, c2_21, c2_22, c2_23, c2_24, g9, g18, g19, g20, g21, g22, g23, g24]
   · -- not RUNNABLE: release straight away
     k_step (wp_s_branch cpu _ (KA.«scheduler» + 0x64#64) false 8170#13 15#5 19#5 (by decide) bop.BNE)
@@ -951,20 +950,19 @@ theorem scheduler_body (SW : SWTCH) (AC : ACQUIRE) [Xv6G GF] [FdslotG GF] [Biosl
     ipureintro
     refine ⟨rfl, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
     all_goals
-      simp only [KCtx.setReg_sie, KCtx.setReg_noff, KCtx.setReg_locks, KCtx.setReg_tier,
-        KCtx.setReg_proc, KCtx.setReg_avail, KCtx.setReg_intena, KCtx.setReg_regs,
-        KCtx.withLocks_sie, KCtx.withLocks_noff, KCtx.withLocks_locks, KCtx.withLocks_tier,
-        KCtx.withLocks_proc, KCtx.withLocks_avail, KCtx.withLocks_intena, KCtx.withLocks_regs,
+      simp only [
+        
+        KCtx.withLocks_noff, KCtx.withLocks_locks, KCtx.withLocks_tier,
+        KCtx.withLocks_proc, KCtx.withLocks_avail, KCtx.withLocks_intena, 
         KCtx.withRegs_sie, KCtx.withRegs_noff, KCtx.withRegs_locks, KCtx.withRegs_tier,
         KCtx.withRegs_proc, KCtx.withRegs_avail, KCtx.withRegs_intena, KCtx.withRegs_regs,
-        KCtx.pushOffAt_sie, KCtx.pushOffAt_noff, KCtx.pushOffAt_locks, KCtx.pushOffAt_tier,
-        KCtx.pushOffAt_proc, KCtx.pushOffAt_avail, KCtx.pushOffAt_intena, KCtx.pushOffAt_regs,
-        hsie, hnoff, hlocks, htier, hproc, hav, hint, trapRes, RegMap.set_apply, BitVec.reduceEq,
-        ite_true, ite_false]
+        KCtx.pushOffAt_noff, KCtx.pushOffAt_tier,
+        KCtx.pushOffAt_proc, KCtx.pushOffAt_avail, KCtx.pushOffAt_intena, 
+        hsie, hnoff, htier, hproc, hav, hint, trapRes]
     · simp
     · unfold scanRegs headRegs
       refine ⟨⟨?_, ?_, ?_, ?_, ?_⟩, ?_, ?_, ?_⟩ <;>
-        simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false, c2_9, c2_18, c2_19,
+        simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, c2_9, c2_18, c2_19,
           c2_20, c2_21, c2_22, c2_23, c2_24, g9, g18, g19, g20, g21, g22, g23, g24]
 
 /-! ## The scan, the loop, and the whole function -/

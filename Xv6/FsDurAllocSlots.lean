@@ -49,8 +49,6 @@ namespace Xv6
 open Iris Iris.Std MachCSL
 open Iris.Std.PartialMap
 
-set_option linter.unusedSectionVars false
-
 /-! ## 2.  The footprint, slot by slot -/
 
 /-- `fsState`'s pieces NAMED by an index (Rocq's `fp_slot`). -/

@@ -128,8 +128,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Iris.Algebra MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-! ## 1.  THE PIN's TWO PURE FACTS -/
 
 /-- AT TWO OR MORE REFERENCES NO FREEZE IS STANDING, so the pin says

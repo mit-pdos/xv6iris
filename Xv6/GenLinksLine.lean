@@ -64,8 +64,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-- THE PARAMETERS: what a tier names (Rocq `gen_params`). -/
 structure GenParams (hlc : HasLC) (GF : BundledGFunctors) [MachGS hlc GF] [Xv6G GF] [DiskG GF]
     [EchoOutG GF] (M : LModel) where

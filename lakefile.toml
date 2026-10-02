@@ -18,14 +18,20 @@ path = "vendor/lean-sail"
 name = "Lean_RV64D"
 path = "model/Lean_RV64D"
 
+# `linter.unusedVariables` / `linter.unusedSectionVars` are off tree-wide:
+# a Spec statement names its preconditions for the reader (and after Rocq)
+# though the declaration itself never mentions them, and the section
+# variables of the instance-heavy sections are included by design.  (They
+# used to be switched off file by file.)  The other linters stay on, so a
+# warning in the build log is worth reading.
 [[lean_lib]]
 name = "MachCSL"
-leanOptions = { autoImplicit = false, relaxedAutoImplicit = false }
+leanOptions = { autoImplicit = false, relaxedAutoImplicit = false, linter.unusedVariables = false, linter.unusedSectionVars = false }
 
 # The xv6 kernel proofs, kept separate from the MachCSL framework.
 [[lean_lib]]
 name = "Xv6"
-leanOptions = { autoImplicit = false, relaxedAutoImplicit = false }
+leanOptions = { autoImplicit = false, relaxedAutoImplicit = false, linter.unusedVariables = false, linter.unusedSectionVars = false }
 
 # The device-conformance suite (vtest-lean/): the machine model re-checked
 # against behaviours captured from QEMU.  NOT a default target: a red test is
@@ -34,4 +40,4 @@ leanOptions = { autoImplicit = false, relaxedAutoImplicit = false }
 [[lean_lib]]
 name = "Vtest"
 srcDir = "vtest-lean"
-leanOptions = { autoImplicit = false, relaxedAutoImplicit = false }
+leanOptions = { autoImplicit = false, relaxedAutoImplicit = false, linter.unusedVariables = false, linter.unusedSectionVars = false }

@@ -95,8 +95,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open UShPipesDefs
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
-
 /-- **Rocq `catf_ws_exec_ok`**: the producer's words at any user file
 (cut W3). -/
 theorem catf_ws_exec_ok (f : List (BitVec 8)) (hf : uname f) : execOk (prodWords (.PrCatF f)) :=

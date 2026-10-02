@@ -107,7 +107,7 @@ theorem mixF_get (bs olds : List (BitVec 8)) (i j : Nat) (hi : i ≤ bs.length) 
   unfold mixF
   rw [List.getElem?_append, List.length_take, Nat.min_eq_left hi]
   by_cases h : j < i
-  · simp [h, List.getElem?_take]
+  · simp [h]
   · simp only [h, ite_false, List.getElem?_drop]
     congr 1; omega
 
@@ -140,7 +140,7 @@ theorem mixB_get (bs olds : List (BitVec 8)) (i j : Nat) (hi : i ≤ olds.length
   unfold mixB
   rw [List.getElem?_append, List.length_take, Nat.min_eq_left hi]
   by_cases h : j < i
-  · simp [h, List.getElem?_take]
+  · simp [h]
   · simp only [h, ite_false, List.getElem?_drop]
     congr 1; omega
 
@@ -283,7 +283,7 @@ theorem memmove_fwd_loop {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
       (((R.set 11#5 (s + BitVec.ofNat 64 i + 1#64)).set 14#5 (d + BitVec.ofNat 64 i + 1#64)).set 13#5 (BitVec.setWidth 64 b))
       (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]; rw [BitVec.ofNat_add, ← BitVec.add_assoc])
       (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]; rw [BitVec.ofNat_add, ← BitVec.add_assoc])
-      (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false, h15]) c')
+      (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, h15]) c')
     iframe
     iapply wpNext_mono _ _ _ _ _ $$ HΦ
     iintro %c'' HΦ %R' Hk Hpc Hsrc Hdst %hother
@@ -433,8 +433,7 @@ theorem memmove_finish {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Cu
   ipureintro
   constructor
   · unfold calleeSaved
-    simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, eq_self_iff_true, _root_.true_and,
-      _root_.and_true]
+    simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, _root_.true_and]
     exact ⟨hcs 9#5 (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide),
       hcs 18#5 (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide),
       hcs 19#5 (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide),
@@ -490,7 +489,7 @@ theorem memmove_fwd_seg {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [C
   rw [mixF_zero]
   iframe
   case h11 => simp [RegMap.set_apply, h11]
-  case h14 => simp [RegMap.set_apply, h10]
+  case h14 => simp []
   case h15 => simp [RegMap.set_apply]
   k_norm_g
   iapply wpNext_intro_pin
@@ -500,12 +499,12 @@ theorem memmove_fwd_seg {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [C
     hK bs dqs R' ?hR2 ?h10 ?hcs) $$ [- $Hk $Hpc]
   rotate_right 1
   iframe
-  case hR2 => rw [hother 2#5 (by decide) (by decide) (by decide)]; simp [RegMap.set_apply, hR2]
-  case h10 => rw [hother 10#5 (by decide) (by decide) (by decide)]; simp [RegMap.set_apply, h10]
+  case hR2 => rw [hother 2#5 (by decide) (by decide) (by decide)]; simp [hR2]
+  case h10 => rw [hother 10#5 (by decide) (by decide) (by decide)]; simp [h10]
   case hcs =>
     intro r h2 h8 h10' h11' h12' h13' h14' h15'
     rw [hother r h11' h13' h14']
-    simp only [RegMap.set_apply, h11', h12', h13', h14', h15', ite_false]
+    simp only [h12', h14', h15', ite_false]
     exact hRk r h2 h8 h13' h14'
 
 /-! ## The function -/
@@ -612,7 +611,7 @@ theorem memmove_proof : MEMMOVE := ⟨fun {hlc GF} _ _ cpu k bs olds n dqs hK hn
         iframe
         case h14 => simp [RegMap.set_apply]
         case h13 => simp [RegMap.set_apply]
-        case h15 => simp [RegMap.set_apply, hn, bwd_a5 (k.regs 11#5) n hn1 hn32]
+        case h15 => simp []
         k_norm_g
         iapply wpNext_intro_pin
         iintro %c14 %hp14 %R' Hk Hpc Hsrc Hdst %hother
@@ -624,12 +623,12 @@ theorem memmove_proof : MEMMOVE := ⟨fun {hlc GF} _ _ cpu k bs olds n dqs hK hn
           ?hR2 ?h10 ?hcs) $$ [- $Hk $Hpc]
         rotate_right 1
         iframe
-        case hR2 => rw [hother 2#5 (by decide) (by decide) (by decide)]; simp [RegMap.set_apply]
-        case h10 => rw [hother 10#5 (by decide) (by decide) (by decide)]; simp [RegMap.set_apply]
+        case hR2 => rw [hother 2#5 (by decide) (by decide) (by decide)]; simp []
+        case h10 => rw [hother 10#5 (by decide) (by decide) (by decide)]; simp []
         case hcs =>
           intro r h2 h8 h10' h11' h12' h13' h14' h15'
           rw [hother r h12' h13' h14']
-          simp [RegMap.set_apply, h2, h8, h13', h14', h15']
+          simp [h2, h8, h13', h14', h15']
     · -- src ≥ dst: forward
       simp only [hlt, Bool.false_eq_true, ↓reduceIte]
       iapply (memmove_fwd_seg cpu c3 k hpin3 hK bs olds n dqs hn32 hls hld hn1 _ ?h10 ?h11 ?h12 ?hR2 ?hRk)

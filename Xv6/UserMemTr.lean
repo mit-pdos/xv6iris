@@ -27,8 +27,6 @@ namespace Xv6
 open MachCSL
 open Sail LeanRV64D LeanRV64D.Functions
 
-set_option linter.unusedSectionVars false
-
 /-- The walk's write-back is an `A`/`D` variant of the leaf (any plain
 access). -/
 theorem ume_update_AD {acc : MemoryAccessType mem_payload} (hpl : accPlain acc) {lw w x : BitVec 64}

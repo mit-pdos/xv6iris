@@ -53,8 +53,6 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Iris.Std.PartialMap
 
-set_option linter.unusedSectionVars false
-
 /-! ## §0 The device kinds and the camera -/
 
 /-- **Rocq `cfdev`** (deviation 1). -/

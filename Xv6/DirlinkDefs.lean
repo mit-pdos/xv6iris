@@ -36,9 +36,6 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedSectionVars false
-set_option linter.unusedVariables false
-
 /-- The facts fixed for the whole call (the contract's premises, and the
 record's alignment). -/
 structure DirlinkStatic [Fscfg] [Icfg] (k : KCtx) (j : Nat) (bm : Blkmap)

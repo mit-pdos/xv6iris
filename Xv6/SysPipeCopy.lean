@@ -30,9 +30,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
@@ -299,7 +297,6 @@ theorem sys_pipe_stage_e {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
         rfl hproc htier hnoff hK hlk hplk hprc hkmem hpin1 hpins h9 v)
       $$ [- $Hk $Hpc $Hfr $Hrf $Hwf $Hr0 $Hr1 $Hqf $Hcore $Howe $Hu0 $Ha0 $Hu1 $Ha1 $Hfrag $Hnext]
     iframe #
-
 
 set_option maxHeartbeats 16000000 in
 /-- `+0x48`, after `fdalloc(wf)`: `sw a0,-64(s0) ; bltz a0` (failure into

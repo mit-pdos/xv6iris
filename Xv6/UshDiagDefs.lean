@@ -64,8 +64,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
-
 /-! ## §1 Literals and formats (deviation 2) -/
 
 /-- **Rocq `shd_nopct`**: the only '%' in the literal is the one at `q`. -/

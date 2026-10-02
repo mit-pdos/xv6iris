@@ -51,8 +51,6 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Iris.Std.PartialMap
 
-set_option linter.unusedSectionVars false
-
 /-- The partial-map union at `RegMapF` (UserHeap's notation). -/
 local notation:65 a:65 " ∪ₚ " b:66 => @Union.union (RegMapF _) PartialMap.instUnion a b
 

@@ -145,7 +145,7 @@ theorem execSpecF_btype (cpu : CPU) (dq : DFrac) (c : MConf) (pc npc₀ : BitVec
   simp only [execute_BTYPE_bcond]
   rcases Bool.eq_false_or_eq_true (bcond op (RegMap.get R rs1) (RegMap.get R rs2)) with hc | hc
   all_goals
-    try simp only [hc, ite_true, ite_false]
+    try simp only [hc, ite_true]
     swp_run 30
     iapply swp_bind
     iapply swp_rX_file_later (hrs := hrs1)
@@ -183,7 +183,7 @@ theorem execSpecF_btype0 (cpu : CPU) (dq : DFrac) (c : MConf) (pc npc₀ : BitVe
   simp only [execute_BTYPE_bcond]
   rcases Bool.eq_false_or_eq_true (bcond op 0#64 (RegMap.get R rs2)) with hc | hc
   all_goals
-    try simp only [hc, ite_true, ite_false]
+    try simp only [hc, ite_true]
     swp_run 30
     iapply swp_bind
     iapply swp_rX_file_later (hrs := hrs2)
@@ -362,7 +362,7 @@ theorem execSpecF_addw (cpu : CPU) (dq : DFrac) (c : MConf) (pc npc₀ : BitVec 
   iapply HΦ $$ HmConf HPC HnextPC HF
 
 theorem beq_ne (v : BitVec 64) (h : v ≠ 0#64) : bcond bop.BEQ v 0#64 = false := by
-  simp only [bcond, beq_iff_eq]; exact decide_eq_false h
+  simp only [bcond]; exact decide_eq_false h
 
 theorem bne_ne {α : Type} (a b : BitVec 64) (h : a ≠ b) (p q : α) :
     (if bcond bop.BNE a b then p else q) = p := by

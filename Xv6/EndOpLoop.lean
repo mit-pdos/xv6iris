@@ -12,9 +12,7 @@ open LeanRV64D LeanRV64D.Functions
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## The inlined `write_log` copy loop
 

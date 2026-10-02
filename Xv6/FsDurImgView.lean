@@ -44,8 +44,6 @@ open Iris Iris.Std MachCSL
 open Iris.Algebra
 open FsStateLink
 
-set_option linter.unusedSectionVars false
-
 /-! ## 8.  The image's abstract state -/
 
 /-- Rocq's `img_state`. -/

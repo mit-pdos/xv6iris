@@ -50,8 +50,6 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedVariables false
-
 /-- **Rocq `ssc_src_ok` at `n = 16`**: the caller owns everything the loop's
 budget (15 bytes) can reach, or a NUL inside what it owns. -/
 def sscSrcOk (bss : List (BitVec 8)) : Prop :=

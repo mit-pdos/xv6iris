@@ -55,8 +55,6 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Iris.Std.PartialMap
 
-set_option linter.unusedSectionVars false
-
 /-! ## 0.  TWO SHARES THAT EACH EXCEED A HALF -/
 
 /-- Rocq's `qp_no_pair_lt` (deviation 2). -/

@@ -20,8 +20,6 @@ open Std MachCSL
 open LeanRV64D
 open Xv6.PtRun
 
-set_option linter.unusedSectionVars false
-
 /-! ## The dummy trees: the shape of the kernel table, region by region -/
 
 /-- A supply longer than any single region needs. -/
@@ -530,7 +528,6 @@ theorem mapsTo_stacks_out (T : PTree) (pas : Nat → BitVec 44) (fs : List (BitV
     have h1 := congrArg BitVec.toNat he
     rw [vpn_add_toNat w i (by omega), Xv6.kstackVpn_toNat j hj] at h1
     omega
-
 
 /-! ## The table `kvmmake` returns -/
 

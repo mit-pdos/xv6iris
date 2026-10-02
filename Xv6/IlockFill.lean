@@ -44,9 +44,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
 
-set_option linter.unusedSectionVars false
-set_option linter.unusedVariables false
-
 /-! ## A claimed inode's bundle, out of nothing (§16.4's fill sub-arm) -/
 
 /-- Rocq's `il_bmcells_empty`. -/

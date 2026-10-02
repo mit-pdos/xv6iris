@@ -291,13 +291,13 @@ theorem strncmp_loop (kb : KCtx)
         rotate_right 1
         iframe
         case h10 =>
-          simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false, reduceIte]
+          simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
           exact sn_succ' s1 i
         case h11 =>
-          simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false, reduceIte]
+          simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
           exact sn_succ' s2 i
         case h12 =>
-          simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false, reduceIte]
+          simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
           congr 1 <;> omega
         iapply wpNext_mono _ _ _ _ _ $$ HΦ
         iintro %c' HΦ %R' Hk Hbuf1 Hbuf2 %hother Hpost
@@ -369,8 +369,8 @@ theorem strncmp_proof : STRNCMP := ⟨fun {hlc GF} _ _ cpu k bs1 bs2 n dq1 dq2 h
     ipureintro
     constructor
     · unfold calleeSaved
-      simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, eq_self_iff_true,
-        _root_.true_and, _root_.and_true]
+      simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, 
+        _root_.true_and]
       exact ⟨hcs 9#5 (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide),
         hcs 18#5 (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide),
         hcs 19#5 (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide),
@@ -382,7 +382,7 @@ theorem strncmp_proof : STRNCMP := ⟨fun {hlc GF} _ _ cpu k bs1 bs2 n dq1 dq2 h
         hcs 25#5 (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide),
         hcs 26#5 (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide),
         hcs 27#5 (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide)⟩
-    · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
+    · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]
       exact hres
   -- beqz a2,e10
   k_step_gen (wp_s_branch c1 _ (KA.«strncmp» + 0x8#64) true 28#13 12#5 0#5 (by decide) bop.BEQ)
@@ -406,7 +406,7 @@ theorem strncmp_proof : STRNCMP := ⟨fun {hlc GF} _ _ cpu k bs1 bs2 n dq1 dq2 h
     iframe
     case hR2 => simp [RegMap.set_apply]
     case hcs => intro r h10 _ _ _ _ h2 h8; simp [RegMap.set_apply, h10, h2, h8]
-    case hres => exact Or.inl ⟨rfl, by simp [RegMap.set_apply]⟩
+    case hres => exact Or.inl ⟨rfl, by simp []⟩
   · -- n > 0: run the loop from index 0
     simp only [hn0, ite_false]
     iapply (strncmp_loop (k.pushed 2) (k.regs 10#5) (k.regs 11#5) dq1 dq2 bs1 bs2 n
@@ -424,10 +424,10 @@ theorem strncmp_proof : STRNCMP := ⟨fun {hlc GF} _ _ cpu k bs1 bs2 n dq1 dq2 h
         r ≠ 2#5 → r ≠ 8#5 → R' r = k.regs r := by
       intro r h10' h11' h12' h14' h15' h2' h8'
       rw [hother r h10' h11' h12' h14' h15']
-      simp [RegMap.set_apply, h2', h8']
+      simp [h2', h8']
     have hR2 : R' 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFF0#64 := by
       rw [hother 2#5 (by decide) (by decide) (by decide) (by decide) (by decide)]
-      simp [RegMap.set_apply]
+      simp []
     have hpin3 : k.sie = false ∨ k.proc = 0#64 → c3 = cpu :=
       fun h => (hp3 h).trans ((hp2 h).trans (hp1 h))
     icases kctx_kernelText _ _ $$ Hk with ⟨#Htext2, Hk⟩
@@ -465,7 +465,7 @@ theorem strncmp_proof : STRNCMP := ⟨fun {hlc GF} _ _ cpu k bs1 bs2 n dq1 dq2 h
         exact hcs r h10' h11' h12' h14' h15' h2' h8'
       case hres =>
         refine Or.inr ⟨by omega, Or.inl ⟨m, bs1[m], bs2[m], hstop, ha, hb, ?_⟩⟩
-        simp [RegMap.set_apply]
+        simp []
     · -- all n bytes agreed and are non-NUL: a0 := 0
       k_step_gen (wp_s_addi c3 _ (KA.«strncmp» + 0x20#64) true 0#12 10#5 0#5 (by decide))
         from (text_instr _ _ _ _ rfl rfl) Htext2 $$ [- $Hk $Hpc] next c4 hp4
@@ -484,6 +484,6 @@ theorem strncmp_proof : STRNCMP := ⟨fun {hlc GF} _ _ cpu k bs1 bs2 n dq1 dq2 h
         simp only [RegMap.set_apply, h10', ite_false]
         exact hcs r h10' h11' h12' h14' h15' h2' h8'
       case hres =>
-        exact Or.inr ⟨by omega, Or.inr ⟨hall, by simp [RegMap.set_apply]⟩⟩⟩
+        exact Or.inr ⟨by omega, Or.inr ⟨hall, by simp []⟩⟩⟩
 
 end Xv6

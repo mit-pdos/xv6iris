@@ -37,8 +37,6 @@ open Iris.Std.PartialMap
 open Std (ExtTreeSet)
 open UexecSG
 
-set_option linter.unusedSectionVars false
-
 section Write
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [FsTopG GF] [OffboxG GF] [Appcfg GF] [FsBytesG GF] [Fscfg] [Icfg] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]

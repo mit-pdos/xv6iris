@@ -25,9 +25,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
@@ -103,7 +101,6 @@ theorem namex_consts (MM : MEMMOVE) (IL : ILOCK) (IUP : IUNLOCKPUT) (IU : IUNLOC
   · simp only [List.drop_zero] at h
     have := namex_wi_need _ _ hbud h
     simpa using this
-
 
 /-- The start's resources, before the walk's reference exists: the loaned
 cells, the path, the name buffer, the slots, the reservation and the token
@@ -222,7 +219,6 @@ theorem namex_abs (MM : MEMMOVE) (IL : ILOCK) (IUP : IUNLOCKPUT) (IU : IUNLOCK) 
   iapply (namex_consts MM IL IUP IU DL IP Γ cpu k A hs spie spp _ (ientry kk) nf hr' hbud)
     $$ [$Hk $Hpc $Hframe $Hte $Hce $Hwalk $Hnext]
   unfold namexEnv; iframe #
-
 
 theorem namexKeep_open (k : KCtx) (A : NamexArgs) :
     namexKeep (GF := GF) k A ⊣⊢
@@ -346,7 +342,6 @@ theorem namex_rel (MM : MEMMOVE) (IL : ILOCK) (IUP : IUNLOCKPUT) (IU : IUNLOCK) 
   iapply (namex_consts MM IL IUP IU DL IP Γ cpu k A hs spie' spp' _ (ientry ck) nf hr' hbud)
     $$ [$Hk $Hpc $Hframe $Hte $Hce $Hwalk $Hnext]
   unfold namexEnv; iframe #
-
 
 set_option maxHeartbeats 16000000 in
 /-- **`+0x1c .. +0x2a`: THE ARGUMENTS AND THE ARM SPLIT** -- `s1 = path`,

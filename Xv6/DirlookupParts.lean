@@ -54,8 +54,6 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedSectionVars false
-
 /-! ## Call targets, return addresses, the literal -/
 
 theorem dirlookup_br_readi : KA.«dirlookup» + 0xFFFFFFFFFFFFFDF2#64 = KA.«readi» := by decide

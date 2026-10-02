@@ -221,10 +221,9 @@ theorem pop_off_proof (M : MYCPU) : POPOFF := ⟨fun {hlc GF} _ _ cpu k hsie hno
       iapply HK $$ %_ Hk Hpc
       ipureintro
       obtain ⟨hs2, _, h9, h18, h19, h20, h21, h22, h23, h24, h25, h26, h27⟩ := hcs2
-      simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] at h9 h18 h19 h20 h21 h22 h23 h24 h25 h26 h27
+      simp only [RegMap.set_apply, BitVec.reduceEq, ite_false] at h9 h18 h19 h20 h21 h22 h23 h24 h25 h26 h27
       unfold calleeSaved
-      simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, eq_self_iff_true, _root_.true_and,
-        _root_.and_true]
+      simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, _root_.true_and]
       exact ⟨h9, h18, h19, h20, h21, h22, h23, h24, h25, h26, h27⟩
       case hR2 => k_norm; rw [hcs2.1]; simp [RegMap.set_apply]
     -- the outermost push_off found interrupts off: they stay off
@@ -243,8 +242,8 @@ theorem pop_off_proof (M : MYCPU) : POPOFF := ⟨fun {hlc GF} _ _ cpu k hsie hno
       obtain ⟨w1, w2, w3, w4, w5⟩ := hwf
       unfold KCtx.wf
       simp only [KCtx.withCpu_sie, KCtx.withCpu_noff, KCtx.withCpu_intena, KCtx.withCpu_locks, KCtx.withCpu_tier,
-        KCtx.withRegs_sie, KCtx.withRegs_intena, KCtx.withRegs_locks, KCtx.withRegs_tier, KCtx.pushed_sie,
-        KCtx.pushed_intena, KCtx.pushed_locks, KCtx.pushed_tier]
+        KCtx.withRegs_sie, KCtx.withRegs_locks, KCtx.withRegs_tier, KCtx.pushed_sie,
+        KCtx.pushed_locks, KCtx.pushed_tier]
       refine ⟨fun _ => hsie, fun h => absurd h (by omega), fun h => absurd h (by rw [hsie]; decide),
         by omega, by omega⟩
     iintro Hk Hpc Hcell
@@ -275,10 +274,9 @@ theorem pop_off_proof (M : MYCPU) : POPOFF := ⟨fun {hlc GF} _ _ cpu k hsie hno
     iapply HΦ' $$ %_ Hk Hpc
     ipureintro
     obtain ⟨hs2, _, h9, h18, h19, h20, h21, h22, h23, h24, h25, h26, h27⟩ := hcs2
-    simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] at h9 h18 h19 h20 h21 h22 h23 h24 h25 h26 h27
+    simp only [RegMap.set_apply, BitVec.reduceEq, ite_false] at h9 h18 h19 h20 h21 h22 h23 h24 h25 h26 h27
     unfold calleeSaved
-    simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, eq_self_iff_true, _root_.true_and,
-      _root_.and_true]
+    simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, _root_.true_and]
     exact ⟨h9, h18, h19, h20, h21, h22, h23, h24, h25, h26, h27⟩
     case hR2 => k_norm; rw [hcs2.1]; simp [RegMap.set_apply]
   · -- the count is still positive: the depth becomes noff - 1, straight to the epilogue
@@ -314,10 +312,9 @@ theorem pop_off_proof (M : MYCPU) : POPOFF := ⟨fun {hlc GF} _ _ cpu k hsie hno
     iapply HΦ' $$ %_ Hk Hpc
     ipureintro
     obtain ⟨hs2, _, h9, h18, h19, h20, h21, h22, h23, h24, h25, h26, h27⟩ := hcs2
-    simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] at h9 h18 h19 h20 h21 h22 h23 h24 h25 h26 h27
+    simp only [RegMap.set_apply, BitVec.reduceEq, ite_false] at h9 h18 h19 h20 h21 h22 h23 h24 h25 h26 h27
     unfold calleeSaved
-    simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, eq_self_iff_true, _root_.true_and,
-      _root_.and_true]
+    simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, _root_.true_and]
     exact ⟨h9, h18, h19, h20, h21, h22, h23, h24, h25, h26, h27⟩
     case hR2 => k_norm; rw [hcs2.1]; simp [RegMap.set_apply]
 ⟩

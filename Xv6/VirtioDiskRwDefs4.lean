@@ -67,8 +67,6 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedSectionVars false
-
 /-! ## The register pin that survives P5 and P6
 
 P5 overwrites `s1` with `&disk.vdisk_lock` and `s2` with the constant the

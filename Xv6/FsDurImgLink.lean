@@ -38,8 +38,6 @@ open Iris Iris.Std MachCSL
 open Iris.Algebra
 open FsStateLink
 
-set_option linter.unusedSectionVars false
-
 /-! ## 9g.  The bridge -/
 
 /-- THE IMAGE'S REGISTER CHOICE, per inum (Rocq's `img_v`). -/

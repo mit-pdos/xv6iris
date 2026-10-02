@@ -13,8 +13,6 @@ open Iris Std MachCSL
 open Iris.Std.PartialMap Iris.Std.FiniteMap
 open Sail LeanRV64D LeanRV64D.Functions
 
-set_option linter.unusedSectionVars false
-
 /-! ## §1 The geometry of a user page -/
 
 /-- A user page is 4096-aligned RAM. -/

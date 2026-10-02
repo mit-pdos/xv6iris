@@ -29,7 +29,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 theorem sstatus_clear_sie_id (o : BitVec 64) (hsm : smFacts o false) :
     mstatusLegalize o (lift_sstatus o (Mk_Sstatus (zero_extend (m := 64) (lower_mstatus o &&& 0xFFFFFFFFFFFFFFFD#64)))) = o := by
   obtain ⟨hSIE, hMPRV, hSXL, hMXR, hTSR, hTVM, hFS, hXS, hVS, hSD, hMPP⟩ := hsm
-  simp only [ite_true, ite_false, Bool.false_eq_true] at hSIE
+  simp only [ite_false, Bool.false_eq_true] at hSIE
   exact sstatus_clear_sie_id' o hSIE hSXL hFS hXS hVS hSD hMPP
 
 /-- The `SIE` bit of the supervisor view is `mstatus`'s. -/
@@ -185,7 +185,7 @@ theorem execSpecF_csrci_sstatus_x0 (cpu : CPU) (c : MConf) (sie : Bool) (hok : S
   simp only [hcl]
   swp_run 30
   unfold wX_bits wX
-  simp only [Sail.BitVec.toNatInt, BitVec.toNat_ofNat, Nat.reduceMod, Int.ofNat_eq_natCast, Int.toNat_natCast]
+  simp only [Sail.BitVec.toNatInt, Int.ofNat_eq_natCast, Int.toNat_natCast]
   swp_run 80
   ihave HmConf := confCells_intro _ _ _ { c with mstatus := c.mstatus &&& 0xFFFFFFFFFFFFFFFD#64 } $$ [Hcur_privilege Hhart_state Hmstatus Hmie
     Hmideleg Hmedeleg Hmepc Hsatp Hmenvcfg Hmcounteren Hmtimecmp Hstimecmp Hpmpcfg_n
@@ -225,7 +225,7 @@ theorem execSpecF_csrsi_sstatus_x0 (cpu : CPU) (c : MConf) (sie : Bool) (hok : S
   simp only [hst]
   swp_run 30
   unfold wX_bits wX
-  simp only [Sail.BitVec.toNatInt, BitVec.toNat_ofNat, Nat.reduceMod, Int.ofNat_eq_natCast, Int.toNat_natCast]
+  simp only [Sail.BitVec.toNatInt, Int.ofNat_eq_natCast, Int.toNat_natCast]
   swp_run 80
   ihave HmConf := confCells_intro _ _ _ { c with mstatus := c.mstatus ||| 2#64 } $$ [Hcur_privilege Hhart_state Hmstatus Hmie
     Hmideleg Hmedeleg Hmepc Hsatp Hmenvcfg Hmcounteren Hmtimecmp Hstimecmp Hpmpcfg_n

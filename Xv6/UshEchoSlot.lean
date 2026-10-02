@@ -51,8 +51,6 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
-
 /-- **Rocq `echo_node_row`**: ONE argument's four rows of the node, at an
 arbitrary index. -/
 def echoNodeRow (ws : List (List (BitVec 8))) (M : ElfMem) (s0 t : Nat) (g : Nat → BitVec 8) (i : Nat) : Prop :=

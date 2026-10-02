@@ -36,9 +36,6 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedSectionVars false
-set_option linter.unusedVariables false
-
 /-- A process block for readi's (dead) user arm: the kernel arm reads none. -/
 def dirlookupVp : ProcPriv :=
   { kstack := 0, sz := 0, pagetable := 0, trapframe := 0, upt := { root := 0, tfp := 0, um := ∅ },

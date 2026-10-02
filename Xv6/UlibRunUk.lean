@@ -47,8 +47,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
-
 /-! ## §1 Pure bridges -/
 
 theorem ulibRget_eq (m : RegMap) (r : BitVec 5) : RegMap.get m r = m.get r := rfl
@@ -71,7 +69,7 @@ theorem uTextGeom_spec {t : User.UTextTree} {w pc : Nat} (h : uTextGeom t w pc =
     pc % 2 = 0 ∧
       (w = 2 → pc % 4 = 0 → ∃ k, t.find? (pc + 2) = some k ∧ 2 ≤ k.width) := by
   unfold uTextGeom at h
-  simp only [Bool.and_eq_true, beq_iff_eq, decide_eq_true_eq, Bool.or_eq_true, Bool.not_eq_true'] at h
+  simp only [Bool.and_eq_true, beq_iff_eq, Bool.or_eq_true, Bool.not_eq_true'] at h
   obtain ⟨h1, h3⟩ := h
   refine ⟨h1, fun hw hp => ?_⟩
   rcases h3 with h3 | h3

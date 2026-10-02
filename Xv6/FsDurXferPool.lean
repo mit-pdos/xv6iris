@@ -57,8 +57,6 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Iris.Std.PartialMap
 
-set_option linter.unusedSectionVars false
-
 /-! ## 3.  THE FILE SYSTEM'S OWN RUNS -/
 
 /-- The record's run IS the record itself (Rocq's `xr_rec`). -/

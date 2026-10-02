@@ -119,8 +119,6 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedVariables false
-
 def sysLinkAddr : BitVec 64 := KA.«sys_link»
 
 /-- sys_link's own frame is 304 bytes -- THIRTY-EIGHT slots -- over its

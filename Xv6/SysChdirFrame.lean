@@ -58,9 +58,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## Constants (Rocq `sc_push` / `sc_pop` / `sc_fp` / `sc_buf` / `sc_frm*`) -/
 

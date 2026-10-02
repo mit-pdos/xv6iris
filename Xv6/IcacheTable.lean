@@ -258,8 +258,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-! ## A ξ-constant row transports (deviation 6) -/
 
 section MorphEq
@@ -966,7 +964,6 @@ theorem islots2_acc_upd [Icfg] [CurCtx] (cn : IcNames) (M : RegMapF (Qp × PosNa
 /-! ### THE HANDLE -/
 
 variable [LogG GF] [IregG GF] [FsLinkG GF]
-
 
 /-- Rocq's `is_itable2`: the itable spinlock over `itableRes2` at its own
 context, the pinw read leaves' address claims (A6.145, minted once at

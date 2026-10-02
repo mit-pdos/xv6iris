@@ -78,9 +78,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## Addresses folded out of the `auipc` pairs -/
 
@@ -295,7 +293,6 @@ theorem cr_bgeu_nat (m N : Nat) (hm : m < 2 ^ 31) (hN : N < 2 ^ 31) :
   · rw [decide_eq_true h, decide_eq_false (show ¬ m < N by omega), Bool.not_false]
   · rw [decide_eq_false h, decide_eq_true (show m < N by omega), Bool.not_true]
 
-
 theorem cr_addr_succ'' (a : BitVec 64) (m : Nat) :
     a + (BitVec.ofNat 64 m + 1#64) = a + BitVec.ofNat 64 (m + 1) := by
   rw [← BitVec.add_assoc]; exact MachCSL.addr_succ a m
@@ -304,13 +301,11 @@ theorem cr_addr_succ' (a : BitVec 64) (m : Nat) :
     a + BitVec.ofNat 64 m + BitVec.signExtend 64 1#12 = a + BitVec.ofNat 64 (m + 1) := by
   rw [pw_sext1]; exact MachCSL.addr_succ a m
 
-
 /-- `sw a5,392(a4)` on the `^D` arm: `cons.r` put back. -/
 theorem cr_keep32 (r : BitVec 32) :
     BitVec.extractLsb' 0 32 (BitVec.signExtend 64 r) = r := by bv_decide
 
 end
-
 
 /-! ## Context bookkeeping -/
 
@@ -936,7 +931,6 @@ theorem cr_minus1 (RE : RELEASE) (c0 c : CPU) (k kb : KCtx) (hb : CrBase k kb) (
 
 end
 
-
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
@@ -1142,9 +1136,7 @@ theorem cr_ctrld (RE : RELEASE) (cpu c : CPU) (k kb : KCtx) (hb : CrBase k kb) (
       $$ [- $Hk $Hpc $Hlocked $Hres $Hrun $Hframe $Htc $Hcl $Hir $Hpriv $Hnext]
     iframe #
 
-
 end
-
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [X : CurCtx]
@@ -1509,7 +1501,6 @@ theorem cr_consume (RE : RELEASE) (EC : EITHER_COPYOUT)
   all_goals first | rfl | exact cr_addr_succ'' _ _ | (congr 1; omega)
 
 end
-
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
@@ -1958,10 +1949,8 @@ theorem cr_empty (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) (KL : KILLED)
 
 end
 
-
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [X : CurCtx]
-
 
 set_option maxHeartbeats 16000000 in
 /-- **One round of the outer loop** (`+0x38`): `n <= 0` ends the read; an
@@ -2119,7 +2108,6 @@ theorem cr_loop (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) (KL : KILLED)
 
 end
 
-
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [X : CurCtx]
 
@@ -2214,7 +2202,6 @@ theorem cr_start (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) (KL : KILLED)
   · rw [hp20]; exact MachCSL.addr_zero _
 
 end
-
 
 /-! ## `consoleread` -/
 

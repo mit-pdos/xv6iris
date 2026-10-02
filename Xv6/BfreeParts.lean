@@ -40,8 +40,6 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedSectionVars false
-
 /-! ## The block number (`b < size ≤ BPB = 8192`) -/
 
 /-- `srliw a5,a1,0xd`: `b / BPB`, which is `0` for every in-range `b`

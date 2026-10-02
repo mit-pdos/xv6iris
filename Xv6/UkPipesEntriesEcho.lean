@@ -14,8 +14,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Iris.Std.PartialMap
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
-
 section PseEntries
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [IcacheG GF] [PipeProtoG GF]
   [PipeOutG GF] [CtokG GF] [FsTopG GF] [OffboxG GF] [Appcfg GF] [FsBytesG GF] [Fscfg] [Icfg]

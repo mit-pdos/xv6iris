@@ -17,9 +17,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
@@ -116,7 +114,6 @@ theorem namexEra_mid (MM : MEMMOVE) (IL : ILOCK) (IUP : IUNLOCKPUT) (IU : IUNLOC
       ⟨hr', h18, hoa, hae, hep, hsl1, hns1, hns, hstop, hes0, hbud, hW, hSb, hfu⟩)
     $$ [$Hk $Hpc $Hframe $Hte $Hce $Hwalk $Hnext $IH]
   iframe #
-
 
 set_option maxHeartbeats 16000000 in
 /-- **ONE TURN OF THE WALK at `+0xf4`**: the leading-separator skip, and

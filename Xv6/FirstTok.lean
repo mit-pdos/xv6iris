@@ -141,8 +141,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Std MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-- The static `int first`, at its identity-mapped kernel address (Rocq
 `first_addr`).  `SpecForkret` names the same cell. -/
 def firstAddr : BitVec 64 := KA.«first_1»

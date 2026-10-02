@@ -22,8 +22,6 @@ open Iris.Std.PartialMap
 open Std (ExtTreeSet)
 open HfpFileClaimsP UkFileDev
 
-set_option linter.unusedSectionVars false
-
 noncomputable section FifRead
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [DiskG GF] [EchoOutG GF] [FileAppG GF] [FifRegG GF]

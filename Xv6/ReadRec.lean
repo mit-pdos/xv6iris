@@ -49,8 +49,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-- THE BYTE THE READ DELIVERED IS THE INPUT'S, AT THE READER'S OWN COUNT
 (Rocq `rr_byte_of_rows`).  Stated at index 0, the only one the era's law
 reaches and the only one sh's `gets` copies. -/

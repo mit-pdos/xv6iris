@@ -34,8 +34,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
-
 /-! ## The message's bytes -/
 
 /-- **Rocq `ush_oom_len`**. -/

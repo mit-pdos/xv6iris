@@ -51,12 +51,9 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## The dispatch's readings -/
-
 
 theorem fwr_blez (n : Int) (hn : 0 ≤ n ∧ n < 2 ^ 31) :
     bcond bop.BGE 0#64 (BitVec.ofInt 64 n) = decide (n = 0) := by
@@ -294,7 +291,6 @@ theorem fwr_dispatch (PW : PIPEWRITE) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK) 
   case hri =>
     repeat (refine fwrRegs_set _ _ _ _ _ _ _ _ _ _ _ _ ?_ (by decide))
     exact hr
-
 
 set_option maxHeartbeats 32000000 in
 /-- **`filewrite` meets its specification**, at either entry `SIE`. -/

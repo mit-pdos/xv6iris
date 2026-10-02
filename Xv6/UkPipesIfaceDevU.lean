@@ -35,8 +35,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Std (ExtTreeSet)
 open UexecSG
 
-set_option linter.unusedSectionVars false
-
 section DevU
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [IcacheG GF] [PipeProtoG GF] [PipeOutG GF] [CtokG GF] [SG : UexecSG GF]
   [PS : UprogSG GF]
@@ -180,7 +178,6 @@ theorem pns_write_haltU (UL : UK_LEAVES) (DK : PipeDevK hlc GF)
         iexfalso; iexact HQ
     · icases HK with ⟨-, HK⟩
       iapply HK $$ Hstd Ht
-
 
 /-- **Rocq `pns_read_atU`**: THE READ AT AN EXACT CURSOR, at a flow
 parameter (`UkPipeDev.pipe_read_at` with `pipe_rpay_of_invU`). -/

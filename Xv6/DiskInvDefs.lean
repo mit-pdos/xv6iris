@@ -164,9 +164,7 @@ import MachCSL.CrashPermInv
 
 namespace Xv6
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 
@@ -248,7 +246,6 @@ structure DiskNames where
 
 /-- The disk invariant's namespace. -/
 def diskN : Namespace := ndot nroot "xv6disk"
-
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
@@ -532,7 +529,6 @@ theorem dmaWriteLease_zero (pa : PAddr) (n : Nat) (hn : n = 0) (w : BitVec (8 * 
     itrivial
   · iintro _
     iexact H
-
 
 /-- Any answer will do: the trivial read obligation. -/
 theorem dmaReadPin_any (pa : PAddr) (n : Nat) (P : IProp GF) :
@@ -1842,7 +1838,6 @@ theorem phase_setPhase_other (v : VirtioState) (h k : BitVec 16) (ph : VPhase) (
     Virtio.phase (Virtio.setPhase v h ph) k = Virtio.phase v k := by
   unfold Virtio.phase Virtio.setPhase
   rw [Alist.get_set_ne _ _ _ _ hk]
-
 
 /-- What `MachCSL.Virtio.pushOk` says head by head. -/
 theorem pushOk_not_pushed (v : VirtioState) (hok : Virtio.pushOk v = true) (h : BitVec 16)
@@ -4230,7 +4225,6 @@ theorem headRes_blkInj (γ : DiskNames) (pd : PAddr) (st : Nat → HState) :
     ihave %hne := headRes_blk_ne γ pd st i j c c' hi hj hij h1 h2 $$ H
     exact (hne hblk).elim
 
-
 /-! ## The invariant -/
 
 /-- The coupling of the image ghost to the model: a block the driver holds
@@ -4255,7 +4249,6 @@ theorem imgOk_read_blk (v : VirtioState) (m : RegMapF (List (BitVec 8)))
     · subst hij; rw [hst] at hstj; cases hstj; rw [hdwr] at hdw; exact absurd hdw (by simp)
     · exact absurd hblk (hinj j i c' c hj hi hij hstj hst)
   · exact he
-
 
 /-- **The cache is DRY under a `.pushed` WRITE.**
 `MachCSL.Virtio.completeOk` tests `MachCSL.Virtio.reqCached` at the
@@ -5115,7 +5108,6 @@ theorem slotTok_quarter_join (γ : DiskNames) (i : Nat) (s s' : HState) :
   | member h =>
     rw [slotTok_member]
     exact headTokQ_join' γ i (.member h) s'
-
 
 def slotRes (γ : DiskNames) (ξ : CtxId) (pd : PAddr) (i : Nat) : IProp GF := iprop%
   ∃ s : HState, slotTok γ i s ∗ slotBody γ ξ pd i s

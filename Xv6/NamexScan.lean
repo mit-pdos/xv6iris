@@ -35,9 +35,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-- A path byte at `i ≤ plen` reads out of the `plen + 1`-byte buffer. -/
 theorem namex_path_lookup (plen i : Nat) (f : Nat → BitVec 8) (hi : i ≤ plen) :
@@ -142,7 +140,6 @@ theorem namex_skip_loop (base pv : BitVec 64) (K : KCtx) (plen : Nat) (f : Nat �
     iapply HK $$ %cpu %(off + 1) %_ [] Hk Hpc Hbuf Hte Hce
     ipureintro
     exact ⟨by omega, by omega, hall', hs1, hR9, hR15, hR⟩
-
 
 set_option maxHeartbeats 8000000 in
 /-- **THE SKIP at `base`**: the first byte, and either done (`bne` taken) or

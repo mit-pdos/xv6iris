@@ -114,8 +114,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-! ## The two superblock fields the allocator reads (deviation 4) -/
 
 /-- `&sb.size`: `balloc +0x0a` resolves `auipc a5,0x1e ; lw a5,-1314(a5)`

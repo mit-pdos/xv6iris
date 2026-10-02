@@ -14,9 +14,6 @@ namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 
-set_option linter.unusedVariables false
-set_option linter.unusedSectionVars false
-
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [WchG GF]
 open UexecSG

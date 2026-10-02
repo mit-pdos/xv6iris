@@ -46,8 +46,6 @@ namespace MachCSL
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
 open LeanRV64D
 
-set_option linter.unusedSectionVars false
-
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 variable {lent : Bool}
@@ -175,8 +173,6 @@ namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
-
-set_option linter.unusedSectionVars false
 
 /-! ## Constants the code computes -/
 

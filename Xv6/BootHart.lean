@@ -52,8 +52,6 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedSectionVars false
-
 /-! ## §1 The boot geometry -/
 
 /-- **Hart `cpu`'s boot stack pointer**, as `_entry` computes it

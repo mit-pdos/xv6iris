@@ -12,8 +12,6 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedSectionVars false
-
 theorem fa_filter_ftable (l : List String) (h : "ftable" ∉ l) :
     ("ftable" :: l).filter (fun x => x ≠ "ftable") = l := by
   rw [List.filter_cons_of_neg (by simp)]

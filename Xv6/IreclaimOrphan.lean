@@ -32,9 +32,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-- `beqz s3` at `+0x50`: NOT taken, `s3 = ientry kslot ≠ 0`. -/
 theorem ireclaim_ientry_beq (k : Nat) (hk : k < NINODE) :

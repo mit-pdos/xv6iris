@@ -24,9 +24,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
@@ -89,7 +87,6 @@ theorem namexEra_rest (IL : ILOCK) (IUP : IUNLOCKPUT) (IU : IUNLOCK) (DL : DIRLO
       hes hnm hbud' hW hSb (by omega) hns2)
     $$ [$Hk $Hpc $Hframe $Hte $Hce $Hnext $IH $Hwalk]
   iframe #
-
 
 set_option maxHeartbeats 16000000 in
 /-- **THE LONG BRANCH `+0xa2 .. +0xac`**: `memmove(name, s, 14)` with NO
@@ -171,8 +168,6 @@ theorem namexEra_long (MM : MEMMOVE) (IL : ILOCK) (IUP : IUNLOCKPUT) (IU : IUNLO
       hf.hSb hf.hfu hnm)
     $$ [$Hk $Hpc $Hframe $Hte $Hce $Hnext $IH $Hwalk]
   iframe #
-
-
 
 set_option maxHeartbeats 16000000 in
 /-- **THE SHORT BRANCH `+0x12c .. +0x13e`**: `memmove(name, s, len)`,
@@ -283,7 +278,6 @@ theorem namexEra_short (MM : MEMMOVE) (IL : ILOCK) (IUP : IUNLOCKPUT) (IU : IUNL
   k_norm_g [h18']
   iframe Hk
   iframe #
-
 
 set_option maxHeartbeats 16000000 in
 /-- **`+0x96 .. +0x9e`: THE ELEMENT'S LENGTH** -- `len = s - path`, its

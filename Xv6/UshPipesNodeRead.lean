@@ -34,8 +34,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Wid RdOut WrOut
 open UShPipesDefs UShPipesStage
 
-set_option linter.unusedSectionVars false
-
 /-- The pipe's mask, inside the family's accessor. -/
 theorem nd_pipeN_pns : (↑pipeN : CoPset) ⊆ (⊤ \ (↑pnsN : CoPset)) := by
   intro p hp

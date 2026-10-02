@@ -91,9 +91,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-- THE SPAN'S REGISTER CONTRACT (Rocq's `cr_cs_but_s3`): `calleeSaved`
 everywhere BUT `s3` -- the `c.mv s3,a0` at `+0xac` is the point of the

@@ -28,7 +28,6 @@ open LeanRV64D LeanRV64D.Functions
 open Iris.Std Iris.Std.PartialMap Iris.Std.LawfulPartialMap
 open Xv6.UPt Xv6.UPtPpt Xv6.PtRun
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
@@ -634,7 +633,6 @@ theorem proc_pagetable_proof (UC : UVMCREATE) (MP : MAPPAGES_ANY) (UM : UVMUNMAP
             | exact (d23.trans (b23.trans a23)) | exact (d24.trans (b24.trans a24))
             | exact (d25.trans (b25.trans a25)) | exact (d26.trans (b26.trans a26))
             | exact (d27.trans (b27.trans a27))⟩
-
 
 end
 

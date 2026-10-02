@@ -39,8 +39,6 @@ the one shared `Xv6G.gmUnitG` (one capacity per camera type).
 import Xv6.UartTrace
 import Xv6.VirtioQueue
 
-set_option linter.unusedSectionVars false
-
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Std MachCSL

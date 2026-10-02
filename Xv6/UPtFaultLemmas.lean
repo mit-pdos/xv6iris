@@ -16,8 +16,6 @@ namespace Xv6.UPtFault
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open Xv6
 
-set_option linter.unusedSectionVars false
-
 /-! ## The two fixed virtual page numbers -/
 
 /-! ## `UPtd.leaves` against `UPtd.um` -/

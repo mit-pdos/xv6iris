@@ -132,7 +132,6 @@ theorem indBytes_insert_same (e : List (BitVec 32)) (i : Nat) (v : BitVec 32) (j
   have hv : (e.set i v)[i]! = v := getElem!_of_getElem? (List.getElem?_set_self hi)
   rw [hv]
 
-set_option linter.unusedVariables false in
 /-- Rocq keeps `i < length e` as a premise even though the Lean proof does
 not need it; the statement is the one consumers quote. -/
 theorem indBytes_insert_other (e : List (BitVec 32)) (i : Nat) (v : BitVec 32) (k : Nat)

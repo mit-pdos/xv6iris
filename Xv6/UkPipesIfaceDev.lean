@@ -35,8 +35,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Iris.Std.PartialMap
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
-
 section Lexit
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [IcacheG GF] [PipeProtoG GF] [PipeOutG GF] [CtokG GF] [DiskG GF] [EchoOutG GF]
   [PipesNG GF]

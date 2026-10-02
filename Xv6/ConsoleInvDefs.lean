@@ -108,8 +108,6 @@ namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-! ## Geometry
 
 ```

@@ -85,9 +85,6 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
 open Iris.ProgramLogic Language.Notation PrimStep
 
-set_option linter.unusedSectionVars false
-set_option linter.unusedVariables false
-
 /-! ## §2 THE SYSTEM THEOREM, at a generic application -/
 
 section gen
@@ -408,7 +405,6 @@ theorem xv6FsAdequacy_xv6GF {hlc : HasLC} (US : USER) (g : GState)
     (∀ e2, e2 ∈ t2 → Reducible (e2, g2)) ∧ xv6TracePure fsimgCov fsimgSb.sbLogstart g2 :=
   letI : MachGpreS hlc xv6GF := xv6GF_machGpreS hlc 0
   xv6FsAdequacyImg (hlc := hlc) (GF := xv6GF) US g Hgen0 Hpow Hdisk n κs t2 g2 hsteps
-
 
 end Xv6
 

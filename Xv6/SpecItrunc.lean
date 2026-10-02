@@ -121,8 +121,6 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedSectionVars false
-
 /-- Address of `itrunc`. -/
 def itruncAddr : BitVec 64 := KA.«itrunc»
 

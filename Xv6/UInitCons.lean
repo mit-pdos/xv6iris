@@ -68,8 +68,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-! ## §1  THE PATH /init PASSES, as a byte list -/
 
 /-- **Rocq `init_cons_pl`** (deviation 2): the path is spelled AS the name. -/

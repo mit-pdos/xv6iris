@@ -23,8 +23,6 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
-
 section Bytes
 variable {GF : BundledGFunctors} [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat]
 

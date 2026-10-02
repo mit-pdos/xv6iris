@@ -39,8 +39,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-- `fsGammaL`'s top map is the names' (`rfl`; for `simp` through the
 unfolded commits; `PinnedObs`' private `pobs_fsGammaL_top`). -/
 theorem fileOpen_fsGammaL_top {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF]

@@ -39,10 +39,6 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedVariables false
-set_option linter.unusedSectionVars false
-
-
 /-! ## §2 The read reason (header) -/
 
 /-- The read clause's guard (Rocq `ut_live_read_g`'s descriptor half): the

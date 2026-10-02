@@ -42,8 +42,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-- THE CONSOLE'S FACT (Rocq `cons_fact`): present at `j`, or absent. -/
 def consFact (jo : Option Nat) (av : Aview) : Prop :=
   match jo with

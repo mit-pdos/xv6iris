@@ -51,9 +51,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-- `icCiWf` after a count move at a live slot: `ci` does not move and
 `mdom M` does not either (Rocq's inline `dom_insert_lookup_L`). -/
@@ -69,7 +67,6 @@ theorem ig_ciwf_update (M : RegMapF (Qp × PosNat)) (ci : RegMapF (BitVec 32 × 
   by_cases h : j = y
   · subst h; simp [hMj]
   · simp only [h, if_false]
-
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IcacheG GF]
@@ -202,7 +199,6 @@ theorem ig_hit_au (c : CPU) (M : RegMapF (Qp × PosNat)) (ci : RegMapF (BitVec 3
   · ipureintro; exact hlot
   iapply credFloor_of_ctx
   iexact Hflt
-
 
 set_option maxHeartbeats 16000000 in
 /-- THE CACHE HIT's walk, `+0x56 .. +0x8c` (Rocq 2083--2462). -/

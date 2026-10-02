@@ -46,8 +46,6 @@ namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-- `&ticks` (kernel/trap.c). -/
 def ticksAddr : BitVec 64 := KA.«ticks»
 

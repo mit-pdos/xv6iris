@@ -262,7 +262,7 @@ theorem uxc_jump_to_misaligned (orc : UOrc) (s : UWSt) (t : BitVec 64)
         s, orc) := by
   simp only [jump_to, ext_control_check_pc, uxc_access0, uxc_access1, h0, h1, uxc_ofBool_false_beq,
     uxc_runME_liftBind, uxc_assert_true, Option.bind, hz, uxc_bit_to_bool_ofBool, uxc_not_eq,
-    Bool.not_false, Bool.and_self, ↓reduceIte, pure_bind, uxc_runME_lift, memory_exception,
+    Bool.not_false, ↓reduceIte, pure_bind, uxc_runME_lift, memory_exception,
     uxc_trap D orc s _ hp hpc]
   rfl
 

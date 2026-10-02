@@ -43,8 +43,6 @@ namespace Xv6
 
 open MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-! ## §1a The block view -/
 
 /-- The file system's view of the durable disk: block `b` is the `BSIZE`

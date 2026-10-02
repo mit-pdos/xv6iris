@@ -12,8 +12,6 @@ namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-- The counting half of a TRACKED sleeplock (Rocq's `authUR (optionUR
 ufracR)`): the authority holds the total of the outstanding "may hold"
 shares, `none` being the AUTHORITATIVE ZERO. -/

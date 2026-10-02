@@ -56,8 +56,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-- THE ECHO APPLICATION'S PER-INSTANCE NAMES (Rocq `echo_names`): the
 console FLAG (`n1`) and the console KEY / SEAL (`n2`), both `mono_list Nat`. -/
 structure EchoNames where

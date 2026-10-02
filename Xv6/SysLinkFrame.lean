@@ -51,9 +51,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## Constants -/
 
@@ -337,7 +335,6 @@ theorem sysLinkPins_exit (k : KCtx) (R : RegMap) (h : sysLinkPins k R (k.regs 9#
   refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
     simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] <;> assumption
 
-
 /-! ## The ambient context, pinned at the kernel tier -/
 
 /-! ## The arguments, the out bundle, the block's cwd seam -/
@@ -481,7 +478,6 @@ theorem sys_link_exit (cpu : CPU) (k : KCtx) (A : SysLinkArgs GF)
     exact hret
   · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
     iexact Harms
-
 
 /-- The reference ledger's regroupings (Rocq `sl_ir3`, `iref_slots_combine`). -/
 theorem sys_link_ir_split :

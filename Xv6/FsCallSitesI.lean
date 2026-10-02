@@ -25,9 +25,6 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedSectionVars false
-set_option linter.unusedVariables false
-
 /-- A process block for readi's (dead) user arm: the kernel arm reads none
 (Rocq's `dl_dummyV`, retired there once readi took `proc_priv_bare`; here
 the kernel arm's contract still names a block, which it never opens). -/

@@ -64,13 +64,10 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
-
 /-! ## S0 THE PINS -/
 
 /-- **Rocq `shp_write`**: sh's `write` stub. -/
 theorem shp_write : User.Sh.Sym.«write» = 0xc82 := by decide
-
 
 /-- **Rocq `alt_execfail_len`** (deviation 1): "exec echo failed\n$ ". -/
 theorem altExecfail_len : altExecfail.length = 19 := by decide
@@ -189,7 +186,6 @@ theorem wp_ksh_write_chain_buf (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : 
   · ipureintro; rw [ha2, e _ (by decide)]
   · ipureintro; rw [← e11]; exact hnf
   · rw [← e11]; iexact Hbuf
-
 
 /-- `wp_ksh_write_chain_buf` with the post READ BY THE CALLER'S OWN
 eliminator `helim` (deviation 4): the walk stays over the class, and the

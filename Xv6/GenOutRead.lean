@@ -23,8 +23,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-- the read's window is a prefix of the echoed list: a disciplined entry is
 never an edit byte (Rocq `gin_read_pure`) -/
 theorem ginReadPure (M : LModel) (B : LmByteLaws M) (k : Nat) (pops : List LogEntry)

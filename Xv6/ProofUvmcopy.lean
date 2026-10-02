@@ -44,7 +44,6 @@ open LeanRV64D LeanRV64D.Functions
 open Iris.Std Iris.Std.PartialMap Iris.Std.LawfulPartialMap
 open Xv6.UPtCopy
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled

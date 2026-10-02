@@ -118,12 +118,9 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## 0.  Pure helpers -/
-
 
 theorem createFound_caller1 : createCaller 1#5 := by unfold createCaller; decide
 theorem createFound_caller10 : createCaller 10#5 := by unfold createCaller; decide
@@ -131,7 +128,6 @@ theorem createFound_caller11 : createCaller 11#5 := by unfold createCaller; deci
 theorem createFound_caller12 : createCaller 12#5 := by unfold createCaller; decide
 theorem createFound_caller14 : createCaller 14#5 := by unfold createCaller; decide
 theorem createFound_caller15 : createCaller 15#5 := by unfold createCaller; decide
-
 
 /-- +0x6c: the `bltu 1,a5` on the word the three ALU leaves leave, at the
 shape the Lean rules produce (`CreateParts.create_bltu_trange`, restated). -/
@@ -166,13 +162,11 @@ theorem createFound_beqz_tym1 (t : BitVec 16) :
   rw [e] at h
   exact h
 
-
 /-! ## 1.  The process block's pid cell (Rocq's `proc_priv_bare_acc`) -/
 
 section Pid
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [BcacheG GF] [DiskG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg]
-
 
 end Pid
 
@@ -590,7 +584,6 @@ theorem createFound_env_ftop (Γ : SchedNames) (A : CreateFoundArgs) :
   unfold createFoundEnv createEnv
   iintro ⟨-, -, -, -, -, -, -, -, -, -, #Hinv, -, -⟩
   iapply iregInv_ftop (hlc := hlc) fscIreg fscFs icfgIst icfgNib $$ Hinv
-
 
 theorem createFound_slots_split (ns : Nat) (h : createIrefSlots ≤ ns) :
     irefSlots (GF := GF) ns ⊢ irefSlots 2 ∗ irefSlots (ns - 2) := by

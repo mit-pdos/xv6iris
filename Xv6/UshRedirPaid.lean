@@ -43,8 +43,6 @@ open Iris.Std.PartialMap
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
-
 /-! ## S1 The refused open's diagnostic, at a name of any length -/
 
 /-- **Rocq `ush_openfail_lookup`**. -/
@@ -172,7 +170,7 @@ theorem ushr_fname_img (γd : GName) (x : UArg) (nm : List (BitVec 8)) (hu : una
       iapply BigSepL.bigSepL_mono (Φ := fun _ j => ubyteq (GF := GF) γd DFrac.discard (x.ptr + j) (x.bytes j))
         (fun {k j} hk => by
           have hj : j < x.len := List.mem_range.1 (List.mem_of_getElem? hk)
-          simp [ushpExt, hj, ← hlen]) $$ Hbs
+          simp [ushpExt, hj]) $$ Hbs
     · simp only [ushpExt, Nat.lt_irrefl, if_false]
       rw [← hlen]
       iexact Hn

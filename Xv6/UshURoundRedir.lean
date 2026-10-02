@@ -50,7 +50,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Std (ExtTreeSet)
 open HfpFileClaimsP
 
-set_option linter.unusedSectionVars false
 set_option synthInstance.maxSize 1024
 
 section UShURoundRedir

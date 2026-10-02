@@ -40,8 +40,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
-
 /-- **Rocq `uwr_fd_st_closed`**: the kernel's reading lands on a low slot the
 ledger says is shut. -/
 theorem uwr_fd_st_closed (v0 : BitVec 64) (fdv l : List FdState) (i : Nat)

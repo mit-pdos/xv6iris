@@ -57,7 +57,6 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
@@ -207,7 +206,6 @@ theorem ProcPriv.updEv_self_upt (V : ProcPriv) : { V.updEv V.ev with upt := V.up
 
 /-! ## Arithmetic facts -/
 
-
 theorem ec_beq_ne {α : Type} (x : BitVec 64) (h : x ≠ 0#64) (p q : α) :
     (if bcond bop.BEQ x 0#64 then p else q) = q := by
   rw [if_neg (by simp only [bcond, beq_iff_eq]; exact fun hc => h hc)]
@@ -232,7 +230,6 @@ theorem ei_ret_32c : jumpPc (KA.«either_copyin» + 0x2c#64) = (KA.«either_copy
 
 theorem ei_ret_348 : jumpPc (KA.«either_copyin» + 0x48#64) = (KA.«either_copyin» + 0x48#64) := by
   decide
-
 
 theorem ec_ret_2d0 : jumpPc (KA.«either_copyout» + 0x1c#64) = (KA.«either_copyout» + 0x1c#64) := by
   decide
@@ -450,7 +447,6 @@ theorem ec_copyin_call (CI : COPYIN) [CurCtx] (c : CPU) (k' : KCtx) (γl : GName
   simp only [copyinAddr] at h
   exact h
 
-
 /-! ## Opening and closing the private block -/
 
 /-- `procPrivExt` at the descriptor `P` minus its address space and the two
@@ -519,7 +515,6 @@ theorem ecRest_lend [CurCtx] (p pa : BitVec 64) (hp : p = pa) (pid : BitVec 32) 
   isplitl []
   · ipureintro; exact hk2
   · ipureintro; exact hlz
-
 
 end
 

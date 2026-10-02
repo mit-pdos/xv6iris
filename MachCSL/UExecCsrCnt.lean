@@ -175,7 +175,7 @@ theorem uxr_counter_enabled (hD : UxrFoot D) (hc : UxrCfg s) (orc : UOrc) (k : N
   unfold counter_enabled feature_enabled_for_priv_bool feature_enabled_for_priv
   rw [runRW_bind_some D _ _ orc orc s s _ (uxr_readReg orc .mcounteren (hD _ (by decide)))]
   rw [runRW_bind_some D _ _ orc orc s s _ (uxr_readReg orc .scounteren (hD _ (by decide)))]
-  simp only [bind_assoc, uxrCen]
+  simp only [uxrCen]
   generalize (BitVec.access (s.file .mcounteren) k == 1#1) = a
   generalize (BitVec.access (s.file .scounteren) k == 1#1) = b
   cases a

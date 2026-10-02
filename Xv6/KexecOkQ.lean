@@ -98,8 +98,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Std MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-! ## 1. THE RELATION WITH THE HOLE -/
 
 /-- The success arm of `KexecDefs.kexecOk`, spelled once (deviation 1). -/

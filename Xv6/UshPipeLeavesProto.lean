@@ -29,8 +29,6 @@ namespace UShPipeLeaves
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-- **Rocq `alt_execfail_app`**: `EchoDisc.alt_execfail` IS the left block
 plus the shell's prompt. -/
 theorem alt_execfail_app : altExecfail = dgExecL ++ uPrompt := rfl

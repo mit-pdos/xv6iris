@@ -92,8 +92,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Std MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-- References a single syscall may hold in locals at once; see the
 header. -/
 def IREFSPARE : Nat := 4

@@ -28,13 +28,11 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
 /-! ## Arithmetic facts -/
-
 
 /-- `ret` out of `kalloc` lands on the `mv a2,a0` after the `jal`. -/
 theorem pms_ret_17a2 : jumpPc (KA.«proc_mapstacks» + 0x56#64) = (KA.«proc_mapstacks» + 0x56#64) := by
@@ -45,7 +43,6 @@ theorem pms_ret_17c4 : jumpPc (KA.«proc_mapstacks» + 0x78#64) = (KA.«proc_map
 
 /-- The virtual address of process `i`'s kernel stack (`KSTACK(i)`). -/
 def pmsVa (i : Nat) : BitVec 64 := BitVec.ofNat 64 (4096 * (0x3FFFFFF - 2 * (i + 1)))
-
 
 theorem pms_h1 (i : Nat) :
     KA.«proc» + (BitVec.ofNat 64 (368 * i) + -KA.«proc») = BitVec.ofNat 64 (368 * i) := by
@@ -157,7 +154,6 @@ theorem pms_auipc_17 : BitVec.signExtend 64 (0x17#20 ++ 0#12) = 0x17000#64 := by
 theorem pms_lui_4000 : BitVec.signExtend 64 (0x4000#20 ++ 0#12) = 0x4000000#64 := by bv_decide
 theorem pms_lui_1 : BitVec.signExtend 64 (1#20 ++ 0#12) = 0x1000#64 := by bv_decide
 
-
 theorem pms_page_range (p : BitVec 64) (h : pageValid p) : p.toNat + 4096 < 2 ^ 56 := by
   obtain ⟨-, -, hhi⟩ := h
   have hlt : p.toNat < 2281701376 := by
@@ -229,12 +225,10 @@ theorem pmsKept_trans {R R' R'' : RegMap} (h : pmsKept R R') (h' : pmsKept R' R'
     h'.2.2.2.2.2.2.2.2.2.2.1.trans h.2.2.2.2.2.2.2.2.2.2.1,
     h'.2.2.2.2.2.2.2.2.2.2.2.trans h.2.2.2.2.2.2.2.2.2.2.2⟩
 
-
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF]
 
 /-! ## The callees, at their entry addresses -/
-
 
 set_option maxHeartbeats 1000000 in
 /-- `kvmmap`'s contract at its entry address, for one read-write page. -/
@@ -509,7 +503,6 @@ theorem pms_iter (KAL : KALLOC) (KM : KVMMAP) [CurCtx]
         f26.trans e26, f27.trans e27⟩
     · simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
 
-
 /-! ## The loop -/
 
 set_option maxHeartbeats 4000000 in
@@ -599,7 +592,6 @@ theorem pms_loop (KAL : KALLOC) (KM : KVMMAP) [CurCtx]
     iapply HΦ $$ %spie3 %spp3 %R3 %T3 %pas3 %fr3 %hsp' Hk Hpc Htree Hpages Hav
     ipureintro
     exact ⟨pmsKept_trans hkept hkept3, hinv3⟩
-
 
 /-! ## The frame and the epilogue -/
 
@@ -727,9 +719,7 @@ theorem pms_epi [CurCtx] (cpu cur : CPU) (k : KCtx)
   refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
   all_goals first | trivial | assumption | (rw [hR2]; bv_omega)
 
-
 /-! ## The function -/
-
 
 theorem proc_mapstacks_br_16c96 : KA.«proc_mapstacks» + 0x16c96#64 = KA.«tickslock» := by decide
 
@@ -917,7 +907,6 @@ theorem proc_mapstacks_proof (KAL : KALLOC) (KM : KVMMAP) : PROC_MAPSTACKS :=
   case g22 => simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
   case g23 => simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
   case g24 => simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]⟩
-
 
 end
 

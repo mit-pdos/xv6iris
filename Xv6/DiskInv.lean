@@ -88,9 +88,7 @@ import MachCSL.WpDevDisk
 
 namespace Xv6
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 
@@ -167,7 +165,6 @@ def serveTail (h : BitVec 16) (r : VioReq) : Virtio.VM Unit := do
   DevM.dmaWriteStep (fun s =>
     if decide (Virtio.reqOf s h = some r) && decide (s.usedIdx = ui) && decide (s.cfg = c) then
       some (Virtio.complete s h) else none) (Virtio.usedIdxAddr c) 2 (ui + 1#16)
-
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
@@ -924,7 +921,6 @@ theorem permTok_lookup (γ : DiskNames) (pm : RegMapF PermVal) (k : Nat) (h : Bi
   ihave %hg := ghost_map_lookup $$ H1 H2
   ipureintro; exact hg
 
-
 theorem mod_NUM_lt (n : Nat) : n % NUM < NUM := Nat.mod_lt _ (by unfold NUM; omega)
 
 theorem reqSectorLen_of_chain (c : Chain) (i : Nat) (hn : Virtio.reqSectorLen c.req i ≠ 0) :
@@ -1250,7 +1246,6 @@ theorem usedIdx_write_lease (γ : DiskNames) (s : VirtioState) (key : Nat) (h : 
 
 The device-side counterpart of `Xv6.permTok`: how a task takes a permit,
 what it pins while it holds one, and how it gives it back. -/
-
 
 /-- **Opening the protocol in the live world.**  A frozen configuration
 rules the dead arm out -- the dead arm holds a HALF of the same ghost
@@ -3355,7 +3350,6 @@ theorem leaseV_root_get (γ : DiskNames) (s : VirtioState) :
     iright
     iframe Hfr
     ipureintro; exact ⟨hcfg.1, hl.1, hl.2⟩
-
 
 theorem leaseV_dmaReadPin_any (γ : DiskNames) (C : IProp GF) (s : VirtioState)
     (pa : PAddr) (n : Nat) :

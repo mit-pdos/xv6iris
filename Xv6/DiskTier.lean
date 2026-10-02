@@ -27,9 +27,7 @@ import MachCSL.WpDmaCtx2
 
 namespace Xv6
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 

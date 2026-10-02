@@ -71,9 +71,6 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedSectionVars false
-set_option linter.unusedVariables false
-
 /-! ## The constants the code computes -/
 
 theorem itrunc_br_bfree : KA.«itrunc» + 0xFFFFFFFFFFFFFC1E#64 = KA.«bfree» := by decide
@@ -470,7 +467,6 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
   [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
 
 end
-
 
 /-! ## (6) The eb-generic call site and continuation (the eb sweep; append-only)
 

@@ -35,8 +35,6 @@ open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 open UexecSG
 
-set_option linter.unusedSectionVars false
-
 /-- **Rocq `upipe_names_agree`**: THE TWO SCANS NAME THE SAME PIPE -- the
 leaf's row and the row-4 post each bind their own slots and names over the
 same incoming table and the same outgoing one. -/

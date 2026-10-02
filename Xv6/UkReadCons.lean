@@ -56,8 +56,6 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
-
 /-- **Rocq `read_cons_fam`**: the console member. -/
 def readConsFam {GF : BundledGFunctors} (Q : Int → IProp GF) (Rd : Nat → Nat → IProp GF)
     (Rin : List (List Obs × BitVec 8) → IProp GF) : Xfam GF :=

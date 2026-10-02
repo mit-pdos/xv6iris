@@ -78,9 +78,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-- The `c.mv s1,a0` at a known value (Rocq's `HP1s1` rewrite). -/
 theorem sys_open_walk_pins_s1 (k : KCtx) (R : RegMap) (s1 s2 s3 v w : BitVec 64)

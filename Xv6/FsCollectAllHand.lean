@@ -39,8 +39,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-! ## THE ABSTRACT MAP, RESTRICTED TO THE REGION -/
 
 /-- Rocq's `col_reg_map`. -/

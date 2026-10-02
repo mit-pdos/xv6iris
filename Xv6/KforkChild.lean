@@ -30,13 +30,13 @@ theorem permLeaf_uLeaf_pteFlags (ppn : BitVec 44) (w : BitVec 64) :
     permLeaf (leafOf ppn (pteFlags w)) = permLeaf w := by
   unfold permLeaf upermBits pteBit leafOf pteFlags
   have h1 : ((BitVec.setWidth 64 ppn <<< 10) ||| w &&& 0x3FF#64 ||| 1#64).getLsbD 1 = w.getLsbD 1 := by
-    simp [BitVec.getLsbD_or, BitVec.getLsbD_and, BitVec.getLsbD_shiftLeft]
+    simp []
   have h2 : ((BitVec.setWidth 64 ppn <<< 10) ||| w &&& 0x3FF#64 ||| 1#64).getLsbD 2 = w.getLsbD 2 := by
-    simp [BitVec.getLsbD_or, BitVec.getLsbD_and, BitVec.getLsbD_shiftLeft]
+    simp []
   have h3 : ((BitVec.setWidth 64 ppn <<< 10) ||| w &&& 0x3FF#64 ||| 1#64).getLsbD 3 = w.getLsbD 3 := by
-    simp [BitVec.getLsbD_or, BitVec.getLsbD_and, BitVec.getLsbD_shiftLeft]
+    simp []
   have h4 : ((BitVec.setWidth 64 ppn <<< 10) ||| w &&& 0x3FF#64 ||| 1#64).getLsbD 4 = w.getLsbD 4 := by
-    simp [BitVec.getLsbD_or, BitVec.getLsbD_and, BitVec.getLsbD_shiftLeft]
+    simp []
   rw [h1, h2, h3, h4]
 
 section

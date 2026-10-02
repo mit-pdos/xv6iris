@@ -24,8 +24,6 @@ import Xv6.PipeInv
 namespace Xv6
 
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
-set_option linter.unusedSectionVars false
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 
 section

@@ -45,8 +45,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open UShPipesDefs
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
-
 theorem cfs_short_nil : consShort [[]] := by
   intro x hx
   simp only [List.mem_cons, List.not_mem_nil, or_false] at hx

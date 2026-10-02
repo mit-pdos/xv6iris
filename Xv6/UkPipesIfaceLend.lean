@@ -33,8 +33,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Iris.Std.PartialMap
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
-
 section LendDefs
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [IcacheG GF] [PipeProtoG GF] [PipeOutG GF] [CtokG GF] [DiskG GF] [EchoOutG GF]
   [PipesNG GF]
@@ -248,7 +246,7 @@ theorem pns_copy_env_raw (OK : PnsRoundOk R) (hsup : ⊢ □ (R.T -∗ Q.Sup)) (
   have hkd : pnsKdsOk Q.kds (pnsCopyVs (.PDCon w2 A2) (.PDCopy (pin, gin) F sk)) := by
     intro dk hdk
     rw [hk] at hdk
-    simp only [List.mem_cons, List.mem_singleton, List.not_mem_nil, or_false] at hdk
+    simp only [List.mem_cons, List.not_mem_nil, or_false] at hdk
     rcases hdk with rfl | rfl <;> simp [pnsCopyVs_get]
   iintro Hstd Hpool Hlend
   unfold pnsCopyLend
@@ -319,7 +317,7 @@ theorem pns_copy_env_raw_m (OK : PnsRoundOk R) (hsup : ⊢ □ (R.T -∗ Q.Sup))
   have hkd : pnsKdsOk Q.kds (pnsCopyVs .PDMute (.PDCopy (pin, gin) F sk)) := by
     intro dk hdk
     rw [hk] at hdk
-    simp only [List.mem_cons, List.mem_singleton, List.not_mem_nil, or_false] at hdk
+    simp only [List.mem_cons, List.not_mem_nil, or_false] at hdk
     rcases hdk with rfl | rfl <;> simp [pnsCopyVs_get]
   iintro Hstd Hpool Hlend
   unfold pnsCopyLendM

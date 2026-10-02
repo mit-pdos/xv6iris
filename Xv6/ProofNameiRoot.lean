@@ -32,9 +32,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 theorem namei_root_br_namex : KA.«namei» + 0xfffffffffffffe08#64 = KA.«namex» := by decide
 theorem namei_root_ret_12 : jumpPc (KA.«namei» + 0x12#64) = (KA.«namei» + 0x12#64) := by decide

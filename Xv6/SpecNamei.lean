@@ -111,9 +111,6 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedVariables false
-set_option linter.unusedSectionVars false
-
 /-- namei's own frame is 32 bytes (4 slots) over namex's 116 (Rocq's
 `K_namei = 120`). -/
 def nameiSlots : Nat := 4 + namexSlots

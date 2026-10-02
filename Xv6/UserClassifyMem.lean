@@ -49,8 +49,6 @@ namespace Xv6
 open MachCSL
 open Sail LeanRV64D LeanRV64D.Functions
 
-set_option linter.unusedSectionVars false
-
 /-- **The memory contract** (U2-M4's deliverable): one execute-level fact per
 base memory family, from any active user machine. -/
 structure UclMemArms (C : UCfg) (P : UPtd) : Prop where

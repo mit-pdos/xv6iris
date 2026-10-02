@@ -154,9 +154,6 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedVariables false
-set_option linter.unusedSectionVars false
-
 def sysUnlinkAddr : BitVec 64 := KA.«sys_unlink»
 
 /-- sys_unlink's own frame is 240 bytes -- THIRTY slots -- over its deepest

@@ -100,8 +100,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Iris.Algebra MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-! ## 1.  THE FREEZE PIN's PRICE AND ITS READER -/
 
 section Pin

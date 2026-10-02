@@ -66,8 +66,6 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Iris.Std.PartialMap
 
-set_option linter.unusedSectionVars false
-
 /-! ## 1.  THE PURE THEORY OF `fsDbytes` -/
 
 /-- Rocq's `LogDefs.fs_dbytes` (deviation 2): the byte flattening of a

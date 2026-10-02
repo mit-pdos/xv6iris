@@ -73,8 +73,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-! ## 1.  THE BLOCK READING OF THE LOGGED VIEW -/
 
 /-- The committed view the commit installs, BY NAME: `FsCrash`'s `D'` on the

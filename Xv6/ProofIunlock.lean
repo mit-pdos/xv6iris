@@ -67,7 +67,6 @@ import MachCSL.LockFacts
 import Xv6.SpecHoldingsleep
 import MachCSL.WpSmodeFrame
 
-
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -75,9 +74,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## Constants the code computes -/
 

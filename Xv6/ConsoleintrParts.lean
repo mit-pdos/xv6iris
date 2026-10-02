@@ -30,9 +30,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## Addresses folded out of the `auipc` pairs -/
 
@@ -113,7 +111,6 @@ def ciSaved4 (R R' : RegMap) : Prop :=
   R' 20#5 = R 20#5 ∧ R' 21#5 = R 21#5 ∧
   R' 22#5 = R 22#5 ∧ R' 23#5 = R 23#5 ∧ R' 24#5 = R 24#5 ∧ R' 25#5 = R 25#5 ∧
   R' 26#5 = R 26#5 ∧ R' 27#5 = R 27#5
-
 
 /-! ## The critical section's context -/
 

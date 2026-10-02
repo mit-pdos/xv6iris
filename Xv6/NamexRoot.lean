@@ -34,9 +34,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-- One step at any `SIE` and depth, the contract's continuation `Hnext`
 (a `wpNext`) shifted to the step's hart, which SHADOWS the name `cpu`. -/

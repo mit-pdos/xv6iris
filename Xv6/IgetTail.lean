@@ -33,9 +33,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-- The callee-saved registers iget never writes (`s5`..`s11`). -/
 def igPins (k : KCtx) (R : RegMap) : Prop :=
@@ -65,7 +63,6 @@ theorem ig_calleeSaved_mk (KR R : RegMap) (ra : BitVec 64)
       | assumption
       | skip
 
-
 /-- The scan's register invariant (Rocq's `Mr !!! …` conjuncts, minus the
 cursor and `s3`, which each stage states itself). -/
 structure IgRegs [Icfg] (k : KCtx) (inum : BitVec 32) (R : RegMap) : Prop where
@@ -87,7 +84,6 @@ theorem IgRegs.set [Icfg] {k : KCtx} {inum : BitVec 32} {R : RegMap} (h : IgRegs
       by simpa [RegMap.set_apply] using p23, by simpa [RegMap.set_apply] using p24,
       by simpa [RegMap.set_apply] using p25, by simpa [RegMap.set_apply] using p26,
       by simpa [RegMap.set_apply] using p27⟩⟩
-
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IcacheG GF]
@@ -185,7 +181,6 @@ def igEnv : IProp GF :=
 
 instance igEnv_persistent : Persistent (igEnv (GF := GF)) := by
   unfold igEnv; infer_instance
-
 
 theorem igEnv_it : igEnv (GF := GF) ⊢
     isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev := by

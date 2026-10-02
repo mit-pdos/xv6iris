@@ -18,9 +18,6 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedVariables false
-set_option linter.unusedSectionVars false
-
 /-- **The record prepare_return leaves** (its four kernel-word stores). -/
 abbrev utPrep (V2 : ProcPriv) (rt : BitVec 44) (c : CPU) : ProcPriv :=
   { V2 with tf := prepareReturnTf V2.tf (satpOf KTier.kpt rt) (V2.kstack + 4096#64) (hartId c) }

@@ -57,8 +57,6 @@ namespace Xv6
 open MachCSL
 open Sail LeanRV64D LeanRV64D.Functions
 
-set_option linter.unusedSectionVars false
-
 /-! ## §1 The predicates -/
 
 /-- **An ACTIVE user machine, stepped from `(t0, mm0)`** (Rocq: the pins of

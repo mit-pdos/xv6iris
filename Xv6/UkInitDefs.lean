@@ -56,8 +56,6 @@ open Iris.Std.PartialMap
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
-
 /-! ## §0 init's code, its argv, and what crosses the fork (deviations 1, 3) -/
 
 section Code

@@ -41,8 +41,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Iris.Std.PartialMap
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
-
 /-! ## §0 The pure argv bridges -/
 
 /-! ## §1 The protected devices' lists -/

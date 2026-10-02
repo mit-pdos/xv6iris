@@ -95,16 +95,13 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## The constants the image computes
 
 Every `auipc`/`addi` pair that materialises `&log` normalises to the same
 offset (`+0x1e4f0`), because the relocation is computed from each pair's
 own `auipc`. -/
-
 
 theorem lw_br_acq : KA.«log_write» + 0xffffffffffffcd02#64 = KA.«acquire» := by decide
 theorem lw_br_bpin : KA.«log_write» + 0xffffffffffffeedc#64 = KA.«bpin» := by decide
@@ -117,7 +114,6 @@ theorem lw_log : KA.«log_write» + 0x1e6da#64 = logAddr := by unfold logAddr; d
 theorem lw_lhn : KA.«log_write» + 0x1e706#64 = lhNAddr := by unfold lhNAddr logAddr; decide
 theorem lw_lout : KA.«log_write» + 0x1e6f6#64 = lOut := by unfold lOut logAddr; decide
 theorem lw_blk0 : KA.«log_write» + 0x1e70a#64 = lhBlock 0 := by unfold lhBlock logAddr; decide
-
 
 /-- **The scan's index, as the machine holds it**: a 64-bit word the
 normaliser does not take apart (`BitVec.ofNat_add` would split every
@@ -135,7 +131,6 @@ theorem lw_shl2 (i : Nat) (h : i ≤ LOGBLOCKS) :
   simp only [BitVec.toNat_shiftLeft, BitVec.toNat_ofNat, Nat.shiftLeft_eq, Nat.reducePow]
   omega
 
-
 /-- `&log.lh.block[i]`, as the `slli`/`addi`/`add`/`sw` chain computes it. -/
 theorem lw_blk_addr (i : Nat) :
     logAddr + (BitVec.ofNat 64 (4 * i) + 48#64) = lhBlock i := by
@@ -145,7 +140,6 @@ theorem lw_blk_addr (i : Nat) :
   rw [← ofNat64_add]
   congr 1
   omega
-
 
 /-- `lw` of a small counter cell (`log.lh.n`, `log.outstanding`). -/
 theorem lw_lwn (m : Nat) (h : m < 2 ^ 31) :
@@ -160,7 +154,6 @@ theorem lw_addiw' (i : Nat) (h : i + 1 < 2 ^ 31) :
     BitVec.signExtend 64 (BitVec.extractLsb' 0 32 (lwIx i + BitVec.signExtend 64 1#12)) =
       lwIx (i + 1) :=
   Xv6.ba_addiw1 i h
-
 
 /-- `beq a3,a1` on two sign-extended block numbers. -/
 theorem lw_beq_sext (x y : BitVec 32) :
@@ -193,7 +186,6 @@ theorem lw_bne_nat (a b : Nat) (ha : a ≤ LOGBLOCKS) (hb : b ≤ LOGBLOCKS) :
   show (!(_ == _)) = _
   rw [show ((lwIx a == lwIx b) = bcond bop.BEQ (lwIx a) (lwIx b)) from rfl,
     lw_beq_nat a b ha hb, ← decide_not]
-
 
 /-- `blt a5,a2` at `+0x22`: the "too big a transaction" guard, `29` against
 `lh.n`. -/
@@ -297,12 +289,10 @@ theorem lwPins_set (kR : RegMap) (kk : Nat) (R : RegMap) (h : lwPins kR kk R)
       | (rw [if_neg (Ne.symm n26)]; exact a26)
       | (rw [if_neg (Ne.symm n27)]; exact a27)
 
-
 theorem lw_cs_refl (R : RegMap) : calleeSaved R R :=
   ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩
 
 /-! ## The ledger's and the batch's bookkeeping -/
-
 
 /-! ## Pure bookkeeping -/
 
@@ -415,7 +405,6 @@ theorem lw_dirty_grow (γfs : FsNames) (LB LB' : List Nat) (b : Nat)
 
 end
 
-
 /-! ## Opening the lock's payload and the handle -/
 
 section
@@ -488,7 +477,6 @@ theorem lw_bp (BP : BPIN) (c : CPU) (k' : KCtx) (γl : GName) (γb : BcacheNames
   unfold wp_bpin_body at h
   simp only [bpinAddr] at h
   exact h
-
 
 /-- `Xv6.bufHold0`, opened for the buffer's two KEY halves: `b->blockno`
 (the three `lw a?,12(s1)`) and `b->dev` (what pins `bpin`'s reference). -/
@@ -574,7 +562,6 @@ theorem lw_state_intro (γb : BcacheNames) (γfs : FsNames) (cov : Std.ExtTreeSe
   isplitr
   · ipureintro; exact hMhdr
   · ipureintro; exact hMtie
-
 
 /-- The `cmt = false` arm of `logResAt`, named, at the outstanding count
 `out` (its quiescence clause reads it, sync K1). -/
@@ -789,7 +776,6 @@ theorem lw_res_intro_t (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
     ⟨hbud, hout3, fun _ => hout0⟩ hfresho hE hfreshl hlive hcap hfresht hTlen)
   isimp only [if_true]
   iframe Hout Hcmt Hnc Hops Hep Hreg Htx Hhelp
-
 
 /-- The header's block cells, one borrowed and put back. -/
 theorem lw_blk_restore (W : List (BitVec 32)) (i : Nat) (hi : i < W.length) :
@@ -1093,7 +1079,6 @@ theorem lw_miss (c : CPU) (kc : KCtx) (hsie : kc.sie = false) (kk n : Nat)
   ipureintro
   repeat refine MachCSL.cs_set _ _ ?_ _ _ (by decide)
   exact lw_cs_refl R
-
 
 /-! ## The append tail: `bpin(b)` and `log.lh.n++` (`+0x66 .. +0x7a`) -/
 
@@ -1426,7 +1411,6 @@ theorem lw_range_shift (Φ : Nat → IProp GF) (m s : Nat) :
   rw [← BigSepL.bigSepL_map (Φ := fun (_ : Nat) (y : Nat) => Φ (s + y)) Nat.succ]
   exact BigSepL.bigSepL_cons
 
-
 /-- ...and the head slot named, for the append's store. -/
 theorem lw_junk_split (n : Nat) (h : n < LOGBLOCKS) :
     ([∗list] j ∈ List.range (LOGBLOCKS - n),
@@ -1752,7 +1736,6 @@ theorem lw_exit (RE : RELEASE) (c : CPU) (k : KCtx) (a b : Bool) (R : RegMap) (k
     (e21.trans p21) (e22.trans p22) (e23.trans p23) (e24.trans p24) (e25.trans p25)
     (e26.trans p26) (e27.trans p27)
 
-
 /-! ## The function's exit, once an arm's ghost step is done -/
 
 set_option maxHeartbeats 8000000 in
@@ -1786,7 +1769,6 @@ theorem lw_finish (RE : RELEASE) (c : CPU) (k : KCtx) (a b : Bool) (R : RegMap) 
   iapply HΦ $$ %a %b %R'' [] Hk Hpc [] Hopsw Hch Hlk2 Hsl
   · ipureintro; exact hsp
   · ipureintro; exact hcs
-
 
 end
 

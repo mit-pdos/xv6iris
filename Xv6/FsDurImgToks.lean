@@ -36,8 +36,6 @@ open Iris Iris.Std MachCSL
 open Iris.Algebra
 open FsStateLink
 
-set_option linter.unusedSectionVars false
-
 /-! ## 9a.  The family, split into authorities and tokens -/
 
 /-- One inode's outgoing tokens, as ONE resource-algebra element: the second

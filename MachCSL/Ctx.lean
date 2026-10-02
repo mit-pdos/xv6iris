@@ -90,7 +90,7 @@ theorem locksMap_get? : ∀ (l : List String) (s : String),
     · rw [LawfulPartialMap.get?_insert_ne h, locksMap_get? l s]
       by_cases hs : s ∈ l
       · rw [if_pos hs, if_pos (List.mem_cons_of_mem _ hs)]
-      · rw [if_neg hs, if_neg (by simp [h, hs]; exact fun e => h e.symm)]
+      · rw [if_neg hs, if_neg (by simp [hs]; exact fun e => h e.symm)]
 
 /-- Hart `cpu`'s held-lock authority: exactly the locks in `locks`. -/
 def lockSetAt (cpu : CPU) (locks : List String) : IProp GF :=

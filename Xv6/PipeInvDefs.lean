@@ -235,8 +235,6 @@ theorem pipeQueue_pop (ws : List (BitVec 8)) (rp : Nat) (nr nw : BitVec 32)
 def pnEnd (γp : PipeNames) (w : Bool) : GName := if w then γp.pnWrite else γp.pnRead
 def pnMark (γp : PipeNames) (w : Bool) : GName := if w then γp.pnMwrite else γp.pnMread
 
-set_option linter.unusedSectionVars false
-
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
 

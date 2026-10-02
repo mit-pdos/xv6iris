@@ -74,8 +74,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Std (ExtTreeSet)
 open Wid Pline'
 
-set_option linter.unusedSectionVars false
-
 /-! ## The stage lists (Rocq's local notations `pc0 RT GS STG REST`) -/
 
 /-- Rocq `pc0 pw`: the first filter stage's offset. -/

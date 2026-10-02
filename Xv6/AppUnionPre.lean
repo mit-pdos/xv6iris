@@ -14,8 +14,6 @@ namespace Xv6
 
 open Iris Iris.BI MachCSL
 
-set_option linter.unusedSectionVars false
-
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGpreS hlc GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [FileAppG GF] [FileOutG GF] [PipeOutG GF]

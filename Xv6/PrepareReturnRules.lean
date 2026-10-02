@@ -25,10 +25,7 @@ open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open Sail Sail.ConcurrencyInterfaceV1
 open LeanRV64D LeanRV64D.Functions
 
-
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
@@ -217,7 +214,6 @@ theorem prepare_return_priv_acc (htc : curTier = KTier.kpt) (γ : FileNames) (pa
   · ipureintro; exact hlz
 
 end
-
 
 /-! ## The flip's resources -/
 

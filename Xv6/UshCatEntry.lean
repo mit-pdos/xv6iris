@@ -57,8 +57,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Iris.Std.PartialMap
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
-
 /-! ## The vector sh's node determines -/
 
 /-- **Rocq `cat_args_det`** (deviation 3): NOT cat's -- `echo_args_det_x`

@@ -48,8 +48,6 @@ namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-- The number of buffers (`kernel/param.h`). -/
 def NBUF : Nat := 30
 

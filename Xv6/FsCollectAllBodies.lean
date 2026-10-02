@@ -40,8 +40,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
 
-set_option linter.unusedSectionVars false
-
 section Bodies
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IregG GF] [IcacheG GF]
   [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF]

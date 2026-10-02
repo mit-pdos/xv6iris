@@ -55,8 +55,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-! ## 1.  THE PIN, AS THE PURE INPUT -/
 
 /-- **Rocq `pin_resolves_at`**: the walk's START inum is the run's head (the
@@ -98,7 +96,6 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [FsTopG GF] [FsBy
 through the binders of the unfolded lends). -/
 private theorem pobs_fsGammaL_top (γfs : FsNames) :
     (fsGammaL (hlc := hlc) (GF := GF) γfs).top = γfs.top := rfl
-
 
 /-! ## 2.  THE FAMILIES -/
 

@@ -28,9 +28,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
@@ -113,7 +111,6 @@ theorem namex_rest (IL : ILOCK) (IUP : IUNLOCKPUT) (IU : IUNLOCK) (DL : DIRLOOKU
     $$ [$Hk $Hpc $Hframe $Hte $Hce $Hnext $IH $Hwalk]
   iframe #
 
-
 /-- The element's window of the path, borrowed (the memmove SOURCE, at the
 caller's fraction; Rocq's `nx_win_acc`). -/
 theorem namex_path_window (pv : BitVec 64) (dq : DFrac) (plen : Nat) (f : Nat → BitVec 8)
@@ -192,7 +189,6 @@ theorem namex_win_nonul [Fscfg] {k : KCtx} {A : NamexArgs} (hs : NamexStatic k A
   obtain ⟨i, hi, rfl⟩ := List.mem_map.mp hb
   rw [List.mem_range] at hi
   exact hs.hnn _ (by omega)
-
 
 /-- The element's facts, shared by the two memmove branches: `s1` at the
 element's start `a`, `s2` at its end `e`, and the walk's invariant at the
@@ -296,7 +292,6 @@ theorem namex_long (MM : MEMMOVE) (IL : ILOCK) (IUP : IUNLOCKPUT) (IU : IUNLOCK)
       hf.hSb hf.hfu hnm)
     $$ [$Hk $Hpc $Hframe $Hte $Hce $Hnext $IH $Hwalk]
   iframe #
-
 
 theorem namex_ret_136' : jumpPc (KA.«namex» + 0x136#64) = KA.«namex» + 0x136#64 := namex_ret_136
 
@@ -408,7 +403,6 @@ theorem namex_short (MM : MEMMOVE) (IL : ILOCK) (IUP : IUNLOCKPUT) (IU : IUNLOCK
   k_norm_g [h18']
   iframe Hk
   iframe #
-
 
 set_option maxHeartbeats 16000000 in
 /-- **`+0x96 .. +0x9e`: THE ELEMENT'S LENGTH** -- `len = s - path`, its

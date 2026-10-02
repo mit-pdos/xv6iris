@@ -104,9 +104,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Std MachCSL
 
-set_option linter.unusedSectionVars false
-set_option linter.unusedVariables false
-
 /-! ## §0 The key's readings -/
 
 /-- **Rocq `xk_a`**: the key's argument word `i`. -/

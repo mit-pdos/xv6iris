@@ -85,8 +85,6 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
 open Iris.Algebra OFE COFE
 
-set_option linter.unusedSectionVars false
-
 /-! ## The cameras (Rocq `genF`, `atokR`, `kshotR`, class `ctokG`) -/
 
 /-- The four PURE values a generation pins: its slot address, its pid, its

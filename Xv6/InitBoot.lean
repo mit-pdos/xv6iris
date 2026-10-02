@@ -45,8 +45,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Std MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-! ## 1.  THE PATH -/
 
 /-- "/init" (deviation 1). -/

@@ -31,9 +31,7 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
@@ -184,7 +182,6 @@ theorem namex_iunlockput (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := h
   ipureintro
   exact ⟨hcs, hf⟩
 
-
 set_option maxHeartbeats 8000000 in
 /-- `iunlock(ip)` at `L_par` (+0x86): the tx form; iunlock does not thread
 the complement, so it is carried across its own crossing (the WIDE HOP). -/
@@ -301,7 +298,6 @@ theorem namex_iput (IP : IPUT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
   iapply HK $$ %c %spie %spp %R' %n' %Sb' %w [] Hk Hpc Hte Hce Hsb Hsi Hpid Hbs Hops Htx Hslot
   ipureintro
   exact ⟨hcs, hf⟩
-
 
 /-- The dirlookup continuation, hart-free (Rocq's arms at `poff = 0`). -/
 def namexDlK (k' : KCtx) (A : NamexArgs) (ik : Nat) (inum : BitVec 32) (bm : Blkmap)

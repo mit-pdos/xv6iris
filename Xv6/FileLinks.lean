@@ -24,8 +24,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode MachCSL
 
-set_option linter.unusedSectionVars false
-
 section FileLinks
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [FileAppG GF] [FileOutG GF]

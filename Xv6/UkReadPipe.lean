@@ -40,8 +40,6 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
-
 /-- **Rocq `read_pipe_fam`**: `xfamRd` at the trivial console readings, with
 the caller's queue cursor `Rp` and empty-ring observation `Rpe`. -/
 def readPipeFam {GF : BundledGFunctors} (Q : Int → IProp GF) (Rp : List (BitVec 8) → IProp GF)

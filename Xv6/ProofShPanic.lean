@@ -22,8 +22,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
-
 /-- The block's literals at 0x54, decided. -/
 theorem shdDieLits_54 : shdDieLits 0x54 1#20 556#12 4144#21 3070#21 0x1280 3 0 := by decide
 

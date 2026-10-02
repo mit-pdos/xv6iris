@@ -74,8 +74,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Iris.Std.PartialMap
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
-
 /-! ## 0.  Pure readings off the lent authorities (deviations 3, 6) -/
 
 section Readings

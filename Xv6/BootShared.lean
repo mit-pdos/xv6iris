@@ -102,9 +102,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
 
-set_option linter.unusedSectionVars false
-set_option linter.unusedVariables false
-
 /-! ## §1 `powerBootRes`, unpacked -/
 
 section rows
@@ -591,7 +588,6 @@ theorem bootSharedAlloc (σ : MState) (hbf : bootFacts σ) (ds0 : DevStates) (hd
     Hbs Hcs Hm0 Hm1 Hcfg Hgh HDk Hkpt Hkauth HP
 
 end alloc
-
 
 /-! ## §6 Transport to the final claim payload -/
 

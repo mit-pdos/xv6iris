@@ -152,8 +152,8 @@ theorem read_wire (u : UartState) (off : Nat) (b : BitVec 8) (u' : UartState)
   have key : ∀ r, read u off = some r → r.2.wire = u.wire := by
     intro r hr
     rcases off with _ | _ | _ | _ | _ | _ | _ | _ | n
-    all_goals simp only [read, Nat.reduceEqDiff, if_true, if_false, reduceIte] at hr
-    · cases hd : dlab u <;> simp only [hd, Bool.false_eq_true, if_true, if_false, reduceIte] at hr
+    all_goals simp only [read, Nat.reduceEqDiff, if_true, if_false] at hr
+    · cases hd : dlab u <;> simp only [hd, Bool.false_eq_true, if_true, if_false] at hr
       · cases hx : u.rx <;> simp only [hx] at hr <;> obtain rfl := Option.some.inj hr <;> rfl
       · obtain rfl := Option.some.inj hr; rfl
     all_goals first
@@ -168,7 +168,7 @@ event is the device's own later drain. -/
 theorem write_wire (u : UartState) (off : Nat) (b : BitVec 8) (u' : UartState)
     (h : write u off b = some u') : u'.wire = u.wire := by
   rcases off with _ | _ | _ | _ | _ | _ | _ | _ | n
-  all_goals simp only [write, Nat.reduceEqDiff, if_true, if_false, reduceIte] at h
+  all_goals simp only [write, Nat.reduceEqDiff, if_true, if_false] at h
   all_goals first
     | (obtain rfl := Option.some.inj h; rfl)
     | (split at h <;> (obtain rfl := Option.some.inj h; rfl))
@@ -214,8 +214,8 @@ theorem read_recvd (u : UartState) (off : Nat) (b : BitVec 8) (u' : UartState)
   have key : ∀ r, read u off = some r → r.2.recvd = u.recvd := by
     intro r hr
     rcases off with _ | _ | _ | _ | _ | _ | _ | _ | n
-    all_goals simp only [read, Nat.reduceEqDiff, if_true, if_false, reduceIte] at hr
-    · cases hd : dlab u <;> simp only [hd, Bool.false_eq_true, if_true, if_false, reduceIte] at hr
+    all_goals simp only [read, Nat.reduceEqDiff, if_true, if_false] at hr
+    · cases hd : dlab u <;> simp only [hd, Bool.false_eq_true, if_true, if_false] at hr
       · cases hx : u.rx <;> simp only [hx] at hr <;> obtain rfl := Option.some.inj hr <;> rfl
       · obtain rfl := Option.some.inj hr; rfl
     all_goals first
@@ -228,7 +228,7 @@ theorem read_recvd (u : UartState) (off : Nat) (b : BitVec 8) (u' : UartState)
 theorem write_recvd (u : UartState) (off : Nat) (b : BitVec 8) (u' : UartState)
     (h : write u off b = some u') : u'.recvd = u.recvd := by
   rcases off with _ | _ | _ | _ | _ | _ | _ | _ | n
-  all_goals simp only [write, Nat.reduceEqDiff, if_true, if_false, reduceIte] at h
+  all_goals simp only [write, Nat.reduceEqDiff, if_true, if_false] at h
   all_goals first
     | (obtain rfl := Option.some.inj h; rfl)
     | (split at h <;> (obtain rfl := Option.some.inj h; rfl))
@@ -269,7 +269,7 @@ theorem txArm_ok (i : UartId) (u u' : UartState) (os : List DevObs) (h : txArm i
     have hw := txPop_wire u b u'' hp
     have hr := txPop_recvd u b u'' hp
     refine ⟨?_, ?_, ?_⟩
-    · cases hl : loopback u <;> simp [hl, DevObs.port]
+    · cases hl : loopback u <;> simp [DevObs.port]
     · show u''.wire = u.wire ++ devObsOut i (if loopback u = true then [] else [.uartOut i b])
       cases hl : loopback u <;> simp_all [devObsOut]
     · show u''.recvd = u.recvd ++ devObsIns i (if loopback u = true then [] else [.uartOut i b])

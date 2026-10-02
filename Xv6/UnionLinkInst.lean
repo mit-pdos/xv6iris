@@ -44,7 +44,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
-set_option linter.unusedSectionVars false
 set_option synthInstance.maxSize 1024
 
 /-! ## 0. The filed block's cursor, at the round's own state (pure) -/

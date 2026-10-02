@@ -77,8 +77,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Std MachCSL LeanRV64D
 
-set_option linter.unusedSectionVars false
-
 /-! ## §0 The U-tier vocabulary the contract is stated over (deviation 3)
 
 `userPtmInv`/`userPtmInvX`, `userTrapFrameAt(m)`, `uvRegs`/`uvAmb` and

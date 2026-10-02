@@ -19,8 +19,6 @@ namespace Xv6.PtStack
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 
-set_option linter.unusedSectionVars false
-
 /-! ## The stack page numbers -/
 
 /-! ## `mapStacks` -/

@@ -61,9 +61,6 @@ open Std (ExtTreeSet)
 open UShUPipes
 open Iris.ProgramLogic Language.Notation PrimStep
 
-set_option linter.unusedSectionVars false
-set_option linter.unusedVariables false
-
 /-! ## The engines, from `UL` -/
 
 /-- init's start (`INIT_START`), printf discharged. -/

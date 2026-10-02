@@ -387,7 +387,7 @@ theorem pkVaCells_intro (sp0 : BitVec 64) (R0 : RegMap) :
     pkVaCells (GF := GF) sp0 R0 := by
   unfold pkVaCells pkApBase
   simp only [List.range_succ, List.range_zero, List.nil_append, List.cons_append,
-    Iris.Algebra.BigOpL.bigOpL_cons, Iris.Algebra.BigOpL.bigOpL_nil, BitVec.reduceMul, BitVec.reduceOfNat,
+    Iris.Algebra.BigOpL.bigOpL_cons, Iris.Algebra.BigOpL.bigOpL_nil, BitVec.reduceMul, 
     BitVec.add_assoc, BitVec.reduceAdd, BitVec.add_zero, BitVec.mul_zero, Nat.reduceAdd]
   iintro ⟨H0, H1, H2, H3, H4, H5, H6⟩
   iframe
@@ -470,7 +470,7 @@ theorem pkRegs_set (R0 R : RegMap) (r : BitVec 5) (v : BitVec 64) (h : pkRegs R0
   exact h.2
 
 theorem pkRegs_set25 (R0 R : RegMap) (h : pkRegsN R0 R) : pkRegs R0 (R.set 25#5 (R0 25#5)) :=
-  ⟨pkRegsN_set R0 R 25#5 _ h (by decide), by simp [RegMap.set_apply]⟩
+  ⟨pkRegsN_set R0 R 25#5 _ h (by decide), by simp []⟩
 
 theorem calleeSaved_set25 (R R' : RegMap) (x : BitVec 64) (h : calleeSaved R R') :
     calleeSaved (R.set 25#5 x) (R'.set 25#5 x) := by

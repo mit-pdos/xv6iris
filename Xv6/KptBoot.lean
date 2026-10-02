@@ -27,7 +27,6 @@ open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
 set_option maxRecDepth 100000
-set_option linter.unusedSectionVars false
 
 /-- The trampoline's canonical leaf. -/
 abbrev kptTrampLeaf : BitVec 64 := kLeaf trampPpn .rx 0#1 0#1

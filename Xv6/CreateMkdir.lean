@@ -124,9 +124,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## 0.  Small pure facts -/
 
@@ -1510,7 +1508,6 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
 
-
 theorem createMkdir_b146c : KA.«create» + 0x130#64 + BitVec.signExtend 64 22#13 =
     KA.«create» + 0x146#64 := by decide
 
@@ -2364,7 +2361,6 @@ theorem create_mkdir_dot (DLK : DIRLINK) (Γ : SchedNames) [ClaimIs (hlc := hlc)
       Harm Hdotsx Hacre Hkeep
 
 end StageDot
-
 
 /-! ## 3.  STAGE 4: ARM C-OK's block from the mkdir arm (`+0xe0 .. +0xea`) -/
 

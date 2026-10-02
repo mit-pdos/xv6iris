@@ -57,8 +57,6 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
-
 /-! ## 1. cat's path, and the pin that resolves it -/
 
 /-- **Rocq `cat_pl`**: argv[0], the pipe line's right word, "cat". -/

@@ -90,8 +90,6 @@ open Iris Iris.BI Iris.ProofMode MachCSL
 open LeanRV64D LeanRV64D.Functions Sail
 open Iris.Std (get?)
 
-set_option linter.unusedSectionVars false
-
 /-! ## §1 Constants and pure pins -/
 
 /-- Rocq `RiscvFetchExec.MIE_S`: `SEIE | STIE` (MachCSL `sConfOf.mie`). -/
@@ -442,8 +440,6 @@ theorem uvRegs_uRegs (cpu : CPU) (va : BitVec 64) (g : RegMap) :
   · ipureintro; exact hms
   · iframe
 
-
 end UVocab
-
 
 end Xv6

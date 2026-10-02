@@ -28,9 +28,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 theorem dirlink_slots_iput (a : Nat) (h : dirlinkSlots ≤ a) : iputSlots ≤ a - 10 := by
   have h1 : iputSlots = 78 := by decide

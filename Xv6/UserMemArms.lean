@@ -25,8 +25,6 @@ namespace Xv6
 open MachCSL
 open Sail LeanRV64D LeanRV64D.Functions
 
-set_option linter.unusedSectionVars false
-
 variable {C : UCfg} {P : UPtd}
 
 /-- **The ZICBOP arm** (`UclMemArms.zicbop`): a prefetch retires, whatever

@@ -109,9 +109,6 @@ open LeanRV64D
 /-- `iput`'s entry (D13). -/
 def iputAddr : BitVec 64 := KA.«iput»
 
-set_option linter.unusedSectionVars false
-set_option linter.unusedVariables false
-
 /-- iput's own 6-slot frame over its deepest callee, itrunc (72): THE SPLICE
 FINDING (Rocq SpecIput.v) -- the reordered free path calls itrunc from the
 locked block with iput's six frame slots pushed.  Rocq's `K_iput = 78`. -/

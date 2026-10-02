@@ -183,11 +183,10 @@ theorem myproc_proof (PU : PUSHOFF) (PO : POPOFF) : MYPROC := ⟨fun {hlc GF} _ 
   obtain ⟨c4_2, c4_8, c4_9, c4_18, c4_19, c4_20, c4_21, c4_22, c4_23, c4_24, c4_25, c4_26, c4_27⟩ := hcs4
   obtain ⟨c2_2, c2_8, c2_9, c2_18, c2_19, c2_20, c2_21, c2_22, c2_23, c2_24, c2_25, c2_26, c2_27⟩ := hcs2
   simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] at c4_9 c4_18 c4_19 c4_20 c4_21 c4_22 c4_23 c4_24 c4_25 c4_26 c4_27
-  simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] at c2_18 c2_19 c2_20 c2_21 c2_22 c2_23 c2_24 c2_25 c2_26 c2_27
+  simp only [RegMap.set_apply, BitVec.reduceEq, ite_false] at c2_18 c2_19 c2_20 c2_21 c2_22 c2_23 c2_24 c2_25 c2_26 c2_27
   constructor
   · unfold calleeSaved
-    simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, eq_self_iff_true, _root_.true_and,
-      _root_.and_true]
+    simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, _root_.true_and]
     exact ⟨c4_18.trans c2_18, c4_19.trans c2_19, c4_20.trans c2_20, c4_21.trans c2_21, c4_22.trans c2_22,
       c4_23.trans c2_23, c4_24.trans c2_24, c4_25.trans c2_25, c4_26.trans c2_26, c4_27.trans c2_27⟩
   · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]

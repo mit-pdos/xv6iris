@@ -37,8 +37,6 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedSectionVars false
-set_option linter.unusedVariables false
 set_option linter.unusedSimpArgs false
 
 /-! ## 1.  Code facts -/
@@ -437,7 +435,6 @@ theorem fwr_priv_back (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P' : UP
   | some w' => simp
   | none => simp [hk]
 
-
 /-- ...at the block's raised event count (permit sweep L1b). -/
 theorem fwr_priv_backEv (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P' : UPtd)
     (M : Nat → List (BitVec 8)) (hext : V.upt.ext P') :
@@ -451,7 +448,6 @@ theorem fwr_priv_backEv (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P' : 
   · iapply fwr_priv_back pa pid (V.updEv kv) P' M hext $$ H
 
 end Block
-
 
 /-! ## 6.  The chunk's bytes (the content seam: SpecFilewrite deviations 4-5) -/
 

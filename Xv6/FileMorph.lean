@@ -38,8 +38,6 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedSectionVars false
-
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF]
   [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF]
@@ -173,7 +171,6 @@ end PipeMorphPremise
 instance cwdRefAt_morph (t : KTier) (v : BitVec 64) (z : Nat) :
     CtxMorph (GF := GF) (fun ξ => letI : CurCtx := ⟨ξ, t⟩; cwdRefAt (GF := GF) v z) :=
   inodeHeldAt_morph t v z
-
 
 end
 end Xv6

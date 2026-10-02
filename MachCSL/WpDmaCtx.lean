@@ -30,8 +30,6 @@ import MachCSL.WpSmodeMint
 
 namespace MachCSL
 
-set_option linter.unusedSectionVars false
-
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Iris.Std Std
 
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]

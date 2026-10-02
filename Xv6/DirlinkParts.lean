@@ -54,8 +54,6 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedSectionVars false
-
 /-! ## Call targets, return addresses, the literal -/
 
 theorem dirlink_br_dirlookup : KA.«dirlink» + 0xFFFFFFFFFFFFFE06#64 = KA.«dirlookup» := by

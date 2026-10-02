@@ -40,8 +40,6 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode MachCSL
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
-
 /-! ## 1.  (W)'s THIRD PIECE: THE NODE THE OBSERVATION REPORTS -/
 
 section ExNodeId

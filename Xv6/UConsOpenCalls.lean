@@ -47,8 +47,6 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
-
 theorem initConsCalls_m1 : (0xFFFFFFFFFFFFFFFF#64 : BitVec 64) = BitVec.ofInt 64 (-1) := by decide
 
 section UConsOpenCalls

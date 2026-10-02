@@ -25,8 +25,6 @@ open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 open UexecSG
 
-set_option linter.unusedSectionVars false
-
 /-- **Rocq `uk_close_row`**: close's row at a descriptor the caller knows is
 open -- the call returned 0 and the named slot is the one that closed. -/
 theorem uk_close_row (m : RegMap) (pc : BitVec 64) (fd : Nat) (st : FdState) (fdv fdv' : List FdState)

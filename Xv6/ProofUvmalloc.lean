@@ -35,11 +35,9 @@ open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Xv6.UPtAlloc
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
-
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
@@ -49,7 +47,6 @@ theorem ua_setReg_spie (k : KCtx) (i : BitVec 5) (v : BitVec 64) :
     k.setReg i v = (k.withSpie k.spie k.spp).withRegs (k.regs.set i v) := rfl
 
 /-! ## `uvmalloc`: the ten-slot frame -/
-
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
@@ -168,7 +165,6 @@ theorem uvma_epi [CurCtx] (cpu cur : CPU) (k : KCtx)
 
 end
 
-
 /-! ## `uvmalloc` -/
 
 section
@@ -205,7 +201,6 @@ theorem ua_ret_130e : jumpPc (KA.«uvmalloc» + 0x8e#64) = (KA.«uvmalloc» + 0x
   decide
 theorem ua_ret_1318 : jumpPc (KA.«uvmalloc» + 0x98#64) = (KA.«uvmalloc» + 0x98#64) := by
   decide
-
 
 /-! ## The callees, as rules at their entry addresses -/
 
@@ -347,7 +342,6 @@ theorem uaSaved_join [CurCtx] (sp s1 s3 s6 : BitVec 64) :
       uaSaved (GF := GF) sp s1 s3 s6 := by
   unfold uaSaved; iintro H; iexact H
 
-
 theorem ua_pageOwn_of [CurCtx] (p : BitVec 64) (bs : List (BitVec 8)) (h : bs.length = 4096) :
     byteBuf (GF := GF) p (DFrac.own 1) bs ⊢ pageOwn p := by
   unfold pageOwn
@@ -356,7 +350,6 @@ theorem ua_pageOwn_of [CurCtx] (p : BitVec 64) (bs : List (BitVec 8)) (h : bs.le
   isplitl []
   · ipureintro; exact h
   · iexact H
-
 
 /-- `mappages` of a single page: either the path completes (the leaf is
 written) or it does not (the tree is only the filled prefix). -/
@@ -554,7 +547,6 @@ theorem uvma_rollB [WchG GF] (KF : KFREE) (UD : UVMDEALLOC) [CurCtx]
   · rw [e25, f25]; exact g25
   · rw [e26, f26]; exact g26
   · rw [e27, f27]; exact g27
-
 
 theorem uaRegs_cs (k : KCtx) (R R' : RegMap) (newsz : BitVec 64) (root : BitVec 44)
     (perm : BitVec 64) (A i : Nat) (h : uaRegs k R newsz root perm A i)

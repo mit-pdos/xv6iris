@@ -144,8 +144,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Iris.Algebra MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-! ## 2.  THE REGION'S INITIAL MAP, AND `iregAlloc` -/
 
 /-- The image's record for inum `z`: block `z / 16`, slot `z % 16` (Rocq

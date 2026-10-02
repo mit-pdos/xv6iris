@@ -361,7 +361,7 @@ theorem swp_write_CSR_pmpaddr0 (cpu : CPU) (dq : DFrac) (cfg : Vector (BitVec 8)
   swp_run 120
   have h1N : ∀ j : Nat, pmpTORLocked cfg[j]! = false := fun j => pmpTORLocked_of_off (hoff j)
   have h1I : ∀ j : Int, pmpTORLocked cfg[j]! = false := fun j => pmpTORLocked_of_off (hoff j.toNat)
-  simp only [h0, h1N, h1I]
+  simp only [h0, h1I]
   iapply HΦ $$ %_ Hpmpcfg_n Hpmpaddr_n []
   ipureintro
   rfl
@@ -382,21 +382,21 @@ theorem swp_write_CSR_pmpcfg0 (cpu : CPU) (cfg : Vector (BitVec 8) 64) (hoff : p
   have lN : ∀ j : Nat, BitVec.extractLsb' 7 1 cfg[j]! = 0#1 := fun j => pmpEntryOff_L' (hoff j)
   have lI : ∀ j : Int, BitVec.extractLsb' 7 1 cfg[j]! = 0#1 := fun j => pmpEntryOff_L' (hoff j.toNat)
   swp_run 200
-  try simp only [lN, lI]
+  try simp only [lI]
   swp_run 200
-  try simp only [lN, lI]
+  try simp only [lN]
   swp_run 200
-  try simp only [lN, lI]
+  try simp only [lN]
   swp_run 200
-  try simp only [lN, lI]
+  try simp only [lN]
   swp_run 200
-  try simp only [lN, lI]
+  try simp only [lN]
   swp_run 200
-  try simp only [lN, lI]
+  try simp only [lN]
   swp_run 200
-  try simp only [lN, lI]
+  try simp only [lN]
   swp_run 200
-  try simp only [lN, lI]
+  try simp only [lN]
   swp_run 200
   try simp only [lN, lI]
   swp_run 200

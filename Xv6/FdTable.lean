@@ -53,8 +53,6 @@ namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-! ## A big-sep accessor that may change the predicate away from the slot -/
 
 section
@@ -883,7 +881,6 @@ theorem procOfilesOwe_cells (γ : FileNames) (γd : GName) (pa : BitVec 64) (fs 
       split
       · iintro ⟨-, H⟩; iexact H
       · unfold ofileSlot; iintro ⟨H, -⟩; iexact H) $$ H
-
 
 /-! ## The null table a fresh incarnation is born with (Rocq
 `ProcInv.proc_dormant_unused`'s mint, `proc_ofiles_null_split`) -/

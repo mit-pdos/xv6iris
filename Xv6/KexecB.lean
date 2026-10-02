@@ -108,9 +108,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## Pure facts -/
 
@@ -137,7 +135,6 @@ theorem kxcB_root_beqz (root : BitVec 44) (h : pageValid (pageAddr root)) :
   have := PtRun.pageValid_ne_zero _ h
   simp only [bcond]
   simpa using this
-
 
 /-- Nothing is covered at size 0. -/
 theorem kxcB_lazyFree_0 (um : RegMapF (BitVec 64)) : lazyFree um 0#64 := by
@@ -461,8 +458,6 @@ theorem kxcB_mask (Q : BitVec 64 → ProcPriv → (Nat → List (BitVec 8)) → 
   exact ⟨Nat.pos_of_ne_zero h0, hPtfp, UPtPpt.umBelow_empty _ _ _, kxcB_lazyFree_0 _, hrows.1,
     hrows.2⟩
 
-
-
 set_option maxHeartbeats 8000000 in
 /-- **+0x0b8 .. +0x0c2**: `sz = 0`, `i = 0`, `s11 = 56`, `s9 = 4096`, `a5 = 0xfff`, then `kxcB_mask`. -/
 theorem kxcB_loopregs (Q : BitVec 64 → ProcPriv → (Nat → List (BitVec 8)) → Prop) (QF : KxfCause → Prop)
@@ -685,7 +680,6 @@ theorem kxcB_fail (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames) [ClaimIs (h
     · exact a26
     · exact a27
 
-
 set_option maxHeartbeats 8000000 in
 /-- **+0x0aa: `lhu a5,-376(s0)`** (`elf.phnum`), then the two arms. -/
 theorem kxcB_lhu (Q : BitVec 64 → ProcPriv → (Nat → List (BitVec 8)) → Prop) (QF : KxfCause → Prop)
@@ -752,7 +746,6 @@ theorem kxcB_lhu (Q : BitVec 64 → ProcPriv → (Nat → List (BitVec 8)) → P
       (by simp [RegMap.set_apply, a25]) (by simp [RegMap.set_apply, a26])
       (by simp [RegMap.set_apply, a27]) hkf hnib hn2 hal hl h0)
       $$ [$Hk $Hpc $Hte $Hce $Hop $Hlog $Hirs $Hbs $Hpt $Hpriv $Hbufs $Fe $Hfb $Hcl $H12c]
-
 
 set_option maxHeartbeats 8000000 in
 /-- **+0x09e .. +0x0a8: the six lazy spills** (slots 5,7,9..12), the frame

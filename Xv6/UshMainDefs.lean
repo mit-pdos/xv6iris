@@ -71,8 +71,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
-
 /-- **Rocq `UkSh`'s section variables** (deviation 1): the console
 position's ghost name, the application's taint, the era's prompt
 credential family, the banner-owed credential and the lease's pieces. -/

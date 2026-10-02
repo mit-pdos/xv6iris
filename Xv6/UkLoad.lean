@@ -21,8 +21,6 @@ open Iris Std MachCSL
 open Iris.Std.PartialMap Iris.Std.FiniteMap
 open Sail LeanRV64D LeanRV64D.Functions
 
-set_option linter.unusedSectionVars false
-
 set_option maxHeartbeats 4000000 in
 set_option maxRecDepth 100000 in
 /-- **A LOAD whose access reads `v`** retires, writing `extend_value u v`

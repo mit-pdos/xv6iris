@@ -37,8 +37,6 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedVariables false
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
 
 theorem ut56_fmt1 : KA.«usertrap» + 19484#64 = KStr.«usertrap(): unexpected scause 0x%lx pid=%d\n» := by

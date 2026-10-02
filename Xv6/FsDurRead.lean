@@ -45,8 +45,6 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Iris.Std.PartialMap
 
-set_option linter.unusedSectionVars false
-
 /-! ## 1.  THE BLOCK MAP'S OWN ROW: every block is a WHOLE block -/
 
 /-- Rocq's `dblk_full`. -/

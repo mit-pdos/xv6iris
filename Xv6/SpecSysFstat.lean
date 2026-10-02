@@ -80,8 +80,6 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedVariables false
-
 def sysFstatAddr : BitVec 64 := KA.«sys_fstat»
 
 /-- sys_fstat's own 4-slot frame over filestat's 76 (argfd's 24 and

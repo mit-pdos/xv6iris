@@ -39,9 +39,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## Link registers -/
 
@@ -57,7 +55,6 @@ theorem aslj_4008 : jumpPc (KA.«acquiresleep» + 0x48#64) = (KA.«acquiresleep�
 
 theorem asl_add0 (x : BitVec 64) : x + 0#64 = x := by simp
 
-
 theorem asl_sext_nz (v : BitVec 32) (h : v ≠ 0#32) : BitVec.signExtend 64 v ≠ 0#64 := by
   intro hc
   apply h
@@ -69,12 +66,10 @@ theorem asl_sext_nz (v : BitVec 32) (h : v ≠ 0#32) : BitVec.signExtend 64 v �
 theorem asl_beq_z : bcond bop.BEQ (BitVec.signExtend 64 (0#32)) 0#64 = true := by decide
 theorem asl_bne_z : bcond bop.BNE (BitVec.signExtend 64 (0#32)) 0#64 = false := by decide
 
-
 theorem asl_beq_nz (v : BitVec 32) (h : v ≠ 0#32) :
     bcond bop.BEQ (BitVec.signExtend 64 v) 0#64 = false := by
   simp only [bcond, beq_eq_false_iff_ne, ne_eq]
   exact asl_sext_nz v h
-
 
 /-- The sleeplock's own address is nonzero: its inner spinlock sits in RAM. -/
 theorem asl_slk_nz (slk : BitVec 64) (h : lockAddrOk (slk + 8#64)) : slk ≠ 0#64 := by
@@ -871,7 +866,6 @@ theorem acquiresleep_llb_proof (ACL : ACQUIRE_LLB) (RE : RELEASE) (MP : MYPROC) 
   case hKa => k_norm_g; unfold acquiresleepSlots sleepSlots at hK; omega
   case hla => k_norm_g; rw [hlocks]; decide⟩
 
-
 /-! ## The NON-BLOCKING contract (`ACQUIRESLEEP_NB`)
 
 The caller presents `slhAuth γt none`, the authoritative zero of the
@@ -885,7 +879,6 @@ theorem asl_filter_nb (l : List String) (h : "sleep lock" ∉ l) :
     ("sleep lock" :: l).filter (fun x => x ≠ "sleep lock") = l := by
   rw [List.filter_cons_of_neg (by simp)]
   exact List.filter_eq_self.2 (fun x hx => by simp; intro e; subst e; exact h hx)
-
 
 theorem asl_pushed_spie_nb (k : KCtx) (m : Nat) :
     (k.pushed m).withSpie k.spie k.spp = k.pushed m := rfl

@@ -46,9 +46,6 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
 open Iris.ProgramLogic Language.Notation PrimStep
 
-set_option linter.unusedSectionVars false
-set_option linter.unusedVariables false
-
 /-! ## 1. The conclusion -/
 
 /-- THE CONCLUSION (Rocq `AppUnionRec.union_phi`): `UnionOutPure.union_phi_sync`

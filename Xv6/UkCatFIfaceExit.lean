@@ -45,8 +45,6 @@ open Iris.Std.PartialMap
 open HfpPipeP HfpFileClaimsP
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
-
 section BigSepAux
 variable {PROP : Type _} [BI PROP] [BIAffine PROP]
 

@@ -98,19 +98,15 @@ open Iris.Std (get?)
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## PURE ARITHMETIC -/
-
 
 /-- `bge` of two small counters. -/
 theorem kxcB3_bge_small (a b : Nat) (ha : a < 2 ^ 63) (hb : b < 2 ^ 63) :
     bcond bop.BGE (BitVec.ofNat 64 a) (BitVec.ofNat 64 b) = decide (b ≤ a) := by
   rw [kxcB2_bge, MachCSL.toInt_ofNat a ha, MachCSL.toInt_ofNat b hb]
   by_cases h : b ≤ a <;> simp [h] <;> omega
-
 
 /-- `flags2perm` reads bits 0 and 1 only: the `lw`'s sign extension does not
 reach them (Rocq `kxc_w32_bit`). -/
@@ -262,10 +258,8 @@ theorem kxcB3_off_step (ef : List (BitVec 8)) (i : Nat) :
   have := kxcOff_step ef i
   simpa using this
 
-
 section Win
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
-
 
 end Win
 
@@ -706,7 +700,6 @@ theorem kxcB3_ret_170 : jumpPc (KA.«kexec» + 0x170#64 + 4#64) = KA.«kexec» +
 theorem kxcB3_br_uvma : KA.«kexec» + 0x17c#64 + BitVec.signExtend 64 2082998#21 = KA.«uvmalloc» := by
   decide
 theorem kxcB3_ret_17c : jumpPc (KA.«kexec» + 0x17c#64 + 4#64) = KA.«kexec» + 0x17c#64 + 4#64 := by decide
-
 
 set_option maxHeartbeats 32000000 in
 /-- **+0x188 .. +0x1a0 and the loadseg loop's exit (+0x116)**: after a

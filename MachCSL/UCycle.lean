@@ -65,7 +65,7 @@ def UWSt.setR (s : UWSt) (r : Register) (v : RegisterType r) : UWSt :=
 @[simp] theorem UWSt.setR_rv (s : UWSt) (r : Register) (v : RegisterType r) : (s.setR r v).rv = s.rv := rfl
 
 theorem UWSt.setR_file_same (s : UWSt) (r : Register) (v : RegisterType r) : (s.setR r v).file r = v := by
-  simp [RegFile.set_same]
+  simp []
 
 theorem UWSt.setR_file_other (s : UWSt) (r r' : Register) (v : RegisterType r) (h : r' ≠ r) :
     (s.setR r v).file r' = s.file r' := by
@@ -126,7 +126,7 @@ variable {D : UFoot}
 and the step body is picked by the hart state. -/
 theorem uc_prelude (hD : UcFoot D) (orc : UOrc) (s : UWSt) :
     runRW D orc s ucPrelude = some (s.file .hart_state, ucPreS s, orc) := by
-  simp only [ucPrelude, should_inc_minstret, bind_assoc, pure_bind,
+  simp only [ucPrelude, should_inc_minstret, bind_assoc, 
     MachCSL.uxa_readReg_bind D _ _ _ _ hD.rd_priv, MachCSL.uxa_readReg_bind D _ _ _ _ hD.rd_mcountinhibit]
   unfold ucPreS ucMiFlag
   -- `minstretcfg` is read only under `mcountinhibit.IR = 0`
@@ -365,7 +365,7 @@ theorem uc_dispatch (hD : UcDispFoot D) (orc : UOrc) (s : UWSt) (hm : UcMisa D s
   simp only [ucDispatch, dispatchInterrupt, getPendingSet, read_mip, external_interrupts_pending,
     bind_assoc, pure_bind, MachCSL.uxa_readReg_bind D _ _ _ _ hD.rd_priv, hpriv, uc_currentlyEnabled_S hm,
     MachCSL.uxa_readReg_bind D _ _ _ _ hD.rd_mip, MachCSL.uxa_readReg_bind D _ _ _ _ hD.rd_mie,
-    MachCSL.uxa_readReg_bind D _ _ _ _ hD.rd_mideleg, MachCSL.uxa_readReg_bind D _ _ _ _ hD.rd_mstatus,
+    MachCSL.uxa_readReg_bind D _ _ _ _ hD.rd_mideleg, 
     ucRW_readReg_any D _ _ _ _ hD.meip_nr hD.meip_any, ucRW_readReg_any D _ _ _ _ hD.seip_nr hD.seip_any,
     if_true]
   have e1 : (Privilege.User == Privilege.Machine) = false := rfl
@@ -377,7 +377,7 @@ theorem uc_dispatch (hD : UcDispFoot D) (orc : UOrc) (s : UWSt) (hm : UcMisa D s
       (_update_Minterrupts_MEI (Mk_Minterrupts zeros) ((orc 0).reg .sig_meip)) ((orc 1).reg .sig_seip)) =
       ucIp (s.file .mip) ((orc 0).reg .sig_meip) ((orc 1).reg .sig_seip) from rfl]
   generalize ucIp (s.file .mip) ((orc 0).reg .sig_meip) ((orc 1).reg .sig_seip) = ip'
-  simp only [e1, e2, e3, hmm, ez, BitVec.and_zero, bne_self_eq_false, Bool.false_and,
+  simp only [e1, e2, e3, hmm, ez, BitVec.and_zero, bne_self_eq_false, 
     Bool.true_and, Bool.or_true, Bool.and_false, Bool.false_eq_true, if_false]
   unfold dispatchU dispatchOfPending pendingU
   by_cases hc : ip' &&& (s.file .mie &&& s.file .mideleg) = 0#64

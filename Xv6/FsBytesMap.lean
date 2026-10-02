@@ -33,8 +33,6 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Std MachCSL
 open Iris.Std Iris.Std.PartialMap
 
-set_option linter.unusedSectionVars false
-
 /-! ## `mapSeq`: Rocq's `map_seqZ` -/
 
 /-- Rocq's `map_seqZ start xs`: the run as a finite map, so the ghost-map

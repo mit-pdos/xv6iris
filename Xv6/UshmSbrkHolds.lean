@@ -11,8 +11,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
-
 /-- **`USHM_SBRK_LEAF` holds**, at the engine. -/
 theorem ushmSbrk_holds (UL : UK_LEAVES) : USHM_SBRK_LEAF where
   wp_uk_ecall_sbrk := fun N h m pc sz n avail hn ha he hsz hal hal4 =>

@@ -31,9 +31,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
@@ -91,7 +89,6 @@ theorem namex_found_held (data : Nat → List (BitVec 8)) (dn : Dinode) (kd kslo
   iframe Href Hru
   ipureintro
   exact ⟨rfl, hks, hnib, hpos⟩
-
 
 /-- The level's facts: the walk's pure invariant at the element just
 consumed (`el`, ending before `o2`) with the parent directory held at slot

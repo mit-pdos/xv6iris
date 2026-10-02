@@ -81,8 +81,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open HfpFileClaimsP
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
-
 namespace UkFileOpen
 
 /-! ## §0 The ledger a tainted open hands back; the fd tie -/
@@ -293,7 +291,7 @@ theorem sbundleAt_open_intro (X : Uvis → IProp GF) (f : Xfam GF) (W : Uvis) :
       UexecSG.sbundleAt (self := uexecSGXv6 (hlc := hlc)) X USYS_open f W := by
   show ⊢ _ -∗ xv6Sbundle (hlc := hlc) X USYS_open f W
   unfold xv6Sbundle xv6SbundleRest xrowOpen
-  simp only [USYS_open, USYS_exec, USYS_pipe, Int.reduceEq, ↓reduceIte]
+  simp only [USYS_open, USYS_exec, Int.reduceEq, ↓reduceIte]
   iintro H
   iexact H
 
@@ -307,7 +305,7 @@ theorem spostAt_open_elim (X : Uvis → IProp GF) (f : Xfam GF) (W : Uvis) (r : 
           f.oP f.oPmiss f.oFarm f.oFun f.oFok f.oFex f.oFo f.oFt W.fd r fdv' := by
   show ⊢ xv6Spost (hlc := hlc) X USYS_open f W r M' fdv' cw' cs' -∗ _
   unfold xv6Spost xpostOpen
-  simp only [USYS_open, USYS_exec, USYS_pipe, Int.reduceEq, ↓reduceIte]
+  simp only [USYS_open, USYS_exec, Int.reduceEq, ↓reduceIte]
   iintro H
   iexact H
 

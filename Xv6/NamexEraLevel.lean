@@ -36,9 +36,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-- ANOTHER ELEMENT IS LEFT: the skip stopped at a byte that is neither the
 terminator nor a separator (Rocq ProofNparEra's `HRne`). -/
@@ -227,7 +225,6 @@ theorem namexEra_tests (IUP : IUNLOCKPUT) (IU : IUNLOCK) (DL : DIRLOOKUP)
         $$ [$Hk $Hpc $Hframe $Hte $Hce $Henv $Hlk $Hload $Hs1 $Hkeep $Hnm $Hbs $Hobs $Hop $HP $Hhops
           $Hnext $IH Hpath]
       unfold namexPath; iexact Hpath
-
 
 set_option maxHeartbeats 16000000 in
 /-- **`+0xc0 .. +0xc2`: THE SHED and ilock**, the walk's reference opened AT

@@ -106,8 +106,6 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
 open Iris.Algebra
 
-set_option linter.unusedSectionVars false
-
 /-! ## 3d.  THE LINK LEDGER's VOCABULARY (design §20.2) -/
 
 /-- Rocq `nat_local_update` (deviation 5): at `(ℕ, +)` a local update is

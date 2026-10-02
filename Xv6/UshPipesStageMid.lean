@@ -47,8 +47,6 @@ open Std (ExtTreeSet)
 open Wid RdOut WrOut
 open UShPipesDefs
 
-set_option linter.unusedSectionVars false
-
 section Mid
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [IcacheG GF]
   [PipeProtoG GF] [PipeOutG GF] [CtokG GF] [FsTopG GF] [OffboxG GF] [Appcfg GF] [FsBytesG GF] [Fscfg] [Icfg]

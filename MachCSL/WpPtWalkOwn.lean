@@ -75,7 +75,7 @@ theorem ctxBytes_hist (ξ : CtxId) (pa : PAddr) (dq : DFrac) (bs : Nat → BitVe
       simp only [hmem hk, if_false]
     isplitl [H1 Hpt]
     · iapply BigSepL.bigSepL_snoc.2
-      simp only [List.length_range, if_true]
+      simp only [if_true]
       rw [heq]
       iframe H1 Hpt
     isplit
@@ -86,7 +86,7 @@ theorem ctxBytes_hist (ξ : CtxId) (pa : PAddr) (dq : DFrac) (bs : Nat → BitVe
       · simp only [hjn, if_false]; exact h1 j (by omega)
     · iintro Hh
       icases BigSepL.bigSepL_snoc.1 $$ Hh with ⟨Hh1, Hh2⟩
-      simp only [List.length_range, if_true]
+      simp only [if_true]
       rw [heq]
       iapply BigSepL.bigSepL_snoc.2
       isplitl [Hh1 W1]

@@ -27,7 +27,6 @@ open LeanRV64D LeanRV64D.Functions
 
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 
-set_option linter.unusedVariables false in
 /-- The clock tick in supervisor or user mode (the retire stage of a cycle
 that ends in either privilege). -/
 theorem swp_tick_clock_cells_SU (cpu : CPU) (dq : DFrac) (p : Privilege)

@@ -101,8 +101,6 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedSectionVars false
-
 /-! # (1) The arithmetic -/
 
 /-- The sign extension of a value that fits in 31 bits is its own value

@@ -26,8 +26,6 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
-
 /-- **Rocq `read_file_fam`**: the inode member at the caller's receipt. -/
 def readFileFam {GF : BundledGFunctors} (Q : Int → IProp GF) (F : Pfam GF (Aview → Nat → Anode → Nat → IProp GF)) :
     Xfam GF :=

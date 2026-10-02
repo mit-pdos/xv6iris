@@ -225,8 +225,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-! ## The identity, the shape, the namespace
 
 The identity `IcBid` and the shape `IcX` live in `Xv6/IcacheRefDefs.lean`
@@ -743,7 +741,6 @@ theorem icDepHeld_bmLen [Icfg] [CurCtx] (γfs : FsNames) (γi : GName)
 /- The descriptor premise `hshr` is unused in the proof, as in Rocq; it is
 kept so the statement matches the Rocq callers (ProofIunlock), which pass
 it. -/
-set_option linter.unusedVariables false in
 /-- Rocq's `ic_dep_held_intro_held`. -/
 theorem icDepHeld_introHeld [Icfg] [CurCtx] (cn : IcNames) (γfs : FsNames) (γi : GName)
     (cov : ExtTreeSet Nat compare) (logstart k : Nat) (d : IcDep) (s : Qp)

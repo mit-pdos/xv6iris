@@ -28,8 +28,6 @@ open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open Iris.Std.PartialMap Iris.Std.FiniteMap
 open Sail LeanRV64D LeanRV64D.Functions
 
-set_option linter.unusedSectionVars false
-
 /-- The lazy view reads the page view only on mapped pages. -/
 theorem umemLazy_congr (P : UPtd) (sz : Nat) (V V' : Nat → List (BitVec 8))
     (h : ∀ k w, get? P.um k = some w → V k = V' k) : umemLazy P sz V = umemLazy P sz V' := by

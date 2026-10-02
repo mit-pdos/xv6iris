@@ -28,7 +28,6 @@ open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 open Xv6.Kvm
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
@@ -73,7 +72,6 @@ theorem km_ret_120c : jumpPc (KA.«kvmmake» + 0xac#64) = (KA.«kvmmake» + 0xac
 theorem km_ret_1212 : jumpPc (KA.«kvmmake» + 0xb2#64) = (KA.«kvmmake» + 0xb2#64) := by
   decide
 
-
 /-- The virtual page numbers of the seven regions. -/
 theorem km_v1 : vpnOf (0x10000000#64) = 0x10000#27 := by decide
 theorem km_v1a : vpnOf (0x1000a000#64) = 0x1000a#27 := by decide
@@ -107,12 +105,10 @@ theorem km_cnt4 {nb : Nat} (h : 166 < nb) : 2 < nb - 1 - 2 - 0 - 0 - 32 := by om
 theorem km_cnt5 {nb : Nat} (h : 166 < nb) : 63 < nb - 1 - 2 - 0 - 0 - 32 - 2 := by omega
 theorem km_cnt6 {nb : Nat} (h : 166 < nb) : 2 < nb - 1 - 2 - 0 - 0 - 32 - 2 - 63 := by omega
 
-
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF]
 
 /-! ## The callees, at their entry addresses -/
-
 
 set_option maxHeartbeats 1000000 in
 /-- `memset`'s contract as a rule. -/
@@ -727,7 +723,6 @@ theorem km_regions (KM : KVMMAP) [CurCtx] (c : CPU) (kb : KCtx) (γl : GName) (�
   · exact m6_9.trans (m5_9.trans (m4_9.trans (m3_9.trans (m2_9.trans (m1a_9.trans (m1_9.trans h9))))))
 
 end
-
 
 /-! ## kvmmake itself: the root, the seven regions, the stacks, the epilogue -/
 

@@ -15,8 +15,6 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedSectionVars false
-
 /-! ## Geometry facts -/
 
 theorem fnode_toNat (k : Nat) (hk : k ≤ NFILE) : (fnode k).toNat = (KernelSyms.«ftable» + 0x18) + 40 * k := by
@@ -70,7 +68,6 @@ theorem fa_bne_end_last : bcond bop.BNE (fnode NFILE) (fnode NFILE) = false := b
 
 /-! ## The `ref` cell's value -/
 
-
 theorem fa_beqz_zero : bcond bop.BEQ (BitVec.signExtend 64 (BitVec.ofNat 32 0)) 0#64 = true := by
   decide
 theorem fa_beqz_nonzero (n : Nat) (hn : n ≠ 0) (hlt : n < 2 ^ 31) :
@@ -78,7 +75,6 @@ theorem fa_beqz_nonzero (n : Nat) (hn : n ≠ 0) (hlt : n < 2 ^ 31) :
   rw [bcond_beq_eq]; exact beq_eq_false_iff_ne.mpr (Xv6.bc_refcnt_nonzero n hn hlt)
 
 /-! ## Pure facts for the count -/
-
 
 /-- `blez a5` with `ref ≥ 1` is not taken. -/
 theorem fd_bgtz (n : Nat) (h1 : 1 ≤ n) (h : n < 2 ^ 31) :
@@ -92,9 +88,7 @@ theorem fd_bgtz (n : Nat) (h1 : 1 ≤ n) (h : n < 2 ^ 31) :
     simp; omega
   rw [hlt]; rfl
 
-
 /-! ## `fileclose`'s counter and field arithmetic -/
-
 
 /-- `bgtz a5` after `--ref`: taken iff two or more references remained. -/
 theorem fc_bgtz (n : Nat) (h1 : 1 ≤ n) (h : n < 2 ^ 31) :

@@ -13,8 +13,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
-
 /-- **`USH_SYS_P` holds**, at the engine. -/
 theorem ushSysP_holds (UL : UK_LEAVES) : USH_SYS_P where
   closeNp := fun {hlc} {GF} _ _ _ _ _ _ _ _ _ N h m pc fd st avail hn ha hal4 hnp => by

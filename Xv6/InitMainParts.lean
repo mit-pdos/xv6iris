@@ -21,8 +21,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
-
 /-! ## §1 Pids (Rocq `pid_lt_Z31`, `pid_Z63`, `pid_geb0`, `pid_ltb0`) -/
 
 /-- A pid, sign-extended, reads back as itself. -/

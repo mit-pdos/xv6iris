@@ -17,8 +17,6 @@ open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open Iris.Std.PartialMap Iris.Std.FiniteMap
 open Sail LeanRV64D LeanRV64D.Functions
 
-set_option linter.unusedSectionVars false
-
 /-! ## §5 The accessor -/
 
 /-- The view a byte map gives the user pages (what `umPages` is re-sealed

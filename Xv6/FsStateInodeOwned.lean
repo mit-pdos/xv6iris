@@ -114,8 +114,6 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Iris.Algebra
 
-set_option linter.unusedSectionVars false
-
 /-- The entry map's functor, for iris-lean's map big-ops (deviation 4):
 `[∗map]` cannot infer its map functor from `Std.ExtTreeMap Fname V compare`
 (the value is not the last argument), so every big-op over `dirEntries`

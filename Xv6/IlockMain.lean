@@ -26,9 +26,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 set_option maxHeartbeats 16000000 in
 /-- `+0x1a .. +0x1c` and on (Rocq 2587-2860). -/
@@ -153,9 +151,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-- `acquiresleep(&ip->lock)` at its call site (the store-order tier, the
 entry's tracked sleeplock over `ic_slp`, the share's `slhTok` slice as the

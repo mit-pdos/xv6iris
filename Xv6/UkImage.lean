@@ -24,8 +24,6 @@ namespace Xv6
 open MachCSL
 open Iris.Std.PartialMap Iris.Std.FiniteMap
 
-set_option linter.unusedSectionVars false
-
 theorem uk_sz_toNat (sz : Nat) (hsz : uszOk sz) : (BitVec.ofNat 64 sz).toNat = sz := by
   unfold uszOk pgRoundUpN at hsz
   rw [BitVec.toNat_ofNat]
@@ -76,7 +74,7 @@ theorem uk_store_view {pt : UPtd} {sz : Nat} {V : Nat → List (BitVec 8)} {M : 
     have e2 : n % 4096 = a % 4096 + (n - a) := by omega
     unfold umemLazy ukViewStore
     rw [e1, hk]
-    simp only [Option.isSome_some, if_true, if_pos rfl, List.getElem?_mapIdx, e2]
+    simp only [Option.isSome_some, if_true, List.getElem?_mapIdx, e2]
     rw [List.getElem?_eq_getElem (by omega)]
     simp only [Option.map_some]
     rw [if_pos ⟨by omega, by omega⟩]

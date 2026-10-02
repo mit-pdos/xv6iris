@@ -17,8 +17,6 @@ namespace Xv6
 open MachCSL
 open Sail LeanRV64D LeanRV64D.Functions
 
-set_option linter.unusedSectionVars false
-
 /-! ## §1 The predicates -/
 
 /-- **A trapped engine machine**: the U→S tower's landing, still at the

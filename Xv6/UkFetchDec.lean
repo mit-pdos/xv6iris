@@ -20,8 +20,6 @@ open MachCSL
 open Iris.Std.PartialMap Iris.Std.FiniteMap
 open Sail LeanRV64D LeanRV64D.Functions
 
-set_option linter.unusedSectionVars false
-
 /-- The instruction's pc is 2-aligned (deviation 7 of `UexecRet`'s form). -/
 theorem ukInstr_al {π : Nat → Option UPerm} {M : ElfMem} {pc : BitVec 64} {isRvc : Bool} {i : instruction}
     (hI : UkInstr π M pc isRvc i) : pc &&& 1#64 = 0#64 := by

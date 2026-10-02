@@ -17,8 +17,6 @@ open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D LeanRV64D.Functions Sail
 open Iris.Std Iris.Std.PartialMap Iris.Std.LawfulPartialMap
 
-set_option linter.unusedSectionVars false
-
 /-! ## Partial maps -/
 
 /-- Deleting an absent key changes nothing. -/
@@ -36,7 +34,6 @@ theorem delete_empty {V : Type} (i : Nat) :
 
 /-! ## `delRunL`: a run of keys removed -/
 
-
 /-- A key past the deleted prefix is untouched. -/
 theorem delRunL_get_ge (L : RegMapF (BitVec 64)) (v0 i j : Nat) (h : i ≤ j) :
     get? (delRunL L v0 i) (v0 + j) = get? L (v0 + j) := by
@@ -46,7 +43,6 @@ theorem delRunL_get_ge (L : RegMapF (BitVec 64)) (v0 i j : Nat) (h : i ≤ j) :
     rw [Xv6.delRunL_succ, get?_delete_ne (by omega), ih (by omega)]
 
 /-! ## `ptRep`: reading and clearing a level-0 entry -/
-
 
 /-- A blocked walk means no leaf. -/
 theorem ptRep_none_of_walk {t : PTree} {L : RegMapF (BitVec 64)} (h : ptRep t L) (vpn : BitVec 27)
@@ -162,7 +158,6 @@ theorem pteAD_pte2pa {w v : BitVec 64} (h : pteAD w v) : pte2pa v = pte2pa w := 
 
 /-! ## The page-number arithmetic of a run -/
 
-
 theorem vpnOf_toNat (va : BitVec 64) : (vpnOf va).toNat = va.toNat / 4096 % 2 ^ 27 := by
   simp only [vpnOf, BitVec.extractLsb'_toNat, Nat.shiftRight_eq_div_pow, Nat.reducePow]
 
@@ -180,7 +175,6 @@ theorem vpn_step_toNat (va : BitVec 64) (i : Nat) (h : va.toNat + 4096 * i < 2 ^
   rw [vpnOf_toNat, vpnOf_toNat, h1, hdiv,
     Nat.mod_eq_of_lt (by omega : va.toNat / 4096 + i < 2 ^ 27),
     Nat.mod_eq_of_lt (by omega : va.toNat / 4096 < 2 ^ 27)]
-
 
 /-! ## Deleting a run out of a map with the fixed leaves -/
 

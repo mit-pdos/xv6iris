@@ -44,8 +44,6 @@ open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 open UexecSG
 
-set_option linter.unusedSectionVars false
-
 theorem usysExec_ne_exit : USYS_exec ≠ USYS_exit := by unfold USYS_exec USYS_exit; decide
 theorem usysExec_ne_fork : USYS_exec ≠ USYS_fork := by unfold USYS_exec USYS_fork; decide
 theorem usysExec_ne_wait : USYS_exec ≠ USYS_wait := by unfold USYS_exec USYS_wait; decide

@@ -66,8 +66,6 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
-
 /-! ## §0 Descriptor maps -/
 
 /-- **Rocq `fdmap`**: descriptors to devices (deviation 1). -/

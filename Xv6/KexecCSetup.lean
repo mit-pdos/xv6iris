@@ -79,9 +79,7 @@ open Iris.Std (get?)
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 theorem kxcC_br_myproc : KA.«kexec» + 0x1ae#64 + BitVec.signExtend 64 2084574#21 = KA.«myproc» := by
   decide

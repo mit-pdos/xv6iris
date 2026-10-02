@@ -22,8 +22,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open HfpFileClaimsP UkFileOpen UkFileDev
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
-
 section Write
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [DiskG GF] [EchoOutG GF] [FileAppG GF] [PS : UprogSG GF]
@@ -163,7 +161,6 @@ theorem fdev_chain_adv_frame (i : Nat) (γo : GName) (M : Nat → List (BitVec 8
       iapply fdev_part_adv_mono $$ [HF] Hp
       iintro Hc
       iapply fdev_chain_adv_frame i γo M ua Pt n Q F cnt (k + 1) $$ Hc HF
-
 
 /-- **Rocq `fdev_out_of_cur`**: the chain's stop, as the device. -/
 theorem fdev_out_of_cur (c : FileFixed) (r : FileAppNames) (sf : Dst) (nm : Fname) (i : Nat) (γo : GName)

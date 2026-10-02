@@ -42,8 +42,6 @@ import MachCSL.WpWire
 
 namespace Xv6
 
-set_option linter.unusedSectionVars false
-
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 
 /-! ## The window at word width
@@ -743,7 +741,6 @@ theorem plic_complete_au (γ0 γ1 : UartNames) (hrt : Nat) (hh : hrt < NCPU) (w 
   imod Hcl
   imodintro
   itrivial
-
 
 /-! ## The boot deposit (Rocq `uart_rx_tok_deposit`)
 

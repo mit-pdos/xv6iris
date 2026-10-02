@@ -53,8 +53,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-- **The configuration ties** (Rocq `fs_boot_supply`'s eleven pure
 conjuncts, deviation 2): the ambient `Icfg`/`Fscfg` fields ARE the era's
 image numbers and the boot chain's names. -/

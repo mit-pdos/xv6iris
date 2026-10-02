@@ -185,12 +185,9 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## §0.  Constants, the stack budget and the branch readings -/
-
 
 /-- `char path[MAXPATH]`: `s0 - 176` off the frame pointer (= the entry sp),
 slots 7..22 (Rocq `so_bufpath`). -/
@@ -234,15 +231,12 @@ theorem sys_open_K (a : Nat) (h : sysOpenSlots ≤ a) :
   rw [sysOpenSlots_eq] at h
   omega
 
-
 /-! ### The sign cluster: the two `bltz`s (+0x24 argstr, +0x70 fdalloc) -/
-
 
 /-- The descriptor fdalloc returns is signed-nonneg (Rocq `so_fd_range`). -/
 theorem sys_open_bltz_fd (fd : Nat) (h : fd < NOFILE) :
     bcond bop.BLT (BitVec.ofNat 64 fd) 0#64 = false :=
   Xv6.sysfile_bltz_nat fd (by unfold NOFILE at h; omega)
-
 
 /-! ### The sixteen-bit compare cluster: the three type tests
 
@@ -556,7 +550,6 @@ variable {lent : Bool}
 def sysOpenAny [CurCtx] (a : BitVec 64) (n : Nat) : IProp GF :=
   iprop(∃ bs : List (BitVec 8), ⌜bs.length = n⌝ ∗ byteBuf a (DFrac.own 1) bs)
 
-
 /-- sys_open's cells: the six upper slots (ra, s0, the three shrink-wrapped
 save slots, a dead one), slot 23 as its two words (the dead lower word and
 `int omode`), and the dead slot 24.  Rocq's `pa_stk sp0 1 .. 6, 23, 24`
@@ -656,7 +649,6 @@ theorem sys_open_fold [CurCtx] (sp0 : BitVec 64) (hal : (sysOpenPath sp0).toNat 
   ihave H6s : stackOwn (GF := GF) sp0 6 $$ [H1 H2 H3 H4 H5 H6]
   case' _ => stack_cells; iframe
   iapply stackOwn_join sp0 6 18 $$ [$H6s $H18]
-
 
 set_option maxHeartbeats 4000000 in
 /-- sys_open's prologue `+0x00 .. +0x06` at `pc`, at either `SIE` (Rocq's
@@ -813,7 +805,6 @@ theorem sysOpenPins_exit (k : KCtx) (R : RegMap)
     simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] <;> assumption
 
 /-! ### The ambient context, pinned at the kernel tier -/
-
 
 section Exit
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
@@ -1025,7 +1016,6 @@ def sysOpenRet (k : KCtx) (Φ : BitVec 64 → IProp GF) : IProp GF :=
     kctx c ((k.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k.regs 1#5)) -∗
     trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗ Φ (R' 10#5) -∗ wpLoop c)
 
-
 /-- ...and the same out of the block's core (after fdalloc split it off
 the descriptor array). -/
 theorem sysOpen_pid_core (hct : curTier = KTier.kpt) (pa : BitVec 64)
@@ -1182,7 +1172,6 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
-
 
 set_option maxHeartbeats 8000000 in
 /-- `argstr(0, path, MAXPATH)` at +0x1c (Rocq `Argstr.wp_argstr_sconf`):

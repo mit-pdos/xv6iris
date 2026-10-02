@@ -29,9 +29,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 theorem ba_ret_46 : jumpPc (KA.«balloc» + 0x46#64) = KA.«balloc» + 0x46#64 := by decide
 theorem ba_ret_4c : jumpPc (KA.«balloc» + 0x4c#64) = KA.«balloc» + 0x4c#64 := by decide

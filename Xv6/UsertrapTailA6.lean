@@ -31,8 +31,6 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedVariables false
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
 
 /-! ## Addresses and branch facts -/
@@ -44,7 +42,6 @@ theorem ut_a6_ret_ac : jumpPc (KA.«usertrap» + 0xac#64) = KA.«usertrap» + 0x
 theorem ut_fa_ret_106 : jumpPc (KA.«usertrap» + 0x106#64) = KA.«usertrap» + 0x106#64 := by decide
 
 theorem ut_bne_sext0 : bcond bop.BNE (BitVec.signExtend 64 (0#32)) 0#64 = false := by decide
-
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]

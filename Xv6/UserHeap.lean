@@ -85,8 +85,6 @@ theorem uRange_set_self (n j : Nat) : (List.range n).set j j = List.range n := b
   · rename_i h; subst h; split <;> simp_all
   · rfl
 
-set_option linter.unusedSectionVars false
-
 /-! ## §1 The two address classes -- the only place the permission map is read -/
 
 /-- The page of `a` is writable (Rocq `uw_addr`, as a Boolean test). -/
@@ -507,7 +505,6 @@ theorem usz_update (γs : GName) (sz sz' sz'' : Nat) :
     usz (GF := GF) γs sz ∗ usz γs sz' ⊢ |==> (usz γs sz'' ∗ usz γs sz'') := by
   unfold usz; iintro ⟨H1, H2⟩; iapply ghost_var_update_halves sz'' γs sz sz' $$ H1 H2
 
-
 /-! ### Range-indexed runs -/
 
 theorem uRange_succ (Φ : Nat → IProp GF) (n : Nat) :
@@ -782,7 +779,6 @@ theorem uheap_stop (γt γd γs : GName) (M : ElfMem) (pm : Nat → Option UPerm
   unfold uheap
   iintro ⟨%Mt, %Md, %Ms, %hok, -, -, -, -⟩
   ipureintro; exact hok.stop
-
 
 /-! ## §5 THE INSTRUCTION RESOURCE -/
 
@@ -1061,7 +1057,6 @@ theorem uinstrIs_rvc2 (γt : GName) (pc : BitVec 64) (h : BitVec 16) (i : instru
   isplitr; · ipureintro; exact hdec
   iexact Hbs
 
-
 /-! ## THE FREE STACK (deviation 4) -/
 
 /-- Rocq `ustack_body`: the `n` words BELOW sp, values existential. -/
@@ -1240,7 +1235,6 @@ theorem ustack_of_ubytes (γd : GName) (sp : BitVec 64) (n : Nat) (f : Nat → B
   isplitr
   · ipureintro; exact ⟨hal, hn⟩
   · iapply ustackBody_of_ubytes γd n sp f hn $$ H
-
 
 /-! ## §4b THE BREAK MOVES UP -- what `sbrk` hands the process -/
 

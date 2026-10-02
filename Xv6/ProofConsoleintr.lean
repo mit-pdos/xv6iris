@@ -33,9 +33,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 theorem ci_sw_ne' (c n : BitVec 8) (m : BitVec 64) (hm : BitVec.setWidth 64 n = m) (h : c ≠ n) :
     BitVec.setWidth 64 c ≠ m := hm ▸ ci_sw_ne c n h

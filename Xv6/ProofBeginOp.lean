@@ -71,9 +71,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## The constants the image computes
 
@@ -85,7 +83,6 @@ theorem bo_log : KA.«begin_op» + 0x1e888#64 = logAddr := by unfold logAddr; de
 theorem bo_lout : KA.«begin_op» + 0x1e8a4#64 = lOut := by unfold lOut logAddr; decide
 
 theorem bo_cmt_addr : logAddr + 32#64 = lCmt := rfl
-
 
 theorem bo_br_acq : KA.«begin_op» + 0xffffffffffffceb0#64 = KA.«acquire» := by decide
 theorem bo_br_rel : KA.«begin_op» + 0xffffffffffffcf38#64 = KA.«release» := by decide
@@ -102,7 +99,6 @@ theorem bo_ret_60 : jumpPc (KA.«begin_op» + 0x60#64) = KA.«begin_op» + 0x60#
 theorem bo_ret_64 : jumpPc (KA.«begin_op» + 0x64#64) = KA.«begin_op» + 0x64#64 := by decide
 theorem bo_ret_6a : jumpPc (KA.«begin_op» + 0x6a#64) = KA.«begin_op» + 0x6a#64 := by decide
 theorem bo_ret_80 : jumpPc (KA.«begin_op» + 0x80#64) = KA.«begin_op» + 0x80#64 := by decide
-
 
 /-! ## The context and the register pins -/
 
@@ -165,7 +161,6 @@ theorem boK_fold (k : KCtx) (a b : Bool) (hK : 4 ≤ k.avail) :
 
 `out ≤ 3` and `n ≤ LOGBLOCKS` keep every intermediate tiny; the bridges
 are in `Xv6/LogLedger.lean`. -/
-
 
 /-- `addiw a4,a4,1` at `+0x40`. -/
 theorem bo_step1 (out : Nat) (h : out ≤ 3) :
@@ -249,7 +244,6 @@ theorem boRegs_cs (k : KCtx) (R R' : RegMap) (h : boRegs k R) (hcs : calleeSaved
 
 theorem boRegs_ws (k : KCtx) (R : RegMap) (a b : Bool) :
     boRegs (k.withSpie a b) R = boRegs k R := rfl
-
 
 /-- The scratch registers the loop writes (`a3`, `a4`, `a5`, and the `a0`
 and `ra` of a call) are none of the pinned ones. -/
@@ -731,7 +725,6 @@ theorem bo_sl (SL : SLEEP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
   unfold wp_sleep_eb_body at h
   simp only [sleepAddr] at h
   exact h
-
 
 /-! ## The park: `sleep_prepare`, `release`, `sleep`, `acquire`
 

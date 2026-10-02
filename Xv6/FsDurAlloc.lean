@@ -48,8 +48,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Iris.Std.PartialMap
 open FsStateLink
 
-set_option linter.unusedSectionVars false
-
 /-! ## 3.  The block ledger, and the cut -/
 
 section Ledger

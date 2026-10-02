@@ -540,16 +540,16 @@ theorem viewFaulted_trans {P P' P'' : UPtd} (M : Nat → List (BitVec 8))
   | some w =>
     have h1 := hsub k w h0
     have h2 := hsub' k w h1
-    simp [h0, h1, h2]
+    simp [h1, h2]
   | none =>
     cases h1 : Iris.Std.PartialMap.get? P'.um k with
     | some w =>
       have h2 := hsub' k w h1
-      simp [h0, h1, h2]
+      simp [h2]
     | none =>
       cases h2 : Iris.Std.PartialMap.get? P''.um k with
-      | some w => simp [h0, h1, h2]
-      | none => simp [h0, h1, h2]
+      | some w => simp []
+      | none => simp []
 
 
 theorem ext_insertLeaf (P : UPtd) (vpn : Nat) (r perm : BitVec 64)

@@ -42,8 +42,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-! ## The history's line list moves (pure) -/
 
 /-- Rocq `echof_lines_of_io`. -/

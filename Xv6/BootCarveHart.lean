@@ -72,8 +72,6 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedSectionVars false
-
 /-! ## Geometry -/
 
 /-- The GOT slot `_entry` loads `&stack0` from, as a number. -/

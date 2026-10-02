@@ -36,9 +36,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
@@ -143,7 +141,6 @@ theorem namexEra_consts (MM : MEMMOVE) (IL : ILOCK) (IUP : IUNLOCKPUT) (IU : IUN
     have := namex_wi_need _ _ hbud h
     simpa using this
 
-
 set_option maxHeartbeats 16000000 in
 /-- **THE ABSOLUTE ARM `+0x48 .. +0x52`**: `iget(ROOTDEV, ROOTINO)` under the
 root licence, `s4 := ip`, and the constants. -/
@@ -230,7 +227,6 @@ theorem namexEra_abs (MM : MEMMOVE) (IL : ILOCK) (IUP : IUNLOCKPUT) (IU : IUNLOC
       hr' hbud)
     $$ [$Hk $Hpc $Hframe $Hte $Hce $Hwalk $Hnext]
   unfold namexEnv; iframe #
-
 
 set_option maxHeartbeats 16000000 in
 /-- **THE RELATIVE ARM `+0x2e .. +0x3a`**: `idup(myproc()->cwd)` -- the cwd
@@ -339,7 +335,6 @@ theorem namexEra_rel (MM : MEMMOVE) (IL : ILOCK) (IUP : IUNLOCKPUT) (IU : IUNLOC
       hr' hbud)
     $$ [$Hk $Hpc $Hframe $Hte $Hce $Hwalk $Hnext]
   unfold namexEnv; iframe #
-
 
 set_option maxHeartbeats 16000000 in
 /-- **`+0x1c .. +0x2a`: THE ARGUMENTS AND THE ARM SPLIT** -- `s1 = path`,

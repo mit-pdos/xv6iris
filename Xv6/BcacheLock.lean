@@ -12,8 +12,6 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedSectionVars false
-
 theorem bc_filter_bcache (l : List String) (h : "bcache" ∉ l) :
     ("bcache" :: l).filter (fun x => x ≠ "bcache") = l := by
   rw [List.filter_cons_of_neg (by simp)]

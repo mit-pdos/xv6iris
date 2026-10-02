@@ -71,8 +71,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-! ## §1 Runs of zero cells -/
 
 section

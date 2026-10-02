@@ -146,8 +146,8 @@ theorem push_off_tail {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Cur
     obtain ⟨w1, w2, w3, w4, w5⟩ := hwf
     unfold KCtx.wf
     simp only [KCtx.withCpu_sie, KCtx.withCpu_noff, KCtx.withCpu_intena, KCtx.withCpu_locks, KCtx.withCpu_tier,
-      KCtx.withRegs_sie, KCtx.withRegs_noff, KCtx.withRegs_intena, KCtx.withRegs_locks, KCtx.withRegs_tier,
-      KCtx.pushed_sie, KCtx.pushed_noff, KCtx.pushed_intena, KCtx.pushed_locks, KCtx.pushed_tier]
+      KCtx.withRegs_sie, KCtx.withRegs_noff, KCtx.withRegs_locks, KCtx.withRegs_tier,
+      KCtx.pushed_sie, KCtx.pushed_noff, KCtx.pushed_locks, KCtx.pushed_tier]
     refine ⟨fun h => absurd h (by omega), fun _ => hsie, fun h => absurd h (by rw [hsie]; decide), by omega, hnoff⟩
   iintro Hk Hpc
   -- epilogue
@@ -165,7 +165,7 @@ theorem push_off_tail {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Cur
     csRegs_set (csRegs_trans (csRegs_set hcs 1#5 _ (by decide)) (csRegs_of_calleeSaved hcs2)) 15#5 _ (by decide)
   obtain ⟨h18, h19, h20, h21, h22, h23, h24, h25, h26, h27⟩ := hc
   unfold calleeSaved
-  simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, eq_self_iff_true, _root_.true_and, _root_.and_true]
+  simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, _root_.true_and]
   exact ⟨h18, h19, h20, h21, h22, h23, h24, h25, h26, h27⟩
   case hR2 => k_norm; rw [hcs2.1]; simp [RegMap.set_apply, hsp]
 

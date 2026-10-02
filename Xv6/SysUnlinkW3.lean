@@ -51,9 +51,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 theorem sys_unlink_li32_16 : BitVec.signExtend 64 16#12 = 16#64 := by decide
 theorem sys_unlink_del_addr (x : BitVec 64) :
@@ -305,7 +303,6 @@ theorem sys_unlink_w4_loop (RD : READI) (PA : PANIC) (Γ : SchedNames) [ClaimIs 
       · have : dirNrec dni.diSize.toNat ≤ jj + 1 := dirlookup_nrec_le _ jj (by omega)
         exact hdead j hj2 (by omega)
 
-
 /-! ## The seam at +0x8a (into W5) -/
 
 /-- A LOCKED entry at an explicit write-arm descriptor, minus its `dev`
@@ -511,7 +508,6 @@ theorem sys_unlink_w3_e (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
       $Hop $Harms]
   unfold sysfileEnv; iframe #
 
-
 /-! ## W4's entry (+0xf8 .. +0x104), after the T_DIR test took the branch -/
 
 set_option maxHeartbeats 32000000 in
@@ -697,7 +693,6 @@ theorem sys_unlink_w3_dir (RD : READI) (PA : PANIC) (IUP : IUNLOCKPUT) (EO : END
     Hlki Hrest Hres HP Hop Hcm
   iframe #
 
-
 /-! ## W3: +0x72 .. +0x86 -/
 
 theorem sys_unlink_li1 : BitVec.signExtend 64 1#12 = 1#64 := by decide
@@ -848,7 +843,6 @@ theorem sys_unlink_w3 (IL : ILOCK) (RD : READI) (PA : PANIC) (IUP : IUNLOCKPUT) 
   refine ⟨hpA, htln, hname, hn, hkd, hnib, hpos, hle, hty, hnd, hndd, hfn, hks, hlei, hnli, ?_⟩
   show dni.diType.toNat ≠ T_DIR_z
   exact fun h => hdir (sys_unlink_tdir_z _ h)
-
 
 end
 

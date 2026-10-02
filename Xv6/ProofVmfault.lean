@@ -30,7 +30,6 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
@@ -724,7 +723,6 @@ theorem vmfault_proof (IM : ISMAPPED) (KAL : KALLOC) (KF : KFREE) (MS : MEMSET)
           | exact True.intro
           | (rw [hrest _ (by decide) (by decide) (by decide) (by decide) (by decide)] <;>
              simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false])⟩
-
 
 end
 

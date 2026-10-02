@@ -94,13 +94,10 @@ import Xv6.BufDefs
 import Xv6.SleepLockDefs
 import MachCSL.CtxBox
 
-
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
-
-set_option linter.unusedSectionVars false
 
 /-! ## Geometry -/
 
@@ -430,7 +427,7 @@ theorem bcacheLru_splice (ξ : CtxId) (h : BitVec 64) (l : List (BitVec 64)) :
     iframe Hhn Hbp
     iintro %a Hhn Hbp Han Hap
     rw [bsegAt_cons ξ h h a (b :: t), bsegAt_cons ξ h a b t]
-    simp only [bhd_cons, blast_cons]
+    simp only [bhd_cons]
     iframe Hhn Hhp Hap Han Hbp Hbn Hseg
 
 /-- **THE UNLINK**, the splice's inverse:
@@ -1418,7 +1415,7 @@ theorem bc_refcnt_nonzero (n : Nat) (hn : n ≠ 0) (hlt : n < 2 ^ 31) :
   have h32 : BitVec.ofNat 32 n = 0#32 := by
     revert e; generalize BitVec.ofNat 32 n = x; intro e; bv_decide
   have h := congrArg BitVec.toNat h32
-  simp only [BitVec.toNat_ofNat, BitVec.toNat_zero] at h
+  simp only [BitVec.toNat_ofNat] at h
   omega
 
 /-- `bnez a5` after the decrement: taken exactly when a reference remains. -/

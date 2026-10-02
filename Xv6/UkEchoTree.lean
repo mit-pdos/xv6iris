@@ -55,8 +55,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
-
 /-! ## §0 the two literal bytes, where echo's `.rodata` has them -/
 
 /-- **Rocq `echo_sep_ro`** (deviation 1). -/

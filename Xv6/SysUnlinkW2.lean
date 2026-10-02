@@ -47,9 +47,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
@@ -364,7 +362,6 @@ theorem sys_unlink_w2_look (DL : DIRLOOKUP) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ
       refine ⟨hp2, ?_, htln, hname, hn, hkd, hnib, hpos, hle, hty, hnd, hndd, hfn, hks⟩
       simp only [RegMap.set_apply, BitVec.reduceEq, ite_true]; exact h10
     · ipureintro; exact ⟨hok, hrl, hdok, hddix, hdoc, hduq⟩
-
 
 /-! ## +0x30 .. +0x58: ilock(dp) and the two name refusals -/
 

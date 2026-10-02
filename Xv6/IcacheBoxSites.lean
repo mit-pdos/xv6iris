@@ -128,8 +128,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-! ## THE SITES (R3's map), as statements over CtxBox's transitions -/
 
 section IcacheBoxSites

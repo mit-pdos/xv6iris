@@ -49,7 +49,6 @@ import Xv6.SysUnlinkParts
 import Xv6.SysUnlinkFrame
 import Xv6.SysUnlinkCalls
 
-
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -57,9 +56,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## Context bookkeeping -/
 

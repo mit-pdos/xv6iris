@@ -38,8 +38,6 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode MachCSL
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
-
 section PinnedExecBundle
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [FsTopG GF] [FsBytesG GF]
   [Appcfg GF] [Icfg] [CtokG GF]

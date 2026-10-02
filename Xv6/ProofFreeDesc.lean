@@ -34,9 +34,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## Addresses and constants -/
 
@@ -51,14 +49,12 @@ theorem fd_free0_addr : KA.«free_desc» + 0x1df82#64 = aFree 0 := by
   unfold aFree diskAddr dOffFree
   decide
 
-
 theorem fd_br_wakeup : KA.«free_desc» + 0xffffffffffffc87a#64 = KA.«wakeup» := by decide
 
 /-- The context comes back from `wakeup` with `SPIE`/`SPP` unchanged. -/
 theorem fd_withSpie (k : KCtx) (m : Nat) : (k.pushed m).withSpie k.spie k.spp = k.pushed m := rfl
 
 theorem fd_ret_56 : jumpPc (KA.«free_desc» + 0x56#64) = KA.«free_desc» + 0x56#64 := by decide
-
 
 /-- `i << 4` is `16 i`. -/
 theorem fd_shl4 (i : Nat) (h : i < NUM) :
@@ -86,7 +82,6 @@ theorem fd_blt_false (i : Nat) (h : i < NUM) :
   unfold NUM at h
   have : i = 0 ∨ i = 1 ∨ i = 2 ∨ i = 3 ∨ i = 4 ∨ i = 5 ∨ i = 6 ∨ i = 7 := by omega
   rcases this with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide
-
 
 /-! ## The stored zeroes -/
 

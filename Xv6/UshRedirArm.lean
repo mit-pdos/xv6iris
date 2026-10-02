@@ -36,8 +36,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
-
 /-- A 32-bit field below 2³¹, sign-extended, is its value. -/
 theorem ush_sext32_small (v : Int) (h0 : 0 ≤ v) (h1 : v < 2 ^ 31) :
     BitVec.signExtend 64 (BitVec.ofInt 32 v) = BitVec.ofInt 64 v := by

@@ -27,7 +27,7 @@ theorem writeN_one (u : UartState) (off : Nat) (b : BitVec 8) :
   simp only [true_or, if_true]
   congr 1
   apply BitVec.eq_of_toNat_eq
-  simp [BitVec.extractLsb'_toNat]
+  simp []
 
 /-! ## The reads -/
 

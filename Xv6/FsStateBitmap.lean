@@ -70,8 +70,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-! ## A position of `List.range` is its own value
 
 Rocq's `seqZ_lookup_nat`, at `Nat` (deviation 1). -/

@@ -20,7 +20,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode MachCSL
 
-set_option linter.unusedSectionVars false
 set_option synthInstance.maxSize 1024
 
 /-- THE WINDOW COMPLETES A WILD LINE (Rocq `rd_wild`). -/

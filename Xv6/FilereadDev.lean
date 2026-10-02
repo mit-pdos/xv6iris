@@ -36,9 +36,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 theorem frd_devsw_cell' (w : BitVec 16) (h : w.toNat ≤ NDEV_max) :
     (BitVec.signExtend 64 w <<< 4) + KA.«devsw» = aDevswRead w.toNat := by

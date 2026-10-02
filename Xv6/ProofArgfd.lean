@@ -31,9 +31,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## Constants and arithmetic -/
 
@@ -46,7 +44,6 @@ theorem af_fd_addr (x : BitVec 64) : x + BitVec.signExtend 64 4060#12 = x + 0xFF
 theorem af_dc (x : BitVec 64) : x + 0xFFFFFFFFFFFFFFD8#64 + 4#64 = x + 0xFFFFFFFFFFFFFFDC#64 := by
   bv_decide
 theorem af_beq_z (x : BitVec 64) (h : x = 0#64) : bcond bop.BEQ x 0#64 = true := by subst h; decide
-
 
 /-- In range: the unsigned compare against 15 falls through. -/
 theorem af_bltu_in (w : BitVec 32) (h0 : 0 ≤ w.toInt) (h16 : w.toInt < 16) :
@@ -218,7 +215,6 @@ theorem af_ofile_addr' (pa : BitVec 64) (fd : Nat) (h : fd < 16) :
   apply BitVec.eq_of_toNat_eq
   simp only [BitVec.toNat_add, BitVec.toNat_shiftLeft, BitVec.toNat_ofNat, Nat.reducePow, Nat.shiftLeft_eq]
   omega
-
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [BcacheG GF] [DiskG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]

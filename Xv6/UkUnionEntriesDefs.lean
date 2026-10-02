@@ -78,8 +78,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Std (ExtTreeSet)
 open HfpFileClaimsP
 
-set_option linter.unusedSectionVars false
-
 /-! ## §0 small facts -/
 
 /-- `imageEntry`, used at one call (its `□ ∀` opened). -/

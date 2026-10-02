@@ -135,7 +135,7 @@ theorem wlToksAt_bounds (r : List (List (BitVec 8))) :
       | cons w' r' =>
         have hb := ih _ tk h
         rw [wlTail_cons]
-        simp only [List.length_cons, List.length_append]
+        simp only [List.length_cons]
         omega
 
 /-- Rocq `pipe_bytes_lo_fs`. -/

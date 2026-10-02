@@ -64,8 +64,6 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Std MachCSL
 open Iris.Std Iris.Std.PartialMap
 
-set_option linter.unusedSectionVars false
-
 /-! ## §0 How wide the totally-tracked window is -/
 
 /-- **Rocq `NSTD`**: how many descriptors at the bottom of the table are
@@ -260,7 +258,6 @@ theorem ufdMapHi_sub {fdv : List FdState} {D : RegMapF FdState} (hsub : D ⊆ uf
   rcases hm.2 with h | h
   · omega
   · simp [FdState.isClosed_eq_false.2 h]
-
 
 /-! ## §1½ The whole table's view (seccomp S3 ruling G2) -/
 

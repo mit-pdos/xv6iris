@@ -31,8 +31,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
-
 /-! ## §0 Pure helpers -/
 
 /-- `addi a4,a5,-d ; beqz a4` on a zero-extended byte, `d < 256`. -/

@@ -113,8 +113,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-! ## Two total-lookup bridges
 
 Rocq gets these from stdpp (`lookup_total_replicate_2`,

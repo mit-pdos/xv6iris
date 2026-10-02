@@ -32,7 +32,6 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 
 -- `confCellsHS` and its `confhs_cases`/`confhs_intro` live in `MachCSL.WpTick`.
 
-set_option linter.unusedVariables false in
 /-- The clock tick at an arbitrary hart state (`swp_tick_clock_cells` at
 `confCellsHS`): the tick does not look at `hart_state`. -/
 theorem swp_tick_clock_cellsHS (cpu : CPU) (dq : DFrac) (p : Privilege)

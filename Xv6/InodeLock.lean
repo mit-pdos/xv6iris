@@ -57,8 +57,6 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedSectionVars false
-
 /-! ## What a well-formed in-memory inode is
 
 Exactly the pure facts `readi`, `writei` and `iupdate` consume, plus the

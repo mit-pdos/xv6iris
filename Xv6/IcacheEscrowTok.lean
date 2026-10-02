@@ -185,8 +185,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-! ## 0.  Timeless instances the arms are built out of
 
 Every opener of the escrow is inside a store's or a load's atomic update,
@@ -671,7 +669,6 @@ def ipoolOrd [Icfg] (γfs : FsNames) (γi : GName) (cov : ExtTreeSet Nat compare
 kept so the row's signature matches `ipoolOrd`'s (the pool partition
 applies the two uniformly; brief §5 item (c), unverified, so the Rocq form
 stays). -/
-set_option linter.unusedVariables false in
 /-- ...and the IN-TRANSITION row: the same two ledger halves beside the
 pending or the await arm.  NOT Timeless (`escAInv` is an `inv`), which is
 the whole reason for the split.  The pending arm's token is in its escrow

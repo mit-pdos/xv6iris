@@ -116,8 +116,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Iris.Algebra MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-! ## 0.  The slot key at the inum (`iregSlotKey` is `InodeRegionInv` §0b) -/
 
 /-- The slot accessor's key, re-read at the inum (Rocq's

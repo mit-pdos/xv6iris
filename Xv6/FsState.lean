@@ -91,8 +91,6 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Iris.Algebra
 
-set_option linter.unusedSectionVars false
-
 /-! ## 1.  The abstract state -/
 
 /-- Rocq's `fs_state_rec` (`MkFsS`). -/

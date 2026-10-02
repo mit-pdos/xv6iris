@@ -39,8 +39,6 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedSectionVars false
-
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
 /-! ## `kinit()` -/
@@ -82,7 +80,7 @@ theorem mn_kinit (KI : KINIT) [CurCtx] (cpu : CPU) (k : KCtx) (R0 : RegMap) (hsi
   simp only [KCtx.withRegs_sie, KCtx.withRegs_proc, hsie]
   iapply wpNext_off_intro
   iintro %spie %spp %R' %hsp Hk Hpc #Hlk Hav _ %_
-  obtain ⟨rfl, rfl⟩ := hsp (by simp [hsie])
+  obtain ⟨rfl, rfl⟩ := hsp (by simp [])
   rw [KCtx.withSpie_self' _ _ _ rfl rfl]
   simp only [KCtx.withRegs_withRegs, KCtx.withRegs_regs, RegMap.set_apply, if_pos, mn_ret_72]
   iapply HΦ $$ %R' Hk Hpc Hlk Hav
@@ -128,7 +126,7 @@ theorem mn_kvminit (KV : KVMINIT) [CurCtx] (cpu : CPU) (k : KCtx) (R0 : RegMap) 
   simp only [KCtx.withRegs_sie, KCtx.withRegs_proc, hsie]
   iapply wpNext_off_intro
   iintro %spie %spp %R' %t %pas %hsp Hk Hpc Htree Hstk Hav Hroot %⟨_, hok⟩
-  obtain ⟨rfl, rfl⟩ := hsp (by simp [hsie])
+  obtain ⟨rfl, rfl⟩ := hsp (by simp [])
   rw [KCtx.withSpie_self' _ _ _ rfl rfl]
   simp only [KCtx.withRegs_withRegs, KCtx.withRegs_regs, RegMap.set_apply, if_pos, mn_ret_76]
   iapply HΦ $$ %R' %t %pas %hok Hk Hpc Htree Hstk Hav Hroot

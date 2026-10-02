@@ -37,8 +37,6 @@ namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-- Two lower bounds on one mono-list, the shorter inside the longer (Rocq
 `cr_pfx_le`). -/
 theorem crPfxLe (l1 l2 : List (List Obs × BitVec 8)) (h : l1 <+: l2 ∨ l2 <+: l1)
@@ -728,7 +726,6 @@ theorem crPopSwallow (cn : ConsNames) (Wd : IProp GF) (γc : GName) [CurCtx]
     iright; iexact Hdt
 
 end
-
 
 /-! ## The run's image and ledger (Rocq `cr_runR` / `cr_glue` / `cr_tagged_glue`) -/
 

@@ -82,8 +82,6 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
 open Iris.Algebra
 
-set_option linter.unusedSectionVars false
-
 /-! ## The pool's element algebra (pure) -/
 
 /-- The liveness pool's value at one slot: a fraction and the agreed

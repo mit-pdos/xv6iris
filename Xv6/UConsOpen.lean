@@ -52,8 +52,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-! ## 1.  /init's omode word, read the way the rows read it -/
 
 /-- **Rocq `init_cons_om2_arg`**. -/

@@ -16,8 +16,6 @@ open Iris Std MachCSL
 open Iris.Std.PartialMap Iris.Std.FiniteMap
 open Sail LeanRV64D LeanRV64D.Functions
 
-set_option linter.unusedSectionVars false
-
 /-! ## §1 Small facts -/
 
 theorem ukf_lo_byte (w : BitVec 32) (j : Nat) (hj : j < 2) :

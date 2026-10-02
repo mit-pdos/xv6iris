@@ -33,8 +33,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-- The echo step's pure argument (Rocq's inline asserts of `gcl_step_echo`):
 the block in progress is WHOLE, and the claim's pure part moves to the stage
 with the echoed entry appended. -/

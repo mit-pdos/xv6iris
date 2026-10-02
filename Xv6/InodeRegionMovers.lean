@@ -100,8 +100,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Iris.Algebra MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-! ## 0.  Pure helper (Rocq's inline `list_insert_id` step; the rest is
 `InodeRegionInv` §0b) -/
 

@@ -36,8 +36,6 @@ namespace Xv6
 
 open Iris Iris.Std MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-! ## 11a.  A record sits at its slot, purely -/
 
 /-- `diblkBytes` SPLIT at one slot -- the shape `recInBlk` is stated in

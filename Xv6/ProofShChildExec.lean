@@ -28,8 +28,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
-
 /-- parsecmd's room at an EXEC node. -/
 theorem ushRoom_exec (toks : List (Nat × Nat)) : ushRoom (.exec toks) = 60 := rfl
 

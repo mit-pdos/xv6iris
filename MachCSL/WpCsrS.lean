@@ -44,7 +44,7 @@ theorem lift_sstatus_mpp (o s : BitVec 64) :
     _update_Mstatus_UXL, _update_Mstatus_SD, _get_Sstatus_SIE, _get_Sstatus_SPIE, _get_Sstatus_SPP,
     _get_Sstatus_VS, _get_Sstatus_FS, _get_Sstatus_XS, _get_Sstatus_SUM, _get_Sstatus_MXR, _get_Sstatus_SPELP,
     _get_Sstatus_UXL, Sail.BitVec.updateSubrange, Sail.BitVec.updateSubrange', Sail.BitVec.extractLsb,
-    BitVec.extractLsb, Sail.BitVec.length]
+    BitVec.extractLsb]
   bv_decide
 
 /-- `legalize_mstatus o L` on this platform (S and U present, no Zicfilp,
@@ -497,9 +497,8 @@ theorem sstatus_clear_sie_id' (o : BitVec 64)
     _update_Sstatus_SIE, _update_Sstatus_SPIE, _update_Sstatus_SPP, _update_Sstatus_VS, _update_Sstatus_FS,
     _update_Sstatus_XS, _update_Sstatus_SUM, _update_Sstatus_MXR, _update_Sstatus_SPELP, _update_Sstatus_UXL,
     _update_Sstatus_SD, _get_Sstatus_SIE, _get_Sstatus_SPIE, _get_Sstatus_SPP, _get_Sstatus_VS, _get_Sstatus_FS,
-    _get_Sstatus_XS, _get_Sstatus_SUM, _get_Sstatus_MXR, _get_Sstatus_SPELP, _get_Sstatus_UXL, _get_Sstatus_SD,
-    Sail.BitVec.updateSubrange, Sail.BitVec.updateSubrange', Sail.BitVec.extractLsb, BitVec.extractLsb,
-    Sail.BitVec.length]
+    _get_Sstatus_XS, _get_Sstatus_SUM, _get_Sstatus_MXR, _get_Sstatus_SPELP, _get_Sstatus_UXL, 
+    Sail.BitVec.updateSubrange, Sail.BitVec.updateSubrange', Sail.BitVec.extractLsb, BitVec.extractLsb]
   bv_decide
 
 /-- Clearing `SIE` in `sstatus` (the supervisor view of an `mstatus` as
@@ -525,9 +524,8 @@ theorem sstatus_clear_sie' (o : BitVec 64)
     _update_Sstatus_SIE, _update_Sstatus_SPIE, _update_Sstatus_SPP, _update_Sstatus_VS, _update_Sstatus_FS,
     _update_Sstatus_XS, _update_Sstatus_SUM, _update_Sstatus_MXR, _update_Sstatus_SPELP, _update_Sstatus_UXL,
     _update_Sstatus_SD, _get_Sstatus_SIE, _get_Sstatus_SPIE, _get_Sstatus_SPP, _get_Sstatus_VS, _get_Sstatus_FS,
-    _get_Sstatus_XS, _get_Sstatus_SUM, _get_Sstatus_MXR, _get_Sstatus_SPELP, _get_Sstatus_UXL, _get_Sstatus_SD,
-    Sail.BitVec.updateSubrange, Sail.BitVec.updateSubrange', Sail.BitVec.extractLsb, BitVec.extractLsb,
-    Sail.BitVec.length]
+    _get_Sstatus_XS, _get_Sstatus_SUM, _get_Sstatus_MXR, _get_Sstatus_SPELP, _get_Sstatus_UXL, 
+    Sail.BitVec.updateSubrange, Sail.BitVec.updateSubrange', Sail.BitVec.extractLsb, BitVec.extractLsb]
   bv_decide
 
 /-- Setting `SIE` in `sstatus` sets exactly that bit of `mstatus`. -/
@@ -552,9 +550,8 @@ theorem sstatus_set_sie' (o : BitVec 64)
     _update_Sstatus_SIE, _update_Sstatus_SPIE, _update_Sstatus_SPP, _update_Sstatus_VS, _update_Sstatus_FS,
     _update_Sstatus_XS, _update_Sstatus_SUM, _update_Sstatus_MXR, _update_Sstatus_SPELP, _update_Sstatus_UXL,
     _update_Sstatus_SD, _get_Sstatus_SIE, _get_Sstatus_SPIE, _get_Sstatus_SPP, _get_Sstatus_VS, _get_Sstatus_FS,
-    _get_Sstatus_XS, _get_Sstatus_SUM, _get_Sstatus_MXR, _get_Sstatus_SPELP, _get_Sstatus_UXL, _get_Sstatus_SD,
-    Sail.BitVec.updateSubrange, Sail.BitVec.updateSubrange', Sail.BitVec.extractLsb, BitVec.extractLsb,
-    Sail.BitVec.length]
+    _get_Sstatus_XS, _get_Sstatus_SUM, _get_Sstatus_MXR, _get_Sstatus_SPELP, _get_Sstatus_UXL, 
+    Sail.BitVec.updateSubrange, Sail.BitVec.updateSubrange', Sail.BitVec.extractLsb, BitVec.extractLsb]
   bv_decide
 
 

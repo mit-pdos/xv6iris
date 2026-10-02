@@ -217,8 +217,7 @@ theorem strlen_proof : STRLEN := ⟨fun {hlc GF} _ _ cpu k s dq hK hn31 => by
     ipureintro
     constructor
     · unfold calleeSaved
-      simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, eq_self_iff_true, _root_.true_and,
-        _root_.and_true]
+      simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, _root_.true_and]
       exact ⟨hcs 9#5 (by decide) (by decide) (by decide) (by decide) (by decide) (by decide),
         hcs 18#5 (by decide) (by decide) (by decide) (by decide) (by decide) (by decide),
         hcs 19#5 (by decide) (by decide) (by decide) (by decide) (by decide) (by decide),
@@ -230,7 +229,7 @@ theorem strlen_proof : STRLEN := ⟨fun {hlc GF} _ _ cpu k s dq hK hn31 => by
         hcs 25#5 (by decide) (by decide) (by decide) (by decide) (by decide) (by decide),
         hcs 26#5 (by decide) (by decide) (by decide) (by decide) (by decide) (by decide),
         hcs 27#5 (by decide) (by decide) (by decide) (by decide) (by decide) (by decide)⟩
-    · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
+    · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]
       exact h10
   by_cases hn0 : s.length = 0
   · -- the empty string: a0 := 0, jump to the epilogue
@@ -251,7 +250,7 @@ theorem strlen_proof : STRLEN := ⟨fun {hlc GF} _ _ cpu k s dq hK hn31 => by
     iframe
     case hR2 => simp [RegMap.set_apply]
     case hcs => intro r h10 h2 h8 _ _ h15; simp [RegMap.set_apply, h10, h2, h8, h15]
-    case h10 => simp [RegMap.set_apply, hn0]
+    case h10 => simp [hn0]
   · -- a nonempty string: into the loop
     have hb0ne' : b0 ≠ 0#8 := hb0ne (by omega)
     simp only [hb0ne', ite_false]
@@ -262,18 +261,18 @@ theorem strlen_proof : STRLEN := ⟨fun {hlc GF} _ _ cpu k s dq hK hn31 => by
       (s.length - 1) 1 (by omega) (by omega) rfl _ ?h15 c4) $$ [- $Hk $Hpc]
     rotate_right 1
     iframe
-    case h15 => simp [RegMap.set_apply]
+    case h15 => simp []
     k_norm_g
     iapply wpNext_intro_pin
     iintro %c5 %hp5 %R' Hk Hpc Hbuf %⟨h13, hother⟩
     have h10 : R' 10#5 = k.regs 10#5 := by
-      rw [hother 10#5 (by decide) (by decide) (by decide)]; simp [RegMap.set_apply]
+      rw [hother 10#5 (by decide) (by decide) (by decide)]; simp []
     -- subw a0,a3,a0
     k_step_gen (wp_s_subw c5 _ (KA.«strlen» + 0x1c#64) false 10#5 13#5 10#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [h13, h10, subw_len (k.regs 10#5) s.length hn31] next c6 hp6
     iintro Hk Hpc
     have hR2 : R' 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFF0#64 := by
-      rw [hother 2#5 (by decide) (by decide) (by decide)]; simp [RegMap.set_apply]
+      rw [hother 2#5 (by decide) (by decide) (by decide)]; simp []
     iapply (hexit c6 (fun h => (hp6 h).trans ((hp5 h).trans ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h)))))) _
       ?hR2 ?hcs ?h10) $$ [- $Hk $Hpc]
     rotate_right 1
@@ -284,7 +283,7 @@ theorem strlen_proof : STRLEN := ⟨fun {hlc GF} _ _ cpu k s dq hK hn31 => by
       intro r h10' h2' h8' h13' h14' h15'
       simp only [RegMap.set_apply, h10', ite_false]
       rw [hother r h13' h14' h15']
-      simp [RegMap.set_apply, h10', h2', h8', h15']
-    case h10 => simp [RegMap.set_apply, h13, h10, subw_len (k.regs 10#5) s.length hn31]⟩
+      simp [h2', h8', h15']
+    case h10 => simp []⟩
 
 end Xv6

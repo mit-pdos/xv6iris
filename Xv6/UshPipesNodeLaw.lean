@@ -54,8 +54,6 @@ open Std (ExtTreeSet)
 open Wid RdOut WrOut
 open UShPipesDefs UShPipesStage UShPipeLeaves UShPipeCall
 
-set_option linter.unusedSectionVars false
-
 /-- **Rocq's second section hypotheses** (deviation 1): the stages as the
 parse cut them and sh's ledger at the top node. -/
 structure LawOk {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [IcacheG GF]

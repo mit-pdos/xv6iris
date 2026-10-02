@@ -28,8 +28,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-- THE WRITE AT A BLOCK'S FIRST BYTE, pure (the stage half of Rocq
 `gcl_step_write_blk`). -/
 theorem gclPure_write_blk (M : LModel) (K : LmHooks M) (B : LmByteLaws M) (sd : M.lmSt) (k : Nat)

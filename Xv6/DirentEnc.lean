@@ -281,7 +281,6 @@ theorem dirblkBytes_set_same (ds : List Dirent) (k : Nat) (d : Dirent) (j : Nat)
     (by rw [List.length_set]; exact hk) hj]
   rw [getElem!_pos (ds.set k d) k (by rw [List.length_set]; exact hk), List.getElem_set_self]
 
-set_option linter.unusedVariables false in
 /-- Rocq `dirblk_bytes_insert_other`.  `hk` is Rocq's hypothesis and is kept
 for statement fidelity even though the Lean proof (via `List.length_set`)
 does not need it. -/
@@ -929,6 +928,5 @@ theorem bname_of_buf (f : Nat → BitVec 8) (e : List (BitVec 8)) (hlen : e.leng
     exact (getElem?_eq_some_getElem! e j hj).symm
   · rw [List.getElem?_eq_none_iff.mpr (by rw [bview_length]; omega),
       List.getElem?_eq_none_iff.mpr (by omega)]
-
 
 end Xv6

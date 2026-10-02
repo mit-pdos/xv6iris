@@ -24,8 +24,6 @@ open LeanRV64D LeanRV64D.Functions
 open Iris.Std Iris.Std.PartialMap Iris.Std.LawfulPartialMap
 open Xv6
 
-set_option linter.unusedSectionVars false
-
 /-! ## `PGROUNDUP` -/
 
 theorem and_mask12 (a : BitVec 64) : a &&& 0xFFFFFFFFFFFFF000#64 = (a >>> 12) <<< 12 := by
@@ -42,7 +40,6 @@ theorem pgRoundUp_bv (x : BitVec 64) (h : x.toNat + 4095 < 2 ^ 64) :
   simp only [BitVec.toNat_shiftLeft, BitVec.toNat_ushiftRight, hadd,
     Nat.shiftRight_eq_div_pow, BitVec.toNat_ofNat, Nat.reducePow, pgRoundUpN,
     Nat.shiftLeft_eq]
-
 
 theorem pgRoundUpN_le {m n : Nat} (h : m ≤ n) : pgRoundUpN m ≤ pgRoundUpN n := by
   unfold pgRoundUpN
@@ -114,14 +111,12 @@ theorem sextw_small (x : BitVec 64) (h : x.toNat < 2 ^ 31) :
 
 /-! ## The run `uvmdealloc` removes -/
 
-
 /-- The page number of an aligned size below `MAXVA`. -/
 theorem vpnOf_ofNat (m : Nat) (h : m < 2 ^ 38) :
     (vpnOf (BitVec.ofNat 64 m)).toNat = m / 4096 := by
   simp only [vpnOf, BitVec.extractLsb'_toNat, BitVec.toNat_ofNat, Nat.reducePow,
     Nat.shiftRight_eq_div_pow]
   omega
-
 
 theorem ofNat_sub_ofNat (a b : Nat) (hb : b ≤ a) (ha : a < 2 ^ 64) :
     BitVec.ofNat 64 a - BitVec.ofNat 64 b = BitVec.ofNat 64 (a - b) := by
@@ -149,9 +144,7 @@ theorem ofNat_aligned (m : Nat) (h : 4096 ∣ m) : (BitVec.ofNat 64 m) &&& 0xfff
   generalize BitVec.ofNat 64 q = y
   bv_decide
 
-
 /-! ## The two fixed virtual page numbers -/
-
 
 /-! ## `UPtd.leaves` against `UPtd.um` -/
 
@@ -164,7 +157,6 @@ theorem leaves_get_of_lt (P : UPtd) (k : Nat) (h : k < tfVpn.toNat) :
 theorem leaves_get_tf (P : UPtd) : get? P.leaves tfVpn.toNat = some (tfLeaf P.tfp) := by
   unfold UPtd.leaves
   rw [get?_insert_ne (by rw [Xv6.trampVpn_toNat, Xv6.tfVpn_toNat]; omega), get?_insert_eq rfl]
-
 
 /-- The leaf map has nothing at an unmapped user page number. -/
 theorem leaves_none_of_um_none (P : UPtd) (k : Nat) (hlt : k < tfVpn.toNat)
@@ -272,7 +264,6 @@ theorem ptRep_setLeaf (t : PTree) (L : RegMapF (BitVec 64)) (vpn : BitVec 27) (v
 
 /-! ## The leaf `uvmalloc` writes -/
 
-
 theorem uLeaf_isLeafPte (ppn : BitVec 44) (perm : BitVec 64) (hr : perm &&& 0xE#64 ≠ 0#64) :
     isLeafPte (leafOf ppn perm) := (Xv6.isLeafPte_iff _).mpr (Xv6.leafOf_valid ppn perm hr)
 
@@ -318,7 +309,6 @@ theorem uptWf_insertLeaf (P : UPtd) (vpn : Nat) (r : BitVec 64) (perm : BitVec 6
 
 /-! ## The run of keys `uvmdealloc` removes -/
 
-
 theorem delRunL_get_mem (L : RegMapF (BitVec 64)) (v0 n j : Nat) (hj : j < n) :
     get? (delRunL L v0 n) (v0 + j) = none := by
   induction n with
@@ -356,7 +346,6 @@ theorem delRun_eq (P Q : UPtd) (vpn0 i : Nat)
   · have hx' : ∀ j, j < i → x ≠ vpn0 + j := fun j hj he => hx ⟨j, hj, he⟩
     rw [delRunL_get_out _ _ _ _ hx']
     exact hout x hx'
-
 
 /-! ## Alignment -/
 
@@ -474,13 +463,11 @@ theorem umPages_insert (P : UPtd) (M : Nat → List (BitVec 8)) (vpn : Nat) (r p
 
 end
 
-
 /-- The page number of an address below `MAXVA`. -/
 theorem vpnOf_toNat_eq (x : BitVec 64) (h : x.toNat < 2 ^ 38) :
     (vpnOf x).toNat = x.toNat / 4096 := by
   simp only [vpnOf, BitVec.extractLsb'_toNat, Nat.shiftRight_eq_div_pow]
   omega
-
 
 /-- A page-aligned address, from its numeric value. -/
 theorem aligned_of_toNat (x : BitVec 64) (h : 4096 ∣ x.toNat) : x &&& 0xfff#64 = 0#64 := by

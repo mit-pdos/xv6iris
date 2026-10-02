@@ -230,7 +230,6 @@ theorem swp_tick_clock_hs (cpu : CPU) (dq : DFrac) (p : Privilege) (c : MConf) (
   confhs_intro HmConf
   iapply HΦ $$ %_ %_ %_ HmConf Hmcycle Hmtime Hmip
 
-set_option linter.unusedVariables false in
 /-- The clock tick, in machine or supervisor mode: `mcycle`/`mtime` advance,
 the pending bits are refreshed from the timer compares (whatever they are),
 no interrupt is taken. -/

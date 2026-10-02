@@ -29,8 +29,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Std MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-! ## Qp arithmetic (Rocq `Qp.mul_add_distr_r`, `Qp.mul_1_l`, `Qp.div_add_distr`) -/
 
 theorem qpMul_add_l (q1 q2 Q : Qp) : qpMul (q1 + q2) Q = qpMul q1 Q + qpMul q2 Q :=
@@ -208,7 +206,6 @@ theorem inodePay_notDev [Icfg] [CurCtx] (γx : GName) (Q : Qp) (g : GName) (inum
   exact hdv rfl
 
 end InodePay
-
 
 /-! ## The off conjunct -/
 

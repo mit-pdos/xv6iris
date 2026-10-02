@@ -170,8 +170,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-! ## The box λs: the ambient bundle at an explicit context
 
 Rocq's `ic_hdr … ξ := ic_hdr_amb (XI := ξ) …`: the ambient `[CurCtx]` is

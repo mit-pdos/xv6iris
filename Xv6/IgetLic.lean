@@ -110,8 +110,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Iris.Algebra MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-! ## 1.  THE ENUMERATION
 
 §20.4's licences, in §20.4's order.

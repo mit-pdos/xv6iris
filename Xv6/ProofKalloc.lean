@@ -92,8 +92,6 @@ theorem ka_al8 (p : BitVec 64) (h : p &&& 0xfff#64 = 0#64) : p.toNat % 8 = 0 := 
 
 /-! ## Curried forms of the allocator's ghost steps -/
 
-set_option linter.unusedSectionVars false
-
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
 

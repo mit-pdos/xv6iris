@@ -61,8 +61,6 @@ namespace Xv6
 
 open Iris Iris.Std Std MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-! ## 1.  The pure tie -/
 
 /-- Inum `z`'s 64 bytes sit at offset `off` of its inode block's byte list,

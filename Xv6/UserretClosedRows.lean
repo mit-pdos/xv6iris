@@ -38,9 +38,6 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedVariables false
-set_option linter.unusedSectionVars false
-
 /-- The record uservec's save walk leaves (the trapped file in words 5..35). -/
 abbrev urcV0 (V : ProcPriv) (W : Uvis) : ProcPriv := { V with tf := uservecTf V.tf (tfResumeGpr0 W.tf) }
 

@@ -59,8 +59,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-! ## Pure helpers -/
 
 /-- A replicated list's big-op is the same big-op over the index range. -/
@@ -346,7 +344,6 @@ theorem bootCarveFs_inodeEntry [CurCtx] (k : Nat) (hk : k < NINODE) :
   obtain ⟨he, hx⟩ := bootCarveFs_range_get hj
   subst he
   iapply bootBss_wordAt (GF := GF) _ 4 _ _ (aAddr x hx) rfl (loA x) (hiA x hx) (alA x) $$ Hk Hj
-
 
 /-- **THE WHOLE `itable` SYMBOL, CARVED** (Rocq `main_locks_raw`'s itable row
 plus `boot_inode_entries`): `[itable, itable + 0x1aa8)` is `iinit`'s lock

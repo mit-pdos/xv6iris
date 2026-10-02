@@ -30,9 +30,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-- The indirect cell cleared, the entry list forgotten: `bmEmpty`. -/
 theorem itrunc_map_empty (bm : Blkmap) (hlen : bm.bmDir.length = NDIRECT) :

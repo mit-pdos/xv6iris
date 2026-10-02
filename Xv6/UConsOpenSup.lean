@@ -57,8 +57,6 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
-
 /-! ## 1.  The path's one element -/
 
 /-- **Rocq `init_cons_elems_len`**. -/

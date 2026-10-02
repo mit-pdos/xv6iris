@@ -81,7 +81,7 @@ theorem memModel_fence_pub (σ : MState) (cpu : CPU) (b : barrier_kind)
   have e : (σ.fence cpu b).tv cpu =
       fencePost (fenceDrains b) (fenceAcq b) (σ.tv cpu) (σ.hr cpu).rv
         (ownPub (hartAgent cpu) σ.log) := by
-    simp [MState.fence, updCpu]
+    simp [updCpu]
   have hle : T ≤ (σ.fence cpu b).tv cpu := by
     rw [e, hdrain]
     unfold fencePost

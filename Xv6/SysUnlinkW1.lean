@@ -58,9 +58,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## Pure helpers -/
 
@@ -413,7 +411,6 @@ theorem sys_unlink_w1_walk (BO : BEGIN_OP) (NP : NPAR_WRAP_ERA) (EO : END_OP) (�
       · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact h10
       · revert hlo; unfold walkSpend MAXOPBLOCKS; cases w <;> simp <;> omega
     · unfold sysUnlinkCells; iframe
-
 
 /-! ## W1, the entry: the prologue and argstr -/
 

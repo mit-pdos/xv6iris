@@ -56,8 +56,6 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Std MachCSL
 open Iris.Std Iris.Std.PartialMap
 
-set_option linter.unusedSectionVars false
-
 /-! ## The exception set, as a list -/
 
 /-- Rocq's `X ∖ {[b]}`.  A `filter`, so it is idempotent: removing a block

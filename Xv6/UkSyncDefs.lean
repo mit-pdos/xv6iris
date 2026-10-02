@@ -51,8 +51,6 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 
-set_option linter.unusedSectionVars false
-
 /-- **Rocq `sync_pay`** (sync K4): its second premise is the kernel's
 durability receipt. -/
 abbrev syncPay {PROP : Type _} [BI PROP] (P Qr R : PROP) : PROP := iprop(P -∗ Qr -∗ R)
@@ -84,7 +82,6 @@ theorem sync_ustack_two (γd : GName) (sp : BitVec 64) :
   iintro ⟨-, H0, H1, -⟩
   isplitl [H0]; · iexact H0
   iexact H1
-
 
 end Code
 

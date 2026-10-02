@@ -22,7 +22,6 @@ open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open Sail LeanRV64D LeanRV64D.Functions
 
 set_option maxRecDepth 8000
-set_option linter.unusedSectionVars false
 
 /-! ## Indices of a node page -/
 

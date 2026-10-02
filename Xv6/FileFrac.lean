@@ -11,8 +11,6 @@ namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-! ## `qsum` -/
 
 theorem qp_add_assoc (x y z : Qp) : x + y + z = x + (y + z) := Subtype.ext (Rat.add_assoc ..)

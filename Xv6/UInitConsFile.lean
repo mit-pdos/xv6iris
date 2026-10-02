@@ -62,8 +62,6 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
-
 /-! ## §1  THE UNARM LEG AT THE WEAKER PURE PARAMETER (pure part) -/
 
 /-- **Rocq `echo_fs_pure_unarm_root`**: a FRESH inum of a view where `/init`
