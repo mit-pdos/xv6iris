@@ -109,7 +109,7 @@ the class with its `round_det` discharge):
 | **M2-G3 sbrk** | `sysSbrkOk`'s −1 only when the pool is empty (growproc/uvmalloc functional in the allocator ledger), and the eager grow's page-table pages as events (`Alloc A vpn`-grained, §3 "concedes more") | `sbrk` |
 | **M2-G4 console write** | the kernel's short count stated at the key's permission view `π` (copyin at the key, not the table) and a write row in the trap contract | console `write` |
 
-- [ ] M2-G1  - [ ] M2-G2  - [ ] M2-G3  - [ ] M2-G4
+- [ ] M2-G1 (DESIGNED 2026-10-03, "M2-G1 design" below; awaiting rulings G1-R1..R6)  - [ ] M2-G2  - [ ] M2-G3  - [ ] M2-G4
 
 Risk register (honest): W1 changes the language and every lifting lemma -- mechanical but wide, and the device
 suite must not notice; W3 is the proof's content and may find a row that cannot be made functional in `(key,
@@ -745,6 +745,342 @@ class {exit, getpid, uptime} reads neither the cwd nor the root, so no row claim
 process-visible state that decides later fs calls' outcomes, so a future lane that grows the class to any path
 call must first give the key the root (the cwd's twin, chroot.md §1) and `usysMemOk` a chroot row.
 `UtRoundQuiet` (T's pure corollary, unreached) was deleted upstream; `niStrongInstance`'s comments say so.
+
+### M2-G1 design (2026-10-03)
+
+Design pass on `lane/g1` (based on `lean` 33ce10f9a). No code landed. The pure vocabulary in §1 was
+shape-checked in a scratch file that `decide`s the examples; it is not in the tree. The rulings G1-R1…R6 at
+the end are needed before a lane starts.
+
+**Short version.** The channel W3 found is real, and it is narrower than "slot placement". `wait`'s
+choice depends on four things: which slots hold the caller's children, which of those are zombies, their
+exit statuses, and the order of the slots. Every write of those facts happens under `wait_lock`:
+- the parent cell: kfork's `np->parent = p`, kexit's `reparent`, kwait's `pp->parent = 0`;
+- the ZOMBIE store: kexit, holding both locks;
+- the reap: kwait.
+
+So **the slot-placement ledger is the zombie ledger, grown into a FAMILY ledger at the lock it already
+lives at.** That means:
+- one new event, `ZFork`: kfork's parent store, recording the child's slot, pid and generation;
+- one new field each on `ZExit` (the reparent target) and `ZReap` (the reaped slot);
+- two CHECKABLE ties that answer D3:
+  - the parent cells, physical, in the same payload, against the fold;
+  - a per-slot ghost-map entry, anchored in the slot's own lock payload at the state cell and the
+    escrow, against the fold's zombie column.
+
+`pid_lock` and the pid ledger are untouched, so G2 is independent. The authority does not split.
+
+Fork's −1 on slot exhaustion is a **different** channel with a worse shape. allocproc's scan is not
+atomic, so no snapshot of the slots decides it (F2). Naming it needs a new ledger kept in an *invariant*,
+not in a lock payload. Even then fork's −1 stays non-functional through allocproc's and uvmcopy's
+kallocs (G3). So it is designed here (§6) and **parked behind G3**.
+
+**Findings.**
+- **F1 (allocproc's choice is placement, not a function).** The brief says allocproc's scan runs under
+  `pid_lock`. It does not.
+  - `allocproc` takes each `p->lock` in turn (`ap_scan_acq`/`ap_scan_rel`). `pid_lock` is taken only in the
+    inlined `allocpid`, after the choice, nested inside slot `j`'s lock.
+  - So "first UNUSED slot" is not even a fact about one moment. The scan can pass slot 0 while it is USED.
+    Slot 0 is then freed behind the cursor, and the scan takes slot 5 while 0 and 5 are both free.
+  - The chosen `j` therefore cannot be computed from any history prefix. It must be RECORDED as an event,
+    exactly as the pid is today: R2(a), "the outcome IS the event".
+  - The honest vocabulary concedes slot indices of a family's children. A process can see slot order only
+    through `wait`, and only for its own children.
+- **F2 (fork's slot −1 is a window, not a snapshot).** The scan fails iff every slot `i` was non-UNUSED *at
+  the instant the cursor visited it*.
+  - That is a property of 64 instants. No single history prefix decides it.
+  - It can be stated honestly only with an event `SFull act` whose well-formedness says: for each `i`, the
+    slot was occupied at some ledger position inside the scan's window.
+  - Positions inside the window need a ledger snapshot at each visit, taken while holding only slot `i`'s
+    lock. A lock-payload ledger cannot give that, because the scanner does not hold its lock. An `inv`-held
+    authority can (§6).
+- **F3 (the kill arm of wait is vacuous at the boundary).** `usertrap` runs `if (killed(p)) kexit(-1)` after
+  `syscall()`. The killed flag is monotone while the process lives (`KillRow`: `killRow ∗ killShot ⊢ kl ≠ 0`).
+  So a round whose −1 came from `killShot` never resumes. The kill channel (§3) does not have to be named
+  for wait.
+  - G1c must check that usertrap's post-syscall `killed` read is the reading form (`wp_killed_r` with the
+    block's row). Only then does the resume path refute a persistent `killShot gn`. If it is the plain
+    form, G1c switches it.
+- **F4 (the copyout −1 is the lazy channel, nothing new).**
+  - `SpecCopyout`'s −1 arm names a byte not `uvaWmapped` at the ENTRY table `P`.
+  - At `W.lazy = false`, `P` and the key's `π` agree on writability. G1c needs this lemma, next to
+    `VmfaultQuiet`.
+  - So at a non-null pointer the copyout outcome is a function of the key exactly when the process has no
+    lazy pages.
+  - At `W.lazy = true` a lazily absent page faults through `vmfault → kalloc`: the allocator's position,
+    which is G3's territory (§3's channel).
+- **F5 (the children's NAMES are in the key).** `ukeyEq` compares `W.ch`, a set of generations. So
+  `usysDet wait` must compute `W.ch \ {γ'}`, which needs the reaped child's generation as a function of
+  `(W, ι)`.
+  - The generation is a ghost name, but the key already carries `gen` and `ch` (W3 accepted that).
+  - `ZFork` therefore records it, and a tie with the payload's `gs` pins it (§1 T1).
+  - The trace level never reads it (W4's law reads registers only).
+- **F6 (W3's per-round ι is unanchored).** `SyscRows` is pure, and the uptime receipt `tickLb n` stops at the
+  arm. So `uexecRet_roundDet_exists` supplies ι *from the answer*, and "∃ ι, W' = usysDet W ι" is only as
+  strong as the SHAPE of `usysDet`'s dependence on ι.
+  - G1 inherits this as it stands; it is not made worse.
+  - The cure is one cross-cutting lane, M2-X (§4), which serves every ledger.
+
+**1. The vocabulary (pure; `Xv6/ZombEv.lean` grows, no new file).** Events:
+
+    inductive Zev where
+      | ZFork (act : BitVec 64) (j : Nat) (pid : BitVec 32) (g : GName)   -- NEW: kfork's np->parent = p
+      | ZExit (act : BitVec 64) (pid : BitVec 32) (xs : Int) (ip : BitVec 64)  -- + ip: reparent's target
+      | ZReap (act : BitVec 64) (j : Nat) (pid : BitVec 32)              -- + j: the reaped slot
+
+What each event means:
+- **`ZFork`** is appended by kfork when it stores `np->parent = p` (`kf_wait_fork`, under `wait_lock`).
+  - `act = p = k.proc`, the parent's slot address.
+  - `j`, `pid` and `g` are the child's slot, pid and generation (`genSlot g (procAddr j)`,
+    `genPid g pid`, all in scope there).
+  - This is THE PLACEMENT EVENT. It is recorded where the placement becomes visible to the family, not at
+    allocproc's choice (F1: there it is not a function anyway, and `pid_lock` is the wrong lock).
+  - userinit appends none. Init's parent cell stays 0.
+- **`ZExit`** gains `ip`, the `initproc` word `reparent` writes. The fold then needs no global init address.
+  `act` is already the exiting slot's address (`procAddr j`, the PI-4 port).
+- **`ZReap`** gains the slot `j`. The fold clears the right slot without having to prove that pids are
+  unique among zombies.
+- **No `SZombie`.** `ZExit`/`ZReap` already are the zombie transitions, and with the actor equal to the slot
+  they are slot-indexed.
+
+Readings (the scratch check's definitions):
+
+    structure ZSlot where par : BitVec 64; gen : GName; zomb : Option (BitVec 32 × Int)
+    def famStep (m : Nat → ZSlot) : Zev → Nat → ZSlot
+      | .ZFork act j _ g     => fun k => if k = j then ⟨act, g, none⟩ else m k
+      | .ZExit act pid xs ip => fun k => let s := m k
+          let s := if s.par = act then { s with par := ip } else s          -- reparent
+          if procAddr k = act then { s with zomb := some (pid, xs) } else s  -- the exiting slot
+      | .ZReap _ j _         => fun k => if k = j then ⟨0, 0, none⟩ else m k  -- pp->parent = 0; freeproc
+    def famOf (h) : Nat → ZSlot := h.foldl famStep (fun _ => ⟨0, 0, none⟩)
+    def zHasKids (h) (a) : Prop := ∃ k < NPROC, (famOf h k).par = a          -- kwait's havekids
+    def zLowest (h) (a) : Option (Nat × BitVec 32 × Int × GName)            -- least k < NPROC with
+      -- (famOf h k).par = a ∧ (famOf h k).zomb = some (pid, xs): the slot, pid, status, generation
+
+- `zombiesOf`/`statusOf` keep their meaning: `ZFork` steps neither, and the new fields are ignored.
+  `statusOf_dom` is re-proved with one more arm.
+- `zombLedAuth`/`zombLedLb`/`zombReceipt` are untouched: same camera (`MonoListG GF Zev`), same name
+  (`wzlName`). The camera's carrier type changes, so every `Zev` pattern match moves. These are:
+  `ZombEv`, `UsysDet`'s readings, `kw_reap_ghost`, ProofKexit's append, `waitAnsLed`.
+
+**D3 revisited: the ties.** D3 was right that "by construction" is all a ledger nobody READS needs. G1's row
+must be PROVEN from the ledger: kwait has to show `rv = (zLowest h me).pid`. That needs the scan's
+observations, made under `wait_lock` and the slot locks, to equal readings of `h`. Two ties in
+`WaitInvTies.waitInvResAt` (inside its existential block, beside `∃ h, zombLedAuth h`) do it:
+
+- **T1 (parents, physical, same lock).** `⌜∀ k < NPROC, ps k = (famOf h k).par ∧ (ps k ≠ 0 → gs k = (famOf h
+  k).gen)⌝`. Here `ps` is the payload's own 64 parent cells, so this is checked against code-written state.
+  The four writers of `ps` all hold the payload:
+  - boot: all zero at `h = []`;
+  - kfork: the store and `ZFork`;
+  - kexit: reparent, then the ZOMBIE store and `ZExit` with `ip` the word reparent wrote, in one critical
+    section;
+  - kwait: `pp->parent = 0` and `ZReap`.
+  - The `gs` half holds because the generation `gs k` is pinned only while `ps k ≠ 0` (`genHalvesEnt k 0 g =
+    emp`), and only kfork makes `ps k` nonzero.
+- **T2 (zombies, anchored at both ends).** A ghost map at a new `WchG` name `wzsName` (a
+  `GhostMapG GF Nat (Option (BitVec 32 × Int))` field of `WchGpre`).
+  - The wait payload holds `ghost_map_auth wzsName 1 (fun k => (famOf h k).zomb)`.
+  - Slot `k`'s lock payload holds the element `ghost_map_elem wzsName k (own 1) v`:
+    - `v = some (pid, xstateVal xsv)` beside `exitTok V.gen pid (xstateVal xsv)` in `procDormant`'s ZOMBIE
+      branch, at the escrow's own binders, so the status the parent copies out IS the ledger's;
+    - `v = none` in the UNUSED branch and, through `procSlotsAt`, in every non-dormant arm.
+  - Only two moves change the element:
+    - kexit's ZOMBIE store, with both locks and both pieces in hand: `none → some`, with `ZExit`;
+    - kwait's reap, with both: `some → none`, with `ZReap`, put back at the UNUSED re-close after
+      freeproc.
+  - Every other state change goes between non-zombie arms at `none` and frames it.
+  - This is NOT D3's "mirror of a mirror". D3's flag was anchored at nothing the code writes. Here one end
+    is the state cell and the escrow under `p->lock`, and the other end is the fold under `wait_lock`.
+
+Cost of T2: `SchedCtx.procSlotsAt` gains a sixth conjunct, `if invDormant st then emp else zsElem pa none`.
+- Its `CtxMorph` instance needs one more `instCtxMorphConst`.
+- Seven `procSlots_*` lemmas change (`_used`, `_recast` with side conditions `st, st' ≠ ZOMBIE`,
+  `_dispatch`, `_park_gen(')`, `_running(_intro)`).
+- `ProcDefs.procDormant`'s xstate block gains the element. Its callers' `if_neg`/`if_pos` rewrites are
+  mechanical.
+- Four proofs destructure `procSlotsAt`: `ProcsInvAlloc` (boot: 64 elements born at `none` with the
+  auth), `ProofAllocproc`, `ProofKwait`, `ProofKfork`.
+- `procLockResAt`'s text does not change.
+- The boot: `childrenBootRows` gains the auth at `fun _ => none`, and `ProcsInvAlloc` the 64 elements.
+
+**2. The ghost: where it lives, and the permit.**
+- **Authority: `wait_lock`, unsplit.** The scan and the reap that need it are both under `wait_lock`. kfork's
+  parent store and kexit's ZOMBIE store are under `wait_lock` too. `pid_lock` holds nothing G1 reads.
+- Born in `childrenBootRows` beside `zombLedAuth []`, plus `wzsName`'s auth at `fun _ => none`.
+  `childrenRes_alloc` adds the name. `MainKvm.mn_pidWait_born` gains the map auth beside `zombLedAuth []`
+  (its one caller, `ProofMain.mn_phaseB`, threads it). The 64 elements go to the slots in `ProcsInvAlloc`.
+- **Receipts.**
+  - (a) kexit: none (no post). The append stays in `kx_park`'s ZOMBIE ghost update.
+  - (b) kfork: `kf_wait_fork` returns `zombReceipt h (ZFork p i pid g)`. kfork drops it. M2-X would carry
+    it.
+  - (c) kwait: `waitAnsLed`'s reap arm already carries `zombReceipt h (.ZReap act rv)`. Its pure part
+    grows to `⌜zLowest h act = some (j, rv, xs, γ')⌝`. The −1 arm splits its reason:
+    - the no-children reason becomes `∃ h, zombLedLb h ∗ ⌜¬ zHasKids h act⌝`, the lb taken under the lock
+      at the decision;
+    - the copyout reason is `nullst = false`, as today;
+    - the kill reason is `killShot`, as today (F3: dead at the boundary).
+  - `waitAnsLed_post`/`waitAnsLed_of` change accordingly. `waitAns` and every landed reader are unchanged.
+- **The permit** (L3's rule: one `actLend_step` per actor-labelled append).
+  - `ZExit` and `ZReap` already step. The new fields do not change that.
+  - `ZFork` is a NEW actor-labelled append, so it costs ONE step in kfork's `wait_lock` section.
+    `kf_wait_fork` takes `actLend p ke` and returns `actLend p (ke+1)`.
+  - kfork holds its lend there (it lent it to allocproc and uvmcopy and got it back). `SpecKfork`'s post is
+    already `∃ k' ≥ ke`, so no Spec text moves for the step.
+- **The brief's "pair `SAlloc` with `PAlloc`" question does not arise for wait.** Placement is recorded at
+  `ZFork`, under the family's lock, in the family's ledger. The pid ledger and `ap_found` are untouched.
+  - If the owner wants the placement also at the choice point (G1-R1), the cheap form is `PAlloc act j
+    pid`: one append, one step, the same event. A separate `SAlloc` in the pid ledger would be a second
+    append and a second step for the same transition. Not recommended.
+
+**3. The rows.**
+- **kwait's proof (`ProofKwait`).**
+  - `kw_scan`/`kw_slot`'s loop invariant already has `R 14 = 0 → ∀ k' < n, parents k' ≠ procAddr j`. It gains
+    the first-ness half `∀ k' < n, parents k' = procAddr j → (famOf h k').zomb = none`, at the payload's
+    `h`, which is constant while the scan holds `wait_lock`:
+    - at a slot whose parent cell is the caller and whose state is not ZOMBIE, the slot's element `none`
+      against T2's auth gives the reading;
+    - at the found ZOMBIE slot, the element `some (pid, xs)` gives the pid and status;
+    - T1 turns the cells into `famOf`'s `par` and `gen`.
+  - So `kw_reap_ghost` concludes `zLowest h (procAddr j) = some (n, pid, xs, g)`.
+  - `kw_nokids_ghost` concludes `¬ zHasKids h (procAddr j)`.
+  - The sleep/re-scan path re-takes `h` at each acquire. Only the final, successful scan's `h` is cited.
+- **The functional row (`UsysDet`).**
+  - `UIota` gains a fifth field, `act : BitVec 64`: the round's actor, the caller's slot address. This is
+    the caller's own placement, so it is public.
+  - `usysDetClass` gains `USYS_wait`.
+  - `usysDet USYS_wait W ι` is defined as:
+    - **no children** (`¬ zHasKids ι.zev ι.act`): `bump W (-1) …`, everything else kept;
+    - **`zLowest ι.zev ι.act = some (j, pid, xs, γ)`**: `bump W (sext pid) (usysWr W.M a0 (if a0 = 0 then []
+      else le32 xs)) … (ch := W.ch.erase γ) …`;
+    - **children, none a zombie**: unreachable on a resumed round (kwait sleeps), so `W` with r := −1 as a
+      default, never cited.
+  - **Not in the class** (the row's premise): `W.lazy = true ∧ a0 ≠ 0`. That is the copyout's allocator
+    channel (F4), G3's.
+    - So the class predicate becomes key-dependent: `usysDetClassAt n W`, at wait `W.lazy = false ∨ a0 = 0`.
+    - `usysDetClass` itself stays the number set, and the dependence is an extra premise of `round_det`.
+  - The copyout's −1 on a bad pointer at `lazy = false` is the arm `∃ d < 4, ¬ πWritable W.perm (a0 + d)`.
+    This is a function of the key, so it joins the row as its first test (−1, nothing reaped, `ch` kept).
+- **`SyscRows`** gains one last field after `uptime`:
+
+      wait : syscNum V ≠ USYS_wait ∨ ∃ (hz : List Zev),
+        syscWaitRow V V' (syscImg V M) (syscImg V' M') cs cs' hz V.procAddr    -- the pure image of the
+                                                                                -- answer at the receipt
+
+  - `syscWaitRow` is the four arms above, stated on `syscA0 V'`, the image and `cs'`.
+  - `SyscallArmsWait.syscall_arm_wait` switches to the led kwait (`KWAIT.wp_kwait_led`; Lean has the
+    field, the PI-4 port) through `SYSWAIT`. `SpecSysWait`'s eb body gains the led answer. It reads the row
+    off `waitAnsLed`'s new pure parts and the copyout's window (`syscUwaitWr`, already there).
+  - `UsysMemOkSpec.syscMemOk_usys` takes one premise more (as W3's `hup`). `UsertrapSysRows` carries it
+    into `usysMemOk`'s wait branch, which becomes the functional arm (`usysWaitRet`, beside `usysUptimeRet`).
+- **`round_det`.** `UexecApply.uexecRet_roundDet` extends its class case to wait at `usysDetClassAt`, and
+  `_exists` supplies `ι.zev := hz` and `ι.act` from the row.
+- **What stays non-functional in wait.**
+  - The copyout at `lazy = true`, non-null: allocator, G3.
+  - The kill arm: dead at the boundary, F3, so not a row.
+  - Init's orphans ARE covered (T1 reparents to `ip`).
+- **Fork's −1 is not re-admitted by G1** (§6):
+  - the slot half needs F2's `inv` ledger;
+  - the allocator half (allocproc's trapframe and `proc_pagetable` kallocs, uvmcopy's per-page and
+    table-page kallocs, whose COUNT depends on the parent's page-table interior, which is not in the key:
+    UsysDet §4 sbrk (b)'s obstacle) is G3's;
+  - the pid on success is G2's.
+  - `SyscRows.fork` keeps its text.
+
+**4. W4's law.**
+- **The family events cannot enter the trace.** `kexit`'s ZOMBIE store and the reap are kernel-internal
+  writes, with no machine event to hang an `Obs` on. Their order relative to the parent's `wait` depends on
+  the kernel's own interleaving, which is not in `h`. So `events h F` cannot RECOMPUTE `zLowest`. As for
+  the tick (W2 O5): **read the answer as the event.**
+- **What changes in `NiTrace`.**
+  - `NiStep.reads` admits an ecall whose effective number is `USYS_wait`. `reading` is its enter's a0, so
+    `events q h F` = q's uptime and wait readings, in order.
+  - `niRoundLaw`'s resume clause covers wait through `usysDetResumes`: pc + 4, `x1..x31` kept but a0.
+  - Its wait conjunct is the answer's shape: a0 = −1 or the sign-extension of a pid in `[1, PIDMAX]`
+    (`usysWaitRet`, from `niFit`'s round arm, supplied at `urc_exit` like `niPidRow`).
+  - `NiInClass` is read at `usysDetClassAt`. The trace has no `lazy` bit, so a wait ecall is in the class
+    iff its key's `lazy = false` or its a0 argument is null. The filing's trapped key carries `lazy`, as it
+    carries `secc` (W4's honest scope (3)).
+  - `niTwoRun`'s hypothesis `events₁ = events₂` now includes the wait answers.
+- **Honesty cost, stated plainly.** At the trace level, wait's answer is a declassified reading, like
+  uptime's. The theorem says equal readings and equal inputs give equal outputs. It does not say WHY the
+  reading is what it is. The content is in-logic, in M0's `round_det`: the answer is `zLowest` of a prefix
+  of the family ledger at the caller's slot. That prefix records the children's forks (with placement),
+  exits (with statuses), reaps, and the reparenting.
+  - So what wait declassifies is: the family's exit order up to slot order, the statuses, and the slot
+    placement of the caller's children (which concedes global slot occupancy at each fork, F1).
+  - Without the in-logic row, the reading would be §2's rejected "oracle of outcomes". With it, the
+    reading is honest in the same sense as O5's tick.
+- **Rejected alternative: a per-filing family witness `z` in `NiEntry.round` with `a0 = pick z`.** `F` is
+  existential (O6) and `z` would be tied to nothing in `h`, so it is the answer in disguise. It is no
+  stronger, and it costs more.
+- **What WOULD be stronger, M2-X ("ι export", cross-cutting; NOT G1).**
+  - Carry each round's persistent receipt (`zombLedLb`, `tickLb`, later `pidLedLb`/`ledLb`) to the enter
+    filing, through a fourth `MachFixedGS` client slot carrying persistent evidence beside `uClaimR`.
+  - Keep in `niR` the longest lb seen per ledger. Two lbs of one mono-list are prefix-comparable
+    (`MonoList` lb/lb validity), so `niOk` can state that **all cited prefixes of one ledger form a chain**.
+  - Then `phi` quantifies ONE history per ledger per run, and the two-run hypothesis becomes "equal
+    histories" instead of "equal readings". That is §2's ι, really exported.
+  - The route is W2d's: syscall arm → `syscWaitOut` → usertrap → userret → filing. It serves ticks (the
+    per-era monotonicity W2 deferred), wait, G2's pid and G3's allocator at once.
+  - Recommended as its own lane after G1–G3.
+
+**5. Lanes** (on `lane/g1`, one `lake` at a time; gate per lane: `lake build Xv6 MachCSL` + `tools/ci/lint.sh` +
+no `sorry`; full `tools/ci/run_all.sh` at G1b and G1d; `tools/audit/baseline.json`/`tools/tcb/expected.json` in
+the same commit when they move):
+
+| Lane | Content | Files | Moves | Gate |
+|---|---|---|---|---|
+| **G1a vocabulary** | §1's events and readings, snoc lemmas, `famOf_take` (prefix reading), `zLowest_spec` (least, member, parent, zombie), `zHasKids_iff`, `statusOf_dom` re-proved | `ZombEv` (pure); every `Zev` match: `UsysDet`, `UserChildren` (`waitAnsLed`'s `ZReap act rv` → `ZReap act j rv`), `ProofKexit` (append), `ProofKwait` (`kw_reap_ghost`) | the `Zev` constructors; `waitAnsLed` (+ slot) | build + lint |
+| **G1b the ties and the four transitions** | T1 in `waitInvResAt`, T2's camera (`WchGpre` field, `wzsName`), the elements in `procSlotsAt`/`procDormant`, the boot, kfork's `ZFork` append + lend step in `kf_wait_fork`, kexit's `ZExit … ip` + element move, kwait's `ZReap … j` + element move, the reparent re-establishing T1 | `SlotGen` (camera + name), `WaitInvTies`, `WaitInv`, `SchedCtx`, `ProcDefs`, `ProcsInvAlloc`, `MainKvm`/`ProofMain` (boot), `ProofKfork`, `ProofKexit`, `ProofKwait`, `ProofAllocproc` (frame), `ProofFreeproc` (frame), xv6GF/unionGF slot | `waitInvResAt` body; `procSlotsAt`, `procDormant` (definitions; statements naming them byte-identical); `kf_wait_fork`; `childrenBootRows` | full (camera change: ~1000-file rebuild); audits |
+| **G1c kwait's first-ness and the led answer** | `kw_scan`/`kw_slot` invariant (first-ness), `kw_reap_ghost` → `zLowest`, `kw_nokids_ghost` → lb + `¬zHasKids`, `waitAnsLed` pure parts; F3's check of usertrap's post-syscall killed read; F4's `P`/`π` lemma at `lazy = false` | `ProofKwait`, `UserChildren`, `SpecKwait` (led body text through `waitAnsLed`), `VmfaultQuiet` (lemma), possibly `ProofUsertrap*` (F3) | `waitAnsLed`; `KWAIT.wp_kwait_led(_eb)` (via the answer) | build + lint |
+| **G1d the rows and `round_det`** | `UIota.act`, `usysDetClassAt`, `usysDet` wait arm, `usysDet_rows`/`_of_rows` extended; `SyscRows.wait`; `syscall_arm_wait` on the led contract; `usysMemOk`'s wait branch functional (`usysWaitRet`); `uexecRet_roundDet(_exists)`; W4: `NiStep.reads`, `niRoundLaw`'s wait conjunct, `niFit`/`niEntryOk`'s round arm (+ `niWaitRow`, after `niPidRow`), `urc_exit` supplies it, `NiInClass` at the class-at | `UsysDet`, `SpecSyscall`, `SyscallArmsWait`, `SpecSysWait`/`ProofSysWait`, `UsysMemOk`, `UsysMemOkSpec`, `UsertrapSysRows`, `UexecApply`, `NiLedger`, `NiTrace`, `UserretClosed*` | `SyscRows` (+`wait`, last); `usysMemOk` (wait branch); `SYSWAIT`'s body; `niFit`; `NiInClass`; the three NI roots' statements are byte-identical (their meaning grows) | full; audit (roots' TCB) |
+
+G1a→G1b→G1c→G1d in sequence (G1b is the wide one, mechanical; G1c is the proof content). Estimated: G1a small,
+G1b ~25 files, G1c 3–5 files but the scan invariant is the hard part, G1d ~15 files (W3's and W2d's routes).
+
+**6. Fork's −1 on slot exhaustion (G1f, designed, PARKED behind G3).**
+- **Ledger.** A slot-OCCUPANCY ledger `Sev := SOcc j | SVac j | SFull act`. It is held in an Iris invariant
+  `inv slotN (∃ h, slotLedAuth h ∗ ghost_map_auth wsoName (occOf h))`, with the element `occ j` in slot
+  `j`'s lock payload: occupied in every non-UNUSED arm, vacant at UNUSED, the `pavSlot` position. It can't
+  be a lock payload (F2).
+  - allocproc's found arm appends `SOcc j` (`ap_found`, with slot `j`'s lock).
+  - freeproc appends `SVac j` at the UNUSED store.
+  - Each scan visit opens the invariant (a timeless fupd, no step) and takes a `slotLedLb` snapshot at
+    which `occOf · i = occupied`.
+  - The failure arm appends `SFull act` after the last release, with the window fact:
+    `∀ i < NPROC, ∃ k ∈ [|h₀|, |h_end|], occOf (h.take k) i`.
+  - `SOcc`/`SVac` are UNLABELLED (no step): the actor is already in the paired `PAlloc`/`PFree`. `SFull`
+    is labelled and costs one step.
+- **Cost.**
+  - The `pavSlot` conjunct is generalised from a marker to the element.
+  - Every slot-payload re-close at a state change across UNUSED gains a ghost-map update: allocproc,
+    freeproc, the boot.
+  - `ap_scan`'s 64-visit loop carries a chain of lbs.
+  - `allocprocPostLed`'s null arm gains the `SFull` receipt and the window.
+  - The steady regime's `procsAvail none` becomes redundant for the refutation. Boot keeps its count.
+- **What it buys alone: nothing on the row.** fork's −1 also fires on allocproc's two kallocs and uvmcopy's
+  kallocs, whose COUNT is not a function of the key (UsysDet §4 fork/sbrk (b)).
+- **Re-admit fork as a joint lane G1f+G2+G3**: −1 iff `SFull` at the round, or `KNull` at one of the round's
+  allocator positions as G3 states them. The pid on success, from G2's counter tie.
+
+**Owner rulings requested.**
+- **G1-R1** The slot-placement datum is recorded at kfork's parent store (`ZFork act j pid g`, in the
+  zombie/family ledger under `wait_lock`), not at allocproc's choice (F1). Recommended. The alternative,
+  `PAlloc act j pid` in the pid ledger, records the same `j` one lock earlier, but nothing under `wait_lock`
+  can read it.
+- **G1-R2** D3 is overturned. Recommended: the two checkable ties T1 (parent cells) and T2 (per-slot ghost
+  map anchored at the state and the escrow). G1's row must be PROVEN from the ledger, and by-construction
+  cannot be read. Cost: `procSlotsAt`/`procDormant` definitions, a camera field, a full rebuild.
+- **G1-R3** `ZExit` gains `ip`, `ZReap` gains `j`, `ZFork` carries the generation `g` (F5). Recommended. The
+  alternative to `g` is to drop `ch` from `round_det`'s key equality at wait: weaker, and inconsistent with
+  W3.
+- **G1-R4** The class becomes key-dependent at wait (`usysDetClassAt`: `lazy = false ∨ a0 = 0`). Recommended.
+  The lazy non-null copyout is G3's.
+- **G1-R5** W4: the wait answer is a READING (O5's rule). Recommended, with the honesty paragraph of §4 in the
+  as-landed note. M2-X (ι export) is a separate cross-cutting lane, after G1–G3.
+- **G1-R6** Fork's slot −1 (§6) is parked behind G3 and re-admitted jointly. Recommended. The alternative,
+  landing G1f now, costs the invariant-held ledger and moves no row.
 
 Each lane's as-landed line goes under its row's design note (the Rocq notes' rule), and this table's
 checkbox below flips when the lane is on `lean-ni`:
