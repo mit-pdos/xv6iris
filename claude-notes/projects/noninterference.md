@@ -1142,6 +1142,41 @@ cannot be read there; keeping the column makes the step's effect on T2's authori
   `kx_dormant_build`.  Spec texts: none moved.
 - Not yet read by anything: `zLowest_spec`, `zHasKids_iff`, `famOf_take`, `zsAuth_lookup` (G1c's).
 
+### M2-G1c as landed (2026-10-03)
+
+Lane `lane/g1`, one commit on G1a+b.  No Spec text moved beyond `waitAnsLed` (so `KWAIT.wp_kwait_led(_eb)`'s
+answers grow through it); `waitAns`, its readers, `SYSWAIT`/`SpecSysWait` untouched.
+
+- **The named history.**  `WaitInvTies.famLed ps gs` is now `∃ h, famLedAt ps gs h` (`famLedAt := zombLedAuth
+  h ∗ ⌜famTie ps gs h⌝ ∗ zsAuth …`, T1 the pure `famTie`); readers `famLedAt_tie`, `famLedAt_lookup` (T2,
+  via `zsAuth_lookup`), `famLedAt_lb`.  `famLed_reap` is stated at `famLedAt … h` and returns
+  `zombReceipt h (ZReap act n pid)` at that `h`.  `childrenInv_reap`'s pure conjunct adds `gs k = g`.
+  `ProofKwait.kwWRest ξ ps h` names `h`; `kw_wait_pay_elim` opens `∃ parents h` once per acquire (the
+  sleep/re-scan path re-opens at each re-acquire; only the final scan's `h` is cited).
+- **The scan's first-ness.**  `kw_scan`/`kw_slot` carry `∀ k' < n, parents k' = procAddr j → (famOf h
+  k').zomb = none` (the advance continuation at `n + 1`); `kw_slot_first` reads it at a visited non-ZOMBIE
+  child off `procSlotsAt`'s element.  `kw_reap_ghost` (+ `zh`, `hfirst`) proves `zLowest zh (procAddr j) =
+  some (n, pide, xstateVal xs, Vf.gen)` by `zLowest_spec` and appends the reap at `zh`.  `kw_nokids_ghost`
+  returns `⌜cs = ∅ ∧ ¬ zHasKids zh (procAddr j)⌝ ∗ zombLedLb zh` (`zHasKids_iff` through T1).
+- **`waitAnsLed`** (UserChildren): `(⌜rv = -1 ∧ cs' = cs⌝ ∗ waitWhyLed cs gn nullst act) ∨ ∃ h j γ',
+  zombReceipt h (ZReap act j rv) ∗ ⌜zLowest h act = some (j, rv, xs, γ')⌝ ∗ ⌜cs' = cs \ {γ'} ∧ 1 ≤ rv ≤
+  PIDMAX⌝ ∗ ⌜γ' ∈ cs ∨ pidv = 1⌝ ∗ exitTok γ' rv xs ∗ genUniq cs rv γ'` -- the reading at the receipt's
+  prefix (before the reap).  `waitWhyLed := ⌜nullst = false⌝ ∨ (⌜cs = ∅⌝ ∗ ∃ h, zombLedLb h ∗ ⌜¬ zHasKids h
+  act⌝) ∨ killShot gn`.  **Deviation from §2(c): the no-children reason KEEPS `cs = ∅`** beside the ledger's
+  reading (`waitAnsLed_post` must produce the landed `waitWhy`).  `waitAnsLed_post` (drop), `waitAnsLed_neg`,
+  `waitAnsLed_of` (now the reap arm's builder at the explicit `γ'`, with Rocq's generation crossing folded in).
+  Deleted as unreached after the switch: `waitAnsGen`, `waitAns_of_gen`, `waitWhy_notnull/_empty/_shot`
+  (replaced by `waitWhyLed_*`), `famOf_take` (genuinely unneeded).  `zLowest_spec`, `zHasKids_iff`,
+  `zsAuth_lookup` are now reached from `KWAIT`'s proof.
+- **F3: no change needed.**  usertrap's post-syscall check (+0xa6, `UsertrapTailA6`) is already the reading
+  form: `KILLED.wp_killed_r` with `utKillRead gn (utKillOut … ∗ ⌜utLive …⌝)`, lending `utLiveRes = (… ∗
+  ⌜utLive⌝) ∨ killShot gn`; at a zero flag `UsertrapParts.ut_kill_lend` refutes the shot
+  (`KillRow.killPaid_shot_nz`), and `usertrap_a6_after` resumes (UT_RET) only off `⌜utLive A V2 cs2⌝`.  So a
+  round whose `-1` came from `killShot` never resumes; G1d cites `ut_kill_lend` / `usertrap_a6_after`.
+- **F4.**  `VmfaultQuiet.lazyFree_wmapped_iff (P) (sz) (hwf : uptWf P) (hlf : lazyFree P.um sz) (va : Nat) :
+  uvaWmapped P va ↔ ∃ q, permOf P.um sz.toNat (va / 4096) = some q ∧ q.W = true` -- every `va`, no size
+  premise.  Unreached until G1d: allowlisted in `tools/ci/dead_allow.txt` (remove the row when G1d lands).
+
 ## Lanes (opened 2026-09-15)
 
 Execution order is §6's, adjusted for one territory fact: upstream's

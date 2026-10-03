@@ -22,8 +22,11 @@ Then the two answers a wait gives, relayed from kwait to the program:
   (`ChildTok.exitTok`) at the zombie's status rides with it, and PID
   UNIQUENESS over the caller's reading (`ChildTok.genUniq`).  The arms are
   disjoint AT THE RETURN VALUE (`sext32_rng_not_neg1`).
-* `waitAnsGen` -- the same at the GENERATION, kwait's own form; the step
-  across is `waitAns_of_gen`, taken once at kwait's exit.
+* `waitAnsLed` -- kwait's own form (NI G1c): `waitAns` with the family
+  ledger's reading -- at a reap the receipt and `zLowest` at the prefix
+  before it, at `-1` the reason `waitWhyLed` (no children: a lower bound of
+  the ledger at which the caller has none).  Rocq's `wait_ans_gen` /
+  `wait_ans_of_gen` crossing is folded into its builder `waitAnsLed_of`.
 
 ## Deviations from Rocq
 
@@ -47,9 +50,20 @@ Then the two answers a wait gives, relayed from kwait to the program:
    `_prefix`/`_lb` read `<+:` (Rocq `prefix_of`), and no `Timeless`
    instances are stated (no Lean caller needs them).  `waitAnsLed` (Rocq
    `wait_ans_led`) sits in `WaitAnsGen` (it needs `[WchG GF]`), with
-   `waitAnsLed_post` (drop) and `waitAnsLed_of` (build; the `-1` case of
-   the reaping arm refuted because `2^32 - 1 > genPidMax`).  `waitAns` is
-   untouched.
+   `waitAnsLed_post` (drop) and `waitAnsLed_of` / `waitAnsLed_neg` (build).
+   `waitAns` is untouched.
+4. **The family ledger's reading in the led answer** (NI M2-G1c, G1 design
+   §2(c)): `waitAnsLed`'s reaping arm binds the receipt's history `h`, the
+   slot `j` and the reaped generation `γ'` together and adds
+   `⌜zLowest h act = some (j, rv, xs, γ')⌝` (the reading at the prefix
+   BEFORE the reap, the one the receipt names); its `-1` arm's reason is
+   `waitWhyLed`, whose no-children reason KEEPS `cs = ∅` (what
+   `waitAnsLed_post` needs for the landed `waitWhy`) beside the ledger's
+   `∃ h, zombLedLb h ∗ ⌜¬ zHasKids h act⌝`.  Rocq's `wait_ans_gen` and
+   `wait_ans_of_gen` (the generation form and its crossing) are folded into
+   `waitAnsLed_of`, which builds the reaping arm at the explicit `γ'` the
+   reading names; `waitWhy_notnull/_empty/_shot` gave way to
+   `waitWhyLed_*` (kwait, their one caller, builds the led reason).
 
 Imports only definitional files.
 -/
@@ -247,23 +261,6 @@ theorem waitAns_neg (xs : Int) (cs : ExtTreeSet GName compare) (gn : GName) (nul
   · ipureintro; exact ⟨rfl, rfl⟩
   · iexact Hwhy
 
-/-- ...and the three ways to build that reason -/
-theorem waitWhy_notnull (cs : ExtTreeSet GName compare) (gn : GName) (nullst : Bool)
-    (h : nullst = false) : ⊢@{IProp GF} waitWhy cs gn nullst := by
-  unfold waitWhy
-  ileft; ipureintro; exact h
-
-theorem waitWhy_empty (cs : ExtTreeSet GName compare) (gn : GName) (nullst : Bool)
-    (h : cs = ∅) : ⊢@{IProp GF} waitWhy cs gn nullst := by
-  unfold waitWhy
-  iright; ileft; ipureintro; exact h
-
-theorem waitWhy_shot (cs : ExtTreeSet GName compare) (gn : GName) (nullst : Bool) :
-    killShot (GF := GF) gn ⊢ waitWhy cs gn nullst := by
-  unfold waitWhy
-  iintro #H
-  iright; iright; iexact H
-
 end WaitAns
 
 /-! ## The zombie ledger's ghost (Rocq `Section ZombLedger`, NI-LEDGER-REST,
@@ -394,100 +391,146 @@ theorem zsAuth_congr (f g : Nat → Option (BitVec 32 × Int)) (h : ∀ k < NPRO
 
 end ZombLedger
 
-/-! ## The same answer, at the generation -- kwait's own form
-(Rocq `Section WaitAnsGen`) -/
+/-! ## The answer with the family ledger's reading -- kwait's own form
+(Rocq `Section WaitAnsGen`, NI G1c) -/
 
 section WaitAnsGen
 variable {GF : BundledGFunctors} [CtokG GF] [WchG GF]
 
-/-- Rocq `wait_ans_gen`. -/
-def waitAnsGen (rv : BitVec 32) (xs : Int) (cs cs' : ExtTreeSet GName compare) (gn : GName)
-    (nullst : Bool) : IProp GF :=
-  iprop((⌜rv = -1#32 ∧ cs' = cs⌝ ∗ waitWhy cs gn nullst) ∨
-    ∃ γ' : GName,
-      ⌜cs' = cs \ {γ'} ∧ 1 ≤ rv.toNat ∧ rv.toNat ≤ genPidMax⌝ ∗
-      (⌜γ' ∈ cs⌝ ∨ genIsInit gn) ∗
-      exitTok γ' rv xs ∗ genUniq cs rv γ')
+/-- THE REASON a led wait failed (NI G1c, G1 design §2(c)): `waitWhy`'s
+three reasons, the no-children one with the family ledger's reading beside
+it -- a lower bound `h` of the ledger, taken under `<wait_lock>` at the
+decision, at which the caller `act` has no child (`¬ zHasKids h act`).  The
+copyout reason (`nullst = false`) and the kill reason (`killShot`) are
+`waitWhy`'s.  Persistent. -/
+def waitWhyLed (cs : ExtTreeSet GName compare) (gn : GName) (nullst : Bool) (act : BitVec 64) :
+    IProp GF :=
+  iprop(⌜nullst = false⌝ ∨ (⌜cs = ∅⌝ ∗ ∃ h : List Zev, zombLedLb h ∗ ⌜¬ zHasKids h act⌝) ∨
+    killShot gn)
 
-/-- THE ANSWER WITH THE REAP'S RECEIPT (Rocq `wait_ans_led`, design
-ni-zombie-ledger.md D4): `waitAns` verbatim, with the zombie ledger's
-receipt of the reap -- `ZReap act j rv`, appended by the reaper `act` at
-some slot `j` (NI G1a: the reap carries the reaped slot) -- as the reaping
-arm's first conjunct.  kwait's led twin
-(`SpecKwait.wp_kwait_led_eb_body`) answers this; `waitAnsLed_post` is the
-step back to the landed row. -/
+instance waitWhyLed_persistent (cs : ExtTreeSet GName compare) (gn : GName) (b : Bool)
+    (act : BitVec 64) : Persistent (waitWhyLed (GF := GF) cs gn b act) := by
+  unfold waitWhyLed; infer_instance
+
+/-- The led reason drops to the landed one. -/
+theorem waitWhyLed_post (cs : ExtTreeSet GName compare) (gn : GName) (nullst : Bool)
+    (act : BitVec 64) : waitWhyLed (GF := GF) cs gn nullst act ⊢ waitWhy cs gn nullst := by
+  unfold waitWhyLed waitWhy
+  iintro (%h | ⟨%h, -⟩ | #H)
+  · ileft; ipureintro; exact h
+  · iright; ileft; ipureintro; exact h
+  · iright; iright; iexact H
+
+/-- ...and the three ways to build it: a non-null status pointer (the
+copyout failed), -/
+theorem waitWhyLed_notnull (cs : ExtTreeSet GName compare) (gn : GName) (nullst : Bool)
+    (act : BitVec 64) (h : nullst = false) : ⊢@{IProp GF} waitWhyLed cs gn nullst act := by
+  unfold waitWhyLed
+  ileft; ipureintro; exact h
+
+/-- ...no children, with the ledger's reading at the decision, -/
+theorem waitWhyLed_nokids (cs : ExtTreeSet GName compare) (gn : GName) (nullst : Bool)
+    (act : BitVec 64) (h : List Zev) (hcs : cs = ∅) (hk : ¬ zHasKids h act) :
+    zombLedLb (GF := GF) h ⊢ waitWhyLed cs gn nullst act := by
+  unfold waitWhyLed
+  iintro #Hlb
+  iright; ileft
+  isplitl []
+  · ipureintro; exact hcs
+  iexists h
+  iframe Hlb
+  ipureintro; exact hk
+
+/-- ...or the kill shot. -/
+theorem waitWhyLed_shot (cs : ExtTreeSet GName compare) (gn : GName) (nullst : Bool)
+    (act : BitVec 64) : killShot (GF := GF) gn ⊢ waitWhyLed cs gn nullst act := by
+  unfold waitWhyLed
+  iintro #H
+  iright; iright; iexact H
+
+/-- THE ANSWER WITH THE FAMILY LEDGER'S READING (Rocq `wait_ans_led`, design
+ni-zombie-ledger.md D4, grown by NI G1c, G1 design §2(c)): `waitAns`, with
+
+  * at `-1`, the reason `waitWhyLed` (the no-children reason carries the
+    ledger's lower bound at which the caller `act` has no child);
+  * at a reap, the zombie ledger's RECEIPT of `ZReap act j rv` -- appended
+    by the reaper `act` right after history `h` -- and THE READING at that
+    same `h` (the prefix BEFORE the reap): slot `j` is the LOWEST slot below
+    `NPROC` holding a zombie child of `act`, and its pid, status and
+    generation are `rv`, `xs` and the reaped `γ'` (`zLowest h act`).
+
+kwait's led twin (`SpecKwait.wp_kwait_led_eb_body`) answers this;
+`waitAnsLed_post` is the step back to the landed row. -/
 def waitAnsLed (rv : BitVec 32) (xs : Int) (cs cs' : ExtTreeSet GName compare) (gn : GName)
     (nullst : Bool) (pidv : BitVec 32) (act : BitVec 64) : IProp GF :=
-  iprop((⌜rv = -1#32 ∧ cs' = cs⌝ ∗ waitWhy cs gn nullst) ∨
-    ((∃ (h : List Zev) (j : Nat), zombReceipt h (.ZReap act j rv)) ∗
-     ∃ γ' : GName,
+  iprop((⌜rv = -1#32 ∧ cs' = cs⌝ ∗ waitWhyLed cs gn nullst act) ∨
+    ∃ (h : List Zev) (j : Nat) (γ' : GName),
+      zombReceipt h (.ZReap act j rv) ∗ ⌜zLowest h act = some (j, rv, xs, γ')⌝ ∗
       ⌜cs' = cs \ {γ'} ∧ 1 ≤ rv.toNat ∧ rv.toNat ≤ genPidMax⌝ ∗
       ⌜γ' ∈ cs ∨ pidv = 1#32⌝ ∗
-      exitTok γ' rv xs ∗ genUniq cs rv γ'))
+      exitTok γ' rv xs ∗ genUniq cs rv γ')
 
-/-- The landed row is the led one with the receipt dropped (Rocq
-`wait_ans_led_post`). -/
+/-- The landed row is the led one with the reason's reading, the receipt and
+the reading dropped (Rocq `wait_ans_led_post`). -/
 theorem waitAnsLed_post (rv : BitVec 32) (xs : Int) (cs cs' : ExtTreeSet GName compare) (gn : GName)
     (nullst : Bool) (pidv : BitVec 32) (act : BitVec 64) :
     waitAnsLed (GF := GF) rv xs cs cs' gn nullst pidv act ⊢ waitAns rv xs cs cs' gn nullst pidv := by
   unfold waitAnsLed waitAns
-  iintro (Hneg | ⟨-, Hr⟩)
-  · ileft; iexact Hneg
-  · iright; iexact Hr
-
-/-- ...and the way in: the landed row, plus the receipt wherever a pid came
-back (Rocq `wait_ans_led_of`).  The `-1` answer is never in `[1, PIDMAX]`,
-so the reaping arm of `waitAns` always finds the receipt's arm of the side
-row. -/
-theorem waitAnsLed_of (rv : BitVec 32) (xs : Int) (cs cs' : ExtTreeSet GName compare) (gn : GName)
-    (nullst : Bool) (pidv : BitVec 32) (act : BitVec 64) :
-    waitAns (GF := GF) rv xs cs cs' gn nullst pidv ⊢
-      (⌜rv = -1#32⌝ ∨ ∃ (h : List Zev) (j : Nat), zombReceipt h (.ZReap act j rv)) -∗
-      waitAnsLed rv xs cs cs' gn nullst pidv act := by
-  unfold waitAns waitAnsLed
-  iintro (Hneg | ⟨%γ', %hc, Hr⟩) Hz
-  · ileft; iexact Hneg
-  · icases Hz with (%hm1 | Hz)
-    · subst hm1
-      have h2 := hc.2.2
-      simp [genPidMax] at h2
-    · iright
-      isplitl [Hz]
-      · iexact Hz
-      · iexists γ'
-        isplitr
-        · ipureintro; exact hc
-        · iexact Hr
-
-/-- THE ONE STEP ACROSS, and it is two agreements: the caller's own
-registration says which pid its generation was given, and the sealed pid
-says which pid init was given. -/
-theorem waitAns_of_gen (rv : BitVec 32) (xs : Int) (cs cs' : ExtTreeSet GName compare) (gn : GName)
-    (nullst : Bool) (pidme : BitVec 32) :
-    genPid (GF := GF) gn pidme ∗ initPidIs 1#32 ∗ waitAnsGen rv xs cs cs' gn nullst ⊢
-      waitAns rv xs cs cs' gn nullst pidme := by
-  unfold waitAnsGen waitAns
-  iintro ⟨#Hgp, #Hi, (Hneg | ⟨%γ', %Hrng, Hoci, Hesc, Huniq⟩)⟩
-  · ileft; iexact Hneg
-  · iright
-    iexists γ'
+  iintro (⟨%hf, #Hwhy⟩ | ⟨%h, %j, %γ', -, -, Hr⟩)
+  · ileft
     isplitr
-    · ipureintro; exact Hrng
-    isplitr [Hesc Huniq]
-    · icases Hoci with (%Hin | #Hgi)
-      · ipureintro; exact Or.inl Hin
-      · ihave ⟨%p1, #Hi1, %Heq⟩ := genIsInit_pid gn pidme $$ [Hgi Hgp]
-        · isplitl []
-          · iexact Hgi
-          · iexact Hgp
-        ihave %h := initPidIs_agree 1#32 p1 $$ [Hi Hi1]
-        · isplitl []
-          · iexact Hi
-          · iexact Hi1
-        ipureintro; exact Or.inr (Heq.trans h.symm)
-    isplitl [Hesc]
-    · iexact Hesc
-    · iexact Huniq
+    · ipureintro; exact hf
+    · iapply waitWhyLed_post cs gn nullst act $$ Hwhy
+  · iright; iexists γ'; iexact Hr
+
+/-- The `-1` answer, for the three exits that reap nothing. -/
+theorem waitAnsLed_neg (xs : Int) (cs : ExtTreeSet GName compare) (gn : GName) (nullst : Bool)
+    (pidv : BitVec 32) (act : BitVec 64) :
+    waitWhyLed (GF := GF) cs gn nullst act ⊢ waitAnsLed (-1#32) xs cs cs gn nullst pidv act := by
+  unfold waitAnsLed
+  iintro #Hwhy
+  ileft
+  isplitr
+  · ipureintro; exact ⟨rfl, rfl⟩
+  · iexact Hwhy
+
+/-- **THE REAP'S ANSWER, BUILT AT THE GENERATION** (Rocq `wait_ans_led_of`
+with `wait_ans_of_gen` folded in): the receipt, the reading at the receipt's
+`h`, and the reaping arm at the reaped generation `γ'` -- where "in my
+column, or I am init" is the GENERATION form, crossed here by two
+agreements: the caller's own registration says which pid its generation was
+given, and the sealed pid says which pid init was given. -/
+theorem waitAnsLed_of (rv : BitVec 32) (xs : Int) (cs cs' : ExtTreeSet GName compare) (gn : GName)
+    (nullst : Bool) (pidme : BitVec 32) (act : BitVec 64) (h : List Zev) (j : Nat) (γ' : GName)
+    (hz : zLowest h act = some (j, rv, xs, γ'))
+    (hc : cs' = cs \ {γ'} ∧ 1 ≤ rv.toNat ∧ rv.toNat ≤ genPidMax) :
+    genPid (GF := GF) gn pidme ∗ initPidIs 1#32 ∗ zombReceipt h (.ZReap act j rv) ∗
+      (⌜γ' ∈ cs⌝ ∨ genIsInit gn) ∗ exitTok γ' rv xs ∗ genUniq cs rv γ' ⊢
+      waitAnsLed rv xs cs cs' gn nullst pidme act := by
+  unfold waitAnsLed
+  iintro ⟨#Hgp, #Hi, #Hzr, Hoci, Hesc, Huniq⟩
+  iright
+  iexists h, j, γ'
+  iframe Hzr
+  isplitr
+  · ipureintro; exact hz
+  isplitr
+  · ipureintro; exact hc
+  isplitr [Hesc Huniq]
+  · icases Hoci with (%Hin | #Hgi)
+    · ipureintro; exact Or.inl Hin
+    · ihave ⟨%p1, #Hi1, %Heq⟩ := genIsInit_pid gn pidme $$ [Hgi Hgp]
+      · isplitl []
+        · iexact Hgi
+        · iexact Hgp
+      ihave %he := initPidIs_agree 1#32 p1 $$ [Hi Hi1]
+      · isplitl []
+        · iexact Hi
+        · iexact Hi1
+      ipureintro; exact Or.inr (Heq.trans he.symm)
+  isplitl [Hesc]
+  · iexact Hesc
+  · iexact Huniq
 
 end WaitAnsGen
 

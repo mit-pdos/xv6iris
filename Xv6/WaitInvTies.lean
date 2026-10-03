@@ -71,6 +71,11 @@ part 1 is `Xv6/WaitInv.lean`, whose header and deviations apply here.
    at `fun _ => none` and each slot's element at `none`, `childrenRes_alloc`
    mints them at the new name `wzsName` (its statement unchanged), and
    `waitRes_alloc` takes the authority (its statement moved, one caller).
+10. **The ledger at a named history** (NI M2-G1c): `famLed ps gs` is `∃ h,
+   famLedAt ps gs h` (T1 as the pure `famTie`), so kwait's scan names the
+   one `h` it reads (`famLedAt_tie`, `famLedAt_lookup` (T2), `famLedAt_lb`);
+   `famLed_reap` is stated at `famLedAt` and returns the receipt at that `h`;
+   `childrenInv_reap`'s pure conjunct adds `gs k = g`.
 
 Imports only definitional files.
 -/
@@ -391,14 +396,16 @@ theorem waitInv_keep {P : IProp GF} {φ : Prop} (h : P ⊢ ⌜φ⌝) : P ⊢ ⌜
 ZOMBIE block's quarter, so freeproc gets the slot generation WHOLE -- the
 cell is zeroed, and the reaped generation leaves BOTH columns of the
 reaper's address.  THE FIRST CONJUNCT IS (W2): what the reaper found is its
-own child, by its own row or by a reparent to it.  The registration comes
+own child, by its own row or by a reparent to it -- and the payload's
+generation at the slot IS the block's (NI G1c: what T1 turns into the
+ledger's `gen`).  The registration comes
 back at THREE QUARTERS beside the pid it is keyed at. -/
 theorem childrenInv_reap [CurCtx] (ξ : CtxId) (ps : Nat → BitVec 64) (gs : Nat → GName)
     (m : ChMap) (O : OrphMap) (k : Nat) (pj : BitVec 64) (γ0 : GName)
     (cs : ExtTreeSet GName compare) (g : GName) (hpj : pj ≠ 0#64) (hk : k < NPROC)
     (hks : ps k = pj) (hm : get? m γ0 = some (pj, cs)) :
     childrenInvAt (GF := GF) ξ ps gs m O ∗ slotGen (procAddr k) (.own Qp.quarter) g ⊢
-      ⌜g ∈ cs ∨ g ∈ orphRow O pj⌝ ∗ slotGen (procAddr k) (.own 1) g ∗
+      ⌜(g ∈ cs ∨ g ∈ orphRow O pj) ∧ gs k = g⌝ ∗ slotGen (procAddr k) (.own 1) g ∗
       (∃ pide : BitVec 32, pidReg pide (.own Qp.threeQuarters) g ∗ genPid g pide) ∗
       childrenInvAt ξ (fun i => if i = k then 0#64 else ps i) gs
         (PartialMap.insert m γ0 (pj, cs \ {g})) (PartialMap.insert O pj (orphRow O pj \ {g})) := by
@@ -415,7 +422,7 @@ theorem childrenInv_reap [CurCtx] (ξ : CtxId) (ps : Nat → BitVec 64) (gs : Na
     · iexact Hsg
   have ⟨hW2, hp'⟩ := invPure_reap ps gs m O k pj γ0 cs g hpj hk hks hm hg0 hp
   isplitr
-  · ipureintro; exact hW2
+  · ipureintro; exact ⟨hW2, hg0⟩
   isplitl [Hsg0 Hsg]
   · iapply (slotGen_quarters (procAddr k) g).mpr
     rw [hg0]
@@ -561,20 +568,63 @@ theorem childrenInv_empty [CurCtx] (ξ : CtxId) (ps : Nat → BitVec 64) (gs : N
 
 /-! ## The family ledger (NI M2-G1b, deviation 9) -/
 
+/-- Tie T1 at history `h` (pure): the 64 parent cells `ps` are the fold's
+parent column, and a nonzero cell's generation is the fold's. -/
+def famTie (ps : Nat → BitVec 64) (gs : Nat → GName) (h : List Zev) : Prop :=
+  ∀ k < NPROC, ps k = (famOf h k).par ∧ (ps k ≠ 0#64 → gs k = (famOf h k).gen)
+
+/-- The family ledger AT A NAMED HISTORY `h` (NI G1c: kwait's scan holds the
+lock, so the history it reads is one `h` for the whole scan): the authority,
+T1 and T2's authority. -/
+def famLedAt (ps : Nat → BitVec 64) (gs : Nat → GName) (h : List Zev) : IProp GF :=
+  iprop(zombLedAuth h ∗ ⌜famTie ps gs h⌝ ∗ zsAuth (fun k => (famOf h k).zomb))
+
+/-- T1, read off the ledger and kept. -/
+theorem famLedAt_tie (ps : Nat → BitVec 64) (gs : Nat → GName) (h : List Zev) :
+    famLedAt (GF := GF) ps gs h ⊢ ⌜famTie ps gs h⌝ ∗ famLedAt ps gs h := by
+  unfold famLedAt
+  iintro ⟨Hzl, %hT, Hzs⟩
+  isplitl []
+  · ipureintro; exact hT
+  iframe Hzl Hzs
+  ipureintro; exact hT
+
+/-- T2: a slot's element reads the fold's zombie column (both kept). -/
+theorem famLedAt_lookup (ps : Nat → BitVec 64) (gs : Nat → GName) (h : List Zev) (k : Nat)
+    (hk : k < NPROC) (v : Option (BitVec 32 × Int)) :
+    famLedAt (GF := GF) ps gs h ∗ zsElem (procAddr k) v ⊢
+      ⌜(famOf h k).zomb = v⌝ ∗ famLedAt ps gs h ∗ zsElem (procAddr k) v := by
+  unfold famLedAt
+  iintro ⟨⟨Hzl, %hT, Hzs⟩, He⟩
+  icases zsAuth_lookup (fun k => (famOf h k).zomb) k hk v $$ [Hzs He] with ⟨%hv, Hzs, He⟩
+  · iframe Hzs He
+  isplitl []
+  · ipureintro; exact hv
+  iframe Hzl Hzs He
+  ipureintro; exact hT
+
+/-- The decision's lower bound: the authority's own history, as a
+persistent snapshot (kwait's no-children arm cites it). -/
+theorem famLedAt_lb (ps : Nat → BitVec 64) (gs : Nat → GName) (h : List Zev) :
+    famLedAt (GF := GF) ps gs h ⊢ zombLedLb h ∗ famLedAt ps gs h := by
+  unfold famLedAt zombLedAuth zombLedLb
+  iintro ⟨Hzl, %hT, Hzs⟩
+  ihave #Hlb := MonoList.lb_own_get (WchG.wzlName GF) (DFrac.own 1) h $$ Hzl
+  iframe Hlb Hzl Hzs
+  ipureintro; exact hT
+
 /-- **THE FAMILY LEDGER at `<wait_lock>`** (G1 design §1, ties T1 and T2):
 the history's authority; T1, the payload's own 64 parent cells `ps` and
 their generations `gs` against the fold (a generation is pinned only while
 its cell is nonzero); and T2's authority at the fold's zombie column, whose
 elements sit in the slots' own lock payloads. -/
 def famLed (ps : Nat → BitVec 64) (gs : Nat → GName) : IProp GF :=
-  iprop(∃ h : List Zev, zombLedAuth h ∗
-    ⌜∀ k < NPROC, ps k = (famOf h k).par ∧ (ps k ≠ 0#64 → gs k = (famOf h k).gen)⌝ ∗
-    zsAuth (fun k => (famOf h k).zomb))
+  iprop(∃ h : List Zev, famLedAt ps gs h)
 
 /-- BOOT: the empty history, every cell 0, every column entry `none`. -/
 theorem famLed_boot (ps : Nat → BitVec 64) (gs : Nat → GName) (hz : ∀ k < NPROC, ps k = 0#64) :
     zombLedAuth (GF := GF) [] ∗ zsAuth (fun _ => none) ⊢ famLed ps gs := by
-  unfold famLed
+  unfold famLed famLedAt famTie
   iintro ⟨Hzl, Hzs⟩
   iexists []
   iframe Hzl
@@ -594,7 +644,7 @@ theorem famLed_fork (ps : Nat → BitVec 64) (gs : Nat → GName) (i : Nat) (pa 
     famLed (GF := GF) ps gs ⊢
       |==> (famLed (fun x => if x = i then pa else ps x) (fun x => if x = i then g else gs x) ∗
         ∃ h : List Zev, zombReceipt h (.ZFork pa i pid g)) := by
-  unfold famLed
+  unfold famLed famLedAt famTie
   iintro ⟨%h, Hzl, %hT, Hzs⟩
   imod zombLedAuth_grow h (.ZFork pa i pid g) $$ Hzl with ⟨Hzl, #Hlb⟩
   imodintro
@@ -622,7 +672,7 @@ theorem famLed_exit (ps : Nat → BitVec 64) (gs : Nat → GName) (j : Nat) (hj 
     (ip : BitVec 64) (pid : BitVec 32) (xs : Int) :
     famLed (GF := GF) ps gs ∗ zsElem (procAddr j) none ⊢
       |==> (famLed (rpMap (procAddr j) ip ps) gs ∗ zsElem (procAddr j) (some (pid, xs))) := by
-  unfold famLed
+  unfold famLed famLedAt famTie
   iintro ⟨⟨%h, Hzl, %hT, Hzs⟩, He⟩
   imod zombExit h (procAddr j) pid xs ip $$ Hzl with ⟨Hzl, -⟩
   imod zsAuth_update _ j hj none (some (pid, xs)) $$ [Hzs He] with ⟨Hzs, He⟩
@@ -658,22 +708,22 @@ theorem famLed_exit (ps : Nat → BitVec 64) (gs : Nat → GName) (j : Nat) (hj 
 
 /-- **KWAIT** (`pp->parent = 0` and the reap, slot `n`): appends `ZReap act n
 pid`; the cell is 0 (T1), and the slot's element moves to `none` (T2), to be
-put back at the UNUSED re-close after `freeproc`. -/
+put back at the UNUSED re-close after `freeproc`.  Stated at the named
+history `h` the scan read (NI G1c): the receipt is at THAT `h`. -/
 theorem famLed_reap (ps : Nat → BitVec 64) (gs : Nat → GName) (n : Nat) (hn : n < NPROC)
-    (act : BitVec 64) (pid : BitVec 32) (v : Option (BitVec 32 × Int)) :
-    famLed (GF := GF) ps gs ∗ zsElem (procAddr n) v ⊢
-      |==> (famLed (fun i => if i = n then 0#64 else ps i) gs ∗ zsElem (procAddr n) none ∗
-        ∃ h : List Zev, zombReceipt h (.ZReap act n pid)) := by
-  unfold famLed
-  iintro ⟨⟨%h, Hzl, %hT, Hzs⟩, He⟩
+    (act : BitVec 64) (pid : BitVec 32) (v : Option (BitVec 32 × Int)) (h : List Zev) :
+    famLedAt (GF := GF) ps gs h ∗ zsElem (procAddr n) v ⊢
+      |==> (famLedAt (fun i => if i = n then 0#64 else ps i) gs (h ++ [.ZReap act n pid]) ∗
+        zsElem (procAddr n) none ∗ zombReceipt h (.ZReap act n pid)) := by
+  unfold famLedAt famTie
+  iintro ⟨⟨Hzl, %hT, Hzs⟩, He⟩
   imod zombReap h act n pid $$ Hzl with ⟨Hzl, #Hr⟩
   imod zsAuth_update _ n hn v none $$ [Hzs He] with ⟨Hzs, He⟩
   · iframe Hzs He
   imodintro
   iframe He
   isplitl [Hzl Hzs]
-  · iexists h ++ [.ZReap act n pid]
-    iframe Hzl
+  · iframe Hzl
     rw [famOf_snoc]
     isplitr
     · ipureintro
@@ -686,7 +736,7 @@ theorem famLed_reap (ps : Nat → BitVec 64) (gs : Nat → GName) (n : Nat) (hn 
       by_cases e : k = n
       · subst e; simp [famStep, ZSlot.empty]
       · simp [famStep, e]
-  · iexists h; iexact Hr
+  · iexact Hr
 
 /-! ## What the boot fupd hands main, and the payload -/
 

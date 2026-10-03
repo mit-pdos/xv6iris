@@ -80,7 +80,10 @@ THE LED FORM (NI-LEDGER-REST, Rocq 2107981b4; design
 `wp_kwait_led_body` are the two contracts verbatim with the answer at
 `UserChildren.waitAnsLed … (procAddr j)`: the reaping arm also hands back the
 zombie ledger's RECEIPT of `ZReap (procAddr j) n rv` (`n` the reaped slot), appended by the caller's
-own proc word under `<wait_lock>`.  `KWAIT` carries the led field
+own proc word under `<wait_lock>`, and (NI M2-G1c) the family ledger's READING at the receipt's
+prefix: `zLowest h (procAddr j) = some (n, rv, xs, γ')`, the lowest zombie child; the `-1` arm's
+no-children reason carries `∃ h, zombLedLb h ∗ ⌜¬ zHasKids h (procAddr j)⌝`.  The texts below
+moved only through `waitAnsLed`.  `KWAIT` carries the led field
 `wp_kwait_led_eb` beside `wp_kwait_eb`; the led form is the proof
 (`ProofKwait.kwait_led_proof`), the landed contract its corollary
 (`UserChildren.waitAnsLed_post`).

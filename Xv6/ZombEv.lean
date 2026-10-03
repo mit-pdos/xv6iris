@@ -151,12 +151,6 @@ theorem famOf_nil : famOf [] = fun _ => ZSlot.empty := rfl
 theorem famOf_snoc (h : List Zev) (e : Zev) : famOf (h ++ [e]) = famStep (famOf h) e := by
   unfold famOf; rw [List.foldl_append]; rfl
 
-/-- THE PREFIX READING: the reading at a prefix of length `n + 1` is the
-reading at the prefix of length `n`, stepped by the `n`-th event. -/
-theorem famOf_take (h : List Zev) (n : Nat) (hn : n < h.length) :
-    famOf (h.take (n + 1)) = famStep (famOf (h.take n)) h[n] := by
-  rw [List.take_add_one, List.getElem?_eq_getElem hn, Option.toList_some, famOf_snoc]
-
 /-- kwait's `havekids`: some slot's parent cell is `a`. -/
 def zHasKids (h : List Zev) (a : BitVec 64) : Prop := ∃ k < NPROC, (famOf h k).par = a
 
