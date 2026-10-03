@@ -34,7 +34,6 @@ it).  Unreached (not ported):
 -/
 import Xv6.UkReadRows
 import Xv6.UkRunSysPipe
-import Xv6.UshSysP
 
 namespace Xv6
 

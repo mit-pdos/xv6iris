@@ -44,7 +44,6 @@ WHOLE block is joined back.
    and `sfs_ok_exit` (repay, join, epilogue).
 -/
 import Xv6.SysFstatParts
-import Xv6.UMemWindow
 import Xv6.SysfileCalls
 import Xv6.SpecSysFstat
 import Xv6.ReadiDefs

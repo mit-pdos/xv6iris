@@ -70,7 +70,6 @@ Imports only definitional files.
 import Xv6.KallocDefs
 import Xv6.SpecEntry
 import Xv6.KernelData
-import MachCSL.Power
 
 namespace Xv6
 

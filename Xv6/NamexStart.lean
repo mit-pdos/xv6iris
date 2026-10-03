@@ -19,6 +19,7 @@ functor parameter of the entry, unused since the absolute arm stopped
 calling iget.)
 -/
 import Xv6.NamexLoop
+import Xv6.SpecIget
 
 namespace Xv6
 

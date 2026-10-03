@@ -22,7 +22,6 @@ the child's inum range comes from the caller on both.
 -/
 import Xv6.DirlinkTail
 import Xv6.DirlinkDefs
-import MachCSL.BvLemmas
 import Xv6.DirlookupParts
 
 namespace Xv6

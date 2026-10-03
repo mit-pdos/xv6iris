@@ -9,7 +9,6 @@ Added (Rocq → Lean): `fop_snoc_inv` → `fopSnoc_inv`, `in_pres_first` →
 Deviations: spelling only (`concat (f <$> l)` is `(l.map f).flatten`,
 `ins` is `consIns`).
 -/
-import Xv6.FileOutPure
 import Xv6.EchoDiscSeal
 
 namespace Xv6

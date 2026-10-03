@@ -40,11 +40,6 @@ UkPipeDev: `pipe_write`, `pipe_write_halt`, `pipe_write_nil`, `pipe_close`
 -/
 import Xv6.HfpFileClaimsP
 import Xv6.HfpPipeClaimsP
-import Xv6.UkFreeHandler
-import Xv6.UserCwd
-import Xv6.UexecExecInst
-import Xv6.ConsoleInvDefs
-import Xv6.SysOpenDefs
 import Xv6.UkPipeDevDefs
 import Xv6.AppFileCons
 import Xv6.FileOpenDeed

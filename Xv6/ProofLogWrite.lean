@@ -81,12 +81,8 @@ and hands one pool unit back in place of the one `bpin` absorbed.
 import Xv6.SpecLogWrite
 import Xv6.LogLedger
 import Xv6.BcacheLock
-import Xv6.CodeTactics
 import Xv6.SpecBpin
-import Xv6.FsWords
 import Xv6.InitlogHead
-import Xv6.PrintkDefs
-import MachCSL.BvLemmas
 import Xv6.BallocParts
 
 namespace Xv6

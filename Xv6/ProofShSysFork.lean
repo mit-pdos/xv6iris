@@ -13,7 +13,6 @@ rides in the payload (`forkable_ushCode`).
 Deviations from Rocq: as in `SpecShSysFork`.
 -/
 import Xv6.SpecShSysFork
-import Xv6.UshStep
 import Xv6.UshRunCode
 
 namespace Xv6

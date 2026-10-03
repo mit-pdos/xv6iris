@@ -23,7 +23,6 @@ Deviations from Rocq: `UshDiagDefs` deviations 1-6; the message strings are
 leaf) is `UshStep.ushS_ld` at `DFrac.discard`; `uint s1 mod 8 = 0` is
 `(m.get 9#5).toNat % 8 = 0`; `ua_ptr/ua_len/ua_bytes` are `UArg.ptr/len/bytes`.
 -/
-import Xv6.UshDiagPanic
 import Xv6.UshDiagDie
 import Xv6.UshRunDefs
 import Xv6.UshRunCode

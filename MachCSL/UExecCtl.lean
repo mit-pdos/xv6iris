@@ -25,7 +25,6 @@ the current `PC`, `Illegal_Instruction`, or `Enter_Wait`; only the GPRs and
 `nextPC` may change; the byte map and reservation bit are untouched; no
 oracle answer is consumed.
 -/
-import MachCSL.UExecCtlJump
 import MachCSL.UExecCtlSys
 
 namespace MachCSL

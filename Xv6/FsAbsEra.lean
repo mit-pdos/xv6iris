@@ -123,7 +123,6 @@ import Xv6.FsAbsWalk
 import Xv6.FsStateEraPure
 import Xv6.PathElems
 import Xv6.FsStateTop
-import Xv6.FsAbsDefs
 
 namespace Xv6
 

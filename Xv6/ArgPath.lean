@@ -69,7 +69,6 @@ kept because the reasons are the content:
 
 Pure: no proof mode, nothing in `IProp`, exactly as Rocq's file is.
 -/
-import Xv6.DirentEnc
 import Xv6.UMemLemmas
 
 namespace Xv6

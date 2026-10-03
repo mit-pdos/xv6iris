@@ -48,8 +48,6 @@ import Xv6.KexecSeam
 import Xv6.SpecMyproc
 import Xv6.SpecStrlen
 import Xv6.SpecCopyout
-import Xv6.UmodeArith
-import MachCSL.BvLemmas
 
 namespace Xv6
 

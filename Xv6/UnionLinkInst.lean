@@ -37,6 +37,7 @@ Rocq's header, abridged: `GenLinksLine.gen_link_inst ulmG union_params`:
 import Xv6.UnionLinks
 import Xv6.FileLinkGen
 import Xv6.FsCfgDefs
+import Xv6.GenLinksLine
 
 namespace Xv6
 

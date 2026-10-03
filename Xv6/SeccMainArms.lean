@@ -15,6 +15,7 @@ interface `SECC_FPRINTF`; the engine is `UL`, the ecall leaves `HS`
 (`UK_SYS_P`), the seccomp leaf `HL` (`UkSysP.wpUkEcallSeccK utab tabLe`).
 -/
 import Xv6.UkSeccStubs
+import Xv6.UkRunBr
 
 namespace Xv6
 

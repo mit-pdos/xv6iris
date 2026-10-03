@@ -13,6 +13,7 @@ interrupts disabled -- the regime of early boot (`main` before
 import MachCSL.WpPmpXv6
 import MachCSL.WpStages
 import MachCSL.SConfPhysDefs
+import MachCSL.ModelFacts
 
 
 namespace MachCSL

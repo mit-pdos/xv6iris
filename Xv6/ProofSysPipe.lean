@@ -24,7 +24,6 @@ the rest is split by pc into `SysPipeAlloc` (`+0x26`, `+0x38`),
 `+0xa0`, `+0xb4`, `+0xc8`), over the shared `SysPipeParts`.
 -/
 import Xv6.SysPipeAlloc
-import Xv6.SysfileCalls
 import Xv6.SysFstatParts
 
 namespace Xv6

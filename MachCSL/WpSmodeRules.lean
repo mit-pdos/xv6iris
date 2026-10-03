@@ -9,7 +9,6 @@ translation tier (interrupts off for now), delivering `wpNext`.  The
 stages are stated at the ambient tier `curTier`; the context's tier is
 pinned to it by `transSlot`.
 -/
-import MachCSL.WpSmodeMem
 import MachCSL.WpSmodeCtl
 import MachCSL.WpSmodeCsr
 import MachCSL.WpSmodeCycle

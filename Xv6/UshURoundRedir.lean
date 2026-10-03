@@ -36,13 +36,9 @@ CONE (UShURound S3): `uHchild_redir`.
 4. The payload `ushfWq (ushURoundCtx …) I` is `uredirWq … I` by `rfl`
    (`hpeq'`).
 -/
-import Xv6.UshOomPaid
 import Xv6.UshURoundRedirDiag
-import Xv6.UshURoundBody
 import Xv6.UshRedirChild
-import Xv6.HfpFileOpenHolds
 import Xv6.LinkShExec
-import Xv6.LinkShParse
 import Xv6.UshURoundEcho
 
 namespace Xv6

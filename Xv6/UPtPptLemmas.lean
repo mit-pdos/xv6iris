@@ -12,6 +12,7 @@ same facts under their own names.
 -/
 import Xv6.UPtLemmas
 import MachCSL.WpSmodeCtl
+import Xv6.PtRunLemmas
 
 namespace Xv6.UPtPpt
 

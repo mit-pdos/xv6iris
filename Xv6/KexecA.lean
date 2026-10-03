@@ -49,6 +49,7 @@ import Xv6.KexecBridge
 import Xv6.SpecKexec
 import Xv6.SpecNameiEra
 import Xv6.FsAbsOpenFire
+import Xv6.DirlookupParts
 
 namespace Xv6
 

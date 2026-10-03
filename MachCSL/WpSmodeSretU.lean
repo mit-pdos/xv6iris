@@ -15,7 +15,6 @@ What this file provides:
 * `execSpecF_sretU` -- the execute stage (S → U).
 -/
 import MachCSL.WpSmodeSret
-import MachCSL.WpSmodeCycleT
 
 namespace MachCSL
 

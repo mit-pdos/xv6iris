@@ -34,7 +34,6 @@ WHOLE block joined at fileread's grown descriptor.
    epilogue).
 -/
 import Xv6.SysReadParts
-import Xv6.UMemWindow
 import Xv6.SysfileCalls
 import Xv6.SpecSysRead
 import Xv6.ReadiDefs

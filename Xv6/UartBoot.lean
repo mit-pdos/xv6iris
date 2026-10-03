@@ -41,7 +41,6 @@ Imports only definitional files.
 -/
 import MachCSL.CtxBox
 import Xv6.UartInv
-import MachCSL.Power
 
 namespace Xv6
 

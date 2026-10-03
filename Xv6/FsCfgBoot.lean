@@ -54,6 +54,7 @@ their own `Local` copies), the empty `FsCfgBootBitmap` section.
 import Xv6.IcacheBootRegion
 import Xv6.FsImgBridge
 import Xv6.FsImgWf
+import Xv6.FsCrashPure
 
 namespace Xv6
 

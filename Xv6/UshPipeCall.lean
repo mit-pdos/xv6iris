@@ -40,10 +40,8 @@ Lean register indices are literals `1#5`, `10#5`, `17#5`), `shpc_pipe`,
    (BitVec.ofNat 32 a)` (UshArmDefs deviation 2).
 6. Namespace `Xv6.UShPipeCall` (lane rule).
 -/
-import Xv6.UkReadPipe
 import Xv6.UkPipeDevXv6
 import Xv6.UshArmDefs
-import Xv6.UshStep
 import Xv6.UshRunCode
 
 namespace Xv6

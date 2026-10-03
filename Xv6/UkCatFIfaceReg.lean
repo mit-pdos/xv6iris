@@ -40,12 +40,8 @@ resolution: Rocq's Σ plumbing, which the class slot in `unionGF` subsumes).
    Rocq's `∃ fd' ∈ dom (delete fd fdm)` spelled without the map.
 -/
 import Xv6.HfpReg
-import Xv6.HfpPipeClaimsP
 import Xv6.PipeBothNPure
-import Xv6.FileDiscLine
-import Xv6.SysOpenDefs
 import Xv6.ConsoleInvDefs
-import Xv6.UserFd
 import Xv6.UkHandler
 import Xv6.PipeProto
 

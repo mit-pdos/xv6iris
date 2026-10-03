@@ -9,7 +9,6 @@ uses it).
 Deviations from Rocq: as `SpecGrepStart`.
 -/
 import Xv6.SpecGrepStart
-import Xv6.UkHandler
 
 namespace Xv6
 

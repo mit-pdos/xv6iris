@@ -7,7 +7,6 @@ text tree holds each function's table at printf.o's load address (`sh`'s
 `putc` symbol; `decide +kernel`), the symbols are their offsets from `putc`,
 and the code resources follow by the generic relocation lemmas.
 -/
-import Xv6.SpecUlibPutc
 import Xv6.UlibPrintfDefs
 import Xv6.User.ShImage
 import Xv6.User.ShTree

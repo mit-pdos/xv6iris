@@ -36,7 +36,6 @@ credential and the generic user-execution WP: no `appSup`, no taint
    keeping the number abstract there brings every theorem under 1 s.
 -/
 import Xv6.UexecSecc
-import Xv6.AppIface
 
 namespace Xv6
 

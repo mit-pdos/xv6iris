@@ -19,6 +19,7 @@ image's BYTES.
    (crash batch C-1, item CE).
 -/
 import Xv6.FsDurSnapBytes
+import Xv6.FsCrashPure
 
 namespace Xv6
 

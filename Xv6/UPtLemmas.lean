@@ -11,7 +11,6 @@ of the user-memory functions may draw on it, and none of them is imported
 here.
 -/
 import Xv6.UPtDefs
-import Xv6.PtRunLemmas
 
 namespace Xv6.UPt
 

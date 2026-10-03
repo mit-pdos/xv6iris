@@ -15,7 +15,6 @@ entry sp (with the empty local run `ustack … 0`), and the epilogue is
 `UshStep.ush_frame_epi`; the returning arm names the register file
 (`ushFork1Tm`) instead of Rocq's "every other register agrees" row.
 -/
-import Xv6.UshRunDefs
 import Xv6.UshStep
 import Xv6.UshRunCode
 

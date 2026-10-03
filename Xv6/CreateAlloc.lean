@@ -94,7 +94,6 @@ contract's own continuation `createPost`.
 import MachCSL.WpSmodeFrame12b
 import Xv6.CreateCalls
 import Xv6.FsStateEraResB
-import Xv6.FsWords
 import Xv6.IcacheShortCarve
 import Xv6.ProcPrivAcc
 import Xv6.SysUnlinkShared

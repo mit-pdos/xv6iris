@@ -161,6 +161,7 @@ import Xv6.KernelMap
 import MachCSL.WpDevDma
 import MachCSL.DmaCtxSplit
 import MachCSL.CrashPermInv
+import MachCSL.WpDev
 
 namespace Xv6
 

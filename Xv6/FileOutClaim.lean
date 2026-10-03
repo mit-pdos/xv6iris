@@ -43,7 +43,6 @@ Rocq's header, abridged:
 -/
 import Xv6.FileOutEra
 import Xv6.GenOut
-import Xv6.EflLines
 
 namespace Xv6
 

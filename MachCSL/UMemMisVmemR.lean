@@ -27,8 +27,6 @@ condition, which is rewritten by the pure plan (`UMemMisPlan`), never
 evaluated at a symbolic address.  The loaded value is existential.
 -/
 import MachCSL.UMemMisPlan
-import MachCSL.UMemMisLoop
-import MachCSL.Tactics
 import MachCSL.UTranslate
 
 namespace MachCSL

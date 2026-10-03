@@ -125,6 +125,7 @@ import Xv6.SpecSysMkdir
 import Xv6.SpecSysClose
 import Xv6.SpecSysSync
 import Xv6.SpecSysSeccomp
+import Xv6.SysExecDefs
 
 namespace Xv6
 
