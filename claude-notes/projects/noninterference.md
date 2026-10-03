@@ -2309,6 +2309,8 @@ write), M3
 
 ### M2-G1e as landed (2026-10-03)
 
+**Coordinator acceptance (2026-10-03):** the two moves the lane asked about are accepted. (1) G1e-R3 as stated was false for a lazy process (a page copyout faults in is written but is not in the entry table), so the copied prefix is writable at the table copyout HANDS BACK (`P'`), the stop byte at the entry table; at `lazyFree` the copy adds no page (`lazyFree_wmapped_ext`), which is R3's content inside the class. (2) `syscEvOut`'s kill disjunct also says nothing moved (`cs' = cs`, image unchanged): true of kwait's kill path (`d = 0`), needed for the class row at a non-null pointer, `SYSCALL`'s text unchanged.
+
 Lane `lane/g1e`, one commit on `lean` 1a1537107 (M2-X4).  Closes G1d's deviation 1: wait at a non-null
 status pointer joins the NI class at a lazy-free process.
 
