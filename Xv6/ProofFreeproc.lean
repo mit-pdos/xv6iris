@@ -354,7 +354,8 @@ theorem fp_pidRes_acc [CurCtx] (j : Nat) (hj : j < NPROC) (Wk : IProp GF) (pid k
   imod fp_pidReg_die R pids hdom Wk pid kl g $$ [Hauth Hkp Hrr] with Hauth
   · iframe
   -- ...and the ledger records the release, beside the register it mirrors
-  imod pidLedger_free R act pid $$ Hled with ⟨Hled, #Hrc⟩
+  imod pidLedger_free np pids (pidsClear pids j) j R act pid hj hpj hpure.2.2
+      (pidsClear_self pids j) (fun i hi => pidsClear_ne pids j i hi) $$ Hled with ⟨Hled, #Hrc⟩
   imodintro
   isplitl [Hnp H0 Hrest Hm1 Hauth Hled Hm2]
   · iexists np, (pidsClear pids j)

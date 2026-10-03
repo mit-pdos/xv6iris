@@ -1543,6 +1543,36 @@ answer).
 
 What remains of G1: fork's slot −1 (parked, §6); G2; G3; G4; M2-X
 
+### M2-G2a as landed (2026-10-03)
+
+On `lane/g2` (based on `lean` 4007ce734), one commit, six files touched as §6 lists (`MainKvm` needed no edit:
+`mn_pidRes_boot`'s proof goes through unchanged against the new `pidLedger_empty`).
+- **`PidEv`** (pure): `nextOf_snoc_alloc/_free`, `liveStepB`/`liveB`, `cycAt`, `pidPick` as §1, and `liveB_iff`,
+  `cycAt_zero`, `cycAt_succ` (at `0 < pidmax`, weaker than the design's `2 ≤`), `cycAt_period`, the helper
+  `pidPick_find` (the first hit of `find?` on `List.range`) and `pidPick_spec` (`k < pidmax` from leastness and
+  the period; no pigeonhole). `pidPick_surj` stays OUT of the tree (F4's witness, the design scratch).
+- **`PidLock`**: `pidCells`, `pidTie`, `pidNext` (+ `pidNext_toNat`, the `nextStep` arm), `pidLedger np pids R`,
+  `pidAllocRcpt` (+ its `Persistent` instance), and the three steps. `pidLockResAt`'s body changes in the one
+  place; its statement, `pidLockPay`'s and every namer's are byte-identical (the full build recompiled them
+  unchanged).
+- **`ProofAllocproc`**: `apNewPid` moved to `PidLock.pidNext` (no alias: every caller renamed; the internal
+  `apNewPid_bounds` keeps its name). `ap_pidloop` gains the ghost start `n0` and the binder `k`; the retry arm
+  steps `k + 1` (`pidNext_toNat`, `cycAt_succ`; slot `m'` is the `pidCells` witness), the entry is `k = 0`
+  (`cycAt_zero` at the payload's bound), the exit hands `⟨k, …⟩` to `apExitCont`'s new conjunct. `ap_found`'s
+  open restates `pidLedger np pids PR`; its close calls `pidLedger_alloc` with the exit's first-ness.
+  `apPostCells`' found arm carries `pidAllocRcpt act pid`.
+- **`SpecAllocproc`**: `allocprocPostLed`'s found arm carries `pidAllocRcpt act pid`; `allocprocPostLed_post`,
+  `allocprocPost`, `wp_allocproc_body` byte-identical.
+- **`ProofFreeproc`**: `fp_pidRes_acc`'s proof calls the new `pidLedger_free` with `pidsOk` (statement unchanged).
+
+Deviations: (1) the steps take the updated cells as a second function `pids'` with pointwise premises
+(`pids' n = pid`, `pids' i = pids i` elsewhere; for free `pids' j = 0`), because `apPidsSet` / `pidsClear` live
+in `ProofAllocproc` / `ProofFreeproc`, above `PidLock` (moving them was not sanctioned); the callers instantiate
+`pids'` at those functions, so the conclusions are the design's. (2) `pidLedger_free` drops the `pid ≠ 0`
+premise: a cell holding 0 is in no `pidCells`, so the tie re-closes without it. (3) `cycAt_succ` at `0 < pidmax`.
+
+What remains of G2: G2b with M2-X; G2c the joint lane.
+
 ## Lanes (opened 2026-09-15)
 
 Execution order is §6's, adjusted for one territory fact: upstream's

@@ -140,7 +140,9 @@ def allocprocPost {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF
 ni-pid-ledger.md D4, ruling R4): a COPY, comments stripped (read them on the
 original above), whose FOUND arm also carries the pid ledger's RECEIPT of
 the allocation -- `PAlloc act pid` appended right after some history `h`,
-the actor `act` being the hart's proc word.  The null arm is unchanged: it
+the actor `act` being the hart's proc word, and (NI M2-G2a) `pid` the pid
+the kernel was bound to give after `h` (`PidLock.pidAllocRcpt`: `pid =
+pidPick PIDMAX h`).  The null arm is unchanged: it
 never reached a registration.  `allocprocPostLed_post` drops the receipt. -/
 def allocprocPostLed {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF]
     [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
@@ -152,7 +154,7 @@ def allocprocPostLed {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
     (procsAvailAt Γ pav tk ∨ pavSpent Γ pav) ∗
     ∃ on' : Option Nat, ⌜on' = on ∨ on' = none⌝ ∗ kallocAvail γk on') ∨
   (∃ (j : Nat) (ch : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (g : Nat),
-    (∃ h : List Pev, pidReceipt h (.PAlloc act pid)) ∗
+    pidAllocRcpt act pid ∗
     ⌜r = procAddr j ∧ j < NPROC ∧ 1 ≤ pid.toNat ∧ pid.toNat ≤ PIDMAX ∧ allocprocPriv V ∧ g ≤ procPagetableNodes + 1 ∧
       (if pavBoot pav tk then pid.toNat = 1 else pid.toNat ≠ 1)⌝ ∗
     procHeld Γ cpu j USED ch ∗ hartAtAny Γ (procAddr j) ∗ slotUsed Γ (procAddr j) ∗ pavSpent Γ (pavDec pav) ∗
