@@ -532,6 +532,72 @@ theorem waitAnsLed_of (rv : BitVec 32) (xs : Int) (cs cs' : ExtTreeSet GName com
   · iexact Hesc
   · iexact Huniq
 
+/-- **No children, no lowest zombie child** (NI M2-X2). -/
+theorem zLowest_none_of_noKids {h : List Zev} {act : BitVec 64} (hk : ¬ zHasKids h act) :
+    zLowest h act = none := by
+  cases hz : zLowest h act with
+  | none => rfl
+  | some v =>
+    obtain ⟨i, pid, xs, g⟩ := v
+    obtain ⟨hi, hpar, -⟩ := (zLowest_spec h act i pid xs g).1 hz
+    exact absurd ⟨i, hi, hpar⟩ hk
+
+/-- **WHAT A LED WAIT ANSWER CITES** (NI M2-X2, design "M2-X design" §2(a)):
+the persistent part of `waitAnsLed` -- at `-1`, the reason with the
+no-children reason's lower bound read as the family ledger's reading
+(`zLowest h act = none`); at a reap, the receipt lowered to the prefix
+BEFORE the reap (`zombLedLb h`, `MonoList.lb_own_le`) with the reading at
+it. -/
+def waitLedCite (rv : BitVec 32) (xs : Int) (cs cs' : ExtTreeSet GName compare) (gn : GName)
+    (nullst : Bool) (act : BitVec 64) : IProp GF :=
+  iprop((⌜rv = -1#32 ∧ cs' = cs⌝ ∗
+      (⌜nullst = false⌝ ∨ (∃ h : List Zev, zombLedLb h ∗ ⌜zLowest h act = none⌝) ∨ killShot gn)) ∨
+    ∃ (h : List Zev) (j : Nat) (γ' : GName),
+      zombLedLb h ∗ ⌜zLowest h act = some (j, rv, xs, γ') ∧ cs' = cs \ {γ'} ∧ 1 ≤ rv.toNat ∧
+        rv.toNat ≤ genPidMax⌝)
+
+instance waitLedCite_persistent (rv : BitVec 32) (xs : Int) (cs cs' : ExtTreeSet GName compare)
+    (gn : GName) (nullst : Bool) (act : BitVec 64) :
+    Persistent (waitLedCite (GF := GF) rv xs cs cs' gn nullst act) := by
+  unfold waitLedCite; infer_instance
+
+/-- **The led answer's citation, read off** (NI M2-X2); the answer goes back
+untouched. -/
+theorem waitAnsLed_cite (rv : BitVec 32) (xs : Int) (cs cs' : ExtTreeSet GName compare) (gn : GName)
+    (nullst : Bool) (pidv : BitVec 32) (act : BitVec 64) :
+    waitAnsLed (GF := GF) rv xs cs cs' gn nullst pidv act ⊢
+      waitLedCite rv xs cs cs' gn nullst act ∗ waitAnsLed rv xs cs cs' gn nullst pidv act := by
+  unfold waitAnsLed
+  iintro (⟨%hf, #Hwhy⟩ | ⟨%h, %j, %γ', #Hr, %hz, %hc, Hrest⟩)
+  · isplitl []
+    · unfold waitLedCite waitWhyLed
+      ileft
+      isplitl []
+      · ipureintro; exact hf
+      icases Hwhy with (%hn | ⟨-, %h, #Hlb, %hk⟩ | #Hsh)
+      · ileft; ipureintro; exact hn
+      · iright; ileft
+        iexists h
+        iframe Hlb
+        ipureintro; exact zLowest_none_of_noKids hk
+      · iright; iright; iexact Hsh
+    · ileft
+      isplitl []
+      · ipureintro; exact hf
+      · iexact Hwhy
+  · isplitl []
+    · unfold waitLedCite
+      iright
+      iexists h, j, γ'
+      isplitl []
+      · unfold zombReceipt zombLedLb
+        iapply MonoList.lb_own_le _ h (List.prefix_append h [_]) $$ Hr
+      · ipureintro; exact ⟨hz, hc⟩
+    · iright
+      iexists h, j, γ'
+      iframe Hr Hrest
+      ipureintro; exact ⟨hz, hc⟩
+
 end WaitAnsGen
 
 end Xv6

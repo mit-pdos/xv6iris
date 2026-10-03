@@ -298,7 +298,9 @@ theorem syscall_arm_exec (SE : SYSEXEC) (hD : SyscDepExec (hlc := hlc) (GF := GF
     iexact Hrf
   isplitr
   · iapply syscForkOut_ne; rw [hn7]; decide
+  isplitr
   · iapply syscWaitOut_ne; rw [hn7]; decide
+  · iapply syscEvOut_quiet _ _ _ _ _ _ _ _ hn7
 
 end
 
@@ -617,7 +619,10 @@ theorem syscall_fallback (PK : PRINTK)
       (syscall_nofs_of_range V hrange)
   isplitr
   · iapply syscForkOut_ne; exact hne 1 (by decide) (by decide)
+  isplitr
   · iapply syscWaitOut_ne; exact hne 3 (by decide) (by decide)
+  · iapply syscEvOut_quiet _ _ _ _ _ _ _ (syscNum V) rfl (hne 14 (by decide) (by decide))
+      (hne 3 (by decide) (by decide)) (hne 1 (by decide) (by decide))
 
 set_option maxHeartbeats 4000000 in
 /-- **THE BLOCKED ARM** (xv6 7b2c1b1b; Rocq `sysc_blocked`): the mask's bit
@@ -683,7 +688,9 @@ theorem syscall_blocked
   · iapply syscSysOut_quiet f V M sts hE gn cs pid _ _ sts _ cs 0 hblk (by decide)
   isplitr
   · iapply syscForkOut_ne; rw [hblk]; decide
+  isplitr
   · iapply syscWaitOut_ne; rw [hblk]; decide
+  · iapply syscEvOut_quiet _ _ _ _ _ _ _ _ hblk
 
 end
 

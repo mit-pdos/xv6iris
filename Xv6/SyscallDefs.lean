@@ -50,6 +50,7 @@ shift `slli a4,a3,3` of the sign-extended number is slot `num`'s offset
 import Xv6.UsysMemOk
 import Xv6.KernelData
 import Xv6.ZombEv
+import Xv6.UsysDet
 
 namespace Xv6
 
@@ -146,6 +147,29 @@ theorem syscWaitRow_ret {V V' : ProcPriv} {img img' : ElfMem} {cs cs' : ExtTreeS
   rcases h with ⟨h, -⟩ | ⟨-, pid, -, -, -, h1, h2, h3, -⟩
   · exact Or.inl h
   · exact Or.inr ⟨pid, h1, h2, h3⟩
+
+/-- **THE ROUND'S CITED ROW** (NI M2-X2, design "M2-X design" §1): what the
+kernel's arm read off the ledgers' receipts, at the CITED prefix `ι` (the
+receipts' histories, as `NiEvid.niIotaLbs` lower bounds, and the caller's
+slot `ι.act`) -- uptime's answer is the word of `ι`'s tick count; wait's,
+at a null status pointer, the family ledger's reading `zLowest ι.zev ι.act`
+(the reap, or `-1` with nothing moved); fork's, on success, the pid
+`pidPick` of `ι`'s pid prefix, and `ι`'s family prefix ends in the round's
+`ZFork` of that pid at the generation the children column gained.  The
+records are the dispatch's (`V`/`img` the entry, `V'`/`img'` the record the
+call left). -/
+def syscEvRow (V V' : ProcPriv) (img img' : ElfMem) (cs cs' : ExtTreeSet GName compare) (ι : UIota) :
+    Prop :=
+  (syscNum V = USYS_uptime → tfW V'.tf (tfArgIdx 0) = usysUptimeWord ι.ticks) ∧
+  (syscNum V = USYS_wait → tfW V.tf (tfArgIdx 0) = 0#64 →
+    match zLowest ι.zev ι.act with
+    | some (_, pid, xs, γ) => tfW V'.tf (tfArgIdx 0) = BitVec.signExtend 64 pid ∧ cs' = cs \ {γ} ∧
+                              img' = usysWr img 0#64 (usysWaitBytes 0#64 xs)
+    | none => tfW V'.tf (tfArgIdx 0) = -1#64 ∧ cs' = cs ∧ img' = img) ∧
+  (syscNum V = USYS_fork → tfW V'.tf (tfArgIdx 0) ≠ -1#64 →
+    tfW V'.tf (tfArgIdx 0) = BitVec.signExtend 64 (BitVec.ofNat 32 (pidPick PIDMAX ι.pev)) ∧
+    ∃ (hz : List Zev) (i : Nat) (γ : GName),
+      ι.zev = hz ++ [.ZFork ι.act i (BitVec.ofNat 32 (pidPick PIDMAX ι.pev)) γ] ∧ cs' = cs ∪ {γ})
 
 /-! ## §2 The dispatch table -/
 

@@ -13,6 +13,10 @@ back (the kernel obligation `ukb`'s body), through
     the key history       one lawful round appended to the residue's history
                           (UtResFits.usertrapResAt_uhist_acc, UhistDefs;
                           design/ni-uhist.md D5, Rocq 5634a3874)
+    the evidence          (NI M2-X2) usertrap's `utEvOut`: at a citing number
+                          the round cites its era and prefix, M0's row at
+                          it (`urc_niDetRow`, `uexecRet_roundDet`) and
+                          fork's pid (`urc_niForkRow`); `NiFitIs.evid`
     the resume            UserretClosedResume.urc_resume (userret, steps C/D)
 
 back to the next round, under the loop hypothesis `▷ urcLoop`.
@@ -117,7 +121,7 @@ theorem urc_exit (UR : USERRET) [NiFitIs (hlc := hlc) GF] (PT : SchedNames → I
   unfold usertrapPost
   iintro ⟨#Hwire, #Hrc, HcR, #Hcl, #Hloop, Harm⟩ %R' %P' %V' %M' %sts' %cs' %uepc %⟨hcs, ha0⟩ %⟨hupt', htfp'⟩ %hround
     %hfdk %hchk %hgk %hevq %hfde %hpipe %hrp %hpc' %hlive Hk Hpc Hsep ⟨%sc2, Hsc⟩ ⟨%tv2, Hstv⟩ Hstvec Hppt Htf Hres
-    Hxo Hfo Hwo Hko Hso
+    Hxo Hfo Hwo Hko Hso Heo
   -- steps A/B: the next slot
   ihave Hslot := urc_post W V Mp gn cs pid sc f V' M' sts' cs' hl hlw hM hpi hsz hcw hgn hch hpid hlz hsc hround
     hfdk hchk hfde hpipe hrp hlive $$ [Hxo Hfo Hwo Hko Hso Harm]
@@ -160,9 +164,48 @@ theorem urc_exit (UR : USERRET) [NiFitIs (hlc := hlc) GF] (PT : SchedNames → I
     (((uservecCtx k (tfResumeGpr0 W.tf) V.tf).intrOff true false).withRegs R') 0
     P' ksp V' M' sts' gn cs' pid uepc sc2 tv2 hproc hctx' htier hnoff hsp' hav' ha0 hpc'
     (hVgn.symm.trans hgk.symm) (some (i, x)) hfit
-  -- ...and the record's evidence (NI M2-X1): the round cites nothing yet
-  -- (`c := none`, `NiFitIs.evid`)
-  ihave #Hev := uEvid_of_niFit (hlc := hlc) (GF := GF) i x _ hfit
+  -- ...and THE RECORD'S EVIDENCE (NI M2-X2): at a citing number (uptime,
+  -- wait, fork at the ecall) the round cites the era and prefix usertrap's
+  -- post carries (`utEvOut`), with M0's row at it (`urc_niDetRow`:
+  -- `uexecRet_roundDet` at the cited ι) and fork's pid (`urc_niForkRow`);
+  -- elsewhere it cites nothing
+  have hnum := urc_num_run W V hl hsc
+  ihave #Hev : MachFixedGS.uEvid (hlc := hlc) (GF := GF) (some (i, x))
+      (.uEnter cpu' (satpOf KTier.kpt P'.root) uepc (tfGprs V'.tf)) $$ [Heo]
+  · by_cases hcit : niCiting sc W
+    · obtain ⟨hsce, hcn⟩ := hcit
+      unfold utEvOut
+      ihave Heo := Heo $$ %hsce
+      icases Heo with (%hq | ⟨%ke, %ι, #Hanc, #Hl, %hev⟩)
+      · exfalso
+        rw [hnum] at hq
+        rcases hcn with h | h | h
+        · exact hq.1 h
+        · exact hq.2.1 h
+        · exact hq.2.2 h
+      · have hfe : niFitEv (some (i, x)) (.uEnter cpu' (satpOf KTier.kpt P'.root) uepc (tfGprs V'.tf))
+            (some (ke, ι)) :=
+          ⟨sc, W, uvisOf V' M' sts' gn cs' pid, hx, ⟨cpu', _, uepc, rfl, hpc'⟩,
+            urc_roundOkKeys W V Mp sc V' M' sts' gn cs' pid hl hM hpi hsz hcw hlz hsc hround, hpid.symm,
+            urc_niPidRow W V sc V' M' sts' gn cs' pid hl hpid hsc hrp,
+            niWaitRow_of_round (urc_roundOkKeys W V Mp sc V' M' sts' gn cs' pid hl hM hpi hsz hcw hlz hsc hround),
+            ⟨fun _ => rfl, fun _ => ⟨hsce, hcn⟩⟩,
+            urc_niDetRow W V Mp sc V' M' sts' gn cs cs' pid ke ι hl hlw hM hpi hsz hcw hgn hch hpid hlz hsc
+              hround hchk hfde hrp hev,
+            urc_niForkRow W V Mp sc V' M' sts' gn cs cs' pid ke ι hl hch hsc hev⟩
+        iapply NiFitIs.evid (hlc := hlc) (GF := GF) i x _ (some (ke, ι)) hfe
+        unfold niCiteRes niCiteResRaw
+        iexists (niNamesHere (GF := GF))
+        iframe Hanc Hl
+    · have hfe : niFitEv (some (i, x)) (.uEnter cpu' (satpOf KTier.kpt P'.root) uepc (tfGprs V'.tf)) none :=
+        ⟨sc, W, uvisOf V' M' sts' gn cs' pid, hx, ⟨cpu', _, uepc, rfl, hpc'⟩,
+          urc_roundOkKeys W V Mp sc V' M' sts' gn cs' pid hl hM hpi hsz hcw hlz hsc hround, hpid.symm,
+          urc_niPidRow W V sc V' M' sts' gn cs' pid hl hpid hsc hrp,
+          niWaitRow_of_round (urc_roundOkKeys W V Mp sc V' M' sts' gn cs' pid hl hM hpi hsz hcw hlz hsc hround),
+          ⟨fun h => absurd h hcit, fun h => absurd h (by simp)⟩, trivial, trivial⟩
+      iapply NiFitIs.evid (hlc := hlc) (GF := GF) i x _ none hfe
+      unfold niCiteRes niCiteResRaw
+      iempintro
   iapply HRS
   unfold uRcptOpt uClaimFor uClaimForRaw
   iframe Hwire Hrc HcR Hev Hcl Hk Hgap Hpc Hsep Hsc Hstv Hstvec Hppt Htf Hres Hslot

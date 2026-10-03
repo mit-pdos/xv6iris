@@ -402,7 +402,9 @@ theorem syscall_arm_sbrk (SS : SYSSBRK)
   · iapply syscSysOut_quiet f V M sts hE gn cs pid _ _ sts _ cs 12 hn12 (by decide)
   isplitr
   · iapply syscForkOut_ne; rw [hn12]; decide
+  isplitr
   · iapply syscWaitOut_ne; rw [hn12]; decide
+  · iapply syscEvOut_quiet _ _ _ _ _ _ _ _ hn12
 
 end
 

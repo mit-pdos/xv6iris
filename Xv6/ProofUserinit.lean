@@ -490,7 +490,7 @@ theorem ui_finish [X : CurCtx] (RE : RELEASE) (FP : FORKRET_PARK_PAID)
   icases ui_block rfl γ V.fdg (procAddr j) pid { V with cwd := kf.regs 10#5, pvSecc := seccAll } M hof
     $$ [$Hpriv $Hcref $Hrref $Hfds $Hkeys] with ⟨Hctxc, ⟨Hbare, Hofs, Hcwr, Hrtr⟩, Hfr⟩
   unfold uiParkRows userinitPark
-  icases Hpk with ⟨⟨#Hwl, #Htk, #Hcons, #Hdev, #Hwire, #Htramp, Hbun, Hrd, Hco⟩, #Hpl, #Hpav, #Hft, #Hig⟩
+  icases Hpk with ⟨⟨#Hwl, #Htk, #Hcons, #Hdev, #Hwire, #Hanc, #Htramp, Hbun, Hrd, Hco⟩, #Hpl, #Hpav, #Hft, #Hig⟩
   -- THE PACKAGE'S ROWS, at this context
   ihave Hrows : iprop(parkGlobals Γ γw γft γ (procAddr j) ∗ utSysParkRows Γ ∗
       stackOwn (V.kstack + 4096#64) forkretStack) $$ [Hstack]
@@ -505,7 +505,7 @@ theorem ui_finish [X : CurCtx] (RE : RELEASE) (FP : FORKRET_PARK_PAID)
     · isplitr
       · iexists γp; iexact Hpl
       iframe Hpav Htk Hcons
-    iframe Hdev Hcons Hpav Hwire Htramp
+    iframe Hdev Hcons Hpav Hwire Hanc Htramp
     isplitr
     · iexists γp; iexact Hpl
     iexists (procAddr j)

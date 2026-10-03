@@ -353,6 +353,9 @@ def wp_main_boot_body [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG G
   -- the device fabric, from time 0, and the boot hart's tokens over it
   uartInv .uart0 γ0 ∗ uartInv .uart1 γ1 ∗ plicInv γ0 γ1 ∗ diskInv γd ∗ diskCrashCaps γd ∗
   wireInv ∗
+  -- THE ERA'S ANCHOR (NI M2-X2): its ledger names, registered at the boot,
+  -- carried to userinit's park beside `wireInv`
+  (∃ k : Nat, MachFixedGS.uEraAnchor (hlc := hlc) (GF := GF) k (niNamesHere (GF := GF))) ∗
   mainUartRaw X .uart0 γ0 l0 ∗ mainUartRaw X .uart1 γ1 l1 ∗
   diskCfgOwn γd c0 ∗ diskInitGhosts γd ∗
   (∃ (vl : BitVec 32) (vn vc pd0 pav0 pu0 : BitVec 64) (free0 : List (BitVec 8)),

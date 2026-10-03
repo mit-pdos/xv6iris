@@ -78,13 +78,13 @@ theorem ut_close (A : UtArgs GF) (c : CPU) (R' : RegMap) (V2 : ProcPriv) (M2 : N
         sts2 cs2 A.pid from .rfl) $$ Hres
   ihave Hout := utOuts_retf A V2 M2 sts2 cs2 (utPrep V2 A.k.root c).tf hu $$ Hout
   unfold utOuts
-  icases Hout with ⟨Hxo, Hfo, Hwo, Hso⟩
+  icases Hout with ⟨Hxo, Hfo, Hwo, Hso, Heo⟩
   unfold utKont
   ihave HK := Hkont $$ %c
   unfold usertrapPost
   iapply HK $$ %R' %V2.upt %(utPrep V2 A.k.root c) %M2 %sts2 %cs2 %(tfW V2.tf 3 &&& 0xFFFFFFFFFFFFFFFE#64)
     %⟨hcs, ha0⟩ %⟨rfl, hrows.tfp⟩ %hrows'.round %hrows'.fdk %hrows'.chk %hrows'.gen %hrows'.evq %hrows'.fde
-    %hrows'.pipe %hrows'.rpid %hepc %hlive' Hk Hpc Hsepc Hsc Htv Hstv Hpt Htf Hres Hxo Hfo Hwo Hko Hso
+    %hrows'.pipe %hrows'.rpid %hepc %hlive' Hk Hpc Hsepc Hsc Htv Hstv Hpt Htf Hres Hxo Hfo Hwo Hko Hso Heo
 
 end Close
 

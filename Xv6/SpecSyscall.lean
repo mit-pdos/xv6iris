@@ -104,6 +104,14 @@ fallback (+0x40..+0x56) and the shared epilogue (+0x58..+0x62).
 9. `syscallSlots = 4 + sysExecSlots` (Rocq `K_syscall = 4 + K_sys_exec`):
    exec IS the deepest entry (248 of the 22 Specs' constants; the printk
    fallback's 52 and myproc's 10 are below it).
+10. **THE LEDGER EVIDENCE** (NI M2-X2, Lean-only; design "M2-X design"
+   §2(b)): the returning continuation takes, LAST, `syscEvOut` -- the
+   persistent deposit beside the pure rows: the number cites nothing, or
+   the arm's citation (the era's anchor `MachFixedGS.uEraAnchor k
+   niNamesHere` out of the park world, the cited prefixes' lower bounds
+   `NiEvid.niIotaLbs`, the cited row `SyscallDefs.syscEvRow`), or (F5)
+   wait's `-1` for the kill shot.  `SyscRows` is unchanged; every arm but
+   uptime's, wait's and fork's pays it by `syscEvOut_quiet`.
 
 Imports only definitional files and the 22 entries' Spec files (the slot
 check).
@@ -132,6 +140,7 @@ import Xv6.SpecSysClose
 import Xv6.SpecSysSync
 import Xv6.SpecSysSeccomp
 import Xv6.SysExecDefs
+import Xv6.NiEvid
 
 namespace Xv6
 
@@ -474,6 +483,52 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [SG : UexecSG GF] [Fscfg] [Icfg] [CurCtx]
 
+/-- **THE ROUND'S LEDGER EVIDENCE** (NI M2-X2, design "M2-X design" §2(b)):
+the deposit beside the pure rows -- the number cites nothing (not uptime,
+wait or fork); or the arm cites era `k`'s ledgers at `ι` (the era's anchor
+at its registered names, the cited prefixes' lower bounds, and the cited row
+`SyscallDefs.syscEvRow`); or (F5) wait answered `-1` for the kill shot,
+which usertrap's resume never takes.  Persistent. -/
+def syscEvOut (V : ProcPriv) (M : Nat → List (BitVec 8)) (V' : ProcPriv) (M' : Nat → List (BitVec 8))
+    (cs cs' : ExtTreeSet GName compare) (gn : GName) : IProp GF :=
+  iprop(⌜syscNum V ≠ USYS_uptime ∧ syscNum V ≠ USYS_wait ∧ syscNum V ≠ USYS_fork⌝ ∨
+    (∃ (k : Nat) (ι : UIota), MachFixedGS.uEraAnchor (hlc := hlc) (GF := GF) k (niNamesHere (GF := GF)) ∗
+      niIotaLbs (niNamesHere (GF := GF)) ι ∗ ⌜syscEvRow V V' (syscImg V M) (syscImg V' M') cs cs' ι⌝) ∨
+    (⌜syscNum V = USYS_wait ∧ syscA0 V' = -1#64⌝ ∗ killShot gn))
+
+instance syscEvOut_persistent (V : ProcPriv) (M : Nat → List (BitVec 8)) (V' : ProcPriv)
+    (M' : Nat → List (BitVec 8)) (cs cs' : ExtTreeSet GName compare) (gn : GName) :
+    Persistent (syscEvOut (hlc := hlc) (GF := GF) V M V' M' cs cs' gn) := by
+  unfold syscEvOut; infer_instance
+
+/-- **The deposit at a number that cites nothing** (NI M2-X2): every arm but
+uptime's, wait's and fork's (the hypotheses default by `decide` at the
+arm's literal number). -/
+theorem syscEvOut_quiet (V : ProcPriv) (M : Nat → List (BitVec 8)) (V' : ProcPriv)
+    (M' : Nat → List (BitVec 8)) (cs cs' : ExtTreeSet GName compare) (gn : GName) (n : Int)
+    (hnum : syscNum V = n) (h14 : n ≠ 14 := by decide) (h3 : n ≠ 3 := by decide)
+    (h1 : n ≠ 1 := by decide) :
+    ⊢ syscEvOut (hlc := hlc) (GF := GF) V M V' M' cs cs' gn := by
+  unfold syscEvOut
+  ileft
+  ipureintro
+  rw [hnum]
+  exact ⟨h14, h3, h1⟩
+
+/-- **The deposit at a citation** (NI M2-X2). -/
+theorem syscEvOut_cite (V : ProcPriv) (M : Nat → List (BitVec 8)) (V' : ProcPriv)
+    (M' : Nat → List (BitVec 8)) (cs cs' : ExtTreeSet GName compare) (gn : GName) (k : Nat) (ι : UIota)
+    (h : syscEvRow V V' (syscImg V M) (syscImg V' M') cs cs' ι) :
+    MachFixedGS.uEraAnchor (hlc := hlc) (GF := GF) k (niNamesHere (GF := GF)) ⊢
+      niIotaLbs (niNamesHere (GF := GF)) ι -∗
+      syscEvOut (hlc := hlc) (GF := GF) V M V' M' cs cs' gn := by
+  unfold syscEvOut
+  iintro #Ha #Hl
+  iright; ileft
+  iexists k, ι
+  iframe Ha Hl
+  ipureintro; exact h
+
 /-- **The returning continuation** (Rocq `sysc_hcont_ty`'s body, the left
 conjunct of the exit slot): at every hart, every `(V', M')`, descriptor
 states and children set the entry left, given the rows, the context back
@@ -495,6 +550,8 @@ def syscallPost (PT : SchedNames → IProp GF) (Γ : SchedNames) (k : KCtx) (γ 
     syscSysOut (hlc := hlc) f V M sts gn cs pid (syscA0 V') (syscImg V' M') sts' V'.cwi cs' -∗
     syscForkOut f V (syscA0 V') cs cs' -∗
     syscWaitOut V M (syscImg V' M') (syscA0 V') cs cs' pid -∗
+    -- THE ROUND'S LEDGER EVIDENCE (NI M2-X2), last
+    syscEvOut (hlc := hlc) V M V' M' cs cs' gn -∗
     wpLoop cpu')
 
 /-- **The divergent conjunct** (deviation 8): an entry that declines to

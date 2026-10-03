@@ -135,7 +135,9 @@ theorem syscall_arm_chroot (SCR : SYSCHROOT)
   · iapply syscSysOut_quiet f V M sts hE gn cs pid _ _ sts _ cs 24 hn24 (by decide)
   isplitr
   · iapply syscForkOut_ne; rw [hn24]; decide
+  isplitr
   · iapply syscWaitOut_ne; rw [hn24]; decide
+  · iapply syscEvOut_quiet _ _ _ _ _ _ _ _ hn24
 
 end
 

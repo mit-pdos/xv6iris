@@ -981,10 +981,13 @@ nothing has exited), the tick counter's mirror (at 0), the pid ledger (at
 the empty history), the NPROC slot-generation wholes (all at one arbitrary
 name -- nothing reads it), the pid register (EMPTY), init's pid cell (WHOLE,
 at junk) and the pid counter's boot-era token (WHOLE) -- and the INSTANCE
-that names them (deviation 4). -/
+that names them (deviation 4), over the ambient cameras (NI M2-X2: the
+instance's `WchGpre` IS the ambient one, so the ledgers' lower bounds a
+citation carries are at the cameras the NI record reads). -/
 theorem childrenRes_alloc {hlc : HasLC} [MachGS hlc GF]
     (hinj : ∀ a b, a < NPROC → b < NPROC → procAddr a = procAddr b → a = b) :
-    ⊢@{IProp GF} |==> ∃ W : WchG GF, @childrenBoot hlc GF _ W ∗ @nextpidPend GF W := by
+    ⊢@{IProp GF} |==> ∃ W : WchG GF, ⌜W.toWchGpre = (inferInstance : WchGpre GF)⌝ ∗
+      @childrenBoot hlc GF _ W ∗ @nextpidPend GF W := by
   imod ghost_map_alloc_empty (GF := GF) (K := GName) (V := BitVec 64 × ExtTreeSet GName compare)
     (H := RegMapF) with ⟨%γ, Ha⟩
   imod chRows_alloc γ NPROC $$ Ha with ⟨%m, Ha, %hm, Hrows⟩
@@ -1024,6 +1027,8 @@ theorem childrenRes_alloc {hlc : HasLC} [MachGS hlc GF]
   iexists ({ wchName := γ, worphName := γo, wsgName := γsg, wprName := γpr, wipName := γip,
              npidName := γnp, wtkName := γtk, wplName := γpl, wzlName := γzl,
              wactName := γact, wzsName := γzs } : WchG GF)
+  isplitl []
+  · ipureintro; rfl
   unfold childrenBoot childrenBootRows childrenResBoot childrenOwnAt orphansOwn pidRegAuth
     pidLedAuth zombLedAuth initPidTok nextpidPend tickCnt zsAuth
   isplitr [Hnp]

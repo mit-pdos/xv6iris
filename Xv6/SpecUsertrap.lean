@@ -103,6 +103,13 @@ Rocq's (`utPayIn`, `utKillIn`, `utKillOut`).
    row): off the ecall, at `pvLazy = false`, `V'.ev = V.ev`.  `utRound` does
    not move.  Design: `claude-notes/design/ni-strong-instance.md` §7.8L.
 
+12. **THE LEDGER EVIDENCE** (NI M2-X2, Lean-only; design "M2-X design"
+   §2(c)): the post takes, LAST, `utEvOut` -- at the ecall, `syscEvOut`'s
+   quiet and citing disjuncts at the record `syscall()` was called with;
+   the kill disjunct is gone (a killed wait never resumes: usertrap's
+   syscall tail cites the boot prefix for it, `UsertrapSysTail.ut_evOut_of`).
+   Off the ecall it owes nothing (`utEvOut_nonecall`).
+
 Imports only definitional files and Spec files (`UexecExecInst` for the
 instance, deviation 10).
 -/
@@ -322,11 +329,38 @@ theorem utWaitOut_quiet (sc sep : BitVec 64) (V : ProcPriv) (M : Nat → List (B
 
 end Rows
 
+/-! ## §4 The ledger evidence (NI M2-X2) -/
+
+section Ev
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF] [Fscfg]
+
+/-- **THE ROUND'S LEDGER EVIDENCE, AT USERTRAP'S POST** (NI M2-X2, design
+"M2-X design" §2(c)): at the ecall, `SpecSyscall.syscEvOut`'s first two
+disjuncts at the record `syscall()` was called with (`utSysRec`) -- the
+number cites nothing, or the arm's citation at era `k`'s anchor; the kill
+disjunct is gone (F5: a killed wait's round never reaches the post). -/
+def utEvOut (sc sep : BitVec 64) (V : ProcPriv) (M : Nat → List (BitVec 8)) (V' : ProcPriv)
+    (M' : Nat → List (BitVec 8)) (cs cs' : ExtTreeSet GName compare) : IProp GF :=
+  iprop(⌜sc = uecallScause⌝ -∗
+    (⌜syscNum (utSysRec sep V) ≠ USYS_uptime ∧ syscNum (utSysRec sep V) ≠ USYS_wait ∧
+        syscNum (utSysRec sep V) ≠ USYS_fork⌝ ∨
+      (∃ (k : Nat) (ι : UIota), MachFixedGS.uEraAnchor (hlc := hlc) (GF := GF) k (niNamesHere (GF := GF)) ∗
+        niIotaLbs (niNamesHere (GF := GF)) ι ∗
+        ⌜syscEvRow (utSysRec sep V) V' (syscImg (utSysRec sep V) M) (syscImg V' M') cs cs' ι⌝)))
+
+/-- Off the ecall the evidence is owed nothing. -/
+theorem utEvOut_nonecall (sc sep : BitVec 64) (V : ProcPriv) (M : Nat → List (BitVec 8)) (V' : ProcPriv)
+    (M' : Nat → List (BitVec 8)) (cs cs' : ExtTreeSet GName compare) (h : sc ≠ uecallScause) :
+    ⊢ utEvOut (hlc := hlc) (GF := GF) sc sep V M V' M' cs cs' := by
+  unfold utEvOut; iintro %hc; exact absurd hc h
+
+end Ev
+
 /-! ## §5 The contract -/
 
 section Contract
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [WchG GF]
-    [CurCtx]
+    [CurCtx] [Xv6G GF] [Fscfg]
 
 /-- **Rocq `usertrap_post`**: userret's entry shape at the resuming hart
 `cpu'`, for every exit register file `R'`, table `P'`, record `(V', M')`,
@@ -359,6 +393,8 @@ def usertrapPost (R : CPU → UPtd → BitVec 64 → ProcPriv → List FdState �
     utKillOut (hlc := hlc) sc Wk -∗
     utSysOut (hlc := hlc) f sc sep V M sts gn cs pid (tfW V'.tf (tfArgIdx 0)) (syscImg V' M') sts'
       V'.cwi cs' -∗
+    -- THE ROUND'S LEDGER EVIDENCE (NI M2-X2), last
+    utEvOut (hlc := hlc) sc sep V M V' M' cs cs' -∗
     wpLoop cpu')
 
 /-- **WP of `usertrap`** (Rocq `wp_usertrap_body`), over an abstract residue

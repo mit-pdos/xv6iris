@@ -22,6 +22,14 @@ dispatch's rows, per the frozen recipe (notes/design-rulings.md).
   (`syscArmWait_bytes`), is `SyscRows.wait` (`syscWaitRow` at the caller's
   slot); the landed answer `waitAns` goes on to `syscWaitOut`.
 
+* THE CITATION (NI M2-X2): `UserChildren.waitAnsLed_cite` keeps the led
+  answer's persistent part; `syscArmWait_ev` turns it, with the era's
+  anchor (`syscallEnv_anchor`), into `syscEvOut` -- the family ledger's
+  prefix the reading was taken at, at the caller's slot (the reap's prefix
+  before it, or the no-children lower bound); the copyout's `-1` cites the
+  boot prefix (vacuous at a non-null pointer), the kill shot is F5's
+  disjunct.
+
 The wait post's raised event count (permit sweep L1a) reaches the
 dispatcher's ∀-general post through `SyscallRet.SyscRows.updEv`.
 -/
@@ -126,6 +134,69 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [SG : UexecSG GF] [Fscfg] [Icfg] [CurCtx]
 
+/-- **WAIT'S CITATION** (NI M2-X2, design "M2-X design" §2(a)): out of the
+led answer's citation (`UserChildren.waitLedCite`) and the era's anchor, the
+round's ledger evidence -- at a reap, and at `-1` with no children, the
+family ledger's prefix the reading was taken at, at the caller's slot; at
+`-1` for the copyout (a non-null pointer) the boot prefix at the caller's
+slot (the row is vacuous there); at `-1` for the kill shot, the shot (F5). -/
+theorem syscArmWait_ev (V : ProcPriv) (M : Nat → List (BitVec 8)) (V' : ProcPriv)
+    (M' : Nat → List (BitVec 8)) (cs cs' : ExtTreeSet GName compare) (gn : GName) (rv : BitVec 32)
+    (xs : Int) (nullst : Bool) (act : BitVec 64) (ke : Nat)
+    (hn : syscNum V = 3) (ha : syscA0 V' = BitVec.signExtend 64 rv)
+    (hnull : nullst = false → tfW V.tf (tfArgIdx 0) ≠ 0#64)
+    (himg0 : tfW V.tf (tfArgIdx 0) = 0#64 → rv = -1#32 → syscImg V' M' = syscImg V M)
+    (himgR : tfW V.tf (tfArgIdx 0) = 0#64 → rv ≠ -1#32 →
+      syscImg V' M' = usysWr (syscImg V M) 0#64 (usysWaitBytes 0#64 xs)) :
+    MachFixedGS.uEraAnchor (hlc := hlc) (GF := GF) ke (niNamesHere (GF := GF)) ⊢
+      waitLedCite rv xs cs cs' gn nullst act -∗ |==> syscEvOut (hlc := hlc) V M V' M' cs cs' gn := by
+  have h14 : syscNum V ≠ USYS_uptime := by rw [hn]; decide
+  have h1 : syscNum V ≠ USYS_fork := by rw [hn]; decide
+  have hw : syscNum V = USYS_wait := hn
+  iintro #Ha #Hc
+  unfold waitLedCite
+  icases Hc with (⟨%hf, (%hnl | ⟨%h, #Hlb, %hz⟩ | #Hsh)⟩ | ⟨%h, %jj, %γ', #Hlb, %hz⟩)
+  · -- the copyout's -1: the row is vacuous (a non-null pointer)
+    imod niIotaLbs_act (GF := GF) (niNamesHere (GF := GF)) act with #Hl
+    imodintro
+    iapply syscEvOut_cite V M V' M' cs cs' gn ke { UIota.boot with act := act } ?_ $$ Ha Hl
+    exact ⟨fun h => absurd h h14, fun _ h0 => absurd h0 (hnull hnl), fun h => absurd h h1⟩
+  · -- no children: the reading at the decision names no zombie
+    ihave #Hlb' := (show zombLedLb (GF := GF) h ⊢ ((niNamesHere (GF := GF)).getD 2 0) ↪◯ML h from .rfl) $$ Hlb
+    imod niIotaLbs_zev (GF := GF) (niNamesHere (GF := GF)) h act $$ Hlb' with #Hl
+    imodintro
+    iapply syscEvOut_cite V M V' M' cs cs' gn ke { UIota.boot with zev := h, act := act } ?_ $$ Ha Hl
+    refine ⟨fun h' => absurd h' h14, fun _ h0 => ?_, fun h' => absurd h' h1⟩
+    show match zLowest h act with
+      | some (_, pid, xs, γ) => tfW V'.tf (tfArgIdx 0) = BitVec.signExtend 64 pid ∧ cs' = cs \ {γ} ∧
+          syscImg V' M' = usysWr (syscImg V M) 0#64 (usysWaitBytes 0#64 xs)
+      | none => tfW V'.tf (tfArgIdx 0) = -1#64 ∧ cs' = cs ∧ syscImg V' M' = syscImg V M
+    rw [hz]
+    refine ⟨?_, hf.2, himg0 h0 hf.1⟩
+    show syscA0 V' = _
+    rw [ha, hf.1]; decide
+  · -- the kill shot (F5)
+    imodintro
+    unfold syscEvOut
+    iright; iright
+    isplitl []
+    · ipureintro; exact ⟨hw, by rw [ha, hf.1]; decide⟩
+    · iexact Hsh
+  · -- the reap: the prefix before it, the reading at it
+    ihave #Hlb' := (show zombLedLb (GF := GF) h ⊢ ((niNamesHere (GF := GF)).getD 2 0) ↪◯ML h from .rfl) $$ Hlb
+    imod niIotaLbs_zev (GF := GF) (niNamesHere (GF := GF)) h act $$ Hlb' with #Hl
+    imodintro
+    obtain ⟨hzl, hcs, -, hr2⟩ := hz
+    have hrv : rv ≠ -1#32 := fun e => by subst e; exact absurd hr2 (by decide)
+    iapply syscEvOut_cite V M V' M' cs cs' gn ke { UIota.boot with zev := h, act := act } ?_ $$ Ha Hl
+    refine ⟨fun h' => absurd h' h14, fun _ h0 => ?_, fun h' => absurd h' h1⟩
+    show match zLowest h act with
+      | some (_, pid, xs, γ) => tfW V'.tf (tfArgIdx 0) = BitVec.signExtend 64 pid ∧ cs' = cs \ {γ} ∧
+          syscImg V' M' = usysWr (syscImg V M) 0#64 (usysWaitBytes 0#64 xs)
+      | none => tfW V'.tf (tfArgIdx 0) = -1#64 ∧ cs' = cs ∧ syscImg V' M' = syscImg V M
+    rw [hzl]
+    exact ⟨ha, hcs, himgR h0 hrv⟩
+
 set_option maxHeartbeats 4000000 in
 /-- **Arm 3, `sys_wait`** (Rocq `sysc_arm_wait`). -/
 theorem syscall_arm_wait (SW : SYSWAIT)
@@ -198,6 +269,8 @@ theorem syscall_arm_wait (SW : SYSWAIT)
     syscStore_a0 _ _ (by show tfArgIdx 0 < V.tf.length; rw [hl]; decide)
   -- WAIT'S ROW (NI G1d): kwait's led answer, read at the dispatch -- the
   -- reap at the family ledger's reading at the receipt, the caller's slot
+  -- THE CITATION (NI M2-X2): the led answer's persistent part, kept
+  icases waitAnsLed_cite rv (xstateVal xw) cs cs' V.gen _ pid (procAddr j) $$ Hwa with ⟨#Hcite, Hwa⟩
   icases waitAnsLed_row rv (xstateVal xw) cs cs' V.gen _ pid (procAddr j) $$ Hwa with ⟨%hwl, Hwa⟩
   have hwrow : ∃ (hz : List Zev) (act : BitVec 64), syscWaitRow V (syscStore { V with upt := P' } (R2 10#5))
       (syscImg V M) (syscImg { V with upt := P' } (umemWrite (viewFaulted V.upt P' M) v.toNat
@@ -212,6 +285,26 @@ theorem syscall_arm_wait (SW : SYSWAIT)
       rw [himg, hw0, syscArmWait_bytes rv xw v d hans hrv]
   have hrows := syscRows_wait V M _ P' sts cs cs' pid (R2 10#5) ((xstateBytes xw).take d) v hw0 hn3 hext
     (by rw [hbl]; exact hd) hz himg hwrow
+  -- THE ROUND'S LEDGER EVIDENCE (NI M2-X2), at the era's anchor
+  icases syscallEnv_anchor PT Γ γ $$ Henv with ⟨%ke, #Hanc⟩
+  iapply wpLoop_bupd
+  imod syscArmWait_ev V M (syscStore { V.updEv k' with upt := P' } (R2 10#5))
+      (umemWrite (viewFaulted V.upt P' M) v.toNat ((xstateBytes xw).take d)) cs cs' gn rv (xstateVal xw)
+      (decide (v = 0#64)) (procAddr j) ke hn3 (by rw [hsa0, ha0])
+      (fun hb h0 => by rw [hw0] at h0; subst h0; simp at hb)
+      (fun h0 hr => by
+        rw [hw0] at h0; subst h0
+        show umemLazy P' V.sz.toNat _ = _
+        have : d = 0 := hans.1 rfl
+        subst this
+        exact himg)
+      (fun h0 hr => by
+        rw [hw0] at h0; subst h0
+        show umemLazy P' V.sz.toNat _ = _
+        rw [himg, syscArmWait_bytes rv xw 0#64 d hans hr])
+    $$ Hanc [Hcite] with #Hev
+  · rw [hgn]; iexact Hcite
+  imodintro
   unfold syscallRet syscallAddr at *
   -- the block at the reap's raised event count (permit sweep L1a): the rows
   -- do not read it (`SyscRows.updEv`)
@@ -224,15 +317,17 @@ theorem syscall_arm_wait (SW : SYSWAIT)
   · iapply syscSysOut_quiet f V M sts hE gn cs pid _ _ sts _ cs' 3 hn3 (by decide)
   isplitr
   · iapply syscForkOut_ne; rw [hn3]; decide
-  rw [hsa0]
-  iapply syscWaitOut_of V M _ (R2 10#5) rv xw cs cs' pid ha0 ?hwr
-  case hwr =>
+  isplitr [Hev]
+  · rw [hsa0]
+    iapply syscWaitOut_of V M _ (R2 10#5) rv xw cs cs' pid ha0 ?hwr
+    case hwr =>
+      rw [hw0]
+      refine ⟨d, hd, fun h0 => hans.1 h0, fun h0 hr => ?_, himg⟩
+      refine hans.2 h0 (fun hrv => hr ?_)
+      rw [ha0, hrv]; decide
     rw [hw0]
-    refine ⟨d, hd, fun h0 => hans.1 h0, fun h0 hr => ?_, himg⟩
-    refine hans.2 h0 (fun hrv => hr ?_)
-    rw [ha0, hrv]; decide
-  rw [hw0]
-  iexact Hwa
+    iexact Hwa
+  · iexact Hev
 
 end
 

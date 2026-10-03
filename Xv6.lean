@@ -1104,6 +1104,7 @@ import Xv6.FsDurXfer
 import Xv6.UexecRet
 import Xv6.UexecRound
 import Xv6.UsysDet
+import Xv6.NiEvid
 import Xv6.UhistDefs
 import Xv6.NiLedger
 import Xv6.NiTrace

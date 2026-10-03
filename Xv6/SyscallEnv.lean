@@ -73,7 +73,10 @@ hands kfork the token out of `syscallEnv_token` (`SpecKfork.kforkPark`).
    `wire_inv` is `wireInv`; the trampoline claim is `kmapAt trampVpn (kLeaf
    trampPpn .rx 0 0)` (UserretEntryPt's `urTrampCl`); Rocq's `∃ ip,
    initproc ↦□ ip ∗ init_gen ip 1` is `∃ ip, initIdentCell curCtx ip ∗
-   initGen ip 1`.
+   initGen ip 1`.  (NI M2-X2, Lean-only) Beside `wireInv`, THE ERA'S
+   ANCHOR `∃ k, MachFixedGS.uEraAnchor k niNamesHere`: the era's ledger
+   names, registered at its boot (`SystemBootEra.xv6Era_run`), which every
+   citing syscall arm hands the filing (`SpecSyscall.syscEvOut`).
 6. **Rocq's `syscall_env_fsabs(_keep)` are dropped**: FirstTok deviation 1
    (no application layer, `first_done` has no `fsabs_env`).
 7. **`syscall_env_uart_base0` / `syscall_env_txlock` are one projection,
@@ -99,6 +102,7 @@ import Xv6.SpecDevintr
 import Xv6.KexecDefs
 import Xv6.ProcAvail
 import Xv6.WaitLock
+import Xv6.NiEvid
 
 namespace Xv6
 
@@ -157,7 +161,10 @@ def parkWorld (Γ : SchedNames) : IProp GF :=
   iprop((∃ (γ0 γ1 : UartNames) (γc γl0 γl1 γt : GName) (pd pav pu : BitVec 64),
       devintrCaps Γ γ0 γ1 γc γl0 γl1 fscDisk fscDlock γt pd pav pu) ∗
     consoleReadyApp ∗ syscPidLock ∗ procsAvailAt Γ none false ∗
-    wireInv ∗ syscTrampCl ∗
+    wireInv ∗
+    -- THE ERA'S ANCHOR (NI M2-X2): the ledger names its boot registered
+    (∃ k : Nat, MachFixedGS.uEraAnchor (hlc := hlc) (GF := GF) k (niNamesHere (GF := GF))) ∗
+    syscTrampCl ∗
     (∃ ip : BitVec 64, initIdentCell curCtx ip ∗ initGen ip 1#32))
 
 instance parkWorld_persistent (Γ : SchedNames) : Persistent (parkWorld (GF := GF) Γ) := by
@@ -243,6 +250,25 @@ theorem syscallEnv_token : syscallEnv (hlc := hlc) PT Γ γ ⊢ PT Γ := by
   unfold syscallEnv
   iintro ⟨-, -, -, -, -, H⟩
   iexact H
+
+/-- **The era's anchor** (NI M2-X2), off the park world. -/
+theorem syscallEnv_anchor : syscallEnv (hlc := hlc) PT Γ γ ⊢
+    ∃ k : Nat, MachFixedGS.uEraAnchor (hlc := hlc) (GF := GF) k (niNamesHere (GF := GF)) := by
+  unfold syscallEnv parkWorld
+  iintro ⟨-, -, -, -, ⟨-, -, -, -, -, #H, -⟩, -⟩
+  iexact H
+
+/-- ...and kept (the environment is handed back whole). -/
+theorem syscallEnv_anchor_keep : syscallEnv (hlc := hlc) PT Γ γ ⊢
+    (∃ k : Nat, MachFixedGS.uEraAnchor (hlc := hlc) (GF := GF) k (niNamesHere (GF := GF))) ∗
+      syscallEnv (hlc := hlc) PT Γ γ := by
+  unfold syscallEnv
+  iintro ⟨H1, H2, H3, H4, #Hw, H6⟩
+  isplitl []
+  · unfold parkWorld
+    icases Hw with ⟨-, -, -, -, -, #H, -⟩
+    iexact H
+  · iframe H1 H2 H3 H4 Hw H6
 
 /-- The file system, off the fs row. -/
 theorem syscallEnv_fsReady : syscallEnv (hlc := hlc) PT Γ γ ⊢ fsReady (hlc := hlc) := by

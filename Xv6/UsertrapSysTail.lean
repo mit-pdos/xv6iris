@@ -36,17 +36,66 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
     [Appcfg GF] [FileG GF] [SG : UexecSG GF] [Fscfg] [Icfg] [CurCtx]
     (PT : SchedNames → IProp GF) (Γ : SchedNames)
 
-/-- The dispatcher's answers, as usertrap's out rows (at the ecall cause). -/
+/-- **The dispatcher's ledger evidence, at usertrap's post** (NI M2-X2,
+design "M2-X design" §2(c)): `syscEvOut`'s quiet and citing disjuncts go
+through as they are; its kill disjunct (F5) -- a wait that answered `-1` for
+the kill shot -- cites the boot prefix at the caller's slot, whose row (no
+zombie, so `-1` with nothing moved at a null pointer) the answer satisfies
+(`syscWaitOut_m1`: the column kept, no status bytes).  Such a round never
+resumes (usertrap's +0xa6 check takes the shot), so the citation is never
+filed. -/
+theorem ut_evOut_of (A : UtArgs GF) (V2 : ProcPriv) (M2 : Nat → List (BitVec 8))
+    (cs2 : ExtTreeSet GName compare) (ke : Nat) (act : BitVec 64)
+    (hwm : syscNum (utSysRec A.sep A.V) = USYS_wait → syscA0 V2 = -1#64 →
+      tfW (utSysRec A.sep A.V).tf (tfArgIdx 0) = 0#64 →
+      cs2 = A.cs ∧ syscImg V2 M2 = syscImg (utSysRec A.sep A.V) A.M) :
+    MachFixedGS.uEraAnchor (hlc := hlc) (GF := GF) ke (niNamesHere (GF := GF)) ⊢
+      syscEvOut (hlc := hlc) (utSysRec A.sep A.V) A.M V2 M2 A.cs cs2 A.gn -∗
+      |==> utEvOut (hlc := hlc) A.sc A.sep A.V A.M V2 M2 A.cs cs2 := by
+  iintro #Ha #He
+  unfold syscEvOut utEvOut
+  icases He with (%hq | ⟨%k, %ι, #Hk, #Hl, %hr⟩ | ⟨%hk, -⟩)
+  · imodintro
+    iintro %_
+    ileft; ipureintro; exact hq
+  · imodintro
+    iintro %_
+    iright
+    iexists k, ι
+    iframe Hk Hl
+    ipureintro; exact hr
+  · obtain ⟨hw, hm1⟩ := hk
+    imod niIotaLbs_act (GF := GF) (niNamesHere (GF := GF)) act with #Hl
+    imodintro
+    iintro %_
+    iright
+    iexists ke, { UIota.boot with act := act }
+    iframe Ha Hl
+    ipureintro
+    refine ⟨fun h => absurd (hw.symm.trans h) (by decide), fun _ h0 => ?_,
+      fun h => absurd (hw.symm.trans h) (by decide)⟩
+    show match zLowest [] act with
+      | some (_, pid, xs, γ) => tfW V2.tf (tfArgIdx 0) = BitVec.signExtend 64 pid ∧ cs2 = A.cs \ {γ} ∧
+          syscImg V2 M2 = usysWr (syscImg (utSysRec A.sep A.V) A.M) 0#64 (usysWaitBytes 0#64 xs)
+      | none => tfW V2.tf (tfArgIdx 0) = -1#64 ∧ cs2 = A.cs ∧ syscImg V2 M2 = syscImg (utSysRec A.sep A.V) A.M
+    rw [zLowest_nil]
+    obtain ⟨hc, hi⟩ := hwm hw hm1 h0
+    exact ⟨hm1, hc, hi⟩
+
+/-- The dispatcher's answers, as usertrap's out rows (at the ecall cause),
+with the round's ledger evidence (NI M2-X2). -/
 theorem ut90_outs (A : UtArgs GF) (V2 : ProcPriv) (M2 : Nat → List (BitVec 8)) (sts2 : List FdState)
     (cs2 : ExtTreeSet GName compare) :
     syscExecOut (hlc := hlc) (utSysRec A.sep A.V) A.M V2 M2 A.sts sts2 A.gn A.cs A.pid ∗
       syscSysOut (hlc := hlc) A.f (utSysRec A.sep A.V) A.M A.sts A.gn A.cs A.pid (syscA0 V2)
         (syscImg V2 M2) sts2 V2.cwi cs2 ∗
       syscForkOut A.f (utSysRec A.sep A.V) (syscA0 V2) A.cs cs2 ∗
-      syscWaitOut (GF := GF) (utSysRec A.sep A.V) A.M (syscImg V2 M2) (syscA0 V2) A.cs cs2 A.pid ⊢
+      syscWaitOut (GF := GF) (utSysRec A.sep A.V) A.M (syscImg V2 M2) (syscA0 V2) A.cs cs2 A.pid ∗
+      utEvOut (hlc := hlc) A.sc A.sep A.V A.M V2 M2 A.cs cs2 ⊢
     utOuts (hlc := hlc) A V2 M2 sts2 cs2 := by
   unfold utOuts utExecOut utForkOut utWaitOut utSysOut
-  iintro ⟨Hx, Hs, Hf, Hw⟩
+  iintro ⟨Hx, Hs, Hf, Hw, He⟩
+  iframe He
   isplitl [Hx]
   · iintro %_
     iexists V2.tf
@@ -77,6 +126,7 @@ theorem ut90_tail (hW : UtReadWhy (GF := GF)) (HA : UT_A6 (hlc := hlc) PT Γ) (A
         (syscImg V2 M2) sts2 V2.cwi cs2 ∗
       syscForkOut A.f (utSysRec A.sep A.V) (syscA0 V2) A.cs cs2 ∗
       syscWaitOut (GF := GF) (utSysRec A.sep A.V) A.M (syscImg V2 M2) (syscA0 V2) A.cs cs2 A.pid ∗
+      syscEvOut (hlc := hlc) (utSysRec A.sep A.V) A.M V2 M2 A.cs cs2 A.gn ∗
       uhistRow
     ⊢ wpLoop (GF := GF) cpu := by
   have hr0 : UtRows0 A V2 M2 sts2 cs2 := ut_rows_of_sysc A V2 M2 sts2 cs2 hok.hlen hok.hP hb hsc hrows
@@ -86,11 +136,19 @@ theorem ut90_tail (hW : UtReadWhy (GF := GF)) (HA : UT_A6 (hlc := hlc) PT Γ) (A
   have hchg : V2.chg = (utSysRec A.sep A.V).chg := hrows.chg
   have hpj : A.N.pj = procAddr A.j := hok.pj
   iintro ⟨Hk, Hpc, Hfr, Hte, Hce, #Hcaps, #Hpay, Hkont, Hbs, Hfd, Hir, Henv, Hpriv, Hfrag, Hch,
-    Hxo, Hso, Hfo, Hwo, Huh⟩
+    Hxo, Hso, Hfo, Hwo, #Heo, Huh⟩
   icases ut_sys_live hW A V2 M2 sts2 cs2 hsc hok.hgn $$ [Hso Hwo] with ⟨#Hwhy, Hso, Hwo⟩
   · iframe Hso Hwo
-  ihave Houts := ut90_outs A V2 M2 sts2 cs2 $$ [Hxo Hso Hfo Hwo]
-  · iframe Hxo Hso Hfo Hwo
+  -- THE ROUND'S LEDGER EVIDENCE (NI M2-X2), at usertrap's post: the era's
+  -- anchor off the environment, the dispatcher's citation re-spelled
+  icases syscWaitOut_m1 (utSysRec A.sep A.V) A.M (syscImg V2 M2) (syscA0 V2) A.cs cs2 A.pid $$ Hwo
+    with ⟨%hwm, Hwo⟩
+  icases syscallEnv_anchor_keep PT Γ A.N.f $$ Henv with ⟨⟨%ke, #Hanc⟩, Henv⟩
+  iapply wpLoop_bupd
+  imod ut_evOut_of A V2 M2 cs2 ke (procAddr A.j) hwm $$ Hanc Heo with Hev
+  imodintro
+  ihave Houts := ut90_outs A V2 M2 sts2 cs2 $$ [Hxo Hso Hfo Hwo Hev]
+  · iframe Hxo Hso Hfo Hwo Hev
   ihave Hown : utOwn (utRsys (hlc := hlc) PT Γ A) A.N V2 M2 sts2 cs2 A.pid $$
     [Hbs Hfd Hir Henv Hpriv Hfrag Hch Huh]
   · unfold utOwn utRsys utSysEnvAt

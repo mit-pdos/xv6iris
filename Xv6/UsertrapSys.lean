@@ -175,13 +175,13 @@ theorem ut90_call [hPT : ∀ Γ, Persistent (PT Γ)] [ClaimIs (hlc := hlc) GF Γ
       iintro %c %_
       unfold syscallPost
       iintro %spie %spp %R' %V2 %M2 %sts2 %cs2 %hcs %hrows Hk Hpc Hte Hce Hbs - Hfd Hir Henv
-        Hpriv Hfrag Hch Hxo Hso Hfo Hwo
+        Hpriv Hfrag Hch Hxo Hso Hfo Hwo Heo
       k_norm_g [MachCSL.KCtx.withSpie_pushed, ut90_ret_a6]
       have hpins' : utPins A R' := by
         refine utPins_calleeSaved A _ R' ?_ hcs
         exact utPins_set A R 1#5 _ hpins (by decide) (by decide) (by decide)
       iapply (ut90_tail PT Γ hW HA A hok hsc hb c spie spp R' V2 M2 sts2 cs2 hpins' hrows)
-      iframe Hk Hpc Hframe Hte Hce Hpay Hkont Hbs Hfd Hir Henv Hpriv Hfrag Hch Hxo Hso Hfo Hwo Hcaps Huh
+      iframe Hk Hpc Hframe Hte Hce Hpay Hkont Hbs Hfd Hir Henv Hpriv Hfrag Hch Hxo Hso Hfo Hwo Heo Hcaps Huh
     · -- the dying conjunct: the stack from syscall's entry sp up to the page top
       unfold syscallCloser
       have e1 : ((A.k.intrOn.pushed 4).withRegs (R.set 1#5 (KA.«usertrap» + 0xa6#64))).sp =

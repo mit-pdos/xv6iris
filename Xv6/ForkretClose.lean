@@ -120,7 +120,7 @@ theorem fkr_close [X : CurCtx] (UC : USERRET_CLOSED) (W : IProp GF) (Γ : SchedN
   icases (utBlock_join N.f (procAddr N.j) N.pid (fkrPrep Vx k.root c) Mx).2 $$ Hpv with ⟨Hblk, Hpt, Htf⟩
   ihave #Hwt := (show utSysParkRows (GF := GF) Γ ⊢ wireInv ∗ syscTrampCl from by
       unfold utSysParkRows parkWorld
-      iintro ⟨%γtk, -, -, -, -, -, Hw, Htr, -⟩
+      iintro ⟨%γtk, -, -, -, -, -, Hw, -, Htr, -⟩
       iframe Hw Htr) $$ HG
   icases Hwt with ⟨#Hwire, #Htr⟩
   ihave #Hglob' := (show parkGlobals (hlc := hlc) (GF := GF) Γ N.w N.ft N.f N.ip ⊢

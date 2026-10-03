@@ -159,6 +159,7 @@ def mnWorldC [Fscfg] [Y : CurCtx] (Γ : SchedNames) (γ0 γ1 : UartNames) (γc �
   uartPort .uart0 γl0 γ0 ∗ uartPort .uart1 γl1 γ1 ∗ uartRxWord .uart0 ∗ uartRxWord .uart1 ∗
   uartInited γ0 ∗ uartInited γ1 ∗ plicInv γ0 γ1 ∗ panicEnv ∗
   isLock fscKalloc kmemLockAddr "kmem" (kmemRes fsReadyKmem) ∗ syscTrampCl ∗ wireInv ∗
+  (∃ k : Nat, MachFixedGS.uEraAnchor (hlc := hlc) (GF := GF) k (niNamesHere (GF := GF))) ∗
   genCert (hlc := hlc) (GF := GF) ∗ fsCrashSeam (hlc := hlc) (GF := GF) fscCov fscLogst ∗
   crashInv (hlc := hlc) (GF := GF)
 
@@ -220,7 +221,7 @@ theorem mn_phaseC (BI : BINIT) (II : IINIT) (FI : FILEINIT) (VD : VIRTIO_DISK_IN
   icases fsKitFsinitGhost_bitmap (fsBlocks dk) Rspent Pb _ $$ Hkit2 with ⟨#Hbm, Hkit2⟩
   unfold mnWorldC
   icases Hw with ⟨#Hpinv, #Htl, #Hwl, #Hpl, #Hcons, #Hp0, #Hp1, #Hr0, #Hr1, #Hi0, #Hi1, #Hplic, #Hpe,
-    #Hkml, #Htr, #Hwire, #Hcert, #Hseam, #Hcinv⟩
+    #Hkml, #Htr, #Hwire, #Hanc, #Hcert, #Hseam, #Hcinv⟩
   have hsl : 12 ≤ k.avail ∧ 4 ≤ k.avail ∧ virtioDiskInitSlots ≤ k.avail ∧ userinitSlots ≤ k.avail ∧
       schedulerSlots ≤ k.avail := by
     unfold mainSlots schedulerSlots kvFrameSlots userinitSlots virtioDiskInitSlots at *
@@ -264,7 +265,7 @@ theorem mn_phaseC (BI : BINIT) (II : IINIT) (FI : FILEINIT) (VD : VIRTIO_DISK_IN
   -- userinit's park rows
   ihave Hpark : iprop(userinitPark (hlc := hlc) (SG := uexecSGXv6) Γ γw γt) $$ [Hbundle Hrdr Hco]
   · unfold userinitPark
-    iframe Hwl Htl Hcready Hwire Htr Hbundle Hrdr Hco
+    iframe Hwl Htl Hcready Hwire Hanc Htr Hbundle Hrdr Hco
     iexists γ0, γ1, γc, γl0, γl1, γt, pd, pav, pu
     rw [hγd, hdl]
     iexact Hdev
@@ -325,6 +326,7 @@ def mnWorldB [Fscfg] [Y : CurCtx] (γ0 γ1 : UartNames) (γl0 γl1 : GName) : IP
   devswTable ∗ uartPort .uart0 γl0 γ0 ∗ uartPort .uart1 γl1 γ1 ∗ uartRxWord .uart0 ∗ uartRxWord .uart1 ∗
   consEchoShift ∗ uartInited γ0 ∗ uartInited γ1 ∗ plicInv γ0 γ1 ∗ panicEnv ∗
   isLock fscKalloc kmemLockAddr "kmem" (kmemRes fsReadyKmem) ∗ syscTrampCl ∗ wireInv ∗
+  (∃ k : Nat, MachFixedGS.uEraAnchor (hlc := hlc) (GF := GF) k (niNamesHere (GF := GF))) ∗
   genCert (hlc := hlc) (GF := GF) ∗ fsCrashSeam (hlc := hlc) (GF := GF) fscCov fscLogst ∗
   crashInv (hlc := hlc) (GF := GF)
 
@@ -382,7 +384,7 @@ theorem mn_phaseB (PR : PROCINIT) (TI : TRAPINIT) (TIH : TRAPINITHART) (PLI : PL
   icases Hrows with ⟨Hchb, Horph, Hpra, Hpled, Htk, Hzled, Hzsa, Hslots⟩
   unfold mnWorldB
   icases Hw with ⟨#Htbl, #Hp0, #Hp1, #Hr0, #Hr1, #Hecho, #Hi0, #Hi1, #Hplic, #Hpe, #Hkml, #Htr, #Hwire,
-    #Hcert, #Hseam, #Hcinv⟩
+    #Hanc, #Hcert, #Hseam, #Hcinv⟩
   have hsl : 10 ≤ k.avail ∧ 4 ≤ k.avail ∧ 2 ≤ k.avail := by
     unfold mainSlots schedulerSlots kvFrameSlots at hK; omega
   -- +0x7a  procinit
@@ -418,7 +420,7 @@ theorem mn_phaseB (PR : PROCINIT) (TI : TRAPINIT) (TIH : TRAPINITHART) (PLI : PL
   iframe Hk Hpc Hfs Hboot Hav Hdinv Hcc Hcfg Hgh Hcells Hpav Hipt Hbundle Hrdr Hco Hinv Hprim Hrec Hbare Hstv
     Hcsrs Hfree
   unfold mnWorldC
-  iframe Hpinv Htl Hwaitl Hpidl Hcons Hp0 Hp1 Hr0 Hr1 Hi0 Hi1 Hplic Hpe Hkml Htr Hwire Hcert Hseam Hcinv
+  iframe Hpinv Htl Hwaitl Hpidl Hcons Hp0 Hp1 Hr0 Hr1 Hi0 Hi1 Hplic Hpe Hkml Htr Hwire Hanc Hcert Hseam Hcinv
 
 end
 
@@ -469,7 +471,7 @@ theorem main_proof (CI : CPUID) (CN : CONSOLEINIT) (PI : PRINTKINIT) (PK : PRINT
     ⟨#Hc0, #Hc16, ⟨%vcl, %vcn, %vcc, Hcw, Hcn, Hcc⟩, Hpr, #Hkm0, #Hkm16, ⟨%vkl, %vkn, %vkc, Hkw, Hkn, Hkc⟩⟩,
     ⟨⟨%dr, %dw, Hdr, Hdw⟩, Hdrest, Hfl, ⟨%kpt0, Hkpt0⟩⟩, HLraw, HGraw, Hsb, Hlog, Hfw, Hnp,
     Hhart, Hps, Hpav, Hsf, Hchb, Hγc, Hγl0, Hγl1, Hγt, Hlks, Hsup, Hmir, Hirb, Hira, Hbs, #Hcert, #Hseam, #Hcinv,
-    Hbundle, Hco, #Hu0, #Hu1, #Hplic, #Hdinv, #Hcrash, #Hwire, Hur0, Hur1, Hcfg, Hgh, Hcells, Hroot, Hauth,
+    Hbundle, Hco, #Hu0, #Hu1, #Hplic, #Hdinv, #Hcrash, #Hwire, #Hanc, Hur0, Hur1, Hcfg, Hgh, Hcells, Hroot, Hauth,
     Hpages⟩
   -- the supply, opened; the ties
   icases fsBootSupply_open dk sb nib cov γ0 γd cn Rspent Pb _ $$ Hsup with ⟨%hties, Hkit1, Hkit2, Hoffa⟩
@@ -562,7 +564,7 @@ theorem main_proof (CI : CPUID) (CN : CONSOLEINIT) (PI : PRINTKINIT) (PK : PRINT
   ihave #Hpk' := mn_pkEnv_toKpt ⟨ξ, KTier.bare⟩ fscPrintk γl1 γ1 $$ Hpk
   ihave #HW : iprop(mnWorldB (GF := GF) (Y := ⟨ξ, KTier.kpt⟩) γ0 γ1 γl0 γl1) $$ []
   · unfold mnWorldB
-    iframe Hecho Hin0 Hin1 Hplic Hkmlk Htr Hwire Hcert Hseam Hcinv
+    iframe Hecho Hin0 Hin1 Hplic Hkmlk Htr Hwire Hanc Hcert Hseam Hcinv
     isplitl []
     · iapply mn_devswTable_toKpt ⟨ξ, KTier.bare⟩ $$ Htbl
     isplitl []

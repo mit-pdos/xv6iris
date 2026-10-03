@@ -131,31 +131,31 @@ end rows
 
 section unpack
 
-/-- Pull the second-to-last row (the lend `r`), the twelfth (the turn `t`)
-and the thirteenth (the origin ticket `o`, NI M2-W2d) of a right-nested
-chain out to the right, dropping the fourteenth (the era's registration
-ticket `k`, NI M2-X1: M2-X1 interim, X2 hands it to `xv6Era_run`). -/
+/-- Pull the second-to-last row (the lend `r`), the twelfth (the turn `t`),
+the thirteenth (the origin ticket `o`, NI M2-W2d) and the fourteenth (the
+era's registration ticket `k`, NI M2-X1, which `xv6Era_run` shoots, NI
+M2-X2) of a right-nested chain out to the right. -/
 theorem bs_pull {PROP : Type _} [BI PROP] [BIAffine PROP]
     (a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11 t o k a12 a13 r c : PROP) :
     iprop(a1 ∗ a2 ∗ a3 ∗ a4 ∗ a5 ∗ a6 ∗ a7 ∗ a8 ∗ a9 ∗ a10 ∗ a11 ∗ t ∗ o ∗ k ∗ a12 ∗ a13 ∗ r ∗ c) ⊢
-      iprop((a1 ∗ a2 ∗ a3 ∗ a4 ∗ a5 ∗ a6 ∗ a7 ∗ a8 ∗ a9 ∗ a10 ∗ a11 ∗ a12 ∗ a13 ∗ c) ∗ r ∗ t ∗ o) := by
-  iintro ⟨H1, H2, H3, H4, H5, H6, H7, H8, H9, H10, H11, Ht, Ho, -, H12, H13, Hr, Hc⟩
-  iframe Hr Ht Ho H1 H2 H3 H4 H5 H6 H7 H8 H9 H10 H11 H12 H13 Hc
+      iprop((a1 ∗ a2 ∗ a3 ∗ a4 ∗ a5 ∗ a6 ∗ a7 ∗ a8 ∗ a9 ∗ a10 ∗ a11 ∗ a12 ∗ a13 ∗ c) ∗ r ∗ t ∗ o ∗ k) := by
+  iintro ⟨H1, H2, H3, H4, H5, H6, H7, H8, H9, H10, H11, Ht, Ho, Hk, H12, H13, Hr, Hc⟩
+  iframe Hr Ht Ho Hk H1 H2 H3 H4 H5 H6 H7 H8 H9 H10 H11 H12 H13 Hc
 
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF]
 
 /-- **Rocq `power_boot_res_unpack`**: at `Hboot`'s era instance
 (`MachGS.ofEra E gen …`, any claim payload), `powerBootRes`
 is the ambient rows plus the client's lent resource and the era's turn
-(deviation 3) and the origin ticket; the era's registration ticket (NI
-M2-X1) is dropped (M2-X1 interim: X2 returns it for `xv6Era_run`).  Pure
-conversion. -/
+(deviation 3), the origin ticket and (NI M2-X1) the era's registration
+ticket, for `xv6Era_run` to shoot (NI M2-X2).  Pure conversion. -/
 theorem powerBootRes_unpack (Mof : (Nat → BitVec 8) → LogMirror)
     (Rb : Nat → (Nat → BitVec 8) → IProp GF) (Tn : Nat → IProp GF) (E : EraGS) (gen : Nat)
     (cP : CPU → BitVec 64 → IProp GF) (cI : ∀ cpu : CPU, ⊢ cP cpu 0#64) (σ : MState) :
     powerBootRes Mof Rb Tn E gen σ ⊢
       @powerBootRows hlc GF (MachGS.ofEra E gen cP cI) Mof σ ∗ Rb gen (diskOf σ.devs) ∗
-        Tn (gen + 1) ∗ MachFixedGS.uClaimO (hlc := hlc) (GF := GF) :=
+        Tn (gen + 1) ∗ MachFixedGS.uClaimO (hlc := hlc) (GF := GF) ∗
+        MachFixedGS.uEraTok (hlc := hlc) (GF := GF) (gen + 1) :=
   bs_pull _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
 
 end unpack
@@ -450,7 +450,8 @@ def bootSupplyCore [Fscfg] [Icfg] (X : CurCtx)
   pageRange kinitBase kinitPages
 
 /-- **The application's two rows, added back**: the core and the era's echo
-justification and `<init>`'s exec bundle are the boot hart's whole supply. -/
+justification and `<init>`'s exec bundle are the boot hart's whole supply
+(with the origin ticket, NI M2-W2d, and the era's anchor, NI M2-X2). -/
 theorem bootPrimarySupply_intro [Fscfg] [Icfg] (X : CurCtx)
     (Γ : SchedNames) (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γt : GName)
     (cn : ConsNames) (l0 l1 : List (BitVec 8)) (c0 : VirtioCfg)
@@ -459,14 +460,15 @@ theorem bootPrimarySupply_intro [Fscfg] [Icfg] (X : CurCtx)
     consEchoShift (hlc := hlc) (GF := GF) ∗
       initBootBundle (hlc := hlc) (SG := uexecSGXv6) ROOTINO ROOTINO seccAll (List.replicate NOFILE FdState.closed) ∗
       MachFixedGS.uClaimO (hlc := hlc) (GF := GF) ∗
+      (∃ k : Nat, MachFixedGS.uEraAnchor (hlc := hlc) (GF := GF) k (niNamesHere (GF := GF))) ∗
       bootSupplyCore X Γ γ0 γ1 γc γl0 γl1 γd γt cn l0 l1 c0 dk sb nib cov Pb Rspent ⊢
       bootPrimarySupply X Γ γ0 γ1 γc γl0 γl1 γd γt cn l0 l1 c0 dk sb nib cov Pb Rspent := by
   unfold bootSupplyCore bootPrimarySupply
-  iintro ⟨He, Hi, Ho, H1, H2, H3, H4, H5, H6, H7, H8, H9, H10, H11, H12, H13, H14, H15, H16, H17, H18,
+  iintro ⟨He, Hi, Ho, Han, H1, H2, H3, H4, H5, H6, H7, H8, H9, H10, H11, H12, H13, H14, H15, H16, H17, H18,
     H19, H20, H21, H22, H23, H24, H25, H26, H27, H28, H29, H30, H31, H32, H33, H34, H35, H36, H37,
     H38, H39⟩
   iframe He H1 H2 H3 H4 H5 H6 H7 H8 H9 H10 H11 H12 H13 H14 H15 H16 H17 H18 H19 H20 H21 H22 H23 H24
-    H25 Hi Ho H26 H27 H28 H29 H30 H31 H32 H33 H34 H35 H36 H37 H38 H39
+    H25 Hi Ho H26 H27 H28 H29 H30 H31 H32 H33 H34 H35 H36 H37 H38 H39 Han
 
 end supply
 
@@ -544,6 +546,8 @@ theorem bootSharedAlloc (σ : MState) (hbf : bootFacts σ) (ds0 : DevStates) (hd
       |={⊤}=> ∃ (ξ0 : CtxId) (Γ : SchedNames) (W : WchG GF) (HFd : FdslotG GF) (HBs : BioslotG GF)
         (HIr : IrefslotG GF) (γc γl0 γl1 γt : GName) (γ0 γ1 : UartNames) (cn : ConsNames)
         (γd : DiskNames) (I : Icfg) (F : Fscfg) (ξd : CtxId),
+        -- (NI M2-X2) the minted instance's cameras are the ambient ones
+        ⌜W.toWchGpre = (inferInstance : WchGpre GF)⌝ ∗
         bootSharedOut σ ξ0 Γ γ0 γ1 γc γl0 γl1 γt cn γd ξd (diskOf σ.devs) sb nib cov Pb
           (snapSpent S nib) := by
   unfold powerBootRows
@@ -552,7 +556,7 @@ theorem bootSharedAlloc (σ : MState) (hbf : bootFacts σ) (ds0 : DevStates) (hd
     #Hcinv⟩, Happ, #Hdurl, Hstok, Hsnap⟩
   -- the gname-only mints (the instances first)
   imod bootSharedDev_names (hlc := hlc) (GF := GF) with
-    ⟨%Γ, %W, %HFd, %HBs, %HIr, %γc, %γl0, %γl1, %γt, Hn⟩
+    ⟨%Γ, %W, %HFd, %HBs, %HIr, %γc, %γl0, %γl1, %γt, %hW, Hn⟩
   -- the carve, at hart 0's context
   imod bootShared_carve σ hbf $$ [Hmem Htoks Hregs Hlocks] with ⟨%ξ0, Hc⟩
   · iframe Hkst Hmem Htoks Hregs Hlocks
@@ -584,6 +588,8 @@ theorem bootSharedAlloc (σ : MState) (hbf : bootFacts σ) (ds0 : DevStates) (hd
   imod ctxStamped_boot (GF := GF) with ⟨%ξd, Hstmp⟩
   imodintro
   iexists ξ0, Γ, W, HFd, HBs, HIr, γc, γl0, γl1, γt, γ0, γ1, cn, γd, I, F, ξd
+  isplitl []
+  · ipureintro; exact hW
   unfold bootSharedOut bootSupplyCore
   isplitr
   · ipureintro; exact hcn

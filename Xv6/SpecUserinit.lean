@@ -127,7 +127,8 @@ def userinitSlots : Nat := 4 + igetrootSlots
 
 /-- **THE PARK ROWS** userinit is the courier of (Rocq SpecUserinit's six
 park rows, the exec bundle and the reader token): the wait lock, the ticks
-lock, the console, the device complement, `wireInv`, the trampoline claim;
+lock, the console, the device complement, `wireInv`, (NI M2-X2) the era's
+anchor, the trampoline claim;
 the first process's exec bundle at the root and the all-closed table, the
 console's reader token, and (NI M2-W2d) the origin ticket. -/
 def userinitPark {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
@@ -137,7 +138,11 @@ def userinitPark {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
   isLock γw waitLockAddr "wait_lock" waitLockPay ∗ isTickslock γtk ∗ consoleReadyApp ∗
   (∃ (γ0 γ1 : UartNames) (γc γl0 γl1 γt : GName) (pd pav pu : BitVec 64),
     devintrCaps Γ γ0 γ1 γc γl0 γl1 fscDisk fscDlock γt pd pav pu) ∗
-  wireInv ∗ syscTrampCl ∗
+  wireInv ∗
+  -- THE ERA'S ANCHOR (NI M2-X2): registered at the era's boot, on to the
+  -- park world every process's syscall environment carries
+  (∃ k : Nat, MachFixedGS.uEraAnchor (hlc := hlc) (GF := GF) k (niNamesHere (GF := GF))) ∗
+  syscTrampCl ∗
   initBootBundle (hlc := hlc) (SG := SG) ROOTINO ROOTINO seccAll (List.replicate NOFILE FdState.closed) ∗
   consReader fscCons 0 ∗
   -- THE ORIGIN TICKET (NI M2-W2d): the power-on's initproc claim, through the

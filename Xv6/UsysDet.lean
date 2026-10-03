@@ -112,8 +112,12 @@ read as the policy (`uexecRetContF_det`) are in `UexecApply`.
    history and the caller's slot** (`SyscRows.uptime` / `SyscRows.wait`);
    `SyscRows` is pure, so the receipts themselves (`tickLb n`,
    `zombReceipt h (ZReap act j rv)`) stop at the kernel's arms, and "∃ ι" is
-   only as strong as `usysDet`'s dependence on ι (G1 design F6; M2-X's ι
-   export would anchor it).  W4 reads both answers as READINGS (O5, G1-R5).
+   only as strong as `usysDet`'s dependence on ι (G1 design F6).  (NI M2-X2)
+   The ι export now anchors it: the arms keep the receipts as the cited
+   prefixes' lower bounds (`NiEvid.niIotaLbs`, `SpecSyscall.syscEvOut`),
+   and the filing proves the row at the CITED ι (`usysIotaFits_of_ev`:
+   the re-keyed `SyscallDefs.syscEvRow` IS the fit; `UserretClosedRows.
+   urc_niDetRow`).  W4 reads both answers as READINGS (O5, G1-R5) until X4.
 5. **The class at wait is `a0 = 0`, not the design's `lazy = false ∨ a0 =
    0`** (G1-R4): §4's wait bullet -- the kernel's led answer leaves the
    `-1` image at a non-null pointer unconstrained, so no row at `lazy =
@@ -312,6 +316,31 @@ theorem usysIotaFits_exists {n : Int} {W : Uvis} {r : BitVec 64} {cs' : Std.ExtT
     · exact ⟨{ UIota.boot with zev := hz, act := act }, fun h => absurd h hu,
         fun _ => Or.inr ⟨j, pid, xs, γ, hzl, hr, hc⟩⟩
   · exact ⟨UIota.boot, fun h => absurd h hu, fun h => absurd h hwt⟩
+
+/-- **The cited row IS the fit** (NI M2-X2): what the kernel's arm cited at
+`ι` (`SyscallDefs.syscEvRow`, read at the keys -- uptime's answer the word
+of `ι`'s count; wait's, at a null status pointer, the family ledger's
+reading at `ι`'s actor: the reap's pid and the column without its
+generation, or `-1` with the column kept) is `usysIotaFits` at `ι`, at a
+class member at the key (`hnull`). -/
+theorem usysIotaFits_of_ev {n : Int} {W : Uvis} {r : BitVec 64} {cs' : Std.ExtTreeSet GName compare}
+    {ι : UIota} (hnull : n = USYS_wait → tfW W.tf (tfArgIdx 0) = 0#64)
+    (hup : n = USYS_uptime → r = usysUptimeWord ι.ticks)
+    (hw : n = USYS_wait → tfW W.tf (tfArgIdx 0) = 0#64 →
+      match zLowest ι.zev ι.act with
+      | some (_, pid, _, γ) => r = BitVec.signExtend 64 pid ∧ cs' = W.ch \ {γ}
+      | none => r = -1#64 ∧ cs' = W.ch) :
+    usysIotaFits n W r cs' ι := by
+  refine ⟨hup, fun hn => ?_⟩
+  have h := hw hn (hnull hn)
+  unfold usysWaitFits UIota.reap
+  revert h
+  cases zLowest ι.zev ι.act with
+  | none => intro h; exact Or.inl ⟨rfl, h.1, h.2⟩
+  | some v =>
+    obtain ⟨j, pid, xs, γ⟩ := v
+    intro h
+    exact Or.inr ⟨j, pid, xs, γ, rfl, h.1, h.2⟩
 
 /-! ## §3 The functional row refines the relation, and the relation at the
 class IS the functional row -/

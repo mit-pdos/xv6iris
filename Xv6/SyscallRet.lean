@@ -203,6 +203,7 @@ theorem syscall_epilogue_tail (PT : SchedNames → IProp GF) (Γ : SchedNames)
     syscSysOut (hlc := hlc) f V M sts gn cs pid (syscA0 V2) (syscImg V2 M2) sts' V2.cwi cs' ∗
     syscForkOut f V (syscA0 V2) cs cs' ∗
     syscWaitOut V M (syscImg V2 M2) (syscA0 V2) cs cs' pid ∗
+    syscEvOut (hlc := hlc) V M V2 M2 cs cs' gn ∗
     wpNext true k.proc c0 (syscallPost (hlc := hlc) PT Γ k γ j pid V M sts gn cs ip f)
     ⊢ wpLoop (GF := GF) cpu := by
   obtain ⟨h2, p19, p20, p21, p22, p23, p24, p25, p26, p27⟩ := hpins
@@ -210,7 +211,7 @@ theorem syscall_epilogue_tail (PT : SchedNames → IProp GF) (Γ : SchedNames)
     have := syscallSlots_val; omega
   have hpn : k.proc ≠ 0#64 := by rw [hproc]; exact procAddr_nonzero hj
   iintro ⟨Hk, Hpc, Hframe, Hte, Hce, Hbs, Hip, Hfd, Hir, Henv, Hpriv, Hfr, Hch, Hxo, Hso, Hfo, Hwo,
-    Hnext⟩
+    Heo, Hnext⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   ihave Hframe := (show frame4s2 (GF := GF) (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5)
         (k.regs 18#5) ⊢
@@ -233,7 +234,7 @@ theorem syscall_epilogue_tail (PT : SchedNames → IProp GF) (Γ : SchedNames)
   ihave HΦ := syscall_post_at k.proc hpn c0 cpu _ $$ Hnext
   unfold syscallPost
   iapply HΦ $$ %spie %spp %_ %V2 %M2 %sts' %cs' [] [] Hk Hpc Hte Hce Hbs Hip Hfd Hir Henv Hpriv Hfr
-    Hch Hxo Hso Hfo Hwo
+    Hch Hxo Hso Hfo Hwo Heo
   · ipureintro
     exact bc_calleeSaved_epi2 k.regs R p19 p20 p21 p22 p23 p24 p25 p26 p27
   · ipureintro; exact hrows
@@ -261,12 +262,13 @@ theorem syscall_ret_tail (PT : SchedNames → IProp GF) (Γ : SchedNames)
       (syscImg (syscStore V1 (R 10#5)) M1) sts' V1.cwi cs' ∗
     syscForkOut f V (syscA0 (syscStore V1 (R 10#5))) cs cs' ∗
     syscWaitOut V M (syscImg (syscStore V1 (R 10#5)) M1) (syscA0 (syscStore V1 (R 10#5))) cs cs' pid ∗
+    syscEvOut (hlc := hlc) V M (syscStore V1 (R 10#5)) M1 cs cs' gn ∗
     wpNext true k.proc c0 (syscallPost (hlc := hlc) PT Γ k γ j pid V M sts gn cs ip f)
     ⊢ wpLoop (GF := GF) cpu := by
   have hpins' := hpins
   obtain ⟨h2, -⟩ := hpins'
   iintro ⟨Hk, Hpc, Hframe, Hte, Hce, Hbs, Hip, Hfd, Hir, Henv, Hpriv, Hfr, Hch, Hxo, Hso, Hfo, Hwo,
-    Hnext⟩
+    Heo, Hnext⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   icases kctx_tier _ _ $$ Hk with ⟨%hti, Hk⟩
   have hct : curTier = KTier.kpt := by rw [← hti]; exact htier
@@ -287,7 +289,7 @@ theorem syscall_ret_tail (PT : SchedNames → IProp GF) (Γ : SchedNames)
   iapply (syscall_epilogue_tail PT Γ c0 cpu k spie spp R γ j pid V M sts gn cs ip f
       (syscStore V1 (R 10#5)) M1 sts' cs' hj hproc hK hpins hrows)
   simp only [syscStore_cwi]
-  iframe Hk Hte Hce Hbs Hip Hfd Hir Henv Hfr Hch Hxo Hso Hfo Hwo Hnext Hframe
+  iframe Hk Hte Hce Hbs Hip Hfd Hir Henv Hfr Hch Hxo Hso Hfo Hwo Heo Hnext Hframe
   isplitl [Hpc]
   · iexact Hpc
   · unfold syscStore; iexact Hpriv

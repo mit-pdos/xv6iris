@@ -13,6 +13,12 @@ contract, crossing `k.sie`) from the dispatch's rows, per the frozen recipe
 * The answer: `syscForkOut` from kfork's `kforkRet` -- the lend
   `sforkLend f` refunded on `-1` (`uforkAns`'s left arm), dropped on success
   beside the parent's `childTok` at a FRESH generation.
+* (NI M2-X2 with G2b) THE CITATION: the arm calls the LED `sys_fork`
+  (`SYSFORK.wp_sys_fork_led_eb`), whose success arm carries the pid
+  ledger's allocation receipt and the family ledger's `ZFork` receipt at the
+  child's generation; `syscArmFork_ev` turns them, with the era's anchor,
+  into `syscEvOut` (the pid prefix before the `PAlloc`, the family prefix
+  ending in the `ZFork`); on `-1` the boot prefix (`syscArmFork_evNeg`).
 
 * The park (W8-P2): kfork's `kforkPark` rows out of the environment --
   printk's credentials, the park world with the syscall side's rows
@@ -112,6 +118,58 @@ theorem syscArmFork_out (f : UexecSG.sfam GF) (V : ProcPriv) (j : Nat)
     ipureintro
     exact ⟨rfl, hr, hf, hcs⟩
 
+/-- **FORK'S CITATION ON SUCCESS** (NI M2-X2 with G2b): out of the led
+answer's two receipts and the era's anchor, the round's ledger evidence --
+the pid ledger's prefix BEFORE the round's `PAlloc` (the pid is `pidPick` of
+it, `PidLock.pidAllocRcpt`) and the family ledger's prefix ENDING in the
+round's `ZFork` at the child's generation (G2 F5), at the caller's slot. -/
+theorem syscArmFork_ev (V : ProcPriv) (M : Nat → List (BitVec 8)) (V' : ProcPriv)
+    (M' : Nat → List (BitVec 8)) (cs : ExtTreeSet GName compare) (gn : GName) (rv : BitVec 32)
+    (γc : GName) (act : BitVec 64) (ke : Nat)
+    (hn : syscNum V = 1) (ha : syscA0 V' = BitVec.signExtend 64 rv) :
+    MachFixedGS.uEraAnchor (hlc := hlc) (GF := GF) ke (niNamesHere (GF := GF)) ⊢
+      pidAllocRcpt act rv -∗ (∃ (hz : List Zev) (i : Nat), zombReceipt hz (.ZFork act i rv γc)) -∗
+      |==> syscEvOut (hlc := hlc) V M V' M' cs (cs ∪ {γc}) gn := by
+  unfold pidAllocRcpt
+  iintro #Ha ⟨%h, #Hp, %hpick⟩ ⟨%hz, %i, #Hz⟩
+  have hrv : BitVec.ofNat 32 (pidPick PIDMAX h) = rv := by rw [← hpick]; exact BitVec.ofNat_toNat _ _
+  ihave #Hp' := (show pidReceipt (GF := GF) h (.PAlloc act rv) ⊢ WchG.wplName GF ↪◯ML h from by
+    unfold pidReceipt pidLedLb
+    iintro #H
+    iapply MonoList.lb_own_le _ h (List.prefix_append h [_]) $$ H) $$ Hp
+  ihave #Hp' := (show (WchG.wplName GF ↪◯ML h) ⊢@{IProp GF} ((niNamesHere (GF := GF)).getD 1 0) ↪◯ML h
+    from .rfl) $$ Hp'
+  ihave #Hz' := (show zombReceipt (GF := GF) hz (.ZFork act i rv γc) ⊢
+      ((niNamesHere (GF := GF)).getD 2 0) ↪◯ML (hz ++ [.ZFork act i rv γc]) from .rfl) $$ Hz
+  imod niIotaLbs_pz (GF := GF) (niNamesHere (GF := GF)) h (hz ++ [.ZFork act i rv γc]) act $$ [Hp' Hz']
+    with #Hl
+  · iframe Hp' Hz'
+  imodintro
+  iapply syscEvOut_cite V M V' M' cs (cs ∪ {γc}) gn ke
+    { UIota.boot with pev := h, zev := hz ++ [.ZFork act i rv γc], act := act } ?_ $$ Ha Hl
+  refine ⟨fun h' => absurd (hn.symm.trans h') (by decide), fun h' => absurd (hn.symm.trans h') (by decide),
+    fun _ _ => ?_⟩
+  show tfW V'.tf (tfArgIdx 0) = BitVec.signExtend 64 (BitVec.ofNat 32 (pidPick PIDMAX h)) ∧
+    ∃ (hz' : List Zev) (i' : Nat) (γ : GName),
+      hz ++ [Zev.ZFork act i rv γc] = hz' ++ [.ZFork act i' (BitVec.ofNat 32 (pidPick PIDMAX h)) γ] ∧
+      cs ∪ {γc} = cs ∪ {γ}
+  rw [hrv]
+  exact ⟨ha, hz, i, γc, rfl, rfl⟩
+
+/-- **FORK'S CITATION ON `-1`** (NI M2-X2): the boot prefix at the caller's
+slot (the row is vacuous at `-1`). -/
+theorem syscArmFork_evNeg (V : ProcPriv) (M : Nat → List (BitVec 8)) (V' : ProcPriv)
+    (M' : Nat → List (BitVec 8)) (cs : ExtTreeSet GName compare) (gn : GName) (act : BitVec 64)
+    (ke : Nat) (hn : syscNum V = 1) (ha : syscA0 V' = -1#64) :
+    MachFixedGS.uEraAnchor (hlc := hlc) (GF := GF) ke (niNamesHere (GF := GF)) ⊢
+      |==> syscEvOut (hlc := hlc) V M V' M' cs cs gn := by
+  iintro #Ha
+  imod niIotaLbs_act (GF := GF) (niNamesHere (GF := GF)) act with #Hl
+  imodintro
+  iapply syscEvOut_cite V M V' M' cs cs gn ke { UIota.boot with act := act } ?_ $$ Ha Hl
+  exact ⟨fun h' => absurd (hn.symm.trans h') (by decide), fun h' => absurd (hn.symm.trans h') (by decide),
+    fun _ h => absurd ha h⟩
+
 /-- The syscall side's park rows (the park world, the ticks and nextpid
 locks, the console), off the environment. -/
 theorem syscallEnv_parkRows (PT : SchedNames → IProp GF) (Γ : SchedNames) (γ : FileNames) :
@@ -180,27 +238,36 @@ theorem syscall_arm_fork (SF : SYSFORK)
     isplitr; · iexact HT
     iframe Hlend Hco
     iexact Hslotw
-  have hU := SF.wp_sys_fork_eb (hlc := hlc) (GF := GF) Γ cpu
+  -- (NI M2-X2 with G2b) THE LED sys_fork: the success arm's two receipts
+  have hU := SF.wp_sys_fork_led_eb (hlc := hlc) (GF := GF) Γ cpu
     (((k.withSpie spie spp).pushed 4).withRegs R) γw γp fscKalloc fsReadyKmem γft γ j pid V M sts
     (UexecSG.sforkPay f) cs (UexecSG.sforkLend f) hj hprocK
     (by k_norm_g; have : sysForkSlots + 4 ≤ syscallSlots := by decide
         omega)
     hnoffK (by k_norm_g; exact htier)
-  unfold wp_sys_fork_eb_body at hU
+  unfold wp_sys_fork_led_eb_body at hU
   rw [syscTarget_fork]
   iapply hU
   iframe Hk Hpi Hwl Hnp Hkl Hka Hpav Hft Hit2 Hiti Hreg Hkw Hdone Hpk Hpriv Hfr Hch Hpc
   k_next_e
-  unfold kforkPost kforkPostB kforkRet
+  unfold kforkPostLed kforkPostB kforkRetLed
   iintro %spie2 %spp2 %R2 %rv %⟨hcs, ha0, hans⟩ Hk Hpc ⟨⟨%k', %hk', Hpriv⟩, Hfr, Hret⟩
   k_norm_g [hra, syscallRet_jumpPc, hww, hpsw]
   k_norm_g at hcs
   have hpins2 := syscPins_calleeSaved k R R2 hpins hcs
   have hs2' : R2 18#5 = pageAddr V.upt.tfp := hcs.2.2.2.1.trans hs2
   -- the children set the post is keyed at, and fork's answer
-  icases Hret with (⟨%hrv, Hch, Hlend⟩ | ⟨%γc, %hr, %hf, Htok, Hch⟩)
+  have hsa : ∀ (W : ProcPriv), W.tf = V.tf → syscA0 (syscStore W (R2 10#5)) = R2 10#5 :=
+    fun W hW => syscStore_a0 W _ (by rw [hW, hl]; decide)
+  -- the era's anchor, for the citation (NI M2-X2)
+  icases syscallEnv_anchor PT Γ γ $$ Henv with ⟨%ke, #Hanc⟩
+  icases Hret with (⟨%hrv, Hch, Hlend⟩ | ⟨%γc, %hr, %hf, Htok, Hch, #Hrc, #Hzr⟩)
   · have hrows := syscRows_fork V M sts cs cs pid (R2 10#5) hn1 (by rw [hl]; decide)
       (by rw [ha0]; exact syscArmFork_ans rv hans)
+    iapply wpLoop_bupd
+    imod syscArmFork_evNeg V M (syscStore (V.updEv k') (R2 10#5)) M cs gn (procAddr j) ke hn1
+      (by rw [hsa (V.updEv k') rfl, ha0, hrv]; decide) $$ Hanc with #Hev
+    imodintro
     unfold syscallRet syscallAddr at *
     -- the parent at fork's raised event count (permit sweep L1a)
     iapply (syscall_ret_tail PT Γ c0 cpu k spie2 spp2 R2 γ j pid V M sts gn cs ip f (V.updEv k') M sts cs
@@ -216,9 +283,15 @@ theorem syscall_arm_fork (SF : SYSFORK)
       ileft
       iframe Hlend
       ipureintro; exact ⟨hrv, rfl⟩
+    isplitr
     · iapply syscWaitOut_ne; rw [hn1]; decide
+    · iexact Hev
   · have hrows := syscRows_fork V M sts cs (cs ∪ {γc}) pid (R2 10#5) hn1 (by rw [hl]; decide)
       (by rw [ha0]; exact syscArmFork_ans rv hans)
+    iapply wpLoop_bupd
+    imod syscArmFork_ev V M (syscStore (V.updEv k') (R2 10#5)) M cs gn rv γc (procAddr j) ke hn1
+      (by rw [hsa (V.updEv k') rfl, ha0]) $$ Hanc Hrc Hzr with #Hev
+    imodintro
     unfold syscallRet syscallAddr at *
     iapply (syscall_ret_tail PT Γ c0 cpu k spie2 spp2 R2 γ j pid V M sts gn cs ip f (V.updEv k') M sts
       (cs ∪ {γc}) hj hproc hK htier hpins2 hs2' (hrows.updEv k'))
@@ -234,7 +307,9 @@ theorem syscall_arm_fork (SF : SYSFORK)
       iexists γc
       iframe Htok
       ipureintro; exact ⟨hr, hf, rfl⟩
+    isplitr
     · iapply syscWaitOut_ne; rw [hn1]; decide
+    · iexact Hev
 
 end
 

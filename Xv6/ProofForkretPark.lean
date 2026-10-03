@@ -129,6 +129,8 @@ instance fkp_utSysParkRows_morph (Γ : SchedNames) :
   refine @instCtxMorphSep hlc GF _ _ _ fkp_syscPidLock_morph ?_
   refine @instCtxMorphSep hlc GF _ _ _ (ctxMorph_ofEq _ (fun _ _ => by amb_tier_rfl)) ?_
   refine @instCtxMorphSep hlc GF _ _ _ (ctxMorph_ofEq _ (fun _ _ => by amb_tier_rfl)) ?_
+  -- the era's anchor (NI M2-X2): context-free
+  refine @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _) ?_
   refine @instCtxMorphSep hlc GF _ _ _ (ctxMorph_ofEq _ (fun _ _ => by amb_tier_rfl)) ?_
   refine @instCtxMorphExists hlc GF _ _ _ (fun ip => ?_)
   exact @instCtxMorphSep hlc GF _ _ _ (fkp_initIdentCell_morph ip) (instCtxMorphConst _)

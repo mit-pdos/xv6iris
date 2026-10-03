@@ -2097,6 +2097,89 @@ dropped row `k`). The NI record (`NiAdequacy`): `uEvid := ⌜∃ c, niFitEv ox e
 Gates: full build, `lint.sh`, `tcb.sh` (no change; `expected.json` not updated), `audit.sh` (9 roots PASS,
 baseline unchanged), `run_all.sh`.
 
+### M2-X2 as landed (2026-10-03)
+
+Lane `lane/m2x`, one commit on X1: §1's row and carrier, §2(a)–(c), §2(d)'s kernel half, and G2b. The
+system roots' statements, axioms and TCB are unchanged (`tcb.sh` and `audit.sh` pass with no baseline
+update: `NiFitIs` is in no root's statement).
+
+**The carrier** (`Xv6/NiEvid.lean`, new, imported from `Xv6.lean` after `UsysDet`): `niNamesHere`
+(`[WchG] [Fscfg]`: `wtkName, wplName, wzlName, fsReadyKmem.pend`), `niIotaLbs ns ι` (the four lower bounds
+at `ns.getD 0..3`), `niBelow`, `niLonger`/`niJoin`, `niBelow_join`, `niIotaLbs_boot`, `niIotaLbs_compat` (three
+`MonoList.lb_own_valid`; no tick conjunct, a `MonoNat` is always comparable), `niIotaLbs_join` (derives the
+compatibility itself), and the arm helpers `niIotaLbs_mk/_ticks/_zev/_pz/_act`. `SyscallDefs.syscEvRow` as §1
+(with `tfW V'.tf (tfArgIdx 0)` for `syscA0`, which `SpecSyscall` defines later).
+
+**The kernel's law** (`NiLedger`): `niCiting`, `niDetRow`, `niForkRow` and `niFitEv` at the full §2(d)
+shape; `niCiteResRaw A c := emp | ∃ ns, A k ns ∗ niIotaLbs ns ι`; `NiFitIs` gains the class parameters
+`[Xv6G GF] [WchGpre GF]` (the cameras the lower bounds live at; every `[NiFitIs GF]` binder's text is
+unchanged); `uEvid_of_niFit` is deleted. `UsysDet.usysIotaFits_of_ev` (pure).
+
+**The route.**
+- Arms: uptime keeps `tickLb nt` and cites `{boot with ticks := nt, act := procAddr j}`; wait reads
+  `UserChildren.waitAnsLed_cite` (new `waitLedCite`: the reap's receipt lowered to the prefix before it, with
+  the reading and the pid range; the no-children lower bound read as `zLowest h act = none`, new
+  `zLowest_none_of_noKids`; or the kill shot) and `SyscallArmsWait.syscArmWait_ev` cites `{boot with zev := h,
+  act}` (the copyout `-1` cites `{boot with act}`: the row is vacuous at a non-null pointer); fork calls
+  `SF.wp_sys_fork_led_eb` and `SyscallArmsFork.syscArmFork_ev` cites `{boot with pev := h, zev := hz ++ [ZFork
+  …], act}` (`syscArmFork_evNeg`: `{boot with act}` on `-1`). Every other arm pays `syscEvOut_quiet`
+  (`syscall_ret_fd` gains a defaulted `h14`). The allocator: nothing (X-R4).
+- `SpecSyscall.syscEvOut` (the three disjuncts verbatim, persistent), `syscallPost`'s LAST premise,
+  `syscEvOut_quiet` (defaulted `h14 h3 h1`), `syscEvOut_cite`. `SyscallRet`'s two tails carry it.
+- `SpecUsertrap.utEvOut` (§2(c)), `usertrapPost`'s LAST premise (the Contract section gains `[Xv6G GF]
+  [Fscfg]`), `utEvOut_nonecall`. `UsertrapParts.utOuts` gains it as a fifth row (so every non-ecall arm pays it
+  by `utOuts_quiet`, and `utOuts_retf` by `utEvOut_retf`); `UsertrapSysTail.ut90_tail` takes `syscEvOut` and
+  forms it by `ut_evOut_of`; `UsertrapClose` hands it to the post.
+- The anchor: `parkWorld` gains `∃ k, MachFixedGS.uEraAnchor k niNamesHere` right after `wireInv`
+  (`syscallEnv_anchor`, `syscallEnv_anchor_keep`); `SpecUserinit.userinitPark`, `MAIN`'s pre,
+  `BootPrimarySupply.bootPrimarySupply` and `ProofMain.mnWorldB`/`mnWorldC` carry it after `wireInv`;
+  `bootPrimarySupply_intro` takes it; `SystemBootEra.xv6Era_run` takes `(ke : Nat)` and `uEraTok ke -∗` after
+  `uClaimO` and shoots it (`NiFitIs.reg ke niNamesHere`); `bs_pull`/`powerBootRes_unpack` return the ticket
+  (`uEraTok (gen + 1)`), and `xv6BootEra` passes it at `ke := gen + 1`.
+- The filing: `UserretClosedRows.urc_num_run`, `urc_a0_run`, `urc_evRow` (the re-keying), `urc_niDetRow`
+  (`uexecRet_roundDet … hfit` with `hfit := usysIotaFits_of_ev hcls.2 …`; `hch`/`hfdrow`/`hpidrow` from
+  `utChKept`/`utFdEcall`/`utRetPid` as `urc_post` reads them) and `urc_niForkRow`. `urc_exit` splits on
+  `niCiting sc W`: citing ⇒ `utEvOut`'s citation (its quiet disjunct is refuted by the number), `c := some (k,
+  ι)`, `NiFitIs.evid` at `ns := niNamesHere`; else `c := none`. `urc_resume`, the origin (`evidNone`) and
+  `USERRET` are X1's, unchanged.
+
+**G2b.** `SpecKfork`: `kforkRetLed` (+ `pidAllocRcpt (procAddr j) rv ∗ ∃ hz i, zombReceipt hz (.ZFork (procAddr
+j) i rv γc)` at the success arm's `γc`), `kforkRetLed_ret`, `kforkPostLed`, `wp_kfork_led_eb_body`, the field
+`KFORK.wp_kfork_led_eb`. `ProofKfork`: `kfork_led_proof` on `AL.wp_allocproc_led` (`kf_postLed_act` re-keys the
+actor; the found arm's receipt rides `kfOfileΨ`, now at `kforkPostLed`, to `kf_publish`, which keeps
+`kf_wait_fork`'s receipt and builds `kforkRetLed`); `kfork_proof` derives `wp_kfork_eb` (`wpNext_mono` +
+`kforkRetLed_ret`). `SpecSysFork.wp_sys_fork_led_eb_body` + the field; `ProofSysFork.sys_fork_kforkB` is the
+forwarder over any returned bundle, both fields its instances. `LinkKfork`/`LinkSysFork`: no text change.
+
+**Deviations.**
+1. **THE CAMERAS (unsanctioned statement moves, flagged).** The lower bounds a kernel citation carries are at
+   the era's `WchG`'s cameras, the NI record reads them at the ambient `WchGpre` (`NiAdequacy`'s), and the boot
+   hands the `WchG` out existentially. So `WaitInvTies.childrenRes_alloc`, `BootSharedDev.bootSharedDev_names`
+   and `BootShared.bootSharedAlloc` each gain `⌜W.toWchGpre = (inferInstance : WchGpre GF)⌝` (proved by `rfl`
+   at the mint), and `xv6BootEra` builds `NiFitIs` at `W.toWchGpre` by rewriting it. Without it X3's
+   `niIotaLbs_compat` could not compare a citation's lower bounds with the hook's. The design's §1 said "over
+   `[MachGS]` and `[WchG]`"; the gap is that `WchG`'s cameras are not its names.
+2. `niIotaLbs`/`niCiteResRaw` take `[MonoNatG GF]` (not `[MachFixedGS]`), so `xv6BootEra`'s `hUevid` (stated
+   before the era's record) elaborates at `MachGpreS.mono_pre`, which the record's `mono` is.
+3. **F5 is discharged at usertrap's syscall tail, not at +0xa6.** `ut_evOut_of` turns `syscEvOut`'s kill
+   disjunct into a citation of `{boot with act}`: a `-1` wait at a null pointer moved nothing
+   (`UsertrapSysLive.syscWaitOut_m1`), which is `zLowest []`'s row. Such a round never resumes (+0xa6 takes the
+   shot), so the citation is never filed. The A6 route would have put `utEvOut` into the lent `utLiveRes` and
+   moved `UT_RET`/`UT_FA`/`usertrap_a6_after` for no content; `UsertrapTailA6` is untouched.
+4. `syscEvOut_quiet` takes `(n) (hnum : syscNum V = n)` before the defaulted `h14 h3 h1`.
+
+**What X3 must absorb.** The NI record (`NiAdequacy`) is still blind: `Ue := ⌜∃ c, niFitEv ox e c⌝` (`evid`
+drops `niCiteResRaw`), `Uet`/`Uea := emp`. X3's `niEvid γe` must state `niIotaLbs ns ι` at the AMBIENT
+`[MachGpreS]`/`[Xv6G]`/`[WchGpre]` (deviations 1–2 make the kernel's lower bounds those). The kernel always
+cites `ns := niNamesHere` at the era `ke = gen + 1` its boot registered, and cites exactly at `niCiting` (`c =
+none` otherwise). `dead_allow.txt` has `decl Xv6.niIotaLbs_join` (with `_compat`, `niBelow`, `niJoin`) for X3's
+`niR_enter`. The remaining X1 interim markers (`NiAdequacy` ×3, `Adequacy.uenterHook_dropEv`) are X3's.
+
+**For X4.** `UsysDet` and `uexecRet_roundDet` are now reached through `urc_niDetRow` (their `dead_allow`
+rows stay for X4/R7, with `uexecRet_roundDet_exists`). `NiTrace`/`niOk` do not read `niFitEv` yet.
+
+Gates: full build (2739 jobs), `lint.sh`, `tcb.sh` (no change), `audit.sh` (9 roots PASS), `run_all.sh`.
+
 ## Lanes (opened 2026-09-15)
 
 Execution order is §6's, adjusted for one territory fact: upstream's

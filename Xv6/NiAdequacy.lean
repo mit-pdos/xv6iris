@@ -279,7 +279,7 @@ theorem xv6NiAppAdequacy (g : GState) (sb : FsSb) (nib : Nat) (cov : ExtTreeSet 
     (fun _ _ => iprop(emp)) (fun _ _ _ => iprop(emp)) (fun _ _ _ => inferInstance)
     (fun _ _ _ => BIUpdate.intro)
     (fun _ _ _ _ cc h => BI.pure_intro ⟨cc, h⟩)
-    (fun _ _ h => BI.pure_intro ⟨none, h, rfl⟩)
+    (fun _ _ h => BI.pure_intro ⟨none, rfl, h⟩)
     (fun γobs p => obsLedgerAt (niLedgerR A p.1 p.2) γobs)
     ?_
     ?_

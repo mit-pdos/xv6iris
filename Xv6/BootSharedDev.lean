@@ -113,10 +113,11 @@ the three slot supplies (building `FdslotG`/`BioslotG`/`IrefslotG`), cut
 into `SpecMain`'s shares. -/
 theorem bootSharedDev_names :
     ⊢@{IProp GF} |==> ∃ (Γ : SchedNames) (W : WchG GF) (HFd : FdslotG GF) (HBs : BioslotG GF)
-      (HIr : IrefslotG GF) (γc γl0 γl1 γt : GName), bsdNameRows (hlc := hlc) Γ γc γl0 γl1 γt := by
+      (HIr : IrefslotG GF) (γc γl0 γl1 γt : GName), ⌜W.toWchGpre = (inferInstance : WchGpre GF)⌝ ∗
+      bsdNameRows (hlc := hlc) Γ γc γl0 γl1 γt := by
   iintro
   imod procBootAlloc (hlc := hlc) (GF := GF) startedPrimary with ⟨%Γ, Hrows⟩
-  imod childrenRes_alloc (GF := GF) (fun a b ha hb h => procAddr_inj ha hb h) with ⟨%W, Hch, Hnp⟩
+  imod childrenRes_alloc (GF := GF) (fun a b ha hb h => procAddr_inj ha hb h) with ⟨%W, %hW, Hch, Hnp⟩
   imod lockGhostAlloc (hlc := hlc) (GF := GF) with ⟨%γc, Hc⟩
   imod lockGhostAlloc (hlc := hlc) (GF := GF) with ⟨%γl0, Hl0⟩
   imod lockGhostAlloc (hlc := hlc) (GF := GF) with ⟨%γl1, Hl1⟩
@@ -133,6 +134,8 @@ theorem bootSharedDev_names :
   icases bsd_irefSlots_split $$ Hir with ⟨Hi1, Hi2, Hi3⟩
   imodintro
   iexists Γ, W, HFd, HBs, HIr, γc, γl0, γl1, γt
+  isplitl []
+  · ipureintro; exact hW
   unfold bsdNameRows
   iframe Hh Hs Hav Hf Hch Hc Hl0 Hl1 Ht Hpl Hfd Hi1 Hi2 Hi3 Hia Hb1 Hb2
 

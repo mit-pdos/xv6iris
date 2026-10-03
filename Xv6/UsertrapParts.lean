@@ -207,17 +207,18 @@ end Rows
 
 section Outs
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [WchG GF]
-    [CurCtx]
+    [CurCtx] [Xv6G GF] [Fscfg]
 
 /-- **The four channel answers at the parked record** (the post's out rows
-minus the kill row). -/
+minus the kill row), and (NI M2-X2) the round's ledger evidence. -/
 def utOuts (A : UtArgs GF) (V2 : ProcPriv) (M2 : Nat → List (BitVec 8)) (sts2 : List FdState)
     (cs2 : ExtTreeSet GName compare) : IProp GF := iprop(
   utExecOut (hlc := hlc) A.sc A.sep A.V A.M V2 M2 A.sts sts2 A.gn A.cs A.pid ∗
   utForkOut A.f A.sc A.sep A.V (tfW V2.tf (tfArgIdx 0)) A.cs cs2 ∗
   utWaitOut A.sc A.sep A.V A.M (syscImg V2 M2) (tfW V2.tf (tfArgIdx 0)) A.cs cs2 A.pid ∗
   utSysOut (hlc := hlc) A.f A.sc A.sep A.V A.M A.sts A.gn A.cs A.pid (tfW V2.tf (tfArgIdx 0))
-    (syscImg V2 M2) sts2 V2.cwi cs2)
+    (syscImg V2 M2) sts2 V2.cwi cs2 ∗
+  utEvOut (hlc := hlc) A.sc A.sep A.V A.M V2 M2 A.cs cs2)
 
 /-- Off the ecall every answer is owed nothing. -/
 theorem utOuts_quiet (A : UtArgs GF) (V2 : ProcPriv) (M2 : Nat → List (BitVec 8)) (sts2 : List FdState)
@@ -230,7 +231,32 @@ theorem utOuts_quiet (A : UtArgs GF) (V2 : ProcPriv) (M2 : Nat → List (BitVec 
   · iapply utForkOut_quiet _ _ _ _ _ _ _ h
   isplitl []
   · iapply utWaitOut_quiet _ _ _ _ _ _ _ _ _ h
+  isplitl []
   · iapply utSysOut_quiet _ _ _ _ _ _ _ _ _ _ _ _ _ _ h
+  · iapply utEvOut_nonecall _ _ _ _ _ _ _ _ h
+
+/-- **The evidence survives a kernel-word rewrite** (it reads the record's
+`a0` and image only). -/
+theorem utEvOut_retf (sc sep : BitVec 64) (V : ProcPriv) (M : Nat → List (BitVec 8)) (V2 : ProcPriv)
+    (M2 : Nat → List (BitVec 8)) (cs cs2 : ExtTreeSet GName compare) (ws : List (BitVec 64))
+    (ha : tfW ws (tfArgIdx 0) = tfW V2.tf (tfArgIdx 0)) :
+    utEvOut (hlc := hlc) (GF := GF) sc sep V M V2 M2 cs cs2 ⊢ utEvOut sc sep V M { V2 with tf := ws } M2 cs cs2 := by
+  have hrow : ∀ ι, syscEvRow (utSysRec sep V) V2 (syscImg (utSysRec sep V) M) (syscImg V2 M2) cs cs2 ι →
+      syscEvRow (utSysRec sep V) { V2 with tf := ws } (syscImg (utSysRec sep V) M)
+        (syscImg { V2 with tf := ws } M2) cs cs2 ι := by
+    intro ι h
+    unfold syscEvRow at h ⊢
+    simp only [ha]
+    exact h
+  unfold utEvOut
+  iintro H %hc
+  ispecialize H $$ %hc
+  icases H with (%hq | ⟨%k, %ι, #Ha, #Hl, %hr⟩)
+  · ileft; ipureintro; exact hq
+  · iright
+    iexists k, ι
+    iframe Ha Hl
+    ipureintro; exact hrow ι hr
 
 /-- **The answers survive a kernel-word rewrite.** -/
 theorem utOuts_retf (A : UtArgs GF) (V2 : ProcPriv) (M2 : Nat → List (BitVec 8)) (sts2 : List FdState)
@@ -239,16 +265,18 @@ theorem utOuts_retf (A : UtArgs GF) (V2 : ProcPriv) (M2 : Nat → List (BitVec 8
   have ha : tfW ws (tfArgIdx 0) = tfW V2.tf (tfArgIdx 0) := (tfUeq_arg 0 (by decide) hu).symm
   unfold utOuts
   simp only [ha]
-  iintro ⟨Hx, Hf, Hw, Hs⟩
+  iintro ⟨Hx, Hf, Hw, Hs, He⟩
   iframe Hf Hw Hs
-  unfold utExecOut
-  iintro %hc
-  ihave H := Hx $$ %hc
-  icases H with ⟨%ws', %hu', H⟩
-  iexists ws'
-  iframe H
-  ipureintro
-  exact tfUeq_trans hu' hu
+  isplitr [He]
+  · unfold utExecOut
+    iintro %hc
+    ihave H := Hx $$ %hc
+    icases H with ⟨%ws', %hu', H⟩
+    iexists ws'
+    iframe H
+    ipureintro
+    exact tfUeq_trans hu' hu
+  · iapply utEvOut_retf A.sc A.sep A.V A.M V2 M2 A.cs cs2 ws ha $$ He
 
 end Outs
 

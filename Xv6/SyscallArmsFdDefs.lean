@@ -583,8 +583,8 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 set_option maxHeartbeats 4000000 in
 /-- **`SyscallRet.syscall_ret_tail` at a descriptor arm** (not exec, fork,
 wait): the three foreign channels answer by number (`syscExecOut_ne`,
-`syscForkOut_ne`, `syscWaitOut_ne`); the arm supplies its own
-`syscSysOut`. -/
+`syscForkOut_ne`, `syscWaitOut_ne`) and the ledger evidence cites nothing
+(`syscEvOut_quiet`, NI M2-X2); the arm supplies its own `syscSysOut`. -/
 theorem syscall_ret_fd (PT : SchedNames → IProp GF) (Γ : SchedNames)
     (c0 cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (γ : FileNames) (j : Nat)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) (gn : GName)
@@ -593,7 +593,8 @@ theorem syscall_ret_fd (PT : SchedNames → IProp GF) (Γ : SchedNames)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : syscallSlots ≤ k.avail)
     (htier : k.tier = KTier.kpt) (hpins : syscPins k R) (hs2 : R 18#5 = pageAddr V1.upt.tfp)
     (hrows : SyscRows V M (syscStore V1 (R 10#5)) M1 sts sts' cs cs' pid)
-    (n : Int) (hn : syscNum V = n) (h1 : n ≠ 1) (h3 : n ≠ 3) (h7 : n ≠ 7) :
+    (n : Int) (hn : syscNum V = n) (h1 : n ≠ 1) (h3 : n ≠ 3) (h7 : n ≠ 7)
+    (h14 : n ≠ 14 := by decide) :
     kctx cpu (((k.withSpie spie spp).pushed 4).withRegs R) ∗ pcIs cpu (KA.«syscall» + 0x46#64) ∗
     frame4s2 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
@@ -612,7 +613,9 @@ theorem syscall_ret_fd (PT : SchedNames → IProp GF) (Γ : SchedNames)
   · iapply syscExecOut_ne; rw [hn]; exact h7
   isplitr
   · iapply syscForkOut_ne; rw [hn]; exact h1
+  isplitr
   · iapply syscWaitOut_ne; rw [hn]; exact h3
+  · iapply syscEvOut_quiet _ _ _ _ _ _ _ _ hn h14 h3 h1
 
 /-- **The syscall channel, paid from the armed post at the stored `a0`**
 (Rocq `sysc_sys_out_at` at the record after the tail's store). -/

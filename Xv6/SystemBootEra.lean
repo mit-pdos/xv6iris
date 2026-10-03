@@ -84,9 +84,12 @@ predicate's lend), every hart's `hartWP` and every device's `devWP`.
    (`NiAdequacy`) `niFit` and the ledger's claims.  (NI M2-X1) Likewise the
    evidence and registration slots `Ue HUe Uet Uea HUea` (`emp` in
    `xv6FixedGS`), and `xv6BootEra` builds `NiFitIs`'s `reg`/`evid`/`evidNone`
-   from `hUreg`/`hUevid`/`hUevidNone`.  The power-on's registration ticket
-   is dropped by `powerBootRes_unpack` (M2-X1 interim: X2 shoots it in
-   `xv6Era_run`).
+   from `hUreg`/`hUevid`/`hUevidNone`.  (NI M2-X2) The power-on's
+   registration ticket comes out of `powerBootRes_unpack` and `xv6Era_run`
+   shoots it (`NiFitIs.reg`) at the era's ledger names (`niNamesHere`); the
+   anchor rides the boot hart's supply to `<init>`'s park world.  The
+   `NiFitIs` instance is built at the minted `WchG`'s cameras, which
+   `bootSharedAlloc` says are the ambient ones (`hW`).
 
 Imports only the boot-chain/allocation files and the device invariants.
 -/
@@ -231,15 +234,22 @@ theorem xv6Era_run (σ : MState) (ξ0 : CtxId) (Γ : SchedNames) [ClaimIs (hlc :
     (hperm : ∀ (i : UartId) (γ : UartNames), (i = .uart0 → fscUart = γ) →
       obsInv ⊢@{IProp GF} uartObsPermit (hlc := hlc) i γ) (B : IProp GF)
     (hinit : ⊢@{IProp GF} appInv (hlc := hlc) fscFs -∗ B ==∗
-        initBootBundle (hlc := hlc) (SG := uexecSGXv6) ROOTINO ROOTINO seccAll (List.replicate NOFILE FdState.closed)) :
+        initBootBundle (hlc := hlc) (SG := uexecSGXv6) ROOTINO ROOTINO seccAll (List.replicate NOFILE FdState.closed))
+    (ke : Nat) :
     obsInv ⊢@{IProp GF} consEchoShift (hlc := hlc) -∗ B -∗
       -- the era's origin ticket (NI M2-W2d), on to `<init>`'s park
       MachFixedGS.uClaimO (hlc := hlc) (GF := GF) -∗
+      -- THE ERA'S REGISTRATION TICKET (NI M2-X1), shot here at the era's
+      -- ledger names (NI M2-X2)
+      MachFixedGS.uEraTok (hlc := hlc) (GF := GF) ke -∗
       bootSharedOut σ ξ0 Γ γ0 γ1 γc γl0 γl1 γt cn γd ξd dk sb nib cov Pb Rspent -∗
       |={⊤}=> ([∗list] c ∈ cpus, wpLoop c) ∗
         ([∗list] d ∈ DevId.all, devWP (genId (hlc := hlc) (GF := GF)) d rootTask (pure ())) ∗
         genCert (hlc := hlc) (GF := GF) := by
-  iintro #Hoinv #Hecho Hinit Huo Hout
+  iintro #Hoinv #Hecho Hinit Huo Hetok Hout
+  -- THE REGISTRATION (NI M2-X2, finding F1): the ticket, shot at the era's
+  -- ledger names -- the anchor every citation of this era carries
+  imod NiFitIs.reg (hlc := hlc) (GF := GF) ke (niNamesHere (GF := GF)) $$ Hetok with #Hanc
   unfold bootSharedOut
   icases Hout with ⟨%hcn, %hcne, #Ht, #Hd, Htok, Hb0, Hrest, Hsc, Hstmp, Hcore, #Hai, #Hu0, #Hu1, #Hpl, #Hw,
     #Hcert, #Hdi, #Hci, #Hcc, Hroot⟩
@@ -249,6 +259,7 @@ theorem xv6Era_run (σ : MState) (ξ0 : CtxId) (Γ : SchedNames) [ClaimIs (hlc :
   ihave Hsup := bootPrimarySupply_intro (hlc := hlc) (GF := GF) _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     $$ [Hecho Hib Huo Hcore]
   · iframe Hecho Hib Huo Hcore
+    iexists ke; iexact Hanc
   imod bootShared_started (hlc := hlc) (GF := GF) Γ γ0 γ1 γc γl0 γl1 γd fscDlock γt ξd $$ [Hsc Hstmp]
     with ⟨%γi, #Hs, Hprim⟩
   · iframe Hsc Hstmp
@@ -500,7 +511,7 @@ theorem xv6BootEra {CT : Type} (N : Type) (appFs : CT → N → Aview → IProp 
   icases powerBootRes_unpack (fun dk => mirrorOf (fsBlocks dk))
     (xv6Lend N appFs appBoot cov sb.sbLogstart c) (Tn c) E gen (fun _ _ => iprop(True))
     (fun _ => BI.true_intro) σ $$ Hres
-    with ⟨Hrows, Hlend, Hturn, Huo⟩
+    with ⟨Hrows, Hlend, Hturn, Huo, Hetok⟩
   imod xv6Era_lend N appFs appBoot c cov sb.sbLogstart gen (diskOf σ.devs) D hrec hhwf hcovin hlogsub
     hls2 $$ Hlend with ⟨%r, %gt, %gsn, %gln, %S, %⟨hlseq, hwf⟩, Hok, Hsnap, Hbres⟩
   -- the seam at the era's superblock, off the slot's value (the literal)
@@ -518,7 +529,7 @@ theorem xv6BootEra {CT : Type} (N : Type) (appFs : CT → N → Aview → IProp 
   -- resource (Rocq `Hbok`, SY3-A1 re-cut)
   ihave ⟨%hokr, Hbres⟩ := fsDurKeep (Hbok (gen + 1) r) $$ Hbres
   imod hA $$ [Hrows Hok Hsnap Hstok] with ⟨%ξ0, %Γ, %W, %HFd, %HBs, %HIr, %γc, %γl0, %γl1, %γt,
-    %γ0, %γ1, %cn, %γd, %I, %Fc, %ξd, Hout⟩
+    %γ0, %γ1, %cn, %γd, %I, %Fc, %ξd, %hW, Hout⟩
   · iframe Hrows Hok Hsnap
     -- THE DURABLE SIDE (Rocq `app_dur_laws`, SY3-A3b): the seam at the guest
     -- and the merge package, at the durable-copy predicate `appOkc c`; the
@@ -549,7 +560,11 @@ theorem xv6BootEra {CT : Type} (N : Type) (appFs : CT → N → Aview → IProp 
   -- fork mint is an origin ticket (NI M2-W2d): `hUf`/`hUfork` (the system
   -- record's `True`/`emp` by `trivial`/`.rfl`, the NI record's by `id` and
   -- `niExitMint_fork`; NI M2-W4)
-  have hNi : @NiFitIs hlc GF M1 := @NiFitIs.mk hlc GF M1 hUf hUfork hUreg hUevid hUevidNone
+  -- (NI M2-X2) at the minted instance's cameras, which are the ambient ones
+  -- (`bootSharedAlloc`'s `hW`): the lower bounds a citation shows are where
+  -- `hUevid` reads them
+  have hNi : @NiFitIs hlc GF M1 _ W.toWchGpre := by
+    rw [hW]; exact @NiFitIs.mk hlc GF M1 _ _ hUf hUfork hUreg hUevid hUevidNone
   ihave Hout := bootSharedOut_ofEra E gen (fun _ _ => iprop(True)) (procClaim Γ)
     (fun _ => BI.true_intro) (fun cpu => procClaim_idle Γ cpu) σ ξ0 Γ γ0 γ1 γc γl0 γl1 γt cn γd ξd (diskOf σ.devs) S.fssSb (fsNib S)
     cov (fsRecView (fsBlocks (diskOf σ.devs)) D) (snapSpent S (fsNib S)) $$ Hout
@@ -563,8 +578,8 @@ theorem xv6BootEra {CT : Type} (N : Type) (appFs : CT → N → Aview → IProp 
       hwf (fun i γ hu => Hperm E gen (procClaim Γ) (fun cpu => procClaim_idle Γ cpu) i γ hu)
       iprop(appBoot c (gen + 1) r ∗ TnInit c (gen + 1)) (by
         iintro Hai ⟨Hb, Ht⟩
-        iapply hI $$ Hai Hb Ht))
-  imod hR $$ Hoinv [] [Hbres Hturn] Huo Hout with ⟨Hharts, Hdevs, #Hcert⟩
+        iapply hI $$ Hai Hb Ht) (gen + 1))
+  imod hR $$ Hoinv [] [Hbres Hturn] Huo Hetok Hout with ⟨Hharts, Hdevs, #Hcert⟩
   · iapply (Hecho E gen (procClaim Γ) (fun cpu => procClaim_idle Γ cpu))
   · isplitl [Hbres]
     · iexact Hbres

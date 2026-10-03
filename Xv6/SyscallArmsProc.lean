@@ -111,8 +111,9 @@ theorem syscall_arm_uptime (SU : SYSUPTIME)
   iapply hU
   iframe Hk Ht Hpc
   k_next_e
-  iintro %spie2 %spp2 %R2 %t %- Hk Hpc %⟨hcs, ha0⟩ ⟨%nt, -, %htn⟩
-  have hup : usysUptimeRet (R2 10#5) := ⟨nt, by rw [ha0, htn]; rfl⟩
+  iintro %spie2 %spp2 %R2 %t %- Hk Hpc %⟨hcs, ha0⟩ ⟨%nt, #Htk, %htn⟩
+  have hupw : R2 10#5 = usysUptimeWord nt := by rw [ha0, htn]; rfl
+  have hup : usysUptimeRet (R2 10#5) := ⟨nt, hupw⟩
   have hww : ∀ (K : KCtx) (a b c d : Bool), (K.withSpie a b).withSpie c d = K.withSpie c d :=
     fun _ _ _ _ _ => rfl
   have hpsw : ∀ (K : KCtx) (m : Nat) (a b : Bool),
@@ -125,6 +126,20 @@ theorem syscall_arm_uptime (SU : SYSUPTIME)
   have hrows := syscRows_keep V M sts cs pid (R2 10#5) 14 hn14 (by decide) (by decide) (by decide)
     (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide)
     (by rw [hl]; decide) (syscRetPid_ne _ _ _ 14 hn14 (by decide)) (by decide) (Or.inr hup)
+  -- THE CITATION (NI M2-X2): the era's anchor off the park world, the tick
+  -- ledger's receipt as the cited count's lower bound, the row at ι
+  icases syscallEnv_anchor PT Γ γ $$ Henv with ⟨%ke, #Hanc⟩
+  ihave #Htk' := (show tickLb (GF := GF) nt ⊢ MonoNat.lb_own ((niNamesHere (GF := GF)).getD 0 0) (.ofNat nt)
+    from .rfl) $$ Htk
+  iapply wpLoop_bupd
+  imod niIotaLbs_ticks (GF := GF) (niNamesHere (GF := GF)) nt (procAddr j) $$ Htk' with #Hlbs
+  imodintro
+  have hev : syscEvRow V (syscStore V (R2 10#5)) (syscImg V M) (syscImg (syscStore V (R2 10#5)) M) cs cs
+      { UIota.boot with ticks := nt, act := procAddr j } := by
+    refine ⟨fun _ => ?_, fun h => absurd (hn14.symm.trans h) (by decide),
+      fun h => absurd (hn14.symm.trans h) (by decide)⟩
+    show syscA0 (syscStore V (R2 10#5)) = _
+    rw [syscStore_a0 V _ (by rw [hl]; decide)]; exact hupw
   unfold syscallRet syscallAddr at *
   iapply (syscall_ret_tail PT Γ c0 cpu k spie2 spp2 R2 γ j pid V M sts gn cs ip f V M sts cs hj hproc hK
     htier hpins2 hs2' hrows)
@@ -135,7 +150,9 @@ theorem syscall_arm_uptime (SU : SYSUPTIME)
   · iapply syscSysOut_quiet f V M sts hE gn cs pid _ _ sts _ cs 14 hn14 (by decide)
   isplitr
   · iapply syscForkOut_ne; rw [hn14]; decide
+  isplitr
   · iapply syscWaitOut_ne; rw [hn14]; decide
+  · iapply syscEvOut_cite V M _ M cs cs gn ke _ hev $$ Hanc Hlbs
 
 /-- **The kill deposit** (Rocq `ProofSyscall.sysc_dep_kill`, over
 `UexecExecInst.sbundle_at_kill_elim`): a process trapping with number 6
@@ -207,7 +224,9 @@ theorem syscall_arm_getpid
   · iapply syscSysOut_quiet f V M sts hE gn cs pid _ _ sts _ cs 11 hnN (by decide)
   isplitr
   · iapply syscForkOut_ne; rw [hnN]; decide
+  isplitr
   · iapply syscWaitOut_ne; rw [hnN]; decide
+  · iapply syscEvOut_quiet _ _ _ _ _ _ _ _ hnN
 
 set_option maxHeartbeats 4000000 in
 /-- **Arm 6, `sys_kill`** (Rocq `sysc_arm_kill`; D31: the raw trapframe cells, the
@@ -280,7 +299,9 @@ theorem syscall_arm_kill
   · iapply syscSysOut_quiet f V M sts hE gn cs pid _ _ sts _ cs 6 hnN (by decide)
   isplitr
   · iapply syscForkOut_ne; rw [hnN]; decide
+  isplitr
   · iapply syscWaitOut_ne; rw [hnN]; decide
+  · iapply syscEvOut_quiet _ _ _ _ _ _ _ _ hnN
 
 set_option maxHeartbeats 4000000 in
 /-- **Arm 13, `sys_pause`** (Rocq `sysc_arm_pause`; the raw trapframe cells). -/
@@ -357,7 +378,9 @@ theorem syscall_arm_pause
   · iapply syscSysOut_quiet f V M sts hE gn cs pid _ _ sts _ cs 13 hnN (by decide)
   isplitr
   · iapply syscForkOut_ne; rw [hnN]; decide
+  isplitr
   · iapply syscWaitOut_ne; rw [hnN]; decide
+  · iapply syscEvOut_quiet _ _ _ _ _ _ _ _ hnN
 
 /-- **Rocq `sysc_dep_sync` + `sysc_out_sync`** (sync K4): sync's bundle is
 the process's optional hook (`hookOpt genId oQ`, `emp` at `none`), handed to
@@ -459,7 +482,9 @@ theorem syscall_arm_sync
     iapply Hout $$ %_ %_ %_ %_ %_ HQo
   isplitr
   · iapply syscForkOut_ne; rw [hnN]; decide
+  isplitr
   · iapply syscWaitOut_ne; rw [hnN]; decide
+  · iapply syscEvOut_quiet _ _ _ _ _ _ _ _ hnN
 
 set_option maxHeartbeats 4000000 in
 /-- **Arm 23, `sys_seccomp`** (xv6 7b2c1b1b; Rocq `sysc_arm_seccomp`): the
@@ -523,7 +548,9 @@ theorem syscall_arm_seccomp
   · iapply syscSysOut_quiet f V M sts hE gn cs pid _ _ sts _ cs 23 hnN (by decide)
   isplitr
   · iapply syscForkOut_ne; rw [hnN]; decide
+  isplitr
   · iapply syscWaitOut_ne; rw [hnN]; decide
+  · iapply syscEvOut_quiet _ _ _ _ _ _ _ _ hnN
 
 end
 
