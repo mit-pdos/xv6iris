@@ -60,6 +60,18 @@ part 1 is `Xv6/WaitInv.lean`, whose header and deviations apply here.
    `childrenRes_alloc` mints the 64 counters with `slotGen_rows_alloc 0` at
    the new name `wactName` (SlotGen deviation 9), its statement unchanged.
 
+9. **The family ledger's two ties** (NI M2-G1b, G1 design §1 "D3
+   revisited", rulings G1-R2): `waitInvResAt`'s trailing zombie-ledger
+   conjunct becomes `famLed ps gs` -- the history's authority, tie T1 (the
+   payload's own parent cells and generations against the fold `famOf`) and
+   tie T2's authority (`UserChildren.zsAuth`) at the fold's zombie column.
+   Its four writers' steps are `famLed_fork` (kfork), `famLed_exit` (kexit's
+   reparent and ZOMBIE store), `famLed_reap` (kwait), and the boot
+   (`famLed_boot`, `zsRows_alloc`); `childrenBootRows` gains T2's authority
+   at `fun _ => none` and each slot's element at `none`, `childrenRes_alloc`
+   mints them at the new name `wzsName` (its statement unchanged), and
+   `waitRes_alloc` takes the authority (its statement moved, one caller).
+
 Imports only definitional files.
 -/
 import Xv6.WaitInv
@@ -547,6 +559,135 @@ theorem childrenInv_empty [CurCtx] (ξ : CtxId) (ps : Nat → BitVec 64) (gs : N
   · obtain ⟨k, hk, hpk, -⟩ := hio pj g hpj hin
     exact absurd hpk (hscan k hk)
 
+/-! ## The family ledger (NI M2-G1b, deviation 9) -/
+
+/-- **THE FAMILY LEDGER at `<wait_lock>`** (G1 design §1, ties T1 and T2):
+the history's authority; T1, the payload's own 64 parent cells `ps` and
+their generations `gs` against the fold (a generation is pinned only while
+its cell is nonzero); and T2's authority at the fold's zombie column, whose
+elements sit in the slots' own lock payloads. -/
+def famLed (ps : Nat → BitVec 64) (gs : Nat → GName) : IProp GF :=
+  iprop(∃ h : List Zev, zombLedAuth h ∗
+    ⌜∀ k < NPROC, ps k = (famOf h k).par ∧ (ps k ≠ 0#64 → gs k = (famOf h k).gen)⌝ ∗
+    zsAuth (fun k => (famOf h k).zomb))
+
+/-- BOOT: the empty history, every cell 0, every column entry `none`. -/
+theorem famLed_boot (ps : Nat → BitVec 64) (gs : Nat → GName) (hz : ∀ k < NPROC, ps k = 0#64) :
+    zombLedAuth (GF := GF) [] ∗ zsAuth (fun _ => none) ⊢ famLed ps gs := by
+  unfold famLed
+  iintro ⟨Hzl, Hzs⟩
+  iexists []
+  iframe Hzl
+  isplitr
+  · ipureintro
+    intro k hk
+    rw [hz k hk]
+    exact ⟨rfl, fun h => absurd rfl h⟩
+  · iapply (zsAuth_congr (GF := GF) (fun _ => none) (fun k => (famOf [] k).zomb) (fun _ _ => rfl))
+    iexact Hzs
+
+/-- **KFORK** (`np->parent = p`, slot `i`): appends `ZFork pa i pid g`; the
+cell and the generation follow the fold (T1); the zombie column does not
+move (ZombEv deviation 5), so T2's authority is untouched. -/
+theorem famLed_fork (ps : Nat → BitVec 64) (gs : Nat → GName) (i : Nat) (pa : BitVec 64)
+    (pid : BitVec 32) (g : GName) :
+    famLed (GF := GF) ps gs ⊢
+      |==> (famLed (fun x => if x = i then pa else ps x) (fun x => if x = i then g else gs x) ∗
+        ∃ h : List Zev, zombReceipt h (.ZFork pa i pid g)) := by
+  unfold famLed
+  iintro ⟨%h, Hzl, %hT, Hzs⟩
+  imod zombLedAuth_grow h (.ZFork pa i pid g) $$ Hzl with ⟨Hzl, #Hlb⟩
+  imodintro
+  isplitl [Hzl Hzs]
+  · iexists h ++ [.ZFork pa i pid g]
+    iframe Hzl
+    rw [famOf_snoc]
+    isplitr
+    · ipureintro
+      intro k hk
+      by_cases e : k = i
+      · subst e; simp [famStep]
+      · simp only [famStep, e, if_false]; exact hT k hk
+    · iapply zsAuth_congr _ _ ?_ $$ Hzs
+      intro k _
+      by_cases e : k = i
+      · subst e; simp [famStep]
+      · simp [famStep, e]
+  · iexists h; unfold zombReceipt; iexact Hlb
+
+/-- **KEXIT** (`reparent(p)`, then the ZOMBIE store, one critical section):
+appends `ZExit (procAddr j) pid xs ip`; the cells are `reparent`'s (T1), and
+the exiting slot's element moves `none → some (pid, xs)` (T2). -/
+theorem famLed_exit (ps : Nat → BitVec 64) (gs : Nat → GName) (j : Nat) (hj : j < NPROC)
+    (ip : BitVec 64) (pid : BitVec 32) (xs : Int) :
+    famLed (GF := GF) ps gs ∗ zsElem (procAddr j) none ⊢
+      |==> (famLed (rpMap (procAddr j) ip ps) gs ∗ zsElem (procAddr j) (some (pid, xs))) := by
+  unfold famLed
+  iintro ⟨⟨%h, Hzl, %hT, Hzs⟩, He⟩
+  imod zombExit h (procAddr j) pid xs ip $$ Hzl with ⟨Hzl, -⟩
+  imod zsAuth_update _ j hj none (some (pid, xs)) $$ [Hzs He] with ⟨Hzs, He⟩
+  · iframe Hzs He
+  imodintro
+  iframe He
+  iexists h ++ [.ZExit (procAddr j) pid xs ip]
+  iframe Hzl
+  rw [famOf_snoc]
+  have hpj : procAddr j ≠ 0#64 := procAddr_nonzero hj
+  isplitr
+  · ipureintro
+    intro k hk
+    obtain ⟨hp, hg⟩ := hT k hk
+    unfold rpMap rpSlot
+    by_cases e : ps k = procAddr j
+    · have e' : (famOf h k).par = procAddr j := hp ▸ e
+      refine ⟨?_, fun _ => ?_⟩
+      · simp only [e, if_true, famStep, e']; split <;> rfl
+      · simp only [famStep, e']; split <;> exact hg (e ▸ hpj)
+    · have e' : ¬ (famOf h k).par = procAddr j := hp ▸ e
+      refine ⟨?_, fun hne => ?_⟩
+      · simp only [e, if_false, famStep, e']; split <;> exact hp
+      · simp only [e, if_false] at hne
+        simp only [famStep, e']; split <;> exact hg hne
+  · iapply zsAuth_congr _ _ ?_ $$ Hzs
+    intro k hk
+    by_cases e : k = j
+    · subst e; simp [famStep]
+    · have e' : procAddr k ≠ procAddr j := fun h => e (procAddr_inj hk hj h)
+      simp only [e, if_false, famStep, e']
+      split <;> rfl
+
+/-- **KWAIT** (`pp->parent = 0` and the reap, slot `n`): appends `ZReap act n
+pid`; the cell is 0 (T1), and the slot's element moves to `none` (T2), to be
+put back at the UNUSED re-close after `freeproc`. -/
+theorem famLed_reap (ps : Nat → BitVec 64) (gs : Nat → GName) (n : Nat) (hn : n < NPROC)
+    (act : BitVec 64) (pid : BitVec 32) (v : Option (BitVec 32 × Int)) :
+    famLed (GF := GF) ps gs ∗ zsElem (procAddr n) v ⊢
+      |==> (famLed (fun i => if i = n then 0#64 else ps i) gs ∗ zsElem (procAddr n) none ∗
+        ∃ h : List Zev, zombReceipt h (.ZReap act n pid)) := by
+  unfold famLed
+  iintro ⟨⟨%h, Hzl, %hT, Hzs⟩, He⟩
+  imod zombReap h act n pid $$ Hzl with ⟨Hzl, #Hr⟩
+  imod zsAuth_update _ n hn v none $$ [Hzs He] with ⟨Hzs, He⟩
+  · iframe Hzs He
+  imodintro
+  iframe He
+  isplitl [Hzl Hzs]
+  · iexists h ++ [.ZReap act n pid]
+    iframe Hzl
+    rw [famOf_snoc]
+    isplitr
+    · ipureintro
+      intro k hk
+      by_cases e : k = n
+      · subst e; simp [famStep, ZSlot.empty]
+      · simp only [e, if_false, famStep]; exact hT k hk
+    · iapply zsAuth_congr _ _ ?_ $$ Hzs
+      intro k _
+      by_cases e : k = n
+      · subst e; simp [famStep, ZSlot.empty]
+      · simp [famStep, e]
+  · iexists h; iexact Hr
+
 /-! ## What the boot fupd hands main, and the payload -/
 
 /-- the NPROC rows, the orphan column, the empty pid register, the pid
@@ -555,13 +696,17 @@ ledger at the empty history (design ni-pid-ledger.md D2: main seals it into
 counter's mirror at 0 (design ni-ticks-ledger.md D1: main raises it to the
 cell's boot value before sealing `<tickslock>`), the zombie ledger at the
 empty history (design ni-zombie-ledger.md D2: main seals it into
-`<wait_lock>`'s payload), and the NPROC
+`<wait_lock>`'s payload) with tie T2's authority at the all-`none` column
+(deviation 9), and the NPROC
 slot-generation wholes, each beside its event counter at 0 (design
-ni-strong-instance.md §7; Rocq `children_boot_rows`). -/
+ni-strong-instance.md §7; Rocq `children_boot_rows`) and its T2 element at
+`none` (main hands it to the slot's UNUSED payload). -/
 def childrenBootRows : IProp GF :=
   iprop(childrenResBoot ∗ orphansOwn ∅ ∗ pidRegAuth ∅ ∗ pidLedAuth [] ∗ tickCnt 0 ∗ zombLedAuth [] ∗
+    zsAuth (fun _ => none) ∗
     [∗list] i ∈ List.range NPROC, ∃ γ0 g : GName,
-      chFrag γ0 (procAddr i) ∅ ∗ slotGen (procAddr i) (.own 1) g ∗ actCnt (procAddr i) 0)
+      chFrag γ0 (procAddr i) ∅ ∗ slotGen (procAddr i) (.own 1) g ∗ actCnt (procAddr i) 0 ∗
+        zsElem (procAddr i) none)
 
 /-- ...and init's saved pid, minted WHOLE at a junk value (Rocq
 `children_boot`) -/
@@ -575,48 +720,51 @@ parent cells, the children rows, the orphan rows, and the invariant tying
 the four columns together.  It is what replaces `WaitLock.waitResAt` as the
 lock's payload (W7-C).  ...AND THE ZOMBIE LEDGER'S AUTHORITY, LAST (design
 ni-zombie-ledger.md D2): every exit and every reap is appended here, under
-this lock.  Untied (ruling R2): nothing in this payload knows which slots are
-ZOMBIE. -/
+this lock -- GROWN INTO THE FAMILY LEDGER (NI M2-G1b, deviation 9): `famLed
+ps gs` ties the cells and the generations to the fold (T1) and holds T2's
+authority over the slots' zombie elements. -/
 def waitInvResAt [CurCtx] (ξ : CtxId) : IProp GF :=
   iprop(∃ (ps : Nat → BitVec 64) (gs : Nat → GName) (m : ChMap) (O : OrphMap),
     parentsOwnAt ξ ps ∗ childrenOwnAt m ∗ orphansOwn O ∗ childrenInvAt ξ ps gs m O ∗
-      ∃ h : List Zev, zombLedAuth h)
+      famLed ps gs)
 
 instance waitInvResAt_morph [CurCtx] : CtxMorph (GF := GF) (waitInvResAt (GF := GF)) :=
   @instCtxMorphExists hlc GF _ _ (fun ps ξ => iprop(∃ (gs : Nat → GName) (m : ChMap) (O : OrphMap),
       parentsOwnAt ξ ps ∗ childrenOwnAt m ∗ orphansOwn O ∗ childrenInvAt ξ ps gs m O ∗
-        ∃ h : List Zev, zombLedAuth h))
+        famLed ps gs))
     (fun ps => @instCtxMorphExists hlc GF _ _ (fun gs ξ => iprop(∃ (m : ChMap) (O : OrphMap),
         parentsOwnAt ξ ps ∗ childrenOwnAt m ∗ orphansOwn O ∗ childrenInvAt ξ ps gs m O ∗
-          ∃ h : List Zev, zombLedAuth h))
+          famLed ps gs))
       (fun gs => @instCtxMorphExists hlc GF _ _ (fun m ξ => iprop(∃ (O : OrphMap),
           parentsOwnAt ξ ps ∗ childrenOwnAt m ∗ orphansOwn O ∗ childrenInvAt ξ ps gs m O ∗
-            ∃ h : List Zev, zombLedAuth h))
+            famLed ps gs))
         (fun m => @instCtxMorphExists hlc GF _ _ (fun O ξ => iprop(
             parentsOwnAt ξ ps ∗ childrenOwnAt m ∗ orphansOwn O ∗ childrenInvAt ξ ps gs m O ∗
-              ∃ h : List Zev, zombLedAuth h))
+              famLed ps gs))
           (fun O => @instCtxMorphSep hlc GF _ (fun ξ => parentsOwnAt ξ ps)
             (fun ξ => iprop(childrenOwnAt m ∗ orphansOwn O ∗ childrenInvAt ξ ps gs m O ∗
-              ∃ h : List Zev, zombLedAuth h))
+              famLed ps gs))
             (parentsOwnAt_morph ps)
             (@instCtxMorphSep hlc GF _ (fun _ => childrenOwnAt m)
-              (fun ξ => iprop(orphansOwn O ∗ childrenInvAt ξ ps gs m O ∗ ∃ h : List Zev, zombLedAuth h))
+              (fun ξ => iprop(orphansOwn O ∗ childrenInvAt ξ ps gs m O ∗ famLed ps gs))
               (instCtxMorphConst _)
               (@instCtxMorphSep hlc GF _ (fun _ => orphansOwn O)
-                (fun ξ => iprop(childrenInvAt ξ ps gs m O ∗ ∃ h : List Zev, zombLedAuth h))
+                (fun ξ => iprop(childrenInvAt ξ ps gs m O ∗ famLed ps gs))
                 (instCtxMorphConst _)
                 (@instCtxMorphSep hlc GF _ (fun ξ => childrenInvAt ξ ps gs m O)
-                  (fun _ => iprop(∃ h : List Zev, zombLedAuth h))
+                  (fun _ => famLed ps gs)
                   (childrenInvAt_morph ps gs m O) (instCtxMorphConst _))))))))
 
 /-- THE PAIRING, in main's own update: EVERY TIE IS VACUOUS HERE (no cell
 written, every row empty, no orphans); the generation column is arbitrary
 (Rocq `wait_res_alloc`).  ...and the zombie ledger's authority, at the
-empty history (design ni-zombie-ledger.md D2), off `childrenBootRows`. -/
+empty history (design ni-zombie-ledger.md D2), with tie T2's authority at
+the all-`none` column (deviation 9), off `childrenBootRows`. -/
 theorem waitRes_alloc [CurCtx] (ξ : CtxId) :
-    parentsResAt (GF := GF) ξ ∗ childrenResBoot ∗ orphansOwn ∅ ∗ zombLedAuth [] ⊢ waitInvResAt ξ := by
+    parentsResAt (GF := GF) ξ ∗ childrenResBoot ∗ orphansOwn ∅ ∗ zombLedAuth [] ∗ zsAuth (fun _ => none) ⊢
+      waitInvResAt ξ := by
   unfold parentsResAt childrenResBoot waitInvResAt childrenInvAt
-  iintro ⟨⟨%ps, Hps, %hz⟩, ⟨%m, Hm, %hm0⟩, Ho, Hzl⟩
+  iintro ⟨⟨%ps, Hps, %hz⟩, ⟨%m, Hm, %hm0⟩, Ho, Hzl, Hzs⟩
   iexists ps, (fun _ => 0), m, ∅
   isplitl [Hps]
   · iexact Hps
@@ -624,9 +772,9 @@ theorem waitRes_alloc [CurCtx] (ξ : CtxId) :
   · iexact Hm
   isplitl [Ho]
   · iexact Ho
-  isplitr [Hzl]
+  isplitr [Hzl Hzs]
   rotate_left 1
-  · iexists []; iexact Hzl
+  · iapply famLed_boot ps _ hz $$ [$Hzl $Hzs]
   isplitr
   · iapply genHalves_zeros ps _ hz
   isplitr
@@ -725,6 +873,49 @@ theorem chRows_unique (m : ChMap)
   obtain ⟨-, hl2, hp2⟩ := hm γ2 pa S2 h2
   exact hinj γ1 γ2 hl1 hl2 (hp1.symm.trans hp2)
 
+/-- T2's boot: one element per slot at `none`, keyed by the slot's address
+(deviation 9), installed into a raw authority over the first `n` slots. -/
+theorem zsRows_alloc (γ : GName) : ∀ n, n ≤ NPROC →
+    ghost_map_auth (H := RegMapF) γ (.own 1) (∅ : RegMapF (Option (BitVec 32 × Int))) ⊢@{IProp GF}
+      |==> ∃ M : RegMapF (Option (BitVec 32 × Int)), ghost_map_auth γ (.own 1) M ∗
+        ⌜(∀ k < n, get? M (procAddr k).toNat = some none) ∧
+          ∀ k, n ≤ k → k < NPROC → get? M (procAddr k).toNat = none⌝ ∗
+        [∗list] i ∈ List.range n,
+          ghost_map_elem (H := RegMapF) γ (.own 1) (procAddr i).toNat (none : Option (BitVec 32 × Int))
+  | 0, _ => by
+    iintro Ha
+    imodintro
+    iexists ∅
+    iframe Ha
+    isplitr
+    · ipureintro
+      exact ⟨fun k hk => absurd hk (Nat.not_lt_zero _), fun k _ _ => get?_empty _⟩
+    · simp only [List.range_zero]
+      iapply BigSepL.bigSepL_nil.mpr; itrivial
+  | n + 1, hn => by
+    iintro Ha
+    imod zsRows_alloc γ n (by omega) $$ Ha with ⟨%M, Ha, %hM, Hrows⟩
+    obtain ⟨hM1, hM2⟩ := hM
+    imod ghost_map_insert (V := Option (BitVec 32 × Int)) (procAddr n).toNat none
+      (hM2 n (Nat.le_refl n) (by omega)) $$ Ha with ⟨Ha, Hf⟩
+    imodintro
+    iexists PartialMap.insert M (procAddr n).toNat none
+    iframe Ha
+    isplitr
+    · ipureintro
+      refine ⟨fun k hk => ?_, fun k hk hk' => ?_⟩
+      · by_cases e : k = n
+        · subst e; exact get?_insert_eq rfl
+        · rw [get?_insert_ne (fun h => e (zs_key_inj (by omega) (by omega) h.symm))]
+          exact hM1 k (by omega)
+      · rw [get?_insert_ne (fun h => absurd (zs_key_inj (by omega) hk' h) (by omega))]
+        exact hM2 k (by omega) hk'
+    · rw [List.range_succ]
+      iapply BigSepL.bigSepL_append.mpr
+      isplitl [Hrows]
+      · iexact Hrows
+      · iapply BigSepL.bigSepL_singleton.mpr; iexact Hf
+
 /-! ## The mint of every canonical name (Rocq `children_res_alloc`) -/
 
 theorem waitInv_procAddr_nodup
@@ -774,12 +965,17 @@ theorem childrenRes_alloc {hlc : HasLC} [MachGS hlc GF]
   -- ...and the zombie ledger, at the empty history (design
   -- ni-zombie-ledger.md D2): nothing has exited
   imod MonoList.own_alloc (GF := GF) ([] : List Zev) with ⟨%γzl, Hzl, -⟩
+  -- ...and tie T2's zombie column, one element per slot at `none` (NI
+  -- M2-G1b, deviation 9): nothing is a zombie
+  imod ghost_map_alloc_empty (GF := GF) (K := Nat) (V := Option (BitVec 32 × Int)) (H := RegMapF)
+    with ⟨%γzs, Hzs⟩
+  imod zsRows_alloc γzs NPROC (Nat.le_refl _) $$ Hzs with ⟨%Mzs, Hzs, %hzs, Hzrows⟩
   imodintro
   iexists ({ wchName := γ, worphName := γo, wsgName := γsg, wprName := γpr, wipName := γip,
              npidName := γnp, wtkName := γtk, wplName := γpl, wzlName := γzl,
-             wactName := γact } : WchG GF)
+             wactName := γact, wzsName := γzs } : WchG GF)
   unfold childrenBoot childrenBootRows childrenResBoot childrenOwnAt orphansOwn pidRegAuth
-    pidLedAuth zombLedAuth initPidTok nextpidPend tickCnt
+    pidLedAuth zombLedAuth initPidTok nextpidPend tickCnt zsAuth
   isplitr [Hnp]
   · isplitl [Hip]
     · iexact Hip
@@ -799,6 +995,14 @@ theorem childrenRes_alloc {hlc : HasLC} [MachGS hlc GF]
     · iexact Htk
     isplitl [Hzl]
     · iexact Hzl
+    isplitl [Hzs]
+    · iexists Mzs
+      iframe Hzs
+      ipureintro; exact hzs.1
+    ihave Hact := BigSepL.bigSepL_sep_eqv.mpr $$ [Hact Hzrows]
+    · isplitl [Hact]
+      · iexact Hact
+      · iexact Hzrows
     ihave Hsg := BigSepL.bigSepL_sep_eqv.mpr $$ [Hsg Hact]
     · isplitl [Hsg]
       · iexact Hsg
@@ -809,14 +1013,16 @@ theorem childrenRes_alloc {hlc : HasLC} [MachGS hlc GF]
       · iexact Hsg
     iapply BigSepL.bigSepL_mono _ $$ H
     intro k i _
-    unfold chFrag slotGen actCnt actOne
-    iintro ⟨Hr, Hs, Ha⟩
+    unfold chFrag slotGen actCnt actOne zsElem
+    iintro ⟨Hr, Hs, Ha, Hz⟩
     iexists i, 0
     isplitl [Hr]
     · iexact Hr
     isplitl [Hs]
     · iexact Hs
+    isplitl [Ha]
     · iexact Ha
+    · iexact Hz
   · iexact Hnp
 
 end WaitInvBoot

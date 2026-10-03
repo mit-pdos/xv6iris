@@ -128,6 +128,13 @@ party that threads a lock's gname.
    `actLend_cont_frame_step` (a stepped lend framed into a continuation
    that wants `∃ k' ≥ ke`); `actLend_congr` / `actLend_ret_congr` move a
    lend across an equation of proc words.
+12. **The family ledger's zombie column (NI M2-G1b, no Rocq counterpart).**
+   T2's camera is a `GhostMapG GF Nat (Option (BitVec 32 × Int)) RegMapF`
+   field of `WchGpre` (`zsG`, xv6GF/unionGF slot 125) and its name
+   `wzsName` a field of `WchG`, for deviation 7's reason (`<wait_lock>`'s
+   payload and the slot payloads are stated over `[WchG GF]`).  The map is
+   keyed by the slot's ADDRESS as a number (`pa.toNat`): the slot payloads
+   that hold the elements are stated at `pa`, not at the index.
 
 Imports only definitional files.
 -/
@@ -187,10 +194,18 @@ class WchGpre (GF : BundledGFunctors) where
   payload (`WaitInvTies.waitInvResAt`), at the canonical name `wzlName`
   (deviation 8). -/
   [zlG : MonoListG GF Zev]
+  /-- THE FAMILY LEDGER'S ZOMBIE COLUMN (NI M2-G1b, tie T2, G1 design §1 "D3
+  revisited"): a ghost map from a slot's key (`pa.toNat`) to its zombie
+  entry (`some (pid, status)` or `none`), whose authority rides
+  `<wait_lock>`'s payload tied to the fold (`UserChildren.famLed`) and whose
+  element sits in the slot's own lock payload (`SchedCtx.procSlotsAt`,
+  `ProcDefs.procDormant`), at the canonical name `wzsName` (deviation 12). -/
+  [zsG : GhostMapG GF Nat (Option (BitVec 32 × Int)) RegMapF]
 
 attribute [reducible, instance] WchGpre.chG WchGpre.orphG WchGpre.sgenG WchGpre.prG WchGpre.ipidG
 attribute [reducible, instance] WchGpre.plG
 attribute [reducible, instance] WchGpre.zlG
+attribute [reducible, instance] WchGpre.zsG
 
 /-- Rocq `wchG`: the cameras and their CANONICAL names (the capacity may be
 assumed by adequacy, the NAMES are minted in the boot fupd and the instance
@@ -230,6 +245,10 @@ class WchG (GF : BundledGFunctors) extends WchGpre GF where
   holds every slot's `actCnt`, born at 0 in
   `WaitInvTies.childrenRes_alloc`.  No camera rides with it (deviation 9). -/
   wactName : GName
+  /-- THE FAMILY LEDGER'S ZOMBIE-COLUMN NAME (NI M2-G1b, tie T2): the
+  `zsG` ghost map at this name (`UserChildren.zsAuth` / `zsElem`), born in
+  `WaitInvTies.childrenRes_alloc` with one element per slot at `none`. -/
+  wzsName : GName
 
 /-- AN EIGHTH (Rocq `qeighth`, deviation 2). -/
 abbrev qeighth : Qp := Qp.quarter.half

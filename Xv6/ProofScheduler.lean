@@ -605,7 +605,7 @@ theorem scheduler_dispatch (SW : SWTCH) [Xv6G GF] [FdslotG GF] [BioslotG GF] [Ir
   icases procSlots_used Γ curCtx (procAddr n) RUNNABLE
       (not_isUnused_of_needsCtx sc_needsCtx_RUNNABLE) $$ Hslots with ⟨#Hused, Hslots⟩
   icases procSlots_dispatch Γ curCtx (procAddr n) RUNNABLE sc_needsCtx_RUNNABLE $$ Hslots with
-    ⟨Hrec, Htag⟩
+    ⟨Hrec, Htag, Hzs⟩
   icases hartAtAny_elim Γ n hn $$ Htag with ⟨%h0, Htag⟩
   -- the mirror steps to RUNNING
   ihave Hpw : pstateWhole (GF := GF) Γ (procAddr n) RUNNABLE $$ [Hpl]
@@ -677,8 +677,9 @@ theorem scheduler_dispatch (SW : SWTCH) [Xv6G GF] [FdslotG GF] [BioslotG GF] [Ir
     exact hx
   icases ownCtxCells_cases (cpuCtxAddr cpu) $$ Hcells with ⟨%vs, Hcells⟩
   icases MachCSL.ctxCells_dup (cpuCtxAddr cpu) vs $$ Hcells with ⟨%hvlen, Hcells⟩
-  ihave Hheld := procHeldAt_intro Γ curCtx cpu n RUNNING ch kl xs pid
-    $$ [$Hlocked $Hpw $Hstate $Hchan $Hrest]
+  -- the slot's T2 element rides the dispatch at RUNNING (NI M2-G1b)
+  ihave Hheld := procHeldAt_live_intro Γ curCtx cpu n RUNNING ch kl xs pid (Or.inl rfl)
+    $$ [$Hlocked $Hpw $Hstate $Hchan $Hrest $Hzs]
   ihave HP := pSched_to_proc Γ curCtx cpu n ch hn $$ [$Htc $Hir $Hheld $Htag]
   ihave Hrec := (show procCtxAt (GF := GF) Γ curCtx (procAddr n) ⊢
       ∃ ξt : CtxId, ctxParked ξt curCtx ∗
@@ -713,9 +714,10 @@ theorem scheduler_dispatch (SW : SWTCH) [Xv6G GF] [FdslotG GF] [BioslotG GF] [Ir
   subst hA'
   subst hcret
   subst hback
-  ihave Hsl := procSlots_park_gen' Γ ξ0 n hn st hpark cpu $$ [$Hused $Hrec' $Htag2 $Hpay2]
-  icases procHeldAt_cases Γ ξ0 cpu n st ch2 $$ Hheld2 with
-    ⟨Hlocked2, Hpw2, %kl2, %xs2, %pid2, Hstate2, Hchan2, Hrest2⟩
+  -- the slot's T2 element, back from the park's held lock (NI M2-G1b)
+  icases procHeldAt_gen_cases Γ ξ0 cpu n st ch2 $$ Hheld2 with
+    ⟨⟨Hlocked2, Hpw2, %kl2, %xs2, %pid2, Hstate2, Hchan2, Hrest2⟩, Hzs2⟩
+  ihave Hsl := procSlots_park_gen' Γ ξ0 n hn st hpark cpu $$ [$Hused $Hrec' $Htag2 $Hpay2 $Hzs2]
   icases (pstateWhole_split Γ (procAddr n) st).mp $$ Hpw2 with ⟨Hpl2, _⟩
   ihave HRes := procLockRes_intro Γ ξ0 (procAddr n) st ch2 kl2 xs2 pid2
     $$ [$Hstate2 $Hpl2 $Hchan2 $Hrest2 $Hsl]

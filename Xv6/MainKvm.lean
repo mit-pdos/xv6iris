@@ -253,7 +253,7 @@ def mnSlotIn [CurCtx] (Γ : SchedNames) (pas : Nat → BitVec 44) (i : Nat) : IP
   hartFull Γ i startedPrimary ∗ pstateFull Γ i UNUSED ∗ slotFree Γ (procAddr i) ∗
   lockFreeTok (Γ.lock i) ∗ byteBuf (pageAddr (pas i)) (DFrac.own 1) (List.replicate 4096 5#8) ∗
   (∃ γ0 g : GName, chFrag γ0 (procAddr i) ∅ ∗ slotGen (procAddr i) (DFrac.own 1) g ∗
-    actCnt (procAddr i) 0)
+    actCnt (procAddr i) 0 ∗ zsElem (procAddr i) none)
 
 theorem mn_unused_isUnused : isUnused UNUSED := by decide
 
@@ -289,7 +289,8 @@ theorem mn_slots_zip [CurCtx] (Γ : SchedNames) (pas : Nat → BitVec 44) :
     ([∗list] i ∈ List.range NPROC, lockFreeTok (Γ.lock i)) ∗
     kstackPages pas ∗
     ([∗list] i ∈ List.range NPROC, ∃ γ0 g : GName,
-      chFrag γ0 (procAddr i) ∅ ∗ slotGen (procAddr i) (DFrac.own 1) g ∗ actCnt (procAddr i) 0)
+      chFrag γ0 (procAddr i) ∅ ∗ slotGen (procAddr i) (DFrac.own 1) g ∗ actCnt (procAddr i) 0 ∗
+        zsElem (procAddr i) none)
     ⊢ [∗list] i ∈ List.range NPROC, mnSlotIn (GF := GF) Γ pas i := by
   unfold kstackPages mnSlotIn
   rw [show List.range 64 = List.range NPROC from rfl]
@@ -297,7 +298,7 @@ theorem mn_slots_zip [CurCtx] (Γ : SchedNames) (pas : Nat → BitVec 44) :
   ihave H := (BigSepL.bigSepL_sep_eqv (l := List.range NPROC)
     (Φ := fun _ i => iprop(byteBuf (GF := GF) (pageAddr (pas i)) (DFrac.own 1) (List.replicate 4096 5#8)))
     (Ψ := fun _ i => iprop(∃ γ0 g : GName, chFrag (GF := GF) γ0 (procAddr i) ∅ ∗
-      slotGen (procAddr i) (DFrac.own 1) g ∗ actCnt (procAddr i) 0))).2 $$ [$H7 $H8]
+      slotGen (procAddr i) (DFrac.own 1) g ∗ actCnt (procAddr i) 0 ∗ zsElem (procAddr i) none))).2 $$ [$H7 $H8]
   ihave H := (BigSepL.bigSepL_sep_eqv (l := List.range NPROC)
     (Φ := fun _ i => iprop(lockFreeTok (GF := GF) (Γ.lock i))) (Ψ := fun _ _ => _)).2 $$ [$H6 $H]
   ihave H := (BigSepL.bigSepL_sep_eqv (l := List.range NPROC)
@@ -391,17 +392,18 @@ after procinit): over `nextpid_res` (the `.data` word at its pinned `1`,
 `pid_lock`'s quarter of every pid cell, the empty registration map, the
 empty pid ledger) and
 over `wait_res` (the parent cells, the children map, no orphans, the zombie
-ledger at the empty history). -/
+ledger at the empty history, and -- NI M2-G1b -- the family ledger's T2
+authority at the all-`none` column). -/
 theorem mn_pidWait_born [CurCtx] (cpu : CPU) (k : KCtx) :
     kctx cpu k ∗ lockInited pidLockAddr nextpidNameAddr ∗ lockInited waitLockAddr waitLockNameAddr ∗
     wordPointsTo nextpidAddr 4 (DFrac.own 1) 1#32 ∗
     ([∗list] i ∈ List.range NPROC, wordPointsTo (pPid (procAddr i)) 4 pidLockQ 0#32) ∗
     pidRegAuth ∅ ∗ pidLedAuth [] ∗ parentsResAt curCtx ∗ childrenResBoot ∗ orphansOwn ∅ ∗
-    zombLedAuth []
+    zombLedAuth [] ∗ zsAuth (fun _ => none)
     ⊢ |={⊤}=> (kctx (GF := GF) cpu k ∗
       (∃ γp : GName, isLock γp pidLockAddr "nextpid" pidLockPay) ∗
       (∃ γw : GName, isLock γw waitLockAddr "wait_lock" waitLockPay)) := by
-  iintro ⟨Hk, Hpl, Hwl, Hn, Hp, Ha, Hled, Hpar, Hch, Ho, Hzl⟩
+  iintro ⟨Hk, Hpl, Hwl, Hn, Hp, Ha, Hled, Hpar, Hch, Ho, Hzl, Hzs⟩
   icases kctx_kmapStatic _ _ $$ Hk with ⟨#HS, Hk⟩
   icases mn_pidLock_kmap $$ HS with ⟨#Hp0, #Hp16⟩
   icases mn_waitLock_kmap $$ HS with ⟨#Hw0, #Hw16⟩
@@ -410,7 +412,7 @@ theorem mn_pidWait_born [CurCtx] (cpu : CPU) (k : KCtx) :
   icases Hwl with ⟨-, Hwf⟩
   ihave HR := mn_pidRes_boot $$ [$Hn $Hp $Ha $Hled]
   imod kctx_newlock cpu k pidLockAddr "nextpid" pidLockPay $$ [$Hk $HR $Hpf $Hp0 $Hp16] with ⟨Hk, Hpid⟩
-  ihave HW := waitRes_alloc curCtx $$ [$Hpar $Hch $Ho $Hzl]
+  ihave HW := waitRes_alloc curCtx $$ [$Hpar $Hch $Ho $Hzl $Hzs]
   ihave HW : iprop(waitLockPay (GF := GF) curCtx) $$ [HW]
   · unfold waitLockPay; iexact HW
   imod kctx_newlock cpu k waitLockAddr "wait_lock" waitLockPay $$ [$Hk $HW $Hwf $Hw0 $Hw16] with ⟨Hk, Hwait⟩

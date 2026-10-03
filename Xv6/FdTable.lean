@@ -990,10 +990,14 @@ theorem procOfiles_null_mint (γ : FileNames) (pa : BitVec 64) :
 /-- **Rocq `ProcInv.proc_priv_nocwd`**: the bare block (no cwd reference,
 no generation row) and the descriptor table, named by the block's own
 `V.fdg`.  allocproc hands it out: the table is null and the name is the one
-allocproc just minted (Rocq `proc_dormant_unused`). -/
+allocproc just minted (Rocq `proc_dormant_unused`).  ...AND the slot's T2
+element of the family ledger's zombie column at `none` (NI M2-G1b): allocproc
+takes it out of the UNUSED payload, and kfork / userinit put it into the USED
+payload (or kfork's failure tail back into the UNUSED one) -- allocproc's post
+names this bundle, so it is the element's carrier between them. -/
 def procPrivNocwd (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) : IProp GF := iprop%
-  procPrivBareAt curCtx pa pid V M ∗ procOfiles γ V.fdg pa V.ofile
+  procPrivBareAt curCtx pa pid V M ∗ procOfiles γ V.fdg pa V.ofile ∗ zsElem pa none
 
 end
 
@@ -1033,11 +1037,11 @@ it. -/
 theorem procPriv_null_mint [X : CurCtx] (h : curTier = KTier.kpt) (γ : FileNames) (pa : BitVec 64)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
     (hof : V.ofile = List.replicate NOFILE 0#64) :
-    procPriv (GF := GF) pa pid V M ∗ dormantAllow ⊢
+    procPriv (GF := GF) pa pid V M ∗ dormantAllow ∗ zsElem pa none ⊢
       |==> ∃ γd : GName, procPrivNocwd γ pa pid { V with fdg := γd } M ∗
         contextCells pa (DFrac.own 1) V.context ∗ fdFrags γd (List.replicate NOFILE .closed) ∗
         fdSlots FDSPARE ∗ irefSlots (IREFHOME + IREFSPARE) ∗ bslots 3 := by
-  iintro ⟨Hp, Ha⟩
+  iintro ⟨Hp, Ha, Hz⟩
   icases (procPriv_bare_split h pa pid V M).1 $$ Hp with ⟨Hb, Hc, Ho⟩
   ihave Ho := (show ofileCells (GF := GF) pa (DFrac.own 1) V.ofile ⊢
       [∗list] i ↦ c ∈ List.replicate NOFILE (0#64 : BitVec 64), wordPointsTo (pOfile pa i) 8 (DFrac.own 1) c
@@ -1053,7 +1057,7 @@ theorem procPriv_null_mint [X : CurCtx] (h : curTier = KTier.kpt) (γ : FileName
   unfold procPrivNocwd
   ihave Hb := (show procPrivBareAt (GF := GF) curCtx pa pid V M ⊢
       procPrivBareAt curCtx pa pid { V with fdg := γd } M from .rfl) $$ Hb
-  iframe Hb
+  iframe Hb Hz
   rw [show ({ V with fdg := γd } : ProcPriv).ofile = List.replicate NOFILE 0#64 from hof]
   iexact Hot
 
@@ -1067,12 +1071,12 @@ theorem procPrivNocwd_null_open [X : CurCtx] (h : curTier = KTier.kpt) (γ : Fil
       fdFrags V.fdg (List.replicate NOFILE .closed) ∗
       fdSlots FDSPARE ∗ irefSlots (IREFHOME + IREFSPARE) ∗ bslots 3 ⊢
       procPriv pa pid V M ∗ dormantAllow ∗
-        [∗list] i ∈ List.range NOFILE, fdStAt V.fdg i (.own 1) .closed := by
+        ([∗list] i ∈ List.range NOFILE, fdStAt V.fdg i (.own 1) .closed) ∗ zsElem pa none := by
   unfold procPrivNocwd
   rw [hof]
-  iintro ⟨⟨Hb, Hot⟩, Hc, Hfr, Hfs, Hir, Hbs⟩
+  iintro ⟨⟨Hb, Hot, Hz⟩, Hc, Hfr, Hfs, Hir, Hbs⟩
   icases procOfiles_null_open γ V.fdg pa $$ [$Hot $Hfr] with ⟨Ho, Hs, Hk⟩
-  iframe Hk
+  iframe Hk Hz
   isplitl [Hb Hc Ho]
   · iapply (procPriv_bare_split h pa pid V M).2
     iframe Hb Hc

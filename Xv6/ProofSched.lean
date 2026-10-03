@@ -398,8 +398,8 @@ theorem sched_proof (SW : SWTCH) (MP : MYPROC) (HO : HOLDING) : SCHED :=
   -- THE KERNEL TABLE, kept: the hart that dispatches this thread back runs
   -- the same one, so its `satp` root is the parking hart's (`kptOn_root_agree`)
   icases kctx_kptOn cpu k htier $$ Hk with ⟨⟨%t1, %M1, %hb1, #Hkpt1⟩, Hk⟩
-  icases procHeldAt_cases Γ ξ0 cpu j st ch $$ Hheld with
-    ⟨Hlocked, Hpst, %kl, %xs, %pid, Hstate, Hchan, Hrest⟩
+  icases procHeldAt_gen_cases Γ ξ0 cpu j st ch $$ Hheld with
+    ⟨⟨Hlocked, Hpst, %kl, %xs, %pid, Hstate, Hchan, Hrest⟩, Hzs⟩
   simp only [schedAddr]
   k_norm
   -- the prologue
@@ -612,8 +612,8 @@ theorem sched_proof (SW : SWTCH) (MP : MYPROC) (HO : HOLDING) : SCHED :=
   icases ownCtxCells_cases (pContext (procAddr j) 0) $$ Hcells with ⟨%vs, Hcells⟩
   icases MachCSL.ctxCells_dup (pContext (procAddr j) 0) vs $$ Hcells with ⟨%hvlen, Hcells⟩
   icases schedVcAt_cases Γ cpu (cpuCtxAddr cpu) (procAddr j) $$ Hvc with ⟨%ξs, Hown, Hrec⟩
-  ihave Hheld := procHeldAt_intro Γ ξ0 cpu j st ch kl xs pid
-    $$ [$Hlocked $Hpst $Hstate $Hchan $Hrest]
+  ihave Hheld := procHeldAt_gen_intro Γ ξ0 cpu j st ch kl xs pid
+    $$ [$Hlocked $Hpst $Hstate $Hchan $Hrest $Hzs]
   have e4_2 : R4 2#5 = R3 2#5 := e4o 2#5 (by decide) (by decide)
   have e4_20 : R4 20#5 = R3 20#5 := e4o 20#5 (by decide) (by decide)
   have e4_21 : R4 21#5 = R3 21#5 := e4o 21#5 (by decide) (by decide)

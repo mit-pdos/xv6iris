@@ -198,6 +198,9 @@ def xv6GF : BundledGFunctors :=
   -- Xv6G: the encoded per-process ledger (Rocq `uledG`'s `mono_listR (leibnizO positive)`,
   -- NI-LEDGER-REST, the key history); slot 124, clear of the union's (95..108)
   |>.set 124 ⟨xgfMl Uled, inferInstance⟩
+  -- WchGpre: the family ledger's zombie column (tie T2, NI M2-G1b); slot 125, clear of
+  -- the union's (95..108)
+  |>.set 125 ⟨xgfGm Nat (Option (BitVec 32 × Int)) RegMapF, inferInstance⟩
 
 /-! ## One instance per camera -/
 
@@ -332,6 +335,8 @@ instance xgfMlPev : MonoListG xv6GF Pev := ⟨xgf_slot 122⟩
 instance xgfMlZev : MonoListG xv6GF Zev := ⟨xgf_slot 123⟩
 -- Xv6G: the encoded per-process ledger (the key history)
 instance xgfMlUled : MonoListG xv6GF Uled := ⟨xgf_slot 124⟩
+-- WchGpre: the family ledger's zombie column
+instance xgfZomCol : GhostMapG xv6GF Nat (Option (BitVec 32 × Int)) RegMapF := ⟨xgf_slot 125⟩
 
 end cameras
 
@@ -398,10 +403,10 @@ rest are the single-camera instances above, the era registry included. -/
 the final theorem; here at arbitrary names, to show they add no camera) -/
 
 /-- `WchG` at given names, over the one `WchGpre` instance. -/
-@[reducible] def xv6GF_wchG (γch γor γsg γpr γip γnp γtk γpl γzl γact : GName) : WchG xv6GF :=
+@[reducible] def xv6GF_wchG (γch γor γsg γpr γip γnp γtk γpl γzl γact γzs : GName) : WchG xv6GF :=
   { toWchGpre := xv6GF_wchGpre, wchName := γch, worphName := γor, wsgName := γsg,
     wprName := γpr, wipName := γip, npidName := γnp, wtkName := γtk, wplName := γpl,
-    wzlName := γzl, wactName := γact }
+    wzlName := γzl, wactName := γact, wzsName := γzs }
 
 /-- The slot supplies' names. -/
 @[reducible] def xv6GF_fdslotG (γ : GName) : FdslotG xv6GF := ⟨γ⟩

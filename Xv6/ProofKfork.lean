@@ -84,7 +84,12 @@ THE PLAN (reverse-engineered; see the report accompanying this file):
 * `acquire(&wait_lock)` (`ACQUIRE`), `np->parent = p` with fork's ghost
   step (`kf_wait_fork`, Rocq `ProofKforkB5`: the cell read 0 by
   `childrenInv_no_entry`, the caller's row moved to `csP ∪ {gen}`, the
-  deposit into `childrenInv_fork`), `release(&wait_lock)`.
+  deposit into `childrenInv_fork`; NI M2-G1b: the family ledger's `ZFork`
+  append, `WaitInvTies.famLed_fork`, which steps the parent's permit once --
+  the parent's block comes back at `kev + 1` -- and whose receipt is
+  dropped), `release(&wait_lock)`.  The child slot's T2 element comes out of
+  allocproc's `procPrivNocwd` into the USED payload (or, on `-1`, the UNUSED
+  re-close).
 * `acquire(&np->lock)` (agreement on the held state-mirror half forces
   USED still), `np->state = RUNNABLE` (`sw a5,24(s4)`), rejoin to whole,
   update USED -> RUNNABLE in the lock payload, `release(&np->lock)`.
@@ -175,12 +180,14 @@ with a parked record owed (`procCtxAt`) and the whole hart tag
 (the record) and `notRunning` (the tag), the `isRunning`/`invDormant`
 arms empty. -/
 theorem procSlots_used_intro (Γ : SchedNames) (ξl : CtxId) (pa : BitVec 64) :
-    slotUsed Γ pa ∗ procCtxAt (GF := GF) Γ ξl pa ∗ hartAtAny Γ pa ⊢ procSlotsAt Γ ξl pa USED := by
+    slotUsed Γ pa ∗ procCtxAt (GF := GF) Γ ξl pa ∗ hartAtAny Γ pa ∗ zsElem pa none ⊢
+      procSlotsAt Γ ξl pa USED := by
   unfold procSlotsAt
   rw [if_pos (show needsCtx USED from by decide), if_neg (show ¬ isRunning USED from by decide),
-    if_neg (show ¬ invDormant USED from by decide), if_pos (show notRunning USED from by decide)]
-  iintro ⟨Hu, Hc, Htag⟩
-  iframe Hc Htag
+    if_neg (show ¬ invDormant USED from by decide), if_pos (show notRunning USED from by decide),
+    if_neg (show ¬ USED = ZOMBIE from by decide)]
+  iintro ⟨Hu, Hc, Htag, Hz⟩
+  iframe Hc Htag Hz
   iapply pavSlot_intro Γ pa USED (by decide) $$ Hu
 
 end
@@ -1558,16 +1565,26 @@ beside the payload's would not compose (`WaitInvTies.childrenInv_no_entry`);
 the caller's row reads the authority (`childrenOwn_lookup`) and moves to
 `cs ∪ {g}` (`childrenOwn_upd`); the invariant takes the deposit
 (`childrenInv_fork`: the three quarters and the two readings).  What is
-handed back closes the payload once the cell holds the parent's address. -/
+handed back closes the payload once the cell holds the parent's address.
+
+THE FAMILY LEDGER (NI M2-G1b, `WaitInvTies.famLed_fork`): the parent store
+IS the placement event -- `ZFork pa i pid g` is appended here, T1 re-holds at
+the child's cell `pa` and generation `g`, and the append costs ONE step of
+the actor's permit (L3's rule: the lend `actLend pa ke` comes back at `ke +
+1`); the receipt is handed back (kfork drops it). -/
 theorem kf_wait_fork [CurCtx] (i : Nat) (hi : i < NPROC) (pa : BitVec 64) (g γp : GName) (pid : BitVec 32)
-    (cs : ExtTreeSet GName compare) (hpa : pa ≠ 0#64) :
+    (cs : ExtTreeSet GName compare) (hpa : pa ≠ 0#64) (ke : Nat) :
     waitInvResAt (GF := GF) curCtx ∗ slotGen (procAddr i) (.own Qp.threeQuarters) g ∗
-      pidReg pid (.own Qp.threeQuarters) g ∗ genSlot g (procAddr i) ∗ genPid g pid ∗ chFrag γp pa cs ⊢
+      pidReg pid (.own Qp.threeQuarters) g ∗ genSlot g (procAddr i) ∗ genPid g pid ∗ chFrag γp pa cs ∗
+      actLend pa ke ⊢
       |==> (⌜g ∉ cs⌝ ∗ (∃ v : BitVec 64, wordAtN curCtx (pParent (procAddr i)) 8 (DFrac.own 1) v) ∗
         (wordAtN curCtx (pParent (procAddr i)) 8 (DFrac.own 1) pa -∗ waitInvResAt curCtx) ∗
-        chFrag γp pa (cs ∪ {g})) := by
+        chFrag γp pa (cs ∪ {g}) ∗ actLend pa (ke + 1) ∗
+        ∃ h : List Zev, zombReceipt h (.ZFork pa i pid g)) := by
   unfold waitInvResAt
-  iintro ⟨⟨%ps, %gs, %m, %O, Hpo, Hch, Ho, Hci, Hzl⟩, Hsg, Hpr, #Hgs, #Hgp, Hrow⟩
+  iintro ⟨⟨%ps, %gs, %m, %O, Hpo, Hch, Ho, Hci, Hzl⟩, Hsg, Hpr, #Hgs, #Hgp, Hrow, Hlend⟩
+  imod famLed_fork ps gs i pa pid g $$ Hzl with ⟨Hzl, #Hrc⟩
+  imod actLend_step pa ke $$ Hlend with Hlend
   icases waitInv_keep (childrenInv_no_entry curCtx ps gs m O i g hi) $$ [Hci Hsg] with ⟨%hno, Hci, Hsg⟩
   · isplitl [Hci]
     · iexact Hci
@@ -1617,7 +1634,8 @@ theorem kf_wait_fork [CurCtx] (i : Nat) (hi : i < NPROC) (pa : BitVec 64) (g γp
     isplitl [Hci]
     · iexact Hci
     · iexact Hzl
-  · iexact Hrow
+  iframe Hrow Hlend
+  iexact Hrc
 
 /-- `p->cwd`'s reference, opened to its slot (idup's `a0`). -/
 theorem kf_cwd_open [CurCtx] (v : BitVec 64) (z : Nat) :
@@ -1899,7 +1917,7 @@ def kfOfileΨ [CurCtx] (cpu : CPU) (k : KCtx) (Γ : SchedNames) [ClaimIs (hlc :=
   wordPointsTo (pRoot (procAddr i)) 8 (DFrac.own 1) V_c.root ∗
   procPtAt Pnew' Mnew' ∗ tfPageAt V_c.upt.tfp (V.tf.set 14 0#64) ∗ actCnt (procAddr i) V_c.ev ∗
   stackOwn (V_c.kstack + 4096#64) 512 ∗
-  procHeld Γ cpu i USED ch ∗ hartAtAny Γ (procAddr i) ∗ slotUsed Γ (procAddr i) ∗
+  procHeld Γ cpu i USED ch ∗ hartAtAny Γ (procAddr i) ∗ zsElem (procAddr i) none ∗ slotUsed Γ (procAddr i) ∗
   cwdRefAt V.cwd V.cwi ∗ rootRefAt V.root V.rti ∗ fdSlots FDSPARE ∗ irefSlots (IREFHOME + IREFSPARE) ∗
   bslots 3 ∗ chFrag V_c.chg (procAddr i) ∅ ∗
   procGenAt curCtx (procAddr j) pid V.gen ∗ chFrag V.chg (procAddr j) csP ∗
@@ -1985,29 +2003,32 @@ theorem kf_rel_at [CurCtx] (RE : RELEASE) (c : CPU) (k' : KCtx) (γ : GName) (lk
 
 /-- Rebuild an UNUSED slot from `freeproc`'s output and the hart tag. -/
 theorem kf_slots_unused_intro [CurCtx] (Γ : SchedNames) (ξl : CtxId) (pa : BitVec 64) :
-    slotUsed Γ pa ∗ @procDormant hlc GF _ ⟨ξl, KTier.kpt⟩ _ _ _ _ _ _ pa UNUSED ∗ hartAtAny Γ pa ⊢
+    slotUsed Γ pa ∗ @procDormant hlc GF _ ⟨ξl, KTier.kpt⟩ _ _ _ _ _ _ pa UNUSED ∗ hartAtAny Γ pa ∗
+      zsElem pa none ⊢
       procSlotsAt (GF := GF) Γ ξl pa UNUSED := by
   unfold procSlotsAt
   rw [if_neg (by decide : ¬ needsCtx UNUSED), if_neg (by decide : ¬ isRunning UNUSED),
-    if_pos (by decide : invDormant UNUSED), if_pos (by decide : notRunning UNUSED)]
-  iintro ⟨Hu, Hd, Hh⟩
+    if_pos (by decide : invDormant UNUSED), if_pos (by decide : notRunning UNUSED),
+    if_neg (by decide : ¬ UNUSED = ZOMBIE)]
+  iintro ⟨Hu, Hd, Hh, Hz⟩
   isplitl []
   · iempintro
   isplitl []
   · iempintro
-  iframe Hd Hh
+  iframe Hd Hh Hz
   iapply pavSlot_unused_of_used Γ pa $$ Hu
 
 /-- `freeproc`'s output plus the hart tag reassemble the UNUSED lock payload. -/
 theorem kf_pay_unused [CurCtx] (Γ : SchedNames) (ξl : CtxId) (j : Nat) (c : CPU) :
     slotUsed Γ (procAddr j) ∗ procHeldAt (GF := GF) Γ ξl c j UNUSED 0#64 ∗
-    @procDormant hlc GF _ ⟨ξl, KTier.kpt⟩ _ _ _ _ _ _ (procAddr j) UNUSED ∗ hartAtAny Γ (procAddr j) ⊢
+    @procDormant hlc GF _ ⟨ξl, KTier.kpt⟩ _ _ _ _ _ _ (procAddr j) UNUSED ∗ hartAtAny Γ (procAddr j) ∗
+      zsElem (procAddr j) none ⊢
       @locked hlc GF _ ⟨ξl, KTier.kpt⟩ (Γ.lock j) c ∗ procLockResAt Γ ξl (procAddr j) := by
-  iintro ⟨Hused, Hheld, Hdorm, Hhart⟩
-  icases procHeldAt_cases Γ ξl c j UNUSED 0#64 $$ Hheld with
+  iintro ⟨Hused, Hheld, Hdorm, Hhart, Hzs⟩
+  icases procHeldAt_cases Γ ξl c j UNUSED 0#64 (by decide) $$ Hheld with
     ⟨Hlocked, Hpg, %kl, %xs, %pid, Hstate, Hchan, Hrest⟩
   icases (pstateWhole_split Γ (procAddr j) UNUSED).1 $$ Hpg with ⟨Hpl, _⟩
-  ihave Hslots := kf_slots_unused_intro Γ ξl (procAddr j) $$ [$Hused $Hdorm $Hhart]
+  ihave Hslots := kf_slots_unused_intro Γ ξl (procAddr j) $$ [$Hused $Hdorm $Hhart $Hzs]
   isplitl [Hlocked]
   · iexact Hlocked
   iapply procLockRes_intro Γ ξl (procAddr j) UNUSED 0#64 kl xs pid
@@ -2177,7 +2198,7 @@ theorem kf_publish [X : CurCtx] (AC : ACQUIRE) (RE : RELEASE) (SS : SAFESTRCPY) 
       wordPointsTo (pRoot (procAddr i)) 8 (DFrac.own 1) V_c.root ∗
       procPtAt Pnew' Mnew' ∗ tfPageAt V_c.upt.tfp (V.tf.set 14 0#64) ∗ actCnt (procAddr i) V_c.ev ∗
       stackOwn (V_c.kstack + 4096#64) 512 ∗
-      procHeld Γ cpu i USED ch ∗ hartAtAny Γ (procAddr i) ∗ slotUsed Γ (procAddr i) ∗
+      procHeld Γ cpu i USED ch ∗ hartAtAny Γ (procAddr i) ∗ zsElem (procAddr i) none ∗ slotUsed Γ (procAddr i) ∗
       cwdRefAt V.cwd V.cwi ∗ rootRefAt V.root V.rti ∗ fdSlots FDSPARE ∗
       irefSlots (IREFHOME + IREFSPARE) ∗ bslots 3 ∗ chFrag V_c.chg (procAddr i) ∅ ∗
       procGenAt curCtx (procAddr j) pid V.gen ∗ chFrag V.chg (procAddr j) csP ∗
@@ -2189,7 +2210,7 @@ theorem kf_publish [X : CurCtx] (AC : ACQUIRE) (RE : RELEASE) (SS : SAFESTRCPY) 
     with ⟨F0, F1, F2, Fs2, Fs3, Fs4, F6, F7, Harm0, Hcl,
       Hpid_p, Hks_p, Hsz_p, Hpg_p, Htf_p, Hcwd_p, Hname_p, Hsc_p, Hrt_p, HPt_p, HTf_p, Hev_p,
       Hpid_c, Hks_c, Hsz_c, Hpg_c, Htf_c, Hctx_c, Hcwd_c, Hname_c, Hsc_c, Hrt_c, HPtn', HTf_c, Hev_c,
-      Hcstack, Hheld, Hhart, #Hused, Hcwr, Hrtr, Hfsp, Hirs, Hbs, Hcch,
+      Hcstack, Hheld, Hhart, Hczs, #Hused, Hcwr, Hrtr, Hfsp, Hirs, Hbs, Hcch,
       HgP, Hrowp, Htok, HgC, Hsg34, Hpr34, #Hgs, #Hgp, #Hfd, #Hmp, Hpark⟩
   -- the two home units, out of the child's allowance (`IREFHOME`): one for
   -- each idup (the child's cwd, then its root, chroot.md §6)
@@ -2523,9 +2544,9 @@ theorem kf_publish [X : CurCtx] (AC : ACQUIRE) (RE : RELEASE) (SS : SAFESTRCPY) 
   ihave Hk := Hback $$ Hown
   imodintro
   -- the used slot: procCtxAt + hartAtAny
-  ihave Hslots := procSlots_used_intro Γ curCtx (procAddr i) $$ [$Hused $HprocCtx $Hhart]
+  ihave Hslots := procSlots_used_intro Γ curCtx (procAddr i) $$ [$Hused $HprocCtx $Hhart $Hczs]
   -- open the held lock's payload
-  icases procHeldAt_cases Γ curCtx cpu i USED ch $$ Hheld with
+  icases procHeldAt_cases Γ curCtx cpu i USED ch (by decide) $$ Hheld with
     ⟨Hlocked, Hpg, %kl, %xs, %pidx, HstateW, Hchan, Hrest⟩
   icases (pstateWhole_split Γ (procAddr i) USED).1 $$ Hpg with ⟨Hpl, Hkept⟩
   ihave Hkept := (show (if unclaimed USED then (emp : IProp GF) else pstateAtHlf Γ (procAddr i) USED) ⊢
@@ -2631,8 +2652,13 @@ theorem kf_publish [X : CurCtx] (AC : ACQUIRE) (RE : RELEASE) (SS : SAFESTRCPY) 
     ihave HW := (show waitLockPay (GF := GF) curCtx ⊢ waitInvResAt curCtx
       from by unfold waitLockPay; iintro H; iexact H) $$ HW
     iapply wpLoop_bupd
-    imod (kf_wait_fork i hi (procAddr j) V_c.gen V.chg pid_c csP (procAddr_nonzero hj)) $$ [HW Hsg34 Hpr34 Hrowp]
-      with ⟨%hfresh, ⟨%pv, Hword⟩, Hback, Hrowp⟩
+    -- (NI M2-G1b) the parent store appends `ZFork`, which costs one step of
+    -- the parent's permit: its counter goes out as the lend and comes back
+    -- stepped; the receipt is dropped
+    ihave Hlnd := actLend_of_cnt (GF := GF) (procAddr j) kev $$ Hev_p
+    imod (kf_wait_fork i hi (procAddr j) V_c.gen V.chg pid_c csP (procAddr_nonzero hj) kev)
+      $$ [HW Hsg34 Hpr34 Hrowp Hlnd]
+      with ⟨%hfresh, ⟨%pv, Hword⟩, Hback, Hrowp, Hlnd, -⟩
     · isplitl [HW]
       · iexact HW
       isplitl [Hsg34]
@@ -2643,7 +2669,10 @@ theorem kf_publish [X : CurCtx] (AC : ACQUIRE) (RE : RELEASE) (SS : SAFESTRCPY) 
       · iexact Hgs
       isplitl []
       · iexact Hgp
+      isplitl [Hrowp]
       · iexact Hrowp
+      · iexact Hlnd
+    ihave Hev_p := actLend_back (GF := GF) (procAddr j) (kev + 1) (procAddr_nonzero hj) $$ Hlnd
     imodintro
     ihave Hword := (show wordAtN curCtx (pParent (procAddr i)) 8 (DFrac.own 1) pv ⊢
       wordPointsTo (procAddr i + 56#64) 8 (DFrac.own 1) pv
@@ -2826,8 +2855,9 @@ theorem kf_publish [X : CurCtx] (AC : ACQUIRE) (RE : RELEASE) (SS : SAFESTRCPY) 
         case' _ => unfold ofileCells; isplitl []
                    · ipureintro; exact hVofl
                    iexact Hpar
-        -- the parent's block at the count its lends came back at (permit sweep L1a)
-        ihave Hpriv : procPrivNoctxAt curCtx (procAddr j) pid (V.updEv kev) M
+        -- the parent's block at the count its lends came back at (permit sweep L1a),
+        -- one more for the `ZFork` append at the parent store (NI M2-G1b)
+        ihave Hpriv : procPrivNoctxAt curCtx (procAddr j) pid (V.updEv (kev + 1)) M
           $$ [Hpid_p Hks_p Hsz_p Hpg_p Htf_p Hof_p Hcwd_p Hname_p Hsc_p Hrt_p HPt_p HTf_p Hev_p]
         case' _ =>
           unfold procPrivNoctxAt procFieldsNoctx pSz pPagetable pTrapframe pCwd pRoot pKstack
@@ -2835,7 +2865,7 @@ theorem kf_publish [X : CurCtx] (AC : ACQUIRE) (RE : RELEASE) (SS : SAFESTRCPY) 
           · ipureintro; exact hVb
           iframe Hpid_p Hks_p Hsz_p Hpg_p Htf_p Hof_p Hcwd_p Hname_p Hsc_p Hrt_p HPt_p HTf_p Hev_p
           ipureintro; exact hlzP
-        ihave HB := kf_parent_close γ (procAddr j) pid (V.updEv kev) M stsP rfl $$ [Hpriv HcwP HrtP HgP Hpays Hfr]
+        ihave HB := kf_parent_close γ (procAddr j) pid (V.updEv (kev + 1)) M stsP rfl $$ [Hpriv HcwP HrtP HgP Hpays Hfr]
         · iframe
         -- the answer: the child's pid, the parent's quarter, the moved row
         ihave HB : kforkRet γ j pid V M stsP Q csP Rc pid_c $$ [HB Htok Hrowp]
@@ -2844,9 +2874,9 @@ theorem kf_publish [X : CurCtx] (AC : ACQUIRE) (RE : RELEASE) (SS : SAFESTRCPY) 
           icases HB with ⟨HB1, HB2⟩
           iframe HB2
           isplitl [HB1]
-          · iexists kev
+          · iexists (kev + 1)
             iframe HB1
-            ipureintro; exact hkev
+            ipureintro; exact Nat.le_succ_of_le hkev
           iright
           iexists V_c.gen
           isplitl []
@@ -3166,7 +3196,7 @@ theorem kfork_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (AL : ALLOCPROC)
       -- its null table opened into the raw cells, the units and the keys at
       -- `closed`, which the copy loop retypes
       icases procPrivNocwd_null_open rfl γ (procAddr i) pid_c V_c M_c hVc.1
-        $$ [$HcNc $HcCtx $HcFr $HcFs $HcIr $HcBs] with ⟨HcPriv, Hcal, Hkeys⟩
+        $$ [$HcNc $HcCtx $HcFr $HcFs $HcIr $HcBs] with ⟨HcPriv, Hcal, Hkeys, Hczs⟩
       -- from here to the release of `np->lock` interrupts are off (the `k_step`s' `hsie`)
       have hsie : (k.pushOffAt a1 b1).sie = false := rfl
       -- the arm allocproc's acquire paid out, handed back at that release
@@ -3395,8 +3425,8 @@ theorem kfork_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (AL : ALLOCPROC)
           -- reassemble the UNUSED lock payload from freeproc's output + the hart tag kept aside
           ihave #HlkN := procsInv_lookup Γ i hi $$ Hpinv
           ihave Hunused : (@locked hlc GF _ ⟨ξ0, KTier.kpt⟩ (Γ.lock i) cpu ∗
-              procLockResAt Γ ξ0 (procAddr i)) $$ [Hheld2 Hdormu Hhart]
-          case' _ => iapply kf_pay_unused Γ ξ0 i cpu; iframe Hused Hheld2 Hdormu Hhart
+              procLockResAt Γ ξ0 (procAddr i)) $$ [Hheld2 Hdormu Hhart Hczs]
+          case' _ => iapply kf_pay_unused Γ ξ0 i cpu; iframe Hused Hheld2 Hdormu Hhart Hczs
           icases Hunused with ⟨Hlocked, Hlockres⟩
           ihave Hlockres := (show procLockResAt Γ ξ0 (procAddr i) ⊢ procLockPay Γ i curCtx
             from by unfold procLockPay; iintro H; iexact H) $$ Hlockres
@@ -3684,12 +3714,12 @@ theorem kfork_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (AL : ALLOCPROC)
               isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
               itableInv (hlc := hlc) ∗ iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗
               kfOfileΨ cpu k Γ R2 R3 w7 j i pid pid_c V V_c M Mnew' Pnew' ch γ stsP Q csP Rc k2)
-            $$ [F0 F1 F2 Fs2 Fs3 Fs4 F6 F7 Harm0 Hcl Hpid_p Hks_p Hsz_p Hpg_p Htf_p Hcwd_p Hname_p Hsc_p Hrt_p HPt_p HTf_p Hev_p Hpid_c Hks_c Hsz_c Hpg_c Htf_c Hctx_c Hcwd_c Hname_c Hsc_c Hrt_c HPtn' HTf_c Hev_c Hcstack Hheld Hhart Hcwr Hrtr Hfsp Hirs Hbs Hcch HgP Hrowp Htok HgC Hsg34 Hpr34 Hpark]
+            $$ [F0 F1 F2 Fs2 Fs3 Fs4 F6 F7 Harm0 Hcl Hpid_p Hks_p Hsz_p Hpg_p Htf_p Hcwd_p Hname_p Hsc_p Hrt_p HPt_p HTf_p Hev_p Hpid_c Hks_c Hsz_c Hpg_c Htf_c Hctx_c Hcwd_c Hname_c Hsc_c Hrt_c HPtn' HTf_c Hev_c Hcstack Hheld Hhart Hczs Hcwr Hrtr Hfsp Hirs Hbs Hcch HgP Hrowp Htok HgC Hsg34 Hpr34 Hpark]
           case' _ =>
             iframe Hwl Hit Hiti Hireg
             unfold kfOfileΨ
             k_norm_g [hVcb.2.2.2]
-            iframe F0 F1 F2 Fs2 Fs3 Fs4 F6 F7 Harm0 Hcl Hpid_p Hks_p Hsz_p Hpg_p Htf_p Hcwd_p Hname_p Hsc_p Hrt_p HPt_p HTf_p Hev_p Hpid_c Hks_c Hsz_c Hpg_c Htf_c Hctx_c Hcwd_c Hname_c Hsc_c Hrt_c HPtn' HTf_c Hev_c Hcstack Hheld Hhart Hused Hcwr Hrtr Hfsp Hirs Hbs Hcch HgP Hrowp Htok HgC Hsg34 Hpr34 Hgs Hgp Hpark
+            iframe F0 F1 F2 Fs2 Fs3 Fs4 F6 F7 Harm0 Hcl Hpid_p Hks_p Hsz_p Hpg_p Htf_p Hcwd_p Hname_p Hsc_p Hrt_p HPt_p HTf_p Hev_p Hpid_c Hks_c Hsz_c Hpg_c Htf_c Hctx_c Hcwd_c Hname_c Hsc_c Hrt_c HPtn' HTf_c Hev_c Hcstack Hheld Hhart Hczs Hused Hcwr Hrtr Hfsp Hirs Hbs Hcch HgP Hrowp Htok HgC Hsg34 Hpr34 Hgs Hgp Hpark
             iframe Hfd Hmp
           -- THE CHILD'S DESCRIPTOR GHOST, allocproc's (`V_c.fdg`, its keys
           -- whole at `closed`), at loop index 0

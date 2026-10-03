@@ -1089,6 +1089,59 @@ checkbox below flips when the lane is on `lean-ni`:
 
 - [x] PI-1  - [x] PI-2  - [x] PI-3  - [x] PI-4  - [x] PI-5  - [x] PI-6  - [x] PJ-G  - [x] PJ-L1a  - [x] PJ-L1b  - [x] PJ-L2
 
+### M2-G1a+b as landed (2026-10-03)
+
+Lane `lane/g1`, two commits (G1a, then G1b).  Rulings R1-R6 as recommended.
+
+**G1a (the vocabulary).**  `ZombEv`: `Zev = ZFork act j pid g | ZExit act pid xs ip | ZReap act j pid`;
+`ZSlot {par, gen, zomb}`, `famStep`, `famOf` (`famOf_snoc`, `famOf_take`: the prefix reading), `zHasKids`
+(decidable; `zHasKids_iff`: through T1's cells it IS the scan over the cells), `zScan`/`zLowest`
+(`zLowest_spec`: least slot below NPROC, parent, zombie, generation, and first-ness).  `zombiesOf`/`statusOf`
+unchanged in meaning (`ZFork` steps neither); `statusOf_dom` no longer exists (a dead-code sweep removed it),
+so nothing to re-prove.  Statement moves: the constructors; `zombExit` (+`ip`), `zombReap` (+slot);
+`waitAnsLed`'s reap arm `∃ h j, zombReceipt h (.ZReap act j rv)` (and `waitAnsLed_of`'s side row).  kexit's
+`ip` is `kx_rest_root`'s own parameter (`initIdentAt curCtx ip`, the word `reparent` writes); kwait's slot is
+`kw_reap_ghost`'s `n`.  **Deviation from §1: `ZFork` keeps the zombie column** (`{m k with par, gen}`):
+kfork's parent store runs after `release(&np->lock)`, so the child's T2 element is in its lock payload and
+cannot be read there; keeping the column makes the step's effect on T2's authority the identity.
+
+**G1b (the ties and the four transitions).**
+- Camera and name: `WchGpre.zsG : GhostMapG GF Nat (Option (BitVec 32 × Int)) RegMapF` (xv6GF/unionGF slot
+  125), `WchG.wzsName` (`xv6GF_wchG` gains `γzs`).  The map is keyed by the slot's ADDRESS as a number
+  (`pa.toNat`): the payloads that hold the elements are stated at `pa`.  `UserChildren`: `zsElem pa v`,
+  `zsAuth f := ∃ M, ghost_map_auth wzsName 1 M ∗ ⌜∀ k < NPROC, get? M (procAddr k).toNat = some (f k)⌝`
+  (a finite map cannot be a function; the authority is tied to the column below NPROC), `zsAuth_lookup`,
+  `zsAuth_update`, `zsAuth_congr`.
+- `WaitInvTies.famLed ps gs := ∃ h, zombLedAuth h ∗ ⌜∀ k < NPROC, ps k = (famOf h k).par ∧ (ps k ≠ 0#64 →
+  gs k = (famOf h k).gen)⌝ ∗ zsAuth (fun k => (famOf h k).zomb)` replaces `waitInvResAt`'s trailing
+  `∃ h, zombLedAuth h` (T1 and T2's authority).  The writers' steps: `famLed_fork`, `famLed_exit`,
+  `famLed_reap`, `famLed_boot`; boot mint `zsRows_alloc`.
+- T2's elements.  `procSlotsAt` gains `if st = ZOMBIE then emp else zsElem pa none` (**deviation: UNUSED's
+  element is here, not in `procDormant`** -- `freeproc`'s post names `procDormant … UNUSED` and nothing it
+  takes carries an element for a reaped ZOMBIE, so kwait puts it back at its re-close, as §2 says);
+  `procDormant`/`procDormantNoctx`'s ZOMBIE branch holds `exitTok … ∗ zsElem pa (some (pid, xstateVal xsv))`.
+  **Carriers across Spec texts that could not move** (no Spec text moved): `procHeldAt` carries the element
+  at `zsHeld st` (RUNNING, RUNNABLE, SLEEPING) -- `sched`'s pre/post and `pSched`'s arms name `procHeld`, so
+  it is the only route between the parking proc, the scheduler and the resumed proc; `FdTable.procPrivNocwd`
+  carries it from allocproc to kfork/userinit (allocproc's post names it).  `procHeldAt_cases`/`_intro` take
+  `¬ zsHeld st`; `_live_*` (at `zsHeld`) and `_gen_*` (conditional) are new.  `procSlots_dispatch` /
+  `_running` return the element, `_running_intro` / `_park_gen(')` take it, `_recast` / `_used` unchanged
+  (their side conditions already exclude ZOMBIE).
+- The four transitions.  kfork: `kf_wait_fork` appends `ZFork p i pid g` (`famLed_fork`), takes `actLend p
+  ke` and returns `actLend p (ke+1)` (kfork lends its block's counter there and takes it back: the parent's
+  block comes back at `kev + 1`; `kforkPost` is `∃ k' ≥ ke`), returns the receipt (dropped).  kexit: the
+  ZOMBIE store's `famLed_exit` (T1 = `reparent`'s cells `rpMap`, element `none → some` out of the RUNNING
+  payload into the ZOMBIE block).  kwait: `famLed_reap` (T1 = the stored 0, element `some → none`, back at the
+  UNUSED re-close after freeproc).  Boot: `childrenBootRows` gains `zsAuth (fun _ => none)` and each slot's
+  element; `waitRes_alloc`, `mn_pidWait_born` take the authority, `mnSlotIn`/`procsInvSlot` the element.
+- Statements moved (non-Spec): `waitRes_alloc`, `mn_pidWait_born`, `mn_slots_zip`, `mnSlotIn`, `procsInvSlot`,
+  `procPriv_null_mint` / `procPrivNocwd_null_open`, the `procSlots_*` lemmas listed above,
+  `procHeldAt_cases/_intro`, `kf_wait_fork`, `kw_reap_ghost`, `kw_dormant_freeprocIn`, `kw_pay_unused`,
+  `kw_slots_unused_intro`, `kf_pay_unused`, `kf_slots_unused_intro`, `procSlots_used_intro`,
+  `ap_slots_unused_elim/_intro`, `apPostCells`, `ui_slots_runnable`, `ui_finish`, `ui_publish`, `sleep_tail`,
+  `kx_dormant_build`.  Spec texts: none moved.
+- Not yet read by anything: `zLowest_spec`, `zHasKids_iff`, `famOf_take`, `zsAuth_lookup` (G1c's).
+
 ## Lanes (opened 2026-09-15)
 
 Execution order is §6's, adjusted for one territory fact: upstream's

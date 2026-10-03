@@ -626,7 +626,7 @@ theorem fp_tail [X : CurCtx]
     0#32 $$ Hxstate with ⟨Hxs1, Hxs2⟩
   ihave Hheld : procHeld Γ cpu j UNUSED 0#64 $$ [Hlocked Hpg Hstate Hchan Hkilled Hxs1 Hpub]
   case' _ =>
-    iapply procHeldAt_intro Γ curCtx cpu j UNUSED 0#64 0#32 0#32 0#32
+    iapply procHeldAt_intro Γ curCtx cpu j UNUSED 0#64 0#32 0#32 0#32 (by decide)
     unfold procPubRest pState pChan pKilled pXstate pPid UNUSED xsHalf
     iframe
     -- `p->killed = 0` and `p->pid = 0`: the killed row is re-founded at its
@@ -1117,7 +1117,7 @@ theorem freeproc_led_proof (KF : KFREE) (PFP : PROC_FREEPAGETABLE) (AC : ACQUIRE
     icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
     have hK4 : 4 ≤ k.avail := by unfold freeprocSlots at hK; omega
     -- decompose the held lock
-    icases procHeldAt_cases Γ ξ0 cpu j st ch $$ Hheld with
+    icases procHeldAt_cases Γ ξ0 cpu j st ch (by rcases hst with rfl | rfl <;> decide) $$ Hheld with
       ⟨Hlocked, Hpg, %kl, %xs, %pidb, Hstate, Hchan, Hpr⟩
     icases (show procPubRest (GF := GF) (procAddr j) kl xs pidb ⊢
         wordPointsTo (pKilled (procAddr j)) 4 (DFrac.own 1) kl ∗

@@ -195,11 +195,11 @@ theorem kx_dormant_build (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (V : Pr
       @stackOwn hlc GF _ ⟨ξ, KTier.kpt⟩ (V.kstack + 4096#64) 512 ∗
       genHalvesAt pa pid V.gen ∗
       (∃ xsv : BitVec 32, @wordPointsTo hlc GF _ ⟨ξ, KTier.kpt⟩ (pXstate pa) 4 xsHalf xsv ∗
-        exitTok V.gen pid (xstateVal xsv)) ⊢
+        exitTok V.gen pid (xstateVal xsv) ∗ zsElem pa (some (pid, xstateVal xsv))) ⊢
       @procDormantNoctx hlc GF _ ⟨ξ, KTier.kpt⟩ _ _ _ _ _ _ pa ZOMBIE := by
   unfold procPrivNoctxAt procDormantNoctx genHalvesDorm
   simp only [ite_true]
-  iintro ⟨⟨%hpure, Hpid, Hfields, Hpt, Htf, -, Hev⟩, Hal, Hch, Hstk, Hgh, ⟨%xsv, Hxs, Hesc⟩⟩
+  iintro ⟨⟨%hpure, Hpid, Hfields, Hpt, Htf, -, Hev⟩, Hal, Hch, Hstk, Hgh, ⟨%xsv, Hxs, Hesc, Hzs⟩⟩
   isplitl []
   · ipureintro; trivial
   -- THE PARK RAISES THE LAZY BIT (Rocq `proc_priv_to_dormant_zombie`'s
@@ -210,9 +210,9 @@ theorem kx_dormant_build (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (V : Pr
   isplitl []
   · ipureintro; exact ⟨hof, hcwd, hroot, hpure.1, trivial⟩
   iframe Hpid Hfields Hal Hch Hev Hgh
-  isplitl [Hxs Hesc]
+  isplitl [Hxs Hesc Hzs]
   · iexists xsv
-    iframe Hxs Hesc
+    iframe Hxs Hesc Hzs
   unfold dormantSpace
   rw [if_neg (by decide : ¬ (ZOMBIE = UNUSED))]
   iexists M
@@ -1011,9 +1011,9 @@ theorem kx_rest_root (AC : ACQUIRE) (RE : RELEASE) (RP : REPARENT) (WU : WAKEUP)
   ihave HW := (show waitLockPay (GF := GF) curCtx ⊢
       ∃ (ps : Nat → BitVec 64) (gs : Nat → GName) (m : ChMap) (O : OrphMap),
         parentsOwnAt curCtx ps ∗ childrenOwnAt m ∗ orphansOwn O ∗ childrenInvAt curCtx ps gs m O ∗
-          ∃ h : List Zev, zombLedAuth h from by
+          famLed ps gs from by
     unfold waitLockPay waitInvResAt; exact .rfl) $$ HR
-  icases HW with ⟨%parents, %gs, %mc, %O, HW, Hchm, Ho, Hci, %hz, Hzl⟩
+  icases HW with ⟨%parents, %gs, %mc, %O, HW, Hchm, Ho, Hci, Hfam⟩
   ihave HW := (show parentsOwnAt (GF := GF) curCtx parents ⊢ waitResAt curCtx parents from by
     unfold parentsOwnAt waitResAt; exact .rfl) $$ HW
   -- THE CHILDREN MOVE (Rocq `kx_park`): the dying process's row is emptied
@@ -1153,7 +1153,7 @@ theorem kx_rest_root (AC : ACQUIRE) (RE : RELEASE) (RP : REPARENT) (WU : WAKEUP)
       pstateHlf Γ j RUNNING ∗ hartHlf Γ j cpu from by
       rw [cpuClaim_eq Γ]; exact procClaim_elim Γ cpu j hj) $$ Hclaim
   icases Hcl with ⟨Hpst, Hhart⟩
-  icases procSlots_running Γ ξ0 j cpu st hj $$ [$Hhart $Hslots] with ⟨%hstr, Htag, Hcells, Hvc⟩
+  icases procSlots_running Γ ξ0 j cpu st hj $$ [$Hhart $Hslots] with ⟨%hstr, Htag, Hcells, Hvc, Hzs⟩
   subst hstr
   have hsplit := pstateWhole_split (GF := GF) Γ (procAddr j) RUNNING
   rw [if_neg (by decide : ¬ unclaimed RUNNING)] at hsplit
@@ -1178,12 +1178,6 @@ theorem kx_rest_root (AC : ACQUIRE) (RE : RELEASE) (RP : REPARENT) (WU : WAKEUP)
   have hxv : xstateVal (BitVec.extractLsb' 0 32 (R7 20#5)) = xstateOf status := by
     rw [hR7_20]; exact kx_xs_val status
   ihave Hesc := exitTok_intro V.gen (procAddr j) pid Q0 Qp (xstateOf status) $$ [$Hkq $Hmyp $HQp]
-  ihave Hxpark : (∃ xsv : BitVec 32, wordPointsTo (GF := GF) (pXstate (procAddr j)) 4 xsHalf xsv ∗
-      exitTok V.gen pid (xstateVal xsv)) $$ [Hxb Hesc]
-  case' _ =>
-    iexists (BitVec.extractLsb' 0 32 (R7 20#5))
-    rw [hxv]
-    iframe Hxb Hesc
   -- c.li a5,5
   k_step (wp_s_addi cpu _ (KA.«kexit» + 0x98#64) true 5#12 15#5 0#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [KCtx.rget_eq]
@@ -1202,16 +1196,26 @@ theorem kx_rest_root (AC : ACQUIRE) (RE : RELEASE) (RP : REPARENT) (WU : WAKEUP)
   -- kexit has no post, so the receipt is dropped.
   -- (NI G1a: the event carries `ip`, the `initproc` word `reparent` wrote
   -- above -- this theorem's own parameter, read off `initIdentAt`.)
-  imod zombExit hz (procAddr j) pid (xstateOf status) ip $$ Hzl with ⟨Hzl, -⟩
+  -- THE FAMILY LEDGER'S TIES (NI M2-G1b, `WaitInvTies.famLed_exit`): T1
+  -- follows `reparent`'s cells, and the slot's T2 element (out of the
+  -- RUNNING payload) moves `none → some (pid, status)`.
+  imod famLed_exit parents gs j hj ip pid (xstateOf status) $$ [$Hfam $Hzs] with ⟨Hfam, Hzs⟩
   -- ...AND THE EXIT COSTS ONE COUNT of this process's own permit (permit
   -- sweep L3c, no Rocq counterpart): the block's counter, in hand since
   -- `kx_rest`'s entry, is stepped here; the ZOMBIE park takes the block at
   -- `ev := V.ev + 1`
   imod actCnt_step (GF := GF) (procAddr j) V.ev $$ Hev with Hev
   imodintro
+  -- the escrow and the T2 element, at the escrow's own binders
+  ihave Hxpark : (∃ xsv : BitVec 32, wordPointsTo (GF := GF) (pXstate (procAddr j)) 4 xsHalf xsv ∗
+      exitTok V.gen pid (xstateVal xsv) ∗ zsElem (procAddr j) (some (pid, xstateVal xsv))) $$ [Hxb Hesc Hzs]
+  case' _ =>
+    iexists (BitVec.extractLsb' 0 32 (R7 20#5))
+    rw [hxv]
+    iframe Hxb Hesc Hzs
   -- the held p->lock at ZOMBIE, kept aside through the release
   ihave Hrest := kx_procPubRest_join (procAddr j) kl _ pid $$ [$Hkilled $Hxstate $Hpidpub $Hkrow]
-  ihave Hheld := procHeldAt_intro Γ ξ0 cpu j ZOMBIE ch kl _ pid
+  ihave Hheld := procHeldAt_intro Γ ξ0 cpu j ZOMBIE ch kl _ pid (by decide)
     $$ [$Hlocked2 $Hwhole $Hstate $Hchan $Hrest]
   -- release(&wait_lock): auipc a0,0x10; addi a0,a0,710; jal release
   k_step (wp_s_auipc cpu _ (KA.«kexit» + 0x9e#64) false 16#20 10#5 (by decide))
@@ -1251,16 +1255,14 @@ theorem kx_rest_root (AC : ACQUIRE) (RE : RELEASE) (RP : REPARENT) (WU : WAKEUP)
     iapply wpNext_off_intro
     iintro %R' Hk Hp %hcs
     iapply Hcont $$ %R' Hk Hp %hcs
-  ihave HWpay : waitLockPay (GF := GF) curCtx $$ [HWrep Hchm Ho Hci Hzl]
+  ihave HWpay : waitLockPay (GF := GF) curCtx $$ [HWrep Hchm Ho Hci Hfam]
   case' _ =>
     unfold waitLockPay waitInvResAt
     iexists (rpMap (procAddr j) ip parents), gs, PartialMap.insert mc V.chg (procAddr j, ∅),
       opMap (procAddr j) ip O cs
-    isplitr [Hchm Ho Hci Hzl]
+    isplitr [Hchm Ho Hci Hfam]
     rotate_left 1
-    · iframe Hchm Ho Hci
-      iexists _
-      iexact Hzl
+    · iframe Hchm Ho Hci Hfam
     have hfe : (fun i => if i = j then reparented parents (procAddr j) ip j
         else reparented parents (procAddr j) ip i) = rpMap (procAddr j) ip parents := by
       funext i; by_cases h : i = j

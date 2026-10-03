@@ -215,6 +215,8 @@ instance ugfMlPev : MonoListG unionGF Pev := ⟨ugf_slot 122⟩
 instance ugfMlZev : MonoListG unionGF Zev := ⟨ugf_slot 123⟩
 -- Xv6G: the encoded per-process ledger (inherited from `xv6GF`'s slot 124)
 instance ugfMlUled : MonoListG unionGF Uled := ⟨ugf_slot 124⟩
+-- WchGpre: the family ledger's zombie column (inherited from `xv6GF`'s slot 125)
+instance ugfZomCol : GhostMapG unionGF Nat (Option (BitVec 32 × Int)) RegMapF := ⟨ugf_slot 125⟩
 
 -- the union's new cameras
 instance ugfEraPins : GhostMapG unionGF Nat EraPins RegMapF := ⟨ugf_slot 95⟩

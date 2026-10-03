@@ -283,8 +283,8 @@ theorem forkret_park_paid (FR : FORKRET) {hlc : HasLC} {GF : BundledGFunctors} [
   icases Hrec with ⟨%ξo, Hown, Hrec⟩
   ihave Hvc := schedVcAt_intro Γ h (cpuCtxAddr h) (procAddr N.j) ξo $$ [$Hown $Hrec]
   -- what holding p->lock at RUNNING is made of
-  icases procHeldAt_cases Γ ξc h N.j RUNNING ch $$ Hheld with
-    ⟨Hlocked, Hwhole, %kl, %xs, %pidx, Hstate, Hchan, Hrest⟩
+  icases procHeldAt_live_cases Γ ξc h N.j RUNNING ch (Or.inl rfl) $$ Hheld with
+    ⟨⟨Hlocked, Hwhole, %kl, %xs, %pidx, Hstate, Hchan, Hrest⟩, Hzs⟩
   have hsplit := pstateWhole_split (GF := GF) Γ (procAddr N.j) RUNNING
   rw [if_neg (by decide : ¬ unclaimed RUNNING)] at hsplit
   icases hsplit.mp $$ Hwhole with ⟨Hpsl, Hpst⟩
@@ -294,7 +294,7 @@ theorem forkret_park_paid (FR : FORKRET) {hlc : HasLC} {GF : BundledGFunctors} [
   ihave Hocells := (@ownCtxCells_intro hlc GF _ ⟨ξc, KTier.kpt⟩ (pContext (procAddr N.j) 0) _) $$ Hcells
   ihave #Hused' := (show slotUsed (GF := GF) N.Γ (procAddr N.j) ⊢ slotUsed Γ (procAddr N.j) from by
     rw [hΓ]) $$ Hused
-  ihave Hslots := procSlots_running_intro Γ ξc N.j h hj $$ [$Hused' $Htag1 $Hocells $Hvc]
+  ihave Hslots := procSlots_running_intro Γ ξc N.j h hj $$ [$Hused' $Htag1 $Hocells $Hvc $Hzs]
   ihave HR := procLockRes_intro Γ ξc (procAddr N.j) RUNNING ch kl xs pidx
     $$ [$Hstate $Hpsl $Hchan $Hrest $Hslots]
   ihave HR := (show procLockResAt (GF := GF) Γ ξc (procAddr N.j) ⊢ procLockPay Γ N.j ξc from by

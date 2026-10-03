@@ -352,7 +352,11 @@ cell's zero; at ZOMBIE the dead process's quarter/eighth (`genHalvesAt`),
 the other three quarters being in `wait_lock`'s payload.  AND THE SLOT'S
 HALF OF `p->xstate`, with -- at a ZOMBIE -- THE EXIT ESCROW keyed at what
 that half reads (`ChildTok.exitTok`, Rocq `exit_tok (pv_gen V) pid
-(xstate_val xsv)`); the other half is `p->lock`'s (`procPub`). -/
+(xstate_val xsv)`); the other half is `p->lock`'s (`procPub`).  ...AND, beside
+the escrow at its own binders, the slot's T2 ELEMENT of the family ledger's
+zombie column at `some (pid, status)` (NI M2-G1b, `UserChildren.zsElem`), so
+the status the parent copies out IS the ledger's; a non-ZOMBIE slot's element
+(`none`) is `SchedCtx.procSlotsAt`'s. -/
 def procDormant (pa : BitVec 64) (st : BitVec 32) : IProp GF := iprop%
   ⌜st = UNUSED ∨ st = ZOMBIE⌝ ∗
   ∃ (V : ProcPriv) (pid : BitVec 32),
@@ -363,7 +367,8 @@ def procDormant (pa : BitVec 64) (st : BitVec 32) : IProp GF := iprop%
     dormantAllow ∗ chFrag V.chg pa ∅ ∗ actCnt pa V.ev ∗
     genHalvesDorm pa pid V.gen st ∗
     (∃ xsv : BitVec 32, wordPointsTo (pXstate pa) 4 xsHalf xsv ∗
-      (if st = ZOMBIE then exitTok V.gen pid (xstateVal xsv) else iprop(emp))) ∗
+      (if st = ZOMBIE then exitTok V.gen pid (xstateVal xsv) ∗ zsElem pa (some (pid, xstateVal xsv))
+        else iprop(emp))) ∗
     dormantSpace st V pid
 
 /-! ### The block before boot seals it (Rocq `ProcInv.proc_dormant_nofd` /

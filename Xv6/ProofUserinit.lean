@@ -218,18 +218,20 @@ theorem ui_block [X : CurCtx] (hct : curTier = KTier.kpt) (γ : FileNames) (γd 
 /-- The RUNNABLE arms: the parked record, the hart tag, the marker.
 `parkOk RUNNABLE`, and `parkPayAt` is empty at a live state. -/
 theorem ui_slots_runnable [CurCtx] (Γ : SchedNames) (ξl : CtxId) (pa : BitVec 64) :
-    slotUsed (GF := GF) Γ pa ∗ procCtxAt Γ ξl pa ∗ hartAtAny Γ pa ⊢
+    slotUsed (GF := GF) Γ pa ∗ procCtxAt Γ ξl pa ∗ hartAtAny Γ pa ∗ zsElem pa none ⊢
       procSlotsAt Γ ξl pa RUNNABLE := by
-  iintro ⟨#Hu, Hc, Hh⟩
+  iintro ⟨#Hu, Hc, Hh, Hz⟩
   iapply (procSlots_park_gen Γ ξl pa RUNNABLE (by decide))
-  rw [if_pos (show needsCtx RUNNABLE from by decide)]
+  rw [if_pos (show needsCtx RUNNABLE from by decide), if_pos (show zsHeld RUNNABLE from Or.inr (Or.inl rfl))]
   isplitl []
   · iexact Hu
   isplitl [Hc]
   · iexact Hc
   isplitl [Hh]
   · iexact Hh
+  isplitr [Hz]
   · iapply (parkPay_needsCtx ξl pa RUNNABLE (by decide))
+  · iexact Hz
 
 end
 
@@ -417,7 +419,7 @@ theorem ui_finish [X : CurCtx] (RE : RELEASE) (FP : FORKRET_PARK_PAID)
     (hsie : kf.sie = false) (hnoff : kf.noff = 1) (hintena : kf.intena = false)
     (hlocks : kf.locks = ["proc"]) (htier : kf.tier = KTier.kpt) (hK : 10 ≤ kf.avail) :
     kctx cpu kf ∗ pcIs cpu (KA.«userinit» + 0x24#64) ∗ procsInv Γ ∗
-    procHeld Γ cpu j USED ch ∗ hartAtAny Γ (procAddr j) ∗ slotUsed Γ (procAddr j) ∗
+    procHeld Γ cpu j USED ch ∗ hartAtAny Γ (procAddr j) ∗ zsElem (procAddr j) none ∗ slotUsed Γ (procAddr j) ∗
     procPriv (procAddr j) pid V M ∗ stackOwn (V.kstack + 4096#64) 512 ∗ liveAllow ∗
     chFrag V.chg (procAddr j) ∅ ∗
     inodeHeldAt (kf.regs 10#5) ROOTINO ∗ inodeHeldAt V.root ROOTINO ∗ uiBootRows (procAddr j) pid V.gen ∗
@@ -431,7 +433,7 @@ theorem ui_finish [X : CurCtx] (RE : RELEASE) (FP : FORKRET_PARK_PAID)
   obtain ⟨ξ0, t0⟩ := X
   subst hct
   letI : CurCtx := ⟨ξ0, KTier.kpt⟩
-  iintro ⟨Hk, Hpc, #Hpinv, Hheld, Hhart, #Hused, Hpriv, Hstack, Hal, Hch, Hcref, Hrref, Hgen, Hfds, Hkeys, Hpk,
+  iintro ⟨Hk, Hpc, #Hpinv, Hheld, Hhart, Hzs, #Hused, Hpriv, Hstack, Hal, Hch, Hcref, Hrref, Hgen, Hfds, Hkeys, Hpk,
     #Hpe, #Hinitp, Hcont⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   ihave #HlkI := procsInv_lookup Γ j hj $$ Hpinv
@@ -449,7 +451,7 @@ theorem ui_finish [X : CurCtx] (RE : RELEASE) (FP : FORKRET_PARK_PAID)
       from by unfold pCwd; iintro H; iexact H) $$ Hcwd
   ihave Hpriv := Hback $$ %(kf.regs 10#5) Hcwd
   -- open the held slot
-  icases procHeldAt_cases Γ ξ0 cpu j USED ch $$ Hheld with
+  icases procHeldAt_cases Γ ξ0 cpu j USED ch (by decide) $$ Hheld with
     ⟨Hlocked, Hwhole, %kl, %xs, %pidx, HstateW, Hchan, Hrest⟩
   ihave HstateW := (show wordPointsTo (GF := GF) (pState (procAddr j)) 4 (DFrac.own 1) USED ⊢
       wordPointsTo (procAddr j + 24#64) 4 (DFrac.own 1) USED
@@ -541,7 +543,7 @@ theorem ui_finish [X : CurCtx] (RE : RELEASE) (FP : FORKRET_PARK_PAID)
   ihave Hk := Hback $$ Hown
   imod (pstateWhole_update Γ (procAddr j) USED RUNNABLE) $$ Hwhole with Hwhole
   imodintro
-  ihave Hslots := ui_slots_runnable Γ ξ0 (procAddr j) $$ [$Hused $HprocCtx $Hhart]
+  ihave Hslots := ui_slots_runnable Γ ξ0 (procAddr j) $$ [$Hused $HprocCtx $Hhart $Hzs]
   icases (pstateWhole_split Γ (procAddr j) RUNNABLE).1 $$ Hwhole with ⟨Hpsl, -⟩
   ihave Hpay : procLockResAt Γ ξ0 (procAddr j) $$ [HstateW Hpsl Hchan Hrest Hslots]
   case' _ =>
@@ -636,7 +638,7 @@ theorem ui_publish [X : CurCtx] (RE : RELEASE) (IR : IGETROOT) (ID : IDUP) (FP :
     isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
     itableInv (hlc := hlc) ∗ iregReg (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗ panicEnv ∗
     irefSlot ∗ irefSlot ∗ liveAllow ∗ chFrag V.chg (procAddr j) ∅ ∗
-    procHeld Γ cpu j USED ch ∗ hartAtAny Γ (procAddr j) ∗ slotUsed Γ (procAddr j) ∗
+    procHeld Γ cpu j USED ch ∗ hartAtAny Γ (procAddr j) ∗ zsElem (procAddr j) none ∗ slotUsed Γ (procAddr j) ∗
     procPriv (procAddr j) pid V M ∗ stackOwn (V.kstack + 4096#64) 512 ∗
     uiBootRows (procAddr j) pid V.gen ∗
     ([∗list] _f ∈ List.replicate NOFILE (0#64 : BitVec 64), fdSlot) ∗
@@ -651,7 +653,7 @@ theorem ui_publish [X : CurCtx] (RE : RELEASE) (IR : IGETROOT) (ID : IDUP) (FP :
   subst hct
   letI : CurCtx := ⟨ξ0, KTier.kpt⟩
   iintro ⟨Hk, Hpc, #Hpinv, ⟨%w0, Hinit⟩, #Hit, #Hiti, #Hireg, #Hpe, Hir1, Hir2, Hal, Hch, Hheld, Hhart,
-    #Hused, Hpriv, Hstack, Hgen, Hfds, Hkeys, Hpk, Hcont⟩
+    Hzs, #Hused, Hpriv, Hstack, Hgen, Hfds, Hkeys, Hpk, Hcont⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- c.mv s1,a0 : s1 = p
   k_step (wp_s_add cpu _ (KA.«userinit» + 0xe#64) true 9#5 0#5 10#5 (by decide))
@@ -742,7 +744,7 @@ theorem ui_publish [X : CurCtx] (RE : RELEASE) (IR : IGETROOT) (ID : IDUP) (FP :
       inodeHeldAt ({ V with root := ipv } : ProcPriv).root ROOTINO from by rw [hipv]) $$ HrP
   iapply (ui_finish RE FP Γ γw γtk γp γft cpu (kb.withRegs R4) j ch γ pid { V with root := ipv } M hj rfl
       hctx hof hs1 ?hsie2 ?hnoff2 ?hintena2 ?hlocks2 ?htier2 ?hK2)
-    $$ [- $Hk $Hpc $Hpinv $Hheld $Hhart $Hused $Hpriv $Hstack $Hal $Hch $Hcref $Hrref $Hgen $Hfds $Hkeys $Hpk
+    $$ [- $Hk $Hpc $Hpinv $Hheld $Hhart $Hzs $Hused $Hpriv $Hstack $Hal $Hch $Hcref $Hrref $Hgen $Hfds $Hkeys $Hpk
       $Hpe $Hinitp]
   rotate_right 1
   · iintro %R5 Hk Hpc %hcs5
@@ -879,7 +881,7 @@ theorem userinit_proof (AP : ALLOCPROC) (RE : RELEASE) (IR : IGETROOT) (ID : IDU
   -- null table opened into the raw cells, the units and the keys at `closed`,
   -- which the block's table is rebuilt from at the publish (`ui_block`)
   icases procPrivNocwd_null_open rfl γ (procAddr j) pid V M hVp.1
-    $$ [$Hnc $Hctx0 $Hfr0 $Hfs0 $Hir0 $Hbs0] with ⟨Hpriv, Hal, Hkeys⟩
+    $$ [$Hnc $Hctx0 $Hfr0 $Hfs0 $Hir0 $Hbs0] with ⟨Hpriv, Hal, Hkeys, Hzs⟩
   -- <INIT>'S PID IS THE LITERAL 1: the ledger's boot-era token pinned it
   -- (`pavBoot`)
   have hp1 : pid.toNat = 1 := by simpa [pavBoot] using hboot
@@ -955,7 +957,7 @@ theorem userinit_proof (AP : ALLOCPROC) (RE : RELEASE) (IR : IGETROOT) (ID : IDU
   k_norm [ui_ret_bee]
   iapply (ui_publish RE IR ID FP Γ γw γtk γp γft cpu _ j ch γ 1#32 V M hj rfl hVp.2.2.2.2.2 hVp.1
       ?ha0 ?hsie2 ?hnoff2 ?hintena2 ?hlocks2 ?htier2 ?hK2 hroot hnib0)
-    $$ [- $Hk $Hpc $Hpinv $Hinit $Hit $Hiti $Hireg $Hpe $Hir1 $Hir2 $Hal $Hch $Hheld $Hhart $Hused $Hpriv $Hstack
+    $$ [- $Hk $Hpc $Hpinv $Hinit $Hit $Hiti $Hireg $Hpe $Hir1 $Hir2 $Hal $Hch $Hheld $Hhart $Hzs $Hused $Hpriv $Hstack
       $Hgen $Hfds $Hkeys $Hpk]
   rotate_right 1
   · iintro %R5 Hk Hpc %hcs5 #Hinitp

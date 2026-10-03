@@ -87,6 +87,12 @@ answer is built inside `kw_reap_ghost`, so `kwAns` and `kwPost` are stated at
 (`kwait_led_proof`, field `wp_kwait_led_eb`), the landed `wp_kwait_eb` its
 corollary (`kwait_eb_of_led`, `waitAnsLed_post`).
 
+THE FAMILY LEDGER (NI M2-G1b): `kwWRest`'s ledger conjunct is
+`WaitInvTies.famLed ps gs` (ties T1 and T2); the reap's ghost step is
+`famLed_reap` -- T1's cell is the stored 0, and the ZOMBIE block's T2 element
+(`kw_dormant_freeprocIn` hands it out beside the escrow) moves to `none` and
+is put back at the UNUSED re-close after freeproc (`kw_pay_unused`).
+
 EITHER ENTRY SIE (Rocq `cpu_own 0 eb`; `KWAIT.wp_kwait_eb`).  The caller
 brings the complement `trapCsrsExt`/`cpuClaimExt`; the prologue, `myproc`
 and the entry `acquire(&wait_lock)` run at the caller's index (the pair
@@ -305,24 +311,28 @@ theorem kw_slots_zombie_elim (Γ : SchedNames) (ξl : CtxId) (pa : BitVec 64) :
       slotUsed Γ pa ∗ @procDormant hlc GF _ ⟨ξl, KTier.kpt⟩ _ _ _ _ _ _ pa ZOMBIE ∗ hartAtAny Γ pa := by
   unfold procSlotsAt
   rw [if_neg kw_zombie_not_needsCtx, if_neg kw_zombie_not_isRunning,
-    if_pos kw_zombie_invDormant, if_pos kw_zombie_notRunning]
-  iintro ⟨_, _, Hd, Hh, Hm⟩
+    if_pos kw_zombie_invDormant, if_pos kw_zombie_notRunning, if_pos rfl]
+  iintro ⟨_, _, Hd, Hh, Hm, -⟩
   ihave #Hu := pavSlot_used Γ pa ZOMBIE (by decide) $$ Hm
   iframe Hu Hd Hh
 
-/-- Rebuild an UNUSED slot from `freeproc`'s output and the hart tag. -/
+/-- Rebuild an UNUSED slot from `freeproc`'s output, the hart tag, and the
+slot's T2 element the reap moved to `none` (NI M2-G1b: put back here, at the
+UNUSED re-close after freeproc). -/
 theorem kw_slots_unused_intro (Γ : SchedNames) (ξl : CtxId) (pa : BitVec 64) :
-    slotUsed Γ pa ∗ @procDormant hlc GF _ ⟨ξl, KTier.kpt⟩ _ _ _ _ _ _ pa UNUSED ∗ hartAtAny Γ pa ⊢
+    slotUsed Γ pa ∗ @procDormant hlc GF _ ⟨ξl, KTier.kpt⟩ _ _ _ _ _ _ pa UNUSED ∗ hartAtAny Γ pa ∗
+      zsElem pa none ⊢
       procSlotsAt (GF := GF) Γ ξl pa UNUSED := by
   unfold procSlotsAt
   rw [if_neg (by decide : ¬ needsCtx UNUSED), if_neg (by decide : ¬ isRunning UNUSED),
-    if_pos (by decide : invDormant UNUSED), if_pos (by decide : notRunning UNUSED)]
-  iintro ⟨Hu, Hd, Hh⟩
+    if_pos (by decide : invDormant UNUSED), if_pos (by decide : notRunning UNUSED),
+    if_neg (by decide : ¬ UNUSED = ZOMBIE)]
+  iintro ⟨Hu, Hd, Hh, Hz⟩
   isplitl []
   · iempintro
   isplitl []
   · iempintro
-  iframe Hd Hh
+  iframe Hd Hh Hz
   iapply pavSlot_unused_of_used Γ pa $$ Hu
 
 /-- **The ZOMBIE reap** (the mathematical heart of `kwait`'s reap arm): a
@@ -345,7 +355,7 @@ theorem kw_dormant_freeprocIn (pa : BitVec 64) (pid0 : BitVec 32) :
       ∃ (V : ProcPriv) (M : Nat → List (BitVec 8)),
         freeprocIn pa pid0 V M ∗ genHalvesAt pa pid0 V.gen ∗
         ∃ xsv : BitVec 32, wordPointsTo (pXstate pa) 4 xsHalf xsv ∗
-          exitTok V.gen pid0 (xstateVal xsv) := by
+          exitTok V.gen pid0 (xstateVal xsv) ∗ zsElem pa (some (pid0, xstateVal xsv)) := by
   unfold procDormant
   iintro ⟨Hq, %_, %V, %pid, %⟨hof, hcwd, hroot, hsz, -⟩, Hpid, Hfields, Hal, Hch, Hev, Hgh, Hxs, Hspace⟩
   icases (show wordPointsTo (GF := GF) (pPid pa) 4 pidPub pid0 ∗ wordPointsTo (pPid pa) 4 pidPriv pid ⊢
@@ -357,6 +367,7 @@ theorem kw_dormant_freeprocIn (pa : BitVec 64) (pid0 : BitVec 32) :
   rw [if_neg (by decide : ¬ (ZOMBIE = UNUSED)), if_pos rfl]
   icases Hxs with ⟨%xsv, Hxs, Hesc⟩
   rw [if_pos rfl]
+  icases Hesc with ⟨Hesc, Hzs⟩
   icases Hspace with ⟨%M, %⟨hpt, htf, humb⟩, Hpt, Htf, Hstack⟩
   icases procPtAt_cases V.upt M $$ Hpt with ⟨%hwf, HptO, Hum⟩
   have htfv : pageValid (pageAddr V.upt.tfp) := hwf.2.2.1
@@ -384,20 +395,21 @@ theorem kw_dormant_freeprocIn (pa : BitVec 64) (pid0 : BitVec 32) :
       · iexact Hpt
   iframe Hgh
   iexists xsv
-  iframe Hxs Hesc
+  iframe Hxs Hesc Hzs
 
 /-- **The reap's release build**: `freeproc`'s output (`procHeld` at UNUSED
 and the fresh dormant block) plus the hart tag `kwait` kept aside from the
 ZOMBIE slot reassemble the UNUSED lock payload, ready for `release`. -/
 theorem kw_pay_unused (Γ : SchedNames) (ξl : CtxId) (j : Nat) (c : CPU) :
     slotUsed Γ (procAddr j) ∗ procHeldAt (GF := GF) Γ ξl c j UNUSED 0#64 ∗
-    @procDormant hlc GF _ ⟨ξl, KTier.kpt⟩ _ _ _ _ _ _ (procAddr j) UNUSED ∗ hartAtAny Γ (procAddr j) ⊢
+    @procDormant hlc GF _ ⟨ξl, KTier.kpt⟩ _ _ _ _ _ _ (procAddr j) UNUSED ∗ hartAtAny Γ (procAddr j) ∗
+      zsElem (procAddr j) none ⊢
       @locked hlc GF _ ⟨ξl, KTier.kpt⟩ (Γ.lock j) c ∗ procLockResAt Γ ξl (procAddr j) := by
-  iintro ⟨Hused, Hheld, Hdorm, Hhart⟩
-  icases procHeldAt_cases Γ ξl c j UNUSED 0#64 $$ Hheld with
+  iintro ⟨Hused, Hheld, Hdorm, Hhart, Hzs⟩
+  icases procHeldAt_cases Γ ξl c j UNUSED 0#64 (by decide) $$ Hheld with
     ⟨Hlocked, Hpg, %kl, %xs, %pid, Hstate, Hchan, Hrest⟩
   icases (pstateWhole_split Γ (procAddr j) UNUSED).1 $$ Hpg with ⟨Hpl, _⟩
-  ihave Hslots := kw_slots_unused_intro Γ ξl (procAddr j) $$ [$Hused $Hdorm $Hhart]
+  ihave Hslots := kw_slots_unused_intro Γ ξl (procAddr j) $$ [$Hused $Hdorm $Hhart $Hzs]
   isplitl [Hlocked]
   · iexact Hlocked
   iapply procLockRes_intro Γ ξl (procAddr j) UNUSED 0#64 kl xs pid
@@ -422,7 +434,7 @@ authority (Rocq `kw_pay ps` without `parents_own_at`; the ledger carried
 existentially, as Rocq's, so the six acquires do not change). -/
 def kwWRest (ξ : CtxId) (ps : Nat → BitVec 64) : IProp GF :=
   iprop(∃ (gs : Nat → GName) (m : ChMap) (O : OrphMap),
-    childrenOwnAt m ∗ orphansOwn O ∗ childrenInvAt ξ ps gs m O ∗ ∃ h : List Zev, zombLedAuth h)
+    childrenOwnAt m ∗ orphansOwn O ∗ childrenInvAt ξ ps gs m O ∗ famLed ps gs)
 
 theorem kw_wait_pay_elim (ξ : CtxId) :
     waitLockPay (GF := GF) ξ ⊢ ∃ parents, waitResAt ξ parents ∗ kwWRest ξ parents := by
@@ -549,15 +561,16 @@ theorem kw_reap_ghost (j n : Nat) (hj : j < NPROC) (hn : n < NPROC)
     |==> (kwWRest curCtx (fun i => if i = n then 0#64 else parents i) ∗
       kwAns j pid V cs pid0 xs nullst ∗
       wordPointsTo (pXstate (procAddr n)) 4 xsHalf xs ∗ wordPointsTo (pPid (procAddr n)) 4 pidPub pid0 ∗
+      zsElem (procAddr n) none ∗
       ∃ (Vf : ProcPriv) (Mf : Nat → List (BitVec 8)) (g : GName),
         freeprocIn (procAddr n) pid0 Vf Mf ∗ freeprocGen (procAddr n) pid0 g) := by
   have hpj : procAddr j ≠ 0#64 := procAddr_nonzero hj
   iintro ⟨Hw, Hg, Hxs, Hq, Hdorm⟩
   unfold kwWRest kwG kwaitGen
-  icases Hw with ⟨%gs, %m, %O, Hch, Ho, Hci, %hz, Hzl⟩
+  icases Hw with ⟨%gs, %m, %O, Hch, Ho, Hci, Hfam⟩
   icases Hg with ⟨⟨⟨%Q, Hkq, #Hmy⟩, Hpriv⟩, Hrow, #Hipis⟩
   icases kw_dormant_freeprocIn (procAddr n) pid0 $$ [Hq Hdorm] with
-    ⟨Hq, %Vf, %Mf, Hfin, Hgha, %xsv, Hxb, Hesc⟩
+    ⟨Hq, %Vf, %Mf, Hfin, Hgha, %xsv, Hxb, Hesc, Hzs⟩
   · iframe Hq Hdorm
   -- the two xstate halves are one word
   icases (show wordPointsTo (GF := GF) (pXstate (procAddr n)) 4 xsHalf xs ∗
@@ -616,24 +629,26 @@ theorem kw_reap_ghost (j n : Nat) (hj : j < NPROC) (hn : n < NPROC)
   imod orphans_del O (procAddr j) Vf.gen $$ Ho with Ho
   -- ...AND THE ZOMBIE LEDGER RECORDS THE REAP (design ni-zombie-ledger.md
   -- D4): the reaper `procAddr j` took pid `pide`; the receipt joins the answer
-  imod zombReap hz (procAddr j) n pide $$ Hzl with ⟨Hzl, #Hzr⟩
+  -- THE FAMILY LEDGER'S TIES (NI M2-G1b, `WaitInvTies.famLed_reap`): T1's
+  -- cell is the 0 just stored, and the slot's T2 element (out of the ZOMBIE
+  -- block, beside the escrow) moves `some → none`, to be put back at the
+  -- UNUSED re-close after freeproc
+  imod famLed_reap parents gs n hn (procAddr j) pide _ $$ [$Hfam $Hzs] with ⟨Hfam, Hzs, %hz, #Hzr⟩
   ihave Hans := waitAnsLed_of pide (xstateVal xs) cs (cs \ {Vf.gen}) V.gen nullst pid (procAddr j)
     $$ Hans [Hzr]
   · iright; iexists hz, n; iexact Hzr
   imodintro
-  isplitl [Hch Ho Hci Hzl]
+  isplitl [Hch Ho Hci Hfam]
   · iexists gs, (PartialMap.insert m V.chg (procAddr j, cs \ {Vf.gen})),
       (PartialMap.insert O (procAddr j) (orphRow O (procAddr j) \ {Vf.gen}))
-    iframe Hch Ho Hci
-    iexists _
-    iexact Hzl
+    iframe Hch Ho Hci Hfam
   isplitl [Hans Hkq Hpriv Hrow]
   · unfold kwAns kwaitGen
     iexists (cs \ {Vf.gen})
     iframe Hans Hrow Hpriv
     iexists Q
     iframe Hkq Hmy
-  iframe Hxs Hq
+  iframe Hxs Hq Hzs
   iexists Vf, Mf, Vf.gen
   iframe Hfin
   unfold freeprocGen pidRegRest
@@ -1260,7 +1275,7 @@ theorem kw_reap (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE)
     icases kw_slots_zombie_elim Γ ξ0 (procAddr n) $$ Hslots with ⟨#Hused, Hdorm, Hhart⟩
     iapply wpLoop_bupd
     imod kw_reap_ghost j n hj hn parents hmatch pid pid0 xs V cs (decide (k.regs 10#5 = 0#64))
-      $$ [Hwrest Hg Hxs Hpid Hdorm] with ⟨Hwrest, Hans, Hxs, Hpid, %Vf, %Mf, %gf, Hfin, Hfgen⟩
+      $$ [Hwrest Hg Hxs Hpid Hdorm] with ⟨Hwrest, Hans, Hxs, Hpid, Hzs, %Vf, %Mf, %gf, Hfin, Hfgen⟩
     · iframe Hwrest Hg Hxs Hpid Hdorm
     -- THE REAP COSTS ONE COUNT of the reaper's permit (permit sweep L3c, no
     -- Rocq counterpart): beside `ZReap (procAddr j) n pide`, the reaper's
@@ -1275,7 +1290,7 @@ theorem kw_reap (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE)
     ihave Hpub : procPubRest (GF := GF) (procAddr n) kl xs pid0 $$ [Hkilled Hxs Hpid Hkp]
     case' _ => unfold procPubRest; iframe Hkilled Hxs Hpid Hkp
     ihave Hheld : procHeldAt (GF := GF) Γ ξ0 cur n ZOMBIE ch $$ [HlpC Hpw Hstate Hchan Hpub]
-    case' _ => iapply procHeldAt_intro Γ ξ0 cur n ZOMBIE ch kl xs pid0; iframe HlpC Hpw Hstate Hchan Hpub
+    case' _ => iapply procHeldAt_intro Γ ξ0 cur n ZOMBIE ch kl xs pid0 (by decide); iframe HlpC Hpw Hstate Hchan Hpub
     -- mv a0,s1 ; jal freeproc
     k_step (wp_s_add cur _ (KA.«kwait» + 0x64#64) true 10#5 0#5 9#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hc9]
@@ -1297,8 +1312,8 @@ theorem kw_reap (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE)
       ihave Hcnt := actLend_back (GF := GF) (procAddr j) k2 (procAddr_nonzero hj) $$ Hlend
       ihave Hpriv := Hpback $$ %k2 Hcnt
       ihave Hunused : iprop(locked (Γ.lock n) cur ∗ procLockResAt Γ ξ0 (procAddr n))
-        $$ [Hheld2 Hdormu Hhart]
-      case' _ => iapply kw_pay_unused Γ ξ0 n cur; iframe Hused Hheld2 Hdormu Hhart
+        $$ [Hheld2 Hdormu Hhart Hzs]
+      case' _ => iapply kw_pay_unused Γ ξ0 n cur; iframe Hused Hheld2 Hdormu Hhart Hzs
       icases Hunused with ⟨Hlockp2, Hlockres⟩
       obtain ⟨rfl, rfl⟩ : spie3 = spie2 ∧ spp3 = spp2 := hsp3 trivial
       icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩

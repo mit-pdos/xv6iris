@@ -318,6 +318,80 @@ theorem zombReap (h : List Zev) (act : BitVec 64) (j : Nat) (pid : BitVec 32) :
       |==> (zombLedAuth (h ++ [.ZReap act j pid]) ∗ zombReceipt h (.ZReap act j pid)) :=
   zombLedAuth_grow h _
 
+/-! ### The zombie column, tie T2 (NI M2-G1b, G1 design §1 "D3 revisited")
+
+A ghost map at `WchG.wzsName` from a slot's key -- its address as a number,
+`pa.toNat` (SlotGen deviation 12) -- to its zombie entry.  The ELEMENT sits
+in the slot's own lock payload, anchored at the state cell and the exit
+escrow (`SchedCtx.procSlotsAt` at every non-ZOMBIE state, `ProcDefs.procDormant`'s
+ZOMBIE branch beside `exitTok`); the AUTHORITY rides `<wait_lock>`'s payload
+at the fold's zombie column (`WaitInvTies.famLed`). -/
+
+/-- T2's element: slot `pa`'s zombie entry `v`. -/
+def zsElem (pa : BitVec 64) (v : Option (BitVec 32 × Int)) : IProp GF :=
+  ghost_map_elem (H := RegMapF) (WchG.wzsName GF) (.own 1) pa.toNat v
+
+instance zsElem_timeless (pa : BitVec 64) (v : Option (BitVec 32 × Int)) :
+    Timeless (zsElem (GF := GF) pa v) := by
+  unfold zsElem; infer_instance
+
+/-- T2's authority at the column `f` (indexed by slot): the map holds `f k`
+at every slot's key. -/
+def zsAuth (f : Nat → Option (BitVec 32 × Int)) : IProp GF :=
+  iprop(∃ M : RegMapF (Option (BitVec 32 × Int)),
+    ghost_map_auth (WchG.wzsName GF) (.own 1) M ∗ ⌜∀ k < NPROC, get? M (procAddr k).toNat = some (f k)⌝)
+
+/-- Two slots' keys are distinct. -/
+theorem zs_key_inj {i k : Nat} (hi : i < NPROC) (hk : k < NPROC)
+    (h : (procAddr i).toNat = (procAddr k).toNat) : i = k :=
+  procAddr_inj hi hk (BitVec.eq_of_toNat_eq h)
+
+/-- The element reads the column. -/
+theorem zsAuth_lookup (f : Nat → Option (BitVec 32 × Int)) (k : Nat) (hk : k < NPROC)
+    (v : Option (BitVec 32 × Int)) :
+    zsAuth (GF := GF) f ∗ zsElem (procAddr k) v ⊢ ⌜f k = v⌝ ∗ zsAuth f ∗ zsElem (procAddr k) v := by
+  unfold zsAuth zsElem
+  iintro ⟨⟨%M, Ha, %hM⟩, He⟩
+  ihave %hl := ghost_map_lookup $$ Ha He
+  isplitl []
+  · ipureintro
+    have := (hM k hk).symm.trans hl
+    exact Option.some.inj this
+  iframe He
+  iexists M
+  iframe Ha
+  ipureintro; exact hM
+
+/-- The element moves the column at its slot. -/
+theorem zsAuth_update (f : Nat → Option (BitVec 32 × Int)) (k : Nat) (hk : k < NPROC)
+    (v w : Option (BitVec 32 × Int)) :
+    zsAuth (GF := GF) f ∗ zsElem (procAddr k) v ⊢
+      |==> (zsAuth (fun i => if i = k then w else f i) ∗ zsElem (procAddr k) w) := by
+  unfold zsAuth zsElem
+  iintro ⟨⟨%M, Ha, %hM⟩, He⟩
+  imod ghost_map_update w $$ Ha He with ⟨Ha, He⟩
+  imodintro
+  iframe He
+  iexists _
+  iframe Ha
+  ipureintro
+  intro i hi
+  by_cases e : i = k
+  · subst e; simp only [if_true]; exact get?_insert_eq rfl
+  · simp only [e, if_false]
+    rw [get?_insert_ne (fun h => e (zs_key_inj hi hk h.symm))]
+    exact hM i hi
+
+/-- The authority only reads the column below `NPROC`. -/
+theorem zsAuth_congr (f g : Nat → Option (BitVec 32 × Int)) (h : ∀ k < NPROC, f k = g k) :
+    zsAuth (GF := GF) f ⊢ zsAuth g := by
+  unfold zsAuth
+  iintro ⟨%M, Ha, %hM⟩
+  iexists M
+  iframe Ha
+  ipureintro
+  intro k hk; rw [hM k hk, h k hk]
+
 end ZombLedger
 
 /-! ## The same answer, at the generation -- kwait's own form

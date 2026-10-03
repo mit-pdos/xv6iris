@@ -172,11 +172,11 @@ theorem yield_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (SC : SCHED) : Y
       rw [cpuClaim_eq Γ]; exact procClaim_elim Γ cpu j hj) $$ Hclaim
   icases Hcl with ⟨Hpst, Hhart⟩
   by_cases hstu : isUnused st
-  · icases procSlots_running Γ ξ0 j cpu st hj $$ [$Hhart $Hslots] with ⟨%hstx, Htag, Hcells, Hvc⟩
+  · icases procSlots_running Γ ξ0 j cpu st hj $$ [$Hhart $Hslots] with ⟨%hstx, Htag, Hcells, Hvc, -⟩
     subst hstx
     exact absurd hstu (by decide)
   icases procSlots_used Γ ξ0 (procAddr j) st hstu $$ Hslots with ⟨#Hused, Hslots⟩
-  icases procSlots_running Γ ξ0 j cpu st hj $$ [$Hhart $Hslots] with ⟨%hstr, Htag, Hcells, Hvc⟩
+  icases procSlots_running Γ ξ0 j cpu st hj $$ [$Hhart $Hslots] with ⟨%hstr, Htag, Hcells, Hvc, Hzs⟩
   subst hstr
   -- the mirror: the lock's half joins the claim's
   have hsplit := pstateWhole_split (GF := GF) Γ (procAddr j) RUNNING
@@ -195,8 +195,9 @@ theorem yield_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (SC : SCHED) : Y
   iapply wpLoop_bupd
   imod (pstateWhole_update Γ (procAddr j) RUNNING RUNNABLE) $$ Hwhole with Hwhole
   imodintro
-  ihave Hheld := procHeldAt_intro Γ ξ0 cpu j RUNNABLE ch kl xs pid
-    $$ [$Hlocked $Hwhole $Hstate $Hchan $Hrest]
+  -- the slot's T2 element parks with the held lock (NI M2-G1b)
+  ihave Hheld := procHeldAt_live_intro Γ ξ0 cpu j RUNNABLE ch kl xs pid (Or.inr (Or.inl rfl))
+    $$ [$Hlocked $Hwhole $Hstate $Hchan $Hrest $Hzs]
   -- jal sched
   k_step (wp_s_jal cpu _ (KA.«yield» + 0x18#64) false 2096940#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [yield_br_ffffffffffffff44]
@@ -262,11 +263,11 @@ theorem yield_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (SC : SCHED) : Y
       kctxL false h1 (((((k.withSpie spie spp).pushed 4).pushOff).withLocks ["proc"]).withRegs R4) from by
       rw [hkeq]) $$ Hk
   -- the lock's payload, rebuilt, and the claim for the resuming hart
-  icases procHeldAt_cases Γ ξ0 h1 j RUNNING ch2 $$ Hheld with
-    ⟨Hlocked2, Hwhole2, %kl2, %xs2, %pid2, Hstate2, Hchan2, Hrest2⟩
+  icases procHeldAt_live_cases Γ ξ0 h1 j RUNNING ch2 (Or.inl rfl) $$ Hheld with
+    ⟨⟨Hlocked2, Hwhole2, %kl2, %xs2, %pid2, Hstate2, Hchan2, Hrest2⟩, Hzs2⟩
   icases hsplit.mp $$ Hwhole2 with ⟨Hpsl2, Hpst2⟩
   icases hart_split Γ j h1 $$ Htag with ⟨Htag1, Htag2⟩
-  ihave Hslots2 := procSlots_running_intro Γ ξ0 j h1 hj $$ [$Hused $Htag1 $Hcells $Hvc]
+  ihave Hslots2 := procSlots_running_intro Γ ξ0 j h1 hj $$ [$Hused $Htag1 $Hcells $Hvc $Hzs2]
   ihave HR2 := procLockRes_intro Γ ξ0 (procAddr j) RUNNING ch2 kl2 xs2 pid2
     $$ [$Hstate2 $Hpsl2 $Hchan2 $Hrest2 $Hslots2]
   ihave HR2 := (show procLockResAt (GF := GF) Γ ξ0 (procAddr j) ⊢ procLockPay Γ j curCtx from by

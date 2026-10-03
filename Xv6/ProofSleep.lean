@@ -151,7 +151,7 @@ theorem sleep_tail (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors} [MachGS 
     wordPointsTo (pChan (procAddr j)) 8 (DFrac.own 1) ch ∗
     procPubRest (procAddr j) kl xs pid ∗
     ownCtxCells (pContext (procAddr j) 0) ∗ hartFull Γ j cpu ∗
-    ▷ schedVcAt Γ cpu (cpuCtxAddr cpu) (procAddr j) ∗
+    ▷ schedVcAt Γ cpu (cpuCtxAddr cpu) (procAddr j) ∗ zsElem (procAddr j) none ∗
     frame4s1 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) ∗
     trapCsrs cpu ∗ intrRes cpu ∗
     (∀ (cpu' : CPU) (R' : RegMap), kctx cpu' ((k.withSpie a b).withRegs R') -∗
@@ -160,7 +160,7 @@ theorem sleep_tail (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors} [MachGS 
     ⊢ wpLoop (GF := GF) cpu := by
   obtain ⟨ξ0, t0⟩ := X
   letI : CurCtx := ⟨ξ0, t0⟩
-  iintro ⟨Hk, Hpc, #Hpinv, #Hused, Hlocked, Hpstw, Hstate, Hchan, Hrest, Hcells, Hfull, Hvc, Hframe,
+  iintro ⟨Hk, Hpc, #Hpinv, #Hused, Hlocked, Hpstw, Hstate, Hchan, Hrest, Hcells, Hfull, Hvc, Hzs, Hframe,
     Htc, Hir, HΦ⟩
   icases kctx_tier cpu _ $$ Hk with ⟨%hct, Hk⟩
   have ht0 : t0 = KTier.kpt := hct.symm.trans htier
@@ -194,7 +194,7 @@ theorem sleep_tail (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors} [MachGS 
     exact hh
   -- the slot, rebuilt at RUNNING; the claim's halves come back out
   icases hart_split Γ j cpu $$ Hfull with ⟨Hh1, Hh2⟩
-  ihave Hslots := procSlots_running_intro Γ curCtx j cpu hj $$ [$Hused $Hh1 $Hcells $Hvc]
+  ihave Hslots := procSlots_running_intro Γ curCtx j cpu hj $$ [$Hused $Hh1 $Hcells $Hvc $Hzs]
   icases sl_pstateWhole_elim Γ (procAddr j) $$ Hpstw with ⟨Hpstl, Hpsth⟩
   ihave HRnew := procLockRes_intro Γ curCtx (procAddr j) RUNNING ch kl xs pid
     $$ [$Hstate $Hpstl $Hchan $Hrest $Hslots]
@@ -358,11 +358,11 @@ theorem sleep_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (SC : SCHED) : S
     ⟨%st, %ch, Hstate, Hpstl, Hchan, ⟨%kl, %xs, %pid, Hrest⟩, Hslots⟩
   -- the claim's hart tag forces RUNNING, and out come the record and the cells
   by_cases hstu : isUnused st
-  · icases procSlots_running Γ curCtx j cpu st hj $$ [$Hhart $Hslots] with ⟨%hstx, Hfull, Hcells, Hvc⟩
+  · icases procSlots_running Γ curCtx j cpu st hj $$ [$Hhart $Hslots] with ⟨%hstx, Hfull, Hcells, Hvc, -⟩
     subst hstx
     exact absurd hstu (by decide)
   icases procSlots_used Γ curCtx (procAddr j) st hstu $$ Hslots with ⟨#Hused, Hslots⟩
-  icases procSlots_running Γ curCtx j cpu st hj $$ [$Hhart $Hslots] with ⟨%hst, Hfull, Hcells, Hvc⟩
+  icases procSlots_running Γ curCtx j cpu st hj $$ [$Hhart $Hslots] with ⟨%hst, Hfull, Hcells, Hvc, Hzs⟩
   subst hst
   ihave Hpsth := pstateAt_intro Γ j (1 : Qp).half RUNNING hj $$ Hpst2
   ihave Hpstw := sl_pstateWhole_intro Γ (procAddr j) $$ [$Hpstl $Hpsth]
@@ -390,7 +390,7 @@ theorem sleep_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (SC : SCHED) : S
     iapply (sleep_tail RE Γ cpu k a b j hj hwf hnoff hlocks htier hproc
       (by unfold sleepSlots at hK; omega) (R3.set 15#5 ch) g2 g9 ghi ch kl xs pid)
     k_norm_g
-    iframe Hk Hpc Hpinv Hused Hlocked Hpstw Hstate Hchan Hrest Hcells Hfull Hvc Hframe Htc Hir
+    iframe Hk Hpc Hpinv Hused Hlocked Hpstw Hstate Hchan Hrest Hcells Hfull Hvc Hzs Hframe Htc Hir
     iintro %c' %R' Hk Hpc Hte Hce %hcs
     iapply HΦ $$ %c' %a %b %R' Hk Hpc Hte Hce %hcs
   · -- THE PARK: p->state = SLEEPING and into the scheduler
@@ -412,8 +412,9 @@ theorem sleep_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (SC : SCHED) : S
     k_step (wp_s_jal cpu _ (KA.«sleep» + 0x1c#64) false 2096832#21 1#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sleep_br_fffffffffffffedc]
     iintro Hk Hpc
-    ihave Hheld := procHeldAt_intro Γ curCtx cpu j SLEEPING ch kl xs pid
-      $$ [$Hlocked $Hpstw $Hstate $Hchan $Hrest]
+    -- the slot's T2 element parks with the held lock (NI M2-G1b)
+    ihave Hheld := procHeldAt_live_intro Γ curCtx cpu j SLEEPING ch kl xs pid (Or.inr (Or.inr rfl))
+      $$ [$Hlocked $Hpstw $Hstate $Hchan $Hrest $Hzs]
     have hsc : ∀ (k' : KCtx) (hK' : schedSlots ≤ k'.avail) (hs' : k'.sie = false)
         (hn' : k'.noff = 1) (hl' : k'.locks = ["proc"]) (ht' : k'.tier = KTier.kpt)
         (hp' : k'.proc = procAddr j),
@@ -463,15 +464,15 @@ theorem sleep_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (SC : SCHED) : S
     have f9 : R9 9#5 = procAddr j := by rw [s9]; k_norm_g [e9]
     have f2 : R9 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFE0#64 := by rw [s2]; k_norm_g [e2]
     have hhi9 : sl_savedHigh k.regs R9 := sl_savedHigh_trans hhi3 hhiS
-    icases procHeldAt_cases Γ curCtx h j RUNNING ch' $$ Hheld with
-      ⟨Hlocked, Hpstw, %kl', %xs', %pid', Hstate, Hchan, Hrest⟩
+    icases procHeldAt_live_cases Γ curCtx h j RUNNING ch' (Or.inl rfl) $$ Hheld with
+      ⟨⟨Hlocked, Hpstw, %kl', %xs', %pid', Hstate, Hchan, Hrest⟩, Hzs⟩
     ihave Hk := kctx_eq_mono h _ ((((k.pushOffAt spie spp).pushed 4).withRegs R9).withLocks ["proc"])
       (by kctx_ext [hlocks, hnoff, htier, hproc, resumedK]) $$ Hk
     iapply (sleep_tail RE Γ h k spie spp j hj hwf hnoff hlocks htier
       hproc (by unfold sleepSlots at hK; omega) R9 f2 f9
       hhi9 ch' kl' xs' pid')
     k_norm_g
-    iframe Hk Hpc Hpinv Hused Hlocked Hpstw Hstate Hchan Hrest Hcells Hfull Hvc Hframe Htc Hir
+    iframe Hk Hpc Hpinv Hused Hlocked Hpstw Hstate Hchan Hrest Hcells Hfull Hvc Hzs Hframe Htc Hir
     iintro %c' %R' Hk Hpc Hte Hce %hcs
     iapply HΦ $$ %c' %spie %spp %R' Hk Hpc Hte Hce %hcs⟩
 

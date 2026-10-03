@@ -36,6 +36,11 @@ DEVIATIONS from Rocq (Lean's name discipline, not process layer):
    row (`procsInvSlot`'s last conjunct) gains `actCnt (procAddr i) 0` beside
    the row and the generation, as Rocq's boot big-sep does, and the seal
    (`procDormantPrestk_seal`) takes it.
+6. **The family ledger's T2 element** (NI M2-G1b): each slot's boot row
+   also brings its element of the zombie column at `none`
+   (`WaitInvTies.childrenBootRows`), which the seal puts into the UNUSED
+   payload's `procSlotsAt` (not into the dormant block: the UNUSED arm's
+   element is `procSlotsAt`'s).
 
 Imports only definitional files.
 -/
@@ -64,7 +69,7 @@ def procsInvSlot [CurCtx] (Γ : SchedNames) (i : Nat) : IProp GF := iprop%
   (∃ h : CPU, hartFull Γ i h) ∗ pstateFull Γ i UNUSED ∗ pavSlot Γ (procAddr i) UNUSED ∗
   lockFreeTok (Γ.lock i) ∗ stackOwn (kstackVa i + 4096#64) 512 ∗
   (∃ γ0 g : GName, chFrag γ0 (procAddr i) ∅ ∗ slotGen (procAddr i) (DFrac.own 1) g ∗
-    actCnt (procAddr i) 0)
+    actCnt (procAddr i) 0 ∗ zsElem (procAddr i) none)
 
 /-- **One slot sealed** (Rocq pass 3's body): its payload at UNUSED, and
 `p->lock` born over it at `Γ.lock i`. -/
@@ -79,7 +84,7 @@ theorem procsInv_alloc_slot [X : CurCtx] (hT : curTier = KTier.kpt) (cpu : CPU) 
   letI : CurCtx := ⟨ξ, KTier.kpt⟩
   unfold procsInvSlot procReady procFieldsOut lockInited
   iintro ⟨Hrun, ⟨⟨⟨-, Hfresh⟩, Hst, Hks⟩, #Hc0, #Hc16, Hpre⟩, ⟨%ch, Hch⟩, ⟨%kl, %xs, %pid, Hpub⟩,
-    ⟨%h, Hhart⟩, Hps, Hpav, Hfree, Hstk, ⟨%γ0, %g, Hrow, Hsg, Hev⟩⟩
+    ⟨%h, Hhart⟩, Hps, Hpav, Hfree, Hstk, ⟨%γ0, %g, Hrow, Hsg, Hev, Hzs⟩⟩
   ihave Hks := (show wordPointsTo (GF := GF) (procAddr i + 64#64) 8 (DFrac.own 1) (kstackVa i) ⊢
       wordPointsTo (pKstack (procAddr i)) 8 (DFrac.own 1) (kstackVa i) from .rfl) $$ Hks
   ihave Hst := (show wordPointsTo (GF := GF) (procAddr i + 24#64) 4 (DFrac.own 1) 0#32 ⊢
@@ -112,8 +117,9 @@ theorem procsInv_alloc_slot [X : CurCtx] (hT : curTier = KTier.kpt) (cpu : CPU) 
     iexact Hpub
   unfold procSlotsAt
   rw [if_neg (show ¬ needsCtx UNUSED by decide), if_neg (show ¬ isRunning UNUSED by decide),
-    if_pos (show invDormant UNUSED by decide), if_pos (show notRunning UNUSED by decide)]
-  iframe Hdorm Hhart Hpav
+    if_pos (show invDormant UNUSED by decide), if_pos (show notRunning UNUSED by decide),
+    if_neg (show ¬ UNUSED = ZOMBIE by decide)]
+  iframe Hdorm Hhart Hpav Hzs
 
 /-- The seals threaded over the first `n` slots. -/
 theorem procsInv_alloc_upto [CurCtx] (hT : curTier = KTier.kpt) (cpu : CPU) (E : CoPset)
