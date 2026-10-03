@@ -76,7 +76,8 @@ quarter to `kw_reap` as a premise; here the ghost lemma borrows it from
 THE ZOMBIE LEDGER (NI-LEDGER-REST, Rocq 2107981b4, design
 ni-zombie-ledger.md D4).  `kwWRest` carries `<wait_lock>`'s trailing `∃ h,
 zombLedAuth h` packed (Rocq's `kw_pay`), so the six acquires and the scan do
-not change.  `kw_reap_ghost` appends `ZReap (procAddr j) pid` beside the two
+not change.  `kw_reap_ghost` appends `ZReap (procAddr j) n pid` (NI G1a: `n`
+the reaped slot) beside the two
 column moves and folds the receipt into the answer (`waitAnsLed_of`).
 Deviation (placement, as the crossing above): Rocq keeps `wait_ans_gen`
 inside and threads a side premise `kw_zr` to the contract's exit; here the
@@ -108,7 +109,7 @@ exits at `V.ev`).
 
 THE REAP COSTS ONE COUNT (permit sweep L3c; deviation: no Rocq counterpart,
 Rocq never landed L3): in `kw_reap`'s common tail, in the same ghost update
-as `kw_reap_ghost`'s `ZReap (procAddr j) pide` append, the reaper's counter
+as `kw_reap_ghost`'s `ZReap (procAddr j) n pide` append, the reaper's counter
 is taken out of its cells (`procPrivNoctxAt_evAcc`) and stepped
 (`actCnt_step`, `kc` to `kc + 1`); freeproc is then lent `kc + 1` (and steps
 it again at its own `PFree`), and the block returns at freeproc's count, `V.ev
@@ -615,10 +616,10 @@ theorem kw_reap_ghost (j n : Nat) (hj : j < NPROC) (hn : n < NPROC)
   imod orphans_del O (procAddr j) Vf.gen $$ Ho with Ho
   -- ...AND THE ZOMBIE LEDGER RECORDS THE REAP (design ni-zombie-ledger.md
   -- D4): the reaper `procAddr j` took pid `pide`; the receipt joins the answer
-  imod zombReap hz (procAddr j) pide $$ Hzl with ⟨Hzl, #Hzr⟩
+  imod zombReap hz (procAddr j) n pide $$ Hzl with ⟨Hzl, #Hzr⟩
   ihave Hans := waitAnsLed_of pide (xstateVal xs) cs (cs \ {Vf.gen}) V.gen nullst pid (procAddr j)
     $$ Hans [Hzr]
-  · iright; iexists hz; iexact Hzr
+  · iright; iexists hz, n; iexact Hzr
   imodintro
   isplitl [Hch Ho Hci Hzl]
   · iexists gs, (PartialMap.insert m V.chg (procAddr j, cs \ {Vf.gen})),
@@ -1262,7 +1263,7 @@ theorem kw_reap (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE)
       $$ [Hwrest Hg Hxs Hpid Hdorm] with ⟨Hwrest, Hans, Hxs, Hpid, %Vf, %Mf, %gf, Hfin, Hfgen⟩
     · iframe Hwrest Hg Hxs Hpid Hdorm
     -- THE REAP COSTS ONE COUNT of the reaper's permit (permit sweep L3c, no
-    -- Rocq counterpart): beside `ZReap (procAddr j) pide`, the reaper's
+    -- Rocq counterpart): beside `ZReap (procAddr j) n pide`, the reaper's
     -- counter, taken out of its cells, is stepped here
     icases procPrivNoctxAt_evAcc (GF := GF) curCtx (procAddr j) pid _ _ $$ Hpriv with ⟨Hcnt, Hpback⟩
     imod actCnt_step (GF := GF) (procAddr j) kc $$ Hcnt with Hcnt

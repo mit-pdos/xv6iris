@@ -92,8 +92,8 @@ exact Rocq instruction (they are pure ghost updates, order-insensitive).
 THE ZOMBIE LEDGER (NI-LEDGER-REST, Rocq 2107981b4, design
 ni-zombie-ledger.md D2/R1): `<wait_lock>`'s payload carries `∃ h,
 zombLedAuth h` last; at the ZOMBIE store, with both locks held, the exit
-appends `ZExit (procAddr j) pid (xstateOf status)` (`UserChildren.zombExit`
--- the actor is Rocq's `pj`, the status the escrow's own argument) in the
+appends `ZExit (procAddr j) pid (xstateOf status) ip` (`UserChildren.zombExit`;
+`ip` the `initproc` word `reparent` wrote, NI G1a; the actor is Rocq's `pj`, the status the escrow's own argument) in the
 same ghost update as the state mirror's step; kexit has no post, so the
 receipt is dropped.  No contract moved.
 
@@ -1200,7 +1200,9 @@ theorem kx_rest_root (AC : ACQUIRE) (RE : RELEASE) (RP : REPARENT) (WU : WAKEUP)
   -- ruling R1), here, at the ZOMBIE store, with BOTH locks held: actor
   -- `procAddr j`, this process's pid, and the status the escrow is keyed at.
   -- kexit has no post, so the receipt is dropped.
-  imod zombExit hz (procAddr j) pid (xstateOf status) $$ Hzl with ⟨Hzl, -⟩
+  -- (NI G1a: the event carries `ip`, the `initproc` word `reparent` wrote
+  -- above -- this theorem's own parameter, read off `initIdentAt`.)
+  imod zombExit hz (procAddr j) pid (xstateOf status) ip $$ Hzl with ⟨Hzl, -⟩
   -- ...AND THE EXIT COSTS ONE COUNT of this process's own permit (permit
   -- sweep L3c, no Rocq counterpart): the block's counter, in hand since
   -- `kx_rest`'s entry, is stepped here; the ZOMBIE park takes the block at

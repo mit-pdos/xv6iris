@@ -79,7 +79,7 @@ THE LED FORM (NI-LEDGER-REST, Rocq 2107981b4; design
 `claude-notes/design/ni-zombie-ledger.md` D4): `wp_kwait_led_eb_body` /
 `wp_kwait_led_body` are the two contracts verbatim with the answer at
 `UserChildren.waitAnsLed … (procAddr j)`: the reaping arm also hands back the
-zombie ledger's RECEIPT of `ZReap (procAddr j) rv`, appended by the caller's
+zombie ledger's RECEIPT of `ZReap (procAddr j) n rv` (`n` the reaped slot), appended by the caller's
 own proc word under `<wait_lock>`.  `KWAIT` carries the led field
 `wp_kwait_led_eb` beside `wp_kwait_eb`; the led form is the proof
 (`ProofKwait.kwait_led_proof`), the landed contract its corollary
@@ -214,7 +214,7 @@ def wp_kwait_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
 /-- THE LED TWIN of `wp_kwait_body` (Rocq `wp_kwait_led_sconf_body`, design
 ni-zombie-ledger.md D4): verbatim, with the answer at `waitAnsLed … (procAddr
 j)` -- the reaping arm also hands back the zombie ledger's receipt of
-`ZReap (procAddr j) rv`. -/
+`ZReap (procAddr j) n rv` (`n` the reaped slot). -/
 def wp_kwait_led_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]

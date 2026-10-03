@@ -304,17 +304,18 @@ instance zombReceipt_persistent (h : List Zev) (e : Zev) :
   unfold zombReceipt; infer_instance
 
 /-- THE EXIT'S GHOST STEP, kexit's at its ZOMBIE store (actor: the exiting
-process's own proc word; the status it exits with) (Rocq `zomb_exit`). -/
-theorem zombExit (h : List Zev) (act : BitVec 64) (pid : BitVec 32) (xs : Int) :
+process's own proc word; the status it exits with; the `initproc` word
+`reparent` wrote, NI G1a) (Rocq `zomb_exit`). -/
+theorem zombExit (h : List Zev) (act : BitVec 64) (pid : BitVec 32) (xs : Int) (ip : BitVec 64) :
     zombLedAuth (GF := GF) h ⊢
-      |==> (zombLedAuth (h ++ [.ZExit act pid xs]) ∗ zombReceipt h (.ZExit act pid xs)) :=
+      |==> (zombLedAuth (h ++ [.ZExit act pid xs ip]) ∗ zombReceipt h (.ZExit act pid xs ip)) :=
   zombLedAuth_grow h _
 
 /-- THE REAP'S GHOST STEP, kwait's at its reap (actor: the reaper; the
-reaped child's pid) (Rocq `zomb_reap`). -/
-theorem zombReap (h : List Zev) (act : BitVec 64) (pid : BitVec 32) :
+reaped child's slot, NI G1a, and pid) (Rocq `zomb_reap`). -/
+theorem zombReap (h : List Zev) (act : BitVec 64) (j : Nat) (pid : BitVec 32) :
     zombLedAuth (GF := GF) h ⊢
-      |==> (zombLedAuth (h ++ [.ZReap act pid]) ∗ zombReceipt h (.ZReap act pid)) :=
+      |==> (zombLedAuth (h ++ [.ZReap act j pid]) ∗ zombReceipt h (.ZReap act j pid)) :=
   zombLedAuth_grow h _
 
 end ZombLedger
@@ -336,14 +337,15 @@ def waitAnsGen (rv : BitVec 32) (xs : Int) (cs cs' : ExtTreeSet GName compare) (
 
 /-- THE ANSWER WITH THE REAP'S RECEIPT (Rocq `wait_ans_led`, design
 ni-zombie-ledger.md D4): `waitAns` verbatim, with the zombie ledger's
-receipt of the reap -- `ZReap act rv`, appended by the reaper `act` -- as
-the reaping arm's first conjunct.  kwait's led twin
+receipt of the reap -- `ZReap act j rv`, appended by the reaper `act` at
+some slot `j` (NI G1a: the reap carries the reaped slot) -- as the reaping
+arm's first conjunct.  kwait's led twin
 (`SpecKwait.wp_kwait_led_eb_body`) answers this; `waitAnsLed_post` is the
 step back to the landed row. -/
 def waitAnsLed (rv : BitVec 32) (xs : Int) (cs cs' : ExtTreeSet GName compare) (gn : GName)
     (nullst : Bool) (pidv : BitVec 32) (act : BitVec 64) : IProp GF :=
   iprop((⌜rv = -1#32 ∧ cs' = cs⌝ ∗ waitWhy cs gn nullst) ∨
-    ((∃ h : List Zev, zombReceipt h (.ZReap act rv)) ∗
+    ((∃ (h : List Zev) (j : Nat), zombReceipt h (.ZReap act j rv)) ∗
      ∃ γ' : GName,
       ⌜cs' = cs \ {γ'} ∧ 1 ≤ rv.toNat ∧ rv.toNat ≤ genPidMax⌝ ∗
       ⌜γ' ∈ cs ∨ pidv = 1#32⌝ ∗
@@ -366,7 +368,7 @@ row. -/
 theorem waitAnsLed_of (rv : BitVec 32) (xs : Int) (cs cs' : ExtTreeSet GName compare) (gn : GName)
     (nullst : Bool) (pidv : BitVec 32) (act : BitVec 64) :
     waitAns (GF := GF) rv xs cs cs' gn nullst pidv ⊢
-      (⌜rv = -1#32⌝ ∨ ∃ h : List Zev, zombReceipt h (.ZReap act rv)) -∗
+      (⌜rv = -1#32⌝ ∨ ∃ (h : List Zev) (j : Nat), zombReceipt h (.ZReap act j rv)) -∗
       waitAnsLed rv xs cs cs' gn nullst pidv act := by
   unfold waitAns waitAnsLed
   iintro (Hneg | ⟨%γ', %hc, Hr⟩) Hz
