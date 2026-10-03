@@ -1437,6 +1437,8 @@ proof content (~100 lines in `ap_pidloop`, ~60 in the steps). G2b is 6 files, me
 (the success path runs from `kfork_proof`'s allocproc call through `kf_publish`, ~860 lines, to
 `kf_epilogue'`; the persistent receipts are framed through it).
 
+**RULINGS G2-R1…R5 (2026-10-03, coordinator, all as recommended):** R1 both R2(b) and R2(c): the tie uses `nextOf`'s wrap and first-ness is the cyclic scan `pidPick`; R2 the tie against the cells (`pidCells`) beside the register tie; R3 led twins for kfork/sys_fork carrying both receipts, landed WITH M2-X; R4 no partial row and no `SyscRows.fork` move before M2-X (F4); R5 fork's answer stays out of `events` until the joint lane. Lanes: G2a now; G2b with M2-X; G2c = the joint lane G1f+G2+G3 after M2-X.
+
 **Owner rulings requested.**
 - **G2-R1 (the counter at `PIDMAX`).** xv6 (ded23f2) wraps and reuses, so the tie uses `nextOf`'s landed wrap
   (`pid = PIDMAX → 1`), and first-ness is the cyclic scan (`pidPick`). Recommended: state BOTH R2(b) and R2(c).
