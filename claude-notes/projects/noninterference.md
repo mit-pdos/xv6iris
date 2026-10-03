@@ -1064,6 +1064,8 @@ G1b ~25 files, G1c 3–5 files but the scan invariant is the hard part, G1d ~15 
 - **Re-admit fork as a joint lane G1f+G2+G3**: −1 iff `SFull` at the round, or `KNull` at one of the round's
   allocator positions as G3 states them. The pid on success, from G2's counter tie.
 
+**RULINGS G1-R1…R6 (2026-10-03, coordinator, all as recommended; they follow O5 and the owner's "honest class, then grow"):** R1 placement recorded at kfork's parent store (`ZFork act j pid g`); R2 D3 overturned, ties T1 and T2; R3 the new fields; R4 the key-dependent class at wait (`usysDetClassAt`); R5 wait's answer is a READING at the trace level, with §4's honesty paragraph; M2-X (ι export) is a later cross-cutting lane; R6 fork's slot −1 parked behind G3. Lanes G1a → G1b → G1c → G1d in sequence.
+
 **Owner rulings requested.**
 - **G1-R1** The slot-placement datum is recorded at kfork's parent store (`ZFork act j pid g`, in the
   zombie/family ledger under `wait_lock`), not at allocproc's choice (F1). Recommended. The alternative,
