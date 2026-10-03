@@ -28,8 +28,6 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 
-set_option linter.unusedSectionVars false
-
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
   LeanRV64D.Functions.virtual_memory_supported
 
@@ -326,26 +324,6 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [X : CurCtx]
-
-/-- **The running block's pieces userret takes** (prepare_return's post
-hands the whole block `procPrivFd γ`, Rocq `proc_priv`): the address space
-and the trapframe page, and the block back from them. -/
-theorem userret_priv_acc (htc : curTier = KTier.kpt) (γ : FileNames) (pa : BitVec 64)
-    (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) :
-    procPrivFd (GF := GF) γ pa pid V M ⊢
-      procPtAt V.upt M ∗ tfPageAt V.upt.tfp V.tf ∗
-      (procPtAt V.upt M -∗ tfPageAt V.upt.tfp V.tf -∗ procPrivFd γ pa pid V M) := by
-  obtain ⟨ξ, t⟩ := X
-  simp only at htc
-  subst htc
-  simp only [procPrivFd, procPrivCoreNoctxAt, procPrivBareAt]
-  iintro ⟨⟨⟨%hf, Hpid, Hfields, Hppt, Hpage, %hlz, Hev⟩, Hc⟩, Ho⟩
-  iframe Hppt Hpage
-  iintro Hppt Hpage
-  iframe Hpid Hfields Hppt Hpage Hc Ho Hev
-  isplit
-  · ipureintro; exact hf
-  · ipureintro; exact hlz
 
 end
 

@@ -11,8 +11,8 @@ Rocq's header, abridged: `EchoDisc` models a session in which every round
 is one echo line and the only state is the console's.  Here a round is one
 of the line shapes and carries a second state -- the files -- which SURVIVES
 the round, the era and the power cycle.  So the session function threads it:
-`sessf ps cs s0 I` is the echo session with the per-round block computed at
-the state the previous rounds left (`fstateUpto`).
+the echo session with the per-round block computed at the state the previous
+rounds left -- here `LineModel.lmSess` at `fileLm` (section 6).
 
 THE OBSERVER STILL CANNOT SEE THE FILE, and does not need to.  EVERY
 alternative's own output is either sh's panic line "fork\n" or a '$'-free
@@ -639,73 +639,6 @@ theorem cont_shape (s : Fstate) (l : Uline) (a : Ralt) (hl : ulineOk l) (hs : fs
   | RSyncRan => exact hpr
   | RSyncExec => exact ⟨wlLine dgExecSync, rfl, wlLine_shape' _ hey⟩
 
-/-! ## 4.  THE SESSION, WITH THE FILE STATE THREADED -/
-
-/-- the alternative round `i` took, decoded -/
-def raltAt (cs : List Nat) (i : Nat) : Ralt := raltDec (cs[i]!)
-
-/-- how many shells have died on their own fork panic BEFORE line `i` -/
-def proIdxF (cs : List Nat) : Nat → Nat
-  | 0 => 0
-  | i' + 1 => proIdxF cs i' + if raltPanic (raltAt cs i') then 1 else 0
-
-/-- THE FILE STATE BEFORE ROUND `q`: the boot state, moved by every round
-before it.  This is the whole of what the file adds to the session. -/
-noncomputable def fstateUpto (cs : List Nat) (s : Fstate) (bs : List (List (BitVec 8))) :
-    Nat → Fstate
-  | 0 => s
-  | q' + 1 => fsm (fstateUpto cs s bs q') (ulineOf (bs[q']!)) (raltAt cs q')
-
-noncomputable def altContF (ps cs : List Nat) (s : Fstate) (bs : List (List (BitVec 8)))
-    (i : Nat) : List (BitVec 8) :=
-  cont (fstateUpto cs s bs i) (ulineOf (bs[i]!)) (raltAt cs i)
-  ++ (if raltPanic (raltAt cs i) then proOf (proFrom (proIdxF cs i + 1) ps) else [])
-
-noncomputable def altBlkF (ps cs : List Nat) (s : Fstate) (bs : List (List (BitVec 8)))
-    (i : Nat) : List (BitVec 8) :=
-  bs[i]! ++ wlNl :: altContF ps cs s bs i
-
-noncomputable def altSeqF (ps cs : List Nat) (s : Fstate) (bs : List (List (BitVec 8)))
-    (q : Nat) : List (BitVec 8) :=
-  ((List.range' 0 q).map (altBlkF ps cs s bs)).flatten
-
-/-- THE EXPECTED SESSION TRANSCRIPT for the era's input `I` at boot state `s` -/
-noncomputable def sessf (ps cs : List Nat) (s : Fstate) (I : List (BitVec 8)) :
-    List (BitVec 8) :=
-  proOf ps ++ altSeqF ps cs s (bodiesOf I) (nlines I) ++ restOf I
-
-/-- the side condition `EchoDisc.pro_ok` states, at the panic alternatives of
-all the line shapes -/
-def proOkF (ps cs : List Nat) (q : Nat) : Prop :=
-  (∀ a ∈ ps, a < proAlts.length) ∧ proIdxF cs q < proRounds ps
-
-/-! ## 5.  THE DISCIPLINE, THE CLAIM'S VOCABULARY, AND THE HISTORY -/
-
-/-- D3 over one power cycle's input -/
-noncomputable def discSegF (seg : List Obs) : Prop := discInputF (consIns seg)
-
-/-- D1/D2 AT ONE INPUT POSITION: the expected transcript for the COMPLETE
-LINES typed so far -- read at the era's boot state -- is already on the
-wire (the RELAXED per-line rule, ruled 2026-09-23). -/
-noncomputable def discPtF (ps cs : List Nat) (s : Fstate) (p : List Obs) : Prop :=
-  sessf ps cs s (doneOf (consIns p)) <+: obsWire .uart0 p
-
-/-- the resolution's range condition: every line's alternative is one ITS
-SHAPE admits (`Forall2` also pins the length) -/
-noncomputable def altsOk (I : List (BitVec 8)) (cs : List Nat) : Prop :=
-  List.Forall₂ (fun l c => raltOk l (raltDec c)) (linesOf I) cs
-
-/-- THE PER-CYCLE DISCIPLINE, with the era's BOOT STATE a parameter -/
-noncomputable def discSegF' (s : Fstate) (seg : List Obs) : Prop :=
-  discSegF seg
-  ∧ ∃ ps cs : List Nat, altsOk (consIns seg) cs
-    ∧ ∀ p ∈ inPres seg, proOkF ps cs (nlines (consIns p)) ∧ discPtF ps cs s p
-
-/-- THE DISCIPLINE OVER THE WHOLE HISTORY: each cycle is read at SOME boot
-state -/
-noncomputable def discF (h : List Obs) : Prop :=
-  ∀ seg ∈ cyclesOf h, ∃ s : Fstate, fstateOk s ∧ discSegF' s seg
-
 /-! ### The lines the file may hold -/
 
 /-- a redirect line's file and word list -/
@@ -724,12 +657,6 @@ noncomputable def echofCyc (seg : List Obs) : List (List (BitVec 8) × List (Lis
 noncomputable def echofLinesOf (h : List Obs) : List (List (BitVec 8) × List (List (BitVec 8))) :=
   ((cyclesOf h).map echofCyc).flatten
 
-/-- ...and the ones typed in cycles STRICTLY BEFORE cycle `k`, which is the
-set a boot state at cycle `k` may have come from -/
-noncomputable def echofLinesBefore (h : List Obs) (k : Nat) :
-    List (List (BitVec 8) × List (List (BitVec 8))) :=
-  (((cyclesOf h).take k).map echofCyc).flatten
-
 /-- the boot state of an era: every file it holds is a chunk subsequence of a
 line typed at THAT file's name in an EARLIER cycle -/
 def fadmBoot (Ls : List (List (BitVec 8) × List (List (BitVec 8)))) (s : Fstate) : Prop :=
@@ -738,7 +665,7 @@ def fadmBoot (Ls : List (List (BitVec 8) × List (List (BitVec 8)))) (s : Fstate
 
 /-! ## 6.  THE LINE MODEL INSTANCE -/
 
-/-- `sessf` is `LineModel.lmSess` at this instance, by conversion. -/
+/-- The line model at this instance; its session is `LineModel.lmSess`. -/
 noncomputable def fileLm : LModel where
   lmSt := Fstate
   lmLine := Uline

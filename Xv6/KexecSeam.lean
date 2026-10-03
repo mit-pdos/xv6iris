@@ -79,7 +79,6 @@ a STAGE file (no `Proof` prefix).  Rocq's header, in short:
    (`ProcPrivAcc.procPrivFd_evLend`).
 -/
 import Xv6.KexecTail
-import Xv6.LazyFree
 import Xv6.KexecBuilt
 
 namespace Xv6
@@ -88,9 +87,7 @@ open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 open Iris.Std (get?)
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## PURE ARITHMETIC -/
 

@@ -32,8 +32,6 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedVariables false
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
 
 /-! ## Pure facts -/
@@ -44,12 +42,12 @@ theorem ut_spp_clear (v : BitVec 64) (spie : Bool) (h : sstatusFull false spie f
   have h8 : BitVec.extractLsb' 8 1 v = 0#1 := by simpa using (h.2.1 rfl).2
   bv_decide
 
-theorem ut_br_myproc : KA.«usertrap» + 0x22#64 + BitVec.signExtend 64 2093770#21 = KA.«myproc» := by
+theorem ut_br_myproc : KA.«usertrap» + 0x22#64 + BitVec.signExtend 64 2093738#21 = KA.«myproc» := by
   decide
 
-theorem ut_kvec : KA.«usertrap» + 12340#64 = kernelvecAddr := by
+theorem ut_kvec : KA.«usertrap» + 12560#64 = kernelvecAddr := by
   unfold kernelvecAddr; decide
-theorem ut_myproc_norm : KA.«usertrap» + 18446744073709548268#64 = KA.«myproc» := by decide
+theorem ut_myproc_norm : KA.«usertrap» + 18446744073709548236#64 = KA.«myproc» := by decide
 theorem ut_ret_26 : jumpPc (KA.«usertrap» + 0x26#64) = KA.«usertrap» + 0x26#64 := by decide
 
 section
@@ -144,7 +142,7 @@ theorem usertrap_entry (MP : MYPROC) (HD : UT_DISPATCH (hlc := hlc) PT Γ)
   k_step (wp_s_auipc cpu _ (KA.«usertrap» + 0x16#64) false 3#20 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_addi cpu _ (KA.«usertrap» + 0x1a#64) false 30#12 15#5 15#5 (by decide))
+  k_step (wp_s_addi cpu _ (KA.«usertrap» + 0x1a#64) false 250#12 15#5 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   k_step (wp_s_csrw_stvec cpu _ ?hs (KA.«usertrap» + 0x1e#64) false 15#5 uservecTvec ?hd)
@@ -152,7 +150,7 @@ theorem usertrap_entry (MP : MYPROC) (HD : UT_DISPATCH (hlc := hlc) PT Γ)
   case hd => k_norm [ut_kvec]; exact kernelvecAddr_direct
   iintro Hk Hpc Hstv
   -- +0x22  jal myproc
-  k_step (wp_s_jal cpu _ (KA.«usertrap» + 0x22#64) false 2093770#21 1#5 (by decide))
+  k_step (wp_s_jal cpu _ (KA.«usertrap» + 0x22#64) false 2093738#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ut_br_myproc]
   iintro Hk Hpc
   k_norm [ut_myproc_norm]

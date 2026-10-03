@@ -10,7 +10,7 @@ MachCSL: **the pure toolkit of the text-map walker** `uxRun`
   map and the text map are disjoint (then no read `runRW` answers is a text
   read, and the disjointness is kept since a walk keeps its map's domain);
 * `uxw_bind` & co. -- the bind toolkit;
-* `uxw_readReg`, `uxw_sail_mem_read_text` -- the two leaves.
+* `uxw_sail_mem_read_text` -- the text-read leaf.
 -/
 import MachCSL.URunX
 import MachCSL.URunRWMono
@@ -154,12 +154,6 @@ theorem uxw_of_runRW {X : Type} (m : SailM X) (orc : UOrc) (s : UWSt) (r : X × 
     runRW D orc s m = some r → uxRun D T orc s m = some r :=
   uxw_of_runRW' D T m orc s r hdisj
 
-@[simp] theorem uxw_pure {X : Type} (orc : UOrc) (s : UWSt) (x : X) :
-    uxRun D T orc s (pure x : SailM X) = some (x, s, orc) := rfl
-
-@[simp] theorem uxw_freeM_pure {X : Type} (orc : UOrc) (s : UWSt) (x : X) :
-    uxRun D T orc s (FreeM.pure x : SailM X) = some (x, s, orc) := rfl
-
 /-- **The bind law.** -/
 theorem uxw_bind {X Y : Type} (m : SailM X) (f : X → SailM Y) :
     ∀ (orc : UOrc) (s : UWSt), uxRun D T orc s (m >>= f) =
@@ -192,26 +186,12 @@ theorem uxw_bind_none {X Y : Type} (m : SailM X) (f : X → SailM Y) (orc : UOrc
     (h : uxRun D T orc s m = none) : uxRun D T orc s (m >>= f) = none := by
   rw [uxw_bind, h]; rfl
 
-/-- The unit-sequencing form. -/
-theorem uxw_seq_some {Y : Type} (m : SailM Unit) (n : SailM Y) (orc orc' : UOrc) (s s' : UWSt)
-    (h : uxRun D T orc s m = some ((), s', orc')) :
-    uxRun D T orc s (m >>= fun _ => n) = uxRun D T orc' s' n :=
-  uxw_bind_some D T m (fun _ => n) orc orc' s s' () h
-
 /-- A known `runRW` sub-walk (from a state missing the text map), then the
 continuation. -/
 theorem uxw_bind_runRW {X Y : Type} (m : SailM X) (f : X → SailM Y) (orc orc' : UOrc) (s s' : UWSt)
     (x : X) (hd : UxwDisj T s) (h : runRW D orc s m = some (x, s', orc')) :
     uxRun D T orc s (m >>= f) = uxRun D T orc' s' (f x) :=
   uxw_bind_some D T m f orc orc' s s' x (uxw_of_runRW' D T m orc s _ hd h)
-
-/-- A register read in the footprint. -/
-theorem uxw_readReg (orc : UOrc) (s : UWSt) (r : Register) (h : D.Dr r = true) :
-    uxRun D T orc s (readReg r) = some (s.file r, s, orc) := by
-  show uxRun D T orc s (FreeM.impure (.ok (.regRead r)) FreeM.pure) = _
-  rw [uxw_node D T orc s _ _ rfl]
-  show (runRW D orc s (FreeM.impure (.ok (.regRead r)) FreeM.pure)).bind _ = _
-  rw [runRW_regRead_dr D orc s r _ h]; rfl
 
 end walker
 

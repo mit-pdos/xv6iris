@@ -55,9 +55,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## Pure facts -/
 
@@ -100,7 +98,7 @@ theorem sys_mkdir_created (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
           (bview pl.length (sysfilePfun pl)) made inum.toNat)
      else
       iprop(⌜R 10#5 = 0#64⌝ ∗ logTx icfgLog ∗
-        creFailArms (hlc := hlc) (fsGammaL fscFs) fscFs T_DIR.toNat 0 0 (fun _ => True) (fun _ => True) A.P A.Pmiss
+        creFailArms (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti T_DIR.toNat 0 0 (fun _ => True) (fun _ => True) A.P A.Pmiss
           A.Farm A.Fdots A.Fun A.Fok A.Fex (bview pl.length (sysfilePfun pl))))
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hcells, Hp, Hrest, Hte, Hce, #Henv, Hblk, HΦ, Hbs, Hir, Hop, Harm⟩
@@ -166,7 +164,7 @@ theorem sys_mkdir_fetched (CR : CREATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : S
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie (procAddr A.j) ∗ sysfileEnv (hlc := hlc) Γ ∗
     procPrivFd A.γ (procAddr A.j) A.pid (sysMkdirV1 A P2) (sysMkdirM1 A P2) ∗
     (∀ c : CPU, sysMkdirPostA k A c) ∗ bslots 3 ∗ irefSlots A.ns ∗ logOp icfgLog MAXOPBLOCKS ∗
-    mkdirAuAt (hlc := hlc) (fsGammaL fscFs) fscFs A.V.cwi (viewLazy A.V.upt A.V.sz A.M) A.v.toNat
+    mkdirAuAt (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti A.V.cwi (viewLazy A.V.upt A.V.sz A.M) A.v.toNat
       A.P A.Pmiss A.Farm A.Fdots A.Fun A.Fok A.Fex
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hcells, Hbuf, Hte, Hce, #Henv, Hblk, HΦ, Hbs, Hir, Hop, Hau⟩
@@ -298,7 +296,7 @@ theorem sys_mkdir_args (AS : ARGSTR) (CR : CREATE) (IUP : IUNLOCKPUT) (EO : END_
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie (procAddr A.j) ∗ sysfileEnv (hlc := hlc) Γ ∗
     procPrivFd A.γ (procAddr A.j) A.pid A.V A.M ∗
     (∀ c : CPU, sysMkdirPostA k A c) ∗ bslots 3 ∗ irefSlots A.ns ∗ logOp icfgLog MAXOPBLOCKS ∗
-    mkdirAuAt (hlc := hlc) (fsGammaL fscFs) fscFs A.V.cwi (viewLazy A.V.upt A.V.sz A.M) A.v.toNat
+    mkdirAuAt (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti A.V.cwi (viewLazy A.V.upt A.V.sz A.M) A.v.toNat
       A.P A.Pmiss A.Farm A.Fdots A.Fun A.Fok A.Fex
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hcells, Hbuf, Hte, Hce, #Henv, Hblk, HΦ, Hbs, Hir, Hop, Hau⟩
@@ -319,7 +317,7 @@ theorem sys_mkdir_args (AS : ARGSTR) (CR : CREATE) (IUP : IUNLOCKPUT) (EO : END_
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x16  jal argstr
-  k_step_e (wp_s_jal cpu _ (KA.«sys_mkdir» + 0x16#64) false 2086300#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_mkdir» + 0x16#64) false 2086204#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_mkdir_br_argstr]
   iintro Hk Hpc
   icases sysfile_blk_bare_ev _ _ _ _ _ $$ Hblk with ⟨Hbare, Hclose⟩
@@ -354,9 +352,9 @@ theorem sys_mkdir_args (AS : ARGSTR) (CR : CREATE) (IUP : IUNLOCKPUT) (EO : END_
     iapply (sysMkdirK_raise k A.γ (procAddr A.j) A.pid A.V A.M A.ns A.v.toNat A.P A.Pmiss A.Farm
       A.Fdots A.Fun A.Fok A.Fex c kv hkv) $$ HΦ
   ihave Hir := (show irefSlots (GF := GF) A.ns ⊢ irefSlots (A.raise kv).ns from .rfl) $$ Hir
-  ihave Hau := (show mkdirAuAt (hlc := hlc) (GF := GF) (fsGammaL fscFs) fscFs A.V.cwi
+  ihave Hau := (show mkdirAuAt (hlc := hlc) (GF := GF) (fsGammaL fscFs) fscFs A.V.rti A.V.cwi
       (viewLazy A.V.upt A.V.sz A.M) A.v.toNat A.P A.Pmiss A.Farm A.Fdots A.Fun A.Fok A.Fex ⊢
-    mkdirAuAt (hlc := hlc) (fsGammaL fscFs) fscFs (A.raise kv).V.cwi
+    mkdirAuAt (hlc := hlc) (fsGammaL fscFs) fscFs (A.raise kv).V.rti (A.raise kv).V.cwi
       (viewLazy (A.raise kv).V.upt (A.raise kv).V.sz (A.raise kv).M) (A.raise kv).v.toNat
       (A.raise kv).P (A.raise kv).Pmiss (A.raise kv).Farm (A.raise kv).Fdots (A.raise kv).Fun
       (A.raise kv).Fok (A.raise kv).Fex from .rfl) $$ Hau

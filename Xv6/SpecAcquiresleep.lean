@@ -116,43 +116,6 @@ structure ACQUIRESLEEP : Prop where
     wp_acquiresleep_gen_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl γ R H q j pid dqp
       hj hproc hK hnoff htier
 
-/-- The interrupts-off instance (the complement is the whole bundle). -/
-theorem ACQUIRESLEEP.wp_acquiresleep_gen (A : ACQUIRESLEEP) {hlc : HasLC} {GF : BundledGFunctors}
-    [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF]
-    [CurCtx] (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (cpu : CPU) (k : KCtx) (γl γ : GName) (R : CtxId → IProp GF) [CtxMorph R] (H : Qp → IProp GF) (q : Qp)
-    (j : Nat) (pid : BitVec 32) (dqp : DFrac) hj hproc hK hsie hnoff hlocks htier :
-    wp_acquiresleep_gen_body (hlc := hlc) (GF := GF) Γ cpu k γl γ R H q j pid dqp
-      hj hproc hK hsie hnoff hlocks htier := by
-  have h := A.wp_acquiresleep_gen_eb (hlc := hlc) (GF := GF) Γ cpu k γl γ R H q j pid dqp
-    hj hproc hK hnoff htier
-  unfold wp_acquiresleep_gen_eb_body at h
-  unfold wp_acquiresleep_gen_body
-  rw [hsie] at h
-  simp only [trapCsrsExt_false, cpuClaimExt_false] at h
-  iintro ⟨Hk, Hpc, Hpi, Htc, Hcl, Hir, Hsl, HH, Hpid, Hnext⟩
-  iapply h
-  iframe Hk Hpc Hpi Htc Hcl Hir Hsl HH Hpid
-  iapply wpNext_mono $$ Hnext
-  iintro %cpu' HK %spie %spp %R' %hcs Hk Hpc ⟨Htc, Hir⟩ Hcl Ht HR Hpid
-  iapply HK $$ %spie %spp %R' %hcs Hk Hpc Htc Hcl Hir Ht HR Hpid
-
-/-- The untracked contract, from the general one. -/
-theorem ACQUIRESLEEP.wp_acquiresleep (A : ACQUIRESLEEP) {hlc : HasLC} {GF : BundledGFunctors}
-    [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF] [CurCtx] (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (cpu : CPU) (k : KCtx) (γl γ : GName) (R : CtxId → IProp GF) [CtxMorph R]
-    (j : Nat) (pid : BitVec 32) (dqp : DFrac) hj hproc hK hsie hnoff hlocks htier :
-    wp_acquiresleep_body (hlc := hlc) (GF := GF) Γ cpu k γl γ R j pid dqp hj hproc hK hsie hnoff hlocks htier := by
-  have h := A.wp_acquiresleep_gen (hlc := hlc) (GF := GF) Γ cpu k γl γ R slUntracked 1 j pid dqp
-    hj hproc hK hsie hnoff hlocks htier
-  unfold wp_acquiresleep_gen_body at h
-  unfold wp_acquiresleep_body isSleeplock
-  iintro ⟨Hk, Hpc, Hpi, Htc, Hcl, Hir, Hsl, Hpid, Hnext⟩
-  iapply h
-  iframe Hk Hpc Hpi Htc Hcl Hir Hsl Hpid Hnext
-  unfold slUntracked
-  iempintro
-
 /-! ## The store-order (`llb`) form (Rocq `wp_acquiresleep_genl_llb_sconf`)
 
 `acquiresleep`'s entry `acquire` mints a view receipt AT ITS AMO
@@ -211,27 +174,6 @@ structure ACQUIRESLEEP_LLB : Prop where
     (j : Nat) (pid : BitVec 32) (dqp : DFrac) (tl : Nat) hj hproc hK hnoff htier,
     wp_acquiresleep_gen_llb_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl γ R H q j pid dqp tl
       hj hproc hK hnoff htier
-
-/-- The interrupts-off store-order instance. -/
-theorem ACQUIRESLEEP_LLB.wp_acquiresleep_gen_llb (A : ACQUIRESLEEP_LLB) {hlc : HasLC} {GF : BundledGFunctors}
-    [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF]
-    [CurCtx] (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (cpu : CPU) (k : KCtx) (γl γ : GName) (R : CtxId → IProp GF) [CtxMorph R] (H : Qp → IProp GF) (q : Qp)
-    (j : Nat) (pid : BitVec 32) (dqp : DFrac) (tl : Nat) hj hproc hK hsie hnoff hlocks htier :
-    wp_acquiresleep_gen_llb_body (hlc := hlc) (GF := GF) Γ cpu k γl γ R H q j pid dqp tl
-      hj hproc hK hsie hnoff hlocks htier := by
-  have h := A.wp_acquiresleep_gen_llb_eb (hlc := hlc) (GF := GF) Γ cpu k γl γ R H q j pid dqp tl
-    hj hproc hK hnoff htier
-  unfold wp_acquiresleep_gen_llb_eb_body at h
-  unfold wp_acquiresleep_gen_llb_body
-  rw [hsie] at h
-  simp only [trapCsrsExt_false, cpuClaimExt_false] at h
-  iintro ⟨Hk, Hpc, Hpi, Htc, Hcl, Hir, Hsl, HH, Htl, Hpid, Hnext⟩
-  iapply h
-  iframe Hk Hpc Hpi Htc Hcl Hir Hsl HH Htl Hpid
-  iapply wpNext_mono $$ Hnext
-  iintro %cpu' HK %spie %spp %R' %hcs Hk Hpc ⟨Htc, Hir⟩ Hcl Ht HR Hfl Hpid
-  iapply HK $$ %spie %spp %R' %hcs Hk Hpc Htc Hcl Hir Ht HR Hfl Hpid
 
 /-- `ACQUIRESLEEP` is the `tl := 0` instance. -/
 theorem ACQUIRESLEEP_LLB.toACQUIRESLEEP (A : ACQUIRESLEEP_LLB) : ACQUIRESLEEP := ⟨by

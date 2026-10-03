@@ -13,7 +13,6 @@ Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
 import MachCSL.WpGpr
 import Xv6.SpecEntry
-import MachCSL.PmpXv6Defs
 import MachCSL.SConfDefs
 
 namespace Xv6

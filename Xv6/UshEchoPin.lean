@@ -21,10 +21,9 @@ two PT_LOADs, the break, the entry pc) are the `UShGeom` chain at
 `echo_room_of_det`, `echo_key_args`, `echo_key_args_holds`.
 (`line_nonul(_x)`, `uint_avi_moi`: `Xv6/UshEchoArgs.lean`.)
 
-Re-exports, landed in UshGeom (cited, not redefined): `ubyte0_bv0`,
-`Xv6.ubyte0_bv0`, `kxc_span_le_line` (`kxcSpan_le_line`), `uk_slen_nul`
-(`ukSlen_nul`), `kexec_vec_bytes` (`kexecVecBytes`), `uk_argv_p_of_bytes`
-(`ukArgvP_of_bytes`).
+Re-exports, landed in UshGeom (cited, not redefined): `kxc_span_le_line`
+(`kxcSpan_le_line`), `uk_slen_nul` (`ukSlen_nul`), `kexec_vec_bytes`
+(`kexecVecBytes`), `uk_argv_p_of_bytes` (`ukArgvP_of_bytes`).
 
 ## Dropped (UNREACHED)
 
@@ -65,7 +64,6 @@ import Xv6.UshGeom
 import Xv6.ElfLoadable
 import Xv6.EchoFsPure
 import Xv6.PinnedExec
-import Xv6.ArgPath
 
 namespace Xv6
 
@@ -80,30 +78,20 @@ def echoPl : List (BitVec 8) := fnameEcho
 /-- **Rocq `echo_path_elems`**. -/
 theorem echoPathElems : pathElems echoPl = echoPath := by decide
 
-/-- **Rocq `echo_pl_len`**. -/
-theorem echoPlLen : echoPl.length = 4 := rfl
-
-/-- **Rocq `echo_pl_line`**: the bytes are the command name. -/
-theorem echoPlLine (j : Nat) (hj : j < 4) : echoPl[j]! = cmdEcho[j]! := by
-  have h : ∀ j, j < 4 → echoPl[j]! = cmdEcho[j]! := by decide
-  exact h j hj
-
-/-- **Rocq `echo_pl_shape`**. -/
-theorem echoPlShape : argPathShape echoPl := by
-  have hall : ∀ b ∈ echoPl, b ≠ 0#8 := by decide
-  exact ⟨by decide, fun _ b hj => hall b (List.mem_of_getElem? hj)⟩
-
 /-! ## 2. The pin resolves, at the child's cwd -/
 
 /-- **Rocq `sh_echo_pin_resolves`**. -/
-theorem shEchoPinResolves :
-    pinResolves era0EchoPins ROOTINO echoPl [ROOTINO, ECHO_INO] ECHO_INO User.Echo.elf 1 := by
-  refine ⟨?_, ?_, ?_⟩
-  · unfold umStartOf; split <;> rfl
+theorem shEchoPinResolves (rt : Nat) :
+    pinResolves era0EchoPins rt ROOTINO echoPl [ROOTINO, ECHO_INO] ECHO_INO User.Echo.elf 1 := by
+  refine ⟨?_, ?_, ?_, ?_⟩
+  · rw [umStartOf_rel rt _ _ (by decide)]; rfl
   · rw [echoPathElems]; rfl
   · intro v ⟨_, hnode, hrun⟩
     rw [echoPathElems]
     exact ⟨hrun, hnode⟩
+  · -- no element is `..`: the root-aware hop is the record one
+    show ∀ s ∈ pathElems echoPl, s ≠ DOTDOT
+    rw [echoPathElems]; decide
 
 /-! ## 3. /echo is a file xv6's exec loads, and the image it builds -/
 
@@ -216,20 +204,6 @@ theorem shExecPathOfX_holds (ws : List (List (BitVec 8))) : shExecPathOfX ws := 
     rw [ushEchoOff_0, Nat.add_zero] at e
     rw [← hal]
     exact hag _ _ e
-
-/-- **Rocq `sh_echo_path_of`**: argv[0]'s string IS "echo", terminated. -/
-def shEchoPathOf (ws : List (List (BitVec 8))) : Prop :=
-  lineOk ws →
-  ∀ (M : ElfMem) (s0 t : Nat) (g : Nat → BitVec 8), echoNodeImg ws M s0 t g → ushEchoArgvBytes ws g →
-    ∀ Mv : Nat → List (BitVec 8), imgAgrees M Mv → argPathOf Mv (BitVec.ofNat 64 s0).toNat echoPl
-
-/-- **Rocq `sh_echo_path_of_holds`** (deviation 2: through the `_x` form). -/
-theorem shEchoPathOf_holds (ws : List (List (BitVec 8))) : shEchoPathOf ws := by
-  intro hok M s0 t g himg hbytes Mv hag
-  have h := shExecPathOfX_holds ws (lineOk_execOk hok) M s0 t g himg hbytes Mv hag
-  have e : ws[0]! = cmdEcho := by simp [List.getElem!_eq_getElem?_getD, lineOk_head ws hok]
-  have hhead : ws[0]! = echoPl := e.trans (by decide)
-  rwa [hhead] at h
 
 /-! ## 5. The room, off the argument reading, and the key's own reading -/
 

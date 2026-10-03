@@ -30,7 +30,8 @@ so nothing moves `M` between the `lw` and the `sw`.
   closes the section (Rocq 670--729); the hooked release (Rocq 795--803:
   `Rin := itableRes2Llb`, hook `itableCtxHook`); `id_exit`.
 * `idup_proof` (Rocq `wp_idup_sconf`): the wrapper -- `inodeRef_shed` →
-  core → `inodeRef_gather`, around `inodeHeldAt`.
+  core → `inodeRef_gather`, around `inodeHeldAt`; and the share form
+  `wp_idup_shr` (Rocq `wp_idup_shr_sconf`), the core verbatim.
 
 ## DEVIATIONS from Rocq
 
@@ -55,6 +56,7 @@ import Xv6.IdupCore
 import Xv6.FtableLock
 import Xv6.CodeTactics
 import Xv6.IcachePinwObl
+import MachCSL.WpSmodeAuRules
 
 namespace Xv6
 
@@ -63,9 +65,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## Constants the code computes -/
 
@@ -74,11 +74,11 @@ theorem id_ret_2a : jumpPc (KA.«idup» + 0x2a#64) = (KA.«idup» + 0x2a#64) := 
 
 /-- Both `auipc a0,0x1d ; addi a0,a0,…` pairs resolve to `&itable` (the
 spinlock is `struct itable`'s first member). -/
-theorem id_lock : KA.«idup» + 0x1d880#64 = itableLock := by
+theorem id_lock : KA.«idup» + 0x1db0c#64 = itableLock := by
   unfold itableLock; decide
 
-theorem id_br_acq : KA.«idup» + 0xffffffffffffd950#64 = KA.«acquire» := by decide
-theorem id_br_rel : KA.«idup» + 0xffffffffffffd9d8#64 = KA.«release» := by decide
+theorem id_br_acq : KA.«idup» + 0xffffffffffffd93c#64 = KA.«acquire» := by decide
+theorem id_br_rel : KA.«idup» + 0xffffffffffffd9c4#64 = KA.«release» := by decide
 
 theorem id_filter_itable (l : List String) (h : "itable" ∉ l) :
     ("itable" :: l).filter (fun x => x ≠ "itable") = l := by
@@ -246,7 +246,7 @@ theorem idup_core [Fscfg] [Icfg] [CurCtx] (AC : ACQUIRE) (RE : RELEASE_HOOK)
     (hlk : "itable" ∉ k.locks) (ha0 : k.regs 10#5 = ientry kk) :
     kctx cpu k ∗ pcIs cpu KA.«idup» ∗
     isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
-    itableInv (hlc := hlc) ∗ iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗
+    itableInv (hlc := hlc) ∗ iregReg (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗
     irefSlot ∗ inodeShr kk s icfgDev inum ∗ runitAny inum.toNat ∗
     wpNext k.sie k.proc cpu (idCoreCont k kk s inum)
     ⊢ wpLoop (GF := GF) cpu := by
@@ -278,10 +278,10 @@ theorem idup_core [Fscfg] [Icfg] [CurCtx] (AC : ACQUIRE) (RE : RELEASE_HOOK)
   k_step_gen (wp_s_auipc c2 _ (KA.«idup» + 0xc#64) false 0x1e#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c3 hp3
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c3 _ (KA.«idup» + 0x10#64) false 2164#12 10#5 10#5 (by decide))
+  k_step_gen (wp_s_addi c3 _ (KA.«idup» + 0x10#64) false 2816#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [id_lock] next c4 hp4
   iintro Hk Hpc
-  k_step_gen (wp_s_jal c4 _ (KA.«idup» + 0x14#64) false 2087228#21 1#5 (by decide))
+  k_step_gen (wp_s_jal c4 _ (KA.«idup» + 0x14#64) false 2087208#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [id_br_acq] next c5 hp5
   iintro Hk Hpc
   iapply (id_acquire AC c5 _ ?ha0 ?hna ?hKa ?hla) $$ [- $Hk $Hpc]
@@ -355,10 +355,10 @@ theorem idup_core [Fscfg] [Icfg] [CurCtx] (AC : ACQUIRE) (RE : RELEASE_HOOK)
   k_step (wp_s_auipc c _ (KA.«idup» + 0x1e#64) false 0x1e#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_addi c _ (KA.«idup» + 0x22#64) false 2146#12 10#5 10#5 (by decide))
+  k_step (wp_s_addi c _ (KA.«idup» + 0x22#64) false 2798#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [id_lock]
   iintro Hk Hpc
-  k_step (wp_s_jal c _ (KA.«idup» + 0x26#64) false 2087346#21 1#5 (by decide))
+  k_step (wp_s_jal c _ (KA.«idup» + 0x26#64) false 2087326#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [id_br_rel]
   iintro Hk Hpc
   iapply (id_release RE c _ ?ha0 ?hsr ?hnr ?hKr k.sie ?hrr ?hor) $$ [- $Hk $Hpc $Hlocked $HR]
@@ -438,6 +438,11 @@ theorem idup_proof (AC : ACQUIRE) (RE : RELEASE_HOOK) : IDUP := ⟨
     isplitr; · ipureintro; exact hinb
     isplitr; · ipureintro; exact hipos
     isplitr; · ipureintro; exact hz
-    iframe Hnew Hru2⟩
+    iframe Hnew Hru2,
+  -- THE SHARE FORM, PUBLIC (chroot.md §2.2): the core, verbatim
+  fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ cpu k kk s inum hnoff hK hkk hlk ha0 => by
+  unfold wp_idup_shr_body
+  simp only [idupAddr]
+  exact idup_core AC RE cpu k kk s inum hnoff hK hkk hlk ha0⟩
 
 end Xv6

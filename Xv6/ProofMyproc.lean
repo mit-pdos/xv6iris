@@ -25,19 +25,19 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 hart's `128 * id`, plus the load's `48`. -/
 theorem myproc_cpu_addr (cpu : CPU) :
     BitVec.signExtend 64 (BitVec.extractLsb' 0 32 (hartId cpu)) <<< 7 +
-      (KA.«myproc» + 0x10b08#64) = aCpuProc cpu := by
+      (KA.«myproc» + 0x10bb4#64) = aCpuProc cpu := by
   rw [MachCSL.hart_shift]
-  have hcp : KA.«myproc» + 0x10b08#64 = KA.«cpus» := by decide
+  have hcp : KA.«myproc» + 0x10bb4#64 = KA.«cpus» := by decide
   rw [hcp]
   unfold aCpuProc cpuAddr procOff cpuSize
   have hb : (KernelGeom.cpusBase : BitVec 64) = KA.«cpus» := rfl
   rw [hb, BitVec.add_comm, BitVec.add_zero]
 
-theorem myproc_br_fffffffffffff310 : KA.«myproc» + 0xfffffffffffff310#64 = KA.«pop_off» := by decide
+theorem myproc_br_fffffffffffff31c : KA.«myproc» + 0xfffffffffffff31c#64 = KA.«pop_off» := by decide
 
-theorem myproc_br_10ad8 : KA.«myproc» + 0x10ad8#64 = KA.«pid_lock» := by decide
+theorem myproc_br_10b84 : KA.«myproc» + 0x10b84#64 = KA.«pid_lock» := by decide
 
-theorem myproc_br_fffffffffffff296 : KA.«myproc» + 0xfffffffffffff296#64 = KA.«push_off» := by decide
+theorem myproc_br_fffffffffffff2a2 : KA.«myproc» + 0xfffffffffffff2a2#64 = KA.«push_off» := by decide
 
 set_option maxHeartbeats 4000000 in
 theorem myproc_proof (PU : PUSHOFF) (PO : POPOFF) : MYPROC := ⟨fun {hlc GF} _ _ cpu k hnoff hK => by
@@ -56,8 +56,8 @@ theorem myproc_proof (PU : PUSHOFF) (PO : POPOFF) : MYPROC := ⟨fun {hlc GF} _ 
   iapply wpNext_intro_pin
   iintro %c1 %hp1 Hk Hpc Hframe
   -- jal push_off
-  k_step_gen (wp_s_jal c1 _ (KA.«myproc» + 0xa#64) false 2093708#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext
-    $$ [- $Hk $Hpc] with [myproc_br_fffffffffffff296] next c2 hp2
+  k_step_gen (wp_s_jal c1 _ (KA.«myproc» + 0xa#64) false 2093720#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext
+    $$ [- $Hk $Hpc] with [myproc_br_fffffffffffff2a2] next c2 hp2
   iintro Hk Hpc
   -- push_off (its contract, unfolded, at the callee's context)
   have hpu : ∀ (k' : KCtx) (hnoff' : k'.noff + 1 < 2 ^ 31) (hK' : 6 ≤ k'.avail),
@@ -101,7 +101,7 @@ theorem myproc_proof (PU : PUSHOFF) (PO : POPOFF) : MYPROC := ⟨fun {hlc GF} _ 
 
   iintro Hk Hpc
   -- addi a4,a4,-1334
-  k_step (wp_s_addi c3 _ (KA.«myproc» + 0x18#64) false 2756#12 14#5 14#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [myproc_br_10ad8]
+  k_step (wp_s_addi c3 _ (KA.«myproc» + 0x18#64) false 2928#12 14#5 14#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [myproc_br_10b84]
 
   iintro Hk Hpc
   -- add a5,a5,a4
@@ -117,7 +117,7 @@ theorem myproc_proof (PU : PUSHOFF) (PO : POPOFF) : MYPROC := ⟨fun {hlc GF} _ 
   k_step (wp_s_add c3 _ (KA.«myproc» + 0x20#64) true 9#5 0#5 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- jal pop_off
-  k_step (wp_s_jal c3 _ (KA.«myproc» + 0x22#64) false 2093806#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [myproc_br_fffffffffffff310]
+  k_step (wp_s_jal c3 _ (KA.«myproc» + 0x22#64) false 2093818#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [myproc_br_fffffffffffff31c]
   iintro Hk Hpc
   -- pop_off (its contract, unfolded, at the callee's context)
   have hpo : ∀ (k' : KCtx) (hsie' : k'.sie = false) (hnoff' : 1 ≤ k'.noff)
@@ -183,11 +183,10 @@ theorem myproc_proof (PU : PUSHOFF) (PO : POPOFF) : MYPROC := ⟨fun {hlc GF} _ 
   obtain ⟨c4_2, c4_8, c4_9, c4_18, c4_19, c4_20, c4_21, c4_22, c4_23, c4_24, c4_25, c4_26, c4_27⟩ := hcs4
   obtain ⟨c2_2, c2_8, c2_9, c2_18, c2_19, c2_20, c2_21, c2_22, c2_23, c2_24, c2_25, c2_26, c2_27⟩ := hcs2
   simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] at c4_9 c4_18 c4_19 c4_20 c4_21 c4_22 c4_23 c4_24 c4_25 c4_26 c4_27
-  simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] at c2_18 c2_19 c2_20 c2_21 c2_22 c2_23 c2_24 c2_25 c2_26 c2_27
+  simp only [RegMap.set_apply, BitVec.reduceEq, ite_false] at c2_18 c2_19 c2_20 c2_21 c2_22 c2_23 c2_24 c2_25 c2_26 c2_27
   constructor
   · unfold calleeSaved
-    simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, eq_self_iff_true, _root_.true_and,
-      _root_.and_true]
+    simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, _root_.true_and]
     exact ⟨c4_18.trans c2_18, c4_19.trans c2_19, c4_20.trans c2_20, c4_21.trans c2_21, c4_22.trans c2_22,
       c4_23.trans c2_23, c4_24.trans c2_24, c4_25.trans c2_25, c4_26.trans c2_26, c4_27.trans c2_27⟩
   · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]

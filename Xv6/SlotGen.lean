@@ -21,8 +21,8 @@ whose halves meet, and this file is the two of them:
   slot's ADDRESS (what `procDormant` / `procPriv` are stated at).  A
   fractional agreement with NO AUTHORITY: the whole updates on its own
   (allocproc, at the mint), two fractions agree, and the whole excludes
-  every other fraction (`slotGen_whole_excl`, which is how kfork proves the
-  slot it just took has no entry in the wait-lock invariant).
+  every other fraction (which is how kfork proves the slot it just took
+  has no entry in the wait-lock invariant).
 * `pidReg pid dq γ` -- PID `pid` is registered to generation γ.  Here there
   IS an authority (`pidRegAuth`, in `pid_lock`'s payload), because a pid is
   CHOSEN: allocproc's scan proves the key fresh, under that lock.  Two
@@ -69,11 +69,8 @@ party that threads a lock's gname.
 2. **`qeighth` is `Qp.quarter.half`** (Rocq `(1/4)/2`, a notation because
    stdpp's `Qp` numerals stop at 4).
 3. **`PIDMAX` is `genPidMax`, a literal `1000`** (Rocq `ProcGeom.PIDMAX`).
-   Lean's `PIDMAX` lives in `Xv6/PidLock.lean`, which will have to IMPORT
-   this file (Rocq `PidLock.nextpid_res_at` carries `pid_reg_auth`), so this
-   file cannot import it.  `genPidMax_eq : genPidMax = PIDMAX := rfl` belongs
-   wherever both are in scope; better, `PIDMAX` moves down into the
-   geometry (Rocq `ProcGeom.v`) -- see the report.
+   Lean's `PIDMAX` is `Xv6/ProcGeom.lean`'s, which this file imports;
+   `genPidMax = PIDMAX` holds by `rfl`.
 4. **The pid register's domain fact (`pidRegDom`) is over the FUNCTION
    `pids : Nat → BitVec 32`** (Rocq: over `list (mword 32)`), because the
    Lean `pid_lock` payload (`PidLock.pidLockResAt`) and allocproc's scan
@@ -123,10 +120,6 @@ party that threads a lock's gname.
    returned lend, then the tail -- Lean's ring-one contracts take the lend
    back right after the return pc (Rocq: as the third premise, after
    `sie_cap_gpr` and `cpu_own`, which Lean's `kctx` bundles).
-   Two more shapes (permit sweep L2): `actLend_cont_frame_x`, the same
-   with a fourth bound value after `R'` (`mappages`' `fresh`), and
-   `actLend_cont_frame_r`, `∀ R'` with two premises (`uvmunmap`'s raw
-   form, which keeps the interrupt bits).
 11. **`actLend_step` / `actLend_ret_step` / `actLend_cont_give` (permit
    sweep L3b, no Rocq counterpart: Rocq never landed L3).**  The step the
    allocator's led forms take (`|==>`, the left disjunct kept, the counter
@@ -147,8 +140,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
 open Iris.Algebra OFE COFE
-
-set_option linter.unusedSectionVars false
 
 /-! ## The cameras (Rocq `Xv6Cameras.v` §14; deviation 1) -/
 
@@ -246,10 +237,6 @@ abbrev qeighth : Qp := Qp.quarter.half
 /-- Rocq `PIDMAX` (deviation 3). -/
 def genPidMax : Nat := 1000
 
-/-- ...and it IS the geometry's `PIDMAX` (now that `Xv6/ProcGeom.lean` sits
-below this file). -/
-theorem genPidMax_eq : genPidMax = PIDMAX := rfl
-
 /-! ## The element, and the map the boot mint hands out -/
 
 /-- one slot's entry (Rocq `sg_one`). -/
@@ -341,17 +328,6 @@ theorem slotGen_agree (pa : BitVec 64) (dq dq' : DFrac) (g g' : GName) :
     slotGen (GF := GF) pa dq g ∗ slotGen pa dq' g' ⊢ ⌜g = g'⌝ :=
   (slotGen_valid2 pa dq dq' g g').trans (pure_mono And.right)
 
-/-- ...AND THE WHOLE EXCLUDES EVERYTHING.  kfork holds the whole for the
-slot allocproc just gave it -- the freshness the deposit needs, as a
-resource fact and not a pure one. -/
-theorem slotGen_whole_excl (pa : BitVec 64) (dq : DFrac) (g g' : GName) :
-    slotGen (GF := GF) pa (.own 1) g ∗ slotGen pa dq g' ⊢ False := by
-  refine (slotGen_valid2 pa _ dq g g').trans (pure_elim' fun h => ?_)
-  exact absurd h.1 (by
-    intro hv
-    have := DFrac.valid_own_op hv
-    simp at this)
-
 theorem slotGen_split (pa : BitVec 64) (q1 q2 : Qp) (g : GName) :
     slotGen (GF := GF) pa (.own (q1 + q2)) g ⊣⊢ slotGen pa (.own q1) g ∗ slotGen pa (.own q2) g := by
   unfold slotGen
@@ -421,19 +397,6 @@ def actCnt (pa : BitVec 64) (k : Nat) : IProp GF :=
 
 instance actCnt_timeless (pa : BitVec 64) (k : Nat) : Timeless (actCnt (GF := GF) pa k) := by
   unfold actCnt; infer_instance
-
-/-- Rocq `act_cnt_excl`. -/
-theorem actCnt_excl (pa : BitVec 64) (k k' : Nat) :
-    actCnt (GF := GF) pa k ∗ actCnt pa k' ⊢ False := by
-  unfold actCnt actOne sgOne
-  iintro ⟨H1, H2⟩
-  icombine H1 H2 gives %Hv
-  rw [Heap.singleton_op_singleton, Heap.singleton_valid_iff] at Hv
-  obtain ⟨hd, -⟩ := DFracAgree.op_valid.mp Hv
-  exact absurd hd (by
-    intro hv
-    have := DFrac.valid_own_op hv
-    simp at this)
 
 /-- Rocq `act_cnt_update`: the holder moves the count anywhere. -/
 theorem actCnt_update (pa : BitVec 64) (k k' : Nat) :
@@ -561,39 +524,6 @@ theorem actLend_cont_frame_ret (sie : Bool) (p : BitVec 64) (cpu : CPU) (p' : Bi
   unfold wpNext
   iintro H Hl %cpu' %h %spie %spp %R' HA HB HC
   iapply H $$ %cpu' %h %spie %spp %R' HA HB HC Hl
-
-/-- `actLend_cont_frame` at a continuation that binds one more value after
-`R'` (`mappages`' freshly allocated pages, permit sweep L2). -/
-theorem actLend_cont_frame_x {α : Type} (sie : Bool) (p : BitVec 64) (cpu : CPU) (p' : BitVec 64)
-    (ke : Nat) (A B C T : CPU → Bool → Bool → RegMap → α → IProp GF) :
-    wpNext sie p cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (x : α),
-      A cpu' spie spp R' x -∗ B cpu' spie spp R' x -∗ C cpu' spie spp R' x -∗
-      (∃ k' : Nat, ⌜ke ≤ k'⌝ ∗ actLend p' k') -∗ T cpu' spie spp R' x)) ⊢
-    actLend p' ke -∗
-    wpNext sie p cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (x : α),
-      A cpu' spie spp R' x -∗ B cpu' spie spp R' x -∗ C cpu' spie spp R' x -∗
-      T cpu' spie spp R' x)) := by
-  unfold wpNext
-  iintro H Hl %cpu' %h %spie %spp %R' %x HA HB HC
-  iapply H $$ %cpu' %h %spie %spp %R' %x HA HB HC
-  iexists ke
-  iframe Hl
-  ipureintro; exact Nat.le_refl ke
-
-/-- `actLend_cont_frame` at a continuation `∀ R'` with two premises (the
-context and the return pc; `uvmunmap`'s raw form, permit sweep L2). -/
-theorem actLend_cont_frame_r (sie : Bool) (p : BitVec 64) (cpu : CPU) (p' : BitVec 64) (ke : Nat)
-    (A B T : CPU → RegMap → IProp GF) :
-    wpNext sie p cpu (fun cpu' => iprop(∀ (R' : RegMap),
-      A cpu' R' -∗ B cpu' R' -∗ (∃ k' : Nat, ⌜ke ≤ k'⌝ ∗ actLend p' k') -∗ T cpu' R')) ⊢
-    actLend p' ke -∗
-    wpNext sie p cpu (fun cpu' => iprop(∀ (R' : RegMap), A cpu' R' -∗ B cpu' R' -∗ T cpu' R')) := by
-  unfold wpNext
-  iintro H Hl %cpu' %h %R' HA HB
-  iapply H $$ %cpu' %h %R' HA HB
-  iexists ke
-  iframe Hl
-  ipureintro; exact Nat.le_refl ke
 
 /-- **THE STEP** (permit sweep L3b, no Rocq counterpart; design
 ni-strong-instance.md §7): what an allocator event costs.  At `p = 0` (the
@@ -871,11 +801,6 @@ theorem initPidIs_agree (p p' : BitVec 32) : initPidIs (GF := GF) p ∗ initPidI
   unfold initPidIs
   exact (ipid_valid2 _ _ _ p p').trans (pure_mono And.right)
 
-/-- ...and the form a child spends it in: its own pid is not init's -/
-theorem initPidIs_ne (p p' : BitVec 32) (hne : p ≠ p') :
-    initPidIs (GF := GF) p ∗ initPidIs p' ⊢ False :=
-  (initPidIs_agree p p').trans (pure_elim' fun h => absurd h hne)
-
 theorem ipid_one_valid (p : BitVec 32) :
     ✓ (some (DFracAgree.mk (.own 1) (⟨p⟩ : DiscreteO (BitVec 32))) : IpidUR) :=
   DFracAgree.mk_valid.mpr DFrac.valid_own_one
@@ -889,14 +814,6 @@ theorem initPid_set (p p' : BitVec 32) : initPidTok (GF := GF) p ⊢ |==> initPi
 theorem initPid_seal (p : BitVec 32) : initPidTok (GF := GF) p ⊢ |==> initPidIs p := by
   unfold initPidTok initPidIs
   exact iOwn_update (Update.option _ _ DFracAgree.persist)
-
-/-- the token is EXCLUSIVE, which is what keeps the seal a one-shot -/
-theorem initPidTok_excl (p p' : BitVec 32) : initPidTok (GF := GF) p ∗ initPidTok p' ⊢ False := by
-  unfold initPidTok
-  refine (ipid_valid2 _ _ _ p p').trans (pure_elim' fun h => absurd h.1 ?_)
-  intro hv
-  have := DFrac.valid_own_op hv
-  simp at this
 
 /-! ## The pid counter's boot-era token (lane TRAP-ROWS-4, B1b)
 
@@ -975,29 +892,6 @@ def pidLedLb (h : List Pev) : IProp GF := WchG.wplName GF ↪◯ML h
 instance pidLedLb_persistent (h : List Pev) : Persistent (pidLedLb (GF := GF) h) := by
   unfold pidLedLb; infer_instance
 
-theorem pidLedAuth_lb (h : List Pev) :
-    pidLedAuth (GF := GF) h ⊢ pidLedAuth h ∗ pidLedLb h := by
-  unfold pidLedAuth pidLedLb
-  iintro Ha
-  ihave #Hb := MonoList.lb_own_get (WchG.wplName GF) _ h $$ Ha
-  isplitl [Ha]
-  · iexact Ha
-  · iexact Hb
-
-theorem pidLedLb_prefix (h h' : List Pev) :
-    pidLedAuth (GF := GF) h ⊢ pidLedLb h' -∗ ⌜h' <+: h⌝ := by
-  unfold pidLedAuth pidLedLb
-  iintro Ha Hb
-  ihave %hv := MonoList.auth_lb_own_valid (WchG.wplName GF) _ h h' $$ Ha Hb
-  ipureintro; exact hv.2
-
-/-- Two lower bounds of the one ledger are comparable (Rocq `pid_led_lb_lb`). -/
-theorem pidLedLb_lb (h h' : List Pev) :
-    pidLedLb (GF := GF) h ⊢ pidLedLb h' -∗ ⌜h <+: h' ∨ h' <+: h⌝ := by
-  unfold pidLedLb
-  iintro Ha Hb
-  iapply MonoList.lb_own_valid (WchG.wplName GF) h h' $$ Ha Hb
-
 theorem pidLedAuth_grow (h : List Pev) (e : Pev) :
     pidLedAuth (GF := GF) h ⊢ |==> (pidLedAuth (h ++ [e]) ∗ pidLedLb (h ++ [e])) := by
   unfold pidLedAuth pidLedLb
@@ -1034,10 +928,6 @@ def genHalvesPriv (pa : BitVec 64) (pid : BitVec 32) (g : GName) : IProp GF :=
 theorem genHalvesPriv_nz (pa : BitVec 64) (pid : BitVec 32) (g : GName) :
     genHalvesPriv (GF := GF) pa pid g ⊢ ⌜pid.toNat ≠ 0⌝ :=
   sep_elim_left.trans (genHalvesAt_nz pa pid g)
-
-theorem genHalvesPriv_rng (pa : BitVec 64) (pid : BitVec 32) (g : GName) :
-    genHalvesPriv (GF := GF) pa pid g ⊢ ⌜1 ≤ pid.toNat ∧ pid.toNat ≤ genPidMax⌝ :=
-  sep_elim_left.trans (genHalvesAt_rng pa pid g)
 
 /-- how the two sites that BUILD one discharge it: both hold allocproc's
 range and the marker the mint handed out -/
@@ -1079,12 +969,6 @@ theorem genHalvesPriv_sg (pa : BitVec 64) (pid : BitVec 32) (g : GName) :
   isplitl [Hback Hsg]
   · iapply Hback $$ Hsg
   · iexact Ht
-
-/-- THE SPLIT `kexit` TAKES: the marker out, the rest into the park
-(`genHalvesDorm` at ZOMBIE is exactly `genHalvesAt`). -/
-theorem genHalvesPriv_split (pa : BitVec 64) (pid : BitVec 32) (g : GName) :
-    genHalvesPriv (GF := GF) pa pid g ⊢ genHalvesAt pa pid g ∗ takenAt g := by
-  unfold genHalvesPriv; exact .rfl
 
 end SlotGenTok
 

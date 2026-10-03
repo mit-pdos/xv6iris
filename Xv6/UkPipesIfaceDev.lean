@@ -26,15 +26,14 @@ CONE (reached): `pns_lexit_of_lend`, `pns_out`, `pns_outh`, `pns_halt`,
    `pfilter` equality `Fp = filt_pf F` is Lean `=` on `PFilter`.
 -/
 import Xv6.UkPipesIfaceReg
-import Xv6.UkPipesIfaceDevU
+import Xv6.PnsKeep
+import Xv6.UkPipeDevDefs
 
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Iris.Std.PartialMap
 open Std (ExtTreeSet)
-
-set_option linter.unusedSectionVars false
 
 section Lexit
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [IcacheG GF] [PipeProtoG GF] [PipeOutG GF] [CtokG GF] [DiskG GF] [EchoOutG GF]

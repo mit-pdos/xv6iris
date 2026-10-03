@@ -87,7 +87,7 @@ theorem ushI_67a (γt : GName) :
     ushCode (GF := GF) γt ⊢ uinstrIs γt (BitVec.ofNat 64 0x67a) false (.UTYPE (1#20, .Regidx 12#5, .AUIPC)) :=
   ushm_uisK γt 0x67a _ _ (by kernel_rfl) (by decide)
 
-/-- `0x67e  addi a2,a2,-858 # 1320 <malloc+0x1b0>` -/
+/-- `0x67e  addi a2,a2,-858 # 1320 <malloc+0x1a8>` -/
 theorem ushI_67e (γt : GName) :
     ushCode (GF := GF) γt ⊢ uinstrIs γt (BitVec.ofNat 64 0x67e) false (.ITYPE (3238#12, .Regidx 12#5, .Regidx 12#5, .ADDI)) :=
   ushm_uisK γt 0x67e _ _ (by kernel_rfl) (by decide)

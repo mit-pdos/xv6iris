@@ -44,6 +44,7 @@ import Xv6.UkReadPipe
 import Xv6.UkPipeDevXv6
 import Xv6.UshArmDefs
 import Xv6.UshStep
+import Xv6.UshRunCode
 
 namespace Xv6
 
@@ -52,8 +53,6 @@ namespace UShPipeCall
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
-
-set_option linter.unusedSectionVars false
 
 /-- **Rocq `shpc_pipe`**: sh's `pipe` stub is at 0xc72. -/
 theorem shpc_pipe : User.Sh.Sym.«pipe» = 0xc72 := rfl

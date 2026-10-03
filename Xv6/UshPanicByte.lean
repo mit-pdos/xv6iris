@@ -37,14 +37,13 @@ import Xv6.UshPanicStub
 import Xv6.UshDiagDefs
 import Xv6.UshOut
 import Xv6.LinkRec
+import Xv6.UEchoOut
 
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
-
-set_option linter.unusedSectionVars false
 
 section UshPanicByte
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]

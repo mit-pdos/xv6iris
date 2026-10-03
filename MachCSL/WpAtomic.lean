@@ -104,9 +104,9 @@ theorem memModel_read_excl (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w :
   · iapply Hclose $$ %(σ.afterExcl cpu pa n w acq)
     · ipureintro
       intro c hc
-      simp [MState.afterExcl, updCpu, hc]
+      simp [updCpu, hc]
     · iapply hartViewsAt_intro
-      simp only [MState.afterExcl, updCpu, if_true, HRead.afterExcl]
+      simp only [updCpu, if_true, HRead.afterExcl]
       iframe Hv Hi Hr
   · ipureintro
     obtain ⟨h1, h2, h3, h4⟩ := hmm
@@ -115,11 +115,11 @@ theorem memModel_read_excl (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w :
       simp only [MState.top] at *
       by_cases hc : c = cpu
       · subst hc
-        simp only [MState.afterExcl, updCpu, if_true, HRead.afterExcl]
+        simp only [updCpu, if_true, HRead.afterExcl]
         refine ⟨by split <;> omega, a2, Nat.le_refl _, a4⟩
-      · simp only [MState.afterExcl, updCpu, hc, if_false]
+      · simp only [updCpu, hc, if_false]
         exact ⟨a1, a2, a3, a4⟩
-    · simp only [MState.afterExcl, updCpu] at hr ⊢
+    · simp only [updCpu] at hr ⊢
       by_cases hc : c = cpu
       · subst hc
         simp only [if_true, Option.some.injEq] at hr
@@ -155,14 +155,6 @@ theorem memModel_read_excl (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w :
           cases hav
       · simp only [hc, if_false] at hr
         exact h3 c r hr
-
-theorem hartViews_store_excl (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
-    (c : CPU) (hc : c ≠ cpu) : hartViewsAt (GF := GF) E (σ.store cpu pa n w true) c = hartViewsAt E σ c := by
-  unfold hartViewsAt
-  have e1 : (σ.store cpu pa n w true).tv c = σ.tv c := by simp [updCpu, hc]
-  have e2 : (σ.store cpu pa n w true).itv c = σ.itv c := rfl
-  have e3 : ((σ.store cpu pa n w true).hr c).rv = (σ.hr c).rv := by simp [updCpu, hc]
-  rw [e1, e2, e3]
 
 /-- The write half of an exclusive pair (the store consumes the
 reservation and the acquire bit; an acquire pair's floor passes its own

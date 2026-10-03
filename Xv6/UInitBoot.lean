@@ -45,15 +45,12 @@ THE PAYLOAD IS THE TRIVIAL ONE: `<init>` has no parent.
 import Xv6.InitBoot
 import Xv6.PinnedExecBundle
 import Xv6.FsInitPinBoot
-import Xv6.KexecLoad
 import Xv6.UInitKernel
 
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode MachCSL
 open Std (ExtTreeSet)
-
-set_option linter.unusedSectionVars false
 
 /-! ## 1.  The path, as the walk reads it -/
 
@@ -69,15 +66,19 @@ theorem initBytes_elf : initBytes = User.Init.elf := rfl
 /-! ## 2.  The pin resolves -/
 
 /-- **Rocq `init_boot_pin_resolves`**: "/init" is ABSOLUTE, so the walk
-starts at the root (and /init's cwd is the root too). -/
+starts at the root -- the first process's, which userinit installs at
+`ROOTINO` -- and /init's cwd is the root too. -/
 theorem initBootPinResolves :
-    pinResolves era0Pins ROOTINO initBootPath [ROOTINO, INIT_INO] INIT_INO User.Init.elf 1 := by
-  refine ⟨?_, ?_, ?_⟩
+    pinResolves era0Pins ROOTINO ROOTINO initBootPath [ROOTINO, INIT_INO] INIT_INO User.Init.elf 1 := by
+  refine ⟨?_, ?_, ?_, ?_⟩
   · unfold umStartOf; split <;> rfl
   · rw [initBootPathElems]; rfl
   · intro v ⟨_, hnode, hrun⟩
     rw [initBootPathElems, ← initBytes_elf]
     exact ⟨hrun, hnode⟩
+  · -- no element is `..`
+    show ∀ s ∈ pathElems initBootPath, s ≠ DOTDOT
+    rw [initBootPathElems]; decide
 
 /-! ## 3.  The room: /init's frames fit under its argument block -/
 
@@ -112,12 +113,12 @@ theorem initBootBundle_of_pinned (initElfLoadable : kexecLoadable User.Init.elf)
         myPay W'.gen (fun _ => iprop(True)) -∗ Pay -∗ uslot (hlc := hlc) (SG := SG) W') -∗
       iprop(□ ∀ W' : Uvis, T -∗ myPay W'.gen (fun _ => iprop(True)) -∗ uslot (hlc := hlc) (SG := SG) W') -∗
       (consReader fscCons 0 -∗ Pay) -∗
-      initBootBundle (hlc := hlc) (SG := SG) ROOTINO seccAll fdt0 := by
+      initBootBundle (hlc := hlc) (SG := SG) ROOTINO ROOTINO seccAll fdt0 := by
   iintro #Hcl #Hinv #Hcon #Hgen HPay
   unfold initBootBundle
   iintro Hrd
   ihave HP := HPay $$ Hrd
-  iapply pinnedExecBundle_boot fscFs (uslot (hlc := hlc) (SG := SG)) era0Pins T ROOTINO seccAll initBootPath
+  iapply pinnedExecBundle_boot fscFs (uslot (hlc := hlc) (SG := SG)) era0Pins T ROOTINO ROOTINO seccAll initBootPath
     [ROOTINO, INIT_INO] INIT_INO User.Init.elf 1 Pay (fun _ => iprop(True)) 1 (fun _ => 5)
     (fun _ => initBootBytes) fdt0 initBootPinResolves initElfLoadable $$ Hcl Hinv Hcon Hgen HP
 

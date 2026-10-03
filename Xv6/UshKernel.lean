@@ -62,7 +62,6 @@ payload is applied at (`shPayKey`).
 -/
 import Xv6.ElfUserSh
 import Xv6.KexecImageOk
-import Xv6.UkRun
 import Xv6.UshMainPure
 
 namespace Xv6
@@ -85,29 +84,6 @@ theorem shkImgSub_of_elf (M : ElfMem) (h : uimgSub (elfImage User.Sh.elf) M) :
     uimgSub User.Sh.code.byte M := by
   rw [User.Sh.elf_image] at h
   exact uimgSub_union_l _ _ _ (uimgSub_union_l _ _ _ h)
-
-/-- **Rocq `elf_segments_loads`**: the PT_LOAD table read off
-`elfSegments`, for a VARIABLE file. -/
-theorem elfSegments_loads (f : ElfBytes) (segs : List (Nat × Nat × Nat × Nat))
-    (h : elfSegments f = some segs) :
-    (elfLoads f).map (fun p => (p.vaddr, p.filesz, p.memsz, p.flags)) = segs := by
-  unfold elfSegments at h
-  unfold elfLoads
-  cases hp : elfPhdrs f with
-  | none => rw [hp] at h; cases h
-  | some ps =>
-    rw [hp] at h
-    simp only [Option.bind_eq_bind, Option.bind_some] at h
-    cases h
-    rfl
-
-/-- **Rocq `sh_loads`** (deviation 3): sh's two PT_LOADs, `(0x0, 0x1c74,
-R-X)` and `(0x2000, 0x98, RW-)`. -/
-theorem shLoads :
-    ∃ p0 p1 : ElfPhdr, elfLoads User.Sh.elf = [p0, p1] ∧
-      p0.vaddr = 0 ∧ p0.memsz = 0x1c74 ∧ p0.flags = 5 ∧
-      p1.vaddr = 0x2000 ∧ p1.memsz = 0x98 ∧ p1.flags = 6 :=
-  ⟨_, _, User.Sh.elf_loads, rfl, rfl, rfl, rfl, rfl, rfl⟩
 
 /-- The break's page, read off `elfMemEnd` for a VARIABLE file (the kernel
 never evaluates sh's 29 KB constant: a defeq check against the concrete
@@ -140,39 +116,16 @@ theorem shSz_ok : uszOk (kexecSz User.Sh.elf + 65536) := by rw [shKexecSz]; unfo
 theorem shStart_pc : retPc (BitVec.ofNat 64 User.Sh.entry) = BitVec.ofNat 64 User.Sh.Sym.«start» := by
   decide
 
-/-- **Rocq `csp_rs1_eq`**: the stack pointer's register index. -/
-theorem cspRs1_eq : spIdx = 2#5 := rfl
-
 /-- **Rocq `kxc_sp_final_mod8`**: the final sp is 16-rounded, hence
 8-aligned. -/
 theorem kxcSpFinal_mod8 (top : Int) (alen : Nat → Nat) (na : Nat) : kxcSpFinal top alen na % 8 = 0 := by
   unfold kxcSpFinal kxcRound16; omega
-
-/-- **Rocq `sh_page_perm`** (deviation 4): a page's permission, read at any
-address on the page. -/
-theorem shPagePerm (π : Nat → Option UPerm) (b a : Nat) (q : UPerm) (hq : π (kexecPg b) = some q)
-    (hb : b % 4096 = 0) (ha1 : b ≤ a) (ha2 : a < b + 4096) (hhi : b + 4096 ≤ 274877906944) :
-    upermAt π (BitVec.ofNat 64 a) = some q := by
-  unfold upermAt
-  unfold kexecPg at hq
-  rw [BitVec.toNat_ofNat, Nat.mod_eq_of_lt (by omega)]
-  rw [show a / 4096 = b / 4096 by omega]
-  exact hq
 
 /-- **Rocq `udata_lo_is_Some`** (deviation 4). -/
 theorem udataLo_isSome (M : ElfMem) (π : Nat → Option UPerm) (sz a : Nat) (b : BitVec 8) (hM : M a = some b)
     (hw : uwAddr π a) (hlt : a < sz) (hcap : a < uCap) : (get? (udataLo M π sz) a).isSome := by
   rw [udataLo_get, if_pos hlt, udataPart_get, if_pos ⟨hcap, hw⟩, hM]
   rfl
-
-/-- **Rocq `uw_addr_of_perm`**. -/
-theorem uwAddr_of_perm (π : Nat → Option UPerm) (a : Nat) (q : UPerm) (hq : upermAt π (BitVec.ofNat 64 a) = some q)
-    (hw : q.W = true) (ha : a < 2 ^ 64) : uwAddr π a := by
-  unfold upermAt at hq
-  rw [BitVec.toNat_ofNat, Nat.mod_eq_of_lt ha] at hq
-  unfold uwAddr uwB
-  rw [hq]
-  simpa using hw
 
 /-- NEW (deviation 6): the page permissions `kxbPermOk` pins at sh's
 literal PT_LOAD table -- text R-X on pages 0 and 1, the .data/.bss page

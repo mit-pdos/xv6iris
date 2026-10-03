@@ -59,9 +59,6 @@ flag, pipeclose's own argument; `true` closes the write end. -/
 def pstClose (w : Bool) (s : PipeSt) : PipeSt :=
   if w then ⟨s.ws, s.rp, s.ro, false⟩ else ⟨s.ws, s.rp, false, s.wo⟩
 
-/-- The open flag of end `w` (Rocq `pst_open`). -/
-def pstOpen (w : Bool) (s : PipeSt) : Bool := if w then s.wo else s.ro
-
 /-- The queue is empty: nothing written past the pointer (Rocq `pst_empty`). -/
 def pstEmpty (s : PipeSt) : Prop := s.rp = s.ws.length
 
@@ -75,11 +72,6 @@ theorem pstWrite_ws (b : BitVec 8) (s : PipeSt) : (pstWrite b s).ws = s.ws ++ [b
 theorem pstWrite_rp (b : BitVec 8) (s : PipeSt) : (pstWrite b s).rp = s.rp := rfl
 theorem pstRead_ws (s : PipeSt) : (pstRead s).ws = s.ws := rfl
 theorem pstRead_rp (s : PipeSt) : (pstRead s).rp = s.rp + 1 := rfl
-theorem pstClose_open (w : Bool) (s : PipeSt) : pstOpen w (pstClose w s) = false := by
-  cases w <;> rfl
-theorem pstClose_other (w : Bool) (s : PipeSt) :
-    pstOpen (!w) (pstClose w s) = pstOpen (!w) s := by
-  cases w <;> rfl
 theorem pstClose_ws (w : Bool) (s : PipeSt) : (pstClose w s).ws = s.ws := by cases w <;> rfl
 theorem pstClose_rp (w : Bool) (s : PipeSt) : (pstClose w s).rp = s.rp := by cases w <;> rfl
 

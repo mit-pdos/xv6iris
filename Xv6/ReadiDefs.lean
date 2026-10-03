@@ -13,7 +13,7 @@ contract at its call site.
    deviation 5's `rdImg` equation).  Rocq's `rd_q` (the vestigial pid fraction) is `rdQ`, and
    now names a real fraction: the user arm's pid share IS `pidPriv`, the
    one inside the running block.
-2. bread / brelse are called through the shared `Xv6.bread_call` /
+2. bread / brelse are called through the shared `Xv6.bread_call_eb` /
    `Xv6.brelse_call` (FsCallSites).  `rd_copyout` is the whole
    either_copyout step on both arms (the kernel arm's window split and
    spliced back, the user arm's `rdImg` advanced by the chunk it wrote).
@@ -35,9 +35,7 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
@@ -167,7 +165,6 @@ theorem rd_bmap (BM : BMAP_NOALLOC) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF �
   exact h
 
 end
-
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
@@ -392,13 +389,6 @@ def rdRegs (k : KCtx) (ip : BitVec 64) (N : Nat) (R : RegMap) (tot pos : Nat) : 
   R 9#5 = BitVec.ofNat 64 pos ∧ R 19#5 = BitVec.ofNat 64 tot ∧
   R 20#5 = k.regs 12#5 + BitVec.ofNat 64 tot ∧ R 21#5 = BitVec.ofNat 64 N ∧
   R 22#5 = ip ∧ R 23#5 = k.regs 11#5 ∧ R 24#5 = 0xFFFFFFFFFFFFFFFF#64 ∧ R 25#5 = 1024#64
-
-theorem rdRegs_cs (k : KCtx) (ip : BitVec 64) (N : Nat) (R R' : RegMap) (tot pos : Nat)
-    (h : rdRegs k ip N R tot pos) (hcs : calleeSaved R R') : rdRegs k ip N R' tot pos := by
-  obtain ⟨a2, a8, a9, a19, a20, a21, a22, a23, a24, a25⟩ := h
-  obtain ⟨c2, c8, c9, c18, c19, c20, c21, c22, c23, c24, c25, c26, c27⟩ := hcs
-  exact ⟨c2.trans a2, c8.trans a8, c9.trans a9, c19.trans a19, c20.trans a20, c21.trans a21,
-    c22.trans a22, c23.trans a23, c24.trans a24, c25.trans a25⟩
 
 section
 variable {GF : BundledGFunctors}

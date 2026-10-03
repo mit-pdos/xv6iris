@@ -61,14 +61,13 @@ None.
 -/
 import Xv6.UInitShPure
 import Xv6.UshMainDefs
+import Xv6.UshNodes
 
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Iris.Std.PartialMap
 open Std (ExtTreeSet)
-
-set_option linter.unusedSectionVars false
 
 section UInitShPay
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]

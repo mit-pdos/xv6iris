@@ -65,9 +65,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## §1 The exec deposit law and the arms' pure reading -/
 
@@ -88,7 +86,7 @@ def SyscDepExec : Prop :=
       myPay gn (UexecSG.sexitPay f) ∗
       ∃ (P Pmiss : Nat → Nat → IProp GF) (Fo : Pfam GF (Aview → Nat → Anode → IProp GF)),
         sysExecAuPre (hlc := hlc) ⟨uslot (hlc := hlc), UexecSG.sexecRefund f⟩ (fsGammaL fscFs) fscFs
-          V.cwi V.pvSecc (UexecSG.sexitPay f) P Pmiss Fo (viewLazy V.upt V.sz M)
+          V.rti V.cwi V.pvSecc (UexecSG.sexitPay f) P Pmiss Fo (viewLazy V.upt V.sz M)
           (tfW V.tf (tfArgIdx 0)) (tfW V.tf (tfArgIdx 1)) sts cs pid
 
 /-- `kexecOk`'s success arm, the fields the dispatch's rows read. -/
@@ -122,7 +120,7 @@ theorem syscExec_arms_read (f : UexecSG.sfam GF) (V : ProcPriv) (M : Nat → Lis
     ((⌜r = 0xFFFFFFFFFFFFFFFF#64 ∧ evAfter { V.updEv k' with upt := P' } V' ∧
         M' = viewFaulted V.upt P' M⌝ ∗
         sysExecPostFail (hlc := hlc) ⟨uslot (hlc := hlc), UexecSG.sexecRefund f⟩ (fsGammaL fscFs) fscFs
-          V.cwi V.pvSecc (UexecSG.sexitPay f) P Pmiss Fo (viewLazy V.upt V.sz M)
+          V.rti V.cwi V.pvSecc (UexecSG.sexitPay f) P Pmiss Fo (viewLazy V.upt V.sz M)
           (tfW V.tf (tfArgIdx 0)) (tfW V.tf (tfArgIdx 1)) sts cs pid) ∨
      (∃ (pl : List (BitVec 8)) (na : Nat) (alen : Nat → Nat) (afun : Nat → Nat → BitVec 8),
         ⌜argPathOf (viewLazy V.upt V.sz M) (tfW V.tf (tfArgIdx 0)).toNat pl⌝ ∗
@@ -312,7 +310,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [SG : UexecSG GF] [Fscfg] [Icfg] [CurCtx]
 
-/-- `%d %s: unknown sys call %d\n` at `0x80007398` (Rocq `sysc_fmt`). -/
+/-- `%d %s: unknown sys call %d\n` at `0x80007390` (Rocq `sysc_fmt`). -/
 def syscFbFmt : List (BitVec 8) :=
   [0x25#8, 0x64#8, 0x20#8, 0x25#8, 0x73#8, 0x3a#8, 0x20#8, 0x75#8, 0x6e#8, 0x6b#8, 0x6e#8, 0x6f#8,
    0x77#8, 0x6e#8, 0x20#8, 0x73#8, 0x79#8, 0x73#8, 0x20#8, 0x63#8, 0x61#8, 0x6c#8, 0x6c#8, 0x20#8,
@@ -332,13 +330,13 @@ theorem syscFb_kinds : pkKinds syscFbFmt = [PkKind.num, PkKind.str, PkKind.num] 
   unfold syscFbFmt; decide
 
 /-- `jal ra,printk` at `+0x4e`. -/
-theorem syscFb_jal_tgt : KA.«syscall» + 0x62#64 + BitVec.signExtend 64 (0x1fdb42#21) = KA.«printk» := by
+theorem syscFb_jal_tgt : KA.«syscall» + 0x62#64 + BitVec.signExtend 64 (0x1fdb2e#21) = KA.«printk» := by
   decide
 
 /-- The format string (`auipc`/`addi` at `+0x46`/`+0x4a`), printk (`jal` at
 `+0x4e`) and the return pc, as the normaliser leaves them. -/
-theorem syscFb_fmt_norm : KA.«syscall» + 18966#64 = KStr.«%d %s: unknown sys call %d\n» := by decide
-theorem syscFb_printk_norm : KA.«syscall» + 18446744073709542308#64 = KA.«printk» := by decide
+theorem syscFb_fmt_norm : KA.«syscall» + 18938#64 = KStr.«%d %s: unknown sys call %d\n» := by decide
+theorem syscFb_printk_norm : KA.«syscall» + 18446744073709542288#64 = KA.«printk» := by decide
 theorem syscFb_ret_norm : jumpPc (KA.«syscall» + 102#64) = KA.«syscall» + 102#64 := by decide
 
 /-- The three varargs `p->pid, p->name, num` (Rocq `sysc_descs_mk`). -/
@@ -395,7 +393,7 @@ theorem syscFb_printk (PK : PRINTK) (c : CPU) (k' : KCtx) (γpr γl : GName) (γ
   iapply HPhi $$ %spie %spp %R' %cs %hsp Hk Hpc %hcs Hf Hs Hsent
 
 /-- `&p->name` is not NULL. -/
-theorem syscFb_name_ne (j : Nat) (hj : j < NPROC) : procAddr j + 344#64 ≠ 0#64 := by
+theorem syscFb_name_ne (j : Nat) (hj : j < NPROC) : procAddr j + 352#64 ≠ 0#64 := by
   intro h
   have e := congrArg BitVec.toNat h
   have hp := procAddr_toNat j hj
@@ -443,8 +441,8 @@ theorem syscFb_name0 [X : CurCtx] (hct : curTier = KTier.kpt) (γ : FileNames) (
 theorem syscFb_name (hct : curTier = KTier.kpt) (γ : FileNames) (pa : BitVec 64)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) :
     procPrivFd (GF := GF) γ pa pid V M ⊢
-      cstr (pa + 344#64) (DFrac.own 1) (bytesString V.name) ∗
-      (cstr (pa + 344#64) (DFrac.own 1) (bytesString V.name) -∗ procPrivFd γ pa pid V M) := by
+      cstr (pa + 352#64) (DFrac.own 1) (bytesString V.name) ∗
+      (cstr (pa + 352#64) (DFrac.own 1) (bytesString V.name) -∗ procPrivFd γ pa pid V M) := by
   iintro H
   icases syscFb_name0 hct γ pa pid V M $$ H with ⟨%hlen, Hnm, Hw⟩
   unfold pnameCells
@@ -482,8 +480,8 @@ theorem syscFb_tf [X : CurCtx] (hct : curTier = KTier.kpt) (γ : FileNames) (pa 
   exact hacc
 
 /-- The number is out of range: every arm's number is refuted. -/
-theorem syscFb_ne (V : ProcPriv) (h : syscNum V < 1 ∨ 23 < syscNum V) (m : Int) (h1 : 1 ≤ m)
-    (h22 : m ≤ 23) : syscNum V ≠ m := by omega
+theorem syscFb_ne (V : ProcPriv) (h : syscNum V < 1 ∨ 24 < syscNum V) (m : Int) (h1 : 1 ≤ m)
+    (h22 : m ≤ 24) : syscNum V ≠ m := by omega
 
 set_option maxHeartbeats 4000000 in
 /-- **THE PRINTK FALLBACK** (Rocq `sysc_fallback`). -/
@@ -496,7 +494,7 @@ theorem syscall_fallback (PK : PRINTK)
     (hE : SyscSpostEmp (GF := GF))
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : syscallSlots ≤ k.avail)
     (hnoff : k.noff = 0) (htier : k.tier = KTier.kpt) (hgn : gn = V.gen)
-    (hrange : syscNum V < 1 ∨ 23 < syscNum V) (hpins : syscPins k R) (hs1 : R 9#5 = procAddr j)
+    (hrange : syscNum V < 1 ∨ 24 < syscNum V) (hpins : syscPins k R) (hs1 : R 9#5 = procAddr j)
     (hs2 : R 18#5 = pageAddr V.upt.tfp) :
     syscFallbackBody PT Γ c0 cpu k spie spp R γw γ j pid V M sts gn cs ip f hE hj hproc hK hnoff htier
       hgn hrange hpins hs1 hs2 := by
@@ -522,8 +520,8 @@ theorem syscall_fallback (PK : PRINTK)
   icases Hpe with ⟨%γpr, %γl, %γd, #Hlk, #Htx, #Hsent⟩
   icases syscFb_pid hct γ (procAddr j) pid V M $$ Hpriv with ⟨Hpid, Hpback⟩
   unfold syscallFallback syscallAddr
-  -- +0x40  addi a2,s1,344
-  k_step_e (wp_s_addi cpu _ (KA.«syscall» + 0x54#64) false 344#12 12#5 9#5 (by decide))
+  -- +0x40  addi a2,s1,352
+  k_step_e (wp_s_addi cpu _ (KA.«syscall» + 0x54#64) false 352#12 12#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hs1]
   iintro Hk Hpc
   -- +0x44  c.lw a1,48(s1)
@@ -537,11 +535,11 @@ theorem syscall_fallback (PK : PRINTK)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x4a  addi a0,a0,-1570
-  k_step_e (wp_s_addi cpu _ (KA.«syscall» + 0x5e#64) false 0x9bc#12 10#5 10#5 (by decide))
+  k_step_e (wp_s_addi cpu _ (KA.«syscall» + 0x5e#64) false 0x9a0#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x4e  jal ra,printk
-  k_step_e (wp_s_jal cpu _ (KA.«syscall» + 0x62#64) false 0x1fdb42#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«syscall» + 0x62#64) false 0x1fdb2e#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [syscFb_jal_tgt]
   iintro Hk Hpc
   k_norm_g [syscFb_printk_norm]
@@ -621,7 +619,6 @@ theorem syscall_fallback (PK : PRINTK)
   · iapply syscForkOut_ne; exact hne 1 (by decide) (by decide)
   · iapply syscWaitOut_ne; exact hne 3 (by decide) (by decide)
 
-
 set_option maxHeartbeats 4000000 in
 /-- **THE BLOCKED ARM** (xv6 7b2c1b1b; Rocq `sysc_blocked`): the mask's bit
 is clear, so the effective number is 0 -- `li a5,-1 ; sd a5,112(s2) ; j
@@ -690,7 +687,7 @@ theorem syscall_blocked
 
 end
 
-/-! ## §4 The 22-way split (Rocq `sysc_arm_dispatch`) -/
+/-! ## §4 The 24-way split (Rocq `sysc_arm_dispatch`) -/
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
@@ -717,8 +714,8 @@ def SyscArmAt (n : Nat)
     syscArmBody n PT Γ c0 cpu k spie spp R γw γ j pid V M sts gn cs ip f hE hj hproc hK hnoff htier hgn
       hnum hpins hs1 hs2 hra
 
-/-- **Rocq `sysc_arm_dispatch`'s case split**: every table index `1 ≤ n ≤ 23`
-has its arm -- the 21 others as hypotheses (deviation 4), exec discharged
+/-- **Rocq `sysc_arm_dispatch`'s case split**: every table index `1 ≤ n ≤ 24`
+has its arm -- the 23 others as hypotheses (deviation 4), exec discharged
 here from `SYSEXEC` and its deposit law. -/
 theorem syscall_arms_all (SE : SYSEXEC) (hD : SyscDepExec (hlc := hlc) (GF := GF))
     (PT : SchedNames → IProp GF) [hPT : ∀ Γ, Persistent (PT Γ)] (Γ : SchedNames)
@@ -753,7 +750,8 @@ theorem syscall_arms_all (SE : SYSEXEC) (hD : SyscDepExec (hlc := hlc) (GF := GF
     (h21 : SyscArmAt 21 PT Γ c0 cpu k spie spp R γw γ j pid V M sts gn cs ip f hE hj hproc hK hnoff htier hgn hpins hs1 hs2 hra) -- close
     (h22 : SyscArmAt 22 PT Γ c0 cpu k spie spp R γw γ j pid V M sts gn cs ip f hE hj hproc hK hnoff htier hgn hpins hs1 hs2 hra) -- sync
     (h23 : SyscArmAt 23 PT Γ c0 cpu k spie spp R γw γ j pid V M sts gn cs ip f hE hj hproc hK hnoff htier hgn hpins hs1 hs2 hra) -- seccomp
-    (n : Nat) (hn1 : 1 ≤ n) (hn22 : n ≤ 23) (hnum : syscNum V = ((n : Nat) : Int)) :
+    (h24 : SyscArmAt 24 PT Γ c0 cpu k spie spp R γw γ j pid V M sts gn cs ip f hE hj hproc hK hnoff htier hgn hpins hs1 hs2 hra) -- chroot
+    (n : Nat) (hn1 : 1 ≤ n) (hn22 : n ≤ 24) (hnum : syscNum V = ((n : Nat) : Int)) :
     syscArmBody n PT Γ c0 cpu k spie spp R γw γ j pid V M sts gn cs ip f hE hj hproc hK hnoff htier hgn
       hnum hpins hs1 hs2 hra := by
   match n, hn1, hn22, hnum with
@@ -783,7 +781,8 @@ theorem syscall_arms_all (SE : SYSEXEC) (hD : SyscDepExec (hlc := hlc) (GF := GF
   | 21, _, _, hnum => exact h21 hnum
   | 22, _, _, hnum => exact h22 hnum
   | 23, _, _, hnum => exact h23 hnum
-  | _ + 24, _, h, _ => exact absurd h (by omega)
+  | 24, _, _, hnum => exact h24 hnum
+  | _ + 25, _, h, _ => exact absurd h (by omega)
 
 end
 

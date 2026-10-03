@@ -41,7 +41,6 @@ The ghost half (the deed, the ticket, the escrow, the claim) is
    `FileClass.txtName_dec` (Rocq `FileDisc.uname_dec`; no instance existed).
 4. `prefix_of` is `List.IsPrefix` (`<+:`).
 -/
-import Xv6.FileDiscLine
 import Xv6.FileDisc
 import Xv6.FsAbsDefs
 

@@ -22,8 +22,6 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open Sail LeanRV64D LeanRV64D.Functions
 
-set_option linter.unusedSectionVars false
-
 /-- **The translation of an instruction fetch at a user machine** (the
 tree-level translation, Rocq `UserFetchCert` §6 / `UserFaultCert` §3,
 from lane U1-P1's TLB and walk facts): every oracle's `translateAddr` walk

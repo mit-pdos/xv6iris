@@ -44,6 +44,7 @@ import Xv6.SpecIdup
 import Xv6.DinodeSlot
 import Xv6.DirlookupParts
 import MachCSL.BvLemmas
+import Xv6.SpecIget
 
 namespace Xv6
 
@@ -53,24 +54,23 @@ set_option linter.unusedSimpArgs false
 
 /-! ## Call targets and return addresses -/
 
-theorem namex_br_myproc : KA.«namex» + 0xffffffffffffdfb6#64 = KA.«myproc» := by decide
-theorem namex_br_idup : KA.«namex» + 0xfffffffffffff936#64 = KA.«idup» := by decide
-theorem namex_br_iget : KA.«namex» + 0xfffffffffffff5ce#64 = KA.«iget» := by decide
-theorem namex_br_iunlock : KA.«namex» + 0xfffffffffffffa1a#64 = KA.«iunlock» := by decide
-theorem namex_br_memmove : KA.«namex» + 0xffffffffffffd3a6#64 = KA.«memmove» := by decide
-theorem namex_br_ilock : KA.«namex» + 0xfffffffffffff96c#64 = KA.«ilock» := by decide
-theorem namex_br_dirlookup : KA.«namex» + 0xffffffffffffff54#64 = KA.«dirlookup» := by decide
-theorem namex_br_iput : KA.«namex» + 0xfffffffffffffaee#64 = KA.«iput» := by decide
+theorem namex_br_myproc : KA.«namex» + 0xffffffffffffdf52#64 = KA.«myproc» := by decide
+theorem namex_br_idup : KA.«namex» + 0xfffffffffffff8f2#64 = KA.«idup» := by decide
+theorem namex_br_iunlock : KA.«namex» + 0xfffffffffffff9d6#64 = KA.«iunlock» := by decide
+theorem namex_br_memmove : KA.«namex» + 0xffffffffffffd34e#64 = KA.«memmove» := by decide
+theorem namex_br_ilock : KA.«namex» + 0xfffffffffffff928#64 = KA.«ilock» := by decide
+theorem namex_br_dirlookup : KA.«namex» + 0xffffffffffffff10#64 = KA.«dirlookup» := by decide
+theorem namex_br_iput : KA.«namex» + 0xfffffffffffffaaa#64 = KA.«iput» := by decide
 
 theorem namex_ret_32 : jumpPc (KA.«namex» + 0x32#64) = KA.«namex» + 0x32#64 := by decide
 theorem namex_ret_3a : jumpPc (KA.«namex» + 0x3a#64) = KA.«namex» + 0x3a#64 := by decide
-theorem namex_ret_50 : jumpPc (KA.«namex» + 0x50#64) = KA.«namex» + 0x50#64 := by decide
-theorem namex_ret_8a : jumpPc (KA.«namex» + 0x8a#64) = KA.«namex» + 0x8a#64 := by decide
-theorem namex_ret_ac : jumpPc (KA.«namex» + 0xac#64) = KA.«namex» + 0xac#64 := by decide
-theorem namex_ret_c6 : jumpPc (KA.«namex» + 0xc6#64) = KA.«namex» + 0xc6#64 := by decide
-theorem namex_ret_e8 : jumpPc (KA.«namex» + 0xe8#64) = KA.«namex» + 0xe8#64 := by decide
-theorem namex_ret_136 : jumpPc (KA.«namex» + 0x136#64) = KA.«namex» + 0x136#64 := by decide
-theorem namex_ret_14a : jumpPc (KA.«namex» + 0x14a#64) = KA.«namex» + 0x14a#64 := by decide
+theorem namex_ret_50 : jumpPc (KA.«namex» + 0x54#64) = KA.«namex» + 0x54#64 := by decide
+theorem namex_ret_8a : jumpPc (KA.«namex» + 0x8e#64) = KA.«namex» + 0x8e#64 := by decide
+theorem namex_ret_ac : jumpPc (KA.«namex» + 0xb0#64) = KA.«namex» + 0xb0#64 := by decide
+theorem namex_ret_c6 : jumpPc (KA.«namex» + 0xca#64) = KA.«namex» + 0xca#64 := by decide
+theorem namex_ret_e8 : jumpPc (KA.«namex» + 0xec#64) = KA.«namex» + 0xec#64 := by decide
+theorem namex_ret_136 : jumpPc (KA.«namex» + 0x13a#64) = KA.«namex» + 0x13a#64 := by decide
+theorem namex_ret_14a : jumpPc (KA.«namex» + 0x14e#64) = KA.«namex» + 0x14e#64 := by decide
 
 /-! ## The stack budget (Rocq's `nx_kb`) -/
 
@@ -93,10 +93,6 @@ theorem namex_slots_iunlock (a : Nat) (h : namexSlots ≤ a) : iunlockSlots ≤ 
   have : iunlockSlots = 26 := by decide
   rw [Xv6.namexSlots_eq] at h; omega
 
-theorem namex_slots_iget (a : Nat) (h : namexSlots ≤ a) : igetSlots ≤ a - 12 := by
-  have : igetSlots = 62 := by decide
-  rw [Xv6.namexSlots_eq] at h; omega
-
 theorem namex_slots_idup (a : Nat) (h : namexSlots ≤ a) : idupSlots ≤ a - 12 := by
   have : idupSlots = 14 := by decide
   rw [Xv6.namexSlots_eq] at h; omega
@@ -111,8 +107,6 @@ theorem namex_slots_small (a : Nat) (h : namexSlots ≤ a) : 10 ≤ a - 12 := by
 
 `lbu` leaves `setWidth 64 b`; the separator is compared against `47` (in
 `a5` at +0x26, in `s3` elsewhere) and the terminator against `x0`. -/
-
-theorem namex_slash_ofNat : BitVec.setWidth 64 SLASH = 47#64 := by decide
 
 theorem namex_beq_slash (b : BitVec 8) :
     bcond bop.BEQ (BitVec.setWidth 64 b) 47#64 = decide (b = SLASH) := by
@@ -222,16 +216,6 @@ theorem namex_drop_cons (off plen : Nat) (f : Nat → BitVec 8) (h : off < plen)
     rw [List.getElem?_drop, List.getElem?_cons_succ, List.getElem?_drop]
     congr 1; omega
 
-theorem namex_bview_drop (off plen : Nat) (f : Nat → BitVec 8) :
-    (bview plen f).drop off = bview (plen - off) (fun i => f (off + i)) := by
-  apply List.ext_getElem?
-  intro i
-  rw [List.getElem?_drop]
-  by_cases hi : i < plen - off
-  · rw [bview_lookup plen f (off + i) (by omega), bview_lookup _ _ i hi]
-  · rw [List.getElem?_eq_none_iff.mpr (by rw [bview_length]; omega),
-      List.getElem?_eq_none_iff.mpr (by rw [bview_length]; omega)]
-
 /-- Rocq's `nx_drop_app`: the element scan's decomposition. -/
 theorem namex_drop_app (a e plen : Nat) (f : Nat → BitVec 8) (hae : a ≤ e) (hep : e ≤ plen) :
     (bview plen f).drop a = bview (e - a) (fun i => f (a + i)) ++ (bview plen f).drop e := by
@@ -309,7 +293,7 @@ theorem namex_elems_step (off a e o2 plen : Nat) (f : Nat → BitVec 8)
     h2]
 
 /-- The element's canonical name, both memmove shapes (Rocq's use of
-`bname_of_buf` through `skipelem_name_view`). -/
+`bname_of_buf` through Rocq's `skipelem_name_view`). -/
 theorem namex_bname (u : List (BitVec 8)) (nf : Nat → BitVec 8) (hne : nonul u)
     (hf : ∀ j, j < (u.take 14).length → nf j = (u.take 14)[j]!)
     (hstop : (u.take 14).length < 14 → nf (u.take 14).length = 0#8) :

@@ -18,10 +18,8 @@ The `int` local rides in the top half of an 8-byte frame slot
 -/
 import Xv6.SpecArgfd
 import Xv6.ArgLemmas
-import MachCSL.WpSmodeFrame6
 import Xv6.CopyLemmas
 import Xv6.DinodeSlot
-import Xv6.FsWords
 import MachCSL.BvLemmas
 
 namespace Xv6
@@ -31,9 +29,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## Constants and arithmetic -/
 
@@ -46,7 +42,6 @@ theorem af_fd_addr (x : BitVec 64) : x + BitVec.signExtend 64 4060#12 = x + 0xFF
 theorem af_dc (x : BitVec 64) : x + 0xFFFFFFFFFFFFFFD8#64 + 4#64 = x + 0xFFFFFFFFFFFFFFDC#64 := by
   bv_decide
 theorem af_beq_z (x : BitVec 64) (h : x = 0#64) : bcond bop.BEQ x 0#64 = true := by subst h; decide
-
 
 /-- In range: the unsigned compare against 15 falls through. -/
 theorem af_bltu_in (w : BitVec 32) (h0 : 0 ≤ w.toInt) (h16 : w.toInt < 16) :
@@ -219,12 +214,11 @@ theorem af_ofile_addr' (pa : BitVec 64) (fd : Nat) (h : fd < 16) :
   simp only [BitVec.toNat_add, BitVec.toNat_shiftLeft, BitVec.toNat_ofNat, Nat.reducePow, Nat.shiftLeft_eq]
   omega
 
-
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [BcacheG GF] [DiskG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
 
 set_option maxHeartbeats 16000000 in
-/-- From `0x80004c96` (the descriptor found, `*pfd` already handled):
+/-- From `0x80004d0a` (the descriptor found, `*pfd` already handled):
 `li a0,0 ; if (pf) *pf = f ; epilogue`. -/
 theorem af_pf_tail (cpu c : CPU) (k : KCtx) (γ : FileNames) (γd : GName) (pa : BitVec 64) (pid : BitVec 32)
     (V : ProcPriv) (M : Nat → List (BitVec 8)) (D : List Nat) (v : BitVec 64) (oldfd : BitVec 32) (oldf : BitVec 64)
@@ -276,9 +270,9 @@ theorem af_pf_tail (cpu c : CPU) (k : KCtx) (γ : FileNames) (γd : GName) (pa :
 
 end
 
-theorem argfd_br_ffffffffffffcd32 : KA.«argfd» + 0xffffffffffffcd32#64 = KA.«myproc» := by decide
+theorem argfd_br_ffffffffffffccb2 : KA.«argfd» + 0xffffffffffffccb2#64 = KA.«myproc» := by decide
 
-theorem argfd_br_ffffffffffffdccc : KA.«argfd» + 0xffffffffffffdccc#64 = KA.«argint» := by decide
+theorem argfd_br_ffffffffffffdc6c : KA.«argfd» + 0xffffffffffffdc6c#64 = KA.«argint» := by decide
 
 set_option maxHeartbeats 32000000 in
 theorem argfd_proof (AI : ARGINT) (MP : MYPROC) : ARGFD := ⟨
@@ -306,11 +300,12 @@ theorem argfd_proof (AI : ARGINT) (MP : MYPROC) : ARGFD := ⟨
        wordPointsTo (pTrapframe pa) 8 (DFrac.own 1) V.trapframe ∗
        wordPointsTo (pCwd pa) 8 (DFrac.own 1) V.cwd ∗
        pnameCells pa (DFrac.own 1) V.name ∗
-       wordPointsTo (pSecc pa) 8 (DFrac.own 1) V.pvSecc) ∗
+       wordPointsTo (pSecc pa) 8 (DFrac.own 1) V.pvSecc ∗
+       wordPointsTo (pRoot pa) 8 (DFrac.own 1) V.root) ∗
       procPtAt V.upt M ∗ tfPageAt V.upt.tfp V.tf ∗ ⌜V.pvLazy = false → lazyFree V.upt.um V.sz⌝ ∗
       actCnt pa V.ev
       from by unfold procPrivBareAt procFieldsNoOfile; iintro H; iexact H) $$ Hcore
-    with ⟨%hVb, Hpid, ⟨Hks, Hsz, Hpg, Htf, Hcwd, Hnm, Hsc⟩, HPt, HTf, %hlz, Hev⟩
+    with ⟨%hVb, Hpid, ⟨Hks, Hsz, Hpg, Htf, Hcwd, Hnm, Hsc, Hrt⟩, HPt, HTf, %hlz, Hev⟩
   ihave Htf := (show wordPointsTo (GF := GF) (pTrapframe pa) 8 (DFrac.own 1) V.trapframe ⊢
       wordPointsTo (pTrapframe k.proc) 8 (DFrac.own 1) (pageAddr V.upt.tfp) from by rw [hVb.2.2.2, hproc]) $$ Htf
   -- the prologue ; mv s2,a1 ; mv s1,a2 ; addi a1,s0,-36
@@ -344,8 +339,8 @@ theorem argfd_proof (AI : ARGINT) (MP : MYPROC) : ARGFD := ⟨
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c4 hp4
   iintro Hk Hpc
   -- jal argint
-  k_step_gen (wp_s_jal c4 _ (KA.«argfd» + 0x14#64) false 2088120#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [argfd_br_ffffffffffffdccc] next c5 hp5
+  k_step_gen (wp_s_jal c4 _ (KA.«argfd» + 0x14#64) false 2088024#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [argfd_br_ffffffffffffdc6c] next c5 hp5
   iintro Hk Hpc
   iapply (af_argint AI c5 _ i V.upt.tfp V.tf v oldfd' (DFrac.own 1) hi ?ha ?hws ?hn ?hKa) $$ [- $Hk $Hpc]
   rotate_right 1
@@ -378,18 +373,18 @@ theorem argfd_proof (AI : ARGINT) (MP : MYPROC) : ARGFD := ⟨
   -- the core, closed again (for either exit)
   ihave Htf := (show wordPointsTo (GF := GF) (pTrapframe k.proc) 8 (DFrac.own 1) (pageAddr V.upt.tfp) ⊢
       wordPointsTo (pTrapframe pa) 8 (DFrac.own 1) V.trapframe from by rw [hVb.2.2.2, hproc]) $$ Htf
-  ihave Hcore : procPrivCoreNoctxAt (GF := GF) curCtx pa pid V M $$ [Hpid Hks Hsz Hpg Htf Hcwd Hnm Hsc HPt HTf Hev Hcw]
+  ihave Hcore : procPrivCoreNoctxAt (GF := GF) curCtx pa pid V M $$ [Hpid Hks Hsz Hpg Htf Hcwd Hnm Hsc Hrt HPt HTf Hev Hcw]
   case' _ =>
     unfold procPrivCoreNoctxAt procPrivBareAt procFieldsNoOfile
-    iframe Hpid Hks Hsz Hpg Htf Hcwd Hnm Hsc HPt HTf Hev Hcw
+    iframe Hpid Hks Hsz Hpg Htf Hcwd Hnm Hsc Hrt HPt HTf Hev Hcw
     ipureintro; exact ⟨hVb, hlz⟩
   by_cases hr : 0 ≤ argZ v ∧ argZ v < 16
   · -- in range: bltu falls through ; jal myproc
     k_step_gen (wp_s_branch c8 _ (KA.«argfd» + 0x1e#64) false 52#13 15#5 14#5 (by decide) bop.BLTU)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [af_li15, af_bltu_in _ hr.1 hr.2] next c9 hp9
     iintro Hk Hpc
-    k_step_gen (wp_s_jal c9 _ (KA.«argfd» + 0x22#64) false 2084112#21 1#5 (by decide))
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [argfd_br_ffffffffffffcd32] next c10 hp10
+    k_step_gen (wp_s_jal c9 _ (KA.«argfd» + 0x22#64) false 2083984#21 1#5 (by decide))
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [argfd_br_ffffffffffffccb2] next c10 hp10
     iintro Hk Hpc
     iapply (af_myproc MP c10 _ ?hnm ?hKm) $$ [- $Hk $Hpc]
     rotate_right 1

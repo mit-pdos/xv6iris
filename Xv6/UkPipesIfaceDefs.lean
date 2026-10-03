@@ -46,7 +46,6 @@ the end of §1) `pns_short`, `pns_admV`.
 5. `cons_short` is H-io's `UkConsOut.consShort`.
 -/
 import Xv6.HfpReg
-import Xv6.ConsNames
 import Xv6.PipesView
 import Xv6.PipeBothNPure
 import Xv6.PipeProto
@@ -55,8 +54,6 @@ import Xv6.ConsoleInvDefs
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
-
-set_option linter.unusedSectionVars false
 
 /-! ## §0 The registry's values -/
 

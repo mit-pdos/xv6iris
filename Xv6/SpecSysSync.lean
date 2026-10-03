@@ -123,27 +123,4 @@ structure SYS_SYNC : Prop where
     wp_sys_sync_eb_body (hlc := hlc) (GF := GF) Γ cpu k γ γb V γfs j logstart dev oQ pidv dqp
       hj hproc hK hnoff htier
 
-/-- The interrupts-off instance of `wp_sys_sync_eb` (the complement is the
-whole bundle). -/
-theorem SYS_SYNC.wp_sys_sync (A : SYS_SYNC) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
-    [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (cpu : CPU) (k : KCtx) (γ : LogNames) (γb : BcacheNames) (V : BioView GF)
-    (γfs : FsNames) (j : Nat) (logstart : Nat) (dev : BitVec 32) (oQ : Option (IProp GF))
-    (pidv : BitVec 32) (dqp : DFrac) hj hproc hK hsie hnoff hlocks htier :
-    wp_sys_sync_body (hlc := hlc) (GF := GF) Γ cpu k γ γb V γfs j logstart dev oQ pidv dqp
-      hj hproc hK hsie hnoff hlocks htier := by
-  have h := A.wp_sys_sync_eb (hlc := hlc) (GF := GF) Γ cpu k γ γb V γfs j logstart dev oQ pidv dqp
-    hj hproc hK hnoff htier
-  unfold wp_sys_sync_eb_body at h
-  unfold wp_sys_sync_body
-  rw [hsie] at h
-  simp only [trapCsrsExt_false, cpuClaimExt_false] at h
-  iintro ⟨H0, H1, H2, Htc, Hcl, Hir, H6, H7, H8, Hnext⟩
-  iapply h
-  iframe H0 H1 H2 Htc Hcl Hir H6 H7 H8
-  iapply wpNext_mono $$ Hnext
-  iintro %cpu' HK %spie %spp %R' %p0 H1 H2 ⟨Htc, Hir⟩ Hcl Hfs H6
-  iapply HK $$ %spie %spp %R' %p0 H1 H2 Htc Hcl Hir Hfs H6
-
 end Xv6

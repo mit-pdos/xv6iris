@@ -180,19 +180,6 @@ theorem ushsToks_tokens {len : Nat} {f : Nat → BitVec 8} {off : Nat} {toks : L
   | nil off h => exact .nil off h
   | cons off toks hn _ ih => exact .cons off toks hn ih
 
-theorem ushsToks_in {len : Nat} {f : Nat → BitVec 8} {stop off : Nat} {toks : List (Nat × Nat)}
-    (h : UshsToks len f stop off toks) :
-    ∀ (i : Nat) (t : Nat × Nat), toks[i]? = some t → off ≤ t.1 ∧ t.1 < t.2 ∧ t.2 ≤ len := by
-  induction h with
-  | nil => intro i t hi; simp at hi
-  | cons off toks hn _ ih =>
-    intro i t hi
-    have hk := ushpSkipws_le (len - off) off f
-    have hn' := ushpToklen_le (len - (off + ushpSkipws (len - off) off f)) (off + ushpSkipws (len - off) off f) f
-    cases i with
-    | zero => simp at hi; subst hi; simp; omega
-    | succ i => simp at hi; have := ih i t hi; omega
-
 theorem ushsToks_le {len : Nat} {f : Nat → BitVec 8} {stop off : Nat} {toks : List (Nat × Nat)}
     (h : UshsToks len f stop off toks) : off ≤ stop := by
   induction h with

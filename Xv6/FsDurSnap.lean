@@ -23,8 +23,7 @@ top fragment, the nested predicate, the root's keep-alive link fragment, and
 the one pure conjunct `SnapShape`); the GUEST half `snapGuest`; the pair
 `durPair`; the mint off an instance (`pDurAlloc_xfer`); the clone
 (`pDurAt_clone`); the reading (`fsSnap_readOk`); the commit's swap
-(`dsnapStep_xfer`); and the consumer's readings (`pDurAt_tie`,
-`pDurAt_tieKeep`).
+(`dsnapStep_xfer`); and the consumer's reading (`pDurAt_tie`).
 
 ## DEVIATIONS from Rocq
 
@@ -65,20 +64,16 @@ the one pure conjunct `SnapShape`); the GUEST half `snapGuest`; the pair
 * THE `EraHome` SECTION (`fs_home_blocks_phi_map`, `fs_home_install_era`,
   `fs_state_install_era`) -- uses checked: none outside that section (the
   brief: "the EraHome section is nearly dead"; its one inner use is the
-  other two).  `fsState_install` (`Xv6/FsDurXfer.lean`) and
-  `fsDbytes_setBlocks` (`Xv6/FsDurBytes.lean`) are the live halves.
+  other two).
 -/
 import Xv6.FsDurSnapBytes
 import Xv6.FsDurRead
 import Xv6.FsDurXfer
-import MachCSL.Resources
 
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open FsStateLink
-
-set_option linter.unusedSectionVars false
 
 /-! ## Pure-reading helpers (deviation 4) -/
 
@@ -203,7 +198,6 @@ theorem pDurAt_intro (g gl gt : GName) (D : BlockMap) (S : FsStateRec) :
 
 instance pDurAt_timeless (gt : GName) (D : BlockMap) : Timeless (pDurAt (GF := GF) gt D) := by
   unfold pDurAt; infer_instance
-
 
 /-! ## 6b.  The epoch off an instance -/
 
@@ -724,7 +718,6 @@ theorem fsSnap_readOk_keep (g gl gt : GName) (D : BlockMap) (S : FsStateRec) (hf
       ⌜snapOk S D⌝ ∗ fsSnap (snapGamma g gl gt) g D S :=
   fsDurKeep (fsSnap_readOk g gl gt D S hf)
 
-
 /-! ## 8.  What a consumer reads off the current snapshot -/
 
 /-- Rocq's `P_dur_at_tie`. -/
@@ -735,17 +728,6 @@ theorem pDurAt_tie (gt : GName) (D : BlockMap) (hf : dblkFull D) :
   ihave %hok := fsSnap_readOk g gl gt D S hf $$ Hs
   iexists S
   ipureintro; exact hok
-
-/-- ...with the snapshot HANDED BACK (Rocq's `P_dur_at_tie_keep`). -/
-theorem pDurAt_tieKeep (gt : GName) (D : BlockMap) (hf : dblkFull D) :
-    pDurAt (GF := GF) gt D ⊢ ∃ S, ⌜snapOk S D⌝ ∗ pDurAt gt D := by
-  iintro H
-  ihave ⟨%g, %gl, %S, Hs⟩ := (pDurAt_unfold gt D).1 $$ H
-  ihave ⟨%hok, Hs⟩ := fsSnap_readOk_keep g gl gt D S hf $$ Hs
-  iexists S
-  isplitr
-  · ipureintro; exact hok
-  · iapply pDurAt_intro g gl gt D S $$ Hs
 
 end ReadOk
 

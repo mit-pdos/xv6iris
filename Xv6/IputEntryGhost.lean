@@ -18,7 +18,6 @@
   freeze of the slot's liveness (`frz_slot_freeze_pinw`), the FROZEN PARK
   (`frzPark_intro_on`) and the table's rows back.
 -/
-import Xv6.IcacheBoxSites
 import Xv6.IputParts
 import Xv6.IdupCore
 
@@ -27,9 +26,7 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-- The share's fraction plan (Rocq's `Qp.div_2` twice). -/
 theorem iput_ent_frac (q : Qp) : q.half.half + (q.half.half + q.half) = q := by

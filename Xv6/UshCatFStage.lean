@@ -38,15 +38,12 @@ import Xv6.UshCatFStageDefs
 import Xv6.SpecShRuncmdExec
 import Xv6.AppFileNames
 import Xv6.UkCatFIfaceReg
-import Xv6.UshExecPin
 
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open UShPipesDefs
 open Std (ExtTreeSet)
-
-set_option linter.unusedSectionVars false
 
 section UshCatFStage
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FileAppG GF] [FsTopG GF] [OffboxG GF]

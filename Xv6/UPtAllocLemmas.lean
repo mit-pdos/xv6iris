@@ -11,11 +11,8 @@ carry the same facts under their own names.
 -/
 import Xv6.UPtDefs
 import Xv6.PtRunLemmas
-import Xv6.PtOwnLemmas
 import MachCSL.WpSmodeCtl
 import Xv6.ByteCursor
-import Xv6.CodeTactics
-import MachCSL.BvLemmas
 
 namespace Xv6.UPtAlloc
 
@@ -23,8 +20,6 @@ open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Iris.Std Iris.Std.PartialMap Iris.Std.LawfulPartialMap
 open Xv6
-
-set_option linter.unusedSectionVars false
 
 /-! ## `PGROUNDUP` -/
 
@@ -42,7 +37,6 @@ theorem pgRoundUp_bv (x : BitVec 64) (h : x.toNat + 4095 < 2 ^ 64) :
   simp only [BitVec.toNat_shiftLeft, BitVec.toNat_ushiftRight, hadd,
     Nat.shiftRight_eq_div_pow, BitVec.toNat_ofNat, Nat.reducePow, pgRoundUpN,
     Nat.shiftLeft_eq]
-
 
 theorem pgRoundUpN_le {m n : Nat} (h : m ≤ n) : pgRoundUpN m ≤ pgRoundUpN n := by
   unfold pgRoundUpN
@@ -114,14 +108,12 @@ theorem sextw_small (x : BitVec 64) (h : x.toNat < 2 ^ 31) :
 
 /-! ## The run `uvmdealloc` removes -/
 
-
 /-- The page number of an aligned size below `MAXVA`. -/
 theorem vpnOf_ofNat (m : Nat) (h : m < 2 ^ 38) :
     (vpnOf (BitVec.ofNat 64 m)).toNat = m / 4096 := by
   simp only [vpnOf, BitVec.extractLsb'_toNat, BitVec.toNat_ofNat, Nat.reducePow,
     Nat.shiftRight_eq_div_pow]
   omega
-
 
 theorem ofNat_sub_ofNat (a b : Nat) (hb : b ≤ a) (ha : a < 2 ^ 64) :
     BitVec.ofNat 64 a - BitVec.ofNat 64 b = BitVec.ofNat 64 (a - b) := by
@@ -149,9 +141,7 @@ theorem ofNat_aligned (m : Nat) (h : 4096 ∣ m) : (BitVec.ofNat 64 m) &&& 0xfff
   generalize BitVec.ofNat 64 q = y
   bv_decide
 
-
 /-! ## The two fixed virtual page numbers -/
-
 
 /-! ## `UPtd.leaves` against `UPtd.um` -/
 
@@ -164,7 +154,6 @@ theorem leaves_get_of_lt (P : UPtd) (k : Nat) (h : k < tfVpn.toNat) :
 theorem leaves_get_tf (P : UPtd) : get? P.leaves tfVpn.toNat = some (tfLeaf P.tfp) := by
   unfold UPtd.leaves
   rw [get?_insert_ne (by rw [Xv6.trampVpn_toNat, Xv6.tfVpn_toNat]; omega), get?_insert_eq rfl]
-
 
 /-- The leaf map has nothing at an unmapped user page number. -/
 theorem leaves_none_of_um_none (P : UPtd) (k : Nat) (hlt : k < tfVpn.toNat)
@@ -272,7 +261,6 @@ theorem ptRep_setLeaf (t : PTree) (L : RegMapF (BitVec 64)) (vpn : BitVec 27) (v
 
 /-! ## The leaf `uvmalloc` writes -/
 
-
 theorem uLeaf_isLeafPte (ppn : BitVec 44) (perm : BitVec 64) (hr : perm &&& 0xE#64 ≠ 0#64) :
     isLeafPte (leafOf ppn perm) := (Xv6.isLeafPte_iff _).mpr (Xv6.leafOf_valid ppn perm hr)
 
@@ -318,7 +306,6 @@ theorem uptWf_insertLeaf (P : UPtd) (vpn : Nat) (r : BitVec 64) (perm : BitVec 6
 
 /-! ## The run of keys `uvmdealloc` removes -/
 
-
 theorem delRunL_get_mem (L : RegMapF (BitVec 64)) (v0 n j : Nat) (hj : j < n) :
     get? (delRunL L v0 n) (v0 + j) = none := by
   induction n with
@@ -357,17 +344,11 @@ theorem delRun_eq (P Q : UPtd) (vpn0 i : Nat)
     rw [delRunL_get_out _ _ _ _ hx']
     exact hout x hx'
 
-
 /-! ## Alignment -/
 
 theorem toNat_mod8 (x : BitVec 64) (h : BitVec.extractLsb' 0 3 x = 0#3) : x.toNat % 8 = 0 := by
   have h2 := congrArg BitVec.toNat h
   simpa [BitVec.extractLsb'_toNat] using h2
-
-theorem pte2pa_mod8 (w : BitVec 64) : (pte2pa w).toNat % 8 = 0 := by
-  refine toNat_mod8 _ ?_
-  unfold pte2pa
-  bv_decide
 
 theorem pageValid_mod8 (r : BitVec 64) (h : pageValid r) : r.toNat % 8 = 0 := by
   refine toNat_mod8 _ ?_
@@ -474,13 +455,11 @@ theorem umPages_insert (P : UPtd) (M : Nat → List (BitVec 8)) (vpn : Nat) (r p
 
 end
 
-
 /-- The page number of an address below `MAXVA`. -/
 theorem vpnOf_toNat_eq (x : BitVec 64) (h : x.toNat < 2 ^ 38) :
     (vpnOf x).toNat = x.toNat / 4096 := by
   simp only [vpnOf, BitVec.extractLsb'_toNat, Nat.shiftRight_eq_div_pow]
   omega
-
 
 /-- A page-aligned address, from its numeric value. -/
 theorem aligned_of_toNat (x : BitVec 64) (h : 4096 ∣ x.toNat) : x &&& 0xfff#64 = 0#64 := by
@@ -572,24 +551,6 @@ theorem uvmdNp_run' (x y : BitVec 64) (A i : Nat) (hx : x.toNat = A + 4096 * i)
   obtain ⟨q, rfl⟩ := h4
   unfold uvmdNp
   rw [hx, hy]
-  by_cases h0 : i = 0
-  · subst h0; rw [if_neg (by omega)]
-  · rw [if_pos (by omega),
-      show 4096 * q + 4096 * i = 4096 * (q + i) from by omega,
-      pgRoundUpN_mul, pgRoundUpN_mul]
-    omega
-
-theorem uvmdVpn0_run (A : Nat) (h4 : 4096 ∣ A) (hlt : A < 2 ^ 64) :
-    pgRoundUpN (BitVec.ofNat 64 A).toNat / 4096 = A / 4096 := by
-  rw [Xv6.bcOfNatToNat _ hlt]
-  obtain ⟨q, rfl⟩ := h4
-  rw [pgRoundUpN_mul]
-
-theorem uvmdNp_run (A i : Nat) (h4 : 4096 ∣ A) (hlt : A + 4096 * i < 2 ^ 64) :
-    uvmdNp (BitVec.ofNat 64 (A + 4096 * i)) (BitVec.ofNat 64 A) = i := by
-  obtain ⟨q, rfl⟩ := h4
-  unfold uvmdNp
-  rw [Xv6.bcOfNatToNat _ (by omega), Xv6.bcOfNatToNat _ (by omega)]
   by_cases h0 : i = 0
   · subst h0; rw [if_neg (by omega)]
   · rw [if_pos (by omega),

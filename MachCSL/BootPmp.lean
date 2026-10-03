@@ -16,7 +16,7 @@ predicate quantifies over EVERY index, so the out-of-range reads (the
 `Inhabited` default `0#8`) are part of the fact.
 -/
 import MachCSL.BootPeel
-import MachCSL.WpPmp
+import MachCSL.WpPmpDefs
 
 namespace MachCSL
 
@@ -94,9 +94,6 @@ abbrev pmpRange : IntRange := { stop := 63, step_pos := by decide }
 theorem pmpRange_mem {i : Int} (h : i ∈ pmpRange) : 0 ≤ i ∧ i ≤ 63 := by
   simp [Membership.mem] at h
   omega
-
-theorem pmpLoop_arith {i : Int} {n : Nat} (hi : 0 ≤ i) (hn : i + (n : Int) = 64) :
-    (i + 1) + ((n - 1 : Nat) : Int) = 64 ∨ n = 0 := by omega
 
 /-- THE LOOP (Rocq `pmp_loop`), generic in the body and keeping the vector
 abstract, by induction on the remaining iteration count. -/

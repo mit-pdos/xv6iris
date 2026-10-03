@@ -20,9 +20,6 @@ namespace Xv6
 
 open Iris MachCSL
 
-set_option linter.unusedVariables false
-set_option linter.unusedSectionVars false
-
 section
 variable {GF : BundledGFunctors} [CtokG GF] [UexecSG GF]
 

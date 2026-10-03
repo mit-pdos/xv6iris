@@ -78,18 +78,8 @@ theorem clockCells_cases (cpu : CPU) :
       Register.mip ↦ᵣ[cpu] mip := by
   unfold clockCells; exact .rfl
 
-theorem clockCells_intro (cpu : CPU) (mi : Bool) (minstret mcycle mtime mip : BitVec 64) :
-    Register.minstret_increment ↦ᵣ[cpu] mi ∗
-    Register.minstret ↦ᵣ[cpu] minstret ∗
-    Register.mcycle ↦ᵣ[cpu] mcycle ∗
-    Register.mtime ↦ᵣ[cpu] mtime ∗
-    Register.mip ↦ᵣ[cpu] mip ⊢ clockCells (GF := GF) cpu := by
-  unfold clockCells
-  iintro H
-  iexists mi, minstret, mcycle, mtime, mip
-  iexact H
-
-/-- `clockCells_intro` curried: reassembly by name, no `iframe` search. -/
+/-- `clockCells` reassembled from its cells, curried: by name, no `iframe`
+search. -/
 theorem clockCells_introW (cpu : CPU) (mi : Bool) (minstret mcycle mtime mip : BitVec 64) :
     ⊢ Register.minstret_increment ↦ᵣ[cpu] mi -∗
     Register.minstret ↦ᵣ[cpu] minstret -∗
@@ -105,11 +95,7 @@ theorem pcIs_cases (cpu : CPU) (pc : BitVec 64) :
     pcIs (GF := GF) cpu pc ⊢ Register.PC ↦ᵣ[cpu] pc ∗ Register.nextPC ↦ᵣ[cpu] pc := by
   unfold pcIs; exact .rfl
 
-theorem pcIs_intro (cpu : CPU) (pc : BitVec 64) :
-    Register.PC ↦ᵣ[cpu] pc ∗ Register.nextPC ↦ᵣ[cpu] pc ⊢ pcIs (GF := GF) cpu pc := by
-  unfold pcIs; exact .rfl
-
-/-- `pcIs_intro` curried. -/
+/-- `pcIs` reassembled from its two cells, curried. -/
 theorem pcIs_introW (cpu : CPU) (pc : BitVec 64) :
     ⊢ Register.PC ↦ᵣ[cpu] pc -∗ Register.nextPC ↦ᵣ[cpu] pc -∗ pcIs (GF := GF) cpu pc := by
   iintro H1 H2

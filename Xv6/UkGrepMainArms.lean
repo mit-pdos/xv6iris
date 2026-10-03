@@ -25,7 +25,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
 set_option maxRecDepth 20000
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
@@ -75,9 +74,9 @@ theorem grepMain_usage (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) 
   inext
   iintro %h1 Hrun
   rw [ukPc 0x22e 0x232 false rfl]
-  -- 0x232  addi a1,a1,-1806 : &"usage: ..."
-  gfetch 0x232 false (.ITYPE (2290#12, .Regidx 11#5, .Regidx 11#5, .ADDI))
-  iapply wp_uk_itype UL N h1 _ (BitVec.ofNat 64 0x232) false 2290#12 11#5 11#5 .ADDI _
+  -- 0x232  addi a1,a1,-1790 : &"usage: ..."
+  gfetch 0x232 false (.ITYPE (2306#12, .Regidx 11#5, .Regidx 11#5, .ADDI))
+  iapply wp_uk_itype UL N h1 _ (BitVec.ofNat 64 0x232) false 2306#12 11#5 11#5 .ADDI _
     (by unfold unotSp spIdx; decide) $$ Hi Hrun
   inext
   iintro %h2 Hrun
@@ -90,26 +89,26 @@ theorem grepMain_usage (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) 
   iintro %h3 Hrun
   rw [ukPc 0x236 0x238 true rfl]
   -- 0x238  jal fprintf
-  gfetch 0x238 false (.JAL (1808#21, .Regidx 1#5))
-  iapply wp_uk_jal UL N h3 _ (BitVec.ofNat 64 0x238) false 1808#21 1#5 _ (by unfold unotSp spIdx; decide)
+  gfetch 0x238 false (.JAL (1816#21, .Regidx 1#5))
+  iapply wp_uk_jal UL N h3 _ (BitVec.ofNat 64 0x238) false 1816#21 1#5 _ (by unfold unotSp spIdx; decide)
     (by decide) $$ Hi Hrun
   inext
   iintro %h4 Hrun
-  rw [show BitVec.ofNat 64 0x238 + BitVec.signExtend 64 1808#21 = BitVec.ofNat 64 User.Grep.Sym.«fprintf»
+  rw [show BitVec.ofNat 64 0x238 + BitVec.signExtend 64 1816#21 = BitVec.ofNat 64 User.Grep.Sym.«fprintf»
     from by decide]
   let m1 := ukWr m 11#5 (ukUtypeVal .AUIPC (BitVec.ofNat 64 0x22e) 1#20)
-  let m2 := ukWr m1 11#5 (ukItypeVal .ADDI (m1.get 11#5) 2290#12)
+  let m2 := ukWr m1 11#5 (ukItypeVal .ADDI (m1.get 11#5) 2306#12)
   let m3 := ukWr m2 10#5 (ukItypeVal .ADDI (m2.get 0#5) 2#12)
   let m4 := ukWr m3 1#5 (BitVec.ofNat 64 0x238 + instrLen false)
   have e10 : m4.get 10#5 = BitVec.ofNat 64 2 := by ureg; exact ukLi _ 2#12 2 (by decide)
-  have e11 : m4.get 11#5 = BitVec.ofNat 64 0xb20 := by ureg; try decide
+  have e11 : m4.get 11#5 = BitVec.ofNat 64 0xb30 := by ureg; try decide
   -- fprintf(2, "usage: grep pattern [file ...]\n")
-  have H := kgrepPaySeq_tree (hlc := hlc) N (m4.get 10#5) 2 (grepLit 0xb20) (by rw [e10]; try decide) 31 0 (exit_ 1)
+  have H := kgrepPaySeq_tree (hlc := hlc) N (m4.get 10#5) 2 (grepLit 0xb30) (by rw [e10]; try decide) 31 0 (exit_ 1)
   simp only [Nat.zero_add, grepUsage_lit] at H
   ihave #Hstr := grepUsage_str N.t $$ Hc
-  iapply wp_grepFprintf_ulib UL N 0xb20 31 (grepLit 0xb20) h4 m4 n _ _ (by decide) (by decide)
-    (fun j hj => User.litOk_nopct _ 0xb20 31 j grepUsage_litOk hj) e11 $$ [] Hc Hstr Ht Hrun
-  · iapply kgrepPaySeq_ulibUk N (m4.get 10#5) (grepLit 0xb20) 31 0 _ _
+  iapply wp_grepFprintf_ulib UL N 0xb30 31 (grepLit 0xb30) h4 m4 n _ _ (by decide) (by decide)
+    (fun j hj => User.litOk_nopct _ 0xb30 31 j grepUsage_litOk hj) e11 $$ [] Hc Hstr Ht Hrun
+  · iapply kgrepPaySeq_ulibUk N (m4.get 10#5) (grepLit 0xb30) 31 0 _ _
     iapply H
   iintro %h5 %m5 - Hx Hrun
   rw [show retPc (m4.get 1#5) = BitVec.ofNat 64 0x23c by rw [ukWr_get_same _ _ _ (by decide)]; decide]
@@ -143,30 +142,30 @@ theorem grepMain_die (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (a
   inext
   iintro - %h1 Hrun
   rw [ukPc 0x250 0x254 false rfl]
-  -- 0x254  auipc a0,0x1 ; 0x258  addi a0,a0,-1812
+  -- 0x254  auipc a0,0x1 ; 0x258  addi a0,a0,-1796
   gfetch 0x254 false (.UTYPE (1#20, .Regidx 10#5, .AUIPC))
   iapply wp_uk_utype UL N h1 _ (BitVec.ofNat 64 0x254) false 1#20 10#5 .AUIPC _
     (by unfold unotSp spIdx; decide) $$ Hi Hrun
   inext
   iintro %h2 Hrun
   rw [ukPc 0x254 0x258 false rfl]
-  gfetch 0x258 false (.ITYPE (2284#12, .Regidx 10#5, .Regidx 10#5, .ADDI))
-  iapply wp_uk_itype UL N h2 _ (BitVec.ofNat 64 0x258) false 2284#12 10#5 10#5 .ADDI _
+  gfetch 0x258 false (.ITYPE (2300#12, .Regidx 10#5, .Regidx 10#5, .ADDI))
+  iapply wp_uk_itype UL N h2 _ (BitVec.ofNat 64 0x258) false 2300#12 10#5 10#5 .ADDI _
     (by unfold unotSp spIdx; decide) $$ Hi Hrun
   inext
   iintro %h3 Hrun
   rw [ukPc 0x258 0x25c false rfl]
   -- 0x25c  jal printf
-  gfetch 0x25c false (.JAL (1814#21, .Regidx 1#5))
-  iapply wp_uk_jal UL N h3 _ (BitVec.ofNat 64 0x25c) false 1814#21 1#5 _ (by unfold unotSp spIdx; decide)
+  gfetch 0x25c false (.JAL (1822#21, .Regidx 1#5))
+  iapply wp_uk_jal UL N h3 _ (BitVec.ofNat 64 0x25c) false 1822#21 1#5 _ (by unfold unotSp spIdx; decide)
     (by decide) $$ Hi Hrun
   inext
   iintro %h4 Hrun
-  rw [show BitVec.ofNat 64 0x25c + BitVec.signExtend 64 1814#21 = BitVec.ofNat 64 User.Grep.Sym.«printf»
+  rw [show BitVec.ofNat 64 0x25c + BitVec.signExtend 64 1822#21 = BitVec.ofNat 64 User.Grep.Sym.«printf»
     from by decide]
   let m1 := ukWr m 11#5 (BitVec.ofNat 64 g.ptr)
   let m2 := ukWr m1 10#5 (ukUtypeVal .AUIPC (BitVec.ofNat 64 0x254) 1#20)
-  let m3 := ukWr m2 10#5 (ukItypeVal .ADDI (m2.get 10#5) 2284#12)
+  let m3 := ukWr m2 10#5 (ukItypeVal .ADDI (m2.get 10#5) 2300#12)
   let m4 := ukWr m3 1#5 (BitVec.ofNat 64 0x25c + instrLen false)
   have e10 : m4.get 10#5 = BitVec.ofNat 64 gmMsg := by ureg; try decide
   have e11 : m4.get 11#5 = BitVec.ofNat 64 g.ptr := by ureg

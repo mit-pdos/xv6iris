@@ -42,8 +42,6 @@ namespace UShPipesDefs
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Wid RdOut WrOut
 
-set_option linter.unusedSectionVars false
-
 noncomputable section
 
 section Pay

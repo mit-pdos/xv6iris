@@ -11,6 +11,8 @@ normalise to; reads become map applications, decided on literal indices.
 -/
 import MachCSL.WpSmodeIntr
 import MachCSL.WpSmodeRegOps
+import MachCSL.KNormCache
+import MachCSL.KApply
 
 
 namespace MachCSL
@@ -34,10 +36,44 @@ theorem imm_m16 : BitVec.signExtend 64 4080#12 = -(8#64 * BitVec.ofNat 64 2) := 
 theorem imm_p16 : BitVec.signExtend 64 16#12 = 8#64 * BitVec.ofNat 64 2 := by
   simp only [BitVec.reduceSignExtend, BitVec.reduceMul]
 
+theorem RegMap.set_apply_of_eq (m : RegMap) (i j : BitVec 5) (v : BitVec 64) (h : j = i) :
+    m.set i v j = v := by
+  subst h; exact RegMap.set_same m j v
+
+open Lean Meta Simp in
+/-- `RegMap.set_apply` for `k_norm`, decided at once on literal indices: a read
+`(m.set i v) j` with `i`, `j` literals becomes `v` or `m j` by one
+`RegMap.set_apply_of_eq` / `RegMap.set_other` (its side condition by `decide`),
+otherwise `if j = i then v else m j` as `RegMap.set_apply` leaves it.  The normal
+form of `RegMap.set_apply` + `BitVec.reduceEq` + `ite_true`/`ite_false`, without
+building and collapsing an `ite` (and its `ite_congr` proof) at every level of a
+chain.  One level at a time (the result is revisited), and a post-procedure, so
+the simp set's lemmas -- and a proof's extra lemmas about an inner read such as
+`(R.set 10#5 v) 2#5` -- are tried first, as they were against
+`RegMap.set_apply`, which this replaces in `k_norm_simps`. -/
+simproc_decl RegMap.reduceApply (RegMap.set _ _ _ _) := fun e => do
+  unless e.isAppOfArity ``RegMap.set 4 do return .continue
+  let m := e.getArg! 0
+  let i := e.getArg! 1
+  let v := e.getArg! 2
+  let j := e.getArg! 3
+  if let some ⟨_, jv⟩ ← getBitVecValue? j then
+    if let some ⟨_, iv⟩ ← getBitVecValue? i then
+      if iv.toNat == jv.toNat then
+        let h ← mkDecideProof (← mkEq j i)
+        return .visit { expr := v, proof? := mkApp5 (mkConst ``RegMap.set_apply_of_eq) m i j v h }
+      let h ← mkDecideProof (mkNot (← mkEq j i))
+      return .visit { expr := mkApp m j, proof? := mkApp5 (mkConst ``RegMap.set_other) m i j v h }
+  let pf := mkApp4 (mkConst ``RegMap.set_apply) m i j v
+  let some (_, _, rhs) := (← inferType pf).eq? | return .continue
+  return .visit { expr := rhs, proof? := pf }
+
 -- The lemmas and simprocs `k_norm` normalises with (see `k_norm_simps`).
+attribute [k_norm_simps] RegMap.reduceApply
+
 attribute [k_norm_simps]
   KCtx.push_eq KCtx.setReg_withRegs KCtx.withRegs_withRegs KCtx.rget_withRegs' KCtx.sp_withRegs
-  KCtx.sp_eq RegMap.set_apply KCtx.pushed_regs KCtx.pushed_sie KCtx.pushed_avail KCtx.pushed_noff
+  KCtx.sp_eq KCtx.pushed_regs KCtx.pushed_sie KCtx.pushed_avail KCtx.pushed_noff
   KCtx.pushed_intena KCtx.pushed_locks KCtx.pushed_tier KCtx.pushed_root KCtx.pushed_proc
   KCtx.withRegs_regs KCtx.withRegs_sie KCtx.withRegs_avail KCtx.withRegs_noff KCtx.withRegs_intena
   KCtx.withRegs_locks KCtx.withRegs_tier KCtx.withRegs_root KCtx.withRegs_proc
@@ -96,9 +132,7 @@ set_option hygiene false in
 macro_rules
   | `(tactic| k_norm_g) => `(tactic| k_norm_g [])
   | `(tactic| k_norm_g at $h:ident) => `(tactic| k_norm_g [] at $h:ident)
-  | `(tactic| k_norm_g [$extra:term,*]) => do
-    let lems ← extra.getElems.mapM fun l => `(Lean.Parser.Tactic.simpLemma| $l:term)
-    `(tactic| try simp only [k_norm_simps, k_addr, $lems,*])
+  | `(tactic| k_norm_g [$extra:term,*]) => `(tactic| k_norm_all [$extra,*])
   | `(tactic| k_norm_g [$extra:term,*] at $h:ident) => do
     let lems ← extra.getElems.mapM fun l => `(Lean.Parser.Tactic.simpLemma| $l:term)
     `(tactic| try simp only [k_norm_simps, k_addr, $lems,*] at $h:ident)
@@ -121,6 +155,40 @@ theorem entails'_later_intro {PROP : Type _} [BI PROP] {e Q : PROP} (h : Entails
     Entails' e iprop(▷ Q) :=
   (show e ⊢ Q from h).trans later_intro
 
+/-! ### The context as iris-lean's proof terms state it
+
+A proof-mode goal `Entails' tm Q` displays its context `tm` with every
+hypothesis wrapped (`IrisHyp P` under a name annotation), but iris-lean's own
+proof terms instantiate their lemmas at the UNWRAPPED context (the `Hyps`
+index).  A proof built by refining the goal directly (`refine lemma ?_`,
+`Eq.mpr` from `simp`, a type hint from `change`) states the wrapped `tm`, and
+wherever it meets an iris-lean term the kernel must convert `tm` to the plain
+context: `IrisHyp P ≡ P` with `P` the taller definition, so the kernel unfolds
+`P` first, ~50 µs a hypothesis, ~2-3 ms a step in a 40-hypothesis context
+(about half of the kernel's time on a whole-function proof).  The step tactics
+below state their proofs at the plain context (`plainCtx`), so no such
+conversion is left; the goals they create keep the wrapped form, which the
+proof mode reads. -/
+
+open Lean Meta in
+/-- The plain (unwrapped) context of an `Entails' tm Q` goal, if it differs from `tm`. -/
+def plainCtx (tgt : Lean.Expr) : Option Lean.Expr := do
+  let g ← Iris.ProofMode.parseIrisGoal? tgt
+  let tm := tgt.consumeMData.getArg! 2
+  if g.e == tm then none else some g.e
+
+open Lean Meta in
+/-- Run `tac` on the main goal, then restate the assignment it left there at the
+plain context (`plainCtx`). -/
+def withPlainCtx (tac : Elab.Tactic.TacticM Unit) : Elab.Tactic.TacticM Unit := do
+  let g ← Elab.Tactic.getMainGoal
+  let tgt ← instantiateMVars (← g.getType)
+  tac
+  let some e := plainCtx tgt | return
+  let tm := tgt.consumeMData.getArg! 2
+  let some v ← getExprMVarAssignment? g | return
+  g.assign (v.replace fun t => if t == tm then some e else none)
+
 /-- Whether `e` mentions a later modality anywhere. -/
 def hasLater (e : Lean.Expr) : Bool :=
   (e.find? fun t => t.isConstOf ``Iris.BI.BIBase.later || t.isConstOf ``Iris.BI.BIBase.laterN).isSome
@@ -135,7 +203,7 @@ elab "inext_goal" : tactic => do
     let e := tgt.getArg! 2
     let q := tgt.getArg! 3
     if q.isAppOfArity ``Iris.BI.BIBase.later 3 && !hasLater e then
-      evalTactic (← `(tactic| refine MachCSL.entails'_later_intro ?_))
+      withPlainCtx <| evalTactic (← `(tactic| refine MachCSL.entails'_later_intro ?_))
       return
   evalTactic (← `(tactic| inext))
 
@@ -147,20 +215,22 @@ elab "k_norm_goal" " [" extra:term,* "]" : tactic => withMainContext do
   let tgt ← instantiateMVars (← goal.getType)
   unless tgt.isAppOfArity ``Iris.ProofMode.Entails' 4 do
     evalTactic (← `(tactic| k_norm_g [$extra,*])); return
-  let lems ← extra.getElems.mapM fun l => `(Lean.Parser.Tactic.simpLemma| $l:term)
-  let stx ← `(tactic| simp only [k_norm_simps, k_addr, $lems,*])
-  let { ctx, simprocs, .. } ← mkSimpContext stx (eraseLocal := false)
   let q := tgt.getArg! 3
-  let (r, _) ← Lean.Meta.simp q ctx simprocs
+  let r ← kNormSimp extra.getElems q
   if r.expr == q then return
   let withConcl (x : Lean.Expr) := mkAppN tgt.getAppFn (tgt.getAppArgs.set! 3 x)
-  let tgt' := withConcl r.expr
+  -- the proof is stated at the plain context (see `plainCtx`), the new goal at the displayed one
+  let tgtP := (plainCtx tgt).elim tgt fun e => mkAppN tgt.getAppFn (tgt.getAppArgs.set! 2 e)
+  let withConclP (x : Lean.Expr) := mkAppN tgtP.getAppFn (tgtP.getAppArgs.set! 3 x)
+  let mvarNew ← mkFreshExprSyntheticOpaqueMVar (withConcl r.expr) (← goal.getTag)
   match r.proof? with
-  | none => replaceMainGoal [← goal.replaceTargetDefEq tgt']
+  | none => goal.assign mvarNew
   | some h =>
     let motive ← withLocalDecl `x .default (← inferType q) fun x =>
-      mkLambdaFVars #[x] (withConcl x)
-    replaceMainGoal [← goal.replaceTargetEq tgt' (← mkCongrArg motive h)]
+      mkLambdaFVars #[x] (withConclP x)
+    goal.assign (mkAppN (mkConst ``Eq.mpr [Level.zero])
+      #[withConclP q, withConclP r.expr, ← mkCongrArg motive h, mvarNew])
+  replaceMainGoal [mvarNew.mvarId!]
 
 /-! The step's continuation, entered without the proof mode: `iapply
 wpNext_off_intro` (~2.5 ms) and `iapply wpNext_intro_pin; iintro %c %hp`
@@ -182,12 +252,16 @@ def betaConcl : TacticM Unit := withMainContext do
   let q := tgt.getArg! 3
   let q' := q.headBeta
   if q' == q then return
-  replaceMainGoal [← g.replaceTargetDefEq (mkAppN tgt.getAppFn (tgt.getAppArgs.set! 3 q'))]
+  -- no type hint: the conversion is a beta step, left to wherever the proof lands
+  let mvarNew ← mkFreshExprSyntheticOpaqueMVar (mkAppN tgt.getAppFn (tgt.getAppArgs.set! 3 q'))
+    (← g.getTag)
+  g.assign mvarNew
+  replaceMainGoal [mvarNew.mvarId!]
 
 open Lean Elab Tactic Meta in
 /-- `iapply wpNext_off_intro`, by `entails'_wpNext_off`. -/
 elab "k_next_off" : tactic => do
-  evalTactic (← `(tactic| refine MachCSL.entails'_wpNext_off ?_))
+  withPlainCtx <| evalTactic (← `(tactic| refine MachCSL.entails'_wpNext_off ?_))
   betaConcl
 
 /-- One instruction: apply its rule (written with `?hs` for the
@@ -211,7 +285,7 @@ set_option hygiene false in
 macro_rules
   | `(tactic| k_step $rule:term $$ $pat:specPat) => `(tactic| k_step $rule:term $$ $pat:specPat with [])
   | `(tactic| k_step $rule:term $$ $pat:specPat with [$extra,*]) =>
-    `(tactic| (iapply $rule:term $$ $pat:specPat
+    `(tactic| (k_iapply $rule:term $$ $pat:specPat
                rotate_right 1
                iframe #
                k_norm_goal [hsie, $extra,*]
@@ -231,7 +305,7 @@ macro_rules
   | `(tactic| k_step $rule:term from $code:term $ht:ident $$ $pat:specPat) =>
     `(tactic| k_step $rule:term from $code:term $ht:ident $$ $pat:specPat with [])
   | `(tactic| k_step $rule:term from $code:term $ht:ident $$ $pat:specPat with [$extra,*]) =>
-    `(tactic| (iapply $rule:term $$ $pat:specPat
+    `(tactic| (k_iapply $rule:term $$ $pat:specPat
                rotate_right 1
                k_code $code:term $ht:ident
                iframe #
@@ -271,7 +345,7 @@ theorem entails'_wpNext_pin {e : IProp GF} {sie : Bool} {p : BitVec 64} {cpu : C
 open Lean Elab Tactic Meta in
 /-- `iapply wpNext_intro_pin; iintro %c %hp`, by `entails'_wpNext_pin`. -/
 elab "k_next_pin " c:ident hp:ident : tactic => do
-  evalTactic (← `(tactic| refine MachCSL.entails'_wpNext_pin fun $c $hp => ?_))
+  withPlainCtx <| evalTactic (← `(tactic| refine MachCSL.entails'_wpNext_pin fun $c $hp => ?_))
   betaConcl
 
 /-- `k_step` at either `SIE`: the continuation is introduced at a fresh
@@ -288,7 +362,7 @@ macro_rules
   | `(tactic| k_step_gen $rule:term $$ $pat:specPat next $c:ident $hp:ident) =>
     `(tactic| k_step_gen $rule:term $$ $pat:specPat with [] next $c $hp)
   | `(tactic| k_step_gen $rule:term $$ $pat:specPat with [$extra,*] next $c:ident $hp:ident) =>
-    `(tactic| (iapply $rule:term $$ $pat:specPat
+    `(tactic| (k_iapply $rule:term $$ $pat:specPat
                rotate_right 1
                iframe #
                k_norm_goal [$extra,*]
@@ -302,7 +376,7 @@ macro_rules
   | `(tactic| k_step_gen $rule:term from $code:term $ht:ident $$ $pat:specPat next $c:ident $hp:ident) =>
     `(tactic| k_step_gen $rule:term from $code:term $ht:ident $$ $pat:specPat with [] next $c $hp)
   | `(tactic| k_step_gen $rule:term from $code:term $ht:ident $$ $pat:specPat with [$extra,*] next $c:ident $hp:ident) =>
-    `(tactic| (iapply $rule:term $$ $pat:specPat
+    `(tactic| (k_iapply $rule:term $$ $pat:specPat
                rotate_right 1
                k_code $code:term $ht:ident
                iframe #
@@ -346,7 +420,7 @@ set_option hygiene false in
 macro_rules
   | `(tactic| k_step_e $rule:term $$ $pat:specPat) => `(tactic| k_step_e $rule:term $$ $pat:specPat with [])
   | `(tactic| k_step_e $rule:term $$ $pat:specPat with [$extra,*]) =>
-    `(tactic| (iapply $rule:term $$ $pat:specPat
+    `(tactic| (k_iapply $rule:term $$ $pat:specPat
                rotate_right 1
                iframe #
                k_norm_goal [$extra,*]
@@ -361,7 +435,7 @@ macro_rules
   | `(tactic| k_step_e $rule:term from $code:term $ht:ident $$ $pat:specPat) =>
     `(tactic| k_step_e $rule:term from $code:term $ht:ident $$ $pat:specPat with [])
   | `(tactic| k_step_e $rule:term from $code:term $ht:ident $$ $pat:specPat with [$extra,*]) =>
-    `(tactic| (iapply $rule:term $$ $pat:specPat
+    `(tactic| (k_iapply $rule:term $$ $pat:specPat
                rotate_right 1
                k_code $code:term $ht:ident
                iframe #

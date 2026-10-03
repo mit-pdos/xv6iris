@@ -45,24 +45,4 @@ theorem umemWrote_refl (P : UPtd) (M : Nat → List (BitVec 8)) (a : BitVec 64) 
     umemWrote P M a 0 P M :=
   ⟨[], rfl, by rw [viewFaulted_self, umemWrite_nil], umMapped_zero P _⟩
 
-/-- `umemWrote` grows by a chunk written at its end. -/
-theorem umemWrote_step {P P1 P2 : UPtd} {M M1 : Nat → List (BitVec 8)} {a : BitVec 64} {m : Nat}
-    (hwf : uptWf P2) (h0 : P.ext P1) (h1 : P1.ext P2) (hr : umemWrote P M a m P1 M1)
-    (bs2 : List (BitVec 8)) (hm2 : umMapped P2 (a + BitVec.ofNat 64 m).toNat bs2.length) :
-    umemWrote P M a (m + bs2.length) P2
-      (umemWrite (viewFaulted P1 P2 M1) (a + BitVec.ofNat 64 m).toNat bs2) := by
-  obtain ⟨bs, hl, rfl, hm⟩ := hr
-  subst hl
-  obtain ⟨he, hmm⟩ := umemWrite_step M a bs bs2 hwf h0 h1 hm hm2
-  exact ⟨bs ++ bs2, by rw [List.length_append], he, by rw [← List.length_append]; exact hmm⟩
-
-/-- A later extension that writes nothing keeps the run. -/
-theorem umemWrote_view {P P1 P2 : UPtd} {M M1 : Nat → List (BitVec 8)} {a : BitVec 64} {m : Nat}
-    (h0 : P.ext P1) (h1 : P1.ext P2) (hr : umemWrote P M a m P1 M1) :
-    umemWrote P M a m P2 (viewFaulted P1 P2 M1) := by
-  obtain ⟨bs, hl, rfl, hm⟩ := hr
-  subst hl
-  exact ⟨bs, rfl, by rw [viewFaulted_umemWrite _ _ _ hm, viewFaulted_trans M h0 h1],
-    umMapped_ext h1 hm⟩
-
 end Xv6.UMemL

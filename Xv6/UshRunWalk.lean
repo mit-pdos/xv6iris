@@ -30,10 +30,8 @@ instances):
 3. The forked child's `ukn_const` is rebuilt from the payload equation
    (`ukn_const_of_eq`, as Rocq); the empty descriptor map is `∅`.
 -/
-import Xv6.UshRunEntry
 import Xv6.SpecShSysWait
 import Xv6.SpecShSysExec
-import Xv6.UkSysP
 import Xv6.UshMainStubs
 import Xv6.UshRedirArm
 
@@ -43,7 +41,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled

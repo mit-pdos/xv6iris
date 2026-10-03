@@ -32,8 +32,6 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedSectionVars false
-
 /-! ## Pointwise update of a boolean marking -/
 
 /-- `f` with index `j` set to `b`. -/
@@ -60,7 +58,7 @@ theorem tk3_apply (h m t : Nat) (i : Nat) :
   by_cases h3 : i = t
   · simp [h3]
   · by_cases h2 : i = m
-    · simp [h2, h3]
+    · simp [h2]
     · by_cases h1 : i = h <;> simp [h1, h2, h3]
 
 theorem tk3_true (h m t : Nat) : tk3 h m t h = true ∧ tk3 h m t m = true ∧ tk3 h m t t = true := by
@@ -505,15 +503,15 @@ end seams
 /-! ## Addresses and constants of the `alloc3_desc` region -/
 
 /-- `&disk`, out of `auipc a4,0x1e; addi a4,a4,-1298` at `+0x5e`. -/
-theorem vdrw2_disk_addr : KA.«virtio_disk_rw» + 0x1dd2c#64 = KA.«disk» := by decide
+theorem vdrw2_disk_addr : KA.«virtio_disk_rw» + 0x1dedc#64 = KA.«disk» := by decide
 
 /-- `&disk.vdisk_lock`, out of the two `auipc/addi` pairs at `+0xa0` and
 `+0xb0`. -/
-theorem vdrw2_lock_addr : KA.«virtio_disk_rw» + 0x1de54#64 = aVdiskLock := by
+theorem vdrw2_lock_addr : KA.«virtio_disk_rw» + 0x1e004#64 = aVdiskLock := by
   unfold aVdiskLock diskAddr dOffLock; decide
 
 /-- `&disk.free[0]`, the sleep channel, out of `auipc/addi` at `+0x94`. -/
-theorem vdrw2_free0_addr : KA.«virtio_disk_rw» + 0x1dd44#64 = aFree 0 := by
+theorem vdrw2_free0_addr : KA.«virtio_disk_rw» + 0x1def4#64 = aFree 0 := by
   unfold aFree diskAddr dOffFree; decide
 
 theorem aFree0_nz : aFree 0 ≠ 0#64 := by unfold aFree diskAddr dOffFree; decide
@@ -537,10 +535,10 @@ theorem vdrw2_disk_succ (j : Nat) :
 /-- The four `jal` targets of the retry path. -/
 theorem vdrw2_br_free_desc : KA.«virtio_disk_rw» + 0xfffffffffffffdc2#64 = KA.«free_desc» := by decide
 theorem vdrw2_br_sleep_prepare :
-    KA.«virtio_disk_rw» + 0xffffffffffffc5d0#64 = KA.«sleep_prepare» := by decide
-theorem vdrw2_br_release : KA.«virtio_disk_rw» + 0xffffffffffffb2dc#64 = KA.«release» := by decide
-theorem vdrw2_br_sleep : KA.«virtio_disk_rw» + 0xffffffffffffc60c#64 = KA.«sleep» := by decide
-theorem vdrw2_br_acquire : KA.«virtio_disk_rw» + 0xffffffffffffb254#64 = KA.«acquire» := by decide
+    KA.«virtio_disk_rw» + 0xffffffffffffc4e0#64 = KA.«sleep_prepare» := by decide
+theorem vdrw2_br_release : KA.«virtio_disk_rw» + 0xffffffffffffb1ec#64 = KA.«release» := by decide
+theorem vdrw2_br_sleep : KA.«virtio_disk_rw» + 0xffffffffffffc51c#64 = KA.«sleep» := by decide
+theorem vdrw2_br_acquire : KA.«virtio_disk_rw» + 0xffffffffffffb164#64 = KA.«acquire» := by decide
 
 /-- The six `jal` return addresses. -/
 theorem vdrw2_ret_86 : jumpPc (KA.«virtio_disk_rw» + 0x86#64) = KA.«virtio_disk_rw» + 0x86#64 := by decide
@@ -574,25 +572,10 @@ theorem vdrw2_addiw1 (n : Nat) (h : n < NUM) :
 
 theorem vdrw2_bnez_1 : bcond bop.BNE 1#64 0#64 = true := by decide
 
-/-- `bne a5,s1` with `s1 = NUM`. -/
-theorem vdrw2_bne_num (n : Nat) (h : n < NUM) :
-    bcond bop.BNE (BitVec.ofNat 64 n) 8#64 = true := by
-  rcases lt8_cases n h with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide
-
-theorem vdrw2_bne_num_end : bcond bop.BNE (BitVec.ofNat 64 8) 8#64 = false := by decide
-
 /-- `bltz a5` on a small index: never taken. -/
 theorem vdrw2_bltz (n : Nat) (h : n < NUM) :
     bcond bop.BLT (BitVec.ofNat 64 n) 0#64 = false := by
   rcases lt8_cases n h with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide
-
-/-- `beq s2,s4` with `s4 = 3`. -/
-theorem vdrw2_beq3 (n : Nat) (h : n < 3) :
-    bcond bop.BEQ (BitVec.ofNat 64 n) 3#64 = false := by
-  have : n = 0 ∨ n = 1 ∨ n = 2 := by omega
-  rcases this with rfl|rfl|rfl <;> decide
-
-theorem vdrw2_beq3_end : bcond bop.BEQ (BitVec.ofNat 64 3) 3#64 = true := by decide
 
 theorem sp_idx2 (sp : BitVec 64) :
     sp + 0xFFFFFFFFFFFFFFA4#64 + 4#64 = sp + 0xFFFFFFFFFFFFFFA8#64 := by
@@ -614,16 +597,5 @@ theorem vdrw2_blez1 : bcond bop.BGE 0#64 1#64 = false := by decide
 theorem vdrw2_blez2 : bcond bop.BGE 0#64 2#64 = false := by decide
 theorem vdrw2_bge11 : bcond bop.BGE 1#64 1#64 = true := by decide
 theorem vdrw2_bge12 : bcond bop.BGE 1#64 2#64 = false := by decide
-
-/-- `blez s2` and `bge a5,s2` of the failure ladder. -/
-theorem vdrw2_blez (n : Nat) (h : n < 3) :
-    bcond bop.BGE 0#64 (BitVec.ofNat 64 n) = decide (n = 0) := by
-  have : n = 0 ∨ n = 1 ∨ n = 2 := by omega
-  rcases this with rfl|rfl|rfl <;> decide
-
-theorem vdrw2_bge1 (n : Nat) (h : n < 3) :
-    bcond bop.BGE 1#64 (BitVec.ofNat 64 n) = decide (n ≤ 1) := by
-  have : n = 0 ∨ n = 1 ∨ n = 2 := by omega
-  rcases this with rfl|rfl|rfl <;> decide
 
 end Xv6

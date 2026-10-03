@@ -62,7 +62,6 @@ import Xv6.FsCallSites
 import Xv6.SpecInitlock
 import Xv6.SpecWriteHead
 import Xv6.BallocDefs
-import Xv6.FsWords
 
 namespace Xv6
 
@@ -71,22 +70,20 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## The relocations the code computes -/
 
 /-- `auipc s2,0x1e ; addi s2,s2,1806` at `+0x12`/`+0x16`. -/
-theorem il_log_addr : KA.«initlog» + 0x1e90a#64 = logAddr := by
+theorem il_log_addr : KA.«initlog» + 0x1eb36#64 = logAddr := by
   unfold logAddr; decide
 /-- `auipc a5,0x1e ; sw zero,1764(a5)` at `+0x68`/`+0x6c`. -/
-theorem il_lhn_reloc : KA.«initlog» + 0x1e936#64 = lhNAddr := by
+theorem il_lhn_reloc : KA.«initlog» + 0x1eb62#64 = lhNAddr := by
   unfold lhNAddr logAddr; decide
 
-theorem il_br_initlock : KA.«initlog» + 0xffffffffffffceb2#64 = KA.«initlock» := by decide
-theorem il_br_bread : KA.«initlog» + 0xFFFFFFFFFFFFEF80#64 = KA.«bread» := by decide
-theorem il_br_brelse : KA.«initlog» + 0xFFFFFFFFFFFFF088#64 = KA.«brelse» := by decide
+theorem il_br_initlock : KA.«initlog» + 0xffffffffffffce3e#64 = KA.«initlock» := by decide
+theorem il_br_bread : KA.«initlog» + 0xffffffffffffef20#64 = KA.«bread» := by decide
+theorem il_br_brelse : KA.«initlog» + 0xfffffffffffff028#64 = KA.«brelse» := by decide
 theorem il_br_install : KA.«initlog» + 0xFFFFFFFFFFFFFF34#64 = KA.«install_trans» := by decide
 theorem il_br_writehead : KA.«initlog» + 0xFFFFFFFFFFFFFED6#64 = KA.«write_head» := by decide
 
@@ -552,21 +549,21 @@ theorem initlog_proof
   k_step_e (wp_s_auipc cpu _ (KA.«initlog» + 0x12#64) false 0x1f#20 18#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_addi cpu _ (KA.«initlog» + 0x16#64) false 2296#12 18#5 18#5 (by decide))
+  k_step_e (wp_s_addi cpu _ (KA.«initlog» + 0x16#64) false 2852#12 18#5 18#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [il_log_addr]
   iintro Hk Hpc
   -- +0x1a/+0x1e  a1 = "log"
   k_step_e (wp_s_auipc cpu _ (KA.«initlog» + 0x1a#64) false 3#20 11#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_addi cpu _ (KA.«initlog» + 0x1e#64) false 2016#12 11#5 11#5 (by decide))
+  k_step_e (wp_s_addi cpu _ (KA.«initlog» + 0x1e#64) false 1900#12 11#5 11#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x22  c.mv a0,s2 ; +0x24  jal ra,initlock
   k_step_e (wp_s_add cpu _ (KA.«initlog» + 0x22#64) true 10#5 0#5 18#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_jal cpu _ (KA.«initlog» + 0x24#64) false 2084494#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«initlog» + 0x24#64) false 2084378#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [il_br_initlock]
   iintro Hk Hpc
   iapply (il_initlock_call IL cpu _ vlock vname vcpu ?iK logAddr ?ia0)
@@ -610,7 +607,7 @@ theorem initlog_proof
   k_step_e (wp_s_add cpu _ (KA.«initlog» + 0x34#64) true 10#5 0#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [a9']
   iintro Hk Hpc
-  k_step_e (wp_s_jal cpu _ (KA.«initlog» + 0x36#64) false 2092874#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«initlog» + 0x36#64) false 2092778#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [il_br_bread]
   iintro Hk Hpc
   iapply (bread_call_eb BD Γ cpu _ γl γb V γdl pd pav pu j pidv dev (BitVec.ofNat 32 logstart) dqp
@@ -678,7 +675,7 @@ theorem initlog_proof
       bs bsd dd).2 $$ [Hhold Hpay]
   case' _ => iframe Hhold Hpay
   -- +0x5e  jal ra,brelse
-  k_step_e (wp_s_jal cpu _ (KA.«initlog» + 0x5e#64) false 2093098#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«initlog» + 0x5e#64) false 2093002#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [il_br_brelse]
   iintro Hk Hpc
   iapply (brelse_call BE Γ cpu _ γl γb V kk pidv dev (BitVec.ofNat 32 logstart) dqp bs bsd dd
@@ -859,7 +856,7 @@ theorem initlog_proof
   k_step_e (wp_s_auipc cpu _ (KA.«initlog» + 0x68#64) false 0x1f#20 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_sw cpu _ (KA.«initlog» + 0x6c#64) false 2254#12 15#5 0#5 (by decide)
+  k_step_e (wp_s_sw cpu _ (KA.«initlog» + 0x6c#64) false 2810#12 15#5 0#5 (by decide)
       (BitVec.ofNat 32 (hdrN bs)))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [il_lhn_reloc, il_ext0]
   iintro Hk Hpc HlhN

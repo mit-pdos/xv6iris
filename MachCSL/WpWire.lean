@@ -1,22 +1,21 @@
 /-
 MachCSL: device threads that DRIVE A PIN.
 
-`MachCSL.WpDev`'s `wpDev_local`/`wpDev_localR` exclude `DevOp.setPin` (and
-so do `WpDevDma`/`WpDevDmaStep`): a pin write is the one local-looking
+`MachCSL.WpDev`'s `DevM.LocalR` excludes `DevOp.setPin` (and so do
+`WpDevDma`/`WpDevDmaStep`): a pin write is the one local-looking
 primitive that moves a HART's register file, so the mirror invariant alone
 cannot re-establish the state interpretation.  The wire invariant
 (`MachCSL.WireInv`) supplies exactly what is missing -- value-agnostic
 ownership of every hart's `sig_seip`/`sig_meip` -- and `machInterp_setPin`
 turns it into the update of the interpretation.
 
-This file therefore repeats `wpDev_localR` with the exclusion dropped:
+This file therefore states the device loop lemma with the exclusion dropped:
 
 * `devOpStep_wireR` -- what a primitive of a pin-driving device does: it
   moves the device's own state inside `rel`, or nothing, or ONE HART'S PIN,
   or forks one named task;
-* `DevM.WireR` / `DevSig.WireR` -- `LocalR` minus the `setPin` exclusion,
-  with `localR_wireR` embedding the old class (so the UARTs, the disk's
-  non-DMA tasks, ... still fit);
+* `DevM.WireR` / `DevSig.WireR` -- `LocalR` minus the `setPin` exclusion
+  (so the UARTs, the disk's non-DMA tasks, ... still fit);
 * `machInterp_setPin` -- the pin update, from the wire invariant's body;
 * `wpDev_wireR` -- the loop lemma.  This is what the PLIC's body needs: its
   wire arm is `DevM.setPin ⟨c, _⟩ mm (eip p ctx)`.
@@ -87,18 +86,6 @@ inductive DevM.WireR {S T : Type} (rel : S → S → Prop) : DevM S T Unit → P
 def DevSig.WireR (d : DevId) (rel : DevSt d → DevSt d → Prop) : Prop :=
   DevM.WireR rel (devSig d).body ∧ ∀ t, DevM.WireR rel ((devSig d).task t)
 
-theorem DevM.LocalR.wireR {S T : Type} {rel : S → S → Prop} {m : DevM S T Unit}
-    (h : DevM.LocalR rel m) : DevM.WireR rel m := by
-  induction h with
-  | pure a => exact .pure a
-  | op o k hw _ hs _ ih => exact .op o k hw hs ih
-
-/-- Every device that fits `wpDev_localR` fits `wpDev_wireR` (the UARTs,
-via `Xv6.uart_localR`; anything else that never pins). -/
-theorem localR_wireR (d : DevId) (rel : DevSt d → DevSt d → Prop) (h : DevSig.LocalR d rel) :
-    DevSig.WireR d rel :=
-  ⟨h.1.wireR, fun t => (h.2 t).wireR⟩
-
 /-! ## The pin update -/
 
 /-- Overwrite one hart's `sig_seip` from the wire invariant's body. -/
@@ -142,7 +129,7 @@ theorem machInterp_setPin (σ : MState) (cpu : CPU) (mmode b : Bool) :
 /-! ## The loop lemma -/
 
 set_option maxHeartbeats 4000000 in
-/-- `wpDev_localR` for a device that also drives pins: the device's own
+/-- The device loop lemma for a device that also drives pins: the device's own
 updates stay inside `rel`, along which the client updates `R`, and every
 pin write is answered by the wire invariant. -/
 theorem wpDev_wireR (N : Namespace) (d : DevId) [DevDiskInert d] (hsil : DevSilent d) (rel : DevSt d → DevSt d → Prop)

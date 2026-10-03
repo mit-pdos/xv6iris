@@ -12,7 +12,6 @@ import MachCSL.WpCycleDefs
 import MachCSL.WpStagesM
 import MachCSL.WpTick
 import MachCSL.Instr
-import MachCSL.Boot
 
 namespace MachCSL
 
@@ -52,22 +51,6 @@ theorem fetchSpec_base2 (cpu : CPU) (dq : DFrac) (c : MConf) (hok : MConf.ok (GF
   intro Φ
   have := swp_fetch_m2_conf cpu dq c hok pc lo hi hram hal Φ
   simp only [fetched2, hc, Bool.false_eq_true, ite_false] at this
-  iintro ⟨HmConf, HPC, ⟨Hlo, Hhi⟩, HΦ⟩
-  iapply this
-  iframe
-  inext
-  iintro HmConf HPC Hlo Hhi
-  iapply HΦ $$ HmConf HPC [Hlo Hhi]
-  iframe
-
-theorem fetchSpec_rvc2 (cpu : CPU) (dq : DFrac) (c : MConf) (hok : MConf.ok (GF := GF) c)
-    (pc : BitVec 64) (lo hi : BitVec 16)
-    (hram : inRam pc 4) (hal : pc.toNat % 4 = 2) (hc : isRVC lo = true) :
-    fetchSpec (GF := GF) cpu dq c pc iprop(imgBytes pc 2 lo ∗ imgBytes (pc + 2#64) 2 hi)
-      (FetchResult.F_RVC lo) := by
-  intro Φ
-  have := swp_fetch_m2_conf cpu dq c hok pc lo hi hram hal Φ
-  simp only [fetched2, hc, ite_true] at this
   iintro ⟨HmConf, HPC, ⟨Hlo, Hhi⟩, HΦ⟩
   iapply this
   iframe

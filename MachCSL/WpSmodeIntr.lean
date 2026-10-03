@@ -39,10 +39,6 @@ theorem smFacts_set (ms : BitVec 64) (sie : Bool) (h : smFacts ms sie) : smFacts
   simp only [ite_true]
   bv_decide
 
-/-- Setting an already-set `SIE` is the identity. -/
-theorem ms_or_sie_self (ms : BitVec 64) (h : BitVec.extractLsb' 1 1 ms = 1#1) : ms ||| 2#64 = ms := by
-  bv_decide
-
 /-- The `SPIE`/`SPP` bits a clear pins. -/
 def spieOf (ms : BitVec 64) : Bool := decide (BitVec.extractLsb' 5 1 ms = 1#1)
 def sppOf (ms : BitVec 64) : Bool := decide (BitVec.extractLsb' 8 1 ms = 1#1)
@@ -105,10 +101,6 @@ theorem KCtx.wf_intrOff (k : KCtx) (a b : Bool) (h : k.wf) : (k.intrOff a b).wf 
   cases hs : k.sie
   · simp only [ite_false, Bool.false_eq_true]; rw [← w1 hn, hs]
   · rfl
-
-/-- With interrupts already off, `intr_off` is the identity. -/
-theorem KCtx.intrOff_off (k : KCtx) (hs : k.sie = false) : k.intrOff k.spie k.spp = k := by
-  cases k; simp only [KCtx.intrOff] at *; simp [hs, trapRes]
 
 /-- The context after `intr_on` (from interrupts off): the trap reserve
 taken back out of the free slots, the depth-0 ghost `intena` canonical. -/
@@ -359,25 +351,6 @@ theorem wp_s_csrsi_sstatus_x0 [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU)
   · ipureintro; rfl
   · iexact Hro
 
-/-- `csrsi sstatus, SIE` with interrupts already on: a no-op. -/
-theorem wp_s_csrsi_sstatus_x0_on [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = true)
-    (pc : BitVec 64) (is_rvc : Bool) :
-    instr (GF := GF) pc is_rvc (instruction.CSRImm (0x100#12, 2#5, regidx.Regidx 0#5, csrop.CSRRS)) ∗
-    kctxL lent cpu k ∗ pcIs cpu pc ∗
-    ▷ wpNext k.sie k.proc cpu (fun cpu' =>
-        iprop(kctxL lent cpu' k -∗ pcIs cpu' (pc + instrLen is_rvc) -∗ wpLoop cpu'))
-    ⊢ wpLoop cpu :=
-  wpLoop_k_keep0 cpu k pc _ is_rvc _
-    (fun cpu' c _ hok _ => by
-      have e := execSpecF_csrsi_sstatus_x0 (GF := GF) cpu' c k.sie hok.phys pc (pc + instrLen is_rvc)
-        (tpPin cpu' k.regs)
-      have h1 : BitVec.extractLsb' 1 1 c.mstatus = 1#1 := by
-        have := hok.phys.2.1.1; rw [hsie] at this; simpa using this
-      have hc : { c with mstatus := c.mstatus ||| 2#64 } = c := by rw [ms_or_sie_self c.mstatus h1]
-      rw [hc] at e
-      exact e)
-
-
 /-! ## The push_off contexts -/
 
 /-- `push_off`'s exit from a context whose saved enable state is `b` (the
@@ -399,7 +372,6 @@ def KCtx.pushOffB (k : KCtx) (b : Bool) : KCtx :=
 @[simp] theorem KCtx.pushOffB_root (k : KCtx) (b : Bool) : (k.pushOffB b).root = k.root := rfl
 @[simp] theorem KCtx.pushOffB_proc (k : KCtx) (b : Bool) : (k.pushOffB b).proc = k.proc := rfl
 @[simp] theorem KCtx.pushOffB_sp (k : KCtx) (b : Bool) : (k.pushOffB b).sp = k.sp := rfl
-theorem KCtx.pushOffB_self (k : KCtx) : k.pushOffB k.intena = k.pushOff := by cases k; rfl
 
 /-- `push_off`'s exit at either `SIE`: interrupts off with `SPIE`/`SPP`
 pinned, the trap reserve free, the depth incremented; `intena` is the
@@ -425,13 +397,6 @@ def KCtx.pushOffAt (k : KCtx) (spie spp : Bool) : KCtx :=
 @[simp] theorem KCtx.pushOffAt_root (k : KCtx) (a b : Bool) : (k.pushOffAt a b).root = k.root := rfl
 @[simp] theorem KCtx.pushOffAt_proc (k : KCtx) (a b : Bool) : (k.pushOffAt a b).proc = k.proc := rfl
 @[simp] theorem KCtx.pushOffAt_sp (k : KCtx) (a b : Bool) : (k.pushOffAt a b).sp = k.sp := rfl
-
-/-- `push_off`'s exit is well-formed. -/
-theorem KCtx.wf_pushOffAt (k : KCtx) (a b : Bool) (h : k.wf) (hn : k.noff + 1 < 2 ^ 31) :
-    (k.pushOffAt a b).wf := by
-  obtain ⟨-, -, -, w4, -⟩ := h
-  exact ⟨fun h0 => absurd h0 (Nat.succ_ne_zero _), fun _ => rfl, fun h' => absurd h' Bool.false_ne_true,
-    Nat.le_succ_of_le w4, hn⟩
 
 /-- With interrupts already off, `push_off`'s exit is `pushOff`. -/
 theorem KCtx.pushOffAt_off' (k : KCtx) (a b : Bool) (hs : k.sie = false) (ha : a = k.spie) (hb : b = k.spp) :
@@ -616,12 +581,12 @@ theorem KCtx.pushOffAt_popExit (k : KCtx) (a b : Bool) (hwf : k.wf) :
   obtain ⟨regs, sie, spie, spp, avail, noff, intena, locks, tier, root, proc⟩ := k
   simp only at w1 w2 w3
   cases sie
-  · simp only [KCtx.popExit_false, KCtx.pushOffAt, KCtx.popOff, KCtx.withSpie, KCtx.mk.injEq, _root_.true_and,
-      _root_.and_true, trapRes, Bool.false_eq_true, ite_false, Nat.zero_add, Nat.add_sub_cancel]
+  · simp only [KCtx.popExit_false, KCtx.pushOffAt, KCtx.popOff, KCtx.withSpie, 
+      trapRes, Bool.false_eq_true, ite_false, Nat.zero_add, Nat.add_sub_cancel]
   · obtain ⟨hn, hi, -, -⟩ := w3 rfl
     subst hn hi
-    simp only [KCtx.popExit_true, KCtx.pushOffAt, KCtx.popOff, KCtx.intrOn, KCtx.withSpie, KCtx.mk.injEq,
-      _root_.true_and, _root_.and_true, trapRes, ite_true, Nat.add_sub_cancel_left]
+    simp only [KCtx.popExit_true, KCtx.pushOffAt, KCtx.popOff, KCtx.intrOn, KCtx.withSpie, 
+      trapRes, ite_true, Nat.add_sub_cancel_left]
 
 /-! ## The trap-CSR complement (Rocq `trap_csrs_ext` / `cpu_claim_ext`)
 
@@ -707,26 +672,6 @@ theorem cpuClaimExt_move (cpu c : CPU) (sie : Bool) (p : BitVec 64) (h : sie = f
   cases sie
   · rw [h rfl]
   · simp only [cpuClaimExt_true]; exact .rfl
-
-/-- The pair moved by one hart-pinning fact (the shape `wpNext_intro_pin`
-hands a step's continuation). -/
-theorem armExt_move (cpu c : CPU) (sie : Bool) (p q : BitVec 64) (h : sie = false ∨ q = 0#64 → c = cpu) :
-    trapCsrsExt (GF := GF) cpu sie ∗ cpuClaimExt cpu sie p ⊢ trapCsrsExt c sie ∗ cpuClaimExt c sie p := by
-  iintro ⟨Ht, Hc⟩
-  isplitl [Ht]
-  · iapply trapCsrsExt_move cpu c sie (fun h' => h (Or.inl h')) $$ Ht
-  · iapply cpuClaimExt_move cpu c sie p (fun h' => h (Or.inl h')) $$ Hc
-
-/-- At a balanced pair's release: the arm the entry acquire paid out, and
-the complement, re-split from the bundle so the release takes its share
-(`popArm_sie`). -/
-theorem armExt_popArm (cpu : CPU) (k k' : KCtx) (hp : k'.proc = k.proc) :
-    trapCsrs (GF := GF) cpu ∗ cpuClaim cpu k.proc ∗ intrRes cpu ⊢
-      popArm cpu k' k.sie ∗ trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc := by
-  iintro H
-  icases armExt_split cpu k.sie k.proc $$ H with ⟨Ha, Ht, Hc⟩
-  iframe Ht Hc
-  iapply popArm_sie cpu k k' hp $$ Ha
 
 end
 

@@ -36,6 +36,7 @@ Deviations from Rocq: the inum is a `Nat` `n` with `s2 = ofNat 64 n` and
 -/
 import Xv6.IallocClaim
 import MachCSL.WpSmodeLh
+import Xv6.IupdateSteps
 
 namespace Xv6
 
@@ -44,9 +45,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-- The registers at the loop head `+0x30`. -/
 def iallocScanRegs [Icfg] (k : KCtx) (ty : BitVec 16) (n : Nat) (R : RegMap) : Prop :=

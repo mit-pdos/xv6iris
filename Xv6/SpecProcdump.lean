@@ -29,7 +29,7 @@ specifying it.  It reads three fields of every slot:
 
     p->state  (+24)   lock-protected and genuinely mutable
     p->pid    (+48)   half private to the process, a quarter lock-protected
-    p->name   (+344)  exclusively owned by whoever is RUNNING the process
+    p->name   (+352)  exclusively owned by whoever is RUNNING the process
 
 so none of the tree's five sharing disciplines gives `procdump` the right to
 read any of them.  In separation logic a load needs a fraction of the cell,

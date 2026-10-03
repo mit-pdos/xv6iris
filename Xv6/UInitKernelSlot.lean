@@ -40,8 +40,8 @@ one row it does not give is room for init's frames below the argument block
 3. **The argv carve persists the WHOLE area below the frame** and reads the
    sixteen bytes off it with `ubytesq_of_pmap` (Rocq: `ubyte_map_sub` to
    the sixteen-entry submap, then `uarea_persist`).  The rest of the area is
-   dropped either way, so the difference is invisible.  `ubyteMapSub` is
-   ported (it is reached) but has no Lean consumer.
+   dropped either way, so the difference is invisible.  `ubyte_map_sub` is
+   not ported (nothing uses it).
 4. Keys and addresses as in `UshKernelSlot` (deviation 5): the frame is
    `(ukeySp W).toNat`, the below-frame cut is a `PartialMap.filter`, the
    room bound of `initSlotOfKexec` casts the frame to `Int`;
@@ -62,8 +62,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Iris.Std.PartialMap
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
-
 /-- The code-segment readings `utextAll_img` asks for, at a key whose page
 0 is X-and-not-W. -/
 theorem initCode_rows (M : ElfMem) (π : Nat → Option UPerm) (hsub : uimgSub User.Init.code.byte M)
@@ -82,12 +80,6 @@ section UInitKernelSlot
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int] [Xv6G GF]
-
-/-- **Rocq `ubyte_map_sub`**: a submap of an owned byte map is owned
-(deviation 3: no Lean consumer). -/
-theorem ubyteMapSub (γd : GName) (A B : RegMapF (BitVec 8)) (hsub : A ⊆ B) :
-    ([∗map] k ↦ b ∈ B, ubyte (GF := GF) γd k b) ⊢ [∗map] k ↦ b ∈ A, ubyte γd k b :=
-  BigSepM.bigSepM_subseteq (Φ := fun k b => ubyte (GF := GF) γd k b) hsub
 
 /-! ## The console dance, N-quantified -/
 

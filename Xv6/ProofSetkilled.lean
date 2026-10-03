@@ -17,17 +17,15 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
 /-! ## `setkilled` -/
 
-theorem setkilled_br_ffffffffffffead2 : KA.«setkilled» + 0xffffffffffffead2#64 = KA.«release» := by decide
+theorem setkilled_br_ffffffffffffeabe : KA.«setkilled» + 0xffffffffffffeabe#64 = KA.«release» := by decide
 
-theorem setkilled_br_ffffffffffffea4a : KA.«setkilled» + 0xffffffffffffea4a#64 = KA.«acquire» := by decide
+theorem setkilled_br_ffffffffffffea36 : KA.«setkilled» + 0xffffffffffffea36#64 = KA.«acquire» := by decide
 
 set_option maxHeartbeats 4000000 in
 /-- **`setkilled` meets its specification.** -/
@@ -58,8 +56,8 @@ theorem setkilled_proof (AC : ACQUIRE) (RE : RELEASE) : SETKILLED :=
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c2 hp2
   iintro Hk Hpc
   -- jal ra, acquire
-  k_step_gen (wp_s_jal c2 _ (KA.«setkilled» + 0xc#64) false 2091582#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [setkilled_br_ffffffffffffea4a] next c3 hp3
+  k_step_gen (wp_s_jal c2 _ (KA.«setkilled» + 0xc#64) false 2091562#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [setkilled_br_ffffffffffffea36] next c3 hp3
   iintro Hk Hpc
   iapply (kl_acquire AC c3 _ (Γ.lock j) (procLockPay Γ j) ?hna ?hKa ?hla) $$ [- $Hk $Hpc]
   rotate_right 1
@@ -107,8 +105,8 @@ theorem setkilled_proof (AC : ACQUIRE) (RE : RELEASE) : SETKILLED :=
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [g9]
   iintro Hk Hpc
   -- jal ra, release
-  k_step (wp_s_jal c _ (KA.«setkilled» + 0x16#64) false 2091708#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [setkilled_br_ffffffffffffead2]
+  k_step (wp_s_jal c _ (KA.«setkilled» + 0x16#64) false 2091688#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [setkilled_br_ffffffffffffeabe]
   iintro Hk Hpc
   ihave Hrest := kl_rest_intro ξ0 (procAddr j) 1#32 xs pid $$ [Hkilled Hxs Hpid Hkp]
   case' _ => simp only [pKilled, pXstate, pPid, pidPub]; iframe
@@ -165,6 +163,5 @@ theorem setkilled_proof (AC : ACQUIRE) (RE : RELEASE) : SETKILLED :=
   exact ⟨trivial, trivial, trivial, e18.trans b18, e19.trans b19, e20.trans b20, e21.trans b21,
     e22.trans b22, e23.trans b23, e24.trans b24, e25.trans b25, e26.trans b26,
     e27.trans b27⟩⟩
-
 
 end Xv6

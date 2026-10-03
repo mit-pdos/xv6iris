@@ -23,8 +23,8 @@ has the instance's design notes M-1'…F20, not repeated here).  Later:
 instances (`ic_hdr_morph` → `icHdr_morph`, `ic_rest_morph`,
 `ic_hdr_held_morph`, `ic_hdr_frz_morph`, `ic_*_timeless`); `ic_q_side` →
 `icQSide`, `ic_dep_id` → `icDepId`, `ic_q_recycle` → `icQRecycle`, `ic_q1` →
-`icQ1`, `ic_q2` → `icQ2` (+ Timeless), `ic_q1_0` / `ic_q1_S` → `icQ1_0` /
-`icQ1_S`, `ic_q2_intro` → `icQ2_intro`; `ic_box` / `ic_escrow` → `icEscrow`,
+`icQ1`, `ic_q2` → `icQ2` (+ Timeless), `ic_q2_intro` → `icQ2_intro` (`ic_q1_0`
+/ `ic_q1_S` are `rfl` here, so not stated); `ic_box` / `ic_escrow` → `icEscrow`,
 `ic_boxes_all` / `ic_escrows` → `icEscrows` (+ Persistent); `ic_cnt` /
 `ic_regd` / `ic_regp` → `icCnt` / `icRegd` / `icRegp`; `ic_hold` → `icHold`,
 `ic_body` → `icBody`, `ic_dep_mass` → `icDepMass`, `ic_deposit2` →
@@ -135,9 +135,9 @@ KEPT and checked live: `ic_q_side` / `ic_dep_id` / `ic_q_recycle` / `ic_q1`
   row at `slhTok (icfgIsl k)`).  `icSlp` takes no `[CurCtx]`.
 * **`IcacheCover`**: `icHdr` / `icRest` (the view's arm, unfold to
   `icHdrAmb` under the `letI`), `icQSide` / `icDepId` / `icQRecycle` /
-  `icQ1` / `icQ2` / `icQ1_0` / `icQ1_S`, and Rocq's `ic_box` is `icEscrow`
-  (its `CtxBox.box_view` call is `MachCSL.boxView (icBoxPay …) (ndot icBoxN
-  k) (icfgBox k)`; its `ic_escrow_body` equation is `isBox`'s `inv`).
+  `icQ1` / `icQ2`, and Rocq's `ic_box` is `icEscrow`
+  (its `CtxBox.box_view` call is `MachCSL.isBox (icBoxPay …) (ndot icBoxN k)
+  (icfgBox k)`; its `ic_escrow_body` equation is `isBox`'s `inv`).
 * **`IcacheBoot`**: `icBoxAllocAt` (`IcacheBoxSites`), `icHdr` / `icRest` at
   `none` / `.icRaw`, `icRegd` / `icCnt` / `icRegp`, `icEscrows`, `icSlp`,
   `icSlotRow`.
@@ -169,8 +169,6 @@ import Xv6.OffBox
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
-
-set_option linter.unusedSectionVars false
 
 /-! ## The box λs: the ambient bundle at an explicit context
 
@@ -443,16 +441,6 @@ instance icQ2_timeless [Icfg] (cn : IcNames) (γfs : FsNames) (γi : GName)
     (cov : ExtTreeSet Nat compare) (logstart k : Nat) :
     Timeless (icQ2 (GF := GF) cn γfs γi cov logstart k) := by
   unfold icQ2; infer_instance
-
-/-- Rocq's `ic_q1_0`. -/
-theorem icQ1_0 [Icfg] (cn : IcNames) (γfs : FsNames) (γi : GName)
-    (cov : ExtTreeSet Nat compare) (logstart k : Nat) :
-    icQ1 (GF := GF) cn γfs γi cov logstart k 0 = icQRecycle cn γfs γi cov logstart k := rfl
-
-/-- Rocq's `ic_q1_S`. -/
-theorem icQ1_S [Icfg] (cn : IcNames) (γfs : FsNames) (γi : GName)
-    (cov : ExtTreeSet Nat compare) (logstart k c : Nat) :
-    icQ1 (GF := GF) cn γfs γi cov logstart k (c + 1) = icPinTx k := rfl
 
 /-- Rocq's `ic_q2_intro`. -/
 theorem icQ2_intro [Icfg] (cn : IcNames) (γfs : FsNames) (γi : GName)

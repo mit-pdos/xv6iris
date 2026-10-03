@@ -18,7 +18,6 @@ namex has no panic of its own: every panic in the cone belongs to a callee
 read"; dirlookup's "not DIR" arm is refuted by namex's own type test).
 -/
 import Xv6.ProofNamex
-import Xv6.LinkIdup
 import Xv6.LinkIlock
 import Xv6.LinkIunlockput
 import Xv6.LinkDirlookup
@@ -29,10 +28,5 @@ namespace Xv6
 theorem Namex (CO : COPYOUT) : NAMEX :=
   namex_proof Myproc (Idup Acquire ReleaseHook) Iget Memmove Ilock Iunlock Iunlockput
     (Dirlookup CO) Iput
-
-/-- The proved ROOT CORNER (Rocq `LinkNamexRoot.v`: `Module NamexRoot :=
-NamexRootProof Iget`): its one callee is iget, and none of the walk's other
-eight is in its cone. -/
-theorem NamexRoot : NAMEX_ROOT := namex_root_proof Iget
 
 end Xv6

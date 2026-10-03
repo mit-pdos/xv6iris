@@ -19,6 +19,10 @@ import Xv6.CopyLemmas
 import Xv6.ByteCursor
 import Xv6.PrintkDefs
 import MachCSL.BvLemmas
+import Xv6.KvmLemmas
+import Xv6.UPtLemmas
+import Xv6.UPtAllocLemmas
+import MachCSL.WpSmodeFrame12
 
 namespace Xv6
 
@@ -26,7 +30,6 @@ open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open Iris.Std (get? insert delete)
 open LeanRV64D
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
@@ -38,7 +41,6 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 variable {lent : Bool}
 
 /-! # `copyinstr`: the byte-by-byte string copy (kernel/vm.c) -/
-
 
 /-! ## The twelve-slot frame of `copyinstr` (ra, s0..s9, one unused slot) -/
 
@@ -215,11 +217,6 @@ def csKeep (R R2 : RegMap) : Prop :=
   R2 2#5 = R 2#5 ∧ R2 9#5 = R 9#5 ∧ R2 19#5 = R 19#5 ∧ R2 20#5 = R 20#5 ∧
   R2 21#5 = R 21#5 ∧ R2 22#5 = R 22#5 ∧ R2 23#5 = R 23#5 ∧ R2 24#5 = R 24#5 ∧
   R2 25#5 = R 25#5 ∧ R2 26#5 = R 26#5 ∧ R2 27#5 = R 27#5
-
-theorem csKeep_of_calleeSaved {R R' : RegMap} (h : calleeSaved R R') : csKeep R R' :=
-  ⟨h.1, h.2.2.1, h.2.2.2.2.1, h.2.2.2.2.2.1, h.2.2.2.2.2.2.1, h.2.2.2.2.2.2.2.1,
-    h.2.2.2.2.2.2.2.2.1, h.2.2.2.2.2.2.2.2.2.1, h.2.2.2.2.2.2.2.2.2.2.1,
-    h.2.2.2.2.2.2.2.2.2.2.2.1, h.2.2.2.2.2.2.2.2.2.2.2.2⟩
 
 /-! ## No NUL among the first `d` bytes -/
 
@@ -476,7 +473,6 @@ theorem cs_noNul_step (view : Nat → List (BitVec 8)) (A d j : Nat)
     subst this
     exact hb
 
-
 theorem cs_ite_beq_byte {α : Type _} (b : BitVec 8) (x y : α) :
     (if bcond bop.BEQ (BitVec.setWidth 64 b) 0#64 then x else y) = if b = 0#8 then x else y := by
   by_cases hb : b = 0#8
@@ -506,7 +502,6 @@ theorem cs_extract_setw (b : BitVec 8) : BitVec.extractLsb' 0 8 (BitVec.setWidth
 theorem cs_a5_step (dst0 : BitVec 64) (m : Nat) :
     dst0 + (BitVec.ofNat 64 m + 1#64) = dst0 + BitVec.ofNat 64 (m + 1) := by
   rw [show (1#64 : BitVec 64) = BitVec.ofNat 64 1 from rfl, co_ofNat_add]
-
 
 /-- `a5` after `addi a5,1`, in `k_norm_g`'s normal form. -/
 theorem cs_a5_split (dst0 : BitVec 64) (d j : Nat) :
@@ -942,7 +937,6 @@ theorem cstr_nsel [Xv6G GF] [CurCtx]
     case h262' => simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]; exact h26
     case h272' => simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]; exact h27
 
-
 /-! ## What `copyinstr` leaves behind -/
 
 /-- The final buffer `bs'`: either the NUL-terminated string (return 0) or a
@@ -968,8 +962,6 @@ theorem cs_noNul_of_read_eq (V1 V2 : Nat → List (BitVec 8)) (A d : Nat)
 
 /-! ## Tail arithmetic -/
 
-theorem cs_sext_neg1 : BitVec.signExtend 64 (4095#12) = -1#64 := by decide
-
 theorem cs_a4adv (dst0 : BitVec 64) (L d : Nat) (h1 : 1 ≤ L) (hd : d ≤ L) (hL : L < 2 ^ 64) :
     BitVec.ofNat 64 (L - d) + -1#64 + (dst0 + BitVec.ofNat 64 d)
       = dst0 + BitVec.ofNat 64 (L - 1) := by
@@ -980,16 +972,8 @@ theorem cs_a4adv (dst0 : BitVec 64) (L d : Nat) (h1 : 1 ≤ L) (hd : d ≤ L) (h
   rw [← h3, ← h2]
   bv_omega
 
-theorem cs_s4adv (dst0 : BitVec 64) (L D2 : Nat) (h1 : 1 ≤ D2) (hD2 : D2 ≤ L) (hL : L < 2 ^ 64) :
-    dst0 + BitVec.ofNat 64 (L - 1) - (dst0 + BitVec.ofNat 64 (D2 - 1)) = BitVec.ofNat 64 (L - D2) := by
-  have h3 : BitVec.ofNat 64 (L - 1) - BitVec.ofNat 64 (D2 - 1) = BitVec.ofNat 64 (L - D2) := by
-    rw [co_ofNat_sub (L - 1) (D2 - 1) (by omega) (by omega)]; congr 1; omega
-  rw [← h3]
-  bv_omega
-
 theorem cs_s1adv (v : Nat) : BitVec.ofNat 64 v + 4096#64 = BitVec.ofNat 64 (v + 4096) := by
   rw [show (4096#64 : BitVec 64) = BitVec.ofNat 64 4096 from rfl, co_ofNat_add]
-
 
 theorem cs_xori_01 : (0#64 : BitVec 64) ^^^ BitVec.signExtend 64 (1#12) = 1#64 := by decide
 

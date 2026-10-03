@@ -26,9 +26,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-- `lbu a2,88(a2)` with `a2 = bp + bi/8`: the data byte `bi / 8`. -/
 theorem ba_addr_byte2 (kk q : Nat) :

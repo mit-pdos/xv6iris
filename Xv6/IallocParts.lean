@@ -5,8 +5,8 @@ scan's index arithmetic, the zero record, and the no-inodes message.
 
 The addresses are the LEAN image's (`KA.«ialloc» + 0x..#64`); Rocq's
 `+0x..` offsets carry over (byte-identical body), its absolute addresses do
-not (ProofIalloc ~l.130's 0x80007428 is stale: the message is at
-`KStr.«ialloc: no inodes\n»` = 0x80007458).
+not (ProofIalloc ~l.130's 0x80007420 is stale: the message is at
+`KStr.«ialloc: no inodes\n»` = 0x80007450).
 
 **THE SCAN'S INDEX IS A `Nat`.**  Rocq threads the inum as an `mword 32`
 sign-extended into `s2`; here `s2 = BitVec.ofNat 64 n` for a natural
@@ -14,7 +14,7 @@ sign-extended into `s2`; here `s2 = BitVec.ofNat 64 n` for a natural
 `BitVec.ofNat 32 n`, whose `toNat` is `n`.  The Rocq lemmas `ia_sext_small`,
 `ia_srli4`, `ia_add_vec32_comm`, `ia_andi15`, `ia_uint64_moi`, `ia_bgeu_moi`,
 `ia_bltu_moi` become the `ialloc_*` facts below at that shape (the
-`Xv6/DinodeSlot.lean` group-1 lemmas `dsSext_small`, `dsSrli4`, `dsAddwIbl`,
+`Xv6/DinodeSlot.lean` group-1 lemmas `dsSext_small`, `dsAddwIbl`,
 `dsAndi15`, `dsSlli6`, `dsBltu` are reused where they apply verbatim).
 `ia_type_zero`/`_nonzero`/`ia_sext64_16_inj` ARE `dsType_zero`/
 `dsType_nonzero`/`dsSext64_16_inj`.  `ia_cbyte`/`ia_cbyte_zero` vanish:
@@ -23,40 +23,32 @@ Lean's `MEMSET` post is already `List.replicate n (low byte of a1)`.
 `Xv6/BallocDefs.lean` pattern).
 -/
 import Xv6.SpecIalloc
-import Xv6.DinodeSlot
-import Xv6.SpecBrelse
-import Xv6.SpecLogWrite
-import Xv6.FsWords
 import Xv6.SpecIget
-import MachCSL.WpSmodeFrame8
 import Xv6.BfreeParts
-import Xv6.IupdateSteps
 
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedSectionVars false
-
 /-! ## Addresses -/
 
 /-- `auipc a4,0x1d ; lw a4,1972(a4)` at `+0x08`: `sb.ninodes`. -/
-theorem ialloc_a_ninodes : KA.«ialloc» + 0x1d9a6#64 = sbNinodes := by unfold sbNinodes; decide
+theorem ialloc_a_ninodes : KA.«ialloc» + 0x1dc32#64 = sbNinodes := by unfold sbNinodes; decide
 /-- `auipc s4,0x1d ; addi s4,s4,1928` at `+0x28`: `&sb`. -/
-theorem ialloc_a_sb : KA.«ialloc» + 0x1d99a#64 = KA.«sb» := by decide
+theorem ialloc_a_sb : KA.«ialloc» + 0x1dc26#64 = KA.«sb» := by decide
 theorem ialloc_ist_addr : KA.«sb» + 24#64 = sbInodestart := rfl
 theorem ialloc_nin_addr : KA.«sb» + 12#64 = sbNinodes := rfl
 /-- `auipc a0,0x4 ; addi a0,a0,606` at `+0x72`: the format string. -/
-theorem ialloc_a_fmt : KA.«ialloc» + 0x428a#64 = KStr.«ialloc: no inodes\n» := by decide
+theorem ialloc_a_fmt : KA.«ialloc» + 0x426e#64 = KStr.«ialloc: no inodes\n» := by decide
 
 /-! ## Call targets and return addresses -/
 
 theorem ialloc_br_bread : KA.«ialloc» + 0xFFFFFFFFFFFFFAD8#64 = KA.«bread» := by decide
 theorem ialloc_br_brelse : KA.«ialloc» + 0xFFFFFFFFFFFFFBE0#64 = KA.«brelse» := by decide
-theorem ialloc_br_printk : KA.«ialloc» + 0xffffffffffffd358#64 = KA.«printk» := by decide
-theorem ialloc_br_memset : KA.«ialloc» + 0xffffffffffffdb4a#64 = KA.«memset» := by decide
-theorem ialloc_br_logwrite : KA.«ialloc» + 0xD88#64 = KA.«log_write» := by decide
+theorem ialloc_br_printk : KA.«ialloc» + 0xffffffffffffd344#64 = KA.«printk» := by decide
+theorem ialloc_br_memset : KA.«ialloc» + 0xffffffffffffdb36#64 = KA.«memset» := by decide
+theorem ialloc_br_logwrite : KA.«ialloc» + 0xde8#64 = KA.«log_write» := by decide
 theorem ialloc_br_iget : KA.«ialloc» + 0xFFFFFFFFFFFFFDD2#64 = KA.«iget» := by decide
 
 theorem ialloc_ret_40 : jumpPc (KA.«ialloc» + 0x40#64) = KA.«ialloc» + 0x40#64 := by decide
@@ -191,16 +183,8 @@ theorem ialloc_bgeu_dead (nin : Nat) (h1 : 1 < nin) (hnin : nin < 2 ^ 31) :
 /-- The all-zero record `memset(dip,0,64)` leaves. -/
 def iallocDzero : Dinode := ⟨0#16, 0#16, 0#16, 0#16, 0#32, List.replicate 13 0#32⟩
 
-theorem iallocDzero_wf : dinodeWf iallocDzero := rfl
-
 /-- ...whose 64 bytes ARE 64 zero bytes. -/
 theorem iallocDzero_bytes : dinodeBytes iallocDzero = List.replicate 64 0#8 := by decide
-
-/-- `iallocFresh ty` IS `iallocDzero` with the type halfword replaced -- exactly
-what the `sh` does to `dislot`'s first cell. -/
-theorem ialloc_fresh_of_zero (ty : BitVec 16) :
-    iallocFresh ty = ⟨ty, iallocDzero.diMajor, iallocDzero.diMinor, iallocDzero.diNlink, iallocDzero.diSize,
-      iallocDzero.diAddrs⟩ := rfl
 
 /-! ## The no-inodes message -/
 

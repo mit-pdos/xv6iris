@@ -88,14 +88,13 @@ import Xv6.UshExecPin
 import Xv6.SpecShRuncmdExec
 import Xv6.UNamePath
 import Xv6.UNamePathCat
+import Xv6.AppFileNames
 
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open UShPipesDefs
 open Std (ExtTreeSet)
-
-set_option linter.unusedSectionVars false
 
 /-- **Rocq `catf_ws_exec_ok`**: the producer's words at any user file
 (cut W3). -/

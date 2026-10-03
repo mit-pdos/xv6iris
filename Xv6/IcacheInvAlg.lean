@@ -66,7 +66,7 @@ their own: `NINODE`/`ISLOTSZ`/`ientry` are `Xv6/FsGeom.lean` /
    `nat -> bv 8` because Rocq's TSO ledger pins bytes; Lean's racy-word
    discipline (`MachCSL.wordCell`) records whole `BitVec 32` entries, so
    `irefSet w := 1 ≤ w.toNat ≤ IREFSLOTS`.  Rocq's own comment says the set
-   is word-level on purpose (the per-byte box of `[1..422]` would readmit
+   is word-level on purpose (the per-byte box of `[1..486]` would readmit
    the all-zero word).  `iref_set_count` keeps its statement at the word;
    `iref_set_read` loses its byte-equality premise (`nth_byte v j = f j`),
    which only existed to rebuild the word from its bytes.
@@ -85,16 +85,15 @@ their own: `NINODE`/`ISLOTSZ`/`ientry` are `Xv6/FsGeom.lean` /
    (`Xv6/IcacheInvStore.lean`) consumes them (Rocq `Local`).  For the same
    reason `ic_incr_lu`/`ic_incr_upd`/`ic_alloc_upd` are public (Rocq
    `Local`, used by §5b's `_noarm` steps in the same Rocq file).
-6. **`iref_lookup` is derived from `iref_frag_lookup`** (Rocq proves both
-   with the same 20-line body; `iref_tok`'s first conjunct IS the
-   fragment).  Same statements.
+6. **`iref_lookup` is not ported** (nothing uses it); `iref_frag_lookup`
+   is `irefFrag_lookup`, same statement.
 7. **Lemma names**: definitions are camelCased (`covBelow`, `irefWord`,
    `icMWf`, `irefSet`, `islSlot`, `islPool`); lemmas keep Rocq's name with
    the definition's prefix camelCased (`icMWf_count`, `irefSet_count`,
    `irefSet_read`, `islSlot_none`, `islPool_acc_upd`, `itableHalf_agree`,
    `irefFrag_lookup`), or Rocq's name verbatim when it has no definition
-   prefix (`blkmap_slot_inrange`, `ic_pos_op_add`, `ic_incr_lu`,
-   `ic_incr_upd`, `ic_alloc_upd`, `iref_lookup`, `seq_ninode_lookup`).
+   prefix (`blkmap_slot_inrange`, `ic_incr_lu`, `ic_incr_upd`, `ic_alloc_upd`,
+   `seq_ninode_lookup`).
 
 ## Dropped/simplified vs Rocq (uses grep-checked over ALL of
 ## `iris/*.v` -- defs, `Spec*`, `Proof*`, `Link*`, the
@@ -140,26 +139,23 @@ their own: `NINODE`/`ISLOTSZ`/`ientry` are `Xv6/FsGeom.lean` /
   `blkmap_slot_inrange` (ProofItrunc), `iref_word` (IcacheInv §5/§5b,
   IcacheBoot, ProofIget/Idup/Iput), `icM_wf` (IcacheEscrow, IcacheBoot,
   ProofIput, IcacheInv §5), `icM_wf_count` (ProofIget, ProofIput),
-  `ic_pos_op_add` (§5b 3230/3953), `ic_incr_upd` (§5b 3143/3585),
-  `ic_alloc_upd` (§5b 3793), `seq_ninode_lookup` (§5), `iref_set` (§5,
+  `ic_pos_op_add` (§5b 3230/3953; `rfl` here, so not stated), `ic_incr_upd`
+  (§5b 3143/3585), `ic_alloc_upd` (§5b 3793), `seq_ninode_lookup` (§5), `iref_set` (§5,
   IcachePinwObl, ProofIget/Idup/Iput), `iref_set_count` (ProofIget/Idup/
   Iput), `iref_set_read` (IcachePinwObl), `isl_slot` (§5b, ProofIget/Idup/
   Iput), `isl_slot_none`/`_some` (§5b, ProofIput), `isl_pool` (IcacheEscrow,
   ProofIget/Iput), `isl_pool_acc_upd` (ProofIget/Idup/Iput),
   `isl_pool_empty` (IcacheBoot), `itable_half_agree`/`_join`/`_split` (§5,
-  §5b, IcacheBoot), `itable_half_op` (their basis), `iref_lookup` (§5
-  1872), `iref_frag_lookup` (ProofIput).
+  §5b, IcacheBoot), `itable_half_op` (their basis), `iref_frag_lookup`
+  (ProofIput).
 -/
 import Xv6.IcacheRefGhost
 import Xv6.InodeInv
-import Xv6.LogDefs
 
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
 open Iris.Algebra
-
-set_option linter.unusedSectionVars false
 
 /-! ## 2.  WHERE itrunc's FIRST OWED PREMISE LIVES: `cov` BOUNDS THE FS
 
@@ -203,9 +199,8 @@ The frac x count pairing is the whole trick and it is what the design note
 calls REF-1 EXCLUSIVITY: `fracR` has no unit and `positiveR` has no zero, so
 `Some (q,1) ≼ Some (qt,n)` forces `n = 1 -> q = qt`.  A thread that holds a
 reference and reads `ip->ref == 1` therefore holds the WHOLE outstanding
-share -- there is no other reference in the system.  That is `iref_lookup`,
-and it is the algebraic half of the theorem xv6's comment above iput
-asserts.  (`IcacheUR`, `IcacheG` live in `Xv6/IcacheRefDefs.lean`.) -/
+share -- there is no other reference in the system.  That is the
+algebraic half of the theorem xv6's comment above iput asserts.  (`IcacheUR`, `IcacheG` live in `Xv6/IcacheRefDefs.lean`.) -/
 
 /-- Rocq `Pos.succ` on `positiveR` (deviation 5). -/
 def PosNat.succ (n : PosNat) : PosNat := ⟨n.val + 1, Nat.succ_pos _⟩
@@ -236,12 +231,8 @@ def icMWf (M : RegMapF (Qp × PosNat)) : Prop :=
 theorem icMWf_count (M : RegMapF (Qp × PosNat)) (k : Nat) (q : Qp) (n : PosNat)
     (hwf : icMWf M) (hM : PartialMap.get? M k = some (q, n)) : n.val < 2 ^ 31 := by
   have h := hwf.2 k q n hM
-  have EI : IREFSLOTS = 422 := rfl
+  have EI : IREFSLOTS = 486 := rfl
   omega
-
-/-- The count component's `•` IS `+`; naming it lets `omega` see the
-arithmetic in the local-update side conditions. -/
-theorem ic_pos_op_add (a b : PosNat) : a • b = a + b := rfl
 
 /-- The pair element's `•`, componentwise. -/
 private theorem ic_pair_op (q1 q2 : Qp) (n1 n2 : PosNat) :
@@ -301,7 +292,7 @@ theorem seq_ninode_lookup (k : Nat) (hk : k < NINODE) : (List.range NINODE)[k]? 
 The word-set pin's member set for `ip->ref` (Rocq's `pw_S`).  The set is
 the counts the CREDIT POOL can back: `1 .. IREFSLOTS` -- never zero, which
 is what kills ilock's and iunlock's `ref < 1` panic at a RACY read (TsoMemPa
-§12f: the per-byte box of `[1..422]` would readmit the all-zero word; the
+§12f: the per-byte box of `[1..486]` would readmit the all-zero word; the
 WORD set does not).  Word-level in Lean (deviation 2). -/
 
 def irefSet (w : BitVec 32) : Prop := 1 ≤ w.toNat ∧ w.toNat ≤ IREFSLOTS
@@ -309,7 +300,7 @@ def irefSet (w : BitVec 32) : Prop := 1 ≤ w.toNat ∧ w.toNat ≤ IREFSLOTS
 /-- The store side: a credit-backed count is a member. -/
 theorem irefSet_count (n : PosNat) (hn : n.val ≤ IREFSLOTS) :
     irefSet (BitVec.ofNat 32 n.val) := by
-  have EI : IREFSLOTS = 422 := rfl
+  have EI : IREFSLOTS = 486 := rfl
   have hp := n.pos
   unfold irefSet
   rw [BitVec.toNat_ofNat, Nat.mod_eq_of_lt (by omega)]
@@ -318,7 +309,7 @@ theorem irefSet_count (n : PosNat) (hn : n.val ≤ IREFSLOTS) :
 /-- The read side: any member word is positive and below `2^31` -- the two
 bounds `InodeLock.inode_ref_spos` turns into "the panic is dead". -/
 theorem irefSet_read (w : BitVec 32) (h : irefSet w) : 0 < w.toNat ∧ w.toNat < 2 ^ 31 := by
-  have EI : IREFSLOTS = 422 := rfl
+  have EI : IREFSLOTS = 486 := rfl
   obtain ⟨h1, h2⟩ := h
   omega
 
@@ -470,17 +461,6 @@ theorem irefFrag_lookup [Icfg] (M : RegMapF (Qp × PosNat)) (k : Nat) (q : Qp) :
   refine ⟨qt, n, hy, ?_, ref1_of_inc hle⟩
   have hv := Heap.valid_get?_valid hval hy
   exact hv.1
-
-theorem iref_lookup [Icfg] (M : RegMapF (Qp × PosNat)) (k : Nat) (q : Qp) :
-    itableHalf (GF := GF) M ∗ irefTok k q ⊢
-      ⌜∃ (qt : Qp) (n : PosNat), PartialMap.get? M k = some (qt, n) ∧ qt ≤ 1 ∧
-         (n = PosNat.one → q = qt) ∧ (q = qt → n = PosNat.one)⌝ := by
-  unfold irefTok
-  iintro ⟨Ha, Hf, -, -⟩
-  iapply irefFrag_lookup M k q
-  isplitl [Ha]
-  · iexact Ha
-  · iexact Hf
 
 end IcacheGhost
 

@@ -31,23 +31,21 @@ cut here is `sys_open_walk_buf_split` / `_join`.
 -/
 import Xv6.SpecNameiEra
 import Xv6.SysOpenParts
+import Xv6.DirlookupParts
 
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## Constants -/
 
-theorem sys_open_walk_br_namei : KA.«sys_open» + 0xffffffffffffe978#64 = KA.«namei» := by decide
-theorem sys_open_walk_br_ilock : KA.«sys_open» + 0xffffffffffffe0ec#64 = KA.«ilock» := by decide
+theorem sys_open_walk_br_namei : KA.«sys_open» + 0xffffffffffffe960#64 = KA.«namei» := by decide
+theorem sys_open_walk_br_ilock : KA.«sys_open» + 0xffffffffffffe08c#64 = KA.«ilock» := by decide
 theorem sys_open_walk_ret_e4 : jumpPc (KA.«sys_open» + 0xe4#64) = KA.«sys_open» + 0xe4#64 := by decide
 theorem sys_open_walk_ret_ec : jumpPc (KA.«sys_open» + 0xec#64) = KA.«sys_open» + 0xec#64 := by decide
-
 
 /-- The whole walk fits the op's reservation (Rocq `so_namei_need`). -/
 theorem sys_open_walk_bud (L : Nat) : walkNeed L ≤ MAXOPBLOCKS := by
@@ -149,8 +147,8 @@ def sysOpenNameiK (k' : KCtx) (se : Bool) (pj : BitVec 64) (plen : Nat) (pfun : 
      else
       iprop(⌜R' 10#5 = 0#64⌝ ∗ irefSlots 2 ∗
         ∃ (kd d : Nat), ⌜kd < (pathElems (bview plen pfun)).length⌝ ∗
-          ((P kd d ∗ exHopsFrom fscFs P Pmiss (bview plen pfun) kd) ∨
-           (Pmiss kd d ∗ exHopsFrom fscFs P Pmiss (bview plen pfun) (kd + 1))))) -∗
+          ((P kd d ∗ exHopsFrom V.rti fscFs P Pmiss (bview plen pfun) kd) ∨
+           (Pmiss kd d ∗ exHopsFrom V.rti fscFs P Pmiss (bview plen pfun) (kd + 1))))) -∗
     wpLoop c)
 
 set_option maxHeartbeats 8000000 in
@@ -170,7 +168,7 @@ theorem sys_open_namei_era (NI : NAMEI_ERA) (Γ : SchedNames) [ClaimIs (hlc := h
     procPrivCoreNoctxAt curCtx pj pid V M ∗
     byteBuf (k'.regs 10#5) (DFrac.own 1) (bview (plen + 1) pfun) ∗
     bslots 3 ∗ irefSlots 2 ∗ logOpS icfgLog n Sb ∗ logTx icfgLog ∗
-    exStart fscFs V.cwi P Pmiss (bview plen pfun) ∗
+    exStart fscFs V.rti V.cwi P Pmiss (bview plen pfun) ∗
     sysOpenNameiK k' se pj plen pfun n Sb P Pmiss pid V M
     ⊢ wpLoop (GF := GF) cpu := by
   subst hs hpj

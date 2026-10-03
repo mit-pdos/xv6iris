@@ -68,9 +68,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## Constants -/
 
@@ -538,12 +536,12 @@ theorem sysUnlinkPost_raise (k : KCtx) (γ : FileNames) (pa : BitVec 64) (pid : 
 
 /-- The armed post, at the record. -/
 abbrev sysUnlinkArmsA (A : SysUnlinkArgs GF) (r : BitVec 64) : IProp GF :=
-  unlinkArms (hlc := hlc) (fsGammaL fscFs) fscFs A.V.cwi (viewLazy A.V.upt A.V.sz A.M) A.v0.toNat
+  unlinkArms (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti A.V.cwi (viewLazy A.V.upt A.V.sz A.M) A.v0.toNat
     A.P A.Pmiss A.Fent A.Ftgt A.Fex A.Fmiss r
 
 /-- The caller's bundle, at the record. -/
 abbrev sysUnlinkAuA (A : SysUnlinkArgs GF) : IProp GF :=
-  unlinkAuAt (hlc := hlc) (fsGammaL fscFs) fscFs A.V.cwi (viewLazy A.V.upt A.V.sz A.M) A.v0.toNat
+  unlinkAuAt (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti A.V.cwi (viewLazy A.V.upt A.V.sz A.M) A.v0.toNat
     A.P A.Pmiss A.Fent A.Ftgt A.Fex A.Fmiss
 
 /-- What every exit hands the epilogue beside the machine state: the two
@@ -583,19 +581,29 @@ theorem sys_unlink_core_open (hct : curTier = KTier.kpt) (A : SysUnlinkArgs GF) 
   iframe Hof
   iapply Hcl $$ Hpid Hcwd Hcwr
 
-/-- The block's pid cell, borrowed and returned (entry-side: the bare block
-at any view). -/
-theorem sys_unlink_bare_pid (hct : curTier = KTier.kpt) (pa : BitVec 64) (pid : BitVec 32)
-    (V : ProcPriv) (M : Nat → List (BitVec 8)) :
-    procPrivBareAt (GF := GF) curCtx pa pid V M ⊢
-      wordPointsTo (pPid pa) 4 pidPriv pid ∗
-      (wordPointsTo (pPid pa) 4 pidPriv pid -∗ procPrivBareAt curCtx pa pid V M) := by
-  unfold procPrivBareAt
+/-- THE ROOT'S TWO ROWS, borrowed out of the hole (chroot: dirlookup's self
+test reads `p->root` and the root's inum): the hole is refilled with the pid
+cell, the root cell and reference come out, and the hole re-forms around
+them. -/
+theorem sys_unlink_hole_root (hct : curTier = KTier.kpt) (A : SysUnlinkArgs GF) (P2 : UPtd) :
+    sysUnlinkHole (GF := GF) A (procAddr A.j) P2 ∗ wordPointsTo (pPid (procAddr A.j)) 4 pidPriv A.pid ⊢
+      wordPointsTo (pPid (procAddr A.j)) 4 pidPriv A.pid ∗
+      wordPointsTo (pRoot (procAddr A.j)) 8 (DFrac.own 1) A.V.root ∗
+      inodeHeldAt A.V.root A.V.rti ∗
+      (wordPointsTo (pRoot (procAddr A.j)) 8 (DFrac.own 1) A.V.root -∗
+        inodeHeldAt A.V.root A.V.rti -∗ sysUnlinkHole A (procAddr A.j) P2) := by
+  unfold sysUnlinkHole procPrivFd procPrivCoreNoctxAt procPrivBareAt procFieldsNoOfile rootRefAt
   rw [sysfile_cur_kpt hct]
-  iintro ⟨%h, Hpid, Hflds, Hpt, Htfp, %hlz, Hev⟩
-  iframe Hpid
+  iintro ⟨⟨%hP2, Hw⟩, Hpid⟩
+  ihave B := Hw $$ Hpid
+  icases B with ⟨⟨⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hcwd, Hnm, Hsc, Hrt⟩, Hpt, Htfp, %hlz, Hev⟩, Hc, Hr,
+    Hg⟩, Hof⟩
+  iframe Hpid Hrt Hr
+  iintro Hrt Hr
+  isplitr
+  · ipureintro; exact hP2
   iintro Hpid
-  iframe Hpid Hflds Hpt Htfp Hev
+  iframe Hpid Hk Hs Hpg Htf Hcwd Hnm Hsc Hrt Hpt Htfp Hc Hr Hg Hof Hev
   isplitl []
   · ipureintro; exact h
   · ipureintro; exact hlz
@@ -666,10 +674,6 @@ theorem sys_unlink_exit (cpu : CPU) (k : KCtx) (A : SysUnlinkArgs GF)
   iapply HΦ $$ %spie %spp %_ %P' %A.V.ev %hcs %hP' %(Nat.le_refl _) Hk Hpc Hte Hce Hbs Hir Hblk
   simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
   iexact Harms
-
-/-- The reference ledger's regroupings. -/
-theorem sys_unlink_ir_split :
-    irefSlots (GF := GF) sysUnlinkSlots ⊢ irefSlot ∗ irefSlot := (irefSlots_op 1 1).1
 
 theorem sys_unlink_ir_11 : irefSlot (GF := GF) ∗ irefSlot ⊢ irefSlots sysUnlinkSlots :=
   (irefSlots_op 1 1).2

@@ -47,8 +47,6 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
-
 theorem initConsCalls_m1 : (0xFFFFFFFFFFFFFFFF#64 : BitVec 64) = BitVec.ofInt 64 (-1) := by decide
 
 section UConsOpenCalls
@@ -76,12 +74,12 @@ theorem consOpen_post_ent (f : Xfam GF) (omo : OffMode) (P Pmiss : Nat → Nat �
     (hk0 : tfW W.tf (tfArgIdx 0) = m.get 10#5) (hk1 : tfW W.tf (tfArgIdx 1) = m.get 11#5)
     (hcw : W.cwd = ROOTINO) (ha0 : (m.get 10#5).toNat = pv) (ha1 : m.get 11#5 = 2#64) :
     UexecSG.spostAt (self := uexecSGXv6 (hlc := hlc)) (uslot (hlc := hlc)) USYS_open f W rv M' fdv' cw' cs' ⊢
-      ∃ Mv : Nat → List (BitVec 8), ⌜imgAgrees W.M Mv⌝ ∗
-        openReceiptPlain (hlc := hlc) omo (fsGammaL (hlc := hlc) fscFs) fscFs ROOTINO Mv pv (2#64) P Pmiss Fo Ft
+      ∃ Mv : Nat → List (BitVec 8), ⌜imgAgrees W.M Mv⌝ ∗ ∃ rt : Nat,
+        openReceiptPlain (hlc := hlc) omo (fsGammaL (hlc := hlc) fscFs) fscFs rt ROOTINO Mv pv (2#64) P Pmiss Fo Ft
           W.fd rv fdv' := by
   obtain ⟨h1, h2, h3, h4, h5⟩ := hf
   refine (wand_entails (UkFileOpen.spostAt_open_elim (hlc := hlc) _ f W rv M' fdv' cw' cs')).trans
-    (exists_mono fun Mv => sep_mono_right ?_)
+    (exists_mono fun Mv => sep_mono_right (exists_mono fun rt => ?_))
   have e0 : xkA W 0 = m.get 10#5 := hk0
   have e1 : xkA W 1 = m.get 11#5 := hk1
   rw [e0, e1, ha0, ha1, hcw, h1, h2, h3, h4, h5]
@@ -96,8 +94,8 @@ theorem consOpen_post_pre (f : Xfam GF) (omo : OffMode) (P Pmiss : Nat → Nat �
     (cs' : ExtTreeSet GName compare) (R : IProp GF)
     (hk0 : tfW W.tf (tfArgIdx 0) = m.get 10#5) (hk1 : tfW W.tf (tfArgIdx 1) = m.get 11#5)
     (hcw : W.cwd = ROOTINO) (ha0 : (m.get 10#5).toNat = pv) (ha1 : m.get 11#5 = 2#64) :
-    iprop((∃ Mv : Nat → List (BitVec 8), ⌜imgAgrees W.M Mv⌝ ∗
-        openReceiptPlain (hlc := hlc) omo (fsGammaL (hlc := hlc) fscFs) fscFs ROOTINO Mv pv (2#64) P Pmiss Fo Ft
+    iprop((∃ Mv : Nat → List (BitVec 8), ⌜imgAgrees W.M Mv⌝ ∗ ∃ rt : Nat,
+        openReceiptPlain (hlc := hlc) omo (fsGammaL (hlc := hlc) fscFs) fscFs rt ROOTINO Mv pv (2#64) P Pmiss Fo Ft
           W.fd rv fdv') -∗ R) ⊢
       iprop(UexecSG.spostAt (self := uexecSGXv6 (hlc := hlc)) (uslot (hlc := hlc)) USYS_open f W rv M' fdv' cw' cs'
         -∗ R) :=
@@ -186,9 +184,9 @@ theorem open_console_call_any (UL : UK_LEAVES) (N : UkNames GF) (T K : IProp GF)
   iapply (consOpen_post_pre (initConsConsoleFam T i N.pay) .parked (pobsP T [ROOTINO, i]) (pobsPmiss T)
     (pobsFo (consPresentAt i) T) (pfamTriv (fun (_ : Aview) (_ : Nat) (_ : List (BitVec 8)) => iprop(True)))
     ⟨rfl, rfl, rfl, rfl, rfl⟩ m pv W rv M' fdv' cw' cs' _ hk0 hk1 hcw ha0' ha1')
-  iintro ⟨%Mv, %hag, Hrc⟩ Hcwd Hrun
+  iintro ⟨%Mv, %hag, %rt, Hrc⟩ Hcwd Hrun
   have hpv' : argPathOf Mv pv initConsPl := hro Mv (fun a b hb => hag a b (himg a b hb))
-  ihave Hans := init_cons_recv fscFs T i Mv pv (2#64) _ W.fd rv fdv' hpv' initCons_om2_trunc $$ Hrc
+  ihave Hans := init_cons_recv fscFs rt T i Mv pv (2#64) _ W.fd rv fdv' hpv' initCons_om2_trunc $$ Hrc
   iapply Hcont $$ %h' %rv [Hfd Hans] Hcwd Hrun
   iapply initConsCalls_fd T N.fd l v W.fd fdv' rv hlen $$ Hfd [Hans]
   icases Hans with (⟨%hr, %hf⟩ | ⟨%hrc, -⟩ | HT)
@@ -229,10 +227,10 @@ theorem open_absent_call_any (UL : UK_LEAVES) (N : UkNames GF) (T K : IProp GF) 
     (pfamTriv (fun (_ : Aview) (_ : Nat) (_ : Anode) => iprop(True)))
     (pfamTriv (fun (_ : Aview) (_ : Nat) (_ : List (BitVec 8)) => iprop(True)))
     ⟨rfl, rfl, rfl, rfl, rfl⟩ m pv W rv M' fdv' cw' cs' _ hk0 hk1 hcw ha0' ha1')
-  iintro ⟨%Mv, %hag, Hrc⟩ Hcwd Hrun
+  iintro ⟨%Mv, %hag, %rt, Hrc⟩ Hcwd Hrun
   have hpv' : argPathOf Mv pv initConsPl := hro Mv (fun a b hb => hag a b (himg a b hb))
   iapply wpLoop_fupd
-  imod (cons_open_dead_recv fscFs T K Mv pv (2#64) _ _ W.fd rv fdv' initCons_om2_trunc hpv') $$ Hrc with Hans
+  imod (cons_open_dead_recv fscFs rt T K Mv pv (2#64) _ _ W.fd rv fdv' initCons_om2_trunc hpv') $$ Hrc with Hans
   imodintro
   iapply Hcont $$ %h' %rv [Hfd Hans] Hcwd Hrun
   icases Hans with (⟨%hr, -, HKT⟩ | HT)

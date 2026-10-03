@@ -20,6 +20,7 @@ is even.  Deviation (DU4): stated once, over the run interface `UlibRunP`
 `urun` is `UlibUkProg.wp_ulibUkFprintf(S)`).
 -/
 import Xv6.SpecUlibVprintf
+import Xv6.UlibFprintfCode
 
 namespace Xv6
 

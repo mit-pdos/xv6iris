@@ -35,14 +35,11 @@ credential pays (`UexecSeccMint`).
 -/
 import Xv6.UexecSeccMasked
 import Xv6.UexecExecInst
-import Xv6.PipeReg
 import Xv6.UserFd
 
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Std MachCSL
-
-set_option linter.unusedSectionVars false
 
 /-! ## 1.  PURE: the blocked set and the mask condition -/
 
@@ -66,7 +63,7 @@ theorem usysEffMaskedNotin (m : BitVec 64) (tf : List (BitVec 64)) (hm : seccMas
     have hk' := hm k hk
     unfold usysTestbit at hb
     rw [← heq] at hb
-    simp only [Int.ofNat_eq_coe, Int.toNat_natCast, Bool.and_eq_true, decide_eq_true_eq] at hb
+    simp only [Int.ofNat_eq_natCast, Int.toNat_natCast, Bool.and_eq_true, decide_eq_true_eq] at hb
     rw [hk'] at hb
     exact Bool.false_ne_true hb.2
   · simp [seccB]

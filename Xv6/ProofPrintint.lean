@@ -46,21 +46,17 @@ import MachCSL.ByteWord
 import Xv6.SpecPrintint
 import Xv6.SpecPrputc
 import Xv6.CodeTactics
-import Xv6.KernelTac
 
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
 /-! ## Arithmetic -/
-
 
 /-- `8`-alignment survives adding a multiple of eight. -/
 theorem pi_align_add (a : BitVec 64) (m : Nat) (h : a.toNat % 8 = 0) (hm : m % 8 = 0) :
@@ -188,7 +184,6 @@ theorem piBuf_acc (a : BitVec 64) (j : Nat) (hj : j < 24) :
   · ipureintro; rw [List.length_set]; exact hl
   iexact H
 
-
 /-! ## The frame
 
 `addi sp,sp,-64; sd ra,56(sp); sd s0,48(sp); sd s2,32(sp); addi s0,sp,64`:
@@ -302,7 +297,6 @@ theorem wp_pi_epilogue (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
   iintro Hk Hpc
   iapply HΦ $$ Hk Hpc
 
-
 /-! ## Instruction-level arithmetic -/
 
 /-- `sext.w` of a value below `2 ^ 31` is the identity. -/
@@ -363,16 +357,8 @@ come, and `i + f ≤ 20` keeps every write inside `buf`. -/
 def dlKept (R R' : RegMap) : Prop :=
   ∀ r : BitVec 5, r ≠ 10#5 → r ≠ 12#5 → r ≠ 13#5 → r ≠ 14#5 → r ≠ 15#5 → r ≠ 17#5 → R' r = R r
 
-theorem dlKept_refl (R : RegMap) : dlKept R R := fun _ _ _ _ _ _ _ => rfl
-
 theorem dlKept_trans {R R' R'' : RegMap} (h : dlKept R R') (h' : dlKept R' R'') : dlKept R R'' :=
   fun r a b c d e f => (h' r a b c d e f).trans (h r a b c d e f)
-
-theorem dlKept_body (R : RegMap) (v17 v12 v14 v15a v15b v15c v10 v13 : BitVec 64) :
-    dlKept R (((((((R.set 17#5 v17).set 12#5 v12).set 14#5 v14).set 15#5 v15a).set 15#5 v15b).set 10#5
-      v10).set 13#5 v13) := by
-  intro r h10 h12 h13 h14 h15 h17
-  simp only [RegMap.set_apply, h10, h12, h13, h14, h15, h17, if_false]
 
 set_option maxHeartbeats 4000000 in
 /-- ONE iteration of the digit loop, `+0x22 .. +0x3e`, handing over at the
@@ -553,11 +539,6 @@ theorem plKept_trans {R R' R'' : RegMap} (h : plKept R R') (h' : plKept R' R'') 
   obtain ⟨b2, b8, b18, b19, b20, b21, b22, b23, b24, b25, b26, b27⟩ := h'
   exact ⟨b2.trans a2, b8.trans a8, b18.trans a18, b19.trans a19, b20.trans a20, b21.trans a21,
     b22.trans a22, b23.trans a23, b24.trans a24, b25.trans a25, b26.trans a26, b27.trans a27⟩
-
-/-- A callee's `calleeSaved` is `plKept` (it keeps `s1` too). -/
-theorem plKept_of_calleeSaved {R R' : RegMap} (h : calleeSaved R R') : plKept R R' := by
-  obtain ⟨a2, a8, _, a18, a19, a20, a21, a22, a23, a24, a25, a26, a27⟩ := h
-  exact ⟨a2, a8, a18, a19, a20, a21, a22, a23, a24, a25, a26, a27⟩
 
 /-- The descending cursor, in the form `k_norm` leaves it. -/
 theorem pi_pred' (b : BitVec 64) (n : Nat) :
@@ -900,7 +881,7 @@ theorem pi_minus_addr (sp0 : BitVec 64) (i : Nat) :
 /-! ## The body from `+0x12`: the digit loop, the sign, the join -/
 
 /-- The `auipc`/`addi` pair at `+0x1a` names the digit table. -/
-theorem pi_digits_addr : KA.«printint» + 0x72a8#64 = KA.«digits» := by decide
+theorem pi_digits_addr : KA.«printint» + 0x72a0#64 = KA.«digits» := by decide
 
 set_option maxHeartbeats 4000000 in
 /-- From `+0x12` (where all three entry paths meet, `t1` holding the sign
@@ -954,7 +935,7 @@ theorem pi_setup (PP : PRPUTC) [Xv6G GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = 
     from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x1e addi a6,a6,654 : a6 = digits
-  k_step (wp_s_addi cpu _ (KA.«printint» + 0x1e#64) false 654#12 16#5 16#5 (by decide))
+  k_step (wp_s_addi cpu _ (KA.«printint» + 0x1e#64) false 646#12 16#5 16#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [pi_digits_addr]
   iintro Hk Hpc
   -- the digit loop

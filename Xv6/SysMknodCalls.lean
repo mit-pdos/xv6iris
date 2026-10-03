@@ -39,9 +39,7 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
@@ -95,7 +93,7 @@ theorem sys_mknod_create (CR : CREATE) (Γ : SchedNames) [ClaimIs (hlc := hlc) G
     procPrivFd γ k'.proc pid V M ∗
     byteBuf (k'.regs 10#5) (DFrac.own 1) (bview (plen + 1) pfun) ∗
     bslots 3 ∗ irefSlots ns ∗ logOpS icfgLog u Sb ∗ logTx icfgLog ∗
-    epStart fscFs V.cwi P Pmiss (bview plen pfun) ∗
+    epStart fscFs V.rti V.cwi P Pmiss (bview plen pfun) ∗
     pfAt (dlookupCommitAt (fsGammaL fscFs) appE) Fex ∗
     creCommits (hlc := hlc) (fsGammaL fscFs) T_DEVICE_w.toNat major.toNat minor.toNat
       Nm Nd (P (nparElems (bview plen pfun)).length) Farm (pfamTriv (fun _ _ _ _ => iprop(True))) Fun Fok ∗

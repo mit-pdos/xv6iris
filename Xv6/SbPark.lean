@@ -63,8 +63,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-! ## The namespace
 
 A CHILD OF `Xv6.logN`, AND THE SIBLING OF THE BYTE VIEW'S OWN `Xv6.fsbN`.

@@ -10,8 +10,7 @@ image is part of the language, not of the initial state: no adequacy theorem
 takes a premise about it.
 
 `bootImage` is a map with one entry per RAM byte (2^27 of them), so it is
-SEALED (an `opaque` witness of its spec `BootImageSpec`, `bootImage_eq`
-pinning it to the RAM list's map): nothing -- not even the kernel's defeq
+SEALED (an `opaque` witness of its spec `BootImageSpec`): nothing -- not even the kernel's defeq
 check -- ever unfolds it; everything reads it through `bootImage_get?`, and
 the per-byte content through `bootByte`, which `decide +kernel` evaluates
 cheaply.
@@ -95,10 +94,5 @@ loaded byte. -/
 theorem bootImage_get? (a : PAddr) :
     bootImage[a]? = if inRam a 1 then some (bootByte a.toNat) else none :=
   bootImageSealed.2 a
-
-/-- The spec pins the map (`ExtTreeMap` is extensional): the sealed constant IS
-the RAM list's map. -/
-theorem bootImage_eq : bootImage = Std.ExtTreeMap.ofList bootImageList compare :=
-  Std.ExtTreeMap.ext_getElem? fun a => by rw [bootImage_get?, bootImageList_spec a]
 
 end MachCSL

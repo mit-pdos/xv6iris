@@ -89,7 +89,7 @@ theorem bm_br_bread : KA.«bmap» + 0xFFFFFFFFFFFFFBF0#64 = KA.«bread» := by d
 /-- `jal brelse` at `+0x84`. -/
 theorem bm_br_brelse : KA.«bmap» + 0xFFFFFFFFFFFFFCF8#64 = KA.«brelse» := by decide
 /-- `jal log_write` at `+0xac`. -/
-theorem bm_br_logwrite : KA.«bmap» + 0xEA0#64 = KA.«log_write» := by decide
+theorem bm_br_logwrite : KA.«bmap» + 0xf00#64 = KA.«log_write» := by decide
 
 theorem bm_ret_2e : jumpPc (KA.«bmap» + 0x2e#64) = KA.«bmap» + 0x2e#64 := by decide
 theorem bm_ret_54 : jumpPc (KA.«bmap» + 0x54#64) = KA.«bmap» + 0x54#64 := by decide

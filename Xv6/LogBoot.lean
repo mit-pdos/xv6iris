@@ -29,8 +29,6 @@ namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-! ## Publishing a word: `own 1 → discard`
 
 `initlog` writes `log.start` and `log.dev` once and then FREEZES them:

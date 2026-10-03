@@ -17,8 +17,6 @@ namespace Xv6
 open MachCSL
 open Sail LeanRV64D LeanRV64D.Functions
 
-set_option linter.unusedSectionVars false
-
 /-! ## §1 Disjointness, and the lift of `runRW` walks -/
 
 /-- **The walker's map misses the text map** (`UkMem.nodup` + `dom` + `domT`). -/
@@ -61,17 +59,9 @@ theorem uke_land_setNpc {C : UCfg} {P : UPtd} {T : BMap} {s : UWSt} (h : UkLand 
     (t : BitVec 64) : UkLand C P T (s.setR .nextPC t) :=
   uke_land_congr h (fun r _ h2 => UWSt.setR_file_other s .nextPC r t h2) rfl
 
-theorem uke_land_uxcNpc {C : UCfg} {P : UPtd} {T : BMap} {s : UWSt} (h : UkLand C P T s)
-    (t : BitVec 64) : UkLand C P T (uxcNpc s t) :=
-  uke_land_setNpc h t
-
 theorem uke_land_ucNpcS {C : UCfg} {P : UPtd} {T : BMap} {s : UWSt} (h : UkLand C P T s)
     (len : Int) : UkLand C P T (ucNpcS s len) :=
   uke_land_setNpc h _
-
-theorem uke_uxcNpc_eq (s : UWSt) (t : BitVec 64) : uxcNpc s t = s.setR .nextPC t := rfl
-
-@[simp] theorem uke_ucNpcS_mm (s : UWSt) (len : Int) : (ucNpcS s len).mm = s.mm := rfl
 
 theorem uke_ucNpcS_npc (s : UWSt) (len : Int) :
     (ucNpcS s len).file .nextPC = BitVec.addInt (s.file .PC) len :=
@@ -90,10 +80,6 @@ theorem uke_regs_setR {s : UWSt} {m : RegMap} (hr : ukRegs s.file m) (r : Regist
 
 theorem uke_regs_ucNpcS {s : UWSt} {m : RegMap} (hr : ukRegs s.file m) (len : Int) :
     ukRegs (ucNpcS s len).file m :=
-  uke_regs_setR hr .nextPC _ (by decide)
-
-theorem uke_regs_uxcNpc {s : UWSt} {m : RegMap} (hr : ukRegs s.file m) (t : BitVec 64) :
-    ukRegs (uxcNpc s t).file m :=
   uke_regs_setR hr .nextPC _ (by decide)
 
 /-- The GPRs after a GPR write (32 × 32 closed cases, each by evaluation). -/

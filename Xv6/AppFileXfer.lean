@@ -45,13 +45,10 @@ Rocq's notes, abridged (the reasons are the content):
 -/
 import Xv6.AppFileSeal
 import Xv6.AppFileHook
-import Xv6.SystemSlot
 
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
-
-set_option linter.unusedSectionVars false
 
 section AppFileXfer
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF]

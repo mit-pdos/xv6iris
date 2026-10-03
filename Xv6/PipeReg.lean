@@ -21,7 +21,7 @@ moves the pipe's AUTHORITY, and a link at the trivial payload gives nothing
 back, so a link conjured from `emp` would move the authority away from a
 fragment that did not move -- which `pipeQueue_agree` refutes at any state
 whose flag the close actually clears.  The two real sources are the taint
-(`pipeReg_of_taint`) and an invariant that owns the fragment (lane
+and an invariant that owns the fragment (lane
 PIPE-PROTO, the union's).
 
 NOT TIMELESS, and deliberately so: `pipeCpay` is a disjunction whose left
@@ -39,14 +39,11 @@ arm is a fupd-producing wand.
    automatic.
 3. `<[k := st]> l` is `l.set k st`; `l !! k` is `l[k]?`.
 -/
-import Xv6.FileDefs
 import Xv6.SpecFileclose
 
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Std MachCSL
-
-set_option linter.unusedSectionVars false
 
 section PipeReg
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
@@ -89,39 +86,7 @@ theorem pipeReg_not_free (γ : GName) :
   ihave %he := pipeQueue_agree γ (pstClose true pst0) pst0 $$ Ha Hf
   exact absurd he (by decide)
 
-/-- ...and the positive half: the fragment's holder buys ONE payment, at the
-cost of the fragment -- which is why a program cannot carry the registry by
-holding the fragment (Rocq `pipe_cpay_of_frag`). -/
-theorem pipeCpay_of_frag (γ : GName) (w : Bool) (s : PipeSt) :
-    pipeQfrag (GF := GF) γ s ⊢ pipeCpay (hlc := hlc) γ w iprop(emp) := by
-  unfold pipeCpay
-  iintro Hf
-  ileft
-  iapply pipeClink_of_frag γ w iprop(emp) s $$ Hf
-  iintro -
-  imodintro
-  iempintro
-
 /-! ## 3.  THE TWO INTROS -/
-
-/-- THE TAINT STILL BUYS IT (Rocq `pipe_reg_of_taint`). -/
-theorem pipeReg_of_taint (γp : PipeNames) :
-    MachFixedGS.killCred (hlc := hlc) (GF := GF) ⊢ pipeReg (hlc := hlc) γp := by
-  unfold pipeReg
-  iintro #Ht
-  imodintro
-  iintro %w
-  iapply pipeCpay_taint $$ Ht
-
-/-- Rocq `pipe_row_reg_of_taint`. -/
-theorem pipeRowReg_of_taint (st : FdState) :
-    MachFixedGS.killCred (hlc := hlc) (GF := GF) ⊢ pipeRowReg (hlc := hlc) st := by
-  unfold pipeRowReg
-  rcases st with _ | ⟨_, _, γp | _ | _⟩
-  · iintro -; iempintro
-  · exact pipeReg_of_taint γp
-  · iintro -; iempintro
-  · iintro -; iempintro
 
 /-- ...AND A ROW THAT IS NOT A PIPE REGISTERS ITSELF (Rocq
 `pipe_row_reg_nopipe`): a program that never calls pipe(2) pays nothing. -/

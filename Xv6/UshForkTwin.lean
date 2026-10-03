@@ -44,14 +44,13 @@ import Xv6.UshDiagPanic
 import Xv6.UshPipeWait
 import Xv6.UshPipeArmBase
 import Xv6.UshMainBytes
+import Xv6.SpecShFork1
 
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
-
-set_option linter.unusedSectionVars false
 
 section UshForkTwin
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]

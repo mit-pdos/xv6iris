@@ -38,8 +38,6 @@ open Iris Iris.Std MachCSL
 open Iris.Algebra
 open FsStateLink
 
-set_option linter.unusedSectionVars false
-
 /-! ## 9g.  The bridge -/
 
 /-- THE IMAGE'S REGISTER CHOICE, per inum (Rocq's `img_v`). -/
@@ -51,9 +49,6 @@ def imgF (P : Nat → List (BitVec 8)) (sb : FsSb) : LinkChoice :=
   fun z => (∅, (imgV P sb z, fun s => match (dirEntries (imgNode P sb z))[s]? with
     | some t => imgV P sb t
     | none => .tFile))
-
-theorem imgF_v (P : Nat → List (BitVec 8)) (sb : FsSb) (z : Nat) :
-    lcV (imgF P sb) z = imgV P sb z := rfl
 
 theorem imgF_tyf (P : Nat → List (BitVec 8)) (sb : FsSb) (z : Nat) (s : Fname) :
     lcTyf (imgF P sb) z s = match (dirEntries (imgNode P sb z))[s]? with

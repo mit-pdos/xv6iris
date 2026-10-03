@@ -28,8 +28,6 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
-
 /-- `UshExecPinPure.UshExecPinProg`, discharged. -/
 theorem ushExecPinProg_holds : UshExecPinProg := ushExecPinProg_of_grep grepElfLoadable
 

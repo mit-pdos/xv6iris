@@ -18,8 +18,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Iris.Std.PartialMap
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
-
 section FifHdls
 variable {GF : BundledGFunctors} [GhostMapG GF (Option Nat) UfdCell UfdMapF]
 
@@ -82,7 +80,7 @@ theorem fifHdls_insert (γfd : GName) (fdm : Fdmap) (vs vs' : FifVs) (k : Int) (
       | none => rfl
       | some d' => simp [hagree fd d' e']
   | some st =>
-    simp only [e]
+    simp only []
     iexists (insert hm k st)
     isplitr
     · ipureintro
@@ -117,7 +115,7 @@ theorem fifHdls_delete (γfd : GName) (fdm : Fdmap) (vs vs' : FifVs) (fd : Int) 
     | some d' => simp [hagree x d' hx e']
   cases e : fifHf vs d with
   | none =>
-    simp only [e]
+    simp only []
     isplitr
     · iempintro
     iexists hm
@@ -131,7 +129,7 @@ theorem fifHdls_delete (γfd : GName) (fdm : Fdmap) (vs vs' : FifVs) (fd : Int) 
       simp [e]
     · exact hagree' x h
   | some st =>
-    simp only [e]
+    simp only []
     have hk : get? hm fd = some st := by rw [hhm, hfd]; simp [e]
     ihave H := (BigSepM.bigSepM_delete (Φ := fun (fd : Int) st => ufd (GF := GF) γfd fd.toNat st) hk).1 $$ Hm
     icases H with ⟨Hx, Hm⟩

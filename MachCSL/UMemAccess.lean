@@ -23,10 +23,9 @@ sub-walks it composes as hypotheses of the walker's equation shape:
 * the PHYSICAL access at the translated state, `mem_read` / `mem_write_ea` /
   `mem_write_value` / `phys_access_check` (`UMemRam`, `UMemPhys`).
 
-The composed corollaries (`uma_vmem_read_addr_load`/`_lr` here,
-`uma_vmem_write_addr_store`/`_sc_ok`/`_sc_fail` in `UMemStore`) state the
-whole access over the owned byte map; `uma_utrTranslate_hit`/`_miss` put lane
-U1-P1's TLB facts in the translation hypothesis's shape.
+The composed corollaries (`uma_vmem_read_addr_lr` here,
+`uma_vmem_write_addr_sc_ok`/`_sc_fail` in `UMemStore`) state the whole access
+over the owned byte map.
 
 **Reservations** (risk 5).  The walker follows Rocq's `resv_any` design
 (`URunRW`): LR's exclusive read (`lr`, `lr.aq`, `lr.aqrl`) sets the walker's
@@ -45,12 +44,8 @@ every proof (performance rule 2); the walks are run by `uwk_run` (UWalkRun),
 which is handed the sub-walk facts instead of re-walking them.
 -/
 import MachCSL.UMemRam
-import MachCSL.BvEnumSatp
 import MachCSL.UTlb
-import MachCSL.UWalkRun
 import MachCSL.SailHooks
-import MachCSL.PlatformFacts
-import MachCSL.Tactics
 import MachCSL.UMemMisPlan
 
 namespace MachCSL
@@ -115,28 +110,6 @@ theorem uma_translateAddr_ok (D : UFoot) (orc orc' : UOrc) (s s' : UWSt) (hp : U
     runRW D orc s (translateAddr (.Virtaddr va) acc) =
       some (.Ok (.Physaddr (paOf ppn va), .PBMT_PMA, ()), s', orc') :=
   utr_translateAddr_ok D orc orc' s s' hp va acc hacc hc ppn .PBMT_PMA htr
-
-/-- **Lane U1-P1's TLB hit, in the shape the vmem arms take** (`UTlb.utlb_translate_of_hit`
-at the front's arguments; the hit itself is `utlb_hit_keep`/`_refresh`/`_denied`). -/
-theorem uma_utrTranslate_hit (D : UFoot) (orc : UOrc) (s : UWSt) (va : BitVec 64)
-    (acc : MemoryAccessType mem_payload) (i : Nat) (ent : TLB_Entry)
-    (r : Option (Result (BitVec 44 × page_based_mem_type × Unit) (PTW_Error × Unit) × UWSt × UOrc))
-    (hl : runRW D orc s (lookup_TLB 39 0#16 (vpnOf va)) = some (some (i, ent), s, orc))
-    (hh : runRW D orc s (translate_TLB_hit 39 0#16 (vpnOf va) acc .User (utrMxr (s.file .mstatus))
-      (utrSum (s.file .mstatus)) () i ent) = r) :
-    runRW D orc s (utrTranslate s va acc) = r :=
-  utlb_translate_of_hit D orc s _ _ acc .User _ _ i ent r hl hh
-
-/-- **Lane U1-P1's TLB miss** (`UTlb.utlb_translate_of_miss`; the miss itself
-is `utlb_miss_ok`/`_err` over `UWalk.uwk_pt_walk`). -/
-theorem uma_utrTranslate_miss (D : UFoot) (orc : UOrc) (s : UWSt) (va : BitVec 64)
-    (acc : MemoryAccessType mem_payload)
-    (r : Option (Result (BitVec 44 × page_based_mem_type × Unit) (PTW_Error × Unit) × UWSt × UOrc))
-    (hl : runRW D orc s (lookup_TLB 39 0#16 (vpnOf va)) = some (none, s, orc))
-    (hm : runRW D orc s (translate_TLB_miss 39 0#16 (utrRoot (s.file .satp)) (vpnOf va) acc .User
-      (utrMxr (s.file .mstatus)) (utrSum (s.file .mstatus)) ()) = r) :
-    runRW D orc s (utrTranslate s va acc) = r :=
-  utlb_translate_of_miss D orc s _ _ acc .User _ _ r hl hm
 
 /-! ## §3 `vmem_read_addr` (LOAD, LR) -/
 
@@ -209,18 +182,6 @@ theorem uma_vmem_read_addr_lr_mis (D : UFoot) (hD : UmaTrapFoot D) (orc : UOrc) 
   have hdcp := hD.dcp
   have hdpc := hD.dpc
   rcases hw with rfl | rfl | rfl | rfl <;> uwk_run [hme, hal']
-
-/-- **An aligned LOAD of owned bytes** (the composed arm): lane U1-P1's
-translation to the page, then the bytes' value. -/
-theorem uma_vmem_read_addr_load (D : UFoot) (orc orc1 : UOrc) (s s1 : UWSt) (hp : UtrPins D s)
-    (hp1 : UmaPhys D s1) (va : BitVec 64) (w : Nat) (hw : umaW w) (hal : va.toNat % w = 0) (hc : utrCanon va)
-    (ppn : BitVec 44)
-    (htr : runRW D orc s (utrTranslate s va (.Load .Data)) = some (.Ok (ppn, .PBMT_PMA, ()), s1, orc1))
-    (hr : UmaRam (paOf ppn va) w) (v : BitVec (8 * w)) (hv : bmRead s1.mm (paOf ppn va) w = some v) :
-    runRW D orc s (vmem_read_addr (.Virtaddr va) w (.Load .Data) false false false) = some (.Ok v, s1, orc1) :=
-  uma_vmem_read_addr_al D orc orc1 s s1 s1 hp va w hw hal (.Load .Data) false false false (paOf ppn va) v
-    (uma_translateAddr_ok D orc orc1 s s1 hp va _ rfl hc ppn htr)
-    (uma_mem_read_load D orc1 s1 hp1 (paOf ppn va) w hw hr v hv)
 
 /-- **An aligned LR of owned bytes** (`lr.w`/`lr.d`, `.aq`/`.aqrl` or not;
 the model passes `aq`, `aq && rl`): the value, and the walker takes the

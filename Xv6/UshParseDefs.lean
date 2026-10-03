@@ -33,20 +33,11 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
-
 /-! ## §1 The byte algebra (Rocq §2) -/
-
-/-- **Rocq `ushp_zext_nul`**: a byte is NUL exactly when its zero-extended
-word is zero. -/
-theorem ush_zext_zero (b : BitVec 8) : BitVec.setWidth 64 b = 0#64 ↔ b = ubyte0 := by
-  have := Xv6.setWidth64_inj b ubyte0
-  rw [show BitVec.setWidth 64 ubyte0 = 0#64 from rfl] at this
-  exact this
 
 /-- `beqz`/`bnez` on a `Nat`-valued word below `2^64`. -/
 theorem ush_beqz_nat (x : Nat) (hx : x < 2 ^ 64) : ukBtaken .BEQ (BitVec.ofNat 64 x) 0#64 = decide (x = 0) := by
-  simp only [ukBtaken, beq_iff_eq]
+  simp only [ukBtaken]
   by_cases h : x = 0
   · subst h; simp
   · have : BitVec.ofNat 64 x ≠ 0#64 := by
@@ -57,7 +48,7 @@ theorem ush_beqz_nat (x : Nat) (hx : x < 2 ^ 64) : ukBtaken .BEQ (BitVec.ofNat 6
 
 theorem ush_bnez_nat (x : Nat) (hx : x < 2 ^ 64) : ukBtaken .BNE (BitVec.ofNat 64 x) 0#64 = !decide (x = 0) := by
   have := ush_beqz_nat x hx
-  simp only [ukBtaken, bne, beq_iff_eq] at this ⊢
+  simp only [ukBtaken, bne] at this ⊢
   rw [this]
 
 /-! ## §0 The addresses of the two static tables and of peek's literals -/
@@ -69,7 +60,6 @@ def ushWsA : Nat := 0x2008
 def ushSymA : Nat := 0x2000
 
 theorem ushWsA_eq : (ushWsA : Int) = ushpWhitespace := rfl
-theorem ushSymA_eq : (ushSymA : Int) = ushpSymbols := rfl
 
 /-- **Rocq `UkShParseLex.ushp_lit`**: a `.rodata` literal as the index
 function a string carries (off sh's R-X segment). -/
@@ -118,13 +108,6 @@ theorem ushSstr_nonul (N : UkNames GF) (tx : Bool) (dq : DFrac) (a len : Nat) (f
   cases tx
   · exact ustr_nonul N.d dq a len f
   · exact utextStr_nonul N.t a len f
-
-/-- **Rocq `ushp_sstr_len`**. -/
-theorem ushSstr_len (N : UkNames GF) (tx : Bool) (dq : DFrac) (a len : Nat) (f : Nat → BitVec 8) :
-    ushSstr N tx dq a len f ⊢ ⌜len < 2 ^ 31⌝ := by
-  cases tx
-  · exact ustr_len N.d dq a len f
-  · exact utextStr_len N.t a len f
 
 /-- **Rocq `ushp_sstr_byte`**: one body byte, out and back (the give-back is
 kept in the text case so one script serves both halves). -/

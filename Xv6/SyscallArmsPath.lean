@@ -68,9 +68,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## §1 Shared pure facts -/
 
@@ -174,10 +172,10 @@ def SyscDepChdir : Prop :=
   ∀ (f : sfam GF) (W : Uvis),
     sbundleAt (uslot (hlc := hlc)) 9 f W ⊢
       ∃ (P Pmiss : Nat → Nat → IProp GF) (Fo : Pfam GF (Aview → Nat → Anode → IProp GF)),
-        chdirAuPre (hlc := hlc) (fsGammaL fscFs) fscFs W.cwd P Pmiss Fo ∗
-        (∀ (r : BitVec 64) (M' : ElfMem) (fdv' : List FdState) (cw' : Nat)
+        (∀ rt : Nat, chdirAuPre (hlc := hlc) (fsGammaL fscFs) fscFs rt W.cwd P Pmiss Fo) ∗
+        (∀ (rt : Nat) (r : BitVec 64) (M' : ElfMem) (fdv' : List FdState) (cw' : Nat)
             (cs' : ExtTreeSet GName compare),
-          chdirReceipt (hlc := hlc) (fsGammaL fscFs) fscFs W.cwd P Pmiss Fo r cw' -∗
+          chdirReceipt (hlc := hlc) (fsGammaL fscFs) fscFs rt W.cwd P Pmiss Fo r cw' -∗
             spostAt (uslot (hlc := hlc)) 9 f W r M' fdv' cw' cs')
 
 /-- **Rocq `sysc_dep_unlink` + `sysc_out_unlink`** (deviation 2: the image
@@ -192,13 +190,13 @@ def SyscDepUnlink : Prop :=
         (Ftgt : Pfam GF (Aview → Nat → IProp GF))
         (Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
         (Fmiss : Pfam GF (Aview → Nat → Fname → IProp GF)),
-        (∀ Mv : Nat → List (BitVec 8), ⌜∀ (a : Nat) (b : BitVec 8), W.M a = some b → umemByte Mv a = b⌝ -∗
-          unlinkAuAt (hlc := hlc) (fsGammaL fscFs) fscFs W.cwd Mv (tfW W.tf (tfArgIdx 0)).toNat
+        (∀ Mv : Nat → List (BitVec 8), ⌜∀ (a : Nat) (b : BitVec 8), W.M a = some b → umemByte Mv a = b⌝ -∗ ∀ rt : Nat,
+          unlinkAuAt (hlc := hlc) (fsGammaL fscFs) fscFs rt W.cwd Mv (tfW W.tf (tfArgIdx 0)).toNat
             P Pmiss Fent Ftgt Fex Fmiss) ∗
-        (∀ (Mv : Nat → List (BitVec 8)) (r : BitVec 64) (M' : ElfMem) (fdv' : List FdState)
+        (∀ (Mv : Nat → List (BitVec 8)) (rt : Nat) (r : BitVec 64) (M' : ElfMem) (fdv' : List FdState)
             (cw' : Nat) (cs' : ExtTreeSet GName compare),
           ⌜∀ (a : Nat) (b : BitVec 8), W.M a = some b → umemByte Mv a = b⌝ -∗
-          unlinkArms (hlc := hlc) (fsGammaL fscFs) fscFs W.cwd Mv (tfW W.tf (tfArgIdx 0)).toNat
+          unlinkArms (hlc := hlc) (fsGammaL fscFs) fscFs rt W.cwd Mv (tfW W.tf (tfArgIdx 0)).toNat
               P Pmiss Fent Ftgt Fex Fmiss r -∗
             spostAt (uslot (hlc := hlc)) 18 f W r M' fdv' cw' cs')
 
@@ -227,13 +225,13 @@ def SyscDepMkdir : Prop :=
         (Fdots : Pfam GF (Aview → Nat → Nat → Bool → IProp GF))
         (Fun : Pfam GF (Aview → Nat → IProp GF))
         (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)),
-        (∀ Mv : Nat → List (BitVec 8), ⌜∀ (a : Nat) (b : BitVec 8), W.M a = some b → umemByte Mv a = b⌝ -∗
-          mkdirAuAt (hlc := hlc) (fsGammaL fscFs) fscFs W.cwd Mv (tfW W.tf (tfArgIdx 0)).toNat
+        (∀ Mv : Nat → List (BitVec 8), ⌜∀ (a : Nat) (b : BitVec 8), W.M a = some b → umemByte Mv a = b⌝ -∗ ∀ rt : Nat,
+          mkdirAuAt (hlc := hlc) (fsGammaL fscFs) fscFs rt W.cwd Mv (tfW W.tf (tfArgIdx 0)).toNat
             P Pmiss Farm Fdots Fun Fok Fex) ∗
-        (∀ (Mv : Nat → List (BitVec 8)) (r : BitVec 64) (M' : ElfMem) (fdv' : List FdState)
+        (∀ (Mv : Nat → List (BitVec 8)) (rt : Nat) (r : BitVec 64) (M' : ElfMem) (fdv' : List FdState)
             (cw' : Nat) (cs' : ExtTreeSet GName compare),
           ⌜∀ (a : Nat) (b : BitVec 8), W.M a = some b → umemByte Mv a = b⌝ -∗
-          mkdirArms (hlc := hlc) (fsGammaL fscFs) fscFs W.cwd Mv (tfW W.tf (tfArgIdx 0)).toNat
+          mkdirArms (hlc := hlc) (fsGammaL fscFs) fscFs rt W.cwd Mv (tfW W.tf (tfArgIdx 0)).toNat
               P Pmiss Farm Fdots Fun Fok Fex r -∗
             spostAt (uslot (hlc := hlc)) 20 f W r M' fdv' cw' cs')
 
@@ -247,13 +245,13 @@ def SyscDepMknod : Prop :=
     sbundleAt (uslot (hlc := hlc)) 17 f W ⊢
       ∃ (P Pmiss : Nat → Nat → IProp GF) (Farm Fun : Pfam GF (Aview → Nat → IProp GF))
         (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)),
-        (∀ Mv : Nat → List (BitVec 8), ⌜∀ (a : Nat) (b : BitVec 8), W.M a = some b → umemByte Mv a = b⌝ -∗
-          mknodAuAt (hlc := hlc) (fsGammaL fscFs) fscFs W.cwd Mv (tfW W.tf (tfArgIdx 0)).toNat
+        (∀ Mv : Nat → List (BitVec 8), ⌜∀ (a : Nat) (b : BitVec 8), W.M a = some b → umemByte Mv a = b⌝ -∗ ∀ rt : Nat,
+          mknodAuAt (hlc := hlc) (fsGammaL fscFs) fscFs rt W.cwd Mv (tfW W.tf (tfArgIdx 0)).toNat
             (devArg (tfW W.tf (tfArgIdx 1))) (devArg (tfW W.tf (tfArgIdx 2))) P Pmiss Farm Fun Fok Fex) ∗
-        (∀ (Mv : Nat → List (BitVec 8)) (r : BitVec 64) (M' : ElfMem) (fdv' : List FdState)
+        (∀ (Mv : Nat → List (BitVec 8)) (rt : Nat) (r : BitVec 64) (M' : ElfMem) (fdv' : List FdState)
             (cw' : Nat) (cs' : ExtTreeSet GName compare),
           ⌜∀ (a : Nat) (b : BitVec 8), W.M a = some b → umemByte Mv a = b⌝ -∗
-          mknodArms (hlc := hlc) (fsGammaL fscFs) fscFs W.cwd Mv (tfW W.tf (tfArgIdx 0)).toNat
+          mknodArms (hlc := hlc) (fsGammaL fscFs) fscFs rt W.cwd Mv (tfW W.tf (tfArgIdx 0)).toNat
               (devArg (tfW W.tf (tfArgIdx 1))) (devArg (tfW W.tf (tfArgIdx 2))) P Pmiss Farm Fun Fok
               Fex r -∗
             spostAt (uslot (hlc := hlc)) 17 f W r M' fdv' cw' cs')
@@ -274,13 +272,13 @@ def SyscDepOpen : Prop :=
         (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
         (Fo : Pfam GF (Aview → Nat → Anode → IProp GF))
         (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)),
-        (∀ Mv : Nat → List (BitVec 8), ⌜∀ (a : Nat) (b : BitVec 8), W.M a = some b → umemByte Mv a = b⌝ -∗
-          openIn (hlc := hlc) (fsGammaL fscFs) fscFs W.cwd Mv (tfW W.tf (tfArgIdx 0)).toNat
+        (∀ Mv : Nat → List (BitVec 8), ⌜∀ (a : Nat) (b : BitVec 8), W.M a = some b → umemByte Mv a = b⌝ -∗ ∀ rt : Nat,
+          openIn (hlc := hlc) (fsGammaL fscFs) fscFs rt W.cwd Mv (tfW W.tf (tfArgIdx 0)).toNat
             (tfW W.tf (tfArgIdx 1)) P Pmiss Farm Fun Fok Fex Fo Ft) ∗
-        (∀ (Mv : Nat → List (BitVec 8)) (r : BitVec 64) (M' : ElfMem) (fdv' : List FdState)
+        (∀ (Mv : Nat → List (BitVec 8)) (rt : Nat) (r : BitVec 64) (M' : ElfMem) (fdv' : List FdState)
             (cw' : Nat) (cs' : ExtTreeSet GName compare),
           ⌜∀ (a : Nat) (b : BitVec 8), W.M a = some b → umemByte Mv a = b⌝ -∗
-          openReceipt (hlc := hlc) omo (fsGammaL fscFs) fscFs W.cwd Mv (tfW W.tf (tfArgIdx 0)).toNat
+          openReceipt (hlc := hlc) omo (fsGammaL fscFs) fscFs rt W.cwd Mv (tfW W.tf (tfArgIdx 0)).toNat
               (tfW W.tf (tfArgIdx 1)) P Pmiss Farm Fun Fok Fex Fo Ft W.fd r fdv' -∗
             spostAt (uslot (hlc := hlc)) 15 f W r M' fdv' cw' cs')
 
@@ -319,8 +317,9 @@ theorem syscall_arm_chdir (SC : SYSCHDIR) (hdep : SyscDepChdir (hlc := hlc) (GF 
   have hn9 : syscNum V = (9 : Int) := hnum
   ihave Hdep := syscSysIn_at f V M sts gn cs pid 9 hn9 (by decide) $$ Hsin
   icases hdep f (uvisOf V M sts gn cs pid) $$ Hdep with ⟨%P, %Pmiss, %Fo, Hau, Hout⟩
-  ihave Hau := (show chdirAuPre (hlc := hlc) (fsGammaL fscFs) fscFs (uvisOf V M sts gn cs pid).cwd P
-      Pmiss Fo ⊢ chdirAuPre (fsGammaL fscFs) fscFs V.cwi P Pmiss Fo from .rfl) $$ Hau
+  ispecialize Hau $$ %V.rti
+  ihave Hau := (show chdirAuPre (hlc := hlc) (fsGammaL fscFs) fscFs V.rti (uvisOf V M sts gn cs pid).cwd P
+      Pmiss Fo ⊢ chdirAuPre (fsGammaL fscFs) fscFs V.rti V.cwi P Pmiss Fo from .rfl) $$ Hau
   ihave #Hpe := syscallEnv_panic PT Γ γ $$ Henv
   ihave #Hrdy := syscallEnv_fsReady PT Γ γ $$ Henv
   icases (show irefSlots (GF := GF) IREFSPARE ⊢ irefSlots 2 ∗ irefSlots 2 from
@@ -341,7 +340,7 @@ theorem syscall_arm_chdir (SC : SYSCHDIR) (hdep : SyscDepChdir (hlc := hlc) (GF 
   iintro %c %_
   unfold sysChdirK
   iintro %spie2 %spp2 %R2 %P' %k' %hcs %hext %hk' Hk Hpc Hte Hce Hbs Hir2 Harms
-  icases chdirArms_split (hlc := hlc) (fsGammaL fscFs) fscFs γ (procAddr j) pid V.cwi P Pmiss Fo
+  icases chdirArms_split (hlc := hlc) (fsGammaL fscFs) fscFs γ (procAddr j) pid V.rti V.cwi P Pmiss Fo
     { V.updEv k' with upt := P' } (viewFaulted V.upt P' M) (R2 10#5) rfl $$ Harms with
     ⟨%V1, %hdisj, Hpriv, Hrc⟩
   ihave Hir := (show irefSlots (GF := GF) 2 ∗ irefSlots 2 ⊢ irefSlots IREFSPARE from
@@ -380,6 +379,7 @@ theorem syscall_arm_chdir (SC : SYSCHDIR) (hdep : SyscDepChdir (hlc := hlc) (GF 
   isplitl [Hout Hrc]
   · iapply (syscSysOut_at f V M sts gn cs pid _ _ _ _ _ 9 hn9 (by decide) (by decide))
     rw [ha0]
+    ispecialize Hout $$ %V.rti
     iapply Hout
     rw [show (uvisOf V M sts gn cs pid).cwd = V.cwi from rfl]
     iexact Hrc
@@ -416,7 +416,7 @@ theorem syscall_arm_unlink (SU : SYSUNLINK) (hdep : SyscDepUnlink (hlc := hlc) (
   rw [show (uvisOf V M sts gn cs pid).cwd = V.cwi from rfl,
     show (uvisOf V M sts gn cs pid).tf = V.tf from rfl,
     show (uvisOf V M sts gn cs pid).M = umemLazy V.upt V.sz.toNat M from rfl]
-  ihave Hau := Hau $$ %(viewLazy V.upt V.sz M) %(syscPath_imgLazy V.upt V.sz M)
+  ihave Hau := Hau $$ %(viewLazy V.upt V.sz M) %(syscPath_imgLazy V.upt V.sz M) %V.rti
   ihave #Hpe := syscallEnv_panic PT Γ γ $$ Henv
   ihave #Hrdy := syscallEnv_fsReady PT Γ γ $$ Henv
   icases (show irefSlots (GF := GF) IREFSPARE ⊢ irefSlots sysUnlinkSlots ∗ irefSlots 2 from
@@ -463,7 +463,7 @@ theorem syscall_arm_unlink (SU : SYSUNLINK) (hdep : SyscDepUnlink (hlc := hlc) (
   isplitl [Hout Harms]
   · iapply (syscSysOut_at f V M sts gn cs pid _ _ _ _ _ 18 hn (by decide) (by decide))
     rw [ha0]
-    iapply Hout $$ %(viewLazy V.upt V.sz M) %_ %_ %_ %_ %_ %(syscPath_imgLazy V.upt V.sz M)
+    iapply Hout $$ %(viewLazy V.upt V.sz M) %V.rti %_ %_ %_ %_ %_ %(syscPath_imgLazy V.upt V.sz M)
     iexact Harms
   isplitr
   · iapply syscForkOut_ne; rw [hn]; decide
@@ -576,7 +576,7 @@ theorem syscall_arm_mkdir (SM : SYSMKDIR) (hdep : SyscDepMkdir (hlc := hlc) (GF 
   rw [show (uvisOf V M sts gn cs pid).cwd = V.cwi from rfl,
     show (uvisOf V M sts gn cs pid).tf = V.tf from rfl,
     show (uvisOf V M sts gn cs pid).M = umemLazy V.upt V.sz.toNat M from rfl]
-  ihave Hau := Hau $$ %(viewLazy V.upt V.sz M) %(syscPath_imgLazy V.upt V.sz M)
+  ihave Hau := Hau $$ %(viewLazy V.upt V.sz M) %(syscPath_imgLazy V.upt V.sz M) %V.rti
   ihave #Hpe := syscallEnv_panic PT Γ γ $$ Henv
   ihave #Hrdy := syscallEnv_fsReady PT Γ γ $$ Henv
   have hC := SM.wp_sys_mkdir_eb (hlc := hlc) (GF := GF) Γ cpu
@@ -618,7 +618,7 @@ theorem syscall_arm_mkdir (SM : SYSMKDIR) (hdep : SyscDepMkdir (hlc := hlc) (GF 
   isplitl [Hout Harms]
   · iapply (syscSysOut_at f V M sts gn cs pid _ _ _ _ _ 20 hn (by decide) (by decide))
     rw [ha0]
-    iapply Hout $$ %(viewLazy V.upt V.sz M) %_ %_ %_ %_ %_ %(syscPath_imgLazy V.upt V.sz M)
+    iapply Hout $$ %(viewLazy V.upt V.sz M) %V.rti %_ %_ %_ %_ %_ %(syscPath_imgLazy V.upt V.sz M)
     iexact Harms
   isplitr
   · iapply syscForkOut_ne; rw [hn]; decide
@@ -653,7 +653,7 @@ theorem syscall_arm_mknod (SN : SYSMKNOD) (hdep : SyscDepMknod (hlc := hlc) (GF 
   rw [show (uvisOf V M sts gn cs pid).cwd = V.cwi from rfl,
     show (uvisOf V M sts gn cs pid).tf = V.tf from rfl,
     show (uvisOf V M sts gn cs pid).M = umemLazy V.upt V.sz.toNat M from rfl]
-  ihave Hau := Hau $$ %(viewLazy V.upt V.sz M) %(syscPath_imgLazy V.upt V.sz M)
+  ihave Hau := Hau $$ %(viewLazy V.upt V.sz M) %(syscPath_imgLazy V.upt V.sz M) %V.rti
   ihave #Hpe := syscallEnv_panic PT Γ γ $$ Henv
   ihave #Hrdy := syscallEnv_fsReady PT Γ γ $$ Henv
   have hC := SN.wp_sys_mknod_eb (hlc := hlc) (GF := GF) Γ cpu
@@ -697,7 +697,7 @@ theorem syscall_arm_mknod (SN : SYSMKNOD) (hdep : SyscDepMknod (hlc := hlc) (GF 
   isplitl [Hout Harms]
   · iapply (syscSysOut_at f V M sts gn cs pid _ _ _ _ _ 17 hn (by decide) (by decide))
     rw [ha0]
-    iapply Hout $$ %(viewLazy V.upt V.sz M) %_ %_ %_ %_ %_ %(syscPath_imgLazy V.upt V.sz M)
+    iapply Hout $$ %(viewLazy V.upt V.sz M) %V.rti %_ %_ %_ %_ %_ %(syscPath_imgLazy V.upt V.sz M)
     iexact Harms
   isplitr
   · iapply syscForkOut_ne; rw [hn]; decide
@@ -810,7 +810,7 @@ theorem syscall_arm_open (SO : SYSOPEN) (hdep : SyscDepOpen (hlc := hlc) (GF := 
     show (uvisOf V M sts gn cs pid).tf = V.tf from rfl,
     show (uvisOf V M sts gn cs pid).fd = sts from rfl,
     show (uvisOf V M sts gn cs pid).M = umemLazy V.upt V.sz.toNat M from rfl]
-  ihave Hau := Hau $$ %(viewLazy V.upt V.sz M) %(syscPath_imgLazy V.upt V.sz M)
+  ihave Hau := Hau $$ %(viewLazy V.upt V.sz M) %(syscPath_imgLazy V.upt V.sz M) %V.rti
   ihave #Hpe := syscallEnv_panic PT Γ γ $$ Henv
   ihave #Hrdy := syscallEnv_fsReady PT Γ γ $$ Henv
   icases syscallEnv_ftable PT Γ γ $$ Henv with ⟨%γl, #Hft⟩
@@ -833,7 +833,7 @@ theorem syscall_arm_open (SO : SYSOPEN) (hdep : SyscDepOpen (hlc := hlc) (GF := 
   iintro %c %_
   unfold sysOpenK
   iintro %spie2 %spp2 %R2 %P' %k' %hcs %hext %hk' Hk Hpc Hte Hce Hbs Hir Harms
-  icases openArms_split (hlc := hlc) omo (fsGammaL fscFs) fscFs V.cwi γ (procAddr j) pid
+  icases openArms_split (hlc := hlc) omo (fsGammaL fscFs) fscFs V.rti V.cwi γ (procAddr j) pid
     (viewLazy V.upt V.sz M) (tfW V.tf (tfArgIdx 0)).toNat (tfW V.tf (tfArgIdx 1)) P Pmiss Farm Fun
     Fok Fex Fo Ft sts { V.updEv k' with upt := P' } (viewFaulted V.upt P' M) (R2 10#5) $$ Harms with
     ⟨%V1, %sts', %hrow, Hpriv, Hfr, Hfd1, Hrc⟩
@@ -873,7 +873,7 @@ theorem syscall_arm_open (SO : SYSOPEN) (hdep : SyscDepOpen (hlc := hlc) (GF := 
   isplitl [Hout Hrc]
   · iapply (syscSysOut_at f V M sts gn cs pid _ _ _ _ _ 15 hn (by decide) (by decide))
     rw [ha0]
-    iapply Hout $$ %(viewLazy V.upt V.sz M) %_ %_ %_ %_ %_ %(syscPath_imgLazy V.upt V.sz M)
+    iapply Hout $$ %(viewLazy V.upt V.sz M) %V.rti %_ %_ %_ %_ %_ %(syscPath_imgLazy V.upt V.sz M)
     iexact Hrc
   isplitr
   · iapply syscForkOut_ne; rw [hn]; decide

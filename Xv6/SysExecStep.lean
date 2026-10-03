@@ -39,7 +39,7 @@ THEOREM, the frozen `sysExecStepBody`).
    1-3): the callees' complement is carried by the `SysExecStepCalls`
    wrappers.
 2. fetchaddr and fetchstr both take the bare block at the round's
-   descriptor (`sysfile_blk_bare`; fetchaddr's ambient `procPrivExt` form
+   descriptor (`sysfile_blk_bare_ev`; fetchaddr's ambient `procPrivExt` form
    by `EitherDefs.procPrivExt_conv`): Rocq hands fetchaddr the whole
    `proc_priv γf … (us_upt U P)` and fetchstr `proc_priv_core`.  PROCESS LAYER (flagged, as `SysExecParts` deviation 4):
    the block is `procPrivFd` at `sysExecV2 A P` / `sysExecM2 A P`.
@@ -59,13 +59,11 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
-theorem sys_exec_br_fetchaddr : KA.«sys_exec» + 0xffffffffffffd3c6#64 = KA.«fetchaddr» := by decide
-theorem sys_exec_br_kalloc : KA.«sys_exec» + 0xffffffffffffb6ae#64 = KA.«kalloc» := by decide
-theorem sys_exec_br_fetchstr : KA.«sys_exec» + 0xffffffffffffd410#64 = KA.«fetchstr» := by decide
+theorem sys_exec_br_fetchaddr : KA.«sys_exec» + 0xffffffffffffd2e6#64 = KA.«fetchaddr» := by decide
+theorem sys_exec_br_kalloc : KA.«sys_exec» + 0xffffffffffffb5ba#64 = KA.«kalloc» := by decide
+theorem sys_exec_br_fetchstr : KA.«sys_exec» + 0xffffffffffffd330#64 = KA.«fetchstr» := by decide
 theorem sys_exec_ret_66 : jumpPc (KA.«sys_exec» + 0x66#64) = KA.«sys_exec» + 0x66#64 := by decide
 theorem sys_exec_ret_74 : jumpPc (KA.«sys_exec» + 0x74#64) = KA.«sys_exec» + 0x74#64 := by decide
 theorem sys_exec_ret_86 : jumpPc (KA.«sys_exec» + 0x86#64) = KA.«sys_exec» + 0x86#64 := by decide
@@ -167,7 +165,7 @@ theorem sys_exec_step_str (FS : FETCHSTR) (Γ : SchedNames) (k : KCtx) (A : SysE
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [a8]
   iintro Hk Hpc H60
   -- +0x82  jal fetchstr
-  k_step_e (wp_s_jal cpu _ (KA.«sys_exec» + 0x82#64) false 2085774#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_exec» + 0x82#64) false 2085550#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_exec_br_fetchstr]
   iintro Hk Hpc
   ihave #Hrdy := sysExecEnv_ready Γ A $$ Henv
@@ -326,7 +324,7 @@ theorem sys_exec_step_kalloc (KL : KALLOC) (FS : FETCHSTR) (Γ : SchedNames) (k 
   simp only [sysExecAddr]
   ihave #Hrdy := sysExecEnv_ready Γ A $$ Henv
   -- +0x70  jal kalloc
-  k_step_e (wp_s_jal cpu _ (KA.«sys_exec» + 0x70#64) false 2078270#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_exec» + 0x70#64) false 2078026#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_exec_br_kalloc]
   iintro Hk Hpc
   -- the block's counter, lent to kalloc (permit sweep L3b): the event costs
@@ -444,7 +442,7 @@ theorem sys_exec_step (FA : FETCHADDR) (KL : KALLOC) (FS : FETCHSTR) (Γ : Sched
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x62  jal fetchaddr
-  k_step_e (wp_s_jal cpu _ (KA.«sys_exec» + 0x62#64) false 2085732#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_exec» + 0x62#64) false 2085508#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_exec_br_fetchaddr]
   iintro Hk Hpc
   icases sysfile_blk_bare_ev A.γ (procAddr A.j) A.pid (sysExecV2 A P kv) (sysExecM2 A P) $$ Hblk

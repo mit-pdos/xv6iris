@@ -89,10 +89,8 @@ own proc word under `<wait_lock>`.  `KWAIT` carries the led field
 
 1. Rocq states one contract (`wp_kwait_sconf_body`, at `eb = true`) and so
    one led twin (`wp_kwait_led_sconf_body`, `Parameter wp_kwait_led_sconf`);
-   Lean states the eb-generic field and its interrupts-off corollary, so
-   both get a led twin: the FIELD `wp_kwait_led_eb` (Rocq's `Parameter`) and
-   the derived `KWAIT.wp_kwait_led`, exactly as `wp_kwait_eb` /
-   `KWAIT.wp_kwait`.
+   Lean states the eb-generic field, so the led twin is the FIELD
+   `wp_kwait_led_eb` (Rocq's `Parameter`), exactly as `wp_kwait_eb`.
 2. The actor is `procAddr j` (Rocq `pj := proc_addr j`, the `cpu_own` proc
    word; here `k.proc = procAddr j` by `hproc`), the address the caller's
    children row is stated at.
@@ -216,7 +214,7 @@ def wp_kwait_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
 /-- THE LED TWIN of `wp_kwait_body` (Rocq `wp_kwait_led_sconf_body`, design
 ni-zombie-ledger.md D4): verbatim, with the answer at `waitAnsLed … (procAddr
 j)` -- the reaping arm also hands back the zombie ledger's receipt of
-`ZReap (procAddr j) rv`.  Derived from `wp_kwait_led_eb` (`KWAIT.wp_kwait_led`). -/
+`ZReap (procAddr j) rv`. -/
 def wp_kwait_led_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
@@ -305,49 +303,5 @@ structure KWAIT : Prop where
     (V : ProcPriv) (M : Nat → List (BitVec 8)) (cs : ExtTreeSet GName compare) hj hproc hK hnoff htier,
     wp_kwait_led_eb_body (hlc := hlc) (GF := GF) Γ cpu k γw γp γl γk γ j pid V M cs
       hj hproc hK hnoff htier
-
-/-- The interrupts-off instance of `wp_kwait_eb` (the complement is the whole
-bundle): the contract every not-yet-generalized caller states. -/
-theorem KWAIT.wp_kwait (A : KWAIT) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
-    [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
-    [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-    [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx] (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (cpu : CPU) (k : KCtx) (γw γp γl : GName) (γk : KmemNames) (γ : FileNames) (j : Nat) (pid : BitVec 32)
-    (V : ProcPriv) (M : Nat → List (BitVec 8)) (cs : ExtTreeSet GName compare) hj hproc hK hsie hnoff hlocks htier :
-    wp_kwait_body (hlc := hlc) (GF := GF) Γ cpu k γw γp γl γk γ j pid V M cs
-      hj hproc hK hsie hnoff hlocks htier := by
-  have h := A.wp_kwait_eb (hlc := hlc) (GF := GF) Γ cpu k γw γp γl γk γ j pid V M cs hj hproc hK hnoff htier
-  unfold wp_kwait_eb_body at h
-  unfold wp_kwait_body
-  rw [hsie] at h
-  simp only [trapCsrsExt_false, cpuClaimExt_false] at h
-  iintro ⟨H0, H1, H2, Htc, Hcl, Hir, H6, H7, H8, H9, H10, H11, H12, Hnext⟩
-  iapply h
-  iframe H0 H1 H2 Htc Hcl Hir H6 H7 H8 H9 H10 H11 H12
-  iapply wpNext_mono $$ Hnext
-  iintro %cpu' HK %spie %spp %R' %P' %rv %xw %d %cs' %k' %p0 Ha Hc H1 H2 ⟨Htc, Hir⟩ Hcl %hk' H6
-  iapply HK $$ %spie %spp %R' %P' %rv %xw %d %cs' %k' %p0 Ha Hc H1 H2 Htc Hcl Hir %hk' H6
-
-/-- The interrupts-off instance of `wp_kwait_led_eb` (the led twin of
-`KWAIT.wp_kwait`, the same derivation). -/
-theorem KWAIT.wp_kwait_led (A : KWAIT) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
-    [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
-    [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-    [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx] (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (cpu : CPU) (k : KCtx) (γw γp γl : GName) (γk : KmemNames) (γ : FileNames) (j : Nat) (pid : BitVec 32)
-    (V : ProcPriv) (M : Nat → List (BitVec 8)) (cs : ExtTreeSet GName compare) hj hproc hK hsie hnoff hlocks htier :
-    wp_kwait_led_body (hlc := hlc) (GF := GF) Γ cpu k γw γp γl γk γ j pid V M cs
-      hj hproc hK hsie hnoff hlocks htier := by
-  have h := A.wp_kwait_led_eb (hlc := hlc) (GF := GF) Γ cpu k γw γp γl γk γ j pid V M cs hj hproc hK hnoff htier
-  unfold wp_kwait_led_eb_body at h
-  unfold wp_kwait_led_body
-  rw [hsie] at h
-  simp only [trapCsrsExt_false, cpuClaimExt_false] at h
-  iintro ⟨H0, H1, H2, Htc, Hcl, Hir, H6, H7, H8, H9, H10, H11, H12, Hnext⟩
-  iapply h
-  iframe H0 H1 H2 Htc Hcl Hir H6 H7 H8 H9 H10 H11 H12
-  iapply wpNext_mono $$ Hnext
-  iintro %cpu' HK %spie %spp %R' %P' %rv %xw %d %cs' %k' %p0 Ha Hc H1 H2 ⟨Htc, Hir⟩ Hcl %hk' H6
-  iapply HK $$ %spie %spp %R' %P' %rv %xw %d %cs' %k' %p0 Ha Hc H1 H2 Htc Hcl Hir %hk' H6
 
 end Xv6

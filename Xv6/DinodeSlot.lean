@@ -45,8 +45,8 @@ Five groups, as in Rocq:
    `BitVec.signExtend 64 imm`, `BitVec.extractLsb' 0 32 x` for the `*W`
    instructions, `>>>`, `<<<`, `&&&` -- and `MachCSL.bcond` for a branch.
    So each Rocq lemma is ported at the same CONTENT in that vocabulary;
-   the `dsSrliw4` / `dsSrli4` pair keeps Rocq's warning that the `srliw`
-   reading truncates to 32 bits first and the `srli` one does not.
+   `dsSrliw4` keeps Rocq's warning that the `srliw` reading truncates to
+   32 bits first (the `srli` one does not).
    (`srliw`'s rule is `MachCSL.wp_s_srliw`, `slliw`'s shape with `>>>`
    for `<<<`; `dsSrliw4` is stated in its output form.)
 2. **`pa_add a n` IS `a + BitVec.ofNat 64 n`**, so Rocq's
@@ -58,7 +58,7 @@ Five groups, as in Rocq:
    `dislot_split` re-anchors a `seq`-indexed window five times.  Here the
    window IS `Xv6.dinodeBytes d`, the split is five
    `MachCSL.byteBuf_append`s, and the six pointwise hypotheses vanish --
-   so `dislotAcc` takes the record and nothing else, and Rocq's
+   so the record is all the split needs, and Rocq's
    `bb_reanchor` / `bb2_cell` / `bb4_cell` / `bb_ext` bookkeeping is gone.
 4. **THE TWO-BYTE CELL BRIDGE** (`wordPointsTo_of_bytes2`,
    `wordPointsTo_to_bytes2`, `halfBytes`) lives in `MachCSL/ByteWord2.lean`,
@@ -92,7 +92,6 @@ Five groups, as in Rocq:
 import Xv6.InodeInv
 import Xv6.BcacheInv
 import Xv6.FsBytesMint
-import Xv6.ByteCursor
 import Xv6.FsWords
 import Xv6.StepLemmas
 
@@ -100,8 +99,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
 open LeanRV64D
-
-set_option linter.unusedSectionVars false
 
 /-! # (1) The arithmetic -/
 
@@ -123,18 +120,6 @@ theorem dsSrliw4 (w : BitVec 32) :
   have hsh : (w >>> 4).toNat = w.toNat / 16 := by
     rw [BitVec.toNat_ushiftRight, Nat.shiftRight_eq_div_pow]
   rw [dsSext_small (w >>> 4) (by rw [hsh]; have := w.isLt; omega), hsh]
-
-/-- `srli a1,s2,4` -- the 64-bit divide by `IPB`.  `dsSrliw4` is the
-`srliw` twin and does NOT apply: it truncates to 32 bits first (Rocq's
-`ds_srli4`). -/
-theorem dsSrli4 (w : BitVec 32) (h : w.toNat < 2 ^ 31) :
-    (BitVec.signExtend 64 w : BitVec 64) >>> 4 = BitVec.ofNat 64 (w.toNat / 16) := by
-  rw [dsSext_small w h]
-  apply BitVec.eq_of_toNat_eq
-  rw [BitVec.toNat_ushiftRight, Nat.shiftRight_eq_div_pow, BitVec.toNat_ofNat,
-    BitVec.toNat_ofNat]
-  have := w.isLt
-  omega
 
 /-- `addw a1,a1,a5`: `IBLOCK`, in 32 bits, with no wrap (Rocq's
 `iu_addw_ibl`). -/
@@ -237,30 +222,11 @@ theorem dsDataAddr (p : BitVec 64) : p + BitVec.signExtend 64 88#12 = aBufData p
   unfold aBufData bOffData
   congr 1
 
-/-- A small non-negative displacement off a base (Rocq's `iu_disp`). -/
-theorem dsDisp (p : BitVec 64) (d : Nat) (h : d < 2048) :
-    p + BitVec.signExtend 64 (BitVec.ofNat 12 d) = p + BitVec.ofNat 64 d := by
-  congr 1
-  have hm : (BitVec.ofNat 12 d).msb = false := by
-    rw [BitVec.msb_eq_decide]
-    simp only [BitVec.toNat_ofNat]
-    simp
-    omega
-  rw [BitVec.signExtend_eq_setWidth_of_msb_false hm]
-  apply BitVec.eq_of_toNat_eq
-  rw [BitVec.toNat_setWidth, BitVec.toNat_ofNat, BitVec.toNat_ofNat]
-  omega
-
 /-- Rocq's `iu_off0`. -/
 theorem dsOff0 (p : BitVec 64) : p + BitVec.signExtend 64 0#12 = p := by
   have h : BitVec.signExtend 64 0#12 = 0#64 := by decide
   rw [h]
   exact BitVec.add_zero p
-
-/-- `addi a1,s1,80`: the base of `ip->addrs` (Rocq's `iu_addrs0`). -/
-theorem dsAddrs0 (ip : BitVec 64) : ip + BitVec.signExtend 64 80#12 = iAddr ip 0 := by
-  unfold iAddr
-  congr 1
 
 /-- ALIGNMENT of the five field cells, from the bcache's geometry (Rocq's
 `iu_align`).  The slot's base is `bcache + 24 + 1112*k + 88 + 64*q`, and 8
@@ -270,7 +236,7 @@ theorem dsAlign (k q off dv : Nat) (hk : k < NBUF) (hq : q < 16) (hoff : off < 6
     (hdv : dv = 2 ∨ dv = 4) (hm : off % dv = 0) :
     (aBufData (bnode k) + BitVec.ofNat 64 (64 * q + off)).toNat % dv = 0 := by
   rw [bufData_toNat k (64 * q + off) hk (by unfold BSIZE; omega)]
-  have hbc : KernelSyms.«bcache» = 0x800184a8 := rfl
+  have hbc : KernelSyms.«bcache» = 0x80018748 := rfl
   rw [hbc]
   rcases hdv with rfl | rfl <;> omega
 
@@ -399,20 +365,6 @@ theorem dislot_bytes [CurCtx] (a : BitVec 64) (d : Dinode) (hal : dislotAlign a)
     BiEntails.to_eq (byteBuf_half (a + BitVec.ofNat 64 6) (DFrac.own 1) d.diNlink h6),
     BiEntails.to_eq (byteBuf_word4 (a + BitVec.ofNat 64 8) (DFrac.own 1) d.diSize h8)]
   exact .rfl
-
-/-- The accessor form Rocq states (`dislot_acc_gen`): out at `d`, back at
-any `d'` -- which is the whole of what the four `sh`s, the `sw` and the
-`memmove` do to the buffer. -/
-theorem dislotAcc [CurCtx] (a : BitVec 64) (d : Dinode) (hal : dislotAlign a) :
-    byteBuf (GF := GF) a (DFrac.own 1) (dinodeBytes d) ⊢
-      iprop(dislot a d ∗
-        (∀ d' : Dinode, dislot a d' -∗ byteBuf a (DFrac.own 1) (dinodeBytes d'))) := by
-  rw [BiEntails.to_eq (dislot_bytes a d hal)]
-  iintro H
-  iframe H
-  iintro %d' H'
-  rw [BiEntails.to_eq (dislot_bytes a d' hal)]
-  iexact H'
 
 /-- Giving slot `k` back at its own record leaves the block as it was
 (shared by `ilock` and `ialloc`). -/

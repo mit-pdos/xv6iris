@@ -58,13 +58,9 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## Pure helpers -/
-
-theorem sys_unlink_li128 : BitVec.signExtend 64 128#12 = 128#64 := by decide
 
 /-- the entry context, the frame's `withSpie` at the entry's own bits -/
 theorem sys_unlink_ctx_entry {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
@@ -312,7 +308,7 @@ theorem sys_unlink_w1_walk (BO : BEGIN_OP) (NP : NPAR_WRAP_ERA) (EO : END_OP) (�
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hp1.2.1, sys_unlink_bufpath]
   iintro Hk Hpc
   -- +0x28  jal nameiparent
-  k_step_e (wp_s_jal cpu _ (KA.«sys_unlink» + 0x28#64) false 2091754#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_unlink» + 0x28#64) false 2091730#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_unlink_br_nameiparent]
   iintro Hk Hpc
   icases sys_unlink_name_open (k.regs 2#5) $$ Hnm with ⟨%nfun, %tl, %htl, Hnm, Htl⟩
@@ -373,7 +369,7 @@ theorem sys_unlink_w1_walk (BO : BEGIN_OP) (NP : NPAR_WRAP_ERA) (EO : END_OP) (�
         bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, Xv6.dirlookup_beqz, decide_true]
     iintro Hk Hpc
-    ihave Harms := unlinkArms_npdead (hlc := hlc) (fsGammaL fscFs) fscFs A.V.cwi (viewLazy A.V.upt A.V.sz A.M)
+    ihave Harms := unlinkArms_npdead (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti A.V.cwi (viewLazy A.V.upt A.V.sz A.M)
       A.v0.toNat A.P A.Pmiss
       A.Fent A.Ftgt A.Fex A.Fmiss (bview plen pfun) $$ [$Hdead $Hcent $Hctgt $Hcex $Hcmiss]
     ihave Hop := logOpS_op icfgLog n' Sb' $$ Hop Htx
@@ -413,7 +409,6 @@ theorem sys_unlink_w1_walk (BO : BEGIN_OP) (NP : NPAR_WRAP_ERA) (EO : END_OP) (�
       · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact h10
       · revert hlo; unfold walkSpend MAXOPBLOCKS; cases w <;> simp <;> omega
     · unfold sysUnlinkCells; iframe
-
 
 /-! ## W1, the entry: the prologue and argstr -/
 
@@ -457,7 +452,7 @@ theorem sys_unlink_w1_args (AS : ARGSTR_W) (BO : BEGIN_OP) (NP : NPAR_WRAP_ERA) 
   k_step_e (wp_s_addi cpu _ (KA.«sys_unlink» + 0x10#64) true 0#12 10#5 0#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_jal cpu _ (KA.«sys_unlink» + 0x12#64) false 2087030#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_unlink» + 0x12#64) false 2086934#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_unlink_br_argstr]
   iintro Hk Hpc
   icases (procPrivFd_split _ _ _ _ _).1 $$ Hblk with ⟨Hcore, Howe⟩
@@ -521,7 +516,7 @@ theorem sys_unlink_w1_args (AS : ARGSTR_W) (BO : BEGIN_OP) (NP : NPAR_WRAP_ERA) 
         bop.BLT)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hr, MachCSL.bltz_m1]
     iintro Hk Hpc
-    ihave Harms := unlinkArms_whole (hlc := hlc) (fsGammaL fscFs) fscFs A.V.cwi (viewLazy A.V.upt A.V.sz A.M)
+    ihave Harms := unlinkArms_whole (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti A.V.cwi (viewLazy A.V.upt A.V.sz A.M)
       A.v0.toNat A.P A.Pmiss A.Fent
       A.Ftgt A.Fex A.Fmiss $$ Hau
     ihave Hout : sysUnlinkOut (A.raise kv) 0xFFFFFFFFFFFFFFFF#64 $$ [Hbs Hir Hcore Howe Harms]

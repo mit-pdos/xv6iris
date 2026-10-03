@@ -46,6 +46,7 @@ import Xv6.SysLinkCalls
 import Xv6.IregLinkNz
 import Xv6.FsAbsLinkFire
 import Xv6.SysLinkParts
+import Xv6.SysUnlinkCalls
 
 namespace Xv6
 
@@ -54,9 +55,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## Context bookkeeping -/
 
@@ -181,7 +180,7 @@ theorem sys_link_tail_c (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames) [Clai
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hpins.2.2.1]
   iintro Hk Hpc
   -- +0xc8  jal iunlockput
-  k_step_e (wp_s_jal cpu _ (KA.«sys_link» + 0xc8#64) false 2090268#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_link» + 0xc8#64) false 2090172#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_link_br_iunlockput]
   iintro Hk Hpc
   iapply (sys_link_iunlockput_sconf IUP Γ cpu _ k.sie (by k_norm_g) k.proc (by k_norm_g) A.j γil γisl
@@ -248,7 +247,7 @@ theorem sys_link_tail_c (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames) [Clai
 set_option maxHeartbeats 16000000 in
 /-- **ARM D** (+0xd6): `ip->nlink == NLINK_MAX` -- ARM C's six instructions
 at a shifted address (the arm the kernel gained in 117c0e7, whose
-FALL-THROUGH makes `wp_iupdate_link`'s `≠ 32767` premise suppliable). -/
+FALL-THROUGH makes `wp_iupdate_link_eb`'s `≠ 32767` premise suppliable). -/
 theorem sys_link_tail_d (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (A : SysLinkArgs GF) (P2 : UPtd) (spie spp : Bool) (R : RegMap)
     (w₄ : BitVec 64) (kk : Nat) (q : Qp) (g : GName) (lo tl : Nat) (γil γisl : GName)
@@ -278,7 +277,7 @@ theorem sys_link_tail_d (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames) [Clai
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hpins.2.2.1]
   iintro Hk Hpc
   -- +0xc8  jal iunlockput
-  k_step_e (wp_s_jal cpu _ (KA.«sys_link» + 0xd8#64) false 2090252#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_link» + 0xd8#64) false 2090156#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_link_br_iunlockput]
   iintro Hk Hpc
   iapply (sys_link_iunlockput_sconf IUP Γ cpu _ k.sie (by k_norm_g) k.proc (by k_norm_g) A.j γil γisl
@@ -360,7 +359,7 @@ under the generation the caller's `ityShot` names (so the record it hands
 back is pinned NOT a directory), read the count's positivity off the
 walk's own link token (`iregInv_tok_nz`), `ip->nlink--` + `iupdate(ip)`
 spending that token, THE UNDO FIRES (`ufUtgt_fire`, unlink's target fire,
-`deltaLinkUntgt` = `deltaUnlTgt`), `iunlockput(ip)`, `end_op`, `a5 = -1`,
+at `deltaUnlTgt`), `iunlockput(ip)`, `end_op`, `a5 = -1`,
 both reloads, and the join point with the do-then-undo pair
 (`linkArms_undone`). -/
 theorem sys_link_tail_bad (IL : ILOCK) (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : END_OP)
@@ -399,7 +398,7 @@ theorem sys_link_tail_bad (IL : ILOCK) (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : E
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hpins.2.2.1]
   iintro Hk Hpc
   -- +0xf6  jal ilock
-  k_step_e (wp_s_jal cpu _ (KA.«sys_link» + 0xf6#64) false 2089626#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_link» + 0xf6#64) false 2089530#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_link_br_ilock]
   iintro Hk Hpc
   iapply (sys_link_ilock IL Γ cpu _ k.sie (by k_norm_g) k.proc (by k_norm_g) A.j γil γisl kk q.half
@@ -486,7 +485,7 @@ theorem sys_link_tail_bad (IL : ILOCK) (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : E
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hp1.2.2.1]
   iintro Hk Hpc
   -- +0x106  jal iupdate
-  k_step_e (wp_s_jal cpu _ (KA.«sys_link» + 0x106#64) false 2089430#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_link» + 0x106#64) false 2089334#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_link_br_iupdate]
   iintro Hk Hpc
   ihave Htok := (show FsStateLink.linkTok (GF := GF) (fsGammaL fscFs) (inum.toNat : Int) uty ⊢
@@ -542,7 +541,7 @@ theorem sys_link_tail_bad (IL : ILOCK) (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : E
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hp2.2.2.1]
   iintro Hk Hpc
   -- +0x10c  jal iunlockput
-  k_step_e (wp_s_jal cpu _ (KA.«sys_link» + 0x10c#64) false 2090200#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_link» + 0x10c#64) false 2090104#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_link_br_iunlockput]
   iintro Hk Hpc
   ihave Hbs := bslots_cons 2 $$ [$Hb1 $Hb2]
@@ -656,7 +655,7 @@ theorem sys_link_tail_e2 (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := h
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hpins.2.2.2.1]
   iintro Hk Hpc
   -- +0xe8  jal iunlockput
-  k_step_e (wp_s_jal cpu _ (KA.«sys_link» + 0xe8#64) false 2090236#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_link» + 0xe8#64) false 2090140#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_link_br_iunlockput]
   iintro Hk Hpc
   iapply (sys_link_iunlockput_gen IUP Γ cpu _ k.sie (by k_norm_g) k.proc (by k_norm_g) A.j γil γisl
@@ -716,7 +715,7 @@ theorem sys_link_tail_f (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := hl
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hpins.2.2.2.1]
   iintro Hk Hpc
   -- +0xe8  jal iunlockput
-  k_step_e (wp_s_jal cpu _ (KA.«sys_link» + 0xf0#64) false 2090228#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_link» + 0xf0#64) false 2090132#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_link_br_iunlockput]
   iintro Hk Hpc
   iapply (sys_link_iunlockput_gen IUP Γ cpu _ k.sie (by k_norm_g) k.proc (by k_norm_g) A.j γil γisl

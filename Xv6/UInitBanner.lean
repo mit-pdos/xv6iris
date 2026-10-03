@@ -59,15 +59,12 @@ PORTED THOUGH THE WALK MARKS IT UNREACHED: `kinit_ban_timeless_at`
 -/
 import Xv6.UshPanicByte
 import Xv6.UkWriteClosed
-import Xv6.UkInitDefs
 
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
-
-set_option linter.unusedSectionVars false
 
 /-! ## S1 THE PURE HALF: init's rodata banner IS the era's -/
 

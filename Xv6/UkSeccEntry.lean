@@ -29,9 +29,8 @@ CONE (re-walked on the pinned glob, 4/4 reached): `secc_rows_tab_le`,
    licence in place of the interface record's two slot equations; the
    `…OfWild` forms are derived from it), and
    `secc_univ_of_mint` takes the payer (`useccompMintOfCons`) in place of
-   the two credentials.  `seccLic_of_iface` recovers the premise from an
-   `AppIface` (the landed deviation-4 form); the union discharges it from
-   `useccTok` (`UshURoundSecc.consLicenceAt_of_useccTok`).
+   the two credentials.  The union discharges the premise from `useccTok`
+   (`UshURoundSecc.consLicenceAt_of_useccTok`).
 2. **Two images** (UkTreeEntryStmt deviation 1): the node at the key image
    `M : ElfMem`, the argument reading at the page view `Mv`, `imgAgrees M Mv`
    between them.  `s0 t : Nat`; `mword_of_int (t + 8)` is
@@ -45,7 +44,7 @@ CONE (re-walked on the pinned glob, 4/4 reached): `secc_rows_tab_le`,
 4. **DU3**: `seccomp_code_of_text`/`seccomp_rodata_of_text` are ONE
    `ukCode γt User.Seccomp.code.byte`, read off `utextAll` by
    `UserHeap.utextAll_img` at the code segment's rows (`seccCode_rows`, NEW,
-   `UkTreeEntryEcho.echoCode_rows`' twin at `0xe5c` bytes).
+   `UkTreeEntryEcho.echoCode_rows`' twin at `0xe6c` bytes).
 5. `image_entry_of_at`'s two stages are introduced as in
    `UkTreeEntryEcho`; the argc register fact is `BitVec.ofNat_toNat` (Rocq
    `moi_of_uint`) and its bound `UkArgs.argc_lt` (Rocq `uka_argc`).
@@ -53,23 +52,18 @@ CONE (re-walked on the pinned glob, 4/4 reached): `secc_rows_tab_le`,
    two tables (Rocq's `big_sepL_intro`).
 -/
 import Xv6.ExecEntry
-import Xv6.ElfUser
 import Xv6.UshEchoArgs
 import Xv6.UshSecc
 import Xv6.UexecSeccMint
 import Xv6.UkSeccWdep
-import Xv6.SpecSeccStart
 import Xv6.SeccPrintfLink
 import Xv6.UkSysPHolds
-import Xv6.UEchoKernel
 
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Iris.Std.PartialMap
 open Std (ExtTreeSet)
-
-set_option linter.unusedSectionVars false
 
 /-- NEW (deviation 4): the code-segment readings `utextAll_img` asks for, at
 a key whose page 0 is X-and-not-W. -/
@@ -78,8 +72,8 @@ theorem seccCode_rows (M : ElfMem) (π : Nat → Option UPerm) (hsub : uimgSub U
     ∀ a b, User.Seccomp.code.byte a = some b → M a = some b ∧ uxAddr π a ∧ ¬ uwAddr π a ∧ a < uCap := by
   intro a b hab
   have hv : User.Seccomp.code.vaddr = 0 := rfl
-  have hs : User.Seccomp.code.size = 0xe5c := rfl
-  have ha : a < 0xe5c := by
+  have hs : User.Seccomp.code.size = 0xe6c := rfl
+  have ha : a < 0xe6c := by
     unfold User.USeg.byte at hab
     split at hab
     · omega
@@ -136,14 +130,6 @@ theorem seccUniv_of_mint (sts : List FdState) :
   isplitl []
   · ipureintro; exact hm
   · iapply seccRows_tabLe W.fd sts hle $$ Hr
-
-/-- The licence premise from an application interface whose two slots are
-the machine's (the landed deviation-4 form, `consLicenceAt_of_wild`). -/
-theorem seccLic_of_iface (Ai : AppIface GF)
-    (hw : MachFixedGS.wild (hlc := hlc) (GF := GF) = Ai.wild)
-    (hc : MachFixedGS.consRes (hlc := hlc) (GF := GF) = Ai.cons) :
-    ∀ k, MachFixedGS.wild (hlc := hlc) (GF := GF) k ⊢ consLicenceAt (hlc := hlc) (GF := GF) k :=
-  fun k => consLicenceAt_of_wild Ai k hw hc
 
 end UkSeccRows
 

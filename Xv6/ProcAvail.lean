@@ -30,8 +30,6 @@ namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-- The namespace of the sealed regime's invariant. -/
 def pavN : Namespace := ndot nroot "xv6procavail"
 
@@ -62,7 +60,7 @@ theorem pav_filter_clear (f : Nat → Bool) (j0 : Nat) (l : List Nat) (hnd : l.N
         apply List.filter_congr
         intro j hj
         exact pavClear_ne f a j (fun he => ha (he ▸ hj))
-      simp [List.filter_cons, pavClear_self, hf, hfilt]
+      simp [pavClear_self, hf, hfilt]
     · have hm' : j0 ∈ t := by
         rcases List.mem_cons.mp hm with h | h
         · exact absurd h.symm hea
@@ -257,7 +255,6 @@ theorem procsAvail_seal (Γ : SchedNames) (n : Nat) :
   imodintro
   iexact Hinv
 
-
 /-! ## The boot-era token (Rocq `procs_avail_at` / `pav_boot` / `pav_spent`)
 
 The ledger also carries `pid_lock`'s BOOT-ERA TOKEN (`SlotGen.nextpidPend`)
@@ -302,22 +299,6 @@ theorem procsAvailAt_tok (Γ : SchedNames) (on : Option Nat) (t : Bool) :
 `nextpid`). -/
 def pavSpent (Γ : SchedNames) (on : Option Nat) : IProp GF :=
   iprop(procsAvail Γ on ∗ nextpidShot)
-
-/-- Rocq `pav_of_spent`. -/
-theorem pavOfSpent (Γ : SchedNames) (on : Option Nat) :
-    initReg (GF := GF) ∗ pavSpent Γ on ⊢ procsAvailAt Γ on false := by
-  unfold pavSpent procsAvailAt npidDone
-  cases on <;> simp only [Bool.false_eq_true, ite_false] <;>
-  · iintro ⟨#Hir, Hc, #Hs⟩
-    iframe Hc
-    isplitr
-    · iexact Hs
-    · iexact Hir
-
-/-- The sealed ledger at its (ignored) index. -/
-theorem procsAvailAt_none (Γ : SchedNames) (t : Bool) :
-    procsAvailAt (GF := GF) Γ none t ⊢ procsAvail Γ none ∗ npidDone := by
-  unfold procsAvailAt; exact .rfl
 
 /-- Rocq `procs_avail_seal_spent`: userinit's seal. -/
 theorem procsAvail_seal_spent (Γ : SchedNames) (n : Nat) :

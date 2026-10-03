@@ -20,8 +20,8 @@ The stages: `Xv6/IallocTail.lean` (epilogue, no-inodes arm),
    convention).
 2. `iallocArms`' claim arm carries the receipt as the ONE row
    `Xv6.inodeClaimed` (Rocq packs its three constituents in `ia_cont`,
-   after the epilogue; `inodeClaimed_intro` is `.rfl`, so the pack point
-   moves nothing).
+   after the epilogue; packing them is `.rfl`, so the pack point moves
+   nothing).
 3. Rocq's ProofIalloc restates iupdate's `log_write` call at
    `dn = iallocFresh ty`; this port once did too (`ialloc_log_write`,
    `iallocClaimAu`), and both are now the shared
@@ -33,7 +33,6 @@ The stages: `Xv6/IallocTail.lean` (epilogue, no-inodes arm),
 import Xv6.SpecIget
 import Xv6.SpecIalloc
 import Xv6.FsCallSitesF
-import Xv6.BallocDefs
 
 namespace Xv6
 
@@ -42,9 +41,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## The frame -/
 

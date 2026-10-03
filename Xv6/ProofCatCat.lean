@@ -25,6 +25,7 @@ import Xv6.SpecCatCat
 import Xv6.CatCatDie
 import Xv6.UkRunBr
 import Xv6.UkRunMem
+import Xv6.UkProgAbi
 
 namespace Xv6
 
@@ -32,7 +33,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 

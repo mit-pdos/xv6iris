@@ -3,9 +3,8 @@ Proof of `iput`'s specification (`SpecIput.IPUT`), given the interfaces of
 `acquire` (store-order tier), the hooked `release`, the non-blocking
 `acquiresleep`, the hooked `releasesleep`, `itrunc`, `bread`, `log_write`
 and `brelse`.  A port of Rocq `ProofIput.v`
-(`iris/ProofIput.v`, `wp_iput_gen` 5076--5654, the seal
-`wp_iput_sconf` 5656--5713 -- here `SpecIput.IPUT.wp_iput_sconf`) against
-the Lean image (`KA.«iput»`).
+(`iris/ProofIput.v`, `wp_iput_gen` 5076--5654; the seal `wp_iput_sconf`
+5656--5713 is not ported, nothing uses it) against the Lean image (`KA.«iput»`).
 
     +0x00  prologue (frame6s1: ra/s0/s1)      +0x0a  mv s1,a0
     +0x0c  auipc/addi a0 = &itable            +0x14  jal acquire
@@ -46,7 +45,6 @@ import Xv6.IputTail
 import Xv6.IputOfflock
 import Xv6.IputLocked
 import Xv6.IputEntry
-import Xv6.IdupCore
 
 namespace Xv6
 
@@ -55,9 +53,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## Constants the code computes -/
 
@@ -162,13 +158,13 @@ theorem iput_main (AC : ACQUIRE_LLB) (HN : IputTailNeSpec) (HE : IputEntrySpec)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ha0]
   iintro Hk Hpc
   -- +0x0c auipc a0 ; +0x10 addi a0 ; +0x14 jal acquire
-  k_step_e (wp_s_auipc cpu _ (KA.«iput» + 0xc#64) false 0x1d#20 10#5 (by decide))
+  k_step_e (wp_s_auipc cpu _ (KA.«iput» + 0xc#64) false 0x1e#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_addi cpu _ (KA.«iput» + 0x10#64) false 1724#12 10#5 10#5 (by decide))
+  k_step_e (wp_s_addi cpu _ (KA.«iput» + 0x10#64) false 2376#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [iput_lock]
   iintro Hk Hpc
-  k_step_e (wp_s_jal cpu _ (KA.«iput» + 0x14#64) false 2086788#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«iput» + 0x14#64) false 2086768#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [iput_br_acquire]
   iintro Hk Hpc
   iapply (iput_acquire AC cpu k (maxStamp mst) hwf hnoff hK16 hlk _ ?h10

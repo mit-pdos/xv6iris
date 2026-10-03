@@ -47,16 +47,13 @@ header, in short:
    `kxcB2_sx32_inj` over `kxcSx32`.
 -/
 import Xv6.KexecSeam
-import Xv6.SpecReadi
 
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## PURE ARITHMETIC: the ABI's 32-bit words -/
 
@@ -186,10 +183,6 @@ theorem kxcB2_zext (x : Nat) (h : x < 2 ^ 32) :
 theorem kxcB2_zext' (x : Nat) (h : x < 2 ^ 32) :
     (kxcSx32 x <<< 32) >>> 32 = BitVec.ofNat 64 x := kxcB2_zext x h
 
-/-- `lw` then the ABI word: the loaded low word IS the ABI word of its value. -/
-theorem kxcB2_lw (x : Nat) (h : x < 2 ^ 32) :
-    BitVec.signExtend 64 (BitVec.ofNat 32 x) = kxcSx32 x := rfl
-
 /-! ## THE FRAME WITH SLOTS 63 AND 65 PINNED -/
 
 section Frames
@@ -284,19 +277,6 @@ theorem kxcB2_ph_join [CurCtx] (sp0 w : BitVec 64) :
   iapply BigSepL.bigSepL_singleton.2
   rw [e]
   iexists w; iexact H
-
-/-- **Rocq `kxc_frameBpin_of_B`**. -/
-theorem kxcFrameBp_of_B [CurCtx] (sp0 ra0 s00 s10 s20 pv av : BitVec 64)
-    (w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 : BitVec 64) :
-    kxcFrameB (GF := GF) sp0 ra0 s00 s10 s20 pv av w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ⊢
-      ∃ w63 w65 : BitVec 64,
-        kxcFrameBp sp0 ra0 s00 s10 s20 pv av w5 w6 w7 w8 w9 w10 w11 w12 w13 w63 w65 w67 := by
-  unfold kxcFrameB kxcFrameBp
-  iintro ⟨A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, Au, Ap, A64, ⟨%w65, A65⟩, A66,
-    A67, A68⟩
-  icases kxcB2_slot63_split sp0 $$ Ap with ⟨Ap, ⟨%w63, A63⟩⟩
-  iexists w63, w65
-  iframe
 
 /-- **Rocq `kxc_frameB_of_Bpin`**. -/
 theorem kxcFrameB_of_Bp [CurCtx] (sp0 ra0 s00 s10 s20 pv av : BitVec 64)

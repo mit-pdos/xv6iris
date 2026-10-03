@@ -3,9 +3,10 @@
 sections 3b-6b of Rocq `FsBlocks.v`'s `FsBytes` section: the exception set
 and its seal (`exc_auth`/`exc_own`/`exc_sealed`), the four pure clauses
 (`bytes_dom`, `bytes_tie`, `bytes_tie_exc`, `bytes_exc_val`), the body and
-invariant (`fs_bytes_body`, `fs_bytes_inv`) and the FIVE CROSSINGS that are
-its whole client interface: `fsblock_home{,_open}`, `fs_bytes_agree{,_exc,_q}`,
-`byte_range_log_update`, `fsblock_update` and `fsblock_install_exc`.
+invariant (`fs_bytes_body`, `fs_bytes_inv`) and the crossings that are its
+client interface: `fs_bytes_agree{,_exc,_q}`, `byte_range_log_update` and
+`fsblock_install_exc` (Rocq's `fsblock_home{,_open}` and `fsblock_update` are
+not ported: nothing uses them).
 
 **WHERE THE PARKED CACHE HALVES LIVE.**  The body holds the byte view's
 AUTH and, per home block, the cache element's OTHER half -- the half the
@@ -55,8 +56,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Std MachCSL
 open Iris.Std Iris.Std.PartialMap
-
-set_option linter.unusedSectionVars false
 
 /-! ## The exception set, as a list -/
 
@@ -417,48 +416,6 @@ instance fsBytesInv_persistent (gL gc gX : GName) (homeL : List Nat)
     Persistent (fsBytesInv (GF := GF) gL gc gX homeL Xv) := by
   unfold fsBytesInv; infer_instance
 
-/-! ## Crossing 1: holding the run is being a home block
-
-Rocq's `fsblock_home_open` / `fsblock_q_home_open`, as a fupd at the row
-rather than at the raw auth: what the bitmap's allocator hands its caller
-is the fresh block's byte run, and "`b` is covered and outside the log's
-own storage" -- the two facts `bread` and `log_write` demand of a block
-number -- is a CONSEQUENCE of holding it, not a clause anybody maintains. -/
-
-theorem fsblockQ_home_open (E : CoPset) (gL gc gX : GName) (dq : DFrac)
-    (homeL : List Nat) (Xv : Nat → List (BitVec 8)) (b : Nat) (bs : List (BitVec 8))
-    (hE : (↑logN : CoPset) ⊆ E) :
-    fsBytesInv (GF := GF) gL gc gX homeL Xv -∗ fsblockQ gL dq b bs -∗
-      |={E}=> (⌜b ∈ homeL⌝ ∗ fsblockQ gL dq b bs) := by
-  unfold fsBytesInv fsblockQ
-  iintro #Hinv ⟨%hlb, Hr⟩
-  ihave Hacc := inv_acc (E := E) (N := fsbN) (P := fsBytesBody gL gc gX homeL Xv)
-    (fsbN_sub E hE) $$ Hinv
-  imod Hacc with ⟨Hbody, Hclose⟩
-  unfold fsBytesBody
-  icases Hbody with ⟨%L, %C, %X, >Ha, >HC, >Hxa, >%hok⟩
-  ihave %hsub := byteRangeQ_lookup gL dq L b 0 bs $$ Ha Hr
-  have hb : b ∈ homeL :=
-    bytesDom_home L homeL b 0 bs hok.bdom BSIZE_pos (by rw [hlb]; exact BSIZE_pos) hsub
-  ihave Hcl := Hclose $$ [Ha HC Hxa]
-  case' _ =>
-    inext
-    iexists L, C, X
-    iframe Ha HC Hxa
-    ipureintro; exact hok
-  imod Hcl
-  imodintro
-  iframe Hr
-  ipureintro; exact ⟨hb, hlb⟩
-
-theorem fsblock_home_open (E : CoPset) (gL gc gX : GName) (homeL : List Nat)
-    (Xv : Nat → List (BitVec 8)) (b : Nat) (bs : List (BitVec 8))
-    (hE : (↑logN : CoPset) ⊆ E) :
-    fsBytesInv (GF := GF) gL gc gX homeL Xv -∗ fsblock gL b bs -∗
-      |={E}=> (⌜b ∈ homeL⌝ ∗ fsblock gL b bs) := by
-  rw [fsblock_1]
-  exact fsblockQ_home_open E gL gc gX (DFrac.own 1) homeL Xv b bs hE
-
 /-! ## Crossing 2: what a `bread` client gets -- `C(b)` IS `L`'s bytes at `b`
 
 This replaces `Xv6.fsChalf_mclean_agree`'s auth-free half/half entailment
@@ -695,44 +652,6 @@ theorem byteRange_log_update (E : CoPset) (gL gc gX : GName) (homeL : List Nat)
   iframe Hca Hr Hm
   ipureintro
   exact ⟨hclk, hlbo, hslice⟩
-
-/-- **THE WHOLE-BLOCK COROLLARY** (Rocq's `fsblock_update`), at its old
-statement so that nothing which uses it moves: the writer that happens to
-own the entire run presents it at `off = 0`, and the splice of a
-full-width run IS that run.
-
-THIS IS WHAT REPLACES `Xv6.fsCache_update` AT A HOME BLOCK: the shape is
-`fsCache_update`'s with `fsChalf` replaced by `fsblock`, `|==>` by
-`|={E}=>`, and two persistent hypotheses added. -/
-theorem fsblock_update (E : CoPset) (gL gc gX : GName) (homeL : List Nat)
-    (Xv : Nat → List (BitVec 8)) (C : BlockMap) (b : Nat)
-    (bs bsNew bsm : List (BitVec 8))
-    (hE : (↑logN : CoPset) ⊆ E) (hlnew : bsNew.length = BSIZE) :
-    fsBytesInv (GF := GF) gL gc gX homeL Xv -∗ excSealed gX -∗ (gc ↪●MAP C) -∗
-      fsblock gL b bs -∗ (gc ↪◯MAP[b]{DFrac.own (1 : Qp).half} bsm) -∗
-      |={E}=> (⌜bsm = bs ∧ PartialMap.get? C b = some bs⌝ ∗
-        (gc ↪●MAP PartialMap.insert C b bsNew) ∗ fsblock gL b bsNew ∗
-        (gc ↪◯MAP[b]{DFrac.own (1 : Qp).half} bsNew)) := by
-  unfold fsblock
-  iintro #Hinv #Hseal Hca ⟨%hlb, Hr⟩ Hm
-  imod byteRange_log_update E gL gc gX homeL Xv C b 0 bs bsNew bsm hE
-    (by rw [hlb]; omega) (by rw [hlb]; exact BSIZE_pos)
-    (fun _ => by rw [hlnew, hlb]) $$ Hinv Hseal Hca Hr Hm
-    with ⟨%hpure, Hca, Hr, Hm⟩
-  obtain ⟨hclk, hlbm, hslice⟩ := hpure
-  have hbe : bsm = bs := by
-    rw [hslice, List.drop_zero, hlb]
-    exact (List.take_of_length_le (by omega)).symm
-  have hsp : blkSplice 0 bsNew bsm = bsNew :=
-    blkSplice_whole bsNew bsm (by rw [hlnew, hlbm])
-  ihave Hca := (show (gc ↪●MAP PartialMap.insert C b (blkSplice 0 bsNew bsm))
-      ⊢@{IProp GF} (gc ↪●MAP PartialMap.insert C b bsNew) from by rw [hsp]) $$ Hca
-  ihave Hm := (show (gc ↪◯MAP[b]{DFrac.own (1 : Qp).half} (blkSplice 0 bsNew bsm))
-      ⊢@{IProp GF} (gc ↪◯MAP[b]{DFrac.own (1 : Qp).half} bsNew) from by rw [hsp]) $$ Hm
-  imodintro
-  iframe Hca Hm Hr
-  ipureintro
-  exact ⟨⟨hbe, by rw [← hbe]; exact hclk⟩, hlnew⟩
 
 /-! ## Crossing 4: THE RECOVERING INSTALL'S GHOST STEP
 

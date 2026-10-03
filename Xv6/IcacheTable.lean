@@ -95,8 +95,7 @@ functions first and the record assembled at the end.
    `TsoCtx.ctx_floor` is `ctxFloor`.
 2. **Named arms with equations** (`IcacheInvRef` deviation 6; Lean does
    not reduce a `match` on `get? M k` under a hypothesis): `islot2`'s live
-   arm is `islotLive`, with `islot2_none` / `islot2_some` / `islot2_someNone`
-   / `islot2_noneSome`; the payload rows' arms are `itableSlotFree` (shared
+   arm is `islotLive`, with `islot2_none` / `islot2_some`; the payload rows' arms are `itableSlotFree` (shared
    by all three row forms, as in Rocq), `itableSlotLive` /
    `itableSlotLiveLlb` / `itableSlotLiveBare`, with `itableSlotRes_none` /
    `_some` (and `_llb`, `_bare` twins).  The texts are Rocq's.
@@ -185,7 +184,7 @@ functions first and the record assembled at the end.
     `itableSlotResBare_none` (`get? ∅ k = none`: the free arm
     `itableSlotFree` -- the zero cell `wordAtN curCtx (iRef (ientry k)) 4 (.own
     1) 0#32` (= `wordPointsTo …`, `rfl`), `istmpAuth k 1 tst`, `topLb tst`)
-    beside `icSlotRowBare tl k none 0` (`icMCount_none`); each `islot2` is
+    beside `icSlotRowBare tl k none 0`; each `islot2` is
     `islot2_none` → `islotEmpty curCtx cn k` (Rocq 1492--1520: ∃ the boot
     `dvs k`, `islotFreeAtCtx` (unfold to `inodeIdent` at `.own (1 :
     Qp).half`; `islotFreeAtCtx_cur` is `rfl`), `icId cn k (1 : Qp).half
@@ -217,7 +216,6 @@ functions first and the record assembled at the end.
     `islots2_acc_upd` for the `islot2` rows; the arm equations
     (`islot2_some` / `_none`, `itableSlotRes_some` / `_none`,
     `itableSlotResLlb_some` / `_none`) to open an arm at a known `get?`.
-    `icMCount_some` / `_none` read the L1 row's count.
   - the exact read: `itableSlotLive ξ k`'s `istmpAuth k (1 : Qp).half tst ∗
     topLb tst ∗ ctxFloor ξ tst` is what `IcachePinwObl.iref_readAU_locked`
     wants (the floor at the holder's `K` after the acquire's transport).
@@ -257,8 +255,6 @@ import Xv6.SleepLockDefs
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
-
-set_option linter.unusedSectionVars false
 
 /-! ## A ξ-constant row transports (deviation 6) -/
 
@@ -338,18 +334,6 @@ theorem islot2_some [Icfg] [CurCtx] (ξ : CtxId) (cn : IcNames) (M : RegMapF (Qp
     islot2 (GF := GF) ξ cn M ci k = islotLive ξ cn k q n dev inum := by
   unfold islot2; rw [hM, hc]
 
-theorem islot2_someNone [Icfg] [CurCtx] (ξ : CtxId) (cn : IcNames) (M : RegMapF (Qp × PosNat))
-    (ci : RegMapF (BitVec 32 × BitVec 32)) (k : Nat) (v : Qp × PosNat)
-    (hM : PartialMap.get? M k = some v) (hc : PartialMap.get? ci k = none) :
-    islot2 (GF := GF) ξ cn M ci k = iprop(False) := by
-  unfold islot2; rw [hM, hc]
-
-theorem islot2_noneSome [Icfg] [CurCtx] (ξ : CtxId) (cn : IcNames) (M : RegMapF (Qp × PosNat))
-    (ci : RegMapF (BitVec 32 × BitVec 32)) (k : Nat) (p : BitVec 32 × BitVec 32)
-    (hM : PartialMap.get? M k = none) (hc : PartialMap.get? ci k = some p) :
-    islot2 (GF := GF) ξ cn M ci k = iprop(False) := by
-  unfold islot2; rw [hM, hc]
-
 end Live
 
 /-! ### THE SIXTH SHAPE'S TRANSPORT (r25 pass 1)
@@ -404,14 +388,6 @@ def icMCount (M : RegMapF (Qp × PosNat)) (k : Nat) : Nat :=
   match PartialMap.get? M k with
   | some (_, n) => n.val
   | none => 0
-
-theorem icMCount_some (M : RegMapF (Qp × PosNat)) (k : Nat) (q : Qp) (n : PosNat)
-    (hM : PartialMap.get? M k = some (q, n)) : icMCount M k = n.val := by
-  unfold icMCount; rw [hM]
-
-theorem icMCount_none (M : RegMapF (Qp × PosNat)) (k : Nat)
-    (hM : PartialMap.get? M k = none) : icMCount M k = 0 := by
-  unfold icMCount; rw [hM]
 
 /-- THE BOX'S L1 ROW, FLOORED at the payload's context (Rocq's
 `ic_slot_row_fl`): what the recycler's (a) and iput's guard (a) present as
@@ -966,7 +942,6 @@ theorem islots2_acc_upd [Icfg] [CurCtx] (cn : IcNames) (M : RegMapF (Qp × PosNa
 /-! ### THE HANDLE -/
 
 variable [LogG GF] [IregG GF] [FsLinkG GF]
-
 
 /-- Rocq's `is_itable2`: the itable spinlock over `itableRes2` at its own
 context, the pinw read leaves' address claims (A6.145, minted once at

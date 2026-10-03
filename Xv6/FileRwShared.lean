@@ -20,23 +20,17 @@ The direction-specific ones (`readable`/`writable`, the carve, the
 dispatch's state readings) stay with their function.
 -/
 import Xv6.EitherDefs
-import Xv6.FsWords
 import Xv6.FdTable
 import Xv6.FilePay
-import Xv6.NamexParts
-
 
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedSectionVars false
-set_option linter.unusedVariables false
 set_option linter.unusedSimpArgs false
 
 /-! ## The dispatch's readings and `f->off` -/
-
 
 theorem filerw_beq1 (t : BitVec 32) :
     bcond bop.BEQ (BitVec.signExtend 64 t) 1#64 = decide (t = FD_PIPE) := by
@@ -163,8 +157,8 @@ theorem filerw_priv_pidEv (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P :
 end Block
 
 /-- **The contracts' block** (the core, Rocq `proc_priv_core`) at the
-kernel-page-table tier IS the ambient bare `procPrivExt` and the cwd
-reference with the generation row (by `rfl` once the ambient context is
+kernel-page-table tier IS the ambient bare `procPrivExt` and the cwd and
+root references with the generation row (by `rfl` once the ambient context is
 taken apart).  fileread / filewrite / filestat never touch `p->cwd` or the
 generation row: the two are parked in the continuation at entry and handed
 back with the block at exit (Rocq carries them inside `proc_priv_core`
@@ -176,7 +170,8 @@ theorem filerw_core_conv {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
     (h : curTier = KTier.kpt) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P : UPtd)
     (M : Nat → List (BitVec 8)) :
     procPrivCoreNoctxAt (GF := GF) curCtx pa pid { V with upt := P } M ⊣⊢
-      procPrivExt pa pid V P M ∗ (cwdRefAt V.cwd V.cwi ∗ procGenAt curCtx pa pid V.gen) := by
+      procPrivExt pa pid V P M ∗
+        (cwdRefAt V.cwd V.cwi ∗ rootRefAt V.root V.rti ∗ procGenAt curCtx pa pid V.gen) := by
   obtain ⟨ξ, t⟩ := X
   simp only at h
   subst h

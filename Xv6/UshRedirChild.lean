@@ -27,15 +27,12 @@ import Xv6.UshRedirBody
 import Xv6.UshRedirPaid
 import Xv6.UshExecEnvRun
 import Xv6.SpecShRuncmdExec
-import Xv6.UShLexRedir
 
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
-
-set_option linter.unusedSectionVars false
 
 section UshRedirChild
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]

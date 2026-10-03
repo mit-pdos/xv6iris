@@ -6,14 +6,16 @@ and sys_exec consume, over the ONE block `FdTable.procPrivFd` = Rocq
 
 | Rocq (ProcInv.v unless noted) | Lean |
 |---|---|
-| `proc_priv_trapframe` :2218 | `procPrivFd_trapframe` |
+| `proc_priv_trapframe` :2218 | not ported (nothing uses it) |
 | `proc_priv_tf` :2429 | `procPrivFd_tf` |
 | `proc_priv_tf_upd` :2463 | `procPrivFd_tfUpd` |
-| `proc_priv_cwd` :2246 | `procPrivFd_cwd` |
+| `proc_priv_cwd` :2246 | not ported (nothing uses it) |
 | `proc_priv_cwd_pid` :2310 | `procPrivFd_cwdPid` |
-| `proc_priv_sz_maxsz` / `_um_below` / `_lazy` / `_pt_wf` :2367–2420 | `procPrivFd_facts` (one projection) + `procPrivFd_lazy` |
+| `proc_priv_root` (chroot) | not ported (nothing uses it) |
+| `proc_priv_root_pid` (chroot) | `procPrivFd_rootPid` |
+| `proc_priv_sz_maxsz` / `_um_below` / `_lazy` / `_pt_wf` :2367–2420 | `procPrivFd_facts` (one projection) |
 | `ProofKforkParts.proc_priv_tfp_valid` :555 | `procPrivFd_tfpValid` |
-| `proc_priv_lazy_true` :2395 | `procPrivFd_lazyTrue` |
+| `proc_priv_lazy_true` :2395 | not ported (nothing uses it) |
 | `proc_priv_addrspace` :2508 | `procPrivFd_addrspace` |
 | `proc_priv_copy` :2576 | `procPrivFd_copy` |
 | `proc_priv_newspace` :2804 | `procPrivFd_newspace` |
@@ -54,7 +56,7 @@ sibling, one layer up.  Definitional: no `wp`.
    no persistent-conclusion `iDestruct` that leaves the hypothesis in place
    (`ProcInv` deviation 5).  Rocq's four separate pure projections
    (`sz_maxsz`, `um_below`, `lazy`, `pt_wf`) are ONE, `procPrivFd_facts`
-   (plus `procPrivFd_lazy` / `procPrivFd_tfpValid`, the two by name).
+   (plus `procPrivFd_tfpValid`, by name).
 7. **`procPrivFd_settle`'s deficit is `[fd]`** (Rocq `{[fd]} ∪ ∅`; the Lean
    deficit is a list, `FdTable`).
 
@@ -67,8 +69,6 @@ namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
-
-set_option linter.unusedSectionVars false
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [BcacheG GF] [DiskG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
@@ -120,15 +120,6 @@ theorem procPrivFd_facts (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V 
     · ipureintro; exact hlz
   · ipureintro; exact ⟨h.1, h.2.1, hlz, hwf⟩
 
-/-- **What the lazy bit claims** (Rocq `proc_priv_lazy`). -/
-theorem procPrivFd_lazy (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
-    (M : Nat → List (BitVec 8)) :
-    procPrivFd (GF := GF) γ pa pid V M ⊢
-      procPrivFd γ pa pid V M ∗ ⌜V.pvLazy = false → lazyFree V.upt.um V.sz⌝ := by
-  iintro H
-  icases procPrivFd_facts γ pa pid V M $$ H with ⟨H, %h⟩
-  iframe H; ipureintro; exact h.2.2.1
-
 /-- **The trapframe page is a kalloc page** (Rocq
 `ProofKforkParts.proc_priv_tfp_valid`): `uptWf`'s last conjunct. -/
 theorem procPrivFd_tfpValid (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
@@ -138,18 +129,6 @@ theorem procPrivFd_tfpValid (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) 
   iintro H
   icases procPrivFd_facts γ pa pid V M $$ H with ⟨H, %h⟩
   iframe H; ipureintro; exact h.2.2.2.2.2.1
-
-/-- **Raising the lazy bit is free** (Rocq `proc_priv_lazy_true`): `true`
-claims nothing. -/
-theorem procPrivFd_lazyTrue (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
-    (M : Nat → List (BitVec 8)) :
-    procPrivFd (GF := GF) γ pa pid V M ⊢ procPrivFd γ pa pid { V with pvLazy := true } M := by
-  unfold procPrivFd procPrivCoreNoctxAt procPrivBareAt procFieldsNoOfile
-  iintro ⟨⟨⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hcwd, Hnm, Hsc⟩, Hpt, Htfp, -, Hev⟩, Hc⟩, Ho⟩
-  iframe Hpid Hk Hs Hpg Htf Hcwd Hnm Hsc Hpt Htfp Hc Ho Hev
-  isplitl []
-  · ipureintro; exact h
-  · ipureintro; intro hf; cases hf
 
 /-! ## The event counter (permit sweep G, design ni-strong-instance.md §7) -/
 
@@ -204,33 +183,6 @@ theorem procPrivFd_evAfter_of (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32
 
 /-! ## The trapframe -/
 
-/-- **The read-only trapframe-POINTER quarter** (Rocq `proc_priv_trapframe`):
-what `p->trapframe->aN` reads first. -/
-theorem procPrivFd_trapframe (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
-    (M : Nat → List (BitVec 8)) :
-    procPrivFd (GF := GF) γ pa pid V M ⊢
-      @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pTrapframe pa) 8 (DFrac.own (1 : Qp).half.half)
-        (pageAddr V.upt.tfp) ∗
-      (@wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pTrapframe pa) 8 (DFrac.own (1 : Qp).half.half)
-          (pageAddr V.upt.tfp) -∗
-        procPrivFd γ pa pid V M) := by
-  unfold procPrivFd procPrivCoreNoctxAt procPrivBareAt procFieldsNoOfile
-  iintro ⟨⟨⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hcwd, Hnm, Hsc⟩, Hpt, Htfp, %hlz, Hev⟩, Hc⟩, Ho⟩
-  ihave Htf := procPrivAcc_eq curCtx _ 8 _ _ _ h.2.2.2 $$ Htf
-  icases procPrivAcc_split curCtx _ 8 1 _ $$ Htf with ⟨Htf, Htf2⟩
-  icases procPrivAcc_split curCtx _ 8 (1 : Qp).half _ $$ Htf with ⟨Htf, Htf1⟩
-  iframe Htf
-  iintro Htf
-  ihave Htf := procPrivAcc_join curCtx _ 8 (1 : Qp).half _ $$ [Htf Htf1]
-  · iframe
-  ihave Htf := procPrivAcc_join curCtx _ 8 1 _ $$ [Htf Htf2]
-  · iframe
-  ihave Htf := procPrivAcc_eq curCtx _ 8 _ _ _ h.2.2.2.symm $$ Htf
-  iframe Hpid Hk Hs Hpg Htf Hcwd Hnm Hsc Hpt Htfp Hc Ho Hev
-  isplitl []
-  · ipureintro; exact h
-  · ipureintro; exact hlz
-
 /-- **The trapframe-pointer quarter AND the event counter** (Rocq
 `kxc_priv_tf_ev`, permit sweep L2): kexec's proc_pagetable reads the cell
 and takes the lend, so both come out of the block at once; the block
@@ -244,7 +196,7 @@ theorem procPrivFd_trapframeEv (γ : FileNames) (pa : BitVec 64) (pid : BitVec 3
           (DFrac.own (1 : Qp).half.half) (pageAddr V.upt.tfp) -∗ actCnt pa k -∗
         procPrivFd γ pa pid (V.updEv k) M) := by
   unfold procPrivFd procPrivCoreNoctxAt procPrivBareAt procFieldsNoOfile
-  iintro ⟨⟨⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hcwd, Hnm, Hsc⟩, Hpt, Htfp, %hlz, Hev⟩, Hc⟩, Ho⟩
+  iintro ⟨⟨⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hcwd, Hnm, Hsc, Hrt⟩, Hpt, Htfp, %hlz, Hev⟩, Hc⟩, Ho⟩
   ihave Htf := procPrivAcc_eq curCtx _ 8 _ _ _ h.2.2.2 $$ Htf
   icases procPrivAcc_split curCtx _ 8 1 _ $$ Htf with ⟨Htf, Htf2⟩
   icases procPrivAcc_split curCtx _ 8 (1 : Qp).half _ $$ Htf with ⟨Htf, Htf1⟩
@@ -255,7 +207,7 @@ theorem procPrivFd_trapframeEv (γ : FileNames) (pa : BitVec 64) (pid : BitVec 3
   ihave Htf := procPrivAcc_join curCtx _ 8 1 _ $$ [Htf Htf2]
   · iframe
   ihave Htf := procPrivAcc_eq curCtx _ 8 _ _ _ h.2.2.2.symm $$ Htf
-  iframe Hpid Hk Hs Hpg Htf Hcwd Hnm Hsc Hpt Htfp Hc Ho Hev
+  iframe Hpid Hk Hs Hpg Htf Hcwd Hnm Hsc Hrt Hpt Htfp Hc Ho Hev
   isplitl []
   · ipureintro; exact h
   · ipureintro; exact hlz
@@ -273,7 +225,7 @@ theorem procPrivFd_tf (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : P
         @tfPageAt hlc GF _ ⟨curCtx, KTier.kpt⟩ V.upt.tfp V.tf -∗
         procPrivFd γ pa pid V M) := by
   unfold procPrivFd procPrivCoreNoctxAt procPrivBareAt procFieldsNoOfile
-  iintro ⟨⟨⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hcwd, Hnm, Hsc⟩, Hpt, Htfp, %hlz, Hev⟩, Hc⟩, Ho⟩
+  iintro ⟨⟨⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hcwd, Hnm, Hsc, Hrt⟩, Hpt, Htfp, %hlz, Hev⟩, Hc⟩, Ho⟩
   ihave Htf := procPrivAcc_eq curCtx _ 8 _ _ _ h.2.2.2 $$ Htf
   icases procPrivAcc_split curCtx _ 8 1 _ $$ Htf with ⟨Htf, Htf2⟩
   icases procPrivAcc_split curCtx _ 8 (1 : Qp).half _ $$ Htf with ⟨Htf, Htf1⟩
@@ -284,7 +236,7 @@ theorem procPrivFd_tf (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : P
   ihave Htf := procPrivAcc_join curCtx _ 8 1 _ $$ [Htf Htf2]
   · iframe
   ihave Htf := procPrivAcc_eq curCtx _ 8 _ _ _ h.2.2.2.symm $$ Htf
-  iframe Hpid Hk Hs Hpg Htf Hcwd Hnm Hsc Hpt Htfp Hc Ho Hev
+  iframe Hpid Hk Hs Hpg Htf Hcwd Hnm Hsc Hrt Hpt Htfp Hc Ho Hev
   isplitl []
   · ipureintro; exact h
   · ipureintro; exact hlz
@@ -301,38 +253,17 @@ theorem procPrivFd_tfUpd (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V 
         @tfPageAt hlc GF _ ⟨curCtx, KTier.kpt⟩ V.upt.tfp ws' -∗
         procPrivFd γ pa pid { V with tf := ws' } M) := by
   unfold procPrivFd procPrivCoreNoctxAt procPrivBareAt procFieldsNoOfile
-  iintro ⟨⟨⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hcwd, Hnm, Hsc⟩, Hpt, Htfp, %hlz, Hev⟩, Hc⟩, Ho⟩
+  iintro ⟨⟨⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hcwd, Hnm, Hsc, Hrt⟩, Hpt, Htfp, %hlz, Hev⟩, Hc⟩, Ho⟩
   ihave Htf := procPrivAcc_eq curCtx _ 8 _ _ _ h.2.2.2 $$ Htf
   iframe Htf Htfp
   iintro %ws' Htf Htfp
   ihave Htf := procPrivAcc_eq curCtx _ 8 _ _ _ h.2.2.2.symm $$ Htf
-  iframe Hpid Hk Hs Hpg Htf Hcwd Hnm Hsc Hpt Htfp Hc Ho Hev
+  iframe Hpid Hk Hs Hpg Htf Hcwd Hnm Hsc Hrt Hpt Htfp Hc Ho Hev
   isplitl []
   · ipureintro; exact h
   · ipureintro; exact hlz
 
 /-! ## The working directory -/
-
-/-- **The working directory, borrowed and replaced** (Rocq `proc_priv_cwd`),
-at the block: the cell and the reference out, a matching pair back at any
-`(v', z')` (sys_chdir, kexit). -/
-theorem procPrivFd_cwd (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
-    (M : Nat → List (BitVec 8)) :
-    procPrivFd (GF := GF) γ pa pid V M ⊢
-      @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pCwd pa) 8 (DFrac.own 1) V.cwd ∗
-      @cwdRefAt hlc GF _ _ _ _ _ ⟨curCtx, KTier.kpt⟩ V.cwd V.cwi ∗
-      (∀ (v' : BitVec 64) (z' : Nat),
-        @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pCwd pa) 8 (DFrac.own 1) v' -∗
-        @cwdRefAt hlc GF _ _ _ _ _ ⟨curCtx, KTier.kpt⟩ v' z' -∗
-        procPrivFd γ pa pid { V with cwd := v', cwi := z' } M) := by
-  unfold procPrivFd procPrivCoreNoctxAt procPrivBareAt procFieldsNoOfile
-  iintro ⟨⟨⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hcwd, Hnm, Hsc⟩, Hpt, Htfp, %hlz, Hev⟩, Hc, Hg⟩, Ho⟩
-  iframe Hcwd Hc
-  iintro %v' %z' Hcwd Hc
-  iframe Hpid Hk Hs Hpg Htf Hcwd Hnm Hsc Hpt Htfp Hc Hg Ho Hev
-  isplitl []
-  · ipureintro; exact h
-  · ipureintro; exact hlz
 
 /-- **The working directory and the pid quarter together** (Rocq
 `proc_priv_cwd_pid`): kexit / sys_chdir hold the cwd cell out across
@@ -349,13 +280,65 @@ theorem procPrivFd_cwdPid (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V
         @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPid pa) 4 (DFrac.own (1 : Qp).half.half) pid -∗
         procPrivFd γ pa pid { V with cwd := v', cwi := z' } M) := by
   unfold procPrivFd procPrivCoreNoctxAt procPrivBareAt procFieldsNoOfile pidPriv
-  iintro ⟨⟨⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hcwd, Hnm, Hsc⟩, Hpt, Htfp, %hlz, Hev⟩, Hc, Hg⟩, Ho⟩
+  iintro ⟨⟨⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hcwd, Hnm, Hsc, Hrt⟩, Hpt, Htfp, %hlz, Hev⟩, Hc, Hg⟩, Ho⟩
   icases procPrivAcc_split curCtx _ 4 (1 : Qp).half _ $$ Hpid with ⟨Hpid, Hpid1⟩
   iframe Hcwd Hc Hpid Hev
   iintro %v' %z' Hcwd Hc Hpid
   ihave Hpid := procPrivAcc_join curCtx _ 4 (1 : Qp).half _ $$ [Hpid Hpid1]
   · iframe
-  iframe Hpid Hk Hs Hpg Htf Hcwd Hnm Hsc Hpt Htfp Hc Hg Ho
+  iframe Hpid Hk Hs Hpg Htf Hcwd Hnm Hsc Hrt Hpt Htfp Hc Hg Ho
+  isplitl []
+  · ipureintro; exact h
+  · ipureintro; exact hlz
+
+/-! ## The root (chroot, `procPrivFd_cwdPid`'s twins at the other cell) -/
+
+/-- **The root and the pid quarter together** (Rocq `proc_priv_root_pid`):
+kexit's second `begin_op; iput; end_op` stage and sys_chroot's hold the root
+cell out across calls that each take a share of `p->pid`. -/
+theorem procPrivFd_rootPid (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
+    (M : Nat → List (BitVec 8)) :
+    procPrivFd (GF := GF) γ pa pid V M ⊢
+      @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pRoot pa) 8 (DFrac.own 1) V.root ∗
+      @rootRefAt hlc GF _ _ _ _ _ ⟨curCtx, KTier.kpt⟩ V.root V.rti ∗
+      @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPid pa) 4 (DFrac.own (1 : Qp).half.half) pid ∗
+      (∀ (v' : BitVec 64) (z' : Nat),
+        @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pRoot pa) 8 (DFrac.own 1) v' -∗
+        @rootRefAt hlc GF _ _ _ _ _ ⟨curCtx, KTier.kpt⟩ v' z' -∗
+        @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPid pa) 4 (DFrac.own (1 : Qp).half.half) pid -∗
+        procPrivFd γ pa pid { V with root := v', rti := z' } M) := by
+  unfold procPrivFd procPrivCoreNoctxAt procPrivBareAt procFieldsNoOfile pidPriv
+  iintro ⟨⟨⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hcwd, Hnm, Hsc, Hrt⟩, Hpt, Htfp, %hlz, Hev⟩, Hc, Hr, Hg⟩, Ho⟩
+  icases procPrivAcc_split curCtx _ 4 (1 : Qp).half _ $$ Hpid with ⟨Hpid, Hpid1⟩
+  iframe Hrt Hr Hpid Hev
+  iintro %v' %z' Hrt Hr Hpid
+  ihave Hpid := procPrivAcc_join curCtx _ 4 (1 : Qp).half _ $$ [Hpid Hpid1]
+  · iframe
+  iframe Hpid Hk Hs Hpg Htf Hcwd Hnm Hsc Hrt Hpt Htfp Hc Hr Hg Ho
+  isplitl []
+  · ipureintro; exact h
+  · ipureintro; exact hlz
+
+/-- **The root and the pid cell together, at the cell's own fraction**
+(chroot): `dirlookup` reads `p->root` and its reference, and `dirlink`
+relays them, beside the pid cell every sleeping callee takes at `pidPriv`.
+`procPrivFd_rootPid`'s shape without the quartering. -/
+theorem procPrivFd_rootPidPriv (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
+    (M : Nat → List (BitVec 8)) :
+    procPrivFd (GF := GF) γ pa pid V M ⊢
+      @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pRoot pa) 8 (DFrac.own 1) V.root ∗
+      @rootRefAt hlc GF _ _ _ _ _ ⟨curCtx, KTier.kpt⟩ V.root V.rti ∗
+      @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPid pa) 4 pidPriv pid ∗
+      (∀ (v' : BitVec 64) (z' : Nat),
+        @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pRoot pa) 8 (DFrac.own 1) v' -∗
+        @rootRefAt hlc GF _ _ _ _ _ ⟨curCtx, KTier.kpt⟩ v' z' -∗
+        @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPid pa) 4 pidPriv pid -∗
+        procPrivFd γ pa pid { V with root := v', rti := z' } M) := by
+  unfold procPrivFd procPrivCoreNoctxAt procPrivBareAt procFieldsNoOfile
+  iintro ⟨⟨⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hcwd, Hnm, Hsc, Hrt⟩, Hpt, Htfp, %hlz, Hev⟩, Hc, Hr, Hg⟩, Ho⟩
+  iframe Hrt Hr Hpid Hev
+  iintro %v' %z' Hrt Hr Hpid
+  iframe Hpid Hk Hs Hpg Htf Hcwd Hnm Hsc Hrt Hpt Htfp Hc Hr Hg Ho
   isplitl []
   · ipureintro; exact h
   · ipureintro; exact hlz
@@ -383,14 +366,14 @@ theorem procPrivFd_addrspace (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32)
         @procPtAt hlc GF _ ⟨curCtx, KTier.kpt⟩ P' M' -∗
         procPrivFd γ pa pid { V with upt := P', sz := szv, pvLazy := lz' } M') := by
   unfold procPrivFd procPrivCoreNoctxAt procPrivBareAt procFieldsNoOfile
-  iintro ⟨⟨⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hcwd, Hnm, Hsc⟩, Hpt, Htfp, %hlz, Hev⟩, Hc⟩, Ho⟩
+  iintro ⟨⟨⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hcwd, Hnm, Hsc, Hrt⟩, Hpt, Htfp, %hlz, Hev⟩, Hc⟩, Ho⟩
   ihave Hpg := procPrivAcc_eq curCtx _ 8 _ _ _ h.2.2.1 $$ Hpg
   iframe Hs Hpg Hpt
   iintro %P' %szv %M' %lz' %hr %ht %hsz %hb %hl Hs Hpg Hpt
   ihave Hpg := procPrivAcc_eq curCtx _ 8 _ _ _ h.2.2.1.symm $$ Hpg
   ihave Htfp := (show @tfPageAt hlc GF _ ⟨curCtx, KTier.kpt⟩ V.upt.tfp V.tf ⊢
       @tfPageAt hlc GF _ ⟨curCtx, KTier.kpt⟩ P'.tfp V.tf from by rw [ht]) $$ Htfp
-  iframe Hpid Hk Hs Hpg Htf Hcwd Hnm Hsc Hpt Htfp Hc Ho Hev
+  iframe Hpid Hk Hs Hpg Htf Hcwd Hnm Hsc Hrt Hpt Htfp Hc Ho Hev
   isplitl []
   · ipureintro; exact ⟨hsz, hb, by rw [hr]; exact h.2.2.1, by rw [ht]; exact h.2.2.2⟩
   · ipureintro; exact hl
@@ -435,14 +418,14 @@ theorem procPrivFd_copyEv (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V
         @procPtAt hlc GF _ ⟨curCtx, KTier.kpt⟩ P' M' -∗ actCnt pa k -∗
         procPrivFd γ pa pid { V.updEv k with upt := P' } M') := by
   unfold procPrivFd procPrivCoreNoctxAt procPrivBareAt procFieldsNoOfile
-  iintro ⟨⟨⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hcwd, Hnm, Hsc⟩, Hpt, Htfp, %hlz, Hev⟩, Hc⟩, Ho⟩
+  iintro ⟨⟨⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hcwd, Hnm, Hsc, Hrt⟩, Hpt, Htfp, %hlz, Hev⟩, Hc⟩, Ho⟩
   ihave Hpg := procPrivAcc_eq curCtx _ 8 _ _ _ h.2.2.1 $$ Hpg
   iframe Hs Hpg Hpt Hev
   iintro %P' %M' %k %hx Hs Hpg Hpt Hev
   ihave Hpg := procPrivAcc_eq curCtx _ 8 _ _ _ h.2.2.1.symm $$ Hpg
   ihave Htfp := (show @tfPageAt hlc GF _ ⟨curCtx, KTier.kpt⟩ V.upt.tfp V.tf ⊢
       @tfPageAt hlc GF _ ⟨curCtx, KTier.kpt⟩ P'.tfp V.tf from by rw [hx.1.2.1]) $$ Htfp
-  iframe Hpid Hk Hs Hpg Htf Hcwd Hnm Hsc Hpt Htfp Hc Ho Hev
+  iframe Hpid Hk Hs Hpg Htf Hcwd Hnm Hsc Hrt Hpt Htfp Hc Ho Hev
   isplitl []
   · ipureintro
     exact ⟨h.1, UMemL.umBelow_extSz h.2.1 hx, by rw [hx.1.1]; exact h.2.2.1,
@@ -478,7 +461,7 @@ theorem procPrivFd_newspace (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) 
         procPrivFd γ pa pid
           { V with upt := P', tf := ws', sz := szv, pvLazy := b, pagetable := pageAddr P'.root } M') := by
   unfold procPrivFd procPrivCoreNoctxAt procPrivBareAt procFieldsNoOfile
-  iintro ⟨⟨⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hcwd, Hnm, Hsc⟩, Hpt, Htfp, %hlz, Hev⟩, Hc⟩, Ho⟩
+  iintro ⟨⟨⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hcwd, Hnm, Hsc, Hrt⟩, Hpt, Htfp, %hlz, Hev⟩, Hc⟩, Ho⟩
   ihave Hpg := procPrivAcc_eq curCtx _ 8 _ _ _ h.2.2.1 $$ Hpg
   ihave Htf := procPrivAcc_eq curCtx _ 8 _ _ _ h.2.2.2 $$ Htf
   isplitl []
@@ -489,7 +472,7 @@ theorem procPrivFd_newspace (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) 
   iintro %P' %szv %ws' %M' %b %ht %hsz %hb %hl Hs Hpg Htf Hpt Htfp
   ihave Htf := procPrivAcc_eq curCtx _ 8 _ _ _ (show pageAddr P'.tfp = V.trapframe by
     rw [ht]; exact h.2.2.2.symm) $$ Htf
-  iframe Hpid Hk Hs Hpg Htf Hcwd Hnm Hsc Hpt Htfp Hc Ho Hev
+  iframe Hpid Hk Hs Hpg Htf Hcwd Hnm Hsc Hrt Hpt Htfp Hc Ho Hev
   isplitl []
   · ipureintro; exact ⟨hsz, hb, rfl, by rw [ht]; exact h.2.2.2⟩
   · ipureintro; exact hl
@@ -507,7 +490,7 @@ theorem procPrivFd_name (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V :
         @pnameCells hlc GF _ ⟨curCtx, KTier.kpt⟩ pa (DFrac.own 1) ns -∗
         procPrivFd γ pa pid { V with name := ns } M) := by
   unfold procPrivFd procPrivCoreNoctxAt procPrivBareAt procFieldsNoOfile
-  iintro ⟨⟨⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hcwd, Hnm, Hsc⟩, Hpt, Htfp, %hlz, Hev⟩, Hc⟩, Ho⟩
+  iintro ⟨⟨⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hcwd, Hnm, Hsc, Hrt⟩, Hpt, Htfp, %hlz, Hev⟩, Hc⟩, Ho⟩
   icases (show @pnameCells hlc GF _ ⟨curCtx, KTier.kpt⟩ pa (DFrac.own 1) V.name ⊢
       @pnameCells hlc GF _ ⟨curCtx, KTier.kpt⟩ pa (DFrac.own 1) V.name ∗ ⌜V.name.length = PNAMELEN⌝ from by
     unfold pnameCells
@@ -520,7 +503,7 @@ theorem procPrivFd_name (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V :
   · ipureintro; exact hnl
   iframe Hnm
   iintro %ns %_ Hnm
-  iframe Hpid Hk Hs Hpg Htf Hcwd Hnm Hsc Hpt Htfp Hc Ho Hev
+  iframe Hpid Hk Hs Hpg Htf Hcwd Hnm Hsc Hrt Hpt Htfp Hc Ho Hev
   isplitl []
   · ipureintro; exact h
   · ipureintro; exact hlz
@@ -537,10 +520,10 @@ theorem procPrivFd_secc (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V :
       (∀ m : BitVec 64, @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pSecc pa) 8 (DFrac.own 1) m -∗
         procPrivFd γ pa pid { V with pvSecc := m } M) := by
   unfold procPrivFd procPrivCoreNoctxAt procPrivBareAt procFieldsNoOfile
-  iintro ⟨⟨⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hcwd, Hnm, Hsc⟩, Hpt, Htfp, %hlz, Hev⟩, Hc⟩, Ho⟩
+  iintro ⟨⟨⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hcwd, Hnm, Hsc, Hrt⟩, Hpt, Htfp, %hlz, Hev⟩, Hc⟩, Ho⟩
   iframe Hsc
   iintro %m Hsc
-  iframe Hpid Hk Hs Hpg Htf Hcwd Hnm Hsc Hpt Htfp Hc Ho Hev
+  iframe Hpid Hk Hs Hpg Htf Hcwd Hnm Hsc Hrt Hpt Htfp Hc Ho Hev
   isplitl []
   · ipureintro; exact h
   · ipureintro; exact hlz
@@ -601,7 +584,8 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 is `procPrivNoctxAt` (every cell, the descriptor array's cells included)
 beside the D8 generation row `procGenAt`, and back -- at any record `V'`
 that keeps the descriptor array, its ghost, the working directory and its
-inum (the payloads and the cwd reference are keyed on exactly those), and
+inum, the root and its inum (the payloads and the two references are keyed
+on exactly those), and
 at the generation row `V'.gen` names.  kwait / sys_wait (Rocq's whole
 `proc_priv`) run their cells-level bodies through this. -/
 theorem procPrivFd_noctxGen [X : CurCtx] (h : curTier = KTier.kpt) (γ : FileNames) (pa : BitVec 64)
@@ -609,7 +593,8 @@ theorem procPrivFd_noctxGen [X : CurCtx] (h : curTier = KTier.kpt) (γ : FileNam
     procPrivFd (GF := GF) γ pa pid V M ⊢
       procPrivNoctxAt curCtx pa pid V M ∗ procGenAt curCtx pa pid V.gen ∗
       (∀ (V' : ProcPriv) (M' : Nat → List (BitVec 8)),
-        ⌜V'.ofile = V.ofile ∧ V'.fdg = V.fdg ∧ V'.cwd = V.cwd ∧ V'.cwi = V.cwi⌝ -∗
+        ⌜V'.ofile = V.ofile ∧ V'.fdg = V.fdg ∧ V'.cwd = V.cwd ∧ V'.cwi = V.cwi ∧
+          V'.root = V.root ∧ V'.rti = V.rti⌝ -∗
         procPrivNoctxAt curCtx pa pid V' M' -∗ procGenAt curCtx pa pid V'.gen -∗
         procPrivFd γ pa pid V' M') := by
   have hcells := procOfilesOwe_cells_acc (GF := GF) γ V.fdg pa V.ofile []
@@ -621,6 +606,8 @@ theorem procPrivFd_noctxGen [X : CurCtx] (h : curTier = KTier.kpt) (γ : FileNam
       from by rw [h1, h2])
   have hcw := fun (V' : ProcPriv) (h3 : V'.cwd = V.cwd) (h4 : V'.cwi = V.cwi) =>
     (show cwdRefAt (GF := GF) V.cwd V.cwi ⊢ cwdRefAt V'.cwd V'.cwi from by rw [h3, h4])
+  have hrt := fun (V' : ProcPriv) (h5 : V'.root = V.root) (h6 : V'.rti = V.rti) =>
+    (show rootRefAt (GF := GF) V.root V.rti ⊢ rootRefAt V'.root V'.rti from by rw [h5, h6])
   have hoc := fun (V' : ProcPriv) (h1 : V'.ofile = V.ofile) =>
     (show ofileCells (GF := GF) pa (DFrac.own 1) V'.ofile ⊢ ofileCells pa (DFrac.own 1) V.ofile
       from by rw [h1])
@@ -628,44 +615,135 @@ theorem procPrivFd_noctxGen [X : CurCtx] (h : curTier = KTier.kpt) (γ : FileNam
   simp only at h
   subst h
   unfold procPrivFd procPrivCoreNoctxAt procOfiles
-  iintro ⟨⟨Hb, Hc, Hg⟩, Ho⟩
+  iintro ⟨⟨Hb, Hc, Hr, Hg⟩, Ho⟩
   icases hcells $$ Ho with ⟨Hcells, Hw⟩
   iframe Hg
   isplitl [Hb Hcells]
   · iapply hs1.2
     iframe Hb Hcells
   iintro %V' %M' %hV Hn Hg
-  obtain ⟨h1, h2, h3, h4⟩ := hV
+  obtain ⟨h1, h2, h3, h4, h5, h6⟩ := hV
   icases (hs2 V' M').1 $$ Hn with ⟨Hb, Hcells⟩
   ihave Hcells := hoc V' h1 $$ Hcells
   ihave Ho := Hw $$ Hcells
   ihave Ho := hback V' h1 h2 $$ Ho
   ihave Hc := hcw V' h3 h4 $$ Hc
-  iframe Hb Hc Hg Ho
+  ihave Hr := hrt V' h5 h6 $$ Hr
+  iframe Hb Hc Hr Hg Ho
 
 /-- **D31's accessor** (wave 8, the dispatch's entry-shape adapter for the
 arms whose bodies run over the cells form -- sys_wait; getpid and sbrk
 now state Rocq's whole block):
 `procPrivFd ⊢ procPrivNoctxAt ∗ (procPrivNoctxAt -∗ procPrivFd)`, the wand
 at any record that keeps the descriptor array, its ghost, the working
-directory, its inum and the generation (a
+directory, its inum, the root, its inum and the generation (a
 `copyout` grows `upt`, none touches those). -/
 theorem procPrivFd_noctx [X : CurCtx] (h : curTier = KTier.kpt) (γ : FileNames) (pa : BitVec 64)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) :
     procPrivFd (GF := GF) γ pa pid V M ⊢
       procPrivNoctxAt curCtx pa pid V M ∗
       (∀ (V' : ProcPriv) (M' : Nat → List (BitVec 8)),
-        ⌜V'.ofile = V.ofile ∧ V'.fdg = V.fdg ∧ V'.cwd = V.cwd ∧ V'.cwi = V.cwi ∧ V'.gen = V.gen⌝ -∗
+        ⌜V'.ofile = V.ofile ∧ V'.fdg = V.fdg ∧ V'.cwd = V.cwd ∧ V'.cwi = V.cwi ∧
+          V'.root = V.root ∧ V'.rti = V.rti ∧ V'.gen = V.gen⌝ -∗
         procPrivNoctxAt curCtx pa pid V' M' -∗ procPrivFd γ pa pid V' M') := by
   iintro H
   icases procPrivFd_noctxGen h γ pa pid V M $$ H with ⟨Hn, Hg, Hw⟩
   iframe Hn
   iintro %V' %M' %hV Hn
-  obtain ⟨h1, h2, h3, h4, h5⟩ := hV
+  obtain ⟨h1, h2, h3, h4, h5, h6, h7⟩ := hV
   ihave Hg := (show procGenAt (GF := GF) curCtx pa pid V.gen ⊢ procGenAt curCtx pa pid V'.gen
-      from by rw [h5]) $$ Hg
+      from by rw [h7]) $$ Hg
   iapply Hw $$ %V' %M' [] Hn Hg
-  ipureintro; exact ⟨h1, h2, h3, h4⟩
+  ipureintro; exact ⟨h1, h2, h3, h4, h5, h6⟩
+
+end
+
+/-! ## The root rows, lent beside a borrowed pid cell (chroot)
+
+The fs syscalls' inner `dirlookup` and `dirlink` take `p->root`, the root
+reference and the pid cell at `pidPriv` together.  Their callers hold the
+block in one of two borrowed shapes -- the pid cell out of the whole block
+(`kxc_priv_pid`'s wand, create's found half) or out of the bare block under
+`create_alloc_priv_open`'s split (create's allocate half) -- and these two
+accessors lend the root rows from either shape and hand the same shape back.
+The block is unchanged: the root comes back verbatim, so the record is `V`
+again (structure eta). -/
+section
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [BcacheG GF] [DiskG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg]
+
+theorem procPrivFd_root_lend_pid [X : CurCtx] (hct : X.curTier = KTier.kpt) (γ : FileNames)
+    (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) :
+    wordPointsTo (GF := GF) (pPid pa) 4 pidPriv pid ∗
+    (wordPointsTo (pPid pa) 4 pidPriv pid -∗ procPrivFd γ pa pid V M) ⊢
+      wordPointsTo (pPid pa) 4 pidPriv pid ∗
+      wordPointsTo (pRoot pa) 8 (DFrac.own 1) V.root ∗ inodeHeldAt V.root V.rti ∗
+      (wordPointsTo (pPid pa) 4 pidPriv pid -∗ wordPointsTo (pRoot pa) 8 (DFrac.own 1) V.root -∗
+        inodeHeldAt V.root V.rti -∗
+        wordPointsTo (pPid pa) 4 pidPriv pid ∗
+        (wordPointsTo (pPid pa) 4 pidPriv pid -∗ procPrivFd γ pa pid V M)) := by
+  obtain ⟨ξ, t⟩ := X
+  simp only at hct
+  subst hct
+  letI : CurCtx := ⟨ξ, KTier.kpt⟩
+  iintro ⟨Hpid, Hw⟩
+  ihave Hfd := Hw $$ Hpid
+  icases procPrivFd_rootPidPriv γ pa pid V M $$ Hfd with ⟨Hrt, Hrr, Hpid, Hback⟩
+  ihave Hrh := rootRefAt_heldAt V.root V.rti $$ Hrr
+  iframe Hpid Hrt Hrh
+  iintro Hpid Hrt Hrh
+  ihave Hrr := rootRefAt_ofHeldAt V.root V.rti $$ Hrh
+  ihave Hfd := Hback $$ %V.root %V.rti Hrt Hrr Hpid
+  ihave Hfd := (show procPrivFd (GF := GF) γ pa pid { V with root := V.root, rti := V.rti } M ⊢
+    procPrivFd γ pa pid V M from .rfl) $$ Hfd
+  unfold procPrivFd procPrivCoreNoctxAt procPrivBareAt
+  icases Hfd with ⟨⟨⟨%hf, Hpid, Hf, Hpt, Htfp, %hlz, Hev⟩, Hcw⟩, Hof⟩
+  iframe Hpid
+  iintro Hpid
+  iframe Hpid Hf Hpt Htfp Hcw Hof Hev
+  isplitl []
+  · ipureintro; exact hf
+  · ipureintro; exact hlz
+
+theorem procPrivFd_root_lend_bare [X : CurCtx] (hct : X.curTier = KTier.kpt) (γ : FileNames)
+    (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) :
+    wordPointsTo (GF := GF) (pPid pa) 4 pidPriv pid ∗
+    (wordPointsTo (pPid pa) 4 pidPriv pid -∗ procPrivBareAt curCtx pa pid V M) ∗
+    (procPrivBareAt curCtx pa pid V M -∗ procPrivFd γ pa pid V M) ⊢
+      wordPointsTo (pPid pa) 4 pidPriv pid ∗
+      wordPointsTo (pRoot pa) 8 (DFrac.own 1) V.root ∗ inodeHeldAt V.root V.rti ∗
+      (wordPointsTo (pPid pa) 4 pidPriv pid -∗ wordPointsTo (pRoot pa) 8 (DFrac.own 1) V.root -∗
+        inodeHeldAt V.root V.rti -∗
+        wordPointsTo (pPid pa) 4 pidPriv pid ∗
+        (wordPointsTo (pPid pa) 4 pidPriv pid -∗ procPrivBareAt curCtx pa pid V M) ∗
+        (procPrivBareAt curCtx pa pid V M -∗ procPrivFd γ pa pid V M)) := by
+  obtain ⟨ξ, t⟩ := X
+  simp only at hct
+  subst hct
+  letI : CurCtx := ⟨ξ, KTier.kpt⟩
+  iintro ⟨Hpid, Hpw, Hbw⟩
+  ihave Hbare := Hpw $$ Hpid
+  ihave Hfd := Hbw $$ Hbare
+  icases procPrivFd_rootPidPriv γ pa pid V M $$ Hfd with ⟨Hrt, Hrr, Hpid, Hback⟩
+  ihave Hrh := rootRefAt_heldAt V.root V.rti $$ Hrr
+  iframe Hpid Hrt Hrh
+  iintro Hpid Hrt Hrh
+  ihave Hrr := rootRefAt_ofHeldAt V.root V.rti $$ Hrh
+  ihave Hfd := Hback $$ %V.root %V.rti Hrt Hrr Hpid
+  ihave Hfd := (show procPrivFd (GF := GF) γ pa pid { V with root := V.root, rti := V.rti } M ⊢
+    procPrivFd γ pa pid V M from .rfl) $$ Hfd
+  unfold procPrivFd procPrivCoreNoctxAt
+  icases Hfd with ⟨⟨Hb, Hc⟩, Ho⟩
+  unfold procPrivBareAt
+  icases Hb with ⟨%h, Hpid, Hf, Hpt, Htfp, %hlz, Hev⟩
+  iframe Hpid
+  isplitl [Hf Hpt Htfp Hev]
+  · iintro Hpid
+    iframe Hpid Hf Hpt Htfp Hev
+    isplitl []
+    · ipureintro; exact h
+    · ipureintro; exact hlz
+  · iintro Hb
+    iframe Hb Hc Ho
 
 end
 

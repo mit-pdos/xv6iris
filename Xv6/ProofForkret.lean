@@ -38,8 +38,6 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedVariables false
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
 
 theorem fkr_prep_slots : prepareReturnSlots ≤ 416 := by decide
@@ -135,7 +133,7 @@ theorem fkr_boot [X : CurCtx] (PR : PREPARE_RETURN) (FS : FSINIT) (KX : KEXEC) (
     trapCsrsExt c1 eb ∗ cpuClaimExt c1 eb (procAddr N.j) ∗
     parkGlobals Γ N.w N.ft N.f N.ip ∗ utSysParkRows Γ ∗
     parkBootBlock (hlc := hlc) N V M ∗ W ∗
-    initBootBundle (hlc := hlc) (SG := uexecSGXv6) V.cwi V.pvSecc sts ∗ consReader fscCons 0 ∗
+    initBootBundle (hlc := hlc) (SG := uexecSGXv6) V.rti V.cwi V.pvSecc sts ∗ consReader fscCons 0 ∗
     MachFixedGS.uClaimO (hlc := hlc) (GF := GF) ∗
     fkrCloser W Γ N V.fdg V.chg V.cwi sts gn cs none
     ⊢ wpLoop (GF := GF) c1 := by
@@ -149,7 +147,7 @@ theorem fkr_boot [X : CurCtx] (PR : PREPARE_RETURN) (FS : FSINIT) (KX : KEXEC) (
   ihave #Hpe := (show parkGlobals (GF := GF) Γ N.w N.ft N.f N.ip ⊢ panicEnv from by
       unfold parkGlobals; iintro ⟨-, H, -⟩; iexact H) $$ Hglob
   unfold parkBootBlock UtNames.pj
-  icases Hblk with ⟨Hbare, Hofs, Hcwr, Hfb, Hkq, #Hmp, Hgh, Hxs⟩
+  icases Hblk with ⟨Hbare, Hofs, Hcwr, Hrtr, Hfb, Hkq, #Hmp, Hgh, Hxs⟩
   icases firstBoot_open (hlc := hlc) $$ Hfb with ⟨Hf1, #Hbp, Hka, Hfsi⟩
   unfold procPrivBareAt
   icases Hbare with ⟨%hb, Hpid, Hfld, Hpt, Htfp, %hlz, Hev⟩
@@ -167,9 +165,9 @@ theorem fkr_boot [X : CurCtx] (PR : PREPARE_RETURN) (FS : FSINIT) (KX : KEXEC) (
   iintro %c3 %kr3 %hkr3 Hk Hpc Hte Hce Hpid #Hdone Hbs Hir
   -- the block, rejoined at the steady token (Rocq's `Hpriv` assert)
   ihave #Htok := firstTok_of_done (hlc := hlc) $$ Hdone
-  ihave Hpv : procPrivFd (GF := GF) N.f (procAddr N.j) N.pid V M $$ [Hpid Hfld Hpt Htfp Hofs Hcwr Hkq Hgh Hxs Hev]
+  ihave Hpv : procPrivFd (GF := GF) N.f (procAddr N.j) N.pid V M $$ [Hpid Hfld Hpt Htfp Hofs Hcwr Hrtr Hkq Hgh Hxs Hev]
   · unfold procPrivFd procPrivCoreNoctxAt procPrivBareAt procGenAt
-    iframe Hpid Hfld Hpt Htfp Hofs Hcwr Hgh Hxs Hev
+    iframe Hpid Hfld Hpt Htfp Hofs Hcwr Hrtr Hgh Hxs Hev
     isplitl []; · ipureintro; exact ⟨hb, hlz⟩
     isplitl []; · iexact Htok
     iexists (fun _ => iprop(True))

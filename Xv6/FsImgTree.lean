@@ -43,9 +43,8 @@ open MachCSL
 
 /-! ## 4.  NODES -/
 
-/-- A free record (`type = 0`) represents no node at all -- `FsTree`'s
-`nodeRep` demands a nonzero type, so the tree never contains one (Rocq's
-`node_at`). -/
+/-- A free record (`type = 0`) represents no node at all -- a tree node has
+a nonzero type, so the tree never contains one (Rocq's `node_at`). -/
 def nodeAt (P : Nat → List (BitVec 8)) (sb : FsSb) (i : Nat) : Option Fsnode :=
   let dn := fsDinode P sb i
   if dn.diType.toNat = 0 then none else some (nodeOf dn (fsDataOf P dn))
@@ -56,12 +55,6 @@ theorem nodeAt_live (P : Nat → List (BitVec 8)) (sb : FsSb) (i : Nat)
     nodeAt P sb i = some (nodeOf (fsDinode P sb i) (fsFileData P sb i)) := by
   unfold nodeAt fsFileData
   simp only [if_neg h]
-
-/-- Rocq's `node_at_free`. -/
-theorem nodeAt_free (P : Nat → List (BitVec 8)) (sb : FsSb) (i : Nat)
-    (h : (fsDinode P sb i).diType.toNat = 0) : nodeAt P sb i = none := by
-  unfold nodeAt
-  simp only [if_pos h]
 
 /-- The node store: fuel counts DOWN, entries are inserted as they are met,
 nothing is reversed (Rocq's `fs_nodes_upto`). -/
@@ -114,15 +107,6 @@ theorem treeOfDisk_lookup (P : Nat → List (BitVec 8)) (sb : FsSb) (i : Nat)
     (hi : i < sb.sbNinodes) : (treeOfDisk P sb).fsNodes[i]? = nodeAt P sb i :=
   fsNodesUpto_lookup P sb _ i hi
 
-/-- Rocq's `tree_of_disk_lookup_out`. -/
-theorem treeOfDisk_lookup_out (P : Nat → List (BitVec 8)) (sb : FsSb) (i : Nat)
-    (hi : sb.sbNinodes ≤ i) : (treeOfDisk P sb).fsNodes[i]? = none :=
-  fsNodesUpto_lookup_out P sb _ i hi
-
-/-- Rocq's `tree_of_disk_root`. -/
-theorem treeOfDisk_root (P : Nat → List (BitVec 8)) (sb : FsSb) :
-    (treeOfDisk P sb).fsRoot = ROOTINO := rfl
-
 /-! ### the path reduction -/
 
 /-- Rocq's `tree_ent_of_disk`. -/
@@ -134,18 +118,6 @@ theorem treeEnt_of_disk (P : Nat → List (BitVec 8)) (sb : FsSb) (i : Nat) (f :
       | _ => none := by
   unfold treeEnt
   rw [treeOfDisk_lookup P sb i hi]
-  rcases nodeAt P sb i with _ | (_ | _) <;> rfl
-
-/-- Rocq's `path_at_disk_cons`. -/
-theorem pathAt_disk_cons (P : Nat → List (BitVec 8)) (sb : FsSb) (i : Nat) (f : Fname)
-    (p : List Fname) (hi : i < sb.sbNinodes) :
-    pathAt (treeOfDisk P sb) i (f :: p) =
-      match (match nodeAt P sb i with
-             | some (.NDir ents) => ents[f]?
-             | _ => none) with
-      | some j => pathAt (treeOfDisk P sb) j p
-      | none => none := by
-  rw [pathAt_cons, treeEnt_of_disk P sb i f hi]
   rcases nodeAt P sb i with _ | (_ | _) <;> rfl
 
 /-- Rocq's `path_at_disk_singleton`: one step out of a directory IS a

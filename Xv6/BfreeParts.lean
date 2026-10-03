@@ -2,7 +2,7 @@
 `bfree`'s own vocabulary (Rocq `ProofBfree.v` 66–545): the pure arithmetic
 of the block number and the bit, the constants the code computes, the
 payload's machinery half, and `log_write` restated at its call site
-(`bread` / `brelse` are the shared `Xv6.bread_call` / `Xv6.brelse_call`,
+(`bread` / `brelse` are the shared `Xv6.bread_call_eb` / `Xv6.brelse_call`,
 `Xv6/FsCallSites.lean`).  Everything here is closed over plain `Nat` / `BitVec` facts or is
 a one-screen ghost move; the instruction walks are in
 `Xv6/ProofBfree.lean` (`+0x00 .. +0x1c`), `Xv6/BfreeMid.lean`
@@ -32,15 +32,11 @@ import Xv6.SpecBfree
 import Xv6.DinodeSlot
 import Xv6.SpecBrelse
 import Xv6.SpecLogWrite
-import Xv6.BallocParts
-import Xv6.FsWords
 
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
-
-set_option linter.unusedSectionVars false
 
 /-! ## The block number (`b < size ≤ BPB = 8192`) -/
 
@@ -113,11 +109,11 @@ theorem bf_data_off' (X : BitVec 64) (q : Nat) :
 /-! ## The constants the code computes -/
 
 /-- `auipc a1,0x1e; lw a1,-1730(a1)` reads `sb.bmapstart`. -/
-theorem bf_sb_addr : KA.«bfree» + 0x1db3a#64 = sbBmapstartAddr := by
+theorem bf_sb_addr : KA.«bfree» + 0x1ddc6#64 = sbBmapstartAddr := by
   unfold sbBmapstartAddr; decide
 
 theorem bf_br_bread : KA.«bfree» + 0xFFFFFFFFFFFFFC5C#64 = KA.«bread» := by decide
-theorem bf_br_logwrite : KA.«bfree» + 0xF0C#64 = KA.«log_write» := by decide
+theorem bf_br_logwrite : KA.«bfree» + 0xf6c#64 = KA.«log_write» := by decide
 theorem bf_br_brelse : KA.«bfree» + 0xFFFFFFFFFFFFFD64#64 = KA.«brelse» := by decide
 
 theorem bf_ret_20 : jumpPc (KA.«bfree» + 0x20#64) = (KA.«bfree» + 0x20#64) := by decide

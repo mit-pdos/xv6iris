@@ -35,9 +35,7 @@ open Xv6.UMemL
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## Pure facts -/
 
@@ -62,9 +60,9 @@ theorem fetchstr_ret_30 : jumpPc (KA.«fetchstr» + 0x30#64) = (KA.«fetchstr» 
 
 theorem fetchstr_blt_zero : bcond bop.BLT 0#64 0#64 = false := by decide
 
-theorem fetchstr_br_myproc : KA.«fetchstr» + 0xfffffffffffff0a8#64 = KA.«myproc» := by decide
-theorem fetchstr_br_copyinstr : KA.«fetchstr» + 0xffffffffffffee44#64 = KA.«copyinstr» := by decide
-theorem fetchstr_br_strlen : KA.«fetchstr» + 0xffffffffffffe5c2#64 = KA.«strlen» := by decide
+theorem fetchstr_br_myproc : KA.«fetchstr» + 0xfffffffffffff088#64 = KA.«myproc» := by decide
+theorem fetchstr_br_copyinstr : KA.«fetchstr» + 0xffffffffffffee30#64 = KA.«copyinstr» := by decide
+theorem fetchstr_br_strlen : KA.«fetchstr» + 0xffffffffffffe5ae#64 = KA.«strlen» := by decide
 
 /-- `s4..s11`, pinned to the entry map. -/
 def fetchstrPins (k : KCtx) (R : RegMap) : Prop :=
@@ -87,7 +85,7 @@ theorem fetchstr_priv_split [X : CurCtx] (ξ : CtxId) (hX : X = ⟨ξ, KTier.kpt
       procPtAt V.upt M ∗ ecRest pa pid V V.upt := by
   subst hX
   unfold procPrivBareAt ecRest procFieldsNoOfile
-  iintro ⟨%hf, Hpid, ⟨Hks, Hsz, Hpg, Htf, Hcwd, Hnm, Hsc⟩, Hpt, Htfp⟩
+  iintro ⟨%hf, Hpid, ⟨Hks, Hsz, Hpg, Htf, Hcwd, Hnm, Hsc, Hrt⟩, Hpt, Htfp⟩
   isplitl []
   · ipureintro; exact hf
   · iframe
@@ -108,7 +106,7 @@ theorem fetchstr_priv_close [X : CurCtx] (ξ : CtxId) (hX : X = ⟨ξ, KTier.kpt
     ⌜V.pvLazy = false → lazyFree P'.um V.sz⌝ ∗ actCnt pa V.ev)
   unfold ecRest procFieldsNoOfile
   rw [hext.1.1, hext.1.2.1]
-  iintro ⟨Hsz, Hpg, Hpt, Hpid, Hks, Htf, Hcwd, Hnm, Hsc, Htfp, %hlz, Hev⟩
+  iintro ⟨Hsz, Hpg, Hpt, Hpid, Hks, Htf, Hcwd, Hnm, Hsc, Hrt, Htfp, %hlz, Hev⟩
   isplitl []
   · ipureintro; exact ⟨hf.1, UMemL.umBelow_extSz hf.2.1 hext, hf.2.2.1, hf.2.2.2⟩
   · iframe
@@ -236,7 +234,7 @@ theorem fetchstr_tail_ok (SL : STRLEN) (cpu c : CPU) (k : KCtx) (Q : BitVec 64 �
   k_step_gen (wp_s_add c1 _ (KA.«fetchstr» + 0x2a#64) true 10#5 0#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c2 hp2
   iintro Hk Hpc
-  k_step_gen (wp_s_jal c2 _ (KA.«fetchstr» + 0x2c#64) false 2090390#21 1#5 (by decide))
+  k_step_gen (wp_s_jal c2 _ (KA.«fetchstr» + 0x2c#64) false 2090370#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fetchstr_br_strlen] next c3 hp3
   iintro Hk Hpc
   k_norm_g
@@ -360,7 +358,7 @@ theorem fetchstr_proof (MP : MYPROC) (CI : COPYINSTR) (SL : STRLEN) : FETCHSTR :
   k_step_gen (wp_s_add c3 _ (KA.«fetchstr» + 0x12#64) true 18#5 0#5 12#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c4 hp4
   iintro Hk Hpc
-  k_step_gen (wp_s_jal c4 _ (KA.«fetchstr» + 0x14#64) false 2093204#21 1#5 (by decide))
+  k_step_gen (wp_s_jal c4 _ (KA.«fetchstr» + 0x14#64) false 2093172#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fetchstr_br_myproc] next c5 hp5
   iintro Hk Hpc
   k_norm_g
@@ -401,7 +399,7 @@ theorem fetchstr_proof (MP : MYPROC) (CI : COPYINSTR) (SL : STRLEN) : FETCHSTR :
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [hpa, pSz, pPagetable] next c11 hp11
   iintro Hk Hpc Hpg
-  k_step_gen (wp_s_jal c11 _ (KA.«fetchstr» + 0x22#64) false 2092578#21 1#5 (by decide))
+  k_step_gen (wp_s_jal c11 _ (KA.«fetchstr» + 0x22#64) false 2092558#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fetchstr_br_copyinstr] next c12 hp12
   iintro Hk Hpc
   k_norm_g

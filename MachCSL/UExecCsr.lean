@@ -38,7 +38,6 @@ kernel walks at a table that does not pin the enables), and the three
 `FS`-gated numbers (composition, `FS = 0` rewriting the symbolic gate).
 -/
 import MachCSL.UExecCsrTab
-import MachCSL.UExecAluGpr
 
 namespace MachCSL
 

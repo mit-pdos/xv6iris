@@ -52,20 +52,10 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
-
 /-! ## §0 A pid is not `-1` (Rocq top level) -/
 
 /-- Rocq `ushf_pid_lt_Z31`. -/
 theorem ushf_pid_lt_Z31 (z : Nat) (h : 1 ≤ z ∧ z ≤ PIDMAX) : z < 2 ^ 31 := by
-  unfold PIDMAX at h; omega
-
-/-- Rocq `ushf_pid_Z64`. -/
-theorem ushf_pid_Z64 (z : Nat) (h : 1 ≤ z ∧ z ≤ PIDMAX) : z < 2 ^ 64 := by
-  unfold PIDMAX at h; omega
-
-/-- Rocq `ushf_pid_ne_m1`. -/
-theorem ushf_pid_ne_m1 (z : Nat) (h : 1 ≤ z ∧ z ≤ PIDMAX) : z ≠ 18446744073709551615 := by
   unfold PIDMAX at h; omega
 
 /-- **Rocq `ushf_pid_sext_ne_m1`**: a pid in `[1, PIDMAX]` does not

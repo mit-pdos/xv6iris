@@ -40,8 +40,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode MachCSL
 
-set_option linter.unusedSectionVars false
-
 section OpenEventsPure
 variable (M : LModel) (sd : M.lmSt)
 
@@ -100,10 +98,6 @@ theorem peclV_gen (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (sd : M.lm
     (WA : GenWa M G sd) (k : Nat) (ho : List Obs) (H : ConsHist) :
     peclV g M G sd WA k ho H ⊣⊢ iprop(gcl M G sd WA k ho H ∨ popenV g M G.gcPIN WA.gwa sd WA.gpr k ho H) :=
   .rfl
-
-theorem csLb_weakenV (v : EraPins) (l l' : List Nat) (hp : l' <+: l) :
-    csLb (GF := GF) v l ⊢ csLb v l' :=
-  gopCsLb_weaken v l l' hp
 
 /-- the reader's receipt: `GenOut.gcl_step_read`'s (Rocq `rd_retV`). -/
 def rdRetV (M : LModel) (G : GenCparams hlc GF M) (k : Nat) (v : EraPins) (n : Nat)

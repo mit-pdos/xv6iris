@@ -10,6 +10,7 @@ import MachCSL.MConf
 import MachCSL.PlatformFacts
 import MachCSL.ModelFacts
 import MachCSL.FetchedDefs
+import MachCSL.Tactics
 
 namespace MachCSL
 
@@ -34,7 +35,7 @@ theorem swp_dispatchInterrupt_conf (cpu : CPU) (dq : DFrac) (c : MConf) (hok : c
   mconf_intro HmConf
   iapply HΦ $$ HmConf Hmip
 
--- The clock tick (`swp_tick_clock_cells`, `swp_tick_clock_conf`) lives in `MachCSL.WpTick`.
+-- The clock tick (`swp_tick_clock_cells`) lives in `MachCSL.WpTick`.
 
 /-! ### Aligned RAM reads -/
 
@@ -143,11 +144,11 @@ theorem swp_transform_effective_address_M (cpu : CPU) (dq : DFrac) (c : MConf) (
     iapply swp_translationMode_M
     swp_run 60
     reduce_closed_widths
-    simp only [pm_transform_PA, pm_transform_VA, zero_extend, sign_extend, Sail.BitVec.zeroExtend,
-      Sail.BitVec.signExtend, Sail.BitVec.extractLsb, BitVec.extractLsb, Functions.xlen, Int.reduceSub,
-      Int.reduceToNat, Int.reduceAdd, Nat.reduceSub, Nat.reduceAdd, Nat.sub_zero, Int.cast_ofNat_Int]
+    simp only [pm_transform_PA, zero_extend, Sail.BitVec.zeroExtend,
+      Sail.BitVec.extractLsb, BitVec.extractLsb, Functions.xlen, Int.reduceSub,
+      Int.reduceToNat, Nat.reduceAdd, Nat.sub_zero, Int.cast_ofNat_Int]
     reduce_closed_widths
-    try simp only [BitVec.zeroExtend, setWidth_extract64', signExtend_extract64']
+    try simp only [BitVec.zeroExtend, setWidth_extract64']
     mconf_intro HmConf
     iapply HΦ $$ HmConf
 
@@ -186,24 +187,26 @@ theorem swp_fetch_m4_conf (cpu : CPU) (dq : DFrac) (c : MConf) (hok : MConf.ok (
   have hva := is_aligned_vaddr_of pc 4 hal
   have hb0 := bit0_clear_of_even pc (by omega)
   have hb1 := bit1_clear_of_mod4 pc hal
+  unfold fetch
+  swp_run 80
+  mconf_intro HmConf
+  iapply swp_bind
+  iapply (swp_translateAddr_M cpu dq c hok pc _ (Or.inl rfl))
+  iframe HmConf
+  iintro HmConf
+  mconf_cases HmConf
+  swp_run 40
+  mconf_intro HmConf
+  iapply swp_bind
+  iapply swp_checked_mem_read_ifetch4_conf (hok := hok) (hram := hram) (hal := hal)
+  iframe
+  inext
+  iintro HmConf Hbytes
+  -- the fetched bits' `isRVC` matters only from here: split after the shared
+  -- walk (splitting first walked the translation and the read twice)
   rcases Bool.eq_false_or_eq_true (isRVC (BitVec.extractLsb' 0 16 w)) with hc | hc
   all_goals
     simp only [fetched4, hc, Bool.false_eq_true, ite_false, ite_true]
-    unfold fetch
-    swp_run 80
-    mconf_intro HmConf
-    iapply swp_bind
-    iapply (swp_translateAddr_M cpu dq c hok pc _ (Or.inl rfl))
-    iframe HmConf
-    iintro HmConf
-    mconf_cases HmConf
-    swp_run 40
-    mconf_intro HmConf
-    iapply swp_bind
-    iapply swp_checked_mem_read_ifetch4_conf (hok := hok) (hram := hram) (hal := hal)
-    iframe
-    inext
-    iintro HmConf Hbytes
     swp_run 40
     iapply HΦ $$ HmConf HPC Hbytes
 
@@ -227,24 +230,25 @@ theorem swp_fetch_m2_conf (cpu : CPU) (dq : DFrac) (c : MConf) (hok : MConf.ok (
   have hal2 : pc.toNat % 2 = 0 := by omega
   have hram2' : inRam (pc + 2#64) 2 := by simp only [inRam, ramBase, ramEnd, h2] at *; omega
   have hal2' : (pc + 2#64).toNat % 2 = 0 := by rw [h2]; omega
+  unfold fetch
+  swp_run 80
+  mconf_intro HmConf
+  iapply swp_bind
+  iapply (swp_translateAddr_M cpu dq c hok pc _ (Or.inl rfl))
+  iframe HmConf
+  iintro HmConf
+  mconf_cases HmConf
+  swp_run 40
+  mconf_intro HmConf
+  iapply swp_bind
+  iapply swp_checked_mem_read_ifetch2_conf (hok := hok) (hram := hram2) (hal := hal2)
+  iframe
+  inext
+  iintro HmConf Hlo
+  -- the fetched bits' `isRVC` matters only from here: split after the shared
+  -- walk (splitting first walked the translation and the read twice)
   rcases Bool.eq_false_or_eq_true (isRVC lo) with hc | hc
-  all_goals
-    simp only [fetched2, hc, Bool.false_eq_true, ite_false, ite_true]
-    unfold fetch
-    swp_run 80
-    mconf_intro HmConf
-    iapply swp_bind
-    iapply (swp_translateAddr_M cpu dq c hok pc _ (Or.inl rfl))
-    iframe HmConf
-    iintro HmConf
-    mconf_cases HmConf
-    swp_run 40
-    mconf_intro HmConf
-    iapply swp_bind
-    iapply swp_checked_mem_read_ifetch2_conf (hok := hok) (hram := hram2) (hal := hal2)
-    iframe
-    inext
-    iintro HmConf Hlo
+  all_goals simp only [fetched2, hc, Bool.false_eq_true, ite_false, ite_true]
   · swp_run 40
     iapply HΦ $$ HmConf HPC Hlo Hhi
   · mconf_cases HmConf

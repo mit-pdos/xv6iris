@@ -155,29 +155,4 @@ structure PIPEREAD : Prop where
     wp_piperead_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl γp w q γkl γk j pid V M n Q Qe hw
       hj hproc hK hnoff htier hn hn'
 
-/-- The interrupts-off instance of `wp_piperead_eb` (the complement is the
-whole bundle). -/
-theorem PIPEREAD.wp_piperead (A : PIPEREAD) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
-    [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (cpu : CPU) (k : KCtx) (γl : GName) (γp : PipeNames) (w : Bool) (q : Qp)
-    (γkl : GName) (γk : KmemNames) (j : Nat) (pid : BitVec 32)
-    (V : ProcPriv) (M : Nat → List (BitVec 8)) (n : Int)
-    (Q : List (BitVec 8) → IProp GF) (Qe : List (BitVec 8) → PipeSt → IProp GF) hw
-    hj hproc hK hsie hnoff hlocks htier hn hn' :
-    wp_piperead_body (hlc := hlc) (GF := GF) Γ cpu k γl γp w q γkl γk j pid V M n Q Qe hw
-      hj hproc hK hsie hnoff hlocks htier hn hn' := by
-  have h := A.wp_piperead_eb (hlc := hlc) (GF := GF) Γ cpu k γl γp w q γkl γk j pid V M n Q Qe hw
-    hj hproc hK hnoff htier hn hn'
-  unfold wp_piperead_eb_body at h
-  unfold wp_piperead_body
-  rw [hsie] at h
-  simp only [trapCsrsExt_false, cpuClaimExt_false] at h
-  iintro ⟨H0, H1, H2, Htc, Hcl, Hir, H6, H7, H8, H9, H10, H11, H12, Hnext⟩
-  iapply h
-  iframe H0 H1 H2 Htc Hcl Hir H6 H7 H8 H9 H10 H11 H12
-  iapply wpNext_mono $$ Hnext
-  iintro %cpu' HK %spie %spp %R' %P' %M' %d %bsW %k' %p0 H1 H2 ⟨Htc, Hir⟩ Hcl H6 %hk' H7 H8 H9
-  iapply HK $$ %spie %spp %R' %P' %M' %d %bsW %k' %p0 H1 H2 Htc Hcl Hir H6 %hk' H7 H8 H9
-
 end Xv6

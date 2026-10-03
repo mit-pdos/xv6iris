@@ -39,8 +39,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-! ## Pure helpers -/
 
 theorem pipeRd_acc_snoc (L acc : List (BitVec 8)) (c : Nat) (b : BitVec 8)

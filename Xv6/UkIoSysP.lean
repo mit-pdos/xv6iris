@@ -36,15 +36,12 @@ Reached from the H-io cone: `wp_uk_ecall_read_recv_at` (UkReadCons),
    port, reused).
 -/
 import Xv6.UshSysP
-import Xv6.UkRunSysWrite
 
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
-
-set_option linter.unusedSectionVars false
 
 namespace UkIoSysP
 

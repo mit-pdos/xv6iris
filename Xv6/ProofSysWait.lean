@@ -31,9 +31,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## Constants and register bookkeeping -/
 
@@ -111,7 +109,7 @@ theorem sw_frame_close (sp ra s0 w1 w2 : BitVec 64) :
 /-! ## The epilogue at `(KernelSyms.«sys_wait» + 0x1a)`, after `kwait` -/
 
 set_option maxHeartbeats 4000000 in
-/-- The epilogue at `0x80002a62` over a generic frame base `kb`. -/
+/-- The epilogue at `0x80002a76` over a generic frame base `kb`. -/
 theorem sw_tail (c : CPU) (kb : KCtx) (hK : 4 ≤ kb.avail)
     (KR : RegMap) (hregs : kb.regs = KR)
     (R : RegMap) (hR2 : R 2#5 = KR 2#5 + 0xFFFFFFFFFFFFFFE0#64) (P : IProp GF) :
@@ -229,11 +227,12 @@ theorem sys_wait_proof (AA : ARGADDR) (KW : KWAIT) : SYSWAIT := ⟨
        ofileCells (procAddr j) (DFrac.own 1) V.ofile ∗
        wordPointsTo (pCwd (procAddr j)) 8 (DFrac.own 1) V.cwd ∗
        pnameCells (procAddr j) (DFrac.own 1) V.name ∗
-       wordPointsTo (pSecc (procAddr j)) 8 (DFrac.own 1) V.pvSecc) ∗
+       wordPointsTo (pSecc (procAddr j)) 8 (DFrac.own 1) V.pvSecc ∗
+       wordPointsTo (pRoot (procAddr j)) 8 (DFrac.own 1) V.root) ∗
       procPtAt V.upt M ∗ tfPageAt V.upt.tfp V.tf ∗ ⌜V.pvLazy = false → lazyFree V.upt.um V.sz⌝ ∗
       actCnt (procAddr j) V.ev
       from by unfold procPrivNoctxAt procFieldsNoctx; iintro H; iexact H) $$ Hblk
-    with ⟨%hVb, Hpid, ⟨Hks, Hsz, Hpg, Htf, Hof, Hcwd, Hnm, Hsc⟩, HPt, HTf, %hlz, Hev⟩
+    with ⟨%hVb, Hpid, ⟨Hks, Hsz, Hpg, Htf, Hof, Hcwd, Hnm, Hsc, Hrt⟩, HPt, HTf, %hlz, Hev⟩
   ihave Htf := (show wordPointsTo (GF := GF) (pTrapframe (procAddr j)) 8 (DFrac.own 1) V.trapframe ⊢
       wordPointsTo (pTrapframe k.proc) 8 (DFrac.own 1) (pageAddr V.upt.tfp) from by rw [hVb.2.2.2, hproc]) $$ Htf
   -- the prologue ; a1 = &p ; a0 = 0 ; jal argaddr
@@ -287,13 +286,13 @@ theorem sys_wait_proof (AA : ARGADDR) (KW : KWAIT) : SYSWAIT := ⟨
   -- the block, closed again
   ihave Htf := (show wordPointsTo (GF := GF) (pTrapframe k.proc) 8 (DFrac.own 1) (pageAddr V.upt.tfp) ⊢
       wordPointsTo (pTrapframe (procAddr j)) 8 (DFrac.own 1) V.trapframe from by rw [hVb.2.2.2, hproc]) $$ Htf
-  ihave Hblk : procPrivNoctxAt (GF := GF) curCtx (procAddr j) pid V M $$ [Hpid Hks Hsz Hpg Htf Hof Hcwd Hnm Hsc HPt HTf Hev]
+  ihave Hblk : procPrivNoctxAt (GF := GF) curCtx (procAddr j) pid V M $$ [Hpid Hks Hsz Hpg Htf Hof Hcwd Hnm Hsc Hrt HPt HTf Hev]
   case' _ =>
     unfold procPrivNoctxAt procFieldsNoctx
-    iframe Hpid Hks Hsz Hpg Htf Hof Hcwd Hnm Hsc HPt HTf Hev
+    iframe Hpid Hks Hsz Hpg Htf Hof Hcwd Hnm Hsc Hrt HPt HTf Hev
     ipureintro; exact ⟨hVb, hlz⟩
   ihave Hblk := Hback $$ %V %M [] Hblk
-  · ipureintro; exact ⟨rfl, rfl, rfl, rfl, rfl⟩
+  · ipureintro; exact ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩
   ihave Hframe := sw_frame_close (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) v w2 $$ [Hra Hs0 Hslot Hc2]
   case' _ => iframe
   iapply (sw_kwait KW Γ c7 _ γw γp γl γk γ j pid V M cs k.sie k.proc v hj ?hpr ?hKw ?hn2 ?ht ?hs ?hp ?ha)

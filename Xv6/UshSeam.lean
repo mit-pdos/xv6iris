@@ -40,8 +40,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
-
 /-! ## §1 The runner's tree off the parser's -/
 
 /-- **Rocq `ushcmd_of_tree`**: the runner's tree read off the parser's at the
@@ -52,10 +50,6 @@ def ushcmdOfTree (s0 : Nat) (g : Nat → BitVec 8) : UshpCmd → Ushcmd
   | .pipe l r => .pipe (ushcmdOfTree s0 g l) (ushcmdOfTree s0 g r)
   | .list l r => .list (ushcmdOfTree s0 g l) (ushcmdOfTree s0 g r)
   | .back c => .back (ushcmdOfTree s0 g c)
-
-/-- The type word agrees. -/
-theorem ushTy_ofTree (s0 : Nat) (g : Nat → BitVec 8) (t : UshpCmd) : ushTy (ushcmdOfTree s0 g t) = ushpTy t := by
-  cases t <;> rfl
 
 section UshSeam
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]

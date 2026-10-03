@@ -20,8 +20,6 @@ namespace Xv6
 open MachCSL
 open Sail LeanRV64D LeanRV64D.Functions
 
-set_option linter.unusedSectionVars false
-
 variable {C : UCfg} {P : UPtd} {t0 : PTree} {mm0 : BMap}
 
 /-- The walker state a store's physical write leaves. -/

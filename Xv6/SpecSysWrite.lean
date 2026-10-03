@@ -20,7 +20,7 @@ three `jal` targets changed.
 
 ## Rocq's header, in short (every clause kept)
 
-* NO NUMERIC PREMISE: filewrite chunks its writes (`fwrChunkJoint`), and
+* NO NUMERIC PREMISE: filewrite chunks its writes, and
   its own `n < 0` test (XV6_REV 31f115a) makes the sign a fact of the
   code, so the count is whatever the user put in `a2`: `argZ v2` (Rocq
   `sys_rw_count v2`), in range by `argZ_range` (Rocq
@@ -86,9 +86,6 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedVariables false
-set_option linter.unusedSectionVars false
-
 def sysWriteAddr : BitVec 64 := KA.«sys_write»
 
 /-- sys_write's own 6-slot frame over filewrite's 104 (argfd's 24 and
@@ -121,23 +118,6 @@ def sysWriteArms (V : ProcPriv) (v : BitVec 64) (sts : List FdState) (n : Int)
     (M : Nat → List (BitVec 8)) (ua : BitVec 64) (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF) (r : BitVec 64) : IProp GF :=
   iprop(⌜sysWriteRet V v n r⌝ ∗ filewriteExtra (hlc := hlc) V.gen V.upt (sysFdSt v V.ofile sts) n M ua Q Qe r)
 
-/-- Rocq `sys_write_arms_ret`. -/
-theorem sysWriteArms_ret (V : ProcPriv) (v : BitVec 64) (sts : List FdState) (n : Int)
-    (M : Nat → List (BitVec 8)) (ua : BitVec 64) (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF) (r : BitVec 64) :
-    sysWriteArms (hlc := hlc) V v sts n M ua Q Qe r ⊢ ⌜sysWriteRet V v n r⌝ := by
-  unfold sysWriteArms
-  iintro ⟨%h, -⟩
-  ipureintro; exact h
-
-/-- Rocq `sys_write_arms_extra`. -/
-theorem sysWriteArms_extra (V : ProcPriv) (v : BitVec 64) (sts : List FdState) (n : Int)
-    (M : Nat → List (BitVec 8)) (ua : BitVec 64) (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF) (r : BitVec 64) :
-    sysWriteArms (hlc := hlc) V v sts n M ua Q Qe r ⊢
-      filewriteExtra (hlc := hlc) V.gen V.upt (sysFdSt v V.ofile sts) n M ua Q Qe r := by
-  unfold sysWriteArms
-  iintro ⟨-, H⟩
-  iexact H
-
 /-- Rocq `sys_write_arms_none`: argfd said no, and the answer is -1. -/
 theorem sysWriteArms_none (V : ProcPriv) (v : BitVec 64) (sts : List FdState) (n : Int)
     (M : Nat → List (BitVec 8)) (ua : BitVec 64) (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF) (r : BitVec 64)
@@ -148,16 +128,6 @@ theorem sysWriteArms_none (V : ProcPriv) (v : BitVec 64) (sts : List FdState) (n
   isplitl []
   · ipureintro; exact Or.inl ⟨hr, hnone⟩
   · unfold filewriteExtra; exact .rfl
-
-/-- ... and the input is dropped there (Rocq's `sys_write_in` at
-`FdClosed`). -/
-theorem sysWriteIn_none (V : ProcPriv) (v : BitVec 64) (sts : List FdState) (n : Int)
-    (M : Nat → List (BitVec 8)) (ua : BitVec 64) (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF)
-    (hnone : argFd v V.ofile = none) :
-    sysWriteIn (hlc := hlc) pmv szv lzv V v sts n M ua Q Qe ⊢ emp := by
-  unfold sysWriteIn
-  rw [sysFdSt_none v V.ofile sts hnone]
-  unfold filewriteIn; exact .rfl
 
 /-- Rocq `sys_write_in_of`. -/
 theorem sysWriteIn_of (V : ProcPriv) (v : BitVec 64) (sts : List FdState) (fd : Nat)

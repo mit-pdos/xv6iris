@@ -48,8 +48,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-! ## 0.  THE CONSOLE CREDENTIAL -/
 
 /-- **Rocq `cons_cred`**: the six predicates the console's supply is

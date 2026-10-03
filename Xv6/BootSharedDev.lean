@@ -51,9 +51,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
 
-set_option linter.unusedSectionVars false
-set_option linter.unusedVariables false
-
 /-! ## §1 The gname-only mints -/
 
 section names
@@ -73,7 +70,7 @@ def bsdNameRows [WchG GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] (Γ : SchedN
   lockFreeTok (hlc := hlc) γt ∗
   ([∗list] i ∈ List.range NPROC, lockFreeTok (hlc := hlc) (Γ.lock i)) ∗
   fdSlots (NPROC * (NOFILE + FDSPARE)) ∗
-  irefSlots (NPROC * (1 + IREFSPARE)) ∗ irefSlots NFILE ∗ irefSlots IREFBOOT ∗ irefSlotsAuth ∗
+  irefSlots (NPROC * (IREFHOME + IREFSPARE)) ∗ irefSlots NFILE ∗ irefSlots IREFBOOT ∗ irefSlotsAuth ∗
   bslots (NPROC * 3) ∗ bslots mainBslotsFs
 
 /-- The bio supply's two shares (the rest is dropped, deviation 3). -/
@@ -87,7 +84,7 @@ theorem bsd_bslots_split [BioslotG GF] :
 /-- The iref supply's three shares and its authority. -/
 theorem bsd_irefSlots_split [IrefslotG GF] :
     irefSlots (GF := GF) IREFSLOTS ⊢
-      irefSlots (NPROC * (1 + IREFSPARE)) ∗ irefSlots NFILE ∗ irefSlots IREFBOOT := by
+      irefSlots (NPROC * (IREFHOME + IREFSPARE)) ∗ irefSlots NFILE ∗ irefSlots IREFBOOT := by
   unfold IREFSLOTS
   iintro H
   icases irefSlots_split _ _ $$ H with ⟨H, Hb⟩

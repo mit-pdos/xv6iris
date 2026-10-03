@@ -67,8 +67,6 @@ namespace UShPipesDefs
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Wid RdOut WrOut
 
-set_option linter.unusedSectionVars false
-
 /-! ## §0 Pure: the writers, the diagnostics, the flow chain's indices -/
 
 /-- **Rocq `chain`**: the chain of the content writer -- its cursor is what
@@ -398,12 +396,10 @@ theorem PdRoundOk.toPns (OK : PdRoundOk D)
 
 variable (D)
 
-/-- Rocq `FAM`: THE FAMILY, at the round (`= D.toPns.FAM`, `FAM_toPns`). -/
+/-- Rocq `FAM`: THE FAMILY, at the round (`= D.toPns.FAM` by `rfl`). -/
 noncomputable abbrev PdRound.FAM : IProp GF :=
   blkNInv (hlc := hlc) D.wsN D.RUNN D.PWN termw D.TOKN (pdep D) pnsN (genId (hlc := hlc) (GF := GF) + 1)
     D.γc D.γm
-
-theorem FAM_toPns : D.toPns.FAM = D.FAM := rfl
 
 end RoundOk
 

@@ -18,8 +18,8 @@ reading it.
 Everything in the family is persistent, and its only context dependence is
 through lock handles (`MachCSL.isLock`, whose floors transport) and the
 read-only `uarts[i]` words (`MachCSL.wordPointsTo`, whose bytes transport)
--- hence `instCtxMorphEnvFam`, which discharges the re-homing witness
-(`envMorph_envFam`).  A lock handle transports only because its PAYLOAD is
+-- hence `instCtxMorphEnvFam`, which discharges the re-homing witness.
+A lock handle transports only because its PAYLOAD is
 a genuine function of the holder's context (`procLockPay`, `ticksLedAt`,
 `diskRes`, and -- since this file demanded it -- `consResAt`); the
 instances below say so at the kernel tier, where a handler always runs.
@@ -149,13 +149,6 @@ instance instCtxMorphEnvFam (Γ : SchedNames) (γ0 γ1 : UartNames) (γc γl0 γ
     (γd : DiskNames) (γdl γt : GName) :
     CtxMorph (GF := GF) (envFam (hlc := hlc) (GF := GF) Γ γ0 γ1 γc γl0 γl1 γd γdl γt) := by
   unfold envFam; infer_instance
-
-/-- The environment's re-homing witness, discharged: the family transports
-(Rocq `kernelvec_env_move`). -/
-theorem envMorph_envFam (Γ : SchedNames) (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames)
-    (γdl γt : GName) :
-    ⊢ envMorph (hlc := hlc) (GF := GF) (envFam Γ γ0 γ1 γc γl0 γl1 γd γdl γt) :=
-  envMorph_of_ctxMorph _
 
 end
 

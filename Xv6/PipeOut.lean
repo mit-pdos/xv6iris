@@ -64,8 +64,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-! ## The per-era record and the fixed part -/
 
 /-- ONE ERA'S BYTE LEDGER (Rocq `pipe_era`). -/

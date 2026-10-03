@@ -21,6 +21,7 @@ import Xv6.SpecShGettoken
 import Xv6.SpecShPipecmd
 import Xv6.UshPipeWalk
 import Xv6.UshCodePipe
+import Xv6.UshRedirsWalk
 
 namespace Xv6
 
@@ -28,7 +29,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
 
 section

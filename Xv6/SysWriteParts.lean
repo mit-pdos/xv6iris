@@ -18,15 +18,8 @@ site, and the shared epilogue at `+0x40`.
 * THE TAIL (`swr_tail`, Rocq `swr_tail`): ONE epilogue over the value the arm
   left in `a0` (the error return is hoisted).
 -/
-import Xv6.ArgLemmas
-import MachCSL.WpSmodeFrame6
-import MachCSL.StackOwnBounds
 import Xv6.SpecFilewrite
-import Xv6.CopyLemmas
-import Xv6.ReadiDefs
-import Xv6.SysFstatParts
 import Xv6.SysReadParts
-import MachCSL.BvLemmas
 
 namespace Xv6
 
@@ -35,14 +28,12 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## Constants -/
 
-theorem sys_write_br_argaddr : KA.«sys_write» + 0xffffffffffffda56#64 = KA.«argaddr» := by decide
-theorem sys_write_br_argint : KA.«sys_write» + 0xffffffffffffda3a#64 = KA.«argint» := by decide
+theorem sys_write_br_argaddr : KA.«sys_write» + 0xffffffffffffd9f6#64 = KA.«argaddr» := by decide
+theorem sys_write_br_argint : KA.«sys_write» + 0xffffffffffffd9da#64 = KA.«argint» := by decide
 theorem sys_write_br_argfd : KA.«sys_write» + 0xfffffffffffffd6e#64 = KA.«argfd» := by decide
 theorem sys_write_br_filewrite : KA.«sys_write» + 0xfffffffffffff570#64 = KA.«filewrite» := by decide
 

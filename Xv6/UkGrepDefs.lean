@@ -50,7 +50,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
 
 /-! ## §0 grep's instruction facts (deviation 1) -/
@@ -127,10 +126,6 @@ theorem grepMmPost_step (d i : Nat) (f : Nat → BitVec 8) (j : Nat) (hd : 0 < d
     · rw [if_neg h1, if_neg (by omega)]
 
 /-! ## §2 Byte facts at the leaves' values (deviation 2) -/
-
-theorem kgrep_setWidth_toNat (b : BitVec 8) : (BitVec.setWidth 64 b).toNat = b.toNat := by
-  simp only [BitVec.toNat_setWidth]
-  exact Nat.mod_eq_of_lt (Nat.lt_trans b.isLt (by decide))
 
 /-- `beq` of two loaded bytes (Rocq `moi_byte_eq`). -/
 theorem kgrep_beq_byte (a b : BitVec 8) :

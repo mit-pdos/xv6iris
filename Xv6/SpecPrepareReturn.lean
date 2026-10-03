@@ -98,10 +98,6 @@ def uservecTvec : BitVec 64 := TRAMPOLINE
 def prepareReturnTf (ws : List (BitVec 64)) (ksat ksp khart : BitVec 64) : List (BitVec 64) :=
   (((ws.set 0 ksat).set 1 ksp).set 2 KA.«usertrap»).set 4 khart
 
-theorem prepare_return_tf_length (ws : List (BitVec 64)) (ksat ksp kh : BitVec 64) :
-    (prepareReturnTf ws ksat ksp kh).length = ws.length := by
-  simp [prepareReturnTf]
-
 /-- THE FOUR STORES ARE INVISIBLE TO THE RESUME STATE (Rocq
 `prepare_return_tf_ueq`): the epc word and every restorable register word
 (`5 ≤ j`) are the ones the function was given. -/

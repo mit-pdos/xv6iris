@@ -47,7 +47,7 @@ in the wave brief's file plan beside this section, is Rocq line 162, in
    each proof): `LiveVal`/`liveVal` (the pool's per-slot value
    `(s, to_agree (g, lo))`), `liveVal_op`, `liveVal_op_valid`,
    `liveVal_singleton_op_valid`, `liveVal_one_update`, `frzname_inj`, and
-   the private `liveGenlo_agree_keep` / `liveElem_frac0`.
+   the private `liveElem_frac0`.
 
 ## Dropped/simplified vs Rocq (uses grep-checked over
 ## `iris/*.v`, comments, `Ltac` and `Hint` bodies included)
@@ -81,8 +81,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
 open Iris.Algebra
-
-set_option linter.unusedSectionVars false
 
 /-! ## The pool's element algebra (pure) -/
 
@@ -196,45 +194,6 @@ theorem liveGenlo_halve [Icfg] (k : Nat) (q : Qp) (g : GName) (lo : Nat) :
   have h := (liveGenlo_split (GF := GF) k q.half q.half g lo).1
   rw [Qp.half_add_half] at h
   exact h
-
-/-- The agreement, keeping both slices (the shape every proof below uses). -/
-private theorem liveGenlo_agree_keep [Icfg] (k : Nat) (s1 : Qp) (g1 : GName) (lo1 : Nat)
-    (s2 : Qp) (g2 : GName) (lo2 : Nat) :
-    liveGenlo (GF := GF) k s1 g1 lo1 ∗ liveGenlo k s2 g2 lo2 ⊢
-      ⌜g1 = g2 ∧ lo1 = lo2⌝ ∗ liveGenlo k s1 g1 lo1 ∗ liveGenlo k s2 g2 lo2 := by
-  unfold liveGenlo
-  iintro ⟨H1, H2⟩
-  icombine H1 H2 gives %Hv
-  isplitr
-  · ipureintro; exact (liveVal_singleton_op_valid Hv).1
-  · iframe H1 H2
-
-theorem liveGen_split [Icfg] (k : Nat) (s1 s2 : Qp) (g : GName) :
-    liveGen (GF := GF) k (s1 + s2) g ⊣⊢ liveGen k s1 g ∗ liveGen k s2 g := by
-  unfold liveGen
-  constructor
-  · iintro ⟨%lo, H⟩
-    icases (liveGenlo_split k s1 s2 g lo).1 $$ H with ⟨H1, H2⟩
-    isplitl [H1]
-    · iexists lo; iexact H1
-    · iexists lo; iexact H2
-  · iintro ⟨⟨%lo1, H1⟩, ⟨%lo2, H2⟩⟩
-    icases liveGenlo_agree_keep k s1 g lo1 s2 g lo2 $$ [$H1 $H2] with ⟨⟨%-, %hlo⟩, H1, H2⟩
-    subst hlo
-    iexists lo1
-    iapply liveGenlo_join
-    iframe H1 H2
-
-theorem liveGen_agree [Icfg] (k : Nat) (s1 : Qp) (g1 : GName) (s2 : Qp) (g2 : GName) :
-    liveGen (GF := GF) k s1 g1 ∗ liveGen k s2 g2 ⊢ ⌜g1 = g2⌝ := by
-  unfold liveGen
-  iintro ⟨⟨%lo1, H1⟩, ⟨%lo2, H2⟩⟩
-  ihave %h := liveGenlo_agree k s1 g1 lo1 s2 g2 lo2 $$ [$H1 $H2]
-  ipureintro; exact h.1
-
-theorem liveGen_join [Icfg] (k : Nat) (s1 s2 : Qp) (g : GName) :
-    liveGen (GF := GF) k s1 g ∗ liveGen k s2 g ⊢ liveGen k (s1 + s2) g :=
-  (liveGen_split k s1 s2 g).2
 
 theorem liveGenlo_bound [Icfg] (k : Nat) (s1 : Qp) (g1 : GName) (lo1 : Nat)
     (s2 : Qp) (g2 : GName) (lo2 : Nat) :

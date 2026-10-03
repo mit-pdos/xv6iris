@@ -5,7 +5,7 @@ of `UserMemStore`).
 `ukRetire_store`: a STORE of width `k ∈ {1,2,4,8}`, aligned (hence inside
 one page, `ukAccess_page`) on a mapped user page with U and W (hence a DATA page): the translation (C1), the
 aligned write of the low `k` bytes of `rs2` into the walker's map
-(`uma_vmem_write_addr_store`, `ume_exec_store`), landing on an engine machine
+(`ume_exec_store`), landing on an engine machine
 whose page view is `ukViewStore V va k (m.get rs2)` (`ukm_view_store`: the
 written window is the page's `[off, off + k)`, no other page moves).
 
@@ -20,8 +20,6 @@ namespace Xv6
 open Iris Std MachCSL
 open Iris.Std.PartialMap Iris.Std.FiniteMap
 open Sail LeanRV64D LeanRV64D.Functions
-
-set_option linter.unusedSectionVars false
 
 /-! ## §1 Pure facts -/
 

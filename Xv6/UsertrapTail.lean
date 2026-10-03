@@ -27,8 +27,6 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedVariables false
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
 
 theorem ut_br_prepare_return : utPc 0xae#64 + BitVec.signExtend 64 0x1ffe02#21 = KA.«prepare_return» := by
@@ -38,8 +36,6 @@ theorem ut_br_prepare_return' : KA.«usertrap» + 18446744073709551280#64 = KA.�
   decide
 
 theorem ut_ret_jump' : jumpPc (KA.«usertrap» + 178#64) = utPc 0xb2#64 := by decide
-
-theorem ut_ret_jump : jumpPc (utPc 0xae#64 + 4#64) = utPc 0xb2#64 := by decide
 
 /-- **The context prepare_return hands back, re-based** at the entry's. -/
 theorem ut_ret_ctx (k kb : KCtx) (h : utBase k kb) (hk : 4 ≤ kb.avail) (R R' : RegMap) :

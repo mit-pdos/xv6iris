@@ -8,7 +8,7 @@ writes.
 
 The walk is `SysUnlinkW1/W2/W3/W5F/W5D` over `SysUnlinkShared` (not yet
 written); the contract is `SpecSysUnlink` (after C0).  THE LEAN IMAGE
-(`KA.«sys_unlink»` = 0x800050d2, 384 B), whose offsets every lemma below
+(`KA.«sys_unlink»` = 0x80005146, 384 B), whose offsets every lemma below
 uses (never Rocq's comments):
     +0x12 `jal argstr` (path at s0-208) / +0x16 `bltz`; +0x1c `jal begin_op`;
     +0x28 `jal nameiparent` (name at s0-80) / +0x2e `beqz`; +0x30 `jal ilock`;
@@ -43,7 +43,7 @@ uses (never Rocq's comments):
 4. The loop arithmetic (`su_li32`, `su_uint_moi`, `su_u31_range`,
    `su_loop_entry_taken/_fall`, `su_loop_back_taken/_fall`,
    `su_inum_zero/_nz`) is `sys_unlink_loop_entry`, `sys_unlink_loop_back`,
-   `sys_unlink_loop_bump`, `sys_unlink_bnez_inum`, stated -- as Rocq's --
+   `sys_unlink_bnez_inum`, stated -- as Rocq's --
    over `BitVec.ofNat 64 sz` (the `lw` of `ip->size` is rewritten to that
    by `SysUnlinkPure.sys_unlink_size_sext`), each as ONE `decide`-valued
    reading instead of a taken/fall pair; the landed `FsWords.fw_bgeu_nat`
@@ -72,7 +72,6 @@ Nothing beyond deviation 1's `Z`-only bookkeeping (uses checked: read only
 by the W1..W5 walks' `Z` side conditions).
 -/
 import Xv6.SysfileCalls
-import Xv6.FsWords
 
 namespace Xv6
 
@@ -80,25 +79,25 @@ open MachCSL LeanRV64D
 
 /-! ## Call targets and return addresses -/
 
-theorem sys_unlink_br_argstr : KA.«sys_unlink» + 0xffffffffffffd888#64 = KA.«argstr» := by decide
+theorem sys_unlink_br_argstr : KA.«sys_unlink» + 0xffffffffffffd828#64 = KA.«argstr» := by decide
 theorem sys_unlink_br_begin_op :
     KA.«sys_unlink» + 0xffffffffffffecd6#64 = KA.«begin_op» := by decide
 theorem sys_unlink_br_nameiparent :
-    KA.«sys_unlink» + 0xffffffffffffeb12#64 = KA.«nameiparent» := by decide
-theorem sys_unlink_br_ilock : KA.«sys_unlink» + 0xffffffffffffe26c#64 = KA.«ilock» := by decide
+    KA.«sys_unlink» + 0xffffffffffffeafa#64 = KA.«nameiparent» := by decide
+theorem sys_unlink_br_ilock : KA.«sys_unlink» + 0xffffffffffffe20c#64 = KA.«ilock» := by decide
 theorem sys_unlink_br_namecmp :
-    KA.«sys_unlink» + 0xffffffffffffe83e#64 = KA.«namecmp» := by decide
+    KA.«sys_unlink» + 0xffffffffffffe7de#64 = KA.«namecmp» := by decide
 theorem sys_unlink_br_dirlookup :
-    KA.«sys_unlink» + 0xffffffffffffe854#64 = KA.«dirlookup» := by decide
-theorem sys_unlink_br_memset : KA.«sys_unlink» + 0xffffffffffffbc46#64 = KA.«memset» := by decide
-theorem sys_unlink_br_writei : KA.«sys_unlink» + 0xffffffffffffe738#64 = KA.«writei» := by decide
+    KA.«sys_unlink» + 0xffffffffffffe7f4#64 = KA.«dirlookup» := by decide
+theorem sys_unlink_br_memset : KA.«sys_unlink» + 0xffffffffffffbbd2#64 = KA.«memset» := by decide
+theorem sys_unlink_br_writei : KA.«sys_unlink» + 0xffffffffffffe6d8#64 = KA.«writei» := by decide
 theorem sys_unlink_br_iunlockput :
-    KA.«sys_unlink» + 0xffffffffffffe4c0#64 = KA.«iunlockput» := by decide
+    KA.«sys_unlink» + 0xffffffffffffe460#64 = KA.«iunlockput» := by decide
 theorem sys_unlink_br_iupdate :
-    KA.«sys_unlink» + 0xffffffffffffe1b8#64 = KA.«iupdate» := by decide
+    KA.«sys_unlink» + 0xffffffffffffe158#64 = KA.«iupdate» := by decide
 theorem sys_unlink_br_end_op : KA.«sys_unlink» + 0xffffffffffffed62#64 = KA.«end_op» := by decide
-theorem sys_unlink_br_panic : KA.«sys_unlink» + 0xffffffffffffb766#64 = KA.«panic» := by decide
-theorem sys_unlink_br_readi : KA.«sys_unlink» + 0xffffffffffffe646#64 = KA.«readi» := by decide
+theorem sys_unlink_br_panic : KA.«sys_unlink» + 0xffffffffffffb6f2#64 = KA.«panic» := by decide
+theorem sys_unlink_br_readi : KA.«sys_unlink» + 0xffffffffffffe5e6#64 = KA.«readi» := by decide
 
 theorem sys_unlink_ret_16 :
     jumpPc (KA.«sys_unlink» + 0x16#64) = KA.«sys_unlink» + 0x16#64 := by decide
@@ -149,12 +148,6 @@ theorem sys_unlink_bufpath (x : BitVec 64) :
 /-- `name` at s0-80. -/
 theorem sys_unlink_bufname (x : BitVec 64) :
     x + BitVec.signExtend 64 4016#12 = x + 0xFFFFFFFFFFFFFFB0#64 := by bv_decide
-/-- writei's `de` at s0-64. -/
-theorem sys_unlink_bufde (x : BitVec 64) :
-    x + BitVec.signExtend 64 4032#12 = x + 0xFFFFFFFFFFFFFFC0#64 := by bv_decide
-/-- isdirempty's `de` at s0-232. -/
-theorem sys_unlink_bufdel (x : BitVec 64) :
-    x + BitVec.signExtend 64 3864#12 = x + 0xFFFFFFFFFFFFFF18#64 := by bv_decide
 /-- `uint off` at s0-212: the UPPER word of slot 27 (deviation 6). -/
 theorem sys_unlink_offcell (x : BitVec 64) :
     x + BitVec.signExtend 64 3884#12 = x + 0xFFFFFFFFFFFFFF2C#64 := by bv_decide
@@ -233,15 +226,6 @@ theorem sys_unlink_loop_back (off sz : Nat) (hoff : off < 2 ^ 31) (hsz : sz < 2 
   simp only [BitVec.ult, BitVec.toNat_ofNat, Nat.mod_eq_of_lt (show off < 2 ^ 64 by omega),
     Nat.mod_eq_of_lt (show sz < 2 ^ 64 by omega)]
 
-/-- the bump at +0x122: `c.addiw s3,s3,16` on a small offset. -/
-theorem sys_unlink_loop_bump (off : Nat) (h : off + 16 < 2 ^ 31) :
-    BitVec.signExtend 64 (BitVec.extractLsb' 0 32 (BitVec.ofNat 64 off + BitVec.signExtend 64 16#12))
-      = BitVec.ofNat 64 (off + 16) := by
-  have e : BitVec.ofNat 64 off + BitVec.signExtend 64 16#12 = BitVec.ofNat 64 (off + 16) := by
-    rw [sys_unlink_li16]; apply BitVec.eq_of_toNat_eq
-    simp only [BitVec.toNat_add, BitVec.toNat_ofNat]; omega
-  rw [e, fw_w32 _ h, MachCSL.signExtend_ofNat32 _ h]
-
 /-- the `c.bnez a5` at +0x120 on the ZERO-extended `de.inum`: taken exactly
 when the record is LIVE (Rocq's `su_inum_zero` / `su_inum_nz`). -/
 theorem sys_unlink_bnez_inum (w : BitVec 16) :
@@ -264,7 +248,7 @@ def sysUnlinkDec16 (h : BitVec 16) : BitVec 16 :=
 theorem sys_unlink_dec16_eq (h : BitVec 16) : sysUnlinkDec16 h = h - 1#16 := by
   unfold sysUnlinkDec16; bv_decide
 
-/-- THE CLAUSE `wp_iupdate_unlink` TAKES (Rocq's `su_nlink_decr`): the OLD
+/-- THE CLAUSE `wp_iupdate_unlink_eb` TAKES (Rocq's `su_nlink_decr`): the OLD
 count is the new one plus one.  Sound at BOTH flushes because the `blez`
 at +0x7c is walked before either. -/
 theorem sys_unlink_nlink_decr (h : BitVec 16) (hnz : h.toNat ≠ 0) :

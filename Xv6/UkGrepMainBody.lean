@@ -12,7 +12,6 @@ as `GREP_GREP`; the failure arm is `grepMain_die`.
 Deviations from Rocq: `UkGrepMainDefs`'s.
 -/
 import Xv6.UkGrepMainArms
-import Xv6.UkRunBr
 
 namespace Xv6
 
@@ -20,7 +19,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
 set_option maxRecDepth 20000
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled

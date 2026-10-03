@@ -7,6 +7,7 @@ walk of `DecodeBridge` (`runRead`), evaluated by `rfl` once per nominal
 -/
 import MachCSL.DecodeBridge
 import MachCSL.PlatformFacts
+import MachCSL.Tactics
 
 namespace MachCSL
 
@@ -43,7 +44,7 @@ theorem lift_sstatus_mpp (o s : BitVec 64) :
     _update_Mstatus_UXL, _update_Mstatus_SD, _get_Sstatus_SIE, _get_Sstatus_SPIE, _get_Sstatus_SPP,
     _get_Sstatus_VS, _get_Sstatus_FS, _get_Sstatus_XS, _get_Sstatus_SUM, _get_Sstatus_MXR, _get_Sstatus_SPELP,
     _get_Sstatus_UXL, Sail.BitVec.updateSubrange, Sail.BitVec.updateSubrange', Sail.BitVec.extractLsb,
-    BitVec.extractLsb, Sail.BitVec.length]
+    BitVec.extractLsb]
   bv_decide
 
 /-- `legalize_mstatus o L` on this platform (S and U present, no Zicfilp,
@@ -88,294 +89,6 @@ def mstatusLegalize (o L : BitVec 64) : BitVec 64 :=
     ((extStatus_map_backwards (_get_Mstatus_XS o') == ExtStatus.Dirty) ||
       (extStatus_map_backwards (_get_Mstatus_VS o') == ExtStatus.Dirty))
   _update_Mstatus_SD o' (bool_to_bit dirty)
-
-/-- The legalised value, folded as soon as the executor produces it (so no
-later pass works on the expanded term): the form the write leaves in the
-`mstatus` cell ... -/
-@[sail_facts] theorem mstatusLegalize_fold (o L : BitVec 64) :
-    _update_Mstatus_SD
-    (_update_Mstatus_SIE
-      (_update_Mstatus_MIE
-        (_update_Mstatus_SPIE
-          (_update_Mstatus_MPIE
-            (_update_Mstatus_SPP
-              (_update_Mstatus_MPP
-                (_update_Mstatus_VS
-                  (_update_Mstatus_FS
-                    (_update_Mstatus_XS
-                      (_update_Mstatus_MPRV
-                        (_update_Mstatus_SUM
-                          (_update_Mstatus_MXR
-                            (_update_Mstatus_TVM
-                              (_update_Mstatus_TW
-                                (_update_Mstatus_TSR
-                                  (_update_Mstatus_SPELP
-                                    (_update_Mstatus_MPELP o (_get_Mstatus_MPELP (Mk_Mstatus L)))
-                                    (_get_Mstatus_SPELP (Mk_Mstatus L)))
-                                  (_get_Mstatus_TSR (Mk_Mstatus L)))
-                                (_get_Mstatus_TW (Mk_Mstatus L)))
-                              (_get_Mstatus_TVM (Mk_Mstatus L)))
-                            (_get_Mstatus_MXR (Mk_Mstatus L)))
-                          (_get_Mstatus_SUM (Mk_Mstatus L)))
-                        (_get_Mstatus_MPRV (Mk_Mstatus L)))
-                      (extStatus_map_forwards ExtStatus.Off))
-                    (legalize_extStatus plat_mstatus_legal_fs (_get_Mstatus_FS (Mk_Mstatus L))))
-                  (legalize_extStatus plat_mstatus_legal_vs (_get_Mstatus_VS (Mk_Mstatus L))))
-                (_get_Mstatus_MPP (Mk_Mstatus L)))
-              (_get_Mstatus_SPP (Mk_Mstatus L)))
-            (_get_Mstatus_MPIE (Mk_Mstatus L)))
-          (_get_Mstatus_SPIE (Mk_Mstatus L)))
-        (_get_Mstatus_MIE (Mk_Mstatus L)))
-      (_get_Mstatus_SIE (Mk_Mstatus L)))
-    (bool_to_bit
-      ((extStatus_map_backwards (_get_Mstatus_FS
-          (_update_Mstatus_SIE
-      (_update_Mstatus_MIE
-        (_update_Mstatus_SPIE
-          (_update_Mstatus_MPIE
-            (_update_Mstatus_SPP
-              (_update_Mstatus_MPP
-                (_update_Mstatus_VS
-                  (_update_Mstatus_FS
-                    (_update_Mstatus_XS
-                      (_update_Mstatus_MPRV
-                        (_update_Mstatus_SUM
-                          (_update_Mstatus_MXR
-                            (_update_Mstatus_TVM
-                              (_update_Mstatus_TW
-                                (_update_Mstatus_TSR
-                                  (_update_Mstatus_SPELP
-                                    (_update_Mstatus_MPELP o (_get_Mstatus_MPELP (Mk_Mstatus L)))
-                                    (_get_Mstatus_SPELP (Mk_Mstatus L)))
-                                  (_get_Mstatus_TSR (Mk_Mstatus L)))
-                                (_get_Mstatus_TW (Mk_Mstatus L)))
-                              (_get_Mstatus_TVM (Mk_Mstatus L)))
-                            (_get_Mstatus_MXR (Mk_Mstatus L)))
-                          (_get_Mstatus_SUM (Mk_Mstatus L)))
-                        (_get_Mstatus_MPRV (Mk_Mstatus L)))
-                      (extStatus_map_forwards ExtStatus.Off))
-                    (legalize_extStatus plat_mstatus_legal_fs (_get_Mstatus_FS (Mk_Mstatus L))))
-                  (legalize_extStatus plat_mstatus_legal_vs (_get_Mstatus_VS (Mk_Mstatus L))))
-                (_get_Mstatus_MPP (Mk_Mstatus L)))
-              (_get_Mstatus_SPP (Mk_Mstatus L)))
-            (_get_Mstatus_MPIE (Mk_Mstatus L)))
-          (_get_Mstatus_SPIE (Mk_Mstatus L)))
-        (_get_Mstatus_MIE (Mk_Mstatus L)))
-      (_get_Mstatus_SIE (Mk_Mstatus L)))) == ExtStatus.Dirty) ||
-       ((extStatus_map_backwards (_get_Mstatus_XS
-          (_update_Mstatus_SIE
-      (_update_Mstatus_MIE
-        (_update_Mstatus_SPIE
-          (_update_Mstatus_MPIE
-            (_update_Mstatus_SPP
-              (_update_Mstatus_MPP
-                (_update_Mstatus_VS
-                  (_update_Mstatus_FS
-                    (_update_Mstatus_XS
-                      (_update_Mstatus_MPRV
-                        (_update_Mstatus_SUM
-                          (_update_Mstatus_MXR
-                            (_update_Mstatus_TVM
-                              (_update_Mstatus_TW
-                                (_update_Mstatus_TSR
-                                  (_update_Mstatus_SPELP
-                                    (_update_Mstatus_MPELP o (_get_Mstatus_MPELP (Mk_Mstatus L)))
-                                    (_get_Mstatus_SPELP (Mk_Mstatus L)))
-                                  (_get_Mstatus_TSR (Mk_Mstatus L)))
-                                (_get_Mstatus_TW (Mk_Mstatus L)))
-                              (_get_Mstatus_TVM (Mk_Mstatus L)))
-                            (_get_Mstatus_MXR (Mk_Mstatus L)))
-                          (_get_Mstatus_SUM (Mk_Mstatus L)))
-                        (_get_Mstatus_MPRV (Mk_Mstatus L)))
-                      (extStatus_map_forwards ExtStatus.Off))
-                    (legalize_extStatus plat_mstatus_legal_fs (_get_Mstatus_FS (Mk_Mstatus L))))
-                  (legalize_extStatus plat_mstatus_legal_vs (_get_Mstatus_VS (Mk_Mstatus L))))
-                (_get_Mstatus_MPP (Mk_Mstatus L)))
-              (_get_Mstatus_SPP (Mk_Mstatus L)))
-            (_get_Mstatus_MPIE (Mk_Mstatus L)))
-          (_get_Mstatus_SPIE (Mk_Mstatus L)))
-        (_get_Mstatus_MIE (Mk_Mstatus L)))
-      (_get_Mstatus_SIE (Mk_Mstatus L)))) == ExtStatus.Dirty) ||
-        (extStatus_map_backwards (_get_Mstatus_VS
-          (_update_Mstatus_SIE
-      (_update_Mstatus_MIE
-        (_update_Mstatus_SPIE
-          (_update_Mstatus_MPIE
-            (_update_Mstatus_SPP
-              (_update_Mstatus_MPP
-                (_update_Mstatus_VS
-                  (_update_Mstatus_FS
-                    (_update_Mstatus_XS
-                      (_update_Mstatus_MPRV
-                        (_update_Mstatus_SUM
-                          (_update_Mstatus_MXR
-                            (_update_Mstatus_TVM
-                              (_update_Mstatus_TW
-                                (_update_Mstatus_TSR
-                                  (_update_Mstatus_SPELP
-                                    (_update_Mstatus_MPELP o (_get_Mstatus_MPELP (Mk_Mstatus L)))
-                                    (_get_Mstatus_SPELP (Mk_Mstatus L)))
-                                  (_get_Mstatus_TSR (Mk_Mstatus L)))
-                                (_get_Mstatus_TW (Mk_Mstatus L)))
-                              (_get_Mstatus_TVM (Mk_Mstatus L)))
-                            (_get_Mstatus_MXR (Mk_Mstatus L)))
-                          (_get_Mstatus_SUM (Mk_Mstatus L)))
-                        (_get_Mstatus_MPRV (Mk_Mstatus L)))
-                      (extStatus_map_forwards ExtStatus.Off))
-                    (legalize_extStatus plat_mstatus_legal_fs (_get_Mstatus_FS (Mk_Mstatus L))))
-                  (legalize_extStatus plat_mstatus_legal_vs (_get_Mstatus_VS (Mk_Mstatus L))))
-                (_get_Mstatus_MPP (Mk_Mstatus L)))
-              (_get_Mstatus_SPP (Mk_Mstatus L)))
-            (_get_Mstatus_MPIE (Mk_Mstatus L)))
-          (_get_Mstatus_SPIE (Mk_Mstatus L)))
-        (_get_Mstatus_MIE (Mk_Mstatus L)))
-      (_get_Mstatus_SIE (Mk_Mstatus L)))) == ExtStatus.Dirty)))) = mstatusLegalize o L := by
-  unfold mstatusLegalize
-  rfl
-
-/-- ... and the form the normalisation leaves in the continuation (three
-getters unfolded). -/
-@[sail_facts] theorem mstatusLegalize_fold' (o L : BitVec 64) :
-    _update_Mstatus_SD
-    (_update_Mstatus_SIE
-      (_update_Mstatus_MIE
-        (_update_Mstatus_SPIE
-          (_update_Mstatus_MPIE
-            (_update_Mstatus_SPP
-              (_update_Mstatus_MPP
-                (_update_Mstatus_VS
-                  (_update_Mstatus_FS
-                    (_update_Mstatus_XS
-                      (_update_Mstatus_MPRV
-                        (_update_Mstatus_SUM
-                          (_update_Mstatus_MXR
-                            (_update_Mstatus_TVM
-                              (_update_Mstatus_TW
-                                (_update_Mstatus_TSR
-                                  (_update_Mstatus_SPELP
-                                    (_update_Mstatus_MPELP o (_get_Mstatus_MPELP (Mk_Mstatus L)))
-                                    (_get_Mstatus_SPELP (Mk_Mstatus L)))
-                                  (_get_Mstatus_TSR (Mk_Mstatus L)))
-                                (_get_Mstatus_TW (Mk_Mstatus L)))
-                              (_get_Mstatus_TVM (Mk_Mstatus L)))
-                            (_get_Mstatus_MXR (Mk_Mstatus L)))
-                          (_get_Mstatus_SUM (Mk_Mstatus L)))
-                        (BitVec.extractLsb' 17 1 (Mk_Mstatus L)))
-                      (extStatus_map_forwards ExtStatus.Off))
-                    (legalize_extStatus plat_mstatus_legal_fs (_get_Mstatus_FS (Mk_Mstatus L))))
-                  (legalize_extStatus plat_mstatus_legal_vs (_get_Mstatus_VS (Mk_Mstatus L))))
-                (BitVec.extractLsb' 11 2 (Mk_Mstatus L)))
-              (_get_Mstatus_SPP (Mk_Mstatus L)))
-            (_get_Mstatus_MPIE (Mk_Mstatus L)))
-          (_get_Mstatus_SPIE (Mk_Mstatus L)))
-        (BitVec.extractLsb' 3 1 (Mk_Mstatus L)))
-      (_get_Mstatus_SIE (Mk_Mstatus L)))
-    (bool_to_bit
-      ((extStatus_map_backwards (_get_Mstatus_FS
-          (_update_Mstatus_SIE
-      (_update_Mstatus_MIE
-        (_update_Mstatus_SPIE
-          (_update_Mstatus_MPIE
-            (_update_Mstatus_SPP
-              (_update_Mstatus_MPP
-                (_update_Mstatus_VS
-                  (_update_Mstatus_FS
-                    (_update_Mstatus_XS
-                      (_update_Mstatus_MPRV
-                        (_update_Mstatus_SUM
-                          (_update_Mstatus_MXR
-                            (_update_Mstatus_TVM
-                              (_update_Mstatus_TW
-                                (_update_Mstatus_TSR
-                                  (_update_Mstatus_SPELP
-                                    (_update_Mstatus_MPELP o (_get_Mstatus_MPELP (Mk_Mstatus L)))
-                                    (_get_Mstatus_SPELP (Mk_Mstatus L)))
-                                  (_get_Mstatus_TSR (Mk_Mstatus L)))
-                                (_get_Mstatus_TW (Mk_Mstatus L)))
-                              (_get_Mstatus_TVM (Mk_Mstatus L)))
-                            (_get_Mstatus_MXR (Mk_Mstatus L)))
-                          (_get_Mstatus_SUM (Mk_Mstatus L)))
-                        (BitVec.extractLsb' 17 1 (Mk_Mstatus L)))
-                      (extStatus_map_forwards ExtStatus.Off))
-                    (legalize_extStatus plat_mstatus_legal_fs (_get_Mstatus_FS (Mk_Mstatus L))))
-                  (legalize_extStatus plat_mstatus_legal_vs (_get_Mstatus_VS (Mk_Mstatus L))))
-                (BitVec.extractLsb' 11 2 (Mk_Mstatus L)))
-              (_get_Mstatus_SPP (Mk_Mstatus L)))
-            (_get_Mstatus_MPIE (Mk_Mstatus L)))
-          (_get_Mstatus_SPIE (Mk_Mstatus L)))
-        (BitVec.extractLsb' 3 1 (Mk_Mstatus L)))
-      (_get_Mstatus_SIE (Mk_Mstatus L)))) == ExtStatus.Dirty) ||
-       ((extStatus_map_backwards (_get_Mstatus_XS
-          (_update_Mstatus_SIE
-      (_update_Mstatus_MIE
-        (_update_Mstatus_SPIE
-          (_update_Mstatus_MPIE
-            (_update_Mstatus_SPP
-              (_update_Mstatus_MPP
-                (_update_Mstatus_VS
-                  (_update_Mstatus_FS
-                    (_update_Mstatus_XS
-                      (_update_Mstatus_MPRV
-                        (_update_Mstatus_SUM
-                          (_update_Mstatus_MXR
-                            (_update_Mstatus_TVM
-                              (_update_Mstatus_TW
-                                (_update_Mstatus_TSR
-                                  (_update_Mstatus_SPELP
-                                    (_update_Mstatus_MPELP o (_get_Mstatus_MPELP (Mk_Mstatus L)))
-                                    (_get_Mstatus_SPELP (Mk_Mstatus L)))
-                                  (_get_Mstatus_TSR (Mk_Mstatus L)))
-                                (_get_Mstatus_TW (Mk_Mstatus L)))
-                              (_get_Mstatus_TVM (Mk_Mstatus L)))
-                            (_get_Mstatus_MXR (Mk_Mstatus L)))
-                          (_get_Mstatus_SUM (Mk_Mstatus L)))
-                        (BitVec.extractLsb' 17 1 (Mk_Mstatus L)))
-                      (extStatus_map_forwards ExtStatus.Off))
-                    (legalize_extStatus plat_mstatus_legal_fs (_get_Mstatus_FS (Mk_Mstatus L))))
-                  (legalize_extStatus plat_mstatus_legal_vs (_get_Mstatus_VS (Mk_Mstatus L))))
-                (BitVec.extractLsb' 11 2 (Mk_Mstatus L)))
-              (_get_Mstatus_SPP (Mk_Mstatus L)))
-            (_get_Mstatus_MPIE (Mk_Mstatus L)))
-          (_get_Mstatus_SPIE (Mk_Mstatus L)))
-        (BitVec.extractLsb' 3 1 (Mk_Mstatus L)))
-      (_get_Mstatus_SIE (Mk_Mstatus L)))) == ExtStatus.Dirty) ||
-        (extStatus_map_backwards (_get_Mstatus_VS
-          (_update_Mstatus_SIE
-      (_update_Mstatus_MIE
-        (_update_Mstatus_SPIE
-          (_update_Mstatus_MPIE
-            (_update_Mstatus_SPP
-              (_update_Mstatus_MPP
-                (_update_Mstatus_VS
-                  (_update_Mstatus_FS
-                    (_update_Mstatus_XS
-                      (_update_Mstatus_MPRV
-                        (_update_Mstatus_SUM
-                          (_update_Mstatus_MXR
-                            (_update_Mstatus_TVM
-                              (_update_Mstatus_TW
-                                (_update_Mstatus_TSR
-                                  (_update_Mstatus_SPELP
-                                    (_update_Mstatus_MPELP o (_get_Mstatus_MPELP (Mk_Mstatus L)))
-                                    (_get_Mstatus_SPELP (Mk_Mstatus L)))
-                                  (_get_Mstatus_TSR (Mk_Mstatus L)))
-                                (_get_Mstatus_TW (Mk_Mstatus L)))
-                              (_get_Mstatus_TVM (Mk_Mstatus L)))
-                            (_get_Mstatus_MXR (Mk_Mstatus L)))
-                          (_get_Mstatus_SUM (Mk_Mstatus L)))
-                        (BitVec.extractLsb' 17 1 (Mk_Mstatus L)))
-                      (extStatus_map_forwards ExtStatus.Off))
-                    (legalize_extStatus plat_mstatus_legal_fs (_get_Mstatus_FS (Mk_Mstatus L))))
-                  (legalize_extStatus plat_mstatus_legal_vs (_get_Mstatus_VS (Mk_Mstatus L))))
-                (BitVec.extractLsb' 11 2 (Mk_Mstatus L)))
-              (_get_Mstatus_SPP (Mk_Mstatus L)))
-            (_get_Mstatus_MPIE (Mk_Mstatus L)))
-          (_get_Mstatus_SPIE (Mk_Mstatus L)))
-        (BitVec.extractLsb' 3 1 (Mk_Mstatus L)))
-      (_get_Mstatus_SIE (Mk_Mstatus L)))) == ExtStatus.Dirty)))) = mstatusLegalize o L := by
-  unfold mstatusLegalize
-  simp only [_get_Mstatus_MPRV, _get_Mstatus_MPP, _get_Mstatus_MIE, Sail.BitVec.extractLsb, BitVec.extractLsb,
-    Nat.reduceSub, Nat.reduceAdd]
 
 /-! ### The walk of `legalize_mstatus` -/
 
@@ -474,33 +187,6 @@ theorem bool_to_bit_eq (b : Bool) : bool_to_bit b = if b then 1#1 else 0#1 := by
 
 theorem legalize_extStatus_four (x : BitVec 2) : legalize_extStatus ExtContextPolicy.ExtContext_FourState x = x := rfl
 
-/-- Clearing `SIE` in `sstatus` when it is already clear (and `mstatus` is as
-`start` left it) is the identity. -/
-theorem sstatus_clear_sie_id' (o : BitVec 64)
-    (hSIE : BitVec.extractLsb' 1 1 o = 0#1) (hSXL : BitVec.extractLsb' 34 2 o = 2#2)
-    (hFS : BitVec.extractLsb' 13 2 o = 0#2) (hXS : BitVec.extractLsb' 15 2 o = 0#2)
-    (hVS : BitVec.extractLsb' 9 2 o = 0#2) (hSD : BitVec.extractLsb' 63 1 o = 0#1)
-    (hMPP : BitVec.extractLsb' 11 2 o ≠ 2#2) :
-    mstatusLegalize o (lift_sstatus o (Mk_Sstatus (zero_extend (m := 64) (lower_mstatus o &&& 0xFFFFFFFFFFFFFFFD#64)))) = o := by
-  have h3 : ∀ x : BitVec 2, x ≠ 2#2 → x = 0#2 ∨ x = 1#2 ∨ x = 3#2 := by decide
-  unfold mstatusLegalize lift_sstatus lower_mstatus
-  simp only [Mk_Mstatus, Mk_Sstatus, zero_extend_eq, BitVec.setWidth_eq, plat_mstatus_legal_fs, plat_mstatus_legal_vs,
-    legalize_extStatus_four, extStatus_dirty_iff, bool_to_bit_eq, extStatus_map_forwards, Functions.zeros,
-    _update_Mstatus_SIE, _update_Mstatus_MIE, _update_Mstatus_SPIE, _update_Mstatus_MPIE, _update_Mstatus_SPP,
-    _update_Mstatus_MPP, _update_Mstatus_VS, _update_Mstatus_FS, _update_Mstatus_XS, _update_Mstatus_MPRV,
-    _update_Mstatus_SUM, _update_Mstatus_MXR, _update_Mstatus_TVM, _update_Mstatus_TW, _update_Mstatus_TSR,
-    _update_Mstatus_SPELP, _update_Mstatus_MPELP, _update_Mstatus_SD, _update_Mstatus_UXL,
-    _get_Mstatus_MPELP, _get_Mstatus_SPELP, _get_Mstatus_TSR, _get_Mstatus_MPRV, _get_Mstatus_MPP, _get_Mstatus_MIE, _get_Mstatus_TW, _get_Mstatus_TVM, _get_Mstatus_MXR,
-    _get_Mstatus_SUM, _get_Mstatus_FS, _get_Mstatus_VS, _get_Mstatus_XS, _get_Mstatus_SPP, _get_Mstatus_MPIE,
-    _get_Mstatus_SPIE, _get_Mstatus_SIE, _get_Mstatus_SD, _get_Mstatus_UXL,
-    _update_Sstatus_SIE, _update_Sstatus_SPIE, _update_Sstatus_SPP, _update_Sstatus_VS, _update_Sstatus_FS,
-    _update_Sstatus_XS, _update_Sstatus_SUM, _update_Sstatus_MXR, _update_Sstatus_SPELP, _update_Sstatus_UXL,
-    _update_Sstatus_SD, _get_Sstatus_SIE, _get_Sstatus_SPIE, _get_Sstatus_SPP, _get_Sstatus_VS, _get_Sstatus_FS,
-    _get_Sstatus_XS, _get_Sstatus_SUM, _get_Sstatus_MXR, _get_Sstatus_SPELP, _get_Sstatus_UXL, _get_Sstatus_SD,
-    Sail.BitVec.updateSubrange, Sail.BitVec.updateSubrange', Sail.BitVec.extractLsb, BitVec.extractLsb,
-    Sail.BitVec.length]
-  bv_decide
-
 /-- Clearing `SIE` in `sstatus` (the supervisor view of an `mstatus` as
 `start` left it, at either `SIE`) clears exactly that bit of `mstatus`. -/
 theorem sstatus_clear_sie' (o : BitVec 64)
@@ -524,9 +210,8 @@ theorem sstatus_clear_sie' (o : BitVec 64)
     _update_Sstatus_SIE, _update_Sstatus_SPIE, _update_Sstatus_SPP, _update_Sstatus_VS, _update_Sstatus_FS,
     _update_Sstatus_XS, _update_Sstatus_SUM, _update_Sstatus_MXR, _update_Sstatus_SPELP, _update_Sstatus_UXL,
     _update_Sstatus_SD, _get_Sstatus_SIE, _get_Sstatus_SPIE, _get_Sstatus_SPP, _get_Sstatus_VS, _get_Sstatus_FS,
-    _get_Sstatus_XS, _get_Sstatus_SUM, _get_Sstatus_MXR, _get_Sstatus_SPELP, _get_Sstatus_UXL, _get_Sstatus_SD,
-    Sail.BitVec.updateSubrange, Sail.BitVec.updateSubrange', Sail.BitVec.extractLsb, BitVec.extractLsb,
-    Sail.BitVec.length]
+    _get_Sstatus_XS, _get_Sstatus_SUM, _get_Sstatus_MXR, _get_Sstatus_SPELP, _get_Sstatus_UXL, 
+    Sail.BitVec.updateSubrange, Sail.BitVec.updateSubrange', Sail.BitVec.extractLsb, BitVec.extractLsb]
   bv_decide
 
 /-- Setting `SIE` in `sstatus` sets exactly that bit of `mstatus`. -/
@@ -551,9 +236,8 @@ theorem sstatus_set_sie' (o : BitVec 64)
     _update_Sstatus_SIE, _update_Sstatus_SPIE, _update_Sstatus_SPP, _update_Sstatus_VS, _update_Sstatus_FS,
     _update_Sstatus_XS, _update_Sstatus_SUM, _update_Sstatus_MXR, _update_Sstatus_SPELP, _update_Sstatus_UXL,
     _update_Sstatus_SD, _get_Sstatus_SIE, _get_Sstatus_SPIE, _get_Sstatus_SPP, _get_Sstatus_VS, _get_Sstatus_FS,
-    _get_Sstatus_XS, _get_Sstatus_SUM, _get_Sstatus_MXR, _get_Sstatus_SPELP, _get_Sstatus_UXL, _get_Sstatus_SD,
-    Sail.BitVec.updateSubrange, Sail.BitVec.updateSubrange', Sail.BitVec.extractLsb, BitVec.extractLsb,
-    Sail.BitVec.length]
+    _get_Sstatus_XS, _get_Sstatus_SUM, _get_Sstatus_MXR, _get_Sstatus_SPELP, _get_Sstatus_UXL, 
+    Sail.BitVec.updateSubrange, Sail.BitVec.updateSubrange', Sail.BitVec.extractLsb, BitVec.extractLsb]
   bv_decide
 
 

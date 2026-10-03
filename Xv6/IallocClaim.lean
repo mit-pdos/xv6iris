@@ -30,6 +30,7 @@ lemma for `+0x88 .. +0xba`) is for elaboration speed only.
 -/
 import MachCSL.WpSmodeFrame12b
 import Xv6.IallocTail
+import Xv6.BallocDefs
 
 namespace Xv6
 
@@ -38,9 +39,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
@@ -320,7 +319,7 @@ theorem ialloc_claim_lw (LW : LOG_WRITE) (BE : BRELSE) (IG : IGET) [Fscfg] [Icfg
   k_step_e (wp_s_add cpu _ (KA.«ialloc» + 0x98#64) true 10#5 0#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9]
   iintro Hk Hpc
-  k_step_e (wp_s_jal cpu _ (KA.«ialloc» + 0x9a#64) false 3310#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«ialloc» + 0x9a#64) false 3406#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ialloc_br_logwrite]
   iintro Hk Hpc
   iapply (dislot_log_write LW cpu _ γl kk pidv inum (iallocFresh ty) ds bsd d0 u false Sb e0 0
@@ -456,7 +455,7 @@ theorem ialloc_claim (MS : MEMSET) (LW : LOG_WRITE) (BE : BRELSE) (IG : IGET) [F
   k_step_e (wp_s_add cpu _ (KA.«ialloc» + 0x8e#64) true 10#5 0#5 19#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h19]
   iintro Hk Hpc
-  k_step_e (wp_s_jal cpu _ (KA.«ialloc» + 0x90#64) false 2087610#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«ialloc» + 0x90#64) false 2087590#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ialloc_br_memset]
   iintro Hk Hpc
   iapply (memset_zero_call MS cpu _ (dinodeBytes ds[islot inum]!)

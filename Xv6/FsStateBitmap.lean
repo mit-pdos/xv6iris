@@ -46,8 +46,7 @@ header, verbatim):
    (`BigSepL.bigSepL_filterMap`), so `freePool_intro` comes out as an
    EQUALITY (`freePool_eq_freeSet`) where Rocq states only `⊢`; the Rocq
    direction is kept under Rocq's name.
-4. `freeBitmapAt_gname` is Rocq's: the bitmap piece of a view depends on
-   `phi` alone, not on the abstract-state gnames `link`/`top`.
+4. `free_bitmap_at_gname` is not ported (nothing uses it).
 5. **`freePool_give` KEEPS ITS `phiExcl` PARAMETER** although the Lean
    proof does not need it: Rocq derives `b ∈ u` there with
    `free_pool_used` and then never uses it (the pool element it drops is
@@ -69,8 +68,6 @@ import Xv6.FsImg
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode MachCSL
-
-set_option linter.unusedSectionVars false
 
 /-! ## A position of `List.range` is its own value
 
@@ -117,14 +114,6 @@ def freeBitmapAt (Γ : FsViewNames GF) (bms nb : Nat) (u : BitSet) : IProp GF :=
 /-- Rocq's `free_bitmap`. -/
 def freeBitmap (Γ : FsViewNames GF) (sb : FsSb) (u : BitSet) : IProp GF :=
   freeBitmapAt Γ sb.sbBmapstart sb.sbSize u
-
-theorem freeBitmap_unfold (Γ : FsViewNames GF) (sb : FsSb) (u : BitSet) :
-    freeBitmap Γ sb u ⊣⊢ freeBitmapAt Γ sb.sbBmapstart sb.sbSize u := .rfl
-
-/-- Rocq's `free_bitmap_at_gname` (deviation 4): the bitmap piece of a
-view depends on `phi` alone. -/
-theorem freeBitmapAt_gname (Γ : FsViewNames GF) (g t : GName) (bms nb : Nat) (u : BitSet) :
-    freeBitmapAt Γ bms nb u ⊣⊢ freeBitmapAt { phi := Γ.phi, link := g, top := t } bms nb u := .rfl
 
 instance poolElt_timeless (Γ : FsViewNames GF) [GTimeless Γ] (u : BitSet) (b : Nat) :
     Timeless (poolElt Γ u b) := by
@@ -305,41 +294,6 @@ theorem freePool_shed (Γ Γ1 Γ2 : FsViewNames GF) (Hs : FsView.viewShed Γ Γ1
     isplitl [H1]
     · iexists bs; iexact H1
     · iexists bs; iexact H2
-
-/-! ## The two movers, at the whole predicate -/
-
-/-- Rocq's `bitmap_alloc`. -/
-theorem bitmapAlloc (Γ : FsViewNames GF) (bms nb : Nat) (u : BitSet) (b : Nat)
-    (hb : b < nb) (hnu : b ∉ u) :
-    freeBitmapAt Γ bms nb u ⊢ iprop(
-      (∃ bs, FsView.blkOwned Γ b bs) ∗
-      FsView.blkOwned Γ bms (bmBytes BSIZE u) ∗
-      (FsView.blkOwned Γ bms (bmBytes BSIZE (u ∪ {b})) -∗
-        freeBitmapAt Γ bms nb (u ∪ {b}))) := by
-  unfold freeBitmapAt
-  iintro ⟨Hbm, Hpool⟩
-  ihave ⟨Hblk, Hpool⟩ := freePool_take Γ nb u b hb hnu $$ Hpool
-  iframe Hblk Hbm
-  iintro Hbm'
-  iframe Hbm' Hpool
-
-/-- Rocq's `bitmap_free`. -/
-theorem bitmapFree (Γ : FsViewNames GF) (Hex : phiExcl Γ) (bms nb : Nat) (u : BitSet)
-    (b : Nat) (bs : List (BitVec 8)) (hb : b < nb) :
-    freeBitmapAt Γ bms nb u ⊢ FsView.blkOwned Γ b bs -∗ iprop(
-      ⌜b ∈ u⌝ ∗
-      FsView.blkOwned Γ bms (bmBytes BSIZE u) ∗
-      (FsView.blkOwned Γ bms (bmBytes BSIZE (u \ {b})) -∗
-        freeBitmapAt Γ bms nb (u \ {b}))) := by
-  unfold freeBitmapAt
-  iintro ⟨Hbm, Hpool⟩ Hin
-  ihave %hin := freePool_used Γ Hex nb u b bs hb $$ Hpool Hin
-  isplitr [Hbm Hpool Hin]
-  · ipureintro; exact hin
-  iframe Hbm
-  iintro Hbm'
-  iframe Hbm'
-  iapply freePool_give Γ Hex nb u b bs hb $$ Hin Hpool
 
 end
 

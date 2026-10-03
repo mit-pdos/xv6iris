@@ -112,27 +112,4 @@ structure BWRITE : Prop where
     wp_bwrite_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl γ V γdl pd pav pu j kk
       pidv dev bno dqp bs bsd Q hj hproc hK hnoff htier hkk ha0 hbno hbsd hpd
 
-/-- The interrupts-off instance of `wp_bwrite_eb` (the complement is the whole
-bundle): the contract every not-yet-generalized caller states. -/
-theorem BWRITE.wp_bwrite (A : BWRITE) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-    [BcacheG GF] [SleepLockG GF] [DiskG GF] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (cpu : CPU) (k : KCtx) (γl : GName) (γ : BcacheNames) (V : BioView GF) (γdl : GName)
-    (pd pav pu : BitVec 64) (j : Nat) (kk : Nat)
-    (pidv dev bno : BitVec 32) (dqp : DFrac) (bs bsd : List (BitVec 8)) (Q : IProp GF)
-    hj hproc hK hsie hnoff hlocks htier hkk ha0 hbno hbsd hpd :
-    wp_bwrite_body (hlc := hlc) (GF := GF) Γ cpu k γl γ V γdl pd pav pu j kk
-      pidv dev bno dqp bs bsd Q hj hproc hK hsie hnoff hlocks htier hkk ha0 hbno hbsd hpd := by
-  have h := A.wp_bwrite_eb (hlc := hlc) (GF := GF) (Γ := Γ) (cpu := cpu) (k := k) (γl := γl) (γ := γ) (V := V) (γdl := γdl) (pd := pd) (pav := pav) (pu := pu) (j := j) (kk := kk) (pidv := pidv) (dev := dev) (bno := bno) (dqp := dqp) (bs := bs) (bsd := bsd) (Q := Q) (hj := hj) (hproc := hproc) (hK := hK) (hnoff := hnoff) (htier := htier) (hkk := hkk) (ha0 := ha0) (hbno := hbno) (hbsd := hbsd) (hpd := hpd)
-  unfold wp_bwrite_eb_body at h
-  unfold wp_bwrite_body
-  rw [hsie] at h
-  simp only [trapCsrsExt_false, cpuClaimExt_false] at h
-  iintro ⟨H0, H1, H2, Htc, Hcl, Hir, H6, H7, H8, H9, H10, Hnext⟩
-  iapply h
-  iframe H0 H1 H2 Htc Hcl Hir H6 H7 H8 H9 H10
-  iapply wpNext_mono $$ Hnext
-  iintro %cpu' HK %spie %spp %R' %p0 H1 H2 ⟨Htc, Hir⟩ Hcl H6 H7 HQ
-  iapply HK $$ %spie %spp %R' %p0 H1 H2 Htc Hcl Hir H6 H7 HQ
-
 end Xv6

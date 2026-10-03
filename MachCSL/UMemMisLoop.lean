@@ -13,7 +13,6 @@ an unrolling.  The loop reads no wire and makes no choice, so the oracle is
 threaded unchanged.
 -/
 import MachCSL.URunRW
-import MachCSL.Tactics
 
 namespace MachCSL
 

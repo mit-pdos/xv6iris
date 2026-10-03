@@ -74,22 +74,6 @@ structure RELEASESLEEP : Prop where
     (pid : BitVec 32) hnoff hK hs hp htier,
     wp_releasesleep_gen_body (hlc := hlc) (GF := GF) Γ cpu k γl γ R H q pid hnoff hK hs hp htier
 
-/-- The untracked contract, from the general one. -/
-theorem RELEASESLEEP.wp_releasesleep (A : RELEASESLEEP) {hlc : HasLC} {GF : BundledGFunctors}
-    [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF] [CurCtx] (Γ : SchedNames)
-    (cpu : CPU) (k : KCtx) (γl γ : GName) (R : CtxId → IProp GF) [CtxMorph R] (q : Qp) (pid : BitVec 32)
-    hnoff hK hs hp htier :
-    wp_releasesleep_body (hlc := hlc) (GF := GF) Γ cpu k γl γ R q pid hnoff hK hs hp htier := by
-  have h := A.wp_releasesleep_gen (hlc := hlc) (GF := GF) Γ cpu k γl γ R slUntracked q pid hnoff hK hs hp htier
-  unfold wp_releasesleep_gen_body at h
-  unfold wp_releasesleep_body isSleeplock
-  iintro ⟨Hk, Hpc, Hpi, Hsl, Ht, HR, Hnext⟩
-  iapply h
-  iframe Hk Hpc Hpi Hsl Ht HR
-  iapply wpNext_mono _ _ _ _ _ $$ Hnext
-  iintro %c' HΦ %spie %spp %R' %hsp Hk Hpc %hcs -
-  iapply HΦ $$ %spie %spp %R' %hsp Hk Hpc %hcs
-
 /-! ## The HOOKED form (Rocq's hooked `releasesleep`, `ProofBrelse.v`)
 
 The payload the releaser surrenders is `Rin`, finished into the `R` the

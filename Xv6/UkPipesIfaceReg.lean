@@ -34,7 +34,7 @@ predicates, which read `UkPipeDev`'s devices, are in `UkPipesIfaceDev`.)
    `ukSysFH_holds` at the engine `UL`.  `HPc`/`HNc` are instance arguments.
 2. **The registry** is `HfpReg` at `Pdev` (UkPipesIfaceDefs deviation 1):
    `pns_tok d q x` is `HfpReg.tok R.γreg d q x`, and Rocq's six token lemmas
-   are `HfpReg.tok_agree` … `HfpReg.toks_agree` at it.
+   are `HfpReg.tok_agree_keep` … `HfpReg.toks_agree` at it.
 3. **`app_taint` / `app_sup`**: the taint's two readings are the kill
    credential `MachFixedGS.killCred` (UkPipesIfaceKit deviation 3) and the
    free handler's abstract supply `Sup` (UkFreeHandler deviation 2), with
@@ -56,8 +56,6 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Iris.Std.PartialMap
 open Std (ExtTreeSet)
-
-set_option linter.unusedSectionVars false
 
 /-! ## §2d The process (deviation 1) -/
 
@@ -103,8 +101,6 @@ def pnsOk (Dp : List Nat) (fdm : Fdmap) (l : List FdState) (vs : RegMapF Pdev) :
 kinds. -/
 def pnsKdsOk (kds : List (Nat × Pdev)) (vs : RegMapF Pdev) : Prop :=
   ∀ dk, dk ∈ kds → get? vs dk.1 = some dk.2
-
-theorem pnsNSTD : NSTD = 3 := rfl
 
 /-- **Rocq `pns_ok_lookup`**. -/
 theorem pns_ok_lookup (Dp : List Nat) (fdm : Fdmap) (l : List FdState) (vs : RegMapF Pdev) (fd : Int)

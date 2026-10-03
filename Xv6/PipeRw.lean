@@ -115,8 +115,6 @@ def wordBytes8 (w : BitVec 64) : List (BitVec 8) :=
   [nthByte (n := 8) w 0, nthByte (n := 8) w 1, nthByte (n := 8) w 2, nthByte (n := 8) w 3,
    nthByte (n := 8) w 4, nthByte (n := 8) w 5, nthByte (n := 8) w 6, nthByte (n := 8) w 7]
 
-@[simp] theorem wordBytes8_length (w : BitVec 64) : (wordBytes8 w).length = 8 := rfl
-
 /-- **An 8-aligned word to its eight bytes** (`copyin`/`copyout`'s stack buffer). -/
 theorem pw_word8_to_bytes (a : BitVec 64) (dq : DFrac) (w : BitVec 64) (hal : a.toNat % 8 = 0) :
     wordPointsTo (GF := GF) a 8 dq w ⊢ byteBuf a dq (wordBytes8 w) := by
@@ -236,8 +234,6 @@ theorem pw_data_addr' (pi : BitVec 64) (x : BitVec 64) (hx : x < 512#64) :
     x + pi + 24#64 = pi + BitVec.ofNat 64 (pipeDataOff + x.toNat) := by
   rw [← pw_data_addr pi x hx]; rfl
 
-theorem pw_idx_lt' (nw : BitVec 32) :
-    (BitVec.signExtend 64 nw &&& BitVec.signExtend 64 511#12) < 512#64 := by bv_decide
 theorem pw_idx_lt'' (nw : BitVec 32) :
     (BitVec.signExtend 64 nw &&& 511#64) < 512#64 := by bv_decide
 
@@ -303,7 +299,6 @@ theorem pw_m1_lit : (-1#64 : BitVec 64) = 0xFFFFFFFFFFFFFFFF#64 := by decide
 theorem pw_sext3999 : BitVec.signExtend 64 3999#12 = 0xFFFFFFFFFFFFFF9F#64 := by decide
 theorem pw_sext4095 : BitVec.signExtend 64 4095#12 = 0xFFFFFFFFFFFFFFFF#64 := by decide
 theorem pw_sext1 : BitVec.signExtend 64 1#12 = 1#64 := by decide
-theorem pw_sext24 : BitVec.signExtend 64 24#12 = 24#64 := by decide
 theorem pw_sext72 : BitVec.signExtend 64 72#12 = 72#64 := by decide
 theorem pw_sext80 : BitVec.signExtend 64 80#12 = 80#64 := by decide
 theorem pw_sext512 : BitVec.signExtend 64 512#12 = 512#64 := by decide
@@ -405,7 +400,7 @@ theorem pw_privExt_split (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P : 
       @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPagetable pa) 8 (DFrac.own 1) V.pagetable ∗
       @procPtAt hlc GF _ ⟨curCtx, KTier.kpt⟩ P M' ∗ @ecRest hlc GF _ _ ⟨curCtx, KTier.kpt⟩ pa pid V P := by
   unfold procPrivBareAt ecRest procFieldsNoOfile
-  iintro ⟨%hf, Hpid, ⟨Hks, Hszc, Hpgc, Htfc, Hcwd, Hnm, Hsc⟩, Hspace, Htfp⟩
+  iintro ⟨%hf, Hpid, ⟨Hks, Hszc, Hpgc, Htfc, Hcwd, Hnm, Hsc, Hrt⟩, Hspace, Htfp⟩
   isplitl []
   · ipureintro; exact hf
   · iframe
@@ -420,7 +415,7 @@ theorem pw_privExt_close (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P P'
       procPrivBareAt (GF := GF) curCtx pa pid { V with upt := P' } M'' := by
   unfold procPrivBareAt ecRest procFieldsNoOfile
   rw [hext.1.1, hext.1.2.1]
-  iintro ⟨Hszc, Hpgc, Hspace, Hpid, Hks, Htfc, Hcwd, Hnm, Hsc, Htfp, %hlz, Hev⟩
+  iintro ⟨Hszc, Hpgc, Hspace, Hpid, Hks, Htfc, Hcwd, Hnm, Hsc, Hrt, Htfp, %hlz, Hev⟩
   isplitl []
   · ipureintro; exact ⟨hf.1, UMemL.umBelow_extSz hf.2.1 hext, hf.2.2.1, hf.2.2.2⟩
   · iframe

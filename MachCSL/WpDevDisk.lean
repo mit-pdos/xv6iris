@@ -5,8 +5,8 @@ to the drain (crash_layer.md D40; Rocq `WpUart.wp_disk_loop` with
 
 Of the whole machine only the disk's own steps move the durable image
 (`Virtio.drain`), so the disk cannot go through the device-generic rules
-(`wpDev_dmaV` and friends need `DevDiskInert`).  This file is `wpDev_dmaV`
-for the disk, over `DevM.LeaseD`: `DevM.LeaseV` with
+(they need `DevDiskInert`, as `wpDev_lift_obs` does).  This file is the
+bus-master loop for the disk, over `DevM.LeaseD`: `DevM.LeaseV` with
 
 * its state-moving arms (`step`, `dmaWrite`) additionally proving that the
   move keeps the durable image (`hdk`), which is how the rule frames the
@@ -60,17 +60,6 @@ theorem DevM.KeepsDisk.lift {S T : Type} {dk : S → Nat → BitVec 8} (o : DevO
     DevM.KeepsDisk dk (DevM.lift (T := T) o) :=
   .op o _ (fun g h => absurd h (hs g)) (fun g pa n w h => absurd h (hw g pa n w))
     (fun r => .pure r)
-
-theorem DevM.KeepsDisk.step' {S T : Type} {dk : S → Nat → BitVec 8}
-    (g : S → Option (S × List DevObs)) (hg : ∀ s s' os, g s = some (s', os) → dk s' = dk s) :
-    DevM.KeepsDisk dk (DevM.step (T := T) g) :=
-  .op _ _ (fun g' h => by cases h; exact hg) (fun _ _ _ _ h => by cases h) (fun _ => .pure ())
-
-theorem DevM.KeepsDisk.dmaWrite' {S T : Type} {dk : S → Nat → BitVec 8}
-    (g : S → Option S) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
-    (hg : ∀ s s', g s = some s' → dk s' = dk s) :
-    DevM.KeepsDisk dk (DevM.dmaWriteStep (T := T) g pa n w) :=
-  .op _ _ (fun _ h => by cases h) (fun g' pa' n' w' h => by cases h; exact hg) (fun _ => .pure ())
 
 /-! ## The lend -/
 
@@ -224,8 +213,9 @@ local macro "disk_first_leg" : tactic => `(tactic| (
   imod Hmask))
 
 set_option maxHeartbeats 4000000 in
-/-- **The disk's tasks are safe** (D40, Rocq `wp_disk_loop`): `wpDev_dmaV`
-for the disk, over `LeaseD`, with the durable disk lent to `stepD`. -/
+/-- **The disk's tasks are safe** (D40, Rocq `wp_disk_loop`): the
+bus-master loop for the disk, over `LeaseD`, with the durable disk lent to
+`stepD`. -/
 theorem wpDev_dmaD (N : Namespace) (Env : IProp GF) [Persistent Env]
     (R : DevSt .virtio → IProp GF) [∀ s, Timeless (R s)]
     (Lt : DevTask .virtio → IProp GF) (Cr : IProp GF)

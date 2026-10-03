@@ -19,8 +19,6 @@ registered and with the handler, only the ledger's slot closes.
 3. `dom fdm ∖ {[fd]}` is `fun z => fdDom fdm z ∧ z ≠ fd`; `<[k := FdClosed]>
    l` is `l.set k .closed`.
 -/
-import Xv6.UkFileIfaceDevP
-import Xv6.UkFileIfaceHdls
 import Xv6.UkFileIfaceWrite
 import Xv6.UkFileIfaceRead
 
@@ -30,8 +28,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Iris.Std.PartialMap
 open Std (ExtTreeSet)
 open HfpFileClaimsP UkFileDev
-
-set_option linter.unusedSectionVars false
 
 noncomputable section FifClose
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]

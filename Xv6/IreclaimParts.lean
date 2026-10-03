@@ -6,7 +6,7 @@ index arithmetic, and the formatted message.
 
 The addresses are the LEAN image's (`KA.«ireclaim» + 0x..#64`); Rocq's
 `+0x..` offsets carry over (byte-identical body), its absolute ones do not
-(Rocq's `irc_msg_addr = 0x80007490` happens to agree with
+(Rocq's `irc_msg_addr = 0x80007488` happens to agree with
 `KStr.«ireclaim: orphaned inode %d\n»`; its `jal` immediates do not).
 
 **THE SCAN'S INDEX IS A `Nat`** (the `Xv6/IallocParts.lean` convention):
@@ -16,54 +16,46 @@ works at is `BitVec.ofNat 32 n`, whose `toNat` is `n`.  Rocq threads an
 (`ialloc_srli4`, `ialloc_addw_ibl`, `ialloc_andi15`, `ialloc_succ`,
 `ialloc_sextw`, `ialloc_bgeu_dead`, `ialloc_bno`), restated here at
 ireclaim's registers because a stage file belongs to ONE function (the
-`Xv6/DinodeSlot.lean` group-1 lemmas `dsSrli4`/`dsAddwIbl`/`dsAndi15`/
-`dsSlli6` and `Xv6/FsWords.lean`'s `fw_*` do the work; these are one-line
+`Xv6/DinodeSlot.lean` group-1 lemmas `dsAddwIbl`/`dsAndi15`/`dsSlli6` and `Xv6/FsWords.lean`'s `fw_*` do the work; these are one-line
 wrappers -- candidates to hoist into DinodeSlot together with ialloc's).
 -/
 import Xv6.SpecIreclaim
-import Xv6.DinodeSlot
 import Xv6.SpecBeginOp
-import Xv6.SpecBrelse
 import Xv6.SpecIunlock
 import Xv6.SpecIput
-import Xv6.FsWords
 import Xv6.SpecIlock
 import Xv6.SpecIget
-import MachCSL.WpSmodeFrame8
 import Xv6.BallocParts
 import Xv6.BfreeParts
-import Xv6.IupdateSteps
 
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedSectionVars false
-
 /-! ## Addresses -/
 
 /-- `auipc a4,0x1d ; lw a4,984(a4)` at `+0x00`: `sb.ninodes`. -/
-theorem ireclaim_a_ninodes : KA.«ireclaim» + 0x1d5c2#64 = sbNinodes := by
+theorem ireclaim_a_ninodes : KA.«ireclaim» + 0x1d84e#64 = sbNinodes := by
   unfold sbNinodes; decide
 /-- `auipc s4,0x1d ; addi s4,s4,934` at `+0x26`: `&sb`. -/
-theorem ireclaim_a_sb : KA.«ireclaim» + 0x1d5b6#64 = KA.«sb» := by decide
+theorem ireclaim_a_sb : KA.«ireclaim» + 0x1d842#64 = KA.«sb» := by decide
 /-- `auipc s6,0x4 ; addi s6,s6,-266` at `+0x2e`: the format string. -/
-theorem ireclaim_a_fmt : KA.«ireclaim» + 0x3ede#64 = KStr.«ireclaim: orphaned inode %d\n» := by
+theorem ireclaim_a_fmt : KA.«ireclaim» + 0x3ec2#64 = KStr.«ireclaim: orphaned inode %d\n» := by
   decide
 theorem ireclaim_ist_addr : KA.«sb» + 24#64 = sbInodestart := rfl
 theorem ireclaim_nin_addr : KA.«sb» + 12#64 = sbNinodes := rfl
 
 /-! ## Call targets and return addresses -/
 
-theorem ireclaim_br_printk : KA.«ireclaim» + 0xffffffffffffcf74#64 = KA.«printk» := by decide
+theorem ireclaim_br_printk : KA.«ireclaim» + 0xffffffffffffcf60#64 = KA.«printk» := by decide
 theorem ireclaim_br_iget : KA.«ireclaim» + 0xFFFFFFFFFFFFF9EE#64 = KA.«iget» := by decide
 theorem ireclaim_br_brelse : KA.«ireclaim» + 0xFFFFFFFFFFFFF7FC#64 = KA.«brelse» := by decide
-theorem ireclaim_br_begin_op : KA.«ireclaim» + 0x7F6#64 = KA.«begin_op» := by decide
+theorem ireclaim_br_begin_op : KA.«ireclaim» + 0x856#64 = KA.«begin_op» := by decide
 theorem ireclaim_br_ilock : KA.«ireclaim» + 0xFFFFFFFFFFFFFD8C#64 = KA.«ilock» := by decide
 theorem ireclaim_br_iunlock : KA.«ireclaim» + 0xFFFFFFFFFFFFFE3A#64 = KA.«iunlock» := by decide
 theorem ireclaim_br_iput : KA.«ireclaim» + 0xFFFFFFFFFFFFFF0E#64 = KA.«iput» := by decide
-theorem ireclaim_br_end_op : KA.«ireclaim» + 0x882#64 = KA.«end_op» := by decide
+theorem ireclaim_br_end_op : KA.«ireclaim» + 0x8e2#64 = KA.«end_op» := by decide
 theorem ireclaim_br_bread : KA.«ireclaim» + 0xFFFFFFFFFFFFF6F4#64 = KA.«bread» := by decide
 
 theorem ireclaim_ret_40 : jumpPc (KA.«ireclaim» + 0x40#64) = KA.«ireclaim» + 0x40#64 := by decide

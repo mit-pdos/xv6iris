@@ -43,18 +43,14 @@ the union discipline: a disciplined history never ends in ^D, so
 -/
 import Xv6.UnionReadInst
 import Xv6.UnionLinkInstAt
-import Xv6.UshMainDefs
 import Xv6.UshMainLine
 import Xv6.UshLineRead
-import Xv6.UexecExecInst
-import Xv6.AppInv
 
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
 set_option synthInstance.maxSize 1024
 
 /-! ## 0. A union-disciplined history never ends in ^D -/
@@ -299,7 +295,6 @@ theorem union_read_leaf_holds_at (UL : UK_LEAVES) (ug : UnionGn)
     (union_dirty_law ug htag s0 hstw hrdw) (fun v => union_pin_refl_at ug s0 v) hlk
 
 end UnionReadLeafHolds
-
 
 section UnionTagLaw
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF]

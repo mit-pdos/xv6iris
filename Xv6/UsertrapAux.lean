@@ -3,8 +3,8 @@
 printk format strings in `.rodata`, their directive kinds, and the printk /
 setkilled call sites at interrupts off.
 
-    "usertrap(): unexpected scause 0x%lx pid=%d\n"   (0x800072b8)
-    "            sepc=0x%lx stval=0x%lx\n"           (0x800072e8)
+    "usertrap(): unexpected scause 0x%lx pid=%d\n"   (0x800072b0)
+    "            sepc=0x%lx stval=0x%lx\n"           (0x800072e0)
 
 Both take two numeric varargs (`PkArgDesc.num`), which cost nothing.
 -/
@@ -15,9 +15,6 @@ namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
-
-set_option linter.unusedVariables false
-set_option linter.unusedSectionVars false
 
 /-- Rocq `ut_fmt1`. -/
 def utFmt1 : List (BitVec 8) :=

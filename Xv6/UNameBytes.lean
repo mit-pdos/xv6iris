@@ -21,15 +21,6 @@ namespace Xv6
 
 /-! ## S2  THE BYTE LAYOUTS AROUND A NAME OF ANY LENGTH -/
 
-theorem sufGt_0 (nm : List (BitVec 8)) : (sufGt nm)[0]! = wlSp := rfl
-
-theorem sufGt_1 (nm : List (BitVec 8)) : (sufGt nm)[1]! = 62#8 := rfl
-
-theorem sufGt_2 (nm : List (BitVec 8)) : (sufGt nm)[2]! = wlSp := rfl
-
-theorem sufGt_name (nm : List (BitVec 8)) (j : Nat) : (sufGt nm)[3 + j]! = nm[j]! :=
-  wlLta_app_r [32#8, 62#8, 32#8] nm j
-
 /-- `"open "` -/
 def openfailPre : List (BitVec 8) := [111#8, 112#8, 101#8, 110#8, 32#8]
 /-- `" failed"` then the newline -/

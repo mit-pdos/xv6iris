@@ -17,7 +17,7 @@ geometry (`ientry` and its laws); the reference-count algebra's CAMERAS
 (Rocq `Xv6Cameras.v` §11, which this port has no file for), CONSTRUCTORS
 and BOOT LITERALS (the `lelem*` layering, `icntBootMap`, `frzmBootMap`,
 `linkBootMap`, `liveBootMap`, `hpnBootMap` and their validity); the
-descriptor accessors (`icDepGname`, `icDepLo`, `icDepRd`); `class Icfg` --
+descriptor accessor `icDepRd`; `class Icfg` --
 THE inode cache's global constants -- and `structure IcNames`; the boot
 allocation (`icfgAlloc` and the family allocators it runs on); the
 per-generation type one-shot's vocabulary (`ityPending` / `ityShot`); and
@@ -94,7 +94,7 @@ its class `Xv6.OffboxBoxG`.  See deviation 6.
    sleeplock keeps the holder token and the counting half at ONE gname, so
    `isl_fun_alloc` mints `sl_free_tok (f k) ∗ slh_auth (f k) None`.  This
    port's sleeplock keeps them at two (`Xv6.slHtok` / `Xv6.slhAuth`), and
-   the holder gname is minted by `Xv6.kctx_newSleeplock` itself.  Only the
+   the holder gname is minted when the lock itself is created.  Only the
    counter is slot-keyed, so `icfgIsl k` names it and `islFunAlloc` mints
    `slhAuth (f k) none`.  Checked downstream: `IcacheBoot.v:1436-1440`
    drops the `sl_free_tok`s explicitly ("this cache does not [build a lock
@@ -172,14 +172,11 @@ import Xv6.DinodeEnc
 import Xv6.BlkmapDefs
 import Xv6.OffBoxCam
 import Xv6.SleepLockGhost
-import MachCSL.CtxBox
 
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
 open Iris.Algebra
-
-set_option linter.unusedSectionVars false
 
 /-! ## 0.  THE CAMERAS (Rocq `Xv6Cameras.v` §11 and the icache box; deviation 1) -/
 
@@ -434,16 +431,10 @@ def iLock (ip : BitVec 64) : BitVec 64 := ip + 16#64
 /-- `&ip->valid` (`lw a5,64(s1)`). -/
 def iValid (ip : BitVec 64) : BitVec 64 := ip + 64#64
 
-theorem iDev_sext (ip : BitVec 64) : ip + BitVec.signExtend 64 0#12 = iDev ip := by
-  unfold iDev; congr 1
-theorem iInum_sext (ip : BitVec 64) : ip + BitVec.signExtend 64 4#12 = iInum ip := by
-  unfold iInum; congr 1
 theorem iRef_sext (ip : BitVec 64) : ip + BitVec.signExtend 64 8#12 = iRef ip := by
   unfold iRef; congr 1
 theorem iLock_sext (ip : BitVec 64) : ip + BitVec.signExtend 64 16#12 = iLock ip := by
   unfold iLock; congr 1
-theorem iValid_sext (ip : BitVec 64) : ip + BitVec.signExtend 64 64#12 = iValid ip := by
-  unfold iValid; congr 1
 
 /-- `&ip->dev` is `ip` itself. -/
 theorem iDev_eq (ip : BitVec 64) : iDev ip = ip := by
@@ -458,7 +449,7 @@ def itableLock : BitVec 64 := KA.«itable»
 /-- `&itable.inode[k]`.  (`24` is `Xv6.ITABLE_OFF`.) -/
 def ientry (k : Nat) : BitVec 64 := BitVec.ofNat 64 (KernelSyms.«itable» + 24 + ISLOTSZ * k)
 
-private theorem itable_val : KernelSyms.«itable» = 0x80020b88 := rfl
+private theorem itable_val : KernelSyms.«itable» = 0x80020e28 := rfl
 
 /-- The whole geometry as ONE arithmetic fact: every entry address in range
 is its literal offset, with no wrap.  Injectivity, the scan's step and the
@@ -652,26 +643,6 @@ theorem linkBootMap_valid (P : ExtTreeSet Nat compare) : ✓ linkBootMap P :=
   gsetToGmap_valid _ (Auth.auth_both_valid_2 lelemBoot_valid (CMRA.inc_refl _)) P
 
 /-! ### The checkout deposit's descriptor accessors (design §14.8) -/
-
-/-- The descriptor's generation, where it has one.  `depNone` is the
-sleeplock's neutral value and names no slot state at all, which is why
-`IcacheEscrow.ic_dep_res` is `False` there; `depFrz` is `none` for the same
-reason, and that is ALSO what refutes it at every ordinary parker and
-borrower: they all name a `d` with a generation. -/
-def icDepGname (d : IcDep) : Option GName :=
-  match d with
-  | .depNone => none
-  | .depFrz .. => none
-  | .depTx _ _ _ g _ _ _ => some g
-  | .depRd _ _ _ g _ => some g
-
-/-- The credential's EPOCH (tso-flip A6.145), where the descriptor has one. -/
-def icDepLo (d : IcDep) : Option Nat :=
-  match d with
-  | .depNone => none
-  | .depFrz .. => none
-  | .depTx _ _ _ _ lo _ _ => some lo
-  | .depRd _ _ _ _ lo => some lo
 
 /-- IS THIS DESCRIPTOR THE READ ARM (durable-disk B''-join)?  The escrow's
 OUT arm at `depRd` keeps three quarters of the inode's bundle; at every

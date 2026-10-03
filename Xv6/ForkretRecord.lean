@@ -16,10 +16,6 @@ three ghost steps are:
 2. `ctx_move`: the record's rows move from the creator's context to `ξp`.
 3. `ctx_park`: `ξp`'s token parks under the creator's context.
 
-`procPriv_split` says the private block is the record's 14 cells and the
-rest.  (W8-P2 retired this file's `forkret_resume` / `forkret_record` /
-`newbornPay`, which assumed forkret's WP through `ForkretIs`.)
-
 A lemma file: it imports Spec files, never a Proof or Link file.
 -/
 import Xv6.SchedCtx
@@ -28,8 +24,6 @@ namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
-
-set_option linter.unusedSectionVars false
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
@@ -70,35 +64,6 @@ theorem ctx_fresh (cpu : CPU) : ⊢@{IProp GF} |==> ∃ ξ : CtxId, ownCtx cpu �
     iintro %k %h %hk
     rw [get?_empty] at hk
     cases hk
-
-end
-
-section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-
-/-! ## The private block without its save area -/
-
-/-- **The block splits at the save area**: the private block is the record's
-14 cells and everything else. -/
-theorem procPriv_split (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
-    (M : Nat → List (BitVec 8)) :
-    @procPriv hlc GF _ ⟨ξ, KTier.kpt⟩ _ pa pid V M ⊣⊢
-      procPrivNoctxAt ξ pa pid V M ∗ @ctxCells hlc GF _ ⟨ξ, KTier.kpt⟩ (pContext pa 0) V.context := by
-  letI : CurCtx := ⟨ξ, KTier.kpt⟩
-  constructor
-  · unfold procPriv procPrivNoctxAt procFields procFieldsNoctx
-    iintro ⟨%hV, Hpid, ⟨Hks, Hsz, Hpt, Htf, Hctx, Hof, Hcwd, Hnm, Hsc⟩, Hspace, Htfp⟩
-    isplitl [Hpid Hks Hsz Hpt Htf Hof Hcwd Hnm Hsc Hspace Htfp]
-    · isplitl []
-      · ipureintro; exact hV
-      iframe
-    · iapply contextCells_to_ctxCells pa V.context $$ Hctx
-  · unfold procPriv procPrivNoctxAt procFields procFieldsNoctx
-    iintro ⟨⟨%hV, Hpid, ⟨Hks, Hsz, Hpt, Htf, Hof, Hcwd, Hnm, Hsc⟩, Hspace, Htfp⟩, Hcells⟩
-    isplitl []
-    · ipureintro; exact hV
-    iframe Hpid Hks Hsz Hpt Htf Hof Hcwd Hnm Hsc Hspace Htfp
-    iapply ctxCells_to_contextCells pa V.context $$ Hcells
 
 end
 

@@ -18,8 +18,7 @@ Each is a ghost wrapper around its pure half in `Xv6/PipeOutNPure.lean`
    `WA.gpr` (`Xv6/PipeOutStore.lean`); the round's first byte takes the
    round's payload FREE at every alternative (`□ ∀ a', WA.gpr k v I0 a'`),
    which opens the round's `gopen`; the filing files it (`gpcs_file`).
-3. The curried agreement forms the steps read (`pcsLb_prefix_c`,
-   `peraPin_agree_c`, `curHalf_agree_c`, `curHalf_excl_c`,
+3. The curried agreement forms the steps read (`peraPin_agree_c`, `curHalf_agree_c`, `curHalf_excl_c`,
    `rblkLb_prefix_c`) are stated here once, as `GenOut`'s `gop*` forms are.
 -/
 import Xv6.PipeOutNDefs
@@ -28,19 +27,11 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode MachCSL
 
-set_option linter.unusedSectionVars false
-
 section PipeOutNSteps
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [PipeOutG GF]
 
 /-! ## Curried agreement forms (the steps keep both sides) -/
-
-theorem pcsLb_prefix_c (v : EraPins) (l l' : List Nat) (fz : Bool) :
-    ⊢ pcs (GF := GF) v l fz -∗ csLb v l' -∗ ⌜l' <+: l⌝ := by
-  iintro H1 H2
-  iapply pcs_lb_prefix v l l' fz $$ [H1 H2]
-  iframe H1 H2
 
 theorem peraPin_agree_c (g : PipeGn) (k : Nat) (w w' : PipeEra) :
     ⊢ peraPin (GF := GF) g k w -∗ peraPin g k w' -∗ ⌜w = w'⌝ := by

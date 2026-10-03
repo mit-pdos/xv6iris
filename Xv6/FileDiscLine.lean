@@ -217,8 +217,6 @@ theorem cmdSync_word : wlWord cmdSync :=
 
 theorem cmdSync_ne_echo : cmdSync ≠ cmdEcho := by decide
 
-theorem cmdSync_ne_cat : cmdSync ≠ fdWCat := by decide
-
 theorem cmdSync_ne_secc : cmdSync ≠ cmdSeccomp := by decide
 
 /-- `'>'` is not a file-name word -/
@@ -263,8 +261,6 @@ def lineBody : Uline → List (BitVec 8)
 
 /-- ...and the LINE the user typed: the body and the newline `gets` stops at. -/
 def lineBytes (l : Uline) : List (BitVec 8) := lineBody l ++ [wlNl]
-
-theorem lineBytes_echo (ws : List (List (BitVec 8))) : lineBytes (.LEcho ws) = wlLine ws := rfl
 
 theorem lineBytes_body (l : Uline) : lineBytes l = lineBody l ++ [wlNl] := rfl
 
@@ -1013,10 +1009,5 @@ theorem lineBytes_bytes (l : Uline) (hok : ulineOk l) :
     | LSecc ws => exact Or.inl (fbodyByte_of_fn b (wlBody_bytes_fn _ (seccOk_wf ws hok) b hb))
     | LSync => exact Or.inl (Or.inl (Or.inl (cmdSync_word.2 b hb)))
   · simp at hb; exact Or.inr (Or.inr hb)
-
-/-- D3: every COMPLETE body parses to an admissible line, and the partial
-line is body bytes short enough that its newline still fits. -/
-def discInputF (I : List (BitVec 8)) : Prop :=
-  (∀ b ∈ bodiesOf I, fbodyOk b) ∧ (∀ b ∈ restOf I, fbodyByte b) ∧ (restOf I).length + 1 < lineMax
 
 end Xv6

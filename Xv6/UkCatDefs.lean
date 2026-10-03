@@ -62,16 +62,12 @@ HOLES the caller funds (Rocq's program-specs cut 3):
 -/
 import Xv6.UkEchoDefs
 import Xv6.UkCatLit
-import Xv6.UkProgAbi
-import Xv6.SlotSupply
 
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
-
-set_option linter.unusedSectionVars false
 
 /-! ## §1 cat's instruction facts (deviation 1) -/
 
@@ -116,15 +112,6 @@ theorem kcat_nthByte0_zext (b : BitVec 8) : nthByte (n := 8) (BitVec.setWidth 64
         Nat.shiftRight_zero]; omega)
     | (simp [BitVec.toNat_setWidth]; omega)
     | simp [BitVec.toNat_setWidth]
-
-/-- **Rocq `nth_byte0_moi`**: the low byte of a byte's value as a word. -/
-theorem kcat_nthByte0_ofNat (b : BitVec 8) : nthByte (n := 8) (BitVec.ofNat 64 b.toNat) 0 = b := by
-  rw [show BitVec.ofNat 64 b.toNat = BitVec.setWidth 64 b from by
-    apply BitVec.eq_of_toNat_eq; simp [BitVec.toNat_setWidth]]
-  exact kcat_nthByte0_zext b
-
-/-- **Rocq `moi_of_sint`**: a word is its own signed reading put back. -/
-theorem kcat_ofInt_toInt (r : BitVec 64) : BitVec.ofInt 64 r.toInt = r := BitVec.ofInt_toInt
 
 /-- A nonnegative signed reading is the word's `Nat` value put back. -/
 theorem kcat_ofNat_of_toInt (r : BitVec 64) (nb : Nat) (h : r.toInt = nb) : BitVec.ofNat 64 nb = r := by
@@ -429,19 +416,6 @@ def cvInv (m0 m : RegMap) (sp0 fdv : BitVec 64) : Prop :=
   m.get 20#5 = BitVec.ofNat 64 512 ∧ m.get 21#5 = BitVec.ofNat 64 1 ∧
   (∀ r : BitVec 5, ucalleeSavedIdx r = true → kcatFree r → m.get r = m0.get r)
 
-/-- **Rocq `cv_inv_call`**: a callee that honours the ABI keeps it. -/
-theorem cvInv_call (m0 m m' : RegMap) (sp0 fdv : BitVec 64) (hcs : ucalleeSaved m m')
-    (h : cvInv m0 m sp0 fdv) : cvInv m0 m' sp0 fdv := by
-  obtain ⟨h2, h8, h18, h19, h20, h21, hfr⟩ := h
-  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
-  · rw [hcs 2#5 (by decide)]; exact h2
-  · rw [hcs 8#5 (by decide)]; exact h8
-  · rw [hcs 18#5 (by decide)]; exact h18
-  · rw [hcs 19#5 (by decide)]; exact h19
-  · rw [hcs 20#5 (by decide)]; exact h20
-  · rw [hcs 21#5 (by decide)]; exact h21
-  · intro r hr hf; rw [hcs r hr]; exact hfr r hr hf
-
 /-- **Rocq `cv_writable`**: the registers a step may write without
 disturbing the invariant. -/
 def cvWritable (r : BitVec 5) : Bool :=
@@ -477,11 +451,11 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : 
 /-- **Rocq `kcat_dg_cw`**: the `cat: write error` run at fd 2, ending in
 the exit hole at status 1. -/
 def kcatDgCw (N : UkNames GF) : IProp GF :=
-  kcatPaySeq (hlc := hlc) N (BitVec.ofNat 64 2) (User.Cat.catLit 0x9b0) 0 17 iprop(emp) (kcatExit (hlc := hlc) N 1)
+  kcatPaySeq (hlc := hlc) N (BitVec.ofNat 64 2) (User.Cat.catLit 0x9c0) 0 17 iprop(emp) (kcatExit (hlc := hlc) N 1)
 
 /-- **Rocq `kcat_dg_cr`**: the `cat: read error` run. -/
 def kcatDgCr (N : UkNames GF) : IProp GF :=
-  kcatPaySeq (hlc := hlc) N (BitVec.ofNat 64 2) (User.Cat.catLit 0x9c8) 0 16 iprop(emp) (kcatExit (hlc := hlc) N 1)
+  kcatPaySeq (hlc := hlc) N (BitVec.ofNat 64 2) (User.Cat.catLit 0x9d8) 0 16 iprop(emp) (kcatExit (hlc := hlc) N 1)
 
 /-- **Rocq `kcat_wpost`**: after the write of `nb` bytes, at the returned
 word: the invariant at the full count, the `write error` tail otherwise. -/
@@ -508,7 +482,7 @@ end Round
 /-! ## §7 main: the literal, the invariant, the payment (Rocq `UkCatMain.v`) -/
 
 /-- **Rocq `cm_msg`**: `"cat: cannot open %s\n"`. -/
-def cmMsg : Nat := 0x9e0
+def cmMsg : Nat := 0x9f0
 /-- **Rocq `cm_msg_len`**. -/
 def cmMsgLen : Nat := 20
 /-- **Rocq `cm_msg_q`**: where the `%` is. -/

@@ -35,25 +35,16 @@ holds is the record equation itself, as a pure persistent fact
    instance search does not unfold a plain `def`).
 -/
 import Xv6.UnionOut
-import Xv6.UartLinks
 
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
-set_option linter.unusedSectionVars false
 set_option synthInstance.maxSize 1024
 
 section UnionLinks
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [FileAppG GF] [FileOutG GF] [PipeOutG GF]
-
-/-- Rocq `uchist_at0`. -/
-theorem uchistAt0 (ug : UnionGn)
-    (hcons : MachFixedGS.consRes (hlc := hlc) (GF := GF) = ucl (hlc := hlc) ug)
-    (kk : Nat) (hh : List Obs) (HH : ConsHist) :
-    chistAt (hlc := hlc) (GF := GF) .uart0 kk hh HH = ucl (hlc := hlc) ug kk hh HH := by
-  simp only [chistAt, hcons]
 
 /-! ## The taint route -/
 

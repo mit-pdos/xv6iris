@@ -7,8 +7,8 @@ states and the device bookkeeping.  Executing over it directly would wrap
 one more closure around each of them at every event, and a lookup would
 then cost the length of the run.
 
-`XState` is the same state with those functions stored: a hash map of
-register writes over the all-default file (`zeroRegs`), a vector of harts, a
+`XState` is the same state with those functions stored: a slot per
+register for its writes, over the all-default file (`zeroRegs`), a vector of harts, a
 field per device.  `XState.abs` is what it denotes -- an `MState` -- and the
 lemmas below say that every update of an `XState` is the language's own
 update of its denotation.  Nothing else about `XState` is ever trusted: the
@@ -34,27 +34,57 @@ harts are powered on with, before the boot program runs (Rocq
 def zeroRegs : RegFile := fun r => by
   cases r <;> exact default
 
-/-- A register file as the writes made to it, over `zeroRegs`. -/
-abbrev XRegs := Std.DHashMap Register RegisterType
+/-- How many registers the model has: `Register.ctorIdx` is below it. -/
+def nRegs : Nat := 180
+
+theorem ctorIdx_lt (r : Register) : r.ctorIdx < nRegs := by
+  cases r <;> decide
+
+theorem ofNat_ctorIdx (r : Register) : Register.ofNat r.ctorIdx = r := by
+  cases r <;> rfl
+
+theorem ctorIdx_inj {r r' : Register} (h : r.ctorIdx = r'.ctorIdx) : r = r' := by
+  rw [← ofNat_ctorIdx r, ← ofNat_ctorIdx r', h]
+
+/-- A register file as the writes made to it, over `zeroRegs`: slot
+`r.ctorIdx` holds the last write to `r`, if any.
+
+KEYED BY THE CONSTRUCTOR INDEX, NOT BY `Register`.  A Std map keyed by
+`Register` runs the model's derived `Hashable`/`BEq` -- interpreted code --
+from inside Std's native lookup on every probe, and that re-entry made one
+register read cost ~10x a `Nat`-keyed one.  Register reads are most of a
+run's events (the PMP scan reads `pmpcfg_n`/`pmpaddr_n` per entry, per
+access), so the representation is on every run's hot path. -/
+structure XRegs where
+  slots : Vector (Option (Σ r, RegisterType r)) nRegs
+
+instance : EmptyCollection XRegs := ⟨⟨Vector.replicate nRegs none⟩⟩
 
 /-- Read one register. -/
-def XRegs.get (m : XRegs) (r : Register) : RegisterType r := (m.get? r).getD (zeroRegs r)
+def XRegs.get (m : XRegs) (r : Register) : RegisterType r :=
+  match m.slots[r.ctorIdx]'(ctorIdx_lt r) with
+  | some ⟨r', v⟩ => if h : r' = r then h ▸ v else zeroRegs r
+  | none => zeroRegs r
+
+/-- Write one register. -/
+def XRegs.insert (m : XRegs) (r : Register) (v : RegisterType r) : XRegs :=
+  ⟨m.slots.set r.ctorIdx (some ⟨r, v⟩) (ctorIdx_lt r)⟩
 
 /-- The file an `XRegs` denotes. -/
 def XRegs.file (m : XRegs) : RegFile := fun r => m.get r
 
 theorem XRegs.file_empty : XRegs.file ∅ = zeroRegs := by
   funext r
-  simp [XRegs.file, XRegs.get]
+  simp [XRegs.file, XRegs.get, EmptyCollection.emptyCollection]
 
 theorem XRegs.file_insert (m : XRegs) (r : Register) (v : RegisterType r) :
     XRegs.file (m.insert r v) = BootRegs.set (XRegs.file m) r v := by
   funext r'
   by_cases h : r' = r
   · subst h
-    simp [XRegs.file, XRegs.get, BootRegs.set]
-  · have h' : (r == r') = false := by simpa using Ne.symm h
-    simp [XRegs.file, XRegs.get, BootRegs.set, h, Std.DHashMap.get?_insert, h']
+    simp [XRegs.file, XRegs.get, XRegs.insert, BootRegs.set]
+  · have hi : r.ctorIdx ≠ r'.ctorIdx := fun e => h (ctorIdx_inj e).symm
+    simp [XRegs.file, XRegs.get, XRegs.insert, BootRegs.set, h, Vector.getElem_set_ne _ _ hi]
 
 /-! ## The state -/
 

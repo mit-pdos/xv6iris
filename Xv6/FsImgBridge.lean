@@ -221,45 +221,4 @@ theorem imgDir_orphanClean (P : Nat → List (BitVec 8)) (sb : FsSb) (dn : Dinod
     (hok : FsInodeOk P sb dn) : dirOrphanClean dn (fsDataOf P dn) :=
   dirOrphanClean_live dn _ (by have := hok.fioNlink; omega)
 
-/-! ## F.  THE SLOT-TO-BLOCK-LIST BRIDGE -/
-
-/-- A nonzero SLOT is in the inode's block list (Rocq's
-`img_slot_in_inode_blocks`; deviation 3). -/
-theorem imgSlot_in_inodeBlocks (P : Nat → List (BitVec 8)) (sb : FsSb) (dn : Dinode) (i : Nat)
-    (hok : FsInodeOk P sb dn) (hi : i ≤ MAXFILE) (hnz : fsSlot P dn i ≠ 0) :
-    fsSlot P dn i ∈ fsInodeBlocks P dn :=
-  List.mem_of_getElem? (fsInodeBlocks_lookup P sb dn i hok hi hnz)
-
-/-! ## G.  THE RESOURCE HALF: block-granular ghosts -> `inodeBlocks` -/
-
-section ImageRes
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF] [FsBlocksG GF]
-
-/-- `inodeBlocks_of_blocks` AT AN IMAGE RECORD (Rocq's
-`img_inode_blocks_res`): the run of ONE inode's blocks the boot carve hands
-over becomes its `inodeBlocks` and `indRes`.  `indRes`'s content half needs
-no premise beyond `fsBlocksFull`: `fsIndBytes_round_trip`. -/
-theorem imgInodeBlocks_res (γfs : FsNames) (P : Nat → List (BitVec 8)) (sb : FsSb) (dn : Dinode)
-    (hwf : dinodeWf dn) (hfull : fsBlocksFull P) (hok : FsInodeOk P sb dn)
-    (hinj : fsSlotInj P dn) :
-    iprop([∗set] b ∈ (LawfulSet.ofList (fsInodeBlocks P dn) : ExtTreeSet Nat compare),
-        fsblock (GF := GF) γfs.bytes b (P b)) ⊢
-      iprop(inodeBlocks γfs (imgBlkmap P dn) (fsDataOf P dn) ∗ indRes γfs (imgBlkmap P dn)) := by
-  refine inodeBlocks_of_blocks γfs (imgBlkmap P dn) _ P (fsDataOf P dn) ?_ ?_ ?_ ?_
-  · intro i j hi hj hnz heq
-    refine hinj i j hi hj ?_ ?_
-    · rw [← imgBlkmap_slot P dn i hwf hi]; exact hnz
-    · rw [← imgBlkmap_slot P dn i hwf hi, ← imgBlkmap_slot P dn j hwf hj, heq]
-  · intro i hi hnz
-    rw [imgBlkmap_slot P dn i hwf hi] at hnz ⊢
-    exact LawfulSet.mem_ofList.1 (imgSlot_in_inodeBlocks P sb dn i hok hi hnz)
-  · intro i hi hnz
-    rw [imgBlkmap_get P dn i hwf hi] at hnz ⊢
-    rw [fsDataOf_addr, if_neg hnz]
-  · intro hnz
-    rw [imgBlkmap_ind] at hnz ⊢
-    exact fsIndBytes_round_trip P dn hfull hnz
-
-end ImageRes
-
 end Xv6

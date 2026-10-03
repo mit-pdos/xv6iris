@@ -8,10 +8,10 @@ ProofSysSeccomp.v against the Lean image.
     +0x0c  c.li a0,0
     +0x0e  jal argaddr             mask = trapframe->a0
     +0x12  jal myproc              a0 = p
-    +0x16  ld a5,360(a0)           p->seccomp
+    +0x16  ld a5,368(a0)           p->seccomp
     +0x1a  ld a4,-24(s0)           mask
     +0x1e  c.and a5,a5,a4
-    +0x20  sd a5,360(a0)           p->seccomp &= mask
+    +0x20  sd a5,368(a0)           p->seccomp &= mask
     +0x24  c.li a0,0               return 0
     +0x26  epilogue
 
@@ -36,14 +36,12 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## Constants -/
 
 theorem ssc_br_argaddr : KA.«sys_seccomp» + 0xfffffffffffffd4c#64 = KA.«argaddr» := by decide
-theorem ssc_br_myproc : KA.«sys_seccomp» + 0xffffffffffffed96#64 = KA.«myproc» := by decide
+theorem ssc_br_myproc : KA.«sys_seccomp» + 0xffffffffffffed76#64 = KA.«myproc» := by decide
 theorem ssc_ret_12 : jumpPc (KA.«sys_seccomp» + 0x12#64) = KA.«sys_seccomp» + 0x12#64 := by decide
 theorem ssc_ret_16 : jumpPc (KA.«sys_seccomp» + 0x16#64) = KA.«sys_seccomp» + 0x16#64 := by decide
 
@@ -150,7 +148,7 @@ theorem sys_seccomp_proof (AA : ARGADDR) (MP : MYPROC) : SYSSECCOMP :=
       wordPointsTo (pTrapframe pa) 8 (DFrac.own (1 : Qp).half.half) (pageAddr V.upt.tfp) from by
     rw [hproc]) $$ Htfp
   ihave Hpriv := Htfback $$ Htfp Htf
-  k_step_gen (wp_s_jal c5 _ (KA.«sys_seccomp» + 0x12#64) false 2092420#21 1#5 (by decide))
+  k_step_gen (wp_s_jal c5 _ (KA.«sys_seccomp» + 0x12#64) false 2092388#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ssc_br_myproc] next c6 hp6
   iintro Hk Hpc
   iapply (ssc_myproc MP c6 _ ?hnm ?hKm) $$ [- $Hk $Hpc]
@@ -167,11 +165,11 @@ theorem sys_seccomp_proof (AA : ARGADDR) (MP : MYPROC) : SYSSECCOMP :=
   k_norm_g at hcs2
   obtain ⟨d2, d8, d9, d18, d19, d20, d21, d22, d23, d24, d25, d26, d27⟩ := hcs2
   have ha0' : R2 10#5 = pa := ha0.trans hproc
-  -- ld a5,360(a0): the mask cell
+  -- ld a5,368(a0): the mask cell
   icases procPrivFd_secc γ pa pid V M $$ Hpriv with ⟨Hsc, Hback⟩
   ihave Hsc := (show wordPointsTo (GF := GF) (pSecc pa) 8 (DFrac.own 1) V.pvSecc ⊢
-      wordPointsTo (pa + 360#64) 8 (DFrac.own 1) V.pvSecc from by unfold pSecc; iintro H; iexact H) $$ Hsc
-  k_step_gen (wp_s_ld c7 _ (KA.«sys_seccomp» + 0x16#64) false 360#12 15#5 10#5 (by decide) (by decide)
+      wordPointsTo (pa + 368#64) 8 (DFrac.own 1) V.pvSecc from by unfold pSecc; iintro H; iexact H) $$ Hsc
+  k_step_gen (wp_s_ld c7 _ (KA.«sys_seccomp» + 0x16#64) false 368#12 15#5 10#5 (by decide) (by decide)
       (DFrac.own 1) V.pvSecc)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ha0'] next c8 hp8
   iintro Hk Hpc Hsc
@@ -184,11 +182,11 @@ theorem sys_seccomp_proof (AA : ARGADDR) (MP : MYPROC) : SYSSECCOMP :=
   k_step_gen (wp_s_and c9 _ (KA.«sys_seccomp» + 0x1e#64) true 15#5 15#5 14#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c10 hp10
   iintro Hk Hpc
-  -- sd a5,360(a0): p->seccomp &= mask
-  k_step_gen (wp_s_sd c10 _ (KA.«sys_seccomp» + 0x20#64) false 360#12 10#5 15#5 (by decide) V.pvSecc)
+  -- sd a5,368(a0): p->seccomp &= mask
+  k_step_gen (wp_s_sd c10 _ (KA.«sys_seccomp» + 0x20#64) false 368#12 10#5 15#5 (by decide) V.pvSecc)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ha0'] next c11 hp11
   iintro Hk Hpc Hsc
-  ihave Hsc := (show wordPointsTo (GF := GF) (pa + 360#64) 8 (DFrac.own 1) (V.pvSecc &&& v0) ⊢
+  ihave Hsc := (show wordPointsTo (GF := GF) (pa + 368#64) 8 (DFrac.own 1) (V.pvSecc &&& v0) ⊢
       wordPointsTo (pSecc pa) 8 (DFrac.own 1) (V.pvSecc &&& v0) from by unfold pSecc; iintro H; iexact H) $$ Hsc
   ihave Hpriv := Hback $$ %(V.pvSecc &&& v0) Hsc
   -- c.li a0,0

@@ -15,7 +15,6 @@ stated per iteration with the index of the last known non-NUL byte, here
 `shStrlen_step`/`shStrlen_loop` (echo's shape).
 -/
 import Xv6.SpecShStrlen
-import Xv6.UkEchoDefs
 import Xv6.UkRunBr
 import Xv6.UkProgAbi
 import Xv6.UshCodeUlib
@@ -26,7 +25,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 

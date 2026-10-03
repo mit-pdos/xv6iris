@@ -1,6 +1,6 @@
 /-
 THE PATH ARGUMENT OF A SYSCALL, READ OFF THE CALLER'S OWN IMAGE.  A pure
-leaf: two definitions, four small lemmas, and nothing in `IProp`.
+leaf: two definitions, three small lemmas, and nothing in `IProp`.
 
 A port of Rocq `ArgPath.v` (`iris/ArgPath.v`).  Rocq's header,
 kept because the reasons are the content:
@@ -57,21 +57,8 @@ kept because the reasons are the content:
    THIS port, which is what Rocq's header asks for; the difference is the
    underlying model's, not this file's.
 
-3. **THE SUPPLIERS TAKE `bb_cstr` / `copyinstr_got` UNFOLDED.**
-   `Xv6/ByteBuf.lean` (`bb_cstr`, `bb_nonul`) is being written by another
-   agent in this same wave, and this port's `Xv6.COPYINSTR` states its
-   promise as `umemStr`, not as a `copyinstr_got` predicate.  So
-   `argPathShape_bview` and `argPathOf_bview` take Rocq's conjuncts
-   verbatim as explicit hypotheses:
-
-   | Rocq | hypothesis here |
-   | --- | --- |
-   | `bb_nonul pfun plen`     | `hnn : ∀ j, j < plen → pfun j ≠ 0#8` |
-   | second half of `bb_cstr` | `hterm : pfun plen = 0#8` |
-   | `copyinstr_got M pv pfun plen` | `hgot : ∀ j, j ≤ plen → umemByte M (pv + j) = pfun j` |
-
-   TODO(coordinator): once `Xv6/ByteBuf.lean` lands, these can be folded back
-   into `bbCstr` / a `copyinstrGot` abbreviation without changing a proof.
+3. **THE SUPPLIERS `arg_path_shape_bview` / `arg_path_of_bview` ARE NOT
+   PORTED** (nothing uses them).
 
 4. **ONE ADDITION: `argPathOf_umemStr`.**  Rocq's supplier chain is
    `copyinstr_got` -> `arg_path_of_bview`; this port's `COPYINSTR` hands back
@@ -105,45 +92,6 @@ def argPathOf (M : Nat → List (BitVec 8)) (pv : Nat) (pl : List (BitVec 8)) : 
 
 theorem argPathOf_shape (M : Nat → List (BitVec 8)) (pv : Nat) (pl : List (BitVec 8))
     (h : argPathOf M pv pl) : argPathShape pl := h.1
-
-/-! ## 2.  THE SUPPLIERS: the buffer argstr handed the syscall -/
-
-/-- Rocq `arg_path_shape_bview`: the SHAPE supplier.  `hnn` is `bb_nonul
-pfun plen`, which is exactly `fetchstr`'s shape promise about that buffer
-(deviation 3). -/
-theorem argPathShape_bview (plen : Nat) (pfun : Nat → BitVec 8) (hlen : plen < 2 ^ 31)
-    (hnn : ∀ j, j < plen → pfun j ≠ 0#8) : argPathShape (bview plen pfun) := by
-  refine ⟨by rw [bview_length]; exact hlen, ?_⟩
-  intro j b hb
-  by_cases hj : j < plen
-  · rw [bview_lookup plen pfun j hj] at hb
-    rw [← Option.some.inj hb]
-    exact hnn j hj
-  · rw [List.getElem?_eq_none_iff.mpr (by rw [bview_length]; omega)] at hb
-    exact absurd hb (by simp)
-
-/-- Rocq `arg_path_of_bview`: the READING supplier, the one step from the
-syscall's own vocabulary.  `hgot` is `SpecCopyinstr.copyinstr_got`, what
-`argstr` relays about the path buffer (`SpecFetchstr.fetchstr_got`); `bview`
-is the same buffer as a list.
-
-The step is an index shuffle and nothing else: both sides count bytes the
-copy loop's way, so there is no side condition to discharge.
-`copyinstr_got`'s `j <= plen` range covers the terminator, which is the third
-conjunct here. -/
-theorem argPathOf_bview (M : Nat → List (BitVec 8)) (pv plen : Nat) (pfun : Nat → BitVec 8)
-    (hlen : plen < 2 ^ 31) (hnn : ∀ j, j < plen → pfun j ≠ 0#8) (hterm : pfun plen = 0#8)
-    (hgot : ∀ j, j ≤ plen → umemByte M (pv + j) = pfun j) :
-    argPathOf M pv (bview plen pfun) := by
-  refine ⟨argPathShape_bview plen pfun hlen hnn, ?_, ?_⟩
-  · intro j b hb
-    by_cases hj : j < plen
-    · rw [bview_lookup plen pfun j hj] at hb
-      rw [← Option.some.inj hb]
-      exact hgot j (by omega)
-    · rw [List.getElem?_eq_none_iff.mpr (by rw [bview_length]; omega)] at hb
-      exact absurd hb (by simp)
-  · rw [bview_length, hgot plen (Nat.le_refl _), hterm]
 
 /-! ## 3.  THE READING PINS THE PATH -/
 

@@ -16,6 +16,8 @@ re-nulls spend the unit and closed authority `fdalloc` released
 caller's proof that it IS the `-1` post).
 -/
 import Xv6.SysPipeParts
+import MachCSL.BvLemmas
+import Xv6.DinodeSlot
 
 namespace Xv6
 
@@ -24,9 +26,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
@@ -91,7 +91,7 @@ theorem sys_pipe_close2_c8 (FC : FILECLOSE) (Γ : SchedNames) [ClaimIs (hlc := h
       (fnode k0))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [p8, sys_pipe_a48] next c1 hp1
   iintro Hk Hpc Hrf
-  k_step_gen (wp_s_jal c1 _ (KA.«sys_pipe» + 0xcc#64) false 2091962#21 1#5 (by decide))
+  k_step_gen (wp_s_jal c1 _ (KA.«sys_pipe» + 0xcc#64) false 2091834#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_pipe_br_fileclose] next c2 hp2
   iintro Hk Hpc
   have hpin2 : k.sie = false ∨ k.proc = 0#64 → c2 = cpu := fun h => (hp2 h).trans ((hp1 h).trans (hpin h))
@@ -121,7 +121,7 @@ theorem sys_pipe_close2_c8 (FC : FILECLOSE) (Γ : SchedNames) [ClaimIs (hlc := h
       (fnode k1))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [p8', sys_pipe_a56] next c4 hp4
   iintro Hk Hpc Hwf
-  k_step_gen (wp_s_jal c4 _ (KA.«sys_pipe» + 0xd4#64) false 2091954#21 1#5 (by decide))
+  k_step_gen (wp_s_jal c4 _ (KA.«sys_pipe» + 0xd4#64) false 2091826#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_pipe_br_fileclose] next c5 hp5
   iintro Hk Hpc
   have hpin5 : k.sie = false ∨ k.proc = 0#64 → c5 = c3 := fun h => (hp5 h).trans (hp4 h)
@@ -207,7 +207,7 @@ theorem sys_pipe_close2_a0 (FC : FILECLOSE) (Γ : SchedNames) [ClaimIs (hlc := h
       (fnode k0))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [p8, sys_pipe_a48] next c1 hp1
   iintro Hk Hpc Hrf
-  k_step_gen (wp_s_jal c1 _ (KA.«sys_pipe» + 0xa4#64) false 2092002#21 1#5 (by decide))
+  k_step_gen (wp_s_jal c1 _ (KA.«sys_pipe» + 0xa4#64) false 2091874#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_pipe_br_fileclose] next c2 hp2
   iintro Hk Hpc
   have hpin2 : k.sie = false ∨ k.proc = 0#64 → c2 = cpu := fun h => (hp2 h).trans ((hp1 h).trans (hpin h))
@@ -236,7 +236,7 @@ theorem sys_pipe_close2_a0 (FC : FILECLOSE) (Γ : SchedNames) [ClaimIs (hlc := h
       (fnode k1))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [p8', sys_pipe_a56] next c4 hp4
   iintro Hk Hpc Hwf
-  k_step_gen (wp_s_jal c4 _ (KA.«sys_pipe» + 0xac#64) false 2091994#21 1#5 (by decide))
+  k_step_gen (wp_s_jal c4 _ (KA.«sys_pipe» + 0xac#64) false 2091866#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_pipe_br_fileclose] next c5 hp5
   iintro Hk Hpc
   have hpin5 : k.sie = false ∨ k.proc = 0#64 → c5 = c3 := fun h => (hp5 h).trans (hp4 h)

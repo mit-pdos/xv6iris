@@ -46,8 +46,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
-set_option linter.unusedSectionVars false
-
 section AppFileEscrow
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [FileAppG GF]
@@ -128,18 +126,6 @@ instance escAuth_timeless (r : FileAppNames) (h : List EscRec) :
 instance escWit_timeless (r : FileAppNames) (n : Nat) (s : Dst) (g : GName) :
     Timeless (escWit (GF := GF) r n s g) := by
   unfold escWit escLb; infer_instance
-
-/-- Rocq `esc_auth_wit`. -/
-theorem escAuth_wit (r : FileAppNames) (h : List EscRec) (n : Nat) (s : Dst) (g : GName)
-    (hn : h[n]? = some (s, g)) :
-    ⊢@{IProp GF} escAuth r h -∗ escAuth r h ∗ escWit r n s g := by
-  unfold escAuth escWit escLb
-  iintro Ha
-  ihave #Hb := MonoList.lb_own_get r.fnEsc _ h $$ Ha
-  iframe Ha
-  iexists h
-  iframe Hb
-  ipureintro; exact hn
 
 /-- Rocq `esc_wit_lookup`. -/
 theorem escWit_lookup (r : FileAppNames) (h : List EscRec) (n : Nat) (s : Dst) (g : GName) :

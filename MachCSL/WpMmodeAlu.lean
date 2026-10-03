@@ -101,26 +101,6 @@ theorem execSpec_ori_same (cpu : CPU) (dq : DFrac) (c : MConf) (pc npc₀ : BitV
   iapply HΦ $$ HmConf HPC HnextPC Hrd
 
 set_option maxHeartbeats 4000000 in
-/-- `andi rd, rd, imm` (`rd ≠ 0`); also `c.andi`. -/
-theorem execSpec_andi_same (cpu : CPU) (dq : DFrac) (c : MConf) (pc npc₀ : BitVec 64) (imm : BitVec 12)
-    (rd : BitVec 5) (hrd : rd ≠ 0#5) (v : BitVec 64) (p : Privilege := Privilege.Machine) :
-    execSpecPP (GF := GF) cpu dq p c p c (instruction.ITYPE (imm, regidx.Regidx rd, regidx.Regidx rd, iop.ANDI))
-      pc npc₀ npc₀ (gpr cpu rd (DFrac.own 1) v)
-      (gpr cpu rd (DFrac.own 1) (v &&& BitVec.signExtend 64 imm)) := by
-  intro Φ
-  iintro ⟨HmConf, HPC, HnextPC, Hrd, HΦ⟩
-  conf_cases HmConf
-  alu_run_r1 hrd
-  iapply swp_bind
-  iapply swp_wX_bits (hrd := hrd)
-  iframe
-  inext
-  iintro Hrd
-  swp_run 10
-  conf_intro HmConf
-  iapply HΦ $$ HmConf HPC HnextPC Hrd
-
-set_option maxHeartbeats 4000000 in
 /-- `srli rd, rd, shamt` (`rd ≠ 0`); also `c.srli`. -/
 theorem execSpec_srli_same (cpu : CPU) (dq : DFrac) (c : MConf) (pc npc₀ : BitVec 64) (shamt : BitVec 6)
     (rd : BitVec 5) (hrd : rd ≠ 0#5) (v : BitVec 64) (p : Privilege := Privilege.Machine) :
@@ -208,23 +188,6 @@ macro "alu_run_r3" hrs1:term "," hrs2:term "," hrd:term : tactic =>
              iintro Hrd
              swp_run 10
              conf_intro HmConf))
-
-set_option maxHeartbeats 4000000 in
-/-- `add rd, rs1, rs2`, three distinct registers, all `≠ 0`. -/
-theorem execSpec_add (cpu : CPU) (dq : DFrac) (c : MConf) (pc npc₀ : BitVec 64) (rd rs1 rs2 : BitVec 5)
-    (hrd : rd ≠ 0#5) (hrs1 : rs1 ≠ 0#5) (hrs2 : rs2 ≠ 0#5) (v v1 v2 : BitVec 64) (p : Privilege := Privilege.Machine) :
-    execSpecPP (GF := GF) cpu dq p c p c
-      (instruction.RTYPE (regidx.Regidx rs2, regidx.Regidx rs1, regidx.Regidx rd, rop.ADD))
-      pc npc₀ npc₀
-      iprop(gpr cpu rd (DFrac.own 1) v ∗ gpr cpu rs1 (DFrac.own 1) v1 ∗ gpr cpu rs2 (DFrac.own 1) v2)
-      iprop(gpr cpu rd (DFrac.own 1) (v1 + v2) ∗ gpr cpu rs1 (DFrac.own 1) v1 ∗
-        gpr cpu rs2 (DFrac.own 1) v2) := by
-  intro Φ
-  iintro ⟨HmConf, HPC, HnextPC, ⟨Hrd, Hrs1, Hrs2⟩, HΦ⟩
-  conf_cases HmConf
-  alu_run_r3 hrs1, hrs2, hrd
-  iapply HΦ $$ HmConf HPC HnextPC [Hrd Hrs1 Hrs2]
-  iframe
 
 set_option maxHeartbeats 4000000 in
 /-- `mv rd, rs2` = `add rd, x0, rs2` (`rd ≠ rs2`, both `≠ 0`); also `c.mv`. -/
@@ -351,17 +314,6 @@ theorem wp_m_ori_same (cpu : CPU) (dq : DFrac) (c : MConf) (hok : MConf.ok (GF :
     ⊢ wpLoop cpu :=
   wpLoop_m_instr cpu dq c c hok pc _ is_rvc _ _ _ (execSpec_ori_same cpu dq c pc _ imm rd hrd v)
 
-/-- `andi rd, rd, imm` (also `c.andi`). -/
-theorem wp_m_andi_same (cpu : CPU) (dq : DFrac) (c : MConf) (hok : MConf.ok (GF := GF) c)
-    (pc : BitVec 64) (is_rvc : Bool)
-    (imm : BitVec 12) (rd : BitVec 5) (hrd : rd ≠ 0#5) (v : BitVec 64) :
-    instr (GF := GF) pc is_rvc (instruction.ITYPE (imm, regidx.Regidx rd, regidx.Regidx rd, iop.ANDI)) ∗
-    mConf cpu dq c ∗ clockCells cpu ∗ pcIs cpu pc ∗ gpr cpu rd (DFrac.own 1) v ∗
-    ▷ (mConf cpu dq c -∗ clockCells cpu -∗ pcIs cpu (pc + instrLen is_rvc) -∗
-        gpr cpu rd (DFrac.own 1) (v &&& BitVec.signExtend 64 imm) -∗ wpLoop cpu)
-    ⊢ wpLoop cpu :=
-  wpLoop_m_instr cpu dq c c hok pc _ is_rvc _ _ _ (execSpec_andi_same cpu dq c pc _ imm rd hrd v)
-
 /-- `srli rd, rd, shamt` (also `c.srli`). -/
 theorem wp_m_srli_same (cpu : CPU) (dq : DFrac) (c : MConf) (hok : MConf.ok (GF := GF) c)
     (pc : BitVec 64) (is_rvc : Bool)
@@ -398,27 +350,6 @@ theorem wp_m_addiw_same (cpu : CPU) (dq : DFrac) (c : MConf) (hok : MConf.ok (GF
         wpLoop cpu)
     ⊢ wpLoop cpu :=
   wpLoop_m_instr cpu dq c c hok pc _ is_rvc _ _ _ (execSpec_addiw_same cpu dq c pc _ imm rd hrd v)
-
-/-- `add rd, rs1, rs2`, three distinct registers. -/
-theorem wp_m_add (cpu : CPU) (dq : DFrac) (c : MConf) (hok : MConf.ok (GF := GF) c)
-    (pc : BitVec 64) (is_rvc : Bool)
-    (rd rs1 rs2 : BitVec 5) (hrd : rd ≠ 0#5) (hrs1 : rs1 ≠ 0#5) (hrs2 : rs2 ≠ 0#5)
-    (v v1 v2 : BitVec 64) :
-    instr (GF := GF) pc is_rvc
-      (instruction.RTYPE (regidx.Regidx rs2, regidx.Regidx rs1, regidx.Regidx rd, rop.ADD)) ∗
-    mConf cpu dq c ∗ clockCells cpu ∗ pcIs cpu pc ∗ gpr cpu rd (DFrac.own 1) v ∗
-    gpr cpu rs1 (DFrac.own 1) v1 ∗ gpr cpu rs2 (DFrac.own 1) v2 ∗
-    ▷ (mConf cpu dq c -∗ clockCells cpu -∗ pcIs cpu (pc + instrLen is_rvc) -∗
-        gpr cpu rd (DFrac.own 1) (v1 + v2) -∗ gpr cpu rs1 (DFrac.own 1) v1 -∗
-        gpr cpu rs2 (DFrac.own 1) v2 -∗ wpLoop cpu)
-    ⊢ wpLoop cpu := by
-  iintro ⟨HI, HmConf, Hclock, Hpc, Hrd, Hrs1, Hrs2, HΦ⟩
-  iapply wpLoop_m_instr cpu dq c c hok pc _ is_rvc _ _ _
-    (execSpec_add cpu dq c pc _ rd rs1 rs2 hrd hrs1 hrs2 v v1 v2)
-  iframe
-  inext
-  iintro HmConf Hclock Hpc ⟨Hrd, Hrs1, Hrs2⟩
-  iapply HΦ $$ HmConf Hclock Hpc Hrd Hrs1 Hrs2
 
 /-- `mv rd, rs2` (`add rd, x0, rs2`; also `c.mv`). -/
 theorem wp_m_mv (cpu : CPU) (dq : DFrac) (c : MConf) (hok : MConf.ok (GF := GF) c)

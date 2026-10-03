@@ -534,15 +534,6 @@ instance lkFloor_persistent (ξ : CtxId) (t : Nat) : Persistent (lkFloor (GF := 
 instance lkFloor_timeless (ξ : CtxId) (t : Nat) : Timeless (lkFloor (GF := GF) ξ t) := by
   unfold lkFloor; infer_instance
 
-theorem lkFloor_0 (ξ : CtxId) : ⊢@{IProp GF} lkFloor ξ 0 := keyAt_0 _ ξ
-
-/-- A floor proper is a lock floor. -/
-theorem lkFloor_of_ctxFloor (ξ : CtxId) (t : Nat) : ctxFloor (GF := GF) ξ t ⊢ lkFloor ξ t := by
-  unfold lkFloor keyAt
-  iintro H
-  ileft
-  iexact H
-
 /-- A lock floor of the running context is cashed into a view receipt and
 an authorship bundle: the entries at the floor are visible to the hart
 (the Rocq `lk_floor_vis`). -/
@@ -646,8 +637,8 @@ context has passed; unlike `isLock`, the lock's invariant carries a DEAD
 branch `D`.  A leaf that opens it presents any credential `T` that REFUTES
 `D` (a live reference to the object, or the lock token itself) to rule the
 dead branch out; the last holder, instead of closing, may DEPOSIT `D` and
-reclaim the lock's storage.  `isLock` is the permanent `D := False` instance
-(`isLock_lockOpenable`), where the dead branch is unreachable. -/
+reclaim the lock's storage.  `isLock` is the permanent `D := False` instance,
+where the dead branch is unreachable. -/
 def lockOpenable [CurCtx] (γ : GName) (lk : BitVec 64) (s : String)
     (R : CtxId → IProp GF) (D : IProp GF) : IProp GF := iprop%
   ⌜lockAddrOk lk⌝ ∗ kmapId lk ∗ kmapId (lk + 16#64) ∗
@@ -667,27 +658,6 @@ theorem lockOpenable_cases [CurCtx] (γ : GName) (lk : BitVec 64) (s : String)
       ∃ lo lc : Nat, inv lockN (iprop(lockBody γ lk s R lo lc ∨ D)) ∗
         lkFloor curCtx lo ∗ lkFloor curCtx lc := by
   unfold lockOpenable; iintro H; iexact H
-
-/-- Today's lock IS the permanent instance of the cancellable one: its dead
-branch is `False`, so nobody may ever destroy it. -/
-theorem isLock_lockOpenable [CurCtx] (γ : GName) (lk : BitVec 64) (s : String)
-    (R : CtxId → IProp GF) :
-    isLock (GF := GF) γ lk s R ⊢ lockOpenable γ lk s R (iprop(False)) := by
-  iintro #H
-  icases isLock_cases γ lk s R $$ H with ⟨%hok, #Hm1, #Hm2, %lo, %lc, #Hinv, #Hflo, #Hflc⟩
-  unfold lockOpenable
-  isplit
-  · ipureintro; exact hok
-  iframe Hm1 Hm2
-  iexists lo, lc
-  iframe Hflo Hflc
-  iapply inv_alter $$ Hinv
-  inext; imodintro; iintro Hb
-  isplitl [Hb]
-  · ileft; iexact Hb
-  · iintro Hq; icases Hq with ⟨Hq | Hq⟩
-    · iexact Hq
-    · iexfalso; iexact Hq
 
 /-- The cancellable producer: an invariant with a dead branch, plus the two
 floors and geometry, gives the openable handle. -/
@@ -750,23 +720,6 @@ theorem newlock_written [CurCtx] (cpu : CPU) (lk : BitVec 64) (s : String) (R : 
   isplit
   · iexact Hflo
   · iexact Hflc
-
-/-- The lock is born free from two never-written windows; the payload is
-deposited at the creator's context. -/
-theorem newlock [CurCtx] (cpu : CPU) (lk : BitVec 64) (s : String) (R : CtxId → IProp GF) [CtxMorph R]
-    (hok : lockAddrOk lk) (tids tids' : Nat → Agent) (E : CoPset) :
-    kmapId lk ∗ kmapId (lk + 16#64) ∗ ownCtx cpu curCtx ∗ R curCtx ∗
-    histBytes lk 4 (fun _ => DFrac.own 1) (fun j => [⟨0, tids j, nthByte (0 : BitVec (8 * 4)) j⟩]) ∗
-    histBytes (lk + 16#64) 8 (fun _ => DFrac.own 1) (fun j => [⟨0, tids' j, nthByte (0 : BitVec (8 * 8)) j⟩])
-    ⊢ |={E}=> (ownCtx cpu curCtx ∗ ∃ γ, isLock (GF := GF) γ lk s R) := by
-  iintro ⟨#Hcl, #Hcl', Hrun, HR, Hw, Hc⟩
-  ihave Hw' := wordCell_of_fresh lk 4 0 tids $$ Hw
-  ihave Hc' := wordCell_of_fresh (lk + 16#64) 8 0 tids' $$ Hc
-  iapply newlock_written cpu lk s R hok 0 0 E
-  iframe Hcl Hcl' Hrun HR Hw' Hc'
-  isplit
-  · iapply lkFloor_0
-  · iapply lkFloor_0
 
 /-- The two word cells a freshly initialised lock hands over: each at its
 own position, certified at the creator's context, at an address a lock may

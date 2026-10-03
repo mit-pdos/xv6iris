@@ -30,9 +30,6 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedSectionVars false
-set_option linter.unusedVariables false
-
 /-- The saves read the file with `a0` overwritten; they save what the user
 had (only `a0` differs, and it is saved separately). -/
 theorem uservec_saveSeq_congr (ns : List (BitVec 5)) (R R' : RegMap) (ws : List (BitVec 64))

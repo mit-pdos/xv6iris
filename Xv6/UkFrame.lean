@@ -24,8 +24,6 @@ open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open Iris.Std.PartialMap Iris.Std.FiniteMap
 open Sail LeanRV64D LeanRV64D.Functions
 
-set_option linter.unusedSectionVars false
-
 /-! ## §1 The register map as the reference file's GPRs -/
 
 theorem ukRegs_ufFile (C : UCfg) (P : UPtd) (v : UfVals) (m : RegMap) (hg : v.g = m) :
@@ -263,17 +261,6 @@ theorem userPtInvX_forget [CurCtx] (cpu : CPU) (P : UPtd) (M : Nat → List (Bit
   iexists t
   iframe
   ipureintro; exact ht
-
-/-- **Rocq `user_ptm_inv_x_forget`**. -/
-theorem userPtmInvX_forget [CurCtx] (cpu : CPU) (P : UPtd) (sz : Nat) (M : ElfMem) :
-    kmapStatic (GF := GF) ⊢ userPtmInvX cpu P sz M -∗ userPtmInv cpu P sz M := by
-  iintro #HS H
-  unfold userPtmInvX userPtmInv
-  icases H with ⟨%Mp, H, %hM⟩
-  iexists Mp
-  ihave H := userPtInvX_forget cpu P Mp $$ HS H
-  iframe
-  ipureintro; exact hM
 
 end frames
 

@@ -11,17 +11,12 @@ wait answer `signExtend 64 p` at `1 ≤ p.toNat ≤ PIDMAX` is a positive
 `Z` inequalities and rewrites through `sext32_small`/`moi_lt_s`).
 -/
 import Xv6.UkInitStubs
-import Xv6.UmodeArith
-import Xv6.UkRunBr
-import Xv6.ConsoleintrArms
 
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
-
-set_option linter.unusedSectionVars false
 
 /-! ## §1 Pids (Rocq `pid_lt_Z31`, `pid_Z63`, `pid_geb0`, `pid_ltb0`) -/
 

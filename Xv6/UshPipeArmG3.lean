@@ -28,15 +28,12 @@ and the borrowed `Cx`).
    (`⊢ N.pay (-1)`); the pipe fd 0's close deposit is `ushCldep_nonpipe`.
 -/
 import Xv6.UshPipeArmKids
-import Xv6.SpecShFork1
 
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
-
-set_option linter.unusedSectionVars false
 
 /-- `addi a0,s0,-40` at the frame pointer's value. -/
 theorem ushpi_addi40 (sp0 : BitVec 64) (hlo : 40 ≤ sp0.toNat) :

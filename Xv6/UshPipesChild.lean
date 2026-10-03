@@ -22,14 +22,13 @@ function).
 -/
 import Xv6.UshPipesSeam
 import Xv6.UshSeamChild
+import Xv6.UshPipesCmd
 
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
-
-set_option linter.unusedSectionVars false
 
 /-- **Rocq `ushq_stages`**: the stages' argument lists, cut from the one
 line, as the runner's right spine. -/

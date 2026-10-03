@@ -28,7 +28,7 @@ makes the jump table's default row dead.  The runner's tree is
    `ushCode` where Rocq's carries `shk_rodata`.
 3. **UkSh's vocabulary is sh-main's** (`UshMainPure`/`UshMainDefs`, lane
    sh-main, in flight beside this one): the jump table `ushJtabA`/`ushJent`/
-   `ushJrow`/`ushJtab`/`ushJtab_ro`/`ushJtab_of_rodata` (its rows at `Nat`
+   `ushJrow`/`ushJtab`/`ushJtab_of_rodata` (its rows at `Nat`
    indexes, so a node selects row `(ushTy c).toNat`), `shDeps` (Rocq
    `sh_deps`) and `ushPid` (Rocq `ush_pid`) are imported from there.
 4. `ush_diag_leaf` (a Rocq SECTION HYPOTHESIS of `UkShRun`) is the `Prop`
@@ -38,7 +38,6 @@ makes the jump table's default row dead.  The runner's tree is
    through its segment's run (`ushCode_run`, the `UkSeccDefs.secc_code_run`
    pattern).
 -/
-import Xv6.UshRunCode
 import Xv6.UkFork
 import Xv6.UshMainDefs
 
@@ -47,8 +46,6 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
-
-set_option linter.unusedSectionVars false
 
 /-! ## §1 The command tree, as data -/
 
@@ -69,9 +66,6 @@ def ushHt : Ushcmd → Nat
   | .list l r => max (ushHt l) (ushHt r) + 1
   | .back c1 => ushHt c1 + 1
 
-/-- Rocq `ush_ht_pos`. -/
-theorem ushHt_pos (c : Ushcmd) : 1 ≤ ushHt c := by cases c <;> simp [ushHt]
-
 /-- **Rocq `ush_simple`**: no REDIRECT and no PIPE node. -/
 def ushSimple : Ushcmd → Prop
   | .exec _ => True
@@ -87,9 +81,6 @@ def ushTy : Ushcmd → Int
   | .pipe .. => 3
   | .list .. => 4
   | .back _ => 5
-
-/-- Rocq `ush_ty_range`. -/
-theorem ushTy_range (c : Ushcmd) : 1 ≤ ushTy c ∧ ushTy c ≤ 5 := by cases c <;> simp [ushTy]
 
 /-- **Rocq `ush_jarm`**: the pc the dispatch's `jr` lands on. -/
 def ushJarm : Ushcmd → Nat

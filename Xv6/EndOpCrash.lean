@@ -24,8 +24,6 @@ namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-! ## The install pass's picture, over a write set of words -/
 
 theorem eo_mapW_get (W : List (BitVec 32)) (i b : Nat) :

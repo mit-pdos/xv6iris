@@ -16,6 +16,7 @@ import Xv6.SpecUvmunmap
 import Xv6.UPtAllocLemmas
 import Xv6.UvmallocDefs
 import Xv6.CodeTactics
+import MachCSL.BvLemmas
 
 namespace Xv6
 
@@ -23,7 +24,6 @@ open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Xv6.UPtAlloc
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
@@ -31,7 +31,6 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 /-- `ret` out of `uvmunmap` lands on the `j` after the `jal`. -/
 theorem ua_ret_127e : jumpPc (KA.«uvmdealloc» + 0x42#64) = (KA.«uvmdealloc» + 0x42#64) := by
   decide
-
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF]

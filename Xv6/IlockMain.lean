@@ -17,7 +17,6 @@ import Xv6.IlockCheckout
 import Xv6.IlockEpi
 import Xv6.IcachePinwLw
 import Xv6.SpecAcquiresleep
-import MachCSL.WpSmodeRegOps
 
 namespace Xv6
 
@@ -26,9 +25,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 set_option maxHeartbeats 16000000 in
 /-- `+0x1a .. +0x1c` and on (Rocq 2587-2860). -/
@@ -153,9 +150,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-- `acquiresleep(&ip->lock)` at its call site (the store-order tier, the
 entry's tracked sleeplock over `ic_slp`, the share's `slhTok` slice as the
@@ -263,7 +258,7 @@ theorem il_main (AS : ACQUIRESLEEP_LLB) (LD : IlLoadEb)
   k_step_e (wp_s_addi cpu _ (KA.«ilock» + 0x14#64) true 16#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ha0]
   iintro Hk Hpc
-  k_step_e (wp_s_jal cpu _ (KA.«ilock» + 0x16#64) false 3440#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«ilock» + 0x16#64) false 3536#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [il_br_acq]
   iintro Hk Hpc
   -- the share's stamps join the caller's `Tl`: ONE receipt, ONE floor

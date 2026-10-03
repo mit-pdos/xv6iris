@@ -64,8 +64,6 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Std MachCSL
 open Iris.Std Iris.Std.PartialMap
 
-set_option linter.unusedSectionVars false
-
 /-! ## §0 How wide the totally-tracked window is -/
 
 /-- **Rocq `NSTD`**: how many descriptors at the bottom of the table are
@@ -83,19 +81,12 @@ def fdt0 : List FdState := List.replicate NOFILE .closed
 
 theorem fdt0_length : fdt0.length = NOFILE := by simp [fdt0]
 
-/-- Rocq `fdt0_take`: a fresh process's standard streams are three closed
-slots, which is what makes init's first `open` land on descriptor 0. -/
-theorem fdt0_take : fdt0.take NSTD = List.replicate NSTD .closed := rfl
-
 /-- The Boolean the map's filter tests (deviation 1). -/
 def FdState.isClosed : FdState → Bool
   | .closed => true
   | .open _ _ _ => false
 
 theorem FdState.isClosed_eq_false {st : FdState} : st.isClosed = false ↔ st ≠ .closed := by
-  cases st <;> simp [FdState.isClosed]
-
-theorem FdState.isClosed_eq_true {st : FdState} : st.isClosed = true ↔ st = .closed := by
   cases st <;> simp [FdState.isClosed]
 
 /-! ## §1 The map a descriptor list denotes -/
@@ -155,11 +146,6 @@ theorem ufdMap_lookup (fdv : List FdState) (fd : Nat) (st : FdState) :
 theorem ufdMap_lookup_1 {fdv : List FdState} {fd : Nat} {st : FdState}
     (h : get? (ufdMap fdv) fd = some st) : fdv[fd]? = some st :=
   ((ufdMap_lookup fdv fd st).1 h).1
-
-/-- Rocq `ufd_map_std`: a std slot is present WHATEVER its state. -/
-theorem ufdMap_std {fdv : List FdState} {fd : Nat} {st : FdState} (hlt : fd < NSTD)
-    (hl : fdv[fd]? = some st) : get? (ufdMap fdv) fd = some st :=
-  (ufdMap_lookup fdv fd st).2 ⟨hl, .inl hlt⟩
 
 /-- Rocq `ufd_map_lookup_None`: a closed slot ABOVE the prefix is absent, which
 is what makes minting a handle for it an insert. -/
@@ -261,7 +247,6 @@ theorem ufdMapHi_sub {fdv : List FdState} {D : RegMapF FdState} (hsub : D ⊆ uf
   · omega
   · simp [FdState.isClosed_eq_false.2 h]
 
-
 /-! ## §1½ The whole table's view (seccomp S3 ruling G2) -/
 
 /-- **Rocq `tab_le`**: THE TABLE VIEW'S RELATION TO THE TABLE.  The view `v`
@@ -330,24 +315,6 @@ theorem ushViewOk_dup {fdv v : List FdState} (fd i : Nat) (st : FdState)
   rcases List.mem_or_eq_of_mem_set hs with h | h
   · exact hf s h
   · subst h; exact hf _ (List.mem_of_getElem? hi)
-
-/-- Rocq `tab_le_take`: the standard streams are never closed behind the
-view's back. -/
-theorem tabLe_take {fdv v : List FdState} (h : tabLe fdv v) : fdv.take NSTD = v.take NSTD := by
-  apply List.ext_getElem?
-  intro i
-  rw [List.getElem?_take, List.getElem?_take]
-  by_cases hi : i < NSTD
-  · rw [if_pos hi, if_pos hi]
-    cases hf : fdv[i]? with
-    | none =>
-      exact (List.getElem?_eq_none (show v.length ≤ i by
-        have := List.getElem?_eq_none_iff.1 hf; have := h.1; omega)).symm
-    | some st =>
-      rcases h.2 i st hf with h' | ⟨_, h'⟩
-      · exact h'.symm
-      · exact absurd h' (by omega)
-  · rw [if_neg hi, if_neg hi]
 
 /-! ### The one ghost map (Rocq `ufd_gm`) -/
 
@@ -671,13 +638,6 @@ theorem ufd_ge (γf : GName) (fd : Nat) (st : FdState) : ufd (GF := GF) γf fd s
   iintro ⟨_, %h⟩
   ipureintro; exact h.2
 
-/-- Rocq `ufd_shut_agree`. -/
-theorem ufdShut_agree (γf : GName) (fdv : List FdState) (fd : Nat) :
-    ⊢@{IProp GF} ufdAuth γf fdv -∗ ufdShut γf fd -∗ ⌜fdv[fd]? = some .closed⌝ := by
-  unfold ufdShut
-  iintro Ha Hf
-  iapply ufd_slot_agree $$ Ha Hf
-
 /-- Rocq `ufd_slot_excl`: the map is at the full fraction, so a fragment is
 exclusive. -/
 theorem ufd_slot_excl (γf : GName) (fd : Nat) (st st' : FdState) :
@@ -721,33 +681,6 @@ theorem ustdRaw_acc (γf : GName) (l : List FdState) (k : Nat) (st : FdState) (h
   · ipureintro; rw [List.length_set]; exact hlen
   · rw [hins st']; iapply Hback $$ Hs
 
-/-- Rocq `ustd_acc`. -/
-theorem ustd_acc (γf : GName) (l : List FdState) (k : Nat) (st : FdState) (hk : l[k]? = some st) :
-    ustd (GF := GF) γf l ⊢
-      ufdSlot γf k st ∗ ∀ st' : FdState, ufdSlot γf k st' -∗ ustd γf (l.set k st') := by
-  unfold ustd
-  iintro ⟨Hr, Ht⟩
-  icases ustdRaw_acc γf l k st hk $$ Hr with ⟨Hk, Hback⟩
-  iframe Hk
-  iintro %st' Hs
-  isplitl [Hback Hs]
-  · iapply Hback $$ Hs
-  · iexact Ht
-
-/-- Rocq `ustd_at_acc`: at a named view, a slot move leaves the view where
-it was. -/
-theorem ustdAt_acc (γf : GName) (l v : List FdState) (k : Nat) (st : FdState) (hk : l[k]? = some st) :
-    ustdAt (GF := GF) γf l v ⊢
-      ufdSlot γf k st ∗ ∀ st' : FdState, ufdSlot γf k st' -∗ ustdAt γf (l.set k st') v := by
-  unfold ustdAt
-  iintro ⟨Hr, Ht⟩
-  icases ustdRaw_acc γf l k st hk $$ Hr with ⟨Hk, Hback⟩
-  iframe Hk
-  iintro %st' Hs
-  isplitl [Hback Hs]
-  · iapply Hback $$ Hs
-  · iexact Ht
-
 /-- The ledger's slots read the view. -/
 theorem ustdRaw_agree (γf : GName) (fdv l : List FdState) :
     ⊢@{IProp GF} ufdAuth γf fdv -∗ ustdRaw γf l -∗ ⌜fdv.take NSTD = l⌝ := by
@@ -782,36 +715,6 @@ theorem ustdAt_agree (γf : GName) (fdv l v : List FdState) :
   unfold ustdAt
   iintro Ha ⟨Hr, _⟩
   iapply ustdRaw_agree $$ Ha Hr
-
-/-- Rocq `ustd_ufd_excl`: the std fragments live IN the ledger. -/
-theorem ustd_ufd_excl (γf : GName) (l : List FdState) (k : Nat) (st : FdState) (hk : k < NSTD) :
-    ⊢@{IProp GF} ustd γf l -∗ ufd γf k st -∗ False := by
-  iintro Hl Hh
-  ihave %hlen := ustd_len γf l $$ Hl
-  obtain ⟨st', hst'⟩ : ∃ st', l[k]? = some st' := by
-    cases h : l[k]? with
-    | none => exact absurd (List.getElem?_eq_none_iff.1 h) (by omega)
-    | some x => exact ⟨x, rfl⟩
-  icases ustd_acc γf l k st' hst' $$ Hl with ⟨Hs', _⟩
-  unfold ufd
-  icases Hh with ⟨Hs, _⟩
-  iapply ufd_slot_excl $$ Hs' Hs
-
-/-- Rocq `ufd_slot_bound`: A FRAGMENT NAMES A DESCRIPTOR A C `int` CAN HOLD. -/
-theorem ufd_slot_bound (γf : GName) (fdv : List FdState) (fd : Nat) (st : FdState) :
-    ⊢@{IProp GF} ufdAuth γf fdv -∗ ufdSlot γf fd st -∗ ⌜fd < NOFILE⌝ := by
-  iintro Ha Hh
-  ihave %hlen := ufdAuth_len γf fdv $$ Ha
-  ihave %hl := ufd_slot_agree γf fdv fd st $$ Ha Hh
-  ipureintro
-  rw [← hlen]; exact (List.getElem?_eq_some_iff.1 hl).1
-
-/-- Rocq `ufd_bound`. -/
-theorem ufd_bound (γf : GName) (fdv : List FdState) (fd : Nat) (st : FdState) :
-    ⊢@{IProp GF} ufdAuth γf fdv -∗ ufd γf fd st -∗ ⌜fd < NOFILE⌝ := by
-  unfold ufd
-  iintro Ha ⟨Hh, _⟩
-  iapply ufd_slot_bound $$ Ha Hh
 
 /-! ## §3 A program's claim on one descriptor, wherever it lives -/
 
@@ -857,12 +760,6 @@ theorem ufdOwn_agree (γf : GName) (fdv l : List FdState) (fd : Nat) (st : FdSta
   · ihave %hi := ufd_agree γf fdv fd st $$ Ha Hh
     ipureintro
     exact ⟨hi, by rw [← hlen]; exact (List.getElem?_eq_some_iff.1 hi).1⟩
-
-/-- Rocq `ufd_own_hi_ge`. -/
-theorem ufdOwn_hi_ge (γf : GName) (l : List FdState) (fd : Nat) (st : FdState) :
-    ⊢@{IProp GF} ustd γf l -∗ ufd γf fd st -∗ ⌜NSTD ≤ fd⌝ := by
-  iintro _ Hh
-  iapply ufd_ge $$ Hh
 
 /-! ### §3½ What an allocation hands back -/
 
@@ -1184,21 +1081,6 @@ theorem ufd_alloc_least_closed (γf : GName) (fdv : List FdState) (fd : Nat)
 /-- Rocq `ustd_any`: a ledger at a state the carrier is not tracking. -/
 def ustdAny (γf : GName) : IProp GF := iprop(∃ l : List FdState, ustd γf l)
 
-/-- Rocq `ufd_state`: the authority together with a ledger nobody reads. -/
-def ufdState (γf : GName) (fdv : List FdState) : IProp GF := iprop(ufdAuth γf fdv ∗ ustdAny γf)
-
-/-- Rocq `ufd_state_len`. -/
-theorem ufdState_len (γf : GName) (fdv : List FdState) :
-    ufdState (GF := GF) γf fdv ⊢ ⌜fdv.length = NOFILE⌝ := by
-  unfold ufdState
-  iintro ⟨Ha, _⟩
-  iapply ufdAuth_len $$ Ha
-
-/-- Rocq `ufd_auth_quiet`. -/
-theorem ufdAuth_quiet (γf : GName) (fdv fdv' : List FdState) (h : fdv' = fdv) :
-    ufdAuth (GF := GF) γf fdv ⊢ ufdAuth γf fdv' := by
-  subst h; exact .rfl
-
 /-- Rocq `ufd_alloc_least_any`: AN ALLOCATION NOBODY IS WATCHING. -/
 theorem ufd_alloc_least_any (γf : GName) (fdv l : List FdState) (fd : Nat) (st : FdState)
     (hle : fdLeastClosed fdv fd) (hne : st ≠ .closed) :
@@ -1252,37 +1134,6 @@ theorem ufd_alloc_std_at (fdv v : List FdState) (D : RegMapF FdState) (hlen : fd
   ipureintro
   exact ufdMapHi_open (hsub fd st hst)
 
-/-- **Rocq `ufd_alloc_std`**: the mint at the table's own view, forgotten. -/
-theorem ufd_alloc_std (fdv : List FdState) (D : RegMapF FdState) (hlen : fdv.length = NOFILE)
-    (hsub : D ⊆ ufdMapHi fdv) :
-    ⊢@{IProp GF} |==> ∃ γf : GName,
-      ufdAuth γf fdv ∗ ustd γf (fdv.take NSTD) ∗ ([∗map] fd ↦ st ∈ D, ufd γf fd st) := by
-  imod ufd_alloc_std_at (GF := GF) fdv fdv D hlen hsub (tabLe_refl fdv) with ⟨%γf, Ha, Hl, Hd⟩
-  imodintro
-  iexists γf
-  iframe Ha Hd
-  iapply ustdAt_ustd $$ Hl
-
-/-- Rocq `ufd_alloc_fdt0`: the fresh-process instance. -/
-theorem ufd_alloc_fdt0 :
-    ⊢@{IProp GF} |==> ∃ γf : GName, ufdAuth γf fdt0 ∗ ustd γf (fdt0.take NSTD) := by
-  imod ufd_alloc_std (GF := GF) fdt0 ∅ fdt0_length (LawfulPartialMap.empty_subset _) with ⟨%γf, Ha, Hl, _⟩
-  imodintro
-  iexists γf
-  iframe
-
-/-- Rocq `ufd_sub`: WHAT A SET OF HANDLES SAYS ABOUT THE TABLE. -/
-theorem ufd_sub (γf : GName) (fdv : List FdState) (D : RegMapF FdState) :
-    ⊢@{IProp GF} ufdAuth γf fdv -∗ ([∗map] fd ↦ st ∈ D, ufd γf fd st) -∗ ⌜D ⊆ ufdMap fdv⌝ := by
-  unfold ufdAuth
-  iintro ⟨%v, Ha, _⟩ HD
-  ihave HD := BigSepM.bigSepM_mono (Φ := fun fd st => ufd (GF := GF) γf fd st)
-    (Ψ := fun fd st => ufdSlot (GF := GF) γf fd st) (fun _ => by unfold ufd; exact sep_elim_left) $$ HD
-  ihave HD := (ufdFrags_eq γf D).2 $$ HD
-  ihave %hsub := ghost_map_lookup_big (ufdKm D) $$ Ha HD
-  ipureintro
-  exact ufdKm_sub hsub
-
 /-- Rocq `ufd_sub_hi`: the inclusion a forking parent proves of its handles. -/
 theorem ufd_sub_hi (γf : GName) (fdv : List FdState) (D : RegMapF FdState) :
     ⊢@{IProp GF} ufdAuth γf fdv -∗ ([∗map] fd ↦ st ∈ D, ufd γf fd st) -∗ ⌜D ⊆ ufdMapHi fdv⌝ := by
@@ -1302,13 +1153,6 @@ theorem ufd_sub_hi (γf : GName) (fdv : List FdState) (D : RegMapF FdState) :
   cases hv : get? D k with
   | none => rw [hv] at hk; cases hk
   | some v => exact (hlo k v hv).2
-
-/-- Rocq `ufd_open_at`: pulling ONE inherited handle out of a family. -/
-theorem ufd_open_at (γf : GName) (D : RegMapF FdState) (fd : Nat) (st : FdState)
-    (hl : get? D fd = some st) :
-    ([∗map] k ↦ v ∈ D, ufd (GF := GF) γf k v) ⊢
-      ufd γf fd st ∗ [∗map] k ↦ v ∈ PartialMap.delete D fd, ufd γf k v :=
-  (BigSepM.bigSepM_delete hl).1
 
 end UserFd
 

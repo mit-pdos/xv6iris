@@ -93,8 +93,8 @@ untouched); the `n < 0` test (+0x1c); the three-way dispatch; FD_PIPE
      `sysc_fwrite_names`): `ConsoleInvDefs.devswWriteVal` at
      `DFrac.discard`, the cells of the persistent `devswTable`.  So
      `filewriteDevEnv γl γu mj` is the cell at `aDevswWrite mj` (`KA.«devsw»
-     + 16 mj + 8`) holding `devswWriteVal mj` (null or consolewrite:
-     `devswWriteVal_cases`, Rocq's disjunct) beside `uartPort .uart0 γl γu`
+     + 16 mj + 8`) holding `devswWriteVal mj` (null or consolewrite,
+     Rocq's disjunct) beside `uartPort .uart0 γl γu`
      (Rocq `filewrite_dev_caps`: `dev_inv` ∗ `is_txlock` ∗
      `uart_base_word Uart0`), and Rocq's DEVSW PIN premise (`Hconw`) is the
      theorem `devswWriteVal_console`.  Consequence: at a non-console major
@@ -155,9 +155,8 @@ untouched); the `n < 0` test (+0x1c); the three-way dispatch; FD_PIPE
 10. Names: `filewrite_ret` → `filewriteRet`, `write_post_ok_at` →
    `writePostOkAt`, `write_post_fail_at` → `writePostFailAt`,
    `write_arms_at` → `writeArmsAt`, `filewrite_in/_extra/_arms` →
-   `filewriteIn/Extra/Arms`, `fw_chunk_joint` → `fwrChunkJoint`,
-   `fw_off_advance` → `fwrOffAdvance` (the `fw_` prefix is taken:
-   FsWords / freewalk).
+   `filewriteIn/Extra/Arms`; `fw_chunk_joint` and `fw_off_advance` are not
+   ported (nothing uses them).
 11. (retired: the FD_PIPE arms are Rocq's -- `filewriteIn`'s is `pipe_wpay`,
     `filewriteExtra`'s is `pipe_wpost` at the key's generation.)  Formerly:
     the FD_PIPE arm of `filewriteExtra` was `⌜pipeWpostR P ua n.toNat r⌝`
@@ -193,9 +192,6 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedVariables false
-set_option linter.unusedSectionVars false
-
 /-- Address of `filewrite`. -/
 def filewriteAddr : BitVec 64 := KA.«filewrite»
 
@@ -205,11 +201,6 @@ pipewrite 64, panic 56 (Rocq's `filewrite_stack = 12 + K_writei`). -/
 def filewriteSlots : Nat := 12 + writeiSlots
 
 theorem filewriteSlots_eq : filewriteSlots = 104 := by decide
-
-/-- THE CHUNK SIZE's derivation (Rocq `fw_max_value`): the two `lui`/`addi`
-pairs at +0x4a..+0x56 materialise `((MAXOPBLOCKS-1-1-2)/2)*BSIZE`. -/
-theorem fwrMax_value : FW_MAX = (((MAXOPBLOCKS : Int) - 1 - 1 - 2) / 2) * (BSIZE : Int) := by
-  decide
 
 /-! ## What filewrite returns -/
 
@@ -223,20 +214,6 @@ theorem filewriteRet_m1 (n : Int) : filewriteRet n (-1#64) := Or.inl rfl
 /-- Rocq `filewrite_ret_all`. -/
 theorem filewriteRet_all (n : Int) (hn : 0 ≤ n) : filewriteRet n (BitVec.ofInt 64 n) :=
   Or.inr ⟨n, rfl, hn, by omega⟩
-
-/-- THE CHUNKING'S ARITHMETIC (Rocq `fw_chunk_joint`): writei's joint
-premise is a CLOSED FACT here. -/
-theorem fwrChunkJoint (off n1 : Nat) (hoff : off ≤ MAXFILE * BSIZE) (hn1 : (n1 : Int) ≤ FW_MAX) :
-    off + n1 < 2 ^ 31 := by
-  unfold FW_MAX at hn1
-  have : MAXFILE * BSIZE = 274432 := rfl
-  omega
-
-/-- ...and the offset's own induction step (Rocq `fw_off_advance`): writei
-refuses rather than writes past the capacity. -/
-theorem fwrOffAdvance (off tot n1 : Nat) (hle : ¬ MAXFILE * BSIZE < off + n1) (htot : tot ≤ n1) :
-    off + tot ≤ MAXFILE * BSIZE := by
-  omega
 
 /-! ## The environment, keyed on the descriptor's state -/
 
@@ -330,19 +307,6 @@ theorem filewrite_env_out_of_env (γl : GName) (γu : UartNames) (st : FdState) 
   · exact filewrite_fs_env_out
   · exact .rfl
 
-/-- Rocq `filewrite_env_none`: a file that is neither a pipe, a device nor
-an inode costs its writer nothing (the arm is the panic). -/
-theorem filewrite_env_none (γl : GName) (γu : UartNames) :
-    ⊢ filewriteEnv (hlc := hlc) (GF := GF) γl γu .closed := by
-  unfold filewriteEnv; exact .rfl
-
-/-- The FD_INODE arm's environment, opened. -/
-theorem filewrite_env_inode (γl : GName) (γu : UartNames) (r w : Bool) (i : Nat) (γo : GName)
-    (om : OffMode) :
-    filewriteEnv (hlc := hlc) (GF := GF) γl γu (.open r w (.inode i γo om)) ⊢
-      filewriteFsEnv (hlc := hlc) :=
-  .rfl
-
 /-- ... and closed. -/
 theorem filewrite_env_out_inode (γl : GName) (γu : UartNames) (r w : Bool) (i : Nat) (γo : GName)
     (om : OffMode) :
@@ -410,15 +374,6 @@ def writeArmsAt (Γ : FsViewNames GF) (i : Nat) (γo : GName) (P : UPtd) (n : In
     (M : Nat → List (BitVec 8)) (ua : BitVec 64) (Q : Nat → IProp GF) (r : BitVec 64) : IProp GF :=
   iprop((⌜r = BitVec.ofInt 64 n ∧ 0 ≤ n⌝ ∗ writePostOkAt (hlc := hlc) Γ i γo P n M ua Q) ∨
     (⌜r = -1#64⌝ ∗ writePostFailAt (hlc := hlc) Γ i γo P n M ua Q))
-
-/-- Rocq `write_arms_at_ret`: the arms refine the landed blanket. -/
-theorem writeArmsAt_ret (Γ : FsViewNames GF) (i : Nat) (γo : GName) (P : UPtd) (n : Int)
-    (M : Nat → List (BitVec 8)) (ua : BitVec 64) (Q : Nat → IProp GF) (r : BitVec 64) :
-    writeArmsAt (hlc := hlc) Γ i γo P n M ua Q r ⊢ ⌜filewriteRet n r⌝ := by
-  unfold writeArmsAt
-  iintro (⟨%h, -⟩ | ⟨%h, -⟩)
-  · ipureintro; rw [h.1]; exact filewriteRet_all n h.2
-  · ipureintro; rw [h]; exact filewriteRet_m1 n
 
 /-- THE SIGN GUARD'S EXIT (Rocq `write_arms_at_neg`): at a negative count
 `wchunks n = 0`, so the input IS the cursor at the empty prefix. -/
@@ -501,16 +456,6 @@ theorem writeConsArms_ret (P : UPtd) (ua : BitVec 64) (Q : Nat → IProp GF) (n 
   · ipureintro; rw [h.1]; exact filewriteRet_all n h.2
   · ipureintro; exact Or.inr ⟨(k : Int), h.1, by omega, by have := h.2.1; omega⟩
   · ipureintro; rw [h.1]; exact filewriteRet_m1 n
-
-/-- Rocq `write_cons_arms_zero`. -/
-theorem writeConsArms_zero (P : UPtd) (ua : BitVec 64) (Q : Nat → IProp GF) :
-    Q 0 ⊢ writeConsArms P ua Q 0 (BitVec.ofInt 64 0) := by
-  unfold writeConsArms
-  iintro H
-  ileft
-  rw [show Int.toNat 0 = 0 from rfl]
-  iframe H
-  ipureintro; exact ⟨rfl, Int.le_refl 0⟩
 
 /-- THE CALLEE'S POST, IN THE ARMS' VOCABULARY (Rocq
 `write_cons_arms_of_cursor`): the FD_DEVICE arm relays consolewrite's count
@@ -621,20 +566,6 @@ def filewriteArms (gn : GName) (P : UPtd) (st : FdState) (n : Int) (M : Nat → 
     (ua : BitVec 64) (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF) (r : BitVec 64) : IProp GF :=
   iprop(⌜filewriteRet n r⌝ ∗ filewriteExtra (hlc := hlc) gn P st n M ua Q Qe r)
 
-/-- Rocq `filewrite_arms_ret`. -/
-theorem filewriteArms_ret (gn : GName) (P : UPtd) (st : FdState) (n : Int) (M : Nat → List (BitVec 8))
-    (ua : BitVec 64) (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF) (r : BitVec 64) :
-    filewriteArms (hlc := hlc) gn P st n M ua Q Qe r ⊢ ⌜filewriteRet n r⌝ := by
-  unfold filewriteArms
-  iintro ⟨%h, -⟩
-  ipureintro; exact h
-
-/-- Rocq `filewrite_in_inode`. -/
-theorem filewriteIn_inode (rb : Bool) (i : Nat) (γo : GName) (n : Int) (M : Nat → List (BitVec 8))
-    (ua : BitVec 64) (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF) :
-    filewriteIn (hlc := hlc) pmv szv lzv (.open rb true (.inode i γo .parked)) n M ua Q Qe ⊣⊢
-      awriteChain (hlc := hlc) (fsGammaL fscFs) appE i γo M ua n Q 0 (wchunks n) := .rfl
-
 /-- The inode arm at either mode (Rocq `filewrite_in_inode_om`): what the
 walk's carrier is initialised from. -/
 def filewriteInInodeOm (om : OffMode) (i : Nat) (γo : GName) (n : Int) (M : Nat → List (BitVec 8))
@@ -649,25 +580,6 @@ theorem filewriteIn_inode_any (rb : Bool) (om : OffMode) (i : Nat) (γo : GName)
     filewriteIn (hlc := hlc) pmv szv lzv (.open rb true (.inode i γo om)) n M ua Q Qe ⊢
       filewriteInInodeOm (hlc := hlc) pmv szv lzv om i γo n M ua Q := by
   cases om <;> exact .rfl
-
-/-- Rocq `filewrite_in_inode_held`: the HELD row's reading. -/
-theorem filewriteIn_inode_held (rb : Bool) (i : Nat) (γo : GName) (n : Int)
-    (M : Nat → List (BitVec 8)) (ua : BitVec 64) (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF) :
-    filewriteIn (hlc := hlc) pmv szv lzv (.open rb true (.inode i γo .held)) n M ua Q Qe ⊣⊢
-      filewriteInHeld (hlc := hlc) pmv szv lzv i γo n M ua Q := .rfl
-
-/-- Rocq `filewrite_in_cons`. -/
-theorem filewriteIn_cons (rb : Bool) (mj : Nat) (n : Int) (M : Nat → List (BitVec 8))
-    (ua : BitVec 64) (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF) :
-    filewriteIn (hlc := hlc) pmv szv lzv (.open rb true (.device mj)) n M ua Q Qe ⊣⊢
-      consOutChain (genId (hlc := hlc) (GF := GF) + 1) M ua Q 0 n.toNat := .rfl
-
-/-- Rocq `filewrite_extra_inode`. -/
-theorem filewriteExtra_inode (gn : GName) (P : UPtd) (rb : Bool) (i : Nat) (γo : GName) (n : Int)
-    (M : Nat → List (BitVec 8)) (ua : BitVec 64) (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF)
-    (r : BitVec 64) :
-    writeArmsAt (hlc := hlc) (fsGammaL fscFs) i γo P n M ua Q r ⊢
-      filewriteExtra (hlc := hlc) gn P (.open rb true (.inode i γo .parked)) n M ua Q Qe r := .rfl
 
 /-- Rocq `filewrite_extra_cons`. -/
 theorem filewriteExtra_cons (gn : GName) (P : UPtd) (rb : Bool) (n : Int) (M : Nat → List (BitVec 8))

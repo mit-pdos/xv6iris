@@ -14,7 +14,7 @@ all stated over it.  This file is that vocabulary, and nothing else: no rule,
 no proof tower.  Its last section (moved from `UexecSlot`/`UexecRet` §0,
 batch 8-P) is the lazy image `umemLazy` and the frames stated at it:
 `userPtmInv`/`userPtmInvX` (Rocq `UserPtTree.user_ptm_inv`, `UmodeText`),
-`userTrapFrameAt(m)` (Rocq `UserExec.user_trap_frame_at(m)`), `uvRegs`/`uvAmb`
+`userTrapFrameAtm` (Rocq `UserExec.user_trap_frame_atm`), `uvRegs`/`uvAmb`
 (Rocq `UmodeRegs`).
 
 **LEAN-NATIVE, over MachCSL's existing resources.**  Every definition names
@@ -89,8 +89,6 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode MachCSL
 open LeanRV64D LeanRV64D.Functions Sail
 open Iris.Std (get?)
-
-set_option linter.unusedSectionVars false
 
 /-! ## §1 Constants and pure pins -/
 
@@ -342,14 +340,6 @@ LAZY view (deviation 7). -/
 def userPtmInvX [xi : CurCtx] (cpu : CPU) (P : UPtd) (sz : Nat) (M : ElfMem) : IProp GF :=
   iprop(∃ Mp : Nat → List (BitVec 8), userPtInvX cpu P Mp ∗ ⌜umemLazy P sz Mp = M⌝)
 
-/-- Rocq `user_ptm_inv_any`. -/
-theorem userPtmInv_any [CurCtx] (cpu : CPU) (P : UPtd) (sz : Nat) (M : ElfMem) :
-    userPtmInv (GF := GF) cpu P sz M ⊢ userPtAny cpu P := by
-  unfold userPtmInv userPtAny
-  iintro ⟨%Mp, H, -⟩
-  iexists Mp
-  iexact H
-
 /-- Rocq `user_ptm_inv_intro`. -/
 theorem userPtmInv_intro [CurCtx] (cpu : CPU) (P : UPtd) (sz : Nat) :
     userPtAny (GF := GF) cpu P ⊢ ∃ M : ElfMem, userPtmInv cpu P sz M := by
@@ -368,18 +358,6 @@ theorem userPtmInvX_pt [CurCtx] (cpu : CPU) (P : UPtd) (sz : Nat) (M : ElfMem) :
   iintro ⟨%Mp, H, -⟩
   iexists Mp
   iexact H
-
-/-- **Rocq `UserExec.user_trap_frame_at`**: `userTrapFrame` at NAMED CSR
-values and register file. -/
-def userTrapFrameAt [CurCtx] (cpu : CPU) (C : UCfg) (pt : UPtd) (Rut : UPtd → IProp GF)
-    (ms sc stv sep : BitVec 64) (g : RegMap) : IProp GF := iprop%
-  ⌜trapMstatusOk ms⌝ ∗
-  Register.hart_state ↦ᵣ[cpu] HartState.HART_ACTIVE () ∗
-  Register.cur_privilege ↦ᵣ[cpu] Privilege.Supervisor ∗
-  Register.mstatus ↦ᵣ[cpu] ms ∗ Register.scause ↦ᵣ[cpu] sc ∗ Register.stval ↦ᵣ[cpu] stv ∗
-  Register.sepc ↦ᵣ[cpu] sep ∗ pcIs cpu (stvecBase C.stvec) ∗ clockCells cpu ∗ gprFile cpu g ∗
-  userPtAny cpu pt ∗ userCfg cpu C ∗ Rut pt ∗
-  uExitTok (hlc := hlc) (.uExit cpu (satpOf .kpt pt.root) sc sep (gprList g))
 
 /-- **Rocq `UserExec.user_trap_frame_atm`**: the same at the LAZY image `M`. -/
 def userTrapFrameAtm [CurCtx] (cpu : CPU) (C : UCfg) (pt : UPtd) (Rut : UPtd → IProp GF)
@@ -409,25 +387,6 @@ theorem uRcpt_gprList_ext {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] 
     uExitTok (hlc := hlc) (GF := GF) (.uExit cpu s sc sep (gprList m)) ⊢
       uExitTok (hlc := hlc) (.uExit cpu s sc sep (gprList m')) := by
   rw [gprList_ext m m' h]
-
-/-- Rocq `user_trap_frame_atm_at`: forget the image. -/
-theorem userTrapFrameAtm_at [CurCtx] (cpu : CPU) (C : UCfg) (pt : UPtd) (Rut : UPtd → IProp GF)
-    (sz : Nat) (M : ElfMem) (ms sc stv sep : BitVec 64) (g : RegMap) :
-    userTrapFrameAtm cpu C pt Rut sz M ms sc stv sep g ⊢ userTrapFrameAt cpu C pt Rut ms sc stv sep g := by
-  unfold userTrapFrameAtm userTrapFrameAt
-  iintro ⟨%Hok, Hhs, Hpr, Hms, Hsc, Hstv, Hsep, Hpc, Hck, Hg, Hpt, Hcfg, Hrut, Hrc⟩
-  ihave Hany := userPtmInv_any cpu pt sz M $$ Hpt
-  iframe
-  ipureintro; exact Hok
-
-/-- Rocq `user_trap_frame_at_frame`: the named frame is a frame. -/
-theorem userTrapFrameAt_frame [CurCtx] (cpu : CPU) (C : UCfg) (pt : UPtd) (Rut : UPtd → IProp GF)
-    (ms sc stv sep : BitVec 64) (g : RegMap) :
-    userTrapFrameAt (GF := GF) cpu C pt Rut ms sc stv sep g ⊢ userTrapFrame cpu C pt Rut := by
-  unfold userTrapFrameAt userTrapFrame
-  iintro H
-  iexists ms, sc, stv, sep, g
-  iexact H
 
 /-- **Rocq `UmodeRegs.uv_regs`**: the per-step CSR cells with their values
 swallowed, plus the clock riders (UserExec deviation 2). -/
@@ -469,8 +428,6 @@ theorem uvRegs_uRegs (cpu : CPU) (va : BitVec 64) (g : RegMap) :
   · ipureintro; exact hms
   · iframe
 
-
 end UVocab
-
 
 end Xv6

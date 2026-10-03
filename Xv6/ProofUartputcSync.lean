@@ -33,7 +33,7 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 /-! ## Pure facts -/
 
 /-- `&uarts`, folded out of `auipc s4,0xa; addi s4,s4,-1794`. -/
-theorem ups_uarts_addr : KA.«uartputc_sync» + 0x9944#64 = KA.«uarts» := by decide
+theorem ups_uarts_addr : KA.«uartputc_sync» + 0x99e4#64 = KA.«uarts» := by decide
 
 /-- The call targets. -/
 theorem ups_br_acquire : KA.«uartputc_sync» + 0x2ac#64 = KA.«acquire» := by decide
@@ -64,7 +64,6 @@ theorem ups_decode0 (i : UartId) : devDecode (uartBaseAddr i) = some (.uart i, 0
 theorem ups_byteOk0 (i : UartId) : devByteOk (uartBaseAddr i) := by
   cases i <;> decide
 
-
 /-- The low byte of `x & 0xff` is the low byte of `x` (`zext.b`). -/
 theorem ups_zext_b (x : BitVec 64) :
     BitVec.extractLsb' 0 8 (x &&& 255#64) = BitVec.extractLsb' 0 8 x := by bv_decide
@@ -91,7 +90,6 @@ theorem ups_filter_cons (s : String) (l : List String) (h : s ∉ l) :
   exact List.filter_eq_self.2 (fun x hx => by simp; intro e; subst e; exact h hx)
 
 section
-set_option linter.unusedSectionVars false
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
 
 theorem ups_txRes_elim [CurCtx] (γ : UartNames) :
@@ -153,7 +151,6 @@ theorem ups_release (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors} [MachGS
   unfold isTxLockAt
   rw [← haddr]
   exact h
-
 
 /-! ## The THRE poll -/
 
@@ -218,7 +215,6 @@ theorem ups_poll {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
     simp only [RegMap.set_apply, hj, ite_false]
     exact hinv j hj
 
-
 /-! ## The function -/
 
 set_option maxHeartbeats 4000000 in
@@ -253,7 +249,7 @@ theorem uartputc_sync_proof (AC : ACQUIRE) (RE : RELEASE) : UARTPUTC_SYNC :=
   k_step (wp_s_auipc cpu _ (KA.«uartputc_sync» + 0x16#64) false 10#20 20#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_addi cpu _ (KA.«uartputc_sync» + 0x1a#64) false 2350#12 20#5 20#5 (by decide))
+  k_step (wp_s_addi cpu _ (KA.«uartputc_sync» + 0x1a#64) false 2510#12 20#5 20#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ups_uarts_addr]
   iintro Hk Hpc
   -- slli s2,a0,0x2 ; add s1,s2,a0 ; slli s1,s1,0x3 ; addi s1,s1,16 ; add s1,s1,s4

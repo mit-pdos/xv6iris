@@ -8,7 +8,7 @@ bounded by (`NPROC`/`NOFILE` of Rocq `ProcGeom.v`, `NFILE`/`FDSPARE`/
 
 WHY A LIGHT FILE BELOW `ProcDefs`.  Rocq's `proc_dormant` (ProcDefs.v:623)
 parks `[∗ list] _ ∈ pv_ofile V, fd_slot`, `fd_slots FDSPARE`,
-`iref_slots (1 + IREFSPARE)` and `bslots 3`, and it can name them with no
+`iref_slots (IREFHOME + IREFSPARE)` and `bslots 3`, and it can name them with no
 ghost-name parameter because all three supplies live at CANONICAL names
 (the class carries the name).  The Lean supplies used to live at fields of
 the file table's `FileNames` (`fdSlots γ n` over `γ.fd`, FileDefs) and of
@@ -38,8 +38,6 @@ the one shared `Xv6G.gmUnitG` (one capacity per camera type).
 -/
 import Xv6.UartTrace
 import Xv6.VirtioQueue
-
-set_option linter.unusedSectionVars false
 
 namespace Xv6
 
@@ -297,17 +295,6 @@ theorem fdSlots_to_list {A : Type _} : ∀ (l : List A),
     iframe H1
     iapply fdSlots_to_list l $$ H
 
-theorem fdSlots_of_list {A : Type _} : ∀ (l : List A),
-    ([∗list] _x ∈ l, fdSlot) ⊢ fdSlots (GF := GF) l.length
-  | [] => by iintro -; iapply fdSlots_zero
-  | _ :: l => by
-    iintro H
-    icases BigSepL.bigSepL_cons.1 $$ H with ⟨H1, H⟩
-    ihave H := fdSlots_of_list l $$ H
-    rw [List.length_cons]
-    iapply fdSlots_cons l.length
-    iframe H1 H
-
 end Fd
 
 section Bio
@@ -340,9 +327,6 @@ theorem bslots_cons (n : Nat) : bslot (GF := GF) ∗ bslots n ⊢ bslots (n + 1)
 
 theorem bslots_uncons (n : Nat) : bslots (GF := GF) (n + 1) ⊢ bslot ∗ bslots n :=
   slotToks_uncons _ _ n
-
-theorem bslots_op_add (m n : Nat) : bslots (GF := GF) m ∗ bslots n ⊢ bslots (m + n) :=
-  slotToks_add _ _ m n
 
 theorem bslots_split (m n : Nat) : bslots (GF := GF) (m + n) ⊢ bslots m ∗ bslots n :=
   slotToks_split _ _ m n

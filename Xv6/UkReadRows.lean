@@ -15,8 +15,9 @@ member).
 
 CONE (re-walked on the pinned globs: 10/11 reached): `xfam_rd`, `xfam_rdf`,
 `sbundle_at_read_intro`, `spost_at_read_elim`, `std_fd_st_of_key`,
-`ufd_fd_st_of_key`, `udepwf_st`, `ufd_key_agree`, `Xv6.ushNarrow_count_le`,
-`uread_count_is_cap`.  Unreached (not ported): `udepwf_st_K`.
+`ufd_fd_st_of_key`, `udepwf_st`, `uread_count_is_cap`.  Unreached (not
+ported): `udepwf_st_K`.  `ufd_key_agree` and `ushNarrow_count_le` are not
+ported either (nothing uses them).
 
 ## Deviations from Rocq
 
@@ -27,7 +28,7 @@ CONE (re-walked on the pinned globs: 10/11 reached): `xfam_rd`, `xfam_rdf`,
    `sys_rw_count v` is `argZ v` (the row's own reading; `argZ_setWidth` is
    the equation); `uint w` is `w.toNat`; `tf_w (uvis_tf W) (tf_arg_idx i)` is
    `tfW W.tf (tfArgIdx i)` (= `xkA W i`); `take NSTD fdv` is `fdv.take NSTD`.
-3. **`spostAt_read_elim` is stated at LEAN'S row-5 post** (UexecExecInst
+3. **The row-5 post is LEAN'S** (UexecExecInst
    deviation 2): two tables (the resume table `P`, which the resume image
    projects from at the page view `Mv`, and the receipt table `Pr`), and
    NO `proc_pt_wf` / `lazy_free` rows -- the Lean kernel dropped them ("no
@@ -40,7 +41,7 @@ CONE (re-walked on the pinned globs: 10/11 reached): `xfam_rd`, `xfam_rdf`,
    (`UexecExecInst` deviation 2, `UexecExecLaws.syscDepRead_holds` /
    `syscDepWrite_holds` off the dispatcher's `procPrivFd_facts`), and
    `ukPostRows_holds : UK_POST_ROWS` is the posts by unfolding.
-4. `udepwfSt` is stated over `UkRun.udepwf`'s Lean spelling (`ElfMem`
+4. `udepwfSt` is stated over `UkRun.udepwfStd`'s Lean spelling (`ElfMem`
    image, `Nat → Option UPerm` permission view, `Nat` break and cwd).
 -/
 import Xv6.UexecExecInst
@@ -50,8 +51,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Std (ExtTreeSet)
-
-set_option linter.unusedSectionVars false
 
 /-! ## §0 The C `int` reading, two spellings -/
 
@@ -97,35 +96,6 @@ theorem sbundleAt_read_intro (X : Uvis → IProp GF) (f : Xfam GF) (W : Uvis) (v
   subst h0 h2 hfd
   exact (sbundleAt_xv6_read (hlc := hlc) X f W).symm ▸ .rfl
 
-/-- **Rocq `spost_at_read_elim`**, at LEAN'S row-5 post (deviation 3): the
-answer's range, and fileread's receipt at the receipt table `Pr`, beside
-the resume table `P` the resume image projects from at the page view `Mv`
-the receipt's bytes are read at. -/
-theorem spostAt_read_elim (X : Uvis → IProp GF) (f : Xfam GF) (W : Uvis) (v0 v1 v2 : BitVec 64)
-    (sts : List FdState) (r : BitVec 64) (M' : ElfMem) (fdv' : List FdState) (cw' : Nat)
-    (cs' : ExtTreeSet GName compare) (h0 : tfW W.tf (tfArgIdx 0) = v0) (h1 : tfW W.tf (tfArgIdx 1) = v1)
-    (h2 : tfW W.tf (tfArgIdx 2) = v2) (hfd : W.fd = sts) :
-    @UexecSG.spostAt GF _ SGX X USYS_read f W r M' fdv' cw' cs' ⊢
-      ⌜filereadRet (argZ v2) r⌝ ∗
-      ∃ (P Pr : UPtd) (Mv : Nat → List (BitVec 8)),
-        ⌜umemLazy P W.sz Mv = M'⌝ ∗ ⌜permOf P.um W.sz = W.perm⌝ ∗ ⌜permOf Pr.um W.sz = W.perm⌝ ∗
-        filereadExtraCore (hlc := hlc) W.gen Pr (fdStOfKey v0 sts) (argZ v2) f.rF f.rRd f.rRin
-          f.rPq f.rPqe r Mv v1 := by
-  subst h0 h1 h2 hfd
-  rw [show (USYS_read : Int) = 5 from rfl, spostAt_xv6_read]
-  unfold xpostRead xkA
-  iintro ⟨%hret, %P, %Pr, %Mv, %h1, -, %h2, %h3, -, -, Hc⟩
-  isplitr
-  · ipureintro; exact hret
-  iexists P, Pr, Mv
-  isplitr
-  · ipureintro; exact h1
-  isplitr
-  · ipureintro; exact h2
-  isplitr
-  · ipureintro; exact h3
-  iexact Hc
-
 end Rows
 
 /-- **Rocq `std_fd_st_of_key`**: a standard slot the LEDGER names is the
@@ -169,16 +139,6 @@ def udepwfSt (N : UkNames GF) (m : RegMap) (pc : BitVec 64) (n : Int) (fdep : Ue
     ⌜fdStOfKey (m.get 10#5) fdv = st⌝ -∗ myPay gn N.pay -∗ uheap N.t N.d N.s M pm sz -∗ ufdAuth N.fd fdv -∗
     uheap N.t N.d N.s M pm sz ∗ ufdAuth N.fd fdv ∗
       UexecSG.sbundleAt (uslot (hlc := hlc)) n fdep (uvisOfRun m pc M pm sz fdv cw gn cs pidv false seccAll))
-
-/-- **Rocq `ufd_key_agree`**: THE DESCRIPTOR THE CALL WILL RUN ON, OUT OF THE
-CALLER'S OWN HANDLE. -/
-theorem ufd_key_agree (N : UkNames GF) (fd : Nat) (st : FdState) (v0 : BitVec 64)
-    (h0 : (BitVec.setWidth 32 v0).toInt = (fd : Int)) (hlt : fd < NOFILE) (fdv : List FdState) :
-    ⊢@{IProp GF} ufdAuth N.fd fdv -∗ ufd N.fd fd st -∗ ⌜fdStOfKey v0 fdv = st⌝ := by
-  iintro Ha Hh
-  ihave %hlk := ufd_agree N.fd fdv fd st $$ Ha Hh
-  ipureintro
-  exact ufd_fd_st_of_key v0 fdv fd st h0 hlt hlk
 
 end StateFixed
 

@@ -53,8 +53,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
-
 /-! ## S1 THE PURE HALF: init's two rodata diagnostics ARE the era's
 alternatives 1 and 2 -/
 

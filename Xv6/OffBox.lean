@@ -119,8 +119,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-! ## THE NAMES
 
 Per inode SLOT the set of published boxes (rows outlive a recycle of the

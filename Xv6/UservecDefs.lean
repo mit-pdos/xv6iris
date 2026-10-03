@@ -30,8 +30,6 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 
-set_option linter.unusedSectionVars false
-
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
   LeanRV64D.Functions.virtual_memory_supported
 
@@ -224,28 +222,16 @@ theorem uservecTf_reg (ws : List (BitVec 64)) (g : RegMap) (hlen : ws.length = 3
     rw [if_neg h0, uvSaveSeq_hi _ _ _ i l3, if_neg hC, uvSaveSeq_hi _ _ _ i l2, if_neg hB,
       uvSaveSeq_hi _ _ _ i l1, if_pos h]; rfl
 
-/-- **Rocq's save-walk fact** (`tf_ueq … (tf_of g …)`): the saved frame is
-the running machine's (`tfOf g`) at its own `epc` word, on the user-visible
-words. -/
-theorem uservecTf_ueq (ws : List (BitVec 64)) (g : RegMap) (hlen : ws.length = 36) :
-    tfUeq (uservecTf ws g) (tfOf g (tfW ws tfEpcIdx)) := by
-  refine ⟨?_, fun i h5 h35 => ?_⟩
-  · rw [tfOf_epc, uservecTf_lo ws g tfEpcIdx (by decide)]
-  · have hr : 4 + (BitVec.ofNat 5 (i - 4)).toNat = i := by simp; omega
-    have hr0 : BitVec.ofNat 5 (i - 4) ≠ 0#5 := by
-      intro h; have := congrArg BitVec.toNat h; simp at this; omega
-    rw [← hr, uservecTf_reg ws g hlen _ hr0, tfOf_reg g _ _ hr0]
-
 /-! ## §3 The trapped machine, opened -/
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 
-/-- **The trapped machine, opened** (uservec's entry; `userTrapFrame_open`
-at the named data): the kernel's supervisor configuration cells over the
-user root (interrupts off, `SPIE = 1`, `SPP = U`), the pc at the handler,
-the file, the trap cells, `stvec`, the installed user table, the pages at a
-page view `Mp` whose lazy view is `M`, and the residue. -/
+/-- **The trapped machine, opened** (uservec's entry, at the named data):
+the kernel's supervisor configuration cells over the user root (interrupts
+off, `SPIE = 1`, `SPP = U`), the pc at the handler, the file, the trap
+cells, `stvec`, the installed user table, the pages at a page view `Mp`
+whose lazy view is `M`, and the residue. -/
 theorem uservec_frame_open [CurCtx] (cpu : CPU) (C : UCfg) (P : UPtd) (Rut : UPtd → IProp GF) (sz : Nat)
     (M : ElfMem) (ms sc tv sep : BitVec 64) (g : RegMap)
     (hdq : C.dqc = DFrac.own 1) (hmie : C.mie = MIE_S) (hmed : C.medeleg = MEDELEG_S) :

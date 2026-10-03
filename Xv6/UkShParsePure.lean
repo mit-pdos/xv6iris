@@ -27,12 +27,11 @@ pure model `ushpFind`, and the parse tree `UshpCmd`.
    kept as the "apply-shaped" forms Rocq uses.
 4. `bv_unsigned` is `BitVec.toNat` (cast to `Int` where a code is an `Int`);
    `Z_to_bv 8 n` is `n#8`; `toks !! i` is `toks[i]?`.
-5. `ushp_len_app1`/`Xv6.epuApp_snoc`/`ushp_len_app_cons`/`ushp_lookup_app_*`
-   are kept under their Rocq names (walks cite them) although each is one
-   `simp` in Lean.
+5. `Xv6.epuApp_snoc`/`ushp_lookup_app_*` are kept under their Rocq names
+   (walks cite them) although each is one `simp` in Lean; `ushp_len_app1` /
+   `ushp_len_app_cons` are not ported (nothing uses them).
 -/
 import Xv6.UmodeAbi
-import Xv6.EchoOutPure
 
 namespace Xv6
 
@@ -137,8 +136,6 @@ def ushpFind : Nat → Nat → (Nat → BitVec 8) → BitVec 8 → Option Nat
   | 0, _, _, _ => none
   | n + 1, i, f, c => if f i = c then some i else ushpFind n (i + 1) f c
 
-theorem ushpFind_0 (i : Nat) (f : Nat → BitVec 8) (c : BitVec 8) : ushpFind 0 i f c = none := rfl
-
 theorem ushpFind_S_hit (n i : Nat) (f : Nat → BitVec 8) (c : BitVec 8) (h : f i = c) :
     ushpFind (n + 1) i f c = some i := by simp [ushpFind, h]
 
@@ -223,14 +220,6 @@ theorem ushp_ws_chr_z (c : BitVec 8) (h : ushpIsWs c = false) :
     rw [hv] at hm
     simp [ushpIsWs, hm] at h
 
-theorem ushp_ws_chr_nz (c : BitVec 8) (h : ushpIsWs c = true) :
-    ∃ j, j < 5 ∧ ushpChr ushpWhitespace 5 0 ushpWsF c = ushpWhitespace + j := by
-  simp only [ushpIsWs, decide_eq_true_eq] at h
-  obtain ⟨j, hj, hv⟩ := ushp_ws_mem_inv c h
-  obtain ⟨k, hk⟩ := ushpFind_some_of 5 0 j ushpWsF c ⟨by omega, by omega⟩ hv
-  have := ushpFind_ge 5 0 ushpWsF c k hk
-  exact ⟨k, by omega, ushpChr_hit _ 5 0 ushpWsF c k hk⟩
-
 /-- Rocq `ushp_sym_f`: the symbols table as an index function. -/
 def ushpSymF (i : Nat) : BitVec 8 :=
   match i with
@@ -266,14 +255,6 @@ theorem ushp_sym_chr_z (c : BitVec 8) (h : ushpIsSym c = false) :
     have hm := ushp_sym_mem j (by omega)
     rw [hv] at hm
     simp [ushpIsSym, hm] at h
-
-theorem ushp_sym_chr_nz (c : BitVec 8) (h : ushpIsSym c = true) :
-    ∃ j, j < 7 ∧ ushpChr ushpSymbols 7 0 ushpSymF c = ushpSymbols + j := by
-  simp only [ushpIsSym, decide_eq_true_eq] at h
-  obtain ⟨j, hj, hv⟩ := ushp_sym_mem_inv c h
-  obtain ⟨k, hk⟩ := ushpFind_some_of 7 0 j ushpSymF c ⟨by omega, by omega⟩ hv
-  have := ushpFind_ge 7 0 ushpSymF c k hk
-  exact ⟨k, by omega, ushpChr_hit _ 7 0 ushpSymF c k hk⟩
 
 /-- Rocq `ushp_nsym_bv`: a byte not in `symbols` is none of the seven values
 gettoken's dispatch chain tests. -/
@@ -351,21 +332,6 @@ theorem ushpTokens_cons_inv' (len i j q : Nat) (f : Nat → BitVec 8) (tk : Nat 
     (rest : List (Nat × Nat)) (hj : j = i + ushpSkipws (len - i) i f) (hq : q = ushpToklen (len - j) j f)
     (h : UshpTokens len f i (tk :: rest)) : 0 < q ∧ tk = (j, j + q) ∧ UshpTokens len f (j + q) rest := by
   subst hj hq; exact ushpTokens_cons_inv len i f tk rest h
-
-theorem ushp_len_app1 {A : Type} (l : List A) (x : A) : (l ++ [x]).length = l.length + 1 := by simp
-
-theorem ushp_len_app_cons {A : Type} (l : List A) (x : A) (r : List A) :
-    (l ++ x :: r).length = l.length + r.length + 1 := by simp; omega
-
-theorem ushp_lookup_app_mid' {A : Type} (l : List A) (x : A) (r : List A) :
-    (l ++ x :: r)[l.length]? = some x := by simp
-
-theorem ushp_lookup_app_next {A : Type} (l : List A) (x y : A) (r : List A) :
-    (l ++ x :: y :: r)[l.length + 1]? = some y := by
-  rw [List.getElem?_append_right (by omega)]; simp
-
-theorem ushp_lookup_app_past {A : Type} (l : List A) (x : A) : (l ++ [x])[l.length + 1]? = none := by
-  simp
 
 /-- **Rocq `ushpTokens_skip`**: the invariant survives a blank skip. -/
 theorem ushpTokens_skip (len : Nat) (f : Nat → BitVec 8) (off : Nat) (toks : List (Nat × Nat))

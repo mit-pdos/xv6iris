@@ -109,7 +109,7 @@ theorem is_aligned_vaddr_of (va : BitVec 64) (n : Nat) (h : va.toNat % n = 0) :
 theorem not_is_aligned_vaddr_of (va : BitVec 64) (n : Nat) (hn : 0 < n) (h : va.toNat % n ≠ 0) :
     is_aligned_vaddr (virtaddr.Virtaddr va) n = false := by
   simp only [is_aligned_vaddr, Sail.BitVec.toNatInt]
-  simp [Int.tmod, h]
+  simp [Int.tmod]
   omega
 
 /-- The model's integer offset on a bitvector is a bitvector addition (the
@@ -188,8 +188,8 @@ theorem split_on_page_boundary_8 (va : BitVec 64) (h : va.toNat % 8 = 0) :
   · simp only [Functions.pagesize_bits, Functions.ones, Functions.zeros, Sail.BitVec.updateSubrange,
       Sail.BitVec.subInt, Sail.BitVec.updateSubrange', Sail.BitVec.length, sail_ones, Sail.BitVec.addInt,
       Int.cast_ofNat_Int, Int.reduceSub, Int.reduceToNat, Nat.reduceSub, Nat.reduceAdd, BitVec.reduceOfInt,
-      BitVec.zero_eq, BitVec.reduceAllOnes, BitVec.reduceSetWidth, BitVec.reduceZeroExtend,
-      BitVec.setWidth_eq, BitVec.shiftLeft_zero, BitVec.and_allOnes, BitVec.or_zero]
+      BitVec.zero_eq, BitVec.reduceAllOnes, BitVec.reduceZeroExtend,
+      BitVec.shiftLeft_zero, BitVec.or_zero]
     exact page_mask_same8 va h7
 
 @[sail_facts] theorem xlen_eq : Functions.xlen = 64 := rfl

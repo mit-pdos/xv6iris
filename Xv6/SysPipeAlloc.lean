@@ -21,9 +21,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
@@ -110,7 +108,7 @@ theorem sys_pipe_stage_c (hct : curTier = KTier.kpt) (FC : FILECLOSE) (FD : FDAL
         (fnode k1))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [p8, sys_pipe_a56] next c3 hp3
     iintro Hk Hpc Hwf
-    k_step_gen (wp_s_jal c3 _ (KA.«sys_pipe» + 0x44#64) false 2094736#21 1#5 (by decide))
+    k_step_gen (wp_s_jal c3 _ (KA.«sys_pipe» + 0x44#64) false 2094608#21 1#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_pipe_br_fdalloc] next c4 hp4
     iintro Hk Hpc
     ihave Howe := (show procOfilesOwe (GF := GF) γ V.fdg pa (V.ofile.set fd0 (fnode k0)) [fd0] ⊢
@@ -199,7 +197,7 @@ theorem sys_pipe_stage_b (hct : curTier = KTier.kpt) (FC : FILECLOSE) (FD : FDAL
         (fnode k0))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [p8, sys_pipe_a48] next c4 hp4
     iintro Hk Hpc Hrf
-    k_step_gen (wp_s_jal c4 _ (KA.«sys_pipe» + 0x34#64) false 2094752#21 1#5 (by decide))
+    k_step_gen (wp_s_jal c4 _ (KA.«sys_pipe» + 0x34#64) false 2094624#21 1#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_pipe_br_fdalloc] next c5 hp5
     iintro Hk Hpc
     ihave Howe := (show procOfilesOwe (GF := GF) γ V.fdg pa V.ofile [] ⊢ procOfilesOwe γ V.fdg k.proc V.ofile [] from by

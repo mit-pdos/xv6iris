@@ -110,15 +110,4 @@ theorem uw_tryStep (hD : UcFoot D) (hW : UwFoot D) (orc : UOrc) (s : UWSt) (wr :
   · simp only [if_true]
     exact uc_finish_retire hD orc _ ib (UWSt.setR_file_same _ _ _)
 
-/-- A parked cycle keeps the owned bytes and the reservation bit. -/
-theorem uwLand_mm (wr : WaitReason) (s : UWSt) : (uwLand wr s).2.mm = s.mm := by
-  unfold uwLand; split
-  · exact (ucEpi_mm _ _)
-  · rfl
-
-theorem uwLand_rv (wr : WaitReason) (s : UWSt) : (uwLand wr s).2.rv = s.rv := by
-  unfold uwLand; split
-  · exact (ucEpi_rv _ _)
-  · rfl
-
 end MachCSL

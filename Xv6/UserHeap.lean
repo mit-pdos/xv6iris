@@ -85,8 +85,6 @@ theorem uRange_set_self (n j : Nat) : (List.range n).set j j = List.range n := b
   · rename_i h; subst h; split <;> simp_all
   · rfl
 
-set_option linter.unusedSectionVars false
-
 /-! ## §1 The two address classes -- the only place the permission map is read -/
 
 /-- The page of `a` is writable (Rocq `uw_addr`, as a Boolean test). -/
@@ -387,10 +385,6 @@ instance utextStr_persistent (γt : GName) (a len : Nat) (f : Nat → BitVec 8) 
     Persistent (utextStr (GF := GF) γt a len f) := by
   unfold utextStr; infer_instance
 
-theorem utextStr_len (γt : GName) (a len : Nat) (f : Nat → BitVec 8) :
-    utextStr (GF := GF) γt a len f ⊢ ⌜len < 2 ^ 31⌝ := by
-  unfold utextStr; iintro ⟨-, %h, -, -⟩; ipureintro; exact h
-
 theorem utextStr_nonul (γt : GName) (a len : Nat) (f : Nat → BitVec 8) :
     utextStr (GF := GF) γt a len f ⊢ ⌜∀ j, j < len → f j ≠ ubyte0⌝ := by
   unfold utextStr; iintro ⟨%h, -, -, -⟩; ipureintro; exact h
@@ -500,13 +494,9 @@ theorem uargv_acc (γd : GName) (av : Nat) (args : List UArg) (i : Nat) (g : UAr
 /-- **Rocq `usz`**: the program's half of the break. -/
 def usz (γs : GName) (sz : Nat) : IProp GF := ghost_var γs (.own (1 : Qp).half) sz
 
-theorem usz_agree (γs : GName) (sz sz' : Nat) : usz (GF := GF) γs sz ∗ usz γs sz' ⊢ ⌜sz = sz'⌝ := by
-  unfold usz; iintro ⟨H1, H2⟩; iapply ghost_var_agree $$ H1 H2
-
 theorem usz_update (γs : GName) (sz sz' sz'' : Nat) :
     usz (GF := GF) γs sz ∗ usz γs sz' ⊢ |==> (usz γs sz'' ∗ usz γs sz'') := by
   unfold usz; iintro ⟨H1, H2⟩; iapply ghost_var_update_halves sz'' γs sz sz' $$ H1 H2
-
 
 /-! ### Range-indexed runs -/
 
@@ -783,7 +773,6 @@ theorem uheap_stop (γt γd γs : GName) (M : ElfMem) (pm : Nat → Option UPerm
   iintro ⟨%Mt, %Md, %Ms, %hok, -, -, -, -⟩
   ipureintro; exact hok.stop
 
-
 /-! ## §5 THE INSTRUCTION RESOURCE -/
 
 /-- **Rocq `uinstr_is`**: `UkInstr` as an iProp over the TEXT heap -- the
@@ -1014,54 +1003,6 @@ theorem uinstrIs_of_facts (γt : GName) (m : ElfMem) (pc : Nat) (rvc : Bool) (i 
       subst hn2
       iapply Xv6.User.utextImg_run (utext γt) m pc 2 _ (fun j hj => by rw [uwin_byte16 w j hj]; exact F.bytes j hj) $$ H
 
-/-- Rocq `uinstr_is_base`. -/
-theorem uinstrIs_base (γt : GName) (pc : BitVec 64) (w : BitVec 32) (i : instruction)
-    (hal : pc.toNat % 2 = 0) (hn : isRVC (BitVec.extractLsb' 0 16 w) = false)
-    (hdec : udecode32 w i) :
-    ([∗list] j ∈ List.range 4, utext (GF := GF) γt (pc.toNat + j) (nthByte (n := 4) w j)) ⊢
-      uinstrIs γt pc false i := by
-  unfold uinstrIs
-  simp only [Bool.false_eq_true, if_false]
-  iintro #Hbs
-  isplitr; · ipureintro; exact hal
-  iexists w
-  isplitr; · ipureintro; exact hn
-  isplitr; · ipureintro; exact hdec
-  iexact Hbs
-
-/-- Rocq `uinstr_is_rvc4`: a compressed instruction at a 4-ALIGNED pc. -/
-theorem uinstrIs_rvc4 (γt : GName) (pc : BitVec 64) (h : BitVec 16) (w : BitVec 32) (i : instruction)
-    (hal4 : pc.toNat % 4 = 0) (hrvc : isRVC h = true) (hdec : udecode16 h i)
-    (hlow : BitVec.extractLsb' 0 16 w = h) :
-    ([∗list] j ∈ List.range 4, utext (GF := GF) γt (pc.toNat + j) (nthByte (n := 4) w j)) ⊢
-      uinstrIs γt pc true i := by
-  unfold uinstrIs
-  simp only [if_true, hal4]
-  iintro #Hbs
-  isplitr; · ipureintro; omega
-  iexists h
-  isplitr; · ipureintro; exact hrvc
-  isplitr; · ipureintro; exact hdec
-  iexists w
-  isplitr; · ipureintro; exact hlow
-  iexact Hbs
-
-/-- Rocq `uinstr_is_rvc2`: at a 2-mod-4 pc, only the two bytes. -/
-theorem uinstrIs_rvc2 (γt : GName) (pc : BitVec 64) (h : BitVec 16) (i : instruction)
-    (hal2 : pc.toNat % 2 = 0) (hne : pc.toNat % 4 ≠ 0) (hrvc : isRVC h = true)
-    (hdec : udecode16 h i) :
-    ([∗list] j ∈ List.range 2, utext (GF := GF) γt (pc.toNat + j) (nthByte (n := 2) h j)) ⊢
-      uinstrIs γt pc true i := by
-  unfold uinstrIs
-  simp only [if_true, hne, if_false]
-  iintro #Hbs
-  isplitr; · ipureintro; exact hal2
-  iexists h
-  isplitr; · ipureintro; exact hrvc
-  isplitr; · ipureintro; exact hdec
-  iexact Hbs
-
-
 /-! ## THE FREE STACK (deviation 4) -/
 
 /-- Rocq `ustack_body`: the `n` words BELOW sp, values existential. -/
@@ -1073,26 +1014,10 @@ words below it), and the `n` words below it owned. -/
 def ustack (γd : GName) (sp : BitVec 64) (n : Nat) : IProp GF :=
   iprop(⌜sp.toNat % 8 = 0 ∧ 8 * n ≤ sp.toNat⌝ ∗ ustackBody γd sp n)
 
-theorem ustack_align (γd : GName) (sp : BitVec 64) (n : Nat) :
-    ustack (GF := GF) γd sp n ⊢ ⌜sp.toNat % 8 = 0⌝ := by
-  unfold ustack; iintro ⟨%h, -⟩; ipureintro; exact h.1
-
 /-- **Rocq `ustack_room`** (a projection here, deviation 4). -/
 theorem ustack_room (γd : GName) (sp : BitVec 64) (n : Nat) :
     ustack (GF := GF) γd sp n ⊢ ⌜8 * n ≤ sp.toNat⌝ := by
   unfold ustack; iintro ⟨%h, -⟩; ipureintro; exact h.2
-
-/-- Rocq `ustack_0`. -/
-theorem ustack_0 (γd : GName) (sp : BitVec 64) : ustack (GF := GF) γd sp 0 ⊣⊢ ⌜sp.toNat % 8 = 0⌝ := by
-  unfold ustack ustackBody
-  constructor
-  · iintro ⟨%h, -⟩; ipureintro; exact h.1
-  · iintro %h
-    isplitr
-    · ipureintro; exact ⟨h, by omega⟩
-    · simp only [List.range_zero]
-      iapply BigSepL.bigSepL_nil.2
-      iempintro
 
 /-- **Rocq `ustack_body_app`**. -/
 theorem ustackBody_app (γd : GName) (sp sp' : BitVec 64) (k n : Nat) (hsp : sp'.toNat = sp.toNat - 8 * k)
@@ -1240,7 +1165,6 @@ theorem ustack_of_ubytes (γd : GName) (sp : BitVec 64) (n : Nat) (f : Nat → B
   isplitr
   · ipureintro; exact ⟨hal, hn⟩
   · iapply ustackBody_of_ubytes γd n sp f hn $$ H
-
 
 /-! ## §4b THE BREAK MOVES UP -- what `sbrk` hands the process -/
 

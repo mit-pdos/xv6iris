@@ -16,7 +16,6 @@ deviation "one blocks state"), the budget `bmPaidS` at the SAME `e0`.
 import Xv6.ItruncParts
 import Xv6.CodeTactics
 import Xv6.BlkmapBuf
-import MachCSL.WpSmodeRegOps
 
 namespace Xv6
 
@@ -25,9 +24,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-- The indirect cursor after `c.addi s1,s1,4`, in the right-associated shape
 the normaliser leaves (Rocq's `b_data_cursor`). -/

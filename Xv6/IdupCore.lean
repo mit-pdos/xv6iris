@@ -56,8 +56,6 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
 open Iris.Algebra
 
-set_option linter.unusedSectionVars false
-
 /-! ## The mint's two fraction facts (Rocq `Xv6.ig_frac_lt` / `Xv6.ig_frac_rest`) -/
 
 /-- A proposition equation as an entailment. -/
@@ -274,7 +272,7 @@ theorem idup_store_au [Fscfg] [Icfg] [CurCtx] (cpu : CPU) (M : RegMapF (Qp × Po
     (k : Nat) (inum : BitVec 32) (qt qn s : Qp) (n : PosNat) (g : GName) (lo tst : Nat)
     (P : IProp GF) (hMk : PartialMap.get? M k = some (qt, n)) (hq : qt + qn < (1 : Qp).half)
     (hno : n.succ.val ≤ IREFSLOTS) (hin : (inum.toNat : Int) < 16 * (icfgNib : Int)) :
-    itableInv (hlc := hlc) (GF := GF) ∗ iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗
+    itableInv (hlc := hlc) (GF := GF) ∗ iregReg (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗
     itableHalf M ∗ istmpAuth k (1 : Qp).half tst ∗ topLb tst ∗
     liveGenlo k s g lo ∗ islSlot M k ∗ frzmH inum.toNat false ∗ runit false inum.toNat ∗
     icntHalf inum.toNat n.val ∗ (idStoreOut M k inum qt qn s n g lo -∗ P) ⊢

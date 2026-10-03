@@ -9,7 +9,7 @@ Rocq); the walk is `SysUnlinkW1..W5D` (not yet written).
 
 1. THE TWO NAME LITERALS.  The `auipc a1,0x2 ; addi a1,a1,1320` pair at
    +0x34 and `auipc a1,0x2 ; addi a1,a1,1308` at +0x48 of the LEAN image
-   compute `KStr.«.»` (0x800075e8) and `KStr.«..»` (0x800075f0)
+   compute `KStr.«.»` (0x800075e8) and `KStr.«..»` (0x800074d8)
    (`sys_unlink_dotaddr` / `_dotdotaddr`; the immediates are the Lean
    image's, not Rocq's `1314`/`1302`).  The fourteen-byte windows
    (`sysUnlinkDotList` / `sysUnlinkDotdotList`) are Rocq's verbatim, and
@@ -26,13 +26,12 @@ Rocq); the walk is `SysUnlinkW1..W5D` (not yet written).
    by `getElem?`; `su_dz_byte` likewise reads `direntBytes direntZero`.
 3. The decrement arithmetic (`su_decr_pay`, `su_dec_short`, `su_decr_pos`,
    `su_le1_nz_eq1`, `su_decr_zero`) is over `Nat`: the Lean contracts state
-   the counts as `toNat` (`wp_iupdate_unlink`'s `hdec`), where Rocq's are
+   the counts as `toNat` (`wp_iupdate_unlink_eb`'s `hdec`), where Rocq's are
    `Z` (`bv_unsigned`).  `su_le1_nz_eq1`'s `0 ≤ x` is vacuous and dropped.
 4. `su_upd_upt_idem` / `su_cwd_upt` / `su_upd_cwd_upt` (PROCESS-LAYER,
    FLAGGED): Rocq's `upd_upt` / `upd_cwd` setters are Lean record updates
-   on `ProcPriv` (`{ V with upt := P }`), so the three are `rfl` facts
-   (`sys_unlink_upd_upt_idem`, `sys_unlink_cwd_upt`,
-   `sys_unlink_upd_cwd_upt`).  They say nothing about the block's
+   on `ProcPriv` (`{ V with upt := P }`), so the three hold by `rfl` and
+   are not stated.  They say nothing about the block's
    resources; no deviation of the process abstraction is introduced.
 5. Names: Rocq's `su_` prefix is `sys_unlink_`; `su_dot_list` →
    `sysUnlinkDotList`, `su_dot_f` → `sysUnlinkDotF`, and so on.
@@ -53,8 +52,7 @@ iris/*.v, comments stripped)
   model) -- uses: ProofSysUnlinkW4-era loop only.
 * `su_moi32_id`, `su_neq_of_eq_true/_false`, `su_noff0`'s `Z` form,
   `su_pn_noff`: Sail `mword_of_int` / `eq_vec` / `neq_vec` bookkeeping that
-  the Lean `bcond` readings of `SysUnlinkParts` subsume (`sys_unlink_noff0`
-  is kept in `Nat`).
+  the Lean `bcond` readings of `SysUnlinkParts` subsume.
 * `su_pn_below`: `locks_below` has no Lean counterpart (no lock ranks;
   brief fs1 §1 vocabulary table).
 * `su_dummyV`: DEAD by Rocq's own comment ("kept only until the last
@@ -63,35 +61,18 @@ iris/*.v, comments stripped)
 import Xv6.SpecDirlookup
 import Xv6.SpecWritei
 import Xv6.SpecIput
-import Xv6.FsWords
-import Xv6.DinodeSlot
-import MachCSL.BvLemmas
 
 namespace Xv6
 
 open MachCSL LeanRV64D
 
-/-! ## The record-shape identities across argstr (deviation 4) -/
-
-theorem sys_unlink_upd_upt_idem (V : ProcPriv) (P1 P2 : UPtd) :
-    ({ ({ V with upt := P1 }) with upt := P2 } : ProcPriv) = { V with upt := P2 } := rfl
-
-theorem sys_unlink_cwd_upt (V : ProcPriv) (P : UPtd) : ({ V with upt := P } : ProcPriv).cwd = V.cwd :=
-  rfl
-
-theorem sys_unlink_upd_cwd_upt (V : ProcPriv) (P : UPtd) :
-    ({ ({ V with upt := P }) with cwd := V.cwd } : ProcPriv) = { V with upt := P } := rfl
-
-/-- argstr's `noff` premise at the walk's own depth, which is zero. -/
-theorem sys_unlink_noff0 : 0 + 1 < 2 ^ 31 := by decide
-
 /-! ## The two name literals the two `namecmp` refusals compare against -/
 
 def sysUnlinkDotList : List (BitVec 8) :=
-  [0x2e#8, 0#8, 0#8, 0#8, 0#8, 0#8, 0#8, 0#8, 0x2e#8, 0x2e#8, 0#8, 0#8, 0#8, 0#8]
+  [0x2e#8, 0#8, 0#8, 0#8, 0#8, 0#8, 0#8, 0#8, 0x75#8, 0x6e#8, 0x6c#8, 0x69#8, 0x6e#8, 0x6b#8]
 
 def sysUnlinkDotdotList : List (BitVec 8) :=
-  [0x2e#8, 0x2e#8, 0#8, 0#8, 0#8, 0#8, 0#8, 0#8, 0x75#8, 0x6e#8, 0x6c#8, 0x69#8, 0x6e#8, 0x6b#8]
+  [0x2e#8, 0x2e#8, 0#8, 0#8, 0#8, 0#8, 0#8, 0#8, 0x64#8, 0x69#8, 0x72#8, 0x6c#8, 0x6f#8, 0x6f#8]
 
 def sysUnlinkDotF (j : Nat) : BitVec 8 := sysUnlinkDotList.getD j 0#8
 def sysUnlinkDotdotF (j : Nat) : BitVec 8 := sysUnlinkDotdotList.getD j 0#8
@@ -108,12 +89,12 @@ theorem sys_unlink_dotdot_name : bname 14 sysUnlinkDotdotF = dotdotName := by de
 /-- the `auipc`/`addi` pair at +0x34, computed (Rocq's `su_dotaddr`) -/
 theorem sys_unlink_dotaddr :
     KA.«sys_unlink» + 0x34#64 + BitVec.signExtend 64 (0x2#20 ++ 0#12) +
-      BitVec.signExtend 64 1250#12 = KStr.«.» := by decide
+      BitVec.signExtend 64 1134#12 = KStr.«.» := by decide
 
 /-- the pair at +0x48 (Rocq's `su_dotdotaddr`) -/
 theorem sys_unlink_dotdotaddr :
     KA.«sys_unlink» + 0x48#64 + BitVec.signExtend 64 (0x2#20 ++ 0#12) +
-      BitVec.signExtend 64 1238#12 = KStr.«..» := by decide
+      BitVec.signExtend 64 842#12 = KStr.«..» := by decide
 
 /-- `diType dn = T_DIR` at the sixteen-bit width, read as the `Nat`
 equality `DirView` states its type tests at (Rocq's `su_tdir_zof`) -/
@@ -137,42 +118,8 @@ theorem sys_unlink_dots_only_scan (self : Nat) (dn : Dinode) (data : Nat → Lis
   | 1 => exact Or.inr hn1
   | k' + 2 => exact absurd (hdead (k' + 2) (by omega) hk) hlive
 
-/-- `rdClamp` at n = 16: never more (Rocq's `su_clamp_le16`) -/
-theorem sys_unlink_clamp_le16 (szw : BitVec 32) (off : Nat) : rdClamp szw off 16 ≤ 16 :=
-  rdClamp_le szw off 16
-
-/-- ...and 16 exactly means the whole record sits inside the file (Rocq's
-`su_clamp16_in`) -/
-theorem sys_unlink_clamp16_in (szw : BitVec 32) (off : Nat) (h : rdClamp szw off 16 = 16) :
-    off + 16 ≤ szw.toNat := by
-  unfold rdClamp at h; split at h <;> omega
-
-/-- `dirNrec` against the byte bound (Rocq's `su_nrec_le`) -/
-theorem sys_unlink_nrec_le (sz j : Nat) (hj : sz ≤ 16 * j) : dirNrec sz ≤ j := by
-  unfold dirNrec; omega
-
 /-- Rocq's `su_nrec16` -/
 theorem sys_unlink_nrec16 (sz : Nat) : 16 * dirNrec sz ≤ sz := (dirNrec_range sz).1
-
-/-- the two inum bytes of a record (Rocq's `su_half_bytes_eq`) -/
-theorem sys_unlink_half_bytes_eq (data : Nat → List (BitVec 8)) (i j : Nat) (hj : j < 2) :
-    nthByte (n := 2) (dirInum data i) j = fileByte data (16 * i + j) := by
-  match j, hj with
-  | 0, _ => exact dirInum_byte0 data i
-  | 1, _ => exact dirInum_byte1 data i
-
-/-- ...and its fourteen name bytes (Rocq's `su_name_shift`) -/
-theorem sys_unlink_name_shift (data : Nat → List (BitVec 8)) (i j : Nat) :
-    fileByte data (16 * i + (2 + j)) = dirName data i j := by
-  unfold dirName; congr 1; omega
-
-/-- readi's delivered byte at `tot = 16` is the file's byte (Rocq's
-`su_rdd_eq`) -/
-theorem sys_unlink_rdd_eq (data : Nat → List (BitVec 8)) (olds : List (BitVec 8)) (off jj : Nat)
-    (hj : jj < 16) : (rdDelivered data olds off 16)[jj]? = some (fileByte data (off + jj)) := by
-  unfold rdDelivered
-  rw [List.getElem?_append_left (by simp; omega)]
-  simp [rdBytes, hj]
 
 /-! ## W5's pure layer: the zeroing writei's cost, the zero record, the decrement -/
 
@@ -194,29 +141,8 @@ theorem sys_unlink_iunlockput_from5 (w : Bool) (n n' : Nat) (h5 : 5 ≤ n)
     (h : n - ipSpendW w true false ≤ n') : 4 ≤ n' := by
   cases w <;> simp [ipSpendW, ipBm] at h <;> omega
 
-/-- the zero record's inum field (Rocq's `su_dz_inum`) -/
-theorem sys_unlink_dz_inum : direntZero.inum = 0#16 := rfl
-
 /-- ...and each of its sixteen bytes (Rocq's `su_dz_byte`) -/
 theorem sys_unlink_dz_byte (j : Nat) (hj : j < 16) : (direntBytes direntZero)[j]? = some 0#8 := by
   rw [direntBytes_zero, List.getElem?_replicate]; simp [hj]
-
-/-- the decrement arithmetic (Rocq's `su_decr_pay`; deviation 3) -/
-theorem sys_unlink_decr_pay (x y : Nat) (bb : Bool) (h : y = x + 1) :
-    x + (if bb then 1 else 0) ≤ y := by
-  cases bb <;> simp <;> omega
-
-/-- Rocq's `su_dec_short` -/
-theorem sys_unlink_dec_short (a c : Nat) (h : c = a + 1) (hc : c ≤ 32767) : a ≤ 32767 := by omega
-
-/-- Rocq's `su_decr_pos` -/
-theorem sys_unlink_decr_pos (x y z : Nat) (h1 : y = x + 1) (h2 : y = z) (h3 : 2 ≤ z) : x ≠ 0 := by
-  omega
-
-/-- Rocq's `su_le1_nz_eq1` -/
-theorem sys_unlink_le1_nz_eq1 (x : Nat) (h1 : x ≤ 1) (h2 : x ≠ 0) : x = 1 := by omega
-
-/-- Rocq's `su_decr_zero` -/
-theorem sys_unlink_decr_zero (x y : Nat) (h1 : y = x + 1) (h2 : y = 1) : x = 0 := by omega
 
 end Xv6

@@ -88,14 +88,6 @@ theorem catElfLoadable : kexecLoadable User.Cat.elf :=
 
 /-! ## 2. The two PT_LOADs, the entry, and the .bss window -/
 
-/-- **Rocq `cat_loads`** (deviation 4): cat's two PT_LOADs, `(0x0, 0xecc,
-R-X)` and `(0x1000, 0x220, RW-)`. -/
-theorem catLoads :
-    ∃ p0 p1 : ElfPhdr, elfLoads User.Cat.elf = [p0, p1] ∧
-      p0.vaddr = 0 ∧ p0.memsz = 0xecc ∧ p0.flags = 5 ∧
-      p1.vaddr = 0x1000 ∧ p1.memsz = 0x220 ∧ p1.flags = 6 :=
-  ⟨_, _, User.Cat.elf_loads, rfl, rfl, rfl, rfl, rfl, rfl⟩
-
 /-- **Rocq `cat_start_pc`** (deviation 5): the entry, as the resume pc reads
 it. -/
 theorem catStart_pc : retPc (BitVec.ofNat 64 User.Cat.entry) = BitVec.ofNat 64 User.Cat.Sym.«start» := by
@@ -108,7 +100,7 @@ theorem catBssImg (a : Nat) (h1 : 0x1000 ≤ a) (h2 : a < 0x1220) : elfImage Use
   rw [User.Cat.elf_image]
   have hc : User.Cat.code.byte a = none := by
     have hv : User.Cat.code.vaddr = 0 := rfl
-    have hs : User.Cat.code.size = 0xecc := rfl
+    have hs : User.Cat.code.size = 0xedc := rfl
     unfold User.USeg.byte
     rw [if_neg (by omega)]
   have hd : User.Cat.data.byte a = none := by

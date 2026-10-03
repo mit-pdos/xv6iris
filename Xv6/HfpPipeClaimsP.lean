@@ -24,18 +24,11 @@ are gone, and the union entries (`UkUnionEntries*`) read U1-P's
 declarations.  The namespace `HfpPipeP` is kept (empty) for the files that
 `open` it.
 -/
-import Xv6.PipeProtoRead
-import Xv6.PipeOutNFam
-import Xv6.GenLinksLine
 import Xv6.UnionDisc
-import Xv6.FileState
-import MachCSL.WpSmodeFrame
 
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
-
-set_option linter.unusedSectionVars false
 
 namespace HfpPipeP
 

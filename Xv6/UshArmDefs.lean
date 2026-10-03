@@ -19,7 +19,7 @@
 
 1. (Retired: the close deposit is the landed `UkRun.udepwCl`, Rocq
    `udepw_cl`, verbatim.)  A pipe end's deposit comes from the pipe call's
-   registration (`ushPipeAns`) or the close law (`ushCldep_of_law`), exactly
+   registration (`ushPipeAns`) or the close law, exactly
    as in Rocq.
 2. Numbers and addresses as in `UshRunDefs` (deviation 1); the two
    descriptor numbers `pipe` writes are `nthByte (n := 4) (BitVec.ofNat 32
@@ -34,8 +34,6 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
-
-set_option linter.unusedSectionVars false
 
 section UshArmDefs
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
@@ -59,17 +57,6 @@ theorem ushCldep_nonpipe (st : FdState) (hnp : ∀ (rb wb : Bool) (gp : PipeName
   imodintro
   iintro %N %m %pc
   iapply udepwCl_nonpipe N m pc st hnp
-
-/-- **Rocq `ush_cldep_of_law`**. -/
-theorem ushCldep_of_law (st : FdState) :
-    ⊢ udepwLaw (hlc := hlc) (GF := GF) USYS_close -∗ ushCldep (hlc := hlc) st := by
-  unfold ushCldep
-  iintro #H
-  imodintro
-  iintro %N %m %pc
-  iapply udepwCl_of_udepw N m pc st
-  rw [show (21 : Int) = USYS_close from rfl]
-  iapply udepw_of_law N m pc USYS_close $$ H
 
 /-! ## `wait(0)` as a call law (Rocq `UkShPipe` §3a'') -/
 

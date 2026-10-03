@@ -23,14 +23,12 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## Addresses -/
 
 /-- `jal ra,myproc` at `+0x08`. -/
-theorem sg_br_myproc : KA.«sys_getpid» + 0xffffffffffffef6a#64 = KA.«myproc» := by decide
+theorem sg_br_myproc : KA.«sys_getpid» + 0xffffffffffffef4a#64 = KA.«myproc» := by decide
 
 /-- The link register of the call. -/
 theorem sg_ret_0c : jumpPc (KA.«sys_getpid» + 0xc#64) = KA.«sys_getpid» + 0xc#64 := by decide
@@ -100,7 +98,7 @@ theorem sys_getpid_proof (MP : MYPROC) : SYSGETPID :=
   iapply wpNext_intro_pin
   iintro %c1 %hp1 Hk Hpc Hframe
   -- jal myproc
-  k_step_gen (wp_s_jal c1 _ (KA.«sys_getpid» + 0x8#64) false 2092898#21 1#5 (by decide))
+  k_step_gen (wp_s_jal c1 _ (KA.«sys_getpid» + 0x8#64) false 2092866#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sg_br_myproc] next c2 hp2
   iintro Hk Hpc
   iapply (sg_myproc MP c2 _ ?hnm ?hKm) $$ [- $Hk $Hpc]

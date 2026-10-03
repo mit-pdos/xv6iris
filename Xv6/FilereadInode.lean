@@ -30,7 +30,6 @@ Deviations: none beyond SpecFileread's.
 import Xv6.FilereadCalls
 import Xv6.FileOffProto
 import Xv6.FileRwShared
-import Xv6.ReadiDefs
 
 namespace Xv6
 
@@ -39,9 +38,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## The frame's two lazy restores and the tail -/
 
@@ -293,7 +290,7 @@ theorem frd_seg_lock (IL : ILOCK) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10]
   iintro Hk Hpc Hip
   -- +0x36  jal ilock
-  k_step_e (wp_s_jal cpu _ (KA.«fileread» + 0x36#64) false 2092926#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«fileread» + 0x36#64) false 2092830#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [frd_br_ilock]
   iintro Hk Hpc
   iapply (frd_ilock IL Γ cpu _ j ik s g lo tl ty inum γil γisl pid Tl hj ?iproc ?iK ?inoff ?itier
@@ -392,7 +389,7 @@ theorem frd_seg_read (RD : READI) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [r9]
   iintro Hk Hpc Hip
   -- +0x44  jal readi
-  k_step_e (wp_s_jal cpu _ (KA.«fileread» + 0x44#64) false 2093898#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«fileread» + 0x44#64) false 2093802#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [frd_br_readi]
   iintro Hk Hpc
   iapply (frd_readi RD Γ cpu _ j γkl γk ik bm data dn v.toNat n V M pid ht hj ?wproc ?wK ?wnoff
@@ -526,7 +523,7 @@ theorem frd_seg_unlock (IU : IUNLOCK) (Γ : SchedNames)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [r9]
   iintro Hk Hpc Hip
   -- +0x56  jal iunlock
-  k_step_e (wp_s_jal cpu _ (KA.«fileread» + 0x56#64) false 2093068#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«fileread» + 0x56#64) false 2092972#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [frd_br_iunlock]
   iintro Hk Hpc
   iapply (frd_iunlock IU Γ cpu _ ik s g lo tl inum dn bm γil γisl pid ?uK ?unoff ?ulocks ?utier hkk

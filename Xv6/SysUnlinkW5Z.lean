@@ -35,9 +35,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## The pure content of the zeroing -/
 
@@ -192,8 +190,6 @@ def sysUnlinkAtAe (Γ : SchedNames) (cpu : CPU) (k : KCtx) (A : SysUnlinkArgs GF
   A.P (npElems pl).length dinum.toNat ∗
   bslots 3 ∗ logOpS icfgLog nw Sbw ∗ sysUnlinkCommits A pl
 
-theorem sys_unlink_li0' : BitVec.signExtend 64 0#12 = 0#64 := by decide
-
 theorem sys_unlink_sext_off (kk : Nat) (h : 16 * kk < 2 ^ 31) :
     BitVec.signExtend 64 (BitVec.ofNat 32 (16 * kk)) = BitVec.ofNat 64 (16 * kk) :=
   MachCSL.signExtend_ofNat32 _ h
@@ -201,8 +197,6 @@ theorem sys_unlink_sext_off (kk : Nat) (h : 16 * kk < 2 ^ 31) :
 theorem sys_unlink_de_addr (x : BitVec 64) :
     x + BitVec.signExtend 64 4032#12 = sysUnlinkDe x := by
   simp only [sysUnlinkDe]; bv_decide
-
-theorem sys_unlink_ret_16a : BitVec.ofNat 64 16 = (16#64 : BitVec 64) := rfl
 
 set_option maxHeartbeats 64000000 in
 /-- **+0x8a .. +0xae**: the memset, the zeroing writei, its two refusals
@@ -253,7 +247,7 @@ theorem sys_unlink_w5_zero (WI : WRITEI) (MS : MEMSET) (PA : PANIC) (Γ : SchedN
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x94  jal memset
-  k_step_e (wp_s_jal cpu _ (KA.«sys_unlink» + 0x94#64) false 2079666#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_unlink» + 0x94#64) false 2079550#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_unlink_br_memset]
   iintro Hk Hpc
   icases (show suAny (GF := GF) (sysUnlinkDe (k.regs 2#5)) 16 ⊢ ∃ bs : List (BitVec 8),
@@ -294,7 +288,7 @@ theorem sys_unlink_w5_zero (WI : WRITEI) (MS : MEMSET) (PA : PANIC) (Γ : SchedN
   k_step_e (wp_s_add cpu _ (KA.«sys_unlink» + 0xa2#64) true 10#5 0#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_jal cpu _ (KA.«sys_unlink» + 0xa4#64) false 2090644#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_unlink» + 0xa4#64) false 2090548#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_unlink_br_writei]
   iintro Hk Hpc
   unfold sysUnlinkLkAt

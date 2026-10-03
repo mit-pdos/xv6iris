@@ -40,7 +40,6 @@ split on explicitly (premises on `t.getLsbD 0`/`t.getLsbD 1`, or an
 -/
 import MachCSL.UExecAluGpr
 import MachCSL.UDecode
-import MachCSL.UTranslate
 
 namespace MachCSL
 
@@ -78,10 +77,6 @@ theorem UxcCfg.priv {s : UWSt} (h : UxcCfg s) : s.file .cur_privilege = Privileg
 
 /-- The walker state after `nextPC := t`. -/
 def uxcNpc (s : UWSt) (t : BitVec 64) : UWSt := { s with pin := s.pin.set .nextPC t }
-
-@[simp] theorem uxcNpc_mm (s : UWSt) (t : BitVec 64) : (uxcNpc s t).mm = s.mm := rfl
-@[simp] theorem uxcNpc_rv (s : UWSt) (t : BitVec 64) : (uxcNpc s t).rv = s.rv := rfl
-@[simp] theorem uxcNpc_rs (s : UWSt) (t : BitVec 64) : (uxcNpc s t).rs = s.rs := rfl
 
 theorem uxcNpc_file (s : UWSt) (t : BitVec 64) : (uxcNpc s t).file = s.file.set .nextPC t :=
   UWSt.file_setPin s .nextPC t
@@ -162,18 +157,6 @@ theorem uxc_runME_liftBind {A R : Type} (orc : UOrc) (s : UWSt) (m : SailM A) (f
       MonadLift.monadLift, ExceptT.lift, ExceptT.run_mk, bind_assoc, map_eq_pure_bind, pure_bind]
   rw [this, runRW_bind]
 
-/-- A lifted computation as the whole early-return block. -/
-theorem uxc_runME_lift {R : Type} (orc : UOrc) (s : UWSt) (m : SailM R) :
-    runRW D orc s (SailME.run (liftM m : SailME R R)) = runRW D orc s m := by
-  have : SailME.run (liftM m : SailME R R) = m := by
-    simp only [SailME.run, PreSail.PreSailME.run, liftM, monadLift, MonadLift.monadLift, ExceptT.lift,
-      ExceptT.run_mk, map_eq_pure_bind, bind_assoc, pure_bind]
-    exact bind_pure m
-  rw [this]
-
-theorem uxc_runME_pure {R : Type} (orc : UOrc) (s : UWSt) (x : R) :
-    runRW D orc s (SailME.run (pure x : SailME R R)) = some (x, s, orc) := rfl
-
 /-- A form that `execute`s to a redirect walks as its target (the one
 `ExecuteAs` of `run_hart_active`, U1-X1's `uxaExecAs`). -/
 theorem uxc_execAs_redirect (orc : UOrc) (s : UWSt) {c i : instruction}
@@ -249,30 +232,6 @@ theorem uxc_jump_to (orc : UOrc) (s : UWSt) (t : BitVec 64) (z : Bool)
       uxc_runME_liftBind, uxc_assert_true, Option.bind, hz, uxc_bit_to_bool_ofBool, uxc_not_eq,
       Bool.not_true, Bool.false_eq_true, ↓reduceIte, pure_bind, uxc_set_next_pc D orc s t hn]
     rfl
-
-/-- **`jump_to`, the misaligned-target trap**: with `Zca` off, a target with
-bit 1 set traps (`E_Fetch_Addr_Align`, `tval` the target) at the current
-privilege and `PC`, writing nothing. -/
-theorem uxc_jump_to_misaligned (orc : UOrc) (s : UWSt) (t : BitVec 64)
-    (hz : runRW D orc s (currentlyEnabled extension.Ext_Zca) = some (false, s, orc))
-    (h0 : t.getLsbD 0 = false) (h1 : t.getLsbD 1 = true) (hp : D.Dr .cur_privilege = true)
-    (hpc : D.Dr .PC = true) :
-    runRW D orc s (jump_to t) =
-      some (.Trap (s.file .cur_privilege, make_sync_exception (.E_Fetch_Addr_Align ()) t, s.file .PC),
-        s, orc) := by
-  simp only [jump_to, ext_control_check_pc, uxc_access0, uxc_access1, h0, h1, uxc_ofBool_false_beq,
-    uxc_runME_liftBind, uxc_assert_true, Option.bind, hz, uxc_bit_to_bool_ofBool, uxc_not_eq,
-    Bool.not_false, Bool.and_self, ↓reduceIte, pure_bind, uxc_runME_lift, memory_exception,
-    uxc_trap D orc s _ hp hpc]
-  rfl
-
-/-- **`jump_to`, an odd target**: the model's assertion fails, so the walk
-refuses (a decode invariant, not a trap: JAL/BTYPE offsets are even and the
-`PC` is 2-aligned; JALR clears bit 0). -/
-theorem uxc_jump_to_odd (orc : UOrc) (s : UWSt) (t : BitVec 64) (h0 : t.getLsbD 0 = true) :
-    runRW D orc s (jump_to t) = none := by
-  simp only [jump_to, ext_control_check_pc, uxc_access0, h0, uxc_runME_liftBind]
-  rfl
 
 end jump
 

@@ -26,8 +26,6 @@ two lemmas whose proof uses it).
 -/
 import Xv6.LineModelSeal
 import Xv6.LineModelLinks
-import Xv6.EchoDiscSeal
-import Xv6.LineWordsSeal
 
 namespace Xv6
 

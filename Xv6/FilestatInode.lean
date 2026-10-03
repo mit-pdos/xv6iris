@@ -36,12 +36,9 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 theorem filestat_pt' (x : BitVec 64) : x + 80#64 = pPagetable x := rfl
-
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
@@ -103,7 +100,7 @@ theorem filestat_copy (CO : COPYOUT) (cpu : CPU) (k : KCtx) (spie spp : Bool) (R
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [r18, Xv6.sys_pipe_pt, filestat_pt']
   iintro Hk Hpc Hpg
   -- +0x4a  jal copyout
-  k_step_e (wp_s_jal cpu _ (KA.«filestat» + 0x4a#64) false 2085460#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«filestat» + 0x4a#64) false 2085344#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [filestat_br_copyout]
   iintro Hk Hpc
   ihave Hhole := (show wordPointsTo (GF := GF) (k.regs 2#5 + 0xFFFFFFFFFFFFFFC4#64) 4 (DFrac.own 1) h ⊢
@@ -178,7 +175,6 @@ theorem filestat_copy (CO : COPYOUT) (cpu : CPU) (k : KCtx) (spie spp : Bool) (R
     refine ⟨hcs', Or.inr (hR.trans h10), hext, Nat.le_of_lt hd', ⟨_, ?_, hM, hmap⟩⟩
     rw [List.length_take, fstatBytes_length]; omega
 
-
 set_option maxHeartbeats 16000000 in
 /-- **`+0x2a .. +0x3a`: `&st`, stati, iunlock** (Rocq's `+0x2a .. +0x38`
 block): the buffer opened as `statAt` + the hole, stati over the read arm's
@@ -227,7 +223,7 @@ theorem filestat_stat (ST : STATI) (IU : IUNLOCK) (CO : COPYOUT) (Γ : SchedName
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [r9]
   iintro Hk Hpc Hip
   -- +0x32  jal stati
-  k_step_e (wp_s_jal cpu _ (KA.«filestat» + 0x32#64) false 2093972#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«filestat» + 0x32#64) false 2093876#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [filestat_br_stati]
   iintro Hk Hpc
   -- the buffer, as `statAt` at some values + the hole
@@ -265,7 +261,7 @@ theorem filestat_stat (ST : STATI) (IU : IUNLOCK) (CO : COPYOUT) (Γ : SchedName
   iintro Hk Hpc Hip
   ihave Hfields := Hfw $$ Hip
   -- +0x38  jal iunlock
-  k_step_e (wp_s_jal cpu _ (KA.«filestat» + 0x38#64) false 2093200#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«filestat» + 0x38#64) false 2093104#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [filestat_br_iunlock]
   iintro Hk Hpc
   icases filerw_priv_pid (procAddr j) pid V V.upt M $$ Hpriv with ⟨Hpid, Hpw⟩
@@ -307,7 +303,6 @@ theorem filestat_stat (ST : STATI) (IU : IUNLOCK) (CO : COPYOUT) (Γ : SchedName
   iframe #
   rw [hproc]
   iexact Hce
-
 
 set_option maxHeartbeats 16000000 in
 /-- **`+0x1e .. +0x28`: the lazy saves, `s2 := p`, ilock at the read arm**
@@ -367,7 +362,7 @@ theorem filestat_lock (IL : ILOCK) (ST : STATI) (IU : IUNLOCK) (CO : COPYOUT) (�
   iintro Hk Hpc Hip
   ihave Hfields := Hfw $$ Hip
   -- +0x26  jal ilock
-  k_step_e (wp_s_jal cpu _ (KA.«filestat» + 0x26#64) false 2093044#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«filestat» + 0x26#64) false 2092948#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [filestat_br_ilock]
   iintro Hk Hpc
   unfold fstatEnvP

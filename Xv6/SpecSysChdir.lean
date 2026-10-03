@@ -25,7 +25,7 @@ The interface of `sys_chdir` (kernel/sysfile.c).  A port of Rocq
       return 0;
     }
 
-`KA.«sys_chdir»` = 0x80005450, 128 bytes / 45 instructions.  A TWENTY-slot
+`KA.«sys_chdir»` = 0x800054c4, 128 bytes / 45 instructions.  A TWENTY-slot
 frame: ra @ `sp0-8`, s0 @ `sp0-16` (the frame pointer, = the entry sp), s1
 @ `sp0-24` (the inode, saved only on the paths that have one), s2 @ `sp0-32`
 (the proc), and the low sixteen slots -- `sp0-160 .. sp0-32` -- being the
@@ -55,11 +55,10 @@ frame: ra @ `sp0-8`, s0 @ `sp0-16` (the frame pointer, = the entry sp), s1
 * DETERMINISM: none is claimed; the postcondition is the honest
   disjunction keyed by the returned a0.
 * ONE CONTRACT: the frame plus ONE caller INPUT (`chdirAuPre`) and ONE armed
-  OUTPUT (`chdirArms`, keyed on a0); the blanket `sysChdirPost` is a
-  CONSEQUENCE (`chdirArms_landed`).  sys_chdir MINTS NO VOCABULARY OF ITS
+  OUTPUT (`chdirArms`, keyed on a0).  sys_chdir MINTS NO VOCABULARY OF ITS
   OWN: every piece it names is the open family's (`SysOpenDefs`).
-* THE START: the walk premise is `nameiWalkPreEra` at `V.cwi`, the calling
-  process's cwd inum at entry.
+* THE START: the walk premise is `nameiWalkPreEra` at `V.rti` / `V.cwi`, the
+  calling process's root and cwd inums at entry (design/chroot.md section 3).
 * THE ARMS: ret 0 -- the walk landed on a DIRECTORY, observed as such, and
   the block's cwd moved to it, pointer AND inum (the walk's own cursor);
   ret -1 -- (i) nothing fs-visible happened (argstr failed), (ii) the walk
@@ -110,11 +109,11 @@ frame: ra @ `sp0-8`, s0 @ `sp0-16` (the frame pointer, = the entry sp), s1
    a directory's entry map is `Std.ExtTreeMap Fname Nat compare`, `-1` is
    `0xFFFFFFFFFFFFFFFF#64` and `zero_reg` is `0#64`; `MkAnode (ADir e) nl`
    is `⟨.ADir e, nl⟩`.
-7. Names: `K_sys_chdir` → `sysChdirSlots`, `sys_chdir_post` →
-   `sysChdirPost`, `chdir_au_pre` → `chdirAuPre`, `chdir_post_fail` /
-   `_ok` → `chdirPostFail` / `chdirPostOk`, `chdir_arms` → `chdirArms`,
-   `chdir_receipt` → `chdirReceipt`, `chdir_arms_split` /
-   `chdir_arms_landed` → `chdirArms_split` / `chdirArms_landed`,
+7. Names: `K_sys_chdir` → `sysChdirSlots`, `chdir_au_pre` → `chdirAuPre`,
+   `chdir_post_fail` / `_ok` → `chdirPostFail` / `chdirPostOk`,
+   `chdir_arms` → `chdirArms`, `chdir_receipt` → `chdirReceipt`,
+   `chdir_arms_split` → `chdirArms_split`; `sys_chdir_post` and
+   `chdir_arms_landed` are not ported (nothing uses them);
    `wp_sys_chdir_frame` + `wp_sys_chdir_body` → ONE `wp_sys_chdir_eb_body`
    (the frame's `EXTRA`/`ARMS` abstraction has exactly one instance, the
    body, and Lean states that instance; the continuation is named
@@ -138,9 +137,6 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedVariables false
-set_option linter.unusedSectionVars false
-
 def sysChdirAddr : BitVec 64 := KA.«sys_chdir»
 
 /-- sys_chdir's own frame is 160 bytes -- TWENTY slots -- over its deepest
@@ -157,33 +153,22 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
 
-/-- sys_chdir's result, keyed by the returned a0 (Rocq's `sys_chdir_post`):
-the -1 arm gives the block back at the working directory it came in with;
-the 0 arm gives it back with a NEW one, at the pointer AND its inum (`z`,
-the REAL inum of the installed inode -- the one `cwdRefAt` ties the pointer
-to; the arms name it). -/
-def sysChdirPost (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
-    (M : Nat → List (BitVec 8)) (r : BitVec 64) : IProp GF :=
-  iprop((⌜r = 0xFFFFFFFFFFFFFFFF#64⌝ ∗ procPrivFd γ pa pid V M) ∨
-    (∃ (ipv : BitVec 64) (z : Nat), ⌜r = 0#64⌝ ∗
-      procPrivFd γ pa pid { V with cwd := ipv, cwi := z } M))
-
 /-- EVERYTHING THE CALLER HANDS IN, at the commit mask `appE` (Rocq's
 `chdir_au_pre`): open's walk premise at the process's cwd inum, and open's
 plain observation commit. -/
-def chdirAuPre (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat) (P Pmiss : Nat → Nat → IProp GF)
+def chdirAuPre (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat) (P Pmiss : Nat → Nat → IProp GF)
     (Fo : Pfam GF (Aview → Nat → Anode → IProp GF)) : IProp GF :=
-  iprop(nameiWalkPreEra (hlc := hlc) γfs cw P Pmiss ∗ pfAt (aopenCommitAt (hlc := hlc) Γ appE) Fo)
+  iprop(nameiWalkPreEra (hlc := hlc) γfs rt cw P Pmiss ∗ pfAt (aopenCommitAt (hlc := hlc) Γ appE) Fo)
 
 /-- ret -1: THE THREE-WAY FOLD (Rocq's `chdir_post_fail`) -- (i) nothing
 fs-visible happened (argstr failed: the bundle back whole), (ii) the walk
 died (the era refund beside the unfired commit), (iii) the walk landed and
 the node was observed to be something other than a directory. -/
-def chdirPostFail (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat) (P Pmiss : Nat → Nat → IProp GF)
+def chdirPostFail (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat) (P Pmiss : Nat → Nat → IProp GF)
     (Fo : Pfam GF (Aview → Nat → Anode → IProp GF)) : IProp GF :=
-  iprop(chdirAuPre Γ γfs cw P Pmiss Fo ∨
+  iprop(chdirAuPre Γ γfs rt cw P Pmiss Fo ∨
     (∃ pl : List (BitVec 8),
-      (nameiWalkDeadEra (hlc := hlc) γfs P Pmiss pl ∗ pfAt (aopenCommitAt (hlc := hlc) Γ appE) Fo) ∨
+      (nameiWalkDeadEra (hlc := hlc) γfs rt P Pmiss pl ∗ pfAt (aopenCommitAt (hlc := hlc) Γ appE) Fo) ∨
       (∃ (i : Nat) (av : Aview) (a : Anode),
         P (pathElems pl).length i ∗ ⌜arowAt av i a⌝ ∗ Fo.pfRecv av i a ∗
         ⌜∀ (e : Std.ExtTreeMap Fname Nat compare) (nl : Nat), a ≠ ⟨.ADir e, nl⟩⌝)))
@@ -202,9 +187,9 @@ def chdirPostOk (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (P : Nat →
 /-- THE ARMED DISJUNCTION the continuation receives, keyed on a0, at the
 block the syscall returns (Rocq's `chdir_arms`). -/
 def chdirArms (Γ : FsViewNames GF) (γfs : FsNames) (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32)
-    (cw : Nat) (P Pmiss : Nat → Nat → IProp GF) (Fo : Pfam GF (Aview → Nat → Anode → IProp GF))
+    (rt cw : Nat) (P Pmiss : Nat → Nat → IProp GF) (Fo : Pfam GF (Aview → Nat → Anode → IProp GF))
     (V : ProcPriv) (M : Nat → List (BitVec 8)) (r : BitVec 64) : IProp GF :=
-  iprop((⌜r = 0xFFFFFFFFFFFFFFFF#64⌝ ∗ procPrivFd γ pa pid V M ∗ chdirPostFail Γ γfs cw P Pmiss Fo) ∨
+  iprop((⌜r = 0xFFFFFFFFFFFFFFFF#64⌝ ∗ procPrivFd γ pa pid V M ∗ chdirPostFail Γ γfs rt cw P Pmiss Fo) ∨
     (⌜r = 0#64⌝ ∗ chdirPostOk γ pa pid P Fo V M))
 
 /-- THE PROCESS-NAMEABLE HALF OF THE ARMS: chdir's RECEIPT (Rocq's
@@ -213,9 +198,9 @@ which is what makes it statable at the U-mode key, where the only thing the
 process holds about its cwd is `cw'`.  A failed chdir resumes at the
 directory it came in with and hands the bundle back; a successful one
 resumes at the inum the walk reached. -/
-def chdirReceipt (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat) (P Pmiss : Nat → Nat → IProp GF)
+def chdirReceipt (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat) (P Pmiss : Nat → Nat → IProp GF)
     (Fo : Pfam GF (Aview → Nat → Anode → IProp GF)) (r : BitVec 64) (cw' : Nat) : IProp GF :=
-  iprop((⌜r = 0xFFFFFFFFFFFFFFFF#64⌝ ∗ ⌜cw' = cw⌝ ∗ chdirPostFail Γ γfs cw P Pmiss Fo) ∨
+  iprop((⌜r = 0xFFFFFFFFFFFFFFFF#64⌝ ∗ ⌜cw' = cw⌝ ∗ chdirPostFail Γ γfs rt cw P Pmiss Fo) ∨
     (⌜r = 0#64⌝ ∗ ∃ (pl : List (BitVec 8)) (i : Nat) (e : Std.ExtTreeMap Fname Nat compare)
         (nl : Nat) (av : Aview),
       ⌜cw' = i⌝ ∗ P (pathElems pl).length i ∗ ⌜arowAt av i ⟨.ADir e, nl⟩⌝ ∗
@@ -226,14 +211,14 @@ the block the call leaves and the pure disjunction that says which --
 beside the receipt, read at the inum the block now carries.  The premise is
 the contract's own instantiation (`cw := V.cwi`). -/
 theorem chdirArms_split (Γ : FsViewNames GF) (γfs : FsNames) (γ : FileNames) (pa : BitVec 64)
-    (pid : BitVec 32) (cw : Nat) (P Pmiss : Nat → Nat → IProp GF)
+    (pid : BitVec 32) (rt cw : Nat) (P Pmiss : Nat → Nat → IProp GF)
     (Fo : Pfam GF (Aview → Nat → Anode → IProp GF)) (V : ProcPriv) (M : Nat → List (BitVec 8))
     (r : BitVec 64) (hcw : V.cwi = cw) :
-    chdirArms Γ γfs γ pa pid cw P Pmiss Fo V M r ⊢
+    chdirArms Γ γfs γ pa pid rt cw P Pmiss Fo V M r ⊢
       ∃ V' : ProcPriv,
         ⌜(r = 0xFFFFFFFFFFFFFFFF#64 ∧ V' = V) ∨
           (r = 0#64 ∧ ∃ (ipv : BitVec 64) (i : Nat), V' = { V with cwd := ipv, cwi := i })⌝ ∗
-        procPrivFd γ pa pid V' M ∗ chdirReceipt Γ γfs cw P Pmiss Fo r V'.cwi := by
+        procPrivFd γ pa pid V' M ∗ chdirReceipt Γ γfs rt cw P Pmiss Fo r V'.cwi := by
   unfold chdirArms chdirPostOk chdirReceipt
   iintro (⟨%hr, Hpriv, Hfail⟩ | ⟨%hr, ⟨%ipv, %pl, %i, %e, %nl, %av, HP, %harow, HFo, Hpriv⟩⟩)
   · iexists V
@@ -257,23 +242,6 @@ theorem chdirArms_split (Γ : FsViewNames GF) (γfs : FsNames) (γ : FileNames) 
         isplitr
         · ipureintro; rfl
         · ipureintro; exact harow
-
-/-- THE RETURN BLANKET, READ OFF THE ARMS (Rocq's `chdir_arms_landed`): a
-consequence, not a second conjunct. -/
-theorem chdirArms_landed (Γ : FsViewNames GF) (γfs : FsNames) (γ : FileNames) (pa : BitVec 64)
-    (pid : BitVec 32) (cw : Nat) (P Pmiss : Nat → Nat → IProp GF)
-    (Fo : Pfam GF (Aview → Nat → Anode → IProp GF)) (V : ProcPriv) (M : Nat → List (BitVec 8))
-    (r : BitVec 64) :
-    chdirArms Γ γfs γ pa pid cw P Pmiss Fo V M r ⊢ sysChdirPost γ pa pid V M r := by
-  unfold chdirArms chdirPostOk sysChdirPost
-  iintro (⟨%hr, Hpriv, -⟩ | ⟨%hr, ⟨%ipv, %pl, %i, %e, %nl, %av, -, -, -, Hpriv⟩⟩)
-  · ileft
-    iframe Hpriv
-    ipureintro; exact hr
-  · iright
-    iexists ipv, i
-    iframe Hpriv
-    ipureintro; exact hr
 
 end Arms
 
@@ -304,8 +272,8 @@ def sysChdirK (k : KCtx) (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V 
     bslots 3 -∗
     -- the allowance, whole: the header's reference ledger
     irefSlots 2 -∗
-    -- the armed post (implies `sysChdirPost`, through `chdirArms_landed`)
-    chdirArms (hlc := hlc) (fsGammaL fscFs) fscFs γ pa pid V.cwi P Pmiss Fo
+    -- the armed post
+    chdirArms (hlc := hlc) (fsGammaL fscFs) fscFs γ pa pid V.rti V.cwi P Pmiss Fo
       { V.updEv k' with upt := P' } (viewFaulted V.upt P' M) (R' 10#5) -∗
     wpLoop cpu')
 
@@ -335,7 +303,7 @@ def wp_sys_chdir_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
   irefSlots 2 ∗
   procPrivFd γ (procAddr j) pid V M ∗
   -- THE CALLER'S BUNDLE (the one addition to the premise list)
-  chdirAuPre (hlc := hlc) (fsGammaL fscFs) fscFs V.cwi P Pmiss Fo ∗
+  chdirAuPre (hlc := hlc) (fsGammaL fscFs) fscFs V.rti V.cwi P Pmiss Fo ∗
   -- THE CROSSING IS THE LITERAL `true`: sys_chdir parks in five callees
   wpNext true k.proc cpu (sysChdirK k γ (procAddr j) pid V M P Pmiss Fo)
   ⊢ wpLoop (GF := GF) cpu

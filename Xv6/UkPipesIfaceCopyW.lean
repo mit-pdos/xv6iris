@@ -31,8 +31,6 @@ open Iris.Std.PartialMap
 open Std (ExtTreeSet)
 open UexecSG
 
-set_option linter.unusedSectionVars false
-
 section CopyW
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [FsTopG GF] [OffboxG GF] [Appcfg GF] [FsBytesG GF] [Fscfg] [Icfg] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
@@ -281,7 +279,7 @@ theorem pns_write_copy_h (CK : PnsCtxOk C) (fdm : Fdmap) (fd : Int) (d : Nat) (F
       iframe Hr H0
       isplitr
       · ipureintro; exact ⟨hw2c, hcL⟩
-      simp only [pnsSink]
+      simp only []
       iframe Hw Hlb'
   isplit
   · iintro Hstd ⟨%c', Hw⟩ #Hsh
@@ -344,7 +342,7 @@ theorem pns_write_copy_end_h (CK : PnsCtxOk C) (fdm : Fdmap) (fd : Int) (d : Nat
       iframe Heof Hr H0
       isplitr
       · ipureintro; exact ⟨hw2c, hcL⟩
-      simp only [pnsSink]
+      simp only []
       iframe Hw Hlb'
   isplit
   · iintro Hstd ⟨%c', Hw⟩ #Hsh

@@ -6,6 +6,7 @@ epilogue (`IputParts.iput_epi`).  A stage file of iput's proof.
 -/
 import Xv6.IputOfflockParts
 import Xv6.IputParts
+import Xv6.IupdateSteps
 
 namespace Xv6
 
@@ -14,9 +15,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
@@ -187,7 +186,7 @@ theorem iput_ofl_tail (LW : LOG_WRITE) (BL : BRELSE)
   ihave #Henv' := Henv
   unfold iputEnv
   icases Henv' with ⟨-, -, #Hbc, #Hlc, -⟩
-  k_step_c (wp_s_jal c _ (KA.«iput» + 0xba#64) false 2524#21 1#5 (by decide))
+  k_step_c (wp_s_jal c _ (KA.«iput» + 0xba#64) false 2620#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [iput_br_log_write]
   iintro Hk Hpc
   obtain ⟨hbnoN, -⟩ := Xv6.iu_bno inum hgeom hcov

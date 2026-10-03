@@ -41,6 +41,7 @@ step rule.
 -/
 import Xv6.SysOpenShared
 import MachCSL.WpSmodeLh
+import Xv6.SysMknodFrame
 
 namespace Xv6
 
@@ -49,9 +50,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## The two compares -/
 

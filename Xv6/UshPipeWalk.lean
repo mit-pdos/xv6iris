@@ -20,7 +20,6 @@ import Xv6.SpecShParseexec
 import Xv6.SpecShPeek
 import Xv6.UshATree
 import Xv6.UshLits
-import Xv6.UshRedirsWalk
 import Xv6.UshCodePipe
 
 namespace Xv6
@@ -29,7 +28,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
 
 /-- parsepipe's spill list. -/

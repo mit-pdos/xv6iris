@@ -18,6 +18,7 @@ diagnostic arms take the plain ledger (`UkSeccDefs` deviation 4).
 import Xv6.SpecSeccMain
 import Xv6.SeccMainArms
 import Xv6.UkProgAbi
+import Xv6.UkFork
 
 namespace Xv6
 
@@ -25,7 +26,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 

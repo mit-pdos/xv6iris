@@ -14,7 +14,7 @@ nothing else.  None of them touches a contract.
   survive it because neither mentions major, minor or nlink.
 * §2  THE TWO NAME LITERALS.  dirlink wants FOURTEEN bytes of name buffer;
   the `"."` / `".."` arguments the auipc/addi pairs at +0xfc / +0x110
-  compute are `KStr.«.»` = 0x800075e8 and `KStr.«..»` = 0x800075f0, whose
+  compute are `KStr.«.»` = 0x800075e8 and `KStr.«..»` = 0x800074d8, whose
   fourteen-byte windows run into their neighbours (`"."`'s holds the `".."`
   eight bytes on, `".."`'s the head of `"unlink"`).  `bname` cuts at the
   first NUL, so both name the right string, and both are PERSISTENT, out of
@@ -26,7 +26,7 @@ nothing else.  None of them touches a contract.
 * §4  THE K SPLIT: every callee runs at `avail - 10`.
 * §5  The `dp->nlink++` wrap refutation (the reason (L4) exists).
 
-**Offsets.**  This image's (`KA.«create»` = 0x80004cf0, 356 bytes); they
+**Offsets.**  This image's (`KA.«create»` = 0x80004d64, 356 bytes); they
 agree with Rocq's post-117c0e7 `CodeCreate.v` (the jal immediates, e.g.
 2090038 / 2090398 at +0xa8 / +0xb0, are Rocq's).  Rocq's header prose
 quotes pre-gate offsets in places; the code is the reference.
@@ -38,10 +38,10 @@ quotes pre-gate offsets in places; the code is the reference.
    leaves' `signExtend` / `extractLsb'` / `setWidth` / shifts.  Rocq's
    `cr_sext_two`, `cr_inner`, `cr_inner_unsigned`, `cr_trange_bv`,
    `cr_trange_unsigned`, `cr_range_Z` (the Sail cast layer and the `Z`
-   arithmetic under it) collapse into ONE `bv_decide` identity,
-   `createTrange_eq`.  The type literals are read as `toNat` against
-   `FsImg.T_FILE` / `T_DEVICE` (`Nat`; `FsAbsCreateFire.T_FILE_w_value`
-   bridges to the sixteen-bit literals).
+   arithmetic under it) are not ported (nothing uses the range test's
+   reading).  The type literals are read as `toNat` against
+   `FsImg.T_FILE` / `T_DEVICE` (`Nat`; the sixteen-bit literals' `toNat` is
+   that `Nat` by `rfl`).
 2. THE FRAME (Rocq's `cr_push`, `cr_pop`, `cr_fp`, `cr_name_addr`,
    `cr_frm1..8`, stack-address equations over `pa_stk`) is NOT ported here:
    in Lean the frame is a prologue/epilogue lemma pair over a `frameN` bundle
@@ -63,9 +63,9 @@ quotes pre-gate offsets in places; the code is the reference.
   `cr_setf_compose`, `cr_setf_clear`, `cr_made_clear`, `cr_setf_wf`,
   `cr_dot_window` (KT0), `cr_sext_two`, `cr_range_Z`, `cr_inner_unsigned`,
   `cr_trange_bv`, `cr_trange_unsigned` -- no user outside this file (the
-  last six are internal steps of `cr_trange_in`, replaced by deviation 1) --
-  reason: dead.  `cr_trange_out` is kept (`create_trange_out`): it is
-  `cr_trange_in`'s converse and F-BAD's branch decision.
+  last six are internal steps of `cr_trange_in`, deviation 1) -- reason:
+  dead.  `cr_trange_in` and its converse `cr_trange_out` are not ported
+  (nothing uses them).
 * `cr_K_value` is `CreateDefs.createSlots_val`.
 -/
 import Xv6.CreateDefs
@@ -84,15 +84,15 @@ set_option linter.unusedSimpArgs false
 
 /-! ## §0  Call targets and return addresses -/
 
-theorem create_br_nameiparent : KA.«create» + 0xffffffffffffeef4#64 = KA.«nameiparent» := by
+theorem create_br_nameiparent : KA.«create» + 0xffffffffffffeedc#64 = KA.«nameiparent» := by
   decide
-theorem create_br_ilock : KA.«create» + 0xffffffffffffe64e#64 = KA.«ilock» := by decide
-theorem create_br_dirlookup : KA.«create» + 0xffffffffffffec36#64 = KA.«dirlookup» := by decide
-theorem create_br_iunlockput : KA.«create» + 0xffffffffffffe8a2#64 = KA.«iunlockput» := by
+theorem create_br_ilock : KA.«create» + 0xffffffffffffe5ee#64 = KA.«ilock» := by decide
+theorem create_br_dirlookup : KA.«create» + 0xffffffffffffebd6#64 = KA.«dirlookup» := by decide
+theorem create_br_iunlockput : KA.«create» + 0xffffffffffffe842#64 = KA.«iunlockput» := by
   decide
-theorem create_br_ialloc : KA.«create» + 0xffffffffffffe4de#64 = KA.«ialloc» := by decide
-theorem create_br_iupdate : KA.«create» + 0xffffffffffffe59a#64 = KA.«iupdate» := by decide
-theorem create_br_dirlink : KA.«create» + 0xffffffffffffee30#64 = KA.«dirlink» := by decide
+theorem create_br_ialloc : KA.«create» + 0xffffffffffffe47e#64 = KA.«ialloc» := by decide
+theorem create_br_iupdate : KA.«create» + 0xffffffffffffe53a#64 = KA.«iupdate» := by decide
+theorem create_br_dirlink : KA.«create» + 0xffffffffffffee18#64 = KA.«dirlink» := by decide
 
 theorem create_ret_20 : jumpPc (KA.«create» + 0x20#64) = KA.«create» + 0x20#64 := by decide
 theorem create_ret_2a : jumpPc (KA.«create» + 0x2a#64) = KA.«create» + 0x2a#64 := by decide
@@ -156,29 +156,23 @@ theorem createSetf_dirOk (nib : Nat) (dn : Dinode) (data : Nat → List (BitVec 
 theorem createSetf_type_nz (dn : Dinode) (mj mn nl : BitVec 16) (h : dn.diType.toNat ≠ 0) :
     (createSetf dn mj mn nl).diType.toNat ≠ 0 := h
 
-/-- Rocq's `cr_made_setf`: `createSetf` over ialloc's claim IS
-`FsAbsCreateFire.createMade` -- the identity that ties the allocate arm to
-the walk. -/
-theorem create_made_setf (ty mj mn : BitVec 16) :
-    createSetf (iallocFresh ty) mj mn 1#16 = createMade ty mj mn := rfl
-
 /-! ## §2  The two name literals -/
 
 /-- `auipc a1,0x3` + `addi a1,a1,-1982` at `+0xfc`: `"."`. -/
-theorem create_dot_addr : KA.«create» + 0x28f8#64 = KStr.«.» := by decide
+theorem create_dot_addr : KA.«create» + 0x2884#64 = KStr.«.» := by decide
 
 /-- `auipc a1,0x3` + `addi a1,a1,-1994` at `+0x110`: `".."`. -/
-theorem create_dotdot_addr : KA.«create» + 0x2900#64 = KStr.«..» := by decide
+theorem create_dotdot_addr : KA.«create» + 0x2774#64 = KStr.«..» := by decide
 
 /-- The fourteen bytes `"."`'s window actually holds (0x800075e8): `"."`,
-then the `".."` eight bytes on.  OWNERSHIP is of all fourteen, so the
+then the head of `"unlink"` eight bytes on.  OWNERSHIP is of all fourteen, so the
 function must be honest. -/
 def createDotList : List (BitVec 8) :=
-  [0x2e#8, 0#8, 0#8, 0#8, 0#8, 0#8, 0#8, 0#8, 0x2e#8, 0x2e#8, 0#8, 0#8, 0#8, 0#8]
+  [0x2e#8, 0#8, 0#8, 0#8, 0#8, 0#8, 0#8, 0#8, 0x75#8, 0x6e#8, 0x6c#8, 0x69#8, 0x6e#8, 0x6b#8]
 
-/-- ...and `".."`'s (0x800075f0): `".."`, then the head of `"unlink"`. -/
+/-- ...and `".."`'s (0x800074d8, in fs.c's strings): `".."`, then the head of `"dirlookup read"`. -/
 def createDotdotList : List (BitVec 8) :=
-  [0x2e#8, 0x2e#8, 0#8, 0#8, 0#8, 0#8, 0#8, 0#8, 0x75#8, 0x6e#8, 0x6c#8, 0x69#8, 0x6e#8, 0x6b#8]
+  [0x2e#8, 0x2e#8, 0#8, 0#8, 0#8, 0#8, 0#8, 0#8, 0x64#8, 0x69#8, 0x72#8, 0x6c#8, 0x6f#8, 0x6f#8]
 
 def createDotF (j : Nat) : BitVec 8 := createDotList.getD j 0#8
 def createDotdotF (j : Nat) : BitVec 8 := createDotdotList.getD j 0#8
@@ -227,8 +221,8 @@ end Windows
 
 The FIRST is namex's shape at a different literal: the argument reached
 create SIGN-extended, and `signExtend 64` is injective on sixteen bits.  The
-SECOND is a zero-extended RANGE test: `createTrange` NAMES the word the three
-ALU leaves leave in a5, at their own output shapes. -/
+SECOND is a zero-extended RANGE test on the word the three ALU leaves leave
+in a5. -/
 
 /-- +0x5c: the `bne` decides the requested type against `T_FILE` exactly
 (Rocq's `cr_tfile_ne` / `cr_tfile_eq`). -/
@@ -241,45 +235,6 @@ theorem create_bne_tfile (t : BitVec 16) :
   · have hn : t.toNat ≠ 2 := fun he => h (BitVec.eq_of_toNat_eq (by simpa using he))
     simp only [hn, ne_eq, not_false_eq_true, decide_true, bne_iff_ne]
     intro he; apply h; bv_decide
-
-/-- THE WORD THE THREE ALU LEAVES LEAVE IN a5 (Rocq's `cr_trange`): `lhu`
-gives `setWidth 64 t`, `addiw -2` sign-extends the low word of the sum, and
-the `slli 48; srli 48` pair keeps the low sixteen bits. -/
-def createTrange (t : BitVec 16) : BitVec 64 :=
-  (BitVec.signExtend 64 (BitVec.extractLsb' 0 32 (BitVec.setWidth 64 t + BitVec.signExtend 64 4094#12))
-      <<< 48) >>> 48
-
-/-- The whole Sail cast layer of Rocq's four-step chain, as one identity:
-the word is `(t - 2) mod 2^16`, zero-extended. -/
-theorem createTrange_eq (t : BitVec 16) : createTrange t = BitVec.setWidth 64 (t - 2#16) := by
-  unfold createTrange; bv_decide
-
-/-- The `bltu 1,a5` at +0x6c, decided: it is TAKEN exactly off
-`{T_FILE, T_DEVICE}`. -/
-theorem create_bltu_trange (t : BitVec 16) :
-    bcond bop.BLTU 1#64 (createTrange t) = !(t == 2#16 || t == 3#16) := by
-  rw [createTrange_eq]; simp only [bcond]; bv_decide
-
-/-- +0x6c FALL-THROUGH: ARM F-OK, and this is the clause the contract wants
-(Rocq's `cr_trange_in`). -/
-theorem create_trange_in (t : BitVec 16) (h : bcond bop.BLTU 1#64 (createTrange t) = false) :
-    t.toNat = T_FILE ∨ t.toNat = T_DEVICE := by
-  rw [create_bltu_trange] at h
-  unfold T_FILE T_DEVICE
-  simp only [Bool.not_eq_false', Bool.or_eq_true, beq_iff_eq] at h
-  rcases h with h | h <;> subst h
-  · exact Or.inl rfl
-  · exact Or.inr rfl
-
-/-- +0x6c TAKEN: the found inode is neither a file nor a device, ARM F-BAD
-(Rocq's `cr_trange_out`). -/
-theorem create_trange_out (t : BitVec 16) (h2 : t.toNat ≠ T_FILE) (h3 : t.toNat ≠ T_DEVICE) :
-    bcond bop.BLTU 1#64 (createTrange t) = true := by
-  rw [create_bltu_trange]
-  unfold T_FILE T_DEVICE at *
-  have h2' : t ≠ 2#16 := fun he => h2 (by subst he; rfl)
-  have h3' : t ≠ 3#16 := fun he => h3 (by subst he; rfl)
-  simp [h2', h3']
 
 /-! ## §4  The K split (Rocq's `cr_kb`) -/
 

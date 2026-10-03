@@ -64,20 +64,19 @@ conclusion names `LogInv.log_tx`, which lives above this leaf.
    argument, no induction.
 5. Rocq's curried `A -∗ B -∗ C` refutations are stated `A ∗ B ⊢ C`, the
    port's idiom (`Xv6/IcacheRefDefs.lean` deviation 12).
-6. `txPin_elem` is an EQUATION (`rfl`) where Rocq states `⊣⊢` (proved by
-   `done`); strictly stronger, and it is what a caller rewriting with it
-   wants.
+6. Rocq's `tx_pin_elem` (a `⊣⊢`, proved by `done`) is `rfl` here, so not
+   stated: `txPin` unfolds to the raw element.
 7. `logTx_halve` / `logTx_join` are Rocq `LogInv.log_tx_halve` /
    `log_tx_join` (LogInv.v:836/844), hosted HERE (wave 1, W1-TX) because
    `Xv6.logTx` is a `LogDefs` definition this leaf already sees; their
-   halves are spelled `txPin γ t ½` (= Rocq's raw element, `txPin_elem`).
+   halves are spelled `txPin γ t ½` (= Rocq's raw element, by `rfl`).
 
 ## Dropped/simplified vs Rocq
 
 * `tx_pin_split`, `tx_pin_join_q` -- uses checked: none (`grep -w` over
   every `iris/*.v`, including `Ltac` bodies) -- dead; a
   caller that needs the split uses iris-lean's `ghost_map_elem_fractional`
-  on `txPin_elem`'s right side, which is what Rocq's one consumer of the
+  on the raw element `txPin` unfolds to, which is what Rocq's one consumer of the
   raw element (`ProofIunlockput`, through `tx_pin_elem`) does.
 -/
 import Xv6.LogDefs
@@ -171,12 +170,6 @@ theorem txPins_noOps {K : Type _} {H : Type _ → Type _} [LawfulFiniteMap H K]
     iapply txPin_noOps $$ [Ha Hp]
     iframe
 
-/-- The bridge a consumer wants when it must hand the RAW element to a
-`LogInv` lemma (or take one from it) without unfolding this file's
-definition by hand. -/
-theorem txPin_elem (γ : LogNames) (t : Nat) (q : Qp) :
-    txPin (GF := GF) γ t q = (γ.tx ↪◯MAP[t]{.own q} ()) := rfl
-
 /-! ## THE TOKEN, HALVED ACROSS A HELD WRITE LOCK
 
 Rocq `LogInv.log_tx_halve` / `log_tx_join` (LogInv.v:836/844).  A
@@ -188,7 +181,7 @@ existentially-keyed share can never be rejoined; it goes back in at the
 join, so nothing above these two lines ever sees an id.
 
 Stated over `txPin` (Rocq states the raw `t ↪[ln_tx γ]{#(1/2)} ()`; the two
-are the same term, `txPin_elem`).  They live here rather than in
+are the same term).  They live here rather than in
 `Xv6/LogInv.lean` because `Xv6.logTx` is a `Xv6/LogDefs.lean` definition,
 which this leaf already imports. -/
 

@@ -9,13 +9,13 @@ namespace Xv6
 
 open Xv6.User
 
-/-! ### seccomp, inum 23, 36144 bytes -/
+/-! ### seccomp, inum 23, 36192 bytes -/
 
 /-- Rocq `fsimg_seccomp_type`. -/
 theorem fsimgSeccompType : (fsDinode fsimgP fsimgSb 23).diType.toNat = T_FILE := by
   rw [fsimgP_eq]; decide +kernel
 
-theorem fsimgSeccompSize : (fsDinode fsimgP fsimgSb 23).diSize.toNat = 36144 := by
+theorem fsimgSeccompSize : (fsDinode fsimgP fsimgSb 23).diSize.toNat = 36192 := by
   rw [fsimgP_eq]; decide +kernel
 
 theorem fsimgSeccompNlink : (fsDinode fsimgP fsimgSb 23).diNlink.toNat = 1 := by

@@ -25,12 +25,9 @@ over a base context `kb`: the caller's own on the no-op path, and
 `sleepExitK` (the resuming hart's `SPIE`/`SPP` and kernel root) on the park
 path.
 -/
-import MachCSL.WpSmodeFrame
 import Xv6.SpecSleep
 import Xv6.SpecSched
 import Xv6.SpecMyproc
-import Xv6.SpecAcquire
-import Xv6.SpecRelease
 import Xv6.CodeTactics
 import Xv6.KilledDefs
 
@@ -40,8 +37,6 @@ open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
-
-set_option linter.unusedSectionVars false
 
 /-! ## Pure facts -/
 
@@ -129,29 +124,6 @@ end
 
 theorem sleep_br_ffffffffffffecd0 : KA.«sleep» + 0xffffffffffffecd0#64 = KA.«release» := by decide
 
-/-- The locked context sleep runs its critical section in: its own
-acquire's exit from the entry context `k` (depth 0), four slots pushed. -/
-theorem sl_ctx_locked (k : KCtx) (a0 b0 a b : Bool) (R2 R3 : RegMap) (h4 : 4 ≤ k.avail) (hl : k.locks = []) :
-    (((((k.withSpie a0 b0).pushed 4).withRegs R2).pushOffAt a b).withRegs R3).withLocks
-        ("proc" :: (((k.withSpie a0 b0).pushed 4).withRegs R2).locks) =
-      (((k.pushOffAt a b).pushed 4).withRegs R3).withLocks ["proc"] := by
-  obtain ⟨regs, sie, spie, spp, avail, noff, intena, locks, tier, root, proc⟩ := k
-  simp only at h4 hl
-  subst hl
-  simp only [KCtx.withSpie, KCtx.pushed, KCtx.withRegs, KCtx.pushOffAt, KCtx.withLocks, KCtx.mk.injEq,
-    _root_.true_and, _root_.and_true]
-  omega
-
-/-- What sched resumes is the locked context at the resuming hart's bits. -/
-theorem sl_ctx_resumed (k : KCtx) (j : Nat) (a b : Bool) (R9 : RegMap) (hnoff : k.noff = 0)
-    (hl : k.locks = []) (htier : k.tier = KTier.kpt) (hproc : k.proc = procAddr j) (h4 : 4 ≤ k.avail) :
-    resumedK R9 a b (trapRes k.sie + k.avail - 4) k.intena k.root (procAddr j) =
-      (((k.pushOffAt a b).pushed 4).withRegs R9).withLocks ["proc"] := by
-  obtain ⟨regs, sie, spie, spp, avail, noff, intena, locks, tier, root, proc⟩ := k
-  simp only at hnoff htier hproc h4 hl
-  subst hnoff htier hproc hl
-  simp only [resumedK, KCtx.pushed, KCtx.withRegs, KCtx.pushOffAt, KCtx.withLocks]
-
 /-- The exit of the balanced pair. -/
 theorem sl_ctx_exit (k : KCtx) (a b : Bool) (hwf : k.wf) (hnoff : k.noff = 0) (hl : k.locks = []) :
     ((k.pushOffAt a b).popExit k.sie).withLocks ([] : List String) = k.withSpie a b := by
@@ -162,7 +134,7 @@ set_option maxHeartbeats 4000000 in
 /-- From `0x80002030` on hart `cpu`, holding `p->lock` with the slot's
 contents out at RUNNING, inside the balanced pair's critical section
 (`k.pushOffAt a b`, `k` the entry context at either `SIE`): re-form the
-claim, split it against the complement (`armExt_popArm`), release, return. -/
+claim, split it against the complement, release, return. -/
 theorem sleep_tail (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [X : CurCtx] (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (a b : Bool) (j : Nat) (hj : j < NPROC)
@@ -282,7 +254,7 @@ theorem sleep_br_fffffffffffffedc : KA.«sleep» + 0xfffffffffffffedc#64 = KA.«
 
 theorem sleep_br_ffffffffffffec48 : KA.«sleep» + 0xffffffffffffec48#64 = KA.«acquire» := by decide
 
-theorem sleep_br_fffffffffffff978 : KA.«sleep» + 0xfffffffffffff978#64 = KA.«myproc» := by decide
+theorem sleep_br_fffffffffffff96c : KA.«sleep» + 0xfffffffffffff96c#64 = KA.«myproc» := by decide
 
 set_option maxHeartbeats 4000000 in
 /-- **`sleep` meets its specification**, at either entry `SIE`: the
@@ -321,8 +293,8 @@ theorem sleep_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (SC : SCHED) : S
   k_next_e
   iintro Hk Hpc Hframe
   -- jal myproc
-  k_step_e (wp_s_jal cpu _ (KA.«sleep» + 0xa#64) false 2095470#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sleep_br_fffffffffffff978]
+  k_step_e (wp_s_jal cpu _ (KA.«sleep» + 0xa#64) false 2095458#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sleep_br_fffffffffffff96c]
   iintro Hk Hpc
   have hmp := MP.wp_myproc (hlc := hlc) (GF := GF)
   unfold wp_myproc_body at hmp

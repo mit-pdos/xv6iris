@@ -82,9 +82,11 @@ theorem fsimgInoOk_22 : fsimgInoOk 22 = true := by
   fsimg_decide [fsimgInoOk, fsInodeWf, fsIndEnts, fsDinode, fsDinodeBytes]
 theorem fsimgInoOk_23 : fsimgInoOk 23 = true := by
   fsimg_decide [fsimgInoOk, fsInodeWf, fsIndEnts, fsDinode, fsDinodeBytes]
+theorem fsimgInoOk_24 : fsimgInoOk 24 = true := by
+  fsimg_decide [fsimgInoOk, fsInodeWf, fsIndEnts, fsDinode, fsDinodeBytes]
 
 /-- The free inums past the last live one. -/
-theorem fsimgInoOk_free : (List.range' 24 176).all fsimgInoOk = true := by
+theorem fsimgInoOk_free : (List.range' 25 175).all fsimgInoOk = true := by
   unfold fsimgInoOk
   fsimg_decide [fsInodeWf, fsIndEnts, fsDinode, fsDinodeBytes]
 
@@ -149,12 +151,5 @@ theorem fsimgLinksEqB : fsLinksEq fsImgBlock fsimgSb = true := by
   unfold fsLinksEq fsAllTickets fsDirTicketsAt fsDirTickets fsRecTicket
   fsimg_decide [fsDataOf, fsIndEnts, fsDinode, fsDinodeBytes, dirLiveb, dirFreeb, dirInum,
     fileByte]
-
-/-- The live records are exactly `1 .. 23` (Rocq `fsimg_live_set`'s sweep). -/
-theorem fsimgLiveSweepB :
-    (List.range 200).all (fun z =>
-      (!decide ((fsDinode fsImgBlock fsimgSb z).diType.toNat = 0)) ==
-        decide (1 ≤ z ∧ z ≤ 23)) = true := by
-  fsimg_decide [fsDinode, fsDinodeBytes]
 
 end Xv6

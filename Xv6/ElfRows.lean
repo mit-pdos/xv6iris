@@ -138,12 +138,8 @@ def elfRodataEndR (rd : ElfRd) : Option Nat := do
 
 theorem elfLoads_eqR (f : ElfBytes) : elfLoads f = elfLoadsR (elfRead f) := rfl
 theorem elfWf_eqR (f : ElfBytes) : elfWf f = elfWfR (elfRead f) f.length := rfl
-theorem elfSectionsWf_eqR (f : ElfBytes) : elfSectionsWf f = elfSectionsWfR (elfRead f) f.length := rfl
 theorem elfEntry_eqR (f : ElfBytes) : elfEntry f = elfEntryR (elfRead f) := rfl
-theorem elfMemBase_eqR (f : ElfBytes) : elfMemBase f = elfMemBaseR (elfRead f) := rfl
 theorem elfMemEnd_eqR (f : ElfBytes) : elfMemEnd f = elfMemEndR (elfRead f) := rfl
-theorem elfSegments_eqR (f : ElfBytes) : elfSegments f = elfSegmentsR (elfRead f) := rfl
-theorem elfRodataEnd_eqR (f : ElfBytes) : elfRodataEnd f = elfRodataEndR (elfRead f) := rfl
 
 /-! ## A row-held file, read through its row tree -/
 

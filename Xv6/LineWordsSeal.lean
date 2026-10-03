@@ -7,7 +7,7 @@ Pure.
 
 Added (Rocq → Lean, the landed file's camelCase convention):
 `wl_app_inv_head` → `wlApp_inv_head`, `wl_prefix_app_cancel` →
-`wlPrefix_app_cancel`, `wl_reshape` → `wlReshape`, `wl_cut_done_of` →
+`wlPrefix_app_cancel`, `wl_cut_done_of` →
 `wlCut_doneOf`, `bodies_of_done` → `bodiesOf_done`, `nlines_done`,
 `done_of_nil` → `doneOf_nil`, `done_of_prefix` → `doneOf_prefix`,
 `done_of_rest_nil` → `doneOf_rest_nil`, `wl_cut_prefix_of` →
@@ -29,11 +29,6 @@ theorem wlPrefix_app_cancel {A : Type} (u v w : List A) (h : u ++ v <+: u ++ w) 
   obtain ⟨k, hk⟩ := h
   refine ⟨k, wlApp_inv_head u _ _ ?_⟩
   rw [← hk, List.append_assoc]
-
-/-- Rocq `wl_reshape`: the one reassociation the prefix witnesses need. -/
-theorem wlReshape {A : Type} (u v m x d : List A) (n : A) :
-    (u ++ ((v ++ m) ++ n :: x)) ++ d = (u ++ v) ++ (m ++ n :: (x ++ d)) := by
-  simp [List.append_assoc]
 
 /-- Rocq `wl_cut_done_of`: the truncation IS complete. -/
 theorem wlCut_doneOf (I : List (BitVec 8)) : wlCut (doneOf I) = (bodiesOf I, []) := by

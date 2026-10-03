@@ -17,10 +17,8 @@ lets the exit context depend on the value read.
 -/
 import MachCSL.WpSmodeAtomic
 import MachCSL.WpSmodeRules
-import MachCSL.CallConv
 import MachCSL.Lock
 import MachCSL.WpLockSchema
-import MachCSL.LockFacts
 
 namespace MachCSL
 
@@ -45,18 +43,6 @@ theorem wp_s_fence_rw_w [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : 
   wpLoop_k_keep0 cpu k pc _ is_rvc _
     (fun cpu' c _ hok hmenv =>
       execSpecF_fence_rw_w cpu' (DFrac.own 1) c k.sie hok.phys hmenv pc _ rs rd (tpPin cpu' k.regs))
-
-/-- `fence rw,rw`. -/
-theorem wp_s_fence_rw_rw [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx)
-    (pc : BitVec 64) (is_rvc : Bool) (rs rd : BitVec 5) :
-    instr (GF := GF) pc is_rvc (instruction.FENCE (0#4, 3#4, 3#4, regidx.Regidx rs, regidx.Regidx rd)) ∗
-    kctxL lent cpu k ∗ pcIs cpu pc ∗
-    ▷ wpNext k.sie k.proc cpu (fun cpu' =>
-        iprop(kctxL lent cpu' k -∗ pcIs cpu' (pc + instrLen is_rvc) -∗ wpLoop cpu'))
-    ⊢ wpLoop cpu :=
-  wpLoop_k_keep0 cpu k pc _ is_rvc _
-    (fun cpu' c _ hok hmenv =>
-      execSpecF_fence_rw_rw cpu' (DFrac.own 1) c k.sie hok.phys hmenv pc _ rs rd (tpPin cpu' k.regs))
 
 /-- `sltiu rd, rs1, imm` (covers `seqz rd, rs1`). -/
 theorem wp_s_sltiu [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx)
@@ -107,25 +93,6 @@ theorem acqPost_ne [CurCtx] (γ : GName) (R : CtxId → IProp GF) (cpu : CPU) (t
 
 section lock
 variable [CurCtx] [KernelGeom] [KernelImage GF]
-
-/-- The two views a lock reader cashes: the lock's floor and, for a holder,
-its acquire position. -/
-theorem lock_reader_view (cpu : CPU) (lo B : Nat) :
-    ownCtx (GF := GF) cpu curCtx ∗ ctxFloor curCtx lo ∗ ctxFloor curCtx B ⊢
-      ownCtx cpu curCtx ∗ ∃ K, viewLb cpu K ∗ ⌜lo ≤ K ∧ B ≤ K⌝ := by
-  iintro ⟨Hctx, #Hlo, #HB⟩
-  icases ownCtx_floor_view cpu curCtx lo $$ [Hctx Hlo] with ⟨Hctx, ⟨%K1, #HK1, %h1⟩⟩
-  · iframe Hctx; iexact Hlo
-  icases ownCtx_floor_view cpu curCtx B $$ [Hctx HB] with ⟨Hctx, ⟨%K2, #HK2, %h2⟩⟩
-  · iframe Hctx; iexact HB
-  iframe Hctx
-  iexists max K1 K2
-  isplit
-  · iapply viewLb_max cpu K1 K2
-    isplit
-    · iexact HK1
-    · iexact HK2
-  · ipureintro; omega
 
 /-- The receipts a lock reader cashes: the lock's floor (a KEY of its
 context -- a view receipt, or its own authorship of the entries there) and,
@@ -1929,24 +1896,10 @@ theorem wp_s_sw_zero_release_hook (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
   iapply HK $$ Hk' Hpc %hmem
 
 
-/-- The ordinary release store: the identity hook. -/
-theorem wp_s_sw_zero_release (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
-    (pc : BitVec 64) (is_rvc : Bool) (imm : BitVec 12) (rs1 : BitVec 5)
-    (γ : GName) (lk : BitVec 64) (s : String) (R : CtxId → IProp GF) [CtxMorph R]
-    (haddr : k.rget cpu rs1 + BitVec.signExtend 64 imm = lk) :
-    instr (GF := GF) pc is_rvc (instruction.STORE (imm, regidx.Regidx 0#5, regidx.Regidx rs1, 4)) ∗
-    kctxL lent cpu k ∗ pcIs cpu pc ∗ isLock γ lk s R ∗ lockedPre γ cpu ∗ lockCtxHeld ∗ R curCtx ∗
-    ▷ wpNext k.sie k.proc cpu (fun cpu' =>
-        iprop(kctxL lent cpu' (k.withLocks (k.locks.filter (fun x => x ≠ s))) -∗
-          pcIs cpu' (pc + instrLen is_rvc) -∗ ⌜s ∈ k.locks⌝ -∗ wpLoop cpu'))
-    ⊢ wpLoop cpu := by
-  iintro ⟨HI, Hk, Hpc, #Hlk, Hlp, Hheld, HR, HΦ⟩
-  iapply (wp_s_sw_zero_release_hook cpu k hsie pc is_rvc imm rs1 γ lk s R R haddr)
-  iframe HI Hk Hpc Hlk Hlp Hheld HR HΦ
-  iapply lockHook_id R
-
 set_option maxHeartbeats 4000000 in
-/-- Cancellable-lock form of `wp_s_sw_zero_release`. -/
+/-- **The release word-clear** (`sw zero, imm(rs1)`, `__sync_lock_release`'s
+store) at a cancellable lock: the free store closes the lock invariant with
+the payload `R`, and the held lock `s` leaves `k.locks`. -/
 theorem wp_s_sw_zero_release_gen (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
     (pc : BitVec 64) (is_rvc : Bool) (imm : BitVec 12) (rs1 : BitVec 5)
     (γ : GName) (lk : BitVec 64) (s : String) (R : CtxId → IProp GF) [CtxMorph R]
@@ -2066,7 +2019,7 @@ theorem wp_s_sw_zero_release_gen (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
 
 set_option maxHeartbeats 4000000 in
 /-- **The DESTROY word-clear** (the cancellable-lock finisher): like
-`wp_s_sw_zero_release`, but at the free store it DESTROYS the lock invariant
+`wp_s_sw_zero_release_gen`, but at the free store it DESTROYS the lock invariant
 instead of closing it.  The destroyer surrenders the payload `R` and a lock
 half to the `destroy` licence, which mints the dead certificate `D` (parked
 in the invariant's dead branch, `iright`) and the output `Out`, and walks off

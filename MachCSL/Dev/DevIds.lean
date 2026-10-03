@@ -66,15 +66,6 @@ def devObsOut (i : UartId) : List DevObs → List (BitVec 8)
   | .uartOut j b :: os => if j = i then b :: devObsOut i os else devObsOut i os
   | .uartIn _ _ :: os => devObsOut i os
 
-theorem devObsOut_append (i : UartId) (os₁ os₂ : List DevObs) :
-    devObsOut i (os₁ ++ os₂) = devObsOut i os₁ ++ devObsOut i os₂ := by
-  induction os₁ with
-  | nil => rfl
-  | cons o os ih =>
-    cases o with
-    | uartOut j b => by_cases h : j = i <;> simp [devObsOut, h, ih]
-    | uartIn j b => simp [devObsOut, ih]
-
 /-- The INPUT bytes of a list of device events on port `i`: what they put into
 that port's receiver (the device-level twin of `MachCSL.obsIns`, Rocq
 `ObsTrace.obs_ins`; relax-d2 lane K1). -/
@@ -82,15 +73,6 @@ def devObsIns (i : UartId) : List DevObs → List (BitVec 8)
   | [] => []
   | .uartIn j b :: os => if j = i then b :: devObsIns i os else devObsIns i os
   | .uartOut _ _ :: os => devObsIns i os
-
-theorem devObsIns_append (i : UartId) (os₁ os₂ : List DevObs) :
-    devObsIns i (os₁ ++ os₂) = devObsIns i os₁ ++ devObsIns i os₂ := by
-  induction os₁ with
-  | nil => rfl
-  | cons o os ih =>
-    cases o with
-    | uartIn j b => by_cases h : j = i <;> simp [devObsIns, h, ih]
-    | uartOut j b => simp [devObsIns, ih]
 
 /-- Events all on port `i` put nothing into any other port's receiver. -/
 theorem devObsIns_other (i j : UartId) (os : List DevObs) (hport : ∀ o ∈ os, o.port = i)

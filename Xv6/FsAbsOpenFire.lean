@@ -12,8 +12,7 @@ wave 7's fileread/filewrite need only its pure readings -- Rocq
 `opf_era_file_typed`, and `FsAbsWriteFire.wrf_write_row_dist` calls
 `opf_era_file_row`).  Sections 1-3 were APPENDED by worktree W-A of wave 7b
 once `SysOpenDefs` section 2c/2d, `FsAbsEra` and `FsAbsMknodFire` sections
-5-6 had landed, together with section 0's last two readings
-(`opfEra_dev_of`/`opfEra_dir_of`, which read `FsAbsMknodFire`).
+5-6 had landed.
 
 Rocq's header, abridged (the reasons are the content):
 
@@ -77,7 +76,7 @@ Rocq's header, abridged (the reasons are the content):
    reuses `FsAbsNparMknod.np_rootino_agree` there; Lean has one `ROOTINO`
    (`Xv6/FsAbsEra.lean` deviation 2), so nothing is reused.
 6. Names: `opf_era_type` → `Xv6.cafEra_type`, `opf_trunc_row` → `opfTrunc_row`,
-   `opf_era_dev_of` → `opfEra_dev_of`, `opf_start_of_open` →
+   `opf_start_of_open` →
    `opfStart_of_open`, `opf_open_fire(_1)` → `opfOpen_fire(_1)`,
    `opf_atrunc_fire` → `opfAtrunc_fire`, and so on (camel head, Rocq's
    snake tail).
@@ -173,22 +172,6 @@ the two unconditional forms a LINKED node's reader wants remain.  A record
 with a nonzero count is LIVE by `FsAbsMknodFire.mkfEra_live` (Rocq's
 `opf_era_live`; deviation 3). -/
 
-/-- Rocq's `opf_era_dev_of`. -/
-theorem opfEra_dev_of (dn : Dinode) (bm : Blkmap) (data : Nat → List (BitVec 8))
-    (hnd : dn.diType.toNat ≠ T_DIR_z) (hnf : dn.diType.toNat ≠ T_FILE)
-    (hnz : dn.diType.toNat ≠ 0) (hnl : dn.diNlink.toNat ≠ 0) :
-    absOf (eraNode dn bm data) =
-      some ⟨.ADev dn.diMajor.toNat dn.diMinor.toNat, fnNlink (eraNode dn bm data)⟩ := by
-  rw [absOf_live _ (Xv6.arfEra_typed dn bm data hnz) (Xv6.eraNlink_nz dn bm data hnl),
-    opfEra_dev_row dn bm data hnd hnf]
-
-/-- Rocq's `opf_era_dir_of`. -/
-theorem opfEra_dir_of (dn : Dinode) (bm : Blkmap) (data : Nat → List (BitVec 8))
-    (hty : dn.diType.toNat = T_DIR_z) (hnl : dn.diNlink.toNat ≠ 0) :
-    absOf (eraNode dn bm data) =
-      some ⟨.ADir (dirEntries (eraNode dn bm data)), fnNlink (eraNode dn bm data)⟩ :=
-  Xv6.absOf_dir _ (mkfEra_is_dir dn bm data hty) (Xv6.eraNlink_nz dn bm data hnl)
-
 section OpenFire
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [FsTopG GF] [FsBytesG GF]
@@ -201,9 +184,9 @@ omit [IcacheG GF] [Xv6G GF] in
 there -- same quantifier over the start, same start rule, same family over
 `pathElems pl` -- so this is a rename.  The namei-side twin of
 `FsAbsMknodFire.npStart_of_mknod`. -/
-theorem opfStart_of_open (γfs : FsNames) (cw : Nat) (P Pmiss : Nat → Nat → IProp GF)
+theorem opfStart_of_open (γfs : FsNames) (rt cw : Nat) (P Pmiss : Nat → Nat → IProp GF)
     (pl : List (BitVec 8)) :
-    nameiWalkPreEra (hlc := hlc) γfs cw P Pmiss ⊢ exStart (hlc := hlc) γfs cw P Pmiss pl := by
+    nameiWalkPreEra (hlc := hlc) γfs rt cw P Pmiss ⊢ exStart (hlc := hlc) γfs rt cw P Pmiss pl := by
   unfold nameiWalkPreEra exStart
   rw [exHops_is_axHops]
   iintro Hpre %r %hr
@@ -263,7 +246,7 @@ theorem opfOpen_fire_1 [Icfg] (γfs : FsNames) (E : CoPset)
 
 /-! ## 3.  Item 3: the trunc fire, fused with the row retag -/
 
-/-- `FsAbsMknodFire.cafAcre_fire`'s mold at `deltaTrunc` (Rocq's
+/-- `FsAbsMknodFire.cafAcre_fire_nm`'s mold at `deltaTrunc` (Rocq's
 `opf_atrunc_fire`).  Replaces the `iregTopRetag_*` sys_open calls after
 `itrunc` returns: same `InodeLocal` premise, same payout, plus the caller's
 two phases inside the one `ftopN` critical section.  The receipt's

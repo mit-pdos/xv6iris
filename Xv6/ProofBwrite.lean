@@ -17,7 +17,6 @@ import Xv6.SpecBwrite
 import Xv6.SpecHoldingsleep
 import Xv6.BcacheLock
 import Xv6.CodeTactics
-import MachCSL.WpSmodeRegOps
 
 namespace Xv6
 
@@ -26,17 +25,15 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## Constants the code computes -/
 
 theorem bw_ret_12 : jumpPc (KA.«bwrite» + 0x12#64) = (KA.«bwrite» + 0x12#64) := by decide
 theorem bw_ret_1c : jumpPc (KA.«bwrite» + 0x1c#64) = (KA.«bwrite» + 0x1c#64) := by decide
 
-theorem bw_br_hold : KA.«bwrite» + 0x13d4#64 = KA.«holdingsleep» := by decide
-theorem bw_br_vdr : KA.«bwrite» + 0x2c88#64 = KA.«virtio_disk_rw» := by decide
+theorem bw_br_hold : KA.«bwrite» + 0x1434#64 = KA.«holdingsleep» := by decide
+theorem bw_br_vdr : KA.«bwrite» + 0x2d64#64 = KA.«virtio_disk_rw» := by decide
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
@@ -156,7 +153,7 @@ theorem bwrite_proof (HS : HOLDINGSLEEP) (VR : VIRTIO_DISK_RW) : BWRITE := ⟨
   k_step_e (wp_s_addi cpu _ (KA.«bwrite» + 0xc#64) true 16#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ha0, aBufLock_sext]
   iintro Hk Hpc
-  k_step_e (wp_s_jal cpu _ (KA.«bwrite» + 0xe#64) false 5062#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«bwrite» + 0xe#64) false 5158#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [bw_br_hold]
   iintro Hk Hpc
   iapply (bw_holdingsleep HS cpu _ γ kk pidv dqp k.proc (by k_norm_g) ?ha ?hn ?hKh ?hsl ?ht)
@@ -188,7 +185,7 @@ theorem bwrite_proof (HS : HOLDINGSLEEP) (VR : VIRTIO_DISK_RW) : BWRITE := ⟨
   k_step_e (wp_s_add cpu _ (KA.«bwrite» + 0x16#64) true 10#5 0#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9]
   iintro Hk Hpc
-  k_step_e (wp_s_jal cpu _ (KA.«bwrite» + 0x18#64) false 11376#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«bwrite» + 0x18#64) false 11596#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [bw_br_vdr]
   iintro Hk Hpc
   iapply (bw_vdr VR Γ cpu _ V γdl pd pav pu j kk bno bs bsd Q k.sie k.proc (by k_norm_g)

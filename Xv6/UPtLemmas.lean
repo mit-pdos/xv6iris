@@ -19,8 +19,6 @@ open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Iris.Std Iris.Std.PartialMap Iris.Std.LawfulPartialMap
 
-set_option linter.unusedSectionVars false
-
 /-! ## The leaf word -/
 
 /-- `PTE2PA` of a user leaf, when `perm` is flag bits only. -/
@@ -35,36 +33,6 @@ theorem ptePpn_uLeaf (ppn : BitVec 44) (perm : BitVec 64) (hp : perm &&& ~~~0x3F
   unfold ptePpn leafOf
   revert hp; bv_decide
 
-/-- With one of `R`/`W`/`X` the leaf is a leaf the walk stops at. -/
-theorem isLeafPte_uLeaf (ppn : BitVec 44) (perm : BitVec 64) (h : perm &&& 0xE#64 ≠ 0#64) :
-    isLeafPte (leafOf ppn perm) := by
-  refine ⟨?_, ?_⟩
-  · show leafOf ppn perm &&& PTE_V ≠ 0#64
-    unfold leafOf PTE_V; bv_decide
-  · have he : leafOf ppn perm &&& 0xE#64 = perm &&& 0xE#64 := by unfold leafOf; bv_decide
-    rw [he]; exact h
-
-/-- With `U` the leaf is a user leaf. -/
-theorem pteVU_uLeaf (ppn : BitVec 44) (perm : BitVec 64) (h : perm &&& PTE_U ≠ 0#64) :
-    pteVU (leafOf ppn perm) := by
-  refine ⟨?_, ?_⟩
-  · show leafOf ppn perm &&& PTE_V ≠ 0#64
-    unfold leafOf PTE_V; bv_decide
-  · have he : leafOf ppn perm &&& PTE_U = perm &&& PTE_U := by unfold leafOf PTE_U; bv_decide
-    rw [he]; exact h
-
-/-- `perm` with its `A` (bit 6) and `D` (bit 7) bits set to `a`/`d`. -/
-def permAD (perm : BitVec 64) (a d : BitVec 1) : BitVec 64 :=
-  (perm &&& ~~~0xC0#64) ||| (BitVec.setWidth 64 a <<< 6) ||| (BitVec.setWidth 64 d <<< 7)
-
-/-- The hardware's `A`/`D` write-back on a user leaf is the leaf at the
-adjusted permission. -/
-theorem uLeaf_setAD (ppn : BitVec 44) (perm : BitVec 64) (a d : BitVec 1) :
-    pteSetAD (leafOf ppn perm) a d = leafOf ppn (permAD perm a d) := by
-  simp only [leafOf, permAD, pteSetAD, Sail.BitVec.extractLsb, Sail.BitVec.updateSubrange,
-    Sail.BitVec.updateSubrange', BitVec.extractLsb, _update_PTE_Flags_A, _update_PTE_Flags_D]
-  bv_decide
-
 /-! ## The `A`/`D` slack -/
 
 /-- `A`/`D` are bits 6 and 7: the page and the low six flag bits survive. -/
@@ -75,37 +43,6 @@ theorem pteAD_pte2pa {c v : BitVec 64} (h : pteAD c v) :
     (simp only [pte2pa, pteFlags, pteSetAD, Sail.BitVec.extractLsb, Sail.BitVec.updateSubrange,
       Sail.BitVec.updateSubrange', BitVec.extractLsb, _update_PTE_Flags_A, _update_PTE_Flags_D]
      bv_decide)
-
-theorem pteAD_isLeafPte {c v : BitVec 64} (h : pteAD c v) (hc : isLeafPte c) : isLeafPte v := by
-  obtain ⟨a, d, rfl⟩ := h
-  obtain ⟨h1, h2⟩ := hc
-  refine ⟨?_, ?_⟩
-  · have : pteSetAD c a d &&& PTE_V = c &&& PTE_V := by
-      simp only [PTE_V, pteSetAD, Sail.BitVec.extractLsb, Sail.BitVec.updateSubrange,
-        Sail.BitVec.updateSubrange', BitVec.extractLsb, _update_PTE_Flags_A, _update_PTE_Flags_D]
-      bv_decide
-    rw [this]; exact h1
-  · have : pteSetAD c a d &&& 0xE#64 = c &&& 0xE#64 := by
-      simp only [pteSetAD, Sail.BitVec.extractLsb, Sail.BitVec.updateSubrange,
-        Sail.BitVec.updateSubrange', BitVec.extractLsb, _update_PTE_Flags_A, _update_PTE_Flags_D]
-      bv_decide
-    rw [this]; exact h2
-
-theorem pteAD_pteVU {c v : BitVec 64} (h : pteAD c v) : pteVU v ↔ pteVU c := by
-  obtain ⟨a, d, rfl⟩ := h
-  have hv : pteSetAD c a d &&& PTE_V = c &&& PTE_V := by
-    simp only [PTE_V, pteSetAD, Sail.BitVec.extractLsb, Sail.BitVec.updateSubrange,
-      Sail.BitVec.updateSubrange', BitVec.extractLsb, _update_PTE_Flags_A, _update_PTE_Flags_D]
-    bv_decide
-  have hu : pteSetAD c a d &&& PTE_U = c &&& PTE_U := by
-    simp only [PTE_U, pteSetAD, Sail.BitVec.extractLsb, Sail.BitVec.updateSubrange,
-      Sail.BitVec.updateSubrange', BitVec.extractLsb, _update_PTE_Flags_A, _update_PTE_Flags_D]
-    bv_decide
-  unfold pteVU; rw [hv, hu]
-
-theorem pteAD_ne_zero {c v : BitVec 64} (h : pteAD c v) (hc : isLeafPte c) : v ≠ 0#64 := by
-  intro hz
-  exact (pteAD_isLeafPte h hc).1 (by rw [hz]; decide)
 
 /-! ## The leaf map of a table -/
 
@@ -150,19 +87,8 @@ theorem leaves_delete_tramp_tf (P : UPtd) (hwf : uptWf P) :
 
 /-! ## `ptRep`: the tree's walks are the leaves -/
 
-theorem ptRep_wfU {t : PTree} {L : RegMapF (BitVec 64)} (h : ptRep t L) : t.wfU 2 := h.1
-theorem ptRep_nodup {t : PTree} {L : RegMapF (BitVec 64)} (h : ptRep t L) : t.pagesNodup 2 := h.2.1
 theorem ptRep_pages_valid {t : PTree} {L : RegMapF (BitVec 64)} (h : ptRep t L) :
     ∀ b ∈ t.pages 2, pageValid (pageAddr b) := h.2.2.1
-
-/-- A mapped key: the walk finds the leaf, up to `A`/`D`. -/
-theorem ptRep_walk_some {t : PTree} {L : RegMapF (BitVec 64)} (h : ptRep t L) (vpn : BitVec 27)
-    (w : BitVec 64) (hk : get? L vpn.toNat = some w) :
-    ∃ addr v : BitVec 64, t.walk 2 vpn = some (addr, v) ∧ pteAD w v := h.2.2.2.1 vpn w hk
-
-/-- An unmapped key: the walk is blocked. -/
-theorem ptRep_walk_none {t : PTree} {L : RegMapF (BitVec 64)} (h : ptRep t L) (vpn : BitVec 27)
-    (hk : get? L vpn.toNat = none) : t.walk 2 vpn = none := h.2.2.2.2 vpn hk
 
 /-- A representation only depends on the map. -/
 theorem ptRep_congr {t : PTree} {L L' : RegMapF (BitVec 64)} (h : ptRep t L)
@@ -200,14 +126,6 @@ theorem delRun_get_not_mem (P : UPtd) (v0 n k : Nat) (h : k < v0 ∨ v0 + n ≤ 
 
 /-! ## `uptWf`, `umBelow`, `mappedIn` -/
 
-/-- Deleting leaves keeps every leaf below the size. -/
-theorem umBelow_delRun (sz : BitVec 64) (P : UPtd) (v0 n : Nat) (h : umBelow sz P) :
-    umBelow sz (P.delRun v0 n) := by
-  intro k w hk
-  by_cases hr : v0 ≤ k ∧ k < v0 + n
-  · rw [delRun_get_mem P v0 n k hr.1 hr.2] at hk; exact absurd hk (by simp)
-  · exact h k w (by rw [← delRun_get_not_mem P v0 n k (by omega)]; exact hk)
-
 /-- A bigger size bounds no fewer leaves. -/
 theorem umBelow_mono (sz sz' : BitVec 64) (P : UPtd) (hle : sz.toNat ≤ sz'.toNat)
     (h : umBelow sz P) : umBelow sz' P := by
@@ -217,16 +135,6 @@ theorem umBelow_mono (sz sz' : BitVec 64) (P : UPtd) (hle : sz.toNat ≤ sz'.toN
     unfold pgRoundUpN
     exact Nat.mul_le_mul_right 4096 (Nat.div_le_div_right (by omega))
   omega
-
-theorem mappedIn_zero (P : UPtd) (v0 : Nat) : P.mappedIn v0 0 = 0 := rfl
-
-theorem mappedIn_succ (P : UPtd) (v0 n : Nat) :
-    P.mappedIn v0 (n + 1) =
-      P.mappedIn v0 n + (if (get? P.um (v0 + n)).isSome then 1 else 0) := by
-  unfold UPtd.mappedIn
-  rw [List.range_succ, List.filter_append]
-  simp only [List.length_append, List.filter_cons, List.filter_nil]
-  by_cases hs : (get? P.um (v0 + n)).isSome <;> simp [hs]
 
 /-! ## The resources: `umPages`, `ptOwnRep`, `procPtAt` -/
 
@@ -292,14 +200,6 @@ theorem umPages_acc [CurCtx] (P : UPtd) (M : Nat → List (BitVec 8)) (k : Nat) 
           intro hc; rw [hc, get?_delete_eq rfl] at hj; exact absurd hj (by simp)
         unfold umPageAt; rw [hM' j hjk])) $$ Hrest
 
-/-- `BigSepM.bigSepM_delete` at `umPages`. -/
-theorem umPages_delete [CurCtx] (P : UPtd) (M : Nat → List (BitVec 8)) (k : Nat) (w : BitVec 64)
-    (hk : get? P.um k = some w) :
-    umPages (GF := GF) P M ⊣⊢
-      (⌜(M k).length = 4096⌝ ∗ byteBuf (pte2pa w) (DFrac.own 1) (M k)) ∗
-      umPages { P with um := delete P.um k } M :=
-  BigSepM.bigSepM_delete (Φ := umPageAt (GF := GF) M) hk
-
 /-- `BigSepM.bigSepM_insert` at `umPages`. -/
 theorem umPages_insert [CurCtx] (P : UPtd) (M : Nat → List (BitVec 8)) (k : Nat) (w : BitVec 64)
     (hk : get? P.um k = none) :
@@ -357,20 +257,6 @@ theorem procPtAt_root_valid [CurCtx] (P : UPtd) (M : Nat → List (BitVec 8)) :
     isplitl [Htree]
     · iapply ptOwnRep_intro P.root P.leaves t hb hr; iexact Htree
     · iexact Hum
-
-/-- **A fresh root is an empty table**: `uvmcreate`'s zeroed page, seen as
-the table with no leaves at all. -/
-theorem ptOwnRep_zeroNode [CurCtx] (b : BitVec 44) (h : pageValid (pageAddr b)) :
-    ptreeOwn (GF := GF) 2 (DFrac.own 1) (PTree.zeroNode b) ⊢ ptOwnRep b ∅ := by
-  refine ptOwnRep_intro b ∅ (PTree.zeroNode b) rfl ⟨MachCSL.PTree.zeroNode_wfU b 2, ?_, ?_, ?_, ?_⟩
-  · unfold PTree.pagesNodup; rw [MachCSL.PTree.zeroNode_pages]; simp
-  · intro b' hb'
-    rw [MachCSL.PTree.zeroNode_pages] at hb'
-    cases hb' with
-    | head => exact h
-    | tail _ hx => cases hx
-  · intro vpn w hk; rw [get?_empty] at hk; exact absurd hk (by simp)
-  · intro vpn _; exact MachCSL.PTree.zeroNode_walk b 2 vpn
 
 end
 

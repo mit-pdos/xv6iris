@@ -9,14 +9,14 @@
     +0x16  ld a5,168(s2)         p->trapframe->a7 (word 21) (ArgLemmas.tfPage_word_acc)
     +0x1a  sext.w a3,a5
     +0x1e  addiw a5,a5,-1
-    +0x20  li a4,22
+    +0x20  li a4,23
     +0x22  bltu a4,a5,+0x54      THE DATA-DEPENDENT SPLIT     (syscall_bltu)
     +0x26  slli a4,a3,3                                      (syscall_idx)
-    +0x2a  auipc a5,0x5 ; addi a5,a5,-532                    (syscall_tbl_addr)
+    +0x2a  auipc a5,0x5 ; addi a5,a5,-532
     +0x32  add a5,a5,a4
     +0x34  ld a4,0(a5)           syscalls[num]               (syscall_tbl_word)
     +0x36  beqz a4,+0x54         dead                         (syscTarget_ne_zero)
-    +0x38  ld a5,360(a0)         p->seccomp                  (procPrivFd_seccRead)
+    +0x38  ld a5,368(a0)         p->seccomp                  (procPrivFd_seccRead)
     +0x3c  srl a5,a5,a3 ; +0x40 andi a5,a5,1                 (syscall_mask_bit)
     +0x42  beqz a5,+0x4c         THE MASK'S SPLIT (xv6 7b2c1b1b): blocked -> +0x4c
     +0x44  jalr a4               into the arm (ra := syscall+0x46)
@@ -59,29 +59,25 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## §1 Addresses and the pure steps -/
 
-
 /-- `jal myproc` at `+0x0c`. -/
-theorem syscall_head_br_myproc : KA.«syscall» + 18446744073709547526#64 = KA.«myproc» := by
+theorem syscall_head_br_myproc : KA.«syscall» + 18446744073709547494#64 = KA.«myproc» := by
   decide
 
 /-- Every table entry is a legal jump target (bit 0 clear). -/
-theorem syscall_head_jump (n : Nat) (h1 : 1 ≤ n) (h22 : n ≤ 23) : jumpPc (syscTarget n) = syscTarget n := by
-  have : ∀ k, k < 23 → jumpPc (syscTarget (k + 1)) = syscTarget (k + 1) := by decide
+theorem syscall_head_jump (n : Nat) (h1 : 1 ≤ n) (h22 : n ≤ 24) : jumpPc (syscTarget n) = syscTarget n := by
+  have : ∀ k, k < 24 → jumpPc (syscTarget (k + 1)) = syscTarget (k + 1) := by decide
   obtain ⟨j, rfl⟩ : ∃ j, n = j + 1 := ⟨n - 1, by omega⟩
   exact this j (by omega)
 
 /-- `myproc`'s return lands at `+0x10`. -/
 theorem syscall_head_ret10 : jumpPc (KA.«syscall» + 0x10#64) = KA.«syscall» + 0x10#64 := by decide
 
-
 /-- The `beqz a4` at `+0x36` falls through: the entry is nonzero. -/
-theorem syscall_head_beqz (n : Nat) (h1 : 1 ≤ n) (h22 : n ≤ 23) :
+theorem syscall_head_beqz (n : Nat) (h1 : 1 ≤ n) (h22 : n ≤ 24) :
     bcond bop.BEQ (syscTarget n) 0#64 = false := by
   have h := syscTarget_ne_zero n h1 h22
   simp [bcond, h]
@@ -118,7 +114,7 @@ def SyscHeadArms (PT : SchedNames → IProp GF) (Γ : SchedNames) [ClaimIs (hlc 
     (hE : SyscSpostEmp (GF := GF))
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : syscallSlots ≤ k.avail)
     (hnoff : k.noff = 0) (htier : k.tier = KTier.kpt) (hgn : gn = V.gen) : Prop :=
-  ∀ (cpu : CPU) (spie spp : Bool) (R : RegMap) (n : Nat) (_hn1 : 1 ≤ n) (_hn22 : n ≤ 23)
+  ∀ (cpu : CPU) (spie spp : Bool) (R : RegMap) (n : Nat) (_hn1 : 1 ≤ n) (_hn22 : n ≤ 24)
     (hnum : syscNum V = ((n : Nat) : Int)) (hpins : syscPins k R) (hs1 : R 9#5 = procAddr j)
     (hs2 : R 18#5 = pageAddr V.upt.tfp) (hra : R 1#5 = syscallRet),
     syscArmBody n PT Γ c0 cpu k spie spp R γw γ j pid V M sts gn cs ip f hE hj hproc hK hnoff htier hgn
@@ -132,7 +128,7 @@ def SyscHeadFb (PT : SchedNames → IProp GF) (Γ : SchedNames) [ClaimIs (hlc :=
     (hE : SyscSpostEmp (GF := GF))
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : syscallSlots ≤ k.avail)
     (hnoff : k.noff = 0) (htier : k.tier = KTier.kpt) (hgn : gn = V.gen) : Prop :=
-  ∀ (cpu : CPU) (spie spp : Bool) (R : RegMap) (hrange : syscNum V < 1 ∨ 23 < syscNum V)
+  ∀ (cpu : CPU) (spie spp : Bool) (R : RegMap) (hrange : syscNum V < 1 ∨ 24 < syscNum V)
     (hpins : syscPins k R) (hs1 : R 9#5 = procAddr j) (hs2 : R 18#5 = pageAddr V.upt.tfp),
     syscFallbackBody PT Γ c0 cpu k spie spp R γw γ j pid V M sts gn cs ip f hE hj hproc hK hnoff htier
       hgn hrange hpins hs1 hs2
@@ -163,6 +159,25 @@ theorem syscall_head_secc [X : CurCtx] (hct : curTier = KTier.kpt) (γ : FileNam
   subst hct
   exact hacc
 
+/-- A write outside the pinned registers keeps the pins.  (The pin goals of
+this file used to be `simp_all`, which also rewrote the arms' hypotheses
+`hA`/`hF`/`hB` -- the large part of the context -- once per conjunct.) -/
+theorem syscPins_set (k : KCtx) (R : RegMap) (i : BitVec 5) (v : BitVec 64)
+    (hi : i ≠ 2#5 ∧ i ≠ 19#5 ∧ i ≠ 20#5 ∧ i ≠ 21#5 ∧ i ≠ 22#5 ∧ i ≠ 23#5 ∧ i ≠ 24#5 ∧ i ≠ 25#5 ∧
+      i ≠ 26#5 ∧ i ≠ 27#5) (hp : syscPins k R) :
+    syscPins k (R.set i v) := by
+  obtain ⟨h2, h19, h20, h21, h22, h23, h24, h25, h26, h27⟩ := hp
+  obtain ⟨n2, n19, n20, n21, n22, n23, n24, n25, n26, n27⟩ := hi
+  simp only [syscPins, RegMap.set_apply, if_neg (Ne.symm n2), if_neg (Ne.symm n19), if_neg (Ne.symm n20),
+    if_neg (Ne.symm n21), if_neg (Ne.symm n22), if_neg (Ne.symm n23), if_neg (Ne.symm n24),
+    if_neg (Ne.symm n25), if_neg (Ne.symm n26), if_neg (Ne.symm n27)]
+  exact ⟨h2, h19, h20, h21, h22, h23, h24, h25, h26, h27⟩
+
+/-- `syscPins k (R.set i₁ v₁ … .set iₙ vₙ)` from `syscPins k R` in scope, each
+index decided outside the pins. -/
+macro "sysc_pins" : tactic =>
+  `(tactic| ((repeat (refine syscPins_set _ _ _ _ (by decide) ?_)); assumption))
+
 /-! ## §3 +0x22 .. +0x44: the split, the table, the mask, the call -/
 
 set_option maxHeartbeats 4000000 in
@@ -184,7 +199,7 @@ theorem syscall_head_split (PT : SchedNames → IProp GF) (Γ : SchedNames) [Cla
     (h10 : R 10#5 = procAddr j)
     (hw : tfW V.tf (tfArgIdx 7) = w)
     (h13 : R 13#5 = BitVec.signExtend 64 (BitVec.extractLsb' 0 32 w))
-    (h14 : R 14#5 = 22#64)
+    (h14 : R 14#5 = 23#64)
     (h15 : R 15#5 = BitVec.signExtend 64 (BitVec.extractLsb' 0 32 (w + 0xFFFFFFFFFFFFFFFF#64))) :
     kctx cpu (((k.withSpie spie spp).pushed 4).withRegs R) ∗ pcIs cpu (KA.«syscall» + 0x22#64) ∗
     frame4s2 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) ∗
@@ -196,9 +211,9 @@ theorem syscall_head_split (PT : SchedNames → IProp GF) (Γ : SchedNames) [Cla
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   icases kctx_tier _ _ $$ Hk with ⟨%hti, Hk⟩
   have hct : curTier = KTier.kpt := by rw [← hti]; k_norm_g; exact htier
-  by_cases hr : 1 ≤ (BitVec.extractLsb' 0 32 w).toInt ∧ (BitVec.extractLsb' 0 32 w).toInt ≤ 23
+  by_cases hr : 1 ≤ (BitVec.extractLsb' 0 32 w).toInt ∧ (BitVec.extractLsb' 0 32 w).toInt ≤ 24
   · -- IN RANGE
-    have hbr : bcond bop.BLTU (22#64)
+    have hbr : bcond bop.BLTU (23#64)
         (BitVec.signExtend 64 (BitVec.extractLsb' 0 32 (w + 0xFFFFFFFFFFFFFFFF#64))) = false :=
       (syscall_bltu w).mpr hr
     k_step_e (wp_s_branch cpu _ (KA.«syscall» + 0x22#64) false 0x32#13 14#5 15#5 (by decide) bop.BLTU)
@@ -213,7 +228,7 @@ theorem syscall_head_split (PT : SchedNames → IProp GF) (Γ : SchedNames) [Cla
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     iintro Hk Hpc
     -- +0x2e  addi a5,a5,-532
-    k_step_e (wp_s_addi cpu _ (KA.«syscall» + 0x2e#64) false 0xdec#12 15#5 15#5 (by decide))
+    k_step_e (wp_s_addi cpu _ (KA.«syscall» + 0x2e#64) false 0xdd0#12 15#5 15#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     iintro Hk Hpc
     -- +0x32  add a5,a5,a4
@@ -223,7 +238,7 @@ theorem syscall_head_split (PT : SchedNames → IProp GF) (Γ : SchedNames) [Cla
     -- +0x34  ld a4,0(a5): THE TABLE READ
     obtain ⟨hn1, hn22⟩ := hr
     have hn1' : 1 ≤ (BitVec.extractLsb' 0 32 w).toInt.toNat := by omega
-    have hn22' : (BitVec.extractLsb' 0 32 w).toInt.toNat ≤ 23 := by omega
+    have hn22' : (BitVec.extractLsb' 0 32 w).toInt.toNat ≤ 24 := by omega
     have hidx : R 13#5 <<< 3 = BitVec.ofNat 64 (8 * (BitVec.extractLsb' 0 32 w).toInt.toNat) := by
       rw [h13]; exact syscall_idx w hn1 hn22
     have h13n : R 13#5 = BitVec.ofNat 64 (BitVec.extractLsb' 0 32 w).toInt.toNat := by
@@ -231,7 +246,7 @@ theorem syscall_head_split (PT : SchedNames → IProp GF) (Γ : SchedNames) [Cla
     have hraw : syscRaw V = (((BitVec.extractLsb' 0 32 w).toInt.toNat : Nat) : Int) :=
       syscall_num_of_idx V _ (by rw [hw]) (by rw [hw]; exact hn1)
     generalize (BitVec.extractLsb' 0 32 w).toInt.toNat = n at hidx hraw hn1' hn22' h13n
-    have haddr : KA.«syscall» + (19990#64 + BitVec.ofNat 64 (8 * n)) = syscallsTbl + BitVec.ofNat 64 (8 * n) := by
+    have haddr : KA.«syscall» + (19962#64 + BitVec.ofNat 64 (8 * n)) = syscallsTbl + BitVec.ofNat 64 (8 * n) := by
       rw [← BitVec.add_assoc]; rfl
     icases kctx_kmapStatic _ _ $$ Hk with ⟨#HS, Hk⟩
     icases kctx_kernelData _ _ $$ Hk with ⟨#HD, Hk⟩
@@ -250,16 +265,16 @@ theorem syscall_head_split (PT : SchedNames → IProp GF) (Γ : SchedNames) [Cla
     k_step_e (wp_s_branch cpu _ (KA.«syscall» + 0x36#64) true 0x1e#13 14#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [syscall_head_beqz n hn1' hn22']
     iintro Hk Hpc
-    -- +0x38  ld a5,360(a0): THE MASK
+    -- +0x38  ld a5,368(a0): THE MASK
     icases syscall_head_secc hct γ (procAddr j) pid V M $$ Hpriv with ⟨Hsc, Hpback⟩
     ihave Hsc := (show wordPointsTo (GF := GF) (pSecc (procAddr j)) 8 (DFrac.own 1) V.pvSecc ⊢
-        wordPointsTo (procAddr j + 360#64) 8 (DFrac.own 1) V.pvSecc from by
+        wordPointsTo (procAddr j + 368#64) 8 (DFrac.own 1) V.pvSecc from by
       unfold pSecc; iintro H; iexact H) $$ Hsc
-    k_step_e (wp_s_ld cpu _ (KA.«syscall» + 0x38#64) false 360#12 15#5 10#5 (by decide) (by decide)
+    k_step_e (wp_s_ld cpu _ (KA.«syscall» + 0x38#64) false 368#12 15#5 10#5 (by decide) (by decide)
         (DFrac.own 1) V.pvSecc)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10]
     iintro Hk Hpc Hsc
-    ihave Hsc := (show wordPointsTo (GF := GF) (procAddr j + 360#64) 8 (DFrac.own 1) V.pvSecc ⊢
+    ihave Hsc := (show wordPointsTo (GF := GF) (procAddr j + 368#64) 8 (DFrac.own 1) V.pvSecc ⊢
         wordPointsTo (pSecc (procAddr j)) 8 (DFrac.own 1) V.pvSecc from by
       unfold pSecc; iintro H; iexact H) $$ Hsc
     ihave Hpriv := Hpback $$ Hsc
@@ -282,15 +297,13 @@ theorem syscall_head_split (PT : SchedNames → IProp GF) (Γ : SchedNames) [Cla
       unfold SyscHeadArms syscArmBody at hA
       iapply (hA cpu spie spp
         (((((((((R.set (14#5) (BitVec.ofNat 64 (8 * n))).set (15#5) (KA.«syscall» + 20522#64)).set (15#5)
-          (KA.«syscall» + 19990#64)).set (15#5) (syscallsTbl + BitVec.ofNat 64 (8 * n))).set
+          (KA.«syscall» + 19962#64)).set (15#5) (syscallsTbl + BitVec.ofNat 64 (8 * n))).set
           (14#5) (syscTarget n)).set (15#5) V.pvSecc).set
           (15#5) (V.pvSecc >>> Sail.BitVec.extractLsb (BitVec.ofNat 64 n) 5 0)).set (15#5) 1#64).set (1#5) (KA.«syscall» + 70#64))
         n hn1' hn22' hnum ?hp ?h1 ?h2 ?hra)
-      case hp =>
-        obtain ⟨p2, p19, p20, p21, p22, p23, p24, p25, p26, p27⟩ := hpins
-        refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;> simp only [RegMap.set_apply] <;> simp_all
-      case h1 => simp only [RegMap.set_apply]; simp_all
-      case h2 => simp only [RegMap.set_apply]; simp_all
+      case hp => sysc_pins
+      case h1 => simpa only [RegMap.set_apply, reduceIte, BitVec.reduceEq] using hs1
+      case h2 => simpa only [RegMap.set_apply, reduceIte, BitVec.reduceEq] using hs2
       case hra => simp only [RegMap.set_apply]; unfold syscallRet syscallAddr; rfl
       unfold syscHeadRest
       icases Hrest with ⟨Hpi, Hwl, Hbs, Hip, Hfd, Hir, Henv, Hfr, Hch, Hsi, Hfi, Hpi', Hslot⟩
@@ -306,20 +319,18 @@ theorem syscall_head_split (PT : SchedNames → IProp GF) (Γ : SchedNames) [Cla
       unfold SyscHeadBlk syscBlockedBody at hB
       iapply (hB cpu spie spp
         (((((((((R.set (14#5) (BitVec.ofNat 64 (8 * n))).set (15#5) (KA.«syscall» + 20522#64)).set (15#5)
-          (KA.«syscall» + 19990#64)).set (15#5) (syscallsTbl + BitVec.ofNat 64 (8 * n))).set
+          (KA.«syscall» + 19962#64)).set (15#5) (syscallsTbl + BitVec.ofNat 64 (8 * n))).set
           (14#5) (syscTarget n)).set (15#5) V.pvSecc).set
           (15#5) (V.pvSecc >>> Sail.BitVec.extractLsb (BitVec.ofNat 64 n) 5 0)).set (15#5) 0#64))
         hblk ?hp ?h1 ?h2)
-      case hp =>
-        obtain ⟨p2, p19, p20, p21, p22, p23, p24, p25, p26, p27⟩ := hpins
-        refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;> simp only [RegMap.set_apply] <;> simp_all
-      case h1 => simp only [RegMap.set_apply]; simp_all
-      case h2 => simp only [RegMap.set_apply]; simp_all
+      case hp => sysc_pins
+      case h1 => simpa only [RegMap.set_apply, reduceIte, BitVec.reduceEq] using hs1
+      case h2 => simpa only [RegMap.set_apply, reduceIte, BitVec.reduceEq] using hs2
       unfold syscHeadRest
       icases Hrest with ⟨Hpi, Hwl, Hbs, Hip, Hfd, Hir, Henv, Hfr, Hch, Hsi, Hfi, Hpi', Hslot⟩
       iframe
   · -- OUT OF RANGE: the fallback
-    have hbr : bcond bop.BLTU (22#64)
+    have hbr : bcond bop.BLTU (23#64)
         (BitVec.signExtend 64 (BitVec.extractLsb' 0 32 (w + 0xFFFFFFFFFFFFFFFF#64))) = true := by
       have h := mt (syscall_bltu w).mp hr
       simp only [bcond]
@@ -329,7 +340,7 @@ theorem syscall_head_split (PT : SchedNames → IProp GF) (Γ : SchedNames) [Cla
     k_step_e (wp_s_branch cpu _ (KA.«syscall» + 0x22#64) false 0x32#13 14#5 15#5 (by decide) bop.BLTU)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h14, h15, hbr, htgt]
     iintro Hk Hpc
-    have hrange : syscNum V < 1 ∨ 23 < syscNum V := by
+    have hrange : syscNum V < 1 ∨ 24 < syscNum V := by
       apply syscall_eff_range
       rw [syscRaw_eq, hw]; omega
     have hb := hF cpu spie spp R hrange hpins hs1 hs2
@@ -340,7 +351,6 @@ theorem syscall_head_split (PT : SchedNames → IProp GF) (Γ : SchedNames) [Cla
     unfold syscHeadRest
     icases Hrest with ⟨Hpi, Hwl, Hbs, Hip, Hfd, Hir, Henv, Hfr, Hch, Hsi, Hfi, Hpi', Hslot⟩
     iframe
-
 
 /-! ## §4 +0x12 .. +0x20: the two loads and the check's arithmetic -/
 
@@ -414,35 +424,31 @@ theorem syscall_head_num (PT : SchedNames → IProp GF) (Γ : SchedNames) [Claim
         (tfW V.tf (tfArgIdx 7)) from by rw [ea]) $$ Hw
   ihave Hpage := Hcl $$ Hw
   ihave Hpriv := Hback $$ Hptr Hpage
-  -- +0x1a  sext.w a3,a5 ; +0x1e  addiw a5,a5,-1 ; +0x20  li a4,22
+  -- +0x1a  sext.w a3,a5 ; +0x1e  addiw a5,a5,-1 ; +0x20  li a4,23
   k_step_e (wp_s_addiw cpu _ (KA.«syscall» + 0x1a#64) false 0#12 13#5 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   k_step_e (wp_s_addiw cpu _ (KA.«syscall» + 0x1e#64) true 0xfff#12 15#5 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_addi cpu _ (KA.«syscall» + 0x20#64) true 22#12 14#5 0#5 (by decide))
+  k_step_e (wp_s_addi cpu _ (KA.«syscall» + 0x20#64) true 23#12 14#5 0#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  have hpins' := hpins
-  obtain ⟨p2, p19, p20, p21, p22, p23, p24, p25, p26, p27⟩ := hpins'
   iapply (syscall_head_split PT Γ c0 k γw γ j pid V M sts gn cs ip f hE hj hproc hK hnoff htier hgn
     hA hF hB cpu spie spp
     (((((R.set (18#5) (pageAddr V.upt.tfp)).set (15#5) (tfW V.tf (tfArgIdx 7))).set (13#5)
       (BitVec.signExtend 64 (BitVec.extractLsb' 0 32 (tfW V.tf (tfArgIdx 7))))).set (15#5)
       (BitVec.signExtend 64 (BitVec.extractLsb' 0 32 (tfW V.tf (tfArgIdx 7) + 0xFFFFFFFFFFFFFFFF#64)))).set
-      14#5 22#64)
+      14#5 23#64)
     (tfW V.tf (tfArgIdx 7)) ?sp ?s1 ?s2 ?a10 rfl ?r13 ?r14 ?r15)
-  case sp =>
-    refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;> simp only [RegMap.set_apply] <;> simp_all
-  case s1 => simp only [RegMap.set_apply]; simp_all
+  case sp => sysc_pins
+  case s1 => simpa only [RegMap.set_apply, reduceIte, BitVec.reduceEq] using hs1
   case s2 => simp only [RegMap.set_apply]; simp
-  case a10 => simp only [RegMap.set_apply]; simp_all
+  case a10 => simpa only [RegMap.set_apply, reduceIte, BitVec.reduceEq] using ha0
   case r13 => simp only [RegMap.set_apply]; simp
   case r14 => simp only [RegMap.set_apply]; simp
   case r15 => simp only [RegMap.set_apply]; simp
   iframe
-
 
 /-! ## §5 +0x00 .. +0x10: the frame and `myproc()` -/
 
@@ -485,7 +491,7 @@ theorem syscall_head_entry (MP : MYPROC) (PT : SchedNames → IProp GF) (Γ : Sc
       kctx cpu (((k.withSpie k.spie k.spp).pushed 4).withRegs
         ((k.regs.set 2#5 (k.regs 2#5 + 0xFFFFFFFFFFFFFFE0#64)).set 8#5 (k.regs 2#5))) from .rfl) $$ Hk
   -- +0x0c  jal myproc
-  k_step_e (wp_s_jal cpu _ (KA.«syscall» + 0xc#64) false 2093050#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«syscall» + 0xc#64) false 2093018#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [syscall_head_br_myproc]
   iintro Hk Hpc
   have hmp := MP.wp_myproc (hlc := hlc) (GF := GF)

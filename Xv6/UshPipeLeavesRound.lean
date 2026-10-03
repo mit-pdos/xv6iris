@@ -36,8 +36,6 @@ namespace UShPipeLeaves
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
-
 /-- `x ∈ {γ}` is `x = γ` (deviation 2). -/
 theorem pl_mem_single (x γ : GName) : x ∈ ({γ} : ExtTreeSet GName compare) ↔ x = γ := by
   rw [Std.ExtTreeSet.singleton_eq_insert, Std.ExtTreeSet.mem_insert]

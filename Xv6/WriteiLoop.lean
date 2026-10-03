@@ -24,9 +24,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 theorem writei_br_bread : KA.«writei» + 0xFFFFFFFFFFFFF49C#64 = KA.«bread» := by decide
 theorem writei_ret_98 : jumpPc (KA.«writei» + 0x98#64) = KA.«writei» + 0x98#64 := by decide

@@ -35,9 +35,6 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedVariables false
-set_option linter.unusedSectionVars false
-
 /-! ## §1 Addresses -/
 
 /-- A pc inside usertrap. -/
@@ -91,9 +88,6 @@ theorem utBase_refl (k : KCtx) : utBase k k := rfl
 
 theorem utBase_withSpie (k kb : KCtx) (a b : Bool) (h : utBase k kb) : utBase k (kb.withSpie a b) := h
 
-theorem utBase_regs {k kb : KCtx} (h : utBase k kb) : kb.regs = k.regs := by
-  have := congrArg KCtx.regs h; simpa using this
-
 theorem utBase_proc {k kb : KCtx} (h : utBase k kb) : kb.proc = k.proc := by
   have := congrArg KCtx.proc h; simpa using this
 
@@ -129,31 +123,6 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [Fscfg] [Icfg]
 
-/-- **The pid half and the registration eighth, out of the block** (Rocq
-`proc_priv_pid_reg`), with the pid's nonzeroness; at the ambient context
-(the kernel tier). -/
-theorem ut_priv_pid [X : CurCtx] (hct : curTier = KTier.kpt) (γ : FileNames) (pa : BitVec 64)
-    (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) :
-    procPrivFd (GF := GF) γ pa pid V M ⊢
-      ⌜pid.toNat ≠ 0⌝ ∗ wordPointsTo (pPid pa) 4 pidPriv pid ∗ pidReg pid (.own qeighth) V.gen ∗
-      (wordPointsTo (pPid pa) 4 pidPriv pid -∗ pidReg pid (.own qeighth) V.gen -∗ procPrivFd γ pa pid V M) := by
-  obtain ⟨ξ, t⟩ := X
-  simp only at hct
-  subst hct
-  unfold procPrivFd procPrivCoreNoctxAt procPrivBareAt procGenAt
-  iintro ⟨⟨⟨%h, Hpid, Hf, Hpt, Htfp, %hlz, Hev⟩, Hc, Hft, Hq, Hxs, Hgh⟩, Ho⟩
-  ihave %hnz := genHalvesPriv_nz pa pid V.gen $$ Hgh
-  icases genHalvesPriv_reg pa pid V.gen $$ Hgh with ⟨Hr, Hgb⟩
-  isplitl []
-  · ipureintro; exact hnz
-  iframe Hpid Hr
-  iintro Hpid Hr
-  ihave Hgh := Hgb $$ Hr
-  iframe Hpid Hf Hpt Htfp Hc Hft Hq Hxs Hgh Ho Hev
-  isplitl []
-  · ipureintro; exact h
-  · ipureintro; exact hlz
-
 /-- **The pid half and the registration eighth, out of the MARKER-LESS
 block** (Rocq `ut_priv_nm_pid_reg`), with the pid's nonzeroness. -/
 theorem ut_privNm_pid [X : CurCtx] (hct : curTier = KTier.kpt) (γ : FileNames) (pa : BitVec 64)
@@ -166,7 +135,7 @@ theorem ut_privNm_pid [X : CurCtx] (hct : curTier = KTier.kpt) (γ : FileNames) 
   simp only at hct
   subst hct
   unfold procPrivUnmarked procPrivCoreUnmarkedAt procPrivBareAt procGenUnmarkedAt
-  iintro ⟨⟨⟨%h, Hpid, Hf, Hpt, Htfp, %hlz, Hev⟩, Hc, Hft, Hq, Hxs, Hgh⟩, Ho⟩
+  iintro ⟨⟨⟨%h, Hpid, Hf, Hpt, Htfp, %hlz, Hev⟩, Hc, Hrr, Hft, Hq, Hxs, Hgh⟩, Ho⟩
   ihave %hnz := genHalvesAt_nz pa pid V.gen $$ Hgh
   icases genHalvesAt_reg pa pid V.gen $$ Hgh with ⟨Hr, Hgb⟩
   isplitl []
@@ -174,7 +143,7 @@ theorem ut_privNm_pid [X : CurCtx] (hct : curTier = KTier.kpt) (γ : FileNames) 
   iframe Hpid Hr
   iintro Hpid Hr
   ihave Hgh := Hgb $$ Hr
-  iframe Hpid Hf Hpt Htfp Hc Hft Hq Hxs Hgh Ho Hev
+  iframe Hpid Hf Hpt Htfp Hc Hrr Hft Hq Hxs Hgh Ho Hev
   isplitl []
   · ipureintro; exact h
   · ipureintro; exact hlz

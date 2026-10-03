@@ -112,11 +112,6 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedVariables false
-
-/-- uservec's entry, `TRAMPOLINE + 0` (stvec's direct base). -/
-def uservecVa : BitVec 64 := TRAMPOLINE
-
 /-- usertrap's entry (`kernel_trap`, the `jalr t0` target). -/
 def usertrapPc : BitVec 64 := KA.«usertrap»
 

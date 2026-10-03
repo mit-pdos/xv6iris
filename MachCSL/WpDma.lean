@@ -7,8 +7,8 @@ single store order, moves no hart's view, and touches neither the registers
 nor the device states.  This file is the memory-side half of the disk's
 verification: the ghost update that mirrors that step (`machInterp_storeDma`),
 the derivation of its DRAM side condition from the cells themselves
-(`histBytes_ramBytes`), and the two facts that pin what a DMA *read* may
-answer (`dmaView_pinned`, `dmaView_ctxBytes`).
+(`histBytes_ramBytes`), and the fact that pins what a DMA *read* may
+answer (`dmaView_pinned`).
 
 Tier.  The lease a device holds over its DMA footprint lives at the RAW
 history tier (`histBytes`, `MachCSL.WpAtomic`), not at the context tier
@@ -158,31 +158,8 @@ theorem machInterp_storeDma (σ : MState) (pa : PAddr) (n : Nat) (Hs : Nat → H
 
 /-! ## The value form of a lease -/
 
-/-- A DMA lease at a value: the footprint at full ownership whose heads
-spell `w`.  Sugar over the primitive history form -- the disk invariant
-usually wants the history form, because it wants the *position* of each
-write in its per-slot rows. -/
-def dmaCell (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) : IProp GF := iprop%
-  ∃ Hs : Nat → Hist, histBytes pa n (fun _ => DFrac.own 1) Hs ∗ ⌜headsAre Hs n w⌝
-
 theorem headsAre_pushed (Hs : Nat → Hist) (t : Nat) (h : Agent) (n : Nat) (w : BitVec (8 * n)) :
     headsAre (pushed Hs t h w) n w := fun _ _ => rfl
-
-/-- The value form of `machInterp_storeDma`. -/
-theorem machInterp_storeDma_val (σ : MState) (pa : PAddr) (n : Nat) (old w : BitVec (8 * n))
-    (hno : ¬ anyReserve σ.resv pa n) :
-    machInterp (GF := GF) σ ∗ dmaCell pa n old ⊢ |==>
-      (machInterp (σ.storeDma pa n w) ∗ dmaCell pa n w ∗
-       authoredBy (σ.top + 1) diskAgent ∗ topLb (σ.top + 1)) := by
-  unfold dmaCell
-  iintro ⟨Hσ, ⟨%Hs, Hb, %_⟩⟩
-  imod machInterp_storeDma σ pa n Hs w hno $$ [$Hσ $Hb] with ⟨Hσ, Hb, #Hau, #Htop⟩
-  imodintro
-  iframe Hσ Hau Htop
-  iexists (pushed Hs (σ.top + 1) diskAgent w)
-  iframe Hb
-  ipureintro
-  exact headsAre_pushed Hs (σ.top + 1) diskAgent n w
 
 /-! ## What a DMA read may answer -/
 
@@ -202,53 +179,6 @@ theorem dmaView_pinned (σ : MState) (pa : PAddr) (n : Nat) (dqs : Nat → DFrac
   refine hv j hj (nthByte w j) ?_
   rw [hget j hj, Option.bind_some]
   exact hh j hj
-
-/-- The same at the context tier, per byte: the heads of the histories a
-context cell owns. -/
-theorem ctxBytes_tops (ξ : CtxId) (m : FlatMem) (pa : PAddr) (dq : DFrac) (bs : Nat → BitVec 8) :
-    ∀ n : Nat, genHeapInterp m ∗
-      ([∗list] j ∈ List.range n, ctxByte ξ (pa + BitVec.ofNat 64 j) dq (bs j)) ⊢@{IProp GF}
-      ⌜∀ j, j < n → (m[pa + BitVec.ofNat 64 j]?).bind Hist.top = some (bs j)⌝
-  | 0 => by
-    iintro ⟨_, _⟩
-    ipureintro
-    intro j hj
-    omega
-  | n + 1 => by
-    rw [List.range_succ]
-    iintro ⟨Hm, Hb⟩
-    icases BigSepL.bigSepL_snoc.1 $$ Hb with ⟨Hb1, Hb2⟩
-    ihave %H1 : ⌜∀ j, j < n → (m[pa + BitVec.ofNat 64 j]?).bind Hist.top = some (bs j)⌝ $$ [Hm Hb1]
-    · iapply ctxBytes_tops ξ m pa dq bs n $$ [Hm Hb1]
-      iframe
-    ihave %H2 : ⌜(m[pa + BitVec.ofNat 64 n]?).bind Hist.top = some (bs n)⌝ $$ [Hm Hb2]
-    · icases ctxByte_cases ξ (pa + BitVec.ofNat 64 n) dq (bs n) $$ Hb2 with ⟨%e, %H, Hpt, %hev, _⟩
-      icases genHeap_valid $$ [$Hm $Hpt] with >%hg
-      ipureintro
-      have hg' : m[pa + BitVec.ofNat 64 n]? = some (e :: H) := hg
-      rw [hg', Option.bind_some]
-      simp [Hist.top, hev]
-    ipureintro
-    intro j hj
-    rcases Nat.lt_succ_iff_lt_or_eq.1 hj with h | rfl
-    · exact H1 j h
-    · exact H2
-
-/-- A context cell over the whole footprint pins a DMA read too. -/
-theorem dmaView_ctxBytes (σ : MState) (ξ : CtxId) (pa : PAddr) (n : Nat) (dq : DFrac)
-    (w : BitVec (8 * n)) :
-    genHeapInterp (GF := GF) σ.mem ∗ ctxBytes ξ pa n dq w ⊢ ⌜∀ v, dmaView σ pa n v → v = w⌝ := by
-  unfold ctxBytes
-  iintro ⟨Hmem, Hb⟩
-  ihave %hget : ⌜∀ j, j < n → (σ.mem[pa + BitVec.ofNat 64 j]?).bind Hist.top = some (nthByte w j)⌝
-      $$ [Hmem Hb]
-  · iapply ctxBytes_tops ξ σ.mem pa dq (nthByte w) n $$ [Hmem Hb]
-    iframe
-  ipureintro
-  intro v hv
-  apply bv_eq_of_bytes
-  intro j hj
-  exact hv j hj (nthByte w j) (hget j hj)
 
 end ambient
 

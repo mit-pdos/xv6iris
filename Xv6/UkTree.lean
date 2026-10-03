@@ -61,14 +61,11 @@ binary's addresses).
 -/
 import Xv6.UkStub
 import Xv6.ProgTree
-import Iris.BI.Lib.Fixpoint
 
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Std (ExtTreeSet)
-
-set_option linter.unusedSectionVars false
 
 /-! ## §0 The program instance, the answer readings -/
 
@@ -320,10 +317,6 @@ theorem treePay_unfold (N : UkNames GF) (P : Uprog GF) (t : Proc) :
 theorem treePay_unfold_mp (N : UkNames GF) (P : Uprog GF) (t : Proc) :
     treePay (hlc := hlc) N P t ⊢ treeF (hlc := hlc) N P (treePay (hlc := hlc) N P) t :=
   greatest_fixpoint_unfold_mp _
-
-theorem treePay_unfold_mpr (N : UkNames GF) (P : Uprog GF) (t : Proc) :
-    treeF (hlc := hlc) N P (treePay (hlc := hlc) N P) t ⊢ treePay (hlc := hlc) N P t :=
-  greatest_fixpoint_unfold_mpr _
 
 /-- **Rocq `tree_pay_tau`**. -/
 theorem treePay_tau (N : UkNames GF) (P : Uprog GF) (t : Proc) :

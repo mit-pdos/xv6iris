@@ -42,13 +42,9 @@ is a `byteBuf` list (`Xv6/NamexParts.lean` deviation 4), not Rocq's
    `A.raise kv` (`SysChdirArgs.raise`), the contract's continuation moved
    there by `sysChdirK_raise`; the exit reads it at the count it came in at.
 -/
-import Xv6.SysfileCalls
 import Xv6.SpecSysChdir
-import Xv6.ProcPrivAcc
-import Xv6.KstackMap
 import Xv6.SpecIunlock
 import Xv6.SpecIlock
-import Xv6.SysFstatParts
 import Xv6.SysMknodFrame
 
 namespace Xv6
@@ -58,9 +54,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## Constants (Rocq `sc_push` / `sc_pop` / `sc_fp` / `sc_buf` / `sc_frm*`) -/
 
@@ -426,7 +420,7 @@ allowances whole and the armed post on the block the call leaves. -/
 def sysChdirOut (A : SysChdirArgs GF) (r : BitVec 64) : IProp GF := iprop%
   bslots 3 ∗ irefSlots 2 ∗
   (∃ P' : UPtd, ⌜A.V.upt.extSz A.V.sz P'⌝ ∗
-    chdirArms (hlc := hlc) (fsGammaL fscFs) fscFs A.γ (procAddr A.j) A.pid A.V.cwi A.P A.Pmiss A.Fo
+    chdirArms (hlc := hlc) (fsGammaL fscFs) fscFs A.γ (procAddr A.j) A.pid A.V.rti A.V.cwi A.P A.Pmiss A.Fo
       { A.V with upt := P' } (viewFaulted A.V.upt P' A.M) r)
 
 set_option maxHeartbeats 8000000 in

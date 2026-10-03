@@ -14,7 +14,6 @@ namespace MachCSL
 of physical memory), R/W/X, unlocked. -/
 def xv6Pmpcfg : Vector (BitVec 8) 64 := Sail.vectorUpdate bootPmpcfg 0 0x0f#8
 def xv6Pmpaddr : Vector (BitVec 64) 64 := Sail.vectorUpdate bootPmpaddr 0 0x3fffffffffffff#64
-theorem xv6Pmpaddr_0 : xv6Pmpaddr[0]! = 0x3fffffffffffff#64 := by decide
 
 /-! ### What `start()`'s two PMP writes leave, over ANY tables (Rocq
 `WpStartNew.st_pmpcfg1` / `st_pmpaddr1`)
@@ -87,10 +86,6 @@ iteration and never looks at them (Rocq keeps them parametric, `st_pmpcfg1
 cfg0`). -/
 def pmpEnt0Ok (cfg : Vector (BitVec 8) 64) (paddr : Vector (BitVec 64) 64) : Prop :=
   cfg[0]! = 0x0f#8 ∧ paddr[0]! = 0x3fffffffffffff#64
-
-/-- The tables `xv6Pmpcfg`/`xv6Pmpaddr` (the reset tables after `start()`'s
-two writes) are one instance. -/
-theorem pmpEnt0Ok_xv6 : pmpEnt0Ok xv6Pmpcfg xv6Pmpaddr := ⟨by decide, by decide⟩
 
 /-- `start()`'s two writes establish it, over any tables. -/
 theorem pmpEnt0Ok_start (cfg : Vector (BitVec 8) 64) (paddr : Vector (BitVec 64) 64) :

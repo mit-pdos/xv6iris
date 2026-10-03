@@ -15,7 +15,7 @@ section parameter (here the explicit `heq : fileAppIs g.fgnCl r`).
 `fsm_panic`, `ush_line_len`, the local notation `T` (spelled
 `fileTaint g.fgnCl`), `redir_K` (`UshFileRedir.redirK`), `redir_Kf`
 (`UshFileRedir.redirKf`), `redir_K_inum` (`UshFileRedir.redirK_inum`),
-`Xv6.shOpen_pc`, `ucallee_saved_a0a7`, `Hopen_hand`
+`ucallee_saved_a0a7`, `Hopen_hand`
 (`UshFileRedir.hopen_hand`), `redir_K'` (`UshFileRedir.redirK'`).
 
 ## Dropped
@@ -58,10 +58,7 @@ None new: `FO` is the landed `UkFileOpen` record (deviation 3).
 import Xv6.UkFileOpenCallsCreate
 import Xv6.UshRedirAns
 import Xv6.UshMainStubs
-import Xv6.FileHooks
-import Xv6.UkEchoDefs
 import Xv6.FileOutEra
-import Xv6.UshConsK
 
 namespace Xv6
 
@@ -69,8 +66,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Iris.Std.PartialMap
 open HfpFileClaimsP UkFileOpen
 open Std (ExtTreeSet)
-
-set_option linter.unusedSectionVars false
 
 /-! ## §0 The pure facts -/
 

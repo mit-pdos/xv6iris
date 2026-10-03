@@ -51,7 +51,7 @@ Rocq's file header (WHAT THE BUNDLE IS / THE DICTIONARY / WHAT
    (`inodeBlocksEra` := `inodeBlocksEraQ _ (.own 1)`, same for `indResEra`
    and `inodeBlocks_dataExt`): Rocq proves each twice, verbatim; in Lean
    `inodeBlocks`/`indRes`/`blkOwned` ARE their `_q` readings at 1 by `rfl`
-   (InodeInv `inodeBlocks_1`, FsStateDefs `blkOwned_1`), so the second copy
+   (FsStateDefs `blkOwned_1`), so the second copy
    is a one-line instance.  Statements unchanged.
 5. `indResEraQ` is `.rfl`: Rocq peels two `case_decide`s because the two
    guards reach the goal through two files' `Decision` instances ("two
@@ -256,7 +256,7 @@ era-vocabulary unification).  A read-locking `ilock` withdraws exactly
 `inodeDatQ (fsGammaL γfs) (DFrac.own (1/4)) n` and the escrow's "out for
 reading" arm keeps the bundle at three quarters -- which is what makes
 cross-inode block disjointness at the commit's collection pure separation
-logic (3/4 + 3/4 > 1, `FsView.blkOwned_ne_34`).  The record is NOT in the
+logic (3/4 + 3/4 > 1).  The record is NOT in the
 leg: records park region-side at fraction 1 always (plan section 2, ruling
 (i)), which is exactly why `inodeDatQ` is `inodePhi` MINUS its record.
 
@@ -401,14 +401,6 @@ theorem inodeOwnedEra_shedOf (γfs : FsNames) (γi : GName) (inum : BitVec 32) (
   · iexact H1
   · iexact H2
 
-/-- Rocq's `inode_owned_era_local`. -/
-theorem inodeOwnedEra_local (γfs : FsNames) (γi : GName) (inum : BitVec 32) (n : FsNode) :
-    inodeOwnedEra (GF := GF) γfs γi inum n ⊢ ⌜InodeLocal inum.toNat n⌝ := by
-  unfold inodeOwnedEra
-  iintro ⟨_, _, _, %hl⟩
-  ipureintro
-  exact hl
-
 /-! ### THE OLD PAYLOAD SHAPE, BOTH WAYS
 
 `ic_loaded`/`ipool_alloc` hold `dinodeAt` beside `indRes` and
@@ -444,27 +436,6 @@ theorem inodeOwnedEra_to (γfs : FsNames) (γi : GName) (inum : BitVec 32) (n : 
   iintro ⟨Hd, ⟨Hb, Hi⟩, Ht, %hl⟩
   ihave Hb := (inodeBlocksEra γfs inum.toNat n hl).2 $$ Hb
   ihave Hi := (indResEra γfs n).2 $$ Hi
-  isplitl [Hd]
-  · iexact Hd
-  isplitl [Hi]
-  · iexact Hi
-  isplitl [Hb]
-  · iexact Hb
-  · iexact Ht
-
-/-- `inodeOwnedEra_to` at an arbitrary share.  What crosses is the
-`InodeInv` vocabulary at `dq`; the record proxy does NOT take a share
-(records park region-side at fraction 1 always, plan section 2).  Rocq's
-`inode_owned_era_to_q`. -/
-theorem inodeOwnedEra_toQ (γfs : FsNames) (dq : DFrac) (γi : GName) (inum : BitVec 32)
-    (n : FsNode) :
-    inodeOwnedEraQ (GF := GF) γfs dq γi inum n ⊢
-      dinodeAt γi inum n.fnRec ∗ indResQ γfs dq (bmOf n)
-        ∗ inodeBlocksQ γfs dq (bmOf n) (fnData n) ∗ topFragQ (fsGammaL γfs) dq inum.toNat n := by
-  unfold inodeOwnedEraQ inodeDatQ
-  iintro ⟨Hd, ⟨Hb, Hi⟩, Ht, %hl⟩
-  ihave Hb := (inodeBlocksEraQ γfs dq inum.toNat n hl).2 $$ Hb
-  ihave Hi := (indResEraQ γfs dq n).2 $$ Hi
   isplitl [Hd]
   · iexact Hd
   isplitl [Hi]

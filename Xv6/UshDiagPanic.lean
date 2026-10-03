@@ -18,27 +18,10 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
-
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int] [Xv6G GF]
-
-/-- **Rocq `wp_kshd_panic`**: panic on the flagged deposit. -/
-theorem wp_kshd_panic (UL : UK_LEAVES) (HS : UK_SYS_P) (SP : SH_PANIC) (N : UkNames GF) [UknConst N]
-    (tx : Bool) (dqs : DFrac) (sa slen : Nat) (sf : Nat → BitVec 8) (h : CPU) (m : RegMap) (n : Nat)
-    (hsa : sa ≠ 0) (ha0 : m.get 10#5 = BitVec.ofNat 64 sa) :
-    ⊢ shDeps (hlc := hlc) -∗ ushCode N.t -∗ ushSstr N tx dqs sa slen sf -∗ N.pay (-1) -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Sh.Sym.«panic») (2 + (10 + (12 + (4 + n)))) -∗ wpLoop h := by
-  iintro #Hdp #Hc Hsstr Hpay Hrun
-  iapply SP.wp_shPanicChain N tx dqs sa slen sf (fun _ => iprop(emp)) (fun _ => iprop(emp)) (fun _ => iprop(emp))
-    h m n hsa ha0 rfl rfl $$ [] [] [] [] Hc Hsstr [Hpay] Hrun
-  · imodintro; iintro %p -; iapply kshW1_of_law UL HS N _ _ $$ Hdp
-  · imodintro; iintro %p -; iapply kshW1_of_law UL HS N _ _ $$ Hdp
-  · imodintro; iintro %p -; iapply kshW1_of_law UL HS N _ _ $$ Hdp
-  · iempintro
-  · iintro -; iexact Hpay
 
 /-- **Rocq `wp_kshd_panic_paid`**: sh's own `panic("fork")`, the ledger
 riding beside the law's family; the exit is the site's. -/

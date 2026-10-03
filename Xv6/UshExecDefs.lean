@@ -59,18 +59,14 @@ dropped from its continuation (so Rocq's statement implies it), and
    `ush_pstate_of_at`, `ush_echo_round_carry`.
 -/
 import Xv6.UshEchoPure
-import Xv6.UshExecCode
 import Xv6.UshTreeDefs
 import Xv6.UkRunExecRef
-import Xv6.FsGeom
 
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
-
-set_option linter.unusedSectionVars false
 
 section UshExecDefs
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]

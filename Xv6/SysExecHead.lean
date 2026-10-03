@@ -30,9 +30,8 @@ Three lemmas, one per call site (each a few seconds):
    `sysExecHeadOuts` names that `∧` (it is `sysExecHeadBody`'s own).
 3. PROCESS LAYER (flagged, as `SysExecParts` deviation 4): argaddr reads the
    trapframe quarter out of the block's core (`SysfileCalls.sysfile_core_tf`,
-   the sys_read idiom); argstr runs over the bare block split off `procPrivFd`
-   (`SysfileCalls.sysfile_blk_bare`), which
-   comes back at `{A.V with upt := P'}` / `viewFaulted A.V.upt P' A.M`
+   the sys_read idiom); argstr runs over the bare block split off
+   `procPrivFd`, which comes back at `{A.V with upt := P'}` / `viewFaulted A.V.upt P' A.M`
    (Rocq `us_upt U P'`).
 4. Rocq's `copyinstr_got (us_M U) v0 pfun plen` / `bb_cstr` are the body's
    `argPathOf (sysExecIm A) A.v0.toNat pl` (`ArgPath.argPathOf_umemStr`) and
@@ -53,12 +52,10 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
-theorem sys_exec_head_br_argaddr : KA.«sys_exec» + 0xffffffffffffd46e#64 = KA.«argaddr» := by decide
-theorem sys_exec_head_br_argstr : KA.«sys_exec» + 0xffffffffffffd48a#64 = KA.«argstr» := by decide
+theorem sys_exec_head_br_argaddr : KA.«sys_exec» + 0xffffffffffffd38e#64 = KA.«argaddr» := by decide
+theorem sys_exec_head_br_argstr : KA.«sys_exec» + 0xffffffffffffd3aa#64 = KA.«argstr» := by decide
 theorem sys_exec_head_ret_12 : jumpPc (KA.«sys_exec» + 0x12#64) = KA.«sys_exec» + 0x12#64 := by decide
 theorem sys_exec_head_ret_20 : jumpPc (KA.«sys_exec» + 0x20#64) = KA.«sys_exec» + 0x20#64 := by decide
 
@@ -182,7 +179,6 @@ theorem sys_exec_head_ret (k : KCtx) (A : SysExecArgs) (hS : SysExecStatic k A) 
     rw [ha0]
     simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
 
-
 set_option maxHeartbeats 16000000 in
 /-- **+0x012 .. +0x01c** (Rocq `sx_head`'s argstr): `li a2,128`, `addi
 a1,s0,-208`, `c.li a0,0`, `argstr(0, path, 128)` over the bare block (the
@@ -220,7 +216,7 @@ theorem sys_exec_head_str (AS : ARGSTR) (Γ : SchedNames) (k : KCtx) (A : SysExe
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x1c  jal argstr
-  k_step_e (wp_s_jal cpu _ (KA.«sys_exec» + 0x1c#64) false 2085998#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_exec» + 0x1c#64) false 2085774#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_exec_head_br_argstr]
   iintro Hk Hpc
   icases sysfile_blk_bare_ev _ _ _ _ _ $$ Hblk with ⟨Hbare, Hclose⟩
@@ -250,7 +246,6 @@ theorem sys_exec_head_str (AS : ARGSTR) (Γ : SchedNames) (k : KCtx) (A : SysExe
     exact hpins
   iapply (sys_exec_head_ret k A hS cpu spie1 spp1 R1 P2 kv old bs hp1 hal hext hkv hold hret)
     $$ [$Hk $Hpc $Hte $Hce $Hblk $Hrs $Hsp $H10 $Hbuf $Hargv $H59 $H60 $HO]
-
 
 set_option maxHeartbeats 16000000 in
 /-- **THE HEAD, +0x000 .. +0x026 AND THE -1 EXIT** (Rocq `sx_head`): the
@@ -289,7 +284,7 @@ theorem sys_exec_head (AA : ARGADDR) (AS : ARGSTR) (Γ : SchedNames) (k : KCtx) 
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x0e  jal argaddr
-  k_step_e (wp_s_jal cpu _ (KA.«sys_exec» + 0xe#64) false 2085984#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_exec» + 0xe#64) false 2085760#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_exec_head_br_argaddr]
   iintro Hk Hpc
   icases (procPrivFd_split A.γ (procAddr A.j) A.pid A.V A.M).1 $$ Hblk with ⟨Hcore, Howe⟩

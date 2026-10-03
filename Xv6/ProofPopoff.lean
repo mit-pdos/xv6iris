@@ -27,10 +27,6 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 theorem sie0_and2 (v : BitVec 64) (h : BitVec.extractLsb' 1 1 v = 0#1) : v &&& 2#64 = 0#64 := by
   bv_decide
 
-/-- With `SIE = 0`, `(sstatus >> 1) & 1 = 0`. -/
-theorem sie0_shr_and1 (v : BitVec 64) (h : BitVec.extractLsb' 1 1 v = 0#1) : (v >>> 1) &&& 1#64 = 0#64 := by
-  bv_decide
-
 theorem ofNat64_eq_zero_iff (n : Nat) (hn : n < 2 ^ 64) : BitVec.ofNat 64 n = 0#64 ↔ n = 0 := by
   constructor
   · intro h
@@ -39,14 +35,6 @@ theorem ofNat64_eq_zero_iff (n : Nat) (hn : n < 2 ^ 64) : BitVec.ofNat 64 n = 0#
     rw [Nat.mod_eq_of_lt (by omega)] at this
     exact this
   · intro h; subst h; rfl
-
-theorem bcond_beq_ofNat (n : Nat) (hn : n < 2 ^ 64) :
-    bcond bop.BEQ (BitVec.ofNat 64 n) 0#64 = decide (n = 0) := by
-  simp only [bcond]
-  by_cases h : n = 0
-  · subst h; rfl
-  · have : BitVec.ofNat 64 n ≠ 0#64 := fun e => h ((ofNat64_eq_zero_iff n hn).mp e)
-    simp [this, h]
 
 /-- `blez` on a positive count is not taken. -/
 theorem bcond_bge_zero_pos (n : Nat) (h1 : 1 ≤ n) (h2 : n < 2 ^ 31) :
@@ -77,11 +65,9 @@ def _root_.MachCSL.KCtx.popOffZ (k : KCtx) : KCtx :=
 @[simp] theorem KCtx.popOffZ_sie (k : KCtx) : k.popOffZ.sie = k.sie := rfl
 @[simp] theorem KCtx.popOffZ_avail (k : KCtx) : k.popOffZ.avail = k.avail := rfl
 @[simp] theorem KCtx.popOffZ_noff (k : KCtx) : k.popOffZ.noff = 0 := rfl
-@[simp] theorem KCtx.popOffZ_intena (k : KCtx) : k.popOffZ.intena = false := rfl
 @[simp] theorem KCtx.popOffZ_locks (k : KCtx) : k.popOffZ.locks = k.locks := rfl
 @[simp] theorem KCtx.popOffZ_tier (k : KCtx) : k.popOffZ.tier = k.tier := rfl
 @[simp] theorem KCtx.popOffZ_proc (k : KCtx) : k.popOffZ.proc = k.proc := rfl
-@[simp] theorem KCtx.popOffZ_sp (k : KCtx) : k.popOffZ.sp = k.sp := rfl
 
 theorem withCpu_popOff2_z (k : KCtx) (R : RegMap) :
     ((k.pushed 2).withRegs R).withCpu R 0 false = (k.popOffZ.pushed 2).withRegs R := rfl
@@ -97,7 +83,7 @@ theorem withCpu_popOff2_one (k : KCtx) (R : RegMap) (h : k.noff = 1) (hi : k.int
     ((k.pushed 2).withRegs R).withCpu R 0 false = (k.popOff.pushed 2).withRegs R := by
   rw [← hi, ← withCpu_popOff2, h]
 
-theorem pop_off_br_cd0 : KA.«pop_off» + 0xcd0#64 = KA.«mycpu» := by decide
+theorem pop_off_br_cc4 : KA.«pop_off» + 0xcc4#64 = KA.«mycpu» := by decide
 
 set_option maxHeartbeats 4000000 in
 theorem pop_off_proof (M : MYCPU) : POPOFF := ⟨fun {hlc GF} _ _ cpu k hsie hnoff hK hlks reen hreen hon => by
@@ -116,7 +102,7 @@ theorem pop_off_proof (M : MYCPU) : POPOFF := ⟨fun {hlc GF} _ _ cpu k hsie hno
   inext
   iintro Hk Hpc Hframe
   -- jal mycpu
-  k_step (wp_s_jal cpu _ (KA.«pop_off» + 0x8#64) false 3272#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pop_off_br_cd0]
+  k_step (wp_s_jal cpu _ (KA.«pop_off» + 0x8#64) false 3260#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pop_off_br_cc4]
   iintro Hk Hpc
   have hm := M.wp_mycpu (hlc := hlc) (GF := GF) (lent := false) cpu ((k.pushed 2).withRegs
       (((k.regs.set 2#5 (k.regs 2#5 + 0xFFFFFFFFFFFFFFF0#64)).set 8#5 (k.regs 2#5)).set 1#5 (KA.«pop_off» + 0xc#64)))
@@ -221,10 +207,9 @@ theorem pop_off_proof (M : MYCPU) : POPOFF := ⟨fun {hlc GF} _ _ cpu k hsie hno
       iapply HK $$ %_ Hk Hpc
       ipureintro
       obtain ⟨hs2, _, h9, h18, h19, h20, h21, h22, h23, h24, h25, h26, h27⟩ := hcs2
-      simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] at h9 h18 h19 h20 h21 h22 h23 h24 h25 h26 h27
+      simp only [RegMap.set_apply, BitVec.reduceEq, ite_false] at h9 h18 h19 h20 h21 h22 h23 h24 h25 h26 h27
       unfold calleeSaved
-      simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, eq_self_iff_true, _root_.true_and,
-        _root_.and_true]
+      simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, _root_.true_and]
       exact ⟨h9, h18, h19, h20, h21, h22, h23, h24, h25, h26, h27⟩
       case hR2 => k_norm; rw [hcs2.1]; simp [RegMap.set_apply]
     -- the outermost push_off found interrupts off: they stay off
@@ -243,8 +228,8 @@ theorem pop_off_proof (M : MYCPU) : POPOFF := ⟨fun {hlc GF} _ _ cpu k hsie hno
       obtain ⟨w1, w2, w3, w4, w5⟩ := hwf
       unfold KCtx.wf
       simp only [KCtx.withCpu_sie, KCtx.withCpu_noff, KCtx.withCpu_intena, KCtx.withCpu_locks, KCtx.withCpu_tier,
-        KCtx.withRegs_sie, KCtx.withRegs_intena, KCtx.withRegs_locks, KCtx.withRegs_tier, KCtx.pushed_sie,
-        KCtx.pushed_intena, KCtx.pushed_locks, KCtx.pushed_tier]
+        KCtx.withRegs_sie, KCtx.withRegs_locks, KCtx.withRegs_tier, KCtx.pushed_sie,
+        KCtx.pushed_locks, KCtx.pushed_tier]
       refine ⟨fun _ => hsie, fun h => absurd h (by omega), fun h => absurd h (by rw [hsie]; decide),
         by omega, by omega⟩
     iintro Hk Hpc Hcell
@@ -275,10 +260,9 @@ theorem pop_off_proof (M : MYCPU) : POPOFF := ⟨fun {hlc GF} _ _ cpu k hsie hno
     iapply HΦ' $$ %_ Hk Hpc
     ipureintro
     obtain ⟨hs2, _, h9, h18, h19, h20, h21, h22, h23, h24, h25, h26, h27⟩ := hcs2
-    simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] at h9 h18 h19 h20 h21 h22 h23 h24 h25 h26 h27
+    simp only [RegMap.set_apply, BitVec.reduceEq, ite_false] at h9 h18 h19 h20 h21 h22 h23 h24 h25 h26 h27
     unfold calleeSaved
-    simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, eq_self_iff_true, _root_.true_and,
-      _root_.and_true]
+    simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, _root_.true_and]
     exact ⟨h9, h18, h19, h20, h21, h22, h23, h24, h25, h26, h27⟩
     case hR2 => k_norm; rw [hcs2.1]; simp [RegMap.set_apply]
   · -- the count is still positive: the depth becomes noff - 1, straight to the epilogue
@@ -314,10 +298,9 @@ theorem pop_off_proof (M : MYCPU) : POPOFF := ⟨fun {hlc GF} _ _ cpu k hsie hno
     iapply HΦ' $$ %_ Hk Hpc
     ipureintro
     obtain ⟨hs2, _, h9, h18, h19, h20, h21, h22, h23, h24, h25, h26, h27⟩ := hcs2
-    simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] at h9 h18 h19 h20 h21 h22 h23 h24 h25 h26 h27
+    simp only [RegMap.set_apply, BitVec.reduceEq, ite_false] at h9 h18 h19 h20 h21 h22 h23 h24 h25 h26 h27
     unfold calleeSaved
-    simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, eq_self_iff_true, _root_.true_and,
-      _root_.and_true]
+    simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, _root_.true_and]
     exact ⟨h9, h18, h19, h20, h21, h22, h23, h24, h25, h26, h27⟩
     case hR2 => k_norm; rw [hcs2.1]; simp [RegMap.set_apply]
 ⟩

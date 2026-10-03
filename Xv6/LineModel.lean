@@ -51,7 +51,6 @@ Deviations from Rocq:
    `lm_expected_rel_out_mono` unreached.)
 -/
 import Xv6.LineBytes
-import MachCSL.ObsTrace
 
 namespace Xv6
 

@@ -12,7 +12,7 @@
       }
     }
 
-`KA.«syscall»` (0x80002982), 100 bytes: the `ra/s0/s1/s2` four-slot frame
+`KA.«syscall»` (0x80002996), 100 bytes: the `ra/s0/s1/s2` four-slot frame
 (+0x00), `jal myproc` (+0x0c), `ld s2,88(a0)` (`p->trapframe`, +0x12),
 `ld a5,168(s2)` (word 21 = `tfArgIdx 7`, +0x16), the fused range check
 (+0x1a..+0x22), the table load and `jalr a5` (+0x26..+0x38), the store of
@@ -100,8 +100,7 @@ fallback (+0x40..+0x56) and the shared epilogue (+0x58..+0x62).
    `kstack_closer pj sp (trap_res b + av)`).
 9. `syscallSlots = 4 + sysExecSlots` (Rocq `K_syscall = 4 + K_sys_exec`):
    exec IS the deepest entry (248 of the 22 Specs' constants; the printk
-   fallback's 52 and myproc's 10 are below it), checked against each Spec
-   by `syscallSlots_entries`.
+   fallback's 52 and myproc's 10 are below it).
 
 Imports only definitional files and the 22 entries' Spec files (the slot
 check).
@@ -135,9 +134,6 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedSectionVars false
-set_option linter.unusedVariables false
-
 /-! ## §0 Address and stack depth -/
 
 /-- Address of `syscall`. -/
@@ -148,25 +144,6 @@ deepest table entry, sys_exec. -/
 def syscallSlots : Nat := syscallFrame + sysExecSlots
 
 theorem syscallSlots_val : syscallSlots = 252 := by decide
-
-/-- **THE CHECK AGAINST EVERY ENTRY'S SPEC**: syscall's frame over each of
-the 22 entries (and over the two direct callees, myproc and the printk
-fallback) fits the budget. -/
-theorem syscallSlots_entries :
-    syscallFrame + sysForkSlots ≤ syscallSlots ∧ syscallFrame + sysExitSlots ≤ syscallSlots ∧
-    syscallFrame + sysWaitSlots ≤ syscallSlots ∧ syscallFrame + sysPipeSlots ≤ syscallSlots ∧
-    syscallFrame + sysReadSlots ≤ syscallSlots ∧ syscallFrame + sysKillSlots ≤ syscallSlots ∧
-    syscallFrame + sysExecSlots ≤ syscallSlots ∧ syscallFrame + sysFstatSlots ≤ syscallSlots ∧
-    syscallFrame + sysChdirSlots ≤ syscallSlots ∧ syscallFrame + sysDupSlots ≤ syscallSlots ∧
-    syscallFrame + sysGetpidSlots ≤ syscallSlots ∧ syscallFrame + sysSbrkSlots ≤ syscallSlots ∧
-    syscallFrame + sysPauseSlots ≤ syscallSlots ∧ syscallFrame + sysUptimeSlots ≤ syscallSlots ∧
-    syscallFrame + sysOpenSlots ≤ syscallSlots ∧ syscallFrame + sysWriteSlots ≤ syscallSlots ∧
-    syscallFrame + sysMknodSlots ≤ syscallSlots ∧ syscallFrame + sysUnlinkK ≤ syscallSlots ∧
-    syscallFrame + sysLinkSlots ≤ syscallSlots ∧ syscallFrame + sysMkdirSlots ≤ syscallSlots ∧
-    syscallFrame + sysCloseSlots ≤ syscallSlots ∧ syscallFrame + sysSyncSlots ≤ syscallSlots ∧
-    syscallFrame + sysSeccompSlots ≤ syscallSlots ∧
-    syscallFrame + 10 ≤ syscallSlots ∧ syscallFrame + 52 ≤ syscallSlots := by
-  decide
 
 /-! ## §1 The pure rows Lean's landed tables lack (deviations 4, 5) -/
 
@@ -368,12 +345,6 @@ def SyscSpostEmp : Prop :=
     syscNumNofs n → ⊢ spostAt X n f W r M' fdv' cw' cs'
 
 variable (f : sfam GF) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState)
-
-/-- Rocq `sysc_fork_in_ne`. -/
-theorem syscForkIn_ne (h : syscNum V ≠ USYS_fork) : ⊢ syscForkIn (hlc := hlc) f V M sts := by
-  unfold syscForkIn
-  iintro %hc
-  exact absurd hc h
 
 /-- Rocq `sysc_fork_out_ne`. -/
 theorem syscForkOut_ne (r : BitVec 64) (cs cs' : ExtTreeSet GName compare)

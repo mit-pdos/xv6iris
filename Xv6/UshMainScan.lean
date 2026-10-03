@@ -22,7 +22,6 @@ the distance to that NUL (Rocq's echo-strlen mould).
 -/
 import Xv6.UshMainStubs
 import Xv6.UshMainCode
-import Xv6.UshMainBytes
 import Xv6.UshGettokScan
 
 namespace Xv6
@@ -30,8 +29,6 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
-
-set_option linter.unusedSectionVars false
 
 /-! ## §0 Pure helpers -/
 

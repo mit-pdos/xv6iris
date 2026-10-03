@@ -9,13 +9,13 @@ namespace Xv6
 
 open Xv6.User
 
-/-! ### init, inum 7, 36024 bytes -/
+/-! ### init, inum 7, 36072 bytes -/
 
 /-- Rocq `fsimg_init_type`. -/
 theorem fsimgInitType : (fsDinode fsimgP fsimgSb 7).diType.toNat = T_FILE := by
   rw [fsimgP_eq]; decide +kernel
 
-theorem fsimgInitSize : (fsDinode fsimgP fsimgSb 7).diSize.toNat = 36024 := by
+theorem fsimgInitSize : (fsDinode fsimgP fsimgSb 7).diSize.toNat = 36072 := by
   rw [fsimgP_eq]; decide +kernel
 
 theorem fsimgInitNlink : (fsDinode fsimgP fsimgSb 7).diNlink.toNat = 1 := by

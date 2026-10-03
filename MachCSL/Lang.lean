@@ -320,9 +320,6 @@ def powerFork (gen : Nat) : List Expr := cpus.map (Loop gen) ++ DevId.all.map (D
 
 /-! ## The per-event step relation -/
 
-/-- The events, as they appear at the head of a Sail computation. -/
-abbrev Ev := Eff RegisterType exception
-
 /-- `evStep cpu o σ v σ'`: in state `σ`, hart `cpu`'s event `o` can be
 answered with `v`, moving the state to `σ'`.  Failure events and the legacy
 direct-RAM events have no answer (the hart is stuck).

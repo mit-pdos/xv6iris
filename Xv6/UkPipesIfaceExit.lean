@@ -30,8 +30,6 @@ open Iris.Std.PartialMap
 open Std (ExtTreeSet)
 open UexecSG
 
-set_option linter.unusedSectionVars false
-
 section SepSList
 variable {PROP : Type _} [BI PROP]
 

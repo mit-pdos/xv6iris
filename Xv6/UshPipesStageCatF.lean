@@ -28,8 +28,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Std (ExtTreeSet)
 open UShPipesDefs
 
-set_option linter.unusedSectionVars false
-
 section CatF
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FileAppG GF] [FsTopG GF] [OffboxG GF]
   [IcacheG GF] [PipeProtoG GF] [PipeOutG GF]

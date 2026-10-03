@@ -214,8 +214,4 @@ structure CONSOLEWRITE : Prop where
     wp_consolewrite_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl γ γkl γk j pid V M n Q hj hproc hK hnoff
       htier huser hn hn'
 
-theorem consWriteRet_of (n : Int) (i : Nat) (h : (i : Int) ≤ max 0 n) :
-    consWriteRet n (BitVec.ofNat 64 i) :=
-  ⟨(i : Int), by rw [BitVec.ofInt_natCast], by omega, h⟩
-
 end Xv6

@@ -36,7 +36,6 @@ So the xv6 pipe device takes exactly the engine `UL : UK_LEAVES` (tip
 -/
 import Xv6.UkPipeDevRead
 import Xv6.UkRunSysClose
-import Xv6.UexecExecMintW
 import Xv6.UkWritePipe
 
 namespace Xv6
@@ -44,8 +43,6 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
-
-set_option linter.unusedSectionVars false
 
 section PipeDevXv6
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]

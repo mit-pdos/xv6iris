@@ -21,12 +21,8 @@ Helpers (no Rocq counterpart; stdpp's `Forall2_app`/`Forall2_app_inv_r`/
 Deviations: spelling as `UnionOutPureSync.lean`.
 -/
 import Xv6.UnionDisc
-import Xv6.UnionDiscDec
-import Xv6.GenOutPureSeal
 import Xv6.GenOutHistSeal
-import Xv6.PipesLedPure
 import Xv6.FileOutPureSeal
-import Xv6.FileDiscSeal
 
 namespace Xv6
 

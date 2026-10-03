@@ -14,14 +14,13 @@ Deviations from Rocq: as in `SpecShSysFork`.
 -/
 import Xv6.SpecShSysFork
 import Xv6.UshStep
+import Xv6.UshRunCode
 
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
-
-set_option linter.unusedSectionVars false
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]

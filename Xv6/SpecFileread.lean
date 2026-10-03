@@ -151,18 +151,13 @@ joins the shared epilogue (+0x5e) with the answer in `s2`.
 
 Imports only definitional files and callee `Spec*` files.
 -/
-import Xv6.FdTable
 import Xv6.FsAbsReadFire
 import Xv6.ConsoleInvDefs
-
 
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
-
-set_option linter.unusedVariables false
-set_option linter.unusedSectionVars false
 
 /-- Address of `fileread`. -/
 def filereadAddr : BitVec 64 := KA.«fileread»
@@ -213,17 +208,6 @@ def consoleReadyApp : IProp GF :=
 
 instance consoleReadyApp_persistent : Persistent (consoleReadyApp (GF := GF)) := by
   unfold consoleReadyApp; infer_instance
-
-/-- Rocq `console_ready_app_intro`. -/
-theorem consoleReadyApp_intro (γc : GName) (hera : fscCons.era = genId (hlc := hlc) (GF := GF) + 1) :
-    consoleInv (GF := GF) fscCons (appRdcred (hlc := hlc) (GF := GF)) γc ⊢ uartInv .uart0 fscCons.uart -∗ consoleReadyApp := by
-  unfold consoleReadyApp
-  iintro #H #Hu
-  iframe Hu
-  isplitl
-  · iexists γc
-    iexact H
-  ipureintro; exact hera
 
 /-- Rocq `console_ready_app_devsw`. -/
 theorem consoleReadyApp_devsw : consoleReadyApp (GF := GF) ⊢ devswTable := by
@@ -313,10 +297,6 @@ theorem fileread_env_out_of_env (st : FdState) :
   · exact .rfl
   · exact fileread_fs_env_out
   · exact .rfl
-
-/-- Rocq `fileread_env_none`. -/
-theorem fileread_env_none : ⊢ filereadEnv (hlc := hlc) (GF := GF) .closed := by
-  unfold filereadEnv; exact .rfl
 
 /-- THE SYSCALL'S SPLIT (Rocq SpecSysRead's `read_env_frame`): the
 content-independent file system and the console bundle, both owned by the
@@ -503,20 +483,6 @@ variable (gn : GName) (pt : UPtd) (F : Pfam GF (Aview → Nat → Anode → Nat 
   (Rd : Nat → Nat → IProp GF) (Rin : List (List Obs × BitVec 8) → IProp GF) (P : IProp GF)
   (Rp : List (BitVec 8) → IProp GF) (Rpe : List (BitVec 8) → PipeSt → IProp GF)
 
-/-- Rocq `fileread_arms_ret`. -/
-theorem filereadArms_ret (st : FdState) (n : Int) (r : BitVec 64) (M' : Nat → List (BitVec 8))
-    (addr : BitVec 64) :
-    filereadArms (hlc := hlc) gn pt st n F Rd Rin Rp Rpe P r M' addr ⊢ ⌜filereadRet n r⌝ := by
-  unfold filereadArms
-  iintro ⟨%h, -⟩
-  ipureintro; exact h
-
-/-- Rocq `fileread_extra_pay`. -/
-theorem filereadExtra_pay (st : FdState) (n : Int) (r : BitVec 64) (M' : Nat → List (BitVec 8))
-    (addr : BitVec 64) :
-    filereadExtra (hlc := hlc) gn pt st n F Rd Rin Rp Rpe P r M' addr ⊢
-      P ∗ filereadExtraCore (hlc := hlc) gn pt st n F Rd Rin Rp Rpe r M' addr := .rfl
-
 /-- **The console arm's `-1` reason, read off the payout without spending
 it** (Rocq `fileread_extra_core_m1_why`): the sign guard, or the kill shot. -/
 theorem filereadExtraCore_m1_why (rb : Bool) (n : Int) (r : BitVec 64) (M' : Nat → List (BitVec 8))
@@ -571,16 +537,6 @@ theorem filereadExtra_pipe (wb : Bool) (γp : PipeNames) (n : Int) (r : BitVec 6
   unfold filereadExtra filereadExtraCore
   iintro HP H
   iframe HP H
-
-/-- Rocq `fileread_extra_dev_other`. -/
-theorem filereadExtra_dev_other (wb : Bool) (mj : Nat) (n : Int) (r : BitVec 64)
-    (M' : Nat → List (BitVec 8)) (addr : BitVec 64) (hmj : mj ≠ CONSOLE) :
-    P ⊢ filereadExtra (hlc := hlc) gn pt (.open true wb (.device mj)) n F Rd Rin Rp Rpe P r M' addr := by
-  unfold filereadExtra filereadExtraCore
-  dsimp only
-  rw [if_neg hmj]
-  iintro HP
-  iframe HP
 
 /-- Rocq `fileread_extra_dev_console`. -/
 theorem filereadExtra_dev_console (wb : Bool) (n : Int) (r : BitVec 64)

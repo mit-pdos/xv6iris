@@ -39,7 +39,6 @@ the table, footprint reading it: the state and the oracle come back
 unchanged.
 -/
 import MachCSL.URunRW
-import MachCSL.HwConfig
 
 namespace MachCSL
 

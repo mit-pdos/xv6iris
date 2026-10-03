@@ -442,11 +442,6 @@ theorem dirRecord_ofName (data : Nat → List (BitVec 8)) (k : Nat)
 def dirWinAgree (data data' : Nat → List (BitVec 8)) (k : Nat) : Prop :=
   ∀ j, j < 16 → fileByte data' (16 * k + j) = fileByte data (16 * k + j)
 
-theorem dirWinAgree_below (data data' : Nat → List (BitVec 8)) (n k : Nat) :
-    (∀ j, j < 16 * n → fileByte data' j = fileByte data j) →
-    k < n → dirWinAgree data data' k :=
-  fun h hk j hj => h _ (by omega)
-
 theorem dirInum_agree (data data' : Nat → List (BitVec 8)) (k : Nat) :
     dirWinAgree data data' k → dirInum data' k = dirInum data k := by
   intro h
@@ -476,11 +471,6 @@ theorem dirMatchb_agree (data data' : Nat → List (BitVec 8)) (k : Nat) (s : Li
     dirWinAgree data data' k → dirMatchb data' k s = dirMatchb data k s := by
   intro h; unfold dirMatchb; rw [dirLiveb_agree data data' k h, dirBname_agree data data' k h]
 
-theorem dirFirst_agree (data data' : Nat → List (BitVec 8)) (n : Nat) (s : List (BitVec 8)) :
-    (∀ k, k < n → dirWinAgree data data' k) → dirFirst data' n s = dirFirst data n s := by
-  intro h; unfold dirFirst
-  exact dfirst_ext _ _ _ (fun j hj => dirMatchb_agree data data' j s (h j hj))
-
 /-! ## 6.  WHAT strncpy LEAVES IN dirlink'S RECORD
 
 `SpecStrncpy.snc_post` TRANSCRIBED, with `ByteBuf.bb_nonul` /
@@ -499,7 +489,7 @@ def dlSnc (f h : Nat → BitVec 8) (n : Nat) : Prop :=
 
 /-- both of strncpy's arms leave a buffer whose canonical prefix is `kk`
 bytes of `f` and whose tail to 14 is NUL; that is exactly `namePad` of the
-source's canonical name, i.e. `DirentEnc.dePadded`. -/
+source's canonical name. -/
 theorem snc_bview_aux (f h : Nat → BitVec 8) (kk : Nat) :
     kk ≤ 14 → (∀ j, j < kk → f j ≠ 0#8) → (kk = 14 ∨ f kk = 0#8) →
     (∀ j, j < kk → h j = f j) → (∀ j, kk ≤ j → j < 14 → h j = 0#8) →
@@ -547,32 +537,6 @@ Granularity is NOT a system invariant (fs-icache.md §15(b)), so the two
 directory proofs carry that turn as a live panic arm rather than refuting
 it. -/
 def dirNrec (sz : Nat) : Nat := sz / 16
-
-theorem dirNrec_exact (sz : Nat) : 16 ∣ sz → 16 * dirNrec sz = sz := by
-  intro h; unfold dirNrec; omega
-
-theorem dirNrec_bound (sz i : Nat) : 16 ∣ sz → (i * 16 < sz ↔ i < dirNrec sz) := by
-  intro h; unfold dirNrec; omega
-
-/-! The GRANULARITY-FREE arithmetic (fs-icache.md §15(b)).  Without
-`16 | sz` the loop bound `off < sz` and the record count part ways in
-exactly one place: at `i = dirNrec sz` the loop may still run (when
-`16 * nrec < sz`, i.e. a short tail record exists) and its readi is short.
-These three replace `dirNrec_bound`'s two directions, each with the premise
-that is actually available:
-
-- `dirNrec_ge` -- a WHOLE record below `nrec` fits, always;
-- `dirNrec_le` -- and conversely, so "readi returned 16" IS `i < nrec`;
-- `dirNrec_lt_le` -- the loop test alone only bounds `i` by `nrec`. -/
-
-theorem dirNrec_le (sz i : Nat) : i * 16 + 16 ≤ sz ↔ i < dirNrec sz := by
-  unfold dirNrec; omega
-
-theorem dirNrec_ge (sz i : Nat) : i < dirNrec sz → i * 16 + 16 ≤ sz :=
-  (dirNrec_le sz i).mpr
-
-theorem dirNrec_lt_le (sz i : Nat) : i * 16 < sz → i ≤ dirNrec sz := by
-  intro h; unfold dirNrec; omega
 
 /-! ## 8.  THE DIRECTORY-WF GATE (fs-icache.md §15(a)) -/
 

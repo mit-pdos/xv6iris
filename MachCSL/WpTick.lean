@@ -16,6 +16,7 @@ corollaries of `swp_tick_clock_hs`.
 import MachCSL.MConf
 import MachCSL.PlatformFacts
 import MachCSL.ModelFacts
+import MachCSL.Tactics
 
 namespace MachCSL
 
@@ -105,27 +106,6 @@ theorem swp_tick_clock_core (cpu : CPU) (dq : DFrac) (p : Privilege)
     iintro %mip' Hmenvcfg Hmtimecmp Hstimecmp Hmtime Hmip
     iapply HΦ $$ %_ %_ %_ Hcur_privilege Hmenvcfg Hmtimecmp Hstimecmp Hmcycle Hmtime Hmip
 
-/-- The clock tick in machine mode with the reset configuration. -/
-theorem swp_tick_clock_m (cpu : CPU) (dq : DFrac) (mcycle mtime mip : BitVec 64)
-    (Φ : Unit → IProp GF) :
-    hwConfig cpu ∗
-    Register.cur_privilege ↦ᵣ[cpu]{dq} Privilege.Machine ∗
-    Register.menvcfg ↦ᵣ[cpu]{dq} 0#64 ∗
-    Register.mtimecmp ↦ᵣ[cpu]{dq} 0xFFFFFFFFFFFFFFFF#64 ∗
-    Register.stimecmp ↦ᵣ[cpu]{dq} 0xFFFFFFFFFFFFFFFF#64 ∗
-    Register.mcycle ↦ᵣ[cpu] mcycle ∗
-    Register.mtime ↦ᵣ[cpu] mtime ∗
-    Register.mip ↦ᵣ[cpu] mip ∗
-    ▷ (∀ mcycle' mtime' mip',
-        Register.cur_privilege ↦ᵣ[cpu]{dq} Privilege.Machine -∗
-        Register.menvcfg ↦ᵣ[cpu]{dq} 0#64 -∗
-        Register.mtimecmp ↦ᵣ[cpu]{dq} 0xFFFFFFFFFFFFFFFF#64 -∗
-        Register.stimecmp ↦ᵣ[cpu]{dq} 0xFFFFFFFFFFFFFFFF#64 -∗
-        Register.mcycle ↦ᵣ[cpu] mcycle' -∗ Register.mtime ↦ᵣ[cpu] mtime' -∗
-        Register.mip ↦ᵣ[cpu] mip' -∗ Φ ())
-    ⊢ swp cpu (tick_clock ()) Φ :=
-  swp_tick_clock_core cpu dq Privilege.Machine _ _ _ mcycle mtime mip Φ
-
 /-! ## The configuration cells at an arbitrary hart state
 
 `MConf.confCells` pins `hart_state` to `HART_ACTIVE`; a parked hart holds the
@@ -150,10 +130,6 @@ def confCellsHS (cpu : CPU) (dq : DFrac) (p : Privilege) (c : MConf) (hs : HartS
   Register.pmpcfg_n ↦ᵣ[cpu]{dq} c.pmpcfg ∗
   Register.pmpaddr_n ↦ᵣ[cpu]{dq} c.pmpaddr ∗
   hwConfig cpu
-
-/-- At `HART_ACTIVE` the family is `confCells` itself. -/
-theorem confCellsHS_active (cpu : CPU) (dq : DFrac) (p : Privilege) (c : MConf) :
-    confCellsHS (GF := GF) cpu dq p c (HartState.HART_ACTIVE ()) = confCells cpu dq p c := rfl
 
 theorem confCellsHS_cases (cpu : CPU) (dq : DFrac) (p : Privilege) (c : MConf) (hs : HartState) :
     confCellsHS (GF := GF) cpu dq p c hs ⊢
@@ -229,7 +205,6 @@ theorem swp_tick_clock_hs (cpu : CPU) (dq : DFrac) (p : Privilege) (c : MConf) (
   confhs_intro HmConf
   iapply HΦ $$ %_ %_ %_ HmConf Hmcycle Hmtime Hmip
 
-set_option linter.unusedVariables false in
 /-- The clock tick, in machine or supervisor mode: `mcycle`/`mtime` advance,
 the pending bits are refreshed from the timer compares (whatever they are),
 no interrupt is taken. -/
@@ -242,14 +217,5 @@ theorem swp_tick_clock_cells (cpu : CPU) (dq : DFrac) (p : Privilege)
         Register.mtime ↦ᵣ[cpu] mtime' -∗ Register.mip ↦ᵣ[cpu] mip' -∗ Φ ())
     ⊢ swp cpu (tick_clock ()) Φ :=
   swp_tick_clock_hs cpu dq p c (HartState.HART_ACTIVE ()) mcycle mtime mip Φ
-
-theorem swp_tick_clock_conf (cpu : CPU) (dq : DFrac) (c : MConf) (mcycle mtime mip : BitVec 64)
-    (Φ : Unit → IProp GF) :
-    mConf cpu dq c ∗ Register.mcycle ↦ᵣ[cpu] mcycle ∗ Register.mtime ↦ᵣ[cpu] mtime ∗
-    Register.mip ↦ᵣ[cpu] mip ∗
-    ▷ (∀ mcycle' mtime' mip', mConf cpu dq c -∗ Register.mcycle ↦ᵣ[cpu] mcycle' -∗
-        Register.mtime ↦ᵣ[cpu] mtime' -∗ Register.mip ↦ᵣ[cpu] mip' -∗ Φ ())
-    ⊢ swp cpu (tick_clock ()) Φ :=
-  swp_tick_clock_cells cpu dq Privilege.Machine (Or.inl rfl) c mcycle mtime mip Φ
 
 end MachCSL

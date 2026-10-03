@@ -11,13 +11,13 @@ Xv6.User.<P>.elf` (`Xv6/User/<P>ElfRaw.lean`).
 
 | program | inum | size  | content blocks (indirect at) |
 |---------|------|-------|------------------------------|
-| cat     | 3    | 36776 | 51-62, 64-87   (63)          |
-| echo    | 4    | 35640 | 88-99, 101-123 (100)         |
-| grep    | 6    | 44496 | 143-154, 156-187 (155)       |
-| init    | 7    | 36024 | 188-199, 201-224 (200)       |
-| sh      | 13   | 58632 | 412-423, 425-470 (424)       |
-| sync    | 22   | 34992 | 949-960, 962-984 (961)       |
-| seccomp | 23   | 36144 | 985-996, 998-1021 (997)      |
+| cat     | 3    | 36816 | 51-62, 64-87   (63)          |
+| echo    | 4    | 35688 | 88-99, 101-123 (100)         |
+| grep    | 6    | 44544 | 143-154, 156-187 (155)       |
+| init    | 7    | 36072 | 188-199, 201-224 (200)       |
+| sh      | 13   | 58680 | 412-423, 425-470 (424)       |
+| sync    | 22   | 35048 | 949-960, 962-984 (961)       |
+| seccomp | 23   | 36192 | 985-996, 998-1021 (997)      |
 
 **THE LEAF RULE** (Rocq's, `FsImgCheck.v`): no proof file imports this one.
 
@@ -46,10 +46,3 @@ Xv6.User.<P>.elf` (`Xv6/User/<P>ElfRaw.lean`).
 5. `fsimg<P>RowsLen` restates `ElfUser`'s `elf_rows_len` (that file is a
    leaf and may not be imported).
 -/
-import Xv6.FsImgFilesCat
-import Xv6.FsImgFilesEcho
-import Xv6.FsImgFilesGrep
-import Xv6.FsImgFilesInit
-import Xv6.FsImgFilesSh
-import Xv6.FsImgFilesSeccomp
-import Xv6.FsImgFilesSync

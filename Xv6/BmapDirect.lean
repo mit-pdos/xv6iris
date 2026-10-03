@@ -26,9 +26,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-- `lw s1,80(s3)` / `sw a0,80(s3)` with `s3 = ip + 4*bn`, as the normaliser
 leaves it (Rocq's `i_addr_indexed`). -/

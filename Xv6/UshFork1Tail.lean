@@ -17,14 +17,13 @@ entry sp (with the empty local run `ustack … 0`), and the epilogue is
 -/
 import Xv6.UshRunDefs
 import Xv6.UshStep
+import Xv6.UshRunCode
 
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
-
-set_option linter.unusedSectionVars false
 
 /-- The register file the tail returns with: `a5 := -1`, then the epilogue's
 restores and pop. -/

@@ -6,16 +6,15 @@ union laws reach (U4 seal wave, walk3.txt).  Pure.
 Added (Rocq → Lean, the landed `lb`-prefix convention):
 `lb_app4` → `lbApp4`, `lb_lookup_total_drop` → `lbLookup_total_drop`,
 `lb_lta_take_eq` → `lbLta_take_eq`, `lb_nonl_lta` → `lbNonl_lta`,
-`lb_prefix_eq` → `lbPrefix_eq`, `lb_take_S` → `lbTake_S`,
-`lb_dollar_split` → `lbDollar_split`, `lb_prompt_of_dollar` →
-`lbPrompt_of_dollar`, `lb_prompt_of_dollar_r` → `lbPrompt_of_dollar_r`.
+`lb_take_S` → `lbTake_S`, `lb_dollar_split` → `lbDollar_split`,
+`lb_prompt_of_dollar` → `lbPrompt_of_dollar`, `lb_prompt_of_dollar_r` →
+`lbPrompt_of_dollar_r`.  `lb_prefix_eq` is not ported (nothing uses it).
 
 Deviations: spelling only.  As in the landed file, Rocq's right-nested
 `u ++ u_prompt ++ Y` is written `u ++ uPrompt ++ Y` (Lean's `++` is
 left-associative: `(u ++ uPrompt) ++ Y`; equal as lists).
 -/
 import Xv6.LineBytes
-import Xv6.LineWordsSeal
 import Xv6.EchoDiscSeal
 
 namespace Xv6
@@ -42,15 +41,6 @@ theorem lbNonl_lta (bs : List (List (BitVec 8))) (i : Nat) (hF : ∀ l ∈ bs, w
     (hi : i < bs.length) : wlNl ∉ bs[i]! := by
   rw [List.getElem!_eq_getElem?_getD, List.getElem?_eq_getElem hi, Option.getD_some]
   exact hF _ (List.getElem_mem hi)
-
-/-- Rocq `lb_prefix_eq`. -/
-theorem lbPrefix_eq {A : Type} (u v : List A) (hp : u <+: v) (hl : v.length ≤ u.length) :
-    u = v := by
-  obtain ⟨k, rfl⟩ := hp
-  rw [List.length_append] at hl
-  have hk : k = [] := List.eq_nil_of_length_eq_zero (by omega)
-  subst hk
-  rw [List.append_nil]
 
 /-- Rocq `lb_take_S`. -/
 theorem lbTake_S {A : Type} [Inhabited A] (n : Nat) (l : List A) (h : n + 1 ≤ l.length) :

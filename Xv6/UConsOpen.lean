@@ -12,7 +12,9 @@ here and the two programs are two instantiations.
 
 ## The rest of the file: `Xv6/UConsOpenSup.lean`, `Xv6/UConsOpenAny.lean`
 
-Everything listed below (once waiting here) is ported: the `UInitCons` /
+Everything listed below (once waiting here) is ported, except
+`init_cons_elems_len`, `init_cons_elems_hd`, `cons_hop_dead` and
+`cons_walk_dead`, which nothing uses: the `UInitCons` /
 `FsConsPin` part and `fupd_wp_triv` / `cons_ro_sub` / `xfam_open` /
 `sbundle_at_open_*` in `UConsOpenSup` (its header maps each name), the K3
 table-view part (`uk_open_fd_arm_at`, `init_cons_fail_std_at`, here;
@@ -51,8 +53,6 @@ import Xv6.UserFd
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode MachCSL
-
-set_option linter.unusedSectionVars false
 
 /-! ## 1.  /init's omode word, read the way the rows read it -/
 
@@ -99,20 +99,6 @@ def consPDead (T K : IProp GF) (d0 k d : Nat) : IProp GF :=
 
 /-- **Rocq `cons_Pmiss`**: the miss family hands the credential back. -/
 def consPmiss (T K : IProp GF) (_k _d : Nat) : IProp GF := iprop(K ∨ T)
-
-/-- **Rocq `cons_hop_dead_hi`**: EVERY LATER HOP, reached only under the
-taint -- the cursor at `k ≠ 0` IS the taint, and the hop opens nothing. -/
-theorem consHopDead_hi (γfs : FsNames) (T K : IProp GF) (d0 k : Nat) (s : Fname) (hk : k ≠ 0) :
-    ⊢ exHop (hlc := hlc) γfs (consPDead T K d0) (consPmiss T K) k s := by
-  unfold exHop axHop consPDead consPmiss
-  iintro %d %ents %dqv HP HF
-  icases HP with (⟨%hpd, -⟩ | HT)
-  · exact absurd hpd.1 hk
-  · imodintro
-    iframe HF
-    cases ents[s]? with
-    | some c => simp only [axHopNext]; iright; iexact HT
-    | none => simp only [axHopNext]; iright; iexact HT
 
 end UConsOpen
 

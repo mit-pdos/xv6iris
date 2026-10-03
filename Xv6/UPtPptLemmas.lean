@@ -12,8 +12,6 @@ same facts under their own names.
 -/
 import Xv6.UPtLemmas
 import MachCSL.WpSmodeCtl
-import Xv6.KvmLemmas
-import Xv6.UPtAllocLemmas
 
 namespace Xv6.UPtPpt
 
@@ -21,8 +19,6 @@ open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Iris.Std Iris.Std.PartialMap Iris.Std.LawfulPartialMap
 open Xv6.PtRun Xv6.UPt
-
-set_option linter.unusedSectionVars false
 
 /-! ## Branches -/
 

@@ -41,8 +41,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
-
 /-- The number a stub's `c.li a7` leaves, read as the trap reads it. -/
 theorem kinit_usysno (m : RegMap) (v : BitVec 64) :
     UkSysP.usysno (ukWr m 17#5 v) = (BitVec.extractLsb' 0 32 v).toInt := by
@@ -55,12 +53,6 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [Uexec
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
 /-! ## §1 The stub laws at init's text -/
-
-unseal LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled in
-theorem init_stub_fork (UL : UK_LEAVES) (N : UkNames GF) :
-    ⊢ stubLaw (hlc := hlc) N (initCode N.t) 1 User.Init.Sym.«fork» :=
-  stub_of_text UL N User.Init.textOk 1 _ 1#12 (by decide) udec% udec% udec%
-    (by decide) (by decide)
 
 unseal LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled in
 theorem init_stub_exit (UL : UK_LEAVES) (N : UkNames GF) :

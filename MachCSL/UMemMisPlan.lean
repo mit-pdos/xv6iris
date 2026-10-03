@@ -26,8 +26,6 @@ a symbolic address (performance rule 2):
   `2^min(ctz pa, ctz W)`-byte chunks).  As in Rocq, nothing downstream needs
   to know which branch was taken.
 -/
-import MachCSL.UTranslate
-import MachCSL.Tactics
 import MachCSL.BvEnumSatp
 import Xv6.UmodeArith
 

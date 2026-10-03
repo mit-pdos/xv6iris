@@ -14,7 +14,6 @@ The result is kkill's `a0`, untouched: the epilogue restores only
 -/
 import Xv6.SpecSysKill
 import Xv6.ArgLemmas
-import MachCSL.WpSmodeFrame6
 import Xv6.SpecKkill
 import Xv6.CopyLemmas
 
@@ -25,9 +24,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## Constants and arithmetic -/
 

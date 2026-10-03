@@ -8,14 +8,11 @@ import Xv6.FileDefs
 import Xv6.StepLemmas
 import Xv6.BcacheInv
 import Xv6.BmapParts
-import Xv6.VirtioQueue
 
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
-
-set_option linter.unusedSectionVars false
 
 /-! ## Geometry facts -/
 
@@ -70,7 +67,6 @@ theorem fa_bne_end_last : bcond bop.BNE (fnode NFILE) (fnode NFILE) = false := b
 
 /-! ## The `ref` cell's value -/
 
-
 theorem fa_beqz_zero : bcond bop.BEQ (BitVec.signExtend 64 (BitVec.ofNat 32 0)) 0#64 = true := by
   decide
 theorem fa_beqz_nonzero (n : Nat) (hn : n ≠ 0) (hlt : n < 2 ^ 31) :
@@ -78,7 +74,6 @@ theorem fa_beqz_nonzero (n : Nat) (hn : n ≠ 0) (hlt : n < 2 ^ 31) :
   rw [bcond_beq_eq]; exact beq_eq_false_iff_ne.mpr (Xv6.bc_refcnt_nonzero n hn hlt)
 
 /-! ## Pure facts for the count -/
-
 
 /-- `blez a5` with `ref ≥ 1` is not taken. -/
 theorem fd_bgtz (n : Nat) (h1 : 1 ≤ n) (h : n < 2 ^ 31) :
@@ -92,9 +87,7 @@ theorem fd_bgtz (n : Nat) (h1 : 1 ≤ n) (h : n < 2 ^ 31) :
     simp; omega
   rw [hlt]; rfl
 
-
 /-! ## `fileclose`'s counter and field arithmetic -/
-
 
 /-- `bgtz a5` after `--ref`: taken iff two or more references remained. -/
 theorem fc_bgtz (n : Nat) (h1 : 1 ≤ n) (h : n < 2 ^ 31) :
@@ -115,8 +108,6 @@ theorem fc_bgtz' (n : Nat) (h1 : 1 ≤ n) (h : n < 2 ^ 31) :
   rw [← fc_bgtz n h1 h]; rfl
 
 theorem aFtype_eq (k : Nat) : aFtype k = fnode k + BitVec.signExtend 64 0#12 := by
-  unfold aFtype; simp
-theorem aFtype_eq' (k : Nat) : fnode k + 0#64 = aFtype k := by
   unfold aFtype; simp
 theorem aFreadable_eq (k : Nat) : aFreadable k = fnode k + BitVec.signExtend 64 8#12 := by
   unfold aFreadable; rfl
@@ -215,14 +206,6 @@ theorem fslot_intro (γ : FileNames) (k : Nat) (L : List (Nat × Qp)) (C : FCont
   iexists C, pn, q'
   iframe H1 H2 H3 H4
   ipureintro; exact ⟨hnd, hlt⟩
-
-/-- The authority knows every holder's id. -/
-theorem fref_lookup (γ : FileNames) (M : RegMapF (Nat × Qp)) (id k : Nat) (q : Qp) :
-    (γ.ref ↪●MAP M) ∗ (γ.ref ↪◯MAP[id]{.own (1 : Qp).half} (k, q)) ⊢@{IProp GF}
-      ⌜PartialMap.get? M id = some (k, q)⌝ := by
-  iintro ⟨Ha, He⟩
-  ihave %h := ghost_map_lookup $$ Ha He
-  ipureintro; exact h
 
 /-- `updAt` at the list a slot already has changes nothing. -/
 theorem updAt_same (Ls : Nat → List (Nat × Qp)) (k : Nat) (L : List (Nat × Qp)) (h : Ls k = L) :

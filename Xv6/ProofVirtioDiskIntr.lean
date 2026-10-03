@@ -38,15 +38,12 @@ fence drains).  `Xv6.vdis_payWm_mk` puts one back at the new watermark when the
 handler releases.
 -/
 import MachCSL.WpSmodeFrame12b
-import MachCSL.WpSmodeDev4
 import MachCSL.WpSmodeFenceFloor2
 import MachCSL.WpSmodeFencePub
 import Xv6.SpecVirtioDiskIntr
 import Xv6.SpecAcquire
 import Xv6.SpecRelease
-import Xv6.DiskAcc
 import Xv6.CodeTactics
-import Xv6.VirtioDiskRwDefs2
 import Xv6.VirtioDiskRwDefs3
 import MachCSL.LockFacts
 
@@ -55,29 +52,27 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
 /-! ## Addresses -/
 
 /-- `&disk`, folded out of `auipc s1,0x1e; addi s1,s1,-1778`. -/
-theorem vdis_disk_addr : KA.«virtio_disk_intr» + 0x1daf8#64 = KA.«disk» := by decide
+theorem vdis_disk_addr : KA.«virtio_disk_intr» + 0x1dca8#64 = KA.«disk» := by decide
 
 /-- `&disk.vdisk_lock`, folded out of either `auipc/addi a0` pair. -/
-theorem vdis_lock_addr : KA.«virtio_disk_intr» + 0x1dc20#64 = aVdiskLock := by
+theorem vdis_lock_addr : KA.«virtio_disk_intr» + 0x1ddd0#64 = aVdiskLock := by
   unfold aVdiskLock diskAddr dOffLock; decide
 
 theorem vdis_br_acquire :
-    KA.«virtio_disk_intr» + 0xffffffffffffb020#64 = KA.«acquire» := by decide
+    KA.«virtio_disk_intr» + 0xffffffffffffaf30#64 = KA.«acquire» := by decide
 
 theorem vdis_br_wakeup :
-    KA.«virtio_disk_intr» + 0xffffffffffffc408#64 = KA.«wakeup» := by decide
+    KA.«virtio_disk_intr» + 0xffffffffffffc318#64 = KA.«wakeup» := by decide
 
 theorem vdis_br_release :
-    KA.«virtio_disk_intr» + 0xffffffffffffb0a8#64 = KA.«release» := by decide
+    KA.«virtio_disk_intr» + 0xffffffffffffafb8#64 = KA.«release» := by decide
 
 theorem vdis_ret_1e : jumpPc (KA.«virtio_disk_intr» + 0x1e#64) = KA.«virtio_disk_intr» + 0x1e#64 := by
   decide
@@ -97,10 +92,9 @@ variable {lent : Bool}
 /-! ## `fence iorw,iorw`, the floor rule
 
 `__sync_synchronize()` is emitted as `0ff0000f`, i.e. `FENCE (0, iorw,
-iorw)`, not the `FENCE (0, rw, rw)` of `MachCSL.wp_s_fence_rw_rw_floor`:
-the two decode to the same `Barrier_RISCV_rw_rw`, because the Sail model
-looks only at the low two bits of each set.  Both encodings now have their
-rules in `MachCSL/WpSmodeFenceFloor2.lean`
+iorw)`, not `FENCE (0, rw, rw)`: the two decode to the same
+`Barrier_RISCV_rw_rw`, because the Sail model looks only at the low two bits
+of each set.  Its rules are in `MachCSL/WpSmodeFenceFloor2.lean`
 (`MachCSL.wp_s_fence_iorw_iorw`, `MachCSL.wp_s_fence_iorw_iorw_floor`);
 the proofs that used to live here were moved there verbatim. -/
 
@@ -383,10 +377,7 @@ def vdisK (k : KCtx) : KCtx :=
 @[simp] theorem vdisK_intena (k : KCtx) : (vdisK k).intena = k.intena := rfl
 @[simp] theorem vdisK_locks (k : KCtx) : (vdisK k).locks = "virtio_disk" :: k.locks := rfl
 @[simp] theorem vdisK_tier (k : KCtx) : (vdisK k).tier = k.tier := rfl
-@[simp] theorem vdisK_proc (k : KCtx) : (vdisK k).proc = k.proc := rfl
 @[simp] theorem vdisK_regs (k : KCtx) : (vdisK k).regs = k.regs := rfl
-@[simp] theorem vdisK_spie (k : KCtx) : (vdisK k).spie = k.spie := rfl
-@[simp] theorem vdisK_spp (k : KCtx) : (vdisK k).spp = k.spp := rfl
 
 theorem vdisK_fold (k : KCtx) :
     ((k.pushOffAt k.spie k.spp).withLocks ("virtio_disk" :: k.locks)).pushed 4 = vdisK k := rfl
@@ -427,13 +418,6 @@ theorem vdisPres_set (k : KCtx) (R : RegMap) (rd : BitVec 5) (v : BitVec 64) (h 
   rcases hne with rfl | rfl | rfl | rfl | rfl | rfl <;>
     simp only [RegMap.set_apply, BitVec.reduceEq, ite_false] <;> exact h
 
-theorem vdisPres_call (k : KCtx) (R R' : RegMap) (h : vdisPres k R) (hcs : calleeSaved R R') :
-    vdisPres k R' := by
-  obtain ⟨h2, h18, h19, h20, h21, h22, h23, h24, h25, h26, h27⟩ := h
-  obtain ⟨c2, -, -, c18, c19, c20, c21, c22, c23, c24, c25, c26, c27⟩ := hcs
-  exact ⟨c2.trans h2, c18.trans h18, c19.trans h19, c20.trans h20, c21.trans h21,
-    c22.trans h22, c23.trans h23, c24.trans h24, c25.trans h25, c26.trans h26, c27.trans h27⟩
-
 /-! ## The exit: `release(&disk.vdisk_lock)` and the epilogue -/
 
 section
@@ -457,11 +441,11 @@ theorem vdis_exit (RE : RELEASE) (cpu : CPU) (k : KCtx) (γ : DiskNames) (γl : 
   k_step (wp_s_auipc cpu _ (KA.«virtio_disk_intr» + 0x8a#64) false 0x1e#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [vdisK_sie k]
   iintro Hk Hpc
-  k_step (wp_s_addi cpu _ (KA.«virtio_disk_intr» + 0x8e#64) false 2966#12 10#5 10#5 (by decide))
+  k_step (wp_s_addi cpu _ (KA.«virtio_disk_intr» + 0x8e#64) false 3398#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [vdisK_sie k, vdis_lock_addr]
   iintro Hk Hpc
   -- +0x92  jal release
-  k_step (wp_s_jal cpu _ (KA.«virtio_disk_intr» + 0x92#64) false 2076694#21 1#5 (by decide))
+  k_step (wp_s_jal cpu _ (KA.«virtio_disk_intr» + 0x92#64) false 2076454#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [vdisK_sie k, vdis_br_release]
   iintro Hk Hpc
   iapply (vdis_release RE cpu _ γ γl pd pav pu ?ha0 ?hsr ?hnr ?hKr false ?hrr ?hor)
@@ -797,7 +781,7 @@ theorem vdis_loop (WK : WAKEUP)
     with [vdisK_sie k, Xv6.vdrw3_bufDisk c.bp]
   iintro Hk Hpc Hdsk
   -- +0x6e  jal wakeup
-  k_step (wp_s_jal cpu _ (KA.«virtio_disk_intr» + 0x6e#64) false 2081690#21 1#5 (by decide))
+  k_step (wp_s_jal cpu _ (KA.«virtio_disk_intr» + 0x6e#64) false 2081450#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [vdisK_sie k, vdis_br_wakeup]
   iintro Hk Hpc
   iapply (vdis_wakeup WK Γ cpu _ ?hsw ?hnw ?hKw ?hlw ?htw) $$ [- $Hk $Hpc]
@@ -982,18 +966,18 @@ theorem virtio_disk_intr_proof
   k_step (wp_s_auipc cpu _ (KA.«virtio_disk_intr» + 0xa#64) false 0x1e#20 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_addi cpu _ (KA.«virtio_disk_intr» + 0xe#64) false 2798#12 9#5 9#5 (by decide))
+  k_step (wp_s_addi cpu _ (KA.«virtio_disk_intr» + 0xe#64) false 3230#12 9#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [vdis_disk_addr]
   iintro Hk Hpc
   -- +0x12  auipc a0,0x1e ; +0x16  addi a0,a0,-1490
   k_step (wp_s_auipc cpu _ (KA.«virtio_disk_intr» + 0x12#64) false 0x1e#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_addi cpu _ (KA.«virtio_disk_intr» + 0x16#64) false 3086#12 10#5 10#5 (by decide))
+  k_step (wp_s_addi cpu _ (KA.«virtio_disk_intr» + 0x16#64) false 3518#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [vdis_lock_addr]
   iintro Hk Hpc
   -- +0x1a  jal acquire
-  k_step (wp_s_jal cpu _ (KA.«virtio_disk_intr» + 0x1a#64) false 2076678#21 1#5 (by decide))
+  k_step (wp_s_jal cpu _ (KA.«virtio_disk_intr» + 0x1a#64) false 2076438#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [vdis_br_acquire]
   iintro Hk Hpc
   iapply (vdis_acquire AC cpu _ γ γl pd pav pu ?ha0 ?hna ?hKa ?hsa) $$ [- $Hk $Hpc]

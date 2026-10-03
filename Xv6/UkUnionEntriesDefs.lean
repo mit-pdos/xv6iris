@@ -54,31 +54,16 @@ not reached (Lean's `ukCode` is persistent by instance).
 -/
 import Xv6.UkFileIfaceRec
 import Xv6.UkUnionEntriesLend
-import Xv6.HfpProgP
-import Xv6.UkStub
-import Xv6.UkCatTree
-import Xv6.UkTreeEntry
-import Xv6.ProgTreeFile
-import Xv6.ExecEntry
-import Xv6.UkSysPHolds
-import Xv6.UkSysFHHolds
-import Xv6.UkFileEntries
 import Xv6.HfpFileOpenHolds
 import Xv6.UkFileDevSysHolds
 import Xv6.UexecExecMintW
-import Xv6.UkTreeEntryStmt
-import Xv6.UkTreeEntryEcho
 import Xv6.UkTreeEntryCat
-import Xv6.User.EchoElfRaw
-import Xv6.User.CatElfRaw
 
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Std (ExtTreeSet)
 open HfpFileClaimsP
-
-set_option linter.unusedSectionVars false
 
 /-! ## §0 small facts -/
 

@@ -19,8 +19,7 @@ its configuration validation.
 
 NO TABLE (BootReset phase 3).  The Lean port once trusted a 31-pin table of
 reset values (`resetVal`/`resetRegs`/`resetWith` in `MachCSL.Lang`); fourteen
-of its pins were NOT consequences of the boot program (`bootProg_keeps`: the
-run leaves medeleg, mepc, satp, mcounteren, scounteren, mtimecmp, stimecmp,
+of its pins were NOT consequences of the boot program (the run leaves medeleg, mepc, satp, mcounteren, scounteren, mtimecmp, stimecmp,
 pmpaddr_n, sig_meip, sig_seip, mcountinhibit, minstretcfg, mcyclecfg at their
 power-on garbage, and pmpcfg_n's R/W/X bits too).  They are now generic
 everywhere downstream, Rocq's route:
@@ -105,15 +104,6 @@ theorem resetRegsRun_of_bootPost (cpu : CPU) (f : RegFile) (h : bootPost (bootHi
   split at hv <;> (try simp only [Option.some.injEq, reduceCtorEq] at hv) <;> subst hv <;>
     first | assumption | exact False.elim hv
 
-/-- **THE THEOREM** (Rocq `reset_regs_of_run`): for EVERY hart and EVERY
-power-on register file, the boot program runs to completion, and the file it
-lands in satisfies every reset fact of Rocq's `reset_regs` -- the seventeen
-exact pins of `resetValRun` and `pmpAllOff` -- with nothing taken on trust. -/
-theorem bootProg_resetRegsRun (cpu : CPU) (f₀ : RegFile) :
-    ∃ f, bootRun (bootProg (bootHid cpu) bootPMA) f₀ = some ((), f) ∧ resetRegsRun cpu f := by
-  obtain ⟨_, f, h, hp⟩ := bootFin_bootProg (bootHid cpu) f₀
-  exact ⟨f, h, resetRegsRun_of_bootPost cpu f hp⟩
-
 /-- Rocq `reset_regs_of_run`, at a given run: the landing file of ANY run of
 the boot program satisfies `resetRegsRun`. -/
 theorem resetRegsRun_of_run (cpu : CPU) (f₀ f : RegFile)
@@ -144,22 +134,5 @@ theorem bootFacts_resetRegsRun {σ : MState} (h : bootFacts σ) (cpu : CPU) :
     resetRegsRun cpu (σ.regs cpu) := by
   obtain ⟨f₀, hr⟩ := h.2.2.2.1 cpu
   exact resetRegsRun_of_run cpu f₀ _ hr
-
-/-- What the boot program does NOT reset: the run leaves each of these
-registers at its power-on value (they are generic everywhere downstream:
-`MachCSL.BootGarb`, `MachCSL.SLeft`, `MachCSL.HwCounters`). -/
-theorem bootProg_keeps (hid : BitVec 64) (f₀ : BootRegs) :
-    BootFin (fun _ f => f .medeleg = f₀ .medeleg ∧ f .mepc = f₀ .mepc ∧ f .satp = f₀ .satp ∧
-        f .mcounteren = f₀ .mcounteren ∧ f .scounteren = f₀ .scounteren ∧
-        f .mtimecmp = f₀ .mtimecmp ∧ f .stimecmp = f₀ .stimecmp ∧
-        f .pmpaddr_n = f₀ .pmpaddr_n ∧ f .sig_meip = f₀ .sig_meip ∧ f .sig_seip = f₀ .sig_seip ∧
-        f .mcountinhibit = f₀ .mcountinhibit ∧ f .minstretcfg = f₀ .minstretcfg ∧
-        f .mcyclecfg = f₀ .mcyclecfg)
-      (bootProg hid bootPMA) f₀ := by
-  unfold bootProg
-  boot_peel [bootFin_reset_pmp]
-  refine bootFin_pure _ _ _ ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
-  all_goals boot_lk
-  all_goals rfl
 
 end MachCSL

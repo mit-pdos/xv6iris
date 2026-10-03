@@ -45,13 +45,6 @@ def uxaAluUC : instruction → Bool
   | .C_NOT _ | .C_ZEXT_B _ | .C_NOP _ => true
   | _ => false
 
-theorem uxaAluU_decodable (ast : instruction) (h : uxaAluU ast = true) : decodableU ast = true := by
-  cases ast <;> first | exact absurd h Bool.false_ne_true | rfl
-
-theorem uxaAluUC_decodable (ast : instruction) (h : uxaAluUC ast = true) :
-    decodableUC ast = true := by
-  cases ast <;> first | exact absurd h Bool.false_ne_true | rfl
-
 section
 variable {D : UFoot}
 

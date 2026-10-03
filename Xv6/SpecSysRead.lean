@@ -84,9 +84,6 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedVariables false
-set_option linter.unusedSectionVars false
-
 def sysReadAddr : BitVec 64 := KA.«sys_read»
 
 /-- sys_read's own 6-slot frame over fileread's 98 (argfd's 24, argint's /
@@ -127,32 +124,6 @@ def sysReadArms (V : ProcPriv) (v : BitVec 64) (sts : List FdState) (n : Int)
 variable (F : Pfam GF (Aview → Nat → Anode → Nat → IProp GF)) (Rd : Nat → Nat → IProp GF)
   (Rin : List (List Obs × BitVec 8) → IProp GF) (P : IProp GF)
   (Rp : List (BitVec 8) → IProp GF) (Rpe : List (BitVec 8) → PipeSt → IProp GF)
-
-/-- Rocq `sys_read_arms_ret`. -/
-theorem sysReadArms_ret (V : ProcPriv) (v : BitVec 64) (sts : List FdState) (n : Int) (r : BitVec 64)
-    (M' : Nat → List (BitVec 8)) (addr : BitVec 64) :
-    sysReadArms (hlc := hlc) V v sts n F Rd Rin Rp Rpe P r M' addr ⊢ ⌜sysReadRet V v n r⌝ := by
-  unfold sysReadArms
-  iintro ⟨%h, -⟩
-  ipureintro; exact h
-
-/-- Rocq `sys_read_arms_extra`. -/
-theorem sysReadArms_extra (V : ProcPriv) (v : BitVec 64) (sts : List FdState) (n : Int)
-    (r : BitVec 64) (M' : Nat → List (BitVec 8)) (addr : BitVec 64) :
-    sysReadArms (hlc := hlc) V v sts n F Rd Rin Rp Rpe P r M' addr ⊢
-      filereadExtra (hlc := hlc) V.gen V.upt (sysFdSt v V.ofile sts) n F Rd Rin Rp Rpe P r M' addr := by
-  unfold sysReadArms
-  iintro ⟨-, H⟩
-  iexact H
-
-/-- Rocq `sys_read_arms_pay`: the payload off the post. -/
-theorem sysReadArms_pay (V : ProcPriv) (v : BitVec 64) (sts : List FdState) (n : Int)
-    (r : BitVec 64) (M' : Nat → List (BitVec 8)) (addr : BitVec 64) :
-    sysReadArms (hlc := hlc) V v sts n F Rd Rin Rp Rpe P r M' addr ⊢
-      P ∗ filereadExtraCore (hlc := hlc) V.gen V.upt (sysFdSt v V.ofile sts) n F Rd Rin Rp Rpe r M' addr := by
-  unfold sysReadArms
-  iintro ⟨-, H⟩
-  iapply filereadExtra_pay $$ H
 
 /-- Rocq `sys_read_arms_none`: argfd answered NONE (the hoisted -1). -/
 theorem sysReadArms_none (V : ProcPriv) (v : BitVec 64) (sts : List FdState) (n : Int)

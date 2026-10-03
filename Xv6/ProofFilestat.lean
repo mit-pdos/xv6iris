@@ -56,9 +56,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 theorem filestat_ctx_entry {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
     (c : CPU) (k : KCtx) (R : RegMap) :
@@ -122,7 +120,7 @@ theorem filestat_main (MP : MYPROC) (IL : ILOCK) (ST : STATI) (IU : IUNLOCK) (CO
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x10  jal myproc
-  k_step_e (wp_s_jal cpu _ (KA.«filestat» + 0x10#64) false 2086484#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«filestat» + 0x10#64) false 2086356#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [filestat_br_myproc]
   iintro Hk Hpc
   iapply (fstat_myproc MP cpu _ ?hn ?hKm) $$ [- $Hk $Hpc]

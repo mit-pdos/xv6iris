@@ -21,14 +21,10 @@ single-block receipt `wi16Pre` / `wi16Fresh`.
    deviation 5): the chunk's view composes by `Xv6.viewFaulted_trans`.
 -/
 import Xv6.WriteiBudgetW
-import Xv6.DinodeSlot
-import Xv6.FsWords
 
 namespace Xv6
 
 open MachCSL LeanRV64D
-
-set_option linter.unusedVariables false
 
 /-! ## (2) The block splice -/
 
@@ -202,12 +198,6 @@ theorem writei_ker_step (user : Bool) (sbs : List (BitVec 8)) (wroteI : Nat → 
     rw [if_pos (by omega)]
     congr 2; omega
 
-/-- The accumulated user run does not shrink (Rocq's `wi_usr_le`). -/
-theorem writei_usr_le (P0 P' : UPtd) (M : Nat → List (BitVec 8)) (src : BitVec 64)
-    (wrote : Nat → BitVec 8) (t tot : Nat) (hle : t ≤ tot)
-    (h : wiUsrGot P0 P' M src tot wrote) : wiUsrGot P0 P' M src t wrote :=
-  ⟨by have := h.1; omega, fun i hi => h.2 i (by omega)⟩
-
 /-- ...and it survives a later extension of the descriptor. -/
 theorem writei_usr_ext (P0 P' P'' : UPtd) (M : Nat → List (BitVec 8)) (src : BitVec 64)
     (wrote : Nat → BitVec 8) (tot : Nat) (hx : P'.ext P'')
@@ -245,7 +235,7 @@ theorem writei_usr_step (P0 PI P2 : UPtd) (M : Nat → List (BitVec 8)) (src : B
     refine ⟨P2, UMemL.ext_trans h0 h2, UMemL.ext_refl P2, ?_⟩
     simp only [getElem!_def, UMemL.umemRead_getElem?, hsrc]
     rw [if_pos (by omega)]
-    simp only [Option.getD_some]
+    simp only []
     congr 1; omega
 
 /-! ## (4) The budget: the iteration bound -/
@@ -365,7 +355,7 @@ theorem wi16Pre_spend (bms : Nat) (inum : BitVec 32) (inodestart : Nat)
   obtain ⟨hs, -, -⟩ := hpre h1
   unfold wi16Spend
   by_cases hc : IBLOCK inum inodestart ∈ Sc
-  · simp only [hc, decide_true, if_true, Bool.false_eq_true, if_false]
+  · simp only [hc, decide_true, if_true]
     by_cases hb : IBLOCK inum inodestart ∈ Sb
     · simp only [hb, decide_true, if_true]; omega
     · simp only [hb, decide_false, Bool.false_eq_true, if_false]; omega

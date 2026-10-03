@@ -7,7 +7,7 @@ part -- the walks themselves are one function per file, DU10:
 
 K&R `malloc`/`free` over `sbrk`, as user/umalloc.c compiles into sh's image:
 `morecore` is INLINED into `malloc`, so the walks are four functions --
-`malloc` (0x1170, 91 instructions), `free` (0x10ea, 46), the C wrapper `sbrk`
+`malloc` (0x1178, 91 instructions), `free` (0x10f2, 46), the C wrapper `sbrk`
 (0xc2e, 10) and the usys.S stub `sys_sbrk` (0xcea, 3).
 
 THE SPEC IS THE NATURAL SEPARATION-LOGIC ONE (Rocq's header): malloc
@@ -62,7 +62,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
 
 /-! ## §1 sh's instruction facts (deviation 1) -/
@@ -112,8 +111,6 @@ abbrev ushmBase : Nat := User.Sh.Sym.«base»
 /-- Every register not in `ws` kept its value from `m` to `m'`. -/
 def ushmKeep (ws : List (BitVec 5)) (m m' : RegMap) : Prop := ∀ r, r ∉ ws → m'.get r = m.get r
 
-theorem ushmKeep_refl (ws : List (BitVec 5)) (m : RegMap) : ushmKeep ws m m := fun _ _ => rfl
-
 theorem ushmKeep_wr (m : RegMap) (rd : BitVec 5) (v : BitVec 64) : ushmKeep [rd] m (ukWr m rd v) :=
   fun r hr => ukWr_get_other _ _ _ _ (fun he => hr (he ▸ List.mem_singleton_self r))
 
@@ -125,11 +122,6 @@ theorem ushmKeep_trans {ws ws' : List (BitVec 5)} {m m' m'' : RegMap} (h1 : ushm
 theorem ushmKeep_mono {ws ws' : List (BitVec 5)} {m m' : RegMap} (h : ushmKeep ws m m')
     (hs : ws.all (fun r => ws'.contains r) = true) : ushmKeep ws' m m' := fun r hr =>
   h r (fun hm => hr (by have := List.all_eq_true.1 hs r hm; simpa using this))
-
-/-- A write after a keep. -/
-theorem ushmKeep_wr' {ws : List (BitVec 5)} {m m' : RegMap} (h : ushmKeep ws m m') (rd : BitVec 5)
-    (v : BitVec 64) : ushmKeep (ws ++ [rd]) m (ukWr m' rd v) :=
-  ushmKeep_trans h (ushmKeep_wr m' rd v)
 
 /-- **The callee-saved post from a keep**: registers outside `ws` kept
 theirs, and every callee-saved one inside `ws` was restored. -/
@@ -227,23 +219,6 @@ theorem ushm_w32_of_ubytes (γd : GName) (a : Nat) (f : Nat → BitVec 8) :
   have h0 := (f 0).isLt; have h1 := (f 1).isLt; have h2 := (f 2).isLt; have h3 := (f 3).isLt
   simp only [BitVec.extractLsb'_toNat, BitVec.toNat_ofNat, Nat.shiftRight_eq_div_pow]
   rcases (show j = 0 ∨ j = 1 ∨ j = 2 ∨ j = 3 by omega) with rfl | rfl | rfl | rfl <;> omega
-
-/-- **Rocq `ushm_hdr_of_ubytes`**: a sixteen-byte cell IS a header (what
-turns the .bss cell `base` into something the allocator talks about). -/
-theorem ushm_hdr_of_ubytes (γd : GName) (a : Nat) (f : Nat → BitVec 8) :
-    ubytes (GF := GF) γd a 16 f ⊢ ∃ (nxt : BitVec 64) (nu : Nat), ushmHdr γd a nxt nu := by
-  iintro H
-  icases (ubytes_app γd a 8 8 f).1 $$ H with ⟨H0, H8⟩
-  icases (ubytes_app γd (a + 8) 4 4 _).1 $$ H8 with ⟨H8, H12⟩
-  icases uword_of_ubytes γd a f $$ H0 with ⟨%w0, H0⟩
-  icases ushm_w32_of_ubytes γd (a + 8) _ $$ H8 with ⟨%w8, H8⟩
-  iexists w0, w8.toNat
-  unfold ushmHdr
-  rw [BitVec.ofNat_toNat, BitVec.setWidth_eq]
-  iframe H0 H8
-  iexists _
-  rw [show a + 8 + 4 = a + 12 by omega]
-  iexact H12
 
 /-- A chunk's first sixteen bytes, split as a header's three fields. -/
 theorem ushm_split16 (γd : GName) (a n : Nat) (f : Nat → BitVec 8) (hn : 16 ≤ n) :
@@ -344,10 +319,6 @@ def ushmMallocTyLe (N : UkNames GF) (B : Nat) (UM UM' : IProp GF) : Prop :=
 /-- **Rocq `UkShParse.ushp_malloc_ty`**: the capability at the allocator's
 whole range. -/
 def ushmMallocTy (N : UkNames GF) (UM UM' : IProp GF) : Prop := ushmMallocTyLe (hlc := hlc) N 65504 UM UM'
-
-/-- **Rocq `ushp_malloc_ty_le_top`**. -/
-theorem ushmMallocTyLe_top (N : UkNames GF) (UM UM' : IProp GF) (H : ushmMallocTy (hlc := hlc) N UM UM') :
-    ushmMallocTyLe (hlc := hlc) N 65504 UM UM' := H
 
 /-- **Rocq `ushp_malloc_ty_le_mono`**. -/
 theorem ushmMallocTyLe_mono (N : UkNames GF) (B B' : Nat) (UM UM' : IProp GF) (hB : B' ≤ B)

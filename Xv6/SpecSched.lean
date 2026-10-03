@@ -29,7 +29,7 @@ The resumed configuration keeps `noff = 1`, `locks = ["proc"]`,
 are the RESUMING hart's, hence quantified.  THE KERNEL ROOT IS NOT: the
 resumed bundle carries the dispatching hart's `satp`, but there is
 exactly one kernel page table (`MachCSL.kptOn_root_agree` over the
-persistent root ghost, `Xv6.SchedCtx.kctx_root_agree`), so it is the
+persistent root ghost), so it is the
 parking hart's own `k.root`.
 
 Imports only definitional files.

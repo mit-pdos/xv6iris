@@ -8,7 +8,6 @@ The taint arm of the entry's row (`ushFd0`) goes generic at once
 Deviations from Rocq: as `SpecShStart`; the prologue is
 `UshStep.ush_frame_pro`; main enters as its interface `SH_MAIN`.
 -/
-import Xv6.UshMainStubs
 import Xv6.UshMainCode
 import Xv6.SpecShMain
 import Xv6.SpecShStart
@@ -18,8 +17,6 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
-
-set_option linter.unusedSectionVars false
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]

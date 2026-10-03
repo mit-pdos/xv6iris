@@ -13,8 +13,7 @@ block-number functions (`logHdrBno`, `logSlotBno`, `logRegion`), the home
 set, the header decoder (`hdrN`, `leWord`, `hdrDec`) with its four
 bridging lemmas, the total block view a crash recovers to (`dvOfD`,
 `fsRestrict`, `fsInstallStep`, `fsInstall`), the era's PICTURE of the
-durable disk (`LogMirror`, `lmUpd`, `lmHdr`, `lmCommitted`, `lmLogged`,
-`lmInstall`) and every pure lemma Rocq proves about them, the `LogNames`
+durable disk (`LogMirror`, `lmUpd`, `lmHdr`, `lmLogged`, `lmInstall`) and every pure lemma Rocq proves about them, the `LogNames`
 record, the epoch lower bound, the append registry and the free-state
 bundle `logFreeTok` with its allocation.
 
@@ -50,8 +49,6 @@ import Xv6.SyncHook
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Std MachCSL
-
-set_option linter.unusedSectionVars false
 
 /-! ## On-disk geometry
 
@@ -140,8 +137,6 @@ def leWord (bs : List (BitVec 8)) (i : Nat) : Nat :=
 (Rocq's `hdr_n`). -/
 def hdrN (bs : List (BitVec 8)) : Nat := leWord bs 0
 
-theorem leWord_zero (bs : List (BitVec 8)) : leWord bs 0 = hdrN bs := rfl
-
 /-- Rocq's `hdr_n_lt`: the field is a 32-bit word. -/
 theorem hdrN_lt (bs : List (BitVec 8)) : hdrN bs < 2 ^ 32 := by
   have h := leAssemble_lt ((bs.drop (4 * 0)).take 4)
@@ -226,9 +221,6 @@ def fsInstall (P : Nat → List (BitVec 8)) (logstart : Nat) (W : List Nat)
     (D : BlockMap) : BlockMap :=
   (List.range W.length).foldr (fsInstallStep P logstart W) D
 
-theorem fsInstall_nil (P : Nat → List (BitVec 8)) (logstart : Nat) (D : BlockMap) :
-    fsInstall P logstart [] D = D := rfl
-
 /-! ## The era's picture of the durable disk
 
 Rocq's `log_mirror` is one total block view; the readings below are what
@@ -262,54 +254,9 @@ theorem lmUpd_idem (M : LogMirror) (b : Nat) (x y : List (BitVec 8)) :
   funext c
   by_cases h : c = b <;> simp [h]
 
-/-- The committed view a picture recovers to (Rocq's `lm_committed`). -/
-def lmCommitted (M : LogMirror) (cov : Std.ExtTreeSet Nat compare) (ls : Nat) : BlockMap :=
-  fsInstall M.view ls (lmHdr M ls).2 (fsRestrict M.view (fsHomeList cov ls))
-
 /-- ...and the committed view a LOGGED view yields on the home set. -/
 def lmLogged (L : BlockMap) (cov : Std.ExtTreeSet Nat compare) (ls : Nat) : BlockMap :=
   fsRestrict (dvOfD L) (fsHomeList cov ls)
-
-/-- With the on-disk header clean nothing is installed, so the committed
-view is the picture on the home blocks (Rocq's `lm_committed_of_clean`). -/
-theorem lmCommitted_of_clean (M : LogMirror) (cov : Std.ExtTreeSet Nat compare) (ls : Nat)
-    (h : lmHdr M ls = (0, [])) :
-    lmCommitted M cov ls = fsRestrict M.view (fsHomeList cov ls) := by
-  unfold lmCommitted
-  rw [h]
-  rfl
-
-/-- The clean picture's committed view IS the logged view (Rocq's
-`lm_committed_clean`): row (b) of the log invariant at the empty batch. -/
-theorem lmCommitted_clean (M : LogMirror) (L : BlockMap)
-    (cov : Std.ExtTreeSet Nat compare) (ls : Nat) (hhdr : lmHdr M ls = (0, []))
-    (hrow : ∀ b, fsHome cov ls b → PartialMap.get? L b = some (M.view b)) :
-    lmCommitted M cov ls = lmLogged L cov ls := by
-  rw [lmCommitted_of_clean M cov ls hhdr]
-  unfold lmLogged
-  symm
-  apply fsRestrict_ext
-  intro b hb
-  unfold dvOfD
-  rw [hrow b ((mem_fsHomeList cov ls b).1 hb)]
-  rfl
-
-/-- ...and it is blind to a write outside the home set (Rocq's
-`lm_committed_upd_ne`): the copy loop's fills go to log SLOTS. -/
-theorem lmCommitted_upd_ne (M : LogMirror) (cov : Std.ExtTreeSet Nat compare) (ls b : Nat)
-    (bs : List (BitVec 8)) (hhdr : lmHdr M ls = (0, [])) (hne : b ≠ logHdrBno ls)
-    (hnh : ¬ fsHome cov ls b) :
-    lmCommitted (lmUpd M b bs) cov ls = lmCommitted M cov ls := by
-  have hhdr' : lmHdr (lmUpd M b bs) ls = (0, []) := by
-    unfold lmHdr
-    rw [lmUpd_view_ne M b (logHdrBno ls) bs (Ne.symm hne)]
-    exact hhdr
-  rw [lmCommitted_of_clean _ cov ls hhdr', lmCommitted_of_clean M cov ls hhdr]
-  apply fsRestrict_ext
-  intro c hc
-  refine lmUpd_view_ne M b c bs ?_
-  intro hbad
-  exact hnh (hbad ▸ (mem_fsHomeList cov ls c).1 hc)
 
 /-- The logged view is blind to a write outside the home set for the same
 reason (Rocq's `lm_logged_insert_ne`). -/
@@ -321,24 +268,6 @@ theorem lmLogged_insert_ne (L : BlockMap) (cov : Std.ExtTreeSet Nat compare)
   intro c hc
   unfold dvOfD
   rw [get?_insert_ne (fun (hbad : b = c) => hb (hbad ▸ (mem_fsHomeList cov ls c).1 hc))]
-
-/-- The case that DOES move the reading: a `log_write` at a home block
-(Rocq's `lm_logged_insert_home`). -/
-theorem lmLogged_insert_home (L : BlockMap) (cov : Std.ExtTreeSet Nat compare)
-    (ls b : Nat) (bs : List (BitVec 8)) (hb : fsHome cov ls b) :
-    lmLogged (PartialMap.insert L b bs) cov ls =
-      PartialMap.insert (lmLogged L cov ls) b bs := by
-  refine equiv_iff_eq.1 (fun c => ?_)
-  unfold lmLogged dvOfD
-  by_cases hc : c = b
-  · subst hc
-    rw [fsRestrict_lookup, if_pos ((mem_fsHomeList cov ls c).2 hb), get?_insert_eq rfl,
-      get?_insert_eq rfl]
-    rfl
-  · rw [get?_insert_ne (Ne.symm hc), fsRestrict_lookup, fsRestrict_lookup]
-    by_cases hm : c ∈ fsHomeList cov ls
-    · rw [if_pos hm, if_pos hm, get?_insert_ne (Ne.symm hc)]
-    · rw [if_neg hm, if_neg hm]
 
 /-! ## The install pass's picture
 
@@ -363,13 +292,6 @@ theorem lmInstall_miss (M : LogMirror) (Ws : List Nat) (Lw : Nat → List (BitVe
     show (lmUpd (lmInstall M Ws Lw t) (Ws[t]!) (Lw t)).view c = M.view c
     rw [hbang, lmUpd_view_ne _ _ _ _ (fun hc => hne t _ (by omega) hb hc.symm)]
     exact ih (by omega) (fun i b hi hib => hne i b (by omega) hib)
-
-theorem lmInstall_hdr (M : LogMirror) (Ws : List Nat) (Lw : Nat → List (BitVec 8))
-    (ls : Nat) (t : Nat) (ht : t ≤ Ws.length)
-    (hne : ∀ i b, i < t → Ws[i]? = some b → b ≠ logHdrBno ls) :
-    lmHdr (lmInstall M Ws Lw t) ls = lmHdr M ls := by
-  unfold lmHdr
-  rw [lmInstall_miss M Ws Lw t _ ht hne]
 
 /-- The duplicate-freedom premise is the INJECTIVITY it is used through,
 exactly as in Rocq. -/
@@ -521,19 +443,6 @@ instance loggedAt_persistent (γ : LogNames) (e b : Nat) :
 
 instance loggedAt_timeless (γ : LogNames) (e b : Nat) :
     Timeless (loggedAt (GF := GF) γ e b) := by unfold loggedAt; infer_instance
-
-/-- **THE REGISTRY'S FRESHNESS WATERMARK.**  Rocq mints a registry row by
-`own_update` into a union, which a `gset` authority admits with no side
-condition.  A Lean ghost map needs a key nobody holds, and this port's
-`LawfulFiniteMap` has no fresh-key lemma, so the log invariant carries a
-next-free-id watermark and mints there -- exactly as `Xv6/BcacheInv.lean`
-does for the buffer cache's reference map (`bpin_fresh`). -/
-theorem logReg_fresh (X : RegMapF (Nat × Nat)) (nx : Nat)
-    (hfresh : ∀ i, nx ≤ i → PartialMap.get? X i = none) :
-    ∀ i, nx + 1 ≤ i → PartialMap.get? (PartialMap.insert X nx ((0, 0) : Nat × Nat)) i = none := by
-  intro i hi
-  rw [get?_insert_ne (by omega : nx ≠ i)]
-  exact hfresh i (by omega)
 
 /-- The registry's two operations: minting (Rocq's `log_mint_logged`)... -/
 theorem logMintLogged (γ : LogNames) (X : RegMapF (Nat × Nat)) (nx e b : Nat)

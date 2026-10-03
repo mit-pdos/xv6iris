@@ -17,10 +17,6 @@ every image (the obligation names the image's `write` stub through `base`).
 contract (see `SpecUlibPrintf`).
 -/
 import Xv6.SpecUlibPutc
-import Xv6.UlibRunPrintf
-import Xv6.UlibVprintfCode
-import Xv6.UlibFprintfCode
-import Xv6.UlibPrintfCode
 
 namespace Xv6
 
@@ -50,22 +46,6 @@ theorem ulibPaySeq_succ (L : UlibRun GF) (base fd : BitVec 64) (f : Nat → BitV
     (Ci Cend : IProp GF) : ulibPaySeq L base fd f i (k + 1) Ci Cend =
       iprop(∃ Cm : IProp GF, ulibPutcWb L base fd (f i) Ci Cm ∗ ulibPaySeq L base fd f (i + 1) k Cm Cend) :=
   rfl
-
-/-- **Rocq `kcat_pay_seq_mono`**: the output side is monotone. -/
-theorem ulibPaySeq_mono (L : UlibRun GF) (base fd : BitVec 64) (f : Nat → BitVec 8) :
-    ∀ (k i : Nat) (Ci Cend Cend' : IProp GF),
-      ⊢ (Cend -∗ Cend') -∗ ulibPaySeq L base fd f i k Ci Cend -∗ ulibPaySeq L base fd f i k Ci Cend'
-  | 0, i, Ci, Cend, Cend' => by
-    rw [ulibPaySeq_zero, ulibPaySeq_zero]
-    iintro Hm Hc HCi
-    iapply Hm
-    iapply Hc $$ HCi
-  | k + 1, i, Ci, Cend, Cend' => by
-    rw [ulibPaySeq_succ, ulibPaySeq_succ]
-    iintro Hm ⟨%Cm, Hw, Hc⟩
-    iexists Cm
-    iframe Hw
-    iapply (ulibPaySeq_mono L base fd f k (i + 1) Cm Cend Cend') $$ Hm Hc
 
 /-- **The per-byte family gives the chain** (init's form, Rocq
 `wp_kinit_printf_chain`'s premise): `k` bytes from index `i`, threading

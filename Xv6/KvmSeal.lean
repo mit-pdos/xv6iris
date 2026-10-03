@@ -5,16 +5,15 @@ Sealing the kernel page table `kvmmake` built into the framework's
 `kvmmake` hands back the tree owned outright (`ptreeOwn 2 (own 1) t`, every
 entry word a Bare-tier kernel cell) plus the pure facts `kvmTableOk`.  What
 `kvminithart` needs is `kptOn t KernelMap.static`: the entries under one
-invariant, the mapping published.  Three steps:
+invariant, the mapping published.  Two steps prepare
+`MachCSL.kptOn_seal`:
 
 * `ptreeOwn_entries` re-associates the tree's ownership into the flat list
   of `(address, value)` pairs the framework speaks of (`PTree.entries`);
 * `kvmTableOk_kptFacts` turns the builder's facts into `kptFacts`: the
   entry addresses are in RAM and 8-aligned because every node page is a
   `pageValid` page, and every entry of the static map is one of the seven
-  identity regions `kvmmake` maps;
-* `kctx_kptOn_seal` runs `MachCSL.kptOn_seal` under the kernel execution
-  context (which carries the running context inside its `ctxTok`).
+  identity regions `kvmmake` maps.
 
 Imports only definitional files.
 -/
@@ -227,37 +226,6 @@ theorem ptreeOwn_entries [CurCtx] (dq : DFrac) : ∀ (lvl : Nat) (t : PTree),
         (fun {_ x} _ => (kidOwn_entries lvl dq t x (ptreeOwn_entries dq lvl)).1),
       BigSepL.bigSepL_mono
         (fun {_ x} _ => (kidOwn_entries lvl dq t x (ptreeOwn_entries dq lvl)).2)⟩
-
-/-! ## The seal at the kernel execution context -/
-
-/-- **`kvmmake`'s output becomes `kptOn`.**  Stated at the kernel execution
-context (which carries the running context inside its `ctxTok`), so that a
-boot proof can run it under `wpLoop_fupd` between `kvminit` and
-`kvminithart`. -/
-theorem kctx_kptOn_seal [CurCtx] [Xv6G GF] {lent : Bool} (cpu : CPU) (k : KCtx)
-    (t : PTree) (pas : Nat → BitVec 44) (r0 : BitVec 44) (hct : curTier = KTier.bare)
-    (hok : kvmTableOk t pas) :
-    kctxL (GF := GF) lent cpu k ∗ ptreeOwn 2 (DFrac.own 1) t ∗
-      (MachGS.kmapName (hlc := hlc) (GF := GF) ↪●MAP KernelMap.static) ∗
-      (MachGS.kptRootName (hlc := hlc) (GF := GF) ↪VAR r0)
-    ⊢ |={⊤}=> (kctxL lent cpu k ∗ kptOn t KernelMap.static) := by
-  iintro ⟨Hk, Ht, Hauth, Hroot⟩
-  icases kctx_cases cpu k $$ Hk with
-    ⟨%hwf, HConf, HF, Hstack, Htrans, Harm, Hcpu, Htok, Hclock, #Hro⟩
-  icases ctxTok_cases cpu curCtx $$ Htok with ⟨Hctx, %r, Hfrag⟩
-  ihave Hents := (ptreeOwn_entries (DFrac.own 1) 2 t).1 $$ Ht
-  imod kptOn_seal cpu t KernelMap.static r0 hct (kvmTableOk_kptFacts t pas hok)
-    $$ [Hctx Hents Hauth Hroot] with ⟨Hctx, #Hkpt⟩
-  · iframe Hctx Hents Hauth Hroot
-  imodintro
-  isplitl [HConf HF Hstack Htrans Harm Hcpu Hctx Hfrag Hclock]
-  · iapply kctx_intro' cpu k hwf
-    iframe HConf HF Hstack Htrans Harm Hcpu Hclock
-    isplitl [Hctx Hfrag]
-    · iapply ctxTok_intro cpu curCtx r
-      iframe Hctx Hfrag
-    · iexact Hro
-  · iexact Hkpt
 
 end
 

@@ -49,8 +49,6 @@ open Iris.Std.PartialMap Iris.Std.FiniteMap
 open Sail LeanRV64D LeanRV64D.Functions
 open UexecSG
 
-set_option linter.unusedSectionVars false
-
 /-! ## §1 The retire and trap predicates -/
 
 /-- The retire predicate of a leaf: only a retiring leaf retires, onto the

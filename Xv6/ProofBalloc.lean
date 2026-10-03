@@ -27,12 +27,11 @@ always taken (`Xv6.ba_bgeu_exhaust`).  Both dead arms are refuted, not
 proved.
 
 **Deviations from Rocq.**  The two dead arms are refuted exactly as Rocq
-does.  Rocq's `wp_balloc_sconf` proof (`log_op_openS` + `log_opS_op`) is the
-Spec file's `BALLOC.wp_balloc_sconf`.  The rest is the stage decomposition
-of `Xv6/BallocDefs.lean`'s header.
+does.  Rocq's `wp_balloc_sconf` (`log_op_openS` + `log_opS_op`) is not
+ported (nothing uses it).  The rest is the stage decomposition of
+`Xv6/BallocDefs.lean`'s header.
 -/
 import Xv6.BallocMain
-import MachCSL.BvLemmas
 
 namespace Xv6
 
@@ -41,12 +40,10 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-- `auipc a5,0x1e ; lw a5,-1314(a5)` at `+0x0a`: `sb.size`. -/
-theorem ba_a_size : KA.«balloc» + 0x1dcd2#64 = sbSizeAddr := by unfold sbSizeAddr; decide
+theorem ba_a_size : KA.«balloc» + 0x1df5e#64 = sbSizeAddr := by unfold sbSizeAddr; decide
 /-- `beqz a5` at `+0x12` on `sb.size`: NOT taken, from `0 < size` (Rocq's
 first dead arm). -/
 theorem ba_beqz_size (size : Nat) (h0 : 0 < size) (h : size < 2 ^ 31) :
@@ -70,8 +67,7 @@ a level-0 stretch: steps are `k_step_e` (the complement `Hte`/`Hce` follows
 the thread), `bread` is called at its eb contract, and the scan's loop
 invariant (`Xv6.baScanPre`) carries the complement at the loop's current
 hart, the induction being over that hart too.  ONE core for the credited
-and the counted forms (Rocq Round 13): `wp_balloc_sconf_eb` is derived in
-the Spec. -/
+and the counted forms (Rocq Round 13), by `cr`. -/
 theorem ba_entry (BR : BREAD) (LW : LOG_WRITE) (BE : BRELSE) (MS : MEMSET) (PK : PRINTK)
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (c0 : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
@@ -130,7 +126,7 @@ theorem ba_entry (BR : BREAD) (LW : LOG_WRITE) (BE : BRELSE) (MS : MEMSET) (PK :
   k_step_e (wp_s_auipc cpu _ (KA.«balloc» + 0xa#64) false 0x1e#20 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_lw cpu _ (KA.«balloc» + 0xe#64) false 3272#12 15#5 15#5 (by decide) (by decide)
+  k_step_e (wp_s_lw cpu _ (KA.«balloc» + 0xe#64) false 3924#12 15#5 15#5 (by decide) (by decide)
       dqs (BitVec.ofNat 32 size))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ba_a_size]
   iintro Hk Hpc Hsz

@@ -40,8 +40,6 @@ The close splits on the count, which is what lets its entries share it:
 -/
 import MachCSL.WpDmaCtx
 import Xv6.IputStages
-import Xv6.IcacheInvStore
-import Xv6.IcacheBoxSites
 import Xv6.IgetHit
 
 namespace Xv6
@@ -52,10 +50,7 @@ open Iris.Algebra
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
-
 
 /-! ## Pure helpers -/
 
@@ -85,13 +80,11 @@ theorem iput_tail_ref_sub [Icfg] {GF : BundledGFunctors} [IcacheG GF]
   obtain ⟨⟨qt, n⟩, hy, hle⟩ := Heap.singleton_inc_iff.mp hinc
   exact ⟨qt, n, hy, iputTail_sub_of_inc hle⟩
 
-
 /-- The decrement of a count `k_norm` split as `x + 1`. -/
 theorem iput_tail_decr1 (x : BitVec 32) :
     BitVec.extractLsb' 0 32 (BitVec.signExtend 64 (BitVec.extractLsb' 0 32
       (BitVec.signExtend 64 (x + 1#32) + 0xFFFFFFFFFFFFFFFF#64))) = x := by
   bv_decide
-
 
 /-- The rest's fraction after a non-last close: the departing share joins
 the table's retained one. -/
@@ -120,7 +113,6 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
-
 
 /-- The persistent pieces a close uses, off the environment. -/
 theorem iput_tail_env (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (γl : GName)
@@ -265,7 +257,6 @@ theorem iput_tail_ne_au (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (c : CPU)
       (Xv6.ig_ciwf_update Mt ci icfgNib icfgDev kk _ _ hMk hciwf)
     iframe
   · unfold irefSlot; iexact Hslot1
-
 
 /-- The table's retained share is at most a half (Rocq `ip_rest_sum`). -/
 theorem iput_tail_rest_le (kk : Nat) (q : Qp) (dev inum : BitVec 32) :
@@ -536,13 +527,13 @@ theorem iput_tail_exit (RH : RELEASE_HOOK) (c : CPU) (k : KCtx)
   have hsie : (k.pushOffAt k.spie k.spp).sie = false := rfl
   iintro ⟨Hk, Hpc, #Hit, Hlocked, Harm, HRin, Hslot, Htx, Hframe, Hte, Hce, Hret, Hpost⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
-  k_step (wp_s_auipc c _ (KA.«iput» + 0x24#64) false 0x1d#20 10#5 (by decide))
+  k_step (wp_s_auipc c _ (KA.«iput» + 0x24#64) false 0x1e#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_addi c _ (KA.«iput» + 0x28#64) false 1700#12 10#5 10#5 (by decide))
+  k_step (wp_s_addi c _ (KA.«iput» + 0x28#64) false 2352#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [iput_lock]
   iintro Hk Hpc
-  k_step (wp_s_jal c _ (KA.«iput» + 0x2c#64) false 2086900#21 1#5 (by decide))
+  k_step (wp_s_jal c _ (KA.«iput» + 0x2c#64) false 2086880#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [iput_br_release]
   iintro Hk Hpc
   iapply (iput_release RH c k hwf hK' hlk _ ?h10 (KA.«iput» + 0x30#64) ?h1)

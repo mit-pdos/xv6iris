@@ -51,18 +51,11 @@ round position `urpos` (`urpos_mono`); the sync round's record `usyncPay` /
 -/
 import Xv6.UshURoundTies
 import Xv6.UnionLinkInstAt
-import Xv6.UnionOut
-import Xv6.AppFileTyped
-import Xv6.AppFileDeed
-import Xv6.AppFilePos
-import Xv6.AppFileSyncReg
-import Xv6.AppFileSync
 
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
-set_option linter.unusedSectionVars false
 set_option synthInstance.maxSize 1024
 
 section UShURoundDefs
@@ -204,14 +197,6 @@ theorem ufi_lpr3 (ug : UnionGn) (s0 : Fstate) (k : Nat) (v : EraPins) (I : List 
 /-- The record's banner family. -/
 theorem ufi_ban (ug : UnionGn) (s0 : Fstate) :
     (unionLinkInstAt (hlc := hlc) (GF := GF) ug s0).lkBan = gwcBan (unionParamsAt (hlc := hlc) ug s0) := rfl
-
-/-- The record's lend. -/
-theorem ufi_lend (ug : UnionGn) (s0 : Fstate) :
-    (unionLinkInstAt (hlc := hlc) (GF := GF) ug s0).lkLend = gwcLend (unionParamsAt (hlc := hlc) ug s0) := rfl
-
-/-- The record's blocks. -/
-theorem ufi_blk (ug : UnionGn) (s0 : Fstate) :
-    (unionLinkInstAt (hlc := hlc) (GF := GF) ug s0).lkBlk = gwcBlk (unionParamsAt (hlc := hlc) ug s0) := rfl
 
 /-- The record's guarded block alternative. -/
 theorem ufi_ab (ug : UnionGn) (s0 : Fstate) :

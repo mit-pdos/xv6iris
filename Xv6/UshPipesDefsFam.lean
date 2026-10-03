@@ -38,8 +38,6 @@ namespace UShPipesDefs
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Wid RdOut WrOut
 
-set_option linter.unusedSectionVars false
-
 section Fam
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [IcacheG GF]
   [PipeProtoG GF] [PipeOutG GF] [CtokG GF] [DiskG GF] [EchoOutG GF] [PipesNG GF]

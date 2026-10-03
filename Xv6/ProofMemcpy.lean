@@ -62,13 +62,12 @@ theorem memcpy_proof (M : MEMMOVE) : MEMCPY := ⟨fun {hlc GF} _ _ cpu k bs olds
   iapply HΦ $$ %_ Hk Hpc Hsrc Hdst
   ipureintro
   obtain ⟨_, _, h9, h18, h19, h20, h21, h22, h23, h24, h25, h26, h27⟩ := hcs
-  simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] at h9 h18 h19 h20 h21 h22 h23 h24 h25 h26 h27 h10
+  simp only [RegMap.set_apply, BitVec.reduceEq, ite_false] at h9 h18 h19 h20 h21 h22 h23 h24 h25 h26 h27 h10
   constructor
   · unfold calleeSaved
-    simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, eq_self_iff_true, _root_.true_and,
-      _root_.and_true]
+    simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, _root_.true_and]
     exact ⟨h9, h18, h19, h20, h21, h22, h23, h24, h25, h26, h27⟩
-  · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
+  · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]
     exact h10⟩
 
 end Xv6

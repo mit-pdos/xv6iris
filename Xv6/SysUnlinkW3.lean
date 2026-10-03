@@ -51,9 +51,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 theorem sys_unlink_li32_16 : BitVec.signExtend 64 16#12 = 16#64 := by decide
 theorem sys_unlink_del_addr (x : BitVec 64) :
@@ -144,7 +142,7 @@ theorem sys_unlink_w4_loop (RD : READI) (PA : PANIC) (Γ : SchedNames) [ClaimIs 
   k_step_e (wp_s_add cpu _ (KA.«sys_unlink» + 0x110#64) true 10#5 0#5 18#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_jal cpu _ (KA.«sys_unlink» + 0x112#64) false 2090292#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_unlink» + 0x112#64) false 2090196#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_unlink_br_readi]
   iintro Hk Hpc
   icases (show suAny (GF := GF) (sysUnlinkDel (k.regs 2#5)) 16 ⊢ ∃ bs : List (BitVec 8),
@@ -304,7 +302,6 @@ theorem sys_unlink_w4_loop (RD : READI) (PA : PANIC) (Γ : SchedNames) [ClaimIs 
       · rw [hjeq]; exact hdead'
       · have : dirNrec dni.diSize.toNat ≤ jj + 1 := dirlookup_nrec_le _ jj (by omega)
         exact hdead j hj2 (by omega)
-
 
 /-! ## The seam at +0x8a (into W5) -/
 
@@ -482,7 +479,7 @@ theorem sys_unlink_w3_e (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
   rw [← topFrag_1, ← topFrag_1]
   ihave HP := (show A.P (npElems pl).length dinum.toNat ⊢ A.P (nparElems pl).length dinum.toNat
     from .rfl) $$ HP
-  ihave Harms := unlinkArms_dex (hlc := hlc) (fsGammaL fscFs) fscFs A.V.cwi (viewLazy A.V.upt A.V.sz A.M)
+  ihave Harms := unlinkArms_dex (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti A.V.cwi (viewLazy A.V.upt A.V.sz A.M)
       A.v0.toNat A.P A.Pmiss A.Fent
     A.Ftgt A.Fex A.Fmiss pl dinum.toNat av _ (bname 14 nf) _ _ _ _
     (sys_unlink_last_of_npar pl nf hname) hrowd hnm' hrowt hne' $$ [$HP $He $Ht $Hrecv $Hm]
@@ -510,7 +507,6 @@ theorem sys_unlink_w3_e (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
     $$ [$Hk $Hpc $Hcells $Hbufs $Hte $Hce $Hpid $Hhole $HΦ $Hlkd $Hloadd $Hlki $Hloadi $Hres $Hbs
       $Hop $Harms]
   unfold sysfileEnv; iframe #
-
 
 /-! ## W4's entry (+0xf8 .. +0x104), after the T_DIR test took the branch -/
 
@@ -697,7 +693,6 @@ theorem sys_unlink_w3_dir (RD : READI) (PA : PANIC) (IUP : IUNLOCKPUT) (EO : END
     Hlki Hrest Hres HP Hop Hcm
   iframe #
 
-
 /-! ## W3: +0x72 .. +0x86 -/
 
 theorem sys_unlink_li1 : BitVec.signExtend 64 1#12 = 1#64 := by decide
@@ -753,7 +748,7 @@ theorem sys_unlink_w3 (IL : ILOCK) (RD : READI) (PA : PANIC) (IUP : IUNLOCKPUT) 
     $$ [Hsl Hdep Hoffr Hdev Hinum Hval Hfrz Hkeep Hru0]
   · unfold sysUnlinkLkAt; iframe; iframe #
   -- +0x74  jal ilock(ip)
-  k_step_e (wp_s_jal cpu _ (KA.«sys_unlink» + 0x74#64) false 2089464#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_unlink» + 0x74#64) false 2089368#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_unlink_br_ilock]
   iintro Hk Hpc
   icases (show sysUnlinkOpen (GF := GF) kd dinum dnd bmd datd ⊢ ⌜dirOk icfgNib dnd datd⌝ ∗
@@ -848,7 +843,6 @@ theorem sys_unlink_w3 (IL : ILOCK) (RD : READI) (PA : PANIC) (IUP : IUNLOCKPUT) 
   refine ⟨hpA, htln, hname, hn, hkd, hnib, hpos, hle, hty, hnd, hndd, hfn, hks, hlei, hnli, ?_⟩
   show dni.diType.toNat ≠ T_DIR_z
   exact fun h => hdir (sys_unlink_tdir_z _ h)
-
 
 end
 

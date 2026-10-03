@@ -21,7 +21,6 @@ import Xv6.DinodeSlot
 import Xv6.SpecPrintk
 import Xv6.BitmapInv
 import Xv6.SpecLogWrite
-import Xv6.FsWords
 
 namespace Xv6
 
@@ -30,9 +29,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## The frame -/
 

@@ -25,14 +25,13 @@ handed into node `k+1`'s bundle, under a fancy update.
 3. `fupd_mwp_ps` is MachCSL's `wpLoop_fupd`.
 -/
 import Xv6.UshPipeArmBase
+import Xv6.SpecShRuncmd
 
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
-
-set_option linter.unusedSectionVars false
 
 section UshPipesLaw
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]

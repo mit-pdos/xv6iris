@@ -87,35 +87,30 @@ Rocq's header, kept because the reasons are the content:
 6. Names: `awrite_full_at` → `awriteFullAt`, `awrite_part_at` →
    `awritePartAt`, `awrite_chain(_0,_cursor,_unit)` → `awriteChain(...)`,
    `awrite_chain_at(_0,_S,_of,_cursor,_unit)` → `awriteChainAt(...)`,
-   `uptd0` → `awriteUptd0`, `wrf_awrite_fire(_gen,_held)` →
-   `wrfAwrite_fire(...)`, `wrf_apart_fire(...)` → `wrfApart_fire(...)`,
-   `wrf_run` → `wrfRun`, `wrf_landed` → `wrfLanded`, `wri_count_*` →
-   `wriCount_*`, `wri_chunk_pos` → `wriChunk_pos`, and so on.
+   `wrf_awrite_fire(_gen,_held)` → `wrfAwrite_fire(...)`,
+   `wrf_apart_fire(...)` → `wrfApart_fire(...)`, `wrf_run` → `wrfRun`,
+   `wrf_landed` → `wrfLanded`, `wri_count_*` → `wriCount_*`, and so on.
 
 7. **THE COMMITS ARE ROCQ'S AFTER LANE K6-C** (Rocq 52b0eb67b..aae081f4c):
    the table binder and the partial arm's reason (WRITE-RELAY-2, RELAY 4's
    carrying half); the full arm's chunk length `(bs.length : Int) =
    wchunkAt n k` and the partial arm's short chunk `(r : Int) < wchunkAt n
    k` (RELAY 3, f5100b989); the single-block arrow `wiBlocks off (wchunkAt
-   n k).toNat = 1 → r = 0` with `awritePartAt_mapped_single` /
-   `awriteFchain` / `awriteChain_mapped_single` (RELAY 4, 340152449); the
+   n k).toNat = 1 → r = 0` (RELAY 4, 340152449); the
    box's arm `offLink` as the LEND and the two-valued `offRet` as phase 2's
    return (SKELETON 5c48aa727, OFF-LINK-2 4919630d6); the client-advanced
    chain `awriteFullAdv` / `awritePartAdv` / `awriteChainAdv` with its
    conversions and supplier-free fires (OFF-LINK-5 53860d4ab/fc69d2631);
-   and EFQ's `awriteFullAdv_mono`, `awritePartAdv_mapped_single`,
-   `awriteFchainAdv` / `awriteChainAdv_mapped_single` (48f7343d9,
-   aae081f4c's bounded premise).
+   and EFQ's `awriteFullAdv_mono` (48f7343d9, aae081f4c's bounded
+   premise).
 
 8. **ONE CRITICAL SECTION, NOT FOUR.**  Rocq spells the `ftopN` critical
    section four times (`wrf_awrite_fire_gen`/`_adv`, `wrf_apart_fire_gen`/
    `_adv`); here it is `wrfFire_core`, over whatever phase 2 hands back,
    and the four fires specialize the node and (for `_gen`) run the supplier
    after.  Same instants, same resources.  `awriteFullAt_mono` /
-   `awritePartAt_mono` (new, the shared inductive step of
-   `awriteChainAt_of_adv` and `awriteChain_mapped_single`) and
-   `awritePart_refute` (the pure core both `_mapped_single` lemmas repeat in
-   Rocq) are likewise factored.
+   `awritePartAt_mono` (new, the inductive step of `awriteChainAt_of_adv`)
+   are likewise factored.
 
 ## Dropped/simplified vs Rocq
 
@@ -217,21 +212,6 @@ theorem wrfFile_bytes_splice_dist (data data' : Nat → List (BitVec 8)) (sz off
   · rw [blkSplice_getElem?_ge _ _ _ j (by rw [hbs]; exact hoff) (by rw [hsub]; omega),
       wrfFb_lookup data sz j (by omega), if_neg (by omega), if_neg (by omega)]
 
-/-- the CLEAN chunk's reading, the general form at `dist = 0` (Rocq's
-`wrf_file_bytes_splice`). -/
-theorem wrfFile_bytes_splice (data data' : Nat → List (BitVec 8)) (sz off tot : Nat)
-    (wrote : Nat → BitVec 8) (hoff : off ≤ sz)
-    (hbytes : ∀ k, k < max (off + tot) sz →
-      fileByte data' k = if off ≤ k ∧ k < off + tot then wrote (k - off) else fileByte data k) :
-    fileBytes data' (max (off + tot) sz) = blkSplice off (wrfRun wrote tot) (fileBytes data sz) := by
-  rw [← wrfLanded_0 wrote wrote sz off tot]
-  apply wrfFile_bytes_splice_dist data data' sz off tot 0 wrote wrote hoff
-  intro k hk
-  rw [hbytes k hk]
-  split
-  · rfl
-  · rw [if_neg (by omega)]
-
 /-! ### The era node's transport -/
 
 /-- `k / BSIZE` is inside the block map exactly when `k` is inside the file
@@ -297,39 +277,7 @@ theorem wrfWrite_row_dist (dn dn' : Dinode) (bm bm' : Blkmap) (data data' : Nat 
     exact hrange k hkb
   rw [opfEra_file_row dn' bm' data' hty2, hb, hnl]
 
-/-- The CLEAN chunk (Rocq's `wrf_write_row`): the general form at
-`dist = 0`, the chunk the loop continues on. -/
-theorem wrfWrite_row (dn dn' : Dinode) (bm bm' : Blkmap) (data data' : Nat → List (BitVec 8))
-    (off tot : Nat) (wrote : Nat → BitVec 8)
-    (hty : dn.diType.toNat = T_FILE) (hty' : dn'.diType = dn.diType)
-    (hnl' : dn'.diNlink = dn.diNlink) (hh : blkHolesZero bm data) (hh' : blkHolesZero bm' data')
-    (hsz' : dn'.diSize.toNat = max (off + tot) dn.diSize.toNat)
-    (hoff : off ≤ dn.diSize.toNat) (hcap : off + tot ≤ MAXFILE * BSIZE)
-    (hcap0 : dn.diSize.toNat ≤ MAXFILE * BSIZE)
-    (hrange : ∀ k, k < MAXFILE * BSIZE →
-      fileByte data' k = if off ≤ k ∧ k < off + tot then wrote (k - off) else fileByte data k) :
-    absRow (eraNode dn' bm' data') =
-      ⟨.AFile (blkSplice off (wrfRun wrote tot) (fnFileBytes (eraNode dn bm data))),
-        fnNlink (eraNode dn bm data)⟩ := by
-  rw [← wrfLanded_0 wrote wrote dn.diSize.toNat off tot]
-  apply wrfWrite_row_dist dn dn' bm bm' data data' off tot 0 wrote wrote
-    hty hty' hnl' hh hh' hsz' hoff hcap hcap0
-  intro k hk
-  rw [hrange k hk]
-  split
-  · rfl
-  · rw [if_neg (by omega)]
-
 /-! ## 1.  Item 4: the instant count -/
-
-/-- `t` bytes written in `p` full chunks, and the loop still running (Rocq's
-`wri_count_lt`). -/
-theorem wriCount_lt (n t : Int) (p : Nat) (_ht : 0 ≤ t) (htn : t < n) (heq : t = FW_MAX * p) :
-    p ≤ wchunks n := by
-  unfold wchunks
-  unfold FW_MAX at heq
-  unfold FW_MAX
-  omega
 
 /-- ...and after ONE more chunk fires, whatever its size (Rocq's
 `wri_count_step`). -/
@@ -337,19 +285,6 @@ theorem wriCount_step (n t : Int) (p : Nat) (_ht : 0 ≤ t) (htn : t < n) (heq :
     p + 1 ≤ wchunks n := by
   unfold wchunks
   unfold FW_MAX at heq
-  unfold FW_MAX
-  omega
-
-/-- the exit reading (Rocq's `wri_count_done`) -/
-theorem wriCount_done (n : Int) (p : Nat) (_hn : 0 ≤ n) (heq : n = FW_MAX * p) : p ≤ wchunks n := by
-  unfold wchunks
-  unfold FW_MAX at heq
-  unfold FW_MAX
-  omega
-
-/-- the chunk the kernel picks is positive whenever the loop is entered
-(Rocq's `wri_chunk_pos`) -/
-theorem wriChunk_pos (n t : Int) (_ht : 0 ≤ t) (htn : t < n) : 0 < min (n - t) FW_MAX := by
   unfold FW_MAX
   omega
 
@@ -400,7 +335,7 @@ TAKEN AT ALL (Rocq lane WRITE-RELAY-2, RELAY 4): the unnamed tail's reason
 `wrFailWhy` at the writer's table `P`, the whole request's base `ua` and
 count `n`), and the SINGLE-BLOCK relay (`wi16Atomic` read at this arm: a
 range inside one block leaves the count at 0).  Together they refute the
-arm (`awritePartAt_mapped_single`).  The half comes back at `offRet … r`. -/
+arm.  The half comes back at `offRet … r`. -/
 def awritePartAt [Appcfg GF] (Γ : FsViewNames GF) (E : CoPset) (i : Nat) (γo : GName)
     (M : Nat → List (BitVec 8)) (ua : BitVec 64) (P : UPtd) (n : Int) (k : Nat)
     (REST : IProp GF) : IProp GF :=
@@ -454,19 +389,6 @@ theorem awriteChainAt_S [Appcfg GF] (Γ : FsViewNames GF) (E : CoPset) (i : Nat)
       iprop(Q k ∧
         (awriteFullAt Γ E i γo M ua n k (awriteChainAt Γ E i γo M ua P n Q (k + 1) cnt) ∧
           awritePartAt Γ E i γo M ua P n k (awriteChainAt Γ E i γo M ua P n Q (k + 1) cnt))) := rfl
-
-/-- The empty table (Rocq's `uptd0`), so that the chain's `∀ P` wrapper can
-be read at its cursor: nothing depends on WHICH table. -/
-def awriteUptd0 : UPtd := { root := 0, tfp := 0, um := ∅ }
-
-/-- Rocq's `awrite_chain_0`. -/
-theorem awriteChain_0 [Appcfg GF] (Γ : FsViewNames GF) (E : CoPset) (i : Nat) (γo : GName)
-    (M : Nat → List (BitVec 8)) (ua : BitVec 64) (n : Int) (Q : Nat → IProp GF) (k : Nat) :
-    awriteChain Γ E i γo M ua n Q k 0 ⊣⊢ Q k := by
-  unfold awriteChain
-  constructor
-  · iintro H; ispecialize H $$ %awriteUptd0; rw [awriteChainAt_0]; iexact H
-  · iintro H %P; rw [awriteChainAt_0]; iexact H
 
 /-- the chain at ONE table, which is what the kernel's own walk holds (Rocq's
 `awrite_chain_at_of`). -/
@@ -690,13 +612,6 @@ theorem awriteChainAt_of_adv [Appcfg GF] (Γ : FsViewNames GF) (E : CoPset) (i :
       iintro Hr
       iapply IH (k + 1) $$ Hr
 
-/-- ... and at the caller's own wrapper (Rocq's `awrite_chain_cursor`). -/
-theorem awriteChain_cursor [Appcfg GF] (Γ : FsViewNames GF) (E : CoPset) (i : Nat) (γo : GName)
-    (M : Nat → List (BitVec 8)) (ua : BitVec 64) (n : Int) (Q : Nat → IProp GF) (k cnt : Nat) :
-    awriteChain Γ E i γo M ua n Q k cnt ⊢ Q k :=
-  (awriteChainAt_of Γ E i γo M ua n Q k cnt awriteUptd0).trans
-    (awriteChainAt_cursor Γ E i γo M ua awriteUptd0 n Q k cnt)
-
 /-- satisfiability, WITHOUT A SHADOW OF THE CLIENT'S (Rocq's
 `awrite_chain_at_unit`): every node frames its lend straight back
 (`offRet_of_link`), so the TRIVIAL-CURSOR chain of any length costs its
@@ -892,57 +807,6 @@ theorem wrfAwrite_fire_adv [Icfg] [Appcfg GF] (γfs : FsNames) (E : CoPset) (i :
   iintro %I %hpre Ha Hg
   iapply Hcm $$ %I %off %bs %bs0 %nl %hpre %hby %hlen Ha Hg
 
-/-- SUPPLIER 1 -- THE PARKED PATH (Rocq's `wrf_awrite_fire`; ProofFilewrite's
-call site). -/
-theorem wrfAwrite_fire [Icfg] [Appcfg GF] (γfs : FsNames) (E : CoPset) (i : Nat) (γo : GName)
-    (M : Nat → List (BitVec 8)) (ua : BitVec 64) (cnt : Int) (k : Nat) (REST : IProp GF)
-    (off : Nat) (bs bs0 : List (BitVec 8)) (nl : Nat) (n n' : FsNode)
-    (hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ E) (hloc : InodeLocal i n')
-    (hpos : 0 < bs.length) (hoff : off ≤ bs0.length) (hcap : off + bs.length ≤ MAXFILE * BSIZE)
-    (hnz : fnType n ≠ 0) (habs : absRow n = ⟨.AFile bs0, nl⟩)
-    (hnz' : fnType n' ≠ 0) (habs' : absRow n' = ⟨.AFile (blkSplice off bs bs0), nl⟩)
-    (hby : ubytesAt M (ua + BitVec.ofInt 64 (FW_MAX * (k : Int))) bs)
-    (hlen : (bs.length : Int) = wchunkAt cnt k) :
-    ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗ appInv (hlc := hlc) γfs -∗
-      offUserInv (hlc := hlc) γo -∗
-      awriteFullAt (hlc := hlc) (fsGammaL γfs) appE i γo M ua cnt k REST -∗
-      topFrag (fsGammaL γfs) i n -∗
-      offLink (hlc := hlc) γo (off : Int) ={E}=∗
-        topFrag (fsGammaL γfs) i n' ∗
-        offLink (hlc := hlc) γo ((off + bs.length : Nat) : Int) ∗ REST := by
-  iintro #Hi #Hai #Hoinv Hcm Hf Hg
-  ihave Hsup := offSupply_parked E γo off bs.length (arfFoffN_sub E hE) $$ Hoinv
-  imod wrfAwrite_fire_gen γfs E i γo M ua cnt k REST iprop(True) off bs bs0 nl n n'
-    hE hloc hpos hoff hcap hnz habs hnz' habs' hby hlen $$ Hi Hai Hsup Hcm Hf Hg
-    with ⟨Hf, Hg, -, Hrest⟩
-  imodintro
-  iframe Hf Hg Hrest
-
-/-- SUPPLIER 2 -- THE HELD PATH (Rocq's `wrf_awrite_fire_held`, RD-1): the
-caller's cursor comes back advanced, or unmoved beside the taint. -/
-theorem wrfAwrite_fire_held [Icfg] [Appcfg GF] (γfs : FsNames) (E : CoPset) (i : Nat)
-    (γo : GName) (M : Nat → List (BitVec 8)) (ua : BitVec 64) (cnt : Int) (k : Nat) (REST : IProp GF)
-    (off : Nat) (bs bs0 : List (BitVec 8)) (nl : Nat) (n n' : FsNode)
-    (hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ E) (hloc : InodeLocal i n')
-    (hpos : 0 < bs.length) (hoff : off ≤ bs0.length) (hcap : off + bs.length ≤ MAXFILE * BSIZE)
-    (hnz : fnType n ≠ 0) (habs : absRow n = ⟨.AFile bs0, nl⟩)
-    (hnz' : fnType n' ≠ 0) (habs' : absRow n' = ⟨.AFile (blkSplice off bs bs0), nl⟩)
-    (hby : ubytesAt M (ua + BitVec.ofInt 64 (FW_MAX * (k : Int))) bs)
-    (hlen : (bs.length : Int) = wchunkAt cnt k) :
-    ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗ appInv (hlc := hlc) γfs -∗ uoff γo off -∗
-      awriteFullAt (hlc := hlc) (fsGammaL γfs) appE i γo M ua cnt k REST -∗
-      topFrag (fsGammaL γfs) i n -∗
-      offLink (hlc := hlc) γo (off : Int) ={E}=∗
-        topFrag (fsGammaL γfs) i n' ∗
-        offLink (hlc := hlc) γo ((off + bs.length : Nat) : Int) ∗
-        (uoff γo (off + bs.length) ∨ (uoff γo off ∗ MachFixedGS.killCred (hlc := hlc) (GF := GF))) ∗
-        REST := by
-  iintro #Hi #Hai Hu Hcm Hf Hg
-  ihave Hsup := offSupply_held (hlc := hlc) E γo off bs.length $$ Hu
-  iapply wrfAwrite_fire_gen γfs E i γo M ua cnt k REST
-    iprop(uoff γo (off + bs.length) ∨ (uoff γo off ∗ MachFixedGS.killCred (hlc := hlc) (GF := GF)))
-    off bs bs0 nl n n' hE hloc hpos hoff hcap hnz habs hnz' habs' hby hlen $$ Hi Hai Hsup Hcm Hf Hg
-
 /-- THE PARTIAL ARM'S FIRE, AT ANY SUPPLIER (Rocq's `wrf_apart_fire_gen`):
 same critical section, same premise, same payout -- the ONE difference is
 the offset, advanced by the COUNT writei returned rather than by the run
@@ -1007,191 +871,6 @@ theorem wrfApart_fire_adv [Icfg] [Appcfg GF] (γfs : FsNames) (E : CoPset) (i : 
   iintro %I %hpre Ha Hg
   iapply Hcm $$ %I %off %r %bs %bs0 %nl %hpre %hr %hgap %hshort %hwhy %hsb1 %hby Ha Hg
 
-/-- SUPPLIER 1 -- THE PARKED PATH (Rocq's `wrf_apart_fire`; ProofFilewrite's
-call site). -/
-theorem wrfApart_fire [Icfg] [Appcfg GF] (γfs : FsNames) (E : CoPset) (i : Nat) (γo : GName)
-    (M : Nat → List (BitVec 8)) (ua : BitVec 64) (P : UPtd) (cnt : Int) (k : Nat)
-    (REST : IProp GF) (off r : Nat) (bs bs0 : List (BitVec 8)) (nl : Nat) (n n' : FsNode)
-    (hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ E) (hloc : InodeLocal i n')
-    (hpos : 0 < bs.length) (hoff : off ≤ bs0.length) (hcap : off + bs.length ≤ MAXFILE * BSIZE)
-    (hr : r ≤ bs.length) (hgap : bs.length ≤ r + BSIZE)
-    (hnz : fnType n ≠ 0) (habs : absRow n = ⟨.AFile bs0, nl⟩)
-    (hnz' : fnType n' ≠ 0) (habs' : absRow n' = ⟨.AFile (blkSplice off bs bs0), nl⟩)
-    (hby : ubytesAt M (ua + BitVec.ofInt 64 (FW_MAX * (k : Int))) (bs.take r))
-    (hshort : (r : Int) < wchunkAt cnt k)
-    (hwhy : r < bs.length → wrFailWhy P ua cnt.toNat)
-    (hsb1 : wiBlocks off (wchunkAt cnt k).toNat = 1 → r = 0) :
-    ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗ appInv (hlc := hlc) γfs -∗
-      offUserInv (hlc := hlc) γo -∗
-      awritePartAt (hlc := hlc) (fsGammaL γfs) appE i γo M ua P cnt k REST -∗
-      topFrag (fsGammaL γfs) i n -∗
-      offLink (hlc := hlc) γo (off : Int) ={E}=∗
-        topFrag (fsGammaL γfs) i n' ∗
-        offLink (hlc := hlc) γo ((off + r : Nat) : Int) ∗ REST := by
-  iintro #Hi #Hai #Hoinv Hcm Hf Hg
-  ihave Hsup := offSupply_parked E γo off r (arfFoffN_sub E hE) $$ Hoinv
-  imod wrfApart_fire_gen γfs E i γo M ua P cnt k REST iprop(True) off r bs bs0 nl n n'
-    hE hloc hpos hoff hcap hr hgap hnz habs hnz' habs' hby hshort hwhy hsb1
-    $$ Hi Hai Hsup Hcm Hf Hg with ⟨Hf, Hg, -, Hrest⟩
-  imodintro
-  iframe Hf Hg Hrest
-
-/-- SUPPLIER 2 -- THE HELD PATH (Rocq's `wrf_apart_fire_held`, RD-1): the
-advance the caller gets back is the COUNT writei returned. -/
-theorem wrfApart_fire_held [Icfg] [Appcfg GF] (γfs : FsNames) (E : CoPset) (i : Nat)
-    (γo : GName) (M : Nat → List (BitVec 8)) (ua : BitVec 64) (P : UPtd) (cnt : Int) (k : Nat)
-    (REST : IProp GF) (off r : Nat) (bs bs0 : List (BitVec 8)) (nl : Nat) (n n' : FsNode)
-    (hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ E) (hloc : InodeLocal i n')
-    (hpos : 0 < bs.length) (hoff : off ≤ bs0.length) (hcap : off + bs.length ≤ MAXFILE * BSIZE)
-    (hr : r ≤ bs.length) (hgap : bs.length ≤ r + BSIZE)
-    (hnz : fnType n ≠ 0) (habs : absRow n = ⟨.AFile bs0, nl⟩)
-    (hnz' : fnType n' ≠ 0) (habs' : absRow n' = ⟨.AFile (blkSplice off bs bs0), nl⟩)
-    (hby : ubytesAt M (ua + BitVec.ofInt 64 (FW_MAX * (k : Int))) (bs.take r))
-    (hshort : (r : Int) < wchunkAt cnt k)
-    (hwhy : r < bs.length → wrFailWhy P ua cnt.toNat)
-    (hsb1 : wiBlocks off (wchunkAt cnt k).toNat = 1 → r = 0) :
-    ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗ appInv (hlc := hlc) γfs -∗ uoff γo off -∗
-      awritePartAt (hlc := hlc) (fsGammaL γfs) appE i γo M ua P cnt k REST -∗
-      topFrag (fsGammaL γfs) i n -∗
-      offLink (hlc := hlc) γo (off : Int) ={E}=∗
-        topFrag (fsGammaL γfs) i n' ∗
-        offLink (hlc := hlc) γo ((off + r : Nat) : Int) ∗
-        (uoff γo (off + r) ∨ (uoff γo off ∗ MachFixedGS.killCred (hlc := hlc) (GF := GF))) ∗
-        REST := by
-  iintro #Hi #Hai Hu Hcm Hf Hg
-  ihave Hsup := offSupply_held (hlc := hlc) E γo off r $$ Hu
-  iapply wrfApart_fire_gen γfs E i γo M ua P cnt k REST
-    iprop(uoff γo (off + r) ∨ (uoff γo off ∗ MachFixedGS.killCred (hlc := hlc) (GF := GF)))
-    off r bs bs0 nl n n' hE hloc hpos hoff hcap hr hgap hnz habs hnz' habs' hby hshort hwhy hsb1
-    $$ Hi Hai Hsup Hcm Hf Hg
-
 end WriteFire
-
-/-! ## 4.  The refutation: a mapped source and a single-block chunk meet no
-partial arm (Rocq lane WRITE-RELAY-2, RELAY 4) -/
-
-section WriteRefute
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [FsTopG GF] [OffboxG GF]
-
-/-- the pure core of both refutations: a mapped source refutes the reason,
-so `r = bs.length`; a single-block chunk forces `r = 0`; `wriPre`'s own
-`0 < bs.length` is the contradiction. -/
-theorem awritePart_refute (P : UPtd) (ua : BitVec 64) (n : Int) (av : Aview) (i off r : Nat)
-    (bs bs0 : List (BitVec 8)) (nl : Nat)
-    (hmap : ∀ j : Nat, j < n.toNat → uvaRmapped P (ua + BitVec.ofNat 64 j).toNat)
-    (hpre : wriPre av i off bs bs0 nl) (hwhy : r < bs.length → wrFailWhy P ua n.toNat)
-    (hr : r ≤ bs.length) (hr0 : r = 0) : False := by
-  have hrl : r = bs.length := by
-    by_cases hlt : r < bs.length
-    · exact (wrFailWhy_refute P ua (Nat.le_refl _) hmap (hwhy hlt)).elim
-    · omega
-  have := hpre.2.1
-  omega
-
-/-- THE NODE IS VACUOUS (Rocq's `awrite_part_at_mapped_single`): at a source
-run every byte of which is readable-mapped in `P` and a chunk that cannot
-straddle a block boundary, the partial arm costs its client NOTHING, at any
-`REST`. -/
-theorem awritePartAt_mapped_single [Appcfg GF] (Γ : FsViewNames GF) (E : CoPset) (i : Nat)
-    (γo : GName) (M : Nat → List (BitVec 8)) (ua : BitVec 64) (P : UPtd) (n : Int) (k : Nat)
-    (REST : IProp GF)
-    (hmap : ∀ j : Nat, j < n.toNat → uvaRmapped P (ua + BitVec.ofNat 64 j).toNat)
-    (hsb : ∀ (I : RegMapF FsNode) (off : Nat) (bs bs0 : List (BitVec 8)) (nl : Nat),
-      wriPre (absView I) i off bs bs0 nl → wiBlocks off (wchunkAt n k).toNat = 1) :
-    ⊢ awritePartAt (hlc := hlc) Γ E i γo M ua P n k REST := by
-  unfold awritePartAt
-  iintro %I %off %r %bs %bs0 %nl %hpre %hr %_ %_ %hwhy %hsb1 %_ _ _
-  exact (awritePart_refute P ua n _ i off r bs bs0 nl hmap hpre hwhy hr
-    (hsb1 (hsb I off bs bs0 nl hpre))).elim
-
-/-- Rocq's `awrite_part_adv_mapped_single` (EFQ): the refutation never
-reaches phase 2, so the advanced node is vacuous the same way. -/
-theorem awritePartAdv_mapped_single [Appcfg GF] (Γ : FsViewNames GF) (E : CoPset) (i : Nat)
-    (γo : GName) (M : Nat → List (BitVec 8)) (ua : BitVec 64) (P : UPtd) (n : Int) (k : Nat)
-    (REST : IProp GF)
-    (hmap : ∀ j : Nat, j < n.toNat → uvaRmapped P (ua + BitVec.ofNat 64 j).toNat)
-    (hsb : ∀ (I : RegMapF FsNode) (off : Nat) (bs bs0 : List (BitVec 8)) (nl : Nat),
-      wriPre (absView I) i off bs bs0 nl → wiBlocks off (wchunkAt n k).toNat = 1) :
-    ⊢ awritePartAdv (hlc := hlc) Γ E i γo M ua P n k REST := by
-  unfold awritePartAdv
-  iintro %I %off %r %bs %bs0 %nl %hpre %hr %_ %_ %hwhy %hsb1 %_ _ _
-  exact (awritePart_refute P ua n _ i off r bs bs0 nl hmap hpre hwhy hr
-    (hsb1 (hsb I off bs bs0 nl hpre))).elim
-
-/-- THE CHAIN OF FULL NODES ALONE (Rocq's `awrite_fchain`), which is what a
-client that cannot pay the partial arm builds. -/
-def awriteFchain [Appcfg GF] (Γ : FsViewNames GF) (E : CoPset) (i : Nat) (γo : GName)
-    (M : Nat → List (BitVec 8)) (ua : BitVec 64) (n : Int) (Q : Nat → IProp GF) :
-    Nat → Nat → IProp GF
-  | k, 0 => Q k
-  | k, cnt + 1 =>
-    iprop(Q k ∧ awriteFullAt (hlc := hlc) Γ E i γo M ua n k (awriteFchain Γ E i γo M ua n Q (k + 1) cnt))
-
-/-- ...AND THE CHAIN THEN SPENDS NO NODE ON THE PARTIAL ARM (Rocq's
-`awrite_chain_mapped_single`, design/app-file.md section 0's limit 1). -/
-theorem awriteChain_mapped_single [Appcfg GF] (Γ : FsViewNames GF) (E : CoPset) (i : Nat)
-    (γo : GName) (M : Nat → List (BitVec 8)) (ua : BitVec 64) (P : UPtd) (n : Int)
-    (Q : Nat → IProp GF) (k cnt : Nat)
-    (hmap : ∀ j : Nat, j < n.toNat → uvaRmapped P (ua + BitVec.ofNat 64 j).toNat)
-    (hsb : ∀ (I : RegMapF FsNode) (off : Nat) (bs bs0 : List (BitVec 8)) (nl kk : Nat),
-      wriPre (absView I) i off bs bs0 nl → wiBlocks off (wchunkAt n kk).toNat = 1) :
-    awriteFchain (hlc := hlc) Γ E i γo M ua n Q k cnt ⊢
-      awriteChainAt (hlc := hlc) Γ E i γo M ua P n Q k cnt := by
-  induction cnt generalizing k with
-  | zero => exact .rfl
-  | succ cnt IH =>
-    rw [awriteChainAt_S]
-    unfold awriteFchain
-    iintro Hf
-    isplit
-    · icases Hf with ⟨H, -⟩; iexact H
-    isplit
-    · icases Hf with ⟨-, H⟩
-      iapply awriteFullAt_mono _ _ _ _ _ _ _ _ _ _ $$ [] H
-      iintro Hr
-      iapply IH (k + 1) $$ Hr
-    · iapply awritePartAt_mapped_single Γ E i γo M ua P n k _ hmap
-        (fun I off bs bs0 nl hpre => hsb I off bs bs0 nl k hpre)
-
-/-- THE CHAIN OF ADVANCED FULL NODES ALONE (Rocq's `awrite_fchain_adv`,
-EFQ). -/
-def awriteFchainAdv [Appcfg GF] (Γ : FsViewNames GF) (E : CoPset) (i : Nat) (γo : GName)
-    (M : Nat → List (BitVec 8)) (ua : BitVec 64) (n : Int) (Q : Nat → IProp GF) :
-    Nat → Nat → IProp GF
-  | k, 0 => Q k
-  | k, cnt + 1 =>
-    iprop(Q k ∧
-      awriteFullAdv (hlc := hlc) Γ E i γo M ua n k (awriteFchainAdv Γ E i γo M ua n Q (k + 1) cnt))
-
-/-- Rocq's `awrite_chain_adv_mapped_single` (EFQ, with aae081f4c's bound:
-the single-block premise is asked only AT THE NODES THIS CHAIN HAS, since
-past the last one it is false). -/
-theorem awriteChainAdv_mapped_single [Appcfg GF] (Γ : FsViewNames GF) (E : CoPset) (i : Nat)
-    (γo : GName) (M : Nat → List (BitVec 8)) (ua : BitVec 64) (P : UPtd) (n : Int)
-    (Q : Nat → IProp GF) (k cnt : Nat)
-    (hmap : ∀ j : Nat, j < n.toNat → uvaRmapped P (ua + BitVec.ofNat 64 j).toNat)
-    (hsb : ∀ (I : RegMapF FsNode) (off : Nat) (bs bs0 : List (BitVec 8)) (nl kk : Nat),
-      k ≤ kk ∧ kk < k + cnt →
-      wriPre (absView I) i off bs bs0 nl → wiBlocks off (wchunkAt n kk).toNat = 1) :
-    awriteFchainAdv (hlc := hlc) Γ E i γo M ua n Q k cnt ⊢
-      awriteChainAdv (hlc := hlc) Γ E i γo M ua P n Q k cnt := by
-  induction cnt generalizing k with
-  | zero => exact .rfl
-  | succ cnt IH =>
-    rw [awriteChainAdv_S]
-    unfold awriteFchainAdv
-    iintro Hf
-    isplit
-    · icases Hf with ⟨H, -⟩; iexact H
-    isplit
-    · icases Hf with ⟨-, H⟩
-      iapply awriteFullAdv_mono _ _ _ _ _ _ _ _ _ _ $$ [] H
-      iintro Hr
-      iapply IH (k + 1) (fun I off bs bs0 nl kk hk hp => hsb I off bs bs0 nl kk ⟨by omega, by omega⟩ hp)
-        $$ Hr
-    · iapply awritePartAdv_mapped_single Γ E i γo M ua P n k _ hmap
-        (fun I off bs bs0 nl hpre => hsb I off bs bs0 nl k ⟨Nat.le_refl _, by omega⟩ hpre)
-
-end WriteRefute
 
 end Xv6

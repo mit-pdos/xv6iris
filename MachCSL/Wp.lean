@@ -133,10 +133,6 @@ abbrev machInterp (σ : MState) : IProp GF := iprop%
 theorem eraInterp_ambient (σ : MState) :
     eraInterp (GF := GF) (MachGS.era (hlc := hlc) (GF := GF)) σ = machInterp σ := rfl
 
-/-- The mirrors do not mention the registers. -/
-theorem memModel_regs (σ : MState) (f : CPU → RegFile) :
-    memModel (GF := GF) { σ with regs := f } = memModel σ := rfl
-
 /-- Re-assemble the interpretation after a register update. -/
 theorem machInterp_of_regs (σ : MState) (f : CPU → RegFile) :
     ([∗list] cpu ∈ cpus, regInterp cpu (f cpu)) ∗ genHeapInterp σ.mem ∗ memModel σ ∗
@@ -156,8 +152,6 @@ def wpHart (cpu : CPU) (m : SailM Unit) : IProp GF := iprop%
 
 /-- The paper's `wp CpuLoop`: it is safe to run hart `cpu` from a cycle boundary. -/
 def wpLoop (cpu : CPU) : IProp GF := wpHart (GF := GF) cpu (pure ())
-
-theorem wpLoop_eq (cpu : CPU) : wpLoop (GF := GF) cpu = wpHart (GF := GF) cpu (pure ()) := rfl
 
 /-- A ghost update before the loop (the WP absorbs the basic update). -/
 theorem wpLoop_bupd (cpu : CPU) : (|==> wpLoop (GF := GF) cpu) ⊢ wpLoop cpu := by
@@ -353,13 +347,6 @@ theorem swp_ret (cpu : CPU) {X : Type} (x : X) (Φ : X → IProp GF) :
   unfold swp
   iintro HΦ %C %_ H
   iapply H $$ HΦ
-
-theorem swp_use (cpu : CPU) {X : Type} (m : SailM X) (Φ : X → IProp GF)
-    (C : SailM X → SailM Unit) (hC : MCtx C) :
-    swp cpu m Φ ∗ (∀ v : X, Φ v -∗ wpHart cpu (C (pure v))) ⊢ wpHart cpu (C m) := by
-  unfold swp
-  iintro ⟨Hswp, H⟩
-  iapply Hswp $$ %C %hC H
 
 theorem swp_mono (cpu : CPU) {X : Type} (m : SailM X) (Φ Ψ : X → IProp GF) :
     (∀ v, Φ v -∗ Ψ v) ∗ swp cpu m Φ ⊢ swp cpu m Ψ := by
@@ -1194,34 +1181,6 @@ theorem swp_silent (cpu : CPU) (o : Outcome Register RegisterType) (u : o.ret)
   iapply swp_ret
   iexact HΦ
 
-theorem swp_sail_cache_op (cpu : CPU) (op : Unit) (Φ : Unit → IProp GF) :
-    ▷ Φ () ⊢ swp cpu (ConcurrencyInterfaceV1.sail_cache_op op) Φ :=
-  swp_silent cpu (.cacheOp op) () (fun _ _ _ => ⟨fun h => ⟨rfl, h⟩, fun h => h.2⟩) (fun _ _ h => h) Φ
-
-theorem swp_sail_tlbi (cpu : CPU) (op : Unit) (Φ : Unit → IProp GF) :
-    ▷ Φ () ⊢ swp cpu (ConcurrencyInterfaceV1.sail_tlbi op) Φ :=
-  swp_silent cpu (.tlbi op) () (fun _ _ _ => ⟨fun h => ⟨rfl, h⟩, fun h => h.2⟩) (fun _ _ h => h) Φ
-
-theorem swp_sail_translation_start (cpu : CPU) (ts : Unit) (Φ : Unit → IProp GF) :
-    ▷ Φ () ⊢ swp cpu (ConcurrencyInterfaceV1.sail_translation_start ts) Φ :=
-  swp_silent cpu (.translationStart ts) () (fun _ _ _ => ⟨fun h => ⟨rfl, h⟩, fun h => h.2⟩)
-    (fun _ _ h => h) Φ
-
-theorem swp_sail_translation_end (cpu : CPU) (te : Unit) (Φ : Unit → IProp GF) :
-    ▷ Φ () ⊢ swp cpu (ConcurrencyInterfaceV1.sail_translation_end te) Φ :=
-  swp_silent cpu (.translationEnd te) () (fun _ _ _ => ⟨fun h => ⟨rfl, h⟩, fun h => h.2⟩)
-    (fun _ _ h => h) Φ
-
-theorem swp_sail_take_exception (cpu : CPU) (f : Unit) (Φ : Unit → IProp GF) :
-    ▷ Φ () ⊢ swp cpu (ConcurrencyInterfaceV1.sail_take_exception f) Φ :=
-  swp_silent cpu (.takeException f) () (fun _ _ _ => ⟨fun h => ⟨rfl, h⟩, fun h => h.2⟩)
-    (fun _ _ h => h) Φ
-
-theorem swp_sail_return_exception (cpu : CPU) (pa : BitVec 64) (Φ : Unit → IProp GF) :
-    ▷ Φ () ⊢ swp cpu (ConcurrencyInterfaceV1.sail_return_exception pa) Φ :=
-  swp_silent cpu (.returnException pa) () (fun _ _ _ => ⟨fun h => ⟨rfl, h⟩, fun h => h.2⟩)
-    (fun _ _ h => h) Φ
-
 theorem swp_cycle_count (cpu : CPU) (Φ : Unit → IProp GF) :
     ▷ Φ () ⊢ swp cpu (cycle_count ()) Φ :=
   swp_silent cpu .cycleCount () (fun _ _ _ => ⟨fun h => ⟨rfl, h⟩, fun h => h.2⟩) (fun _ _ h => h) Φ
@@ -1378,7 +1337,7 @@ theorem memModel_load (σ : MState) (cpu : CPU) (pa : PAddr) (n tvn : Nat) (htv 
   imodintro
   have hresv : resvMap (σ.afterLoad cpu pa n tvn) = resvMap σ :=
     resvMap_congr _ _ (fun c => by
-      simp only [MState.afterLoad, updCpu]
+      simp only [updCpu]
       split
       · rename_i hc; subst hc; simp [HRead.afterLoad]
       · simp)
@@ -1388,9 +1347,9 @@ theorem memModel_load (σ : MState) (cpu : CPU) (pa : PAddr) (n tvn : Nat) (htv 
   · iapply Hclose $$ %(σ.afterLoad cpu pa n tvn)
     · ipureintro
       intro c hc
-      simp [MState.afterLoad, updCpu, hc]
+      simp [updCpu, hc]
     · iapply hartViewsAt_intro
-      simp only [MState.afterLoad, updCpu, if_true, HRead.afterLoad]
+      simp only [updCpu, if_true, HRead.afterLoad]
       iframe Hv Hi Hr
   · ipureintro
     exact mmOk_afterLoad σ cpu pa n tvn htv hmm
@@ -1408,12 +1367,12 @@ theorem memModel_fence (σ : MState) (cpu : CPU) (b : barrier_kind) :
   have htv' : (σ.fence cpu b).tv cpu ≤ σ.top := (hmm'.2.1 cpu).1
   have e_tv : (σ.fence cpu b).tv cpu =
       fencePost (fenceDrains b) (fenceAcq b) (σ.tv cpu) (σ.hr cpu).rv (ownPub (hartAgent cpu) σ.log) := by
-    simp [MState.fence, updCpu]
+    simp [updCpu]
   have e_itv : (σ.fence cpu b).itv cpu =
       (if fenceIfetch b then
         max (σ.itv cpu) (fencePost true false (σ.tv cpu) (σ.hr cpu).rv (ownPub (hartAgent cpu) σ.log))
        else σ.itv cpu) := by
-    simp [MState.fence, updCpu]
+    simp [updCpu]
   imod MonoNat.own_update _ (.ofNat (σ.tv cpu)) (.ofNat ((σ.fence cpu b).tv cpu))
     (by rw [e_tv]; simp only [MaxNat.le_toNat]; exact fencePost_ge _ _ _ _ _) $$ Hv with ⟨Hv, #Hvlb⟩
   imod MonoNat.own_update _ (.ofNat (σ.itv cpu)) (.ofNat ((σ.fence cpu b).itv cpu))
@@ -1428,7 +1387,7 @@ theorem memModel_fence (σ : MState) (cpu : CPU) (b : barrier_kind) :
     · iapply Hclose $$ %(σ.fence cpu b)
       · ipureintro
         intro c hc
-        simp [MState.fence, updCpu, hc]
+        simp [updCpu, hc]
       · iapply hartViewsAt_intro
         rw [show ((σ.fence cpu b).hr cpu).rv = (σ.hr cpu).rv from rfl]
         iframe Hv Hi Hr
@@ -1445,10 +1404,10 @@ theorem hartViews_store_plain (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (
     (c : CPU) : hartViewsAt (GF := GF) E (σ.store cpu pa n w false) c = hartViewsAt E σ c := by
   unfold hartViewsAt
   have e1 : (σ.store cpu pa n w false).tv c = σ.tv c := by
-    simp only [MState.store, updCpu, Bool.false_and, if_false]; split <;> simp_all
+    simp only [updCpu, Bool.false_and]; split <;> simp_all
   have e2 : (σ.store cpu pa n w false).itv c = σ.itv c := rfl
   have e3 : ((σ.store cpu pa n w false).hr c).rv = (σ.hr c).rv := by
-    simp only [MState.store, updCpu]; split <;> simp_all [HRead.clearAcq]
+    simp only [updCpu]; split <;> simp_all [HRead.clearAcq]
   rw [e1, e2, e3]
 
 /-- A plain store by a hart: the store order grows by the hart's message,
@@ -1480,7 +1439,7 @@ theorem memModel_store_plain (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w
   iframe Hfrag Hresv
   isplitl [Htop Hauth Hviews]
   · rw [show (σ.store cpu pa n w false).top = σ.top + 1 by
-          simp [MState.store, MState.top],
+          simp [MState.top],
         show (σ.store cpu pa n w false).log = σ.log ++ [hartAgent cpu] from rfl, authMap_snoc]
     iframe Htop Hauth
     isplitl [Hviews]
@@ -1499,9 +1458,6 @@ end memmodel
 
 section bytes
 variable [MachGS hlc GF]
-
-theorem mem_get?_eq {V : Type} (m : MemF V) (k : PAddr) :
-    Iris.Std.PartialMap.get? (M := MemF) m k = m[k]? := rfl
 
 theorem mem_insert_eq {V : Type} (m : MemF V) (k : PAddr) (v : V) :
     Iris.Std.PartialMap.insert (M := MemF) m k v = m.insert k v := by

@@ -39,6 +39,7 @@ Rocq's header, kept because the reasons are the content:
    `_dotdot_window` (persistent, `DFrac.discard`).
 -/
 import Xv6.SysUnlinkW1
+import Xv6.IcacheShortCarve
 
 namespace Xv6
 
@@ -47,9 +48,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
@@ -163,7 +162,7 @@ theorem sys_unlink_w2_dot (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
   icases Hcm with ⟨He, Ht, Hx, Hm⟩
   ihave HP := (show A.P (npElems pl).length dinum.toNat ⊢ A.P (nparElems pl).length dinum.toNat
     from .rfl) $$ HP
-  ihave Harms := unlinkArms_dot (hlc := hlc) (fsGammaL fscFs) fscFs A.V.cwi (viewLazy A.V.upt A.V.sz A.M)
+  ihave Harms := unlinkArms_dot (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti A.V.cwi (viewLazy A.V.upt A.V.sz A.M)
       A.v0.toNat A.P A.Pmiss A.Fent
     A.Ftgt A.Fex A.Fmiss pl dinum.toNat (bname 14 nf) (sys_unlink_last_of_npar pl nf hname) hdot
     $$ [$HP $He $Ht $Hx $Hm]
@@ -243,7 +242,7 @@ theorem sys_unlink_w2_look (DL : DIRLOOKUP) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hpins.2.2.1]
   iintro Hk Hpc
   -- +0x68  jal dirlookup
-  k_step_e (wp_s_jal cpu _ (KA.«sys_unlink» + 0x68#64) false 2090988#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_unlink» + 0x68#64) false 2090892#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_unlink_br_dirlookup]
   iintro Hk Hpc
   icases sys_unlink_open kd dinum dnd bmd $$ Hload with ⟨%datd, Hopen⟩
@@ -253,11 +252,29 @@ theorem sys_unlink_w2_look (DL : DIRLOOKUP) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ
   icases Hlk with ⟨#Hslk, #Hfl, Hsl, Hdep, Hoffr, Hdev, Hinum, Hval, Hshot, Hfrz, Hkeep, Hru⟩
   icases bslots_uncons 2 $$ Hbs with ⟨Hb1, Hb2⟩
   ihave Hir := (show irefSlots (GF := GF) 1 ⊢ irefSlot from .rfl) $$ Hir
+  -- THE SELF TEST'S ROWS (chroot): dp's share carved off the short parent, its
+  -- unit, and the root's cell and reference out of the block's hole
+  icases inodeRefShortGenlo_lend kd (q.half + q.half) q.half icfgDev dinum g lo tl hle
+    $$ [Hfl Hkeep] with ⟨Hkeep, Hshr⟩
+  · iframe Hkeep; iexact Hfl
+  icases kctx_tier cpu _ $$ Hk with ⟨%hct, Hk⟩
+  have ht0 : curTier = KTier.kpt := by rw [← hct]; exact ok.htier
+  ihave Hhole := (show sysUnlinkHole (GF := GF) A k.proc P2 ⊢ sysUnlinkHole A (procAddr A.j) P2 by
+    rw [ok.hproc]) $$ Hhole
+  ihave Hpid := (show wordPointsTo (GF := GF) (pPid k.proc) 4 pidPriv A.pid ⊢
+    wordPointsTo (pPid (procAddr A.j)) 4 pidPriv A.pid by rw [ok.hproc]) $$ Hpid
+  icases sys_unlink_hole_root ht0 A P2 $$ [Hhole Hpid] with ⟨Hpid, Hrc, Hrr, Hhcl⟩
+  · iframe
+  ihave Hpid := (show wordPointsTo (GF := GF) (pPid (procAddr A.j)) 4 pidPriv A.pid ⊢
+    wordPointsTo (pPid k.proc) 4 pidPriv A.pid by rw [ok.hproc]) $$ Hpid
+  ihave Hrc := (show wordPointsTo (GF := GF) (pRoot (procAddr A.j)) 8 (DFrac.own 1) A.V.root ⊢
+    wordPointsTo (pRoot k.proc) 8 (DFrac.own 1) A.V.root by rw [ok.hproc]) $$ Hrc
   iapply (sys_unlink_dirlookup DL Γ cpu _ k.sie (by k_norm_g) k.proc (by k_norm_g) A.j A.pid kd
       dinum bmd datd dnd nf ov ok.hj ?dp ?dK ?dn ?dt hty hnd hndd hok hdok hdoc ?da0
       (sysUnlinkName (k.regs 2#5)) (sysUnlinkOff (k.regs 2#5)) ?dnb ?dpa
-      (sys_unlink_off_nonnull _ ok.hsp))
-    $$ [- $Hk $Hpc $Hte $Hce $Henv $Hdev $Hmeta $Hnm $Hoff $Hpid $Hb1 $Hir $Hdl $Hdi]
+      (sys_unlink_off_nonnull _ ok.hsp) hkd q.half.half A.V.root A.V.rti)
+    $$ [- $Hk $Hpc $Hte $Hce $Henv $Hdev $Hmeta $Hshr $Hru $Hnm $Hoff $Hpid $Hrc $Hrr $Hb1 $Hir $Hdl
+      $Hdi]
   rotate_right 1
   k_norm_g [sys_unlink_ret_6c]
   case dp => k_norm_g; exact ok.hproc
@@ -271,8 +288,16 @@ theorem sys_unlink_w2_look (DL : DIRLOOKUP) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ
   isplitl [Hadd Hind]
   · unfold inodeMap; iframe
   unfold sysUnlinkDlK
-  iintro %cpu %spie1 %spp1 %R1 %found %kk %ks %qq %hcs1 Hk Hpc Hte Hce Hdev Hmeta Hmap Hblk Hnm
-    Hpid Hb1 Hdl Hdi Harm
+  iintro %cpu %spie1 %spp1 %R1 %found %kk %ks %qq %hcs1 Hk Hpc Hte Hce Hdev Hmeta Hmap Hblk Hshr
+    Hru Hnm Hpid Hrc Hrr Hb1 Hdl Hdi Harm
+  ihave Hkeep := inodeRefShortGenlo_regather kd (q.half + q.half) q.half icfgDev dinum g lo
+    $$ [Hkeep Hshr]
+  · iframe
+  ihave Hrc := (show wordPointsTo (GF := GF) (pRoot k.proc) 8 (DFrac.own 1) A.V.root ⊢
+    wordPointsTo (pRoot (procAddr A.j)) 8 (DFrac.own 1) A.V.root by rw [ok.hproc]) $$ Hrc
+  ihave Hhole := Hhcl $$ Hrc Hrr
+  ihave Hhole := (show sysUnlinkHole (GF := GF) A (procAddr A.j) P2 ⊢ sysUnlinkHole A k.proc P2 by
+    rw [ok.hproc]) $$ Hhole
   k_norm_g [sys_unlink_ret_6c, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp1 := sysUnlinkPins_cs k _ R1 (ientry kd) (k.regs 18#5) (k.regs 19#5)
     (sysUnlinkPins_set k _ _ _ _ 1#5 _ (sysUnlinkPins_set k _ _ _ _ 10#5 _
@@ -311,7 +336,7 @@ theorem sys_unlink_w2_look (DL : DIRLOOKUP) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ
       $$ Hftop Hm Htop with ⟨Htop, ⟨%av, %hrow, %hnone, Hrecv⟩⟩
     imodintro
     rw [← topFrag_1]
-    ihave Harms := unlinkArms_miss (hlc := hlc) (fsGammaL fscFs) fscFs A.V.cwi (viewLazy A.V.upt A.V.sz A.M)
+    ihave Harms := unlinkArms_miss (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti A.V.cwi (viewLazy A.V.upt A.V.sz A.M)
       A.v0.toNat A.P A.Pmiss A.Fent
       A.Ftgt A.Fex A.Fmiss pl dinum.toNat av (bname 14 nf) _ _
       (sys_unlink_last_of_npar pl nf hname) hrow hnone $$ [$HP $He $Ht $Hrecv $Hx]
@@ -365,7 +390,6 @@ theorem sys_unlink_w2_look (DL : DIRLOOKUP) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ
       simp only [RegMap.set_apply, BitVec.reduceEq, ite_true]; exact h10
     · ipureintro; exact ⟨hok, hrl, hdok, hddix, hdoc, hduq⟩
 
-
 /-! ## +0x30 .. +0x58: ilock(dp) and the two name refusals -/
 
 theorem sys_unlink_namecmp_ne (nf g : Nat → BitVec 8) (r : BitVec 64)
@@ -401,7 +425,7 @@ theorem sys_unlink_w2 (IL : ILOCK) (NC : NAMECMP) (DL : DIRLOOKUP) (IUP : IUNLOC
     #Hty, Hru⟩
   subst hiL hv
   -- +0x30  jal ilock
-  k_step_e (wp_s_jal cpu _ (KA.«sys_unlink» + 0x30#64) false 2089532#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_unlink» + 0x30#64) false 2089436#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_unlink_br_ilock]
   iintro Hk Hpc
   icases bslots_uncons 2 $$ Hbs with ⟨Hb1, Hb2⟩
@@ -432,13 +456,13 @@ theorem sys_unlink_w2 (IL : ILOCK) (NC : NAMECMP) (DL : DIRLOOKUP) (IUP : IUNLOC
   k_step_e (wp_s_auipc cpu _ (KA.«sys_unlink» + 0x34#64) false 2#20 11#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_addi cpu _ (KA.«sys_unlink» + 0x38#64) false 1250#12 11#5 11#5 (by decide))
+  k_step_e (wp_s_addi cpu _ (KA.«sys_unlink» + 0x38#64) false 1134#12 11#5 11#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   k_step_e (wp_s_addi cpu _ (KA.«sys_unlink» + 0x3c#64) false 4016#12 10#5 8#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hp1.2.1]
   iintro Hk Hpc
-  k_step_e (wp_s_jal cpu _ (KA.«sys_unlink» + 0x40#64) false 2091006#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_unlink» + 0x40#64) false 2090910#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_unlink_br_namecmp]
   iintro Hk Hpc
   ihave Hdot1 := (show byteBuf (GF := GF) KStr.«.» DFrac.discard sysUnlinkDotList ⊢
@@ -481,13 +505,13 @@ theorem sys_unlink_w2 (IL : ILOCK) (NC : NAMECMP) (DL : DIRLOOKUP) (IUP : IUNLOC
   k_step_e (wp_s_auipc cpu _ (KA.«sys_unlink» + 0x48#64) false 2#20 11#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_addi cpu _ (KA.«sys_unlink» + 0x4c#64) false 1238#12 11#5 11#5 (by decide))
+  k_step_e (wp_s_addi cpu _ (KA.«sys_unlink» + 0x4c#64) false 842#12 11#5 11#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   k_step_e (wp_s_addi cpu _ (KA.«sys_unlink» + 0x50#64) false 4016#12 10#5 8#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hp2.2.1]
   iintro Hk Hpc
-  k_step_e (wp_s_jal cpu _ (KA.«sys_unlink» + 0x54#64) false 2090986#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_unlink» + 0x54#64) false 2090890#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_unlink_br_namecmp]
   iintro Hk Hpc
   ihave Hdotdot1 := (show byteBuf (GF := GF) KStr.«..» DFrac.discard sysUnlinkDotdotList ⊢

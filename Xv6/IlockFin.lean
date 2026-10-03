@@ -24,9 +24,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 set_option maxHeartbeats 16000000 in
 /-- **`+0x8e .. +0xaa`** (Rocq 1921-2234). -/
@@ -169,10 +167,10 @@ theorem il_fin (BL : BRELSE) (PA : PANIC)
     k_step_e (wp_s_auipc cpu _ (KA.«ilock» + 0xa2#64) false 0x4#20 10#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     iintro Hk Hpc
-    k_step_e (wp_s_addi cpu _ (KA.«ilock» + 0xa6#64) false 152#12 10#5 10#5 (by decide))
+    k_step_e (wp_s_addi cpu _ (KA.«ilock» + 0xa6#64) false 124#12 10#5 10#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [il_msg_addr]
     iintro Hk Hpc
-    k_step_e (wp_s_jal cpu _ (KA.«ilock» + 0xaa#64) false 2085968#21 1#5 (by decide))
+    k_step_e (wp_s_jal cpu _ (KA.«ilock» + 0xaa#64) false 2085948#21 1#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [il_br_panic]
     iintro Hk Hpc
     iapply (il_panic PA cpu _ (by k_norm_g) ?pk ?pn ?pp ?pu) $$ [- $Hk $Hpc $Hpe $Hmsg]

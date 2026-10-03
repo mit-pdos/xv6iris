@@ -46,15 +46,6 @@ theorem swp_pmpCheck_ent0_S (cpu : CPU) (dq : DFrac) (addr : BitVec 64) (width :
     swp_run 60
     iapply HΦ $$ Hpmpcfg_n Hpmpaddr_n
 
-/-- Under xv6's PMP tables (`swp_pmpCheck_ent0_S` at `xv6Pmpcfg`/`xv6Pmpaddr`). -/
-theorem swp_pmpCheck_xv6_S (cpu : CPU) (dq : DFrac) (addr : BitVec 64) (width : Nat)
-    (acc : MemoryAccessType mem_payload) (Φ : Option ExceptionType → IProp GF)
-    (hacc : kernelAccess acc) (hram : pmpOk addr width) :
-    Register.pmpcfg_n ↦ᵣ[cpu]{dq} xv6Pmpcfg ∗ Register.pmpaddr_n ↦ᵣ[cpu]{dq} xv6Pmpaddr ∗
-    ▷ (Register.pmpcfg_n ↦ᵣ[cpu]{dq} xv6Pmpcfg -∗ Register.pmpaddr_n ↦ᵣ[cpu]{dq} xv6Pmpaddr -∗ Φ none)
-    ⊢ swp cpu (pmpCheck (physaddr.Physaddr addr) width acc Privilege.Supervisor) Φ :=
-  swp_pmpCheck_ent0_S cpu dq addr width acc Φ _ _ pmpEnt0Ok_xv6 hacc hram
-
 /-! ## The PMP pass of a configuration, and the Bare tier -/
 
 -- `pmpPassesS` and `SConfPhys` live in `MachCSL.SConfPhysDefs`.
@@ -65,12 +56,6 @@ theorem pmpPassesS_ent0 (cpu : CPU) (dq : DFrac) (c : MConf) (h0 : pmpEnt0Ok c.p
     pmpPassesS (GF := GF) cpu dq c := by
   intro addr width acc Φ hacc hram
   exact swp_pmpCheck_ent0_S cpu dq addr width acc Φ c.pmpcfg c.pmpaddr h0 hacc hram
-
-theorem pmpPassesS_xv6 (cpu : CPU) (dq : DFrac) (c : MConf) (hcfg : c.pmpcfg = xv6Pmpcfg)
-    (haddr : c.pmpaddr = xv6Pmpaddr) : pmpPassesS (GF := GF) cpu dq c := by
-  intro addr width acc Φ hacc hram
-  rw [hcfg, haddr]
-  exact swp_pmpCheck_xv6_S cpu dq addr width acc Φ hacc hram
 
 -- `SConfBare` lives in `MachCSL.SConfAtDefs`.
 

@@ -14,13 +14,13 @@ and the trapframe words `tf`, and the private block owns them through
 Layout of `struct proc` (kernel/proc.h, spinlock = {locked; name; cpu} =
 24 bytes, NOFILE = 16), corroborated by the compiled image (`myproc`'s
 `ld a5,48(a5)` off `pid_lock` = `cpus` + 48 - 48 ...; `allocproc`'s
-`auipc/addi` pins `proc` at (KernelSyms.«cpus» + 0x3b0); sizeof = 368 = 96 + 14*8 + 16*8
+`auipc/addi` pins `proc` at (KernelSyms.«cpus» + 0x3b0); sizeof = 376 = 96 + 14*8 + 16*8
 + 8 + 16 + 8, the Rocq `proc_size`):
 
   lock@0 (locked@0, name@8, cpu@16), state@24, chan@32, killed@40,
   xstate@44, pid@48, parent@56, kstack@64, sz@72, pagetable@80,
   trapframe@88, context@96..207 (14 words: ra sp s0..s11),
-  ofile@208..335 (16 pointers), cwd@336, name@344..359, seccomp@360
+  ofile@208..335 (16 pointers), cwd@336, root@344, name@352..367, seccomp@368
   (xv6 7b2c1b1b's syscall mask, appended last).
 
 ## Deviations from Rocq (permit sweep G+G', Rocq 9fb1d089c + f344a089a's G')
@@ -46,8 +46,6 @@ Imports only definitional files.
 import Xv6.UPtDefs
 import Xv6.KillRow
 import Xv6.WaitInv
-
-set_option linter.unusedSectionVars false
 
 namespace Xv6
 
@@ -125,7 +123,7 @@ structure ProcPriv where
   pvLazy : Bool
   /-- **The syscall mask** (Rocq `ProcDefs.pv_secc`, `p->seccomp`, xv6
   7b2c1b1b): bit `n` set means syscall `n` is allowed.  A CELL, unlike
-  `cwi`/`pvLazy` (the uint64 at +360, `ProcGeom.pSecc`, owned by
+  `cwi`/`pvLazy` (the uint64 at +368, `ProcGeom.pSecc`, owned by
   `procFields`), and process-visible: the dispatcher's blocked arm makes a
   call's effect depend on it, so the key carries it (`Uvis.secc`).
   userinit stores `seccAll`, kfork copies the parent's, sys_seccomp ANDs it
@@ -139,6 +137,19 @@ structure ProcPriv where
   `pvLazy`: nothing in `struct proc` stores it.  LAST, as in Rocq; every
   `{ V with … }` update carries it through. -/
   ev : Nat
+  /-- **The process's root directory** (Rocq `ProcDefs.pv_root`, upstream
+  b72cbac's `p->root`, design chroot.md §1): the cwd's twin.  A CELL (the
+  pointer at +344, `ProcGeom.pRoot`, owned by `procFields`), holding ONE
+  WHOLE inode reference AT `rti` (`ProcInv.rootRefAt V.root V.rti`, the core's
+  conjunct right after the cwd's).  userinit installs it (`igetroot`),
+  kfork copies it (`idup`), sys_chroot moves it, kexit drops it; exec and
+  everything else keep it.  Appended after `ev`, as in Rocq. -/
+  root : BitVec 64
+  /-- **The root directory's inum** (Rocq `pv_rti`), the twin of `cwi`: what
+  the walk's absolute arm and `dirlookup`'s `..`-at-the-root arm compare
+  against.  Not a cell.  NOT in the user-visible key (`UexecSlot.Uvis`;
+  chroot.md §1 says why).  A `Nat`, as `cwi`.  LAST. -/
+  rti : Nat
 
 /-- The event counter's ghost write (Rocq `upd_ev`): the permit's holder
 steps it once per actor-labelled append (design ni-strong-instance.md §7). -/
@@ -146,6 +157,14 @@ abbrev ProcPriv.updEv (V : ProcPriv) (k : Nat) : ProcPriv := { V with ev := k }
 
 /-- Rocq `upd_ev_id`. -/
 theorem ProcPriv.updEv_id (V : ProcPriv) : V.updEv V.ev = V := rfl
+
+/-- The root cell's write (Rocq `upd_root`): sys_chroot's, kexit's and the
+installers' `sd …,344(…)`. -/
+abbrev ProcPriv.updRoot (V : ProcPriv) (v : BitVec 64) : ProcPriv := { V with root := v }
+
+/-- The root inum's ghost write (Rocq `upd_rti`): it moves with the
+reference the cell names. -/
+abbrev ProcPriv.updRti (V : ProcPriv) (z : Nat) : ProcPriv := { V with rti := z }
 
 omit [CurCtx] in
 /-- **THE EVENT COUNT ONLY ROSE** (Rocq `ProcInv.ev_after`, permit sweep L1a,
@@ -199,7 +218,8 @@ def procFields (pa : BitVec 64) (dq : DFrac) (V : ProcPriv) : IProp GF := iprop%
   ofileCells pa dq V.ofile ∗
   wordPointsTo (pCwd pa) 8 dq V.cwd ∗
   pnameCells pa dq V.name ∗
-  wordPointsTo (pSecc pa) 8 dq V.pvSecc
+  wordPointsTo (pSecc pa) 8 dq V.pvSecc ∗
+  wordPointsTo (pRoot pa) 8 dq V.root
 
 /-- The pid cell's three fractions (Rocq): a HALF rides in the private
 block, a QUARTER is lock-protected (`procPub`), a QUARTER sits in the
@@ -271,12 +291,11 @@ def procPub (pa : BitVec 64) (st : BitVec 32) (chan : BitVec 64) (killed xstate 
   wordPointsTo (pPid pa) 4 pidPub pid ∗
   killPaidAt (MachFixedGS.killCred (hlc := hlc) (GF := GF)) pid killed
 
-
 /-- **The dormant slot's allowances** (Rocq `proc_dormant`'s four supply
 rows, ProcDefs.v:623): one fd-slot unit per descriptor (`[∗ list] _ ∈
 pv_ofile V, fd_slot`, at the dormant block's all-null array), the fd
 allowance `fd_slots FDSPARE`, the cwd's unit plus the iref allowance
-`iref_slots (1 + IREFSPARE)`, and the bio allowance `bslots 3`.  Rocq writes
+`iref_slots (IREFHOME + IREFSPARE)`, and the bio allowance `bslots 3`.  Rocq writes
 the four inline in `proc_dormant`, `proc_dormant_noctx`, `SpecFreeproc.fp_rest`
 and allocproc's post; the port names the group once (a presentation
 cleanup: every one of those sites moves the four together), keyed at the
@@ -285,7 +304,7 @@ under the block's own pure conjunct, and a `V`-free name is what lets a
 proof that rebuilds `V` carry the group untouched. -/
 def dormantAllow : IProp GF := iprop%
   ([∗list] _f ∈ List.replicate NOFILE (0#64 : BitVec 64), fdSlot) ∗
-  fdSlots FDSPARE ∗ irefSlots (1 + IREFSPARE) ∗ bslots 3
+  fdSlots FDSPARE ∗ irefSlots (IREFHOME + IREFSPARE) ∗ bslots 3
 
 instance dormantAllow_timeless : Timeless (dormantAllow (GF := GF)) := by
   unfold dormantAllow; infer_instance
@@ -306,7 +325,7 @@ instance liveAllow_timeless : Timeless (liveAllow (GF := GF)) := by
 /-- A slot nobody runs (UNUSED or ZOMBIE): the private block's cells with
 existential values, no open files, no cwd, and the slot's SUPPLY
 ALLOWANCES (`dormantAllow`: the per-descriptor fd slots, `fdSlots FDSPARE`,
-`irefSlots (1 + IREFSPARE)`, `bslots 3` -- Rocq `proc_dormant`, wave 7 P3;
+`irefSlots (IREFHOME + IREFSPARE)`, `bslots 3` -- Rocq `proc_dormant`, wave 7 P3;
 allocproc hands them to the new process, freeproc passes them through,
 kexit's park returns them).  A ZOMBIE keeps its address space and
 trapframe page until `wait` reaps it; `freeproc` empties them and the slot
@@ -337,7 +356,7 @@ that half reads (`ChildTok.exitTok`, Rocq `exit_tok (pv_gen V) pid
 def procDormant (pa : BitVec 64) (st : BitVec 32) : IProp GF := iprop%
   ⌜st = UNUSED ∨ st = ZOMBIE⌝ ∗
   ∃ (V : ProcPriv) (pid : BitVec 32),
-    ⌜V.ofile = List.replicate NOFILE 0#64 ∧ V.cwd = 0#64 ∧ V.sz.toNat ≤ uvmMaxsz ∧
+    ⌜V.ofile = List.replicate NOFILE 0#64 ∧ V.cwd = 0#64 ∧ V.root = 0#64 ∧ V.sz.toNat ≤ uvmMaxsz ∧
       V.pvLazy = true⌝ ∗
     wordPointsTo (pPid pa) 4 pidPriv pid ∗
     procFields pa (DFrac.own 1) V ∗
@@ -361,7 +380,8 @@ def procFieldsNoKstack (pa : BitVec 64) (dq : DFrac) (V : ProcPriv) : IProp GF :
   ofileCells pa dq V.ofile ∗
   wordPointsTo (pCwd pa) 8 dq V.cwd ∗
   pnameCells pa dq V.name ∗
-  wordPointsTo (pSecc pa) 8 dq V.pvSecc
+  wordPointsTo (pSecc pa) 8 dq V.pvSecc ∗
+  wordPointsTo (pRoot pa) 8 dq V.root
 
 /-- **The UNUSED block without its supply units** (Rocq
 `ProcInv.proc_dormant_nofd`): what `procinit` is handed for each process
@@ -377,7 +397,7 @@ cell is not here -- procinit writes it -- and joins the block at the seal
 `trapframe` / pid are pure facts (`dormantSpace`). -/
 def procDormantNofd (pa : BitVec 64) : IProp GF := iprop%
   ∃ (V : ProcPriv) (pid : BitVec 32),
-    ⌜V.ofile = List.replicate NOFILE 0#64 ∧ V.cwd = 0#64 ∧ V.pvLazy = true ∧
+    ⌜V.ofile = List.replicate NOFILE 0#64 ∧ V.cwd = 0#64 ∧ V.root = 0#64 ∧ V.pvLazy = true ∧
       V.pagetable = 0#64 ∧ V.trapframe = 0#64 ∧ V.sz = 0#64 ∧ pid = 0#32⌝ ∗
     wordPointsTo (pPid pa) 4 pidPriv pid ∗
     procFieldsNoKstack pa (DFrac.own 1) V ∗
@@ -387,12 +407,7 @@ def procDormantNofd (pa : BitVec 64) : IProp GF := iprop%
 (Rocq `ProcInv.proc_dormant_prestk`): procinit's output per slot, beside
 the `p->kstack` cell it just wrote. -/
 def procDormantPrestk (pa : BitVec 64) : IProp GF := iprop%
-  procDormantNofd pa ∗ fdSlots (NOFILE + FDSPARE) ∗ irefSlots (1 + IREFSPARE) ∗ bslots 3
-
-/-- Rocq `proc_dormant_prestk_intro`. -/
-theorem procDormantPrestk_intro (pa : BitVec 64) :
-    procDormantNofd (GF := GF) pa ∗ fdSlots (NOFILE + FDSPARE) ∗ irefSlots (1 + IREFSPARE) ∗
-      bslots 3 ⊢ procDormantPrestk pa := .rfl
+  procDormantNofd pa ∗ fdSlots (NOFILE + FDSPARE) ∗ irefSlots (IREFHOME + IREFSPARE) ∗ bslots 3
 
 /-- **The seal** (Rocq `proc_dormant_prestk_seal`): the pre-stack block, the
 `p->kstack` cell procinit wrote (Lean's block owns it; Rocq's `is_kstack`),
@@ -407,13 +422,13 @@ theorem procDormantPrestk_seal (pa : BitVec 64) (ks : BitVec 64) (γ0 g : GName)
       procDormant pa UNUSED := by
   unfold procDormantPrestk procDormantNofd procDormant
   iintro ⟨⟨⟨%V, %pid, %hV, Hpid, Hf, ⟨%xsv, Hxs⟩⟩, Hfd, Hir, Hbs⟩, Hks, Hstk, Hch, Hsg, Hev⟩
-  obtain ⟨hof, hcwd, hlz, hpg, htf, hsz, hpid⟩ := hV
+  obtain ⟨hof, hcwd, hroot, hlz, hpg, htf, hsz, hpid⟩ := hV
   isplitl []
   · ipureintro; exact Or.inl rfl
   iexists { V with kstack := ks, chg := γ0, gen := g, ev := 0 }, pid
   isplitl []
   · ipureintro
-    refine ⟨hof, hcwd, ?_, hlz⟩
+    refine ⟨hof, hcwd, hroot, ?_, hlz⟩
     show V.sz.toNat ≤ uvmMaxsz
     rw [hsz]; unfold uvmMaxsz; decide
   iframe Hpid
@@ -443,31 +458,9 @@ theorem procDormantPrestk_seal (pa : BitVec 64) (ks : BitVec 64) (γ0 g : GName)
   iframe Hstk
   ipureintro; exact ⟨hpg, htf, hsz, hpid⟩
 
-/-- What slot `i` owes at state `st` besides the lock-protected part
-(Rocq `proc_slots`): the dormant block at UNUSED/ZOMBIE, nothing else yet
-(the running/parked contexts of `SchedCtx.v` are not ported). -/
-def procSlot (i : Nat) (st : BitVec 32) : IProp GF :=
-  if st = UNUSED ∨ st = ZOMBIE then procDormant (procAddr i) st else iprop(True)
-
 end Dormant
 
 /-! ## The current process (Rocq `ProcGeom.cur_proc`) -/
-
-/-- The current-process resource: `cpus[cpu].proc` holds `p` (Rocq
-`cur_proc p`; the hart is explicit here where Rocq's is the ambient
-`CpuId`).  `myproc()` returns exactly this value. -/
-def curProc [KernelGeom] (cpu : CPU) (p : BitVec 64) : IProp GF :=
-  wordPointsTo (aCpuProc cpu) 8 (DFrac.own 1) p
-
-/-- `cur_proc` is the first cell of the per-cpu bundle (Rocq `cpu_cells`). -/
-theorem cpuCells_curProc [KernelGeom] (cpu : CPU) (lent sie : Bool) (noff : Nat) (intena : Bool) (p : BitVec 64) :
-    cpuCells (GF := GF) cpu lent sie noff intena p ⊢
-      curProc cpu p ∗ (curProc cpu p -∗ cpuCells cpu lent sie noff intena p) := by
-  unfold cpuCells curProc
-  iintro ⟨Hp, Hn, Hi⟩
-  iframe Hp
-  iintro Hp
-  iframe
 
 /-- Setting one byte of a 16-byte buffer to `0` makes it a well-formed name. -/
 theorem pnameWf_set (cur : List (BitVec 8)) (p : Nat) (hlen : cur.length = 16) (hp : p ≤ 15) :

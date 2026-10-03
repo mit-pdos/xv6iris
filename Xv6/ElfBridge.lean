@@ -18,8 +18,8 @@ header, in short:
 > `AFile (fn_file_bytes (era_node dn bm data))`, and `fn_file_bytes` is
 > `file_bytes data (fn_size n)`.  So the missing pure link is
 > index-by-index: `file_bytes`' total lookup at `k` IS `file_byte` at `k`,
-> below the size (`fileBytes_lookup`).  The two halves compose into
-> `leAt_of_fileBytes`, the shape a proof with a `readi`-filled buffer wants.
+> below the size (`fileBytes_lookup`).  The two halves compose into the
+> shape a proof with a `readi`-filled buffer wants.
 >
 > THE TWO TRUNCATIONS ARE THE ONLY REAL CONTENT.  `eh_phoff` and `ph_off` are
 > FOUR-byte loads of EIGHT-byte fields, so they equal `ee_phoff` /
@@ -199,18 +199,6 @@ theorem elfTable_lookup {α : Type} (parse : Nat → Option α) (o step n : Nat)
           rw [show o + step * (j + 1) = o + step + step * j by rw [Nat.mul_succ]; omega]
           exact this
 
-/-- Rocq `elf_parse_phdr_fields` (the six fields the code reads; `0 <= o`
-vacuous, deviation 2). -/
-theorem elfParsePhdr_fields (l : ElfBytes) (o : Nat) (p : ElfPhdr) (hp : elfParsePhdr l o = some p) :
-    o + 56 ≤ l.length ∧ p.type = leAt l o 4 ∧ p.flags = leAt l (o + 4) 4 ∧
-      p.offset = leAt l (o + 8) 8 ∧ p.vaddr = leAt l (o + 16) 8 ∧
-      p.filesz = leAt l (o + 32) 8 ∧ p.memsz = leAt l (o + 40) 8 := by
-  simp only [elfParsePhdr, elfReadU64, elfReadU32, elfRead, bind, pure] at hp
-  repeat (split at hp <;> try (simp at hp; done))
-  simp only [Option.bind_some, Option.some.injEq] at hp
-  subst hp
-  exact ⟨by omega, rfl, rfl, rfl, rfl, rfl, rfl⟩
-
 /-- Rocq `elf_parse_phdr_all`: ALL EIGHT FIELDS, which identifies the parsed
 record with the TOTAL reader the phdr loop's invariant is stated on. -/
 theorem elfParsePhdr_all (l : ElfBytes) (o : Nat) (p : ElfPhdr) (hp : elfParsePhdr l o = some p) :
@@ -220,27 +208,6 @@ theorem elfParsePhdr_all (l : ElfBytes) (o : Nat) (p : ElfPhdr) (hp : elfParsePh
   repeat (split at hp <;> try (simp at hp; done))
   simp only [Option.bind_some, Option.some.injEq] at hp
   exact hp.symm
-
-/-- **Rocq `ph_fields_of_phdr`, THE PROGRAM-HEADER BRIDGE**: `g` is the
-56-byte `struct proghdr` kexec `readi`d out of the file at offset `o`;
-`phOff` is the FOUR-byte read, so it needs `ep_offset p < 2^31`. -/
-theorem phFields_of_phdr (g l : ElfBytes) (o : Nat) (p : ElfPhdr) (hp : elfParsePhdr l o = some p)
-    (hag : ∀ j, j < 56 → g[j]! = l[o + j]!) :
-    phType g = p.type ∧ phFlags g = p.flags ∧ phVaddr g = p.vaddr ∧ phFilesz g = p.filesz ∧
-      phMemsz g = p.memsz ∧ (p.offset < 2 ^ 31 → phOff g = p.offset) := by
-  obtain ⟨-, h1, h2, h3, h4, h6, h7⟩ := elfParsePhdr_fields l o p hp
-  have hsh : ∀ a n : Nat, a + n ≤ 56 → leAt g a n = leAt l (o + a) n := fun a n han =>
-    leAt_shift_of_list g l o a n fun j hj => by
-      rw [Nat.add_assoc o a j]; exact hag (a + j) (by omega)
-  unfold phType phFlags phVaddr phFilesz phMemsz phOff
-  rw [hsh 0 4 (by omega), hsh 4 4 (by omega), hsh 16 8 (by omega), hsh 32 8 (by omega),
-    hsh 40 8 (by omega), hsh 8 4 (by omega)]
-  refine ⟨by simpa using h1.symm, h2.symm, h4.symm, h6.symm, h7.symm, fun hlt => ?_⟩
-  rw [h3]
-  apply leAt_trunc_small l (o + 8) 4 8 (by omega)
-  rw [← h3]
-  have : (2 : Nat) ^ 31 < 2 ^ (8 * 4) := by decide
-  omega
 
 /-! ## 5.  THE TABLE, AS THE PHDR LOOP WALKS IT -/
 
@@ -287,32 +254,5 @@ theorem phAt_of_ehdr (g l : ElfBytes) (e : ElfEhdr) (i : Nat) (he : elfParseEhdr
     phAt g i = e.phoff + 56 * i := by
   unfold phAt
   rw [(ehFields_of_ehdr g l e he hag).2.2 hlt]
-
-/-- Rocq `elf_loads_elem`: a PT_LOAD entry of the table is a member of
-`elfLoads`. -/
-theorem elfLoads_elem (l : ElfBytes) (ps : List ElfPhdr) (i : Nat) (p : ElfPhdr)
-    (hps : elfPhdrs l = some ps) (hi : ps[i]? = some p) (hty : p.type = 1) : p ∈ elfLoads l := by
-  unfold elfLoads
-  rw [hps]
-  exact List.mem_filter.2 ⟨List.mem_of_getElem? hi, by simp [hty]⟩
-
-/-- Rocq `elf_loads_sub`: every member of `elfLoads` is a table entry. -/
-theorem elfLoads_sub (l : ElfBytes) (ps : List ElfPhdr) (p : ElfPhdr)
-    (hps : elfPhdrs l = some ps) (hp : p ∈ elfLoads l) : p ∈ ps ∧ p.type = 1 := by
-  unfold elfLoads at hp
-  rw [hps] at hp
-  obtain ⟨h1, h2⟩ := List.mem_filter.1 hp
-  exact ⟨h1, by simpa using h2⟩
-
-/-! ## 6.  THE `readi` WINDOW: the bytes kexec reads ARE the abstract file -/
-
-/-- **Rocq `le_at_of_file_bytes`, THE COMPOSITE the exec proof applies**: a
-buffer filled by `readi` from file offset `base` reads exactly as the
-abstract byte list `fileBytes data sz` does. -/
-theorem leAt_of_fileBytes (g : ElfBytes) (data : Nat → List (BitVec 8)) (sz base o n : Nat)
-    (hg : ∀ j, j < n → g[o + j]! = fileByte data (base + o + j)) (hsz : base + o + n ≤ sz) :
-    leAt g o n = leAt (fileBytes data sz) (base + o) n :=
-  leAt_shift_of_list g _ base o n fun j hj => by
-    rw [hg j hj, fileBytes_lookup data sz _ (by omega)]
 
 end Xv6

@@ -27,8 +27,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
-
 /-- **Rocq `UkShEcho.echo_execfail_bytes`**: "exec echo failed\n" around
 "echo" is sh's `.rodata` format at 0x1298. -/
 theorem ushEchoExecfailBytes : ushExecfailBytes altExecfail cmdEcho := by

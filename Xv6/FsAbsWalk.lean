@@ -41,11 +41,18 @@ Rocq's comment on the hop, kept:
 3. `S k` is `k + 1`; the big separating conjunction is iris-lean's
    `[∗list] j ↦ s ∈ ps.drop n, …` (index-first, as Rocq's).
 4. The `match ents !! s with Some c => P (S k) c | None => Pmiss k d`
-   inside the hop is NAMED, `axHopNext P Pmiss k d (ents[s]?)` (with
-   `axHopNext_some`/`_none`, both `rfl`).  An inline `match` elaborates to
+   inside the hop is NAMED, `axHopNext P Pmiss k d (ents[s]?)` (both
+   arms reduce by `rfl`).  An inline `match` elaborates to
    a fresh matcher at every statement that restates it, and the proof mode
    cannot unify two of them; the named form is the same term everywhere
    (the era fires state their conclusion through it).
+
+5. **The chroot bump** (design/chroot.md section 3): `axHop rt`/
+   `axHopsFrom rt` are the record-only hop plus the root's self rule,
+   whose answer is NAMED `axHopAns` (deviation 4's reason;
+   `axHopAns_self`/`_rec` read it).  Rocq's `decide` is the `Decidable` instance of `s = DOTDOT ∧
+   d = rt` (`Fname` has `DecidableEq`).  `ax_hops_nodot`'s `Forall` is
+   `∀ s ∈ ps.drop n, s ≠ DOTDOT`.
 
 ## Dropped/simplified vs Rocq
 
@@ -68,27 +75,38 @@ def axHopNext (P Pmiss : Nat → Nat → IProp GF) (k d : Nat) : Option Nat → 
   | some c => P (k + 1) c
   | none => Pmiss k d
 
-theorem axHopNext_some (P Pmiss : Nat → Nat → IProp GF) (k d c : Nat) :
-    axHopNext P Pmiss k d (some c) = P (k + 1) c := rfl
+/-- WHAT THE HOP AT THE PROCESS'S ROOT `rt` HANDS BACK (the `if` inside
+Rocq's `ax_hop`, named for the same reason as `axHopNext`, deviation 4):
+`..` at the root steps the cursor IN PLACE, whatever the record says
+(dirlookup's self arm, design/chroot.md section 3); everywhere else the
+record answers. -/
+def axHopAns (rt : Nat) (P Pmiss : Nat → Nat → IProp GF) (k d : Nat) (s : Fname)
+    (ents : Std.ExtTreeMap Fname Nat compare) : IProp GF :=
+  if s = DOTDOT ∧ d = rt then P (k + 1) d else axHopNext P Pmiss k d ents[s]?
 
-theorem axHopNext_none (P Pmiss : Nat → Nat → IProp GF) (k d : Nat) :
-    axHopNext P Pmiss k d none = Pmiss k d := rfl
+theorem axHopAns_self (rt : Nat) (P Pmiss : Nat → Nat → IProp GF) (k d : Nat) (s : Fname)
+    (ents : Std.ExtTreeMap Fname Nat compare) (hs : s = DOTDOT) (hd : d = rt) :
+    axHopAns rt P Pmiss k d s ents = P (k + 1) d := by
+  unfold axHopAns; rw [if_pos ⟨hs, hd⟩]
 
-/-- ONE caller-supplied atomic step (Rocq's `ax_hop`): given the cursor
-`P k d` and the lent fragment `F d dqv ents` at the directory `d`, the
-caller hands the fragment back at the SAME share and steps the cursor --
-to `P (k+1) c` if `s` is an entry of `d` (at child `c`), to `Pmiss k d`
-otherwise. -/
-def axHop (F : Nat → DFrac → Std.ExtTreeMap Fname Nat compare → IProp GF)
+theorem axHopAns_rec (rt : Nat) (P Pmiss : Nat → Nat → IProp GF) (k d : Nat) (s : Fname)
+    (ents : Std.ExtTreeMap Fname Nat compare) (hns : ¬(s = DOTDOT ∧ d = rt)) :
+    axHopAns rt P Pmiss k d s ents = axHopNext P Pmiss k d ents[s]? := by
+  unfold axHopAns; rw [if_neg hns]
+
+/-- THE HOP THE WALK FIRES, AT THE PROCESS'S ROOT `rt` (Rocq's `ax_hop`,
+design/chroot.md section 3): the record-only hop plus the root's self rule.
+Every kernel contract instantiates `rt` at its block's `V.rti`. -/
+def axHop (rt : Nat) (F : Nat → DFrac → Std.ExtTreeMap Fname Nat compare → IProp GF)
     (P Pmiss : Nat → Nat → IProp GF) (k : Nat) (s : Fname) : IProp GF :=
   iprop(∀ (d : Nat) (ents : Std.ExtTreeMap Fname Nat compare) (dqv : DFrac),
     P k d -∗ F d dqv ents ={⊤}=∗
-      F d dqv ents ∗ axHopNext P Pmiss k d ents[s]?)
+      F d dqv ents ∗ axHopAns rt P Pmiss k d s ents)
 
 /-- The hops still owed from index `n` on (Rocq's `ax_hops_from`). -/
-def axHopsFrom (F : Nat → DFrac → Std.ExtTreeMap Fname Nat compare → IProp GF)
+def axHopsFrom (rt : Nat) (F : Nat → DFrac → Std.ExtTreeMap Fname Nat compare → IProp GF)
     (P Pmiss : Nat → Nat → IProp GF) (ps : List Fname) (n : Nat) : IProp GF :=
-  iprop([∗list] j ↦ s ∈ ps.drop n, axHop F P Pmiss (n + j) s)
+  iprop([∗list] j ↦ s ∈ ps.drop n, axHop rt F P Pmiss (n + j) s)
 
 end FsAbsWalk
 

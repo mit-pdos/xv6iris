@@ -98,19 +98,15 @@ open Iris.Std (get?)
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## PURE ARITHMETIC -/
-
 
 /-- `bge` of two small counters. -/
 theorem kxcB3_bge_small (a b : Nat) (ha : a < 2 ^ 63) (hb : b < 2 ^ 63) :
     bcond bop.BGE (BitVec.ofNat 64 a) (BitVec.ofNat 64 b) = decide (b ≤ a) := by
   rw [kxcB2_bge, MachCSL.toInt_ofNat a ha, MachCSL.toInt_ofNat b hb]
   by_cases h : b ≤ a <;> simp [h] <;> omega
-
 
 /-- `flags2perm` reads bits 0 and 1 only: the `lw`'s sign extension does not
 reach them (Rocq `kxc_w32_bit`). -/
@@ -262,10 +258,8 @@ theorem kxcB3_off_step (ef : List (BitVec 8)) (i : Nat) :
   have := kxcOff_step ef i
   simpa using this
 
-
 section Win
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
-
 
 end Win
 
@@ -703,10 +697,9 @@ theorem kxcB3_stub (IUP : IUNLOCKPUT) (EO : END_OP) (PFP : PROC_FREEPAGETABLE) (
 theorem kxcB3_br_f2p : KA.«kexec» + 0x170#64 + BitVec.signExtend 64 2096752#21 = KA.«flags2perm» := by
   decide
 theorem kxcB3_ret_170 : jumpPc (KA.«kexec» + 0x170#64 + 4#64) = KA.«kexec» + 0x170#64 + 4#64 := by decide
-theorem kxcB3_br_uvma : KA.«kexec» + 0x17c#64 + BitVec.signExtend 64 2082998#21 = KA.«uvmalloc» := by
+theorem kxcB3_br_uvma : KA.«kexec» + 0x17c#64 + BitVec.signExtend 64 2082882#21 = KA.«uvmalloc» := by
   decide
 theorem kxcB3_ret_17c : jumpPc (KA.«kexec» + 0x17c#64 + 4#64) = KA.«kexec» + 0x17c#64 + 4#64 := by decide
-
 
 set_option maxHeartbeats 32000000 in
 /-- **+0x188 .. +0x1a0 and the loadseg loop's exit (+0x116)**: after a
@@ -1118,7 +1111,7 @@ theorem kxcB3_checks (RD : READI) (WA : WALKADDR) (PA : PANIC) (IUP : IUNLOCKPUT
   -- +0x17c  jal uvmalloc, the block's event counter lent to it (permit
   -- sweep L1a, Rocq `proc_priv_ev_lend`)
   icases procPrivFd_evLend A.γ k.proc A.pidv A.V A.M $$ Hpriv with ⟨Hlend, Hpback⟩
-  iapply (kxcB2_call_uvmalloc UV Γ cpu k A spie spp _ (KA.«kexec» + 0x17c#64) 2082998#21 kxcB3_br_uvma
+  iapply (kxcB2_call_uvmalloc UV Γ cpu k A spie spp _ (KA.«kexec» + 0x17c#64) 2082882#21 kxcB3_br_uvma
       kxcB3_ret_17c P Mi A.V.ev hK hnoff (by simp [RegMap.set_apply, a22])
       (by simpa [RegMap.set_apply, a18] using hbelow) (by simpa [RegMap.set_apply, a18] using hcov)
       (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hf2p];
@@ -1226,7 +1219,7 @@ theorem kxcB3_checks (RD : READI) (WA : WALKADDR) (PA : PANIC) (IUP : IUNLOCKPUT
         hbelow hcov hplen hok rfl hnw hret hva hwin hout))
     $$ [$Hk $Hpc $Hte $Hce $Hfab $Hop $Hlog $Hirs $Hbs $Hpt $Hpriv $Hbufs $He $Hfr $Hcl $H1a4 $HB]
 
-theorem kxcB3_br_readi : KA.«kexec» + 0x13a#64 + BitVec.signExtend 64 2092258#21 = KA.«readi» := by
+theorem kxcB3_br_readi : KA.«kexec» + 0x13a#64 + BitVec.signExtend 64 2092162#21 = KA.«readi» := by
   decide
 theorem kxcB3_ret_13a : jumpPc (KA.«kexec» + 0x13a#64 + 4#64) = KA.«kexec» + 0x13a#64 + 4#64 := by decide
 
@@ -1310,7 +1303,7 @@ theorem kxc_ph_step (RD : READI) (WA : WALKADDR) (PA : PANIC) (IUP : IUNLOCKPUT)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x13a  jal readi   (the header, 56 bytes at off)
-  iapply (kxcB2_call_readi RD Γ cpu k A spie spp _ (KA.«kexec» + 0x13a#64) 2092258#21 kxcB3_br_readi
+  iapply (kxcB2_call_readi RD Γ cpu k A spie spp _ (KA.«kexec» + 0x13a#64) 2092162#21 kxcB3_br_readi
       kxcB3_ret_13a hK hnoff htier hj hproc kf qf sf gyf loyf tlyf inumf dnf bmf data gilf gislf
       (kxbPhoff ef i) 56 (Nat.mod_lt _ (by decide)) (by omega) g0 hg0 (kxcPhBuf (k.regs 2#5))
       ?r2 ?r0 ?r1 ?r3 ?r4)
@@ -1510,7 +1503,7 @@ theorem kxc_phdr (RD : READI) (WA : WALKADDR) (PA : PANIC) (IUP : IUNLOCKPUT) (E
 
 /-! ## THE TWO PATHS THAT CLOSE THE INODE, AND PHASE B2 WHOLE -/
 
-theorem kxcB3_br_iup : KA.«kexec» + 0x1a6#64 + BitVec.signExtend 64 2091760#21 = KA.«iunlockput» := by
+theorem kxcB3_br_iup : KA.«kexec» + 0x1a6#64 + BitVec.signExtend 64 2091664#21 = KA.«iunlockput» := by
   decide
 theorem kxcB3_ret_1a6 : jumpPc (KA.«kexec» + 0x1a6#64 + 4#64) = KA.«kexec» + 0x1a6#64 + 4#64 := by decide
 theorem kxcB3_br_eo : KA.«kexec» + 0x1aa#64 + BitVec.signExtend 64 2093966#21 = KA.«end_op» := by
@@ -1596,7 +1589,7 @@ theorem kxc_close (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames) [ClaimIs (h
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x1a6  jal iunlockput
-  iapply (kxc_call_iup IUP Γ cpu k A spie spp _ (KA.«kexec» + 0x1a6#64) 2091760#21 kxcB3_br_iup
+  iapply (kxc_call_iup IUP Γ cpu k A spie spp _ (KA.«kexec» + 0x1a6#64) 2091664#21 kxcB3_br_iup
       kxcB3_ret_1a6 kf qf sf gyf loyf tlyf inumf dnf bmf data gilf gislf n2 hK hnoff htier hj hproc hkf
       hnib hn2 (by simp [RegMap.set_apply, h20]))
     $$ [- $Hk $Hpc $Hte $Hce $Hfab $Hop $Hlog $Hbs $Hpid]

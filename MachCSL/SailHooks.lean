@@ -23,21 +23,7 @@ namespace LeanRV64D.Functions
 theorem load_reservation_term (a : physaddrbits) (w : Nat) :
     load_reservation a w = (pure () : SailM Unit) := rfl
 
-theorem cancel_reservation_term (u : Unit) :
-    cancel_reservation u = (pure () : SailM Unit) := rfl
-
-theorem plat_term_write_term (b : BitVec 8) :
-    plat_term_write b = (pure () : SailM Unit) := rfl
-
 theorem match_reservation_eq (a : physaddrbits) :
     match_reservation a = xv6_resv_matches a := rfl
-
-theorem valid_reservation_eq (u : Unit) :
-    valid_reservation u = xv6_resv_is_valid := rfl
-
-/-- Experimental extensions are off (Rocq `riscv_extras.v:28`), so the decode
-gates on them (`Ext_Zibi`, `Ext_Zvabd`) are closed. -/
-@[sail_facts] theorem sys_enable_experimental_extensions_eq (u : Unit) :
-    sys_enable_experimental_extensions u = false := rfl
 
 end LeanRV64D.Functions

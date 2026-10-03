@@ -25,15 +25,12 @@ DEVIATIONS from Rocq:
    under an `iAssert`; `Forall (fun I => I `prefix_of` ins seg) Is` is
    `∀ I ∈ Is, I <+: consIns seg`.
 -/
-import Xv6.GenOut
 import Xv6.GenOutSealPure
 import Xv6.GenOutHistSeal
 
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode MachCSL
-
-set_option linter.unusedSectionVars false
 
 /-- The echo step's pure argument (Rocq's inline asserts of `gcl_step_echo`):
 the block in progress is WHOLE, and the claim's pure part moves to the stage

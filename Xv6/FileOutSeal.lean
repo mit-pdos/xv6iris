@@ -9,18 +9,16 @@ that the U0-X cone audit trimmed from `Xv6/FileOut{Era,Claim}.lean`
 * `f0Alloc` (Rocq `f0_alloc`): an era's two boot-state ledgers, empty;
 * `f0Map_step` / `f0Map_on` (Rocq `f0_map_step` / `f0_map_on`): the second
   per-era map's moves, `EchoOutSealEra.pinMap_step` / `pinMap_on` verbatim;
-* the history's line list: `echofLinesOf_io`, `eflOf_io`, `eflOf_out`,
-  `eflOf_snoc`, `echofLinesOf_power`, `eflOf_power` (Rocq `echof_lines_of_io`,
-  `efl_of_io`, `efl_of_out`, `efl_of_snoc`, `echof_lines_of_power`,
-  `efl_of_power`);
 * THE ERA'S PIN IN THE LEDGER: `f0Pinned_undrained`, `f0Pinned_io`,
   `f0Pinned_drained`, `f0Pinned_drain` (Rocq `f0_pinned_*`);
-* `f0Typed_adm` (Rocq `f0_typed_adm`): the deed's typed witness read against
-  the ledger's own line list; `flAuth_grow_pre` (Rocq `fl_auth_grow_pre`);
+* `flAuth_grow_pre` (Rocq `fl_auth_grow_pre`);
 * `fileBirthAll` (Rocq `file_birth_all`): `AppFileSeal.fileBirth` beside one
   more `ghost_map` allocation.
 
-Already landed: `f0_typed_none` is `FileOutEra.f0Typed_none`.
+Already landed: `f0_typed_none` is `FileOutEra.f0Typed_none`.  Not ported
+(nothing uses them): the history's line-list lemmas (Rocq
+`echof_lines_of_io`, `efl_of_io`, `efl_of_out`, `efl_of_snoc`,
+`echof_lines_of_power`, `efl_of_power`) and `f0_typed_adm`.
 
 ## DEVIATIONS from Rocq
 
@@ -41,59 +39,6 @@ import Xv6.EchoOutSealEra
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
-
-set_option linter.unusedSectionVars false
-
-/-! ## The history's line list moves (pure) -/
-
-/-- Rocq `echof_lines_of_io`. -/
-theorem echofLinesOf_io (h : List Obs) (e : Obs) (hs : traceShape h true) (hio : isIo e = true)
-    (hin : consIns [e] = []) : echofLinesOf (h ++ [e]) = echofLinesOf h := by
-  obtain ⟨cs, h1, h2⟩ := cyclesOf_io h [e] hs (io_singleton e hio)
-  unfold echofLinesOf
-  rw [h1, h2, List.map_append, List.map_append, List.flatten_append, List.flatten_append]
-  congr 1
-  simp only [List.map_cons, List.map_nil, List.flatten_cons, List.flatten_nil]
-  unfold echofCyc
-  rw [consIns_app, hin]
-  simp only [List.append_nil]
-
-/-- Rocq `efl_of_io`. -/
-theorem eflOf_io (h : List Obs) (e : Obs) (hs : traceShape h true) (hio : isIo e = true)
-    (hin : consIns [e] = []) : eflOf (h ++ [e]) = eflOf h :=
-  eflLines_io h e hs hio hin
-
-/-- Rocq `efl_of_out`. -/
-theorem eflOf_out (h : List Obs) (i : UartId) (b : BitVec 8) (hs : traceShape h true) :
-    eflOf (h ++ [Obs.dev (.uartOut i b)]) = eflOf h :=
-  eflOf_io h _ hs rfl rfl
-
-/-- Rocq `efl_of_snoc`. -/
-theorem eflOf_snoc (h : List Obs) (e : Obs) : eflOf h <+: eflOf (h ++ [e]) :=
-  eflLines_snoc h e
-
-/-- Rocq `efl_of_echof`: the ledger's redirect lines are the history's. -/
-theorem eflOf_echof (h : List Obs) : flRedirs (eflOf h) = echofLinesOf h :=
-  eflLines_echof h
-
-/-- Rocq `echof_lines_of_power`. -/
-theorem echofLinesOf_power (h : List Obs) (on : Bool) :
-    echofLinesOf (h ++ [powerEv on]) = echofLinesOf h := by
-  cases on with
-  | true =>
-    unfold echofLinesOf
-    simp only [powerEv, if_true]
-    rw [cyclesOf_off]
-  | false =>
-    unfold echofLinesOf
-    simp only [powerEv, Bool.false_eq_true, if_false]
-    rw [cyclesOf_on, List.map_append, List.flatten_append]
-    simp only [List.map_cons, List.map_nil, List.flatten_cons, List.flatten_nil, echofCyc_nil,
-      List.append_nil]
-
-/-- Rocq `efl_of_power`. -/
-theorem eflOf_power (h : List Obs) (on : Bool) : eflOf (h ++ [powerEv on]) = eflOf h := by
-  cases on <;> exact eflLines_power h _
 
 section FileOutSeal
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
@@ -212,26 +157,7 @@ theorem f0Pinned_drain (g : FileGn) (h : List Obs) (b : BitVec 8) (u1 : List Fst
     · iexact Hfp
     · iexact Hlb
 
-/-! ## The typed witness against the ledger, and the line list's growth -/
-
-/-- The deed's typed witness, read against the ledger's own line list (Rocq
-`f0_typed_adm`). -/
-theorem f0Typed_adm (g : FileGn) (Lp : List FlLine) (s0 : Fstate) :
-    flAuth (GF := GF) g.fgnCl Lp ∗ f0Typed g s0 ⊢ flAuth g.fgnCl Lp ∗ ⌜fadmBoot (flRedirs Lp) s0⌝ := by
-  unfold f0Typed
-  iintro ⟨Ha, Hs⟩
-  icases Hs with (%he | ⟨%ls, #Hlb, %hall⟩)
-  · subst he
-    iframe Ha
-    ipureintro
-    exact fadmBoot_empty _
-  · ihave %hpre := flLb_prefix g.fgnCl Lp ls $$ Ha Hlb
-    iframe Ha
-    ipureintro
-    intro N bs hs
-    obtain ⟨ws, sel, hin, -, hsel, hbs⟩ :=
-      fBytesTyped_mono _ _ N bs (flRedirs_prefix ls Lp hpre) (hall N bs hs).2
-    exact ⟨ws, sel, hin, hsel, hbs⟩
+/-! ## The line list's growth -/
 
 /-- The line list grows by whatever the new input completed (Rocq
 `fl_auth_grow_pre`). -/

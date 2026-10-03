@@ -139,8 +139,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-! ## 5.  THE POOL (§13.2 / §13.3) -/
 
 section PoolPure

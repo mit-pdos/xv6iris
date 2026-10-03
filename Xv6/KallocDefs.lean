@@ -53,7 +53,6 @@ the number but not the list.  The ghost steps (`kmemAuth_dec`,
    from `kmemAuth_inc` before it).
 -/
 import Xv6.UartTrace
-import Xv6.KallocEv
 import MachCSL.BytesFree
 
 namespace Xv6
@@ -87,8 +86,6 @@ def availInc (on : Option Nat) : Option Nat := on.map (· + 1)
 def availDec (on : Option Nat) : Option Nat := on.map (· - 1)
 /-- Whether the allocator may answer `0`. -/
 def availZero (on : Option Nat) : Prop := on = none ∨ on = some 0
-
-set_option linter.unusedSectionVars false
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
@@ -138,16 +135,6 @@ precondition): 4096 mappable visibility-free bytes.  A valued page forgets
 to it; the reclaimed page whose per-byte era keys are gone is one. -/
 def pageFree [CurCtx] (p : BitVec 64) : IProp GF := iprop%
   ∃ bs : List (BitVec 8), ⌜bs.length = 4096⌝ ∗ bytesFree p bs
-
-/-- An owned (valued) page forgets to a visibility-free one. -/
-theorem pageOwn_pageFree [CurCtx] (p : BitVec 64) :
-    pageOwn (GF := GF) p ⊢ pageFree p := by
-  unfold pageOwn pageFree
-  iintro ⟨%bs, %hbs, Hbuf⟩
-  iexists bs
-  isplit
-  · ipureintro; exact hbs
-  · iapply byteBuf_bytesFree p bs $$ Hbuf
 
 /-! ## The freelist chain -/
 
@@ -210,29 +197,6 @@ def ledLb (γe : GName) (h : List Kev) : IProp GF := γe ↪◯ML h
 
 instance ledLb_persistent (γe : GName) (h : List Kev) : Persistent (ledLb (GF := GF) γe h) := by
   unfold ledLb; infer_instance
-
-theorem ledAuth_lb (γe : GName) (h : List Kev) :
-    ledAuth (GF := GF) γe h ⊢ ledAuth γe h ∗ ledLb γe h := by
-  unfold ledAuth ledLb
-  iintro Ha
-  ihave #Hb := MonoList.lb_own_get γe _ h $$ Ha
-  isplitl [Ha]
-  · iexact Ha
-  · iexact Hb
-
-theorem ledLb_prefix (γe : GName) (h h' : List Kev) :
-    ledAuth (GF := GF) γe h ⊢ ledLb γe h' -∗ ⌜h' <+: h⌝ := by
-  unfold ledAuth ledLb
-  iintro Ha Hb
-  ihave %hv := MonoList.auth_lb_own_valid γe _ h h' $$ Ha Hb
-  ipureintro; exact hv.2
-
-/-- Two lower bounds of one ledger are comparable (Rocq `led_lb_lb`). -/
-theorem ledLb_lb (γe : GName) (h h' : List Kev) :
-    ledLb (GF := GF) γe h ⊢ ledLb γe h' -∗ ⌜h <+: h' ∨ h' <+: h⌝ := by
-  unfold ledLb
-  iintro Ha Hb
-  iapply MonoList.lb_own_valid γe h h' $$ Ha Hb
 
 theorem ledAuth_grow (γe : GName) (h : List Kev) (e : Kev) :
     ledAuth (GF := GF) γe h ⊢ |==> (ledAuth γe (h ++ [e]) ∗ ledLb γe (h ++ [e])) := by
@@ -414,7 +378,6 @@ theorem kmemCnt_agree (γk : KmemNames) (n : Nat) (on : Option Nat) :
       ileft; iexact Hc'
     · ihave %hv := ghost_var_valid_2 _ _ _ _ _ $$ Hp Hs
       exact absurd hv.1 (by simp [DFrac.valid_own_op_discard])
-
 
 /-- `kfree`'s ghost step (Rocq `kmem_avail_inc`): the client's count agrees
 with the allocator's, the pair steps up, and the actor's `KFree` is

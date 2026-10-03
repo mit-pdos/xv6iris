@@ -37,19 +37,17 @@ A FILE OF ITS OWN, and additive, as in Rocq.
    `aunarm_of_arm_nd_of` → `aunarmOfArmNd_of`, `cre_child_unfired_nd` →
    `creChildUnfiredNd`, …).
 
-## The four create-side bridges (landed by lane K6-A)
+## The create-side bridges (landed by lane K6-A)
 
-`acre_commit_at_gen_nm_of`, `acre_commit_at_nm_of`,
-`acre_commit_at_gen_of_nm`, `acre_commit_at_of_nm` → `acreCommitAtGenNm_of`,
-`acreCommitAtNm_of`, `acreCommitAtGen_of_nm`, `acreCommitAt_of_nm`.  They
-landed once `acreCommitAtGen` carried TL-3K's parent cursor (`fec45648e`)
+`acre_commit_at_gen_nm_of`, `acre_commit_at_nm_of` → `acreCommitAtGenNm_of`,
+`acreCommitAtNm_of`; the converse pair `acre_commit_at_gen_of_nm`,
+`acre_commit_at_of_nm` is not ported (nothing uses it).  They landed once `acreCommitAtGen` carried TL-3K's parent cursor (`fec45648e`)
 and the dot-name credential (`84090c137`).
 
 ## Dropped/simplified vs Rocq
 
 Nothing.
 -/
-import Xv6.FsAbsCreateFire
 import Xv6.SysMknodDefs
 
 namespace Xv6
@@ -107,26 +105,6 @@ theorem acreCommitAtNm_of (Γ : FsViewNames GF) (E : CoPset) (c : Absnode)
     (Φ : Aview → Nat → Fname → Nat → IProp GF) :
     acreCommitAt (hlc := hlc) Γ E c Pd Farm Φ ⊢ acreCommitAtNm (hlc := hlc) Γ E c Nm Pd Farm Φ :=
   acreCommitAtGenNm_of Γ E (fun _ _ => c) Nm Pd Farm Φ
-
-/-- ...and back, at the predicate every landed site is at (Rocq
-`acre_commit_at_gen_of_nm`). -/
-theorem acreCommitAtGen_of_nm (Γ : FsViewNames GF) (E : CoPset) (cf : Nat → Nat → Absnode)
-    (Nm : Fname → Prop) (Pd : Nat → IProp GF)
-    (Farm : Pfam GF (Aview → Nat → IProp GF))
-    (Φ : Aview → Nat → Fname → Nat → IProp GF) (hNm : ∀ nm : Fname, Nm nm) :
-    acreCommitAtGenNm (hlc := hlc) Γ E cf Nm Pd Farm Φ ⊢
-      acreCommitAtGen (hlc := hlc) Γ E cf Pd Farm Φ := by
-  unfold acreCommitAtGen acreCommitAtGenNm
-  iintro H %I %d %i %nm %ents %nl %hpre %hnm Harm HPd Ha
-  iapply H $$ %I %d %i %nm %ents %nl %hpre %hnm %(hNm nm) Harm HPd Ha
-
-/-- Rocq `acre_commit_at_of_nm`. -/
-theorem acreCommitAt_of_nm (Γ : FsViewNames GF) (E : CoPset) (c : Absnode)
-    (Nm : Fname → Prop) (Pd : Nat → IProp GF)
-    (Farm : Pfam GF (Aview → Nat → IProp GF))
-    (Φ : Aview → Nat → Fname → Nat → IProp GF) (hNm : ∀ nm : Fname, Nm nm) :
-    acreCommitAtNm (hlc := hlc) Γ E c Nm Pd Farm Φ ⊢ acreCommitAt (hlc := hlc) Γ E c Pd Farm Φ :=
-  acreCommitAtGen_of_nm Γ E (fun _ _ => c) Nm Pd Farm Φ hNm
 
 /-- Rocq `acre_commit_at_gen_nm_cur_mono`: the CURSOR moves under the
 commit exactly as it does without the name predicate (pure, rides through). -/
@@ -222,14 +200,6 @@ theorem aunarmCommitAt_of_nd (Γ : FsViewNames GF) (E : CoPset) (i : Nat) (Nd : 
   iintro H %I %c %hrow Ha
   iapply H $$ %I %c %hrow %(hNd c) Ha
 
-/-- Rocq `aunarm_commit_at_nd_mono`. -/
-theorem aunarmCommitAtNd_mono (Γ : FsViewNames GF) (E : CoPset) (i : Nat)
-    (Nd Nd' : Absnode → Prop) (Φ : Aview → Nat → IProp GF) (hle : ∀ c : Absnode, Nd' c → Nd c) :
-    aunarmCommitAtNd (hlc := hlc) Γ E i Nd Φ ⊢ aunarmCommitAtNd (hlc := hlc) Γ E i Nd' Φ := by
-  unfold aunarmCommitAtNd
-  iintro H %I %c %hrow %hNd' Ha
-  iapply H $$ %I %c %hrow %(hle c hNd') Ha
-
 /-- Rocq `aunarm_of_arm_nd_of`. -/
 theorem aunarmOfArmNd_of (Γ : FsViewNames GF) (E : CoPset) (Nd : Absnode → Prop)
     (Farm : Pfam GF (Aview → Nat → IProp GF)) (Φ : Aview → Nat → IProp GF) :
@@ -248,16 +218,6 @@ theorem aunarmOfArm_of_nd (Γ : FsViewNames GF) (E : CoPset) (Nd : Absnode → P
   iintro H %i Harm
   ihave Hu := H $$ %i Harm
   iapply (aunarmCommitAt_of_nd (hlc := hlc) Γ E i Nd Φ hNd) $$ Hu
-
-/-- Rocq `aunarm_of_arm_nd_mono`. -/
-theorem aunarmOfArmNd_mono (Γ : FsViewNames GF) (E : CoPset) (Nd Nd' : Absnode → Prop)
-    (Farm : Pfam GF (Aview → Nat → IProp GF)) (Φ : Aview → Nat → IProp GF)
-    (hle : ∀ c : Absnode, Nd' c → Nd c) :
-    aunarmOfArmNd (hlc := hlc) Γ E Nd Farm Φ ⊢ aunarmOfArmNd (hlc := hlc) Γ E Nd' Farm Φ := by
-  unfold aunarmOfArmNd
-  iintro H %i Harm
-  ihave Hu := H $$ %i Harm
-  iapply (aunarmCommitAtNd_mono (hlc := hlc) Γ E i Nd Nd' Φ hle) $$ Hu
 
 /-- Rocq `cre_child_unfired_nd`: THE CHILD'S TWO LEGS, with the unarm
 PINNED at the node the arm placed. -/

@@ -17,8 +17,8 @@ splitting the allocation in two lets the round name `pn` BEFORE `pipe(2)`.
    constant cameras (`eofPending_alloc`, `sideTok_alloc`, helpers), the
    read-end shot by ChildTok's `shotPending_alloc` (PipeProto deviation 2),
    the two cursors by `ghost_var_alloc` split in halves.
-3. `alt_execfail_app` is `rfl` (Rocq `eq_sym alt_execL_echo`; Lean's
-   `PipeDisc.altExecL_echo` is itself `rfl`).
+3. Rocq's `alt_execfail_app` (`eq_sym alt_execL_echo`) is `rfl` here, so
+   not stated; Rocq's `alt_execL_echo` is `rfl` here too.
 -/
 import Xv6.PipeProto
 import Xv6.PipeDisc
@@ -28,12 +28,6 @@ namespace Xv6
 namespace UShPipeLeaves
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
-
-set_option linter.unusedSectionVars false
-
-/-- **Rocq `alt_execfail_app`**: `EchoDisc.alt_execfail` IS the left block
-plus the shell's prompt. -/
-theorem alt_execfail_app : altExecfail = dgExecL ++ uPrompt := rfl
 
 section Proto
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [IcacheG GF]

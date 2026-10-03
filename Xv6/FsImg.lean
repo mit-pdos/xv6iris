@@ -58,7 +58,7 @@ the only one that loses a Rocq lemma.**
    `leAssemble ((bs.drop o).take n)`, which truncates instead of padding.
    The two agree on every list: a missing high byte contributes
    `0 * 256 ^ k`.  The spelling is chosen so that `fsLeAt bs (4 * i) 4` is
-   `leWord bs i` BY `rfl` (`fsLeAt_leWord`), which is what lets the
+   `leWord bs i` BY `rfl`, which is what lets the
    superblock's eight fields and the log header's words share one reader.
    The price is that Rocq's `fs_le_at_2` / `fs_le_at_4` -- `reflexivity`
    there -- become the "the bytes are really there" forms `fsLeAt_2` /
@@ -98,11 +98,6 @@ def T_DEVICE : Nat := 3
 of `bs`. -/
 def fsLeAt (bs : List (BitVec 8)) (o n : Nat) : Nat :=
   leAssemble ((bs.drop o).take n)
-
-/-- The whole point of deviation 2: a 4-aligned field is the log header's
-own word reader. -/
-theorem fsLeAt_leWord (bs : List (BitVec 8)) (i : Nat) :
-    fsLeAt bs (4 * i) 4 = leWord bs i := rfl
 
 /-- `take` of a `drop`, one element at a time. -/
 theorem drop_take_succ {α : Type _} (l : List α) (o k : Nat) (h : o < l.length) :
@@ -201,22 +196,6 @@ theorem fsLeHalfAt (bs : List (BitVec 8)) (o : Nat) (w : BitVec 16)
   rw [fsLeAt_2 bs o _ _ (by simpa using h 0 (by omega)) (h 1 (by omega))]
   exact halfBytes_dec w
 
-/-- Rocq's `assemble_bytes_zero_byte`: a byte of an all-zero
-little-endian value is zero (W2's byte reading). -/
-theorem leAssemble_zero_byte : ∀ (bs : List (BitVec 8)) (j : Nat) (v : BitVec 8),
-    leAssemble bs = 0 → bs[j]? = some v → v = 0#8
-  | [], j, v, _, hv => by simp at hv
-  | b :: bs, j, v, hz, hv => by
-    have hb : b.toNat + 256 * leAssemble bs = 0 := hz
-    have hb0 : b = 0#8 := by
-      have : b.toNat = 0 := by omega
-      exact BitVec.eq_of_toNat_eq (by simpa using this)
-    match j with
-    | 0 => simp only [List.getElem?_cons_zero, Option.some.injEq] at hv; rw [← hv]; exact hb0
-    | j + 1 =>
-      rw [List.getElem?_cons_succ] at hv
-      exact leAssemble_zero_byte bs j v (by omega) hv
-
 /-- Rocq's `forallb_seq`: the `seq`/`forallb` bridge every W-conjunct's
 spec lemma peels with (deviation 4). -/
 theorem forallb_range (f : Nat → Bool) (n k : Nat) (h : (List.range n).all f = true)
@@ -265,8 +244,7 @@ def fsDataStart (sb : FsSb) : Nat := sb.sbBmapstart + 1
 /-! ## 6.  W1 -- the superblock is mkfs's
 
 Every consumer's block geometry is read off these fields --
-`Xv6.IBLOCK` off `inodestart`, `Xv6.BBLOCK_single` off `bmapstart` and
-`size`, `Xv6.logRegion` off `logstart`.  The equations are mkfs.c's own
+`Xv6.IBLOCK` off `inodestart`, `Xv6.logRegion` off `logstart`.  The equations are mkfs.c's own
 (mkfs/mkfs.c, `main`):
 
     nlog = LOGBLOCKS + 1;  logstart = 2;  inodestart = 2 + nlog;
@@ -275,8 +253,7 @@ Every consumer's block geometry is read off these fields --
 
 `ninodes / 16 + 1` is mkfs's own inode-block count, NOT a ceiling: the two
 coincide except when 16 divides `ninodes`, where mkfs leaves one spare
-block.  `fsSbOk_inodes_fit` is the weaker fact consumers want (the region
-covers every inum).  `size ≤ 8 * BSIZE` is the single-bitmap-block
+block.  `size ≤ 8 * BSIZE` is the single-bitmap-block
 simplification the whole tree stands on (`FSSIZE = 2000 < BPB = 8192`, so
 `BBLOCK` collapses and balloc's outer loop runs once).
 `ROOTINO < ninodes` is what lets the tree conjunct speak at all -- the
@@ -331,15 +308,6 @@ theorem fsSbWf_ok (sb : FsSb) (h : fsSbWf sb = true) : FsSbOk sb := by
           sboBmapstart := h5, sboSize := h6, sboNinodes := h7, sboNblocks := h8,
           sboOneBitmap := h9, sboUshort := h10 }
 
-/-- What a consumer actually wants out of W1: the inode region covers
-every inum and stops below the bitmap (Rocq's `fs_sb_ok_inodes_fit`). -/
-theorem fsSbOk_inodes_fit (sb : FsSb) (h : FsSbOk sb) :
-    sb.sbInodestart + (sb.sbNinodes + 15) / 16 ≤ sb.sbBmapstart := by
-  have hb := h.sboBmapstart
-  have hn := h.sboNinodes
-  unfold ROOTINO at hn
-  omega
-
 /-- ...and the data region is what is left (Rocq's `fs_sb_ok_meta`). -/
 theorem fsSbOk_meta (sb : FsSb) (h : FsSbOk sb) :
     2 < sb.sbInodestart ∧ sb.sbInodestart < fsDataStart sb ∧ fsDataStart sb ≤ sb.sbSize := by
@@ -369,15 +337,5 @@ def fsLogClean (P : Nat → List (BitVec 8)) (sb : FsSb) : Bool :=
 theorem fsLogClean_spec (P : Nat → List (BitVec 8)) (sb : FsSb) :
     fsLogClean P sb = true ↔ hdrN (P sb.sbLogstart) = 0 := by
   unfold fsLogClean; exact beq_iff_eq
-
-/-- ...and the same fact at the BYTES, which is what "the header says
-zero" means on a disk (Rocq's `fs_log_clean_bytes`). -/
-theorem fsLogClean_bytes (P : Nat → List (BitVec 8)) (sb : FsSb) (j : Nat)
-    (v : BitVec 8) (hc : fsLogClean P sb = true) (hj : j < 4)
-    (hv : (P sb.sbLogstart)[j]? = some v) : v = 0#8 := by
-  rw [fsLogClean_spec] at hc
-  refine leAssemble_zero_byte ((P sb.sbLogstart).take 4) j v hc ?_
-  rw [List.getElem?_take, if_pos hj]
-  exact hv
 
 end Xv6

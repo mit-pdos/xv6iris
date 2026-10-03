@@ -110,19 +110,6 @@ def ucArm (step_val : Step) : SailM Unit :=
 /-! The trapping arms are the model's handlers (so UTrap's `swp` towers
 apply to them as they are). -/
 
-theorem ucArm_pending (i : InterruptType) (p : Privilege) :
-    ucArm (Step_Pending_Interrupt (i, p)) = handle_interrupt i p := rfl
-
-theorem ucArm_fetchFail (va : virtaddr) (e : ExceptionType) :
-    ucArm (Step_Fetch_Failure (va, e)) = handle_exception (bits_of_virtaddr va) e := rfl
-
-theorem ucArm_trap (p : Privilege) (exc : sync_exception) (pc : BitVec 64) (ib : BitVec 32) :
-    ucArm (Step_Execute (Trap (p, exc, pc), ib)) = (exception_handler p exc pc >>= set_next_pc) := rfl
-
-theorem ucArm_illegal (ib : BitVec 32) :
-    ucArm (Step_Execute (Illegal_Instruction (), ib)) =
-      handle_exception (zero_extend (m := 64) ib) (E_Illegal_Instr ()) := rfl
-
 /-- Whether the step retired an instruction (the model's `retired`). -/
 def ucRetired (step_val : Step) : Bool :=
   match step_val with

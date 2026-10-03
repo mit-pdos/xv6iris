@@ -26,18 +26,11 @@ file's, the sync REGISTRY, the ERA'S BASE and the FLOOR, and its conclusion
    the on-arm), as the landed `pinMap`/`f0Map` state theirs.
 -/
 import Xv6.UnionOut
-import Xv6.UnionOutPureSync
-import Xv6.UnionOutSyncPure
-import Xv6.AppFileSyncReg
-import Xv6.AppFileSync
 import Xv6.AppFileBoot
-import Xv6.AppFilePos
 
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
-
-set_option linter.unusedSectionVars false
 
 /-- WHAT THE UNION'S BIRTH PROMISES OF THE MACHINE'S NAMES (Rocq
 `union_born`, `App.app_born`): the file application's fixed part keeps the

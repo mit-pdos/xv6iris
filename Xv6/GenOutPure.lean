@@ -44,7 +44,6 @@ Deviations from Rocq:
    notes/cone_reaudit.md, finds the rest unreached.)
 -/
 import Xv6.LineModelLinks
-import Xv6.EchoOutPure
 
 namespace Xv6
 

@@ -27,28 +27,19 @@ The use (`row_flen`, `f_inum_not_pinned`) is `Xv6/FileDeltasStep.lean`.
    is `flatten`.
 2. The six `*_bytes_length` lemmas are stated at `Nat`, not `Z.of_nat`: the
    Rocq detour through `Z` avoids an opaque `Nat.of_num_uint` literal, which
-   Lean does not have (`omega` reads `36024` directly).
+   Lean does not have (`omega` reads `36072` directly).
 3. `sum_list_with_submseteq`'s proof goes through a `Sublist` (Lean's
    `Subperm` is `∃ l', l' ~ l ∧ l' <+ k`) instead of stdpp's
    `submseteq_Permutation`; `subseq_length_le` uses Batteries'
    `subperm_of_subset` for stdpp's `NoDup_submseteq`.
 -/
 import Xv6.AppFilePure
-import Xv6.ElfUserCat
-import Xv6.ElfUserEcho
-import Xv6.ElfUserGrep
-import Xv6.ElfUserInit
-import Xv6.ElfUserSeccomp
-import Xv6.ElfUserSh
-import Xv6.ElfUserSync
-import Xv6.FsInitPin
 import Xv6.FsShPin
 import Xv6.FsEchoPin
 import Xv6.FsCatPin
 import Xv6.FsGrepPin
 import Xv6.FsSeccPin
 import Xv6.FsSyncPin
-import Batteries.Data.List.Perm
 
 namespace Xv6
 
@@ -148,24 +139,24 @@ theorem f_bytes_typed_short (ls : List Fwline) (N : Fname) (bs : List (BitVec 8)
 /-! ## 5c. The pinned binaries' lengths -/
 
 /-- Rocq `init_bytes_length` (deviation 2). -/
-theorem init_bytes_length : initBytes.length = 36024 := Xv6.User.Init.elf_length
+theorem init_bytes_length : initBytes.length = 36072 := Xv6.User.Init.elf_length
 
 /-- Rocq `sh_bytes_length` (deviation 2). -/
-theorem sh_bytes_length : shBytes.length = 58632 := Xv6.User.Sh.elf_length
+theorem sh_bytes_length : shBytes.length = 58680 := Xv6.User.Sh.elf_length
 
 /-- Rocq `echo_bytes_length` (deviation 2). -/
-theorem echo_bytes_length : echoBytes.length = 35640 := Xv6.User.Echo.elf_length
+theorem echo_bytes_length : echoBytes.length = 35688 := Xv6.User.Echo.elf_length
 
 /-- Rocq `cat_bytes_length` (deviation 2). -/
-theorem cat_bytes_length : catBytes.length = 36776 := Xv6.User.Cat.elf_length
+theorem cat_bytes_length : catBytes.length = 36816 := Xv6.User.Cat.elf_length
 
 /-- Rocq `grep_bytes_length` (deviation 2). -/
-theorem grep_bytes_length : grepBytes.length = 44496 := Xv6.User.Grep.elf_length
+theorem grep_bytes_length : grepBytes.length = 44544 := Xv6.User.Grep.elf_length
 
 /-- Rocq `secc_bytes_length` (deviation 2). -/
-theorem secc_bytes_length : seccBytes.length = 36144 := Xv6.User.Seccomp.elf_length
+theorem secc_bytes_length : seccBytes.length = 36192 := Xv6.User.Seccomp.elf_length
 
 /-- Rocq `syncf_bytes_length` (deviation 2; drift SY2). -/
-theorem syncf_bytes_length : syncfBytes.length = 34992 := Xv6.User.Sync.elf_length
+theorem syncf_bytes_length : syncfBytes.length = 35048 := Xv6.User.Sync.elf_length
 
 end Xv6

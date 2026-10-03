@@ -45,13 +45,12 @@ CONE: all three reached and ported; the echo instances
    `ushExtraCore_closed` below.
 -/
 import Xv6.UshLineDefs
+import Xv6.UshMainDefs
 
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Std (ExtTreeSet)
-
-set_option linter.unusedSectionVars false
 
 section Read
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]

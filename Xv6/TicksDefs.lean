@@ -38,15 +38,12 @@ seals from trapinit's `lkFresh`.
    through `MainTrap.mn_trapinit`); main's raise is `ticksLed_boot` here
    (Rocq inlined it in `ProofMain`).
 -/
-import Xv6.KallocDefs
 import Xv6.SpecTrapinit
 import Xv6.WaitInv
 
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
-
-set_option linter.unusedSectionVars false
 
 /-- `&ticks` (kernel/trap.c). -/
 def ticksAddr : BitVec 64 := KA.«ticks»

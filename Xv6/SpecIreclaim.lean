@@ -118,8 +118,6 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedVariables false
-
 /-- Address of `ireclaim`. -/
 def ireclaimAddr : BitVec 64 := KA.«ireclaim»
 
@@ -268,29 +266,5 @@ structure IRECLAIM : Prop where
     hj hproc hK hnoff htier hgeom hblk hbg hbel hn1 hnnib hn31 hpd ha0,
     wp_ireclaim_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl pd pav pu j pidv dqp dqb dqs dqn
       hj hproc hK hnoff htier hgeom hblk hbg hbel hn1 hnnib hn31 hpd ha0
-
-/-- The interrupts-off instance of `wp_ireclaim_eb` (the complement is the whole
-bundle): the contract every not-yet-generalized caller states. -/
-theorem IRECLAIM.wp_ireclaim (A : IRECLAIM) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
-    [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
-    [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-    [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
-    (pidv : BitVec 32) (dqp dqb dqs dqn : DFrac)
-    hj hproc hK hsie hnoff hlocks htier hgeom hblk hbg hbel hn1 hnnib hn31 hpd ha0 :
-    wp_ireclaim_body (hlc := hlc) (GF := GF) Γ cpu k γl pd pav pu j pidv dqp dqb dqs dqn
-      hj hproc hK hsie hnoff hlocks htier hgeom hblk hbg hbel hn1 hnnib hn31 hpd ha0 := by
-  have h := A.wp_ireclaim_eb (hlc := hlc) (GF := GF) (Γ := Γ) (cpu := cpu) (k := k) (γl := γl) (pd := pd) (pav := pav) (pu := pu) (j := j) (pidv := pidv) (dqp := dqp) (dqb := dqb) (dqs := dqs) (dqn := dqn) (hj := hj) (hproc := hproc) (hK := hK) (hnoff := hnoff) (htier := htier) (hgeom := hgeom) (hblk := hblk) (hbg := hbg) (hbel := hbel) (hn1 := hn1) (hnnib := hnnib) (hn31 := hn31) (hpd := hpd) (ha0 := ha0)
-  unfold wp_ireclaim_eb_body at h
-  unfold wp_ireclaim_body
-  rw [hsie] at h
-  simp only [trapCsrsExt_false, cpuClaimExt_false] at h
-  iintro ⟨H0, H1, H2, Htc, Hcl, Hir, H6, H7, H8, Hs, Hc, H9, H10, H11, H12, H13, H14, H15, H16, H17, H18, H19, H20, H21, Hnext⟩
-  iapply h
-  iframe H0 H1 H2 Htc Hcl Hir H6 H7 H8 Hs Hc H9 H10 H11 H12 H13 H14 H15 H16 H17 H18 H19 H20 H21
-  iapply wpNext_mono $$ Hnext
-  iintro %cpu' HK %spie %spp %R' %p0 H1 H2 ⟨Htc, Hir⟩ Hcl H6 H7 H8 H9 H10 H11 H12
-  iapply HK $$ %spie %spp %R' %p0 H1 H2 Htc Hcl Hir H6 H7 H8 H9 H10 H11 H12
 
 end Xv6

@@ -42,9 +42,6 @@ def catPath : List Fname := [fnameCat]
 /-- The tracked raw (Rocq `cat_bytes`). -/
 def catBytes : List (BitVec 8) := Xv6.User.Cat.elf
 
-/-- THE TIE TO THE ELF LAYER (Rocq `cat_bytes_elf`). -/
-theorem catBytes_elf : catBytes = Xv6.User.Cat.elf := rfl
-
 /-- Rocq `era0_dur_cat`. -/
 theorem era0DurCat : durNode era0D CAT_INO (imgNode fsimgP fsimgSb CAT_INO) :=
   imgDurNode fsImgDisk XV6_DISK_BYTES fsimgSb fsimgNib fsimgCov CAT_INO fsimgImageWf (by decide)

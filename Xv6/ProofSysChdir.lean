@@ -66,19 +66,15 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## Pure facts -/
-
 
 theorem sysChdirPins_entry (k : KCtx) :
     sysChdirPins k ((k.regs.set 2#5 (k.regs 2#5 + 0xFFFFFFFFFFFFFF60#64)).set 8#5 (k.regs 2#5))
       (k.regs 9#5) (k.regs 18#5) := by
   refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
     simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
-
 
 /-- the observed row is NOT a directory's (Rocq's `abs_row_dir_inv` step). -/
 theorem sys_chdir_notdir (dn : Dinode) (bm : Blkmap) (data : Nat → List (BitVec 8))
@@ -93,16 +89,13 @@ theorem sys_chdir_notdir (dn : Dinode) (bm : Blkmap) (data : Nat → List (BitVe
   rw [Xv6.era_notDir dn bm data hnd] at hd
   cases hd
 
-
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
 
-
 /-! ## The block, taken apart the way argstr and namei take it -/
-
 
 /-- `procPrivFd` IS core ∗ array (its definition). -/
 theorem sys_chdir_blk_open (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
@@ -117,11 +110,11 @@ theorem sys_chdir_blk_close (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) 
 
 /-- the era walk's death receipt IS `nameiWalkDeadEra` (`exHopsFrom` is
 `axHopsFrom` at `pathElems`, `FsAbsEra.exHops_is_axHops`). -/
-theorem sys_chdir_dead (P Pmiss : Nat → Nat → IProp GF) (pl : List (BitVec 8)) :
+theorem sys_chdir_dead (rt : Nat) (P Pmiss : Nat → Nat → IProp GF) (pl : List (BitVec 8)) :
     (∃ (kd d : Nat), ⌜kd < (pathElems pl).length⌝ ∗
-      ((P kd d ∗ exHopsFrom fscFs P Pmiss pl kd) ∨
-       (Pmiss kd d ∗ exHopsFrom fscFs P Pmiss pl (kd + 1)))) ⊢
-    nameiWalkDeadEra (hlc := hlc) fscFs P Pmiss pl := by
+      ((P kd d ∗ exHopsFrom rt fscFs P Pmiss pl kd) ∨
+       (Pmiss kd d ∗ exHopsFrom rt fscFs P Pmiss pl (kd + 1)))) ⊢
+    nameiWalkDeadEra (hlc := hlc) fscFs rt P Pmiss pl := by
   unfold nameiWalkDeadEra
   simp only [exHops_is_axHops]
   exact .rfl
@@ -203,7 +196,7 @@ theorem sys_chdir_tested (IU : IUNLOCK) (IP : IPUT) (IUP : IUNLOCKPUT) (EO : END
     k_step_e (wp_s_branch cpu _ (KA.«sys_chdir» + 0x3e#64) false 50#13 14#5 15#5 (by decide) bop.BNE)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hbt, hbt1, hd]
     iintro Hk Hpc
-    ihave Hfail : chdirPostFail (hlc := hlc) (fsGammaL fscFs) fscFs A.V.cwi A.P A.Pmiss A.Fo $$ [HP HFo]
+    ihave Hfail : chdirPostFail (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.P A.Pmiss A.Fo $$ [HP HFo]
     · unfold chdirPostFail
       iright
       iexists bview pl.length (sysfilePfun pl)
@@ -238,7 +231,6 @@ theorem sys_chdir_tested (IU : IUNLOCK) (IP : IPUT) (IUP : IUNLOCKPUT) (EO : END
       repeat (refine sysChdirPins_set _ _ _ _ _ _ ?_ (by decide))
       exact hpins
 
-
 /-! ## +0x30: namei came back -/
 
 set_option maxHeartbeats 16000000 in
@@ -261,7 +253,7 @@ theorem sys_chdir_miss (EO : END_OP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF 
     procPrivFd A.γ (procAddr A.j) A.pid (sysChdirV1 A P2) (sysChdirM1 A P2) ∗
     (∀ c : CPU, sysChdirPostA k A c) ∗ bslots 3 ∗ irefSlots 2 ∗
     logOpS icfgLog n Sb ∗ logTx icfgLog ∗
-    nameiWalkDeadEra (hlc := hlc) fscFs A.P A.Pmiss (bview pl.length (sysfilePfun pl)) ∗
+    nameiWalkDeadEra (hlc := hlc) fscFs A.V.rti A.P A.Pmiss (bview pl.length (sysfilePfun pl)) ∗
     pfAt (aopenCommitAt (hlc := hlc) (fsGammaL fscFs) appE) A.Fo
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hcells, Hp, Hrest, Hte, Hce, #Henv, Hblk, HΦ, Hbs, Hir, Hop, Htx, Hdead, Hoc⟩
@@ -288,7 +280,7 @@ theorem sys_chdir_miss (EO : END_OP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF 
   · unfold sysChdirCells; iframe
   icases sys_chdir_cwdpid hct _ _ _ _ _ $$ Hblk with ⟨Hrows, Hhole⟩
   ihave Hop := logOpS_op icfgLog n Sb $$ Hop Htx
-  ihave Hfail : chdirPostFail (hlc := hlc) (fsGammaL fscFs) fscFs A.V.cwi A.P A.Pmiss A.Fo
+  ihave Hfail : chdirPostFail (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.P A.Pmiss A.Fo
     $$ [Hdead Hoc]
   · unfold chdirPostFail
     iright
@@ -342,7 +334,7 @@ theorem sys_chdir_found (IL : ILOCK) (IU : IUNLOCK) (IP : IPUT) (IUP : IUNLOCKPU
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, Xv6.dirlookup_beqz, hd]
   iintro Hk Hpc
   -- +0x34  jal ilock
-  k_step_e (wp_s_jal cpu _ (KA.«sys_chdir» + 0x34#64) false 2088634#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_chdir» + 0x34#64) false 2088538#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_chdir_br_ilock]
   iintro Hk Hpc
   -- THE REFERENCE namei MADE, taken apart
@@ -410,7 +402,7 @@ theorem sys_chdir_fetched (NI : NAMEI_ERA) (IL : ILOCK) (IU : IUNLOCK) (IP : IPU
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie (procAddr A.j) ∗ sysfileEnv (hlc := hlc) Γ ∗
     procPrivFd A.γ (procAddr A.j) A.pid (sysChdirV1 A P2) (sysChdirM1 A P2) ∗
     (∀ c : CPU, sysChdirPostA k A c) ∗ bslots 3 ∗ irefSlots 2 ∗ logOp icfgLog MAXOPBLOCKS ∗
-    chdirAuPre (hlc := hlc) (fsGammaL fscFs) fscFs A.V.cwi A.P A.Pmiss A.Fo
+    chdirAuPre (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.P A.Pmiss A.Fo
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hcells, Hbuf, Hte, Hce, #Henv, Hblk, HΦ, Hbs, Hir, Hop, Hau⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -442,7 +434,7 @@ theorem sys_chdir_fetched (NI : NAMEI_ERA) (IL : ILOCK) (IU : IUNLOCK) (IP : IPU
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hpins.2.1, sys_chdir_buf_addr]
     iintro Hk Hpc
     -- +0x2c  jal namei
-    k_step_e (wp_s_jal cpu _ (KA.«sys_chdir» + 0x2c#64) false 2090830#21 1#5 (by decide))
+    k_step_e (wp_s_jal cpu _ (KA.«sys_chdir» + 0x2c#64) false 2090806#21 1#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_chdir_br_namei]
     iintro Hk Hpc
     icases sysfile_buf_split _ pl' _ $$ Hbuf with ⟨Hp, Hrest⟩
@@ -450,7 +442,7 @@ theorem sys_chdir_fetched (NI : NAMEI_ERA) (IL : ILOCK) (IU : IUNLOCK) (IP : IPU
     unfold chdirAuPre
     icases Hau with ⟨Hwp, Hoc⟩
     -- THE ONE-SHOT, HANDED DOWN UNFIRED: the walk picks the start
-    ihave Hst := opfStart_of_open (hlc := hlc) fscFs A.V.cwi A.P A.Pmiss
+    ihave Hst := opfStart_of_open (hlc := hlc) fscFs A.V.rti A.V.cwi A.P A.Pmiss
       (bview pl'.length (sysfilePfun pl')) $$ Hwp
     icases logOp_openS icfgLog MAXOPBLOCKS $$ Hop with ⟨%Sb, HopS, Htx⟩
     ihave Hp := (show byteBuf (GF := GF) (sysChdirBuf (k.regs 2#5)) (DFrac.own 1)
@@ -488,7 +480,7 @@ theorem sys_chdir_fetched (NI : NAMEI_ERA) (IL : ILOCK) (IU : IUNLOCK) (IP : IPU
     · -- ===== the walk DIED: ARM B =====
       ihave Harm := Xv6.kxcA_ite_f _ _ $$ Harm
       icases Harm with ⟨%h10, Hir, Hdead⟩
-      ihave Hdead := sys_chdir_dead A.P A.Pmiss _ $$ Hdead
+      ihave Hdead := sys_chdir_dead _ A.P A.Pmiss _ $$ Hdead
       iapply (sys_chdir_miss EO Γ cpu k A P2 spie1 spp1 R1 pl' _ n' Sb' hj hproc hK hnoff htier hct
           hp1 h10 hal hP2 hlen)
         $$ [$Hk $Hpc $Hcells $Hp $Hrest $Hte $Hce $Henv $Hblk $HΦ $Hbs $Hir $HopS $Htx $Hdead $Hoc]
@@ -506,7 +498,7 @@ theorem sys_chdir_fetched (NI : NAMEI_ERA) (IL : ILOCK) (IU : IUNLOCK) (IP : IPU
     ihave Hbuf : sysfileAny (sysChdirBuf (k.regs 2#5)) 128 $$ [Hbuf]
     · unfold sysfileAny; iexists bs; iframe; ipureintro; omega
     icases sys_chdir_cwdpid hct _ _ _ _ _ $$ Hblk with ⟨Hrows, Hhole⟩
-    ihave Hfail : chdirPostFail (hlc := hlc) (fsGammaL fscFs) fscFs A.V.cwi A.P A.Pmiss A.Fo
+    ihave Hfail : chdirPostFail (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.P A.Pmiss A.Fo
       $$ [Hau]
     · unfold chdirPostFail; ileft; iexact Hau
     iapply (sys_chdir_tail_68 EO Γ cpu k A P2 spie spp R w₃ MAXOPBLOCKS hj hproc hK hnoff htier hpins
@@ -533,7 +525,7 @@ theorem sys_chdir_args (AS : ARGSTR) (NI : NAMEI_ERA) (IL : ILOCK) (IU : IUNLOCK
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie (procAddr A.j) ∗ sysfileEnv (hlc := hlc) Γ ∗
     procPrivFd A.γ (procAddr A.j) A.pid A.V A.M ∗
     (∀ c : CPU, sysChdirPostA k A c) ∗ bslots 3 ∗ irefSlots 2 ∗ logOp icfgLog MAXOPBLOCKS ∗
-    chdirAuPre (hlc := hlc) (fsGammaL fscFs) fscFs A.V.cwi A.P A.Pmiss A.Fo
+    chdirAuPre (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.P A.Pmiss A.Fo
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hcells, Hbuf, Hte, Hce, #Henv, Hblk, HΦ, Hbs, Hir, Hop, Hau⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -553,7 +545,7 @@ theorem sys_chdir_args (AS : ARGSTR) (NI : NAMEI_ERA) (IL : ILOCK) (IU : IUNLOCK
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x1e  jal argstr
-  k_step_e (wp_s_jal cpu _ (KA.«sys_chdir» + 0x1e#64) false 2086124#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_chdir» + 0x1e#64) false 2086028#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_chdir_br_argstr]
   iintro Hk Hpc
   icases sysfile_blk_bare_ev _ _ _ _ _ $$ Hblk with ⟨Hbare, Hclose⟩
@@ -586,8 +578,8 @@ theorem sys_chdir_args (AS : ARGSTR) (NI : NAMEI_ERA) (IL : ILOCK) (IU : IUNLOCK
   · iintro %c
     ispecialize HΦ $$ %c
     iapply (sysChdirK_raise k A.γ (procAddr A.j) A.pid A.V A.M A.P A.Pmiss A.Fo c kv hkv) $$ HΦ
-  ihave Hau := (show chdirAuPre (hlc := hlc) (GF := GF) (fsGammaL fscFs) fscFs A.V.cwi A.P A.Pmiss A.Fo ⊢
-    chdirAuPre (hlc := hlc) (fsGammaL fscFs) fscFs (A.raise kv).V.cwi (A.raise kv).P (A.raise kv).Pmiss
+  ihave Hau := (show chdirAuPre (hlc := hlc) (GF := GF) (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.P A.Pmiss A.Fo ⊢
+    chdirAuPre (hlc := hlc) (fsGammaL fscFs) fscFs (A.raise kv).V.rti (A.raise kv).V.cwi (A.raise kv).P (A.raise kv).Pmiss
       (A.raise kv).Fo from .rfl) $$ Hau
   have hp1 : sysChdirPins k R1 (k.regs 9#5) (procAddr A.j) := by
     refine sysChdirPins_cs k _ R1 _ _ ?_ hcs1
@@ -596,7 +588,6 @@ theorem sys_chdir_args (AS : ARGSTR) (NI : NAMEI_ERA) (IL : ILOCK) (IU : IUNLOCK
   iapply (sys_chdir_fetched NI IL IU IP IUP EO Γ cpu k (A.raise kv) P2 spie1 spp1 R1 w₃ v old bs hj hproc hK
       hnoff htier hct hp1 hal hext hold hret)
     $$ [$Hk $Hpc $Hcells $Hbuf $Hte $Hce $Henv $Hblk $HΦ $Hbs $Hir $Hop $Hau]
-
 
 /-! ## The entry: prologue, myproc, begin_op -/
 
@@ -647,7 +638,7 @@ theorem sys_chdir_main (MP : MYPROC) (AS : ARGSTR) (BO : BEGIN_OP) (NI : NAMEI_E
         ((k.regs.set 2#5 (k.regs 2#5 + 0xFFFFFFFFFFFFFF60#64)).set 8#5 (k.regs 2#5))) from .rfl) $$ Hk
   have hp0 := sysChdirPins_entry k
   -- +0x0a  jal myproc
-  k_step_e (wp_s_jal cpu _ (KA.«sys_chdir» + 0xa#64) false 2082094#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_chdir» + 0xa#64) false 2081966#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_chdir_br_myproc]
   iintro Hk Hpc
   have hmp := MP.wp_myproc (hlc := hlc) (GF := GF)

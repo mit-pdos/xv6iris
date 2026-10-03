@@ -23,8 +23,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
-
 /-- A string's pointer is not NULL. -/
 theorem ushExec_ptr_ne0 (x : Nat) (h0 : 0 < x) (h38 : x < 2 ^ 38) : (BitVec.ofNat 64 x == 0#64) = false := by
   rw [beq_eq_false_iff_ne]
@@ -108,29 +106,6 @@ theorem shExecXAtGen_holds (UL : UK_LEAVES) (SX : SH_EXEC_AT_CWD) (TabF : GName 
   · iintro - Hd
     rw [hpeq]
     iapply Hcd $$ Hd
-
-/-- **Rocq `wp_kshr_exec_x_at_holds`**. -/
-theorem shExecXAt_holds (UL : UK_LEAVES) (SX : SH_EXEC_AT_CWD) (Fd1 : List FdState → Prop) (ws : List (List (BitVec 8)))
-    (dg : List (BitVec 8)) (Q : Int → IProp GF) (Cr Cd : IProp GF) : wpShExecXAtBody E Fd1 ws dg Q Cr Cd :=
-  shExecXAtGen_holds E UL SX _ (fun _ _ => .rfl) Fd1 ws dg Q Cr Cd
-
-/-- **Rocq `wp_kshr_exec_x_at_v_holds`**. -/
-theorem shExecXAtV_holds (UL : UK_LEAVES) (SX : SH_EXEC_AT_CWD) (Fd1 : List FdState → Prop) (ws : List (List (BitVec 8)))
-    (dg : List (BitVec 8)) (Q : Int → IProp GF) (Cr Cd : IProp GF) : wpShExecXAtVBody E Fd1 ws dg Q Cr Cd :=
-  fun v => shExecXAtGen_holds E UL SX _ (fun γ ld => ustdAt_ustd γ ld v) Fd1 ws dg Q Cr Cd
-
-/-- **Rocq `wp_kshr_exec_echo_at_holds`**: the general arm at echo's
-alternative, by conversion (with the head word read as `cmdEcho` the law's
-index `13 + 4` is the landed 17). -/
-theorem shExecEchoAt_holds (UL : UK_LEAVES) (SX : SH_EXEC_AT_CWD) (Fd1 : List FdState → Prop) (ws : List (List (BitVec 8)))
-    (Q : Int → IProp GF) (Cr Cd : IProp GF) : wpShExecEchoAtBody E Fd1 ws Q Cr Cd := by
-  intro N hc h m t szv s0 g ld n hok hpeq ha0 hbytes hfd1 hfd2
-  have hhd : ws[0]! = cmdEcho := by
-    rw [List.getElem!_eq_getElem?_getD, lineOk_head ws hok]; rfl
-  have H := shExecXAt_holds E UL SX Fd1 ws altExecfail Q Cr Cd N hc h m t szv s0 g ld n (lineOk_execOk hok)
-    (by rw [hhd]; exact E.echo_execfail_bytes) hpeq ha0 hbytes hfd1 hfd2
-  rw [hhd] at H
-  exact H
 
 end
 

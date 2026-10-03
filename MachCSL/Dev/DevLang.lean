@@ -106,12 +106,6 @@ instance : Monad (DevM S T) where
   pure := DevM.pure
   bind := DevM.bind
 
-theorem bind_pure_left {α β : Type} (a : α) (f : α → DevM S T β) :
-    (DevM.pure a).bind f = f a := rfl
-
-theorem bind_op {α β : Type} (o : DevOp S T) (k : o.ret → DevM S T α) (f : α → DevM S T β) :
-    (DevM.op o k).bind f = .op o (fun r => (k r).bind f) := rfl
-
 /-- One primitive, as a program. -/
 def lift (o : DevOp S T) : DevM S T o.ret := .op o .pure
 
@@ -180,20 +174,6 @@ def fork (t : T) : DevM S T TaskId := lift (.fork t)
 
 /-- Wait for a task. -/
 def join (tid : TaskId) : DevM S T Unit := lift (.join tid)
-
-/-- Fork every task of a list, then join them all: the parallel phase of a
-request, whose transactions complete in any order. -/
-def forkJoinAll (ts : List T) : DevM S T Unit := do
-  let tids ← ts.mapM fork
-  tids.forM join
-
-/-- Run `p` until it yields `false`: a bounded device loop. -/
-def loopFuel (fuel : Nat) (p : DevM S T Bool) : DevM S T Unit :=
-  match fuel with
-  | 0 => pure ()
-  | n + 1 => do
-    let c ← p
-    if c then loopFuel n p else pure ()
 
 end DevM
 

@@ -30,7 +30,7 @@ Rocq's header on the laws, kept because the reasons are the content:
   `al_programs` (`EraInitBoot` at `A.turn`) takes `A.turn c (gen + 1)`
   (Rocq `app_turn A c (S gen_id) -∗`).
 * (Done, K3.) `al_programs` yields Rocq's `init_boot_bundle … secc_all fdt0`:
-  `EraInitBoot` states `initBootBundle ROOTINO seccAll fdt0` (the exec's mask
+  `EraInitBoot` states `initBootBundle ROOTINO ROOTINO seccAll fdt0` (the exec's mask
   pin, `SpecKexec.execSlotPre`'s `secc`), and this field follows it by name.
 
 ## THE USER BOUNDARY (NI M2-W1, 2026-10-01)
@@ -98,7 +98,7 @@ M2-W2's.
    over a `MachFixedGS` (Rocq: a `riscvGS`).  `al_xfer` is at
    `MachGpreS.mono_pre` (Rocq `riscv_pre_genGS`).  The triv lemmas are
    `appBirth_ofValidCls`, `appBack_id` (its premise is `∀ k, turn'' c k =
-   turn' c k`), `appInit_ofValid`, `appInit_ofValidOkc`, `appTriv_init`.
+   turn' c k`), `appTriv_init`.
 -/
 import Xv6.SystemAdequacy
 
@@ -106,9 +106,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
 open Iris.ProgramLogic Language.Notation PrimStep
-
-set_option linter.unusedSectionVars false
-set_option linter.unusedVariables false
 
 /-! ## §1 The laws (Rocq `App.xv6_app_laws`) -/
 
@@ -279,24 +276,6 @@ theorem appBack_id (A : Xv6App GF) (c : A.fixed) (h : List Obs)
   imodintro
   iframe HR HT
 
-/-- Rocq `app_init_of_valid`. -/
-theorem appInit_ofValid (A : Xv6App GF) (P : A.fixed → IProp GF) (hP : ∀ c, ⊢@{IProp GF} P c)
-    (c : A.fixed) : A.cls c ⊢@{IProp GF} P c := by
-  iintro _
-  iapply hP c
-
-/-- ...at an application whose durable-copy predicate holds of every record
-(Rocq `app_init_of_valid_okc`, SY3-A3b). -/
-theorem appInit_ofValidOkc (A : Xv6App GF) (av : Aview) (hok : ∀ c r, A.okc c r)
-    (hP : ∀ c : A.fixed, ⊢@{IProp GF} |==> ∃ r : A.names, A.pred c r av) (c : A.fixed) :
-    A.cls c ⊢@{IProp GF} |==> ∃ r : A.names, ⌜A.okc c r⌝ ∗ A.pred c r av := by
-  iintro _
-  imod hP c with ⟨%r, Hp⟩
-  imodintro
-  iexists r
-  iframe Hp
-  ipureintro; exact hok c r
-
 /-- ERA 0 at the generic application (Rocq `app_triv_init`). -/
 theorem appTriv_init (c : (appTriv GF).fixed) (av : Aview) :
     (appTriv GF).cls c ⊢@{IProp GF} |==> ∃ r : (appTriv GF).names,
@@ -422,11 +401,10 @@ theorem appTriv_initBoot (US : USER) (c : Unit)
   ihave #Hl := hlic
   ihave #Hg := hgen
   imodintro
-  iapply initBootBundle_of_mint (hlc := hlc) (GF := GF) ROOTINO seccAll (List.replicate NOFILE FdState.closed)
+  iapply initBootBundle_of_mint (hlc := hlc) (GF := GF) ROOTINO ROOTINO seccAll (List.replicate NOFILE FdState.closed)
     $$ Hs Hk Hl Hg
 
 end trivBoot
-
 
 section triv
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGpreS hlc GF] [Xv6G GF] [WchGpre GF]

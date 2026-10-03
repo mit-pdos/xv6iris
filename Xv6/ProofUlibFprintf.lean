@@ -15,7 +15,6 @@ with `vprintf`'s contract `ULIB_VPRINTF` (a parameter).
 -/
 import Xv6.SpecUlibFprintf
 import Xv6.UlibVprintfInv
-import Xv6.KernelTac
 
 namespace Xv6
 

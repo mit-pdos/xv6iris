@@ -38,13 +38,11 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## Constants the code computes -/
 
-theorem namei_br_namex : KA.«namei» + 0xfffffffffffffe08#64 = KA.«namex» := by decide
+theorem namei_br_namex : KA.«namei» + 0xfffffffffffffe04#64 = KA.«namex» := by decide
 theorem namei_ret_12 : jumpPc (KA.«namei» + 0x12#64) = (KA.«namei» + 0x12#64) := by decide
 
 theorem namei_slots_4 (a : Nat) (h : nameiSlots ≤ a) : 4 ≤ a := by
@@ -89,6 +87,7 @@ theorem namei_main (NX : NAMEX)
     (γkl : GName) (γk : KmemNames)
     (plen : Nat) (pfun : Nat → BitVec 8) (n : Nat) (Sb : List Nat)
     (pidv : BitVec 32) (cwdv : BitVec 64) (cwi : Nat) (dqp dqc dqb dqs dqpv : DFrac)
+    (rootv : BitVec 64) (rti : Nat) (dqr : DFrac)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : nameiSlots ≤ k.avail)
     (hnoff : k.noff = 0) (htier : k.tier = KTier.kpt)
     (hroot : icfgDev = BitVec.ofNat 32 ROOTDEV) (hnib0 : 0 < icfgNib)
@@ -101,15 +100,15 @@ theorem namei_main (NX : NAMEX)
     (hbud : walkNeed (pathElems (bview plen pfun)).length ≤ n)
     (hpd : descPageRw pd) :
     wp_namei_gen_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl pd pav pu j γkl γk plen pfun
-      n Sb pidv cwdv cwi dqp dqc dqb dqs dqpv
+      n Sb pidv cwdv cwi dqp dqc dqb dqs dqpv rootv rti dqr
       hj hproc hK hnoff htier hroot hnib0 hgeom hbg hbel hireg hnn hterm hplen hbud hpd := by
   unfold wp_namei_gen_eb_body
   iintro ⟨Hk, Hpc, #Hpi, Hte, Hce, #Hpe, #Hbc, #Hlc, #Hdc, #Hkl, #Hav, #Hit2, #Hiti, #Hslks,
-    #Hinv, #Hopen, Hsb, Hsi, #Hbmi, Hpid, Hcwd, Hcwr, Hpath, Hbs, Hs2, Hop, Htx, Hnext⟩
+    #Hinv, #Hopen, Hsb, Hsi, #Hbmi, Hpid, Hcwd, Hcwr, Hrtc, Hrtr, Hpath, Hbs, Hs2, Hop, Htx, Hnext⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   have hK4 := namei_slots_4 _ hK
   -- the caller's continuation is hart-free (a park's crossing, at a proc)
-  ihave HΦ : ∀ c : CPU, nameiPost k plen pfun n Sb pidv cwdv cwi dqp dqc dqb dqs dqpv c
+  ihave HΦ : ∀ c : CPU, nameiPost k plen pfun n Sb pidv cwdv cwi dqp dqc dqb dqs dqpv rootv rti dqr c
     $$ [Hnext]
   · iintro %c
     iapply wpNext_at true k.proc cpu c _ (fun hc => Or.elim hc (fun hx => absurd hx (by decide))
@@ -136,7 +135,7 @@ theorem namei_main (NX : NAMEX)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x0e  jal namex
-  k_step_e (wp_s_jal cpu _ (KA.«namei» + 0xe#64) false 2096634#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«namei» + 0xe#64) false 2096630#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [namei_br_namex]
   iintro Hk Hpc
   -- THE CALL: namex(path, 0, name) at its eb contract
@@ -145,7 +144,7 @@ theorem namei_main (NX : NAMEX)
     ((k.pushed 4).withRegs
       (((((k.regs.set (2#5) (k.regs 2#5 + 0xFFFFFFFFFFFFFFE0#64)).set (8#5) (k.regs 2#5)).set (12#5)
         (k.regs 2#5 + 0xFFFFFFFFFFFFFFE0#64)).set 11#5 0#64).set (1#5) (KA.«namei» + 18#64)))
-    γl pd pav pu j γkl γk plen pfun nfun false n Sb pidv cwdv cwi dqp dqc dqb dqs dqpv
+    γl pd pav pu j γkl γk plen pfun nfun false n Sb pidv cwdv cwi dqp dqc dqb dqs dqpv rootv rti dqr
     hj hproc (by show namexSlots ≤ k.avail - 4; exact namei_slots_namex _ hK)
     hnoff htier hroot hnib0 hgeom hbg hbel hireg hnn hterm hplen hbud
     (by simp only [KCtx.withRegs_regs, RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true,
@@ -157,12 +156,12 @@ theorem namei_main (NX : NAMEX)
   unfold nameiBuf
   iapply h
   iframe Hk Hpc Hpi Hte Hce Hpe Hbc Hlc Hdc Hkl Hav Hit2 Hiti Hslks Hinv Hopen Hsb Hsi Hbmi
-    Hpid Hcwd Hcwr Hpath Hname Hbs Hs2 Hop Htx
+    Hpid Hcwd Hcwr Hrtc Hrtr Hpath Hname Hbs Hs2 Hop Htx
   iapply wpNext_intro
   iintro %c'
   unfold namexPost
   iintro %spie %spp %R' %n' %Sb' %ok %nf %ipv %w %hcs Hk Hpc Hte Hce Hsb Hsi Hpid Hcwd
-    Hcwr Hpath Hname Hbs %hf Hop Htx Hok
+    Hcwr Hrtc Hrtr Hpath Hname Hbs %hf Hop Htx Hok
   k_norm_g [namei_ret_12]
   unfold calleeSaved at hcs
   k_norm_g at hcs
@@ -198,7 +197,7 @@ theorem namei_main (NX : NAMEX)
   iintro Hk Hpc
   k_norm_g
   unfold nameiPost
-  iapply HΦ $$ %c %spie %spp %_ %n' %Sb' %ok %ipv %w [] Hk Hpc Hte Hce Hsb Hsi Hpid Hcwd Hcwr
+  iapply HΦ $$ %c %spie %spp %_ %n' %Sb' %ok %ipv %w [] Hk Hpc Hte Hce Hsb Hsi Hpid Hcwd Hcwr Hrtc Hrtr
     Hpath Hbs %hf Hop Htx [Hok]
   · ipureintro
     unfold calleeSaved
@@ -223,9 +222,9 @@ end
 /-- `namei`'s proof, from namex's interface (Rocq's `NameiProof` functor
 over `Namex`). -/
 theorem namei_proof (NX : NAMEX) : NAMEI :=
-  ⟨fun Γ _ cpu k γl pd pav pu j γkl γk plen pfun n Sb pidv cwdv cwi dqp dqc dqb dqs dqpv
+  ⟨fun Γ _ cpu k γl pd pav pu j γkl γk plen pfun n Sb pidv cwdv cwi dqp dqc dqb dqs dqpv rootv rti dqr
     hj hproc hK hnoff htier hroot hnib0 hgeom hbg hbel hireg hnn hterm hplen hbud hpd =>
-  namei_main NX Γ cpu k γl pd pav pu j γkl γk plen pfun n Sb pidv cwdv cwi dqp dqc dqb dqs dqpv
+  namei_main NX Γ cpu k γl pd pav pu j γkl γk plen pfun n Sb pidv cwdv cwi dqp dqc dqb dqs dqpv rootv rti dqr
     hj hproc hK hnoff htier hroot hnib0 hgeom hbg hbel hireg hnn hterm hplen hbud hpd⟩
 
 end Xv6

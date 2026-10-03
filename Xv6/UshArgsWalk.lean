@@ -28,11 +28,7 @@ Deviations from Rocq:
 2. Register facts per register (`ushPexRegs`), `Nat` addresses.
 3. The node lemmas are `UshNodes`' (`ush_slots_upd`, `ush_slots_cap`).
 -/
-import Xv6.SpecShPeek
-import Xv6.SpecShGettoken
-import Xv6.SpecShExeccmd
 import Xv6.SpecShParseredirs
-import Xv6.UshLits
 import Xv6.UshNodes
 import Xv6.UshRedirsWalk
 import Xv6.UlibVprintfInv
@@ -45,9 +41,7 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## §0 Pure helpers -/
 
@@ -114,11 +108,6 @@ theorem ushPexRegs_cs {m m' : RegMap} {fp t0 argc ps es p : Nat}
     by rw [hk _ rfl]; exact h19, by rw [hk _ rfl]; exact h20, by rw [hk _ rfl]; exact h21,
     by rw [hk _ rfl]; exact h22, by rw [hk _ rfl]; exact h23, by rw [hk _ rfl]; exact h24,
     by rw [hk _ rfl]; exact h25, by rw [hk _ rfl]; exact h26, by rw [hk _ rfl]; exact h27⟩
-
-/-- A caller-saved write keeps the callee-saved file. -/
-theorem ush_cs_wrs (m : RegMap) (rd : BitVec 5) (v : BitVec 64) (hd : ucalleeSavedIdx rd = false) :
-    ∀ r, ucalleeSavedIdx r = true → (ukWr m rd v).get r = m.get r :=
-  fun r hr => ush_cs_wr m rd r v hr hd
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]

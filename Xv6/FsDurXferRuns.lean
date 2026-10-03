@@ -11,15 +11,16 @@ BOTH ENDS OF EVERY TRANSPORT ARE `fsState`s, and nothing is ever computed
 from the abstract state but the state itself.  The one fact the mint
 needs -- that two objects never name one byte -- is not stated, not
 maintained and not passed in: it is READ OFF THE SOURCE'S OWN EXCLUSIVITY
-(`phiRuns_disj`, `phiRunsQ_disj`; `phiExcl`).  THE TRANSPORT RUNS AT ANY
+(`phiRunsQ_disj`; `phiExcl`).  THE TRANSPORT RUNS AT ANY
 SHARE ABOVE A HALF: two shares of one byte that each exceed a half do not
 fit inside it (`dfracNvalidPair`, `dfracOwnGtHalf`).
 
 THE SHAPE, bottom up:
 1. A RUN is a (block, offset, bytes) triple; `xrMap` is its flat byte map
    and `phiRuns` the `∗` of the runs at a view.
-2. `phiRuns_disj`: the runs' maps are pairwise disjoint, off `phiExcl`
-   alone -- a PURE conclusion, consuming nothing.
+2. The runs' maps are pairwise disjoint, off `phiExcl` alone -- a PURE
+   conclusion, consuming nothing, proved at a share per run
+   (`phiRunsQ_disj`, 2d).
 3. `phiRuns_union`: with that disjointness the `∗` of the runs IS the `∗`
    of ONE map, both ways, Γ-generically.
 2d. The same at a share per run (`XQRun`); the one-share list `xqAt dq l`
@@ -54,8 +55,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Iris.Std.PartialMap
-
-set_option linter.unusedSectionVars false
 
 /-! ## 0.  TWO SHARES THAT EACH EXCEED A HALF -/
 
@@ -142,8 +141,6 @@ def xrUnion (l : List XRun) : RegMapF (BitVec 8) :=
 def xrDisj (l : List XRun) : Prop :=
   ∀ (k j : Nat) r1 r2, k ≠ j → l[k]? = some r1 → l[j]? = some r2 → xrMap r1 ##ₘ xrMap r2
 
-theorem xrUnion_nil : xrUnion [] = ∅ := rfl
-
 theorem xrUnion_cons (r : XRun) (l : List XRun) :
     xrUnion (r :: l) = PartialMap.union (xrMap r) (xrUnion l) := rfl
 
@@ -206,39 +203,6 @@ theorem phiRuns_app (Γ : FsViewNames GF) (l1 l2 : List XRun) :
 
 /-! ### 2a.  DISJOINTNESS IS READ OFF EXCLUSIVITY -/
 
-/-- One byte of a flat map (helper). -/
-theorem phiMap_lookup (Γ : FsViewNames GF) (M : RegMapF (BitVec 8)) (a : Nat) (w : BitVec 8)
-    (hw : get? M a = some w) : phiMap Γ M ⊢ Γ.phi (DFrac.own 1) a w := by
-  unfold phiMap
-  exact (BigSepM.bigSepM_lookup_acc hw).1.trans sep_elim_left
-
-/-- Rocq's `phi_map_disj`. -/
-theorem phiMap_disj (Γ : FsViewNames GF) (hex : phiExcl Γ) (M1 M2 : RegMapF (BitVec 8)) :
-    phiMap Γ M1 ⊢ phiMap Γ M2 -∗ ⌜M1 ##ₘ M2⌝ := by
-  induction M1 using LawfulFiniteMap.induction_on with
-  | hemp =>
-    iintro - -
-    ipureintro
-    exact LawfulPartialMap.disjoint_empty_left _
-  | hins a v M1 ha ih =>
-    have hins : phiMap Γ (insert M1 a v) ⊣⊢ iprop(Γ.phi (DFrac.own 1) a v ∗ phiMap Γ M1) :=
-      BigSepM.bigSepM_insert ha
-    refine hins.1.trans ?_
-    iintro ⟨Hav, HM1⟩ HM2
-    cases hw : get? M2 a with
-    | some w =>
-      ihave Haw := phiMap_lookup Γ M2 a w hw $$ HM2
-      ihave %hv := hex a v w (DFrac.own 1) (DFrac.own 1) $$ Hav Haw
-      exact absurd hv (dfracFullNvalid _)
-    | none =>
-      ihave %hd := ih $$ HM1 HM2
-      ipureintro
-      intro k ⟨hk1, hk2⟩
-      by_cases hka : a = k
-      · subst hka; rw [hw] at hk2; exact absurd hk2 (by simp)
-      · rw [get?_insert_ne hka] at hk1
-        exact hd k ⟨hk1, hk2⟩
-
 /-- A pure reading that does NOT consume its source: Rocq's
 `iAssert (⌜φ⌝ ∧ P)` idiom, as one lemma (helper). -/
 theorem fsDurKeep {P : IProp GF} {φ : Prop} (h : P ⊢ ⌜φ⌝) : P ⊢ ⌜φ⌝ ∗ P :=
@@ -254,57 +218,6 @@ Rocq's `rewrite bi.pure_forall; iIntros` (helper). -/
 theorem fsDurPureForall2 {α β : Type _} {P : IProp GF} {φ : α → β → Prop}
     (h : ∀ x y, P ⊢ ⌜φ x y⌝) : P ⊢ ⌜∀ x y, φ x y⌝ :=
   (forall_intro fun x => (forall_intro fun y => h x y).trans pure_forall.2).trans pure_forall.2
-
-/-- The head run against every later run (helper of `phiRuns_disj`). -/
-theorem phiRuns_headDisj (Γ : FsViewNames GF) (hex : phiExcl Γ) (r : XRun) (l : List XRun) :
-    phiMap Γ (xrMap r) ∗ phiRuns Γ l ⊢ ⌜∀ (j : Nat) (r2 : XRun), l[j]? = some r2 → xrMap r ##ₘ xrMap r2⌝ := by
-  refine fsDurPureForall2 fun (j : Nat) (r2 : XRun) => ?_
-  by_cases hj : l[j]? = some r2
-  · unfold phiRuns
-    iintro ⟨Hr, Hl⟩
-    ihave Hr2 := (BigSepL.bigSepL_lookup_acc (Φ := fun _ r =>
-      FsView.byteRange Γ (xrBlk r) (xrOff r) (xrBs r)) hj).1 $$ Hl
-    icases Hr2 with ⟨Hr2, -⟩
-    ihave Hr2 := (phiMap_ofRange Γ r2).1 $$ Hr2
-    ihave %hd := phiMap_disj Γ hex _ _ $$ Hr Hr2
-    ipureintro
-    exact fun _ => hd
-  · iintro -
-    ipureintro
-    exact fun h => absurd h hj
-
-/-- Rocq's `phi_runs_disj`. -/
-theorem phiRuns_disj (Γ : FsViewNames GF) (hex : phiExcl Γ) (l : List XRun) :
-    phiRuns Γ l ⊢ ⌜xrDisj l⌝ := by
-  induction l with
-  | nil =>
-    iintro -
-    ipureintro
-    intro k j r1 r2 _ hk
-    simp at hk
-  | cons r l ih =>
-    refine (phiRuns_cons Γ r l).1.trans ?_
-    iintro ⟨Hr, Hl⟩
-    ihave ⟨%hdl, Hl⟩ := fsDurKeep ih $$ Hl
-    ihave %hhd := phiRuns_headDisj Γ hex r l $$ [Hr Hl]
-    · iframe Hr Hl
-    ipureintro
-    intro k j r1 r2 hne hk hj
-    cases k with
-    | zero =>
-      cases j with
-      | zero => exact absurd rfl hne
-      | succ j =>
-        simp only [List.getElem?_cons_zero, Option.some.injEq] at hk
-        subst hk
-        exact hhd j r2 hj
-    | succ k =>
-      cases j with
-      | zero =>
-        simp only [List.getElem?_cons_zero, Option.some.injEq] at hj
-        subst hj
-        exact PartialMap.disjoint_comm (hhd k r1 hk)
-      | succ j => exact hdl k j r1 r2 (by omega) hk hj
 
 /-! ### 2b.  THE FLATTENING, BOTH WAYS -/
 
@@ -329,32 +242,6 @@ map, which is what every byte tie is later read through. -/
 /-- Rocq's `phi_agree`. -/
 def phiAgree (Γ : FsViewNames GF) (A : IProp GF) (M : RegMapF (BitVec 8)) : Prop :=
   ∀ (dq : DFrac) (a : Nat) (v : BitVec 8), A ∗ Γ.phi dq a v ⊢ ⌜get? M a = some v⌝
-
-/-- Rocq's `phi_map_in`. -/
-theorem phiMap_in (Γ : FsViewNames GF) (A : IProp GF) (M : RegMapF (BitVec 8))
-    (hag : phiAgree Γ A M) (N : RegMapF (BitVec 8)) :
-    A ⊢ phiMap Γ N -∗ ⌜N ⊆ M⌝ := by
-  refine wand_intro (fsDurPureForall2 fun (k : Nat) (v : BitVec 8) => ?_)
-  by_cases hk : get? N k = some v
-  · unfold phiMap
-    iintro ⟨HA, HN⟩
-    ihave Hk := (BigSepM.bigSepM_lookup_acc hk).1 $$ HN
-    icases Hk with ⟨Hk, -⟩
-    ihave %h := hag (DFrac.own 1) k v $$ [HA Hk]
-    · iframe HA Hk
-    ipureintro
-    exact fun _ => h
-  · iintro -
-    ipureintro
-    exact fun h => absurd h hk
-
-/-- Rocq's `phi_runs_in`. -/
-theorem phiRuns_in (Γ : FsViewNames GF) (A : IProp GF) (M : RegMapF (BitVec 8))
-    (hag : phiAgree Γ A M) (l : List XRun) (hd : xrDisj l) :
-    A ⊢ phiRuns Γ l -∗ ⌜xrUnion l ⊆ M⌝ := by
-  iintro HA Hl
-  ihave Hl := (phiRuns_union Γ l hd).1 $$ Hl
-  iapply phiMap_in Γ A M hag $$ HA Hl
 
 end Runs
 

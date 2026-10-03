@@ -52,8 +52,6 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedSectionVars false
-
 /-! ## §0 The `_entry` address bridge -/
 
 /-- The reset vector is `_entry` (Rocq `entry_sym_addr`): the boot run
@@ -162,8 +160,6 @@ kernel-written cells, then the frozen ones of `MachCSL.hwConfig`. -/
 def bootConfRegs : List Register :=
   [.cur_privilege, .hart_state, .mstatus, .mie, .mideleg, .medeleg, .mepc, .satp,
    .menvcfg, .mcounteren, .mtimecmp, .stimecmp, .pmpcfg_n, .pmpaddr_n] ++ hwRegs
-
-theorem bootConfRegs_nodup : bootConfRegs.Nodup := by decide
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]

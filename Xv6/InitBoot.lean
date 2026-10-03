@@ -31,7 +31,10 @@ carrying it is built at the PARKER's context and spent at the RESUMER's).
    literal of bytes, so `initBootStr` spells the five bytes and
    `initBootBytes j = (cstringBytes initBootStr).getD j 0` (the terminator
    at index 5, zero beyond, as Rocq's `!!!` default).
-2. The first process's cwd `cw` is `Nat` (the key's `Uvis.cwd`).
+2. The first process's cwd `cw` is `Nat` (the key's `Uvis.cwd`), and so is
+   its root `rt` (design/chroot.md section 3: the boot and application
+   sites state the bundle at `(ROOTINO, ROOTINO)`, userinit's install;
+   "/init" is the tree's one absolute walk).
 3. The class binders are the ones `SpecKexec.execAuPre` reads (`MachGS`,
    `FsTopG`, `CtokG`) plus `FsBytesG`/`Appcfg` for `execAuPre_triv_at`,
    `Fscfg` for `fscFs`/`fscCons`, `Xv6G` for the console reader token; Rocq's `xv6G`/`fileG`/… section binders
@@ -44,8 +47,6 @@ import Xv6.ConsoleInvDefs
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Std MachCSL
-
-set_option linter.unusedSectionVars false
 
 /-! ## 1.  THE PATH -/
 
@@ -72,7 +73,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FsTopG
 /-- **Rocq `init_boot_bundle`**: WHAT THE APPLICATION OWES THE KERNEL ABOUT
 USER EXECUTION -- kexec's caller-side bundle at "/init" (`na = 1`, the one
 argument the path again: forkret's `kexec("/init", (char *[]){"/init", 0})`),
-at the first process's cwd `cw`, SYSCALL MASK `secc` (exec keeps it: the
+at the first process's root `rt` and cwd `cw`, SYSCALL MASK `secc` (exec keeps it: the
 slot wands' `W'.secc = secc` row, xv6 7b2c1b1b; the boot chain states it at
 `seccAll`, userinit's record) and descriptor view `sts`, with the SLOT
 PIECE at `UexecRet.uslot` and refund `R`; the cursor, miss family,
@@ -81,27 +82,27 @@ LINEAR (its pieces are one-shot).  AT THE TRIVIAL PAYLOAD (`<init>` has no
 parent).  It TAKES THE CONSOLE'S READER TOKEN as an input (the kernel's to
 hand, threaded main → userinit → the park → forkret's boot arm), and is owed
 AT EVERY CHILDREN SET AND PID. -/
-def initBootBundle (cw : Nat) (secc : BitVec 64) (sts : List FdState) : IProp GF :=
+def initBootBundle (rt cw : Nat) (secc : BitVec 64) (sts : List FdState) : IProp GF :=
   iprop(consReader fscCons 0 -∗
     ∃ (P Pmiss : Nat → Nat → IProp GF) (Fo : Pfam GF (Aview → Nat → Anode → IProp GF)) (R : IProp GF),
       ∀ (cs : ExtTreeSet GName compare) (pidv : BitVec 32),
-        execAuPre (hlc := hlc) ⟨uslot (hlc := hlc) (SG := SG), R⟩ (fsGammaL fscFs) fscFs cw secc
+        execAuPre (hlc := hlc) ⟨uslot (hlc := hlc) (SG := SG), R⟩ (fsGammaL fscFs) fscFs rt cw secc
           (fun _ => iprop(True)) P Pmiss Fo initBootPath 1 (fun _ => 5) (fun _ => initBootBytes)
           sts cs pidv)
 
 /-- **Rocq `init_boot_bundle_triv`**: THE GENERIC APPLICATION'S -- a slot at
 every key answers both wands and tracks nothing; the reader token is
 dropped. -/
-theorem initBootBundle_triv (cw : Nat) (secc : BitVec 64) (sts : List FdState) :
+theorem initBootBundle_triv (rt cw : Nat) (secc : BitVec 64) (sts : List FdState) :
     ⊢ □ (∀ W : Uvis, myPay W.gen (fun _ => iprop(True)) -∗ uslot (hlc := hlc) (SG := SG) W) -∗
-      initBootBundle (hlc := hlc) (SG := SG) cw secc sts := by
+      initBootBundle (hlc := hlc) (SG := SG) rt cw secc sts := by
   iintro #HS
   unfold initBootBundle
   iintro -
   iexists (fun _ _ => iprop(True)), (fun _ _ => iprop(True)), (pfamTriv (fun _ _ _ => iprop(True))),
     iprop(True)
   iintro %cs %pidv
-  iapply (execAuPre_triv_at (hlc := hlc) (uslot (hlc := hlc) (SG := SG)) (fsGammaL fscFs) fscFs cw secc
+  iapply (execAuPre_triv_at (hlc := hlc) (uslot (hlc := hlc) (SG := SG)) (fsGammaL fscFs) fscFs rt cw secc
     initBootPath 1 (fun _ => 5) (fun _ => initBootBytes) sts cs pidv)
   iexact HS
 

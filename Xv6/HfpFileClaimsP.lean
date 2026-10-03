@@ -16,8 +16,8 @@ spell their section equation with:
   (`FileOpenDeed`), `fdeed`, `ftkt`, `fown` (`AppFileDeed`), `escTok`,
   `escKey` (`AppFileEscrow`), `filePred` (`AppFileClaim`), `fileConsCred`
   (`AppFileCons`, its console flag an `Option Nat`), `fileCur`
-  (`FileWriteCur`), `fecl` (`FileOutClaim`), `fileParams` (`FileLinkGen`),
-  `fileLinks` (`FileLinks`), `fescRes`, `fileUnarmFam`, `fileOpenPay`,
+  (`FileWriteCur`), `fecl` (`FileOutClaim`), `fescRes`, `fileUnarmFam`,
+  `fileOpenPay`,
   `fileOpenFdK` (`FileOpenFams`);
 * the lemmas `fdq_split`, `fdq_join` (`FileOpenDeed`), `fileSup_of_taint`
   (`AppFileSteps`), `fileEscrowPark` (`AppFileEra`; it takes `fown r s`, =
@@ -34,26 +34,11 @@ The rename map from the old record is `lane-hfp/scratch/file_swap_map.txt`.
    FileAppNames, appPred := filePred c, appRun := r }`), so a `heq` passes
    straight through.
 -/
-import Xv6.GenLinksLine
-import Xv6.FileDisc
-import Xv6.FileState
-import Xv6.AppInv
-import Xv6.UserOff
-import Xv6.FsCfgDefs
-import Xv6.PieceFam
 import Xv6.AppFileEra
-import Xv6.AppFileCons
-import Xv6.FileOpenDeed
-import Xv6.FileOpenFams
-import Xv6.FileWriteCur
-import Xv6.FileLinks
-import Xv6.FileLinkGen
 
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
-
-set_option linter.unusedSectionVars false
 
 section Claims
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]

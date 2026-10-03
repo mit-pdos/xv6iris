@@ -33,7 +33,7 @@ instruction stream computes, and each callee's contract at its call site.
    read-only cells bundled (`Xv6.wiCells`) and the source at `wiSrc`; the
    entry lemma converts once.
 6. The callee call sites: `bread`/`brelse` are the shared
-   `Xv6.bread_callF`/`brelse_callF` (`Xv6/FsCallSitesF.lean`), `log_write`
+   `Xv6.bread_callF_eb`/`brelse_callF` (`Xv6/FsCallSitesF.lean`), `log_write`
    the shared `Xv6.log_write_gen_call` at the ambient view
    (`Xv6.writei_log_writeF`).  `writei_bmap_eb` (BMAP has no shared call site
    yet), `writei_either_copyin` and `writei_iupdate_eb` (a copy of
@@ -50,9 +50,7 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## The arguments and the contract's premises -/
 
@@ -138,12 +136,6 @@ entry values (`s1`, `s8`..`s11`; `s3` comes from its slot). -/
 def wiPins5 (k : KCtx) (R : RegMap) : Prop :=
   R 9#5 = k.regs 9#5 ∧ R 24#5 = k.regs 24#5 ∧ R 25#5 = k.regs 25#5 ∧ R 26#5 = k.regs 26#5 ∧
   R 27#5 = k.regs 27#5
-
-theorem wiPins5_cs (k : KCtx) (R R' : RegMap) (h : wiPins5 k R) (hcs : calleeSaved R R') :
-    wiPins5 k R' := by
-  obtain ⟨a9, a24, a25, a26, a27⟩ := h
-  obtain ⟨-, -, c9, -, -, -, -, -, -, c24, c25, c26, c27⟩ := hcs
-  exact ⟨c9.trans a9, c24.trans a24, c25.trans a25, c26.trans a26, c27.trans a27⟩
 
 /-- The epilogue's `calleeSaved`: the return block restores `ra`, `s0`,
 `s2`, `s4`..`s7` and `sp`; `s1`, `s3`, `s8`..`s11` are already back. -/

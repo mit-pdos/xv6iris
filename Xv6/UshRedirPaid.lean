@@ -43,8 +43,6 @@ open Iris.Std.PartialMap
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
-
 /-! ## S1 The refused open's diagnostic, at a name of any length -/
 
 /-- **Rocq `ush_openfail_lookup`**. -/
@@ -107,7 +105,7 @@ theorem wp_kshd_openfail_paid (UL : UK_LEAVES) (HS : UK_SYS_P) (HF : USH_FPRINTF
       (fun p => iprop(ustd N.fd l ∗ Pf (p - 2 + nm.length))) (5 + 2) := by
     simp only []
     rw [show 5 + x.len = 5 + 2 - 2 + nm.length by omega]
-  iapply wp_kshd_die_chain UL HS HF N false .discard 0x110 1#20 408#12 3956#21 2882#21 1#12 0x12a8 15 5 x.ptr x.len
+  iapply wp_kshd_die_chain UL HS HF N false .discard 0x110 1#20 408#12 3964#21 2882#21 1#12 0x12a8 15 5 x.ptr x.len
     x.bytes (fun p => iprop(ustd N.fd l ∗ Pf p)) (fun p => iprop(ustd N.fd l ∗ Pf (5 + p)))
     (fun p => iprop(ustd N.fd l ∗ Pf (p - 2 + nm.length))) h1 (ukWr m 12#5 (BitVec.ofNat 64 x.ptr)) (n + 2)
     shdDieLits_110 (by omega) (by ureg) rfl e2
@@ -172,7 +170,7 @@ theorem ushr_fname_img (γd : GName) (x : UArg) (nm : List (BitVec 8)) (hu : una
       iapply BigSepL.bigSepL_mono (Φ := fun _ j => ubyteq (GF := GF) γd DFrac.discard (x.ptr + j) (x.bytes j))
         (fun {k j} hk => by
           have hj : j < x.len := List.mem_range.1 (List.mem_of_getElem? hk)
-          simp [ushpExt, hj, ← hlen]) $$ Hbs
+          simp [ushpExt, hj]) $$ Hbs
     · simp only [ushpExt, Nat.lt_irrefl, if_false]
       rw [← hlen]
       iexact Hn
@@ -191,7 +189,7 @@ theorem ush_open_call_g_of_call2 {A : Type} (N : UkNames GF) (file : UArg) (nm :
   unfold ushOpenCall2 ushOpenCallG
   iintro Hc %h %m %av %ha0 %ha1 #Hstr Hd #Hcode Hcwd Hstd Hrun Hcont
   icases ushr_fname_img N.d file nm hu hlen hb $$ Hstr with ⟨%Img, %hpath, #Himg⟩
-  iapply Hc $$ %h %m %av %Img %nm %a %ha0 %ha1 %hpath %(uname_npElems nm hu) %(uname_start nm hu ROOTINO)
+  iapply Hc $$ %h %m %av %Img %nm %a %ha0 %ha1 %hpath %(uname_npElems nm hu) %(fun rt => uname_start nm hu rt ROOTINO)
     %(uname_last nm hu) %hfdl Himg Hd Hcode Hcwd Hstd Hrun
   iintro %h' %m' %r %hcs %hr Hcwd Hans Hrun
   iapply Hcont $$ %h' %m' %r %hcs %hr Hcwd [Hans] Hrun

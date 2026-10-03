@@ -112,191 +112,22 @@ theorem execSpecF_ret (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Bool) (hok : S
     conf_intro HmConf
     iapply HΦ $$ HmConf HPC HnextPC HF
 
-set_option hygiene false in
-/-- The branch script, one operator at a time. -/
-macro "btype_proof" op:term : tactic =>
-  `(tactic| (
-    intro Φ
-    iintro ⟨HmConf, HPC, HnextPC, HF, HΦ⟩
-    conf_cases HmConf
-    have hb0 := ofBool_bit0_beq_of_even _ htgt
-    unfold execute
-    rcases Bool.eq_false_or_eq_true (bcond $op (RegMap.get R rs1) (RegMap.get R rs2)) with hc | hc
-    all_goals
-      try simp only [hc, ite_true, ite_false]
-      simp only [bcond] at hc
-      swp_run 30
-      iapply swp_bind
-      iapply swp_rX_file_later (hrs := hrs1)
-      iframe
-      inext
-      iintro HF
-      swp_run 30
-      iapply swp_bind
-      iapply swp_rX_file
-      iframe
-      iintro HF
-      try simp only [hc]
-      swp_run 60
-      -- a taken branch: the jump's `Zca` gate branches on the target's bit 1
-      (try split)
-      all_goals
-        swp_run 60
-        conf_intro HmConf
-        iapply HΦ $$ HmConf HPC HnextPC HF))
+/-- **The conditional branch with its operator abstract**: the model's
+per-operator `match` is one comparison, `bcond`.  (The branch rules were
+proved once per operator, each a full symbolic run of `execute_BTYPE`; over
+an abstract `op` the run is done once and the operators are corollaries.) -/
+theorem execute_BTYPE_bcond (imm : BitVec 13) (rs2 rs1 : regidx) (op : bop) :
+    execute_BTYPE imm rs2 rs1 op =
+      (do
+        let a ← rX_bits rs1
+        let b ← rX_bits rs2
+        if bcond op a b then jump_to ((← readReg Register.PC) + (sign_extend (m := 64) imm))
+        else pure RETIRE_SUCCESS) := by
+  cases op <;>
+    simp only [execute_BTYPE, bcond, bind_assoc, pure_bind, zopz0zI_s_eq, zopz0zKzJ_s_eq, zopz0zI_u_eq,
+      zopz0zKzJ_u_eq] <;> rfl
 
 set_option maxHeartbeats 4000000 in
-theorem execSpecF_beq (cpu : CPU) (dq : DFrac) (c : MConf) (pc npc₀ : BitVec 64) (imm : BitVec 13)
-    (rs1 rs2 : BitVec 5) (hrs1 : rs1 ≠ 0#5) (R : RegMap)
-    (htgt : (pc + BitVec.signExtend 64 imm).toNat % 2 = 0) (p : Privilege := Privilege.Supervisor) :
-    execSpecPP (GF := GF) cpu dq p c p c (instruction.BTYPE (imm, regidx.Regidx rs2, regidx.Regidx rs1, bop.BEQ))
-      pc npc₀ (if bcond bop.BEQ (RegMap.get R rs1) (RegMap.get R rs2) then pc + BitVec.signExtend 64 imm else npc₀)
-      (gprFile cpu R) (gprFile cpu R) := by
-  btype_proof bop.BEQ
-
-set_option maxHeartbeats 4000000 in
-theorem execSpecF_bne (cpu : CPU) (dq : DFrac) (c : MConf) (pc npc₀ : BitVec 64) (imm : BitVec 13)
-    (rs1 rs2 : BitVec 5) (hrs1 : rs1 ≠ 0#5) (R : RegMap)
-    (htgt : (pc + BitVec.signExtend 64 imm).toNat % 2 = 0) (p : Privilege := Privilege.Supervisor) :
-    execSpecPP (GF := GF) cpu dq p c p c (instruction.BTYPE (imm, regidx.Regidx rs2, regidx.Regidx rs1, bop.BNE))
-      pc npc₀ (if bcond bop.BNE (RegMap.get R rs1) (RegMap.get R rs2) then pc + BitVec.signExtend 64 imm else npc₀)
-      (gprFile cpu R) (gprFile cpu R) := by
-  btype_proof bop.BNE
-
-set_option maxHeartbeats 4000000 in
-theorem execSpecF_blt (cpu : CPU) (dq : DFrac) (c : MConf) (pc npc₀ : BitVec 64) (imm : BitVec 13)
-    (rs1 rs2 : BitVec 5) (hrs1 : rs1 ≠ 0#5) (R : RegMap)
-    (htgt : (pc + BitVec.signExtend 64 imm).toNat % 2 = 0) (p : Privilege := Privilege.Supervisor) :
-    execSpecPP (GF := GF) cpu dq p c p c (instruction.BTYPE (imm, regidx.Regidx rs2, regidx.Regidx rs1, bop.BLT))
-      pc npc₀ (if bcond bop.BLT (RegMap.get R rs1) (RegMap.get R rs2) then pc + BitVec.signExtend 64 imm else npc₀)
-      (gprFile cpu R) (gprFile cpu R) := by
-  btype_proof bop.BLT
-
-set_option maxHeartbeats 4000000 in
-theorem execSpecF_bge (cpu : CPU) (dq : DFrac) (c : MConf) (pc npc₀ : BitVec 64) (imm : BitVec 13)
-    (rs1 rs2 : BitVec 5) (hrs1 : rs1 ≠ 0#5) (R : RegMap)
-    (htgt : (pc + BitVec.signExtend 64 imm).toNat % 2 = 0) (p : Privilege := Privilege.Supervisor) :
-    execSpecPP (GF := GF) cpu dq p c p c (instruction.BTYPE (imm, regidx.Regidx rs2, regidx.Regidx rs1, bop.BGE))
-      pc npc₀ (if bcond bop.BGE (RegMap.get R rs1) (RegMap.get R rs2) then pc + BitVec.signExtend 64 imm else npc₀)
-      (gprFile cpu R) (gprFile cpu R) := by
-  btype_proof bop.BGE
-
-set_option maxHeartbeats 4000000 in
-theorem execSpecF_bltu (cpu : CPU) (dq : DFrac) (c : MConf) (pc npc₀ : BitVec 64) (imm : BitVec 13)
-    (rs1 rs2 : BitVec 5) (hrs1 : rs1 ≠ 0#5) (R : RegMap)
-    (htgt : (pc + BitVec.signExtend 64 imm).toNat % 2 = 0) (p : Privilege := Privilege.Supervisor) :
-    execSpecPP (GF := GF) cpu dq p c p c (instruction.BTYPE (imm, regidx.Regidx rs2, regidx.Regidx rs1, bop.BLTU))
-      pc npc₀ (if bcond bop.BLTU (RegMap.get R rs1) (RegMap.get R rs2) then pc + BitVec.signExtend 64 imm else npc₀)
-      (gprFile cpu R) (gprFile cpu R) := by
-  btype_proof bop.BLTU
-
-set_option maxHeartbeats 4000000 in
-theorem execSpecF_bgeu (cpu : CPU) (dq : DFrac) (c : MConf) (pc npc₀ : BitVec 64) (imm : BitVec 13)
-    (rs1 rs2 : BitVec 5) (hrs1 : rs1 ≠ 0#5) (R : RegMap)
-    (htgt : (pc + BitVec.signExtend 64 imm).toNat % 2 = 0) (p : Privilege := Privilege.Supervisor) :
-    execSpecPP (GF := GF) cpu dq p c p c (instruction.BTYPE (imm, regidx.Regidx rs2, regidx.Regidx rs1, bop.BGEU))
-      pc npc₀ (if bcond bop.BGEU (RegMap.get R rs1) (RegMap.get R rs2) then pc + BitVec.signExtend 64 imm else npc₀)
-      (gprFile cpu R) (gprFile cpu R) := by
-  btype_proof bop.BGEU
-
-set_option hygiene false in
-/-- The branch script with `rs1 = x0` (`blez`, `bgtz`): `x0` reads as `0`
-without a step, the `rs2` read is the step. -/
-macro "btype0_proof" op:term : tactic =>
-  `(tactic| (
-    intro Φ
-    iintro ⟨HmConf, HPC, HnextPC, HF, HΦ⟩
-    conf_cases HmConf
-    have hb0 := ofBool_bit0_beq_of_even _ htgt
-    unfold execute
-    rcases Bool.eq_false_or_eq_true (bcond $op 0#64 (RegMap.get R rs2)) with hc | hc
-    all_goals
-      try simp only [hc, ite_true, ite_false]
-      simp only [bcond] at hc
-      swp_run 30
-      iapply swp_bind
-      iapply swp_rX_file_later (hrs := hrs2)
-      iframe
-      inext
-      iintro HF
-      try simp only [hc]
-      swp_run 60
-      -- a taken branch: the jump's `Zca` gate branches on the target's bit 1
-      (try split)
-      all_goals
-        swp_run 60
-        conf_intro HmConf
-        iapply HΦ $$ HmConf HPC HnextPC HF))
-
-set_option maxHeartbeats 4000000 in
-theorem execSpecF_beq0 (cpu : CPU) (dq : DFrac) (c : MConf) (pc npc₀ : BitVec 64) (imm : BitVec 13)
-    (rs2 : BitVec 5) (hrs2 : rs2 ≠ 0#5) (R : RegMap)
-    (htgt : (pc + BitVec.signExtend 64 imm).toNat % 2 = 0) (p : Privilege := Privilege.Supervisor) :
-    execSpecPP (GF := GF) cpu dq p c p c (instruction.BTYPE (imm, regidx.Regidx rs2, regidx.Regidx 0#5, bop.BEQ))
-      pc npc₀ (if bcond bop.BEQ 0#64 (RegMap.get R rs2) then pc + BitVec.signExtend 64 imm else npc₀)
-      (gprFile cpu R) (gprFile cpu R) := by
-  btype0_proof bop.BEQ
-
-set_option maxHeartbeats 4000000 in
-theorem execSpecF_bne0 (cpu : CPU) (dq : DFrac) (c : MConf) (pc npc₀ : BitVec 64) (imm : BitVec 13)
-    (rs2 : BitVec 5) (hrs2 : rs2 ≠ 0#5) (R : RegMap)
-    (htgt : (pc + BitVec.signExtend 64 imm).toNat % 2 = 0) (p : Privilege := Privilege.Supervisor) :
-    execSpecPP (GF := GF) cpu dq p c p c (instruction.BTYPE (imm, regidx.Regidx rs2, regidx.Regidx 0#5, bop.BNE))
-      pc npc₀ (if bcond bop.BNE 0#64 (RegMap.get R rs2) then pc + BitVec.signExtend 64 imm else npc₀)
-      (gprFile cpu R) (gprFile cpu R) := by
-  btype0_proof bop.BNE
-
-set_option maxHeartbeats 4000000 in
-theorem execSpecF_blt0 (cpu : CPU) (dq : DFrac) (c : MConf) (pc npc₀ : BitVec 64) (imm : BitVec 13)
-    (rs2 : BitVec 5) (hrs2 : rs2 ≠ 0#5) (R : RegMap)
-    (htgt : (pc + BitVec.signExtend 64 imm).toNat % 2 = 0) (p : Privilege := Privilege.Supervisor) :
-    execSpecPP (GF := GF) cpu dq p c p c (instruction.BTYPE (imm, regidx.Regidx rs2, regidx.Regidx 0#5, bop.BLT))
-      pc npc₀ (if bcond bop.BLT 0#64 (RegMap.get R rs2) then pc + BitVec.signExtend 64 imm else npc₀)
-      (gprFile cpu R) (gprFile cpu R) := by
-  btype0_proof bop.BLT
-
-set_option maxHeartbeats 4000000 in
-theorem execSpecF_bge0 (cpu : CPU) (dq : DFrac) (c : MConf) (pc npc₀ : BitVec 64) (imm : BitVec 13)
-    (rs2 : BitVec 5) (hrs2 : rs2 ≠ 0#5) (R : RegMap)
-    (htgt : (pc + BitVec.signExtend 64 imm).toNat % 2 = 0) (p : Privilege := Privilege.Supervisor) :
-    execSpecPP (GF := GF) cpu dq p c p c (instruction.BTYPE (imm, regidx.Regidx rs2, regidx.Regidx 0#5, bop.BGE))
-      pc npc₀ (if bcond bop.BGE 0#64 (RegMap.get R rs2) then pc + BitVec.signExtend 64 imm else npc₀)
-      (gprFile cpu R) (gprFile cpu R) := by
-  btype0_proof bop.BGE
-
-set_option maxHeartbeats 4000000 in
-theorem execSpecF_bltu0 (cpu : CPU) (dq : DFrac) (c : MConf) (pc npc₀ : BitVec 64) (imm : BitVec 13)
-    (rs2 : BitVec 5) (hrs2 : rs2 ≠ 0#5) (R : RegMap)
-    (htgt : (pc + BitVec.signExtend 64 imm).toNat % 2 = 0) (p : Privilege := Privilege.Supervisor) :
-    execSpecPP (GF := GF) cpu dq p c p c (instruction.BTYPE (imm, regidx.Regidx rs2, regidx.Regidx 0#5, bop.BLTU))
-      pc npc₀ (if bcond bop.BLTU 0#64 (RegMap.get R rs2) then pc + BitVec.signExtend 64 imm else npc₀)
-      (gprFile cpu R) (gprFile cpu R) := by
-  btype0_proof bop.BLTU
-
-set_option maxHeartbeats 4000000 in
-theorem execSpecF_bgeu0 (cpu : CPU) (dq : DFrac) (c : MConf) (pc npc₀ : BitVec 64) (imm : BitVec 13)
-    (rs2 : BitVec 5) (hrs2 : rs2 ≠ 0#5) (R : RegMap)
-    (htgt : (pc + BitVec.signExtend 64 imm).toNat % 2 = 0) (p : Privilege := Privilege.Supervisor) :
-    execSpecPP (GF := GF) cpu dq p c p c (instruction.BTYPE (imm, regidx.Regidx rs2, regidx.Regidx 0#5, bop.BGEU))
-      pc npc₀ (if bcond bop.BGEU 0#64 (RegMap.get R rs2) then pc + BitVec.signExtend 64 imm else npc₀)
-      (gprFile cpu R) (gprFile cpu R) := by
-  btype0_proof bop.BGEU
-
-/-- The conditional branches with `rs1 = x0` (`blez rs2` is `bge x0, rs2`). -/
-theorem execSpecF_btype0 (cpu : CPU) (dq : DFrac) (c : MConf) (pc npc₀ : BitVec 64) (imm : BitVec 13)
-    (rs2 : BitVec 5) (hrs2 : rs2 ≠ 0#5) (op : bop) (R : RegMap)
-    (htgt : (pc + BitVec.signExtend 64 imm).toNat % 2 = 0) (p : Privilege := Privilege.Supervisor) :
-    execSpecPP (GF := GF) cpu dq p c p c (instruction.BTYPE (imm, regidx.Regidx rs2, regidx.Regidx 0#5, op))
-      pc npc₀ (if bcond op 0#64 (RegMap.get R rs2) then pc + BitVec.signExtend 64 imm else npc₀)
-      (gprFile cpu R) (gprFile cpu R) := by
-  cases op
-  · exact execSpecF_beq0 cpu dq c pc npc₀ imm rs2 hrs2 R htgt p
-  · exact execSpecF_bne0 cpu dq c pc npc₀ imm rs2 hrs2 R htgt p
-  · exact execSpecF_blt0 cpu dq c pc npc₀ imm rs2 hrs2 R htgt p
-  · exact execSpecF_bge0 cpu dq c pc npc₀ imm rs2 hrs2 R htgt p
-  · exact execSpecF_bltu0 cpu dq c pc npc₀ imm rs2 hrs2 R htgt p
-  · exact execSpecF_bgeu0 cpu dq c pc npc₀ imm rs2 hrs2 R htgt p
-
 /-- The conditional branches: `pc + off` if the condition holds, else fall
 through.  (`htgt`: the target is even; the C extension is on, so that is the
 whole alignment check.  `rs1 ≠ x0`: the first read is a step.) -/
@@ -306,13 +137,67 @@ theorem execSpecF_btype (cpu : CPU) (dq : DFrac) (c : MConf) (pc npc₀ : BitVec
     execSpecPP (GF := GF) cpu dq p c p c (instruction.BTYPE (imm, regidx.Regidx rs2, regidx.Regidx rs1, op))
       pc npc₀ (if bcond op (RegMap.get R rs1) (RegMap.get R rs2) then pc + BitVec.signExtend 64 imm else npc₀)
       (gprFile cpu R) (gprFile cpu R) := by
-  cases op
-  · exact execSpecF_beq cpu dq c pc npc₀ imm rs1 rs2 hrs1 R htgt p
-  · exact execSpecF_bne cpu dq c pc npc₀ imm rs1 rs2 hrs1 R htgt p
-  · exact execSpecF_blt cpu dq c pc npc₀ imm rs1 rs2 hrs1 R htgt p
-  · exact execSpecF_bge cpu dq c pc npc₀ imm rs1 rs2 hrs1 R htgt p
-  · exact execSpecF_bltu cpu dq c pc npc₀ imm rs1 rs2 hrs1 R htgt p
-  · exact execSpecF_bgeu cpu dq c pc npc₀ imm rs1 rs2 hrs1 R htgt p
+  intro Φ
+  iintro ⟨HmConf, HPC, HnextPC, HF, HΦ⟩
+  conf_cases HmConf
+  have hb0 := ofBool_bit0_beq_of_even _ htgt
+  unfold execute
+  simp only [execute_BTYPE_bcond]
+  rcases Bool.eq_false_or_eq_true (bcond op (RegMap.get R rs1) (RegMap.get R rs2)) with hc | hc
+  all_goals
+    try simp only [hc, ite_true]
+    swp_run 30
+    iapply swp_bind
+    iapply swp_rX_file_later (hrs := hrs1)
+    iframe
+    inext
+    iintro HF
+    swp_run 30
+    iapply swp_bind
+    iapply swp_rX_file
+    iframe
+    iintro HF
+    try simp only [hc]
+    swp_run 60
+    -- a taken branch: the jump's `Zca` gate branches on the target's bit 1
+    (try split)
+    all_goals
+      swp_run 60
+      conf_intro HmConf
+      iapply HΦ $$ HmConf HPC HnextPC HF
+
+set_option maxHeartbeats 4000000 in
+/-- The conditional branches with `rs1 = x0` (`blez rs2` is `bge x0, rs2`): `x0` reads as `0`
+without a step, the `rs2` read is the step. -/
+theorem execSpecF_btype0 (cpu : CPU) (dq : DFrac) (c : MConf) (pc npc₀ : BitVec 64) (imm : BitVec 13)
+    (rs2 : BitVec 5) (hrs2 : rs2 ≠ 0#5) (op : bop) (R : RegMap)
+    (htgt : (pc + BitVec.signExtend 64 imm).toNat % 2 = 0) (p : Privilege := Privilege.Supervisor) :
+    execSpecPP (GF := GF) cpu dq p c p c (instruction.BTYPE (imm, regidx.Regidx rs2, regidx.Regidx 0#5, op))
+      pc npc₀ (if bcond op 0#64 (RegMap.get R rs2) then pc + BitVec.signExtend 64 imm else npc₀)
+      (gprFile cpu R) (gprFile cpu R) := by
+  intro Φ
+  iintro ⟨HmConf, HPC, HnextPC, HF, HΦ⟩
+  conf_cases HmConf
+  have hb0 := ofBool_bit0_beq_of_even _ htgt
+  unfold execute
+  simp only [execute_BTYPE_bcond]
+  rcases Bool.eq_false_or_eq_true (bcond op 0#64 (RegMap.get R rs2)) with hc | hc
+  all_goals
+    try simp only [hc, ite_true]
+    swp_run 30
+    iapply swp_bind
+    iapply swp_rX_file_later (hrs := hrs2)
+    iframe
+    inext
+    iintro HF
+    try simp only [hc]
+    swp_run 60
+    -- a taken branch: the jump's `Zca` gate branches on the target's bit 1
+    (try split)
+    all_goals
+      swp_run 60
+      conf_intro HmConf
+      iapply HΦ $$ HmConf HPC HnextPC HF
 
 set_option maxHeartbeats 4000000 in
 /-- `subw rd, rs1, rs2` (also `c.subw`). -/
@@ -381,7 +266,7 @@ theorem execSpecF_addw (cpu : CPU) (dq : DFrac) (c : MConf) (pc npc₀ : BitVec 
   iapply HΦ $$ HmConf HPC HnextPC HF
 
 theorem beq_ne (v : BitVec 64) (h : v ≠ 0#64) : bcond bop.BEQ v 0#64 = false := by
-  simp only [bcond, beq_iff_eq]; exact decide_eq_false h
+  simp only [bcond]; exact decide_eq_false h
 
 theorem bne_ne {α : Type} (a b : BitVec 64) (h : a ≠ b) (p q : α) :
     (if bcond bop.BNE a b then p else q) = p := by

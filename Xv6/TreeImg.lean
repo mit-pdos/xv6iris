@@ -16,15 +16,12 @@ block).  State the FORM TO COMPUTE WITH, never the naive one.
 
 1. `Nat.leb` is `Nat.ble`; `gmap fname Z` is `ExtTreeMap Fname Nat`.
 2. `img_root_ents_eq` goes through `dirView_dataExt` (an `fbAgree` below
-   `16 * nrec`) rather than Rocq's per-record `dir_view_agree`;
-   `imgRootBlk_agree` (the per-record form) is kept, read off the same fact.
+   `16 * nrec`) rather than Rocq's per-record `dir_view_agree`.
 3. CONE TRIM: the tree application's era-0 facts (`img_root_range*`,
    `img_root_inj*`, `fsimg_live_nlink*`, `img_tree_*`) are unreached
    (`treeG` is not in the union's bundle) and not ported.
 -/
 import Xv6.FsImgNames
-import Xv6.FsDurImgView
-import Xv6.FsStateEraPure
 
 namespace Xv6
 
@@ -54,12 +51,6 @@ theorem imgRootBlk_fbAgree :
   have h0 : i / BSIZE = 0 := Nat.div_eq_of_lt (by unfold BSIZE; omega)
   unfold fileByte imgRootBlk
   rw [h0]
-
-/-- Rocq `img_root_blk_agree`. -/
-theorem imgRootBlk_agree (k : Nat) (hk : k < fsimgRootNrec) :
-    dirWinAgree fsimgRootData (fun _ : Nat => imgRootBlk) k := by
-  intro j hj
-  exact (imgRootBlk_fbAgree (16 * k + j) (by omega)).symm
 
 /-- Rocq `img_root_ents_eq`. -/
 theorem imgRootEnts_eq : dirEntries (imgNode fsimgP fsimgSb ROOTINO) = imgRootEnts := by

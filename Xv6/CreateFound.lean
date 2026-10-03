@@ -110,6 +110,9 @@ import Xv6.DirlookupParts
 import Xv6.KexecTail
 import Xv6.NamexParts
 import MachCSL.BvLemmas
+import Xv6.IcacheShortCarve
+import Xv6.ProcPrivAcc
+import Xv6.SysUnlinkShared
 
 namespace Xv6
 
@@ -118,23 +121,16 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## 0.  Pure helpers -/
 
-
 theorem createFound_caller1 : createCaller 1#5 := by unfold createCaller; decide
 theorem createFound_caller10 : createCaller 10#5 := by unfold createCaller; decide
-theorem createFound_caller11 : createCaller 11#5 := by unfold createCaller; decide
-theorem createFound_caller12 : createCaller 12#5 := by unfold createCaller; decide
-theorem createFound_caller14 : createCaller 14#5 := by unfold createCaller; decide
 theorem createFound_caller15 : createCaller 15#5 := by unfold createCaller; decide
 
-
 /-- +0x6c: the `bltu 1,a5` on the word the three ALU leaves leave, at the
-shape the Lean rules produce (`CreateParts.create_bltu_trange`, restated). -/
+shape the Lean rules produce. -/
 theorem createFound_bltu (t : BitVec 16) :
     bcond bop.BLTU 1#64 ((BitVec.signExtend 64 (BitVec.extractLsb' 0 32
         (BitVec.setWidth 64 t + 18446744073709551614#64)) <<< 48) >>> 48) =
@@ -166,13 +162,11 @@ theorem createFound_beqz_tym1 (t : BitVec 16) :
   rw [e] at h
   exact h
 
-
 /-! ## 1.  The process block's pid cell (Rocq's `proc_priv_bare_acc`) -/
 
 section Pid
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [BcacheG GF] [DiskG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg]
-
 
 end Pid
 
@@ -337,24 +331,31 @@ theorem createFound_iunlockput (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hl
 
 /-- The dirlookup continuation, hart-free (the arms at `poff = 0`). -/
 def createFoundDlK (k' : KCtx) (pidv : BitVec 32) (dqp : DFrac) (ik : Nat) (inum : BitVec 32)
-    (bm : Blkmap) (data : Nat → List (BitVec 8)) (dn : Dinode) (nf : Nat → BitVec 8) :
-    IProp GF := iprop(
+    (bm : Blkmap) (data : Nat → List (BitVec 8)) (dn : Dinode) (nf : Nat → BitVec 8) (sd : Qp)
+    (rootv : BitVec 64) (rti : Nat) (dqr : DFrac) : IProp GF := iprop(
   ∀ (c : CPU) (spie spp : Bool) (R' : RegMap) (found : Bool) (kk kslot : Nat) (qq : Qp),
     ⌜calleeSaved k'.regs R'⌝ -∗
     kctx c ((k'.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k'.regs 1#5)) -∗
     trapCsrsExt c k'.sie -∗ cpuClaimExt c k'.sie k'.proc -∗
     wordPointsTo (iDev (ientry ik)) 4 (DFrac.own (1 : Qp).half) icfgDev -∗
     inodeMeta (ientry ik) dn -∗ inodeMap fscFs (ientry ik) bm -∗ inodeBlocks fscFs bm data -∗
+    inodeShr ik sd icfgDev inum -∗ runitAny inum.toNat -∗
     byteBuf (k'.regs 11#5) (DFrac.own 1) (bview 14 nf) -∗
-    wordPointsTo (pPid k'.proc) 4 dqp pidv -∗ bslot -∗
+    wordPointsTo (pPid k'.proc) 4 dqp pidv -∗
+    wordPointsTo (pRoot k'.proc) 8 dqr rootv -∗ inodeHeldAt rootv rti -∗ bslot -∗
     dlinks fscFs inum.toNat dn bm data -∗ dinodeAt fscIreg inum dn -∗
+    -- THE ARMS (chroot): a record hit, or the SELF arm -- `..` at the
+    -- process's root hands back a fresh reference to dp itself
     (if found then
-      iprop(⌜dirFirst data (dirNrec dn.diSize.toNat) (bname 14 nf) = some kk ∧
-          kslot < NINODE ∧ R' 10#5 = ientry kslot⌝ ∗
-        inodeRef kslot qq icfgDev (BitVec.setWidth 32 (dirInum data kk)) ∗
-        runitAny (BitVec.setWidth 32 (dirInum data kk)).toNat)
+      iprop(∃ (inum2 : BitVec 32) (self : Bool), ⌜kslot < NINODE ∧ R' 10#5 = ientry kslot⌝ ∗
+        ⌜if self then dlSelf (bname 14 nf) inum rti ∧ inum2 = inum ∧ ientry kslot = ientry ik
+         else ¬ dlSelf (bname 14 nf) inum rti ∧
+           dirFirst data (dirNrec dn.diSize.toNat) (bname 14 nf) = some kk ∧
+           inum2 = BitVec.setWidth 32 (dirInum data kk)⌝ ∗
+        inodeRef kslot qq icfgDev inum2 ∗ runitAny inum2.toNat)
      else
-      iprop(⌜dirFirst data (dirNrec dn.diSize.toNat) (bname 14 nf) = none ∧ R' 10#5 = 0#64⌝ ∗
+      iprop(⌜¬ dlSelf (bname 14 nf) inum rti ∧
+          dirFirst data (dirNrec dn.diSize.toNat) (bname 14 nf) = none ∧ R' 10#5 = 0#64⌝ ∗
         irefSlot)) -∗
     wpLoop c)
 
@@ -367,52 +368,78 @@ theorem createFound_dirlookup (DL : DIRLOOKUP) (Γ : SchedNames) [ClaimIs (hlc :
     (cpu : CPU) (k' : KCtx) (j : Nat) (γl : GName) (pd pav pu : BitVec 64) (γkl : GName)
     (γk : KmemNames) (pidv : BitVec 32) (dqp : DFrac)
     (ik : Nat) (inum : BitVec 32) (bm : Blkmap)
-    (data : Nat → List (BitVec 8)) (dn : Dinode) (nf : Nat → BitVec 8)
+    (data : Nat → List (BitVec 8)) (dn : Dinode) (nf : Nat → BitVec 8) (sd : Qp)
+    (rootv : BitVec 64) (rti : Nat) (dqr : DFrac)
     (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hK : dirlookupSlots ≤ k'.avail)
     (hnoff : k'.noff = 0) (htier : k'.tier = KTier.kpt)
     (htype : dn.diType = T_DIR) (hnl : dn.diNlink.toNat ≠ 0)
     (hgeom : logGeomOk fscCov fscLogst) (hok : inodeOk fscCov fscLogst dn bm data)
-    (hdok : dirOk icfgNib dn data) (horph : dirOrphanClean dn data)
+    (hdok : dirOk icfgNib dn data) (horph : dirOrphanClean dn data) (hik : ik < NINODE)
     (hpd : descPageRw pd) (ha0 : k'.regs 10#5 = ientry ik) (ha2 : k'.regs 12#5 = 0#64) :
     kctx cpu k' ∗ pcIs cpu KA.«dirlookup» ∗
     trapCsrsExt cpu k'.sie ∗ cpuClaimExt cpu k'.sie k'.proc ∗
     createEnv (hlc := hlc) Γ γl pd pav pu γkl γk ∗
     wordPointsTo (iDev (ientry ik)) 4 (DFrac.own (1 : Qp).half) icfgDev ∗
     inodeMeta (ientry ik) dn ∗ inodeMap fscFs (ientry ik) bm ∗ inodeBlocks fscFs bm data ∗
+    -- the inner lookup's rows (chroot): dp's share and unit, the root cell
+    -- and reference
+    inodeShr ik sd icfgDev inum ∗ runitAny inum.toNat ∗
     byteBuf (k'.regs 11#5) (DFrac.own 1) (bview 14 nf) ∗
-    wordPointsTo (pPid k'.proc) 4 dqp pidv ∗ bslot ∗ irefSlot ∗
+    wordPointsTo (pPid k'.proc) 4 dqp pidv ∗
+    wordPointsTo (pRoot k'.proc) 8 dqr rootv ∗ inodeHeldAt rootv rti ∗ bslot ∗ irefSlot ∗
     dlinks fscFs inum.toNat dn bm data ∗ dinodeAt fscIreg inum dn ∗
-    createFoundDlK k' pidv dqp ik inum bm data dn nf
+    createFoundDlK k' pidv dqp ik inum bm data dn nf sd rootv rti dqr
     ⊢ wpLoop (GF := GF) cpu := by
   obtain ⟨hwf, hcov, -, hty0, hsz, hholes, -⟩ := hok
   have hinums := dirOk_dir icfgNib dn data htype hdok
   have h := DL.wp_dirlookup_eb (hlc := hlc) (GF := GF) Γ cpu k' γl pd pav pu j γkl
     γk (ientry ik) inum bm data dn dn nf false 0#32 pidv dqp (DFrac.own (1 : Qp).half)
-    (DFrac.own 1) hj hproc hK hnoff htier htype hgeom hwf hcov hsz hholes hinums (Or.inl hnl)
-    horph hty0 rfl hpd ha0 (by simp only [Bool.false_eq_true, if_false]; exact ha2)
+    (DFrac.own 1) ik sd rootv rti dqr hj hproc hK hnoff htier htype hgeom hwf hcov hsz hholes hinums
+    (Or.inl hnl) horph hty0 rfl hpd ha0 rfl hik
+    (by simp only [Bool.false_eq_true, if_false]; exact ha2)
   unfold wp_dirlookup_eb_body at h
   simp only [dirlookupAddr, Bool.false_eq_true, if_false] at h
   unfold createEnv
   iintro ⟨Hk, Hpc, Hte, Hce, ⟨#Hpi, #Hpe, #Hbc, #Hlc, #Hdc, #Hkl, #Hav, #Hit2, #Hiti, #Hslks,
-    #Hinv, #Hopen, #Hbmi⟩, Hdev, Hmeta, Hmap, Hblk, Hnm, Hpid, Hbs, Hslot, Hlk, Hdi, HK⟩
+    #Hinv, #Hopen, #Hbmi⟩, Hdev, Hmeta, Hmap, Hblk, Hshr, Hru, Hnm, Hpid, Hrt, Hrh, Hbs, Hslot, Hlk,
+    Hdi, HK⟩
   iapply h
-  iframe Hk Hpc Hte Hce Hdev Hmeta Hmap Hblk Hnm Hpid Hbs Hslot Hlk Hdi
+  iframe Hk Hpc Hte Hce Hdev Hmeta Hmap Hblk Hshr Hru Hnm Hpid Hrt Hrh Hbs Hslot Hlk Hdi
   iframe #
   iapply wpNext_intro_pin
-  iintro %c %_ %spie %spp %R' %found %kd %kslot %qq %hcs Hk Hpc Hte Hce Hdev Hmeta Hmap Hblk Hnm
-    Hpid Hbs Hlk Hdi Harm
+  iintro %c %_ %spie %spp %R' %found %kd %kslot %qq %self %hcs Hk Hpc Hte Hce Hdev Hmeta Hmap Hblk
+    Hshr Hru Hnm Hpid Hrt Hrh Hbs Hlk Hdi Harm
   unfold createFoundDlK
   iapply HK $$ %c %spie %spp %R' %found %kd %kslot %qq %hcs Hk Hpc Hte Hce Hdev Hmeta Hmap Hblk
-    Hnm Hpid Hbs Hlk Hdi
+    Hshr Hru Hnm Hpid Hrt Hrh Hbs Hlk Hdi
   cases found
   · simp only [Bool.false_eq_true, if_false]
     icases Harm with ⟨%hf, Hslot, -⟩
     iframe Hslot
     ipureintro; exact hf
   · simp only [if_true]
-    icases Harm with ⟨%hf, Href, Hru, -⟩
-    iframe Href Hru
-    ipureintro; exact hf
+    icases Harm with ⟨%inum2, %hks, %harm, Href, Hru2, -⟩
+    iexists inum2, self
+    iframe Href Hru2
+    ipureintro
+    exact ⟨hks, harm⟩
+
+/-- **ONE GENERATION FOR TWO REFERENCES TO ONE SLOT** (chroot): on the inner
+lookup's SELF arm the child's fresh reference and the parent's short keep
+name the same slot, so their epochs agree (`liveGenlo_agree`); the child
+then carries the parent's `T_DIR` one-shot, which refutes arm F-OK. -/
+theorem createFound_genlo_agree (kslot kd : Nat) (qq qt qi : Qp) (cinum dind : BitVec 32)
+    (gc gd : GName) (loc lod : Nat) (hk : kslot = kd) :
+    inodeRefGenlo (GF := GF) kslot qq icfgDev cinum gc loc ∗
+    inodeRefShortGenlo kd qt qi icfgDev dind gd lod ⊢
+      (inodeRefGenlo kslot qq icfgDev cinum gc loc ∗
+        inodeRefShortGenlo kd qt qi icfgDev dind gd lod) ∗ ⌜gc = gd⌝ := by
+  subst hk
+  unfold inodeRefGenlo inodeRefShortGenlo
+  iintro ⟨⟨Hf, Hl1, Hi1, Hs1, Hst1⟩, ⟨Hf2, Hl2, Hi2, Hs2, Hst2⟩⟩
+  icases liveGenlo_agree_keep' kslot qq gc loc qi gd lod $$ [$Hl1 $Hl2] with ⟨⟨Hl1, Hl2⟩, %he⟩
+  iframe Hf Hl1 Hi1 Hs1 Hst1 Hf2 Hl2 Hi2 Hs2 Hst2
+  ipureintro; exact he.1
 
 /-- The loaded content's HEADER, lent out (the `lh` at +0x2a reads `nlink`,
 the `lhu` at +0x60 reads `type`) and put back. -/
@@ -491,7 +518,7 @@ theorem createFound_npar (NP : NPAR_WRAP_ERA) (Γ : SchedNames) [ClaimIs (hlc :=
     byteBuf (k'.regs 10#5) dqpv (bview (plen + 1) pfun) ∗
     byteBuf (k'.regs 11#5) (DFrac.own 1) (bview 14 nfun) ∗
     bslots 3 ∗ irefSlots 2 ∗ logOpS icfgLog n Sb ∗ logTx icfgLog ∗
-    epStart fscFs V.cwi P Pmiss (bview plen pfun) ∗
+    epStart fscFs V.rti V.cwi P Pmiss (bview plen pfun) ∗
     (∀ c : CPU, nparWrapEraPost (hlc := hlc) k' plen pfun n Sb P Pmiss pid V M dqb dqs dqpv c)
     ⊢ wpLoop (GF := GF) cpu := by
   have h := NP.wp_npar_wrap_era_eb (hlc := hlc) (GF := GF) Γ cpu k' γl pd pav pu j γkl γk plen
@@ -591,7 +618,6 @@ theorem createFound_env_ftop (Γ : SchedNames) (A : CreateFoundArgs) :
   iintro ⟨-, -, -, -, -, -, -, -, -, -, #Hinv, -, -⟩
   iapply iregInv_ftop (hlc := hlc) fscIreg fscFs icfgIst icfgNib $$ Hinv
 
-
 theorem createFound_slots_split (ns : Nat) (h : createIrefSlots ≤ ns) :
     irefSlots (GF := GF) ns ⊢ irefSlots 2 ∗ irefSlots (ns - 2) := by
   have e := create_ns_split ns h
@@ -625,7 +651,7 @@ theorem createFound_exit_fail (cpu : CPU) (k : KCtx) (A : CreateFoundArgs)
     wordPointsTo sbBmapstartAddr 4 A.dqb (BitVec.ofNat 32 fscBmapstart) ∗
     createFoundOwe k A ∗ wordPointsTo (pPid k.proc) 4 pidPriv A.pid ∗ bslots 3 ∗
     irefSlots m ∗ logOpS icfgLog u' Sb' ∗ logTx icfgLog ∗
-    creFailArms (hlc := hlc) (fsGammaL fscFs) fscFs A.ty.toNat A.major.toNat A.minor.toNat F.Nm F.Nd F.P
+    creFailArms (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti A.ty.toNat A.major.toNat A.minor.toNat F.Nm F.Nd F.P
       F.Pmiss F.Farm F.Fdots F.Fun F.Fok F.Fex (bview A.plen A.pfun) ∗
     createFoundK k A F
     ⊢ wpLoop (GF := GF) cpu := by
@@ -744,7 +770,7 @@ theorem createFound_armG (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := h
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x86  jal iunlockput
-  k_step_e (wp_s_jal cpu _ (KA.«create» + 0x86#64) false 2091036#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«create» + 0x86#64) false 2090940#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [create_br_iunlockput]
   iintro Hk Hpc
   iapply (createFound_iunlockput IUP Γ cpu _ A.j A.γl A.pd A.pav A.pu A.γkl A.γk A.pid pidPriv
@@ -784,7 +810,7 @@ theorem createFound_armG (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := h
     (by kctx_ext) $$ Hk
   ihave Hsl := irefSlots_combine 1 1 $$ [$Hs1 Hslot]
   · iapply (show irefSlot (GF := GF) ⊢ irefSlots 1 from .rfl); iexact Hslot
-  ihave Hcf := create_fail_of_cursor (hlc := hlc) (fsGammaL fscFs) fscFs A.ty.toNat A.major.toNat
+  ihave Hcf := create_fail_of_cursor (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti A.ty.toNat A.major.toNat
     A.minor.toNat F.Nm F.Nd F.P F.Pmiss F.Farm F.Fdots F.Fun F.Fok F.Fex (bview A.plen A.pfun) dind.toNat
     $$ HP Hdl Hcre
   have hns := hS.hns
@@ -834,7 +860,7 @@ theorem createFound_armG2 (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := 
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x90  jal iunlockput
-  k_step_e (wp_s_jal cpu _ (KA.«create» + 0x90#64) false 2091026#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«create» + 0x90#64) false 2090930#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [create_br_iunlockput]
   iintro Hk Hpc
   iapply (createFound_iunlockput IUP Γ cpu _ A.j A.γl A.pd A.pav A.pu A.γkl A.γk A.pid pidPriv
@@ -874,7 +900,7 @@ theorem createFound_armG2 (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := 
     (by kctx_ext) $$ Hk
   ihave Hsl := irefSlots_combine 1 1 $$ [$Hs1 Hslot]
   · iapply (show irefSlot (GF := GF) ⊢ irefSlots 1 from .rfl); iexact Hslot
-  ihave Hcf := create_fail_of_cursor (hlc := hlc) (fsGammaL fscFs) fscFs A.ty.toNat A.major.toNat
+  ihave Hcf := create_fail_of_cursor (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti A.ty.toNat A.major.toNat
     A.minor.toNat F.Nm F.Nd F.P F.Pmiss F.Farm F.Fdots F.Fun F.Fok F.Fex (bview A.plen A.pfun) dind.toNat
     $$ HP Hdl Hcre
   have hns := hS.hns
@@ -901,7 +927,7 @@ theorem createFound_armN (cpu : CPU) (k : KCtx) (A : CreateFoundArgs) (F : Creat
     wordPointsTo sbBmapstartAddr 4 A.dqb (BitVec.ofNat 32 fscBmapstart) ∗
     createFoundOwe k A ∗ wordPointsTo (pPid k.proc) 4 pidPriv A.pid ∗ bslots 3 ∗
     irefSlots 2 ∗ logOpS icfgLog n1 Sb1 ∗ logTx icfgLog ∗
-    npDead (hlc := hlc) fscFs F.P F.Pmiss (bview A.plen A.pfun) ∗
+    npDead (hlc := hlc) A.V.rti fscFs F.P F.Pmiss (bview A.plen A.pfun) ∗
     pfAt (dlookupCommitAt (fsGammaL fscFs) appE) F.Fex ∗
     creCommits (hlc := hlc) (fsGammaL fscFs) A.ty.toNat A.major.toNat A.minor.toNat
       F.Nm F.Nd (F.P (nparElems (bview A.plen A.pfun)).length) F.Farm F.Fdots F.Fun F.Fok ∗
@@ -913,7 +939,7 @@ theorem createFound_armN (cpu : CPU) (k : KCtx) (A : CreateFoundArgs) (F : Creat
   iintro ⟨Hk, Hpc, Hfr, Hte, Hce, Hsi, Hsb, Howe, Hpid, Hbs, Hs2, Hop, Htx, Hdead, Hdl, Hcre,
     Hpost⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
-  ihave Hcf := create_fail_of_dead (hlc := hlc) (fsGammaL fscFs) fscFs A.ty.toNat A.major.toNat
+  ihave Hcf := create_fail_of_dead (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti A.ty.toNat A.major.toNat
     A.minor.toNat F.Nm F.Nd F.P F.Pmiss F.Farm F.Fdots F.Fun F.Fok F.Fex (bview A.plen A.pfun)
     $$ Hdead Hdl Hcre
   -- +0x22  beqz a0 TAKEN
@@ -962,7 +988,7 @@ theorem createFound_fbad (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := h
     wordPointsTo sbBmapstartAddr 4 A.dqb (BitVec.ofNat 32 fscBmapstart) ∗
     createFoundOwe k A ∗ wordPointsTo (pPid k.proc) 4 pidPriv A.pid ∗ bslots 3 ∗
     irefSlots 1 ∗ logOpS icfgLog n2 Sb2 ∗
-    creFailArms (hlc := hlc) (fsGammaL fscFs) fscFs A.ty.toNat A.major.toNat A.minor.toNat F.Nm F.Nd F.P
+    creFailArms (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti A.ty.toNat A.major.toNat A.minor.toNat F.Nm F.Nd F.P
       F.Pmiss F.Farm F.Fdots F.Fun F.Fok F.Fex (bview A.plen A.pfun) ∗
     createFoundK k A F
     ⊢ wpLoop (GF := GF) cpu := by
@@ -977,7 +1003,7 @@ theorem createFound_fbad (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := h
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x9a  jal iunlockput
-  k_step_e (wp_s_jal cpu _ (KA.«create» + 0x9a#64) false 2091016#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«create» + 0x9a#64) false 2090920#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [create_br_iunlockput]
   iintro Hk Hpc
   iapply (createFound_iunlockput IUP Γ cpu _ A.j A.γl A.pd A.pav A.pu A.γkl A.γk A.pid pidPriv
@@ -1038,7 +1064,7 @@ theorem createFound_tests (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := 
     (spie spp : Bool) (R : RegMap) (v3 dpv : BitVec 64) (nf : Nat → BitVec 8) (tl : List (BitVec 8))
     (dind : BitVec 32)
     (kc : Nat) (qc : Qp) (gc : GName) (loc tlc : Nat) (cinum : BitVec 32) (dnc : Dinode)
-    (bmc : Blkmap) (γil γisl : GName) (n2 : Nat) (Sb2 : List Nat)
+    (bmc : Blkmap) (γil γisl : GName) (n2 : Nat) (Sb2 : List Nat) (cexv : Nat)
     (hR : createRegs k dpv (ientry kc) A.ty A.major A.minor R) (hkc : kc < NINODE)
     (hcnib : cinum.toNat < 16 * icfgNib) (hcpos : 0 < cinum.toNat) (hle : loc ≤ tlc)
     (hal : (createBuf (k.regs 2#5)).toNat % 8 = 0) (htl : tl.length = 2)
@@ -1054,7 +1080,11 @@ theorem createFound_tests (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := 
     createFoundOwe k A ∗ wordPointsTo (pPid k.proc) 4 pidPriv A.pid ∗ bslots 3 ∗
     irefSlots 1 ∗ logOpS icfgLog n2 Sb2 ∗
     F.P (nparElems (bview A.plen A.pfun)).length dind.toNat ∗
-    creExFired F.Fex dind.toNat (bname 14 nf) cinum.toNat ∗
+    -- THE EXISTS OBSERVATION, fired at the lookup: at the matched record's
+    -- inum, or (the SELF arm) at the directory's own `..` record -- then the
+    -- child IS dp and carries its `T_DIR` one-shot
+    creExFired F.Fex dind.toNat (bname 14 nf) cexv ∗
+    (⌜cexv = cinum.toNat⌝ ∨ ityShot gc T_DIR) ∗
     creCommits (hlc := hlc) (fsGammaL fscFs) A.ty.toNat A.major.toNat A.minor.toNat
       F.Nm F.Nd (F.P (nparElems (bview A.plen A.pfun)).length) F.Farm F.Fdots F.Fun F.Fok ∗
     createFoundK k A F
@@ -1064,7 +1094,7 @@ theorem createFound_tests (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := 
   have hK10 := create_slots_10 _ hS.hK
   have hlast := Xv6.sys_unlink_last_of_npar _ nf hname
   iintro ⟨Hk, Hpc, Hfr, Hte, Hce, #Henv, Hlk, Hload, Hsi, Hsb, Howe, Hpid, Hbs, Hs1, Hop, HP, Hex,
-    Hcre, Hpost⟩
+    Hsel, Hcre, Hpost⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- +0x5a  c.li a5,2
   k_step_e (wp_s_addi cpu _ (KA.«create» + 0x5a#64) true 2#12 15#5 0#5 (by decide))
@@ -1114,33 +1144,42 @@ theorem createFound_tests (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := 
       unfold createFoundLk
       icases Hlk with ⟨#Hslk, -, #Hfl, Hsl, Hdep, Hoff, Hdev, Hinum, Hval, #Hshot, Hfrz, Hkeep,
         Hru⟩
-      ihave Hlkd := createLocked_mk A.pid kc qc.half qc.half gc cinum dnc bmc γil γisl rfl
-        $$ Hslk Hsl [Hdep] Hoff Hdev Hinum Hval Hload Hshot Hfrz [Hkeep] Hru
-      · iexists loc, tlc; iframe Hfl Hdep; ipureintro; exact hle
-      · iexists loc, tlc; iframe Hfl Hkeep; ipureintro; exact hle
-      ihave Harms := create_ok_of_found (hlc := hlc) (fsGammaL fscFs) A.ty.toNat A.major.toNat
-        A.minor.toNat F.Nm F.Nd F.P F.Farm F.Fdots F.Fun F.Fok F.Fex (bview A.plen A.pfun) dind.toNat
-        (bname 14 nf) cinum.toNat hlast $$ HP Hex Hcre
-      have hty : A.ty = T_FILE_w := BitVec.eq_of_toNat_eq (by rw [hf]; rfl)
-      have hpure : creOkPure A.ty A.major A.minor false dnc := by
-        unfold creOkPure
-        simp only [Bool.false_eq_true, if_false]
-        exact ⟨hty, hin⟩
-      iapply (createFound_exit_ok cpu k A F spie spp _ v3 nf tl n2 Sb2 kc qc.half gc cinum dnc bmc
-        hK10 hal htl (createTregs_of_regs k _ _ _ _ _ _ ?hr6) ?h18
-        hkc hcpos hcnib hpure hS.hns hsub hn2 hn)
-      rotate_left 2
-      iframe Hk Hpc Hfr Hte Hce Hsi Hsb Howe Hpid Hbs Hop Hlkd Harms Hpost
-      iapply (show irefSlots (GF := GF) 1 ⊢ irefSlot from .rfl); iexact Hs1
-      case hr6 => exact createFound_regs_caller k _ _ _ _ _ R _ hr (by simp [RegMap.set_apply])
-      case h18 => simp [RegMap.set_apply, r18]
+      -- THE SELF ARM NEVER GETS HERE (chroot): the child IS dp, and the
+      -- generation both references named carries dp's T_DIR one-shot, which
+      -- the range test just excluded.
+      icases Hsel with (%hcex | #Hshotc)
+      · ihave Hex := (show creExFired (GF := GF) F.Fex dind.toNat (bname 14 nf) cexv ⊢
+          creExFired F.Fex dind.toNat (bname 14 nf) cinum.toNat by rw [hcex]) $$ Hex
+        ihave Hlkd := createLocked_mk A.pid kc qc.half qc.half gc cinum dnc bmc γil γisl rfl
+          $$ Hslk Hsl [Hdep] Hoff Hdev Hinum Hval Hload Hshot Hfrz [Hkeep] Hru
+        · iexists loc, tlc; iframe Hfl Hdep; ipureintro; exact hle
+        · iexists loc, tlc; iframe Hfl Hkeep; ipureintro; exact hle
+        ihave Harms := create_ok_of_found (hlc := hlc) (fsGammaL fscFs) A.ty.toNat A.major.toNat
+          A.minor.toNat F.Nm F.Nd F.P F.Farm F.Fdots F.Fun F.Fok F.Fex (bview A.plen A.pfun) dind.toNat
+          (bname 14 nf) cinum.toNat hlast $$ HP Hex Hcre
+        have hty : A.ty = T_FILE_w := BitVec.eq_of_toNat_eq (by rw [hf]; rfl)
+        have hpure : creOkPure A.ty A.major A.minor false dnc := by
+          unfold creOkPure
+          simp only [Bool.false_eq_true, if_false]
+          exact ⟨hty, hin⟩
+        iapply (createFound_exit_ok cpu k A F spie spp _ v3 nf tl n2 Sb2 kc qc.half gc cinum dnc bmc
+          hK10 hal htl (createTregs_of_regs k _ _ _ _ _ _ ?hr6) ?h18
+          hkc hcpos hcnib hpure hS.hns hsub hn2 hn)
+        rotate_left 2
+        iframe Hk Hpc Hfr Hte Hce Hsi Hsb Howe Hpid Hbs Hop Hlkd Harms Hpost
+        iapply (show irefSlots (GF := GF) 1 ⊢ irefSlot from .rfl); iexact Hs1
+        case hr6 => exact createFound_regs_caller k _ _ _ _ _ R _ hr (by simp [RegMap.set_apply])
+        case h18 => simp [RegMap.set_apply, r18]
+      · ihave %hty := ityShot_agree gc T_DIR dnc.diType $$ [$Hshotc $Hshot]
+        rcases hin with h | h <;> rw [← hty] at h <;> exact absurd h (by decide)
     · -- ===== ARM F-BAD, second entry =====
       have hb : (dnc.diType == 2#16 || dnc.diType == 3#16) = false := by
         simp only [not_or] at hin; simp [hin.1, hin.2]
       simp only [hb, Bool.not_false, if_true]
-      ihave Hcf := create_fail_of_seen (hlc := hlc) (fsGammaL fscFs) fscFs A.ty.toNat
+      iclear Hsel
+      ihave Hcf := create_fail_of_seen (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti A.ty.toNat
         A.major.toNat A.minor.toNat F.Nm F.Nd F.P F.Pmiss F.Farm F.Fdots F.Fun F.Fok F.Fex
-        (bview A.plen A.pfun) dind.toNat (bname 14 nf) cinum.toNat hlast $$ HP Hex Hcre
+        (bview A.plen A.pfun) dind.toNat (bname 14 nf) cexv hlast $$ HP Hex Hcre
       iapply (createFound_fbad IUP Γ cpu k A F hS spie spp _ v3 dpv nf tl kc qc gc loc tlc cinum
         dnc bmc γil γisl n2 Sb2 ?hr7 hkc hcnib hle hal htl hn hsub hn2)
       rotate_left 1
@@ -1150,9 +1189,10 @@ theorem createFound_tests (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := 
   · -- ===== ARM F-BAD, first entry: the requested type is not T_FILE =====
     have hb : decide (A.ty.toNat ≠ T_FILE) = true := decide_eq_true hf
     simp only [hb, if_true]
-    ihave Hcf := create_fail_of_seen (hlc := hlc) (fsGammaL fscFs) fscFs A.ty.toNat
+    iclear Hsel
+    ihave Hcf := create_fail_of_seen (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti A.ty.toNat
       A.major.toNat A.minor.toNat F.Nm F.Nd F.P F.Pmiss F.Farm F.Fdots F.Fun F.Fok F.Fex
-      (bview A.plen A.pfun) dind.toNat (bname 14 nf) cinum.toNat hlast $$ HP Hex Hcre
+      (bview A.plen A.pfun) dind.toNat (bname 14 nf) cexv hlast $$ HP Hex Hcre
     iapply (createFound_fbad IUP Γ cpu k A F hS spie spp _ v3 dpv nf tl kc qc gc loc tlc cinum
       dnc bmc γil γisl n2 Sb2 hr5 hkc hcnib hle hal htl hn hsub hn2)
     iframe Hk Hpc Hfr Hte Hce Hlk Hload Hsi Hsb Howe Hpid Hbs Hs1 Hop Hcf Hpost
@@ -1169,11 +1209,11 @@ theorem createFound_found (IL : ILOCK) (IUP : IUNLOCKPUT) (Γ : SchedNames)
     (hS : CreateStatic k A.j A.pd A.plen A.pfun A.ty A.major A.minor A.u A.ns)
     (spie spp : Bool) (R : RegMap) (v3 : BitVec 64) (nf : Nat → BitVec 8) (tl : List (BitVec 8))
     (kd : Nat) (qd : Qp) (gd : GName) (lod tld : Nat) (dind : BitVec 32) (dn : Dinode)
-    (bm : Blkmap) (γil γisl : GName) (kslot : Nat) (qq : Qp) (cinum : BitVec 32)
-    (n1 : Nat) (Sb1 : List Nat)
+    (bm : Blkmap) (γil γisl : GName) (kslot : Nat) (qq : Qp) (gc : GName) (loc tlc : Nat)
+    (cinum : BitVec 32) (cexv : Nat) (n1 : Nat) (Sb1 : List Nat)
     (hR : createRegs k (ientry kd) (ientry kslot) A.ty A.major A.minor R) (hkd : kd < NINODE)
     (hdnib : dind.toNat < 16 * icfgNib) (hle : lod ≤ tld) (hks : kslot < NINODE)
-    (hcnib : cinum.toNat < 16 * icfgNib) (hcpos : 0 < cinum.toNat)
+    (hcnib : cinum.toNat < 16 * icfgNib) (hcpos : 0 < cinum.toNat) (hlec : loc ≤ tlc)
     (hal : (createBuf (k.regs 2#5)).toNat % 8 = 0) (htl : tl.length = 2)
     (hname : ∃ es e, nameiparentOf (bview A.plen A.pfun) es e ∧ bname 14 nf = e)
     (hn9 : 9 ≤ n1) (hsub : ∀ x ∈ A.Sb, x ∈ Sb1) (hn1 : n1 ≤ A.u) :
@@ -1186,9 +1226,12 @@ theorem createFound_found (IL : ILOCK) (IUP : IUNLOCKPUT) (Γ : SchedNames)
     wordPointsTo sbBmapstartAddr 4 A.dqb (BitVec.ofNat 32 fscBmapstart) ∗
     createFoundOwe k A ∗ wordPointsTo (pPid k.proc) 4 pidPriv A.pid ∗ bslots 3 ∗
     logOpS icfgLog n1 Sb1 ∗
-    inodeRef kslot qq icfgDev cinum ∗ runitAny cinum.toNat ∗
+    -- the child's reference, generation-named at the lookup (while the
+    -- parent's short keep was in hand: `createFound_genlo_agree`)
+    credFloor loc tlc ∗ inodeRefGenlo kslot qq icfgDev cinum gc loc ∗ runitAny cinum.toNat ∗
     F.P (nparElems (bview A.plen A.pfun)).length dind.toNat ∗
-    creExFired F.Fex dind.toNat (bname 14 nf) cinum.toNat ∗
+    creExFired F.Fex dind.toNat (bname 14 nf) cexv ∗
+    (⌜cexv = cinum.toNat⌝ ∨ ityShot gc T_DIR) ∗
     creCommits (hlc := hlc) (fsGammaL fscFs) A.ty.toNat A.major.toNat A.minor.toNat
       F.Nm F.Nd (F.P (nparElems (bview A.plen A.pfun)).length) F.Farm F.Fdots F.Fun F.Fok ∗
     createFoundK k A F
@@ -1197,15 +1240,15 @@ theorem createFound_found (IL : ILOCK) (IUP : IUNLOCKPUT) (Γ : SchedNames)
   obtain ⟨r2, r8, r9, r18, r20, r21, r22, r19, r23, r24, r25, r26, r27⟩ := hR
   obtain ⟨hcov, hlog⟩ := hS.hireg dind hdnib
   obtain ⟨hccov, -⟩ := hS.hireg cinum hcnib
-  iintro ⟨Hk, Hpc, Hfr, Hte, Hce, #Henv, Hlk, Hload, Hsi, Hsb, Howe, Hpid, Hbs, Hop, Href, Hru,
-    HP, Hex, Hcre, Hpost⟩
+  iintro ⟨Hk, Hpc, Hfr, Hte, Hce, #Henv, Hlk, Hload, Hsi, Hsb, Howe, Hpid, Hbs, Hop, #Hflc, Href,
+    Hru, HP, Hex, Hsel, Hcre, Hpost⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- +0x4e  c.mv a0,s1
   k_step_e (wp_s_add cpu _ (KA.«create» + 0x4e#64) true 10#5 0#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x50  jal iunlockput (the parent)
-  k_step_e (wp_s_jal cpu _ (KA.«create» + 0x50#64) false 2091090#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«create» + 0x50#64) false 2090994#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [create_br_iunlockput]
   iintro Hk Hpc
   iapply (createFound_iunlockput IUP Γ cpu _ A.j A.γl A.pd A.pav A.pu A.γkl A.γk A.pid pidPriv
@@ -1238,11 +1281,9 @@ theorem createFound_found (IL : ILOCK) (IUP : IUNLOCKPUT) (Γ : SchedNames)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x56  jal ilock (the child)
-  k_step_e (wp_s_jal cpu _ (KA.«create» + 0x56#64) false 2090488#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«create» + 0x56#64) false 2090392#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [create_br_ilock]
   iintro Hk Hpc
-  icases (inodeRef_gen_intro kslot qq icfgDev cinum).1 $$ Href with ⟨%gc, %loc, %tlc, %hlec,
-    #Hflc, Href⟩
   icases bslots_uncons 2 $$ Hbs with ⟨Hb1, Hb2⟩
   iapply (createFound_ilock IL Γ cpu _ A.j A.γl A.pd A.pav A.pu A.γkl A.γk A.pid pidPriv A.dqs
       kslot qq gc loc tlc cinum hS.hj ?lp ?lK ?ln ?lt hks hS.hgeom hccov hcnib hS.hpd ?la0 hlec)
@@ -1269,9 +1310,9 @@ theorem createFound_found (IL : ILOCK) (IUP : IUNLOCKPUT) (Γ : SchedNames)
   ihave Hbs := bslots_cons 2 $$ [$Hb1 $Hb2]
   ihave Hs1 := (show irefSlot (GF := GF) ⊢ irefSlots 1 from .rfl) $$ Hslot
   iapply (createFound_tests IUP Γ cpu k A F hS spie2 spp2 R2 v3 (ientry kd) nf tl dind kslot qq gc
-    loc tlc cinum dnc bmc γilc γislc n2 Sb2 hr2 hks hcnib hcpos hlec hal htl hname hip2
+    loc tlc cinum dnc bmc γilc γislc n2 Sb2 cexv hr2 hks hcnib hcpos hlec hal htl hname hip2
     (Xv6.namex_sub_trans _ _ _ hsub hsub2) (Nat.le_trans hhi2 hn1))
-  iframe Hk Hpc Hfr Hte Hce Hlkc Hloadc Hsi Hsb Howe Hpid Hbs Hs1 Hop HP Hex Hcre Hpost
+  iframe Hk Hpc Hfr Hte Hce Hlkc Hloadc Hsi Hsb Howe Hpid Hbs Hs1 Hop HP Hex Hsel Hcre Hpost
   iframe #
 
 set_option maxHeartbeats 16000000 in
@@ -1295,7 +1336,7 @@ theorem createFound_join (IL : ILOCK) (IUP : IUNLOCKPUT) (DL : DIRLOOKUP) (Γ : 
     (kd : Nat) (qd : Qp) (gd : GName) (lod tld : Nat) (dind : BitVec 32) (dn : Dinode)
     (bm : Blkmap) (γil γisl : GName) (n1 : Nat) (Sb1 : List Nat) (w : Bool)
     (hR : createRegs k (ientry kd) ansv A.ty A.major A.minor R) (hkd : kd < NINODE)
-    (hdnib : dind.toNat < 16 * icfgNib) (hle : lod ≤ tld)
+    (hdnib : dind.toNat < 16 * icfgNib) (hdpos : 0 < dind.toNat) (hle : lod ≤ tld)
     (htype : dn.diType = T_DIR) (hnl : dn.diNlink ≠ 0#16)
     (hmax : A.ty = T_DIR → dn.diNlink ≠ 32767#16)
     (hal : (createBuf (k.regs 2#5)).toNat % 8 = 0) (htl : tl.length = 2)
@@ -1335,7 +1376,7 @@ theorem createFound_join (IL : ILOCK) (IUP : IUNLOCKPUT) (DL : DIRLOOKUP) (Γ : 
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x46  jal dirlookup
-  k_step_e (wp_s_jal cpu _ (KA.«create» + 0x46#64) false 2092016#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«create» + 0x46#64) false 2091920#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [create_br_dirlookup]
   iintro Hk Hpc
   icases createFound_loaded_open kd dind dn bm $$ Hload with
@@ -1347,13 +1388,23 @@ theorem createFound_join (IL : ILOCK) (IUP : IUNLOCKPUT) (DL : DIRLOOKUP) (Γ : 
   icases Hfr with ⟨Hframe, Hnm, Htl⟩
   icases bslots_uncons 2 $$ Hbs with ⟨Hb1, Hb2⟩
   ihave Hs1 := (show irefSlots (GF := GF) 1 ⊢ irefSlot from .rfl) $$ Hs1
+  -- the inner lookup's rows (chroot): a share off the parent's short keep,
+  -- the root cell and reference out of the block
+  icases kctx_tier _ _ $$ Hk with ⟨%hct, Hk⟩
+  have ht0 : curTier = KTier.kpt := by rw [← hct]; exact hS.htier
+  icases inodeRefShortGenlo_lend kd (qd.half + qd.half) qd.half icfgDev dind gd lod tld hle
+    $$ [$Hfl $Hkeep] with ⟨Hkeep, Hshr⟩
+  unfold createFoundOwe
+  icases Howe with ⟨Hsn, Hss, Hpath, Hpcl, Hrest⟩
+  icases procPrivFd_root_lend_pid ht0 A.γ k.proc A.pid A.V A.M $$ [$Hpid $Hpcl]
+    with ⟨Hpid, Hrt, Hrh, Hback⟩
   iapply (createFound_dirlookup DL Γ cpu _ A.j A.γl A.pd A.pav A.pu A.γkl A.γk A.pid pidPriv
-      kd dind bm data dn nf hS.hj ?gp ?gK ?gn ?gt htype hnlz hS.hgeom hok hdok hdoc hS.hpd
-      ?ga0 ?ga2)
+      kd dind bm data dn nf qd.half.half A.V.root A.V.rti (DFrac.own 1) hS.hj ?gp ?gK ?gn ?gt htype
+      hnlz hS.hgeom hok hdok hdoc hkd hS.hpd ?ga0 ?ga2)
     $$ [- $Hk $Hpc]
   rotate_right 1
   k_norm_g [r8]
-  iframe Hte Hce Hdev Hmeta Hmap Hblk Hnm Hpid Hb1 Hs1 Hdl Hdi
+  iframe Hte Hce Hdev Hmeta Hmap Hblk Hshr Hru Hnm Hpid Hrt Hrh Hb1 Hs1 Hdl Hdi
   iframe #
   case gp => k_norm_g; try exact hS.hproc
   case gK => k_norm_g; try exact create_slots_dirlookup _ hS.hK
@@ -1362,9 +1413,16 @@ theorem createFound_join (IL : ILOCK) (IUP : IUNLOCKPUT) (DL : DIRLOOKUP) (Γ : 
   case ga0 => k_norm_g [r9]
   case ga2 => k_norm_g
   unfold createFoundDlK
-  iintro %cpu %spie1 %spp1 %R1 %found %kk %kslot %qq %hcs Hk Hpc Hte Hce Hdev Hmeta Hmap Hblk Hnm
-    Hpid Hb1 Hdl Hdi Harm
+  iintro %cpu %spie1 %spp1 %R1 %found %kk %kslot %qq %hcs Hk Hpc Hte Hce Hdev Hmeta Hmap Hblk Hshr
+    Hru Hnm Hpid Hrt Hrh Hb1 Hdl Hdi Harm
+  -- the rows back: the share regathered, the block at `A.V` again
+  ihave Hkeep := inodeRefShortGenlo_regather kd (qd.half + qd.half) qd.half icfgDev dind gd lod
+    $$ [$Hkeep $Hshr]
   k_norm_g [create_ret_4a, r8]
+  ihave Hpb := Hback $$ Hpid Hrt Hrh
+  icases Hpb with ⟨Hpid, Hpcl⟩
+  ihave Howe : createFoundOwe k A $$ [Hsn Hss Hpath Hpcl Hrest]
+  · unfold createFoundOwe; iframe
   have hr1 : createRegs k (ientry kd) ansv A.ty A.major A.minor R1 :=
     createRegs_cs k _ _ _ _ _ _ R1 hcs
       (createFound_regs_caller k _ _ _ _ _ R _ hr (by simp [RegMap.set_apply]))
@@ -1374,7 +1432,7 @@ theorem createFound_join (IL : ILOCK) (IUP : IUNLOCKPUT) (DL : DIRLOOKUP) (Γ : 
   cases found
   · -- ===== MISS: +0x4a c.mv s2,a0 ; +0x4c c.beqz TAKEN -> the allocate half =====
     simp only [Bool.false_eq_true, if_false]
-    icases Harm with ⟨%⟨hnone, ha0⟩, Hs1⟩
+    icases Harm with ⟨%⟨-, hnone, ha0⟩, Hs1⟩
     k_step_e (wp_s_add cpu _ (KA.«create» + 0x4a#64) true 18#5 0#5 10#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ha0]
     iintro Hk Hpc
@@ -1410,31 +1468,76 @@ theorem createFound_join (IL : ILOCK) (IUP : IUNLOCKPUT) (DL : DIRLOOKUP) (Γ : 
       Hslots Hop Htp HP Hdlc Hcre Hpost
   · -- ===== HIT: THE FIRE, then +0x4a c.mv s2,a0 ; +0x4c c.beqz falls =====
     simp only [if_true]
-    icases Harm with ⟨%⟨hsome, hks, ha0⟩, Href, Hru2⟩
-    have hlt := dirFirst_lt _ _ _ _ hsome
-    have hlive := dirFirst_live _ _ _ _ hsome
-    have hcnib : (BitVec.setWidth 32 (dirInum data kk)).toNat < 16 * icfgNib := by
-      rw [MachCSL.zext32_toNat]; exact dirOk_dir icfgNib dn data htype hdok kk hlt hlive
-    have hcpos := Xv6.dirlookup_live_pos data kk hlive
-    have hents : (dirEntries (eraNode dn bm data))[bname 14 nf]? =
-        some (BitVec.setWidth 32 (dirInum data kk)).toNat := by
-      rw [dirEntries_eraNode dn bm data hok.2.2.2.2.2.1 hok.2.2.2.2.1, if_pos htyz,
-        MachCSL.zext32_toNat]
-      exact dv_lookup_found _ data _ _ kk rfl hsome
+    icases Harm with ⟨%cinum, %self, %⟨hks, ha0⟩, %hsel, Href, Hru2⟩
+    -- the child's reference, generation-NAMED once, here (chroot): on the
+    -- SELF arm it is a fresh reference to dp's own slot, and while the
+    -- parent's short keep is still in hand the two slices pin one
+    -- generation -- which is what refutes arm F-OK below
+    icases (inodeRef_gen_intro kslot qq icfgDev cinum).1 $$ Href with ⟨%gc, %loc, %tlc, %hlec,
+      #Hflc, Href⟩
+    -- THE CHILD'S RECORD FACTS, ON BOTH ARMS.  The record arm reads them
+    -- off the matched record; the SELF arm is `..` at the process's root --
+    -- the child IS dp, so its inum is `dind`, and the exists observation
+    -- fires at the directory's own `..` record (a live directory has one:
+    -- `dirDotsIx`), the name create asked for.
+    have hcfacts : cinum.toNat < 16 * icfgNib ∧ 0 < cinum.toNat ∧ (self = true → kslot = kd) ∧
+        ∃ cexv : Nat, (dirEntries (eraNode dn bm data))[bname 14 nf]? = some cexv ∧
+          (self = false → cexv = cinum.toNat) := by
+      cases self with
+      | true =>
+        simp only [if_true] at hsel
+        obtain ⟨⟨hdd, -⟩, heq, hkeq⟩ := hsel
+        refine ⟨by rw [heq]; exact hdnib, by rw [heq]; exact hdpos,
+          fun _ => ientry_inj kslot kd (Nat.le_of_lt hks) (Nat.le_of_lt hkd) hkeq, ?_⟩
+        rcases hfd : dirFirst data (dirNrec dn.diSize.toNat) (bname 14 nf) with _ | k1
+        · exact absurd hdd
+            (dirDots_miss_not_dots dind.toNat dn data (bname 14 nf) htyz hnlz hddix hfd).2
+        · refine ⟨(dirInum data k1).toNat, ?_, (fun h => by cases h)⟩
+          rw [dirEntries_eraNode dn bm data hok.2.2.2.2.2.1 hok.2.2.2.2.1, if_pos htyz]
+          exact dv_lookup_found _ data _ _ k1 rfl hfd
+      | false =>
+        simp only [Bool.false_eq_true, if_false] at hsel
+        obtain ⟨-, hsome, rfl⟩ := hsel
+        have hlt := dirFirst_lt _ _ _ _ hsome
+        have hlive := dirFirst_live _ _ _ _ hsome
+        refine ⟨?_, Xv6.dirlookup_live_pos data kk hlive, (fun h => by cases h),
+          (BitVec.setWidth 32 (dirInum data kk)).toNat, ?_, (fun _ => rfl)⟩
+        · rw [MachCSL.zext32_toNat]; exact dirOk_dir icfgNib dn data htype hdok kk hlt hlive
+        · rw [dirEntries_eraNode dn bm data hok.2.2.2.2.2.1 hok.2.2.2.2.1, if_pos htyz,
+            MachCSL.zext32_toNat]
+          exact dv_lookup_found _ data _ _ kk rfl hsome
+    obtain ⟨hcnib, hcpos, hkself, cexv, hents, hcexs⟩ := hcfacts
+    -- THE SELECTOR arm F-OK reads: the record arm's `cexv = cinum`, or the
+    -- self arm's `T_DIR` one-shot at the child's generation
+    ihave Hsel3 : ((⌜cexv = cinum.toNat⌝ ∨ ityShot gc T_DIR) ∗
+        inodeRefGenlo kslot qq icfgDev cinum gc loc ∗
+        inodeRefShortGenlo kd (qd.half + qd.half) qd.half icfgDev dind gd lod) $$ [Href Hkeep]
+    · cases self with
+      | false =>
+        iframe Href Hkeep
+        ileft; ipureintro; exact hcexs rfl
+      | true =>
+        icases createFound_genlo_agree kslot kd qq (qd.half + qd.half) qd.half cinum dind gc gd loc
+          lod (hkself rfl) $$ [$Href $Hkeep] with ⟨⟨Href, Hkeep⟩, %hgg⟩
+        iframe Href Hkeep
+        iright
+        ihave Hshotc := (show ityShot (GF := GF) gd dn.diType ⊢ ityShot gc T_DIR by
+          rw [hgg, htype]) $$ Hshot
+        iexact Hshotc
+    icases Hsel3 with ⟨Hsel, Href, Hkeep⟩
     ihave #Hft := createFound_env_ftop Γ A $$ Henv
     iapply wpLoop_fupd
     ihave Htop := (show topFrag (GF := GF) (fsGammaL fscFs) dind.toNat (eraNode dn bm data) ⊢
       topFragQ (fsGammaL fscFs) (DFrac.own 1) dind.toNat (eraNode dn bm data) from .rfl) $$ Htop
-    imod (mkfDlookup_fire (hlc := hlc) fscFs ⊤ (DFrac.own 1) F.Fex dind.toNat
-      (BitVec.setWidth 32 (dirInum data kk)).toNat (bname 14 nf) (eraNode dn bm data)
+    imod (mkfDlookup_fire (hlc := hlc) fscFs ⊤ (DFrac.own 1) F.Fex dind.toNat cexv (bname 14 nf)
+      (eraNode dn bm data)
       CoPset.subseteq_top (mkfEra_is_dir dn bm data htyz) (Xv6.eraNlink_nz dn bm data hnlz) hents)
       $$ Hft Hdlc Htop with ⟨Htop, %av, %hrow, %hnm, Hrecv⟩
     imodintro
     ihave Htop := (show topFragQ (GF := GF) (fsGammaL fscFs) (DFrac.own 1) dind.toNat
       (eraNode dn bm data) ⊢ topFrag (fsGammaL fscFs) dind.toNat (eraNode dn bm data) from .rfl)
       $$ Htop
-    ihave Hex : creExFired F.Fex dind.toNat (bname 14 nf)
-        (BitVec.setWidth 32 (dirInum data kk)).toNat $$ [Hrecv]
+    ihave Hex : creExFired F.Fex dind.toNat (bname 14 nf) cexv $$ [Hrecv]
     · unfold creExFired
       iexists av, dirEntries (eraNode dn bm data), fnNlink (eraNode dn bm data)
       iframe Hrecv
@@ -1455,10 +1558,10 @@ theorem createFound_join (IL : ILOCK) (IUP : IUNLOCKPUT) (DL : DIRLOOKUP) (Γ : 
     ihave Hk := kctx_eq_mono cpu _ (((k.withSpie spie1 spp1).pushed 10).withRegs
       (R1.set 18#5 (ientry kslot))) (by kctx_ext) $$ Hk
     iapply (createFound_found IL IUP Γ cpu k A F hS spie1 spp1 (R1.set 18#5 (ientry kslot)) v3 nf
-      tl kd qd gd lod tld dind dn bm γil γisl kslot qq (BitVec.setWidth 32 (dirInum data kk)) n1 Sb1
-      (createRegs_s2 k _ _ _ _ _ _ R1 _ rfl hr1) hkd hdnib hle hks hcnib hcpos hal htl hname
+      tl kd qd gd lod tld dind dn bm γil γisl kslot qq gc loc tlc cinum cexv n1 Sb1
+      (createRegs_s2 k _ _ _ _ _ _ R1 _ rfl hr1) hkd hdnib hle hks hcnib hcpos hlec hal htl hname
       (create_n1_lo A.u n1 w hS.hu hled.1) hsub hled.2)
-    iframe Hk Hpc Hfr Hte Hce Hlk Hload Hsi Hsb Howe Hpid Hbs Hop Href Hru2 HP Hex Hcre Hpost
+    iframe Hk Hpc Hfr Hte Hce Hlk Hload Hsi Hsb Howe Hpid Hbs Hop Href Hru2 HP Hex Hsel Hcre Hpost
     iframe #
 
 set_option maxHeartbeats 16000000 in
@@ -1481,7 +1584,7 @@ theorem createFound_gate (IL : ILOCK) (IUP : IUNLOCKPUT) (DL : DIRLOOKUP) (Γ : 
     (bm : Blkmap) (γil γisl : GName) (n1 : Nat) (Sb1 : List Nat) (w : Bool)
     (hR : createRegs k (ientry kd) ansv A.ty A.major A.minor R)
     (h15 : R 15#5 = BitVec.signExtend 64 dn.diNlink) (hkd : kd < NINODE)
-    (hdnib : dind.toNat < 16 * icfgNib) (hle : lod ≤ tld)
+    (hdnib : dind.toNat < 16 * icfgNib) (hdpos : 0 < dind.toNat) (hle : lod ≤ tld)
     (htype : dn.diType = T_DIR) (hnl : dn.diNlink ≠ 0#16)
     (hal : (createBuf (k.regs 2#5)).toNat % 8 = 0) (htl : tl.length = 2)
     (hname : ∃ es e, nameiparentOf (bview A.plen A.pfun) es e ∧ bname 14 nf = e)
@@ -1545,7 +1648,7 @@ theorem createFound_gate (IL : ILOCK) (IUP : IUNLOCKPUT) (DL : DIRLOOKUP) (Γ : 
     · have hb2 : decide (A.ty = T_DIR) = false := by simp [ht]
       simp only [hb2, Bool.false_eq_true, if_false]
       iapply (createFound_join IL IUP DL Γ cpu k A F hS hA spie spp _ v3 ansv nf tl kd qd gd lod tld
-        dind dn bm γil γisl n1 Sb1 w ?hrj hkd hdnib hle htype hnl (fun h => absurd h ht) hal htl
+        dind dn bm γil γisl n1 Sb1 w ?hrj hkd hdnib hdpos hle htype hnl (fun h => absurd h ht) hal htl
         hname hsub hw hled)
       rotate_left 1
       iframe Hk Hpc Hfr Hte Hce Hlk Hload Hsi Hsb Howe Hpid Hbs Hs1 Hop HP Hdlc Hcre Hpost
@@ -1554,7 +1657,7 @@ theorem createFound_gate (IL : ILOCK) (IUP : IUNLOCKPUT) (DL : DIRLOOKUP) (Γ : 
   · have hb : decide (dn.diNlink ≠ 32767#16) = true := decide_eq_true hm
     simp only [hb, if_true]
     iapply (createFound_join IL IUP DL Γ cpu k A F hS hA spie spp _ v3 ansv nf tl kd qd gd lod tld
-      dind dn bm γil γisl n1 Sb1 w ?hrj hkd hdnib hle htype hnl (fun _ => hm) hal htl
+      dind dn bm γil γisl n1 Sb1 w ?hrj hkd hdnib hdpos hle htype hnl (fun _ => hm) hal htl
       hname hsub hw hled)
     rotate_left 1
     iframe Hk Hpc Hfr Hte Hce Hlk Hload Hsi Hsb Howe Hpid Hbs Hs1 Hop HP Hdlc Hcre Hpost
@@ -1580,7 +1683,8 @@ theorem createFound_parent (IL : ILOCK) (IUP : IUNLOCKPUT) (DL : DIRLOOKUP) (Γ 
     (kd : Nat) (qd : Qp) (gd : GName) (lod tld : Nat) (dind : BitVec 32)
     (n1 : Nat) (Sb1 : List Nat) (w : Bool)
     (hR : createRegs k (ientry kd) ansv A.ty A.major A.minor R) (h10 : R 10#5 = ientry kd)
-    (hkd : kd < NINODE) (hdnib : dind.toNat < 16 * icfgNib) (hle : lod ≤ tld)
+    (hkd : kd < NINODE) (hdnib : dind.toNat < 16 * icfgNib) (hdpos : 0 < dind.toNat)
+    (hle : lod ≤ tld)
     (hal : (createBuf (k.regs 2#5)).toNat % 8 = 0) (htl : tl.length = 2)
     (hname : ∃ es e, nameiparentOf (bview A.plen A.pfun) es e ∧ bname 14 nf = e)
     (hsub : ∀ x ∈ A.Sb, x ∈ Sb1) (hw : w = true → fscBmapstart ∈ Sb1)
@@ -1612,7 +1716,7 @@ theorem createFound_parent (IL : ILOCK) (IUP : IUNLOCKPUT) (DL : DIRLOOKUP) (Γ 
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, create_beqz_ientry kd hkd]
   iintro Hk Hpc
   -- +0x26  jal ilock (a0 is still dp)
-  k_step_e (wp_s_jal cpu _ (KA.«create» + 0x26#64) false 2090536#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«create» + 0x26#64) false 2090440#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [create_br_ilock]
   iintro Hk Hpc
   icases bslots_uncons 2 $$ Hbs with ⟨Hb1, Hb2⟩
@@ -1674,7 +1778,7 @@ theorem createFound_parent (IL : ILOCK) (IUP : IUNLOCKPUT) (DL : DIRLOOKUP) (Γ 
     iapply (createFound_gate IL IUP DL Γ cpu k A F hS hA spie1 spp1 (R1.set 15#5
       (BitVec.signExtend 64 dn.diNlink)) v3 ansv nf tl kd qd gd lod tld dind dn bm γil γisl n1 Sb1
       w (createRegs_set k _ _ _ _ _ R1 15#5 _ createFound_caller15 hr1)
-      (by simp [RegMap.set_apply]) hkd hdnib hle htype hz hal htl hname hsub hw hled)
+      (by simp [RegMap.set_apply]) hkd hdnib hdpos hle htype hz hal htl hname hsub hw hled)
     iframe Hk Hpc Hfr Hte Hce Hlk Hload Hsi Hsb Howe Hpid Hbs Hs1 Hop HP Hdlc Hcre Hpost
     iframe #
 
@@ -1701,7 +1805,7 @@ theorem createFound_entry (NP : NPAR_WRAP_ERA) (IL : ILOCK) (IUP : IUNLOCKPUT) (
     procPrivFd A.γ k.proc A.pid A.V A.M ∗
     byteBuf (k.regs 10#5) A.dqpv (bview (A.plen + 1) A.pfun) ∗
     bslots 3 ∗ irefSlots A.ns ∗ logOpS icfgLog A.u A.Sb ∗ logTx icfgLog ∗
-    epStart fscFs A.V.cwi F.P F.Pmiss (bview A.plen A.pfun) ∗
+    epStart fscFs A.V.rti A.V.cwi F.P F.Pmiss (bview A.plen A.pfun) ∗
     pfAt (dlookupCommitAt (fsGammaL fscFs) appE) F.Fex ∗
     creCommits (hlc := hlc) (fsGammaL fscFs) A.ty.toNat A.major.toNat A.minor.toNat
       F.Nm F.Nd (F.P (nparElems (bview A.plen A.pfun)).length) F.Farm F.Fdots F.Fun F.Fok ∗
@@ -1739,7 +1843,7 @@ theorem createFound_entry (NP : NPAR_WRAP_ERA) (IL : ILOCK) (IUP : IUNLOCKPUT) (
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x1c  jal nameiparent
-  k_step_e (wp_s_jal cpu _ (KA.«create» + 0x1c#64) false 2092760#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«create» + 0x1c#64) false 2092736#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [create_br_nameiparent]
   iintro Hk Hpc
   icases (procPrivFd_split A.γ k.proc A.pid A.V A.M).1 $$ Hpriv with ⟨Hcore, Hofs⟩
@@ -1806,7 +1910,7 @@ theorem createFound_entry (NP : NPAR_WRAP_ERA) (IL : ILOCK) (IUP : IUNLOCKPUT) (
       simp [RegMap.set_apply, ha0, hie]
     iapply (createFound_parent IL IUP DL Γ cpu k A F hS hA spie1 spp1 (R1.set 9#5 (R1 10#5)) v3
       (k.regs 18#5) nf tl kd qd gd lod tld dind n1 Sb1 w
-      (createRegs_s1 k _ _ _ _ _ _ R1 _ (by rw [ha0, hie]) hr1) h10 hkd hdnib hle hal htl hname
+      (createRegs_s1 k _ _ _ _ _ _ R1 _ (by rw [ha0, hie]) hr1) h10 hkd hdnib hdpos hle hal htl hname
       hsub1 hw1 ⟨by simpa using hlo1, hhi1⟩)
     iframe Hk Hpc Hfr Hte Hce Href Hru Hsi Hsb Howe Hpid Hbs Hs1 Hop Htx HP Hdlc Hcre Hpost
     iframe #

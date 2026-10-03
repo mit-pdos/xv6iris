@@ -19,7 +19,6 @@ offset row's invariant).
 -/
 import Xv6.FilewriteChain
 import Xv6.FilewriteParts
-import Xv6.ReadiDefs
 
 namespace Xv6
 
@@ -28,9 +27,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## The static arguments -/
 

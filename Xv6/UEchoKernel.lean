@@ -25,9 +25,7 @@ sp, read-only -- into `UserHeap.uargv` of that list.
    `echo_uexec_slot` (the generic-entry slot, UexecCond's sync/echo gate,
    out of the cone per DU1).
 -/
-import Xv6.UkAbi
 import Xv6.UserHeap
-import Xv6.UexecRet
 
 namespace Xv6
 

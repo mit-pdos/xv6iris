@@ -21,7 +21,7 @@ the body's `dirDotsOnly`), so its `dlinks` are rebuilt from nothing
 (`createSetf` moves only the count) or discharged by the orphan
 (`dirDotsIx_orphan`, `dirOrphanClean_of_only`).  THE UNARM FIRES after the
 flush (Rocq's site #13b): the row disappears, the registry arm comes home
-with the transaction's half (`create_dirty_clear_unarm`).  The two
+with the transaction's half (`create_dirty_clear_unarm_nd`).  The two
 `iunlockput`s hand back a quarter each; with the half they make `logTx`.
 
 ## Deviations from Rocq
@@ -58,6 +58,7 @@ with the transaction's half (`create_dirty_clear_unarm`).  The two
 import MachCSL.WpSmodeFrame12b
 import Xv6.CreateCalls
 import Xv6.FsStateEraResB
+import Xv6.NamexParts
 
 namespace Xv6
 
@@ -66,9 +67,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## 0.  Pure and block-level helpers -/
 
@@ -319,7 +318,7 @@ theorem create_fail_mkdir_half (IUP : IUNLOCKPUT) (IU : IUPDATE) (Γ : SchedName
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR.2.2.2.2.1]
   iintro Hk Hpc
   -- ===== +0x14c  jal iupdate : THE UNLINK FLUSH =====
-  k_step_e (wp_s_jal cpu _ (KA.«create» + 0x14c#64) false 2090062#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«create» + 0x14c#64) false 2089966#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [create_br_iupdate]
   iintro Hk Hpc
   icases bslots_uncons 2 $$ Hbs with ⟨Hb1, Hb2⟩
@@ -364,7 +363,7 @@ theorem create_fail_mkdir_half (IUP : IUNLOCKPUT) (IU : IUPDATE) (Γ : SchedName
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR1.2.2.2.2.1]
   iintro Hk Hpc
   -- ===== +0x152  jal iunlockput(ip) : THE PUT THAT FREES =====
-  k_step_e (wp_s_jal cpu _ (KA.«create» + 0x152#64) false 2090832#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«create» + 0x152#64) false 2090736#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [create_br_iunlockput]
   iintro Hk Hpc
   ihave Hbs := bslots_cons 2 $$ [Hb1 Hb2]
@@ -414,7 +413,7 @@ theorem create_fail_mkdir_half (IUP : IUNLOCKPUT) (IU : IUPDATE) (Γ : SchedName
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR2.2.2.1]
   iintro Hk Hpc
   -- ===== +0x158  jal iunlockput(dp) =====
-  k_step_e (wp_s_jal cpu _ (KA.«create» + 0x158#64) false 2090826#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«create» + 0x158#64) false 2090730#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [create_br_iunlockput]
   iintro Hk Hpc
   -- THE PARENT NEEDS NO RE-PARK: it re-closes at the record it was handed
@@ -484,7 +483,7 @@ theorem create_fail_mkdir_half (IUP : IUNLOCKPUT) (IU : IUPDATE) (Γ : SchedName
   ihave Hsl := irefSlots_combine (1 + 1) (ns - 2) $$ [Hsl Hislr]
   · iframe
   -- mkdir's `fail:` payout: the do-then-undo PAIR, the dots as the entry brought them
-  ihave Hcf := create_fail_of_pair (hlc := hlc) (fsGammaL fscFs) fscFs ty.toNat major.toNat
+  ihave Hcf := create_fail_of_pair (hlc := hlc) (fsGammaL fscFs) fscFs V.rti ty.toNat major.toNat
     minor.toNat Nm Nd P Pmiss Farm Fdots Fun Fok Fex (bview plen pfun) dind.toNat cinum.toNat
     $$ HP Hdlk Hacre Hdots Hunr
   have hns' : (if false = true then 1 + 1 + (ns - 2) + 1 = ns else 1 + 1 + (ns - 2) = ns) := by

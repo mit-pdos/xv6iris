@@ -53,8 +53,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
-
 /-- **Rocq `ushp_ptr`**: the child addresses of a tree, constructor by
 constructor, for the three walked shapes. -/
 inductive UshPtr : Type
@@ -185,13 +183,6 @@ def ushRedirsRes (N : UkNames GF) (rs : List Rredir) (dv : DFrac) (Pex : IProp G
   | [] => iprop(emp)
   | _ :: _ => iprop(ustr N.d dv ushSymA 7 ushpSymF ∗ Pex ∗ ushpOom (hlc := hlc) N Pex K)
 
-/-- **Rocq `UkShArgs.ushp_pex_res`** (main): the exit lend and its law, when
-redirects are consumed. -/
-def ushPexRes (N : UkNames GF) (rs : List Rredir) (Pex : IProp GF) (K : Nat) : IProp GF :=
-  match rs with
-  | [] => iprop(emp)
-  | _ :: _ => iprop(Pex ∗ ushpOom (hlc := hlc) N Pex K)
-
 /-- **Rocq `ushp_atree`**: the tree at `p` with every child pointer NAMED by
 `a` and the constructors' bounds kept. -/
 def ushATree (N : UkNames GF) (s0 : Nat) : Nat → UshpCmd → UshPtr → IProp GF
@@ -222,15 +213,6 @@ theorem ushMallocChain_split (N : UkNames GF) :
     obtain ⟨UM1, h1, h2⟩ := h
     obtain ⟨UM2, h3, h4⟩ := ushMallocChain_split N k k' UM1 UM' h2
     exact ⟨UM2, ⟨UM1, h1, h3⟩, h4⟩
-
-/-- **Rocq `ushp_malloc_chain_app`**. -/
-theorem ushMallocChain_app (N : UkNames GF) :
-    ∀ (k k' : Nat) (UM UM1 UM' : IProp GF), ushMallocChain (hlc := hlc) N k UM UM1 →
-      ushMallocChain (hlc := hlc) N k' UM1 UM' → ushMallocChain (hlc := hlc) N (k + k') UM UM'
-  | 0, k', UM, UM1, UM', h1, h2 => by simp only [ushMallocChain] at h1; subst h1; simpa using h2
-  | k + 1, k', UM, UM1, UM', ⟨UM2, h1, h3⟩, h2 => by
-    rw [Nat.add_right_comm]
-    exact ⟨UM2, h1, ushMallocChain_app N k k' UM2 UM1 UM' h3 h2⟩
 
 /-- **Rocq `UkSh.wp_ksh_memset`**: memset writes the byte `a1` holds over the
 `Nb`-byte buffer at `a0`. -/

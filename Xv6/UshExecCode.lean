@@ -21,7 +21,6 @@ pcs cannot clash with these.
 Deviation from Rocq (DU3): as `UshCode`'s -- `shk_code γt` is `ushCode γt`.
 -/
 import Xv6.UshCodeDefs
-import Xv6.UkStub
 import Xv6.UkShMallocDefs
 
 namespace Xv6

@@ -5,8 +5,6 @@ vocabulary split from `WpSmodeFrame12`/`WpSmodeFrame12b` so the disk
 driver's definitions (`Xv6.VirtioDiskRwDefs`) do not wait for the
 supervisor-mode accessor and store rules those files import.
 -/
-import MachCSL.WordPointsTo
-import MachCSL.KMap
 import MachCSL.WpDmaCtx2
 
 namespace MachCSL
@@ -44,8 +42,8 @@ abbrev frame12s8 [CurCtx] (sp v0 v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 : BitVec 64)
 The `int idx[3]` local lives in the frame's two scratch cells, and the
 code writes it a WORD at a time (`sw`/`lw` at `-96(s0)`, `-92(s0)`,
 `-88(s0)`).  These two lemmas take a stack cell apart into its two words
-and put it back -- at INDEPENDENT values, which is what the accessor pair
-`wordPointsTo_lo4_acc`/`wordPointsTo_hi4_acc` cannot do. -/
+and put it back -- at INDEPENDENT values, which is what the accessor
+`wordPointsTo_lo4_acc` cannot do. -/
 
 theorem wordPointsTo_split8 [CurCtx] (a : BitVec 64) (w : BitVec 64) :
     wordPointsTo (GF := GF) a 8 (DFrac.own 1) w ⊢

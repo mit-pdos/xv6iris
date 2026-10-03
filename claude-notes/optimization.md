@@ -953,7 +953,8 @@ kernel's share unchanged (now ~30 % of a big declaration).
   match* (prio above `frameSep`): fires, buys nothing. A failed `Frame R
   P1` is cheap; the cost is the SUCCESSFUL frame (`frame_here_absorbing`
   + two `QuickAbsorbing` + `MakeSep` searches, ~1.5 ms per framed
-  hypothesis), i.e. the per-frame floor of the proof mode.
+  hypothesis), i.e. the per-frame floor of the proof mode.  (Lane K: not so against a
+  multi-conjunct premise -- see "five cuts (lane K)" below.)
 - *A simproc dropping shadowed register writes* (`(C.set i v).set .. .set
   i w`, chains of 23 `set`s for 8 registers after 30 straight-line steps):
   −13 % on `ProofVirtioDiskRwC`, noise on `ProofKfork`, and it breaks proofs
@@ -1040,6 +1041,180 @@ Lessons:
 - Not done: the user programs' `udec%` sites (854, ~5 ms each: ≤ 4 s
   tree-wide before dedup) -- the same scheme would need `drefU` facts and a
   `utextDecodeWith` lemma for the window word; not worth a second generator.
+
+### Lean: the next tier of heavy declarations (lane S)
+
+Measured Oct 1 2026, each module's saved base copy vs the edit, back to back
+under the lock (`lean -Dtrace.profiler=true -DElab.async=false`, so module
+times are sequential CPU).  Eight causes; each is a rule.
+
+- **`simp_all` meets the context you did not build for it.**  `SyscallHead`'s
+  pin goals (`syscPins k (R.set …)`, ten conjuncts) were `refine ⟨…⟩ <;>
+  simp only [RegMap.set_apply] <;> simp_all` with the three arm hypotheses
+  (`hA`/`hF`/`hB`, unfolded continuations) in scope: `simp_all` rewrote all
+  of them once per conjunct.  A lemma for the shape (`syscPins_set`, write
+  outside the pins, index side condition by `decide`; the `sysc_pins`
+  macro) and `simpa … using` the one fact a register goal needs:
+  `syscall_head_split` 5.58 → 1.45 s, module 8.0 → 3.7 s.  Same in
+  `UserFrame.ufCfg_of_ro`: `cases r <;> simp_all [hwVal, hwRegs]` over ~250
+  `Register` arms under `UfCfg` -- the case split in its own lemma with only
+  the one hypothesis (`uf_hwVal_mem`): 2.27 → 0.42 s.
+- **Never read an image byte by `rfl` on a list index.**  `argraw_tbl_word`
+  proved its 24 table bytes by `Kernel.rodata[1920 + k]? = some _ := rfl`:
+  each walked ~1920 cells in the elaborator AND again in the kernel.  One
+  `rodataRun` decision per entry (`kernelData_buf_nat`) instead: 7.2 → 1.07 s,
+  module 8.1 → 1.8 s.
+- **Share the walk across a chunk's reads.**  `BootCarve`'s image check read
+  each word's row by `List.getD` from the front of its page (up to 128 rows,
+  ~27 µs a cell) and sent row-crossing words to a per-BYTE page walk.  Bytes
+  now come off `bcRowsDrop n = Nat.rec bcRows (·.tail) n` over the flattened
+  rows (`bc_row_eq`: equal to the page lookup inside the dump; ten full pages
+  checked by `decide +kernel`): the kernel caches each `bcRowsDrop k`, so a
+  chunk's words, in address order, walk the rows once.  Text chunks 0.44 →
+  0.2 s each; rodata the same way; module 10.1 → 7.0 s.  (Probe first: a
+  trivial predicate over the same chunk was 24 ms, so the reads were the
+  whole cost.)
+- **Prove the rule over the parameter the walk does not branch on.**
+  `WpSmodeCtl` proved twelve branch rules (six operators, `rs1 = x0` or not),
+  each a full symbolic run of `execute_BTYPE` (~1.1 s).  The model's
+  per-operator `match` is one comparison: a program equation
+  (`execute_BTYPE_bcond`: two reads, then `if bcond op a b`), proved by
+  `cases op <;> simp only [bind_assoc, pure_bind, …]`, lets ONE run cover an
+  abstract `op`; the operators are one-line corollaries (statements
+  unchanged): module 19.2 → 7.4 s.
+- **Split late.**  The fetch rules split on `isRVC` of the fetched bits and
+  then walked the translation and the memory read in BOTH arms; the bits
+  matter only after the read.  Split after the shared prefix: `WpSmodeFetch4`
+  2.73 → 1.78 s, `WpSmodeFetch2` 3.79 → 2.62 s (both on the S-mode prefix of
+  the critical path), `WpStagesM` 12.6 → 10.5 s, `WpSmodeSatpU` 11.0 → 8.9 s.
+- **Merge, do not split, a symbolic branch whose arms rejoin.**
+  `uwk_pte_is_invalid` walked `pte_is_invalid`'s short-circuit chain by
+  `repeat' (first | uwk_run | uwk_split)`: every undecided `if` failed the
+  walk (after two failing `bv_omega`s), the goal was split, and the walk
+  restarted from the top -- 29 paths, each re-walking its prefix, then 29
+  `bv_decide` leaves.  `uwk_run +merge` walks both arms of an undecided `if`
+  under `c` / `¬c` and, when they end in the same state and oracle, returns
+  `if c then x₁ else x₂` (`uwk_ite_merge`); merge mode does not bit-blast
+  undecided conditions.  One walk, one leaf: 4.5 → 1.4 s.  Where the
+  program is closed once its bits are named, skip the stepper altogether:
+  `ume_check_perm_pf` (32 bit cases x 3 operations, 96 walks) now has
+  `uwk_check_perm`'s proof (`rfl` per closed program): `UMemPfWalk` 5.4 →
+  2.2 s.  `UWalk` 10.3 → ~7 s.
+- **A failed trial `isDefEq` doubles per level on a two-branch function.**
+  `uwk_run` tries to close `r = rhs` at default transparency; when it fails
+  on two different `bmWrite`s (`umo_amo_ok`: the model's AMO value vs
+  `umoNew op …` with `op` still abstract), `isDefEq` compares `bmSet m a b`
+  arguments (fails), unfolds both, and compares `m a'` under the `if` again:
+  2^n for an `n`-byte store, 2.6 s at width 8.  `bmSet` is now
+  `@[irreducible]` (every proof used `unfold bmSet`; the kernel is
+  unaffected): `UMemAmo` 15.6 → 4.6 s.  The tell is a `[Meta.isDefEq] ❌`
+  tower whose times halve at each level.  Do not "fix" it by closing at
+  instance transparency: three `UWalk` proofs rely on the default-
+  transparency close.
+- **What did not move, and why.**  `KexecB2` and `CreateMkdir` are
+  whole-function step proofs with no dominant declaration piece (each stage
+  ~1-2.5 s, ~30 % kernel), i.e. the per-`k_step` floor (lane K's
+  machinery).  `WpSmodeFrame12b`'s `sh`/`lhu` rules (1.3-2 s) are the shared
+  `store_file_S_proof`/`load_file_S_proof` walks of `execute_STORE`/`LOAD`
+  -- a width-generic rule would need the same program-equation treatment as
+  the branches, over `BitVec (8 * n)`.  `UExecCsrTabR`/`W` are four
+  `kernel_rfl`s of ~1 s each, already split per access type; their cost is
+  the model's `check_CSR_result` run for the 339 non-default numbers.
+  `FsImgCheckSweeps.fsimgRegionBareB` (1.8 s) reads ~10k bytes one at a
+  time; a whole-record `Nat` test needs a byte-vs-`Nat` equivalence lemma.
+
+### Lean: what a step still cost after lane P, and five cuts (lane K)
+
+Measured Oct 1 2026 on origin/lean 06ca39eef.  Kernel time was located with a
+probe that re-runs `Environment.addDeclCore` on a finished theorem's value
+(warm it up once: the first `addDecl` of a file pays ~1.7 s of loading) and,
+for each application node, `Kernel.isDefEq` of the argument's inferred type
+against the binder's domain whenever the two are not syntactically equal
+(kernel diagnostics through `Kernel.enableDiag` give the unfold counts).
+Elaboration was located with `trace.profiler` at threshold 1 ms on a scratch
+copy of the module, aggregated per tactic name.
+
+1. **The kernel converted every step's context from the displayed form to
+   the plain one.**  A proof-mode goal `Entails' tm Q` shows each hypothesis
+   as `IrisHyp P` under name metadata, but iris-lean's lemmas are instantiated
+   at the UNWRAPPED context (the `Hyps` index).  A proof made by refining the
+   goal directly (`refine lemma ?_`, simp's `Eq.mpr`, `change`'s `id` hint)
+   states the wrapped `tm`, and where it meets an iris-lean term the kernel
+   must prove `tm ≡ e`.  `IrisHyp` is a `@[reducible] def` -- to the kernel a
+   regular definition of height ~0 -- so lazy delta unfolds the TALLER side,
+   the hypothesis `P`, first, down to `UPred.holds` (42,888 unfolds in
+   `vdrw_P3`): ~50 µs a hypothesis, 2-3 ms a conversion, ~3 conversions a
+   step.  The head mismatch `Entails'`/`Entails` itself costs 0.07 ms; the
+   context costs 2 ms; stripping every `IrisHyp`/metadata from the finished
+   term halves the kernel (`vdrw_P3` 1134 → 616 ms).  The step tactics
+   (`inext_goal`, `k_next_off`, `k_next_pin`, `k_norm_goal`, `betaConcl`) now
+   state their proofs at the plain context (`MachCSL.plainCtx` /
+   `withPlainCtx`); the goals they create keep the wrapped form, which the
+   proof mode parses.  Kernel time of the 30 slowest proof modules (probe):
+   59.1 → 46.5 s; the all-stripped floor is 43.5 s.  The remaining ~3 s
+   comes from plain Lean tactics on proof-mode goals (`k_norm` over the whole
+   goal, `obtain`/`cases` motives, `iintro %x`): a generic fix would strip the
+   finished term, which needs a wrapper around each `by` block -- not done.
+   **Rule: a tactic that builds a proof-mode proof term itself must state it
+   at `parseIrisGoal?`'s `e`, never at the goal's displayed context.**
+2. **A failing `Frame` search is NOT cheap when the goal is a conjunction**
+   (correcting lane P's note): `frameSep` walks the premise, ~2 ms per
+   hypothesis, and a memory step's bare `iframe` tried every `wordPointsTo`
+   cell (they all pass the head filter): 25-40 ms.  `FrameFilter` now also
+   requires a hypothesis whose head is a non-`Iris` constant keying no
+   `Frame` instance (checked in the instance discrimination tree) to UNIFY
+   with a goal atom of that head (the proof mode's own configuration,
+   instance transparency, rolled back); atoms found under a binder disable
+   the test.  Exact for the same reason as the head filter: such a
+   hypothesis can only frame by a leaf instance.  Memory-step `iframe` ~5 ms.
+3. **`RegMap.reduceApply`** replaces `RegMap.set_apply` in `k_norm_simps`: a
+   read `(m.set i v) j` with literal indices becomes `v` or `m j` by one
+   `set_apply_of_eq`/`set_other` with a `decide` side condition, instead of
+   building an `ite`, deciding the condition and collapsing it through
+   `ite_congr` -- 23k `ite_congr` nodes in `vdrw_P3`'s term.  It must stay a
+   POST-procedure that does ONE level per call: a pre-order version walking
+   the whole chain at once broke `KexecD` and `SysOpenTails`, whose extra
+   lemmas rewrite an inner read (`(R.set 10#5 v) 2#5 = …`) that the walk
+   skipped past.  Simp in `ProofVirtioDiskRwC` 1.2 → 0.3 s.
+4. **`k_code_text` frames the code fact directly** (`Xv6.code_frame` on
+   `Hyps.remove` of the persistent text hypothesis) instead of
+   `isplitr; iapply; iexact`: ~4 ms → <1 ms a step.
+5. **`k_iapply`** (`MachCSL.KApply`): `iapply rule $$ [- $Hk $Hpc]` without
+   `AsEmpValid`, `IntoWand`, two `Frame` searches and `TCOr` (~14 ms → ~4 ms,
+   most of it elaborating the rule term).  When the two framed hypotheses
+   unify with two CONSECUTIVE premise conjuncts and no earlier conjunct
+   unifies with either, both leave the context by `Hyps.remove`, the premise
+   goal is the remaining conjuncts in order (what the `Frame` search leaves),
+   and `kapply_gen` with a `kperm_base`/`kperm_step` reassociation closes it;
+   goals come out in `iapply`'s order.  Anything else falls back to
+   `iapply`.  Used by the shared step macros and the proofs' own (`PrintkDefs`,
+   `ProofPiperead`/`Pipewrite`, `BmapDefs`, `NamexRoot`, `IputParts`,
+   `PlicPlanExtra`).
+6. Small: `k_norm`'s simp keeps simp's own cache (`Simp.State`) across the
+   calls of a declaration with the same extra lemmas (`MachCSL.KNormCache`; a
+   result mentioning a local that left the context is recomputed).  A
+   whole-context `k_norm` after a step 6 → 1.3 ms; `k_norm_goal` barely moves
+   (its conclusion is new each step).  simp's cost is its traversal: an EMPTY
+   lemma set takes 3.6 ms over a 40-hypothesis context.
+
+Result (one isolated run of each module, base 06ca39eef vs after, back to
+back under the lock): the 30 slowest kernel-proof modules **340.6 → 279.0 s
+CPU (−18 %)**; Kfork 28.7 → 23.2, Printk 27.3 → 22.0, InstallTrans 19.2 →
+15.3, Allocproc 16.9 → 15.0, VirtioDiskRwC 6.0 → 3.1, Kernelvec 6.2 → 3.9.
+Declarations: `kfork_proof` 9.4 → 6.3 s (kernel 2.96 → 0.95), `kf_publish`
+6.6 → 4.7 (2.21 → 0.92), `ap_found` 7.6 → 6.4, `initlog_proof` 6.3 → 5.4
+(1.06 → 0.53), `vdrw_P3` 5.1 → 2.3, `vmfault_proof` 5.3 → 3.8,
+`printk_proof` 4.3 → 2.5, `it_body` 5.1 → 4.0.  Per register step in
+`vdrw_P3`: ~70 → ~25 ms of elaboration.
+
+Not improved, and why:
+- The kernel's decode of each instruction (`text_instrK`, ~7.5 ms, now 2/3
+  of `vdrw_P3`'s kernel time): only per-encoding facts remove it (lane D).
+- Glue-heavy declarations (`kfork_proof`, `printk_pct`, `strncmp_loop`):
+  their time is in `ihave`/`icases`/`simp`/`omega` on proof-specific
+  shapes, not in the step machinery.
+- `k_norm_goal` (~6 ms a step): the conclusion's register chain is new each
+  step, so neither simp's cache nor a chain-at-once simproc helps.
 
 ## Build shape
 
@@ -1165,6 +1340,40 @@ What worked, and the traps:
   `CtxBoot`, `StepLemmas` proving `signExtend_ofNat32` inline so it no
   longer imports the S-mode rules.  Keep the old name importing the new
   module so no other importer changes.
+
+### Lean: lake runs ready modules first come first served
+
+On a core-bound machine (CI's 24 cores) the wall is ΣCPU/cores plus an
+early dip and a late tail, and both are shaped by lake's order, not by the
+critical path:
+
+- **Lake's ready queue is FIFO** (every module job runs at one task
+  priority).  In the saturated middle a chain waits behind hundreds of
+  queued modules at EVERY link (5-15 s each on CI), so a 360 s critical
+  path finishes at ~650 s and its last ten links run on an idle machine.
+  Price a cut by the FIFO makespan (`tools/import_graph.py --cores 24`
+  prints it beside the longest-path-first one), averaged over a few
+  ±20 %-perturbed copies of the times: it is chaotic, and a graph with a
+  SHORTER critical path can have a longer FIFO makespan (the exact-needs
+  graph does).  On 96 cores the two agree and nothing here pays.
+- **Early, everything hangs on one spine** (`TsoMem` … `Lang` …
+  `Tactics` …).  A spine module that imports a later one for a few
+  definitions gates every module below it: split the definitions from the
+  proofs that need the later module (`WpPmpDefs`, `Gpr`, `ByteWordDefs`,
+  `MConfBoot`), and the family that only decodes bytes or states
+  configurations starts minutes early.
+- **The needs dump does not see tactic syntax.**  A module that RUNS
+  `swp_run`, or a `macro` whose quotation contains it, needs `Tactics`,
+  and no `N` row says so.  Scan the sources for the keywords each module
+  declares (`syntax`/`macro`/`elab "kw"`) and treat a use as a need, per
+  declaration when splitting (a `macro` is its own declaration, not part of
+  the `def` above it).  ConstDeps also misses some value references
+  (`MConf.bootConf_ok`); the build is the gate, and a compensating import
+  per module that reached the cut module through the old edge is the fix.
+- **Late, a tail module holding N independent stage proofs costs their
+  sum**: one module per program (`UkPipesEntriesEcho`/`Cat`/`Grep`), and
+  a lemma two sibling stages share moves up to their common parent
+  (`UshPipesStageCtx`), so the siblings build side by side.
 
 ### Splitting a whole-function proof across files
 

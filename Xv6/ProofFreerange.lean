@@ -12,7 +12,6 @@ on, and the exit `spie`/`spp` are the last call's.
 import Xv6.SpecFreerange
 import Xv6.SpecKfree
 import Xv6.CodeTactics
-import Xv6.StepLemmas
 import MachCSL.WpSmodeFrame6
 import Xv6.ByteCursor
 import Xv6.UvmallocDefs
@@ -23,7 +22,6 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled

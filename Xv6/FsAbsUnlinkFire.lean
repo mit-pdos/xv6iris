@@ -348,7 +348,7 @@ theorem ufUent_fire [Icfg] [Appcfg GF] (γfs : FsNames) (E : CoPset) (dqt : DFra
   ipureintro; exact hpre
 
 /-- INSTANT 2 -- THE TARGET ROW, FUSED WITH ITS RETAG (Rocq's
-`uf_utgt_fire`).  `wp_iupdate_unlink` has flushed `ip` at its lowered count;
+`uf_utgt_fire`).  `wp_iupdate_unlink_eb` has flushed `ip` at its lowered count;
 this is the abstract half of the same move.  The pre-state row it hands back
 is the one the ret-0 arm pins -- true because the target's fragment has been
 in the walk's custody since W3. -/

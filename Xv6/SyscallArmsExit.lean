@@ -21,7 +21,6 @@ re-spec, no not-init premise: init's exit ends in the live
   whole table (`SyscDepExit`, `filecloseCpays sts`) -- and sys_exit relays
   them to kexit at the dispatch's own table.
 -/
-import Xv6.SyscallRet
 import Xv6.SyscallArmsFdDefs
 
 namespace Xv6
@@ -31,9 +30,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 theorem syscArmExit_sp4 (x : BitVec 64) :
     x - 8#64 * BitVec.ofNat 64 4 = x + 0xFFFFFFFFFFFFFFE0#64 := by bv_decide

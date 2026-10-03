@@ -52,7 +52,7 @@ kept because the reasons are the content:
 > the code's behaviour and this model says it: `ehPhoff` is the 4-byte
 > little-endian reading at offset 32, NOT the 8-byte field, and a consumer
 > that needs the sign-extended register value applies the sign extension to
-> THIS number.  `phOff` (@8) has exactly the same story.  `ehMagic` is an
+> THIS number.  `phOff` (@8) has exactly the same story.  The magic is an
 > `lw` too, but 0x464c457f has bit 31 clear, so its sign extension is the
 > identity.
 >
@@ -80,18 +80,14 @@ kept because the reasons are the content:
 3. **`assembleBytes`** is Rocq `RiscvModelBytes.assemble_bytes` (the little-
    endian assembler of a byte list), which the Lean tree did not have; it is
    defined here, the one assembler of the ELF layer.
-4. **The load bridges are Lean additions**: `leAt_word` / `leAt_word4` read a
-   field out of the window a `ld` / `lw` delivers through
-   `MachCSL.byteBuf_word_at`-style accessors (`bytesToWord` /
-   `bytesToWord4` of the window), which is the Lean shape of Rocq's
-   `le_at_nth_byte` use.  `leAt_nthByte` is Rocq's lemma itself.
+4. `leAt_nthByte` is Rocq's `le_at_nth_byte`.
 5. `le_bytes_length` / `le_bytes_lookup` / `map_eq_fmap` (Rocq's `map` vs
    `<$>` bridge) become `leBytes_length` / `leBytes_getElem!`; there is one
    `map` in Lean.
 
 Imports only definitional files.
 -/
-import MachCSL.ByteWord4
+import MachCSL.ByteWordDefs
 
 namespace Xv6
 
@@ -194,82 +190,8 @@ theorem leAt_nthByte_exact (f : List (BitVec 8)) (o n j : Nat) (hj : j < n) :
     nthByte (n := n) (BitVec.ofNat (8 * n) (leAt f o n)) j = f[o + j]! :=
   leAt_nthByte n f o n j (Nat.le_refl n) hj
 
-/-! ## The load bridges (deviation 4) -/
-
-/-- The window at `o` of length `n`, when present, is `leBytes`. -/
-theorem leBytes_eq_take_drop (f : List (BitVec 8)) (o n : Nat) (h : o + n ≤ f.length) :
-    leBytes f o n = (f.drop o).take n := by
-  apply List.ext_getElem
-  · simp; omega
-  · intro j h1 h2
-    simp only [leBytes, List.getElem_map, List.getElem_range, List.getElem_take, List.getElem_drop]
-    simp at h1
-    exact getElem!_pos f (o + j) (by omega)
-
-theorem bytesToWord_or_add (x : BitVec 64) (b : BitVec 8) :
-    x <<< 8 ||| BitVec.setWidth 64 b = x <<< 8 + BitVec.setWidth 64 b := by
-  bv_decide
-
-theorem bytesToWord4_or_add (x : BitVec 32) (b : BitVec 8) :
-    x <<< 8 ||| BitVec.setWidth 32 b = x <<< 8 + BitVec.setWidth 32 b := by
-  bv_decide
-
-/-- A doubleword's value is its bytes assembled (at most eight of them). -/
-theorem bytesToWord_toNat (bs : List (BitVec 8)) (h : bs.length ≤ 8) :
-    (bytesToWord bs).toNat = assembleBytes bs := by
-  induction bs with
-  | nil => rfl
-  | cons b bs ih =>
-    simp only [List.length_cons] at h
-    have ih' := ih (by omega)
-    have hb := b.isLt
-    have hA := assembleBytes_bound bs
-    have hp : 2 ^ (8 * bs.length) ≤ 2 ^ 56 := Nat.pow_le_pow_right (by decide) (by omega)
-    show (bytesToWord bs <<< 8 ||| BitVec.setWidth 64 b).toNat = _
-    rw [bytesToWord_or_add, BitVec.toNat_add, BitVec.toNat_shiftLeft, BitVec.toNat_setWidth, ih',
-      assembleBytes_cons, Nat.shiftLeft_eq]
-    have : b.toNat % 2 ^ 64 = b.toNat := Nat.mod_eq_of_lt (by omega)
-    rw [this]
-    have h2 : 2 ^ 8 = 256 := rfl
-    rw [h2]
-    omega
-
-/-- A word's value is its bytes assembled (at most four of them). -/
-theorem bytesToWord4_toNat (bs : List (BitVec 8)) (h : bs.length ≤ 4) :
-    (bytesToWord4 bs).toNat = assembleBytes bs := by
-  induction bs with
-  | nil => rfl
-  | cons b bs ih =>
-    simp only [List.length_cons] at h
-    have ih' := ih (by omega)
-    have hb := b.isLt
-    have hA := assembleBytes_bound bs
-    have hp : 2 ^ (8 * bs.length) ≤ 2 ^ 24 := Nat.pow_le_pow_right (by decide) (by omega)
-    show (bytesToWord4 bs <<< 8 ||| BitVec.setWidth 32 b).toNat = _
-    rw [bytesToWord4_or_add, BitVec.toNat_add, BitVec.toNat_shiftLeft, BitVec.toNat_setWidth, ih',
-      assembleBytes_cons, Nat.shiftLeft_eq]
-    have : b.toNat % 2 ^ 32 = b.toNat := Nat.mod_eq_of_lt (by omega)
-    rw [this]
-    have h2 : 2 ^ 8 = 256 := rfl
-    rw [h2]
-    omega
-
-/-- **What a `ld` of the field delivers**: the doubleword of the window at
-`o` (as `MachCSL.byteBuf_word_acc` hands it out) is the 8-byte field. -/
-theorem leAt_word (f : List (BitVec 8)) (o : Nat) (h : o + 8 ≤ f.length) :
-    (bytesToWord ((f.drop o).take 8)).toNat = leAt f o 8 := by
-  rw [leAt, leBytes_eq_take_drop f o 8 h, bytesToWord_toNat _ (by simp; omega)]
-
-/-- **What a `lw` of the field delivers** (before its sign extension): the
-word of the window at `o` is the 4-byte field. -/
-theorem leAt_word4 (f : List (BitVec 8)) (o : Nat) (h : o + 4 ≤ f.length) :
-    (bytesToWord4 ((f.drop o).take 4)).toNat = leAt f o 4 := by
-  rw [leAt, leBytes_eq_take_drop f o 4 h, bytesToWord4_toNat _ (by simp; omega)]
-
 /-! ## `struct elfhdr` -- 64 bytes; kexec reads exactly four fields -/
 
-/-- Rocq `eh_magic`. -/
-def ehMagic (f : List (BitVec 8)) : Nat := leAt f 0 4
 /-- Rocq `eh_entry`. -/
 def ehEntry (f : List (BitVec 8)) : Nat := leAt f 24 8
 
@@ -284,18 +206,6 @@ def ehPhnum (f : List (BitVec 8)) : Nat := leAt f 56 2
 
 /-- The constant kexec's `lui 0x464c4 ; addi 1407` builds (Rocq `ELF_MAGIC`). -/
 def ELF_MAGIC : Nat := 0x464C457F
-
-/-- Rocq `eh_magic_ok`. -/
-def ehMagicOk (f : List (BitVec 8)) : Prop := ehMagic f = ELF_MAGIC
-
-theorem ehMagic_bound (f : List (BitVec 8)) : ehMagic f < 2 ^ 32 :=
-  leAt_bound_lit f 0 4 _ rfl
-
-theorem ehEntry_bound (f : List (BitVec 8)) : ehEntry f < 2 ^ 64 :=
-  leAt_bound_lit f 24 8 _ rfl
-
-theorem ehPhoff_bound (f : List (BitVec 8)) : ehPhoff f < 2 ^ 32 :=
-  leAt_bound_lit f 32 4 _ rfl
 
 /-- The loop bound `i < elf.phnum` is a zero-extended halfword. -/
 theorem ehPhnum_bound (f : List (BitVec 8)) : ehPhnum f < 65536 :=
@@ -319,17 +229,6 @@ def phVaddr (f : List (BitVec 8)) : Nat := leAt f 16 8
 def phFilesz (f : List (BitVec 8)) : Nat := leAt f 32 8
 /-- Rocq `ph_memsz`. -/
 def phMemsz (f : List (BitVec 8)) : Nat := leAt f 40 8
-
-/-- The constant kexec's `li a4,1 ; bne` tests `ph.type` against (Rocq
-`ELF_PROG_LOAD`). -/
-def ELF_PROG_LOAD : Nat := 1
-
-theorem phType_bound (f : List (BitVec 8)) : phType f < 2 ^ 32 := leAt_bound_lit f 0 4 _ rfl
-theorem phFlags_bound (f : List (BitVec 8)) : phFlags f < 2 ^ 32 := leAt_bound_lit f 4 4 _ rfl
-theorem phOff_bound (f : List (BitVec 8)) : phOff f < 2 ^ 32 := leAt_bound_lit f 8 4 _ rfl
-theorem phVaddr_bound (f : List (BitVec 8)) : phVaddr f < 2 ^ 64 := leAt_bound_lit f 16 8 _ rfl
-theorem phFilesz_bound (f : List (BitVec 8)) : phFilesz f < 2 ^ 64 := leAt_bound_lit f 32 8 _ rfl
-theorem phMemsz_bound (f : List (BitVec 8)) : phMemsz f < 2 ^ 64 := leAt_bound_lit f 40 8 _ rfl
 
 /-! ## Where the i-th program header sits in the file -/
 

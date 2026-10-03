@@ -49,9 +49,8 @@ DEVIATIONS from Rocq.
 * `Forall dinode_wf ds` is spelled `∀ d ∈ ds, dinodeWf d` (this toolchain
   has the membership lemmas, not stdpp's `Forall_insert`), `<[k := d]> ds`
   is `ds.set k d`, `!!` is `[·]?` and `!!!` is `[·]!`.
-* The two `ind_bytes` cons readings Rocq parks here (`indBytes_cons_lo` /
-  `indBytes_cons_hi`) stay here for the same reason Rocq gives: this is
-  the file that reuses `indBytes` as the `addrs` field encoder.
+* The two `ind_bytes` cons readings Rocq parks here are not ported
+  (nothing uses them).
 -/
 import Xv6.BlockWords
 import MachCSL.ByteWord2
@@ -122,21 +121,6 @@ theorem halfBytes_lookup (w : BitVec 16) (j : Nat) (hj : j < 2) :
   · rfl
   · rfl
   · omega
-
-/-- The two `indBytes` cons readings the addrs-cells bridge peels a word
-run with.  They belong beside `Xv6/BlockWords.lean`'s own `indBytes_*`
-laws, but this is the file that reuses `indBytes` as the `addrs` field
-encoder, which is the home Rocq chose too. -/
-theorem indBytes_cons_lo (w : BitVec 32) (l : List (BitVec 32)) (i : Nat) (hi : i < 4) :
-    (indBytes (w :: l))[i]! = nthByte (n := 4) w i := by
-  apply getElem!_of_getElem?
-  rw [indBytes_cons, getElem?_append_lt _ _ 4 i (wordToBytes4_length w) hi]
-  exact wordToBytes4_lookup w i hi
-
-theorem indBytes_cons_hi (w : BitVec 32) (l : List (BitVec 32)) (i : Nat) :
-    (indBytes (w :: l))[4 + i]! = (indBytes l)[i]! := by
-  rw [List.getElem!_eq_getElem?_getD, List.getElem!_eq_getElem?_getD, indBytes_cons,
-      getElem?_append_shift _ _ 4 i (wordToBytes4_length w)]
 
 theorem dinodeBytes_length (d : Dinode) (hd : dinodeWf d) :
     (dinodeBytes d).length = 64 := by
@@ -268,7 +252,6 @@ theorem diblkBytes_insert_same (ds : List Dinode) (k : Nat) (d : Dinode) (j : Na
   have hv : (ds.set k d)[k]! = d := getElem!_of_getElem? (List.getElem?_set_self hk)
   rw [hv]
 
-set_option linter.unusedVariables false in
 /-- Rocq keeps `k < length ds` as a premise; the statement is the one
 consumers quote. -/
 theorem diblkBytes_insert_other (ds : List Dinode) (k : Nat) (d : Dinode) (i : Nat)
@@ -297,54 +280,10 @@ theorem diblkBytes_insert_other (ds : List Dinode) (k : Nat) (d : Dinode) (i : N
 A byte-buffer window is named by a FUNCTION, so every consumer wants
 `[·]!`, not `[·]?`. -/
 
-theorem dinodeBytes_type_t (d : Dinode) (j : Nat) (hj : j < 2) :
-    (dinodeBytes d)[j]! = nthByte (n := 2) d.diType j :=
-  getElem!_of_getElem? (dinodeBytes_type d j hj)
-
-theorem dinodeBytes_major_t (d : Dinode) (j : Nat) (hj : j < 2) :
-    (dinodeBytes d)[2 + j]! = nthByte (n := 2) d.diMajor j :=
-  getElem!_of_getElem? (dinodeBytes_major d j hj)
-
-theorem dinodeBytes_minor_t (d : Dinode) (j : Nat) (hj : j < 2) :
-    (dinodeBytes d)[4 + j]! = nthByte (n := 2) d.diMinor j :=
-  getElem!_of_getElem? (dinodeBytes_minor d j hj)
-
-theorem dinodeBytes_nlink_t (d : Dinode) (j : Nat) (hj : j < 2) :
-    (dinodeBytes d)[6 + j]! = nthByte (n := 2) d.diNlink j :=
-  getElem!_of_getElem? (dinodeBytes_nlink d j hj)
-
-theorem dinodeBytes_size_t (d : Dinode) (j : Nat) (hj : j < 4) :
-    (dinodeBytes d)[8 + j]! = nthByte (n := 4) d.diSize j :=
-  getElem!_of_getElem? (dinodeBytes_size d j hj)
-
-theorem dinodeBytes_addrs_t (d : Dinode) (j : Nat) :
-    (dinodeBytes d)[12 + j]! = (indBytes d.diAddrs)[j]! := by
-  rw [List.getElem!_eq_getElem?_getD, List.getElem!_eq_getElem?_getD,
-      dinodeBytes_addrs d j]
-
 /-- Slot `k`'s record is well formed. -/
 theorem diblkWf_slot (ds : List Dinode) (k : Nat) (hall : ∀ x ∈ ds, dinodeWf x)
     (hk : k < ds.length) : dinodeWf ds[k]! := by
   rw [getElem!_pos ds k hk]
   exact hall _ (List.getElem_mem hk)
-
-theorem diblkBytes_lookup_t (ds : List Dinode) (k j : Nat)
-    (hall : ∀ x ∈ ds, dinodeWf x) (hk : k < ds.length) (hj : j < 64) :
-    (diblkBytes ds)[64 * k + j]! = (dinodeBytes ds[k]!)[j]! := by
-  rw [List.getElem!_eq_getElem?_getD, List.getElem!_eq_getElem?_getD,
-      diblkBytes_lookup ds k j hall hk hj]
-
-theorem diblkBytes_insert_same_t (ds : List Dinode) (k : Nat) (d : Dinode) (j : Nat)
-    (hall : ∀ x ∈ ds, dinodeWf x) (hd : dinodeWf d) (hk : k < ds.length) (hj : j < 64) :
-    (diblkBytes (ds.set k d))[64 * k + j]! = (dinodeBytes d)[j]! := by
-  rw [List.getElem!_eq_getElem?_getD, List.getElem!_eq_getElem?_getD,
-      diblkBytes_insert_same ds k d j hall hd hk hj]
-
-theorem diblkBytes_insert_other_t (ds : List Dinode) (k : Nat) (d : Dinode) (i : Nat)
-    (hall : ∀ x ∈ ds, dinodeWf x) (hd : dinodeWf d) (hk : k < ds.length)
-    (hi : i < 64 * k ∨ 64 * k + 64 ≤ i) :
-    (diblkBytes (ds.set k d))[i]! = (diblkBytes ds)[i]! := by
-  rw [List.getElem!_eq_getElem?_getD, List.getElem!_eq_getElem?_getD,
-      diblkBytes_insert_other ds k d i hall hd hk hi]
 
 end Xv6

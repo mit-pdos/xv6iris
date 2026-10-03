@@ -40,7 +40,7 @@ list (`Xv6/NamexParts.lean` deviation 4), not Rocq's `bytes_own` /
    `proc_priv_bare_acc`, a fraction of the same row), the trapframe
    quarter and page through `ProcPrivAcc.procPrivFd_tf` (Rocq
    `proc_priv_tf`), and argstr takes the bare block by `procPrivFd`'s own
-   definition (`SysfileCalls.sysfile_blk_bare`).
+   definition.
 4. The fetched string's shape is `UMemL.umemStr_nul`; the path buffer and
    the slots↔bytes carve are the shared `Xv6/SysfileCalls.lean` helpers;
    the fold is the landed `KstackMap.byteBuf_stackOwn`.
@@ -52,8 +52,6 @@ list (`Xv6/NamexParts.lean` deviation 4), not Rocq's `bytes_own` /
 import Xv6.SysfileCalls
 import Xv6.SpecSysMknod
 import Xv6.ProcPrivAcc
-import Xv6.KstackMap
-import Xv6.CopyLemmas
 import Xv6.KexecParts
 
 namespace Xv6
@@ -63,9 +61,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## Constants (Rocq `mn_push` / `mn_pop` / `mn_fp` / `mn_buf` / `mn_min` /
 `mn_maj` / `mn_frm*`) -/
@@ -84,12 +80,6 @@ def sysMknodMaj (sp0 : BitVec 64) : BitVec 64 := sp0 + 0xFFFFFFFFFFFFFF6C#64
 /-- slot 20, the padding, `s0 - 160`. -/
 def sysMknodPad (sp0 : BitVec 64) : BitVec 64 := sp0 + 0xFFFFFFFFFFFFFF60#64
 
-theorem sys_mknod_buf_addr (x : BitVec 64) : x + BitVec.signExtend 64 3952#12 = sysMknodBuf x := by
-  unfold sysMknodBuf; bv_decide
-theorem sys_mknod_min_addr (x : BitVec 64) : x + BitVec.signExtend 64 3944#12 = sysMknodMin x := by
-  unfold sysMknodMin; bv_decide
-theorem sys_mknod_maj_addr (x : BitVec 64) : x + BitVec.signExtend 64 3948#12 = sysMknodMaj x := by
-  unfold sysMknodMaj; bv_decide
 theorem sys_mknod_min4 (x : BitVec 64) : sysMknodMin x + 4#64 = sysMknodMaj x := by
   unfold sysMknodMin sysMknodMaj; bv_decide
 
@@ -112,10 +102,6 @@ theorem sys_mknod_K (a : Nat) (h : sysMknodSlots ≤ a) :
 
 /-! ## The sign cluster (the `bltz` at +0x2e, the `c.beqz` at +0x44) and
 the immediates -/
-
-theorem sys_mknod_li2 : 0#64 + BitVec.signExtend 64 2#12 = BitVec.ofNat 64 2 := by decide
-theorem sys_mknod_li3 : 0#64 + BitVec.signExtend 64 3#12 = BitVec.signExtend 64 T_DEVICE_w := by
-  decide
 
 theorem sys_mknod_tdev_nz : T_DEVICE_w.toNat ≠ 0 := by decide
 
@@ -497,7 +483,7 @@ abbrev sysMknodPostA (k : KCtx) (A : SysMknodArgs GF) (c : CPU) : IProp GF :=
 
 /-- The caller's bundle at the record. -/
 abbrev sysMknodAu (A : SysMknodArgs GF) : IProp GF :=
-  mknodAuAt (hlc := hlc) (fsGammaL fscFs) fscFs A.V.cwi (viewLazy A.V.upt A.V.sz A.M) A.v0.toNat
+  mknodAuAt (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti A.V.cwi (viewLazy A.V.upt A.V.sz A.M) A.v0.toNat
     (devArg A.v1) (devArg A.v2) A.P A.Pmiss A.Farm A.Fun A.Fok A.Fex
 
 /-- THE RECORD AT A RAISED COUNT (permit sweep L1b, deviation 5): argstr
@@ -568,7 +554,7 @@ def sysMknodOut (A : SysMknodArgs GF) (r : BitVec 64) : IProp GF := iprop%
   bslots 3 ∗ irefSlots A.ns ∗
   (∃ P' : UPtd, ⌜A.V.upt.extSz A.V.sz P'⌝ ∗
     procPrivFd A.γ (procAddr A.j) A.pid { A.V with upt := P' } (viewFaulted A.V.upt P' A.M) ∗
-    mknodArms (hlc := hlc) (fsGammaL fscFs) fscFs A.V.cwi (viewLazy A.V.upt A.V.sz A.M) A.v0.toNat
+    mknodArms (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti A.V.cwi (viewLazy A.V.upt A.V.sz A.M) A.v0.toNat
       (devArg A.v1) (devArg A.v2) A.P A.Pmiss A.Farm A.Fun A.Fok A.Fex r)
 
 set_option maxHeartbeats 8000000 in

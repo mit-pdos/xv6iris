@@ -4,15 +4,10 @@ interfaces of `bread`, `bwrite` and `brelse`.
 -/
 import Xv6.SpecWriteHead
 import Xv6.BcacheLock
-import Xv6.CodeTactics
 import Xv6.FsCallSites
 import Xv6.SpecBwrite
-import Xv6.BlkmapBuf
 import Xv6.EndOpDefs
-import Xv6.FileInv
-import Xv6.FsWords
 import Xv6.InitlogHead
-import Xv6.VirtioDiskRwDefs2
 
 namespace Xv6
 
@@ -21,9 +16,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## The little-endian image the copy loop lays down -/
 
@@ -93,7 +86,7 @@ theorem whBytes_step (n t : Nat) (W : List (BitVec 32)) (bs0 : List (BitVec 8)) 
       show 4 * (t + 1) + 4 = 4 * (t + 1 + 1) from by omega]
   rw [hd]
   unfold whBytes
-  rw [List.take_succ, hw, wbytes_append]
+  rw [List.take_add_one, hw, wbytes_append]
   simp only [Option.toList_some, wbytes, List.append_nil, List.append_assoc]
 
 theorem whBytes_word (n : Nat) (W : List (BitVec 32)) (bs0 : List (BitVec 8)) (i : Nat)
@@ -402,13 +395,13 @@ theorem wh_ret_20 : jumpPc (KA.«write_head» + 0x20#64) = (KA.«write_head» + 
 theorem wh_ret_4c : jumpPc (KA.«write_head» + 0x4c#64) = (KA.«write_head» + 0x4c#64) := by decide
 theorem wh_ret_52 : jumpPc (KA.«write_head» + 0x52#64) = (KA.«write_head» + 0x52#64) := by decide
 
-theorem wh_br_bread : KA.«write_head» + 0xFFFFFFFFFFFFF0AA#64 = KA.«bread» := by decide
-theorem wh_br_bwrite : KA.«write_head» + 0xFFFFFFFFFFFFF180#64 = KA.«bwrite» := by decide
-theorem wh_br_brelse : KA.«write_head» + 0xFFFFFFFFFFFFF1B2#64 = KA.«brelse» := by decide
+theorem wh_br_bread : KA.«write_head» + 0xfffffffffffff04a#64 = KA.«bread» := by decide
+theorem wh_br_bwrite : KA.«write_head» + 0xfffffffffffff120#64 = KA.«bwrite» := by decide
+theorem wh_br_brelse : KA.«write_head» + 0xfffffffffffff152#64 = KA.«brelse» := by decide
 
-theorem wh_log_addr : KA.«write_head» + 0x1ea34#64 = logAddr := by
+theorem wh_log_addr : KA.«write_head» + 0x1ec60#64 = logAddr := by
   unfold logAddr; decide
-theorem wh_lhb0 : KA.«write_head» + 0x1ea64#64 = lhBlock 0 := by
+theorem wh_lhb0 : KA.«write_head» + 0x1ec90#64 = lhBlock 0 := by
   unfold lhBlock logAddr; decide
 
 /-! ## The three callees, at their call sites -/
@@ -528,7 +521,7 @@ theorem wh_tail (BW : BWRITE) (BE : BRELSE)
   k_step_e (wp_s_add cpu _ (KA.«write_head» + 0x46#64) true 10#5 0#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hs1]
   iintro Hk Hpc
-  k_step_e (wp_s_jal cpu _ (KA.«write_head» + 0x48#64) false 2093368#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«write_head» + 0x48#64) false 2093272#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [wh_br_bwrite]
   iintro Hk Hpc
   iapply (wh_bwrite BW Γ cpu _ γl γb V γdl pd pav pu j kk pidv dev bno dqp bs' bs (Q bs') k.proc
@@ -557,7 +550,7 @@ theorem wh_tail (BW : BWRITE) (BE : BRELSE)
   k_step_e (wp_s_add cpu _ (KA.«write_head» + 0x4c#64) true 10#5 0#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hs1']
   iintro Hk Hpc
-  k_step_e (wp_s_jal cpu _ (KA.«write_head» + 0x4e#64) false 2093412#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«write_head» + 0x4e#64) false 2093316#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [wh_br_brelse]
   iintro Hk Hpc
   -- the payload, re-paired at the written bytes (Rocq's `wh_pay_mk`)
@@ -689,7 +682,7 @@ theorem writeHead_proof (BD : BREAD) (BW : BWRITE) (BE : BRELSE) : WRITE_HEAD :=
   k_step_e (wp_s_auipc cpu _ (KA.«write_head» + 0xc#64) false 0x1f#20 18#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_addi cpu _ (KA.«write_head» + 0x10#64) false 2600#12 18#5 18#5 (by decide))
+  k_step_e (wp_s_addi cpu _ (KA.«write_head» + 0x10#64) false 3156#12 18#5 18#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [wh_log_addr]
   iintro Hk Hpc
   -- +0x14 lw a1,24(s2) ; +0x18 lw a0,36(s2)
@@ -718,7 +711,7 @@ theorem writeHead_proof (BD : BREAD) (BW : BWRITE) (BE : BRELSE) : WRITE_HEAD :=
   k_norm_g [Xv6.eo_o_dev]
   iintro Hk Hpc -
   -- +0x1c jal bread
-  k_step_e (wp_s_jal cpu _ (KA.«write_head» + 0x1c#64) false 2093198#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«write_head» + 0x1c#64) false 2093102#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [wh_br_bread]
   iintro Hk Hpc
   iapply (bread_call_eb BD Γ cpu _ γl γb V γdl pd pav pu j pidv dev (BitVec.ofNat 32 logstart) dqp
@@ -816,7 +809,7 @@ theorem writeHead_proof (BD : BREAD) (BW : BWRITE) (BE : BRELSE) : WRITE_HEAD :=
     k_step_e (wp_s_auipc cpu _ (KA.«write_head» + 0x2c#64) false 0x1f#20 14#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     iintro Hk Hpc
-    k_step_e (wp_s_addi cpu _ (KA.«write_head» + 0x30#64) false 2616#12 14#5 14#5 (by decide))
+    k_step_e (wp_s_addi cpu _ (KA.«write_head» + 0x30#64) false 3172#12 14#5 14#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [wh_lhb0]
     iintro Hk Hpc
     -- +0x34 c.mv a5,a0 ; +0x36 c.slli a2,a2,2 ; +0x38 c.add a2,a2,a0

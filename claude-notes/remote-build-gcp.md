@@ -50,6 +50,19 @@ run-on-gcp --where            # print the remote path for $PWD
 The switch is on `PATH` in every remote shell, so `rocq`, `coqc` and
 `coq_makefile` just work — no `opam exec --switch=…` wrapper.
 
+**Until the shared switch directories are swapped (opam/README.md), the
+switch on the VM's `PATH` is the PRE-2026-09-26 toolchain and the tree's
+toolchain is `/shared/xv6rocq-new`.** Nothing in `run-on-gcp` selects it
+(`config.sh`'s `ROCQ_OPAM_SWITCH` is unused), so every remote command that
+compiles — the detached `nohup bash -c` forms above included, and
+`vmbuild.sh`'s make line — starts with
+`export PATH=/shared/xv6rocq-new/_opam/bin:$PATH`, and uses `bash -c`, not
+`bash -lc` (a login shell re-prepends the old switch).  The tell of the
+wrong switch is `The variable lookup_insert_eq was not found` in a low
+file that is green on main.  Artifacts built under the wrong switch must
+be deleted, not rebuilt over (`make` cannot see the difference).  This
+host has no matching switch, so `--pull-vo` rechecks are off until it does.
+
 **`--no-sync` is for querying the VM, never for diagnosing your own latest
 edit.** It compiles whatever was last pushed, so after an edit you have not
 synced it reports errors from a file you no longer have, confidently, with line

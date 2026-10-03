@@ -34,7 +34,7 @@ So this file adds the missing RECEIPT and the rule that cashes it:
   produced) becomes the postcondition of a plain load: `readAUr` is
   `MachCSL.readAU` whose continuation ALSO receives `rviewLb cpu tvn` for
   the very view the load read at;
-* `wp_s_fence_rw_rw_floor` consumes `rviewLb cpu T` and hands out
+* `wp_s_fence_r_rw_floor` consumes `rviewLb cpu T` and hands out
   `viewLb cpu T`.
 
 Everything else is a parallel copy of the existing load stack at width 2
@@ -50,9 +50,8 @@ and the fence stage, which needs its own barrier leaf because
 away:
 
     memModel_fence_acq  →  swp_sail_barrier_view
-                        →  execSpecF_fence_rw_rw_floor  →  wp_s_fence_rw_rw_floor
+                        →  execSpecF_fence_r_rw_floor  →  wp_s_fence_r_rw_floor
 -/
-import MachCSL.SmodeMemFacts
 import MachCSL.ReadAUr
 import MachCSL.WpLockSchema
 import MachCSL.WpSmodeAtomic
@@ -101,7 +100,7 @@ theorem memModel_load_rv (σ : MState) (cpu : CPU) (pa : PAddr) (n tvn : Nat) (h
   imodintro
   have hresv : resvMap (σ.afterLoad cpu pa n tvn) = resvMap σ :=
     resvMap_congr _ _ (fun c => by
-      simp only [MState.afterLoad, updCpu]
+      simp only [updCpu]
       split
       · rename_i hc; subst hc; simp [HRead.afterLoad]
       · simp)
@@ -112,9 +111,9 @@ theorem memModel_load_rv (σ : MState) (cpu : CPU) (pa : PAddr) (n tvn : Nat) (h
     · iapply Hclose $$ %(σ.afterLoad cpu pa n tvn)
       · ipureintro
         intro c hc
-        simp [MState.afterLoad, updCpu, hc]
+        simp [updCpu, hc]
       · iapply hartViewsAt_intro
-        simp only [MState.afterLoad, updCpu, if_true, HRead.afterLoad]
+        simp only [updCpu, if_true, HRead.afterLoad]
         iframe Hv Hi Hr
     · ipureintro
       exact mmOk_afterLoad σ cpu pa n tvn htv hmm
@@ -145,7 +144,7 @@ theorem memModel_fence_acq (σ : MState) (cpu : CPU) (b : barrier_kind)
   have e : (σ.fence cpu b).tv cpu =
       fencePost (fenceDrains b) (fenceAcq b) (σ.tv cpu) (σ.hr cpu).rv
         (ownPub (hartAgent cpu) σ.log) := by
-    simp [MState.fence, updCpu]
+    simp [updCpu]
   have hle : T ≤ (σ.fence cpu b).tv cpu := by
     rw [e, hacq]
     unfold fencePost
@@ -435,57 +434,6 @@ elab "swp_to_barrier " n:num : tactic => withSailNormCtx do
     if !ok then break
   throwError "swp_to_barrier: no barrier event reached"
 
-set_option maxHeartbeats 4000000 in
-/-- `fence rw,rw`, absorbing a position the hart has read past. -/
-theorem execSpecF_fence_rw_rw_floor (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Bool)
-    (hok : SConfPhys (GF := GF) c sie) (hmenv : c.menvcfg = menvcfgS)
-    (pc npc₀ : BitVec 64) (rs rd : BitVec 5) (R : RegMap) (T : Nat) :
-    execSpecPP (GF := GF) cpu dq Privilege.Supervisor c Privilege.Supervisor c
-      (instruction.FENCE (0#4, 3#4, 3#4, regidx.Regidx rs, regidx.Regidx rd)) pc npc₀ npc₀
-      iprop(gprFile cpu R ∗ rviewLb cpu T) iprop(gprFile cpu R ∗ viewLb cpu T) := by
-  intro Φ
-  have hfiom : _get_MEnvcfg_FIOM c.menvcfg = 0#1 := by rw [hmenv]; rfl
-  clear hmenv
-  iintro ⟨HmConf, HPC, HnextPC, ⟨HF, #Hrv⟩, HΦ⟩
-  conf_cases HmConf
-  obtain ⟨hpmp, hms, hpmm, hlpe⟩ := hok
-  obtain ⟨hSIE, hMPRV, hSXL, hMXR, hTSR, hTVM, hFS, hXS, hVS, hSD, hMPP⟩ := hms
-  unfold execute
-  swp_to_barrier 40
-  iapply swp_bind
-  iapply (swp_sail_barrier_view cpu _ (by decide) T)
-  isplit
-  · iexact Hrv
-  inext
-  iintro #Hv
-  iapply swp_ret
-  swp_run 80
-  conf_intro HmConf
-  iapply HΦ $$ HmConf HPC HnextPC [HF Hv]
-  iframe HF
-  iexact Hv
-
-/-- **`fence rw,rw` (`__sync_synchronize()`), the floor rule.**  The
-hart's floor absorbs any position its READ WATERMARK has reached: what the
-hart has already read past, its later loads see.
-
-The premise is `rviewLb cpu T`, not `topLb T`: a full fence does not take
-the floor to the top of the store order (see this file's header), and the
-receipt is what a `readAUr` load leaves behind.  Interrupts are off, so
-the fence runs on this hart. -/
-theorem wp_s_fence_rw_rw_floor [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx)
-    (hsie : k.sie = false) (pc : BitVec 64) (is_rvc : Bool) (rs rd : BitVec 5) (T : Nat) :
-    instr (GF := GF) pc is_rvc (instruction.FENCE (0#4, 3#4, 3#4, regidx.Regidx rs, regidx.Regidx rd)) ∗
-    kctxL lent cpu k ∗ pcIs cpu pc ∗ rviewLb cpu T ∗
-    ▷ wpNext k.sie k.proc cpu (fun cpu' =>
-        iprop(kctxL lent cpu' k -∗ pcIs cpu' (pc + instrLen is_rvc) -∗ viewLb cpu T -∗ wpLoop cpu'))
-    ⊢ wpLoop cpu :=
-  wpLoop_k_keep cpu k pc _ is_rvc _ (rviewLb cpu T) (fun _ => viewLb cpu T)
-    (fun cpu' c hpin hok hmenv => by
-      obtain rfl : cpu' = cpu := hpin (Or.inl hsie)
-      exact execSpecF_fence_rw_rw_floor cpu' (DFrac.own 1) c k.sie hok.phys hmenv pc _ rs rd
-        (tpPin cpu' k.regs) T)
-
 /-! ## Width 4 and the acquire-only fence (xv6 `main`'s secondary spin)
 
 The racy width-4 load (`lw`, sign-extending) inside a `readAUr`, and the
@@ -646,8 +594,8 @@ theorem execSpecF_fence_r_rw_floor (cpu : CPU) (dq : DFrac) (c : MConf) (sie : B
   iexact Hv
 
 /-- **`fence r,rw` (the acquire fence after the spin's load), the floor
-rule** (the acquire-only twin of `wp_s_fence_rw_rw_floor`): the
-hart's floor absorbs any position its read watermark has reached. -/
+rule**: the hart's floor absorbs any position its read watermark has
+reached. -/
 theorem wp_s_fence_r_rw_floor [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx)
     (hsie : k.sie = false) (pc : BitVec 64) (is_rvc : Bool) (rs rd : BitVec 5) (T : Nat) :
     instr (GF := GF) pc is_rvc (instruction.FENCE (0#4, 2#4, 3#4, regidx.Regidx rs, regidx.Regidx rd)) ∗
@@ -681,7 +629,7 @@ theorem execSpecF_fence_r_rw (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Bool)
   conf_intro HmConf
   iapply HΦ $$ HmConf HPC HnextPC HF
 
-/-- `fence r,rw`, receipt-free (the twin of `wp_s_fence_rw_rw`). -/
+/-- `fence r,rw`, receipt-free. -/
 theorem wp_s_fence_r_rw [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx)
     (pc : BitVec 64) (is_rvc : Bool) (rs rd : BitVec 5) :
     instr (GF := GF) pc is_rvc (instruction.FENCE (0#4, 2#4, 3#4, regidx.Regidx rs, regidx.Regidx rd)) ∗

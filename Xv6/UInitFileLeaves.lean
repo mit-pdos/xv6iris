@@ -55,7 +55,6 @@ Nothing else (15 declarations: 14 reached + the instance).
 -/
 import Xv6.UInitConsFile
 import Xv6.FileLinkGen
-import Xv6.FileOutClaim
 import Xv6.UexecExecMintW
 import Xv6.UkWriteClosed
 import Xv6.LinkUexecWp
@@ -64,8 +63,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Std (ExtTreeSet)
-
-set_option linter.unusedSectionVars false
 
 section UInitFileLeaves
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]

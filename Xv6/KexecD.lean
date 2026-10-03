@@ -53,10 +53,9 @@ around the commit's stores; the closed record is Rocq's `upd_exec`.
    `hsrc : sscSrcOk bss`) and the new file retired.
 4. **The entry-point premise is Rocq's GUARDED one** (`kexec_built` ->
    `Q (kxq_entry ef) U'`), over `KexecBuilt.kexecBuilt fb ef sz1 A.na A.alen
-   A.afun V' M'`; `kxd_phaseD_all` is the unguarded instance
-   (`∀ V' M', Q (kxqEntry ef) V' M'`, kc_interfaces §5).  Rocq's `kxq_pay`
-   (the four-projection form inside `kxd_commit`) is folded: the commit
-   proves `kexecBuilt` at the record it builds.
+   A.afun V' M'`.  Rocq's `kxq_pay` (the four-projection form inside
+   `kxd_commit`) is folded: the commit proves `kexecBuilt` at the record it
+   builds.
 5. **Premises the frozen `kxcAt2a6` does not carry** are taken as pure
    premises, as Rocq's `kxd_phaseD` takes them: `8192 ≤ sz1.toNat`
    (`Hsz1ge`), the argument vector non-null below `na` (`Havf_nz`), the ELF
@@ -89,10 +88,8 @@ continuation takes the block at any record `evAfter` the swap's, and
 the success arm does not read the count.
 -/
 import Xv6.KexecSeam
-import Xv6.ProcPrivAcc
 import Xv6.SpecSafestrcpySrc
 import Xv6.PrepareReturnStores
-import Xv6.KernelTac
 
 namespace Xv6
 
@@ -101,9 +98,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## PURE FACTS -/
 
@@ -394,10 +389,10 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
 
-theorem kxd_br_ss : KA.«kexec» + 0x2d8#64 + BitVec.signExtend 64 2081432#21 = KA.«safestrcpy» := by
+theorem kxd_br_ss : KA.«kexec» + 0x2d8#64 + BitVec.signExtend 64 2081316#21 = KA.«safestrcpy» := by
   decide
 theorem kxd_ret_ss : jumpPc (KA.«kexec» + 0x2d8#64 + 4#64) = KA.«kexec» + 0x2d8#64 + 4#64 := by decide
-theorem kxd_br_pfp : KA.«kexec» + 0x2fc#64 + BitVec.signExtend 64 2084572#21 =
+theorem kxd_br_pfp : KA.«kexec» + 0x2fc#64 + BitVec.signExtend 64 2084444#21 =
     KA.«proc_freepagetable» := by decide
 theorem kxd_ret_pfp : jumpPc (KA.«kexec» + 0x2fc#64 + 4#64) = KA.«kexec» + 0x2fc#64 + 4#64 := by
   decide
@@ -486,8 +481,8 @@ theorem kxd_commit1 (SS : SAFESTRCPY_SRC) (cpu : CPU) (k : KCtx) (A : KexecArgs)
       (DFrac.own 1) (k.regs 10#5 + BitVec.ofNat 64 q))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h8]
   iintro Hk Hpc Hs
-  -- +0x2d4  addi a0,s3,344 : &p->name
-  k_step_e (wp_s_addi cpu _ (KA.«kexec» + 0x2d4#64) false 344#12 10#5 19#5 (by decide))
+  -- +0x2d4  addi a0,s3,352 : &p->name
+  k_step_e (wp_s_addi cpu _ (KA.«kexec» + 0x2d4#64) false 352#12 10#5 19#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [RegMap.set_apply, h19]
   iintro Hk Hpc
   -- the two buffers: p->name out of the block, the path from `last` on
@@ -502,7 +497,7 @@ theorem kxd_commit1 (SS : SAFESTRCPY_SRC) (cpu : CPU) (k : KCtx) (A : KexecArgs)
     rw [List.getElem?_drop, show q + (A.plen - q) = A.plen by omega,
       bview_lookup _ _ _ (by omega), hterm]
   -- +0x2d8  jal safestrcpy
-  iapply (kxd_call_ss SS cpu k spie spp _ (KA.«kexec» + 0x2d8#64) 2081432#21 kxd_br_ss kxd_ret_ss
+  iapply (kxd_call_ss SS cpu k spie spp _ (KA.«kexec» + 0x2d8#64) 2081316#21 kxd_br_ss kxd_ret_ss
       (pName k.proc) (k.regs 10#5 + BitVec.ofNat 64 q) V.name ((bview (A.plen + 1) A.pfun).drop q)
       A.dqpv hK (by simp [RegMap.set_apply, pName]) (by simp [RegMap.set_apply])
       (by simp [RegMap.set_apply]) (by rw [hnl]; rfl) hsrc)
@@ -634,7 +629,7 @@ theorem kxd_commit2 (PFP : PROC_FREEPAGETABLE) (Γ : SchedNames) (cpu : CPU) (k 
   icases procPrivFd_evLend A.γ k.proc A.pidv
       (kxdV3 V P sz1 ((V.tf.set tfEpcIdx (kxqEntry ef)).set kxcTfSpIdx spv)) Mi $$ Hpriv
     with ⟨Hlend, Hpback⟩
-  iapply (kxc_call_pfp PFP Γ cpu k A spie spp _ (KA.«kexec» + 0x2fc#64) 2084572#21 kxd_br_pfp
+  iapply (kxc_call_pfp PFP Γ cpu k A spie spp _ (KA.«kexec» + 0x2fc#64) 2084444#21 kxd_br_pfp
       kxd_ret_pfp V.upt A.M (kxdV3 V P sz1 ((V.tf.set tfEpcIdx (kxqEntry ef)).set kxcTfSpIdx spv)).ev
       hK hnoff (by simp [RegMap.set_apply]) (by simpa [RegMap.set_apply] using hszo)
       (by simpa [RegMap.set_apply] using hbo))
@@ -1042,25 +1037,6 @@ theorem kxd_phaseD (SS : SAFESTRCPY_SRC) (PFP : PROC_FREEPAGETABLE) (Γ : SchedN
         F1 F2 F3 F4 F5 F6 F7 F8 F9 F10 F11 F12 F13 Fu Fp F64 F65 F66 F67 F68 $Hcl]
     · unfold kxcBufs; iframe
       unfold kxcFrameB; iframe
-
-/-- **The unguarded instance** (kc_interfaces §5's shape): a plug that holds
-at EVERY final block pays the guarded premise. -/
-theorem kxd_phaseD_all (SS : SAFESTRCPY_SRC) (PFP : PROC_FREEPAGETABLE) (Γ : SchedNames)
-    (Q : BitVec 64 → ProcPriv → (Nat → List (BitVec 8)) → Prop) (QF : KxfCause → Prop)
-    (cpu : CPU) (k : KCtx) (A : KexecArgs) (spie spp : Bool) (R : RegMap) (w13 w67 : BitVec 64)
-    (fb ef : List (BitVec 8)) (P : UPtd) (Mi : Nat → List (BitVec 8)) (sz1 : BitVec 64) (ci : Nat)
-    (hQ : ∀ V' M', Q (kxqEntry ef) V' M')
-    (hK : kexecSlots ≤ k.avail) (hnoff : k.noff = 0) (htier : k.tier = KTier.kpt)
-    (hsz1 : 8192 ≤ sz1.toNat) (havf : ∀ i, i < A.na → A.avf i ≠ 0#64)
-    (hal : (kxcElfBuf (k.regs 2#5)).toNat % 8 = 0) (hl : ef.length = 64)
-    (hterm : A.pfun A.plen = 0#8) :
-    kxcAt2a6 k A cpu spie spp R (k.regs 19#5) (k.regs 20#5) (k.regs 21#5) (k.regs 22#5) (k.regs 23#5)
-      (k.regs 24#5) (k.regs 25#5) (k.regs 26#5) w13 w67 fb ef P Mi A.V.sz sz1 (k.regs 27#5) ci ∗
-    fsFabric (hlc := hlc) Γ A.pd A.pav A.pu ∗
-    (∀ c' : CPU, kexecCloser Q QF k A c')
-    ⊢ wpLoop (GF := GF) cpu :=
-  kxd_phaseD SS PFP Γ Q QF cpu k A spie spp R w13 w67 fb ef P Mi sz1 ci (fun V' M' _ => hQ V' M') hK
-    hnoff htier hsz1 havf hal hl hterm
 
 end Commit
 

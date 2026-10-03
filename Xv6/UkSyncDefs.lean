@@ -14,9 +14,8 @@ exit; `syncPay P Qr R` turns the one into the other, and it is spent in
 call's effect is complete.  ITS SECOND PREMISE IS THE KERNEL'S DURABILITY
 RECEIPT (Rocq sync K4 6ec6feccd): `Qr` is what the call handed back --
 `qOpt oQ` at the hook `main` deposited (`ksyncLeaf`) -- so a payment may
-spend what the sync made durable.  At a trivial payload it is free
-(`syncPay_triv`); the union's round pays PEND at RAN with it (`UkSyncEntry`,
-`UshURoundSync`).
+spend what the sync made durable.  At a trivial payload it is free; the
+union's round pays PEND at RAN with it (`UkSyncEntry`, `UshURoundSync`).
 
 THE ECALL LEAF, AS A PARAMETER (Rocq `UkSync.ksync_leaf`, sync K4; the mould
 is `UkInit.uki_mknod_leaf`).  sync's one returning syscall is 22, whose
@@ -25,8 +24,7 @@ row 22) -- rows only the xv6 instance can read, while the program's walks are
 stated at the abstract `UexecSG`.  So the ecall at 0x36a is a CONTRACT
 (`ksyncLeaf N oQ`): the run at the ecall's pc with a7 = 22, the cwd fragment
 and the hook in; the run after the ecall with the hook's `Q` and the
-fragment out.  `UkSyncStubs.ksyncLeaf_none` discharges it at `none` at any
-instance (the quiet leaf); the xv6 instance discharges it at every `oQ`
+fragment out.  The xv6 instance discharges it at every `oQ`
 (`UkSyncEntry.ksyncLeaf_xv6`).
 
 ## Deviations from Rocq
@@ -41,27 +39,17 @@ instance (the quiet leaf); the xv6 instance discharges it at every `oQ`
    `UshURoundSync` (drift D3-app).
 -/
 import Xv6.UkStub
-import Xv6.UkRunMem
 import Xv6.UkSysP
 import Xv6.User.SyncText
-import Xv6.SyncHook
 
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 
-set_option linter.unusedSectionVars false
-
 /-- **Rocq `sync_pay`** (sync K4): its second premise is the kernel's
 durability receipt. -/
 abbrev syncPay {PROP : Type _} [BI PROP] (P Qr R : PROP) : PROP := iprop(P -∗ Qr -∗ R)
-
-/-- **Rocq `sync_pay_triv`**. -/
-theorem syncPay_triv {PROP : Type _} [BI PROP] (P Qr : PROP) : ⊢ syncPay P Qr iprop(True) := by
-  unfold syncPay
-  iintro - -
-  ipureintro; trivial
 
 section Code
 variable {GF : BundledGFunctors} [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat]
@@ -84,7 +72,6 @@ theorem sync_ustack_two (γd : GName) (sp : BitVec 64) :
   iintro ⟨-, H0, H1, -⟩
   isplitl [H0]; · iexact H0
   iexact H1
-
 
 end Code
 

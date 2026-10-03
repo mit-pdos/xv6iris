@@ -47,10 +47,10 @@ explicit in the Lean uservec/userret contracts, which take `Rut` opaque.
   `ut_own_nopt` (+ the trapframe out)     | `utOwnBare Rsys N V sts cs pid`
   `ut_res` / `ut_res_parked` / `ut_res_bare` | `utResBare cpu Rsys P ksp V sts cs pid`
   `ut_trap_csrs_fold` / `ut_csrs_raw_fold` | `utCsrs_fold`
-  `ut_hold` / `ut_hold_transport`         | `utHold` / `utHold_move`
+  `ut_hold` / `ut_hold_transport`         | not ported (nothing uses them)
   `park_globals` / `ut_caps_of_park` /    | `parkGlobals` / `utCaps_of_park` /
     `park_own` / `ut_res_bare_park`       |   `parkOwn` / `utResBare_park`
-  `wp_next_true_swap`                     | `wpNext_true_swap`
+  `wp_next_true_swap`                     | not ported (nothing uses it)
 
 THE WHOLE-PAGE STACK (the uservec obligation, notes/design-rulings.md):
 uservec is entered at a context `k` whose `sp` is the trapframe's
@@ -61,8 +61,7 @@ userret leaves is deeper when the thread came through forkret (whose frame
 is never popped: Rocq SpecForkret "the frame merged back in"); the frame's
 cells are the caller's, and `userretLeft_pop` / `userretLeft_top` merge them
 back (`MachCSL.stackOwn_join`).  Rocq carries the budget as `⌜K_usertrap ≤
-av⌝` inside the residue; here it is the context's `avail`, and
-`usertrapSlots_le_page` says the page covers it.
+av⌝` inside the residue; here it is the context's `avail`.
 
 ## Deviations from Rocq
 
@@ -78,7 +77,7 @@ av⌝` inside the residue; here it is the context's `avail`, and
    halves of the sret mirror at SPP = U / SPIE = 1) and `ut_exit_ms_ok` are
    the KCtx facts `utCtxOk k` (`sie = false`, `spie = true`, `spp = false`),
    which uservec's exit (`uservecCtx_ok`) and prepare_return's post
-   (`intrOff_ok`) establish and userret's entry premises consume.
+   establish and userret's entry premises consume.
    `ut_trap_open` (the entry assembly into `sie_cap_gpr`) is uservec's own
    post (`kctx cpu (uservecCtx k g ws)`), so it has no counterpart.
 3. **The residue is indexed by `V` alone**, not Rocq's `U = (V, M)`: the
@@ -144,8 +143,8 @@ av⌝` inside the residue; here it is the context's `avail`, and
     accessor `utResBare_uhist_acc` names `γ` existentially -- exactly the
     shape of Rocq's `usertrap_res_bare_uhist_acc`, whose `γ` is existential
     too because the residue closes over `N`.  No observer can tell the two
-    apart: the residue is `∃ N` in both.  `utOwn_rebuild` takes the row as a
-    premise (as Rocq's does); no other statement in this file moves.
+    apart: the residue is `∃ N` in both.  No other statement in this file
+    moves.
 
 Imports only definitional files.
 -/
@@ -160,20 +159,6 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedVariables false
-set_option linter.unusedSectionVars false
-
-/-! ## §0 The budget -/
-
-/-- **Rocq `K_usertrap`**: usertrap's own 4-slot frame, the `kv_frame_slots`
-the syscall arm's `csrsi sstatus` owes a nested trap, and syscall's
-`4 + K_sys_exec` below it. -/
-def usertrapSlots : Nat := 4 + kvFrameSlots + (4 + sysExecSlots)
-
-/-- The kernel stack page covers it (512 slots). -/
-theorem usertrapSlots_le_page : usertrapSlots ≤ 512 := by
-  unfold usertrapSlots kvFrameSlots sysExecSlots kexecSlots; omega
-
 /-! ## §1 The trap side (D27: KCtx facts) -/
 
 /-- **Rocq `ut_ghosts`, restated** (D27): the context usertrap runs in and
@@ -184,10 +169,6 @@ def utCtxOk (k : KCtx) : Prop := k.sie = false ∧ k.spie = true ∧ k.spp = fal
 /-- uservec's exit establishes it (the trap from User set `SPIE`/`SPP`). -/
 theorem uservecCtx_ok (k : KCtx) (g : RegMap) (ws : List (BitVec 64)) (h : k.sie = false) :
     utCtxOk (uservecCtx k g ws) := ⟨h, rfl, rfl⟩
-
-/-- **Rocq `ut_exit_ms_ok`, restated**: prepare_return's post context is
-sret-ready (userret's `hsie`/`hspie`/`hspp`). -/
-theorem intrOff_ok (k : KCtx) : utCtxOk (k.intrOff true false) := ⟨rfl, rfl, rfl⟩
 
 /-- **The whole-page stack** uservec is entered at: `sp` at the page top
 `ksp`, all 512 slots free (the trap reserve is empty at `sie = false`). -/
@@ -235,19 +216,6 @@ theorem userretLeft_top (cpu : CPU) (k : KCtx) (ksp : BitVec 64) (m : Nat)
   ipureintro
   exact ⟨by simp [KCtx.pop_sp], by simp [KCtx.pop_avail, hav]⟩
 
-/-- **Rocq `wp_next_true_swap`**: at `sie = true` the crossing does not
-depend on the proc (for a real one). -/
-theorem wpNext_true_swap (p q : BitVec 64) (cpu : CPU) (K : CPU → IProp GF) (hp : p ≠ 0#64) :
-    wpNext true p cpu K ⊢ wpNext true q cpu K := by
-  unfold wpNext
-  iintro H %cpu' %_
-  iapply H $$ %cpu'
-  ipureintro
-  intro h
-  rcases h with h | h
-  · cases h
-  · exact absurd h hp
-
 end Trap
 
 /-! ## §2 The names -/
@@ -283,10 +251,6 @@ kernel-table `satp` at `root`, the stack top `ksp`, usertrap, this hart. -/
 def utKWords (cpu : CPU) (root : BitVec 44) (ksp : BitVec 64) (ws : List (BitVec 64)) : Prop :=
   tfW ws 0 = satpOf KTier.kpt root ∧ tfW ws 1 = ksp ∧ tfW ws 2 = usertrapPc ∧ tfW ws 4 = hartId cpu
 
-/-- ...and it is uservec's premise at a context rooted there, on that stack. -/
-theorem utKWords_uservec (cpu : CPU) (k : KCtx) (ws : List (BitVec 64))
-    (h : utKWords cpu k.root k.sp ws) : uservecKWords cpu k ws := h
-
 /-- The four kernel words, read off a word list. -/
 theorem tfW_of_getElem? {ws : List (BitVec 64)} {i : Nat} {w : BitVec 64} (h : ws[i]? = some w) :
     tfW ws i = w := by
@@ -321,14 +285,6 @@ theorem uservecTf_low (ws : List (BitVec 64)) (g : RegMap) (i : Nat) (hi : i < 5
   unfold uservecTf
   rw [uvSaveSeq_low _ (by simp) g _ i hi, uvSaveSeq_low _ (by simp [uvSavesC]) g _ i hi,
     uvSaveSeq_low _ (by simp [uvSavesB]) g _ i hi, uvSaveSeq_low _ (by simp [uvSavesA]) g _ i hi]
-
-theorem utKWords_uservecTf (cpu : CPU) (root : BitVec 44) (ksp : BitVec 64)
-    (ws : List (BitVec 64)) (g : RegMap) (h : utKWords cpu root ksp ws) :
-    utKWords cpu root ksp (uservecTf ws g) := by
-  have hlow : ∀ i, i < 5 → tfW (uservecTf ws g) i = tfW ws i := uservecTf_low ws g
-  obtain ⟨h0, h1, h2, h4⟩ := h
-  exact ⟨(hlow 0 (by omega)).trans h0, (hlow 1 (by omega)).trans h1,
-    (hlow 2 (by omega)).trans h2, (hlow 4 (by omega)).trans h4⟩
 
 section Tfk
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
@@ -427,7 +383,8 @@ theorem utCaps_kalloc (N : UtNames) :
 execution.  At the kernel tier of the ambient context, as `procPrivFd`
 states it.  It keeps the slot's event counter (`actCnt pa V.ev`, after the
 lazy claim -- the bare block's, Rocq G's `proc_priv_nopt` conjunct, design
-ni-strong-instance.md §7): the residue parks with the permit. -/
+ni-strong-instance.md §7): the residue parks with the permit.  The root's
+reference rides right after the cwd's, as in the core (chroot). -/
 def utBlock (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) : IProp GF := iprop%
   ⌜V.sz.toNat ≤ uvmMaxsz ∧ umBelow V.sz V.upt ∧
     V.pagetable = pageAddr V.upt.root ∧ V.trapframe = pageAddr V.upt.tfp⌝ ∗
@@ -436,12 +393,9 @@ def utBlock (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) :
   ⌜V.pvLazy = false → lazyFree V.upt.um V.sz⌝ ∗
   actCnt pa V.ev ∗
   @cwdRefAt hlc GF _ _ _ _ _ ⟨curCtx, KTier.kpt⟩ V.cwd V.cwi ∗
+  @rootRefAt hlc GF _ _ _ _ _ ⟨curCtx, KTier.kpt⟩ V.root V.rti ∗
   procGenAt curCtx pa pid V.gen ∗
   procOfiles γ V.fdg pa V.ofile
-
-/-- The block does not read the trapframe's words. -/
-theorem utBlock_tf (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
-    (ws : List (BitVec 64)) : utBlock (GF := GF) γ pa pid { V with tf := ws } = utBlock γ pa pid V := rfl
 
 /-- **Rocq `proc_priv_split_pt` + `proc_priv_tf_open`**: the block is the
 parked part, the address space and the trapframe page. -/
@@ -451,13 +405,13 @@ theorem utBlock_join (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : Pr
       @tfPageAt hlc GF _ ⟨curCtx, KTier.kpt⟩ V.upt.tfp V.tf ⊣⊢ procPrivFd γ pa pid V M := by
   unfold utBlock procPrivFd procPrivCoreNoctxAt procPrivBareAt
   constructor
-  · iintro ⟨⟨%h, Hpid, Hf, %hlz, Hev, Hc, Hg, Ho⟩, Hpt, Htf⟩
-    iframe Hpid Hf Hc Hg Ho Hpt Htf Hev
+  · iintro ⟨⟨%h, Hpid, Hf, %hlz, Hev, Hc, Hr, Hg, Ho⟩, Hpt, Htf⟩
+    iframe Hpid Hf Hc Hr Hg Ho Hpt Htf Hev
     isplitl []
     · ipureintro; exact h
     · ipureintro; exact hlz
-  · iintro ⟨⟨⟨%h, Hpid, Hf, Hpt, Htf, %hlz, Hev⟩, Hc, Hg⟩, Ho⟩
-    iframe Hpid Hf Hc Hg Ho Hpt Htf Hev
+  · iintro ⟨⟨⟨%h, Hpid, Hf, Hpt, Htf, %hlz, Hev⟩, Hc, Hr, Hg⟩, Ho⟩
+    iframe Hpid Hf Hc Hr Hg Ho Hpt Htf Hev
     isplitl []
     · ipureintro; exact h
     · ipureintro; exact hlz
@@ -556,14 +510,6 @@ theorem utOwn_priv (Rsys : UtNames → BitVec 32 → IProp GF) (N : UtNames) (V 
   iintro %V' %M' %sts' %cs' Hpv Hfr Hch Hsy
   iframe Hb Hfd Hir Hpv Hfr Hch Hsy Huh
 
-/-- **Rocq `ut_own_rebuild`** (which, like this, takes the key history as a
-premise since Rocq 5634a3874). -/
-theorem utOwn_rebuild (Rsys : UtNames → BitVec 32 → IProp GF) (N : UtNames) (V : ProcPriv)
-    (M : Nat → List (BitVec 8)) (sts : List FdState) (cs : ExtTreeSet GName compare) (pid : BitVec 32) :
-    bslots 3 ∗ fdSlots FDSPARE ∗ irefSlots IREFSPARE ∗ procPrivFd N.f N.pj pid V M ∗
-      fdFrags V.fdg sts ∗ chFrag V.chg N.pj cs ∗ Rsys N pid ∗ uhistRow ⊢ utOwn (GF := GF) Rsys N V M sts cs pid := by
-  unfold utOwn; exact .rfl
-
 /-- **Rocq `ut_epc_exists` / `ut_tf_length`** (deviation 10): the
 trapframe is 36 words, so `p->trapframe->epc` exists (prepare_return's
 `hepc`). -/
@@ -575,26 +521,6 @@ theorem utOwn_tfLen (Rsys : UtNames → BitVec 32 → IProp GF) (N : UtNames) (V
   iframe Hb Hfd Hir Hpid Hf Hpt Hw Hbs Hc Hg Ho Hfr Hch Hsy Huh Hev
   ipureintro
   exact ⟨⟨h, hl, hlz⟩, hl⟩
-
-/-- **Rocq `ut_hold`**: what a usertrap block carries besides the context,
-at its own `SIE` index -- the trap-CSR / claim complement (the whole bundle
-at `false`, `emp` at `true`) and the environment. -/
-def utHold (cpu : CPU) (Rsys : UtNames → BitVec 32 → IProp GF) (N : UtNames) (V : ProcPriv)
-    (M : Nat → List (BitVec 8)) (b : Bool) (sts : List FdState) (cs : ExtTreeSet GName compare)
-    (pid : BitVec 32) : IProp GF := iprop(
-  trapCsrsExt cpu b ∗ cpuClaimExt cpu b N.pj ∗ utCaps N ∗ utOwn Rsys N V M sts cs pid)
-
-/-- **Rocq `ut_hold_transport`**: the environment is hart-free, the
-complement moves where the hart cannot. -/
-theorem utHold_move (cpu c : CPU) (Rsys : UtNames → BitVec 32 → IProp GF) (N : UtNames) (V : ProcPriv)
-    (M : Nat → List (BitVec 8)) (b : Bool) (sts : List FdState) (cs : ExtTreeSet GName compare)
-    (pid : BitVec 32) (h : b = false ∨ N.pj = 0#64 → c = cpu) :
-    utHold (GF := GF) cpu Rsys N V M b sts cs pid ⊢ utHold c Rsys N V M b sts cs pid := by
-  unfold utHold
-  iintro ⟨Ht, Hc, Hrest⟩
-  icases armExt_move cpu c b N.pj N.pj h $$ [Ht Hc] with ⟨Ht, Hc⟩
-  · iframe Ht Hc
-  iframe Ht Hc Hrest
 
 /-! ## §6 The residue -/
 
@@ -662,14 +588,6 @@ theorem utResBare_split (h : curTier = KTier.kpt) (cpu : CPU) (Rsys : UtNames �
   iexists N
   iframe Htfk Hcl Hcaps Hown
   ipureintro; exact ⟨rfl, hk, hw⟩
-
-/-- The running form, opened (usertrap's stages work on the rows). -/
-theorem utResRun_open (cpu : CPU) (Rsys : UtNames → BitVec 32 → IProp GF) (P : UPtd) (ksp : BitVec 64)
-    (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) (cs : ExtTreeSet GName compare)
-    (pid : BitVec 32) :
-    utResRun (GF := GF) cpu Rsys P ksp V M sts cs pid ⊣⊢
-      ∃ N : UtNames, ⌜V.upt = P ∧ V.kstack + 4096#64 = ksp ∧ utWf N⌝ ∗
-        utTfk cpu ksp V ∗ cpuClaim cpu N.pj ∗ utCaps N ∗ utOwn Rsys N V M sts cs pid := .rfl
 
 /-- The kernel words, copied out (uservec's `hkw` via `utTfk_uservec`). -/
 theorem utResBare_tfk (cpu : CPU) (Rsys : UtNames → BitVec 32 → IProp GF) (P : UPtd) (ksp : BitVec 64)
@@ -742,21 +660,6 @@ theorem utResBare_fd_open (cpu : CPU) (Rsys : UtNames → BitVec 32 → IProp GF
   iintro ⟨%N, %hN, #Htfk, Hcl, #Hcaps, Hb, Hfd, Hir, Hbl, Hfr, Hch, Hsy, Huh⟩
   iframe Hfr
   iintro %sts' Hfr
-  iexists N
-  iframe Htfk Hcl Hcaps Hb Hfd Hir Hbl Hfr Hch Hsy Huh
-  ipureintro; exact hN
-
-/-- **Rocq `ut_res_bare_fsabs`, generic in the fact**: a persistent fact
-the syscall environment carries, read off the residue (the loop mints the
-exec bundle from one). -/
-theorem utResBare_env (Q : IProp GF) [Persistent Q] (cpu : CPU) (Rsys : UtNames → BitVec 32 → IProp GF)
-    (P : UPtd) (ksp : BitVec 64) (V : ProcPriv) (sts : List FdState) (cs : ExtTreeSet GName compare)
-    (pid : BitVec 32) (hR : ∀ N pid, Rsys N pid ⊢ Q ∗ Rsys N pid) :
-    utResBare (GF := GF) cpu Rsys P ksp V sts cs pid ⊢ Q ∗ utResBare cpu Rsys P ksp V sts cs pid := by
-  unfold utResBare utOwnBare
-  iintro ⟨%N, %hN, #Htfk, Hcl, #Hcaps, Hb, Hfd, Hir, Hbl, Hfr, Hch, Hsy, Huh⟩
-  icases hR N pid $$ Hsy with ⟨#HQ, Hsy⟩
-  iframe HQ
   iexists N
   iframe Htfk Hcl Hcaps Hb Hfd Hir Hbl Hfr Hch Hsy Huh
   ipureintro; exact hN

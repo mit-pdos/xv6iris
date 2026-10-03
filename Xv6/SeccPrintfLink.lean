@@ -6,7 +6,6 @@ stated over `urun` in `UkSeccDefs`) from `LinkUlibPrintf` through
 seccomp's chain `kseccPaySeq` is `ulibUkPaySeq` at its image.
 -/
 import Xv6.UlibUkProg
-import Xv6.UkSeccDefs
 import Xv6.LinkSecc
 
 namespace Xv6
@@ -14,8 +13,6 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
-
-set_option linter.unusedSectionVars false
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]

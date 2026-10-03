@@ -40,11 +40,6 @@ def ctxCells [CurCtx] (c : BitVec 64) (vs : List (BitVec 64)) : IProp GF := ipro
   ⌜vs.length = 14⌝ ∗
   [∗list] j ↦ w ∈ vs, wordPointsTo (c + BitVec.ofNat 64 (8 * j)) 8 (DFrac.own 1) w
 
-theorem ctxCells_cases [CurCtx] (c : BitVec 64) (vs : List (BitVec 64)) :
-    ctxCells (GF := GF) c vs ⊢ ⌜vs.length = 14⌝ ∗
-      [∗list] j ↦ w ∈ vs, wordPointsTo (c + BitVec.ofNat 64 (8 * j)) 8 (DFrac.own 1) w := by
-  unfold ctxCells; iintro H; iexact H
-
 theorem ctxCells_intro [CurCtx] (c : BitVec 64) (vs : List (BitVec 64)) (h : vs.length = 14) :
     ([∗list] j ↦ w ∈ vs, wordPointsTo (c + BitVec.ofNat 64 (8 * j)) 8 (DFrac.own 1) w) ⊢
       ctxCells (GF := GF) c vs := by

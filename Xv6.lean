@@ -551,7 +551,6 @@ import Xv6.ProofEndOp
 import Xv6.LinkEndOp
 import Xv6.ArrCursor
 import Xv6.ByteCursor
-import Xv6.ByteBuf
 import Xv6.FsGeom
 import Xv6.BlockWords
 import Xv6.BlkmapDefs
@@ -571,10 +570,8 @@ import Xv6.FsCfgDefs
 import Xv6.FsStateDefs
 import Xv6.FsBytesGamma
 import Xv6.SbPark
-import Xv6.WriteiBudget
 import Xv6.FsStateBitmap
 import Xv6.BitmapInv
-import Xv6.WriteiBudgetBitmap
 import Xv6.FsNode
 import Xv6.FsStateInode
 import Xv6.InodeInv
@@ -620,6 +617,7 @@ import Xv6.InodeRegionLink
 import Xv6.FsStateEraResB
 import Xv6.IcacheEscrowTok
 import Xv6.IcacheHeld
+import Xv6.IcacheShortCarve
 import Xv6.ProcInv
 import Xv6.ProcPrivAcc
 import Xv6.InodeRegionWithdraw
@@ -686,6 +684,9 @@ import Xv6.IgetHit
 import Xv6.IgetScan
 import Xv6.ProofIget
 import Xv6.LinkIget
+import Xv6.SpecIgetroot
+import Xv6.ProofIgetroot
+import Xv6.LinkIgetroot
 import Xv6.SpecBalloc
 import Xv6.BallocParts
 import Xv6.BallocDefs
@@ -831,14 +832,12 @@ import Xv6.NamexLevel
 import Xv6.NamexElem
 import Xv6.NamexLoop
 import Xv6.NamexStart
-import Xv6.NamexRoot
 import Xv6.ProofNamex
 import Xv6.LinkNamex
 import Xv6.FsReady
 import Xv6.PieceFam
 import Xv6.UserOff
 import Xv6.FsAbsDelta
-import Xv6.FsAbsState
 import Xv6.SysReadDefs
 import Xv6.SysWriteDefs
 import Xv6.FsAbsOpenFire
@@ -847,7 +846,6 @@ import Xv6.FsAbsWriteFire
 import Xv6.SpecNamei
 import Xv6.NameiFrame
 import Xv6.ProofNamei
-import Xv6.ProofNameiRoot
 import Xv6.LinkNamei
 import Xv6.SpecNameiparent
 import Xv6.ProofNameiparent
@@ -869,7 +867,6 @@ import Xv6.ProofFilestat
 import Xv6.LinkFilestat
 import Xv6.FsAbsWalk
 import Xv6.FsAbsEra
-import Xv6.FsAbsEraState
 import Xv6.FsAbsCreateFire
 import Xv6.FsAbsCreateNm
 import Xv6.SysMknodDefs
@@ -879,7 +876,6 @@ import Xv6.FsAbsUnlinkFire
 import Xv6.SysLinkDefs
 import Xv6.FsAbsLinkFire
 import Xv6.SysUnlinkBudget
-import Xv6.SysLinkBudget
 import Xv6.SysOpenDefs
 import Xv6.SysOpenKept
 import Xv6.SysOpenBits
@@ -901,11 +897,10 @@ import Xv6.KexecPtImage
 import Xv6.KexecImageAlg
 import Xv6.KexecImageOk
 import Xv6.IregLinkNz
+import Xv6.IregClaimPlain
 import Xv6.CreateDefs
 import Xv6.CreateParts
 import Xv6.CreateFreshTy
-import Xv6.CreateBudget
-import Xv6.SysOpenBudget
 import Xv6.SpecNamexEra
 import Xv6.SpecNparEra
 import Xv6.SpecNameiEra
@@ -947,6 +942,10 @@ import Xv6.SysChdirCalls
 import Xv6.SysChdirTails
 import Xv6.ProofSysChdir
 import Xv6.LinkSysChdir
+import Xv6.SpecSysChroot
+import Xv6.SysChrootParts
+import Xv6.ProofSysChroot
+import Xv6.LinkSysChroot
 import Xv6.CreateFound
 import Xv6.CreateAlloc
 import Xv6.SpecFilewrite
@@ -1109,7 +1108,6 @@ import Xv6.UhistDefs
 import Xv6.NiLedger
 import Xv6.NiTrace
 import Xv6.UexecApply
-import Xv6.UexecCond
 import Xv6.ProofUexecWp
 import Xv6.BootConfig
 import Xv6.BootHart
@@ -1173,8 +1171,8 @@ import Xv6.SyscallTable
 import Xv6.SyscallRet
 import Xv6.UtResFits
 import Xv6.SpecUsertrap
-import Xv6.UtRoundQuiet
 import Xv6.SyscallArmsPath
+import Xv6.SyscallArmsChroot
 import Xv6.SyscallArmsExec
 import Xv6.SyscallArmsFdDefs
 import Xv6.SyscallArmsFd
@@ -1370,7 +1368,6 @@ import Xv6.GrepFilt
 import Xv6.PipesDisc
 import Xv6.PipesUline
 import Xv6.PipesView
-import Xv6.PipesDiscDec
 import Xv6.PipeBothNPure
 import Xv6.PipesFire
 import Xv6.UnionDisc
@@ -1615,7 +1612,6 @@ import Xv6.GrepPrintfLink
 import Xv6.UkTree
 import Xv6.UkHandler
 import Xv6.UkFreeHandler
-import Xv6.UkTreeRead
 import Xv6.UkTreeEntry
 import Xv6.ExecArgs
 import Xv6.ExecRun
@@ -1749,7 +1745,6 @@ import Xv6.UshRedirBody
 import Xv6.UshForkTwin
 import Xv6.UshCatForkTwin
 import Xv6.UshDiagLeaf
-import Xv6.UshDiagFinal
 import Xv6.UshSeam
 import Xv6.UshExecEnvRun
 import Xv6.UshForkChildEcho
@@ -1806,7 +1801,6 @@ import Xv6.FileOutEra
 import Xv6.FileOutClaim
 import Xv6.FileLinksLine
 import Xv6.FileLinkGen
-import Xv6.FileLinks
 import Xv6.FileOpenDeed
 import Xv6.FileOpenFams
 import Xv6.FileOpenClaim
@@ -1856,6 +1850,7 @@ import Xv6.UkPipesIfaceDefs
 import Xv6.UkPipesIfaceKit
 import Xv6.UkCatFIfaceCon
 import Xv6.UkPipesIfaceDevU
+import Xv6.PnsKeep
 import Xv6.UkPipesIfaceReg
 import Xv6.UkPipesIfaceDev
 import Xv6.UkFileDevSysHolds
@@ -1892,6 +1887,9 @@ import Xv6.UkPipesIfaceExit
 import Xv6.UkPipesIfaceRec
 import Xv6.UkPipesEntriesDefs
 import Xv6.UkPipesEntries
+import Xv6.UkPipesEntriesEcho
+import Xv6.UkPipesEntriesCat
+import Xv6.UkPipesEntriesGrep
 import Xv6.UkUnionEntriesPure
 import Xv6.UkUnionEntriesLend
 import Xv6.UkUnionEntriesDefs
@@ -1900,11 +1898,9 @@ import Xv6.UkUnionEntriesEcho
 import Xv6.UkUnionEntriesFile
 import Xv6.UshLineDefs
 import Xv6.UshLineLease
-import Xv6.UshLineHold
 import Xv6.UshLineRead
 import Xv6.UshOut
 import Xv6.UshPromptLaw
-import Xv6.UshPanicHold
 import Xv6.UshPanicStub
 import Xv6.UshPanicByte
 import Xv6.UshPanicPrompt

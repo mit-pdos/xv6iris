@@ -20,8 +20,8 @@ left, plus one induction:
   `1 < ninodes`), the lazy saves of `s1..s6`, and the loop constants.
 
 **Deviations from Rocq.**  Rocq's `wp_ialloc_sconf` derivation
-(ProofIalloc 3355–3400: `log_op_openS`, the set form, `log_opS_op`) is the
-Spec file's `IALLOC.wp_ialloc_sconf`.  The functor parameter `PRINTK_GEN`
+(ProofIalloc 3355–3400: `log_op_openS`, the set form, `log_opS_op`) is not
+ported (nothing uses it).  The functor parameter `PRINTK_GEN`
 is Lean's `PRINTK` (its general-varargs form); `MemsetArray` is `MEMSET`.
 The rest is the stage decomposition of `Xv6/IallocDefs.lean`'s header.
 
@@ -42,9 +42,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
@@ -164,7 +162,7 @@ theorem ialloc_setup (BD : BREAD) (MS : MEMSET) (LW : LOG_WRITE) (BE : BRELSE) (
   k_step_e (wp_s_auipc cpu _ (KA.«ialloc» + 0x28#64) false 0x1e#20 20#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_addi cpu _ (KA.«ialloc» + 0x2c#64) false 2418#12 20#5 20#5 (by decide))
+  k_step_e (wp_s_addi cpu _ (KA.«ialloc» + 0x2c#64) false 3070#12 20#5 20#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ialloc_a_sb]
   iintro Hk Hpc
   -- THE SCAN, at inum = 1
@@ -231,7 +229,7 @@ theorem ialloc_entry (BD : BREAD) (MS : MEMSET) (LW : LOG_WRITE) (BE : BRELSE) (
   k_step_e (wp_s_auipc cpu _ (KA.«ialloc» + 0x8#64) false 0x1e#20 14#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_lw cpu _ (KA.«ialloc» + 0xc#64) false 2462#12 14#5 14#5 (by decide) (by decide)
+  k_step_e (wp_s_lw cpu _ (KA.«ialloc» + 0xc#64) false 3114#12 14#5 14#5 (by decide) (by decide)
       dqn (BitVec.ofNat 32 fscNinodes))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ialloc_a_ninodes]
   iintro Hk Hpc Hsn

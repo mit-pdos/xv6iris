@@ -14,6 +14,12 @@ import MachCSL.WpSmodeCtl
 import MachCSL.WpSmodeCsr
 import MachCSL.WpSmodeCycle
 import MachCSL.WpAluFile
+import MachCSL.WpSmodeMemLbu
+import MachCSL.WpSmodeMemLd
+import MachCSL.WpSmodeMemLw
+import MachCSL.WpSmodeMemSb
+import MachCSL.WpSmodeMemSd
+import MachCSL.WpSmodeMemSw
 
 
 namespace MachCSL
@@ -680,30 +686,6 @@ theorem wp_s_csrr_sstatus [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k 
     (fun cpu' c _ hok _ => by
       have e := execSpecF_csrr_sstatus (GF := GF) cpu' (DFrac.own 1) c k.sie hok.phys pc (pc + instrLen is_rvc) rd hrd.1
         (tpPin cpu' k.regs)
-      rw [htp] at e; exact e)
-  simpa only [KCtx.setReg_eq_withRegs] using h
-
-/-- `csrrci rd, sstatus, SIE` with interrupts off: reads `sstatus` (its `SIE`
-bit is `0`), leaves the configuration alone (`intr_off` at `SIE = 0`). -/
-theorem wp_s_csrrci_sstatus [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
-    (pc : BitVec 64) (is_rvc : Bool) (rd : BitVec 5) (hrd : rdOk rd) :
-    instr (GF := GF) pc is_rvc (instruction.CSRImm (0x100#12, 2#5, regidx.Regidx rd, csrop.CSRRC)) ∗
-    kctxL lent cpu k ∗ pcIs cpu pc ∗
-    ▷ wpNext k.sie k.proc cpu (fun cpu' =>
-        iprop(∀ v : BitVec 64, ⌜sstatusAt k.sie v⌝ -∗ kctxL lent cpu' (k.setReg rd v) -∗
-          pcIs cpu' (pc + instrLen is_rvc) -∗ wpLoop cpu'))
-    ⊢ wpLoop cpu := by
-  have htp := fun v => tpPin_set cpu k.regs rd v hrd.2.2
-  have h := wpLoop_k_genv (lent := lent) cpu k pc (pc + instrLen is_rvc) is_rvc _
-    (fun c => lower_mstatus c.mstatus) (sstatusAt k.sie)
-    (fun c (hok : SConfAt (GF := GF) curTier c k.root k.sie) _ => by
-      unfold sstatusAt; rw [lower_mstatus_sie]; exact hok.phys.2.1.1)
-    (fun v => k.regs.set rd v) (fun v => RegMap.set_other _ _ _ _ (Ne.symm hrd.2.1))
-    (fun (cpu' : CPU) (c : MConf) (hpin : k.sie = false ∨ k.proc = 0#64 → cpu' = cpu) hok _ => by
-      obtain rfl := hpin (Or.inl hsie)
-      have hph := hok.phys
-      rw [hsie] at hph
-      have e := execSpecF_csrrci_sstatus (GF := GF) cpu' c hph pc (pc + instrLen is_rvc) rd hrd.1 (tpPin cpu' k.regs)
       rw [htp] at e; exact e)
   simpa only [KCtx.setReg_eq_withRegs] using h
 

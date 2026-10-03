@@ -26,15 +26,12 @@ ledger's lowest closed slot 1, and the deed `Dd a` handed AT the call.
 -/
 import Xv6.UshArmDefs
 import Xv6.UStrImg
-import Xv6.FsAbsEra
 
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Iris.Std.PartialMap
 open Std (ExtTreeSet)
-
-set_option linter.unusedSectionVars false
 
 section UshRedirAns
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
@@ -55,7 +52,7 @@ def ushOpenCall2 {A : Type} (N : UkNames GF) (cwdv file : Nat) (mode : Int) (nm 
     ⌜m.get 10#5 = BitVec.ofNat 64 file⌝ -∗ ⌜m.get 11#5 = BitVec.ofInt 64 mode⌝ -∗
     ⌜∀ (E : ElfMem) (Mv : Nat → List (BitVec 8)), uimgSub (fun x => get? Img x) E → imgAgrees E Mv →
       argPathOf Mv file pl⌝ -∗
-    ⌜npElems pl = []⌝ -∗ ⌜umStartOf cwdv pl = ROOTINO⌝ -∗ ⌜(pathElems pl).getLast? = some nm⌝ -∗
+    ⌜npElems pl = []⌝ -∗ ⌜∀ rt : Nat, umStartOf rt cwdv pl = ROOTINO⌝ -∗ ⌜(pathElems pl).getLast? = some nm⌝ -∗
     ⌜fdLowestClosed l = some 1⌝ -∗
     ([∗map] ad ↦ b ∈ Img, ubyteq N.d DFrac.discard ad b) -∗ Dd a -∗ ushCode N.t -∗ ucwd N.cwd cwdv -∗
     ustd N.fd l -∗ urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Sh.Sym.«open») av -∗

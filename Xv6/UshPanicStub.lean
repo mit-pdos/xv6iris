@@ -17,7 +17,7 @@ prompt as one call and its law), `UshPanicLaws` (S6-S7, the diagnostic laws
 with a linear frame).
 
 CONE of `UShPanic` (re-walked on the pinned globs: 31/38 reached).  Here:
-`shp_write`, `alt_panic_len`, `alt_execfail_len`, `ubyte_halves`,
+`alt_panic_len`, `alt_execfail_len`, `ubyte_halves`,
 `ubyte_split`, `ubyte_join`, `ubytesq_one`, `ubytesq_of_one`,
 `ubytesq_to_one`, `wp_ksh_write_chain_buf`; the notations `a0_idx`,
 `a1_idx`, `a2_idx`, `a7_idx`, `ra_idx`, `sh_prompt_pv` are Lean's register
@@ -54,8 +54,6 @@ DROPPED from `UShPanic` (unreached): `ksh_w_of_link_prompt_post_at`,
    6 s kernel check per walk.
 -/
 import Xv6.UshMainStubs
-import Xv6.UkRunSysWrite
-import Xv6.UkConsOut
 import Xv6.UshSysPHolds
 
 namespace Xv6
@@ -64,13 +62,7 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
-
 /-! ## S0 THE PINS -/
-
-/-- **Rocq `shp_write`**: sh's `write` stub. -/
-theorem shp_write : User.Sh.Sym.«write» = 0xc82 := by decide
-
 
 /-- **Rocq `alt_execfail_len`** (deviation 1): "exec echo failed\n$ ". -/
 theorem altExecfail_len : altExecfail.length = 19 := by decide
@@ -189,7 +181,6 @@ theorem wp_ksh_write_chain_buf (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : 
   · ipureintro; rw [ha2, e _ (by decide)]
   · ipureintro; rw [← e11]; exact hnf
   · rw [← e11]; iexact Hbuf
-
 
 /-- `wp_ksh_write_chain_buf` with the post READ BY THE CALLER'S OWN
 eliminator `helim` (deviation 4): the walk stays over the class, and the

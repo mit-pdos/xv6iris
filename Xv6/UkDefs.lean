@@ -26,7 +26,6 @@ lands on the known post state.  It runs on the same walker frames
 `ukView`); §3 the stamped address space (`userPtInvX`, `userPtmInvX`).
 -/
 import Xv6.UserFrame
-import Xv6.UserPerm
 import MachCSL.URunX
 import MachCSL.UCycle
 
@@ -35,8 +34,6 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Std MachCSL
 open Iris.Std.PartialMap Iris.Std.FiniteMap
 open Sail LeanRV64D LeanRV64D.Functions
-
-set_option linter.unusedSectionVars false
 
 /-! ## §1 The text pages, and the image split by them -/
 
@@ -139,6 +136,5 @@ def ukViewStore (V : Nat → List (BitVec 8)) (a n : Nat) (v : BitVec 64) : Nat 
   fun k => if k = a / 4096 then
       (V k).mapIdx (fun j b => if a % 4096 ≤ j ∧ j < a % 4096 + n then nthByte (n := 8) v (j - a % 4096) else b)
     else V k
-
 
 end Xv6

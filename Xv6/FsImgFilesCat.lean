@@ -9,13 +9,13 @@ namespace Xv6
 
 open Xv6.User
 
-/-! ### cat, inum 3, 36776 bytes -/
+/-! ### cat, inum 3, 36816 bytes -/
 
 /-- Rocq `fsimg_cat_type`. -/
 theorem fsimgCatType : (fsDinode fsimgP fsimgSb 3).diType.toNat = T_FILE := by
   rw [fsimgP_eq]; decide +kernel
 
-theorem fsimgCatSize : (fsDinode fsimgP fsimgSb 3).diSize.toNat = 36776 := by
+theorem fsimgCatSize : (fsDinode fsimgP fsimgSb 3).diSize.toNat = 36816 := by
   rw [fsimgP_eq]; decide +kernel
 
 theorem fsimgCatNlink : (fsDinode fsimgP fsimgSb 3).diNlink.toNat = 1 := by

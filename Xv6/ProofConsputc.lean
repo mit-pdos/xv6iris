@@ -9,7 +9,6 @@ arms leave through the same epilogue at `+0x18`, so the tail is shared
 (`consputc_finish`).  Interrupts are off throughout (the caller's
 `hsie`), so the thread stays on this hart.
 -/
-import MachCSL.WpSmodeFrame
 import Xv6.SpecConsputc
 import Xv6.SpecUartputcSync
 import Xv6.CodeTactics
@@ -20,9 +19,7 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 

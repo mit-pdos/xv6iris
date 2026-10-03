@@ -11,8 +11,6 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedSectionVars false
-
 section primary
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
   [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF]
@@ -45,7 +43,7 @@ def bootPrimarySupply [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG G
   logMirrorBorn (mirrorOf (fsBlocks dk)) ∗
   irefSlots IREFBOOT ∗ irefSlotsAuth ∗ bslots mainBslotsFs ∗
   genCert ∗ fsCrashSeam cov sb.sbLogstart ∗ crashInv ∗
-  initBootBundle (hlc := hlc) (SG := uexecSGXv6) ROOTINO seccAll (List.replicate NOFILE FdState.closed) ∗
+  initBootBundle (hlc := hlc) (SG := uexecSGXv6) ROOTINO ROOTINO seccAll (List.replicate NOFILE FdState.closed) ∗
   MachFixedGS.uClaimO (hlc := hlc) (GF := GF) ∗
   uartInv .uart0 γ0 ∗ uartInv .uart1 γ1 ∗ plicInv γ0 γ1 ∗ diskInv γd ∗ diskCrashCaps γd ∗
   wireInv ∗

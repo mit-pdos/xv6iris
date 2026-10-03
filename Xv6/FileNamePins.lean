@@ -102,6 +102,12 @@ theorem nl_ne_console (P : Fname → Prop) [DecidablePred P] (HL : NameLaws P) (
     (hN : P N) : N ≠ fnameConsole :=
   nl_ne_sys P HL N fnameConsole hN (by simp [sysNames])
 
+/-- Rocq `nl_ne_dotdot`: a class name is not `..` (the chroot bump's one
+fact about a pinned one-element path, `PinnedObs.pathNodot`). -/
+theorem nl_ne_dotdot (P : Fname → Prop) [DecidablePred P] (HL : NameLaws P) (N : Fname)
+    (hN : P N) : N ≠ DOTDOT :=
+  nl_ne_sys P HL N DOTDOT hN (by simp [sysNames])
+
 /-! ## 7.  WHAT THE LAWS SAY TO A LAYER ABOVE -/
 
 /-- Rocq `era0_astep_root`: at era 0, one hop out of the root IS the

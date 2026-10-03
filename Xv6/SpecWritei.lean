@@ -129,7 +129,7 @@ running-process bundle; its crossing is the literal `true`.
   `wp_writei_gen` (ProofDirlink.v 2366, ProofFilewrite.v 2591,
   ProofSysUnlinkW5D.v 767, ProofSysUnlinkW5F.v 759) -- reason: no consumer.
   It is `logOp_openS` + this contract + `logOpS_op` if a later wave wants
-  it (the `ITRUNC.wp_itrunc_sconf` pattern).
+  it.
 * The unused `dq`, `γf` and `γl`(process) binders of Rocq's body (`dq` is
   the pid-share fraction, which is `dqp` here on the kernel arm and inside
   the block on the user arm) -- uses checked: the four callers above pass
@@ -149,8 +149,6 @@ namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
-
-set_option linter.unusedVariables false
 
 /-- Address of `writei`. -/
 def writeiAddr : BitVec 64 := KA.«writei»
@@ -199,13 +197,6 @@ theorem wi16Spend_le4 (crb crd cru al ind : Bool) : wi16Spend crb crd cru al ind
 
 /-- What must be IN HAND on entry (Rocq's `wi16_need`). -/
 def wi16Need (crb ind : Bool) : Nat := bmapNeed crb ind + 2
-
-theorem wi16Need_value_dir : wi16Need false false = 4 := rfl
-
-/-- Rocq's `wi16_need_matches_landed`. -/
-theorem wi16Need_matches_landed (off : Nat) (h : wiBlocks off 16 = 1) :
-    wi16Need false false = wiCostBmonly off 16 := by
-  unfold wi16Need bmapNeed wiCostBmonly; rw [h]; rfl
 
 /-- The disk block the single-block window lands on, as `log_write` names
 it in the ledger (Rocq's `wi_tgt_blk`). -/
@@ -512,35 +503,5 @@ structure WRITEI : Prop where
       dn dn0 user off n sbs V M ncount Sb pidv dqp dqs dqd dqn dqi dqb dqz
       hj hproc hK hnoff htier hcost hgeom hcov hlog hnib hda hnz hstab hnl hwf hhz
       hcovs hsum hsz hbg hsbs hpd ha0 huser ha3 ha4
-
-/-- The interrupts-off instance of `wp_writei_gen_eb` (the complement is the whole
-bundle): the contract every not-yet-generalized caller states. -/
-theorem WRITEI.wp_writei_gen (A : WRITEI) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-    [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
-    [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
-    (γkl : GName) (γk : KmemNames)
-    (ip : BitVec 64) (inum : BitVec 32) (bm : Blkmap) (data : Nat → List (BitVec 8))
-    (dn dn0 : Dinode) (user : Bool) (off n : Nat) (sbs : List (BitVec 8))
-    (V : ProcPriv) (M : Nat → List (BitVec 8)) (ncount : Nat) (Sb : List Nat)
-    (pidv : BitVec 32) (dqp dqs dqd dqn dqi dqb dqz : DFrac)
-    hj hproc hK hsie hnoff hlocks htier hcost hgeom hcov hlog hnib hda hnz hstab hnl hwf hhz
-    hcovs hsum hsz hbg hsbs hpd ha0 huser ha3 ha4 :
-    wp_writei_gen_body (hlc := hlc) (GF := GF) Γ cpu k γl pd pav pu j γkl γk ip inum bm data
-      dn dn0 user off n sbs V M ncount Sb pidv dqp dqs dqd dqn dqi dqb dqz
-      hj hproc hK hsie hnoff hlocks htier hcost hgeom hcov hlog hnib hda hnz hstab hnl hwf hhz
-      hcovs hsum hsz hbg hsbs hpd ha0 huser ha3 ha4 := by
-  have h := A.wp_writei_gen_eb (hlc := hlc) (GF := GF) (Γ := Γ) (cpu := cpu) (k := k) (γl := γl) (pd := pd) (pav := pav) (pu := pu) (j := j) (γkl := γkl) (γk := γk) (ip := ip) (inum := inum) (bm := bm) (data := data) (dn := dn) (dn0 := dn0) (user := user) (off := off) (n := n) (sbs := sbs) (V := V) (M := M) (ncount := ncount) (Sb := Sb) (pidv := pidv) (dqp := dqp) (dqs := dqs) (dqd := dqd) (dqn := dqn) (dqi := dqi) (dqb := dqb) (dqz := dqz) (hj := hj) (hproc := hproc) (hK := hK) (hnoff := hnoff) (htier := htier) (hcost := hcost) (hgeom := hgeom) (hcov := hcov) (hlog := hlog) (hnib := hnib) (hda := hda) (hnz := hnz) (hstab := hstab) (hnl := hnl) (hwf := hwf) (hhz := hhz) (hcovs := hcovs) (hsum := hsum) (hsz := hsz) (hbg := hbg) (hsbs := hsbs) (hpd := hpd) (ha0 := ha0) (huser := huser) (ha3 := ha3) (ha4 := ha4)
-  unfold wp_writei_gen_eb_body at h
-  unfold wp_writei_gen_body
-  rw [hsie] at h
-  simp only [trapCsrsExt_false, cpuClaimExt_false] at h
-  iintro ⟨H0, H1, H2, Htc, Hcl, Hir, H6, H7, H8, H9, H10, H11, H12, H13, H14, H15, H16, H17, H18, H19, H20, H21, H22, H23, H24, H25, Hnext⟩
-  iapply h
-  iframe H0 H1 H2 Htc Hcl Hir H6 H7 H8 H9 H10 H11 H12 H13 H14 H15 H16 H17 H18 H19 H20 H21 H22 H23 H24 H25
-  iapply wpNext_mono $$ Hnext
-  iintro %cpu' HK %spie %spp %R' %tot %bm' %data' %dn' %dn0' %n' %wrote %dist %dstb %P' %Sb' %p0 %p1 H2 H3 ⟨Htc, Hir⟩ Hcl H7 H8 H9 H10 H11 H12 H13 H14 H15 H16 H17 H18
-  iapply HK $$ %spie %spp %R' %tot %bm' %data' %dn' %dn0' %n' %wrote %dist %dstb %P' %Sb' %p0 %p1 H2 H3 Htc Hcl Hir H7 H8 H9 H10 H11 H12 H13 H14 H15 H16 H17 H18
 
 end Xv6

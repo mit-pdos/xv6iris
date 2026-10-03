@@ -42,7 +42,7 @@ proved from the `fail:` twin `createFailMkdirBody` as a PREMISE.
   flush (`nlink_add1_nz_eq`).
 * THE APPLICATION: the DOTS fire first (`create_dirty_clear_dots`: the
   child's row moves `ADir ∅ → dotsEnts true`, its registry arm comes home),
-  then the PARENT LEG (`cafAcre_fire` at `creChild`).  The three `fail:`
+  then the PARENT LEG (`cafAcre_fire_nm` at `creChild`).  The three `fail:`
   entries fire the dots as far as they landed (entry 1: none, the retag is
   view-preserving; entry 2: `"."` alone; entry 3: both) and hand the child
   over WITHOUT its `dlinks`, with the fill's pile WHOLE again (the `"."`
@@ -114,8 +114,11 @@ proved from the `fail:` twin `createFailMkdirBody` as a PREMISE.
 -/
 import Xv6.CreateCalls
 import Xv6.IregLinkNz
+import Xv6.IcacheShortCarve
+import Xv6.ProcPrivAcc
 import Xv6.FsStateEraResB
 import Xv6.KexecCArgv
+import Xv6.SysUnlinkShared
 
 namespace Xv6
 
@@ -124,9 +127,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## 0.  Small pure facts -/
 
@@ -157,11 +158,6 @@ theorem createMkdir_n6 (n5 n6 : Nat) (crd cru al ind : Bool) (h5 : 6 ≤ n5)
 theorem createMkdir_dlneed5 (ind : Bool) (n : Nat) (h : 6 ≤ n) : dlNeed true ind ≤ n := by
   cases ind <;> (have := dlNeed_values; simp only [dlNeed] at *; omega)
 
-/-- the `".."` link's need: the bitmap block is in the set and the window is
-direct. -/
-theorem createMkdir_dlneed4 (n : Nat) (h : 6 ≤ n) : dlNeed true false ≤ n :=
-  createMkdir_dlneed5 false n h
-
 /-! ## 1.  The callees at create's environment, hart-free (the `SysLinkCalls`
 pattern) -/
 
@@ -180,7 +176,7 @@ theorem createMkdir_dirlink (DLK : DIRLINK) (Γ : SchedNames) [ClaimIs (hlc := h
     (γk : KmemNames) (ip : BitVec 64) (dinum : BitVec 32) (bm : Blkmap)
     (data : Nat → List (BitVec 8)) (dn : Dinode) (fn : Nat → BitVec 8) (inum : BitVec 16)
     (ncount : Nat) (Sb : List Nat) (tid : Nat) (qtx : Qp) (pidv : BitVec 32)
-    (dqn dqs dqbs dqb : DFrac)
+    (dqn dqs dqbs dqb : DFrac) (kd : Nat) (sd : Qp) (rootv : BitVec 64) (rti : Nat) (dqr : DFrac)
     (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hK : dirlinkSlots ≤ k'.avail)
     (hnoff : k'.noff = 0) (htier : k'.tier = KTier.kpt)
     (htype : dn.diType = T_DIR)
@@ -197,7 +193,8 @@ theorem createMkdir_dirlink (DLK : DIRLINK) (Γ : SchedNames) [ClaimIs (hlc := h
     (hneed : dlNeed (decide (fscBmapstart ∈ Sb))
       (bmapInd (16 * dirSlot data (dirNrec dn.diSize.toNat) / BSIZE)) ≤ ncount)
     (hpd : descPageRw pd)
-    (ha0 : k'.regs 10#5 = ip) (ha2 : k'.regs 12#5 = BitVec.setWidth 64 inum) :
+    (ha0 : k'.regs 10#5 = ip) (ha2 : k'.regs 12#5 = BitVec.setWidth 64 inum)
+    (hkd : ip = ientry kd) (hkdn : kd < NINODE) :
     kctx cpu k' ∗ pcIs cpu KA.«dirlink» ∗
     trapCsrsExt cpu k'.sie ∗ cpuClaimExt cpu k'.sie k'.proc ∗
     createEnv (hlc := hlc) Γ γl pd pav pu γkl γk ∗
@@ -209,15 +206,20 @@ theorem createMkdir_dirlink (DLK : DIRLINK) (Γ : SchedNames) [ClaimIs (hlc := h
     wordPointsTo sbSizeAddr 4 dqbs (BitVec.ofNat 32 fscSize) ∗
     wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 fscBmapstart) ∗
     dinodeAt fscIreg dinum dn ∗
-    wordPointsTo (pPid k'.proc) 4 pidPriv pidv ∗ bslots 3 ∗ irefSlot ∗
+    wordPointsTo (pPid k'.proc) 4 pidPriv pidv ∗
+    -- the inner lookup's rows (chroot): dp's share and unit, the root cell
+    -- and reference
+    inodeShr kd sd icfgDev dinum ∗ runitAny dinum.toNat ∗
+    wordPointsTo (pRoot k'.proc) 8 dqr rootv ∗ inodeHeldAt rootv rti ∗
+    bslots 3 ∗ irefSlot ∗
     dlinks fscFs dinum.toNat dn bm data ∗
     logOpS icfgLog ncount Sb ∗ txPin icfgLog tid qtx ∗
     (∀ (c : CPU) (spie spp : Bool) (R' : RegMap) (found : Bool)
       (bm' : Blkmap) (data' : Nat → List (BitVec 8)) (dn' dn0' : Dinode) (n' : Nat)
       (Sb' : List Nat) (tot : Nat),
       ⌜calleeSaved k'.regs R' ∧
-        DirlinkOut bm data dn dn fn inum dinum ncount Sb (R' 10#5) found bm' data' dn' dn0' n' Sb'
-          tot⌝ -∗
+        DirlinkOut bm data dn dn fn inum dinum rti ncount Sb (R' 10#5) found bm' data' dn' dn0' n'
+          Sb' tot⌝ -∗
       kctx c ((k'.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k'.regs 1#5)) -∗
       trapCsrsExt c k'.sie -∗ cpuClaimExt c k'.sie k'.proc -∗
       wordPointsTo (iDev ip) 4 (DFrac.own (1 : Qp).half) icfgDev -∗
@@ -229,6 +231,8 @@ theorem createMkdir_dirlink (DLK : DIRLINK) (Γ : SchedNames) [ClaimIs (hlc := h
       wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 fscBmapstart) -∗
       dinodeAt fscIreg dinum dn0' -∗
       wordPointsTo (pPid k'.proc) 4 pidPriv pidv -∗
+      inodeShr kd sd icfgDev dinum -∗ runitAny dinum.toNat -∗
+      wordPointsTo (pRoot k'.proc) 8 dqr rootv -∗ inodeHeldAt rootv rti -∗
       bslots 3 -∗ irefSlot -∗
       dlinks fscFs dinum.toNat dn bm data -∗
       logOpS icfgLog n' Sb' -∗ txPin icfgLog tid qtx -∗ wpLoop c)
@@ -236,24 +240,25 @@ theorem createMkdir_dirlink (DLK : DIRLINK) (Γ : SchedNames) [ClaimIs (hlc := h
   obtain ⟨hdcov, hdlog⟩ := hireg dinum hdnib
   unfold createEnv
   iintro ⟨Hk, Hpc, Hte, Hce, ⟨#Hpi, #Hpe, #Hbc, #Hlc, #Hdc, #Hkl, #Hav, #Hit2, #Hiti, #Hslks,
-    #Hinv, #Hopen, #Hbmi⟩, Hdev, Hinum, Hmeta, Hmap, Hblk, Hnm, Hsi, Hss, Hsb, Hdi, Hpid, Hbs,
-    Hslot, Hdl, Hop, Htx, HK⟩
+    #Hinv, #Hopen, #Hbmi⟩, Hdev, Hinum, Hmeta, Hmap, Hblk, Hnm, Hsi, Hss, Hsb, Hdi, Hpid, Hsh, Hru,
+    Hrt, Hrh, Hbs, Hslot, Hdl, Hop, Htx, HK⟩
   have h := DLK.wp_dirlink_gen_eb (hlc := hlc) (GF := GF) Γ cpu k' γl pd pav pu j γkl γk
     ip dinum bm data dn dn fn inum ncount Sb tid qtx pidv pidPriv
-    (DFrac.own (1 : Qp).half) (DFrac.own (1 : Qp).half) dqn dqs dqbs dqb
+    (DFrac.own (1 : Qp).half) (DFrac.own (1 : Qp).half) dqn dqs dqbs dqb kd sd rootv rti dqr
     hj hproc hK hnoff htier htype hcovs hszb hinums hdisj horph
     (diTypeStable_eq _ _ rfl) hnl hgeom hwf hholes hda hsz31 hdcov hdlog hdnib hinib hbg hbel
-    hireg hneed hpd ha0 ha2
+    hireg hneed hpd ha0 ha2 hkd hkdn
   unfold wp_dirlink_gen_eb_body at h
   simp only [dirlinkAddr] at h
   iapply h
-  iframe Hk Hpc Hte Hce Hdev Hinum Hmeta Hmap Hblk Hnm Hsi Hss Hsb Hdi Hpid Hbs Hslot Hdl Hop Htx
+  iframe Hk Hpc Hte Hce Hdev Hinum Hmeta Hmap Hblk Hnm Hsi Hss Hsb Hdi Hpid Hsh Hru Hrt Hrh Hbs
+    Hslot Hdl Hop Htx
   iframe #
   iapply wpNext_intro_pin
   iintro %c %_ %spie %spp %R' %found %bm' %data' %dn' %dn0' %n' %Sb' %tot %hcs %hout Hk Hpc Hte Hce
-    Hdev Hinum Hmeta Hmap Hblk Hnm Hsi Hss Hsb Hdi Hpid Hbs Hslot Hdl Hop Htx
+    Hdev Hinum Hmeta Hmap Hblk Hnm Hsi Hss Hsb Hdi Hpid Hsh Hru Hrt Hrh Hbs Hslot Hdl Hop Htx
   iapply HK $$ %c %spie %spp %R' %found %bm' %data' %dn' %dn0' %n' %Sb' %tot [] Hk Hpc Hte Hce Hdev
-    Hinum Hmeta Hmap Hblk Hnm Hsi Hss Hsb Hdi Hpid Hbs Hslot Hdl Hop Htx
+    Hinum Hmeta Hmap Hblk Hnm Hsi Hss Hsb Hdi Hpid Hsh Hru Hrt Hrh Hbs Hslot Hdl Hop Htx
   ipureintro
   exact ⟨hcs, hout⟩
 
@@ -436,11 +441,14 @@ structure CreateMkdirPar [Fscfg] [Icfg] (plen : Nat) (pfun : Nat → BitVec 8) (
   hnone : dirFirst data (dirNrec dn.diSize.toNat) (bname 14 nf) = none
 
 /-- the child's slot and inum -/
-structure CreateMkdirKid [Fscfg] [Icfg] (kslot : Nat) (cinum : BitVec 32) : Prop where
+structure CreateMkdirKid [Fscfg] [Icfg] (rti : Nat) (kslot : Nat) (cinum : BitVec 32) : Prop where
   hk : kslot < NINODE
   hpos : 0 < cinum.toNat
   hlt : cinum.toNat < fscNinodes
   hnib : cinum.toNat < 16 * icfgNib
+  /-- R1 (design/chroot.md §8): the fresh inum is not the process's root's
+  (the `".."` link's inner lookup refutes its self arm with it) -/
+  hnrt : cinum.toNat ≠ rti
 
 /-- the child after its `"."` link (Rocq's `Hc1*` / `Hd1*` block): one record,
 `"."` at its own inum. -/
@@ -544,6 +552,96 @@ def createMkdirKeep (k : KCtx) (plen : Nat) (pfun : Nat → BitVec 8) (ty major 
     inodeRefShortGenlo kslot (q.half + q.half) q.half icfgDev cinum g lo ∗
     runitAny cinum.toNat)
 
+/-- **THE INNER LOOKUP'S ROWS, OFF THE KEEP** (chroot): `dirlink(dp, name,
+..)` on the PARENT takes a share of its short keep and its unit, the root
+cell and reference out of the block, with the pid cell beside them; back in
+the same shape (the share regathered, the block at `V` again). -/
+theorem createMkdirKeep_lend_par [X : CurCtx] (hct : X.curTier = KTier.kpt) (k : KCtx) (plen : Nat) (pfun : Nat → BitVec 8) (ty major minor : BitVec 16)
+    (γ : FileNames) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
+    (u : Nat) (Sb : List Nat) (ns : Nat) (dqb dqs dqbs dqn dqpv : DFrac)
+    (Nm : Fname → Prop) (Nd : Absnode → Prop) (P Pmiss : Nat → Nat → IProp GF)
+    (Farm : Pfam GF (Aview → Nat → IProp GF))
+    (Fdots : Pfam GF (Aview → Nat → Nat → Bool → IProp GF))
+    (Fun : Pfam GF (Aview → Nat → IProp GF))
+    (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
+    (kd : Nat) (qd : Qp) (gd γil γisl : GName) (dind : BitVec 32) (tl : List (BitVec 8))
+    (kslot : Nat) (q : Qp) (g gil gisl : GName) (lo tl0 : Nat) (cinum : BitVec 32) :
+    createMkdirKeep (hlc := hlc) k plen pfun ty major minor γ pid V M u Sb ns dqb dqs dqbs dqn dqpv
+      Nm Nd P Pmiss Farm Fdots Fun Fok Fex kd qd gd γil γisl dind tl kslot q g gil gisl lo tl0 cinum ∗
+    wordPointsTo (pPid k.proc) 4 pidPriv pid ⊢
+      inodeShr kd qd.half.half icfgDev dind ∗ runitAny dind.toNat ∗
+      wordPointsTo (pRoot k.proc) 8 (DFrac.own 1) V.root ∗ inodeHeldAt V.root V.rti ∗
+      wordPointsTo (pPid k.proc) 4 pidPriv pid ∗
+      (inodeShr kd qd.half.half icfgDev dind -∗ runitAny dind.toNat -∗
+        wordPointsTo (pRoot k.proc) 8 (DFrac.own 1) V.root -∗ inodeHeldAt V.root V.rti -∗
+        wordPointsTo (pPid k.proc) 4 pidPriv pid -∗
+        createMkdirKeep (hlc := hlc) k plen pfun ty major minor γ pid V M u Sb ns dqb dqs dqbs dqn dqpv
+      Nm Nd P Pmiss Farm Fdots Fun Fok Fex kd qd gd γil γisl dind tl kslot q g gil gisl lo tl0 cinum ∗
+        wordPointsTo (pPid k.proc) 4 pidPriv pid) := by
+  unfold createMkdirKeep
+  iintro ⟨⟨Hframe, Htl, Hsbn, Hpidw, Hbarew, Hpath, Hisl, HP, Hdlk, Hun, Hcont,
+    #Hslk, Hsl, Hoff, #Hshot, Hfrz, Hkp, Hru,
+    #Hcslk, Hcsl, Hcoff, #Hcshot, Hcfrz, %hlec, #Hcfl, Hckp, Hcru⟩, Hpid⟩
+  icases Hkp with ⟨%lo', %tl', %hle', #Hfl', Hkp⟩
+  icases inodeRefShortGenlo_lend kd (qd.half + qd.half) qd.half icfgDev dind gd lo' tl' hle'
+    $$ [$Hfl' $Hkp] with ⟨Hkp, Hshr⟩
+  icases procPrivFd_root_lend_bare hct γ k.proc pid V M $$ [$Hpid $Hpidw $Hbarew]
+    with ⟨Hpid, Hrt, Hrh, Hback⟩
+  iframe Hshr Hru Hrt Hrh Hpid
+  iintro Hshr Hru Hrt Hrh Hpid
+  ihave Hkp := inodeRefShortGenlo_regather kd (qd.half + qd.half) qd.half icfgDev dind gd lo'
+    $$ [$Hkp $Hshr]
+  ihave Hpb := Hback $$ Hpid Hrt Hrh
+  icases Hpb with ⟨Hpid, Hpidw, Hbarew⟩
+  ihave Hkp : (∃ lo' tl' : Nat, ⌜lo' ≤ tl'⌝ ∗ credFloor lo' tl' ∗
+      inodeRefShortGenlo kd (qd.half + qd.half) qd.half icfgDev dind gd lo') $$ [Hkp]
+  · iexists lo', tl'; iframe Hfl' Hkp; ipureintro; exact hle'
+  iframe Hpid Hframe Htl Hsbn Hpidw Hbarew Hpath Hisl HP Hdlk Hun Hcont Hslk Hsl Hoff Hshot Hfrz Hkp
+    Hru Hcslk Hcsl Hcoff Hcshot Hcfrz Hcfl Hckp Hcru
+  ipureintro; exact hlec
+
+/-- The same rows off the CHILD's short keep: `dirlink(ip, ".", ..)` and
+`dirlink(ip, "..", ..)` run their inner lookup on the fresh directory. -/
+theorem createMkdirKeep_lend_kid [X : CurCtx] (hct : X.curTier = KTier.kpt) (k : KCtx) (plen : Nat) (pfun : Nat → BitVec 8) (ty major minor : BitVec 16)
+    (γ : FileNames) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
+    (u : Nat) (Sb : List Nat) (ns : Nat) (dqb dqs dqbs dqn dqpv : DFrac)
+    (Nm : Fname → Prop) (Nd : Absnode → Prop) (P Pmiss : Nat → Nat → IProp GF)
+    (Farm : Pfam GF (Aview → Nat → IProp GF))
+    (Fdots : Pfam GF (Aview → Nat → Nat → Bool → IProp GF))
+    (Fun : Pfam GF (Aview → Nat → IProp GF))
+    (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
+    (kd : Nat) (qd : Qp) (gd γil γisl : GName) (dind : BitVec 32) (tl : List (BitVec 8))
+    (kslot : Nat) (q : Qp) (g gil gisl : GName) (lo tl0 : Nat) (cinum : BitVec 32) :
+    createMkdirKeep (hlc := hlc) k plen pfun ty major minor γ pid V M u Sb ns dqb dqs dqbs dqn dqpv
+      Nm Nd P Pmiss Farm Fdots Fun Fok Fex kd qd gd γil γisl dind tl kslot q g gil gisl lo tl0 cinum ∗
+    wordPointsTo (pPid k.proc) 4 pidPriv pid ⊢
+      inodeShr kslot q.half.half icfgDev cinum ∗ runitAny cinum.toNat ∗
+      wordPointsTo (pRoot k.proc) 8 (DFrac.own 1) V.root ∗ inodeHeldAt V.root V.rti ∗
+      wordPointsTo (pPid k.proc) 4 pidPriv pid ∗
+      (inodeShr kslot q.half.half icfgDev cinum -∗ runitAny cinum.toNat -∗
+        wordPointsTo (pRoot k.proc) 8 (DFrac.own 1) V.root -∗ inodeHeldAt V.root V.rti -∗
+        wordPointsTo (pPid k.proc) 4 pidPriv pid -∗
+        createMkdirKeep (hlc := hlc) k plen pfun ty major minor γ pid V M u Sb ns dqb dqs dqbs dqn dqpv
+      Nm Nd P Pmiss Farm Fdots Fun Fok Fex kd qd gd γil γisl dind tl kslot q g gil gisl lo tl0 cinum ∗
+        wordPointsTo (pPid k.proc) 4 pidPriv pid) := by
+  unfold createMkdirKeep
+  iintro ⟨⟨Hframe, Htl, Hsbn, Hpidw, Hbarew, Hpath, Hisl, HP, Hdlk, Hun, Hcont,
+    #Hslk, Hsl, Hoff, #Hshot, Hfrz, Hkp, Hru,
+    #Hcslk, Hcsl, Hcoff, #Hcshot, Hcfrz, %hlec, #Hcfl, Hckp, Hcru⟩, Hpid⟩
+  icases inodeRefShortGenlo_lend kslot (q.half + q.half) q.half icfgDev cinum g lo tl0 hlec
+    $$ [$Hcfl $Hckp] with ⟨Hckp, Hshr⟩
+  icases procPrivFd_root_lend_bare hct γ k.proc pid V M $$ [$Hpid $Hpidw $Hbarew]
+    with ⟨Hpid, Hrt, Hrh, Hback⟩
+  iframe Hshr Hcru Hrt Hrh Hpid
+  iintro Hshr Hcru Hrt Hrh Hpid
+  ihave Hckp := inodeRefShortGenlo_regather kslot (q.half + q.half) q.half icfgDev cinum g lo
+    $$ [$Hckp $Hshr]
+  ihave Hpb := Hback $$ Hpid Hrt Hrh
+  icases Hpb with ⟨Hpid, Hpidw, Hbarew⟩
+  iframe Hpid Hframe Htl Hsbn Hpidw Hbarew Hpath Hisl HP Hdlk Hun Hcont Hslk Hsl Hoff Hshot Hfrz Hkp
+    Hru Hcslk Hcsl Hcoff Hcshot Hcfrz Hcfl Hckp Hcru
+  ipureintro; exact hlec
+
 /-- the parked bundle LENDS its parent cursor (TL-3K): the parent leg reads
 `P (nparElems pl).length dind` at its fire and hands it back, so the bundle
 closes around it again (Rocq holds `HPpar` in context across the fire). -/
@@ -613,7 +711,7 @@ def createMkdirDotdotBody (k : KCtx) (plen : Nat) (pfun : Nat → BitVec 8) (ty 
     ⌜createRegs3 k (ientry kd) 0#64 (ientry kslot) ty major minor R⌝ -∗
     ⌜ty = T_DIR⌝ -∗
     ⌜CreateMkdirPar plen pfun kd dind dn bm data nf⌝ -∗
-    ⌜CreateMkdirKid kslot cinum⌝ -∗
+    ⌜CreateMkdirKid V.rti kslot cinum⌝ -∗
     ⌜CreateMkdirDot ty major minor cinum dnc bmc datc dc1 bm1 dat1⌝ -∗
     ⌜(∀ x ∈ Sb, x ∈ Sb4) ∧ IBLOCK cinum icfgIst ∈ Sb4 ∧ fscBmapstart ∈ Sb4 ∧ 7 ≤ n4 ∧ n4 ≤ u⌝ -∗
     ⌜(createBuf (k.regs 2#5)).toNat % 8 = 0 ∧ tl.length = 2⌝ -∗
@@ -678,7 +776,7 @@ def createMkdirNameBody (k : KCtx) (plen : Nat) (pfun : Nat → BitVec 8) (ty ma
     ⌜createRegs3 k (ientry kd) 0#64 (ientry kslot) ty major minor R⌝ -∗
     ⌜ty = T_DIR⌝ -∗
     ⌜CreateMkdirPar plen pfun kd dind dn bm data nf⌝ -∗
-    ⌜CreateMkdirKid kslot cinum⌝ -∗
+    ⌜CreateMkdirKid V.rti kslot cinum⌝ -∗
     ⌜CreateMkdirDd ty major minor cinum dind dnc bmc datc dc2 bm2 dat2⌝ -∗
     ⌜(∀ x ∈ Sb, x ∈ Sb5) ∧ IBLOCK cinum icfgIst ∈ Sb5 ∧ fscBmapstart ∈ Sb5 ∧ 6 ≤ n5 ∧ n5 ≤ u⌝ -∗
     ⌜(createBuf (k.regs 2#5)).toNat % 8 = 0 ∧ tl.length = 2⌝ -∗
@@ -744,7 +842,7 @@ def createMkdirBumpBody (k : KCtx) (plen : Nat) (pfun : Nat → BitVec 8) (ty ma
     ⌜createRegs3 k (ientry kd) 0#64 (ientry kslot) ty major minor R⌝ -∗
     ⌜ty = T_DIR⌝ -∗
     ⌜CreateMkdirPar plen pfun kd dind dn bm data nf⌝ -∗
-    ⌜CreateMkdirKid kslot cinum⌝ -∗
+    ⌜CreateMkdirKid V.rti kslot cinum⌝ -∗
     ⌜CreateMkdirDd ty major minor cinum dind dnc bmc datc dc2 bm2 dat2⌝ -∗
     ⌜CreateMkdirApp dind cinum dn bm data nf dp3 bm3 dat3⌝ -∗
     ⌜(∀ x ∈ Sb, x ∈ Sb6) ∧ fscBmapstart ∈ Sb6 ∧ IBLOCK dind icfgIst ∈ Sb6 ∧
@@ -810,7 +908,7 @@ def createMkdirCokBody (k : KCtx) (plen : Nat) (pfun : Nat → BitVec 8) (ty maj
       (dc2 : Dinode) (bm2 : Blkmap) (dp4 : Dinode) (bm3 : Blkmap) (n6 : Nat) (Sb6 : List Nat),
     ⌜createRegs3 k (ientry kd) 0#64 (ientry kslot) ty major minor R⌝ -∗
     ⌜CreateMkdirPar plen pfun kd dind dn bm data nf⌝ -∗
-    ⌜CreateMkdirKid kslot cinum⌝ -∗
+    ⌜CreateMkdirKid V.rti kslot cinum⌝ -∗
     ⌜ty = T_DIR ∧ dp4.diType = T_DIR ∧ dc2.diType = ty ∧ dc2.diMajor = major ∧ dc2.diMinor = minor ∧
       dc2.diNlink = 1#16⌝ -∗
     ⌜(∀ x ∈ Sb, x ∈ Sb6) ∧ fscBmapstart ∈ Sb6 ∧ IBLOCK dind icfgIst ∈ Sb6 ∧
@@ -912,7 +1010,7 @@ theorem createMkdir_exit (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (dc : Dinode) (bmc : Blkmap) (datc : Nat → List (BitVec 8)) (n4 : Nat) (Sb4 : List Nat)
     (hns : createIrefSlots ≤ ns)
     (hR : createRegs3 k (ientry kd) 0#64 (ientry kslot) ty major minor R) (htd : ty = T_DIR)
-    (hpar : CreateMkdirFmPar kd dind dp bmp datap) (hkid : CreateMkdirKid kslot cinum)
+    (hpar : CreateMkdirFmPar kd dind dp bmp datap) {rti : Nat} (hkid : CreateMkdirKid rti kslot cinum)
     (hkc : CreateMkdirFmKid ty major minor dc bmc datc)
     (hsub : ∀ x ∈ Sb, x ∈ Sb4) (hmem : IBLOCK cinum icfgIst ∈ Sb4) (hn4 : iputUnits ≤ n4 ∧ n4 ≤ u)
     (hor : iputUnits + 1 ≤ n4 ∨ fscBmapstart ∈ Sb4)
@@ -1001,13 +1099,13 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 /-- the found arm's record, the size read-back and the four record facts at
 the parent's append (Rocq's `Hp3*` block, before the `blt` splits it). -/
 theorem createMkdir_par_post (plen : Nat) (pfun : Nat → BitVec 8) (kd : Nat)
-    (dind cinum : BitVec 32) (dn : Dinode) (bm : Blkmap) (data : Nat → List (BitVec 8))
+    (dind cinum : BitVec 32) (rti : Nat) (dn : Dinode) (bm : Blkmap) (data : Nat → List (BitVec 8))
     (nf : Nat → BitVec 8) (n5 : Nat) (Sb5 : List Nat) (a0 : BitVec 64) (bm3 : Blkmap)
     (dat3 : Nat → List (BitVec 8)) (dp3 dp03 : Dinode) (n6 : Nat) (Sb6 : List Nat) (tot : Nat)
     (hpar : CreateMkdirPar plen pfun kd dind dn bm data nf) (hcnib : cinum.toNat < 16 * icfgNib)
     (h16 : 16 * icfgNib ≤ 2 ^ 16)
-    (hout : DirlinkOut bm data dn dn nf (createLow16 cinum) dind n5 Sb5 a0 false bm3 dat3 dp3 dp03
-      n6 Sb6 tot) :
+    (hout : DirlinkOut bm data dn dn nf (createLow16 cinum) dind rti n5 Sb5 a0 false bm3 dat3 dp3
+      dp03 n6 Sb6 tot) :
     dp03 = dp3 ∧ dp3.diType = dn.diType ∧ dp3.diNlink = dn.diNlink ∧
       dp3.diSize.toNat = max dn.diSize.toNat (16 * dirSlot data (dirNrec dn.diSize.toNat) + tot) ∧
       inodeOk fscCov fscLogst dp3 bm3 dat3 ∧ dirOk icfgNib dp3 dat3 ∧
@@ -1276,15 +1374,15 @@ found arm refuted by the `"."` record, the record at `max 16 (16 + tot)`,
 the four record facts, and the CONTENT clause `dirDotsOnly` that holds
 whether the `".."` went in or not. -/
 theorem createMkdir_dd_post [Fscfg] [Icfg] (ty major minor : BitVec 16) (cinum dind : BitVec 32)
-    (dnc : Dinode) (bmc : Blkmap) (datc : Nat → List (BitVec 8))
+    (rti : Nat) (dnc : Dinode) (bmc : Blkmap) (datc : Nat → List (BitVec 8))
     (dc1 : Dinode) (bm1 : Blkmap) (dat1 : Nat → List (BitVec 8)) (n4 : Nat) (Sb4 : List Nat)
     (a0 : BitVec 64) (found : Bool) (bm2 : Blkmap) (dat2 : Nat → List (BitVec 8)) (dc2 dc02 : Dinode)
     (n5 : Nat) (Sb5 : List Nat) (tot : Nat)
     (hdot : CreateMkdirDot ty major minor cinum dnc bmc datc dc1 bm1 dat1) (htd : ty = T_DIR)
     (hcpos : 0 < cinum.toNat) (hc16 : cinum.toNat < 2 ^ 16) (hd16 : dind.toNat < 2 ^ 16)
-    (hdinib : (createLow16 dind).toNat < 16 * icfgNib)
-    (hout : DirlinkOut bm1 dat1 dc1 dc1 createDotdotF (createLow16 dind) cinum n4 Sb4 a0 found bm2
-      dat2 dc2 dc02 n5 Sb5 tot) :
+    (hdinib : (createLow16 dind).toNat < 16 * icfgNib) (hcrt : cinum.toNat ≠ rti)
+    (hout : DirlinkOut bm1 dat1 dc1 dc1 createDotdotF (createLow16 dind) cinum rti n4 Sb4 a0 found
+      bm2 dat2 dc2 dc02 n5 Sb5 tot) :
     found = false ∧ dc02 = dc2 ∧ dirNrec dc1.diSize.toNat = 1 ∧ dirSlot dat1 1 = 1 ∧
       dc2.diType = ty ∧ dc2.diMajor = major ∧ dc2.diMinor = minor ∧ dc2.diNlink = 1#16 ∧
       dc2.diSize.toNat = max 16 (16 * 1 + tot) ∧
@@ -1305,7 +1403,11 @@ theorem createMkdir_dd_post [Fscfg] [Icfg] (ty major minor : BitVec 16) (cinum d
   case true =>
     have harms := hout.arms
     simp only [if_true] at harms
-    exact absurd (by rw [hnr1]; exact hdot.hmiss) harms.1
+    -- the record arm by the `"."` record, the SELF arm by R1
+    exact harms.1.elim
+      (fun h => absurd (show dirFirst dat1 (dirNrec dc1.diSize.toNat) (bname 14 createDotdotF) = none
+        by rw [hnr1]; exact hdot.hmiss) h)
+      (fun h => (hcrt h.2).elim)
   have harms := hout.arms
   simp only [Bool.false_eq_true, if_false] at harms
   obtain ⟨hnone, hwf2, hholes2, haddr2, _, hcov2, hdc2, hdc02, htot16, hrng2, hbl2⟩ := harms
@@ -1510,7 +1612,6 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
 
-
 theorem createMkdir_b146c : KA.«create» + 0x130#64 + BitVec.signExtend 64 22#13 =
     KA.«create» + 0x146#64 := by decide
 
@@ -1577,7 +1678,7 @@ theorem create_mkdir_name (DLK : DIRLINK) (Γ : SchedNames) [ClaimIs (hlc := hlc
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [r9]
   iintro Hk Hpc
   -- ===== +0x12c  jal dirlink(dp, name, ip->inum) =====
-  k_step_e (wp_s_jal cpu _ (KA.«create» + 0x12c#64) false 2092292#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«create» + 0x12c#64) false 2092268#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [create_br_dirlink]
   iintro Hk Hpc
   -- THE SHARE THE CALL'S OWN `iput` MAY NEED: an eighth off the CHILD's arm
@@ -1588,8 +1689,15 @@ theorem create_mkdir_name (DLK : DIRLINK) (Γ : SchedNames) [ClaimIs (hlc := hlc
       Qp.quarter Qp.quarter.half Qp.quarter.half createMkdir_qq.symm CoPset.subseteq_top)
     $$ Hescc Hcval Hcdep with ⟨Hcval, Hcdep, Htxs⟩
   imodintro
+  -- the inner lookup's rows, off the keep (chroot)
+  icases kctx_tier _ _ $$ Hk with ⟨%hct, Hk⟩
+  have ht0 : curTier = KTier.kpt := by rw [← hct]; exact hS.htier
+  icases createMkdirKeep_lend_par ht0 k plen pfun ty major minor γ pid V M u Sb ns dqb dqs dqbs dqn
+      dqpv Nm Nd P Pmiss Farm Fdots Fun Fok Fex kd qd gd γil γisl dind tl kslot q g gil gisl lo tl0
+      cinum $$ [$Hkeep $Hpid] with ⟨Hshr, Hru, Hrt, Hrh, Hpid, Hkback⟩
   iapply (createMkdir_dirlink DLK Γ cpu _ j γl pd pav pu γkl γk (ientry kd) dind bm data dn nf
-      (createLow16 cinum) n5 Sb5 t Qp.quarter.half pid (DFrac.own 1) dqs dqbs dqb hS.hj ?dp ?dK
+      (createLow16 cinum) n5 Sb5 t Qp.quarter.half pid (DFrac.own 1) dqs dqbs dqb kd qd.half.half
+      V.root V.rti (DFrac.own 1) hS.hj ?dp ?dK
       ?dn ?dt hpar.hty hpar.hiok.2.1 hszcap
       (dirOk_dir icfgNib dn data (by rw [hpar.hty]; rfl) hpar.hdok) (Or.inl hnlz)
       (create_doc_of_live dn dn data rfl hpar.hnl0)
@@ -1597,12 +1705,13 @@ theorem create_mkdir_name (DLK : DIRLINK) (Γ : SchedNames) [ClaimIs (hlc := hlc
       hpar.hiok.2.2.1 (by have : MAXFILE * BSIZE = 274432 := by decide
                           omega)
       hS.hireg hpar.hdib hcl16b hS.hbg hS.hbel
-      (by rw [decide_eq_true hbm5]; exact createMkdir_dlneed5 _ _ hn5) hS.hpd ?da0 ?da2)
+      (by rw [decide_eq_true hbm5]; exact createMkdir_dlneed5 _ _ hn5) hS.hpd ?da0 ?da2 rfl
+      hpar.hkd)
     $$ [- $Hk $Hpc]
   rotate_right 1
-  iframe Hdev Hinum Hmeta Hmap Hblk Hsi Hss Hsb Hdi Hbs Hslot Hdl Hop Htxs
+  iframe Hdev Hinum Hmeta Hmap Hblk Hsi Hss Hsb Hdi Hbs Hslot Hdl Hop Htxs Hshr Hru
   k_norm_g [r8, create_name_addr]
-  iframe Hte Hce Hnm Hpid
+  iframe Hte Hce Hnm Hpid Hrt Hrh
   iframe #
   case dp => k_norm_g; try exact hS.hproc
   case dK => k_norm_g; try exact create_slots_dirlink _ hS.hK
@@ -1612,22 +1721,28 @@ theorem create_mkdir_name (DLK : DIRLINK) (Γ : SchedNames) [ClaimIs (hlc := hlc
   case da2 => k_norm_g [r19]; exact create_a2_low16 cinum hc16
   -- back from dirlink, at +0x130
   iintro %cpu %spie1 %spp1 %R1 %found %bm3 %dat3 %dp3 %dp03 %n6 %Sb6 %tot %hp Hk Hpc Hte Hce
-    Hdev Hinum Hmeta Hmap Hblk Hnm Hsi Hss Hsb Hdi Hpid Hbs Hslot Hdl Hop Htxs
+    Hdev Hinum Hmeta Hmap Hblk Hnm Hsi Hss Hsb Hdi Hpid Hshr Hru Hrt Hrh Hbs Hslot Hdl Hop Htxs
+  k_norm_g
+  ihave Hkb := Hkback $$ Hshr Hru Hrt Hrh Hpid
+  icases Hkb with ⟨Hkeep, Hpid⟩
   obtain ⟨hcs1, hout⟩ := hp
   iapply wpLoop_fupd
   imod (icGrowTx ⊤ fscIc fscFs fscIreg fscCov fscLogst kslot q.half icfgDev cinum g locc true t
       Qp.quarter Qp.quarter.half Qp.quarter.half createMkdir_qq.symm CoPset.subseteq_top)
     $$ Hescc Hcval Hcdep Htxs with ⟨Hcval, Hcdep⟩
   imodintro
-  -- the FOUND arm is refuted by the body's own miss
+  -- the FOUND arm is refuted by the body's own miss, on both of the inner
+  -- lookup's arms (a live directory's `..` is never a miss)
   cases found
   case true =>
     have harms := hout.arms
     simp only [if_true] at harms
-    exact absurd hpar.hnone harms.1
+    exact harms.1.elim (absurd hpar.hnone) (fun h =>
+      ((dirDots_miss_not_dots dind.toNat dn data (bname 14 nf) (by rw [hpar.hty]; rfl)
+        (create_nl0z dn hpar.hnl0) hpar.hddix hpar.hnone).2 h.1).elim)
   obtain ⟨hdp03, hty3, hnl3, hszmax, hiok3, hdok3, hddix3, hatom3, htot16, hrng3, hbl3⟩ :=
-    createMkdir_par_post plen pfun kd dind cinum dn bm data nf n5 Sb5 _ bm3 dat3 dp3 dp03 n6 Sb6
-      tot hpar hkid.hnib hS.h16 hout
+    createMkdir_par_post plen pfun kd dind cinum V.rti dn bm data nf n5 Sb5 _ bm3 dat3 dp3 dp03 n6
+      Sb6 tot hpar hkid.hnib hS.h16 hout
   subst dp03
   obtain ⟨hspend3, -, hmem3⟩ := hout.w16 rfl
   rw [decide_eq_true hbm5] at hspend3
@@ -1705,14 +1820,15 @@ end StageName
 directory has no records), the record at `max 0 tot`, the four record facts,
 and the facts BOTH arms' exits take. -/
 theorem createMkdir_dot_post [Fscfg] [Icfg] (ty major minor : BitVec 16) (cinum : BitVec 32)
-    (dnc : Dinode) (bmc : Blkmap) (datc : Nat → List (BitVec 8)) (n3 : Nat) (Sb3 : List Nat)
+    (rti : Nat) (dnc : Dinode) (bmc : Blkmap) (datc : Nat → List (BitVec 8)) (n3 : Nat)
+    (Sb3 : List Nat)
     (a0 : BitVec 64) (found : Bool) (bm1 : Blkmap) (dat1 : Nat → List (BitVec 8)) (dc1 dc01 : Dinode)
     (n4 : Nat) (Sb4 : List Nat) (tot : Nat)
     (hfresh : freshShape dnc) (htyc : dnc.diType = ty) (htd : ty = T_DIR)
     (hciok : inodeOk fscCov fscLogst dnc bmc datc) (hcdok : dirOk icfgNib dnc datc)
     (hc16 : cinum.toNat < 2 ^ 16) (hcpos : 0 < cinum.toNat) (hcnib : cinum.toNat < 16 * icfgNib)
     (hout : DirlinkOut bmc datc (createSetf dnc major minor 1#16) (createSetf dnc major minor 1#16)
-      createDotF (createLow16 cinum) cinum n3 Sb3 a0 found bm1 dat1 dc1 dc01 n4 Sb4 tot) :
+      createDotF (createLow16 cinum) cinum rti n3 Sb3 a0 found bm1 dat1 dc1 dc01 n4 Sb4 tot) :
     found = false ∧ dc01 = dc1 ∧
       dc1.diType = ty ∧ dc1.diMajor = major ∧ dc1.diMinor = minor ∧ dc1.diNlink = 1#16 ∧
       dc1.diSize.toNat = tot ∧
@@ -1732,7 +1848,12 @@ theorem createMkdir_dot_post [Fscfg] [Icfg] (ty major minor : BitVec 16) (cinum 
   case true =>
     have harms := hout.arms
     simp only [if_true] at harms
-    exact absurd (by rw [hnr0]; exact create_first_0 datc _) harms.1
+    -- the record arm: an empty directory has no records; the SELF arm: `"."`
+    -- is not `".."`
+    exact harms.1.elim
+      (fun h => absurd (show dirFirst datc (dirNrec (createSetf dnc major minor 1#16).diSize.toNat)
+          (bname 14 createDotF) = none by rw [hnr0]; exact create_first_0 datc _) h)
+      (fun h => absurd (create_dot_name.symm.trans h.1) (by decide))
   have harms := hout.arms
   simp only [Bool.false_eq_true, if_false] at harms
   obtain ⟨hnone, hwf1, hholes1, haddr1, _, hcov1, hdc1, hdc01, htot16, hrng1, hbl1⟩ := harms
@@ -1953,7 +2074,7 @@ theorem create_mkdir_dotdot (DLK : DIRLINK) (Γ : SchedNames) [ClaimIs (hlc := h
   k_step_e (wp_s_auipc cpu _ (KA.«create» + 0x110#64) false 2#20 11#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_addi cpu _ (KA.«create» + 0x114#64) false 2032#12 11#5 11#5 (by decide))
+  k_step_e (wp_s_addi cpu _ (KA.«create» + 0x114#64) false 1636#12 11#5 11#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- ===== +0x118  c.mv a0,s3 : the CHILD =====
@@ -1961,7 +2082,7 @@ theorem create_mkdir_dotdot (DLK : DIRLINK) (Γ : SchedNames) [ClaimIs (hlc := h
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [r19]
   iintro Hk Hpc
   -- ===== +0x11a  jal dirlink(ip, "..", dp->inum) =====
-  k_step_e (wp_s_jal cpu _ (KA.«create» + 0x11a#64) false 2092310#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«create» + 0x11a#64) false 2092286#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [create_br_dirlink]
   iintro Hk Hpc
   -- the eighth off the PARENT's arm
@@ -1972,20 +2093,28 @@ theorem create_mkdir_dotdot (DLK : DIRLINK) (Γ : SchedNames) [ClaimIs (hlc := h
       Qp.quarter Qp.quarter.half Qp.quarter.half createMkdir_qq.symm CoPset.subseteq_top)
     $$ Hescd Hval Hdep with ⟨Hval, Hdep, Htxs⟩
   imodintro
+  -- the inner lookup's rows, off the keep (chroot): the fresh child is dp here
+  icases kctx_tier _ _ $$ Hk with ⟨%hct, Hk⟩
+  have ht0 : curTier = KTier.kpt := by rw [← hct]; exact hS.htier
+  icases createMkdirKeep_lend_kid ht0 k plen pfun ty major minor γ pid V M u Sb ns dqb dqs dqbs dqn
+      dqpv Nm Nd P Pmiss Farm Fdots Fun Fok Fex kd qd gd γil γisl dind tl kslot q g gil gisl lo tl0
+      cinum $$ [$Hkeep $Hpid] with ⟨Hshr, Hcru, Hrt, Hrh, Hpid, Hkback⟩
   iapply (createMkdir_dirlink DLK Γ cpu _ j γl pd pav pu γkl γk (ientry kslot) cinum bm1 dat1 dc1
-      createDotdotF (createLow16 dind) n4 Sb4 t Qp.quarter.half pid DFrac.discard dqs dqbs dqb
+      createDotdotF (createLow16 dind) n4 Sb4 t Qp.quarter.half pid DFrac.discard dqs dqbs dqb kslot
+      q.half.half V.root V.rti (DFrac.own 1)
       hS.hj ?dp ?dK ?dnf ?dt hty1 hdot.hiok.2.1 hdot.hiok.2.2.2.2.1
       (dirOk_dir icfgNib dc1 dat1 hty1 hdot.hdok) (Or.inl (by rw [hdot.hnl]; decide))
       (dirOrphanClean_live _ _ (by rw [hdot.hnl]; decide))
       (diNlinkStable_refl dc1 hdot.hiok.2.2.2.1) hS.hgeom hdot.hiok.1 hdot.hiok.2.2.2.2.2.1
       hdot.hiok.2.2.1 (by rw [hsz1]; decide)
       hS.hireg hkid.hnib hdl16b hS.hbg hS.hbel
-      (by rw [decide_eq_true hbm4]; exact createMkdir_dlneed5 _ _ (by omega)) hS.hpd ?da0 ?da2)
+      (by rw [decide_eq_true hbm4]; exact createMkdir_dlneed5 _ _ (by omega)) hS.hpd ?da0 ?da2 rfl
+      hkid.hk)
     $$ [- $Hk $Hpc]
   rotate_right 1
-  iframe Hcdev Hcinum Hcmeta Hcmap Hcblk Hsi Hss Hsb Hcdi Hbs Hslot Hcdl Hop Htxs
+  iframe Hcdev Hcinum Hcmeta Hcmap Hcblk Hsi Hss Hsb Hcdi Hbs Hslot Hcdl Hop Htxs Hshr Hcru
   k_norm_g [create_dotdot_addr]
-  iframe Hte Hce Hpid
+  iframe Hte Hce Hpid Hrt Hrh
   iframe #
   case dp => k_norm_g; try exact hS.hproc
   case dK => k_norm_g; try exact create_slots_dirlink _ hS.hK
@@ -1995,11 +2124,16 @@ theorem create_mkdir_dotdot (DLK : DIRLINK) (Γ : SchedNames) [ClaimIs (hlc := h
   case da2 => k_norm_g; exact create_a2_low16 dind hd16
   -- back from dirlink, at +0x11e
   iintro %cpu %spie1 %spp1 %R1 %found %bm2 %dat2 %dc2 %dc02 %n5 %Sb5 %tot %hp Hk Hpc Hte Hce
-    Hcdev Hcinum Hcmeta Hcmap Hcblk Hnmd Hsi Hss Hsb Hcdi Hpid Hbs Hslot Hcdl Hop Htxs
+    Hcdev Hcinum Hcmeta Hcmap Hcblk Hnmd Hsi Hss Hsb Hcdi Hpid Hshr Hcru Hrt Hrh Hbs Hslot Hcdl Hop
+    Htxs
+  k_norm_g
+  ihave Hkb := Hkback $$ Hshr Hcru Hrt Hrh Hpid
+  icases Hkb with ⟨Hkeep, Hpid⟩
   obtain ⟨hcs1, hout⟩ := hp
   obtain ⟨hf, hdc02, hnr1, hsl1, hty2, hmj2, hmn2, hnl2, hszmax, hiok2, hdok2, hduq2, hdots2,
-    hrl2, hatom, hrng2, hbl2⟩ := createMkdir_dd_post ty major minor cinum dind dnc bmc datc dc1 bm1
-      dat1 n4 Sb4 _ found bm2 dat2 dc2 dc02 n5 Sb5 tot hdot htd hkid.hpos hc16 hd16 hdl16b hout
+    hrl2, hatom, hrng2, hbl2⟩ := createMkdir_dd_post ty major minor cinum dind V.rti dnc bmc datc dc1
+      bm1 dat1 n4 Sb4 _ found bm2 dat2 dc2 dc02 n5 Sb5 tot hdot htd hkid.hpos hc16 hd16 hdl16b
+      hkid.hnrt hout
   subst hf dc02
   have hspend := (hout.w16 rfl).1
   rw [decide_eq_true hbm4, decide_eq_true hmem4] at hspend
@@ -2160,14 +2294,14 @@ theorem create_mkdir_dot (DLK : DIRLINK) (Γ : SchedNames) [ClaimIs (hlc := hlc)
   iintro %cpu %spie %spp %R %kd %qd %gd %γil %γisl %dind %dn %bm %data %nf %tl %t %kslot %q %g
     %gil %gisl %lo %tl0 %cinum %dnc %bmc %datc %n3 %Sb3
   iintro %hR %htd %hkd %hdib %htydir %hnl0 %hnlmax %hiok %hdok %hddix %hduq %hrl %hnp %hnone
-    %hks %hcpos %hcnib %hfresh %hrlc %htyc %hciok %hcdok %hsub3 %hmem3 %hn3 %hcorr %hal
+    %hks %hcpos %hcnib %hnrt %hfresh %hrlc %htyc %hciok %hcdok %hsub3 %hmem3 %hn3 %hcorr %hal
   iintro Hk Hpc Hte Hce Hframe Hnm Htl #Hslk Hsl Hdep Hoff Hdev Hinum Hval Hdl Hdi Hmeta Hmap
     Hblk Htop #Hshot Hfrz Hkp Hru #Hcslk Hcsl Hcdep Hcoff Hcdev Hcinum Hcval Hcdl0 Hcdi Hcmeta
     Hcmap Hcblk Hctop #Hcshot Hcfrz %hlec #Hcfl Hckp Hcru Hpile Hsbn Hsi Hss Hsb Hbare Hbarew
     Hpath Hbs Hisl Hop Hdirty HP Hdlk Harm Hdotsc Hun Hacre Hcont
   have hpar : CreateMkdirPar plen pfun kd dind dn bm data nf :=
     ⟨hkd, hdib, htydir, hnl0, hnlmax, hiok, hdok, hddix, hduq, hrl, hnp, hnone⟩
-  have hkid : CreateMkdirKid kslot cinum := ⟨hks, hcpos.1, hcpos.2, hcnib⟩
+  have hkid : CreateMkdirKid V.rti kslot cinum := ⟨hks, hcpos.1, hcpos.2, hcnib, hnrt⟩
   have hR' := hR
   obtain ⟨r2, r8, r9, r18, r19, r20, r21, r22, r23, r24, r25, r26, r27⟩ := hR'
   have hc16 : cinum.toNat < 2 ^ 16 := by have := hS.h16; omega
@@ -2221,7 +2355,7 @@ theorem create_mkdir_dot (DLK : DIRLINK) (Γ : SchedNames) [ClaimIs (hlc := hlc)
   k_step_e (wp_s_auipc cpu _ (KA.«create» + 0xfc#64) false 2#20 11#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_addi cpu _ (KA.«create» + 0x100#64) false 2044#12 11#5 11#5 (by decide))
+  k_step_e (wp_s_addi cpu _ (KA.«create» + 0x100#64) false 1928#12 11#5 11#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- ===== +0x104  c.mv a0,s3 : the CHILD =====
@@ -2229,7 +2363,7 @@ theorem create_mkdir_dot (DLK : DIRLINK) (Γ : SchedNames) [ClaimIs (hlc := hlc)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [r19]
   iintro Hk Hpc
   -- ===== +0x106  jal dirlink(ip, ".", ip->inum) =====
-  k_step_e (wp_s_jal cpu _ (KA.«create» + 0x106#64) false 2092330#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«create» + 0x106#64) false 2092306#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [create_br_dirlink]
   iintro Hk Hpc
   -- the fresh child's licence (deviation 6), and an eighth off the PARENT's arm
@@ -2242,20 +2376,26 @@ theorem create_mkdir_dot (DLK : DIRLINK) (Γ : SchedNames) [ClaimIs (hlc := hlc)
       Qp.quarter Qp.quarter.half Qp.quarter.half createMkdir_qq.symm CoPset.subseteq_top)
     $$ Hescd Hval Hdep with ⟨Hval, Hdep, Htxs⟩
   imodintro
+  -- the inner lookup's rows, off the keep (chroot): the fresh child is dp here
+  icases createMkdirKeep_lend_kid hct k plen pfun ty major minor γ pid V M u Sb ns dqb dqs dqbs dqn
+      dqpv Nm Nd P Pmiss Farm Fdots Fun Fok Fex kd qd gd γil γisl dind tl kslot q g gil gisl lo tl0
+      cinum $$ [$Hkeep $Hpid] with ⟨Hshr, Hcru, Hrt, Hrh, Hpid, Hkback⟩
   iapply (createMkdir_dirlink DLK Γ cpu _ j γl pd pav pu γkl γk (ientry kslot) cinum bmc datc
       (createSetf dnc major minor 1#16) createDotF (createLow16 cinum) n3 Sb3 t Qp.quarter.half pid
-      DFrac.discard dqs dqbs dqb hS.hj ?dp ?dK ?dnf ?dt htys hciok'.2.1 hciok'.2.2.2.2.1
+      DFrac.discard dqs dqbs dqb kslot q.half.half V.root V.rti (DFrac.own 1) hS.hj ?dp ?dK ?dnf ?dt
+      htys hciok'.2.1 hciok'.2.2.2.2.1
       (dirOk_dir icfgNib _ datc htys (createSetf_dirOk icfgNib dnc datc major minor 1#16 hcdok))
       (Or.inl (by rw [createSetf_nlink]; decide))
       (dirOrphanClean_live _ _ (by rw [createSetf_nlink]; decide))
       (diNlinkStable_refl _ hciok'.2.2.2.1) hS.hgeom hciok'.1 hciok'.2.2.2.2.2.1
       hciok'.2.2.1 (by rw [hsz0]; decide)
-      hS.hireg hcnib hcl16b hS.hbg hS.hbel (create_alloc_dlneed n3 _ _ hn3.1) hS.hpd ?da0 ?da2)
+      hS.hireg hcnib hcl16b hS.hbg hS.hbel (create_alloc_dlneed n3 _ _ hn3.1) hS.hpd ?da0 ?da2 rfl
+      hks)
     $$ [- $Hk $Hpc]
   rotate_right 1
-  iframe Hcdev Hcinum Hcmeta Hcmap Hcblk Hsi Hss Hsb Hcdi Hbs Hslot Hcdls Hop Htxs
+  iframe Hcdev Hcinum Hcmeta Hcmap Hcblk Hsi Hss Hsb Hcdi Hbs Hslot Hcdls Hop Htxs Hshr Hcru
   k_norm_g [create_dot_addr]
-  iframe Hte Hce Hpid
+  iframe Hte Hce Hpid Hrt Hrh
   iframe #
   case dp => k_norm_g; try exact hS.hproc
   case dK => k_norm_g; try exact create_slots_dirlink _ hS.hK
@@ -2265,11 +2405,15 @@ theorem create_mkdir_dot (DLK : DIRLINK) (Γ : SchedNames) [ClaimIs (hlc := hlc)
   case da2 => k_norm_g; exact create_a2_low16 cinum hc16
   -- back from dirlink, at +0x10a
   iintro %cpu %spie1 %spp1 %R1 %found %bm1 %dat1 %dc1 %dc01 %n4 %Sb4 %tot %hp Hk Hpc Hte Hce
-    Hcdev Hcinum Hcmeta Hcmap Hcblk Hnmd Hsi Hss Hsb Hcdi Hpid Hbs Hslot Hcdls Hop Htxs
+    Hcdev Hcinum Hcmeta Hcmap Hcblk Hnmd Hsi Hss Hsb Hcdi Hpid Hshr Hcru Hrt Hrh Hbs Hslot Hcdls Hop
+    Htxs
+  k_norm_g
+  ihave Hkb := Hkback $$ Hshr Hcru Hrt Hrh Hpid
+  icases Hkb with ⟨Hkeep, Hpid⟩
   obtain ⟨hcs1, hout⟩ := hp
   obtain ⟨hf, hdc01, hty1, hmj1, hmn1, hnl1, hsz1, hiok1, hdok1, hduq1, hrow0, hatom, hrng1,
-    hbl1⟩ := createMkdir_dot_post ty major minor cinum dnc bmc datc n3 Sb3 _ found bm1 dat1 dc1 dc01
-      n4 Sb4 tot hfresh htyc htd hciok hcdok hc16 hcpos.1 hcnib hout
+    hbl1⟩ := createMkdir_dot_post ty major minor cinum V.rti dnc bmc datc n3 Sb3 _ found bm1 dat1 dc1
+      dc01 n4 Sb4 tot hfresh htyc htd hciok hcdok hc16 hcpos.1 hcnib hout
   subst hf dc01
   have hw16 := hout.w16 rfl
   have hnr0 : dirNrec (createSetf dnc major minor 1#16).diSize.toNat = 0 := by rw [hsz0]; rfl
@@ -2365,7 +2509,6 @@ theorem create_mkdir_dot (DLK : DIRLINK) (Γ : SchedNames) [ClaimIs (hlc := hlc)
 
 end StageDot
 
-
 /-! ## 3.  STAGE 4: ARM C-OK's block from the mkdir arm (`+0xe0 .. +0xea`) -/
 
 section StageCok
@@ -2419,7 +2562,7 @@ theorem create_mkdir_cok (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := h
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [r9]
   iintro Hk Hpc
   -- ===== +0xe2  jal iunlockput(dp) =====
-  k_step_e (wp_s_jal cpu _ (KA.«create» + 0xe2#64) false 2090944#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«create» + 0xe2#64) false 2090848#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [create_br_iunlockput]
   iintro Hk Hpc
   ihave Hshotp : ityShot gd dp4.diType $$ [Hshot]
@@ -2616,7 +2759,7 @@ theorem create_mkdir_bump (IU : IUPDATE) (Γ : SchedNames) [ClaimIs (hlc := hlc)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [r9]
   iintro Hk Hpc
   -- ===== +0x140  jal iupdate(dp) : THE SECOND MINT =====
-  k_step_e (wp_s_jal cpu _ (KA.«create» + 0x140#64) false 2090074#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«create» + 0x140#64) false 2089978#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [create_br_iupdate]
   iintro Hk Hpc
   have htz : dn.diType.toNat = T_DIR_z := by rw [hpar.hty]; rfl

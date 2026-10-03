@@ -54,9 +54,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Std (ExtTreeSet)
 open UShUPipes
 
-set_option linter.unusedSectionVars false
-set_option linter.unusedVariables false
-
 /-! ## A slot absorbs a `◇` (Rocq `uslot_except_0_u`) -/
 
 section Slot
@@ -106,9 +103,6 @@ theorem Xu_initShCtx (ug : UnionGn) (r : FileAppNames) (s0 : Fstate) (γp : GNam
     Xu (hlc := hlc) (GF := GF) ug r s0 γp =
       initShCtx (unionCc (hlc := hlc) (GF := GF) ug r s0) γp (fileTaint (hlc := hlc) ug.ugnFile.fgnCl) := rfl
 
-/-- The record's residue and links (casts). -/
-theorem unionLinkInstAt_lkRres (ug : UnionGn) (s0 : Fstate) :
-    (unionLinkInstAt (hlc := hlc) (GF := GF) ug s0).lkRres = urresw (hlc := hlc) ug := rfl
 theorem urresw_lkRres (ug : UnionGn) (s0 : Fstate) (v : EraPins) (I : List (BitVec 8)) :
     ⊢ urresw (hlc := hlc) (GF := GF) ug v I -∗ (unionLinkInstAt (hlc := hlc) (GF := GF) ug s0).lkRres v I :=
   BI.entails_wand .rfl
@@ -154,7 +148,7 @@ theorem union_Hinit_boot_at (E : UPipesEng (hlc := hlc) (GF := GF) (PS := uprogS
       = unionHk (hlc := hlc) (filePred (hlc := hlc)) ug.ugnFile.fgnCl) :
     ⊢ appInv (hlc := hlc) fscFs -∗ unionBoot (hlc := hlc) ug (genId (hlc := hlc) (GF := GF) + 1) r -∗
       uturnI (GF := GF) ug (genId (hlc := hlc) (GF := GF) + 1) ==∗
-      initBootBundle (hlc := hlc) (SG := uexecSGXv6) ROOTINO seccAll fdt0 := by
+      initBootBundle (hlc := hlc) (SG := uexecSGXv6) ROOTINO ROOTINO seccAll fdt0 := by
   letI : UprogSG GF := uprogSGFree
   have UL := E.UL
   have hrdws := ush_rdwild_of_shape_holds (hlc := hlc) (GF := GF) ug hrdw

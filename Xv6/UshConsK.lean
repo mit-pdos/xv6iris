@@ -27,7 +27,7 @@ credential `K` whose law is `shConsNeverLaw` (owner's ruling (A):
   instance is what the `□`-shaped premise needs), `sh_cons_console_echo`,
   `sh_cons_absent_echo`.
 * The local notations `ra_idx`, `a0_idx`, `a1_idx`, `a7_idx` (reached):
-  Lean spells registers `1#5`, `10#5`, … (`UmodeAbi.raIdx`/`a0Idx`/…
+  Lean spells registers `1#5`, `10#5`, … (`UmodeAbi.a0Idx`/`a1Idx`
   exist; UshMainDefs deviation 4) -- no declaration to port.
 
 ## Parameters taken (unlanded prerequisites) -- `ShConsOpenCalls`
@@ -76,8 +76,6 @@ cons_absent T K`).
 -/
 import Xv6.UshMainStubs
 import Xv6.UStrImg
-import Xv6.AppEcho
-import Xv6.AppInv
 import Xv6.UInitCons
 
 namespace Xv6
@@ -85,8 +83,6 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
-
-set_option linter.unusedSectionVars false
 
 /-! ## S1 The path, off sh's read-only image -/
 
@@ -103,10 +99,6 @@ theorem shConsRo_byte (k : Nat) (hk : k < 7) : User.Sh.code.byte (shConsPv + k) 
 
 /-- **Rocq `sh_cons_ro_nul_bool`**: ...and its NUL. -/
 theorem shConsRo_nul_bool : User.Sh.code.byte (shConsPv + 7) = some 0#8 := by decide
-
-/-- **Rocq `sh_open_pc`**: sh's own open stub, at the address its symbol
-table pins. -/
-theorem shOpen_pc : User.Sh.Sym.«open» = 0xca2 := rfl
 
 theorem fnameConsole_length : fnameConsole.length = 7 := rfl
 
@@ -139,10 +131,6 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [Uexec
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int] [Xv6G GF] [DiskG GF]
   [FsTopG GF] [Appcfg GF] [Icfg]
-
-/-- **Rocq `shk_rodata_img`** (deviation 1): sh's rodata, at the shape the
-`_img` leaf takes it. -/
-theorem shkRodata_img (γ : GName) : ushCode (GF := GF) γ ⊢ ukCode γ User.Sh.code.byte := .rfl
 
 /-! ## S2 The persistent absence law (ruling (A)) -/
 

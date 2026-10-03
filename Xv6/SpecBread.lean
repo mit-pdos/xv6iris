@@ -129,26 +129,4 @@ structure BREAD : Prop where
     wp_bread_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl γ V γdl pd pav pu j pidv dev bno dqp
       hj hproc hK hnoff htier hbno hcov hdev hpd ha0 ha1
 
-/-- The interrupts-off instance of `wp_bread_eb` (the complement is the whole
-bundle): the contract every not-yet-generalized caller states. -/
-theorem BREAD.wp_bread (A : BREAD) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-    [BcacheG GF] [SleepLockG GF] [DiskG GF] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (cpu : CPU) (k : KCtx) (γl : GName) (γ : BcacheNames) (V : BioView GF) (γdl : GName)
-    (pd pav pu : BitVec 64) (j : Nat) (pidv dev bno : BitVec 32) (dqp : DFrac)
-    hj hproc hK hsie hnoff hlocks htier hbno hcov hdev hpd ha0 ha1 :
-    wp_bread_body (hlc := hlc) (GF := GF) Γ cpu k γl γ V γdl pd pav pu j pidv dev bno dqp
-      hj hproc hK hsie hnoff hlocks htier hbno hcov hdev hpd ha0 ha1 := by
-  have h := A.wp_bread_eb (hlc := hlc) (GF := GF) (Γ := Γ) (cpu := cpu) (k := k) (γl := γl) (γ := γ) (V := V) (γdl := γdl) (pd := pd) (pav := pav) (pu := pu) (j := j) (pidv := pidv) (dev := dev) (bno := bno) (dqp := dqp) (hj := hj) (hproc := hproc) (hK := hK) (hnoff := hnoff) (htier := htier) (hbno := hbno) (hcov := hcov) (hdev := hdev) (hpd := hpd) (ha0 := ha0) (ha1 := ha1)
-  unfold wp_bread_eb_body at h
-  unfold wp_bread_body
-  rw [hsie] at h
-  simp only [trapCsrsExt_false, cpuClaimExt_false] at h
-  iintro ⟨H0, H1, H2, Htc, Hcl, Hir, H6, H7, H8, H9, H10, Hnext⟩
-  iapply h
-  iframe H0 H1 H2 Htc Hcl Hir H6 H7 H8 H9 H10
-  iapply wpNext_mono $$ Hnext
-  iintro %cpu' HK %spie %spp %R' %kk %bs %bsd %d %p0 H1 H2 ⟨Htc, Hir⟩ Hcl H6 H7
-  iapply HK $$ %spie %spp %R' %kk %bs %bsd %d %p0 H1 H2 Htc Hcl Hir H6 H7
-
 end Xv6

@@ -129,7 +129,7 @@ theorem ulibPrintf_i3ca (L : UlibRun GF) (base : BitVec 64) :
     ulibPrintfCode L base ⊢ L.uinstrIs (base + 0x3ca#64) true (.ITYPE (1#12, .Regidx 0#5, .Regidx 10#5, .ADDI)) :=
   ulibTabCode_instr L ulibPrintfTab base 14 ⟨0x3ca, 2, 0x4505, true, .ITYPE (1#12, .Regidx 0#5, .Regidx 10#5, .ADDI)⟩ rfl
 
-/-- `+0x3cc  jal 518 <vprintf>` -/
+/-- `+0x3cc  jal 520 <vprintf>` -/
 theorem ulibPrintf_i3cc (L : UlibRun GF) (base : BitVec 64) :
     ulibPrintfCode L base ⊢ L.uinstrIs (base + 0x3cc#64) false (.JAL (2096368#21, .Regidx 1#5)) :=
   ulibTabCode_instr L ulibPrintfTab base 15 ⟨0x3cc, 4, 0xcf1ff0ef, false, .JAL (2096368#21, .Regidx 1#5)⟩ rfl

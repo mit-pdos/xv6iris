@@ -285,18 +285,6 @@ theorem utr_translateAddr_err (D : UFoot) (orc orc' : UOrc) (s s' : UWSt) (hp : 
   rw [utr_translateAddr_canon D orc s hp va acc hacc hc, htr]
   rfl
 
-/-- A refused walk refuses the translation (and a total walk gives a total
-translation: `utr_translateAddr_canon` maps `some` to `some`). -/
-theorem utr_translateAddr_isSome (D : UFoot) (orc : UOrc) (s : UWSt) (hp : UtrPins D s) (va : BitVec 64)
-    (acc : MemoryAccessType mem_payload) (hacc : utrAcc acc = true)
-    (htr : utrCanon va → (runRW D orc s (utrTranslate s va acc)).isSome = true) :
-    (runRW D orc s (translateAddr (.Virtaddr va) acc)).isSome = true := by
-  by_cases hc : utrCanon va
-  · rw [utr_translateAddr_canon D orc s hp va acc hacc hc, Option.isSome_map]
-    exact htr hc
-  · rw [utr_translateAddr_noncanon D orc s hp va acc hacc hc]
-    rfl
-
 /-- `translate` is the TLB lookup, then the hit or the miss (the split lane
 U1-P1's `UTlb` facts are stated over). -/
 theorem utr_translate_split (D : UFoot) (orc : UOrc) (s : UWSt) (asid : BitVec 16) (root : BitVec 44)
@@ -463,18 +451,9 @@ theorem utr_pmaCheck_ram (D : UFoot) (orc : UOrc) (s : UWSt) (pa : BitVec 64) (w
   utr_pmaCheck_ok D orc s pa w acc pbmt res ramRegion hD
     (by rw [hpma]; exact matching_pma_ram pa w hram hw hw') hok halign
 
-/-- The RAM region allows every non-atomic user access kind (at the
-reservation flag the model asserts), under the table's own memory type. -/
-theorem utrPmaOk_ram_fetch (w : Nat) (u : Unit) :
-    utrPmaOk (override_PMA ramRegion.attributes .PBMT_PMA) (.InstructionFetch u) w false = true := rfl
 theorem utrPmaOk_ram_load (w : Nat) :
     utrPmaOk (override_PMA ramRegion.attributes .PBMT_PMA) (.Load .Data) w false = true := rfl
 theorem utrPmaOk_ram_store (w : Nat) :
     utrPmaOk (override_PMA ramRegion.attributes .PBMT_PMA) (.Store .Data) w false = true := rfl
-theorem utrPmaOk_ram_lr (w : Nat) (aq rl : Bool) :
-    utrPmaOk (override_PMA ramRegion.attributes .PBMT_PMA) (.LoadReserved (aq, rl, .Data)) w true = true := rfl
-theorem utrPmaOk_ram_sc (w : Nat) (aq rl : Bool) :
-    utrPmaOk (override_PMA ramRegion.attributes .PBMT_PMA) (.StoreConditional (aq, rl, .Data)) w true = true :=
-  rfl
 
 end MachCSL

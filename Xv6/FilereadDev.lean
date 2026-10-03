@@ -28,6 +28,8 @@ receipt is built from its post (`frd_receipt_of_run` / `_of_dirty`, or the
 import Xv6.FilereadArms
 import MachCSL.WpSmodeJalr
 import MachCSL.WpSmodeLh
+import Xv6.UMemWindow
+import Xv6.DirlookupParts
 
 namespace Xv6
 
@@ -36,9 +38,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 theorem frd_devsw_cell' (w : BitVec 16) (h : w.toNat ≤ NDEV_max) :
     (BitVec.signExtend 64 w <<< 4) + KA.«devsw» = aDevswRead w.toNat := by
@@ -215,7 +215,7 @@ theorem frd_arm_dev (CR : CONSOLEREAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) G
   k_step_e (wp_s_auipc cpu _ (KA.«fileread» + 0x8a#64) false 0x1e#20 14#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_addi cpu _ (KA.«fileread» + 0x8e#64) false 708#12 14#5 14#5 (by decide))
+  k_step_e (wp_s_addi cpu _ (KA.«fileread» + 0x8e#64) false 1264#12 14#5 14#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [frd_devsw_addr]
   iintro Hk Hpc
   -- +0x92  c.add a5,a5,a4

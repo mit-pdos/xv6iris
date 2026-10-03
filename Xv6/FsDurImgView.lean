@@ -23,8 +23,8 @@ the bridge `Xv6/FsDurImgLink.lean`).
    `dir_bname_win_agree`, `dir_first_agree` (FsDurImg.v's local copy),
    `dir_wins_agree`, `dir_view_agree`, `img_node_data` and
    `img_node_file_byte` are NOT re-ported.  Uses checked: FsDurImg.v and
-   FsInitPin.v (D36-skipped) only; DirView.v's `dir_first_agree` is the
-   landed `Xv6.dirFirst_agree`.
+   FsInitPin.v (D36-skipped) only; DirView.v's `dir_first_agree` is not
+   ported either (nothing uses it).
 2. **`dirView`'s one-step recursion is read through `dirView_S_lookup`**
    (`Xv6/FsTree.lean`; the landed `dirView_S` is a union with its operands
    swapped), packaged as `dirViewSucc_wins` / `dirViewSucc_loses`
@@ -43,8 +43,6 @@ namespace Xv6
 open Iris Iris.Std MachCSL
 open Iris.Algebra
 open FsStateLink
-
-set_option linter.unusedSectionVars false
 
 /-! ## 8.  The image's abstract state -/
 

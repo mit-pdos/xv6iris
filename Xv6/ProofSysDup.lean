@@ -28,7 +28,6 @@ import Xv6.SpecFiledup
 import Xv6.CodeTactics
 import MachCSL.WpSmodeFrame6
 import Xv6.CopyLemmas
-import Xv6.DinodeSlot
 import MachCSL.BvLemmas
 import Xv6.SpecFdalloc
 
@@ -39,9 +38,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## Constants and arithmetic -/
 
@@ -49,7 +46,6 @@ theorem sd_ret_4d64 : jumpPc (KA.«sys_dup» + 0x14#64) = (KA.«sys_dup» + 0x14
 theorem sd_ret_4d78 : jumpPc (KA.«sys_dup» + 0x28#64) = (KA.«sys_dup» + 0x28#64) := by decide
 theorem sd_ret_4d86 : jumpPc (KA.«sys_dup» + 0x36#64) = (KA.«sys_dup» + 0x36#64) := by decide
 
-theorem sd_add0' (x : BitVec 64) : x + 0#64 = x := by simp
 theorem sd_sp24 (x : BitVec 64) : x + 0xFFFFFFFFFFFFFFD0#64 + BitVec.signExtend 64 24#12 = x + 0xFFFFFFFFFFFFFFE8#64 := by
   bv_decide
 theorem sd_sp24' (x : BitVec 64) : x + 0xFFFFFFFFFFFFFFD0#64 + 24#64 = x + 0xFFFFFFFFFFFFFFE8#64 := by bv_decide

@@ -79,8 +79,8 @@ relative start is NOT refuted; both walks fire it.)
    `np_len_removelast` = `List.length_dropLast`,
    `np_removelast_app` = `List.dropLast_append_of_ne_nil` (argument order
    swapped), `np_removelast_snoc` = `List.dropLast_concat`.  The two index
-   bounds (`np_removelast_len_ge`/`_gt`) are kept as
-   `npRemovelast_len_ge`/`_gt` (the walk's convenience form).
+   bounds (`np_removelast_len_ge`/`_gt`) are not ported (nothing uses
+   them).
 4. **ONE generic hop-peel.**  Rocq proves `ex_hops_cons` and `ep_hops_cons`
    by the same six lines at two lists; here the peel is proved once over
    `axHopsFrom` (`axHopsFrom_cons`, with `axHopsFrom_done`) and the two
@@ -96,7 +96,7 @@ relative start is NOT refuted; both walks fire it.)
 6. Rocq's curried `A -∗ B -∗ C` pure-conclusion lemmas are kept curried
    under `⊢@{IProp GF}` for the fupd ones (the FsAbsReadFire idiom), and
    stated as entailments where the Rocq lemma is one (`elend_frag`,
-   `elend_intro`, `elend_ofEra`, `exHops_cons`).
+   `elend_intro`, `elend_ofEra`).
 7. `bview_head_slash_intro`'s premise `bb_cstr pfun plen` is the one half
    it reads, `pfun plen = 0#8` (`hterm`, the form `SpecNamex` states;
    `Xv6/ArgPath.lean` deviation 3).
@@ -105,7 +105,14 @@ relative start is NOT refuted; both walks fire it.)
    `np_dead_unfired` → `npDead_unfired`, `um_start_of_slash` →
    `umStartOf_slash`, `bview_head_slash` → `bview_headSlash`, …);
    `dir_entries_era_ok` → `dirEntries_eraOk`, `era_nlink_nz` →
-   `eraNlink_nz`, `abs_of_era_dir` → `absOf_eraDir`.  `S k` is `k + 1`.
+   `eraNlink_nz`.  `S k` is `k + 1`.
+
+9. **The chroot bump** (design/chroot.md section 3): every hop family,
+   start and death arm takes the walking process's root `rt` (before
+   `γfs`, as Rocq's `ex_hop rt γfs`; `exStart γfs rt cw`), `umStartOf rt
+   cw` starts an absolute path at `rt`, the hit/miss fires carry `¬(s =
+   DOTDOT ∧ d = rt)`, and `elend_fire_self` is the self arm's fire.  The
+   common fire concludes `FsAbsWalk.axHopAns`.
 
 ## Dropped/simplified vs Rocq
 
@@ -141,34 +148,10 @@ theorem dirEntries_eraOk (cov : Std.ExtTreeSet Nat compare) (logstart : Nat) (dn
 theorem eraNlink_nz (dn : Dinode) (bm : Blkmap) (data : Nat → List (BitVec 8))
     (hnz : dn.diNlink.toNat ≠ 0) : fnNlink (eraNode dn bm data) ≠ 0 := hnz
 
-/-- ...and the same fact as the ABSTRACT NODE's arm (Rocq's
-`abs_of_era_dir`). -/
-theorem absOf_eraDir (cov : Std.ExtTreeSet Nat compare) (logstart : Nat) (dn : Dinode)
-    (bm : Blkmap) (data : Nat → List (BitVec 8)) (hok : inodeOk cov logstart dn bm data)
-    (hd : fnIsDir (eraNode dn bm data) = true) (hnl : dn.diNlink.toNat ≠ 0) :
-    absOf (eraNode dn bm data)
-      = some ⟨.ADir (dirView data (dirNrec dn.diSize.toNat)), fnNlink (eraNode dn bm data)⟩ := by
-  rw [absOf_dir _ hd (eraNlink_nz dn bm data hnl), dirEntries_eraOk cov logstart dn bm data hok hd]
-
 /-! ## 6.0  Two index bounds about `dropLast` (Rocq's `removelast`)
 
 Hoisted, as Rocq hoists them, so the walk never subtracts inside the proof
 mode (deviation 3 for the three list facts core already has). -/
-
-/-- Rocq's `np_removelast_len_ge`. -/
-theorem npRemovelast_len_ge {A : Type _} (ps es rest : List A) (hps : ps = es ++ rest)
-    (hne : rest ≠ []) : es.length ≤ ps.dropLast.length := by
-  subst hps
-  rw [List.dropLast_append_of_ne_nil hne, List.length_append]
-  omega
-
-/-- Rocq's `np_removelast_len_gt`. -/
-theorem npRemovelast_len_gt {A : Type _} (ps es : List A) (x : A) (rest : List A)
-    (hps : ps = (es ++ [x]) ++ rest) (hne : rest ≠ []) : es.length < ps.dropLast.length := by
-  subst hps
-  rw [List.dropLast_append_of_ne_nil hne, List.length_append, List.length_append]
-  simp only [List.length_singleton]
-  omega
 
 /-- The parent prefix: every path element but the last (Rocq's
 `np_elems`; `SysMknodDefs.npar_elems` is the same list). -/
@@ -196,17 +179,19 @@ theorem bview_headSlash_intro (plen : Nat) (pfun : Nat → BitVec 8) (hterm : pf
 
 /-! ## 7.0'  namex's start rule -/
 
-/-- absolute paths start at the root, relative ones at the process's cwd
-inum `cw` (Rocq's `um_start_of`, lane C3). -/
-def umStartOf (cw : Nat) (pl : List (BitVec 8)) : Nat :=
-  if pl[0]? = some SLASH then ROOTINO else cw
+/-- absolute paths start at the process's ROOT inum `rt` (design/chroot.md
+section 3), relative ones at its cwd inum `cw` (Rocq's `um_start_of`, lane
+C3).  A U-mode caller reads the relative arm off the cwd its resume key
+carries; it never knows `rt`. -/
+def umStartOf (rt cw : Nat) (pl : List (BitVec 8)) : Nat :=
+  if pl[0]? = some SLASH then rt else cw
 
-theorem umStartOf_slash (cw : Nat) (pl : List (BitVec 8)) (h : pl[0]? = some SLASH) :
-    umStartOf cw pl = ROOTINO := by
+theorem umStartOf_slash (rt cw : Nat) (pl : List (BitVec 8)) (h : pl[0]? = some SLASH) :
+    umStartOf rt cw pl = rt := by
   unfold umStartOf; rw [if_pos h]
 
-theorem umStartOf_rel (cw : Nat) (pl : List (BitVec 8)) (h : pl[0]? ≠ some SLASH) :
-    umStartOf cw pl = cw := by
+theorem umStartOf_rel (rt cw : Nat) (pl : List (BitVec 8)) (h : pl[0]? ≠ some SLASH) :
+    umStartOf rt cw pl = cw := by
   unfold umStartOf; rw [if_neg h]
 
 /-! ## The hop family, generically (deviation 4) -/
@@ -216,16 +201,17 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 
 /-- PEEL THE HEAD HOP (the common proof of Rocq's `ex_hops_cons` /
 `ep_hops_cons`). -/
-theorem axHopsFrom_cons (F : Nat → DFrac → Std.ExtTreeMap Fname Nat compare → IProp GF)
+theorem axHopsFrom_cons (rt : Nat)
+    (F : Nat → DFrac → Std.ExtTreeMap Fname Nat compare → IProp GF)
     (P Pmiss : Nat → Nat → IProp GF) (ps : List Fname) (k : Nat) (s : Fname)
     (rest : List Fname) (hd : ps.drop k = s :: rest) :
-    axHopsFrom F P Pmiss ps k ⊢ axHop F P Pmiss k s ∗ axHopsFrom F P Pmiss ps (k + 1) := by
+    axHopsFrom rt F P Pmiss ps k ⊢ axHop rt F P Pmiss k s ∗ axHopsFrom rt F P Pmiss ps (k + 1) := by
   have hdS : ps.drop (k + 1) = rest := by
     rw [← List.drop_drop, hd]; rfl
   unfold axHopsFrom
   rw [hd, hdS]
-  have heq : iprop([∗list] j ↦ x ∈ rest, axHop F P Pmiss (k + (j + 1)) x)
-      = iprop([∗list] j ↦ x ∈ rest, axHop F P Pmiss (k + 1 + j) x) :=
+  have heq : iprop([∗list] j ↦ x ∈ rest, axHop rt F P Pmiss (k + (j + 1)) x)
+      = iprop([∗list] j ↦ x ∈ rest, axHop rt F P Pmiss (k + 1 + j) x) :=
     BigSepL.bigSepL_eq_of_forall_eq (fun {j _} => by rw [show k + (j + 1) = k + 1 + j by omega])
   refine BigSepL.bigSepL_cons.1.trans ?_
   rw [heq]
@@ -233,18 +219,19 @@ theorem axHopsFrom_cons (F : Nat → DFrac → Std.ExtTreeMap Fname Nat compare 
 
 /-- the family past its end is `emp` (the common proof of Rocq's
 `ep_hops_done`). -/
-theorem axHopsFrom_done (F : Nat → DFrac → Std.ExtTreeMap Fname Nat compare → IProp GF)
+theorem axHopsFrom_done (rt : Nat)
+    (F : Nat → DFrac → Std.ExtTreeMap Fname Nat compare → IProp GF)
     (P Pmiss : Nat → Nat → IProp GF) (ps : List Fname) (k : Nat) (hk : ps.length ≤ k) :
-    ⊢ axHopsFrom F P Pmiss ps k := by
+    ⊢ axHopsFrom rt F P Pmiss ps k := by
   unfold axHopsFrom
   rw [List.drop_eq_nil_of_le hk]
   exact BigSepL.bigSepL_nil.2
 
 /-- THE TRIVIAL FAMILY: every hop says yes and every cursor is `True`
 (Rocq's `ax_hops_triv`; what a caller that tracks nothing hands in). -/
-theorem axHops_triv (F : Nat → DFrac → Std.ExtTreeMap Fname Nat compare → IProp GF)
+theorem axHops_triv (rt : Nat) (F : Nat → DFrac → Std.ExtTreeMap Fname Nat compare → IProp GF)
     (ps : List Fname) (n : Nat) :
-    ⊢ axHopsFrom F (fun _ _ => iprop(True)) (fun _ _ => iprop(True)) ps n := by
+    ⊢ axHopsFrom rt F (fun _ _ => iprop(True)) (fun _ _ => iprop(True)) ps n := by
   unfold axHopsFrom
   refine BigSepL.bigSepL_intro (fun j s _ => ?_)
   unfold axHop
@@ -252,7 +239,11 @@ theorem axHops_triv (F : Nat → DFrac → Std.ExtTreeMap Fname Nat compare → 
   imodintro
   isplitl [Hl]
   · iexact Hl
-  · cases ents[s]? <;> (simp only [axHopNext]; ipureintro; trivial)
+  · by_cases hsr : s = DOTDOT ∧ d = rt
+    · rw [axHopAns_self rt _ _ (n + j) d s ents hsr.1 hsr.2]
+      ipureintro; trivial
+    · rw [axHopAns_rec rt _ _ (n + j) d s ents hsr]
+      cases ents[s]? <;> (simp only [axHopNext]; ipureintro; trivial)
 
 end Hops
 
@@ -315,28 +306,25 @@ variable [FsBytesG GF]
 
 /-! ## 3.  The hop vocabulary: `axHop` at this lend -/
 
-/-- Rocq's `ex_hop`: `axHop` at the live Γ's era lend. -/
-def exHop (γfs : FsNames) (P Pmiss : Nat → Nat → IProp GF) (k : Nat) (s : Fname) : IProp GF :=
-  axHop (elend (fsGammaL γfs)) P Pmiss k s
+/-- Rocq's `ex_hop`: `axHop` at the live Γ's era lend, at the walking
+process's root `rt` (`FsAbsWalk.axHop`'s self rule). -/
+def exHop (rt : Nat) (γfs : FsNames) (P Pmiss : Nat → Nat → IProp GF) (k : Nat) (s : Fname) :
+    IProp GF :=
+  axHop rt (elend (fsGammaL γfs)) P Pmiss k s
 
 /-- Rocq's `ex_hops_from`: the full family over `pathElems pl`. -/
-def exHopsFrom (γfs : FsNames) (P Pmiss : Nat → Nat → IProp GF) (pl : List (BitVec 8))
-    (n : Nat) : IProp GF :=
-  axHopsFrom (elend (fsGammaL γfs)) P Pmiss (pathElems pl) n
+def exHopsFrom (rt : Nat) (γfs : FsNames) (P Pmiss : Nat → Nat → IProp GF)
+    (pl : List (BitVec 8)) (n : Nat) : IProp GF :=
+  axHopsFrom rt (elend (fsGammaL γfs)) P Pmiss (pathElems pl) n
 
-theorem exHop_is_axHop (γfs : FsNames) (P Pmiss : Nat → Nat → IProp GF) (k : Nat) (s : Fname) :
-    exHop γfs P Pmiss k s = axHop (elend (fsGammaL γfs)) P Pmiss k s := rfl
+theorem exHop_is_axHop (rt : Nat) (γfs : FsNames) (P Pmiss : Nat → Nat → IProp GF) (k : Nat)
+    (s : Fname) : exHop rt γfs P Pmiss k s = axHop rt (elend (fsGammaL γfs)) P Pmiss k s := rfl
 
-theorem exHops_is_axHops (γfs : FsNames) (P Pmiss : Nat → Nat → IProp GF)
+theorem exHops_is_axHops (rt : Nat) (γfs : FsNames) (P Pmiss : Nat → Nat → IProp GF)
     (pl : List (BitVec 8)) (n : Nat) :
-    exHopsFrom γfs P Pmiss pl n = axHopsFrom (elend (fsGammaL γfs)) P Pmiss (pathElems pl) n :=
+    exHopsFrom rt γfs P Pmiss pl n
+      = axHopsFrom rt (elend (fsGammaL γfs)) P Pmiss (pathElems pl) n :=
   rfl
-
-/-- PEEL THE HEAD HOP (Rocq's `ex_hops_cons`). -/
-theorem exHops_cons (γfs : FsNames) (P Pmiss : Nat → Nat → IProp GF) (pl : List (BitVec 8))
-    (k : Nat) (s : Fname) (rest : List Fname) (hd : (pathElems pl).drop k = s :: rest) :
-    exHopsFrom γfs P Pmiss pl k ⊢ exHop γfs P Pmiss k s ∗ exHopsFrom γfs P Pmiss pl (k + 1) :=
-  axHopsFrom_cons _ P Pmiss _ k s rest hd
 
 /-! ## 4.  The producer at the fire, and the two fire lemmas -/
 
@@ -355,15 +343,16 @@ theorem elend_ofEra (γfs : FsNames) (cov : Std.ExtTreeSet Nat compare) (logstar
 /-- THE COMMON FIRE: lend half, run the caller's hop, pin the returned half
 back to the kept one, and re-form the whole element.  Both Rocq fires are
 this proof with the lookup case read off at the end. -/
-private theorem elend_fire (γfs : FsNames) (cov : Std.ExtTreeSet Nat compare) (logstart : Nat)
+private theorem elend_fire (rt : Nat) (γfs : FsNames) (cov : Std.ExtTreeSet Nat compare)
+    (logstart : Nat)
     (P Pmiss : Nat → Nat → IProp GF) (k : Nat) (s : Fname) (d : Nat)
     (dn : Dinode) (bm : Blkmap) (data : Nat → List (BitVec 8))
     (hok : inodeOk cov logstart dn bm data) (hty : dn.diType.toNat = T_DIR_z)
     (hnl : dn.diNlink.toNat ≠ 0) :
-    ⊢@{IProp GF} exHop γfs P Pmiss k s -∗ P k d -∗
+    ⊢@{IProp GF} exHop rt γfs P Pmiss k s -∗ P k d -∗
       topFrag (fsGammaL γfs) d (eraNode dn bm data) ={⊤}=∗
         topFrag (fsGammaL γfs) d (eraNode dn bm data) ∗
-        axHopNext P Pmiss k d (dirView data (dirNrec dn.diSize.toNat))[s]? := by
+        axHopAns rt P Pmiss k d s (dirView data (dirNrec dn.diSize.toNat)) := by
   iintro Hh HP Ht
   ihave ⟨Ht1, Ht2⟩ := (eraHalf_split (fsGammaL γfs) d (eraNode dn bm data)).1 $$ Ht
   ihave HF := elend_ofEra γfs cov logstart (DFrac.own (1 : Qp).half) d dn bm data hok hty hnl
@@ -387,72 +376,83 @@ private theorem elend_fire (γfs : FsNames) (cov : Std.ExtTreeSet Nat compare) (
 
 /-- FIRE A HOP THAT HITS (Rocq's `elend_fire_hit`): same caller fupd, the
 cursor steps to the child, the element comes back WHOLE at the same node. -/
-theorem elend_fire_hit (γfs : FsNames) (cov : Std.ExtTreeSet Nat compare) (logstart : Nat)
+theorem elend_fire_hit (rt : Nat) (γfs : FsNames) (cov : Std.ExtTreeSet Nat compare)
+    (logstart : Nat)
     (P Pmiss : Nat → Nat → IProp GF) (k : Nat) (s : Fname) (d : Nat)
     (dn : Dinode) (bm : Blkmap) (data : Nat → List (BitVec 8)) (c : Nat)
     (hok : inodeOk cov logstart dn bm data) (hty : dn.diType.toNat = T_DIR_z)
-    (hnl : dn.diNlink.toNat ≠ 0) (he : (dirView data (dirNrec dn.diSize.toNat))[s]? = some c) :
-    ⊢@{IProp GF} exHop γfs P Pmiss k s -∗ P k d -∗
+    (hnl : dn.diNlink.toNat ≠ 0) (he : (dirView data (dirNrec dn.diSize.toNat))[s]? = some c)
+    (hns : ¬(s = DOTDOT ∧ d = rt)) :
+    ⊢@{IProp GF} exHop rt γfs P Pmiss k s -∗ P k d -∗
       topFrag (fsGammaL γfs) d (eraNode dn bm data) ={⊤}=∗
         topFrag (fsGammaL γfs) d (eraNode dn bm data) ∗ P (k + 1) c := by
-  have h := elend_fire (hlc := hlc) γfs cov logstart P Pmiss k s d dn bm data hok hty hnl
-  rw [he] at h
+  have h := elend_fire (hlc := hlc) rt γfs cov logstart P Pmiss k s d dn bm data hok hty hnl
+  rw [axHopAns_rec rt P Pmiss k d s _ hns, he] at h
   exact h
 
 /-- ...AND ONE THAT MISSES (Rocq's `elend_fire_miss`): `Pmiss` back
 instead of a stepped cursor. -/
-theorem elend_fire_miss (γfs : FsNames) (cov : Std.ExtTreeSet Nat compare) (logstart : Nat)
+theorem elend_fire_miss (rt : Nat) (γfs : FsNames) (cov : Std.ExtTreeSet Nat compare)
+    (logstart : Nat)
     (P Pmiss : Nat → Nat → IProp GF) (k : Nat) (s : Fname) (d : Nat)
     (dn : Dinode) (bm : Blkmap) (data : Nat → List (BitVec 8))
     (hok : inodeOk cov logstart dn bm data) (hty : dn.diType.toNat = T_DIR_z)
-    (hnl : dn.diNlink.toNat ≠ 0) (he : (dirView data (dirNrec dn.diSize.toNat))[s]? = none) :
-    ⊢@{IProp GF} exHop γfs P Pmiss k s -∗ P k d -∗
+    (hnl : dn.diNlink.toNat ≠ 0) (he : (dirView data (dirNrec dn.diSize.toNat))[s]? = none)
+    (hns : ¬(s = DOTDOT ∧ d = rt)) :
+    ⊢@{IProp GF} exHop rt γfs P Pmiss k s -∗ P k d -∗
       topFrag (fsGammaL γfs) d (eraNode dn bm data) ={⊤}=∗
         topFrag (fsGammaL γfs) d (eraNode dn bm data) ∗ Pmiss k d := by
-  have h := elend_fire (hlc := hlc) γfs cov logstart P Pmiss k s d dn bm data hok hty hnl
-  rw [he] at h
+  have h := elend_fire (hlc := hlc) rt γfs cov logstart P Pmiss k s d dn bm data hok hty hnl
+  rw [axHopAns_rec rt P Pmiss k d s _ hns, he] at h
+  exact h
+
+/-- ...AND THE SELF ARM (Rocq's `elend_fire_self`; upstream b72cbac): `..`
+at the process's root answers the root itself, whatever the record says,
+and the hop's self rule steps the cursor IN PLACE.  The lend is the same
+one; only the answer is read off the rule instead of the entry map. -/
+theorem elend_fire_self (rt : Nat) (γfs : FsNames) (cov : Std.ExtTreeSet Nat compare)
+    (logstart : Nat)
+    (P Pmiss : Nat → Nat → IProp GF) (k : Nat) (s : Fname) (d : Nat)
+    (dn : Dinode) (bm : Blkmap) (data : Nat → List (BitVec 8))
+    (hok : inodeOk cov logstart dn bm data) (hty : dn.diType.toNat = T_DIR_z)
+    (hnl : dn.diNlink.toNat ≠ 0) (hs : s = DOTDOT) (hd : d = rt) :
+    ⊢@{IProp GF} exHop rt γfs P Pmiss k s -∗ P k d -∗
+      topFrag (fsGammaL γfs) d (eraNode dn bm data) ={⊤}=∗
+        topFrag (fsGammaL γfs) d (eraNode dn bm data) ∗ P (k + 1) d := by
+  have h := elend_fire (hlc := hlc) rt γfs cov logstart P Pmiss k s d dn bm data hok hty hnl
+  rw [axHopAns_self rt P Pmiss k d s _ hs hd] at h
   exact h
 
 /-! ## 6.  The nameiparent prefix family (was FsAbsNpar.v) -/
 
 /-- Rocq's `ep_hop`: the very same hop `exHop` is. -/
-def epHop (γfs : FsNames) (P Pmiss : Nat → Nat → IProp GF) (k : Nat) (s : Fname) : IProp GF :=
-  axHop (elend (fsGammaL γfs)) P Pmiss k s
+def epHop (rt : Nat) (γfs : FsNames) (P Pmiss : Nat → Nat → IProp GF) (k : Nat) (s : Fname) :
+    IProp GF :=
+  axHop rt (elend (fsGammaL γfs)) P Pmiss k s
 
 /-- Rocq's `ep_hops_from`: the family over the PARENT PREFIX. -/
-def epHopsFrom (γfs : FsNames) (P Pmiss : Nat → Nat → IProp GF) (pl : List (BitVec 8))
-    (n : Nat) : IProp GF :=
-  axHopsFrom (elend (fsGammaL γfs)) P Pmiss (npElems pl) n
-
-theorem epHop_is_axHop (γfs : FsNames) (P Pmiss : Nat → Nat → IProp GF) (k : Nat) (s : Fname) :
-    epHop γfs P Pmiss k s = axHop (elend (fsGammaL γfs)) P Pmiss k s := rfl
-
-theorem epHops_is_axHops (γfs : FsNames) (P Pmiss : Nat → Nat → IProp GF)
-    (pl : List (BitVec 8)) (n : Nat) :
-    epHopsFrom γfs P Pmiss pl n = axHopsFrom (elend (fsGammaL γfs)) P Pmiss (npElems pl) n :=
-  rfl
-
-/-- Rocq's `ep_hops_cons`. -/
-theorem epHops_cons (γfs : FsNames) (P Pmiss : Nat → Nat → IProp GF) (pl : List (BitVec 8))
-    (k : Nat) (s : Fname) (rest : List Fname) (hd : (npElems pl).drop k = s :: rest) :
-    epHopsFrom γfs P Pmiss pl k ⊢ epHop γfs P Pmiss k s ∗ epHopsFrom γfs P Pmiss pl (k + 1) :=
-  axHopsFrom_cons _ P Pmiss _ k s rest hd
+def epHopsFrom (rt : Nat) (γfs : FsNames) (P Pmiss : Nat → Nat → IProp GF)
+    (pl : List (BitVec 8)) (n : Nat) : IProp GF :=
+  axHopsFrom rt (elend (fsGammaL γfs)) P Pmiss (npElems pl) n
 
 /-- the family past its end is `emp`: what the success exit and the
 "nameiparent of /" exit hand back (Rocq's `ep_hops_done`). -/
-theorem epHops_done (γfs : FsNames) (P Pmiss : Nat → Nat → IProp GF) (pl : List (BitVec 8))
-    (k : Nat) (hk : (npElems pl).length ≤ k) : ⊢ epHopsFrom γfs P Pmiss pl k :=
-  axHopsFrom_done _ P Pmiss _ k hk
+theorem epHops_done (rt : Nat) (γfs : FsNames) (P Pmiss : Nat → Nat → IProp GF)
+    (pl : List (BitVec 8)) (k : Nat) (hk : (npElems pl).length ≤ k) :
+    ⊢ epHopsFrom rt γfs P Pmiss pl k :=
+  axHopsFrom_done rt _ P Pmiss _ k hk
 
 /-- THE DEATH ARM (Rocq's `np_dead`; see the header for the two bounds). -/
-def npDead (γfs : FsNames) (P Pmiss : Nat → Nat → IProp GF) (pl : List (BitVec 8)) : IProp GF :=
-  iprop((∃ (k d : Nat), ⌜k ≤ (npElems pl).length⌝ ∗ P k d ∗ epHopsFrom γfs P Pmiss pl k) ∨
-    (∃ (k d : Nat), ⌜k < (npElems pl).length⌝ ∗ Pmiss k d ∗ epHopsFrom γfs P Pmiss pl (k + 1)))
+def npDead (rt : Nat) (γfs : FsNames) (P Pmiss : Nat → Nat → IProp GF) (pl : List (BitVec 8)) :
+    IProp GF :=
+  iprop((∃ (k d : Nat), ⌜k ≤ (npElems pl).length⌝ ∗ P k d ∗ epHopsFrom rt γfs P Pmiss pl k) ∨
+    (∃ (k d : Nat), ⌜k < (npElems pl).length⌝ ∗ Pmiss k d ∗
+      epHopsFrom rt γfs P Pmiss pl (k + 1)))
 
 /-- hop `k` never fired (Rocq's `np_dead_unfired`). -/
-theorem npDead_unfired (γfs : FsNames) (P Pmiss : Nat → Nat → IProp GF) (pl : List (BitVec 8))
-    (k d : Nat) (hk : k ≤ (npElems pl).length) :
-    ⊢@{IProp GF} P k d -∗ epHopsFrom γfs P Pmiss pl k -∗ npDead γfs P Pmiss pl := by
+theorem npDead_unfired (rt : Nat) (γfs : FsNames) (P Pmiss : Nat → Nat → IProp GF)
+    (pl : List (BitVec 8)) (k d : Nat) (hk : k ≤ (npElems pl).length) :
+    ⊢@{IProp GF} P k d -∗ epHopsFrom rt γfs P Pmiss pl k -∗ npDead rt γfs P Pmiss pl := by
   iintro HP Hh
   unfold npDead
   ileft
@@ -464,9 +464,10 @@ theorem npDead_unfired (γfs : FsNames) (P Pmiss : Nat → Nat → IProp GF) (pl
     · iexact Hh
 
 /-- hop `k` fired and missed (Rocq's `np_dead_missed`). -/
-theorem npDead_missed (γfs : FsNames) (P Pmiss : Nat → Nat → IProp GF) (pl : List (BitVec 8))
-    (k d : Nat) (hk : k < (npElems pl).length) :
-    ⊢@{IProp GF} Pmiss k d -∗ epHopsFrom γfs P Pmiss pl (k + 1) -∗ npDead γfs P Pmiss pl := by
+theorem npDead_missed (rt : Nat) (γfs : FsNames) (P Pmiss : Nat → Nat → IProp GF)
+    (pl : List (BitVec 8)) (k d : Nat) (hk : k < (npElems pl).length) :
+    ⊢@{IProp GF} Pmiss k d -∗ epHopsFrom rt γfs P Pmiss pl (k + 1) -∗
+      npDead rt γfs P Pmiss pl := by
   iintro HP Hh
   unfold npDead
   iright
@@ -477,68 +478,19 @@ theorem npDead_missed (γfs : FsNames) (P Pmiss : Nat → Nat → IProp GF) (pl 
     · iexact HP
     · iexact Hh
 
-/-- "nameiparent of /": no elements, so the cursor at 0 IS the whole
-refund (Rocq's `np_dead_noelems`). -/
-theorem npDead_noelems (γfs : FsNames) (P Pmiss : Nat → Nat → IProp GF) (pl : List (BitVec 8))
-    (d : Nat) (hnil : pathElems pl = []) :
-    ⊢@{IProp GF} P 0 d -∗ npDead γfs P Pmiss pl := by
-  have hlen : (npElems pl).length ≤ 0 := by simp [npElems, hnil]
-  iintro HP
-  iapply (npDead_unfired γfs P Pmiss pl 0 d (Nat.zero_le _)) $$ HP
-  iapply (epHops_done γfs P Pmiss pl 0 hlen)
-
 /-! ## 7.  The deferred start (was FsAbsStart.v) -/
 
 /-- THE NAMEI SIDE (Rocq's `ex_start`): one shot, at the start inum
 namex's start rule picks. -/
-def exStart (γfs : FsNames) (cw : Nat) (P Pmiss : Nat → Nat → IProp GF)
+def exStart (γfs : FsNames) (rt cw : Nat) (P Pmiss : Nat → Nat → IProp GF)
     (pl : List (BitVec 8)) : IProp GF :=
-  iprop(∀ r : Nat, ⌜r = umStartOf cw pl⌝ ={⊤}=∗ P 0 r ∗ exHopsFrom γfs P Pmiss pl 0)
+  iprop(∀ r : Nat, ⌜r = umStartOf rt cw pl⌝ ={⊤}=∗ P 0 r ∗ exHopsFrom rt γfs P Pmiss pl 0)
 
 /-- THE NAMEIPARENT SIDE (Rocq's `ep_start`): the same one shot over the
 parent prefix. -/
-def epStart (γfs : FsNames) (cw : Nat) (P Pmiss : Nat → Nat → IProp GF)
+def epStart (γfs : FsNames) (rt cw : Nat) (P Pmiss : Nat → Nat → IProp GF)
     (pl : List (BitVec 8)) : IProp GF :=
-  iprop(∀ r : Nat, ⌜r = umStartOf cw pl⌝ ={⊤}=∗ P 0 r ∗ epHopsFrom γfs P Pmiss pl 0)
-
-/-- THE RECEIPT: the absolute pair is a start (Rocq's `ex_start_of_pair`;
-deviation 2: `P 0 ROOTINO` directly). -/
-theorem exStart_ofPair (γfs : FsNames) (cw : Nat) (P Pmiss : Nat → Nat → IProp GF)
-    (pl : List (BitVec 8)) (hsl : pl[0]? = some SLASH) :
-    ⊢@{IProp GF} P 0 ROOTINO -∗ exHopsFrom γfs P Pmiss pl 0 -∗ exStart γfs cw P Pmiss pl := by
-  iintro HP Hh
-  unfold exStart
-  iintro %r %hr
-  rw [hr, umStartOf_slash cw pl hsl]
-  imodintro
-  isplitl [HP]
-  · iexact HP
-  · iexact Hh
-
-/-- Rocq's `ep_start_of_pair`. -/
-theorem epStart_ofPair (γfs : FsNames) (cw : Nat) (P Pmiss : Nat → Nat → IProp GF)
-    (pl : List (BitVec 8)) (hsl : pl[0]? = some SLASH) :
-    ⊢@{IProp GF} P 0 ROOTINO -∗ epHopsFrom γfs P Pmiss pl 0 -∗ epStart γfs cw P Pmiss pl := by
-  iintro HP Hh
-  unfold epStart
-  iintro %r %hr
-  rw [hr, umStartOf_slash cw pl hsl]
-  imodintro
-  isplitl [HP]
-  · iexact HP
-  · iexact Hh
-
-/-- the trivial start: every hop says yes and every cursor is `True`
-(Rocq's `ep_start_triv`; SpecCreate's bundle unit). -/
-theorem epStart_triv (γfs : FsNames) (cw : Nat) (pl : List (BitVec 8)) :
-    ⊢ epStart (GF := GF) γfs cw (fun _ _ => iprop(True)) (fun _ _ => iprop(True)) pl := by
-  unfold epStart
-  iintro %r _
-  imodintro
-  isplitr
-  · ipureintro; trivial
-  · unfold epHopsFrom
-    iapply (axHops_triv (hlc := hlc) (GF := GF) (elend (fsGammaL γfs)) (npElems pl) 0)
+  iprop(∀ r : Nat, ⌜r = umStartOf rt cw pl⌝ ={⊤}=∗ P 0 r ∗ epHopsFrom rt γfs P Pmiss pl 0)
 
 end FsAbsEra
 

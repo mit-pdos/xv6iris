@@ -40,14 +40,11 @@ the proof frames it through for now.
 -/
 import Xv6.PipeInvDefs
 import Xv6.SchedCtx
-import Xv6.SlotGen
 import MachCSL.WpSmodeIntr
 
 namespace Xv6
 
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
-set_option linter.unusedSectionVars false
 open Iris Iris.ProgramLogic Iris.BI Std MachCSL
 open LeanRV64D
 

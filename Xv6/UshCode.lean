@@ -26,14 +26,3 @@ ukCode γt User.Sh.code.byte`, and a per-pc fact is a `rfl` evaluation
 through sh-malloc's one catalog lemma `UkShMallocDefs.ushm_uis`
 (its witness-free form `ushm_uisK`).
 -/
-import Xv6.UshCodeDefs
-import Xv6.UshCodeAlloc
-import Xv6.UshCodeGettoken
-import Xv6.UshCodePeek
-import Xv6.UshCodeRedirs
-import Xv6.UshCodeExec
-import Xv6.UshCodePipe
-import Xv6.UshCodeLine
-import Xv6.UshCodeNul
-import Xv6.UshCodeParsecmd
-import Xv6.UshCodeUlib

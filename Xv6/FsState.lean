@@ -19,9 +19,8 @@ because it is a fact about a FILE SYSTEM, readable at BOTH instances.
 `fsState` TAKES A `DFrac` (durable-disk EV-X): every BYTE rides at that
 share -- it is written at the constant-share view `FsView.gammaQ Γ dq` --
 while the ghost column (the link authority, the type register, a
-directory's entry tokens) stays WHOLE (`gammaQ_inodeGhost` is `rfl`).
-`fsState Γ (DFrac.own 1) S` is the fraction-1 predicate on the nose
-(`fsState_1`).
+directory's entry tokens) stays WHOLE (by `rfl`).
+`fsState Γ (DFrac.own 1) S` is the fraction-1 predicate on the nose.
 
 THE MINT IS THE TRANSPORT (`Xv6/FsDurXfer.lean`, `fsState_xfer_tok`), which
 ALLOCATES the target's byte map at the flattening of the source's own runs;
@@ -29,7 +28,7 @@ ALLOCATES the target's byte map at the flattening of the source's own runs;
 share) and the Φ-free `fsGhost` (whole), which is what makes that possible.
 The link family's VALIDITY -- "#tokens ≤ nlink at every inum", the one
 whole-state fact of the design -- is READ OFF the source's own `iOwn` by
-`fsLinks_valid` / `fsLinks_valid_tok`; it is never proved and never
+`fsLinks_valid_tok`; it is never proved and never
 maintained.
 
 ## DEVIATIONS from Rocq
@@ -67,9 +66,8 @@ maintained.
 * `fs_state_gq` -- uses checked: none (a `reflexivity`).
 * `fs_footprint_gname` -- uses checked: comment only (FsStateBitmap.v:73).
 * `fs_footprint_shed` -- uses checked: none (the commit's collection sheds
-  through `gamma_q_shed` and the per-shape `_shed` lemmas directly; those
-  are all landed: `FsView.gammaQ_shed`, `FsView.blkOwned_shed`,
-  `freePool_shed`, `inodePhi_shed`).
+  through `gamma_q_shed` and the per-shape `_shed` lemmas directly; the one
+  something uses is landed: `FsView.blkOwned_shed`).
 * `link_elem_node_no_ents`, `link_elem_no_ents_lookup`,
   `link_elem_valid_no_ents` -- uses checked: none outside this chain.
 * `fs_links_full`, `fs_links_full_alloc`, `fs_boot_alloc_full`,
@@ -84,14 +82,11 @@ Everything else is ported with Rocq's statement (modulo the deviations).
 -/
 import Xv6.FsStateTop
 import Xv6.FsStateInodeOwned
-import Xv6.FsStateBitmap
 
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Iris.Algebra
-
-set_option linter.unusedSectionVars false
 
 /-! ## 1.  The abstract state -/
 
@@ -228,12 +223,6 @@ def fsState (Γ : FsViewNames GF) (dq : DFrac) (S : FsStateRec) : IProp GF :=
     ∗ freeBitmap (FsView.gammaQ Γ dq) S.fssSb S.fssUsed
     ∗ ⌜FsGeom S⌝)
 
-/-- THE ONE-LINE BRIDGE (Rocq's `fs_state_1`). -/
-theorem fsState_1 (Γ : FsViewNames GF) (S : FsStateRec) :
-    fsState Γ (DFrac.own 1) S ⊣⊢
-      iprop(sbOwned Γ S.fssSb S.fssSbb ∗ fsInodes Γ S.fssSb S.fssInodes
-        ∗ freeBitmap Γ S.fssSb S.fssUsed ∗ ⌜FsGeom S⌝) := .rfl
-
 /-! ## 3.  Timelessness -/
 
 instance fsInodes_timeless (Γ : FsViewNames GF) [GTimeless Γ] (sb : FsSb)
@@ -354,20 +343,6 @@ theorem linkElem_insert (I : RegMapF FsNode) (i : Nat) (n : FsNode) (f : LinkCho
     linkElem (insert I i n) f = linkElemNode i n (lcV f i) (lcTyf f i) • linkElem I f := by
   unfold linkElem
   exact BigOpM.bigOpM_insert_eq _ n hi
-
-theorem linkElem_delete (I : RegMapF FsNode) (i : Nat) (n : FsNode) (f : LinkChoice)
-    (hi : get? I i = some n) :
-    linkElem I f = linkElemNode i n (lcV f i) (lcTyf f i) • linkElem (delete I i) f := by
-  unfold linkElem
-  exact BigOpM.bigOpM_delete_eq _ hi
-
-theorem linkElemOk_ext (I : RegMapF FsNode) (f g : LinkChoice)
-    (hfg : ∀ i, (∃ n, get? I i = some n) → f i = g i) (hok : linkElemOk I f) :
-    linkElemOk I g := by
-  intro i n hi
-  unfold lcD lcV lcTyf
-  rw [← hfg i ⟨n, hi⟩]
-  exact hok i n hi
 
 /-- A big-op of SINGLETONS AT THEIR OWN (cast) KEYS reads pointwise: the one
 induction every "the family is valid" argument needs (Rocq's
@@ -493,52 +468,6 @@ theorem fsLinks_own_valid (g : GName) (x : FsLinkUR) :
   ipureintro
   exact Hv
 
-/-- Rocq's `fs_links_valid`: the empty map is valid at the unit; otherwise
-one inode's element is the gather's accumulator (Rocq picks it with
-`map_choose`; here the map's own induction supplies it). -/
-theorem fsLinks_valid (g : GName) (I : RegMapF FsNode) :
-    fsLinks (GF := GF) g I ⊢ ⌜∃ f, linkElemOk I f ∧ ✓ linkElem I f⌝ := by
-  induction I using LawfulFiniteMap.induction_on with
-  | hemp =>
-    iintro -
-    ipureintro
-    refine ⟨fun _ => (∅, (Ity.tFile, fun _ => Ity.tFile)), ?_, ?_⟩
-    · intro j m hj
-      rw [LawfulPartialMap.get?_empty] at hj
-      cases hj
-    · rw [linkElem_empty]
-      exact UCMRA.unit_valid
-  | hins i n I hi _ =>
-    unfold fsLinks
-    refine (BigSepM.bigSepM_insert hi).1.trans ?_
-    unfold fsLinkNode
-    iintro ⟨⟨%DD, %vv, %P, %Hok, Hi⟩, Hrest⟩
-    ihave ⟨%f, %Hf, H⟩ := fsLinks_gather g I (linkElemNode i n vv P) $$ [Hi Hrest]
-    · iframe Hi
-      unfold fsLinks fsLinkNode
-      iexact Hrest
-    ihave %Hv := fsLinks_own_valid g _ $$ H
-    ipureintro
-    have hext : ∀ j, (∃ m, get? I j = some m) →
-        f j = (fun z => if z = i then (DD, (vv, P)) else f z) j := by
-      intro j ⟨m, hj⟩
-      have hji : j ≠ i := fun e => by subst e; rw [hi] at hj; cases hj
-      simp only [hji, if_false]
-    refine ⟨fun z => if z = i then (DD, (vv, P)) else f z, ?_, ?_⟩
-    · intro j m hj
-      by_cases hji : j = i
-      · subst hji
-        rw [get?_insert_eq rfl] at hj
-        cases hj
-        simp only [lcD, lcV, lcTyf, if_true]
-        exact Hok
-      · rw [get?_insert_ne (fun e => hji e.symm)] at hj
-        simp only [lcD, lcV, lcTyf, hji, if_false]
-        exact Hf j m hj
-    · rw [linkElem_insert I i n _ hi, ← linkElem_ext I f _ hext]
-      simp only [lcV, lcTyf, if_true]
-      exact Hv
-
 /-- ...AND THE SAME READING WITH A SPARE FRAGMENT IN HAND: the family's
 validity SLACKED by one token (the inode region's keep-alive at the root)
 (Rocq's `fs_links_valid_tok`; deviation 1 for the `Int` key). -/
@@ -563,21 +492,6 @@ theorem fsLinkOwn_scatter {K V : Type _} {M : Type _ → Type _} [LawfulFiniteMa
   @bigOpM_iOwn_entail GF (constOF FsLinkUR) OFunctor.constOF_URFunctorContractive
     FsLinkG.fsLinkInG K M V _ γ f m
 
-/-- The family allocated at a valid element (Rocq's `fs_links_alloc`). -/
-theorem fsLinks_alloc (I : RegMapF FsNode) (f : LinkChoice) (hok : linkElemOk I f)
-    (hv : ✓ linkElem I f) : ⊢ |==> ∃ g : GName, fsLinks (GF := GF) g I := by
-  imod (iOwn_alloc (GF := GF) (F := constOF FsLinkUR) (linkElem I f) hv) with ⟨%g, H⟩
-  imodintro
-  iexists g
-  unfold fsLinks fsLinkNode linkElem
-  ihave H := fsLinkOwn_scatter g _ I $$ H
-  iapply (BigSepM.bigSepM_mono fun {i n} hi => ?_) $$ H
-  iintro H
-  iexists (lcD f i), (lcV f i), (lcTyf f i)
-  iframe H
-  ipureintro
-  exact hok i n hi
-
 end FsStateLinks
 
 /-! ## 5b.  THE BOOT ALLOCATION
@@ -591,19 +505,6 @@ at a different map than the link family. -/
 section FsStateBoot
 variable {GF : BundledGFunctors} [FsLinkG GF] [FsTopG GF]
 open FsStateLink
-
-/-- BOTH era ghosts, allocated together from maps of nodes: the top map's
-AUTH plus one fragment per inum, and the link family (Rocq's
-`fs_boot_alloc_at`). -/
-theorem fsBootAlloc_at (IL IT : RegMapF FsNode) (f : LinkChoice) (hok : linkElemOk IL f)
-    (hv : ✓ linkElem IL f) :
-    ⊢ |==> ∃ gl gt : GName,
-        iprop((gt ↪●MAP IT) ∗ ([∗map] i ↦ n ∈ IT, gt ↪◯MAP[i] n) ∗ fsLinks (GF := GF) gl IL) := by
-  imod (fsLinks_alloc (GF := GF) IL f hok hv) with ⟨%gl, Hl⟩
-  imod (ghost_map_alloc (GF := GF) (K := Nat) (V := FsNode) (H := RegMapF) IT) with ⟨%gt, Ha, Hf⟩
-  imodintro
-  iexists gl, gt
-  iframe Ha Hf Hl
 
 /-- THE BOOT MINT'S ALLOCATION, AT THE SLACKED ELEMENT: ONE `own_alloc` at
 `linkElem I f • linkTokElem r v` yields the whole `fsLinks` bundle PLUS the

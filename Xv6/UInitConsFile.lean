@@ -56,13 +56,12 @@ Nothing else: the file has 22 declarations, 21 reached + the instance.
 -/
 import Xv6.UInitConsK
 import Xv6.FileOpenClaim
+import Xv6.FileOutEra
 
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Std (ExtTreeSet)
-
-set_option linter.unusedSectionVars false
 
 /-! ## §1  THE UNARM LEG AT THE WEAKER PURE PARAMETER (pure part) -/
 

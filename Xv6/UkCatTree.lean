@@ -40,7 +40,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
 
 /-! ## §0' the `bytes_of` fact of a prefix -/
@@ -97,11 +96,6 @@ theorem catUpathAt_data (N : UkNames GF) (pv n : Nat) (f : Nat → BitVec 8) :
 theorem kcatTp_wr (N : UkNames GF) (fd : Int) (bs : Bytes) (k : Int → Proc) :
     treePay (hlc := hlc) N (catProg N) (.vis (.EWrite fd bs) k) ⊢
       wrObl (hlc := hlc) N (catProg N) fd bs (fun r => treePay (hlc := hlc) N (catProg N) (k r)) := by
-  rw [treePay_vis]; exact .rfl
-
-theorem kcatTp_op (N : UkNames GF) (p : Bytes) (mode : Int) (k : Int → Proc) :
-    treePay (hlc := hlc) N (catProg N) (.vis (.EOpen p mode) k) ⊢
-      opObl (hlc := hlc) N (catProg N) p mode (fun r => treePay (hlc := hlc) N (catProg N) (k r)) := by
   rw [treePay_vis]; exact .rfl
 
 theorem kcatTp_files (N : UkNames GF) (p : Bytes) (ps : List Bytes) (rest : Proc) :

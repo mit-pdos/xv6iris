@@ -16,6 +16,7 @@ the callees enter only by their interfaces (`SH_SYS_WAIT`, `SH_SYS_EXEC`,
 import Xv6.UshRunWalk
 import Xv6.UshRedirArm
 import Xv6.UshPipeArmG3
+import Xv6.UshRunEntry
 
 namespace Xv6
 

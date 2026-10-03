@@ -10,8 +10,7 @@ definitional `Xv6/FilePay.lean`"); the predicates are `Xv6/FileDefs.lean`'s.
   LAST CLOSER'S MOVE: fraction one is a whole `inodeHeld` for iput -- the
   cinv gives back the parent short by `Q`, the closer's own side and share
   are `1 * Q`, the exact complement; `inodeRef_gather_genlo` restores the
-  canonical pairing), `inodePay_alloc` (sys_open's publish), and
-  `inodePay_notDev` (the fifth conjunct against a caller's own one-shot);
+  canonical pairing), and `inodePay_alloc` (sys_open's publish);
 * the off conjunct: `offFree_split`, `offFree_one` (`offFree k 1` IS
   `offLastClose`'s free word), `offFd_split`, `offFdAt_qsum`,
   `fileOffReclaim` (Rocq `file_off_reclaim`: the last close's off step);
@@ -28,8 +27,6 @@ import Xv6.FileDefs
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Std MachCSL
-
-set_option linter.unusedSectionVars false
 
 /-! ## Qp arithmetic (Rocq `Qp.mul_add_distr_r`, `Qp.mul_1_l`, `Qp.div_add_distr`) -/
 
@@ -193,22 +190,7 @@ theorem inodePay_alloc [Icfg] [CurCtx] (E : CoPset) (k : Nat) (Q : Qp) (g : GNam
     isplitr; · ipureintro; exact hwr
     ipureintro; exact hdv
 
-/-- The fifth conjunct against a caller's own copy of the generation's
-one-shot (Rocq `inode_pay_not_dev`): behind an `FD_INODE` descriptor the
-inode is not a device.  Pure conclusion; the payload is kept. -/
-theorem inodePay_notDev [Icfg] [CurCtx] (γx : GName) (Q : Qp) (g : GName) (inum : BitVec 32)
-    (v : BitVec 64) (wr : Bool) (q : Qp) (ty : BitVec 16) :
-    inodePay (GF := GF) γx Q g inum v FD_INODE wr q ∗ ityShot g ty ⊢ ⌜ty.toNat ≠ T_DEVICE⌝ := by
-  unfold inodePay
-  iintro ⟨⟨-, -, -, -, %ty', #Hs, -, %hdv⟩, #Hshot⟩
-  ihave %he := ityShot_agree g ty' ty $$ [Hs Hshot]
-  · iframe Hs Hshot
-  ipureintro
-  subst he
-  exact hdv rfl
-
 end InodePay
-
 
 /-! ## The off conjunct -/
 
@@ -341,9 +323,6 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 theorem fdNone_ne_pipe : FD_NONE ≠ FD_PIPE := by decide
 theorem fdNone_ne_inode : FD_NONE ≠ FD_INODE := by decide
 theorem fdNone_ne_device : FD_NONE ≠ FD_DEVICE := by decide
-theorem fdPipe_ne_inode : FD_PIPE ≠ FD_INODE := by decide
-theorem fdPipe_ne_device : FD_PIPE ≠ FD_DEVICE := by decide
-theorem fdDevice_ne_inode : FD_DEVICE ≠ FD_INODE := by decide
 
 /-- The pipe arm (the reading `fileclose`'s pipe arm takes). -/
 theorem fileCoreNoff_pipe (q : Qp) (pn : FPNames) (C : FContent) (h : C.type = FD_PIPE) :

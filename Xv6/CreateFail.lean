@@ -18,7 +18,7 @@ THE GHOST MOVES (Rocq's, kept):
 * THE UNARM FIRES between the flush and the put (round E2, site #16): the
   child was armed at +0xc4 and the parent's `dirlink` failed, so its row
   DISAPPEARS (ruling Q-h, the do-then-undo PAIR).  The child is NOT under the
-  registry on this arm, so the PLAIN fire (`cafUnarm_fire`) applies; the
+  registry on this arm, so the PLAIN fire applies; the
   zeroed record owes `InodeLocal`, which a non-directory record at
   `nlink = 0` is.
 * THE PARENT'S RE-PARK: `tot = 0`, nothing written, so the entry tokens
@@ -71,6 +71,7 @@ THE GHOST MOVES (Rocq's, kept):
 import MachCSL.WpSmodeFrame12b
 import Xv6.CreateCalls
 import Xv6.FsStateEraResB
+import Xv6.NamexParts
 
 namespace Xv6
 
@@ -79,9 +80,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## 0.  Small facts -/
 
@@ -458,7 +457,7 @@ theorem createFail_parent_tail (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hl
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- ===== +0x158  jal iunlockput(dp) =====
-  k_step_e (wp_s_jal cpu _ (KA.«create» + 0x158#64) false 2090826#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«create» + 0x158#64) false 2090730#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [create_br_iunlockput]
   iintro Hk Hpc
   icases Hdep with ⟨%lodc, %tldc, %hledc, Hfldc, Hdep⟩
@@ -520,7 +519,7 @@ theorem createFail_parent_tail (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hl
   iintro %c' %R' %hfin Hk Hpc Hte Hce
   obtain ⟨hcsf, ha0f⟩ := hfin
   -- ARM FAIL: the do-then-undo PAIR, the cursor and the observation home
-  ihave Hcf := create_fail_of_pair (hlc := hlc) (fsGammaL fscFs) fscFs ty.toNat major.toNat
+  ihave Hcf := create_fail_of_pair (hlc := hlc) (fsGammaL fscFs) fscFs V.rti ty.toNat major.toNat
     minor.toNat Nm Nd P Pmiss Farm Fdots Fun Fok Fex (bview plen pfun) dind.toNat cinum.toNat
     $$ HPpar Hdlkc Hacre [Hdots] Hunr
   · iright; iexact Hdots
@@ -601,7 +600,7 @@ theorem create_fail_half (IUP : IUNLOCKPUT) (IU : IUPDATE) (Γ : SchedNames)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- ===== +0x14c  jal iupdate : THE UNLINK FLUSH =====
-  k_step_e (wp_s_jal cpu _ (KA.«create» + 0x14c#64) false 2090062#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«create» + 0x14c#64) false 2089966#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [create_br_iupdate]
   iintro Hk Hpc
   icases bslots_uncons 2 $$ Hbsl with ⟨Hb1, Hb2⟩
@@ -646,7 +645,7 @@ theorem create_fail_half (IUP : IUNLOCKPUT) (IU : IUPDATE) (Γ : SchedNames)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- ===== +0x152  jal iunlockput(ip) : THE PUT THAT FREES =====
-  k_step_e (wp_s_jal cpu _ (KA.«create» + 0x152#64) false 2090832#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«create» + 0x152#64) false 2090736#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [create_br_iunlockput]
   iintro Hk Hpc
   -- THE TWO RE-PARKS: the UNARM fires at the child, the parent retags

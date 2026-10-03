@@ -19,13 +19,11 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## Constants and register bookkeeping -/
 
-/-- `argraw` returns to `0x80002932`. -/
+/-- `argraw` returns to `0x80002946`. -/
 theorem ai_ret_2870 : jumpPc (KA.«argint» + 0x10#64) = (KA.«argint» + 0x10#64) := by
   decide
 

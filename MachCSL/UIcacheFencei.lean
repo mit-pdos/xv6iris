@@ -2,10 +2,10 @@
 MachCSL: **the kernel's `fence.i` with a stamping step** (userret's first
 instruction; Rocq `wp_hart_fence_i` at the instruction level).
 
-`execSpecF_fencei` (`WpSmodeSatpU`) runs the barrier with the receipt-less
-`swp_sail_barrier`.  This twin steps up to the barrier, runs it with
-`swp_sail_barrier_fencei` (the client's ghost step `ifenceStep cpu P Q` at
-the raised instruction view `K`), and hands out `iviewLb cpu K ∗ Q K`.
+The rule steps up to the barrier, runs it with `swp_sail_barrier_fencei`
+(the client's ghost step `ifenceStep cpu P Q` at the raised instruction
+view `K`) rather than the receipt-less `swp_sail_barrier`, and hands out
+`iviewLb cpu K ∗ Q K`.
 -/
 import MachCSL.WpSmodeFenceFloor
 import MachCSL.UIcacheFence

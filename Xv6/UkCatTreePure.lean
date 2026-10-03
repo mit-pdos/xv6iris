@@ -19,8 +19,8 @@ Deviations from Rocq:
 1. Rocq `cat_step` is `catTurn` here (`ProgTree.catStep` is already the
    coalgebra of `catLoop`).
 2. `cat_dg_open_pre_lit` is stated as the whole diagnostic
-   (`catDgOpen_lit`: prefix ++ p ++ newline); `cat_dg_open_nl_lit` is the
-   newline after the directive (`catDgOpen_nl_lit`).
+   (`catDgOpen_lit`: prefix ++ p ++ newline); `cat_dg_open_nl_lit` is not
+   ported (nothing uses it).
 3. `bvs_moi_small` / `cint_moi_small` are `UkCatDefs.kcat_ofNat_of_toInt` /
    `kcat_cint_small` (landed with the walks); `uarg_bytes_of`,
    `bytes_of_one`, `bytes_of_prefix` wait for UkTree's `bytes_of`.
@@ -39,10 +39,10 @@ theorem writeBytes_app (fd : Int) (a b : Bytes) (rest : Proc) :
 
 /-- **Rocq `cat_dg_read_lit`**: `"cat: read error\n"` as cat's `.rodata`
 spells it. -/
-theorem catDgRead_lit : (List.range 16).map (User.Cat.catLit 0x9c8) = catDgRead := by decide +kernel
+theorem catDgRead_lit : (List.range 16).map (User.Cat.catLit 0x9d8) = catDgRead := by decide +kernel
 
 /-- **Rocq `cat_dg_write_lit`**. -/
-theorem catDgWrite_lit : (List.range 17).map (User.Cat.catLit 0x9b0) = catDgWrite := by decide +kernel
+theorem catDgWrite_lit : (List.range 17).map (User.Cat.catLit 0x9c0) = catDgWrite := by decide +kernel
 
 /-- **Rocq `cat_dg_open_pre_lit`** (deviation 2). -/
 theorem catDgOpen_lit (p : Bytes) : (List.range cmMsgQ).map cmLit ++ p ++ [wlNl] = catDgOpen p := by
@@ -50,10 +50,6 @@ theorem catDgOpen_lit (p : Bytes) : (List.range cmMsgQ).map cmLit ++ p ++ [wlNl]
       [99#8, 97#8, 116#8, 58#8, 32#8, 99#8, 97#8, 110#8, 110#8, 111#8, 116#8, 32#8, 111#8, 112#8, 101#8,
         110#8, 32#8] := by decide +kernel
   rw [e]; rfl
-
-/-- **Rocq `cat_dg_open_nl_lit`**: after the directive, the newline. -/
-theorem catDgOpen_nl_lit : (List.range (cmMsgLen - (cmMsgQ + 2))).map (fun j => cmLit (cmMsgQ + 2 + j)) = [wlNl] := by
-  decide +kernel
 
 /-- **Rocq `cat_step`** (deviation 1): one turn of `catLoop`, at the read's
 answer. -/

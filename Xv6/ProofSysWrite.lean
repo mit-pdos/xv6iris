@@ -37,6 +37,10 @@ block joined back.
 import Xv6.SysWriteParts
 import Xv6.SysfileCalls
 import Xv6.SpecSysWrite
+import Xv6.ReadiDefs
+import Xv6.SysFstatParts
+import MachCSL.BvLemmas
+import Xv6.CopyLemmas
 
 namespace Xv6
 
@@ -45,9 +49,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
@@ -430,7 +432,7 @@ theorem swr_argint_call (AI : ARGINT) (AF : ARGFD) (FW : FILEWRITE) (Γ : SchedN
   k_step_e (wp_s_addi cpu _ (KA.«sys_write» + 0x16#64) true 2#12 10#5 0#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [swr_li2]
   iintro Hk Hpc
-  k_step_e (wp_s_jal cpu _ (KA.«sys_write» + 0x18#64) false 2087458#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_write» + 0x18#64) false 2087362#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_write_br_argint]
   iintro Hk Hpc
   icases sysfile_core_tf ht0 (procAddr j) pid V M $$ Hcore with ⟨%htf, Htf, Htfp, Hcorew⟩
@@ -517,7 +519,7 @@ theorem sys_write_main (AA : ARGADDR) (AI : ARGINT) (AF : ARGFD) (FW : FILEWRITE
   k_step_e (wp_s_addi cpu _ (KA.«sys_write» + 0xc#64) true 1#12 10#5 0#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [Xv6.ci_li_one]
   iintro Hk Hpc
-  k_step_e (wp_s_jal cpu _ (KA.«sys_write» + 0xe#64) false 2087496#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_write» + 0xe#64) false 2087400#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_write_br_argaddr]
   iintro Hk Hpc
   icases sysfile_core_tf ht0 (procAddr j) pid V M $$ Hcore with ⟨%htf, Htf, Htfp, Hcorew⟩

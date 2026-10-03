@@ -15,7 +15,6 @@ uses inline).
 * the trapframe word store, the private block's accessor, and the flip's
   resource merge (`prepareReturnExt` / the arm the `csrci` pays out).
 -/
-import MachCSL.KCtxGpr
 import MachCSL.WpSmodeTrapCsr
 import Xv6.SpecPrepareReturn
 
@@ -25,20 +24,13 @@ open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open Sail Sail.ConcurrencyInterfaceV1
 open LeanRV64D LeanRV64D.Functions
 
-
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 variable {lent : Bool}
 
 /-! ## `csrr rd, satp` -/
-
-/-- The CSR read dispatch at `satp` (a leaf of `read_CSR`'s match; without
-it the executor walks the whole match, ~15 s). -/
-@[local sail_facts] theorem prepare_return_read_CSR_satp : read_CSR 0x180#12 = readReg Register.satp := rfl
 
 set_option maxHeartbeats 4000000 in
 /-- `csrr rd, satp`: the configuration's `satp` into `rd`. -/
@@ -217,7 +209,6 @@ theorem prepare_return_priv_acc (htc : curTier = KTier.kpt) (γ : FileNames) (pa
   · ipureintro; exact hlz
 
 end
-
 
 /-! ## The flip's resources -/
 

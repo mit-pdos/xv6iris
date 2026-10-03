@@ -29,6 +29,7 @@ pinned `1900b8a43`).
 -/
 import Xv6.SpecShRuncmd
 import Xv6.UshNulParts
+import Xv6.UshRunCode
 
 namespace Xv6
 
@@ -36,7 +37,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled

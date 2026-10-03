@@ -7,8 +7,8 @@ kernel-side obligations built from them.
 * `consLink i k ev Φ` -- the one wand per boundary event: fired by the
   kernel with the port's invariant open, having proved the event's pure
   premise (`consEvOk`) from its own state;
-* `outLink`/`outChain`/`outRun` -- a process byte reaching the wire
-  (`evOut`), one link per byte, and the stoppable chain;
+* `outLink`/`outChain` -- a process byte reaching the wire (`evOut`), and
+  one link per byte;
 * `echoLink`/`echoChain` -- the echo's byte (`evByte`), `readLink` and
   `consReadPay` -- a read (`evRead`), `consRun` -- a consoleintr arm's run;
 * `consLicence` -- "any holder of the supply may move the resource by any
@@ -24,8 +24,6 @@ import Xv6.UartGhosts
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
-
-set_option linter.unusedSectionVars false
 
 /-- Port `i`'s invariant's namespace. -/
 def uartN : UartId → Namespace
@@ -126,12 +124,6 @@ def outChain (i : UartId) (k : Nat) : List (BitVec 8) → IProp GF → IProp GF
   | [], Φ => Φ
   | b :: bs, Φ => outLink i k b (outChain i k bs Φ)
 
-/-- THE STOPPABLE CHAIN (Rocq `out_run`): `Q j` is the payload after `j`
-bytes, cashable at any prefix. -/
-def outRun (i : UartId) (k : Nat) : List (BitVec 8) → (Nat → IProp GF) → IProp GF
-  | [], Q => Q 0
-  | b :: bs, Q => iprop(Q 0 ∧ outLink i k b (outRun i k bs (fun j => Q (j + 1))))
-
 theorem outLink_mono (i : UartId) (k : Nat) (b : BitVec 8) (Φ Φ' : IProp GF) :
     (Φ -∗ Φ') ⊢ outLink i k b Φ -∗ outLink i k b Φ' := by
   unfold outLink
@@ -142,24 +134,13 @@ theorem outLink_mono (i : UartId) (k : Nat) (b : BitVec 8) (Φ Φ' : IProp GF) :
   iframe Hlb' Hres'
   iapply HΦ $$ HP
 
-theorem outChain_mono (i : UartId) (k : Nat) (bs : List (BitVec 8)) (Φ Φ' : IProp GF) :
-    (Φ -∗ Φ') ⊢ outChain i k bs Φ -∗ outChain i k bs Φ' := by
-  induction bs generalizing Φ Φ' with
-  | nil => unfold outChain; iintro HΦ H; iapply HΦ $$ H
-  | cons b bs ih =>
-    unfold outChain
-    iintro HΦ H
-    iapply outLink_mono i k b _ _ $$ [HΦ] H
-    iintro H
-    iapply ih Φ Φ' $$ HΦ H
-
 /-- THE LICENCE AT ONE ERA, FOR THE PROCESS EVENTS (Rocq `cons_licence_at`,
 seccomp design §9/§10.2, lane S0): the `∀ k` of `consLicence` instantiated,
 at the two events a process steps the claim by (`wildEv`) and under the
 event's validity premise `consEvOk` (`True` at `evOut`, so `outLink` pays it
 with no premise of its own).  The general licence buys it at every era by
 ignoring both premises (`consLicenceAt_of_licence`); the WILD credential buys
-it at its own (`consLicenceAt_of_wild`, AppIface).  The write link and the
+it at its own.  The write link and the
 read payment have their era-`k` forms at this; the echo arm's `consRun` does
 not (its events are the interrupt's). -/
 def consLicenceAt (k : Nat) : IProp GF := iprop%
@@ -199,16 +180,6 @@ theorem outLink_of_licence (k : Nat) (b : BitVec 8) (Φ : IProp GF) :
   iapply outLink_of_licenceAt k b Φ
   iapply consLicenceAt_of_licence k $$ Hlic
 
-theorem outChain_of_licence (k : Nat) (bs : List (BitVec 8)) (Φ : IProp GF) :
-    consLicence ⊢ Φ -∗ outChain .uart0 k bs Φ := by
-  induction bs with
-  | nil => unfold outChain; iintro _ HΦ; iexact HΦ
-  | cons b bs ih =>
-    unfold outChain
-    iintro #Hlic HΦ
-    iapply outLink_of_licence k b _ $$ Hlic
-    iapply ih $$ Hlic HΦ
-
 /-- The KERNEL'S PORT owes nothing (Rocq `out_link_triv`). -/
 theorem outLink_triv (k : Nat) (b : BitVec 8) (Φ : IProp GF) :
     Φ ⊢ outLink .uart1 k b Φ := by
@@ -230,24 +201,6 @@ theorem outChain_triv (k : Nat) (bs : List (BitVec 8)) (Φ : IProp GF) :
     iapply outLink_triv k b _
     iapply ih $$ HΦ
 
-theorem outRun_stop (i : UartId) (k : Nat) (bs : List (BitVec 8)) (Q : Nat → IProp GF) :
-    outRun i k bs Q ⊢ Q 0 := by
-  cases bs with
-  | nil => exact .rfl
-  | cons b bs => unfold outRun; exact and_elim_l
-
-theorem outRun_chain (i : UartId) (k : Nat) (bs : List (BitVec 8)) (Q : Nat → IProp GF) :
-    outRun i k bs Q ⊢ outChain i k bs (Q bs.length) := by
-  induction bs generalizing Q with
-  | nil => exact .rfl
-  | cons b bs ih =>
-    unfold outRun outChain
-    iintro H
-    ihave H := (and_elim_r (P := Q 0)) $$ H
-    iapply outLink_mono i k b _ _ $$ [] H
-    iintro H
-    iapply ih (fun j => Q (j + 1)) $$ H
-
 /-! ## The echo's and the reader's links -/
 
 /-- THE ECHO'S BYTE REACHING THE WIRE (Rocq `echo_link`): the `evByte`
@@ -259,30 +212,9 @@ def echoChain (k : Nat) (h : List Obs) : List (BitVec 8) → IProp GF → IProp 
   | [], Φ => Φ
   | b :: bs, Φ => echoLink k h b (echoChain k h bs Φ)
 
-theorem echoLink_mono (k : Nat) (h : List Obs) (b : BitVec 8) (Φ Φ' : IProp GF) :
-    (Φ -∗ Φ') ⊢ echoLink k h b Φ -∗ echoLink k h b Φ' := by
-  unfold echoLink
-  exact consLink_mono .uart0 k (.evByte b) Φ Φ'
-
-theorem echoChain_mono (k : Nat) (h : List Obs) (bs : List (BitVec 8)) (Φ Φ' : IProp GF) :
-    (Φ -∗ Φ') ⊢ echoChain k h bs Φ -∗ echoChain k h bs Φ' := by
-  induction bs generalizing Φ Φ' with
-  | nil => unfold echoChain; iintro HΦ H; iapply HΦ $$ H
-  | cons b bs ih =>
-    unfold echoChain
-    iintro HΦ H
-    iapply echoLink_mono k h b _ _ $$ [HΦ] H
-    iintro H
-    iapply ih Φ Φ' $$ HΦ H
-
 /-- THE READ (Rocq `read_link`): the `evRead` link. -/
 def readLink (k : Nat) (ws : List (List Obs × BitVec 8)) (Φ : IProp GF) : IProp GF :=
   consLink .uart0 k (.evRead ws) Φ
-
-theorem readLink_of_licence (k : Nat) (ws : List (List Obs × BitVec 8)) (Φ : IProp GF) :
-    consLicence ⊢ Φ -∗ readLink k ws Φ := by
-  unfold readLink
-  exact consLink_of_licence k (.evRead ws) Φ
 
 /-- WHAT A CONSOLE READ CARRIES IN (Rocq `cons_read_pay`): one link
 quantified over the window. -/
@@ -436,13 +368,6 @@ theorem storeChain_uart1 (γ : UartNames) (bs : List (BitVec 8)) (Φ : IProp GF)
   iintro HΦ
   iapply storeChain_of_outChain .uart1 γ bs Φ
   iapply outChain_triv $$ HΦ
-
-/-- A licensed writer at the console port. -/
-theorem storeChain_of_licence (γ : UartNames) (bs : List (BitVec 8)) (Φ : IProp GF) :
-    consLicence (hlc := hlc) (GF := GF) ⊢ Φ -∗ storeChain .uart0 γ bs Φ := by
-  iintro #Hlic HΦ
-  iapply storeChain_of_outChain .uart0 γ bs Φ
-  iapply outChain_of_licence $$ Hlic HΦ
 
 /-- THE ECHO'S STORE (Rocq `store_ob_of_echo_link`): the arm says which byte
 is next, the event steps the history, and both halves of the arm advance. -/

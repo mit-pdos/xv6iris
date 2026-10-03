@@ -20,9 +20,9 @@ The residue carries the history (`UsertrapRes.utOwn`'s last row,
    (`Uvis.M : Nat → Option (BitVec 8)`, `Uvis.perm : Nat → Option UPerm`),
    so it is not countable; the carrier is `UartTrace.Uled` (numbers, pairs,
    and `Nat`-indexed families), and `UledEnc` is the injection (Rocq's
-   `Countable` + `encode_inj`).  Prefix and comparability come back through
-   injectivity exactly as Rocq's do (`uled_map_prefix`, Rocq
-   `uhist_fmap_prefix`).
+   `Countable` + `encode_inj`); `encList_inj` is the injectivity on lists.
+   Rocq's prefix lemma (`uhist_fmap_prefix`) is not ported (nothing uses
+   it).
 2. `Uround` is `BitVec 64 × Uvis × Uvis` (Lean's product nests to the right:
    Rocq's `e.1.1, e.1.2, e.2` are `e.1, e.2.1, e.2.2`); `uhistWf` is the
    membership form of Rocq's `Forall`.
@@ -152,26 +152,6 @@ instance instUvis : UledEnc Uvis where
 
 end UledEnc
 
-open UledEnc in
-/-- The encoding, mapped over a list, is injective. -/
-theorem uled_map_inj {α : Type} [UledEnc α] : ∀ {l l' : List α}, l.map enc = l'.map enc → l = l'
-  | [], [], _ => rfl
-  | [], _ :: _, h => by simp at h
-  | _ :: _, [], h => by simp at h
-  | a :: l, a' :: l', h => by
-    simp only [List.map_cons, List.cons.injEq] at h
-    rw [enc_inj h.1, uled_map_inj h.2]
-
-open UledEnc in
-/-- The encoding is injective on lists, so a prefix of encodings is a prefix
-(Rocq `uhist_fmap_prefix`). -/
-theorem uled_map_prefix {α : Type} [UledEnc α] {h h' : List α}
-    (hp : h'.map enc <+: h.map enc) : h' <+: h := by
-  obtain ⟨t, ht⟩ := hp
-  obtain ⟨a, b, hab, ha, _⟩ := List.map_eq_append_iff.mp ht.symm
-  refine ⟨b, ?_⟩
-  rw [hab, uled_map_inj ha]
-
 /-! ## §2 The entries (Rocq `uround`, `round_ok_keys`, `uhist_wf`) -/
 
 /-- **Rocq `uround`**: one round -- the cause, the trapped key, the resumed
@@ -228,33 +208,6 @@ instance uhistLb_timeless (γ : GName) (h : List Uround) : Timeless (uhistLb (GF
 
 instance uhistAuth_timeless (γ : GName) (h : List Uround) : Timeless (uhistAuth (GF := GF) γ h) := by
   unfold uhistAuth; infer_instance
-
-/-- **Rocq `uhist_auth_lb`**. -/
-theorem uhistAuth_lb (γ : GName) (h : List Uround) :
-    uhistAuth (GF := GF) γ h ⊢ uhistAuth γ h ∗ uhistLb γ h := by
-  unfold uhistAuth uhistLb
-  iintro Ha
-  ihave #Hb := MonoList.lb_own_get γ _ (h.map enc) $$ Ha
-  isplitl [Ha]
-  · iexact Ha
-  · iexact Hb
-
-/-- **Rocq `uhist_lb_prefix`**: a lower bound is a prefix (through the
-encoding's injectivity). -/
-theorem uhistLb_prefix (γ : GName) (h h' : List Uround) :
-    uhistAuth (GF := GF) γ h ⊢ uhistLb γ h' -∗ ⌜h' <+: h⌝ := by
-  unfold uhistAuth uhistLb
-  iintro Ha Hb
-  ihave %hv := MonoList.auth_lb_own_valid γ _ (h.map enc) (h'.map enc) $$ Ha Hb
-  ipureintro; exact uled_map_prefix hv.2
-
-/-- **Rocq `uhist_lb_lb`**: two lower bounds of one history are comparable. -/
-theorem uhistLb_lb (γ : GName) (h h' : List Uround) :
-    uhistLb (GF := GF) γ h ⊢ uhistLb γ h' -∗ ⌜h <+: h' ∨ h' <+: h⌝ := by
-  unfold uhistLb
-  iintro Ha Hb
-  ihave %hv := MonoList.lb_own_valid γ (h.map enc) (h'.map enc) $$ Ha Hb
-  ipureintro; exact hv.imp uled_map_prefix uled_map_prefix
 
 /-- **Rocq `uhist_grow`**. -/
 theorem uhistAuth_grow (γ : GName) (h : List Uround) (e : Uround) :

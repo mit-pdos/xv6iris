@@ -38,7 +38,6 @@ THE EVENT COUNTER (permit sweep L1a, Rocq f344a089a): the post
 with `V.ev ≤ kc` -- growproc's on the eager path, `V.ev` on the lazy and
 failing ones.
 -/
-import MachCSL.WpSmodeFrame6
 import Xv6.SpecSysSbrk
 import Xv6.ArgLemmas
 import Xv6.ProcPrivAcc
@@ -55,15 +54,13 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## Constants, branches, contexts -/
 
 theorem sys_sbrk_br_argint : KA.«sys_sbrk» + 0xfffffffffffffeb8#64 = KA.«argint» := by decide
-theorem sys_sbrk_br_myproc : KA.«sys_sbrk» + 0xffffffffffffef1e#64 = KA.«myproc» := by decide
-theorem sys_sbrk_br_growproc : KA.«sys_sbrk» + 0xfffffffffffff256#64 = KA.«growproc» := by decide
+theorem sys_sbrk_br_myproc : KA.«sys_sbrk» + 0xffffffffffffeefe#64 = KA.«myproc» := by decide
+theorem sys_sbrk_br_growproc : KA.«sys_sbrk» + 0xfffffffffffff236#64 = KA.«growproc» := by decide
 
 theorem sys_sbrk_ret_14 : jumpPc (KA.«sys_sbrk» + 0x14#64) = KA.«sys_sbrk» + 0x14#64 := by decide
 theorem sys_sbrk_ret_1e : jumpPc (KA.«sys_sbrk» + 0x1e#64) = KA.«sys_sbrk» + 0x1e#64 := by decide
@@ -188,7 +185,7 @@ theorem sys_sbrk_priv_elim (htc : curTier = KTier.kpt) (γ : FileNames) (pa : Bi
   subst htc
   letI : CurCtx := ⟨ξ, KTier.kpt⟩
   unfold sysSbrkBack procPrivFd procPrivCoreNoctxAt procPrivBareAt procFieldsNoOfile
-  iintro ⟨⟨⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hcwd, Hnm, Hsc⟩, Hpt, Htfp, %hlz, Hev⟩, Hc⟩, Ho⟩
+  iintro ⟨⟨⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hcwd, Hnm, Hsc, Hrt⟩, Hpt, Htfp, %hlz, Hev⟩, Hc⟩, Ho⟩
   ihave Htf := procPrivAcc_eq ξ _ 8 _ _ _ h.2.2.2 $$ Htf
   isplitl []
   · ipureintro; exact h
@@ -197,7 +194,7 @@ theorem sys_sbrk_priv_elim (htc : curTier = KTier.kpt) (γ : FileNames) (pa : Bi
   iframe Hs Htf Htfp
   iintro %v %b %hv ⟨Hs, Htf, Htfp⟩
   ihave Htf := procPrivAcc_eq ξ _ 8 _ _ _ h.2.2.2.symm $$ Htf
-  iframe Hpid Hk Hs Hpg Htf Hcwd Hnm Hsc Hpt Htfp Hc Ho Hev
+  iframe Hpid Hk Hs Hpg Htf Hcwd Hnm Hsc Hrt Hpt Htfp Hc Ho Hev
   isplitl []
   · ipureintro; exact ⟨hv.1, hv.2.1, h.2.2.1, h.2.2.2⟩
   · ipureintro; exact hv.2.2
@@ -269,14 +266,6 @@ def sysSbrkPins (k : KCtx) (R : RegMap) : Prop :=
   R 18#5 = k.regs 18#5 ∧ R 19#5 = k.regs 19#5 ∧ R 20#5 = k.regs 20#5 ∧
   R 21#5 = k.regs 21#5 ∧ R 22#5 = k.regs 22#5 ∧ R 23#5 = k.regs 23#5 ∧ R 24#5 = k.regs 24#5 ∧
   R 25#5 = k.regs 25#5 ∧ R 26#5 = k.regs 26#5 ∧ R 27#5 = k.regs 27#5
-
-/-- A callee returned with the callee-saved registers of `R` intact: the pins carry. -/
-theorem sysSbrkPins_cs (k : KCtx) (R R' : RegMap) (h : sysSbrkPins k R) (hcs : calleeSaved R R') :
-    sysSbrkPins k R' := by
-  obtain ⟨a2, a8, a18, a19, a20, a21, a22, a23, a24, a25, a26, a27⟩ := h
-  obtain ⟨c2, c8, c9, c18, c19, c20, c21, c22, c23, c24, c25, c26, c27⟩ := hcs
-  exact ⟨c2.trans a2, c8.trans a8, c18.trans a18, c19.trans a19, c20.trans a20, c21.trans a21,
-    c22.trans a22, c23.trans a23, c24.trans a24, c25.trans a25, c26.trans a26, c27.trans a27⟩
 
 set_option maxHeartbeats 2000000 in
 /-- **The join point** `+0x64`: `mv a0,s1` and the epilogue, then the
@@ -415,7 +404,7 @@ theorem sys_sbrk_eager (GP : GROWPROC) (c : CPU) (k : KCtx) (γl : GName) (γk :
     from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [KCtx.rget_eq, a8, MachCSL.add_sext_4056] next c1 hp1
   iintro Hk Hpc Fn
   -- jal growproc
-  k_step_gen (wp_s_jal c1 _ (KA.«sys_sbrk» + 0x5c#64) false 2093562#21 1#5 (by decide))
+  k_step_gen (wp_s_jal c1 _ (KA.«sys_sbrk» + 0x5c#64) false 2093530#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [sys_sbrk_br_growproc] next c2 hp2
   iintro Hk Hpc
   ihave HΦ := wpNext_shift _ _ _ _ _ (fun h => (hp2 h).trans (hp1 h)) $$ HΦ
@@ -613,7 +602,7 @@ theorem sys_sbrk_lazy (MP : MYPROC) (GP : GROWPROC) (c : CPU) (k : KCtx) (γl : 
         with [KCtx.rget_eq, h9, Xv6.UPtAlloc.bltu_neg (sysSbrkArg v0 + V.sz) V.sz (by omega)] next c8 hp8
       iintro Hk Hpc
       -- jal myproc
-      k_step_gen (wp_s_jal c8 _ (KA.«sys_sbrk» + 0x48#64) false 2092758#21 1#5 (by decide))
+      k_step_gen (wp_s_jal c8 _ (KA.«sys_sbrk» + 0x48#64) false 2092726#21 1#5 (by decide))
         from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [sys_sbrk_br_myproc] next c9 hp9
       iintro Hk Hpc
       ihave HΦ := wpNext_shift _ _ _ _ _ (fun h => (hp9 h).trans ((hp8 h).trans (hp7 h))) $$ HΦ
@@ -782,7 +771,7 @@ theorem sys_sbrk_proof (AI : ARGINT) (MP : MYPROC) (GP : GROWPROC) : SYSSBRK :=
   k_norm_g at hcs2
   obtain ⟨d2, d8, d9, d18, d19, d20, d21, d22, d23, d24, d25, d26, d27⟩ := hcs2
   -- jal myproc ; ld s1,72(a0)
-  k_step_gen (wp_s_jal c9 _ (KA.«sys_sbrk» + 0x1e#64) false 2092800#21 1#5 (by decide))
+  k_step_gen (wp_s_jal c9 _ (KA.«sys_sbrk» + 0x1e#64) false 2092768#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_sbrk_br_myproc] next c10 hp10
   iintro Hk Hpc
   ihave HΦ := wpNext_shift _ _ _ _ _ hp10 $$ HΦ

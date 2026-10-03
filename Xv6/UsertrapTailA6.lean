@@ -31,20 +31,17 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedVariables false
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
 
 /-! ## Addresses and branch facts -/
 
 theorem ut_a6_killed_tgt : KA.«usertrap» + 0xfffffffffffffb96#64 = KA.«killed» := by decide
-theorem ut_a6_kexit_tgt : KA.«usertrap» + 0xfffffffffffffa60#64 = KA.«kexit» := by decide
-theorem ut_fa_yield_tgt : KA.«usertrap» + 0xfffffffffffff90c#64 = KA.«yield» := by decide
+theorem ut_a6_kexit_tgt : KA.«usertrap» + 0xfffffffffffffa4c#64 = KA.«kexit» := by decide
+theorem ut_fa_yield_tgt : KA.«usertrap» + 0xfffffffffffff8f8#64 = KA.«yield» := by decide
 theorem ut_a6_ret_ac : jumpPc (KA.«usertrap» + 0xac#64) = KA.«usertrap» + 0xac#64 := by decide
 theorem ut_fa_ret_106 : jumpPc (KA.«usertrap» + 0x106#64) = KA.«usertrap» + 0x106#64 := by decide
 
 theorem ut_bne_sext0 : bcond bop.BNE (BitVec.signExtend 64 (0#32)) 0#64 = false := by decide
-
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
@@ -128,7 +125,7 @@ theorem usertrap_a6_after [ClaimIs (hlc := hlc) GF Γ] (HR : UT_RET PT Γ) (HK :
     k_step_e (wp_s_addi cpu _ (KA.«usertrap» + 0xf6#64) true 0xfff#12 10#5 0#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     iintro Hk Hpc
-    k_step_e (wp_s_jal cpu _ (KA.«usertrap» + 0xf8#64) false 2095464#21 1#5 (by decide))
+    k_step_e (wp_s_jal cpu _ (KA.«usertrap» + 0xf8#64) false 2095444#21 1#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ut_a6_kexit_tgt]
     iintro Hk Hpc
     have hsp := hpins.1
@@ -217,7 +214,7 @@ theorem usertrap_a6_self [ClaimIs (hlc := hlc) GF Γ] (KI : KILLED) (HK : UT_KEX
     k_step_e (wp_s_addi cpu _ (KA.«usertrap» + 0xf6#64) true 0xfff#12 10#5 0#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     iintro Hk Hpc
-    k_step_e (wp_s_jal cpu _ (KA.«usertrap» + 0xf8#64) false 2095464#21 1#5 (by decide))
+    k_step_e (wp_s_jal cpu _ (KA.«usertrap» + 0xf8#64) false 2095444#21 1#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ut_a6_kexit_tgt]
     iintro Hk Hpc
     have hsp := hpins'.1
@@ -342,7 +339,7 @@ theorem usertrap_fa_proof [ClaimIs (hlc := hlc) GF Γ] (YI : YIELD) (HR : UT_RET
     k_step (wp_s_branch cpu _ (KA.«usertrap» + 0xfe#64) false 8112#13 18#5 15#5 (by decide) bop.BNE)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h2, MachCSL.bne_eq]
     iintro Hk Hpc
-    k_step (wp_s_jal cpu _ (KA.«usertrap» + 0x102#64) false 2095114#21 1#5 (by decide))
+    k_step (wp_s_jal cpu _ (KA.«usertrap» + 0x102#64) false 2095094#21 1#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ut_fa_yield_tgt]
     iintro Hk Hpc
     unfold utCaps

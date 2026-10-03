@@ -20,9 +20,8 @@ invariant `tokN` with its witness `tokN_blocks`.
 3. `wid_eq_dec` is `deriving DecidableEq`; the `Inj` instance `WLeft_inj` is
    `Wid.WLeft.inj`.
 4. CONE TRIM (98 of 124 reached): not ported, as unreached:
-   `compatN_fire`, `wid_eq_dec` (derived; `cntN_length`, `sel_wfN_prefix`
-   and `mergeN_forall`, also unreached, are in `PipesMerge`, one line each),
-   `wids_from_length`, `lcats_cats`, `nth_cats`, `lfilt_cats`,
+   `compatN_fire`, `wid_eq_dec` (derived), `cntN_length`, `sel_wfN_prefix`,
+   `mergeN_forall`, `wids_from_length`, `lcats_cats`, `nth_cats`, `lfilt_cats`,
    `lpipes_cats_eq`, `pipesN_wit`, `pipesN_wit_of_blk`, `pipesN_complete`,
    `pipesN_complete_nd`, `termw_true`.
 -/

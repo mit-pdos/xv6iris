@@ -7,8 +7,7 @@ deposit raises the stamp per deposited fact.  Boot uses it for each hart's
 parked save area (`cpuCtxFree`, Rocq `BootShared.boot_hart_pre`) and for the
 disk handover channel's context `ξd` (Rocq `BootShared` :2351).
 
-`ctxStamped_boot_list` is the per-element form over a list (eight harts at
-once), by `bigSepL_bupd`.  `ownCtx_boot` (a fresh RUNNING context for a hart,
+`ownCtx_boot` (a fresh RUNNING context for a hart,
 moved here from `MachCSL.Power`) lets `MachCSL.Lock` skip the power-cycle file.
 -/
 import MachCSL.CtxLaws
@@ -42,17 +41,6 @@ theorem ctxStamped_boot : ⊢@{IProp GF} |==> ∃ ξ : CtxId, ctxStamped ξ 0 :=
     iintro %k %h %hk
     rw [LawfulPartialMap.get?_empty] at hk
     simp at hk
-
-/-- One fresh stamped context per element of `l`. -/
-theorem ctxStamped_boot_list {A : Type} :
-    ∀ l : List A, ⊢@{IProp GF} |==> [∗list] _x ∈ l, ∃ ξ : CtxId, ctxStamped ξ 0
-  | [] => BIUpdate.intro
-  | _ :: l => by
-    imod ctxStamped_boot with Hx
-    imod (ctxStamped_boot_list l) with Hl
-    imodintro
-    iapply BigSepL.bigSepL_cons.2
-    iframe Hx Hl
 
 end MachCSL
 

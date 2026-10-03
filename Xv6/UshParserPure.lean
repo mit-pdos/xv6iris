@@ -73,8 +73,6 @@ def ushPexDeep (t : UshpCmd) : Nat := if refHasRedir t then 42 else 22
 
 theorem ushPexDeep_ge (t : UshpCmd) : 22 ≤ ushPexDeep t := by unfold ushPexDeep; split <;> omega
 
-theorem ushPexDeep_le (t : UshpCmd) : ushPexDeep t ≤ 42 := by unfold ushPexDeep; split <;> omega
-
 theorem ushPexDeep_has (t : UshpCmd) (h : refHasRedir t = true) : ushPexDeep t = 42 := by
   unfold ushPexDeep; rw [h]; rfl
 
@@ -82,28 +80,6 @@ theorem ushPexDeep_has (t : UshpCmd) (h : refHasRedir t = true) : ushPexDeep t =
 def ushPpDeep : UshpCmd → Nat
   | .pipe l r => 6 + max (ushPexDeep l) (ushPpDeep r)
   | t => 6 + ushPexDeep t
-
-theorem ushPpDeep_ge : ∀ t : UshpCmd, 28 ≤ ushPpDeep t
-  | .pipe l r => by simp only [ushPpDeep]; have := ushPexDeep_ge l; omega
-  | .exec toks => by simp only [ushPpDeep]; have := ushPexDeep_ge (.exec toks); omega
-  | .redir c q e mode fd => by simp only [ushPpDeep]; have := ushPexDeep_ge (.redir c q e mode fd); omega
-  | .list l r => by simp only [ushPpDeep]; have := ushPexDeep_ge (.list l r); omega
-  | .back c => by simp only [ushPpDeep]; have := ushPexDeep_ge (.back c); omega
-
-/-- **Rocq `ushp_pex_deep_le_room`**. -/
-theorem ushPexDeep_le_room (t : UshpCmd) : ushPexDeep t ≤ ushPexRoom t := by
-  unfold ushPexDeep ushPexRoom ushPexExtra; split <;> omega
-
-/-- **Rocq `ushp_pp_deep_le_room`**. -/
-theorem ushPpDeep_le_room : ∀ t : UshpCmd, ushPpDeep t ≤ ushPpRoom t
-  | .pipe l r => by
-    simp only [ushPpDeep, ushPpRoom]
-    have := ushPexDeep_le_room l; have := ushPpDeep_le_room r; omega
-  | .exec toks => by simp only [ushPpDeep, ushPpRoom]; have := ushPexDeep_le_room (.exec toks); omega
-  | .redir c q e mode fd => by
-    simp only [ushPpDeep, ushPpRoom]; have := ushPexDeep_le_room (.redir c q e mode fd); omega
-  | .list l r => by simp only [ushPpDeep, ushPpRoom]; have := ushPexDeep_le_room (.list l r); omega
-  | .back c => by simp only [ushPpDeep, ushPpRoom]; have := ushPexDeep_le_room (.back c); omega
 
 /-- **Rocq `ushp_pp_deep_wrap`**: parseexec's answer is never a pipe. -/
 theorem ushPpDeep_wrap (toks : List (Nat × Nat)) (rs : List Rredir) :
@@ -118,17 +94,11 @@ def ushPlDeep (t : UshpCmd) : Nat := 6 + ushPpDeep t
 /-- **Rocq `ushp_deep`**. -/
 def ushDeep (t : UshpCmd) : Nat := 8 + ushPlDeep t
 
-/-- **Rocq `ushp_deep_le_room`**. -/
-theorem ushDeep_le_room (t : UshpCmd) : ushDeep t ≤ ushRoom t := by
-  unfold ushDeep ushPlDeep ushRoom ushPlRoom; have := ushPpDeep_le_room t; omega
-
 /-! ## The cut (Rocq (5a)) -/
 
 /-- **Rocq `ushp_zero_at`**. -/
 def ushZeroAt (js : List Nat) (g : Nat → BitVec 8) : Nat → BitVec 8 :=
   js.foldl (fun g' j => ushpSetb g' j ubyte0) g
-
-theorem ushZeroAt_nil (g : Nat → BitVec 8) : ushZeroAt [] g = g := rfl
 
 theorem ushZeroAt_app (l1 l2 : List Nat) (g : Nat → BitVec 8) :
     ushZeroAt (l1 ++ l2) g = ushZeroAt l2 (ushZeroAt l1 g) := by

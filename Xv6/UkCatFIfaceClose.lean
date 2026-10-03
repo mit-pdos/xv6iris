@@ -29,8 +29,6 @@ open Iris.Std.PartialMap
 open HfpPipeP HfpFileClaimsP
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
-
 /-- The handle function after a descriptor naming NO handle closed, its
 device dropped (it was the last) -- deviation 2. -/
 theorem cifHf_delete (fdm : Fdmap) (vs : RegMapF CfDev) (fd : Int) (d : Nat) (hfd : fdm fd = some d)

@@ -36,7 +36,6 @@ its ledger, working directory, children and pid are dropped.
    is Rocq's 38 + 4 = the key's 42 words.
 -/
 import Xv6.ExecEntry
-import Xv6.ElfUser
 import Xv6.UshEchoArgs
 import Xv6.UshSync
 import Xv6.LinkSync
@@ -48,8 +47,6 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Iris.Std.PartialMap
 open Std (ExtTreeSet)
-
-set_option linter.unusedSectionVars false
 
 /-- NEW (deviation 4): the code-segment readings `utextAll_img` asks for, at
 a key whose page 0 is X-and-not-W. -/

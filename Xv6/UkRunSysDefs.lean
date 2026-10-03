@@ -43,8 +43,6 @@ open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 open UexecSG
 
-set_option linter.unusedSectionVars false
-
 /-- `usysno` IS the trap-out key's number. -/
 theorem usysno_tf (m : RegMap) (pc : BitVec 64) : usysNum (tfOf m pc) = usysno m := tfOf_num m pc
 

@@ -39,6 +39,7 @@ import Xv6.UshPipeLeavesGen
 import Xv6.UshPipeLeavesRound
 import Xv6.UshPipeCall
 import Xv6.UshPipesLaw
+import Xv6.UshForkDefs
 
 namespace Xv6
 
@@ -49,8 +50,6 @@ open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 open Wid RdOut WrOut
 open UShPipesDefs UShPipesStage UShPipeLeaves UShPipeCall
-
-set_option linter.unusedSectionVars false
 
 section Obl
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [IcacheG GF]

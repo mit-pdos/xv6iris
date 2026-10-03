@@ -167,10 +167,6 @@ instance : Inhabited Dirent := ⟨⟨0#16, []⟩⟩
 /-- Rocq `dirent_wf`. -/
 def direntWf (d : Dirent) : Prop := d.name.length = 14
 
-/-- Rocq `dirblk_wf`. -/
-def dirblkWf (ds : List Dirent) : Prop :=
-  ds.length = 64 ∧ ∀ d ∈ ds, direntWf d
-
 /-- Rocq `de_free`: the FREE test dirlookup's `lhu`/`beqz` pair performs. -/
 def deFree (d : Dirent) : Prop := d.inum = 0#16
 
@@ -184,17 +180,7 @@ def dirblkBytes : List Dirent → List (BitVec 8)
   | [] => []
   | d :: ds => direntBytes d ++ dirblkBytes ds
 
-theorem dirblkBytes_nil : dirblkBytes [] = [] := rfl
-
-theorem dirblkBytes_cons (d : Dirent) (ds : List Dirent) :
-    dirblkBytes (d :: ds) = direntBytes d ++ dirblkBytes ds := rfl
-
 /-! ## One record: length, and the two field readings -/
-
-theorem direntBytes_length (d : Dirent) (hd : direntWf d) :
-    (direntBytes d).length = 16 := by
-  unfold direntBytes
-  rw [List.length_append, halfBytes_length, hd]
 
 theorem direntBytes_inum (d : Dirent) (j : Nat) (hj : j < 2) :
     (direntBytes d)[j]? = some (nthByte (n := 2) d.inum j) := by
@@ -218,133 +204,6 @@ theorem direntBytes_name_t (d : Dirent) (j : Nat) :
     (direntBytes d)[2 + j]! = d.name[j]! :=
   getElem!_congr (direntBytes_name d j)
 
-/-! ## The block: length, slot lookup, and one-slot installation -/
-
-theorem dirblkBytes_length : ∀ (ds : List Dirent), (∀ d ∈ ds, direntWf d) →
-    (dirblkBytes ds).length = 16 * ds.length := by
-  intro ds
-  induction ds with
-  | nil => intro _; rfl
-  | cons d ds ih =>
-    intro hall
-    rw [dirblkBytes_cons, List.length_append, direntBytes_length d (hall d (by simp)),
-      ih (fun x hx => hall x (by simp [hx]))]
-    simp [Nat.mul_succ]
-    omega
-
-theorem dirblkBytes_length_64 (ds : List Dirent) (hwf : dirblkWf ds) :
-    (dirblkBytes ds).length = 1024 := by
-  rw [dirblkBytes_length ds hwf.2, hwf.1]
-
-theorem dirblkBytes_lookup : ∀ (ds : List Dirent) (k j : Nat), (∀ d ∈ ds, direntWf d) →
-    k < ds.length → j < 16 →
-    (dirblkBytes ds)[16 * k + j]? = (direntBytes ds[k]!)[j]? := by
-  intro ds
-  induction ds with
-  | nil => intro k j _ hk _; simp at hk
-  | cons d ds ih =>
-    intro k j hall hk hj
-    have hd : direntWf d := hall d (by simp)
-    have hds : ∀ x ∈ ds, direntWf x := fun x hx => hall x (by simp [hx])
-    rw [dirblkBytes_cons]
-    cases k with
-    | zero =>
-      rw [show 16 * 0 + j = j from by omega,
-        List.getElem?_append_left (by rw [direntBytes_length d hd]; omega),
-        getElem!_cons_zero]
-    | succ k' =>
-      rw [show 16 * (k' + 1) + j = (direntBytes d).length + (16 * k' + j) from by
-        rw [direntBytes_length d hd]; omega]
-      rw [List.getElem?_append_right (by omega), Nat.add_sub_cancel_left,
-        ih k' j hds (by simpa using hk) hj, getElem!_cons_succ]
-
-theorem dirblkBytes_lookup_none (ds : List Dirent) (i : Nat) (hall : ∀ d ∈ ds, direntWf d)
-    (hi : 16 * ds.length ≤ i) : (dirblkBytes ds)[i]? = none := by
-  rw [List.getElem?_eq_none_iff, dirblkBytes_length ds hall]; omega
-
-theorem direntWf_set (ds : List Dirent) (k : Nat) (d : Dirent)
-    (hall : ∀ x ∈ ds, direntWf x) (hd : direntWf d) :
-    ∀ x ∈ ds.set k d, direntWf x := by
-  intro x hx
-  rcases List.mem_or_eq_of_mem_set hx with hx | rfl
-  · exact hall x hx
-  · exact hd
-
-theorem dirblkWf_set (ds : List Dirent) (k : Nat) (d : Dirent)
-    (hwf : dirblkWf ds) (hd : direntWf d) : dirblkWf (ds.set k d) := by
-  refine ⟨by rw [List.length_set]; exact hwf.1, direntWf_set ds k d hwf.2 hd⟩
-
-theorem dirblkBytes_set_same (ds : List Dirent) (k : Nat) (d : Dirent) (j : Nat)
-    (hall : ∀ x ∈ ds, direntWf x) (hd : direntWf d) (hk : k < ds.length) (hj : j < 16) :
-    (dirblkBytes (ds.set k d))[16 * k + j]? = (direntBytes d)[j]? := by
-  rw [dirblkBytes_lookup (ds.set k d) k j (direntWf_set ds k d hall hd)
-    (by rw [List.length_set]; exact hk) hj]
-  rw [getElem!_pos (ds.set k d) k (by rw [List.length_set]; exact hk), List.getElem_set_self]
-
-set_option linter.unusedVariables false in
-/-- Rocq `dirblk_bytes_insert_other`.  `hk` is Rocq's hypothesis and is kept
-for statement fidelity even though the Lean proof (via `List.length_set`)
-does not need it. -/
-theorem dirblkBytes_set_other (ds : List Dirent) (k : Nat) (d : Dirent) (i : Nat)
-    (hall : ∀ x ∈ ds, direntWf x) (hd : direntWf d) (hk : k < ds.length)
-    (hi : i < 16 * k ∨ 16 * k + 16 ≤ i) :
-    (dirblkBytes (ds.set k d))[i]? = (dirblkBytes ds)[i]? := by
-  have hall' := direntWf_set ds k d hall hd
-  rcases Nat.lt_or_ge i (16 * ds.length) with hlt | hge
-  · obtain ⟨q, r, hr, rfl⟩ : ∃ q r, r < 16 ∧ i = 16 * q + r :=
-      ⟨i / 16, i % 16, by omega, by omega⟩
-    have hq : q < ds.length := by omega
-    have hqk : q ≠ k := by omega
-    rw [dirblkBytes_lookup (ds.set k d) q r hall' (by rw [List.length_set]; exact hq) hr,
-      dirblkBytes_lookup ds q r hall hq hr]
-    rw [getElem!_pos (ds.set k d) q (by rw [List.length_set]; exact hq),
-      getElem!_pos ds q hq, List.getElem_set_ne (by omega : k ≠ q)]
-  · rw [dirblkBytes_lookup_none (ds.set k d) _ hall' (by rw [List.length_set]; exact hge),
-      dirblkBytes_lookup_none ds _ hall hge]
-
-/-! ## The same readings in TOTAL-lookup form
-
-A `ByteBuf` window is named by a FUNCTION, so every consumer wants `[i]!`,
-not `[i]?`. -/
-
-theorem dirblkWf_slot (ds : List Dirent) (k : Nat) (hall : ∀ d ∈ ds, direntWf d)
-    (hk : k < ds.length) : direntWf ds[k]! := by
-  rw [getElem!_pos ds k hk]; exact hall _ (List.getElem_mem hk)
-
-theorem dirblkBytes_lookup_t (ds : List Dirent) (k j : Nat) (hall : ∀ d ∈ ds, direntWf d)
-    (hk : k < ds.length) (hj : j < 16) :
-    (dirblkBytes ds)[16 * k + j]! = (direntBytes ds[k]!)[j]! :=
-  getElem!_congr (dirblkBytes_lookup ds k j hall hk hj)
-
-theorem dirblkBytes_set_same_t (ds : List Dirent) (k : Nat) (d : Dirent) (j : Nat)
-    (hall : ∀ x ∈ ds, direntWf x) (hd : direntWf d) (hk : k < ds.length) (hj : j < 16) :
-    (dirblkBytes (ds.set k d))[16 * k + j]! = (direntBytes d)[j]! :=
-  getElem!_congr (dirblkBytes_set_same ds k d j hall hd hk hj)
-
-theorem dirblkBytes_set_other_t (ds : List Dirent) (k : Nat) (d : Dirent) (i : Nat)
-    (hall : ∀ x ∈ ds, direntWf x) (hd : direntWf d) (hk : k < ds.length)
-    (hi : i < 16 * k ∨ 16 * k + 16 ≤ i) :
-    (dirblkBytes (ds.set k d))[i]! = (dirblkBytes ds)[i]! :=
-  getElem!_congr (dirblkBytes_set_other ds k d i hall hd hk hi)
-
-/-! ## The two PER-BYTE readings straight out of the block image
-
-At the offsets dirlookup's `lhu ...,-96(s0)` and its `de.name` pointer
-name. -/
-
-theorem dirblkBytes_inum (ds : List Dirent) (k j : Nat) (hall : ∀ d ∈ ds, direntWf d)
-    (hk : k < ds.length) (hj : j < 2) :
-    (dirblkBytes ds)[16 * k + j]? = some (nthByte (n := 2) ds[k]!.inum j) := by
-  rw [dirblkBytes_lookup ds k j hall hk (by omega)]
-  exact direntBytes_inum _ _ hj
-
-theorem dirblkBytes_name (ds : List Dirent) (k j : Nat) (hall : ∀ d ∈ ds, direntWf d)
-    (hk : k < ds.length) (hj : j < 14) :
-    (dirblkBytes ds)[16 * k + 2 + j]? = ds[k]!.name[j]? := by
-  rw [show 16 * k + 2 + j = 16 * k + (2 + j) from by omega]
-  rw [dirblkBytes_lookup ds k (2 + j) hall hk (by omega)]
-  exact direntBytes_name _ _
-
 /-! ## ZERO records: what a bzero'd directory block decodes to
 
 Rocq's `NUL_bv0` is vacuous here (deviation 1): `0#8` is the only spelling. -/
@@ -354,40 +213,9 @@ theorem halfBytes_zero : halfBytes 0#16 = [0#8, 0#8] := by
 
 def direntZero : Dirent := ⟨0#16, List.replicate 14 0#8⟩
 
-theorem direntZero_wf : direntWf direntZero := by
-  simp [direntWf, direntZero]
-
-theorem direntZero_free : deFree direntZero := rfl
-
-/-- Rocq `Forall_replicate_de`. -/
-theorem forall_replicate_de {α : Type _} (P : α → Prop) (n : Nat) (b : α) (hP : P b) :
-    ∀ x ∈ List.replicate n b, P x := by
-  intro x hx; rw [List.eq_of_mem_replicate hx]; exact hP
-
 theorem direntBytes_zero : direntBytes direntZero = List.replicate 16 0#8 := by
   show halfBytes 0#16 ++ List.replicate 14 0#8 = _
   rw [halfBytes_zero]; rfl
-
-theorem dirblkBytes_replicate (n : Nat) :
-    dirblkBytes (List.replicate n direntZero) = List.replicate (16 * n) 0#8 := by
-  induction n with
-  | zero => rfl
-  | succ n ih =>
-    rw [List.replicate_succ, dirblkBytes_cons, direntBytes_zero, ih,
-      show 16 * (n + 1) = 16 + 16 * n from by omega, ← List.replicate_append_replicate]
-
-def dirblkZero : List Dirent := List.replicate 64 direntZero
-
-theorem dirblkZero_wf : dirblkWf dirblkZero := by
-  exact ⟨by simp [dirblkZero], forall_replicate_de _ 64 _ direntZero_wf⟩
-
-theorem dirblkBytes_zero : dirblkBytes dirblkZero = List.replicate 1024 0#8 := by
-  rw [dirblkZero, dirblkBytes_replicate]
-
-/-- Rocq `de_free_inum_bytes`: a free record contributes two zero bytes at
-its inum, which is exactly what dirlookup's `lhu` reads. -/
-theorem deFree_inum_bytes (d : Dirent) (hd : deFree d) : halfBytes d.inum = [0#8, 0#8] := by
-  rw [show d.inum = 0#16 from hd]; exact halfBytes_zero
 
 /-! ## THE ENCODING IS INJECTIVE ON WELL-FORMED RECORDS
 
@@ -400,38 +228,6 @@ theorem deHalfBytes_inj (w1 w2 : BitVec 16) (h : halfBytes w1 = halfBytes w2) : 
   simp only [halfBytes, nthByte, List.cons.injEq, and_true] at h
   obtain ⟨h0, h1⟩ := h
   bv_decide
-
-theorem direntBytes_inj (d1 d2 : Dirent) (h1 : direntWf d1) (h2 : direntWf d2)
-    (h : direntBytes d1 = direntBytes d2) : d1 = d2 := by
-  unfold direntBytes at h
-  obtain ⟨hin, hnm⟩ := List.append_inj h (by rw [halfBytes_length, halfBytes_length])
-  cases d1; cases d2
-  simp only [Dirent.mk.injEq]
-  exact ⟨deHalfBytes_inj _ _ hin, hnm⟩
-
-theorem dirblkBytes_inj_aux : ∀ (ds1 ds2 : List Dirent), ds1.length = ds2.length →
-    (∀ d ∈ ds1, direntWf d) → (∀ d ∈ ds2, direntWf d) →
-    dirblkBytes ds1 = dirblkBytes ds2 → ds1 = ds2 := by
-  intro ds1
-  induction ds1 with
-  | nil => intro ds2 hlen _ _ _; exact (List.length_eq_zero_iff.mp hlen.symm).symm
-  | cons d1 ds1 ih =>
-    intro ds2 hlen hw1 hw2 h
-    cases ds2 with
-    | nil => simp at hlen
-    | cons d2 ds2 =>
-      have hd1 : direntWf d1 := hw1 d1 (by simp)
-      have hd2 : direntWf d2 := hw2 d2 (by simp)
-      rw [dirblkBytes_cons, dirblkBytes_cons] at h
-      obtain ⟨hh, ht⟩ := List.append_inj h
-        (by rw [direntBytes_length d1 hd1, direntBytes_length d2 hd2])
-      rw [direntBytes_inj d1 d2 hd1 hd2 hh]
-      rw [ih ds2 (by simpa using hlen) (fun x hx => hw1 x (by simp [hx]))
-        (fun x hx => hw2 x (by simp [hx])) ht]
-
-theorem dirblkBytes_inj (ds1 ds2 : List Dirent) (hw1 : dirblkWf ds1) (hw2 : dirblkWf ds2)
-    (h : dirblkBytes ds1 = dirblkBytes ds2) : ds1 = ds2 :=
-  dirblkBytes_inj_aux ds1 ds2 (by rw [hw1.1, hw2.1]) hw1.2 hw2.2 h
 
 /-! # THE NAME MODEL -/
 
@@ -451,8 +247,6 @@ theorem cutNul_eq_bytesString : ∀ l : List (BitVec 8), cutNul l = bytesString 
     by_cases hb : b = 0#8
     · simp [hb]
     · simp only [hb, if_false]; rw [cutNul_eq_bytesString l]
-
-theorem cutNul_nil : cutNul [] = [] := rfl
 
 theorem cutNul_cons_nul (l : List (BitVec 8)) : cutNul (0#8 :: l) = [] := by
   rw [cutNul]; simp
@@ -558,30 +352,6 @@ theorem cutNul_length_ge : ∀ (l : List (BitVec 8)) (k : Nat), k ≤ l.length �
         exact Nat.succ_le_succ (ih k' (by simpa using hk)
           (fun j hj => by simpa using hne (j + 1) (by omega)))
 
-theorem cutNul_take (l : List (BitVec 8)) : cutNul l = l.take (cutNul l).length := by
-  apply List.ext_getElem?
-  intro j
-  rcases Nat.lt_or_ge j (cutNul l).length with hj | hj
-  · rw [List.getElem?_take, if_pos hj]
-    exact cutNul_lookup l j hj
-  · rw [List.getElem?_eq_none_iff.mpr hj,
-      List.getElem?_eq_none_iff.mpr (by rw [List.length_take]; omega)]
-
-theorem cutNul_append_drop (l : List (BitVec 8)) :
-    cutNul l ++ l.drop (cutNul l).length = l := by
-  have h := List.take_append_drop (cutNul l).length l
-  rw [← cutNul_take] at h
-  exact h
-
-theorem cutNul_id : ∀ l : List (BitVec 8), nonul l → cutNul l = l
-  | [], _ => rfl
-  | b :: l, h => by
-    rw [cutNul_cons_ne b l (h b (by simp)),
-      cutNul_id l (fun x hx => h x (by simp [hx]))]
-
-theorem cutNul_idem (l : List (BitVec 8)) : cutNul (cutNul l) = cutNul l :=
-  cutNul_id _ (cutNul_nonul l)
-
 theorem cutNul_append : ∀ (l1 l2 : List (BitVec 8)), nonul l1 →
     cutNul (l1 ++ l2) = l1 ++ cutNul l2
   | [], _, _ => rfl
@@ -615,41 +385,6 @@ theorem namePad_cut (s : List (BitVec 8)) (hlen : s.length ≤ 14) (hs : nonul s
     cutNul (namePad s) = s := by
   rw [namePad_eq s hlen, cutNul_append s _ hs, cutNul_replicate, List.append_nil]
 
-/-- Rocq `de_padded_l`: "once NUL, always NUL", what strncpy leaves behind,
-stated as a property of the STORED bytes rather than of the caller's
-argument. -/
-def dePaddedL (l : List (BitVec 8)) : Prop := ∀ b ∈ l.drop (cutNul l).length, b = 0#8
-
-/-- Rocq `de_padded`. -/
-def dePadded (d : Dirent) : Prop := dePaddedL d.name
-
-/-- Rocq `Forall_eq_replicate`. -/
-theorem forall_eq_replicate (l : List (BitVec 8)) (b : BitVec 8) (h : ∀ c ∈ l, c = b) :
-    l = List.replicate l.length b :=
-  List.eq_replicate_iff.mpr ⟨rfl, h⟩
-
-theorem namePad_padded (s : List (BitVec 8)) (hlen : s.length ≤ 14) (hs : nonul s) :
-    dePaddedL (namePad s) := by
-  unfold dePaddedL
-  rw [namePad_cut s hlen hs, namePad_eq s hlen, List.drop_left' rfl]
-  exact forall_replicate_de _ _ _ rfl
-
-/-- Rocq `de_padded_name_pad`: the shape law -- a padded 14-byte name IS the
-padding of its canonical view. -/
-theorem dePadded_namePad (l : List (BitVec 8)) (hlen : l.length = 14) (hpad : dePaddedL l) :
-    l = namePad (cutNul l) := by
-  have hk : (cutNul l).length ≤ 14 := by rw [← hlen]; exact cutNul_length l
-  have hdrop : l.drop (cutNul l).length = List.replicate (14 - (cutNul l).length) 0#8 := by
-    rw [forall_eq_replicate _ 0#8 hpad, List.length_drop, hlen]
-  rw [namePad_eq _ hk, ← hdrop, cutNul_append_drop]
-
-/-- Rocq `de_name_faithful`: canonical equality determines the bytes, which is
-what makes the directory's `name -> inum` view well defined. -/
-theorem deName_faithful (d1 d2 : Dirent) (h1 : direntWf d1) (h2 : direntWf d2)
-    (p1 : dePadded d1) (p2 : dePadded d2) (hc : cutNul d1.name = cutNul d2.name) :
-    d1.name = d2.name := by
-  rw [dePadded_namePad _ h1 p1, dePadded_namePad _ h2 p2, hc]
-
 /-- Rocq `de_name_str`: the canonical name of a record. -/
 def deNameStr (d : Dirent) : List (BitVec 8) := cutNul d.name
 
@@ -658,10 +393,6 @@ def deOfName (i : BitVec 16) (s : List (BitVec 8)) : Dirent := ⟨i, namePad s�
 
 theorem deOfName_wf (i : BitVec 16) (s : List (BitVec 8)) : direntWf (deOfName i s) :=
   namePad_length s
-
-theorem deOfName_padded (i : BitVec 16) (s : List (BitVec 8)) (hlen : s.length ≤ 14)
-    (hs : nonul s) : dePadded (deOfName i s) :=
-  namePad_padded s hlen hs
 
 theorem deOfName_str (i : BitVec 16) (s : List (BitVec 8)) (hlen : s.length ≤ 14)
     (hs : nonul s) : deNameStr (deOfName i s) = s :=
@@ -900,16 +631,6 @@ theorem ncZero_iff (f g : Nat → BitVec 8) (n : Nat) :
         have := bname_length_le n f; omega
       exact ⟨heq j hjl, hnonul j hjl⟩
 
-/-- Rocq `namecmp_bridge`: namecmp's contract, at the width the code uses.
-`f` is the SEARCH name (dirlookup passes `name` in a0), `g` the record's
-field (a1). -/
-theorem namecmp_bridge (f : Nat → BitVec 8) (d : Dirent) (hd : direntWf d) :
-    (((∃ k, ncStop f (fun j => d.name[j]!) 14 k ∧ f k = d.name[k]!)
-      ∨ ncRun f (fun j => d.name[j]!) 14)
-     ↔ bname 14 f = deNameStr d) := by
-  rw [← de_bname_name d hd]
-  exact ncZero_iff f _ 14
-
 /-- Rocq `bname_of_buf`: the buffer shape skipelem's two branches leave
 behind -- a name shorter than 14 terminated by a NUL, or exactly 14 bytes
 with no terminator at all.  Either way the canonical view is the element. -/
@@ -929,6 +650,5 @@ theorem bname_of_buf (f : Nat → BitVec 8) (e : List (BitVec 8)) (hlen : e.leng
     exact (getElem?_eq_some_getElem! e j hj).symm
   · rw [List.getElem?_eq_none_iff.mpr (by rw [bview_length]; omega),
       List.getElem?_eq_none_iff.mpr (by omega)]
-
 
 end Xv6

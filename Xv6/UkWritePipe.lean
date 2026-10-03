@@ -18,8 +18,6 @@ namespace Xv6
 
 open Iris Iris.BI MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-- **Rocq `write_pipe_fam`**: `xfam_wr` with the caller's read-shut
 observation `Qe` in `wQe`. -/
 def writePipeFam {GF : BundledGFunctors} (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF)

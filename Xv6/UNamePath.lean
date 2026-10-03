@@ -100,7 +100,8 @@ theorem uname_npElems (nm : List (BitVec 8)) (hu : uname nm) : npElems nm = [] :
 theorem uname_last (nm : List (BitVec 8)) (hu : uname nm) : (pathElems nm).getLast? = some nm := by
   rw [uname_pathElems nm hu]; rfl
 
-theorem uname_start (nm : List (BitVec 8)) (hu : uname nm) (cw : Nat) : umStartOf cw nm = cw := by
+theorem uname_start (nm : List (BitVec 8)) (hu : uname nm) (rt cw : Nat) :
+    umStartOf rt cw nm = cw := by
   unfold umStartOf
   rw [if_neg]
   intro hs
@@ -114,13 +115,6 @@ theorem catWords_execOk (nm : List (BitVec 8)) (hu : uname nm) : execOk [fdWCat,
   have hl := uname_len nm hu
   refine ⟨prodWf (.PrCatF nm) (uname_lex nm hu), by simp, by simp, ?_⟩
   simp [wlLine, wlBody, wlTail, fdWCat, lineMax]
-  omega
-
-/-- cat's diagnostic at a class name is short (L2) -/
-theorem catopen_short (nm : List (BitVec 8)) (hu : uname nm) :
-    (dgCatopenN nm).length < 2 ^ 31 := by
-  have hl := uname_len nm hu
-  simp [dgCatopenN, dgCatopenPre, nlb]
   omega
 
 end Xv6

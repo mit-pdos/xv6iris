@@ -20,14 +20,13 @@ user page with W clear is `E_SAMO_Page_Fault`.
 import Xv6.UkXlateMem
 import Xv6.UserFetchWf
 import Xv6.UMemLemmas
+import Xv6.UserPerm
 
 namespace Xv6
 
 open Iris Std MachCSL
 open Iris.Std.PartialMap Iris.Std.FiniteMap
 open Sail LeanRV64D LeanRV64D.Functions
-
-set_option linter.unusedSectionVars false
 
 /-! ## §1 Small facts -/
 

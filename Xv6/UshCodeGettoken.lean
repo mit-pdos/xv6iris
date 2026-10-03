@@ -487,21 +487,6 @@ theorem ushI_404 (γt : GName) :
     ushCode (GF := GF) γt ⊢ uinstrIs γt (BitVec.ofNat 64 0x404) true (.JAL (2097032#21, .Regidx 0#5)) :=
   ushm_uisK γt 0x404 _ _ (by kernel_rfl) (by decide)
 
-/-- `0x406  addi s1,s1,2` -/
-theorem ushI_406 (γt : GName) :
-    ushCode (GF := GF) γt ⊢ uinstrIs γt (BitVec.ofNat 64 0x406) true (.ITYPE (2#12, .Regidx 9#5, .Regidx 9#5, .ADDI)) :=
-  ushm_uisK γt 0x406 _ _ (by kernel_rfl) (by decide)
-
-/-- `0x408  li s5,43` -/
-theorem ushI_408 (γt : GName) :
-    ushCode (GF := GF) γt ⊢ uinstrIs γt (BitVec.ofNat 64 0x408) false (.ITYPE (43#12, .Regidx 0#5, .Regidx 21#5, .ADDI)) :=
-  ushm_uisK γt 0x408 _ _ (by kernel_rfl) (by decide)
-
-/-- `0x40c  j 364 <gettoken+0x78>` -/
-theorem ushI_40c (γt : GName) :
-    ushCode (GF := GF) γt ⊢ uinstrIs γt (BitVec.ofNat 64 0x40c) true (.JAL (2096984#21, .Regidx 0#5)) :=
-  ushm_uisK γt 0x40c _ _ (by kernel_rfl) (by decide)
-
 /-- `0x40e  li s5,97` -/
 theorem ushI_40e (γt : GName) :
     ushCode (GF := GF) γt ⊢ uinstrIs γt (BitVec.ofNat 64 0x40e) false (.ITYPE (97#12, .Regidx 0#5, .Regidx 21#5, .ADDI)) :=
@@ -521,21 +506,6 @@ theorem ushI_414 (γt : GName) :
 theorem ushI_418 (γt : GName) :
     ushCode (GF := GF) γt ⊢ uinstrIs γt (BitVec.ofNat 64 0x418) true (.JAL (2096972#21, .Regidx 0#5)) :=
   ushm_uisK γt 0x418 _ _ (by kernel_rfl) (by decide)
-
-/-- `0x41a  li s5,97` -/
-theorem ushI_41a (γt : GName) :
-    ushCode (GF := GF) γt ⊢ uinstrIs γt (BitVec.ofNat 64 0x41a) false (.ITYPE (97#12, .Regidx 0#5, .Regidx 21#5, .ADDI)) :=
-  ushm_uisK γt 0x41a _ _ (by kernel_rfl) (by decide)
-
-/-- `0x41e  bnez s6,368 <gettoken+0x7c>` -/
-theorem ushI_41e (γt : GName) :
-    ushCode (GF := GF) γt ⊢ uinstrIs γt (BitVec.ofNat 64 0x41e) false (.BTYPE (8010#13, .Regidx 0#5, .Regidx 22#5, .BNE)) :=
-  ushm_uisK γt 0x41e _ _ (by kernel_rfl) (by decide)
-
-/-- `0x422  j 38c <gettoken+0xa0>` -/
-theorem ushI_422 (γt : GName) :
-    ushCode (GF := GF) γt ⊢ uinstrIs γt (BitVec.ofNat 64 0x422) true (.JAL (2097002#21, .Regidx 0#5)) :=
-  ushm_uisK γt 0x422 _ _ (by kernel_rfl) (by decide)
 
 end
 

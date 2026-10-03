@@ -63,7 +63,7 @@ def tailVals (n : Nat) (v0 : BitVec (8 * n)) (Hold : Nat → Hist) : Prop :=
 /-- The tails with a position PER BYTE: nonempty, byte `j`'s head spelling
 byte `j` of `v0` at EXACTLY the position `ts j`.  A word zeroed by a byte
 loop (`memset`) has eight different positions, one per store; `tailOk n lo`
-is the constant case (`tailOk_toT`). -/
+is the constant case. -/
 def tailOkT (n : Nat) (ts : Nat → Nat) (v0 : BitVec (8 * n)) (Hold : Nat → Hist) : Prop :=
   ∀ j, j < n → ∃ e H, Hold j = e :: H ∧ e.v = nthByte v0 j ∧ e.t = ts j
 
@@ -74,11 +74,6 @@ theorem tailOk_vals {n lo : Nat} {v0 : BitVec (8 * n)} {Hold : Nat → Hist}
 theorem tailOkT_vals {n : Nat} {ts : Nat → Nat} {v0 : BitVec (8 * n)} {Hold : Nat → Hist}
     (h : tailOkT n ts v0 Hold) : tailVals n v0 Hold :=
   fun j hj => let ⟨e, H, h1, h2, _⟩ := h j hj; ⟨e, H, h1, h2⟩
-
-/-- A word under one discipline position is a word under the constant
-per-byte positions. -/
-theorem tailOk_toT {n lo : Nat} {v0 : BitVec (8 * n)} {Hold : Nat → Hist}
-    (h : tailOk n lo v0 Hold) : tailOkT n (fun _ => lo) v0 Hold := h
 
 /-- The head of a tail: its value and its (exact) per-byte position. -/
 theorem tailOkT_head {n : Nat} {ts : Nat → Nat} {v0 : BitVec (8 * n)} {Hold : Nat → Hist}
@@ -192,18 +187,6 @@ theorem WordHist.read_cases_floor (W : WordHist n) (Hold : Nat → Hist) (h : Ag
   WordHist.read_cases W Hold h tvn lo v0 w hn htail
     (fun j hj e H hH => HEnt.visible_of_le h tvn e (by
       rw [(tailOk_head htail j hj e H hH).2]; exact hlo)) hrd
-
-/-- The reader AUTHORED the tails' entries: they are visible to it at every
-view (store-to-load forwarding). -/
-theorem WordHist.read_cases_own (W : WordHist n) (Hold : Nat → Hist) (h : Agent) (tvn lo : Nat)
-    (v0 w : BitVec (8 * n)) (hn : 0 < n) (htail : tailOk n lo v0 Hold)
-    (hown : ∀ j, j < n → ∀ e H, Hold j = e :: H → e.tid = h)
-    (hrd : readsAre h tvn (W.hist Hold) n w) :
-    (∃ W1 e W2, W = W1 ++ e :: W2 ∧ e.visible h tvn = true ∧ (∀ x ∈ W1, x.visible h tvn = false) ∧
-      w = e.v) ∨
-    ((∀ x ∈ W, x.visible h tvn = false) ∧ w = v0) :=
-  WordHist.read_cases W Hold h tvn lo v0 w hn htail
-    (fun j hj e H hH => HEnt.visible_of_own h tvn e (hown j hj e H hH)) hrd
 
 /-- The tail heads are visible to a reader that either has a view past the
 tails' position or AUTHORED the entries there -- the two arms of a lock
@@ -382,17 +365,6 @@ theorem wordCellT_push (pa : PAddr) (n : Nat) (ts : Nat → Nat) (v0 : BitVec (8
       wordCellT pa n ts v0 (⟨t, h, w⟩ :: W) := by
   rw [WordHist.hist_push]
   exact wordCellT_intro pa n ts v0 _ Hold htail
-
-/-- A word cell at one position is a word cell at the constant per-byte
-positions. -/
-theorem wordCell_toT (pa : PAddr) (n lo : Nat) (v0 : BitVec (8 * n)) (W : WordHist n) :
-    wordCell (GF := GF) pa n lo v0 W ⊢ wordCellT pa n (fun _ => lo) v0 W := by
-  unfold wordCell wordCellT
-  iintro ⟨%Hold, H, %htail⟩
-  iexists Hold
-  iframe H
-  ipureintro
-  exact tailOk_toT htail
 
 /-- A window never written since the image is a word cell at floor `0`. -/
 theorem WordHist.hist_nil (Hold : Nat → Hist) : WordHist.hist ([] : WordHist n) Hold = Hold := by

@@ -2,7 +2,7 @@
 Proof of `iget`'s specification (`SpecIget.IGET`), given the interfaces of
 `acquire`, the hooked `release` and `panic`.  A port of Rocq `ProofIget.v`
 (`iris/ProofIget.v`, `wp_iget_sconf`, 449--2618) against
-the Lean image (`KA.«iget»` = `0x80002fa0`).
+the Lean image (`KA.«iget»` = `0x80002fb4`).
 
     +0x00  the six-slot prologue (ra, s0..s4)          -- IgetParts.ig_prologue
     +0x10  mv s2,a0 ; mv s4,a1
@@ -46,7 +46,6 @@ entered at slot 0 with `NINODE - 1` units of fuel.
    `wp_next_chain`).
 -/
 import Xv6.IgetScan
-import Xv6.SpecAcquire
 
 namespace Xv6
 
@@ -55,9 +54,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IcacheG GF]
@@ -121,13 +118,13 @@ theorem ig_enter (RH : RELEASE_HOOK) (PA : PANIC) (c cpu : CPU) (k : KCtx) (spie
   k_step (wp_s_auipc c _ (KA.«iget» + 0x22#64) false 0x1e#20 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_addi c _ (KA.«iget» + 0x26#64) false 3038#12 9#5 9#5 (by decide))
+  k_step (wp_s_addi c _ (KA.«iget» + 0x26#64) false 3690#12 9#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ig_s1_0]
   iintro Hk Hpc
-  k_step (wp_s_auipc c _ (KA.«iget» + 0x2a#64) false 0x1f#20 13#5 (by decide))
+  k_step (wp_s_auipc c _ (KA.«iget» + 0x2a#64) false 0x20#20 13#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_addi c _ (KA.«iget» + 0x2e#64) false 1638#12 13#5 13#5 (by decide))
+  k_step (wp_s_addi c _ (KA.«iget» + 0x2e#64) false 2290#12 13#5 13#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ig_a3_log]
   iintro Hk Hpc
   k_step (wp_s_j c _ (KA.«iget» + 0x32#64) true 18#21)
@@ -184,10 +181,10 @@ theorem iget_proof (AC : ACQUIRE) (RH : RELEASE_HOOK) (PA : PANIC) : IGET := ⟨
   k_step_gen (wp_s_auipc c3 _ (KA.«iget» + 0x14#64) false 0x1e#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c4 hp4
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c4 _ (KA.«iget» + 0x18#64) false 3028#12 10#5 10#5 (by decide))
+  k_step_gen (wp_s_addi c4 _ (KA.«iget» + 0x18#64) false 3680#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c5 hp5
   iintro Hk Hpc
-  k_step_gen (wp_s_jal c5 _ (KA.«iget» + 0x1c#64) false 2088092#21 1#5 (by decide))
+  k_step_gen (wp_s_jal c5 _ (KA.«iget» + 0x1c#64) false 2088072#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ig_br_acq] next c6 hp6
   iintro Hk Hpc
   ihave #Hlk := isItable2_lock $$ Hit

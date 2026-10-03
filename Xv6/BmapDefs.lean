@@ -38,7 +38,7 @@ any").  Three things hang off it:
    once over their own small contexts (Rocq's own reason for naming them:
    `set_solver` in a proof-mode context costs minutes).
 5. The callee wrappers `bread` / `brelse` / `log_write` are the shared
-   `Xv6.bread_call` / `Xv6.brelse_call` / `Xv6.log_write_gen_call`
+   `Xv6.bread_call_eb` / `Xv6.brelse_call` / `Xv6.log_write_gen_call`
    (`Xv6/FsCallSites.lean`; formerly `bm_bread` / `bm_brelse` /
    `bm_log_write_gen`, copies of BallocDefs').  `bm_balloc` and the view
    lemma `Xv6.bioView_eq_fsView` (a copy of `Xv6/BallocDefs.lean`'s
@@ -46,7 +46,6 @@ any").  Three things hang off it:
    stay here; promotion candidates.
 -/
 import Xv6.SpecBmap
-import Xv6.DinodeSlot
 import Xv6.BlkmapBuf
 import Xv6.BmapParts
 import MachCSL.WpSmodeFrame6c
@@ -57,9 +56,7 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## The kit and the ledger -/
 
@@ -69,7 +66,7 @@ def bmBmsset : Option BmAlloc → List Nat
   | some a => [a.baBms]
   | none => []
 
-/-- THE LEDGER CLAUSE, once (Rocq's `bm_ledger_ok`): `wp_bmap_gen`'s budget
+/-- THE LEDGER CLAUSE, once (Rocq's `bm_ledger_ok`): `wp_bmap_gen_body`'s budget
 conjunct with `bmapstart` replaced by `bmBmsset ak`. -/
 def bmLedgerOk (ak : Option BmAlloc) (cr : Bool) (bm bm' : Blkmap) (fbn : Nat) (n n' : Nat)
     (Sb Sb' : List Nat) : Prop :=
@@ -398,13 +395,6 @@ theorem bmPins_set (k : KCtx) (R : RegMap) (r : BitVec 5) (v : BitVec 64)
       | (rw [if_neg (Ne.symm n26)]; assumption)
       | (rw [if_neg (Ne.symm n27)]; assumption)
 
-theorem bmPins_cs (k : KCtx) (R R' : RegMap) (h : bmPins k R) (hcs : calleeSaved R R') :
-    bmPins k R' := by
-  obtain ⟨a21, a22, a23, a24, a25, a26, a27⟩ := h
-  obtain ⟨-, -, -, -, -, -, c21, c22, c23, c24, c25, c26, c27⟩ := hcs
-  exact ⟨c21.trans a21, c22.trans a22, c23.trans a23, c24.trans a24, c25.trans a25,
-    c26.trans a26, c27.trans a27⟩
-
 /-- The epilogue's `calleeSaved`: the frame restores `ra`, `s0`..`s3` and
 `sp`; `s4` was restored (or never written) and `s5..s11` never touched. -/
 theorem bm_calleeSaved_epi (KR R : RegMap) (v : BitVec 64) (h20 : R 20#5 = KR 20#5)
@@ -443,7 +433,7 @@ macro_rules
   | `(tactic| bm_step $rule:term from $code:term $ht:ident $$ $pat:specPat) =>
     `(tactic| bm_step $rule:term from $code:term $ht:ident $$ $pat:specPat with [])
   | `(tactic| bm_step $rule:term from $code:term $ht:ident $$ $pat:specPat with [$extra,*]) =>
-    `(tactic| (iapply $rule:term $$ $pat:specPat
+    `(tactic| (k_iapply $rule:term $$ $pat:specPat
                rotate_right 1
                k_code $code:term $ht:ident
                iframe #

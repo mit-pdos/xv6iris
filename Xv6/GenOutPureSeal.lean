@@ -11,16 +11,16 @@ Added (Rocq → Lean, the landed camelCase convention): `gstage0`,
 `lmD_pending_sess`, `lm_D_stage_prefix` → `lmD_stage_prefix`,
 `lm_E_disc_of_hist` → `lmEDisc_of_hist`, `lm_cs_len_ok_0` → `lmCsLenOk_0`,
 `lm_cs_len_ok_echo` → `lmCsLenOk_echo`, (sync SY3-A4, cc76f92ab/38bb72f5b)
-`lm_good_out_pad` → `lmGoodOutPad`, `lm_good_out_of_pad` → `lmGoodOut_of_pad`,
-`lm_good_out_pad_of_stage` → `lmGoodOutPad_of_stage` (Rocq main deleted
-`lm_good_out_of_stage`, which it replaces), `lm_good_out_step` → `lmGoodOut_step`,
-`lm_out_pure_0` → `lmOutPure_0`, `lm_pcount_echo` → `lmPcount_echo`,
+`lm_good_out_pad` → `lmGoodOutPad`, `lm_good_out_pad_of_stage` →
+`lmGoodOutPad_of_stage` (Rocq main deleted `lm_good_out_of_stage`, which it
+replaces), `lm_out_pure_0` → `lmOutPure_0`, `lm_pcount_echo` → `lmPcount_echo`,
 `lm_pending_nil_inv` → `lmPending_nil_inv`, `lm_pending_nonnil` →
 `lmPending_nonnil`, `lm_pending_ps_mono` → `lmPending_ps_mono`,
 `lm_pro_idx_ge` → `lmProIdx_ge`, `lm_pro_idx_le` → `lmProIdx_le`,
 `lm_pro_ok_pad` → `lmProOk_pad`, `lm_ps_len_ok_0` → `lmPsLenOk_0`,
 `lm_ps_len_ok_echo` → `lmPsLenOk_echo`, `lm_stage_sess_pad` →
-`lmStage_sess_pad`.
+`lmStage_sess_pad`.  `lm_good_out_of_pad` and `lm_good_out_step` are not
+ported (nothing uses them).
 
 The section's `(M) (L) (K) (B) (sd)` are Lean section variables in Rocq's
 order; the hooks `K` appear explicitly wherever the statement names them
@@ -292,12 +292,6 @@ def lmGoodOutPad (s : M.lmSt) (seg : List Obs) (cs : List Nat) : Prop :=
     ∧ lmAltsOk M s (consIns seg) (lmAltsPad M K (consIns seg) cs)
     ∧ obsWire .uart0 seg <+: lmSess M ps (lmAltsPad M K (consIns seg) cs) s (consIns seg)
 
-/-- Rocq `lm_good_out_of_pad`. -/
-theorem lmGoodOut_of_pad (s : M.lmSt) (seg : List Obs) (cs : List Nat)
-    (h : lmGoodOutPad M K s seg cs) : lmGoodOut M s seg := by
-  obtain ⟨ps, h1, h2, h3⟩ := h
-  exact ⟨ps, lmAltsPad M K (consIns seg) cs, h1, h2, h3⟩
-
 include K B in
 /-- Rocq `lm_good_out_pad_of_stage`: a stage below the wire gives the output
 claim at the resolution the stage names, the prologue padded with settled
@@ -327,29 +321,6 @@ theorem lmGoodOutPad_of_stage (ps cs : List Nat) (s : M.lmSt) (E : List (List Ob
       exact ⟨[], by rw [List.append_nil]; exact e⟩
     · exact List.nil_prefix
   exact (lmD_stage_prefix M B _ _ s E w hE hw').trans (lmSess_mono M _ _ s _ _ hinp)
-
-include K B in
-/-- Rocq `lm_good_out_step`: an event that puts nothing on the wire keeps the
-output claim. -/
-theorem lmGoodOut_step (s : M.lmSt) (seg : List Obs) (e : Obs) (he : obsWire .uart0 [e] = [])
-    (h : lmGoodOut M s seg) : lmGoodOut M s (seg ++ [e]) := by
-  obtain ⟨ps, cs, ⟨hpsb, hlt⟩, hao, hwire⟩ := h
-  have hII : consIns seg <+: consIns (seg ++ [e]) := by
-    rw [consIns_app]; exact List.prefix_append _ _
-  have hlen := lmAltsOk_len M s _ _ hao
-  have hnl := nlines_prefix _ _ hII
-  refine ⟨ps, lmAltsPad M K (consIns (seg ++ [e])) cs, ⟨hpsb, ?_⟩,
-    lmAltsPad_ok M K s _ cs (lmAltsPre_mono M s _ _ cs hII (lmAltsPre_of_altsOk M s _ cs hao)), ?_⟩
-  · rw [lmAltsPad_pro_idx M K B _ cs _ (Nat.le_refl _),
-      lmProIdx_ge M B cs (nlines (consIns seg)) _ (by omega) hnl]
-    exact hlt
-  · show obsWire .uart0 (seg ++ [e]) <+: _
-    rw [obsWire_app, he, List.append_nil]
-    have hcut : lmSess M ps cs s (consIns seg)
-        = lmSess M ps (lmAltsPad M K (consIns (seg ++ [e])) cs) s (consIns seg) :=
-      lmSess_cs_ext M ps _ _ s _ (fun j hj => (lmAltsPad_lt M K _ cs j (by omega)).symm)
-    rw [hcut] at hwire
-    exact hwire.trans (lmSess_mono M _ _ s _ _ hII)
 
 include B in
 /-- Rocq `lm_stage_sess_pad`: the stage, read at the padded choice list. -/

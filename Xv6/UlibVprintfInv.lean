@@ -175,19 +175,6 @@ theorem ulibZ_eq (c : BitVec 8) (k : Nat) (h : c.toNat = k) : c.zeroExtend 64 = 
   have := c.isLt
   omega
 
-/-- A loaded byte minus a constant is nonzero (`addi a0,a1,-k; bnez a0`). -/
-theorem ulibZsub_ne (c : BitVec 8) (k : Nat) (imm : BitVec 12) (hk : k < 256)
-    (himm : BitVec.signExtend 64 imm = 0#64 - BitVec.ofNat 64 k) (h : c.toNat ≠ k) :
-    (c.zeroExtend 64 + BitVec.signExtend 64 imm != 0#64) = true := by
-  rw [himm]
-  simp only [bne_iff_ne, ne_eq]
-  intro e
-  have := congrArg BitVec.toNat e
-  have hc := c.isLt
-  rw [BitVec.toNat_add, BitVec.toNat_sub, ulibZext_toNat, BitVec.toNat_ofNat] at this
-  simp at this
-  omega
-
 /-- A loaded non-NUL byte is nonzero. -/
 theorem ulibZ_beq0 (c : BitVec 8) (h : c ≠ ubyte0) : (c.zeroExtend 64 == 0#64) = false := by
   simp only [beq_eq_false_iff_ne, ne_eq]

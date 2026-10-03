@@ -46,8 +46,6 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
-
 /-- **Rocq `ush_fd1pipe`**: the child's fd 1 is the WRITE end of THIS
 pipe. -/
 def ushFd1pipe (γp : PipeNames) (l : List FdState) : Prop :=

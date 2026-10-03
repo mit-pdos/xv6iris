@@ -23,7 +23,6 @@ for those two CSR rows.  The model is now regenerated with the fix,
 -/
 import Xv6.SpecUser
 import Xv6.UserStep
-import Xv6.UserFetchXlate
 import Xv6.UserMemArms
 
 namespace Xv6

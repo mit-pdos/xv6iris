@@ -17,7 +17,6 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
@@ -27,9 +26,6 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 /-- The two `auipc` constants. -/
 theorem pki_u6 : BitVec.signExtend 64 (6#20 ++ 0#12) = 0x6000#64 := by decide
 theorem pki_u12 : BitVec.signExtend 64 (0x12#20 ++ 0#12) = 0x12000#64 := by decide
-
-/-- `&pr.lock`, as the two address instructions compute it. -/
-theorem pki_prLock : prLock = KA.«pr» := rfl
 
 /-- `ret` out of `initlock` lands on the instruction after the `jal`. -/
 theorem pki_ret_086a : jumpPc (KA.«printkinit» + 0x1c#64) = (KA.«printkinit» + 0x1c#64) := by
@@ -101,7 +97,7 @@ theorem printkinit_finish [CurCtx] (cpu c : CPU) (k : KCtx)
 
 theorem printkinit_br_366 : KA.«printkinit» + 0x366#64 = KA.«initlock» := by decide
 
-theorem printkinit_br_11bb6 : KA.«printkinit» + 0x11bb6#64 = KA.«pr» := by decide
+theorem printkinit_br_11c56 : KA.«printkinit» + 0x11c56#64 = KA.«pr» := by decide
 
 theorem printkinit_br_67b6 : KA.«printkinit» + 0x67b6#64 = KStr.«pr» := by decide
 
@@ -132,8 +128,8 @@ theorem printkinit_proof (IL : INITLOCK) : PRINTKINIT :=
   k_step_gen (wp_s_auipc c3 _ (KA.«printkinit» + 0x10#64) false 0x12#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pki_u12] next c4 hp4
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c4 _ (KA.«printkinit» + 0x14#64) false 2982#12 10#5 10#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [printkinit_br_11bb6] next c5 hp5
+  k_step_gen (wp_s_addi c4 _ (KA.«printkinit» + 0x14#64) false 3142#12 10#5 10#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [printkinit_br_11c56] next c5 hp5
   iintro Hk Hpc
   -- jal ra, initlock
   k_step_gen (wp_s_jal c5 _ (KA.«printkinit» + 0x18#64) false 846#21 1#5 (by decide))

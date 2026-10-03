@@ -14,8 +14,6 @@ namespace Xv6
 
 open Iris Iris.BI MachCSL
 
-set_option linter.unusedSectionVars false
-
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGpreS hlc GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [FileAppG GF] [FileOutG GF] [PipeOutG GF]
@@ -56,10 +54,6 @@ theorem appUnion_pred_era (ug : UnionGn) :
 theorem appUnion_boot_era (ug : UnionGn) :
     unionBoot (hlc := hlc) (GF := GF) ug = (appUnion (hlc := hlc) (GF := GF)).boot ug :=
   preGS_transport (fun M' : MachGS hlc GF => letI := M'; unionBoot (hlc := hlc) (GF := GF) ug) M rfl hmono
-
-theorem appUnion_turn_era (ug : UnionGn) :
-    uturn (GF := GF) ug = (appUnion (hlc := hlc) (GF := GF)).turn ug :=
-  preGS_transport (fun M' : MachGS hlc GF => letI := M'; uturn (GF := GF) ug) M rfl hmono
 
 /-- the era's turn as `<init>` is handed it (Rocq `app_iturn`, SY3-A3bc) -/
 theorem appUnion_iturn_era (ug : UnionGn) :

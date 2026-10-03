@@ -16,8 +16,7 @@ pin that MISSES; the two SPEC-TIGHTEN legs are no longer premises; and
 
 ## Ported (reached from `union_adequacy_closed`)
 
-`init_cons_pl`, `init_cons_path_elems`, `init_cons_pl_len`,
-`cons_pin_resolves_at`, `cons_pin_misses_at`, `init_cons_npar_elems`,
+`init_cons_pl`, `init_cons_path_elems`, `cons_pin_resolves_at`, `cons_pin_misses_at`, `init_cons_npar_elems`,
 `init_cons_npar_len`, `init_cons_np_elems`, `init_cons_start`,
 `init_cons_last`, `init_cons_open_bundle`, `init_cons_open_bundle_rdwr`,
 `init_cons_recv`, `init_cons_pin_law`, `init_cons_abs_law`, `init_mk_Farm`,
@@ -50,7 +49,7 @@ dischargers: the union's era is the FILE application's, `UInitConsFile`).
    `M : Nat → List (BitVec 8)`, `SpecSysOpen`/`SpecSysMknod` deviations);
    `-1` is `0xFFFFFFFFFFFFFFFF#64`; `<[fd := st]> sts` is `sts.set fd st`.
 2. `init_cons_pl` is `FsConsPin.fnameConsole` (Rocq's own definition), so
-   `init_cons_pl_len` is `rfl`.
+   Rocq's `init_cons_pl_len` is `rfl` here, and not stated.
 3. Lean's `mknodAuAt` carries the parent cursor under the syscall's guard
    (`SysMknodDefs.nparCur`, TL-3K) in the commit: the parent leg reads it
    back at `init_cons_pl` (`nparCur_elim`) where Rocq reads `P` directly.
@@ -68,8 +67,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-! ## §1  THE PATH /init PASSES, as a byte list -/
 
 /-- **Rocq `init_cons_pl`** (deviation 2): the path is spelled AS the name. -/
@@ -78,21 +75,27 @@ abbrev initConsPl : List (BitVec 8) := fnameConsole
 /-- **Rocq `init_cons_path_elems`**. -/
 theorem init_cons_path_elems : pathElems initConsPl = consPath := by decide
 
-/-- **Rocq `init_cons_pl_len`**. -/
-theorem init_cons_pl_len : initConsPl.length = 7 := rfl
+/-- **Rocq `init_cons_pl_rel`**: the path is RELATIVE, so the walk starts at
+the cwd at EVERY root. -/
+theorem init_cons_pl_rel : initConsPl[0]? ≠ some SLASH := by decide
 
-/-- **Rocq `init_cons_start`**: init's cwd IS the root and its path is
-relative, so both arms of the start rule agree. -/
-theorem init_cons_start : umStartOf ROOTINO initConsPl = ROOTINO := by
-  unfold umStartOf; split <;> rfl
+/-- **Rocq `init_cons_pl_nodot`**. -/
+theorem init_cons_pl_nodot : pathNodot initConsPl := by
+  show ∀ s ∈ pathElems initConsPl, s ≠ DOTDOT
+  rw [init_cons_path_elems]; decide
+
+/-- **Rocq `init_cons_start`**: init's path is relative, so the walk starts
+at its cwd -- the root -- at EVERY process root. -/
+theorem init_cons_start (rt : Nat) : umStartOf rt ROOTINO initConsPl = ROOTINO :=
+  umStartOf_rel rt ROOTINO initConsPl init_cons_pl_rel
 
 /-! ## §2  THE PIN RESOLVES, at init's cwd; §2b THE PIN THAT MISSES -/
 
 /-- **Rocq `cons_pin_resolves_at`**: `PinnedObs.pinResolvesAt` at the
 console's PRESENT state -- all three conjuncts are `consPresentAt`'s own. -/
-theorem cons_pin_resolves_at (i : Nat) :
-    pinResolvesAt (consPresentAt i) ROOTINO initConsPl [ROOTINO, i] i consDev := by
-  refine ⟨init_cons_start, ?_, ?_⟩
+theorem cons_pin_resolves_at (rt i : Nat) :
+    pinResolvesAt (consPresentAt i) rt ROOTINO initConsPl [ROOTINO, i] i consDev := by
+  refine ⟨init_cons_start rt, ?_, ?_, init_cons_pl_nodot⟩
   · rw [init_cons_path_elems]; rfl
   · intro v hv
     rw [init_cons_path_elems]
@@ -100,8 +103,8 @@ theorem cons_pin_resolves_at (i : Nat) :
 
 /-- **Rocq `cons_pin_misses_at`**: at the ABSENT state `console` is not an
 entry of the root -- `consAbsent` verbatim. -/
-theorem cons_pin_misses_at : pinMissesAt consAbsent ROOTINO initConsPl ROOTINO := by
-  refine ⟨init_cons_start, ?_⟩
+theorem cons_pin_misses_at (rt : Nat) : pinMissesAt consAbsent rt ROOTINO initConsPl ROOTINO := by
+  refine ⟨init_cons_start rt, ?_, init_cons_pl_nodot⟩
   intro v s habs hs
   rw [init_cons_path_elems] at hs
   unfold consPath at hs
@@ -311,7 +314,7 @@ theorem initCons_fsGammaL_top (γfs : FsNames) :
 
 /-- **Rocq `init_cons_open_bundle`**: `PinnedOpen.pinned_open_bundle` at the
 console pin, the claim law a premise. -/
-theorem init_cons_open_bundle (γfs : FsNames) (T : IProp GF) [Persistent T] [Timeless T] (i : Nat)
+theorem init_cons_open_bundle (γfs : FsNames) (rt : Nat) (T : IProp GF) [Persistent T] [Timeless T] (i : Nat)
     (M : Nat → List (BitVec 8)) (pv : Nat) (vom : BitVec 64)
     (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF))
     (Farm Fun : Pfam GF (Aview → Nat → IProp GF))
@@ -320,14 +323,14 @@ theorem init_cons_open_bundle (γfs : FsNames) (T : IProp GF) [Persistent T] [Ti
     ⊢ iprop(□ ∀ v : Aview, appPred appRun v -∗ appPred appRun v ∗ (⌜consPresentAt i v⌝ ∨ T)) -∗
       appInv (hlc := hlc) γfs -∗
       openTruncPiece (hlc := hlc) (fsGammaL γfs) vom (truncTermArg M pv (pobsP T [ROOTINO, i])) Ft -∗
-      openIn (hlc := hlc) (fsGammaL γfs) γfs ROOTINO M pv vom (pobsP T [ROOTINO, i]) (pobsPmiss T) Farm Fun
+      openIn (hlc := hlc) (fsGammaL γfs) γfs rt ROOTINO M pv vom (pobsP T [ROOTINO, i]) (pobsPmiss T) Farm Fun
         Fok Fex (pobsFo (consPresentAt i) T) Ft :=
-  pinned_open_bundle γfs (consPresentAt i) T ROOTINO initConsPl [ROOTINO, i] i consDev M pv vom Ft
-    Farm Fun Fok Fex hcr (cons_pin_resolves_at i) hpath
+  pinned_open_bundle γfs (consPresentAt i) T rt ROOTINO initConsPl [ROOTINO, i] i consDev M pv vom Ft
+    Farm Fun Fok Fex hcr (cons_pin_resolves_at rt i) hpath
 
 /-- **Rocq `init_cons_open_bundle_rdwr`**: ...AT INIT'S OWN OMODE (O_RDWR),
 where the bundle is the pin and nothing else. -/
-theorem init_cons_open_bundle_rdwr (γfs : FsNames) (T : IProp GF) [Persistent T] [Timeless T] (i : Nat)
+theorem init_cons_open_bundle_rdwr (γfs : FsNames) (rt : Nat) (T : IProp GF) [Persistent T] [Timeless T] (i : Nat)
     (M : Nat → List (BitVec 8)) (pv : Nat) (vom : BitVec 64)
     (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF))
     (Farm Fun : Pfam GF (Aview → Nat → IProp GF))
@@ -335,36 +338,36 @@ theorem init_cons_open_bundle_rdwr (γfs : FsNames) (T : IProp GF) [Persistent T
     (hom : omArg vom = 2) (hpath : argPathOf M pv initConsPl) :
     ⊢ iprop(□ ∀ v : Aview, appPred appRun v -∗ appPred appRun v ∗ (⌜consPresentAt i v⌝ ∨ T)) -∗
       appInv (hlc := hlc) γfs -∗
-      openIn (hlc := hlc) (fsGammaL γfs) γfs ROOTINO M pv vom (pobsP T [ROOTINO, i]) (pobsPmiss T) Farm Fun
+      openIn (hlc := hlc) (fsGammaL γfs) γfs rt ROOTINO M pv vom (pobsP T [ROOTINO, i]) (pobsPmiss T) Farm Fun
         Fok Fex (pobsFo (consPresentAt i) T) Ft := by
   obtain ⟨hcr, htr⟩ := omRdwr_plain vom hom
   iintro #Hcl #Hinv
-  iapply (init_cons_open_bundle γfs T i M pv vom Ft Farm Fun Fok Fex hcr hpath) $$ Hcl Hinv
+  iapply (init_cons_open_bundle γfs rt T i M pv vom Ft Farm Fun Fok Fex hcr hpath) $$ Hcl Hinv
   iapply (openTruncPiece_none (hlc := hlc) (fsGammaL γfs) vom _ Ft htr)
 
 /-- **Rocq `init_cons_recv`**: THE RECEIPT, READ -- the call failed and
 nothing moved, or fd is the CONSOLE device (with the truncation piece
 unfired), or the taint. -/
-theorem init_cons_recv (γfs : FsNames) (T : IProp GF) [Persistent T] [Timeless T] (i : Nat)
+theorem init_cons_recv (γfs : FsNames) (rt : Nat) (T : IProp GF) [Persistent T] [Timeless T] (i : Nat)
     (M : Nat → List (BitVec 8)) (pv : Nat) (vom : BitVec 64)
     (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF))
     (sts : List FdState) (r : BitVec 64) (fdv' : List FdState)
     (hpath : argPathOf M pv initConsPl) (htr : omTrunc vom = false) :
-    ⊢ openReceiptPlain (hlc := hlc) .parked (fsGammaL γfs) γfs ROOTINO M pv vom (pobsP T [ROOTINO, i])
+    ⊢ openReceiptPlain (hlc := hlc) .parked (fsGammaL γfs) γfs rt ROOTINO M pv vom (pobsP T [ROOTINO, i])
         (pobsPmiss T) (pobsFo (consPresentAt i) T) Ft sts r fdv' -∗
       iprop((⌜r = 0xFFFFFFFFFFFFFFFF#64⌝ ∗ ⌜fdv' = sts⌝) ∨
         (⌜openFdRcpt (omReadable vom) (omWritable vom) (.device CONSOLE) sts r fdv'⌝ ∗
           openTruncAt (hlc := hlc) (fsGammaL γfs) vom i Ft) ∨
         T) :=
-  pinned_open_dev γfs .parked (consPresentAt i) T ROOTINO initConsPl [ROOTINO, i] i CONSOLE 0 1 M pv vom
-    Ft sts r fdv' (cons_pin_resolves_at i) hpath htr
+  pinned_open_dev γfs .parked (consPresentAt i) T rt ROOTINO initConsPl [ROOTINO, i] i CONSOLE 0 1 M pv vom
+    Ft sts r fdv' (cons_pin_resolves_at rt i) hpath htr
 
 /-- **Rocq `init_cons_mknod_bundle`**: THE MKNOD BUNDLE, PROVED from the
 eight laws (a)-(h): the walk (no hop), the parent leg (the console's own
 create moves the claim ABSENT → PRESENT and shoots the flag; any other
 create keeps the key), the free exists observation, the arm leg (mints the
 permit) and the unarm leg (spends it). -/
-theorem init_cons_mknod_bundle (γfs : FsNames) (Pure : Aview → Prop) (Made : Nat → IProp GF)
+theorem init_cons_mknod_bundle (γfs : FsNames) (rt : Nat) (Pure : Aview → Prop) (Made : Nat → IProp GF)
     (Pv : Aview → Prop) (T K : IProp GF) [Persistent T] [Timeless T] [Timeless K]
     [HTL : ∀ v : Aview, Timeless (appPred (GF := GF) appRun v)]
     (M : Nat → List (BitVec 8)) (pv : Nat) (hpath : argPathOf M pv initConsPl) :
@@ -387,7 +390,7 @@ theorem init_cons_mknod_bundle (γfs : FsNames) (Pure : Aview → Prop) (Made : 
       iprop(□ (∀ (av : Aview) (i : Nat), ⌜consPresentAt i av⌝ -∗
         appPred appRun av ==∗ appPred appRun av ∗ (Made i ∨ T))) -∗
       appInv (hlc := hlc) γfs -∗ K -∗
-      mknodAuAt (hlc := hlc) (fsGammaL γfs) γfs ROOTINO M pv CONSOLE 0 (initMkP T)
+      mknodAuAt (hlc := hlc) (fsGammaL γfs) γfs rt ROOTINO M pv CONSOLE 0 (initMkP T)
         (fun _ _ => iprop(True)) (initMkFarm Pure Pv T K) (initMkFun T K) (initMkFok Made T K) initMkFex := by
   iintro #Hsup #Hpure #Habs #Harml #Hunl #Hmk #Hoth #Hshoot #Hinv HK
   unfold mknodAuAt
@@ -402,7 +405,7 @@ theorem init_cons_mknod_bundle (γfs : FsNames) (Pure : Aview → Prop) (Made : 
     isplitr
     · unfold initMkP
       ileft; ipureintro
-      exact ⟨rfl, by rw [hr0, init_cons_start]⟩
+      exact ⟨rfl, by rw [hr0, (init_cons_start rt)]⟩
     · unfold epHopsFrom axHopsFrom
       rw [init_cons_np_elems]
       exact BigSepL.bigSepL_nil_intro
@@ -642,10 +645,10 @@ theorem init_cons_mknod_recv (γfs : FsNames) (Pure : Aview → Prop) (Made : Na
 /-- **Rocq `init_cons_mknod_fail_recv`**: ...AND ON FAILURE: no step and no
 flag, but THE KEY COMES BACK (the arm piece's refund, or the unarm's
 receipt). -/
-theorem init_cons_mknod_fail_recv (γfs : FsNames) (Pure : Aview → Prop) (Made : Nat → IProp GF)
+theorem init_cons_mknod_fail_recv (γfs : FsNames) (rt : Nat) (Pure : Aview → Prop) (Made : Nat → IProp GF)
     (Pv : Aview → Prop) (T K : IProp GF) (Pmiss : Nat → Nat → IProp GF) (M : Nat → List (BitVec 8))
     (pv : Nat) :
-    ⊢ mknodPostFail (hlc := hlc) (fsGammaL γfs) γfs ROOTINO M pv CONSOLE 0 (initMkP T) Pmiss
+    ⊢ mknodPostFail (hlc := hlc) (fsGammaL γfs) γfs rt ROOTINO M pv CONSOLE 0 (initMkP T) Pmiss
         (initMkFarm Pure Pv T K) (initMkFun T K) (initMkFok Made T K) initMkFex -∗ iprop(K ∨ T) := by
   unfold mknodPostFail mknodAuAt creChildUnfiredNd
   iintro (⟨-, -, -, Harm, -⟩ | ⟨%pl, %_hpl, Hf⟩)
@@ -665,22 +668,22 @@ theorem init_cons_mknod_fail_recv (γfs : FsNames) (Pure : Aview → Prop) (Made
 
 /-- **Rocq `init_cons_laws_mknod_bundle`**: law (g) WEAKENS to the names the
 syscall can reach. -/
-theorem init_cons_laws_mknod_bundle (γfs : FsNames) (Pure : Aview → Prop) (Made : Nat → IProp GF)
+theorem init_cons_laws_mknod_bundle (γfs : FsNames) (rt : Nat) (Pure : Aview → Prop) (Made : Nat → IProp GF)
     (Pv : Aview → Prop) (T K : IProp GF) [Persistent T] [Timeless T] [Timeless K]
     [HTL : ∀ v : Aview, Timeless (appPred (GF := GF) appRun v)]
     (M : Nat → List (BitVec 8)) (pv : Nat) (hpath : argPathOf M pv initConsPl) :
     ⊢ initConsLawsAt Pure Made Pv T K -∗ appInv (hlc := hlc) γfs -∗ K -∗
-      mknodAuAt (hlc := hlc) (fsGammaL γfs) γfs ROOTINO M pv CONSOLE 0 (initMkP T)
+      mknodAuAt (hlc := hlc) (fsGammaL γfs) γfs rt ROOTINO M pv CONSOLE 0 (initMkP T)
         (fun _ _ => iprop(True)) (initMkFarm Pure Pv T K) (initMkFun T K) (initMkFok Made T K) initMkFex := by
   unfold initConsLawsAt
   iintro ⟨#Ha, #Hb, #Hc, #Hd, #He, #Hf, #Hg, #Hh, -⟩ #Hinv HK
-  iapply (init_cons_mknod_bundle γfs Pure Made Pv T K M pv hpath) $$ Ha Hb Hc Hd He Hf [] Hh Hinv HK
+  iapply (init_cons_mknod_bundle γfs rt Pure Made Pv T K M pv hpath) $$ Ha Hb Hc Hd He Hf [] Hh Hinv HK
   iintro !> %av %d %nmn %ents %nl %i %hpre %_hnmc %hd Hp
   iapply Hg $$ %av %d %nmn %ents %nl %i %hpre %(Or.inl hd) %(Or.inl hd) Hp
 
 /-- **Rocq `init_cons_laws_open_console`**: the SECOND open, at the resolving
 pin -- law (i) spends the flag once and hands back the `□` pin law. -/
-theorem init_cons_laws_open_console (γfs : FsNames) (Pure : Aview → Prop) (Made : Nat → IProp GF)
+theorem init_cons_laws_open_console (γfs : FsNames) (rt : Nat) (Pure : Aview → Prop) (Made : Nat → IProp GF)
     (Pv : Aview → Prop) (T K : IProp GF) [Persistent T] [Timeless T] (i : Nat)
     (M : Nat → List (BitVec 8)) (pv : Nat) (vom : BitVec 64)
     (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF))
@@ -688,12 +691,12 @@ theorem init_cons_laws_open_console (γfs : FsNames) (Pure : Aview → Prop) (Ma
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
     (hom : omArg vom = 2) (hpath : argPathOf M pv initConsPl) :
     ⊢ initConsLawsAt Pure Made Pv T K -∗ Made i -∗ appInv (hlc := hlc) γfs -∗
-      openIn (hlc := hlc) (fsGammaL γfs) γfs ROOTINO M pv vom (pobsP T [ROOTINO, i]) (pobsPmiss T) Farm Fun
+      openIn (hlc := hlc) (fsGammaL γfs) γfs rt ROOTINO M pv vom (pobsP T [ROOTINO, i]) (pobsPmiss T) Farm Fun
         Fok Fex (pobsFo (consPresentAt i) T) Ft := by
   unfold initConsLawsAt
   iintro ⟨-, -, -, -, -, -, -, -, #Hi⟩ Hm #Hinv
   ihave #Hcl := Hi $$ %i Hm
-  iapply (init_cons_open_bundle_rdwr γfs T i M pv vom Ft Farm Fun Fok Fex hom hpath) $$ Hcl Hinv
+  iapply (init_cons_open_bundle_rdwr γfs rt T i M pv vom Ft Farm Fun Fok Fex hom hpath) $$ Hcl Hinv
 
 end UInitCons
 

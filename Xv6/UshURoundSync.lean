@@ -33,10 +33,7 @@ PORTED: `ulines_in_last`, `usync_q`, `usync_ran_pay`, `usync_lend`,
    `UshExecPin.shExecSupXOfEntry` at the plain ledger.
 -/
 import Xv6.UshURoundEcho
-import Xv6.UshURoundCat
-import Xv6.UshSync
 import Xv6.UkSyncEntry
-import Xv6.UshOomPaid
 import Xv6.AppFileHook
 
 namespace Xv6
@@ -45,7 +42,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Std (ExtTreeSet)
 open Ualt
 
-set_option linter.unusedSectionVars false
 set_option synthInstance.maxSize 1024
 
 section UShURoundSync

@@ -62,7 +62,7 @@ and exactly the map `LogSnapLaw.snapLawOut` names.
   `Corpse` (`col_corpse_no_ops`, `col_slot_unfrozen`) and `PoolWitness`
   (`reg_full_no_pool_half`) sections -- uses checked: none in code (they
   are the machine-checked RECORD of residues (E)/(F)/(G), which the landed
-  `iregCpin_no_ops` / `iregFsh_no_ops` / `ipoolQuiesceAcc` now close).
+  `iregCpin_no_ops` / `ipoolQuiesceAcc` now close).
 -/
 import Xv6.FsStateEraRes
 import Xv6.InodeRegionInv
@@ -72,8 +72,6 @@ import Xv6.FsDurXferRuns
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
-
-set_option linter.unusedSectionVars false
 
 /-! ## 1.  THE BLOCK READING OF THE LOGGED VIEW -/
 

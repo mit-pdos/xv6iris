@@ -20,8 +20,8 @@ CONE: the bullets of `uHchild_redir` (Rocq inline; no Rocq names).
    name `uWcl` and at `unionLinks` is `uredir_diag_at` (a term-mode
    conversion: the record's `lkLcred`/`lkLinks` are `uWcl`/`unionLinks` by
    `rfl`, as `UshURoundWide.uPanic_file`).
-2. Rocq's `uexecfail_law_at_wand` is used for the exec-failed law; the
-   open-failed law opens the goal at the caller's `N l` and uses
+2. Rocq's `uexecfail_law_at_wand` (the exec-failed law's) is not ported
+   (nothing uses it); the open-failed law opens the goal at the caller's `N l` and uses
    `uexecfail_law_at_use` (the same body at one call, Rocq's inline
    `iDestruct ("Hx" $! N l …)`).  The tainted `-1` arm is read at
    `Hold := T` (Rocq: `emp`).
@@ -30,7 +30,6 @@ CONE: the bullets of `uHchild_redir` (Rocq inline; no Rocq names).
    of the era's pin off the lend).
 -/
 import Xv6.UshURoundRedirSup
-import Xv6.UshURoundEcho
 
 namespace Xv6
 
@@ -38,7 +37,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Std (ExtTreeSet)
 open HfpFileClaimsP
 
-set_option linter.unusedSectionVars false
 set_option synthInstance.maxSize 1024
 
 section UShURoundRedirDiag

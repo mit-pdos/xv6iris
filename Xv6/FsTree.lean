@@ -46,10 +46,6 @@ kept because the reasons are the content:
 > dirlink, which refuses a present name under the directory lock.  Under
 > the invariant `dirView` is the exact ANY-match map (`dirView_live`) and
 > record-zeroing commutes with `erase` (`dirView_zero`).
->
-> THE ONE REAL PROOF OBLIGATION.  `nodeRep_inj`: the tree is a FUNCTION of
-> the bytes.  Proved in its sharpest form -- `nodeRep_nodeOf`, "any node
-> representing (dn, data) IS `nodeOf dn data`".
 
 Pure: no proof mode, nothing in `IProp`.
 
@@ -389,10 +385,6 @@ def dirZeroedAt (data data' : Nat → List (BitVec 8)) (k0 : Nat) : Prop :=
   ∧ (∀ q, q ≠ k0 → dirInum data' q = dirInum data q)
   ∧ (∀ q, q ≠ k0 → dirBname data' q = dirBname data q)
 
-theorem dirZeroed_dead (data data' : Nat → List (BitVec 8)) (k0 : Nat) :
-    dirZeroedAt data data' k0 → ¬ dirLive data' k0 :=
-  fun h hl => hl h.1
-
 /-- uniqueness is preserved trivially: zeroing only REMOVES a live name -/
 theorem dirNamesUnique_zero (data data' : Nat → List (BitVec 8)) (nrec k0 : Nat) :
     dirZeroedAt data data' k0 → dirNamesUnique data nrec → dirNamesUnique data' nrec := by
@@ -474,87 +466,11 @@ theorem fileBytes_lookup (data : Nat → List (BitVec 8)) (sz k : Nat) (hk : k <
   exact getElem!_of_getElem? h
 
 /-- THE READING, AND IT IS A FUNCTION.  `nodeOf` is bytes -> tree spelled
-out; `nodeRep` is the relation, which exists so that a resource can carry
-it as a pure conjunct without committing to the `decide`. -/
+out. -/
 def nodeOf (dn : Dinode) (data : Nat → List (BitVec 8)) : Fsnode :=
   if dn.diType.toNat = T_DIR_z
   then .NDir (dirView data (dirNrec dn.diSize.toNat))
   else .NFile (fileBytes data dn.diSize.toNat)
-
-/-- `nodeRep n dn data`: the abstract node `n` IS what the on-disk record
-`dn` and the payload bytes `data` say.
-
-THE NDir CASE CARRIES `dirNamesUnique` (R2): it is exactly the premise
-`dirView_zero` needs, and a directory that has lost it is not a directory
-this layer can talk about at all.
-
-A node is ALLOCATED by construction: `NFile` demands a nonzero type, so a
-free record represents no node and the tree never contains one. -/
-def nodeRep (n : Fsnode) (dn : Dinode) (data : Nat → List (BitVec 8)) : Prop :=
-  match n with
-  | .NFile bs =>
-      dn.diType.toNat ≠ 0 ∧ dn.diType.toNat ≠ T_DIR_z ∧ bs = fileBytes data dn.diSize.toNat
-  | .NDir ents =>
-      dn.diType.toNat = T_DIR_z
-      ∧ dirNamesUnique data (dirNrec dn.diSize.toNat)
-      ∧ ents = dirView data (dirNrec dn.diSize.toNat)
-
-theorem nodeRep_of (dn : Dinode) (data : Nat → List (BitVec 8)) :
-    dn.diType.toNat ≠ 0 → dirNamesUnique data (dirNrec dn.diSize.toNat) →
-    nodeRep (nodeOf dn data) dn data := by
-  intro hnz hu
-  unfold nodeOf
-  by_cases hd : dn.diType.toNat = T_DIR_z
-  · rw [if_pos hd]; exact ⟨hd, hu, rfl⟩
-  · rw [if_neg hd]; exact ⟨hnz, hd, rfl⟩
-
-/-- **THE SHARP FORM OF F1's ONE PROOF OBLIGATION.**  Any node representing
-`(dn, data)` IS `nodeOf dn data` -- bytes determine the tree. -/
-theorem nodeRep_nodeOf (n : Fsnode) (dn : Dinode) (data : Nat → List (BitVec 8)) :
-    nodeRep n dn data → n = nodeOf dn data := by
-  cases n with
-  | NFile bs =>
-    rintro ⟨_, hnd, rfl⟩; unfold nodeOf; rw [if_neg hnd]
-  | NDir ents =>
-    rintro ⟨hd, _, rfl⟩; unfold nodeOf; rw [if_pos hd]
-
-/-- ...and its determinacy corollary: this is what makes `FsRep.fs_rep` a
-function of the resources rather than a relation. -/
-theorem nodeRep_inj (n1 n2 : Fsnode) (dn : Dinode) (data : Nat → List (BitVec 8)) :
-    nodeRep n1 dn data → nodeRep n2 dn data → n1 = n2 := by
-  intro h1 h2
-  rw [nodeRep_nodeOf n1 dn data h1, nodeRep_nodeOf n2 dn data h2]
-
-/-- the node's type, read back off the representation -/
-theorem nodeRep_dir (ents : Std.ExtTreeMap Fname Nat compare) (dn : Dinode)
-    (data : Nat → List (BitVec 8)) :
-    nodeRep (.NDir ents) dn data → dn.diType.toNat = T_DIR_z :=
-  fun h => h.1
-
-theorem nodeRep_alloc (n : Fsnode) (dn : Dinode) (data : Nat → List (BitVec 8)) :
-    nodeRep n dn data → dn.diType.toNat ≠ 0 := by
-  cases n with
-  | NFile bs => exact fun h => h.1
-  | NDir ents => intro h; rw [h.1]; decide
-
-/-- THE ENTRY BRIDGE: a name in `ents` IS a live record of the bytes, at the
-index dirlookup stops on. -/
-theorem nodeRep_ent (ents : Std.ExtTreeMap Fname Nat compare) (dn : Dinode)
-    (data : Nat → List (BitVec 8)) (s : Fname) (z : Nat) :
-    nodeRep (.NDir ents) dn data → ents[s]? = some z →
-    ∃ k, dirFirst data (dirNrec dn.diSize.toNat) s = some k ∧ dirLive data k
-      ∧ dirBname data k = s ∧ (dirInum data k).toNat = z := by
-  rintro ⟨_, _, rfl⟩ h
-  obtain ⟨k, hk, hz⟩ := (dirView_lookup_Some _ _ _ _).mp h
-  exact ⟨k, hk, dirFirst_live _ _ _ _ hk, dirFirst_name _ _ _ _ hk, hz⟩
-
-/-- ...and back: under the invariant every live record IS an entry -/
-theorem nodeRep_ent_of (ents : Std.ExtTreeMap Fname Nat compare) (dn : Dinode)
-    (data : Nat → List (BitVec 8)) (k : Nat) :
-    nodeRep (.NDir ents) dn data → k < dirNrec dn.diSize.toNat → dirLive data k →
-    ents[dirBname data k]? = some (dirInum data k).toNat := by
-  rintro ⟨_, hu, rfl⟩ hk hl
-  exact dirView_live data _ k hu hk hl
 
 /-! ## 7.  PATHS -/
 
@@ -592,57 +508,8 @@ theorem pathAt_cons (t : Fstree) (i : Nat) (f : Fname) (p : List Fname) :
   | some j => rfl
   | none => exact pathStep_none t p
 
-theorem pathAt_app (t : Fstree) (i : Nat) (p q : List Fname) :
-    pathAt t i (p ++ q) = match pathAt t i p with
-      | some j => pathAt t j q
-      | none => none := by
-  induction p generalizing i with
-  | nil => rfl
-  | cons f p ih =>
-    rw [List.cons_append, pathAt_cons, pathAt_cons]
-    cases treeEnt t i f with
-    | some j => exact ih j
-    | none => rfl
-
 theorem pathAt_singleton (t : Fstree) (i : Nat) (f : Fname) : pathAt t i [f] = treeEnt t i f := by
   rw [pathAt_cons]; cases treeEnt t i f <;> rfl
-
-/-- THE NODES A WALK TOUCHES, in order, stopping where the walk does.  This
-is what `FsRep.fslice` holds an `fnode` for. -/
-def pathChain (t : Fstree) (i : Nat) : List Fname → List Nat
-  | [] => [i]
-  | f :: p' => i :: (match treeEnt t i f with
-                     | some j => pathChain t j p'
-                     | none => [])
-
-theorem pathChain_last (t : Fstree) (i j : Nat) (p : List Fname) :
-    pathAt t i p = some j → j ∈ pathChain t i p := by
-  induction p generalizing i with
-  | nil =>
-    intro h
-    have : i = j := Option.some.inj h
-    subst this; exact List.mem_singleton_self _
-  | cons f p ih =>
-    intro h
-    rw [pathAt_cons] at h
-    unfold pathChain
-    cases hte : treeEnt t i f with
-    | none => rw [hte] at h; cases h
-    | some k =>
-      rw [hte] at h
-      exact List.mem_cons_of_mem _ (ih k h)
-
-/-! ## 8.  WELL-FORMEDNESS -/
-
-/-- Every key is a legal inum -- what makes the 32-bit coercion at
-`FsRep.inum_of` round-trip.  Range against the region's capacity is
-`dirInumsOk`'s business and stays there. -/
-def fsInumsOk (t : Fstree) : Prop := ∀ i n, t.fsNodes[i]? = some n → i < 2 ^ 32
-
-def fsRootDir (t : Fstree) : Prop :=
-  ∃ ents : Std.ExtTreeMap Fname Nat compare, t.fsNodes[t.fsRoot]? = some (.NDir ents)
-
-def fsWf (t : Fstree) : Prop := fsInumsOk t ∧ fsRootDir t
 
 /-! ## 9.  THE RECORD DELTAS THE FRIENDLY LAYER READS ITS TREE DELTAS OFF -/
 

@@ -126,29 +126,4 @@ structure SYSWAIT : Prop where
     wp_sys_wait_eb_body (hlc := hlc) (GF := GF) Γ cpu k γw γp γl γk γ j pid V M v cs
       hj hproc hv hK hnoff htier
 
-/-- The interrupts-off instance of `wp_sys_wait_eb` (the complement is the
-whole bundle). -/
-theorem SYSWAIT.wp_sys_wait (A : SYSWAIT) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
-    [Xv6G GF] [FdslotG GF] [BioslotG GF]
-    [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
-    [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-    [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx] (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (cpu : CPU) (k : KCtx) (γw γp γl : GName) (γk : KmemNames) (γ : FileNames) (j : Nat) (pid : BitVec 32)
-    (V : ProcPriv) (M : Nat → List (BitVec 8)) (v : BitVec 64) (cs : ExtTreeSet GName compare)
-    hj hproc hv hK hsie hnoff hlocks htier :
-    wp_sys_wait_body (hlc := hlc) (GF := GF) Γ cpu k γw γp γl γk γ j pid V M v cs
-      hj hproc hv hK hsie hnoff hlocks htier := by
-  have h := A.wp_sys_wait_eb (hlc := hlc) (GF := GF) Γ cpu k γw γp γl γk γ j pid V M v cs hj hproc hv hK
-    hnoff htier
-  unfold wp_sys_wait_eb_body at h
-  unfold wp_sys_wait_body
-  rw [hsie] at h
-  simp only [trapCsrsExt_false, cpuClaimExt_false] at h
-  iintro ⟨H0, H1, H2, Htc, Hcl, Hir, H6, H7, H8, H9, H10, H11, H12, Hnext⟩
-  iapply h
-  iframe H0 H1 H2 Htc Hcl Hir H6 H7 H8 H9 H10 H11 H12
-  iapply wpNext_mono $$ Hnext
-  iintro %cpu' HK %spie %spp %R' %P' %rv %xw %d %cs' %k' %p0 Ha Hc H1 H2 ⟨Htc, Hir⟩ Hcl %hk' H6
-  iapply HK $$ %spie %spp %R' %P' %rv %xw %d %cs' %k' %p0 Ha Hc H1 H2 Htc Hcl Hir %hk' H6
-
 end Xv6

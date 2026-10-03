@@ -42,19 +42,17 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedSectionVars false
-
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-theorem mn_br_8e : KA.«main» + 7506#64 = KA.«binit» := by decide
+theorem mn_br_8e : KA.«main» + 7526#64 = KA.«binit» := by decide
 theorem mn_ret_92 : jumpPc (KA.«main» + 146#64) = KA.«main» + 146#64 := by decide
-theorem mn_br_92 : KA.«main» + 8872#64 = KA.«iinit» := by decide
+theorem mn_br_92 : KA.«main» + 8892#64 = KA.«iinit» := by decide
 theorem mn_ret_96 : jumpPc (KA.«main» + 150#64) = KA.«main» + 150#64 := by decide
-theorem mn_br_96 : KA.«main» + 13004#64 = KA.«fileinit» := by decide
+theorem mn_br_96 : KA.«main» + 13120#64 = KA.«fileinit» := by decide
 theorem mn_ret_9a : jumpPc (KA.«main» + 154#64) = KA.«main» + 154#64 := by decide
-theorem mn_br_9a : KA.«main» + 18798#64 = KA.«virtio_disk_init» := by decide
+theorem mn_br_9a : KA.«main» + 19038#64 = KA.«virtio_disk_init» := by decide
 theorem mn_ret_9e : jumpPc (KA.«main» + 158#64) = KA.«main» + 158#64 := by decide
-theorem mn_br_9e : KA.«main» + 3504#64 = KA.«userinit» := by decide
+theorem mn_br_9e : KA.«main» + 3492#64 = KA.«userinit» := by decide
 theorem mn_ret_a2 : jumpPc (KA.«main» + 162#64) = KA.«main» + 162#64 := by decide
 
 /-- iinit's sleeplock cursor IS the itable entry's lock (Rocq
@@ -93,7 +91,7 @@ theorem mn_binit (BI : BINIT) [CurCtx] (cpu : CPU) (k : KCtx) (R0 : RegMap) (hsi
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   ihave Hin := (show ([∗list] i ∈ List.range NBUF, bufIn (GF := GF) i) ⊢
     [∗list] i ∈ List.range 30, bufIn i from .rfl) $$ Hin
-  k_step (wp_s_jal cpu _ (KA.«main» + 142#64) false 7364#21 1#5 (by decide))
+  k_step (wp_s_jal cpu _ (KA.«main» + 142#64) false 7384#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [mn_br_8e]
   iintro Hk Hpc
   have hbi := BI.wp_binit (hlc := hlc) (GF := GF) cpu (k.withRegs (R0.set 1#5 (KA.«main» + 146#64)))
@@ -181,7 +179,7 @@ theorem mn_iinit (II : IINIT) [Fscfg] [Icfg] [CurCtx] (cpu : CPU) (k : KCtx) (R0
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   ihave Hin := (show ([∗list] i ∈ List.range NINODE, sleepLockIn (GF := GF) (inodeAddr i)) ⊢
     [∗list] i ∈ List.range 50, sleepLockIn (inodeAddr i) from .rfl) $$ Hin
-  k_step (wp_s_jal cpu _ (KA.«main» + 146#64) false 8726#21 1#5 (by decide))
+  k_step (wp_s_jal cpu _ (KA.«main» + 146#64) false 8746#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [mn_br_92]
   iintro Hk Hpc
   have hii := II.wp_iinit (hlc := hlc) (GF := GF) cpu (k.withRegs (R0.set 1#5 (KA.«main» + 150#64)))
@@ -250,7 +248,7 @@ theorem mn_fileinit (FI : FILEINIT) [Icfg] [CurCtx] (cpu : CPU) (k : KCtx) (R0 :
   unfold mainLkRaw
   iintro ⟨Hk, Hpc, ⟨%vl, %vn, %vc, Hlw⟩, Hraw, Hir, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
-  k_step (wp_s_jal cpu _ (KA.«main» + 150#64) false 12854#21 1#5 (by decide))
+  k_step (wp_s_jal cpu _ (KA.«main» + 150#64) false 12970#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [mn_br_96]
   iintro Hk Hpc
   have hfi := FI.wp_fileinit (hlc := hlc) (GF := GF) cpu (k.withRegs (R0.set 1#5 (KA.«main» + 154#64)))
@@ -298,7 +296,7 @@ theorem mn_virtio (VD : VIRTIO_DISK_INIT) [CurCtx] (cpu : CPU) (k : KCtx) (R0 : 
   iintro ⟨Hk, Hpc, #Hkml, Hav, #Hdinv, #Hcc, Hcfg, Hgh, ⟨%vl, %vn, %vc, %pd0, %pav0, %pu0, %free0, Hcells⟩,
     Hlf, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
-  k_step (wp_s_jal cpu _ (KA.«main» + 154#64) false 18644#21 1#5 (by decide))
+  k_step (wp_s_jal cpu _ (KA.«main» + 154#64) false 18884#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [mn_br_9a]
   iintro Hk Hpc
   have hvd := VD.wp_virtio_disk_init (hlc := hlc) (GF := GF) cpu
@@ -512,7 +510,7 @@ theorem mn_userinit (UI : USERINIT) [Fscfg] [Icfg] [FileG GF] [CurCtx]
   unfold mnIcacheRows
   icases Hrows with ⟨#Hit, #Hiti, -, -⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
-  k_step (wp_s_jal cpu _ (KA.«main» + 158#64) false 3346#21 1#5 (by decide))
+  k_step (wp_s_jal cpu _ (KA.«main» + 158#64) false 3334#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [mn_br_9e]
   iintro Hk Hpc
   have hui := UI.wp_userinit (hlc := hlc) (GF := GF) Γ cpu

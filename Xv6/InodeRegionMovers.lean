@@ -100,8 +100,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Iris.Algebra MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-! ## 0.  Pure helper (Rocq's inline `list_insert_id` step; the rest is
 `InodeRegionInv` §0b) -/
 
@@ -215,6 +213,31 @@ theorem iregInv_slot_acc [Icfg] (E : CoPset) (γi : GName) (γfs : FsNames) (ino
         iregSlotRest γi γfs inodestart nib inum m ds ∗
         (iregBody γi γfs inodestart nib ={E \ ↑iregN, E}=∗ True) := by
   unfold iregInv
+  iintro ⟨#Hiinv, -, -, -⟩
+  imod (inv_acc_timeless (E := E) (N := iregN)
+    (P := iregBody (GF := GF) γi γfs inodestart nib) hE) $$ Hiinv with ⟨Hbody, Hclose⟩
+  icases iregBody_slot_open γi γfs inodestart nib inum hin $$ Hbody with
+    ⟨%m, %ds, %hwf, %hcp, Ha, Hrec, Hslot, Hrest⟩
+  imodintro
+  iexists m, ds
+  iframe Ha Hrec Hslot Hrest Hclose
+  ipureintro
+  exact ⟨hwf, hcp⟩
+
+/-- The same opening from the UNSEALED region (`iregReg`): the opening
+reads only the region's invariant, never the byte row, so it holds at
+PowerOn too (chroot bump: userinit's `idup` runs before fsinit). -/
+theorem iregReg_slot_acc [Icfg] (E : CoPset) (γi : GName) (γfs : FsNames) (inodestart nib : Nat)
+    (inum : BitVec 32) (hE : (↑iregN : CoPset) ⊆ E)
+    (hin : (inum.toNat : Int) < 16 * (nib : Int)) :
+    ⊢@{IProp GF} iregReg (hlc := hlc) γi γfs inodestart nib -∗
+      |={E, E \ ↑iregN}=> ∃ (m : IregMapF Dinode) (ds : List Dinode),
+        ⌜diblkWf ds⌝ ∗ ⌜iregCouple m (iregBi inum) ds⌝ ∗ (γi ↪●MAP m) ∗
+        iregRecs γfs inodestart (iregBi inum) ds ∗
+        iregSlot γfs γi inum.toNat ds[islot inum]! ∗
+        iregSlotRest γi γfs inodestart nib inum m ds ∗
+        (iregBody γi γfs inodestart nib ={E \ ↑iregN, E}=∗ True) := by
+  unfold iregReg
   iintro ⟨#Hiinv, -, -, -⟩
   imod (inv_acc_timeless (E := E) (N := iregN)
     (P := iregBody (GF := GF) γi γfs inodestart nib) hE) $$ Hiinv with ⟨Hbody, Hclose⟩

@@ -16,6 +16,11 @@ THE LEND (permit sweep L1b, Rocq b69bd0fab; threaded by L2, Rocq
 import Xv6.SpecCopyin
 import Xv6.CodeTactics
 import Xv6.CopyLemmas
+import Xv6.KvmLemmas
+import Xv6.UPtLemmas
+import Xv6.UPtAllocLemmas
+import MachCSL.WpSmodeFrame12
+import MachCSL.BvLemmas
 
 namespace Xv6
 
@@ -23,7 +28,6 @@ open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open Iris.Std (get? insert delete)
 open LeanRV64D
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
@@ -36,7 +40,6 @@ set_option maxRecDepth 8000
 survives as such: it is split into `BitVec.ofNat 64 A + BitVec.ofNat 64 d`
 (and `BitVec.add_assoc` then re-associates).  These are the page-offset folds
 stated on the shapes the normaliser actually leaves. -/
-
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
@@ -57,7 +60,6 @@ def frameCi [CurCtx] (sp ra s0 s1 s2 s3 s4 s5 s6 s7 s8 s9 s10 : BitVec 64) : IPr
   wordPointsTo (sp + 0xFFFFFFFFFFFFFFB0#64) 8 (DFrac.own 1) s8 ∗
   wordPointsTo (sp + 0xFFFFFFFFFFFFFFA8#64) 8 (DFrac.own 1) s9 ∗
   wordPointsTo (sp + 0xFFFFFFFFFFFFFFA0#64) 8 (DFrac.own 1) s10
-
 
 set_option maxHeartbeats 4000000 in
 /-- The prologue at `0x8000168a`. -/
@@ -227,11 +229,6 @@ def ciKeep (R R2 : RegMap) : Prop :=
   R2 2#5 = R 2#5 ∧ R2 18#5 = R 18#5 ∧ R2 20#5 = R 20#5 ∧ R2 21#5 = R 21#5 ∧
   R2 22#5 = R 22#5 ∧ R2 23#5 = R 23#5 ∧ R2 24#5 = R 24#5 ∧ R2 25#5 = R 25#5 ∧
   R2 26#5 = R 26#5 ∧ R2 27#5 = R 27#5
-
-theorem ciKeep_of_calleeSaved {R R' : RegMap} (h : calleeSaved R R') : ciKeep R R' :=
-  ⟨h.1, h.2.2.2.1, h.2.2.2.2.2.1, h.2.2.2.2.2.2.1, h.2.2.2.2.2.2.2.1,
-    h.2.2.2.2.2.2.2.2.1, h.2.2.2.2.2.2.2.2.2.1, h.2.2.2.2.2.2.2.2.2.2.1,
-    h.2.2.2.2.2.2.2.2.2.2.2.1, h.2.2.2.2.2.2.2.2.2.2.2.2⟩
 
 /-- What `copyin` leaves behind: the final kernel buffer `bs'`. -/
 def ciPost (psz : BitVec 64) (P : UPtd) (M : Nat → List (BitVec 8)) (A : Nat) (old : List (BitVec 8))
@@ -946,7 +943,6 @@ theorem ci_loop (WA : WALKADDR) (VF : VMFAULT) (MM : MEMMOVE) [Xv6G GF] [WchG GF
       exact hpost3
 
 /-! ## `copyin` meets its specification -/
-
 
 set_option maxHeartbeats 4000000 in
 /-- **`copyin` meets its specification.** -/

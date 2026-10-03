@@ -274,13 +274,3 @@ jobs:
       - name: Tool unit tests (make test-tools)
         if: ${{ !cancelled() }}
         run: tools/ci/run_all.sh test-tools
-
-      # ---- 10. Dead imports (informational) ----
-      # Rocq runs this as a scheduled sweep (dead-imports.yml).  GitHub fires
-      # `schedule` only from the DEFAULT branch, so a scheduled workflow on
-      # `lean` would never run; the analysis takes seconds on a built tree, so
-      # it is a report-only step here instead.  It never blocks the job.
-      - name: Dead-import report (informational)
-        if: ${{ !cancelled() }}
-        continue-on-error: true
-        run: tools/ci/run_all.sh dead-imports

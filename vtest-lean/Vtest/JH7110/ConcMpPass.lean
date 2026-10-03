@@ -15,7 +15,7 @@ import Vtest.JH7110.ConcMpRun
 namespace Vtest.JH7110.ConcMp
 
 theorem agrees : RunAgrees test observed :=
-  concAgrees_all test { tick := false, sched := [], rounds := 6000 } observed
+  concAgrees_all test { tick := false, sched := [], rounds := 6000, burst := 4 } observed
     (by native_decide)
 
 end Vtest.JH7110.ConcMp

@@ -11,7 +11,6 @@ UExecCtlSys, which already name the landing) re-read: the JALR target's
 -/
 import Xv6.SpecUkLeaves
 import MachCSL.UExecCtlJump
-import MachCSL.UExecCtlSys
 import MachCSL.UCycle
 
 namespace Xv6

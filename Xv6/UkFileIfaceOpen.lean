@@ -16,6 +16,7 @@ mode that does not create: -1, or the taint.
 -/
 import Xv6.UkFileIfaceDevP
 import Xv6.UkFileIfaceHdls
+import Xv6.UkFileDevOpen
 
 namespace Xv6
 
@@ -23,8 +24,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Iris.Std.PartialMap
 open Std (ExtTreeSet)
 open HfpFileClaimsP UkFileDev
-
-set_option linter.unusedSectionVars false
 
 noncomputable section FifOpen
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]

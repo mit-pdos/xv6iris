@@ -13,9 +13,10 @@ S0 is the pure half: a pipeline line leaves the state alone, and the `'$'`
 at the deed's alternative writes a block up to its space.
 
 CONE (UShURoundLaws S0-S1, reached): `ustep_pipe`, `uwr_blk_dollar_at`,
-`ulpr_inp`, `uWcl_inp`, `uWbl_inp`, `ushape_inp`, `uWbf_inp`, `uWcf_inp`,
-`upterm_inp`, `updone_inp`, `uWcu_inp`.  Unreached, NOT ported:
-`url_T_pers0`, `url_T_tl0` (Lean's `fileTaint` has its instances).
+`ulpr_inp`, `uWcl_inp`, `uWbl_inp`, `ushape_inp`, `uWbf_inp`,
+`upterm_inp`, `updone_inp`, `uWcu_inp`.  NOT ported: `url_T_pers0`,
+`url_T_tl0` (Lean's `fileTaint` has its instances), and `uWcf_inp` (nothing
+uses it; its core `uWcf_inp0` is here).
 
 ## Deviations from Rocq
 
@@ -25,8 +26,8 @@ CONE (UShURoundLaws S0-S1, reached): `ustep_pipe`, `uwr_blk_dollar_at`,
    lemma `<name>0 : F ⊢ R` into the (persistent) reading `R`, and the
    reading itself is `persistent_entails_left` of the core (`uinp_of0`), so
    no credential is ever rebuilt; `uWbf_inp` goes through `uWbl_inp0`
-   rather than `UShLineHold.ush_wb_inp_hold` (whose Lean twin
-   `ushWbInpHold` is not needed).  Same statements.
+   rather than `UShLineHold.ush_wb_inp_hold` (not needed, so
+   not ported).  Same statements.
 2. `ulpr_inp` is split by index (`ulpr_inp_line`, `ulpr_inp`) and reads the
    record's families at `unionParamsAt ug s0` / `unionXAt ug s0` directly
    (Rocq's `cbn [gwc_lpr ...]`); the X arm is unfolded to
@@ -37,14 +38,13 @@ CONE (UShURoundLaws S0-S1, reached): `ustep_pipe`, `uwr_blk_dollar_at`,
    `uptermShape ug`/`updoneShape ug`.
 -/
 import Xv6.UshURoundShapes
-import Xv6.UshLineHold
+import Xv6.UshLineDefs
 
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
 set_option synthInstance.maxSize 1024
 
 /-! ## S0 THE PURE HALF -/
@@ -226,7 +226,7 @@ theorem uWbf_inp :
       (uWbf (hlc := hlc) ug r s0) :=
   fun I => uinp_of0 (uWbf_inp0 ug r s0 I)
 
-/-- The core of `uWcf_inp` (deviation 1). -/
+/-- The core of Rocq's `uWcf_inp` (deviation 1). -/
 theorem uWcf_inp0 (I : List (BitVec 8)) (p : Nat) :
     uWcf (hlc := hlc) (GF := GF) ug r s0 I p ⊢
       iprop((∃ v : EraPins, eraPin (fgnEcho ug.ugnFile) (genId (hlc := hlc) (GF := GF) + 1) v ∗ inpLb v I)
@@ -249,12 +249,6 @@ theorem uWcf_inp0 (I : List (BitVec 8)) (p : Nat) :
     rw [uWcf_S3]
     iintro ⟨Hc, -⟩
     iapply uWcl_inp0 ug s0 I 3 $$ Hc
-
-/-- **Rocq `uWcf_inp`**. -/
-theorem uWcf_inp :
-    ushWcInp (hlc := hlc) (GF := GF) (fgnEcho ug.ugnFile) (fileTaint (hlc := hlc) ug.ugnFile.fgnCl)
-      (uWcf (hlc := hlc) ug r s0) :=
-  fun I p => uinp_of0 (uWcf_inp0 ug r s0 I p)
 
 /-- **Rocq `upterm_inp`** (deviation 1: the persistent core). -/
 theorem upterm_inp (I : List (BitVec 8)) (c : Nat) :

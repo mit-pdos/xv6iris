@@ -17,6 +17,7 @@ hart each arm leaves from (Rocq's `trap_csrs_ext_transport` over
 `ext_chain`), as does the caller's `true` crossing (`fc_next_shift`).
 -/
 import Xv6.FilecloseInode
+import Xv6.CopyLemmas
 
 namespace Xv6
 
@@ -25,9 +26,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
@@ -472,11 +471,11 @@ theorem fc_last (RE : RELEASE) (PC : PIPECLOSE) (BO : BEGIN_OP) (IP : IPUT) (EO 
   k_step (wp_s_auipc c _ (KA.«fileclose» + 0x48#64) false 0x1e#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_addi c _ (KA.«fileclose» + 0x4c#64) false 1230#12 10#5 10#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fileclose_br_1e516, fc_lock_41a6]
+  k_step (wp_s_addi c _ (KA.«fileclose» + 0x4c#64) false 1786#12 10#5 10#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fileclose_br_1e742, fc_lock_41a6]
   iintro Hk Hpc
-  k_step (wp_s_jal c _ (KA.«fileclose» + 0x50#64) false 2083374#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fileclose_br_ffffffffffffca7e]
+  k_step (wp_s_jal c _ (KA.«fileclose» + 0x50#64) false 2083258#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fileclose_br_ffffffffffffca0a]
   iintro Hk Hpc
   iapply (fa_release RE c _ γl γ ?ha0 ?hsr ?hnr ?hKr k.sie ?hrr ?hor) $$ [- $Hk $Hpc $Hlocked $HR]
   rotate_right 1

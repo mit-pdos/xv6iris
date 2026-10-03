@@ -5,13 +5,13 @@ into the step block at `+0x6e`.
 
 * THE SET-FORM RESERVATION at iput (Rocq 1938–1948): ireclaim is the one
   caller that freezes under the BOOT regime, so it reads the indexed
-  `IPUT.wp_iput_gen` at `rg = false` (`iregRegime false = iregBoot`, lent and
+  `IPUT.wp_iput_gen_eb` at `rg = false` (`iregRegime false = iregBoot`, lent and
   returned) and uncredited (`crb = cru = crz = false`).  The reservation's
   set is the `logOp` existential's own (opened in `Xv6/IreclaimOrphanB.lean`),
   its birth epoch `logOpS_named`'s, and the transaction token HALVES
   (`logTx_halve`): one half is the gen contract's named share, the other
   waits for the join after the call (`logTx_join`, `logOpS_op`), exactly as
-  `IPUT.wp_iput_sconf` derives the counted seal.
+  Rocq's `wp_iput_sconf` derives the counted seal.
 * `iputUnits = 3 ≤ MAXOPBLOCKS = 10` is a closed numeric fact.
 * `end_op` retires the reservation at whatever `n'` iput left.
 
@@ -29,9 +29,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
@@ -128,7 +126,7 @@ theorem ireclaim_orphan_c (IP : IPUT) (EO : END_OP) [Fscfg] [Icfg] [CurCtx]
       | exact h9
       | (simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact h9)
   -- +0x6a  jal end_op
-  k_step_e (wp_s_jal cpu _ (KA.«ireclaim» + 0x6a#64) false 2072#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«ireclaim» + 0x6a#64) false 2168#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ireclaim_br_end_op]
   iintro Hk Hpc
   iapply (ireclaim_end_op EO Γ cpu _ γl pd pav pu j n' pidv dqp k.proc (by k_norm_g) k.sie

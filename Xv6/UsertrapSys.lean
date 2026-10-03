@@ -33,8 +33,6 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedVariables false
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
 
 /-! ## Addresses -/
@@ -366,7 +364,7 @@ theorem ut90_after [hPT : ∀ Γ, Persistent (PT Γ)] [ClaimIs (hlc := hlc) GF �
     k_step (wp_s_addi cpu _ (KA.«usertrap» + 0xc8#64) true 0xfff#12 10#5 0#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     iintro Hk Hpc
-    k_step (wp_s_jal cpu _ (KA.«usertrap» + 0xca#64) false 2095510#21 1#5 (by decide))
+    k_step (wp_s_jal cpu _ (KA.«usertrap» + 0xca#64) false 2095490#21 1#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ut_a6_kexit_tgt]
     iintro Hk Hpc
     have hsp := hpins.1

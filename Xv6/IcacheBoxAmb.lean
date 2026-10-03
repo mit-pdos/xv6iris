@@ -225,8 +225,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-! ## The identity, the shape, the namespace
 
 The identity `IcBid` and the shape `IcX` live in `Xv6/IcacheRefDefs.lean`
@@ -522,8 +520,9 @@ instance icRdHeldGhost_timeless (γfs : FsNames) (cov : ExtTreeSet Nat compare)
   unfold icRdHeldGhost; infer_instance
 
 omit [IcacheG GF] [LogG GF] in
-/-- `icInodeLeg_local`, keeping the leg (Rocq's `iDestruct … as %` keeps
-the hypothesis). -/
+/-- The leg's own pure reading (`InodeLocal`, the era bundle's last
+conjunct), keeping the leg (Rocq's `iDestruct … as %` keeps the
+hypothesis). -/
 private theorem icInodeLeg_localKeep (γfs : FsNames) (dq : DFrac) (γi : GName)
     (inum : BitVec 32) (n : FsNode) :
     icInodeLeg (GF := GF) γfs dq γi inum n ⊢
@@ -743,7 +742,6 @@ theorem icDepHeld_bmLen [Icfg] [CurCtx] (γfs : FsNames) (γi : GName)
 /- The descriptor premise `hshr` is unused in the proof, as in Rocq; it is
 kept so the statement matches the Rocq callers (ProofIunlock), which pass
 it. -/
-set_option linter.unusedVariables false in
 /-- Rocq's `ic_dep_held_intro_held`. -/
 theorem icDepHeld_introHeld [Icfg] [CurCtx] (cn : IcNames) (γfs : FsNames) (γi : GName)
     (cov : ExtTreeSet Nat compare) (logstart k : Nat) (d : IcDep) (s : Qp)

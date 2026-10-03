@@ -6,7 +6,7 @@ contract.  A port of Rocq `SpecNamex.v` (`iris/SpecNamex.v`).
     namex(char *path, int nameiparent, char *name)
     {
       struct inode *ip, *next;
-      if(*path == '/') ip = iget(ROOTDEV, ROOTINO);
+      if(*path == '/') ip = idup(myproc()->root);
       else             ip = idup(myproc()->cwd);
       while((path = skipelem(path, name)) != 0){
         ilock(ip);
@@ -36,7 +36,7 @@ so the loop is namex's own and `Xv6/PathElems.lean` models it directly.
 * THE NAME BUFFER is 14 caller-owned bytes at `a2`, WRITTEN (full
   ownership); it comes back at an unspecified naming function `nf`, with
   `bname 14 nf = e` on the nameiparent success arm, `e` the last element
-  (`skipelem_name_view`, both memmove shapes).
+  (both memmove shapes).
 * THE POSTCONDITION IS RESOURCE-SHAPED: success is `a0 = ip` with the held
   reference (bundled with its directory type on a nameiparent walk,
   `inodeHeldTy`), failure is `a0 = 0` with everything back and NO inode
@@ -56,6 +56,14 @@ so the loop is namex's own and `Xv6/PathElems.lean` models it directly.
   by namex's own type test); the credentials are threaded.
 * namex SLEEPS (ilock / dirlookup / iput), so the crossing is the literal
   `true`; it enters and returns at depth 0.
+* THE ROOT (chroot bump, b72cbac; design/chroot.md §2.1): the absolute arm
+  is the relative arm's twin, `idup(myproc()->root)`, so the contract takes
+  ONE more row in and out beside the cwd's, the root's cell and reference
+  `wordPointsTo (pRoot k.proc) 8 dqr rootv ∗ inodeHeldAt rootv rti`, lent
+  unconditionally (dirlookup's self test reads it at every level).  The
+  ledger figures do not move (`idup` mints from one `irefSlot` exactly as
+  `iget` did); the `icfgDev = ROOTDEV` / `0 < icfgNib` premises no longer
+  pay for anything in namex itself and are kept (a surplus premise is free).
 
 ## DEVIATIONS from Rocq
 
@@ -87,6 +95,9 @@ so the loop is namex's own and `Xv6/PathElems.lean` models it directly.
    `pv_cwi`).  All three come back unchanged.  REPORTED, not invented: a
    caller carves the cwd cell out of `procFields` the way it carves the pid
    cell; where the reference lives is the process layer's open question.
+   The ROOT (chroot) follows the same pattern: Rocq's
+   `inode_held_at (pv_root (us_V Upr)) (pv_rti (us_V Upr))` is the cell row
+   `wordPointsTo (pRoot k.proc) 8 dqr rootv` and `inodeHeldAt rootv rti`.
 4. **THE PATH** is `byteBuf (k.regs 10#5) dqpv (bview (plen + 1) pfun)` and
    Rocq's `bb_cstr pfun plen` is the two premises `hnn` / `hterm` (the
    `Xv6/ArgPath.lean` deviation 3 spelling).  THE NAME BUFFER is
@@ -109,8 +120,8 @@ so the loop is namex's own and `Xv6/PathElems.lean` models it directly.
   (comment-stripped grep of `iris/*.v`): no caller outside
   SpecNamex.v / ProofNamex.v (namei and nameiparent call `wp_namex_gen`;
   ProofNparEra.v's header records it has no twin) -- reason: dead.  The
-  budget bridge `walkNeed_counted` / `walkSpend_counted` that the counted
-  callers (ProofNamei.v:644/656) use is KEPT.
+  budget bridge the counted callers (ProofNamei.v:644/656) use is not ported
+  either (nothing uses it).
 * `ic_escrows fsc_ic …` -- following SpecIget/SpecDirlookup (isItable2
   carries the family) -- uses checked: ProofNamex.v frames it into iget,
   dirlookup, ilock, iunlockput and iput only -- reason: redundant.
@@ -123,15 +134,11 @@ Imports only definitional files and callee `Spec*` files.
 import Xv6.SpecDirlookup
 import Xv6.PathElems
 import Xv6.SpecIput
-import Xv6.SpecIget
 
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
-
-set_option linter.unusedVariables false
-set_option linter.unusedSectionVars false
 
 /-- Address of `namex`. -/
 def namexAddr : BitVec 64 := KA.«namex»
@@ -167,20 +174,6 @@ def walkNeed (L : Nat) : Nat :=
   | 0 => iputUnits
   | _ + 1 => iputUnits + 1
 
-/-- Rocq's `walk_need_counted`: the counted premise implies the priced one. -/
-theorem walkNeed_counted (L n : Nat) (h : (L + 1) * iputUnits ≤ n) : walkNeed L ≤ n := by
-  cases L with
-  | zero => unfold walkNeed iputUnits at *; omega
-  | succ L => show iputUnits + 1 ≤ n; unfold iputUnits at *; rw [Nat.succ_mul] at h; omega
-
-/-- Rocq's `walk_spend_counted`: the priced interval implies the counted one. -/
-theorem walkSpend_counted (L n n' : Nat) (w ok : Bool) (h : (L + 1) * iputUnits ≤ n)
-    (h' : n - (walkSpend w + (if ok then 0 else 1)) ≤ n') :
-    n - (L + 1) * iputUnits ≤ n' := by
-  have h3 : 3 ≤ (L + 1) * iputUnits := by
-    unfold iputUnits; rw [Nat.succ_mul]; omega
-  cases w <;> cases ok <;> unfold walkSpend at h' <;> simp at h' <;> omega
-
 section Post
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
@@ -193,7 +186,8 @@ UNSPECIFIED naming function; the set only grows; the paid-bitmap report
 `w`; the priced interval; and the two arms. -/
 def namexPost [Fscfg] [Icfg] [CurCtx] (k : KCtx) (plen : Nat) (pfun : Nat → BitVec 8)
     (npar : Bool) (n : Nat) (Sb : List Nat) (pidv : BitVec 32) (cwdv : BitVec 64) (cwi : Nat)
-    (dqp dqc dqb dqs dqpv : DFrac) (cpu' : CPU) : IProp GF :=
+    (dqp dqc dqb dqs dqpv : DFrac) (rootv : BitVec 64) (rti : Nat) (dqr : DFrac)
+    (cpu' : CPU) : IProp GF :=
   iprop(∀ (spie spp : Bool) (R' : RegMap) (n' : Nat) (Sb' : List Nat) (ok : Bool)
       (nf : Nat → BitVec 8) (ipv : BitVec 64) (w : Bool),
     ⌜calleeSaved k.regs R'⌝ -∗
@@ -204,6 +198,7 @@ def namexPost [Fscfg] [Icfg] [CurCtx] (k : KCtx) (plen : Nat) (pfun : Nat → Bi
     wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) -∗
     wordPointsTo (pPid k.proc) 4 dqp pidv -∗
     wordPointsTo (pCwd k.proc) 8 dqc cwdv -∗ inodeHeldAt cwdv cwi -∗
+    wordPointsTo (pRoot k.proc) 8 dqr rootv -∗ inodeHeldAt rootv rti -∗
     byteBuf (k.regs 10#5) dqpv (bview (plen + 1) pfun) -∗
     -- the name buffer, at an UNSPECIFIED naming function
     byteBuf (k.regs 12#5) (DFrac.own 1) (bview 14 nf) -∗
@@ -233,6 +228,7 @@ def wp_namex_gen_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
     (γkl : GName) (γk : KmemNames)
     (plen : Nat) (pfun nfun : Nat → BitVec 8) (npar : Bool) (n : Nat) (Sb : List Nat)
     (pidv : BitVec 32) (cwdv : BitVec 64) (cwi : Nat) (dqp dqc dqb dqs dqpv : DFrac)
+    (rootv : BitVec 64) (rti : Nat) (dqr : DFrac)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : namexSlots ≤ k.avail)
     (hnoff : k.noff = 0) (htier : k.tier = KTier.kpt)
     -- (2) the absolute arm's two immediates
@@ -273,6 +269,9 @@ def wp_namex_gen_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
   -- ---- the caller's pid cell, and THE WORKING DIRECTORY (deviation 3) ----
   wordPointsTo (pPid k.proc) 4 dqp pidv ∗
   wordPointsTo (pCwd k.proc) 8 dqc cwdv ∗ inodeHeldAt cwdv cwi ∗
+  -- ---- THE ROOT (chroot): its cell and its reference, lent unconditionally
+  -- (the absolute arm's `idup(p->root)`, dirlookup's self test) ----
+  wordPointsTo (pRoot k.proc) 8 dqr rootv ∗ inodeHeldAt rootv rti ∗
   -- ---- THE PATH, at the caller's fraction (only READ) ----
   byteBuf (k.regs 10#5) dqpv (bview (plen + 1) pfun) ∗
   -- ---- THE NAME BUFFER, WRITTEN: full ownership ----
@@ -285,7 +284,7 @@ def wp_namex_gen_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
   logOpS icfgLog n Sb ∗ logTx icfgLog ∗
   -- THE CROSSING IS THE LITERAL `true`: namex parks
   wpNext true k.proc cpu
-    (namexPost k plen pfun npar n Sb pidv cwdv cwi dqp dqc dqb dqs dqpv)
+    (namexPost k plen pfun npar n Sb pidv cwdv cwi dqp dqc dqb dqs dqpv rootv rti dqr)
   ⊢ wpLoop (GF := GF) cpu
 
 /-- The interface of `namex` (Rocq's `Module Type NAMEX`, its `wp_namex_gen`
@@ -300,74 +299,10 @@ structure NAMEX : Prop where
     (γkl : GName) (γk : KmemNames)
     (plen : Nat) (pfun nfun : Nat → BitVec 8) (npar : Bool) (n : Nat) (Sb : List Nat)
     (pidv : BitVec 32) (cwdv : BitVec 64) (cwi : Nat) (dqp dqc dqb dqs dqpv : DFrac)
+    (rootv : BitVec 64) (rti : Nat) (dqr : DFrac)
     hj hproc hK hnoff htier hroot hnib0 hgeom hbg hbel hireg hnn hterm hplen hbud hnpar hpd,
     wp_namex_gen_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl pd pav pu j γkl γk plen pfun nfun
-      npar n Sb pidv cwdv cwi dqp dqc dqb dqs dqpv
+      npar n Sb pidv cwdv cwi dqp dqc dqb dqs dqpv rootv rti dqr
       hj hproc hK hnoff htier hroot hnib0 hgeom hbg hbel hireg hnn hterm hplen hbud hnpar hpd
-
-/-! ## THE ROOT CORNER: `namex("/", 0, name)` (Rocq SpecNamex.v 770-896)
-
-WHY A SECOND CONTRACT AND NOT AN INSTANCE OF THE FIRST (Rocq's header): the
-general contract is about a WALK -- the whole file-system fabric, an open
-transaction, the running process, and it can SLEEP.  None of that holds of
-the one caller that matters at BOOT: `userinit` calls `namei("/")` before
-there is a current process, before fsinit has read the superblock and
-before any transaction exists.  A path of exactly one '/' has NO elements,
-so the walk's body never runs: what executes is the prologue, the
-`*path == '/'` test, `iget(ROOTDEV, ROOTINO)`, the constants, one turn of the
-separator skip, the nameiparent test at `+0x140` and the epilogue.  Nothing
-reads a disk block, nothing sleeps -- so this contract is the ICACHE and
-nothing else, at any interrupt state and depth, with no process named.
-
-WHAT IT DOES NOT TAKE: `iregOpen` (the SEALED regime, which does not exist
-before fsinit) -- the corner never reaches iput.  THE PATH IS TWO BYTES at
-an arbitrary fraction (`userinit`'s "/" is a `.rodata` literal); the name
-buffer is untouched and absent.
-
-**Deviations** (as the walk's contract, and iget's): `cpu_own n eb p b lks`
-is `kctx cpu k` at any depth with `k.noff + 3 < 2^31` (iget's live panic
-fires under itable.lock, where printk takes two more), `locks_below lks
-"itable"` is the three non-memberships iget takes; the crossing is
-`wpNext k.sie` (the corner never parks), with iget's `spie`/`spp` pin; the
-two path cells are `byteBuf (k.regs 10#5) dqp [SLASH, 0#8]`.  Rocq's unused
-`Vpr` / `n` binders are gone. -/
-
-/-- 12 slots for namex's own frame, over iget's 62 (Rocq's `K_namex_root`). -/
-def namexRootSlots : Nat := 12 + igetSlots
-
-/-- **WP of `namex("/", 0, name)`, the root corner** (Rocq's
-`wp_namex_root_body`). -/
-def wp_namex_root_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
-    [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF]
-    [SleepLockG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
-    (cpu : CPU) (k : KCtx) (dqp : DFrac)
-    (hK : namexRootSlots ≤ k.avail) (hnoff : k.noff + 3 < 2 ^ 31)
-    (hroot : icfgDev = BitVec.ofNat 32 ROOTDEV) (hnib0 : 0 < icfgNib)
-    -- a1 = 0: this is the namei side, so +0x140 takes the "return ip" branch
-    (ha1 : k.regs 11#5 = 0#64)
-    -- iget acquires and releases "itable" (and its live panic takes "pr" then "uart1")
-    (hit : "itable" ∉ k.locks) (hpr : "pr" ∉ k.locks) (huart : "uart1" ∉ k.locks) : Prop :=
-  kctx cpu k ∗ pcIs cpu namexAddr ∗
-  isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
-  itableInv (hlc := hlc) ∗ iregReg (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗ panicEnv ∗
-  irefSlot ∗
-  -- the path: `pv` holds '/' and `pv + 1` the terminator
-  byteBuf (k.regs 10#5) dqp [SLASH, 0#8] ∗
-  wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (ipv : BitVec 64),
-    ⌜k.sie = false → spie = k.spie ∧ spp = k.spp⌝ -∗
-    kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
-    ⌜calleeSaved k.regs R' ∧ R' 10#5 = ipv⌝ -∗
-    byteBuf (k.regs 10#5) dqp [SLASH, 0#8] -∗
-    -- AT ROOTINO: the absolute arm's one iget names the inum
-    inodeHeldAt ipv ROOTINO -∗ wpLoop cpu'))
-  ⊢ wpLoop (GF := GF) cpu
-
-/-- The root corner's interface (Rocq's `Module Type NAMEX_ROOT`). -/
-structure NAMEX_ROOT : Prop where
-  wp_namex_root : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
-    [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF]
-    [SleepLockG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
-    (cpu : CPU) (k : KCtx) (dqp : DFrac) hK hnoff hroot hnib0 ha1 hit hpr huart,
-    wp_namex_root_body (hlc := hlc) (GF := GF) cpu k dqp hK hnoff hroot hnib0 ha1 hit hpr huart
 
 end Xv6

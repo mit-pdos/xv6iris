@@ -40,8 +40,6 @@ def shBuf : Nat := 0x2020
 /-- **Rocq `sh_nbuf`**. -/
 def shNbuf : Nat := 100
 
-theorem shBuf_sym : shBuf = User.Sh.Sym.«buf_0» := rfl
-
 /-- **Rocq `ush_set`**: one index of a byte-run's contents overwritten. -/
 def ushSet (f : Nat → BitVec 8) (j : Nat) (b : BitVec 8) : Nat → BitVec 8 :=
   fun i => if i = j then b else f i
@@ -53,10 +51,6 @@ theorem ushSet_lt (f : Nat → BitVec 8) (i j : Nat) (b : BitVec 8) (h : j < i) 
 /-- **Rocq `ush_set_at`**. -/
 theorem ushSet_at (f : Nat → BitVec 8) (i : Nat) (b : BitVec 8) : ushSet f i b i = b := by
   unfold ushSet; rw [if_pos rfl]
-
-/-- **Rocq `sh_nbuf_line_max`**: the buffer is exactly as long as the
-longest admissible line. -/
-theorem shNbuf_lineMax : shNbuf = lineMax := rfl
 
 /-! ## §2 The rows the console preamble establishes -/
 
@@ -174,10 +168,6 @@ theorem ushLcl_rows (l : List FdState) (h : ushLcl l 3) : ushFd0c l ∧ ushFd1p 
 /-- **Rocq `ush_line_echo`**: the echo era admits `LEcho` lines alone. -/
 def ushLineEcho (l : Uline) : Prop := ∃ ws, l = .LEcho ws
 
-/-- **Rocq `ush_line_at_echo`** (by conversion). -/
-theorem ushLineAt_echo (ws : List (List (BitVec 8))) (f : Nat → BitVec 8) (k len : Nat) :
-    ushLineAt (.LEcho ws) f k len ↔ ushLineIs ws f k len := Iff.rfl
-
 /-! ## §4 runcmd's jump table (deviation 3) -/
 
 /-- **Rocq `SH_JTAB`**: the jump table at 0x1398 (.rodata). -/
@@ -241,9 +231,6 @@ def ushDpipe : Nat := 60
 /-- **Rocq `ush_Dbody`**: the body's frame (fork1 2, diagnostics 28, parser
 60, runner 8, +8 for the redirect parse, + the pipeline's 60). -/
 def ushDbody : Nat := 148
-
-/-- **Rocq `ush_Dbody_split`**. -/
-theorem ushDbody_split : ushDbody = 88 + ushDpipe := rfl
 
 /-- **Rocq `ush_gets_keep`**: the registers gets' loop body does NOT write
 (sp, gp, tp, s0, s4..s7, s9..s11). -/

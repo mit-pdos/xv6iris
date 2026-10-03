@@ -16,7 +16,6 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
@@ -175,7 +174,6 @@ theorem ismapped_proof (W : WALK_NOALLOC) : ISMAPPED :=
     case hR2d =>
       simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]
       exact a2⟩
-
 
 end
 

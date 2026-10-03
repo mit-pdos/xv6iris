@@ -63,8 +63,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
 
-set_option linter.unusedSectionVars false
-
 section KillRow
 variable {GF : BundledGFunctors} [CtokG GF]
 
@@ -83,8 +81,6 @@ def killRow (Wk : IProp GF) (gn : GName) (kl : BitVec 32) : IProp GF :=
 
 /-- THE FREE ARM'S FLAG (Rocq `kill_free`): an UNUSED slot's flag is zero. -/
 def killFree (kl : BitVec 32) : Prop := kl = 0#32
-
-theorem killFree_zero : killFree 0#32 := rfl
 
 /-- the row's three arms -/
 theorem killRow_zero (Wk : IProp GF) (gn : GName) : killPend (GF := GF) gn ⊢ killRow Wk gn 0#32 := by
@@ -264,42 +260,6 @@ theorem killPaid_reg_keep (pid : BitVec 32) (dq : DFrac) (gn gn' : GName) :
     pidReg (GF := GF) pid dq gn ∗ pidReg pid (.own qeighth) gn' ⊢
       ⌜gn = gn'⌝ ∗ (pidReg pid dq gn ∗ pidReg pid (.own qeighth) gn') :=
   (and_intro (pidReg_agree pid pid dq _ gn gn' rfl) .rfl).trans persistent_and_sep_mp
-
-/-- ...AND THE SAME STEP FOR A WRITER THAT PAYS OUT OF ITS OWN POCKET (a
-process that faults ON PURPOSE deposits its OWN `Q (-1)`; Rocq
-`kill_paid_kill_owed`). -/
-theorem killPaid_kill_owed (Wk : IProp GF) (pid : BitVec 32) (kl kl' : BitVec 32) (dq : DFrac)
-    (gn : GName) (hpnz : pid.toNat ≠ 0) (hknz : kl' ≠ 0#32) :
-    pidReg pid dq gn ∗ □ Wk ∗ killOwed gn ∗ killPaidAt Wk pid kl ⊢
-      |==> (pidReg pid dq gn ∗ killPaidAt Wk pid kl') := by
-  unfold killPaidAt
-  iintro ⟨Hmine, #Hsup, Howed, (⟨%hz, -⟩ | ⟨%hnz, ⟨%gn', %Q, Hr, #Hmy, #Hw, Hrow⟩⟩)⟩
-  · exact absurd hz hpnz
-  icases killPaid_reg_keep pid dq gn gn' $$ [Hmine Hr] with ⟨%e, Hmine, Hr⟩
-  · isplitl [Hmine]
-    · iexact Hmine
-    · iexact Hr
-  subst e
-  imod killRow_fire Wk gn kl $$ Hrow with #Hs
-  imodintro
-  isplitl [Hmine]
-  · iexact Hmine
-  iright
-  isplitr
-  · ipureintro; exact hnz
-  iexists gn, Q
-  isplitl [Hr]
-  · iexact Hr
-  isplitr
-  · iexact Hmy
-  isplitr
-  · iexact Hw
-  iapply killRow_of_owed Wk gn kl' hknz
-  isplitr
-  · iexact Hs
-  isplitr
-  · iexact Hsup
-  · iexact Howed
 
 /-- ...AND THE TWO SIDES AS ONE STEP (setkilled, on `myproc()`; Rocq
 `kill_paid_kill_two`): the process is killed by a party holding the

@@ -58,8 +58,7 @@ WHAT IS HERE, bottom up (Rocq name → Lean name):
    and the mint's top-map routing) are iris-lean's `BigSepM.bigSepM_dom` +
    `BigSepS.bigSepS_subseteq` after re-keying the values by `fpNode_of`
    (`snapLinks_toSet` here, `snapBigSepM_toSet` in `Xv6/FsCfgSnap.lean`).
-5. `snapBitmapSpent` is `LawfulSet.ofList (bmapstart :: freeSet size used)`,
-   the landed image twin `fsBitmapSpent`'s shape.
+5. `snapBitmapSpent` is `LawfulSet.ofList (bmapstart :: freeSet size used)`.
 6. `ipool_alloc`'s Lean counterpart is `Xv6.ipoolAllocRows`
    (`Xv6/IcacheBootRegion.lean`), stated at the pool's
    `(BitVec.ofNat 32 z).toNat` keys; the ledger columns are shifted with
@@ -73,8 +72,6 @@ import Xv6.BitmapInv
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
-
-set_option linter.unusedSectionVars false
 
 /-! ## 1.  The decode bridge -/
 
@@ -109,7 +106,6 @@ theorem snapRecDecode_region (S : FsStateRec) (P : Nat → List (BitVec 8)) (hom
   snapRecDecode S P home z (fpNode S z) hfull hb (snapNode_at S _ nib z hb hw hz)
 
 /-! ## 2.  `iregAlloc`'s six decoding conjuncts -/
-
 
 /-- **Rocq `snap_ireg_premises`**: every one of `iregAlloc`'s image
 conjuncts is an `InodeLocal` clause at the node `skRegdom` names, read
@@ -213,7 +209,6 @@ theorem mem_snapBitmapSpent (S : FsStateRec) (b : Nat) :
       b = S.fssSb.sbBmapstart ∨ (b < S.fssSb.sbSize ∧ b ∉ S.fssUsed) := by
   unfold snapBitmapSpent
   rw [← LawfulSet.mem_ofList, List.mem_cons, mem_freeSet]
-
 
 /-! ## 5.  The whole `inodeOk`, at the snapshot's node -/
 
@@ -350,7 +345,6 @@ theorem dirUniq_ofLocal (i : Nat) (n : FsNode) (hl : InodeLocal i n) :
     dirUniq n.fnRec (fnData n) := by
   intro hty
   exact hl.inlDirUniq (decide_eq_true hty)
-
 
 /-! ## 6.  The type register, routed off `fsLinks` -/
 
@@ -636,7 +630,6 @@ theorem mem_snapSpent (S : FsStateRec) (nib b : Nat) :
       have := Xv6.logRegion_range _ b h
       exact ⟨b - S.fssSb.sbLogstart, by omega, by omega⟩
   rw [hreg]
-
 
 /-! ## 8b.  The peels (Rocq's inline set facts of `fs_cfg_alloc_snap`)
 

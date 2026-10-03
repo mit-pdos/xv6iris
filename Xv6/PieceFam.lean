@@ -102,16 +102,6 @@ theorem refund_mono (A A' R : IProp GF) :
   · icases H with ⟨-, H⟩
     iexact H
 
-/-- ...the entailment-shaped mover (Rocq's `refund_mono_ent`). -/
-theorem refund_mono_ent (A A' R : IProp GF) (hA : A ⊢ A') :
-    iprop(A ∧ R) ⊢ iprop(A' ∧ R) := by
-  iintro H
-  isplit
-  · icases H with ⟨H, -⟩
-    iapply hA $$ H
-  · icases H with ⟨-, H⟩
-    iexact H
-
 /-- "the piece is spent" (Rocq's `refund_au`). -/
 theorem refund_au (A R : IProp GF) : iprop(A ∧ R) ⊢ A := by
   iintro H

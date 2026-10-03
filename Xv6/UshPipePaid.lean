@@ -26,7 +26,6 @@ contributes.  S2 is the "pipe" message's byte facts.
    (a Coq instance-priority workaround), `wp_kshr_pipe_arm_paid`.
 -/
 import Xv6.UshDiagLeaf
-import Xv6.UshForkDefs
 import Xv6.PipeDisc
 
 namespace Xv6
@@ -34,8 +33,6 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
-
-set_option linter.unusedSectionVars false
 
 /-! ## S2 The two messages' bytes -/
 

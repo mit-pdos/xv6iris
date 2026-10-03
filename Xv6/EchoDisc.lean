@@ -10,7 +10,7 @@ line's first byte only after the `"$ "` prompt); each round types its own
 line, read through `LineWords`' parser.  What survives the union cone here is
 the VOCABULARY the line model (`LineModel`) is built from:
 
-* §1 the admissible line (`lineOk`, `bodyOk`, `discInput`) and the parse
+* §1 the admissible line (`lineOk`, `bodyOk`) and the parse
   counters' small laws;
 * §2 the PROLOGUE alphabet (`proAlts`: the prompt, init's exec/fork
   failures, init's banner), its resolution (`proOf`, `proDone`, `proTail`,
@@ -31,8 +31,9 @@ Deviations from Rocq:
    `BitVec 8` lists, each with its string in the doc comment; the lengths and
    lookups Rocq gets by `vm_compute` are `rfl`/`decide`.
 2. Rocq's `ins h := obs_ins Uart0 h` is `consIns h := obsIns .uart0 h`
-   (the name `ins` is too short to stand unprefixed); `consIns_obsIns`/
-   `consIns_app`/`consIns_in` are Rocq's `ins_obs_ins`/`ins_app`/`ins_in`.
+   (the name `ins` is too short to stand unprefixed); `consIns_app`/`consIns_in`
+   are Rocq's `ins_app`/`ins_in`, and Rocq's `ins_obs_ins` is `rfl` here, so
+   not stated.
 3. Bytes are `BitVec 8` (`bv_unsigned` is `toNat`); `l !! i` is `l[i]?`,
    `l !!! i` is `l[i]!`, `prefix_of` is `<+:`, `Forall P l` is `∀ x ∈ l,
    P x`, `Exists P l` is `∃ x ∈ l, P x`, `concat` is `flatten`.
@@ -60,13 +61,12 @@ Deviations from Rocq:
    `pro_alts_head_dollar`, `pro_of_dollar_prompt`, `pro_of_open_head`,
    `pro_rounds_from`, `pro_rounds_replicate_0` ARE reached, through the
    instance `union_laws_at`, and are ported in `EchoDiscSeal.lean`
-   (`ins_obs_ins` is `consIns_obsIns` here).  The kernel-term re-audit,
+   (`ins_obs_ins` is `rfl` here, so not stated).  The kernel-term re-audit,
    notes/cone_reaudit.md, finds the rest unreached, except the candidate
    enumerations and `obs_wire_length`, which are reached only through the
    DU9 deciders (`UnionDecU`).)
 -/
 import Xv6.LineWords
-import MachCSL.Lang
 import MachCSL.ObsTrace
 
 namespace Xv6
@@ -99,11 +99,6 @@ theorem lineOk_len (ws : List (List (BitVec 8))) (h : lineOk ws) : (wlLine ws).l
 theorem lineOk_pos (ws : List (List (BitVec 8))) (h : lineOk ws) : 0 < ws.length := by
   have := lineOk_ge2 ws h; omega
 
-/-- The COMMAND NAME is four bytes. -/
-theorem lineOk_head_len (ws : List (List (BitVec 8))) (h : lineOk ws) : (ws[0]!).length = 4 := by
-  have hh := lineOk_head ws h
-  simp [List.getElem!_eq_getElem?_getD, hh, cmdEcho]
-
 /-- ...and opens with `'e'`. -/
 theorem lineOk_head_byte0 (ws : List (List (BitVec 8))) (h : lineOk ws) :
     ((wlLine ws)[0]!).toNat = 101 := by
@@ -117,10 +112,6 @@ theorem lineOk_at (ws : List (List (BitVec 8))) (i : Nat) (_ : lineOk ws) (hi : 
 
 /-- A BODY IS A WELL-FORMED JOIN OF ITS OWN WORDS. -/
 def bodyOk (l : List (BitVec 8)) : Prop := wlBody (wlWords l) = l ∧ lineOk (wlWords l)
-
-/-- D3: the input parses as admissible lines plus a started one. -/
-def discInput (I : List (BitVec 8)) : Prop :=
-  (∀ l ∈ bodiesOf I, bodyOk l) ∧ (∀ b ∈ restOf I, wlBodyByte b) ∧ (restOf I).length + 1 < lineMax
 
 theorem join_elem_of (bs : List (List (BitVec 8))) (b : BitVec 8) (hb : b ∈ wlJoin bs) :
     b = wlNl ∨ ∃ l, l ∈ bs ∧ b ∈ l := by
@@ -155,9 +146,6 @@ theorem nlines_pos_of_rest_nil (I : List (BitVec 8)) (hne : I ≠ []) (hr : rest
 /-- The console's INPUT bytes of an observation list, in order (Rocq
 `ins h := obs_ins Uart0 h`; deviation 2). -/
 def consIns (h : List Obs) : List (BitVec 8) := obsIns .uart0 h
-
-/-- Rocq `ins_obs_ins`. -/
-theorem consIns_obsIns (h : List Obs) : consIns h = obsIns .uart0 h := rfl
 
 theorem consIns_app (h k : List Obs) : consIns (h ++ k) = consIns h ++ consIns k :=
   obsIns_app .uart0 h k
@@ -491,42 +479,6 @@ theorem outCur_lt (ws : List (List (BitVec 8))) (i : Nat) (w : List (BitVec 8)) 
     outCur ws i + j < (wlLine (ws.drop 1)).length :=
   wlOff_lt_line (ws.drop 1) (i - 1) w j (by rw [ws_drop ws i hi]; exact hw) hj
 
-theorem lineAltsOf_0_length (ws : List (List (BitVec 8))) :
-    ((lineAltsOf ws)[0]!).length = (wlLine (ws.drop 1)).length + 2 := by
-  rw [lineAltsOf_0, List.length_append]; rfl
-
-theorem lineAlts_len1 (ws : List (List (BitVec 8))) : ((lineAltsOf ws)[1]!).length = 19 := rfl
-theorem lineAlts_len2_ (ws : List (List (BitVec 8))) : ((lineAltsOf ws)[2]!).length = 2 := rfl
-theorem lineAlts_len3 (ws : List (List (BitVec 8))) : ((lineAltsOf ws)[3]!).length = 5 := rfl
-
-theorem lineAlts_len_ge2 (ws : List (List (BitVec 8))) (a : Nat) (ha : a < 3) :
-    2 ≤ ((lineAltsOf ws)[a]!).length := by
-  match a, ha with
-  | 0, _ => rw [lineAltsOf_0_length]; omega
-  | 1, _ => rw [lineAlts_len1]; omega
-  | 2, _ => rw [lineAlts_len2_]; omega
-
-/-- ...and its last two bytes ARE the prompt. -/
-theorem lineAlts_dollar (ws : List (List (BitVec 8))) (a : Nat) (ha : a < 3) :
-    ((lineAltsOf ws)[a]!)[((lineAltsOf ws)[a]!).length - 2]? = some (uPrompt[0]!) := by
-  match a, ha with
-  | 0, _ =>
-    rw [lineAltsOf_0_length, lineAltsOf_0, Nat.add_sub_cancel,
-      List.getElem?_append_right (Nat.le_refl _), Nat.sub_self]
-    rfl
-  | 1, _ => rfl
-  | 2, _ => rfl
-
-theorem lineAlts_space (ws : List (List (BitVec 8))) (a : Nat) (ha : a < 3) :
-    ((lineAltsOf ws)[a]!)[((lineAltsOf ws)[a]!).length - 1]? = some (uPrompt[1]!) := by
-  match a, ha with
-  | 0, _ =>
-    rw [lineAltsOf_0_length, lineAltsOf_0, show (wlLine (ws.drop 1)).length + 2 - 1
-        = (wlLine (ws.drop 1)).length + 1 by omega, lookup_app_shift]
-    rfl
-  | 1, _ => rfl
-  | 2, _ => rfl
-
 theorem proOf_snoc_head (ps : List Nat) (a : Nat) (b : BitVec 8) (hnd : ¬ proDone ps)
     (hb : (proAlts[a]!)[0]? = some b) : proOf ps ++ [b] <+: proOf (ps ++ [a]) := by
   rw [proOf_open_app ps [a] hnd, proOf_singleton]
@@ -721,10 +673,6 @@ theorem nstarted_strict (J I : List (BitVec 8)) (hp : J <+: I) (hne : J ≠ I) :
     by_cases hb : b = wlNl
     · subst hb; rw [nstarted_snoc_nl] at hle; omega
     · rw [nstarted_snoc_other J b hb] at hle; omega
-
-theorem prefix_take_le {A : Type} (l : List A) (n m : Nat) (h : n ≤ m) : l.take n <+: l.take m := by
-  have : l.take n = (l.take m).take n := by rw [List.take_take, Nat.min_eq_left h]
-  rw [this]; exact List.take_prefix _ _
 
 /-! ## §3 The wire the user had seen at each input -/
 

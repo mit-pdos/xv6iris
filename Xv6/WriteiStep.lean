@@ -30,9 +30,6 @@ import Xv6.WriteiDefs
 
 namespace Xv6
 
-set_option linter.unusedVariables false
-set_option linter.unusedSectionVars false
-
 /-- What bmap's postcondition hands the rest of the iteration (Rocq's
 `Hwf2 Hagr2 Hnoun2 Hdep2 Hbud2` at `wi_loop`'s bmap return, on the
 success arm). -/

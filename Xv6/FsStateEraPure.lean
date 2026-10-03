@@ -96,8 +96,8 @@ have no `inodeOk` counterpart -- the tree carries the latter two as
    instead of Rocq's `b ∈ cov /\ ~ (b ∈ log_region_set ls)`.
 4. **`dir_nrec_bound` IS `dirNrec_boundMax`.**  Rocq's FsStateEra
    `dir_nrec_bound` shadows `DirView.dir_nrec_bound` (a different lemma,
-   ported as `Xv6.dirNrec_bound`); both live in namespace `Xv6` here, so
-   this one is renamed.  Its `0 <= sz` premise vanishes (deviation 1).
+   not ported: nothing uses it); the Lean name keeps the two apart.  Its
+   `0 <= sz` premise vanishes (deviation 1).
 5. `bool_decide P` in `dir_entries_era_node` / `fn_orphan_era_node` is
    `if P then ..` / `decide P`, as FsStateInode's `fnIsDir` / `fnOrphan`
    spell them; `Z.to_nat (bv_unsigned x)` is `x.toNat`.
@@ -593,8 +593,7 @@ theorem dirOrphanClean_dataExt (dn : Dinode) (data data' : Nat → List (BitVec 
 
 /-! ### and the two facts that instantiate it at `eraNode` -/
 
-/-- Rocq's FsStateEra `dir_nrec_bound` (deviation 4: renamed, since
-`Xv6.dirNrec_bound` is DirView's). -/
+/-- Rocq's FsStateEra `dir_nrec_bound` (deviation 4: renamed). -/
 theorem dirNrec_boundMax (sz : Nat) (hsz : sz ≤ MAXFILE * BSIZE) :
     16 * dirNrec sz ≤ MAXFILE * BSIZE := by
   unfold dirNrec

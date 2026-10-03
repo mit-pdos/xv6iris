@@ -28,15 +28,12 @@ CONE (this file): `uecho_lend`, `ucat_lend` (and `ucat_alts`, pure, in
 -/
 import Xv6.UkUnionEntriesPure
 import Xv6.UnionLinkInstAt
-import Xv6.UexecExecInst
 
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Std (ExtTreeSet)
 open Ualt
-
-set_option linter.unusedSectionVars false
 
 section UkUnionLend
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]

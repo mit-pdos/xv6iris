@@ -7,7 +7,7 @@ Rocq's header, in short: the same derivation as `UShCat` (turning
 `kexecImageOk` at the program's ELF into the rows its entry reads off the
 key), at `User.Grep.elf`, and the differences are all of it:
 
-1. grep's IMAGE IS ONE PAGE TALLER.  Its PT_LOADs are `(0, 0x10cc, R-X)` and
+1. grep's IMAGE IS ONE PAGE TALLER.  Its PT_LOADs are `(0, 0x10dc, R-X)` and
    `(0x2000, 0x420, RW-)`, so the text spans TWO pages (the X-and-not-W
    window is `[0, 8192)`), the data page is `0x2000`, `kexecTop` is `0x3000`,
    the guard page `0x3000`, the stack page `[0x4000, 0x5000)` and `kexecSz`
@@ -228,13 +228,6 @@ theorem grepArgvFits_of_ok_x (ws : List (List (BitVec 8))) (hok : execOk ws) :
 
 /-! ## 2. The two PT_LOADs, the entry, and the .bss window -/
 
-/-- **Rocq `grep_loads`** (deviation 3). -/
-theorem grepLoads :
-    ∃ p0 p1 : ElfPhdr, elfLoads User.Grep.elf = [p0, p1] ∧
-      p0.vaddr = 0 ∧ p0.memsz = 0x10cc ∧ p0.flags = 5 ∧
-      p1.vaddr = 0x2000 ∧ p1.memsz = 0x420 ∧ p1.flags = 6 :=
-  ⟨_, _, User.Grep.elf_loads, rfl, rfl, rfl, rfl, rfl, rfl⟩
-
 /-- **Rocq `grep_start_pc`**: the entry, as the resume pc reads it. -/
 theorem grepStart_pc : retPc (BitVec.ofNat 64 User.Grep.entry) = BitVec.ofNat 64 User.Grep.Sym.«start» := by
   decide
@@ -246,7 +239,7 @@ theorem grepBssImg (a : Nat) (h1 : 0x2000 ≤ a) (h2 : a < 0x2420) : elfImage Us
   rw [User.Grep.elf_image]
   have hc : User.Grep.code.byte a = none := by
     have hv : User.Grep.code.vaddr = 0 := rfl
-    have hs : User.Grep.code.size = 0x10cc := rfl
+    have hs : User.Grep.code.size = 0x10dc := rfl
     unfold User.USeg.byte
     rw [if_neg (by rw [hv, hs]; omega)]
   have hd : User.Grep.data.byte a = none := by

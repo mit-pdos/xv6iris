@@ -70,6 +70,7 @@ over the `UTlb`/`UWalk` facts):
    the proof.
 -/
 import MachCSL.UMemAmoBase
+import MachCSL.UTlb
 
 namespace MachCSL
 

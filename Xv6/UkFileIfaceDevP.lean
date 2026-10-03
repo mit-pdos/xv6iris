@@ -20,18 +20,13 @@ record take ONE argument.  The program's four stub laws are UkFileDev's
    `UkFileDevSysP` (`UkFileDevSysP.ofLanded UL`), each owned as listed in
    `UkFileDevDefs`' header.
 -/
-import Xv6.UkFileIfaceDefs
 import Xv6.UkFileDevClose
-import Xv6.UkFileDevNil
-import Xv6.UkFileDevOpen
 
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Std (ExtTreeSet)
 open HfpFileClaimsP
-
-set_option linter.unusedSectionVars false
 
 section FifDevP
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]

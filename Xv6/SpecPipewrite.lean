@@ -164,29 +164,4 @@ structure PIPEWRITE : Prop where
     wp_pipewrite_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl γp w q γkl γk j pid V M n Q Qe hw
       hj hproc hK hnoff htier hn hn'
 
-/-- The interrupts-off instance of `wp_pipewrite_eb` (the complement is the
-whole bundle). -/
-theorem PIPEWRITE.wp_pipewrite (A : PIPEWRITE) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
-    [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (cpu : CPU) (k : KCtx) (γl : GName) (γp : PipeNames) (w : Bool) (q : Qp)
-    (γkl : GName) (γk : KmemNames) (j : Nat) (pid : BitVec 32)
-    (V : ProcPriv) (M : Nat → List (BitVec 8)) (n : Int)
-    (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF) hw
-    hj hproc hK hsie hnoff hlocks htier hn hn' :
-    wp_pipewrite_body (hlc := hlc) (GF := GF) Γ cpu k γl γp w q γkl γk j pid V M n Q Qe hw
-      hj hproc hK hsie hnoff hlocks htier hn hn' := by
-  have h := A.wp_pipewrite_eb (hlc := hlc) (GF := GF) Γ cpu k γl γp w q γkl γk j pid V M n Q Qe hw
-    hj hproc hK hnoff htier hn hn'
-  unfold wp_pipewrite_eb_body at h
-  unfold wp_pipewrite_body
-  rw [hsie] at h
-  simp only [trapCsrsExt_false, cpuClaimExt_false] at h
-  iintro ⟨H0, H1, H2, Htc, Hcl, Hir, H6, H7, H8, H9, H10, H11, H12, Hnext⟩
-  iapply h
-  iframe H0 H1 H2 Htc Hcl Hir H6 H7 H8 H9 H10 H11 H12
-  iapply wpNext_mono $$ Hnext
-  iintro %cpu' HK %spie %spp %R' %P' %k' %p0 H1 H2 ⟨Htc, Hir⟩ Hcl H6 %hk' H7 H8 H9
-  iapply HK $$ %spie %spp %R' %P' %k' %p0 H1 H2 Htc Hcl Hir H6 %hk' H7 H8 H9
-
 end Xv6

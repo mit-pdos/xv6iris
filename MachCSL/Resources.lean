@@ -305,7 +305,7 @@ class MachFixedGS (hlc : outParam HasLC) (GF : BundledGFunctors) where
   the taint.  Persistent and timeless (fields).  Its LAW -- the era's
   licence for the two process events -- names Xv6's console events, so it
   lives on the Xv6-level record (`Xv6.AppIface.wild_lic`), read back at a
-  record whose slots are the interface's (`Xv6.consLicenceAt_of_wild`).
+  record whose slots are the interface's.
   `wildNone` (`False`) for an application with no masked program. -/
   wild : Nat → IProp GF
   wild_persistent : ∀ k, Persistent (wild k)
@@ -656,7 +656,7 @@ theorem not_devBytes_of_ramBytes {pa : PAddr} {n : Nat} (h : ramBytes pa n) (hn 
     ¬ devBytes pa n := by
   intro hd
   have h1 := hd 0 hn
-  simp only [BitVec.ofNat_eq_ofNat, BitVec.add_zero] at h1
+  simp only [BitVec.add_zero] at h1
   rw [devAddr_false_of_ramBytes h hn] at h1
   exact absurd h1 (by decide)
 
@@ -709,14 +709,6 @@ theorem ramBytes_of_readBytes {m : FlatMem} (hm : memRam m) {ag : Agent} {tv : N
   refine ramBytes_of_cells hm (fun j hj => ?_)
   have hr := h j hj
   unfold FlatMem.read at hr
-  cases hg : m[pa + BitVec.ofNat 64 j]? with
-  | none => rw [hg] at hr; simp at hr
-  | some H => exact ⟨H, rfl⟩
-
-theorem ramBytes_of_topBytes {m : FlatMem} (hm : memRam m) {pa : PAddr} {n : Nat}
-    {w : BitVec (8 * n)} (h : m.topBytes pa n w) : ramBytes pa n := by
-  refine ramBytes_of_cells hm (fun j hj => ?_)
-  have hr := h j hj
   cases hg : m[pa + BitVec.ofNat 64 j]? with
   | none => rw [hg] at hr; simp at hr
   | some H => exact ⟨H, rfl⟩
@@ -784,7 +776,7 @@ theorem mmOk_afterLoad (σ : MState) (cpu : CPU) (pa : PAddr) (n tvn : Nat) (htv
   simp only [MState.top] at *
   by_cases hc : c = cpu
   · subst hc
-    simp only [MState.afterLoad, updCpu, if_true]
+    simp only [updCpu, if_true]
     refine ⟨a1, a2, ?_, ?_⟩
     · simp only [HRead.afterLoad]; omega
     · intro a
@@ -792,7 +784,7 @@ theorem mmOk_afterLoad (σ : MState) (cpu : CPU) (pa : PAddr) (n tvn : Nat) (htv
       split
       · exact htv
       · exact a4 a
-  · simp only [MState.afterLoad, updCpu, hc, if_false]
+  · simp only [updCpu, hc, if_false]
     exact ⟨a1, a2, a3, a4⟩
 
 theorem mmOk_fence (σ : MState) (cpu : CPU) (b : barrier_kind) (h : mmOk σ) : mmOk (σ.fence cpu b) := by
@@ -804,12 +796,12 @@ theorem mmOk_fence (σ : MState) (cpu : CPU) (b : barrier_kind) (h : mmOk σ) : 
   simp only [MState.top] at *
   by_cases hc : c = cpu
   · subst hc
-    simp only [MState.fence, updCpu, if_true]
+    simp only [updCpu, if_true]
     refine ⟨fencePost_le _ _ _ _ _ _ b1 b3 hpub, ?_, a3, a4⟩
     split
     · exact Nat.max_le.2 ⟨b2, fencePost_le _ _ _ _ _ _ b1 b3 hpub⟩
     · exact b2
-  · simp only [MState.fence, updCpu, hc, if_false]
+  · simp only [updCpu, hc, if_false]
     exact ⟨a1, a2, a3, a4⟩
 
 theorem mmOk_store (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (excl : Bool)
@@ -824,15 +816,15 @@ theorem mmOk_store (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec 
     simp only [MState.top] at *
     by_cases hc : c = cpu
     · subst hc
-      simp only [MState.store, updCpu, if_true, List.length_append, List.length_singleton]
+      simp only [updCpu, if_true, List.length_append, List.length_singleton]
       refine ⟨?_, by omega, ?_, ?_⟩
       · split <;> omega
       · simp only [HRead.clearAcq]; omega
       · intro a; simp only [HRead.clearAcq]; have := a4 a; omega
-    · simp only [MState.store, updCpu, hc, if_false, List.length_append, List.length_singleton]
+    · simp only [updCpu, hc, if_false, List.length_append, List.length_singleton]
       exact ⟨by omega, by omega, by omega, fun a => by have := a4 a; omega⟩
   · intro c r hr a v hav
-    simp only [MState.store, updCpu] at hr ⊢
+    simp only [updCpu] at hr ⊢
     by_cases hc : c = cpu
     · subst hc
       simp at hr
@@ -858,10 +850,10 @@ theorem mmOk_storeDma (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
     exact FlatMem.writeBytes_histOk σ.mem σ.log pa w diskAgent h1 a H hget
   · intro c
     obtain ⟨a1, a2, a3, a4⟩ := h2 c
-    simp only [MState.storeDma, MState.top, List.length_append, List.length_singleton] at *
+    simp only [MState.top, List.length_append, List.length_singleton] at *
     exact ⟨by omega, by omega, by omega, fun a => by have := a4 a; omega⟩
   · intro c r hr a v hav
-    simp only [MState.storeDma] at hr ⊢
+    simp only [] at hr ⊢
     have hno' : ∀ j, j < n → a ≠ pa + BitVec.ofNat 64 j := by
       intro j hj heq
       exact hno ⟨c, r, hr, j, hj, by rw [← heq, hav]; rfl⟩
@@ -876,7 +868,7 @@ theorem mmOk_setRt (σ : MState) (d : DevId) (rt : DevRt)
     (hnext : 0 < (σ.devrt d).next → 0 < rt.next) (h : mmOk σ) : mmOk (σ.setRt d rt) := by
   obtain ⟨h1, h2, h3, h4, h5⟩ := h
   refine ⟨h1, h2, h3, h4, fun d' => ?_⟩
-  simp only [MState.setRt, updCpu']
+  simp only [updCpu']
   by_cases hd : d' = d
   · subst hd; simp only [if_true]; exact hnext (h5 d')
   · simp only [hd, if_false]; exact h5 d'
@@ -1140,6 +1132,7 @@ theorem obsAuth_lb (h : List Obs) : obsAuth (GF := GF) h ⊢ obsAuth h ∗ obsHi
   ihave #Hlb := MonoList.lb_own_get _ _ h $$ Ha
   iframe Hv Ha Hlb
 
+-- restored for NI M2 (dead-code pass 1 deleted it)
 /-- A snapshot and the authority together order the two histories. -/
 theorem obsHistLb_prefix (h h0 : List Obs) :
     obsAuth (GF := GF) h ∗ obsHistLb h0 ⊢ ⌜h0 <+: h⌝ := by
@@ -1147,22 +1140,6 @@ theorem obsHistLb_prefix (h h0 : List Obs) :
   iintro ⟨⟨_, Ha⟩, Hlb⟩
   ihave %hv := MonoList.auth_lb_own_valid _ _ h h0 $$ Ha Hlb
   ipureintro; exact hv.2
-
-/-- TWO LOWER BOUNDS ON ONE MONOTONE HISTORY ARE COMPARABLE: the one fact
-that lets a writer's view shift place its byte's history against the one a
-claim is read at, without either side holding the authority. -/
-theorem obsHistLb_cmp (h1 h2 : List Obs) :
-    obsHistLb (GF := GF) h1 ∗ obsHistLb h2 ⊢ ⌜h1 <+: h2 ∨ h2 <+: h1⌝ := by
-  unfold obsHistLb
-  iintro ⟨H1, H2⟩
-  iapply MonoList.lb_own_valid _ h1 h2 $$ H1 H2
-
-/-- A bound weakens to any prefix of itself. -/
-theorem obsHistLb_mono (h0 h1 : List Obs) (hp : h0 <+: h1) :
-    obsHistLb (GF := GF) h1 ⊢ obsHistLb h0 := by
-  unfold obsHistLb
-  iintro H
-  iapply MonoList.lb_own_le _ h0 hp $$ H
 
 /-- THE TRIVIAL TAG FAMILY: what an application that claims nothing about its
 input fills the tag slot with. -/

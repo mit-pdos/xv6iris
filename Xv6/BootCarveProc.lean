@@ -14,7 +14,7 @@ the rest at `X.toKpt`, SpecMain deviation 5):
   block's context / ofile / name rows are stated in (Rocq
   `boot_ctx_cells` / `boot_zero_cells` / `boot_name_cells`, one lemma);
 * §2 ONE PROC SLOT (`bootCarveProc_slot`, Rocq `boot_proc_slot`): the
-  368 bytes of `proc[i]` are `procRaw i` (lock words, state, kstack, the
+  376 bytes of `proc[i]` are `procRaw i` (lock words, state, kstack, the
   fd-free dormant block with its half of pid and of xstate), the public
   pair (`chan`, `procPubRest` with the killed row on its free arm), the
   `pid_lock` quarter of pid and the parent cell, all at their `.bss`
@@ -46,9 +46,7 @@ the rest at `X.toKpt`, SpecMain deviation 5):
   (what `BootCarveHart.bootCarve_gotRo` hands back) into `first` /
   `nextpid` / `uarts[0]` / `uarts[1]`; `bootCarveProc_mainGlobalsRaw`
   places this file's rows (`bcpProcRows`) among the other agents' in
-  `mainGlobalsRaw`'s order (`bootCarveProc_mainGlobalsRaw`);
-* §9 THE TIER SPLIT (`bootCarveProc_tiers`, SpecMain deviation 5): the
-  Bare rows at the entry context `X`, the rest at `X.toKpt`.
+  `mainGlobalsRaw`'s order (`bootCarveProc_mainGlobalsRaw`).
 
 Deviations (none process-layer):
 1. (Retired, D47.) The boot image is the language constant `bootImage`; `BootImage` is the theorem `bootImage_wf`.
@@ -71,8 +69,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-! ## §1 Runs of zero cells -/
 
 section
@@ -83,8 +79,8 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 the addresses `f j`, as the `replicate`-indexed big-op the proc block's
 rows are stated in. -/
 theorem bcpZeroRun [CurCtx] (w : Nat) (hw : 0 < w)
-    (f : Nat → PAddr) (A : Nat) (hlo : 0x8000a360 ≤ A) (hal : A % w = 0) :
-    ∀ n : Nat, (∀ j, j < n → (f j).toNat = A + w * j) → A + w * n ≤ 0x80023870 →
+    (f : Nat → PAddr) (A : Nat) (hlo : 0x8000a400 ≤ A) (hal : A % w = 0) :
+    ∀ n : Nat, (∀ j, j < n → (f j).toNat = A + w * j) → A + w * n ≤ 0x80023b10 →
       kmapStatic (GF := GF) ⊢ bootRan (imgFlat bootImage) A (A + w * n) -∗
         [∗list] j ↦ v ∈ List.replicate n (0#(8 * w)), wordPointsTo (f j) w (DFrac.own 1) v
   | 0, _, _ => by
@@ -131,34 +127,34 @@ def bcpBootPriv : ProcPriv :=
   { kstack := 0#64, sz := 0#64, pagetable := 0#64, trapframe := 0#64, upt := UPtd.mk 0#44 0#44 ∅,
     tf := [], context := List.replicate 14 0#64, ofile := List.replicate NOFILE 0#64, fdg := 0,
     cwd := 0#64, name := List.replicate PNAMELEN 0#8, cwi := 0, gen := 0, chg := 0, pvLazy := true, pvSecc := 0#64,
-    ev := 0 }
+    ev := 0, root := 0#64, rti := 0 }
 
 theorem bcp_pnameWf_zero : pnameWf (List.replicate PNAMELEN 0#8) :=
   ⟨by simp [PNAMELEN], 0, by decide, rfl⟩
 
 /-- `&proc[i]`, as a number. -/
-def bcpProc (i : Nat) : Nat := MachCSL.KernelSyms.«proc» + 368 * i
+def bcpProc (i : Nat) : Nat := MachCSL.KernelSyms.«proc» + 376 * i
 
 theorem bcp_proc_bounds (i : Nat) (hi : i < NPROC) :
-    0x8000a360 ≤ bcpProc i ∧ bcpProc i + 368 ≤ 0x80023870 ∧ bcpProc i % 8 = 0 := by
+    0x8000a400 ≤ bcpProc i ∧ bcpProc i + 376 ≤ 0x80023b10 ∧ bcpProc i % 8 = 0 := by
   unfold bcpProc NPROC at *
   simp only [MachCSL.KernelSyms.«proc»]
   omega
 
-/-- **ONE PROC SLOT, carved** (Rocq `boot_proc_slot`): the 368 `.bss`
+/-- **ONE PROC SLOT, carved** (Rocq `boot_proc_slot`): the 376 `.bss`
 bytes of `proc[i]`, every field at zero; the pid cell cut
 `1/2` (the dormant block) `+ 1/4` (`procPubRest`) `+ 1/4` (`pid_lock`), the
 xstate cell `1/2 + 1/2` (block / `procPubRest`), the killed row on its
 free arm. -/
 theorem bootCarveProc_slot [CurCtx] (i : Nat) (hi : i < NPROC) :
-    kmapStatic (GF := GF) ⊢ bootRan (imgFlat bootImage) (bcpProc i) (bcpProc i + 368) -∗ bcpSlot i := by
+    kmapStatic (GF := GF) ⊢ bootRan (imgFlat bootImage) (bcpProc i) (bcpProc i + 376) -∗ bcpSlot i := by
   have hP : (procAddr i).toNat = bcpProc i := procAddr_toNat i hi
   obtain ⟨hlo, hend, hal⟩ := bcp_proc_bounds i hi
   unfold bcpSlot procRaw procFieldsIn procDormantNofd procFieldsNoKstack contextCells ofileCells
     pnameCells byteBuf procPubRest pidPriv pidPub pidLockQ xsHalf
   generalize procAddr i = pa at hP ⊢
   generalize bcpProc i = P at hP hlo hend hal ⊢
-  have o : ∀ k, k < 368 → (pa + BitVec.ofNat 64 k).toNat = P + k :=
+  have o : ∀ k, k < 376 → (pa + BitVec.ofNat 64 k).toNat = P + k :=
     fun k hk => bc_toNat_add pa k P hP (by omega)
   have hctx : ∀ j, j < 14 → (pContext pa j).toNat = P + 96 + 8 * j := by
     intro j hj
@@ -168,32 +164,33 @@ theorem bootCarveProc_slot [CurCtx] (i : Nat) (hi : i < NPROC) :
   have hof : ∀ j, j < NOFILE → (pOfile pa j).toNat = P + 208 + 8 * j := by
     intro j hj
     exact bc_toNat_add (pa + 208#64) (8 * j) (P + 208) (o 208 (by omega)) (by omega)
-  have hnm : ∀ j, j < PNAMELEN → (pName pa + BitVec.ofNat 64 j).toNat = P + 344 + 1 * j := by
+  have hnm : ∀ j, j < PNAMELEN → (pName pa + BitVec.ofNat 64 j).toNat = P + 352 + 1 * j := by
     intro j hj
-    have := bc_toNat_add (pName pa) j (P + 344) (o 344 (by omega)) (by omega)
+    have := bc_toNat_add (pName pa) j (P + 352) (o 352 (by omega)) (by omega)
     omega
   have hq := wordPointsTo_split (GF := GF) (pPid pa) 4 ((1 : Qp).half.half) ((1 : Qp).half.half) 0#32
   rw [Qp.half_add_half] at hq
   have hkill := killPaid_zero (MachFixedGS.killCred (hlc := hlc) (GF := GF)) 0#32 0#32 rfl rfl
   iintro #Hk H
-  icases (bootRan_split (GF := GF) (imgFlat bootImage) P (P + 24) (P + 368) (by omega) (by omega)).1 $$ H with ⟨Hlk, H⟩
-  icases (bootRan_split (GF := GF) (imgFlat bootImage) (P + 24) (P + 28) (P + 368) (by omega) (by omega)).1 $$ H with ⟨Hst, H⟩
-  icases (bootRan_split (GF := GF) (imgFlat bootImage) (P + 28) (P + 32) (P + 368) (by omega) (by omega)).1 $$ H with ⟨-, H⟩
-  icases (bootRan_split (GF := GF) (imgFlat bootImage) (P + 32) (P + 40) (P + 368) (by omega) (by omega)).1 $$ H with ⟨Hch, H⟩
-  icases (bootRan_split (GF := GF) (imgFlat bootImage) (P + 40) (P + 44) (P + 368) (by omega) (by omega)).1 $$ H with ⟨Hkl, H⟩
-  icases (bootRan_split (GF := GF) (imgFlat bootImage) (P + 44) (P + 48) (P + 368) (by omega) (by omega)).1 $$ H with ⟨Hxs, H⟩
-  icases (bootRan_split (GF := GF) (imgFlat bootImage) (P + 48) (P + 52) (P + 368) (by omega) (by omega)).1 $$ H with ⟨Hpid, H⟩
-  icases (bootRan_split (GF := GF) (imgFlat bootImage) (P + 52) (P + 56) (P + 368) (by omega) (by omega)).1 $$ H with ⟨-, H⟩
-  icases (bootRan_split (GF := GF) (imgFlat bootImage) (P + 56) (P + 64) (P + 368) (by omega) (by omega)).1 $$ H with ⟨Hpar, H⟩
-  icases (bootRan_split (GF := GF) (imgFlat bootImage) (P + 64) (P + 72) (P + 368) (by omega) (by omega)).1 $$ H with ⟨Hks, H⟩
-  icases (bootRan_split (GF := GF) (imgFlat bootImage) (P + 72) (P + 80) (P + 368) (by omega) (by omega)).1 $$ H with ⟨Hsz, H⟩
-  icases (bootRan_split (GF := GF) (imgFlat bootImage) (P + 80) (P + 88) (P + 368) (by omega) (by omega)).1 $$ H with ⟨Hpg, H⟩
-  icases (bootRan_split (GF := GF) (imgFlat bootImage) (P + 88) (P + 96) (P + 368) (by omega) (by omega)).1 $$ H with ⟨Htf, H⟩
-  icases (bootRan_split (GF := GF) (imgFlat bootImage) (P + 96) (P + 96 + 8 * 14) (P + 368) (by omega) (by omega)).1 $$ H with ⟨Hctx, H⟩
-  icases (bootRan_split (GF := GF) (imgFlat bootImage) (P + 96 + 8 * 14) (P + 208 + 8 * NOFILE) (P + 368) (by omega) (by omega)).1 $$ H with ⟨Hof, H⟩
-  icases (bootRan_split (GF := GF) (imgFlat bootImage) (P + 208 + 8 * NOFILE) (P + 344) (P + 368) (by omega) (by omega)).1 $$ H with ⟨Hcwd, Hnm⟩
-  icases (bootRan_split (GF := GF) (imgFlat bootImage) (P + 344) (P + 360) (P + 368) (by omega) (by omega)).1 $$ Hnm with ⟨Hnm, Hsc⟩
-  icases (bootRan_split (GF := GF) (imgFlat bootImage) (P + 208 + 8 * NOFILE) (P + 336) (P + 344) (by omega) (by omega)).1 $$ Hcwd with ⟨-, Hcwd⟩
+  icases (bootRan_split (GF := GF) (imgFlat bootImage) P (P + 24) (P + 376) (by omega) (by omega)).1 $$ H with ⟨Hlk, H⟩
+  icases (bootRan_split (GF := GF) (imgFlat bootImage) (P + 24) (P + 28) (P + 376) (by omega) (by omega)).1 $$ H with ⟨Hst, H⟩
+  icases (bootRan_split (GF := GF) (imgFlat bootImage) (P + 28) (P + 32) (P + 376) (by omega) (by omega)).1 $$ H with ⟨-, H⟩
+  icases (bootRan_split (GF := GF) (imgFlat bootImage) (P + 32) (P + 40) (P + 376) (by omega) (by omega)).1 $$ H with ⟨Hch, H⟩
+  icases (bootRan_split (GF := GF) (imgFlat bootImage) (P + 40) (P + 44) (P + 376) (by omega) (by omega)).1 $$ H with ⟨Hkl, H⟩
+  icases (bootRan_split (GF := GF) (imgFlat bootImage) (P + 44) (P + 48) (P + 376) (by omega) (by omega)).1 $$ H with ⟨Hxs, H⟩
+  icases (bootRan_split (GF := GF) (imgFlat bootImage) (P + 48) (P + 52) (P + 376) (by omega) (by omega)).1 $$ H with ⟨Hpid, H⟩
+  icases (bootRan_split (GF := GF) (imgFlat bootImage) (P + 52) (P + 56) (P + 376) (by omega) (by omega)).1 $$ H with ⟨-, H⟩
+  icases (bootRan_split (GF := GF) (imgFlat bootImage) (P + 56) (P + 64) (P + 376) (by omega) (by omega)).1 $$ H with ⟨Hpar, H⟩
+  icases (bootRan_split (GF := GF) (imgFlat bootImage) (P + 64) (P + 72) (P + 376) (by omega) (by omega)).1 $$ H with ⟨Hks, H⟩
+  icases (bootRan_split (GF := GF) (imgFlat bootImage) (P + 72) (P + 80) (P + 376) (by omega) (by omega)).1 $$ H with ⟨Hsz, H⟩
+  icases (bootRan_split (GF := GF) (imgFlat bootImage) (P + 80) (P + 88) (P + 376) (by omega) (by omega)).1 $$ H with ⟨Hpg, H⟩
+  icases (bootRan_split (GF := GF) (imgFlat bootImage) (P + 88) (P + 96) (P + 376) (by omega) (by omega)).1 $$ H with ⟨Htf, H⟩
+  icases (bootRan_split (GF := GF) (imgFlat bootImage) (P + 96) (P + 96 + 8 * 14) (P + 376) (by omega) (by omega)).1 $$ H with ⟨Hctx, H⟩
+  icases (bootRan_split (GF := GF) (imgFlat bootImage) (P + 96 + 8 * 14) (P + 208 + 8 * NOFILE) (P + 376) (by omega) (by omega)).1 $$ H with ⟨Hof, H⟩
+  icases (bootRan_split (GF := GF) (imgFlat bootImage) (P + 208 + 8 * NOFILE) (P + 352) (P + 376) (by omega) (by omega)).1 $$ H with ⟨Hcwd, Hnm⟩
+  icases (bootRan_split (GF := GF) (imgFlat bootImage) (P + 352) (P + 368) (P + 376) (by omega) (by omega)).1 $$ Hnm with ⟨Hnm, Hsc⟩
+  icases (bootRan_split (GF := GF) (imgFlat bootImage) (P + 208 + 8 * NOFILE) (P + 336) (P + 352) (by omega) (by omega)).1 $$ Hcwd with ⟨-, Hcwd⟩
+  icases (bootRan_split (GF := GF) (imgFlat bootImage) (P + 336) (P + 344) (P + 352) (by omega) (by omega)).1 $$ Hcwd with ⟨Hcwd, Hrt⟩
   ihave Hlk := bootCarve_lockWords (GF := GF) pa P hP hlo (by omega) hal $$ Hk Hlk
   ihave Hst := bootBss_wordAt (GF := GF) (pa + 24#64) 4 (P + 24) (P + 28) (o 24 (by omega)) rfl (by omega) (by omega) (by omega) $$ Hk Hst
   ihave Hch := bootBss_wordAt (GF := GF) (pChan pa) 8 (P + 32) (P + 40) (o 32 (by omega)) rfl (by omega) (by omega) (by omega) $$ Hk Hch
@@ -206,19 +203,20 @@ theorem bootCarveProc_slot [CurCtx] (i : Nat) (hi : i < NPROC) :
   ihave Hpg := bootBss_wordAt (GF := GF) (pPagetable pa) 8 (P + 80) (P + 88) (o 80 (by omega)) rfl (by omega) (by omega) (by omega) $$ Hk Hpg
   ihave Htf := bootBss_wordAt (GF := GF) (pTrapframe pa) 8 (P + 88) (P + 96) (o 88 (by omega)) rfl (by omega) (by omega) (by omega) $$ Hk Htf
   ihave Hcwd := bootBss_wordAt (GF := GF) (pCwd pa) 8 (P + 336) (P + 344) (o 336 (by omega)) rfl (by omega) (by omega) (by omega) $$ Hk Hcwd
-  ihave Hsc := bootBss_wordAt (GF := GF) (pSecc pa) 8 (P + 360) (P + 368) (o 360 (by omega)) rfl (by omega) (by omega) (by omega) $$ Hk Hsc
+  ihave Hsc := bootBss_wordAt (GF := GF) (pSecc pa) 8 (P + 368) (P + 376) (o 368 (by omega)) rfl (by omega) (by omega) (by omega) $$ Hk Hsc
+  ihave Hrt := bootBss_wordAt (GF := GF) (pRoot pa) 8 (P + 344) (P + 352) (o 344 (by omega)) rfl (by omega) (by omega) (by omega) $$ Hk Hrt
   ihave Hctx := bcpZeroRun (GF := GF) 8 (by omega) (pContext pa) (P + 96) (by omega) (by omega) 14 hctx (by omega) $$ Hk Hctx
   ihave Hof := bcpZeroRun (GF := GF) 8 (by omega) (pOfile pa) (P + 208) (by omega) (by omega) NOFILE hof (by omega) $$ Hk
     [Hof]
   · rw [show P + 96 + 8 * 14 = P + 208 by omega]; iexact Hof
-  ihave Hnm := bcpZeroRun (GF := GF) 1 (by omega) (fun j => pName pa + BitVec.ofNat 64 j) (P + 344) (by omega) (by omega) PNAMELEN hnm (by omega) $$ Hk
+  ihave Hnm := bcpZeroRun (GF := GF) 1 (by omega) (fun j => pName pa + BitVec.ofNat 64 j) (P + 352) (by omega) (by omega) PNAMELEN hnm (by omega) $$ Hk
     [Hnm]
-  · rw [show P + 344 + 1 * PNAMELEN = P + 360 by omega]; iexact Hnm
+  · rw [show P + 352 + 1 * PNAMELEN = P + 368 by omega]; iexact Hnm
   icases wordPointsTo_halves_split (GF := GF) (pPid pa) 4 0#32 $$ Hpid with ⟨Hpid1, Hpid⟩
   icases hq $$ Hpid with ⟨Hpid2, Hpid3⟩
   icases wordPointsTo_halves_split (GF := GF) (pXstate pa) 4 0#32 $$ Hxs with ⟨Hxs1, Hxs2⟩
   ihave Hkp := hkill
-  isplitl [Hlk Hst Hks Hpid1 Hsz Hpg Htf Hctx Hof Hcwd Hnm Hsc Hxs1]
+  isplitl [Hlk Hst Hks Hpid1 Hsz Hpg Htf Hctx Hof Hcwd Hnm Hsc Hrt Hxs1]
   · isplitl [Hlk Hst Hks]
     · iexists 0#32, 0#64, 0#64, 0#32, 0#64
       iframe Hlk Hst Hks
@@ -227,7 +225,7 @@ theorem bootCarveProc_slot [CurCtx] (i : Nat) (hi : i < NPROC) :
       isplitr
       · ipureintro; trivial
       iframe Hpid1 Hsz Hpg Htf Hcwd
-      isplitl [Hctx Hof Hnm Hsc]
+      isplitl [Hctx Hof Hnm Hsc Hrt]
       · isplitl [Hctx]
         · isplitr
           · ipureintro; rfl
@@ -240,7 +238,7 @@ theorem bootCarveProc_slot [CurCtx] (i : Nat) (hi : i < NPROC) :
           · isplitr
             · ipureintro; exact bcp_pnameWf_zero
             · iexact Hnm
-          · iexact Hsc
+          · iframe Hsc Hrt
       · iexists 0#32
         iexact Hxs1
   isplitl [Hch Hkl Hxs2 Hpid2 Hkp]
@@ -258,7 +256,7 @@ of `proc[]` are `mainGlobalsRaw`'s three proc big-ops and wait_lock's
 element is `bootCarveProc_slot`. -/
 theorem bootCarveProc_procs [CurCtx] :
     kmapStatic (GF := GF) ⊢
-      bootRan (imgFlat bootImage) MachCSL.KernelSyms.«proc» (MachCSL.KernelSyms.«proc» + 368 * NPROC) -∗
+      bootRan (imgFlat bootImage) MachCSL.KernelSyms.«proc» (MachCSL.KernelSyms.«proc» + 376 * NPROC) -∗
       ([∗list] i ∈ List.range NPROC, procRaw i) ∗
       ([∗list] i ∈ List.range NPROC,
         (∃ ch : BitVec 64, wordPointsTo (pChan (procAddr i)) 8 (DFrac.own 1) ch) ∗
@@ -266,13 +264,13 @@ theorem bootCarveProc_procs [CurCtx] :
       ([∗list] i ∈ List.range NPROC, wordPointsTo (pPid (procAddr i)) 4 pidLockQ 0#32) ∗
       parentsResAt curCtx := by
   iintro #Hk H
-  ihave H := bootRan_stride (GF := GF) (imgFlat bootImage) MachCSL.KernelSyms.«proc» 368 NPROC $$ H
+  ihave H := bootRan_stride (GF := GF) (imgFlat bootImage) MachCSL.KernelSyms.«proc» 376 NPROC $$ H
   ihave H : [∗list] i ∈ List.range NPROC, bcpSlot (GF := GF) i $$ [H]
   · iapply BigSepL.bigSepL_impl $$ H
     imodintro
     iintro %k %i %hk Hi
     have hi : i < NPROC := List.mem_range.1 (List.mem_of_getElem? hk)
-    have e : MachCSL.KernelSyms.«proc» + 368 * i = bcpProc i := rfl
+    have e : MachCSL.KernelSyms.«proc» + 376 * i = bcpProc i := rfl
     rw [e]
     iapply bootCarveProc_slot i hi $$ Hk Hi
   unfold bcpSlot
@@ -301,19 +299,19 @@ theorem bcp_range10 (E : Nat → IProp GF) :
   iintro ⟨H0, H1, H2, H3, H4, H5, H6, H7, H8, H9, -⟩
   iframe H0 H1 H2 H3 H4 H5 H6 H7 H8 H9
 
-theorem bcp_devsw_val : MachCSL.KernelSyms.«devsw» = 0x800226d8 := rfl
+theorem bcp_devsw_val : MachCSL.KernelSyms.«devsw» = 0x80022978 := rfl
 
 /-- One `devsw[i]` entry at its `.bss` zeros. -/
 theorem bcp_devswEntry [CurCtx] (i : Nat) (hi : i < 10) :
-    kmapStatic (GF := GF) ⊢ bootRan (imgFlat bootImage) (0x800226d8 + 16 * i) (0x800226d8 + 16 * i + 16) -∗
+    kmapStatic (GF := GF) ⊢ bootRan (imgFlat bootImage) (0x80022978 + 16 * i) (0x80022978 + 16 * i + 16) -∗
       wordPointsTo (aDevswRead i) 8 (DFrac.own 1) 0#64 ∗ wordPointsTo (aDevswWrite i) 8 (DFrac.own 1) 0#64 := by
-  have hD : (KA.«devsw» : BitVec 64).toNat = 0x800226d8 := rfl
-  have hr : (aDevswRead i).toNat = 0x800226d8 + 16 * i := bc_toNat_add _ (16 * i) _ hD (by omega)
-  have hw : (aDevswWrite i).toNat = 0x800226d8 + 16 * i + 8 := by
+  have hD : (KA.«devsw» : BitVec 64).toNat = 0x80022978 := rfl
+  have hr : (aDevswRead i).toNat = 0x80022978 + 16 * i := bc_toNat_add _ (16 * i) _ hD (by omega)
+  have hw : (aDevswWrite i).toNat = 0x80022978 + 16 * i + 8 := by
     have := bc_toNat_add KA.«devsw» (16 * i + 8) _ hD (by omega); unfold aDevswWrite; omega
   iintro #Hk H
-  icases (bootRan_split (GF := GF) (imgFlat bootImage) (0x800226d8 + 16 * i) (0x800226d8 + 16 * i + 8)
-    (0x800226d8 + 16 * i + 16) (by omega) (by omega)).1 $$ H with ⟨Hr, Hw⟩
+  icases (bootRan_split (GF := GF) (imgFlat bootImage) (0x80022978 + 16 * i) (0x80022978 + 16 * i + 8)
+    (0x80022978 + 16 * i + 16) (by omega) (by omega)).1 $$ H with ⟨Hr, Hw⟩
   ihave Hr := bootBss_wordAt (GF := GF) _ 8 _ _ hr rfl (by omega) (by omega) (by omega) $$ Hk Hr
   ihave Hw := bootBss_wordAt (GF := GF) _ 8 _ _ hw (by omega) (by omega) (by omega) (by omega) $$ Hk Hw
   iframe Hr Hw
@@ -330,7 +328,7 @@ theorem bootCarveProc_devsw [CurCtx] :
   have e2 : devswConsoleWrite = aDevswWrite 1 := rfl
   rw [bcp_devsw_val, e1, e2]
   iintro #Hk H
-  ihave H := bootRan_stride (GF := GF) (imgFlat bootImage) 0x800226d8 16 10 $$ H
+  ihave H := bootRan_stride (GF := GF) (imgFlat bootImage) 0x80022978 16 10 $$ H
   ihave H : [∗list] i ∈ List.range 10,
       (wordPointsTo (GF := GF) (aDevswRead i) 8 (DFrac.own 1) 0#64 ∗
         wordPointsTo (aDevswWrite i) 8 (DFrac.own 1) 0#64) $$ [H]
@@ -347,7 +345,7 @@ theorem bootCarveProc_devsw [CurCtx] :
   · iexists 0#64, 0#64; iframe H1r H1w
   iapply devswRest_intro $$ H0r H0w H2r H2w H3r H3w H4r H4w H5r H5w H6r H6w H7r H7w H8r H8w H9r H9w
 
-theorem bcp_kpt_val : MachCSL.KernelSyms.«kernel_pagetable» = 0x8000a368 := rfl
+theorem bcp_kpt_val : MachCSL.KernelSyms.«kernel_pagetable» = 0x8000a408 := rfl
 
 /-- `kernel_pagetable`, at its `.bss` zero. -/
 theorem bootCarveProc_kpt [CurCtx] :
@@ -356,10 +354,10 @@ theorem bootCarveProc_kpt [CurCtx] :
       ∃ kpt0 : BitVec 64, wordPointsTo kernelPagetableAddr 8 (DFrac.own 1) kpt0 := by
   rw [bcp_kpt_val]
   iintro #Hk H
-  ihave H := bootBss_wordAt (GF := GF) kernelPagetableAddr 8 0x8000a368 _ rfl rfl (by omega) (by omega) (by omega) $$ Hk H
+  ihave H := bootBss_wordAt (GF := GF) kernelPagetableAddr 8 0x8000a408 _ rfl rfl (by omega) (by omega) (by omega) $$ Hk H
   iexists 0#64; iexact H
 
-theorem bcp_kmem_val : MachCSL.KernelSyms.«kmem» = 0x80012440 := rfl
+theorem bcp_kmem_val : MachCSL.KernelSyms.«kmem» = 0x800124e0 := rfl
 
 /-- **`mainGlobalsBare`, carved** (Rocq `main_globals_raw`'s first three
 rows): the devsw table, kmem's NULL free list (the last 8 bytes of `kmem`)
@@ -374,13 +372,13 @@ theorem bootCarveProc_globalsBare [CurCtx] :
   ihave Hd := bootCarveProc_devsw $$ Hk Hd
   ihave Hp := bootCarveProc_kpt $$ Hk Hp
   rw [bcp_kmem_val]
-  ihave Hf := bootBss_wordAt (GF := GF) kmemFreelistAddr 8 (0x80012440 + 24) _ rfl rfl (by omega) (by omega) (by omega) $$ Hk Hf
+  ihave Hf := bootBss_wordAt (GF := GF) kmemFreelistAddr 8 (0x800124e0 + 24) _ rfl rfl (by omega) (by omega) (by omega) $$ Hk Hf
   unfold mainGlobalsBare
   icases Hd with ⟨Hd, Hr⟩
   iframe Hd Hr Hf Hp
 
-theorem bcp_cons_val : MachCSL.KernelSyms.«cons» = 0x80012380 := rfl
-theorem bcp_pr_val : MachCSL.KernelSyms.«pr» = 0x80012428 := rfl
+theorem bcp_cons_val : MachCSL.KernelSyms.«cons» = 0x80012420 := rfl
+theorem bcp_pr_val : MachCSL.KernelSyms.«pr» = 0x800124c8 := rfl
 
 /-- **`mainLocksBare`, carved** (Rocq `boot_lk_raw` at `cons` / `pr` /
 `kmem`): the three locks spent before the switch, at their `.bss` zeros,
@@ -393,9 +391,9 @@ theorem bootCarveProc_locksBare [CurCtx] :
       mainLocksBare := by
   rw [bcp_cons_val, bcp_pr_val, bcp_kmem_val]
   iintro #Hk Hc Hp Hm
-  ihave Hc := bootCarve_lockWords (GF := GF) consAddr 0x80012380 rfl (by omega) (by omega) (by omega) $$ Hk Hc
-  ihave Hp := bootCarve_lockWords (GF := GF) prLock 0x80012428 rfl (by omega) (by omega) (by omega) $$ Hk Hp
-  ihave Hm := bootCarve_lockWords (GF := GF) kmemLockAddr 0x80012440 rfl (by omega) (by omega) (by omega) $$ Hk Hm
+  ihave Hc := bootCarve_lockWords (GF := GF) consAddr 0x80012420 rfl (by omega) (by omega) (by omega) $$ Hk Hc
+  ihave Hp := bootCarve_lockWords (GF := GF) prLock 0x800124c8 rfl (by omega) (by omega) (by omega) $$ Hk Hp
+  ihave Hm := bootCarve_lockWords (GF := GF) kmemLockAddr 0x800124e0 rfl (by omega) (by omega) (by omega) $$ Hk Hm
   unfold mainLocksBare mainLkRaw
   unfold lockWords
   icases Hc with ⟨Hc1, Hc2, Hc3, Hc4, Hc5⟩
@@ -409,8 +407,8 @@ theorem bootCarveProc_locksBare [CurCtx] :
 
 /-! ## §5 The scalars -/
 
-theorem bcp_initproc_val : MachCSL.KernelSyms.«initproc» = 0x8000a370 := rfl
-theorem bcp_ticks_val : MachCSL.KernelSyms.«ticks» = 0x8000a378 := rfl
+theorem bcp_initproc_val : MachCSL.KernelSyms.«initproc» = 0x8000a410 := rfl
+theorem bcp_ticks_val : MachCSL.KernelSyms.«ticks» = 0x8000a418 := rfl
 
 /-- `initproc`, at its `.bss` zero (Rocq `main_globals_raw`'s initproc row). -/
 theorem bootCarveProc_initproc [CurCtx] :
@@ -419,7 +417,7 @@ theorem bootCarveProc_initproc [CurCtx] :
       ∃ v0 : BitVec 64, wordPointsTo initprocAddr 8 (DFrac.own 1) v0 := by
   rw [bcp_initproc_val]
   iintro #Hk H
-  ihave H := bootBss_wordAt (GF := GF) initprocAddr 8 0x8000a370 _ rfl rfl (by omega) (by omega) (by omega) $$ Hk H
+  ihave H := bootBss_wordAt (GF := GF) initprocAddr 8 0x8000a410 _ rfl rfl (by omega) (by omega) (by omega) $$ Hk H
   iexists 0#64; iexact H
 
 /-- `tickslock`'s payload at the ambient context, at its `.bss` zero. -/
@@ -429,7 +427,7 @@ theorem bootCarveProc_ticks [CurCtx] :
       ticksResAt curCtx := by
   rw [bcp_ticks_val]
   iintro #Hk H
-  ihave H := bootBss_wordAt (GF := GF) ticksAddr 4 0x8000a378 _ rfl rfl (by omega) (by omega) (by omega) $$ Hk H
+  ihave H := bootBss_wordAt (GF := GF) ticksAddr 4 0x8000a418 _ rfl rfl (by omega) (by omega) (by omega) $$ Hk H
   iapply ticksRes_intro
   iexact H
 
@@ -460,26 +458,26 @@ theorem bootCarveProc_consRes [CurCtx] (cn : ConsNames) :
       consStoredAuth cn [] -∗ consCursor cn 0 -∗ consHi cn none -∗ consLogm cn [] -∗
       consDlcnt cn 0 -∗ consResAt cn curCtx := by
   rw [bcp_cons_val, consResAt_cur]
-  have hB : (consBufAddr).toNat = 0x80012380 + 24 := rfl
-  have hbs : ∀ j, j < INPUT_BUF_SIZE → (consBufAddr + BitVec.ofNat 64 j).toNat = 0x80012380 + 24 + 1 * j := by
+  have hB : (consBufAddr).toNat = 0x80012420 + 24 := rfl
+  have hbs : ∀ j, j < INPUT_BUF_SIZE → (consBufAddr + BitVec.ofNat 64 j).toNat = 0x80012420 + 24 + 1 * j := by
     intro j hj
     have := bc_toNat_add consBufAddr j _ hB (by unfold INPUT_BUF_SIZE at hj; omega)
     omega
   have hN : INPUT_BUF_SIZE = 128 := rfl
   have hts := consTags_none (GF := GF) INPUT_BUF_SIZE
   iintro #Hk H Hsa Hcu Hhi Hlm Hdc
-  icases (bootRan_split (GF := GF) (imgFlat bootImage) (0x80012380 + 24) (0x80012380 + 152)
-    (0x80012380 + 164) (by omega) (by omega)).1 $$ H with ⟨Hb, H⟩
-  icases (bootRan_split (GF := GF) (imgFlat bootImage) (0x80012380 + 152) (0x80012380 + 156)
-    (0x80012380 + 164) (by omega) (by omega)).1 $$ H with ⟨Hr, H⟩
-  icases (bootRan_split (GF := GF) (imgFlat bootImage) (0x80012380 + 156) (0x80012380 + 160)
-    (0x80012380 + 164) (by omega) (by omega)).1 $$ H with ⟨Hw, He⟩
+  icases (bootRan_split (GF := GF) (imgFlat bootImage) (0x80012420 + 24) (0x80012420 + 152)
+    (0x80012420 + 164) (by omega) (by omega)).1 $$ H with ⟨Hb, H⟩
+  icases (bootRan_split (GF := GF) (imgFlat bootImage) (0x80012420 + 152) (0x80012420 + 156)
+    (0x80012420 + 164) (by omega) (by omega)).1 $$ H with ⟨Hr, H⟩
+  icases (bootRan_split (GF := GF) (imgFlat bootImage) (0x80012420 + 156) (0x80012420 + 160)
+    (0x80012420 + 164) (by omega) (by omega)).1 $$ H with ⟨Hw, He⟩
   ihave Hb := bcpZeroRun (GF := GF) 1 (by omega) (fun j => consBufAddr + BitVec.ofNat 64 j)
-    (0x80012380 + 24) (by omega) (by omega) INPUT_BUF_SIZE hbs (by omega) $$ Hk [Hb]
-  · rw [show 0x80012380 + 24 + 1 * INPUT_BUF_SIZE = 0x80012380 + 152 by rw [hN]]; iexact Hb
-  ihave Hr := bootBss_wordAt (GF := GF) consRAddr 4 (0x80012380 + 152) _ rfl rfl (by omega) (by omega) (by omega) $$ Hk Hr
-  ihave Hw := bootBss_wordAt (GF := GF) consWAddr 4 (0x80012380 + 156) _ rfl rfl (by omega) (by omega) (by omega) $$ Hk Hw
-  ihave He := bootBss_wordAt (GF := GF) consEAddr 4 (0x80012380 + 160) _ rfl (by omega) (by omega) (by omega) (by omega) $$ Hk He
+    (0x80012420 + 24) (by omega) (by omega) INPUT_BUF_SIZE hbs (by omega) $$ Hk [Hb]
+  · rw [show 0x80012420 + 24 + 1 * INPUT_BUF_SIZE = 0x80012420 + 152 by rw [hN]]; iexact Hb
+  ihave Hr := bootBss_wordAt (GF := GF) consRAddr 4 (0x80012420 + 152) _ rfl rfl (by omega) (by omega) (by omega) $$ Hk Hr
+  ihave Hw := bootBss_wordAt (GF := GF) consWAddr 4 (0x80012420 + 156) _ rfl rfl (by omega) (by omega) (by omega) $$ Hk Hw
+  ihave He := bootBss_wordAt (GF := GF) consEAddr 4 (0x80012420 + 160) _ rfl (by omega) (by omega) (by omega) (by omega) $$ Hk He
   ihave Hts := hts
   unfold consResCur
   iexists 0#32, 0#32, 0#32, List.replicate INPUT_BUF_SIZE 0#8, List.replicate INPUT_BUF_SIZE none,
@@ -552,7 +550,7 @@ theorem bcp_dataHas (A n : Nat) (w : BitVec (8 * n))
 /-- A `.data` word at its image value, at the ambient context. -/
 theorem bcp_dataWord [CurCtx] (va : PAddr) (A n : Nat)
     (w : BitVec (8 * n)) (hva : va = BitVec.ofNat 64 A) (hn : 0 < n)
-    (hlo : 0x8000a2e0 ≤ A) (hhi : A + n ≤ 0x8000a340) (hal : A % n = 0)
+    (hlo : 0x8000a380 ≤ A) (hhi : A + n ≤ 0x8000a3e0) (hal : A % n = 0)
     (h : ∀ j, j < n → (A + j, (nthByte w j).toNat) ∈ Kernel.dataInit) :
     kmapStatic (GF := GF) ⊢ bootRan (imgFlat bootImage) A (A + n) -∗ wordPointsTo va n (DFrac.own 1) w := by
   subst hva
@@ -567,7 +565,7 @@ theorem bootCarveProc_first [CurCtx] :
     kmapStatic (GF := GF) ⊢
       bootRan (imgFlat bootImage) MachCSL.KernelSyms.«first_1» (MachCSL.KernelSyms.«first_1» + 4) -∗
       wordPointsTo firstAddr 4 (DFrac.own 1) 1#32 :=
-  bcp_dataWord firstAddr 0x8000a2e0 4 1#32 rfl (by omega) (by omega) (by omega) (by omega)
+  bcp_dataWord firstAddr 0x8000a380 4 1#32 rfl (by omega) (by omega) (by omega) (by omega)
     (by decide)
 
 /-- **`nextpid = 1`** (Rocq `main_data_raw`'s second row). -/
@@ -575,14 +573,14 @@ theorem bootCarveProc_nextpid [CurCtx] :
     kmapStatic (GF := GF) ⊢
       bootRan (imgFlat bootImage) MachCSL.KernelSyms.«nextpid» (MachCSL.KernelSyms.«nextpid» + 4) -∗
       wordPointsTo nextpidAddr 4 (DFrac.own 1) 1#32 :=
-  bcp_dataWord nextpidAddr 0x8000a2e4 4 1#32 rfl (by omega) (by omega) (by omega) (by omega)
+  bcp_dataWord nextpidAddr 0x8000a384 4 1#32 rfl (by omega) (by omega) (by omega) (by omega)
     (by decide)
 
 /-- `&uarts[i]`, as a number. -/
 def bcpUart (i : UartId) : Nat := MachCSL.KernelSyms.«uarts» + 40 * i.idx
 
 theorem bcp_uart_geom (i : UartId) :
-    0x8000a2e0 ≤ bcpUart i ∧ bcpUart i + 40 ≤ 0x8000a340 ∧ bcpUart i % 8 = 0 ∧
+    0x8000a380 ≤ bcpUart i ∧ bcpUart i + 40 ≤ 0x8000a3e0 ∧ bcpUart i % 8 = 0 ∧
     uartElt i = BitVec.ofNat 64 (bcpUart i) ∧ uartElt i + 8#64 = BitVec.ofNat 64 (bcpUart i + 8) ∧
     txLockAddr i = BitVec.ofNat 64 (bcpUart i + 16) ∧
     txLockAddr i + 8#64 = BitVec.ofNat 64 (bcpUart i + 24) ∧
@@ -714,7 +712,7 @@ theorem bcpBssWindows (m : MemF Hist) :
       bootRan m MachCSL.KernelSyms.«pid_lock» (MachCSL.KernelSyms.«pid_lock» + 24) ∗
       bootRan m MachCSL.KernelSyms.«wait_lock» (MachCSL.KernelSyms.«wait_lock» + 24) ∗
       bootRan m MachCSL.KernelSyms.«cpus» (MachCSL.KernelSyms.«cpus» + 128 * NCPU) ∗
-      bootRan m MachCSL.KernelSyms.«proc» (MachCSL.KernelSyms.«proc» + 368 * NPROC) ∗
+      bootRan m MachCSL.KernelSyms.«proc» (MachCSL.KernelSyms.«proc» + 376 * NPROC) ∗
       bootRan m MachCSL.KernelSyms.«tickslock» (MachCSL.KernelSyms.«tickslock» + 24) ∗
       bootRan m MachCSL.KernelSyms.«bcache» (MachCSL.KernelSyms.«bcache» + 0x86c0) ∗
       bootRan m MachCSL.KernelSyms.«sb» (MachCSL.KernelSyms.«sb» + 32) ∗
@@ -737,7 +735,7 @@ theorem bcpBssWindows (m : MemF Hist) :
   icases bcp_take m _ MachCSL.KernelSyms.«pid_lock» (MachCSL.KernelSyms.«pid_lock» + 24) _ (by decide) (by decide) (by decide) $$ H with ⟨H10, H⟩
   icases bcp_take m _ MachCSL.KernelSyms.«wait_lock» (MachCSL.KernelSyms.«wait_lock» + 24) _ (by decide) (by decide) (by decide) $$ H with ⟨H11, H⟩
   icases bcp_take m _ MachCSL.KernelSyms.«cpus» (MachCSL.KernelSyms.«cpus» + 128 * NCPU) _ (by decide) (by decide) (by decide) $$ H with ⟨H12, H⟩
-  icases bcp_take m _ MachCSL.KernelSyms.«proc» (MachCSL.KernelSyms.«proc» + 368 * NPROC) _ (by decide) (by decide) (by decide) $$ H with ⟨H13, H⟩
+  icases bcp_take m _ MachCSL.KernelSyms.«proc» (MachCSL.KernelSyms.«proc» + 376 * NPROC) _ (by decide) (by decide) (by decide) $$ H with ⟨H13, H⟩
   icases bcp_take m _ MachCSL.KernelSyms.«tickslock» (MachCSL.KernelSyms.«tickslock» + 24) _ (by decide) (by decide) (by decide) $$ H with ⟨H14, H⟩
   icases bcp_take m _ MachCSL.KernelSyms.«bcache» (MachCSL.KernelSyms.«bcache» + 0x86c0) _ (by decide) (by decide) (by decide) $$ H with ⟨H15, H⟩
   icases bcp_take m _ MachCSL.KernelSyms.«sb» (MachCSL.KernelSyms.«sb» + 32) _ (by decide) (by decide) (by decide) $$ H with ⟨H16, H⟩
@@ -753,7 +751,7 @@ theorem bcpBssWindows (m : MemF Hist) :
 hands back `[_data, GOT)`) is `first`, `nextpid` and the two `uarts[]`
 records. -/
 theorem bcpDataWindows (m : MemF Hist) :
-    bootRan (GF := GF) m MachCSL.KernelSyms.«_data» 0x8000a348 ⊢
+    bootRan (GF := GF) m MachCSL.KernelSyms.«_data» 0x8000a3e8 ⊢
       bootRan m MachCSL.KernelSyms.«first_1» (MachCSL.KernelSyms.«first_1» + 4) ∗
       bootRan m MachCSL.KernelSyms.«nextpid» (MachCSL.KernelSyms.«nextpid» + 4) ∗
       bootRan m (bcpUart .uart0) (bcpUart .uart0 + 40) ∗
@@ -789,7 +787,7 @@ def bcpProcRows [Y : CurCtx] (cn : ConsNames) : IProp GF := iprop%
 `boot_cons_res` and the initproc / ticks rows of `main_globals_raw`). -/
 theorem bootCarveProc_rows [CurCtx] (cn : ConsNames) :
     kmapStatic (GF := GF) ⊢
-      bootRan (imgFlat bootImage) MachCSL.KernelSyms.«proc» (MachCSL.KernelSyms.«proc» + 368 * NPROC) -∗
+      bootRan (imgFlat bootImage) MachCSL.KernelSyms.«proc» (MachCSL.KernelSyms.«proc» + 376 * NPROC) -∗
       bootRan (imgFlat bootImage) MachCSL.KernelSyms.«initproc» (MachCSL.KernelSyms.«initproc» + 8) -∗
       bootRan (imgFlat bootImage) MachCSL.KernelSyms.«ticks» (MachCSL.KernelSyms.«ticks» + 4) -∗
       bootRan (imgFlat bootImage) (MachCSL.KernelSyms.«cons» + 24) (MachCSL.KernelSyms.«cons» + 164) -∗
@@ -812,7 +810,7 @@ file table's entries (FileBoot) and the bcache / itable rows
 theorem bootCarveProc_mainGlobalsRaw [CurCtx] (cn : ConsNames) :
     bcpProcRows (GF := GF) cn ⊢
       fdSlots (NPROC * (NOFILE + FDSPARE)) -∗
-      irefSlots (NPROC * (1 + IREFSPARE)) -∗
+      irefSlots (NPROC * (IREFHOME + IREFSPARE)) -∗
       ([∗list] k ∈ List.range NFILE, fentryRaw curCtx k) -∗
       irefSlots NFILE -∗
       bslots (NPROC * 3) -∗
@@ -828,58 +826,5 @@ theorem bootCarveProc_mainGlobalsRaw [CurCtx] (cn : ConsNames) :
   iframe H1 H2 H3 H4 Hfd Hir Hfe Hirf Hbs Hi Ht Hhd Hbi Hbd Hsl Hie Hc1 Hc2 Hc3
 
 end rows
-
-/-! ## §9 At SpecMain's tiers -/
-
-section tiers
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
-  [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-
-/-- **THE TIER SPLIT** (SpecMain deviation 5): the rows spent before
-`kvminithart` (`mainLocksBare`, `mainGlobalsBare`, both ports' `.data`
-cells) at the entry context `X`, and this file's other rows
-(`bcpProcRows`, `first`, `nextpid`) at `X.toKpt`, out of their windows
-(`bcpBssWindows` / `bcpDataWindows`). -/
-theorem bootCarveProc_tiers (X : CurCtx) (cn : ConsNames) :
-    kmapStatic (GF := GF) ⊢
-      bootRan (imgFlat bootImage) MachCSL.KernelSyms.«cons» (MachCSL.KernelSyms.«cons» + 24) -∗
-      bootRan (imgFlat bootImage) MachCSL.KernelSyms.«pr» (MachCSL.KernelSyms.«pr» + 24) -∗
-      bootRan (imgFlat bootImage) MachCSL.KernelSyms.«kmem» (MachCSL.KernelSyms.«kmem» + 24) -∗
-      bootRan (imgFlat bootImage) (MachCSL.KernelSyms.«kmem» + 24) (MachCSL.KernelSyms.«kmem» + 32) -∗
-      bootRan (imgFlat bootImage) MachCSL.KernelSyms.«devsw» (MachCSL.KernelSyms.«devsw» + 16 * 10) -∗
-      bootRan (imgFlat bootImage) MachCSL.KernelSyms.«kernel_pagetable» (MachCSL.KernelSyms.«kernel_pagetable» + 8) -∗
-      bootRan (imgFlat bootImage) (bcpUart .uart0) (bcpUart .uart0 + 40) -∗
-      bootRan (imgFlat bootImage) (bcpUart .uart1) (bcpUart .uart1 + 40) -∗
-      bootRan (imgFlat bootImage) MachCSL.KernelSyms.«proc» (MachCSL.KernelSyms.«proc» + 368 * NPROC) -∗
-      bootRan (imgFlat bootImage) MachCSL.KernelSyms.«initproc» (MachCSL.KernelSyms.«initproc» + 8) -∗
-      bootRan (imgFlat bootImage) MachCSL.KernelSyms.«ticks» (MachCSL.KernelSyms.«ticks» + 4) -∗
-      bootRan (imgFlat bootImage) (MachCSL.KernelSyms.«cons» + 24) (MachCSL.KernelSyms.«cons» + 164) -∗
-      bootRan (imgFlat bootImage) MachCSL.KernelSyms.«first_1» (MachCSL.KernelSyms.«first_1» + 4) -∗
-      bootRan (imgFlat bootImage) MachCSL.KernelSyms.«nextpid» (MachCSL.KernelSyms.«nextpid» + 4) -∗
-      consGhostsBoot cn -∗
-      |==> (mainLocksBare (Y := X) ∗ mainGlobalsBare (Y := X) ∗
-        bcpUartCells (Y := X) .uart0 ∗ bcpUartCells (Y := X) .uart1 ∗
-        bcpProcRows (Y := X.toKpt) cn ∗
-        @wordPointsTo hlc GF _ X.toKpt firstAddr 4 (DFrac.own 1) 1#32 ∗
-        @wordPointsTo hlc GF _ X.toKpt nextpidAddr 4 (DFrac.own 1) 1#32) := by
-  have hL := (letI : CurCtx := X; bootCarveProc_locksBare (GF := GF))
-  have hG := (letI : CurCtx := X; bootCarveProc_globalsBare (GF := GF))
-  have hU0 := (letI : CurCtx := X; bootCarveProc_uartCells (GF := GF) .uart0)
-  have hU1 := (letI : CurCtx := X; bootCarveProc_uartCells (GF := GF) .uart1)
-  have hR := (letI : CurCtx := X.toKpt; bootCarveProc_rows (GF := GF) cn)
-  have hF := (letI : CurCtx := X.toKpt; bootCarveProc_first (GF := GF))
-  have hN := (letI : CurCtx := X.toKpt; bootCarveProc_nextpid (GF := GF))
-  iintro #Hk Hc Hp Hm Hf Hd Hkp Hu0 Hu1 Hpr Hi Ht Hring H1 H2 Hg
-  ihave HL := hL $$ Hk Hc Hp Hm
-  ihave HG := hG $$ Hk Hd Hf Hkp
-  ihave HR := hR $$ Hk Hpr Hi Ht Hring Hg
-  ihave HF := hF $$ Hk H1
-  ihave HN := hN $$ Hk H2
-  imod hU0 $$ Hk Hu0 with HU0
-  imod hU1 $$ Hk Hu1 with HU1
-  imodintro
-  iframe HL HG HU0 HU1 HR HF HN
-
-end tiers
 
 end Xv6

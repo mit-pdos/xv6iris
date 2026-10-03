@@ -15,6 +15,7 @@ arbitrary `MemoryAccessType`.
 import MachCSL.MConf
 import MachCSL.PmpXv6Defs
 import MachCSL.PlatformFacts
+import MachCSL.WpPmp
 
 namespace MachCSL
 
@@ -28,8 +29,6 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 
 attribute [sail_facts] Nat.reducePow
 
-/-- The xv6 PMP tables at the entries the check reads (integer and natural indices). -/
-@[sail_facts] theorem xv6Pmpcfg_getInt0 : xv6Pmpcfg[(0 : Int)]! = 0x0f#8 := by decide
 @[sail_facts] theorem xv6Pmpcfg_getInt1 : xv6Pmpcfg[(1 : Int)]! = 0#8 := by decide
 @[sail_facts] theorem xv6Pmpaddr_getInt0 : xv6Pmpaddr[(0 : Int)]! = 0x3fffffffffffff#64 := by decide
 @[sail_facts] theorem xv6Pmpcfg_getNat0 : xv6Pmpcfg[(0 : Nat)]! = 0x0f#8 := by decide
@@ -100,27 +99,6 @@ theorem swp_pmpCheck_ent0 (cpu : CPU) (dq : DFrac) (addr : BitVec 64) (width : N
     swp_run 60
     iapply HΦ $$ Hpmpcfg_n Hpmpaddr_n
 
-/-- Under xv6's PMP tables, a machine-mode fetch, load or store inside RAM
-passes the PMP check (`swp_pmpCheck_ent0` at `xv6Pmpcfg`/`xv6Pmpaddr`). -/
-theorem swp_pmpCheck_xv6 (cpu : CPU) (dq : DFrac) (addr : BitVec 64) (width : Nat)
-    (acc : MemoryAccessType mem_payload) (Φ : Option ExceptionType → IProp GF)
-    (hacc : kernelAccess acc)
-    (hram : pmpOk addr width) :
-    Register.pmpcfg_n ↦ᵣ[cpu]{dq} xv6Pmpcfg ∗ Register.pmpaddr_n ↦ᵣ[cpu]{dq} xv6Pmpaddr ∗
-    ▷ (Register.pmpcfg_n ↦ᵣ[cpu]{dq} xv6Pmpcfg -∗ Register.pmpaddr_n ↦ᵣ[cpu]{dq} xv6Pmpaddr -∗ Φ none)
-    ⊢ swp cpu (pmpCheck (physaddr.Physaddr addr) width acc Privilege.Machine) Φ :=
-  swp_pmpCheck_ent0 cpu dq addr width acc Φ _ _ pmpEnt0Ok_xv6 hacc hram
-
-/-- The all-off table passes regardless of the address table (the addresses
-are read but never inspected): `swp_pmpCheck_allOff` at `bootPmpcfg`. -/
-theorem swp_pmpCheck_off_any (cpu : CPU) (dq : DFrac) (addr : BitVec 64) (width : Nat)
-    (acc : MemoryAccessType mem_payload) (Φ : Option ExceptionType → IProp GF)
-    (paddr : Vector (BitVec 64) 64) :
-    Register.pmpcfg_n ↦ᵣ[cpu]{dq} bootPmpcfg ∗ Register.pmpaddr_n ↦ᵣ[cpu]{dq} paddr ∗
-    ▷ (Register.pmpcfg_n ↦ᵣ[cpu]{dq} bootPmpcfg -∗ Register.pmpaddr_n ↦ᵣ[cpu]{dq} paddr -∗ Φ none)
-    ⊢ swp cpu (pmpCheck (physaddr.Physaddr addr) width acc Privilege.Machine) Φ :=
-  swp_pmpCheck_allOff cpu dq addr width acc Φ bootPmpcfg paddr pmpAllOff_bootPmpcfg
-
 /-! ### The configurations' PMP obligations -/
 
 /-- A configuration whose PMP entry 0 is xv6's passes the PMP check for
@@ -130,30 +108,12 @@ theorem pmpPassesM_ent0 (cpu : CPU) (dq : DFrac) (c : MConf) (h0 : pmpEnt0Ok c.p
   intro addr width acc Φ hacc hram
   exact swp_pmpCheck_ent0 cpu dq addr width acc Φ c.pmpcfg c.pmpaddr h0 hacc (pmpOk_of_inRam hram)
 
-/-- A configuration carrying xv6's PMP tables passes the PMP check for kernel accesses. -/
-theorem pmpPassesM_xv6 (cpu : CPU) (dq : DFrac) (c : MConf) (hcfg : c.pmpcfg = xv6Pmpcfg)
-    (haddr : c.pmpaddr = xv6Pmpaddr) : pmpPassesM (GF := GF) cpu dq c := by
-  intro addr width acc Φ hacc hram
-  rw [hcfg, haddr]
-  exact swp_pmpCheck_xv6 cpu dq addr width acc Φ hacc (pmpOk_of_inRam hram)
-
 /-- A configuration whose PMP entries are all off passes, whatever its
 address table (Rocq `wp_entry_boot`'s `pmp_all_off` premise). -/
 theorem pmpPassesM_allOff (cpu : CPU) (dq : DFrac) (c : MConf) (hcfg : pmpAllOff c.pmpcfg) :
     pmpPassesM (GF := GF) cpu dq c := by
   intro addr width acc Φ _ _
   exact swp_pmpCheck_allOff cpu dq addr width acc Φ c.pmpcfg c.pmpaddr hcfg
-
-/-- A configuration with all PMP entries off passes, whatever its address table. -/
-theorem pmpPassesM_off_any (cpu : CPU) (dq : DFrac) (c : MConf) (hcfg : c.pmpcfg = bootPmpcfg) :
-    pmpPassesM (GF := GF) cpu dq c := by
-  intro addr width acc Φ _ _
-  rw [hcfg]
-  exact swp_pmpCheck_off_any cpu dq addr width acc Φ c.pmpaddr
-
-theorem MConf.ok_xv6 (c : MConf) (hm : c.mok) (hcfg : c.pmpcfg = xv6Pmpcfg)
-    (haddr : c.pmpaddr = xv6Pmpaddr) : MConf.ok (GF := GF) c :=
-  ⟨hm, fun cpu dq => pmpPassesM_xv6 cpu dq c hcfg haddr⟩
 
 theorem MConf.ok_ent0 (c : MConf) (hm : c.mok) (h0 : pmpEnt0Ok c.pmpcfg c.pmpaddr) :
     MConf.ok (GF := GF) c :=
@@ -162,9 +122,5 @@ theorem MConf.ok_ent0 (c : MConf) (hm : c.mok) (h0 : pmpEnt0Ok c.pmpcfg c.pmpadd
 theorem MConf.ok_allOff (c : MConf) (hm : c.mok) (hcfg : pmpAllOff c.pmpcfg) :
     MConf.ok (GF := GF) c :=
   ⟨hm, fun cpu dq => pmpPassesM_allOff cpu dq c hcfg⟩
-
-theorem MConf.ok_off_any (c : MConf) (hm : c.mok) (hcfg : c.pmpcfg = bootPmpcfg) :
-    MConf.ok (GF := GF) c :=
-  ⟨hm, fun cpu dq => pmpPassesM_off_any cpu dq c hcfg⟩
 
 end MachCSL

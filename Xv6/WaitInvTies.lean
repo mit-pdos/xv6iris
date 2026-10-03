@@ -13,14 +13,13 @@ part 1 is `Xv6/WaitInv.lean`, whose header and deviations apply here.
   (`childrenInv_reap`, kwait's `pp->parent = 0`: the entry comes out, its
   three quarters rejoin the zombie block's quarter, and the reaped
   generation leaves both columns of the reaper's address).
-* What the REAPER reads: (W3) pid uniqueness (`childrenInv_pid`,
-  `_pid_one`, `_pid_list`, `_pid_all`), (W5) the empty row
+* What the REAPER reads: (W3) pid uniqueness
+  (`childrenInv_pid_one`, `_pid_list`, `_pid_all`), (W5) the empty row
   (`childrenInv_empty`).
 * THE PAYLOAD (`waitInvResAt`, Rocq `wait_res_at`): ONE existential over the
   four columns, the three resources first and `childrenInvAt` last.
-* THE BOOT: the parent cells pinned at zero (`parentsRes_of_cells`), the
-  pairing (`waitRes_alloc`), the NPROC children rows (`chRows_alloc`) and
-  the mint of every canonical name (`childrenRes_alloc`).
+* THE BOOT: the pairing (`waitRes_alloc`), the NPROC children rows
+  (`chRows_alloc`) and the mint of every canonical name (`childrenRes_alloc`).
 
 ## Deviations from Rocq (beyond WaitInv.lean's)
 
@@ -34,7 +33,7 @@ part 1 is `Xv6/WaitInv.lean`, whose header and deviations apply here.
    induction principle on the big-op.
 3. **`parents_cells_gather`** (the offset induction turning the carve's per
    slot cells into one list) is not needed with the function-form columns:
-   the carve's cells ARE `parentsOwnAt ξ (fun _ => 0#64)` (`parentsRes_of_cells`).
+   the carve's cells ARE `parentsOwnAt ξ (fun _ => 0#64)`.
 4. **`children_res_alloc` returns the instance** as `∃ W : WchG GF` over an
    ambient `[WchGpre GF]` (IrefSlots' `irefSlots_alloc` precedent), with the
    NPROC slot-generation wholes minted over the boot's address list
@@ -68,8 +67,6 @@ import Xv6.WaitInv
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Iris.Std Std MachCSL
-
-set_option linter.unusedSectionVars false
 
 section WaitInvTies
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [WchG GF] [CtokG GF]
@@ -426,31 +423,6 @@ theorem childrenInv_reap [CurCtx] (ξ : CtxId) (ps : Nat → BitVec 64) (gs : Na
   -- the reap only SHRINKS the orphan column
   iapply orphAtInit_shrink ξ O pj _ (fun x h => (mem_diff.mp h).1) $$ Hoi
 
-/-- (W3), THE PID UNIQUENESS THE REAPER REPORTS, one generation at a time
-(Rocq `children_inv_pid`). -/
-theorem childrenInv_pid [CurCtx] (ξ : CtxId) (ps : Nat → BitVec 64) (gs : Nat → GName)
-    (m : ChMap) (O : OrphMap) (γ0 : GName) (pj : BitVec 64) (cs : ExtTreeSet GName compare)
-    (g g' : GName) (pid : BitVec 32) (dq : DFrac) (hpj : pj ≠ 0#64)
-    (hm : get? m γ0 = some (pj, cs)) (hin : g ∈ cs) :
-    childrenInvAt (GF := GF) ξ ps gs m O ∗ genPid g pid ∗ pidReg pid dq g' ⊢ ⌜g = g'⌝ := by
-  unfold childrenInvAt
-  iintro ⟨⟨Hgh, %hp, -⟩, #Hgp, Hpr⟩
-  obtain ⟨-, -, hir, -, -⟩ := hp
-  obtain ⟨k, hk, hpk, hgk⟩ := hir γ0 pj cs g hm hpj hin
-  icases genHalves_take ps gs k hk $$ Hgh with ⟨He, -⟩
-  unfold genHalvesEnt
-  rw [hpk, if_neg hpj, hgk]
-  icases He with ⟨%pid0, -, Hpr0, -, #Hgp0⟩
-  ihave %e := genPid_agree g pid0 pid $$ [Hgp0 Hgp]
-  · isplitl []
-    · iexact Hgp0
-    · iexact Hgp
-  subst e
-  iapply pidReg_agree pid0 pid0 _ dq g g' rfl
-  isplitl [Hpr0]
-  · iexact Hpr0
-  · iexact Hpr
-
 /-- ONE MEMBER OF THE ROW, READ WITHOUT SPENDING THE INVARIANT (Rocq
 `children_inv_pid_one`): what comes out is PERSISTENT. -/
 theorem childrenInv_pid_one [CurCtx] (ξ : CtxId) (ps : Nat → BitVec 64) (gs : Nat → GName)
@@ -637,19 +609,6 @@ instance waitInvResAt_morph [CurCtx] : CtxMorph (GF := GF) (waitInvResAt (GF := 
                   (fun _ => iprop(∃ h : List Zev, zombLedAuth h))
                   (childrenInvAt_morph ps gs m O) (instCtxMorphConst _))))))))
 
-/-- what the boot chain hands main: the parent half, out of the NPROC
-parent cells the image owns, pinned at zero (Rocq `parents_res_of_cells`,
-deviation 3). -/
-theorem parentsRes_of_cells [CurCtx] (ξ : CtxId) :
-    ([∗list] i ∈ List.range NPROC, wordAtN (GF := GF) ξ (pParent (procAddr i)) 8 (.own 1) 0#64) ⊢
-      parentsResAt ξ := by
-  unfold parentsResAt parentsOwnAt
-  iintro H
-  iexists (fun _ => 0#64)
-  isplitl [H]
-  · iexact H
-  · ipureintro; intro _ _; rfl
-
 /-- THE PAIRING, in main's own update: EVERY TIE IS VACUOUS HERE (no cell
 written, every row empty, no orphans); the generation column is arbitrary
 (Rocq `wait_res_alloc`).  ...and the zombie ledger's authority, at the
@@ -692,22 +651,6 @@ theorem parentsOwn_acc [CurCtx] (ξ : CtxId) (ps : Nat → BitVec 64) (j : Nat) 
     (fun v' i => wordAtN ξ (pParent (procAddr i)) 8 (.own 1) (if i = j then v' else ps i)) ?_).trans ?_
   · intro v' i hi; simp only [hi, if_false]
   · simp only [if_true]; exact .rfl
-
-/-- the read-only instance: the cell comes back unchanged (Rocq
-`parents_own_read`). -/
-theorem parentsOwn_read [CurCtx] (ξ : CtxId) (ps : Nat → BitVec 64) (j : Nat) (hj : j < NPROC) :
-    parentsOwnAt (GF := GF) ξ ps ⊢
-      wordAtN ξ (pParent (procAddr j)) 8 (.own 1) (ps j) ∗
-      (wordAtN ξ (pParent (procAddr j)) 8 (.own 1) (ps j) -∗ parentsOwnAt ξ ps) := by
-  refine (parentsOwn_acc ξ ps j hj).trans (sep_mono_right ?_)
-  have hid : (fun i => if i = j then ps j else ps i) = ps := funext fun i => by
-    by_cases e : i = j
-    · rw [if_pos e, e]
-    · rw [if_neg e]
-  iintro H Hc
-  ihave H := H $$ %(ps j) Hc
-  rw [hid]
-  iexact H
 
 end WaitInvTies
 

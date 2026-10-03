@@ -31,7 +31,7 @@ FsCfgKits / FsCfgSnap / ProofMain).
   `newlock_at_llb` → `newlockAt_llb` (the hooked `MachCSL.newlock_written` birth with its
   `lockHalf_alloc` taken out, the fold being `MachCSL.lockHook_llb`, exactly
   Rocq's proof), `big_sepL_fupd_thread` → `bigSepL_fupd_thread`,
-  `sl_fresh_new_genl` → `slFresh_newGenl` (`Xv6.kctx_newSleeplock`'s body at
+  `sl_fresh_new_genl` → `slFresh_newGenl` (a fresh sleeplock's birth at
   `ownCtx` and any mask).  NO framework gap remains: every step of Rocq's
   proof has a Lean counterpart.  They were first ported in this file and
   now live in their homes: `MachCSL/LockBornHook.lean` (the first three),
@@ -165,8 +165,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-! ## 4.  THE FIFTY ENTRIES, THE ESCROWS, THE TABLE AND THE LOCK
 
 ### The pure boot state's well-formedness facts -/
@@ -200,8 +198,8 @@ Rocq mints the pinw leaves' address claims off the boot cells
 come from the kernel map's static half.  The whole itable (`0x1aa8` bytes at
 `KernelSyms.itable`) is kernel read-write data. -/
 
-theorem itable_kmapRw (a : BitVec 64) (h1 : 0x80020b88 ≤ a.toNat)
-    (h2 : a.toNat < 0x80020b88 + 0x1aa8) : kmapClass (vpnOf a).toNat = some .rw := by
+theorem itable_kmapRw (a : BitVec 64) (h1 : 0x80020e28 ≤ a.toNat)
+    (h2 : a.toNat < 0x80020e28 + 0x1aa8) : kmapClass (vpnOf a).toNat = some .rw := by
   have hv : (vpnOf a).toNat = a.toNat / 4096 % 134217728 := by
     simp only [vpnOf, BitVec.extractLsb'_toNat, Nat.reducePow, Nat.shiftRight_eq_div_pow]
   rw [hv, Nat.mod_eq_of_lt (by omega)]
@@ -209,9 +207,9 @@ theorem itable_kmapRw (a : BitVec 64) (h1 : 0x80020b88 ≤ a.toNat)
   rw [if_neg (by omega), if_pos (Or.inl ⟨by omega, by omega⟩)]
 
 theorem ientry_off_toNat (k m : Nat) (hk : k < NINODE) (hm : m < ISLOTSZ) :
-    (ientry k + BitVec.ofNat 64 m).toNat = 0x80020b88 + 24 + ISLOTSZ * k + m := by
+    (ientry k + BitVec.ofNat 64 m).toNat = 0x80020e28 + 24 + ISLOTSZ * k + m := by
   have e := ientry_unsigned k (Nat.le_of_lt hk)
-  have hv : KernelSyms.«itable» = 0x80020b88 := rfl
+  have hv : KernelSyms.«itable» = 0x80020e28 := rfl
   rw [hv] at e
   have hI : ISLOTSZ = 136 := rfl
   unfold NINODE at hk
@@ -242,8 +240,8 @@ theorem ientry_kmapId [CurCtx] (k m : Nat) (hk : k < NINODE) (hm : m < ISLOTSZ) 
 /-- The itable spinlock's two words. -/
 theorem itableLock_kmapIds [CurCtx] :
     kmapStatic (GF := GF) ⊢ kmapId itableLock ∗ kmapId (itableLock + 16#64) := by
-  have e0 : itableLock.toNat = 0x80020b88 := rfl
-  have e16 : (itableLock + 16#64).toNat = 0x80020b88 + 16 := by
+  have e0 : itableLock.toNat = 0x80020e28 := rfl
+  have e16 : (itableLock + 16#64).toNat = 0x80020e28 + 16 := by
     rw [BitVec.toNat_add, e0]; rfl
   iintro #HS
   isplitl []
@@ -553,8 +551,8 @@ region.  The last conjunct IS `icSleeplocks cn`.
 The itable lock's gname and the whole escrow-name record are GIVEN rather
 than returned, so a caller that had to write `isItable2 fscItlock fscIc …`
 before this fupd ran (the era fupd of the boot kit, whose reason to exist
-is that an ambient class field cannot be an existential) can: `newlock`
-becomes `newlockAt_llb γl` against `lockFreeTok γl`, and `icNamesAlloc`
+is that an ambient class field cannot be an existential) can: the lock's
+birth is `newlockAt_llb γl` against `lockFreeTok γl`, and `icNamesAlloc`
 becomes the three families as PREMISES, the identification one at
 ARBITRARY recorded values, re-tagged per slot by `icId_set`.
 

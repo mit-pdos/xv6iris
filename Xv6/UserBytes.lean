@@ -19,9 +19,8 @@ presentable as a single map.  This file is that presentation.
 * §4 `UbMemWf` / `UbMemStep` (Rocq `u_mem_wf` / `u_mem_step`): the pure
   well-formedness of the hart's owned map and the relation a user cycle may
   move it by, with the projections the memory arms need (`ubMemWf_entry`:
-  a tree word reads out of the map; `ubMemWf_data`: a data window is owned;
-  `ubMemWf_ram`: the map is RAM) and the step's refl/trans/wf, the data
-  store step (`ubMemStep_write`) and the A/D write-back step
+  a tree word reads out of the map; `ubMemWf_data`: a data window is owned)
+  and the step's refl/trans/wf and the A/D write-back step
   (`ubMemStep_setLeaf`).
 * §5 the accessor (Rocq `user_pt_inv_bytes`): `ub_userPtInv_open` takes
   `userPtInv` apart into the translation registers and ONE byte frame
@@ -62,8 +61,6 @@ open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open Iris.Std.PartialMap Iris.Std.FiniteMap
 open Sail LeanRV64D LeanRV64D.Functions
 
-set_option linter.unusedSectionVars false
-
 /-! ## §0 Helpers -/
 
 section helpers
@@ -78,12 +75,6 @@ theorem ub_sepL_wand {X : Type} (P : IProp GF) [Persistent P] (l : List X) (Φ �
   imodintro
   iintro %k %x %hk HΦ
   iapply (h x (List.mem_of_getElem? hk)) $$ HP HΦ
-
-/-- A big separating conjunction, converted element-wise (both ways). -/
-theorem ub_sepL_equiv {X : Type} (l : List X) (Φ Ψ : X → IProp GF) (h : ∀ x ∈ l, Φ x ⊣⊢ Ψ x) :
-    ([∗list] x ∈ l, Φ x) ⊣⊢ [∗list] x ∈ l, Ψ x :=
-  ⟨BigSepL.bigSepL_mono (fun hk => (h _ (List.mem_of_getElem? hk)).1),
-   BigSepL.bigSepL_mono (fun hk => (h _ (List.mem_of_getElem? hk)).2)⟩
 
 /-- An indexed big separating conjunction over a list, as one over its
 indices. -/
@@ -443,43 +434,6 @@ theorem ubMemWf_data (P : UPtd) (t : PTree) (mm : BMap) (hwf : UbMemWf P t mm) (
   rw [BitVec.add_assoc, show BitVec.ofNat 64 off + BitVec.ofNat 64 j = BitVec.ofNat 64 (off + j) from
     (BitVec.ofNat_add _ _).symm]
   exact (hwf.dom _).2 (List.mem_append_right _ (ubDataAddrs_mem P.um k w h (off + j) (by omega)))
-
-/-- **The owned map is RAM** (Rocq `u_mem_wf_not_dev`/`addr_is_ram`). -/
-theorem ubMemWf_ram (P : UPtd) (t : PTree) (mm : BMap) (hwf : UbMemWf P t mm) (a : PAddr)
-    (ha : (mm a).isSome = true) : inRam a 1 := by
-  have hm := (hwf.dom a).1 ha
-  rcases List.mem_append.1 hm with h | h
-  · obtain ⟨b, hb, h⟩ := List.mem_flatMap.1 h
-    obtain ⟨i, -, h⟩ := List.mem_flatMap.1 h
-    obtain ⟨j, hj, rfl⟩ := (ubWin_mem _ _ _).1 h
-    have hv := hwf.rep.2.2.1 b hb
-    rw [pteAddr_eq_pageAddr_add, BitVec.add_assoc, ← BitVec.ofNat_add]
-    exact ub_inRam_page b hv _ 1 (by have := i.isLt; omega)
-  · obtain ⟨kv, hkv, h⟩ := List.mem_flatMap.1 h
-    obtain ⟨j, hj, rfl⟩ := (ubWin_mem _ _ _).1 h
-    obtain ⟨he, hv⟩ := ub_data_valid P hwf.wf kv.1 kv.2 (toList_get.1 hkv)
-    rw [he]
-    exact ub_inRam_page _ hv j 1 (by omega)
-
-/-- **A store into a user page is a step** (the disjointness payoff, Rocq
-R7): the window lies in a data page, hence off the tree, so the tree's
-bytes are untouched. -/
-theorem ubMemStep_write (P : UPtd) (t : PTree) (mm : BMap) (hwf : UbMemWf P t mm) (k : Nat)
-    (w : BitVec 64) (h : get? P.um k = some w) (off n : Nat) (hn : off + n ≤ 4096) (v : BitVec (8 * n)) :
-    UbMemStep P t t mm (bmWrite mm (pte2pa w + BitVec.ofNat 64 off) n v) := by
-  have ho := ubMemWf_data P t mm hwf k w h off n hn
-  refine ⟨ubSameShape_refl 2 t, hwf.rep, fun a => bmWrite_isSome mm _ n v (by omega) ho a, ?_⟩
-  intro p hp
-  rw [bmWrite_other]
-  · exact hwf.tree p hp
-  intro hw
-  obtain ⟨j, hj, hpj⟩ := (ubWin_mem _ _ _).1 hw
-  have hd : p.1 ∈ ubDataAddrs P.um := by
-    rw [hpj, BitVec.add_assoc, ← BitVec.ofNat_add]
-    exact ubDataAddrs_mem P.um k w h (off + j) (by omega)
-  have ht : p.1 ∈ ubTreeAddrs 2 t := by
-    rw [← ubTreeBytes_fst]; exact List.mem_map_of_mem hp
-  exact (List.nodup_append.1 hwf.nodup).2.2 _ ht _ hd rfl
 
 /-- Two entry windows overlap only if they are the same entry. -/
 theorem ub_pteAddr_win (b b' : BitVec 44) (i i' : BitVec 9) (j j' : Nat) (hj : j < 8) (hj' : j' < 8)

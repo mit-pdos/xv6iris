@@ -44,9 +44,9 @@ Rocq's header, kept because the reasons are the content:
 4. Rocq's `Require Export FsAbsDelta` has no Lean analogue to port: Lean
    imports are transitive.  The comments that point at `cre_pre`/
    `delta_create_dev` living in FsAbsDelta are Rocq's history.
-5. Names: `dev_arg` → `devArg`, `abs_of_create_dev` → `absOf_create_dev`,
-   `npar_elems` → `nparElems`, `npar_cur` → `nparCur` (`npar_cur_intro` →
-   `nparCur_intro`, …).
+5. Names: `dev_arg` → `devArg`, `npar_elems` → `nparElems`, `npar_cur` →
+   `nparCur` (`npar_cur_intro` → `nparCur_intro`, …); `abs_of_create_dev`
+   is not ported (nothing uses it).
 6. `npar_cur`'s `M : gmap Z (bv 8)` / `pv : mword 64` are `ArgPath`'s
    `M : Nat → List (BitVec 8)` / `pv : Nat` (its deviations 1-2), the
    cursor's inum is `Nat`.
@@ -70,18 +70,6 @@ argint keeps the low int, create's lh/sh pair keeps the low HALFWORD, and
 the record field reads back unsigned -- so the abstract child's number is
 the low sixteen bits of the trapframe word, read unsigned. -/
 def devArg (v : BitVec 64) : Nat := v.toNat % 2 ^ 16
-
-theorem devArg_range (v : BitVec 64) : devArg v < 2 ^ 16 :=
-  Nat.mod_lt _ (by decide)
-
-/-- the abstract child create's non-directory success arm leaves behind:
-`createMade` read through `absOf` (Rocq's `abs_of_create_dev`). -/
-theorem absOf_create_dev (n : FsNode) (major minor : BitVec 16)
-    (hr : n.fnRec = createMade T_DEVICE_w major minor) :
-    absOf n = some ⟨.ADev major.toNat minor.toNat, 1⟩ := by
-  unfold absOf absRow absNode fnIsDir fnType fnMajor fnMinor fnNlink
-  rw [hr]
-  rfl
 
 /-! ## 2.  nameiparent's hop names -/
 

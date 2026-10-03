@@ -66,9 +66,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## The recycle's pure steps -/
 
@@ -249,7 +247,6 @@ end
 
 /-! ## The masks of the flip (Rocq's `solve_ndisj`) -/
 
-
 theorem ig_ipool_box (e : Nat) : (↑ipoolN : CoPset) ## (↑(ndot icBoxN e) : CoPset) :=
   fun p ⟨h1, h2⟩ => (ndot_ne_disjoint nroot (by decide) : (↑ipoolN : CoPset) ## (↑icBoxN : CoPset))
     p ⟨h1, nclose_subseteq icBoxN e p h2⟩
@@ -395,7 +392,6 @@ theorem ig_rcy_ghost (c : CPU) (M : RegMapF (Qp × PosNat)) (e : Nat) (he : e < 
   iapply credFloor_of_lk
   iexact Hkey
 
-
 set_option maxHeartbeats 4000000 in
 /-- THE RECYCLE's CLOSE (Rocq 1640--1720): the slot's rows go back at the
 new identity and count 1 -- `ci` gains `e ↦ (dev, inum)`, the pool has lost
@@ -463,7 +459,6 @@ theorem ig_rcy_close (M : RegMapF (Qp × PosNat)) (ci : RegMapF (BitVec 32 × Bi
     (ig_ciwf_insert M ci icfgNib icfgDev inum e _ hciwf hnib hnotin)
   iframe Hhalf Hrows Hiauth Hipool Hslots Hpool
 
-
 set_option maxHeartbeats 8000000 in
 /-- The recycle's release, `+0x80 .. +0x8c` (Rocq 1720--1795): the table
 goes back in its release form and the shared tail returns `ientry e`. -/
@@ -485,10 +480,10 @@ theorem ig_recycle_rel (RH : RELEASE_HOOK) (c cpu : CPU) (k : KCtx) (spie spp : 
   k_step (wp_s_auipc c _ (KA.«iget» + 0x80#64) false 0x1e#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_addi c _ (KA.«iget» + 0x84#64) false 2920#12 10#5 10#5 (by decide))
+  k_step (wp_s_addi c _ (KA.«iget» + 0x84#64) false 3572#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ig_lock]
   iintro Hk Hpc
-  k_step (wp_s_jal c _ (KA.«iget» + 0x88#64) false 2088120#21 1#5 (by decide))
+  k_step (wp_s_jal c _ (KA.«iget» + 0x88#64) false 2088100#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ig_br_rel]
   iintro Hk Hpc
   iapply (ig_release RH c cpu k spie spp hwf hK hlk hpin _ ?h10 (KA.«iget» + 0x8c#64) ?h1)
@@ -507,7 +502,6 @@ theorem ig_recycle_rel (RH : RELEASE_HOOK) (c cpu : CPU) (k : KCtx) (spie spp : 
   ipureintro
   exact ⟨he, c19.trans hs3, c2.trans h2, c21.trans p21, c22.trans p22, c23.trans p23,
     c24.trans p24, c25.trans p25, c26.trans p26, c27.trans p27⟩
-
 
 /-! ## THE RECYCLE, `+0x6a .. +0x8c` -/
 
@@ -640,10 +634,10 @@ theorem ig_panic_arm (PA : PANIC) (c : CPU) (k : KCtx) (spie spp : Bool)
   k_step (wp_s_auipc c _ (KA.«iget» + 0x9e#64) false 0x4#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_addi c _ (KA.«iget» + 0xa2#64) false 970#12 10#5 10#5 (by decide))
+  k_step (wp_s_addi c _ (KA.«iget» + 0xa2#64) false 942#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ig_msg]
   iintro Hk Hpc
-  k_step (wp_s_jal c _ (KA.«iget» + 0xa6#64) false 2086898#21 1#5 (by decide))
+  k_step (wp_s_jal c _ (KA.«iget» + 0xa6#64) false 2086878#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ig_br_panic]
   iintro Hk Hpc
   iapply (ig_panic PA c _ ?pa ?pk ?pn ?pp ?pu) $$ [- $Hk $Hpc $Hpe $Hmsg]

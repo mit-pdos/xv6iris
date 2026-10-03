@@ -9,7 +9,7 @@ file belongs to ONE function (`notes/design-rulings.md`), so
 each function's stage files had grown a copy.  This definitional file holds
 them once.  Merged here (old names, all deleted):
 
-* `bread_call`  -- `ba_bread`, `bm_bread`, `bf_bread`, `ilk_bread`
+* `bread_call_eb` -- `ba_bread`, `bm_bread`, `bf_bread`, `ilk_bread`
   (BallocDefs, BmapDefs, BfreeParts, IlockLoad): the general view `V`.
 * `brelse_call` -- `ba_brelse`, `bm_brelse`, `bf_brelse`, `ilk_brelse`.
 * `log_write_gen_call` -- `bm_log_write_gen`, and `ba_log_write_gen` (its
@@ -32,45 +32,11 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedSectionVars false
-
 /-! ## `bread` and `brelse` -/
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [CurCtx]
-
-set_option maxHeartbeats 1000000 in
-/-- `bread(dev, bno)` at its call site, at any view `V`. -/
-theorem bread_call (BR : BREAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (c : CPU) (k' : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
-    (pd pav pu : BitVec 64) (j : Nat) (pidv dev bno : BitVec 32) (dqp : DFrac)
-    (pj : BitVec 64) (hpj : k'.proc = pj)
-    (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hK : breadSlots ≤ k'.avail)
-    (hsie : k'.sie = false) (hnoff : k'.noff = 0) (hlocks : k'.locks = [])
-    (htier : k'.tier = KTier.kpt)
-    (hbno : bno.toNat < 2 ^ 31) (hcov : bno.toNat ∈ V.cov) (hdev : dev = V.dev)
-    (hpd : descPageRw pd)
-    (ha0 : k'.regs 10#5 = BitVec.signExtend 64 dev)
-    (ha1 : k'.regs 11#5 = BitVec.signExtend 64 bno) :
-    kctx c k' ∗ pcIs c KA.«bread» ∗ procsInv Γ ∗
-    trapCsrs c ∗ cpuClaim c pj ∗ intrRes c ∗
-    bioCtx γl γb V ∗ diskCaps V.gd γdl pd pav pu ∗ panicEnv ∗
-    wordPointsTo (pPid pj) 4 dqp pidv ∗ bslot ∗
-    wpNext true pj c (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (kk : Nat)
-        (bs bsd : List (BitVec 8)) (d : Bool),
-      ⌜calleeSaved k'.regs R' ∧ R' 10#5 = bnode kk⌝ -∗
-      kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
-      trapCsrs cpu' -∗ cpuClaim cpu' pj -∗ intrRes cpu' -∗
-      wordPointsTo (pPid pj) 4 dqp pidv -∗
-      bioLocked γb V kk pidv dev bno bs bsd d -∗ wpLoop cpu'))
-    ⊢ wpLoop (GF := GF) c := by
-  subst hpj
-  have h := BR.wp_bread (hlc := hlc) (GF := GF) Γ c k' γl γb V γdl pd pav pu j pidv dev bno dqp
-    hj hproc hK hsie hnoff hlocks htier hbno hcov hdev hpd ha0 ha1
-  unfold wp_bread_body at h
-  simp only [breadAddr] at h
-  exact h
 
 set_option maxHeartbeats 1000000 in
 /-- `bread(dev, bno)` at its call site, at EITHER entry `SIE` (`BREAD.wp_bread_eb`): the

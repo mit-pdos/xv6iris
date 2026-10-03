@@ -13,7 +13,6 @@ cell that came out with it.
 -/
 import Xv6.BreadDefs
 import MachCSL.WpSmodeFrame6c
-import Xv6.CodeTactics
 import Xv6.BufEscrow
 import Xv6.SpecBread
 import MachCSL.LockFacts
@@ -25,22 +24,13 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-- The callee-saved registers `s4..s11` and the frame pointer, pinned to
 the entry map: what survives bread's body. -/
 def bdPins (k : KCtx) (R : RegMap) : Prop :=
   R 20#5 = k.regs 20#5 ∧ R 21#5 = k.regs 21#5 ∧ R 22#5 = k.regs 22#5 ∧ R 23#5 = k.regs 23#5 ∧
   R 24#5 = k.regs 24#5 ∧ R 25#5 = k.regs 25#5 ∧ R 26#5 = k.regs 26#5 ∧ R 27#5 = k.regs 27#5
-
-theorem bdPins_cs (k : KCtx) (R R' : RegMap) (h : bdPins k R) (hcs : calleeSaved R R') :
-    bdPins k R' := by
-  obtain ⟨a20, a21, a22, a23, a24, a25, a26, a27⟩ := h
-  obtain ⟨-, -, -, -, -, c20, c21, c22, c23, c24, c25, c26, c27⟩ := hcs
-  exact ⟨c20.trans a20, c21.trans a21, c22.trans a22, c23.trans a23,
-    c24.trans a24, c25.trans a25, c26.trans a26, c27.trans a27⟩
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF]
@@ -231,7 +221,7 @@ theorem bd_tail (VR : VIRTIO_DISK_RW) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF
     k_step_e (wp_s_add cpu _ (KA.«bread» + 0xca#64) true 10#5 0#5 9#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9]
     iintro Hk Hpc
-    k_step_e (wp_s_jal cpu _ (KA.«bread» + 0xcc#64) false 11410#21 1#5 (by decide))
+    k_step_e (wp_s_jal cpu _ (KA.«bread» + 0xcc#64) false 11630#21 1#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [bd_br_vdr]
     iintro Hk Hpc
     iapply (bd_vdr VR Γ cpu _ V γdl pd pav pu j kk bno bs bsd k0.sie k0.proc (by k_norm_g)

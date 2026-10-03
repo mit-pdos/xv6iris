@@ -17,15 +17,12 @@ USH_RUN_SYS_P`, over the port `UkRunSysExec.wp_uk_ecall_exec`.
 register write is `ukWr m 10#5 (-1#64)`.
 -/
 import Xv6.UkSysP
-import Xv6.UshRunDefs
 
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
-
-set_option linter.unusedSectionVars false
 
 namespace UshRunSysP
 

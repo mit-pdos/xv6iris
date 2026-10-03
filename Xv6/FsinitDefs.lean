@@ -26,9 +26,6 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedSectionVars false
-set_option linter.unusedVariables false
-
 /-! ## The crash rows the stages thread to `initlog`
 
 Built once at fsinit's entry (`Xv6.fsinit_entry`, the top of Rocq's
@@ -68,12 +65,12 @@ def fsinitCrashPure [Fscfg] (L : BlockMap) (M : LogMirror) (bsSb : List (BitVec 
 
 /-- `auipc aX,0x1d ; addi/lw aX,…(aX)` at `+0x1e`, `+0x30`, `+0x44` all land
 on `&sb`. -/
-theorem fsinit_sb_addr : KA.«fsinit» + 0x1d4ee#64 = KA.«sb» := by decide
+theorem fsinit_sb_addr : KA.«fsinit» + 0x1d77a#64 = KA.«sb» := by decide
 
 theorem fsinit_br_bread : KA.«fsinit» + 0xFFFFFFFFFFFFF62C#64 = KA.«bread» := by decide
-theorem fsinit_br_memmove : KA.«fsinit» + 0xffffffffffffd6fe#64 = KA.«memmove» := by decide
+theorem fsinit_br_memmove : KA.«fsinit» + 0xffffffffffffd6ea#64 = KA.«memmove» := by decide
 theorem fsinit_br_brelse : KA.«fsinit» + 0xFFFFFFFFFFFFF734#64 = KA.«brelse» := by decide
-theorem fsinit_br_initlog : KA.«fsinit» + 0x6AC#64 = KA.«initlog» := by decide
+theorem fsinit_br_initlog : KA.«fsinit» + 0x70c#64 = KA.«initlog» := by decide
 theorem fsinit_br_ireclaim : KA.«fsinit» + 0xFFFFFFFFFFFFFF38#64 = KA.«ireclaim» := by decide
 
 theorem fsinit_ret_14 : jumpPc (KA.«fsinit» + 0x14#64) = (KA.«fsinit» + 0x14#64) := by decide
@@ -108,13 +105,9 @@ theorem fsinit_bne_dead (w : BitVec 32) (hw : w.toNat = FSMAGIC) :
 
 /-! ## The superblock image, read back as eight cells -/
 
-theorem fsinit_sbImage_length (a b c d e f g h : BitVec 32) :
-    (sbImage a b c d e f g h).length = 32 := by
-  simp [sbImage, wordToBytes4_length]
-
 /-- `&sb` is word aligned, and so is every field. -/
 theorem fsinit_sb_align (i : Nat) (hi : i < 8) : (KA.«sb» + BitVec.ofNat 64 (4 * i)).toNat % 4 = 0 := by
-  have hs : KA.«sb».toNat = 0x80020b68 := rfl
+  have hs : KA.«sb».toNat = 0x80020e08 := rfl
   rw [BitVec.toNat_add, hs, BitVec.toNat_ofNat]
   omega
 

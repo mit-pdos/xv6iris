@@ -50,7 +50,7 @@ entry view with every lazy page zeroed (`Xv6/UMemLazy.lean`; Rocq's `us_M`,
 at which `fetchstr_got` is stated).  copyinstr says the string's pages are
 mapped in the table it returns (`umMapped`), and on those pages the faulted
 view is the lazy image (`UMemL.umemStr_viewLazy`).  For a block with no lazy
-page it is `M` itself (`UMemL.viewLazy_of_lazyFree`).
+page it is `M` itself.
 
 THE EVENT COUNTER (permit sweep L1b, Rocq b69bd0fab): fetchstr lends the
 block's counter to copyinstr, which may step it, so the block comes back at

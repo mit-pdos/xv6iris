@@ -35,9 +35,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-- A path byte at `i ≤ plen` reads out of the `plen + 1`-byte buffer. -/
 theorem namex_path_lookup (plen i : Nat) (f : Nat → BitVec 8) (hi : i ≤ plen) :
@@ -143,7 +141,6 @@ theorem namex_skip_loop (base pv : BitVec 64) (K : KCtx) (plen : Nat) (f : Nat �
     ipureintro
     exact ⟨by omega, by omega, hall', hs1, hR9, hR15, hR⟩
 
-
 set_option maxHeartbeats 8000000 in
 /-- **THE SKIP at `base`**: the first byte, and either done (`bne` taken) or
 the loop at `base + 8`. -/
@@ -199,7 +196,7 @@ def namexScanK (pv : BitVec 64) (K : KCtx) (plen : Nat) (f : Nat → BitVec 8) (
     ⌜a < e ∧ e ≤ plen ∧ (∀ i, a ≤ i → i < e → f i ≠ SLASH) ∧ (e = plen ∨ f e = SLASH) ∧
       R' 18#5 = pv + BitVec.ofNat 64 e ∧
       (∀ r : BitVec 5, r ≠ 18#5 → r ≠ 15#5 → r ≠ 14#5 → R' r = R0 r)⌝ -∗
-    kctx c (K.withRegs R') -∗ pcIs c (KA.«namex» + 0x96#64) -∗
+    kctx c (K.withRegs R') -∗ pcIs c (KA.«namex» + 0x9a#64) -∗
     byteBuf pv dq (bview (plen + 1) f) -∗
     trapCsrsExt c K.sie -∗ cpuClaimExt c K.sie K.proc -∗ wpLoop c)
 
@@ -212,7 +209,7 @@ theorem namex_scan_loop (pv : BitVec 64) (K : KCtx) (plen : Nat) (f : Nat → Bi
     ∀ (fuel ii : Nat) (R : RegMap) (cpu : CPU), plen - ii < fuel → a ≤ ii → ii < plen →
       (∀ i, a ≤ i → i ≤ ii → f i ≠ SLASH) → R 18#5 = pv + BitVec.ofNat 64 ii →
       (∀ r : BitVec 5, r ≠ 18#5 → r ≠ 15#5 → r ≠ 14#5 → R r = R0 r) →
-      kctx cpu (K.withRegs R) ∗ pcIs cpu (KA.«namex» + 0x116#64) ∗
+      kctx cpu (K.withRegs R) ∗ pcIs cpu (KA.«namex» + 0x11a#64) ∗
       byteBuf pv dq (bview (plen + 1) f) ∗
       trapCsrsExt cpu K.sie ∗ cpuClaimExt cpu K.sie K.proc ∗
       namexScanK pv K plen f dq a R0
@@ -226,19 +223,19 @@ theorem namex_scan_loop (pv : BitVec 64) (K : KCtx) (plen : Nat) (f : Nat → Bi
   iintro ⟨Hk, Hpc, Hbuf, Hte, Hce, HK⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- +0x116  c.addi s2,s2,1
-  k_step_e (wp_s_addi cpu _ (KA.«namex» + 0x116#64) true 1#12 18#5 18#5 (by decide))
+  k_step_e (wp_s_addi cpu _ (KA.«namex» + 0x11a#64) true 1#12 18#5 18#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h18]
   iintro Hk Hpc
   -- +0x118  lbu a5,0(s2)
   icases byteBuf_acc pv dq _ (ii + 1) (f (ii + 1)) hacc $$ Hbuf with ⟨Hb, Hbk⟩
   isimp only [BitVec.ofNat_add, BitVec.reduceOfNat] at Hb Hbk
-  k_step_e (wp_s_lbu cpu _ (KA.«namex» + 0x118#64) false 0#12 15#5 18#5 (by decide) (by decide) dq
+  k_step_e (wp_s_lbu cpu _ (KA.«namex» + 0x11c#64) false 0#12 15#5 18#5 (by decide) (by decide) dq
       (f (ii + 1)))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h18]
   iintro Hk Hpc Hb
   ihave Hbuf := Hbk $$ Hb
   -- +0x11c  addi a4,a5,-47
-  k_step_e (wp_s_addi cpu _ (KA.«namex» + 0x11c#64) false 4049#12 14#5 15#5 (by decide))
+  k_step_e (wp_s_addi cpu _ (KA.«namex» + 0x120#64) false 4049#12 14#5 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   have hR : ∀ r : BitVec 5, r ≠ 18#5 → r ≠ 15#5 → r ≠ 14#5 →
@@ -255,7 +252,7 @@ theorem namex_scan_loop (pv : BitVec 64) (K : KCtx) (plen : Nat) (f : Nat → Bi
   -- +0x120  c.beqz a4,+0x96
   by_cases hs : f (ii + 1) = SLASH
   · have hd : decide (f (ii + 1) = SLASH) = true := by simp [hs]
-    k_step_e (wp_s_branch cpu _ (KA.«namex» + 0x120#64) true 8054#13 14#5 0#5 (by decide) bop.BEQ)
+    k_step_e (wp_s_branch cpu _ (KA.«namex» + 0x124#64) true 8054#13 14#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ha4, hd]
     iintro Hk Hpc
     unfold namexScanK
@@ -263,7 +260,7 @@ theorem namex_scan_loop (pv : BitVec 64) (K : KCtx) (plen : Nat) (f : Nat → Bi
     ipureintro
     exact ⟨by omega, by omega, fun i h1 h2 => hns i h1 (by omega), Or.inr hs, hR18, hR⟩
   · have hd : decide (f (ii + 1) = SLASH) = false := by simp [hs]
-    k_step_e (wp_s_branch cpu _ (KA.«namex» + 0x120#64) true 8054#13 14#5 0#5 (by decide) bop.BEQ)
+    k_step_e (wp_s_branch cpu _ (KA.«namex» + 0x124#64) true 8054#13 14#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ha4, hd]
     iintro Hk Hpc
     have hbz := namex_bnez_byte (f (ii + 1))
@@ -274,11 +271,11 @@ theorem namex_scan_loop (pv : BitVec 64) (K : KCtx) (plen : Nat) (f : Nat → Bi
         rcases Nat.lt_or_ge (ii + 1) plen with h | h
         · exact absurd hz (hnn _ h)
         · omega
-      k_step_e (wp_s_branch cpu _ (KA.«namex» + 0x122#64) true 8180#13 15#5 0#5 (by decide) bop.BNE)
+      k_step_e (wp_s_branch cpu _ (KA.«namex» + 0x126#64) true 8180#13 15#5 0#5 (by decide) bop.BNE)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hbz, hdz]
       iintro Hk Hpc
       -- +0x124  c.j +0x96
-      k_step_e (wp_s_j cpu _ (KA.«namex» + 0x124#64) true 2097010#21)
+      k_step_e (wp_s_j cpu _ (KA.«namex» + 0x128#64) true 2097010#21)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       iintro Hk Hpc
       unfold namexScanK
@@ -286,7 +283,7 @@ theorem namex_scan_loop (pv : BitVec 64) (K : KCtx) (plen : Nat) (f : Nat → Bi
       ipureintro
       exact ⟨by omega, by omega, fun i h1 h2 => hns i h1 (by omega), Or.inl hep, hR18, hR⟩
     · have hdz : decide (f (ii + 1) ≠ 0#8) = true := by simp [hz]
-      k_step_e (wp_s_branch cpu _ (KA.«namex» + 0x122#64) true 8180#13 15#5 0#5 (by decide) bop.BNE)
+      k_step_e (wp_s_branch cpu _ (KA.«namex» + 0x126#64) true 8180#13 15#5 0#5 (by decide) bop.BNE)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hbz, hdz]
       iintro Hk Hpc
       have hlt' : ii + 1 < plen := by

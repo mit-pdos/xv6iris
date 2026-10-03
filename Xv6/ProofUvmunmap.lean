@@ -25,13 +25,10 @@ which the cursor loop threads unchanged; at each freed page
 (`unFreeL_intro`) and hands back what the loop returns (`unFreeL_elim`).
 -/
 import Xv6.SpecUvmunmap
-import Xv6.SpecWalk
-import Xv6.SpecKfree
 import Xv6.UvmCallSites
 import Xv6.UPtUnmapLemmas
 import Xv6.CodeTactics
 import MachCSL.WpSmodeFrame8
-import Xv6.ByteCursor
 import Xv6.UvmallocDefs
 import Xv6.WalkaddrDefs
 import MachCSL.BvLemmas
@@ -43,7 +40,6 @@ open Iris.Std Iris.Std.PartialMap Iris.Std.LawfulPartialMap
 open LeanRV64D LeanRV64D.Functions
 open Xv6.UPtUnmap
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled

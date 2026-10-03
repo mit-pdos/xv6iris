@@ -76,7 +76,7 @@ Imports `SysOpenParts` and the shared call-site files `FsCallSitesOp`, `SysfileC
 -/
 import Xv6.SysOpenParts
 import Xv6.FsCallSitesOp
-import Xv6.SysfileCalls
+import MachCSL.BvLemmas
 
 namespace Xv6
 
@@ -85,15 +85,13 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## Constants -/
 
 theorem sys_open_tails_br_end_op : sysOpenAddr + 0xffffffffffffebe2#64 = KA.«end_op» := by decide
-theorem sys_open_tails_br_iunlockput : sysOpenAddr + 0xffffffffffffe340#64 = KA.«iunlockput» := by decide
-theorem sys_open_tails_br_iunlock : sysOpenAddr + 0xffffffffffffe19a#64 = KA.«iunlock» := by decide
+theorem sys_open_tails_br_iunlockput : sysOpenAddr + 0xffffffffffffe2e0#64 = KA.«iunlockput» := by decide
+theorem sys_open_tails_br_iunlock : sysOpenAddr + 0xffffffffffffe13a#64 = KA.«iunlock» := by decide
 theorem sys_open_tails_br_fileclose : sysOpenAddr + 0xfffffffffffff010#64 = KA.«fileclose» := by decide
 
 theorem sys_open_tails_ret_d6 : jumpPc (sysOpenAddr + 0xd6#64) = sysOpenAddr + 0xd6#64 := by decide
@@ -415,7 +413,7 @@ theorem sys_open_tail_c (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames) [Clai
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hpins.2.2.1]
   iintro Hk Hpc
   -- 0xfe  jal iunlockput
-  k_step_e (wp_s_jal cpu _ (sysOpenAddr + 0xfe#64) false 2089538#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (sysOpenAddr + 0xfe#64) false 2089442#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_open_tails_br_iunlockput]
   iintro Hk Hpc
   iapply (sys_open_tails_iunlockput IUP Γ cpu _ k.sie (by k_norm_g) k.proc (by k_norm_g) A γil γisl loc tlc
@@ -493,7 +491,7 @@ theorem sys_open_tail_d (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames) [Clai
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hpins.2.2.1]
   iintro Hk Hpc
   -- 0x118  jal iunlockput
-  k_step_e (wp_s_jal cpu _ (sysOpenAddr + 0x118#64) false 2089512#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (sysOpenAddr + 0x118#64) false 2089416#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_open_tails_br_iunlockput]
   iintro Hk Hpc
   iapply (sys_open_tails_iunlockput IUP Γ cpu _ k.sie (by k_norm_g) k.proc (by k_norm_g) A γil γisl loc tlc
@@ -575,7 +573,7 @@ theorem sys_open_tail_e (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames) [Clai
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hpins.2.2.1]
   iintro Hk Hpc
   -- +0x130  jal iunlockput
-  k_step_e (wp_s_jal cpu _ (sysOpenAddr + 0x130#64) false 2089488#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (sysOpenAddr + 0x130#64) false 2089392#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_open_tails_br_iunlockput]
   iintro Hk Hpc
   iapply (sys_open_tails_iunlockput IUP Γ cpu _ k.sie (by k_norm_g) k.proc (by k_norm_g) A γil γisl loc tlc
@@ -726,7 +724,7 @@ theorem sys_open_tail_s (IU : IUNLOCK) (EO : END_OP) (Γ : SchedNames) [ClaimIs 
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hpins.2.2.1]
   iintro Hk Hpc
   -- +0xba  jal iunlock
-  k_step_e (wp_s_jal cpu _ (sysOpenAddr + 0xba#64) false 2089184#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (sysOpenAddr + 0xba#64) false 2089088#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_open_tails_br_iunlock]
   iintro Hk Hpc
   iapply (sys_open_tails_iunlock IU Γ cpu _ k.sie (by k_norm_g) k.proc (by k_norm_g) A γil γisl loc tlc

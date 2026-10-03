@@ -95,26 +95,4 @@ structure BEGIN_OP : Prop where
     wp_begin_op_eb_body (hlc := hlc) (GF := GF) Γ cpu k γ γb V γfs j logstart dev pidv dqp
       hj hproc hK hnoff htier
 
-/-- The interrupts-off instance of `wp_begin_op_eb` (the complement is the whole
-bundle): the contract every not-yet-generalized caller states. -/
-theorem BEGIN_OP.wp_begin_op (A : BEGIN_OP) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-    [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (cpu : CPU) (k : KCtx) (γ : LogNames) (γb : BcacheNames) (V : BioView GF)
-    (γfs : FsNames) (j : Nat) (logstart : Nat) (dev : BitVec 32)
-    (pidv : BitVec 32) (dqp : DFrac) hj hproc hK hsie hnoff hlocks htier :
-    wp_begin_op_body (hlc := hlc) (GF := GF) Γ cpu k γ γb V γfs j logstart dev pidv dqp
-      hj hproc hK hsie hnoff hlocks htier := by
-  have h := A.wp_begin_op_eb (hlc := hlc) (GF := GF) (Γ := Γ) (cpu := cpu) (k := k) (γ := γ) (γb := γb) (V := V) (γfs := γfs) (j := j) (logstart := logstart) (dev := dev) (pidv := pidv) (dqp := dqp) (hj := hj) (hproc := hproc) (hK := hK) (hnoff := hnoff) (htier := htier)
-  unfold wp_begin_op_eb_body at h
-  unfold wp_begin_op_body
-  rw [hsie] at h
-  simp only [trapCsrsExt_false, cpuClaimExt_false] at h
-  iintro ⟨H0, H1, H2, Htc, Hcl, Hir, H6, H7, Hnext⟩
-  iapply h
-  iframe H0 H1 H2 Htc Hcl Hir H6 H7
-  iapply wpNext_mono $$ Hnext
-  iintro %cpu' HK %spie %spp %R' %p0 H1 H2 ⟨Htc, Hir⟩ Hcl H6 H7
-  iapply HK $$ %spie %spp %R' %p0 H1 H2 Htc Hcl Hir H6 H7
-
 end Xv6

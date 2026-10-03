@@ -109,8 +109,6 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedSectionVars false
-
 /-- `fileclose`'s entry (D13: the address lives with its Spec). -/
 def filecloseAddr : BitVec 64 := KA.«fileclose»
 
@@ -390,13 +388,6 @@ theorem filecloseCpost_of_fired (q : Qp) (st : FdState) (Φc : IProp GF) (r w : 
   · iright; ileft; iframe Ht Hp
   · exact absurd hf (by decide)
 
-/-- ...and its INPUT, at the same key: what the closer hands pipeclose (Rocq
-`fileclose_cpay_pipe`). -/
-theorem filecloseCpay_pipe (st : FdState) (Φc : IProp GF) (r w : Bool) (γp : PipeNames)
-    (hst : st = .open r w (.pipe γp)) :
-    filecloseCpay (hlc := hlc) st Φc ⊢ pipeCpay (hlc := hlc) γp.pnQueue w Φc := by
-  subst hst; exact .rfl
-
 /-- ...and a state that is not a pipe pays and gets back nothing (Rocq
 `fileclose_cpost_nonpipe`, at the state rather than the content). -/
 theorem filecloseCpost_nopipe (q : Qp) (st : FdState) (Φc : IProp GF) (h : fdstNopipe st) :
@@ -413,20 +404,6 @@ payload -- the process never resumes to be told anything (Rocq
 `fileclose_cpays`). -/
 def filecloseCpays (sts : List FdState) : IProp GF :=
   iprop([∗list] st ∈ sts, filecloseCpay (hlc := hlc) st iprop(emp))
-
-/-- ...at a table that holds no pipe row, every payment is `emp` (Rocq
-`fileclose_cpays_nopipe`). -/
-theorem filecloseCpays_nopipe (sts : List FdState) (h : ∀ st ∈ sts, fdstNopipe st) :
-    ⊢ filecloseCpays (hlc := hlc) (GF := GF) sts := by
-  unfold filecloseCpays
-  refine BigSepL.bigSepL_intro (P := iprop(emp)) (fun k st hk => ?_)
-  have hn := h st (List.mem_of_getElem? hk)
-  unfold filecloseCpay
-  rcases st with _ | ⟨_, w, _ | _ | _⟩
-  · exact .rfl
-  · exact hn.elim
-  · exact .rfl
-  · exact .rfl
 
 /-- Rocq `fileclose_cpays_taint`. -/
 theorem filecloseCpays_taint (sts : List FdState) :

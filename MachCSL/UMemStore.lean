@@ -13,7 +13,7 @@ translation-fault path.
 
 * the reservation MATCHES (or the access is a plain STORE): `mem_write_ea`
   then `mem_write_value` -- the bytes land (`uma_vmem_write_addr_al`,
-  composed: `uma_vmem_write_addr_store`, `uma_vmem_write_addr_sc_ok`; the
+  composed: `uma_vmem_write_addr_sc_ok`; the
   SC's exclusive write goes through from any reservation state);
 * it does NOT match (SC only): the access is still CHECKED
   (`phys_access_check`), nothing is written, the SC answers `false`
@@ -28,7 +28,6 @@ in a later cycle than its LR, one whose reservation a store spent, or an
 reserves the bytes; the walker's bookkeeping bit drops.
 -/
 import MachCSL.UMemAccess
-import MachCSL.UWalkRun
 
 namespace MachCSL
 
@@ -125,21 +124,6 @@ theorem uma_vmem_write_addr_sc_mis (D : UFoot) (hD : UmaTrapFoot D) (orc : UOrc)
   rcases hw with rfl | rfl | rfl | rfl <;> uwk_run [hme, hal']
 
 /-! ## The composed arms -/
-
-/-- **An aligned STORE to owned bytes**: lane U1-P1's translation to the
-page, then the bytes land; the reservation bit drops. -/
-theorem uma_vmem_write_addr_store (D : UFoot) (orc orc1 : UOrc) (s s1 : UWSt) (hp : UtrPins D s)
-    (hp1 : UmaPhys D s1) (va : BitVec 64) (w : Nat) (hw : umaW w) (hal : va.toNat % w = 0) (hc : utrCanon va)
-    (data : BitVec (8 * w)) (ppn : BitVec 44)
-    (htr : runRW D orc s (utrTranslate s va (.Store .Data)) = some (.Ok (ppn, .PBMT_PMA, ()), s1, orc1))
-    (hr : UmaRam (paOf ppn va) w) (ho : bmOwned s1.mm (paOf ppn va) w = true) :
-    runRW D orc s (vmem_write_addr (.Virtaddr va) w data (.Store .Data) false false false) =
-      some (.Ok true, { s1 with mm := bmWrite s1.mm (paOf ppn va) w data, rv := false }, orc1) :=
-  uma_vmem_write_addr_al D orc orc1 s s1 hp va w hw hal data (.Store .Data) false false false rfl
-    (paOf ppn va) rfl true (fun d => { s1 with mm := bmWrite s1.mm (paOf ppn va) w d, rv := false })
-    (uma_translateAddr_ok D orc orc1 s s1 hp va _ rfl hc ppn htr)
-    (uma_mem_write_ea_store D orc1 s1 hp1 (paOf ppn va) w hw hr)
-    (fun d => uma_mem_write_value_store D orc1 s1 hp1 (paOf ppn va) w hw hr d ho)
 
 /-- **An aligned SC whose reservation matches** (from any reservation
 state): the bytes land, the SC answers `true`, the reservation bit drops. -/

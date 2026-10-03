@@ -16,9 +16,6 @@ import Xv6.SpecAcquiresleep
 import Xv6.BcacheInv
 import Xv6.SpecPanic
 import Xv6.ConsoleintrArms
-import Xv6.ConsoleintrParts
-import Xv6.FsWords
-import Xv6.VirtioDiskRwDefs3
 import Xv6.StepLemmas
 
 namespace Xv6
@@ -28,36 +25,34 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## Constants the code computes -/
 
 /-- `&bcache.lock`, from all three `auipc a0,0x15 ; addi a0,a0,_` pairs. -/
-theorem bd_lock : KA.«bread» + 0x15802#64 = bcacheLockAddr := by
+theorem bd_lock : KA.«bread» + 0x15a8e#64 = bcacheLockAddr := by
   unfold bcacheLockAddr; decide
 
 /-- `&bcache.head`, from both `auipc a5,0x1e ; addi a5,a5,_` pairs. -/
-theorem bd_head : KA.«bread» + 0x1da6a#64 = bhead := by
+theorem bd_head : KA.«bread» + 0x1dcf6#64 = bhead := by
   unfold bhead bcacheHeadAddr; decide
 
 /-- `&bcache.head.next`, the forward scan's first load. -/
-theorem bd_hnext : KA.«bread» + 0x1daba#64 = bNext bhead := by
+theorem bd_hnext : KA.«bread» + 0x1dd46#64 = bNext bhead := by
   unfold bNext bhead bcacheHeadAddr; decide
 
 /-- `&bcache.head.prev`, the backward scan's first load. -/
-theorem bd_hprev : KA.«bread» + 0x1dab2#64 = bPrev bhead := by
+theorem bd_hprev : KA.«bread» + 0x1dd3e#64 = bPrev bhead := by
   unfold bPrev bhead bcacheHeadAddr; decide
 
 /-- The `"bget: no buffers"` literal. -/
-theorem bd_msg : KA.«bread» + 0x4722#64 = KStr.«bget: no buffers» := by decide
+theorem bd_msg : KA.«bread» + 0x4706#64 = KStr.«bget: no buffers» := by decide
 
-theorem bd_br_acq : KA.«bread» + 0xffffffffffffdfb2#64 = KA.«acquire» := by decide
-theorem bd_br_rel : KA.«bread» + 0xffffffffffffe03a#64 = KA.«release» := by decide
-theorem bd_br_aslp : KA.«bread» + 0x141e#64 = KA.«acquiresleep» := by decide
-theorem bd_br_panic : KA.«bread» + 0xffffffffffffdb92#64 = KA.«panic» := by decide
-theorem bd_br_vdr : KA.«bread» + 0x2d5e#64 = KA.«virtio_disk_rw» := by decide
+theorem bd_br_acq : KA.«bread» + 0xffffffffffffdf9e#64 = KA.«acquire» := by decide
+theorem bd_br_rel : KA.«bread» + 0xffffffffffffe026#64 = KA.«release» := by decide
+theorem bd_br_aslp : KA.«bread» + 0x147e#64 = KA.«acquiresleep» := by decide
+theorem bd_br_panic : KA.«bread» + 0xffffffffffffdb7e#64 = KA.«panic» := by decide
+theorem bd_br_vdr : KA.«bread» + 0x2e3a#64 = KA.«virtio_disk_rw» := by decide
 
 theorem bd_ret_1e : jumpPc (KA.«bread» + 0x1e#64) = (KA.«bread» + 0x1e#64) := by decide
 theorem bd_ret_5a : jumpPc (KA.«bread» + 0x5a#64) = (KA.«bread» + 0x5a#64) := by decide
@@ -66,9 +61,6 @@ theorem bd_ret_ac : jumpPc (KA.«bread» + 0xac#64) = (KA.«bread» + 0xac#64) :
 theorem bd_ret_b4 : jumpPc (KA.«bread» + 0xb4#64) = (KA.«bread» + 0xb4#64) := by decide
 theorem bd_ret_d0 : jumpPc (KA.«bread» + 0xd0#64) = (KA.«bread» + 0xd0#64) := by decide
 
-/-- The forward scan's two branch targets and the loop's back edge. -/
-theorem bd_t_miss1 : KA.«bread» + 0x2e#64 + BitVec.signExtend 64 54#13 = KA.«bread» + 0x64#64 := by
-  decide
 theorem bd_t_miss2 : KA.«bread» + 0x38#64 + BitVec.signExtend 64 44#13 = KA.«bread» + 0x64#64 := by
   decide
 theorem bd_t_back1 : KA.«bread» + 0x3e#64 + BitVec.signExtend 64 8184#13 = KA.«bread» + 0x36#64 := by
@@ -76,8 +68,6 @@ theorem bd_t_back1 : KA.«bread» + 0x3e#64 + BitVec.signExtend 64 8184#13 = KA.
 theorem bd_t_back2 : KA.«bread» + 0x44#64 + BitVec.signExtend 64 8178#13 = KA.«bread» + 0x36#64 := by
   decide
 theorem bd_t_j3c : KA.«bread» + 0x34#64 + BitVec.signExtend 64 8#21 = KA.«bread» + 0x3c#64 := by
-  decide
-theorem bd_t_panic : KA.«bread» + 0x74#64 + BitVec.signExtend 64 16#13 = KA.«bread» + 0x84#64 := by
   decide
 theorem bd_t_recyc : KA.«bread» + 0x7c#64 + BitVec.signExtend 64 20#13 = KA.«bread» + 0x90#64 := by
   decide
@@ -91,15 +81,6 @@ theorem bd_t_ret : KA.«bread» + 0xd4#64 + BitVec.signExtend 64 2097124#21 = KA
   decide
 
 /-! ## Pure arithmetic -/
-
-/-- The RV64 ABI hands `uint` arguments sign-extended, and the scan's `lw`s
-sign-extend what they read, so the 64-bit compares are exact. -/
-theorem bd_setWidth_sext (a : BitVec 32) : BitVec.setWidth 32 (BitVec.signExtend 64 a) = a := by
-  apply BitVec.eq_of_getLsbD_eq
-  intro i
-  simp only [BitVec.getLsbD_setWidth, BitVec.getLsbD_signExtend]
-  intro h
-  simp [h, show i < 64 by omega]
 
 theorem bd_sext_ne (a b : BitVec 32) (h : a ≠ b) :
     BitVec.signExtend 64 a ≠ BitVec.signExtend 64 b := fun he => h (Xv6.ci_sext_inj a b he)
@@ -178,7 +159,7 @@ theorem bd_old_unique {GF : BundledGFunctors} (V : BioView GF) (bnos : Nat → B
 
 /-! ## The `"bget: no buffers"` literal -/
 
-/-- `bget: no buffers` at `0x800073c8`. -/
+/-- `bget: no buffers` at `0x800073c0`. -/
 def bdMsgStr : List (BitVec 8) :=
   [0x62#8, 0x67#8, 0x65#8, 0x74#8, 0x3a#8, 0x20#8, 0x6e#8, 0x6f#8, 0x20#8,
    0x62#8, 0x75#8, 0x66#8, 0x66#8, 0x65#8, 0x72#8, 0x73#8]
@@ -331,28 +312,6 @@ end
 
 theorem bd_valid_eq (a : BitVec 64) : aBufValid a = a := by
   unfold aBufValid bOffValid; simp
-theorem bd_valid_sext (a : BitVec 64) : a + BitVec.signExtend 64 0#12 = aBufValid a := by
-  unfold aBufValid bOffValid; congr 1
-theorem bd_dev_sext (a : BitVec 64) : a + BitVec.signExtend 64 8#12 = aBufDev a := by
-  unfold aBufDev bOffDev; congr 1
-theorem bd_bno_sext (a : BitVec 64) : a + BitVec.signExtend 64 12#12 = aBufBlockno a := by
-  unfold aBufBlockno bOffBlockno; congr 1
-
-/-- The `lw`'s sign extension is zero exactly when the word is. -/
-theorem bd_sext_zero (v : BitVec 32) : (BitVec.signExtend 64 v = 0#64) ↔ (v = 0#32) := by
-  constructor
-  · intro h
-    exact Xv6.ci_sext_inj v 0#32 (by rw [h]; decide)
-  · intro h; rw [h]; decide
-
-theorem bd_dev_eq (a : BitVec 64) : aBufDev a = a + BitVec.signExtend 64 8#12 := by
-  unfold aBufDev bOffDev; congr 1
-theorem bd_bno_eq (a : BitVec 64) : aBufBlockno a = a + BitVec.signExtend 64 12#12 := by
-  unfold aBufBlockno bOffBlockno; congr 1
-theorem bd_prev_eq (a : BitVec 64) : bPrev a = a + BitVec.signExtend 64 72#12 := by
-  unfold bPrev; congr 1
-theorem bd_next_eq (a : BitVec 64) : bNext a = a + BitVec.signExtend 64 80#12 := by
-  unfold bNext; congr 1
 
 theorem bd_dev_eq' (a : BitVec 64) : aBufDev a = a + 8#64 := by
   unfold aBufDev bOffDev; congr 1
@@ -385,8 +344,6 @@ theorem bd_blast_map (l : List Nat) (a : Nat) (d : BitVec 64) :
     blast ((l ++ [a]).map bnode) d = bnode a := by
   simp only [List.map_append, List.map_cons, List.map_nil]
   rw [blast_app]; rfl
-
-theorem bd_blast_nil (d : BitVec 64) : blast (([] : List Nat).map bnode) d = d := rfl
 
 theorem bd_ext_zero : BitVec.extractLsb' 0 32 (0#64 : BitVec 64) = 0#32 := by decide
 theorem bd_ext_one : BitVec.extractLsb' 0 32 (BitVec.signExtend 64 (1#12 : BitVec 12))

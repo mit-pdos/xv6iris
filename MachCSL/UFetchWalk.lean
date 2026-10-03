@@ -132,7 +132,7 @@ theorem uft_mrdx (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (n vasize : Nat)
   rw [← h]
   exact uft_node_of D orc s (.ok (.memRead n vasize req)) k hif
     (Result.Ok (w, none) : Result ((BitVec (8 * n)) × (Option Bool)) Arch.abort) _ orc
-    (by simp only [runRW, hif, hn, hex, hacq, hr, Bool.false_eq_true, ↓reduceIte])
+    (by simp only [runRW, hif, hn, hex, hr, Bool.false_eq_true, ↓reduceIte])
 
 theorem uft_mwr (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (n vasize : Nat)
     (req : Mem_write_request n vasize Arch.pa Arch.translation Arch.arch_ak)
@@ -145,7 +145,7 @@ theorem uft_mwr (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (n vasize : Nat)
   rw [← h]
   exact uft_node_of D orc s (.ok (.memWrite n vasize req)) k rfl
     (Result.Ok (some true) : Result (Option Bool) Arch.abort) _ orc
-    (by simp only [runRW, hn, hv, ho, hex, Bool.false_eq_true, ↓reduceIte])
+    (by simp only [runRW, hn, hv, ho, ↓reduceIte])
 
 theorem uft_mwrx (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (n vasize : Nat)
     (req : Mem_write_request n vasize Arch.pa Arch.translation Arch.arch_ak)
@@ -158,7 +158,7 @@ theorem uft_mwrx (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (n vasize : Nat)
   rw [← h]
   exact uft_node_of D orc s (.ok (.memWrite n vasize req)) k rfl
     (Result.Ok (some true) : Result (Option Bool) Arch.abort) _ orc
-    (by simp only [runRW, hn, hv, ho, hex, hrv, ↓reduceIte])
+    (by simp only [runRW, hn, hv, ho, ↓reduceIte])
 
 theorem uft_choose (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (p : Sail.Primitive)
     (k : p.reflect → SailM X) (res : Option (X × UWSt × UOrc))

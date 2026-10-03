@@ -49,9 +49,6 @@ def qOpt (oQ : Option (IProp GF)) : IProp GF :=
   | none => iprop(emp)
   | some Q => Q
 
-theorem hookOpt_none (gen : Nat) : hookOpt (hlc := hlc) (GF := GF) gen none = iprop(emp) := rfl
-theorem qOpt_none : qOpt (GF := GF) none = iprop(emp) := rfl
-
 end
 
 end Xv6

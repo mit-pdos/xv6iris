@@ -14,9 +14,8 @@ CROSSES HERE (`initConsSup`), and THE WORKING DIRECTORY IS A PREMISE
 premise from `kexecImageOk User.Init.elf …` exactly as sh's does.  init's
 image is one page of text plus one of data, so `kexecTop` is 0x2000,
 `kexecSz` 0x4000, and the stack page is `[0x3000, 0x4000)`.  The generic
-entry geometry (`uimgSub_union_l`, `shPagePerm`, `udataLo_isSome`,
-`uwAddr_of_perm`, `kxcSpFinal_mod8`, `kexecTop_of_memEnd`, `kexecSz_of_top`,
-`shKeySp`) is `UshKernel`'s, reused verbatim.
+entry geometry (`uimgSub_union_l`, `udataLo_isSome`, `kxcSpFinal_mod8`,
+`kexecTop_of_memEnd`, `kexecSz_of_top`, `shKeySp`) is `UshKernel`'s, reused verbatim.
 
 ## Ported (reached from `union_adequacy_closed`)
 
@@ -80,14 +79,6 @@ theorem initImgSub_of_elf (M : ElfMem) (h : uimgSub (elfImage User.Init.elf) M) 
   have hd : User.Init.data.byte a = some b := hab
   apply hf
   simp only [elfUnion, hc, hd]
-
-/-- **Rocq `init_loads`** (deviation 3): init's two PT_LOADs, `(0x0, 0xe7c,
-R-X)` and `(0x1000, 0x30, RW-)`. -/
-theorem initLoads :
-    ∃ p0 p1 : ElfPhdr, elfLoads User.Init.elf = [p0, p1] ∧
-      p0.vaddr = 0 ∧ p0.memsz = 0xe7c ∧ p0.flags = 5 ∧
-      p1.vaddr = 0x1000 ∧ p1.memsz = 0x30 ∧ p1.flags = 6 :=
-  ⟨_, _, User.Init.elf_loads, rfl, rfl, rfl, rfl, rfl, rfl⟩
 
 /-- **Rocq `init_kexec_top`** (deviation 4). -/
 theorem initKexecTop : kexecTop User.Init.elf = 0x2000 :=

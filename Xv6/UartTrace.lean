@@ -112,7 +112,7 @@ class Xv6G (GF : BundledGFunctors) where
   functor list. -/
   kallocLedSlot : ElemG.τ GF (GhostVarF Unit) ≠ ElemG.τ GF (constOF (MonoList (DiscreteO Kev)))
 
-attribute [instance] Xv6G.monoListG Xv6G.gvListG
+attribute [reducible, instance] Xv6G.monoListG Xv6G.gvListG
 attribute [reducible, instance] Xv6G.gvNatG Xv6G.gvUnitG Xv6G.gvCpuG Xv6G.gvW32G Xv6G.gvBoolG
 attribute [reducible, instance] Xv6G.gmUnitG Xv6G.gmBlkG Xv6G.authUfracG Xv6G.cinvG
 attribute [reducible, instance] Xv6G.gvPopG Xv6G.gvOHistG Xv6G.gvDelivG Xv6G.gvLogG Xv6G.gvArmG Xv6G.mlLogG

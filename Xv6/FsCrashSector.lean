@@ -27,9 +27,9 @@ the written block).
    `Xv6/LogDefs.lean` are `Nat`-indexed); Rocq's `Z.of_nat` casts vanish.
    Rocq's `virtio_sector_bytes` (nat) and `virtio_sector_size` (Z) are both
    `MachCSL.Virtio.sectorSize`.
-2. Rocq's `VirtioModel.disk_read_write` / `disk_write_in` are not in the Lean
-   machine layer; they are proved here as `diskRead_diskWrite` /
-   `diskWrite_in` (pure, about `MachCSL.Virtio.diskRead`/`diskWrite`).
+2. Rocq's `VirtioModel.disk_write_in` is not in the Lean machine layer; it
+   is proved here as `diskWrite_in` (pure, about `MachCSL.Virtio.diskWrite`).
+   `disk_read_write` is not ported (nothing uses it).
 3. NOT HERE: `wr_nsectors_block`, `wr_sector_blk0`, `wr_sector_blk1` (FsCrash.v
    :1257-1283).  They are stated over `RiscvPtsto.wr_nsectors`/`wr_sector`,
    the permit layer's sector split, which the Lean tree gets from batch C-M
@@ -42,8 +42,6 @@ import Xv6.DiskDefs
 namespace Xv6
 
 open MachCSL
-
-set_option linter.unusedSectionVars false
 
 /-! ## §1a The block view -/
 
@@ -75,38 +73,12 @@ theorem diskWrite_in (dk : Nat → BitVec 8) (off : Nat) (bs : List (BitVec 8)) 
   unfold Virtio.diskWrite
   rw [if_pos hle, hx]
 
-/-- Reading back a write (Rocq `VirtioModel.disk_read_write`). -/
-theorem diskRead_diskWrite (dk : Nat → BitVec 8) (off : Nat) (bs : List (BitVec 8)) :
-    Virtio.diskRead (Virtio.diskWrite dk off bs) off bs.length = bs := by
-  apply List.ext_getElem?
-  intro j
-  unfold Virtio.diskRead
-  rw [List.getElem?_map]
-  by_cases hj : j < bs.length
-  · rw [List.getElem?_range hj]
-    obtain ⟨x, hx⟩ : ∃ x, bs[j]? = some x := ⟨bs[j], List.getElem?_eq_getElem hj⟩
-    rw [hx]
-    simp only [Option.map_some]
-    congr 1
-    exact diskWrite_in dk off bs (off + j) x (by omega) (by simpa using hx)
-  · rw [List.getElem?_eq_none (by simpa using hj), List.getElem?_eq_none (by omega)]
-    rfl
-
 /-- One byte of the view (Rocq `fs_blocks_lookup`). -/
 theorem fsBlocks_lookup (dk : Nat → BitVec 8) (b k : Nat) (hk : k < BSIZE) :
     (fsBlocks dk b)[k]? = some (dk (b * BSIZE + k)) := by
   unfold fsBlocks Virtio.diskRead
   rw [List.getElem?_map, List.getElem?_range hk]
   rfl
-
-/-- A one-block write moves exactly that block (Rocq `fs_blocks_write_eq`). -/
-theorem fsBlocks_write_eq (dk : Nat → BitVec 8) (b : Nat) (bs : List (BitVec 8))
-    (hlen : bs.length = BSIZE) :
-    fsBlocks (Virtio.diskWrite dk (b * BSIZE) bs) b = bs := by
-  unfold fsBlocks
-  have h := diskRead_diskWrite dk (b * BSIZE) bs
-  rw [hlen] at h
-  exact h
 
 /-- Byte `j < BSIZE` of block `c ≠ b` is outside `[b*BSIZE + o, b*BSIZE + o + n)`
 whenever `o + n ≤ BSIZE`. -/
@@ -136,13 +108,6 @@ theorem fsBlocks_sub_ne (dk : Nat → BitVec 8) (b c o : Nat) (bs : List (BitVec
     exact diskWrite_out dk _ bs _ (fsCrash_blk_disjoint b c o bs.length j hfit hne hj)
   · rw [List.getElem?_eq_none (by rw [fsBlocks_length]; omega),
       List.getElem?_eq_none (by rw [fsBlocks_length]; omega)]
-
-/-- ...the whole-block form (Rocq `fs_blocks_write_ne`). -/
-theorem fsBlocks_write_ne (dk : Nat → BitVec 8) (b c : Nat) (bs : List (BitVec 8))
-    (hlen : bs.length = BSIZE) (hne : c ≠ b) :
-    fsBlocks (Virtio.diskWrite dk (b * BSIZE) bs) c = fsBlocks dk c := by
-  have h := fsBlocks_sub_ne dk b c 0 bs (by omega) hne
-  simpa using h
 
 /-- ...and a sub-block write SPLICES the block it does write (Rocq
 `fs_blocks_splice`). -/
@@ -239,11 +204,6 @@ theorem hdrDec_sector0 (bs : List (BitVec 8)) (hn : (hdrDec bs).1 ≤ LOGBLOCKS)
   show _ ≤ 512
   omega
 
-/-- The tight form: `4 + 4 * LOGBLOCKS = 124` bytes (Rocq `hdr_dec_hdr_bytes`). -/
-theorem hdrDec_hdr_bytes (bs : List (BitVec 8)) (hn : (hdrDec bs).1 ≤ LOGBLOCKS) :
-    hdrDec (bs.take (4 * (LOGBLOCKS + 1))) = hdrDec bs := by
-  apply hdrDec_take; omega
-
 /-- THE FORM EVERY COROLLARY USES: two block contents that agree on sector 0
 decode to the same header (Rocq `hdr_dec_sector0_eq`). -/
 theorem hdrDec_sector0_eq (bs bs' : List (BitVec 8)) (hn : (hdrDec bs).1 ≤ LOGBLOCKS)
@@ -256,13 +216,6 @@ theorem hdrDec_sector0_eq (bs bs' : List (BitVec 8)) (hn : (hdrDec bs).1 ≤ LOG
   rw [← hdrDec_sector0 bs' hn', heq, hdrDec_sector0 bs hn]
 
 /-! ## §1c''' The two sectors of an xv6 block write -/
-
-/-- The two slices reassemble the block (Rocq `sector_split`). -/
-theorem sector_split (bs : List (BitVec 8)) (hlen : bs.length = BSIZE) :
-    bs.take Virtio.sectorSize ++ (bs.drop Virtio.sectorSize).take Virtio.sectorSize = bs := by
-  rw [List.take_of_length_le (l := bs.drop Virtio.sectorSize)
-      (by rw [List.length_drop, hlen, bsize_two_sectors]; omega),
-    List.take_append_drop]
 
 theorem sector0_len (bs : List (BitVec 8)) (hlen : bs.length = BSIZE) :
     (bs.take Virtio.sectorSize).length = Virtio.sectorSize := by
@@ -279,16 +232,6 @@ def blkSec0 (old bs : List (BitVec 8)) : List (BitVec 8) :=
 /-- The block picture after sector 1 lands (Rocq `blk_sec1`). -/
 def blkSec1 (old bs : List (BitVec 8)) : List (BitVec 8) :=
   old.take Virtio.sectorSize ++ bs.drop Virtio.sectorSize
-
-theorem blkSec0_len (old bs : List (BitVec 8)) (ho : old.length = BSIZE)
-    (hb : bs.length = BSIZE) : (blkSec0 old bs).length = BSIZE := by
-  unfold blkSec0
-  rw [List.length_append, List.length_take, List.length_drop, ho, hb, bsize_two_sectors]; omega
-
-theorem blkSec1_len (old bs : List (BitVec 8)) (ho : old.length = BSIZE)
-    (hb : bs.length = BSIZE) : (blkSec1 old bs).length = BSIZE := by
-  unfold blkSec1
-  rw [List.length_append, List.length_take, List.length_drop, ho, hb, bsize_two_sectors]; omega
 
 /-- Sector 1's landing leaves the first 512 bytes, hence the decode, where it
 was (Rocq `blk_sec1_take0`). -/

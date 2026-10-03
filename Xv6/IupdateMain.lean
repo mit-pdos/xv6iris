@@ -30,7 +30,6 @@ Deviations from Rocq: as `Xv6/IupdateTail.lean`; the four-stage cut
 -/
 import Xv6.IupdateTail
 import MachCSL.WpSmodeLh
-import Xv6.FsWords
 
 namespace Xv6
 
@@ -39,9 +38,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 set_option maxHeartbeats 16000000 in
 /-- `+0x56 .. +0x62`, the memmove of the thirteen addrs, the slot rebuilt at
@@ -119,7 +116,7 @@ theorem iu_mm (LW : LOG_WRITE) (BE : BRELSE) (MM : MEMMOVE)
   k_step_e (wp_s_addi cpu _ (KA.«iupdate» + 0x5e#64) false 12#12 10#5 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ha5]
   iintro Hk Hpc
-  k_step_e (wp_s_jal cpu _ (KA.«iupdate» + 0x62#64) false 2087564#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«iupdate» + 0x62#64) false 2087544#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [iu_br_memmove]
   iintro Hk Hpc
   -- the SOURCE: the thirteen addrs cells as 52 contiguous bytes
@@ -278,7 +275,6 @@ theorem iu_copy (LW : LOG_WRITE) (BE : BRELSE) (MM : MEMMOVE)
   all_goals first
     | exact hs1 | exact hs2 | exact ha5 | exact hR2 | exact p19 | exact p20 | exact p21
     | exact p22 | exact p23 | exact p24 | exact p25 | exact p26 | exact p27
-
 
 /-- The slot index, off the sign-extended inum, at `c.andi`'s normal form. -/
 theorem iu_andi15 (inum : BitVec 32) :
@@ -495,7 +491,7 @@ theorem iu_main (BD : BREAD) (LW : LOG_WRITE) (BE : BRELSE) (MM : MEMMOVE)
   k_step_e (wp_s_auipc cpu _ (KA.«iupdate» + 0x14#64) false 0x1e#20 11#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_lw cpu _ (KA.«iupdate» + 0x18#64) false 2274#12 11#5 11#5 (by decide) (by decide)
+  k_step_e (wp_s_lw cpu _ (KA.«iupdate» + 0x18#64) false 2926#12 11#5 11#5 (by decide) (by decide)
       dqs (BitVec.ofNat 32 icfgIst))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [iu_sb_addr]
   iintro Hk Hpc Hsb

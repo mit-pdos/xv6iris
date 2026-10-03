@@ -61,9 +61,7 @@ Rocq's header, abridged:
    (Rocq: `vm_compute`).
 -/
 import Xv6.UnionOutWild
-import Xv6.UnionDiscDec
 import Xv6.PipeOutWRead
-import Xv6.PipeOutWSteps
 import Xv6.FileOutClaim
 import Xv6.AppFileSync
 import Xv6.UnionOutSyncPure
@@ -72,7 +70,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
-set_option linter.unusedSectionVars false
 set_option synthInstance.maxSize 1024
 
 /-! ## 0. The fixed part -/

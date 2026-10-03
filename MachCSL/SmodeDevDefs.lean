@@ -56,21 +56,4 @@ theorem devReadAU_wand (d : DevId) (off n : Nat) (Ψ Ψ' : BitVec (8 * n) → IP
   imodintro
   iapply HW $$ %w HΨ
 
-theorem devWriteAU_wand (d : DevId) (off n : Nat) (w : BitVec (8 * n)) (Ψ Ψ' : IProp GF) :
-    devWriteAU d off n w Ψ ⊢ ▷ (Ψ -∗ Ψ') -∗ devWriteAU d off n w Ψ' := by
-  unfold devWriteAU
-  iintro H HW
-  imod H with ⟨%s, Hfrag, %hsome, Hcont⟩
-  imodintro
-  iexists s
-  iframe Hfrag
-  isplit
-  · ipureintro; exact hsome
-  inext
-  iintro %s' %hwr Hfrag
-  ihave HΨ := Hcont $$ %s' %hwr Hfrag
-  imod HΨ
-  imodintro
-  iapply HW $$ HΨ
-
 end MachCSL

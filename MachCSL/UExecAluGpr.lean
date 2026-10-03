@@ -250,13 +250,6 @@ end gpr
 
 /-! ## What a GPR write leaves alone -/
 
-@[simp] theorem uxaWr_mm (s : UWSt) (i : BitVec 5) (v : BitVec 64) : (uxaWr s i v).mm = s.mm := rfl
-@[simp] theorem uxaWr_rv (s : UWSt) (i : BitVec 5) (v : BitVec 64) : (uxaWr s i v).rv = s.rv := rfl
-@[simp] theorem uxaWr_rs (s : UWSt) (i : BitVec 5) (v : BitVec 64) : (uxaWr s i v).rs = s.rs := rfl
-
-/-- A write to `x0` is discarded. -/
-@[simp] theorem uxaWr_zero (s : UWSt) (v : BitVec 64) : uxaWr s 0 v = s := rfl
-
 /-- Every non-GPR register (`PC`, `nextPC`, the CSRs, ...) reads as before. -/
 theorem uxaWr_file_other (s : UWSt) (i : BitVec 5) (v : BitVec 64) (r : Register)
     (hr : r ∉ uxaGprs) : (uxaWr s i v).file r = s.file r := by
@@ -279,8 +272,6 @@ def uxaIdx : regidx → BitVec 5
 
 /-- The index of a compressed register payload (`x8`…`x15`). -/
 def uxaCIdx (c : cregidx) : BitVec 5 := uxaIdx (creg2reg_idx c)
-
-theorem uxa_regidx_eta (r : regidx) : regidx.Regidx (uxaIdx r) = r := by cases r; rfl
 
 theorem uxa_creg2reg_idx (c : cregidx) : creg2reg_idx c = regidx.Regidx (uxaCIdx c) := by
   cases c; rfl

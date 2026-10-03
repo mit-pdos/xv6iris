@@ -7,9 +7,6 @@ evaluation (DU3).  Stage file of `ProofShSys*`.
 Deviation from Rocq: the stubs are walked once by `UkStub.stub_run`, not
 inline per lemma (the `ProofShSysSbrk` precedent).
 -/
-import Xv6.UshRunDefs
-import Xv6.UkStub
-import Xv6.UshExecCode
 import Xv6.UshMainStubs
 
 namespace Xv6
@@ -17,8 +14,6 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
-
-set_option linter.unusedSectionVars false
 
 /-- The number a stub loads into a7, as the trap reads it. -/
 theorem ushRS_usysno (m : RegMap) (v : BitVec 64) :

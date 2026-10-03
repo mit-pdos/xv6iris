@@ -104,8 +104,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Std MachCSL
 
-set_option linter.unusedSectionVars false
-
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
@@ -240,12 +238,6 @@ theorem syscallEnv_first : syscallEnv (hlc := hlc) PT Γ γ ⊢ firstDone (hlc :
   iintro ⟨-, -, -, H, -⟩
   iexact H
 
-/-- Rocq `syscall_env_world`. -/
-theorem syscallEnv_world : syscallEnv (hlc := hlc) PT Γ γ ⊢ parkWorld Γ := by
-  unfold syscallEnv
-  iintro ⟨-, -, -, -, H, -⟩
-  iexact H
-
 /-- Rocq `syscall_env_token`: the park, for fork's sake (W8-P2's kfork). -/
 theorem syscallEnv_token : syscallEnv (hlc := hlc) PT Γ γ ⊢ PT Γ := by
   unfold syscallEnv
@@ -263,21 +255,6 @@ theorem syscallEnv_panic : syscallEnv (hlc := hlc) PT Γ γ ⊢ panicEnv := by
   unfold syscallEnv syscFsEnv
   iintro ⟨-, -, ⟨H, -⟩, -⟩
   iexact H
-
-/-- **Rocq `syscall_env_all`**: the old shape, as a projection -- the four
-process locks (genuinely quantified), the allocator at `fsReady`'s names
-(Rocq `kalloc_env fsc_kalloc None`), the ledger, printk and the fs row. -/
-theorem syscallEnv_all : syscallEnv (hlc := hlc) PT Γ γ ⊢
-    ∃ (γp γw γft γtk : GName),
-      isLock fscKalloc kmemLockAddr "kmem" (kmemRes fsReadyKmem) ∗ kallocAvail fsReadyKmem none ∗
-      isLock γp pidLockAddr "nextpid" pidLockPay ∗ procsAvailAt Γ none false ∗
-      isLock γw waitLockAddr "wait_lock" waitLockPay ∗ isFtable γft γ ∗ isTickslock γtk ∗
-      panicEnv ∗ fsReady (hlc := hlc) := by
-  unfold syscallEnv syscProcEnv syscFsEnv
-  iintro ⟨⟨%γp, %γw, %γft, %γtk, #Hnp, #Hpav, #Hwl, #Hft, #Htk⟩, -, ⟨#Hpe, #Hrdy⟩, -⟩
-  icases fsReady_kmem $$ Hrdy with ⟨#Hkl, #Hka⟩
-  iexists γp, γw, γft, γtk
-  iframe Hkl Hka Hnp Hpav Hwl Hft Htk Hpe Hrdy
 
 /-- The `ftable` handle alone (pipe, dup, close, exit). -/
 theorem syscallEnv_ftable : syscallEnv (hlc := hlc) PT Γ γ ⊢ ∃ γft : GName, isFtable γft γ := by

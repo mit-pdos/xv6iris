@@ -34,9 +34,8 @@ the fit check.
    (UsertrapRes deviation 8), so no parker-side world is needed.
 4. The accessors Rocq restates for the module type (`_tlb_*`, `_pt(m)_*`,
    `_tf_open`, `_csrs_open`, `_tf_csrs_open`, `_sstc`, `_norm`) have no
-   Lean counterpart (UsertrapRes deviations 1, 6, 9); `_fsabs` is
-   `usertrapResAt_firstDone` (FirstTok deviation 1: no application layer, so
-   the loop reads the file system's `firstDone` instead).
+   Lean counterpart (UsertrapRes deviations 1, 6, 9); `_fsabs` is not
+   ported (nothing uses it).
 5. **The residue is pinned** (`utSysEnvAt PT Γ j`: `⌜N.Γ = Γ ∧ N.j = j⌝`
    beside `syscallEnv`): the Lean callees are stated under `[ClaimIs GF Γ]`
    and the running context names `k.proc = procAddr j`
@@ -58,9 +57,6 @@ namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
-
-set_option linter.unusedVariables false
-set_option linter.unusedSectionVars false
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
@@ -102,13 +98,6 @@ theorem usertrapResAt_join (h : curTier = KTier.kpt) (M : Nat → List (BitVec 8
       usertrapResRunAt PT Γ j cpu P ksp V M sts cs pid :=
   utResBare_join h cpu _ P ksp V M sts cs pid
 
-/-- **Rocq `usertrap_res_tlb_open` / `_ptm_open`** (UsertrapRes
-`utResBare_split`). -/
-theorem usertrapResAt_split (h : curTier = KTier.kpt) (M : Nat → List (BitVec 8)) :
-    usertrapResRunAt (GF := GF) PT Γ j cpu P ksp V M sts cs pid ⊢
-      usertrapResAt PT Γ j cpu P ksp V sts cs pid ∗ procPtAt P M ∗ tfPageAt P.tfp V.tf :=
-  utResBare_split h cpu _ P ksp V M sts cs pid
-
 /-- The kernel words (uservec's `hkw`, with `utTfk_uservec`). -/
 theorem usertrapResAt_tfk :
     usertrapResAt (GF := GF) PT Γ j cpu P ksp V sts cs pid ⊢
@@ -149,18 +138,6 @@ theorem usertrapResAt_uhist_acc :
       ∃ (γ : GName) (h : List Uround), uhistAuth γ h ∗ ⌜uhistWf h⌝ ∗
         (∀ h' : List Uround, uhistAuth γ h' -∗ ⌜uhistWf h'⌝ -∗ usertrapResAt PT Γ j cpu P ksp V sts cs pid) :=
   utResBare_uhist_acc cpu _ P ksp V sts cs pid
-
-/-- **Rocq `usertrap_res_bare_fsabs`** (deviation 4): the file system's
-steady token, off the syscall environment. -/
-theorem usertrapResAt_firstDone [∀ Γ, Persistent (PT Γ)] :
-    usertrapResAt (GF := GF) PT Γ j cpu P ksp V sts cs pid ⊢
-      firstDone (hlc := hlc) ∗ usertrapResAt PT Γ j cpu P ksp V sts cs pid :=
-  utResBare_env _ cpu _ P ksp V sts cs pid (fun N _ => by
-    unfold utSysEnvAt
-    iintro ⟨%hp, #H⟩
-    ihave #F := syscallEnv_first PT N.Γ N.f $$ H
-    iframe F H
-    ipureintro; exact hp)
 
 end Res
 

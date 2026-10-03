@@ -47,6 +47,9 @@ import Xv6.SysFstatParts
 import Xv6.UMemWindow
 import Xv6.SysfileCalls
 import Xv6.SpecSysFstat
+import Xv6.ReadiDefs
+import MachCSL.BvLemmas
+import Xv6.CopyLemmas
 
 namespace Xv6
 
@@ -55,9 +58,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
@@ -444,7 +445,7 @@ theorem sys_fstat_main (AA : ARGADDR) (AF : ARGFD) (FS : FILESTAT)
   k_step_e (wp_s_addi cpu _ (KA.«sys_fstat» + 0xc#64) true 1#12 10#5 0#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [Xv6.ci_li_one]
   iintro Hk Hpc
-  k_step_e (wp_s_jal cpu _ (KA.«sys_fstat» + 0xe#64) false 2087356#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_fstat» + 0xe#64) false 2087260#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_fstat_br_argaddr]
   iintro Hk Hpc
   icases sysfile_core_tf ht0 (procAddr j) pid V M $$ Hcore with ⟨%htf, Htf, Htfp, Hcorew⟩

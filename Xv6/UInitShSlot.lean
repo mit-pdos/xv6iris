@@ -66,15 +66,12 @@ import Xv6.UshKernelSlot
 import Xv6.UshPromptLaw
 import Xv6.ExecRunSup
 import Xv6.EchoFsPure
-import Xv6.UserChildren
 
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Iris.Std.PartialMap
 open Std (ExtTreeSet)
-
-set_option linter.unusedSectionVars false
 
 /-! ## 0.  Pure readings off the lent authorities (deviations 3, 6) -/
 

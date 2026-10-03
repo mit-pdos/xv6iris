@@ -17,18 +17,14 @@ fetch and any text load):
 -/
 import Xv6.UkArms
 import Xv6.UkBundle
-import Xv6.SpecUkLeaves
 import Xv6.UkLandGlue
 import MachCSL.URunXSwp
-import Xv6.UserFrameFoot
 
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open Sail LeanRV64D LeanRV64D.Functions
 open Register HartState Step ExecutionResult FetchResult ExceptionType
-
-set_option linter.unusedSectionVars false
 
 /-! ## §1 The execute outcome -/
 

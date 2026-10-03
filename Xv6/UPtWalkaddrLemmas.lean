@@ -5,7 +5,6 @@ reading — without changing — the level-0 entry a completed walk reaches, wha
 leaf survive the `A`/`D` bits the hardware may have set (`pteAD`).
 -/
 import Xv6.UPtDefs
-import Xv6.PtOwnLemmas
 import Xv6.PtRunLemmas
 
 namespace Xv6.UPtWalkaddr
@@ -91,12 +90,6 @@ theorem ptRep_get_some {t : PTree} {L : RegMapF (BitVec 64)} (h : ptRep t L) (vp
 /-! ## The `A`/`D` bits do not touch `V`, `U` or the page number -/
 
 theorem pteAD_and17 {w v : BitVec 64} (h : pteAD w v) : v &&& 17#64 = w &&& 17#64 := by
-  obtain ⟨a, d, rfl⟩ := h
-  simp only [pteSetAD, Sail.BitVec.extractLsb, Sail.BitVec.updateSubrange,
-    Sail.BitVec.updateSubrange', BitVec.extractLsb, _update_PTE_Flags_A, _update_PTE_Flags_D]
-  bv_decide
-
-theorem pteAD_and1 {w v : BitVec 64} (h : pteAD w v) : v &&& 1#64 = w &&& 1#64 := by
   obtain ⟨a, d, rfl⟩ := h
   simp only [pteSetAD, Sail.BitVec.extractLsb, Sail.BitVec.updateSubrange,
     Sail.BitVec.updateSubrange', BitVec.extractLsb, _update_PTE_Flags_A, _update_PTE_Flags_D]

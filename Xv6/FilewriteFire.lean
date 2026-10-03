@@ -12,9 +12,9 @@ and the re-park):
   fd is provably not a directory, so the directory clauses are vacuous).
 * `fwr_fire` -- THE FIRE, IN PLACE OF THE RETAG (Rocq's "AU EDIT
   (differences 3 and 4)"): on a FULL chunk the chain's full arm fires
-  (`FsAbsWriteFire.wrfAwrite_fire`), the offset's half advanced by the
+  (`FsAbsWriteFire.wrfAwrite_fire_gen` / `_adv`), the offset's half advanced by the
   count; on a short chunk that landed something, the PARTIAL arm
-  (`wrfApart_fire`) at the landed run (the counted bytes plus writei's
+  (`wrfApart_fire_gen` / `_adv`) at the landed run (the counted bytes plus writei's
   visible disturbed tail, `wrfLanded`), its reason writei's own
   (`WriteiOut.why`, at the writer's entry table `P`); on a chunk that landed nothing and
   on writei's `-1`, `iregTopRetag_same` and nothing spent.  The offset's
@@ -35,9 +35,7 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## 1.  The join (pure) -/
 

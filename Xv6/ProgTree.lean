@@ -3,9 +3,8 @@
 (Rocq `ProgTree.v`, 1584 lines, pinned `1900b8a43`; design
 program-specs.md).  Pure.
 
-* `PEv` (Rocq `ev`; renamed because `MachCSL.Ev` is the Sail effect type) is
-  what a process does that the world can see (open, close, read, write,
-  exit); `Ans e` is the kernel's answer type.
+* `PEv` (Rocq `ev`) is what a process does that the world can see (open,
+  close, read, write, exit); `Ans e` is the kernel's answer type.
 * `ITree R` is the interaction tree; a process never returns (`Proc :=
   ITree Empty`).
 * `echoTree`/`catTree` are the two programs' specs at SYSCALL granularity
@@ -23,8 +22,8 @@ path (`ITree.ext`).  The Rocq vocabulary is recovered as:
 
 * constructors `ITree.ret`/`ITree.tau`/`ITree.vis` (Rocq `Ret`/`Tau`/`Vis`);
 * `ITree.observe t : ITreeF R (ITree R)` is Rocq's `force`/pattern match,
-  with `observe_ret`/`observe_tau`/`observe_vis` and `ITree.eta : t = ofF
-  (observe t)` (Rocq `force_eq`); `ITree.vis_inj`/... are the injectivities;
+  with `observe_tau`/`observe_vis` and `ITree.eta : t = ofF
+  (observe t)` (Rocq `force_eq`);
 * `ITree.corec` builds a tree from a one-step coalgebra that may hand back a
   finished tree (`Sum.inl`) or a new state (`Sum.inr`) at each child; its
   unfolding is `ITree.corec_eq` (Rocq's cofixpoint unfolding);
@@ -222,8 +221,6 @@ def ofF : ITreeF R (ITree R) → ITree R
   | .tau t => tau t
   | .vis e k => vis e k
 
-theorem observe_ret (r : R) : (ret r).observe = .ret r := rfl
-
 theorem observe_tau (t : ITree R) : (tau t).observe = .tau t := rfl
 
 theorem observe_vis (e : PEv) (k : Ans e → ITree R) : (vis e k).observe = .vis e k := by
@@ -263,39 +260,6 @@ theorem eta (t : ITree R) : t = ofF t.observe := by
       cases hs : stepAns e st with
       | none => exact t.canon _ (by simp [rawValid, hr, hs])
       | some a => rw [stepAns_some hs]; rfl
-
-theorem ofF_observe (t : ITree R) : ofF t.observe = t := (eta t).symm
-
-theorem observe_inj {t t' : ITree R} (h : t.observe = t'.observe) : t = t' := by
-  rw [eta t, eta t', h]
-
-/-- Case analysis on a tree (Rocq `destruct t as [v | t' | e k]`). -/
-theorem cases_on {motive : ITree R → Prop} (t : ITree R) (hret : ∀ r, motive (ret r))
-    (htau : ∀ t, motive (tau t)) (hvis : ∀ e k, motive (vis e k)) : motive t := by
-  rw [eta t]
-  cases t.observe with
-  | ret r => exact hret r
-  | tau t => exact htau t
-  | vis e k => exact hvis e k
-
-theorem tau_inj {t t' : ITree R} (h : tau t = tau t') : t = t' := by
-  have := congrArg observe h; simp only [observe_tau, ITreeF.tau.injEq] at this; exact this
-
-theorem vis_inj {e e' : PEv} {k : Ans e → ITree R} {k' : Ans e' → ITree R} (h : vis e k = vis e' k') :
-    e = e' ∧ HEq k k' := by
-  have := congrArg observe h; simp only [observe_vis, ITreeF.vis.injEq] at this; exact this
-
-theorem vis_inj_k {e : PEv} {k k' : Ans e → ITree R} (h : vis e k = vis e k') : k = k' :=
-  eq_of_heq (vis_inj h).2
-
-theorem ret_ne_tau (r : R) (t : ITree R) : ret r ≠ tau t := by
-  intro h; have := congrArg observe h; simp [observe_ret, observe_tau] at this
-
-theorem ret_ne_vis (r : R) (e : PEv) (k : Ans e → ITree R) : ret r ≠ vis e k := by
-  intro h; have := congrArg observe h; simp [observe_ret, observe_vis] at this
-
-theorem tau_ne_vis (t : ITree R) (e : PEv) (k : Ans e → ITree R) : tau t ≠ vis e k := by
-  intro h; have := congrArg observe h; simp [observe_tau, observe_vis] at this
 
 /-! ### Corecursion -/
 
@@ -339,11 +303,6 @@ def canonize (f : List ITStep → ITAct R) : ITree R where
         (fun p hp => by simp [hp]) hv'
       rw [this] at hv; cases hv
     · rfl
-
-theorem canonize_eq (t : ITree R) : canonize t.raw = t := by
-  apply ext; intro p; simp only [canonize]; split
-  · rfl
-  · rename_i hv; exact (t.canon p (by simpa using hv)).symm
 
 /-- The raw unfolding of a coalgebra. -/
 def corecRaw {σ : Type} (f : σ → ITreeF R (ITree R ⊕ σ)) : σ → List ITStep → ITAct R
@@ -802,15 +761,6 @@ theorem cf_write_copy (fd : Int) (d : Nat) (F : PFilter) (h : Bool) (Rr S p bs :
   simp only [cfStep, ITree.observe_vis, cfVis]
   exact ⟨d, hfd, Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inl ⟨hne, hfdc, F, h, Rr, S, p, hd, hp, hk, hh⟩)))))⟩
 
-theorem cf_write_copy_end (fd : Int) (d : Nat) (F : PFilter) (h : Bool) (p bs : Bytes)
-    (k : Ans (.EWrite fd bs) → Proc) (hne : bs ≠ []) (hfdc : fd = copyOut) (hfd : E.fd fd = some d)
-    (hd : E.dev d = .DCopyEnd F h p) (hp : bs <+: p)
-    (hk : R (envSetDev E d (.DCopyEnd F h (p.drop bs.length))) (k (bs.length : Int)))
-    (hh : h = true → R (envSetDev E d (.DCopyHalt none)) (k (-1 : Int))) :
-    cfStep R E (.vis (.EWrite fd bs) k) := by
-  simp only [cfStep, ITree.observe_vis, cfVis]
-  exact ⟨d, hfd, Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inl ⟨hne, hfdc, F, h, p, hd, hp, hk, hh⟩))))))⟩
-
 theorem cf_write_copy_halt (fd : Int) (d : Nat) (oS : Option Bytes) (bs : Bytes) (k : Ans (.EWrite fd bs) → Proc)
     (hne : bs ≠ []) (hlt : (bs.length : Int) < 2 ^ 31) (hfdc : fd = copyOut) (hfd : E.fd fd = some d)
     (hd : E.dev d = .DCopyHalt oS) (h : R E (k (-1 : Int))) : cfStep R E (.vis (.EWrite fd bs) k) := by
@@ -826,13 +776,6 @@ theorem cf_write_prod (fd : Int) (d : Nat) (outs xs ds : List Bytes) (a bs : Byt
   simp only [cfStep, ITree.observe_vis, cfVis]
   exact ⟨d, hfd, Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inl
     ⟨hne, hfdc, outs, xs, ds, a, hd, ha, hp, hk, hh⟩))))))))⟩
-
-theorem cf_write_prod_halt (fd : Int) (d : Nat) (ds : List Bytes) (bs : Bytes) (k : Ans (.EWrite fd bs) → Proc)
-    (hne : bs ≠ []) (hlt : (bs.length : Int) < 2 ^ 31) (hfdc : fd = prodOut) (hfd : E.fd fd = some d)
-    (hd : E.dev d = .DProdHalt ds) (h : R E (k (-1 : Int))) : cfStep R E (.vis (.EWrite fd bs) k) := by
-  simp only [cfStep, ITree.observe_vis, cfVis]
-  exact ⟨d, hfd, Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inl
-    ⟨hne, hlt, hfdc, ds, hd, h⟩)))))))))⟩
 
 theorem cf_write_prod_err (fd : Int) (d : Nat) (outs xs ds : List Bytes) (a bs : Bytes)
     (k : Ans (.EWrite fd bs) → Proc) (hne : bs ≠ []) (hfdc : fd = prodErr) (hfd : E.fd fd = some d)
@@ -868,19 +811,6 @@ theorem cf_read (fd : Int) (d : Nat) (S : Bytes) (n : Nat) (k : Ans (.ERead fd n
   simp only [cfStep, ITree.observe_vis, cfVis]
   exact ⟨d, hfd, hn, Or.inl ⟨S, hd, h⟩⟩
 
-theorem cf_read_e (fd : Int) (d : Nat) (S : Bytes) (n : Nat) (k : Ans (.ERead fd n) → Proc) (hn : 0 < n)
-    (hfd : E.fd fd = some d) (hd : E.dev d = .DInE S)
-    (h : ∀ c S', chunkOk n S c S' → R (envSetDev E d (.DInE S')) (k (.RdBytes c)))
-    (he : R (envSetDev E d .DInEnd) (k (.RdBytes []))) : cfStep R E (.vis (.ERead fd n) k) := by
-  simp only [cfStep, ITree.observe_vis, cfVis]
-  exact ⟨d, hfd, hn, Or.inr (Or.inl ⟨S, hd, h, he⟩)⟩
-
-theorem cf_read_end (fd : Int) (d : Nat) (n : Nat) (k : Ans (.ERead fd n) → Proc) (hn : 0 < n)
-    (hfd : E.fd fd = some d) (hd : E.dev d = .DInEnd) (h : R E (k (.RdBytes []))) :
-    cfStep R E (.vis (.ERead fd n) k) := by
-  simp only [cfStep, ITree.observe_vis, cfVis]
-  exact ⟨d, hfd, hn, Or.inr (Or.inr (Or.inl ⟨hd, h⟩))⟩
-
 theorem cf_read_copy (fd : Int) (d : Nat) (F : PFilter) (h : Bool) (Rr S p : Bytes) (n : Nat)
     (k : Ans (.ERead fd n) → Proc) (hn : 0 < n) (hfdc : fd = copyIn) (hfd : E.fd fd = some d)
     (hd : E.dev d = .DCopy F h Rr S p)
@@ -889,12 +819,6 @@ theorem cf_read_copy (fd : Int) (d : Nat) (F : PFilter) (h : Bool) (Rr S p : Byt
     (he : R (envSetDev E d (.DCopyEnd F h p)) (k (.RdBytes []))) : cfStep R E (.vis (.ERead fd n) k) := by
   simp only [cfStep, ITree.observe_vis, cfVis]
   exact ⟨d, hfd, hn, Or.inr (Or.inr (Or.inr (Or.inl ⟨hfdc, F, h, Rr, S, p, hd, hk, he⟩)))⟩
-
-theorem cf_read_copy_end (fd : Int) (d : Nat) (F : PFilter) (h : Bool) (p : Bytes) (n : Nat)
-    (k : Ans (.ERead fd n) → Proc) (hn : 0 < n) (hfdc : fd = copyIn) (hfd : E.fd fd = some d)
-    (hd : E.dev d = .DCopyEnd F h p) (he : R E (k (.RdBytes []))) : cfStep R E (.vis (.ERead fd n) k) := by
-  simp only [cfStep, ITree.observe_vis, cfVis]
-  exact ⟨d, hfd, hn, Or.inr (Or.inr (Or.inr (Or.inr (Or.inl ⟨hfdc, F, h, p, hd, he⟩))))⟩
 
 theorem cf_read_copy_halt (fd : Int) (d : Nat) (S : Bytes) (n : Nat) (k : Ans (.ERead fd n) → Proc)
     (hn : 0 < n) (hfdc : fd = copyIn) (hfd : E.fd fd = some d) (hd : E.dev d = .DCopyHalt (some S))
@@ -938,8 +862,6 @@ end Intro
 
 theorem envSetDev_dev (E : Penv) (d : Nat) (x : Dspec) : (envSetDev E d x).dev d = x := by
   simp [envSetDev]
-
-theorem envSetDev_fd (E : Penv) (d : Nat) (x : Dspec) : (envSetDev E d x).fd = E.fd := rfl
 
 theorem envSetDev_set_dev (E : Penv) (d : Nat) (x y : Dspec) :
     envSetDev (envSetDev E d x) d y = envSetDev E d y := by
@@ -1062,13 +984,6 @@ theorem catEnv0_out (alts alts' : List Bytes) (files : Bytes → Option Bytes) (
     envSetDev (catEnv0 alts files paths) 0 (.DOut alts') = catEnv0 alts' files paths := by
   simp only [envSetDev, catEnv0, Penv.mk.injEq, true_and, and_true]
   funext d; split <;> simp_all
-
-theorem catEnv_exit (fdin : Int) (din : Nat) (S : Bytes) (alts : List Bytes) (files : Bytes → Option Bytes)
-    (paths : List Bytes) (st : Int) (hin : [] ∈ alts) : Conforms (catEnv fdin din S alts files paths) (exit_ st) := by
-  apply conforms_fold; apply cf_exit
-  intro d; simp only [catEnv]; split
-  · exact hin
-  · split <;> simp [drained]
 
 /-- **Rocq `cat_loop_conforms`**: one call of `cat(fdin)`. -/
 theorem catLoop_conforms (fdin : Int) (din : Nat) (S : Bytes) (alts : List Bytes) (files : Bytes → Option Bytes)

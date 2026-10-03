@@ -51,9 +51,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-- `icCiWf` after a count move at a live slot: `ci` does not move and
 `mdom M` does not either (Rocq's inline `dom_insert_lookup_L`). -/
@@ -69,7 +67,6 @@ theorem ig_ciwf_update (M : RegMapF (Qp × PosNat)) (ci : RegMapF (BitVec 32 × 
   by_cases h : j = y
   · subst h; simp [hMj]
   · simp only [h, if_false]
-
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IcacheG GF]
@@ -203,7 +200,6 @@ theorem ig_hit_au (c : CPU) (M : RegMapF (Qp × PosNat)) (ci : RegMapF (BitVec 3
   iapply credFloor_of_ctx
   iexact Hflt
 
-
 set_option maxHeartbeats 16000000 in
 /-- THE CACHE HIT's walk, `+0x56 .. +0x8c` (Rocq 2083--2462). -/
 theorem ig_hit (RH : RELEASE_HOOK) (c cpu : CPU) (k : KCtx) (spie spp : Bool) (hwf : k.wf)
@@ -249,10 +245,10 @@ theorem ig_hit (RH : RELEASE_HOOK) (c cpu : CPU) (k : KCtx) (spie spp : Bool) (h
   k_step (wp_s_auipc c _ (KA.«iget» + 0x5a#64) false 0x1e#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_addi c _ (KA.«iget» + 0x5e#64) false 2958#12 10#5 10#5 (by decide))
+  k_step (wp_s_addi c _ (KA.«iget» + 0x5e#64) false 3610#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ig_lock]
   iintro Hk Hpc
-  k_step (wp_s_jal c _ (KA.«iget» + 0x62#64) false 2088158#21 1#5 (by decide))
+  k_step (wp_s_jal c _ (KA.«iget» + 0x62#64) false 2088138#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ig_br_rel]
   iintro Hk Hpc
   iapply (ig_release RH c cpu k spie spp hwf hK hlk hpin _ ?h10 (KA.«iget» + 0x66#64) ?h1)

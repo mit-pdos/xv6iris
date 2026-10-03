@@ -55,8 +55,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Std MachCSL
 
-set_option linter.unusedSectionVars false
-
 section AppDurRaw
 variable {GF : BundledGFunctors} [FsTopG GF]
 
@@ -98,24 +96,6 @@ theorem appDurRaw_pack {N : Type} (A : N → Aview → IProp GF) (Okc : N → Pr
   unfold appDurRaw
   iexists r, I
   iframe Hh Hp
-  ipureintro; exact hr
-
-/-- AGREEMENT (Rocq `app_dur_raw_agree`): a guest against a kernel fraction of
-the same map pins the guest's map; the claim comes out at the kernel's map,
-under its later, with its record's predicate; both fractions come back. -/
-theorem appDurRaw_agree {N : Type} (A : N → Aview → IProp GF) (Okc : N → Prop) (gt : GName)
-    (q : Qp) (I : RegMapF FsNode) :
-    (gt ↪●MAP{DFrac.own q} I) ⊢ ▷ appDurRaw A Okc gt -∗
-      ◇ ((gt ↪●MAP{DFrac.own q} I) ∗ (gt ↪●MAP{DFrac.own (1 : Qp).half} I) ∗
-        ∃ r : N, ⌜Okc r⌝ ∗ ▷ A r (absView I)) := by
-  iintro Hk Hg
-  imod appDurRaw_open A Okc gt $$ Hg with ⟨%r, %I', %hr, Hh, Hp⟩
-  ihave %heq := ghost_map_auth_agree _ _ _ _ _ $$ Hk Hh
-  subst heq
-  imodintro
-  iframe Hk Hh
-  iexists r
-  iframe Hp
   ipureintro; exact hr
 
 end AppDurRaw

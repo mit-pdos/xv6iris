@@ -42,8 +42,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-- A `BitVec.ofInt` of a non-negative value never exceeds it (Rocq
 `moi_le`). -/
 theorem moi_le (z : Int) (hz : 0 ≤ z) : ((BitVec.ofInt 64 z).toNat : Int) ≤ z := by

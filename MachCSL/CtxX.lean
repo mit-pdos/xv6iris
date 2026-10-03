@@ -56,15 +56,4 @@ theorem ctxByteX_forget (ξ : CtxId) (K : Nat) (a : PAddr) (dq : DFrac) (v : Bit
   iframe Hpt Hk
   ipureintro; exact hv
 
-/-- **Rocq `ctx_phys_xpointsto_mono`**. -/
-theorem ctxByteX_mono (ξ : CtxId) (K K' : Nat) (a : PAddr) (dq : DFrac) (v : BitVec 8) (h : K ≤ K') :
-    ctxByteX ξ K a dq v ⊢@{IProp GF} ctxByteX ξ K' a dq v := by
-  unfold ctxByteX
-  iintro ⟨%e, %H, Hpt, %hv, Hk, %ht⟩
-  iexists e, H
-  iframe Hpt Hk
-  isplitr
-  · ipureintro; exact hv
-  · ipureintro; omega
-
 end MachCSL

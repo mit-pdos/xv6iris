@@ -27,7 +27,6 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
@@ -178,8 +177,6 @@ theorem mp_last_val (size va : BitVec 64) (n : Nat) (hs : size = BitVec.ofNat 64
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
-
-theorem mp_availSub (nb g : Nat) : availSub (some nb) g = some (nb - g) := rfl
 
 /-! ## The call to `walk` -/
 

@@ -53,16 +53,16 @@ are the only difference between the contracts.  (The SpecIupdate.v banners
 calling credgen "primitive, derive the rest" are stale; the proof seals
 each directly from the core.)
 
-* `wp_iupdate_credgen` -- the credited ordinary flush (Rocq's
+* `wp_iupdate_credgen_eb` -- the credited ordinary flush (Rocq's
   `wp_iupdate_credgen_body`): `logEpochLb v`, the absorption credit as a
   RESOURCE `logCredit icfgLog cru Sb e0 (IBLOCK …)` and the epoch-named
   entry `logOpSe (u + 1) Sb e0` in; `logOpS (if cru then u + 1 else u)
   (IBLOCK … :: Sb)` and the deposit's receipt
   `∃ e, loggedAt icfgLog e (IBLOCK …) ∗ ⌜v ≤ e⌝` out; payout `iregOut`.
-* `wp_iupdate_link` -- the link-MINTING flush (`ip->nlink++`): the exact
+* `wp_iupdate_link_eb` -- the link-MINTING flush (`ip->nlink++`): the exact
   machine-width increment, the freeze-pin premise `iregLinkPin` (borrowed
   and returned), the pure own-set credit; the minted `linkToks` pile out.
-* `wp_iupdate_unlink` -- the link-SPENDING flush (`ip->nlink--`,
+* `wp_iupdate_unlink_eb` -- the link-SPENDING flush (`ip->nlink--`,
   `ip->nlink = 0`): the Z-form decrement, the spent `linkToks` pile in;
   the zero-record receipt is built inside log_write's ghost step.
 
@@ -74,8 +74,7 @@ each directly from the core.)
    what the interface proves.  Depth 0 implies no spinlock held (`KCtx.wf`:
    `locks.length ≤ noff`), which is Lean's reading of Rocq's `locks_below`
    premise (Lean has no lock ranks).  The `sie = false` bodies (the whole trap
-   bundle, `k.locks = []`) are kept as DERIVED instances for the callers not yet
-   generalized.
+   bundle, `k.locks = []`) are stated beside them.
 2. THE AMBIENT NAMES are `Fscfg`/`Icfg` class fields (as
    `Xv6/SpecIdup.lean`): `fsc_bio`/`fsc_fs`/`fsc_cov`/`fsc_logst`/
    `fsc_ireg`/`fsc_disk`/`fsc_dlock` are `fscBio`/`fscFs`/`fscCov`/
@@ -515,87 +514,5 @@ structure IUPDATE : Prop where
       u Sb cru uty pidv dqp dqd dqn dqs
       hj hproc hK hnoff htier hcru hgeom hcov hlog hnib hstab hnz hdec
       hda hdir hpd ha0
-
-/-- The interrupts-off instance of `wp_iupdate_credgen_eb` (the complement is the whole
-bundle): the contract every not-yet-generalized caller states. -/
-theorem IUPDATE.wp_iupdate_credgen (A : IUPDATE) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-    [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
-    [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
-    (ip : BitVec 64) (inum : BitVec 32) (dn dn0 : Dinode) (bm : Blkmap)
-    (u : Nat) (Sb : List Nat) (cru : Bool) (e0 v : Nat)
-    (pidv : BitVec 32) (dqp dqd dqn dqs : DFrac)
-    hj hproc hK hsie hnoff hlocks htier hgeom hcov hlog hnib hstab hnl hnz hda hdir hpd ha0 :
-    wp_iupdate_credgen_body (hlc := hlc) (GF := GF) Γ cpu k γl pd pav pu j ip inum dn dn0 bm
-      u Sb cru e0 v pidv dqp dqd dqn dqs
-      hj hproc hK hsie hnoff hlocks htier hgeom hcov hlog hnib hstab hnl hnz hda hdir hpd ha0 := by
-  have h := A.wp_iupdate_credgen_eb (hlc := hlc) (GF := GF) (Γ := Γ) (cpu := cpu) (k := k) (γl := γl) (pd := pd) (pav := pav) (pu := pu) (j := j) (ip := ip) (inum := inum) (dn := dn) (dn0 := dn0) (bm := bm) (u := u) (Sb := Sb) (cru := cru) (e0 := e0) (v := v) (pidv := pidv) (dqp := dqp) (dqd := dqd) (dqn := dqn) (dqs := dqs) (hj := hj) (hproc := hproc) (hK := hK) (hnoff := hnoff) (htier := htier) (hgeom := hgeom) (hcov := hcov) (hlog := hlog) (hnib := hnib) (hstab := hstab) (hnl := hnl) (hnz := hnz) (hda := hda) (hdir := hdir) (hpd := hpd) (ha0 := ha0)
-  unfold wp_iupdate_credgen_eb_body at h
-  unfold wp_iupdate_credgen_body
-  rw [hsie] at h
-  simp only [trapCsrsExt_false, cpuClaimExt_false] at h
-  iintro ⟨H0, H1, H2, Htc, Hcl, Hir, H6, H7, H8, H9, H10, H11, H12, H13, H14, H15, H16, H17, Hnext⟩
-  iapply h
-  iframe H0 H1 H2 Htc Hcl Hir H6 H7 H8 H9 H10 H11 H12 H13 H14 H15 H16 H17
-  iapply wpNext_mono $$ Hnext
-  iintro %cpu' HK %spie %spp %R' %p0 H1 H2 ⟨Htc, Hir⟩ Hcl H6 H7 H8 H9 H10 H11
-  iapply HK $$ %spie %spp %R' %p0 H1 H2 Htc Hcl Hir H6 H7 H8 H9 H10 H11
-
-/-- The interrupts-off instance of `wp_iupdate_link_eb` (the complement is the whole
-bundle): the contract every not-yet-generalized caller states. -/
-theorem IUPDATE.wp_iupdate_link (A : IUPDATE) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-    [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
-    [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
-    (ip : BitVec 64) (inum : BitVec 32) (dn dn0 : Dinode) (bm : Blkmap)
-    (u : Nat) (Sb : List Nat) (cru : Bool) (pin : Bool) (oty : Option Ity)
-    (pidv : BitVec 32) (dqp dqd dqn dqs : DFrac)
-    hj hproc hK hsie hnoff hlocks htier hcru hgeom hcov hlog hnib hstab hnz hup hbump hgrd
-    hda hdir hpd ha0 :
-    wp_iupdate_link_body (hlc := hlc) (GF := GF) Γ cpu k γl pd pav pu j ip inum dn dn0 bm
-      u Sb cru pin oty pidv dqp dqd dqn dqs
-      hj hproc hK hsie hnoff hlocks htier hcru hgeom hcov hlog hnib hstab hnz hup hbump hgrd
-      hda hdir hpd ha0 := by
-  have h := A.wp_iupdate_link_eb (hlc := hlc) (GF := GF) (Γ := Γ) (cpu := cpu) (k := k) (γl := γl) (pd := pd) (pav := pav) (pu := pu) (j := j) (ip := ip) (inum := inum) (dn := dn) (dn0 := dn0) (bm := bm) (u := u) (Sb := Sb) (cru := cru) (pin := pin) (oty := oty) (pidv := pidv) (dqp := dqp) (dqd := dqd) (dqn := dqn) (dqs := dqs) (hj := hj) (hproc := hproc) (hK := hK) (hnoff := hnoff) (htier := htier) (hcru := hcru) (hgeom := hgeom) (hcov := hcov) (hlog := hlog) (hnib := hnib) (hstab := hstab) (hnz := hnz) (hup := hup) (hbump := hbump) (hgrd := hgrd) (hda := hda) (hdir := hdir) (hpd := hpd) (ha0 := ha0)
-  unfold wp_iupdate_link_eb_body at h
-  unfold wp_iupdate_link_body
-  rw [hsie] at h
-  simp only [trapCsrsExt_false, cpuClaimExt_false] at h
-  iintro ⟨H0, H1, H2, Htc, Hcl, Hir, H6, H7, H8, H9, H10, H11, H12, H13, H14, H15, H16, Hnext⟩
-  iapply h
-  iframe H0 H1 H2 Htc Hcl Hir H6 H7 H8 H9 H10 H11 H12 H13 H14 H15 H16
-  iapply wpNext_mono $$ Hnext
-  iintro %cpu' HK %spie %spp %R' %p0 H1 H2 ⟨Htc, Hir⟩ Hcl H6 H7 H8 H9 H10 H11 H12
-  iapply HK $$ %spie %spp %R' %p0 H1 H2 Htc Hcl Hir H6 H7 H8 H9 H10 H11 H12
-
-/-- The interrupts-off instance of `wp_iupdate_unlink_eb` (the complement is the whole
-bundle): the contract every not-yet-generalized caller states. -/
-theorem IUPDATE.wp_iupdate_unlink (A : IUPDATE) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-    [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
-    [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
-    (ip : BitVec 64) (inum : BitVec 32) (dn dn0 : Dinode) (bm : Blkmap)
-    (u : Nat) (Sb : List Nat) (cru : Bool) (uty : Ity)
-    (pidv : BitVec 32) (dqp dqd dqn dqs : DFrac)
-    hj hproc hK hsie hnoff hlocks htier hcru hgeom hcov hlog hnib hstab hnz hdec
-    hda hdir hpd ha0 :
-    wp_iupdate_unlink_body (hlc := hlc) (GF := GF) Γ cpu k γl pd pav pu j ip inum dn dn0 bm
-      u Sb cru uty pidv dqp dqd dqn dqs
-      hj hproc hK hsie hnoff hlocks htier hcru hgeom hcov hlog hnib hstab hnz hdec
-      hda hdir hpd ha0 := by
-  have h := A.wp_iupdate_unlink_eb (hlc := hlc) (GF := GF) (Γ := Γ) (cpu := cpu) (k := k) (γl := γl) (pd := pd) (pav := pav) (pu := pu) (j := j) (ip := ip) (inum := inum) (dn := dn) (dn0 := dn0) (bm := bm) (u := u) (Sb := Sb) (cru := cru) (uty := uty) (pidv := pidv) (dqp := dqp) (dqd := dqd) (dqn := dqn) (dqs := dqs) (hj := hj) (hproc := hproc) (hK := hK) (hnoff := hnoff) (htier := htier) (hcru := hcru) (hgeom := hgeom) (hcov := hcov) (hlog := hlog) (hnib := hnib) (hstab := hstab) (hnz := hnz) (hdec := hdec) (hda := hda) (hdir := hdir) (hpd := hpd) (ha0 := ha0)
-  unfold wp_iupdate_unlink_eb_body at h
-  unfold wp_iupdate_unlink_body
-  rw [hsie] at h
-  simp only [trapCsrsExt_false, cpuClaimExt_false] at h
-  iintro ⟨H0, H1, H2, Htc, Hcl, Hir, H6, H7, H8, H9, H10, H11, H12, H13, H14, H15, H16, Hnext⟩
-  iapply h
-  iframe H0 H1 H2 Htc Hcl Hir H6 H7 H8 H9 H10 H11 H12 H13 H14 H15 H16
-  iapply wpNext_mono $$ Hnext
-  iintro %cpu' HK %spie %spp %R' %p0 H1 H2 ⟨Htc, Hir⟩ Hcl H6 H7 H8 H9 H10
-  iapply HK $$ %spie %spp %R' %p0 H1 H2 Htc Hcl Hir H6 H7 H8 H9 H10
 
 end Xv6

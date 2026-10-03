@@ -18,7 +18,6 @@ deviation 2: Rocq's `filter P` over a `Decision`-carrying `Prop` is
 -/
 import Xv6.EchoOutPure
 import Xv6.EchoDiscSeal
-import Xv6.LineWordsSeal
 
 namespace Xv6
 

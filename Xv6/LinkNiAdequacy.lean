@@ -72,7 +72,7 @@ theorem xv6NiTwoRun {hlc : HasLC}
 /-- **THE STRONG INSTANCE**: in a run from a booting machine, at the filing
 its ledger witnesses, every incarnation's steps before its first ecall
 replay their exits (`NiTrace.niStrongInstance`; T's
-`UtRoundQuiet.utRoundQuiet` lifted to the trace). -/
+`utRoundQuiet`, its module since deleted as unreached, lifted to the trace). -/
 theorem xv6NiStrongInstance {hlc : HasLC}
     (g : GState) (Hgen0 : g.gen = 0) (Hpow : g.pow = false) (Hdisk : diskOf g.m.devs = fsImgDisk)
     (n : Nat) (κs : List Obs) (t2 : List Expr) (g2 : GState)

@@ -23,11 +23,10 @@ Rocq's header, abridged (the reasons are the content):
 * `syncRole`, `syncBody`, `syncClaim` (Rocq `sync_role`, `sync_body`,
   `sync_claim`), timeless; `syncBody_intro`;
 * `unionTkb` (Rocq `union_tkb`), `flLb_join` (Rocq `fl_lb_join`);
-* the closure lemmas: `unionMerge_closes`, `unionHook_closes`,
-  `syncClaim_redirStep`, `syncClaim_recEq`, `slLb_mono`, `syncClaim_same`,
-  `syncRedir` / `syncClaim_redir`, `syncClaim_advance`, `syncClaim_rebase`,
-  `syncClaim_birth` (Rocq `union_merge_closes`, `union_hook_closes`,
-  `sync_claim_redir_step`, `sync_claim_rec_eq`, `sl_lb_mono`,
+* the closure lemmas: `unionHook_closes`, `syncClaim_redirStep`,
+  `syncClaim_recEq`, `syncClaim_same`, `syncRedir` / `syncClaim_redir`,
+  `syncClaim_advance`, `syncClaim_rebase`, `syncClaim_birth` (Rocq
+  `union_hook_closes`, `sync_claim_redir_step`, `sync_claim_rec_eq`,
   `sync_claim_same`, `sync_redir`, `sync_claim_redir`, `sync_claim_advance`,
   `sync_claim_rebase`, `sync_claim_birth`).
 
@@ -49,8 +48,6 @@ import Xv6.AppFileSyncReg
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
-
-set_option linter.unusedSectionVars false
 
 section AppFileSync
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
@@ -162,12 +159,6 @@ theorem slAuth_split3 (γ : GName) (Ls : List Srec) :
   rw [Qp.half_add_half] at hq
   ihave ⟨H2, H3⟩ := hq $$ H23
   iframe H1 H2 H3
-
-/-- A lower bound shrinks (Rocq `sl_lb_mono`). -/
-theorem slLb_mono (γ : GName) (Ls Ls' : List Srec) (hp : Ls' <+: Ls) :
-    ⊢@{IProp GF} slLb γ Ls -∗ slLb γ Ls' := by
-  unfold slLb
-  exact MonoList.lb_own_le γ Ls' hp
 
 /-- A fresh list, full authority at `[]`. -/
 theorem slAuth_alloc : ⊢@{IProp GF} |==> ∃ γ : GName, slAuth γ 1 [] := by

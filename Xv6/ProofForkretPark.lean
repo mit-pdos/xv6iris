@@ -53,9 +53,6 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedVariables false
-set_option linter.unusedSectionVars false
-
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
@@ -145,6 +142,7 @@ instance fkp_parkBlock_morph (steady : Bool) (N : UtNames) (V : ProcPriv) (M : N
     refine @instCtxMorphSep hlc GF _ _ _ (procPrivBareAt_morph _ _ _ _) ?_
     refine @instCtxMorphSep hlc GF _ _ _ (procOfiles_morph KTier.kpt _ _ _ _) ?_
     refine @instCtxMorphSep hlc GF _ _ _ (cwdRefAt_morph KTier.kpt _ _) ?_
+    refine @instCtxMorphSep hlc GF _ _ _ (rootRefAt_morph KTier.kpt _ _) ?_
     refine @instCtxMorphSep hlc GF _ _ _ firstBoot_morph ?_
     refine @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _) ?_
     refine @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _) ?_
@@ -164,8 +162,8 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 
 /-- The mode row: `firstDone` (steady), the exec bundle and reader token
 (boot, context-free). -/
-instance fkp_parkMode_morph (cw : Nat) (secc : BitVec 64) (sts : List FdState) (Wk : Option Uvis) :
-    CtxMorph (GF := GF) (fun ξ => letI : CurCtx := ⟨ξ, KTier.kpt⟩; parkMode (hlc := hlc) (SG := SG) cw secc sts Wk) := by
+instance fkp_parkMode_morph (rt cw : Nat) (secc : BitVec 64) (sts : List FdState) (Wk : Option Uvis) :
+    CtxMorph (GF := GF) (fun ξ => letI : CurCtx := ⟨ξ, KTier.kpt⟩; parkMode (hlc := hlc) (SG := SG) rt cw secc sts Wk) := by
   cases Wk
   · unfold parkMode
     exact instCtxMorphConst _
@@ -180,7 +178,7 @@ def fkpPay (N : UtNames) (rest : List (BitVec 64)) (V : ProcPriv) (M : Nat → L
     stackOwn (V.kstack + 4096#64) forkretStack ∗
     parkGlobals N.Γ N.w N.ft N.f N.ip ∗ utSysParkRows N.Γ ∗
     parkBlock (hlc := hlc) steady N V M ∗
-    parkMode (hlc := hlc) (SG := SG) V.cwi V.pvSecc sts (parkKey steady V M cs N.pid))
+    parkMode (hlc := hlc) (SG := SG) V.rti V.cwi V.pvSecc sts (parkKey steady V M cs N.pid))
 
 instance fkpPay_morph (N : UtNames) (rest : List (BitVec 64)) (V : ProcPriv) (M : Nat → List (BitVec 8))
     (sts : List FdState) (cs : ExtTreeSet GName compare) (steady : Bool) :
@@ -191,7 +189,7 @@ instance fkpPay_morph (N : UtNames) (rest : List (BitVec 64)) (V : ProcPriv) (M 
       (@instCtxMorphSep hlc GF _ _ _ (fkp_parkGlobals_morph _ _ _ _ _)
         (@instCtxMorphSep hlc GF _ _ _ (fkp_utSysParkRows_morph _)
           (@instCtxMorphSep hlc GF _ _ _ (fkp_parkBlock_morph steady N V M)
-            (fkp_parkMode_morph _ _ _ _)))))
+            (fkp_parkMode_morph _ _ _ _ _)))))
 
 /-- forkret's closer out of the package's: the two spare allowances the park
 captured go in (Rocq `forkret_park_paid`'s `iAssert`). -/

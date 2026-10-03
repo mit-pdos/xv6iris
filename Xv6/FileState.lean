@@ -60,24 +60,6 @@ abbrev Fstate : Type := Std.ExtTreeMap (List (BitVec 8)) (List (BitVec 8)) compa
 `FileDisc`'s `fnameF` is this constant.  (Rocq `fname_m`.) -/
 def fnameM : List (BitVec 8) := [102#8]
 
-/-- the one-name state an option content denotes: the bridge from the
-deed's `Option` to the model's map (Rocq `fst_of`) -/
-def fstOf : Option (List (BitVec 8)) → Fstate
-  | none => ∅
-  | some bs => (∅ : Fstate).insert fnameM bs
-
-theorem fstOf_lookup (o : Option (List (BitVec 8))) : (fstOf o)[fnameM]? = o := by
-  cases o <;> simp [fstOf]
-
-theorem fstOf_lookup_ne (o : Option (List (BitVec 8))) (N : List (BitVec 8))
-    (hN : N ≠ fnameM) : (fstOf o)[N]? = none := by
-  cases o with
-  | none => simp [fstOf]
-  | some bs =>
-    simp only [fstOf, Std.ExtTreeMap.getElem?_insert]
-    rw [if_neg (by rw [Std.compare_eq_iff_eq]; exact fun h => hN h.symm)]
-    simp
-
 /-! ## 2.  ECHO'S CHUNKS -/
 
 /-- `echoArgsChunks args` for the arguments AFTER the command name:
@@ -89,26 +71,6 @@ def echoArgsChunks : List (List (BitVec 8)) → List (List (BitVec 8))
 
 def echoChunks (ws : List (List (BitVec 8))) : List (List (BitVec 8)) :=
   echoArgsChunks (ws.drop 1)
-
-theorem echoArgsChunks_nonnil (args : List (List (BitVec 8)))
-    (hf : ∀ a ∈ args, a ≠ []) : ∀ c ∈ echoArgsChunks args, c ≠ [] := by
-  induction args with
-  | nil => simp [echoArgsChunks]
-  | cons a rest ih =>
-    cases rest with
-    | nil =>
-      intro c hc
-      simp [echoArgsChunks] at hc
-      rcases hc with rfl | rfl
-      · exact hf _ (by simp)
-      · simp
-    | cons b rest' =>
-      intro c hc
-      simp only [echoArgsChunks, List.mem_cons] at hc
-      rcases hc with rfl | rfl | hc
-      · exact hf _ (by simp)
-      · simp
-      · exact ih (fun x hx => hf x (List.mem_cons_of_mem _ hx)) c hc
 
 /-! ## 3.  SUBSETS AND THEIR CONCATENATION -/
 
@@ -172,68 +134,6 @@ echo's payment recursion walks ARGUMENTS; the deed's cursor walks CHUNKS.
 These four lemmas are the dictionary: argument `q` of the tail is chunk
 `2q`, the separator or newline after it is chunk `2q + 1`, and there are
 exactly `2 * |args|` of them. -/
-
-theorem echoArgsChunks_length (args : List (List (BitVec 8))) (h : args ≠ []) :
-    (echoArgsChunks args).length = 2 * args.length := by
-  induction args with
-  | nil => exact absurd rfl h
-  | cons a args ih =>
-    cases args with
-    | nil => rfl
-    | cons a' args' =>
-      simp only [echoArgsChunks, List.length_cons] at ih ⊢
-      rw [ih (by simp)]; omega
-
-theorem echoArgsChunks_word (args : List (List (BitVec 8))) (q : Nat) (hq : q < args.length) :
-    (echoArgsChunks args)[2 * q]? = args[q]? := by
-  induction args generalizing q with
-  | nil => simp at hq
-  | cons a args ih =>
-    cases q with
-    | zero => cases args <;> rfl
-    | succ q' =>
-      cases args with
-      | nil => simp at hq
-      | cons a' args' =>
-        have : 2 * (q' + 1) = 2 * q' + 1 + 1 := by omega
-        rw [this]
-        simp only [echoArgsChunks, List.getElem?_cons_succ]
-        exact ih q' (by simp at hq ⊢; omega)
-
-theorem echoArgsChunks_sep (args : List (List (BitVec 8))) (q : Nat) (hq : q + 1 < args.length) :
-    (echoArgsChunks args)[2 * q + 1]? = some [wlSp] := by
-  induction args generalizing q with
-  | nil => simp at hq
-  | cons a args ih =>
-    cases args with
-    | nil => simp at hq
-    | cons a' args' =>
-      cases q with
-      | zero => rfl
-      | succ q' =>
-        have : 2 * (q' + 1) + 1 = 2 * q' + 1 + 1 + 1 := by omega
-        rw [this]
-        simp only [echoArgsChunks, List.getElem?_cons_succ]
-        exact ih q' (by simp at hq ⊢; omega)
-
-theorem echoArgsChunks_nl (args : List (List (BitVec 8))) (q : Nat) (hq : q + 1 = args.length) :
-    (echoArgsChunks args)[2 * q + 1]? = some [wlNl] := by
-  induction args generalizing q with
-  | nil => simp at hq
-  | cons a args ih =>
-    cases args with
-    | nil =>
-      cases q with
-      | zero => rfl
-      | succ => simp at hq
-    | cons a' args' =>
-      cases q with
-      | zero => simp at hq
-      | succ q' =>
-        have : 2 * (q' + 1) + 1 = 2 * q' + 1 + 1 + 1 := by omega
-        rw [this]
-        simp only [echoArgsChunks, List.getElem?_cons_succ]
-        exact ih q' (by simp at hq ⊢; omega)
 
 theorem echoArgsChunks_concat (args : List (List (BitVec 8))) (h : args ≠ []) :
     (echoArgsChunks args).flatten = wlLine args := by

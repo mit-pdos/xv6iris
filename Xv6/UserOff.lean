@@ -52,21 +52,20 @@ the Rocq tree's `claude-notes/design/user-read.md` sections 2 and 4, and
 
 4. **LANE K6-C (Rocq 5c48aa727, bb7d140b3, 4919630d6).**  `offSupply`'s
    input is `offRet` and its output the box's arm `offLink`; the parked
-   supplier passes the taint through, `offSupply_taint` is the disconnect,
-   and `offSupply_held`'s residue is `uoff (off+d) ∨ (uoff off ∗
-   killCred)`.  Rocq's three vacuity `Example`s are theorems here
+   supplier passes the taint through, and `offSupply_taint` is the
+   disconnect.  Rocq's three vacuity `Example`s are theorems here
    (`vacuity_link_not_taint`, `vacuity_lend_not_taint`,
    `vacuity_supply_not_taint`, over `offGv_whole_half`); `off_link` and its
    arms live in `OffGv` (landed by K5); `off_settle` is gone, as in Rocq.
 
 ## Dropped/simplified vs Rocq
 
-Nothing.  (`uoff_park`, `off_pub_park`, `off_pub_hand(_0)`,
-`uoff_agree(_k)` have no kernel-proof consumer today -- they serve
-sys_open's publish (wave 7b) and the U tier -- but they are a few lines
-each and are the file's stated API, so they are kept.)
+`off_supply_held` is not ported (nothing uses it).  (`uoff_park`,
+`off_pub_park`, `off_pub_hand(_0)`, `uoff_agree(_k)` have no kernel-proof
+consumer today -- they serve sys_open's publish (wave 7b) and the U tier --
+but they are a few lines each and are the file's stated API, so they are
+kept.)
 -/
-import Xv6.OffGv
 import Xv6.FileDefs
 
 namespace Xv6
@@ -131,13 +130,6 @@ def foffPub (om : OffMode) (γo : GName) : IProp GF :=
   | .parked => iprop(emp)
   | .held => uoff γo 0
 
-/-- Rocq's `foff_pub_parked`. -/
-theorem foffPub_parked (γo : GName) : ⊢@{IProp GF} foffPub .parked γo := by
-  unfold foffPub; iempintro
-
-/-- Rocq's `foff_pub_held`. -/
-theorem foffPub_held (γo : GName) : uoff (GF := GF) γo 0 ⊢ foffPub .held γo := .rfl
-
 /-- Rocq's `foff_pub_of_held`. -/
 theorem foffPub_of_held (γo : GName) : foffPub (GF := GF) .held γo ⊢ uoff γo 0 := .rfl
 
@@ -152,10 +144,6 @@ def foffPubT (om : OffMode) (t : FdType) : IProp GF :=
 /-- Rocq's `foff_pub_t_dev`. -/
 theorem foffPubT_dev (om : OffMode) (mj : Nat) : ⊢@{IProp GF} foffPubT om (.device mj) := by
   unfold foffPubT; iempintro
-
-/-- Rocq's `foff_pub_t_inode`. -/
-theorem foffPubT_inode (om : OffMode) (i : Nat) (γo : GName) (m : OffMode) :
-    foffPub (GF := GF) om γo ⊢ foffPubT om (.inode i γo m) := .rfl
 
 /-- ...and back (the arms read the type-keyed half at the inode they built). -/
 theorem foffPubT_inode_elim (om : OffMode) (i : Nat) (γo : GName) (m : OffMode) :
@@ -224,33 +212,6 @@ theorem offSupply_taint (E : CoPset) (γo : GName) (off d : Nat) :
   · iapply offLink_taint $$ Ht
   · ipureintro; trivial
 
-/-- SUPPLIER 2 -- HELD (Rocq's `off_supply_held`): no invariant is opened, so
-this supplier is good at EVERY mask.  ITS POST IS `fired ∨ (taint ∗ payment
-back)` (Rocq lane OFF-LINK-2's L3): at a COUPLED object both halves move
-together and the caller's cursor comes back ADVANCED; at a DISCONNECTED one
-there is no other half to move, so the caller's own half comes back UNMOVED
-beside the taint that says why. -/
-theorem offSupply_held (E : CoPset) (γo : GName) (off d : Nat) :
-    ⊢@{IProp GF} uoff γo off -∗
-      offSupply γo E off d
-        iprop(uoff γo (off + d) ∨ (uoff γo off ∗ MachFixedGS.killCred (hlc := hlc) (GF := GF))) := by
-  unfold offSupply offRet offLink
-  iintro Hu ⟨%v, Hk, -⟩
-  icases Hk with (Hk | #Ht)
-  · -- the caller's own half PINS the value: the advanced arm is a
-    -- contradiction for this supplier whenever `0 < d`
-    ihave %hv := uoff_agree_k γo off v $$ Hu Hk
-    subst hv
-    imod uoff_advance γo off d $$ Hu Hk with ⟨Hk, Hu⟩
-    imodintro
-    isplitl [Hk]
-    · ileft; iexact Hk
-    · ileft; iexact Hu
-  · imodintro
-    isplitl []
-    · iright; iexact Ht
-    · iright; iframe Hu; iexact Ht
-
 /-- THE PUBLISH, MODE PARK (Rocq's `off_pub_park`): what sys_open's publish
 does, and what the generic tier must keep doing. -/
 theorem off_pub_park (E : CoPset) (γo : GName) (z : Int) :
@@ -260,21 +221,6 @@ theorem off_pub_park (E : CoPset) (γo : GName) (z : Int) :
   imod offUserInv_alloc E γo z $$ Hu with #Hinv
   imodintro
   iframe Hk Hinv
-
-/-! ## 4.  The box's arm (Rocq lane OFF-LINK, L0/L3)
-
-`offLink` and its two arms live in `OffGv` (the nodes' LEND is stated at
-them).  Rocq's `off_settle` is gone: `offSupply`'s own output is the box's
-arm. -/
-
-/-- ...AND THE THIRD CASE NEEDS NO PAYER AT ALL (Rocq's `off_link_advanced`):
-a node whose closure held `uoff γo off` advanced BOTH halves inside its own
-phase 2 and handed the kernel's back at `off + d`, which IS the box's
-coupled arm. -/
-theorem offLink_advanced (γo : GName) (off d : Nat) :
-    offGv (GF := GF) γo (1 : Qp).half ((off + d : Nat) : Int) ⊢
-      offLink (hlc := hlc) γo ((off + d : Nat) : Int) :=
-  offLink_of γo _
 
 /-! ## 5.  The vacuity check (Rocq design/app-file.md SS3.6)
 

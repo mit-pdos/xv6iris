@@ -38,7 +38,6 @@ CONE (UShURound S3): `uredir_exec_sup`.
 import Xv6.UshURoundRedirExit
 import Xv6.UkUnionEntriesFile
 import Xv6.UshEchoPipePay
-import Xv6.UshFileRedir
 import Xv6.UshRedirBody
 
 namespace Xv6
@@ -47,7 +46,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Std (ExtTreeSet)
 open HfpFileClaimsP
 
-set_option linter.unusedSectionVars false
 set_option synthInstance.maxSize 1024
 
 section UShURoundRedirSup

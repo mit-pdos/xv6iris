@@ -13,17 +13,20 @@ reference AT ITS INUM, not `inodeHeld`), the cursor `P (length es0) dcur` and
 the UNFIRED suffix of the hop family from `length es0`.  The family is over
 `pathElems pl` on the namei side (`FsAbsEra.exHopsFrom`) and over the parent
 prefix `npElems pl` on the nameiparent side (`FsAbsEra.epHopsFrom`); both ARE
-`FsAbsWalk.axHopsFrom` at the era lend (`exHops_is_axHops`/
-`epHops_is_axHops`), so ONE family `namexEraHops` over the list
+`FsAbsWalk.axHopsFrom` at the era lend (`exHops_is_axHops`, and
+by `rfl` on the nameiparent side), so ONE family `namexEraHops` over the list
 `namexEraPs A` (selected by `A.npar`) serves both, and the peel is one lemma.
 
 * `namexEraPs`, `namexEraHops`, `namexEraStart`: the hop list, the family,
-  and the one-shot start at `A.cwi` (`exStart` / `epStart` by `A.npar`).
+  and the one-shot start at `umStartOf A.rti A.cwi` (`exStart` / `epStart`
+  by `A.npar`); every hop at the root `A.rti` (chroot: `..` at the root
+  steps in place).
 * `namexEraDead`, `namexEraArm`, `namexEraOut`, `namexEraPostR`: the
   contract's two arms (the namei arms of `SpecNamexEra.namexEraPost` or the
   nameiparent arms of `SpecNparEra.nparEraPost`, by `A.npar`) and the
   continuation, IN ROW FORM (`namexKeep`: the pid cell, the `p->cwd` cell and
-  `inodeHeldAt cwdv cwi`, SpecNamex deviation 3).  The two seals open the
+  `inodeHeldAt cwdv cwi`, the `p->root` cell and `inodeHeldAt rootv rti`,
+  SpecNamex deviation 3).  The two seals open the
   process block's core into those rows (`namexEra_core_rows`) and close it
   with the returned wand (`namexEra_post_of_spec`, `nparEra_post_of_spec`).
 * `namexEraInv`: the plain invariant `namexInv` plus Rocq ProofNparEra's
@@ -54,9 +57,6 @@ namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
-
-set_option linter.unusedSectionVars false
-set_option linter.unusedVariables false
 
 /-! ## The hop list, and the peel's pure half -/
 
@@ -125,14 +125,14 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 /-- THE HOPS STILL OWED from index `kk` (`exHopsFrom` / `epHopsFrom` by
 `A.npar`). -/
 def namexEraHops (A : NamexArgs) (P Pmiss : Nat → Nat → IProp GF) (kk : Nat) : IProp GF :=
-  axHopsFrom (elend (fsGammaL fscFs)) P Pmiss (namexEraPs A) kk
+  axHopsFrom A.rti (elend (fsGammaL fscFs)) P Pmiss (namexEraPs A) kk
 
 theorem namexEraHops_ex (A : NamexArgs) (P Pmiss : Nat → Nat → IProp GF) (kk : Nat)
-    (h : A.npar = false) : namexEraHops A P Pmiss kk = exHopsFrom fscFs P Pmiss A.pl kk := by
+    (h : A.npar = false) : namexEraHops A P Pmiss kk = exHopsFrom A.rti fscFs P Pmiss A.pl kk := by
   unfold namexEraHops exHopsFrom; rw [namexEraPs_false A h]
 
 theorem namexEraHops_ep (A : NamexArgs) (P Pmiss : Nat → Nat → IProp GF) (kk : Nat)
-    (h : A.npar = true) : namexEraHops A P Pmiss kk = epHopsFrom fscFs P Pmiss A.pl kk := by
+    (h : A.npar = true) : namexEraHops A P Pmiss kk = epHopsFrom A.rti fscFs P Pmiss A.pl kk := by
   unfold namexEraHops epHopsFrom; rw [namexEraPs_true A h]
 
 /-- PEEL THE HEAD HOP at the level's index (Rocq's `ex_hops_cons` /
@@ -141,25 +141,21 @@ theorem namexEraHops_cons (A : NamexArgs) (P Pmiss : Nat → Nat → IProp GF)
     (es0 : List Fname) (el : Fname) (R : List Fname)
     (hes : pathElems A.pl = (es0 ++ [el]) ++ R) (hR : A.npar = true → R ≠ []) :
     namexEraHops A P Pmiss es0.length ⊢
-      exHop fscFs P Pmiss es0.length el ∗ namexEraHops A P Pmiss (es0.length + 1) :=
-  axHopsFrom_cons _ P Pmiss _ es0.length el _ (namexEra_ps_drop A es0 el R hes hR)
+      exHop A.rti fscFs P Pmiss es0.length el ∗ namexEraHops A P Pmiss (es0.length + 1) :=
+  axHopsFrom_cons A.rti _ P Pmiss _ es0.length el _ (namexEra_ps_drop A es0 el R hes hR)
 
-/-- The family past its end is `emp`. -/
-theorem namexEraHops_done (A : NamexArgs) (P Pmiss : Nat → Nat → IProp GF) (kk : Nat)
-    (hk : (namexEraPs A).length ≤ kk) : ⊢ namexEraHops A P Pmiss kk :=
-  axHopsFrom_done _ P Pmiss _ kk hk
-
-/-- THE ONE-SHOT START at the cwd inum `A.cwi` (`exStart` / `epStart`). -/
+/-- THE ONE-SHOT START at the root inum `A.rti` (an absolute path) or the
+cwd inum `A.cwi` (`exStart` / `epStart`). -/
 def namexEraStart (A : NamexArgs) (P Pmiss : Nat → Nat → IProp GF) : IProp GF :=
-  iprop(∀ r : Nat, ⌜r = umStartOf A.cwi A.pl⌝ ={⊤}=∗ P 0 r ∗ namexEraHops A P Pmiss 0)
+  iprop(∀ r : Nat, ⌜r = umStartOf A.rti A.cwi A.pl⌝ ={⊤}=∗ P 0 r ∗ namexEraHops A P Pmiss 0)
 
 theorem namexEraStart_ex (A : NamexArgs) (P Pmiss : Nat → Nat → IProp GF) (h : A.npar = false) :
-    exStart fscFs A.cwi P Pmiss A.pl ⊢ namexEraStart A P Pmiss := by
+    exStart fscFs A.rti A.cwi P Pmiss A.pl ⊢ namexEraStart A P Pmiss := by
   unfold namexEraStart exStart
   rw [namexEraHops_ex A P Pmiss 0 h]
 
 theorem namexEraStart_ep (A : NamexArgs) (P Pmiss : Nat → Nat → IProp GF) (h : A.npar = true) :
-    epStart fscFs A.cwi P Pmiss A.pl ⊢ namexEraStart A P Pmiss := by
+    epStart fscFs A.rti A.cwi P Pmiss A.pl ⊢ namexEraStart A P Pmiss := by
   unfold namexEraStart epStart
   rw [namexEraHops_ep A P Pmiss 0 h]
 
@@ -168,10 +164,10 @@ theorem namexEraStart_ep (A : NamexArgs) (P Pmiss : Nat → Nat → IProp GF) (h
 /-- THE DEATH ARM: the namei post's disjunction (`kd < L`, LEFT unfired /
 RIGHT fired-and-missed) or `npDead` on the nameiparent side. -/
 def namexEraDead (A : NamexArgs) (P Pmiss : Nat → Nat → IProp GF) : IProp GF :=
-  if A.npar then npDead fscFs P Pmiss A.pl
+  if A.npar then npDead A.rti fscFs P Pmiss A.pl
   else iprop(∃ (kd d : Nat), ⌜kd < (pathElems A.pl).length⌝ ∗
-    ((P kd d ∗ exHopsFrom fscFs P Pmiss A.pl kd) ∨
-     (Pmiss kd d ∗ exHopsFrom fscFs P Pmiss A.pl (kd + 1))))
+    ((P kd d ∗ exHopsFrom A.rti fscFs P Pmiss A.pl kd) ∨
+     (Pmiss kd d ∗ exHopsFrom A.rti fscFs P Pmiss A.pl (kd + 1))))
 
 /-- A LEVEL DIED BEFORE ITS HOP FIRED (the type test, the nlink guard):
 the cursor and the whole unfired suffix go back (Rocq's LEFT disjunct /
@@ -194,7 +190,7 @@ theorem namexEra_dead_level (A : NamexArgs) (P Pmiss : Nat → Nat → IProp GF)
   · simp only [if_true]
     rw [namexEraHops_ep A P Pmiss _ h]
     iintro ⟨HP, Hh⟩
-    iapply (npDead_unfired fscFs P Pmiss A.pl es0.length d (hle h)) $$ HP Hh
+    iapply (npDead_unfired A.rti fscFs P Pmiss A.pl es0.length d (hle h)) $$ HP Hh
 
 /-- THE HOP FIRED AND MISSED (Rocq's RIGHT disjunct / `np_dead_missed` at
 `Hkltp`). -/
@@ -218,7 +214,7 @@ theorem namexEra_dead_missed (A : NamexArgs) (P Pmiss : Nat → Nat → IProp GF
     rw [namexEraHops_ep A P Pmiss _ h]
     rw [namexEraPs_true A h] at hlt
     iintro ⟨HP, Hh⟩
-    iapply (npDead_missed fscFs P Pmiss A.pl es0.length d hlt) $$ HP Hh
+    iapply (npDead_missed A.rti fscFs P Pmiss A.pl es0.length d hlt) $$ HP Hh
 
 /-- "nameiparent of /": no elements, the cursor at 0 is the whole refund
 (Rocq's `np_dead_unfired` at index 0, ProofNparEra's +0x140). -/
@@ -229,7 +225,7 @@ theorem namexEra_dead_noelems (A : NamexArgs) (P Pmiss : Nat → Nat → IProp G
   rw [hnp, namexEraHops_ep A P Pmiss _ hnp]
   simp only [if_true]
   iintro ⟨HP, Hh⟩
-  iapply (npDead_unfired fscFs P Pmiss A.pl 0 d (Nat.zero_le _)) $$ HP Hh
+  iapply (npDead_unfired A.rti fscFs P Pmiss A.pl 0 d (Nat.zero_le _)) $$ HP Hh
 
 /-- The contract's two arms at the value `rv` that ends up in `a0`: THE PIN
 (namei: the reference at its inum and the cursor at `L`; nameiparent: the
@@ -300,7 +296,7 @@ def namexEraLoop (k : KCtx) (A : NamexArgs) (P Pmiss : Nat → Nat → IProp GF)
     (dcur : Nat),
     ⌜namexEraInv k A R off ipv ncur Scur es0 wc fuel⌝ -∗
     kctx c (((k.withSpie spie spp).pushed 12).withRegs R) -∗
-    pcIs c (KA.«namex» + 0xf4#64) -∗
+    pcIs c (KA.«namex» + 0xf8#64) -∗
     namexFrame k -∗ trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗
     namexEraWalk k A P Pmiss ipv dcur es0.length ncur Scur nf -∗
     (∀ c' : CPU, namexEraPostR k A P Pmiss c') -∗ wpLoop c)
@@ -313,7 +309,7 @@ theorem namexEraLoop_elim (k : KCtx) (A : NamexArgs) (P Pmiss : Nat → Nat → 
         (dcur : Nat),
       ⌜namexEraInv k A R off ipv ncur Scur es0 wc fuel⌝ -∗
       kctx c (((k.withSpie spie spp).pushed 12).withRegs R) -∗
-      pcIs c (KA.«namex» + 0xf4#64) -∗
+      pcIs c (KA.«namex» + 0xf8#64) -∗
       namexFrame k -∗ trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗
       namexEraWalk k A P Pmiss ipv dcur es0.length ncur Scur nf -∗
       (∀ c' : CPU, namexEraPostR k A P Pmiss c') -∗ wpLoop c := by
@@ -326,7 +322,7 @@ theorem namexEraLoop_intro (k : KCtx) (A : NamexArgs) (P Pmiss : Nat → Nat →
         (dcur : Nat),
       ⌜namexEraInv k A R off ipv ncur Scur es0 wc fuel⌝ -∗
       kctx c (((k.withSpie spie spp).pushed 12).withRegs R) -∗
-      pcIs c (KA.«namex» + 0xf4#64) -∗
+      pcIs c (KA.«namex» + 0xf8#64) -∗
       namexFrame k -∗ trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗
       namexEraWalk k A P Pmiss ipv dcur es0.length ncur Scur nf -∗
       (∀ c' : CPU, namexEraPostR k A P Pmiss c') -∗ wpLoop c) ⊢
@@ -357,13 +353,18 @@ structure NamexEraRows (A : NamexArgs) (pid : BitVec 32) (V : ProcPriv) : Prop w
   hcwi : A.cwi = V.cwi
   hdqp : A.dqp = pidPriv
   hdqc : A.dqc = DFrac.own 1
+  hroot : A.rootv = V.root
+  hrti : A.rti = V.rti
+  hdqr : A.dqr = DFrac.own 1
 
 /-- The core's closing wand, at the record's rows. -/
 def namexEraClose (k : KCtx) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) :
     IProp GF :=
   iprop(wordPointsTo (pPid k.proc) 4 pidPriv pid -∗
     wordPointsTo (pCwd k.proc) 8 (DFrac.own 1) V.cwd -∗
-    inodeHeldAt V.cwd V.cwi -∗ procPrivCoreNoctxAt curCtx k.proc pid V M)
+    inodeHeldAt V.cwd V.cwi -∗
+    wordPointsTo (pRoot k.proc) 8 (DFrac.own 1) V.root -∗ inodeHeldAt V.root V.rti -∗
+    procPrivCoreNoctxAt curCtx k.proc pid V M)
 
 /-- THE NAMEI SIDE's continuation, in row form. -/
 theorem namexEra_post_of_spec (k : KCtx) (A : NamexArgs) (P Pmiss : Nat → Nat → IProp GF)
@@ -374,22 +375,22 @@ theorem namexEra_post_of_spec (k : KCtx) (A : NamexArgs) (P Pmiss : Nat → Nat 
         (namexEraPost k A.plen A.pfun A.n A.Sb P Pmiss pid V M A.dqb A.dqs A.dqpv) ∗
       namexEraClose k pid V M ⊢
     ∀ c : CPU, namexEraPostR (GF := GF) k A P Pmiss c := by
-  obtain ⟨hpid, hcwd, hcwi, hdqp, hdqc⟩ := hrows
+  obtain ⟨hpid, hcwd, hcwi, hdqp, hdqc, hroot, hrti, hdqr⟩ := hrows
   iintro ⟨H, Hcl⟩ %c
   ihave H := wpNext_at true k.proc cpu c _ (Xv6.rd_pin hj k hproc c cpu) $$ H
   unfold namexEraPostR
   iintro %spie %spp %R' %n' %Sb' %ok %nf %ipv %w %hcs Hk Hpc Hte Hce Hout
   unfold namexEraOut namexKeep namexPath
-  icases Hout with ⟨⟨Hsb, Hsi, Hpid, Hcwd, Hcwr⟩, Hpath, Hnm, Hbs, %hf, Hop, Htx, Harm⟩
-  rw [hpid, hcwd, hcwi, hdqp, hdqc]
+  icases Hout with ⟨⟨Hsb, Hsi, Hpid, Hcwd, Hcwr, Hrtc, Hrtr⟩, Hpath, Hnm, Hbs, %hf, Hop, Htx, Harm⟩
+  rw [hpid, hcwd, hcwi, hdqp, hdqc, hroot, hrti, hdqr]
   unfold namexEraClose
-  ihave Hcore := Hcl $$ Hpid Hcwd Hcwr
+  ihave Hcore := Hcl $$ Hpid Hcwd Hcwr Hrtc Hrtr
   unfold namexEraPost
   iapply H $$ %spie %spp %R' %n' %Sb' %ok %nf %ipv %w %hcs Hk Hpc Hte Hce Hsb Hsi Hcore Hpath
     Hnm Hbs %hf Hop Htx
   unfold namexEraArm namexEraDead
   rw [hnp]
-  simp only [Bool.false_eq_true, if_false]
+  simp only [Bool.false_eq_true, if_false, hrti]
   iexact Harm
 
 /-- THE NAMEIPARENT SIDE's continuation, in row form. -/
@@ -401,22 +402,22 @@ theorem nparEra_post_of_spec (k : KCtx) (A : NamexArgs) (P Pmiss : Nat → Nat �
         (nparEraPost k A.plen A.pfun A.n A.Sb P Pmiss pid V M A.dqb A.dqs A.dqpv) ∗
       namexEraClose k pid V M ⊢
     ∀ c : CPU, namexEraPostR (GF := GF) k A P Pmiss c := by
-  obtain ⟨hpid, hcwd, hcwi, hdqp, hdqc⟩ := hrows
+  obtain ⟨hpid, hcwd, hcwi, hdqp, hdqc, hroot, hrti, hdqr⟩ := hrows
   iintro ⟨H, Hcl⟩ %c
   ihave H := wpNext_at true k.proc cpu c _ (Xv6.rd_pin hj k hproc c cpu) $$ H
   unfold namexEraPostR
   iintro %spie %spp %R' %n' %Sb' %ok %nf %ipv %w %hcs Hk Hpc Hte Hce Hout
   unfold namexEraOut namexKeep namexPath
-  icases Hout with ⟨⟨Hsb, Hsi, Hpid, Hcwd, Hcwr⟩, Hpath, Hnm, Hbs, %hf, Hop, Htx, Harm⟩
-  rw [hpid, hcwd, hcwi, hdqp, hdqc]
+  icases Hout with ⟨⟨Hsb, Hsi, Hpid, Hcwd, Hcwr, Hrtc, Hrtr⟩, Hpath, Hnm, Hbs, %hf, Hop, Htx, Harm⟩
+  rw [hpid, hcwd, hcwi, hdqp, hdqc, hroot, hrti, hdqr]
   unfold namexEraClose
-  ihave Hcore := Hcl $$ Hpid Hcwd Hcwr
+  ihave Hcore := Hcl $$ Hpid Hcwd Hcwr Hrtc Hrtr
   unfold nparEraPost
   iapply H $$ %spie %spp %R' %n' %Sb' %ok %nf %ipv %w %hcs Hk Hpc Hte Hce Hsb Hsi Hcore Hpath
     Hnm Hbs %hf Hop Htx
   unfold namexEraArm namexEraDead
   rw [hnp]
-  simp only [if_true]
+  simp only [if_true, hrti]
   iexact Harm
 
 end Seal

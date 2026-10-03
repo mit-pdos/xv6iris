@@ -37,8 +37,8 @@ in short (every clause kept):
    (`ElfEnc.le_at`'s body over `l !!!`) IS `Xv6.leAt l o n` here, because the
    Lean buffer is a list too.  So this file imports `Xv6.ElfEnc` (Rocq's does
    not) and has no `elf_le_at`; `elf_le_bytes_length` is `leBytes_length`,
-   `elf_le_bytes_take_drop` is `leBytes_eq_take_drop`, `elf_map_is_fmap` is
-   vacuous.
+   `elf_le_bytes_take_drop` is not ported (nothing uses it), `elf_map_is_fmap`
+   is vacuous.
 2. **`Nat`, NOT `Z`**, for every field, offset and address (ElfEnc
    deviation 2).  Consequences, each a vacuous conjunct dropped:
    `elf_read`'s `0 <=? o` test; `elf_wf`'s `0 <=? ee_phoff`/`ee_phnum` and
@@ -51,8 +51,8 @@ in short (every clause kept):
    `range_disj_b`'s `ep_memsz p <=? 0` is `p.memsz = 0`.
 3. **`elf_avail` IS DROPPED.**  It is an O(o+n) `vm_compute` device
    (checking only the last byte); `elfRead` tests `o + n ≤ f.length`
-   directly and `elfRead_some` is Rocq's `elf_read_Some` without the
-   `0 < n` premise (which only `elf_avail`'s `n = 0` case needed).  Consumers
+   directly, with no `0 < n` premise (which only `elf_avail`'s `n = 0` case
+   needed); Rocq's `elf_read_Some` is not ported (nothing uses it).  Consumers
    (grep): `elf_avail`/`elf_avail_spec` have none outside this file.
 4. **THE IMAGE IS A PARTIAL FUNCTION `Nat → Option (BitVec 8)`** (`ElfMem`),
    not a `gmap Z (bv 8)`: `map_seqZ` is `elfSeq`, `∪` is the left-biased
@@ -85,18 +85,6 @@ def elfReadU8 (f : ElfBytes) (o : Nat) : Option Nat := elfRead f o 1
 def elfReadU16 (f : ElfBytes) (o : Nat) : Option Nat := elfRead f o 2
 def elfReadU32 (f : ElfBytes) (o : Nat) : Option Nat := elfRead f o 4
 def elfReadU64 (f : ElfBytes) (o : Nat) : Option Nat := elfRead f o 8
-
-/-- Rocq `elf_read_Some`. -/
-theorem elfRead_some (f : ElfBytes) (o n v : Nat) :
-    elfRead f o n = some v ↔ o + n ≤ f.length ∧ v = leAt f o n := by
-  unfold elfRead
-  split
-  · constructor
-    · intro h; exact ⟨by assumption, (Option.some.inj h).symm⟩
-    · rintro ⟨-, rfl⟩; rfl
-  · constructor
-    · intro h; cases h
-    · rintro ⟨h, -⟩; contradiction
 
 /-! ## The three header records -/
 
@@ -479,10 +467,6 @@ theorem lookup_segFileMap (f : ElfBytes) (p : ElfPhdr) (a : Nat) (b : BitVec 8) 
     rw [segFileBytes_lookup f p _ (by omega)]
     exact hl
 
-/-- Rocq `seg_zero_bytes_length`. -/
-theorem segZeroBytes_length (p : ElfPhdr) : (segZeroBytes p).length = p.memsz - p.filesz := by
-  simp [segZeroBytes]
-
 /-- Rocq `lookup_seg_zero_map`. -/
 theorem lookup_segZeroMap (p : ElfPhdr) (a : Nat) (b : BitVec 8) (hm : p.filesz ≤ p.memsz) :
     segZeroMap p a = some b ↔
@@ -586,23 +570,6 @@ theorem segsUnion_lookup_inv (g : α → ElfMem) (ps : List α) (a : Nat) (b : B
     · obtain ⟨p, hp, hg⟩ := ih h
       exact ⟨p, List.mem_cons_of_mem _ hp, hg⟩
 
-/-- `segsUnion`'s domain (Rocq's `dom` reading, pointwise). -/
-theorem segsUnion_isSome (g : α → ElfMem) (ps : List α) (a : Nat) :
-    (segsUnion g ps a).isSome ↔ ∃ p, p ∈ ps ∧ (g p a).isSome := by
-  induction ps with
-  | nil => simp [segsUnion, elfEmpty]
-  | cons c ps ih =>
-    simp only [segsUnion, List.foldr_cons] at ih ⊢
-    rw [elfUnion_isSome, ih]
-    constructor
-    · rintro (h | ⟨p, hp, h⟩)
-      · exact ⟨c, List.mem_cons_self .., h⟩
-      · exact ⟨p, List.mem_cons_of_mem _ hp, h⟩
-    · rintro ⟨p, hp, h⟩
-      rcases List.mem_cons.1 hp with rfl | hp
-      · exact Or.inl h
-      · exact Or.inr ⟨p, hp, h⟩
-
 /-- Rocq `segs_union_disjoint_l`. -/
 theorem segsUnion_disjoint_l (g1 g2 : α → ElfMem) (p : α) (qs : List α)
     (h : ∀ q, q ∈ qs → elfDisj (g1 p) (g2 q)) : elfDisj (g1 p) (segsUnion g2 qs) := by
@@ -631,28 +598,6 @@ theorem segsUnion_disjoint (g1 g2 : α → ElfMem) (ps qs : List α)
     · rw [h'] at hg; cases hg
     · exact Or.inr h'
 
-/-- Rocq `segs_union_lookup`. -/
-theorem segsUnion_lookup [DecidableEq α] (g : α → ElfMem) (ps : List α) (a : Nat) (b : BitVec 8)
-    (hdisj : ∀ p q, p ∈ ps → q ∈ ps → p ≠ q → elfDisj (g p) (g q)) :
-    segsUnion g ps a = some b ↔ ∃ p, p ∈ ps ∧ g p a = some b := by
-  refine ⟨segsUnion_lookup_inv g ps a b, ?_⟩
-  induction ps with
-  | nil => rintro ⟨p, hp, -⟩; cases hp
-  | cons c ps ih =>
-    rintro ⟨p, hp, hg⟩
-    simp only [segsUnion, List.foldr_cons] at ih ⊢
-    rw [elfUnion_some_raw]
-    rcases List.mem_cons.1 hp with rfl | hp
-    · exact Or.inl hg
-    · by_cases hcp : c = p
-      · subst hcp; exact Or.inl hg
-      · right
-        refine ⟨?_, ih (fun x y hx hy hne => hdisj x y (List.mem_cons_of_mem _ hx)
-          (List.mem_cons_of_mem _ hy) hne) ⟨p, hp, hg⟩⟩
-        rcases hdisj c p (List.mem_cons_self ..) (List.mem_cons_of_mem _ hp) hcp a with h | h
-        · exact h
-        · rw [h] at hg; cases hg
-
 /-- Rocq `segs_union_split`. -/
 theorem segsUnion_split (g1 g2 : α → ElfMem) (ps : List α)
     (h : ∀ p q, p ∈ ps → q ∈ ps → elfDisj (g1 p) (g2 q)) :
@@ -678,12 +623,6 @@ end segs
 
 /-! ## THE ABSTRACT LAWS -- what an exec() spec consumes -/
 
-/-- Rocq `elf_wf_seg_map_disjoint`. -/
-theorem elfWf_segMap_disjoint (f : ElfBytes) (p q : ElfPhdr) (hwf : elfWf f = true)
-    (hp : p ∈ elfLoads f) (hq : q ∈ elfLoads f) (hne : p ≠ q) : elfDisj (segMap f p) (segMap f q) :=
-  segMap_disjoint f p q (elfWf_phdrOk f p hwf hp) (elfWf_phdrOk f q hwf hq)
-    (fun a => elfWf_loadsDisj f p q a hwf hp hq hne)
-
 /-- Rocq `elf_wf_file_zero_disjoint`. -/
 theorem elfWf_fileZero_disjoint (f : ElfBytes) (p q : ElfPhdr) (hwf : elfWf f = true)
     (hp : p ∈ elfLoads f) (hq : q ∈ elfLoads f) : elfDisj (segFileMap f p) (segZeroMap q) := by
@@ -702,69 +641,5 @@ theorem elfImage_split (f : ElfBytes) (hwf : elfWf f = true) :
     exact segsUnion_split (segFileMap f) segZeroMap _
       (fun p q hp hq => elfWf_fileZero_disjoint f p q hwf hp hq)
   · exact segsUnion_disjoint _ _ _ _ (fun p q hp hq => elfWf_fileZero_disjoint f p q hwf hp hq)
-
-/-- **Rocq `elf_image_lookup`**: every byte of the image is either a file byte
-at the segment's file offset, or a zero of the segment's .bss tail. -/
-theorem elfImage_lookup (f : ElfBytes) (a : Nat) (b : BitVec 8) (hwf : elfWf f = true) :
-    elfImage f a = some b ↔ ∃ p, p ∈ elfLoads f ∧
-      (((p.vaddr ≤ a ∧ a < p.vaddr + p.filesz) ∧ f[p.offset + (a - p.vaddr)]? = some b) ∨
-       ((p.vaddr + p.filesz ≤ a ∧ a < p.vaddr + p.memsz) ∧ b = elfZeroByte)) := by
-  unfold elfImage
-  rw [segsUnion_lookup _ _ a b (fun p q hp hq hne => elfWf_segMap_disjoint f p q hwf hp hq hne)]
-  constructor
-  · rintro ⟨p, hp, hg⟩
-    exact ⟨p, hp, (lookup_segMap f p a b (elfWf_phdrOk f p hwf hp)).1 hg⟩
-  · rintro ⟨p, hp, hc⟩
-    exact ⟨p, hp, (lookup_segMap f p a b (elfWf_phdrOk f p hwf hp)).2 hc⟩
-
-/-- A file window's union is disjoint pairwise (Rocq's inline
-`map_disjoint_weaken` in `elf_file_image_lookup`). -/
-theorem elfWf_segFileMap_disjoint (f : ElfBytes) (p q : ElfPhdr) (hwf : elfWf f = true)
-    (hp : p ∈ elfLoads f) (hq : q ∈ elfLoads f) (hne : p ≠ q) :
-    elfDisj (segFileMap f p) (segFileMap f q) :=
-  elfDisj_weaken (elfWf_segMap_disjoint f p q hwf hp hq hne)
-    (fun x hx => by unfold segMap; rw [elfUnion_isSome]; exact Or.inl hx)
-    (fun x hx => by unfold segMap; rw [elfUnion_isSome]; exact Or.inl hx)
-
-/-- Rocq `elf_file_image_lookup`. -/
-theorem elfFileImage_lookup (f : ElfBytes) (a : Nat) (b : BitVec 8) (hwf : elfWf f = true) :
-    elfFileImage f a = some b ↔ ∃ p, p ∈ elfLoads f ∧
-      (p.vaddr ≤ a ∧ a < p.vaddr + p.filesz) ∧ f[p.offset + (a - p.vaddr)]? = some b := by
-  unfold elfFileImage
-  rw [segsUnion_lookup _ _ a b (fun p q hp hq hne => elfWf_segFileMap_disjoint f p q hwf hp hq hne)]
-  constructor
-  · rintro ⟨p, hp, hg⟩
-    exact ⟨p, hp, (lookup_segFileMap f p a b (elfWf_phdrOk f p hwf hp)).1 hg⟩
-  · rintro ⟨p, hp, hc⟩
-    exact ⟨p, hp, (lookup_segFileMap f p a b (elfWf_phdrOk f p hwf hp)).2 hc⟩
-
-/-- Rocq `elf_zero_image_lookup`. -/
-theorem elfZeroImage_lookup (f : ElfBytes) (a : Nat) (b : BitVec 8) (hwf : elfWf f = true) :
-    elfZeroImage f a = some b ↔ ∃ p, p ∈ elfLoads f ∧
-      (p.vaddr + p.filesz ≤ a ∧ a < p.vaddr + p.memsz) ∧ b = elfZeroByte := by
-  unfold elfZeroImage
-  have hd : ∀ p q, p ∈ elfLoads f → q ∈ elfLoads f → p ≠ q → elfDisj (segZeroMap p) (segZeroMap q) :=
-    fun p q hp hq hne => elfDisj_weaken (elfWf_segMap_disjoint f p q hwf hp hq hne)
-      (fun x hx => by unfold segMap; rw [elfUnion_isSome]; exact Or.inr hx)
-      (fun x hx => by unfold segMap; rw [elfUnion_isSome]; exact Or.inr hx)
-  rw [segsUnion_lookup _ _ a b hd]
-  constructor
-  · rintro ⟨p, hp, hg⟩
-    exact ⟨p, hp, (lookup_segZeroMap p a b (elfWf_phdrOk f p hwf hp).poMemsz).1 hg⟩
-  · rintro ⟨p, hp, hc⟩
-    exact ⟨p, hp, (lookup_segZeroMap p a b (elfWf_phdrOk f p hwf hp).poMemsz).2 hc⟩
-
-/-- Rocq `elf_image_dom`: the image's DOMAIN is exactly the union of the
-PT_LOAD memory ranges (`filesz` plays no role, which is the point of
-`memsz`). -/
-theorem elfImage_dom (f : ElfBytes) (a : Nat) (hwf : elfWf f = true) :
-    (elfImage f a).isSome ↔ ∃ p, p ∈ elfLoads f ∧ inSeg p a := by
-  unfold elfImage
-  rw [segsUnion_isSome]
-  constructor
-  · rintro ⟨p, hp, h⟩
-    exact ⟨p, hp, (segMap_inSeg f p a (elfWf_phdrOk f p hwf hp)).1 h⟩
-  · rintro ⟨p, hp, h⟩
-    exact ⟨p, hp, (segMap_inSeg f p a (elfWf_phdrOk f p hwf hp)).2 h⟩
 
 end Xv6

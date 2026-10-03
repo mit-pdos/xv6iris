@@ -45,18 +45,14 @@ lambda `fun ld => ushFd0c ld ∧ ushFd1p ld ∧ ushFd2p ld` (deviation 5).
    body is inlined, so that the cat sub-lane's definition does not clash.
 -/
 import Xv6.UshURoundEcho
-import Xv6.UexecSecc
-import Xv6.UshSecc
 import Xv6.LinkUexecWp
 import Xv6.UkSeccEntry
-import Xv6.UshOomPaid
 
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
 set_option synthInstance.maxSize 1024
 
 section UShURoundSecc
@@ -88,7 +84,6 @@ theorem consLicenceAt_of_useccTok (ug : UnionGn)
   imodintro
   iintro %h %H %ev %hw %hok Hres
   iapply Hl $$ %h %H %ev %(hev ev hw) %hok Hres
-
 
 /-- The file family at index 3, opened. -/
 theorem uWcf3_open (ug : UnionGn) (r : FileAppNames) (s0 : Fstate) (I : List (BitVec 8)) :

@@ -164,9 +164,7 @@ import MachCSL.CrashPermInv
 
 namespace Xv6
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 
@@ -248,7 +246,6 @@ structure DiskNames where
 
 /-- The disk invariant's namespace. -/
 def diskN : Namespace := ndot nroot "xv6disk"
-
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
@@ -431,43 +428,6 @@ instance dmaHalf_timeless (pa : PAddr) (n : Nat) : Timeless (dmaHalf (GF := GF) 
 instance dmaHalfAt_timeless (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) :
     Timeless (dmaHalfAt (GF := GF) pa n w) := by unfold dmaHalfAt; infer_instance
 
-theorem dmaOwnAt_dmaOwn (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) :
-    dmaOwnAt (GF := GF) pa n w ⊢ dmaOwn pa n := by
-  unfold dmaOwnAt dmaOwn
-  iintro ⟨%Hs, H, %_⟩
-  iexists Hs
-  iexact H
-
-/-- **A leased footprint answers a DMA write**: full ownership of the
-bytes is exactly `dmaWriteLease`, and what comes back is the same
-footprint at the written value. -/
-theorem dmaOwn_lease (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) :
-    dmaOwn (GF := GF) pa n ⊢ dmaWriteLease pa n w (dmaOwnAt pa n w) := by
-  unfold dmaOwn dmaWriteLease dmaOwnAt
-  iintro ⟨%Hs, Hb⟩
-  iexists Hs, 0
-  iframe Hb
-  isplitl []
-  · iapply topLbAt_0
-  iintro %t Hb2 _ _ %_
-  iexists (pushed Hs t diskAgent w)
-  iframe Hb2
-  ipureintro
-  exact headsAre_pushed Hs t diskAgent n w
-
-/-- The same, forgetting the value written. -/
-theorem dmaOwn_lease' (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) :
-    dmaOwn (GF := GF) pa n ⊢ dmaWriteLease pa n w (dmaOwn pa n) := by
-  unfold dmaOwn dmaWriteLease
-  iintro ⟨%Hs, Hb⟩
-  iexists Hs, 0
-  iframe Hb
-  isplitl []
-  · iapply topLbAt_0
-  iintro %t Hb2 _ _ %_
-  iexists (pushed Hs t diskAgent w)
-  iexact Hb2
-
 /-- A cell over the whole footprint, at any fraction, pins a DMA READ. -/
 theorem dmaHalfAt_pin (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (P : IProp GF)
     (Q : BitVec (8 * n) → Prop) (hQ : Q w) :
@@ -487,21 +447,6 @@ theorem dmaHalfAt_pin (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (P : IProp GF)
   iframe Hb2
   ipureintro; exact hh
 
-/-- **The lease, framed**: full ownership of the footprint plus the way
-back into the client's state is exactly what a DMA write asks for. -/
-theorem dmaOwn_lease_frame (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (Q : IProp GF) :
-    dmaOwn pa n ∗ (dmaOwn pa n -∗ Q) ⊢ dmaWriteLease pa n w Q := by
-  unfold dmaOwn dmaWriteLease
-  iintro ⟨⟨%Hs, Hb⟩, Hback⟩
-  iexists Hs, 0
-  iframe Hb
-  isplitl []
-  · iapply topLbAt_0
-  iintro %t Hb2 _ _ %_
-  iapply Hback
-  iexists (pushed Hs t diskAgent w)
-  iexact Hb2
-
 /-- The lease's continuation is monotone. -/
 theorem dmaWriteLease_mono (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (P Q : IProp GF)
     (hpq : P ⊢ Q) : dmaWriteLease (GF := GF) pa n w P ⊢ dmaWriteLease pa n w Q := by
@@ -512,37 +457,6 @@ theorem dmaWriteLease_mono (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (P Q : IP
   iintro %t Hb2 Hau Ht %hkb
   iapply hpq
   iapply Hback $$ %t Hb2 Hau Ht %hkb
-
-/-- The empty footprint is free. -/
-theorem dmaOwn_zero (pa : PAddr) : emp ⊢@{IProp GF} dmaOwn pa 0 := by
-  unfold dmaOwn histBytes
-  iintro _
-  iexists (fun _ => ([] : Hist))
-  simp only [List.range_zero]
-  exact BigSepL.bigSepL_nil_intro
-
-/-- A zero-width DMA write asks for nothing. -/
-theorem dmaWriteLease_zero (pa : PAddr) (n : Nat) (hn : n = 0) (w : BitVec (8 * n))
-    (Q : IProp GF) : Q ⊢ dmaWriteLease pa n w Q := by
-  subst hn
-  iintro H
-  iapply dmaOwn_lease_frame pa 0 w Q
-  isplitl []
-  · iapply dmaOwn_zero pa
-    itrivial
-  · iintro _
-    iexact H
-
-
-/-- Any answer will do: the trivial read obligation. -/
-theorem dmaReadPin_any (pa : PAddr) (n : Nat) (P : IProp GF) :
-    P ⊢ dmaReadPin pa n (fun _ => True) P := by
-  unfold dmaReadPin
-  iintro H
-  ileft
-  iframe H
-  ipureintro
-  intro _; trivial
 
 /-! ## The ghost state -/
 
@@ -572,13 +486,6 @@ def headAuth (γ : DiskNames) (i : Nat) (s : HState) : IProp GF :=
 def headTok (γ : DiskNames) (i : Nat) (s : HState) : IProp GF :=
   γ.head i ↪VAR{.own (1 : Qp).half} s
 
-theorem headTok_agree (γ : DiskNames) (i : Nat) (s s' : HState) :
-    headAuth (GF := GF) γ i s ∗ headTok γ i s' ⊢ ⌜s = s'⌝ := by
-  unfold headAuth headTok
-  iintro ⟨H1, H2⟩
-  ihave %h := ghost_var_agree (γ.head i) _ _ _ _ $$ H1 H2
-  ipureintro; exact h
-
 /-- The driver's side of the receipt at an ARBITRARY fraction.  Agreement
 is all a READER of the slot needs, and the readers no longer all hold the
 same fraction: an in-flight slot's driver half is split in two (see
@@ -586,9 +493,6 @@ same fraction: an in-flight slot's driver half is split in two (see
 lock payload, holds only a QUARTER. -/
 def headTokF (γ : DiskNames) (q : Qp) (i : Nat) (s : HState) : IProp GF :=
   γ.head i ↪VAR{.own q} s
-
-theorem headTok_eq (γ : DiskNames) (i : Nat) (s : HState) :
-    headTok (GF := GF) γ i s = headTokF γ (1 : Qp).half i s := rfl
 
 /-- **A QUARTER of the driver's half.**  From `Xv6.disk_publish` to
 `Xv6.disk_collect` the driver's half of an in-flight slot's receipt is
@@ -609,13 +513,6 @@ instance headTokQ_timeless (γ : DiskNames) (i : Nat) (s : HState) :
 theorem headTokF_agree (γ : DiskNames) (q q' : Qp) (i : Nat) (s s' : HState) :
     headTokF (GF := GF) γ q i s ∗ headTokF γ q' i s' ⊢ ⌜s = s'⌝ := by
   unfold headTokF
-  iintro ⟨H1, H2⟩
-  ihave %h := ghost_var_agree (γ.head i) _ _ _ _ $$ H1 H2
-  ipureintro; exact h
-
-theorem headAuth_tokF_agree (γ : DiskNames) (q : Qp) (i : Nat) (s s' : HState) :
-    headAuth (GF := GF) γ i s ∗ headTokF γ q i s' ⊢ ⌜s = s'⌝ := by
-  unfold headAuth headTokF
   iintro ⟨H1, H2⟩
   ihave %h := ghost_var_agree (γ.head i) _ _ _ _ $$ H1 H2
   ipureintro; exact h
@@ -713,22 +610,6 @@ theorem diskBlockQ_agree (γ : DiskNames) (m : RegMapF (List (BitVec 8))) (bno :
   ihave %h := ghost_map_lookup $$ H1 H2
   ipureintro; exact h
 
-theorem diskBlockT_agree (γ : DiskNames) (m : RegMapF (List (BitVec 8))) (bno : Nat)
-    (bs : List (BitVec 8)) :
-    ⊢@{IProp GF} imgAuth γ m -∗ diskBlockT γ bno bs -∗ ⌜PartialMap.get? m bno = some bs⌝ := by
-  unfold imgAuth diskBlockT
-  iintro H1 H2
-  ihave %h := ghost_map_lookup $$ H1 H2
-  ipureintro; exact h
-
-theorem diskBlock_agree (γ : DiskNames) (m : RegMapF (List (BitVec 8))) (bno : Nat)
-    (bs : List (BitVec 8)) :
-    imgAuth (GF := GF) γ m ∗ diskBlock γ bno bs ⊢ ⌜PartialMap.get? m bno = some bs⌝ := by
-  unfold imgAuth diskBlock
-  iintro ⟨H1, H2⟩
-  ihave %h := ghost_map_lookup $$ H1 H2
-  ipureintro; exact h
-
 theorem diskBlock_agree' (γ : DiskNames) (m : RegMapF (List (BitVec 8))) (bno : Nat)
     (bs : List (BitVec 8)) :
     ⊢@{IProp GF} imgAuth γ m -∗ diskBlock γ bno bs -∗ ⌜PartialMap.get? m bno = some bs⌝ := by
@@ -792,16 +673,6 @@ instance diskReadLb_persistent (γ : DiskNames) (n : Nat) :
 instance diskReadLbAuth_timeless (γ : DiskNames) (n : Nat) :
     Timeless (diskReadLbAuth (GF := GF) γ n) := by unfold diskReadLbAuth; infer_instance
 
-/-- The watermark's authority yields its persistent lower bound. -/
-theorem diskReadLbAuth_lb (γ : DiskNames) (n : Nat) :
-    diskReadLbAuth (GF := GF) γ n ⊢ |==> (diskReadLbAuth γ n ∗ diskReadLb γ n) := by
-  unfold diskReadLbAuth diskReadLb
-  iintro H
-  imod MonoNat.own_update γ.nrlb (.ofNat n) (.ofNat n)
-    (by simp only [MaxNat.le_toNat]; omega) $$ H with ⟨H1, H2⟩
-  imodintro
-  iframe H1 H2
-
 /-- **The watermark moves up**, and the new bound comes out with it. -/
 theorem diskReadLbAuth_bump (γ : DiskNames) (n m : Nat) (h : n ≤ m) :
     diskReadLbAuth (GF := GF) γ n ⊢ |==> (diskReadLbAuth γ m ∗ diskReadLb γ m) := by
@@ -820,14 +691,6 @@ theorem diskReadLb_le (γ : DiskNames) (M n : Nat) :
   ihave %h := MonoNat.auth_lb_own_valid γ.nrlb _ _ _ $$ H1 H2
   ipureintro
   simpa only [MaxNat.le_toNat] using h.2
-
-/-- The bound weakens. -/
-theorem diskReadLb_mono (γ : DiskNames) (m n : Nat) (h : n ≤ m) :
-    diskReadLb (GF := GF) γ m ⊢ diskReadLb γ n := by
-  unfold diskReadLb
-  iintro #H
-  iapply MonoNat.lb_own_le γ.nrlb (.ofNat m) (.ofNat n) (by simp only [MaxNat.le_toNat]; omega)
-  iexact H
 
 /-- The published count: the lock payload's half. -/
 def diskPubAuth (γ : DiskNames) (n : Nat) : IProp GF := γ.np ↪VAR{.own (1 : Qp).half} n
@@ -868,13 +731,6 @@ theorem diskStage_agree (γ : DiskNames) (s s' : Option Nat) :
   iintro H1 H2
   ihave %h := ghost_var_agree γ.stage _ _ _ _ $$ H1 H2
   ipureintro; exact h
-
-theorem diskStage_split (γ : DiskNames) (s : Option Nat) :
-    ⊢@{IProp GF} (γ.stage ↪VAR{.own 1} s) -∗ (diskStageAuth γ s ∗ diskStage γ s) := by
-  unfold diskStageAuth diskStage
-  have h := ghost_var_split (GF := GF) γ.stage s (1 : Qp).half (1 : Qp).half
-  rw [Qp.half_add_half] at h
-  exact h
 
 theorem diskReadAt_update (γ : DiskNames) (n n' t : Nat) :
     diskReadAtAuth (GF := GF) γ n ∗ diskReadAt γ n' ⊢
@@ -1194,66 +1050,6 @@ theorem usedIdxCell_lease (pa : PAddr) (b : Nat) (dl : List UsedRec) (m hd ep Kb
     ipureintro; exact ht
   · iexact HR
 
-/-- **The tails of a context window**, with a bound on their positions:
-what a window the driver hands over whole leaves the invariant to start
-its log from. -/
-theorem ctxBytes_tails (ξ : CtxId) (pa : PAddr) (dq : DFrac) (bs : Nat → BitVec 8) :
-    ∀ n : Nat, ([∗list] j ∈ List.range n, ctxByte ξ (pa + BitVec.ofNat 64 j) dq (bs j))
-      ⊢@{IProp GF} ∃ (Hold : Nat → Hist) (b : Nat), histBytes pa n (fun _ => dq) Hold ∗
-        ⌜∀ j, j < n → ∃ e H, Hold j = e :: H ∧ e.v = bs j ∧ e.t ≤ b⌝
-  | 0 => by
-    iintro H
-    iexists (fun _ => ([] : Hist)), 0
-    unfold histBytes
-    simp only [List.range_zero]
-    isplitl []
-    · exact BigSepL.bigSepL_nil_intro
-    · ipureintro
-      intro j hj; omega
-  | n + 1 => by
-    rw [List.range_succ]
-    iintro H
-    icases BigSepL.bigSepL_snoc.1 $$ H with ⟨H1, H2⟩
-    icases ctxBytes_tails ξ pa dq bs n $$ H1 with ⟨%Hold, %b, Hb, %hh⟩
-    icases ctxByte_cases ξ (pa + BitVec.ofNat 64 n) dq (bs n) $$ H2
-      with ⟨%e, %He, Hpt, %hev, _⟩
-    iexists (fun j => if j = n then e :: He else Hold j), (max b e.t)
-    isplitl [Hb Hpt]
-    · unfold histBytes
-      rw [List.range_succ]
-      iapply BigSepL.bigSepL_snoc.2
-      isplitl [Hb]
-      · rw [BigSepL.bigSepL_eq (l := List.range n)
-          (Φ := fun _ (j : Nat) => iprop((pa + BitVec.ofNat 64 j) ↦ₕ{dq}
-            (if j = n then e :: He else Hold j)))
-          (Ψ := fun _ (j : Nat) => iprop((pa + BitVec.ofNat 64 j) ↦ₕ{dq} Hold j))
-          (fun {_ x} hx => by rw [if_neg (Nat.ne_of_lt (MachCSL.rangeIdx_lt hx))])]
-        iexact Hb
-      · simp only [↓reduceIte]
-        iexact Hpt
-    · ipureintro
-      intro j hj
-      rcases Nat.lt_succ_iff_lt_or_eq.1 hj with h | h
-      · obtain ⟨e', H', h1, h2, h3⟩ := hh j h
-        exact ⟨e', H', by simp only [if_neg (Nat.ne_of_lt h)]; exact h1, h2, by omega⟩
-      · subst h
-        exact ⟨e, He, by simp, hev, by omega⟩
-
-/-- **The used-index cell, as the flip hands it over**: the driver's whole
-window becomes an empty log over tails whose positions are bounded. -/
-theorem ctxBytes_usedIdxCell (ξ : CtxId) (pa : PAddr) :
-    ctxBytes (GF := GF) ξ pa 2 (DFrac.own 1) (0 : BitVec (8 * 2)) ⊢
-      ∃ b : Nat, usedIdxCell pa b [] := by
-  unfold ctxBytes usedIdxCell
-  iintro H
-  icases ctxBytes_tails ξ pa (DFrac.own 1) (nthByte (0 : BitVec (8 * 2))) 2 $$ H
-    with ⟨%Hold, %b, Hb, %ht⟩
-  iexists b, Hold
-  rw [usedW_nil, WordHist.hist_nil]
-  iframe Hb
-  ipureintro
-  exact ht
-
 /-! ### What a racy read of `used->idx` returns -/
 
 /-- A used-index entry is visible to a hart exactly when its position is
@@ -1441,14 +1237,6 @@ theorem dlTops_max (dl : List UsedRec) : dlTops (GF := GF) dl ⊢ topLb (maxPos 
     · iexact Ha
     · iexact Hl
 
-theorem dlTops_mem (dl : List UsedRec) (r : UsedRec) (h : r ∈ dl) :
-    dlTops (GF := GF) dl ⊢ topLb r.2.1 := by
-  unfold dlTops
-  iintro H
-  icases BigSepL.bigSepL_mem_acc (Φ := fun (r : UsedRec) => topLb (GF := GF) r.2.1) h $$ H
-    with ⟨Hr, _⟩
-  iexact Hr
-
 theorem usedIdxCell_cases (pa : PAddr) (b : Nat) (dl : List UsedRec) :
     usedIdxCell (GF := GF) pa b dl ⊢ ∃ Hold : Nat → Hist,
       histBytes pa 2 (fun _ => DFrac.own 1) ((usedW dl).hist Hold) ∗ ⌜usedTailOk b Hold⌝ := by
@@ -1535,8 +1323,7 @@ iteration of its loop to the next.  It is MINTED by the read of
 `used->idx` itself (`Xv6.disk_used_idx_read`, over `MachCSL.readAUr`,
 whose continuation names the view the load read at) and CASHED by the
 reads that follow the loop body's `__sync_synchronize()`, which is what
-turns that read watermark into a floor
-(`MachCSL.wp_s_fence_rw_rw_floor`). -/
+turns that read watermark into a floor. -/
 def diskWm (γ : DiskNames) (n F : Nat) : IProp GF := iprop%
   (∃ b : Nat, diskBaseFrozen γ b ∗ ⌜b ≤ F⌝) ∗
   (⌜n = 0⌝ ∨ ∃ (k m t hd ep : Nat), doneRec γ k (m, t, hd, ep) ∗ ⌜n ≤ m ∧ t ≤ F⌝)
@@ -1575,13 +1362,6 @@ def headDoneE (γ : DiskNames) (n h ep : Nat) : IProp GF := iprop%
 
 instance headDoneE_persistent (γ : DiskNames) (n h ep : Nat) :
     Persistent (headDoneE (GF := GF) γ n h ep) := by unfold headDoneE; infer_instance
-
-theorem headDoneE_headDone (γ : DiskNames) (n h ep : Nat) :
-    headDoneE (GF := GF) γ n h ep ⊢ headDone γ n h := by
-  unfold headDoneE headDone
-  iintro ⟨%k, %t, H⟩
-  iexists k, t, ep
-  iexact H
 
 /-- The log entry an epoch-indexed record names. -/
 theorem headDoneE_lookup (γ : DiskNames) (l : List UsedRec) (n h ep : Nat) :
@@ -1655,12 +1435,6 @@ def headRead (γ : DiskNames) (h nr : Nat) : IProp GF := iprop%
 
 instance headRead_persistent (γ : DiskNames) (h nr : Nat) :
     Persistent (headRead (GF := GF) γ h nr) := by unfold headRead; infer_instance
-
-theorem headRead_le (γ : DiskNames) (h nr n : Nat) :
-    headRead (GF := GF) γ h nr ∗ headDone γ n h ⊢ ⌜n ≤ nr⌝ := by
-  unfold headRead
-  iintro ⟨#H, #Hd⟩
-  iapply H $$ %n Hd
 
 /-- **The credential at the base**: a watermark of zero needs only the
 bound on the zeroing stores. -/
@@ -1843,7 +1617,6 @@ theorem phase_setPhase_other (v : VirtioState) (h k : BitVec 16) (ph : VPhase) (
   unfold Virtio.phase Virtio.setPhase
   rw [Alist.get_set_ne _ _ _ _ hk]
 
-
 /-- What `MachCSL.Virtio.pushOk` says head by head. -/
 theorem pushOk_not_pushed (v : VirtioState) (hok : Virtio.pushOk v = true) (h : BitVec 16)
     (r : VioReq) : Virtio.phase v h ≠ some (.pushed r) := by
@@ -1868,13 +1641,6 @@ theorem permOk_dead (v v' : VirtioState) (pm : RegMapF PermVal)
     (hok : permOk v pm (fun _ => .inactive)) : permOk v' pm (fun _ => .inactive) := by
   intro k h c p u hget
   exact absurd hget (permOk_none v pm hok k h c p u)
-
-theorem permOk_delete (v : VirtioState) (pm : RegMapF PermVal) (st : Nat → HState) (k : Nat)
-    (hok : permOk v pm st) : permOk v (PartialMap.delete pm k) st := by
-  intro k' h' c' p' u' hget
-  by_cases hk : k = k'
-  · rw [get?_delete_eq hk] at hget; exact absurd hget (by simp)
-  · exact hok k' h' c' p' u' (by rwa [get?_delete_ne hk] at hget)
 
 /-- Arming a head no permit names keeps every permit honest. -/
 theorem permOk_arm (v : VirtioState) (pm : RegMapF PermVal) (st : Nat → HState) (i : Nat)
@@ -2139,13 +1905,6 @@ theorem wroteIdx_insert_wit (pm : RegMapF PermVal) (k : Nat) (x1 : PermVal) (h1 
     wroteIdx (PartialMap.insert pm k x1) :=
   ⟨k, x1, by rw [get?_insert_eq (rfl : k = k)], h1⟩
 
-theorem wroteIdx_of_delete (pm : RegMapF PermVal) (k : Nat)
-    (h : wroteIdx (PartialMap.delete pm k)) : wroteIdx pm := by
-  obtain ⟨key, x, hg, hx⟩ := h
-  have hk : k ≠ key := by
-    intro he; rw [get?_delete_eq he] at hg; exact absurd hg (by simp)
-  exact ⟨key, x, by rwa [get?_delete_ne hk] at hg, hx⟩
-
 /-- **The witness is unique, and it is the permit that made the write.**
 A permit at `true` is at a `.pushed` head (`Xv6.permOk`); a second
 `.pushed` head is the same head (`Xv6.pushedUniq`); a second permit at
@@ -2265,17 +2024,6 @@ theorem cntOk_complete (pm pm' : RegMapF PermVal) (dl : List UsedRec) (nc : Nat)
     cntOk pm' dl (nc + 1) :=
   ⟨h.1, fun hx => absurd hx hn, fun _ => h.2.1 hw⟩
 
-/-- **Every entry of the log is at a counter at most `nc`** while no
-permit carries the witness -- what the used-index write needs of the
-entries already there. -/
-theorem cntOk_le (pm : RegMapF PermVal) (dl : List UsedRec) (nc : Nat) (h : cntOk pm dl nc)
-    (hn : ¬ wroteIdx pm) (r : UsedRec) (hr : r ∈ dl) : r.1 ≤ nc := by
-  obtain ⟨k, hk, he⟩ := List.getElem_of_mem hr
-  have := h.1 k hk
-  have hlen := h.2.2 hn
-  rw [he] at this
-  omega
-
 /-! ### (P3): unread completions have DISTINCT heads
 
 The window bound `dl.length - nr ≤ NUM` -- the completion-side twin of
@@ -2351,20 +2099,6 @@ theorem wroteAt_delete_other (pm : RegMapF PermVal) (k : Nat) (x0 : PermVal) (h 
   · rintro ⟨key, x, hg, hx, hh⟩
     have hk : k ≠ key := by
       rintro rfl; rw [hget] at hg; cases hg; exact hne hh.symm
-    exact ⟨key, x, by rw [get?_delete_ne hk]; exact hg, hx, hh⟩
-
-/-- Deleting a permit that is NOT the witness disturbs no head's bit. -/
-theorem wroteAt_delete_nonwit (pm : RegMapF PermVal) (k : Nat) (x0 : PermVal) (h : BitVec 16)
-    (hget : PartialMap.get? pm k = some x0) (hnw : ¬ isWit x0) :
-    wroteAt (PartialMap.delete pm k) h ↔ wroteAt pm h := by
-  constructor
-  · rintro ⟨key, x, hg, hx, hh⟩
-    have hk : k ≠ key := by
-      intro he; rw [get?_delete_eq he] at hg; exact absurd hg (by simp)
-    exact ⟨key, x, by rwa [get?_delete_ne hk] at hg, hx, hh⟩
-  · rintro ⟨key, x, hg, hx, hh⟩
-    have hk : k ≠ key := by
-      rintro rfl; rw [hget] at hg; cases hg; exact absurd hx hnw
     exact ⟨key, x, by rw [get?_delete_ne hk]; exact hg, hx, hh⟩
 
 /-- **An in-flight head that has not made its used-index write has no
@@ -2493,24 +2227,6 @@ theorem p3Ok_complete (v : VirtioState) (pm : RegMapF PermVal) (dl : List UsedRe
     refine h.1 hh hs (fun hx => hnw ?_) e he hlt
     exact (wroteAt_delete_other pm key x0 hh hget (by rw [h0]; exact hhh)).2 hx
 
-/-- **THE WINDOW BOUND** `dl.length - nr ≤ NUM`: the unread entries sit at
-counters `nr+1 .. dl.length` (strict counters), their heads are distinct
-and are descriptors of the queue, and there are eight of those. -/
-theorem unread_window (pm : RegMapF PermVal) (dl : List UsedRec) (nr nc : Nat)
-    (hc : cntOk pm dl nc) (hi : unreadInj dl nr) : dl.length ≤ nr + NUM := by
-  refine window_le_of_inj nr dl.length (fun k => (dl[k]?.getD ((0, 0, 0, 0) : UsedRec)).hd)
-    (fun p hp1 hp2 => ?_) (fun p q hp1 hp2 hq1 hq2 he => ?_)
-  · simp only [List.getElem?_eq_getElem hp2, Option.getD_some]
-    exact hi.1 (dl[p]'hp2) (List.getElem_mem hp2)
-      (by show nr < (dl[p]'hp2).1; rw [hc.1 p hp2]; omega)
-  · simp only [List.getElem?_eq_getElem hp2, List.getElem?_eq_getElem hq2,
-      Option.getD_some] at he
-    have := hi.2 (dl[p]'hp2) (List.getElem_mem hp2) (dl[q]'hq2) (List.getElem_mem hq2)
-      (by show nr < (dl[p]'hp2).1; rw [hc.1 p hp2]; omega)
-      (by show nr < (dl[q]'hq2).1; rw [hc.1 q hq2]; omega) he
-    have hthis : p + 1 = q + 1 := by rw [← hc.1 p hp2, ← hc.1 q hq2]; exact this
-    omega
-
 /-- **The pigeonhole with one value EXCLUDED.**  An injection of a window
 into the descriptors that AVOIDS one of them bounds the window strictly. -/
 theorem window_lt_of_inj_excl (lo np : Nat) (f : Nat → Nat) (x : Nat) (hx : x < NUM)
@@ -2578,15 +2294,6 @@ theorem unread_window_lt (v : VirtioState) (pm : RegMapF PermVal) (dl : List Use
       (by show nr < (dl[q]'hq2).1; rw [hc.1 q hq2]; omega) he
     have hthis : p + 1 = q + 1 := by rw [← hc.1 p hp2, ← hc.1 q hq2]; exact hx
     omega
-
-/-- **The entry at a counter.**  With strict counters, an index into the
-log IS its counter minus one. -/
-theorem cntOk_mem (pm : RegMapF PermVal) (dl : List UsedRec) (nc k : Nat)
-    (h : cntOk pm dl nc) (hk : k < dl.length) : ((k + 1, (dl[k]'hk).2) : UsedRec) ∈ dl := by
-  have he : ((k + 1, (dl[k]'hk).2) : UsedRec) = dl[k]'hk := by
-    rw [← h.1 k hk]
-  rw [he]
-  exact List.getElem_mem hk
 
 theorem pushedUniq_none (v : VirtioState) (h : noInflight v) : pushedUniq v := by
   intro hh hh' r r' hp _
@@ -2887,10 +2594,6 @@ install -- whose permit has installed nothing, and so knows the phase
 only through `Xv6.permOk`'s `.popped` clause -- know that the byte is
 still the invariant's. -/
 
-/-- The address of sector `i` of a buffer. -/
-def sectorAddr (base : PAddr) (i : Nat) : PAddr :=
-  base + BitVec.ofNat 64 (Virtio.sectorSize * i)
-
 /-- A READ chain's data buffer BEFORE the fill: the whole window at full
 ownership, content UNCONSTRAINED.  What the device leaves in it is the
 chain's payload, and from the fill on the row keeps it at that value
@@ -3061,18 +2764,9 @@ theorem statusRes_own (γ : DiskNames) (c : Chain) (b : SByte) (hb : b ≠ .lent
     iframe Hq
     iapply bufDone_dmaOwn c ts $$ Hbuf
 
-/-- **Two full footprints over one byte are one too many**: what says a
-slot whose byte the serving task holds is `.lent` in the invariant. -/
-theorem dmaOwn_excl1 (pa : PAddr) : dmaOwn (GF := GF) pa 1 ∗ dmaOwn pa 1 ⊢ False := by
-  unfold dmaOwn
-  iintro ⟨⟨%Hs, H1⟩, ⟨%Hs', H2⟩⟩
-  ihave H1 := histBytes_one_l pa (DFrac.own 1) Hs $$ H1
-  ihave H2 := histBytes_one_l pa (DFrac.own 1) Hs' $$ H2
-  icases pointsTo_ne (L := PAddr) (V := Hist) (H := MemF) $$ H1 H2 with %hne
-  exact absurd rfl hne
-
-/-- **Two full footprints over one WINDOW are one too many**, at any
-nonzero width: the width-generic `Xv6.dmaOwn_excl1`. -/
+/-- One byte's full history out of a full footprint, at any nonzero width:
+what makes two full footprints over one WINDOW one too many
+(`Xv6.dmaOwn_excl`). -/
 theorem dmaOwn_byte0 (pa : PAddr) (n : Nat) (hn : 0 < n) :
     dmaOwn (GF := GF) pa n ⊢ ∃ H : Hist, pa ↦ₕ{DFrac.own 1} H := by
   unfold dmaOwn histBytes
@@ -3090,27 +2784,6 @@ theorem dmaOwn_excl (pa : PAddr) (n : Nat) (hn : 0 < n) :
   icases dmaOwn_byte0 pa n hn $$ H2 with ⟨%Hb, H2⟩
   icases pointsTo_ne (L := PAddr) (V := Hist) (H := MemF) $$ H1 H2 with %hne
   exact absurd rfl hne
-
-/-- The status byte of an armed slot is the invariant's unless the slot
-says `.lent`. -/
-theorem statusRes_not_lent (γ : DiskNames) (c : Chain) (b : SByte) :
-    statusRes (GF := GF) γ (.active c) b ∗ dmaOwn c.status 1 ⊢ ⌜b = SByte.lent⌝ := by
-  cases b with
-  | lent => iintro _; ipureintro; rfl
-  | free =>
-    rw [statusRes_free]
-    iintro ⟨⟨H1, _, _⟩, H2⟩
-    iapply false_elim
-    iapply dmaOwn_excl1 c.status
-    iframe H1 H2
-  | done ts =>
-    rw [statusRes_done]
-    iintro ⟨⟨H1, _, _⟩, H2⟩
-    iapply false_elim
-    iapply dmaOwn_excl1 c.status
-    isplitl [H1]
-    · iapply dmaOwnT_dmaOwn c.status 1 0#8 ts $$ H1
-    · iexact H2
 
 /-- **The eight status rows, at the live flip**: every slot is free, so
 the invariant holds nothing. -/
@@ -3203,12 +2876,6 @@ def sbAt (op : Option VPhase) (b : SByte) : Prop :=
 def sbOk (v : VirtioState) (sb : Nat → SByte) : Prop :=
   ∀ h : BitVec 16, sbAt (Virtio.phase v h) (sb h.toNat)
 
-/-- A head that is NOT in flight keeps its byte in the invariant. -/
-theorem sbAt_none (b : SByte) (hb : b ≠ SByte.lent) : sbAt none b := by
-  refine ⟨⟨fun he => absurd he hb, fun hx => ?_⟩, fun r hr => ?_⟩
-  · obtain ⟨r, hr | hr⟩ := hx <;> exact absurd hr (by simp)
-  · rcases hr with hr | hr <;> exact absurd hr (by simp)
-
 theorem sbAt_notLent (op : Option VPhase) (b : SByte) (h : sbAt op b)
     (hnf : ∀ r : VioReq, op ≠ some (.fetched r))
     (hno : ∀ r : VioReq, op ≠ some (.served r)) : b ≠ SByte.lent := by
@@ -3237,10 +2904,6 @@ def unreadArmed (v : VirtioState) (st : Nat → HState) (dl : List UsedRec) (nr 
     (∃ c : Chain, st r.hd = HState.active c ∧ c.ep = r.ep) ∧
     (∀ p, lo ≤ p → p < np → ring (p % NUM) ≠ r.hd) ∧ stg ≠ some r.hd ∧
     ∃ ts : Nat, sb r.hd = SByte.done ts ∧ ts ≤ r.pos
-
-theorem unreadArmed_sb (v : VirtioState) (st : Nat → HState) (dl : List UsedRec) (nr : Nat)
-    (ring : Nat → Nat) (lo np : Nat) (stg : Option Nat) (sb : Nat → SByte)
-    (h : unreadArmed v st dl nr ring lo np stg sb) : sbOk v sb := h.1
 
 /-- Sixteen bits identify a head. -/
 theorem head_toNat_inj (a b : BitVec 16) (h : a.toNat = b.toNat) : a = b := by
@@ -3621,9 +3284,6 @@ theorem epDone_done (v : VirtioState) (st : Nat → HState)
 theorem epLt_mono (dl : List UsedRec) (lo lo' : Nat) (h : epLt dl lo) (hle : lo ≤ lo') :
     epLt dl lo' := fun r hr => Nat.lt_of_lt_of_le (h r hr) hle
 
-theorem epPerm_mono (pm : RegMapF PermVal) (lo lo' : Nat) (h : epPerm pm lo) (hle : lo ≤ lo') :
-    epPerm pm lo' := fun k hh c p u hg => Nat.lt_of_lt_of_le (h k hh c p u hg) hle
-
 /-- The phases do not move: the clause travels. -/
 theorem epDone_congr (v v' : VirtioState) (st : Nat → HState)
     (dl : List UsedRec) (hph : ∀ h : BitVec 16, Virtio.phase v' h = Virtio.phase v h)
@@ -3782,22 +3442,6 @@ theorem epOk_write_complete (v : VirtioState) (st : Nat → HState) (pm : RegMap
     · have hre : r = ((nc, t, hd.toNat, c.ep) : UsedRec) := by simpa using hr
       have hre' : r' = ((nc, t, hd.toNat, c.ep) : UsedRec) := by simpa using hr'
       rw [hre, hre']
-
-/-- **Dropping a permit that is not the witness** (a task that stalls, or
-hands its permit back before its write). -/
-theorem epOk_drop (v : VirtioState) (st : Nat → HState) (pm : RegMapF PermVal)
-    (dl : List UsedRec) (ring : Nat → Nat) (lo np : Nat) (stg : Option Nat)
-    (key : Nat) (x0 : PermVal) (hget : PartialMap.get? pm key = some x0) (hnw : ¬ isWit x0)
-    (h : epOk v st pm dl ring lo np stg) :
-    epOk v st (PartialMap.delete pm key) dl ring lo np stg := by
-  obtain ⟨hpend, hlow, hperm, hdone, hinj⟩ := h
-  refine ⟨hpend, hlow, ?_, fun hh cc hsc hs r hr hrh => ?_, hinj⟩
-  · intro k' hh cc p u hg
-    have hk : key ≠ k' := by
-      intro he; rw [get?_delete_eq he] at hg; exact absurd hg (by simp)
-    rw [get?_delete_ne hk] at hg
-    exact hperm k' hh cc p u hg
-  · exact hdone hh cc hsc hs r hr hrh
 
 /-! ## The leases -/
 
@@ -4230,7 +3874,6 @@ theorem headRes_blkInj (γ : DiskNames) (pd : PAddr) (st : Nat → HState) :
     ihave %hne := headRes_blk_ne γ pd st i j c c' hi hj hij h1 h2 $$ H
     exact (hne hblk).elim
 
-
 /-! ## The invariant -/
 
 /-- The coupling of the image ghost to the model: a block the driver holds
@@ -4256,7 +3899,6 @@ theorem imgOk_read_blk (v : VirtioState) (m : RegMapF (List (BitVec 8)))
     · exact absurd hblk (hinj j i c' c hj hi hij hstj hst)
   · exact he
 
-
 /-- **The cache is DRY under a `.pushed` WRITE.**
 `MachCSL.Virtio.completeOk` tests `MachCSL.Virtio.reqCached` at the
 `.pushed` INSTALL -- two machine steps before the used-index write that
@@ -4275,8 +3917,8 @@ hence disjoint sectors.  A DRAIN only removes cache entries, and
 `Virtio.complete` takes the `.pushed` head out of flight altogether.
 
 `Xv6.diskLive` still carries it, and it is still the write-through gate's
-own statement; what CASHES it is no longer the collect, which since
-`Xv6.cachedOk` retired has no cache obligation at all, but the record of
+own statement; what CASHES it is not the collect, which has no cache
+obligation at all, but the record of
 what `MachCSL.Virtio.completeOk` guarantees at the `.pushed` install. -/
 def dryOk (v : VirtioState) : Prop :=
   ∀ (h : BitVec 16) (r : VioReq), Virtio.phase v h = some (.pushed r) →
@@ -4447,17 +4089,6 @@ theorem capOk_congr (v v' : VirtioState) (st : Nat → HState) (sb : Nat → SBy
   · exact Or.inl ⟨ph, by rw [← hph]; exact hp, hpc⟩
   · exact Or.inr hx
 
-/-- The clause travels through the rows alone, when the state does not
-move at all. -/
-theorem capOk_sb (v : VirtioState) (st : Nat → HState) (sb sb' : Nat → SByte)
-    (hsb : ∀ i ts, sb' i = SByte.done ts → ∃ ts', sb i = SByte.done ts')
-    (h : capOk v st sb) : capOk v st sb' := by
-  intro i c hi hst hdw hx
-  refine h i c hi hst hdw ?_
-  rcases hx with hx | ⟨ts, hts⟩
-  · exact Or.inl hx
-  · exact Or.inr (hsb i ts hts)
-
 /-- **A phase install, with the row it moves.**  The obligation is the
 clause's own conclusion, and it is empty unless the install is the one
 that ENTERS the post-capture world (`Xv6.postCap`) or sets the row to
@@ -4504,19 +4135,6 @@ theorem capOk_complete (v : VirtioState) (st : Nat → HState) (sb : Nat → SBy
         rw [← Xv6.phase_complete_other' v hd (BitVec.ofNat 16 i) (ofNat16_ne i hd hi hid)]
         exact hp, hpc⟩
     · exact Or.inr hx
-
-/-- A slot that is `.inactive` is invisible to the clause. -/
-theorem capOk_free (v : VirtioState) (st : Nat → HState) (sb : Nat → SByte) (i : Nat)
-    (h : capOk v st sb) (b : SByte) :
-    capOk v (fun j => if j = i then HState.inactive else st j) (updS sb i b) := by
-  intro j c hj hst hdw hx
-  by_cases hji : j = i
-  · rw [hji] at hst; simp only [if_pos rfl] at hst; exact absurd hst (by simp)
-  · simp only [hji, if_false] at hst
-    refine h j c hj hst hdw ?_
-    rcases hx with hx | ⟨ts, hts⟩
-    · exact Or.inl hx
-    · exact Or.inr ⟨ts, by rw [← updS_ne sb i b j hji]; exact hts⟩
 
 /-- **The pop** installs `Xv6.VPhase.popped`, which is before the data
 phase, and moves no row. -/
@@ -5010,13 +4628,6 @@ theorem claimResD_claimRes (γ : DiskNames) (ξ : CtxId) (pd : PAddr) (c : Chain
   iexists d
   iframe Hd Hdn
 
-theorem claimRes_claimResD (γ : DiskNames) (ξ : CtxId) (pd : PAddr) (c : Chain) :
-    claimRes (GF := GF) γ ξ pd c ⊢ ∃ d : BitVec 32, claimResD γ ξ pd c d ∗ claimDone γ c d := by
-  unfold claimResD claimRes
-  iintro ⟨H0, H1, H2, H3, Hb, %d, Hd, #Hdn⟩
-  iexists d
-  iframe H0 H1 H2 H3 Hb Hd Hdn
-
 /-- **`b->disk`, borrowed out of the claim and given back at `0`**: the
 handler's `b->disk = 0` before `wakeup(b)`.  The row comes back only with
 the READ EVIDENCE beside it, which is what the handler earns two steps
@@ -5052,7 +4663,7 @@ whole driver half -- nobody else holds a piece of it -- and an IN-FLIGHT
 slot's QUARTER: the publisher of the chain keeps the other quarter from
 `Xv6.disk_publish` to `Xv6.disk_collect`, across its park inside `sleep`,
 and agreement with it is what tells the woken publisher that the slot it
-is about to collect is still ITS chain (`Xv6.diskRes_slot_of_quarter`).
+is about to collect is still ITS chain.
 
 A member's quarter travels with the head's: `disk_collect` re-assembles
 all three driver halves out of the payload's quarters and its own. -/
@@ -5085,14 +4696,6 @@ instance slotTok_timeless (γ : DiskNames) (i : Nat) (s : HState) :
   | active c => show Timeless (headTokQ (GF := GF) γ i (.active c)); infer_instance
   | member h => show Timeless (headTokQ (GF := GF) γ i (.member h)); infer_instance
 
-/-- The payload's receipt agrees with any other fragment. -/
-theorem slotTok_agree (γ : DiskNames) (q : Qp) (i : Nat) (s s' : HState) :
-    slotTok (GF := GF) γ i s ∗ headTokF γ q i s' ⊢ ⌜s = s'⌝ := by
-  cases s with
-  | inactive => exact headTokF_agree γ _ q i _ s'
-  | active c => exact headTokF_agree γ _ q i _ s'
-  | member h => exact headTokF_agree γ _ q i _ s'
-
 /-- **The payload's receipt and an outside QUARTER agree and join.**  The
 whole point of the split: the woken publisher's quarter pins the slot's
 state, and the two pieces make the driver's half the collect must own to
@@ -5115,7 +4718,6 @@ theorem slotTok_quarter_join (γ : DiskNames) (i : Nat) (s s' : HState) :
   | member h =>
     rw [slotTok_member]
     exact headTokQ_join' γ i (.member h) s'
-
 
 def slotRes (γ : DiskNames) (ξ : CtxId) (pd : PAddr) (i : Nat) : IProp GF := iprop%
   ∃ s : HState, slotTok γ i s ∗ slotBody γ ξ pd i s
@@ -5168,9 +4770,6 @@ instance instCtxMorphPayFl (nr T : Nat) : CtxMorph (GF := GF) (fun ξ => diskPay
 
 theorem diskPayFl_zero (ξ : CtxId) (T : Nat) :
     diskPayFl (GF := GF) 0 ξ T = keyAt (MachGS.era (hlc := hlc) (GF := GF)) ξ T := rfl
-
-theorem diskPayFl_succ (n : Nat) (ξ : CtxId) (T : Nat) :
-    diskPayFl (GF := GF) (n + 1) ξ T = ctxFloor ξ T := rfl
 
 /-- A floor is a key. -/
 theorem diskPayFl_key (nr : Nat) (ξ : CtxId) (T : Nat) :
@@ -5226,23 +4825,6 @@ theorem diskPayWm_zero (γ : DiskNames) (ξ : CtxId) (b : Nat) :
   · iapply diskWm_zero γ b b (Nat.le_refl b)
     iexact Hb
   · rw [diskPayFl_zero]; iexact Hfl
-
-theorem diskPayWm_mono (γ : DiskNames) (ξ : CtxId) (n n' : Nat) (h : n' ≤ n) :
-    diskPayWm (GF := GF) γ n ξ ⊢ diskPayWm γ n' ξ := by
-  unfold diskPayWm
-  iintro ⟨%T, #Hw, #Hfl⟩
-  iexists T
-  isplitl []
-  · iapply diskWm_mono γ n n' T T h (Nat.le_refl T)
-    iexact Hw
-  · cases n' with
-    | zero =>
-      rw [diskPayFl_zero]
-      iapply diskPayFl_key n ξ T $$ Hfl
-    | succ m' =>
-      obtain ⟨m, rfl⟩ : ∃ m, n = m + 1 := ⟨n - 1, by omega⟩
-      rw [diskPayFl_succ, diskPayFl_succ] at *
-      iexact Hfl
 
 /-- **The payload of `disk.vdisk_lock`** (Rocq's `disk_res`): the
 publisher's and the handler's halves of the counters (the watermark

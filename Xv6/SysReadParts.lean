@@ -18,13 +18,8 @@ epilogue at `+0x40`.
   (the error return is hoisted).
 -/
 import Xv6.ArgLemmas
-import MachCSL.WpSmodeFrame6
 import MachCSL.StackOwnBounds
 import Xv6.SpecFileread
-import Xv6.CopyLemmas
-import Xv6.ReadiDefs
-import Xv6.SysFstatParts
-import MachCSL.BvLemmas
 
 namespace Xv6
 
@@ -33,14 +28,12 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## Constants -/
 
-theorem srd_br_argaddr : KA.«sys_read» + 0xffffffffffffda9e#64 = KA.«argaddr» := by decide
-theorem srd_br_argint : KA.«sys_read» + 0xffffffffffffda82#64 = KA.«argint» := by decide
+theorem srd_br_argaddr : KA.«sys_read» + 0xffffffffffffda3e#64 = KA.«argaddr» := by decide
+theorem srd_br_argint : KA.«sys_read» + 0xffffffffffffda22#64 = KA.«argint» := by decide
 theorem srd_br_argfd : KA.«sys_read» + 0xfffffffffffffdb6#64 = KA.«argfd» := by decide
 theorem srd_br_fileread : KA.«sys_read» + 0xfffffffffffff4ea#64 = KA.«fileread» := by decide
 

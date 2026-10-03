@@ -128,8 +128,7 @@ current values and the cells hold junk until saved.
    stage needs are stated here at the Lean shapes (`sys_open_bltz_*`,
    `Xv6.dirlookup_beqz`, `sys_open_ty_*`, `sys_open_omode_eqz`,
    `sys_open_wr_rdonly`), the byte readings are `SysOpenBits`'
-   `sys_open_rd_byte` / `sys_open_wr_byte`, the major test
-   `sys_open_major_bound` / `_bltu`.
+   `sys_open_rd_byte` / `sys_open_wr_byte`.
 9. `so_word_half_join` / `so_ip_split` (the `f->ip` cell's halves) are not
    needed: Lean's `fileFieldsAt` holds `f->ip` WHOLE at fraction one.
    `flive_tok` has no Lean counterpart (FileDefs deviation 2).
@@ -159,23 +158,14 @@ Imports only definitional files, callee Specs and the landed stage pure
 leaves (`SysOpenBits`, `SysOpenBudget`).
 -/
 import Xv6.SpecSysOpen
-import Xv6.SysOpenBits
-import Xv6.KstackMap
 import Xv6.FileFrac
-import Xv6.SpecArgstr
-import Xv6.SpecArgint
 import Xv6.SpecIunlock
-import Xv6.SpecIunlockput
 import Xv6.SpecFileclose
 import Xv6.SpecIlock
 import Xv6.SpecNamei
-import Xv6.DirlookupParts
 import Xv6.KexecParts
 import Xv6.PrintkDefs
-import Xv6.SysChdirFrame
-import Xv6.SysMknodFrame
 import Xv6.SysfileCalls
-import MachCSL.BvLemmas
 import Xv6.SpecFdalloc
 
 namespace Xv6
@@ -185,12 +175,9 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## §0.  Constants, the stack budget and the branch readings -/
-
 
 /-- `char path[MAXPATH]`: `s0 - 176` off the frame pointer (= the entry sp),
 slots 7..22 (Rocq `so_bufpath`). -/
@@ -198,14 +185,6 @@ def sysOpenPath (sp0 : BitVec 64) : BitVec 64 := sp0 + 0xFFFFFFFFFFFFFF50#64
 
 /-- `int omode`: `s0 - 180`, the UPPER word of slot 23 (Rocq `so_omode`). -/
 def sysOpenOmode (sp0 : BitVec 64) : BitVec 64 := sp0 + 0xFFFFFFFFFFFFFF4C#64
-
-theorem sys_open_path_addr (x : BitVec 64) :
-    x + BitVec.signExtend 64 3920#12 = sysOpenPath x := by
-  unfold sysOpenPath; bv_decide
-
-theorem sys_open_omode_addr (x : BitVec 64) :
-    x + BitVec.signExtend 64 3916#12 = sysOpenOmode x := by
-  unfold sysOpenOmode; bv_decide
 
 theorem sysOpenSlots_24 (a : Nat) (h : sysOpenSlots ≤ a) : 24 ≤ a := by
   rw [sysOpenSlots_eq] at h; omega
@@ -234,25 +213,18 @@ theorem sys_open_K (a : Nat) (h : sysOpenSlots ≤ a) :
   rw [sysOpenSlots_eq] at h
   omega
 
-
 /-! ### The sign cluster: the two `bltz`s (+0x24 argstr, +0x70 fdalloc) -/
-
 
 /-- The descriptor fdalloc returns is signed-nonneg (Rocq `so_fd_range`). -/
 theorem sys_open_bltz_fd (fd : Nat) (h : fd < NOFILE) :
     bcond bop.BLT (BitVec.ofNat 64 fd) 0#64 = false :=
   Xv6.sysfile_bltz_nat fd (by unfold NOFILE at h; omega)
 
-
 /-! ### The sixteen-bit compare cluster: the three type tests
 
 ALL are `beq`/`bne` against a sign-extended `lh` of `ip->type` and a `li`
 literal: T_DIR = 1 (+0xf2), T_FILE = 2 (+0xb4), T_DEVICE = 3 (+0x50, +0x7a)
 (Rocq `so_sext16_inj` / `so_sext_lit` / `so_ty_eq` / `so_ty_ne`). -/
-
-/-- `lh` of the type, against `li a5,1` (T_DIR). -/
-theorem sys_open_ty_dir (t : BitVec 16) : BitVec.signExtend 64 t = 1#64 ↔ t = 1#16 := by
-  bv_decide
 
 /-- ...against `li a5,2` (T_FILE). -/
 theorem sys_open_ty_file (t : BitVec 16) : BitVec.signExtend 64 t = 2#64 ↔ t = 2#16 := by
@@ -495,27 +467,6 @@ section Trunc
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IcacheG GF]
   [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF]
 
-/-- the open direction, one unfolding (Rocq `so_loaded_open`): `icLoaded`'s
-`inodeAddrs ∗ indRes` is itrunc's `inodeMap`. -/
-theorem sys_open_loaded_open [Icfg] [CurCtx] (γfs : FsNames) (γi : GName)
-    (cov : Std.ExtTreeSet Nat compare) (logstart k : Nat) (inum : BitVec 32) (dn : Dinode)
-    (bm : Blkmap) :
-    icLoaded (GF := GF) γfs γi cov logstart k inum dn bm ⊢
-      ∃ data : Nat → List (BitVec 8),
-        ⌜inodeOk cov logstart dn bm data⌝ ∗ ⌜inodeRecLocal dn⌝ ∗ ⌜dirOk icfgNib dn data⌝ ∗
-        dlinks γfs inum.toNat dn bm data ∗ dinodeAt γi inum dn ∗ inodeMeta (ientry k) dn ∗
-        inodeMap γfs (ientry k) bm ∗ inodeBlocks γfs bm data ∗
-        topFrag (fsGammaL γfs) inum.toNat (eraNode dn bm data) := by
-  iintro H
-  ihave H := icLoaded_open γfs γi cov logstart k inum dn bm $$ H
-  unfold icLoadedFlatBody
-  icases H with
-    ⟨%data, %hok, %hrl, %hdir, -, -, -, Hl, Hd, Hm, Ha, Hr, Hb, Ht⟩
-  iexists data
-  unfold inodeMap
-  iframe Hl Hd Hm Ha Hr Hb Ht
-  ipureintro; exact ⟨hok, hrl, hdir⟩
-
 /-- ...and the close direction at itrunc's outputs (Rocq
 `so_trunc_loaded`). -/
 theorem sys_open_trunc_loaded [Icfg] [CurCtx] (γfs : FsNames) (γi : GName)
@@ -555,7 +506,6 @@ variable {lent : Bool}
 /-- A buffer of `n` bytes at `a`, contents unknown. -/
 def sysOpenAny [CurCtx] (a : BitVec 64) (n : Nat) : IProp GF :=
   iprop(∃ bs : List (BitVec 8), ⌜bs.length = n⌝ ∗ byteBuf a (DFrac.own 1) bs)
-
 
 /-- sys_open's cells: the six upper slots (ra, s0, the three shrink-wrapped
 save slots, a dead one), slot 23 as its two words (the dead lower word and
@@ -656,7 +606,6 @@ theorem sys_open_fold [CurCtx] (sp0 : BitVec 64) (hal : (sysOpenPath sp0).toNat 
   ihave H6s : stackOwn (GF := GF) sp0 6 $$ [H1 H2 H3 H4 H5 H6]
   case' _ => stack_cells; iframe
   iapply stackOwn_join sp0 6 18 $$ [$H6s $H18]
-
 
 set_option maxHeartbeats 4000000 in
 /-- sys_open's prologue `+0x00 .. +0x06` at `pc`, at either `SIE` (Rocq's
@@ -814,7 +763,6 @@ theorem sysOpenPins_exit (k : KCtx) (R : RegMap)
 
 /-! ### The ambient context, pinned at the kernel tier -/
 
-
 section Exit
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
 
@@ -930,8 +878,7 @@ abbrev sysOpenOm {GF : BundledGFunctors} (A : SysOpenArgs GF) : BitVec 32 := Bit
 
 /-- THE IMAGE THE PATH IS READ AT (Rocq's `us_M U` at entry): the entry view
 with every lazy page read as zeros (`UMemLazy.viewLazy`), which is where
-argstr reads its string.  `A.M` itself when the block has no lazy page
-(`UMemL.viewLazy_of_lazyFree`). -/
+argstr reads its string.  `A.M` itself when the block has no lazy page. -/
 abbrev sysOpenIm {GF : BundledGFunctors} (A : SysOpenArgs GF) : Nat → List (BitVec 8) := viewLazy A.V.upt A.V.sz A.M
 
 section Vocab
@@ -955,7 +902,7 @@ instance sysOpenEnv_persistent (Γ : SchedNames) (A : SysOpenArgs GF) :
 `openArmsPlain`; deviation 3). -/
 abbrev sysOpenPostP (k : KCtx) (A : SysOpenArgs GF) (c : CPU) : IProp GF :=
   sysOpenK (hlc := hlc) k A.ns A.V A.M
-    (openArmsPlain (hlc := hlc) A.omo (fsGammaL fscFs) fscFs A.V.cwi A.γ (procAddr A.j) A.pid
+    (openArmsPlain (hlc := hlc) A.omo (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.γ (procAddr A.j) A.pid
       (sysOpenIm A) A.v.toNat A.vom A.P A.Pmiss A.Fo A.Ft A.sts) c
 
 /-- ...and at the CREATE arms (Rocq's `so_cont0_au_create`). -/
@@ -963,7 +910,7 @@ abbrev sysOpenPostC (k : KCtx) (A : SysOpenArgs GF)
     (Farm Fun : Pfam GF (Aview → Nat → IProp GF))
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) (c : CPU) : IProp GF :=
   sysOpenK (hlc := hlc) k A.ns A.V A.M
-    (openArmsCreate (hlc := hlc) A.omo (fsGammaL fscFs) fscFs A.V.cwi A.γ (procAddr A.j) A.pid
+    (openArmsCreate (hlc := hlc) A.omo (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.γ (procAddr A.j) A.pid
       (sysOpenIm A) A.v.toNat A.vom A.P A.Pmiss Farm Fun Fok Fex A.Fo A.Ft A.sts) c
 
 /-- The contract's `wpNext` continuation, HART-FREE (a `true` crossing at a
@@ -975,19 +922,6 @@ theorem sys_open_post_pin (k : KCtx) (A : SysOpenArgs GF) (hS : SysOpenStatic k 
   iintro H %c
   iapply (wpNext_at true k.proc cpu c _ (fun h => h.elim (fun h => absurd h (by decide))
     (fun h => absurd h (by rw [hS.hproc]; exact procAddr_nonzero hS.hj)))) $$ H
-
-/-- THE CONTINUATION IS MONOTONE IN ITS ARMS: what `SysOpenCreArm`'s shim
-needs (the create entry reaches the plain-arm bodies at the shim's families
-and converts their arms back into the create arms). -/
-theorem sysOpenK_mono (k : KCtx) (ns : Nat) (V : ProcPriv) (M : Nat → List (BitVec 8))
-    (ARMS ARMS' : ProcPriv → (Nat → List (BitVec 8)) → BitVec 64 → IProp GF) (c : CPU) :
-    sysOpenK (hlc := hlc) k ns V M ARMS c ⊢
-      (∀ (VW : ProcPriv) (MW : Nat → List (BitVec 8)) (r : BitVec 64), ARMS' VW MW r -∗ ARMS VW MW r) -∗
-      sysOpenK (hlc := hlc) k ns V M ARMS' c := by
-  unfold sysOpenK
-  iintro H Hw %spie %spp %R' %P' %k' %hcs %hext %hk' Hk Hpc Hte Hce Hbs Hir Harms
-  ihave Harms := Hw $$ %_ %_ %_ Harms
-  iapply H $$ %spie %spp %R' %P' %k' %hcs %hext %hk' Hk Hpc Hte Hce Hbs Hir Harms
 
 /-- THE CONTINUATION AT A RAISED COUNT (permit sweep L1b, Rocq's `UA` in
 `ProofSysOpen`): argstr hands the block back at `V.updEv kv`, and the rest
@@ -1024,7 +958,6 @@ def sysOpenRet (k : KCtx) (Φ : BitVec 64 → IProp GF) : IProp GF :=
   iprop(∀ (c : CPU) (spie spp : Bool) (R' : RegMap), ⌜calleeSaved k.regs R'⌝ -∗
     kctx c ((k.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k.regs 1#5)) -∗
     trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗ Φ (R' 10#5) -∗ wpLoop c)
-
 
 /-- ...and the same out of the block's core (after fdalloc split it off
 the descriptor array). -/
@@ -1182,7 +1115,6 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
-
 
 set_option maxHeartbeats 8000000 in
 /-- `argstr(0, path, MAXPATH)` at +0x1c (Rocq `Argstr.wp_argstr_sconf`):
@@ -1588,7 +1520,7 @@ def sysOpenEntryNBody (Γ : SchedNames) (k : KCtx) (A : SysOpenArgs GF) : IProp 
     logOpS icfgLog MAXOPBLOCKS Sb -∗ logTx icfgLog -∗
     bslots 3 -∗ irefSlots A.ns -∗ fdSlot -∗ fdFrags A.V.fdg A.sts -∗
     -- THE AU BUNDLE, at the string argstr fetched
-    exStart (hlc := hlc) fscFs A.V.cwi A.P A.Pmiss (bview plen bp) -∗
+    exStart (hlc := hlc) fscFs A.V.rti A.V.cwi A.P A.Pmiss (bview plen bp) -∗
     pfAt (aopenCommitAt (hlc := hlc) (fsGammaL fscFs) appE) A.Fo -∗
     -- the truncate's permit is the walk's terminal cursor (Rocq TRUNC-PERMIT)
     openTruncPiece (hlc := hlc) (fsGammaL fscFs) A.vom (truncTermAt (bview plen bp) A.P) A.Ft -∗
@@ -1617,7 +1549,7 @@ def sysOpenEntryCBody (Γ : SchedNames) (k : KCtx) (A : SysOpenArgs GF)
     logOpS icfgLog MAXOPBLOCKS Sb -∗ logTx icfgLog -∗
     bslots 3 -∗ irefSlots A.ns -∗ fdSlot -∗ fdFrags A.V.fdg A.sts -∗
     -- THE AU BUNDLE (the contract's O_CREATE side), at the fetched string
-    epStart (hlc := hlc) fscFs A.V.cwi A.P A.Pmiss (bview plen bp) -∗
+    epStart (hlc := hlc) fscFs A.V.rti A.V.cwi A.P A.Pmiss (bview plen bp) -∗
     pfAt (acreCommitAtNm (hlc := hlc) (fsGammaL fscFs) appE (.AFile []) (nparNm (sysOpenIm A) A.v.toNat)
       (A.P (nparElems (bview plen bp)).length) Farm) Fok -∗
     pfAt (dlookupCommitAt (hlc := hlc) (fsGammaL fscFs) appE) Fex -∗

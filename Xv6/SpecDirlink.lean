@@ -73,7 +73,7 @@ at `+0x90 .. +0x96` (`addi a0,a0,-16; snez a0,a0; negw a0,a0`), i.e.
    `SIE`, and is what the interface proves.  Depth 0 implies no spinlock
    held (`KCtx.wf`), Lean's reading of Rocq's `locks_below lks "log"`.  The
    crossing is the literal `true` (as Rocq).  The `sie = false` body is kept
-   as a DERIVED instance (`DIRLINK.wp_dirlink_gen`).
+   (`wp_dirlink_gen_body`).
 2. THE AMBIENT NAMES are the `Fscfg`/`Icfg` fields; the kalloc environment
    (`kalloc_env fsc_kalloc None`) is `isLock γkl kmemLockAddr "kmem"
    (kmemRes γk) ∗ kallocAvail γk none` with `γkl`/`γk` parameters (as
@@ -86,8 +86,15 @@ at `+0x90 .. +0x96` (`addi a0,a0,-16; snez a0,a0; negw a0,a0`), i.e.
    (SpecIput deviation 2); `ireg_blocks_ok` is `iregBlocksOk` (InodeInv).
 4. THE NAME BUFFER is `byteBuf nb dqn (bview 14 fn)` (SpecDirlookup
    deviation 3); `proc_priv_bare pj pidv Upr` is the pid cell
-   `wordPointsTo (pPid k.proc) 4 dqp pidv`; `tid ↪[ln_tx icfg_log]{#qtx} ()`
-   is `txPin icfgLog tid qtx`; `IcacheEscrow.dlinks` is `dlinks`.
+   `wordPointsTo (pPid k.proc) 4 dqp pidv`, and Rocq's whole process block
+   (which dirlink reads only for `p->root`) is the inner lookup's two rows
+   `wordPointsTo (pRoot k.proc) 8 dqr rootv ∗ inodeHeldAt rootv rti`
+   (SpecDirlookup's spelling), lent beside dp's share `inodeShr kd sd
+   icfgDev dinum ∗ runitAny dinum.toNat` with `ip = ientry kd`; `tid
+   ↪[ln_tx icfg_log]{#qtx} ()` is `txPin icfgLog tid qtx`;
+   `IcacheEscrow.dlinks` is `dlinks`.  The found arm's disjunct `dlSelf
+   (bname 14 fn) dinum rti` is the inner lookup's SELF arm (design/chroot.md
+   §2, §8).
 5. `a2 = zero_extend' 64 inum` is `k.regs 12#5 = BitVec.setWidth 64 inum`.
 6. THE PURE POSTCONDITION IS ONE NAMED STRUCTURE (`Xv6.DirlinkOut`, one
    field per Rocq conjunct, in Rocq's order; SpecWritei deviation 6).  The
@@ -127,9 +134,6 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedVariables false
-set_option linter.unusedSectionVars false
-
 /-- Address of `dirlink`. -/
 def dirlinkAddr : BitVec 64 := KA.«dirlink»
 
@@ -146,10 +150,6 @@ def dirlinkUnits : Nat := 7
 
 /-! ## What a dirlink spends, and what it needs (Rocq's, moved out of
 `CreateBudget` because the contract exposes the figures) -/
-
-/-- Rocq's `dl_spend`: IS `wi16Spend` (dirlink's one writei is the
-sixteen-byte window; dirlookup, readi and the scan log nothing). -/
-def dlSpend (crb crd cru al ind : Bool) : Nat := wi16Spend crb crd cru al ind
 
 /-- Rocq's `dl_need`: the append's `wi16Need` or the found arm's
 `iputUnits`, whichever is larger. -/
@@ -172,32 +172,9 @@ theorem dlNeed_iput (crb ind : Bool) : iputUnits ≤ dlNeed crb ind := by
 theorem dlNeed_wi (crb ind : Bool) : 4 ≤ dlNeed crb ind := by
   cases crb <;> cases ind <;> decide
 
-/-- Rocq's `dl_need_crb`: the need FALLS when the bitmap block is logged. -/
-theorem dlNeed_crb (crb ind : Bool) : dlNeed crb ind ≤ dlNeed false ind := by
-  cases crb <;> cases ind <;> decide
-
-/-- Rocq's `dl_need_ind`: ...and RISES through the indirect block. -/
-theorem dlNeed_ind (crb ind : Bool) : dlNeed crb ind ≤ dlNeed crb true := by
-  cases crb <;> cases ind <;> decide
-
 /-- Rocq's `dl0_spend`: the coarse constant for a FAILING append (see
 Rocq's header: kept for `CreateBudget`, which is stated at it). -/
 def dl0Spend : Nat := 4
-
-/-- Rocq's `dl0_spend_bmonly`: it IS writei's allowance for one block. -/
-theorem dl0Spend_bmonly : dl0Spend = wiCostBmonly 0 16 := rfl
-
-/-- Rocq's `dl0_spend_covers`. -/
-theorem dl0Spend_covers (crb crd cru al ind : Bool) :
-    wi16Spend crb crd cru al ind ≤ dl0Spend := wi16Spend_le4 crb crd cru al ind
-
-/-- Rocq's `dl0_of_spend`. -/
-theorem dl0_of_spend (ncount n' : Nat) (crb crd cru al ind : Bool) :
-    ncount - wi16Spend crb crd cru al ind ≤ n' → ncount - dl0Spend ≤ n' := by
-  have := dl0Spend_covers crb crd cru al ind; omega
-
-/-- Rocq's `dl0_spend_lt`. -/
-theorem dl0Spend_lt : dl0Spend < dirlinkUnits := by decide
 
 /-- **THE SIXTEEN-BYTE SEAM AT dirlink's OWN WINDOW** (Rocq's `dl16_post`):
 guarded by the APPEND arm alone; the credit-aware spend UNGUARDED (writei's
@@ -218,7 +195,7 @@ def dl16Post (bmapstart : Nat) (dinum : BitVec 32) (inodestart : Nat)
 `wp_dirlink_gen_body`'s continuation, in Rocq's order.  `k0` is the append
 slot `dirSlot data (dirNrec size)`, `s` the canonical name `bname 14 fn`. -/
 structure DirlinkOut [Fscfg] [Icfg] (bm : Blkmap) (data : Nat → List (BitVec 8))
-    (dn dn0 : Dinode) (fn : Nat → BitVec 8) (inum : BitVec 16) (dinum : BitVec 32)
+    (dn dn0 : Dinode) (fn : Nat → BitVec 8) (inum : BitVec 16) (dinum : BitVec 32) (rti : Nat)
     (ncount : Nat) (Sb : List Nat) (a0 : BitVec 64) (found : Bool) (bm' : Blkmap)
     (data' : Nat → List (BitVec 8)) (dn' dn0' : Dinode) (n' : Nat) (Sb' : List Nat)
     (tot : Nat) : Prop where
@@ -234,9 +211,12 @@ structure DirlinkOut [Fscfg] [Icfg] (bm : Blkmap) (data : Nat → List (BitVec 8
   /-- the two `inodeOk` conjuncts a re-parker needs, as preservations -/
   cap : dn.diSize.toNat ≤ MAXFILE * BSIZE → dn'.diSize.toNat ≤ MAXFILE * BSIZE
   sized : inodeSized data → inodeSized data'
-  /-- THE TWO ARMS -/
+  /-- THE TWO ARMS.  The found arm includes the inner lookup's SELF arm
+  (chroot): `..` at the process's root, which `dirlink` refuses exactly like a
+  record hit; `sys_link` can be asked to link `..` and does no lookup first. -/
   arms : if found then
-      dirFirst data (dirNrec dn.diSize.toNat) (bname 14 fn) ≠ none ∧ a0 = -1#64 ∧
+      (dirFirst data (dirNrec dn.diSize.toNat) (bname 14 fn) ≠ none ∨
+        dlSelf (bname 14 fn) dinum rti) ∧ a0 = -1#64 ∧
         bm' = bm ∧ data' = data ∧ dn' = dn ∧ dn0' = dn0 ∧ tot = 0
     else
       dirFirst data (dirNrec dn.diSize.toNat) (bname 14 fn) = none ∧
@@ -267,6 +247,7 @@ def wp_dirlink_gen_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [X
     (dn dn0 : Dinode) (fn : Nat → BitVec 8) (inum : BitVec 16)
     (ncount : Nat) (Sb : List Nat) (tid : Nat) (qtx : Qp)
     (pidv : BitVec 32) (dqp dqd dqf dqn dqs dqbs dqb : DFrac)
+    (kd : Nat) (sd : Qp) (rootv : BitVec 64) (rti : Nat) (dqr : DFrac)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : dirlinkSlots ≤ k.avail)
     (hsie : k.sie = false) (hnoff : k.noff = 0) (hlocks : k.locks = [])
     (htier : k.tier = KTier.kpt)
@@ -295,7 +276,9 @@ def wp_dirlink_gen_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [X
     (hneed : dlNeed (decide (fscBmapstart ∈ Sb))
       (bmapInd (16 * dirSlot data (dirNrec dn.diSize.toNat) / BSIZE)) ≤ ncount)
     (hpd : descPageRw pd)
-    (ha0 : k.regs 10#5 = ip) (ha2 : k.regs 12#5 = BitVec.setWidth 64 inum) : Prop :=
+    (ha0 : k.regs 10#5 = ip) (ha2 : k.regs 12#5 = BitVec.setWidth 64 inum)
+    -- ...and dp IS slot `kd`, the slot of the share lent to the inner lookup
+    (hkd : ip = ientry kd) (hkdn : kd < NINODE) : Prop :=
   kctx cpu k ∗ pcIs cpu dirlinkAddr ∗ procsInv Γ ∗
   trapCsrs cpu ∗ cpuClaim cpu k.proc ∗ intrRes cpu ∗ panicEnv ∗
   bioCtx γl fscBio (fsView fscFs fscDisk icfgDev fscCov) ∗
@@ -317,6 +300,11 @@ def wp_dirlink_gen_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [X
   dinodeAt fscIreg dinum dn0 ∗
   -- the caller's own pid cell
   wordPointsTo (pPid k.proc) 4 dqp pidv ∗
+  -- THE INNER LOOKUP'S ROWS (chroot): a share of the caller's own reference
+  -- to dp and its unit (dirlookup's self test), the process's root cell and
+  -- its whole reference.  Lent, back verbatim.
+  inodeShr kd sd icfgDev dinum ∗ runitAny dinum.toNat ∗
+  wordPointsTo (pRoot k.proc) 8 dqr rootv ∗ inodeHeldAt rootv rti ∗
   bslots 3 ∗
   -- THE ICACHE
   isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
@@ -330,7 +318,7 @@ def wp_dirlink_gen_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [X
       (bm' : Blkmap) (data' : Nat → List (BitVec 8)) (dn' dn0' : Dinode) (n' : Nat)
       (Sb' : List Nat) (tot : Nat),
     ⌜calleeSaved k.regs R'⌝ -∗
-    ⌜DirlinkOut bm data dn dn0 fn inum dinum ncount Sb (R' 10#5) found bm' data' dn' dn0' n' Sb'
+    ⌜DirlinkOut bm data dn dn0 fn inum dinum rti ncount Sb (R' 10#5) found bm' data' dn' dn0' n' Sb'
       tot⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     trapCsrs cpu' -∗ cpuClaim cpu' k.proc -∗ intrRes cpu' -∗
@@ -342,6 +330,8 @@ def wp_dirlink_gen_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [X
     wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 fscBmapstart) -∗
     dinodeAt fscIreg dinum dn0' -∗
     wordPointsTo (pPid k.proc) 4 dqp pidv -∗
+    inodeShr kd sd icfgDev dinum -∗ runitAny dinum.toNat -∗
+    wordPointsTo (pRoot k.proc) 8 dqr rootv -∗ inodeHeldAt rootv rti -∗
     bslots 3 -∗
     -- NET ZERO on the ledger
     irefSlot -∗
@@ -366,6 +356,7 @@ def wp_dirlink_gen_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
     (dn dn0 : Dinode) (fn : Nat → BitVec 8) (inum : BitVec 16)
     (ncount : Nat) (Sb : List Nat) (tid : Nat) (qtx : Qp)
     (pidv : BitVec 32) (dqp dqd dqf dqn dqs dqbs dqb : DFrac)
+    (kd : Nat) (sd : Qp) (rootv : BitVec 64) (rti : Nat) (dqr : DFrac)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : dirlinkSlots ≤ k.avail)
     (hnoff : k.noff = 0)
     (htier : k.tier = KTier.kpt)
@@ -388,7 +379,9 @@ def wp_dirlink_gen_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
     (hneed : dlNeed (decide (fscBmapstart ∈ Sb))
       (bmapInd (16 * dirSlot data (dirNrec dn.diSize.toNat) / BSIZE)) ≤ ncount)
     (hpd : descPageRw pd)
-    (ha0 : k.regs 10#5 = ip) (ha2 : k.regs 12#5 = BitVec.setWidth 64 inum) : Prop :=
+    (ha0 : k.regs 10#5 = ip) (ha2 : k.regs 12#5 = BitVec.setWidth 64 inum)
+    -- ...and dp IS slot `kd`, the slot of the share lent to the inner lookup
+    (hkd : ip = ientry kd) (hkdn : kd < NINODE) : Prop :=
   kctx cpu k ∗ pcIs cpu dirlinkAddr ∗ procsInv Γ ∗
   trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ panicEnv ∗
   bioCtx γl fscBio (fsView fscFs fscDisk icfgDev fscCov) ∗
@@ -405,6 +398,11 @@ def wp_dirlink_gen_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
   iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗ iregOpen ∗
   dinodeAt fscIreg dinum dn0 ∗
   wordPointsTo (pPid k.proc) 4 dqp pidv ∗
+  -- THE INNER LOOKUP'S ROWS (chroot): a share of the caller's own reference
+  -- to dp and its unit (dirlookup's self test), the process's root cell and
+  -- its whole reference.  Lent, back verbatim.
+  inodeShr kd sd icfgDev dinum ∗ runitAny dinum.toNat ∗
+  wordPointsTo (pRoot k.proc) 8 dqr rootv ∗ inodeHeldAt rootv rti ∗
   bslots 3 ∗
   isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
   itableInv (hlc := hlc) ∗ icSleeplocks fscIc ∗
@@ -415,7 +413,7 @@ def wp_dirlink_gen_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
       (bm' : Blkmap) (data' : Nat → List (BitVec 8)) (dn' dn0' : Dinode) (n' : Nat)
       (Sb' : List Nat) (tot : Nat),
     ⌜calleeSaved k.regs R'⌝ -∗
-    ⌜DirlinkOut bm data dn dn0 fn inum dinum ncount Sb (R' 10#5) found bm' data' dn' dn0' n' Sb'
+    ⌜DirlinkOut bm data dn dn0 fn inum dinum rti ncount Sb (R' 10#5) found bm' data' dn' dn0' n' Sb'
       tot⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
@@ -427,6 +425,8 @@ def wp_dirlink_gen_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
     wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 fscBmapstart) -∗
     dinodeAt fscIreg dinum dn0' -∗
     wordPointsTo (pPid k.proc) 4 dqp pidv -∗
+    inodeShr kd sd icfgDev dinum -∗ runitAny dinum.toNat -∗
+    wordPointsTo (pRoot k.proc) 8 dqr rootv -∗ inodeHeldAt rootv rti -∗
     bslots 3 -∗
     irefSlot -∗
     dlinks fscFs dinum.toNat dn bm data -∗
@@ -448,50 +448,12 @@ structure DIRLINK : Prop where
     (dn dn0 : Dinode) (fn : Nat → BitVec 8) (inum : BitVec 16)
     (ncount : Nat) (Sb : List Nat) (tid : Nat) (qtx : Qp)
     (pidv : BitVec 32) (dqp dqd dqf dqn dqs dqbs dqb : DFrac)
+    (kd : Nat) (sd : Qp) (rootv : BitVec 64) (rti : Nat) (dqr : DFrac)
     hj hproc hK hnoff htier htype hcovs hszb hinums hdisj horph hstab hnl hgeom hwf hholes
-    hda hsz31 hdcov hdlog hdnib hinib hbg hbel hiregb hneed hpd ha0 ha2,
+    hda hsz31 hdcov hdlog hdnib hinib hbg hbel hiregb hneed hpd ha0 ha2 hkd hkdn,
     wp_dirlink_gen_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl pd pav pu j γkl γk ip dinum bm
-      data dn dn0 fn inum ncount Sb tid qtx pidv dqp dqd dqf dqn dqs dqbs dqb
+      data dn dn0 fn inum ncount Sb tid qtx pidv dqp dqd dqf dqn dqs dqbs dqb kd sd rootv rti dqr
       hj hproc hK hnoff htier htype hcovs hszb hinums hdisj horph hstab hnl hgeom hwf hholes
-      hda hsz31 hdcov hdlog hdnib hinib hbg hbel hiregb hneed hpd ha0 ha2
-
-/-- The interrupts-off instance of `wp_dirlink_gen_eb` (the complement is the
-whole bundle). -/
-theorem DIRLINK.wp_dirlink_gen (A : DIRLINK) {hlc : HasLC} {GF : BundledGFunctors}
-    [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
-    [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
-    [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-    [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
-    (γkl : GName) (γk : KmemNames)
-    (ip : BitVec 64) (dinum : BitVec 32) (bm : Blkmap) (data : Nat → List (BitVec 8))
-    (dn dn0 : Dinode) (fn : Nat → BitVec 8) (inum : BitVec 16)
-    (ncount : Nat) (Sb : List Nat) (tid : Nat) (qtx : Qp)
-    (pidv : BitVec 32) (dqp dqd dqf dqn dqs dqbs dqb : DFrac)
-    hj hproc hK hsie hnoff hlocks htier htype hcovs hszb hinums hdisj horph hstab hnl hgeom
-    hwf hholes hda hsz31 hdcov hdlog hdnib hinib hbg hbel hiregb hneed hpd ha0 ha2 :
-    wp_dirlink_gen_body (hlc := hlc) (GF := GF) Γ cpu k γl pd pav pu j γkl γk ip dinum bm
-      data dn dn0 fn inum ncount Sb tid qtx pidv dqp dqd dqf dqn dqs dqbs dqb
-      hj hproc hK hsie hnoff hlocks htier htype hcovs hszb hinums hdisj horph hstab hnl hgeom
-      hwf hholes hda hsz31 hdcov hdlog hdnib hinib hbg hbel hiregb hneed hpd ha0 ha2 := by
-  have h := A.wp_dirlink_gen_eb (hlc := hlc) (GF := GF) Γ cpu k γl pd pav pu j γkl γk ip dinum
-    bm data dn dn0 fn inum ncount Sb tid qtx pidv dqp dqd dqf dqn dqs dqbs dqb
-    hj hproc hK hnoff htier htype hcovs hszb hinums hdisj horph hstab hnl hgeom hwf hholes
-    hda hsz31 hdcov hdlog hdnib hinib hbg hbel hiregb hneed hpd ha0 ha2
-  unfold wp_dirlink_gen_eb_body at h
-  unfold wp_dirlink_gen_body
-  rw [hsie] at h
-  simp only [trapCsrsExt_false, cpuClaimExt_false] at h
-  iintro ⟨H0, H1, H2, Htc, Hcl, Hir, H6, H7, H8, H9, H10, H11, H12, H13, H14, H15, H16, H17,
-    H18, H19, H20, H21, H22, H23, H24, H25, H26, H27, H28, H29, H30, H31, H32, H33, Hnext⟩
-  iapply h
-  iframe H0 H1 H2 Htc Hcl Hir H6 H7 H8 H9 H10 H11 H12 H13 H14 H15 H16 H17 H18 H19 H20 H21
-    H22 H23 H24 H25 H26 H27 H28 H29 H30 H31 H32 H33
-  iapply wpNext_mono $$ Hnext
-  iintro %cpu' HK %spie %spp %R' %found %bm' %data' %dn' %dn0' %n' %Sb' %tot %p0 %p1 H2 H3
-    ⟨Htc, Hir⟩ Hcl H7 H8 H9 H10 H11 H12 H13 H14 H15 H16 H17 H18 H19 H20 H21 H22
-  iapply HK $$ %spie %spp %R' %found %bm' %data' %dn' %dn0' %n' %Sb' %tot %p0 %p1 H2 H3 Htc Hcl
-    Hir H7 H8 H9 H10 H11 H12 H13 H14 H15 H16 H17 H18 H19 H20 H21 H22
+      hda hsz31 hdcov hdlog hdnib hinib hbg hbel hiregb hneed hpd ha0 ha2 hkd hkdn
 
 end Xv6

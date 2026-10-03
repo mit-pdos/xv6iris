@@ -141,8 +141,6 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Iris.Algebra
 
-set_option linter.unusedSectionVars false
-
 /-! ## 0.  The camera (Rocq `Xv6Cameras.v`; deviations 1-3) -/
 
 /-- Rocq `gmultiset ity`. -/

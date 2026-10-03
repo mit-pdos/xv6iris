@@ -53,27 +53,25 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## Constants the code computes -/
 
 /-- Every `auipc a0,0x1d ; addi a0,a0,…` pair resolves to `&itable`. -/
-theorem iput_lock : KA.«iput» + 0x1d6c8#64 = itableLock := by
+theorem iput_lock : KA.«iput» + 0x1d954#64 = itableLock := by
   unfold itableLock; decide
 
 /-- `auipc a1,0x1d ; lw a1,1082(a1)` at +0x9c reads `sb.inodestart`. -/
-theorem iput_sbi : KA.«iput» + 0x1d6c0#64 = sbInodestart := by
+theorem iput_sbi : KA.«iput» + 0x1d94c#64 = sbInodestart := by
   unfold sbInodestart; decide
 
-theorem iput_br_acquire : KA.«iput» + 0xffffffffffffd798#64 = KA.«acquire» := by decide
-theorem iput_br_release : KA.«iput» + 0xffffffffffffd820#64 = KA.«release» := by decide
-theorem iput_br_acquiresleep : KA.«iput» + 0xc04#64 = KA.«acquiresleep» := by decide
+theorem iput_br_acquire : KA.«iput» + 0xffffffffffffd784#64 = KA.«acquire» := by decide
+theorem iput_br_release : KA.«iput» + 0xffffffffffffd80c#64 = KA.«release» := by decide
+theorem iput_br_acquiresleep : KA.«iput» + 0xc64#64 = KA.«acquiresleep» := by decide
 theorem iput_br_itrunc : KA.«iput» + 0xffffffffffffff6c#64 = KA.«itrunc» := by decide
-theorem iput_br_releasesleep : KA.«iput» + 0xc58#64 = KA.«releasesleep» := by decide
+theorem iput_br_releasesleep : KA.«iput» + 0xcb8#64 = KA.«releasesleep» := by decide
 theorem iput_br_bread : KA.«iput» + 0xfffffffffffff7e6#64 = KA.«bread» := by decide
-theorem iput_br_log_write : KA.«iput» + 0xa96#64 = KA.«log_write» := by decide
+theorem iput_br_log_write : KA.«iput» + 0xaf6#64 = KA.«log_write» := by decide
 theorem iput_br_brelse : KA.«iput» + 0xfffffffffffff8ee#64 = KA.«brelse» := by decide
 
 /-! ## The pure set steps at the LAST CLOSE (Rocq `ip_ci_inums_delete`,
@@ -165,13 +163,6 @@ theorem iputLedger_refl [Fscfg] (n : Nat) (Sb : List Nat) (crb cru crz : Bool) :
 def iputPins (KR R : RegMap) : Prop :=
   R 21#5 = KR 21#5 ∧ R 22#5 = KR 22#5 ∧ R 23#5 = KR 23#5 ∧ R 24#5 = KR 24#5 ∧
   R 25#5 = KR 25#5 ∧ R 26#5 = KR 26#5 ∧ R 27#5 = KR 27#5
-
-theorem iputPins_cs (KR R R' : RegMap) (h : iputPins KR R) (hcs : calleeSaved R R') :
-    iputPins KR R' := by
-  obtain ⟨a21, a22, a23, a24, a25, a26, a27⟩ := h
-  obtain ⟨-, -, -, -, -, -, c21, c22, c23, c24, c25, c26, c27⟩ := hcs
-  exact ⟨c21.trans a21, c22.trans a22, c23.trans a23, c24.trans a24, c25.trans a25,
-    c26.trans a26, c27.trans a27⟩
 
 /-- A register write outside `s5`..`s11` keeps the pins. -/
 theorem iputPins_set (KR R : RegMap) (h : iputPins KR R) (r : BitVec 5) (v : BitVec 64)
@@ -369,7 +360,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 
 set_option maxHeartbeats 4000000 in
 /-- **THE EPILOGUE** (Rocq's `ip_epilogue` and the post hand-off of
-`ip_tail_exit` / `wp_iput_gen`'s Exit B seam): `ld ra/s0/s1`, `addi
+`ip_tail_exit` / `wp_iput_gen_eb`'s Exit B seam): `ld ra/s0/s1`, `addi
 sp,48`, `ret`, then the contract's continuation.  Every arm reaches it --
 the two close arms as release's return address, the free path from the
 off-lock tail's `j +0x30`.  A LEVEL-0 stretch (depth 0, the caller's
@@ -546,7 +537,7 @@ macro_rules
   | `(tactic| k_step_c $rule:term from $code:term $ht:ident $$ $pat:specPat) =>
     `(tactic| k_step_c $rule:term from $code:term $ht:ident $$ $pat:specPat with [])
   | `(tactic| k_step_c $rule:term from $code:term $ht:ident $$ $pat:specPat with [$extra,*]) =>
-    `(tactic| (iapply $rule:term $$ $pat:specPat
+    `(tactic| (k_iapply $rule:term $$ $pat:specPat
                rotate_right 1
                k_code $code:term $ht:ident
                iframe #

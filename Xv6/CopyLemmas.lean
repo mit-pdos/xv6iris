@@ -12,10 +12,6 @@ import Xv6.SpecWalkaddr
 import Xv6.SpecVmfault
 import Xv6.SpecMemmove
 import Xv6.UMemLemmas
-import MachCSL.WpSmodeFrame12
-import Xv6.ByteCursor
-import Xv6.UPtAllocLemmas
-import MachCSL.BvLemmas
 
 namespace Xv6
 
@@ -23,7 +19,6 @@ open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open Iris.Std (get? insert delete)
 open LeanRV64D
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
@@ -66,7 +61,6 @@ theorem co_ult_ofNat (a b : Nat) (ha : a < 2 ^ 64) (hb : b < 2 ^ 64) :
 
 theorem co_lui_4096 : BitVec.signExtend 64 (1#20 ++ 0#12) = 4096#64 := by decide
 
-
 theorem co_li_neg1 : (0#64 : BitVec 64) + BitVec.signExtend 64 4095#12 = -1#64 := by decide
 
 theorem co_li_zero : (0#64 : BitVec 64) + BitVec.signExtend 64 0#12 = 0#64 := by decide
@@ -97,7 +91,6 @@ theorem co_bgeu_lt {α : Type _} (a b : Nat) (ha : a < 2 ^ 64) (hb : b < 2 ^ 64)
   refine if_neg ?_
   simp only [bcond, co_ult_ofNat a b ha hb, Bool.not_eq_true', decide_eq_false_iff_not]
   omega
-
 
 theorem co_sext_0 : BitVec.signExtend 64 0#12 = 0#64 := by decide
 
@@ -162,7 +155,6 @@ theorem co_memmove_call (MM : MEMMOVE) [CurCtx]
   simp only [memmoveAddr] at h
   exact h
 
-
 theorem co_n_val3 (a : Nat) (ha : a < 2 ^ 64) :
     BitVec.ofNat 64 (a / 4096 * 4096) + (-BitVec.ofNat 64 a + 4096#64)
       = BitVec.ofNat 64 (4096 - a % 4096) := by
@@ -174,9 +166,7 @@ theorem co_n_val3 (a : Nat) (ha : a < 2 ^ 64) :
   rw [h1, h, show (4096#64 : BitVec 64) = BitVec.ofNat 64 4096 from rfl,
     co_ofNat_sub 4096 _ (by omega) (by omega)]
 
-
 theorem ci_li_one : (0#64 : BitVec 64) + BitVec.signExtend 64 1#12 = 1#64 := by decide
-
 
 /-! ## Address folds in `k_norm`'s normal form
 
@@ -221,15 +211,6 @@ theorem co_ite_bne {α : Type _} (x y : BitVec 64) (p q : α) :
     (if bcond bop.BNE x y then p else q) = if x = y then q else p := by
   by_cases h : x = y <;> simp [bcond, h]
 
-theorem co_ite_bltu {α : Type _} (x y : BitVec 64) (p q : α) :
-    (if bcond bop.BLTU x y then p else q) = if x.toNat < y.toNat then p else q := by
-  by_cases h : x.toNat < y.toNat <;> simp [bcond, BitVec.ult, h]
-
-theorem co_ite_bgeu {α : Type _} (x y : BitVec 64) (p q : α) :
-    (if bcond bop.BGEU x y then p else q) = if x.toNat < y.toNat then q else p := by
-  by_cases h : x.toNat < y.toNat <;> simp [bcond, BitVec.ult, h]
-
-
 /-! ## Why the `-1` arm failed, as a fact about the ENTRY table
 
 Rocq `ProofCopyin.ci_fault_vpn` / `ci_fault_leaf` (lane TRAP-ROWS, T1):
@@ -265,7 +246,6 @@ theorem ci_fault_leaf (P P1 : UPtd) (x : Nat) (hext : P.ext P1) (hwf : uptWf P1)
   · omega
   · rw [hlv] at h; cases h
   · rw [hlv] at h; cases h; exact hn hvu
-
 
 /-- ...AND THE WRITE SIDE (Rocq `ProofCopyout`'s `co_fault_*`): walkaddr's
 verdict refutes `uvaRmapped`, hence `uvaWmapped`. -/

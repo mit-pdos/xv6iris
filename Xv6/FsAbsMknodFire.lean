@@ -65,21 +65,19 @@ Rocq's header, kept because the reasons are the content:
    spelling `Z_to_bv 16 (assemble_bytes [nth_byte w 0; nth_byte w 1])`
    because `hw_lo` lives in a proof file.  The Lean machine's halfword
    store writes `BitVec.extractLsb' 0 16 r` and `argint` writes
-   `BitVec.extractLsb' 0 32 v` (`SpecArgint`), so the bridge is stated in
-   BOTH spellings: `mkfLow16_mod`/`mkfDev_arg` over `extractLsb'`, and
-   `mkfLow16_bytes` over the two `nthByte`s (with `mkfSplit16`, Rocq's
-   pure split, at `Nat`).  Which one `SysMknod`'s stages consume is theirs
-   to pick; `trunc32` is `extractLsb' 0 32`.
+   `BitVec.extractLsb' 0 32 v` (`SpecArgint`), so the bridge is stated
+   over `extractLsb'` (`mkfDev_arg`); the byte spelling and Rocq's pure
+   split are not ported (nothing uses them).  `trunc32` is
+   `extractLsb' 0 32`.
 4. `bv_unsigned` is `.toNat`; `<[s := v]>` on an entry map is `.insert s
    v`; `T_FILE`/`T_DEVICE` (halfwords) are `T_FILE_w`/`T_DEVICE_w`
    (`FsAbsCreateFire` deviation 2).
 5. Names: `mkf_abs_of_dir` → `Xv6.absOf_dir`, `mkf_parent_row` →
    `mkfParent_row`, `mkf_dlookup_fire` → `mkfDlookup_fire`,
-   `caf_acre_fire(_file)` → `cafAcre_fire(_file)`, `caf_made_row(_node)` →
-   `cafMade_row(_node)`, `npar_walk_pre_era` → `nparWalkPreEra`,
-   `np_start_of_mknod` → `npStart_of_mknod`, `np_elems_is_mknod_parent_elems`
-   → `npElems_is_nparElems`, `ep_hops_is_mknod_hops` → `epHops_is_mknodHops`,
-   and so on.
+   `caf_made_row(_node)` → `cafMade_row(_node)`, `npar_walk_pre_era` →
+   `nparWalkPreEra`, `np_start_of_mknod` → `npStart_of_mknod`,
+   `np_elems_is_mknod_parent_elems` → `npElems_is_nparElems`,
+   `ep_hops_is_mknod_hops` → `epHops_is_mknodHops`, and so on.
 6. **Sections 5-6 (the W-A append).**  Rocq's section-local
    `Require FsImg` / `Require Import FsAbsEra` is the file-level
    `import Xv6.FsAbsEra`.  The binders are `[MachGS hlc GF] [FsTopG GF]
@@ -88,15 +86,16 @@ Rocq's header, kept because the reasons are the content:
    predicates' `S k` is `k + 1`, inums `Nat`.  Rocq seals them
    (`Typeclasses Opaque`); Lean definitions are not unfolded by the proof
    mode unless asked, so no seal is needed.
+7. **The chroot bump** (design/chroot.md section 3): `nparWalkPreEra γfs
+   rt cw`, `nparWalkDeadEra γfs rt`, and the section-6 lemmas take the
+   process's root `rt`; the absolute one-shot fires at `rt`, so Rocq's
+   `np_rootino_agree` has nothing left to do.
 
 ## Dropped/simplified vs Rocq
 
-`np_rootino_agree` (section 6): Lean has one `ROOTINO : Nat`
-(`Xv6/FsAbsEra.lean` deviation 2), so `np_pre_of_mknod`'s
-`P 0 (bv_unsigned InodeInv.ROOTINO)` is `P 0 ROOTINO` and the rewrite
-vanishes.  Nothing else.
+`np_rootino_agree` (section 6): the absolute fetch starts at `rt`
+(deviation 7) and Lean has one `ROOTINO : Nat` anyway.  Nothing else.
 -/
-import Xv6.SysMknodDefs
 import Xv6.FsAbsEra
 import Xv6.FsAbsCreateNm
 
@@ -129,12 +128,6 @@ theorem mkfParent_row (dn dn' : Dinode) (bm bm' : Blkmap) (data data' : Nat → 
   have hdir' : fnIsDir (eraNode dn' bm' data') = true := mkfEra_is_dir dn' bm' data' (by rw [hty']; exact hty)
   rw [Xv6.absOf_dir _ hdir' (Xv6.eraNlink_nz dn' bm' data' (by rw [hnl']; exact hnl)), hents,
     Xv6.cafEra_nlink, Xv6.cafEra_nlink, hnl']
-
-/-- ITEM 4: THE MINTED CHILD'S ROW (Rocq's `mkf_child_dev`). -/
-theorem mkfChild_dev (dn : Dinode) (bm : Blkmap) (data : Nat → List (BitVec 8))
-    (major minor : BitVec 16) (h : dn = createMade T_DEVICE_w major minor) :
-    absOf (eraNode dn bm data) = some ⟨.ADev major.toNat minor.toNat, 1⟩ :=
-  absOf_create_dev _ major minor (by rw [eraNode_rec, h])
 
 /-! ## 3.  The read-only fire point, `ftopN` opened and closed -/
 
@@ -186,28 +179,6 @@ end MknodFire
 
 /-! ## 4.  Item 4's bit-level half: the halfword argument (deviation 3) -/
 
-/-- the pure split, at the shape the byte assembly leaves behind (Rocq's
-`mkf_split16`, at `Nat`). -/
-theorem mkfSplit16 (u : Nat) :
-    (u % 2 ^ 8 + 2 ^ 8 * ((u / 2 ^ 8) % 2 ^ 8 + 2 ^ 8 * 0)) % 2 ^ 16 = u % 2 ^ 16 := by
-  simp only [Nat.reducePow, Nat.mul_zero, Nat.add_zero]
-  omega
-
-/-- the low halfword of a word, in the byte spelling: two `nthByte`s
-(Rocq's `mkf_low16_mod`'s statement). -/
-theorem mkfLow16_bytes (w : BitVec 32) :
-    ((nthByte (n := 4) w 0).toNat + 2 ^ 8 * ((nthByte (n := 4) w 1).toNat + 2 ^ 8 * 0)) % 2 ^ 16 =
-      w.toNat % 2 ^ 16 := by
-  unfold nthByte
-  simp only [BitVec.extractLsb'_toNat, Nat.mul_zero, Nat.shiftRight_eq_div_pow]
-  rw [show (8 * 1 : Nat) = 8 from rfl, ← mkfSplit16 w.toNat]
-  simp
-
-/-- the low halfword a halfword store writes, read unsigned (Rocq's
-`mkf_low16_mod`, in the `extractLsb'` spelling). -/
-theorem mkfLow16_mod (w : BitVec 32) : (w.extractLsb' 0 16).toNat = w.toNat % 2 ^ 16 := by
-  simp [BitVec.extractLsb'_toNat]
-
 /-- sys_mknod's device number: the low halfword of the `int` `argint`
 wrote, read unsigned, IS `devArg` (Rocq's `mkf_dev_arg`). -/
 theorem mkfDev_arg (v : BitVec 64) : ((v.extractLsb' 0 32).extractLsb' 0 16).toNat = devArg v := by
@@ -222,9 +193,10 @@ mknod, unlink, open's create arm, create itself -- so the `npar` prefix
 names the family's mold, not one caller.  They ride the ERA LEND
 (`FsAbsEra.elend`): the lent fragment and the carrier are the same ghost,
 which is what makes the fire points reachable.  The START is namex's rule
-(`FsAbsEra.umStartOf cw pl`): ROOTINO on an absolute fetch, the calling
-process's cwd inum `cw` on a relative one (the syscall contract passes its
-block's `cwi`). -/
+(`FsAbsEra.umStartOf rt cw pl`): the calling process's root inum `rt` on an
+absolute fetch, its cwd inum `cw` on a relative one (the syscall contract
+passes its block's `rti` and `cwi`); the hops are at `rt` too
+(`FsAbsWalk.axHop`'s self rule). -/
 
 section EraMknod
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [FsTopG GF] [FsBytesG GF]
@@ -232,18 +204,19 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [FsTopG GF] [FsBy
 /-- THE PARENT-PREFIX ONE-SHOT (Rocq's `npar_walk_pre_era`): one fupd,
 universally quantified over the fetched string, yielding the cursor at the
 start and one `axHop` per parent element. -/
-def nparWalkPreEra (γfs : FsNames) (cw : Nat) (P Pmiss : Nat → Nat → IProp GF) : IProp GF :=
-  iprop(∀ (pl : List (BitVec 8)) (r : Nat), ⌜r = umStartOf cw pl⌝ ={⊤}=∗
-    P 0 r ∗ axHopsFrom (elend (fsGammaL γfs)) P Pmiss (nparElems pl) 0)
+def nparWalkPreEra (γfs : FsNames) (rt cw : Nat) (P Pmiss : Nat → Nat → IProp GF) :
+    IProp GF :=
+  iprop(∀ (pl : List (BitVec 8)) (r : Nat), ⌜r = umStartOf rt cw pl⌝ ={⊤}=∗
+    P 0 r ∗ axHopsFrom rt (elend (fsGammaL γfs)) P Pmiss (nparElems pl) 0)
 
 /-- the walk's death receipt, strict at both disjuncts (Rocq's
 `npar_walk_dead_era`; section 6's `npDead_to_mknod` records why it does not
 cover every walk failure alone). -/
-def nparWalkDeadEra (γfs : FsNames) (P Pmiss : Nat → Nat → IProp GF) (pl : List (BitVec 8)) :
-    IProp GF :=
+def nparWalkDeadEra (γfs : FsNames) (rt : Nat) (P Pmiss : Nat → Nat → IProp GF)
+    (pl : List (BitVec 8)) : IProp GF :=
   iprop(∃ (k d : Nat), ⌜k < (nparElems pl).length⌝ ∗
-    ((P k d ∗ axHopsFrom (elend (fsGammaL γfs)) P Pmiss (nparElems pl) k) ∨
-     (Pmiss k d ∗ axHopsFrom (elend (fsGammaL γfs)) P Pmiss (nparElems pl) (k + 1))))
+    ((P k d ∗ axHopsFrom rt (elend (fsGammaL γfs)) P Pmiss (nparElems pl) k) ∨
+     (Pmiss k d ∗ axHopsFrom rt (elend (fsGammaL γfs)) P Pmiss (nparElems pl) (k + 1))))
 
 end EraMknod
 
@@ -258,7 +231,7 @@ contract (`SpecNparEra`) consumes and produces.  Rocq's reading, kept:
 >
 > (2) THE PRE.  `np_start_of_mknod` is the general form the walk actually
 > takes: the START INUM is the walk's to choose, so no firing happens at
-> all.  `np_pre_of_mknod` fires the one-shot at ROOTINO, where an absolute
+> all.  `np_pre_of_mknod` fires the one-shot at `rt`, where an absolute
 > fetch starts.
 >
 > (3) THE DEAD.  This one is NOT an identity.  `npar_walk_dead_era` bounds
@@ -269,9 +242,7 @@ contract (`SpecNparEra`) consumes and produces.  Rocq's reading, kept:
 > predicate, or the cursor at the parent index -- exactly what
 > `SpecCreate.cre_fail_arms`'s walk-death arm carries.
 
-Rocq's `np_rootino_agree` is DROPPED: Lean has one `ROOTINO : Nat`
-(`Xv6/FsAbsEra.lean` deviation 2), so `np_pre_of_mknod`'s
-`P 0 (bv_unsigned InodeInv.ROOTINO)` is `P 0 ROOTINO`. -/
+Rocq's `np_rootino_agree` is DROPPED (header deviation 7). -/
 
 section NparMknod
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [FsTopG GF] [FsBytesG GF]
@@ -280,39 +251,29 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [FsTopG GF] [FsBy
 theorem npElems_is_nparElems (pl : List (BitVec 8)) : npElems pl = nparElems pl := rfl
 
 /-- Rocq's `ep_hops_is_mknod_hops`. -/
-theorem epHops_is_mknodHops (γfs : FsNames) (P Pmiss : Nat → Nat → IProp GF)
+theorem epHops_is_mknodHops (rt : Nat) (γfs : FsNames) (P Pmiss : Nat → Nat → IProp GF)
     (pl : List (BitVec 8)) (n : Nat) :
-    epHopsFrom γfs P Pmiss pl n = axHopsFrom (elend (fsGammaL γfs)) P Pmiss (nparElems pl) n :=
+    epHopsFrom rt γfs P Pmiss pl n
+      = axHopsFrom rt (elend (fsGammaL γfs)) P Pmiss (nparElems pl) n :=
   rfl
 
 /-- THE FORM THE WALK TAKES (Rocq's `np_start_of_mknod`): `epStart` at a
 fixed `pl` IS `nparWalkPreEra` specialised there -- a rename. -/
-theorem npStart_of_mknod (γfs : FsNames) (cw : Nat) (P Pmiss : Nat → Nat → IProp GF)
+theorem npStart_of_mknod (γfs : FsNames) (rt cw : Nat) (P Pmiss : Nat → Nat → IProp GF)
     (pl : List (BitVec 8)) :
-    nparWalkPreEra (hlc := hlc) γfs cw P Pmiss ⊢ epStart (hlc := hlc) γfs cw P Pmiss pl := by
+    nparWalkPreEra (hlc := hlc) γfs rt cw P Pmiss ⊢ epStart (hlc := hlc) γfs rt cw P Pmiss pl := by
   unfold nparWalkPreEra epStart
   rw [epHops_is_mknodHops]
   iintro Hpre %r %hr
   iapply Hpre $$ %pl %r %hr
 
-/-- the absolute fetch: fire the one-shot at ROOTINO (Rocq's
-`np_pre_of_mknod`, minus the root-agreement rewrite). -/
-theorem npPre_of_mknod (γfs : FsNames) (cw : Nat) (P Pmiss : Nat → Nat → IProp GF)
-    (pl : List (BitVec 8)) (hsl : pl[0]? = some SLASH) :
-    ⊢@{IProp GF} nparWalkPreEra (hlc := hlc) γfs cw P Pmiss ={⊤}=∗
-      P 0 ROOTINO ∗ epHopsFrom γfs P Pmiss pl 0 := by
-  unfold nparWalkPreEra
-  rw [epHops_is_mknodHops]
-  iintro Hpre
-  iapply Hpre $$ %pl %ROOTINO %(umStartOf_slash cw pl hsl).symm
-
 /-- THE DEATH ARM, FOLDED (Rocq's `np_dead_to_mknod`): the strict
 predicate, or the cursor at the parent index (the parent's own level died;
 the family from there is empty). -/
-theorem npDead_to_mknod (γfs : FsNames) (P Pmiss : Nat → Nat → IProp GF)
+theorem npDead_to_mknod (rt : Nat) (γfs : FsNames) (P Pmiss : Nat → Nat → IProp GF)
     (pl : List (BitVec 8)) :
-    npDead γfs P Pmiss pl ⊢
-      nparWalkDeadEra γfs P Pmiss pl ∨ ∃ d : Nat, P (nparElems pl).length d := by
+    npDead rt γfs P Pmiss pl ⊢
+      nparWalkDeadEra γfs rt P Pmiss pl ∨ ∃ d : Nat, P (nparElems pl).length d := by
   unfold npDead nparWalkDeadEra
   simp only [epHops_is_mknodHops]
   iintro (⟨%k, %d, %hk, HP, Hh⟩ | ⟨%k, %d, %hk, HP, Hh⟩)
@@ -336,54 +297,11 @@ theorem npDead_to_mknod (γfs : FsNames) (P Pmiss : Nat → Nat → IProp GF)
     · iright
       iframe HP Hh
 
-omit [FsTopG GF] [FsBytesG GF] in
-/-- ...and the SUCCESS side needs no lemma at all (Rocq's
-`np_ok_is_mknod_ok`). -/
-theorem npOk_is_mknodOk (P : Nat → Nat → IProp GF) (pl : List (BitVec 8)) (iL : Nat) :
-    P (npElems pl).length iL = P (nparElems pl).length iL := rfl
-
 end NparMknod
 
 /-! ## 7.  Fire 2, at the armed child (was Rocq iris/FsAbsCreateFire.v) -/
 
-/-! ### 7.1  The delta's collapse at a non-directory child (pure) -/
-
-/-- `acreBump` is zero at everything but a directory (Rocq's
-`caf_acre_bump_nondir`). -/
-theorem cafAcreBump_nondir (c : Absnode) (hc : ∀ e, c ≠ .ADir e) : acreBump c = 0 := by
-  cases c with
-  | ADir e => exact absurd rfl (hc e)
-  | _ => rfl
-
-/-- `deltaCreate_dev` with the device-ness dropped (Rocq's
-`caf_delta_create_nondir`): under `crePre` at a NON-DIRECTORY child the
-fused delta IS the one-row parent insert. -/
-theorem cafDeltaCreate_nondir (av : Aview) (d : Nat) (nm : Fname)
-    (ents : Std.ExtTreeMap Fname Nat compare) (nl i : Nat) (c : Absnode)
-    (hc : ∀ e, c ≠ .ADir e) (hp : crePre av d nm ents nl i c) :
-    deltaCreate d nm i c av = PartialMap.insert av d ⟨.ADir (ents.insert nm i), nl⟩ := by
-  rw [deltaCreate_armed av d nm ents nl i c hp (crePre_ne av d nm ents nl i c hp hc),
-    cafAcreBump_nondir c hc, Nat.add_zero]
-
 /-! ### 7.2  The minted child's row at `T_FILE` -/
-
-/-- `absOf_create_dev`'s twin (Rocq's `caf_abs_of_create_file`): the size
-is zero, so the byte list is `fileBytes _ 0 = []`; the count is one. -/
-theorem cafAbs_of_create_file (n : FsNode) (major minor : BitVec 16)
-    (hr : n.fnRec = createMade T_FILE_w major minor) : absOf n = some ⟨.AFile [], 1⟩ := by
-  have hnd : fnIsDir n = false := by
-    unfold fnIsDir fnType; rw [hr]; rfl
-  have hfl : fnType n = T_FILE := by unfold fnType; rw [hr]; rfl
-  have hnl : fnNlink n = 1 := by unfold fnNlink; rw [hr]; rfl
-  have hb : fnFileBytes n = [] := by
-    unfold fnFileBytes fnSize; rw [hr]; rfl
-  rw [absOf_file n hnd hfl (by rw [hnl]; decide), hb, hnl]
-
-/-- ...and at the era node (Rocq's `caf_child_file`). -/
-theorem cafChild_file (dn : Dinode) (bm : Blkmap) (data : Nat → List (BitVec 8))
-    (major minor : BitVec 16) (h : dn = createMade T_FILE_w major minor) :
-    absOf (eraNode dn bm data) = some ⟨.AFile [], 1⟩ :=
-  cafAbs_of_create_file _ major minor (by rw [eraNode_rec, h])
 
 /-- THE MINTED CHILD'S ROW AT ANY TYPE (Rocq's `caf_made_row_node`):
 `createMade` at a nonzero type reads as `creC0` of the type and the two
@@ -502,62 +420,6 @@ theorem cafAcre_fire_nm [Icfg] (γfs : FsNames) (E : CoPset) (cf : Nat → Nat �
   iexists absView I
   iframe HΦ
   ipureintro; exact hpre
-
-/-- ...and the landed reading, at the predicate every other site is at
-(Rocq's `caf_acre_fire`): a provider that answers at EVERY name answers at
-this one (`FsAbsCreateNm.acreCommitAtGenNm_of`). -/
-theorem cafAcre_fire [Icfg] (γfs : FsNames) (E : CoPset) (cf : Nat → Nat → Absnode)
-    (Pd : Nat → IProp GF)
-    (Farm : Pfam GF (Aview → Nat → IProp GF))
-    (Fok : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
-    (d i : Nat) (nm : Fname) (dqc : DFrac) (np np' nc : FsNode)
-    (hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ E) (hloc : InodeLocal d np')
-    (hdir : fnIsDir np = true) (hnl : fnNlink np ≠ 0) (hnone : (dirEntries np)[nm]? = none)
-    (hpnm : nm ≠ DOT ∧ nm ≠ DOTDOT)
-    (habsp' : absOf np' =
-      some ⟨.ADir ((dirEntries np).insert nm i), fnNlink np + acreBump (cf d i)⟩)
-    (habsc : absOf nc = some ⟨cf d i, 1⟩) :
-    ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗ appInv (hlc := hlc) γfs -∗
-      pfAt (acreCommitAtGen (hlc := hlc) (fsGammaL γfs) appE cf Pd Farm) Fok -∗
-      creArmFired Farm i -∗
-      Pd d -∗
-      topFrag (fsGammaL γfs) d np -∗
-      topFragQ (fsGammaL γfs) dqc i nc ={E}=∗
-        topFrag (fsGammaL γfs) d np' ∗ topFragQ (fsGammaL γfs) dqc i nc ∗ Pd d ∗
-        ∃ av : Aview, ⌜crePre av d nm (dirEntries np) (fnNlink np) i (cf d i)⌝ ∗
-          Fok.pfRecv av d nm i := by
-  iintro #Hi #Hai Hcm Harm HPd Hfp Hfc
-  ihave Hcm := (pfAt_mono (acreCommitAtGen (hlc := hlc) (fsGammaL γfs) appE cf Pd Farm)
-    (acreCommitAtGenNm (hlc := hlc) (fsGammaL γfs) appE cf (fun _ => True) Pd Farm) Fok) $$ [] Hcm
-  · iintro H
-    iapply (acreCommitAtGenNm_of (hlc := hlc) (fsGammaL γfs) appE cf (fun _ => True) Pd Farm
-      Fok.pfRecv) $$ H
-  iapply (cafAcre_fire_nm γfs E cf (fun _ => True) Pd Farm Fok d i nm dqc np np' nc hE trivial
-    hloc hdir hnl hnone hpnm habsp' habsc) $$ Hi Hai Hcm Harm HPd Hfp Hfc
-
-/-- the `AFile []` instance, the one the T_FILE create-AU fires (Rocq's
-`caf_acre_fire_file`). -/
-theorem cafAcre_fire_file [Icfg] (γfs : FsNames) (E : CoPset)
-    (Pd : Nat → IProp GF)
-    (Farm : Pfam GF (Aview → Nat → IProp GF))
-    (Fok : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
-    (d i : Nat) (nm : Fname) (dqc : DFrac) (np np' nc : FsNode)
-    (hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ E) (hloc : InodeLocal d np')
-    (hdir : fnIsDir np = true) (hnl : fnNlink np ≠ 0) (hnone : (dirEntries np)[nm]? = none)
-    (hpnm : nm ≠ DOT ∧ nm ≠ DOTDOT)
-    (habsp' : absOf np' = some ⟨.ADir ((dirEntries np).insert nm i), fnNlink np⟩)
-    (habsc : absOf nc = some ⟨.AFile [], 1⟩) :
-    ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗ appInv (hlc := hlc) γfs -∗
-      pfAt (acreCommitAt (hlc := hlc) (fsGammaL γfs) appE (.AFile []) Pd Farm) Fok -∗
-      creArmFired Farm i -∗
-      Pd d -∗
-      topFrag (fsGammaL γfs) d np -∗
-      topFragQ (fsGammaL γfs) dqc i nc ={E}=∗
-        topFrag (fsGammaL γfs) d np' ∗ topFragQ (fsGammaL γfs) dqc i nc ∗ Pd d ∗
-        ∃ av : Aview, ⌜crePre av d nm (dirEntries np) (fnNlink np) i (.AFile [])⌝ ∗
-          Fok.pfRecv av d nm i :=
-  cafAcre_fire γfs E (fun _ _ => .AFile []) Pd Farm Fok d i nm dqc np np' nc hE hloc hdir hnl hnone
-    hpnm habsp' habsc
 
 end CreateFire2
 

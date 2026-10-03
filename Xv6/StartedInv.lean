@@ -25,15 +25,15 @@ invariant is where the boot hart's output is PARKED -- a one-shot escrow:
 A secondary that READS `1` saw the store: it is not hart 0, so the entry
 was visible only at `t ≤ tvn`, and the read leaves `rviewLb cpu tvn`
 (`started_readAUr`); its `__sync_synchronize()` turns that into
-`viewLb cpu t` (`MachCSL.wp_s_fence_rw_rw_floor`), and a second opening
+`viewLb cpu t` (`MachCSL.wp_s_fence_iorw_iorw_floor`), and a second opening
 ABSORBS the deposit into its own context (`started_absorb`,
 `MachCSL.ctxAbsorbLb`), leaving `ξd` stamped where it was so every hart can
 do the same.  THE DEPOSIT MUST BE PERSISTENT (`∀ ξ, Persistent (P ξ)`): up
 to `NCPU - 1` harts take it, and the invariant keeps it.
 
-The primary opens the unarmed arm (`started_store_open`), deposits `P`
-into `ξd` (`started_deposit`, `MachCSL.ctxDeposit`) and, after its store at
-`t`, arms the invariant (`started_store_close`).
+The primary opens the unarmed arm, deposits `P` into `ξd`
+(`started_deposit`, `MachCSL.ctxDeposit`) and, after its store at `t`, arms
+the invariant (`started_writeAUT`).
 
 This is main's `__sync_synchronize(); started = 1;` edge and the other
 harts' spin.  (The disk's `DiskAcc.DISK_INIT_WM`, once said to stand for
@@ -61,10 +61,10 @@ handler's own fence -- `DiskInvDefs.diskPayFl`.)
    (`tso_interp_llb_valid`).  `MachCSL.writeAU`'s continuation gets
    `authoredBy t` and `topLb t` but no order against an earlier `topLb T`;
    `MachCSL.exclWriteAU` has exactly that field (`T ≤ t`) and
-   `MachCSL/WpDevDma`'s disk store has `Kb < t`.  `started_store_close`
-   takes `T ≤ t` as a hypothesis; the plain-store rule that supplies it is
-   `MachCSL.WpStoreOrd` (`writeAUT` / `wp_s_sw_auT`, the ordered store), and
-   main's store runs it through `started_writeAUT` (two openings, below).
+   `MachCSL/WpDevDma`'s disk store has `Kb < t`.  The plain-store rule that
+   supplies it is `MachCSL.WpStoreOrd` (`writeAUT` / `wp_s_sw_auT`, the
+   ordered store), and main's store runs it through `started_writeAUT` (two
+   openings, below).
 4. The ghost is a `ghost_var` over `Nat` (the existing `Xv6G.gvNatG`
    capacity: one instance per camera), `0` unarmed and `t + 1` armed,
    frozen at the store; Rocq's `dset_auth`/`dset_in` set camera is not
@@ -170,29 +170,6 @@ theorem startedPrim_idx (γ : GName) (t : Nat) :
   ihave %h := ghost_var_agree γ _ _ _ _ $$ Hp Hi
   omega
 
-/-- **THE RELEASE SIDE'S OPENING** (Rocq `started_store_open`): the primary
-holds its token, which excludes the armed arm, so what it finds is the
-unarmed window; closing takes the armed arm back. -/
-theorem started_store_open (E : CoPset) (γ : GName) (ξd : CtxId) (P : CtxId → IProp GF)
-    (hE : (↑startedN : CoPset) ⊆ E) :
-    startedInv γ ξd P ∗ startedPrim γ ⊢
-      |={E, E \ ↑startedN}=> ((startedUnarmed γ ξd ∗ startedPrim γ) ∗
-        (startedArmed γ ξd P ={E \ ↑startedN, E}=∗ True)) := by
-  iintro ⟨#Hinv, Hprim⟩
-  unfold startedInv
-  imod (inv_acc (E := E) (N := startedN) (P := startedBody γ ξd P) hE) $$ Hinv with ⟨Hbody, Hclose⟩
-  unfold startedBody startedUnarmed startedArmed
-  icases Hbody with (⟨>Hw, >Hg, >Hst⟩ | ⟨%t, %T, >Hw, >Hidx, >%hT, >Hst, HP⟩)
-  · imodintro
-    iframe Hw Hg Hst Hprim
-    iintro Harm
-    iapply Hclose
-    inext
-    iright
-    iexact Harm
-  · iexfalso
-    iapply startedPrim_idx γ t $$ Hprim Hidx
-
 omit [Xv6G GF] in
 /-- The stamp of a stamped context is a store-order receipt. -/
 theorem startedStamped_topLb (ξ : CtxId) (T : Nat) :
@@ -224,27 +201,6 @@ theorem started_deposit [CurCtx] (cpu : CPU) (ξd : CtxId) (P : CtxId → IProp 
   iframe Hrun
   iexists T
   iframe Hst HP HT
-
-/-- **THE ARMING** (the close of Rocq `started_store_obl`): after the
-primary's store at `t` (the window grown by its entry), the two ghost halves
-freeze at `t + 1` and the record, stamped at or below `t`, is parked in the
-armed arm. -/
-theorem started_store_close (γ : GName) (ξd : CtxId) (P : CtxId → IProp GF) (t T : Nat)
-    (hT : T ≤ t) :
-    startedPrim γ ∗ ghost_var γ (.own (1 : Qp).half) (0 : Nat) ∗
-      wordCell startedAddr 4 0 startedClear [⟨t, hartAgent startedPrimary, startedSet⟩] ∗
-      ctxStamped ξd T ∗ P ξd ⊢
-      |==> (startedArmed (GF := GF) γ ξd P ∗ startedIdx γ t) := by
-  unfold startedPrim startedArmed startedIdx
-  iintro ⟨H1, H2, Hw, Hst, HP⟩
-  imod ghost_var_update_halves (t + 1) γ (0 : Nat) (0 : Nat) $$ H1 H2 with ⟨H1, H2⟩
-  imod ghost_var_persist γ _ (t + 1) $$ H1 with #H1
-  imodintro
-  isplitr []
-  · iexists t, T
-    iframe Hw H1 Hst HP
-    ipureintro; exact hT
-  · iexact H1
 
 omit [Xv6G GF] in
 /-- The read watermark receipt is downward closed. -/
@@ -403,7 +359,7 @@ see, so it runs at a first opening, just before the store: the payload is
 deposited into `ξd` and the (unarmed) window closed again with the new
 stamp.  The store's accessor (`MachCSL.writeAUT`) is the second opening: it
 names the stamp's store-order receipt, learns that the flag's position
-passes it, and arms the invariant (`started_store_close`). -/
+passes it, and arms the invariant (`started_writeAUT`). -/
 
 /-- **The deposit**, at a first opening: the payload moves from the
 primary's context into `ξd`, whose stamp advances; the window stays

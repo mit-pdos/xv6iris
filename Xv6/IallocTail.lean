@@ -17,6 +17,7 @@ rows, which `iallocArms` already carries packed (its deviation 2).
 import Xv6.IallocDefs
 import Xv6.CodeTactics
 import Xv6.IallocParts
+import MachCSL.WpSmodeFrame8
 
 namespace Xv6
 
@@ -25,9 +26,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
@@ -173,11 +172,11 @@ theorem ialloc_out (PK : PRINTK) [Fscfg] [Icfg] [CurCtx] (cpu c0 : CPU) (k : KCt
   k_step_e (wp_s_auipc cpu _ (KA.«ialloc» + 0x72#64) false 0x4#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_addi cpu _ (KA.«ialloc» + 0x76#64) false 536#12 10#5 10#5 (by decide))
+  k_step_e (wp_s_addi cpu _ (KA.«ialloc» + 0x76#64) false 508#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ialloc_a_fmt]
   iintro Hk Hpc
   -- +0x7a  jal printk
-  k_step_e (wp_s_jal cpu _ (KA.«ialloc» + 0x7a#64) false 2085598#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«ialloc» + 0x7a#64) false 2085578#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ialloc_br_printk]
   iintro Hk Hpc
   iapply (printk_msg_call PK cpu _ _ iallocFmtStr (by unfold iallocFmtStr; decide) ialloc_pkKinds

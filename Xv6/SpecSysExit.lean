@@ -47,7 +47,6 @@ trap-CSR complement `trapCsrsExt` / `cpuClaimExt` goes in and is passed on
 to kexit, which spends it; the closer takes the trap reserve too
 (`trapRes k.sie + k.avail`, Rocq's `kstack_closer ... (trap_res b + av)`).
 Rocq's `SpecSysExit.v` still pins `eb = true`; this form subsumes it.
-The `sie = false` contract `SYSEXIT.wp_sys_exit` is derived.
 
 THE STACK CLOSER is in transit: sys_exit takes the closer anchored at ITS
 entry `sp`, wraps its own (dead) 4-slot frame around it, and hands the
@@ -135,27 +134,5 @@ structure SYSEXIT : Prop where
     hj hproc hv hK hnoff htier,
     wp_sys_exit_eb_body (hlc := hlc) (GF := GF) Γ cpu k γw γl γ γkl γk on j pid V M ip v cs sts Q
       hj hproc hv hK hnoff htier
-
-/-- The interrupts-off instance of `wp_sys_exit_eb`. -/
-theorem SYSEXIT.wp_sys_exit (A : SYSEXIT) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
-    [Xv6G GF] [FdslotG GF] [BioslotG GF]
-    [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
-    [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-    [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx] (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (cpu : CPU) (k : KCtx) (γw γl : GName) (γ : FileNames) (γkl : GName) (γk : KmemNames)
-    (on : Option Nat) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
-    (M : Nat → List (BitVec 8)) (ip v : BitVec 64) (cs : ExtTreeSet GName compare) (sts : List FdState) (Q : Int → IProp GF)
-    hj hproc hv hK hsie hnoff hlocks htier :
-    wp_sys_exit_body (hlc := hlc) (GF := GF) Γ cpu k γw γl γ γkl γk on j pid V M ip v cs sts Q
-      hj hproc hv hK hsie hnoff hlocks htier := by
-  have h := A.wp_sys_exit_eb (hlc := hlc) (GF := GF) Γ cpu k γw γl γ γkl γk on j pid V M ip v cs sts Q hj hproc hv hK hnoff
-    htier
-  unfold wp_sys_exit_eb_body at h
-  unfold wp_sys_exit_body
-  rw [hsie, trapRes_off] at h
-  simp only [trapCsrsExt_false, cpuClaimExt_false] at h
-  iintro ⟨Hk, Hpc, Hpi, Htc, Hcl, Hir, Hwl, Hin, Hft, Hpe, Hkl, Hav, Hrdy, Hbs, Hfs, Hirs, Hpr, Hfr, Hcp, Hch, Hmy, Hpay, Hcl2⟩
-  iapply h
-  iframe Hk Hpc Hpi Htc Hcl Hir Hwl Hin Hft Hpe Hkl Hav Hrdy Hbs Hfs Hirs Hpr Hfr Hcp Hch Hmy Hpay Hcl2
 
 end Xv6

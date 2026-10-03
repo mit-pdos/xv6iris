@@ -115,10 +115,6 @@ what `consDropOk`'s full-ring disjunct counts, as a name. -/
 def echoedCount (L : List LogEntry) : Nat :=
   (L.filter (fun e => decide (logEchoed e))).length
 
-/-- Rocq `echoed_count_eq`. -/
-theorem echoedCount_eq (L : List LogEntry) :
-    echoedCount L = (L.filter (fun e => decide (logEchoed e))).length := rfl
-
 /-- THE ERASE RUN IS NEVER ONE GLYPH (Rocq `cons_bs_join_length`, relax-d2
 K3): an erase arm's echo is a whole number of `consputcBs` triples. -/
 theorem consBsJoin_length (n : Nat) :
@@ -128,14 +124,6 @@ theorem consBsJoin_length (n : Nat) :
   | succ k ih =>
     rw [List.replicate_succ, List.flatten_cons, List.length_append, ih]
     simp [consputcBs]; omega
-
-/-- Rocq `cons_bs_join_not_single`. -/
-theorem consBsJoin_not_single (n : Nat) (x : BitVec 8) :
-    (List.replicate n consputcBs).flatten ≠ [x] := by
-  intro he
-  have := congrArg List.length he
-  rw [consBsJoin_length] at this
-  simp at this; omega
 
 /-- ...and the same for a run SPLIT at the arm's position, the shape the kill
 loop's early stop is in (Rocq `cons_bs_join_app_not_single`). -/
@@ -383,19 +371,5 @@ theorem consHistOk_step (H : ConsHist) (ev : ConsEv)
   | evRead ws =>
     -- only `chDl` moves
     exact ⟨hlog, harm⟩
-
-/-- The log only ever grows, and only at `evClose`. -/
-theorem consStep_log (H : ConsHist) (ev : ConsEv) :
-    ∃ suf, (consStep H ev).chLog = H.chLog ++ suf := by
-  cases ev with
-  | evByte b =>
-    unfold consStep
-    rcases H.chArm with _ | ⟨⟨h, c, cs⟩, j⟩ <;> exact ⟨[], by simp⟩
-  | evClose =>
-    unfold consStep
-    rcases H.chArm with _ | ⟨⟨h, c, cs⟩, j⟩
-    · exact ⟨[], by simp⟩
-    · exact ⟨[(h, c, cs.take j)], rfl⟩
-  | _ => exact ⟨[], by simp [consStep]⟩
 
 end Xv6

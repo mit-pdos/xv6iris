@@ -91,15 +91,11 @@ the new depth is the pushed one. -/
 theorem withCpu_pushOff4B (k : KCtx) (R : RegMap) (b : Bool) :
     ((k.pushed 4).withRegs R).withCpu R (k.noff + 1) b = ((k.pushOffB b).pushed 4).withRegs R := rfl
 
-/-- A store that leaves the depth and the saved enable state alone. -/
-theorem withCpu_self4 (k : KCtx) (R : RegMap) :
-    ((k.pushed 4).withRegs R).withCpu R k.noff k.intena = (k.pushed 4).withRegs R := rfl
-
 set_option maxHeartbeats 4000000 in
 /-- The common tail from `80000c36`: `mycpu()`, `noff += 1`, the epilogue.
 `R` is the body's map; its callee-saved registers other than `s1` (restored
 from the frame) are the caller's. -/
-theorem push_off_br_d4a : KA.«push_off» + 0xd4a#64 = KA.«mycpu» := by decide
+theorem push_off_br_d3e : KA.«push_off» + 0xd3e#64 = KA.«mycpu» := by decide
 
 theorem push_off_tail {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx] (M : MYCPU) (lent : Bool)
     (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
@@ -114,7 +110,7 @@ theorem push_off_tail {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Cur
   iintro ⟨Hk, Hpc, Hframe, Hpin, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#HT, Hk⟩
   -- jal mycpu
-  k_step (wp_s_jal cpu _ (KA.«push_off» + 0x18#64) false 3378#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [push_off_br_d4a]
+  k_step (wp_s_jal cpu _ (KA.«push_off» + 0x18#64) false 3366#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [push_off_br_d3e]
   iintro Hk Hpc
   have hm := M.wp_mycpu (hlc := hlc) (GF := GF) (lent := lent) cpu ((k.pushed 4).withRegs (R.set 1#5 (KA.«push_off» + 0x1c#64)))
     (by k_norm) (by k_norm; omega)
@@ -146,8 +142,8 @@ theorem push_off_tail {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Cur
     obtain ⟨w1, w2, w3, w4, w5⟩ := hwf
     unfold KCtx.wf
     simp only [KCtx.withCpu_sie, KCtx.withCpu_noff, KCtx.withCpu_intena, KCtx.withCpu_locks, KCtx.withCpu_tier,
-      KCtx.withRegs_sie, KCtx.withRegs_noff, KCtx.withRegs_intena, KCtx.withRegs_locks, KCtx.withRegs_tier,
-      KCtx.pushed_sie, KCtx.pushed_noff, KCtx.pushed_intena, KCtx.pushed_locks, KCtx.pushed_tier]
+      KCtx.withRegs_sie, KCtx.withRegs_noff, KCtx.withRegs_locks, KCtx.withRegs_tier,
+      KCtx.pushed_sie, KCtx.pushed_noff, KCtx.pushed_locks, KCtx.pushed_tier]
     refine ⟨fun h => absurd h (by omega), fun _ => hsie, fun h => absurd h (by rw [hsie]; decide), by omega, hnoff⟩
   iintro Hk Hpc
   -- epilogue
@@ -165,7 +161,7 @@ theorem push_off_tail {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Cur
     csRegs_set (csRegs_trans (csRegs_set hcs 1#5 _ (by decide)) (csRegs_of_calleeSaved hcs2)) 15#5 _ (by decide)
   obtain ⟨h18, h19, h20, h21, h22, h23, h24, h25, h26, h27⟩ := hc
   unfold calleeSaved
-  simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, eq_self_iff_true, _root_.true_and, _root_.and_true]
+  simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, _root_.true_and]
   exact ⟨h18, h19, h20, h21, h22, h23, h24, h25, h26, h27⟩
   case hR2 => k_norm; rw [hcs2.1]; simp [RegMap.set_apply, hsp]
 
@@ -190,7 +186,7 @@ theorem push_off_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Cur
   k_step (wp_s_add cpu _ (KA.«push_off» + 0xe#64) true 9#5 0#5 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- jal mycpu
-  k_step (wp_s_jal cpu _ (KA.«push_off» + 0x10#64) false 3386#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [push_off_br_d4a]
+  k_step (wp_s_jal cpu _ (KA.«push_off» + 0x10#64) false 3374#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [push_off_br_d3e]
   iintro Hk Hpc
   have hm := M.wp_mycpu (hlc := hlc) (GF := GF) (lent := false) cpu ((k.pushed 4).withRegs
       (((((k.regs.set 2#5 (k.regs 2#5 + 0xFFFFFFFFFFFFFFE0#64)).set 8#5 (k.regs 2#5)).set 15#5 v).set 9#5 v).set 1#5
@@ -217,7 +213,7 @@ theorem push_off_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Cur
       $$ [- $Hk $Hpc] with [hn0, MachCSL.beqz_zero]
     iintro Hk Hpc
     -- jal mycpu
-    k_step (wp_s_jal cpu _ (KA.«push_off» + 0x2c#64) false 3358#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [push_off_br_d4a]
+    k_step (wp_s_jal cpu _ (KA.«push_off» + 0x2c#64) false 3346#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [push_off_br_d3e]
     iintro Hk Hpc
     have hm4 := M.wp_mycpu (hlc := hlc) (GF := GF) (lent := false) cpu ((k.pushed 4).withRegs
         ((R2.set 15#5 0#64).set 1#5 (KA.«push_off» + 0x30#64)))

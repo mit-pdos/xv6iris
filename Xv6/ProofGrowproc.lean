@@ -40,7 +40,6 @@ import Xv6.SpecMyproc
 import Xv6.SpecUvmdealloc
 import Xv6.CodeTactics
 import Xv6.UPtPptLemmas
-import Xv6.UvmallocDefs
 
 namespace Xv6
 
@@ -48,13 +47,11 @@ open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Xv6.UPtAlloc
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
 /-! ## Shared facts -/
-
 
 /-- `blez`/`bgez` (the signed branches against `zero`). -/
 theorem gp_toInt_zero : (0#64 : BitVec 64).toInt = 0 := by decide
@@ -117,7 +114,7 @@ theorem gp_priv_elim (htc : curTier = KTier.kpt) (γ : FileNames) (pa : BitVec 6
   simp only at htc
   subst htc
   unfold procPrivFd procPrivCoreNoctxAt procPrivBareAt procFieldsNoOfile
-  iintro ⟨⟨⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hcwd, Hnm, Hsc⟩, Hpt, Htfp, %hlz, Hev⟩, Hc⟩, Ho⟩
+  iintro ⟨⟨⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hcwd, Hnm, Hsc, Hrt⟩, Hpt, Htfp, %hlz, Hev⟩, Hc⟩, Ho⟩
   isplitl []
   · ipureintro; exact h
   isplitl []
@@ -127,7 +124,7 @@ theorem gp_priv_elim (htc : curTier = KTier.kpt) (γ : FileNames) (pa : BitVec 6
   obtain ⟨hsz, hb, hr, ht, hl⟩ := hv
   ihave Htfp := (show @tfPageAt hlc GF _ ⟨ξ, KTier.kpt⟩ V.upt.tfp V.tf ⊢
       @tfPageAt hlc GF _ ⟨ξ, KTier.kpt⟩ P'.tfp V.tf from by rw [ht]) $$ Htfp
-  iframe Hpid Hk Hs Hpg Htf Hcwd Hnm Hsc Hpt Htfp Hc Ho Hev
+  iframe Hpid Hk Hs Hpg Htf Hcwd Hnm Hsc Hrt Hpt Htfp Hc Ho Hev
   isplitl []
   · ipureintro; exact ⟨hsz, hb, by rw [hr]; exact h.2.2.1, by rw [ht]; exact h.2.2.2⟩
   · ipureintro; exact hl
@@ -166,7 +163,7 @@ theorem gp_lazy_shrink (P : UPtd) (sz new : BitVec 64) (h : lazyFree P.um sz) :
   · exact h
 
 set_option maxHeartbeats 1000000 in
-/-- The epilogue at `0x80001cfc`, shared by the five endings: `a0` is
+/-- The epilogue at `0x80001cf0`, shared by the five endings: `a0` is
 already the return value. -/
 theorem gp_epi (c : CPU) (kb : KCtx) (hK : 4 ≤ kb.avail) (spie spp : Bool) (R : RegMap)
     (hR2 : R 2#5 = kb.regs 2#5 + 0xFFFFFFFFFFFFFFE0#64)
@@ -252,13 +249,11 @@ theorem gp_store (c : CPU) (kb : KCtx) (hK : 4 ≤ kb.avail) (spie spp : Bool) (
 
 end
 
-
 /-! ## The pure side conditions -/
 
 namespace GrowProc
 
 open Iris.Std Iris.Std.PartialMap Iris.Std.LawfulPartialMap Xv6.UPt
-
 
 /-- Above `PGROUNDUP(sz)` nothing is mapped: what `uvmalloc` demands. -/
 theorem um_free_above (sz newsz : BitVec 64) (P : UPtd) (h : umBelow sz P) (i : Nat)
@@ -340,7 +335,6 @@ theorem umBelow_shrink (oldsz newsz : BitVec 64) (P : UPtd) (h : umBelow oldsz P
 
 end GrowProc
 
-
 /-! ## The three shapes of `growprocOk` -/
 
 theorem gp_ok_same (V : ProcPriv) (M : Nat → List (BitVec 8)) (n r : BitVec 64)
@@ -373,12 +367,11 @@ theorem gp_ret_c4e : jumpPc (KA.«growproc» + 0x32#64) = (KA.«growproc» + 0x3
   decide
 theorem gp_ret_c72 : jumpPc (KA.«growproc» + 0x56#64) = (KA.«growproc» + 0x56#64) := by
   decide
-theorem gp_minus_one : BitVec.signExtend 64 (4095#12) = -1#64 := by decide
 theorem gp_uvmMaxsz_toNat : (0x3FFFFFE000#64).toNat = uvmMaxsz := by decide
 
-theorem growproc_br_fffffffffffff62a : KA.«growproc» + 0xfffffffffffff62a#64 = KA.«uvmdealloc» := by decide
+theorem growproc_br_fffffffffffff636 : KA.«growproc» + 0xfffffffffffff636#64 = KA.«uvmdealloc» := by decide
 
-theorem growproc_br_fffffffffffff66e : KA.«growproc» + 0xfffffffffffff66e#64 = KA.«uvmalloc» := by decide
+theorem growproc_br_fffffffffffff67a : KA.«growproc» + 0xfffffffffffff67a#64 = KA.«uvmalloc» := by decide
 
 theorem growproc_br_fffffffffffffcc8 : KA.«growproc» + 0xfffffffffffffcc8#64 = KA.«myproc» := by decide
 
@@ -589,8 +582,8 @@ theorem growproc_proof (MP : MYPROC) (UA : UVMALLOC) (UD : UVMDEALLOC) : GROWPRO
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
         with [KCtx.rget_eq, h10_1, gp_pt_off] next c14 hp14
       iintro Hk Hpc Hpt
-      k_step_gen (wp_s_jal c14 _ (KA.«growproc» + 0x2e#64) false 2094656#21 1#5 (by decide))
-        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [growproc_br_fffffffffffff66e] next c15 hp15
+      k_step_gen (wp_s_jal c14 _ (KA.«growproc» + 0x2e#64) false 2094668#21 1#5 (by decide))
+        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [growproc_br_fffffffffffff67a] next c15 hp15
       iintro Hk Hpc
       -- the lend (permit sweep L1a): the block's counter, borrowed
       icases Hcnt with ⟨%kc0, %hkc0, Hcnt⟩
@@ -794,8 +787,8 @@ theorem growproc_proof (MP : MYPROC) (UA : UVMALLOC) (UD : UVMDEALLOC) : GROWPRO
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
         with [KCtx.rget_eq, h10_1, gp_pt_off] next c10 hp10
       iintro Hk Hpc Hpt
-      k_step_gen (wp_s_jal c10 _ (KA.«growproc» + 0x52#64) false 2094552#21 1#5 (by decide))
-        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [growproc_br_fffffffffffff62a] next c11 hp11
+      k_step_gen (wp_s_jal c10 _ (KA.«growproc» + 0x52#64) false 2094564#21 1#5 (by decide))
+        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [growproc_br_fffffffffffff636] next c11 hp11
       iintro Hk Hpc
       -- the lend (permit sweep L2): the block's counter, borrowed
       icases Hcnt with ⟨%kc0, %hkc0, Hcnt⟩
@@ -829,7 +822,7 @@ theorem growproc_proof (MP : MYPROC) (UA : UVMALLOC) (UD : UVMDEALLOC) : GROWPRO
         BitVec.reduceEq, ite_true, ite_false, d2, d8, d9, d18, d19, d20, d21, d22, d23, d24, d25,
         d26, d27, h10_1] at hcs2 hr10
       obtain ⟨e2, e8, e9, e18, e19, e20, e21, e22, e23, e24, e25, e26, e27⟩ := hcs2
-      -- c.mv a1,a0 ; j 0x80001cf6
+      -- c.mv a1,a0 ; j 0x80001cea
       k_step_gen (wp_s_add c12 _ (KA.«growproc» + 0x56#64) true 11#5 0#5 10#5 (by decide))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c13 hp13
       iintro Hk Hpc
@@ -879,6 +872,5 @@ theorem growproc_proof (MP : MYPROC) (UA : UVMALLOC) (UD : UVMDEALLOC) : GROWPRO
             | rfl
             | exact e19 | exact e20 | exact e21 | exact e22 | exact e23
             | exact e24 | exact e25 | exact e26 | exact e27⟩
-
 
 end Xv6

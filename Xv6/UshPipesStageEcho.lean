@@ -30,13 +30,13 @@ producer (echo's is `stage_echo_law`; `cat f`'s is R-prog's
 As `UshPipesStageMid`; plus: sh-exec's echo arm (Rocq
 `wp_kshr_exec_echo_at_holds`) is the general `S.RX.wp_shExecXAtGen` at
 echo's diagnostic (`altExecfail`, bytes `UshExecEnvRun.ushEchoExecfailBytes`,
-the law's index `13 + 4 = 17` read off `lineOk_head`), as
-`ProofShRuncmdExec.shExecEchoAt_holds` converts; `prod_stage_law` is stated
+the law's index `13 + 4 = 17` read off `lineOk_head`); `prod_stage_law` is stated
 at sh's concrete rows (`ushJtab`, `ushCmd`, `ushFd2p`, `ushDg`, which ARE
 `S.E`'s fields by `rfl`), fd 1 R-prog's `ushFd1pipe`.
 -/
 import Xv6.UshPipesStageLaw
-import Xv6.UshPipesStageMid
+import Xv6.UshPipesStageCtx
+import Xv6.UkPipesEntriesEcho
 
 namespace Xv6
 
@@ -47,8 +47,6 @@ open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 open Wid RdOut WrOut
 open UShPipesDefs
-
-set_option linter.unusedSectionVars false
 
 section Echo
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [IcacheG GF]

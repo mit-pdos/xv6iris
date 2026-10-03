@@ -4,18 +4,18 @@ MachCSL: the CONTROL dispatch at User privilege with the TRAP CAUSES named
 control rows, `UserExecFacts.v` `exec_execute_ECALL_U`/`…_EBREAK_U`/the
 `jump_to` misaligned arm).
 
-Lane U1-X2's dispatch (`uxc_ctl_total32/16`, outcome `UxcStep`) says a
-control trap is AT USER at the current `PC`; the classification also needs
-its cause: user-raisable and delegable, and no extension payload.  This file
-restates the two dispatch facts with the stronger outcome `UclCtlStep`
-(`UxcStep` + `uclCtlRes`), from the same per-family walks:
+Lane U1-X2's per-family walks (outcome `UxcStep`) say a control trap is AT
+USER at the current `PC`; the classification also needs its cause:
+user-raisable and delegable, and no extension payload.  This file states the
+two dispatch facts with the stronger outcome `UclCtlStep` (`UxcStep` +
+`uclCtlRes`), from those per-family walks:
 
 * a `Trap` is at User with `ext = none` and a cause in `uclCtlExc`:
   `E_U_EnvCall` (ECALL), `E_Breakpoint` (EBREAK, C.EBREAK) -- and
-  `E_Fetch_Addr_Align`, the misaligned-target arm of `jump_to`
-  (`uxc_jal_misaligned` & co.), which cannot fire at the user tier's
-  configuration (`Zca` is on, so only bit 0 of a target matters, and it is
-  clear) but is admitted so the outcome is the Rocq one;
+  `E_Fetch_Addr_Align`, the misaligned-target arm of `jump_to`, which
+  cannot fire at the user tier's configuration (`Zca` is on, so only bit 0
+  of a target matters, and it is clear) but is admitted so the outcome is
+  the Rocq one;
 * an `Enter_Wait` is a `WRS` wait (`uwIsWrs`);
 * otherwise `Retire_Success` or `Illegal_Instruction`.
 -/
@@ -67,8 +67,7 @@ theorem uclCtlOut_execAs {orc : UOrc} {s s' : UWSt} {c : instruction} {res : Exe
 
 theorem ucl_wrs_isWrs (op : wrsop) : uwIsWrs (uxcWrsReason op) = true := by cases op <;> rfl
 
-/-- **The 32-bit control dispatch, causes named** (U1-X2's `uxc_ctl_total32`
-with `UclCtlStep`). -/
+/-- **The 32-bit control dispatch, causes named** (outcome `UclCtlStep`). -/
 theorem ucl_ctl_total32 (hD : UxcFoot D) (orc : UOrc) (s : UWSt) (hU : UxcCfg s)
     (hpc : (s.file .PC).getLsbD 0 = false) (ast : instruction) (hdec : decodableU ast = true)
     (h : uxcCtlU ast = true) : UclCtlOut D orc s (uxaExecAs ast) := by
@@ -121,8 +120,8 @@ theorem ucl_ctl_total32 (hD : UxcFoot D) (orc : UOrc) (s : UWSt) (hU : UxcCfg s)
     exact uclCtlOut_execAs (uxc_zimop_rr hD orc s mop rs2 rs1 rd) (uxcStep_wr ..) trivial
   case ILLEGAL p => exact uclCtlOut_execAs (uxc_illegal orc s p) (uxcStep_self s _ trivial) trivial
 
-/-- **The compressed control dispatch, causes named** (U1-X2's
-`uxc_ctl_total16` with `UclCtlStep`). -/
+/-- **The compressed control dispatch, causes named** (outcome
+`UclCtlStep`). -/
 theorem ucl_ctl_total16 (hD : UxcFoot D) (orc : UOrc) (s : UWSt) (hU : UxcCfg s)
     (hpc : (s.file .PC).getLsbD 0 = false) (ast : instruction) (h : uxcCtlUC ast = true) :
     UclCtlOut D orc s (uxaExecAs ast) := by

@@ -170,6 +170,15 @@ def config(name):
            #               instead of minutes; a run that DOES reach it stops
            #               there and pays nothing for a high number.
            "crounds": 0,
+           #   cburst=N    in a multi-hart case's round-robin, the PRIMARY
+           #               takes N instructions per instruction of the
+           #               second hart.  For a case whose second hart only
+           #               has to keep pace (conc_mp's free-running writer),
+           #               the even split spends half the model's run on
+           #               instructions no published word depends on.
+           #               Untrusted, like every schedule: it can make a run
+           #               fail to match, never pass.
+           "cburst": 1,
            #   ipol=fresh|stale;...   THE FETCH VIEW, for a case whose
            #               subject is self-modifying code: one per
            #               observation.  [fresh] reads the fetch at the top
@@ -197,8 +206,15 @@ def config(name):
                 k, _, v = kv.partition("=")
                 cfg[k] = int(v) if k in ("repeat", "smp", "budget", "tick",
                                      "board_repeat", "selfmod", "uarts",
-                                     "crounds", "latch") else v
+                                     "crounds", "cburst", "latch") else v
     return cfg
+
+def conc_cfg(tick, sched, rounds, cfg):
+    """The `ConcCfg` literal of a multi-hart run (vtest-lean/Vtest/Sched.lean)."""
+    burst = int(cfg["cburst"])
+    return ("{ tick := %s, sched := %s, rounds := %d%s }"
+            % (tick, sched, rounds, ", burst := %d" % burst if burst != 1 else ""))
+
 
 def build(name, defines=(), march="rv64imafd", tag=""):
     """[defines]/[march]/[tag] are for a BOARD PROFILE (tools/vtest/board.py)
@@ -645,8 +661,7 @@ def emit_passes(built=None, reset=False):
                 # ONE CONFIGURATION PER OBSERVATION, paired with its own
                 # schedule, in the order the capture lists them.
                 body = each("concAgrees_each",
-                            ["{ tick := %s, sched := %s, rounds := %d }"
-                             % (tick, sc, conc_rounds) for sc in scheds])
+                            [conc_cfg(tick, sc, conc_rounds, cfg) for sc in scheds])
                 what = ("the model EXHIBITS every observation the platform\n"
                         "   produced, each under an INTERLEAVING of the two harts\n"
                         "   named for it -- which is what a race has and what the\n"
@@ -655,8 +670,8 @@ def emit_passes(built=None, reset=False):
                 # THE MULTI-HART FORM.  Run such a case through the
                 # single-hart theorem and the second hart never executes.
                 body = ("theorem agrees : RunAgrees test observed :=\n"
-                        "  concAgrees_all test { tick := %s, sched := [], rounds := %d } observed\n"
-                        "    (by native_decide)" % (tick, conc_rounds))
+                        "  concAgrees_all test %s observed\n"
+                        "    (by native_decide)" % conc_cfg(tick, "[]", conc_rounds, cfg))
                 what = ("the model EXHIBITS every observation the platform\n"
                         "   produced, under an INTERLEAVING of the two harts --\n"
                         "   which is what a race has and what the single-hart\n"
@@ -740,9 +755,8 @@ def explain_source(mods):
         ns = lean_ns(vmod, pl)
         imports.append("import %sRun" % ns)
         if conc:
-            cfgs = (["{ tick := %s, sched := %s, rounds := %d }" % (tick, sc, rounds)
-                     for sc in scheds]
-                    or ["{ tick := %s, sched := [], rounds := %d }" % (tick, rounds)])
+            cfgs = ([conc_cfg(tick, sc, rounds, cfg) for sc in scheds]
+                    or [conc_cfg(tick, "[]", rounds, cfg)])
             fn = "explainConc"
         else:
             pk = {"lowest_head": ".lowest", "highest_head": ".highest"}

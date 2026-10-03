@@ -32,7 +32,6 @@ and `UkShParser.v` (5) -- `ushp_nul_row(_exec/_redir/_pipe)`,
 -/
 import Xv6.UshTreeDefs
 import Xv6.UshParserPure
-import Xv6.ByteCursor
 import Xv6.UshCodeNul
 
 namespace Xv6
@@ -41,7 +40,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled

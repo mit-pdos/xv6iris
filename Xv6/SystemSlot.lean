@@ -81,7 +81,6 @@ mint's ledger, the claim at its view, and `fsBootSnapWf`).
    (below this file, beside `appTriv` which uses them); `appTriv_found`/
    `appTriv_syncRun` are here.  `xv6Slot_swap` takes `Born`, the turn stages
    `Tn Tn'` and the born fact, as Rocq's inline `Hswap` does.
-   `appXferRaw_ofClone` is the pin's `app_xfer_raw_of_boot` at the clone.
 
 ## NOT PORTED here (Rocq §1-§2 items owned elsewhere)
 
@@ -106,8 +105,6 @@ import MachCSL.AdequacyDisk
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Std MachCSL
-
-set_option linter.unusedSectionVars false
 
 /-! ## 1.  The era-independent coverage facts, off the image -/
 
@@ -166,12 +163,6 @@ theorem appCloneRaw_raw {N : Type} (A : N → Aview → IProp GF) (B : N → IPr
   · iexact HA
   · iexists r'
     iexact HA'
-
-/-- The plain transport off a clone (what every landed application's merge is
-made of, `AppInv.appMergeRaw_ofXfer`). -/
-theorem appXferRaw_ofClone {N : Type} (A : N → Aview → IProp GF) (B : N → IProp GF)
-    (hb : ⊢ appCloneRaw A B) : ⊢ appXferRaw A :=
-  hb.trans (appCloneRaw_raw A B)
 
 /-- The generic application's clone: nothing claimed and nothing handed over
 (Rocq `app_clone_raw_triv`). -/

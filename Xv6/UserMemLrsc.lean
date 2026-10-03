@@ -21,8 +21,6 @@ namespace Xv6
 open MachCSL
 open Sail LeanRV64D LeanRV64D.Functions
 
-set_option linter.unusedSectionVars false
-
 variable {C : UCfg} {P : UPtd} {t0 : PTree} {mm0 : BMap}
 
 theorem ume_lrsc_nat (n : Nat) (h : lrsc_width_valid n = true) : n = 4 ∨ n = 8 := by

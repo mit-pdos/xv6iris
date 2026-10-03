@@ -25,10 +25,10 @@ Design: `claude-notes/design/ni-pid-ledger.md` (§2 D1, §3 W1).
 
 ## Deviations from Rocq
 
-1. Names: `pev`/`pev_actor`/`pev_pid`/`live_of`/`next_of` are
-   `Pev`/`Pev.actor`/`Pev.pid`/`liveOf`/`nextOf`; the constructors keep
-   Rocq's spelling (`Pev.PAlloc`, `Pev.PFree`).  `mword 64` / `mword 32`
-   are `BitVec 64` / `BitVec 32`.
+1. Names: `pev`/`pev_pid`/`live_of`/`next_of` are
+   `Pev`/`Pev.pid`/`liveOf`/`nextOf` (`pev_actor` is not ported: nothing
+   uses it); the constructors keep Rocq's spelling (`Pev.PAlloc`,
+   `Pev.PFree`).  `mword 64` / `mword 32` are `BitVec 64` / `BitVec 32`.
 2. **The live set is a PREDICATE on `Int`** (`Int → Prop`; Rocq: `gset Z`):
    it is compared with the pid register's domain, which in this tree is
    `PartialMap.dom R : Int → Prop` over `R : IntMapF GName` (the register
@@ -54,10 +54,6 @@ inductive Pev where
   | PFree (act : BitVec 64) (pid : BitVec 32)
   deriving DecidableEq, Repr
 
-/-- The label: the actor that ran the call (Rocq `pev_actor`). -/
-def Pev.actor : Pev → BitVec 64
-  | .PAlloc a _ | .PFree a _ => a
-
 /-- The pid the event carries (Rocq `pev_pid`). -/
 def Pev.pid : Pev → BitVec 32
   | .PAlloc _ p | .PFree _ p => p
@@ -82,8 +78,6 @@ def nextOf (pidmax : Nat) (h : List Pev) : Nat := h.foldl (nextStep pidmax) 1
 
 /-! ## 3. The snoc equations -/
 
-theorem liveOf_nil : liveOf [] = fun _ => False := rfl
-
 theorem liveOf_snoc (h : List Pev) (e : Pev) : liveOf (h ++ [e]) = liveStep (liveOf h) e := by
   unfold liveOf; rw [List.foldl_append]; rfl
 
@@ -94,45 +88,6 @@ theorem liveOf_snoc_alloc (h : List Pev) (a : BitVec 64) (p : BitVec 32) :
 theorem liveOf_snoc_free (h : List Pev) (a : BitVec 64) (p : BitVec 32) :
     liveOf (h ++ [.PFree a p]) = fun k => liveOf h k ∧ k ≠ (p.toNat : Int) := by
   rw [liveOf_snoc]; rfl
-
-theorem nextOf_nil (pidmax : Nat) : nextOf pidmax [] = 1 := rfl
-
-theorem nextOf_snoc (pidmax : Nat) (h : List Pev) (e : Pev) :
-    nextOf pidmax (h ++ [e]) = nextStep pidmax (nextOf pidmax h) e := by
-  unfold nextOf; rw [List.foldl_append]; rfl
-
-theorem nextOf_snoc_alloc (pidmax : Nat) (h : List Pev) (a : BitVec 64) (p : BitVec 32) :
-    nextOf pidmax (h ++ [.PAlloc a p]) = if p.toNat = pidmax then 1 else p.toNat + 1 := by
-  rw [nextOf_snoc]; rfl
-
-theorem nextOf_snoc_free (pidmax : Nat) (h : List Pev) (a : BitVec 64) (p : BitVec 32) :
-    nextOf pidmax (h ++ [.PFree a p]) = nextOf pidmax h := by
-  rw [nextOf_snoc]; rfl
-
-/-! ## 4. The counter stays in `[1, pidmax]` when every pid does -/
-
-/-- The fold's step keeps the bound, from any start inside it. -/
-theorem foldl_nextStep_bound (pidmax : Nat) (h : List Pev) (n : Nat)
-    (hn : 1 ≤ n ∧ n ≤ pidmax)
-    (hin : ∀ e, e ∈ h → 1 ≤ e.pid.toNat ∧ e.pid.toNat ≤ pidmax) :
-    1 ≤ h.foldl (nextStep pidmax) n ∧ h.foldl (nextStep pidmax) n ≤ pidmax := by
-  induction h generalizing n with
-  | nil => exact hn
-  | cons e h ih =>
-    simp only [List.foldl_cons]
-    refine ih _ ?_ (fun e' he' => hin e' (List.mem_cons_of_mem _ he'))
-    have he := hin e List.mem_cons_self
-    cases e with
-    | PAlloc a p =>
-      simp only [Pev.pid] at he
-      simp only [nextStep]
-      split <;> omega
-    | PFree a p => exact hn
-
-theorem nextOf_bound (pidmax : Nat) (h : List Pev) (hmax : 1 ≤ pidmax)
-    (hin : ∀ e, e ∈ h → 1 ≤ e.pid.toNat ∧ e.pid.toNat ≤ pidmax) :
-    1 ≤ nextOf pidmax h ∧ nextOf pidmax h ≤ pidmax :=
-  foldl_nextStep_bound pidmax h 1 ⟨Nat.le_refl 1, hmax⟩ hin
 
 /-! ## 5. The rewrite forms the invariant's tie uses -/
 

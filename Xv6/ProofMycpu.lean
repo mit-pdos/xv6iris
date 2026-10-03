@@ -20,7 +20,7 @@ theorem mycpu_addr (cpu : CPU) :
   rw [MachCSL.hart_shift]
   rfl
 
-theorem mycpu_br_10b28 : KA.«mycpu» + 0x10b28#64 = KA.«cpus» := by decide
+theorem mycpu_br_10bd4 : KA.«mycpu» + 0x10bd4#64 = KA.«cpus» := by decide
 
 set_option maxHeartbeats 4000000 in
 theorem mycpu_proof : MYCPU := ⟨fun {hlc GF} _ _ {lent} cpu k hsie hK => by
@@ -50,7 +50,7 @@ theorem mycpu_proof : MYCPU := ⟨fun {hlc GF} _ _ {lent} cpu k hsie hK => by
     with [BitVec.reduceAppend]
   iintro Hk Hpc
   -- addi a0,a0,-1296
-  k_step (wp_s_addi cpu _ (KA.«mycpu» + 0x12#64) false 2842#12 10#5 10#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [mycpu_br_10b28]
+  k_step (wp_s_addi cpu _ (KA.«mycpu» + 0x12#64) false 3014#12 10#5 10#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [mycpu_br_10bd4]
   iintro Hk Hpc
   -- add a0,a0,a5
   k_step (wp_s_add cpu _ (KA.«mycpu» + 0x16#64) true 10#5 10#5 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]

@@ -15,15 +15,12 @@ misses `T`).
 -/
 import Xv6.UkLoad
 import MachCSL.UkfWalk
-import MachCSL.UFetch
 
 namespace Xv6
 
 open Iris Std MachCSL
 open Iris.Std.PartialMap Iris.Std.FiniteMap
 open Sail LeanRV64D LeanRV64D.Functions
-
-set_option linter.unusedSectionVars false
 
 /-! ## §1 The walks -/
 

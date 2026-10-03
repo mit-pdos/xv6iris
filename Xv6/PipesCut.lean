@@ -10,12 +10,13 @@ consumer).  Pure.
 
 ## Deviations from Rocq / what is NOT here
 
-1. PARTIAL (row U0-3): only the 15 reached declarations whose statements
-   need nothing but `LineWords`/`EchoDisc`/`FileDiscLine` are ported: `bat`,
+1. PARTIAL (row U0-3): only reached declarations whose statements need
+   nothing but `LineWords`/`EchoDisc`/`FileDiscLine` are ported: `bat`,
    `bat_app`, `bat_cons3`, `line_ok_body_pos`, `catf_body_len`,
-   `wl_toks_end_le`, `map_lookup_fmap`, `line_bytes_pipe_length_fs`,
-   `ushq_soff(_ge)`, `wl_off_shift`, `wl_toks_at_bounds`, `pipe_bytes_lo_fs`,
-   `suf_filt(s)_len_ge`, `upls_fs_le`.
+   `wl_toks_end_le`, `line_bytes_pipe_length_fs`, `ushq_soff(_ge)`,
+   `wl_off_shift`, `wl_toks_at_bounds`, `pipe_bytes_lo_fs`,
+   `suf_filt(s)_len_ge`.  Of that class, `map_lookup_fmap` and `upls_fs_le`
+   are not ported (nothing uses them).
 2. The other 22 reached declarations — `prod_ws_ok`, `fd_bar_bar`,
    `filt_ws_ok`, `line_bytes_pipe_split_fs`, `tail_filts`,
    `lines_of_pipe_fs`, `ushq_rtoks_ws_lookup`, `wl_toks_at_shift`,
@@ -72,11 +73,6 @@ theorem wlToks_end_le (ws : List (List (BitVec 8))) (tk : Nat × Nat) (htk : tk 
   cases hi
   have := wlOff_le_body ws 0 i w w.length hw (Nat.le_refl _)
   simpa using this
-
-/-- Rocq `map_lookup_fmap`. -/
-theorem map_lookup_fmap {A B : Type} (f : A → B) (l : List A) (k : Nat) :
-    (l.map f)[k]? = (l[k]?).map f := by
-  simp
 
 /-- Rocq `bat_cons3`. -/
 theorem bat_cons3 (g : Nat → BitVec 8) (c : Nat) (a b d : BitVec 8) (l : List (BitVec 8))
@@ -135,7 +131,7 @@ theorem wlToksAt_bounds (r : List (List (BitVec 8))) :
       | cons w' r' =>
         have hb := ih _ tk h
         rw [wlTail_cons]
-        simp only [List.length_cons, List.length_append]
+        simp only [List.length_cons]
         omega
 
 /-- Rocq `pipe_bytes_lo_fs`. -/
@@ -160,14 +156,6 @@ theorem sufFilts_len_ge (fs : List Filt) : 6 * fs.length ≤ (sufFilts fs).lengt
     rw [sufFilts_cons, List.length_append]
     have := sufFilt_len_ge F
     simp only [List.length_cons]; omega
-
-/-- Rocq `upls_fs_le`: an admissible pipeline has at most 16 filter stages. -/
-theorem upls_fs_le (p : Producer) (fs : List Filt) (h : ulineOk (.LPipe p fs)) : fs.length ≤ 16 := by
-  have hlm := h.2.2.2
-  rw [lineBytes_pipe_length_fs] at hlm
-  have := sufFilts_len_ge fs
-  simp only [lineMax] at hlm
-  omega
 
 /-- **Rocq `prod_body_len3`** (DRIFT SY1, Rocq `UShUPipes`, 7adb0cba2): every
 producer's body is at least three bytes (`echo` and `cat` both). -/

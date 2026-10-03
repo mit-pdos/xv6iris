@@ -22,14 +22,14 @@ CONE (this file): `ucat_image_entry`.
 3. The key image is a page view (UkUnionEntriesDefs deviation 2).
 -/
 import Xv6.UkUnionEntriesDefs
+import Xv6.UkSysFHHolds
+import Xv6.UkSysPHolds
 
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Std (ExtTreeSet)
 open HfpFileClaimsP Ualt
-
-set_option linter.unusedSectionVars false
 
 /-- cat's diagnostic is short: the name is shorter than `DIRSIZ`. -/
 theorem ucat_dg_short (nm : List (BitVec 8)) (hu : uname nm) : ((catDgOpen nm).length : Int) < 2 ^ 31 := by

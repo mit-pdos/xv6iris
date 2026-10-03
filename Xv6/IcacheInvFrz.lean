@@ -106,12 +106,12 @@ Z.of_nat nib` is `(inum.toNat : Int) < 16 * (nib : Int)` (what
   function as `IcacheRefDefs.frzIspre` (Rocq `frz_ispre`): the two are
   Rocq's two names, `frz_bit` appears in the statements of
   `ireg_icnt_frz_acc` and of IcacheInvStore's movers, and ProofIput's
-  `cbn [frz_close frz_bit]` steps read it.  `frzBit_eq_frzIspre` bridges.
+  `cbn [frz_close frz_bit]` steps read it.
 * The two `Global Instance … Timeless` are instances.
 
 ## Added (Rocq's inline steps, named; no statement moves)
 
-* `frzBit_eq_frzIspre` (the bridge above), `iregFrzmOk_of_bit` (Rocq's
+* `iregFrzmOk_of_bit` (Rocq's
   inline `assert (Hmok' : ireg_frzm_ok (frz_bit ph') …)`),
   `iregClaimOk_frz_step` (Rocq's inline `assert (Hclm' : …)` in
   `ireg_icnt_frz_acc`: the claim clause across a phase step).
@@ -127,8 +127,6 @@ import Xv6.IgetLic
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Iris.Algebra MachCSL
-
-set_option linter.unusedSectionVars false
 
 /-! ## 1.  THE PIN's TWO PURE FACTS -/
 
@@ -182,9 +180,6 @@ def frzBit (ph : Frz) : Bool :=
   match ph with
   | .frzPre _ => true
   | _ => false
-
-theorem frzBit_eq_frzIspre (ph : Frz) : frzBit ph = frzIspre ph := by
-  cases ph <;> rfl
 
 /-- The region's mirror clause READ OFF the slot: `iregFrzmOk` at a known
 phase IS "`b` is `frzBit ph`". -/
@@ -662,14 +657,14 @@ PARENT's flavour -- "idup copies the flavour" -- which keeps (R3) true. -/
 theorem iregIcnt_mir_acc [Icfg] (E : CoPset) (γi : GName) (γfs : FsNames)
     (inodestart nib : Nat) (inum : BitVec 32) (bfl : Bool) (n : Nat)
     (hE : (↑iregN : CoPset) ⊆ E) (hin : (inum.toNat : Int) < 16 * (nib : Int)) (hn : 1 ≤ n) :
-    ⊢@{IProp GF} iregInv (hlc := hlc) γi γfs inodestart nib -∗
+    ⊢@{IProp GF} iregReg (hlc := hlc) γi γfs inodestart nib -∗
       frzmH inum.toNat false -∗ icntHalf inum.toNat n -∗
       |={E, E \ ↑iregN}=> (frzmH inum.toNat false ∗
         (∀ m : Nat, ⌜m = n + 1⌝ -∗ runit bfl inum.toNat -∗
           |={E \ ↑iregN, E}=>
             (icntHalf inum.toNat m ∗ runit bfl inum.toNat ∗ runit bfl inum.toNat))) := by
   iintro #Hinv Hmir Hhalf
-  imod iregInv_slot_acc E γi γfs inodestart nib inum hE hin $$ Hinv with
+  imod iregReg_slot_acc E γi γfs inodestart nib inum hE hin $$ Hinv with
     ⟨%mm, %ds, %hwf, %hcp, Ha, Hrec, Hslot, Hrest, Hclose⟩
   unfold iregSlot
   icases Hslot with

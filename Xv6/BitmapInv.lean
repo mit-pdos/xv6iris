@@ -48,7 +48,7 @@ else.  There is no per-block ownership token:
 
 * `balloc` hands out the block's EXCLUSIVE run, so a caller that keeps one
   per block its own structures name concludes the new block is none of
-  them (`Xv6.fsblock_excl`) -- the fact that re-establishes the inode
+  them -- the fact that re-establishes the inode
   block map's injectivity;
 * `bfree`'s `panic("freeing free block")` is DEAD, and
   `Xv6.freePool_used` is the proof: the caller arrives holding the block's
@@ -65,11 +65,11 @@ names.
 
 **DEVIATIONS from Rocq, with reasons.**
 
-1. **`BPB` / `BBLOCK` / `BBLOCK_single` / `BPB_value` ARE NOT DEFINED
-   HERE.**  They are already `Xv6/FsGeom.lean`'s, which collects the
-   `fs.h` / `param.h` constants that Rocq scatters across the files that
-   need them first; this file imports them.  `FSSIZE_lt_BPB` and
-   `BBLOCK_of_lt_FSSIZE` live there too.
+1. **`BPB` IS NOT DEFINED HERE.**  It is already
+   `Xv6/FsGeom.lean`'s, which collects the `fs.h` / `param.h` constants
+   that Rocq scatters across the files that need them first; this file
+   imports them.  `BBLOCK`, `BBLOCK_single`, `FSSIZE_lt_BPB` and
+   `BBLOCK_of_lt_FSSIZE` are not ported (nothing uses them).
 2. **BLOCK NUMBERS ARE `Nat` AND SETS OF THEM ARE NOT `gset Z`**: `cov` is
    the `Std.ExtTreeSet Nat compare` the log layer already threads, the
    home set is the `List Nat` `Xv6.fsHomeList`, and the bitmap's index set
@@ -104,7 +104,6 @@ names.
    `MachCSL.wordPointsTo … 4`, the port's spelling of Rocq's `↦₄`.
 -/
 import Xv6.FsBytesGamma
-import Xv6.LogDefs
 import Xv6.FsBytesMint
 import Xv6.FsStateBitmap
 import Xv6.IrefSlots
@@ -113,8 +112,6 @@ import Xv6.SlotGen
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
-
-set_option linter.unusedSectionVars false
 
 /-! ## The two superblock fields the allocator reads (deviation 4) -/
 
@@ -347,13 +344,6 @@ instance bitmapInv_persistent (γfs : FsNames) (bms : Nat) (cov : ExtTreeSet Nat
     (ls size : Nat) : Persistent (bitmapInv (GF := GF) γfs bms cov ls size) := by
   unfold bitmapInv; infer_instance
 
-theorem bitmapInv_reg (γfs : FsNames) (bms : Nat) (cov : ExtTreeSet Nat compare)
-    (ls size : Nat) :
-    bitmapInv (GF := GF) γfs bms cov ls size ⊢ bitmapReg γfs bms cov ls size := by
-  unfold bitmapInv bitmapReg fsBytesAnyAt
-  iintro ⟨H1, H2, -⟩
-  iframe H1 H2
-
 theorem bitmapInv_of (γfs : FsNames) (bms : Nat) (cov : ExtTreeSet Nat compare)
     (ls size : Nat) :
     bitmapReg (GF := GF) γfs bms cov ls size ⊢ excSealed γfs.exc -∗
@@ -384,14 +374,6 @@ theorem bitmapInv_bytes_at (γfs : FsNames) (bms : Nat) (cov : ExtTreeSet Nat co
     (ls size : Nat) :
     bitmapReg (GF := GF) γfs bms cov ls size ⊢ fsBytesAt γfs (fsHomeList cov ls) := by
   unfold bitmapReg; iintro ⟨-, H⟩; iexact H
-
-/-- Rocq's `bitmap_inv_bytes`. -/
-theorem bitmapInv_bytes (γfs : FsNames) (bms : Nat) (cov : ExtTreeSet Nat compare)
-    (ls size : Nat) :
-    bitmapInv (GF := GF) γfs bms cov ls size ⊢ fsBytesAny γfs := by
-  unfold bitmapInv
-  iintro ⟨-, Hb⟩
-  iapply fsBytesAnyAt_any γfs (fsHomeList cov ls) $$ Hb
 
 /-! ## `bitmapOk`, READ OFF THE POOL -/
 

@@ -42,7 +42,6 @@ path[128]` at `sp0-144`.  The buffer is a `byteBuf` list
 import Xv6.SysfileCalls
 import Xv6.SpecSysMkdir
 import Xv6.ProcPrivAcc
-import Xv6.KstackMap
 import Xv6.KexecParts
 
 namespace Xv6
@@ -52,9 +51,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## Constants (Rocq `md_push` / `md_pop` / `md_fp` / `md_buf` / `md_frm*`) -/
 
@@ -88,11 +85,6 @@ theorem sys_mkdir_K (a : Nat) (h : sysMkdirSlots ≤ a) :
   omega
 
 /-! ## The sign cluster (the `bltz` at +0x1a) and the `beqz` at +0x2c -/
-
-/-- `c.li a1,1` leaves create's `ty` argument, SIGN-extended (`T_DIR`). -/
-theorem sys_mkdir_a1 : 0#64 + BitVec.signExtend 64 1#12 = BitVec.signExtend 64 T_DIR := by decide
-/-- `c.li a2,0` / `c.li a3,0`: `major = minor = 0`. -/
-theorem sys_mkdir_a23 : 0#64 + BitVec.signExtend 64 0#12 = BitVec.signExtend 64 (0#16) := by decide
 
 theorem sys_mkdir_tdir_nz : T_DIR.toNat ≠ 0 := by decide
 theorem sys_mkdir_tdir_ne_file : T_DIR ≠ T_FILE_w := by decide
@@ -375,7 +367,7 @@ def sysMkdirOut (A : SysMkdirArgs GF) (r : BitVec 64) : IProp GF := iprop%
   bslots 3 ∗ irefSlots A.ns ∗
   (∃ P' : UPtd, ⌜A.V.upt.extSz A.V.sz P'⌝ ∗
     procPrivFd A.γ (procAddr A.j) A.pid { A.V with upt := P' } (viewFaulted A.V.upt P' A.M)) ∗
-  mkdirArms (hlc := hlc) (fsGammaL fscFs) fscFs A.V.cwi (viewLazy A.V.upt A.V.sz A.M) A.v.toNat
+  mkdirArms (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti A.V.cwi (viewLazy A.V.upt A.V.sz A.M) A.v.toNat
     A.P A.Pmiss A.Farm A.Fdots A.Fun A.Fok A.Fex r
 
 set_option maxHeartbeats 8000000 in

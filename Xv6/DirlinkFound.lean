@@ -15,11 +15,15 @@ region by `dirInumsOk` at the record dirlookup stopped on, so its
 `IBLOCK` facts come out of `iregBlocksOk`.  The credited spend
 (`ipSpendW w false false ≤ 2`) is weakened to the counted `iputUnits` at
 the seam (Rocq's GR-2c finding 5), and the arm reports `a0 = -1`, the
-directory UNCHANGED, `tot = 0`.
+directory UNCHANGED, `tot = 0`.  The arm is entered from EITHER of the inner
+lookup's found arms (chroot): a matched record, or the SELF arm (`..` at the
+process's root, where dirlookup hands back a fresh reference to dp itself);
+the child's inum range comes from the caller on both.
 -/
 import Xv6.DirlinkTail
 import Xv6.DirlinkDefs
 import MachCSL.BvLemmas
+import Xv6.DirlookupParts
 
 namespace Xv6
 
@@ -28,9 +32,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 theorem dirlink_slots_iput (a : Nat) (h : dirlinkSlots ≤ a) : iputSlots ≤ a - 10 := by
   have h1 : iputSlots = 78 := by decide
@@ -115,34 +117,34 @@ theorem dirlink_found (IP : IPUT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (ip : BitVec 64) (dinum : BitVec 32) (bm : Blkmap) (data : Nat → List (BitVec 8))
     (dn dn0 : Dinode) (fn : Nat → BitVec 8) (inum : BitVec 16) (ncount : Nat) (Sb : List Nat)
     (tid : Nat) (qtx : Qp) (pidv : BitVec 32) (dqp dqd dqf dqn dqs dqbs dqb : DFrac)
-    (v1 v3 v4 : BitVec 64) (bs : List (BitVec 8)) (kk kslot : Nat) (q : Qp)
+    (kd : Nat) (sd : Qp) (rootv : BitVec 64) (rti : Nat) (dqr : DFrac)
+    (v1 v3 v4 : BitVec 64) (bs : List (BitVec 8)) (kslot : Nat) (q : Qp) (inum2 : BitVec 32)
     (hs : DirlinkStatic k j bm data dn dn0 fn inum dinum ncount Sb) (hpd : descPageRw pd)
     (hr : dirlinkRegs k ip (k.regs 9#5) (k.regs 19#5) (k.regs 20#5) R)
-    (hfound : dirFirst data (dirNrec dn.diSize.toNat) (bname 14 fn) = some kk)
+    -- the child's range, and WHICH arm found it: a record, or the inner
+    -- lookup's SELF arm (`..` at the process's root: the child is dp itself)
+    (hnib : inum2.toNat < 16 * icfgNib)
+    (harm : dirFirst data (dirNrec dn.diSize.toNat) (bname 14 fn) ≠ none ∨
+      dlSelf (bname 14 fn) dinum rti)
     (hkslot : kslot < NINODE) (ha0 : R 10#5 = ientry kslot) :
     kctx cpu (((k.withSpie spie spp).pushed 10).withRegs R) ∗ pcIs cpu (KA.«dirlink» + 0x1a#64) ∗
     dirlinkFrame (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) v1 (k.regs 18#5) v3 v4 (k.regs 21#5)
       (k.regs 22#5) ∗
     dirlinkDe (k.regs 2#5) bs ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    inodeRef kslot q icfgDev (BitVec.setWidth 32 (dirInum data kk)) ∗
-    runitAny (BitVec.setWidth 32 (dirInum data kk)).toNat ∗
-    dirlinkKeep k ip dinum bm data dn dn0 fn pidv dqp dqd dqf dqn dqs dqbs dqb ∗
+    inodeRef kslot q icfgDev inum2 ∗ runitAny inum2.toNat ∗
+    dirlinkKeep k ip dinum bm data dn dn0 fn pidv dqp dqd dqf dqn dqs dqbs dqb kd sd rootv rti dqr ∗
     bslots 3 ∗ dlinks fscFs dinum.toNat dn bm data ∗
     logOpS icfgLog ncount Sb ∗ txPin icfgLog tid qtx ∗
     dirlinkEnv (hlc := hlc) Γ γl pd pav pu γkl γk ∗
     (∀ c' : CPU, dirlinkPost k ip dinum bm data dn dn0 fn inum ncount Sb tid qtx pidv
-      dqp dqd dqf dqn dqs dqbs dqb c')
+      dqp dqd dqf dqn dqs dqbs dqb kd sd rootv rti dqr c')
     ⊢ wpLoop (GF := GF) cpu := by
   have hww : ∀ (K : KCtx) (a b c d : Bool), (K.withSpie a b).withSpie c d = K.withSpie c d :=
     fun _ _ _ _ _ => rfl
   have hpsw : ∀ (K : KCtx) (m : Nat) (a b : Bool),
       (K.pushed m).withSpie a b = (K.withSpie a b).pushed m := fun _ _ _ _ => rfl
   have hne := ientry_ne_zero kslot (Nat.le_of_lt hkslot)
-  have hklt := dirFirst_lt _ _ _ _ hfound
-  have hlive := dirFirst_live _ _ _ _ hfound
-  have hnib : (BitVec.setWidth 32 (dirInum data kk)).toNat < 16 * icfgNib := by
-    rw [MachCSL.zext32_toNat]; exact hs.hinums kk hklt hlive
   obtain ⟨hcov, hlog⟩ := hs.hiregb _ hnib
   have hn3 := dirlink_3le _ _ _ hs.hneed
   obtain ⟨r2, r8, r9, r18, r19, r20, r21, r22, r23, r24, r25, r26, r27⟩ := id hr
@@ -156,13 +158,13 @@ theorem dirlink_found (IP : IPUT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     with [ha0, Xv6.dirlookup_bnez, decide_eq_true hne]
   iintro Hk Hpc
   -- +0x58  jal iput
-  k_step_e (wp_s_jal cpu _ (KA.«dirlink» + 0x58#64) false 2095432#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«dirlink» + 0x58#64) false 2095360#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [dirlink_br_iput]
   iintro Hk Hpc
   unfold dirlinkKeep
-  icases Hkeep with ⟨Hdev, Hin, Hmeta, Hmap, Hblk, Hnm, Hsi, Hss, Hsb, Hdi, Hpid⟩
+  icases Hkeep with ⟨Hdev, Hin, Hmeta, Hmap, Hblk, Hnm, Hsi, Hss, Hsb, Hdi, Hpid, Hdr⟩
   icases logOpS_named icfgLog ncount Sb $$ Hop with ⟨%e0, Hop⟩
-  ihave Hrefp : inodeRefp kslot q icfgDev (BitVec.setWidth 32 (dirInum data kk)) $$ [Href Hru]
+  ihave Hrefp : inodeRefp kslot q icfgDev inum2 $$ [Href Hru]
   · unfold inodeRefp; iframe
   iapply (dirlink_iput IP Γ cpu _ γl pd pav pu j kslot q _ ncount Sb e0 tid qtx pidv dqp dqb dqs
       hs.hj ?gproc ?gK ?gnoff ?gtier hkslot hs.hgeom hs.hbg hcov hlog hnib hs.hbel hn3 hpd ?ga0)
@@ -196,7 +198,7 @@ theorem dirlink_found (IP : IPUT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
   iintro Hk Hpc
   have hspend : ncount - iputUnits ≤ n' := by
     unfold ipSpendW ipBm iputUnits at *; cases w <;> simp at hn1 <;> omega
-  have hout : DirlinkOut bm data dn dn0 fn inum dinum ncount Sb (-1#64) true bm data dn dn0 n' Sb'
+  have hout : DirlinkOut bm data dn dn0 fn inum dinum rti ncount Sb (-1#64) true bm data dn dn0 n' Sb'
       0 :=
     { spend := dirlink_budget3 n' ncount hspend hn2
       sub := hsub
@@ -206,21 +208,21 @@ theorem dirlink_found (IP : IPUT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
       sized := id
       arms := by
         rw [if_pos rfl]
-        exact ⟨by rw [hfound]; exact Option.some_ne_none kk, rfl, rfl, rfl, rfl, rfl, rfl⟩ }
+        exact ⟨harm, rfl, rfl, rfl, rfl, rfl, rfl⟩ }
   iapply (dirlink_tail cpu k spie1 spp1 _ v1 v3 v4 bs
       (by have := hs.hK; unfold dirlinkSlots at this; omega) hs.hal ?t2 ?t9 ?t19 ?t20 ?t23 ?t24
       ?t25 ?t26 ?t27)
     $$ [$Hk $Hpc $Hframe $Hde $Hte $Hce Hpost Hdev Hin Hmeta Hmap Hblk Hnm Hsi Hss Hsb Hdi Hpid
-      Hbs Hslot Hlk Hop Htx]
+      Hdr Hbs Hslot Hlk Hop Htx]
   all_goals first
     | (simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, b2, b9, b19,
         b20, b23, b24, b25, b26, b27, r2, r9, r19, r20, r23, r24, r25, r26, r27]; done)
     | skip
   · iintro %c' %R' %⟨hcs', ha0'⟩ Hk Hpc Hte Hce
     ispecialize Hpost $$ %c'
-    ihave HΦ := dirlinkPost_elim _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ $$ Hpost
+    ihave HΦ := dirlinkPost_elim _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ $$ Hpost
     iapply HΦ $$ %spie1 %spp1 %R' %true %bm %data %dn %dn0 %n' %Sb' %0 %hcs' [] Hk Hpc Hte Hce
-      [Hdev Hin Hmeta Hmap Hblk Hnm Hsi Hss Hsb Hdi Hpid] Hbs Hslot Hlk Hop Htx
+      [Hdev Hin Hmeta Hmap Hblk Hnm Hsi Hss Hsb Hdi Hpid Hdr] Hbs Hslot Hlk Hop Htx
     · ipureintro
       simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] at ha0'
       rw [ha0']; exact hout

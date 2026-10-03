@@ -25,6 +25,8 @@ strips it (Rocq: `gen_pay_timeless` after it).
 import Xv6.InitMainDie
 import Xv6.InitMainFork
 import Xv6.InitMainBanner
+import Xv6.ConsoleintrArms
+import Xv6.UkRunBr
 
 namespace Xv6
 
@@ -32,7 +34,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
@@ -89,12 +90,12 @@ theorem wp_kinit_main_loop (UL : UK_LEAVES) (HS : UK_SYS_P) (HP : INIT_PRINTF)
     iintro %h1 Hrun
     rw [ukPc 0x32 0x34 true rfl, ukMv, hs2]
     -- 0x34  jal printf
-    ihave Hi := init_uis N.t 0x34 false (.JAL (0x794#21, .Regidx 1#5)) udec% (by decide) $$ Hc
-    iapply wp_uk_jal UL N h1 _ (BitVec.ofNat 64 0x34) false 0x794#21 1#5 _ (by unfold unotSp spIdx; decide)
+    ihave Hi := init_uis N.t 0x34 false (.JAL (0x79c#21, .Regidx 1#5)) udec% (by decide) $$ Hc
+    iapply wp_uk_jal UL N h1 _ (BitVec.ofNat 64 0x34) false 0x79c#21 1#5 _ (by unfold unotSp spIdx; decide)
       (by decide) $$ Hi Hrun
     inext
     iintro %h2 Hrun
-    rw [show BitVec.ofNat 64 0x34 + BitVec.signExtend 64 0x794#21 = BitVec.ofNat 64 User.Init.Sym.«printf»
+    rw [show BitVec.ofNat 64 0x34 + BitVec.signExtend 64 0x79c#21 = BitVec.ofNat 64 User.Init.Sym.«printf»
       from by decide]
     let m2 := ukWr (ukWr m 10#5 (BitVec.ofNat 64 kinitLitStart)) 1#5 (BitVec.ofNat 64 0x34 + instrLen false)
     iapply wp_kinit_banner UL HS HP N T stc Cr cn h2 m2 n (by ureg) $$ Hwl Hblaw Hc Hstr Htk Hstd Hrun

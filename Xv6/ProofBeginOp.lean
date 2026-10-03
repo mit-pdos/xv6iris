@@ -81,16 +81,16 @@ The three `auipc`/`addi` pairs that materialise `&log` all normalise to the
 SAME offset (`+0x1e69e`), because the relocation is computed from each
 pair's own `auipc`. -/
 
-theorem bo_log : KA.«begin_op» + 0x1e888#64 = logAddr := by unfold logAddr; decide
-theorem bo_lout : KA.«begin_op» + 0x1e8a4#64 = lOut := by unfold lOut logAddr; decide
+theorem bo_log : KA.«begin_op» + 0x1eab4#64 = logAddr := by unfold logAddr; decide
+theorem bo_lout : KA.«begin_op» + 0x1ead0#64 = lOut := by unfold lOut logAddr; decide
 
 theorem bo_cmt_addr : logAddr + 32#64 = lCmt := rfl
 
 
-theorem bo_br_acq : KA.«begin_op» + 0xffffffffffffceb0#64 = KA.«acquire» := by decide
-theorem bo_br_rel : KA.«begin_op» + 0xffffffffffffcf38#64 = KA.«release» := by decide
-theorem bo_br_sp : KA.«begin_op» + 0xffffffffffffe22c#64 = KA.«sleep_prepare» := by decide
-theorem bo_br_sl : KA.«begin_op» + 0xffffffffffffe268#64 = KA.«sleep» := by decide
+theorem bo_br_acq : KA.«begin_op» + 0xffffffffffffce3c#64 = KA.«acquire» := by decide
+theorem bo_br_rel : KA.«begin_op» + 0xffffffffffffcec4#64 = KA.«release» := by decide
+theorem bo_br_sp : KA.«begin_op» + 0xffffffffffffe1b8#64 = KA.«sleep_prepare» := by decide
+theorem bo_br_sl : KA.«begin_op» + 0xffffffffffffe1f4#64 = KA.«sleep» := by decide
 
 theorem bo_ret_18 : jumpPc (KA.«begin_op» + 0x18#64) = KA.«begin_op» + 0x18#64 := by decide
 theorem bo_ret_2a : jumpPc (KA.«begin_op» + 0x2a#64) = KA.«begin_op» + 0x2a#64 := by decide
@@ -123,7 +123,6 @@ def boK (k : KCtx) : KCtx :=
 @[simp] theorem boK_locks (k : KCtx) : (boK k).locks = "log" :: k.locks := rfl
 @[simp] theorem boK_tier (k : KCtx) : (boK k).tier = k.tier := rfl
 @[simp] theorem boK_proc (k : KCtx) : (boK k).proc = k.proc := rfl
-@[simp] theorem boK_regs (k : KCtx) : (boK k).regs = k.regs := rfl
 @[simp] theorem boK_spie (k : KCtx) : (boK k).spie = k.spie := rfl
 @[simp] theorem boK_spp (k : KCtx) : (boK k).spp = k.spp := rfl
 
@@ -148,18 +147,6 @@ theorem boK_popExit (k : KCtx) (hnoff : k.noff = 0) (hint : k.intena = k.sie) (h
     simp only [boK, KCtx.pushed, KCtx.withLocks, KCtx.popExit, KCtx.popOff, KCtx.intrOn, KCtx.pushOffAt,
       KCtx.mk.injEq, trapRes, kvFrameSlots, ite_true, ite_false, Bool.false_eq_true,
       _root_.true_and, _root_.and_true] <;> omega
-
-/-- The re-acquire after a park lands back in `boK`, at the `SPIE`/`SPP`
-the park resumed with. -/
-theorem boK_fold (k : KCtx) (a b : Bool) (hK : 4 ≤ k.avail) :
-    (((k.pushed 4).withSpie a b).pushOffAt a b).withLocks ("log" :: k.locks) =
-      boK (k.withSpie a b) := by
-  unfold boK
-  obtain ⟨regs, sie, spie, spp, avail, noff, intena, locks, tier, root, proc⟩ := k
-  simp only at hK ⊢
-  simp only [KCtx.pushed, KCtx.withSpie, KCtx.pushOffAt, KCtx.withLocks, KCtx.mk.injEq,
-    _root_.true_and, _root_.and_true]
-  omega
 
 /-! ## The guard's 32-bit chain
 
@@ -776,7 +763,7 @@ theorem bo_park1 (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SLEEP)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [boK_sie k, KCtx.rget_zero, q9]
   iintro Hk Hpc
-  k_step (wp_s_jal cpu _ (KA.«begin_op» + 0x26#64) false 2089478#21 1#5 (by decide))
+  k_step (wp_s_jal cpu _ (KA.«begin_op» + 0x26#64) false 2089362#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [boK_sie k, bo_br_sp]
   iintro Hk Hpc
   iapply (bo_sp SP Γ cpu _ jp hjp ?hp1 ?hc1 ?hn1 ?hK1 ?hl1 ?ht1) $$ [- $Hk $Hpc]
@@ -806,7 +793,7 @@ theorem bo_park1 (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SLEEP)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [boK_sie k, KCtx.rget_zero, r9]
   iintro Hk Hpc
-  k_step (wp_s_jal cpu _ (KA.«begin_op» + 0x2c#64) false 2084620#21 1#5 (by decide))
+  k_step (wp_s_jal cpu _ (KA.«begin_op» + 0x2c#64) false 2084504#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [boK_sie k, bo_br_rel]
   iintro Hk Hpc
   -- the release takes back the arm; the complement goes on to `sleep`
@@ -834,7 +821,7 @@ theorem bo_park1 (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SLEEP)
     refine ⟨rfl, rfl, ?_, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩
     simp only [RegMap.set_apply, BitVec.reduceEq, ite_false])) (by k_norm_g at hcs2; exact hcs2)
   -- jal sleep
-  k_step_e (wp_s_jal cpu _ (KA.«begin_op» + 0x30#64) false 2089528#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«begin_op» + 0x30#64) false 2089412#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [bo_br_sl]
   iintro Hk Hpc
   iapply (bo_sl SL Γ cpu _ jp k.sie k.proc hjp ?hp3 ?hK3 ?hn3 ?ht3 ?hs3 ?hpp3)
@@ -859,7 +846,7 @@ theorem bo_park1 (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SLEEP)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [KCtx.rget_zero, t9]
   iintro Hk Hpc
-  k_step_e (wp_s_jal cpu _ (KA.«begin_op» + 0x36#64) false 2084474#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«begin_op» + 0x36#64) false 2084358#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [bo_br_acq]
   iintro Hk Hpc
   iapply (bo_ac AC cpu _ γ γb γfs cov ls dev ?ha0q ?hnq ?hKq ?hsq) $$ [- $Hk $Hpc]
@@ -927,7 +914,7 @@ theorem bo_park2 (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SLEEP)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [boK_sie k, KCtx.rget_zero, q9]
   iintro Hk Hpc
-  k_step (wp_s_jal cpu _ (KA.«begin_op» + 0x56#64) false 2089430#21 1#5 (by decide))
+  k_step (wp_s_jal cpu _ (KA.«begin_op» + 0x56#64) false 2089314#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [boK_sie k, bo_br_sp]
   iintro Hk Hpc
   iapply (bo_sp SP Γ cpu _ jp hjp ?hp1 ?hc1 ?hn1 ?hK1 ?hl1 ?ht1) $$ [- $Hk $Hpc]
@@ -957,7 +944,7 @@ theorem bo_park2 (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SLEEP)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [boK_sie k, KCtx.rget_zero, r9]
   iintro Hk Hpc
-  k_step (wp_s_jal cpu _ (KA.«begin_op» + 0x5c#64) false 2084572#21 1#5 (by decide))
+  k_step (wp_s_jal cpu _ (KA.«begin_op» + 0x5c#64) false 2084456#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [boK_sie k, bo_br_rel]
   iintro Hk Hpc
   -- the release takes back the arm; the complement goes on to `sleep`
@@ -985,7 +972,7 @@ theorem bo_park2 (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SLEEP)
     refine ⟨rfl, rfl, ?_, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩
     simp only [RegMap.set_apply, BitVec.reduceEq, ite_false])) (by k_norm_g at hcs2; exact hcs2)
   -- jal sleep
-  k_step_e (wp_s_jal cpu _ (KA.«begin_op» + 0x60#64) false 2089480#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«begin_op» + 0x60#64) false 2089364#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [bo_br_sl]
   iintro Hk Hpc
   iapply (bo_sl SL Γ cpu _ jp k.sie k.proc hjp ?hp3 ?hK3 ?hn3 ?ht3 ?hs3 ?hpp3)
@@ -1010,7 +997,7 @@ theorem bo_park2 (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SLEEP)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [KCtx.rget_zero, t9]
   iintro Hk Hpc
-  k_step_e (wp_s_jal cpu _ (KA.«begin_op» + 0x66#64) false 2084426#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«begin_op» + 0x66#64) false 2084310#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [bo_br_acq]
   iintro Hk Hpc
   iapply (bo_ac AC cpu _ γ γb γfs cov ls dev ?ha0q ?hnq ?hKq ?hsq) $$ [- $Hk $Hpc]
@@ -1084,10 +1071,10 @@ theorem bo_exit_body (RE : RELEASE) (cpu : CPU) (k : KCtx) (γ : LogNames) (γb 
   k_step (wp_s_auipc cpu _ (KA.«begin_op» + 0x74#64) false 0x1f#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [boK_sie k]
   iintro Hk Hpc
-  k_step (wp_s_addi cpu _ (KA.«begin_op» + 0x78#64) false 2068#12 10#5 10#5 (by decide))
+  k_step (wp_s_addi cpu _ (KA.«begin_op» + 0x78#64) false 2624#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [boK_sie k, bo_log]
   iintro Hk Hpc
-  k_step (wp_s_jal cpu _ (KA.«begin_op» + 0x7c#64) false 2084540#21 1#5 (by decide))
+  k_step (wp_s_jal cpu _ (KA.«begin_op» + 0x7c#64) false 2084424#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [boK_sie k, bo_br_rel]
   iintro Hk Hpc
   -- the release takes back the arm the entry acquire paid out
@@ -1241,7 +1228,7 @@ theorem bo_loop (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SLEEP)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
         with [boK_sie (k.withSpie a b), bo_step1 out hout3, bo_step1' out hout3]
       iintro Hk Hpc
-      k_step (wp_s_sw c _ (KA.«begin_op» + 0x70#64) false 2104#12 15#5 14#5 (by decide)
+      k_step (wp_s_sw c _ (KA.«begin_op» + 0x70#64) false 2660#12 15#5 14#5 (by decide)
           (BitVec.ofNat 32 out))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
         with [boK_sie (k.withSpie a b), bo_lout, bo_step1 out hout3, bo_step1' out hout3,
@@ -1444,10 +1431,10 @@ theorem bo_entry (AC : ACQUIRE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
   k_step_e (wp_s_auipc cpu _ (KA.«begin_op» + 0xc#64) false 0x1f#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_addi cpu _ (KA.«begin_op» + 0x10#64) false 2172#12 10#5 10#5 (by decide))
+  k_step_e (wp_s_addi cpu _ (KA.«begin_op» + 0x10#64) false 2728#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [bo_log]
   iintro Hk Hpc
-  k_step_e (wp_s_jal cpu _ (KA.«begin_op» + 0x14#64) false 2084508#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«begin_op» + 0x14#64) false 2084392#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [bo_br_acq]
   iintro Hk Hpc
   iapply (bo_ac AC cpu _ γ γb γfs cov ls dev ?ha0 ?hna ?hKa ?hla) $$ [- $Hk $Hpc]
@@ -1474,7 +1461,7 @@ theorem bo_entry (AC : ACQUIRE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
   k_step (wp_s_auipc cpu _ (KA.«begin_op» + 0x18#64) false 0x1f#20 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [boK_sie (k.withSpie s0 p0)]
   iintro Hk Hpc
-  k_step (wp_s_addi cpu _ (KA.«begin_op» + 0x1c#64) false 2160#12 9#5 9#5 (by decide))
+  k_step (wp_s_addi cpu _ (KA.«begin_op» + 0x1c#64) false 2716#12 9#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [boK_sie (k.withSpie s0 p0), bo_log]
   iintro Hk Hpc
   k_step (wp_s_addi cpu _ (KA.«begin_op» + 0x20#64) true 30#12 18#5 0#5 (by decide))

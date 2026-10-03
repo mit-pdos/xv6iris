@@ -32,8 +32,6 @@ Unreached, NOT ported: `udone_tie_of_pre_id`, `upre_tie_inhabited`,
 import Xv6.UnionOutWild
 import Xv6.UnionDiscDec
 import Xv6.UshFileRedir
-import Xv6.FileLinksLine
-import Xv6.EchoLinks
 import Xv6.UnionDemo
 
 namespace Xv6

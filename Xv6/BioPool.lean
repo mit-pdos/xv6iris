@@ -48,8 +48,6 @@ namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-- The number of buffers (`kernel/param.h`). -/
 def NBUF : Nat := 30
 
@@ -153,19 +151,6 @@ where it must be, because every cached/uncached transition happens under that
 lock. -/
 def bioPool (V : BioView GF) (bnos : Nat → BitVec 32) : IProp GF :=
   iprop([∗set] b ∈ V.cov, (if bcached bnos b then iprop(emp) else poolBlk V b))
-
-theorem bioPool_intro (V : BioView GF) (bnos : Nat → BitVec 32) :
-    (iprop([∗set] b ∈ V.cov, (if bcached bnos b then iprop(emp) else poolBlk (GF := GF) V b))) ⊢
-      bioPool V bnos := by
-  unfold bioPool; iintro H; iexact H
-
-/-- The pool depends on `bnos` only through `Xv6.bcached`. -/
-theorem bioPool_congr (V : BioView GF) (bnos bnos' : Nat → BitVec 32)
-    (h : ∀ b, b ∈ V.cov → bcached bnos b = bcached bnos' b) :
-    bioPool (GF := GF) V bnos ⊢ bioPool V bnos' := by
-  unfold bioPool
-  refine BigSepS.bigSepS_mono (fun {b} hb => ?_)
-  rw [h b hb]
 
 /-- **THE RECYCLE'S ONE-SHOT POOL EXCHANGE** (Rocq's `bio_pool_recycle`), at
 the `b->blockno` store: slot `k`'s claim moves from `old` to `B`, so `B`'s

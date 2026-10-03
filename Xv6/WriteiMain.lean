@@ -26,9 +26,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## The pure halves -/
 
@@ -120,9 +118,6 @@ theorem writei_zero_ok (A : WiArgs) (k : KCtx) (hA : WiFactsEb k A) (hn : A.n = 
     ext := UMemL.extSz_refl _ _ }
 
 end
-
-theorem writei_li_m1 : BitVec.signExtend 64 4095#12 = -1#64 := by decide
-theorem writei_lui43 : BitVec.signExtend 64 (0x43#20 ++ 0#12) = BitVec.ofNat 64 274432 := by decide
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]

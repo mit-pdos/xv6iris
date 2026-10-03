@@ -22,8 +22,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
-
 /-! ## §1 Pure -/
 
 /-- **Rocq `ushp_nth_byte_zero`**. -/
@@ -193,15 +191,6 @@ theorem ush_redir_close (N : UkNames GF) (s0 t pc q eq : Nat) (mode fd : Int) (c
   isplitl [Hty Hpad]
   · iframe Hty Hpad
   · iexists pc; iframe Hpc Hc
-
-/-- **Rocq `ushp_pipe_node_addr`**. -/
-theorem ush_pipe_node_addr (N : UkNames GF) (t pl pr : Nat) :
-    ushPipeNode N t pl pr ⊢ ⌜0 < t ∧ t % 8 = 0 ∧ t + 40 < 2 ^ 64⌝ ∗ ushPipeNode N t pl pr := by
-  unfold ushPipeNode
-  iintro ⟨%h1, %h2, %h3, H⟩
-  isplitr; · ipureintro; exact ⟨h1, h2, h3⟩
-  iframe H
-  ipureintro; exact ⟨h1, h2, h3⟩
 
 /-- **Rocq `ushp_pipe_close`**. -/
 theorem ush_pipe_close (N : UkNames GF) (s0 t pl pr : Nat) (l r : UshpCmd) :

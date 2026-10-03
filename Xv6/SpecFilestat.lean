@@ -145,9 +145,6 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedVariables false
-set_option linter.unusedSectionVars false
-
 /-- Address of `filestat`. -/
 def filestatAddr : BitVec 64 := KA.«filestat»
 
@@ -235,17 +232,6 @@ theorem filestat_env_out_of_env (st : FdState) :
     filestatEnv (hlc := hlc) (GF := GF) st ⊢ filestatEnvOut st := by
   unfold filestatEnv filestatEnvOut
   rcases st with _ | ⟨r, w, _ | ⟨n, g, om⟩ | mj⟩ <;> first | exact .rfl | exact filestat_fs_env_out
-
-/-- Rocq `filestat_env_none`: a file that carries no inode costs its
-stat-er nothing. -/
-theorem filestat_env_none (st : FdState) (h : ¬ fstatStInode st) :
-    ⊢ filestatEnv (hlc := hlc) (GF := GF) st := by
-  unfold filestatEnv
-  rcases st with _ | ⟨r, w, _ | ⟨n, g, om⟩ | mj⟩
-  · exact .rfl
-  · exact .rfl
-  · exact absurd trivial h
-  · exact absurd trivial h
 
 /-- The inode arm's environment, opened (Rocq ProofFilestat's
 `fst_env_in`). -/

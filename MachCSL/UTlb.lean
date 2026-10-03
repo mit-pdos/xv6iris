@@ -116,8 +116,6 @@ theorem utlb_hit_refresh (D : UFoot) (orc orc' : UOrc) (s s' : UWSt) (hp : UwkPi
     pteAddr_tlbEntryOf, tlb_get_ppn_tlbEntryOf, utlb_pte_tlbEntryOf]
   simp only [tlb_get_ppn_tlbEntryOf, BitVec.setWidth_eq, tlb_set_pte_tlbEntryOf]
 
-theorem utlb_w0 : ((0 : Int) * 9).toNat = 0 := rfl
-
 /-! ## §3 The miss (Rocq `exec_translate_TLB_miss_user`,
 `exec_translate_TLB_miss_user_walk_err`, `exec_add_to_TLB_user`) -/
 
@@ -151,7 +149,7 @@ theorem utlb_miss_ok (D : UFoot) (orc orc' : UOrc) (s s' : UWSt) (hdr : D.Dr .tl
   cases po <;> uwk_run -bv [tlbHash_eq] <;>
     simp only [uwkOut, tlbHash_eq, Option.getD_none, Option.getD_some] <;>
     reduce_closed_widths <;> simp only [tlbEntryOf] <;> congr <;>
-    simp only [sign_extend, zero_extend, ones, sail_ones, Sail.BitVec.signExtend, Sail.BitVec.zeroExtend, ptePpn] <;>
+    simp only [zero_extend, ones, sail_ones, Sail.BitVec.zeroExtend, ptePpn] <;>
     bv_decide
 
 /-! ## §4 The user TLB invariant (Rocq `PtTree.tlb_ok_pt`, the TLB row of
@@ -216,13 +214,6 @@ theorem utlbOk_fill (t : PTree) (tlb : Tlb) (h : utlbOk t tlb) (vpn : BitVec 27)
   · exact h i hi ent hget
 
 /-! ## §5 `A`/`D` variants classify alike -/
-
-theorem utlb_nonleaf_setAD (w : BitVec 64) (a d : BitVec 1) :
-    pte_is_non_leaf (uwkFl (pteSetAD w a d)) = pte_is_non_leaf (uwkFl w) := by
-  simp only [pte_is_non_leaf, pteSetAD, _get_PTE_Flags_R, _get_PTE_Flags_W, _get_PTE_Flags_X, Mk_PTE_Flags,
-    Sail.BitVec.extractLsb, Sail.BitVec.updateSubrange, Sail.BitVec.updateSubrange', BitVec.extractLsb,
-    _update_PTE_Flags_A, _update_PTE_Flags_D]
-  bv_decide
 
 theorem utlb_inv_setAD (w : BitVec 64) (a d : BitVec 1) (h : pte_is_non_leaf (uwkFl w) = false) :
     uwkInv (pteSetAD w a d) = uwkInv w := by

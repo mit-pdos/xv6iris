@@ -20,14 +20,12 @@ import Xv6.UInitUnionCC
 import Xv6.UInitShSlot
 import Xv6.UInitCons
 import Xv6.ElfLoadable
+import Xv6.UInitUnionDisc
 
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Std (ExtTreeSet)
-
-set_option linter.unusedSectionVars false
-set_option linter.unusedVariables false
 
 section UnionInitSup
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]

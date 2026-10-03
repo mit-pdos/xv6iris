@@ -57,21 +57,16 @@ CONE (UShURound S1, all reached): `union_D_exfb`, `uHexecfail_D`, `uwc3`,
    `ushDeedAt_open`, `ufown_split`, `ufown_join`, `uHtkill`,
    `ushPinSlot_gen`, `ushPinSlot_inv`, `uecho_sup_at`.
 -/
-import Xv6.UshURoundWide
-import Xv6.UshURoundPure
 import Xv6.UshURoundBody
 import Xv6.UshForkChildEcho
 import Xv6.UshExecPinHolds
-import Xv6.UshRunEntry
 import Xv6.UkUnionEntriesEcho
-import Xv6.UshFileRedir
 
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
 set_option synthInstance.maxSize 1024
 
 section UShURoundEcho

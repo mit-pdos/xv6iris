@@ -104,8 +104,6 @@ import Xv6.SysReadDefs
 import Xv6.PieceFam
 import Xv6.UserOff
 import Xv6.FdTable
-import Xv6.InodeRegionInv
-import Xv6.FsStateEraNode
 
 namespace Xv6
 
@@ -168,22 +166,6 @@ theorem arfCount_bridge_era (dn : Dinode) (bm : Blkmap) (data : Nat → List (Bi
   arfCount_bridge _ bs off n' hf
 
 /-! ### The two arms of the return tie -/
-
-/-- Rocq's `arf_ret_tie_file`. -/
-theorem arfRetTie_file (nz : Int) (a : Anode) (bs : List (BitVec 8)) (off : Nat) (r : BitVec 64)
-    (ha : a.anNode = .AFile bs) (hr : r = BitVec.ofNat 64 (ardCount nz.toNat off bs.length)) :
-    ardRetTie nz a off r := by
-  unfold ardRetTie; rw [ha]; exact hr
-
-/-- the directory / device fold: the landed `fileread_ret` bounds are exactly
-what the wildcard arm asks for (Rocq's `arf_ret_tie_other`) -/
-theorem arfRetTie_other (nz : Int) (a : Anode) (off : Nat) (rv : Int)
-    (h : match a.anNode with | .AFile _ => False | _ => True) (hrv : 0 ≤ rv ∧ rv ≤ nz) :
-    ardRetTie nz a off (BitVec.ofInt 64 rv) := by
-  unfold ardRetTie
-  split
-  · rename_i heq; rw [heq] at h; exact h.elim
-  · exact ⟨rv, rfl, hrv⟩
 
 /-- THE BUFFER TIE of the ok arm (Rocq inlines it in `read_post_ok`;
 deviation 3): on a FILE row the `d` bytes at `addr` in the image the call
@@ -299,18 +281,6 @@ def readArms (Γ : FsViewNames GF) (i : Nat) (γo : GName) (P : UPtd) (n : Int)
     (F : Pfam GF (Aview → Nat → Anode → Nat → IProp GF)) (r : BitVec 64)
     (M' : Nat → List (BitVec 8)) (addr : BitVec 64) : IProp GF :=
   iprop(readPostOk i n F r M' addr ∨ (⌜r = -1#64⌝ ∗ readPostFail Γ i γo P n F addr))
-
-/-- the arms refine the unified contract's unconditional return clause
-(Rocq's `read_arms_ret`) -/
-theorem readArms_ret (Γ : FsViewNames GF) (i : Nat) (γo : GName) (P : UPtd) (n : Int)
-    (F : Pfam GF (Aview → Nat → Anode → Nat → IProp GF)) (r : BitVec 64)
-    (M' : Nat → List (BitVec 8)) (addr : BitVec 64) :
-    readArms Γ i γo P n F r M' addr ⊢ ⌜pipeRwRet n r⌝ := by
-  unfold readArms readPostOk
-  iintro H
-  icases H with (⟨%av, %off, %a, %d, %_, %hn, %htie, _⟩ | ⟨%hm1, _⟩)
-  · ipureintro; exact ardRetTie_ret n a off r hn htie
-  · ipureintro; exact Or.inl hm1
 
 /-- THE SIGN GUARD'S EXIT (Rocq's `read_arms_neg`): the piece goes back
 exactly as it came in. -/
@@ -440,27 +410,6 @@ theorem arfRead_fire [Icfg] (γfs : FsNames) (E : CoPset) (dq : DFrac)
   imodintro
   iframe Hf Hg Hav
 
-/-- SUPPLIER 2 -- THE HELD PATH (Rocq's `arf_read_fire_held`, RD-1): the
-caller owns its file position and says so.  No invariant is opened. -/
-theorem arfRead_fire_held [Icfg] (γfs : FsNames) (E : CoPset) (dq : DFrac)
-    (F : Pfam GF (Aview → Nat → Anode → Nat → IProp GF)) (i : Nat) (γo : GName)
-    (off d : Nat) (n : FsNode)
-    (hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ E) (hoff : off ≤ MAXFILE * BSIZE)
-    (hsz : anodeSizeOk (absRow n)) (hnz : fnType n ≠ 0) :
-    ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗ uoff γo off -∗
-      pfAt (areadCommitAt (fsGammaL γfs) appE i γo) F -∗
-      topFragQ (fsGammaL γfs) dq i n -∗
-      offLink (hlc := hlc) γo (off : Int) ={E}=∗
-        topFragQ (fsGammaL γfs) dq i n ∗
-        offLink (hlc := hlc) γo ((off + d : Nat) : Int) ∗
-        (uoff γo (off + d) ∨ (uoff γo off ∗ MachFixedGS.killCred (hlc := hlc) (GF := GF))) ∗
-        ∃ av : Aview, ⌜arowAt av i (absRow n)⌝ ∗ F.pfRecv av off (absRow n) d := by
-  iintro #Hi Hu Hcm Hf Hg
-  ihave Hsup := offSupply_held E γo off d $$ Hu
-  iapply arfRead_fire_gen γfs E dq
-    iprop(uoff γo (off + d) ∨ (uoff γo off ∗ MachFixedGS.killCred (hlc := hlc) (GF := GF)))
-    F i γo off d n hE hoff hsz hnz $$ Hi Hsup Hcm Hf Hg
-
 /-- THE FIRE WITH NO SUPPLIER AT ALL (Rocq's `arf_read_fire_adv`, lane
 OFF-LINK-5): a HELD row's read.  The client's commit hands the box's arm
 back ALREADY ADVANCED, so the lemma has no user-side premise. -/
@@ -534,42 +483,6 @@ theorem arfRead_fire_om [Icfg] [FileG GF] [SleepLockG GF] [IcboxG GF] [OffboxBox
         Hi Hsup Hcm Hf Hg with ⟨Hf, Hg, -, Hav⟩
       imodintro
       iframe Hf Hg Hav
-
-/-- the `DFrac.own 1` reading, which is the spelling fileread holds
-(`topFrag` whole, from its `ilock` to its `iunlock`; Rocq's
-`arf_read_fire_1`) -/
-theorem arfRead_fire_1 [Icfg] (γfs : FsNames) (E : CoPset)
-    (F : Pfam GF (Aview → Nat → Anode → Nat → IProp GF)) (i : Nat) (γo : GName)
-    (off d : Nat) (n : FsNode)
-    (hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ E) (hoff : off ≤ MAXFILE * BSIZE)
-    (hsz : anodeSizeOk (absRow n)) (hnz : fnType n ≠ 0) :
-    ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗ offUserInv (hlc := hlc) γo -∗
-      pfAt (areadCommitAt (fsGammaL γfs) appE i γo) F -∗
-      topFrag (fsGammaL γfs) i n -∗
-      offLink (hlc := hlc) γo (off : Int) ={E}=∗
-        topFrag (fsGammaL γfs) i n ∗
-        offLink (hlc := hlc) γo ((off + d : Nat) : Int) ∗
-        ∃ av : Aview, ⌜arowAt av i (absRow n)⌝ ∗ F.pfRecv av off (absRow n) d := by
-  rw [topFrag_1]
-  exact arfRead_fire γfs E _ F i γo off d n hE hoff hsz hnz
-
-/-- ...and the same reading of the HELD fire (Rocq's
-`arf_read_fire_held_1`) -/
-theorem arfRead_fire_held_1 [Icfg] (γfs : FsNames) (E : CoPset)
-    (F : Pfam GF (Aview → Nat → Anode → Nat → IProp GF)) (i : Nat) (γo : GName)
-    (off d : Nat) (n : FsNode)
-    (hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ E) (hoff : off ≤ MAXFILE * BSIZE)
-    (hsz : anodeSizeOk (absRow n)) (hnz : fnType n ≠ 0) :
-    ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗ uoff γo off -∗
-      pfAt (areadCommitAt (fsGammaL γfs) appE i γo) F -∗
-      topFrag (fsGammaL γfs) i n -∗
-      offLink (hlc := hlc) γo (off : Int) ={E}=∗
-        topFrag (fsGammaL γfs) i n ∗
-        offLink (hlc := hlc) γo ((off + d : Nat) : Int) ∗
-        (uoff γo (off + d) ∨ (uoff γo off ∗ MachFixedGS.killCred (hlc := hlc) (GF := GF))) ∗
-        ∃ av : Aview, ⌜arowAt av i (absRow n)⌝ ∗ F.pfRecv av off (absRow n) d := by
-  rw [topFrag_1]
-  exact arfRead_fire_held γfs E _ F i γo off d n hE hoff hsz hnz
 
 end ReadFire
 

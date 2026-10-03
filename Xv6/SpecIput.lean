@@ -86,8 +86,8 @@ no caller can know in advance which arm runs.
    `(k.withSpie spie spp).withRegs R'` (SpecItrunc's shape).
 5. `iputAddr` lives here (wave 7 D13; it used to be `Xv6/FsEnv.lean`'s,
    retired with FsEnv's abstract entries).
-6. `wp_iput_sconf` is not a field: it is DERIVED below
-   (`IPUT.wp_iput_sconf`), exactly as Rocq derives it in ProofIput.v
+6. `wp_iput_sconf` is not a field: its eb form is DERIVED below
+   (`IPUT.wp_iput_sconf_eb`), exactly as Rocq derives it in ProofIput.v
    5656--5713 (at the `logOp` existential's own witness, `crb = cru = crz =
    false`, the regime at `rg := true`).  Both forms are consumed downstream
    (Rocq: `wp_iput_gen` by ProofIunlockput / ProofDirlink / ProofNamex /
@@ -108,9 +108,6 @@ open LeanRV64D
 
 /-- `iput`'s entry (D13). -/
 def iputAddr : BitVec 64 := KA.«iput»
-
-set_option linter.unusedSectionVars false
-set_option linter.unusedVariables false
 
 /-- iput's own 6-slot frame over its deepest callee, itrunc (72): THE SPLICE
 FINDING (Rocq SpecIput.v) -- the reordered free path calls itrunc from the
@@ -406,7 +403,7 @@ def wp_iput_sconf_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] 
   ⊢ wpLoop (GF := GF) cpu
 
 /-- The interface of `iput` (Rocq's `Module Type IPUT`, less
-`wp_iput_sconf`, derived below). -/
+`wp_iput_sconf`, whose eb form is derived below). -/
 structure IPUT : Prop where
   /-- the credited set-form contract -/
   wp_iput_gen_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
@@ -423,33 +420,6 @@ structure IPUT : Prop where
       n Sb crb cru crz e0 tid qtx pidv dqp dqb dqs rg
       hj hproc hK hnoff htier hkk hcrb hcru hgeom hbg hcov hlog hnib hbel hn hpd ha0
 
-/-- The interrupts-off instance of `wp_iput_gen_eb` (the complement is the whole
-bundle): the contract every not-yet-generalized caller states. -/
-theorem IPUT.wp_iput_gen (A : IPUT) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
-    [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
-    [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-    [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
-    (γil γisl : GName) (kk : Nat) (q : Qp) (inum : BitVec 32)
-    (n : Nat) (Sb : List Nat) (crb cru crz : Bool) (e0 : Nat) (tid : Nat) (qtx : Qp)
-    (pidv : BitVec 32) (dqp dqb dqs : DFrac) (rg : Bool)
-    hj hproc hK hsie hnoff hlocks htier hkk hcrb hcru hgeom hbg hcov hlog hnib hbel hn hpd ha0 :
-    wp_iput_gen_body (hlc := hlc) (GF := GF) Γ cpu k γl pd pav pu j γil γisl kk q inum
-      n Sb crb cru crz e0 tid qtx pidv dqp dqb dqs rg
-      hj hproc hK hsie hnoff hlocks htier hkk hcrb hcru hgeom hbg hcov hlog hnib hbel hn hpd ha0 := by
-  have h := A.wp_iput_gen_eb (hlc := hlc) (GF := GF) (Γ := Γ) (cpu := cpu) (k := k) (γl := γl) (pd := pd) (pav := pav) (pu := pu) (j := j) (γil := γil) (γisl := γisl) (kk := kk) (q := q) (inum := inum) (n := n) (Sb := Sb) (crb := crb) (cru := cru) (crz := crz) (e0 := e0) (tid := tid) (qtx := qtx) (pidv := pidv) (dqp := dqp) (dqb := dqb) (dqs := dqs) (rg := rg) (hj := hj) (hproc := hproc) (hK := hK) (hnoff := hnoff) (htier := htier) (hkk := hkk) (hcrb := hcrb) (hcru := hcru) (hgeom := hgeom) (hbg := hbg) (hcov := hcov) (hlog := hlog) (hnib := hnib) (hbel := hbel) (hn := hn) (hpd := hpd) (ha0 := ha0)
-  unfold wp_iput_gen_eb_body at h
-  unfold wp_iput_gen_body
-  rw [hsie] at h
-  simp only [trapCsrsExt_false, cpuClaimExt_false] at h
-  iintro ⟨H0, H1, H2, Htc, Hcl, Hir, H6, H7, H8, H9, H10, H11, H12, H13, H14, H15, H16, H17, H18, H19, H20, H21, H22, H23, H24, Hnext⟩
-  iapply h
-  iframe H0 H1 H2 Htc Hcl Hir H6 H7 H8 H9 H10 H11 H12 H13 H14 H15 H16 H17 H18 H19 H20 H21 H22 H23 H24
-  iapply wpNext_mono $$ Hnext
-  iintro %cpu' HK %spie %spp %R' %n' %Sb' %w %p0 H1 H2 ⟨Htc, Hir⟩ Hcl H6 H7 H8 H9 %p10 H11 H12 H13 H14
-  iapply HK $$ %spie %spp %R' %n' %Sb' %w %p0 H1 H2 Htc Hcl Hir H6 H7 H8 H9 %p10 H11 H12 H13 H14
-
 /-- The counted seal's arithmetic: uncredited, the gen bound
 `n - ipSpendW w false false ≤ n'` is at least as strong as
 `n - iputUnits ≤ n'` (Rocq's `unfold ip_spend_w, ip_bm; destruct wf; lia`). -/
@@ -457,55 +427,6 @@ theorem ipSpendW_uncredited (w : Bool) (n n' : Nat) (h : n - ipSpendW w false fa
     n - iputUnits ≤ n' := by
   unfold ipSpendW ipBm iputUnits at *
   cases w <;> simp at h <;> omega
-
-/-- **THE COUNTED SEAL**, derived at the `logOp` existential's OWN WITNESS
-(Rocq's `wp_iput_sconf`, ProofIput.v 5656--5713): the reservation opens at
-its set (`logOp_openS`) and birth epoch (`logOpS_named`), the transaction
-token halves (`logTx_halve`: one half is the gen contract's named share, the
-other waits for the join), the regime is `iregOpen` at `rg := true`
-(`iregRegime_true`, persistent, and dropped on the way out), and the grown
-set is forgotten again (`logOpS_op` after `logTx_join`). -/
-theorem IPUT.wp_iput_sconf (IP : IPUT) {hlc : HasLC} {GF : BundledGFunctors}
-    [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
-    [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
-    [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-    [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
-    (γil γisl : GName) (kk : Nat) (q : Qp) (inum : BitVec 32) (n : Nat)
-    (pidv : BitVec 32) (dqp dqb dqs : DFrac)
-    hj hproc hK hsie hnoff hlocks htier hkk hgeom hbg hcov hlog hnib hbel hn hpd ha0 :
-    wp_iput_sconf_body (hlc := hlc) (GF := GF) Γ cpu k γl pd pav pu j γil γisl kk q inum n
-      pidv dqp dqb dqs
-      hj hproc hK hsie hnoff hlocks htier hkk hgeom hbg hcov hlog hnib hbel hn hpd ha0 := by
-  unfold wp_iput_sconf_body
-  iintro ⟨Hk, Hpc, #Hpi, Htc, Hcl, Hir, #Hpe, #Hbc, #Hlc, #Hdc, #Hit, #Hinv, #Hesc, #Hireg,
-    #Hopen, #Hslk, Href, Hsb, Hsi, #Hbmi, Hpid, Hsl, Hop, Hnext⟩
-  icases logOp_openS icfgLog n $$ Hop with ⟨%Sb, HopS, Htx⟩
-  icases logOpS_named icfgLog n Sb $$ HopS with ⟨%e0, Hope⟩
-  icases logTx_halve icfgLog $$ Htx with ⟨%t, Ht1, Ht2⟩
-  have h := IP.wp_iput_gen (hlc := hlc) (GF := GF) Γ cpu k γl pd pav pu j γil γisl kk q inum
-    n Sb false false false e0 t (1 : Qp).half pidv dqp dqb dqs true
-    hj hproc hK hsie hnoff hlocks htier hkk (fun h => absurd h (by simp))
-    (fun h => absurd h (by simp)) hgeom hbg hcov hlog hnib hbel hn hpd ha0
-  unfold wp_iput_gen_body at h
-  iapply h
-  iframe Hk Hpc Hpi Htc Hcl Hir Hpe Hbc Hlc Hdc Hit Hinv Hesc Hireg Hslk Href Hsb Hsi Hbmi
-    Hpid Hsl Hope Ht1
-  isplitl []
-  · rw [iregRegime_true]; iexact Hopen
-  isplitl []
-  · simp only [Bool.false_eq_true, if_false]
-    iempintro
-  iapply wpNext_mono _ _ _ _ _ $$ Hnext
-  iintro %c HΦ %spie %spp %R' %n' %Sb' %w %hcs Hk Hpc Htc Hcl Hir Hpid Hsb Hsi Hsl %hf HopS
-    Ht1 Hslot -
-  obtain ⟨-, -, -, hlo, hhi⟩ := hf
-  ihave Htx := logTx_join icfgLog t $$ Ht1 Ht2
-  ihave Hop := logOpS_op icfgLog n' Sb' $$ HopS Htx
-  iapply HΦ $$ %spie %spp %R' %n' %hcs Hk Hpc Htc Hcl Hir Hpid Hsb Hsi Hsl [] Hop Hslot
-  ipureintro
-  exact ⟨ipSpendW_uncredited w n n' hlo, hhi⟩
 
 theorem IPUT.wp_iput_sconf_eb (IP : IPUT) {hlc : HasLC} {GF : BundledGFunctors}
     [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]

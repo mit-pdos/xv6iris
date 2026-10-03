@@ -51,13 +51,6 @@ theorem ucwd_agree (γc : GName) (c c' : Nat) : ucwdAuth (GF := GF) γc c ∗ uc
   iintro ⟨H1, H2⟩
   iapply ghost_var_agree $$ H1 H2
 
-/-- **Rocq `ucwd_update`**: BOTH halves move it (what chdir spends). -/
-theorem ucwd_update (γc : GName) (c c' c'' : Nat) :
-    ucwdAuth (GF := GF) γc c ∗ ucwd γc c' ⊢ |==> (ucwdAuth γc c'' ∗ ucwd γc c'') := by
-  unfold ucwdAuth ucwd
-  iintro ⟨H1, H2⟩
-  iapply ghost_var_update_halves c'' γc c c' $$ H1 H2
-
 /-- **Rocq `ucwd_alloc`**: the mint, at the cwd the key carries. -/
 theorem ucwd_alloc (c : Nat) : ⊢@{IProp GF} |==> ∃ γc : GName, ucwdAuth γc c ∗ ucwd γc c := by
   imod ghost_var_alloc (GF := GF) c with ⟨%γc, Hc⟩
@@ -73,13 +66,6 @@ def ucwdAny (γc : GName) : IProp GF := iprop(∃ c : Nat, ucwd γc c)
 
 instance ucwdAny_timeless (γc : GName) : Timeless (ucwdAny (GF := GF) γc) := by
   unfold ucwdAny; infer_instance
-
-/-- Rocq `ucwd_any_of`. -/
-theorem ucwdAny_of (γc : GName) (c : Nat) : ucwd (GF := GF) γc c ⊢ ucwdAny γc := by
-  unfold ucwdAny
-  iintro H
-  iexists c
-  iexact H
 
 end UserCwd
 

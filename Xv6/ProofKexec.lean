@@ -51,9 +51,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## The pure plumbing -/
 
@@ -192,7 +190,7 @@ theorem kxau_close_fail (k : KCtx) (A : KexecArgs) (Fs : Pfam GF (Uvis → IProp
     (sts : List FdState) (gn : GName) (cs : Std.ExtTreeSet GName compare) (Qpay : Int → IProp GF)
     (P Pmiss : Nat → Nat → IProp GF) (Fo : Pfam GF (Aview → Nat → Anode → IProp GF)) (c : CPU) :
     kexecK (hlc := hlc) k A Fs sts gn cs Qpay P Pmiss Fo c ⊢
-      execPostFail (hlc := hlc) Fs (fsGammaL fscFs) fscFs A.V.cwi A.V.pvSecc Qpay P Pmiss Fo
+      execPostFail (hlc := hlc) Fs (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.V.pvSecc Qpay P Pmiss Fo
         (bview A.plen A.pfun) A.na A.alen A.afun sts cs A.pidv -∗
       kexecCloser kxauQ (fun _ => True) k A c := by
   iintro Hret Hfail

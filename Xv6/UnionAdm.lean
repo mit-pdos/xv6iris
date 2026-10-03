@@ -8,32 +8,29 @@ record of the earlier cycles, the bridge) are `Xv6/UnionAdmSync.lean`.
 Rocq's header, abridged: THE LINE LIST (`ulinesOf h`) is every complete line
 of every cycle, in order, as the union parses it (`ulineOfU`) -- a `sync`
 line is an entry like a redirect line.  The redirect lines the ledger keeps
-are this list's projection (`filterMap echofWs`, `ulinesOf_echof`).  A
-line's POSITION in the list is its global round index.  A SYNC RECORD
+are this list's projection (`filterMap echofWs`).  A line's POSITION in the
+list is its global round index.  A SYNC RECORD
 `(p, S)` names what a completed sync fixed: `S` the files at the sync, `p`
 the position of the first line typed after the sync line.  `srec0 = (0, ∅)`
 is "no sync yet".  `uadm ls (p, S) s` -- the design's `Adm(ls, k)` -- says
 each file of `s` is either as it was at the sync or a chunk subset of a
 redirect line at its name typed at a position `≥ p`.  At `srec0` it is the
-landed `fadmBoot` of the redirect lines (`uadm_srec0`).
+landed `fadmBoot` of the redirect lines.
 
 Names (Rocq → Lean): `ulines_in` → `ulinesIn`, `ulines_cyc` → `ulinesCyc`,
 `ulines_of` → `ulinesOf`, `ulines_before` → `ulinesBefore`,
-`ulines_in_length` → `ulinesIn_length`, `ulines_before_all` →
-`ulinesBefore_all`, `ulines_in_app` → `ulinesIn_app`, `ulines_cyc_app` →
-`ulinesCyc_app`, `ulines_of_snoc` → `ulinesOf_snoc`, `ulines_of_prefix` →
-`ulinesOf_prefix`, `ulines_of_io` → `ulinesOf_io`, `ulines_of_out` →
-`ulinesOf_out`, `ulines_of_power` → `ulinesOf_power`, `ulines_before_cut` →
-`ulinesBefore_cut`, `ulines_of_cut` → `ulinesOf_cut`,
-`echof_ws_uline_of_u` → `echofWs_ulineOfU`, `omap_concat` →
-`uaFilterMap_flatten`, `ulines_in_echof` → `ulinesIn_echof`,
-`ulines_cycs_echof` → `ulinesCycs_echof`, `ulines_of_echof` →
-`ulinesOf_echof`, `ulines_before_echof` → `ulinesBefore_echof`; `srec` →
-`Srec`, `srec0` → `srec0`, `uadm` → `uadm`, `uadm_self` → `uadm_self`,
-`uadm_srec0` → `uadm_srec0`, `uadm_mono` → `uadm_mono`, `srec_le` →
-`srecLe`, `uadm_shrink` → `uadm_shrink`, `srec_le_refl/_trans/_mono/_0` →
-`srecLe_refl/_trans/_mono/_0`, `uadm_shrink_chain` → `uadm_shrink_chain`,
-`uadm_redir` → `uadm_redir`, `uadm_ustep` → `uadm_ustep`.
+`ulines_in_length` → `ulinesIn_length`, `ulines_in_app` → `ulinesIn_app`,
+`ulines_cyc_app` → `ulinesCyc_app`, `ulines_of_snoc` → `ulinesOf_snoc`,
+`ulines_of_io` → `ulinesOf_io`, `ulines_of_out` → `ulinesOf_out`,
+`ulines_of_power` → `ulinesOf_power`, `ulines_before_cut` →
+`ulinesBefore_cut`, `ulines_of_cut` → `ulinesOf_cut`; `srec` → `Srec`,
+`srec0` → `srec0`, `uadm` → `uadm`, `uadm_self` → `uadm_self`, `uadm_mono` →
+`uadm_mono`, `srec_le` → `srecLe`, `uadm_shrink` → `uadm_shrink`,
+`srec_le_mono` → `srecLe_mono`, `uadm_shrink_chain` → `uadm_shrink_chain`,
+`uadm_redir` → `uadm_redir`.  NOT PORTED (nothing uses them):
+`ulines_before_all`, `ulines_of_prefix`, `echof_ws_uline_of_u`, `omap_concat`,
+`ulines_in_echof`, `ulines_cycs_echof`, `ulines_of_echof`,
+`ulines_before_echof`, `uadm_srec0`, `srec_le_refl/_trans/_0`, `uadm_ustep`.
 
 DEVIATIONS from Rocq:
 1. Spelling: `omap` is `List.filterMap`, `concat` is `List.flatten`, `fmap`
@@ -41,11 +38,8 @@ DEVIATIONS from Rocq:
    `s.insert N c`, `S k` is `k + 1`; `ObsUartOut i b` is
    `.dev (.uartOut i b)`, `ObsPowerOn/Off` is `.powerOn/.powerOff`.
 2. `echof_ws` returns `(N, ws)` in the Lean port (`FileDisc.echofWs`), and
-   `fadmBoot` states `c = subseq ..` of the looked-up `c`; `uadm_srec0` is
-   stated against those.
-3. `uadm_ustep`'s `uok adm_u_g` is `uok admUG`.
+   `fadmBoot` states `c = subseq ..` of the looked-up `c`.
 -/
-import Xv6.FileDisc
 import Xv6.UnionDisc
 
 namespace Xv6
@@ -72,10 +66,6 @@ noncomputable def ulinesBefore (h : List Obs) (k : Nat) : List Uline :=
 /-- Rocq `ulines_in_length`. -/
 theorem ulinesIn_length (I : List (BitVec 8)) : (ulinesIn I).length = nlines I := by
   simp [ulinesIn, nlines]
-
-/-- Rocq `ulines_before_all`. -/
-theorem ulinesBefore_all (h : List Obs) : ulinesBefore h (cyclesOf h).length = ulinesOf h := by
-  simp [ulinesBefore, ulinesOf]
 
 /-- Rocq `ulines_in_app`. -/
 theorem ulinesIn_app (I k : List (BitVec 8)) : ulinesIn I <+: ulinesIn (I ++ k) := by
@@ -109,15 +99,6 @@ theorem ulinesOf_snoc (h : List Obs) (e : Obs) : ulinesOf h <+: ulinesOf (h ++ [
     simp only [cycStep, List.reverse_cons, List.map_append, List.flatten_append]
     exact List.prefix_append _ _
   | powerOff => exact List.prefix_refl _
-
-/-- Rocq `ulines_of_prefix`. -/
-theorem ulinesOf_prefix (h' h : List Obs) (hp : h' <+: h) : ulinesOf h' <+: ulinesOf h := by
-  obtain ⟨k, rfl⟩ := hp
-  induction k using lineSnocInd with
-  | nil => rw [List.append_nil]; exact List.prefix_refl _
-  | snoc k e ih =>
-    rw [← List.append_assoc]
-    exact ih.trans (ulinesOf_snoc _ e)
 
 /-- Rocq `ulines_of_io`: an event that completes no line leaves the list. -/
 theorem ulinesOf_io (h : List Obs) (e : Obs) (hsh : traceShape h true) (hio : isIo e = true)
@@ -161,54 +142,6 @@ theorem ulinesOf_cut (h : List Obs) (cs : List (List Obs)) (o : List Obs)
   rw [hc, List.map_append, List.flatten_append, List.map_singleton, List.flatten_singleton, he,
     List.append_nil]
 
-/-- Rocq `echof_ws_uline_of_u`: THE REDIRECT LINES ARE THE LIST'S
-PROJECTION -- the union's parser answers a redirect exactly where the file
-model's does. -/
-theorem echofWs_ulineOfU (b : List (BitVec 8)) : echofWs (ulineOfU b) = echofWs (ulineOf b) := by
-  unfold ulineOfU ulineOf
-  split
-  · next l hl => rw [hl]; rfl
-  · next hl =>
-    rw [hl]
-    show _ = echofWs default
-    split
-    · rfl
-    · split
-      · rfl
-      · split <;> rfl
-
-/-- Rocq `omap_concat`. -/
-theorem uaFilterMap_flatten {A B : Type} (f : A → Option B) (L : List (List A)) :
-    L.flatten.filterMap f = (L.map (fun l => l.filterMap f)).flatten := by
-  induction L with
-  | nil => rfl
-  | cons l L ih => simp only [List.flatten_cons, List.filterMap_append, ih, List.map_cons]
-
-/-- Rocq `ulines_in_echof`. -/
-theorem ulinesIn_echof (I : List (BitVec 8)) : (ulinesIn I).filterMap echofWs = echofLinesIn I := by
-  simp only [ulinesIn, echofLinesIn, linesOf, List.filterMap_map]
-  congr 1
-  funext b
-  exact echofWs_ulineOfU b
-
-/-- Rocq `ulines_cycs_echof`. -/
-theorem ulinesCycs_echof (segs : List (List Obs)) :
-    ((segs.map ulinesCyc).flatten).filterMap echofWs = (segs.map echofCyc).flatten := by
-  rw [uaFilterMap_flatten, List.map_map]
-  congr 1
-  apply List.map_congr_left
-  intro seg _
-  exact ulinesIn_echof _
-
-/-- Rocq `ulines_of_echof`. -/
-theorem ulinesOf_echof (h : List Obs) : (ulinesOf h).filterMap echofWs = echofLinesOf h :=
-  ulinesCycs_echof _
-
-/-- Rocq `ulines_before_echof`. -/
-theorem ulinesBefore_echof (h : List Obs) (k : Nat) :
-    (ulinesBefore h k).filterMap echofWs = echofLinesBefore h k :=
-  ulinesCycs_echof _
-
 /-! ## 2.  THE ADMISSIBLE SETS, AND THE SHRINK -/
 
 /-- Rocq `srec`: a sync record -- the position of the first line typed after
@@ -228,30 +161,6 @@ def uadm (ls : List Uline) (r : Srec) (s : Fstate) : Prop :=
 
 /-- Rocq `uadm_self`: the state at the sync is admissible at its own record. -/
 theorem uadm_self (ls : List Uline) (r : Srec) : uadm ls r r.2 := fun _ => Or.inl rfl
-
-/-- Rocq `uadm_srec0`: WITH NO SYNC, THE LANDED SET -- `fadmBoot` of the
-redirect lines. -/
-theorem uadm_srec0 (ls : List Uline) (s : Fstate) :
-    uadm ls srec0 s ↔ fadmBoot (ls.filterMap echofWs) s := by
-  constructor
-  · intro H N c hc
-    rcases H N with h0 | ⟨ws, sel, hin, hsel, hs⟩
-    · rw [hc] at h0; simp [srec0] at h0
-    · rw [hc] at hs
-      refine ⟨ws, sel, ?_, hsel, Option.some.inj hs⟩
-      rw [List.mem_filterMap]
-      exact ⟨.LEchoF ws N, by simpa [srec0] using hin, rfl⟩
-  · intro H N
-    cases hc : s[N]? with
-    | none => left; simp [srec0]
-    | some c =>
-      right
-      obtain ⟨ws, sel, hin, hsel, rfl⟩ := H N c hc
-      rw [List.mem_filterMap] at hin
-      obtain ⟨l, hl, hw⟩ := hin
-      cases l <;> simp [echofWs] at hw
-      obtain ⟨rfl, rfl⟩ := hw
-      exact ⟨_, sel, by simpa [srec0] using hl, hsel, rfl⟩
 
 /-- Rocq `uadm_mono`: MONOTONE IN THE LIST -- a line typed later only adds
 states. -/
@@ -283,24 +192,10 @@ theorem uadm_shrink (ls : List Uline) (r r' : Srec) (s : Fstate) (hle : srecLe l
     rw [hd] at hin
     exact List.mem_of_mem_drop hin
 
-/-- Rocq `srec_le_refl`. -/
-theorem srecLe_refl (ls : List Uline) (r : Srec) : srecLe ls r r :=
-  ⟨Nat.le_refl _, uadm_self ls r⟩
-
-/-- Rocq `srec_le_trans`. -/
-theorem srecLe_trans (ls : List Uline) (r r' r'' : Srec) (h1 : srecLe ls r r')
-    (h2 : srecLe ls r' r'') : srecLe ls r r'' :=
-  ⟨Nat.le_trans h1.1 h2.1, uadm_shrink ls r r' _ h1 h2.2⟩
-
 /-- Rocq `srec_le_mono`. -/
 theorem srecLe_mono (ls ls' : List Uline) (r r' : Srec) (hp : ls <+: ls')
     (h : srecLe ls r r') : srecLe ls' r r' :=
   ⟨h.1, uadm_mono ls ls' r _ hp h.2⟩
-
-/-- Rocq `srec_le_0`: every record is above `srec0` once its state is
-admissible there. -/
-theorem srecLe_0 (ls : List Uline) (r : Srec) (h : uadm ls srec0 r.2) : srecLe ls srec0 r :=
-  ⟨Nat.zero_le _, h⟩
 
 /-- Rocq `uadm_shrink_chain`: THE SHRINK AT A COUNTER (design section 4's
 form) -- records numbered by the sync counter, each above the one before;
@@ -335,36 +230,5 @@ theorem uadm_redir (ls : List Uline) (r : Srec) (s : Fstate) (ws : List (List (B
     subst he
     exact Or.inr ⟨ws, sel, hin, hsel, rfl⟩
   · exact H M
-
-/-- Rocq `uadm_ustep`: ...and every other round moves nothing. -/
-theorem uadm_ustep (ls : List Uline) (r : Srec) (s : Fstate) (j : Nat) (l : Uline) (a : Ualt)
-    (hj : ls[j]? = some l) (hr : r.1 ≤ j) (hok : uok admUG s l a) (H : uadm ls r s) :
-    uadm ls r (ustep s l a) := by
-  cases a with
-  | UR a =>
-    cases l with
-    | LEchoF ws N =>
-      have hin : Uline.LEchoF ws N ∈ ls.drop r.1 := by
-        rw [List.mem_iff_getElem?]
-        exact ⟨j - r.1, by rw [List.getElem?_drop, show r.1 + (j - r.1) = j by omega]; exact hj⟩
-      have hok' : raltOk (.LEchoF ws N) a := hok
-      cases a
-      case RFRan sel => exact uadm_redir ls r s ws N sel hin hok' H
-      case RFExec =>
-        have := uadm_redir ls r s ws N [] hin (selOk_nil _) H
-        rw [subseq_nil] at this
-        exact this
-      case RFOpenM =>
-        show uadm ls r (match s[N]? with
-          | none => s.insert N []
-          | some _ => s)
-        split
-        · have := uadm_redir ls r s ws N [] hin (selOk_nil _) H
-          rw [subseq_nil] at this
-          exact this
-        · exact H
-      all_goals exact H
-    | _ => exact H
-  | _ => exact H
 
 end Xv6

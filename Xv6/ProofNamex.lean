@@ -42,7 +42,7 @@ Rocq's header on the share choreography, the four exits and the budget
    `isItable2_escrows` + `icEscrows_lookup`).
 
 Stale in Rocq, recorded: the SpecNamex / LinkNamex headers list absolute
-`jal` targets (`myproc 0x80001906` …) of an older image, and SpecNamex says
+`jal` targets (`myproc 0x800018fa` …) of an older image, and SpecNamex says
 the function is 318 bytes; it is 334 (0x14e) in both images, and the offsets
 above are the Lean image's (read off `KA.«namex»`, identical to Rocq's
 `+0x..`).  SpecNamex's header describes the pre-§G.24 LINEAR budget
@@ -51,7 +51,6 @@ which is what is ported.  SpecNamex says the path is taken "at FULL
 ownership"; the premise is at the caller's `dqpv`.
 -/
 import Xv6.NamexStart
-import Xv6.NamexRoot
 
 namespace Xv6
 
@@ -60,9 +59,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 theorem namex_ctx_entry {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
     (c : CPU) (k : KCtx) (R : RegMap) :
@@ -85,6 +82,7 @@ theorem namex_main (MP : MYPROC) (ID : IDUP) (IG : IGET) (MM : MEMMOVE) (IL : IL
     (γkl : GName) (γk : KmemNames)
     (plen : Nat) (pfun nfun : Nat → BitVec 8) (npar : Bool) (n : Nat) (Sb : List Nat)
     (pidv : BitVec 32) (cwdv : BitVec 64) (cwi : Nat) (dqp dqc dqb dqs dqpv : DFrac)
+    (rootv : BitVec 64) (rti : Nat) (dqr : DFrac)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : namexSlots ≤ k.avail)
     (hnoff : k.noff = 0) (htier : k.tier = KTier.kpt)
     (hroot : icfgDev = BitVec.ofNat 32 ROOTDEV) (hnib0 : 0 < icfgNib)
@@ -98,14 +96,15 @@ theorem namex_main (MP : MYPROC) (ID : IDUP) (IG : IGET) (MM : MEMMOVE) (IL : IL
     (hnpar : if npar then k.regs 11#5 ≠ 0#64 else k.regs 11#5 = 0#64)
     (hpd : descPageRw pd) :
     wp_namex_gen_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl pd pav pu j γkl γk plen pfun nfun
-      npar n Sb pidv cwdv cwi dqp dqc dqb dqs dqpv
+      npar n Sb pidv cwdv cwi dqp dqc dqb dqs dqpv rootv rti dqr
       hj hproc hK hnoff htier hroot hnib0 hgeom hbg hbel hireg hnn hterm hplen hbud hnpar hpd := by
   unfold wp_namex_gen_eb_body
   let A : NamexArgs := ⟨γl, pd, pav, pu, j, γkl, γk, plen, pfun, npar, n, Sb, pidv, cwdv, cwi,
-    dqp, dqc, dqb, dqs, dqpv⟩
+    dqp, dqc, dqb, dqs, dqpv, rootv, rti, dqr⟩
   have hK12 := namex_slots_12 _ hK
   iintro ⟨Hk, Hpc, #Hpi, Hte, Hce, #Hpe, #Hbc, #Hlc, #Hdc, #Hkl, #Hav, #Hit2, #Hiti, #Hslks,
-    #Hinv, #Hopen, Hsb, Hsi, #Hbmi, Hpid, Hcwd, Hcwr, Hpath, Hnm, Hbs, Hs2, Hop, Htx, Hnext⟩
+    #Hinv, #Hopen, Hsb, Hsi, #Hbmi, Hpid, Hcwd, Hcwr, Hrtc, Hrtr, Hpath, Hnm, Hbs, Hs2, Hop, Htx,
+    Hnext⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   icases kctx_wf _ _ $$ Hk with ⟨%hkwf, Hk⟩
   have hlocks : k.locks = [] := List.eq_nil_of_length_eq_zero (by have := hkwf.2.2.2.1; omega)
@@ -116,7 +115,7 @@ theorem namex_main (MP : MYPROC) (ID : IDUP) (IG : IGET) (MM : MEMMOVE) (IL : IL
   ihave Hnext := namex_post_of_spec k A cpu hj hproc $$ Hnext
   ihave #Henv : namexEnv (hlc := hlc) Γ A $$ []
   · unfold namexEnv; iframe #
-  ihave Hpre : namexPre k A nfun $$ [Hsb Hsi Hpid Hcwd Hcwr Hpath Hnm Hbs Hs2 Hop Htx]
+  ihave Hpre : namexPre k A nfun $$ [Hsb Hsi Hpid Hcwd Hcwr Hrtc Hrtr Hpath Hnm Hbs Hs2 Hop Htx]
   · unfold namexPre namexKeep namexPath; iframe
   simp only [namexAddr]
   -- +0x00 .. +0x1a  the prologue
@@ -143,15 +142,10 @@ Iput`). -/
 theorem namex_proof (MP : MYPROC) (ID : IDUP) (IG : IGET) (MM : MEMMOVE) (IL : ILOCK)
     (IU : IUNLOCK) (IUP : IUNLOCKPUT) (DL : DIRLOOKUP) (IP : IPUT) : NAMEX :=
   ⟨fun Γ _ cpu k γl pd pav pu j γkl γk plen pfun nfun npar n Sb pidv cwdv cwi dqp dqc dqb dqs dqpv
+    rootv rti dqr
     hj hproc hK hnoff htier hroot hnib0 hgeom hbg hbel hireg hnn hterm hplen hbud hnpar hpd =>
   namex_main MP ID IG MM IL IU IUP DL IP Γ cpu k γl pd pav pu j γkl γk plen pfun nfun npar n Sb
-    pidv cwdv cwi dqp dqc dqb dqs dqpv hj hproc hK hnoff htier hroot hnib0 hgeom hbg hbel hireg hnn
+    pidv cwdv cwi dqp dqc dqb dqs dqpv rootv rti dqr hj hproc hK hnoff htier hroot hnib0 hgeom hbg hbel hireg hnn
     hterm hplen hbud hnpar hpd⟩
-
-/-- THE ROOT CORNER's proof, from `iget` alone (Rocq's `NamexRootProof`
-functor over `Iget`). -/
-theorem namex_root_proof (IG : IGET) : NAMEX_ROOT :=
-  ⟨fun cpu k dqp hK hnoff hroot hnib0 ha1 hit hpr huart =>
-    namex_root_main IG cpu k dqp hK hnoff hroot hnib0 ha1 hit hpr huart⟩
 
 end Xv6

@@ -41,28 +41,25 @@ eager three and pops.
 import Xv6.SpecFileread
 import MachCSL.WpSmodeFrame6c
 import Xv6.FilePay
-import Xv6.DirlookupParts
 
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedSectionVars false
-set_option linter.unusedVariables false
 set_option linter.unusedSimpArgs false
 
 /-! ## 1.  Code facts -/
 
-theorem frd_br_ilock : KA.«fileread» + 0xffffffffffffefb4#64 = KA.«ilock» := by decide
-theorem frd_br_readi : KA.«fileread» + 0xfffffffffffff38e#64 = KA.«readi» := by decide
-theorem frd_br_iunlock : KA.«fileread» + 0xfffffffffffff062#64 = KA.«iunlock» := by decide
+theorem frd_br_ilock : KA.«fileread» + 0xffffffffffffef54#64 = KA.«ilock» := by decide
+theorem frd_br_readi : KA.«fileread» + 0xfffffffffffff32e#64 = KA.«readi» := by decide
+theorem frd_br_iunlock : KA.«fileread» + 0xfffffffffffff002#64 = KA.«iunlock» := by decide
 theorem frd_br_piperead : KA.«fileread» + 0x44e#64 = KA.«piperead» := by decide
-theorem frd_br_panic : KA.«fileread» + 0xffffffffffffc4ae#64 = KA.«panic» := by decide
+theorem frd_br_panic : KA.«fileread» + 0xffffffffffffc43a#64 = KA.«panic» := by decide
 /-- `auipc a0,0x3` + `addi a0,a0,440`: the panic literal. -/
-theorem frd_msg_addr : KA.«fileread» + 0x3216#64 = KStr.«fileread» := by decide
+theorem frd_msg_addr : KA.«fileread» + 0x31a2#64 = KStr.«fileread» := by decide
 /-- `auipc a4,0x1e` + `addi a4,a4,218`: the device table. -/
-theorem frd_devsw_addr : KA.«fileread» + 0x1e34e#64 = KA.«devsw» := by decide
+theorem frd_devsw_addr : KA.«fileread» + 0x1e57a#64 = KA.«devsw» := by decide
 
 theorem frd_ret_3a : jumpPc (KA.«fileread» + 0x3a#64) = KA.«fileread» + 0x3a#64 := by decide
 theorem frd_ret_48 : jumpPc (KA.«fileread» + 0x48#64) = KA.«fileread» + 0x48#64 := by decide
@@ -73,11 +70,6 @@ theorem frd_ret_9c : jumpPc (KA.«fileread» + 0x9c#64) = KA.«fileread» + 0x9c
 theorem frd_jump_cr : jumpPc KA.«consoleread» = KA.«consoleread» := by decide
 
 /-! ## 2.  The pure arithmetic -/
-
-/-- `lw a3,32(s1)`: a wf offset, sign-extended, is its own value. -/
-theorem frd_lw_off (v : BitVec 32) (h : v.toNat < 2 ^ 31) :
-    BitVec.signExtend 64 v = BitVec.signExtend 64 (BitVec.ofNat 32 v.toNat) := by
-  simp
 
 /-- The count register, as readi's `uint` argument (Rocq `fr_sext_moi32`). -/
 theorem frd_n_arg (n : Int) (h0 : 0 ≤ n) (h1 : n < 2 ^ 31) :

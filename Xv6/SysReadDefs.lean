@@ -65,9 +65,9 @@ Rocq's header, kept because the reasons are the content:
    `0 ≤ rv ∧ rv ≤ n`.
 3. `seq off r` is `List.range' off r`; `file_byte data <$> _` is
    `List.map (fileByte data) _`; `take`/`drop` are `List.take`/`List.drop`.
-4. The two local word lemmas `moi64_lit_inj` / `moi64_lit_ne_m1` are
-   `srd_ofNat_inj` / `srd_ofNat_ne_m1` (over `BitVec.ofNat`, the spelling of
-   deviation 2).
+4. The local word lemma `moi64_lit_ne_m1` is `srd_ofNat_ne_m1` (over
+   `BitVec.ofNat`, the spelling of deviation 2); `moi64_lit_inj` is not
+   ported (nothing uses it).
 5. `length_file_bytes` is `fileBytes_length'` (primed: no landed
    `fileBytes_length` exists, but the name is kept distinct from FsTree's
    namespace in case one is added there).
@@ -98,17 +98,6 @@ theorem ardCount_le (n off len : Nat) : ardCount n off len ≤ n := Nat.min_le_l
 
 theorem ardCount_sub (n off len : Nat) : ardCount n off len ≤ len - off := Nat.min_le_right _ _
 
-theorem ardCount_eof (n off len : Nat) (h : len ≤ off) : ardCount n off len = 0 := by
-  unfold ardCount; omega
-
-theorem ardCount_full (n off len : Nat) (h : off + n ≤ len) : ardCount n off len = n := by
-  unfold ardCount; omega
-
-/-- r = 0 is EXACTLY "nothing was asked or nothing is there" (Rocq's
-`ard_count_0`) -/
-theorem ardCount_0 (n off len : Nat) : ardCount n off len = 0 ↔ n = 0 ∨ len ≤ off := by
-  unfold ardCount; omega
-
 /-- THE BRIDGE TO READI'S OWN CLAMP (Rocq's `rd_clamp_ard`): `rdClamp` over
 the size word IS `ardCount` over the byte count. -/
 theorem rdClamp_ard (sz : BitVec 32) (off n : Nat) :
@@ -125,27 +114,6 @@ theorem fileBytes_length' (data : Nat → List (BitVec 8)) (len : Nat) :
 /-- Rocq's `length_fn_file_bytes`. -/
 theorem fnFileBytes_length (n : FsNode) : (fnFileBytes n).length = fnSize n := by
   simp [fnFileBytes, fileBytes]
-
-/-- THE SLICE IS EXACT ON BOTH ENDS (Rocq's `ard_slice_length`). -/
-theorem ardSlice_length (off r : Nat) (bs : List (BitVec 8)) (hr : r ≤ bs.length - off) :
-    ((bs.drop off).take r).length = r := by
-  simp only [List.length_take, List.length_drop]
-  omega
-
-/-- Rocq's `ard_slice_count`. -/
-theorem ardSlice_count (n off : Nat) (bs : List (BitVec 8)) :
-    ((bs.drop off).take (ardCount n off bs.length)).length = ardCount n off bs.length :=
-  ardSlice_length _ _ _ (ardCount_sub _ _ _)
-
-/-- THE READI BYTE BRIDGE'S PURE HALF (Rocq's `file_bytes_slice`): the slice
-of the flat view is the per-index `fileByte` family, summed into a list. -/
-theorem fileBytes_slice (data : Nat → List (BitVec 8)) (len off r : Nat) (hr : r ≤ len - off) :
-    ((fileBytes data len).drop off).take r = (List.range' off r).map (fileByte data) := by
-  unfold fileBytes
-  rw [← List.map_drop, ← List.map_take, List.range_eq_range', List.drop_range',
-    List.take_range'_of_length_ge hr]
-  congr 2
-  omega
 
 /-! ## 1a.  The observation's side conditions, and the return tie -/
 
@@ -188,13 +156,6 @@ theorem ardRetTie_ret (n : Int) (a : Anode) (off : Nat) (r : BitVec 64) (hn : 0 
 
 /-! ## 1b.  The exact-count join: the return tie meets the window's length -/
 
-/-- Rocq's (local) `moi64_lit_inj`. -/
-theorem srd_ofNat_inj (x y : Nat) (hx : x < 2 ^ 64) (hy : y < 2 ^ 64)
-    (h : BitVec.ofNat 64 x = BitVec.ofNat 64 y) : x = y := by
-  have := congrArg BitVec.toNat h
-  simp only [BitVec.toNat_ofNat] at this
-  rwa [Nat.mod_eq_of_lt hx, Nat.mod_eq_of_lt hy] at this
-
 /-- Rocq's (local) `moi64_lit_ne_m1`. -/
 theorem srd_ofNat_ne_m1 (x : Nat) (hx : x < 2 ^ 64 - 1) : BitVec.ofNat 64 x ≠ -1#64 := by
   intro h
@@ -203,38 +164,5 @@ theorem srd_ofNat_ne_m1 (x : Nat) (hx : x < 2 ^ 64 - 1) : BitVec.ofNat 64 x ≠ 
   rw [Nat.mod_eq_of_lt (by omega)] at this
   have hm : (-1#64).toNat = 2 ^ 64 - 1 := by decide
   omega
-
-/-- the ok arm's value is never the -1 literal, so the relayed disjunction
-collapses: THE ANSWER IS THE WINDOW'S LENGTH, on every row (Rocq's
-`ard_ret_tie_pos`) -/
-theorem ardRetTie_pos (n : Int) (a : Anode) (off d : Nat) (r : BitVec 64)
-    (hn : 0 ≤ n ∧ n < 2 ^ 31) (htie : ardRetTie n a off r)
-    (hor : r = BitVec.ofNat 64 d ∨ r = -1#64) : r = BitVec.ofNat 64 d := by
-  rcases hor with hd | hm1
-  · exact hd
-  exfalso
-  unfold ardRetTie at htie
-  split at htie
-  · rename_i bs _
-    rw [htie] at hm1
-    have := ardCount_le n.toNat off bs.length
-    exact srd_ofNat_ne_m1 _ (by omega) hm1
-  · obtain ⟨rv, hr, h0, h1⟩ := htie
-    rw [hr, show rv = ((rv.toNat : Nat) : Int) by omega, BitVec.ofInt_natCast] at hm1
-    exact srd_ofNat_ne_m1 _ (by omega) hm1
-
-/-- ...and on a FILE row the length is the ABSTRACT count (Rocq's
-`ard_ret_tie_exact_file`) -/
-theorem ardRetTie_exact_file (n : Int) (bs : List (BitVec 8)) (a : Anode) (off d : Nat)
-    (r : BitVec 64) (hn : 0 ≤ n ∧ n < 2 ^ 31) (hdle : (d : Int) ≤ max 0 n)
-    (hfile : a.anNode = .AFile bs) (htie : ardRetTie n a off r)
-    (hor : r = BitVec.ofNat 64 d ∨ r = -1#64) :
-    d = ardCount n.toNat off bs.length := by
-  have hpos := ardRetTie_pos n a off d r hn htie hor
-  unfold ardRetTie at htie
-  rw [hfile] at htie
-  rw [htie] at hpos
-  have := ardCount_le n.toNat off bs.length
-  exact (srd_ofNat_inj _ _ (by omega) (by omega) hpos).symm
 
 end Xv6

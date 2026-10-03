@@ -26,8 +26,6 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedSectionVars false
-
 /-- A kalloc'd page is RAM above the kernel image: its identity mapping is a
 read-write static entry, at every offset. -/
 theorem kt_kmapClass_page (p : BitVec 64) (hp : pageValid p) (off : Nat) (hoff : off < 4096) :

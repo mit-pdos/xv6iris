@@ -29,8 +29,8 @@ site); what needs one is a SYMBOLIC value.
    lemmas are stated at the Lean `BitVec` operations the leaves' value
    functions unfold to (`SpecUkLeaves` §4); `nw_unsigned`/`shift_amount_bv`
    (Rocq's `N_to_word` plumbing) have no Lean counterpart.
-3. `zext8_unsigned`/`zext8_moi` are one lemma (`uzext8_moi`); `add_vec_zero_l`
-   is `BitVec.zero_add` (not restated).
+3. `zext8_unsigned`/`zext8_moi` are not ported (nothing uses them);
+   `add_vec_zero_l` is `BitVec.zero_add` (not restated).
 -/
 import Std.Tactic.BVDecide
 
@@ -52,12 +52,6 @@ theorem umoi_small {z : Int} (h0 : 0 ≤ z) (h1 : z < 2 ^ 64) : ((BitVec.ofInt 6
 theorem umoi_toNat_nat {z : Int} (h0 : 0 ≤ z) (h1 : z < 2 ^ 64) : (BitVec.ofInt 64 z).toNat = z.toNat := by
   have := umoi_small h0 h1; omega
 
-/-- Rocq `moi_mod`. -/
-theorem umoi_mod {x y : Int} (h : x % 2 ^ 64 = y % 2 ^ 64) : BitVec.ofInt 64 x = BitVec.ofInt 64 y := by
-  apply BitVec.eq_of_toNat_eq
-  have hx := umoi_toNat x; have hy := umoi_toNat y
-  omega
-
 /-- Rocq `moi_of_unsigned` / `moi_of_uint`. -/
 theorem umoi_of_toNat (a : BitVec 64) : BitVec.ofInt 64 (a.toNat : Int) = a := by
   rw [BitVec.ofInt_natCast, BitVec.ofNat_toNat, BitVec.setWidth_eq]
@@ -76,58 +70,10 @@ theorem umoi_natCast (n : Nat) : BitVec.ofInt 64 (n : Int) = BitVec.ofNat 64 n :
 theorem umoi_add (x y : Int) : BitVec.ofInt 64 x + BitVec.ofInt 64 y = BitVec.ofInt 64 (x + y) :=
   (BitVec.ofInt_add x y).symm
 
-/-- Rocq `moi_sub`. -/
-theorem umoi_sub (x y : Int) : BitVec.ofInt 64 x - BitVec.ofInt 64 y = BitVec.ofInt 64 (x - y) := by
-  rw [Int.sub_eq_add_neg, ← umoi_add, BitVec.ofInt_neg, BitVec.sub_eq_add_neg]
-
 /-- Rocq `moi_add_l`: `umoi_add` at a register not yet normalized. -/
 theorem umoi_add_l (a : BitVec 64) (d : Int) : a + BitVec.ofInt 64 d = BitVec.ofInt 64 (a.toNat + d) := by
   conv => lhs; rw [← umoi_of_toNat a]
   exact umoi_add _ _
-
-/-- Rocq `moi_of_uint_eq`: a word whose `toNat` is known IS that literal's
-`ofInt`. -/
-theorem umoi_of_toNat_eq (a : BitVec 64) (z : Int) (h : (a.toNat : Int) = z) : a = BitVec.ofInt 64 z := by
-  rw [← h, umoi_of_toNat]
-
-/-! ## §3 Comparisons (the branch leaf's `ukBtaken` arguments) -/
-
-/-- Rocq `moi_eq_vec`. -/
-theorem umoi_beq {x y : Int} (hx0 : 0 ≤ x) (hx1 : x < 2 ^ 64) (hy0 : 0 ≤ y) (hy1 : y < 2 ^ 64) :
-    (BitVec.ofInt 64 x == BitVec.ofInt 64 y) = decide (x = y) := by
-  by_cases h : x = y
-  · subst h; simp
-  · have hne : BitVec.ofInt 64 x ≠ BitVec.ofInt 64 y := by
-      intro he
-      have := congrArg BitVec.toNat he
-      have := umoi_small hx0 hx1; have := umoi_small hy0 hy1
-      omega
-    simp [h, hne]
-
-/-- Rocq `moi_neq_vec`. -/
-theorem umoi_bne {x y : Int} (hx0 : 0 ≤ x) (hx1 : x < 2 ^ 64) (hy0 : 0 ≤ y) (hy1 : y < 2 ^ 64) :
-    (BitVec.ofInt 64 x != BitVec.ofInt 64 y) = !decide (x = y) := by
-  rw [bne, umoi_beq hx0 hx1 hy0 hy1]
-
-/-- Rocq `moi_lt_s` (the model's `zopz0zI_s` is `toInt <`). -/
-theorem umoi_lt_s {x y : Int} (hx0 : 0 ≤ x) (hx1 : x < 2 ^ 63) (hy0 : 0 ≤ y) (hy1 : y < 2 ^ 63) :
-    decide ((BitVec.ofInt 64 x).toInt < (BitVec.ofInt 64 y).toInt) = decide (x < y) := by
-  rw [umoi_toInt hx0 hx1, umoi_toInt hy0 hy1]
-
-/-- Rocq `moi_ge_s`. -/
-theorem umoi_ge_s {x y : Int} (hx0 : 0 ≤ x) (hx1 : x < 2 ^ 63) (hy0 : 0 ≤ y) (hy1 : y < 2 ^ 63) :
-    decide ((BitVec.ofInt 64 x).toInt ≥ (BitVec.ofInt 64 y).toInt) = decide (x ≥ y) := by
-  rw [umoi_toInt hx0 hx1, umoi_toInt hy0 hy1]
-
-/-- Rocq `moi_lt_u` (the model's `zopz0zI_u` is `toNat <`, as `Int`). -/
-theorem umoi_lt_u {x y : Int} (hx0 : 0 ≤ x) (hx1 : x < 2 ^ 64) (hy0 : 0 ≤ y) (hy1 : y < 2 ^ 64) :
-    decide (((BitVec.ofInt 64 x).toNat : Int) < ((BitVec.ofInt 64 y).toNat : Int)) = decide (x < y) := by
-  rw [umoi_small hx0 hx1, umoi_small hy0 hy1]
-
-/-- Rocq `moi_ge_u`. -/
-theorem umoi_ge_u {x y : Int} (hx0 : 0 ≤ x) (hx1 : x < 2 ^ 64) (hy0 : 0 ≤ y) (hy1 : y < 2 ^ 64) :
-    decide (((BitVec.ofInt 64 x).toNat : Int) ≥ ((BitVec.ofInt 64 y).toNat : Int)) = decide (x ≥ y) := by
-  rw [umoi_small hx0 hx1, umoi_small hy0 hy1]
 
 /-! ## §4 The 32-bit truncating operations: addiw / subw
 
@@ -223,41 +169,5 @@ theorem umoi_zext_scale {z : Int} (k : Nat) (h0 : 0 ≤ z) (h1 : z < 2 ^ 32) (hk
   have e : (2 : Int) ^ 32 = 2 ^ k * 2 ^ (32 - k) := by
     rw [← Int.pow_add]; congr 1; omega
   rw [e, ← Int.mul_assoc, Int.mul_ediv_cancel _ (Int.ne_of_gt (Int.pow_pos (by decide)))]
-
-/-! ## §6 x0, byte loads, immediates -/
-
-/-- Rocq `zero_reg_moi`. -/
-theorem uzero_moi : (0#64 : BitVec 64) = BitVec.ofInt 64 0 := rfl
-
-/-- Rocq `moi_add_zero_l`. -/
-theorem umoi_add_zero_l (x : Int) : (0#64 : BitVec 64) + BitVec.ofInt 64 x = BitVec.ofInt 64 x :=
-  BitVec.zero_add _
-
-/-- Rocq `moi_eq_zero`. -/
-theorem umoi_beq_zero {x : Int} (h0 : 0 ≤ x) (h1 : x < 2 ^ 64) :
-    (BitVec.ofInt 64 x == 0#64) = decide (x = 0) := by
-  rw [uzero_moi]; exact umoi_beq h0 h1 (Int.le_refl _) (by decide)
-
-/-- Rocq `moi_neq_zero`. -/
-theorem umoi_bne_zero {x : Int} (h0 : 0 ≤ x) (h1 : x < 2 ^ 64) :
-    (BitVec.ofInt 64 x != 0#64) = !decide (x = 0) := by
-  rw [bne, umoi_beq_zero h0 h1]
-
-/-- Rocq `zext8_unsigned` / `zext8_moi`: an unsigned byte load leaves its
-byte ZERO-extended. -/
-theorem uzext8_moi (b : BitVec 8) : BitVec.setWidth 64 b = BitVec.ofInt 64 (b.toNat : Int) := by
-  apply BitVec.eq_of_toNat_eq
-  simp
-
-/-- Rocq `sext6_12_64`: sign extension composes. -/
-theorem usext6_12_64 (imm : BitVec 6) :
-    BitVec.signExtend 64 (BitVec.signExtend 12 imm) = BitVec.signExtend 64 imm := by
-  bv_decide
-
-/-- Rocq `uimm6_norm`: the compressed-immediate chain as the leaves consume
-it (`0 + sext64 (sext12 imm)`). -/
-theorem uimm6_norm (imm : BitVec 6) :
-    (0#64 : BitVec 64) + BitVec.signExtend 64 (BitVec.signExtend 12 imm) = BitVec.signExtend 64 imm := by
-  rw [BitVec.zero_add, usext6_12_64]
 
 end Xv6

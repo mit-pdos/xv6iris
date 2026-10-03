@@ -24,8 +24,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
-set_option linter.unusedSectionVars false
-
 section FileOpenCreateAu
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [FileAppG GF] [OffboxG GF] [FsTopG GF] [FsBytesG GF] [Appcfg GF] [Icfg]
@@ -33,15 +31,15 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG 
 /-- THE WHOLE CREATE BUNDLE (Rocq `file_open_create_au`). -/
 theorem fileOpenCreate_au (γfs : FsNames) (c : FileFixed) (r : FileAppNames)
     (jo : Option Nat) (n : Nat) (N : Fname) (s : Dst) (g : GName) (np : Nat) (ls : List FlLine)
-    (ws : Wordline) (cw : Nat) (M : Nat → List (BitVec 8)) (pv : Nat) (vom : BitVec 64)
+    (ws : Wordline) (rt cw : Nat) (M : Nat → List (BitVec 8)) (pv : Nat) (vom : BitVec 64)
     (pl : List (BitVec 8))
     (heq : ‹Appcfg GF› = { appNames := FileAppNames, appPred := filePred (hlc := hlc) c, appRun := r })
     (hN : uname N) (hpath : argPathOf M pv pl) (hnp : npElems pl = [])
-    (hstart : umStartOf cw pl = ROOTINO) (hlast : (pathElems pl).getLast? = some N)
+    (hstart : umStartOf rt cw pl = ROOTINO) (hlast : (pathElems pl).getLast? = some N)
     (hlst : ls.getLast? = some (Uline.LEchoF ws N)) (hnpl : np = ls.length) (hokw : lineOk ws) :
     ⊢@{IProp GF} appInv (hlc := hlc) γfs -∗ fileConsCred (hlc := hlc) c r jo -∗ flLb c ls -∗
       escKey (hlc := hlc) c r n s g -∗ fescRes (hlc := hlc) r s g np -∗
-      openAuCreateAt (hlc := hlc) (fsGammaL γfs) γfs cw M pv vom
+      openAuCreateAt (hlc := hlc) (fsGammaL γfs) γfs rt cw M pv vom
         (fun (_ : Nat) (d : Nat) => iprop(⌜d = ROOTINO⌝)) (fun _ _ => iprop(True))
         (fileArmFam (hlc := hlc) c r jo s g np) (fileUnarmFam (hlc := hlc) c r s g np)
         (fileCreFam (hlc := hlc) c r jo N s g np) (fileDlkFam (hlc := hlc) c r n s g)
@@ -65,7 +63,7 @@ theorem fileOpenCreate_au (γfs : FsNames) (c : FileFixed) (r : FileAppNames)
     isplitr
     · dsimp only
       ipureintro; rw [hr0, hstart]
-    · iapply (epHops_done (hlc := hlc) γfs _ _ pl 0 (by rw [hnp]; simp))
+    · iapply (epHops_done (hlc := hlc) rt γfs _ _ pl 0 (by rw [hnp]; simp))
   isplitl []
   · -- THE PARENT LEG, at the guarded cursor and the pinned name
     unfold pfAt

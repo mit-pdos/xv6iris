@@ -22,9 +22,7 @@ Rocq's header of §S8, abridged:
 
 1. **Scope: the reached declarations only** (union_cone.md §1.2: FileLinksLine
    8/92), plus the `Persistent`/`Timeless` instances of the reached
-   predicates and the agreement laws of `f0w`/`f0bw` (`f0w_agree`,
-   `f0bw_agree`, `f0w_bw`, `f0w_bw_agree`: two lines each, and what every
-   consumer of the pair reads).  Not ported (unreached): the file's pure
+   predicates.  Not ported (unreached): the file's pure
    stage account (§S0–§S7: `wr_*_f`, `proc_before_f`, the refutations,
    `wr_banp_f`), `fcur`, `fwc_rres`, `fwc_rresw`.
 2. Rocq's `Local Notation FT := file_taint (fgn_cl g)` is spelled out.
@@ -35,13 +33,10 @@ Rocq's header of §S8, abridged:
 5. `alt_panic_len5` is `LineBytes.lbPanic_len` (Rocq proves it the same way).
 -/
 import Xv6.FileOutClaim
-import Xv6.LineBytes
 
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
-
-set_option linter.unusedSectionVars false
 
 section FileLinksLine
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
@@ -71,54 +66,6 @@ instance f0bw_persistent (g : FileGn) (k : Nat) (s : Fstate) :
 instance f0bw_timeless (g : FileGn) (k : Nat) (s : Fstate) :
     Timeless (f0bw (hlc := hlc) (GF := GF) g k s) := by
   unfold f0bw; infer_instance
-
-/-- Rocq `f0bw_agree`. -/
-theorem f0bw_agree (g : FileGn) (k k' : Nat) (s s' : Fstate) :
-    f0bw (hlc := hlc) (GF := GF) g k s ∗ f0bw g k' s' ⊢ ⌜s = s'⌝ := by
-  unfold f0bw
-  iintro ⟨⟨%hk, %vf, #Hp, #Hl⟩, ⟨%hk', %vf', #Hp', #Hl'⟩⟩
-  subst hk hk'
-  ihave %he := fileEraPin_agree $$ [Hp Hp']
-  · isplitl [Hp]
-    · iexact Hp
-    · iexact Hp'
-  subst he
-  iapply f0Bl_agree g
-  isplitl [Hl]
-  · iexact Hl
-  · iexact Hl'
-
-/-- Rocq `f0w_bw`. -/
-theorem f0w_bw (g : FileGn) (k : Nat) (s : Fstate) :
-    f0w (hlc := hlc) (GF := GF) g k s ⊢ f0bw g k s := by
-  unfold f0w f0bw
-  iintro ⟨%hk, %vf, #Hp, #Hl⟩
-  isplitr
-  · ipureintro; exact hk
-  · iexists vf
-    iframe Hp
-    iapply f0Lb_bl g $$ Hl
-
-/-- Rocq `f0w_agree`. -/
-theorem f0w_agree (g : FileGn) (k k' : Nat) (s s' : Fstate) :
-    f0w (hlc := hlc) (GF := GF) g k s ∗ f0w g k' s' ⊢ ⌜s = s'⌝ := by
-  iintro ⟨H1, H2⟩
-  ihave H1 := f0w_bw g k s $$ H1
-  ihave H2 := f0w_bw g k' s' $$ H2
-  iapply f0bw_agree
-  isplitl [H1]
-  · iexact H1
-  · iexact H2
-
-/-- Rocq `f0w_bw_agree`. -/
-theorem f0w_bw_agree (g : FileGn) (k k' : Nat) (s s' : Fstate) :
-    f0w (hlc := hlc) (GF := GF) g k s ∗ f0bw g k' s' ⊢ ⌜s = s'⌝ := by
-  iintro ⟨H1, H2⟩
-  ihave H1 := f0w_bw g k s $$ H1
-  iapply f0bw_agree
-  isplitl [H1]
-  · iexact H1
-  · iexact H2
 
 /-- THE HEAD'S PRECONDITION: the typed witness of the boot state beside its
 (already minted) boot-ledger entry (Rocq `f0pre`). -/

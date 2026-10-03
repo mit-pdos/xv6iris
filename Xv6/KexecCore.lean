@@ -42,13 +42,8 @@ conversion.  A STAGE file (no `Proof` prefix).
    first chunk does too: proc_pagetable takes the counter, so `kxc_b1`'s two
    outputs run at `{ A with V := A.V.updEv kb }` and the loop path's phases
    C and D at the record raised twice.
-4. **NEW: `kxc_core`**, the landed whole (brief §6.3): `kxc_phaseA` over the
-   plain `NAMEI` ∘ `kxc_from90`, at plugs that hold of every file (Rocq has
-   no such lemma: its only whole is the AU one).  Its instance at
-   `Q := True`, `QF := True` is kexec at the landed `kexecOk`.
 -/
 import Xv6.KexecACode
-import Xv6.KexecB
 import Xv6.KexecB3
 import Xv6.KexecC
 import Xv6.KexecD
@@ -57,9 +52,6 @@ namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
-
-set_option linter.unusedSectionVars false
-set_option linter.unusedVariables false
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
@@ -155,41 +147,6 @@ theorem kxc_from90 (IUP : IUNLOCKPUT) (EO : END_OP) (PPT : PROC_PAGETABLE) (RD :
       (k.regs 27#5) 4095#64 (kxcFb data dnf) ef P2 Mo szv hQ hqfm hqfa hK hnoff htier hargs hna havf
       havfnz hterm)
     iframe Hs Hfab Hcl
-
-/-- **THE LANDED WHOLE** (deviation 3): kexec from its entry, phase A at the
-plain `NAMEI` (`KexecACode.kxc_phaseA`) and phases B .. D (`kxc_from90`), at
-plugs that hold of every file.  At `Q := True`, `QF := True` the closer is
-the landed `kexecOk` exit (`kexecCloser_of_ok`). -/
-theorem kxc_core (MP : MYPROC) (BO : BEGIN_OP) (NI : NAMEI) (IL : ILOCK) (RD : READI)
-    (IUP : IUNLOCKPUT) (EO : END_OP) (PPT : PROC_PAGETABLE) (WA : WALKADDR) (PA : PANIC)
-    (F2P : FLAGS2PERM) (UA : UVMALLOC) (UC : UVMCLEAR) (SL : STRLEN) (CO : COPYOUT)
-    (PFP : PROC_FREEPAGETABLE) (SS : SAFESTRCPY_SRC)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (Q : BitVec 64 → ProcPriv → (Nat → List (BitVec 8)) → Prop) (QF : KxfCause → Prop)
-    (cpu : CPU) (k : KCtx) (A : KexecArgs)
-    (hQ : ∀ fb ef sz1 V' M', kexecBuilt fb ef sz1 A.na A.alen A.afun V' M' → Q (kxqEntry ef) V' M')
-    (hqfl : QF .notLoadable) (hqfm : QF .noMem) (hqfa : QF .argsFit)
-    (hK : kexecSlots ≤ k.avail) (hnoff : k.noff = 0) (htier : k.tier = KTier.kpt)
-    (hj : A.j < NPROC) (hproc : k.proc = procAddr A.j)
-    (hnn : ∀ i, i < A.plen → A.pfun i ≠ 0#8) (hterm : A.pfun A.plen = 0#8)
-    (hplen : A.plen < 2 ^ 31)
-    (hargs : kxcArgsOk A) (hna : A.na < MAXARG) (havf : A.avf A.na = 0#64)
-    (havfnz : ∀ i, i < A.na → A.avf i ≠ 0#64) :
-    kctx cpu k ∗ pcIs cpu KA.«kexec» ∗ trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    fsFabric (hlc := hlc) Γ A.pd A.pav A.pu ∗
-    procPrivFd A.γ k.proc A.pidv A.V A.M ∗ kxcBufs k A ∗ bslots 3 ∗ irefSlots 2 ∗
-    (∀ c' : CPU, kexecCloser Q QF k A c')
-    ⊢ wpLoop (GF := GF) cpu := by
-  iintro ⟨Hk, Hpc, Hte, Hce, #Hfab, Hpriv, Hbufs, Hbs, Hirs, Hcl⟩
-  iapply (kxc_phaseA MP BO NI IL RD IUP EO Γ Q QF cpu k A ⟨_, hqfm⟩ hK hnoff htier hj hproc hnn
-    hterm hplen)
-  iframe Hk Hpc Hte Hce Hfab Hpriv Hbufs Hbs Hirs Hcl
-  iintro %c %spie %spp %R %kf %qf %sf %gyf %loyf %tlyf %inumf %dnf %bmf %data %gilf %gislf %n2 %ef
-    Hs Hcl
-  iapply (kxc_from90 IUP EO PPT RD WA PA F2P UA MP UC SL CO PFP SS Γ Q QF c k A spie spp R kf qf sf
-    gyf loyf tlyf inumf dnf bmf data gilf gislf n2 ef (hQ _ ef) (fun _ => hqfl) hqfm (fun _ _ _ => hqfa) hK hnoff htier
-    hj hproc hargs hna havf havfnz hterm)
-  iframe Hs Hfab Hcl
 
 end
 

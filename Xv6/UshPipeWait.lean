@@ -17,14 +17,13 @@ register file is `UkStub.stubRet m 3 ret`; `ukn_const` is not needed.
 import Xv6.UkRunSysWait
 import Xv6.UshRunDefs
 import Xv6.UkStub
+import Xv6.UshRunCode
 
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
-
-set_option linter.unusedSectionVars false
 
 section UshPipeWait
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]

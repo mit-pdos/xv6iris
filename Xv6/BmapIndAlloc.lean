@@ -29,9 +29,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
@@ -100,7 +98,6 @@ theorem bm_ind_alloc_fail (BE : BRELSE) (Γ : SchedNames) (c cpu : CPU) (k : KCt
   case e2 => simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] <;> exact hR2
   case e9 => simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, bm_sext0] <;> exact h10
   case e20 => simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] <;> exact h20
-
 
 set_option maxHeartbeats 16000000 in
 /-- **`+0xa2 .. +0xb0`: balloc SUCCEEDED** -- install `a[q] = blk`,
@@ -182,7 +179,7 @@ theorem bm_ind_alloc_ok (LW : LOG_WRITE) (BE : BRELSE) (Γ : SchedNames) (c cpu 
   bm_step (wp_s_add c _ (KA.«bmap» + 0xaa#64) true 10#5 0#5 20#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h20]
   iintro Hk Hpc
-  bm_step (wp_s_jal c _ (KA.«bmap» + 0xac#64) false 3572#21 1#5 (by decide))
+  bm_step (wp_s_jal c _ (KA.«bmap» + 0xac#64) false 3668#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [bm_br_logwrite]
   iintro Hk Hpc
   ihave Hfsbi := fsblockQ_1_of γfs.bytes (DFrac.own 1) _ _ rfl $$ Hind
@@ -249,7 +246,6 @@ theorem bm_ind_alloc_ok (LW : LOG_WRITE) (BE : BRELSE) (Γ : SchedNames) (c cpu 
   case e2 => rw [b2]; exact hR2
   case e9 => rw [b9]
   case e20 => rw [b20]; exact h20
-
 
 set_option maxHeartbeats 16000000 in
 /-- **`+0x9a .. +0x9e`: THE DATA balloc** (Rocq's `bm_indirect_tail`, its

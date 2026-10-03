@@ -722,6 +722,30 @@ key to the previous round's resumed key), so each round step carries its trapped
 inputs include it.  (4) The uptime reading is the tick (O5); the law adds that it is a tick count's word.
 (5) The filing `F` is existential (O6).
 
+### Merge with the chroot bump (2026-10-03)
+
+`lean` (M2 complete) merged with `origin/lean` at 4bfa3048b (the chroot kernel bump to xv6 b72cbac1, four
+dead-code passes, the 18 dead modules, the dead-import sweep, the build-shape cuts).  **No statement of ours or
+theirs changed** beyond the textual union at the 15 conflicted sites: wherever upstream threaded the root
+(`initBootBundle … rt cw …`, `parkMode rt cw …`, `parkPkg … V.rti V.cwi …`, `ui_publish` on `IGETROOT`/`IDUP`
+in place of `NAMEI_ROOT`), our origin ticket `MachFixedGS.uClaimO` rides beside it unchanged (`parkMode`'s two
+arms, `userinitPark`, `wp_main_boot_body`, `bootPrimarySupply(_intro)`, `mn_phaseB/C`, `fkr_boot`,
+`parkToken_park(_steady)`), and `[NiFitIs]` stays on `ui_publish`/`ui_finish`.  Upstream's dead-code passes had
+deleted helpers that were dead in OUR tree too (`wireInv_alloc`, `wireInv_eq`, `wpLoop_s_sretU`,
+`userInv_of_sret`, `userTrapFrame_open`, `wpLoop_userret_sret`, `userTrapFrameAt(_frame)`,
+`userTrapFrameAtm_at`, `uf_drefU_acc`, `uf_swp_decode16/32`, `uf_cfg_walk`, `usysMemOk_perm`,
+`bootFixedGS_obsPredTriv`/`_obsLedger`, `riscvTraceAdequacy`): those deletions were taken (our M2 edits to
+them were edits of unreached code).  Two helpers M2 uses were restored in place (`-- restored for NI M2 …`):
+`Resources.obsHistLb_prefix` (by `uRcpt_valid`) and `UsysMemOk.usysRetPid_getpid` (by `UsysDet` and
+`NiTrace`), both deleted by dead-code pass 1 (baa85f62c).
+
+**The key and the root.**  Upstream did NOT give `Uvis` a root field (`uvisOf` reads `V.cwi`, not `V.rti`),
+and `usysMemOk` has no chroot branch (entry 24 falls to the default arm).  The W3 rows are unaffected: the
+class {exit, getpid, uptime} reads neither the cwd nor the root, so no row claim became false.  But the root is
+process-visible state that decides later fs calls' outcomes, so a future lane that grows the class to any path
+call must first give the key the root (the cwd's twin, chroot.md §1) and `usysMemOk` a chroot row.
+`UtRoundQuiet` (T's pure corollary, unreached) was deleted upstream; `niStrongInstance`'s comments say so.
+
 Each lane's as-landed line goes under its row's design note (the Rocq notes' rule), and this table's
 checkbox below flips when the lane is on `lean-ni`:
 

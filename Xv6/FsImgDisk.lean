@@ -77,25 +77,4 @@ theorem fsimgP_eq : fsimgP = fsImgBlock := by
     rw [List.mem_range] at hj
     rw [fsImgDisk_eq, if_neg (by rw [hs]; rw [hB] at hj ⊢; omega)]
 
-/-! ## 2.  THE LOG IS CLEAN -/
-
-/-- mkfs writes a zero log header at `logstart = 2` (the superblock says so:
-`FsImgCheck.fsimgParseSb`).  The ONE computation on the adequacy cone, and
-it reads four bytes (Rocq `fsimg_log_clean`). -/
-theorem fsimgLogClean : hdrN (fsimgP 2) = 0 := by
-  rw [fsimgP_eq]; decide +kernel
-
-/-! ## 3.  THE DURABLE STATE, AND RECOVERY AT IT -/
-
-/-- What a reboot finds: the image's own home blocks, over whatever block
-range the client covers (Rocq `fsimg_D0`). -/
-def fsimgD0 (cov : ExtTreeSet Nat compare) : BlockMap :=
-  fsRestrict fsimgP (fsHomeList cov 2)
-
-/-- **THE FACT THE SYSTEM THEOREM CONSUMES** (Rocq `fsimg_recovery`):
-`fsRecovery_clean` at `fsimgLogClean`. -/
-theorem fsimgRecovery (cov : ExtTreeSet Nat compare) :
-    fsRecovery fsimgP (fsimgD0 cov) cov 2 :=
-  (fsRecovery_clean fsimgP (fsimgD0 cov) cov 2 fsimgLogClean).2 rfl
-
 end Xv6

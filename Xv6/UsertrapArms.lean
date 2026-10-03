@@ -22,8 +22,6 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedVariables false
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
 
 /-! ## §1 Pure facts -/
@@ -33,10 +31,6 @@ variable {GF : BundledGFunctors} [CtokG GF] [UexecSG GF]
 
 /-- A device cause is not the ecall. -/
 theorem utA_sCause_ne (sc : BitVec 64) (h : sCauseOk sc) : sc ≠ uecallScause := by
-  rcases h with h | h <;> subst h <;> decide
-
-/-- A device cause is not a cause usertrap kills at. -/
-theorem utA_sCause_nokill (sc : BitVec 64) (h : sCauseOk sc) : ¬ ukillSc sc := by
   rcases h with h | h <;> subst h <;> decide
 
 /-- **The prologue's record carries the round's rows** (Rocq's
@@ -52,13 +46,6 @@ theorem utA_live_ne (A : UtArgs GF) (V2 : ProcPriv) (cs2 : ExtTreeSet GName comp
   utLiveOut_ne _ _ _ _ _ _ hne
 
 theorem utA_decide_False : (decide False = true) = False := by simp
-
-theorem utA_bcond_bne_sext (kl : BitVec 32) :
-    bcond bop.BNE (BitVec.signExtend 64 kl) 0#64 = !decide (kl = 0#32) := by
-  by_cases h : kl = 0#32
-  · subst h; decide
-  · have : BitVec.signExtend 64 kl ≠ 0#64 := by bv_decide
-    simp [bcond, h, this]
 
 end Pure
 
@@ -116,7 +103,7 @@ end Own
 /-! ## §4 +0xea -/
 
 theorem utA_ea_killed : KA.«usertrap» + 18446744073709550486#64 = KA.«killed» := by decide
-theorem utA_ea_kexit : KA.«usertrap» + 18446744073709550176#64 = KA.«kexit» := by decide
+theorem utA_ea_kexit : KA.«usertrap» + 18446744073709550156#64 = KA.«kexit» := by decide
 theorem utA_ea_ret : jumpPc (KA.«usertrap» + 0xf0#64) = KA.«usertrap» + 0xf0#64 := by decide
 
 section EA
@@ -208,7 +195,7 @@ theorem usertrap_ea_proof [ClaimIs (hlc := hlc) GF Γ] (KI : KILLED) (HF : UT_FA
     k_step (wp_s_addi cpu _ (KA.«usertrap» + 0xf6#64) true 4095#12 10#5 0#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     iintro Hk Hpc
-    k_step (wp_s_jal cpu _ (KA.«usertrap» + 0xf8#64) false 0x1ff968#21 1#5 (by decide))
+    k_step (wp_s_jal cpu _ (KA.«usertrap» + 0xf8#64) false 0x1ff954#21 1#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [utA_ea_kexit]
     iintro Hk Hpc
     ihave Hframe := (show utFrame (GF := GF) A ⊢ frame4s2 A.ksp (A.k.regs 1#5) (A.k.regs 8#5)

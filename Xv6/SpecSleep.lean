@@ -83,21 +83,4 @@ structure SLEEP : Prop where
     (cpu : CPU) (k : KCtx) (j : Nat) hj hproc hK hnoff htier,
     wp_sleep_eb_body (hlc := hlc) (GF := GF) Γ cpu k j hj hproc hK hnoff htier
 
-/-- The interrupts-off instance: the complement is the whole bundle. -/
-theorem SLEEP.wp_sleep (S : SLEEP) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (cpu : CPU) (k : KCtx) (j : Nat) hj hproc hK hsie hnoff hlocks htier :
-    wp_sleep_body (hlc := hlc) (GF := GF) Γ cpu k j hj hproc hK hsie hnoff hlocks htier := by
-  have h := S.wp_sleep_eb (hlc := hlc) (GF := GF) Γ cpu k j hj hproc hK hnoff htier
-  unfold wp_sleep_eb_body at h
-  unfold wp_sleep_body
-  rw [hsie] at h
-  simp only [trapCsrsExt_false, cpuClaimExt_false] at h
-  iintro ⟨Hk, Hpc, Hpi, Htc, Hcl, Hir, Hnext⟩
-  iapply h
-  iframe Hk Hpc Hpi Htc Hcl Hir
-  iapply wpNext_mono $$ Hnext
-  iintro %cpu' HK %spie %spp %R' Hk Hpc ⟨Htc, Hir⟩ Hcl %hcs
-  iapply HK $$ %spie %spp %R' Hk Hpc Htc Hcl Hir %hcs
-
 end Xv6

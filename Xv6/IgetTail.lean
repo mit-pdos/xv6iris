@@ -24,7 +24,6 @@ import Xv6.IgetParts
 import Xv6.SpecRelease
 import Xv6.CodeTactics
 import Xv6.SpecIget
-import Xv6.FsWords
 
 namespace Xv6
 
@@ -33,21 +32,12 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-- The callee-saved registers iget never writes (`s5`..`s11`). -/
 def igPins (k : KCtx) (R : RegMap) : Prop :=
   R 21#5 = k.regs 21#5 ∧ R 22#5 = k.regs 22#5 ∧ R 23#5 = k.regs 23#5 ∧ R 24#5 = k.regs 24#5 ∧
   R 25#5 = k.regs 25#5 ∧ R 26#5 = k.regs 26#5 ∧ R 27#5 = k.regs 27#5
-
-theorem igPins_cs (k : KCtx) (R R' : RegMap) (h : igPins k R) (hcs : calleeSaved R R') :
-    igPins k R' := by
-  obtain ⟨a21, a22, a23, a24, a25, a26, a27⟩ := h
-  obtain ⟨-, -, -, -, -, -, c21, c22, c23, c24, c25, c26, c27⟩ := hcs
-  exact ⟨c21.trans a21, c22.trans a22, c23.trans a23, c24.trans a24, c25.trans a25,
-    c26.trans a26, c27.trans a27⟩
 
 /-- The epilogue's register file is the caller's, up to what iget may
 clobber. -/
@@ -64,7 +54,6 @@ theorem ig_calleeSaved_mk (KR R : RegMap) (ra : BitVec 64)
       | rfl
       | assumption
       | skip
-
 
 /-- The scan's register invariant (Rocq's `Mr !!! …` conjuncts, minus the
 cursor and `s3`, which each stage states itself). -/
@@ -87,7 +76,6 @@ theorem IgRegs.set [Icfg] {k : KCtx} {inum : BitVec 32} {R : RegMap} (h : IgRegs
       by simpa [RegMap.set_apply] using p23, by simpa [RegMap.set_apply] using p24,
       by simpa [RegMap.set_apply] using p25, by simpa [RegMap.set_apply] using p26,
       by simpa [RegMap.set_apply] using p27⟩⟩
-
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IcacheG GF]
@@ -185,7 +173,6 @@ def igEnv : IProp GF :=
 
 instance igEnv_persistent : Persistent (igEnv (GF := GF)) := by
   unfold igEnv; infer_instance
-
 
 theorem igEnv_it : igEnv (GF := GF) ⊢
     isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev := by

@@ -45,13 +45,14 @@ import Xv6.PipeBothNPure
 import Xv6.FileDiscLine
 import Xv6.SysOpenDefs
 import Xv6.ConsoleInvDefs
+import Xv6.UserFd
+import Xv6.UkHandler
+import Xv6.PipeProto
 
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Iris.Std.PartialMap
-
-set_option linter.unusedSectionVars false
 
 /-! ## §0 The device kinds and the camera -/
 

@@ -53,7 +53,6 @@ instance resolution, which the glob walk cannot see; notes/cone_reaudit.md) and
 3. `Hfire` is stated as sibling b's Prop `UShPipesStage.HfireP D` (its
    statement verbatim).
 -/
-import Xv6.UshPipesDefsPay
 import Xv6.UshPipesDefsFam
 import Xv6.UshPipesDefsFire
 import Xv6.UshPipesStageDefs
@@ -65,8 +64,6 @@ namespace UShPipesNode
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Wid RdOut WrOut
 open UShPipesDefs UShPipesStage
-
-set_option linter.unusedSectionVars false
 
 /-- **Rocq `take_pos_ne_at`**: a nonempty prefix of a line is not empty. -/
 theorem take_pos_ne_at (L : List (BitVec 8)) (c : Nat) (hc : 0 < c ∧ c ≤ L.length) : L.take c ≠ [] := by

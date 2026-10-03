@@ -31,26 +31,15 @@ Rocq's header, abridged:
 4. `(FdOpen true true (FdDevice CONSOLE))` is the local notation `stcCons`
    (as UInitDiag/UInitBanner).
 -/
-import Xv6.UInitUnionDisc
 import Xv6.UInitShPay
 import Xv6.UInitDiag
-import Xv6.UInitBanner
 import Xv6.UshURoundLawsRead
-import Xv6.UshURoundLawsInp
-import Xv6.UshURoundWide
-import Xv6.UshLineLease
-import Xv6.UnionReadInstAt
-import Xv6.UnionLinks
 import Xv6.UInitFileLeaves
-import Xv6.HfpFileClaimsP
 
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Std (ExtTreeSet)
-
-set_option linter.unusedSectionVars false
-set_option linter.unusedVariables false
 
 section UnionInitCC
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]

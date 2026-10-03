@@ -49,7 +49,6 @@ gone (balloc's printk is behind `BMAP`, and writei calls none itself --
 uses checked: ProofWritei.v only).
 -/
 import Xv6.WriteiMain
-import Xv6.ReadiFrame
 
 namespace Xv6
 
@@ -58,9 +57,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 theorem writei_kctx_push {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
     [KernelGeom] [KernelImage GF] (c : CPU) (k : KCtx) (R0 R1 : RegMap) (m : Nat) :

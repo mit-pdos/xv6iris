@@ -44,8 +44,6 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedSectionVars false
-
 /-! ## Phase D: the handover and the join -/
 
 section
@@ -205,7 +203,7 @@ theorem mn_phaseC (BI : BINIT) (II : IINIT) (FI : FILEINIT) (VD : VIRTIO_DISK_IN
     (∃ (vl : BitVec 32) (vn vc pd0 pav0 pu0 : BitVec 64) (free0 : List (BitVec 8)),
       diskInitCells vl vn vc pd0 pav0 pu0 free0) ∗
     procsAvailAt Γ (some NPROC) true ∗ initPidTok 0#32 ∗
-    initBootBundle (hlc := hlc) (SG := uexecSGXv6) ROOTINO seccAll (List.replicate NOFILE FdState.closed) ∗
+    initBootBundle (hlc := hlc) (SG := uexecSGXv6) ROOTINO ROOTINO seccAll (List.replicate NOFILE FdState.closed) ∗
     consReader fscCons 0 ∗ MachFixedGS.uClaimO (hlc := hlc) (GF := GF) ∗
     startedInv γi ξd P ∗ startedPrim γi ∗
     mainDepositRecipe ⟨ξ, KTier.bare⟩ Γ γ0 γ1 γc γl0 γl1 γd γdl γt P ∗
@@ -310,7 +308,7 @@ def mnKptB [Y : CurCtx] (cn : ConsNames) : IProp GF := iprop%
     (∃ kl xs pid : BitVec 32, procPubRest (procAddr i) kl xs pid)) ∗
   ([∗list] i ∈ List.range NPROC, wordPointsTo (pPid (procAddr i)) 4 pidLockQ 0#32) ∗
   parentsResAt curCtx ∗
-  fdSlots (NPROC * (NOFILE + FDSPARE)) ∗ irefSlots (NPROC * (1 + IREFSPARE)) ∗ bslots (NPROC * 3) ∗
+  fdSlots (NPROC * (NOFILE + FDSPARE)) ∗ irefSlots (NPROC * (IREFHOME + IREFSPARE)) ∗ bslots (NPROC * 3) ∗
   ticksResAt curCtx ∗ consResAt cn curCtx ∗ consCleanTok cn ∗
   wordPointsTo nextpidAddr 4 (DFrac.own 1) 1#32
 
@@ -365,7 +363,7 @@ theorem mn_phaseB (PR : PROCINIT) (TI : TRAPINIT) (TIH : TRAPINITHART) (PLI : PL
     (∃ (vl : BitVec 32) (vn vc pd0 pav0 pu0 : BitVec 64) (free0 : List (BitVec 8)),
       diskInitCells vl vn vc pd0 pav0 pu0 free0) ∗
     procsAvailAt Γ (some NPROC) true ∗ initPidTok 0#32 ∗
-    initBootBundle (hlc := hlc) (SG := uexecSGXv6) ROOTINO seccAll (List.replicate NOFILE FdState.closed) ∗
+    initBootBundle (hlc := hlc) (SG := uexecSGXv6) ROOTINO ROOTINO seccAll (List.replicate NOFILE FdState.closed) ∗
     consReader fscCons 0 ∗ MachFixedGS.uClaimO (hlc := hlc) (GF := GF) ∗
     startedInv γi ξd P ∗ startedPrim γi ∗
     mainDepositRecipe ⟨ξ, KTier.bare⟩ Γ γ0 γ1 γc γl0 γl1 γd γdl γt P ∗

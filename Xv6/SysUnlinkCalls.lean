@@ -64,9 +64,7 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
@@ -226,7 +224,7 @@ def sysUnlinkNpK (k' : KCtx) (se : Bool) (pj pa pv nb : BitVec 64) (plen : Nat) 
         inodeHeldTyAt ipv T_DIR iL ∗
         P (npElems (bview plen pfun)).length iL ∗ irefSlots 1)
      else
-      iprop(⌜R' 10#5 = 0#64⌝ ∗ irefSlots 2 ∗ npDead fscFs P Pmiss (bview plen pfun))) -∗
+      iprop(⌜R' 10#5 = 0#64⌝ ∗ irefSlots 2 ∗ npDead V.rti fscFs P Pmiss (bview plen pfun))) -∗
     wpLoop c)
 
 set_option maxHeartbeats 8000000 in
@@ -248,7 +246,7 @@ theorem sys_unlink_nameiparent (NP : NPAR_WRAP_ERA) (Γ : SchedNames) [ClaimIs (
     byteBuf pv (DFrac.own 1) (bview (plen + 1) pfun) ∗
     byteBuf nb (DFrac.own 1) (bview 14 nfun) ∗
     bslots 3 ∗ irefSlots 2 ∗ logOpS icfgLog n Sb ∗ logTx icfgLog ∗
-    epStart fscFs V.cwi P Pmiss (bview plen pfun) ∗
+    epStart fscFs V.rti V.cwi P Pmiss (bview plen pfun) ∗
     sysUnlinkNpK k' se pj pa pv nb plen pfun n Sb P Pmiss pid V M
     ⊢ wpLoop (GF := GF) cpu := by
   subst hs hpj hpa hpv hnb
@@ -484,15 +482,18 @@ theorem sys_unlink_namecmp (NC : NAMECMP) (cpu : CPU) (k' : KCtx) (se : Bool) (h
 /-- The dirlookup continuation, hart-free (the arms at `poff = &off`). -/
 def sysUnlinkDlK (k' : KCtx) (se : Bool) (pj nb pa : BitVec 64) (pidv : BitVec 32) (ik : Nat)
     (inum : BitVec 32) (bm : Blkmap) (data : Nat → List (BitVec 8)) (dn : Dinode)
-    (nf : Nat → BitVec 8) (pofv : BitVec 32) : IProp GF := iprop(
+    (nf : Nat → BitVec 8) (pofv : BitVec 32) (sd : Qp) (rootv : BitVec 64) (rti : Nat) :
+    IProp GF := iprop(
   ∀ (c : CPU) (spie spp : Bool) (R' : RegMap) (found : Bool) (kk kslot : Nat) (qq : Qp),
     ⌜calleeSaved k'.regs R'⌝ -∗
     kctx c ((k'.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k'.regs 1#5)) -∗
     trapCsrsExt c se -∗ cpuClaimExt c se pj -∗
     wordPointsTo (iDev (ientry ik)) 4 (DFrac.own (1 : Qp).half) icfgDev -∗
     inodeMeta (ientry ik) dn -∗ inodeMap fscFs (ientry ik) bm -∗ inodeBlocks fscFs bm data -∗
+    inodeShr ik sd icfgDev inum -∗ runitAny inum.toNat -∗
     byteBuf nb (DFrac.own 1) (bview 14 nf) -∗
-    wordPointsTo (pPid pj) 4 pidPriv pidv -∗ bslot -∗
+    wordPointsTo (pPid pj) 4 pidPriv pidv -∗
+    wordPointsTo (pRoot pj) 8 (DFrac.own 1) rootv -∗ inodeHeldAt rootv rti -∗ bslot -∗
     dlinks fscFs inum.toNat dn bm data -∗ dinodeAt fscIreg inum dn -∗
     (if found then
       iprop(⌜dirFirst data (dirNrec dn.diSize.toNat) (bname 14 nf) = some kk ∧
@@ -509,7 +510,10 @@ set_option maxHeartbeats 8000000 in
 /-- `dirlookup(dp, name, &off)` at +0x68, on the parent sys_unlink holds
 locked: THE LICENCE PREMISE's RIGHT disjunct -- the two namecmp refusals
 just fell through (Rocq's `right; exact (conj Hnotdot Hnotdd)`); the
-borrowed region record is the in-core one (premise (6')). -/
+borrowed region record is the in-core one (premise (6')).  THE SELF ARM is
+refuted by the same refusal (the name is not `".."`, so `¬ dlSelf`): the
+contract's arms are read back at the record shape.  dp's share and unit and
+the root's cell and reference are lent and come back. -/
 theorem sys_unlink_dirlookup (DL : DIRLOOKUP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k' : KCtx) (se : Bool) (hs : k'.sie = se) (pj : BitVec 64) (hpj : k'.proc = pj)
     (j : Nat) (pidv : BitVec 32) (ik : Nat) (inum : BitVec 32) (bm : Blkmap)
@@ -521,22 +525,26 @@ theorem sys_unlink_dirlookup (DL : DIRLOOKUP) (Γ : SchedNames) [ClaimIs (hlc :=
     (hok : inodeOk fscCov fscLogst dn bm data)
     (hdok : dirOk icfgNib dn data) (horph : dirOrphanClean dn data)
     (ha0 : k'.regs 10#5 = ientry ik) (nb pa : BitVec 64) (hnb : k'.regs 11#5 = nb)
-    (hpa : k'.regs 12#5 = pa) (ha2 : pa ≠ 0#64) :
+    (hpa : k'.regs 12#5 = pa) (ha2 : pa ≠ 0#64) (hik : ik < NINODE) (sd : Qp)
+    (rootv : BitVec 64) (rti : Nat) :
     kctx cpu k' ∗ pcIs cpu KA.«dirlookup» ∗
     trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗ sysfileEnv (hlc := hlc) Γ ∗
     wordPointsTo (iDev (ientry ik)) 4 (DFrac.own (1 : Qp).half) icfgDev ∗
     inodeMeta (ientry ik) dn ∗ inodeMap fscFs (ientry ik) bm ∗ inodeBlocks fscFs bm data ∗
+    inodeShr ik sd icfgDev inum ∗ runitAny inum.toNat ∗
     byteBuf nb (DFrac.own 1) (bview 14 nf) ∗
     wordPointsTo pa 4 (DFrac.own 1) pofv ∗
-    wordPointsTo (pPid pj) 4 pidPriv pidv ∗ bslot ∗ irefSlot ∗
+    wordPointsTo (pPid pj) 4 pidPriv pidv ∗
+    wordPointsTo (pRoot pj) 8 (DFrac.own 1) rootv ∗ inodeHeldAt rootv rti ∗ bslot ∗ irefSlot ∗
     dlinks fscFs inum.toNat dn bm data ∗ dinodeAt fscIreg inum dn ∗
-    sysUnlinkDlK k' se pj nb pa pidv ik inum bm data dn nf pofv
+    sysUnlinkDlK k' se pj nb pa pidv ik inum bm data dn nf pofv sd rootv rti
     ⊢ wpLoop (GF := GF) cpu := by
   subst hs hpj hnb hpa
   obtain ⟨hwf, hcov, -, hty0, hsz, hholes, -⟩ := hok
   have hinums := dirOk_dir icfgNib dn data htype hdok
-  iintro ⟨Hk, Hpc, Hte, Hce, #Henv, Hdev, Hmeta, Hmap, Hblk, Hnm, Hoff, Hpid, Hbs, Hslot, Hlk,
-    Hdi, HK⟩
+  have hns : ¬ dlSelf (bname 14 nf) inum rti := fun h => hndd h.1
+  iintro ⟨Hk, Hpc, Hte, Hce, #Henv, Hdev, Hmeta, Hmap, Hblk, Hshr, Hru, Hnm, Hoff, Hpid, Hrc, Hrr,
+    Hbs, Hslot, Hlk, Hdi, HK⟩
   unfold sysfileEnv
   icases Henv with ⟨#Hpi, #Hpe, #Hrdy⟩
   ihave %hg := fsReady_geom $$ Hrdy
@@ -547,19 +555,35 @@ theorem sys_unlink_dirlookup (DL : DIRLOOKUP) (Γ : SchedNames) [ClaimIs (hlc :=
   icases fsReady_region $$ Hrdy with ⟨#Hinv, #Hopen⟩
   have h := DL.wp_dirlookup_eb (hlc := hlc) (GF := GF) Γ cpu k' γbl pd pav pu j fscKalloc
     fsReadyKmem (ientry ik) inum bm data dn dn nf true pofv pidv pidPriv (DFrac.own (1 : Qp).half)
-    (DFrac.own 1) hj hproc hK hnoff htier htype hg.fgoLog hwf hcov hsz hholes hinums
-    (Or.inr ⟨hnd, hndd⟩) horph hty0 rfl hpd ha0 (by simp only [if_true]; exact ha2)
+    (DFrac.own 1) ik sd rootv rti (DFrac.own 1) hj hproc hK hnoff htier htype hg.fgoLog hwf hcov
+    hsz hholes hinums (Or.inr ⟨hnd, hndd⟩) horph hty0 rfl hpd ha0 rfl hik
+    (by simp only [if_true]; exact ha2)
   unfold wp_dirlookup_eb_body at h
   simp only [dirlookupAddr, if_true] at h
   iapply h
-  iframe Hk Hpc Hte Hce Hdev Hmeta Hmap Hblk Hnm Hoff Hpid Hbs Hslot Hlk Hdi
+  iframe Hk Hpc Hte Hce Hdev Hmeta Hmap Hblk Hshr Hru Hnm Hoff Hpid Hrc Hrr Hbs Hslot Hlk Hdi
   iframe #
   iapply wpNext_intro_pin
-  iintro %c %_ %spie %spp %R' %found %kd %kslot %qq %hcs Hk Hpc Hte Hce Hdev Hmeta Hmap Hblk Hnm
-    Hpid Hbs Hlk Hdi Harm
+  iintro %c %_ %spie %spp %R' %found %kd %kslot %qq %self %hcs Hk Hpc Hte Hce Hdev Hmeta Hmap Hblk
+    Hshr Hru Hnm Hpid Hrc Hrr Hbs Hlk Hdi Harm
   unfold sysUnlinkDlK
   iapply HK $$ %c %spie %spp %R' %found %kd %kslot %qq %hcs Hk Hpc Hte Hce Hdev Hmeta Hmap Hblk
-    Hnm Hpid Hbs Hlk Hdi Harm
+    Hshr Hru Hnm Hpid Hrc Hrr Hbs Hlk Hdi
+  -- THE SELF ARM IS REFUTED by the name; the record arms at their old shape
+  cases found
+  · simp only [Bool.false_eq_true, if_false]
+    icases Harm with ⟨%⟨-, hf, ha⟩, Hs, Hp⟩
+    iframe Hs Hp
+    ipureintro; exact ⟨hf, ha⟩
+  · simp only [if_true]
+    icases Harm with ⟨%inum2, %⟨hks, ha⟩, %harm, Href, Hru2, Hp⟩
+    cases self
+    · simp only [Bool.false_eq_true, if_false] at harm ⊢
+      obtain ⟨-, hf, rfl⟩ := harm
+      iframe Href Hru2 Hp
+      ipureintro; exact ⟨hf, hks, ha⟩
+    · simp only [if_true] at harm
+      exact absurd harm.1 hns
 
 /-! ## writei: the zeroing, on the kernel arm -/
 

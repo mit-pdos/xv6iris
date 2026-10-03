@@ -64,10 +64,6 @@ theorem ushEchoOff_lt (ws : List (List (BitVec 8))) (i j : Nat) (hok : lineOk ws
 /-- **Rocq `echo_off_0`**: the first word starts at the line's base. -/
 theorem ushEchoOff_0 (ws : List (List (BitVec 8))) : ushEchoOff ws 0 = 0 := wlOff_0 0 ws
 
-/-- **Rocq `echo_alen_0`**: the command name is four bytes. -/
-theorem ushEchoAlen_0 (ws : List (List (BitVec 8))) (hok : lineOk ws) : ushEchoAlen ws 0 = 4 :=
-  lineOk_head_len ws hok
-
 /-- **Rocq `echo_toks_lookup_x`**. -/
 theorem ushEchoToks_lookup_x (ws : List (List (BitVec 8))) (i : Nat) (hok : execOk ws) (hi : i < ws.length) :
     (ushEchoToks ws)[i]? = some (ushEchoOff ws i, ushEchoOff ws i + ushEchoAlen ws i) :=
@@ -77,13 +73,6 @@ theorem ushEchoToks_lookup_x (ws : List (List (BitVec 8))) (i : Nat) (hok : exec
 theorem ushEchoLine_word0 (ws : List (List (BitVec 8))) (j : Nat) (hok : execOk ws) (hj : j < (ws[0]!).length) :
     (wlLine ws)[j]! = (ws[0]!)[j]! := by
   have hw := wlLine_word ws 0 (ws[0]!) j (execOk_at 0 hok (execOk_pos hok)) hj
-  rwa [wlOff_0, Nat.zero_add] at hw
-
-/-- **Rocq `echo_line_cmd_byte`**: THE COMMAND NAME IS THE LINE'S FIRST
-FOUR BYTES. -/
-theorem ushEchoLine_cmd_byte (ws : List (List (BitVec 8))) (j : Nat) (hok : lineOk ws) (hj : j < 4) :
-    (wlLine ws)[j]! = cmdEcho[j]! := by
-  have hw := wlLine_word ws 0 cmdEcho j (lineOk_head ws hok) (by simp [cmdEcho]; omega)
   rwa [wlOff_0, Nat.zero_add] at hw
 
 /-! ## §2 The line lexes -/

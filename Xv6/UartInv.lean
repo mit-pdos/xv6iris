@@ -36,8 +36,6 @@ namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-! ## The ports -/
 
 /-- The MMIO base of port `i` (`UART0`, `UART1` of `kernel/memlayout.h`). -/
@@ -292,17 +290,6 @@ theorem uartObsPermit_triv (i : UartId) (γ : UartNames)
   split
   · rw [htag]; unfold rxTagTriv; ipureintro; trivial
   · iempintro
-
-/-- ...so at the trivial predicates the thread needs only the trace invariant. -/
-theorem wpDev_uart_inv_triv (i : UartId) (γ : UartNames)
-    (heq : MachFixedGS.obsPred (hlc := hlc) (GF := GF) = obsPredTriv)
-    (htag : MachFixedGS.rxTag (hlc := hlc) (GF := GF) = rxTagTriv) :
-    uartInv i γ ∗ obsInv ∗ genCert ⊢@{IProp GF}
-      devWP (genId (hlc := hlc) (GF := GF)) (.uart i) rootTask (DevM.pure ()) := by
-  iintro ⟨Hinv, #Hoinv, Hcert⟩
-  ihave #Hperm := uartObsPermit_triv i γ heq htag $$ Hoinv
-  iapply wpDev_uart_inv i γ
-  iframe Hinv Hperm Hcert
 
 /-- The application's console resource at a port, spelled over the
 application's own family `Cres` (the Rocq ledger's

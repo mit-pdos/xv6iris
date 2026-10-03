@@ -1,7 +1,7 @@
 /-
 **The user/kernel trap contract, as user execution holds it** (Rocq
 `UexecRet.v`): what a process hands back at a trap (`uexecRet`), what the
-kernel owes it (`ukont`), the bundle it runs under (`uvb`), and the
+kernel owes it (`ukontF`), the bundle it runs under (`uvb`), and the
 trapframe-keyed slot restated on that bundle (`uslot`).
 
 Rocq's header, kept point for point:
@@ -20,7 +20,7 @@ Rocq's header, kept point for point:
     the parent's and the child's slot, every other ecall a slot at the bumped
     key for every return value and image `usysMemOk` allows, and a non-ecall
     trap is transparent;
-  - `ukont`: the kernel obligation `▷ (∀ W' sc stv, trappedMachine ∗
+  - `ukontF`: the kernel obligation `▷ (∀ W' sc stv, trappedMachine ∗
     uexecRet -∗ wpLoop)`, the guard of the fixpoint;
   - `uvb`: everything user execution owns while it runs, keyed on the
     natural user-space state;
@@ -28,7 +28,7 @@ Rocq's header, kept point for point:
 * THE KEY'S IMAGE IS THE LAZY VIEW (Rocq owner's ruling 2026-08-28): a
   process cannot tell a faulted-in page from an untouched one.  `uvb` also
   carries `⌜uszOk sz⌝` (`p->sz ≤ MAXVA - 2 pages`).
-* `uslot` is MUTUALLY RECURSIVE with `uexecRet` through `ukont`'s `▷`: a
+* `uslot` is MUTUALLY RECURSIVE with `uexecRet` through `ukontF`'s `▷`: a
   guarded `fixpoint` over `Uvis → IProp GF` (the `UexecWp.uexecF` pattern).
 * x0, DECIDED: the file the slot restores is `tfResumeGpr0 tf :=
   tfResumeGpr zeroRf tf` (x0 = 0).
@@ -52,7 +52,7 @@ Rocq's header, kept point for point:
    that `UserExec.lean` (W8-C) did not port, is §0 below: `uszOk`,
    `userPtmInv`/`userPtmInvX` (the lazy-view twin of `userPtInv`: the page
    view `Mp` with `umemLazy P sz Mp = M`, UexecSlot's own lazy view),
-   `userTrapFrameAt`/`userTrapFrameAtm`, `uvRegs`, `uvAmb`.  `uvAmb cpu` is
+   `userTrapFrameAtm`, `uvRegs`, `uvAmb`.  `uvAmb cpu` is
    `hwConfig cpu ∗ kmapStatic ∗ wireInv` (Rocq `uv_amb`; `minstret_inv` is
    `emp`; `kmapStatic` is not in Rocq, UserExec deviation 9);
    `uvRegs` carries `clockCells` (UserExec deviation 2).  Candidates to move
@@ -77,11 +77,9 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Std MachCSL LeanRV64D
 
-set_option linter.unusedSectionVars false
-
 /-! ## §0 The U-tier vocabulary the contract is stated over (deviation 3)
 
-`userPtmInv`/`userPtmInvX`, `userTrapFrameAt(m)`, `uvRegs`/`uvAmb` and
+`userPtmInv`/`userPtmInvX`, `userTrapFrameAtm`, `uvRegs`/`uvAmb` and
 `MachCSL.gprFile_ext` live in `Xv6/UserExec.lean` (batch 8-P, the 8-M
 review); the register file `zeroRf`/`tfResumeGpr*` in `Xv6/UexecSlot.lean`;
 `exitXs` in `Xv6/ProcGeom.lean` (Rocq `ProcGeom.exit_xs`, shared with
@@ -210,11 +208,6 @@ def bump (W : Uvis) (r : BitVec 64) (M' : ElfMem) (π' : Nat → Option UPerm) (
     (secc' : BitVec 64) : Uvis :=
   bumpAt W r M' π' szv' fdv' cw' g' cs' W.pid lz' secc'
 
-/-- Rocq `bump_pid`: THE PID IS KEPT. -/
-@[simp] theorem bump_pid (W : Uvis) (r : BitVec 64) (M' : ElfMem) (π' : Nat → Option UPerm)
-    (szv' : Nat) (fdv' : List FdState) (cw' : Nat) (g' : GName) (cs' : ExtTreeSet GName compare)
-    (lz' : Bool) (secc' : BitVec 64) : (bump W r M' π' szv' fdv' cw' g' cs' lz' secc').pid = W.pid := rfl
-
 /-- Rocq `bump_run_gpr` (at `bumpAt`, fork's child's key). -/
 theorem bumpRun_gpr (m : RegMap) (pc : BitVec 64) (M M' : ElfMem) (π π' : Nat → Option UPerm)
     (szv szv' : Nat) (fdv fdv' : List FdState) (cw cw' : Nat) (g g' : GName)
@@ -278,18 +271,6 @@ def trappedMachine [xi : CurCtx] (cpu : CPU) (C : UCfg) (pt : UPtd) (Rut : UPtd 
     (sc stv : BitVec 64) (W : Uvis) : IProp GF :=
   iprop(∃ ms : BitVec 64, ⌜W.tf.length = 36⌝ ∗
     userTrapFrameAtm cpu C pt Rut sz W.M ms sc stv (tfW W.tf tfEpcIdx) (tfResumeGpr0 W.tf))
-
-/-- Rocq `trapped_machine_intro`. -/
-theorem trappedMachine_intro [CurCtx] (cpu : CPU) (C : UCfg) (pt : UPtd) (Rut : UPtd → IProp GF)
-    (sz : Nat) (sc stv : BitVec 64) (W : Uvis) (ms : BitVec 64) (hlen : W.tf.length = 36) :
-    userTrapFrameAtm cpu C pt Rut sz W.M ms sc stv (tfW W.tf tfEpcIdx) (tfResumeGpr0 W.tf) ⊢
-      trappedMachine (GF := GF) cpu C pt Rut sz sc stv W := by
-  unfold trappedMachine
-  iintro H
-  iexists ms
-  isplitr
-  · ipureintro; exact hlen
-  · iexact H
 
 /-- **Rocq `user_trap_frame_trapped`**: the old existential frame is a trapped
 machine at the key uservec saves, at the components the caller names. -/
@@ -474,60 +455,8 @@ theorem uwaitAns_of_pid (r : BitVec 64) (cs cs' : ExtTreeSet GName compare) (pid
     uwaitAnsPid (GF := GF) r cs cs' pidv ⊢ uwaitAns r cs cs' := by
   unfold uwaitAns; iintro H; iexists pidv; iexact H
 
-theorem uwaitAns_of (r : BitVec 64) (cs cs' : ExtTreeSet GName compare) (gn : GName) (b : Bool)
-    (pidv : BitVec 32) : uwaitAnsAt (GF := GF) r cs cs' gn b pidv ⊢ uwaitAns r cs cs' := by
-  unfold uwaitAns uwaitAnsPid; iintro H; iexists pidv, gn, b; iexact H
-
 /-- Rocq `sext_neg1_64`. -/
 theorem sext_neg1_64 : BitVec.signExtend 64 (-1#32) = -1#64 := by decide
-
-/-- Rocq `uwait_ans_at_neg1`: the failing arm, at the word `li -1` leaves. -/
-theorem uwaitAnsAt_neg1 (cs : ExtTreeSet GName compare) (gn : GName) (b : Bool) (pidv : BitVec 32) :
-    waitWhy (GF := GF) cs gn b ⊢ uwaitAnsAt (-1#64) cs cs gn b pidv := by
-  unfold uwaitAnsAt
-  iintro #Hwhy
-  iexists -1#32, 0
-  isplitr
-  · ipureintro; exact sext_neg1_64.symm
-  · iapply waitAns_neg 0 cs gn b pidv $$ Hwhy
-
-/-- Rocq `uwait_ans_neg1`. -/
-theorem uwaitAns_neg1 (cs : ExtTreeSet GName compare) : ⊢ uwaitAns (GF := GF) (-1#64) cs cs := by
-  refine BI.Entails.trans ?_ (uwaitAns_of (-1#64) cs cs 0 false 0#32)
-  refine BI.Entails.trans ?_ (uwaitAnsAt_neg1 cs 0 false 0#32)
-  unfold waitWhy
-  iintro -
-  ileft
-  ipureintro; rfl
-
-/-- Rocq `uwait_ans_reaped`. -/
-theorem uwaitAns_reaped (r : BitVec 64) (cs cs' : ExtTreeSet GName compare) :
-    uwaitAns (GF := GF) r cs cs' ⊢ ⌜chReaped cs cs'⌝ := by
-  unfold uwaitAns uwaitAnsPid uwaitAnsAt
-  iintro ⟨%pidv, %gn, %b, %rv, %xs, -, Ha⟩
-  iapply waitAns_reaped rv xs cs cs' gn b pidv $$ Ha
-
-/-- **Rocq `uwait_ans_pid_mine`**: a process that knows it is not init reads
-the reaping arm as "the generation I reaped was MY child". -/
-theorem uwaitAnsPid_mine (r : BitVec 64) (cs cs' : ExtTreeSet GName compare) (pidv : BitVec 32)
-    (hne : pidv ≠ 1#32) (hm1 : r ≠ -1#64) :
-    uwaitAnsPid (GF := GF) r cs cs' pidv ⊢
-      ∃ (γ' : GName) (rv : BitVec 32) (xs : Int),
-        ⌜r = BitVec.signExtend 64 rv ∧ cs' = cs \ {γ'} ∧ γ' ∈ cs ∧ 1 ≤ rv.toNat ∧ rv.toNat ≤ genPidMax⌝ ∗
-        exitTok γ' rv xs ∗ genUniq cs rv γ' := by
-  unfold uwaitAnsPid uwaitAnsAt waitAns
-  iintro ⟨%gn, %b, %rv, %xs, %hr, (⟨%hf, -⟩ | ⟨%γ', %hrng, %hoci, Hesc, Huniq⟩)⟩
-  · exfalso; apply hm1; rw [hr, hf.1]; exact sext_neg1_64
-  · iexists γ', rv, xs
-    isplitr
-    · ipureintro
-      refine ⟨hr, hrng.1, ?_, hrng.2.1, hrng.2.2⟩
-      rcases hoci with h | h
-      · exact h
-      · exact absurd h hne
-    · isplitl [Hesc]
-      · iexact Hesc
-      · iexact Huniq
 
 /-! ### Fork's two slots -/
 
@@ -671,10 +600,6 @@ theorem ukillCredAt_of_owed (X : Uvis → IProp GF) (gn : GName) (sc : BitVec 64
   · iintro H; iright; iexact H
   · iintro -; iempintro
 
-theorem ukillCredAt_ecall (X : Uvis → IProp GF) (gn : GName) (W : Uvis) (f : sfam GF) :
-    ⊢ ukillCredAt (GF := GF) X gn uecallScause W f :=
-  ukillCredAt_not X gn _ W f (fun h => h.1 rfl)
-
 theorem ukillCredAt_ne (k : Nat) (X Y : Uvis → IProp GF) (HX : ∀ W, X W ≡{k}≡ Y W) (gn : GName)
     (sc : BitVec 64) (W : Uvis) (f : sfam GF) :
     ukillCredAt X gn sc W f ≡{k}≡ ukillCredAt Y gn sc W f := by
@@ -793,13 +718,6 @@ theorem uexecForkParentF_ne (W : Uvis) (Q : Int → IProp GF) (Rc : IProp GF) :
   refine BI.forall_ne (fun _ => BI.forall_ne (fun _ => BI.forall_ne (fun _ => BI.forall_ne (fun _ => ?_))))
   exact BI.wand_ne.ne .rfl (BI.wand_ne.ne .rfl (BI.wand_ne.ne .rfl (BI.wand_ne.ne .rfl (HX _))))
 
-theorem uexecForkChildF_ne (W : Uvis) (Q : Int → IProp GF) (Rc : IProp GF) :
-    uexecForkChildF X W Q Rc ≡{k}≡ uexecForkChildF Y W Q Rc := by
-  unfold uexecForkChildF
-  refine BI.sep_ne.ne .rfl (BI.sep_ne.ne .rfl ?_)
-  refine BI.forall_ne (fun _ => BI.forall_ne (fun _ => ?_))
-  exact BI.wand_ne.ne .rfl (BI.wand_ne.ne .rfl (BI.wand_ne.ne .rfl (HX _)))
-
 theorem uexecForkF_ne (W : Uvis) (f : sfam GF) : uexecForkF X W f ≡{k}≡ uexecForkF Y W f := by
   unfold uexecForkF
   refine BI.sep_ne.ne (uexecForkParentF_ne k X Y HX W _ _) (BI.sep_ne.ne .rfl (BI.sep_ne.ne .rfl ?_))
@@ -886,12 +804,6 @@ abbrev ukb [xi : CurCtx] (cpu : CPU) (C : UCfg) (pt : UPtd) (Rfd : List FdState 
     (Rut : UPtd → IProp GF) (sz : Nat) (π : Nat → Option UPerm) (fdv : List FdState) (cw : Nat)
     (g : GName) (cs : ExtTreeSet GName compare) (pidv : BitVec 32) (lz : Bool) (secc : BitVec 64) : IProp GF :=
   ukbF uslot cpu C pt Rfd Rut sz π fdv cw g cs pidv lz secc
-
-/-- Rocq `ukont`. -/
-abbrev ukont [xi : CurCtx] (cpu : CPU) (C : UCfg) (pt : UPtd) (Rfd : List FdState → IProp GF)
-    (Rut : UPtd → IProp GF) (sz : Nat) (π : Nat → Option UPerm) (fdv : List FdState) (cw : Nat)
-    (g : GName) (cs : ExtTreeSet GName compare) (pidv : BitVec 32) (lz : Bool) (secc : BitVec 64) : IProp GF :=
-  ukontF uslot cpu C pt Rfd Rut sz π fdv cw g cs pidv lz secc
 
 /-- Rocq `uvb`. -/
 abbrev uvb [xi : CurCtx] (cpu : CPU) (C : UCfg) (pt : UPtd) (Rfd : List FdState → IProp GF)
@@ -1039,10 +951,6 @@ theorem uexecArm_transparent (sc : BitVec 64) (W : Uvis) (f : sfam GF) (h : sc �
 /-- Rocq `uexec_kill_arm_not`. -/
 theorem uexecKillArm_not (sc : BitVec 64) (W : Uvis) (f : sfam GF) (h : ¬ ukillSc sc) :
     uslot W ⊢ uexecKillArm sc W f := uexecKillArmF_not uslot sc W f h
-
-/-- Rocq `uexec_kill_arm_of_cred`. -/
-theorem uexecKillArm_of_cred (sc : BitVec 64) (W : Uvis) (f : sfam GF) :
-    □ uKillCred ∗ uslot W ⊢ uexecKillArm sc W f := uexecKillArmF_of_cred uslot sc W f
 
 /-- Rocq `uexec_kill_arm_slot`. -/
 theorem uexecKillArm_slot (sc : BitVec 64) (W : Uvis) (f : sfam GF) :

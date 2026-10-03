@@ -6,13 +6,13 @@ interface of the non-allocating `walk`.
 arithmetic facts and the `walk` call rule are in `Xv6/VmfaultDefs.lean`.
 -/
 import Xv6.VmfaultDefs
+import Xv6.WalkaddrDefs
 
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled

@@ -22,14 +22,12 @@ notations).
    `S gen_id` is `genId + 1`; `(1/2)` is `(1 : Qp).half`.
 -/
 import Xv6.UshURoundWide
-import Xv6.PipeOutNFam
 import Xv6.UkPipesIfaceDefs
 
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
-set_option linter.unusedSectionVars false
 set_option synthInstance.maxSize 1024
 
 section UShURoundShapes

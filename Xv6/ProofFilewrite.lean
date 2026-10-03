@@ -43,6 +43,8 @@ shared `FileOffProto`).
    one ghost lemma (`fwr_post_ghost`).
 -/
 import Xv6.FilewriteArms
+import Xv6.ReadiDefs
+import Xv6.NamexParts
 
 namespace Xv6
 
@@ -51,12 +53,9 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## The dispatch's readings -/
-
 
 theorem fwr_blez (n : Int) (hn : 0 ≤ n ∧ n < 2 ^ 31) :
     bcond bop.BGE 0#64 (BitVec.ofInt 64 n) = decide (n = 0) := by
@@ -295,7 +294,6 @@ theorem fwr_dispatch (PW : PIPEWRITE) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK) 
     repeat (refine fwrRegs_set _ _ _ _ _ _ _ _ _ _ _ _ ?_ (by decide))
     exact hr
 
-
 set_option maxHeartbeats 32000000 in
 /-- **`filewrite` meets its specification**, at either entry `SIE`. -/
 theorem filewrite_main (PW : PIPEWRITE) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK) (BO : BEGIN_OP)
@@ -322,16 +320,16 @@ theorem filewrite_main (PW : PIPEWRITE) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK
   have hlocks : k.locks = [] := List.eq_nil_of_length_eq_zero (by have := hkwf.2.2.2.1; omega)
   -- THE CONTRACT'S CONTINUATION, hart-free, at the ambient block form (the cwd
   -- reference and the generation row parked in it)
-  icases (filerw_core_conv ht0 (procAddr j) pid V V.upt M).1 $$ Hpriv with ⟨Hpriv, Hcwd, Hpg⟩
+  icases (filerw_core_conv ht0 (procAddr j) pid V V.upt M).1 $$ Hpriv with ⟨Hpriv, Hcwd, Hrtr, Hpg⟩
   -- the generation halves stay out: pipewrite's kill read lends them
   unfold procGenAt
   icases Hpg with ⟨Hft, HQ, Hxs, Hgen⟩
-  ihave HΦG : fwrKG (hlc := hlc) k γl γu γ fk q st j pid V M n Q Qe $$ [Hnext Hcwd Hft HQ Hxs]
+  ihave HΦG : fwrKG (hlc := hlc) k γl γu γ fk q st j pid V M n Q Qe $$ [Hnext Hcwd Hrtr Hft HQ Hxs]
   · unfold fwrKG fwrK filewritePost
     iintro Hgen %c %spie %spp %R' %P' %hp Hk Hpc Hte Hce Href Hpriv Henv Harms
     icases procPrivExtEv_elim _ _ _ _ _ $$ Hpriv with ⟨%kv, %hkv, Hpriv⟩
     ihave HK := wpNext_at true k.proc cpu c _ (Xv6.rd_pin hj k hproc c cpu) $$ Hnext
-    ihave Hpriv := (filerw_core_conv ht0 (procAddr j) pid (V.updEv kv) P' _).2 $$ [Hpriv Hcwd Hft HQ Hxs Hgen]
+    ihave Hpriv := (filerw_core_conv ht0 (procAddr j) pid (V.updEv kv) P' _).2 $$ [Hpriv Hcwd Hrtr Hft HQ Hxs Hgen]
     · unfold procGenAt
       iframe
     iapply HK $$ %spie %spp %R' %P' %kv %hp Hk Hpc Hte Hce Href %hkv Hpriv Henv Harms

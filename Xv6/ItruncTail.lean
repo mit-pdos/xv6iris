@@ -13,7 +13,7 @@ is iupdate's.
 
 THE CREDIT AND THE EPOCH ARE THE CALLER'S: `logCredit icfgLog cru Sb e0
 (IBLOCK …)` travels from the contract, grown along the running set
-(`Xv6.logCredit_mono`), to `IUPDATE.wp_iupdate_credgen` at the SAME `e0`
+(`Xv6.logCredit_mono`), to `IUPDATE.wp_iupdate_credgen_eb` at the SAME `e0`
 the loops threaded; iupdate's own post re-closes the epoch.  The anchor is
 `logEpochLb_0` and the deposit's receipt is dropped (Rocq's).  iupdate's
 payout is `iregOut`, and `diTrunc` keeps the (nonzero) type, so it is the
@@ -31,9 +31,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]

@@ -20,6 +20,10 @@ import Xv6.CodeTactics
 import Xv6.CopyLemmas
 import Xv6.ReadiFrame
 import Xv6.VmfaultDefs
+import Xv6.KvmLemmas
+import Xv6.UPtLemmas
+import Xv6.UPtAllocLemmas
+import MachCSL.BvLemmas
 
 namespace Xv6
 
@@ -27,45 +31,15 @@ open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open Iris.Std (get? insert delete)
 open LeanRV64D
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
 set_option maxRecDepth 8000
 
-
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 variable {lent : Bool}
-
-
-/-! ## Arithmetic -/
-
-
-/-- `dstva - PGROUNDDOWN(dstva)`. -/
-theorem co_off (x : BitVec 64) :
-    x - (x &&& 0xFFFFFFFFFFFFF000#64) = BitVec.ofNat 64 (x.toNat % 4096) := by
-  have h : x - (x &&& 0xFFFFFFFFFFFFF000#64) = BitVec.setWidth 64 (BitVec.extractLsb' 0 12 x) := by
-    bv_decide
-  have hx := x.isLt
-  rw [h]
-  apply BitVec.eq_of_toNat_eq
-  rw [BitVec.toNat_setWidth, BitVec.toNat_ofNat, BitVec.extractLsb'_toNat]
-  simp only [Nat.shiftRight_zero, Nat.reducePow]
-
-
-/-- `PGSIZE - (dstva - va0)`. -/
-theorem co_n_val (x : BitVec 64) :
-    (x &&& 0xFFFFFFFFFFFFF000#64) - x + 4096#64 = BitVec.ofNat 64 (4096 - x.toNat % 4096) := by
-  have h := co_off x
-  have hoff : x.toNat % 4096 < 4096 := Nat.mod_lt _ (by omega)
-  have h2 : (x &&& 0xFFFFFFFFFFFFF000#64) - x + 4096#64
-      = 4096#64 - BitVec.ofNat 64 (x.toNat % 4096) := by
-    rw [← h]; bv_decide
-  rw [h2, show (4096#64 : BitVec 64) = BitVec.ofNat 64 4096 from rfl,
-    co_ofNat_sub 4096 _ (by omega) (by omega)]
-
 
 /-! ## Return addresses -/
 
@@ -77,7 +51,6 @@ theorem co_ret_1596 : jumpPc (KA.«copyout» + 0x82#64) = (KA.«copyout» + 0x82
   decide
 theorem co_ret_155a : jumpPc (KA.«copyout» + 0x46#64) = (KA.«copyout» + 0x46#64) := by
   decide
-
 
 /-! ## The fourteen-slot frame -/
 
@@ -98,7 +71,6 @@ def frame14 [CurCtx] (sp ra s0 s1 s2 s3 s4 s5 s6 s7 s8 s9 s10 s11 : BitVec 64) :
   wordPointsTo (sp + 0xFFFFFFFFFFFFFFA0#64) 8 (DFrac.own 1) s10 ∗
   wordPointsTo (sp + 0xFFFFFFFFFFFFFF98#64) 8 (DFrac.own 1) s11 ∗
   (∃ w : BitVec 64, wordPointsTo (sp + 0xFFFFFFFFFFFFFF90#64) 8 (DFrac.own 1) w)
-
 
 set_option maxHeartbeats 4000000 in
 /-- The prologue at `0x800015c4`. -/
@@ -275,7 +247,6 @@ theorem co_bltu_in {α : Type _} (m : Nat) (h : m < 2 ^ 38) (p q : α) :
   simp only [bcond, BitVec.ult, BitVec.toNat_ofNat, decide_eq_true_eq]
   omega
 
-
 theorem co_sext_4 : BitVec.signExtend 64 4#12 = 4#64 := by decide
 
 /-! ## The registers the body keeps -/
@@ -284,21 +255,6 @@ def coKeep (R R2 : RegMap) : Prop :=
   R2 2#5 = R 2#5 ∧ R2 18#5 = R 18#5 ∧ R2 20#5 = R 20#5 ∧ R2 21#5 = R 21#5 ∧
   R2 22#5 = R 22#5 ∧ R2 23#5 = R 23#5 ∧ R2 24#5 = R 24#5 ∧ R2 25#5 = R 25#5 ∧
   R2 26#5 = R 26#5 ∧ R2 27#5 = R 27#5
-
-theorem coKeep_refl (R : RegMap) : coKeep R R :=
-  ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩
-
-theorem coKeep_trans {R R' R'' : RegMap} (h : coKeep R R') (h' : coKeep R' R'') :
-    coKeep R R'' := by
-  obtain ⟨a1, a2, a3, a4, a5, a6, a7, a8, a9, a10⟩ := h
-  obtain ⟨b1, b2, b3, b4, b5, b6, b7, b8, b9, b10⟩ := h'
-  exact ⟨b1.trans a1, b2.trans a2, b3.trans a3, b4.trans a4, b5.trans a5, b6.trans a6,
-    b7.trans a7, b8.trans a8, b9.trans a9, b10.trans a10⟩
-
-theorem coKeep_of_calleeSaved {R R' : RegMap} (h : calleeSaved R R') : coKeep R R' :=
-  ⟨h.1, h.2.2.2.1, h.2.2.2.2.2.1, h.2.2.2.2.2.2.1, h.2.2.2.2.2.2.2.1,
-    h.2.2.2.2.2.2.2.2.1, h.2.2.2.2.2.2.2.2.2.1, h.2.2.2.2.2.2.2.2.2.2.1,
-    h.2.2.2.2.2.2.2.2.2.2.2.1, h.2.2.2.2.2.2.2.2.2.2.2.2⟩
 
 /-- What `copyout` leaves behind. -/
 def coPost (psz : BitVec 64) (P : UPtd) (M : Nat → List (BitVec 8)) (A : Nat) (bs : List (BitVec 8))
@@ -309,7 +265,6 @@ def coPost (psz : BitVec 64) (P : UPtd) (M : Nat → List (BitVec 8)) (A : Nat) 
        umMapped P' A e ∧ A + e < 2 ^ 64 ∧ ¬ uvaWmapped P (A + e)))
 
 /-! ## The callees -/
-
 
 theorem co_walk_call (W : WALK_NOALLOC) [Xv6G GF] [CurCtx]
     (c : CPU) (k' : KCtx) (dq : DFrac) (t : PTree)
@@ -325,9 +280,7 @@ theorem co_walk_call (W : WALK_NOALLOC) [Xv6G GF] [CurCtx]
   simp only [walkAddr] at h
   exact h
 
-
 /-! ## One page: `walkaddr`, and `vmfault` when it is not mapped -/
-
 
 set_option maxHeartbeats 4000000 in
 /-- From the loop head `0x80001616`: `va0 = PGROUNDDOWN(dstva)`, the
@@ -796,7 +749,6 @@ theorem copyout_move (MM : MEMMOVE) [Xv6G GF] [CurCtx]
     · simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
       rw [g24, h24]
 
-
 theorem copyout_br_fffffffffffff9ec : KA.«copyout» + 0xfffffffffffff9ec#64 = KA.«walk» := by decide
 
 set_option maxHeartbeats 4000000 in
@@ -1159,7 +1111,6 @@ theorem copyout_loop (WA : WALKADDR) (VF : VMFAULT) (W : WALK_NOALLOC) (MM : MEM
         Hk Hpc Hlend HP Hsrc
       ipureintro
       exact hpost3
-
 
 theorem co_srli_max : (-1#64 : BitVec 64) >>> (26 : Nat) = 0x3FFFFFFFFF#64 := by decide
 

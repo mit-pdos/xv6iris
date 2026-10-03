@@ -133,8 +133,6 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
 open Iris.Algebra
 
-set_option linter.unusedSectionVars false
-
 /-! ## 0.  Pure helpers: the map after a count move -/
 
 /-- Rocq's inline `icM_wf` re-proof after an `<[k := (q, n')]>`
@@ -193,7 +191,6 @@ theorem logN_sub_diff_icacheN (E : CoPset) (h : (↑logN : CoPset) ⊆ E) :
   intro p hp
   rw [CoPset.in_diff]
   exact ⟨h p hp, fun hc => icacheN_logN_disj p ⟨hc, hp⟩⟩
-
 
 /-- THE NOT-LAST CLOSE's local update at the slot (Rocq's inline
 `gmap_local_update` in `iref_close_step_noarm`): the departing `(q, 1)`
@@ -742,7 +739,7 @@ theorem iref_upgrade_mir_store_pinw_au [Icfg] (Eo : CoPset) (γi : GName) (γfs 
     (hin : (inum.toNat : Int) < 16 * (nib : Int))
     (hMk : PartialMap.get? M k = some (qt, n)) (hq : qt + qn < (1 : Qp).half)
     (hno : n.succ.val ≤ IREFSLOTS) :
-    ⊢@{IProp GF} itableInv (hlc := hlc) -∗ iregInv (hlc := hlc) γi γfs inodestart nib -∗
+    ⊢@{IProp GF} itableInv (hlc := hlc) -∗ iregReg (hlc := hlc) γi γfs inodestart nib -∗
       itableHalf M -∗ liveGenlo k s g lo -∗ islSlot M k -∗
       frzmH inum.toNat false -∗ runit bfl inum.toNat -∗ icntHalf inum.toNat n.val -∗
       istmpAuth k (1 : Qp).half tstp -∗ topLb tstp -∗

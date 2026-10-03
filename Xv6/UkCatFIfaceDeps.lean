@@ -46,14 +46,15 @@ import Xv6.UexecExecInst
 import Xv6.ConsoleInvDefs
 import Xv6.SysOpenDefs
 import Xv6.UkPipeDevDefs
+import Xv6.AppFileCons
+import Xv6.FileOpenDeed
+import Xv6.PipeOut
 
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open HfpPipeP HfpFileClaimsP
 open Std (ExtTreeSet)
-
-set_option linter.unusedSectionVars false
 
 section CifDeps
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FileAppG GF] [FsTopG GF] [OffboxG GF] [IcacheG GF] [PipeProtoG GF] [PipeOutG GF]

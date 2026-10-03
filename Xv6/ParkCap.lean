@@ -42,8 +42,8 @@ Both occurrences of the token inside its own definition are under `▷`
   space, so no key captured at the park survives: the package carries the
   EXEC BUNDLE that arm spends (`InitBoot.initBootBundle` + the console's
   reader token) and the closer owes no slot.  The block is handed SPLIT
-  (`parkBootBlock`: the deficit block, the cwd reference and `firstBoot`'s
-  rows beside the generation pair at the trivial payload), so "this record is
+  (`parkBootBlock`: the deficit block, the cwd and root references and
+  `firstBoot`'s rows beside the generation pair at the trivial payload), so "this record is
   the first process" is a row of the park.
 * `some Wk` -- THE STEADY MODE (kfork's child).  The parker holds
   `FirstTok.firstDone`, so the boot arm is dead for this record (its
@@ -78,8 +78,8 @@ Both occurrences of the token inside its own definition are under `▷`
    `own_context ξp ==∗ own_context ξp ∗ proc_ctx γs pa` at the Lean record.
 5. The channel quantifies no parker context (UsertrapRes deviation 8: the
    parker's rows are ghost).
-6. The cap's `K_usertrap ≤ av` premise is Lean's `usertrapSlots_le_page`
-   (the parked stack is the whole page).
+6. The cap's `K_usertrap ≤ av` premise holds because the parked stack is
+   the whole page (`forkretStack`).
 
 Imports only definitional files.
 -/
@@ -92,9 +92,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
-
-set_option linter.unusedVariables false
-set_option linter.unusedSectionVars false
 
 /-- Rocq `ParkCap`'s residue family `URB`, indexed by the slot (deviation 1). -/
 abbrev ParkURB (GF : BundledGFunctors) : Type _ :=
@@ -123,13 +120,14 @@ instance utSysParkRows_persistent [CurCtx] (Γ : SchedNames) :
 /-! ## §1 The pieces -/
 
 /-- THE BOOT MODE'S BLOCK (Rocq `park_child`'s `false` arm): the deficit
-block with its descriptor array, the cwd reference, `firstBoot`'s rows,
+block with its descriptor array, the cwd reference and the root reference
+(chroot, right after it, as in the core), `firstBoot`'s rows,
 the incarnation's pair at the trivial payload (`<init>` has no parent),
 the two quarters and the slot's half of `p->xstate` -- `procGenAt` minus its
 token, split, at the parker-chosen context. -/
 def parkBootBlock [CurCtx] (N : UtNames) (V : ProcPriv) (M : Nat → List (BitVec 8)) : IProp GF :=
   iprop(procPrivBareAt curCtx N.pj N.pid V M ∗ procOfiles N.f V.fdg N.pj V.ofile ∗
-    cwdRefAt V.cwd V.cwi ∗ firstBoot (hlc := hlc) ∗
+    cwdRefAt V.cwd V.cwi ∗ rootRefAt V.root V.rti ∗ firstBoot (hlc := hlc) ∗
     genKq V.gen N.pj N.pid (fun _ => iprop(True)) ∗ myPay V.gen (fun _ => iprop(True)) ∗
     genHalvesPriv N.pj N.pid V.gen ∗ (∃ xsv : BitVec 32, wordPointsTo (pXstate N.pj) 4 xsHalf xsv))
 
@@ -145,10 +143,10 @@ bundle and the console's reader token on the boot mode -- and on both (NI
 M2-W2d) THE ORIGIN TICKET the record's first resume spends on its origin
 filing (kfork's child: the fork exit's child-origin claim; `<init>`: the
 power-on's). -/
-def parkMode [CurCtx] (cw : Nat) (secc : BitVec 64) (sts : List FdState) (Wk : Option Uvis) : IProp GF :=
+def parkMode [CurCtx] (rt cw : Nat) (secc : BitVec 64) (sts : List FdState) (Wk : Option Uvis) : IProp GF :=
   match Wk with
   | some _ => iprop(firstDone (hlc := hlc) ∗ MachFixedGS.uClaimO (hlc := hlc) (GF := GF))
-  | none => iprop(initBootBundle (hlc := hlc) (SG := SG) cw secc sts ∗ consReader fscCons 0 ∗
+  | none => iprop(initBootBundle (hlc := hlc) (SG := SG) rt cw secc sts ∗ consReader fscCons 0 ∗
       MachFixedGS.uClaimO (hlc := hlc) (GF := GF))
 
 /-- The slot a closer yields (Rocq `park_pkg`'s closer's `match Wk`): on the
@@ -196,12 +194,12 @@ def parkCloser (URB : ParkURB GF) (W : IProp GF) (N : UtNames) (g γch : GName) 
 the child's kernel stack, the mode row -- NOW -- and the closer, under a
 later. -/
 def parkPkg (URB : ParkURB GF) (W : IProp GF) (N : UtNames) (ξ : CtxId) (ks : BitVec 64)
-    (g γch : GName) (cw : Nat) (secc : BitVec 64) (sts : List FdState) (gn : GName)
+    (g γch : GName) (rt cw : Nat) (secc : BitVec 64) (sts : List FdState) (gn : GName)
     (cs : ExtTreeSet GName compare) (Wk : Option Uvis) : IProp GF :=
   letI : CurCtx := ⟨ξ, KTier.kpt⟩
   iprop(parkGlobals N.Γ N.w N.ft N.f N.ip ∗ utSysParkRows N.Γ ∗ slotUsed N.Γ N.pj ∗
     stackOwn (ks + 4096#64) forkretStack ∗
-    parkMode (hlc := hlc) (SG := SG) cw secc sts Wk ∗
+    parkMode (hlc := hlc) (SG := SG) rt cw secc sts Wk ∗
     ▷ parkCloser (hlc := hlc) (SG := SG) URB W N g γch cw sts gn cs Wk)
 
 /-- **THE CHILD'S OWN ROWS** (Rocq `park_child`): the saved context (`ra =
@@ -227,7 +225,7 @@ def parkCap (URB : ParkURB GF) (W : IProp GF) (Γ : SchedNames) : IProp GF :=
       (M : Nat → List (BitVec 8)) (sts : List FdState) (cs : ExtTreeSet GName compare) (steady : Bool),
     ⌜N.Γ = Γ ∧ utWf N ∧ rest.length = 12⌝ -∗
     ownCtx hp ξp -∗
-    parkPkg (hlc := hlc) (SG := SG) URB W N ξp V.kstack V.fdg V.chg V.cwi V.pvSecc sts V.gen cs
+    parkPkg (hlc := hlc) (SG := SG) URB W N ξp V.kstack V.fdg V.chg V.rti V.cwi V.pvSecc sts V.gen cs
       (parkKey steady V M cs N.pid) -∗
     ▷ W -∗
     parkChild (hlc := hlc) ξp N rest V M steady -∗
@@ -388,7 +386,7 @@ theorem parkToken_park (hp : CPU) (ξ : CtxId) (N : UtNames) (rest : List (BitVe
         stackOwn (V.kstack + 4096#64) forkretStack)) -∗
       slotUsed N.Γ N.pj -∗ parkOwn -∗ utParkCaps N -∗
       fdFrags V.fdg sts -∗ chFrag V.chg N.pj cs -∗
-      initBootBundle (hlc := hlc) (SG := SG) V.cwi V.pvSecc sts -∗ consReader fscCons 0 -∗
+      initBootBundle (hlc := hlc) (SG := SG) V.rti V.cwi V.pvSecc sts -∗ consReader fscCons 0 -∗
       MachFixedGS.uClaimO (hlc := hlc) (GF := GF) -∗
       parkChild (hlc := hlc) ξ N rest V M false -∗
       |==> (ownCtx hp ξ ∗ procCtxAt N.Γ ξ N.pj) := by
@@ -398,7 +396,7 @@ theorem parkToken_park (hp : CPU) (ξ : CtxId) (N : UtNames) (rest : List (BitVe
   icases Htok' with ⟨%URB, #Hcap, #Hchan⟩
   unfold parkChan
   ihave Hclose := Hchan $$ %N %rfl %hwf
-  ihave Hpkg : parkPkg (hlc := hlc) (SG := SG) URB (parkToken N.Γ) N ξ V.kstack V.fdg V.chg V.cwi V.pvSecc sts
+  ihave Hpkg : parkPkg (hlc := hlc) (SG := SG) URB (parkToken N.Γ) N ξ V.kstack V.fdg V.chg V.rti V.cwi V.pvSecc sts
       V.gen cs (parkKey false V M cs N.pid) $$ [Hstk Hbun Hrd Hco Hclose Hown Hfr Hch]
   · unfold parkPkg parkKey
     simp only [Bool.false_eq_true, ↓reduceIte]
@@ -446,7 +444,7 @@ theorem parkToken_park_steady (hp : CPU) (ξ : CtxId) (N : UtNames) (rest : List
   icases Htok' with ⟨%URB, #Hcap, #Hchan⟩
   unfold parkChan
   ihave Hclose := Hchan $$ %N %rfl %hwf
-  ihave Hpkg : parkPkg (hlc := hlc) (SG := SG) URB (parkToken N.Γ) N ξ V.kstack V.fdg V.chg V.cwi V.pvSecc sts
+  ihave Hpkg : parkPkg (hlc := hlc) (SG := SG) URB (parkToken N.Γ) N ξ V.kstack V.fdg V.chg V.rti V.cwi V.pvSecc sts
       V.gen cs (parkKey true V M cs N.pid) $$ [Hstk Hslot Hco Hclose Hown Hfr Hch]
   · unfold parkPkg parkKey
     simp only [↓reduceIte]

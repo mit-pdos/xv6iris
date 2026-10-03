@@ -36,18 +36,12 @@ open Iris Iris.Std MachCSL
 open Iris.Algebra
 open FsStateLink
 
-set_option linter.unusedSectionVars false
-
 /-! ## 9a.  The family, split into authorities and tokens -/
 
 /-- One inode's outgoing tokens, as ONE resource-algebra element: the second
 half of `linkElemNode` (Rocq's `ent_ops`). -/
 def entOps (i : Nat) (n : FsNode) (tyf : Fname → Ity) : FsLinkUR :=
   bigOpM (M' := FnameMapF) CMRA.op (fun s t => entElem i (fnOrphan n) s t (tyf s)) (dirEntries n)
-
-/-- `linkElemNode` IS the authority beside `entOps` (helper; `rfl`). -/
-theorem linkElemNode_entOps (i : Nat) (n : FsNode) (v : Ity) (tyf : Fname → Ity) :
-    linkElemNode i n v tyf = linkAuthElem (i : Int) (fnMult n) v • entOps i n tyf := rfl
 
 /-- Rocq's `link_auths`. -/
 def linkAuths (I : RegMapF FsNode) (fv : Nat → Ity) : FsLinkUR :=

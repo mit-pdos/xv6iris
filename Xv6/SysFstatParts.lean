@@ -23,9 +23,6 @@ import Xv6.CodeTactics
 import MachCSL.WpSmodeFrame6
 import MachCSL.StackOwnBounds
 import Xv6.SpecFilestat
-import Xv6.CopyLemmas
-import Xv6.ReadiDefs
-import MachCSL.BvLemmas
 
 namespace Xv6
 
@@ -34,13 +31,11 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## Constants -/
 
-theorem sys_fstat_br_argaddr : KA.«sys_fstat» + 0xffffffffffffd9ca#64 = KA.«argaddr» := by decide
+theorem sys_fstat_br_argaddr : KA.«sys_fstat» + 0xffffffffffffd96a#64 = KA.«argaddr» := by decide
 theorem sys_fstat_br_argfd : KA.«sys_fstat» + 0xfffffffffffffce2#64 = KA.«argfd» := by decide
 theorem sys_fstat_br_filestat : KA.«sys_fstat» + 0xfffffffffffff3b0#64 = KA.«filestat» := by decide
 

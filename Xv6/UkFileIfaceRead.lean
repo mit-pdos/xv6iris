@@ -14,6 +14,7 @@ deed is lent from the core to UkFileDev's `file_read(_std)` and comes back.
 -/
 import Xv6.UkFileIfaceDevP
 import Xv6.UkFileIfaceHdls
+import Xv6.UkFileDevRead
 
 namespace Xv6
 
@@ -21,8 +22,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Iris.Std.PartialMap
 open Std (ExtTreeSet)
 open HfpFileClaimsP UkFileDev
-
-set_option linter.unusedSectionVars false
 
 noncomputable section FifRead
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]

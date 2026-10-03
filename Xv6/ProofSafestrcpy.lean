@@ -35,9 +35,6 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 
 /-! ## Arithmetic facts -/
 
-/-- The 12-bit immediate `-1`, sign-extended. -/
-theorem ss_negone : BitVec.signExtend 64 (4095#12) = 0xFFFFFFFFFFFFFFFF#64 := by decide
-
 /-- The same, right-associated: the form `k_norm` leaves after `BitVec.add_assoc`. -/
 theorem ss_succ' (b : BitVec 64) (k : Nat) :
     b + (BitVec.ofNat 64 k + 1#64) = b + BitVec.ofNat 64 (k + 1) := by bv_omega
@@ -186,7 +183,7 @@ theorem sscpy_loop (kb : KCtx) (dst src : BitVec 64) (bss : List (BitVec 8)) (dq
       iapply HΦ' $$ %_ %(cur.set k bk) %(k + 1) Hk Hpc Hdst Hsrc
       ipureintro
       refine ⟨by rw [List.length_set]; exact hcur, ?_, by omega, ?_⟩
-      · simp only [RegMap.set_apply, BitVec.reduceEq, if_true, if_false, reduceIte]
+      · simp only [RegMap.set_apply, BitVec.reduceEq, if_true, if_false]
         exact ss_succ' dst k
       · exact ssKept_body R _ _ _
     · -- the byte is non-zero: loop
@@ -196,10 +193,10 @@ theorem sscpy_loop (kb : KCtx) (dst src : BitVec 64) (bss : List (BitVec 8)) (dq
       iapply (ih (k + 1) (by omega) (by omega) (cur.set k bk) (by rw [List.length_set]; exact hcur)
         (((R.set 11#5 (src + (BitVec.ofNat 64 k + 1#64))).set 15#5 (dst + (BitVec.ofNat 64 k + 1#64))).set 14#5
           (BitVec.setWidth 64 bk))
-        (by simp only [RegMap.set_apply, BitVec.reduceEq, if_true, if_false, reduceIte]
+        (by simp only [RegMap.set_apply, BitVec.reduceEq, if_true, if_false]
             exact ss_succ' src k)
-        (by simp only [RegMap.set_apply, BitVec.reduceEq, if_true, if_false, reduceIte]; exact h13)
-        (by simp only [RegMap.set_apply, BitVec.reduceEq, if_true, if_false, reduceIte]
+        (by simp only [RegMap.set_apply, BitVec.reduceEq, if_false]; exact h13)
+        (by simp only [RegMap.set_apply, BitVec.reduceEq, if_true, if_false]
             exact ss_succ' dst k) c6)
       iframe Hk Hpc Hdst Hsrc
       iapply wpNext_mono _ _ _ _ _ $$ HΦ
@@ -257,13 +254,13 @@ theorem safestrcpy_proof : SAFESTRCPY := ⟨fun {hlc GF} _ _ cpu k bsd bss dq hK
   iapply (sscpy_loop (k.pushed 2) (k.regs 10#5) (k.regs 11#5) bss dq hls 15 0 (by omega) (by omega)
     bsd hld _ ?h11 ?h13 ?h15 c7) $$ [- $Hk $Hpc $Hdst $Hsrc]
   case h11 =>
-    simp only [RegMap.set_apply, BitVec.reduceEq, if_true, if_false, ite_true, ite_false, reduceIte]
+    simp only [RegMap.set_apply, BitVec.reduceEq, if_false]
     simp
   case h13 =>
-    simp only [RegMap.set_apply, BitVec.reduceEq, if_true, if_false, ite_true, ite_false, reduceIte]
+    simp only [RegMap.set_apply, BitVec.reduceEq, if_true, if_false]
     rw [BitVec.add_comm]
   case h15 =>
-    simp only [RegMap.set_apply, BitVec.reduceEq, if_true, if_false, ite_true, ite_false, reduceIte]
+    simp only [RegMap.set_apply, BitVec.reduceEq, if_true, if_false]
     simp
   iapply wpNext_intro_pin
   iintro %c8 %hp8 %R' %cur' %p Hk Hpc Hdst Hsrc %⟨hlen', h15', hpp, hkept⟩
@@ -290,8 +287,7 @@ theorem safestrcpy_proof : SAFESTRCPY := ⟨fun {hlc GF} _ _ cpu k bsd bss dq hK
     fun h => (hp9 h).trans ((hp8 h).trans (hpinD h))
   have hR2 : R' 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFF0#64 := by
     rw [hkept 2#5 (by decide) (by decide) (by decide) (by decide)]
-    simp only [RegMap.set_apply, BitVec.reduceEq, if_true, if_false, ite_true, ite_false, reduceIte,
-      KCtx.pushed_regs, KCtx.withRegs_regs]
+    simp only [RegMap.set_apply, BitVec.reduceEq, if_true, if_false]
   -- epilogue: restore ra, s0, pop the frame, ret
   iapply (wp_epilogue2_gen c9 k (KA.«safestrcpy» + 0x2e#64) hK R' hR2 (k.regs 1#5) (k.regs 8#5)) $$ [- $Hk $Hpc]
   k_code (text_instr _ _ _ _ rfl rfl) Htext2
@@ -308,11 +304,9 @@ theorem safestrcpy_proof : SAFESTRCPY := ⟨fun {hlc GF} _ _ cpu k bsd bss dq hK
     simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false, _root_.true_and]
     refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
       · rw [hkept _ (by decide) (by decide) (by decide) (by decide)]
-        simp only [RegMap.set_apply, BitVec.reduceEq, if_true, if_false, ite_true, ite_false,
-          reduceIte, KCtx.pushed_regs, KCtx.withRegs_regs]
+        simp only [RegMap.set_apply, BitVec.reduceEq, if_false]
   · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]
     rw [hkept 10#5 (by decide) (by decide) (by decide) (by decide)]
-    simp only [RegMap.set_apply, BitVec.reduceEq, if_true, if_false, ite_true, ite_false, reduceIte,
-      KCtx.pushed_regs, KCtx.withRegs_regs]⟩
+    simp only [RegMap.set_apply, BitVec.reduceEq, if_false]⟩
 
 end Xv6

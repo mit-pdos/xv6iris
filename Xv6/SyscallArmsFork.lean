@@ -41,9 +41,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-- kfork's answer, sign-extended, is `-1` or a pid in `[1, PIDMAX]` read as
 an `int` (the `fork` row of `SyscRows`). -/

@@ -73,27 +73,10 @@ def upermAt (π : Nat → Option UPerm) (va : BitVec 64) : Option UPerm := π (v
 
 namespace UserPerm
 
-/-- Rocq `perm_of_lookup`. -/
-theorem permOf_lookup (um : RegMapF (BitVec 64)) (sz k : Nat) :
-    permOf um sz k = match get? um k with
-      | some w => permLeaf w
-      | none => if k * 4096 < pgRoundUpN sz then some upermRw else none := rfl
-
 /-- A mapped page reads its own leaf (Rocq `perm_of_of_leaf`'s core). -/
 theorem permOf_mapped {um : RegMapF (BitVec 64)} (sz : Nat) {k : Nat} {w : BitVec 64}
     (h : get? um k = some w) : permOf um sz k = permLeaf w := by
   simp only [permOf, h]
-
-/-- Rocq `perm_of_lookup_mapped`. -/
-theorem permOf_lookup_mapped {um : RegMapF (BitVec 64)} (sz : Nat) {k : Nat} {w : BitVec 64}
-    (h : get? um k = some w) (hu : pteBit w 4 = true) (hr : pteBit w 1 = true) :
-    permOf um sz k = some (upermBits w) := by
-  rw [permOf_mapped sz h]; simp [permLeaf, hu, hr]
-
-/-- Rocq `perm_of_lookup_nou`. -/
-theorem permOf_lookup_nou {um : RegMapF (BitVec 64)} (sz : Nat) {k : Nat} {w : BitVec 64}
-    (h : get? um k = some w) (hn : (pteBit w 4 && pteBit w 1) = false) : permOf um sz k = none := by
-  rw [permOf_mapped sz h]; simp [permLeaf, hn]
 
 /-- Rocq `perm_of_lookup_Some`: an entry is a user leaf's bits or a filled
 lazy page. -/
@@ -115,30 +98,6 @@ theorem permOf_lookup_some {um : RegMapF (BitVec 64)} {sz k : Nat} {q : UPerm}
     split at h
     · exact Or.inr ⟨hw, (Option.some.inj h).symm⟩
     · cases h
-
-/-- Rocq `perm_of_X_mapped`: an X page is a mapped user page. -/
-theorem permOf_X_mapped {um : RegMapF (BitVec 64)} {sz k : Nat} {q : UPerm}
-    (h : permOf um sz k = some q) (hx : q.X = true) :
-    ∃ w, get? um k = some w ∧ pteBit w 4 = true ∧ pteBit w 1 = true ∧ pteBit w 3 = true := by
-  rcases permOf_lookup_some h with ⟨w, hw, hu, hr, rfl⟩ | ⟨-, rfl⟩
-  · exact ⟨w, hw, hu, hr, hx⟩
-  · cases hx
-
-/-- Rocq `perm_of_W_mapped`. -/
-theorem permOf_W_mapped {um : RegMapF (BitVec 64)} {sz k : Nat} {q : UPerm} {w : BitVec 64}
-    (h : permOf um sz k = some q) (hw : q.W = true) (hl : get? um k = some w) :
-    pteBit w 4 = true ∧ pteBit w 1 = true ∧ pteBit w 2 = true := by
-  rcases permOf_lookup_some h with ⟨w', hw', hu, hr, rfl⟩ | ⟨hn, -⟩
-  · rw [hl] at hw'; cases hw'; exact ⟨hu, hr, hw⟩
-  · rw [hl] at hn; cases hn
-
-/-- Rocq `perm_of_mapped_U`. -/
-theorem permOf_mapped_U {um : RegMapF (BitVec 64)} {sz k : Nat} {q : UPerm} {w : BitVec 64}
-    (h : permOf um sz k = some q) (hl : get? um k = some w) :
-    pteBit w 4 = true ∧ pteBit w 1 = true := by
-  rcases permOf_lookup_some h with ⟨w', hw', hu, hr, -⟩ | ⟨hn, -⟩
-  · rw [hl] at hw'; cases hw'; exact ⟨hu, hr⟩
-  · rw [hl] at hn; cases hn
 
 /-- Rocq `perm_of_of_leaf` (KexecBuilt §3e(d)). -/
 theorem permOf_of_leaf {um : RegMapF (BitVec 64)} (sz : Nat) {k : Nat} {w : BitVec 64} {q : UPerm}

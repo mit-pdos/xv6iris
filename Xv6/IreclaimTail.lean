@@ -20,6 +20,7 @@ deviation 1.
 import Xv6.IreclaimDefs
 import Xv6.CodeTactics
 import Xv6.FsCallSitesF
+import MachCSL.WpSmodeFrame8
 
 namespace Xv6
 
@@ -28,9 +29,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]

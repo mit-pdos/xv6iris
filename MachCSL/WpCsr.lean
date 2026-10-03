@@ -13,7 +13,6 @@ import MachCSL.PlatformFacts
 import MachCSL.WpGpr
 import MachCSL.PmpXv6Defs
 import MachCSL.ModelFacts
-import MachCSL.WpPmp
 import MachCSL.WpCsrFacts
 
 namespace MachCSL
@@ -361,7 +360,7 @@ theorem swp_write_CSR_pmpaddr0 (cpu : CPU) (dq : DFrac) (cfg : Vector (BitVec 8)
   swp_run 120
   have h1N : ∀ j : Nat, pmpTORLocked cfg[j]! = false := fun j => pmpTORLocked_of_off (hoff j)
   have h1I : ∀ j : Int, pmpTORLocked cfg[j]! = false := fun j => pmpTORLocked_of_off (hoff j.toNat)
-  simp only [h0, h1N, h1I]
+  simp only [h0, h1I]
   iapply HΦ $$ %_ Hpmpcfg_n Hpmpaddr_n []
   ipureintro
   rfl
@@ -382,66 +381,27 @@ theorem swp_write_CSR_pmpcfg0 (cpu : CPU) (cfg : Vector (BitVec 8) 64) (hoff : p
   have lN : ∀ j : Nat, BitVec.extractLsb' 7 1 cfg[j]! = 0#1 := fun j => pmpEntryOff_L' (hoff j)
   have lI : ∀ j : Int, BitVec.extractLsb' 7 1 cfg[j]! = 0#1 := fun j => pmpEntryOff_L' (hoff j.toNat)
   swp_run 200
-  try simp only [lN, lI]
+  try simp only [lI]
   swp_run 200
-  try simp only [lN, lI]
+  try simp only [lN]
   swp_run 200
-  try simp only [lN, lI]
+  try simp only [lN]
   swp_run 200
-  try simp only [lN, lI]
+  try simp only [lN]
   swp_run 200
-  try simp only [lN, lI]
+  try simp only [lN]
   swp_run 200
-  try simp only [lN, lI]
+  try simp only [lN]
   swp_run 200
-  try simp only [lN, lI]
+  try simp only [lN]
   swp_run 200
-  try simp only [lN, lI]
+  try simp only [lN]
   swp_run 200
   try simp only [lN, lI]
   swp_run 200
   iapply HΦ $$ %_ %_ Hpmpcfg_n []
   ipureintro
   exact ⟨rfl, by decide⟩
-
-/-! ### `read_CSR` -/
-
-theorem swp_read_CSR_mstatus (cpu : CPU) (dq : DFrac) (ms : BitVec 64) (Φ : BitVec 64 → IProp GF) :
-    Register.mstatus ↦ᵣ[cpu]{dq} ms ∗ ▷ (Register.mstatus ↦ᵣ[cpu]{dq} ms -∗ Φ ms)
-    ⊢ swp cpu (read_CSR 0x300#12) Φ := by
-  iintro ⟨Hmstatus, HΦ⟩
-  swp_run 20
-  iapply HΦ $$ Hmstatus
-
-theorem swp_read_CSR_sie (cpu : CPU) (dq : DFrac) (m d : BitVec 64) (Φ : BitVec 64 → IProp GF) :
-    Register.mie ↦ᵣ[cpu]{dq} m ∗ Register.mideleg ↦ᵣ[cpu]{dq} d ∗
-    ▷ (Register.mie ↦ᵣ[cpu]{dq} m -∗ Register.mideleg ↦ᵣ[cpu]{dq} d -∗ Φ (lower_mie m d))
-    ⊢ swp cpu (read_CSR 0x104#12) Φ := by
-  iintro ⟨Hmie, Hmideleg, HΦ⟩
-  swp_run 20
-  iapply HΦ $$ Hmie Hmideleg
-
-theorem swp_read_CSR_menvcfg (cpu : CPU) (dq : DFrac) (e : BitVec 64) (Φ : BitVec 64 → IProp GF) :
-    Register.menvcfg ↦ᵣ[cpu]{dq} e ∗ ▷ (Register.menvcfg ↦ᵣ[cpu]{dq} e -∗ Φ e)
-    ⊢ swp cpu (read_CSR 0x30A#12) Φ := by
-  iintro ⟨Hmenvcfg, HΦ⟩
-  swp_run 20
-  iapply HΦ $$ Hmenvcfg
-
-theorem swp_read_CSR_mcounteren (cpu : CPU) (dq : DFrac) (c : BitVec 32) (Φ : BitVec 64 → IProp GF) :
-    Register.mcounteren ↦ᵣ[cpu]{dq} c ∗
-    ▷ (Register.mcounteren ↦ᵣ[cpu]{dq} c -∗ Φ (BitVec.setWidth 64 c))
-    ⊢ swp cpu (read_CSR 0x306#12) Φ := by
-  iintro ⟨Hmcounteren, HΦ⟩
-  swp_run 20
-  iapply HΦ $$ Hmcounteren
-
-theorem swp_read_CSR_time (cpu : CPU) (dq : DFrac) (t : BitVec 64) (Φ : BitVec 64 → IProp GF) :
-    Register.mtime ↦ᵣ[cpu]{dq} t ∗ ▷ (Register.mtime ↦ᵣ[cpu]{dq} t -∗ Φ t)
-    ⊢ swp cpu (read_CSR 0xC01#12) Φ := by
-  iintro ⟨Hmtime, HΦ⟩
-  swp_run 20
-  iapply HΦ $$ Hmtime
 
 /-! ### `doCSR`: what `csrw`/`csrr` reduce to
 
@@ -466,229 +426,15 @@ through the checks and apply their `swp_write_CSR_*` lemma.) -/
 macro "csrw_run" : tactic =>
   `(tactic| (unfold csrw doCSR; swp_run 300; try (unfold wX_bits wX; swp_run 40)))
 
-set_option maxHeartbeats 4000000 in
-theorem swp_csrw_mstatus (cpu : CPU) (dq : DFrac) (o v : BitVec 64)
-    (hMPP : BitVec.extractLsb' 11 2 v = 1#2) (Φ : ExecutionResult → IProp GF) :
-    hwConfig cpu ∗ Register.cur_privilege ↦ᵣ[cpu]{dq} Privilege.Machine ∗
-    Register.mstatus ↦ᵣ[cpu] o ∗
-    ▷ (Register.cur_privilege ↦ᵣ[cpu]{dq} Privilege.Machine -∗
-        Register.mstatus ↦ᵣ[cpu] mstatusWrite o v -∗ Φ (ExecutionResult.Retire_Success ()))
-    ⊢ swp cpu (csrw 0x300#12 v) Φ := by
-  iintro ⟨#Hhw, Hcur_privilege, Hmstatus, HΦ⟩
-  unfold csrw doCSR
-  generalize hW : write_CSR 0x300#12 = W
-  swp_run 300
-  subst hW
-  iapply swp_bind
-  iapply swp_write_CSR_mstatus (hMPP := hMPP)
-  iframe; iframe Hhw
-  inext
-  iintro Hmstatus
-  swp_run 60
-  try (unfold wX_bits wX; swp_run 40)
-  iapply HΦ $$ Hcur_privilege Hmstatus
-
-set_option maxHeartbeats 4000000 in
-theorem swp_csrw_mepc (cpu : CPU) (dq : DFrac) (e v : BitVec 64) (Φ : ExecutionResult → IProp GF) :
-    hwConfig cpu ∗ Register.cur_privilege ↦ᵣ[cpu]{dq} Privilege.Machine ∗
-    Register.mepc ↦ᵣ[cpu] e ∗
-    ▷ (Register.cur_privilege ↦ᵣ[cpu]{dq} Privilege.Machine -∗
-        Register.mepc ↦ᵣ[cpu] legalize_xepc v -∗ Φ (ExecutionResult.Retire_Success ()))
-    ⊢ swp cpu (csrw 0x341#12 v) Φ := by
-  iintro ⟨#Hhw, Hcur_privilege, Hmepc, HΦ⟩
-  csrw_run
-  iapply HΦ $$ Hcur_privilege Hmepc
-
-set_option maxHeartbeats 4000000 in
-theorem swp_csrw_satp0 (cpu : CPU) (dq : DFrac) (ms s : BitVec 64)
-    (hSXL : BitVec.extractLsb' 34 2 ms = 2#2) (Φ : ExecutionResult → IProp GF) :
-    hwConfig cpu ∗ Register.cur_privilege ↦ᵣ[cpu]{dq} Privilege.Machine ∗
-    Register.mstatus ↦ᵣ[cpu]{dq} ms ∗ Register.satp ↦ᵣ[cpu] s ∗
-    ▷ (∀ x, Register.cur_privilege ↦ᵣ[cpu]{dq} Privilege.Machine -∗
-        Register.mstatus ↦ᵣ[cpu]{dq} ms -∗ Register.satp ↦ᵣ[cpu] x -∗ ⌜x = 0#64⌝ -∗
-        Φ (ExecutionResult.Retire_Success ()))
-    ⊢ swp cpu (csrw 0x180#12 0#64) Φ := by
-  iintro ⟨#Hhw, Hcur_privilege, Hmstatus, Hsatp, HΦ⟩
-  csrw_run
-  iapply HΦ $$ %_ Hcur_privilege Hmstatus Hsatp []
-  ipureintro
-  decide
-
-set_option maxHeartbeats 4000000 in
-theorem swp_csrw_medeleg (cpu : CPU) (dq : DFrac) (d v : BitVec 64) (Φ : ExecutionResult → IProp GF) :
-    hwConfig cpu ∗ Register.cur_privilege ↦ᵣ[cpu]{dq} Privilege.Machine ∗
-    Register.medeleg ↦ᵣ[cpu] d ∗
-    ▷ (Register.cur_privilege ↦ᵣ[cpu]{dq} Privilege.Machine -∗
-        Register.medeleg ↦ᵣ[cpu] legalize_medeleg d v -∗ Φ (ExecutionResult.Retire_Success ()))
-    ⊢ swp cpu (csrw 0x302#12 v) Φ := by
-  iintro ⟨#Hhw, Hcur_privilege, Hmedeleg, HΦ⟩
-  csrw_run
-  iapply HΦ $$ Hcur_privilege Hmedeleg
-
-set_option maxHeartbeats 4000000 in
-theorem swp_csrw_mideleg (cpu : CPU) (dq : DFrac) (d v : BitVec 64) (Φ : ExecutionResult → IProp GF) :
-    hwConfig cpu ∗ Register.cur_privilege ↦ᵣ[cpu]{dq} Privilege.Machine ∗
-    Register.mideleg ↦ᵣ[cpu] d ∗
-    ▷ (Register.cur_privilege ↦ᵣ[cpu]{dq} Privilege.Machine -∗
-        Register.mideleg ↦ᵣ[cpu] midelegWrite v -∗ Φ (ExecutionResult.Retire_Success ()))
-    ⊢ swp cpu (csrw 0x303#12 v) Φ := by
-  iintro ⟨#Hhw, Hcur_privilege, Hmideleg, HΦ⟩
-  unfold csrw doCSR
-  generalize hW : write_CSR 0x303#12 = W
-  swp_run 300
-  subst hW
-  iapply swp_bind
-  iapply swp_write_CSR_mideleg
-  iframe; iframe Hhw
-  inext
-  iintro Hmideleg
-  swp_run 60
-  try (unfold wX_bits wX; swp_run 40)
-  iapply HΦ $$ Hcur_privilege Hmideleg
-
-set_option maxHeartbeats 4000000 in
-theorem swp_csrw_sie (cpu : CPU) (dq : DFrac) (m d v : BitVec 64) (Φ : ExecutionResult → IProp GF) :
-    hwConfig cpu ∗ Register.cur_privilege ↦ᵣ[cpu]{dq} Privilege.Machine ∗
-    Register.mie ↦ᵣ[cpu] m ∗ Register.mideleg ↦ᵣ[cpu]{dq} d ∗
-    ▷ (Register.cur_privilege ↦ᵣ[cpu]{dq} Privilege.Machine -∗
-        Register.mie ↦ᵣ[cpu] legalize_sie m d v -∗ Register.mideleg ↦ᵣ[cpu]{dq} d -∗
-        Φ (ExecutionResult.Retire_Success ()))
-    ⊢ swp cpu (csrw 0x104#12 v) Φ := by
-  iintro ⟨#Hhw, Hcur_privilege, Hmie, Hmideleg, HΦ⟩
-  csrw_run
-  iapply HΦ $$ Hcur_privilege Hmie Hmideleg
-
-set_option maxHeartbeats 4000000 in
-theorem swp_csrw_menvcfg (cpu : CPU) (dq : DFrac) (o v : BitVec 64)
-    (hcbie : BitVec.extractLsb' 4 2 v = 0#2) (hpmm : BitVec.extractLsb' 32 2 v = 0#2)
-    (Φ : ExecutionResult → IProp GF) :
-    hwConfig cpu ∗ Register.cur_privilege ↦ᵣ[cpu]{dq} Privilege.Machine ∗
-    Register.menvcfg ↦ᵣ[cpu] o ∗
-    ▷ (Register.cur_privilege ↦ᵣ[cpu]{dq} Privilege.Machine -∗
-        Register.menvcfg ↦ᵣ[cpu] menvcfgWrite o v -∗ Φ (ExecutionResult.Retire_Success ()))
-    ⊢ swp cpu (csrw 0x30A#12 v) Φ := by
-  iintro ⟨#Hhw, Hcur_privilege, Hmenvcfg, HΦ⟩
-  unfold csrw doCSR
-  generalize hW : write_CSR 0x30A#12 = W
-  swp_run 300
-  subst hW
-  iapply swp_bind
-  iapply swp_write_CSR_menvcfg (hcbie := hcbie) (hpmm := hpmm)
-  iframe; iframe Hhw
-  inext
-  iintro Hmenvcfg
-  swp_run 60
-  try (unfold wX_bits wX; swp_run 40)
-  iapply HΦ $$ Hcur_privilege Hmenvcfg
-
-set_option maxHeartbeats 4000000 in
-theorem swp_csrw_mcounteren (cpu : CPU) (dq : DFrac) (c : BitVec 32) (v : BitVec 64)
-    (Φ : ExecutionResult → IProp GF) :
-    hwConfig cpu ∗ Register.cur_privilege ↦ᵣ[cpu]{dq} Privilege.Machine ∗
-    Register.mcounteren ↦ᵣ[cpu] c ∗
-    ▷ (Register.cur_privilege ↦ᵣ[cpu]{dq} Privilege.Machine -∗
-        Register.mcounteren ↦ᵣ[cpu] legalize_mcounteren c v -∗ Φ (ExecutionResult.Retire_Success ()))
-    ⊢ swp cpu (csrw 0x306#12 v) Φ := by
-  iintro ⟨#Hhw, Hcur_privilege, Hmcounteren, HΦ⟩
-  csrw_run
-  iapply HΦ $$ Hcur_privilege Hmcounteren
-
-set_option maxHeartbeats 4000000 in
-theorem swp_csrw_stimecmp (cpu : CPU) (dq : DFrac) (s v mt mtc mip me : BitVec 64)
-    (hstce : BitVec.extractLsb' 63 1 me = 1#1) (Φ : ExecutionResult → IProp GF) :
-    hwConfig cpu ∗ Register.cur_privilege ↦ᵣ[cpu]{dq} Privilege.Machine ∗
-    Register.stimecmp ↦ᵣ[cpu] s ∗ Register.mtime ↦ᵣ[cpu]{dq} mt ∗ Register.mtimecmp ↦ᵣ[cpu]{dq} mtc ∗
-    Register.mip ↦ᵣ[cpu] mip ∗ Register.menvcfg ↦ᵣ[cpu]{dq} me ∗
-    ▷ (∀ mip', Register.cur_privilege ↦ᵣ[cpu]{dq} Privilege.Machine -∗ Register.stimecmp ↦ᵣ[cpu] v -∗
-        Register.mtime ↦ᵣ[cpu]{dq} mt -∗ Register.mtimecmp ↦ᵣ[cpu]{dq} mtc -∗ Register.mip ↦ᵣ[cpu] mip' -∗
-        Register.menvcfg ↦ᵣ[cpu]{dq} me -∗ Φ (ExecutionResult.Retire_Success ()))
-    ⊢ swp cpu (csrw 0x14D#12 v) Φ := by
-  iintro ⟨#Hhw, Hcur_privilege, Hstimecmp, Hmtime, Hmtimecmp, Hmip, Hmenvcfg, HΦ⟩
-  unfold csrw doCSR
-  swp_run 300
-  split
-  · swp_run 60
-    try (unfold wX_bits wX; swp_run 40)
-    iapply HΦ $$ %_ Hcur_privilege Hstimecmp Hmtime Hmtimecmp Hmip Hmenvcfg
-  · swp_run 60
-    try (unfold wX_bits wX; swp_run 40)
-    iapply HΦ $$ %_ Hcur_privilege Hstimecmp Hmtime Hmtimecmp Hmip Hmenvcfg
-
 /-- The `csrr` path: the checks, the read, the `rd` write (`rd ≠ 0`). -/
 macro "csrr_run" hrd:ident h:ident : tactic =>
   `(tactic| (unfold csrr doCSR; swp_run 300; iapply swp_bind; iapply swp_wX_bits (hrd := $hrd); iframe; inext;
              iintro $h:ident; swp_run 40))
 
-set_option maxHeartbeats 4000000 in
-theorem swp_csrr_mstatus (cpu : CPU) (dq : DFrac) (rd : BitVec 5) (hrd : rd ≠ 0#5) (ms v : BitVec 64)
-    (Φ : ExecutionResult → IProp GF) :
-    hwConfig cpu ∗ Register.cur_privilege ↦ᵣ[cpu]{dq} Privilege.Machine ∗
-    Register.mstatus ↦ᵣ[cpu]{dq} ms ∗ gpr cpu rd (DFrac.own 1) v ∗
-    ▷ (Register.cur_privilege ↦ᵣ[cpu]{dq} Privilege.Machine -∗
-        Register.mstatus ↦ᵣ[cpu]{dq} ms -∗ gpr cpu rd (DFrac.own 1) ms -∗ Φ (ExecutionResult.Retire_Success ()))
-    ⊢ swp cpu (csrr 0x300#12 rd) Φ := by
-  iintro ⟨#Hhw, Hcur_privilege, Hmstatus, Hrd, HΦ⟩
-  csrr_run hrd Hrd
-  iapply HΦ $$ Hcur_privilege Hmstatus Hrd
-
-set_option maxHeartbeats 4000000 in
-theorem swp_csrr_sie (cpu : CPU) (dq : DFrac) (rd : BitVec 5) (hrd : rd ≠ 0#5) (m d v : BitVec 64)
-    (Φ : ExecutionResult → IProp GF) :
-    hwConfig cpu ∗ Register.cur_privilege ↦ᵣ[cpu]{dq} Privilege.Machine ∗
-    Register.mie ↦ᵣ[cpu]{dq} m ∗ Register.mideleg ↦ᵣ[cpu]{dq} d ∗ gpr cpu rd (DFrac.own 1) v ∗
-    ▷ (Register.cur_privilege ↦ᵣ[cpu]{dq} Privilege.Machine -∗
-        Register.mie ↦ᵣ[cpu]{dq} m -∗ Register.mideleg ↦ᵣ[cpu]{dq} d -∗
-        gpr cpu rd (DFrac.own 1) (lower_mie m d) -∗ Φ (ExecutionResult.Retire_Success ()))
-    ⊢ swp cpu (csrr 0x104#12 rd) Φ := by
-  iintro ⟨#Hhw, Hcur_privilege, Hmie, Hmideleg, Hrd, HΦ⟩
-  csrr_run hrd Hrd
-  iapply HΦ $$ Hcur_privilege Hmie Hmideleg Hrd
-
-set_option maxHeartbeats 4000000 in
-theorem swp_csrr_menvcfg (cpu : CPU) (dq : DFrac) (rd : BitVec 5) (hrd : rd ≠ 0#5) (e v : BitVec 64)
-    (Φ : ExecutionResult → IProp GF) :
-    hwConfig cpu ∗ Register.cur_privilege ↦ᵣ[cpu]{dq} Privilege.Machine ∗
-    Register.menvcfg ↦ᵣ[cpu]{dq} e ∗ gpr cpu rd (DFrac.own 1) v ∗
-    ▷ (Register.cur_privilege ↦ᵣ[cpu]{dq} Privilege.Machine -∗
-        Register.menvcfg ↦ᵣ[cpu]{dq} e -∗ gpr cpu rd (DFrac.own 1) e -∗ Φ (ExecutionResult.Retire_Success ()))
-    ⊢ swp cpu (csrr 0x30A#12 rd) Φ := by
-  iintro ⟨#Hhw, Hcur_privilege, Hmenvcfg, Hrd, HΦ⟩
-  csrr_run hrd Hrd
-  iapply HΦ $$ Hcur_privilege Hmenvcfg Hrd
-
-set_option maxHeartbeats 4000000 in
-theorem swp_csrr_mcounteren (cpu : CPU) (dq : DFrac) (rd : BitVec 5) (hrd : rd ≠ 0#5) (c : BitVec 32)
-    (v : BitVec 64) (Φ : ExecutionResult → IProp GF) :
-    hwConfig cpu ∗ Register.cur_privilege ↦ᵣ[cpu]{dq} Privilege.Machine ∗
-    Register.mcounteren ↦ᵣ[cpu]{dq} c ∗ gpr cpu rd (DFrac.own 1) v ∗
-    ▷ (Register.cur_privilege ↦ᵣ[cpu]{dq} Privilege.Machine -∗
-        Register.mcounteren ↦ᵣ[cpu]{dq} c -∗ gpr cpu rd (DFrac.own 1) (BitVec.setWidth 64 c) -∗
-        Φ (ExecutionResult.Retire_Success ()))
-    ⊢ swp cpu (csrr 0x306#12 rd) Φ := by
-  iintro ⟨#Hhw, Hcur_privilege, Hmcounteren, Hrd, HΦ⟩
-  csrr_run hrd Hrd
-  iapply HΦ $$ Hcur_privilege Hmcounteren Hrd
-
-set_option maxHeartbeats 4000000 in
-/-- `rdtime rd` (`csrr rd, time`): reads `mtime`; the counter permission cells
-are consulted (`mcounteren` at any value, `scounteren` off `hwConfig`). -/
-theorem swp_csrr_time (cpu : CPU) (dq : DFrac) (rd : BitVec 5) (hrd : rd ≠ 0#5) (t v : BitVec 64)
-    (c : BitVec 32) (Φ : ExecutionResult → IProp GF) :
-    hwConfig cpu ∗ Register.cur_privilege ↦ᵣ[cpu]{dq} Privilege.Machine ∗
-    Register.mcounteren ↦ᵣ[cpu]{dq} c ∗ Register.mtime ↦ᵣ[cpu]{dq} t ∗ gpr cpu rd (DFrac.own 1) v ∗
-    ▷ (Register.cur_privilege ↦ᵣ[cpu]{dq} Privilege.Machine -∗
-        Register.mcounteren ↦ᵣ[cpu]{dq} c -∗ Register.mtime ↦ᵣ[cpu]{dq} t -∗ gpr cpu rd (DFrac.own 1) t -∗ Φ (ExecutionResult.Retire_Success ()))
-    ⊢ swp cpu (csrr 0xC01#12 rd) Φ := by
-  iintro ⟨#Hhw, Hcur_privilege, Hmcounteren, Hmtime, Hrd, HΦ⟩
-  csrr_run hrd Hrd
-  iapply HΦ $$ Hcur_privilege Hmcounteren Hmtime Hrd
-
 /-! ### The concrete values xv6 writes -/
 
 /-- `start()`: `mstatus := (mstatus & ~MPP) | MPP_S` from the reset value. -/
 theorem mstatusWrite_xv6 : mstatusWrite 0xA00000000#64 0xA00000800#64 = 0xA00000800#64 := by decide
-theorem xv6_mstatus_MPP : BitVec.extractLsb' 11 2 0xA00000800#64 = 1#2 := by decide
-theorem xv6_mstatus_SXL : BitVec.extractLsb' 34 2 0xA00000800#64 = 2#2 := by decide
 /-- `w_medeleg(0xffff)`: the delegatable bits. -/
 theorem legalize_medeleg_xv6 : legalize_medeleg 0#64 0xffff#64 = 0xb3ff#64 := by decide
 /-- `w_mideleg(0xffff)`: the supervisor interrupt bits (SSI, STI, SEI, LCOFI). -/

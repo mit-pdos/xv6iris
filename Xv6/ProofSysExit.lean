@@ -28,9 +28,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## Constants -/
 
@@ -164,7 +162,7 @@ theorem sysx_status (v : BitVec 64) :
 
 theorem sys_exit_br_ffffffffffffff28 : KA.«sys_exit» + 0xffffffffffffff28#64 = KA.«argint» := by decide
 
-theorem sys_exit_br_fffffffffffff702 : KA.«sys_exit» + 0xfffffffffffff702#64 = KA.«kexit» := by decide
+theorem sys_exit_br_fffffffffffff6ee : KA.«sys_exit» + 0xfffffffffffff6ee#64 = KA.«kexit» := by decide
 
 set_option maxHeartbeats 64000000 in
 set_option maxRecDepth 20000 in
@@ -200,12 +198,13 @@ theorem sys_exit_proof (AI : ARGINT) (KX : KEXIT) : SYSEXIT := ⟨
        wordPointsTo (pTrapframe (procAddr j)) 8 (DFrac.own 1) V.trapframe ∗
        wordPointsTo (pCwd (procAddr j)) 8 (DFrac.own 1) V.cwd ∗
        pnameCells (procAddr j) (DFrac.own 1) V.name ∗
-       wordPointsTo (pSecc (procAddr j)) 8 (DFrac.own 1) V.pvSecc) ∗
+       wordPointsTo (pSecc (procAddr j)) 8 (DFrac.own 1) V.pvSecc ∗
+       wordPointsTo (pRoot (procAddr j)) 8 (DFrac.own 1) V.root) ∗
       procPtAt V.upt M ∗ tfPageAt V.upt.tfp V.tf ∗ ⌜V.pvLazy = false → lazyFree V.upt.um V.sz⌝ ∗
       actCnt (procAddr j) V.ev ∗
-      (cwdRefAt V.cwd V.cwi ∗ procGenAt curCtx (procAddr j) pid V.gen)
+      (cwdRefAt V.cwd V.cwi ∗ rootRefAt V.root V.rti ∗ procGenAt curCtx (procAddr j) pid V.gen)
       from by unfold procPrivCoreNoctxAt procPrivBareAt procFieldsNoOfile; iintro ⟨⟨H1, H2, H3, H4, H5, H6, H8⟩, H7⟩; iframe) $$ Hcore
-    with ⟨%hVb, Hpid, ⟨Hks, Hsz, Hpg, Htf, Hcwd, Hnm, Hsc⟩, HPt, HTf, %hlz, Hev, Hcwr⟩
+    with ⟨%hVb, Hpid, ⟨Hks, Hsz, Hpg, Htf, Hcwd, Hnm, Hsc, Hrt⟩, HPt, HTf, %hlz, Hev, Hcwr⟩
   ihave Htf := (show wordPointsTo (GF := GF) (pTrapframe (procAddr j)) 8 (DFrac.own 1) V.trapframe ⊢
       wordPointsTo (pTrapframe k.proc) 8 (DFrac.own 1) (pageAddr V.upt.tfp) from by rw [hVb.2.2.2, hproc]) $$ Htf
   -- the prologue ; a1 = &n ; a0 = 0 ; jal argint
@@ -243,16 +242,16 @@ theorem sys_exit_proof (AI : ARGINT) (KX : KEXIT) : SYSEXIT := ⟨
         (DFrac.own 1) (BitVec.extractLsb' 0 32 v))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [c8, sysx_n_addr]
     iintro Hk Hpc Fnn
-    k_step_e (wp_s_jal cpu _ (KA.«sys_exit» + 0x16#64) false 2094828#21 1#5 (by decide))
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_exit_br_fffffffffffff702]
+    k_step_e (wp_s_jal cpu _ (KA.«sys_exit» + 0x16#64) false 2094808#21 1#5 (by decide))
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_exit_br_fffffffffffff6ee]
     iintro Hk Hpc
     -- the block, closed again
     ihave Htf := (show wordPointsTo (GF := GF) (pTrapframe k.proc) 8 (DFrac.own 1) (pageAddr V.upt.tfp) ⊢
         wordPointsTo (pTrapframe (procAddr j)) 8 (DFrac.own 1) V.trapframe from by rw [hVb.2.2.2, hproc]) $$ Htf
-    ihave Hblk : procPrivFd (GF := GF) γ (procAddr j) pid V M $$ [Hpid Hks Hsz Hpg Htf Hcwd Hnm Hsc HPt HTf Hev Hcwr Hofs]
+    ihave Hblk : procPrivFd (GF := GF) γ (procAddr j) pid V M $$ [Hpid Hks Hsz Hpg Htf Hcwd Hnm Hsc Hrt HPt HTf Hev Hcwr Hofs]
     case' _ =>
       unfold procPrivFd procPrivCoreNoctxAt procPrivBareAt procFieldsNoOfile procOfiles
-      iframe Hpid Hks Hsz Hpg Htf Hcwd Hnm Hsc HPt HTf Hev Hcwr Hofs
+      iframe Hpid Hks Hsz Hpg Htf Hcwd Hnm Hsc Hrt HPt HTf Hev Hcwr Hofs
       ipureintro; exact ⟨hVb, hlz⟩
     -- THE MARKER COMES OFF THE BLOCK HERE (Rocq lane PQ-C, "The exit path"):
     -- kexit is stated at the marker-less block; a normal exit takes the LEFT

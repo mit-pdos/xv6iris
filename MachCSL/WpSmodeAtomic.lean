@@ -388,25 +388,6 @@ theorem execSpecF_fence_rw_w (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Bool) (
   iapply HΦ $$ HmConf HPC HnextPC HF
 
 set_option maxHeartbeats 4000000 in
-/-- `fence rw,rw` (`__sync_synchronize`). -/
-theorem execSpecF_fence_rw_rw (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Bool) (hok : SConfPhys (GF := GF) c sie)
-    (hmenv : c.menvcfg = menvcfgS) (pc npc₀ : BitVec 64) (rs rd : BitVec 5) (R : RegMap) :
-    execSpecPP (GF := GF) cpu dq Privilege.Supervisor c Privilege.Supervisor c
-      (instruction.FENCE (0#4, 3#4, 3#4, regidx.Regidx rs, regidx.Regidx rd)) pc npc₀ npc₀
-      (gprFile cpu R) (gprFile cpu R) := by
-  intro Φ
-  have hfiom : _get_MEnvcfg_FIOM c.menvcfg = 0#1 := by rw [hmenv]; rfl
-  clear hmenv
-  iintro ⟨HmConf, HPC, HnextPC, HF, HΦ⟩
-  conf_cases HmConf
-  obtain ⟨hpmp, hms, hpmm, hlpe⟩ := hok
-  obtain ⟨hSIE, hMPRV, hSXL, hMXR, hTSR, hTVM, hFS, hXS, hVS, hSD, hMPP⟩ := hms
-  unfold execute
-  swp_run 80
-  conf_intro HmConf
-  iapply HΦ $$ HmConf HPC HnextPC HF
-
-set_option maxHeartbeats 4000000 in
 /-- `sltiu rd, rs1, imm` (covers `seqz`). -/
 theorem execSpecF_sltiu (cpu : CPU) (dq : DFrac) (c : MConf) (pc npc₀ : BitVec 64) (imm : BitVec 12)
     (rd rs1 : BitVec 5) (hrd : rd ≠ 0#5) (R : RegMap) :

@@ -10,8 +10,8 @@ SpecSysSeccomp.v):
     }
 
 Seventeen instructions: the four-slot frame (`ra`, `s0` and the `mask` cell
-at `s0-24`), `jal argaddr`, `jal myproc`, `ld a5,360(a0)` / `ld a4,-24(s0)` /
-`c.and a5,a5,a4` / `sd a5,360(a0)` -- `p->seccomp &= mask` -- `c.li a0,0`,
+at `s0-24`), `jal argaddr`, `jal myproc`, `ld a5,368(a0)` / `ld a4,-24(s0)` /
+`c.and a5,a5,a4` / `sd a5,368(a0)` -- `p->seccomp &= mask` -- `c.li a0,0`,
 the epilogue.
 
 sys_getpid's shape (the running process's own block, no lock), plus
@@ -31,11 +31,8 @@ dispatcher relays).
 
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
-import Xv6.SchedCtx
 import Xv6.FdTable
-import Xv6.Image
 import Xv6.SpecArgaddr
-import MachCSL.WpSmodeIntr
 
 namespace Xv6
 

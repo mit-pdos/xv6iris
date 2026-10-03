@@ -25,9 +25,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 set_option maxHeartbeats 16000000 in
 theorem iu_tail (LW : LOG_WRITE) (BE : BRELSE)
@@ -82,7 +80,7 @@ theorem iu_tail (LW : LOG_WRITE) (BE : BRELSE)
   k_step_e (wp_s_add cpu _ (KA.«iupdate» + 0x66#64) true 10#5 0#5 18#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hs2]
   iintro Hk Hpc
-  k_step_e (wp_s_jal cpu _ (KA.«iupdate» + 0x68#64) false 3172#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«iupdate» + 0x68#64) false 3268#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [iu_br_logwrite]
   iintro Hk Hpc
   iapply (dislot_log_write LW cpu _ γl kk pidv inum dn ds bsd d0 u cru Sb e0 v Pout

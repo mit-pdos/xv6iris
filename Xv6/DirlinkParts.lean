@@ -40,13 +40,8 @@ record is the two bottom cells (`&de = s0-80 = sp`, `&de.name = s0-78`).
    `wiCostBmonly` (`Xv6.sys_unlink_wi_cost`).
 -/
 import Xv6.SpecDirlink
-import Xv6.FsWords
-import Xv6.DinodeSlot
 import Xv6.SpecStrncpy
-import Xv6.DirlookupParts
 import Xv6.IcacheBootDecode
-import Xv6.ReadiParts
-import Xv6.SysUnlinkPure
 import MachCSL.BvLemmas
 
 namespace Xv6
@@ -54,17 +49,15 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedSectionVars false
-
 /-! ## Call targets, return addresses, the literal -/
 
-theorem dirlink_br_dirlookup : KA.«dirlink» + 0xFFFFFFFFFFFFFE06#64 = KA.«dirlookup» := by
+theorem dirlink_br_dirlookup : KA.«dirlink» + 0xfffffffffffffdbe#64 = KA.«dirlookup» := by
   decide
-theorem dirlink_br_readi : KA.«dirlink» + 0xFFFFFFFFFFFFFBF8#64 = KA.«readi» := by decide
-theorem dirlink_br_iput : KA.«dirlink» + 0xFFFFFFFFFFFFF9A0#64 = KA.«iput» := by decide
-theorem dirlink_br_panic : KA.«dirlink» + 0xffffffffffffcd18#64 = KA.«panic» := by decide
-theorem dirlink_br_strncpy : KA.«dirlink» + 0xffffffffffffd306#64 = KA.«strncpy» := by decide
-theorem dirlink_br_writei : KA.«dirlink» + 0xFFFFFFFFFFFFFCEA#64 = KA.«writei» := by decide
+theorem dirlink_br_readi : KA.«dirlink» + 0xfffffffffffffbb0#64 = KA.«readi» := by decide
+theorem dirlink_br_iput : KA.«dirlink» + 0xfffffffffffff958#64 = KA.«iput» := by decide
+theorem dirlink_br_panic : KA.«dirlink» + 0xffffffffffffccbc#64 = KA.«panic» := by decide
+theorem dirlink_br_strncpy : KA.«dirlink» + 0xffffffffffffd2aa#64 = KA.«strncpy» := by decide
+theorem dirlink_br_writei : KA.«dirlink» + 0xfffffffffffffca2#64 = KA.«writei» := by decide
 
 theorem dirlink_ret_1a : jumpPc (KA.«dirlink» + 0x1a#64) = KA.«dirlink» + 0x1a#64 := by decide
 theorem dirlink_ret_3e : jumpPc (KA.«dirlink» + 0x3e#64) = KA.«dirlink» + 0x3e#64 := by decide
@@ -73,7 +66,7 @@ theorem dirlink_ret_7c : jumpPc (KA.«dirlink» + 0x7c#64) = KA.«dirlink» + 0x
 theorem dirlink_ret_90 : jumpPc (KA.«dirlink» + 0x90#64) = KA.«dirlink» + 0x90#64 := by decide
 
 /-- `auipc a0,0x4` + `addi a0,a0,-1610` at `+0x60`: the panic literal. -/
-theorem dirlink_msg_addr : KA.«dirlink» + 0x39d0#64 = KStr.«dirlink read» := by decide
+theorem dirlink_msg_addr : KA.«dirlink» + 0x3974#64 = KStr.«dirlink read» := by decide
 
 /-- `dirlink read` at `0x800074f0` (Rocq's `dl_msg`). -/
 def dirlinkMsgStr : List (BitVec 8) :=

@@ -81,8 +81,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open HfpFileClaimsP
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
-
 namespace UkFileOpen
 
 /-! ## §0 The ledger a tainted open hands back; the fd tie -/
@@ -175,24 +173,25 @@ are used directly.) -/
 structure HfpFileOpenP : Prop where
   /-- Rocq `FileOpen.file_open_plain_au` (U1-F `fileOpenPlain_au`) -/
   fileOpenPlainAu : ∀ (γfs : FsNames) (c : FileFixed) (r : FileAppNames) (q1 q2 : Qp)
-      (i : Nat) (bs : List (BitVec 8)) (N : Fname) (s : Dst) (cw : Nat) (M : Nat → List (BitVec 8))
+      (i : Nat) (bs : List (BitVec 8)) (N : Fname) (s : Dst) (rt cw : Nat) (M : Nat → List (BitVec 8))
       (pv : Nat) (vom : BitVec 64) (pl : List (BitVec 8))
       (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)),
-    s[N]? = some (i, bs) → fileAppIs (hlc := hlc) (GF := GF) c r →
-    argPathOf M pv pl → pathElems pl = [N] → umStartOf cw pl = ROOTINO → omTrunc vom = false →
+    uname N → s[N]? = some (i, bs) → fileAppIs (hlc := hlc) (GF := GF) c r →
+    argPathOf M pv pl → pathElems pl = [N] → umStartOf rt cw pl = ROOTINO → omTrunc vom = false →
     ⊢@{IProp GF} appInv (hlc := hlc) γfs -∗ fdq r q1 s -∗ fdq r q2 s -∗
-      openAuPlainAt (hlc := hlc) (fsGammaL γfs) γfs cw M pv vom
+      openAuPlainAt (hlc := hlc) (fsGammaL γfs) γfs rt cw M pv vom
         (pobsPLin (fileTaint (hlc := hlc) c) [ROOTINO, i] (fdq r q1 s))
         (pobsPmiss (fileTaint (hlc := hlc) c)) (fileOpenRecv (hlc := hlc) c r q2 s) Ft
   /-- Rocq `FileOpen.file_open_recv_file` (U1-F `fileOpenRecv_file`) -/
   fileOpenRecvFile : ∀ (γfs : FsNames) (c : FileFixed) (r : FileAppNames) (omo : OffMode)
-      (q1 q2 : Qp) (i : Nat) (bs : List (BitVec 8)) (N : Fname) (s : Dst) (cw : Nat)
+      (q1 q2 : Qp) (i : Nat) (bs : List (BitVec 8)) (N : Fname) (s : Dst) (rt cw : Nat)
       (M : Nat → List (BitVec 8)) (pv : Nat) (vom : BitVec 64) (pl : List (BitVec 8))
       (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)) (sts : List FdState)
       (rv : BitVec 64) (fdv' : List FdState),
-    s[N]? = some (i, bs) → argPathOf M pv pl → pathElems pl = [N] → umStartOf cw pl = ROOTINO →
+    uname N → s[N]? = some (i, bs) → argPathOf M pv pl → pathElems pl = [N] →
+    umStartOf rt cw pl = ROOTINO →
     omTrunc vom = false →
-    ⊢@{IProp GF} openReceiptPlain (hlc := hlc) omo (fsGammaL γfs) γfs cw M pv vom
+    ⊢@{IProp GF} openReceiptPlain (hlc := hlc) omo (fsGammaL γfs) γfs rt cw M pv vom
         (pobsPLin (fileTaint (hlc := hlc) c) [ROOTINO, i] (fdq r q1 s))
         (pobsPmiss (fileTaint (hlc := hlc) c)) (fileOpenRecv (hlc := hlc) c r q2 s) Ft sts rv fdv'
       ={⊤}=∗
@@ -203,24 +202,24 @@ structure HfpFileOpenP : Prop where
         fileTaint (hlc := hlc) c)
   /-- Rocq `FileOpen.file_open_miss_au` (U1-F `fileOpenMiss_au`) -/
   fileOpenMissAu : ∀ (γfs : FsNames) (c : FileFixed) (r : FileAppNames) (q : Qp) (N : Fname)
-      (s : Dst) (cw : Nat) (M : Nat → List (BitVec 8)) (pv : Nat) (vom : BitVec 64)
+      (s : Dst) (rt cw : Nat) (M : Nat → List (BitVec 8)) (pv : Nat) (vom : BitVec 64)
       (pl : List (BitVec 8)) (Farm Fun : Pfam GF (Aview → Nat → IProp GF))
       (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)),
     fileAppIs (hlc := hlc) (GF := GF) c r → uname N → s[N]? = none → argPathOf M pv pl → pathElems pl = [N] →
-    umStartOf cw pl = ROOTINO → omCreate vom = false →
+    umStartOf rt cw pl = ROOTINO → omCreate vom = false →
     ⊢@{IProp GF} appInv (hlc := hlc) γfs -∗ fdq r q s -∗
-      openIn (hlc := hlc) (fsGammaL γfs) γfs cw M pv vom
+      openIn (hlc := hlc) (fsGammaL γfs) γfs rt cw M pv vom
         (pobsPDeadLin (fileTaint (hlc := hlc) c) (fdq r q s) ROOTINO)
         (pobsPmissRef (fileTaint (hlc := hlc) c) (fdq r q s)) Farm Fun Fok Fex
         (pfamTriv (fun (_ : Aview) (_ : Nat) (_ : Anode) => iprop(True)))
         (pfamTriv (fun (_ : Aview) (_ : Nat) (_ : List (BitVec 8)) => fileTaint (hlc := hlc) c))
   /-- Rocq `FileOpen.file_open_miss_recv` (U1-F `fileOpenMiss_recv`) -/
   fileOpenMissRecv : ∀ (γfs : FsNames) (c : FileFixed) (r : FileAppNames) (omo : OffMode)
-      (q : Qp) (N : Fname) (s : Dst) (cw : Nat) (M : Nat → List (BitVec 8)) (pv : Nat)
+      (q : Qp) (N : Fname) (s : Dst) (rt cw : Nat) (M : Nat → List (BitVec 8)) (pv : Nat)
       (vom : BitVec 64) (pl : List (BitVec 8)) (Fo : Pfam GF (Aview → Nat → Anode → IProp GF))
       (sts : List FdState) (rv : BitVec 64) (fdv' : List FdState),
     argPathOf M pv pl → pathElems pl = [N] →
-    ⊢@{IProp GF} openReceiptPlain (hlc := hlc) omo (fsGammaL γfs) γfs cw M pv vom
+    ⊢@{IProp GF} openReceiptPlain (hlc := hlc) omo (fsGammaL γfs) γfs rt cw M pv vom
         (pobsPDeadLin (fileTaint (hlc := hlc) c) (fdq r q s) ROOTINO)
         (pobsPmissRef (fileTaint (hlc := hlc) c) (fdq r q s)) Fo
         (pfamTriv (fun (_ : Aview) (_ : Nat) (_ : List (BitVec 8)) => fileTaint (hlc := hlc) c))
@@ -229,13 +228,13 @@ structure HfpFileOpenP : Prop where
         fileTaint (hlc := hlc) c)
   /-- Rocq `FileOpen.file_open_create_recv` (U1-F `fileOpenCreate_recv`) -/
   fileOpenCreateRecv : ∀ (γfs : FsNames) (c : FileFixed) (omo : OffMode) (r : FileAppNames)
-      (jo : Option Nat) (n : Nat) (N : Fname) (s : Dst) (g : GName) (np : Nat) (cw : Nat)
+      (jo : Option Nat) (n : Nat) (N : Fname) (s : Dst) (g : GName) (np : Nat) (rt cw : Nat)
       (M : Nat → List (BitVec 8)) (pv : Nat) (vom : BitVec 64) (pl : List (BitVec 8))
       (sts : List FdState) (rv : BitVec 64) (fdv' : List FdState) (E : CoPset),
     (↑appN : CoPset) ⊆ E → omTrunc vom = true → uname N →
     argPathOf M pv pl → (pathElems pl).getLast? = some N → fileAppIs (hlc := hlc) (GF := GF) c r →
     ⊢@{IProp GF} appInv (hlc := hlc) γfs -∗ escKey (hlc := hlc) c r n s g -∗
-      openReceiptCreate (hlc := hlc) omo (fsGammaL γfs) γfs cw M pv vom
+      openReceiptCreate (hlc := hlc) omo (fsGammaL γfs) γfs rt cw M pv vom
         (fun (_ : Nat) (d : Nat) => iprop(⌜d = ROOTINO⌝)) (fun _ _ => iprop(True))
         (fileArmFam (hlc := hlc) c r jo s g np) (fileUnarmFam (hlc := hlc) c r s g np)
         (fileCreFam (hlc := hlc) c r jo N s g np) (fileDlkFam (hlc := hlc) c r n s g)
@@ -287,13 +286,13 @@ namespace UkFileOpen
 /-- **UConsOpen `sbundle_at_open_intro_at`** at the xv6 instance
 (deviation 1): row 15 at every page view agreeing with the key's image. -/
 theorem sbundleAt_open_intro (X : Uvis → IProp GF) (f : Xfam GF) (W : Uvis) :
-    ⊢ (∀ Mv : Nat → List (BitVec 8), ⌜imgAgrees W.M Mv⌝ -∗
-        openIn (hlc := hlc) (fsGammaL (hlc := hlc) fscFs) fscFs W.cwd Mv (xkA W 0).toNat (xkA W 1)
+    ⊢ (∀ Mv : Nat → List (BitVec 8), ⌜imgAgrees W.M Mv⌝ -∗ ∀ rt : Nat,
+        openIn (hlc := hlc) (fsGammaL (hlc := hlc) fscFs) fscFs rt W.cwd Mv (xkA W 0).toNat (xkA W 1)
           f.oP f.oPmiss f.oFarm f.oFun f.oFok f.oFex f.oFo f.oFt) -∗
       UexecSG.sbundleAt (self := uexecSGXv6 (hlc := hlc)) X USYS_open f W := by
   show ⊢ _ -∗ xv6Sbundle (hlc := hlc) X USYS_open f W
   unfold xv6Sbundle xv6SbundleRest xrowOpen
-  simp only [USYS_open, USYS_exec, USYS_pipe, Int.reduceEq, ↓reduceIte]
+  simp only [USYS_open, USYS_exec, Int.reduceEq, ↓reduceIte]
   iintro H
   iexact H
 
@@ -302,12 +301,12 @@ the receipt at the page view the call fired at. -/
 theorem spostAt_open_elim (X : Uvis → IProp GF) (f : Xfam GF) (W : Uvis) (r : BitVec 64) (M' : ElfMem)
     (fdv' : List FdState) (cw' : Nat) (cs' : ExtTreeSet GName compare) :
     ⊢ UexecSG.spostAt (self := uexecSGXv6 (hlc := hlc)) X USYS_open f W r M' fdv' cw' cs' -∗
-      ∃ Mv : Nat → List (BitVec 8), ⌜imgAgrees W.M Mv⌝ ∗
-        openReceipt (hlc := hlc) f.oOm (fsGammaL (hlc := hlc) fscFs) fscFs W.cwd Mv (xkA W 0).toNat (xkA W 1)
+      ∃ Mv : Nat → List (BitVec 8), ⌜imgAgrees W.M Mv⌝ ∗ ∃ rt : Nat,
+        openReceipt (hlc := hlc) f.oOm (fsGammaL (hlc := hlc) fscFs) fscFs rt W.cwd Mv (xkA W 0).toNat (xkA W 1)
           f.oP f.oPmiss f.oFarm f.oFun f.oFok f.oFex f.oFo f.oFt W.fd r fdv' := by
   show ⊢ xv6Spost (hlc := hlc) X USYS_open f W r M' fdv' cw' cs' -∗ _
   unfold xv6Spost xpostOpen
-  simp only [USYS_open, USYS_exec, USYS_pipe, Int.reduceEq, ↓reduceIte]
+  simp only [USYS_open, USYS_exec, Int.reduceEq, ↓reduceIte]
   iintro H
   iexact H
 
@@ -325,8 +324,8 @@ theorem spostAt_open_eq (X : Uvis → IProp GF) (f : Xfam GF) (W : Uvis) (r : Bi
 /-- `spostAt_open_elim` at the unfolded post (see `spostAt_open_eq`). -/
 theorem xpostOpen_elim (f : Xfam GF) (W : Uvis) (r : BitVec 64) (fdv' : List FdState) :
     ⊢ xpostOpen (hlc := hlc) f.oOm f.oP f.oPmiss f.oFarm f.oFun f.oFok f.oFex f.oFo f.oFt W r fdv' -∗
-      ∃ Mv : Nat → List (BitVec 8), ⌜imgAgrees W.M Mv⌝ ∗
-        openReceipt (hlc := hlc) f.oOm (fsGammaL (hlc := hlc) fscFs) fscFs W.cwd Mv (xkA W 0).toNat (xkA W 1)
+      ∃ Mv : Nat → List (BitVec 8), ⌜imgAgrees W.M Mv⌝ ∗ ∃ rt : Nat,
+        openReceipt (hlc := hlc) f.oOm (fsGammaL (hlc := hlc) fscFs) fscFs rt W.cwd Mv (xkA W 0).toNat (xkA W 1)
           f.oP f.oPmiss f.oFarm f.oFun f.oFok f.oFex f.oFo f.oFt W.fd r fdv' :=
   spostAt_open_elim (fun _ => iprop(emp)) f W r W.M fdv' 0 ∅
 

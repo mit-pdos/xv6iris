@@ -81,8 +81,6 @@ namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Iris.Std Std MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-! ## The pure model of what reparent() does to the parent table -/
 
 /-- one slot: a child of `p` is handed to `ip`, anything else is untouched
@@ -446,25 +444,6 @@ def initGen (ip : BitVec 64) (p0 : BitVec 32) : IProp GF :=
 instance initGen_persistent (ip : BitVec 64) (p0 : BitVec 32) : Persistent (initGen (GF := GF) ip p0) := by
   unfold initGen; infer_instance
 
-theorem initGen_pidIs (ip : BitVec 64) (p0 : BitVec 32) : initGen (GF := GF) ip p0 ⊢ initPidIs p0 := by
-  unfold initGen
-  iintro ⟨%g, -, -, #H, -⟩
-  iexact H
-
-/-- ...AND WHAT A FRESH PID IS REFUTED AGAINST (Rocq `init_gen_reg_ne`). -/
-theorem initGen_reg_ne (R : IntMapF GName) (ip : BitVec 64) (p0 pidc : BitVec 32)
-    (hfree : get? R (pidc.toNat : Int) = none) :
-    pidRegAuth (GF := GF) R ∗ initGen ip p0 ⊢ ⌜pidc ≠ p0⌝ := by
-  unfold initGen
-  iintro ⟨Ha, ⟨%g, -, -, -, #Hreg⟩⟩
-  ihave %hl := pidReg_lookup R p0 .discard g $$ [Ha Hreg]
-  · isplitl [Ha]
-    · iexact Ha
-    · iexact Hreg
-  ipureintro
-  intro he; subst he
-  rw [hfree] at hl; cases hl
-
 /-- the `initproc` cell (Rocq `KernelSyms.initproc`) -/
 def initIdentCell [CurCtx] (ξ : CtxId) (ip : BitVec 64) : IProp GF :=
   wordAtN ξ KA.«initproc» 8 .discard ip
@@ -481,27 +460,6 @@ instance initIdentCell_persistent [CurCtx] (ξ : CtxId) (ip : BitVec 64) :
 instance initIdentAt_persistent [CurCtx] (ξ : CtxId) (ip : BitVec 64) :
     Persistent (initIdentAt (GF := GF) ξ ip) := by
   unfold initIdentAt; infer_instance
-
-/-- the two halves joined, which is what every kexit-chain caller does -/
-theorem initIdentAt_of_gen [CurCtx] (ξ : CtxId) (ip : BitVec 64) :
-    initIdentCell (GF := GF) ξ ip ∗ initGen ip 1#32 ⊢ initIdentAt ξ ip := by
-  unfold initIdentAt initGen
-  iintro ⟨#Hc, ⟨%g, #Hsg, #Hgp, #Hi, -⟩⟩
-  isplitr
-  · iexact Hc
-  iexists g
-  isplitr
-  · iexact Hsg
-  isplitr
-  · iexact Hgp
-  · iexact Hi
-
-/-- the reading allocproc's insert is refuted against (Rocq `init_gen_reg`) -/
-theorem initGen_reg (ip : BitVec 64) : initGen (GF := GF) ip 1#32 ⊢ initReg := by
-  unfold initGen initReg
-  iintro ⟨%g, -, -, -, #Hreg⟩
-  iexists g
-  iexact Hreg
 
 /-- the reading the syscall layer relays to kwait's contract -/
 theorem initIdent_pidIs [CurCtx] (ξ : CtxId) (ip : BitVec 64) :
@@ -646,17 +604,6 @@ theorem childrenInv_orph_all [CurCtx] (ξ : CtxId) (ps : Nat → BitVec 64) (gs 
   · ipureintro; exact hp
   · iexact Hoi
 
-/-- WHAT THE REAPER READS OFF IT: an address with orphans IS init's -/
-theorem childrenInv_orph_init [CurCtx] (ξ : CtxId) (ps : Nat → BitVec 64) (gs : Nat → GName)
-    (m : ChMap) (O : OrphMap) (pa : BitVec 64) (g : GName) (hin : g ∈ orphRow O pa) :
-    childrenInvAt (GF := GF) ξ ps gs m O ⊢ initIdentAt ξ pa := by
-  unfold childrenInvAt
-  iintro ⟨-, -, #Hoi⟩
-  iapply orphAtInit_read ξ O pa g hin $$ Hoi
-
-/-- the children map's own existential closure (Rocq `children_res`) -/
-def childrenRes : IProp GF := iprop(∃ m : ChMap, childrenOwnAt m)
-
 /-- ...AND THE BOOT SHAPE OF IT: the rows sit at distinct slot addresses,
 and every one of them is empty (Rocq `children_res_boot`) -/
 def childrenResBoot : IProp GF :=
@@ -689,9 +636,6 @@ theorem orphans_del (O : OrphMap) (pa : BitVec 64) (g : GName) :
   unfold orphansOwn
   iintro H
   iapply ghost_var_update $$ H
-
-/-- Rocq `orphans_res`. -/
-def orphansRes : IProp GF := iprop(∃ O : OrphMap, orphansOwn O)
 
 /-! ### Transport across contexts (deviation 4) -/
 
@@ -772,14 +716,6 @@ theorem tickCnt_lb (n : Nat) : tickCnt (GF := GF) n ⊢ tickCnt n ∗ tickLb n :
   iintro Ha
   ihave #Hb := MonoNat.lb_own_get _ _ _ $$ Ha
   iframe Ha Hb
-
-/-- every receipt is below the count (Rocq `tick_lb_le`). -/
-theorem tickLb_le (n m : Nat) : tickCnt (GF := GF) n ⊢ tickLb m -∗ ⌜m ≤ n⌝ := by
-  unfold tickCnt tickLb
-  iintro Ha Hb
-  ihave %h := MonoNat.auth_lb_own_valid _ _ _ _ $$ Ha Hb
-  ipureintro
-  exact (MaxNat.le_toNat _ _).mp h.2
 
 /-- the count only grows (Rocq `tick_cnt_raise`). -/
 theorem tickCnt_raise (n m : Nat) (h : n ≤ m) : tickCnt (GF := GF) n ⊢ |==> tickCnt m := by

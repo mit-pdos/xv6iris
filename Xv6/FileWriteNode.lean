@@ -56,8 +56,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-- Rocq's stdpp `insert_insert`, at the deed's map (deviation 5). -/
 theorem fileWrite_dst_insert_insert (s : Dst) (N : Fname) (v w : Nat × List (BitVec 8)) :
     (s.insert N v).insert N w = s.insert N w := by

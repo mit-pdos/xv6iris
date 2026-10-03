@@ -28,9 +28,8 @@ X4).
   `userTrapFrame` from the frames at any landing file satisfying the pins.
 * §5 the SEAMS the other lanes asked for: `uf_trapCells` (the frame opened
   into exactly UTrap's cells, and closed at the tower's post-values),
-  `uf_utrPins` (U1-P2's `UtrPins`), `uf_drefU` (U1-X2's `UxcCfg`: the file
-  agrees with `drefU`), and the decode bridge `uf_swp_decode32/16`
-  (`swp_runRead` at `drefU` from `decodeU_total32/16`).
+  `uf_utrPins` (U1-P2's `UtrPins`), and `uf_drefU` (U1-X2's `UxcCfg`: the
+  file agrees with `drefU`).
 
 ## Deviations from Rocq
 
@@ -57,7 +56,6 @@ import Xv6.UserBytesAcc
 import MachCSL.UFrameDf
 import MachCSL.UExecCtlBase
 import MachCSL.UTranslate
-import MachCSL.UDecode
 import MachCSL.URunRWMono
 import MachCSL.WpSmodeSret
 
@@ -65,8 +63,6 @@ namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open Sail LeanRV64D LeanRV64D.Functions
-
-set_option linter.unusedSectionVars false
 
 /-! ## §1 The footprint -/
 
@@ -203,6 +199,12 @@ theorem ufCfg_file (C : UCfg) (P : UPtd) (v : UfVals) (hv : v.lf.ok) : UfCfg C P
   intro r x h
   cases r <;> simp only [hwVal, reduceCtorEq, Option.some.injEq] at h <;> (subst h; rfl)
 
+/-- A register `hwVal` pins is one of `hwRegs` (a case split over every
+register, in an empty context: under `ufCfg_of_ro`'s hypotheses each of the
+~250 arms' `simp_all` cost ~9 ms). -/
+theorem uf_hwVal_mem (r : Register) (x : RegisterType r) (h : hwVal r = some x) : r ∈ hwRegs := by
+  cases r <;> simp only [hwVal, reduceCtorEq] at h <;> decide
+
 /-- The pins only mention read-only cells: a file agreeing there keeps them. -/
 theorem ufCfg_of_ro (C : UCfg) (P : UPtd) (f f' : RegFile) (hc : UfCfg C P f)
     (h : ∀ r ∈ ufRoList, f' r = f r) : UfCfg C P f' := by
@@ -215,7 +217,7 @@ theorem ufCfg_of_ro (C : UCfg) (P : UPtd) (f f' : RegFile) (hc : UfCfg C P f)
     (e _ (by decide)).trans hc.satp, hl ▸ hc.lok, ?_⟩
   intro r x hx
   have hm : r ∈ ufRoList := by
-    have : r ∈ hwRegs := by cases r <;> simp_all [hwVal, hwRegs]
+    have : r ∈ hwRegs := uf_hwVal_mem r x hx
     simp only [ufRoList, List.mem_append]; exact Or.inr (Or.inr this)
   rw [e r hm]; exact hc.hw r x hx
 
@@ -554,22 +556,22 @@ theorem ufTrapSet_other (f : RegFile) (p : Privilege) (ms sc stv sep npc : BitVe
 
 theorem ufTrapSet_cp (f : RegFile) (p : Privilege) (ms sc stv sep npc : BitVec 64) :
     ufTrapSet f p ms sc stv sep npc .cur_privilege = p := by
-  unfold ufTrapSet; simp [RegFile.set_other, RegFile.set_same]
+  unfold ufTrapSet; simp [RegFile.set_other]
 theorem ufTrapSet_ms (f : RegFile) (p : Privilege) (ms sc stv sep npc : BitVec 64) :
     ufTrapSet f p ms sc stv sep npc .mstatus = ms := by
-  unfold ufTrapSet; simp [RegFile.set_other, RegFile.set_same]
+  unfold ufTrapSet; simp [RegFile.set_other]
 theorem ufTrapSet_sc (f : RegFile) (p : Privilege) (ms sc stv sep npc : BitVec 64) :
     ufTrapSet f p ms sc stv sep npc .scause = sc := by
-  unfold ufTrapSet; simp [RegFile.set_other, RegFile.set_same]
+  unfold ufTrapSet; simp [RegFile.set_other]
 theorem ufTrapSet_stv (f : RegFile) (p : Privilege) (ms sc stv sep npc : BitVec 64) :
     ufTrapSet f p ms sc stv sep npc .stval = stv := by
-  unfold ufTrapSet; simp [RegFile.set_other, RegFile.set_same]
+  unfold ufTrapSet; simp [RegFile.set_other]
 theorem ufTrapSet_sep (f : RegFile) (p : Privilege) (ms sc stv sep npc : BitVec 64) :
     ufTrapSet f p ms sc stv sep npc .sepc = sep := by
-  unfold ufTrapSet; simp [RegFile.set_other, RegFile.set_same]
+  unfold ufTrapSet; simp [RegFile.set_other]
 theorem ufTrapSet_npc (f : RegFile) (p : Privilege) (ms sc stv sep npc : BitVec 64) :
     ufTrapSet f p ms sc stv sep npc .nextPC = npc := by
-  unfold ufTrapSet; simp [RegFile.set_same]
+  unfold ufTrapSet; simp []
 theorem ufTrapSet_pc (f : RegFile) (p : Privilege) (ms sc stv sep npc : BitVec 64) :
     ufTrapSet f p ms sc stv sep npc .PC = f .PC := by
   unfold ufTrapSet; simp [RegFile.set_other]
@@ -648,7 +650,6 @@ theorem uf_trapCells (cpu : CPU) (C : UCfg) (P : UPtd) (f : RegFile) (hc : UfCfg
 
 end seams
 
-
 /-- **U1-P2's translation pins** (`UtrPins`) at any walker state whose file
 is a user file: the footprint reads `mstatus`/`cur_privilege`/`satp`; User
 privilege; `userMstatusOk` gives SXL = 2 and MPRV = 0; `satp` is
@@ -671,64 +672,5 @@ theorem uf_drefU (C : UCfg) (P : UPtd) (f : RegFile) (hc : UfCfg C P f)
 theorem uf_uxcCfg (C : UCfg) (P : UPtd) (s : UWSt) (hc : UfCfg C P s.file)
     (hpriv : s.file .cur_privilege = Privilege.User) : UxcCfg s :=
   uf_drefU C P s.file hc hpriv
-
-section decode
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
-
-/-- The decoder's registers, off the user frame (`swp_runRead`'s accessor at
-`drefU`). -/
-theorem uf_drefU_acc (cpu : CPU) (C : UCfg) (P : UPtd) (f : RegFile) (hc : UfCfg C P f)
-    (hpriv : f .cur_privilege = Privilege.User) :
-    ∀ (r : Register) (v : RegisterType r), drefU r = some v →
-      (ufRegF (GF := GF) cpu C).F f ⊢ ∃ dq : DFrac, r ↦ᵣ[cpu]{dq} v ∗ (r ↦ᵣ[cpu]{dq} v -∗ (ufRegF cpu C).F f) := by
-  intro r v h
-  have hv := uf_drefU C P f hc hpriv r v h
-  have hd : ufFoot.Dr r = true := by
-    cases r <;> simp only [drefU, reduceCtorEq] at h <;> exact ufFoot_rd _ (by decide)
-  subst hv
-  exact (ufRegF cpu C).rd f r hd
-
-/-- **The decode bridge, 32-bit** (`swp_runRead` at `drefU` from
-`decodeU_total32`): a user frame decodes any word to an instruction of
-`decodableU`. -/
-theorem uf_swp_decode32 (cpu : CPU) (C : UCfg) (P : UPtd) (f : RegFile) (hc : UfCfg C P f)
-    (hpriv : f .cur_privilege = Privilege.User) (w : BitVec 32) (Φ : instruction → IProp GF) :
-    (ufRegF cpu C).F f ∗
-      (∀ (ast : instruction) (b : Bool), ⌜runRead drefU (ext_decode w) = some (ast, b)⌝ -∗
-        ⌜decodableU ast = true⌝ -∗ laterIf b iprop((ufRegF cpu C).F f -∗ Φ ast))
-    ⊢ swp cpu (ext_decode w) Φ := by
-  obtain ⟨ast, b, h, hd⟩ := decodeU_total32 w
-  iintro ⟨HF, HΦ⟩
-  iapply swp_runRead cpu drefU _ (uf_drefU_acc cpu C P f hc hpriv) _ ast b h Φ
-  iframe HF
-  iapply HΦ $$ %ast %b %h %hd
-
-/-- **The decode bridge, 16-bit** (`decodeU_total16`). -/
-theorem uf_swp_decode16 (cpu : CPU) (C : UCfg) (P : UPtd) (f : RegFile) (hc : UfCfg C P f)
-    (hpriv : f .cur_privilege = Privilege.User) (w : BitVec 16) (Φ : instruction → IProp GF) :
-    (ufRegF cpu C).F f ∗
-      (∀ (ast : instruction) (b : Bool), ⌜runRead drefU (ext_decode_compressed w) = some (ast, b)⌝ -∗
-        ⌜decodableUC ast = true⌝ -∗ laterIf b iprop((ufRegF cpu C).F f -∗ Φ ast))
-    ⊢ swp cpu (ext_decode_compressed w) Φ := by
-  obtain ⟨ast, b, h, hd⟩ := decodeU_total16 w
-  iintro ⟨HF, HΦ⟩
-  iapply swp_runRead cpu drefU _ (uf_drefU_acc cpu C P f hc hpriv) _ ast b h Φ
-  iframe HF
-  iapply HΦ $$ %ast %b %h %hd
-
-end decode
-
-/-- **The walker keeps the configuration pins** (the pinned cells are off
-the written list). -/
-theorem uf_cfg_walk (C : UCfg) (P : UPtd) {X : Type} (m : SailM X) (orc : UOrc) (s : UWSt) (x : X)
-    (s' : UWSt) (orc' : UOrc) (h : runRW ufFoot orc s m = some (x, s', orc')) (hc : UfCfg C P s.file) :
-    UfCfg C P s'.file := by
-  refine ufCfg_of_ro C P s.file s'.file hc (fun r hr => runRW_file_ro ufFoot m orc s x s' orc' h r ?_)
-  have hn : r ∉ ufRwList := by
-    intro hw
-    have := List.nodup_append.1 ufLists_nodup
-    exact this.2.2 r hw r hr rfl
-  simp only [ufFoot, uFootL]
-  simp [hn]
 
 end Xv6

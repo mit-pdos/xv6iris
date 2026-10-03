@@ -11,14 +11,11 @@ reached only through `union_laws_at`'s `al_echo`: `union_byte_link`,
 -/
 import Xv6.UnionLinks
 import Xv6.UnionOutSealSteps
-import Xv6.UnionOutPureSeal
 import Xv6.ConsoleDefs
 
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
-
-set_option linter.unusedSectionVars false
 
 section UnionLinksSeal
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF]

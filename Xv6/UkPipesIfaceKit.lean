@@ -55,8 +55,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-! ## §2 The round (deviation 1) -/
 
 /-- **Rocq `UkPipesIface`'s section context (data)**. -/

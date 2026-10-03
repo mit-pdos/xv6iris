@@ -21,7 +21,6 @@ Nothing here is PLIC-specific state: no Iris ghosts, no invariant.
 -/
 import Xv6.PlicPlan
 import Xv6.SpecCpuid
-import MachCSL.WpSmodeFrame
 import MachCSL.WpSmodeFrame12b
 
 namespace Xv6
@@ -29,8 +28,6 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open Sail Sail.ConcurrencyInterfaceV1
 open LeanRV64D LeanRV64D.Functions
-
-set_option linter.unusedSectionVars false
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
@@ -120,7 +117,7 @@ macro_rules
   | `(tactic| k_step_au $rule:term from $code:term $ht:ident $$ $pat:specPat) =>
     `(tactic| k_step_au $rule:term from $code:term $ht:ident $$ $pat:specPat with [])
   | `(tactic| k_step_au $rule:term from $code:term $ht:ident $$ $pat:specPat with [$extra,*]) =>
-    `(tactic| (iapply $rule:term $$ $pat:specPat
+    `(tactic| (k_iapply $rule:term $$ $pat:specPat
                rotate_right 1
                k_code $code:term $ht:ident
                iframe #
@@ -133,10 +130,6 @@ macro_rules
                try (case hs => k_norm)))
 
 /-! ## The offsets the kernel touches, as legal word accesses -/
-
-theorem prioOff_ok (i : Nat) (hi : i < Plic.nsrc) : prioOff i % 4 = 0 ∧ prioOff i < plicSize := by
-  unfold prioOff Plic.nsrc plicSize at *
-  omega
 
 theorem senableOff_ok (h : Nat) (hh : h < NCPU) :
     senableOff h % 4 = 0 ∧ senableOff h < plicSize := by

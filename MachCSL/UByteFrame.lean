@@ -194,9 +194,6 @@ theorem ub_ctxByte_ne (ξ : CtxId) (a a' : PAddr) (b b' : BitVec 8) :
   icases pointsTo_ne $$ Hp Hp' with %hne
   ipureintro; exact hne
 
-theorem ubOwn_nil (ξ : CtxId) (mm : BMap) : ⊢ ubOwn (GF := GF) ξ [] mm := by
-  unfold ubOwn; simp only [Iris.Algebra.BigOpL.bigOpL_nil]; iempintro
-
 theorem ubOwn_cons (ξ : CtxId) (a : PAddr) (D : List PAddr) (mm : BMap) :
     ubOwn (GF := GF) ξ (a :: D) mm ⊣⊢
       iprop((∃ b : BitVec 8, ⌜mm a = some b⌝ ∗ ctxByte ξ a (DFrac.own 1) b) ∗ ubOwn ξ D mm) := by

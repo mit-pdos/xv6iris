@@ -29,8 +29,6 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedSectionVars false
-
 /-! ## The ghost names -/
 
 /-- The per-proc ghost names: the slot's spinlock, its hart tag
@@ -84,22 +82,16 @@ theorem needsCtx_not_isRunning {st : BitVec 32} (h : needsCtx st) : ¬ isRunning
 theorem needsCtx_not_invDormant {st : BitVec 32} (h : needsCtx st) : ¬ invDormant st := by
   rcases h with h | h | h <;> subst h <;> decide
 
-theorem needsCtx_unclaimed {st : BitVec 32} (h : needsCtx st) : st ≠ USED → unclaimed st :=
-  fun hu => ⟨needsCtx_notRunning h, hu⟩
-
-theorem notRunning_of_not_isRunning {st : BitVec 32} (h : ¬ isRunning st) : notRunning st := h
 theorem isRunning_of_not_notRunning {st : BitVec 32} (h : ¬ notRunning st) : isRunning st := by
   unfold notRunning at h; unfold isRunning
   by_cases hc : st = RUNNING
   · exact hc
   · exact absurd hc h
 
-theorem parkOk_cases {st : BitVec 32} (h : parkOk st) : needsCtx st ∨ st = ZOMBIE := h.1
 theorem parkOk_notRunning {st : BitVec 32} (h : parkOk st) : notRunning st := by
   rcases h.1 with h' | h'
   · exact needsCtx_notRunning h'
   · subst h'; decide
-theorem parkOk_unclaimed {st : BitVec 32} (h : parkOk st) : unclaimed st := ⟨parkOk_notRunning h, h.2⟩
 theorem parkOk_not_RUNNING {st : BitVec 32} (h : parkOk st) : st ≠ RUNNING := parkOk_notRunning h
 
 @[simp] theorem needsCtx_RUNNING : ¬ needsCtx RUNNING := by decide
@@ -107,7 +99,6 @@ theorem parkOk_not_RUNNING {st : BitVec 32} (h : parkOk st) : st ≠ RUNNING := 
 @[simp] theorem isRunning_RUNNING : isRunning RUNNING := rfl
 @[simp] theorem notRunning_RUNNING : ¬ notRunning RUNNING := by decide
 @[simp] theorem unclaimed_RUNNING : ¬ unclaimed RUNNING := by decide
-
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
@@ -287,19 +278,6 @@ theorem pstate_split (Γ : SchedNames) (j : Nat) (st : BitVec 32) :
   rw [Qp.half_add_half] at e
   exact e
 
-theorem pstate_join (Γ : SchedNames) (j : Nat) (st : BitVec 32) :
-    pstateHlf (GF := GF) Γ j st ∗ pstateHlf Γ j st ⊢ pstateFull Γ j st := by
-  have e := pstateOwn_join (GF := GF) Γ j (1 : Qp).half (1 : Qp).half st
-  rw [Qp.half_add_half] at e
-  exact e
-
-/-- Both halves step together. -/
-theorem pstate_update (Γ : SchedNames) (j : Nat) (st st' : BitVec 32) :
-    pstateHlf (GF := GF) Γ j st ∗ pstateHlf Γ j st ⊢ |==> (pstateHlf Γ j st' ∗ pstateHlf Γ j st') := by
-  unfold pstateHlf pstateOwn
-  iintro ⟨H1, H2⟩
-  iapply ghost_var_update_halves _ _ _ _ $$ H1 H2
-
 /-- The mirror, keyed by the proc's address. -/
 def pstateAt (Γ : SchedNames) (pa : BitVec 64) (q : Qp) (st : BitVec 32) : IProp GF := iprop%
   ∃ j : Nat, ⌜pa = procAddr j ∧ j < NPROC⌝ ∗ pstateOwn Γ j q st
@@ -462,11 +440,6 @@ def procPubRest (pa : BitVec 64) (killed xstate pid : BitVec 32) : IProp GF := i
   wordPointsTo (pPid pa) 4 pidPub pid ∗
   killPaidAt (MachFixedGS.killCred (hlc := hlc) (GF := GF)) pid killed
 
-theorem procPub_eq (pa : BitVec 64) (st : BitVec 32) (chan : BitVec 64) (kl xs pid : BitVec 32) :
-    procPub (GF := GF) pa st chan kl xs pid =
-      iprop(wordPointsTo (pState pa) 4 (DFrac.own 1) st ∗
-        wordPointsTo (pChan pa) 8 (DFrac.own 1) chan ∗ procPubRest pa kl xs pid) := rfl
-
 end PubRest
 
 /-! ## The dormant block, minus its context cells (Rocq `proc_dormant_noctx`)
@@ -484,7 +457,8 @@ def procFieldsNoctx (pa : BitVec 64) (dq : DFrac) (V : ProcPriv) : IProp GF := i
   ofileCells pa dq V.ofile ∗
   wordPointsTo (pCwd pa) 8 dq V.cwd ∗
   pnameCells pa dq V.name ∗
-  wordPointsTo (pSecc pa) 8 dq V.pvSecc
+  wordPointsTo (pSecc pa) 8 dq V.pvSecc ∗
+  wordPointsTo (pRoot pa) 8 dq V.root
 
 section DormantNoctx
 variable [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
@@ -496,7 +470,7 @@ as in `procDormant` (`kexit`'s park raises it). -/
 def procDormantNoctx (pa : BitVec 64) (st : BitVec 32) : IProp GF := iprop%
   ⌜st = UNUSED ∨ st = ZOMBIE⌝ ∗
   ∃ (V : ProcPriv) (pid : BitVec 32),
-    ⌜V.ofile = List.replicate NOFILE 0#64 ∧ V.cwd = 0#64 ∧ V.sz.toNat ≤ uvmMaxsz ∧
+    ⌜V.ofile = List.replicate NOFILE 0#64 ∧ V.cwd = 0#64 ∧ V.root = 0#64 ∧ V.sz.toNat ≤ uvmMaxsz ∧
       V.pvLazy = true⌝ ∗
     wordPointsTo (pPid pa) 4 pidPriv pid ∗
     procFieldsNoctx pa (DFrac.own 1) V ∗
@@ -533,9 +507,6 @@ the block's resources. -/
 theorem procFieldsNoctx_pvLazy (pa : BitVec 64) (dq : DFrac) (V : ProcPriv) (b : Bool) :
     procFieldsNoctx (GF := GF) pa dq { V with pvLazy := b } = procFieldsNoctx pa dq V := rfl
 
-theorem procFields_pvLazy (pa : BitVec 64) (dq : DFrac) (V : ProcPriv) (b : Bool) :
-    procFields (GF := GF) pa dq { V with pvLazy := b } = procFields pa dq V := rfl
-
 theorem dormantSpace_pvLazy (st : BitVec 32) (V : ProcPriv) (b : Bool) (pid : BitVec 32) :
     dormantSpace (GF := GF) st { V with pvLazy := b } pid = dormantSpace st V pid := rfl
 
@@ -553,8 +524,8 @@ theorem procDormant_split (pa : BitVec 64) (st : BitVec 32) :
     procDormant (GF := GF) pa st ⊣⊢ procDormantNoctx pa st ∗ ownCtxCells (pContext pa 0) := by
   constructor
   · unfold procDormant procDormantNoctx procFields procFieldsNoctx
-    iintro ⟨%hst, %V, %pid, %hV, Hpid, ⟨Hks, Hsz, Hpt, Htf, Hctx, Hof, Hcwd, Hnm, Hsc⟩, Hal, Has⟩
-    isplitl [Hpid Hks Hsz Hpt Htf Hof Hcwd Hnm Hsc Hal Has]
+    iintro ⟨%hst, %V, %pid, %hV, Hpid, ⟨Hks, Hsz, Hpt, Htf, Hctx, Hof, Hcwd, Hnm, Hsc, Hrt⟩, Hal, Has⟩
+    isplitl [Hpid Hks Hsz Hpt Htf Hof Hcwd Hnm Hsc Hrt Hal Has]
     · isplitl []
       · ipureintro; exact hst
       iexists V, pid
@@ -564,14 +535,14 @@ theorem procDormant_split (pa : BitVec 64) (st : BitVec 32) :
     · iapply ownCtxCells_intro (pContext pa 0) V.context
       iapply contextCells_to_ctxCells pa V.context $$ Hctx
   · unfold procDormant procDormantNoctx procFields procFieldsNoctx ownCtxCells
-    iintro ⟨⟨%hst, %V, %pid, %hV, Hpid, ⟨Hks, Hsz, Hpt, Htf, Hof, Hcwd, Hnm, Hsc⟩, Hal, Has⟩, ⟨%vs, Hcells⟩⟩
+    iintro ⟨⟨%hst, %V, %pid, %hV, Hpid, ⟨Hks, Hsz, Hpt, Htf, Hof, Hcwd, Hnm, Hsc, Hrt⟩, Hal, Has⟩, ⟨%vs, Hcells⟩⟩
     isplitl []
     · ipureintro; exact hst
     iexists { V with context := vs }, pid
     isplitl []
     · ipureintro; exact hV
     simp only [dormantSpace_context]
-    iframe Hpid Hks Hsz Hpt Hof Hcwd Hnm Hsc Htf Hal Has
+    iframe Hpid Hks Hsz Hpt Hof Hcwd Hnm Hsc Hrt Htf Hal Has
     iapply ctxCells_to_contextCells pa vs $$ Hcells
 
 end DormantSplit
@@ -673,8 +644,8 @@ theorem ctxMorph_ptreeOwn (tier : KTier) : ∀ (lvl : Nat) (dq : DFrac) (t : PTr
           | none => iprop(emp))
         (fun _ i => by
           cases h : t.kids i with
-          | none => simp only [h]; exact instCtxMorphConst _
-          | some c => simp only [h]; exact ctxMorph_ptreeOwn tier lvl dq c))
+          | none => simp only []; exact instCtxMorphConst _
+          | some c => simp only []; exact ctxMorph_ptreeOwn tier lvl dq c))
 
 instance instCtxMorphPtreeOwn (tier : KTier) (lvl : Nat) (dq : DFrac) (t : PTree) :
     CtxMorph (GF := GF) (fun ξ => @ptreeOwn hlc GF _ ⟨ξ, tier⟩ lvl dq t) :=
@@ -714,7 +685,6 @@ instance instCtxMorphTfPageAt (tier : KTier) (tfp : BitVec 44) (ws : List (BitVe
         (fun bs => @instCtxMorphSep hlc GF _ (fun _ => iprop(⌜bs.length = 4096 - 288⌝)) _
           (instCtxMorphConst _) (instCtxMorphByteBuf _ _ _ _))))
 
-
 instance instCtxMorphDormantSpace (tier : KTier) (st : BitVec 32) (V : ProcPriv) (pid : BitVec 32) :
     CtxMorph (GF := GF) (fun ξ => @dormantSpace hlc GF _ ⟨ξ, tier⟩ st V pid) := by
   unfold dormantSpace
@@ -737,14 +707,15 @@ instance instCtxMorphProcFieldsNoctx (tier : KTier) (pa : BitVec 64) (dq : DFrac
           (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphOfileCells _ _ _ _)
             (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphWordAt _ _ _ _ _)
               (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphPnameCells _ _ _ _)
-                (instCtxMorphWordAt _ _ _ _ _)))))))
+                (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphWordAt _ _ _ _ _)
+                  (instCtxMorphWordAt _ _ _ _ _))))))))
 
 instance instCtxMorphProcDormantNoctx (tier : KTier) (pa : BitVec 64) (st : BitVec 32) :
     CtxMorph (GF := GF) (fun ξ => @procDormantNoctx hlc GF _ ⟨ξ, tier⟩ _ _ _ _ _ _ pa st) :=
   @instCtxMorphSep hlc GF _ (fun _ => iprop(⌜st = UNUSED ∨ st = ZOMBIE⌝)) _ (instCtxMorphConst _)
     (@instCtxMorphExists hlc GF _ _
       (fun (V : ProcPriv) ξ => iprop(∃ pid : BitVec 32,
-        ⌜V.ofile = List.replicate NOFILE 0#64 ∧ V.cwd = 0#64 ∧ V.sz.toNat ≤ uvmMaxsz ∧
+        ⌜V.ofile = List.replicate NOFILE 0#64 ∧ V.cwd = 0#64 ∧ V.root = 0#64 ∧ V.sz.toNat ≤ uvmMaxsz ∧
       V.pvLazy = true⌝ ∗
         @wordPointsTo hlc GF _ ⟨ξ, tier⟩ (pPid pa) 4 pidPriv pid ∗
         @procFieldsNoctx hlc GF _ ⟨ξ, tier⟩ pa (DFrac.own 1) V ∗
@@ -830,14 +801,15 @@ instance instCtxMorphProcFields (tier : KTier) (pa : BitVec 64) (dq : DFrac) (V 
             (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphOfileCells _ _ _ _)
               (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphWordAt _ _ _ _ _)
                 (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphPnameCells _ _ _ _)
-                  (instCtxMorphWordAt _ _ _ _ _))))))))
+                  (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphWordAt _ _ _ _ _)
+                    (instCtxMorphWordAt _ _ _ _ _)))))))))
 
 instance instCtxMorphProcDormant (tier : KTier) (pa : BitVec 64) (st : BitVec 32) :
     CtxMorph (GF := GF) (fun ξ => @procDormant hlc GF _ ⟨ξ, tier⟩ _ _ _ _ _ _ pa st) :=
   @instCtxMorphSep hlc GF _ (fun _ => iprop(⌜st = UNUSED ∨ st = ZOMBIE⌝)) _ (instCtxMorphConst _)
     (@instCtxMorphExists hlc GF _ _
       (fun (V : ProcPriv) ξ => iprop(∃ pid : BitVec 32,
-        ⌜V.ofile = List.replicate NOFILE 0#64 ∧ V.cwd = 0#64 ∧ V.sz.toNat ≤ uvmMaxsz ∧
+        ⌜V.ofile = List.replicate NOFILE 0#64 ∧ V.cwd = 0#64 ∧ V.root = 0#64 ∧ V.sz.toNat ≤ uvmMaxsz ∧
       V.pvLazy = true⌝ ∗
         @wordPointsTo hlc GF _ ⟨ξ, tier⟩ (pPid pa) 4 pidPriv pid ∗
         @procFields hlc GF _ ⟨ξ, tier⟩ pa (DFrac.own 1) V ∗
@@ -889,7 +861,6 @@ instance instCtxMorphProcHeld (Γ : SchedNames) (h : CPU) (j : Nat) (st : BitVec
       (@instCtxMorphExists hlc GF _ _ _ (fun _ => @instCtxMorphExists hlc GF _ _ _
         (fun _ => @instCtxMorphExists hlc GF _ _ _ (fun _ => instCtxMorphProcPub _ _ _ _ _ _ _)))))
 
-
 /-! ### Address disjointness: `cpus[]` and `proc[]` -/
 
 /-- `&cpus[]` as a number: the symbol's value (below `2^32`). -/
@@ -912,7 +883,7 @@ theorem cpuCtxAddr_toNat (h : CPU) : (cpuCtxAddr h).toNat = KernelSyms.«cpus» 
   omega
 
 theorem pContext0_toNat (j : Nat) (hj : j < NPROC) :
-    (pContext (procAddr j) 0).toNat = KernelSyms.«proc» + 96 + 368 * j := by
+    (pContext (procAddr j) 0).toNat = KernelSyms.«proc» + 96 + 376 * j := by
   have hp := procs_lt
   unfold pContext
   simp only [Nat.mul_zero]
@@ -1068,15 +1039,6 @@ instance instCtxMorphProcCtxAt (Γ : SchedNames) (pa : BitVec 64) :
   unfold procCtxAt
   exact @instCtxMorphExists hlc GF _ _ _
     (fun ξp => @instCtxMorphSep hlc GF _ _ _ (instCtxMorphParked ξp) (instCtxMorphConst _))
-
-/-- A migratable record at the holder's own context IS what `swtch` wants of
-its target. -/
-theorem procCtx_resume_tok (Γ : SchedNames) (ξl : CtxId) (pa : BitVec 64) :
-    procCtxAt (GF := GF) Γ ξl pa ⊢
-      ∃ ξt : CtxId, parkTokAt ξl none ξt ∗ ▷ validCtx (pSched Γ) ⟨none, pContext pa 0, pa, ξt⟩ := by
-  unfold procCtxAt
-  simp only [parkTokAt_none]
-  iintro H; iexact H
 
 /-- ...and what a park hands the resumed scheduler IS the slot. -/
 theorem procCtx_of_tok (Γ : SchedNames) (ξl ξo : CtxId) (pa : BitVec 64) :
@@ -1506,19 +1468,6 @@ theorem kctx_kptOn {lent : Bool} (cpu : CPU) (k : KCtx) (ht : k.tier = KTier.kpt
   iframe Hk2
   iapply kctx_intro' cpu k hwf
   iframe HC HF Hst Htr Ha Hc Htok Hcl Hro
-
-/-- Two Kpt bundles run the same kernel table, hence the same root. -/
-theorem kctx_root_agree {lent lent' : Bool} (cpu cpu' : CPU) (k k' : KCtx)
-    (ht : k.tier = KTier.kpt) (ht' : k'.tier = KTier.kpt) :
-    kctxL (GF := GF) lent cpu k ∗ kctxL lent' cpu' k' ⊢
-      ⌜k'.root = k.root⌝ ∗ kctxL lent cpu k ∗ kctxL lent' cpu' k' := by
-  iintro ⟨Hk, Hk'⟩
-  icases kctx_kptOn cpu k ht $$ Hk with ⟨⟨%t, %M, %hb, #Hkpt⟩, Hk⟩
-  icases kctx_kptOn cpu' k' ht' $$ Hk' with ⟨⟨%t', %M', %hb', #Hkpt'⟩, Hk'⟩
-  ihave %hbb := kptOn_root_agree t t' M M' $$ [$Hkpt $Hkpt']
-  iframe Hk Hk'
-  ipureintro
-  rw [← hb', ← hbb]; exact hb
 
 end
 

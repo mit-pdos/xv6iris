@@ -6,7 +6,7 @@ cluster, the `++` / `--` clusters, and the record either flush writes.
 
 The walk is `SysLinkWalkA` / `SysLinkWalkB` / `ProofSysLink` (not yet
 written); the contract is `SpecSysLink` (after C0).  THE LEAN IMAGE
-(`KA.«sys_link»` = 0x80004fae, 292 B), whose offsets every lemma below
+(`KA.«sys_link»` = 0x80005022, 292 B), whose offsets every lemma below
 uses (never Rocq's comments):
     +0x00 `addi sp,sp,-304` ... +0x12/+0x26 `jal argstr` (old at s0-304,
     new at s0-176), +0x18/+0x2c `bltz`, +0x32 `jal begin_op`, +0x3a `jal
@@ -35,13 +35,13 @@ uses (never Rocq's comments):
      one `bcond` reading per test (`sysfile_beq_tdir`,
      `Xv6.namex_beqz_half`, `sys_link_beq_nmax`) plus `sys_link_li_nmax`;
    * the `++` chain (`sl_uns16`, `sl_sext16_low`, `sl_ninner*`,
-     `sl_nbump_*`, `sl_nlink_incr`) is ONE `bv_decide` (`sys_link_nlink_incr`),
-     at the shape `SpecIupdate.wp_iupdate_link` takes
-     (`dn.diNlink = dn0.diNlink + 1#16`);
+     `sl_nbump_*`, `sl_nlink_incr`) is ONE `bv_decide`
+     (`SysLinkWalkA.sys_link_inc_store`), at the shape
+     `SpecIupdate.wp_iupdate_link_body` takes (`dn.diNlink = dn0.diNlink + 1#16`);
    * the `--` chain (`sl_dinner*`, `sl_dbump_*`, `sl_nlink_decr`, `sl_ndec`,
      `sl_ndec_decr`) is `sysLinkNdec` + `sys_link_ndec_eq` (`= h - 1#16`) +
-     `sys_link_ndec_decr`, the `toNat` form `wp_iupdate_unlink`'s `hdec`
-     takes.
+     `sys_link_ndec_decr`, the `toNat` form `wp_iupdate_unlink_body`'s
+     `hdec` takes.
 2. `sl_setnl` is the record update `{ dn with diNlink := nl }`
    (`sysfileSetnl`); `sl_setnl_ddix` goes through the landed
    `DirView.dirDotsIx_eq`.
@@ -76,7 +76,6 @@ are read only by ProofSysLink.v's `Z` side conditions, which the `Nat`
 statements above discharge directly).
 -/
 import Xv6.SysfileCalls
-import Xv6.NamexParts
 
 namespace Xv6
 
@@ -84,18 +83,18 @@ open MachCSL LeanRV64D
 
 /-! ## Call targets and return addresses -/
 
-theorem sys_link_br_argstr : KA.«sys_link» + 0xffffffffffffd9ac#64 = KA.«argstr» := by decide
+theorem sys_link_br_argstr : KA.«sys_link» + 0xffffffffffffd94c#64 = KA.«argstr» := by decide
 theorem sys_link_br_begin_op : KA.«sys_link» + 0xffffffffffffedfa#64 = KA.«begin_op» := by decide
-theorem sys_link_br_namei : KA.«sys_link» + 0xffffffffffffec1c#64 = KA.«namei» := by decide
-theorem sys_link_br_ilock : KA.«sys_link» + 0xffffffffffffe390#64 = KA.«ilock» := by decide
-theorem sys_link_br_iupdate : KA.«sys_link» + 0xffffffffffffe2dc#64 = KA.«iupdate» := by decide
-theorem sys_link_br_iunlock : KA.«sys_link» + 0xffffffffffffe43e#64 = KA.«iunlock» := by decide
+theorem sys_link_br_namei : KA.«sys_link» + 0xffffffffffffec04#64 = KA.«namei» := by decide
+theorem sys_link_br_ilock : KA.«sys_link» + 0xffffffffffffe330#64 = KA.«ilock» := by decide
+theorem sys_link_br_iupdate : KA.«sys_link» + 0xffffffffffffe27c#64 = KA.«iupdate» := by decide
+theorem sys_link_br_iunlock : KA.«sys_link» + 0xffffffffffffe3de#64 = KA.«iunlock» := by decide
 theorem sys_link_br_nameiparent :
-    KA.«sys_link» + 0xffffffffffffec36#64 = KA.«nameiparent» := by decide
-theorem sys_link_br_dirlink : KA.«sys_link» + 0xffffffffffffeb72#64 = KA.«dirlink» := by decide
+    KA.«sys_link» + 0xffffffffffffec1e#64 = KA.«nameiparent» := by decide
+theorem sys_link_br_dirlink : KA.«sys_link» + 0xffffffffffffeb5a#64 = KA.«dirlink» := by decide
 theorem sys_link_br_iunlockput :
-    KA.«sys_link» + 0xffffffffffffe5e4#64 = KA.«iunlockput» := by decide
-theorem sys_link_br_iput : KA.«sys_link» + 0xffffffffffffe512#64 = KA.«iput» := by decide
+    KA.«sys_link» + 0xffffffffffffe584#64 = KA.«iunlockput» := by decide
+theorem sys_link_br_iput : KA.«sys_link» + 0xffffffffffffe4b2#64 = KA.«iput» := by decide
 theorem sys_link_br_end_op : KA.«sys_link» + 0xffffffffffffee86#64 = KA.«end_op» := by decide
 
 theorem sys_link_ret_16 : jumpPc (KA.«sys_link» + 0x16#64) = KA.«sys_link» + 0x16#64 := by decide
@@ -165,14 +164,6 @@ BOTH sixteen-bit, and they do NOT share a lemma: the `++` reuses the
 SIGN-extended `lh` the NLINK_MAX guard already loaded, while the `--` does
 its own ZERO-extended `lhu` (Rocq's header, kept). -/
 
-/-- THE `++` (Rocq's `sl_nlink_incr`): `lh` (sign), `c.addiw +1`, `sh` stores
-the halfword plus one, which is `wp_iupdate_link`'s `hbump`. -/
-theorem sys_link_nlink_incr (h : BitVec 16) :
-    BitVec.extractLsb' 0 16 (BitVec.signExtend 64
-      (BitVec.extractLsb' 0 32 (BitVec.signExtend 64 h + BitVec.signExtend 64 1#12))) =
-      h + 1#16 := by
-  bv_decide
-
 /-- the halfword the `sh` at +0x102 commits (Rocq's `sl_ndec`): `lhu`
 (zero), `c.addiw -1`. -/
 def sysLinkNdec (h : BitVec 16) : BitVec 16 :=
@@ -182,7 +173,7 @@ def sysLinkNdec (h : BitVec 16) : BitVec 16 :=
 theorem sys_link_ndec_eq (h : BitVec 16) : sysLinkNdec h = h - 1#16 := by
   unfold sysLinkNdec; bv_decide
 
-/-- THE CLAUSE `wp_iupdate_unlink` TAKES (Rocq's `sl_nlink_decr` /
+/-- THE CLAUSE `wp_iupdate_unlink_body` TAKES (Rocq's `sl_nlink_decr` /
 `sl_ndec_decr`): the OLD count is the new one plus one -- sound because the
 walk's own `++` put `h` at least one. -/
 theorem sys_link_ndec_decr (h : BitVec 16) (hnz : h.toNat ≠ 0) :

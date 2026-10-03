@@ -31,8 +31,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Std MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-! ## 1.  The pure core -/
 
 /-- **A QUIESCENT BATCH'S LOGGED VIEW IS THE COMMITTED MAP** (Rocq

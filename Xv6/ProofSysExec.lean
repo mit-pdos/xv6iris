@@ -27,7 +27,6 @@ import Xv6.SysExecHead
 import Xv6.SysExecSetup
 import Xv6.SysExecStep
 import Xv6.SysExecLoop
-import Xv6.SysExecFree
 import Xv6.SysExecTails
 import Xv6.SysExecBreak
 

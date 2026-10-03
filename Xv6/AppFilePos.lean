@@ -21,8 +21,8 @@ Rocq's note, abridged (the reasons are the content):
 
 * `fposf`/`fpos`/`fposq`/`fposh` (Rocq `fposf`/`fpos`/`fposq`/`fposh`),
   timeless;
-* `fposf_agree`, `fpos_agree`, `fposf_split`, `fpos_quarters`, `fposq_join`,
-  `fposf_whole`, `fposf_update`, `fpos_alloc`, `fposh_rec_eq`, `fpos_rec_eq`.
+* `fposf_agree`, `fposf_split`, `fpos_quarters`, `fposq_join`, `fposf_whole`,
+  `fposf_update`, `fpos_alloc`, `fposh_rec_eq`.
 
 ## DEVIATIONS from Rocq
 
@@ -46,8 +46,6 @@ import Xv6.AppFileNames
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
-
-set_option linter.unusedSectionVars false
 
 section AppFilePos
 variable {GF : BundledGFunctors} [Xv6G GF] [FileAppG GF]
@@ -126,13 +124,6 @@ theorem fposf_agree (r : FileAppNames) (q q' : Qp) (n n' : Nat) :
     ⊢@{IProp GF} fposf r q n -∗ fposf r q' n' -∗ ⌜n = n'⌝ := by
   unfold fposf
   exact posVar_agree r.fnPos q q' n n'
-
-/-- Rocq `fpos_agree`. -/
-theorem fpos_agree (r : FileAppNames) (n n' : Nat) :
-    ⊢@{IProp GF} fpos r n -∗ fpos r n' -∗ ⌜n = n'⌝ := by
-  unfold fpos
-  iintro ⟨-, H1⟩ ⟨-, H2⟩
-  iapply fposf_agree r _ _ n n' $$ H1 H2
 
 /-- Rocq `fposf_split`, left to right. -/
 theorem fposf_split (r : FileAppNames) (q1 q2 : Qp) (n : Nat) :
@@ -251,12 +242,6 @@ theorem fposh_role (r : FileAppNames) (n : Nat) :
 theorem fposh_rec_eq (r1 r2 : FileAppNames) (n : Nat) (hr : r1.fnRole = r2.fnRole)
     (hp : r1.fnPos = r2.fnPos) : fposh (GF := GF) r1 n ⊢ fposh r2 n := by
   unfold fposh fpos fposq fposf
-  rw [hr, hp]
-
-/-- Rocq `fpos_rec_eq`. -/
-theorem fpos_rec_eq (r1 r2 : FileAppNames) (n : Nat) (hr : r1.fnRole = r2.fnRole)
-    (hp : r1.fnPos = r2.fnPos) : fpos (GF := GF) r1 n ⊢ fpos r2 n := by
-  unfold fpos fposf
   rw [hr, hp]
 
 end AppFilePos

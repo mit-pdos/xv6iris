@@ -1,10 +1,10 @@
 /-
 Specification of `namei` (kernel/fs.c), namex's namei-side wrapper: the
-public contracts.  A port of Rocq `SpecNamei.v`
-(`iris/SpecNamei.v`) -- its general walk contract
-(`wp_namei_gen`) and its ROOT CORNER (`wp_namei_root`) -- and of the boot
-form `SpecNameiRootBoot.v`, which collapses onto the root corner here (see
-below).
+public contract.  A port of Rocq `SpecNamei.v`
+(`iris/SpecNamei.v`) -- its general walk contract (`wp_namei_gen`).  The
+ROOT CORNER (`wp_namei_root`, and the boot form `SpecNameiRootBoot.v`) is
+gone with the chroot bump (chroot.md §5): userinit reaches the root through
+`igetroot` (`Xv6/SpecIgetroot.lean`).
 
     struct inode*
     namei(char *path)
@@ -41,31 +41,12 @@ Lean namex takes the two cells it touches (pid, `p->cwd`) and
 `inodeHeldAt cwdv cwi` as rows of their own (SpecNamex deviation 3); this
 contract threads exactly those rows (frame rule: stating it over less than
 the block is strictly more general).  THE BRIDGE from the cwd-bearing block
-(`ProcInv.procPrivCwd`, Rocq's `proc_priv_bare ∗ cwd_ref_at`) is
-`namei_procPrivCwd_rows` below: the block gives the pid cell (at `pidPriv`),
-the `p->cwd` cell (whole) and `cwdRefAt V.cwd V.cwi` (= `inodeHeldAt`, by
-`rfl`), and takes the three back.  A caller instantiates `dqp := pidPriv`,
+(`ProcInv.procPrivCwd`, Rocq's `proc_priv_bare ∗ cwd_ref_at`): the block
+gives the pid cell (at `pidPriv`), the `p->cwd` cell (whole) and
+`cwdRefAt V.cwd V.cwi` (= `inodeHeldAt`, by `rfl`), and takes the three
+back.  A caller instantiates `dqp := pidPriv`,
 `dqc := DFrac.own 1`, `cwdv := V.cwd`, `cwi := V.cwi` (and nameiparent's
 callers the same, `Xv6/SpecNameiparent.lean`).
-
-## THE ROOT CORNER, AND ITS BOOT FORM
-
-`wp_namei_root_body` is Rocq's `wp_namei_root_body`: a thin forward of
-`SpecNamex.wp_namex_root_body` (namei's whole body is a namex call), the
-regime that contract's -- no running process, no transaction, no fs fabric
-beyond the inode cache, any interrupt state and depth.  The name buffer is
-not even carved (no memmove runs on "/").
-
-Rocq's `SpecNameiRootBoot.wp_namei_root_boot_body` is the same contract with
-`ic_escrows` and the dead `Vpr` binder -- both already dropped from the Lean
-root corner (SpecNamex's "Dropped" list) -- and it exists as a separate file
-only to keep the walk's cone out of main's import closure.  After those two
-cleanups the Lean boot body IS `wp_namei_root_body`, binder for binder, and
-Rocq's `LinkNameiRootBoot.v` proof is "thirteen hypotheses passed straight
-through" plus a dummy `Vpr`; so the boot form is the interface
-`NAMEI_ROOT` itself (userinit's re-link, off `FsEnv.nameiBoot`, consumes
-`NAMEI_ROOT.wp_namei_root`).  The Lean `SpecNamex` already imports the walk's
-cone, so a separate boot spec file would not shorten any import closure.
 
 ## DEVIATIONS from Rocq
 
@@ -80,12 +61,6 @@ cone, so a separate boot spec file would not shorten any import closure.
    `dqpv`; `log_opSt` is `logOpS ∗ logTx`; the pure post clauses are one
    `⌜…⌝`.
 3. The cwd is namex's three rows (above).
-4. The root corner's `cpu_own n eb p b lks` / `locks_below lks "itable"` are
-   SpecNamex's `wp_namex_root_body` reading (`kctx` at any depth with
-   `k.noff + 3 < 2^31`, three lock non-memberships); the crossing is
-   `wpNext k.sie` with iget's `spie`/`spp` pin; the two path cells are
-   `byteBuf (k.regs 10#5) dqp [SLASH, 0#8]`.  Unlike namex's root body there
-   is no `a1 = 0` premise: namei's own `c.li a1,0` establishes it.
 
 ## Dropped/simplified vs Rocq
 
@@ -94,12 +69,8 @@ cone, so a separate boot spec file would not shorten any import closure.
   in SysOpenBudget.v (`so_counted_namei_busts`); every caller (ProofSysLink,
   ProofKexecA/KexecDefs, ProofSysOpenWalk, SysExecDefs) uses `wp_namei_gen`
   -- reason: dead (as namex's `wp_namex_sconf`, SpecNamex "Dropped").
-* `ic_escrows`, `dq`, `gf`, `gs`/`gl`, the root's `Vpr` -- as SpecNamex
+* `ic_escrows`, `dq`, `gf`, `gs`/`gl` -- as SpecNamex
   (isItable2 carries the escrow family; the rest are dead binders).
-* `SpecNameiRootBoot.v` / `LinkNameiRootBoot.v` -- collapsed onto
-  `NAMEI_ROOT` (above); uses checked: ProofUserinit.v / SpecUserinit.v take
-  `NAMEI_ROOT_BOOT`, whose body is the root body minus exactly the two
-  dropped items.
 
 Imports only definitional files and callee `Spec*` files.
 -/
@@ -111,19 +82,11 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedVariables false
-set_option linter.unusedSectionVars false
-
 /-- namei's own frame is 32 bytes (4 slots) over namex's 116 (Rocq's
 `K_namei = 120`). -/
 def nameiSlots : Nat := 4 + namexSlots
 
 theorem nameiSlots_eq : nameiSlots = 120 := by decide
-
-/-- ... and over the root corner's 74 (Rocq's `K_namei_root = 78`). -/
-def nameiRootSlots : Nat := 4 + namexRootSlots
-
-theorem nameiRootSlots_eq : nameiRootSlots = 78 := by decide
 
 section Post
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
@@ -136,6 +99,7 @@ namex's (`namexPost`) at `npar = false`, without the name buffer and without
 its (vacuous) nameiparent clause. -/
 def nameiPost (k : KCtx) (plen : Nat) (pfun : Nat → BitVec 8) (n : Nat) (Sb : List Nat)
     (pidv : BitVec 32) (cwdv : BitVec 64) (cwi : Nat) (dqp dqc dqb dqs dqpv : DFrac)
+    (rootv : BitVec 64) (rti : Nat) (dqr : DFrac)
     (cpu' : CPU) : IProp GF :=
   iprop(∀ (spie spp : Bool) (R' : RegMap) (n' : Nat) (Sb' : List Nat) (ok : Bool)
       (ipv : BitVec 64) (w : Bool),
@@ -147,6 +111,7 @@ def nameiPost (k : KCtx) (plen : Nat) (pfun : Nat → BitVec 8) (n : Nat) (Sb : 
     wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) -∗
     wordPointsTo (pPid k.proc) 4 dqp pidv -∗
     wordPointsTo (pCwd k.proc) 8 dqc cwdv -∗ inodeHeldAt cwdv cwi -∗
+    wordPointsTo (pRoot k.proc) 8 dqr rootv -∗ inodeHeldAt rootv rti -∗
     byteBuf (k.regs 10#5) dqpv (bview (plen + 1) pfun) -∗
     bslots 3 -∗
     -- THE SET ONLY GROWS; THE PAID-BITMAP REPORT; THE PRICED INTERVAL
@@ -171,6 +136,7 @@ def wp_namei_gen_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
     (γkl : GName) (γk : KmemNames)
     (plen : Nat) (pfun : Nat → BitVec 8) (n : Nat) (Sb : List Nat)
     (pidv : BitVec 32) (cwdv : BitVec 64) (cwi : Nat) (dqp dqc dqb dqs dqpv : DFrac)
+    (rootv : BitVec 64) (rti : Nat) (dqr : DFrac)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : nameiSlots ≤ k.avail)
     (hnoff : k.noff = 0) (htier : k.tier = KTier.kpt)
     (hroot : icfgDev = BitVec.ofNat 32 ROOTDEV) (hnib0 : 0 < icfgNib)
@@ -202,13 +168,14 @@ def wp_namei_gen_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
   -- ---- the caller's pid cell, and THE WORKING DIRECTORY (namex's rows) ----
   wordPointsTo (pPid k.proc) 4 dqp pidv ∗
   wordPointsTo (pCwd k.proc) 8 dqc cwdv ∗ inodeHeldAt cwdv cwi ∗
+  wordPointsTo (pRoot k.proc) 8 dqr rootv ∗ inodeHeldAt rootv rti ∗
   -- ---- THE PATH, at the caller's fraction (only READ) ----
   byteBuf (k.regs 10#5) dqpv (bview (plen + 1) pfun) ∗
   bslots 3 ∗
   irefSlots 2 ∗
   logOpS icfgLog n Sb ∗ logTx icfgLog ∗
   -- THE CROSSING IS THE LITERAL `true`: namei parks (through namex)
-  wpNext true k.proc cpu (nameiPost k plen pfun n Sb pidv cwdv cwi dqp dqc dqb dqs dqpv)
+  wpNext true k.proc cpu (nameiPost k plen pfun n Sb pidv cwdv cwi dqp dqc dqb dqs dqpv rootv rti dqr)
   ⊢ wpLoop (GF := GF) cpu
 
 /-- The interface of `namei` (Rocq's `Module Type NAMEI`, its `wp_namei_gen`
@@ -223,76 +190,17 @@ structure NAMEI : Prop where
     (γkl : GName) (γk : KmemNames)
     (plen : Nat) (pfun : Nat → BitVec 8) (n : Nat) (Sb : List Nat)
     (pidv : BitVec 32) (cwdv : BitVec 64) (cwi : Nat) (dqp dqc dqb dqs dqpv : DFrac)
+    (rootv : BitVec 64) (rti : Nat) (dqr : DFrac)
     hj hproc hK hnoff htier hroot hnib0 hgeom hbg hbel hireg hnn hterm hplen hbud hpd,
     wp_namei_gen_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl pd pav pu j γkl γk plen pfun
-      n Sb pidv cwdv cwi dqp dqc dqb dqs dqpv
+      n Sb pidv cwdv cwi dqp dqc dqb dqs dqpv rootv rti dqr
       hj hproc hK hnoff htier hroot hnib0 hgeom hbg hbel hireg hnn hterm hplen hbud hpd
-
-/-- **WP of `namei("/")`, the root corner** (Rocq's `wp_namei_root_body`,
-and -- after SpecNamex's two cleanups -- `SpecNameiRootBoot`'s
-`wp_namei_root_boot_body` too). -/
-def wp_namei_root_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
-    [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF]
-    [SleepLockG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
-    (cpu : CPU) (k : KCtx) (dqp : DFrac)
-    (hK : nameiRootSlots ≤ k.avail) (hnoff : k.noff + 3 < 2 ^ 31)
-    (hroot : icfgDev = BitVec.ofNat 32 ROOTDEV) (hnib0 : 0 < icfgNib)
-    -- iget acquires and releases "itable" (and its live panic takes "pr" then "uart1")
-    (hit : "itable" ∉ k.locks) (hpr : "pr" ∉ k.locks) (huart : "uart1" ∉ k.locks) : Prop :=
-  kctx cpu k ∗ pcIs cpu KA.«namei» ∗
-  isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
-  itableInv (hlc := hlc) ∗ iregReg (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗ panicEnv ∗
-  irefSlot ∗
-  -- the path: `pv` holds '/' and `pv + 1` the terminator
-  byteBuf (k.regs 10#5) dqp [SLASH, 0#8] ∗
-  wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (ipv : BitVec 64),
-    ⌜k.sie = false → spie = k.spie ∧ spp = k.spp⌝ -∗
-    kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
-    ⌜calleeSaved k.regs R' ∧ R' 10#5 = ipv⌝ -∗
-    byteBuf (k.regs 10#5) dqp [SLASH, 0#8] -∗
-    -- AT ROOTINO: where userinit reads the inum it installs in `p->cwd`
-    inodeHeldAt ipv ROOTINO -∗ wpLoop cpu'))
-  ⊢ wpLoop (GF := GF) cpu
-
-/-- The root corner's interface (Rocq's `Module Type NAMEI_ROOT`, and
-`NAMEI_ROOT_BOOT`'s, see the header). -/
-structure NAMEI_ROOT : Prop where
-  wp_namei_root : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
-    [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF]
-    [SleepLockG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
-    (cpu : CPU) (k : KCtx) (dqp : DFrac) hK hnoff hroot hnib0 hit hpr huart,
-    wp_namei_root_body (hlc := hlc) (GF := GF) cpu k dqp hK hnoff hroot hnib0 hit hpr huart
 
 /-! ## THE CWD BRIDGE -/
 
 section Bridge
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [IcacheG GF]
   [SleepLockG GF] [IcboxG GF] [Icfg] [CurCtx]
-
-/-- **The cwd-bearing block as namex's / namei's / nameiparent's three
-rows** (Rocq: a caller's `proc_priv_bare` + `cwd_ref_at_held_at`): the pid
-cell at `pidPriv`, the `p->cwd` cell whole, and the reference at the block's
-inum; the three come back and re-form the block.  Stated at the kernel tier
-of the ambient context, as `ProcInv.procPrivCwd_cwd` is (a caller that has
-learned `curTier = KTier.kpt` from `kctx_tier` reads it at its own
-instance). -/
-theorem namei_procPrivCwd_rows (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
-    (M : Nat → List (BitVec 8)) :
-    procPrivCwd (GF := GF) pa pid V M ⊢
-      @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPid pa) 4 pidPriv pid ∗
-      @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pCwd pa) 8 (DFrac.own 1) V.cwd ∗
-      inodeHeldAt V.cwd V.cwi ∗
-      (@wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPid pa) 4 pidPriv pid -∗
-        @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pCwd pa) 8 (DFrac.own 1) V.cwd -∗
-        inodeHeldAt V.cwd V.cwi -∗ procPrivCwd pa pid V M) := by
-  unfold procPrivCwd procPrivNoctxAt procFieldsNoctx cwdRefAt
-  iintro ⟨⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hof, Hcwd, Hnm, Hsc⟩, Hpt, Htfp, %hlz, Hev⟩, Hc⟩
-  iframe Hpid Hcwd Hc Hev
-  iintro Hpid Hcwd Hc
-  iframe Hpid Hk Hs Hpg Htf Hof Hcwd Hnm Hsc Hpt Htfp Hc
-  isplitl []
-  · ipureintro; exact h
-  · ipureintro; exact hlz
 
 end Bridge
 

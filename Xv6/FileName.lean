@@ -11,8 +11,8 @@ the pinned binaries), L4 (absent from the mkfs root, ONE computation over
 the root block), L5 (decidable).  Each instance is decided by a boolean over
 the byte values so that L3 and L4 close by computation.
 
-WHAT IS HERE NOW: the two boolean sweeps every L3/L4 proof is
-(`notIn_of_forallb`, `mapForall_of_forallb`) and the root's one hop at a
+WHAT IS HERE NOW: the boolean sweep every L3/L4 proof is
+(`notIn_of_forallb`) and the root's one hop at a
 directory row (`astep_root_of_row`).
 
 PORTED ELSEWHERE: the declarations once PENDING here on the image pins are
@@ -49,17 +49,6 @@ theorem notIn_of_forallb (P : Fname → Prop) (p : Fname → Bool) (l : List Fna
   intro N hN hin
   have := List.all_eq_true.1 hl N hin
   rw [hp N hN] at this
-  simp at this
-
-/-- ...and from a map's domain by one sweep of its association list -/
-theorem mapForall_of_forallb (P : Fname → Prop) (p : Fname → Bool)
-    (m : Std.ExtTreeMap Fname Nat compare) (hp : ∀ N, P N → p N = true)
-    (hl : m.toList.all (fun kv => !p kv.1) = true) :
-    ∀ nm z, m[nm]? = some z → ¬ P nm := by
-  intro nm z hnm hP
-  have hin : (nm, z) ∈ m.toList := Std.ExtTreeMap.mem_toList_iff_getElem?_eq_some.2 hnm
-  have := List.all_eq_true.1 hl _ hin
-  rw [hp nm hP] at this
   simp at this
 
 /-! ## 7.  WHAT THE LAWS SAY TO A LAYER ABOVE -/

@@ -25,8 +25,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
-
 /-- What the stub hands back, before the tail: a7 and a0 written over the
 link and the prologue's two writes. -/
 theorem ushF1_regs (m m2 : RegMap) (r : BitVec 64)

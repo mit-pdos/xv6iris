@@ -79,12 +79,6 @@ def wrSectorBytes (w : DiskWr) (i : Nat) : List (BitVec 8) :=
   | some ob => ob.2
   | none => []
 
-/-- DRAINED BYTES = CAPTURED BYTES: writing sector `i`'s cached payload at the
-sector's own offset IS the sector-`i` piece of the whole write. -/
-theorem wrSector_write (off : Nat) (bs : List (BitVec 8)) (i : Nat) (dk : Nat → BitVec 8) :
-    Virtio.diskWrite dk (off + Virtio.sectorSize * i) (wrSectorBytes (some (off, bs)) i) =
-      wrApply (wrSector (some (off, bs)) i) dk := rfl
-
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF]
 
@@ -181,18 +175,6 @@ theorem sperm_one_intro (gd : Nat) (w : DiskWr) (i : Nat) (Q : IProp GF) :
   subst hj
   simp only [spermAux]
   iexact H
-
-/-- ...and back (Rocq `sperm_one`, the forward half). -/
-theorem sperm_one_elim (gd : Nat) (w : DiskWr) (i : Nat) (Q : IProp GF) :
-    sperm gd w [i] Q ⊢@{IProp GF}
-      diskWritePermit gd (wrSector w i) (diskWritePermit gd none Q) := by
-  unfold sperm
-  show iprop(∀ j : Nat, ⌜j ∈ [i]⌝ -∗
-    diskWritePermit gd (wrSector w j) (spermAux gd w 0 ([i].erase j) Q)) ⊢ _
-  iintro H
-  ihave H' := H $$ %i %(List.mem_singleton_self i)
-  simp only [spermAux] at *
-  iexact H'
 
 /-- A READ is still free at the sequence level (Rocq `disk_seq_permit_none`). -/
 theorem diskSeqPermit_none (gd : Nat) (Q : IProp GF) :

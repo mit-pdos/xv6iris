@@ -38,23 +38,21 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## Addresses -/
 
 /-- `&tickslock`, folded out of either `auipc a0,0x15; addi a0,a0,<off>`
 pair (`+0x0a`/`+0x0e` and `+0x20`/`+0x24` -- the same address). -/
-theorem su_tickslock_addr : KA.«sys_uptime» + 0x158da#64 = tickslockAddr := by
+theorem su_tickslock_addr : KA.«sys_uptime» + 0x15b66#64 = tickslockAddr := by
   unfold tickslockAddr; decide
 
 /-- `&ticks`, folded out of `auipc a5,0x7; addi a5,a5,1940`. -/
-theorem su_ticks_addr : KA.«sys_uptime» + 0x77c2#64 = ticksAddr := by
+theorem su_ticks_addr : KA.«sys_uptime» + 0x784e#64 = ticksAddr := by
   unfold ticksAddr; decide
 
-theorem su_br_acquire : KA.«sys_uptime» + 0xffffffffffffe0a2#64 = KA.«acquire» := by decide
-theorem su_br_release : KA.«sys_uptime» + 0xffffffffffffe12a#64 = KA.«release» := by decide
+theorem su_br_acquire : KA.«sys_uptime» + 0xffffffffffffe08e#64 = KA.«acquire» := by decide
+theorem su_br_release : KA.«sys_uptime» + 0xffffffffffffe116#64 = KA.«release» := by decide
 
 /-- The link registers of the two calls. -/
 theorem su_ret_16 : jumpPc (KA.«sys_uptime» + 0x16#64) = KA.«sys_uptime» + 0x16#64 := by decide
@@ -151,10 +149,10 @@ theorem sys_uptime_led (AC : ACQUIRE) (RE : RELEASE) {hlc : HasLC} {GF : Bundled
   k_step_gen (wp_s_auipc c1 _ (KA.«sys_uptime» + 0xa#64) false 22#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [su_u_15] next c2 hp2
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c2 _ (KA.«sys_uptime» + 0xe#64) false 2256#12 10#5 10#5 (by decide))
+  k_step_gen (wp_s_addi c2 _ (KA.«sys_uptime» + 0xe#64) false 2908#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [su_tickslock_addr] next c3 hp3
   iintro Hk Hpc
-  k_step_gen (wp_s_jal c3 _ (KA.«sys_uptime» + 0x12#64) false 2089104#21 1#5 (by decide))
+  k_step_gen (wp_s_jal c3 _ (KA.«sys_uptime» + 0x12#64) false 2089084#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [su_br_acquire] next c4 hp4
   iintro Hk Hpc
   iapply (su_acquire AC c4 _ γt ?ha0 ?hna ?hKa ?hla) $$ [- $Hk $Hpc]
@@ -175,10 +173,10 @@ theorem sys_uptime_led (AC : ACQUIRE) (RE : RELEASE) {hlc : HasLC} {GF : Bundled
   icases ticksLed_elim $$ Hpay with ⟨%t0, %n0, Hticks, Htk, %htie⟩
   icases tickCnt_lb n0 $$ Htk with ⟨Htk, #Htklb⟩
   -- auipc a5,0x7 ; lw a5,1940(a5) ; mv s1,a5
-  k_step_gen (wp_s_auipc c5 _ (KA.«sys_uptime» + 0x16#64) false 7#20 15#5 (by decide))
+  k_step_gen (wp_s_auipc c5 _ (KA.«sys_uptime» + 0x16#64) false 8#20 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [su_u_7] next c6 hp6
   iintro Hk Hpc
-  k_step_gen (wp_s_lw c6 _ (KA.«sys_uptime» + 0x1a#64) false 1964#12 15#5 15#5
+  k_step_gen (wp_s_lw c6 _ (KA.«sys_uptime» + 0x1a#64) false 2104#12 15#5 15#5
       (by decide) (by decide) (DFrac.own 1) t0)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [su_ticks_addr] next c7 hp7
   iintro Hk Hpc Hticks
@@ -190,10 +188,10 @@ theorem sys_uptime_led (AC : ACQUIRE) (RE : RELEASE) {hlc : HasLC} {GF : Bundled
   k_step_gen (wp_s_auipc c8 _ (KA.«sys_uptime» + 0x20#64) false 22#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [su_u_15] next c9 hp9
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c9 _ (KA.«sys_uptime» + 0x24#64) false 2234#12 10#5 10#5 (by decide))
+  k_step_gen (wp_s_addi c9 _ (KA.«sys_uptime» + 0x24#64) false 2886#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [su_tickslock_addr] next c10 hp10
   iintro Hk Hpc
-  k_step_gen (wp_s_jal c10 _ (KA.«sys_uptime» + 0x28#64) false 2089218#21 1#5 (by decide))
+  k_step_gen (wp_s_jal c10 _ (KA.«sys_uptime» + 0x28#64) false 2089198#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [su_br_release] next c11 hp11
   iintro Hk Hpc
   have e115 : c11 = c5 :=

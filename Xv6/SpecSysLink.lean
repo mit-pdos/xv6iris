@@ -28,7 +28,7 @@ split-off `Xv6/SysLinkDefs.lean` (brief fs7b D21).
       return -1;
     }
 
-`KA.«sys_link»` = 0x80004fae, 292 bytes.  A THIRTY-EIGHT slot frame
+`KA.«sys_link»` = 0x80005022, 292 bytes.  A THIRTY-EIGHT slot frame
 (`addi sp,sp,-304`), carved (Rocq's header, verified against the Lean
 image): slot 1 (`sp0-8`) ra, slot 2 (`sp0-16`) s0 (the frame pointer, =
 the entry sp), slot 3 (`sp0-24`) s1 = ip -- saved LATE, at +0x30 --, slot 4
@@ -46,7 +46,7 @@ contract.
   interface in either direction.
 * THE ORPHAN GUARD (`dp->nlink == 0`, +0x84) is what makes the deposit
   legal; THE NLINK_MAX GUARD (+0x58) is what makes the mint legal
-  (`wp_iupdate_link`'s `dn0.diNlink ≠ 32767#16`).
+  (the mint's side condition `dn0.diNlink ≠ 32767#16`).
 * THE REFERENCE LEDGER CLOSES AT THREE ON EVERY ARM (`sysLinkIrefs`): the
   second resolve (nameiparent) runs while `ip` is still held.
 * THE LOG LEDGER IS THE SET FORM, AND IT HAS TO BE: two unbounded walks in
@@ -118,8 +118,6 @@ namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Std MachCSL
 open LeanRV64D
-
-set_option linter.unusedVariables false
 
 def sysLinkAddr : BitVec 64 := KA.«sys_link»
 

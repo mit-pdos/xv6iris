@@ -40,15 +40,12 @@ the engine `UL`.
    `bv_signed (trunc32 a0)`); `uint a0 = 0` is `(m.get 10#5).toNat = 0`.
 -/
 import Xv6.UkRunLeaf
-import Xv6.UkFork
 
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
-
-set_option linter.unusedSectionVars false
 
 namespace UkSysP
 

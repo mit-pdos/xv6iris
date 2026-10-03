@@ -45,25 +45,6 @@ theorem pteVariant_kLeaf (ppn : BitVec 44) (perm : KPerm) (a d a' d' : BitVec 1)
     pteVariant (kLeaf ppn perm a d) (kLeaf ppn perm a' d') :=
   Or.inr ⟨ppn, perm, a, d, a', d', rfl, rfl⟩
 
-/-- A variant of a variant. -/
-theorem pteVariant_trans {c v w : BitVec 64} (h1 : pteVariant c v) (h2 : pteVariant v w) : pteVariant c w := by
-  rcases h1 with rfl | ⟨ppn, perm, a, d, a', d', rfl, rfl⟩
-  · exact h2
-  · rcases h2 with rfl | ⟨ppn₂, perm₂, a₂, d₂, a₂', d₂', h, rfl⟩
-    · exact pteVariant_kLeaf ppn perm a d a' d'
-    · obtain ⟨rfl, rfl⟩ := kLeaf_inj h
-      exact pteVariant_kLeaf ppn perm a d a₂' d₂'
-
-/-- The A/D write-back of a variant of a leaf is a variant of the leaf. -/
-theorem pteVariant_setAD {c v : BitVec 64} (ppn : BitVec 44) (perm : KPerm) (a d : BitVec 1)
-    (hc : c = kLeaf ppn perm a d) (hv : pteVariant c v) (a' d' : BitVec 1) :
-    pteVariant c (pteSetAD v a' d') := by
-  subst hc
-  rcases hv with rfl | ⟨ppn₂, perm₂, a₂, d₂, a₂', d₂', h, rfl⟩
-  · unfold kLeaf; rw [pteSetAD_pteSetAD]; exact pteVariant_kLeaf ppn perm a d a' d'
-  · obtain ⟨rfl, rfl⟩ := kLeaf_inj h
-    unfold kLeaf; rw [pteSetAD_pteSetAD]; exact pteVariant_kLeaf ppn perm a d a' d'
-
 /-- The value at the point of a variant: the leaf's page and permission. -/
 theorem pteVariant_of_kLeaf {v : BitVec 64} (ppn : BitVec 44) (perm : KPerm) (a d : BitVec 1)
     (hv : pteVariant (kLeaf ppn perm a d) v) : ∃ a' d', v = kLeaf ppn perm a' d' := by

@@ -67,10 +67,9 @@ kernel's result spine, every closed datum evaluated to a literal and the
 symbolic ones left as the walk built them; `bv_decide`/`simp` then finish.
 
 The bind toolkit (Rocq `gm_bind`, `gm_bind0`, `gm_bind_nest`) is
-`runRW_bind` and its corollaries (`runRW_bind_some`, `runRW_bind_none`,
-`runRW_seq_some`, `runRW_bind_nest`): a walk of `m >>= f` is the walk of `m`
-followed by the walk of `f` from where `m` landed, on what `m` left of the
-oracle.  It is how a fact over a symbolic ADDRESS or register INDEX is
+`runRW_bind` and its corollaries (`runRW_bind_some`, `runRW_bind_none`): a
+walk of `m >>= f` is the walk of `m` followed by the walk of `f` from where
+`m` landed, on what `m` left of the oracle.  It is how a fact over a symbolic ADDRESS or register INDEX is
 built: a sub-lemma per branch, composed (`URunRWDemo.urwDemo_add_sym`).
 -/
 import MachCSL.DecodeBridge
@@ -229,8 +228,6 @@ def UOrc.cons (a : UAns) (o : UOrc) : UOrc
 @[simp] theorem UOrc.tail_cons (a : UAns) (o : UOrc) : (UOrc.cons a o).tail = o := rfl
 @[simp] theorem UOrc.cons_zero (a : UAns) (o : UOrc) : UOrc.cons a o 0 = a := rfl
 @[simp] theorem UOrc.drop_zero (o : UOrc) : o.drop 0 = o := rfl
-theorem UOrc.drop_tail (o : UOrc) (k : Nat) : o.tail.drop k = o.drop (k + 1) := by
-  funext i; simp only [UOrc.drop, UOrc.tail]; congr 1
 
 /-- The owned byte map. -/
 abbrev BMap := PAddr → Option (BitVec 8)
@@ -247,8 +244,12 @@ def bmRead (mm : BMap) (pa : PAddr) : (n : Nat) → Option (BitVec (8 * n))
 def bmOwned (mm : BMap) (pa : PAddr) (n : Nat) : Bool :=
   (List.range n).all fun j => (mm (pa + BitVec.ofNat 64 j)).isSome
 
-/-- Set one byte. -/
-def bmSet (mm : BMap) (a : PAddr) (b : BitVec 8) : BMap :=
+/-- Set one byte.  Irreducible to the elaborator (`unfold bmSet` still
+works; the kernel is unaffected): a failed unification of two different
+`bmWrite`s otherwise unfolds each `bmSet` level twice -- `2^n` for an
+`n`-byte store (`umo_amo_ok` at width 8: 2.6 s in `uwk_run`'s closing
+`isDefEq`). -/
+@[irreducible] def bmSet (mm : BMap) (a : PAddr) (b : BitVec 8) : BMap :=
   fun a' => if a' = a then some b else mm a'
 
 /-- Store the `n` bytes of `w` at `pa`. -/
@@ -476,18 +477,6 @@ theorem runRW_bind_none {X Y : Type} (m : SailM X) (f : X → SailM Y) (orc : UO
     (h : runRW D orc s m = none) : runRW D orc s (m >>= f) = none := by
   rw [runRW_bind, h]; rfl
 
-/-- The unit-sequencing form (Rocq `gm_bind0`). -/
-theorem runRW_seq_some {Y : Type} (m : SailM Unit) (n : SailM Y) (orc orc' : UOrc) (s s' : UWSt)
-    (h : runRW D orc s m = some ((), s', orc')) :
-    runRW D orc s (m >>= fun _ => n) = runRW D orc' s' n :=
-  runRW_bind_some D m (fun _ => n) orc orc' s s' () h
-
-/-- The left-nested form (Rocq `gm_bind_nest`): `(m >>= f) >>= g`. -/
-theorem runRW_bind_nest {X Y Z : Type} (m : SailM X) (f : X → SailM Y) (g : Y → SailM Z)
-    (orc : UOrc) (s : UWSt) :
-    runRW D orc s ((m >>= f) >>= g) = runRW D orc s (m >>= fun x => f x >>= g) := by
-  rw [bind_assoc]
-
 end toolkit
 
 /-! ## The frames -/
@@ -500,10 +489,6 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 walk's bookkeeping bit `rv` says. -/
 def uResvTok (cpu : CPU) (_rv : Bool) : IProp GF :=
   iprop(∃ r : Option Resv, resvFragAny cpu r)
-
-theorem uResvTok_rv (cpu : CPU) (rv rv' : Bool) : uResvTok (GF := GF) cpu rv ⊢ uResvTok cpu rv' := by
-  unfold uResvTok
-  iintro H; iexact H
 
 theorem uResvTok_of (cpu : CPU) (rv : Bool) (r : Option Resv) (b : Bool) :
     resvFrag cpu r b ⊢@{IProp GF} uResvTok cpu rv := by
@@ -936,21 +921,6 @@ theorem swp_runRW {X : Type} (m : SailM X) (s : UWSt)
     (hok : ∀ orc, (runRW D orc s m).isSome = true) (Φ : X → IProp GF) :
     uFr RF BF s ∗ uPost RF BF s m Φ ⊢ swp cpu m Φ :=
   swp_runRW_gen RF BF m s hok Φ
-
-/-- The Rocq shape (`swp_hmrun`): the frames in, a walk equation and the
-landing frames out. -/
-theorem swp_runRW_frames {X : Type} (m : SailM X) (s : UWSt)
-    (hok : ∀ orc, (runRW D orc s m).isSome = true) :
-    uFr RF BF s ⊢ swp cpu m (fun x => iprop(∃ (orc : UOrc) (s' : UWSt) (orc' : UOrc),
-      ⌜runRW D orc s m = some (x, s', orc')⌝ ∗ uFr RF BF s')) := by
-  iintro Hfr
-  iapply swp_runRW RF BF m s hok
-  iframe Hfr
-  unfold uPost uFr
-  iintro %orc %x %s' %orc' %h HF HB Hc Hr
-  iexists orc, s', orc'
-  iframe
-  ipureintro; exact h
 
 end cases
 

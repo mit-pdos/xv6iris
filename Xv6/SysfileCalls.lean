@@ -15,10 +15,7 @@ the frames' layouts, pins and cells).
   `sysfile_ofdOut_null` (were SysFstatParts' `sfs_*`; sys_fstat /
   sys_write), their unpacked `wpNext` forms `sysfile_argaddr_wp` /
   `sysfile_argfd_wp` (were `sw_argaddr` / `sys_pipe_argaddr`, `sd_argfd` /
-  `sc_argfd`), and `sysfile_blk_bare` (the bare block around argstr /
-  fetchstr; was `sys_{chdir,mkdir,mknod,open,exec}_blk_bare`,
-  `sys_exec_head_bare`, `sys_link_block_bare`),
-  `sysfile_argstr` (sys_chdir / sys_mkdir / sys_mknod), `sysfile_begin_op`
+  `sc_argfd`), `sysfile_argstr` (sys_chdir / sys_mkdir / sys_mknod), `sysfile_begin_op`
   / `sysfile_end_op` at a caller-named pid share (all five; sys_link /
   sys_unlink pass `pidPriv`, which their copies had fixed),
   `sysfile_iunlockput` (the counted write arm), `sysfile_meta_type`;
@@ -31,7 +28,7 @@ the frames' layouts, pins and cells).
   `sysfileSetnl` and its eight projections (sys_link / sys_unlink);
 * instruction constants and `KCtx` identities (`MachCSL.beqz_zero`,
   `sysfile_bltz_nat`, `MachCSL.bltz_m1`, `Xv6.dirlookup_beqz`, `Xv6.co_li_zero`,
-  `MachCSL.li_m1`, `sysfile_sext_m1`, `sysfile_li128`, `sysfile_arg0_lt`,
+  `MachCSL.li_m1`, `sysfile_sext_m1`, `sysfile_arg0_lt`,
   `sysfile_beq_tdir`, `MachCSL.KCtx.withSpie_twice`, `MachCSL.KCtx.withSpie_pushed`, `sysfile_ctx`,
   `sysfile_cur_kpt`, `sysfilePidQ`).
 
@@ -50,9 +47,7 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## Pure: instruction constants, `KCtx` identities, the path as a function, the `nlink` store -/
 
@@ -66,8 +61,6 @@ theorem sysfile_bltz_nat (n : Nat) (h : n < 2 ^ 31) :
   omega
 
 theorem sysfile_sext_m1 : BitVec.signExtend 64 4095#12 = 0xFFFFFFFFFFFFFFFF#64 := by decide
-
-theorem sysfile_li128 : 0#64 + BitVec.signExtend 64 128#12 = BitVec.ofNat 64 128 := by decide
 
 theorem sysfile_arg0_lt : 0 < NARG := by decide
 
@@ -472,34 +465,15 @@ theorem sysfile_core_tf (h : curTier = KTier.kpt) (pa : BitVec 64) (pid : BitVec
   simp only at h
   subst h
   unfold procPrivCoreNoctxAt procPrivBareAt procFieldsNoOfile
-  iintro ⟨⟨%hf, Hpid, ⟨Hks, Hsz, Hpg, Htf, Hcwd, Hnm, Hsc⟩, Hpt, Htfp, %hlz, Hev⟩, Hcw⟩
+  iintro ⟨⟨%hf, Hpid, ⟨Hks, Hsz, Hpg, Htf, Hcwd, Hnm, Hsc, Hrt⟩, Hpt, Htfp, %hlz, Hev⟩, Hcw⟩
   iframe Htf Htfp
   isplitl []
   · ipureintro; exact hf.2.2.2
   iintro Htf Htfp
-  iframe Hpid Hks Hsz Hpg Htf Hcwd Hnm Hsc Hpt Htfp Hcw Hev
+  iframe Hpid Hks Hsz Hpg Htf Hcwd Hnm Hsc Hrt Hpt Htfp Hcw Hev
   isplitl []
   · ipureintro; exact hf
   · ipureintro; exact hlz
-
-/-- THE BLOCK AROUND A BARE-BLOCK CALLEE (Rocq `proc_priv_split_cwd` +
-`proc_priv_nocwd_bare`; argstr / fetchstr / create's allocation): the bare
-block out; the cwd reference and the descriptor array wait in the wand,
-which re-closes the WHOLE block at whatever descriptor and view the callee
-returns (neither mentions `upt`).  One copy for sys_chdir / sys_exec /
-sys_link / sys_mkdir / sys_mknod / sys_open. -/
-theorem sysfile_blk_bare (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
-    (M : Nat → List (BitVec 8)) :
-    procPrivFd (GF := GF) γ pa pid V M ⊢
-      procPrivBareAt curCtx pa pid V M ∗
-      (∀ (P' : UPtd) (M' : Nat → List (BitVec 8)),
-        procPrivBareAt curCtx pa pid { V with upt := P' } M' -∗
-        procPrivFd γ pa pid { V with upt := P' } M') := by
-  unfold procPrivFd procPrivCoreNoctxAt
-  iintro ⟨⟨Hb, Hc⟩, Ho⟩
-  iframe Hb
-  iintro %P' %M' Hb
-  iframe
 
 /-- ...and closing at ANY count (permit sweep L1b, Rocq
 `proc_priv_bare_acc_ev`): argstr lends the bare block's counter to

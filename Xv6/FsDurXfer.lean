@@ -10,7 +10,7 @@ not one decode:
   runs.  The fresh elements come out already in the source's `∗` shape,
   because the map they are allocated at IS that `∗` flattened, and the
   flattening is a bijection exactly where the source's own exclusivity says
-  the objects do not overlap (`phiRuns_disj` / `phiRunsQ_disj`).
+  the objects do not overlap (`phiRunsQ_disj`).
 * the LINK family: ONE `own_alloc` at the SOURCE's own element (read off by
   `fsLinks_valid_tok`) plus the spare root fragment
   (`fsBootAlloc_rootSlack`).
@@ -47,8 +47,6 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Iris.Std.PartialMap
 
-set_option linter.unusedSectionVars false
-
 section XferBytes
 variable {GF : BundledGFunctors} [GhostMapG GF Nat (BitVec 8) RegMapF]
 
@@ -60,20 +58,6 @@ theorem snapGamma_agree (g gl gt : GName) (B : RegMapF (BitVec 8)) :
   show iprop((g ↪●MAP B) ∗ (g ↪◯MAP[a]{dq} v)) ⊢ _
   iintro ⟨Ha, Hv⟩
   iapply ghost_map_lookup $$ Ha Hv
-
-/-- WHERE THE INSTALL'S PURE PREMISES COME FROM: all three are READ off the
-durable source (its footprint and its byte authority); the source is not
-moved (Rocq's `fs_footprint_install_facts`). -/
-theorem fsFootprint_installFacts (g gl gt : GName) (B : RegMapF (BitVec 8)) (S : FsStateRec) :
-    (g ↪●MAP B) ⊢ fsFootprint (snapGamma (GF := GF) g gl gt) (DFrac.own 1) S -∗
-      ∃ PM, ⌜xfShape S PM ∧ xrDisj (xrFs S PM) ∧ xrUnion (xrFs S PM) ⊆ B⌝ := by
-  iintro Hba Hf
-  ihave ⟨%PM, %hs, Hr⟩ := fsFootprint_runs _ S $$ Hf
-  ihave ⟨%hd, Hr⟩ := fsDurKeep (phiRuns_disj _ (snapGamma_excl g gl gt) _) $$ Hr
-  ihave %hin := phiRuns_in _ _ B (snapGamma_agree g gl gt B) _ hd $$ Hba Hr
-  iexists PM
-  ipureintro
-  exact ⟨hs, hd, hin⟩
 
 /-- THE MINT: the allocation half alone, over the three pure facts and no
 resource at all (Rocq's `fs_footprint_mint`). -/
@@ -122,20 +106,6 @@ end XferBytes
 section Xfer
 variable {GF : BundledGFunctors} [GhostMapG GF Nat (BitVec 8) RegMapF] [FsLinkG GF] [FsTopG GF]
 open FsStateLink
-
-/-- ...AND THE WHOLE INSTANCE, installed: the ghost half is HANDED IN (it
-mentions no `phi`), the byte half is carved off the era's flat map (Rocq's
-`fs_state_install`). -/
-theorem fsState_install (Γ : FsViewNames GF) (S : FsStateRec) (PM : BlockMap)
-    (Mh : RegMapF (BitVec 8)) (hs : xfShape S PM) (hd : xrDisj (xrFs S PM))
-    (hsub : xrUnion (xrFs S PM) ⊆ Mh) :
-    phiMap Γ Mh ∗ fsGhost Γ S ⊢
-      fsState Γ (DFrac.own 1) S ∗ phiMap Γ (PartialMap.difference Mh (xrUnion (xrFs S PM))) := by
-  refine (sep_mono_left (fsFootprint_install Γ S PM Mh hs hd hsub)).trans ?_
-  iintro ⟨⟨Hf, Hr⟩, Hg⟩
-  iframe Hr
-  iapply (fsState_split Γ (DFrac.own 1) S).2
-  iframe Hf Hg
 
 /-- THE TRANSPORT, WITH THE ROOT'S SPARE LINK FRAGMENT RIDING ALONG (the
 inode region's keep-alive token: no directory entry accounts for it, so it

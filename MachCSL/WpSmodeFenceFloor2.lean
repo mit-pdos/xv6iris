@@ -3,27 +3,20 @@ MachCSL: `fence iorw,iorw` -- the encoding `__sync_synchronize()` actually
 emits -- as a hart-step rule, plain and with the ACQUIRE EDGE.
 
 WHY THIS FILE EXISTS.  gcc emits `__sync_synchronize()` as `0ff0000f`,
-i.e. `FENCE (0, iorw, iorw)`, not the `FENCE (0, rw, rw)` of
-`MachCSL.wp_s_fence_rw_rw` / `MachCSL.wp_s_fence_rw_rw_floor`.  The two
-decode to the same `Barrier_RISCV_rw_rw` -- the Sail model looks only at
-the low two bits of each set -- but a proof that steps the instruction has
-to name the encoding it sees in the kernel image, so the rules have to
-exist at BOTH encodings.
+i.e. `FENCE (0, iorw, iorw)`, not `FENCE (0, rw, rw)`.  The two decode to
+the same `Barrier_RISCV_rw_rw` -- the Sail model looks only at the low two
+bits of each set -- but a proof that steps the instruction has to name the
+encoding it sees in the kernel image, so the rules are stated at the
+`iorw,iorw` encoding:
 
-This file is therefore a parallel copy of the two `rw,rw` rules at the
-`iorw,iorw` encoding, and nothing else:
-
-* `wp_s_fence_iorw_iorw` -- the plain barrier (the twin of
-  `MachCSL.wp_s_fence_rw_rw`, whose leaf lives in
-  `MachCSL/WpSmodeAtomic.lean`);
+* `wp_s_fence_iorw_iorw` -- the plain barrier;
 * `wp_s_fence_iorw_iorw_floor` -- the barrier that absorbs a position the
-  hart's READ WATERMARK has reached (the twin of
-  `MachCSL.wp_s_fence_rw_rw_floor`, whose header explains why the premise
-  is `MachCSL.rviewLb`, produced by `MachCSL.readAUr`, and not `topLb`).
+  hart's READ WATERMARK has reached (the header of
+  `MachCSL/WpSmodeFenceFloor.lean` explains why the premise is
+  `MachCSL.rviewLb`, produced by `MachCSL.readAUr`, and not `topLb`).
 
-The proofs are the `rw,rw` ones verbatim (they were first written as the
-local `vdis_*fence*` lemmas of `Xv6/ProofVirtioDiskIntr.lean`, which now
-use these instead).
+The floor rule's barrier leaf is `MachCSL.swp_sail_barrier_view`, as for
+the `r,rw` floor rule of `MachCSL/WpSmodeFenceFloor.lean`.
 -/
 import MachCSL.WpSmodeFenceFloor
 

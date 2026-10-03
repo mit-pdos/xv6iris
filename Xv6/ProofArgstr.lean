@@ -22,9 +22,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## Constants -/
 
@@ -65,7 +63,7 @@ theorem argstr_priv_tf [X : CurCtx] (ξ : CtxId) (hX : X = ⟨ξ, KTier.kpt⟩) 
   subst hX
   letI : CurCtx := ⟨ξ, KTier.kpt⟩
   unfold procPrivBareAt procFieldsNoOfile
-  iintro ⟨%hf, Hpid, ⟨Hks, Hsz, Hpg, Htf, Hcwd, Hnm, Hsc⟩, Hpt, Htfp, %hlz, Hev⟩
+  iintro ⟨%hf, Hpid, ⟨Hks, Hsz, Hpg, Htf, Hcwd, Hnm, Hsc, Hrt⟩, Hpt, Htfp, %hlz, Hev⟩
   have h3 : V.trapframe = pageAddr V.upt.tfp := hf.2.2.2
   ihave Htf := (show wordPointsTo (GF := GF) (pTrapframe pa) 8 (DFrac.own 1) V.trapframe ⊢
       wordPointsTo (pTrapframe pa) 8 (DFrac.own 1) (pageAddr V.upt.tfp) from by rw [h3]) $$ Htf
@@ -73,7 +71,7 @@ theorem argstr_priv_tf [X : CurCtx] (ξ : CtxId) (hX : X = ⟨ξ, KTier.kpt⟩) 
   iintro Htf Htfp
   ihave Htf := (show wordPointsTo (GF := GF) (pTrapframe pa) 8 (DFrac.own 1) (pageAddr V.upt.tfp) ⊢
       wordPointsTo (pTrapframe pa) 8 (DFrac.own 1) V.trapframe from by rw [h3]) $$ Htf
-  iframe Hpid Hks Hsz Hpg Htf Hcwd Hnm Hsc Hpt Htfp Hev
+  iframe Hpid Hks Hsz Hpg Htf Hcwd Hnm Hsc Hrt Hpt Htfp Hev
   isplitl []
   · ipureintro; exact hf
   · ipureintro; exact hlz

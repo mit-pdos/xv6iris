@@ -7,7 +7,6 @@ region (`Xv6.il_blk_open`); then `Xv6.il_mid`.  `il_load` is the proof of
 the interface `Xv6.IlLoadEb` the main walk was checked against.
 -/
 import Xv6.IlockMid
-import Xv6.FsCallSitesF
 
 namespace Xv6
 
@@ -16,9 +15,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-- A slot of a well-formed block is a well-formed record. -/
 theorem il_dnwf (ds : List Dinode) (hwf : diblkWf ds) (inum : BitVec 32) :
@@ -69,7 +66,7 @@ theorem il_load (BD : BREAD) (MM : MEMMOVE) (BL : BRELSE) (PA : PANIC) : IlLoadE
   k_step_e (wp_s_auipc cpu _ (KA.«ilock» + 0x3e#64) false 0x1e#20 11#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_lw cpu _ (KA.«ilock» + 0x42#64) false 2052#12 11#5 11#5 (by decide) (by decide)
+  k_step_e (wp_s_lw cpu _ (KA.«ilock» + 0x42#64) false 2704#12 11#5 11#5 (by decide) (by decide)
       dqs (BitVec.ofNat 32 icfgIst))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [il_sb_addr]
   iintro Hk Hpc Hsb

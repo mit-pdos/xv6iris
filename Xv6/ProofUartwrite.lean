@@ -37,7 +37,6 @@ import Xv6.SpecSleepPrepare
 import Xv6.CodeTactics
 import MachCSL.WpSmodeFrame8b
 import Xv6.PrintkDefs
-import Xv6.StepLemmas
 import MachCSL.BvLemmas
 import MachCSL.WpSmodeDev
 
@@ -48,14 +47,12 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## The addresses `uartwrite` computes -/
 
 /-- `&uarts` as the `auipc`/`addi` pair at `+0x24` leaves it. -/
-theorem uw_uarts : KA.«uartwrite» + 0x99d2#64 = KA.«uarts» := by decide
+theorem uw_uarts : KA.«uartwrite» + 0x9a72#64 = KA.«uarts» := by decide
 
 /-- `40 * uid`, as `slli; add; slli` computes it. -/
 theorem uw_idx40 (i : UartId) :
@@ -929,7 +926,7 @@ theorem uartwrite_proof (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL :
     k_step_e (wp_s_auipc cpu _ (KA.«uartwrite» + 0x24#64) false 10#20 18#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     iintro Hk Hpc
-    k_step_e (wp_s_addi cpu _ (KA.«uartwrite» + 0x28#64) false 2478#12 18#5 18#5 (by decide))
+    k_step_e (wp_s_addi cpu _ (KA.«uartwrite» + 0x28#64) false 2638#12 18#5 18#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [uw_uarts]
     iintro Hk Hpc
     -- add s5,s2,a5 ; c.addi a5,a5,16 ; c.add s2,s2,a5

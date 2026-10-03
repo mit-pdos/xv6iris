@@ -22,7 +22,8 @@ CONE (UShURound S0, all reached): `ulm_ok_R`, `ulm_cont_R`, `ulm_step_R`,
 `usecc_execfail_bytes`, `ush_line_pipeU` (`ushLinePipeU`), `ush_line_union`
 (`ushLineUnion`), `ush_line_upipe` (`ushLineUpipe`), `union_D` (`unionD`),
 `union_D_of_line`, `union_D_nw`, `union_D_nopipe`.
-Unported: none.  (The local notations `U`/`K` are `ulmG`/`ulmGHooks`.)
+Unported: `ucat_ws_line` (`rfl` here, so not stated).  (The local notations
+`U`/`K` are `ulmG`/`ulmGHooks`.)
 
 ## Deviations from Rocq
 
@@ -40,15 +41,12 @@ Unported: none.  (The local notations `U`/`K` are `ulmG`/`ulmGHooks`.)
    only uses its pipeline half, as Rocq's.
 -/
 import Xv6.UshURoundTies
-import Xv6.UshExecPinPure
 import Xv6.UshCatPay
 import Xv6.UNamePathCat
 
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
-
-set_option linter.unusedSectionVars false
 
 /-! ## S0 THE UNION'S CODES AT A FILE LINE, READ BACK AS THE FILE'S -/
 
@@ -177,9 +175,6 @@ theorem ucat_ws_fname (nm : List (BitVec 8)) (j : Nat) (hj : j < nm.length) :
 
 /-- **Rocq `ucat_ws_head`**. -/
 theorem ucat_ws_head (nm : List (BitVec 8)) : (ucatWs nm)[0]! = catPl := catWords_head nm
-
-/-- **Rocq `ucat_ws_line`**. -/
-theorem ucat_ws_line (nm : List (BitVec 8)) : wlLine (ucatWs nm) = lineBytes (.LCat nm) := rfl
 
 /-- **Rocq `ucat_xline`**. -/
 theorem ucat_xline (nm : List (BitVec 8)) (gb : Nat → BitVec 8) (len : Nat)

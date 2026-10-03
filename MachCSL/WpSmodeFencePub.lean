@@ -81,7 +81,7 @@ theorem memModel_fence_pub (σ : MState) (cpu : CPU) (b : barrier_kind)
   have e : (σ.fence cpu b).tv cpu =
       fencePost (fenceDrains b) (fenceAcq b) (σ.tv cpu) (σ.hr cpu).rv
         (ownPub (hartAgent cpu) σ.log) := by
-    simp [MState.fence, updCpu]
+    simp [updCpu]
   have hle : T ≤ (σ.fence cpu b).tv cpu := by
     rw [e, hdrain]
     unfold fencePost
@@ -123,56 +123,6 @@ theorem swp_sail_barrier_pub (cpu : CPU) (b : barrier_kind) (hdrain : fenceDrain
     iapply HΦ $$ Hv
 
 /-! ## The two encodings -/
-
-set_option maxHeartbeats 4000000 in
-/-- `fence rw,rw`, absorbing a position the hart has written. -/
-theorem execSpecF_fence_rw_rw_pub (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Bool)
-    (hok : SConfPhys (GF := GF) c sie) (hmenv : c.menvcfg = menvcfgS)
-    (pc npc₀ : BitVec 64) (rs rd : BitVec 5) (R : RegMap) (T : Nat) :
-    execSpecPP (GF := GF) cpu dq Privilege.Supervisor c Privilege.Supervisor c
-      (instruction.FENCE (0#4, 3#4, 3#4, regidx.Regidx rs, regidx.Regidx rd)) pc npc₀ npc₀
-      iprop(gprFile cpu R ∗ authoredBy T (hartAgent cpu))
-      iprop(gprFile cpu R ∗ viewLb cpu T) := by
-  intro Φ
-  have hfiom : _get_MEnvcfg_FIOM c.menvcfg = 0#1 := by rw [hmenv]; rfl
-  clear hmenv
-  iintro ⟨HmConf, HPC, HnextPC, ⟨HF, #Hau⟩, HΦ⟩
-  conf_cases HmConf
-  obtain ⟨hpmp, hms, hpmm, hlpe⟩ := hok
-  obtain ⟨hSIE, hMPRV, hSXL, hMXR, hTSR, hTVM, hFS, hXS, hVS, hSD, hMPP⟩ := hms
-  unfold execute
-  swp_to_barrier 40
-  iapply swp_bind
-  iapply (swp_sail_barrier_pub cpu _ (by decide) T)
-  isplit
-  · iexact Hau
-  inext
-  iintro #Hv
-  iapply swp_ret
-  swp_run 80
-  conf_intro HmConf
-  iapply HΦ $$ HmConf HPC HnextPC [HF Hv]
-  iframe HF
-  iexact Hv
-
-/-- **`fence rw,rw`, the DRAIN rule**: the hart's floor absorbs any
-position it has itself written.  The premise is the store's own
-`MachCSL.authoredBy` receipt -- `MachCSL.writeAU` and
-`MachCSL.machInterp_store` hand it out with every store.  Interrupts are
-off, so the fence runs on this hart. -/
-theorem wp_s_fence_rw_rw_pub [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx)
-    (hsie : k.sie = false) (pc : BitVec 64) (is_rvc : Bool) (rs rd : BitVec 5) (T : Nat) :
-    instr (GF := GF) pc is_rvc
-      (instruction.FENCE (0#4, 3#4, 3#4, regidx.Regidx rs, regidx.Regidx rd)) ∗
-    kctxL lent cpu k ∗ pcIs cpu pc ∗ authoredBy T (hartAgent cpu) ∗
-    ▷ wpNext k.sie k.proc cpu (fun cpu' =>
-        iprop(kctxL lent cpu' k -∗ pcIs cpu' (pc + instrLen is_rvc) -∗ viewLb cpu T -∗ wpLoop cpu'))
-    ⊢ wpLoop cpu :=
-  wpLoop_k_keep cpu k pc _ is_rvc _ (authoredBy T (hartAgent cpu)) (fun _ => viewLb cpu T)
-    (fun cpu' c hpin hok hmenv => by
-      obtain rfl : cpu' = cpu := hpin (Or.inl hsie)
-      exact execSpecF_fence_rw_rw_pub cpu' (DFrac.own 1) c k.sie hok.phys hmenv pc _ rs rd
-        (tpPin cpu' k.regs) T)
 
 set_option maxHeartbeats 4000000 in
 /-- `fence iorw,iorw`, absorbing a position the hart has written. -/

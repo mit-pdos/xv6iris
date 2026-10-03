@@ -49,35 +49,7 @@ theorem syncElfLoadable : kexecLoadable User.Sync.elf :=
   kexecLoadable_of_rows _ _ User.Sync.elf_wf User.Sync.elf_loads
     (by rw [User.Sync.elf_read]; decide +kernel) (by decide) (by decide)
 
-/-- **Rocq `sync_argv_fits`**: the push and forty-two words below it fit the
-one stack page. -/
-def syncArgvFits (ws : List (List (BitVec 8))) (alen : Nat → Nat) : Prop :=
-  kxcSpan alen ws.length + (8 * ((ws.length : Int) + 1) + 16) ≤ 4096 - 336
-
-/-- **Rocq `sync_room`**. -/
-theorem syncRoom (ws : List (List (BitVec 8))) (alen : Nat → Nat) (hfit : syncArgvFits ws alen) :
-    (kexecSz User.Sync.elf : Int) - 4096 + 336 ≤ kxcSpFinal (kexecSz User.Sync.elf : Int) alen ws.length := by
-  unfold syncArgvFits at hfit
-  have := kxcSpFinal_ge (kexecSz User.Sync.elf : Int) alen ws.length
-  rw [syncKexecSz] at this ⊢
-  omega
-
-/-- **Rocq `sync_argv_fits_of_ok_x`**: every exec'able line earns it. -/
-theorem syncArgvFits_of_ok_x (ws : List (List (BitVec 8))) (hok : execOk ws) :
-    syncArgvFits ws (ushEchoAlen ws) := by
-  have h := imgArgvFits_of_ok_x 42 ws (by decide) hok
-  unfold imgArgvFits at h
-  unfold syncArgvFits
-  omega
-
 /-! ## 2. The two PT_LOADs and the entry -/
-
-/-- **Rocq `sync_loads`** (deviation 3). -/
-theorem syncLoads :
-    ∃ p0 p1 : ElfPhdr, elfLoads User.Sync.elf = [p0, p1] ∧
-      p0.vaddr = 0 ∧ p0.memsz = 0xd54 ∧ p0.flags = 5 ∧
-      p1.vaddr = 0x1000 ∧ p1.memsz = 0x20 ∧ p1.flags = 6 :=
-  ⟨_, _, User.Sync.elf_loads, rfl, rfl, rfl, rfl, rfl, rfl⟩
 
 /-- **Rocq `sync_start_pc`** (deviation 4). -/
 theorem syncStart_pc :
@@ -92,29 +64,6 @@ theorem syncRoom42 {alen : Nat → Nat} {na : Nat}
     (kexecSz User.Sync.elf : Int) - 4096 + 8 * ((42 : Nat) : Int) ≤
       kxcSpFinal (kexecSz User.Sync.elf : Int) alen na := by
   omega
-
-/-- **Rocq `sync_kexec_geom`**: `imgKexecGeom` at sync and frame 42. -/
-theorem syncKexecGeom (na : Nat) (alen : Nat → Nat) (afun : Nat → Nat → BitVec 8) (sts : List FdState)
-    (W' : Uvis) (hok : kexecImageOk User.Sync.elf na alen afun sts W')
-    (hroom : (kexecSz User.Sync.elf : Int) - 4096 + 336 ≤
-      kxcSpFinal (kexecSz User.Sync.elf : Int) alen na) :
-    W'.sz = 0x4000 ∧
-    0x3150 ≤ kxcSpFinal 0x4000 alen na ∧
-    kxcSpFinal 0x4000 alen na + 8 * ((na : Int) + 1) ≤ 0x4000 ∧
-    ((uvisSp W').toNat : Int) = kxcSpFinal 0x4000 alen na ∧
-    (uvisAv W' : Int) = kxcSpFinal 0x4000 alen na ∧
-    uvisArgc W' = na ∧
-    (∀ i, i ≤ na → (ukArgvP W'.M (kxcSpFinal 0x4000 alen na).toNat i : Int) = kexecUstack 0x4000 alen na i) ∧
-    (∀ i, i < na → kxcSpFinal 0x4000 alen na < kxcSp 0x4000 alen (i + 1) ∧
-        kxcSp 0x4000 alen (i + 1) + (alen i : Int) < 0x4000) ∧
-    (∀ i, i < na → ∀ j, j ≤ alen i → ∃ b : BitVec 8, memAtZ W'.M (kxcSp 0x4000 alen (i + 1) + (j : Int)) = some b) ∧
-    (∀ i, i < na → ukSlen W'.M (kxcSp 0x4000 alen (i + 1)).toNat ≤ alen i ∧
-        Ucstr W'.M (kxcSp 0x4000 alen (i + 1)).toNat (ukSlen W'.M (kxcSp 0x4000 alen (i + 1)).toNat)) ∧
-    (∀ j : Int, 0 ≤ j → j < 8 * ((na : Int) + 1) →
-        ∃ b : BitVec 8, memAtZ W'.M (kxcSpFinal 0x4000 alen na + j) = some b) ∧
-    (∀ a : Int, 0x3000 ≤ a → a < kxcSpFinal 0x4000 alen na → memAtZ W'.M a = some 0#8) := by
-  obtain ⟨h1, h2, h3⟩ := imgKexecGeom User.Sync.elf 42 na alen afun sts W' syncKexecSz hok (syncRoom42 hroom)
-  exact ⟨h1, by omega, h3⟩
 
 /-- **Rocq `sync_kexec_pages`** (deviation 2): the entry pc, the code
 segment's inclusion, page 0 X-and-not-W, the .bss page W, the stack page
@@ -135,44 +84,6 @@ theorem syncKexecPages (na : Nat) (alen : Nat → Nat) (afun : Nat → Nat → B
   refine ⟨by rw [hpc]; exact syncStart_pc, ?_, hx, hdw, hwr, hrp⟩
   rw [User.Sync.elf_image] at himg
   exact uimgSub_union_l _ _ _ (uimgSub_union_l _ _ _ himg)
-
-/-- **Rocq `sync_kexec_argsc`**. -/
-theorem syncKexecArgsc (na : Nat) (alen : Nat → Nat) (afun : Nat → Nat → BitVec 8) (sts : List FdState)
-    (W' : Uvis) (hok : kexecImageOk User.Sync.elf na alen afun sts W')
-    (hroom : (kexecSz User.Sync.elf : Int) - 4096 + 336 ≤
-      kxcSpFinal (kexecSz User.Sync.elf : Int) alen na)
-    (hwr : ∀ a, 0x3000 ≤ a → a < 0x4000 → uwAddr W'.perm a)
-    (hrp : ∀ a, 0x3000 ≤ a → a < 0x4000 → ukRpage W'.perm (BitVec.ofNat 64 a)) :
-    UkArgsC W'.perm W'.M (uvisAv W') (uvisArgc W') (uvisSp W').toNat :=
-  imgKexecArgsc User.Sync.elf 42 na alen afun sts W' syncKexecSz hok (syncRoom42 hroom) hwr hrp
-
-/-- **Rocq `sync_kexec_avd`**. -/
-theorem syncKexecAvd (na : Nat) (alen : Nat → Nat) (afun : Nat → Nat → BitVec 8) (sts : List FdState)
-    (W' : Uvis) (hok : kexecImageOk User.Sync.elf na alen afun sts W')
-    (hroom : (kexecSz User.Sync.elf : Int) - 4096 + 336 ≤
-      kxcSpFinal (kexecSz User.Sync.elf : Int) alen na)
-    (hwr : ∀ a, 0x3000 ≤ a → a < 0x4000 → uwAddr W'.perm a) :
-    ∀ j, j < 8 * uvisArgc W' → (get? (udataLo W'.M W'.perm W'.sz) (uvisAv W' + j)).isSome :=
-  imgKexecAvd User.Sync.elf 42 na alen afun sts W' syncKexecSz hok (syncRoom42 hroom) hwr
-
-/-- **Rocq `sync_kexec_avs`**. -/
-theorem syncKexecAvs (na : Nat) (alen : Nat → Nat) (afun : Nat → Nat → BitVec 8) (sts : List FdState)
-    (W' : Uvis) (hok : kexecImageOk User.Sync.elf na alen afun sts W')
-    (hroom : (kexecSz User.Sync.elf : Int) - 4096 + 336 ≤
-      kxcSpFinal (kexecSz User.Sync.elf : Int) alen na)
-    (hwr : ∀ a, 0x3000 ≤ a → a < 0x4000 → uwAddr W'.perm a) :
-    ∀ i j, i < uvisArgc W' → j ≤ ukSlens W'.M (uvisAv W') i →
-      (get? (udataLo W'.M W'.perm W'.sz) (ukArgvP W'.M (uvisAv W') i + j)).isSome :=
-  imgKexecAvs User.Sync.elf 42 na alen afun sts W' syncKexecSz hok (syncRoom42 hroom) hwr
-
-/-- **Rocq `sync_kexec_stkrow`**. -/
-theorem syncKexecStkrow (na : Nat) (alen : Nat → Nat) (afun : Nat → Nat → BitVec 8) (sts : List FdState)
-    (W' : Uvis) (hok : kexecImageOk User.Sync.elf na alen afun sts W')
-    (hroom : (kexecSz User.Sync.elf : Int) - 4096 + 336 ≤
-      kxcSpFinal (kexecSz User.Sync.elf : Int) alen na)
-    (hwr : ∀ a, 0x3000 ≤ a → a < 0x4000 → uwAddr W'.perm a) :
-    ∀ j, j < 8 * 42 → (get? (udataLo W'.M W'.perm W'.sz) ((uvisSp W').toNat - 8 * 42 + j)).isSome :=
-  imgKexecStkrow User.Sync.elf 42 na alen afun sts W' syncKexecSz hok (syncRoom42 hroom) hwr
 
 /-- **Rocq `sync_kexec_entry_rows`**: every row sync's entry reads off the
 key. -/

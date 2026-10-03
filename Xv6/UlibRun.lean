@@ -42,10 +42,8 @@ The jump leaf carries the model's target-alignment premise (SpecUkLeaves
 `wpUkJalBody`), and the frame close carries the room below `sp` (UserHeap's
 `ustack` holds it, UserHeap deviation 4), so the real instance exists.
 -/
-import MachCSL.DecodeBridge
 import Xv6.UserTextDefs
 import Xv6.SpecUkLeaves
-import MachCSL.Instr
 
 namespace Xv6
 

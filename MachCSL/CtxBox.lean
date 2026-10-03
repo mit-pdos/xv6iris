@@ -35,8 +35,7 @@ THE TRANSITIONS (Rocq's seven, with their hooked forms): (a)
 `boxWithdrawL1`(`Hook`/`Free`), (b) `boxDepositL1`(`Hook`/`Shape`), (c)
 `boxRefIncr`, (d) `boxRefDecr`, (e) `boxCheckout`(`Hook`/`Split`), (f)
 `boxPark`(`Hook`/`Join`), (g) `boxL1ToL2`(`Hook`); the accessors
-`boxQUpdate` / `boxQ1Update` / `boxView`; boot `boxAlloc` / `boxAllocAt` /
-`boxAllocAtHalves`.
+`boxQUpdate` / `boxQ1Update`; boot `boxAllocAt` / `boxAllocAtHalves`.
 
 **Porting notes** (spelling, not design):
 
@@ -78,8 +77,6 @@ namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Iris.Std Std
 open LeanRV64D
-
-set_option linter.unusedSectionVars false
 
 section transport
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
@@ -501,15 +498,6 @@ theorem qsum_singleton_op (m : StampMap Id) (p : Id × Nat) (q : UFrac) :
     qsum ((PartialMap.singleton p q : StampMap Id) • m) = q.frac.val + qsum m := by
   rw [qsum_op, qsum_singleton]
 
-theorem qsum_insert (m : StampMap Id) (p : Id × Nat) (q : UFrac) (hp : get? m p = none) :
-    qsum (PartialMap.insert m p q) = q.frac.val + qsum m := by
-  rw [Heap.insert_eq_singleton_op_singleton hp, qsum_singleton_op]
-
-theorem qsum_delete (m : StampMap Id) (p : Id × Nat) (q : UFrac) (hp : get? m p = some q) :
-    qsum m = q.frac.val + qsum (PartialMap.delete m p) := by
-  conv => lhs; rw [← LawfulPartialMap.insert_delete_cancel hp]
-  exact qsum_insert _ p q (LawfulPartialMap.get?_delete_eq rfl)
-
 /-- Inclusion, as the witness equation (iris-lean's `≼` is Leibniz). -/
 theorem stamps_incl_eq {m1 m2 : StampMap Id} (h : m1 ≼ m2) : ∃ z, m2 = m1 • z := h
 
@@ -589,14 +577,6 @@ theorem maxStamp_op (m1 m2 : StampMap Id) :
     have h2 := (maxStamp_le_iff m2 (maxStamp (m1 • m2))).2
       (fun p hp => maxStamp_ge _ p ((isSome_sop m1 m2 p).2 (Or.inr hp)))
     omega
-
-theorem maxStamp_singleton_op (m : StampMap Id) (p : Id × Nat) (q : UFrac) :
-    maxStamp ((PartialMap.singleton p q : StampMap Id) • m) = max p.2 (maxStamp m) := by
-  rw [maxStamp_op, maxStamp_singleton]
-
-theorem maxStamp_insert (m : StampMap Id) (p : Id × Nat) (q : UFrac) (hp : get? m p = none) :
-    maxStamp (PartialMap.insert m p q) = max p.2 (maxStamp m) := by
-  rw [Heap.insert_eq_singleton_op_singleton hp, maxStamp_singleton_op]
 
 /-- Every key of the fragment is at this identity (Rocq's `keyed`). -/
 def keyed (m : StampMap Id) (i : Id) : Prop := ∀ p, (get? m p).isSome → p.1 = i
@@ -709,7 +689,6 @@ theorem stampMap_valid (m : StampMap Id) : ✓ m := by
   cases get? m p <;> trivial
 
 end helpers
-
 
 /-! ## The box's cameras (Rocq `Xv6Cameras` §15's `stampsR` / `boxG`) -/
 
@@ -1068,7 +1047,6 @@ theorem bigSepL_topLb_max (P : Nat → Nat → IProp GF) :
         iframe HP'
         iexact Hl'
 
-
 section withX
 variable [GhostVarG GF (SlotReg Id X)]
 
@@ -1101,19 +1079,6 @@ def l1Row (γ : BoxNames) (r : SlotReg Id X) (ξ : CtxId) : IProp GF := iprop%
 
 instance l1Row_morph (γ : BoxNames) (r : SlotReg Id X) :
     CtxMorph (GF := GF) (l1Row γ r) := by unfold l1Row; infer_instance
-
-/-- L1's row, folded (Rocq's `l1_row_fold`). -/
-theorem l1Row_fold (γ : BoxNames) (r : SlotReg Id X) (ξ : CtxId)
-    (hw : r.win = false) (hx : r.x = none) :
-    slotdHalf (GF := GF) γ r ∗ ctxFloor ξ r.td ∗ topLb r.td ⊢ l1Row γ r ξ := by
-  unfold l1Row
-  iintro ⟨Hr, #Hfl, #Ht⟩
-  iframe Hr
-  isplit
-  · ipureintro; exact ⟨hw, hx⟩
-  isplit
-  · iexact Hfl
-  · iexact Ht
 
 /-! ## The arms -/
 
@@ -1268,13 +1233,6 @@ theorem boxArm_shut (P : BoxPay GF Id X) (γ : BoxNames) (T : Nat) (ξb : CtxId)
     · ipureintro; exact hw'
     · iexact H
 
-/-- The body, opened: its prefix named. -/
-theorem boxBody_open (P : BoxPay GF Id X) (γ : BoxNames) :
-    boxBody P γ ⊢ ∃ (T : Nat) (ξb : CtxId) (m : StampMap Id) (c : Nat) (r : SlotReg Id X)
-      (s : L2Reg Id), ctxStamped ξb T ∗ stampsAuth γ m ∗ cntHalf γ c ∗ slotdHalf γ r ∗
-        slotpHalf γ s ∗ ⌜boxRows T m c r s⌝ ∗ boxArm P γ T ξb m c r s := by
-  unfold boxBody; iintro H; iexact H
-
 /-- The body, opened under the invariant's later. -/
 theorem boxBody_open_later (P : BoxPay GF Id X) (γ : BoxNames) :
     ▷ boxBody P γ ⊢ ▷ ∃ (T : Nat) (ξb : CtxId) (m : StampMap Id) (c : Nat) (r : SlotReg Id X)
@@ -1313,7 +1271,6 @@ theorem box_floor_view2 (cpu : CPU) (ξ : CtxId) (K1 K2 T : Nat) (h : T ≤ K1 �
     iexists K
     iframe HK
     ipureintro; omega
-
 
 section inh
 variable [Inhabited Id] [Inhabited X]
@@ -1812,7 +1769,6 @@ theorem boxCheckoutHook (P : BoxPay GF Id X) [BoxPayOk P] (N : Namespace) (γ : 
     iframe Hrp0
     iexact Hllbh
 
-
 /-- Rocq's `box_checkout` -- plain (e): the caller's `Q2` passes straight
 into the arm. -/
 theorem boxCheckout (P : BoxPay GF Id X) [BoxPayOk P] (N : Namespace) (γ : BoxNames)
@@ -2086,36 +2042,6 @@ theorem boxQ1Update (P : BoxPay GF Id X) [BoxPayOk P] (N : Namespace) (γ : BoxN
     rw [hw2] at hw
     exact absurd hw (by simp)
 
-/-- Rocq's `box_view`: a read-only view for a NON-OWNER (holding no lock of
-the box's): the registers' values with the four rows and the ARM, closed
-again with what was opened. -/
-theorem boxView (P : BoxPay GF Id X) [BoxPayOk P] (N : Namespace) (γ : BoxNames)
-    (E : CoPset) (hE : ↑N ⊆ E) :
-    isBox P N γ ⊢ |={E, E \ ↑N}=> ∃ (T : Nat) (ξb : CtxId) (m : StampMap Id) (c : Nat)
-      (r : SlotReg Id X) (s : L2Reg Id),
-      ⌜boxRows T m c r s⌝ ∗ boxArm P γ T ξb m c r s ∗
-      (boxArm P γ T ξb m c r s ={E \ ↑N, E}=∗ True) := by
-  iintro #Hbox
-  unfold isBox inv
-  ihave Hacc := Hbox $$ %E %hE
-  icases Hacc with #Hacc
-  imod Hacc with ⟨Hbody, Hclose⟩
-  icases boxBody_open_later P γ $$ Hbody with
-    ⟨%T, %ξb, %m, %c1, %r1, %s1, >Hpk, >Hst, >Hc, >Hrd, >Hrp, >%hrows, >Harm⟩
-  imodintro
-  iexists T, ξb, m, c1, r1, s1
-  isplit
-  · ipureintro; exact hrows
-  isplitl [Harm]
-  · iexact Harm
-  iintro Harm
-  imod Hclose $$ [Hpk Hst Hc Hrd Hrp Harm]
-  · inext
-    iapply boxBody_close P γ T ξb m c1 r1 s1 hrows
-    iframe
-  imodintro
-  itrivial
-
 /-! ## Boot: the box is born IN, at the boot deposit's stamp -/
 
 /-- Rocq's `box_alloc_at`: the box is built at names already allocated, out
@@ -2201,31 +2127,7 @@ theorem boxAllocAtHalves (P : BoxPay GF Id X) [BoxPayOk P] (N : Namespace)
   · iexact Hinv
   · iexact HtopTb
 
-/-- Rocq's `box_alloc`: the names are allocated too. -/
-theorem boxAlloc (P : BoxPay GF Id X) [BoxPayOk P] (N : Namespace)
-    (cpu : CPU) (ξ : CtxId) (i0 : Id) (E : CoPset) :
-    ownCtx cpu ξ ∗ inArm P i0 ξ ⊢
-      |={E}=> (ownCtx cpu ξ ∗ ∃ (γ : BoxNames) (Tb : Nat), isBox P N γ ∗
-        slotdHalf γ (⟨Tb, false, i0, none⟩ : SlotReg Id X) ∗ topLb Tb ∗ cntHalf γ 0 ∗
-        slotpHalf γ (⟨0, none⟩ : L2Reg Id)) := by
-  iintro ⟨Hrun, Hin⟩
-  imod stampsAuth_alloc (GF := GF) (Id := Id) with ⟨%g1, Hst⟩
-  imod ghost_var_alloc (GF := GF) (0 : Nat) with ⟨%g2, Hcnt⟩
-  imod ghost_var_alloc (GF := GF) (default : SlotReg Id X) with ⟨%g3, Hrd⟩
-  imod ghost_var_alloc (GF := GF) (⟨0, none⟩ : L2Reg Id) with ⟨%g4, Hrp⟩
-  imod boxAllocAt P N ⟨g1, g2, g3, g4⟩ cpu ξ i0 E
-    $$ [Hst Hcnt Hrd Hrp Hrun Hin] with ⟨Hrun, ⟨%Tb, H⟩⟩
-  · unfold stampsAuth
-    iframe Hst Hcnt Hrp Hrun Hin
-    iexists (default : SlotReg Id X)
-    iexact Hrd
-  imodintro
-  iframe Hrun
-  iexists ⟨g1, g2, g3, g4⟩, Tb
-  iexact H
-
 end inh
-
 
 end withX
 end box

@@ -45,8 +45,6 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Iris.Std.PartialMap
 
-set_option linter.unusedSectionVars false
-
 /-! ## 1.  THE BLOCK MAP'S OWN ROW: every block is a WHOLE block -/
 
 /-- Rocq's `dblk_full`. -/
@@ -258,17 +256,6 @@ theorem snapBlkRead_full (g gl gt : GName) (D : BlockMap) (b : Nat) (bs : List (
     snapAuth (GF := GF) g D ⊢ FsView.blkOwned (snapGamma g gl gt) b bs -∗
       ⌜get? D b = some bs⌝ :=
   snapBlkRead g gl gt D (DFrac.own 1) b bs hf
-
-/-- ...and the DOMAIN reading a block whose bytes the snapshot owns at an
-unknown value needs: the free pool's arm (Rocq's `snap_blk_dom`). -/
-theorem snapBlkDom (g gl gt : GName) (D : BlockMap) (dq : DFrac) (b : Nat)
-    (bs : List (BitVec 8)) (hf : dblkFull D) :
-    snapAuth (GF := GF) g D ⊢ FsView.blkOwnedQ (snapGamma g gl gt) dq b bs -∗
-      ⌜∃ cs, get? D b = some cs⌝ := by
-  iintro Ha Hb
-  ihave %hb := snapBlkRead g gl gt D dq b bs hf $$ Ha Hb
-  ipureintro
-  exact ⟨bs, hb⟩
 
 end Read
 

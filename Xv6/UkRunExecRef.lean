@@ -4,13 +4,14 @@ lines, pinned `1900b8a43`).
 
 A FAILED exec hands its refund back.  Rocq's `UkRunSys.wp_uk_ecall_exec_at_cwd`
 hands it as the record's own exit payload at the kill status
-(`UkRun.udepwAtRef`: the deposit carries `□ (sexecRefund f -∗ N.pay (-1))`);
+(Rocq's `udepw_at_ref`: the deposit carries `□ (sexecRefund f -∗ N.pay (-1))`);
 /init's child needs more on that arm (it prints "init: exec sh failed"
 first, and the credential that pays those bytes went INTO the deposit), so
 here the refund's consequence is a parameter `R`: `udepwAtRefR N m pc c R` is
-`udepwAtRef` with `□ (sexecRefund f -∗ R)`, and the leaf hands the caller
-`R`.  The `_ids` twin also LENDS the record's identity authorities (children
-set and pid, `urunIds`) to the supplier, which wants to say what they are.
+Rocq's `udepw_at_ref` with `□ (sexecRefund f -∗ R)`, and the leaf hands the
+caller `R`.  The `_ids` twin also LENDS the record's identity authorities
+(children set and pid, `urunIds`) to the supplier, which wants to say what
+they are.
 
 The proof is Rocq's: the ecall leaf (`UK_LEAVES.wp_uk_ecall`, a PARAMETER,
 DU2); `uexecRet` at the ecall cause and the exec number; the payment is free
@@ -44,8 +45,6 @@ open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 open UexecSG
 
-set_option linter.unusedSectionVars false
-
 theorem usysExec_ne_exit : USYS_exec ≠ USYS_exit := by unfold USYS_exec USYS_exit; decide
 theorem usysExec_ne_fork : USYS_exec ≠ USYS_fork := by unfold USYS_exec USYS_fork; decide
 theorem usysExec_ne_wait : USYS_exec ≠ USYS_wait := by unfold USYS_exec USYS_wait; decide
@@ -55,12 +54,12 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : 
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
-/-- **Rocq `sbundle_pay_refR`**: `sbundlePayRef` with the refund's
+/-- **Rocq `sbundle_pay_refR`**: Rocq's `sbundle_pay_ref` with the refund's
 consequence a parameter `R`. -/
 def sbundlePayRefR (X : Uvis → IProp GF) (Q : Int → IProp GF) (R : IProp GF) (W : Uvis) : IProp GF :=
   iprop(∃ f : sfam GF, ⌜sexitPay f = Q⌝ ∗ □ (sexecRefund f -∗ R) ∗ sbundleAt X USYS_exec f W)
 
-/-- **Rocq `udepw_at_refR`**: `UkRun.udepwAtRef` at the refund `R`, the
+/-- **Rocq `udepw_at_refR`**: Rocq's `udepw_at_ref` at the refund `R`, the
 run's pipe rows LENT (persistent, so nothing comes back). -/
 def udepwAtRefR (N : UkNames GF) (m : RegMap) (pc : BitVec 64) (c : Nat) (R : IProp GF) : IProp GF :=
   iprop(∀ (M : ElfMem) (pm : Nat → Option UPerm) (sz : Nat) (fdv : List FdState) (gn : GName)

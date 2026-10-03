@@ -35,10 +35,6 @@ namespace Xv6
 open MachCSL
 open Iris.Std (get?)
 
-/-- The number the dispatcher's rows are keyed by is the table's EFFECTIVE
-number at the block's mask (Rocq `sysc_num_usys`, xv6 7b2c1b1b). -/
-theorem syscNum_usys (V : ProcPriv) : syscNum V = usysEff V.pvSecc V.tf := rfl
-
 /-- **Every entry but exec and sbrk**: the kernel's table implies the
 user's, given the permission view, the break and the lazy bit did not move
 and what fork, read and uptime answered (Rocq `sysc_mem_ok_usys`; the uptime
@@ -74,16 +70,6 @@ theorem syscMemOk_usys (V V' : ProcPriv) (M M' : ElfMem) (r : BitVec 64)
   by_cases hu : syscNum V = USYS_uptime
   · rw [if_pos hu]; exact ⟨hup hu, H, hp, hs, hlz⟩
   · rw [if_neg hu]; exact ⟨H, hp, hs, hlz⟩
-
-/-- THE DESCRIPTOR BRIDGE, an identity -- which is the point: if either side
-grows a row the other cannot express, this stops compiling (Rocq
-`sysc_fd_ok_usys`). -/
-theorem syscFdOk_usys (V : ProcPriv) (r : BitVec 64) (sts sts' : List FdState)
-    (H : syscFdOk V r sts sts') : usysFdOk (syscNum V) V.tf r sts sts' := H
-
-/-- Rocq `usys_fd_ok_sysc`. -/
-theorem usysFdOk_sysc (V : ProcPriv) (r : BitVec 64) (sts sts' : List FdState)
-    (H : usysFdOk (syscNum V) V.tf r sts sts') : syscFdOk V r sts sts' := H
 
 /-- sbrk: the dispatcher's row (Rocq `sysc_mem_ok_sbrk_row`). -/
 theorem syscMemOk_sbrkRow {V V' : ProcPriv} {M M' : ElfMem} (hn : syscNum V = USYS_sbrk)

@@ -67,8 +67,6 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedSectionVars false
-
 /-! ## The register pin that survives P5 and P6
 
 P5 overwrites `s1` with `&disk.vdisk_lock` and `s2` with the constant the
@@ -92,9 +90,6 @@ theorem vdrwRegs6_call (k : KCtx) (R R' : RegMap) (h : vdrwRegs6 k R) (hc : call
   obtain ⟨h2, h8, h25, h26, h27⟩ := h
   obtain ⟨c2, c8, -, -, -, -, -, -, -, -, c25, c26, c27⟩ := hc
   exact ⟨by rw [c2, h2], by rw [c8, h8], by rw [c25, h25], by rw [c26, h26], by rw [c27, h27]⟩
-
-theorem vdrwRegs6_ws (k : KCtx) (a b : Bool) (R : RegMap) :
-    vdrwRegs6 (k.withSpie a b) R = vdrwRegs6 k R := rfl
 
 /-! ## Two marking identities -/
 
@@ -293,21 +288,6 @@ theorem vdrwK_withSpie' (k : KCtx) (a b : Bool) :
 theorem vdrw5_filter :
     (["virtio_disk"] : List String).filter (fun x => x ≠ "virtio_disk") = [] := by decide
 
-/-- **Re-entering the critical section after the park**: the context the
-sleeper's `acquire` leaves is the one it had before the `release`, with
-the pinned bits `sleep` came back on. -/
-theorem vdrw5_reenter (k : KCtx) (a b c d : Bool) (hwf : k.wf) (hnoff : k.noff = 0)
-    (hlocks : k.locks = []) (hK : 12 ≤ k.avail) :
-    ((((k.pushed 12).withSpie a b).pushOffAt c d).withLocks ["virtio_disk"]) =
-      vdrwK (k.withSpie c d) := by
-  obtain ⟨-, -, -, -, -⟩ := hwf
-  obtain ⟨regs, sie, spie, spp, avail, noff, intena, locks, tier, root, proc⟩ := k
-  simp only at hnoff hlocks hK
-  subst hnoff; subst hlocks
-  simp only [vdrwK, KCtx.pushOffAt, KCtx.pushed, KCtx.withLocks, KCtx.withSpie, KCtx.mk.injEq,
-    _root_.true_and, _root_.and_true]
-  omega
-
 /-- After the `release` of a balanced pair, `virtio_disk_rw`'s context is
 its entry context with the twelve-slot frame still up (at either `SIE`). -/
 theorem vdrw_popctx (k : KCtx) (s : Bool) (hs : k.sie = s) (hlocks : k.locks = []) (hwf : k.wf) :
@@ -363,51 +343,6 @@ def vdrwP5Exit (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
   vdrwSaved k ∗
   idxCells (k.regs 2#5) (BitVec.ofNat 32 c.hd) (BitVec.ofNat 32 c.md) (BitVec.ofNat 32 c.tl) y ∗
   vdrwNext k γ bno wr dataBuf dataDisk (some c.kq.2) cpu
-
-/-- The loop invariant, assembled from its parts. -/
-theorem vdrwP5Loop_intro (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (cpu : CPU) (k : KCtx) (γ : DiskNames) (γl : GName) (pd pav pu : BitVec 64)
-    (bno : BitVec 32) (dataBuf dataDisk : List (BitVec 8)) (wr : Bool)
-    (c : Chain) (y : BitVec 32) (R : RegMap) :
-    ⌜vdrwRegs6 k R ∧ c.wf ∧ c.bp = k.regs 10#5 ∧ c.blk = bno.toNat ∧
-      R 19#5 = k.regs 10#5 ∧ R 9#5 = aVdiskLock ∧ R 18#5 = 1#64⌝ ∗
-    kctx cpu ((vdrwK k).withRegs R) ∗ pcIs cpu (KA.«virtio_disk_rw» + 0x1b4#64) ∗
-    procsInv Γ ∗ trapCsrs cpu ∗ cpuClaim cpu k.proc ∗ intrRes cpu ∗
-    vdrwCaps γ γl pd pav pu ∗ locked γl cpu ∗ diskRes γ pd pav pu curCtx ∗
-    headTokQ γ c.hd (.active c) ∗ headTokQ γ c.md (.member c.hd) ∗
-    headTokQ γ c.tl (.member c.hd) ∗
-    wordPointsTo (aBufBlockno c.bp) 4 (DFrac.own (1 : Qp).half) bno ∗
-    vdrwSaved k ∗
-    idxCells (k.regs 2#5) (BitVec.ofNat 32 c.hd) (BitVec.ofNat 32 c.md)
-      (BitVec.ofNat 32 c.tl) y ∗
-    vdrwNext k γ bno wr dataBuf dataDisk (some c.kq.2) cpu ⊢
-      vdrwP5Loop (GF := GF) Γ cpu k γ γl pd pav pu bno dataBuf dataDisk wr c y R := by
-  unfold vdrwP5Loop
-  iintro H
-  iexact H
-
-/-- The seam, assembled from its parts. -/
-theorem vdrwP5Exit_intro (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (cpu : CPU) (k : KCtx) (γ : DiskNames) (γl : GName) (pd pav pu : BitVec 64)
-    (bno : BitVec 32) (dataBuf dataDisk : List (BitVec 8)) (wr : Bool)
-    (c : Chain) (y : BitVec 32) (R : RegMap) :
-    ⌜vdrwRegs6 k R ∧ c.wf ∧ c.bp = k.regs 10#5 ∧ c.blk = bno.toNat⌝ ∗
-    kctx cpu ((vdrwK k).withRegs R) ∗ pcIs cpu (KA.«virtio_disk_rw» + 0x1d2#64) ∗
-    procsInv Γ ∗ trapCsrs cpu ∗ cpuClaim cpu k.proc ∗ intrRes cpu ∗
-    vdrwCaps γ γl pd pav pu ∗ locked γl cpu ∗
-    diskResA γ pd pav pu curCtx (updB (fun _ => false) c.hd true) ∗
-    headTok γ c.hd (.active c) ∗
-    claimResD γ curCtx pd c 0#32 ∗ (∃ n : Nat, headDoneE γ n c.hd c.ep ∗ diskReadLb γ n) ∗
-    headTokQ γ c.md (.member c.hd) ∗ headTokQ γ c.tl (.member c.hd) ∗
-    wordPointsTo (aBufBlockno c.bp) 4 (DFrac.own (1 : Qp).half) bno ∗
-    vdrwSaved k ∗
-    idxCells (k.regs 2#5) (BitVec.ofNat 32 c.hd) (BitVec.ofNat 32 c.md)
-      (BitVec.ofNat 32 c.tl) y ∗
-    vdrwNext k γ bno wr dataBuf dataDisk (some c.kq.2) cpu ⊢
-      vdrwP5Exit (GF := GF) Γ cpu k γ γl pd pav pu bno dataBuf dataDisk wr c y R := by
-  unfold vdrwP5Exit
-  iintro H
-  iexact H
 
 theorem vdrwP5Exit_self (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γ : DiskNames) (γl : GName) (pd pav pu : BitVec 64)
@@ -594,14 +529,6 @@ theorem vdrw6_ret_20c : jumpPc (KA.«virtio_disk_rw» + 0x20c#64) =
   KA.«virtio_disk_rw» + 0x20c#64 := by decide
 theorem vdrw6_ret_21c : jumpPc (KA.«virtio_disk_rw» + 0x21c#64) =
   KA.«virtio_disk_rw» + 0x21c#64 := by decide
-
-/-- `&disk.info[h].b`, as `+0x1d6 .. +0x1e8` compute it (`a5 = 16 h + 32
-+ &disk`, offset 8). -/
-theorem vdrw6_infoB (i : Nat) :
-    BitVec.ofNat 64 (16 * i) + 32#64 + (KA.«disk» + 8#64) = aInfoB i := by
-  rw [BitVec.add_assoc (BitVec.ofNat 64 (16 * i)) 32#64]
-  rw [vdrw3_disk_off' 32 i 8]
-  exact vdrw3_infoB i
 
 /-- `&disk.desc[i]`, as `+0x1f4 .. +0x1fc` compute it. -/
 theorem vdrw6_descAt (pd : PAddr) (i : Nat) : pd + BitVec.ofNat 64 (16 * i) = descAt pd i := rfl

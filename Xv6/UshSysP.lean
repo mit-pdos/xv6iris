@@ -30,16 +30,12 @@ Namespace `UshSysP`, so nothing here can clash with the eventual port
    against the UkRunSys port.
 -/
 import Xv6.UkSysP
-import Xv6.UPtDefs
-import Xv6.UserPerm
 
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
-
-set_option linter.unusedSectionVars false
 
 namespace UshSysP
 

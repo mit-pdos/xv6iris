@@ -53,7 +53,6 @@ import Xv6.SpecUartwrite
 import Xv6.FsWords
 import Xv6.UmodeArith
 import MachCSL.BvLemmas
-import Xv6.KernelTac
 
 namespace Xv6
 
@@ -62,15 +61,13 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## Addresses -/
 
 theorem cwj_4a : jumpPc (KA.«consolewrite» + 0x4a#64) = KA.«consolewrite» + 0x4a#64 := by decide
 theorem cwj_58 : jumpPc (KA.«consolewrite» + 0x58#64) = KA.«consolewrite» + 0x58#64 := by decide
-theorem cw_br_copyin : KA.«consolewrite» + 0x22dc#64 = KA.«either_copyin» := by decide
+theorem cw_br_copyin : KA.«consolewrite» + 0x22f0#64 = KA.«either_copyin» := by decide
 theorem cw_br_uartwrite : KA.«consolewrite» + 0x848#64 = KA.«uartwrite» := by decide
 
 /-! ## Word arithmetic, as the instructions compute it -/
@@ -142,9 +139,6 @@ theorem cw_bge_add (x y m : Nat) (hx : x + y < 2 ^ 63) (hm : m < 2 ^ 63) :
       decide (m ≤ x + y) := by
   rw [← ofNat64_add]; exact cw_bge_nat (x + y) m hx hm
 
-/-- The result of the `n ≤ 0` exit. -/
-theorem cw_ret0 (n : Int) : consWriteRet n 0#64 := ⟨0, by decide, by omega, by omega⟩
-
 /-- `beq a0,s8` at the copy's return: `a0` is `0` or `-1`. -/
 theorem cw_beq_ok : bcond bop.BEQ 0#64 0xFFFFFFFFFFFFFFFF#64 = false := by decide
 theorem cw_beq_fail : bcond bop.BEQ (-1#64) 0xFFFFFFFFFFFFFFFF#64 = true := by decide
@@ -194,12 +188,6 @@ theorem cw_join8 (a b : BitVec 64) (hb : b = a + 8#64) (w : BitVec 64) (bs : Lis
   iapply (byteBuf_append (GF := GF) a (DFrac.own 1) (wordToBytes w) bs).2
   rw [wordToBytes_length]
   iframe Hw Hb
-
-theorem cw_buf_nil (a : BitVec 64) (bs : List (BitVec 8)) (h : bs = []) :
-    ⊢ byteBuf (GF := GF) a (DFrac.own 1) bs := by
-  subst h; unfold byteBuf
-  simp only [Iris.Algebra.BigOpL.bigOpL_nil]
-  iintro; iempintro
 
 end
 
@@ -591,16 +579,6 @@ theorem cwFix_cs (k : KCtx) (N : Nat) (R R' : RegMap) (h : cwFix k N R)
   exact ⟨c2.trans a2, c8.trans a8, c20.trans a20, c21.trans a21, c22.trans a22, c23.trans a23,
     c24.trans a24, c25.trans a25, c26.trans a26, c27.trans a27⟩
 
-theorem cwFix_set (k : KCtx) (N : Nat) (R : RegMap) (h : cwFix k N R)
-    (r : BitVec 5) (v : BitVec 64)
-    (hr : r ∉ ([2, 8, 20, 21, 22, 23, 24, 25, 26, 27] : List (BitVec 5))) :
-    cwFix k N (R.set r v) := by
-  obtain ⟨a2, a8, a20, a21, a22, a23, a24, a25, a26, a27⟩ := h
-  simp only [List.mem_cons, List.mem_nil_iff, or_false, not_or] at hr
-  obtain ⟨n2, n8, n20, n21, n22, n23, n24, n25, n26, n27⟩ := hr
-  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
-    simp only [RegMap.set_apply] <;> rw [if_neg (Ne.symm ‹_›)] <;> assumption
-
 /-- The caller's continuation (the spec's, named). -/
 def cwPost (k : KCtx) (j : Nat) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
     (n : Int) (Q : Nat → IProp GF) : CPU → IProp GF :=
@@ -954,7 +932,7 @@ theorem cw_body (EC : EITHER_COPYIN) (UW : UARTWRITE) (Γ : SchedNames) [ClaimIs
   k_step_e (wp_s_add cpu _ (KA.«consolewrite» + 0x44#64) true 10#5 0#5 21#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [g21]
   iintro Hk Hpc
-  k_step_e (wp_s_jal cpu _ (KA.«consolewrite» + 0x46#64) false 8854#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«consolewrite» + 0x46#64) false 8874#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [cw_br_copyin]
   iintro Hk Hpc
   -- the bounce buffer, split at the chunk length

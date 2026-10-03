@@ -49,12 +49,4 @@ theorem imgWord_of_bytes (E : ElfMem) (Mv : Nat → List (BitVec 8)) (a : Nat) (
   rw [h 0 (by decide), h 1 (by decide), h 2 (by decide),
     h 3 (by decide), h 4 (by decide), h 5 (by decide), h 6 (by decide), h 7 (by decide)]
 
-/-- **Rocq `uimg_word_det`**: eight image bytes pin the word they encode --
-the contract's reading `w` at `a` IS `z`. -/
-theorem uimgWord_det (E : ElfMem) (Mv : Nat → List (BitVec 8)) (a : Nat) (w z : BitVec 64)
-    (hag : imgAgrees E Mv) (hw : bytesToWord (umemRead Mv a 8) = w)
-    (hb : ∀ k, k < 8 → E (a + k) = some (nthByte (n := 8) z k)) : w = z := by
-  rw [imgWord_of_bytes E Mv a z hag hb, bytesToWord_wordToBytes] at hw
-  exact hw.symm
-
 end Xv6

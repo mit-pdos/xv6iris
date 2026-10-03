@@ -40,8 +40,6 @@ is read.  Unreached: `echo_image_entry_env` (the equation-free corollary).
 import Xv6.UkTreeEntryStmt
 import Xv6.UkTreeEntry
 import Xv6.UshEchoOut
-import Xv6.UshEchoPin
-import Xv6.UEchoKernel
 import Xv6.LinkEcho
 
 namespace Xv6
@@ -49,8 +47,6 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Iris.Std.PartialMap
 open Std (ExtTreeSet)
-
-set_option linter.unusedSectionVars false
 
 /-- NEW (deviation 2): the code-segment readings `utextAll_img` asks for, at
 a key whose page 0 is X-and-not-W. -/

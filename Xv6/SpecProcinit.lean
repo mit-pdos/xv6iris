@@ -24,7 +24,7 @@ PROCINIT IS WHERE THE SLOT SUPPLIES ARE ROUTED (Rocq, batch 8-P, pending
 (`ProcDefs.procDormantNofd`, Rocq `proc_dormant_nofd`; `procRaw` is Rocq's
 `proc_raw`), and the caller hands over the WHOLE per-process shares of the
 three supplies -- `fdSlots (NPROC * (NOFILE + FDSPARE))`, `irefSlots (NPROC
-* (1 + IREFSPARE))`, `bslots (NPROC * 3)` -- which procinit routes, one
+* (IREFHOME + IREFSPARE))`, `bslots (NPROC * 3)` -- which procinit routes, one
 share per slot, into the PRE-STACK block (`ProcDefs.procDormantPrestk`,
 Rocq `proc_dormant_prestk`).  What comes back per slot (`procReady`, Rocq
 `proc_ready`) is the lock's fresh words, `state = UNUSED`, `p->kstack =
@@ -36,7 +36,7 @@ is the caller's ghost step (`Xv6/ProcsInvAlloc.lean`, Rocq
 DEVIATION (Lean block shape, not process layer): Lean's dormant block owns
 the `p->kstack` cell (Rocq persists it into `is_kstack`), so the seal takes
 the cell rather than a persistent reading; and the lock's two identity
-claims (`kmapId`), which Lean's `newlock` takes beside `lkFresh`, ride
+claims (`kmapId`), which Lean's `newlock_of_fresh` takes beside `lkFresh`, ride
 `procReady` (Rocq's `lk_fresh` carries what its `newlock` needs).
 
 Imports only definitional files (never a `Code*` or `Proof*` file).
@@ -44,8 +44,6 @@ Imports only definitional files (never a `Code*` or `Proof*` file).
 import Xv6.ProcDefs
 import Xv6.Image
 import MachCSL.AluFacts
-import MachCSL.Lock
-import MachCSL.CallConv
 
 namespace Xv6
 
@@ -61,9 +59,9 @@ def nextpidNameAddr : BitVec 64 := KStr.«nextpid»
 def waitLockNameAddr : BitVec 64 := KStr.«wait_lock»
 /-- The `"proc"` literal. -/
 def procNameAddr : BitVec 64 := KStr.«proc»
-/-- `&proc[i]` is `ProcDefs.procAddr` (`sizeof(struct proc) = 368`); its
+/-- `&proc[i]` is `ProcDefs.procAddr` (`sizeof(struct proc) = 376`); its
 lock is its first field, `state` at `+24`, `kstack` at `+64`. -/
-theorem procAddr_eq (i : Nat) : procAddr i = KA.«proc» + BitVec.ofNat 64 (368 * i) := rfl
+theorem procAddr_eq (i : Nat) : procAddr i = KA.«proc» + BitVec.ofNat 64 (376 * i) := rfl
 /-- `KSTACK(i)`. -/
 def kstackVa (i : Nat) : BitVec 64 := 0x3ffffff000#64 - BitVec.ofNat 64 ((i + 1) * 8192)
 
@@ -120,7 +118,7 @@ def wp_procinit_body (cpu : CPU) (k : KCtx) (hK : 10 ≤ k.avail) : Prop :=
   (∃ vlock vname vcpu, lockWords waitLockAddr vlock vname vcpu) ∗
   ([∗list] i ∈ List.range NPROC, procRaw i) ∗
   fdSlots (NPROC * (NOFILE + FDSPARE)) ∗
-  irefSlots (NPROC * (1 + IREFSPARE)) ∗
+  irefSlots (NPROC * (IREFHOME + IREFSPARE)) ∗
   bslots (NPROC * 3) ∗
   wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ R' : RegMap,
     kctx cpu' (k.withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗

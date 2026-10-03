@@ -24,6 +24,7 @@
 Deviations from Rocq: as `Xv6/IreclaimOrphanC.lean`.
 -/
 import Xv6.IreclaimOrphanB
+import Xv6.IupdateSteps
 
 namespace Xv6
 
@@ -32,9 +33,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-- `beqz s3` at `+0x50`: NOT taken, `s3 = ientry kslot ≠ 0`. -/
 theorem ireclaim_ientry_beq (k : Nat) (hk : k < NINODE) :
@@ -135,7 +134,7 @@ theorem ireclaim_orphan (PK : PRINTK) (BE : BRELSE) (IG : IGET) (BO : BEGIN_OP) 
   k_step_e (wp_s_add cpu _ (KA.«ireclaim» + 0x3a#64) true 10#5 0#5 22#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [a22]
   iintro Hk Hpc
-  k_step_e (wp_s_jal cpu _ (KA.«ireclaim» + 0x3c#64) false 2084664#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«ireclaim» + 0x3c#64) false 2084644#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ireclaim_br_printk]
   iintro Hk Hpc
   iapply (ireclaim_printk PK cpu _ ?pK ?pnoff ?ppr ?puart ?pa0) $$ [- $Hk $Hpc $Hfmt $Hpe]

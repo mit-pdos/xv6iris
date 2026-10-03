@@ -44,7 +44,6 @@ instances of Rocq (ported as Lean instances where a proof needs them).
 -/
 import Xv6.UkCatFIfaceCon
 import Xv6.UkCatFIfaceDeps
-import Xv6.UkCatFIfaceReg
 import Xv6.UkPipesIfaceReg
 
 namespace Xv6
@@ -53,8 +52,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Iris.Std.PartialMap
 open HfpPipeP HfpFileClaimsP
 open Std (ExtTreeSet)
-
-set_option linter.unusedSectionVars false
 
 /-! ## §0 The handles (deviation 3) -/
 

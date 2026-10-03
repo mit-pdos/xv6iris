@@ -51,9 +51,10 @@ The view is the MAPPED one; Rocq's `us_M` is the lazy view.  They agree under
   only because Rocq's kernel stages could not import SpecKexec).
 * `umem_wr_write`, `kx_wr_linear`, `mword0_bv0`, `elf_zero_byte_bv0`,
   `umem_write_ext_kxb`: Lean-trivial (Nat-keyed list writes; one zero).
-* `kx_str_at_step`, `kxb_args_at_intro`, `kxb_stack_at_intro`: subsumed by
-  `kx_argv_push` / `kx_argv_vec` / `kexec_stack_at_intro` (their only
-  consumers were the argv rows, ProofKexecC).
+* `kx_str_at_step`, `kxb_args_at_intro`: subsumed by `kx_argv_push` /
+  `kx_argv_vec` (their only consumers were the argv rows, ProofKexecC);
+  `kxb_stack_at_intro` and `kexec_stack_at_intro` are not ported (nothing
+  uses them).
 * `load_win_step` (the file-named instance), `load_win_write_out`: subsumed
   by `loadWin_step` (Rocq's `_step_g`) / unused (no Rocq consumer).
 * `uimg_sub_umem_write`/`_umem_wr`: `uimgSub_write` (a covered copyout is a
@@ -112,10 +113,6 @@ theorem umemView_ofNat (P : UPtd) (M : Nat → List (BitVec 8)) (n : Nat) :
     umemView P M (n : Int) = umemGet P M n := by
   simp [umemView]
 
-theorem umemView_neg (P : UPtd) (M : Nat → List (BitVec 8)) (a : Int) (h : a < 0) :
-    umemView P M a = none := by
-  simp only [umemView]; rw [if_neg (by omega)]
-
 /-- A defined byte is on a mapped page. -/
 theorem umemGet_mapped {P : UPtd} {M : Nat → List (BitVec 8)} {n : Nat} {b : BitVec 8}
     (h : umemGet P M n = some b) : (get? P.um (n / 4096)).isSome := by
@@ -141,10 +138,6 @@ theorem umemGet_congr {P P' : UPtd} (M : Nat → List (BitVec 8))
     (h : ∀ k, (get? P.um k).isSome = (get? P'.um k).isSome) : umemGet P M = umemGet P' M := by
   funext n; unfold umemGet; rw [h]
 
-theorem umemView_congr {P P' : UPtd} (M : Nat → List (BitVec 8))
-    (h : ∀ k, (get? P.um k).isSome = (get? P'.um k).isSome) : umemView P M = umemView P' M := by
-  funext a; unfold umemView; rw [umemGet_congr M h]
-
 /-- **Nothing above the break** (Rocq `proc_pt_fresh_above(_z)`, now pure):
 under `umBelow sz`, no byte at or above a page-aligned bound past `sz` is
 defined. -/
@@ -164,13 +157,6 @@ theorem umemGet_none_above {P : UPtd} (M : Nat → List (BitVec 8)) {sz : BitVec
       omega
     have : bnd ≤ n / 4096 * 4096 := by omega
     omega
-
-theorem umemView_none_above {P : UPtd} (M : Nat → List (BitVec 8)) {sz : BitVec 64}
-    (hb : umBelow sz P) {bnd : Nat} (halign : bnd % 4096 = 0) (hge : sz.toNat ≤ bnd)
-    {a : Int} (ha : (bnd : Int) ≤ a) : umemView P M a = none := by
-  unfold umemView
-  rw [if_pos (by omega)]
-  exact umemGet_none_above M hb halign hge (by omega)
 
 /-! ## §0.2 uvmalloc (Rocq `umem_grow`) -/
 
@@ -211,17 +197,6 @@ theorem umemGet_uvmalloc_zero {P P' : UPtd} {M M' : Nat → List (BitVec 8)} {o 
   rw [List.getElem?_replicate]
   rw [if_pos (by omega)]
 
-/-- uvmalloc keeps every mapped page full (`umPages`' length fact, carried). -/
-theorem umPageLen_uvmalloc {P P' : UPtd} {M M' : Nat → List (BitVec 8)} {o nw x : BitVec 64}
-    (hok : uvmallocOk P P' M M' o nw x) (hlen : umPageLen P M) : umPageLen P' M' := by
-  intro k w hk
-  by_cases hr : uvmaVpn0 o ≤ k ∧ k < uvmaVpn0 o + uvmaNp o nw
-  · obtain ⟨-, hz⟩ := hok.2.2 (k - uvmaVpn0 o) (by omega)
-    rw [show uvmaVpn0 o + (k - uvmaVpn0 o) = k by omega] at hz
-    rw [hz, List.length_replicate]
-  · obtain ⟨hg, hm⟩ := hok.2.1 k hr
-    rw [hm]; rw [hg] at hk; exact hlen k w hk
-
 /-! ## §0.3 A page write (Rocq `umem_write`), the table unchanged -/
 
 /-- **A byte the write misses** (Rocq `umem_write_lookup_out`). -/
@@ -254,12 +229,6 @@ theorem umemGet_write_in (P : UPtd) (M : Nat → List (BitVec 8)) (va : Nat) (bs
         show va + j - va = j by omega, List.getElem?_eq_getElem hj]
       rfl
   · cases hdef
-
-/-- A write keeps every page full. -/
-theorem umPageLen_write {P : UPtd} {M : Nat → List (BitVec 8)} (va : Nat) (bs : List (BitVec 8))
-    (hlen : umPageLen P M) : umPageLen P (umemWrite M va bs) := by
-  intro k w hk
-  rw [UMemL.umemWrite_length]; exact hlen k w hk
 
 theorem umemView_write_out (P : UPtd) (M : Nat → List (BitVec 8)) (va : Nat) (bs : List (BitVec 8))
     {a : Int} (ha : ¬ ((va : Int) ≤ a ∧ a < va + bs.length)) :
@@ -320,10 +289,6 @@ theorem umemGet_clearU {P : UPtd} (M : Nat → List (BitVec 8)) {v : Nat} {w : B
   · subst hk; rw [Iris.Std.LawfulPartialMap.get?_insert_eq rfl, hv]; rfl
   · rw [Iris.Std.LawfulPartialMap.get?_insert_ne hk]
 
-theorem umemView_clearU {P : UPtd} (M : Nat → List (BitVec 8)) {v : Nat} {w : BitVec 64}
-    (hv : get? P.um v = some w) : umemView (P.clearU v w) M = umemView P M := by
-  funext a; unfold umemView; rw [umemGet_clearU M hv]
-
 end KexecBuilt
 
 
@@ -335,9 +300,6 @@ and the view are `ElfMem`, so this is the one place the two meet. -/
 def memAtZ (Mv : ElfMem) (a : Int) : Option (BitVec 8) := if 0 ≤ a then Mv a.toNat else none
 
 namespace KexecBuilt
-
-theorem umemView_eq (P : UPtd) (M : Nat → List (BitVec 8)) : umemView P M = memAtZ (umemGet P M) :=
-  rfl
 
 theorem memAtZ_ofNat (Mv : ElfMem) (n : Nat) : memAtZ Mv (n : Int) = Mv n := by
   simp [memAtZ]
@@ -399,10 +361,6 @@ theorem kxb_str_zone_arg (top : Int) (alen : Nat → Nat) (na : Nat) {a : Int}
 theorem kxb_str_zone_push (top : Int) (alen : Nat → Nat) (k : Nat) {j : Nat} (hj : j < alen k + 1) :
     kxbStrZone top alen (k + 1) (kxcSp top alen (k + 1) + (j : Int)) :=
   ⟨k, by omega, by omega, by omega⟩
-
-theorem kxb_arg_addr_str (top : Int) (alen : Nat → Nat) {na i j : Nat} (hi : i < na)
-    (hj : j < alen i + 1) : kexecArgAddr top alen na (kxcSp top alen (i + 1) + (j : Int)) :=
-  Or.inl ⟨i, hi, by omega, by omega⟩
 
 theorem kxb_arg_addr_vec (top : Int) (alen : Nat → Nat) {na j : Nat} (hj : j < 8 * (na + 1)) :
     kexecArgAddr top alen na (kxcSpFinal top alen na + (j : Int)) :=
@@ -486,10 +444,6 @@ theorem kx_zero_except_write {top : Int} {Pz : Int → Prop} (P : UPtd) {M : Nat
 theorem kx_str_at_0 (top : Int) (alen : Nat → Nat) (afun : Nat → Nat → BitVec 8) (Mv : ElfMem) :
     kxStrAt top alen afun 0 Mv :=
   ⟨fun _ _ h => absurd h (by omega), fun _ h => absurd h (by omega)⟩
-
-theorem kexec_stack_at_intro {top : Int} {alen : Nat → Nat} {na : Nat} {Mv : ElfMem}
-    (hok : kxcStackOk top (top - 4096) alen na) (hz : kxZeroExcept top (kexecArgAddr top alen na) Mv) :
-    kexecStackAt top alen na Mv := ⟨hok, hz⟩
 
 /-- ONE PUSH (Rocq `kx_argv_push`): the copyout of string `k` and its NUL at
 `kxcSp top alen (k+1)`, the destination bytes defined (the stack page is
@@ -577,8 +531,6 @@ def uimgSub (img Mv : ElfMem) : Prop := ∀ a b, img a = some b → Mv a = some 
 
 namespace KexecBuilt
 
-theorem uimgSub_empty (Mv : ElfMem) : uimgSub elfEmpty Mv := fun _ _ h => by cases h
-
 /-- No disjointness side condition: the union is left-biased. -/
 theorem uimgSub_union {m1 m2 Mv : ElfMem} (h1 : uimgSub m1 Mv) (h2 : uimgSub m2 Mv) :
     uimgSub (elfUnion m1 m2) Mv := by
@@ -649,11 +601,6 @@ def loadWin (f : ElfBytes) (off va n : Nat) (Mv : ElfMem) : Prop :=
 theorem loadWin_0 (f : ElfBytes) (off va : Nat) (Mv : ElfMem) : loadWin f off va 0 Mv :=
   fun _ h => absurd h (by omega)
 
-/-- ...DOWNWARD CLOSED in the width (Rocq `load_win_mono`). -/
-theorem loadWin_mono {f : ElfBytes} {off va n n' : Nat} {Mv : ElfMem} (hn : n' ≤ n)
-    (h : loadWin f off va n Mv) : loadWin f off va n' Mv :=
-  fun j hj => h j (by omega)
-
 /-- ONE PAGE STEP (Rocq `load_win_step_g`): the page write of `bs`, which
 agrees with the file over its run and lands on defined bytes, extends the
 window by `bs.length`. -/
@@ -669,16 +616,6 @@ theorem loadWin_step {f : ElfBytes} {off va i : Nat} (P : UPtd) {M : Nat → Lis
     have e : va + j = va + i + (j - i) := by omega
     rw [e, umemGet_write_in P M (va + i) bs hk (hdef _ hk), hbs _ hk]
     congr 1; omega
-
-/-- ...the window survives a later uvmalloc (Rocq `load_win_grow`). -/
-theorem loadWin_uvmalloc {f : ElfBytes} {off va n : Nat} {P P' : UPtd} {M M' : Nat → List (BitVec 8)}
-    {o nw x : BitVec 64} (hok : uvmallocOk P P' M M' o nw x)
-    (hfree : ∀ i, i < uvmaNp o nw → get? P.um (uvmaVpn0 o + i) = none)
-    (hdef : ∀ j, j < n → (f[off + j]?).isSome)
-    (h : loadWin f off va n (umemGet P M)) : loadWin f off va n (umemGet P' M') := by
-  intro j hj
-  obtain ⟨b, hb⟩ := Option.isSome_iff_exists.1 (hdef j hj)
-  rw [umemGet_uvmalloc_old hok hfree (by rw [h j hj, hb]), hb]
 
 /-- THE FRAME ROW (Rocq `load_out`): outside `[va, va + n)` nothing moved. -/
 def loadOut (va n : Nat) (Mb Mv : ElfMem) : Prop := ∀ a, a < va ∨ va + n ≤ a → Mv a = Mb a
@@ -738,14 +675,6 @@ theorem foldl_kxGrow_ge (ps : List ElfPhdr) (s : Nat) : s ≤ ps.foldl kxGrow s 
     simp only [List.foldl_cons]
     have := ih (kxGrow s q); rw [kxGrow_eq] at this ⊢; omega
 
-theorem foldl_kxGrow_max (ps : List ElfPhdr) (s t : Nat) :
-    ps.foldl kxGrow (max s t) = max s (ps.foldl kxGrow t) := by
-  induction ps generalizing t with
-  | nil => rfl
-  | cons q ps ih =>
-    simp only [List.foldl_cons]
-    rw [kxGrow_eq, kxGrow_eq, Nat.max_assoc, ih]
-
 /-- The fold is at least every member's top (Rocq `kexec_sz_after_elem`). -/
 theorem kexecSzAfter_elem {ps : List ElfPhdr} {p : ElfPhdr} (hp : p ∈ ps) :
     p.vaddr + p.memsz ≤ kexecSzAfter ps := by
@@ -796,20 +725,6 @@ theorem kexecSzAfter_memEnd (f : ElfBytes) :
     rw [show max 0 x = x by omega]
 
 /-! ### Ascending segments (Rocq `kxb_ascending*`, stated at `loadsAscending`) -/
-
-theorem loadsAscending_app_l (ps qs : List ElfPhdr) (h : loadsAscending (ps ++ qs)) : loadsAscending ps := by
-  induction ps with
-  | nil => trivial
-  | cons p ps ih =>
-    obtain ⟨hstep, hrest⟩ := h
-    refine ⟨?_, ih hrest⟩
-    cases ps with
-    | nil => trivial
-    | cons q ps => exact hstep
-
-theorem loadsAscending_take (ps : List ElfPhdr) (i : Nat) (h : loadsAscending ps) :
-    loadsAscending (ps.take i) :=
-  loadsAscending_app_l (ps.take i) (ps.drop i) (by rw [List.take_append_drop]; exact h)
 
 theorem loadsAscending_adj : ∀ (ps : List ElfPhdr) (i : Nat) (p q : ElfPhdr), loadsAscending ps →
     ps[i]? = some p → ps[i + 1]? = some q → p.vaddr + p.memsz ≤ q.vaddr
@@ -1034,15 +949,6 @@ theorem kxb_not_walk_loadable_off {f ef : ElfBytes} {i : Nat} (hi : i < ehPhnum 
 theorem segMap_lookup_range {f : ElfBytes} {p : ElfPhdr} {a : Nat} {b : BitVec 8} (hok : PhdrOk f p)
     (ha : segMap f p a = some b) : p.vaddr ≤ a ∧ a < p.vaddr + p.memsz :=
   (segMap_inSeg f p a hok).1 (by rw [ha]; rfl)
-
-/-- Rocq `uimg_sub_seg_map_above`: a write at or above a segment's top misses it. -/
-theorem uimgSub_segMap_above {f : ElfBytes} {p : ElfPhdr} (P : UPtd) {M : Nat → List (BitVec 8)}
-    {a : Nat} (bs : List (BitVec 8)) (hok : PhdrOk f p) (hab : p.vaddr + p.memsz ≤ a)
-    (h : uimgSub (segMap f p) (umemGet P M)) : uimgSub (segMap f p) (umemGet P (umemWrite M a bs)) := by
-  refine uimgSub_write P a bs h fun va h1 _ => ?_
-  cases hb : segMap f p va with
-  | none => rfl
-  | some b => have := segMap_lookup_range hok hb; omega
 
 /-- THE FIELD AGREEMENT (Rocq `kxb_phdr_fields` + `kxb_phdr_flags`): the
 56-byte frame buffer `g` read at file offset `o` reads, field by field, as

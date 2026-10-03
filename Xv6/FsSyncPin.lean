@@ -36,9 +36,6 @@ def syncPath : List Fname := [fnameSync]
 /-- The tracked raw (Rocq `syncf_bytes`). -/
 def syncfBytes : List (BitVec 8) := Xv6.User.Sync.elf
 
-/-- THE TIE TO THE ELF LAYER (Rocq `syncf_bytes_elf`). -/
-theorem syncfBytes_elf : syncfBytes = Xv6.User.Sync.elf := rfl
-
 /-- Rocq `era0_dur_sync`. -/
 theorem era0DurSync : durNode era0D SYNC_INO (imgNode fsimgP fsimgSb SYNC_INO) :=
   imgDurNode fsImgDisk XV6_DISK_BYTES fsimgSb fsimgNib fsimgCov SYNC_INO fsimgImageWf (by decide)

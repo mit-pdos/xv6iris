@@ -44,9 +44,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
 
-set_option linter.unusedSectionVars false
-set_option linter.unusedVariables false
-
 /-! ## A claimed inode's bundle, out of nothing (§16.4's fill sub-arm) -/
 
 /-- Rocq's `il_bmcells_empty`. -/
@@ -119,7 +116,7 @@ def ilFillOut [Icfg] (γfs : FsNames) (γi : GName) (cov : ExtTreeSet Nat compar
         topFrag (fsGammaL γfs) inum.toNat (eraNode dn bm data))
     ∨ ⌜dn.diType.toNat = 0⌝)
 
-/-- `inodeOwnedEra_local`, keeping the bundle. -/
+/-- The node's `InodeLocal`, read off `inodeOwnedEra`, keeping the bundle. -/
 private theorem il_era_localKeep (γfs : FsNames) (γi : GName) (inum : BitVec 32) (n : FsNode) :
     inodeOwnedEra (GF := GF) γfs γi inum n ⊢
       ⌜InodeLocal inum.toNat n⌝ ∗ inodeOwnedEra γfs γi inum n := by

@@ -75,8 +75,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-! ## The cycle-relative image of an entry list -/
 
 /-- THE CYCLE-RELATIVE IMAGE of a list of (history, byte) entries (Rocq
@@ -257,11 +255,6 @@ theorem turn_update (v : EraPins) (P P' P'' : Nat) (hle : P ≤ P'') :
   imodintro
   iapply hsplit'.mp $$ H
 
-theorem turnLb_get (v : EraPins) (P : Nat) : turnAuth (GF := GF) v P ⊢ turnLb v P := by
-  unfold turnAuth turnLb
-  iintro H
-  iapply MonoNat.lb_own_get $$ H
-
 theorem turnLb_le (v : EraPins) (P m : Nat) :
     turn (GF := GF) v P ∗ turnLb v m ⊢ ⌜m ≤ P⌝ := by
   unfold turn turnLb
@@ -373,38 +366,11 @@ instance elistAuth_timeless (v : EraPins) (E : List (List Obs × BitVec 8)) :
     Timeless (elistAuth (GF := GF) v E) := by
   unfold elistAuth; infer_instance
 
-theorem elistLb_get (v : EraPins) (E : List (List Obs × BitVec 8)) :
-    elistAuth (GF := GF) v E ⊢ elistAuth v E ∗ elistLb v E := by
-  unfold elistAuth elistLb
-  iintro H
-  ihave #Hl := MonoList.lb_own_get $$ H
-  iframe H Hl
-
 theorem elistAuth_grow (v : EraPins) (E : List (List Obs × BitVec 8)) (x : List Obs × BitVec 8) :
     elistAuth (GF := GF) v E ⊢ |==> (elistAuth v (E ++ [x]) ∗ elistLb v (E ++ [x])) := by
   unfold elistAuth elistLb
   iintro H
   iapply MonoList.auth_own_update_app $$ H
-
-theorem elist_prefix (v : EraPins) (E E' : List (List Obs × BitVec 8)) :
-    elistAuth (GF := GF) v E ∗ elistLb v E' ⊢ ⌜E' <+: E⌝ := by
-  unfold elistAuth elistLb
-  iintro ⟨Ha, Hl⟩
-  ihave %h := MonoList.auth_lb_own_valid $$ Ha Hl
-  ipureintro; exact h.2
-
-theorem elistLb_cmp (v : EraPins) (E1 E2 : List (List Obs × BitVec 8)) :
-    elistLb (GF := GF) v E1 ∗ elistLb v E2 ⊢ ⌜E1 <+: E2 ∨ E2 <+: E1⌝ := by
-  unfold elistLb
-  iintro ⟨H1, H2⟩
-  iapply MonoList.lb_own_valid $$ H1 H2
-
-theorem elistLb_weaken (v : EraPins) (E E' : List (List Obs × BitVec 8)) (hp : E' <+: E) :
-    elistLb (GF := GF) v E ⊢ elistLb v E' := by
-  unfold elistLb
-  iintro H
-  iapply MonoList.lb_own_le $$ H
-  exact hp
 
 /-- THE ERA'S DELIVERED LIST, authority (Rocq `dl_list_auth`). -/
 def dlListAuth (v : EraPins) (D : List (List Obs × BitVec 8)) : IProp GF :=
@@ -491,20 +457,6 @@ theorem inpLb_le (v : EraPins) (D : List (List Obs × BitVec 8)) (I : List (BitV
   ipureintro
   rw [← heq]
   exact hp.map _
-
-theorem inpLb_prefix (v : EraPins) (I I' : List (BitVec 8)) (hI : I' <+: I) :
-    inpLb (GF := GF) v I ⊢ inpLb v I' := by
-  iintro Hl
-  unfold inpLb
-  icases Hl with ⟨%D, Hl, %heq⟩
-  ihave H' := dlListLb_weaken v D (D.take I'.length) (List.take_prefix _ _) $$ Hl
-  iexists D.take I'.length
-  iframe H'
-  ipureintro
-  subst heq
-  obtain ⟨z, hz⟩ := hI
-  rw [List.map_take, ← hz, List.take_left']
-  rfl
 
 theorem inpLb_cmp (v : EraPins) (I1 I2 : List (BitVec 8)) :
     inpLb (GF := GF) v I1 ∗ inpLb v I2 ⊢ ⌜I1 <+: I2 ∨ I2 <+: I1⌝ := by

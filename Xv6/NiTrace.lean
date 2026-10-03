@@ -485,8 +485,8 @@ theorem niStrongInstance_trace (q : NiInc) (tr : List NiStep) (hl : NiClassLaw q
     (hq : ∀ s ∈ tr, s.ecall = false) : ∀ s ∈ tr, s.replays :=
   fun s hs => NiStep.replays_of_law (hl s hs) (hq s hs)
 
-/-- **`niStrongInstance`** (T's `UtRoundQuiet.utRoundQuiet` lifted to the
-trace: there, a quiet run's event counter is constant; here, BEFORE ITS
+/-- **`niStrongInstance`** (T's `utRoundQuiet` -- its module `UtRoundQuiet` since deleted as
+unreached by the dead-code sweep -- lifted to the trace: there, a quiet run's event counter is constant; here, BEFORE ITS
 FIRST ECALL every round of an incarnation is transparent, so its enters
 replay its exits).  T's other half -- no ledger event labelled with the
 process -- stays in-logic: the ledgers are not in `h`. -/

@@ -31,16 +31,12 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
 
 /-- A callee-saved register survives a write to a caller-saved one. -/
 theorem ush_cs_wr (m : RegMap) (rd r : BitVec 5) (v : BitVec 64) (hr : ucalleeSavedIdx r = true)
     (hd : ucalleeSavedIdx rd = false) : (ukWr m rd v).get r = m.get r :=
   ukWr_get_other _ _ _ _ (ucs_ne r rd hr hd)
-
-/-- **Rocq `E62u`**. -/
-theorem ushRedirs_E62 : ((rbGt.toNat : Nat) : Int) = 62 := by decide
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]

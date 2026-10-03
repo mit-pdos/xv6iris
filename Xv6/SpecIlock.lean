@@ -60,7 +60,7 @@ other way.
 
 `wp_ilock_tx_body` swaps `icDepSide d` for `logTx icfgLog` and the handle /
 held bundle for `icTxDep` / `icLoaded`.  As in Rocq it is a DERIVATION of
-the one generic body (`ILOCK.wp_ilock_tx`, Rocq's `wp_ilock_tx_of_dep`,
+the one generic body (`ILOCK.wp_ilock_tx_eb`, Rocq's `wp_ilock_tx_of_dep`,
 which Rocq also keeps in the Spec file): `logTx_halve` → the generic form at
 `depTx s dev inum g lo t ½` → `icTxDep_intro`.  Not a line of ilock's code
 is re-proved.
@@ -118,8 +118,6 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedVariables false
-
 /-- Address of `ilock`. -/
 def ilockAddr : BitVec 64 := KA.«ilock»
 
@@ -167,7 +165,6 @@ def ilockPostDep [Fscfg] [Icfg] [CurCtx] (k : KCtx) (γisl : GName) (kk : Nat) (
     ⌜filled = true → freshShape dn⌝ -∗
     iregWdBack o g inum.toNat -∗
     ⌜ilkPost o filled dn⌝ -∗ wpLoop cpu')
-
 
 /-- `ilockPostDep` at either `SIE`: the complement comes back. -/
 def ilockPostDepEb [Fscfg] [Icfg] [CurCtx] (k : KCtx) (γisl : GName) (kk : Nat) (s : Qp)
@@ -227,7 +224,6 @@ def ilockPostTx [Fscfg] [Icfg] [CurCtx] (k : KCtx) (γisl : GName) (kk : Nat) (s
     ⌜filled = true → freshShape dn⌝ -∗
     iregWdBack o g inum.toNat -∗
     ⌜ilkPost o filled dn⌝ -∗ wpLoop cpu')
-
 
 /-- `ilockPostTx` at either `SIE`: the complement comes back. -/
 def ilockPostTxEb [Fscfg] [Icfg] [CurCtx] (k : KCtx) (γisl : GName) (kk : Nat) (s : Qp)
@@ -312,7 +308,6 @@ def wp_ilock_dep_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6
   topLb Tl ∗
   wpNext true k.proc cpu (ilockPostDep k γisl kk s g d o inum pidv dqp dqs Tl)
   ⊢ wpLoop (GF := GF) cpu
-
 
 /-- The eb-generic form of `wp_ilock_dep_body` (Rocq: `cpu_own 0 eb`, the complement
 `trap_csrs_ext` / `cpu_claim_ext` in and out; depth 0, so no spinlock held). -/
@@ -410,7 +405,6 @@ def wp_ilock_tx_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
   wpNext true k.proc cpu (ilockPostTx k γisl kk s g lo o inum pidv dqp dqs Tl)
   ⊢ wpLoop (GF := GF) cpu
 
-
 /-- The eb-generic form of `wp_ilock_tx_body` (Rocq: `cpu_own 0 eb`, the complement
 `trap_csrs_ext` / `cpu_claim_ext` in and out; depth 0, so no spinlock held). -/
 def wp_ilock_tx_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
@@ -469,65 +463,10 @@ structure ILOCK : Prop where
       inum pidv dqp dqs Tl hj hproc hK hnoff htier hshr hrdo hkk hgeom hcov hnib
       hpd ha0 hle
 
-/-- The interrupts-off instance of `wp_ilock_dep_eb` (the complement is the
-whole bundle): the contract every not-yet-generalized caller states. -/
-theorem ILOCK.wp_ilock_dep (A : ILOCK) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-    [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
-    [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [Appcfg GF]
-    [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
-    (γil γisl : GName) (kk : Nat) (s : Qp) (g : GName) (lo tl : Nat) (d : IcDep) (o : Ilkc)
-    (inum : BitVec 32) (pidv : BitVec 32) (dqp dqs : DFrac) (Tl : Nat)
-    hj hproc hK hsie hnoff hlocks htier hshr hrdo hkk hgeom hcov hnib hpd ha0 hle :
-    wp_ilock_dep_body (hlc := hlc) (GF := GF) Γ cpu k γl pd pav pu j γil γisl kk s g lo tl d o
-      inum pidv dqp dqs Tl hj hproc hK hsie hnoff hlocks htier hshr hrdo hkk hgeom hcov hnib
-      hpd ha0 hle := by
-  have h := A.wp_ilock_dep_eb (hlc := hlc) (GF := GF) Γ cpu k γl pd pav pu j γil γisl kk s g lo tl
-    d o inum pidv dqp dqs Tl hj hproc hK hnoff htier hshr hrdo hkk hgeom hcov hnib hpd ha0 hle
-  unfold wp_ilock_dep_eb_body at h
-  unfold wp_ilock_dep_body
-  rw [hsie] at h
-  simp only [trapCsrsExt_false, cpuClaimExt_false] at h
-  iintro ⟨Hk, Hpc, Hpi, Htc, Hcl, Hir, Hpe, Hbc, Hdc, Hit, Hesc, Hireg, Hslk, Hfl, Hclm, Hshr,
-    Hside, Hlic, Hsb, Hpid, Hsl, Hllb, HΦ⟩
-  iapply h
-  iframe Hk Hpc Hpi Htc Hcl Hir Hpe Hbc Hdc Hit Hesc Hireg Hslk Hfl Hclm Hshr Hside Hlic Hsb Hpid
-    Hsl Hllb
-  iapply wpNext_mono $$ HΦ
-  iintro %cpu' HK
-  unfold ilockPostDep ilockPostDepEb
-  rw [hsie]
-  simp only [trapCsrsExt_false, cpuClaimExt_false]
-  iintro %spie %spp %R' %dn %bm %filled %hcs Hfl Hk Hpc ⟨Htc, Hir⟩ Hcl Hpid Hsb Hsl Hslk
-    Hdep Hoff Hidev Hinum Hval Hload Hshot Hfoff %hfr Hwb %hpost
-  iapply HK $$ %spie %spp %R' %dn %bm %filled %hcs Hfl Hk Hpc Htc Hcl Hir Hpid Hsb Hsl Hslk
-    Hdep Hoff Hidev Hinum Hval Hload Hshot Hfoff %hfr Hwb %hpost
-
 section TxOfDep
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF]
   [SleepLockG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF]
   [IcboxG GF] [OffboxG GF] [OffboxBoxG GF]
-
-/-- The write arm's post, read back as the transactional post: the
-checkout's handle at `depTx … t ½` and the transaction's other half rejoin
-into `icTxDep` (`icTxDep_intro`), and the held bundle at a bundleless
-descriptor IS `icLoaded`. -/
-theorem ilockPostDep_tx [Fscfg] [Icfg] [CurCtx] (k : KCtx) (γisl : GName) (kk : Nat) (s : Qp)
-    (g : GName) (lo t : Nat) (o : Ilkc) (inum : BitVec 32) (pidv : BitVec 32)
-    (dqp dqs : DFrac) (Tl : Nat) (cpu' : CPU) :
-    txPin (GF := GF) icfgLog t (1 : Qp).half ⊢
-      ilockPostTx k γisl kk s g lo o inum pidv dqp dqs Tl cpu' -∗
-      ilockPostDep k γisl kk s g (.depTx s icfgDev inum g lo t (1 : Qp).half) o inum pidv
-        dqp dqs Tl cpu' := by
-  unfold ilockPostDep ilockPostTx
-  iintro Ht HΦ %spie %spp %R' %dn %bm %filled %hcs Hfl Hk Hpc Htc Hcl Hir Hpid Hsb Hsl Hslk
-    Hdep Hoff Hidev Hinum Hval Hload Hshot Hfoff %hfr Hwb %hpost
-  ihave Hdep := icTxDep_intro fscIc kk s icfgDev inum g lo t $$ Hdep Ht
-  simp only [icDepHeld, icDepRd, Bool.false_eq_true, ↓reduceIte]
-  iapply HΦ $$ %spie %spp %R' %dn %bm %filled %hcs Hfl Hk Hpc Htc Hcl Hir Hpid Hsb Hsl Hslk
-    Hdep Hoff Hidev Hinum Hval Hload Hshot Hfoff %hfr Hwb %hpost
-
 
 theorem ilockPostDepEb_tx [Fscfg] [Icfg] [CurCtx] (k : KCtx) (γisl : GName) (kk : Nat) (s : Qp)
     (g : GName) (lo t : Nat) (o : Ilkc) (inum : BitVec 32) (pidv : BitVec 32)
@@ -545,41 +484,6 @@ theorem ilockPostDepEb_tx [Fscfg] [Icfg] [CurCtx] (k : KCtx) (γisl : GName) (kk
     Hdep Hoff Hidev Hinum Hval Hload Hshot Hfoff %hfr Hwb %hpost
 
 end TxOfDep
-
-/-- **THE TRANSACTIONAL FORM, DERIVED** (Rocq's `wp_ilock_tx_of_dep`, and
-its `wp_ilock_tx_sconf`): the transaction id comes out of `logTx`'s
-existential (`logTx_halve`), the generic form runs at `depTx s dev inum g
-lo t ½` with one half as the descriptor's side share, and the two halves
-rejoin into `icTxDep` at the post. -/
-theorem ILOCK.wp_ilock_tx (IL : ILOCK) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
-    [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF]
-    [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [Appcfg GF]
-    [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
-    (γil γisl : GName) (kk : Nat) (s : Qp) (g : GName) (lo tl : Nat) (o : Ilkc)
-    (inum : BitVec 32) (pidv : BitVec 32) (dqp dqs : DFrac) (Tl : Nat)
-    hj hproc hK hsie hnoff hlocks htier hkk hgeom hcov hnib hpd ha0 hle :
-    wp_ilock_tx_body (hlc := hlc) (GF := GF) Γ cpu k γl pd pav pu j γil γisl kk s g lo tl o
-      inum pidv dqp dqs Tl hj hproc hK hsie hnoff hlocks htier hkk hgeom hcov hnib hpd ha0 hle := by
-  unfold wp_ilock_tx_body
-  iintro ⟨Hk, Hpc, Hpi, Htc, Hcl, Hir, Hpe, Hbc, Hdc, Hit, Hesc, Hireg, Hslk, Hfl, Hclm, Hshr,
-    Hlic, Hsb, Hpid, Hsl, Htx, Hllb, HΦ⟩
-  icases logTx_halve icfgLog $$ Htx with ⟨%t, Ht1, Ht2⟩
-  have h := IL.wp_ilock_dep (hlc := hlc) (GF := GF) Γ cpu k γl pd pav pu j γil γisl kk s g lo tl
-    (.depTx s icfgDev inum g lo t (1 : Qp).half) o inum pidv dqp dqs Tl hj hproc hK hsie hnoff
-    hlocks htier rfl (fun h => by simp [icDepRd] at h) hkk hgeom hcov hnib hpd ha0 hle
-  unfold wp_ilock_dep_body at h
-  iapply h
-  iframe Hk Hpc Hpi Htc Hcl Hir Hpe Hbc Hdc Hit Hesc Hireg Hslk Hfl Hclm Hshr Hlic Hsb Hpid Hsl
-    Hllb
-  isplitl [Ht1]
-  · rw [icDepSide_ofTx _ t (1 : Qp).half rfl]
-    iexact Ht1
-  iapply wpNext_mono $$ HΦ
-  iintro %cpu' HΦ
-  iapply ilockPostDep_tx k γisl kk s g lo t o inum pidv dqp dqs Tl cpu' $$ Ht2 HΦ
-
 
 theorem ILOCK.wp_ilock_tx_eb (IL : ILOCK) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
     [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF]

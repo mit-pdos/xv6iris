@@ -88,16 +88,6 @@ theorem regAgree_regMapOf (f : RegFile) : regAgree (regMapOf f) f :=
 def regCells (γ : GName) (f : RegFile) : IProp GF := iprop%
   [∗map] k ↦ v ∈ regMapOf f, γ ↪◯MAP[k] v
 
-/-- Take one register's cell out of a whole file's cells. -/
-theorem regCells_take (γ : GName) (f : RegFile) (r : Register) :
-    regCells γ f ⊢@{IProp GF}
-      regPointsToAt γ r (DFrac.own 1) (f r) ∗
-      [∗map] k ↦ v ∈ delete (regMapOf f) (regIdx r), γ ↪◯MAP[k] v := by
-  unfold regCells regPointsToAt
-  iintro H
-  icases (BigSepM.bigSepM_delete (regAgree_regMapOf f r)).1 $$ H with ⟨Hr, Hrest⟩
-  iframe Hr Hrest
-
 /-- The fully owned cells of a whole register file EXCEPT the two interrupt
 pins.  The pins are not the hart's: `wp_power` puts them into `wireInv`
 (`MachCSL.WireInv`) the moment the era is born, because the PLIC's wire step

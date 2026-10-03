@@ -20,10 +20,9 @@ are vacuous.  The taint pays any disciplined tree by the free handler
    handler's credentials `uKillCred` / `appSup` (UkFileIfaceDefs deviation
    3).
 2. `fif_dev_of` is an equation per spec: Lean's `devSel` is UkHandler's
-   deviation 2 (Rocq's inline match).
+   deviation 2 (Rocq's inline match); `fif_ei_fds` / `fif_ei_files` are
+   `rfl` here, so not stated.
 -/
-import Xv6.UkFileIfaceRead
-import Xv6.UkFileIfaceWrite
 import Xv6.UkFileIfaceOpen
 import Xv6.UkFileIfaceClose
 import Xv6.UkFileIfaceGlue
@@ -34,8 +33,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Iris.Std.PartialMap
 open Std (ExtTreeSet)
 open HfpFileClaimsP UkFileDev
-
-set_option linter.unusedSectionVars false
 
 noncomputable section FifRec
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
@@ -141,12 +138,6 @@ variable (DP : FifDevP (hlc := hlc) (GF := GF)) (UL : UK_LEAVES) (SYS : UK_SYS_P
     (hLw : ⊢ X.LINKS -∗ glW X.Pm) (hLb : ⊢ X.LINKS -∗ glBlk X.Pm)
     (hLt : ⊢ X.LINKS -∗ glTaintAt X.Pm (genId (hlc := hlc) (GF := GF) + 1))
     (hw0 : ∀ d, d ∈ X.D0 → ∀ nm i γo, X.w0 d ≠ .FDIn false nm i γo)
-
-/-- **Rocq `fif_ei_fds`**. -/
-theorem fif_ei_fds : (X.fileIface DP UL SYS FH H heq hLw hLb hLt hw0).eiFds = X.fifFds := rfl
-
-/-- **Rocq `fif_ei_files`**. -/
-theorem fif_ei_files : (X.fileIface DP UL SYS FH H heq hLw hLb hLt hw0).eiFiles = X.fifFilesr := rfl
 
 /-- `devOf` at the record is `fifDev` (Rocq `fif_dev_of` at `dev_of`). -/
 theorem fif_devOf (d : Nat) (x : Dspec) :

@@ -37,10 +37,7 @@ neither needs the other.
    is a `foldr` over the map's list; iris-lean's `FiniteMap.mapFold` is a
    `foldl`, so the definition is the `foldr` spelled out (`toList`'s order
    is unspecified in both; `fsDbytes_insert` is the order-free equation).
-3. **`fsDbytes_setBlocks` TAKES `home.Nodup`.**  Rocq's home is a
-   `gset Z` and the bridge is `[∗ set]`; the port's home sets are
-   `List Nat` (`LogDefs.fsRestrict`, the brief's `gset Z` → `List Nat`
-   row), so the big-op is `[∗list]` and duplicates must be excluded.
+3. Rocq's `fs_dbytes_set_blocks` is not ported (nothing uses it).
 4. **`snapGamma` IS GENERIC IN THE BYTE CAMERA's CAPACITY INSTANCE**
    (`[GhostMapG GF Nat (BitVec 8) RegMapF]`, Rocq `diskImgG`).  Rocq has two
    `ghost_mapG Σ Z (bv 8)` classes (`fsLogG`'s byte map and `diskImgG`) and
@@ -65,8 +62,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Iris.Std.PartialMap
-
-set_option linter.unusedSectionVars false
 
 /-! ## 1.  THE PURE THEORY OF `fsDbytes` -/
 
@@ -284,46 +279,6 @@ theorem fsDbytes_blocks (Γ : FsViewNames GF) (D : BlockMap)
     refine BiEntails.trans ?_ (BigSepM.bigSepM_insert hb).symm
     exact sep_congr (blkOwned_mapSeq Γ b bs hlb).symm (ih hlenD)
 
-/-- THE SAME OVER A HOME SET (durable-disk BT-0, the boot-side transport's
-one bridge; deviation 3).  The era's byte half is a big-op over a SET at a
-TOTAL block view, while the durable side is indexed by the map
-`fsRestrict Pb home`; the two are the same resource (Rocq's
-`fs_dbytes_set_blocks`). -/
-theorem fsDbytes_setBlocks (Γ : FsViewNames GF) (Pb : Nat → List (BitVec 8)) (home : List Nat)
-    (hnd : home.Nodup) (hlen : ∀ b, b ∈ home → (Pb b).length = BSIZE) :
-    ([∗map] a ↦ v ∈ fsDbytes (fsRestrict Pb home), Γ.phi (DFrac.own 1) a v) ⊣⊢
-      [∗list] b ∈ home, FsView.blkOwned Γ b (Pb b) := by
-  have hml : ∀ b bs, get? (fsRestrict Pb home) b = some bs → bs.length = BSIZE := by
-    intro b bs hb
-    rw [fsRestrict_lookup] at hb
-    by_cases hin : b ∈ home
-    · rw [if_pos hin] at hb; cases hb; exact hlen b hin
-    · rw [if_neg hin] at hb; cases hb
-  refine (fsDbytes_blocks Γ _ hml).trans ?_
-  clear hml hlen
-  induction home with
-  | nil =>
-    have : fsRestrict Pb [] = ∅ := rfl
-    rw [this]
-    exact BigSepM.bigSepM_empty.trans BigSepL.bigSepL_nil.symm
-  | cons a s ih =>
-    obtain ⟨has, hnds⟩ := List.nodup_cons.mp hnd
-    have heq : fsRestrict Pb (a :: s) = insert (fsRestrict Pb s) a (Pb a) := by
-      refine equiv_iff_eq.1 (fun b => ?_)
-      rw [fsRestrict_lookup]
-      by_cases hba : a = b
-      · subst hba; rw [get?_insert_eq rfl, if_pos List.mem_cons_self]
-      · rw [get?_insert_ne hba, fsRestrict_lookup]
-        by_cases hbs : b ∈ s
-        · rw [if_pos (List.mem_cons_of_mem a hbs), if_pos hbs]
-        · rw [if_neg hbs, if_neg (by simp only [List.mem_cons, not_or]; exact ⟨fun e => hba e.symm, hbs⟩)]
-    have hna : get? (fsRestrict Pb s) a = none := by
-      rw [fsRestrict_lookup, if_neg has]
-    rw [heq]
-    refine (BigSepM.bigSepM_insert hna).trans ?_
-    refine BiEntails.trans ?_ BigSepL.bigSepL_cons.symm
-    exact sep_congr .rfl (ih hnds)
-
 end DbytesGen
 
 /-! ## 3.  THE DURABLE INSTANCE'S VIEW RECORD
@@ -339,9 +294,6 @@ variable {GF : BundledGFunctors} [GhostMapG GF Nat (BitVec 8) RegMapF]
 /-- Rocq's `snap_gamma` (deviation 4 on the capacity instance). -/
 def snapGamma (g gl gt : GName) : FsViewNames GF :=
   { phi := fun dq a v => g ↪◯MAP[a]{dq} v, link := gl, top := gt }
-
-theorem snapGamma_phi (g gl gt : GName) (dq : DFrac) (a : Nat) (v : BitVec 8) :
-    (snapGamma (GF := GF) g gl gt).phi dq a v = (g ↪◯MAP[a]{dq} v) := rfl
 
 instance snapGamma_gtimeless (g gl gt : GName) : GTimeless (snapGamma (GF := GF) g gl gt) where
   gtimeless := fun _ _ _ => by unfold snapGamma; infer_instance

@@ -22,6 +22,8 @@ descriptor (`sys_pipe_core_ext`); the `int` locals are its source bytes
 those cells pin the ambient context to the kernel tier first (`hct`).
 -/
 import Xv6.SysPipeTails
+import Xv6.VirtioDiskRwDefs2
+import Xv6.CopyLemmas
 
 namespace Xv6
 
@@ -30,9 +32,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
@@ -235,7 +235,7 @@ theorem sys_pipe_stage_e {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
         V.pagetable)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9, sys_pipe_pt, sys_pipe_pt'] next c7 hp7
     iintro Hk Hpc Hpg
-    k_step_gen (wp_s_jal c7 _ (KA.«sys_pipe» + 0x76#64) false 2080624#21 1#5 (by decide))
+    k_step_gen (wp_s_jal c7 _ (KA.«sys_pipe» + 0x76#64) false 2080380#21 1#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_pipe_br_copyout] next c8 hp8
     iintro Hk Hpc
     icases sys_pipe_frame_fd1 _ _ _ _ _ _ _ $$ Hfr with ⟨%hal, Hc1, Hfrw⟩
@@ -299,7 +299,6 @@ theorem sys_pipe_stage_e {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
         rfl hproc htier hnoff hK hlk hplk hprc hkmem hpin1 hpins h9 v)
       $$ [- $Hk $Hpc $Hfr $Hrf $Hwf $Hr0 $Hr1 $Hqf $Hcore $Howe $Hu0 $Ha0 $Hu1 $Ha1 $Hfrag $Hnext]
     iframe #
-
 
 set_option maxHeartbeats 16000000 in
 /-- `+0x48`, after `fdalloc(wf)`: `sw a0,-64(s0) ; bltz a0` (failure into
@@ -397,7 +396,7 @@ theorem sys_pipe_stage_d {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
         V.pagetable)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9, sys_pipe_pt, sys_pipe_pt'] next c7 hp7
     iintro Hk Hpc Hpg
-    k_step_gen (wp_s_jal c7 _ (KA.«sys_pipe» + 0x5e#64) false 2080648#21 1#5 (by decide))
+    k_step_gen (wp_s_jal c7 _ (KA.«sys_pipe» + 0x5e#64) false 2080404#21 1#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_pipe_br_copyout] next c8 hp8
     iintro Hk Hpc
     icases sys_pipe_frame_fd0 _ _ _ _ _ _ _ $$ Hfr with ⟨%hal', Hc0, Hfrw⟩

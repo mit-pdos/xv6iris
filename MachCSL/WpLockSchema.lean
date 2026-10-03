@@ -8,7 +8,6 @@ longer wait for the lock rules' proofs.
 -/
 import MachCSL.CallConv
 import MachCSL.WpSmodeCycle
-import MachCSL.Lock
 
 namespace MachCSL
 
@@ -73,7 +72,7 @@ theorem wpLoop_k_lock [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KC
   simp only [KCtx.withLocks_regs, KCtx.withLocks_sie, KCtx.withLocks_spie, KCtx.withLocks_spp, KCtx.withLocks_avail,
     KCtx.withLocks_noff, KCtx.withLocks_intena, KCtx.withLocks_locks, KCtx.withLocks_tier, KCtx.withLocks_root,
     KCtx.withLocks_proc, KCtx.sp_withLocks, KCtx.withRegs_regs, KCtx.withRegs_sie, KCtx.withRegs_spie,
-    KCtx.withRegs_spp, KCtx.withRegs_avail, KCtx.withRegs_noff, KCtx.withRegs_intena, KCtx.withRegs_locks,
+    KCtx.withRegs_spp, KCtx.withRegs_avail, KCtx.withRegs_noff, KCtx.withRegs_intena, 
     KCtx.withRegs_tier, KCtx.withRegs_root, KCtx.withRegs_proc, hsp', hsie, hkt]
   unfold transSlot
   iframe HConf HF Hstack Htrans Harm Hcells Hlocks Hcsrs Htok Hclock

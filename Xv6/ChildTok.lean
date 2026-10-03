@@ -85,8 +85,6 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
 open Iris.Algebra OFE COFE
 
-set_option linter.unusedSectionVars false
-
 /-! ## The cameras (Rocq `genF`, `atokR`, `kshotR`, class `ctokG`) -/
 
 /-- The four PURE values a generation pins: its slot address, its pid, its
@@ -170,12 +168,6 @@ instance shotPending_timeless (gk : GName) : Timeless (shotPending (GF := GF) gk
   unfold shotPending; infer_instance
 instance shotDone_timeless (gk : GName) : Timeless (shotDone (GF := GF) gk) := by
   unfold shotDone; infer_instance
-
-theorem shotPending_excl (gk : GName) : shotPending (GF := GF) gk ∗ shotPending gk ⊢ False := by
-  unfold shotPending
-  iintro ⟨H1, H2⟩
-  icombine H1 H2 gives %Hv
-  exact Hv.elim
 
 /-- the two states are incompatible: this is what refutes the zero arm -/
 theorem shotPending_done (gk : GName) : shotPending (GF := GF) gk ∗ shotDone gk ⊢ False := by
@@ -350,15 +342,6 @@ theorem genPid_agree (γ : GName) (pid pid' : BitVec 32) :
   ihave %h := gen_agree_pure γ _ _ pa pid ga gk Q pa' pid' ga' gk' Q' $$ [$H1 $H2]
   ipureintro; exact h.2.1
 
-/-- THE ESCROW'S QUARTER NAMES THE PID ITS GENERATION WAS GIVEN, at the
-derived forms (the quarter survives: the conclusion is pure). -/
-theorem genPid_kq_agree (γ : GName) (pa : BitVec 64) (pid pid' : BitVec 32) (Q : Int → IProp GF) :
-    genPid γ pid' ∗ genKq γ pa pid Q ⊢ ⌜pid' = pid⌝ := by
-  unfold genPid genKq
-  iintro ⟨⟨%pa1, %ga1, %gk1, %Q1, H1⟩, ⟨%ga2, %gk2, H2⟩⟩
-  ihave %h := gen_agree_pure γ _ _ pa1 pid' ga1 gk1 Q1 pa pid ga2 gk2 Q $$ [$H1 $H2]
-  ipureintro; exact h.2.1
-
 /-- ...AND THE TWO PERSISTENT READINGS AT THE NAMED SLOT AND PID: the
 kernel's quarter names them, and comes back. -/
 theorem myPay_kq_readings (γ : GName) (pa : BitVec 64) (pid : BitVec 32) (Q : Int → IProp GF) :
@@ -383,16 +366,6 @@ theorem childTok_pid (γ : GName) (pid pid' : BitVec 32) (Q : Int → IProp GF) 
   iintro ⟨⟨%pa, %ga, %gk, H1⟩, ⟨%pa', %ga', %gk', %Q', H2⟩⟩
   ihave %h := gen_agree_pure γ _ _ pa pid ga gk Q pa' pid' ga' gk' Q' $$ [$H1 $H2]
   ipureintro; exact h.2.1
-
-/-- ...and the child's persistent knowledge is the parent's payload -/
-theorem myPay_agree (γ : GName) (Q Q' : Int → IProp GF) :
-    myPay γ Q ∗ myPay γ Q' ⊢ ▷ (∀ xs, internalEq (Q xs) (Q' xs)) := by
-  unfold myPay
-  iintro ⟨⟨%pa, %pid, %ga, %gk, H1⟩, ⟨%pa', %pid', %ga', %gk', H2⟩⟩
-  iapply (gen_agree γ _ _ pa pid ga gk Q pa' pid' ga' gk' Q').trans sep_elim_right
-  isplitl [H1]
-  · iexact H1
-  · iexact H2
 
 /-- Rewriting a paid payload along the saved predicate's later: the one
 step every consumer of an agreement takes. -/
@@ -451,14 +424,6 @@ theorem killPend_of (γ gk : GName) : genShotn (GF := GF) γ gk ∗ shotPending 
   · iexact Hg
   · iexact H
 
-theorem killShot_of (γ gk : GName) : genShotn (GF := GF) γ gk ∗ shotDone gk ⊢ killShot γ := by
-  unfold killShot
-  iintro ⟨#Hg, #H⟩
-  iexists gk
-  isplitr
-  · iexact Hg
-  · iexact H
-
 /-- WHAT A WRITER OF `p->killed` DOES, and the only producer of the shot
 state there is. -/
 theorem killPend_fire (γ : GName) : killPend (GF := GF) γ ⊢ |==> killShot γ := by
@@ -506,20 +471,6 @@ theorem killOwed_of (γ : GName) (Q : Int → IProp GF) : myPay γ Q ∗ Q (-1) 
   isplitr
   · iexact Hmy
   · iexact H
-
-/-- ...AND WHAT IT COSTS TO CASH IT AT A NAMED PAYLOAD: one LATER (the two
-readings agree only up to the saved predicate's own later). -/
-theorem killOwed_pay (γ : GName) (Q : Int → IProp GF) : myPay γ Q ∗ killOwed γ ⊢ ▷ Q (-1) := by
-  unfold killOwed
-  iintro ⟨#Hmy, ⟨%Q', #Hmy', HQ⟩⟩
-  ihave #Heq := myPay_agree γ Q Q' $$ [Hmy Hmy']
-  · isplitl []
-    · iexact Hmy
-    · iexact Hmy'
-  iapply genPay_rewrite Q Q' (-1)
-  isplitr
-  · iexact Heq
-  · iexact HQ
 
 /-- the ESCROW names the pid it is keyed at, off the discarded half it
 carries beside the kernel's quarter -/

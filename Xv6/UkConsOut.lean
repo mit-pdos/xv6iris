@@ -68,8 +68,6 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
-
 /-! ## S1 THE PURE HALF -/
 
 /-- **Rocq `dq_half`**: a fraction, halved. -/
@@ -306,9 +304,6 @@ theorem consOut_chain (D : List (List (BitVec 8)) → IProp GF)
       rw [e]
       iapply ih (j + 1) (fun t h1 h2 => ha t (by omega) (by omega))
         (fun t h1 h2 => hM t (by omega) (by omega)) $$ Hd'
-
-/-- **Rocq `cons_fam`**: the deposit family row 16 is read at. -/
-def consFam (N : UkNames GF) (Q : Nat → IProp GF) : Xfam GF := xfamWr Q N.pay
 
 /-- The source run's address, as the leaf spells it (the rebase premise). -/
 theorem ukco_ua (m : RegMap) (ua n : Nat) (ha1 : m.get 11#5 = BitVec.ofNat 64 ua)

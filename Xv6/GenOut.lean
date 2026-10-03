@@ -69,13 +69,10 @@ Rocq's header, abridged:
    `iAssert` over `big_sepL_lookup`).
 -/
 import Xv6.GenOutHist
-import Xv6.PipeOutPure
 
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode MachCSL
-
-set_option linter.unusedSectionVars false
 
 /-- WHAT THE CLAIM READS OF AN APPLICATION (Rocq `gen_cparams`). -/
 structure GenCparams (hlc : HasLC) (GF : BundledGFunctors) [MachGS hlc GF] [Xv6G GF] [DiskG GF]
@@ -415,12 +412,6 @@ theorem gopTurn_agree (v : EraPins) (P P' : Nat) :
     ⊢ turn (GF := GF) v P -∗ turnAuth v P' -∗ ⌜P = P'⌝ := by
   iintro H1 H2
   iapply turn_agree v P P' $$ [H1 H2]
-  iframe H1 H2
-
-theorem gopCsLb_prefix (v : EraPins) (l l' : List Nat) :
-    ⊢ csAuth (GF := GF) v l -∗ csLb v l' -∗ ⌜l' <+: l⌝ := by
-  iintro H1 H2
-  iapply csLb_prefix v l l' $$ [H1 H2]
   iframe H1 H2
 
 theorem gopPsLb_prefix (v : EraPins) (l l' : List Nat) :

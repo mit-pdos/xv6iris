@@ -25,7 +25,6 @@ The image's `first` is read NON-atomically, with no fence (xv6 3e9926ea).
 A stage file: it imports Spec and definitional files only.
 -/
 import Xv6.SpecRelease
-import MachCSL.WpSmodeFrame6
 import Xv6.ParkCap
 import MachCSL.LockFacts
 
@@ -36,12 +35,10 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedVariables false
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
 
 theorem fkr_br_myproc : KA.«forkret» + 0xffffffffffffffce#64 = KA.«myproc» := by decide
-theorem fkr_br_release : KA.«forkret» + 0xfffffffffffff326#64 = KA.«release» := by decide
+theorem fkr_br_release : KA.«forkret» + 0xfffffffffffff332#64 = KA.«release» := by decide
 theorem fkr_ret0e : jumpPc (KA.«forkret» + 0xe#64) = KA.«forkret» + 0xe#64 := by decide
 theorem fkr_ret14 : jumpPc (KA.«forkret» + 0x14#64) = KA.«forkret» + 0x14#64 := by decide
 
@@ -156,7 +153,7 @@ theorem fkr_head [X : CurCtx] (MP : MYPROC) (RE : RELEASE) (Γ : SchedNames) [Cl
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [KCtx.rget_eq, h10]
   iintro Hk Hpc
   -- +0x10  jal release
-  k_step (wp_s_jal c _ (KA.«forkret» + 0x10#64) false 2093846#21 1#5 (by decide))
+  k_step (wp_s_jal c _ (KA.«forkret» + 0x10#64) false 2093858#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fkr_br_release]
   iintro Hk Hpc
   ihave #Hlk := procsInv_lookup Γ j hj $$ Hpinv
@@ -219,11 +216,8 @@ theorem fkr_head [X : CurCtx] (MP : MYPROC) (RE : RELEASE) (Γ : SchedNames) [Cl
 end Head
 
 /-- `first`'s address, as the `auipc`/`lw` pair computes it. -/
-theorem fkr_first_addr : KA.«forkret» + 35110#64 = firstAddr := by decide
-theorem fkr_first_addr' : KA.«forkret» + 36884#64 + 18446744073709549842#64 = firstAddr := by decide
-theorem fkr_beqz_taken : KA.«forkret» + 0x1c#64 + BitVec.signExtend 64 56#13 = KA.«forkret» + 0x54#64 := by
-  decide
-theorem fkr_beqz_tgt : KA.«forkret» + 84#64 = KA.«forkret» + 0x54#64 := rfl
+theorem fkr_first_addr : KA.«forkret» + 35282#64 = firstAddr := by decide
+theorem fkr_first_addr' : KA.«forkret» + 36884#64 + 18446744073709550014#64 = firstAddr := by decide
 
 /-- `FkrAfter` does not read `a5` (nor any register but `sp`, `s0`, `s1`). -/
 theorem FkrAfter.setReg {kr : KCtx} {eb : Bool} {root : BitVec 44} {pa ksp : BitVec 64}
@@ -257,7 +251,7 @@ theorem fkr_first_steady [CurCtx] (c : CPU) (kr : KCtx) (eb : Bool) (root : BitV
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c1 hp1
   iintro Hk Hpc
   -- +0x18  lw a5,-1822(a5)
-  k_step_gen (wp_s_lw c1 _ (KA.«forkret» + 0x18#64) false 2322#12 15#5 15#5 (by decide) (by decide)
+  k_step_gen (wp_s_lw c1 _ (KA.«forkret» + 0x18#64) false 2494#12 15#5 15#5 (by decide) (by decide)
     DFrac.discard 0#32) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [KCtx.rget_eq, KCtx.setReg_regs, RegMap.set_apply, fkr_first_addr', fkr_first_addr] next c2 hp2
   iintro Hk Hpc -
@@ -289,7 +283,7 @@ theorem fkr_first_boot [CurCtx] (c : CPU) (kr : KCtx) (eb : Bool) (root : BitVec
   k_step_gen (wp_s_auipc c _ (KA.«forkret» + 0x14#64) false 9#20 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c1 hp1
   iintro Hk Hpc
-  k_step_gen (wp_s_lw c1 _ (KA.«forkret» + 0x18#64) false 2322#12 15#5 15#5 (by decide) (by decide)
+  k_step_gen (wp_s_lw c1 _ (KA.«forkret» + 0x18#64) false 2494#12 15#5 15#5 (by decide) (by decide)
     (DFrac.own 1) 1#32) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [KCtx.rget_eq, KCtx.setReg_regs, RegMap.set_apply, fkr_first_addr', fkr_first_addr] next c2 hp2
   iintro Hk Hpc Hf

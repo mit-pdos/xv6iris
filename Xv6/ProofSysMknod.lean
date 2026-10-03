@@ -56,6 +56,7 @@ import Xv6.ArgLemmas
 import Xv6.SysMknodCalls
 import Xv6.ReadiDefs
 import Xv6.SysLinkParts
+import Xv6.DirlookupParts
 
 namespace Xv6
 
@@ -64,9 +65,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## Pure facts -/
 
@@ -155,7 +154,7 @@ theorem sys_mknod_created (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
           A.Farm (pfamTriv (fun _ _ _ _ => iprop(True))) A.Fun A.Fok A.Fex pl made inum.toNat)
      else
       iprop(⌜R 10#5 = 0#64⌝ ∗ logTx icfgLog ∗
-        creFailArms (hlc := hlc) (fsGammaL fscFs) fscFs T_DEVICE_w.toNat (devArg A.v1)
+        creFailArms (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti T_DEVICE_w.toNat (devArg A.v1)
           (devArg A.v2) (nparNm (viewLazy A.V.upt A.V.sz A.M) A.v0.toNat) (fun c => c = .ADev (devArg A.v1) (devArg A.v2)) A.P A.Pmiss A.Farm (pfamTriv (fun _ _ _ _ => iprop(True))) A.Fun A.Fok
           A.Fex pl))
     ⊢ wpLoop (GF := GF) cpu := by
@@ -171,9 +170,9 @@ theorem sys_mknod_created (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, MachCSL.beqz_zero]
     iintro Hk Hpc
     ihave Hop := logOpS_op icfgLog u' Sb' $$ Hop Htx
-    ihave Hcf := creFailArms_dev (hlc := hlc) (fsGammaL fscFs) fscFs (devArg A.v1) (devArg A.v2)
+    ihave Hcf := creFailArms_dev (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti (devArg A.v1) (devArg A.v2)
       (nparNm (viewLazy A.V.upt A.V.sz A.M) A.v0.toNat) (fun c => c = .ADev (devArg A.v1) (devArg A.v2)) A.P A.Pmiss A.Farm (pfamTriv (fun _ _ _ _ => iprop(True))) A.Fun A.Fok A.Fex pl $$ Hcf
-    ihave Hfail : mknodPostFail (hlc := hlc) (fsGammaL fscFs) fscFs A.V.cwi (viewLazy A.V.upt A.V.sz A.M)
+    ihave Hfail : mknodPostFail (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti A.V.cwi (viewLazy A.V.upt A.V.sz A.M)
         A.v0.toNat (devArg A.v1) (devArg A.v2) A.P A.Pmiss A.Farm A.Fun A.Fok
         A.Fex $$ [Hcf]
     · unfold mknodPostFail
@@ -306,7 +305,7 @@ theorem sys_mknod_fetched (CR : CREATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : S
     iintro Hk Hpc
     icases sysfile_buf_split _ pl _ $$ Hbuf with ⟨Hp, Hrest⟩
     -- THE ONE-SHOT, HANDED DOWN UNFIRED, AT THE PATH THE CALLER PASSED
-    ihave Hau := mknodAuAt_inst (hlc := hlc) (fsGammaL fscFs) fscFs A.V.cwi (viewLazy A.V.upt A.V.sz A.M)
+    ihave Hau := mknodAuAt_inst (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti A.V.cwi (viewLazy A.V.upt A.V.sz A.M)
       A.v0.toNat pl (devArg A.v1) (devArg A.v2) A.P A.Pmiss A.Farm A.Fun A.Fok A.Fex
       hpl $$ Hau
     unfold mknodAuPre
@@ -324,8 +323,8 @@ theorem sys_mknod_fetched (CR : CREATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : S
         (sysMknodHw A.v2).toNat (nparNm (viewLazy A.V.upt A.V.sz A.M) A.v0.toNat) (fun c => c = .ADev (devArg A.v1) (devArg A.v2)) (A.P (nparElems (bview pl.length (sysfilePfun pl))).length) A.Farm
         (pfamTriv (fun _ _ _ _ => iprop(True))) A.Fun A.Fok
       from by rw [sys_mknod_hw_dev, sys_mknod_hw_dev, sys_mknod_bview_self]) $$ Hcre
-    ihave Hst := (show epStart (hlc := hlc) (GF := GF) fscFs A.V.cwi A.P A.Pmiss pl ⊢
-      epStart (hlc := hlc) fscFs A.V.cwi A.P A.Pmiss (bview pl.length (sysfilePfun pl))
+    ihave Hst := (show epStart (hlc := hlc) (GF := GF) fscFs A.V.rti A.V.cwi A.P A.Pmiss pl ⊢
+      epStart (hlc := hlc) fscFs A.V.rti A.V.cwi A.P A.Pmiss (bview pl.length (sysfilePfun pl))
       from by rw [sys_mknod_bview_self]) $$ Hst
     icases logOp_openS icfgLog MAXOPBLOCKS $$ Hop with ⟨%Sb, HopS, Htx⟩
     ihave Hp := (show byteBuf (GF := GF) (sysMknodBuf (k.regs 2#5)) (DFrac.own 1)
@@ -393,7 +392,7 @@ theorem sys_mknod_fetched (CR : CREATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : S
     ihave Hbuf : sysfileAny (sysMknodBuf (k.regs 2#5)) 128 $$ [Hbuf]
     · unfold sysfileAny; iexists bs; iframe; ipureintro; omega
     ihave Hlow := sys_mknod_ints_close (k.regs 2#5) hal8 _ _ $$ Hints
-    ihave Hfail : mknodPostFail (hlc := hlc) (fsGammaL fscFs) fscFs A.V.cwi (viewLazy A.V.upt A.V.sz A.M)
+    ihave Hfail : mknodPostFail (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti A.V.cwi (viewLazy A.V.upt A.V.sz A.M)
         A.v0.toNat (devArg A.v1) (devArg A.v2) A.P A.Pmiss A.Farm A.Fun A.Fok
         A.Fex $$ [Hau]
     · unfold mknodPostFail; ileft; iexact Hau
@@ -443,7 +442,7 @@ theorem sys_mknod_args (AS : ARGSTR) (CR : CREATE) (IUP : IUNLOCKPUT) (EO : END_
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x2a  jal argstr
-  k_step_e (wp_s_jal cpu _ (KA.«sys_mknod» + 0x2a#64) false 2086208#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_mknod» + 0x2a#64) false 2086112#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_mknod_br_argstr]
   iintro Hk Hpc
   icases sysfile_blk_bare_ev _ _ _ _ _ $$ Hblk with ⟨Hbare, Hclose⟩
@@ -572,7 +571,7 @@ theorem sys_mknod_main (BO : BEGIN_OP) (AI : ARGINT) (AS : ARGSTR) (CR : CREATE)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x12  jal argint
-  k_step_e (wp_s_jal cpu _ (KA.«sys_mknod» + 0x12#64) false 2086176#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_mknod» + 0x12#64) false 2086080#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_mknod_br_argint]
   iintro Hk Hpc
   icases sys_mknod_tf hct _ _ _ _ _ $$ Hblk with ⟨Htf, Hpg, Htfb⟩
@@ -603,7 +602,7 @@ theorem sys_mknod_main (BO : BEGIN_OP) (AI : ARGINT) (AS : ARGSTR) (CR : CREATE)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x1c  jal argint
-  k_step_e (wp_s_jal cpu _ (KA.«sys_mknod» + 0x1c#64) false 2086166#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_mknod» + 0x1c#64) false 2086070#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_mknod_br_argint]
   iintro Hk Hpc
   icases sys_mknod_tf hct _ _ _ _ _ $$ Hblk with ⟨Htf, Hpg, Htfb⟩

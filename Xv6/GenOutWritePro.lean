@@ -29,8 +29,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-- AN UNFILED STAGE IS EMPTY, so its cursor is at zero (Rocq's inline
 `gop_empty_stage_ps` argument in `gcl_step_write_pro`). -/
 theorem gproUnfiled (M : LModel) (sd : M.lmSt) (k : Nat) (ho : List Obs) (so : GStage M)

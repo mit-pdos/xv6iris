@@ -144,19 +144,6 @@ theorem mergeAll_one (x u : List α) : MergeAll [x] u ↔ u = x := by
     | nil => exact .done _ (by simp)
     | cons y x ih => exact .take _ 0 y x x rfl (by simpa using ih)
 
-/-- Rocq `merge_all_block`: one stream taken as a block, anywhere. -/
-theorem mergeAll_block (ss : List (List α)) (i : Nat) (x y u : List α)
-    (hi : ss[i]? = some (x ++ y)) (hm : MergeAll (ss.set i y) u) : MergeAll ss (x ++ u) := by
-  induction x generalizing ss with
-  | nil =>
-    have hi' : ss[i]? = some y := by simpa using hi
-    rw [pmerge_set_id ss i y hi'] at hm
-    simpa using hm
-  | cons z x ih =>
-    have hlt : i < ss.length := (List.getElem?_eq_some_iff.1 hi).1
-    refine .take _ i z (x ++ y) _ hi (ih _ (pmerge_get_set _ _ _ hlt) ?_)
-    simpa [List.set_set] using hm
-
 /-- **Rocq `shuf2`** (PipesDisc): the textbook shuffle of two streams. -/
 inductive Shuf2 : List α → List α → List α → Prop where
   | nil : Shuf2 [] [] []
@@ -194,21 +181,6 @@ theorem shuf2_cons_inv (a b : List α) (x : α) (u : List α) (h : Shuf2 a b (x 
 /-- Rocq `shuf2_nil_inv`. -/
 theorem shuf2_nil_inv (a b : List α) (h : Shuf2 a b []) : a = [] ∧ b = [] := by
   cases h; exact ⟨rfl, rfl⟩
-
-/-- Rocq `shuf2_nil_l`. -/
-theorem shuf2_nil_l (b u : List α) : Shuf2 [] b u ↔ u = b := by
-  constructor
-  · intro h
-    induction u generalizing b with
-    | nil => exact ((shuf2_nil_inv _ _ h).2).symm
-    | cons x u ih =>
-      rcases shuf2_cons_inv _ _ _ _ h with ⟨a', ha, _⟩ | ⟨b', rfl, hs⟩
-      · cases ha
-      · rw [ih b' hs]
-  · rintro rfl
-    induction u with
-    | nil => exact .nil
-    | cons x b ih => exact .r _ _ _ _ ih
 
 /-- Rocq `shuf2_nil_r`. -/
 theorem shuf2_nil_r (a u : List α) : Shuf2 a [] u ↔ u = a := by
@@ -462,11 +434,6 @@ theorem cntN_elem (s : List W) (w : W) : w ∈ s ↔ cntN s w ≠ 0 := by
 theorem cntN_nil_notin (s : List W) (w : W) (hn : w ∉ s) : cntN s w = 0 := by
   exact Decidable.byContradiction fun h => hn ((cntN_elem s w).2 h)
 
-theorem cntN_length (s : List W) (w : W) : cntN s w ≤ s.length := by
-  induction s with
-  | nil => simp [cntN]
-  | cons x s ih => simp only [cntN, List.length_cons]; split <;> omega
-
 theorem mergeN_ext (f g : W → List α) (sel : List W) (hfg : ∀ w, f w = g w) :
     mergeN f sel = mergeN g sel := by
   induction sel generalizing f g with
@@ -495,7 +462,7 @@ theorem mergeN_local (f g : W → List α) (sel : List W) (hfg : ∀ w ∈ sel, 
 theorem sel_wfN_cons_inv (src : W → List α) (w : W) (s : List W) (hwf : sel_wfN src (w :: s)) :
     ∃ b r, src w = b :: r ∧ sel_wfN (supd src w r) s := by
   have hw := hwf w
-  simp only [cntN, if_pos rfl] at hw
+  simp only [cntN] at hw
   cases h : src w with
   | nil => rw [h] at hw; simp at hw
   | cons b r =>
@@ -527,10 +494,6 @@ theorem mergeN_app (src : W → List α) (s1 s2 : List W) (hwf : sel_wfN src s1)
 theorem sel_wfN_app_l (src : W → List α) (s1 s2 : List W) (h : sel_wfN src (s1 ++ s2)) :
     sel_wfN src s1 := fun w => by have := h w; rw [cntN_app] at this; omega
 
-theorem sel_wfN_prefix (src : W → List α) (s1 s2 : List W) (hp : s1 <+: s2)
-    (h : sel_wfN src s2) : sel_wfN src s1 := by
-  obtain ⟨z, rfl⟩ := hp; exact sel_wfN_app_l src s1 z h
-
 /-- Rocq `mergeN_snoc`: a byte at writer `w`'s cursor appends exactly it. -/
 theorem mergeN_snoc (src : W → List α) (sel : List W) (w : W) (b : α)
     (hwf : sel_wfN src sel) (hb : (src w)[cntN sel w]? = some b) :
@@ -561,27 +524,6 @@ theorem mergeN_prefix (src : W → List α) (s1 s2 : List W) (hp : s1 <+: s2)
   obtain ⟨z, rfl⟩ := hp
   rw [mergeN_app src s1 z (sel_wfN_app_l src s1 z hwf)]
   exact List.prefix_append _ _
-
-theorem mergeN_forall (P : α → Prop) (src : W → List α) (sel : List W)
-    (hP : ∀ w ∈ sel, ∀ x ∈ src w, P x) : ∀ x ∈ mergeN src sel, P x := by
-  induction sel generalizing src with
-  | nil => simp [mergeN]
-  | cons w s ih =>
-    have hw := hP w (List.mem_cons_self ..)
-    simp only [mergeN]
-    split
-    · simp
-    · rename_i b r hs
-      rw [hs] at hw
-      intro x hx
-      rcases List.mem_cons.1 hx with rfl | hx
-      · exact hw _ (List.mem_cons_self ..)
-      · refine ih _ ?_ x hx
-        intro w' hw' y hy
-        simp only [supd] at hy
-        split at hy
-        · exact hw y (List.mem_cons_of_mem _ hy)
-        · exact hP w' (List.mem_cons_of_mem _ hw') y hy
 
 theorem map_supd_insert (src : W → List α) (ws : List W) (i : Nat) (w : W) (r : List α)
     (hnd : ws.Nodup) (hi : ws[i]? = some w) :

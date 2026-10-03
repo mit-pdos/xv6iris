@@ -22,10 +22,10 @@ CONE (UkFileIface.v, reached, this file): `fdev` (+ `FDCons`/`FDFile`/`FDIn`),
 registries' shared shape, stated once): `fif_pool` = `HfpReg.pool`,
 `fif_single` = `HfpReg.single`, `fif_dfa_valid`/`fif_pool_valid`/
 `fif_pool_take`/`fif_pool_ext`/`fif_pool_update`/`fif_reg_alloc`/
-`fif_tok_agree`/`fif_tok_halves`/`fif_pool_own_take`/`fif_pool_give`/
-`fif_toks_agree` = `HfpReg.dfa_valid`/`pool_valid`/`pool_take`/`pool_ext`/
-`pool_update`/`reg_alloc`/`tok_agree`/`tok_halves`/`pool_own_take`/
-`pool_give`/`toks_agree`.  `fifRegΣ` is U4's `unionGF` slot for
+`fif_tok_halves`/`fif_pool_own_take`/`fif_pool_give`/`fif_toks_agree` =
+`HfpReg.dfa_valid`/`pool_valid`/`pool_take`/`pool_ext`/`pool_update`/
+`reg_alloc`/`tok_halves`/`pool_own_take`/`pool_give`/`toks_agree`
+(`fif_tok_agree` is not ported: nothing uses it).  `fifRegΣ` is U4's `unionGF` slot for
 `FifRegG` (deviation 4); the section notations `c`, `γfd`, `a0_idx`..`a7_idx`,
 `fcons_atc` are written out.  Not ported: the schemes; `fif_reg_inG`,
 `subG_fifRegΣ` (reached only by instance resolution: Rocq's Σ plumbing,
@@ -46,8 +46,8 @@ which the class slot in `unionGF` subsumes).
    `fdInsert fdm fd d`, `delete fd fdm` is `fdDelete fdm fd`; ledger
    lookups `l !! Z.to_nat fd` are `l[fd.toNat]?`.
 4. **The camera** `discrete_funUR (nat → optionUR (dfrac_agreeR (leibnizO
-   fdev)))` is `FifRegR := Nat → Option (DFracAgree.DFracAgreeR (DiscreteO
-   Fdev))` (`HfpReg.RegR Fdev`), owned through `iOwn` at `ElemG GF
+   fdev)))` is `HfpReg.RegR Fdev` (`Nat → Option (DFracAgree.DFracAgreeR
+   (DiscreteO Fdev))`), owned through `iOwn` at `ElemG GF
    (HfpReg.RegF Fdev)` -- a NEW camera class `FifRegG` (U4 gives it its
    `unionGF` slot; union_cone §4.1's shared shape at `X = fdev`).
 5. `fif_om_create` is stated over Lean's `modeCreate` (ProgTree) and
@@ -59,14 +59,13 @@ import Xv6.HfpReg
 import Xv6.EchoOut
 import Xv6.SysOpenDefs
 import Xv6.ConsoleInvDefs
+import Xv6.UkHandler
 
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Iris.Std.PartialMap
 open Std (ExtTreeSet)
-
-set_option linter.unusedSectionVars false
 
 /-! ## §0 The device values -/
 
@@ -88,9 +87,6 @@ abbrev FifVs := RegMapF Fdev
 abbrev fifDom (vs : FifVs) (d : Nat) : Prop := PartialMap.dom vs d
 
 /-! ## §1 The registry camera (deviation 4) -/
-
-/-- **Rocq `fifRegR`**: `HfpReg.RegR` at `Fdev`. -/
-abbrev FifRegR : Type := HfpReg.RegR Fdev
 
 /-- **Rocq `fifRegG`**: THE registry camera at `Fdev`. -/
 class FifRegG (GF : BundledGFunctors) where
@@ -289,7 +285,7 @@ theorem fif_ok_open_std (fdm : Fdmap) (l : List FdState) (vs : FifVs) (k : Nat) 
       subst e
       simp only [fifRow]
       refine ⟨by omega, ?_⟩
-      simp [List.getElem?_set, hkl]
+      simp [hkl]
     · rw [if_neg e] at h
       rw [LawfulPartialMap.get?_insert, if_neg (fun e' => hfr fd (by rw [e']; exact h))]
       have hr := h2 fd d' h

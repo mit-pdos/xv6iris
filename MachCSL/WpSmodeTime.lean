@@ -248,12 +248,6 @@ theorem execSpecClk_csrw_stimecmp (cpu : CPU) (c : MConf) (sie : Bool) (hok : SC
 
 /-! ## The rules -/
 
-@[simp] theorem sConfOf_mcounteren (tier : KTier) (root : BitVec 44) (ms mdl mepc stc : BitVec 64) (lf : SLeft) :
-    (sConfOf tier root ms mdl mepc stc lf).mcounteren = lf.mcen := rfl
-
-@[simp] theorem sConfOf_menvcfg (tier : KTier) (root : BitVec 44) (ms mdl mepc stc : BitVec 64) (lf : SLeft) :
-    (sConfOf tier root ms mdl mepc stc lf).menvcfg = menvcfgS := rfl
-
 /-- The configuration after a `stimecmp` write: the same, at the new
 timer compare. -/
 theorem sConfOf_setStc (tier : KTier) (root : BitVec 44) (ms mdl mepc stc v : BitVec 64) (lf : SLeft) :

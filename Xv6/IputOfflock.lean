@@ -27,6 +27,7 @@ comes back with them; the three shares rejoin into the caller's
 -/
 import Xv6.IputOfflockTail
 import Xv6.IputStages
+import Xv6.IupdateMain
 
 namespace Xv6
 
@@ -35,9 +36,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
@@ -230,10 +229,10 @@ theorem iput_offlock (BR : BREAD) (LW : LOG_WRITE) (BL : BRELSE)
   k_step_c (wp_s_srliw c _ (KA.«iput» + 0x98#64) false 4#5 15#5 18#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h18, dsSrliw4]
   iintro Hk Hpc
-  k_step_c (wp_s_auipc c _ (KA.«iput» + 0x9c#64) false 0x1d#20 11#5 (by decide))
+  k_step_c (wp_s_auipc c _ (KA.«iput» + 0x9c#64) false 0x1e#20 11#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_c (wp_s_lw c _ (KA.«iput» + 0xa0#64) false 1572#12 11#5 11#5 (by decide) (by decide)
+  k_step_c (wp_s_lw c _ (KA.«iput» + 0xa0#64) false 2224#12 11#5 11#5 (by decide) (by decide)
       dqs (BitVec.ofNat 32 icfgIst))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [iput_sbi]
   iintro Hk Hpc Hsi

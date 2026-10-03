@@ -5,8 +5,8 @@ as landed by b23e6791f -- drift SY2).
 usys.S's instructions (`c.li a7,N; ecall; c.jr ra`), walked once by
 `UkStub.stub_run` at sync's addresses (`exit` @0x2c8, `sync` @0x368).  exit's
 ecall is the leaf of `UkSysP`; sync's is THE LEAF `ksyncLeaf oQ` (Rocq sync
-K4: the hook in, its receipt out), discharged here at `none` by the quiet
-leaf (`ksyncLeaf_none`, Rocq `ksync_leaf_none`).
+K4: the hook in, its receipt out).  Rocq's quiet-leaf discharge at `none`
+(`ksync_leaf_none`) is not ported (nothing uses it).
 
 Deviations from Rocq: `UkSyncDefs` 1-2; the section hypotheses `Hpay`
 (`ukn_const`) and `Hpsok_free` are the premises `[UknConst N]` / `Hps`; the
@@ -19,8 +19,6 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
-
-set_option linter.unusedSectionVars false
 
 section UkSyncStubs
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
@@ -62,32 +60,6 @@ theorem wp_ksync_exit (UL : UK_LEAVES) (HS : UK_SYS_P) (N : UkNames GF) [hc : Uk
   iapply HS.exit N h1 _ _ avail (sync_usysno m USYS_exit (by unfold USYS_exit; decide)) $$ Hi [Hpay] Hrun
   rw [hc.eq (UkSysP.uexitst (ukWr m 17#5 (BitVec.ofInt 64 USYS_exit))) (-1)]
   iexact Hpay
-
-unseal LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled in
-/-- **Rocq `ksync_leaf_none`** (sync K4): AT `none`, at any instance, 22 is
-a FREE number, so the deposit is minted from nothing and the QUIET leaf walks
-the ecall; the hook and the receipt are both `emp`. -/
-theorem ksyncLeaf_none (HS : UK_SYS_P) (Hps : ∀ k : Int, freeNum k → UprogSG.psok (GF := GF) k)
-    (N : UkNames GF) : ⊢ ksyncLeaf (hlc := hlc) N none := by
-  unfold ksyncLeaf
-  iintro %h %m %avail %c %hn #Hc Hrun Hcwd - Hcont
-  -- the ecall's decode, at the stub's own address (as `sync_stub_sync` reads it)
-  have hdec : ∃ i₀ n w, User.utextDecodeWith udrefU User.Sync.tree User.Sync.code.byte
-      (User.Sync.Sym.«sync» + 2) = some (false, .ECALL (), i₀, n, w) := udec%
-  ihave #Hi := sync_uis N.t (User.Sync.Sym.«sync» + 2) false (.ECALL ()) hdec (by decide) $$ Hc
-  rw [show User.Sync.Sym.«sync» + 2 = 0x36a from rfl]
-  iapply HS.quiet N h m (BitVec.ofNat 64 0x36a) 22 avail hn
-    (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide)
-    (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide)
-    $$ Hi Hrun []
-  · iapply udepw_of_psok N _ _ 22 (Hps 22 (by unfold freeNum USYS_exec USYS_exit; decide))
-      (by unfold USYS_exec; decide)
-  iintro %h' %r Hrun
-  rw [show BitVec.ofNat 64 0x36a + 4#64 = BitVec.ofNat 64 0x36e from by decide]
-  ihave Hq : iprop(qOpt (GF := GF) none) $$ []
-  · simp only [qOpt]
-    iempintro
-  iapply Hcont $$ %h' %r Hq Hcwd Hrun
 
 /-- **Rocq `wp_ksync_sync`**: sync() @0x368 RETURNS.  The ecall is THE
 LEAF's (`ksyncLeaf`, sync K4): the hook goes in, and what comes back to the

@@ -59,8 +59,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-! ## The children set, as a resource (Rocq `Section UserChildren`) -/
 
 section UserChildren
@@ -154,26 +152,12 @@ def upidAny (γp : GName) : IProp GF := iprop(∃ p : Int, upid γp p)
 instance upidAny_timeless (γp : GName) : Timeless (upidAny (GF := GF) γp) := by
   unfold upidAny; infer_instance
 
-theorem upidAny_of (γp : GName) (p : Int) : upid (GF := GF) γp p ⊢ upidAny γp := by
-  unfold upidAny
-  iintro H
-  iexists p
-  iexact H
-
 end UserPid
 
 /-! ## What a reap does to the reading (Rocq `ch_reaped`)
 
 AT MOST ONE generation leaves it -- the one that was reaped -- and every
 failing arm leaves it alone. -/
-
-def chReaped (cs cs' : ExtTreeSet GName compare) : Prop :=
-  cs' = cs ∨ ∃ γ' : GName, cs' = cs \ {γ'}
-
-theorem chReaped_refl (cs : ExtTreeSet GName compare) : chReaped cs cs := Or.inl rfl
-
-theorem chReaped_del (cs : ExtTreeSet GName compare) (γ' : GName) : chReaped cs (cs \ {γ'}) :=
-  Or.inr ⟨γ', rfl⟩
 
 /-- THE TWO ARMS ARE DISJOINT AT THE RETURN VALUE, as a pure fact about the
 word: a pid in `[1, PIDMAX]` sign-extends to a small POSITIVE 64-bit word,
@@ -212,20 +196,6 @@ theorem genIsInit_pid (g : GName) (pidv : BitVec 32) :
   · iexact Hi
   · ipureintro; exact h
 
-/-- ...AND THE REFUTATION A FORKED CHILD SPENDS -/
-theorem genIsInit_ne (g : GName) (pidv p0 : BitVec 32) (hne : pidv ≠ p0) :
-    initPidIs (GF := GF) p0 ∗ genPid g pidv ∗ genIsInit g ⊢ False := by
-  iintro ⟨#Hi, #Hp, #Hg⟩
-  ihave ⟨%p1, #Hi1, %Heq⟩ := genIsInit_pid g pidv $$ [Hg Hp]
-  · isplitl []
-    · iexact Hg
-    · iexact Hp
-  ihave %h := initPidIs_agree p0 p1 $$ [Hi Hi1]
-  · isplitl []
-    · iexact Hi
-    · iexact Hi1
-  exact absurd (Heq.trans h.symm) hne
-
 end GenIsInit
 
 /-! ## What a wait answers (Rocq `Section WaitAns`) -/
@@ -253,16 +223,6 @@ def waitAns (rv : BitVec 32) (xs : Int) (cs cs' : ExtTreeSet GName compare) (gn 
       ⌜cs' = cs \ {γ'} ∧ 1 ≤ rv.toNat ∧ rv.toNat ≤ genPidMax⌝ ∗
       ⌜γ' ∈ cs ∨ pidv = 1#32⌝ ∗
       exitTok γ' rv xs ∗ genUniq cs rv γ')
-
-/-- the pure row, which is all the relays between kwait and the program
-ever look at -/
-theorem waitAns_reaped (rv : BitVec 32) (xs : Int) (cs cs' : ExtTreeSet GName compare) (gn : GName)
-    (nullst : Bool) (pidv : BitVec 32) :
-    waitAns (GF := GF) rv xs cs cs' gn nullst pidv ⊢ ⌜chReaped cs cs'⌝ := by
-  unfold waitAns
-  iintro (⟨%h, -⟩ | ⟨%γ', %h, -, -, -⟩)
-  · ipureintro; exact Or.inl h.2
-  · ipureintro; exact Or.inr ⟨γ', h.1⟩
 
 /-- ...AND THE ARM A -1 RETURN IS ON: the whole answer is persistent there. -/
 theorem waitAns_m1 (rv : BitVec 32) (xs : Int) (cs cs' : ExtTreeSet GName compare) (gn : GName)
@@ -327,29 +287,6 @@ def zombLedLb (h : List Zev) : IProp GF := WchG.wzlName GF ↪◯ML h
 
 instance zombLedLb_persistent (h : List Zev) : Persistent (zombLedLb (GF := GF) h) := by
   unfold zombLedLb; infer_instance
-
-theorem zombLedAuth_lb (h : List Zev) :
-    zombLedAuth (GF := GF) h ⊢ zombLedAuth h ∗ zombLedLb h := by
-  unfold zombLedAuth zombLedLb
-  iintro Ha
-  ihave #Hb := MonoList.lb_own_get (WchG.wzlName GF) _ h $$ Ha
-  isplitl [Ha]
-  · iexact Ha
-  · iexact Hb
-
-theorem zombLedLb_prefix (h h' : List Zev) :
-    zombLedAuth (GF := GF) h ⊢ zombLedLb h' -∗ ⌜h' <+: h⌝ := by
-  unfold zombLedAuth zombLedLb
-  iintro Ha Hb
-  ihave %hv := MonoList.auth_lb_own_valid (WchG.wzlName GF) _ h h' $$ Ha Hb
-  ipureintro; exact hv.2
-
-/-- Two lower bounds of the one ledger are comparable (Rocq `zomb_led_lb_lb`). -/
-theorem zombLedLb_lb (h h' : List Zev) :
-    zombLedLb (GF := GF) h ⊢ zombLedLb h' -∗ ⌜h <+: h' ∨ h' <+: h⌝ := by
-  unfold zombLedLb
-  iintro Ha Hb
-  iapply MonoList.lb_own_valid (WchG.wzlName GF) h h' $$ Ha Hb
 
 theorem zombLedAuth_grow (h : List Zev) (e : Zev) :
     zombLedAuth (GF := GF) h ⊢ |==> (zombLedAuth (h ++ [e]) ∗ zombLedLb (h ++ [e])) := by
@@ -445,15 +382,6 @@ theorem waitAnsLed_of (rv : BitVec 32) (xs : Int) (cs cs' : ExtTreeSet GName com
         isplitr
         · ipureintro; exact hc
         · iexact Hr
-
-theorem waitAnsGen_neg (xs : Int) (cs : ExtTreeSet GName compare) (gn : GName) (nullst : Bool) :
-    waitWhy (GF := GF) cs gn nullst ⊢ waitAnsGen (-1#32) xs cs cs gn nullst := by
-  unfold waitAnsGen
-  iintro #Hwhy
-  ileft
-  isplitr
-  · ipureintro; exact ⟨rfl, rfl⟩
-  · iexact Hwhy
 
 /-- THE ONE STEP ACROSS, and it is two agreements: the caller's own
 registration says which pid its generation was given, and the sealed pid

@@ -31,8 +31,6 @@ open Iris.Std.PartialMap
 open HfpPipeP HfpFileClaimsP
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
-
 /-- The handle function after a standard slot's input joined. -/
 theorem cifHf_insert_std (fdm : Fdmap) (vs : RegMapF CfDev) (k d : Nat) (nm : List (BitVec 8)) (i : Nat)
     (γo : GName) (hnone : fdm (k : Int) = none) (hfr : ∀ fd', fdm fd' ≠ some d) (fd : Int) :
@@ -46,10 +44,6 @@ theorem cifHf_insert_std (fdm : Fdmap) (vs : RegMapF CfDev) (k d : Nat) (nm : Li
     | some d' =>
       have hne : d ≠ d' := fun h => hfr fd (h ▸ e)
       simp only [Option.bind_some, cifHf, LawfulPartialMap.get?_insert_ne hne]
-
-/-- The registry's pool at a fresh device's kind, its domain grown. -/
-theorem pool_dom_insert (vs : RegMapF CfDev) (d : Nat) (v : CfDev) (hvd : get? vs d = none) (x : Nat) :
-    (x = d ∨ dom vs x) ↔ dom (insert vs d v) x := (cif_dom_insert vs d v x).symm
 
 section CifOpen
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FileAppG GF] [FsTopG GF] [OffboxG GF] [IcacheG GF] [PipeProtoG GF] [PipeOutG GF]

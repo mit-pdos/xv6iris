@@ -5,10 +5,10 @@ allocation lemmas at the end of its `FsBytes` section (`byte_map_grow`,
 `fs_bytes_alloc`, `fs_alloc`).
 
 **THE ROWS.**  The home set is BOUND in `Xv6.fsBytesRow` because no consumer
-needs to name it: holding a block's byte run IS being a home block
-(`Xv6.fsblock_home_open`), and the byte map's AUTH -- of which there is
-exactly one -- is inside the invariant, so two invariants at `Xv6.fsbN`
-over one `γfs.bytes` cannot disagree about it.  What a consumer needs is
+needs to name it: holding a block's byte run IS being a home block, and the
+byte map's AUTH -- of which there is exactly one -- is inside the invariant,
+so two invariants at `Xv6.fsbN` over one `γfs.bytes` cannot disagree about
+it.  What a consumer needs is
 only that SOME such invariant exists, which is what the row says.
 
 `Xv6.fsBytesAny` is the row a RUNTIME reader needs: the row plus the SEAL.
@@ -35,8 +35,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Std MachCSL
 open Iris.Std Iris.Std.PartialMap
-
-set_option linter.unusedSectionVars false
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FsBlocksG GF]
@@ -241,13 +239,6 @@ instance fsBytesAnyAt_persistent (γ : FsNames) (homeL : List Nat) :
 theorem fsBytesAny_row (γ : FsNames) : fsBytesAny (GF := GF) γ ⊢ fsBytesRow γ := by
   unfold fsBytesAny; iintro ⟨H, -⟩; iexact H
 
-theorem fsBytesAny_seal (γ : FsNames) : fsBytesAny (GF := GF) γ ⊢ excSealed γ.exc := by
-  unfold fsBytesAny; iintro ⟨-, H⟩; iexact H
-
-theorem fsBytesAny_of (γ : FsNames) :
-    fsBytesRow (GF := GF) γ ⊢ excSealed γ.exc -∗ fsBytesAny γ := by
-  unfold fsBytesAny; iintro H1 H2; iframe H1 H2
-
 theorem fsBytesAnyAt_at (γ : FsNames) (homeL : List Nat) :
     fsBytesAnyAt (GF := GF) γ homeL ⊢ fsBytesAt γ homeL := by
   unfold fsBytesAnyAt; iintro ⟨H, -⟩; iexact H
@@ -295,24 +286,6 @@ theorem fsBytes_agree_any (E : CoPset) (γ : FsNames) (b : Nat)
   rw [fsblock_1]
   exact fsBytes_agree_any_q E γ (DFrac.own 1) b bs bsm hE
 
-/-- **THE DROP-IN FOR `Xv6.fsCache_update` AT A HOME BLOCK** (Rocq's
-`fsblock_update`, read at the row `Xv6.logCtx` carries).  The shape is
-`fsCache_update`'s with `fsChalf` replaced by `fsblock`, `|==>` by
-`|={E}=>`, and the persistent row added -- which is why the call sites are
-one-line edits. -/
-theorem fsblock_update_any (E : CoPset) (γ : FsNames) (L : BlockMap) (b : Nat)
-    (bs bsNew bs' : List (BitVec 8)) (hE : (↑logN : CoPset) ⊆ E)
-    (hlnew : bsNew.length = BSIZE) :
-    fsBytesAny (GF := GF) γ -∗ fsCacheAuth γ L -∗ fsblock γ.bytes b bs -∗
-      (γ.cache ↪◯MAP[b]{DFrac.own (1 : Qp).half} bs') -∗
-      |={E}=> (⌜bs' = bs ∧ PartialMap.get? L b = some bs⌝ ∗
-        fsCacheAuth γ (PartialMap.insert L b bsNew) ∗ fsblock γ.bytes b bsNew ∗
-        (γ.cache ↪◯MAP[b]{DFrac.own (1 : Qp).half} bsNew)) := by
-  unfold fsBytesAny fsBytesRow fsBytesAt fsCacheAuth
-  iintro ⟨⟨%homeL, %Xv, #Hinv⟩, #Hseal⟩ Ha Hfb Hm
-  iapply fsblock_update E γ.bytes γ.cache γ.exc homeL Xv L b bs bsNew bs' hE hlnew
-    $$ Hinv Hseal Ha Hfb Hm
-
 /-- **...AND AT BYTE-RANGE GRANULARITY** (Rocq's `byte_range_log_update`,
 read at the row `Xv6.logCtx` carries): `log_write`'s ghost step for a
 writer that owns only `subOld` at `off` (`Xv6.byteRange_log_update`).  The
@@ -353,15 +326,6 @@ theorem fsblock_install_exc_at (E : CoPset) (γ : FsNames) (homeL : List Nat)
   iintro #Hinv Hxo Ha Hm
   iapply fsblock_install_exc E γ.bytes γ.cache γ.exc homeL Xv L X b bsm hE hb hlen
     $$ Hinv Hxo Ha Hm
-
-/-- ...and the home-block reading, at the row. -/
-theorem fsblock_home_any (E : CoPset) (γ : FsNames) (homeL : List Nat) (b : Nat)
-    (bs : List (BitVec 8)) (hE : (↑logN : CoPset) ⊆ E) :
-    fsBytesAt (GF := GF) γ homeL -∗ fsblock γ.bytes b bs -∗
-      |={E}=> (⌜b ∈ homeL⌝ ∗ fsblock γ.bytes b bs) := by
-  unfold fsBytesAt
-  iintro ⟨%Xv, #Hinv⟩ Hfb
-  iapply fsblock_home_open E γ.bytes γ.cache γ.exc homeL Xv b bs hE $$ Hinv Hfb
 
 end
 

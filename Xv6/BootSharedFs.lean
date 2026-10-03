@@ -42,9 +42,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
 
-set_option linter.unusedSectionVars false
-set_option linter.unusedVariables false
-
 -- `fsBlocks dk b` is a 1024-byte `diskRead`: never unfold it during unification.
 attribute [local irreducible] fsBlocks
 

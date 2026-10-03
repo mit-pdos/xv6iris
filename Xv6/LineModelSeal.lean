@@ -31,6 +31,7 @@ Deviations: spelling only (as `LineModel.lean`); Rocq's `S i = q` is
 -/
 import Xv6.LineModel
 import Xv6.LineBytesSeal
+import Xv6.LineWordsSeal
 
 namespace Xv6
 

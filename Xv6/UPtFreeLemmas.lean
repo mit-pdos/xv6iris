@@ -11,7 +11,6 @@ zero is a whole page, ready for `kfree`.
 (The shared `Xv6/UPtLemmas.lean` belongs to another proof; this file is
 `freewalk`'s and `uvmfree`'s own.)
 -/
-import Xv6.PtOwnLemmas
 import Xv6.UPtDefs
 import MachCSL.WpSmodeFrame
 import Xv6.PtRunLemmas
@@ -22,7 +21,6 @@ open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open Sail LeanRV64D LeanRV64D.Functions
 
 set_option maxRecDepth 8000
-set_option linter.unusedSectionVars false
 
 /-! ## Indices of a node page -/
 

@@ -45,8 +45,6 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
-
 /-- The key's reading of argument `j`, when it exists, is below the count. -/
 theorem catArgs_lookup_lt (W : Uvis) (j : Nat) (g : UArg) (hj : (catArgs W)[j]? = some g) :
     j < uvisArgc W ∧ g = echoArg W.M (uvisAv W) j := by

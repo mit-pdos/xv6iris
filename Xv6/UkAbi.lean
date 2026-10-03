@@ -16,7 +16,7 @@ header, point for point:
 * THE LENGTHS ARE AN EXPLICIT PARAMETER (`alen`), which is what makes the
   gate DECIDABLE, and there is a CANONICAL choice (`ukSlen`, a NUL scan with
   fuel `2^31`), so "some assignment works" and "the canonical one works" are
-  the same claim (`ukArgs_canon`).
+  the same claim.
 * THE ARRAY'S NULL TERMINATOR is a separate, named conjunct (`UkArgvNull`).
 * The stack BUDGET on the key (`UkStack`), with its split and slot lemmas.
 * §0 carries the byte-window readings of `SpecUkLeaves.uMWord` (Rocq
@@ -130,9 +130,6 @@ instance ukWpage_dec (π : Nat → Option UPerm) (va : BitVec 64) : Decidable (u
 instance ukXpage_dec (π : Nat → Option UPerm) (va : BitVec 64) : Decidable (ukXpage π va) :=
   decidable_of_iff ((upermAt π va).any (·.X) = true) (by unfold ukXpage; cases upermAt π va <;> simp)
 
-/-- Rocq `uk_rpage_load_ok` (definitional). -/
-theorem ukRpage_loadOk {π : Nat → Option UPerm} {va : BitVec 64} (h : ukRpage π va) : ukLoadOk π va := h
-
 /-- **Rocq `uk_rd`**: `n` bytes from `a` present in the image and on readable
 pages of the key, below `MAXVA`; mapping quantified PER BYTE. -/
 structure UkRd (π : Nat → Option UPerm) (M : ElfMem) (a n : Nat) : Prop where
@@ -144,25 +141,6 @@ instance ukRd_dec (π : Nat → Option UPerm) (M : ElfMem) (a n : Nat) : Decidab
   decidable_of_iff (a + n ≤ 2 ^ 38 ∧ (∀ j, j < n → ukRpage π (BitVec.ofNat 64 (a + j))) ∧
       ∀ j, j < n → (M (a + j)).isSome = true)
     ⟨fun ⟨h1, h2, h3⟩ => ⟨h1, h2, h3⟩, fun ⟨h1, h2, h3⟩ => ⟨h1, h2, h3⟩⟩
-
-/-- Rocq `uk_rd_sub`. -/
-theorem ukRd_sub {π : Nat → Option UPerm} {M : ElfMem} {a n a' n' : Nat} (h : UkRd π M a n)
-    (ha : a ≤ a') (hhi : a' + n' ≤ a + n) : UkRd π M a' n' :=
-  ⟨by have := h.hi; omega,
-   fun j hj => by have e : a' + j = a + (a' - a + j) := by omega
-                  rw [e]; exact h.page _ (by omega),
-   fun j hj => by have e : a' + j = a + (a' - a + j) := by omega
-                  rw [e]; exact h.bytes _ (by omega)⟩
-
-/-- Rocq `uk_rd_dom`. -/
-theorem ukRd_dom {π : Nat → Option UPerm} {M M' : ElfMem} {a n : Nat}
-    (hdom : ∀ k, (M k).isSome → (M' k).isSome) (h : UkRd π M a n) : UkRd π M' a n :=
-  ⟨h.hi, h.page, fun j hj => hdom _ (h.bytes j hj)⟩
-
-/-- Rocq `uk_rd_above`. -/
-theorem ukRd_above {π : Nat → Option UPerm} {M M' : ElfMem} {a n lo : Nat}
-    (heq : ∀ k, lo ≤ k → M' k = M k) (hlo : lo ≤ a) (h : UkRd π M a n) : UkRd π M' a n :=
-  ⟨h.hi, h.page, fun j hj => by rw [heq _ (by omega)]; exact h.bytes j hj⟩
 
 /-! ## §2 C strings: the canonical length -/
 
@@ -219,9 +197,6 @@ def ukArgvP (M : ElfMem) (av i : Nat) : Nat := (ukArgvW M av i).toNat
 theorem ukArgvP_w (M : ElfMem) (av i : Nat) : BitVec.ofNat 64 (ukArgvP M av i) = ukArgvW M av i := by
   unfold ukArgvP; rw [BitVec.ofNat_toNat, BitVec.setWidth_eq]
 
-/-- Rocq `uk_argv_p_range`. -/
-theorem ukArgvP_range (M : ElfMem) (av i : Nat) : ukArgvP M av i < 2 ^ 64 := (ukArgvW M av i).isLt
-
 /-- **Rocq `uk_args`**: THE ARGUMENT AREA.  Everything is at or above `lo`
 (in the image exec builds, the entry sp). -/
 structure UkArgs (π : Nat → Option UPerm) (M : ElfMem) (av argc lo : Nat) (alen : Nat → Nat) : Prop where
@@ -250,18 +225,6 @@ def UkArgsC (π : Nat → Option UPerm) (M : ElfMem) (av argc lo : Nat) : Prop :
 instance ukArgsC_dec (π : Nat → Option UPerm) (M : ElfMem) (av argc lo : Nat) :
     Decidable (UkArgsC π M av argc lo) := ukArgs_dec π M av argc lo _
 
-/-- **Rocq `uk_args_canon`**. -/
-theorem ukArgs_canon {π : Nat → Option UPerm} {M : ElfMem} {av argc lo : Nat} {alen : Nat → Nat}
-    (h : UkArgs π M av argc lo alen) : UkArgsC π M av argc lo :=
-  ⟨h.al, h.lo_le, h.argc_lt, h.rd, fun i hi => by
-    obtain ⟨hp, hl, hs, hr⟩ := h.ptr i hi
-    unfold ukSlens; rw [ukSlen_ucstr hl hs]
-    exact ⟨hp, hl, hs, hr⟩⟩
-
-/-- Rocq `uk_args_c_ex`. -/
-theorem ukArgsC_ex {π : Nat → Option UPerm} {M : ElfMem} {av argc lo : Nat} (h : UkArgsC π M av argc lo) :
-    ∃ alen : Nat → Nat, UkArgs π M av argc lo alen := ⟨_, h⟩
-
 /-! ## §4 The array's NULL terminator -/
 
 /-- **Rocq `uk_argv_null`**: `argv[argc] = 0`, and the slot is readable. -/
@@ -274,120 +237,6 @@ instance ukArgvNull_dec (π : Nat → Option UPerm) (M : ElfMem) (av argc : Nat)
   decidable_of_iff (UkRd π M (av + 8 * argc) 8 ∧
       ∀ j, j < 8 → M (av + 8 * argc + j) = some (nthByte (n := 8) 0#64 j))
     ⟨fun ⟨h1, h2⟩ => ⟨h1, h2⟩, fun ⟨h1, h2⟩ => ⟨h1, h2⟩⟩
-
-/-! ## §5 Frame lemmas: the area survives everything a program does below it -/
-
-/-- **Rocq `uk_argv_w_ext`**. -/
-theorem ukArgvW_ext {M M' : ElfMem} {av i : Nat}
-    (heq : ∀ j, j < 8 → M' (av + 8 * i + j) = M (av + 8 * i + j)) :
-    ukArgvW M' av i = ukArgvW M av i := by
-  unfold ukArgvW
-  apply MachCSL.bv_eq_of_bytes
-  intro j hj
-  rw [uMWord_nthByte _ _ _ _ hj, uMWord_nthByte _ _ _ _ hj, heq j hj]
-
-/-- **Rocq `uk_args_above`**: THE FRAME LEMMA. -/
-theorem ukArgs_above {π : Nat → Option UPerm} {M M' : ElfMem} {av argc lo : Nat} {alen : Nat → Nat}
-    (heq : ∀ k, lo ≤ k → M' k = M k) (h : UkArgs π M av argc lo alen) : UkArgs π M' av argc lo alen := by
-  have hp : ∀ i, ukArgvP M' av i = ukArgvP M av i := fun i => by
-    unfold ukArgvP; rw [ukArgvW_ext (fun j _ => heq _ (by have := h.lo_le; omega))]
-  refine ⟨h.al, h.lo_le, h.argc_lt, ukRd_above heq h.lo_le h.rd, fun i hi => ?_⟩
-  obtain ⟨hlop, hl, hs, hr⟩ := h.ptr i hi
-  rw [hp i]
-  exact ⟨hlop, hl, ucstr_above heq hlop hs, ukRd_above heq hlop hr⟩
-
-/-- Rocq `uk_argv_null_above`. -/
-theorem ukArgvNull_above {π : Nat → Option UPerm} {M M' : ElfMem} {av argc lo : Nat}
-    (heq : ∀ k, lo ≤ k → M' k = M k) (hlo : lo ≤ av) (h : UkArgvNull π M av argc) :
-    UkArgvNull π M' av argc :=
-  ⟨ukRd_above heq (by omega) h.rd, fun j hj => by rw [heq _ (by omega)]; exact h.zero j hj⟩
-
-/-- Rocq `uk_args_lo_le`: the bound may always be lowered. -/
-theorem ukArgs_lo_le {π : Nat → Option UPerm} {M : ElfMem} {av argc lo lo' : Nat} {alen : Nat → Nat}
-    (hle : lo' ≤ lo) (h : UkArgs π M av argc lo alen) : UkArgs π M av argc lo' alen :=
-  ⟨h.al, by have := h.lo_le; omega, h.argc_lt, h.rd, fun i hi => by
-    obtain ⟨hp, hr⟩ := h.ptr i hi; exact ⟨by omega, hr⟩⟩
-
-/-! ## §6 The readers -- the argument area in the shape the LEAVES consume -/
-
-/-- **Rocq `uk_rd_byte`**: one byte anywhere in a readable window. -/
-theorem ukRd_byte {π : Nat → Option UPerm} {M : ElfMem} {a n k : Nat} {va : BitVec 64}
-    (h : UkRd π M a n) (hk : a ≤ k ∧ k < a + n) (hva : va = BitVec.ofNat 64 k) :
-    va.toNat = k ∧ ukLoadOk π va ∧ (M va.toNat).isSome := by
-  have hhi := h.hi
-  have hu : va.toNat = k := by subst hva; simp; omega
-  refine ⟨hu, ?_, ?_⟩
-  · have hp := h.page (k - a) (by omega)
-    have e : a + (k - a) = k := by omega
-    rw [e] at hp; subst hva; exact hp
-  · have hb := h.bytes (k - a) (by omega)
-    have e : a + (k - a) = k := by omega
-    rw [e] at hb; rw [hu]; exact hb
-
-/-- **Rocq `uk_args_slot`**: every premise `wp_uk_load` needs at
-`argv + 8*i`, plus the value the load leaves in the register. -/
-theorem ukArgs_slot {π : Nat → Option UPerm} {M : ElfMem} {av argc lo : Nat} {alen : Nat → Nat}
-    {i : Nat} {va : BitVec 64} (h : UkArgs π M av argc lo alen) (hi : i < argc)
-    (hva : va = BitVec.ofNat 64 (av + 8 * i)) :
-    va.toNat = av + 8 * i ∧ ukLoadOk π va ∧ ukAccessOk M va 8 ∧ ukArgvW M av i = uMWord M va.toNat 8 := by
-  have hhi := h.rd.hi
-  have hal := h.al
-  have h8 : (av + 8 * i) % 8 = 0 := by omega
-  obtain ⟨hu, -, hali⟩ := uv_slot8_facts (av + 8 * i) va h8 (by omega) hva
-  refine ⟨hu, ?_, ⟨Or.inr (Or.inr (Or.inr rfl)), hali, fun j hj => ?_⟩, by rw [hu]; rfl⟩
-  · have hp := h.rd.page (8 * i) (by omega)
-    subst hva; exact hp
-  · rw [hu]
-    have hb := h.rd.bytes (8 * i + j) (by omega)
-    rw [← Nat.add_assoc] at hb; exact hb
-
-/-- Rocq `uk_args_ptr_bytes`: `uargs`' own `uM_bytes` clause, recovered. -/
-theorem ukArgs_ptr_bytes {π : Nat → Option UPerm} {M : ElfMem} {av argc lo : Nat} {alen : Nat → Nat}
-    {i : Nat} (h : UkArgs π M av argc lo alen) (hi : i < argc) :
-    uMBytes (n := 8) M (av + 8 * i) 8 (BitVec.ofNat 64 (ukArgvP M av i)) := by
-  rw [ukArgvP_w]
-  unfold ukArgvW
-  apply uMWord_bytes
-  intro j hj
-  have hb := h.rd.bytes (8 * i + j) (by omega)
-  rw [← Nat.add_assoc] at hb; exact hb
-
-/-- Rocq `uk_args_str`: THE STRING at `argv[i]`. -/
-theorem ukArgs_str {π : Nat → Option UPerm} {M : ElfMem} {av argc lo : Nat} {alen : Nat → Nat}
-    {i : Nat} (h : UkArgs π M av argc lo alen) (hi : i < argc) :
-    lo ≤ ukArgvP M av i ∧ alen i < 2 ^ 31 ∧ Ucstr M (ukArgvP M av i) (alen i) ∧
-      UkRd π M (ukArgvP M av i) (alen i + 1) := h.ptr i hi
-
-/-- **Rocq `uk_args_str_byte`**: one byte of `argv[i]` WITH THE SCAN'S
-DICHOTOMY (what a `strlen` loop consumes). -/
-theorem ukArgs_str_byte {π : Nat → Option UPerm} {M : ElfMem} {av argc lo : Nat} {alen : Nat → Nat}
-    {i j : Nat} {va : BitVec 64} (h : UkArgs π M av argc lo alen) (hi : i < argc) (hj : j ≤ alen i)
-    (hva : va = BitVec.ofNat 64 (ukArgvP M av i + j)) :
-    va.toNat = ukArgvP M av i + j ∧ ukLoadOk π va ∧
-      ∃ b, M va.toNat = some b ∧ (b = ubyte0 ↔ j = alen i) := by
-  obtain ⟨_, _, hs, hr⟩ := ukArgs_str h hi
-  obtain ⟨hu, hok, _⟩ := ukRd_byte hr (k := ukArgvP M av i + j) ⟨by omega, by omega⟩ hva
-  refine ⟨hu, hok, ?_⟩
-  rw [hu]
-  by_cases he : j = alen i
-  · subst he; exact ⟨ubyte0, hs.nul, ⟨fun _ => rfl, fun _ => rfl⟩⟩
-  · obtain ⟨b, hb, hb0⟩ := hs.body j (by omega)
-    exact ⟨b, hb, ⟨fun e => absurd e hb0, fun e => absurd e he⟩⟩
-
-/-- **Rocq `uk_argv_null_slot`**: the terminator's slot, and the zero the
-load leaves. -/
-theorem ukArgvNull_slot {π : Nat → Option UPerm} {M : ElfMem} {av argc : Nat} {va : BitVec 64}
-    (hal : av % 8 = 0) (h : UkArgvNull π M av argc) (hva : va = BitVec.ofNat 64 (av + 8 * argc)) :
-    va.toNat = av + 8 * argc ∧ ukLoadOk π va ∧ ukAccessOk M va 8 ∧ (0#64 : BitVec 64) = uMWord M va.toNat 8 := by
-  have hhi := h.rd.hi
-  have h8 : (av + 8 * argc) % 8 = 0 := by omega
-  obtain ⟨hu, -, hali⟩ := uv_slot8_facts (av + 8 * argc) va h8 (by omega) hva
-  have hbytes : ∀ j, j < 8 → (M (av + 8 * argc + j)).isSome := fun j hj => h.rd.bytes j hj
-  refine ⟨hu, ?_, ⟨Or.inr (Or.inr (Or.inr rfl)), hali, fun j hj => by rw [hu]; exact hbytes j hj⟩, ?_⟩
-  · have hp := h.rd.page 0 (by omega)
-    simp only [Nat.add_zero] at hp; subst hva; exact hp
-  · rw [hu]
-    exact uMBytes_inj h.zero (uMWord_bytes M _ 8 hbytes)
 
 /-! ## §7 The stack budget, on the key -/
 
@@ -409,63 +258,5 @@ instance ukStack_dec (π : Nat → Option UPerm) (M : ElfMem) (sp0 : BitVec 64) 
       ∀ j, j < n → (M (sp0.toNat - n + j)).isSome = true)
     ⟨fun ⟨h1, h2, h3, h4, h5, h6, h7⟩ => ⟨h1, h2, h3, h4, h5, h6, h7⟩,
      fun ⟨h1, h2, h3, h4, h5, h6, h7⟩ => ⟨h1, h2, h3, h4, h5, h6, h7⟩⟩
-
-/-- Rocq `uk_stack_dom`. -/
-theorem ukStack_dom {π : Nat → Option UPerm} {M M' : ElfMem} {sp0 : BitVec 64} {n : Nat}
-    (hdom : ∀ k, (M k).isSome → (M' k).isSome) (h : UkStack π M sp0 n) : UkStack π M' sp0 n :=
-  { h with bytes := fun j hj => hdom _ (h.bytes j hj) }
-
-/-- Two addresses on one page share its permission. -/
-theorem upermAt_samePage {π : Nat → Option UPerm} {a b : Nat}
-    (h : a / 4096 = b / 4096) (ha : a < 2 ^ 64) (hb : b < 2 ^ 64) :
-    upermAt π (BitVec.ofNat 64 a) = upermAt π (BitVec.ofNat 64 b) := by
-  unfold upermAt
-  rw [BitVec.toNat_ofNat, BitVec.toNat_ofNat, Nat.mod_eq_of_lt ha, Nat.mod_eq_of_lt hb, h]
-
-/-- **Rocq `uk_stack_split`**: the caller keeps `n1`, the callee gets `n2`
-at the post-prologue sp. -/
-theorem ukStack_split {π : Nat → Option UPerm} {M : ElfMem} {sp0 : BitVec 64} {n n1 n2 : Nat}
-    (hn : n1 + n2 = n) (hn1 : n1 % 16 = 0) (h : UkStack π M sp0 n) :
-    UkStack π M sp0 n1 ∧ UkStack π M (BitVec.ofNat 64 (sp0.toNat - n1)) n2 := by
-  subst hn
-  have hal := h.al; have hn16 := h.n16; have hpg := h.page; have hlo := h.lo; have hc := h.canon
-  have hsp := sp0.isLt
-  have hu : (BitVec.ofNat 64 (sp0.toNat - n1)).toNat = sp0.toNat - n1 := by
-    rw [BitVec.toNat_ofNat, Nat.mod_eq_of_lt (by omega)]
-  constructor
-  · refine ⟨hal, hn1, ?_, by omega, hc, fun hp => ?_, fun j hj => ?_⟩
-    · omega
-    · have hl := h.leaf (by omega)
-      unfold ukWpage ukStoreOk at hl ⊢
-      rw [upermAt_samePage (b := sp0.toNat - (n1 + n2)) (by omega) (by omega) (by omega)]
-      exact hl
-    · have e : sp0.toNat - n1 + j = sp0.toNat - (n1 + n2) + (n2 + j) := by omega
-      rw [e]; exact h.bytes _ (by omega)
-  · refine ⟨by rw [hu]; omega, by omega, by rw [hu]; omega, by rw [hu]; omega, by rw [hu]; omega,
-      fun hp => ?_, fun j hj => ?_⟩
-    · rw [hu]
-      have e : sp0.toNat - n1 - n2 = sp0.toNat - (n1 + n2) := by omega
-      rw [e]; exact h.leaf (by omega)
-    · rw [hu]
-      have e : sp0.toNat - n1 - n2 + j = sp0.toNat - (n1 + n2) + j := by omega
-      rw [e]; exact h.bytes _ (by omega)
-
-/-- **Rocq `uk_stack_slot`**: ONE 8-byte slot of the budget, every premise the
-store (and load) leaf needs, on the key. -/
-theorem ukStack_slot {π : Nat → Option UPerm} {M : ElfMem} {sp0 : BitVec 64} {n d : Nat}
-    (h : UkStack π M sp0 n) (hdn : d + 8 ≤ n) (hd8 : d % 8 = 0) :
-    (BitVec.ofNat 64 (sp0.toNat - n + d)).toNat = sp0.toNat - n + d ∧
-      ukWpage π (BitVec.ofNat 64 (sp0.toNat - n + d)) ∧
-      ukAccessOk M (BitVec.ofNat 64 (sp0.toNat - n + d)) 8 := by
-  have hal := h.al; have hn16 := h.n16; have hpg := h.page; have hlo := h.lo; have hc := h.canon
-  have hsp := sp0.isLt
-  have hu : (BitVec.ofNat 64 (sp0.toNat - n + d)).toNat = sp0.toNat - n + d := by
-    rw [BitVec.toNat_ofNat, Nat.mod_eq_of_lt (by omega)]
-  refine ⟨hu, ?_, Or.inr (Or.inr (Or.inr rfl)), by rw [hu]; omega, fun j hj => ?_⟩
-  · have hl := h.leaf (by omega)
-    unfold ukWpage ukStoreOk at hl ⊢
-    rw [upermAt_samePage (b := sp0.toNat - n) (by omega) (by omega) (by omega)]
-    exact hl
-  · rw [hu, Nat.add_assoc]; exact h.bytes _ (by omega)
 
 end Xv6

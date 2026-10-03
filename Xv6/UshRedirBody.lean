@@ -32,14 +32,13 @@ import Xv6.UkShRedirCut
 import Xv6.UkShRedirLine
 import Xv6.UkShWords
 import Xv6.UNameBytes
+import Xv6.UshRunCode
 
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
-
-set_option linter.unusedSectionVars false
 
 /-! ## §1 The redirect line, as a line shape -/
 

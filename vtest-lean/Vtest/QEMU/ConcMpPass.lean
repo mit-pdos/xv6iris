@@ -15,7 +15,7 @@ import Vtest.QEMU.ConcMpRun
 namespace Vtest.QEMU.ConcMp
 
 theorem agrees : RunAgrees test observed :=
-  concAgrees_all test { tick := false, sched := [], rounds := 6000 } observed
+  concAgrees_all test { tick := false, sched := [], rounds := 6000, burst := 4 } observed
     (by native_decide)
 
 end Vtest.QEMU.ConcMp

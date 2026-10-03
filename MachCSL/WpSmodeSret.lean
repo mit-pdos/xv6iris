@@ -214,7 +214,7 @@ theorem kctx_regs_ext [CurCtx] [KernelGeom] [KernelImage GF] {lent : Bool} (cpu 
     intro i h0
     unfold tpPin
     by_cases h4 : i = 4#5
-    · subst h4; simp [RegMap.set_apply]
+    · subst h4; simp []
     · simp [RegMap.set_apply, h4, h i h0 h4]
   have h2 : R 2#5 = k.regs 2#5 := h 2#5 (by decide) (by decide)
   iintro H

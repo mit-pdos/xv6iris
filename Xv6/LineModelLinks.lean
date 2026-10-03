@@ -3,8 +3,7 @@ THE WRITER'S PURE READING OF A LINE MODEL, once -- a port of Rocq
 `LineModelLinks.v` (`iris/LineModelLinks.v`, 1653 lines,
 pinned `1900b8a43`), row U0-1 of `notes/design-rulings.md`.  Pure.  DRIFT
 SY1 (Rocq 3d74ec49f): `lmhNoc` is OPTIONAL (`Option Nat`, its laws under
-`some`), and `lmWrBlk_dollar` files any alternative whose block is the bare
-prompt.
+`some`).
 
 Rocq's header, abridged: what the console credential families spend of the
 model is PURE -- the block an alternative owes at the line that was typed
@@ -99,12 +98,6 @@ theorem ll_proOf_open_snoc_eq (ps : List Nat) (a : Nat) (hnd : ¬ proDone ps) :
   rw [proOf_open_app ps [a] hnd, proOf_singleton]
 
 /-! ## §1 The hooks: what the shell's own code names in a model -/
-
-/-- **Rocq `lmh_noc_some`**: an instance whose silent round is TOTAL (`some`
-at every line) proves the `lmhNoc` laws from its landed per-line ones through
-this. -/
-theorem lmhNoc_some (P : Nat → Prop) (x c : Nat) (hP : P x) (hc : some x = some c) : P c := by
-  cases hc; exact hP
 
 structure LmHooks (M : LModel) where
   /-- the alternatives whose output is a function of the LINE alone -/
@@ -570,16 +563,6 @@ theorem lmAb_exf (I : List (BitVec 8)) :
 theorem lmApr_exf (I : List (BitVec 8)) : lmApr M K I (K.lmhExf (lmLineAt M I)) :=
   ⟨K.lmhExfOk _ _, K.lmhExfFree _, K.lmhExfNopanic _⟩
 
-/-- ...and the silent round, at a line whose model has one -/
-theorem lmAb_noc (I : List (BitVec 8)) (c : Nat) (hc : K.lmhNoc (lmLineAt M I) = some c) :
-    lmAb M K I c = uPrompt := by
-  rw [lmAb_is M K I _ (K.lmhNocOk _ _ _ hc) (K.lmhNocFree _ _ hc)]
-  exact K.lmhNocCont _ _ _ hc
-
-theorem lmApr_noc (I : List (BitVec 8)) (c : Nat) (hc : K.lmhNoc (lmLineAt M I) = some c) :
-    lmApr M K I c :=
-  ⟨K.lmhNocOk _ _ _ hc, K.lmhNocFree _ _ hc, K.lmhNocNopanic _ _ hc⟩
-
 theorem lmWrBlk_nonnil (ps cs : List Nat) (s0 : M.lmSt) (I : List (BitVec 8)) (P : Nat)
     (h : lmWrBlk M ps cs s0 I P) : I ≠ [] := by
   rintro rfl
@@ -628,12 +611,6 @@ theorem lmWrBlk_pending_s (ps cs : List Nat) (s0 : M.lmSt) (I : List (BitVec 8))
   unfold lmPendingAt lmContAt
   rw [if_neg hne, if_pos hr, lmBlk_snoc_at M cs I a hn, lmBlk_snoc_upto M cs s0 I a hn, hnp]
   simp [lmAbs, lmLineAt]
-
-theorem lmWrBlk_pending (ps cs : List Nat) (s0 : M.lmSt) (I : List (BitVec 8)) (P a : Nat)
-    (hw : lmWrBlk M ps cs s0 I P) (hpr : lmApr M K I a) :
-    lmPendingAt M ps (cs ++ [a]) s0 I = lmAb M K I a := by
-  rw [← lmAbs_ab M K s0 cs I a hpr]
-  exact lmWrBlk_pending_s M ps cs s0 I P a hw hpr.2.2
 
 /-- THE STREAM BYTE THE WRITE LINK ASKS FOR. -/
 theorem lmWrBlk_byte_s (ps cs : List Nat) (s0 : M.lmSt) (I : List (BitVec 8)) (P a j : Nat)
@@ -742,31 +719,6 @@ theorem lmWrPro_dollar (ps cs : List Nat) (s0 : M.lmSt) (I : List (BitVec 8)) (P
     rw [hup, List.length_append, Xv6.wrPrompt_len, hP]
   refine ⟨⟨lmProPin_mono M ps (ps ++ [0]) cs I hpre hpin, hm, hdv, ?_, hlen.symm⟩, ?_⟩
   · rw [proRounds_app, ll_proRounds_one]; omega
-  · rw [hup, hP, lookup_app_shift]; rfl
-
-/-- (2) the LINE's choice byte at a settled round: the shell's '$' is the
-block's first byte and files an alternative whose block is the bare prompt
-(the line's silent round, where its model has one). -/
-theorem lmWrBlk_dollar (ps cs : List Nat) (s0 : M.lmSt) (I : List (BitVec 8)) (P : Nat) (c : Nat)
-    (hc : lmApr M K I c) (hcb : lmAb M K I c = uPrompt)
-    (hw : lmWrBlk M ps cs s0 I P) :
-    lmWrSp M ps (cs ++ [c]) s0 I (P + 1) := by
-  have hst := lmWrBlk_started M ps cs s0 I P hw
-  have hnp : M.lmPanic (M.lmDec c) = false := hc.2.2
-  have hpend : lmPendingAt M ps (cs ++ [c]) s0 I = uPrompt := by
-    rw [lmWrBlk_pending M K ps cs s0 I P _ hw hc]; exact hcb
-  have hlow := lmWrBlk_low M ps cs s0 I P c hw
-  have hpinS := lmWrBlk_pin_snoc M ps cs s0 I P c hw
-  obtain ⟨hpin, hm, hdv, hP⟩ := hw
-  have hup : lmProcStream M ps (cs ++ [c]) s0 I
-      = lmProcBefore M ps cs s0 I ++ uPrompt := by
-    rw [lmProcStream, hlow, hpend]
-  have hlen : (lmProcStream M ps (cs ++ [c]) s0 I).length = P + 1 + 1 := by
-    rw [hup, List.length_append, Xv6.wrPrompt_len, hP]
-  refine ⟨⟨hpinS, hm, ?_, ?_, hlen.symm⟩, ?_⟩
-  · rw [List.length_append, hdv]; rfl
-  · rw [hdv, lmProIdx_snoc_ne M cs _ hnp]
-    exact hpin cs.length (by rw [hst]; omega)
   · rw [hup, hP, lookup_app_shift]; rfl
 
 /-- (3) the SPACE. -/

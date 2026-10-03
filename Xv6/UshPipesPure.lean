@@ -80,29 +80,6 @@ theorem ushqBars_good (len : Nat) (f : Nat → BitVec 8) :
     · exact ushqToks_good htoks i tk hi
     · exact ih _ tk hi
 
-/-- **Rocq `ushq_bars_bnd`**: the index bounds nulterminate reads, stage by
-stage. -/
-theorem ushqBars_bnd (len : Nat) (f : Nat → BitVec 8) :
-    ∀ (c : Nat) (a : List (Nat × Nat)) (rest : List (List (Nat × Nat))), UshqBars len f c a rest →
-      ∀ (j : Nat) (toks : List (Nat × Nat)), (a :: rest)[j]? = some toks →
-      ∀ (i : Nat) (tk : Nat × Nat), toks[i]? = some tk → tk.1 ≤ len ∧ tk.2 ≤ len := by
-  intro c a rest h
-  induction h with
-  | last c toks _ _ htoks _ =>
-    intro j tl hj i tk hi
-    cases j with
-    | zero => simp at hj; subst hj; have := ushsToks_in htoks i tk hi; omega
-    | succ j => simp at hj
-  | cons c gp toks b rest _ hbw htoks _ _ _ ih =>
-    intro j tl hj i tk hi
-    cases j with
-    | zero =>
-      simp at hj; subst hj
-      have := ushsToks_in htoks i tk hi
-      have := hbw.1
-      omega
-    | succ j => exact ih j tl (by simpa using hj) i tk hi
-
 /-- **Rocq `ushq_cut_ok_of_good`**: the seam's premise for one token list,
 off a set `T` of good tokens it is drawn from, at the fold over all of
 `T`. -/

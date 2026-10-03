@@ -88,7 +88,7 @@ itable.lock's payload.
     definition prefix are Rocq's verbatim (`iref_load_pinw_au`,
     `iref_load_locked_pinw_au`, `iref_share_lookup_pinw_au`,
     `frz_slot_kill_pinw`, `frz_slot_freeze_pinw`, `live_slot_regen_pinw`,
-    `iref_lookup_genlo`, `pinw_arm_split`).
+    `pinw_arm_split`).
 
 ## Added (the design note's helper lemmas, §3/§5; no Rocq counterpart)
 
@@ -144,16 +144,14 @@ itable.lock's payload.
   (IcachePinwObl, Proof{Iget,Idup,Iput,Ilock,Iunlock}), `pinw_slot`
   (IcacheBoot), `itable_body` (IcacheBoot), `itable_inv` (~75 files),
   `pinw_slot_acc(_upd)`/`pinw_slot_slice` (§5b), the six accessors (Proof
-  files), `iref_tok_genlo` (Proof{Iget,Idup,Iput}), `iref_lookup_genlo`
-  (ProofIput), `pinw_store_post` (Proof{Iget,Idup,Iput}), `pinw_arm_split`
+  files), `iref_tok_genlo` (Proof{Iget,Idup,Iput}), `pinw_store_post`
+  (Proof{Iget,Idup,Iput}), `pinw_arm_split`
   (§5b 3148/3589), `frz_park` + its four lemmas (ProofIput/Idup/Iget,
   IcacheEscrow), `islot_rest(_at)`, `islot_free_at`, `islot_rest_join`
   (ProofIput/Iget/Idup, IcacheEscrow, IcacheBoot).
 -/
 import Xv6.IcacheInvAlg
 import Xv6.IcacheRef
-
-set_option linter.unusedSectionVars false
 
 /-! ## 0.  Word-history and context helpers (design note §3/§5) -/
 
@@ -317,7 +315,7 @@ Rocq's `wordw_claim`; deviation 3). -/
 theorem iRef_ram_aligned (k : Nat) (hk : k < NINODE) :
     inRam (iRef (ientry k)) 4 ∧ (iRef (ientry k)).toNat % 4 = 0 := by
   have e := ientry_unsigned k (Nat.le_of_lt hk)
-  have hv : KernelSyms.«itable» = 0x80020b88 := rfl
+  have hv : KernelSyms.«itable» = 0x80020e28 := rfl
   have e2 : (iRef (ientry k)).toNat = KernelSyms.«itable» + 24 + ISLOTSZ * k + 8 := by
     unfold iRef
     rw [BitVec.toNat_add, e]
@@ -1020,21 +1018,6 @@ instance irefTokGenlo_timeless [Icfg] (k : Nat) (q : Qp) (g : GName) (lo : Nat) 
     Timeless (irefTokGenlo (GF := GF) k q g lo) := by
   unfold irefTokGenlo; infer_instance
 
-/-- The pure lookups, at the NAMED token (A6.145): pack the `∃`s back. -/
-theorem iref_lookup_genlo [Icfg] (M : RegMapF (Qp × PosNat)) (k : Nat) (q : Qp) (g : GName)
-    (lo : Nat) :
-    itableHalf (GF := GF) M ∗ irefTokGenlo k q g lo ⊢
-      ⌜∃ (qt : Qp) (n : PosNat), PartialMap.get? M k = some (qt, n) ∧ qt ≤ 1 ∧
-         (n = PosNat.one → q = qt) ∧ (q = qt → n = PosNat.one)⌝ := by
-  unfold irefTokGenlo
-  iintro ⟨Ha, Hf, Hl, Hs⟩
-  iapply iref_lookup M k q
-  iframe Ha
-  unfold irefTok liveFrac liveGen
-  iframe Hf Hs
-  iexists g, lo
-  iexact Hl
-
 end IcacheRefTok
 
 /-! ## 6.  THE itable LOCK'S RESOURCE: dev / inum, AND WHAT A REFERENCE IS
@@ -1105,7 +1088,7 @@ instance islotFreeAt_timeless [CurCtx] (k : Nat) (dev inum : BitVec 32) :
   unfold islotFreeAt; infer_instance
 
 /-- THE LAST CLOSER'S JOIN, and the second half of REF-1 EXCLUSIVITY at the
-points-to level: `iref_lookup` forced `q = qt` on a slot whose count is
+points-to level: the table's lookup forced `q = qt` on a slot whose count is
 one, so the closer's share plus whatever the table kept is everything the
 TABLE can ever hold of this entry -- half of each identity cell.  That is
 exactly `islotFreeAt`, i.e. the slot handed back to iget as free; each

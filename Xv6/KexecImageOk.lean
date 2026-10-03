@@ -129,15 +129,6 @@ section ExecKey
 variable (V' : ProcPriv) (M' : Nat → List (BitVec 8)) (sts : List FdState) (gn : GName)
   (cs : Std.ExtTreeSet GName compare) (pidv : BitVec 32) (na : Nat)
 
-/-- Rocq `exec_key_cwd`: the key's working directory is the block's. -/
-theorem execKey_cwd : (execKey V' M' sts gn cs pidv na).cwd = V'.cwi := rfl
-
-/-- Rocq `exec_key_lazy`. -/
-theorem execKey_lazy : (execKey V' M' sts gn cs pidv na).lazy = V'.pvLazy := rfl
-
-/-- Rocq `exec_key_secc`: the key's mask reading, beside `execKey_lazy`. -/
-theorem execKey_secc : (execKey V' M' sts gn cs pidv na).secc = V'.pvSecc := rfl
-
 /-- Rocq `exec_key_tf`: the post-exec frame with argc inserted. -/
 theorem execKey_tf :
     (execKey V' M' sts gn cs pidv na).tf = V'.tf.set (tfArgIdx 0) (BitVec.ofNat 64 na) := rfl
@@ -147,12 +138,6 @@ theorem execKey_sz : (execKey V' M' sts gn cs pidv na).sz = V'.sz.toNat := rfl
 
 /-- Rocq `exec_key_fd`. -/
 theorem execKey_fd : (execKey V' M' sts gn cs pidv na).fd = sts := rfl
-
-/-- Rocq `exec_key_ch`. -/
-theorem execKey_ch : (execKey V' M' sts gn cs pidv na).ch = cs := rfl
-
-/-- Rocq `exec_key_pid`. -/
-theorem execKey_pid : (execKey V' M' sts gn cs pidv na).pid = pidv := rfl
 
 /-- NEW: the key's image is the block's lazy view. -/
 theorem execKey_M : (execKey V' M' sts gn cs pidv na).M = umemLazy V'.upt V'.sz.toNat M' := rfl
@@ -213,26 +198,6 @@ exec for a generic tier that is no longer told anything about offsets.
 theorem kexecImageOk_below (h : kexecImageOk f na alen afun sts W') :
     kxbPermBelow W'.sz W'.perm :=
   h.2.2.2.2.2.2.2.2.2.1
-
-/-- Rocq `kexec_image_ok_perm`: THE TEXT READER -- a page of PT_LOAD header
-`i` carries that header's bits. -/
-theorem kexecImageOk_perm (h : kexecImageOk f na alen afun sts W') {i : Nat} {p : ElfPhdr}
-    {b : Nat} (hi : (elfLoads f)[i]? = some p) (hb : kexecSegPages (elfLoads f) i p b) :
-    W'.perm (kexecPg b) = some (kexecSegPerm p) :=
-  h.2.2.2.2.2.2.2.2.1.1 i p hi b hb
-
-/-- Rocq `kexec_image_ok_argv`: THE ARGV READER -- what main sees. -/
-theorem kexecImageOk_argv (h : kexecImageOk f na alen afun sts W') :
-    tfW W'.tf (tfArgIdx 1) = BitVec.ofInt 64 (kxcSpFinal (kexecSz f : Int) alen na) ∧
-    tfW W'.tf (tfArgIdx 0) = BitVec.ofNat 64 na ∧
-    (∀ (i k : Nat), i ≤ na → k < 8 →
-      memAtZ W'.M (kxcSpFinal (kexecSz f : Int) alen na + 8 * (i : Int) + (k : Int)) =
-        some (nthByte (n := 8) (BitVec.ofInt 64 (kexecUstack (kexecSz f : Int) alen na i)) k)) ∧
-    (∀ i j, i < na → j < alen i →
-      memAtZ W'.M (kxcSp (kexecSz f : Int) alen (i + 1) + (j : Int)) = some (afun i j)) ∧
-    (∀ i, i < na → memAtZ W'.M (kxcSp (kexecSz f : Int) alen (i + 1) + (alen i : Int)) = some 0#8) := by
-  obtain ⟨-, -, -, ha1, ha0, -, ⟨hstr, hnul, hvec⟩, -⟩ := h
-  exact ⟨ha1, ha0, hvec, hstr, hnul⟩
 
 end ImageOk
 

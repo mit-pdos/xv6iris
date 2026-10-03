@@ -57,8 +57,6 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedSectionVars false
-
 /-! ## What a well-formed in-memory inode is
 
 Exactly the pure facts `readi`, `writei` and `iupdate` consume, plus the
@@ -156,9 +154,6 @@ def inodeRawAt [CurCtx] (ξ : CtxId) (ip : BitVec 64) : IProp GF := iprop%
 def inodeRaw [CurCtx] (ip : BitVec 64) : IProp GF := iprop%
   (∃ d : Dinode, inodeMeta ip d) ∗
   (∃ l : List (BitVec 32), ⌜l.length = 13⌝ ∗ inodeAddrs ip l)
-
-theorem inodeRawAt_cur [CurCtx] (ip : BitVec 64) :
-    inodeRawAt (GF := GF) curCtx ip = inodeRaw ip := rfl
 
 /-- Rocq's `inode_raw_morph`: `inodeRaw` is the two cell bundles, hence
 transportable rather than context-constant. -/

@@ -19,6 +19,7 @@ facts take `s.file .cur_privilege = User` (a consequence of `UxcCfg s`,
 user tier by `uxc_fiom`).  The compressed forms are stated on `uxaExecAs`.
 -/
 import MachCSL.UExecCtlBase
+import MachCSL.UTranslate
 
 namespace MachCSL
 
@@ -161,17 +162,6 @@ theorem uxc_zimop_rr (hD : UxcFoot D) (orc : UOrc) (s : UWSt) (mop : BitVec 3) (
   show runRW D orc s (execute_ZIMOP_MOP_RR mop rs2 rs1 (regidx.Regidx i)) = _
   simp only [execute_ZIMOP_MOP_RR, runRW_bind, uxa_wX hD.alu, Option.bind, runRW_pure]
   rfl
-
-/-- **MOP.R in U1-X1's shape** (`UxaRetire`). -/
-theorem uxc_zimop_r_retire (hD : UxcFoot D) (orc : UOrc) (s : UWSt) (mop : BitVec 5) (rs1 rd : regidx) :
-    UxaRetire D orc s (execute (.ZIMOP_MOP_R (mop, rs1, rd))) (uxaIdx rd) :=
-  ⟨_, uxc_zimop_r hD orc s mop rs1 rd⟩
-
-/-- **MOP.RR in U1-X1's shape** (`UxaRetire`). -/
-theorem uxc_zimop_rr_retire (hD : UxcFoot D) (orc : UOrc) (s : UWSt) (mop : BitVec 3)
-    (rs2 rs1 rd : regidx) :
-    UxaRetire D orc s (execute (.ZIMOP_MOP_RR (mop, rs2, rs1, rd))) (uxaIdx rd) :=
-  ⟨_, uxc_zimop_rr hD orc s mop rs2 rs1 rd⟩
 
 /-- **C.MOP**: retires, nothing written. -/
 theorem uxc_zcmop (orc : UOrc) (s : UWSt) (mop : BitVec 3) :

@@ -23,14 +23,16 @@ CONE (this file): `uecho_cons_image_entry`.
 3. The key image is a page view (UkUnionEntriesDefs deviation 2).
 -/
 import Xv6.UkUnionEntriesDefs
+import Xv6.UkSysFHHolds
+import Xv6.UkSysPHolds
+import Xv6.UkFileEntries
+import Xv6.UkTreeEntryEcho
 
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Std (ExtTreeSet)
 open HfpFileClaimsP
-
-set_option linter.unusedSectionVars false
 
 section UEcho
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]

@@ -13,9 +13,7 @@ open LeanRV64D LeanRV64D.Functions
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## The commit's tail
 
@@ -325,10 +323,10 @@ theorem eo_commit (WH : WRITE_HEAD) (IT : INSTALL_TRANS) (AC : ACQUIRE) (RE : RE
     exact eo_idx_range W (fun i _ => fsChalf γfs (logSlotBno ls i) (Lw i))
       (fun i => fsChalf γfs (logSlotBno ls i) (Lw i)) (fun i x => .rfl)) $$ Hdone
   -- ===== +0x10e  auipc a5,0x1e ; +0x112  sw zero,1328(a5) =====
-  k_step_e (wp_s_auipc cpu _ (KA.«end_op» + 0x10e#64) false 0x1e#20 15#5 (by decide))
+  k_step_e (wp_s_auipc cpu _ (KA.«end_op» + 0x10e#64) false 0x1f#20 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_sw cpu _ (KA.«end_op» + 0x112#64) false 1818#12 15#5 0#5 (by decide)
+  k_step_e (wp_s_sw cpu _ (KA.«end_op» + 0x112#64) false 2374#12 15#5 0#5 (by decide)
       (BitVec.ofNat 32 n))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eo_lhn, KCtx.rget_zero]
   iintro Hk Hpc HlhN

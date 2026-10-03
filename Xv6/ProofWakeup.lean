@@ -11,13 +11,9 @@ epilogue.  Stated at either interrupt index and at any lock depth, as
 `acquire`/`release` are: the pair is balanced, so `noff` and `locks` come back
 unchanged.
 -/
-import MachCSL.WpSmodeFrame
 import Xv6.SpecWakeup
-import Xv6.SpecAcquire
-import Xv6.SpecRelease
 import Xv6.CodeTactics
 import MachCSL.WpSmodeFrame8
-import Xv6.ByteCursor
 import Xv6.KilledDefs
 import Xv6.UvmallocDefs
 
@@ -26,7 +22,6 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
@@ -35,8 +30,8 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 
 /-- `&proc[i]` as a number, up to and including the sentinel `&proc[NPROC]`. -/
 theorem wk_procAddr_toNat (j : Nat) (hj : j ≤ NPROC) :
-    (procAddr j).toNat = KernelSyms.«proc» + 368 * j := by
-  have h1 : (BitVec.ofNat 64 (procSize * j)).toNat = 368 * j := by
+    (procAddr j).toNat = KernelSyms.«proc» + 376 * j := by
+  have h1 : (BitVec.ofNat 64 (procSize * j)).toNat = 376 * j := by
     simp only [BitVec.toNat_ofNat, procSize]
     exact Nat.mod_eq_of_lt (by unfold NPROC at hj; omega)
   have h2 : (procsAddr : BitVec 64).toNat = KernelSyms.«proc» := by decide
@@ -45,13 +40,13 @@ theorem wk_procAddr_toNat (j : Nat) (hj : j ≤ NPROC) :
   rw [BitVec.toNat_add, h1, h2]
   exact Nat.mod_eq_of_lt (by unfold NPROC at hj; omega)
 
-/-- The cursor one slot on (`addi s1,s1,368`). -/
-theorem wk_cursor (i : Nat) : procAddr i + 368#64 = procAddr (i + 1) := by
+/-- The cursor one slot on (`addi s1,s1,376`). -/
+theorem wk_cursor (i : Nat) : procAddr i + 376#64 = procAddr (i + 1) := by
   unfold procAddr procSize
-  rw [show 368 * (i + 1) = 368 * i + 368 from by omega, BitVec.ofNat_add,
-    show BitVec.ofNat 64 368 = 368#64 from rfl, BitVec.add_assoc]
+  rw [show 376 * (i + 1) = 376 * i + 376 from by omega, BitVec.ofNat_add,
+    show BitVec.ofNat 64 376 = 376#64 from rfl, BitVec.add_assoc]
 
-/-- The sentinel `&proc[NPROC] = 0x80018490`. -/
+/-- The sentinel `&proc[NPROC] = 0x80018730`. -/
 theorem wk_sentinel : procAddr NPROC = KA.«tickslock» := by decide
 
 /-- The loop test `beq s1,s3`: the scan stops exactly at the last slot. -/
@@ -62,7 +57,7 @@ theorem wk_cursor_eq (i : Nat) (hi : i < NPROC) :
     have h := congrArg BitVec.toNat he
     rw [wk_procAddr_toNat (i + 1) (by unfold NPROC at hi ⊢; omega)] at h
     have hr : (KA.«tickslock»).toNat = KernelSyms.«tickslock» := rfl
-    have hts : KernelSyms.«tickslock» = KernelSyms.«proc» + 368 * 64 := by decide
+    have hts : KernelSyms.«tickslock» = KernelSyms.«proc» + 376 * 64 := by decide
     rw [hr] at h
     unfold NPROC
     omega
@@ -221,8 +216,8 @@ theorem wk_rel (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc 
   have hkept3 : wkKept Rr R3 := ⟨d2, d8, d18, d19, d20, d21, d22, d23, d24, d25, d26, d27⟩
   have h9' : R3 9#5 = procAddr i := d9.trans h9
   have h19' : R3 19#5 = KA.«tickslock» := d19.trans h19
-  -- addi s1,s1,368
-  k_step_gen (wp_s_addi c3 _ (KA.«wakeup» + 0x30#64) false 368#12 9#5 9#5 (by decide))
+  -- addi s1,s1,376
+  k_step_gen (wp_s_addi c3 _ (KA.«wakeup» + 0x30#64) false 376#12 9#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [h9', wk_cursor i] next c4 hq4
   iintro Hk Hpc
@@ -612,16 +607,16 @@ theorem wk_procAddr_zero : procAddr 0 = KA.«proc» := by decide
 
 /-- `&proc`, folded out of `auipc s1,0x11; addi s1,s1,-2032`. -/
 theorem wk_proc0_addr :
-    KA.«wakeup» + 0x10850#64
+    KA.«wakeup» + 0x108f0#64
       = KA.«proc» := by decide
 
 /-- `&proc[NPROC]`, folded out of `auipc s3,0x16; addi s3,s3,516`. -/
 theorem wk_sent_addr :
-    KA.«wakeup» + 0x16450#64 = KA.«tickslock» := by decide
+    KA.«wakeup» + 0x166f0#64 = KA.«tickslock» := by decide
 
-theorem wakeup_br_10850 : KA.«wakeup» + 0x10850#64 = KA.«proc» := by decide
+theorem wakeup_br_108f0 : KA.«wakeup» + 0x108f0#64 = KA.«proc» := by decide
 
-theorem wakeup_br_16450 : KA.«wakeup» + 0x16450#64 = KA.«tickslock» := by decide
+theorem wakeup_br_166f0 : KA.«wakeup» + 0x166f0#64 = KA.«tickslock» := by decide
 
 set_option maxHeartbeats 4000000 in
 /-- **`wakeup` meets its specification.** -/
@@ -673,8 +668,8 @@ theorem wakeup_proof (AC : ACQUIRE) (RE : RELEASE) : WAKEUP :=
   k_step_gen (wp_s_auipc c10 _ (KA.«wakeup» + 0x14#64) false 17#20 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c11 hp11
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c11 _ (KA.«wakeup» + 0x18#64) false 2108#12 9#5 9#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [wakeup_br_10850, wk_proc0_addr] next c12 hp12
+  k_step_gen (wp_s_addi c11 _ (KA.«wakeup» + 0x18#64) false 2268#12 9#5 9#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [wakeup_br_108f0, wk_proc0_addr] next c12 hp12
   iintro Hk Hpc
   k_step_gen (wp_s_addi c12 _ (KA.«wakeup» + 0x1c#64) true 2#12 20#5 0#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c13 hp13
@@ -685,8 +680,8 @@ theorem wakeup_proof (AC : ACQUIRE) (RE : RELEASE) : WAKEUP :=
   k_step_gen (wp_s_auipc c14 _ (KA.«wakeup» + 0x20#64) false 22#20 19#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c15 hp15
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c15 _ (KA.«wakeup» + 0x24#64) false 1072#12 19#5 19#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [wakeup_br_16450, wk_sent_addr] next c16 hp16
+  k_step_gen (wp_s_addi c15 _ (KA.«wakeup» + 0x24#64) false 1744#12 19#5 19#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [wakeup_br_166f0, wk_sent_addr] next c16 hp16
   iintro Hk Hpc
   k_step_gen (wp_s_j c16 _ (KA.«wakeup» + 0x28#64) true 16#21)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c17 hp17

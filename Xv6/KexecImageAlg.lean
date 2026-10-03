@@ -21,12 +21,12 @@ Rocq's file keeps that genuinely names the contract is here.
   consumers (ProofKexecC/Seam/B3/D, KexecBridge, ProofKexec) reach the
   twins only through these bridges or KexecBuilt's own rows, all of which
   are stated at the Lean names;
-* `loads_ascending_app_l/_take/_adj`, `kexec_sz_after_take_step`: are
-  `KexecBuilt.loadsAscending_app_l/_take/_adj`,
-  `KexecBuilt.kexecSzAfter_take_step` (no `phdrs_nonneg`: vacuous at
-  `Nat`);
-* `kexec_stack_at_intro`, `kexec_args_at_intro`: are
-  `KexecBuilt.kexec_stack_at_intro` and `KexecBuilt.kx_argv_vec`;
+* `loads_ascending_adj`, `kexec_sz_after_take_step`: are
+  `KexecBuilt.loadsAscending_adj`, `KexecBuilt.kexecSzAfter_take_step` (no
+  `phdrs_nonneg`: vacuous at `Nat`); `loads_ascending_app_l/_take` are not
+  ported (nothing uses them);
+* `kexec_args_at_intro`: is `KexecBuilt.kx_argv_vec`;
+  `kexec_stack_at_intro` is not ported (nothing uses it);
 * `kexec_top_nonneg`: vacuous at `Nat` (KexecLoad deviation 1).
 
 ## Deviations from Rocq
@@ -57,20 +57,6 @@ theorem kexecTop_of_szAfter (f : ElfBytes) : kexecTop f = pgRoundUpN (kexecSzAft
 theorem kexecSz_of_szAfter (f : ElfBytes) :
     kexecSz f = pgRoundUpN (kexecSzAfter (elfLoads f)) + 2 * 4096 := by
   unfold kexecSz; rw [kexecTop_of_szAfter]
-
-theorem kexecTop_mod (f : ElfBytes) : kexecTop f % 4096 = 0 := by
-  rw [kexecTop_of_szAfter]
-  obtain ⟨q, hq⟩ := UPtAlloc.pgRoundUpN_dvd (kexecSzAfter (elfLoads f))
-  omega
-
-theorem kexecSz_mod (f : ElfBytes) : kexecSz f % 4096 = 0 := by
-  have := kexecTop_mod f; unfold kexecSz; omega
-
-theorem kexecSz_ge (f : ElfBytes) : 2 * 4096 ≤ kexecSz f := by
-  unfold kexecSz; omega
-
-theorem kexecSzAfter_take_all (ps : List ElfPhdr) : kexecSzAfter (ps.take ps.length) = kexecSzAfter ps := by
-  rw [List.take_length]
 
 /-! ## The phdr walk's guard, from `kexecLoadable` -/
 

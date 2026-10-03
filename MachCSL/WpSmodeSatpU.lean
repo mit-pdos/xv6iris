@@ -29,7 +29,6 @@ What this file provides:
 * `execSpecF_csrw_satp_sv39` (`WpSmodeSatp`) is root-generic already: the
   switch to a user root is that execute stage at the user root.
 -/
-import MachCSL.KCtxGpr
 import MachCSL.WpSmodeCycleT
 import MachCSL.WpSmodeFrame
 
@@ -68,25 +67,27 @@ theorem swp_fetch_s4X (cpu : CPU) (c : MConf) (sie : Bool) (hok : SConfPhys (GF 
   have hva := is_aligned_vaddr_of pc 4 hal
   have hb0 := bit0_clear_of_even pc (by omega)
   have hb1 := bit1_clear_of_mod4 pc (by omega)
+  conf_cases HmConf
+  unfold fetch
+  swp_run 80
+  conf_intro HmConf
+  iapply swp_bind
+  iapply (htr _)
+  iframe HmConf HT
+  iintro HmConf HT
+  conf_cases HmConf
+  swp_run 40
+  conf_intro HmConf
+  iapply swp_bind
+  iapply swp_checked_mem_read_ifetch4_S (hok := hok) (hram := hram) (hal := hpal)
+  iframe
+  inext
+  iintro HmConf Hbytes
+  -- the fetched word's `isRVC` matters only from here: split here, not
+  -- before the walk (the translation and the read were walked twice)
   rcases Bool.eq_false_or_eq_true (isRVC (BitVec.extractLsb' 0 16 w)) with hc | hc
   all_goals
     simp only [fetched4, hc, Bool.false_eq_true, ite_false, ite_true]
-    conf_cases HmConf
-    unfold fetch
-    swp_run 80
-    conf_intro HmConf
-    iapply swp_bind
-    iapply (htr _)
-    iframe HmConf HT
-    iintro HmConf HT
-    conf_cases HmConf
-    swp_run 40
-    conf_intro HmConf
-    iapply swp_bind
-    iapply swp_checked_mem_read_ifetch4_S (hok := hok) (hram := hram) (hal := hpal)
-    iframe
-    inext
-    iintro HmConf Hbytes
     swp_run 40
     iapply HΦ $$ HmConf HPC HT Hbytes
 
@@ -114,25 +115,25 @@ theorem swp_fetch_s2X (cpu : CPU) (c : MConf) (sie : Bool) (hok : SConfPhys (GF 
   have hal2 : pa.toNat % 2 = 0 := by omega
   have hram2' : inRam (pa + 2#64) 2 := by simp only [inRam, ramBase, ramEnd, h2] at *; omega
   have hal2' : (pa + 2#64).toNat % 2 = 0 := by rw [h2]; omega
+  conf_cases HmConf
+  unfold fetch
+  swp_run 80
+  conf_intro HmConf
+  iapply swp_bind
+  iapply (htr _)
+  iframe HmConf HT
+  iintro HmConf HT
+  conf_cases HmConf
+  swp_run 40
+  conf_intro HmConf
+  iapply swp_bind
+  iapply swp_checked_mem_read_ifetch2_S (hok := hok) (hram := hram2) (hal := hal2)
+  iframe
+  inext
+  iintro HmConf Hlo
+  -- the low half's `isRVC` matters only from here (split after the shared walk)
   rcases Bool.eq_false_or_eq_true (isRVC lo) with hc | hc
-  all_goals
-    simp only [fetched2, hc, Bool.false_eq_true, ite_false, ite_true]
-    conf_cases HmConf
-    unfold fetch
-    swp_run 80
-    conf_intro HmConf
-    iapply swp_bind
-    iapply (htr _)
-    iframe HmConf HT
-    iintro HmConf HT
-    conf_cases HmConf
-    swp_run 40
-    conf_intro HmConf
-    iapply swp_bind
-    iapply swp_checked_mem_read_ifetch2_S (hok := hok) (hram := hram2) (hal := hal2)
-    iframe
-    inext
-    iintro HmConf Hlo
+  all_goals simp only [fetched2, hc, Bool.false_eq_true, ite_false, ite_true]
   · swp_run 40
     iapply HΦ $$ HmConf HPC HT Hlo Hhi
   · conf_cases HmConf
@@ -521,26 +522,5 @@ theorem transSpecX_kpt [CurCtx] (cpu : CPU) (c : MConf) (sie : Bool) (root : Bit
   isplitl [Htrans Htok]
   · iframe Htrans Htok
   · iexact Hcl
-
-/-! ## `fence.i` (userret's first instruction) -/
-
-set_option maxHeartbeats 4000000 in
-/-- `fence.i`: an instruction-fetch barrier event; no resources move (the
-machine model has no separate instruction view, so the barrier is the
-memory model's `Barrier_RISCV_i`, which the fence lemma absorbs). -/
-theorem execSpecF_fencei (cpu : CPU) (c : MConf) (sie : Bool) (hok : SConfPhys (GF := GF) c sie)
-    (pc npc₀ : BitVec 64) (imm : BitVec 12) (rs rd : BitVec 5) (R : RegMap) :
-    execSpecPP (GF := GF) cpu (DFrac.own 1) Privilege.Supervisor c Privilege.Supervisor c
-      (instruction.FENCEI (imm, regidx.Regidx rs, regidx.Regidx rd)) pc npc₀ npc₀
-      (gprFile cpu R) (gprFile cpu R) := by
-  intro Φ
-  iintro ⟨HmConf, HPC, HnextPC, HF, HΦ⟩
-  conf_cases HmConf
-  obtain ⟨hpmp, hms, hpmm, hlpe⟩ := hok
-  obtain ⟨hSIE, hMPRV, hSXL, hMXR, hTSR, hTVM, hFS, hXS, hVS, hSD, hMPP⟩ := hms
-  unfold execute
-  swp_run 80
-  conf_intro HmConf
-  iapply HΦ $$ HmConf HPC HnextPC HF
 
 end MachCSL

@@ -35,7 +35,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
-set_option linter.unusedSectionVars false
 set_option synthInstance.maxSize 1024
 
 section UShURoundFold
@@ -434,17 +433,6 @@ theorem uHwbwc_f (ug : UnionGn) (r : FileAppNames) (s0 : Fstate) (I : List (BitV
   ileft
   iframe Hd
   iapply uWcl0_of_ban ug s0 I $$ Hb
-
-/-- The banner-owed credential, from its pin and its banner. -/
-theorem uWbl_intro (ug : UnionGn) (s0 : Fstate) (I : List (BitVec 8)) (v : EraPins) :
-    ⊢ eraPin (GF := GF) (fgnEcho ug.ugnFile) (genId (hlc := hlc) (GF := GF) + 1) v -∗
-      gwcBan (unionParamsAt (hlc := hlc) ug s0) (genId (hlc := hlc) (GF := GF) + 1) v I 0 -∗
-      uWbl (hlc := hlc) ug s0 I := by
-  iintro #Hpin Hb
-  unfold uWbl
-  iexists v
-  rw [ufi_pin, ufi_ban]
-  iframe Hpin Hb
 
 /-- **Rocq `ush_done_of_pre_ban`**: sh's own fork panic -- PRE -> DONE at the
 banner-owed credential, the last filed alternative a panic. -/

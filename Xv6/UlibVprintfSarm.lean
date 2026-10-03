@@ -16,7 +16,6 @@ the argument's bytes (Rocq's middle chain).  The argument word is read at
 a fraction and handed back; so is the string (any fraction `sdq`).
 -/
 import Xv6.UlibVprintfPct
-import Xv6.ByteCursor
 import Xv6.PrintkDefs
 
 namespace Xv6

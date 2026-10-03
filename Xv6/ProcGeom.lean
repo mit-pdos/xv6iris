@@ -8,20 +8,18 @@ and `procAddr_inj`, and `ProcDefs.procDormant` names their predicates, so the
 geometry must sit BELOW them, exactly as Rocq's `ProcGeom.v` does).
 
 Layout of `struct proc` (kernel/proc.h, spinlock = {locked; name; cpu} =
-24 bytes, NOFILE = 16), corroborated by the compiled image (sizeof = 368 =
-96 + 14*8 + 16*8 + 8 + 16 + 8, the Rocq `proc_size`):
+24 bytes, NOFILE = 16), corroborated by the compiled image (sizeof = 376 =
+96 + 14*8 + 16*8 + 8 + 8 + 16 + 8, the Rocq `proc_size`):
 
   lock@0 (locked@0, name@8, cpu@16), state@24, chan@32, killed@40,
   xstate@44, pid@48, parent@56, kstack@64, sz@72, pagetable@80,
   trapframe@88, context@96..207 (14 words: ra sp s0..s11),
-  ofile@208..335 (16 pointers), cwd@336, name@344..359, seccomp@360
-  (xv6 7b2c1b1b's syscall mask, appended last).
+  ofile@208..335 (16 pointers), cwd@336, root@344 (xv6 b72cbac1's chroot
+  root), name@352..367, seccomp@368 (xv6 7b2c1b1b's syscall mask).
 
 Imports only definitional files.
 -/
 import Xv6.SlotSupply
-
-set_option linter.unusedSectionVars false
 
 namespace Xv6
 
@@ -33,24 +31,20 @@ open LeanRV64D
 /-- `proc[NPROC]` (kernel/proc.c) in this image: `procinit`'s and
 `proc_mapstacks`' `auipc s1,0x11; addi s1,s1,-116` / `addi s1,s1,82`
 both land on `KernelSyms.«proc»`, and `&proc[NPROC] = KernelSyms.«tickslock» = tickslock`
-(`KernelSyms.«proc» + 64 * 368`).  (The Rocq `KernelSyms.proc` is (KernelSyms.«cpus» + 0x3b0): a
+(`KernelSyms.«proc» + 64 * 376`).  (The Rocq `KernelSyms.proc` is (KernelSyms.«cpus» + 0x3b0): a
 different build of the same kernel.) -/
 def procsAddr : BitVec 64 := KA.«proc»
 
 -- `NPROC` / `NOFILE` are `Xv6/SlotSupply.lean`'s (the slot supplies'
 -- bounds need them below this file).
 /-- `sizeof (struct proc)` (Rocq `proc_size`). -/
-def procSize : Nat := 368
+def procSize : Nat := 376
 /-- `sizeof (p->name)` (Rocq `PNAMELEN`). -/
 def PNAMELEN : Nat := 16
-/-- `MAXVA` (kernel/riscv.h): `1 << 38`. -/
-def MAXVA : Nat := 2 ^ 38
 
 /-- `&proc[i]` (Rocq `proc_addr`). -/
 def procAddr (i : Nat) : BitVec 64 := procsAddr + BitVec.ofNat 64 (procSize * i)
 
-/-- `&p->lock` (offset 0; `locked` at 0, `name` at 8, `cpu` at 16). -/
-def pLock (pa : BitVec 64) : BitVec 64 := pa
 def pState (pa : BitVec 64) : BitVec 64 := pa + 24#64
 def pChan (pa : BitVec 64) : BitVec 64 := pa + 32#64
 def pKilled (pa : BitVec 64) : BitVec 64 := pa + 40#64
@@ -66,10 +60,12 @@ def pContext (pa : BitVec 64) (j : Nat) : BitVec 64 := pa + 96#64 + BitVec.ofNat
 /-- `&p->ofile[j]` (`j < NOFILE`). -/
 def pOfile (pa : BitVec 64) (j : Nat) : BitVec 64 := pa + 208#64 + BitVec.ofNat 64 (8 * j)
 def pCwd (pa : BitVec 64) : BitVec 64 := pa + 336#64
+/-- `&p->root` (the process's root directory, xv6 b72cbac1's chroot). -/
+def pRoot (pa : BitVec 64) : BitVec 64 := pa + 344#64
 /-- `&p->name` (16 bytes). -/
-def pName (pa : BitVec 64) : BitVec 64 := pa + 344#64
+def pName (pa : BitVec 64) : BitVec 64 := pa + 352#64
 /-- `&p->seccomp` (the syscall mask, xv6 7b2c1b1b; Rocq `p_secc`). -/
-def pSecc (pa : BitVec 64) : BitVec 64 := pa + 360#64
+def pSecc (pa : BitVec 64) : BitVec 64 := pa + 368#64
 
 /-- `enum procstate`. -/
 def UNUSED : BitVec 32 := 0#32
@@ -122,8 +118,8 @@ theorem exitXs_of_arg0 {tf : List (BitVec 64)} {v : BitVec 64} (h : tf[tfArgIdx 
 theorem procs_toNat : (procsAddr : BitVec 64).toNat = KernelSyms.«proc» := by decide
 theorem procs_lt : KernelSyms.«proc» < 2 ^ 32 := by decide
 
-theorem procAddr_toNat (j : Nat) (hj : j < NPROC) : (procAddr j).toNat = KernelSyms.«proc» + 368 * j := by
-  have h1 : (BitVec.ofNat 64 (procSize * j)).toNat = 368 * j := by
+theorem procAddr_toNat (j : Nat) (hj : j < NPROC) : (procAddr j).toNat = KernelSyms.«proc» + 376 * j := by
+  have h1 : (BitVec.ofNat 64 (procSize * j)).toNat = 376 * j := by
     simp only [BitVec.toNat_ofNat, procSize]
     exact Nat.mod_eq_of_lt (by unfold NPROC at hj; omega)
   have hp := procs_lt
@@ -160,13 +156,10 @@ theorem procAddr_ne_end {m : Nat} (h : m < NPROC) : procAddr m ≠ KA.«ticksloc
   have h1 := procAddr_toNat m h
   rw [he] at h1
   have h2 : (KA.«tickslock» : BitVec 64).toNat = KernelSyms.«tickslock» := by decide
-  have h3 : KernelSyms.«tickslock» = KernelSyms.«proc» + 368 * 64 := by decide
+  have h3 : KernelSyms.«tickslock» = KernelSyms.«proc» + 376 * 64 := by decide
   rw [h2, h3] at h1
   unfold NPROC at h
   omega
-
-theorem secc_addr (x : BitVec 64) : x + BitVec.signExtend 64 360#12 = pSecc x := by
-  unfold pSecc; rfl
 
 /-- A state cell whose sign-extension is `2` holds SLEEPING. -/
 theorem sext_sleeping (st : BitVec 32) (h : BitVec.signExtend 64 st = 2#64) : st = SLEEPING := by

@@ -36,7 +36,6 @@ cells at `sp₀-72`, `sp₀-64`, `sp₀-56`; the cell at `sp₀-80` is unused.
    call sites; `fst_noff0`/`fst_len24` likewise.
 -/
 import Xv6.SpecFilestat
-import Xv6.DinodeSlot
 import Xv6.EitherDefs
 import Xv6.SpecStati
 import MachCSL.BvLemmas
@@ -46,16 +45,13 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedSectionVars false
-set_option linter.unusedVariables false
-
 /-! ## Call targets, return addresses -/
 
-theorem filestat_br_myproc : KA.«filestat» + 0xffffffffffffd664#64 = KA.«myproc» := by decide
-theorem filestat_br_ilock : KA.«filestat» + 0xFFFFFFFFFFFFF01A#64 = KA.«ilock» := by decide
-theorem filestat_br_stati : KA.«filestat» + 0xFFFFFFFFFFFFF3C6#64 = KA.«stati» := by decide
-theorem filestat_br_iunlock : KA.«filestat» + 0xFFFFFFFFFFFFF0C8#64 = KA.«iunlock» := by decide
-theorem filestat_br_copyout : KA.«filestat» + 0xffffffffffffd29e#64 = KA.«copyout» := by decide
+theorem filestat_br_myproc : KA.«filestat» + 0xffffffffffffd5e4#64 = KA.«myproc» := by decide
+theorem filestat_br_ilock : KA.«filestat» + 0xffffffffffffefba#64 = KA.«ilock» := by decide
+theorem filestat_br_stati : KA.«filestat» + 0xfffffffffffff366#64 = KA.«stati» := by decide
+theorem filestat_br_iunlock : KA.«filestat» + 0xfffffffffffff068#64 = KA.«iunlock» := by decide
+theorem filestat_br_copyout : KA.«filestat» + 0xffffffffffffd22a#64 = KA.«copyout» := by decide
 
 theorem filestat_ret_14 : jumpPc (KA.«filestat» + 0x14#64) = KA.«filestat» + 0x14#64 := by decide
 theorem filestat_ret_2a : jumpPc (KA.«filestat» + 0x2a#64) = KA.«filestat» + 0x2a#64 := by decide
@@ -83,16 +79,6 @@ theorem filestat_bltu (t : BitVec 32) :
     simp only [Bool.not_false]
     revert h2 h3
     bv_decide
-
-/-- `sraiw a0,a0,31` on copyout's two answers (Rocq's `fst_sraiw_0` /
-`fst_sraiw_m1`). -/
-theorem filestat_sraiw_0 :
-    BitVec.signExtend 64 ((BitVec.extractLsb' 0 32 (0#64)).sshiftRight (31#5).toNat) = 0#64 := by
-  decide
-theorem filestat_sraiw_m1 :
-    BitVec.signExtend 64 ((BitVec.extractLsb' 0 32 (-1#64)).sshiftRight (31#5).toNat)
-      = 0xFFFFFFFFFFFFFFFF#64 := by
-  decide
 
 /-! ## The frame -/
 

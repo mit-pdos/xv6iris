@@ -45,13 +45,14 @@ import Xv6.ElfUser
 import Xv6.EchoDisc
 import Xv6.UshEchoPure
 import Xv6.UshEchoImg
+import Xv6.User.CatElfRaw
+import Xv6.User.EchoElfRaw
+import Xv6.User.GrepElfRaw
 
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Std (ExtTreeSet)
-
-set_option linter.unusedSectionVars false
 
 section UkTreeEntryStmt
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]

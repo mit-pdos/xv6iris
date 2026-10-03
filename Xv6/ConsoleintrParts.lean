@@ -30,21 +30,19 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## Addresses folded out of the `auipc` pairs -/
 
 /-- `&cons`, folded out of every `auipc a?,0x12; addi a?,a?,<off>` pair. -/
-theorem ci_cons_addr : KA.«consoleintr» + 0x120b8#64 = KA.«cons» := by decide
+theorem ci_cons_addr : KA.«consoleintr» + 0x12158#64 = KA.«cons» := by decide
 /-- `&cons.r`, folded out of `auipc a4,0x12; lw a4,162(a4)` (and of the
 `addi a0,a0,-62` that makes `wakeup`'s argument). -/
-theorem ci_r_addr : KA.«consoleintr» + 0x12150#64 = consRAddr := by decide
+theorem ci_r_addr : KA.«consoleintr» + 0x121f0#64 = consRAddr := by decide
 /-- `&cons.w`, folded out of `auipc a5,0x12; sw a2,-50(a5)`. -/
-theorem ci_w_addr : KA.«consoleintr» + 0x12154#64 = consWAddr := by decide
+theorem ci_w_addr : KA.«consoleintr» + 0x121f4#64 = consWAddr := by decide
 /-- `&cons.e`, folded out of `auipc a4,0x12; sw a5,12(a4)`. -/
-theorem ci_e_addr : KA.«consoleintr» + 0x12158#64 = consEAddr := by decide
+theorem ci_e_addr : KA.«consoleintr» + 0x121f8#64 = consEAddr := by decide
 
 /-- The three index fields, as offsets off `&cons`. -/
 theorem ci_rA : KA.«cons» + 152#64 = consRAddr := rfl
@@ -114,7 +112,6 @@ def ciSaved4 (R R' : RegMap) : Prop :=
   R' 22#5 = R 22#5 ∧ R' 23#5 = R 23#5 ∧ R' 24#5 = R 24#5 ∧ R' 25#5 = R 25#5 ∧
   R' 26#5 = R 26#5 ∧ R' 27#5 = R 27#5
 
-
 /-! ## The critical section's context -/
 
 /-- The context inside the critical section: `push_off`'s depth at the
@@ -123,16 +120,6 @@ frame pushed. -/
 def ciK (k : KCtx) (a b : Bool) : KCtx :=
   ((k.pushOffAt a b).withLocks ("cons" :: k.locks)).pushed 6
 
-@[simp] theorem ciK_sie (k : KCtx) (a b : Bool) : (ciK k a b).sie = false := rfl
-@[simp] theorem ciK_noff (k : KCtx) (a b : Bool) : (ciK k a b).noff = k.noff + 1 := rfl
-@[simp] theorem ciK_intena (k : KCtx) (a b : Bool) : (ciK k a b).intena = k.intena := rfl
-@[simp] theorem ciK_locks (k : KCtx) (a b : Bool) : (ciK k a b).locks = "cons" :: k.locks := rfl
-@[simp] theorem ciK_tier (k : KCtx) (a b : Bool) : (ciK k a b).tier = k.tier := rfl
-@[simp] theorem ciK_proc (k : KCtx) (a b : Bool) : (ciK k a b).proc = k.proc := rfl
-@[simp] theorem ciK_regs (k : KCtx) (a b : Bool) : (ciK k a b).regs = k.regs := rfl
-@[simp] theorem ciK_spie (k : KCtx) (a b : Bool) : (ciK k a b).spie = a := rfl
-@[simp] theorem ciK_spp (k : KCtx) (a b : Bool) : (ciK k a b).spp = b := rfl
-theorem ciK_withSpie (k : KCtx) (a b : Bool) : (ciK k a b).withSpie a b = ciK k a b := rfl
 theorem ciK_avail (k : KCtx) (a b : Bool) : (ciK k a b).avail = trapRes k.sie + k.avail - 6 := rfl
 
 theorem ciK_avail_ge (k : KCtx) (a b : Bool) : k.avail - 6 ≤ (ciK k a b).avail := by
@@ -299,7 +286,7 @@ theorem ci_tail (RE : RELEASE) (c : CPU) (k : KCtx) (a b : Bool) (γc : GName) (
   k_step (wp_s_auipc c _ (KA.«consoleintr» + 0x104#64) false 18#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_addi c _ (KA.«consoleintr» + 0x108#64) false 4020#12 10#5 10#5 (by decide))
+  k_step (wp_s_addi c _ (KA.«consoleintr» + 0x108#64) false 84#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ci_cons_addr]
   iintro Hk Hpc
   -- jal release

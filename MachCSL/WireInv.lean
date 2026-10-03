@@ -100,11 +100,6 @@ user-boundary permit: the trace permits the two tiers share (the wire tie
 and, since M2-W1, the user-boundary permit). -/
 def wireInv : IProp GF := iprop(inv wireN (wireBody (GF := GF)) ∗ hartObsPermit)
 
-/-- In the ambient era the two forms agree. -/
-theorem wireBody_eq : wireBody (GF := GF) = wireBodyAt (MachGS.era (hlc := hlc) (GF := GF)) := rfl
-
-theorem wireInv_eq : wireInv (GF := GF) = wireInvAt (MachGS.era (hlc := hlc) (GF := GF)) := rfl
-
 instance wireBody_timeless : Timeless (wireBody (GF := GF)) := by
   unfold wireBody regPointsTo regPointsToAt; infer_instance
 
@@ -135,22 +130,6 @@ theorem wireInv_enter (e : Obs) (ox : Option (Nat × Obs)) (he : isUEnter e = tr
   iintro #Hw
   iapply hartObsPermit_enter e ox he hf
   iapply wireInv_permit $$ Hw
-
-/-- Allocate the invariant from the owned pin cells, at any levels, beside
-the user-boundary permit. -/
-theorem wireInv_alloc (E : CoPset) (seip meip : CPU → BitVec 1) :
-    hartObsPermit ∗
-    ([∗list] cpu ∈ cpus,
-        (Register.sig_seip ↦ᵣ[cpu] seip cpu ∗ Register.sig_meip ↦ᵣ[cpu] meip cpu))
-      ⊢@{IProp GF} |={E}=> wireInv := by
-  iintro ⟨#Hp, Hcells⟩
-  unfold wireInv
-  iframe Hp
-  iapply inv_alloc wireN E (wireBody (GF := GF))
-  inext
-  unfold wireBody
-  iexists seip, meip
-  iexact Hcells
 
 /-- Take hart `cpu`'s two pin cells out of the body, with a closing wand
 that accepts them back at ANY levels. -/

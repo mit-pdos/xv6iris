@@ -61,14 +61,11 @@ view's `fsbN`.
 -/
 import Xv6.FsCollectAllBodies
 import Xv6.AppDur
-import Xv6.IcacheEscrowPoolMove
 import Xv6.IputOfflockParts
 
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
-
-set_option linter.unusedSectionVars false
 
 /-! ## 3.  THE NAMESPACE ARITHMETIC -/
 

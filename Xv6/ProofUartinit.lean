@@ -15,7 +15,6 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
@@ -29,9 +28,9 @@ theorem ui_ua : BitVec.signExtend 64 (0xa#20 ++ 0#12) = 0xa000#64 := by decide
 /-- `"uart0"`, `&uarts[0]`, `"uart1"`, `&uarts[1]`, as the four address
 pairs compute them. -/
 theorem uartinit_br_674a : KA.«uartinit» + 0x674a#64 = KStr.«uart0» := by decide
-theorem uartinit_br_9a0a : KA.«uartinit» + 0x9a0a#64 = uartElt .uart0 := by decide
+theorem uartinit_br_9aaa : KA.«uartinit» + 0x9aaa#64 = uartElt .uart0 := by decide
 theorem uartinit_br_6752 : KA.«uartinit» + 0x6752#64 = KStr.«uart1» := by decide
-theorem uartinit_br_9a32 : KA.«uartinit» + 0x9a32#64 = uartElt .uart1 := by decide
+theorem uartinit_br_9ad2 : KA.«uartinit» + 0x9ad2#64 = uartElt .uart1 := by decide
 
 /-- Both `jal`s reach `uartinitone`. -/
 theorem uartinit_br_call : KA.«uartinit» + 0xFFFFFFFFFFFFFFB0#64 = KA.«uartinitone» := by decide
@@ -89,8 +88,8 @@ theorem uartinit_proof (UI : UARTINITONE) : UARTINIT :=
   k_step_gen (wp_s_auipc c3 _ (KA.«uartinit» + 0x10#64) false 0xa#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ui_ua] next c4 hp4
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c4 _ (KA.«uartinit» + 0x14#64) false 2554#12 10#5 10#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [uartinit_br_9a0a] next c5 hp5
+  k_step_gen (wp_s_addi c4 _ (KA.«uartinit» + 0x14#64) false 2714#12 10#5 10#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [uartinit_br_9aaa] next c5 hp5
   iintro Hk Hpc
   -- jal ra, uartinitone
   k_step_gen (wp_s_jal c5 _ (KA.«uartinit» + 0x18#64) false 2097048#21 1#5 (by decide))
@@ -104,7 +103,7 @@ theorem uartinit_proof (UI : UARTINITONE) : UARTINIT :=
   iframe #
   case hs0 => k_norm_g [hsie]
   case hK0 => k_norm_g; omega
-  case ha00 => k_norm_g [uartinit_br_9a0a]
+  case ha00 => k_norm_g [uartinit_br_9aaa]
   case ha10 => k_norm_g [uartinit_br_674a, uartNameStr]
   -- past the first call
   iapply wpNext_intro_pin
@@ -124,8 +123,8 @@ theorem uartinit_proof (UI : UARTINITONE) : UARTINIT :=
   k_step_gen (wp_s_auipc c9 _ (KA.«uartinit» + 0x24#64) false 0xa#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ui_ua] next c10 hp10
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c10 _ (KA.«uartinit» + 0x28#64) false 2574#12 10#5 10#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [uartinit_br_9a32] next c11 hp11
+  k_step_gen (wp_s_addi c10 _ (KA.«uartinit» + 0x28#64) false 2734#12 10#5 10#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [uartinit_br_9ad2] next c11 hp11
   iintro Hk Hpc
   -- jal ra, uartinitone
   k_step_gen (wp_s_jal c11 _ (KA.«uartinit» + 0x2c#64) false 2097028#21 1#5 (by decide))
@@ -139,7 +138,7 @@ theorem uartinit_proof (UI : UARTINITONE) : UARTINIT :=
   iframe #
   case hs1 => k_norm_g [hsie]
   case hK1 => k_norm_g; omega
-  case ha01 => k_norm_g [uartinit_br_9a32]
+  case ha01 => k_norm_g [uartinit_br_9ad2]
   case ha11 => k_norm_g [uartinit_br_6752, uartNameStr]
   -- past the second call: the epilogue
   iapply wpNext_intro_pin

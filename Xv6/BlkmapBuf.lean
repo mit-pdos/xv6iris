@@ -78,8 +78,6 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedSectionVars false
-
 /-! # (1) The zero tests: `c.beqz` / `c.bnez` on a sign-extended `lw` -/
 
 theorem bm_eqz_true (w : BitVec 32) (h : w.toNat = 0) :
@@ -116,7 +114,7 @@ theorem bm_nez_true (w : BitVec 32) (h : w.toNat ≠ 0) :
 theorem bm_align4 (k q : Nat) (hk : k < NBUF) (hq : q < 256) :
     (aBufData (bnode k) + BitVec.ofNat 64 (4 * q)).toNat % 4 = 0 := by
   rw [bufData_toNat k (4 * q) hk (by unfold BSIZE; omega)]
-  have hbc : KernelSyms.«bcache» = 0x800184a8 := rfl
+  have hbc : KernelSyms.«bcache» = 0x80018748 := rfl
   rw [hbc]; omega
 
 /-- The data area's base is 4-aligned (deviation 3). -/

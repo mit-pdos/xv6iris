@@ -37,9 +37,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
@@ -163,16 +161,16 @@ theorem ireclaim_setup (PK : PRINTK) (BD : BREAD) (BE : BRELSE) (IG : IGET) (BO 
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h15]
   iintro Hk Hpc
   -- +0x26 / +0x2a  s4 = &sb ; +0x2e / +0x32  s6 = the format string
-  k_step_e (wp_s_auipc cpu _ (KA.«ireclaim» + 0x26#64) false 0x1d#20 20#5 (by decide))
+  k_step_e (wp_s_auipc cpu _ (KA.«ireclaim» + 0x26#64) false 0x1e#20 20#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_addi cpu _ (KA.«ireclaim» + 0x2a#64) false 1424#12 20#5 20#5 (by decide))
+  k_step_e (wp_s_addi cpu _ (KA.«ireclaim» + 0x2a#64) false 2076#12 20#5 20#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ireclaim_a_sb]
   iintro Hk Hpc
   k_step_e (wp_s_auipc cpu _ (KA.«ireclaim» + 0x2e#64) false 0x4#20 22#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_addi cpu _ (KA.«ireclaim» + 0x32#64) false 3760#12 22#5 22#5 (by decide))
+  k_step_e (wp_s_addi cpu _ (KA.«ireclaim» + 0x32#64) false 3732#12 22#5 22#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ireclaim_a_fmt]
   iintro Hk Hpc
   -- +0x36  c.j +0x7c : INTO THE LOOP BODY
@@ -225,10 +223,10 @@ theorem ireclaim_entry (PK : PRINTK) (BD : BREAD) (BE : BRELSE) (IG : IGET) (BO 
   · have hkw : k.withRegs k.regs = k := by cases k; rfl
     rw [hkw]; iexact Hk
   -- +0x00  auipc a4 ; +0x04  lw a4,sb.ninodes ; +0x08  li a5,1
-  k_step_e (wp_s_auipc cpu _ (KA.«ireclaim») false 0x1d#20 14#5 (by decide))
+  k_step_e (wp_s_auipc cpu _ (KA.«ireclaim») false 0x1e#20 14#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_lw cpu _ (KA.«ireclaim» + 0x4#64) false 1474#12 14#5 14#5 (by decide) (by decide)
+  k_step_e (wp_s_lw cpu _ (KA.«ireclaim» + 0x4#64) false 2126#12 14#5 14#5 (by decide) (by decide)
       dqn (BitVec.ofNat 32 fscNinodes))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ireclaim_a_ninodes]
   iintro Hk Hpc Hsn

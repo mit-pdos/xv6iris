@@ -30,8 +30,7 @@ the state at +0x36 (`sysOpenAt36`), whose proof per side is in
 2. **PROCESS LAYER (flagged).**  argint is lent the trapframe quarter and
    page (`ProcPrivAcc.procPrivFd_tf`, Rocq `proc_priv_tf`); argstr takes the
    bare block by `procPrivFd`'s own definition and hands it back at the
-   grown page table (`SysfileCalls.sysfile_blk_bare`;
-   Rocq's `proc_priv` is threaded whole there); begin_op is lent the pid
+   grown page table (Rocq's `proc_priv` is threaded whole there); begin_op is lent the pid
    cell at the block's share `pidPriv` (`SysOpenParts.sysOpen_pid_fd`; Rocq
    `proc_priv_bare_acc`'s `1/4`).  Rocq's `proc_priv_tfp_valid` premise of
    argint is not needed (the Lean argint reads through `tfPageAt`).
@@ -56,9 +55,6 @@ the state at +0x36 (`sysOpenAt36`), whose proof per side is in
    `sys_open_args` / `sys_open_entry` take the +0x36 body for every `kv`.
 -/
 import Xv6.SysOpenParts
-import Xv6.SysfileCalls
-import Xv6.ProcPrivAcc
-import Xv6.ReadiDefs
 import Xv6.SysLinkParts
 import Xv6.SysMknodFrame
 
@@ -69,20 +65,17 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## Constants -/
 
-theorem sys_open_br_argint : KA.«sys_open» + 0xffffffffffffd6d0#64 = KA.«argint» := by decide
-theorem sys_open_br_argstr : KA.«sys_open» + 0xffffffffffffd708#64 = KA.«argstr» := by decide
+theorem sys_open_br_argint : KA.«sys_open» + 0xffffffffffffd670#64 = KA.«argint» := by decide
+theorem sys_open_br_argstr : KA.«sys_open» + 0xffffffffffffd6a8#64 = KA.«argstr» := by decide
 theorem sys_open_br_begin_op : KA.«sys_open» + 0xffffffffffffeb56#64 = KA.«begin_op» := by decide
 
 theorem sys_open_ret_12 : jumpPc (KA.«sys_open» + 0x12#64) = KA.«sys_open» + 0x12#64 := by decide
 theorem sys_open_ret_20 : jumpPc (KA.«sys_open» + 0x20#64) = KA.«sys_open» + 0x20#64 := by decide
 theorem sys_open_ret_2e : jumpPc (KA.«sys_open» + 0x2e#64) = KA.«sys_open» + 0x2e#64 := by decide
-
 
 /-! ## The fetched path (argstr's buffer as a function) -/
 
@@ -166,7 +159,6 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 
 /-! ## The block's seams -/
 
-
 /-! ## The call sites: the shared sysfile wrappers (`SysfileCalls`) -/
 
 /-- The shared wrappers' environment, out of sys_open's. -/
@@ -211,13 +203,6 @@ def sysOpenArm0 (A : SysOpenArgs GF) (EXTRA : IProp GF)
   ∀ (VW : ProcPriv) (MW : Nat → List (BitVec 8)), VW.fdg = A.V.fdg →
     EXTRA ∗ procPrivFd A.γ (procAddr A.j) A.pid VW MW ∗ fdFrags VW.fdg A.sts ∗ fdSlot ⊢
       ARMS VW MW 0xFFFFFFFFFFFFFFFF#64
-
-theorem sys_open_ret_m1 : (0#64 : BitVec 64) + BitVec.signExtend 64 4095#12 = 0xFFFFFFFFFFFFFFFF#64 := by
-  decide
-
-theorem sys_open_s1slot (x : BitVec 64) :
-    x + 0xFFFFFFFFFFFFFF40#64 + BitVec.signExtend 64 168#12 = x + 0xFFFFFFFFFFFFFFE8#64 := by
-  bv_decide
 
 /-! ## +0x20: argstr came back -/
 
@@ -365,7 +350,6 @@ theorem sys_open_fetched (BO : BEGIN_OP) (Γ : SchedNames) [ClaimIs (hlc := hlc)
     iapply (sys_open_exit cpu k spie spp _ w3 w4 w5 w6 lo (sysOpenOm A) w24 hS.hK hp1 hal)
       $$ [$Hk $Hpc $Hcells $Hbuf $Hte $Hce $HK]
 
-
 /-! ## +0x08: argint and argstr -/
 
 set_option maxHeartbeats 32000000 in
@@ -404,7 +388,7 @@ theorem sys_open_args (AI : ARGINT) (AS : ARGSTR) (BO : BEGIN_OP) (Γ : SchedNam
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x0e  jal argint
-  k_step_e (wp_s_jal cpu _ (KA.«sys_open» + 0xe#64) false 2086594#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_open» + 0xe#64) false 2086498#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_open_br_argint]
   iintro Hk Hpc
   icases sysOpenCells_om _ _ _ _ _ _ _ _ _ _ $$ Hcells with ⟨Hom, Hcback⟩
@@ -452,7 +436,7 @@ theorem sys_open_args (AI : ARGINT) (AS : ARGSTR) (BO : BEGIN_OP) (Γ : SchedNam
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x1c  jal argstr
-  k_step_e (wp_s_jal cpu _ (KA.«sys_open» + 0x1c#64) false 2086636#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_open» + 0x1c#64) false 2086540#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_open_br_argstr]
   iintro Hk Hpc
   icases sysfile_blk_bare_ev _ _ _ _ _ $$ Hblk with ⟨Hbare, Hclose⟩

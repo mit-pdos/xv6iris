@@ -6,8 +6,7 @@ pinned `1900b8a43`; cut C9f2, design union.md §3, review B3).
 `UShUPipes.v` (namespace `Xv6.UShUPipes`) is split:
 
 * `UshUPipesPure`   -- S0, the pure section (sibling a);
-* `UshUPipesClaim`  -- this file: `ucons_claim`, `usup`, `uup_fupd_mwp`,
-  `udeed_typed`, the stage lists (`pc0 RT GS STG REST`, `uup_um_usz`,
+* `UshUPipesClaim`  -- this file: `ucons_claim`, `usup`, `udeed_typed`, the stage lists (`pc0 RT GS STG REST`, `uup_um_usz`,
   `urt_len`, `ustg_len`, `ustg_fs_rb`);
 * `UshUPipesFin`    -- `ufin`, `uopen`, `uup_genw`, `uup_pin0`,
   `pls_nodes_alloc` (and the union's round `uD`);
@@ -47,24 +46,10 @@ pc0 RT GS STG REST PWC Pm` are spelled out, or are the abbreviations below.
 3. `Z.of_nat (length c) < 2 ^ 31` is `(c.length : Int) < 2 ^ 31` (sibling
    a's `catf_short`); `usz`'s `sz` is a `Nat`.
 -/
-import Xv6.UshURoundBody
 import Xv6.UshURoundWide
-import Xv6.UshURoundShapes
-import Xv6.UshURoundPure
-import Xv6.UshRedirBody
-import Xv6.UshLineDefs
-import Xv6.UshCatPay
-import Xv6.UshEchoSlot
 import Xv6.UkPipesIfaceDefs
-import Xv6.HfpFileClaimsP
-import Xv6.UshKernel
-import Xv6.PipeOutNFam
-import Xv6.UshUPipesPure
 import Xv6.UshPipesChild
-import Xv6.UexecExecInst
 import Xv6.PipesCutEcho
-import Xv6.AppFileTyped
-import Xv6.FileDeltasLen
 
 namespace Xv6
 
@@ -73,8 +58,6 @@ namespace UShUPipes
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Std (ExtTreeSet)
 open Wid Pline'
-
-set_option linter.unusedSectionVars false
 
 /-! ## The stage lists (Rocq's local notations `pc0 RT GS STG REST`) -/
 
@@ -111,14 +94,6 @@ producer. -/
 theorem ustg_len (pw : List (List (BitVec 8))) (fs : List Filt) (len : Nat) (gb : Nat → BitVec 8) (sa : Nat) :
     (uSTG pw fs len gb sa).length = fs.length + 1 := by
   simp [uSTG, uRT, ushqRtoksWs_length]
-
-/-- `REST` is the tail of the stages below the first filter's. -/
-theorem uSTG_cons (pw : List (List (BitVec 8))) (F : Filt) (fs' : List Filt) (len : Nat) (gb : Nat → BitVec 8)
-    (sa : Nat) :
-    uSTG pw (F :: fs') len gb sa =
-      ushArgs sa (uGS pw (F :: fs') len gb) (wlToks pw)
-        :: ushArgs sa (uGS pw (F :: fs') len gb) (ushqRebase (pc0 pw) (wlToks (filtWords F)))
-        :: uREST pw F fs' len gb sa := rfl
 
 /-- **Rocq `ustg_fs_rb`**: ...READ AS THE NODE's STAGE ARGV (the node's
 `Hstc`, cut G8): stage `k`'s words at its offset in the line, the stage
@@ -170,9 +145,6 @@ theorem usup (ug : UnionGn) (r : FileAppNames)
   rw [e']
   iintro !> #Ht
   iapply h $$ Ht
-
-/-- **Rocq `uup_fupd_mwp`**. -/
-theorem uup_fupd_mwp (h : CPU) : (|={⊤}=> wpLoop (GF := GF) h) ⊢ wpLoop h := wpLoop_fupd h
 
 /-- **Rocq `udeed_typed`**: the deed's typing -- a well-formed state, and a
 short content. -/

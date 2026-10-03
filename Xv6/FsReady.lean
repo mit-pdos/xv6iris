@@ -42,12 +42,10 @@ in-progress `wp_namex_gen_eb_body` (SpecNamex deviation 2):
 |---|---|
 | `bioCtx γl fscBio (fsView fscFs fscDisk icfgDev fscCov)` | `fsReady_bio` (γl bound, deviation 2) |
 | `logCtx icfgLog fscBio fscFs fscCov fscLogst icfgDev` | `fsReady_log` |
-| `diskCaps fscDisk fscDlock pd pav pu`, `hpd : descPageRw pd` | `fsReady_disk` (pd/pav/pu bound, as Rocq) + `diskGeom_agree` |
+| `diskCaps fscDisk fscDlock pd pav pu`, `hpd : descPageRw pd` | `fsReady_disk` (pd/pav/pu bound, as Rocq) |
 | `isItable2 fscItlock fscIc …`, `itableInv`, `icSleeplocks fscIc` | `fsReady_icache` |
 | `icEscrow fscIc fscFs fscIreg fscCov fscLogst kk` (iput, ilock) | `fsReady_escrow` |
 | `iregInv fscIreg fscFs icfgIst icfgNib`, `iregOpen` (namex, dirlink) | `fsReady_region` |
-| `iregRegime rg` at `rg = true` (iput) | `fsReady_regime` |
-| `iregReg …` (iget) | `fsReady_reg` |
 | `fsBytesAny fscFs` (readi) | `fsReady_bytes` |
 | `isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none` | `fsReady_kmem`, at `γkl := fscKalloc`, `γk := fsReadyKmem` |
 | `wordPointsTo sbNinodes/sbInodestart/sbSizeAddr/sbBmapstartAddr 4 dq …` | `fsReady_sb_four`, at `dq := DFrac.discard` |
@@ -131,8 +129,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Std MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-! ## 0.  THE IMAGE'S GEOMETRY: the accessors (Rocq `fgo_*`)
 
 The record itself is `Xv6.FsGeomOk` (`Xv6/FsCfgDefs.lean`).  These are
@@ -141,10 +137,6 @@ Rocq's accessors in the forms the Lean contracts state the premises. -/
 /-- Rocq `fgo_size`. -/
 theorem FsGeomOk.size [Fscfg] [Icfg] (h : FsGeomOk) : 0 < fscSize ∧ fscSize ≤ BPB :=
   ⟨h.fgoBitmap.1, h.fgoBitmap.2.1⟩
-
-/-- Rocq `fgo_bm_cov`. -/
-theorem FsGeomOk.bmCov [Fscfg] [Icfg] (h : FsGeomOk) : fscBmapstart ∈ fscCov :=
-  h.fgoBitmap.2.2.1
 
 /-- Rocq `fgo_bm_out`. -/
 theorem FsGeomOk.bmOut [Fscfg] [Icfg] (h : FsGeomOk) : logRegion fscLogst fscBmapstart = false :=
@@ -215,7 +207,7 @@ def fsReady [Fscfg] [Icfg] [CurCtx] : IProp GF := iprop(
   logCtx icfgLog fscBio fscFs fscCov fscLogst icfgDev ∗
   -- THE DISK FABRIC, WITH THE THREE RING PAGES QUANTIFIED HERE (Rocq R1:
   -- `virtio_disk_init` `kalloc`s them at WP time, so no boot-era record can
-  -- hold them; `diskGeom_agree` is the recovery)
+  -- hold them)
   (∃ pd pav pu : BitVec 64, diskCaps fscDisk fscDlock pd pav pu) ∗
   -- the icache's persistent set (`isItable2` carries the escrows, deviation 5)
   isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
@@ -298,21 +290,6 @@ theorem fsReady_disk [Fscfg] [Icfg] [CurCtx] :
   · iexact Hd
   · ipureintro; exact hpd
 
-/-- Rocq `disk_geom_agree`, THE RECOVERY R1 RESTS ON: the ring pages are
-addresses pinned by the frozen configuration, so any two `diskGeom`s at one
-`DiskNames` agree on all three.  A consumer that threads its own
-`pd`/`pav`/`pu` identifies them with `fsReady`'s witness through this. -/
-theorem diskGeom_agree [CurCtx] (γ : DiskNames) (pd pav pu pd' pav' pu' : BitVec 64) :
-    diskGeom (GF := GF) γ pd pav pu ∗ diskGeom γ pd' pav' pu' ⊢
-      ⌜pd = pd' ∧ pav = pav' ∧ pu = pu'⌝ := by
-  unfold diskGeom
-  iintro ⟨⟨%c, Hc, %hc, -⟩, ⟨%c', Hc', %hc', -⟩⟩
-  ihave %he := diskCfgFrozen_agree γ c c' $$ [Hc Hc']
-  · iframe Hc Hc'
-  ipureintro
-  subst he
-  exact ⟨hc.1.symm.trans hc'.1, hc.2.1.symm.trans hc'.2.1, hc.2.2.1.symm.trans hc'.2.2.1⟩
-
 /-- Rocq `fs_ready_icache` (less `ic_escrows`, deviation 5). -/
 theorem fsReady_icache [Fscfg] [Icfg] [CurCtx] :
     fsReady (hlc := hlc) (GF := GF) ⊢
@@ -339,21 +316,6 @@ theorem fsReady_region [Fscfg] [Icfg] [CurCtx] :
   iintro ⟨-, -, -, -, -, -, H1, H2, -⟩
   iframe H1 H2
 
-/-- The regime in iput's indexed form (`iregRegime rg`, `rg = true`). -/
-theorem fsReady_regime [Fscfg] [Icfg] [CurCtx] :
-    fsReady (hlc := hlc) (GF := GF) ⊢ iregRegime true := by
-  rw [show iregRegime (GF := GF) true = iregOpen from rfl]
-  unfold fsReady
-  iintro ⟨-, -, -, -, -, -, -, H, -⟩
-  iexact H
-
-/-- The region in iget's PowerOn form (`iregReg`, via `iregInv_reg`). -/
-theorem fsReady_reg [Fscfg] [Icfg] [CurCtx] :
-    fsReady (hlc := hlc) (GF := GF) ⊢ iregReg (hlc := hlc) fscIreg fscFs icfgIst icfgNib := by
-  unfold fsReady
-  iintro ⟨-, -, -, -, -, -, H, -⟩
-  iapply iregInv_reg $$ H
-
 /-- The byte view's row readi takes (`fsBytesAny`, via `iregInv_bytes`). -/
 theorem fsReady_bytes [Fscfg] [Icfg] [CurCtx] :
     fsReady (hlc := hlc) (GF := GF) ⊢ fsBytesAny fscFs := by
@@ -376,13 +338,6 @@ theorem fsReady_geom [Fscfg] [Icfg] [CurCtx] :
   unfold fsReady
   iintro ⟨-, -, -, -, -, -, -, -, -, -, %h, -⟩
   ipureintro; exact h
-
-/-- Rocq `fs_ready_sb`. -/
-theorem fsReady_sb [Fscfg] [Icfg] [CurCtx] :
-    fsReady (hlc := hlc) (GF := GF) ⊢ fsSbCells := by
-  unfold fsReady
-  iintro ⟨-, -, -, -, -, -, -, -, -, -, -, H, -⟩
-  iexact H
 
 /-- Rocq `fs_ready_sb_four`: the four cells spelled one by one, the form
 every fs contract states them in, at `dq := DFrac.discard`. -/

@@ -101,7 +101,7 @@ pointer line per top-level and `design/` file and does NOT list `projects/` or
   it there (`make XV6_DIR=<copy> KDUMP=<scratch> UDUMP=<scratch> <the .v
   targets>`), then diff against the tracked files — only the source-path
   comment line may differ. `xv6-riscv/` is a build INPUT pinned at
-  `$(XV6_REV)`, on upstream's `verified` branch; `make xv6-rev-check` says
+  `$(XV6_REV)`, on `zeldovich/xv6-riscv`'s `chroot` branch (the Makefile's `XV6_URL`); `make xv6-rev-check` says
   whether the checkout is that revision.
 - **QEMU must be built from git master** (`> 11.1`: xv6's `verified` branch
   needs the virt machine's second UART at `serial@1000a000`, and `make qemu`

@@ -34,9 +34,6 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
 open Iris.ProgramLogic Language.Notation PrimStep
 
-set_option linter.unusedSectionVars false
-set_option linter.unusedVariables false
-
 section UnionAdequacy
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGpreS hlc GF] [Xv6G GF] [WchGpre GF]
   [CtokG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF]

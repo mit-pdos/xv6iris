@@ -12,8 +12,7 @@ round resumed.  Everything here is what that re-keying needs:
   only through those plus the number and the three argument words.
   `uexecArm_run` is the instance the loop uses: the trapped key and the RUN
   key it projects to (`uvisRun`) are the same key.
-* §3 the one frame mover that is free (`trappedMachine_frame`).
-* §4 THE ROUND'S TAIL, AS NAMED LEMMAS (Rocq milestone J, S5): the returned
+* §3 THE ROUND'S TAIL, AS NAMED LEMMAS (Rocq milestone J, S5): the returned
   arm re-keyed at the resume state (`uexecRet_roundSlot`/`_of`), the bundle
   built row by row and the continuation applied (`ukc_apply`,
   `uslot_applyLoop`).  NOTHING IS MINTED: every arm is the process's own.
@@ -57,8 +56,6 @@ import Xv6.UsysDet
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Std MachCSL LeanRV64D
-
-set_option linter.unusedSectionVars false
 
 /-! ## §1 `retPc` and the `+4` congruence (K4) -/
 
@@ -106,13 +103,6 @@ theorem uvisRun_arg (W : Uvis) (k : Nat) (hk : k < 8) :
 /-- Rocq `uvis_run_num`. -/
 theorem uvisRun_num (W : Uvis) : usysNum (uvisRun W).tf = usysNum W.tf :=
   usysNum_argCong _ _ (uvisRun_arg W 7 (by decide))
-
-/-- Rocq `uvis_run_secc`. -/
-theorem uvisRun_secc (W : Uvis) : (uvisRun W).secc = W.secc := rfl
-
-/-- Rocq `uvis_run_eff`: the run projection's effective number is the key's. -/
-theorem uvisRun_eff (W : Uvis) : uvisNum (uvisRun W) = uvisNum W :=
-  usysEff_numCong _ _ _ (uvisRun_num W)
 
 /-- **The eleven readings a slot sees** (Rocq `uslot_key_cong`'s premises,
 bundled: deviation 2). -/
@@ -237,14 +227,6 @@ theorem uexecArmF_key_cong (S : Uvis → IProp GF) (HS : UKeyCong S) (sc : BitVe
   ⟨uexecArmF_key_mono S HS sc W W' f hl hl' hn ha0 ha1 ha2 hk,
    uexecArmF_key_mono S HS sc W' W f hl' hl hn.symm ha0.symm ha1.symm ha2.symm (ukeyEq_symm hk)⟩
 
-/-- Rocq `uexec_arm_key_cong`. -/
-theorem uexecArm_key_cong (sc : BitVec 64) (W W' : Uvis) (f : sfam GF) (hl : W.tf.length = 36)
-    (hl' : W'.tf.length = 36) (hn : usysNum W.tf = usysNum W'.tf)
-    (ha0 : tfW W.tf (tfArgIdx 0) = tfW W'.tf (tfArgIdx 0)) (ha1 : tfW W.tf (tfArgIdx 1) = tfW W'.tf (tfArgIdx 1))
-    (ha2 : tfW W.tf (tfArgIdx 2) = tfW W'.tf (tfArgIdx 2)) (hk : ukeyEq W W') :
-    uexecArm sc W f ⊣⊢ uexecArm sc W' f :=
-  uexecArmF_key_cong uslot uslot_keyCong sc W W' f hl hl' hn ha0 ha1 ha2 hk
-
 /-- **Rocq `uexec_arm_F_run`**: THE INSTANCE THE LOOP USES -- the trapped key
 and its own run projection. -/
 theorem uexecArmF_run (S : Uvis → IProp GF) (HS : UKeyCong S) (sc : BitVec 64) (W : Uvis) (f : sfam GF)
@@ -258,38 +240,9 @@ theorem uexecArm_run (sc : BitVec 64) (W : Uvis) (f : sfam GF) (hl : W.tf.length
     uexecArm sc W f ⊣⊢ uexecArm sc (uvisRun W) f :=
   uexecArmF_run uslot uslot_keyCong sc W f hl
 
-/-- Rocq `uslot_run_cong`: the slot alone across the same step. -/
-theorem uslot_run_cong (W : Uvis) : uslot (GF := GF) W ⊣⊢ uslot (uvisRun W) :=
-  uslot_keyCong W (uvisRun W) (ukeyEq_run W)
-
 end Apply
 
-/-! ## §3 THE ONE FRAME MOVER THAT IS FREE -/
-
-section Frame
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
-
-/-- **Rocq `trapped_machine_frame`**: forget the image. -/
-theorem trappedMachine_frame [CurCtx] (cpu : CPU) (C : UCfg) (pt : UPtd) (Rut : UPtd → IProp GF)
-    (sz : Nat) (sc stv : BitVec 64) (W : Uvis) :
-    trappedMachine (GF := GF) cpu C pt Rut sz sc stv W ⊢
-      ∃ ms : BitVec 64, ⌜trapMstatusOk ms⌝ ∗
-        userTrapFrameAt cpu C pt Rut ms sc stv (tfW W.tf tfEpcIdx) (tfResumeGpr0 W.tf) := by
-  unfold trappedMachine
-  iintro ⟨%ms, -, H⟩
-  iexists ms
-  ihave H := userTrapFrameAtm_at cpu C pt Rut sz W.M ms sc stv _ _ $$ H
-  unfold userTrapFrameAt
-  icases H with ⟨%hto, Hrest⟩
-  isplitr
-  · ipureintro; exact hto
-  isplitr
-  · ipureintro; exact hto
-  · iexact Hrest
-
-end Frame
-
-/-! ## §4 THE ROUND'S TAIL, AS NAMED LEMMAS -/
+/-! ## §3 THE ROUND'S TAIL, AS NAMED LEMMAS -/
 
 section LoopApply
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF]

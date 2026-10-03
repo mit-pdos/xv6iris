@@ -32,7 +32,7 @@ child is `Rc` (refunded on the failing arm).
    through `usysEff_seccAll`.
 4. (Retired, K3.)  The ledger is Rocq's whole-table `ustdAt l v` (seccomp
    S3 G2): the child's is re-minted by `ufd_alloc_std_at` at the parent's
-   view; `wp_uk_ecall_fork` is the form at a ledger nobody reads.
+   view.
 5. The killer's price is `□ (uKillCred -∗ Q (-1))` (Rocq `□ (app_taint -∗ Q
    (-1))`; MachCSL's ambient kill credential is Lean's name for the taint,
    `UexecRet.uKillCred`).
@@ -53,8 +53,6 @@ open Iris.Std.PartialMap
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 open UexecSG
-
-set_option linter.unusedSectionVars false
 
 section UkFork
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
@@ -243,39 +241,6 @@ theorem wp_uk_ecall_fork_at (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : Reg
     apply BitVec.eq_of_toNat_eq
     have : pidc.toNat = 1 := by omega
     rw [this]; rfl
-
-/-- **Rocq `wp_uk_ecall_fork`**: ...AND AT A LEDGER WHOSE VIEW NOBODY READS
-(every caller but the seccomp program's). -/
-theorem wp_uk_ecall_fork (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64)
-    (avail sz : Nat) (l : List FdState) (D : RegMapF FdState) (c : Nat) (Sc : ExtTreeSet GName compare)
-    (Q : Int → IProp GF) (Rc : IProp GF) (P : GName → GName → GName → IProp GF) [FP : Forkable P]
-    (hn : usysno m = USYS_fork) (hal4 : (pc + 4#64) &&& 1#64 = 0#64) :
-    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ Rc -∗ P N.t N.d N.s -∗ usz N.s sz -∗ ustd N.fd l -∗
-      ([∗map] fd ↦ st ∈ D, ufd N.fd fd st) -∗ ucwd N.cwd c -∗ uch N.ch Sc -∗
-      □ (uKillCred (hlc := hlc) -∗ Q (-1)) -∗ urun (hlc := hlc) N h m pc avail -∗
-      ((∀ (h' : CPU) (r : BitVec 64), ⌜r ≠ 0#64⌝ -∗
-          ((⌜r = -1#64⌝ ∗ uch N.ch Sc ∗ Rc) ∨
-            ∃ (γ : GName) (pidv : BitVec 32), ⌜r = BitVec.signExtend 64 pidv⌝ ∗
-              ⌜1 ≤ pidv.toNat ∧ pidv.toNat ≤ PIDMAX⌝ ∗ ⌜γ ∉ Sc⌝ ∗ childTok γ pidv Q ∗
-              uch N.ch (Sc ∪ {γ})) -∗
-          P N.t N.d N.s -∗ usz N.s sz -∗ ustd N.fd l -∗ ([∗map] fd ↦ st ∈ D, ufd N.fd fd st) -∗
-          ucwd N.cwd c -∗ urun (hlc := hlc) N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') ∗
-        (∀ (N' : UkNames GF) (h' : CPU) (γ' : GName), ⌜N'.pay = Q⌝ -∗ myPay γ' Q -∗ Rc -∗
-          P N'.t N'.d N'.s -∗ usz N'.s sz -∗ ustd N'.fd l -∗ ([∗map] fd ↦ st ∈ D, ufd N'.fd fd st) -∗
-          ucwd N'.cwd c -∗ uch N'.ch ∅ -∗ (∃ p : Int, ⌜p ≠ 1⌝ ∗ upid N'.pid p) -∗
-          urun (hlc := hlc) N' h' (ukWr m 10#5 0#64) (pc + 4#64) avail -∗ wpLoop h')) -∗
-      wpLoop h := by
-  iintro #Hi HRc HP Hsz Hstd HD Hcwd Hchf #Hkw Hrun ⟨Hpar, Hchild⟩
-  icases ustd_ustdAt N.fd l $$ Hstd with ⟨%v, Hstd⟩
-  iapply wp_uk_ecall_fork_at UL N h m pc avail sz l D c v Sc Q Rc P hn hal4
-    $$ Hi HRc HP Hsz Hstd HD Hcwd Hchf Hkw Hrun
-  isplitl [Hpar]
-  · iintro %h' %r %hr Harm HP Hsz Hstd HD Hcwd Hrun
-    ihave Hstd := ustdAt_ustd N.fd l v $$ Hstd
-    iapply Hpar $$ %h' %r %hr Harm HP Hsz Hstd HD Hcwd Hrun
-  · iintro %N' %h' %γ' %hq Hmp HRc' HP' Hsz' Hstd' Hfrag' Hcwd' Hch' Hpid' Hrun
-    ihave Hstd' := ustdAt_ustd N'.fd l v $$ Hstd'
-    iapply Hchild $$ %N' %h' %γ' %hq Hmp HRc' HP' Hsz' Hstd' Hfrag' Hcwd' Hch' Hpid' Hrun
 
 end UkFork
 

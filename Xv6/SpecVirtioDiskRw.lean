@@ -148,25 +148,4 @@ structure VIRTIO_DISK_RW : Prop where
     wp_virtio_disk_rw_eb_body (hlc := hlc) (GF := GF) Γ cpu k γ γl pd pav pu j bno dsk0 dataBuf dataDisk
       Q hj hproc hK hnoff htier hbno hdata hpd hkm
 
-/-- The interrupts-off instance (the complement is the whole bundle). -/
-theorem VIRTIO_DISK_RW.wp_virtio_disk_rw (V : VIRTIO_DISK_RW) {hlc : HasLC} {GF : BundledGFunctors}
-    [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx] (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (cpu : CPU) (k : KCtx) (γ : DiskNames) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
-    (bno dsk0 : BitVec 32) (dataBuf dataDisk : List (BitVec 8)) (Q : IProp GF)
-    hj hproc hK hsie hnoff hlocks htier hbno hdata hpd hkm :
-    wp_virtio_disk_rw_body (hlc := hlc) (GF := GF) Γ cpu k γ γl pd pav pu j bno dsk0 dataBuf dataDisk
-      Q hj hproc hK hsie hnoff hlocks htier hbno hdata hpd hkm := by
-  have h := V.wp_virtio_disk_rw_eb (hlc := hlc) (GF := GF) Γ cpu k γ γl pd pav pu j bno dsk0
-    dataBuf dataDisk Q hj hproc hK hnoff htier hbno hdata hpd hkm
-  unfold wp_virtio_disk_rw_eb_body at h
-  unfold wp_virtio_disk_rw_body
-  rw [hsie] at h
-  simp only [trapCsrsExt_false, cpuClaimExt_false] at h
-  iintro ⟨Hk, Hpc, Hpi, Htc, Hcl, Hir, Hcaps, Hbuf, Hblk, Hperm, Hnext⟩
-  iapply h
-  iframe Hk Hpc Hpi Htc Hcl Hir Hcaps Hbuf Hblk Hperm
-  iapply wpNext_mono $$ Hnext
-  iintro %cpu' HK %spie %spp %R' %hcs Hk Hpc ⟨Htc, Hir⟩ Hcl Hbuf Hblk HQ
-  iapply HK $$ %spie %spp %R' %hcs Hk Hpc Htc Hcl Hir Hbuf Hblk HQ
-
 end Xv6

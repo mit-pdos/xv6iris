@@ -492,13 +492,20 @@ that writes is provable the moment either route lands.
   - `TreeExec.v`: **`exec_walk_of_own`** — EX-2's successor, finally:
     ```
     file_app = MkAppcfg tree_names (tree_pred c) r ->
-    fs_proper (path_elems pl) -> um_start_of cw pl = d ->
+    fs_proper (path_elems pl) -> (forall rt, um_start_of rt cw pl = d) ->
     d ∈ dom (tv_nodes t) -> resolves_from t d pl = Some (i, AFile f) ->
     tree_pin r g root t -∗ app_inv fsc_fs -∗
     exec_walk_of_abs cw (tree_taint c) pl (AFile f)
     ```
-    with `exec_walk_of_own_root` at an absolute path under `/`, and the
-    consumer test `wp_uk_ecall_exec_own_test`: a process holding a
+    THE START IS QUANTIFIED OVER THE PROCESS'S ROOT ([`chroot.md`](chroot.md)
+    §3): the program tier does not know its root, so a relative path
+    (`um_start_of_rel`) is the only kind it can pin at every root, and the
+    absolute tree lemmas (`tree_pin_resolves_abs_path`,
+    `tree_pwalk_of_own_root`) are stated at `rt = ROOTINO`; every pin
+    carries `path_nodot pl` because the hop is root-aware (`..` at the root
+    is the root, `ax_hop rt`'s self rule) and a `..`-free path reads the
+    record whatever the root is.  The consumer test
+    `wp_uk_ecall_exec_own_test`: a process holding a
     frozen deed execs a loadable file of its own subtree at
     `wp_uk_ecall_exec_run_abs`, with `image_entry` and NO whole-fs pin.
   - `TreeObs.v` is the bridge both sides share: `tree_pin_claim_law`

@@ -16,8 +16,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open HfpFileClaimsP UkFileOpen UkFileDev
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
-
 section Close
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [DiskG GF] [EchoOutG GF] [FileAppG GF] [PS : UprogSG GF]
@@ -57,7 +55,6 @@ theorem file_close (N : UkNames GF) (Pr : Uprog GF) (STB : FdevStubs (hlc := hlc
   iapply Hcont $$ %h3 %ret [HK] Hrun
   rw [fdev_ret0 ret hr0]
   iexact HK
-
 
 /-- **Rocq `file_close_in`**: ...at the input device: the deed's fraction
 comes home. -/

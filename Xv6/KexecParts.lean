@@ -57,9 +57,9 @@ s0,sp,544`), epilogue `+0x72 .. +0x86` (`ld ra/s0/s1/s2` at 536..512(sp);
    here, landing on exactly `kxcFrame`.
 3. **The frame cells are at the `k_addr` normal form** `sp0 + <literal>`
    (Rocq `pa_stk sp0 k`), and the 55 low slots are `stackOwn (sp0 - 104) 55`
-   (Rocq `stack_own (pa_stk sp0 13) 55`).  `kxc_rest_split` splits them into
-   the four regions (ustack, elf, ph, the spilled locals) -- Rocq does this
-   inline at each carve site.
+   (Rocq `stack_own (pa_stk sp0 13) 55`), split into the four regions
+   (ustack, elf, ph, the spilled locals) inline at each carve site, as Rocq
+   does.
 4. **The carves are over `byteBuf` / `stackOwn`** (the NameiFrame precedent),
    not `bytes_own` / `slotsn_bytes_own`: `kxc_slots_elf` hands the 64 bytes
    out as `∃ bs, byteBuf (kxcElfBuf sp0) bs` with the base's alignment (Rocq
@@ -79,7 +79,6 @@ The eb question: every rule here is at either `SIE` (`kctxL lent`,
 import Xv6.CodeTactics
 import Xv6.KstackMap
 import MachCSL.WpSmodeFrame12b
-import Xv6.KernelTac
 
 namespace Xv6
 
@@ -88,9 +87,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## The frame arithmetic -/
 
@@ -109,18 +106,6 @@ def kxcPhBuf (sp0 : BitVec 64) : BitVec 64 := sp0 + 0xFFFFFFFFFFFFFE18#64
 /-- `uint64 ustack[33]` at `s0-368` (slots 46 down to 14). -/
 def kxcUstackBuf (sp0 : BitVec 64) : BitVec 64 := sp0 + 0xFFFFFFFFFFFFFE90#64
 
-/-- Rocq `kxc_elf_base`: `addi _,s0,-432` computes the ELF buffer's base. -/
-theorem kxc_elf_base (sp0 : BitVec 64) : sp0 + BitVec.signExtend 64 3664#12 = kxcElfBuf sp0 := by
-  simp only [BitVec.reduceSignExtend, kxcElfBuf]
-
-/-- Rocq `kxc_ph_base`: `addi _,s0,-488`. -/
-theorem kxc_ph_base (sp0 : BitVec 64) : sp0 + BitVec.signExtend 64 3608#12 = kxcPhBuf sp0 := by
-  simp only [BitVec.reduceSignExtend, kxcPhBuf]
-
-/-- Rocq `kxc_ustack_base`: `addi _,s0,-368`. -/
-theorem kxc_ustack_base (sp0 : BitVec 64) : sp0 + BitVec.signExtend 64 3728#12 = kxcUstackBuf sp0 := by
-  simp only [BitVec.reduceSignExtend, kxcUstackBuf]
-
 /-- The 55 low slots' top: slot 13's address, `sp0 - 104`. -/
 theorem kxc_rest_addr (sp0 : BitVec 64) :
     sp0 - 8#64 * BitVec.ofNat 64 13 = sp0 + 0xFFFFFFFFFFFFFF98#64 := by
@@ -131,36 +116,6 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 variable {lent : Bool}
 
 /-! ## The 55 low slots, and the three carves -/
-
-theorem kxc_split_addr (a : BitVec 64) (m : Nat) (c : BitVec 64) (h : c = 8#64 * BitVec.ofNat 64 m) :
-    a - 8#64 * BitVec.ofNat 64 m = a + -c := by
-  subst h; bv_omega_g
-
-/-- The 55 low slots are the four regions: `ustack` (33), `elf` (8), `ph`
-(7) and the spilled locals (7) (deviation 3). -/
-theorem kxc_rest_split [CurCtx] (sp0 : BitVec 64) :
-    stackOwn (GF := GF) (sp0 + 0xFFFFFFFFFFFFFF98#64) 55 ⊣⊢
-      stackOwn (sp0 + 0xFFFFFFFFFFFFFF98#64) 33 ∗ stackOwn (kxcUstackBuf sp0) 8 ∗
-        stackOwn (kxcElfBuf sp0) 7 ∗ stackOwn (kxcPhBuf sp0) 7 := by
-  have e1 : sp0 + 0xFFFFFFFFFFFFFF98#64 - 8#64 * BitVec.ofNat 64 33 = kxcUstackBuf sp0 := by
-    unfold kxcUstackBuf; bv_omega_g
-  have e2 : kxcUstackBuf sp0 - 8#64 * BitVec.ofNat 64 8 = kxcElfBuf sp0 := by
-    unfold kxcUstackBuf kxcElfBuf; bv_omega_g
-  have e3 : kxcElfBuf sp0 - 8#64 * BitVec.ofNat 64 7 = kxcPhBuf sp0 := by
-    unfold kxcElfBuf kxcPhBuf; bv_omega_g
-  constructor
-  · refine (stackOwn_split (sp0 + 0xFFFFFFFFFFFFFF98#64) 33 22).trans ?_
-    rw [e1]
-    refine sep_mono_right ((stackOwn_split (kxcUstackBuf sp0) 8 14).trans ?_)
-    rw [e2]
-    refine sep_mono_right ((stackOwn_split (kxcElfBuf sp0) 7 7).trans ?_)
-    rw [e3]
-  · refine Entails.trans ?_ (stackOwn_join (sp0 + 0xFFFFFFFFFFFFFF98#64) 33 22)
-    rw [e1]
-    refine sep_mono_right (Entails.trans ?_ (stackOwn_join (kxcUstackBuf sp0) 8 14))
-    rw [e2]
-    refine sep_mono_right (Entails.trans ?_ (stackOwn_join (kxcElfBuf sp0) 7 7))
-    rw [e3]
 
 /-- **The carve, generically** (deviation 4): `n + 1` slots below
 `a + 8 (n + 1)` are `8 (n + 1)` bytes at `a`, and `a` is 8-aligned. -/
@@ -248,27 +203,6 @@ theorem kxc_bytes_ph [CurCtx] (sp0 : BitVec 64) (bs : List (BitVec 8))
     unfold kxcPhBuf kxcElfBuf; bv_omega_g
   rw [← e]
   exact byteBuf_stackOwn (kxcPhBuf sp0) hal 7 bs hl
-
-/-- **Rocq `kxc_slots_ustack`**: the 33 `ustack` slots are 264 bytes (no
-slack above: slot 14 abuts s11's spill). -/
-theorem kxc_slots_ustack [CurCtx] (sp0 : BitVec 64) :
-    stackOwn (GF := GF) (sp0 + 0xFFFFFFFFFFFFFF98#64) 33 ⊢
-      ∃ bs : List (BitVec 8), ⌜bs.length = 264 ∧ (kxcUstackBuf sp0).toNat % 8 = 0⌝ ∗
-        byteBuf (kxcUstackBuf sp0) (DFrac.own 1) bs := by
-  have e : kxcUstackBuf sp0 + BitVec.ofNat 64 (8 * (32 + 1)) = sp0 + 0xFFFFFFFFFFFFFF98#64 := by
-    unfold kxcUstackBuf; bv_omega_g
-  rw [← e]
-  exact kxc_stackOwn_byteBuf (kxcUstackBuf sp0) 32
-
-/-- **Rocq `kxc_bytes_ustack`**. -/
-theorem kxc_bytes_ustack [CurCtx] (sp0 : BitVec 64) (bs : List (BitVec 8))
-    (hal : (kxcUstackBuf sp0).toNat % 8 = 0) (hl : bs.length = 264) :
-    byteBuf (GF := GF) (kxcUstackBuf sp0) (DFrac.own 1) bs ⊢
-      stackOwn (sp0 + 0xFFFFFFFFFFFFFF98#64) 33 := by
-  have e : kxcUstackBuf sp0 + BitVec.ofNat 64 (8 * 33) = sp0 + 0xFFFFFFFFFFFFFF98#64 := by
-    unfold kxcUstackBuf; bv_omega_g
-  rw [← e]
-  exact byteBuf_stackOwn (kxcUstackBuf sp0) hal 33 bs hl
 
 /-! ## THE FRAME, as every exit presents it
 

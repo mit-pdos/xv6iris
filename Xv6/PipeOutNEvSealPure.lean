@@ -23,7 +23,6 @@ projections.  `lm_alts_pre_snoc` is
 -/
 import Xv6.PipeOutNPure
 import Xv6.GenOutHistSeal
-import Xv6.GenOutWildSeal
 import Xv6.GenOutSealPure
 import Xv6.PipeOutPureSeal
 

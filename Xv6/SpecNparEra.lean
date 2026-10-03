@@ -30,16 +30,14 @@ public contract, and the returned parent's pinned typed reference
 
 `IcacheHeld.inodeHeldTy` with the inum EXPOSED, exactly as `inodeHeldAt` is
 `inodeHeld` with the inum exposed.  It lives here (not in IcacheHeld) so no
-landed file is edited (brief fs7b §3.2); the three forget lemmas recover
-the landed shapes: `inodeHeldTyAt_ty` (→ `inodeHeldTy`), `inodeHeldTyAt_held`
-(→ `inodeHeld`), `inodeHeldTyAt_at` (→ `inodeHeldAt`).  Deviation: the inum
+landed file is edited (brief fs7b §3.2).  Deviation: the inum
 `z` is a `Nat` (`inum.toNat = z`), IcacheHeld's deviation 3.
 
 ## THE PROCESS BLOCK -- FLAG
 
 As `SpecNamexEra` (its header): Rocq's `proc_priv_bare ∗ inode_held_at
 (pv_cwd) (pv_cwi)` is the core `procPrivCoreNoctxAt curCtx k.proc pid V M`,
-in and out unchanged; `ep_start fsc_fs (pv_cwi ..)` is `epStart fscFs V.cwi`.
+in and out unchanged; `ep_start fsc_fs (pv_cwi ..)` is `epStart fscFs V.rti V.cwi`.
 
 ## DEVIATIONS from Rocq
 
@@ -63,9 +61,6 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedVariables false
-set_option linter.unusedSectionVars false
-
 /-! ## 0. The returned parent: typed and pinned -/
 
 section HeldTyAt
@@ -83,44 +78,6 @@ def inodeHeldTyAt (v : BitVec 64) (ty : BitVec 16) (z : Nat) : IProp GF :=
 instance inodeHeldTyAt_timeless (v : BitVec 64) (ty : BitVec 16) (z : Nat) :
     Timeless (inodeHeldTyAt (GF := GF) v ty z) := by
   unfold inodeHeldTyAt; infer_instance
-
-/-- Forget the inum (Rocq's `inode_held_ty_at_ty`). -/
-theorem inodeHeldTyAt_ty (v : BitVec 64) (ty : BitVec 16) (z : Nat) :
-    inodeHeldTyAt (GF := GF) v ty z ⊢ inodeHeldTy v ty := by
-  unfold inodeHeldTyAt inodeHeldTy
-  iintro ⟨%k, %q, %inum, %g, %lo, %tl, %hv, %hk, %hb, %hp, -, %hle, #Hfl, Href, Hs, Hru⟩
-  iexists k, q, inum, g, lo, tl
-  isplitr; · ipureintro; exact hv
-  isplitr; · ipureintro; exact hk
-  isplitr; · ipureintro; exact hb
-  isplitr; · ipureintro; exact hp
-  isplitr; · ipureintro; exact hle
-  isplitr; · iexact Hfl
-  iframe Href Hs Hru
-
-/-- Forget the inum and the type (Rocq's `inode_held_ty_at_held`). -/
-theorem inodeHeldTyAt_held (v : BitVec 64) (ty : BitVec 16) (z : Nat) :
-    inodeHeldTyAt (GF := GF) v ty z ⊢ inodeHeld v :=
-  (inodeHeldTyAt_ty v ty z).trans (inodeHeldTy_forget v ty)
-
-/-- Forget the type, keep the inum (Rocq's `inode_held_ty_at_at`). -/
-theorem inodeHeldTyAt_at (v : BitVec 64) (ty : BitVec 16) (z : Nat) :
-    inodeHeldTyAt (GF := GF) v ty z ⊢ inodeHeldAt v z := by
-  unfold inodeHeldTyAt inodeHeldAt inodeRefp
-  iintro ⟨%k, %q, %inum, %g, %lo, %tl, %hv, %hk, %hb, %hp, %hz, %hle, #Hfl, Href, -, Hru⟩
-  iexists k, q, inum
-  isplitr; · ipureintro; exact hv
-  isplitr; · ipureintro; exact hk
-  isplitr; · ipureintro; exact hb
-  isplitr; · ipureintro; exact hp
-  isplitr; · ipureintro; exact hz
-  iframe Hru
-  iapply (inodeRef_gen_intro k q icfgDev inum).2
-  iexists g, lo, tl
-  iframe Href
-  isplitr
-  · ipureintro; exact hle
-  · iexact Hfl
 
 end HeldTyAt
 
@@ -164,7 +121,7 @@ def nparEraPost (k : KCtx) (plen : Nat) (pfun : Nat → BitVec 8) (n : Nat) (Sb 
         P (npElems (bview plen pfun)).length iL ∗ irefSlots 1)
      else
       -- the death index, the receipt, and the UNFIRED suffix (`npDead`)
-      iprop(⌜R' 10#5 = 0#64⌝ ∗ irefSlots 2 ∗ npDead fscFs P Pmiss (bview plen pfun))) -∗
+      iprop(⌜R' 10#5 = 0#64⌝ ∗ irefSlots 2 ∗ npDead V.rti fscFs P Pmiss (bview plen pfun))) -∗
     wpLoop cpu')
 
 end Post
@@ -216,7 +173,7 @@ def wp_npar_era_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [X
   irefSlots 2 ∗
   logOpS icfgLog n Sb ∗ logTx icfgLog ∗
   -- ---- THE TRACE, OVER THE PARENT PREFIX, DEFERRED IN THE START ----
-  epStart fscFs V.cwi P Pmiss (bview plen pfun) ∗
+  epStart fscFs V.rti V.cwi P Pmiss (bview plen pfun) ∗
   wpNext true k.proc cpu (nparEraPost k plen pfun n Sb P Pmiss pid V M dqb dqs dqpv)
   ⊢ wpLoop (GF := GF) cpu
 

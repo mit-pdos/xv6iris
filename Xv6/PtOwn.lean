@@ -124,10 +124,6 @@ theorem leafOf_permBits (ppn : BitVec 44) (perm : KPerm) :
   · exact leafOf_kLeaf_rx ppn
   · exact leafOf_kLeaf_rw ppn
 
-/-- `V` is set, so the leaf is never the invalid word. -/
-theorem leafOf_ne_zero (ppn : BitVec 44) (perm : BitVec 64) : leafOf ppn perm ≠ 0#64 := by
-  simp only [leafOf]; bv_decide
-
 /-- With one of `R`/`W`/`X` in `perm` the leaf is a valid level-0 leaf. -/
 theorem leafOf_valid (ppn : BitVec 44) (perm : BitVec 64) (h : perm &&& 0xE#64 ≠ 0#64) :
     (leafOf ppn perm).getLsbD 0 = true ∧ (leafOf ppn perm) &&& 0xE#64 ≠ 0#64 := by

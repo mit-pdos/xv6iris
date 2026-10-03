@@ -12,8 +12,7 @@ sys_exec's FILL-LOOP CALL SITES AND BOOKKEEPING (stage file of
   out of `fsReady` (`fsReady_kmem`, Rocq `kalloc_env`);
 * THE BLOCK'S SEAM: fetchaddr (at its ambient `EitherDefs.procPrivExt`
   form) and fetchstr are both stated over the bare block, carved out of the
-  WHOLE block and re-closed at the grown descriptor by
-  `SysfileCalls.sysfile_blk_bare`;
+  WHOLE block and re-closed at the grown descriptor;
 * the pure bookkeeping of a round: fetchstr's buffer as the page's byte
   function (`sys_exec_fstr_ok`, `sys_exec_bview_full`), the pages pushed
   (`sysExecPages_push`, Rocq `sx_pages_close`), the argument address
@@ -43,9 +42,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## The pure bookkeeping of one round -/
 

@@ -46,17 +46,16 @@ contract").  One existential map `bm'` and the returned block, in two arms:
 Both arms return `inodeMap γfs ip bm'` and `blkmapWf cov logstart bm'`.  The
 fresh data block is DEPOSITED into the caller's `inodeBlocks` bundle, not
 returned; the bundles are also what carry each block's EXCLUSIVE byte run,
-which is what re-establishes `blkmapWf`'s injectivity at an install
-(`Xv6.inodeFresh`).
+which is what re-establishes `blkmapWf`'s injectivity at an install.
 
-THE LEDGER IS SET-FORM AND ARM-WISE (`wp_bmap_gen`, Rocq's
+THE LEDGER IS SET-FORM AND ARM-WISE (`wp_bmap_gen_body`, as Rocq's
 `wp_bmap_gen_body`): `logOpS γ n Sb` in, `logOpS γ n' Sb'` out, with the
 arm's cost a FUNCTION of the maps going in and out (`Xv6.bmapCost`), ONE
 credit (the bitmap block, `cr = true → bmapstart ∈ Sb`), and the five
 clauses (a)-(e) writei's loop invariant is stated over.  They are kept
 Rocq-literal, clause for clause.
 
-THE NO-ALLOC CONTRACT (`wp_bmap_noalloc`, Rocq's
+THE NO-ALLOC CONTRACT (`wp_bmap_noalloc_body`, Rocq's
 `wp_bmap_noalloc_sconf_body`).  readi runs OUTSIDE a transaction, and under
 the single premise `(blkmapGet bm fbn).toNat ≠ 0` ALL THREE allocation
 sites are dead (the indirect-BLOCK test through `Xv6.blkmapWf_ind_nz`).  It
@@ -112,8 +111,8 @@ their lemmas; ProofCreate*/WriteiBudget use them by name.
   parameter), `ProofBmap.v` (its seal) and comments (ProofIupdate,
   ProofDirlink, ProofWritei); writei calls `BM.wp_bmap_gen`, readi
   `BMN.wp_bmap_noalloc_sconf` -- reason: no consumer.  It is a one-screen
-  corollary of `wp_bmap_gen` (`logOp_openS`, gen at `cr = false`,
-  `bmapCost_le3`, `logOpS_op`) if a later wave wants it.
+  corollary of the set-form contract (`logOp_openS`, gen at `cr = false`,
+  `bmapCost ≤ 3`, `logOpS_op`) if a later wave wants it.
 * The unused `dq` binder of Rocq's `wp_bmap_gen_body` (vestigial there: the
   allocating form is at fraction 1) -- uses checked: the seal and
   `ProofWritei.v` instantiate it and nothing reads it -- reason: unused.
@@ -128,8 +127,6 @@ namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
-
-set_option linter.unusedVariables false
 
 /-- Address of `bmap`. -/
 def bmapAddr : BitVec 64 := KA.«bmap»
@@ -181,12 +178,6 @@ two units even when it absorbs, and the indirect path can run balloc twice
 with a `log_write` after it. -/
 def bmapNeed (cr ind : Bool) : Nat :=
   if ind then (if cr then 3 else 4) else 2
-
-theorem bmapCost_le3 (cr al ind : Bool) : bmapCost cr al ind ≤ 3 := by
-  cases cr <;> cases al <;> cases ind <;> decide
-
-theorem bmapNeed_le4 (cr ind : Bool) : bmapNeed cr ind ≤ 4 := by
-  cases cr <;> cases ind <;> decide
 
 /-- balloc's own two units are wanted on every allocating arm. -/
 theorem bmapNeed_ge2 (cr ind : Bool) : 2 ≤ bmapNeed cr ind := by
@@ -494,34 +485,6 @@ structure BMAP : Prop where
       hj hproc hK hnoff htier hneed hgeom hbm hcredit hfbn hwf hdev hcl hdt hpd
       ha0 ha1
 
-/-- The interrupts-off instance of `wp_bmap_gen_eb` (the complement is the whole
-bundle): the contract every not-yet-generalized caller states. -/
-theorem BMAP.wp_bmap_gen (A : BMAP) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-    [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (cpu : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
-    (pd pav pu : BitVec 64) (j : Nat) (γ : LogNames) (γfs : FsNames)
-    (logstart bmapstart size : Nat) (dev : BitVec 32)
-    (ip : BitVec 64) (bm : Blkmap) (data : Nat → List (BitVec 8)) (fbn : Nat)
-    (n : Nat) (cr : Bool) (Sb : List Nat) (pidv : BitVec 32) (dqp dqd dqb dqs : DFrac)
-    hj hproc hK hsie hnoff hlocks htier hneed hgeom hbm hcredit hfbn hwf hdev hcl hdt hpd
-    ha0 ha1 :
-    wp_bmap_gen_body (hlc := hlc) (GF := GF) Γ cpu k γl γb V γdl pd pav pu j γ γfs
-      logstart bmapstart size dev ip bm data fbn n cr Sb pidv dqp dqd dqb dqs
-      hj hproc hK hsie hnoff hlocks htier hneed hgeom hbm hcredit hfbn hwf hdev hcl hdt hpd
-      ha0 ha1 := by
-  have h := A.wp_bmap_gen_eb (hlc := hlc) (GF := GF) (Γ := Γ) (cpu := cpu) (k := k) (γl := γl) (γb := γb) (V := V) (γdl := γdl) (pd := pd) (pav := pav) (pu := pu) (j := j) (γ := γ) (γfs := γfs) (logstart := logstart) (bmapstart := bmapstart) (size := size) (dev := dev) (ip := ip) (bm := bm) (data := data) (fbn := fbn) (n := n) (cr := cr) (Sb := Sb) (pidv := pidv) (dqp := dqp) (dqd := dqd) (dqb := dqb) (dqs := dqs) (hj := hj) (hproc := hproc) (hK := hK) (hnoff := hnoff) (htier := htier) (hneed := hneed) (hgeom := hgeom) (hbm := hbm) (hcredit := hcredit) (hfbn := hfbn) (hwf := hwf) (hdev := hdev) (hcl := hcl) (hdt := hdt) (hpd := hpd) (ha0 := ha0) (ha1 := ha1)
-  unfold wp_bmap_gen_eb_body at h
-  unfold wp_bmap_gen_body
-  rw [hsie] at h
-  simp only [trapCsrsExt_false, cpuClaimExt_false] at h
-  iintro ⟨H0, H1, H2, Htc, Hcl, Hir, H6, H7, H8, H9, H10, H11, H12, H13, H14, H15, H16, H17, H18, H19, Hnext⟩
-  iapply h
-  iframe H0 H1 H2 Htc Hcl Hir H6 H7 H8 H9 H10 H11 H12 H13 H14 H15 H16 H17 H18 H19
-  iapply wpNext_mono $$ Hnext
-  iintro %cpu' HK %spie %spp %R' %bm' %n' %data' %Sb' %p0 %p1 %p2 %p3 %p4 H5 H6 ⟨Htc, Hir⟩ Hcl H10 H11 H12 H13 H14 %p15 H16 H17 %p18 H19
-  iapply HK $$ %spie %spp %R' %bm' %n' %data' %Sb' %p0 %p1 %p2 %p3 %p4 H5 H6 Htc Hcl Hir H10 H11 H12 H13 H14 %p15 H16 H17 %p18 H19
-
 /-- The interface of the no-alloc `bmap` (Rocq's `Module Type BMAP_NOALLOC`). -/
 structure BMAP_NOALLOC : Prop where
   wp_bmap_noalloc_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
@@ -535,30 +498,5 @@ structure BMAP_NOALLOC : Prop where
     wp_bmap_noalloc_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl γb V γdl pd pav pu j γfs logstart
       dev ip bm data fbn pidv dqp dq dqd
       hj hproc hK hnoff htier hgeom hfbn hwf hnz hdev hcl hdt hpd ha0 ha1
-
-/-- The interrupts-off instance of `wp_bmap_noalloc_eb` (the complement is the whole
-bundle): the contract every not-yet-generalized caller states. -/
-theorem BMAP_NOALLOC.wp_bmap_noalloc (A : BMAP_NOALLOC) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-    [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (cpu : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
-    (pd pav pu : BitVec 64) (j : Nat) (γfs : FsNames) (logstart : Nat) (dev : BitVec 32)
-    (ip : BitVec 64) (bm : Blkmap) (data : Nat → List (BitVec 8)) (fbn : Nat)
-    (pidv : BitVec 32) (dqp dq dqd : DFrac)
-    hj hproc hK hsie hnoff hlocks htier hgeom hfbn hwf hnz hdev hcl hdt hpd ha0 ha1 :
-    wp_bmap_noalloc_body (hlc := hlc) (GF := GF) Γ cpu k γl γb V γdl pd pav pu j γfs logstart
-      dev ip bm data fbn pidv dqp dq dqd
-      hj hproc hK hsie hnoff hlocks htier hgeom hfbn hwf hnz hdev hcl hdt hpd ha0 ha1 := by
-  have h := A.wp_bmap_noalloc_eb (hlc := hlc) (GF := GF) (Γ := Γ) (cpu := cpu) (k := k) (γl := γl) (γb := γb) (V := V) (γdl := γdl) (pd := pd) (pav := pav) (pu := pu) (j := j) (γfs := γfs) (logstart := logstart) (dev := dev) (ip := ip) (bm := bm) (data := data) (fbn := fbn) (pidv := pidv) (dqp := dqp) (dq := dq) (dqd := dqd) (hj := hj) (hproc := hproc) (hK := hK) (hnoff := hnoff) (htier := htier) (hgeom := hgeom) (hfbn := hfbn) (hwf := hwf) (hnz := hnz) (hdev := hdev) (hcl := hcl) (hdt := hdt) (hpd := hpd) (ha0 := ha0) (ha1 := ha1)
-  unfold wp_bmap_noalloc_eb_body at h
-  unfold wp_bmap_noalloc_body
-  rw [hsie] at h
-  simp only [trapCsrsExt_false, cpuClaimExt_false] at h
-  iintro ⟨H0, H1, H2, Htc, Hcl, Hir, H6, H7, H8, H9, H10, H11, H12, H13, H14, Hnext⟩
-  iapply h
-  iframe H0 H1 H2 Htc Hcl Hir H6 H7 H8 H9 H10 H11 H12 H13 H14
-  iapply wpNext_mono $$ Hnext
-  iintro %cpu' HK %spie %spp %R' %p0 %p1 H2 H3 ⟨Htc, Hir⟩ Hcl H7 H8 H9 H10 H11
-  iapply HK $$ %spie %spp %R' %p0 %p1 H2 H3 Htc Hcl Hir H7 H8 H9 H10 H11
 
 end Xv6

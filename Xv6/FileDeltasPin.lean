@@ -29,14 +29,13 @@ composite create `FileDeltasStep`.
    `ExtTreeMap Fname Nat compare`; `av !! i` is `PartialMap.get? av i`.
 2. **CONE TRIM**: only the reached declarations of §0-§1.  Not ported
    (unreached): `fname_f_ne_dot/_dotdot/_console`, `fname_console_ne_f`,
-   `redir_name_ok(_ne_console)`, `uname_ne_dot`, `uname_ne_dotdot`,
+   `redir_name_ok(_ne_console)`, `uname_ne_dot`,
    `name_absent_cons`, `name_absent_f` (the `FsFPin` readings; Lean has no
    `FsFPin`, which the cone audit found unreached).
 3. `uname_ne_console` is `FileNamePins.nl_ne_console` at `txtLaws` (Rocq's
-   proof, verbatim); `FileDisc.uname` is `FileDiscLine.uname` (= `txtName`).
+   proof, verbatim; `uname_ne_dotdot` is not ported, nothing uses it); `FileDisc.uname` is `FileDiscLine.uname` (= `txtName`).
 -/
 import Xv6.AppFilePure
-import Xv6.FsConsPin
 import Xv6.FileNamePins
 
 namespace Xv6

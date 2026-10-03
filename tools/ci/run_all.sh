@@ -30,10 +30,11 @@
 #                    a proof of the green set stopped compiling   (BLOCKING)
 #   test-tools       make test-tools: the unit tests of the Python tools
 #
-# and, outside the default sequence (the scheduled workflow runs it):
+# and, outside the default sequence:
 #
-#   dead-imports     tools/ci/dead_imports.sh, informational: never fails on
-#                    what it finds
+#   dead-imports     tools/ci/dead_imports.sh, a report only: never fails on
+#                    what it finds.  The nightly sweep that APPLIES the
+#                    removals is .github/workflows/lean-dead-imports.yml
 #
 # With no STEP every step of the sequence runs, in that order, stopping at the
 # first failure as the workflow does (-k: keep going; --from STEP: start

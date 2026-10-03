@@ -30,6 +30,9 @@ import Xv6.User.InitImage
 import Xv6.User.InitTree
 import Xv6.User.SeccompImage
 import Xv6.User.SeccompTree
+import Xv6.UlibVprintfCode
+import Xv6.UlibFprintfCode
+import Xv6.UlibPrintfCode
 
 namespace Xv6
 
@@ -39,9 +42,6 @@ open Iris Iris.BI Iris.ProofMode Std MachCSL LeanRV64D
 
 theorem ulibVprintf_cat_at : ulibTabAt User.Cat.tree ulibVprintfTab User.Cat.Sym.«putc» = true := by
   decide +kernel
-
-theorem ulibVprintf_cat_sym : ulibVprintfAt (BitVec.ofNat 64 User.Cat.Sym.«putc») = BitVec.ofNat 64 User.Cat.Sym.«vprintf» := by
-  decide
 
 /-- `vprintf`'s code at `cat`'s printf.o, from `cat`'s text. -/
 theorem ulibVprintfCode_cat {GF : BundledGFunctors} (L : UlibRun GF) :
@@ -75,9 +75,6 @@ theorem ulibPrintfCode_cat {GF : BundledGFunctors} (L : UlibRun GF) :
 theorem ulibVprintf_grep_at : ulibTabAt User.Grep.tree ulibVprintfTab User.Grep.Sym.«putc» = true := by
   decide +kernel
 
-theorem ulibVprintf_grep_sym : ulibVprintfAt (BitVec.ofNat 64 User.Grep.Sym.«putc») = BitVec.ofNat 64 User.Grep.Sym.«vprintf» := by
-  decide
-
 /-- `vprintf`'s code at `grep`'s printf.o, from `grep`'s text. -/
 theorem ulibVprintfCode_grep {GF : BundledGFunctors} (L : UlibRun GF) :
     L.utext User.Grep.tree ⊢ ulibVprintfCode L (BitVec.ofNat 64 User.Grep.Sym.«putc») :=
@@ -110,9 +107,6 @@ theorem ulibPrintfCode_grep {GF : BundledGFunctors} (L : UlibRun GF) :
 theorem ulibVprintf_init_at : ulibTabAt User.Init.tree ulibVprintfTab User.Init.Sym.«putc» = true := by
   decide +kernel
 
-theorem ulibVprintf_init_sym : ulibVprintfAt (BitVec.ofNat 64 User.Init.Sym.«putc») = BitVec.ofNat 64 User.Init.Sym.«vprintf» := by
-  decide
-
 /-- `vprintf`'s code at `init`'s printf.o, from `init`'s text. -/
 theorem ulibVprintfCode_init {GF : BundledGFunctors} (L : UlibRun GF) :
     L.utext User.Init.tree ⊢ ulibVprintfCode L (BitVec.ofNat 64 User.Init.Sym.«putc») :=
@@ -144,9 +138,6 @@ theorem ulibPrintfCode_init {GF : BundledGFunctors} (L : UlibRun GF) :
 
 theorem ulibVprintf_seccomp_at : ulibTabAt User.Seccomp.tree ulibVprintfTab User.Seccomp.Sym.«putc» = true := by
   decide +kernel
-
-theorem ulibVprintf_seccomp_sym : ulibVprintfAt (BitVec.ofNat 64 User.Seccomp.Sym.«putc») = BitVec.ofNat 64 User.Seccomp.Sym.«vprintf» := by
-  decide
 
 /-- `vprintf`'s code at `seccomp`'s printf.o, from `seccomp`'s text. -/
 theorem ulibVprintfCode_seccomp {GF : BundledGFunctors} (L : UlibRun GF) :

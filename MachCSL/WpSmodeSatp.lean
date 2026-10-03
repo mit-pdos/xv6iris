@@ -3,9 +3,7 @@ MachCSL: `csrw satp, rs1` in supervisor mode -- installing the kernel page
 table (xv6's `w_satp(MAKE_SATP(kernel_pagetable))` in `kvminithart`), and the
 transport of points-to resources from the ambient Bare tier to the Kpt tier.
 -/
-import MachCSL.KCtxGpr
 import MachCSL.WpSmodeFrame
-import MachCSL.WpCsr
 
 namespace MachCSL
 
@@ -105,27 +103,10 @@ that genuinely changes with the tier; it is not treated here. -/
 /-- The ambient context at the kernel-table tier: same context id, tier `kpt`. -/
 @[reducible] def CurCtx.toKpt (X : CurCtx) : CurCtx := ⟨X.curCtx, KTier.kpt⟩
 
-@[simp] theorem CurCtx.toKpt_curCtx (X : CurCtx) : X.toKpt.curCtx = X.curCtx := rfl
 @[simp] theorem CurCtx.toKpt_curTier (X : CurCtx) : X.toKpt.curTier = KTier.kpt := rfl
 
 section transport
 variable (X : CurCtx)
-
-/-- The byte layer does not look at the tier. -/
-theorem bytesPointsTo_toKpt (pa : PAddr) (n : Nat) (dq : DFrac) (w : BitVec (8 * n)) :
-    @bytesPointsTo hlc GF _ X pa n dq w = @bytesPointsTo hlc GF _ X.toKpt pa n dq w := rfl
-
-/-- The physical word does not look at the tier. -/
-theorem pwordPointsTo_toKpt (pa : PAddr) (n : Nat) (dq : DFrac) (w : BitVec (8 * n)) :
-    @pwordPointsTo hlc GF _ X pa n dq w = @pwordPointsTo hlc GF _ X.toKpt pa n dq w := rfl
-
-/-- The mapping claim does not look at the tier. -/
-theorem kmapId_toKpt (va : BitVec 64) :
-    @kmapId hlc GF _ X va = @kmapId hlc GF _ X.toKpt va := rfl
-
-/-- The running-thread token is at the context id, which does not change. -/
-theorem ctxToken_toKpt (cpu : CPU) :
-    @ctxToken hlc GF _ X cpu = @ctxToken hlc GF _ X.toKpt cpu := rfl
 
 /-- **A word travels to the kernel table**: the kpt tier pins nothing, and
 neither the claim nor the bytes mention the tier. -/

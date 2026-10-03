@@ -9,9 +9,9 @@ The pieces, all landed:
 * the head (`SyscallHead.syscall_head_entry`): the frame, `myproc()`, the
   two trapframe loads, the fused range check, the table read and the
   `jalr` -- into the arm of the table index, or the printk fallback;
-* the 22-way split (`SyscallArmsExec.syscall_arms_all`, exec discharged
-  there) over the 21 other arms (`SyscallArms{Proc,Sbrk,Wait,Exit,Fork,
-  Fd,Fd2,Path}`), each passed as `fun hnum => syscall_arm_<name> … hnum
+* the 24-way split (`SyscallArmsExec.syscall_arms_all`, exec discharged
+  there) over the 23 other arms (`SyscallArms{Proc,Sbrk,Wait,Exit,Fork,
+  Fd,Fd2,Path,Chroot}`), each passed as `fun hnum => syscall_arm_<name> … hnum
   hpins hs1 hs2 hra`;
 * the fallback (`SyscallArmsExec.syscall_fallback`);
 * the return tail (`SyscallRet`, inside each returning arm).
@@ -44,22 +44,20 @@ import Xv6.SyscallArmsFd
 import Xv6.SyscallArmsFd2
 import Xv6.SyscallArmsFork
 import Xv6.SyscallArmsWait
+import Xv6.SyscallArmsChroot
 
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 
-set_option linter.unusedSectionVars false
-set_option linter.unusedVariables false
-
 /-- **`syscall()` meets its specification** at the kernel's deposit instance,
-given the 22 table entries' interfaces, `myproc` and `printk`. -/
+given the 24 table entries' interfaces, `myproc` and `printk`. -/
 theorem syscall_proof (MP : MYPROC) (PK : PRINTK)
     (SFK : SYSFORK) (SEX : SYSEXIT) (SWT : SYSWAIT) (SPP : SYSPIPE) (SRD : SYSREAD) (SKL : SYSKILL)
     (SEC : SYSEXEC) (SFS : SYSFSTAT) (SCD : SYSCHDIR) (SDP : SYSDUP) (SGP : SYSGETPID)
     (SSB : SYSSBRK) (SPS : SYSPAUSE) (SUP : SYSUPTIME) (SOP : SYSOPEN) (SWR : SYSWRITE)
     (SMN : SYSMKNOD) (SUL : SYSUNLINK) (SLK : SYSLINK) (SMD : SYSMKDIR) (SCL : SYSCLOSE)
-    (SSY : SYS_SYNC) (SSC : SYSSECCOMP) :
+    (SSY : SYS_SYNC) (SSC : SYSSECCOMP) (SCR : SYSCHROOT) :
     SYSCALL_XV6 :=
   ⟨fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
       Γ _ c0 k γw γ j pid V M sts gn cs ip f hj hproc hK hnoff htier hgn => by
@@ -113,6 +111,8 @@ theorem syscall_proof (MP : MYPROC) (PK : PRINTK)
         (fun h => syscall_arm_sync SSY PT Γ syscDepSync_holds c0 cpu k spie spp R γw γ j pid V M sts gn cs ip f hE hj
           hproc hK hnoff htier hgn h hpins hs1 hs2 hra)
         (fun h => syscall_arm_seccomp SSC PT Γ c0 cpu k spie spp R γw γ j pid V M sts gn cs ip f hE hj
+          hproc hK hnoff htier hgn h hpins hs1 hs2 hra)
+        (fun h => syscall_arm_chroot SCR PT Γ c0 cpu k spie spp R γw γ j pid V M sts gn cs ip f hE hj
           hproc hK hnoff htier hgn h hpins hs1 hs2 hra)
         n hn1 hn22 hnum
     · intro cpu spie spp R hrange hpins hs1 hs2

@@ -15,7 +15,6 @@ ONE function, so a call-site form two functions need lives here once.
   dirlink wave report).
 -/
 import Xv6.SpecReadi
-import Xv6.FsWords
 import Xv6.FsCfgDefs
 import Xv6.InodeRegion
 import Xv6.AppCfg
@@ -25,16 +24,13 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedSectionVars false
-set_option linter.unusedVariables false
-
 /-- A process block for readi's (dead) user arm: the kernel arm reads none
 (Rocq's `dl_dummyV`, retired there once readi took `proc_priv_bare`; here
 the kernel arm's contract still names a block, which it never opens). -/
 def readiKVp : ProcPriv :=
   { kstack := 0, sz := 0, pagetable := 0, trapframe := 0, upt := { root := 0, tfp := 0, um := ∅ },
     tf := [], context := [], ofile := [], fdg := 0, cwd := 0, name := [], cwi := 0, gen := 0,
-    chg := 0, pvLazy := false, pvSecc := 0#64, ev := 0 }
+    chg := 0, pvLazy := false, pvSecc := 0#64, ev := 0, root := 0#64, rti := 0 }
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]

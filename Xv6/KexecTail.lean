@@ -73,8 +73,7 @@ a STAGE file (no `Proof` prefix, brief rule 2; the one seal is
    unfolding wand is `□ (∀ c, KEX c -∗ kexecCloser Q QF k A c)` in the port.
 9. **DROPPED single-slot accessors** `kxa_esc_acc` (= `FsReady.fsReady_escrow`),
    `kxa_bs3_split/join` (= `bslots` arithmetic at the call site).
-10. **`kxc_exit_qgen` is `KexecOkQ.kexecCloser_of_ok`** (it states no
-    functor argument; it lives with the closer).
+10. **`kxc_exit_qgen` is not ported** (nothing uses it).
 11. **ADDED: the call-site wrappers** `kxc_call_iup` / `kxc_call_endop` /
     `kxc_call_pfp` (the `NamexExit.namex_call_iup` precedent): `jal` +
     the callee's eb-generic (iunlockput `tx_sconf_eb`, end_op `_eb`) or
@@ -120,9 +119,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## The magic word and the registers a seam keeps -/
 
@@ -136,35 +133,6 @@ theorem kxc_magic_word :
 /-- The callee-saved registers in `rs` still hold kexec's entry values
 (deviation 1: Rocq's threading clause, as an explicit list). -/
 def kxcKeeps (k : KCtx) (R : RegMap) (rs : List (BitVec 5)) : Prop := ∀ r ∈ rs, R r = k.regs r
-
-theorem kxcKeeps_set (k : KCtx) (R : RegMap) (rs : List (BitVec 5)) (r : BitVec 5) (v : BitVec 64)
-    (h : kxcKeeps k R rs) (hr : r ∉ rs) : kxcKeeps k (R.set r v) rs := by
-  intro x hx
-  have hne : x ≠ r := fun e => hr (e ▸ hx)
-  rw [RegMap.set_other _ _ _ _ hne]
-  exact h x hx
-
-theorem kxcKeeps_cs (k : KCtx) (R R' : RegMap) (rs : List (BitVec 5)) (h : kxcKeeps k R rs)
-    (hcs : calleeSaved R R') (hsub : ∀ r ∈ rs, r ∈ [19#5, 20#5, 21#5, 22#5, 23#5, 24#5, 25#5, 26#5, 27#5]) :
-    kxcKeeps k R' rs := by
-  intro x hx
-  obtain ⟨-, -, -, -, c19, c20, c21, c22, c23, c24, c25, c26, c27⟩ := hcs
-  have hm := hsub x hx
-  simp only [List.mem_cons, List.not_mem_nil, or_false] at hm
-  rcases hm with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl
-  · exact c19.trans (h _ hx)
-  · exact c20.trans (h _ hx)
-  · exact c21.trans (h _ hx)
-  · exact c22.trans (h _ hx)
-  · exact c23.trans (h _ hx)
-  · exact c24.trans (h _ hx)
-  · exact c25.trans (h _ hx)
-  · exact c26.trans (h _ hx)
-  · exact c27.trans (h _ hx)
-
-theorem kxcKeeps_sub (k : KCtx) (R : RegMap) (rs rs' : List (BitVec 5)) (h : kxcKeeps k R rs)
-    (hsub : ∀ r ∈ rs', r ∈ rs) : kxcKeeps k R rs' :=
-  fun r hr => h r (hsub r hr)
 
 section Frame
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
@@ -329,14 +297,6 @@ theorem kxc_low55_join [CurCtx] (sp0 w64 w65 w66 w67 w68 : BitVec 64) :
   isplitl [H5]
   · iexists w68; iexact H5
   iempintro
-
-/-- **Rocq `kxc_frameA6_weaken`**. -/
-theorem kxcFrameA6_weaken [CurCtx] (sp0 ra0 s00 s10 s20 pv av w6 : BitVec 64) :
-    kxcFrameA6 (GF := GF) sp0 ra0 s00 s10 s20 pv av w6 ⊢ kxcFrameA sp0 ra0 s00 s10 s20 pv av := by
-  unfold kxcFrameA6 kxcFrameA
-  iintro ⟨H1, H2, H3, H4, H5, H6, H7, H8, H9, H10, H11, H12, H13, Hm, H64, H65, H66, H67, H68⟩
-  iframe H1 H2 H3 H4 H5 H7 H8 H9 H10 H11 H12 H13 Hm H64 H65 H66 H67 H68
-  iexists w6; iexact H6
 
 /-- **Rocq `kxc_frameA6x_fold`**: the way back to the landed frame (phase A's
 own `bad:` tail takes it: `kxc_bad64` wants `kxcFrameA6`). -/
@@ -582,7 +542,7 @@ entry map: the frame is pushed, s0 is the frame pointer, s1 the running
 process and s2 the path; the callee-saved registers this stretch has NOT
 written (s3..s11) still hold their entry values.  The process block travels
 WHOLE (Rocq convention 2, D16).  `zi` is the inum the walk returned
-(N-5.2B: `inodeHeldAt`, the landed walk publishes it by `inodeHeld_zi`). -/
+(N-5.2B: `inodeHeldAt`, the landed walk publishes it). -/
 def kxcAtA2 (k : KCtx) (A : KexecArgs) (c : CPU) (spie spp : Bool) (R : RegMap) (ipv : BitVec 64)
     (zi n1 : Nat) : IProp GF := iprop%
   ⌜R 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFDE0#64 ∧ R 8#5 = k.regs 2#5 ∧ R 9#5 = k.proc ∧
@@ -832,7 +792,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
 
-theorem kxc_br_iup_66 : KA.«kexec» + 0x66#64 + BitVec.signExtend 64 2092080#21 = KA.«iunlockput» := by
+theorem kxc_br_iup_66 : KA.«kexec» + 0x66#64 + BitVec.signExtend 64 2091984#21 = KA.«iunlockput» := by
   decide
 theorem kxc_ret_66 : jumpPc (KA.«kexec» + 0x66#64 + 4#64) = KA.«kexec» + 0x66#64 + 4#64 := by decide
 theorem kxc_br_eo_6a : KA.«kexec» + 0x6a#64 + BitVec.signExtend 64 2094286#21 = KA.«end_op» := by
@@ -876,7 +836,7 @@ theorem kxc_bad64 (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames) [ClaimIs (h
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h20]
   iintro Hk Hpc
   -- +0x066  jal iunlockput
-  iapply (kxc_call_iup IUP Γ cpu k A spie spp _ (KA.«kexec» + 0x66#64) 2092080#21 kxc_br_iup_66
+  iapply (kxc_call_iup IUP Γ cpu k A spie spp _ (KA.«kexec» + 0x66#64) 2091984#21 kxc_br_iup_66
       kxc_ret_66 kf qf sf gyf loyf tlyf inumf dnf bmf data gilf gislf n2 hK hnoff htier hj hproc hkf
       hnib hn2 (by simp [RegMap.set_apply, h20]))
     $$ [- $Hk $Hpc $Hte $Hce $Hfab $Hop $Hlog $Hbs $Hpid]
@@ -997,7 +957,7 @@ theorem kxc_call_pfp (PFP : PROC_FREEPAGETABLE) (Γ : SchedNames) (cpu : CPU) (k
   ipureintro
   simpa using hcs
 
-theorem kxc_br_pfp_1da : KA.«kexec» + 0x1da#64 + BitVec.signExtend 64 2084862#21 =
+theorem kxc_br_pfp_1da : KA.«kexec» + 0x1da#64 + BitVec.signExtend 64 2084734#21 =
     KA.«proc_freepagetable» := by decide
 theorem kxc_ret_1da : jumpPc (KA.«kexec» + 0x1da#64 + 4#64) = KA.«kexec» + 0x1da#64 + 4#64 := by
   decide
@@ -1044,7 +1004,7 @@ theorem kxc_bad_1d6 (PFP : PROC_FREEPAGETABLE) (Γ : SchedNames)
   -- +0x1da  jal proc_freepagetable, the block's event counter lent to the
   -- frees (permit sweep L1a, Rocq `proc_priv_ev_lend`)
   icases procPrivFd_evLend A.γ k.proc A.pidv A.V A.M $$ Hpriv with ⟨Hlend, Hpback⟩
-  iapply (kxc_call_pfp PFP Γ cpu k A spie spp _ (KA.«kexec» + 0x1da#64) 2084862#21 kxc_br_pfp_1da
+  iapply (kxc_call_pfp PFP Γ cpu k A spie spp _ (KA.«kexec» + 0x1da#64) 2084734#21 kxc_br_pfp_1da
       kxc_ret_1da P Mi A.V.ev hK hnoff (by simp [RegMap.set_apply, h22]) (by simpa [RegMap.set_apply, h24] using hsz)
       (by simpa [RegMap.set_apply, h24] using hbelow))
     $$ [- $Hk $Hpc $Hte $Hce $Hfab $Hpt $Hlend]

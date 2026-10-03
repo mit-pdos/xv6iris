@@ -32,8 +32,9 @@ computing form `fsImgBlock`; this file rewrites the block view to it
    has `DecidableEq` in Lean too) and REWRITES `node_at_file` to reach the
    node, so no `Fsnode` equality is ever decided.  `fsimgFileBytes` /
    `fsimgNodeFile` below are that reduction, ready for an `ElfUser` port.
-3. `fsimg_live_set`'s set EQUALITY (`ExtTreeSet` has no `DecidableEq`) is
-   stated as its membership law directly (`fsimgLiveSetMem`), off one sweep.
+3. `fsimg_live_set`'s set EQUALITY (`ExtTreeSet` has no `DecidableEq`) and
+   its membership law (`fsimg_live_set_elem`) are not ported (nothing uses
+   them).
 -/
 import Xv6.FsImgCheckSweeps
 import Xv6.FsBootParams
@@ -49,24 +50,20 @@ open Std
 theorem fsimgParseSb : fsParseSb fsimgP = some fsimgSb := by
   rw [fsimgP_eq]; exact fsimgParseSbB
 
-/-- Rocq `fsimg_sb_logstart`: the `2` `FsImgDisk` is stated at is the
-image's own. -/
-theorem fsimgSb_logstart : fsimgSb.sbLogstart = 2 := rfl
-
 /-! ## 2.  THE IMAGE IS WELL FORMED -/
 
 /-- W1-W9 (Rocq `fsimg_wf_ok`). -/
 theorem fsimgWfOk : fsimgWf fsimgP fsimgSb = true := by
   have hw3 : fsInodesWf fsImgBlock fsimgSb = true := by
     rw [fsimgInodesWf_eq, List.range_eq_range',
-      show (200 : Nat) = 24 + 176 from rfl, ← List.range'_append_1, List.all_append,
-      fsimgInoOk_free, Bool.and_true, show List.range' 0 24 = List.range 24 from rfl]
+      show (200 : Nat) = 25 + 175 from rfl, ← List.range'_append_1, List.all_append,
+      fsimgInoOk_free, Bool.and_true, show List.range' 0 25 = List.range 25 from rfl]
     simp only [List.range_succ, List.range_zero, List.nil_append, List.all_append, List.all_cons,
       List.all_nil, fsimgInoOk_0, fsimgInoOk_1, fsimgInoOk_2, fsimgInoOk_3, fsimgInoOk_4,
       fsimgInoOk_5, fsimgInoOk_6, fsimgInoOk_7, fsimgInoOk_8, fsimgInoOk_9, fsimgInoOk_10,
       fsimgInoOk_11, fsimgInoOk_12, fsimgInoOk_13, fsimgInoOk_14, fsimgInoOk_15,
       fsimgInoOk_16, fsimgInoOk_17, fsimgInoOk_18, fsimgInoOk_19, fsimgInoOk_20,
-      fsimgInoOk_21, fsimgInoOk_22, fsimgInoOk_23, Bool.and_self]
+      fsimgInoOk_21, fsimgInoOk_22, fsimgInoOk_23, fsimgInoOk_24, Bool.and_self]
   -- W4 + W5, opened: the sweep file's `match` is its own matcher, so the
   -- set is named here rather than the two matchers compared by defeq
   have hu : ∃ u, fsUsedSet fsImgBlock fsimgSb = some u ∧ fsBitmapWf fsImgBlock fsimgSb u = true := by
@@ -82,55 +79,16 @@ theorem fsimgWfOk : fsimgWf fsimgP fsimgSb = true := by
     fsimgLinksWfB]
   simp only [hu2, Bool.and_self]
 
-/-- Rocq `fsimg_root_dir`. -/
-theorem fsimgRootDir : fsRootDir (treeOfDisk fsimgP fsimgSb) :=
-  fsimgWf_treeRoot fsimgP fsimgSb fsimgWfOk
-
 /-- Rocq `fsimg_blocks_full`. -/
 theorem fsimgBlocksFull : fsBlocksFull fsimgP := fun b => fsBlocks_length _ b
 
-/-- W2 IS `FsImgDisk.fsimgLogClean` (Rocq `fsimg_wf_log_clean`): the two
-image files do not drift. -/
+/-- W2 (Rocq `fsimg_wf_log_clean`): the image's log header is zero. -/
 theorem fsimgWfLogClean : hdrN (fsimgP (logHdrBno fsimgSb.sbLogstart)) = 0 :=
   fsimgWf_log fsimgP fsimgSb fsimgWfOk
 
 /-! ## 2b.  WHAT THE BOOT-TIME STOCKING OF THE INODE POOL READS OFF THE IMAGE
 
 Each is ONE sweep or a citation of `fsimgWfOk` (Rocq's cost rule). -/
-
-/-- Rocq `fsimg_dots`. -/
-theorem fsimgDots (i : Nat) (hi : i < fsimgSb.sbNinodes)
-    (hty : (fsDinode fsimgP fsimgSb i).diType.toNat = T_DIR_z) :
-    dirDotsIx i (fsDinode fsimgP fsimgSb i) (fsDataOf fsimgP (fsDinode fsimgP fsimgSb i)) :=
-  fsimgWf_dots fsimgP fsimgSb i fsimgWfOk hi hty
-
-/-- Rocq `fsimg_root_dots`. -/
-theorem fsimgRootDots :
-    dirDotsIx ROOTINO (fsDinode fsimgP fsimgSb ROOTINO)
-      (fsDataOf fsimgP (fsDinode fsimgP fsimgSb ROOTINO)) :=
-  fsimgDots ROOTINO (by decide)
-    (fsRootWf_type fsimgP fsimgSb (fsimgWf_root fsimgP fsimgSb fsimgWfOk))
-
-/-- Rocq `fsimg_link_le`. -/
-theorem fsimgLinkLe (z : Nat) :
-    fsLinkCount fsimgP fsimgSb z ≤ (fsDinode fsimgP fsimgSb z).diNlink.toNat :=
-  fsimgWf_linkLe fsimgP fsimgSb z fsimgWfOk
-
-/-- Rocq `fsimg_link_dir`. -/
-theorem fsimgLinkDir (z : Nat) (hty : (fsDinode fsimgP fsimgSb z).diType.toNat = T_DIR_z) :
-    fsLinkCount fsimgP fsimgSb z = 0 :=
-  fsimgWf_linkDir fsimgP fsimgSb z fsimgWfOk hty
-
-/-- Rocq `fsimg_dir_nlink`. -/
-theorem fsimgDirNlink (z : Nat) (hz : z < fsimgSb.sbNinodes)
-    (hty : (fsDinode fsimgP fsimgSb z).diType.toNat = T_DIR_z) :
-    (fsDinode fsimgP fsimgSb z).diNlink.toNat = 1 :=
-  fsimgWf_dirNlink fsimgP fsimgSb z fsimgWfOk hz hty
-
-/-- Rocq `fsimg_dir_root`. -/
-theorem fsimgDirRoot (z : Nat) (hz : z < fsimgSb.sbNinodes)
-    (hty : (fsDinode fsimgP fsimgSb z).diType.toNat = T_DIR_z) : z = ROOTINO :=
-  fsimgWf_dirRoot fsimgP fsimgSb z fsimgWfOk hz hty
 
 /-- Rocq `fsimg_root_link`. -/
 theorem fsimgRootLink :
@@ -146,20 +104,9 @@ theorem fsimgLinksEq : fsLinksEq fsimgP fsimgSb = true := by
 theorem fsimgRootNoSelf : fsRootNoSelf fsimgP fsimgSb = true := by
   rw [fsimgP_eq]; exact fsimgRootNoSelfB
 
-/-- W4 reindexed (Rocq `fsimg_slot_inj`). -/
-theorem fsimgSlotInj (i : Nat) (hi : i < fsimgSb.sbNinodes)
-    (hnz : (fsDinode fsimgP fsimgSb i).diType.toNat ≠ 0) :
-    fsSlotInj fsimgP (fsDinode fsimgP fsimgSb i) :=
-  fsimgWf_slotInj fsimgP fsimgSb i fsimgWfOk hi hnz
-
 /-- The region's tail is free (Rocq `fsimg_region_free`). -/
 theorem fsimgRegionFree : fsRegionFree fsimgP fsimgSb fsimgNib = true := by
   rw [fsimgP_eq]; exact fsimgRegionFreeB
-
-/-- Rocq `fsimg_region_tail_free`. -/
-theorem fsimgRegionTailFree (z : Nat) (h1 : 200 ≤ z) (h2 : z < 208) :
-    (fsDinode fsimgP fsimgSb z).diType.toNat = 0 :=
-  fsRegionFree_spec fsimgP fsimgSb fsimgNib z fsimgRegionFree h1 h2
 
 /-- L3/L4 over the whole region (Rocq `fsimg_region_nlink`). -/
 theorem fsimgRegionNlink : fsRegionNlink fsimgP fsimgSb fsimgNib = true := by
@@ -173,48 +120,6 @@ theorem fsimgRegionBare : fsRegionBare fsimgP fsimgSb fsimgNib = true := by
 /-- Rocq `fsimg_region_wf`. -/
 theorem fsimgRegionWf : fsRegionWf fsimgP fsimgSb fsimgNib = true := by
   unfold fsRegionWf; rw [fsimgRegionFree, fsimgRegionNlink, Bool.and_self]
-
-/-- Rocq `fsimg_free_nlink`. -/
-theorem fsimgFreeNlink (z : Nat) (hz : z < 208)
-    (hty : (fsDinode fsimgP fsimgSb z).diType.toNat = 0) :
-    (fsDinode fsimgP fsimgSb z).diNlink.toNat = 0 :=
-  fsRegionNlink_free fsimgP fsimgSb fsimgNib z fsimgRegionNlink hz hty
-
-/-- Rocq `fsimg_nlink_short`. -/
-theorem fsimgNlinkShort (z : Nat) (hz : z < 208) :
-    (fsDinode fsimgP fsimgSb z).diNlink.toNat ≤ 32767 :=
-  fsRegionNlink_short fsimgP fsimgSb fsimgNib z fsimgRegionNlink hz
-
-/-- The live records are exactly `1 .. 23`, as one sweep (Rocq
-`fsimg_live_set`, deviation 3). -/
-theorem fsimgLiveSweep :
-    (List.range 200).all (fun z =>
-      (!decide ((fsDinode fsimgP fsimgSb z).diType.toNat = 0)) == decide (1 ≤ z ∧ z ≤ 23)) =
-      true := by
-  rw [fsimgP_eq]; exact fsimgLiveSweepB
-
-/-- Rocq `fsimg_live_iff`. -/
-theorem fsimgLiveIff (z : Nat) :
-    (1 ≤ z ∧ z ≤ 23) ↔
-      z < fsimgSb.sbNinodes ∧ (fsDinode fsimgP fsimgSb z).diType.toNat ≠ 0 := by
-  have hn : fsimgSb.sbNinodes = 200 := rfl
-  rw [hn]
-  by_cases hz : z < 200
-  · have := List.all_eq_true.1 fsimgLiveSweep z (List.mem_range.2 hz)
-    rw [beq_iff_eq] at this
-    by_cases h0 : (fsDinode fsimgP fsimgSb z).diType.toNat = 0
-    · rw [h0] at this ⊢
-      simp only [decide_true, Bool.not_true] at this
-      have := (decide_eq_false_iff_not.1 this.symm)
-      omega
-    · simp only [h0, decide_false, Bool.not_false] at this
-      have := of_decide_eq_true this.symm
-      omega
-  · omega
-
-/-- Rocq `fsimg_live_set_elem`. -/
-theorem fsimgLiveSetMem (z : Nat) : z ∈ fsLiveSet fsimgP fsimgSb ↔ 1 ≤ z ∧ z ≤ 23 := by
-  rw [fsLiveSet_mem, fsimgLiveIff]
 
 /-! ## 3.  PATHS OUT OF THE ROOT -/
 

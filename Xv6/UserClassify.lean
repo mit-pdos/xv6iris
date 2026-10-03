@@ -27,8 +27,6 @@ namespace Xv6
 open MachCSL
 open Sail LeanRV64D LeanRV64D.Functions
 
-set_option linter.unusedSectionVars false
-
 /-- **The 32-bit decode image, by family.** -/
 theorem ucl_cover32 (i : instruction) (h : decodableU i = true) :
     (uxaAluU i || uxcCtlU i || uclCsrU i || uclCfgRefusedU i || uclMemU i) = true := by

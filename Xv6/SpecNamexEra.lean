@@ -39,7 +39,7 @@ argument.  Lean states Rocq's two conjuncts as the block's core
 `procPrivCoreNoctxAt curCtx k.proc pid V M` (`Xv6/FdTable.lean`, C0), which
 IS `procPrivBareAt curCtx … ∗ cwdRefAt V.cwd V.cwi` and `cwdRefAt =
 inodeHeldAt` (`procPrivCoreNoctxAt_bare`, `.rfl`), in and out unchanged, and
-`exStart fscFs V.cwi P Pmiss (bview plen pfun)`.  The landed argfd contract
+`exStart fscFs V.rti V.cwi P Pmiss (bview plen pfun)`.  The landed argfd contract
 states the same core (`SpecArgfd`).  A caller holding the whole block
 `procPrivFd γ pa pid V M` (Rocq `proc_priv`) splits it by `procPrivFd_split`
 (`.rfl`) and frames the fd array, which is Rocq's `proc_priv_bare_cref`.
@@ -86,9 +86,6 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedVariables false
-set_option linter.unusedSectionVars false
-
 section Post
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
@@ -128,8 +125,8 @@ def namexEraPost (k : KCtx) (plen : Nat) (pfun : Nat → BitVec 8) (n : Nat) (Sb
       -- the death index, the receipt, and the UNFIRED suffix
       iprop(⌜R' 10#5 = 0#64⌝ ∗ irefSlots 2 ∗
         ∃ (kd d : Nat), ⌜kd < (pathElems (bview plen pfun)).length⌝ ∗
-          ((P kd d ∗ exHopsFrom fscFs P Pmiss (bview plen pfun) kd) ∨
-           (Pmiss kd d ∗ exHopsFrom fscFs P Pmiss (bview plen pfun) (kd + 1))))) -∗
+          ((P kd d ∗ exHopsFrom V.rti fscFs P Pmiss (bview plen pfun) kd) ∨
+           (Pmiss kd d ∗ exHopsFrom V.rti fscFs P Pmiss (bview plen pfun) (kd + 1))))) -∗
     wpLoop cpu')
 
 end Post
@@ -181,7 +178,7 @@ def wp_namex_era_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
   irefSlots 2 ∗
   logOpS icfgLog n Sb ∗ logTx icfgLog ∗
   -- ---- THE TRACE (ONE premise, DEFERRED IN THE START) ----
-  exStart fscFs V.cwi P Pmiss (bview plen pfun) ∗
+  exStart fscFs V.rti V.cwi P Pmiss (bview plen pfun) ∗
   -- THE CROSSING IS THE LITERAL `true`: namex parks
   wpNext true k.proc cpu (namexEraPost k plen pfun n Sb P Pmiss pid V M dqb dqs dqpv)
   ⊢ wpLoop (GF := GF) cpu
@@ -230,10 +227,38 @@ theorem namexEra_core_rows [X : CurCtx] (hct : X.curTier = KTier.kpt) (pa : BitV
   simp only at hct
   subst hct
   unfold procPrivCoreNoctxAt procPrivBareAt procFieldsNoOfile cwdRefAt
-  iintro ⟨⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hcwd, Hnm, Hsc⟩, Hpt, Htfp, %hlz, Hev⟩, Hc, Hg⟩
+  iintro ⟨⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hcwd, Hnm, Hsc, Hrt⟩, Hpt, Htfp, %hlz, Hev⟩, Hc, Hg⟩
   iframe Hpid Hcwd Hc Hev
   iintro Hpid Hcwd Hc
-  iframe Hpid Hk Hs Hpg Htf Hcwd Hnm Hsc Hpt Htfp Hc Hg
+  iframe Hpid Hk Hs Hpg Htf Hcwd Hnm Hsc Hrt Hpt Htfp Hc Hg
+  isplitl []
+  · ipureintro; exact h
+  · ipureintro; exact hlz
+
+/-- **...and the FIVE rows the walk lends since the chroot bump**: the root's
+cell and reference beside the cwd's (the absolute arm's `idup`, dirlookup's
+self test). -/
+theorem namexEra_core_rows5 [X : CurCtx] (hct : X.curTier = KTier.kpt) (pa : BitVec 64)
+    (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) :
+    procPrivCoreNoctxAt (GF := GF) curCtx pa pid V M ⊢
+      wordPointsTo (pPid pa) 4 pidPriv pid ∗
+      wordPointsTo (pCwd pa) 8 (DFrac.own 1) V.cwd ∗
+      inodeHeldAt V.cwd V.cwi ∗
+      wordPointsTo (pRoot pa) 8 (DFrac.own 1) V.root ∗
+      inodeHeldAt V.root V.rti ∗
+      (wordPointsTo (pPid pa) 4 pidPriv pid -∗
+        wordPointsTo (pCwd pa) 8 (DFrac.own 1) V.cwd -∗
+        inodeHeldAt V.cwd V.cwi -∗
+        wordPointsTo (pRoot pa) 8 (DFrac.own 1) V.root -∗
+        inodeHeldAt V.root V.rti -∗ procPrivCoreNoctxAt curCtx pa pid V M) := by
+  obtain ⟨c, t⟩ := X
+  simp only at hct
+  subst hct
+  unfold procPrivCoreNoctxAt procPrivBareAt procFieldsNoOfile cwdRefAt rootRefAt
+  iintro ⟨⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hcwd, Hnm, Hsc, Hrt⟩, Hpt, Htfp, %hlz, Hev⟩, Hc, Hr, Hg⟩
+  iframe Hpid Hcwd Hc Hrt Hr Hev
+  iintro Hpid Hcwd Hc Hrt Hr
+  iframe Hpid Hk Hs Hpg Htf Hcwd Hnm Hsc Hrt Hpt Htfp Hc Hr Hg
   isplitl []
   · ipureintro; exact h
   · ipureintro; exact hlz

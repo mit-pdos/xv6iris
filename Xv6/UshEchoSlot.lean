@@ -51,8 +51,6 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
-
 /-- **Rocq `echo_node_row`**: ONE argument's four rows of the node, at an
 arbitrary index. -/
 def echoNodeRow (ws : List (List (BitVec 8))) (M : ElfMem) (s0 t : Nat) (g : Nat → BitVec 8) (i : Nat) : Prop :=
@@ -148,13 +146,6 @@ theorem echoNodeImg_of_cmd_x (ws : List (List (BitVec 8))) (gt gd gs : GName) (M
   ipureintro
   exact ⟨ha.1, fun i hi => (hall i hi).1, fun i hi => (hall i hi).2.1, hbc, fun i hi => (hall i hi).2.2.1,
     fun i hi => (hall i hi).2.2.2⟩
-
-/-- **Rocq `echo_node_img_of_cmd`**: the same at an admissible LINE. -/
-theorem echoNodeImg_of_cmd (ws : List (List (BitVec 8))) (gt gd gs : GName) (M : ElfMem)
-    (pm : Nat → Option UPerm) (sz s0 t : Nat) (g : Nat → BitVec 8) (hok : lineOk ws) :
-    ⊢ uheap (GF := GF) gt gd gs M pm sz -∗ E.ush_cmd gd t (ushEchoCmd E ws s0 g) -∗
-      ⌜echoNodeImg ws M s0 t g⌝ :=
-  echoNodeImg_of_cmd_x E ws gt gd gs M pm sz s0 t g (lineOk_execOk hok)
 
 end UshEchoSlot
 

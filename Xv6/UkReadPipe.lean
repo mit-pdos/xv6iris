@@ -11,7 +11,8 @@ taken as it stands; the post's pipe arm is `pipeRpostImg`.
 CONE (re-walked on the pinned globs: 10/14 reached): `a0_idx`, `a2_idx`
 (notations), `read_pipe_fam`, `uread_pipe_core`, `uread_pipe_ans`,
 `uread_pipe_ans_of_ret`, `ustd_after_none`, `upipe_ends_handles`,
-`wp_uk_pipe_read_end`, `udepwf_std_read_pipe`.  Unreached (not ported):
+`wp_uk_pipe_read_end`; `udepwf_std_read_pipe` is not ported (nothing uses
+it).  Unreached (not ported):
 `a1_idx`, `udepwf_st_read_pipe`, `wp_uk_ecall_read_pipe`,
 `wp_uk_ecall_read_pipe_std`.
 
@@ -39,8 +40,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Std (ExtTreeSet)
-
-set_option linter.unusedSectionVars false
 
 /-- **Rocq `read_pipe_fam`**: `xfamRd` at the trivial console readings, with
 the caller's queue cursor `Rp` and empty-ring observation `Rpe`. -/
@@ -108,31 +107,6 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FsTopG
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
 local notation "SGX" => uexecSGXv6 (hlc := hlc)
-
-/-- **Rocq `udepwf_std_read_pipe`**: THE DEPOSIT AT A LEDGER SLOT -- the arm
-computed from the caller's own ledger, the payment taken as it stands. -/
-theorem udepwf_std_read_pipe (N : UkNames GF) (m : RegMap) (pc : BitVec 64) (l : List FdState) (fd : Nat)
-    (wb : Bool) (γp : PipeNames) (Rp : List (BitVec 8) → IProp GF) (Rpe : List (BitVec 8) → PipeSt → IProp GF)
-    (h0 : (BitVec.setWidth 32 (m.get 10#5)).toInt = (fd : Int)) (hlt : fd < NSTD)
-    (hl : l[fd]? = some (.open true wb (.pipe γp))) :
-    pipeRpay (hlc := hlc) γp.pnQueue Rp Rpe (argZ (m.get 12#5)).toNat ⊢
-      UshSysP.udepwfStd (hlc := hlc) (SG := SGX) N m pc USYS_read (readPipeFam N.pay Rp Rpe) l := by
-  unfold UshSysP.udepwfStd Xv6.udepwfStd
-  iintro Hpay
-  isplitr
-  · ipureintro; rfl
-  iintro %M %pm %sz %fdv %cw %gn %cs %pidv %htake - Hh Hf
-  iframe Hh Hf
-  iapply sbundleAt_read_intro (hlc := hlc) (uslot (hlc := hlc) (SG := SGX)) (readPipeFam N.pay Rp Rpe)
-    (uvisOfRun m pc M pm sz fdv cw gn cs pidv false seccAll) (m.get 10#5) (m.get 12#5) fdv
-    (Xv6.tfOf_a0 m pc) (Xv6.tfOf_a2 m pc) rfl
-  rw [std_fd_st_of_key (m.get 10#5) fdv l fd _ h0 hlt htake hl]
-  unfold filereadIn
-  iintro HP
-  isplitl [HP]
-  · iexact HP
-  dsimp only [readPipeFam]
-  iexact Hpay
 
 end Supply
 

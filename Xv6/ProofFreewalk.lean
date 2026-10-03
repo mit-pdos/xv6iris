@@ -24,7 +24,6 @@ and the stepped lend is framed into the continuation
 (`SlotGen.actLend_cont_frame_step`).
 -/
 import Xv6.SpecFreewalk
-import Xv6.SpecKfree
 import Xv6.UvmCallSites
 import Xv6.UPtFreeLemmas
 import Xv6.CodeTactics
@@ -38,7 +37,6 @@ open Xv6.UPtFree
 open LeanRV64D LeanRV64D.Functions
 
 set_option maxRecDepth 8000
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
@@ -117,16 +115,6 @@ def fwFrame [CurCtx] (sp v0 v1 v2 v3 v4 v5 : BitVec 64) : IProp GF := iprop%
   wordPointsTo (sp + 0xFFFFFFFFFFFFFFD8#64) 8 (DFrac.own 1) v4 ∗
   wordPointsTo (sp + 0xFFFFFFFFFFFFFFD0#64) 8 (DFrac.own 1) v5
 
-theorem fwFrame_split [CurCtx] (sp v0 v1 v2 v3 v4 v5 : BitVec 64) :
-    fwFrame (GF := GF) sp v0 v1 v2 v3 v4 v5 ⊢
-      iprop(wordPointsTo (sp + 0xFFFFFFFFFFFFFFF8#64) 8 (DFrac.own 1) v0 ∗
-      wordPointsTo (sp + 0xFFFFFFFFFFFFFFF0#64) 8 (DFrac.own 1) v1 ∗
-      wordPointsTo (sp + 0xFFFFFFFFFFFFFFE8#64) 8 (DFrac.own 1) v2 ∗
-      wordPointsTo (sp + 0xFFFFFFFFFFFFFFE0#64) 8 (DFrac.own 1) v3 ∗
-      wordPointsTo (sp + 0xFFFFFFFFFFFFFFD8#64) 8 (DFrac.own 1) v4 ∗
-      wordPointsTo (sp + 0xFFFFFFFFFFFFFFD0#64) 8 (DFrac.own 1) v5) := by
-  unfold fwFrame; iintro H; iexact H
-
 theorem fwFrame_join [CurCtx] (sp v0 v1 v2 v3 v4 v5 : BitVec 64) :
     iprop(wordPointsTo (sp + 0xFFFFFFFFFFFFFFF8#64) 8 (DFrac.own 1) v0 ∗
       wordPointsTo (sp + 0xFFFFFFFFFFFFFFF0#64) 8 (DFrac.own 1) v1 ∗
@@ -142,9 +130,6 @@ def fwSaved (R R' : RegMap) : Prop :=
   R' 2#5 = R 2#5 ∧ R' 8#5 = R 8#5 ∧ R' 18#5 = R 18#5 ∧ R' 19#5 = R 19#5 ∧
   R' 20#5 = R 20#5 ∧ R' 21#5 = R 21#5 ∧ R' 22#5 = R 22#5 ∧ R' 23#5 = R 23#5 ∧
   R' 24#5 = R 24#5 ∧ R' 25#5 = R 25#5 ∧ R' 26#5 = R 26#5 ∧ R' 27#5 = R 27#5
-
-theorem fwSaved_refl (R : RegMap) : fwSaved R R :=
-  ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩
 
 theorem fwSaved_trans {R1 R2 R3 : RegMap} (h1 : fwSaved R1 R2) (h2 : fwSaved R2 R3) :
     fwSaved R1 R3 :=

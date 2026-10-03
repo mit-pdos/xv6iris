@@ -14,6 +14,7 @@ import MachCSL.WpLock
 import Xv6.SpecHolding
 import Xv6.SpecMycpu
 import Xv6.CodeTactics
+import MachCSL.LockFacts
 
 namespace Xv6
 
@@ -48,7 +49,7 @@ set_option maxHeartbeats 4000000 in
 /-- The prologue-to-return tail of `holding` from `0x80000bfa`, for a
 context `k` whose `a0` is `lk`, given what the owner-word load answers
 (`P` before, `Q w` after, with the answer `w`) and the comparison's value. -/
-theorem holding_br_d76 : KA.«holding» + 0xd76#64 = KA.«mycpu» := by decide
+theorem holding_br_d6a : KA.«holding» + 0xd6a#64 = KA.«mycpu» := by decide
 
 theorem holding_tail (MC : MYCPU) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (hK : 6 ≤ k.avail)
@@ -86,7 +87,7 @@ theorem holding_tail (MC : MYCPU) {hlc : HasLC} {GF : BundledGFunctors} [MachGS 
   k_step (wp_s_add cpu _ (KA.«holding» + 0x14#64) true 9#5 0#5 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- jal mycpu
-  k_step (wp_s_jal cpu _ (KA.«holding» + 0x16#64) false 3424#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [holding_br_d76]
+  k_step (wp_s_jal cpu _ (KA.«holding» + 0x16#64) false 3412#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [holding_br_d6a]
   iintro Hk Hpc
   have hmc : ∀ (k' : KCtx) (hsie' : k'.sie = false) (hK' : 2 ≤ k'.avail),
       kctx cpu k' ∗ pcIs cpu KA.«mycpu» ∗
@@ -132,7 +133,7 @@ theorem holding_tail (MC : MYCPU) {hlc : HasLC} {GF : BundledGFunctors} [MachGS 
   obtain ⟨c2_2, c2_8, c2_9, c2_18, c2_19, c2_20, c2_21, c2_22, c2_23, c2_24, c2_25, c2_26, c2_27⟩ := hcs2
   constructor
   · unfold calleeSaved
-    simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, eq_self_iff_true, true_and, and_true]
+    simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, true_and]
     exact ⟨c2_18, c2_19, c2_20, c2_21, c2_22, c2_23, c2_24, c2_25, c2_26, c2_27⟩
   · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
 
@@ -170,8 +171,8 @@ theorem holding_notheld_proof (MC : MYCPU) {hlc : HasLC} {GF : BundledGFunctors}
     ipureintro
     constructor
     · unfold calleeSaved
-      simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, eq_self_iff_true, true_and, and_true]
-    · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, BitVec.reduceSignExtend, BitVec.add_zero]
+      simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, and_true]
+    · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
   · -- the word is nonzero: read the owner word, which is not ours
     k_step (wp_s_branch cpu _ (KA.«holding» + 0x2#64) true 6#13 15#5 0#5 (by decide) bop.BNE) from (text_instr _ _ _ _ rfl rfl) Htext
       $$ [- $Hk $Hpc] with [MachCSL.bcond_bne_sext_ne w hw]
@@ -247,8 +248,8 @@ theorem holding_notheld_gen_proof (MC : MYCPU) {hlc : HasLC} {GF : BundledGFunct
     ipureintro
     constructor
     · unfold calleeSaved
-      simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, eq_self_iff_true, true_and, and_true]
-    · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, BitVec.reduceSignExtend, BitVec.add_zero]
+      simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, and_true]
+    · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
   · -- the word is nonzero: read the owner word, which is not ours; Tc rides in Q
     k_step (wp_s_branch cpu _ (KA.«holding» + 0x2#64) true 6#13 15#5 0#5 (by decide) bop.BNE) from (text_instr _ _ _ _ rfl rfl) Htext
       $$ [- $Hk $Hpc] with [MachCSL.bcond_bne_sext_ne w hw]

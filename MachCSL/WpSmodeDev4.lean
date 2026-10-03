@@ -20,7 +20,6 @@ The memory leaves (`swp_sail_mem_read_dev`, `swp_sail_mem_write_dev`) are
 already width-generic, so only the checked stage and the execute stages
 are repeated here.
 -/
-import MachCSL.KCtxGpr
 import MachCSL.WpSmodeDev
 
 namespace MachCSL

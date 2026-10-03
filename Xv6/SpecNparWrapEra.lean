@@ -21,7 +21,7 @@ wrapper into namex.  A port of Rocq `SpecNparWrapEra.v`
 
 As `SpecNamexEra`: Rocq's `proc_priv_bare ∗ inode_held_at (pv_cwd) (pv_cwi)`
 is the core `procPrivCoreNoctxAt curCtx k.proc pid V M`, in and out; the
-trace is `epStart fscFs V.cwi P Pmiss (bview plen pfun)`.
+trace is `epStart fscFs V.rti V.cwi P Pmiss (bview plen pfun)`.
 
 ## DEVIATIONS from Rocq
 
@@ -43,9 +43,6 @@ namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
-
-set_option linter.unusedVariables false
-set_option linter.unusedSectionVars false
 
 section Post
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
@@ -83,7 +80,7 @@ def nparWrapEraPost (k : KCtx) (plen : Nat) (pfun : Nat → BitVec 8) (n : Nat) 
         inodeHeldTyAt ipv T_DIR iL ∗
         P (npElems (bview plen pfun)).length iL ∗ irefSlots 1)
      else
-      iprop(⌜R' 10#5 = 0#64⌝ ∗ irefSlots 2 ∗ npDead fscFs P Pmiss (bview plen pfun))) -∗
+      iprop(⌜R' 10#5 = 0#64⌝ ∗ irefSlots 2 ∗ npDead V.rti fscFs P Pmiss (bview plen pfun))) -∗
     wpLoop cpu')
 
 end Post
@@ -132,7 +129,7 @@ def wp_npar_wrap_era_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc G
   irefSlots 2 ∗
   logOpS icfgLog n Sb ∗ logTx icfgLog ∗
   -- ---- THE TRACE, OVER THE PARENT PREFIX, DEFERRED IN THE START ----
-  epStart fscFs V.cwi P Pmiss (bview plen pfun) ∗
+  epStart fscFs V.rti V.cwi P Pmiss (bview plen pfun) ∗
   -- THE CROSSING IS THE LITERAL `true`: nameiparent parks (through namex)
   wpNext true k.proc cpu (nparWrapEraPost k plen pfun n Sb P Pmiss pid V M dqb dqs dqpv)
   ⊢ wpLoop (GF := GF) cpu

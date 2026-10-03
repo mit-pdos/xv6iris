@@ -23,7 +23,7 @@ arithmetic -- is what bounds the count.
 
 THE SUPPLY.  Where can an inode reference actually live?
 
-  - each process's `p->cwd`                                    NPROC
+  - each process's two homes, `p->cwd` and `p->root`   NPROC * IREFHOME
   - each ftable entry holding an FD_INODE / FD_DEVICE file     NFILE
   - a per-process allowance for references a syscall holds in
     LOCALS before they reach either home            NPROC * IREFSPARE
@@ -35,7 +35,8 @@ room, matching `FdSlots.FDSPARE`'s reasoning.
 
 Note this supply is NOT `FDSLOTS` and the two must not be shared: an fd
 slot bounds descriptors, an iref slot bounds inode references, and a
-process holds NOFILE of the first but at most one cwd of the second.
+process holds NOFILE of the first but at most IREFHOME homes (its cwd and
+its root) of the second.
 
 Routing mirrors the fd units exactly: the AUTHORITY lives in the itable
 lock's resource (`IcacheEscrow.itable_res2`) beside the per-slot counts, so
@@ -52,12 +53,13 @@ Rocq's, over the same algebra.
 
 ## DEVIATIONS from Rocq
 
-1. **`positive` IS `Nat`** in `Xv6.irefSlots_bound` / `irefSlots_no_overflow`.
-   Rocq states both at `n : positive` (the icache count column's type) with
-   `iref_slots (Pos.to_nat n)`; here they take `n : Nat` and the premise
-   `irefSlots n`.  The conclusions are Rocq's (`n <= IREFSLOTS`;
-   `n < 2^31 /\ n + 1 < 2^31`), and the lemmas are STRONGER (no positivity
-   premise); a caller holding the icache's `PosNat` count passes `.val`.
+1. **`positive` IS `Nat`** in `Xv6.irefSlots_bound`.  Rocq states it at
+   `n : positive` (the icache count column's type) with
+   `iref_slots (Pos.to_nat n)`; here it takes `n : Nat` and the premise
+   `irefSlots n`.  The conclusion is Rocq's (`n <= IREFSLOTS`), and the
+   lemma is STRONGER (no positivity premise); a caller holding the icache's
+   `PosNat` count passes `.val`.  Rocq's `iref_slots_no_overflow` is not
+   ported (nothing uses it).
 2. **`pos_to_Qp (Pos.of_succ_nat k)` is `natQp k`**, the rational `k + 1`
    as a `Qp`, since iris-lean's `Qp` is `{q : Rat // 0 < q}`.
 3. **THE CAMERA IS SHARED WITH THE SLEEPLOCK'S COUNTER.**
@@ -83,7 +85,7 @@ Nothing.
 `NPROC` and `NFILE` come from the light `Xv6/SlotSupply.lean` (Rocq's
 `ProcGeom.v`/`FdSlots.v` role), so this file sits BELOW `Xv6/ProcDefs.lean`:
 the dormant block (`ProcDefs.procDormant`, Rocq `proc_dormant`) parks
-`irefSlots (1 + IREFSPARE)`, and `FileDefs` imports this file (Rocq's
+`irefSlots (IREFHOME + IREFSPARE)`, and `FileDefs` imports this file (Rocq's
 `file_core` names `iref_frac`) -- neither may be a cycle.
 -/
 import Xv6.SlotSupply
@@ -92,11 +94,17 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Std MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-- References a single syscall may hold in locals at once; see the
 header. -/
 def IREFSPARE : Nat := 4
+
+/-- **The references a live process keeps at HOME** in its `struct proc`
+(Rocq `IREFHOME`, design chroot.md §6): two, `p->cwd` and `p->root` (upstream
+b72cbac's per-process root directory).  Both are parked in the process
+block, so every per-process figure -- allocproc's and freeproc's posts, the
+ZOMBIE park, `ProcDefs.dormantAllow`, `procDormantPrestk`, the boot carve's
+provisioning -- is `IREFHOME + IREFSPARE`. -/
+def IREFHOME : Nat := 2
 
 /-- THE BOOT CHAIN'S OWN TWO UNITS, and they are NOT part of the table's
 provisioning.  `SpecFsinit` takes one for ireclaim's iget/iput pair and
@@ -107,9 +115,9 @@ could not start with all `NFILE` slots FREE, and a free slot owns one whole
 unit (`FileInvDefs.file_core`'s untyped arm).  So they are their own row. -/
 def IREFBOOT : Nat := 2
 
-/-- One cwd per process, one per open file, plus the per-process allowance,
-plus the boot chain's two. -/
-def IREFSLOTS : Nat := NPROC * (1 + IREFSPARE) + NFILE + IREFBOOT
+/-- A cwd and a root per process, one per open file, plus the per-process
+allowance, plus the boot chain's two. -/
+def IREFSLOTS : Nat := NPROC * (IREFHOME + IREFSPARE) + NFILE + IREFBOOT
 
 /-- THE CMRA IS FRACTIONAL, and it has to be.  A unit is evidence that the
 system has somewhere to put a reference, and for the `NFILE` units that
@@ -233,12 +241,6 @@ theorem irefFrac_op (q1 q2 : Qp) :
       ((some ⟨q1⟩ : Option UFrac) • (some ⟨q2⟩ : Option UFrac)) from rfl, Auth.frag_op]
   exact iOwn_op
 
-theorem irefFrac_split (q1 q2 : Qp) :
-    irefFrac (GF := GF) (q1 + q2) ⊢ irefFrac q1 ∗ irefFrac q2 := (irefFrac_op q1 q2).1
-
-theorem irefFrac_combine (q1 q2 : Qp) :
-    irefFrac (GF := GF) q1 ∗ irefFrac q2 ⊢ irefFrac (q1 + q2) := (irefFrac_op q1 q2).2
-
 instance irefFrac_fractional : Fractional (PROP := IProp GF) (fun q => irefFrac q) :=
   ⟨irefFrac_op⟩
 
@@ -266,58 +268,11 @@ theorem irefSlots_bound (n : Nat) :
   ipureintro
   exact natUfrac_incl n IREFSLOTS (Auth.auth_both_valid_discrete.mp Hv).1
 
-/-- ...and its consequence, the one idup needs: a count backed by iref
-slots is far below what an `int` can hold, so incrementing it is safe.
-This is where "there are only so many places to keep an inode" turns into
-"ip->ref++ does not overflow".  Deviation 1: `n : Nat`. -/
-theorem irefSlots_no_overflow (n : Nat) :
-    irefSlotsAuth (GF := GF) ∗ irefSlots n ⊢ ⌜n < 2 ^ 31 ∧ n + 1 < 2 ^ 31⌝ := by
-  iintro H
-  ihave %hle := irefSlots_bound n $$ H
-  ipureintro
-  have EI : IREFSLOTS = 422 := rfl
-  omega
-
 /-! ### The boot-time distribution
 
 Stated exactly as `FdSlots`', and for the same reason: the proc layer parks
 units in `proc_dormant` and the file table parks one per entry, and both
 want the parcelled-out form. -/
-
-theorem irefSlots_split_n (n m : Nat) :
-    irefSlots (GF := GF) (n * m) ⊢ [∗list] _j ∈ List.range n, irefSlots m := by
-  induction n with
-  | zero =>
-    iintro -
-    simp only [List.range_zero]
-    iapply BigSepL.bigSepL_nil.2
-    itrivial
-  | succ n ih =>
-    iintro H
-    rw [List.range_succ]
-    rw [show (n + 1) * m = n * m + m by rw [Nat.succ_mul]]
-    icases irefSlots_split (n * m) m $$ H with ⟨Hn, Hm⟩
-    iapply BigSepL.bigSepL_append.2
-    isplitl [Hn]
-    · iapply ih $$ Hn
-    · iapply BigSepL.bigSepL_singleton.2
-      iexact Hm
-
-theorem irefSlots_to_any {A : Type _} (l : List A) :
-    irefSlots (GF := GF) l.length ⊢ [∗list] _x ∈ l, irefSlot := by
-  induction l with
-  | nil =>
-    iintro -
-    iapply BigSepL.bigSepL_nil.2
-    itrivial
-  | cons x l ih =>
-    iintro H
-    rw [List.length_cons]
-    icases irefSlots_split l.length 1 $$ H with ⟨Hl, H1⟩
-    iapply BigSepL.bigSepL_cons.2
-    isplitl [H1]
-    · unfold irefSlot; iexact H1
-    · iapply ih $$ Hl
 
 theorem irefSlots_to_list (n : Nat) :
     irefSlots (GF := GF) n ⊢ [∗list] _j ∈ List.range n, irefSlot := by

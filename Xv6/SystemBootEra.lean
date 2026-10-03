@@ -93,9 +93,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
 
-set_option linter.unusedSectionVars false
-set_option linter.unusedVariables false
-
 /-! ## §3 The four device loops -/
 
 section devs
@@ -229,7 +226,7 @@ theorem xv6Era_run (σ : MState) (ξ0 : CtxId) (Γ : SchedNames) [ClaimIs (hlc :
     (hperm : ∀ (i : UartId) (γ : UartNames), (i = .uart0 → fscUart = γ) →
       obsInv ⊢@{IProp GF} uartObsPermit (hlc := hlc) i γ) (B : IProp GF)
     (hinit : ⊢@{IProp GF} appInv (hlc := hlc) fscFs -∗ B ==∗
-        initBootBundle (hlc := hlc) (SG := uexecSGXv6) ROOTINO seccAll (List.replicate NOFILE FdState.closed)) :
+        initBootBundle (hlc := hlc) (SG := uexecSGXv6) ROOTINO ROOTINO seccAll (List.replicate NOFILE FdState.closed)) :
     obsInv ⊢@{IProp GF} consEchoShift (hlc := hlc) -∗ B -∗
       -- the era's origin ticket (NI M2-W2d), on to `<init>`'s park
       MachFixedGS.uClaimO (hlc := hlc) (GF := GF) -∗
@@ -268,9 +265,6 @@ end Xv6
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
-
-set_option linter.unusedSectionVars false
-set_option linter.unusedVariables false
 
 /-! ## §1 The lend, unpacked, and the era's instances -/
 
@@ -362,7 +356,7 @@ at the era's application record `⟨N, appFs c, r⟩`, handed the application's
 invariant, the era's boot resource and THE ERA'S TURN `Tn c (gen + 1)` (the
 application's own per-era credential, minted at the power-on step and
 carried by `powerBootRes`; Rocq `Tn -∗`).  The bundle is at the first
-process's mask `seccAll` (userinit's `li a5,-1 ; sd a5,360(s1)`; Rocq
+process's mask `seccAll` (userinit's `li a5,-1 ; sd a5,368(s1)`; Rocq
 `init_boot_bundle … ProcDefs.secc_all fdt0`). -/
 def EraInitBoot {CT : Type} (N : Type) (appFs : CT → N → Aview → IProp GF)
     (appBoot : CT → Nat → N → IProp GF) (Tn : CT → Nat → IProp GF) (c : CT) : Prop :=
@@ -372,7 +366,7 @@ def EraInitBoot {CT : Type} (N : Type) (appFs : CT → N → Aview → IProp GF)
     letI : MachGS hlc GF := MachGS.ofEra E gen cP cI
     letI : Appcfg GF := ⟨N, appFs c, r⟩
     (⊢@{IProp GF} appInv (hlc := hlc) fscFs -∗ appBoot c (gen + 1) r -∗ Tn c (gen + 1) ==∗
-      initBootBundle (hlc := hlc) (SG := uexecSGXv6) ROOTINO seccAll (List.replicate NOFILE FdState.closed))
+      initBootBundle (hlc := hlc) (SG := uexecSGXv6) ROOTINO ROOTINO seccAll (List.replicate NOFILE FdState.closed))
 
 end inst
 

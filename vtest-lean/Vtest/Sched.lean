@@ -284,6 +284,11 @@ structure ConcCfg where
   tick : Bool := false
   sched : List CItem := []
   rounds : Nat := 1500
+  /-- How many instructions the first hart takes per instruction of the
+  second in the round-robin.  For a case whose second hart only has to keep
+  pace -- a writer free-running while the primary samples -- the even split
+  spends half the run on instructions nothing published depends on. -/
+  burst : Nat := 1
 
 def concPrefix (tick : Bool) : List CItem → TRun t → Option (TRun t)
   | [], r => some r
@@ -292,19 +297,32 @@ def concPrefix (tick : Bool) : List CItem → TRun t → Option (TRun t)
     | .ok r' => concPrefix tick rest r'
     | .stuck _ => none
 
-def concFinish (tick : Bool) : Nat → TRun t → RunRes (TRun t)
+/-- `n` instructions of the first hart, the devices settling between them (not
+after the last: the round settles once both harts have moved); it stops early
+at the DONE flag. -/
+def concBurst (tick : Bool) : Nat → TRun t → IRes (TRun t)
+  | 0, r => .ok r
+  | n + 1, r =>
+    match runInstr { tick := tick } 0 r with
+    | .stuck r' => .stuck r'
+    | .ok r' =>
+      match n with
+      | 0 => .ok r'
+      | _ => if flagSet r'.x then .ok r' else concBurst tick n (settle {} r')
+
+def concFinish (tick : Bool) (burst : Nat) : Nat → TRun t → RunRes (TRun t)
   | n, r =>
     if flagSet r.x then .done r
     else
       match n with
       | 0 => .budget r
       | n + 1 =>
-        match runInstr { tick := tick } 0 r with
+        match concBurst tick burst r with
         | .stuck r' => .stuck r'
         | .ok r1 =>
           match runInstr { tick := tick } 1 r1 with
           | .stuck r' => .stuck r'
-          | .ok r2 => concFinish tick n (settle {} r2)
+          | .ok r2 => concFinish tick burst n (settle {} r2)
 
 def runConc (t : Test) (cfg : ConcCfg) : Option (RunRes (TRun t)) :=
   match TRun.start t with
@@ -312,7 +330,7 @@ def runConc (t : Test) (cfg : ConcCfg) : Option (RunRes (TRun t)) :=
   | some r =>
     match concPrefix cfg.tick cfg.sched (typeInput t.uartInput r) with
     | none => none
-    | some r' => some (concFinish cfg.tick cfg.rounds r')
+    | some r' => some (concFinish cfg.tick cfg.burst cfg.rounds r')
 
 /-! ## The checks, and what each proves -/
 

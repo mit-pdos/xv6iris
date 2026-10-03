@@ -28,11 +28,9 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
-theorem writei_br_logwrite : KA.«writei» + 0x74c#64 = KA.«log_write» := by decide
+theorem writei_br_logwrite : KA.«writei» + 0x7ac#64 = KA.«log_write» := by decide
 theorem writei_br_brelse : KA.«writei» + 0xFFFFFFFFFFFFF5A4#64 = KA.«brelse» := by decide
 theorem writei_ret_b6 : jumpPc (KA.«writei» + 0xb6#64) = KA.«writei» + 0xb6#64 := by decide
 theorem writei_ret_bc : jumpPc (KA.«writei» + 0xbc#64) = KA.«writei» + 0xbc#64 := by decide
@@ -109,7 +107,7 @@ theorem writei_iter_fail (IU : IUPDATE) (LW : LOG_WRITE) (BE : BRELSE) (Γ : Sch
   k_step_e (wp_s_add cpu _ (KA.«writei» + 0xb0#64) true 10#5 0#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9]
   iintro Hk Hpc
-  k_step_e (wp_s_jal cpu _ (KA.«writei» + 0xb2#64) false 1690#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«writei» + 0xb2#64) false 1786#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [writei_br_logwrite]
   iintro Hk Hpc
   icases bslots_uncons 1 $$ Hsl with ⟨Hsl1, Hslr⟩
@@ -263,7 +261,7 @@ theorem writei_iter_ok (IU : IUPDATE) (LW : LOG_WRITE) (BE : BRELSE) (Γ : Sched
   k_step_e (wp_s_add cpu _ (KA.«writei» + 0x68#64) true 10#5 0#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9]
   iintro Hk Hpc
-  k_step_e (wp_s_jal cpu _ (KA.«writei» + 0x6a#64) false 1762#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«writei» + 0x6a#64) false 1858#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [writei_br_logwrite]
   iintro Hk Hpc
   icases bslots_uncons 1 $$ Hsl with ⟨Hsl1, Hslr⟩

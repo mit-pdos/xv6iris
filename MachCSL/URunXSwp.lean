@@ -16,7 +16,6 @@ text `uxTextOwn ξ K DT T` and the receipt `iviewLb cpu K`:
 The local unfolding lemmas are `uxr_run_node` / `MachCSL.uxw_text_some`.
 -/
 import MachCSL.UIcache
-import MachCSL.UFetchRun
 import MachCSL.URunXWalk
 
 namespace MachCSL

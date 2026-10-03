@@ -35,9 +35,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-- The target's record after `ip->nlink--` (Rocq's `su_setnl dni (su_dec16 …)`). -/
 abbrev sysUnlinkDni2 (dni : Dinode) : Dinode := sysfileSetnl dni (sysUnlinkDec16 dni.diNlink)
@@ -123,7 +121,7 @@ theorem sys_unlink_w5_spine (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ 
   k_step_e (wp_s_add cpu _ (KA.«sys_unlink» + 0xb8#64) true 10#5 0#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hpins.2.2.1]
   iintro Hk Hpc
-  k_step_e (wp_s_jal cpu _ (KA.«sys_unlink» + 0xba#64) false 2089990#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_unlink» + 0xba#64) false 2089894#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_unlink_br_iunlockput]
   iintro Hk Hpc
   iapply (sys_unlink_iunlockput_dep IUP Γ cpu _ k.sie (by k_norm_g) k.proc (by k_norm_g) A.j A.pid
@@ -169,7 +167,7 @@ theorem sys_unlink_w5_spine (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ 
   k_step_e (wp_s_add cpu _ (KA.«sys_unlink» + 0xc8#64) true 10#5 0#5 18#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hp1.2.2.2.1]
   iintro Hk Hpc
-  k_step_e (wp_s_jal cpu _ (KA.«sys_unlink» + 0xca#64) false 2089198#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_unlink» + 0xca#64) false 2089102#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_unlink_br_iupdate]
   iintro Hk Hpc
   obtain ⟨u, rfl⟩ : ∃ u, n2 = u + 1 := ⟨n2 - 1, by omega⟩
@@ -230,7 +228,7 @@ theorem sys_unlink_w5_spine (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ 
   k_step_e (wp_s_add cpu _ (KA.«sys_unlink» + 0xce#64) true 10#5 0#5 18#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hp2.2.2.2.1]
   iintro Hk Hpc
-  k_step_e (wp_s_jal cpu _ (KA.«sys_unlink» + 0xd0#64) false 2089968#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_unlink» + 0xd0#64) false 2089872#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_unlink_br_iunlockput]
   iintro Hk Hpc
   ihave Hbs := bslots_cons 2 $$ [$Hb1 $Hb2]
@@ -306,7 +304,7 @@ theorem sys_unlink_w5_spine (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ 
       (k.regs 18#5) (k.regs 19#5) $$ [Hra Hs0 H3 H4 H5]
   · unfold sysUnlinkCells; iframe
   -- ret 0: BOTH receipts, and the instant-2 pin on the target
-  ihave Harms := unlinkArms_ok (hlc := hlc) (fsGammaL fscFs) fscFs A.V.cwi (viewLazy A.V.upt A.V.sz A.M)
+  ihave Harms := unlinkArms_ok (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti A.V.cwi (viewLazy A.V.upt A.V.sz A.M)
       A.v0.toNat A.P A.Pmiss A.Fent A.Ftgt
     A.Fex A.Fmiss pl av0 av1 dinum.toNat iinum.toNat nm ents nl (absRow (eraNode dni bmi dati)) hlast
     hpre ⟨hpos, hnibi⟩ hav1 $$ [$HP $Hx $Hm $He $Hrcv]

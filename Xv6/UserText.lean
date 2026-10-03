@@ -24,6 +24,7 @@ tree lookup by `rfl` where it applies an instruction rule, as the kernel's do
 (`Xv6.kernelText_find`).
 -/
 import Xv6.UserTextDefs
+import Iris.Instances.UPred.Instance
 
 namespace Xv6.User
 

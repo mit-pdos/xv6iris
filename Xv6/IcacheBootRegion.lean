@@ -144,8 +144,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Iris.Algebra MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-! ## 2.  THE REGION'S INITIAL MAP, AND `iregAlloc` -/
 
 /-- The image's record for inum `z`: block `z / 16`, slot `z % 16` (Rocq
@@ -251,14 +249,6 @@ theorem iregM0_lookup (dss : List (List Dinode)) (nib z : Nat) (hz : z ∈ regio
   unfold iregM0
   exact foldIns_get_mem (fun z => (z : Int)) _ _ z (fun a _ h => by exact_mod_cast h)
     (List.mem_range.mpr hz)
-
-/-- Rocq's `ireg_M0_lookup_Some`, at the `Int` key (the KEY-TYPE SEAM: the
-key is the cast of a region inum). -/
-theorem iregM0_lookup_Some (dss : List (List Dinode)) (nib : Nat) (y : Int) (dn : Dinode)
-    (h : PartialMap.get? (iregM0 dss nib) y = some dn) :
-    ∃ z : Nat, y = (z : Int) ∧ z ∈ regionInums nib ∧ dn = imageDinode dss z := by
-  obtain ⟨z, hz, hfz, hgz⟩ := foldIns_get_some _ _ _ y dn h
-  exact ⟨z, hfz.symm, (regionInums_spec nib z).mpr (List.mem_range.mp hz), hgz.symm⟩
 
 /-! ### THE MARKER HALF OF THE MINT (§16.4)
 

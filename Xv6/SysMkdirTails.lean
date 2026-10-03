@@ -34,6 +34,7 @@ Rocq's header points, kept:
 -/
 import Xv6.SysMkdirFrame
 import Xv6.CopyLemmas
+import MachCSL.BvLemmas
 
 namespace Xv6
 
@@ -42,16 +43,14 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## Constants -/
 
 theorem sys_mkdir_br_begin_op : KA.«sys_mkdir» + 0xffffffffffffea00#64 = KA.«begin_op» := by decide
-theorem sys_mkdir_br_argstr : KA.«sys_mkdir» + 0xffffffffffffd5b2#64 = KA.«argstr» := by decide
+theorem sys_mkdir_br_argstr : KA.«sys_mkdir» + 0xffffffffffffd552#64 = KA.«argstr» := by decide
 theorem sys_mkdir_br_create : KA.«sys_mkdir» + 0xfffffffffffff948#64 = KA.«create» := by decide
-theorem sys_mkdir_br_iunlockput : KA.«sys_mkdir» + 0xffffffffffffe1ea#64 = KA.«iunlockput» := by
+theorem sys_mkdir_br_iunlockput : KA.«sys_mkdir» + 0xffffffffffffe18a#64 = KA.«iunlockput» := by
   decide
 theorem sys_mkdir_br_end_op : KA.«sys_mkdir» + 0xffffffffffffea8c#64 = KA.«end_op» := by decide
 
@@ -73,10 +72,10 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 /-- ret -1's receipt (the `-1` arm of `mkdirArms`): the whole bundle back
 (argstr failed), or create's own failure fold. -/
 def sysMkdirFail (A : SysMkdirArgs GF) : IProp GF := iprop(
-  mkdirAuAt (hlc := hlc) (fsGammaL fscFs) fscFs A.V.cwi (viewLazy A.V.upt A.V.sz A.M) A.v.toNat
+  mkdirAuAt (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti A.V.cwi (viewLazy A.V.upt A.V.sz A.M) A.v.toNat
     A.P A.Pmiss A.Farm A.Fdots A.Fun A.Fok A.Fex ∨
     ∃ pl : List (BitVec 8),
-      creFailArms (hlc := hlc) (fsGammaL fscFs) fscFs T_DIR.toNat 0 0 (fun _ => True) (fun _ => True) A.P A.Pmiss A.Farm A.Fdots
+      creFailArms (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti T_DIR.toNat 0 0 (fun _ => True) (fun _ => True) A.P A.Pmiss A.Farm A.Fdots
         A.Fun A.Fok A.Fex pl)
 
 /-- ret -1: the block closed at the grown page table. -/
@@ -213,7 +212,7 @@ theorem sys_mkdir_tail_ok (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
   ihave Hop := logOpS_opb icfgLog u' Sb' $$ Hop
   icases sys_mkdir_pid hct _ _ _ _ _ $$ Hblk with ⟨Hpid, Hback⟩
   -- +0x2e  jal iunlockput
-  k_step_e (wp_s_jal cpu _ (KA.«sys_mkdir» + 0x2e#64) false 2089404#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_mkdir» + 0x2e#64) false 2089308#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_mkdir_br_iunlockput]
   iintro Hk Hpc
   iapply (sysfile_iunlockput IUP Γ cpu _ k.sie (by k_norm_g) (procAddr A.j)

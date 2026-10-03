@@ -26,7 +26,6 @@ fresh heap at `0` and the one-block list `4084 - 12 j` units deep at `j + 1`;
 -/
 import Xv6.UshSeam
 import Xv6.UshPipeArmBase
-import Xv6.UshPipesCmd
 import Xv6.UkShMallocCap
 import Xv6.UshPipesPure
 
@@ -35,8 +34,6 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
-
-set_option linter.unusedSectionVars false
 
 section UshPipesSeam
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]

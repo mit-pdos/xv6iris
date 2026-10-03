@@ -33,7 +33,6 @@ stubs are `UkSeccStubs`').
    instance `uexecSGXv6` (the kernel-cost split of UexecSeccMint deviation 6).
 -/
 import Xv6.UkSeccStubs
-import Xv6.UkRunSysWrite
 import Xv6.UkWriteClosed
 import Xv6.UexecSecc
 
@@ -42,8 +41,6 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
-
-set_option linter.unusedSectionVars false
 
 section UkSeccWdepWalk
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]

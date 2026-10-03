@@ -35,6 +35,8 @@ Rocq's header points, kept:
    `pidPriv` share through `sys_mknod_pid` (SysMknodFrame deviation 3).
 -/
 import Xv6.SysMknodFrame
+import MachCSL.BvLemmas
+import Xv6.CopyLemmas
 
 namespace Xv6
 
@@ -43,17 +45,15 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## Constants -/
 
 theorem sys_mknod_br_begin_op : KA.«sys_mknod» + 0xffffffffffffe9b8#64 = KA.«begin_op» := by decide
-theorem sys_mknod_br_argint : KA.«sys_mknod» + 0xffffffffffffd532#64 = KA.«argint» := by decide
-theorem sys_mknod_br_argstr : KA.«sys_mknod» + 0xffffffffffffd56a#64 = KA.«argstr» := by decide
+theorem sys_mknod_br_argint : KA.«sys_mknod» + 0xffffffffffffd4d2#64 = KA.«argint» := by decide
+theorem sys_mknod_br_argstr : KA.«sys_mknod» + 0xffffffffffffd50a#64 = KA.«argstr» := by decide
 theorem sys_mknod_br_create : KA.«sys_mknod» + 0xfffffffffffff900#64 = KA.«create» := by decide
-theorem sys_mknod_br_iunlockput : KA.«sys_mknod» + 0xffffffffffffe1a2#64 = KA.«iunlockput» := by
+theorem sys_mknod_br_iunlockput : KA.«sys_mknod» + 0xffffffffffffe142#64 = KA.«iunlockput» := by
   decide
 theorem sys_mknod_br_end_op : KA.«sys_mknod» + 0xffffffffffffea44#64 = KA.«end_op» := by decide
 
@@ -79,7 +79,7 @@ fail fold the caller built. -/
 theorem sys_mknod_out_fail (A : SysMknodArgs GF) (P2 : UPtd) (hP2 : A.V.upt.extSz A.V.sz P2) :
     procPrivFd (GF := GF) A.γ (procAddr A.j) A.pid (sysMknodV1 A P2) (sysMknodM1 A P2) ∗
       bslots 3 ∗ irefSlots A.ns ∗
-      mknodPostFail (hlc := hlc) (fsGammaL fscFs) fscFs A.V.cwi (viewLazy A.V.upt A.V.sz A.M) A.v0.toNat (devArg A.v1) (devArg A.v2) A.P A.Pmiss A.Farm A.Fun A.Fok A.Fex ⊢
+      mknodPostFail (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti A.V.cwi (viewLazy A.V.upt A.V.sz A.M) A.v0.toNat (devArg A.v1) (devArg A.v2) A.P A.Pmiss A.Farm A.Fun A.Fok A.Fex ⊢
     sysMknodOut A 0xFFFFFFFFFFFFFFFF#64 := by
   iintro ⟨Hblk, Hbs, Hir, Hf⟩
   unfold sysMknodOut
@@ -130,7 +130,7 @@ theorem sys_mknod_tail_58 (EO : END_OP) (Γ : SchedNames) [ClaimIs (hlc := hlc) 
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie (procAddr A.j) ∗ sysfileEnv (hlc := hlc) Γ ∗
     procPrivFd A.γ (procAddr A.j) A.pid (sysMknodV1 A P2) (sysMknodM1 A P2) ∗
     (∀ c : CPU, sysMknodPostA k A c) ∗ bslots 3 ∗ irefSlots A.ns ∗ logOp icfgLog u ∗
-    mknodPostFail (hlc := hlc) (fsGammaL fscFs) fscFs A.V.cwi (viewLazy A.V.upt A.V.sz A.M) A.v0.toNat (devArg A.v1) (devArg A.v2) A.P A.Pmiss A.Farm A.Fun A.Fok A.Fex
+    mknodPostFail (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti A.V.cwi (viewLazy A.V.upt A.V.sz A.M) A.v0.toNat (devArg A.v1) (devArg A.v2) A.P A.Pmiss A.Farm A.Fun A.Fok A.Fex
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hcells, Hbuf, Hlow, Hte, Hce, #Henv, Hblk, HΦ, Hbs, Hir, Hop, Hfail⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -210,7 +210,7 @@ theorem sys_mknod_tail_46 (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
   ihave Hop := logOpS_opb icfgLog n Sb $$ Hop
   icases sys_mknod_pid hct _ _ _ _ _ $$ Hblk with ⟨Hpid, Hback⟩
   -- +0x46  jal iunlockput
-  k_step_e (wp_s_jal cpu _ (KA.«sys_mknod» + 0x46#64) false 2089308#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_mknod» + 0x46#64) false 2089212#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_mknod_br_iunlockput]
   iintro Hk Hpc
   iapply (sysfile_iunlockput IUP Γ cpu _ k.sie (by k_norm_g) (procAddr A.j)

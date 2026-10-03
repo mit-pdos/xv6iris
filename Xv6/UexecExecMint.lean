@@ -27,22 +27,19 @@ Rocq's header, point for point:
    their statements are over `UkRun.udep`/`udepw`/`udepw_law`/`uk_names`,
    the wave-9 program tier (D24), which does not exist in Lean; they return
    with it.  `filewrite_in_of_sup` is `FsAbsInvFire.fsabsFilewriteIn`.
-3. **`uslot_mint` is not gated** (UexecCond deviation 1: the verified-program
-   gate chain is empty until wave 9), and its all-parked key narrowing
-   (lane OFF-HAND-2) is vacuous here (Lean's generic fires need no offset
-   supplier, FsAbsInvFire deviation 2).
+3. **`uslot_mint` is not gated** (the verified-program gate chain is empty
+   until wave 9), and its all-parked key narrowing (lane OFF-HAND-2) is
+   vacuous here (Lean's generic fires need no offset supplier, FsAbsInvFire
+   deviation 2).
 4. `initBootBundle_of_mint` (Rocq `SystemAdequacy.init_boot_of_triv` +
    `InitBoot.init_boot_bundle_triv` at this mint) lives here, beside the
    mint it composes, for the generic application's `Hinit_boot`.
 -/
 import Xv6.UexecExecInst
-import Xv6.UexecCond
 
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Std MachCSL
-
-set_option linter.unusedSectionVars false
 
 section UexecExecMint
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
@@ -71,19 +68,6 @@ theorem uslotMint :
   iintro %W #Hpay
   iapply (Xv6.uexecWp_uslot_triv (hlc := hlc) W) $$ Hs Hkc Hgen Hpay
 
-/-- **Rocq `uslot_mint_pay`**: THE MINT AT A CONSTANT PAYLOAD (GENERIC-PAY),
-the payload as the persistent carrier `□ (killCred -∗ R)` (Rocq's
-`□ (app_taint -∗ R)`, UexecExecInst deviation 3). -/
-theorem uslotMint_pay (R : IProp GF) :
-    ⊢ appSup (GF := GF) -∗ uKillCred (hlc := hlc) -∗ consLicence (hlc := hlc) (GF := GF) -∗
-      □ uexecWp (hlc := hlc) (GF := GF) -∗
-      □ (∀ W : Uvis, myPay W.gen (fun _ => R) -∗ □ (uKillCred (hlc := hlc) -∗ R) -∗ uslot (hlc := hlc) W) := by
-  iintro #Hsup #Hkc #Hlic #Hgen
-  ihave #Hs := xv6Ssupply_intro (hlc := hlc) (GF := GF) $$ Hsup Hkc Hlic
-  imodintro
-  iintro %W #Hpay #HR
-  iapply (Xv6.uexecWp_uslot (hlc := hlc) R W) $$ Hs Hkc Hgen Hpay HR
-
 /-- **Rocq `uslot_mint_all`**: the same with the payload under the box. -/
 theorem uslotMint_all :
     ⊢ appSup (GF := GF) -∗ uKillCred (hlc := hlc) -∗ consLicence (hlc := hlc) (GF := GF) -∗
@@ -100,13 +84,13 @@ theorem uslotMint_all :
 `SystemAdequacy.init_boot_of_triv` over `init_boot_bundle_triv` and
 `uslot_mint`): the first process's exec bundle at the kernel's instance, out
 of the supply and the generic slot. -/
-theorem initBootBundle_of_mint (cw : Nat) (secc : BitVec 64) (sts : List FdState) :
+theorem initBootBundle_of_mint (rt cw : Nat) (secc : BitVec 64) (sts : List FdState) :
     ⊢ appSup (GF := GF) -∗ uKillCred (hlc := hlc) -∗ consLicence (hlc := hlc) (GF := GF) -∗
       □ uexecWp (hlc := hlc) (GF := GF) -∗
-      initBootBundle (hlc := hlc) (SG := uexecSGXv6) cw secc sts := by
+      initBootBundle (hlc := hlc) (SG := uexecSGXv6) rt cw secc sts := by
   iintro #Hsup #Hkc #Hlic #Hgen
   ihave #Hm := uslotMint (hlc := hlc) (GF := GF) $$ Hsup Hkc Hlic Hgen
-  iapply (initBootBundle_triv (hlc := hlc) (SG := uexecSGXv6) cw secc sts) $$ Hm
+  iapply (initBootBundle_triv (hlc := hlc) (SG := uexecSGXv6) rt cw secc sts) $$ Hm
 
 end UexecExecMint
 

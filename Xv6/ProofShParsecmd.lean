@@ -24,7 +24,6 @@ the leftovers peek is taken at the reference's `refPeek len f s []` directly
 import Xv6.SpecShParsecmd
 import Xv6.SpecShStrlen
 import Xv6.SpecShParseline
-import Xv6.SpecShPeek
 import Xv6.SpecShNulterminate
 import Xv6.UshRedirsWalk
 import Xv6.UshATree
@@ -36,7 +35,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
 
 /-- `slli a0,a0,32 ; srli a0,a0,32`: the zero-extension of a 32-bit value. -/

@@ -48,6 +48,7 @@ import Xv6.UInitFdHead
 import Xv6.UkInitLit
 import Xv6.User.InitText
 import Xv6.FsGeom
+import Xv6.UkForkHeap
 
 namespace Xv6
 
@@ -55,8 +56,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Iris.Std.PartialMap
 open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
-
-set_option linter.unusedSectionVars false
 
 /-! ## §0 init's code, its argv, and what crosses the fork (deviations 1, 3) -/
 

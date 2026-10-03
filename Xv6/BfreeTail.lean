@@ -36,7 +36,6 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
@@ -107,7 +106,7 @@ theorem bf_tail (LW : LOG_WRITE) (BE : BRELSE)
     (bitmapBytes (used \ {bi})) (bitmapBytes used) iprop(emp) e0 $$ Hau
   imodintro
   -- +0x4a  jal log_write
-  k_step_e (wp_s_jal cpu _ (KA.«bfree» + 0x4a#64) false 3778#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«bfree» + 0x4a#64) false 3874#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [bf_br_logwrite]
   iintro Hk Hpc
   iapply (bf_log_write LW cpu _ γ γl γb V γfs logstart dev kk pidv bnoB

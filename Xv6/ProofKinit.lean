@@ -18,7 +18,6 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
@@ -39,8 +38,6 @@ theorem ki_ret_ad8 : jumpPc (KA.«kinit» + 0x2c#64) = (KA.«kinit» + 0x2c#64) 
 /-- `freerange` starts the count at zero. -/
 theorem ki_availAdd0 : availAdd (some 0) kinitPages = some kinitPages := by
   simp only [availAdd, Option.map_some, Nat.zero_add]
-
-theorem ki_stop_toNat : (0x88000000#64).toNat = 0x88000000 := rfl
 
 /-- The arguments `kinit` hands `freerange`: `end` and `PHYSTOP` delimit
 exactly `kinitPages` whole pages from `PGROUNDUP(end) = kinitBase`.  Every
@@ -160,11 +157,11 @@ theorem kinit_finish [CurCtx] (cpu c : CPU) (k : KCtx)
 
 theorem kinit_br_ffffffffffffffb8 : KA.«kinit» + 0xffffffffffffffb8#64 = KA.«freerange» := by decide
 
-theorem kinit_br_22d26 : KA.«kinit» + 0x22d26#64 = KA.«end» := by decide
+theorem kinit_br_22fc6 : KA.«kinit» + 0x22fc6#64 = KA.«end» := by decide
 
 theorem kinit_br_8e : KA.«kinit» + 0x8e#64 = KA.«initlock» := by decide
 
-theorem kinit_br_118f6 : KA.«kinit» + 0x118f6#64 = KA.«kmem» := by decide
+theorem kinit_br_11996 : KA.«kinit» + 0x11996#64 = KA.«kmem» := by decide
 
 theorem kinit_br_64fe : KA.«kinit» + 0x64fe#64 = KStr.«kmem» := by decide
 
@@ -195,8 +192,8 @@ theorem kinit_proof (IL : INITLOCK) (FR : FREERANGE) : KINIT :=
   k_step_gen (wp_s_auipc c3 _ (KA.«kinit» + 0x10#64) false 0x12#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ki_u12] next c4 hp4
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c4 _ (KA.«kinit» + 0x14#64) false 2278#12 10#5 10#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kinit_br_118f6] next c5 hp5
+  k_step_gen (wp_s_addi c4 _ (KA.«kinit» + 0x14#64) false 2438#12 10#5 10#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kinit_br_11996] next c5 hp5
   iintro Hk Hpc
   -- jal ra, initlock
   k_step_gen (wp_s_jal c5 _ (KA.«kinit» + 0x18#64) false 118#21 1#5 (by decide))
@@ -242,8 +239,8 @@ theorem kinit_proof (IL : INITLOCK) (FR : FREERANGE) : KINIT :=
   k_step_gen (wp_s_auipc c9 _ (KA.«kinit» + 0x20#64) false 0x23#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ki_u23] next c10 hp10
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c10 _ (KA.«kinit» + 0x24#64) false 3334#12 10#5 10#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kinit_br_22d26] next c11 hp11
+  k_step_gen (wp_s_addi c10 _ (KA.«kinit» + 0x24#64) false 4006#12 10#5 10#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kinit_br_22fc6] next c11 hp11
   iintro Hk Hpc
   -- jal ra, freerange
   k_step_gen (wp_s_jal c11 _ (KA.«kinit» + 0x28#64) false 2097040#21 1#5 (by decide))

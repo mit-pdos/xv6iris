@@ -33,10 +33,10 @@ literally `LOG_WRITE.wp_log_write_au_range`'s atomic-update premise at
 
 **Dropped/simplified vs Rocq.**
 * Rocq's `iui_*` instruction facts, `pcw`/`nz`/`regne` tactics and the
-  `iu_andi15`/`iu_slli6`/`iu_srliw4`/`iu_addw_ibl`/`Xv6.dsDisp`/`iu_off0` bridge
+  `iu_andi15`/`iu_slli6`/`iu_srliw4`/`iu_addw_ibl`/`iu_off0` bridge
   lemmas are `Xv6.text_instr` and the `Xv6/DinodeSlot.lean` group-1/2
   lemmas (`dsSrliw4`, `dsAddwIbl`, `dsAndi15`, `dsSext_mod16`, `dsSlli6`,
-  `dsDataAddr`, `dsDisp`, `dsOff0`, `dsAddrs0`, `dsAlign`) -- uses checked:
+  `dsDataAddr`, `dsOff0`, `dsAlign`) -- uses checked:
   all are `Local` to ProofIupdate.v or ported in DinodeSlot.
 * Rocq's `iu_slots_split`/`iu_slots_join` are `Xv6.dsSlots_split`/`_join`.
 -/
@@ -51,17 +51,15 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedSectionVars false
-
 /-! ## The constants the code computes -/
 
 /-- `auipc a1,0x1d; lw a1,1784(a1)` reads `sb.inodestart`. -/
-theorem iu_sb_addr : KA.«iupdate» + 0x1d8f6#64 = sbInodestart := by
+theorem iu_sb_addr : KA.«iupdate» + 0x1db82#64 = sbInodestart := by
   unfold sbInodestart; decide
 
 theorem iu_br_bread : KA.«iupdate» + 0xFFFFFFFFFFFFFA1C#64 = KA.«bread» := by decide
-theorem iu_br_memmove : KA.«iupdate» + 0xffffffffffffdaee#64 = KA.«memmove» := by decide
-theorem iu_br_logwrite : KA.«iupdate» + 0xCCC#64 = KA.«log_write» := by decide
+theorem iu_br_memmove : KA.«iupdate» + 0xffffffffffffdada#64 = KA.«memmove» := by decide
+theorem iu_br_logwrite : KA.«iupdate» + 0xd2c#64 = KA.«log_write» := by decide
 theorem iu_br_brelse : KA.«iupdate» + 0xFFFFFFFFFFFFFB24#64 = KA.«brelse» := by decide
 
 theorem iu_ret_24 : jumpPc (KA.«iupdate» + 0x24#64) = (KA.«iupdate» + 0x24#64) := by decide

@@ -64,8 +64,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode MachCSL
 
-set_option linter.unusedSectionVars false
-
 /-- THE PARAMETERS: what a tier names (Rocq `gen_params`). -/
 structure GenParams (hlc : HasLC) (GF : BundledGFunctors) [MachGS hlc GF] [Xv6G GF] [DiskG GF]
     [EchoOutG GF] (M : LModel) where
@@ -316,9 +314,6 @@ theorem gwcOpenT_taint (k : Nat) (v : EraPins) (I : List (BitVec 8)) : ⊢ G.gT 
 theorem gwcBan_taint (k : Nat) (v : EraPins) (I : List (BitVec 8)) (i : Nat) :
     ⊢ G.gT -∗ gwcBan G k v I i := by
   iintro H; unfold gwcBan; iright; iright; iexact H
-theorem gwcPost_taint (k : Nat) (v : EraPins) (I : List (BitVec 8)) (a : Nat) :
-    ⊢ G.gT -∗ gwcPost G k v I a := by
-  iintro H; unfold gwcPost; iright; iexact H
 theorem gwcLine_taint (X : Nat → EraPins → List (BitVec 8) → IProp GF)
     (k : Nat) (v : EraPins) (I : List (BitVec 8)) : ⊢ G.gT -∗ gwcLine G X k v I := by
   iintro H; unfold gwcLine; ileft; iapply gwcPro_taint G k v I $$ H
@@ -334,13 +329,6 @@ theorem gwcPdiag_taint (k : Nat) (v : EraPins) (I : List (BitVec 8)) (a i : Nat)
   match i with
   | 0 => exact gwcPban_taint G k v I
   | i + 1 => exact gwcPdg_taint G k v I a (i + 1)
-theorem gwcLpr_taint (X : Nat → EraPins → List (BitVec 8) → IProp GF)
-    (k : Nat) (v : EraPins) (I : List (BitVec 8)) (p : Nat) : ⊢ G.gT -∗ gwcLpr G X k v I p := by
-  match p with
-  | 0 => exact gwcLine_taint G X k v I
-  | 1 => exact gwcSpT_taint G k v I
-  | 2 => exact gwcOpenT_taint G k v I
-  | _ + 3 => exact gwcBlk_taint G k v I 0 0
 
 theorem gwcPro_owed (k : Nat) (v : EraPins) (I : List (BitVec 8)) :
     ⊢ gwcPro G k v I -∗ gwcOwed G k v I := by
@@ -412,16 +400,6 @@ theorem gwcLine_of_post (X : Nat → EraPins → List (BitVec 8) → IProp GF)
   isplitr
   · ipureintro; exact lmApr_aprs M G.gK I a ha
   iapply gwcPost_of_blk G k v I a ha $$ Hc
-
-theorem gwcLine_of_posts (X : Nat → EraPins → List (BitVec 8) → IProp GF)
-    (k : Nat) (v : EraPins) (I : List (BitVec 8)) (a : Nat) (ha : lmAprs M I a) :
-    ⊢ gwcPost G k v I a -∗ gwcLine G X k v I := by
-  iintro Hc
-  unfold gwcLine
-  iright; ileft
-  iexists a
-  iframe Hc
-  ipureintro; exact ha
 
 theorem gwcLine_of_pro (X : Nat → EraPins → List (BitVec 8) → IProp GF)
     (k : Nat) (v : EraPins) (I : List (BitVec 8)) :

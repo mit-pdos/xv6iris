@@ -20,15 +20,12 @@ close re-seals at the page view `ukView P.um mm' T` of the landing map.
 §1 the split byte lists; §2 the pages, both ways; §3 open and close.
 -/
 import Xv6.UkDefs
-import Xv6.UserBytesAcc
 
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Std MachCSL
 open Iris.Std.PartialMap Iris.Std.FiniteMap
 open Sail LeanRV64D LeanRV64D.Functions
-
-set_option linter.unusedSectionVars false
 
 /-! ## §1 The split byte lists -/
 

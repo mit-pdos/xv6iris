@@ -44,7 +44,6 @@ unreached: `ua_ubyte0_moi0`, `ua_ubyte0_bv0`, `uheap_ubytesq_range`,
 4. `uheap_ubytesq_img` is `UserHeap.uheap_ubytes_at`'s image component;
    `uheap_uwordq_img` takes the word `w` itself (Rocq `mword_of_int z`).
 -/
-import Xv6.SpecSysExec
 import Xv6.UImgWordDefs
 import Xv6.UserHeap
 import Xv6.BootCarve

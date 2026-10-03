@@ -107,7 +107,7 @@ theorem uc_clintDispatch (hT : UcTickFoot D) (orc : UOrc) (s : UWSt) (hm : UcMis
   generalize hs1 : s.setR .mip _ = s1
   have ha1 : ucClockAgree s s1 := hs1 ▸ ucClockAgree_setR _ _ _ (Or.inr (Or.inr rfl))
   rw [uc_currentlyEnabled_Sstc (hmS s1 ha1)]
-  simp only [↓reduceIte, bind_assoc, pure_bind, MachCSL.uxa_readReg_bind D _ _ _ _ hT.rd_menvcfg]
+  simp only [↓reduceIte, pure_bind, MachCSL.uxa_readReg_bind D _ _ _ _ hT.rd_menvcfg]
   split
   · simp only [MachCSL.uxa_readReg_bind D _ _ _ _ hT.rd_mip, MachCSL.uxa_readReg_bind D _ _ _ _ hT.rd_stimecmp,
       MachCSL.uxa_readReg_bind D _ _ _ _ hT.rd_mtime, ucRW_writeReg D _ _ _ _ _ hT.wr_mip]
@@ -127,7 +127,7 @@ theorem uc_tickClock (hT : UcTickFoot D) (orc : UOrc) (s : UWSt) (hm : UcMisa D 
     ∃ s' orc', runRW D orc s (tick_clock ()) = some ((), s', orc') ∧ ucClockAgree s s' := by
   have hmS : ∀ (t : UWSt), ucClockAgree s t → UcMisa D t := fun t ht =>
     ⟨hm.rd, by rw [ht.2.2 _ (by decide) (by decide) (by decide), hm.val]⟩
-  simp only [tick_clock, should_inc_mcycle, bind_assoc, pure_bind, MachCSL.uxa_readReg_bind D _ _ _ _ hT.rd_priv,
+  simp only [tick_clock, should_inc_mcycle, bind_assoc, MachCSL.uxa_readReg_bind D _ _ _ _ hT.rd_priv,
     MachCSL.uxa_readReg_bind D _ _ _ _ hT.rd_mcountinhibit]
   have rest : ∀ (t : UWSt), ucClockAgree s t →
       ∃ s' orc', runRW D orc t (do

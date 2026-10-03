@@ -150,18 +150,6 @@ theorem wp_s_or [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx)
   wpLoop_k_setReg cpu k pc _ is_rvc _ rd hrd _
     (fun cpu' c _ _ _ => execSpecF_or cpu' (DFrac.own 1) c pc _ rd rs1 rs2 hrd.1 (tpPin cpu' k.regs))
 
-/-- `xor rd, rs1, rs2` (also `c.xor`). -/
-theorem wp_s_xor [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx)
-    (pc : BitVec 64) (is_rvc : Bool) (rd rs1 rs2 : BitVec 5) (hrd : rdOk rd) :
-    instr (GF := GF) pc is_rvc (instruction.RTYPE (regidx.Regidx rs2, regidx.Regidx rs1, regidx.Regidx rd, rop.XOR)) ∗
-    kctxL lent cpu k ∗ pcIs cpu pc ∗
-    ▷ wpNext k.sie k.proc cpu (fun cpu' =>
-        iprop(kctxL lent cpu' (k.setReg rd (k.rget cpu' rs1 ^^^ k.rget cpu' rs2)) -∗
-        pcIs cpu' (pc + instrLen is_rvc) -∗ wpLoop cpu'))
-    ⊢ wpLoop cpu :=
-  wpLoop_k_setReg cpu k pc _ is_rvc _ rd hrd _
-    (fun cpu' c _ _ _ => execSpecF_xor cpu' (DFrac.own 1) c pc _ rd rs1 rs2 hrd.1 (tpPin cpu' k.regs))
-
 /-- `mul rd, rs1, rs2`. -/
 theorem wp_s_mul [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx)
     (pc : BitVec 64) (is_rvc : Bool) (rd rs1 rs2 : BitVec 5) (hrd : rdOk rd) :

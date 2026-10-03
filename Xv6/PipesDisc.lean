@@ -38,8 +38,8 @@ names without their prefix (`so_catf_halt` → `StageOut.catfHalt`,
    (`filtParse`, `prodParse`, `plParse`, hence `plOf`, `plBodyOk`,
    `pipesLm`) decide `bodyOk`/`fnWord`/`wlWord` CLASSICALLY and are
    `noncomputable`.
-4. `FileDisc.all_cats` (trimmed from `FileDiscLine`, but reached through
-   `adm_echo`) is defined here as `allCats`.
+4. `FileDisc.all_cats` (trimmed from `FileDiscLine`) is not ported here
+   either (nothing uses it).
 5. Spelling: `Forall P l` is `∀ x ∈ l, P x`, `!!` is `[·]?`, `<[i:=x]>` is
    `List.set`, `prefix_of` is `<+:`, `default d o` is `o.getD d`,
    `bv_unsigned` is `toNat`; Rocq's `Notation`s re-exporting `FileDisc`'s
@@ -50,8 +50,8 @@ names without their prefix (`so_catf_halt` → `StageOut.catfHalt`,
    `pipe_pairB_of_pair/echo/cat`, `plalt_code_inj`, `pl_nz`, `pl_ok_nz`,
    `pipes_lm_cont_run`, `pipes_lm_ok_intro`, `pipes_lm_term`,
    `pipes_lm_merge`, `merge_all_block` (ported in `PipesMerge` anyway),
-   `shuf2_nil_l`/`comm`/`app_l`/`app_r`/`prefix`/`pmerge`, `shufb_shuf2`
-   (`shuf2_nil_l` is in `PipesMerge`), `nohd_execL`…`nohd_open`,
+   `shuf2_nil_l`/`comm`/`app_l`/`app_r`/`prefix`/`pmerge`, `shufb_shuf2`,
+   `nohd_execL`…`nohd_open`,
    `stage_out_nohd`, `stage_out_mid_inv`, `stage_out_mid_grep_inv`,
    `stage_out_last_inv`, `sfx_run_shape`, `line_run_shape`,
    `line_run_one`, `fok_grep`, `fok_cats`, `passes_cats`, `adm_ok`,
@@ -566,11 +566,6 @@ theorem fok_pass (F : Filt) (L D : List (BitVec 8)) (hF : fok F L) (hD : D <+: L
   cases F with
   | FCat => exact ⟨rfl, rfl⟩
   | FGrep w => exact fapp_pass (.FGrep w) L D hF.1 hD hne
-
-/-- **Rocq `FileDisc.all_cats`**: the all-cat test the admissions ask (not in
-`FileDiscLine`, whose cone trim dropped the `cats` family; reached here
-through `adm_echo`). -/
-def allCats (fs : List Filt) : Bool := fs.all filtIsCat
 
 /-- **Rocq `passes`**: every filter of the line passes its content. -/
 def passes (fs : List Filt) (L : List (BitVec 8)) : Prop := ∀ F ∈ fs, fapp F L = L
@@ -1343,17 +1338,5 @@ theorem pipesLm_laws_fc (fc : List (BitVec 8) → Option (List (BitVec 8))) (adm
       · exact ⟨b, rfl, pipes_block_nodollar fc l b hfc hl hok,
           fun Y ps W hps hcmp => pipes_block_below_panic fc l b Y ps W hfc hl hok hps hcmp⟩
   lmlTermSt s l c hc ht s' := ⟨c, hc, ht⟩
-
-/-! ### The admissions -/
-
-/-- **Rocq `adm_echo`**: every echo pipeline — the pipeline application's
-admission. -/
-def admEcho : Pline' → Bool
-  | LEcho' _ => true
-  | LPipes (.PrEcho _) fs => allCats fs
-  | _ => false
-
-/-- **Rocq `pipes_lmE`**: the pipeline application's model. -/
-noncomputable def pipesLmE : LModel := pipesLm (fun _ => none) admEcho
 
 end Xv6

@@ -50,9 +50,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-- **The record after the tail's store** (Rocq `<[tf_arg_idx 0 := r]>`):
 `p->trapframe->a0 = r`. -/
@@ -60,9 +58,6 @@ def syscStore (V : ProcPriv) (r : BitVec 64) : ProcPriv := { V with tf := V.tf.s
 
 @[simp] theorem syscStore_upt (V : ProcPriv) (r : BitVec 64) : (syscStore V r).upt = V.upt := rfl
 @[simp] theorem syscStore_sz (V : ProcPriv) (r : BitVec 64) : (syscStore V r).sz = V.sz := rfl
-@[simp] theorem syscStore_fdg (V : ProcPriv) (r : BitVec 64) : (syscStore V r).fdg = V.fdg := rfl
-@[simp] theorem syscStore_chg (V : ProcPriv) (r : BitVec 64) : (syscStore V r).chg = V.chg := rfl
-@[simp] theorem syscStore_gen (V : ProcPriv) (r : BitVec 64) : (syscStore V r).gen = V.gen := rfl
 @[simp] theorem syscStore_cwi (V : ProcPriv) (r : BitVec 64) : (syscStore V r).cwi = V.cwi := rfl
 @[simp] theorem syscStore_pvLazy (V : ProcPriv) (r : BitVec 64) :
     (syscStore V r).pvLazy = V.pvLazy := rfl
@@ -85,10 +80,6 @@ theorem SyscRows.updEv {V : ProcPriv} {M : Nat → List (BitVec 8)} {V' : ProcPr
     SyscRows V M (V'.updEv k) M' sts sts' cs cs' pid :=
   ⟨h.mem, h.fd, h.pipe, h.ch, h.ret, h.tf, h.upt, h.sz, h.lazy, h.tfp, h.fdg, h.chg, h.gen, h.cwi,
     h.sbrk, h.fork, h.read, h.pid, h.ks, h.secc, h.uptime⟩
-
-/-- The store and the count commute (both are record updates). -/
-theorem syscStore_updEv (V : ProcPriv) (r : BitVec 64) (k : Nat) :
-    syscStore (V.updEv k) r = (syscStore V r).updEv k := rfl
 
 /-- **The rows of an entry that moved nothing but a0** (Rocq's
 `sysc_mem_ok_quiet` / `sysc_fd_ok_refl_at` / `sysc_pipe_ok_quiet` /

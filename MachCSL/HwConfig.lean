@@ -16,8 +16,8 @@ counter configuration (`scounteren`, and the four cells the cycle reads:
 values (`hwVal`) are the values a run of the boot program derives
 (`MachCSL.resetValRun`).  The counter
 cells are EXISTENTIAL (`HwCounters`, Rocq `counter_caps` +
-`HartMCycle.mcycle_inc_flag`): the boot program never writes them
-(`MachCSL.bootProg_keeps`), so they hold power-on garbage, and the rules are
+`HartMCycle.mcycle_inc_flag`): the boot program never writes them,
+so they hold power-on garbage, and the rules are
 generic in them -- a read is answered at an arbitrary value
 (`swp_readReg_hwAny_bind`), so the minstret/mcycle increment flags are
 symbolic, and `scounteren` (Rocq `counter_caps`' `scen`) is symbolic too: a
@@ -80,8 +80,6 @@ def hwRegs : List Register :=
   [.misa, .mseccfg, .pma_regions, .htif_tohost_base, .elp, .senvcfg, .scounteren, .mstateen0,
    .sstateen0, .mcountinhibit, .minstretcfg, .mcyclecfg, .mhpmcounter]
 
-theorem hwRegs_nodup : hwRegs.Nodup := by decide
-
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 
 instance regPointsTo_discard_persistent (cpu : CPU) (r : Register) (v : RegisterType r) :
@@ -127,14 +125,6 @@ theorem hwConfig_counters (cpu : CPU) :
       Register.scounteren ↦ᵣ[cpu]□ ctr.scen := by
   unfold hwConfig
   iintro ⟨-, -, -, -, -, -, -, -, H⟩
-  iexact H
-
-/-- `mhpmcounter`, at some value, off the bundle. -/
-theorem hwConfig_mhpmcounter (cpu : CPU) :
-    hwConfig (GF := GF) cpu ⊢ ∃ hpm : Vector (BitVec 64) 32, Register.mhpmcounter ↦ᵣ[cpu]□ hpm := by
-  iintro #H
-  icases hwConfig_counters cpu $$ H with ⟨%ctr, -, -, -, #H, -⟩
-  iexists ctr.hpm
   iexact H
 
 /-- An existential counter cell (`hwAny`), at some value, off the bundle. -/

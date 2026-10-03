@@ -17,7 +17,7 @@ independently of its proof.
       ((void (*)(uint64))(TRAMPOLINE + (userret - trampoline)))(satp);
     }
 
-@ `KA.«forkret»` (0x800019ba in the image, 52 instructions).  The image is
+@ `KA.«forkret»` (0x800019ae in the image, 52 instructions).  The image is
 xv6 3e9926ea: `first` is read and written NON-atomically, with no fences.
 
 It is the entry point every process is BORN at: `allocproc` writes
@@ -39,7 +39,7 @@ the CLOSED trap loop.
   a boot-mode record carries `firstBoot`'s rows beside a block without its
   token (`ParkCap.parkBootBlock`), a steady-mode one the block whole plus
   `firstDone` (`ParkCap.parkBlock`, `parkMode`).  At `steady = true` the
-  boot arm is REFUTED (`FirstTok.firstBoot_done_excl`) and the steady arm
+  boot arm is REFUTED and the steady arm
   PROVES the run key it is asked for; at `false` forkret walks the boot arm.
 * **THE ENTRY IS THE SCHEDULER'S HAND-OFF**: swtch lands here with `p->lock`
   STILL HELD from scheduler() -- a resumed kernel context
@@ -69,7 +69,7 @@ the CLOSED trap loop.
    `cpu_own 1 eb p false {["proc"]}`), the calling convention `R sp =
    V.kstack + PGSIZE` (Rocq `is_kstack` + the `sp` register fact).  Rocq's
    `trap_res eb + av2 = av - 6`, `K_kexec ≤ av2`, `K_usertrap ≤ av` budget
-   premises are the whole page (`forkretStack = 512`, `usertrapSlots_le_page`).
+   premises are the whole page (`forkretStack = 512`).
 2. **The globals are Lean's park rows** (ParkCap deviation 2):
    `parkGlobals` (which carries `procsInv Γ`) and `utSysParkRows`;
    `kernel_text` is `kctx`'s, `wire_inv` / the trampoline claim ride
@@ -159,7 +159,7 @@ def wp_forkret_gen_body [CurCtx] (URB : ParkURB GF) (W : IProp GF)
   parkBlock (hlc := hlc) steady N V M ∗
   W ∗
   -- the mode's payload: `firstDone` (steady), the exec bundle (boot)
-  parkMode (hlc := hlc) (SG := SG) V.cwi V.pvSecc sts (parkKey steady V M cs N.pid) ∗
+  parkMode (hlc := hlc) (SG := SG) V.rti V.cwi V.pvSecc sts (parkKey steady V M cs N.pid) ∗
   -- the residue closer
   forkretCloser (hlc := hlc) (SG := SG) URB W N V.fdg V.chg V.cwi sts gn cs (parkKey steady V M cs N.pid)
   ⊢ wpLoop (GF := GF) cpu

@@ -34,13 +34,12 @@ reached and ported; their echo-era twins (`ush_mid_of_at`,
    `lk_pin_epin`, `lk_epin_agr` are the record's fields.
 -/
 import Xv6.UshLineDefs
+import Xv6.UshMainDefs
 
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Std (ExtTreeSet)
-
-set_option linter.unusedSectionVars false
 
 section Lease
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [EchoOutG GF] [Fscfg]

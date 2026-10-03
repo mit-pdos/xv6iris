@@ -44,8 +44,6 @@ open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 open UexecSG
 
-set_option linter.unusedSectionVars false
-
 /-- **Rocq `usrc_ok`**: every source byte is the image's, and readable
 through any table the key's projection admits. -/
 def usrcOk (M : ElfMem) (pm : Nat → Option UPerm) (sz : Nat) (ua : BitVec 64) (nb : Nat) (f : Nat → BitVec 8) :

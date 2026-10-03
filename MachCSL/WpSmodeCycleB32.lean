@@ -4,6 +4,8 @@ describes the cycle; the retire scripts and `fetchSpecS` stay there): one cycle
 lemma per module, so the two build in parallel.
 -/
 import MachCSL.WpSmodeCycleBase
+import MachCSL.WpTrap
+import MachCSL.WpTick
 
 namespace MachCSL
 

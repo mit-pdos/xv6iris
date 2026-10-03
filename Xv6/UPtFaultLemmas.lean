@@ -9,14 +9,11 @@ so the other `vm.c` proofs of this wave can be checked in parallel.
 -/
 import Xv6.UPtDefs
 import Xv6.PtRunLemmas
-import Xv6.PtOwnLemmas
 
 namespace Xv6.UPtFault
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open Xv6
-
-set_option linter.unusedSectionVars false
 
 /-! ## The two fixed virtual page numbers -/
 
@@ -308,11 +305,6 @@ theorem leaves_insert_comm (P Q : UPtd) (vpn : Nat) (u : BitVec 64)
 theorem toNat_mod8 (x : BitVec 64) (h : BitVec.extractLsb' 0 3 x = 0#3) : x.toNat % 8 = 0 := by
   have h2 := congrArg BitVec.toNat h
   simpa [BitVec.extractLsb'_toNat] using h2
-
-theorem pte2pa_mod8 (w : BitVec 64) : (pte2pa w).toNat % 8 = 0 := by
-  refine toNat_mod8 _ ?_
-  unfold pte2pa
-  bv_decide
 
 theorem pageValid_mod8 (r : BitVec 64) (h : pageValid r) : r.toNat % 8 = 0 := by
   refine toNat_mod8 _ ?_

@@ -5,7 +5,7 @@ constants, and pure facts about the format language.  Definitional only
 -/
 import Xv6.SpecPrintk
 import Xv6.StepLemmas
-import MachCSL.WpSmodeBits
+import MachCSL.KApply
 
 namespace Xv6
 
@@ -149,14 +149,6 @@ theorem ite_beq_zext {α : Type} (c n : BitVec 8) (x y : α) :
   · have : BitVec.setWidth 64 c ≠ BitVec.setWidth 64 n := fun e => h ((setWidth64_inj c n).1 e)
     simp [h, this]
 
-theorem ite_beq_zext' {α : Type} (n c : BitVec 8) (x y : α) :
-    (if bcond bop.BEQ (BitVec.setWidth 64 n) (BitVec.setWidth 64 c) then x else y) = if c = n then x else y := by
-  rw [bcond_beq_eq]
-  by_cases h : c = n
-  · subst h; simp
-  · have : BitVec.setWidth 64 n ≠ BitVec.setWidth 64 c := fun e => h ((setWidth64_inj c n).1 e.symm)
-    simp [h, this]
-
 theorem ite_bne_zext {α : Type} (c n : BitVec 8) (x y : α) :
     (if bcond bop.BNE (BitVec.setWidth 64 c) (BitVec.setWidth 64 n) then x else y) = if c = n then y else x := by
   rw [bcond_bne_eq]
@@ -197,15 +189,6 @@ theorem ite_bne_sub {α : Type} (c n : BitVec 8) (x y : α) :
 theorem ite_beq_zext_d {α : Type} (c : BitVec 8) (x y : α) :
     (if bcond bop.BEQ (BitVec.setWidth 64 c) 100#64 then x else y) = if c = chD then x else y :=
   ite_beq_zext c chD x y
-theorem ite_beq_zext_d' {α : Type} (c : BitVec 8) (x y : α) :
-    (if bcond bop.BEQ 100#64 (BitVec.setWidth 64 c) then x else y) = if c = chD then x else y :=
-  ite_beq_zext' chD c x y
-theorem ite_bne_zext_d {α : Type} (c : BitVec 8) (x y : α) :
-    (if bcond bop.BNE (BitVec.setWidth 64 c) 100#64 then x else y) = if c = chD then y else x :=
-  ite_bne_zext c chD x y
-theorem sltiu_zext_d (c : BitVec 8) :
-    (if (BitVec.setWidth 64 c + 18446744073709551516#64).ult 1#64 then 1#64 else 0#64) = if c = chD then 1#64 else 0#64 :=
-  sltiu_zext c chD
 theorem ite_bne_sub_d {α : Type} (c : BitVec 8) (x y : α) :
     (if bcond bop.BNE (BitVec.setWidth 64 c + 18446744073709551516#64) 0#64 then x else y) = if c = chD then y else x :=
   ite_bne_sub c chD x y
@@ -213,15 +196,6 @@ theorem ite_bne_sub_d {α : Type} (c : BitVec 8) (x y : α) :
 theorem ite_beq_zext_u {α : Type} (c : BitVec 8) (x y : α) :
     (if bcond bop.BEQ (BitVec.setWidth 64 c) 117#64 then x else y) = if c = chU then x else y :=
   ite_beq_zext c chU x y
-theorem ite_beq_zext_u' {α : Type} (c : BitVec 8) (x y : α) :
-    (if bcond bop.BEQ 117#64 (BitVec.setWidth 64 c) then x else y) = if c = chU then x else y :=
-  ite_beq_zext' chU c x y
-theorem ite_bne_zext_u {α : Type} (c : BitVec 8) (x y : α) :
-    (if bcond bop.BNE (BitVec.setWidth 64 c) 117#64 then x else y) = if c = chU then y else x :=
-  ite_bne_zext c chU x y
-theorem sltiu_zext_u (c : BitVec 8) :
-    (if (BitVec.setWidth 64 c + 18446744073709551499#64).ult 1#64 then 1#64 else 0#64) = if c = chU then 1#64 else 0#64 :=
-  sltiu_zext c chU
 theorem ite_bne_sub_u {α : Type} (c : BitVec 8) (x y : α) :
     (if bcond bop.BNE (BitVec.setWidth 64 c + 18446744073709551499#64) 0#64 then x else y) = if c = chU then y else x :=
   ite_bne_sub c chU x y
@@ -229,15 +203,6 @@ theorem ite_bne_sub_u {α : Type} (c : BitVec 8) (x y : α) :
 theorem ite_beq_zext_x {α : Type} (c : BitVec 8) (x y : α) :
     (if bcond bop.BEQ (BitVec.setWidth 64 c) 120#64 then x else y) = if c = chX then x else y :=
   ite_beq_zext c chX x y
-theorem ite_beq_zext_x' {α : Type} (c : BitVec 8) (x y : α) :
-    (if bcond bop.BEQ 120#64 (BitVec.setWidth 64 c) then x else y) = if c = chX then x else y :=
-  ite_beq_zext' chX c x y
-theorem ite_bne_zext_x {α : Type} (c : BitVec 8) (x y : α) :
-    (if bcond bop.BNE (BitVec.setWidth 64 c) 120#64 then x else y) = if c = chX then y else x :=
-  ite_bne_zext c chX x y
-theorem sltiu_zext_x (c : BitVec 8) :
-    (if (BitVec.setWidth 64 c + 18446744073709551496#64).ult 1#64 then 1#64 else 0#64) = if c = chX then 1#64 else 0#64 :=
-  sltiu_zext c chX
 theorem ite_bne_sub_x {α : Type} (c : BitVec 8) (x y : α) :
     (if bcond bop.BNE (BitVec.setWidth 64 c + 18446744073709551496#64) 0#64 then x else y) = if c = chX then y else x :=
   ite_bne_sub c chX x y
@@ -245,82 +210,25 @@ theorem ite_bne_sub_x {α : Type} (c : BitVec 8) (x y : α) :
 theorem ite_beq_zext_p {α : Type} (c : BitVec 8) (x y : α) :
     (if bcond bop.BEQ (BitVec.setWidth 64 c) 112#64 then x else y) = if c = chP then x else y :=
   ite_beq_zext c chP x y
-theorem ite_beq_zext_p' {α : Type} (c : BitVec 8) (x y : α) :
-    (if bcond bop.BEQ 112#64 (BitVec.setWidth 64 c) then x else y) = if c = chP then x else y :=
-  ite_beq_zext' chP c x y
-theorem ite_bne_zext_p {α : Type} (c : BitVec 8) (x y : α) :
-    (if bcond bop.BNE (BitVec.setWidth 64 c) 112#64 then x else y) = if c = chP then y else x :=
-  ite_bne_zext c chP x y
-theorem sltiu_zext_p (c : BitVec 8) :
-    (if (BitVec.setWidth 64 c + 18446744073709551504#64).ult 1#64 then 1#64 else 0#64) = if c = chP then 1#64 else 0#64 :=
-  sltiu_zext c chP
-theorem ite_bne_sub_p {α : Type} (c : BitVec 8) (x y : α) :
-    (if bcond bop.BNE (BitVec.setWidth 64 c + 18446744073709551504#64) 0#64 then x else y) = if c = chP then y else x :=
-  ite_bne_sub c chP x y
 
 theorem ite_beq_zext_c {α : Type} (c : BitVec 8) (x y : α) :
     (if bcond bop.BEQ (BitVec.setWidth 64 c) 99#64 then x else y) = if c = chC then x else y :=
   ite_beq_zext c chC x y
-theorem ite_beq_zext_c' {α : Type} (c : BitVec 8) (x y : α) :
-    (if bcond bop.BEQ 99#64 (BitVec.setWidth 64 c) then x else y) = if c = chC then x else y :=
-  ite_beq_zext' chC c x y
-theorem ite_bne_zext_c {α : Type} (c : BitVec 8) (x y : α) :
-    (if bcond bop.BNE (BitVec.setWidth 64 c) 99#64 then x else y) = if c = chC then y else x :=
-  ite_bne_zext c chC x y
-theorem sltiu_zext_c (c : BitVec 8) :
-    (if (BitVec.setWidth 64 c + 18446744073709551517#64).ult 1#64 then 1#64 else 0#64) = if c = chC then 1#64 else 0#64 :=
-  sltiu_zext c chC
-theorem ite_bne_sub_c {α : Type} (c : BitVec 8) (x y : α) :
-    (if bcond bop.BNE (BitVec.setWidth 64 c + 18446744073709551517#64) 0#64 then x else y) = if c = chC then y else x :=
-  ite_bne_sub c chC x y
 
 theorem ite_beq_zext_s {α : Type} (c : BitVec 8) (x y : α) :
     (if bcond bop.BEQ (BitVec.setWidth 64 c) 115#64 then x else y) = if c = chS then x else y :=
   ite_beq_zext c chS x y
-theorem ite_beq_zext_s' {α : Type} (c : BitVec 8) (x y : α) :
-    (if bcond bop.BEQ 115#64 (BitVec.setWidth 64 c) then x else y) = if c = chS then x else y :=
-  ite_beq_zext' chS c x y
-theorem ite_bne_zext_s {α : Type} (c : BitVec 8) (x y : α) :
-    (if bcond bop.BNE (BitVec.setWidth 64 c) 115#64 then x else y) = if c = chS then y else x :=
-  ite_bne_zext c chS x y
-theorem sltiu_zext_s (c : BitVec 8) :
-    (if (BitVec.setWidth 64 c + 18446744073709551501#64).ult 1#64 then 1#64 else 0#64) = if c = chS then 1#64 else 0#64 :=
-  sltiu_zext c chS
-theorem ite_bne_sub_s {α : Type} (c : BitVec 8) (x y : α) :
-    (if bcond bop.BNE (BitVec.setWidth 64 c + 18446744073709551501#64) 0#64 then x else y) = if c = chS then y else x :=
-  ite_bne_sub c chS x y
 
 theorem ite_beq_zext_pct {α : Type} (c : BitVec 8) (x y : α) :
     (if bcond bop.BEQ (BitVec.setWidth 64 c) 37#64 then x else y) = if c = chPct then x else y :=
   ite_beq_zext c chPct x y
-theorem ite_beq_zext_pct' {α : Type} (c : BitVec 8) (x y : α) :
-    (if bcond bop.BEQ 37#64 (BitVec.setWidth 64 c) then x else y) = if c = chPct then x else y :=
-  ite_beq_zext' chPct c x y
 theorem ite_bne_zext_pct {α : Type} (c : BitVec 8) (x y : α) :
     (if bcond bop.BNE (BitVec.setWidth 64 c) 37#64 then x else y) = if c = chPct then y else x :=
   ite_bne_zext c chPct x y
-theorem sltiu_zext_pct (c : BitVec 8) :
-    (if (BitVec.setWidth 64 c + 18446744073709551579#64).ult 1#64 then 1#64 else 0#64) = if c = chPct then 1#64 else 0#64 :=
-  sltiu_zext c chPct
-theorem ite_bne_sub_pct {α : Type} (c : BitVec 8) (x y : α) :
-    (if bcond bop.BNE (BitVec.setWidth 64 c + 18446744073709551579#64) 0#64 then x else y) = if c = chPct then y else x :=
-  ite_bne_sub c chPct x y
 
-theorem ite_beq_zext_l {α : Type} (c : BitVec 8) (x y : α) :
-    (if bcond bop.BEQ (BitVec.setWidth 64 c) 108#64 then x else y) = if c = chL then x else y :=
-  ite_beq_zext c chL x y
-theorem ite_beq_zext_l' {α : Type} (c : BitVec 8) (x y : α) :
-    (if bcond bop.BEQ 108#64 (BitVec.setWidth 64 c) then x else y) = if c = chL then x else y :=
-  ite_beq_zext' chL c x y
-theorem ite_bne_zext_l {α : Type} (c : BitVec 8) (x y : α) :
-    (if bcond bop.BNE (BitVec.setWidth 64 c) 108#64 then x else y) = if c = chL then y else x :=
-  ite_bne_zext c chL x y
 theorem sltiu_zext_l (c : BitVec 8) :
     (if (BitVec.setWidth 64 c + 18446744073709551508#64).ult 1#64 then 1#64 else 0#64) = if c = chL then 1#64 else 0#64 :=
   sltiu_zext c chL
-theorem ite_bne_sub_l {α : Type} (c : BitVec 8) (x y : α) :
-    (if bcond bop.BNE (BitVec.setWidth 64 c + 18446744073709551508#64) 0#64 then x else y) = if c = chL then y else x :=
-  ite_bne_sub c chL x y
 
 
 theorem ite_bne_bit {α : Type} (p : Prop) [Decidable p] (x y : α) :
@@ -344,12 +252,6 @@ theorem shr60_lt (v : BitVec 64) : (v >>> 60).toNat < 16 := by
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
-
-omit [CurCtx] in
-theorem ap_next (sp0 : BitVec 64) (kk : Nat) :
-    pkApBase sp0 + 8#64 * BitVec.ofNat 64 kk + 8#64 = pkApBase sp0 + 8#64 * BitVec.ofNat 64 (kk + 1) := by
-  rw [BitVec.ofNat_add, BitVec.mul_add]
-  simp only [BitVec.add_assoc, BitVec.reduceMul]
 
 /-- Vararg slot `kk` of the frame. -/
 theorem pkVaCells_acc (sp0 : BitVec 64) (R0 : RegMap) (kk : Nat) (hk : kk < 7) :
@@ -386,7 +288,7 @@ theorem pkVaCells_intro (sp0 : BitVec 64) (R0 : RegMap) :
     pkVaCells (GF := GF) sp0 R0 := by
   unfold pkVaCells pkApBase
   simp only [List.range_succ, List.range_zero, List.nil_append, List.cons_append,
-    Iris.Algebra.BigOpL.bigOpL_cons, Iris.Algebra.BigOpL.bigOpL_nil, BitVec.reduceMul, BitVec.reduceOfNat,
+    Iris.Algebra.BigOpL.bigOpL_cons, Iris.Algebra.BigOpL.bigOpL_nil, BitVec.reduceMul, 
     BitVec.add_assoc, BitVec.reduceAdd, BitVec.add_zero, BitVec.mul_zero, Nat.reduceAdd]
   iintro ⟨H0, H1, H2, H3, H4, H5, H6⟩
   iframe
@@ -469,14 +371,7 @@ theorem pkRegs_set (R0 R : RegMap) (r : BitVec 5) (v : BitVec 64) (h : pkRegs R0
   exact h.2
 
 theorem pkRegs_set25 (R0 R : RegMap) (h : pkRegsN R0 R) : pkRegs R0 (R.set 25#5 (R0 25#5)) :=
-  ⟨pkRegsN_set R0 R 25#5 _ h (by decide), by simp [RegMap.set_apply]⟩
-
-theorem calleeSaved_set25 (R R' : RegMap) (x : BitVec 64) (h : calleeSaved R R') :
-    calleeSaved (R.set 25#5 x) (R'.set 25#5 x) := by
-  unfold calleeSaved at *
-  simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
-  exact ⟨h.1, h.2.1, h.2.2.1, h.2.2.2.1, h.2.2.2.2.1, h.2.2.2.2.2.1, h.2.2.2.2.2.2.1, h.2.2.2.2.2.2.2.1,
-    h.2.2.2.2.2.2.2.2.1, h.2.2.2.2.2.2.2.2.2.1, trivial, h.2.2.2.2.2.2.2.2.2.2.2.1, h.2.2.2.2.2.2.2.2.2.2.2.2⟩
+  ⟨pkRegsN_set R0 R 25#5 _ h (by decide), by simp []⟩
 
 /-! ## The format walk's bookkeeping -/
 
@@ -727,7 +622,7 @@ theorem nullBody_nonul : nonul nullBody := by
 theorem null_addr : KA.«printk» + 0x6ae2#64 = KStr.«(null)» := by
   decide
 
-theorem digits_addr : KA.«printk» + 0x7212#64 = KA.«digits» := by
+theorem digits_addr : KA.«printk» + 0x720a#64 = KA.«digits» := by
   decide
 
 theorem ite_decide_ne {α : Type} (n : Nat) (x y : α) :
@@ -778,8 +673,6 @@ abbrev pkExit (cpu : CPU) (k : KCtx) (γpr : GName) (γd : UartNames) (bs : List
 
 end
 
-
-theorem dispatch7a0_zero : dispatch7a0 0#8 0#8 0#8 = (KA.«printk» + 0x2fe#64) := by decide
 
 /-! ## The directive table, case by case -/
 
@@ -937,7 +830,7 @@ theorem pkKinds_at_none (f : List (BitVec 8)) (i : Nat) (hi : i < f.length) (hp 
   rw [pkKinds_at f i hi hp, h]
   rfl
 
-theorem pr_addr_520 : KA.«printk» + 0x11f02#64 = KA.«pr» := by
+theorem pr_addr_520 : KA.«printk» + 0x11fa2#64 = KA.«pr» := by
   decide
 
 theorem ret_52c : jumpPc (KA.«printk» + 0x2a#64) = (KA.«printk» + 0x2a#64) := by decide
@@ -1055,7 +948,7 @@ set_option hygiene false in
 macro_rules
   | `(tactic| k_step_noite $rule:term $$ $pat:specPat) => `(tactic| k_step_noite $rule:term $$ $pat:specPat with [])
   | `(tactic| k_step_noite $rule:term $$ $pat:specPat with [$extra,*]) =>
-    `(tactic| (iapply $rule:term $$ $pat:specPat
+    `(tactic| (k_iapply $rule:term $$ $pat:specPat
                rotate_right 1
                iframe #
                k_norm_noite [$extra,*]
@@ -1073,7 +966,7 @@ macro_rules
   | `(tactic| k_step_noite $rule:term from $code:term $ht:ident $$ $pat:specPat) =>
     `(tactic| k_step_noite $rule:term from $code:term $ht:ident $$ $pat:specPat with [])
   | `(tactic| k_step_noite $rule:term from $code:term $ht:ident $$ $pat:specPat with [$extra,*]) =>
-    `(tactic| (iapply $rule:term $$ $pat:specPat
+    `(tactic| (k_iapply $rule:term $$ $pat:specPat
                rotate_right 1
                isplitr
                · iapply $code:term

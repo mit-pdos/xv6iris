@@ -34,8 +34,6 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedVariables false
-
 /-- **`usertrap` meets its specification**, given its callees'
 interfaces. -/
 theorem usertrap_proof (SY : SYSCALL_XV6) (PK : PRINTK) (MP : MYPROC) (KI : KILLED) (SK : SETKILLED)

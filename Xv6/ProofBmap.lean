@@ -62,9 +62,7 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-- The core's arm, on `rv`, read at `a0`. -/
 theorem bm_arm_a0 (R' : RegMap) (rv w : BitVec 32) (ha0 : R' 10#5 = BitVec.signExtend 64 rv)
@@ -74,7 +72,7 @@ theorem bm_arm_a0 (R' : RegMap) (rv w : BitVec 32) (ha0 : R' 10#5 = BitVec.signE
   · exact Or.inl ⟨ha0.trans (fw_sext_zero rv h0), hw⟩
   · exact Or.inr ⟨by rw [ha0, he], hw⟩
 
-/-- The core's ledger at a kit, read as `wp_bmap_gen`'s clauses (a)-(e). -/
+/-- The core's ledger at a kit, read as `wp_bmap_gen_body`'s clauses (a)-(e). -/
 theorem bm_ledger_gen (a : BmAlloc) (cr : Bool) (bm bm' : Blkmap) (fbn n n' : Nat)
     (Sb Sb' : List Nat) (h : bmLedgerOk (some a) cr bm bm' fbn n n' Sb Sb') :
     n ≤ n' + bmapCost cr (bmapAlloced bm bm' fbn) (bmapInd fbn) ∧ n' ≤ n ∧

@@ -42,17 +42,15 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-set_option linter.unusedVariables false
 
 /-! ## The code's constants -/
 
-theorem il_br_acq : KA.«ilock» + 0xd86#64 = KA.«acquiresleep» := by decide
+theorem il_br_acq : KA.«ilock» + 0xde6#64 = KA.«acquiresleep» := by decide
 theorem ilk_br_bread : KA.«ilock» + 0xfffffffffffff968#64 = KA.«bread» := by decide
-theorem il_br_memmove : KA.«ilock» + 0xffffffffffffda3a#64 = KA.«memmove» := by decide
+theorem il_br_memmove : KA.«ilock» + 0xffffffffffffda26#64 = KA.«memmove» := by decide
 theorem ilk_br_brelse : KA.«ilock» + 0xfffffffffffffa70#64 = KA.«brelse» := by decide
-theorem il_br_panic : KA.«ilock» + 0xffffffffffffd4fa#64 = KA.«panic» := by decide
+theorem il_br_panic : KA.«ilock» + 0xffffffffffffd4e6#64 = KA.«panic» := by decide
 theorem il_t_valid : KA.«ilock» + 0x1c#64 + BitVec.signExtend 64 26#13 = KA.«ilock» + 0x36#64 := by
   decide
 
@@ -62,9 +60,9 @@ theorem il_ret_8e : jumpPc (KA.«ilock» + 0x8e#64) = KA.«ilock» + 0x8e#64 := 
 theorem il_ret_94 : jumpPc (KA.«ilock» + 0x94#64) = KA.«ilock» + 0x94#64 := by decide
 
 /-- `auipc a1,0x1d` + `lw a1,1562(a1)`: `sb.inodestart`. -/
-theorem il_sb_addr : KA.«ilock» + 0x1d842#64 = sbInodestart := by decide
+theorem il_sb_addr : KA.«ilock» + 0x1dace#64 = sbInodestart := by decide
 /-- `auipc a0,0x4` + `addi a0,a0,222`: the panic literal. -/
-theorem il_msg_addr : KA.«ilock» + 0x413a#64 = KStr.«ilock: no type» := by decide
+theorem il_msg_addr : KA.«ilock» + 0x411e#64 = KStr.«ilock: no type» := by decide
 
 /-! ## The guards' readings
 
@@ -78,7 +76,7 @@ theorem il_entry_nonzero (kk : Nat) (hkk : kk < NINODE) : (ientry kk).toNat ≠ 
 
 /-! ## The panic message -/
 
-/-- `ilock: no type` at `0x80007478` (Rocq's `il_msg`). -/
+/-- `ilock: no type` at `0x80007470` (Rocq's `il_msg`). -/
 def ilMsgStr : List (BitVec 8) :=
   [0x69#8, 0x6c#8, 0x6f#8, 0x63#8, 0x6b#8, 0x3a#8, 0x20#8, 0x6e#8, 0x6f#8, 0x20#8,
    0x74#8, 0x79#8, 0x70#8, 0x65#8]

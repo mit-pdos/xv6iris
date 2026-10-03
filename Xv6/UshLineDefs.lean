@@ -49,7 +49,6 @@ instance (`rd_res`, `echo_link_inst`) and the plain-ledger twins.
    where it fixes the implicit `L`); it is kept so a call names the record.
 -/
 import Xv6.UkReadCons
-import Xv6.UshMainDefs
 import Xv6.ReadRec
 import Xv6.UkInitDefs
 
@@ -57,8 +56,6 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Std (ExtTreeSet)
-
-set_option linter.unusedSectionVars false
 
 /-! ## §1 The family -/
 
@@ -177,12 +174,6 @@ def ushRdInAt {L : LinkRec hlc GF} (_R : ReadRec L) (γ : EchoGn) (I : List (Bit
     (ws : List (List Obs × BitVec 8)) : IProp GF :=
   iprop((∃ v : EraPins, eraPin γ (genId (hlc := hlc) (GF := GF) + 1) v ∗ inpLb v I ∗ L.lkRres v I ∗
       L.lkRr (genId (hlc := hlc) (GF := GF) + 1) v I.length ws) ∨ L.lkT)
-
-/-- **Rocq `ush_read_fam_era_at`**: the family at the era's own `Rp`
-(the hold) and `Rin` (`ushRdInAt`). -/
-def ushReadFamEraAt {L : LinkRec hlc GF} (R : ReadRec L) (γ : EchoGn) (γp : GName) (I : List (BitVec 8))
-    (Q : Int → IProp GF) : Xfam GF :=
-  ushReadFamAt (hlc := hlc) γp L.lkT I.length (ushRdHold (hlc := hlc) L.lkRres γ I) (ushRdInAt R γ I) Q
 
 /-- **Rocq `ush_dirty_law`**: THE MARKED ARM'S LAW (seccomp S5b) -- a byte
 the call took from a stored position at or after the reader's, of this era,

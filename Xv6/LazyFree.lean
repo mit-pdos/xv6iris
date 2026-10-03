@@ -53,12 +53,6 @@ theorem lazyFree_extSz {P P' : UPtd} {sz sz' : BitVec 64} (hext : P.extSz sz P')
     (h : lazyFree P.um sz') : lazyFree P'.um sz' :=
   lazyFree_ext hext.1 h
 
-/-- It reads the table only through its DOMAIN (Rocq `lazy_free_dom`). -/
-theorem lazyFree_dom {um um' : RegMapF (BitVec 64)} (sz : BitVec 64)
-    (hd : ∀ k, (get? um k).isSome = (get? um' k).isSome) :
-    lazyFree um sz ↔ lazyFree um' sz :=
-  ⟨fun h k hk => (hd k) ▸ h k hk, fun h k hk => (hd k).symm ▸ h k hk⟩
-
 /-- THE SHRINK (Rocq `lazy_free_del_run`): a run deleted at or above
 `PGROUNDUP` of the new, lower break leaves every page it still covers. -/
 theorem lazyFree_delRun (P : UPtd) (sz sz' : BitVec 64) (v0 n : Nat)

@@ -29,7 +29,6 @@ statement.  The tree-level corollary `wp_ref_parseexec_tree` is unreached
 (not ported).
 -/
 import Xv6.UshTreeDefs
-import Xv6.RefParseSym
 import Xv6.UshParserPure
 
 namespace Xv6

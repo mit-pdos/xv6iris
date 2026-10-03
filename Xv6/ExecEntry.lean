@@ -41,7 +41,7 @@ definitions are introduced persistently by every consumer).
 1. **The caller's image is a PAGE VIEW** `M : Nat → List (BitVec 8)` (the
    type `SpecSysExec.execArgsOf` reads; Rocq `gmap Z (bv 8)`) --
    UexecExecInst deviation 1: a consumer at a key states the entry at every
-   view agreeing with the key's `ElfMem` (`ExecRunSup.uexecSupRun`).
+   view agreeing with the key's `ElfMem`.
 2. Numbers: `cw : Nat` (inums, FsAbsDefs deviation 1), `Q : Int → IProp`,
    `cs : ExtTreeSet GName compare` (Rocq `gset gname`), `X : Uvis → IProp`
    (Rocq `uvis -d> iPropO Σ`).

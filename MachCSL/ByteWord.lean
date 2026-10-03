@@ -8,8 +8,9 @@ of width 8.  This file is the bridge:
 
 * `byteBuf_append` / `byteBuf_replicate_split`: a buffer splits at any
   index (the big-op over `++`, with the index shift on the addresses);
-* `wordToBytes` / `bytesToWord`: the little-endian byte list of a
-  doubleword and its inverse, mutually inverse on eight bytes;
+* `wordToBytes` / `bytesToWord` (defined in `MachCSL.ByteWordDefs`): the
+  little-endian byte list of a doubleword and its inverse, mutually inverse
+  on eight bytes;
 * `wordPointsTo_of_bytes` / `wordPointsTo_to_bytes`: eight byte cells at an
   8-aligned address are a doubleword cell, and back.  The eight cells each
   carry their own mapping claim, pin and RAM fact; since the address is
@@ -20,6 +21,7 @@ of width 8.  This file is the bridge:
   of a page out of the buffer, write it, put the bytes back.
 -/
 import MachCSL.CallConv
+import MachCSL.ByteWordDefs
 
 namespace MachCSL
 
@@ -99,15 +101,6 @@ theorem inRam8_of_ends (p : BitVec 64) (hlo : inRam p 1) (hhi : inRam (p + BitVe
 
 /-! ## Words as bytes -/
 
-/-- The eight bytes of a doubleword, little-endian. -/
-def wordToBytes (w : BitVec 64) : List (BitVec 8) :=
-  [nthByte (n := 8) w 0, nthByte (n := 8) w 1, nthByte (n := 8) w 2, nthByte (n := 8) w 3,
-   nthByte (n := 8) w 4, nthByte (n := 8) w 5, nthByte (n := 8) w 6, nthByte (n := 8) w 7]
-
-/-- The doubleword of a byte list, little-endian (the first byte lowest). -/
-def bytesToWord (bs : List (BitVec 8)) : BitVec 64 :=
-  bs.foldr (fun b acc => acc <<< 8 ||| BitVec.setWidth 64 b) 0#64
-
 theorem wordToBytes_length (w : BitVec 64) : (wordToBytes w).length = 8 := rfl
 
 /-- The single byte of a one-byte window is the value itself. -/
@@ -137,12 +130,6 @@ theorem nthByte_bytesToWord (b0 b1 b2 b3 b4 b5 b6 b7 : BitVec 8) :
 theorem bytesToWord_wordToBytes (w : BitVec 64) : bytesToWord (wordToBytes w) = w := by
   simp only [bytesToWord, wordToBytes, nthByte, List.foldr_cons, List.foldr_nil]
   bv_decide
-
-theorem wordToBytes_bytesToWord (bs : List (BitVec 8)) (h : bs.length = 8) :
-    wordToBytes (bytesToWord bs) = bs := by
-  obtain ⟨b0, b1, b2, b3, b4, b5, b6, b7, rfl⟩ := list8 bs h
-  obtain ⟨e0, e1, e2, e3, e4, e5, e6, e7⟩ := nthByte_bytesToWord b0 b1 b2 b3 b4 b5 b6 b7
-  simp only [wordToBytes, e0, e1, e2, e3, e4, e5, e6, e7]
 
 /-! ## Splitting a buffer -/
 

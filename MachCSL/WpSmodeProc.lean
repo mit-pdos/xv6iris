@@ -11,6 +11,7 @@ and the change would have to be paid for; xv6 never does it there.)
 import MachCSL.CallConv
 import MachCSL.WpSmodeCycle
 import MachCSL.WpSmodeMem
+import MachCSL.WpSmodeMemSd
 
 namespace MachCSL
 
@@ -44,10 +45,6 @@ theorem KCtx.withProc_self (k : KCtx) (p : BitVec 64) (h : k.proc = p) : k.withP
 
 theorem KCtx.withProc_withRegs (k : KCtx) (R : RegMap) (p : BitVec 64) :
     (k.withRegs R).withProc p = (k.withProc p).withRegs R := rfl
-theorem KCtx.withProc_pushed (k : KCtx) (m : Nat) (p : BitVec 64) :
-    (k.pushed m).withProc p = (k.withProc p).pushed m := rfl
-theorem KCtx.withProc_withLocks (k : KCtx) (l : List String) (p : BitVec 64) :
-    (k.withLocks l).withProc p = (k.withProc p).withLocks l := rfl
 
 set_option maxHeartbeats 4000000 in
 /-- The schema for an instruction that retargets this hart's `c->proc`

@@ -18,7 +18,6 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 
 set_option maxHeartbeats 4000000 in
 -- the linter walks the multi-case `swp_run` info tree (12 cases: 10 s, a third of the file)
-set_option linter.unusedVariables false in
 /-- The effective-address transform of a kernel access at either tier:
 pointer masking is off (`menvcfg.PMM = 0`), the address is untouched. -/
 theorem swp_transform_effective_address_S [CurCtx] (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Bool)
@@ -57,7 +56,7 @@ theorem swp_transform_effective_address_S [CurCtx] (cpu : CPU) (dq : DFrac) (c :
       reduce_closed_widths
       simp only [pm_transform_PA, pm_transform_VA, zero_extend, sign_extend, Sail.BitVec.zeroExtend,
         Sail.BitVec.signExtend, Sail.BitVec.extractLsb, BitVec.extractLsb, Functions.xlen, Int.reduceSub,
-        Int.reduceToNat, Int.reduceAdd, Nat.reduceSub, Nat.reduceAdd, Nat.sub_zero, Int.cast_ofNat_Int]
+        Int.reduceToNat, Nat.reduceAdd, Nat.sub_zero, Int.cast_ofNat_Int]
       reduce_closed_widths
       try simp only [BitVec.zeroExtend, MachCSL.setWidth_extract64', MachCSL.signExtend_extract64']
       conf_intro HmConf

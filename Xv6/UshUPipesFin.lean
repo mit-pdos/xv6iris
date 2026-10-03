@@ -26,6 +26,8 @@ import Xv6.UshUPipesClaim
 import Xv6.UshPipesNodeDefs
 import Xv6.UshPipesFork
 import Xv6.UexecRet
+import Xv6.UshURoundShapes
+import Xv6.UshURoundBody
 
 namespace Xv6
 
@@ -35,8 +37,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Std (ExtTreeSet)
 open Wid Pline'
 open UShPipesDefs UShPipesNode
-
-set_option linter.unusedSectionVars false
 
 section Fin
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [IcacheG GF]
@@ -51,6 +51,10 @@ s0 PT PD`, `Wbu := uWbf ug r s0` at `PT := upterm_shape ug`, `PD :=
 updone_shape ug`). -/
 noncomputable abbrev Xu (ug : UnionGn) (r : FileAppNames) (s0 : Fstate) (γp : GName) : UshCtx GF :=
   ushURoundCtx (hlc := hlc) ug r s0 (uptermShape ug) (updoneShape ug) γp
+
+/-- The union's credential family, read off the record. -/
+theorem Xu_Wc (ug : UnionGn) (r : FileAppNames) (s0 : Fstate) (γp : GName) :
+    (Xu (hlc := hlc) (GF := GF) ug r s0 γp).Wc = uWcu ug r s0 (uptermShape ug) (updoneShape ug) := rfl
 
 /-- THE ROUND the branch runs: `UShPipesDefs`'s section variables at the
 union (`pg := ugn_pipe ug`, `U`, `pview_unionU`, `CPU := ucparams ug`, `∅`,
@@ -83,8 +87,6 @@ section uDEq
 variable (ug : UnionGn) (v : EraPins) (I : List (BitVec 8)) (sR : Fstate) (lR : Pline')
   (L : List (BitVec 8)) (pr : Producer) (Rd : IProp GF) (γc γm : Wid → GName) (P : Nat → PNames)
   (gF gG : Nat → GName)
-
-theorem uD_T : (uD ug v I sR lR L pr Rd γc γm P gF gG).T = fileTaint (hlc := hlc) ug.ugnFile.fgnCl := rfl
 
 theorem uD_FAM : (uD ug v I sR lR L pr Rd γc γm P gF gG).FAM =
     blkNInv (hlc := hlc) (wids (lcats lR)) (runN (filesOf sR) lR) (pwcBlkU ug v I sR) termw (tokN (filesOf sR) lR)

@@ -42,9 +42,6 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedSectionVars false
-set_option linter.unusedVariables false
-
 /-- The contract's parameters (everything but the machine context, `Γ` and
 the hart). -/
 structure NamexArgs where
@@ -68,6 +65,9 @@ structure NamexArgs where
   dqb : DFrac
   dqs : DFrac
   dqpv : DFrac
+  rootv : BitVec 64
+  rti : Nat
+  dqr : DFrac
 
 /-- The modelled path (Rocq's `pl := bview plen pfun`). -/
 abbrev NamexArgs.pl (A : NamexArgs) : List (BitVec 8) := bview A.plen A.pfun
@@ -229,7 +229,8 @@ def namexKeep (k : KCtx) (A : NamexArgs) : IProp GF := iprop%
   wordPointsTo sbBmapstartAddr 4 A.dqb (BitVec.ofNat 32 fscBmapstart) ∗
   wordPointsTo sbInodestart 4 A.dqs (BitVec.ofNat 32 icfgIst) ∗
   wordPointsTo (pPid k.proc) 4 A.dqp A.pidv ∗
-  wordPointsTo (pCwd k.proc) 8 A.dqc A.cwdv ∗ inodeHeldAt A.cwdv A.cwi
+  wordPointsTo (pCwd k.proc) 8 A.dqc A.cwdv ∗ inodeHeldAt A.cwdv A.cwi ∗
+  wordPointsTo (pRoot k.proc) 8 A.dqr A.rootv ∗ inodeHeldAt A.rootv A.rti
 
 /-- The path buffer: `plen` content bytes and the terminator. -/
 def namexPath (k : KCtx) (A : NamexArgs) : IProp GF :=
@@ -263,7 +264,8 @@ def namexOut (k : KCtx) (A : NamexArgs) (n' : Nat) (Sb' : List Nat) (ok : Bool)
 
 /-- The contract's continuation at the record. -/
 def namexPostA (k : KCtx) (A : NamexArgs) (c : CPU) : IProp GF :=
-  namexPost k A.plen A.pfun A.npar A.n A.Sb A.pidv A.cwdv A.cwi A.dqp A.dqc A.dqb A.dqs A.dqpv c
+  namexPost k A.plen A.pfun A.npar A.n A.Sb A.pidv A.cwdv A.cwi A.dqp A.dqc A.dqb A.dqs A.dqpv
+    A.rootv A.rti A.dqr c
 
 /-- The continuation, applied to an out-bundle. -/
 theorem namexPostA_elim (k : KCtx) (A : NamexArgs) (c : CPU) (spie spp : Bool) (R' : RegMap)
@@ -274,9 +276,10 @@ theorem namexPostA_elim (k : KCtx) (A : NamexArgs) (c : CPU) (spie spp : Bool) (
       trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗
       namexOut k A n' Sb' ok nf ipv w (R' 10#5) -∗ wpLoop c := by
   unfold namexPostA namexPost namexOut namexKeep namexPath
-  iintro H Hk Hpc Hte Hce ⟨⟨Hsb, Hsi, Hpid, Hcwd, Hcwr⟩, Hpath, Hnm, Hbs, %hf, Hlog, Htx, Harm⟩
+  iintro H Hk Hpc Hte Hce ⟨⟨Hsb, Hsi, Hpid, Hcwd, Hcwr, Hrtc, Hrtr⟩, Hpath, Hnm, Hbs, %hf, Hlog,
+    Htx, Harm⟩
   iapply H $$ %spie %spp %R' %n' %Sb' %ok %nf %ipv %w %hcs Hk Hpc Hte Hce Hsb Hsi Hpid Hcwd Hcwr
-    Hpath Hnm Hbs %hf Hlog Htx
+    Hrtc Hrtr Hpath Hnm Hbs %hf Hlog Htx
   unfold namexArm
   iexact Harm
 
@@ -284,7 +287,8 @@ theorem namexPostA_elim (k : KCtx) (A : NamexArgs) (c : CPU) (spie spp : Bool) (
 theorem namex_post_of_spec (k : KCtx) (A : NamexArgs) (cpu : CPU) (hj : A.j < NPROC)
     (hproc : k.proc = procAddr A.j) :
     wpNext true k.proc cpu (namexPost k A.plen A.pfun A.npar A.n A.Sb A.pidv A.cwdv A.cwi
-      A.dqp A.dqc A.dqb A.dqs A.dqpv) ⊢ ∀ c : CPU, namexPostA (GF := GF) k A c := by
+      A.dqp A.dqc A.dqb A.dqs A.dqpv A.rootv A.rti A.dqr) ⊢
+      ∀ c : CPU, namexPostA (GF := GF) k A c := by
   iintro H %c
   unfold namexPostA
   iapply wpNext_at true k.proc cpu c _ (Xv6.rd_pin hj k hproc c cpu) $$ H
@@ -296,7 +300,7 @@ def namexLoop (k : KCtx) (A : NamexArgs) (fuel : Nat) : IProp GF := iprop(
     (Scur : List Nat) (es0 : List (List (BitVec 8))) (nf : Nat → BitVec 8) (wc : Bool),
     ⌜namexInv k A R off ipv ncur Scur es0 wc fuel⌝ -∗
     kctx c (((k.withSpie spie spp).pushed 12).withRegs R) -∗
-    pcIs c (KA.«namex» + 0xf4#64) -∗
+    pcIs c (KA.«namex» + 0xf8#64) -∗
     namexFrame k -∗ trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗
     namexWalk k A ipv ncur Scur nf -∗
     (∀ c' : CPU, namexPostA k A c') -∗ wpLoop c)
@@ -307,7 +311,7 @@ theorem namexLoop_elim (k : KCtx) (A : NamexArgs) (fuel : Nat) :
         (Scur : List Nat) (es0 : List (List (BitVec 8))) (nf : Nat → BitVec 8) (wc : Bool),
       ⌜namexInv k A R off ipv ncur Scur es0 wc fuel⌝ -∗
       kctx c (((k.withSpie spie spp).pushed 12).withRegs R) -∗
-      pcIs c (KA.«namex» + 0xf4#64) -∗
+      pcIs c (KA.«namex» + 0xf8#64) -∗
       namexFrame k -∗ trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗
       namexWalk k A ipv ncur Scur nf -∗
       (∀ c' : CPU, namexPostA k A c') -∗ wpLoop c := by
@@ -318,7 +322,7 @@ theorem namexLoop_intro (k : KCtx) (A : NamexArgs) (fuel : Nat) :
         (Scur : List Nat) (es0 : List (List (BitVec 8))) (nf : Nat → BitVec 8) (wc : Bool),
       ⌜namexInv k A R off ipv ncur Scur es0 wc fuel⌝ -∗
       kctx c (((k.withSpie spie spp).pushed 12).withRegs R) -∗
-      pcIs c (KA.«namex» + 0xf4#64) -∗
+      pcIs c (KA.«namex» + 0xf8#64) -∗
       namexFrame k -∗ trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗
       namexWalk k A ipv ncur Scur nf -∗
       (∀ c' : CPU, namexPostA k A c') -∗ wpLoop c) ⊢ namexLoop (GF := GF) k A fuel := by

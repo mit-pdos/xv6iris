@@ -40,10 +40,3 @@ disagreeing address and fix the dumper (`tools/dump_user_elf.py`).
    (`segFileMap_rows`), not decided.
 3. `sync` is dumped since drift SY2 (Rocq b23e6791f: the union runs /sync); so is `seccomp`.
 -/
-import Xv6.ElfUserEcho
-import Xv6.ElfUserInit
-import Xv6.ElfUserSh
-import Xv6.ElfUserCat
-import Xv6.ElfUserGrep
-import Xv6.ElfUserSeccomp
-import Xv6.ElfUserSync

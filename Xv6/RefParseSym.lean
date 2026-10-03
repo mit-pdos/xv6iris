@@ -36,8 +36,6 @@ def refNonnul (len : Nat) (f : Nat → BitVec 8) : Prop := ∀ j, j < len → f 
 
 /-! ## §0 The cursor lemmas -/
 
-theorem rb_gt_is_ushs : ushsGt = rbGt := rfl
-
 theorem rtWord_ne_0 : rtWord ≠ 0 := by decide
 
 theorem refAt_lt (len : Nat) (f : Nat → BitVec 8) (i : Nat) (h : i < len) : refAt len f i = f i := by
@@ -267,8 +265,6 @@ theorem refRedirs_gt (len : Nat) (f : Nat → BitVec 8) (p e n i : Nat) (acc : L
   simp [refRedirs_succ, e1, e2, e3, e4, rredirOf_gt]
 
 theorem rb_gt_ne_nul : rbGt ≠ ubyte0 := by decide
-theorem rb_bar_ne_lt : rbBar ≠ rbLt := by decide
-theorem ushpIsSym_lt : ushpIsSym rbLt = true := by decide
 
 /-- the accumulator is only ever appended to. -/
 theorem refRedirs_acc (len : Nat) (f : Nat → BitVec 8) (n i : Nat) (acc : List Rredir) :
@@ -594,12 +590,6 @@ theorem refHasRedir_wrap (c : UshpCmd) (rs : List Rredir) (hne : rs ≠ []) : re
     · rw [e]; rfl
     · rw [E]; rfl
 
-theorem app_ne_l {A : Type} (l1 l2 : List A) (h : l1 ≠ []) : l1 ++ l2 ≠ [] := by
-  intro e; exact h (List.append_eq_nil_iff.1 e).1
-
-theorem app_ne_r {A : Type} (l1 l2 : List A) (h : l2 ≠ []) : l1 ++ l2 ≠ [] := by
-  intro e; exact h (List.append_eq_nil_iff.1 e).2
-
 /-! ### The redirect line -/
 
 theorem ushsOne_le_sym (len : Nat) (f : Nat → BitVec 8) (p j : Nat) (hone : ushsOne len f (some p))
@@ -750,20 +740,12 @@ theorem refParsecmd_redir (len : Nat) (f : Nat → BitVec 8) (p e : Nat) (toks :
 
 /-! ### The two symbol bytes parseline peeks for are out of the scope -/
 
-theorem ushpIsSym_amp : ushpIsSym rbAmp = true := by decide
-theorem ushpIsSym_semi : ushpIsSym rbSemi = true := by decide
-theorem rb_amp_ne_bar : rbAmp ≠ rbBar := by decide
-theorem rb_amp_ne_gt : rbAmp ≠ rbGt := by decide
-theorem rb_semi_ne_bar : rbSemi ≠ rbBar := by decide
-theorem rb_semi_ne_gt : rbSemi ≠ rbGt := by decide
-
 /-- Rocq `ref_out_scope`: a peek table of symbol bytes none of which the scope admits. -/
 def refOutScope (toks : List (BitVec 8)) : Prop :=
   ∀ b ∈ toks, ushpIsSym b = true ∧ b ≠ rbBar ∧ b ≠ rbGt
 
 theorem refOutScope_amp : refOutScope [rbAmp] := by unfold refOutScope; decide
 theorem refOutScope_semi : refOutScope [rbSemi] := by unfold refOutScope; decide
-theorem refOutScope_nil : refOutScope [] := by unfold refOutScope; decide
 
 theorem refPeek_scope_miss (len : Nat) (f : Nat → BitVec 8) (i : Nat) (toks : List (BitVec 8))
     (hsc : refSymScope len f) (hout : refOutScope toks) : refPeek len f i toks = (false, refSkip len f i) := by

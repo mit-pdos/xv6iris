@@ -41,8 +41,6 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-set_option linter.unusedSectionVars false
-
 /-! ## The chain the phase formats -/
 
 /-- The `Xv6.Chain` record `virtio_disk_rw` builds out of the three
@@ -51,19 +49,6 @@ device's direction bit `dwr` is the NEGATION of the C parameter `write`
 (`write` means the device READS the data descriptor). -/
 def vdrwChain (b : BitVec 64) (bno : BitVec 32) (wr : Bool) (h m t : Nat) : Chain :=
   { hd := h, md := m, tl := t, dwr := !wr, sector := sectorOf bno, bp := b }
-
-@[simp] theorem vdrwChain_hd (b : BitVec 64) (bno : BitVec 32) (wr : Bool) (h m t : Nat) :
-    (vdrwChain b bno wr h m t).hd = h := rfl
-@[simp] theorem vdrwChain_md (b : BitVec 64) (bno : BitVec 32) (wr : Bool) (h m t : Nat) :
-    (vdrwChain b bno wr h m t).md = m := rfl
-@[simp] theorem vdrwChain_tl (b : BitVec 64) (bno : BitVec 32) (wr : Bool) (h m t : Nat) :
-    (vdrwChain b bno wr h m t).tl = t := rfl
-@[simp] theorem vdrwChain_dwr (b : BitVec 64) (bno : BitVec 32) (wr : Bool) (h m t : Nat) :
-    (vdrwChain b bno wr h m t).dwr = !wr := rfl
-@[simp] theorem vdrwChain_sector (b : BitVec 64) (bno : BitVec 32) (wr : Bool) (h m t : Nat) :
-    (vdrwChain b bno wr h m t).sector = sectorOf bno := rfl
-@[simp] theorem vdrwChain_bp (b : BitVec 64) (bno : BitVec 32) (wr : Bool) (h m t : Nat) :
-    (vdrwChain b bno wr h m t).bp = b := rfl
 
 /-- **The chain's payload**, as the publication stamps it: the bytes the
 block holds once the transfer is over -- the DISK's for a read
@@ -159,22 +144,10 @@ theorem opsSec_facts (i : Nat) (hi : i < NUM) :
       kmapClass (vpnOf (aOps i + 8#64)).toNat = some .rw := by
   rcases lt8_cases i hi with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> exact ⟨by decide, by decide, by decide⟩
 
-theorem infoB_facts (i : Nat) (hi : i < NUM) :
-    inRam (aInfoB i) 8 ∧ (aInfoB i).toNat % 8 = 0 ∧
-      kmapClass (vpnOf (aInfoB i)).toNat = some .rw := by
-  rcases lt8_cases i hi with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> exact ⟨by decide, by decide, by decide⟩
-
-theorem infoStatus_facts (i : Nat) (hi : i < NUM) :
-    inRam (aInfoStatus i) 1 ∧ (aInfoStatus i).toNat % 1 = 0 ∧
-      kmapClass (vpnOf (aInfoStatus i)).toNat = some .rw := by
-  rcases lt8_cases i hi with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> exact ⟨by decide, by decide, by decide⟩
-
 /-! ## `disk.ops[i]`, as the three cells the driver stores through -/
 
 section ops
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
-
-theorem aOps_off4 (i : Nat) : aOps i + BitVec.ofNat 64 4 = aOps i + 4#64 := rfl
 
 /-- **The request-header window, opened**: `type` (4), `reserved` (4),
 `sector` (8). -/
@@ -247,8 +220,8 @@ end ops
 
 `Xv6.diskResA` is `Xv6.diskRes` with some slots taken, so it has the
 same counters, the same `avail->idx` half and the same eight ring cells;
-these four lemmas are `Xv6.diskRes_open`, `diskRes_close`,
-`diskRes_availIdx_acc` and `diskRes_ring_acc` at that payload. -/
+`diskResA_open` / `diskResA_close` are `Xv6.diskRes_open` / `diskRes_close`
+at that payload. -/
 
 section payloadA
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
@@ -474,9 +447,9 @@ theorem vdrw_chainWr_arm (c : Chain) (wr : Bool) (bno : BitVec 32) (dataBuf : Li
     chainWr (c.arm e pw ξ kq) = vdrwWr wr bno dataBuf := by
   unfold chainWr vdrwWr
   cases wr
-  · simp only [Chain.arm_dwr, hdwr, Bool.not_false, ite_true, Bool.false_eq_true, ite_false]
+  · simp only [hdwr, Bool.not_false, ite_true, Bool.false_eq_true, ite_false]
   · have hd : c.dwr = false := by rw [hdwr]; rfl
-    simp only [Chain.arm_dwr, hd, Chain.arm_blk, hblk, Chain.arm_pay, hpw hd,
+    simp only [hd, Chain.arm_blk, hblk, Chain.arm_pay, hpw hd,
       bytesOf_bvOfBytes BSIZE dataBuf hdl, Bool.false_eq_true, ite_false, ite_true]
 
 /-- The era's crash-permit channel, out of the bundle. -/
@@ -485,12 +458,6 @@ theorem vdrwCaps_perm (γ : DiskNames) (γl : GName) (pd pav pu : BitVec 64) :
   unfold vdrwCaps
   iintro ⟨#H1, #H2, #H3, #H4⟩
   iexact H4
-
-theorem vdrwCaps_lock (γ : DiskNames) (γl : GName) (pd pav pu : BitVec 64) :
-    vdrwCaps (GF := GF) γ γl pd pav pu ⊢ isLock γl aVdiskLock "virtio_disk" (diskRes γ pd pav pu) := by
-  unfold vdrwCaps
-  iintro ⟨#H1, #H2, #H3, #H4⟩
-  iexact H3
 
 end caps
 
@@ -548,8 +515,7 @@ payload one QUARTER of each of the three receipts and hands the other
 back here (`Xv6.headTokQ`): they are what the publisher carries across
 its park inside `sleep`, and agreement with the payload's quarters is
 what says, when it wakes and re-acquires the lock, that the slots it is
-about to collect are still ITS chain
-(`Xv6.diskRes_slot_of_quarter`). -/
+about to collect are still ITS chain. -/
 def vdrwP4Exit (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γ : DiskNames) (γl : GName) (pd pav pu : BitVec 64)
     (bno : BitVec 32) (dataBuf dataDisk : List (BitVec 8)) (wr : Bool)
@@ -648,7 +614,7 @@ end rules
 /-! ## Addresses of the P3/P4 region -/
 
 /-- `&disk`, out of `auipc a5,0x1e; addi a5,a5,-1408` at `+0xcc`. -/
-theorem vdrw3_disk_addr : KA.«virtio_disk_rw» + 0x1dd2c#64 = KA.«disk» := by decide
+theorem vdrw3_disk_addr : KA.«virtio_disk_rw» + 0x1dedc#64 = KA.«disk» := by decide
 
 /-- `slli rd,rs,4` on a descriptor index. -/
 theorem vdrw3_shl4 (i : Nat) : BitVec.ofNat 64 i <<< 4 = BitVec.ofNat 64 (16 * i) := by
@@ -678,8 +644,6 @@ theorem vdrw3_disk_off' (off i k : Nat) :
   rw [← BitVec.add_assoc (BitVec.ofNat 64 off) KA.«disk» (BitVec.ofNat 64 k),
     ← BitVec.add_assoc (BitVec.ofNat 64 (16 * i)), ← BitVec.add_assoc]
   exact vdrw3_disk_off off i k
-
-theorem vdrw3_diskAddr (off : Nat) : KA.«disk» + BitVec.ofNat 64 off = diskAddr off := rfl
 
 /-- The three cells of `disk.ops[h]`, as `+0xe2`, `+0xe4` and `+0xe8` name them. -/
 theorem vdrw3_ops0 (i : Nat) : KA.«disk» + BitVec.ofNat 64 (160 + 16 * i + 8) = aOps i := by
@@ -720,10 +684,6 @@ theorem vdrw3_opsVal (i : Nat) :
   rw [diskIdx_addr' 168 i]
   rfl
 
-/-- The descriptor at `pd + 16 i`, as `add rd,pd,a3` computes it. -/
-theorem vdrw3_descAt (pd : PAddr) (i k : Nat) :
-    pd + BitVec.ofNat 64 (16 * i) + BitVec.ofNat 64 k = descAt pd i + BitVec.ofNat 64 k := rfl
-
 theorem vdrw3_desc0 (pd : PAddr) (i : Nat) :
     pd + BitVec.ofNat 64 (16 * i) = descAt pd i := rfl
 theorem vdrw3_desc8 (pd : PAddr) (i : Nat) :
@@ -740,19 +700,12 @@ theorem vdrw3_desc14 (pd : PAddr) (i : Nat) :
 theorem vdrw3_bufData (b : BitVec 64) : b + 88#64 = aBufData b := rfl
 theorem vdrw3_bufDisk (b : BitVec 64) : b + 4#64 = aBufDisk b := rfl
 
-/-- `&disk.desc`, `&disk.avail`: `ld a4,0(a5)`, `ld a3,8(a5)` with `a5 = &disk`. -/
-theorem vdrw3_descPtr : KA.«disk» = aDescPtr := rfl
-theorem vdrw4_availPtr : KA.«disk» + 8#64 = aAvailPtr := rfl
-
 /-- `disk.avail->idx` and one ring cell, as `+0x178` and `+0x182` name them. -/
 theorem vdrw4_availIdx (pav : PAddr) : pav + 2#64 = availIdxAt pav := rfl
 theorem vdrw4_availRing (pav : PAddr) (j : Nat) :
     pav + (BitVec.ofNat 64 (2 * j) + 4#64) = availRingAt pav j := by
   unfold availRingAt
   rw [← MachCSL.ofNat64_add, show 2 * j + 4 = 4 + 2 * j from by omega]
-
-/-- `*R(QUEUE_NOTIFY)`, out of `lui a5,0x10001; sw zero,80(a5)`. -/
-theorem vdrw4_notify_addr : 0x10001000#64 + 80#64 = 0x10001050#64 := by decide
 
 /-! ## The arithmetic of the two phases -/
 
@@ -786,23 +739,8 @@ theorem vdrw3_type (wr : Bool) :
       (if !wr then BitVec.ofNat 32 Virtio.blkTIn else BitVec.ofNat 32 Virtio.blkTOut) := by
   cases wr <;> decide
 
-/-- `sd` of the sector. -/
-theorem vdrw3_sector (bno : BitVec 32) : sectorOf bno = sectorOf bno := rfl
-
-/-- `sw a4,8(a6)` with `a4 = 16`: the header descriptor's length. -/
-theorem vdrw3_len16 : BitVec.extractLsb' 0 32 (16#64) = BitVec.ofNat 32 opsSize := by decide
-/-- `sw a2,8(a4)` with `a2 = 1024`. -/
-theorem vdrw3_len1024 : BitVec.extractLsb' 0 32 (1024#64) = BitVec.ofNat 32 BSIZE := by decide
 /-- `sw a1,8(a4)` with `a1 = 1`: the status descriptor's length. -/
 theorem vdrw3_len1 : BitVec.extractLsb' 0 32 (1#64) = 1#32 := by decide
-/-- `sh a1,12(a6)` with `a1 = 1`: `VRING_DESC_F_NEXT`. -/
-theorem vdrw3_flNext : BitVec.extractLsb' 0 16 (1#64) = BitVec.ofNat 16 Virtio.descFNext := by
-  decide
-/-- `sh a3,12(a4)` with `a3 = 2`: `VRING_DESC_F_WRITE`. -/
-theorem vdrw3_flWrite : BitVec.extractLsb' 0 16 (2#64) = BitVec.ofNat 16 Virtio.descFWrite := by
-  decide
-/-- `sh zero,14(a4)`: the chain ends. -/
-theorem vdrw3_next0 : BitVec.extractLsb' 0 16 (0#64) = 0#16 := by decide
 
 /-- `seqz a2,s6 ; slliw a2,a2,1 ; or a2,a2,a1`: the data descriptor's flags. -/
 theorem vdrw3_flData (wr : Bool) :
@@ -821,7 +759,6 @@ theorem vdrw3_nextIdx (i : Nat) (hi : i < NUM) :
 /-- `sb a4,16(a6)` with `a4 = -1`: `info[h].status = 0xff`. -/
 theorem vdrw3_statusByte :
     BitVec.extractLsb' 0 8 (0xffffffffffffffff#64) = 0xff#8 := by decide
-
 
 /-- `lhu a5,2(a4) ; addiw a5,a5,1 ; sh a5,2(a4)`: the published count. -/
 theorem vdrw4_bump (n : Nat) :
@@ -884,6 +821,5 @@ theorem vdrw4_idx_write (γ : DiskNames) (pd pav pu : PAddr) (cpu : CPU) (np i :
   exact disk_avail_idx_write γ pd pav pu cpu np i c
 
 end ring
-
 
 end Xv6
