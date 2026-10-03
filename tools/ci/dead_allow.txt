@@ -27,15 +27,21 @@ decl Xv6.Spin
 #    lane that strengthens kwait's copyout-failure answer
 decl Xv6.lazyFree_wmapped_iff
 
-# -- the NI campaign's in-logic core (M0 / M2-W3, G1d): round_det and the
-#    functional rows are reached by no root until M2-X carries the ledger
-#    receipts into the trace filing (claude-notes/projects/noninterference.md,
-#    "### M2-G1 design" §4 "M2-X"); keep them until then
-module Xv6.UsysDet
-decl Xv6.uexecRet_roundDet
-decl Xv6.uexecRet_roundDet_exists
+# -- the user tier's M0 engine reading (NI M0 / M2-W3): the landed
+#    relational arm at getpid / uptime IS the functional arm `usysDet`
+#    (`uexecRetContF_det`, with `usysIotaFits_exists`, which supplies the
+#    prefix from the answer).  `round_det` itself is reached since NI M2-X4
+#    (UserretClosedRows.urc_niDetRow, at the round's cited ι); this reading
+#    is reached only when a program proof takes the det arm -- keep it until
+#    one does (claude-notes/projects/noninterference.md, "M2-X design" §3)
 decl Xv6.uexecRetContF_det
-decl Xv6.zLowest_nil
-decl Xv6.usysWaitBytes_null
-decl Xv6.usysWaitBytes_length
-decl Xv6.usysWr_nil
+
+# -- the ledgers' other readings at a round's ι-prefix (NI M0 / M2-W3):
+#    `round_det`'s class reads only the tick count and (wait) `zLowest`; the
+#    allocator's, the pid counter's and the zombie set / statuses are the
+#    readings the lanes that re-admit sbrk (G3) and fork (the joint lane
+#    G1f+G2c+G3) will state their rows in -- remove each row with its lane
+decl Xv6.UIota.poolEmpty
+decl Xv6.UIota.nextPid
+decl Xv6.UIota.zombies
+decl Xv6.UIota.status

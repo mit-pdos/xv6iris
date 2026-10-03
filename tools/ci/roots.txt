@@ -10,5 +10,6 @@ Xv6.unionAdequacyClosed       # the union application (Rocq union_adequacy_close
 Xv6.unionSyncCutNeg           # Rocq union_sync_cut_neg
 Xv6.unionResults              # Rocq UInitUnion.union_results
 Xv6.xv6NiAdequacy             # NI M2-W4: the trace-level NI theorem, closed (publication gated on W2d)
-Xv6.xv6NiTwoRun               # NI M2-W4: its two-run corollary
+Xv6.xv6NiTwoRun               # NI M2-W4 / M2-X4: its two-run corollary, at equal ledger histories
+Xv6.xv6NiTwoRunObs            # NI M2-X4 (ruling X-R3 amended): the two-run corollary's observable form
 Xv6.xv6NiStrongInstance       # NI M2-W4: its strong instance (enters before the first ecall replay exits)

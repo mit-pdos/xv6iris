@@ -19,9 +19,10 @@ round resumed.  Everything here is what that re-keying needs:
 * §5 THE FUNCTIONAL ROWS (NI M0 / M2-W3, grown by M2-G1d, `UsysDet`):
   `round_det` -- at a class number AT THE KEY (`usysDetClassAt`: wait at a
   null status pointer) the round's actual resume key IS `usysDet` at the
-  round's ι-prefix (`uexecRet_roundDet`, `_exists`; at wait the family
-  ledger's reading, `hwait`) -- and the quiet members' returning arm READ
-  AS THE POLICY (`uexecRetDetF`, `uexecRetContF_det`).
+  round's ι-prefix (`uexecRet_roundDet`, at the ι the round CITES: NI
+  M2-X's `UserretClosedRows.urc_niDetRow`; the answer fits ι, `hfit`: at
+  wait the family ledger's reading) -- and the quiet members' returning arm
+  READ AS THE POLICY (`uexecRetDetF`, `uexecRetContF_det`).
 
 ## Deviations from Rocq
 
@@ -589,43 +590,6 @@ theorem uexecRet_roundDet (sc : BitVec 64) (W W' : Uvis) (ι : UIota) (hl : W.tf
       rw [tfResumeGpr0_bump _ _ (by rw [uvisRun_length]; decide), hb1]
     · show tfResumePc (bumpTf (uvisRun W).tf r) = _
       rw [tfResumePc_bump _ _ (by rw [uvisRun_length]; decide), hb2]
-
-/-- **`round_det`, the prefix supplied**: every round at a class number (at
-the key) has an ι-prefix it is `usysDet` at -- the one whose tick count is
-the uptime row's (the count the kernel's arm read off the tick ledger's
-receipt), and (NI G1d) whose family history and actor are wait's row's
-(`hwait`: the kernel's `SyscRows.wait` at the keys, the history and slot of
-kwait's led receipt; at `-1` the empty history, G1 design F6). -/
-theorem uexecRet_roundDet_exists (sc : BitVec 64) (W W' : Uvis) (hl : W.tf.length = 36)
-    (hgn : W'.gen = W.gen) (hpidk : W'.pid = W.pid)
-    (hch : ¬ (sc = uecallScause ∧ (uvisNum (uvisRun W) = USYS_fork ∨ uvisNum (uvisRun W) = USYS_wait)) →
-      W'.ch = W.ch)
-    (hfdrow : sc = uecallScause →
-      usysFdOk (uvisNum (uvisRun W)) (uvisRun W).tf (tfW W'.tf (tfArgIdx 0)) W.fd W'.fd)
-    (hpidrow : sc = uecallScause → usysRetPid (uvisNum (uvisRun W)) (tfW W'.tf (tfArgIdx 0)) W.pid)
-    (hwait : sc = uecallScause → uvisNum (uvisRun W) = USYS_wait →
-      ∃ (hz : List Zev) (act : BitVec 64), usysWaitRow (uvisRun W) hz act (tfW W'.tf (tfArgIdx 0)) W'.ch)
-    (hr : uroundOk sc (uvisRun W).tf W.M W.perm W.sz W.cwd W.lazy W.secc W'.tf W'.M W'.perm W'.sz W'.cwd
-      W'.lazy W'.secc)
-    (hsc : sc = uecallScause)
-    (hcls : usysDetClassAt (uvisNum (uvisRun W)) (tfW (uvisRun W).tf (tfArgIdx 0))) :
-    ∃ ι : UIota, ukeyEq (usysDet (uvisNum (uvisRun W)) (uvisRun W) ι) W' := by
-  have hup : uvisNum (uvisRun W) = USYS_uptime → usysUptimeRet (tfW W'.tf (tfArgIdx 0)) := by
-    intro hu
-    have hr' := hr
-    rw [hsc] at hr'
-    rcases uroundOk_ecall hr' with ⟨hexec, -, -⟩ | ⟨-, r, ⟨hb1, -⟩, hm, -⟩
-    · change uvisNum (uvisRun W) = USYS_exec at hexec
-      rw [hu] at hexec; exact absurd hexec (by decide)
-    · have ha0 : tfW W'.tf (tfArgIdx 0) = r := by
-        have := congrFun hb1 10#5
-        rw [tfResumeGpr0, tfResumeGpr_a0] at this
-        rw [this]; simp
-      change usysMemOk (uvisNum (uvisRun W)) _ _ _ _ _ _ _ _ _ _ at hm
-      rw [hu] at hm
-      rw [ha0]; exact usysMemOk_uptimeRet hm
-  obtain ⟨ι, hfit⟩ := usysIotaFits_exists hup (hwait hsc)
-  exact ⟨ι, uexecRet_roundDet sc W W' ι hl hgn hpidk hch hfdrow hpidrow hr hsc hcls hfit⟩
 
 /-- **THE RETURNING ARM AS THE POLICY** (NI M0, §4 of the design: "the arm,
 for `n` in the class, `X (usysDet n W ι)`"): at every ι-prefix the kernel

@@ -109,7 +109,7 @@ the class with its `round_det` discharge):
 | **M2-G3 sbrk** | `sysSbrkOk`'s −1 only when the pool is empty (growproc/uvmalloc functional in the allocator ledger), and the eager grow's page-table pages as events (`Alloc A vpn`-grained, §3 "concedes more") | `sbrk` |
 | **M2-G4 console write** | the kernel's short count stated at the key's permission view `π` (copyin at the key, not the table) and a write row in the trap contract | console `write` |
 
-- [ ] M2-G1 (DESIGNED 2026-10-03, "M2-G1 design" below; awaiting rulings G1-R1..R6)  - [ ] M2-G2 (DESIGNED 2026-10-03, "M2-G2 design" below; awaiting rulings G2-R1..R5)  - [ ] M2-G3  - [ ] M2-G4  - [ ] M2-X (ι export; DESIGNED 2026-10-03, "M2-X design" below; awaiting rulings X-R1..R7)
+- [ ] M2-G1 (DESIGNED 2026-10-03, "M2-G1 design" below; awaiting rulings G1-R1..R6)  - [ ] M2-G2 (DESIGNED 2026-10-03, "M2-G2 design" below; awaiting rulings G2-R1..R5)  - [ ] M2-G3  - [ ] M2-G4  - [x] M2-X (ι export; X1 ba13ce661, X2 2c3f0000b, X3 e864f14ed, X4 "M2-X4 as landed" below: xv6NiPhi carries the chain, uptime/wait derived from usysDet at the cited ι, xv6NiTwoRun at equal ledger histories, xv6NiTwoRunObs the tenth root)
 
 Risk register (honest): W1 changes the language and every lifting lemma -- mechanical but wide, and the device
 suite must not notice; W3 is the proof's content and may find a row that cannot be made functional in `(key,
@@ -2249,6 +2249,63 @@ Gates: full build (2739 jobs), `lint.sh`, `tcb.sh --update` (the three NI roots 
 `xv6NiStrongInstance`'s; no axiom or opaque moves; every other root unchanged), `audit.sh` (9 roots PASS,
 baseline unchanged), `run_all.sh` (all 11 steps). `dead_allow.txt`: `decl Xv6.niIotaLbs_join` removed (reached
 through `niChainSt_file`).
+
+### M2-X4 as landed (2026-10-03)
+
+Lane `lane/m2x`, one commit on X3: §3 and §5 row X4, with X-R3 as amended. No Spec text moves;
+`xv6NiAdequacy` and `xv6NiStrongInstance` are byte-identical (their meaning grows); `xv6NiTwoRun`'s
+hypotheses move as designed; `xv6NiTwoRunObs` is a new (tenth) root.
+
+**`NiTrace`.** `NiStep.round secc x e (c : Option (Nat × UIota))` (`niStepOf` carries the filing's
+`cite`; `niStepOf_cite`); `NiPos` (`era kev pev zev ticks : Nat`, `act : BitVec 64`), `UIota.pos k ι`;
+`NiStep.input` gains `c.map fun p => p.2.pos p.1`; `usysWaitAns`; `niRoundLaw … c` with the three re-cut
+clauses verbatim (uptime `∃ k ι, c = some (k, ι) ∧ gprsA0 eg = usysUptimeWord ι.ticks`; wait at `gprsA0 xg =
+0#64` `… = usysWaitAns ι`; fork on success, outside the resume block, `… = signExtend 64 (ofNat 32 (pidPick
+PIDMAX ι.pev))`). `niStepOf_law` derives them from `niEntryOk`'s `niCiting ↔ cite.isSome` (`niCiting_some`),
+`niDetRow` (`niDetRow_uptime` by `usysDet_quiet`/`usysDetRet_uptime`, `niDetRow_wait` by `usysDet_wait` and
+`usysDetWait`'s arms, both through `ukeyEq_bump_a0`) and `niForkRow`; `usysMemOk_uptimeRet`/`niWaitRow` are no
+longer read by the law. `niTraceChain`, `niTraceChain_of` (from `niChain`), `niBelow_pos`, `NiStep.cite_eq`;
+`niTwoRun_trace q H` and `niTwoRun (hF₁ hC₁ hF₂ hC₂ q hcls hin hH)`. The observable form: `NiStep.obsInput`
+(W4's input), `NiStep.classReading` (the enter's `a0` at an uptime ecall or a wait ecall at a null pointer),
+`niReadings q h F`, `niTwoRunObs`; the shared step lemma `NiStep.output_eq_of`. Deleted: `NiStep.reads`,
+`NiStep.reading`, `traceEvents`, `events` (and `reads_input`/`reading_isSome`). The header's honesty scopes
+are §3's seven, rewritten.
+
+**`NiAdequacy`/`LinkNiAdequacy`.** `xv6NiPhi g h := ∃ F, niOk h F ∧ niOneShot h F ∧ niChain F (niHist F) ∧ ∀
+q, NiClassLaw q (utrace q h F)`; `Hphi` reads `niR_pure`'s chain conjunct. `xv6NiTwoRun`'s `∃ F₁ F₂` carries
+both chains and its per-`q` hypotheses are `NiInClass`, equal `NiStep.input`s, `niHist F₁ = niHist F₂`.
+`xv6NiTwoRunObs`: the same `∃` as W4's (no chains), hypotheses `NiInClass`, equal `NiStep.obsInput`s, equal
+`niReadings`.
+
+**F3's limit, verbatim:** the histories are ghost witnesses inside `F`; ι is not observable.
+
+**Registration.** `roots.txt` and `baseline.json`: `Xv6.xv6NiTwoRunObs` (axioms `propext`,
+`Classical.choice`, `Quot.sound`; opaques the same three). `expected.json`: the new root (its statement's
+TCB is the old `xv6NiTwoRun`'s, module for module); `Xv6.NiEvid` ENTERS `xv6NiAdequacy`'s and
+`xv6NiTwoRun`'s (`niBelow`, through `niChain`); no axiom or opaque moves; every other root unchanged.
+(`KallocEv`/`PidEv`/`ZombEv` were already in by X3.)
+
+**`dead_allow.txt`.** Off: `module Xv6.UsysDet`, `decl Xv6.uexecRet_roundDet` (reached:
+`urc_niDetRow` → `uexecRet_roundDet`; `niOk_classLaw` → `usysDet`'s readers), `uexecRet_roundDet_exists`
+(DELETED from `UexecApply`), `zLowest_nil`, `usysWaitBytes_null`, `usysWaitBytes_length`, `usysWr_nil`
+(reached). Kept: `uexecRetContF_det` (new comment; reaches `usysIotaFits_exists`). Added, with a comment
+naming G3 / the joint lane: `UIota.poolEmpty`, `nextPid`, `zombies`, `status` (the only `UsysDet`
+declarations the report found unreached).
+
+**Deviations.**
+1. The readings survive under new names (`NiStep.classReading`, `niReadings`) for `niTwoRunObs` only (X-R3
+   amended); `classReading` reads wait only at a null status pointer (the class), where W4's `reads` read
+   every wait.
+2. `NiInClass` gains the binder `c` (the constructor's new field); its content is unchanged.
+3. `hH` is the whole function, not the per-era generalisation.
+4. The wait clause no longer states `usysWaitRet` at a non-null pointer (§3's re-cut, verbatim): outside
+   the class wait's answer is unconstrained by the law, as every non-class ecall's.
+
+Gates: full build (2739 jobs), `lint.sh` (10 roots), `tcb.sh --update` (above), `audit.sh` (10 roots PASS),
+`run_all.sh` (all 11 steps; `reports` with no stale row).
+
+What remains: G1e (wait at a non-null pointer), G1f+G2c+G3 (the joint fork lane), G3 (sbrk), G4 (console
+write), M3
 
 ## Lanes (opened 2026-09-15)
 

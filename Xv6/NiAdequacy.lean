@@ -4,12 +4,15 @@ M2-W4; design of record `claude-notes/projects/noninterference.md`, "M2-W2
 design (2026-10-02)" §1/§4, rulings O2/O4/O6, "M2-W2c as landed", "M2-W2d as
 landed").
 
-* §1 `xv6NiPhi g h := ∃ F, niOk h F ∧ niOneShot h F ∧ ∀ q, NiClassLaw q
-  (utrace q h F)` (O6: the filing is part of the run's witness; `niOneShot`,
-  W2d's fact, is what makes an origin filing honest: every filing spent a
-  distinct claim minted in `h` before its enter -- a round's at the exit it
-  cites, an origin's at a fork exit or a power-on -- so a round's resume
-  cannot be re-filed as a fresh origin without a minted origin claim).
+* §1 `xv6NiPhi g h := ∃ F, niOk h F ∧ niOneShot h F ∧ niChain F (niHist F)
+  ∧ ∀ q, NiClassLaw q (utrace q h F)` (O6: the filing is part of the run's
+  witness; `niOneShot`, W2d's fact, is what makes an origin filing honest:
+  every filing spent a distinct claim minted in `h` before its enter -- a
+  round's at the exit it cites, an origin's at a fork exit or a power-on --
+  so a round's resume cannot be re-filed as a fresh origin without a minted
+  origin claim; (NI M2-X4) `niChain F (niHist F)`: every citation is a
+  prefix of ONE history per (era, ledger), the canonical join `niHist F`,
+  ruling X-R2).
 * §2 THE NI LEDGER beside the application's: `niLedgerR A c γ γe h := A.R c
   h ∗ niR γ γe h` (W2c's composition, at W2d's claim authority `γ` and NI
   M2-X3's chain state `γe`), and its laws -- the power step (a power-on
@@ -29,21 +32,26 @@ landed").
   `uEraAnchor := niEraAnchor γe` (`NiFitIs.reg` by `niEraTok_shoot`,
   `evid` by `niEvid_cite`, `evidNone` by `niEvid_none`), the trace slot
   `obsLedgerAt (niLedgerR A c γ γe)`, `phi := xv6NiPhi` (`Hphi` from
-  `obsLedgerAt_phi`, `niR_pure` and `NiTrace.niOk_classLaw`).
+  `obsLedgerAt_phi`, `niR_pure` -- its chain conjunct read since NI M2-X4 --
+  and `NiTrace.niOk_classLaw`).
 
 The closed instance (`USER` discharged: `ProofUser`) and the two corollaries
 are `LinkNiAdequacy` (only a `Link` file may import a `Proof` file).
 
 ## Honest scope (see `NiTrace`'s header for the trace side)
 
-1. The class is {exit, getpid, uptime}; every other ecall's enter is free.
+1. The class is {exit, getpid, uptime} and wait at a null status pointer;
+   every other ecall's enter is free but for fork's pid on success.
 2. Origins are honest by W2d's one-shot claims (`niOneShot` in the
    conclusion): the filing's origin claims are fork exits' or power-ons',
    each spent once.  That an origin's FIRST KEY is the forked child's is not
    stated (the claim names the parent's fork exit, not the child's key).
-3. The syscall mask is carried per filing (`NiTrace` scope 3); getpid's
-   answer is the incarnation's pid (W2d's pid row); the uptime reading IS
-   the tick (O5).
+3. The syscall mask and the actor are carried per filing (`NiTrace` scope
+   3); getpid's answer is the incarnation's pid (W2d's pid row); uptime's
+   and wait's answers are DERIVED from the cited ι (`NiTrace` scopes 4, 6).
+4. (NI M2-X4, F3) The histories `niHist F` are ghost witnesses inside the
+   existential `F`: ι is not observable (`NiTrace` scope 5); the cited era
+   is an input (scope 7).
 -/
 import Xv6.NiTrace
 import Xv6.AppLaws
@@ -58,15 +66,17 @@ set_option linter.unusedSectionVars false
 /-! ## §1 THE CONCLUSION (ruling O6) -/
 
 /-- **THE NI CONCLUSION** of a run ending at history `h`: the ledger's filing
-of `h` exists, it is one-shot (W2d), and every incarnation's trace obeys the
-class law. -/
+of `h` exists, it is one-shot (W2d), (NI M2-X4) its citations are prefixes
+of ONE history per (era, ledger), `niHist F` (the chain), and every
+incarnation's trace obeys the class law (whose uptime and wait answers are
+M0's row at the cited ι). -/
 def xv6NiPhi (_ : GState) (h : List Obs) : Prop :=
-  ∃ F, niOk h F ∧ niOneShot h F ∧ ∀ q, NiClassLaw q (utrace q h F)
+  ∃ F, niOk h F ∧ niOneShot h F ∧ niChain F (niHist F) ∧ ∀ q, NiClassLaw q (utrace q h F)
 
 /-- The ledger's facts give the conclusion (`NiTrace.niOk_classLaw`). -/
 theorem xv6NiPhi_of {g : GState} {h : List Obs} {F : List NiEntry} (hF : niOk h F)
-    (h1 : niOneShot h F) : xv6NiPhi g h :=
-  ⟨F, hF, h1, niOk_classLaw hF⟩
+    (h1 : niOneShot h F) (hC : niChain F (niHist F)) : xv6NiPhi g h :=
+  ⟨F, hF, h1, hC, niOk_classLaw hF⟩
 
 /-! ## §2 THE NI LEDGER beside the application's -/
 
@@ -349,8 +359,8 @@ theorem xv6NiAppAdequacy (g : GState) (sb : FsSb) (nib : Nat) (cov : ExtTreeSet 
       iintro ⟨-, Hn⟩
       ihave %hF := niR_pure p.2.1 p.2.2 h $$ Hn
       ipureintro
-      obtain ⟨F, hF, h1, -⟩ := hF
-      exact xv6NiPhi_of hF h1) γobs h
+      obtain ⟨F, hF, h1, hC⟩ := hF
+      exact xv6NiPhi_of hF h1 hC) γobs h
     iframe Ha HP
 
 end gen
