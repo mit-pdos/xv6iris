@@ -625,17 +625,17 @@ theorem uvaRmapped_of_wmapped {P : UPtd} {va : Nat} (hr : uvaWmapped P va) : uva
 /-- A copyout post (`SpecCopyout` / `SpecEitherCopyout`) with its failure
 reason dropped: what the callers that never read the reason restate. -/
 theorem coPost_drop {P P' : UPtd} {sz : BitVec 64} {r : BitVec 64} {M M' : Nat → List (BitVec 8)}
-    {A : Nat} {bs : List (BitVec 8)} {Q : Nat → Prop}
+    {A : Nat} {bs : List (BitVec 8)} {Q0 : Prop} {Q : Nat → Prop}
     (h : P.extSz sz P' ∧
-      ((r = 0#64 ∧ M' = umemWrite (viewFaulted P P' M) A bs ∧ umMapped P' A bs.length) ∨
+      ((r = 0#64 ∧ M' = umemWrite (viewFaulted P P' M) A bs ∧ umMapped P' A bs.length ∧ Q0) ∨
        (r = -1#64 ∧ ∃ d, d < bs.length ∧ M' = umemWrite (viewFaulted P P' M) A (bs.take d) ∧
           umMapped P' A d ∧ Q d))) :
     P.extSz sz P' ∧
       ((r = 0#64 ∧ M' = umemWrite (viewFaulted P P' M) A bs ∧ umMapped P' A bs.length) ∨
        (r = -1#64 ∧ ∃ d, d < bs.length ∧ M' = umemWrite (viewFaulted P P' M) A (bs.take d) ∧
           umMapped P' A d)) := by
-  obtain ⟨he, h | ⟨h1, d, hd, hM, hm, -⟩⟩ := h
-  · exact ⟨he, Or.inl h⟩
+  obtain ⟨he, ⟨h0, hM0, hm0, -⟩ | ⟨h1, d, hd, hM, hm, -⟩⟩ := h
+  · exact ⟨he, Or.inl ⟨h0, hM0, hm0⟩⟩
   · exact ⟨he, Or.inr ⟨h1, d, hd, hM, hm⟩⟩
 
 theorem umMapped_zero (P : UPtd) (va : Nat) : umMapped P va 0 := fun _ h => absurd h (by omega)

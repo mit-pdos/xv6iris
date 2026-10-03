@@ -284,6 +284,14 @@ def uvaWmapped (P : UPtd) (va : Nat) : Prop :=
     Iris.Std.PartialMap.get? P.um vpn = some w ∧ pteVU w ∧ w &&& PTE_W ≠ 0#64 ∧ j < 4096 ∧
       va = vpn * 4096 + j
 
+/-- **The `d` bytes from `a` are writable** (NI M2-G1e): every byte of the
+run passes `uvaWmapped` at `P`, at the WRAPPED address `a + i` (copyout's
+cursor).  What `SpecCopyout`'s arms say of the bytes the copy wrote: each
+page is copied only after it passes the `PTE_W` re-walk, so the written
+prefix is writable in the table the copy hands back. -/
+def uvaWprefix (P : UPtd) (a : BitVec 64) (d : Nat) : Prop :=
+  ∀ i, i < d → uvaWmapped P (a + BitVec.ofNat 64 i).toNat
+
 /-- The view with page `k` zeroed. -/
 def viewZero (M : Nat → List (BitVec 8)) (k : Nat) : Nat → List (BitVec 8) :=
   fun k' => if k' = k then List.replicate 4096 0#8 else M k'

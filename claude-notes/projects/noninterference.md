@@ -2307,6 +2307,191 @@ Gates: full build (2739 jobs), `lint.sh` (10 roots), `tcb.sh --update` (above), 
 What remains: G1e (wait at a non-null pointer), G1f+G2c+G3 (the joint fork lane), G3 (sbrk), G4 (console
 write), M3
 
+### M2-G1e as landed (2026-10-03)
+
+Lane `lane/g1e`, one commit on `lean` 1a1537107 (M2-X4).  Closes G1d's deviation 1: wait at a non-null
+status pointer joins the NI class at a lazy-free process.
+
+**Coordinator rulings (verbatim).**
+- **G1e-R1 (the class).** `usysDetClassAt n a0 lz := usysDetClass n ∧ (n = USYS_wait → a0 = 0#64 ∨ lz =
+  false)`. The lazy bit is the filing's key's `W.lazy` (it rides the step exactly as `secc` does, W4's
+  honest scope 3: a ghost-key reading, not a trace reading). `NiInClass` reads it off the step.
+- **G1e-R2 (the window profile is an input).** The trace-level two-run proof (`NiStep.output_eq_of`) needs
+  wait's answer determined by the step's inputs and `ι`. So at a non-null a0 the step carries the status
+  window's writability profile read off the key: `win : Nat` = the first offset `i < 4` with `¬ πWritable
+  W.perm (a0 + i)`, or `4` when all four bytes are writable (define `uwaitWin (perm) (a0) : Nat` in
+  `UsysDet`). It is part of `NiStep.input` (the caller's OWN mapping of its own buffer: public to the
+  process, like `secc`/`lazy`). `niRoundLaw`'s wait clause becomes `gprsA0 eg = usysWaitAns ι win` with
+  `usysWaitAns ι 4 = (reap → sext pid | -1)` and `usysWaitAns ι d = -1` at `d < 4` (write it as one
+  definition). `niReadings`/`xv6NiTwoRunObs` unchanged in substance (the reading is still the resumed a0).
+- **G1e-R3 (the copyout reason's prefix).** `SpecCopyout`'s `-1` arm pins the written prefix `bs.take d`
+  with `umMapped P' a0 d` — MAPPED, not writable, so `d` is not the first non-writable byte and the image
+  is not pinned by the key. Strengthen the reason arm to `(∀ i < d, uvaWmapped P (a0 + i)) ∧ ¬ uvaWmapped P
+  (a0 + d)` (keep `umMapped P' a0 d` if readers use it), prove it in `ProofCopyout` (the loop copies a
+  page only after the `PTE_W` check), and keep `wp_copyout_nr(_body)` BYTE-IDENTICAL (its corollary proof
+  adapts). This is a sanctioned Spec move: the owner signed off G1e knowing it needs Spec moves. If the
+  proof of the strengthened arm is not closable in the lane, STOP and report with the exact obstacle
+  rather than weakening the row.
+
+**The copyout (`UPtDefs`, `SpecCopyout`, `ProofCopyout`).**  `UPtDefs.uvaWprefix P a d := ∀ i, i < d →
+uvaWmapped P (a + ofNat i).toNat`.  `wp_copyout_body`'s arms gain the WRITTEN prefix's writability in the
+RETURNED table (deviation 1): success `… ∧ uvaWprefix P' dst bs.length`, `-1` `… ∧ umMapped P' dst d ∧
+uvaWprefix P' dst d ∧ ¬ uvaWmapped P (dst + ofNat d).toNat`.  `ProofCopyout`: the page step returns
+walkaddr's `V ∧ U` (or vmfault's fresh `W|U|R` leaf, `co_vu_faultLeaf`) at the `0x78` arm and threads the
+prefix; the chunk after the `PTE_W` check extends it (`co_wpre_step`); `co_wmapped_lt` turns the Nat
+cursor into the wrapped one.  `wp_copyout_nr_body` byte-identical (`UMemL.coPost_drop` takes a `Q0` for
+the success arm's new conjunct); `ProofEitherCopyout.ec_copyout_call` and `ProofPiperead.pr_copyout`
+(their restated reasoned contract unchanged) drop the prefix by `wpNext_mono`.
+
+**kwait (`UserChildren`, `SpecKwait`, `ProofKwait`).**  `waitCopyFail a0 P P' d := d < 4 ∧ uvaWprefix P'
+a0 d ∧ ¬ uvaWmapped P (a0 + ofNat d).toNat`, `waitCopyOk a0 P' := a0 ≠ 0 → uvaWprefix P' a0 4`.
+
+    def waitWhyLed (cs) (gn) (nullst : Bool) (act : BitVec 64) (xs : Int) (a0 : BitVec 64) (P P' : UPtd)
+        (d : Nat) : IProp GF :=
+      iprop((⌜nullst = false⌝ ∗ ∃ (h : List Zev) (j : Nat) (pidc : BitVec 32) (γ' : GName),
+          zombLedLb h ∗ ⌜zLowest h act = some (j, pidc, xs, γ') ∧ waitCopyFail a0 P P' d⌝) ∨
+        (⌜cs = ∅ ∧ d = 0⌝ ∗ ∃ h : List Zev, zombLedLb h ∗ ⌜¬ zHasKids h act⌝) ∨
+        (⌜d = 0⌝ ∗ killShot gn))
+
+`waitAnsLed … act a0 P P' d` (the reap arm's pure part `zLowest h act = some (j, rv, xs, γ') ∧ waitCopyOk
+a0 P'`), `waitLedCite` the same window; `waitAnsLed_post` still yields `waitAns` (landed readers
+untouched); `waitWhyLed_notnull` → `waitWhyLed_copyFail`.  `SpecKwait`'s two led bodies move only by
+`waitAnsLed …` gaining `(k.regs 10#5) V.upt P' d`; `wp_kwait_eb_body` byte-identical.  `ProofKwait`: kwait
+calls `COPYOUT.wp_copyout` (`kw_copyout` restates the reasoned contract); at the copyout's `-1`, under both
+locks, `kw_slots_zombie_split` lends the ZOMBIE dormant block and `kw_peek_ghost` reads T1, the block's T2
+element, the xstate halves and the scan's first-ness into `zombLedLb h ∗ ⌜zLowest h (procAddr j) = some
+(n, pid, xstateVal xs, g)⌝`, every resource handed back; the reap's `Hcommon` carries `waitCopyOk` into
+`kw_reap_ghost`; the no-children and kill paths copy nothing (`d = 0`).
+
+**The rows (`SyscallDefs`, `SpecSysWait`/`ProofSysWait`, `SyscallArmsWait`, `SpecSyscall`,
+`UsertrapSysTail`).**
+
+    def syscWaitRow (V V' : ProcPriv) (img img' : ElfMem) (cs cs' : ExtTreeSet GName compare)
+        (hz : List Zev) (act : BitVec 64) : Prop :=
+      (tfW V'.tf (tfArgIdx 0) = -1#64 ∧ cs' = cs) ∨
+      (∃ (j : Nat) (pid : BitVec 32) (xs : Int) (γ : GName) (d : Nat), zLowest hz act = some (j, pid, xs, γ) ∧
+        d < 4 ∧ uvaWprefix V'.upt (tfW V.tf (tfArgIdx 0)) d ∧
+        ¬ uvaWmapped V.upt (tfW V.tf (tfArgIdx 0) + BitVec.ofNat 64 d).toNat ∧
+        img' = usysWr img (tfW V.tf (tfArgIdx 0)) ((usysWaitBytes (tfW V.tf (tfArgIdx 0)) xs).take d) ∧
+        tfW V'.tf (tfArgIdx 0) = -1#64 ∧ cs' = cs) ∨
+      ∃ (j : Nat) (pid : BitVec 32) (xs : Int) (γ : GName), zLowest hz act = some (j, pid, xs, γ) ∧ …  -- the reap, as G1d
+
+`syscEvRow`'s wait clause: `syscNum V = USYS_wait → (a0 = 0#64 ∨ V.pvLazy = false) → usysWaitFitsAt
+(permOf V.upt.um V.sz.toNat) a0 cs img ι a0' cs' img'` (the cited row at the ENTRY's permission view).
+`SpecSysWait`'s led body moves only through `waitAnsLed … v V.upt P' d`.  `SyscallArmsWait`:
+`syscArmWait_win` (the window at a lazy-free key: `VmfaultQuiet.lazyFree_wmapped_ext` moves the written
+prefix from `P'` to the entry `P`, `lazyFree_wmapped_iff` from `P` to `permOf P.um sz` -- the entry block's
+`lazyFree V.upt.um V.sz` and `uptWf V.upt` off `procPrivFd_facts`); `syscArmWait_ev` cites `{boot with zev
+:= h, act}` at the copyout failure (the zombie's prefix), at no children and at the reap; the kill shot is
+F5's disjunct with nothing moved (deviation 2).  `waitAnsLed_row` gains the copyout-failure arm.
+
+**The functional row (`UsysDet`, `UexecApply`, `UserretClosedRows`).**
+
+    def πWritable (perm : Nat → Option UPerm) (va : Nat) : Prop := ∃ q : UPerm, perm (va / 4096) = some q ∧ q.W = true
+    def uwaitWin (perm : Nat → Option UPerm) (a0 : BitVec 64) : Nat :=
+      if a0 = 0#64 then 4
+      else if ¬ πWritable perm (a0 + BitVec.ofNat 64 0).toNat then 0
+      else if ¬ πWritable perm (a0 + BitVec.ofNat 64 1).toNat then 1
+      else if ¬ πWritable perm (a0 + BitVec.ofNat 64 2).toNat then 2
+      else if ¬ πWritable perm (a0 + BitVec.ofNat 64 3).toNat then 3
+      else 4
+    def usysWaitAns (ι : UIota) (win : Nat) : BitVec 64 :=
+      match ι.reap with
+      | some (_, pid, _, _) => if win = 4 then BitVec.signExtend 64 pid else -1#64
+      | none => -1#64
+    def usysDetClassAt (n : Int) (a0 : BitVec 64) (lz : Bool) : Prop :=
+      usysDetClass n ∧ (n = USYS_wait → a0 = 0#64 ∨ lz = false)
+    def usysDetWait (W : Uvis) (ι : UIota) : Uvis :=
+      match ι.reap with
+      | some (_, pid, xs, γ) =>
+        if uwaitWin W.perm (tfW W.tf (tfArgIdx 0)) = 4 then
+          bump W (BitVec.signExtend 64 pid) (usysWr W.M a0 (usysWaitBytes a0 xs)) W.perm W.sz W.fd
+            W.cwd W.gen (W.ch \ {γ}) W.lazy W.secc
+        else
+          bump W (-1#64) (usysWr W.M a0 ((usysWaitBytes a0 xs).take (uwaitWin W.perm a0)))
+            W.perm W.sz W.fd W.cwd W.gen W.ch W.lazy W.secc
+      | none => bump W (-1#64) W.M W.perm W.sz W.fd W.cwd W.gen W.ch W.lazy W.secc    -- a0 := tfW W.tf (tfArgIdx 0)
+
+`uwaitWin_eq` (the window IS the first non-writable byte), `uwaitWin_null`; `usysDetRet` at wait is
+`usysWaitAns ι (uwaitWin W.perm a0)`.  `usysWaitFitsAt perm a0 ch M ι r cs' M'` (the three arms on the
+readings: one text for the kernel's cited row and the key's), `usysWaitFits W ι r cs' M'`, `usysIotaFits n
+W r cs' M' ι` (the IMAGE joins the fit: the relational `usysMemOk` leaves the non-null image open);
+`usysIotaFits_of_ev` at `hcls : n = wait → a0 = 0 ∨ W.lazy = false`; `usysDet_mem`/`_rows` at the three
+arms; `usysDet_of_rows` drops `hnull` (the fit carries the image); `usysIotaFits_exists` is stated off
+wait (`hwt : n ≠ USYS_wait`), `usysWaitRow` deleted (deviation 4).  `uexecRet_roundDet` at `usysDetClassAt
+… (uvisRun W).lazy` and the fit at `W'.M`; it stays PURE on the keys (the kernel→key move is at the arm,
+deviation 3).  `urc_evRow` re-keys wait's cited row by `hpi : W.perm = permOf V.upt.um V.sz.toNat`, `hlz :
+W.lazy = V.pvLazy`, `hM`, `hch` (`urc_niForkRow` reads `syscEvRow`'s fork clause directly).
+
+**The filing and the law (`NiLedger`, `NiTrace`, `NiAdequacy`/`LinkNiAdequacy`).**  `niDetRow`'s class
+premise at `usysDetClassAt … (uvisRun W).lazy` (`niFit`/`niEntryOk`/`niFitEv` read it there, texts
+otherwise unchanged).
+
+    inductive NiStep where
+      | origin (W0 : Uvis) (e : Obs)
+      | round (secc : BitVec 64) (lz : Bool) (win : Nat) (x e : Obs) (c : Option (Nat × UIota))
+    def NiInClass (tr : List NiStep) : Prop :=
+      ∀ secc lz win x e c, NiStep.round secc lz win x e c ∈ tr → ∀ ep xg,
+        exitView x = some (uecallScause, ep, xg) → usysDetClassAt (gprsNum secc xg) (gprsA0 xg) lz
+    -- niRoundLaw secc lz win pid x e c, the wait clause:
+          (gprsNum secc xg = USYS_wait → (gprsA0 xg = 0#64 ∨ lz = false) →
+            ∃ k ι, c = some (k, ι) ∧ gprsA0 eg = usysWaitAns ι win)
+
+`niStepOf` fills `lz := W.lazy`, `win := uwaitWin W.perm (tfW W.tf (tfArgIdx 0))` from the filing's trapped
+key; `NiStep.input := .inr (secc, lz, win, exitView x, positions)`; `NiStep.obsInput := .inr (secc, lz,
+exitView x)` (whether a wait reads is the class's); `NiStep.classReading` reads a wait at `a0 = 0 ∨ lz =
+false`.  `niDetRow_wait` (from `usysDet_wait`, at `a0 = 0 ∨ lazy = false`) gives `usysWaitAns ι (uwaitWin …)`;
+`NiStep.output_eq_of` lets the second step's `lz`/`win` be free (the obs form's answers are readings).
+`xv6NiTwoRun`'s and `xv6NiTwoRunObs`'s statements are byte-identical (their meaning grows through
+`NiStep`); `xv6NiAdequacy` and `xv6NiStrongInstance` byte-identical.  `usysWaitAns` moved from `NiTrace` to
+`UsysDet` (one definition, ruling R2).
+
+**Honest scope** (`NiTrace` scopes 1 and 6, `UsysDet` deviation 5).  Wait is in the class at a null status
+pointer or at a lazy-free process (`W.lazy = false`, a ghost-key reading riding the step, as `secc`).
+There its answer is DERIVED: `usysWaitAns ι win`, the cited family prefix's lowest zombie child through
+the key's status window -- the reap at a whole window, `-1` with the window's prefix written and the child
+NOT reaped at a broken one (xv6's page-by-page copyout).  The window is the caller's own mapping of its own
+buffer, an input.  The lazy non-null status copyout stays OUT: a lazily absent page faults through
+`vmfault → kalloc`, the allocator's position (G3).
+
+**Deviations.**
+1. **R3's prefix is stated at the RETURNED table `P'`, not the entry `P`, and on both arms.**  R3's literal
+   `∀ i < d, uvaWmapped P (a0 + i)` is FALSE for a lazy process: a lazily absent page the copy faults in
+   (vmfault's `W|U|R` leaf) is written but is not in `P`.  The strongest true statement is the prefix at
+   `P'` (each page passed the `PTE_W` re-walk in the table of the moment, which `P'` extends); the stop
+   byte stays at `P`.  At `lazyFree` the copy gains no leaf (`extSz`'s gained leaves are below `sz`, which
+   `lazyFree` maps up to `PGROUNDUP(sz)`), so the prefix is `P`'s (`lazyFree_wmapped_ext`) -- the row's
+   content in the class is R3's.  The SUCCESS arm also gains `uvaWprefix P' dst len`: a reap at a non-null
+   pointer must show the window whole (`uwaitWin = 4`).  `syscWaitRow`'s copy-failure arm states the
+   prefix at `V'.upt` and the stop byte at `V.upt` accordingly.  Both arms are `wp_copyout_body` (the
+   sanctioned statement); `wp_copyout_nr_body` byte-identical.
+2. **UNSANCTIONED SPEC MOVE: `SpecSyscall.syscEvOut`'s F5 kill disjunct gains `cs' = cs ∧ syscImg V' M' =
+   syscImg V M`.**  `UsertrapSysTail.ut_evOut_of` discharges the kill disjunct by citing the boot prefix;
+   with the class at `lazy = false` the boot row must hold at a NON-null pointer too, where nothing usertrap
+   holds pins the image (the landed `syscWaitOut` leaves a `-1`'s copied prefix open).  kwait's kill path
+   copies nothing (`waitWhyLed`'s kill and no-children reasons carry `d = 0`), so the disjunct carries
+   "nothing moved"; `ut_evOut_of` loses its `hwm` premise, `UsertrapSysLive.syscWaitOut_m1` (its one
+   source) is deleted.  `SYSCALL`'s text is byte-identical (it names `syscEvOut`); its meaning grows.
+3. The kernel→key move (window facts at `P`/`P'` → `uwaitWin (permOf V.upt.um V.sz)`) is at the ARM
+   (`syscArmWait_win`), where the entry block's `lazyFree`/`uptWf` are in hand; `syscEvRow` carries the
+   key-level fit (`usysWaitFitsAt`), so `uexecRet_roundDet` is pure on the keys and takes no `lazyFree`.
+   The key/perm lemma: `urc_evRow`'s `hpi : W.perm = permOf V.upt.um V.sz.toNat` (the loop's key row) with
+   `VmfaultQuiet.lazyFree_wmapped_iff` at the arm.
+4. `usysWaitRow` deleted and `usysIotaFits_exists` stated off wait: wait's fit now pins the image, which
+   the relational row cannot supply; wait's prefix is always the CITED one (`usysIotaFits_of_ev`).
+5. `uwaitWin` is `4` at a null pointer (nothing to copy), so `usysDetWait`/`usysWaitAns` test only the
+   window.
+6. `NiStep.round` gains two fields (`lz`, `win`), not a record; `NiStep.obsInput` carries `lz`.
+7. `waitAnsLed`/`waitWhyLed`/`waitLedCite` take the window as parameters (`a0 P P' d`), not read off
+   `kwaitAns`'s neighbourhood.
+
+**TCB / audit.**  `tcb.sh`: unchanged for all 10 recorded theorems (no `--update`; `UserChildren`'s new
+`import Xv6.UPtDefs` adds no module to any root's TCB).  `audit.sh`: 10 roots PASS, baseline unchanged, no
+new axiom or opaque.  `dead_allow.txt`: `decl Xv6.lazyFree_wmapped_iff` removed (reached:
+`urc_niDetRow` → … → `syscArmWait_win`).
+
+What remains: G1f+G2c+G3 (the joint fork lane), G3 (sbrk), G4 (console write), M3
+
 ## Lanes (opened 2026-09-15)
 
 Execution order is §6's, adjusted for one territory fact: upstream's

@@ -40,7 +40,8 @@ are `LinkNiAdequacy` (only a `Link` file may import a `Proof` file).
 
 ## Honest scope (see `NiTrace`'s header for the trace side)
 
-1. The class is {exit, getpid, uptime} and wait at a null status pointer;
+1. The class is {exit, getpid, uptime} and wait at a null status pointer or
+   of a lazy-free process (NI M2-G1e: the key's lazy bit rides the step);
    every other ecall's enter is free but for fork's pid on success.
 2. Origins are honest by W2d's one-shot claims (`niOneShot` in the
    conclusion): the filing's origin claims are fork exits' or power-ons',

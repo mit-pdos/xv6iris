@@ -27,7 +27,8 @@ A `Link` file because it consumes `ProofUser` (tools/check_layering.sh).
 
 ## Honest scope
 
-The class is {exit, getpid, uptime} and wait at a null status pointer;
+The class is {exit, getpid, uptime} and wait at a null status pointer or of
+a lazy-free process (NI M2-G1e);
 every filing spent a distinct claim minted before its enter (`niOneShot`,
 W2d); the mask and actor are carried per filing; uptime's and wait's
 answers are derived from the cited ι, getpid's is the incarnation's pid
@@ -62,7 +63,8 @@ theorem xv6NiAdequacy {hlc : HasLC}
 /-- **THE TWO-RUN COROLLARY** (NI M2-X4): two runs from booting machines; at
 the filings their ledgers witness -- each one-shot, each with its citations
 below its canonical histories `niHist F` -- an incarnation `q` whose ecalls
-(in run 1) are in the class, with equal inputs (keys, masks, exits and the
+(in run 1) are in the class, with equal inputs (keys, masks -- NI M2-G1e:
+and each round's key's lazy bit and wait status window --, exits and the
 cited POSITIONS) in the two runs and EQUAL LEDGER HISTORIES, has equal
 enters. -/
 theorem xv6NiTwoRun {hlc : HasLC}
@@ -84,9 +86,9 @@ theorem xv6NiTwoRun {hlc : HasLC}
 /-- **THE TWO-RUN COROLLARY, OBSERVABLE FORM** (NI M2-X4, ruling X-R3
 amended): two runs from booting machines; at the one-shot filings their
 ledgers witness, an incarnation `q` whose ecalls (in run 1) are in the
-class, with equal observable inputs (keys, masks, exits) and equal READINGS
-(`niReadings`: its uptime answers and its wait answers at a null status
-pointer, read off the enters) in the two runs, has equal enters.  The same
+class, with equal observable inputs (keys, masks, lazy bits, exits) and
+equal READINGS (`niReadings`: its uptime answers and its wait answers in
+the class, read off the enters) in the two runs, has equal enters.  The same
 law as `xv6NiTwoRun`'s; the hypothesis is checkable on the trace. -/
 theorem xv6NiTwoRunObs {hlc : HasLC}
     (g₁ g₂ : GState) (Hgen₁ : g₁.gen = 0) (Hpow₁ : g₁.pow = false) (Hdisk₁ : diskOf g₁.m.devs = fsImgDisk)

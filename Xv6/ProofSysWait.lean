@@ -72,7 +72,7 @@ theorem sw_kwait (KW : KWAIT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
       (rv xw : BitVec 32) (d : Nat) (cs' : ExtTreeSet GName compare) (ke' : Nat),
       ⌜calleeSaved k'.regs R' ∧ R' 10#5 = BitVec.signExtend 64 rv ∧ V.upt.extSz V.sz P' ∧ d ≤ 4 ∧
         kwaitAns rv a d ∧ umMapped P' a.toNat d⌝ -∗
-      waitAnsLed rv (xstateVal xw) cs cs' V.gen (decide (a = 0#64)) pid (procAddr j) -∗
+      waitAnsLed rv (xstateVal xw) cs cs' V.gen (decide (a = 0#64)) pid (procAddr j) a V.upt P' d -∗
       chFrag V.chg (procAddr j) cs' -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       trapCsrsExt cpu' s -∗ cpuClaimExt cpu' s p -∗
@@ -152,13 +152,13 @@ theorem sw_exit (cpu cr : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : BitV
     trapCsrsExt cr k.sie ∗ cpuClaimExt cr k.sie k.proc ∗
     procPrivFd γ (procAddr j) pid { V.updEv k' with upt := P' }
       (umemWrite (viewFaulted V.upt P' M) v.toNat ((xstateBytes xw).take d)) ∗
-    waitAnsLed rv (xstateVal xw) cs cs' V.gen (decide (v = 0#64)) pid (procAddr j) ∗
+    waitAnsLed rv (xstateVal xw) cs cs' V.gen (decide (v = 0#64)) pid (procAddr j) v V.upt P' d ∗
     chFrag V.chg (procAddr j) cs' ∗
     wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd)
       (rv xw : BitVec 32) (d : Nat) (cs' : ExtTreeSet GName compare) (k' : Nat),
       ⌜calleeSaved k.regs R' ∧ R' 10#5 = BitVec.signExtend 64 rv ∧ V.upt.extSz V.sz P' ∧ d ≤ 4 ∧
         kwaitAns rv v d ∧ umMapped P' v.toNat d⌝ -∗
-      waitAnsLed rv (xstateVal xw) cs cs' V.gen (decide (v = 0#64)) pid (procAddr j) -∗
+      waitAnsLed rv (xstateVal xw) cs cs' V.gen (decide (v = 0#64)) pid (procAddr j) v V.upt P' d -∗
       chFrag V.chg (procAddr j) cs' -∗
       kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
       trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
@@ -174,7 +174,7 @@ theorem sw_exit (cpu cr : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : BitV
       iprop(trapCsrsExt cr k.sie ∗ cpuClaimExt cr k.sie k.proc ∗
         procPrivFd γ (procAddr j) pid { V.updEv k' with upt := P' }
           (umemWrite (viewFaulted V.upt P' M) v.toNat ((xstateBytes xw).take d)) ∗
-        waitAnsLed rv (xstateVal xw) cs cs' V.gen (decide (v = 0#64)) pid (procAddr j) ∗
+        waitAnsLed rv (xstateVal xw) cs cs' V.gen (decide (v = 0#64)) pid (procAddr j) v V.upt P' d ∗
         chFrag V.chg (procAddr j) cs'))
     $$ [- $Hk $Hpc $Hframe]
   isplitl [Hte Hce Hblk Hans Hch]

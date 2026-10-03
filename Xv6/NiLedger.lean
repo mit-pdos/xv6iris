@@ -167,11 +167,11 @@ def niCiting (sc : BitVec 64) (W : Uvis) : Prop :=
     uvisNum (uvisRun W) = USYS_fork)
 
 /-- **M0'S ROW AT THE CITED ι** (NI M2-X2): at an ecall in the private class
-(at the key), the key the round resumed IS `usysDet` at the cited prefix
-(up to the kernel words, `ukeyEq`). -/
+(at the key: NI M2-G1e, with the key's lazy bit), the key the round resumed
+IS `usysDet` at the cited prefix (up to the kernel words, `ukeyEq`). -/
 def niDetRow (sc : BitVec 64) (W W' : Uvis) : Option (Nat × UIota) → Prop
   | some (_, ι) => sc = uecallScause →
-      usysDetClassAt (uvisNum (uvisRun W)) (tfW (uvisRun W).tf (tfArgIdx 0)) →
+      usysDetClassAt (uvisNum (uvisRun W)) (tfW (uvisRun W).tf (tfArgIdx 0)) (uvisRun W).lazy →
       ukeyEq (usysDet (uvisNum (uvisRun W)) (uvisRun W) ι) W'
   | none => True
 

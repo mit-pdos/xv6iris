@@ -126,16 +126,25 @@ image of kwait's led answer (`UserChildren.waitAnsLed`) at the dispatch's
 vocabulary -- `V`/`img` the entry record and its image, `V'`/`img'` the
 record the call left, `cs`/`cs'` the caller's children column before and
 after, `hz` a family-ledger history and `act` the caller's slot address.
-Either `-1` with the column kept (copyout's failure, no children, or the
-kill shot -- the pure row cannot tell them apart: the kill shot is refuted
-only at usertrap's post-syscall check, `UsertrapParts.ut_kill_lend`, after
-the rows are fixed; so this arm names no history), or the REAP: `zLowest hz act` names the slot, pid,
-status and generation of the lowest zombie child, the answer is that pid
-(in `[1, PIDMAX]`) sign-extended, the generation left the column, and the
-image is the status's bytes at the a0 pointer (none at null). -/
+Either `-1` with the column kept (no children, or the kill shot -- the
+pure row cannot tell them apart: the kill shot is refuted only at usertrap's
+post-syscall check, `UsertrapParts.ut_kill_lend`, after the rows are fixed;
+so this arm names no history), or (NI M2-G1e) the COPYOUT'S FAILURE at the
+zombie `zLowest hz act` names: `d < 4` status bytes written, each writable
+in the returned table `V'.upt`, the byte at `d` not writable at the entry
+table `V.upt`, the answer `-1` and the column kept (nothing reaped), or the
+REAP: `zLowest hz act` names the slot, pid, status and generation of the
+lowest zombie child, the answer is that pid (in `[1, PIDMAX]`)
+sign-extended, the generation left the column, and the image is the
+status's bytes at the a0 pointer (none at null). -/
 def syscWaitRow (V V' : ProcPriv) (img img' : ElfMem) (cs cs' : ExtTreeSet GName compare)
     (hz : List Zev) (act : BitVec 64) : Prop :=
   (tfW V'.tf (tfArgIdx 0) = -1#64 ∧ cs' = cs) ∨
+  (∃ (j : Nat) (pid : BitVec 32) (xs : Int) (γ : GName) (d : Nat), zLowest hz act = some (j, pid, xs, γ) ∧
+    d < 4 ∧ uvaWprefix V'.upt (tfW V.tf (tfArgIdx 0)) d ∧
+    ¬ uvaWmapped V.upt (tfW V.tf (tfArgIdx 0) + BitVec.ofNat 64 d).toNat ∧
+    img' = usysWr img (tfW V.tf (tfArgIdx 0)) ((usysWaitBytes (tfW V.tf (tfArgIdx 0)) xs).take d) ∧
+    tfW V'.tf (tfArgIdx 0) = -1#64 ∧ cs' = cs) ∨
   ∃ (j : Nat) (pid : BitVec 32) (xs : Int) (γ : GName), zLowest hz act = some (j, pid, xs, γ) ∧
     1 ≤ pid.toNat ∧ pid.toNat ≤ PIDMAX ∧ tfW V'.tf (tfArgIdx 0) = BitVec.signExtend 64 pid ∧
     cs' = cs \ {γ} ∧ img' = usysWr img (tfW V.tf (tfArgIdx 0)) (usysWaitBytes (tfW V.tf (tfArgIdx 0)) xs)
@@ -144,7 +153,8 @@ def syscWaitRow (V V' : ProcPriv) (img img' : ElfMem) (cs cs' : ExtTreeSet GName
 theorem syscWaitRow_ret {V V' : ProcPriv} {img img' : ElfMem} {cs cs' : ExtTreeSet GName compare}
     {hz : List Zev} {act : BitVec 64} (h : syscWaitRow V V' img img' cs cs' hz act) :
     usysWaitRet (tfW V'.tf (tfArgIdx 0)) := by
-  rcases h with ⟨h, -⟩ | ⟨-, pid, -, -, -, h1, h2, h3, -⟩
+  rcases h with ⟨h, -⟩ | ⟨-, -, -, -, -, -, -, -, -, -, h, -⟩ | ⟨-, pid, -, -, -, h1, h2, h3, -⟩
+  · exact Or.inl h
   · exact Or.inl h
   · exact Or.inr ⟨pid, h1, h2, h3⟩
 
@@ -152,8 +162,11 @@ theorem syscWaitRow_ret {V V' : ProcPriv} {img img' : ElfMem} {cs cs' : ExtTreeS
 kernel's arm read off the ledgers' receipts, at the CITED prefix `ι` (the
 receipts' histories, as `NiEvid.niIotaLbs` lower bounds, and the caller's
 slot `ι.act`) -- uptime's answer is the word of `ι`'s tick count; wait's,
-at a null status pointer, the family ledger's reading `zLowest ι.zev ι.act`
-(the reap, or `-1` with nothing moved); fork's, on success, the pid
+at a null status pointer or a lazy-free process (NI M2-G1e), the family
+ledger's reading `zLowest ι.zev ι.act` through the status window the
+entry's permission view gives (`UsysDet.usysWaitFitsAt` at `permOf V.upt.um
+V.sz`: the reap, the window's prefix with nothing reaped, or `-1` with
+nothing moved); fork's, on success, the pid
 `pidPick` of `ι`'s pid prefix, and `ι`'s family prefix ends in the round's
 `ZFork` of that pid at the generation the children column gained.  The
 records are the dispatch's (`V`/`img` the entry, `V'`/`img'` the record the
@@ -161,11 +174,9 @@ call left). -/
 def syscEvRow (V V' : ProcPriv) (img img' : ElfMem) (cs cs' : ExtTreeSet GName compare) (ι : UIota) :
     Prop :=
   (syscNum V = USYS_uptime → tfW V'.tf (tfArgIdx 0) = usysUptimeWord ι.ticks) ∧
-  (syscNum V = USYS_wait → tfW V.tf (tfArgIdx 0) = 0#64 →
-    match zLowest ι.zev ι.act with
-    | some (_, pid, xs, γ) => tfW V'.tf (tfArgIdx 0) = BitVec.signExtend 64 pid ∧ cs' = cs \ {γ} ∧
-                              img' = usysWr img 0#64 (usysWaitBytes 0#64 xs)
-    | none => tfW V'.tf (tfArgIdx 0) = -1#64 ∧ cs' = cs ∧ img' = img) ∧
+  (syscNum V = USYS_wait → (tfW V.tf (tfArgIdx 0) = 0#64 ∨ V.pvLazy = false) →
+    usysWaitFitsAt (permOf V.upt.um V.sz.toNat) (tfW V.tf (tfArgIdx 0)) cs img ι (tfW V'.tf (tfArgIdx 0))
+      cs' img') ∧
   (syscNum V = USYS_fork → tfW V'.tf (tfArgIdx 0) ≠ -1#64 →
     tfW V'.tf (tfArgIdx 0) = BitVec.signExtend 64 (BitVec.ofNat 32 (pidPick PIDMAX ι.pev)) ∧
     ∃ (hz : List Zev) (i : Nat) (γ : GName),

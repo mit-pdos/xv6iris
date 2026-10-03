@@ -64,7 +64,13 @@ holds my address" (Rocq `kw_nokids_*`).  The ghost steps are Rocq's:
   * killed: `KILLED.wp_killed_r` with the reading `kwKillOut` built from the
     block's pid half and registration eighth (`kw_kill_acc`,
     `killPaid_shot`, `pid ≠ 0` from `genHalvesPriv_nz`) → `waitWhyLed_shot`;
-  * copyout failure: `waitWhyLed_notnull`.
+  * copyout failure (NI M2-G1e): kwait calls the REASONED copyout
+    (`COPYOUT.wp_copyout`, `kw_copyout`), and before releasing either lock
+    peeks at the zombie it found (`kw_slots_zombie_split`, `kw_peek_ghost`:
+    the family ledger's lower bound and `zLowest h (procAddr j) = some (n,
+    pid, xs, g)`, every resource handed back) → `waitWhyLed_copyFail` with
+    the copied window; a reap carries the window's writability
+    (`waitCopyOk`, through `kw_reap_ghost`).
 
 Deviations (all in placement, not content): Rocq's `kw_reap` hands
 `wait_ans_gen` out and `wp_kwait_sconf` crosses it with `wait_ans_of_gen`;
@@ -332,6 +338,20 @@ theorem kw_slots_zombie_elim (Γ : SchedNames) (ξl : CtxId) (pa : BitVec 64) :
   ihave #Hu := pavSlot_used Γ pa ZOMBIE (by decide) $$ Hm
   iframe Hu Hd Hh
 
+/-- The slot at ZOMBIE lends its dormant block (NI M2-G1e: kwait's copyout
+failure peeks at it, `kw_peek_ghost`) and takes it back. -/
+theorem kw_slots_zombie_split (Γ : SchedNames) (ξl : CtxId) (pa : BitVec 64) :
+    procSlotsAt (GF := GF) Γ ξl pa ZOMBIE ⊢
+      @procDormant hlc GF _ ⟨ξl, KTier.kpt⟩ _ _ _ _ _ _ pa ZOMBIE ∗
+      (@procDormant hlc GF _ ⟨ξl, KTier.kpt⟩ _ _ _ _ _ _ pa ZOMBIE -∗ procSlotsAt Γ ξl pa ZOMBIE) := by
+  unfold procSlotsAt
+  rw [if_neg kw_zombie_not_needsCtx, if_neg kw_zombie_not_isRunning,
+    if_pos kw_zombie_invDormant, if_pos kw_zombie_notRunning, if_pos rfl]
+  iintro ⟨H1, H2, Hd, Hh, Hm, H6⟩
+  iframe Hd
+  iintro Hd
+  iframe H1 H2 Hd Hh Hm H6
+
 /-- Rebuild an UNUSED slot from `freeproc`'s output, the hart tag, and the
 slot's T2 element the reap moved to `none` (NI M2-G1b: put back here, at the
 UNUSED re-close after freeproc). -/
@@ -513,7 +533,8 @@ def kwPost (cpu : CPU) (k : KCtx) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
     ⌜calleeSaved k.regs R' ∧ R' 10#5 = BitVec.signExtend 64 rv ∧ V.upt.extSz V.sz P' ∧ d ≤ 4 ∧
       kwaitAns rv (k.regs 10#5) d ∧
       umMapped P' (k.regs 10#5).toNat d⌝ -∗
-    waitAnsLed rv (xstateVal xw) cs cs' V.gen (decide (k.regs 10#5 = 0#64)) pid (procAddr j) -∗
+    waitAnsLed rv (xstateVal xw) cs cs' V.gen (decide (k.regs 10#5 = 0#64)) pid (procAddr j)
+      (k.regs 10#5) V.upt P' d -∗
     kwaitGen (procAddr j) pid V.gen -∗ chFrag V.chg (procAddr j) cs' -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
@@ -543,22 +564,22 @@ def kwCellsEbBody (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
 /-- the answer the post receives (led: the reap's receipt rides the reaping
 arm), bundled with the rows it hands back -/
 def kwAns (j : Nat) (pid : BitVec 32) (V : ProcPriv) (cs : ExtTreeSet GName compare)
-    (rv xw : BitVec 32) (nullst : Bool) : IProp GF :=
+    (rv xw : BitVec 32) (nullst : Bool) (a0 : BitVec 64) (P' : UPtd) (d : Nat) : IProp GF :=
   iprop(∃ cs' : ExtTreeSet GName compare,
-    waitAnsLed rv (xstateVal xw) cs cs' V.gen nullst pid (procAddr j) ∗
+    waitAnsLed rv (xstateVal xw) cs cs' V.gen nullst pid (procAddr j) a0 V.upt P' d ∗
     kwaitGen (procAddr j) pid V.gen ∗ chFrag V.chg (procAddr j) cs')
 
 /-- The three `-1` exits: the row does not move, the reason is `waitWhyLed`
 (NI G1c: the no-children reason carries the ledger's reading). -/
 theorem kw_ans_neg_ghost (j : Nat) (pid : BitVec 32) (V : ProcPriv) (cs : ExtTreeSet GName compare)
-    (xw : BitVec 32) (nullst : Bool) :
-    waitWhyLed cs V.gen nullst (procAddr j) ∗ kwG (GF := GF) j pid V cs ⊢
-      kwAns j pid V cs (-1#32) xw nullst := by
+    (xw : BitVec 32) (nullst : Bool) (a0 : BitVec 64) (P' : UPtd) (d : Nat) :
+    waitWhyLed cs V.gen nullst (procAddr j) (xstateVal xw) a0 V.upt P' d ∗ kwG (GF := GF) j pid V cs ⊢
+      kwAns j pid V cs (-1#32) xw nullst a0 P' d := by
   unfold kwG kwAns
   iintro ⟨#Hwhy, Hkg, Hrow, -⟩
   iexists cs
   iframe Hkg Hrow
-  iapply waitAnsLed_neg (xstateVal xw) cs V.gen nullst pid (procAddr j) $$ Hwhy
+  iapply waitAnsLed_neg (xstateVal xw) cs V.gen nullst pid (procAddr j) a0 V.upt P' d $$ Hwhy
 
 /-- `genPid` agrees with an escrow's `exitTok` on the pid. -/
 theorem kw_genPid_exitTok (g : GName) (pide pid0 : BitVec 32) (xs : Int) :
@@ -599,13 +620,14 @@ set_option maxHeartbeats 1000000 in
 theorem kw_reap_ghost (j n : Nat) (hj : j < NPROC) (hn : n < NPROC)
     (parents : Nat → BitVec 64) (hmatch : parents n = procAddr j) (zh : List Zev)
     (hfirst : ∀ k' < n, parents k' = procAddr j → (famOf zh k').zomb = none)
-    (pid pid0 xs : BitVec 32) (V : ProcPriv) (cs : ExtTreeSet GName compare) (nullst : Bool) :
+    (pid pid0 xs : BitVec 32) (V : ProcPriv) (cs : ExtTreeSet GName compare) (nullst : Bool)
+    (a0 : BitVec 64) (P' : UPtd) (d : Nat) (hok : waitCopyOk a0 P') :
     kwWRest (GF := GF) curCtx parents zh ∗ kwG j pid V cs ∗
     wordPointsTo (pXstate (procAddr n)) 4 xsHalf xs ∗ wordPointsTo (pPid (procAddr n)) 4 pidPub pid0 ∗
     procDormant (procAddr n) ZOMBIE ⊢
     |==> (kwWRest curCtx (fun i => if i = n then 0#64 else parents i)
         (zh ++ [.ZReap (procAddr j) n pid0]) ∗
-      kwAns j pid V cs pid0 xs nullst ∗
+      kwAns j pid V cs pid0 xs nullst a0 P' d ∗
       wordPointsTo (pXstate (procAddr n)) 4 xsHalf xs ∗ wordPointsTo (pPid (procAddr n)) 4 pidPub pid0 ∗
       zsElem (procAddr n) none ∗
       ∃ (Vf : ProcPriv) (Mf : Nat → List (BitVec 8)) (g : GName),
@@ -681,7 +703,7 @@ theorem kw_reap_ghost (j n : Nat) (hj : j < NPROC) (hn : n < NPROC)
   -- UNUSED re-close after freeproc
   imod famLed_reap parents gs n hn (procAddr j) pide _ zh $$ [$Hfam $Hzs] with ⟨Hfam, Hzs, #Hzr⟩
   ihave Hans := waitAnsLed_of pide (xstateVal xs) cs (cs \ {Vf.gen}) V.gen nullst pid (procAddr j)
-      zh n Vf.gen hlow ⟨rfl, hrng.1, hrng.2⟩ $$ [Hgpme Hipis Hzr Hoci Hesc Huniq]
+      a0 V.upt P' d zh n Vf.gen hlow hok ⟨rfl, hrng.1, hrng.2⟩ $$ [Hgpme Hipis Hzr Hoci Hesc Huniq]
   · iframe Hgpme Hipis Hzr Hoci Hesc Huniq
   imodintro
   isplitl [Hch Ho Hci Hfam]
@@ -701,6 +723,65 @@ theorem kw_reap_ghost (j n : Nat) (hj : j < NPROC) (hn : n < NPROC)
   iframe Hsg Hpr34 Hpr8
   iexists xs
   iexact Hxb
+
+/-- **THE ZOMBIE'S READING, PEEKED** (NI M2-G1e): under `wait_lock` and
+`pp->lock`, at the ZOMBIE child the scan found, before anything moves --
+the family ledger's lower bound at the payload's `h` and the reading
+`zLowest h (procAddr j) = some (n, pid, xs, g)` (T1 for the parent and
+generation, the ZOMBIE block's T2 element for the pid and status, the
+scan's first-ness) -- with every resource handed back.  What the copyout's
+`-1` reason carries (`waitWhyLed`): the status `xs` is the word `p->lock`'s
+half reads, which is what the copyout copied. -/
+theorem kw_peek_ghost (j n : Nat) (hj : j < NPROC) (hn : n < NPROC)
+    (parents : Nat → BitVec 64) (hmatch : parents n = procAddr j) (zh : List Zev)
+    (hfirst : ∀ k' < n, parents k' = procAddr j → (famOf zh k').zomb = none) (xs : BitVec 32) :
+    kwWRest (GF := GF) curCtx parents zh ∗ wordPointsTo (pXstate (procAddr n)) 4 xsHalf xs ∗
+      procDormant (procAddr n) ZOMBIE ⊢
+    (∃ (pidc : BitVec 32) (g : GName), zombLedLb zh ∗
+        ⌜zLowest zh (procAddr j) = some (n, pidc, xstateVal xs, g)⌝) ∗
+      kwWRest curCtx parents zh ∗ wordPointsTo (pXstate (procAddr n)) 4 xsHalf xs ∗
+      procDormant (procAddr n) ZOMBIE := by
+  have hpj : procAddr j ≠ 0#64 := procAddr_nonzero hj
+  unfold kwWRest procDormant
+  iintro ⟨⟨%gs, %m, %O, Hch, Ho, Hci, Hfam⟩, Hxs, %hst, %V, %pid, %hV, Hpid, Hf, Hal, Hchf, Hev, Hgh,
+    ⟨%xsv, Hxb, Hz⟩, Hsp⟩
+  rw [if_pos rfl]
+  icases Hz with ⟨Hesc, Hzs⟩
+  icases famLedAt_tie parents gs zh $$ Hfam with ⟨%hT, Hfam⟩
+  icases famLedAt_lb parents gs zh $$ Hfam with ⟨#Hlb, Hfam⟩
+  -- the two xstate halves are one word
+  icases (show wordPointsTo (GF := GF) (pXstate (procAddr n)) 4 xsHalf xs ∗
+      wordPointsTo (pXstate (procAddr n)) 4 xsHalf xsv ⊢
+      ⌜xs = xsv⌝ ∗ wordPointsTo (pXstate (procAddr n)) 4 xsHalf xs ∗
+        wordPointsTo (pXstate (procAddr n)) 4 xsHalf xsv from by
+    unfold xsHalf; exact wordPointsTo_agree_keep _ _ _ _ _ _) $$ [Hxs Hxb] with ⟨%hxe, Hxs, Hxb⟩
+  · iframe Hxs Hxb
+  subst hxe
+  -- T2: the ZOMBIE block's element reads the fold's zombie column at `n`
+  icases famLedAt_lookup parents gs zh n hn _ $$ [Hfam Hzs] with ⟨%hzn, Hfam, Hzs⟩
+  · iframe Hfam Hzs
+  have hlow : zLowest zh (procAddr j) = some (n, pid, xstateVal xs, (famOf zh n).gen) := by
+    refine (zLowest_spec zh (procAddr j) n pid (xstateVal xs) _).2
+      ⟨hn, (hT n hn).1.symm.trans hmatch, hzn, rfl, ?_⟩
+    intro i' hi' hp
+    exact hfirst i' hi' ((hT i' (by omega)).1.trans hp)
+  isplitl []
+  · iexists pid, (famOf zh n).gen
+    iframe Hlb
+    ipureintro; exact hlow
+  isplitl [Hch Ho Hci Hfam]
+  · iexists gs, m, O
+    iframe Hch Ho Hci Hfam
+  iframe Hxs
+  isplitl []
+  · ipureintro; exact hst
+  iexists V, pid
+  iframe Hpid Hf Hal Hchf Hev Hgh Hsp
+  isplitl []
+  · ipureintro; exact hV
+  iexists xs
+  rw [if_pos rfl]
+  iframe Hxb Hesc Hzs
 
 /-- The reading `kwait` lends `killed()` (Rocq `kw_round_tail`'s `Hkacc`):
 the block's half of `p->pid` and its registration eighth, which make the
@@ -893,7 +974,10 @@ theorem kw_killed (KL : KILLED) (Γ : SchedNames) (c : CPU) (k' : KCtx) (j : Nat
   exact h
 
 set_option maxHeartbeats 1000000 in
-/-- `copyout`'s contract at its entry (folded to `0x800015c2`). -/
+/-- `copyout`'s contract at its entry (folded to `0x800015c2`): the REASONED
+contract (NI M2-G1e, `COPYOUT.wp_copyout`) -- the written prefix writable in
+the returned table, and at `-1` the byte it stopped at not writable at the
+entry table. -/
 theorem kw_copyout (CO : COPYOUT) (c : CPU) (k' : KCtx) (γl : GName) (γk : KmemNames)
     (P : UPtd) (M : Nat → List (BitVec 8)) (dqs : DFrac) (bs : List (BitVec 8))
     (ke : Nat) (p : BitVec 64) (hp : k'.proc = p)
@@ -912,16 +996,17 @@ theorem kw_copyout (CO : COPYOUT) (c : CPU) (k' : KCtx) (γl : GName) (γk : Kme
       (∃ (P' : UPtd) (M' : Nat → List (BitVec 8)),
         ⌜P.extSz (k'.regs 11#5) P' ∧
           ((R' 10#5 = 0#64 ∧ M' = umemWrite (viewFaulted P P' M) dst.toNat bs ∧
-              umMapped P' dst.toNat bs.length) ∨
+              umMapped P' dst.toNat bs.length ∧ uvaWprefix P' dst bs.length) ∨
            (R' 10#5 = -1#64 ∧ ∃ d, d < bs.length ∧
               M' = umemWrite (viewFaulted P P' M) dst.toNat (bs.take d) ∧
-              umMapped P' dst.toNat d))⌝ ∗
+              umMapped P' dst.toNat d ∧ uvaWprefix P' dst d ∧
+              ¬ uvaWmapped P (dst + BitVec.ofNat 64 d).toNat))⌝ ∗
         procPtAt P' M') -∗
       ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   subst hsrc hdst hp
-  have h := CO.wp_copyout_nr (hlc := hlc) (GF := GF) c k' γl γk P M dqs bs ke hnoff hK hlk hroot hsz hlen hlen'
-  unfold wp_copyout_nr_body at h
+  have h := CO.wp_copyout (hlc := hlc) (GF := GF) c k' γl γk P M dqs bs ke hnoff hK hlk hroot hsz hlen hlen'
+  unfold wp_copyout_body at h
   simp only [copyoutAddr] at h
   exact h
 
@@ -1044,7 +1129,7 @@ theorem kw_epi (Γ : SchedNames) (cpu cur : CPU) (k : KCtx) (γw γp γl : GName
     procPrivNoctxAt curCtx (procAddr j) pid { V.updEv k' with upt := P' }
       (umemWrite (viewFaulted V.upt P' M) (k.regs 10#5).toNat ((xstateBytes xw).take d)) ∗
     trapCsrsExt cur k.sie ∗ cpuClaimExt cur k.sie k.proc ∗
-    kwAns j pid V cs rv xw (decide (k.regs 10#5 = 0#64)) ∗
+    kwAns j pid V cs rv xw (decide (k.regs 10#5 = 0#64)) (k.regs 10#5) P' d ∗
     kwPost cpu k j pid V M cs
     ⊢ wpLoop (GF := GF) cur := by
   unfold kwAns kwPost
@@ -1291,7 +1376,8 @@ theorem kw_reap (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE)
         Rc 19#5 = BitVec.signExtend 64 pid0 ∧ Rc 22#5 = waitLockAddr ∧ Rc 24#5 = k.regs 24#5 ∧
         Rc 25#5 = k.regs 25#5 ∧ Rc 26#5 = k.regs 26#5 ∧ Rc 27#5 = k.regs 27#5 ∧
         V.upt.extSz V.sz P' ∧ d ≤ 4 ∧ kwaitAns pid0 (k.regs 10#5) d ∧
-        umMapped P' (k.regs 10#5).toNat d ∧ M'' = umemWrite (viewFaulted V.upt P' M) (k.regs 10#5).toNat ((xstateBytes xs).take d)⌝ -∗
+        umMapped P' (k.regs 10#5).toNat d ∧ waitCopyOk (k.regs 10#5) P' ∧
+        M'' = umemWrite (viewFaulted V.upt P' M) (k.regs 10#5).toNat ((xstateBytes xs).take d)⌝ -∗
       kctx cur (((kh.pushOffAt spie2 spp2).withLocks ("proc" :: kh.locks)).withRegs Rc) -∗
       pcIs cur (KA.«kwait» + 0x60#64) -∗
       locked (Γ.lock n) cur -∗ locked γw cur -∗ waitResAt curCtx parents -∗ kwWRest curCtx parents zh -∗
@@ -1314,7 +1400,7 @@ theorem kw_reap (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE)
       wpLoop cur) $$ []
   case' _ =>
     iintro %Rc %P' %M'' %d %kc
-      %⟨hcsp, hc9, hc18, hc19, hc22, hc24, hc25, hc26, hc27, hext, hd, hans, hmap, hM⟩
+      %⟨hcsp, hc9, hc18, hc19, hc22, hc24, hc25, hc26, hc27, hext, hd, hans, hmap, hok, hM⟩
       Hk Hpc HlpC Hlockw Hwr Hwrest Hg Hstate Hpl Hchan Hkilled Hxs Hpid Hkp Hslots %hkc Hpriv Htc Hcl Hir
       Hframe HΦ
     icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -1332,7 +1418,7 @@ theorem kw_reap (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE)
     icases kw_slots_zombie_elim Γ ξ0 (procAddr n) $$ Hslots with ⟨#Hused, Hdorm, Hhart⟩
     iapply wpLoop_bupd
     imod kw_reap_ghost j n hj hn parents hmatch zh hfirst pid pid0 xs V cs (decide (k.regs 10#5 = 0#64))
-      $$ [Hwrest Hg Hxs Hpid Hdorm] with ⟨Hwrest, Hans, Hxs, Hpid, Hzs, %Vf, %Mf, %gf, Hfin, Hfgen⟩
+      (k.regs 10#5) P' d hok $$ [Hwrest Hg Hxs Hpid Hdorm] with ⟨Hwrest, Hans, Hxs, Hpid, Hzs, %Vf, %Mf, %gf, Hfin, Hfgen⟩
     · iframe Hwrest Hg Hxs Hpid Hdorm
     -- THE REAP COSTS ONE COUNT of the reaper's permit (permit sweep L3c, no
     -- Rocq counterpart): beside `ZReap (procAddr j) n pide`, the reaper's
@@ -1509,7 +1595,7 @@ theorem kw_reap (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE)
       Hframe HΦ
     · ipureintro
       refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, extSz_refl _ V.upt, by omega,
-        kw_ans_null pid0 (k.regs 10#5) haddr, Xv6.UMemL.umMapped_zero _ _, ?_⟩
+        kw_ans_null pid0 (k.regs 10#5) haddr, Xv6.UMemL.umMapped_zero _ _, fun h => absurd haddr h, ?_⟩
       · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact hR2sp
       · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact h9
       · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact h18
@@ -1610,7 +1696,7 @@ theorem kw_reap (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE)
       have hRC27 : RC 27#5 = k.regs 27#5 := by
         rw [hcsC.2.2.2.2.2.2.2.2.2.2.2.2]; simp only [KCtx.setReg_regs, KCtx.withLocks_regs, KCtx.withRegs_regs,
           KCtx.pushOffAt_regs, RegMap.set_apply, BitVec.reduceEq, ite_false]; exact h27
-      rcases hdisj with ⟨h10, hMeq, hmapC⟩ | ⟨h10, dd, hdd, hMeq, hmapC⟩
+      rcases hdisj with ⟨h10, hMeq, hmapC, hpreC⟩ | ⟨h10, dd, hdd, hMeq, hmapC, hpreC, hnotC⟩
       · -- copyout succeeded (a0 = 0): fall through to the common tail
         k_step (wp_s_branch cur _ (KA.«kwait» + 0x5c#64) false 56#13 10#5 0#5 (by decide) bop.BLT)
           from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
@@ -1628,7 +1714,7 @@ theorem kw_reap (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE)
           Hir Hframe HΦ
         · ipureintro
           refine ⟨hRC2, hRC9, hRC18, hRC19, hRC22, hRC24, hRC25, hRC26, hRC27, hext', by omega,
-            kw_ans_full pid0 (k.regs 10#5) haddr, ?_, ?_⟩
+            kw_ans_full pid0 (k.regs 10#5) haddr, ?_, fun _ => by simpa only [xstateBytes_length] using hpreC, ?_⟩
           · simpa only [xstateBytes_length] using hmapC
           rw [hMeq, show (4 : Nat) = (xstateBytes xs).length from (xstateBytes_length xs).symm,
             List.take_length]
@@ -1638,6 +1724,19 @@ theorem kw_reap (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE)
         -- reassemble the child's xstate word and rebuild its ZOMBIE lock payload
         ihave Hxs := kw_bytes_to_word4 (pXstate (procAddr n)) xsHalf xs
           (kw_pXstate_align4 n hn) $$ Hbytes
+        -- THE ZOMBIE'S READING (NI M2-G1e): the child kwait found, peeked at
+        -- under both locks before they are released -- the copyout's `-1`
+        -- reason carries it, with the copied window
+        icases kw_slots_zombie_split Γ ξ0 (procAddr n) $$ Hslots with ⟨Hdorm, Hsback⟩
+        icases kw_peek_ghost j n hj hn parents hmatch zh hfirst xs $$ [Hwrest Hxs Hdorm] with
+          ⟨⟨%pidc, %gz, #Hzlb, %hzl⟩, Hwrest, Hxs, Hdorm⟩
+        · iframe Hwrest Hxs Hdorm
+        ihave Hslots := Hsback $$ Hdorm
+        have hdd4 : dd < 4 := by rw [xstateBytes_length] at hdd; exact hdd
+        ihave #Hwhy : waitWhyLed (GF := GF) cs V.gen (decide (k.regs 10#5 = 0#64)) (procAddr j) (xstateVal xs)
+            (k.regs 10#5) V.upt P' dd $$ [Hzlb]
+        · iapply waitWhyLed_copyFail cs V.gen _ (procAddr j) (xstateVal xs) (k.regs 10#5) V.upt P' dd zh n
+            pidc gz (by simp [haddr]) hzl ⟨hdd4, hpreC, hnotC⟩ $$ Hzlb
         ihave Hpub : procPubRest (procAddr n) kl xs pid0 $$ [Hkilled Hxs Hpid Hkp]
         case' _ => unfold procPubRest; iframe Hkilled Hxs Hpid Hkp
         ihave Hlockres : procLockResAt Γ ξ0 (procAddr n) $$ [Hstate Hpl Hchan Hpub Hslots]
@@ -1755,10 +1854,10 @@ theorem kw_reap (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE)
             have hR5_27 : R5 27#5 = k.regs 27#5 :=
               (hcs5.2.2.2.2.2.2.2.2.2.2.2.2).trans ((hcs4.2.2.2.2.2.2.2.2.2.2.2.2).trans hRC27)
             k_norm_g
-            ihave Hans : kwAns j pid V cs (-1#32) xs (decide (k.regs 10#5 = 0#64)) $$ [Hg]
-            · iapply kw_ans_neg_ghost j pid V cs xs _
+            ihave Hans : kwAns j pid V cs (-1#32) xs (decide (k.regs 10#5 = 0#64)) (k.regs 10#5) P' dd $$ [Hg]
+            · iapply kw_ans_neg_ghost j pid V cs xs _ (k.regs 10#5) P' dd
               isplitr [Hg]
-              · iapply waitWhyLed_notnull cs V.gen _ (procAddr j) (by simp [haddr])
+              · iexact Hwhy
               · iexact Hg
             iapply (kw_epi Γ cpu c7 k γw γp γl γk j pid V M cs hj hkproc (by omega) spie2 spp2
                 (R5.set 19#5 18446744073709551615#64) (-1#32) xs dd P' w9 ?heR2 ?heS3 ?heH24 ?heH25 ?heH26 ?heH27
@@ -2363,7 +2462,8 @@ theorem kw_noKids (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE) (AC : ACQUIRE) (
   ihave HpathA : (∀ (RA : RegMap), ⌜kwFix k RA⌝ -∗
       kctx cur (kh.withRegs RA) -∗ pcIs cur (KA.«kwait» + 0xfa#64) -∗
       trapCsrs cur -∗ cpuClaim cur k.proc -∗ intrRes cur -∗ locked γw cur -∗
-      waitLockPay curCtx -∗ waitWhyLed cs V.gen (decide (k.regs 10#5 = 0#64)) (procAddr j) -∗
+      waitLockPay curCtx -∗
+      waitWhyLed cs V.gen (decide (k.regs 10#5 = 0#64)) (procAddr j) (xstateVal 0#32) (k.regs 10#5) V.upt V.upt 0 -∗
       kwG j pid V cs -∗
       procPrivNoctxAt curCtx (procAddr j) pid V M -∗
       kwFrame (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)
@@ -2431,8 +2531,8 @@ theorem kw_noKids (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE) (AC : ACQUIRE) (
           (umemWrite (viewFaulted V.upt V.upt M) (k.regs 10#5).toNat ((xstateBytes 0#32).take 0))
         from by rw [List.take_zero, umemWrite_nil, viewFaulted_self]) $$ Hpriv
       k_norm_g
-      ihave Hans : kwAns j pid V cs (-1#32) 0#32 (decide (k.regs 10#5 = 0#64)) $$ [Hg]
-      · iapply kw_ans_neg_ghost j pid V cs 0#32 _
+      ihave Hans : kwAns j pid V cs (-1#32) 0#32 (decide (k.regs 10#5 = 0#64)) (k.regs 10#5) V.upt 0 $$ [Hg]
+      · iapply kw_ans_neg_ghost j pid V cs 0#32 _ (k.regs 10#5) V.upt 0
         isplitr [Hg]
         · iexact Hwhy
         · iexact Hg
@@ -2465,8 +2565,9 @@ theorem kw_noKids (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE) (AC : ACQUIRE) (
     · iframe Hwrest Hg
     ihave Hpay := kw_wait_pay_intro curCtx parents zh $$ [Hwr Hwrest]
     · iframe Hwr Hwrest
-    ihave #Hwhy : waitWhyLed (GF := GF) cs V.gen (decide (k.regs 10#5 = 0#64)) (procAddr j) $$ [Hlb]
-    · iapply waitWhyLed_nokids cs V.gen _ (procAddr j) zh hcse hnk $$ Hlb
+    ihave #Hwhy : waitWhyLed (GF := GF) cs V.gen (decide (k.regs 10#5 = 0#64)) (procAddr j) (xstateVal 0#32)
+        (k.regs 10#5) V.upt V.upt 0 $$ [Hlb]
+    · iapply waitWhyLed_nokids cs V.gen _ (procAddr j) (xstateVal 0#32) (k.regs 10#5) V.upt V.upt zh hcse hnk $$ Hlb
     iapply HpathA $$ %Rex [] Hk Hpc Htc Hcl Hir Hlockw Hpay Hwhy Hg Hpriv Hframe HΦ
     ipureintro; exact hfixE
   · -- havekids : killed(p) ; then sleep or -1
@@ -2675,8 +2776,9 @@ theorem kw_noKids (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE) (AC : ACQUIRE) (
             rw [if_pos (fun h => hkilled (by revert h; bv_decide))]) $$ Hpc
         icases Hkr with (%hk0 | #Hshot)
         · exact absurd hk0 hkilled
-        ihave #Hwhy : waitWhyLed (GF := GF) cs V.gen (decide (k.regs 10#5 = 0#64)) (procAddr j) $$ []
-        · iapply waitWhyLed_shot cs V.gen _ (procAddr j) $$ Hshot
+        ihave #Hwhy : waitWhyLed (GF := GF) cs V.gen (decide (k.regs 10#5 = 0#64)) (procAddr j) (xstateVal 0#32)
+            (k.regs 10#5) V.upt V.upt 0 $$ []
+        · iapply waitWhyLed_shot cs V.gen _ (procAddr j) (xstateVal 0#32) (k.regs 10#5) V.upt V.upt $$ Hshot
         iapply HpathA $$ %RK [] Hk Hpc Htc Hcl Hir Hlockw Hpay Hwhy Hg Hpriv Hframe HΦ
         ipureintro; exact hfixK
     case hkp => k_norm_g
@@ -3116,7 +3218,7 @@ theorem kwait_eb_of_led
   iframe H0 H1 H2 H3 H4 H5 H6 H7 H8 H9 H10 H11
   iapply wpNext_mono $$ HΦ
   iintro %cpu' HK %spie %spp %R' %P' %rv %xw %d %cs' %k' %hp Hans Hrow Hk Hpc Hte Hce %hk' Hblk
-  ihave Hans := waitAnsLed_post rv (xstateVal xw) cs cs' V.gen _ pid (procAddr j) $$ Hans
+  ihave Hans := waitAnsLed_post rv (xstateVal xw) cs cs' V.gen _ pid (procAddr j) _ _ _ _ $$ Hans
   iapply HK $$ %spie %spp %R' %P' %rv %xw %d %cs' %k' %hp Hans Hrow Hk Hpc Hte Hce %hk' Hblk
 
 end

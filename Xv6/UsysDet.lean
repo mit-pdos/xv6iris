@@ -15,9 +15,11 @@ be made one today.
   own placement, never another process's outcome.
 * §2 THE PRIVATE CLASS and `usysDet n W ι`: exit (no resume), getpid (the
   key's own pid), uptime (the tick count of `ι`) and (G1d) wait (the family
-  ledger's lowest zombie child of the caller, `zLowest ι.zev ι.act`).  The
-  class is KEY-DEPENDENT at wait (`usysDetClassAt`, ruling G1-R4): a wait is
-  in it at a NULL status pointer (deviation 5).  Every other number stays
+  ledger's lowest zombie child of the caller, `zLowest ι.zev ι.act`, through
+  the key's STATUS WINDOW `uwaitWin`, NI M2-G1e).  The class is
+  KEY-DEPENDENT at wait (`usysDetClassAt`, rulings G1-R4 and G1e-R1): a wait
+  is in it at a NULL status pointer or with the key's LAZY BIT OFF
+  (deviation 5).  Every other number stays
   RELATIONAL (`UsysMemOk.usysMemOk` and its siblings); §4 below says why
   each of §4's other candidates is out.
 * §3 THE FUNCTIONAL ROW REFINES THE LANDED RELATION (`usysDet_mem` and
@@ -62,26 +64,24 @@ read as the policy (`uexecRetContF_det`) are in `UexecApply`.
   store appends `ZFork act j pid g` under `wait_lock`), so the reap is
   `zLowest` of the family ledger at the caller's slot, and kwait's led
   answer carries that reading at the reap's receipt (G1c).  The row
-  (`usysDetWait`): `zLowest ι.zev ι.act = some (j, pid, xs, γ)` reaps --
-  the answer `pid` sign-extended, the status's bytes at the a0 pointer
-  (none at null), `γ` out of the children set; otherwise `-1` with nothing
-  moved (no children: `¬ zHasKids` makes `zLowest` `none`; children of which
-  none is a zombie: unreachable on a resumed round, kwait sleeps).  What
-  stays NON-FUNCTIONAL in wait:
-  - **the status copyout at a non-null pointer** (deviation 5): at `lazy =
-    true` a lazily absent page faults through `vmfault → kalloc` (the
-    allocator's position, G3's).  At `lazy = false` the copyout's outcome IS
-    a function of the key (`VmfaultQuiet.lazyFree_wmapped_iff`, G1c's F4),
-    but the kernel's led answer does not yet say so: kwait calls
-    `COPYOUT.wp_copyout_nr` (no failure reason) and `waitAnsLed`'s copyout
-    reason is only `nullst = false`, so at a `-1` the window
-    (`SpecSyscall.syscUwaitWr`) writes an UNCONSTRAINED prefix of an
-    unconstrained status word.  And the design's "bad pointer → -1, nothing
-    moved" is not what xv6 does: a zombie child's status straddling a
-    writable and a non-writable page is copied out up to the page boundary
-    before the -1.  Re-admitting `lazy = false` at a non-null pointer needs
-    kwait's led answer to carry, at a copyout failure, the reading at the
-    found zombie and the copied prefix (`d` = the first non-writable byte).
+  (`usysDetWait`): `zLowest ι.zev ι.act = some (j, pid, xs, γ)` reaps at a
+  whole status window (`uwaitWin W.perm a0 = 4`: a null pointer, or the
+  four status bytes writable in the key's `π`) -- the answer `pid`
+  sign-extended, the status's bytes at the a0 pointer (none at null), `γ`
+  out of the children set; at a window broken at byte `d < 4` (NI M2-G1e)
+  it answers `-1` with the first `d` status bytes written and NOTHING reaped
+  (xv6's copyout copies page by page, each after its `PTE_W` check);
+  otherwise `-1` with nothing moved (no children: `¬ zHasKids` makes
+  `zLowest` `none`; children of which none is a zombie: unreachable on a
+  resumed round, kwait sleeps).  The kernel's led answer carries it (NI
+  M2-G1e): kwait calls the reasoned `COPYOUT.wp_copyout`, its copyout
+  reason carries the zombie found and the copied window, and at `lazy =
+  false` the window IS the key's (`VmfaultQuiet.lazyFree_wmapped_iff`, G1c's
+  F4; `SyscallArmsWait.syscArmWait_win`).  What stays NON-FUNCTIONAL in
+  wait:
+  - **the status copyout at a non-null pointer of a lazy process**
+    (deviation 5): a lazily absent page faults through `vmfault → kalloc`
+    (the allocator's position, G3's).
   - **the kill arm**: dead at the boundary (G1c's F3): usertrap's
     post-syscall `killed` read is the reading form, so a round whose `-1`
     came from `killShot` never resumes (`UsertrapParts.ut_kill_lend`,
@@ -102,7 +102,8 @@ read as the policy (`uexecRetContF_det`) are in `UexecApply`.
 
 1. **M0 as designed for Lean; Rocq never landed it** (NI-DET-ROWS stayed
    open on the `rocq` branch).  Nothing here is a port.
-2. **The class is {exit, getpid, uptime, wait at a null status pointer}**,
+2. **The class is {exit, getpid, uptime, wait at a null status pointer or
+   a lazy-free key}** (NI M2-G1e),
    not §4's whole list: §4 above.
 3. **`round_det` concludes the KEY equality `ukeyEq`**, not `W' = usysDet …`
    on the nose: the round relation pins the resume trapframe through its
@@ -118,15 +119,16 @@ read as the policy (`uexecRetContF_det`) are in `UexecApply`.
    and the filing proves the row at the CITED ι (`usysIotaFits_of_ev`:
    the re-keyed `SyscallDefs.syscEvRow` IS the fit; `UserretClosedRows.
    urc_niDetRow`).  W4 reads both answers as READINGS (O5, G1-R5) until X4.
-5. **The class at wait is `a0 = 0`, not the design's `lazy = false ∨ a0 =
-   0`** (G1-R4): §4's wait bullet -- the kernel's led answer leaves the
-   `-1` image at a non-null pointer unconstrained, so no row at `lazy =
-   false` and a non-null pointer can be proved functional today.  The
-   class predicate takes the a0 WORD (`usysDetClassAt n a0`), so the trace
-   (`NiTrace.NiInClass`) reads it off the exit's registers; the design's
-   `lazy` bit would have to ride the filing.  For the same reason the
-   design's first test (a non-writable status word at `lazy = false` → -1)
-   is not in `usysDetWait`.
+5. **The class at wait is `a0 = 0 ∨ lazy = false`** (G1-R4 as designed,
+   narrowed by G1d to `a0 = 0` and re-admitted by NI M2-G1e, ruling
+   G1e-R1): the class predicate takes the a0 WORD and the key's LAZY BIT
+   (`usysDetClassAt n a0 lz`); the trace (`NiTrace.NiInClass`) reads the a0
+   word off the exit's registers and the lazy bit off the step (a ghost-key
+   reading the filing carries, as `secc`).  The design's first test ("a
+   non-writable status word at `lazy = false` → -1, nothing moved") is not
+   xv6's: with a zombie child the status is copied up to the first
+   non-writable byte (`uwaitWin`, ruling G1e-R2) and the child is NOT
+   reaped; `usysDetWait`'s middle arm.
 -/
 import Xv6.UexecRound
 import Xv6.KallocEv
@@ -198,18 +200,21 @@ def usysDetResumes (n : Int) : Prop := usysDetQuiet n ∨ n = USYS_wait
 instance (n : Int) : Decidable (usysDetResumes n) := by unfold usysDetResumes; infer_instance
 
 /-- **THE PRIVATE CLASS**, as numbers: the numbers whose round is a function
-of `(key, ι)` at SOME key (wait's at a null status pointer only:
-`usysDetClassAt`). -/
+of `(key, ι)` at SOME key (wait's at a null status pointer or a lazy-free
+process only: `usysDetClassAt`). -/
 def usysDetClass (n : Int) : Prop := n = USYS_exit ∨ n = USYS_getpid ∨ n = USYS_uptime ∨ n = USYS_wait
 
 instance (n : Int) : Decidable (usysDetClass n) := by unfold usysDetClass; infer_instance
 
 /-- **THE PRIVATE CLASS AT A KEY** (NI G1d, ruling G1-R4: key-dependent at
-wait): the number is in the class and, at wait, the status pointer -- the
-trapped key's argument word 0 -- is null (deviation 5). -/
-def usysDetClassAt (n : Int) (a0 : BitVec 64) : Prop := usysDetClass n ∧ (n = USYS_wait → a0 = 0#64)
+wait; NI M2-G1e, ruling G1e-R1): the number is in the class and, at wait,
+the status pointer -- the trapped key's argument word 0 -- is null, or the
+key's lazy bit `lz` is off (no lazily absent page: the status copyout's
+outcome is the key's `uwaitWin`). -/
+def usysDetClassAt (n : Int) (a0 : BitVec 64) (lz : Bool) : Prop :=
+  usysDetClass n ∧ (n = USYS_wait → a0 = 0#64 ∨ lz = false)
 
-instance (n : Int) (a0 : BitVec 64) : Decidable (usysDetClassAt n a0) := by
+instance (n : Int) (a0 : BitVec 64) (lz : Bool) : Decidable (usysDetClassAt n a0 lz) := by
   unfold usysDetClassAt; infer_instance
 
 theorem usysDetClass_resumes {n : Int} (h : usysDetClass n) (hx : n ≠ USYS_exit) : usysDetResumes n := by
@@ -224,29 +229,96 @@ theorem usysDetQuiet_resumes {n : Int} (h : usysDetQuiet n) : usysDetResumes n :
 theorem usysDetQuiet_wait {n : Int} (h : usysDetQuiet n) : n ≠ USYS_wait := by
   rcases h with rfl | rfl <;> decide
 
+/-- **Writable per the key's permission view** (NI M2-G1e): the page of
+`va` is mapped in the key's `π` with `W`. -/
+def πWritable (perm : Nat → Option UPerm) (va : Nat) : Prop :=
+  ∃ q : UPerm, perm (va / 4096) = some q ∧ q.W = true
+
+theorem πWritable_iff (perm : Nat → Option UPerm) (va : Nat) :
+    πWritable perm va ↔ (perm (va / 4096)).any (fun q => q.W) = true := by
+  unfold πWritable
+  cases perm (va / 4096) <;> simp
+
+instance (perm : Nat → Option UPerm) (va : Nat) : Decidable (πWritable perm va) :=
+  decidable_of_iff _ (πWritable_iff perm va).symm
+
+/-- **wait's STATUS WINDOW at the key** (NI M2-G1e, ruling G1e-R2): the
+first offset `i < 4` whose byte `a0 + i` the key's `π` does not let the
+process write, or `4` when all four are writable -- and `4` at a null
+pointer (nothing to copy).  It is read off the caller's OWN mapping of its
+own buffer: public to the process, like `secc` and `lazy`. -/
+def uwaitWin (perm : Nat → Option UPerm) (a0 : BitVec 64) : Nat :=
+  if a0 = 0#64 then 4
+  else if ¬ πWritable perm (a0 + BitVec.ofNat 64 0).toNat then 0
+  else if ¬ πWritable perm (a0 + BitVec.ofNat 64 1).toNat then 1
+  else if ¬ πWritable perm (a0 + BitVec.ofNat 64 2).toNat then 2
+  else if ¬ πWritable perm (a0 + BitVec.ofNat 64 3).toNat then 3
+  else 4
+
+/-- The window IS the first non-writable byte (or `4`). -/
+theorem uwaitWin_eq {perm : Nat → Option UPerm} {a0 : BitVec 64} {d : Nat} (h0 : a0 ≠ 0#64)
+    (hd : d ≤ 4) (hpre : ∀ i, i < d → πWritable perm (a0 + BitVec.ofNat 64 i).toNat)
+    (hstop : d < 4 → ¬ πWritable perm (a0 + BitVec.ofNat 64 d).toNat) : uwaitWin perm a0 = d := by
+  unfold uwaitWin
+  rw [if_neg h0]
+  have w : ∀ i, i < d → ¬ ¬ πWritable perm (a0 + BitVec.ofNat 64 i).toNat :=
+    fun i hi h => h (hpre i hi)
+  rcases (show d = 0 ∨ d = 1 ∨ d = 2 ∨ d = 3 ∨ d = 4 by omega) with rfl | rfl | rfl | rfl | rfl
+  · rw [if_pos (hstop (by decide))]
+  · rw [if_neg (w 0 (by decide)), if_pos (hstop (by decide))]
+  · rw [if_neg (w 0 (by decide)), if_neg (w 1 (by decide)), if_pos (hstop (by decide))]
+  · rw [if_neg (w 0 (by decide)), if_neg (w 1 (by decide)), if_neg (w 2 (by decide)),
+      if_pos (hstop (by decide))]
+  · rw [if_neg (w 0 (by decide)), if_neg (w 1 (by decide)), if_neg (w 2 (by decide)),
+      if_neg (w 3 (by decide))]
+
+theorem uwaitWin_null (perm : Nat → Option UPerm) : uwaitWin perm 0#64 = 4 := by
+  unfold uwaitWin; rw [if_pos rfl]
+
+/-- **wait's answer at a cited prefix and a window** (M2-X; NI M2-G1e,
+ruling G1e-R2): the family ledger's lowest zombie child of the cited actor,
+its pid sign-extended -- when the status window is whole (`4`) --, or `-1`:
+no zombie child, or the status copyout stopped at byte `win < 4` (the child
+is not reaped). -/
+def usysWaitAns (ι : UIota) (win : Nat) : BitVec 64 :=
+  match ι.reap with
+  | some (_, pid, _, _) => if win = 4 then BitVec.signExtend 64 pid else -1#64
+  | none => -1#64
+
 /-- **The answer**: getpid the key's own pid (sign-extended, `c.lw`), uptime
-the tick count of `ι` (`usysUptimeWord`), wait (NI G1d) the reaped child's
-pid sign-extended, or `-1` when the family ledger names no zombie child. -/
+the tick count of `ι` (`usysUptimeWord`), wait (NI G1d; NI M2-G1e) the
+reaped child's pid sign-extended at a whole status window, or `-1`
+(`usysWaitAns` at the key's window). -/
 def usysDetRet (n : Int) (W : Uvis) (ι : UIota) : BitVec 64 :=
-  if n = USYS_wait then
-    match ι.reap with
-    | some (_, pid, _, _) => BitVec.signExtend 64 pid
-    | none => -1#64
+  if n = USYS_wait then usysWaitAns ι (uwaitWin W.perm (tfW W.tf (tfArgIdx 0)))
   else if n = USYS_uptime then usysUptimeWord ι.ticks else BitVec.signExtend 64 W.pid
 
-/-- **wait's functional row** (NI G1d; G1 design §3): at the family
-ledger's lowest zombie child `(j, pid, xs, γ)` of the caller's slot, the
-REAP -- the answer `pid`, the status's bytes at the a0 pointer (none at
-null), `γ` out of the children set; with no zombie child, `-1` and nothing
-moved (the design's "no children" arm: `¬ zHasKids` gives `none`; its
-"children, none a zombie" default is the same key, never cited: kwait
-sleeps). -/
+/-- **wait's functional row** (NI G1d; G1 design §3; NI M2-G1e): at the
+family ledger's lowest zombie child `(j, pid, xs, γ)` of the caller's slot,
+
+  * at a whole status window (`uwaitWin W.perm a0 = 4`: a null pointer, or
+    all four status bytes writable), the REAP -- the answer `pid`, the
+    status's bytes at the a0 pointer (none at null), `γ` out of the
+    children set;
+  * at a window stopped at byte `d < 4` (xv6's copyout: each page copied
+    only after its `PTE_W` check), `-1` with the first `d` status bytes
+    written and NOTHING reaped (the child stays a zombie, `ch` kept);
+
+with no zombie child, `-1` and nothing moved (the design's "no children"
+arm: `¬ zHasKids` gives `none`; its "children, none a zombie" default is
+the same key, never cited: kwait sleeps). -/
 def usysDetWait (W : Uvis) (ι : UIota) : Uvis :=
   match ι.reap with
   | some (_, pid, xs, γ) =>
-    bump W (BitVec.signExtend 64 pid)
-      (usysWr W.M (tfW W.tf (tfArgIdx 0)) (usysWaitBytes (tfW W.tf (tfArgIdx 0)) xs)) W.perm W.sz W.fd W.cwd
-      W.gen (W.ch \ {γ}) W.lazy W.secc
+    if uwaitWin W.perm (tfW W.tf (tfArgIdx 0)) = 4 then
+      bump W (BitVec.signExtend 64 pid)
+        (usysWr W.M (tfW W.tf (tfArgIdx 0)) (usysWaitBytes (tfW W.tf (tfArgIdx 0)) xs)) W.perm W.sz W.fd
+        W.cwd W.gen (W.ch \ {γ}) W.lazy W.secc
+    else
+      bump W (-1#64)
+        (usysWr W.M (tfW W.tf (tfArgIdx 0))
+          ((usysWaitBytes (tfW W.tf (tfArgIdx 0)) xs).take (uwaitWin W.perm (tfW W.tf (tfArgIdx 0)))))
+        W.perm W.sz W.fd W.cwd W.gen W.ch W.lazy W.secc
   | none => bump W (-1#64) W.M W.perm W.sz W.fd W.cwd W.gen W.ch W.lazy W.secc
 
 /-- **`usysDet n W ι`**: the key the round resumes the process at -- for the
@@ -274,73 +346,60 @@ theorem usysDetRet_uptime (W : Uvis) (ι : UIota) :
     usysDetRet USYS_uptime W ι = usysUptimeWord ι.ticks := by
   unfold usysDetRet; rw [if_neg (by decide), if_pos rfl]
 
-/-- **wait's row at the keys** (NI G1d): what the kernel's `SyscRows.wait`
-says at a history `hz` and slot `act`, read at the trapped key `W` --
-`-1` with the children kept, or the reap `zLowest hz act` names (the pid in
-`[1, PIDMAX]`, its generation out of the set). -/
-def usysWaitRow (W : Uvis) (hz : List Zev) (act : BitVec 64) (r : BitVec 64)
-    (cs' : Std.ExtTreeSet GName compare) : Prop :=
-  (r = -1#64 ∧ cs' = W.ch) ∨
-  ∃ (j : Nat) (pid : BitVec 32) (xs : Int) (γ : GName), zLowest hz act = some (j, pid, xs, γ) ∧
-    1 ≤ pid.toNat ∧ pid.toNat ≤ PIDMAX ∧ r = BitVec.signExtend 64 pid ∧ cs' = W.ch \ {γ}
+/-- **wait's fit, at the key's readings** (NI G1d; NI M2-G1e): the answer
+`r`, the children set `cs'` and the image `M'` are the ones the family
+ledger's reading at `ι` names, at the key's permission view `perm`, status
+pointer `a0`, children `ch` and image `M` -- the reap at a whole status
+window, `-1` with the window's prefix written and nothing reaped at a
+broken one, `-1` with nothing moved with no zombie child.  Stated on the
+readings so the kernel's cited row (`SyscallDefs.syscEvRow`, at the
+dispatch's record) and the key's (`usysWaitFits`) are one text. -/
+def usysWaitFitsAt (perm : Nat → Option UPerm) (a0 : BitVec 64) (ch : Std.ExtTreeSet GName compare)
+    (M : ElfMem) (ι : UIota) (r : BitVec 64) (cs' : Std.ExtTreeSet GName compare) (M' : ElfMem) : Prop :=
+  match ι.reap with
+  | some (_, pid, xs, γ) =>
+    if uwaitWin perm a0 = 4 then
+      r = BitVec.signExtend 64 pid ∧ cs' = ch \ {γ} ∧ M' = usysWr M a0 (usysWaitBytes a0 xs)
+    else r = -1#64 ∧ cs' = ch ∧ M' = usysWr M a0 ((usysWaitBytes a0 xs).take (uwaitWin perm a0))
+  | none => r = -1#64 ∧ cs' = ch ∧ M' = M
 
-/-- **wait's fit**: the answer and the children set are the ones the
-family ledger's reading at `ι` names. -/
-def usysWaitFits (W : Uvis) (ι : UIota) (r : BitVec 64) (cs' : Std.ExtTreeSet GName compare) : Prop :=
-  (ι.reap = none ∧ r = -1#64 ∧ cs' = W.ch) ∨
-  ∃ (j : Nat) (pid : BitVec 32) (xs : Int) (γ : GName), ι.reap = some (j, pid, xs, γ) ∧
-    r = BitVec.signExtend 64 pid ∧ cs' = W.ch \ {γ}
+/-- **wait's fit** at the key `W`. -/
+def usysWaitFits (W : Uvis) (ι : UIota) (r : BitVec 64) (cs' : Std.ExtTreeSet GName compare) (M' : ElfMem) :
+    Prop :=
+  usysWaitFitsAt W.perm (tfW W.tf (tfArgIdx 0)) W.ch W.M ι r cs' M'
 
 /-- **The receipt-derived fact a round carries** (the ι-prefix fits the
-answer): at uptime the answer is the count `ι` names; at wait (NI G1d) the
-answer and the children set are the family ledger's reading at `ι`'s actor;
-no other class member reads `ι`. -/
-def usysIotaFits (n : Int) (W : Uvis) (r : BitVec 64) (cs' : Std.ExtTreeSet GName compare) (ι : UIota) :
-    Prop :=
-  (n = USYS_uptime → r = usysUptimeWord ι.ticks) ∧ (n = USYS_wait → usysWaitFits W ι r cs')
+answer): at uptime the answer is the count `ι` names; at wait (NI G1d; NI
+M2-G1e) the answer, the children set and the image are the family ledger's
+reading at `ι`'s actor through the key's status window; no other class
+member reads `ι`. -/
+def usysIotaFits (n : Int) (W : Uvis) (r : BitVec 64) (cs' : Std.ExtTreeSet GName compare) (M' : ElfMem)
+    (ι : UIota) : Prop :=
+  (n = USYS_uptime → r = usysUptimeWord ι.ticks) ∧ (n = USYS_wait → usysWaitFits W ι r cs' M')
 
-/-- Every answer the rows allow has a prefix it fits: uptime's the row's
-count, wait's the row's history and slot (at `-1`, the empty history). -/
+/-- Every answer the rows allow at a number other than wait has a prefix it
+fits: uptime's the row's count (NI M2-G1e: wait's fit pins the image, which
+the relational row does not, so wait is not served here -- its prefix is the
+CITED one, `usysIotaFits_of_ev`). -/
 theorem usysIotaFits_exists {n : Int} {W : Uvis} {r : BitVec 64} {cs' : Std.ExtTreeSet GName compare}
-    (hup : n = USYS_uptime → usysUptimeRet r)
-    (hw : n = USYS_wait → ∃ (hz : List Zev) (act : BitVec 64), usysWaitRow W hz act r cs') :
-    ∃ ι : UIota, usysIotaFits n W r cs' ι := by
+    {M' : ElfMem} (hup : n = USYS_uptime → usysUptimeRet r) (hwt : n ≠ USYS_wait) :
+    ∃ ι : UIota, usysIotaFits n W r cs' M' ι := by
   by_cases hu : n = USYS_uptime
   · obtain ⟨t, ht⟩ := hup hu
-    exact ⟨{ UIota.boot with ticks := t }, fun _ => ht, fun h => absurd (hu.symm.trans h) (by decide)⟩
-  by_cases hwt : n = USYS_wait
-  · obtain ⟨hz, act, hrow⟩ := hw hwt
-    rcases hrow with ⟨hr, hc⟩ | ⟨j, pid, xs, γ, hzl, -, -, hr, hc⟩
-    · exact ⟨{ UIota.boot with act := act }, fun h => absurd h hu,
-        fun _ => Or.inl ⟨zLowest_nil act, hr, hc⟩⟩
-    · exact ⟨{ UIota.boot with zev := hz, act := act }, fun h => absurd h hu,
-        fun _ => Or.inr ⟨j, pid, xs, γ, hzl, hr, hc⟩⟩
+    exact ⟨{ UIota.boot with ticks := t }, fun _ => ht, fun h => absurd h hwt⟩
   · exact ⟨UIota.boot, fun h => absurd h hu, fun h => absurd h hwt⟩
 
-/-- **The cited row IS the fit** (NI M2-X2): what the kernel's arm cited at
-`ι` (`SyscallDefs.syscEvRow`, read at the keys -- uptime's answer the word
-of `ι`'s count; wait's, at a null status pointer, the family ledger's
-reading at `ι`'s actor: the reap's pid and the column without its
-generation, or `-1` with the column kept) is `usysIotaFits` at `ι`, at a
-class member at the key (`hnull`). -/
+/-- **The cited row IS the fit** (NI M2-X2; NI M2-G1e): what the kernel's
+arm cited at `ι` (`SyscallDefs.syscEvRow`, read at the keys -- uptime's
+answer the word of `ι`'s count; wait's, at a class key (a null status
+pointer or a lazy-free process), `usysWaitFitsAt` at the key's readings) is
+`usysIotaFits` at `ι`, at a class member at the key (`hcls`). -/
 theorem usysIotaFits_of_ev {n : Int} {W : Uvis} {r : BitVec 64} {cs' : Std.ExtTreeSet GName compare}
-    {ι : UIota} (hnull : n = USYS_wait → tfW W.tf (tfArgIdx 0) = 0#64)
+    {M' : ElfMem} {ι : UIota} (hcls : n = USYS_wait → tfW W.tf (tfArgIdx 0) = 0#64 ∨ W.lazy = false)
     (hup : n = USYS_uptime → r = usysUptimeWord ι.ticks)
-    (hw : n = USYS_wait → tfW W.tf (tfArgIdx 0) = 0#64 →
-      match zLowest ι.zev ι.act with
-      | some (_, pid, _, γ) => r = BitVec.signExtend 64 pid ∧ cs' = W.ch \ {γ}
-      | none => r = -1#64 ∧ cs' = W.ch) :
-    usysIotaFits n W r cs' ι := by
-  refine ⟨hup, fun hn => ?_⟩
-  have h := hw hn (hnull hn)
-  unfold usysWaitFits UIota.reap
-  revert h
-  cases zLowest ι.zev ι.act with
-  | none => intro h; exact Or.inl ⟨rfl, h.1, h.2⟩
-  | some v =>
-    obtain ⟨j, pid, xs, γ⟩ := v
-    intro h
-    exact Or.inr ⟨j, pid, xs, γ, rfl, h.1, h.2⟩
+    (hw : n = USYS_wait → (tfW W.tf (tfArgIdx 0) = 0#64 ∨ W.lazy = false) → usysWaitFits W ι r cs' M') :
+    usysIotaFits n W r cs' M' ι :=
+  ⟨hup, fun hn => hw hn (hcls hn)⟩
 
 /-! ## §3 The functional row refines the relation, and the relation at the
 class IS the functional row -/
@@ -383,15 +442,24 @@ theorem usysDet_mem {n : Int} (W : Uvis) (ι : UIota) (h : usysDetResumes n)
       exact ⟨⟨[], by simp, fun _ => rfl, rfl⟩, rfl, rfl, rfl, hw⟩
     | some v =>
       obtain ⟨_, pid, xs, γ⟩ := v
-      refine ⟨⟨usysWaitBytes (tfW W.tf (tfArgIdx 0)) xs, usysWaitBytes_length _ _, fun h0 => ?_, rfl⟩,
-        rfl, rfl, rfl, hw⟩
-      rw [show tfW W.tf (tfArgIdx 0) = 0#64 from BitVec.eq_of_toNat_eq (by simpa using h0)]
-      exact usysWaitBytes_null xs
+      dsimp only
+      by_cases hwin : uwaitWin W.perm (tfW W.tf (tfArgIdx 0)) = 4
+      · rw [if_pos hwin]
+        refine ⟨⟨usysWaitBytes (tfW W.tf (tfArgIdx 0)) xs, usysWaitBytes_length _ _, fun h0 => ?_, rfl⟩,
+          rfl, rfl, rfl, hw⟩
+        rw [show tfW W.tf (tfArgIdx 0) = 0#64 from BitVec.eq_of_toNat_eq (by simpa using h0)]
+        exact usysWaitBytes_null xs
+      · rw [if_neg hwin]
+        refine ⟨⟨(usysWaitBytes (tfW W.tf (tfArgIdx 0)) xs).take (uwaitWin W.perm (tfW W.tf (tfArgIdx 0))),
+          le_trans (List.length_take_le' _ _) (usysWaitBytes_length _ _), fun h0 => ?_, rfl⟩,
+          rfl, rfl, rfl, hw⟩
+        rw [show tfW W.tf (tfArgIdx 0) = 0#64 from BitVec.eq_of_toNat_eq (by simpa using h0),
+          usysWaitBytes_null, List.take_nil]
 
 /-- **The other rows, at the functional answer**: descriptors, pipe, cwd,
 generation, pid, mask and (off wait) children all hold at `usysDet`, and the
-answer fits `ι` (the arm's remaining premises; wait's children move is its
-own arm's, `uwaitAnsPid`). -/
+answer (with the children set and the image) fits `ι` (the arm's remaining
+premises; wait's children move is its own arm's, `uwaitAnsPid`). -/
 theorem usysDet_rows {n : Int} (W : Uvis) (ι : UIota) (h : usysDetResumes n) :
     usysFdOk n W.tf (usysDetRet n W ι) W.fd (usysDet n W ι).fd ∧
     usysPipeOk n W.tf (usysDetRet n W ι) W.M (usysDet n W ι).M W.fd (usysDet n W ι).fd ∧
@@ -400,24 +468,16 @@ theorem usysDet_rows {n : Int} (W : Uvis) (ι : UIota) (h : usysDetResumes n) :
     usysRetPid n (usysDetRet n W ι) W.pid ∧
     usysSeccOk n W.tf W.secc (usysDet n W ι).secc (usysDetRet n W ι) ∧
     (n ≠ USYS_wait → usysChOk n (usysDetRet n W ι) W.ch (usysDet n W ι).ch) ∧
-    usysIotaFits n W (usysDetRet n W ι) (usysDet n W ι).ch ι := by
+    usysIotaFits n W (usysDetRet n W ι) (usysDet n W ι).ch (usysDet n W ι).M ι := by
   obtain ⟨-, -, h4, -, -, -, -, hcl, hdp, hop, hcd, h23⟩ := usysDetResumes_ne h
   have hfd : (usysDet n W ι).fd = W.fd := by
-    unfold usysDet usysDetWait; split
-    · split <;> rfl
-    · split <;> rfl
+    unfold usysDet usysDetWait; split <;> (repeat' split) <;> rfl
   have hcw : (usysDet n W ι).cwd = W.cwd := by
-    unfold usysDet usysDetWait; split
-    · split <;> rfl
-    · split <;> rfl
+    unfold usysDet usysDetWait; split <;> (repeat' split) <;> rfl
   have hgn : (usysDet n W ι).gen = W.gen := by
-    unfold usysDet usysDetWait; split
-    · split <;> rfl
-    · split <;> rfl
+    unfold usysDet usysDetWait; split <;> (repeat' split) <;> rfl
   have hsc : (usysDet n W ι).secc = W.secc := by
-    unfold usysDet usysDetWait; split
-    · split <;> rfl
-    · split <;> rfl
+    unfold usysDet usysDetWait; split <;> (repeat' split) <;> rfl
   rw [hfd, hcw, hgn, hsc]
   refine ⟨usysFdOk_refl_at n n _ _ _ rfl hcl hdp hop h4, usysPipeOk_quiet _ _ _ _ _ _ _ h4,
     usysCwdOk_refl_at n n _ _ rfl hcd, rfl, ?_, usysSeccOk_refl _ _ _ _ h23, ?_, ?_, ?_⟩
@@ -432,27 +492,29 @@ theorem usysDet_rows {n : Int} (W : Uvis) (ι : UIota) (h : usysDetResumes n) :
   · intro hu; subst hu; rw [usysDetRet_uptime]
   · intro hw; subst hw
     rw [usysDet_wait]
-    unfold usysDetWait usysDetRet
+    unfold usysWaitFits usysWaitFitsAt usysDetWait usysDetRet usysWaitAns
     rw [if_pos rfl]
-    cases hr : ι.reap with
-    | none => exact Or.inl ⟨hr, rfl, rfl⟩
+    cases ι.reap with
+    | none => exact ⟨rfl, rfl, rfl⟩
     | some v =>
       obtain ⟨j, pid, xs, γ⟩ := v
-      exact Or.inr ⟨j, pid, xs, γ, hr, rfl, rfl⟩
+      dsimp only
+      by_cases hwin : uwaitWin W.perm (tfW W.tf (tfArgIdx 0)) = 4
+      · simp only [hwin, ↓reduceIte] <;> trivial
+      · simp only [hwin, ↓reduceIte] <;> trivial
 
 /-- **THE CONVERSE, at the arm** (`round_det`'s pure core): at a resuming
-class member -- at wait (NI G1d) at a null status pointer (`hnull`,
-`usysDetClassAt`) -- any `(r, M', …)` the landed rows allow, at a prefix the
-answer (and at wait the children set) fits, IS `usysDet`'s -- the bumped key
-equals the functional one ON THE NOSE. -/
-theorem usysDet_of_rows {n : Int} (W : Uvis) (ι : UIota) (h : usysDetResumes n)
-    (hnull : n = USYS_wait → tfW W.tf (tfArgIdx 0) = 0#64) (r : BitVec 64)
+class member, any `(r, M', …)` the landed rows allow, at a prefix the
+answer (and at wait the children set and the image: NI M2-G1e) fits, IS
+`usysDet`'s -- the bumped key equals the functional one ON THE NOSE.  (The
+class condition at wait is the fit's to carry: `usysIotaFits_of_ev`.) -/
+theorem usysDet_of_rows {n : Int} (W : Uvis) (ι : UIota) (h : usysDetResumes n) (r : BitVec 64)
     (M' : ElfMem) (π' : Nat → Option UPerm) (szv' : Nat) (fdv' : List FdState) (cw' : Nat)
     (g' : Iris.GName) (cs' : ExtTreeSet Iris.GName compare) (lz' : Bool) (secc' : BitVec 64)
     (hm : usysMemOk n W.tf r W.M W.perm W.sz W.lazy M' π' szv' lz')
     (hfd : usysFdOk n W.tf r W.fd fdv') (hc : usysCwdOk n r W.cwd cw') (hg : usysGenOk n W.gen g')
     (hpid : usysRetPid n r W.pid) (hs : usysSeccOk n W.tf W.secc secc' r) (hch : n ≠ USYS_wait → cs' = W.ch)
-    (hfit : usysIotaFits n W r cs' ι) :
+    (hfit : usysIotaFits n W r cs' M' ι) :
     r = usysDetRet n W ι ∧ bump W r M' π' szv' fdv' cw' g' cs' lz' secc' = usysDet n W ι := by
   obtain ⟨h7, h12, h4, h5, h8, hf, -, hcl, hdp, hop, hcd, h23⟩ := usysDetResumes_ne h
   have hlz := usysMemOk_lazy h12 hm
@@ -472,18 +534,29 @@ theorem usysDet_of_rows {n : Int} (W : Uvis) (ι : UIota) (h : usysDetResumes n)
     have hch' := hch h3
     subst hM hp hsz hlz hfd' hc' hs' hg' hch' hr
     rfl
-  · have h0 : (tfW W.tf (tfArgIdx 0)).toNat = 0 := by rw [hnull rfl]; rfl
-    obtain ⟨hM, hp, hsz⟩ := usysMemOk_waitNull h0 hm
+  · have hpw : π' = W.perm ∧ szv' = W.sz := by
+      unfold usysMemOk at hm
+      rw [if_neg (by decide), if_neg (by decide), if_pos rfl] at hm
+      exact ⟨hm.2.1, hm.2.2.1⟩
+    obtain ⟨hp, hsz⟩ := hpw
+    have hf := hfit.2 rfl
     rw [usysDet_wait]
-    unfold usysDetWait usysDetRet
+    unfold usysWaitFits usysWaitFitsAt at hf
+    unfold usysDetWait usysDetRet usysWaitAns
     rw [if_pos rfl]
-    subst hM hp hsz hlz hfd' hc' hs' hg'
-    rcases hfit.2 rfl with ⟨hr0, hrr, hcc⟩ | ⟨j, pid, xs, γ, hr0, hrr, hcc⟩
-    · rw [hr0]; subst hrr hcc; exact ⟨rfl, rfl⟩
-    · rw [hr0]; subst hrr hcc
-      refine ⟨rfl, ?_⟩
+    subst hp hsz hlz hfd' hc' hs' hg'
+    revert hf
+    cases ι.reap with
+    | none =>
+      intro hf; obtain ⟨hrr, hcc, hM⟩ := hf; subst hrr hcc hM; exact ⟨rfl, rfl⟩
+    | some v =>
+      obtain ⟨j, pid, xs, γ⟩ := v
       dsimp only
-      rw [hnull rfl, usysWaitBytes_null, usysWr_nil]
+      by_cases hwin : uwaitWin W.perm (tfW W.tf (tfArgIdx 0)) = 4
+      · simp only [hwin, ↓reduceIte]
+        intro hf; obtain ⟨hrr, hcc, hM⟩ := hf; subst hrr hcc hM; exact ⟨rfl, rfl⟩
+      · simp only [hwin, ↓reduceIte]
+        intro hf; obtain ⟨hrr, hcc, hM⟩ := hf; subst hrr hcc hM; exact ⟨rfl, rfl⟩
 
 /-- **Exit never resumes**: the round relation has no ecall disjunct at
 exit's effective number (the returning one excludes it, exec's is another

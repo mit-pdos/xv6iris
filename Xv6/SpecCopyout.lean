@@ -22,6 +22,14 @@ arm): the byte the copy stopped at, at the wrapped address `dstva + d`
 ENTRY table `P` -- the `MAXVA` test, walkaddr-then-vmfault declining, or
 the `PTE_W` re-walk.
 
+THE WRITTEN BYTES ARE WRITABLE (NI M2-G1e, ruling G1e-R3 as landed): on
+both arms the bytes the copy wrote are writable in the table it hands back
+(`uvaWprefix P' dstva d`, `d` the count written: all of `len` on success) --
+the loop copies a page only after the page passed the `PTE_W` re-walk.  The
+prefix is stated at the RETURNED table `P'`, not the entry `P`: a lazily
+absent page the copy faulted in is writable in `P'` and absent from `P`.
+At `lazyFree` the two agree (`VmfaultQuiet.lazyFree_wmapped_ext`).
+
 THE LEND (permit sweep L1b, Rocq b69bd0fab; design ni-strong-instance.md
 §7): the contract takes the running proc's event-counter lend `actLend
 k.proc ke` (for the kalloc a lazy fault inside the copy makes) and hands it
@@ -60,10 +68,10 @@ def wp_copyout_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G 
     (∃ (P' : UPtd) (M' : Nat → List (BitVec 8)),
       ⌜P.extSz (k.regs 11#5) P' ∧
         ((R' 10#5 = 0#64 ∧ M' = umemWrite (viewFaulted P P' M) (k.regs 12#5).toNat bs ∧
-            umMapped P' (k.regs 12#5).toNat bs.length) ∨
+            umMapped P' (k.regs 12#5).toNat bs.length ∧ uvaWprefix P' (k.regs 12#5) bs.length) ∨
          (R' 10#5 = -1#64 ∧ ∃ d, d < bs.length ∧
             M' = umemWrite (viewFaulted P P' M) (k.regs 12#5).toNat (bs.take d) ∧
-            umMapped P' (k.regs 12#5).toNat d ∧
+            umMapped P' (k.regs 12#5).toNat d ∧ uvaWprefix P' (k.regs 12#5) d ∧
             ¬ uvaWmapped P (k.regs 12#5 + BitVec.ofNat 64 d).toNat))⌝ ∗
       procPtAt P' M') -∗
     ⌜calleeSaved k.regs R'⌝ -∗ wpLoop cpu'))
@@ -101,7 +109,8 @@ structure COPYOUT : Prop where
     hnoff hK hlk hroot hsz hlen hlen',
     wp_copyout_body (hlc := hlc) (GF := GF) cpu k γl γk P M dqs bs ke hnoff hK hlk hroot hsz hlen hlen'
 
-/-- The contract with the failure reason dropped (`UMemL.coPost_drop`). -/
+/-- The contract with the failure reason and the written prefix's writability dropped
+(`UMemL.coPost_drop`). -/
 theorem COPYOUT.wp_copyout_nr (A : COPYOUT) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF]
     [CurCtx] (cpu : CPU) (k : KCtx) (γl : GName) (γk : KmemNames) (P : UPtd) (M : Nat → List (BitVec 8))
     (dqs : DFrac) (bs : List (BitVec 8)) (ke : Nat) hnoff hK hlk hroot hsz hlen hlen' :

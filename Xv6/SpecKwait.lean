@@ -82,8 +82,12 @@ THE LED FORM (NI-LEDGER-REST, Rocq 2107981b4; design
 zombie ledger's RECEIPT of `ZReap (procAddr j) n rv` (`n` the reaped slot), appended by the caller's
 own proc word under `<wait_lock>`, and (NI M2-G1c) the family ledger's READING at the receipt's
 prefix: `zLowest h (procAddr j) = some (n, rv, xs, γ')`, the lowest zombie child; the `-1` arm's
-no-children reason carries `∃ h, zombLedLb h ∗ ⌜¬ zHasKids h (procAddr j)⌝`.  The texts below
-moved only through `waitAnsLed`.  `KWAIT` carries the led field
+no-children reason carries `∃ h, zombLedLb h ∗ ⌜¬ zHasKids h (procAddr j)⌝`.  (NI M2-G1e) The
+answer is stated at the status copyout's WINDOW (`a0`, the entry table `V.upt`, the returned
+`P'`, the count `d`): the copyout's `-1` reason carries the zombie kwait found (a lower bound
+and `zLowest` at it, its status the answer's) and the copied window (`d < 4` bytes writable in
+`P'`, the next not writable at `V.upt`); the reap, the four bytes writable in `P'`; the other
+two `-1` reasons, nothing copied.  The texts below moved only through `waitAnsLed`.  `KWAIT` carries the led field
 `wp_kwait_led_eb` beside `wp_kwait_eb`; the led form is the proof
 (`ProofKwait.kwait_led_proof`), the landed contract its corollary
 (`UserChildren.waitAnsLed_post`).
@@ -239,7 +243,8 @@ def wp_kwait_led_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6
     ⌜calleeSaved k.regs R' ∧ R' 10#5 = BitVec.signExtend 64 rv ∧ V.upt.extSz V.sz P' ∧ d ≤ 4 ∧
       kwaitAns rv (k.regs 10#5) d ∧
       umMapped P' (k.regs 10#5).toNat d⌝ -∗
-    waitAnsLed rv (xstateVal xw) cs cs' V.gen (decide (k.regs 10#5 = 0#64)) pid (procAddr j) -∗
+    waitAnsLed rv (xstateVal xw) cs cs' V.gen (decide (k.regs 10#5 = 0#64)) pid (procAddr j)
+      (k.regs 10#5) V.upt P' d -∗
     chFrag V.chg (procAddr j) cs' -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     trapCsrs cpu' -∗ cpuClaim cpu' k.proc -∗ intrRes cpu' -∗
@@ -274,7 +279,8 @@ def wp_kwait_led_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
     ⌜calleeSaved k.regs R' ∧ R' 10#5 = BitVec.signExtend 64 rv ∧ V.upt.extSz V.sz P' ∧ d ≤ 4 ∧
       kwaitAns rv (k.regs 10#5) d ∧
       umMapped P' (k.regs 10#5).toNat d⌝ -∗
-    waitAnsLed rv (xstateVal xw) cs cs' V.gen (decide (k.regs 10#5 = 0#64)) pid (procAddr j) -∗
+    waitAnsLed rv (xstateVal xw) cs cs' V.gen (decide (k.regs 10#5 = 0#64)) pid (procAddr j)
+      (k.regs 10#5) V.upt P' d -∗
     chFrag V.chg (procAddr j) cs' -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗

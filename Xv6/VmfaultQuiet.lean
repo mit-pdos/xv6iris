@@ -47,7 +47,12 @@ size premise: below the size `lazyFree` maps the page, above it both sides
 read the table).  So copyout's `-1` at a non-null status pointer is a
 function of the key exactly when the process has no lazy pages.  It needs
 the table's validity (`uptWf`: a valid user leaf, never `W` without `R`).
-G1d's wait row reads it.
+NI M2-G1e reads it: the wait arm (`SyscallArmsWait.syscArmWait_win`) turns
+kwait's copyout window into the key's `UsysDet.uwaitWin`.  `SpecCopyout`
+states the WRITTEN prefix at the table the copy hands back (a lazily absent
+page the copy faulted in is writable there and absent at the entry); at
+`lazyFree` the copy gained no leaf, so that prefix is the entry table's
+(`lazyFree_wmapped_ext`).
 -/
 import Xv6.UserPerm
 
@@ -118,6 +123,26 @@ theorem lazyFree_wmapped_iff (P : UPtd) (sz : BitVec 64) (hwf : uptWf P) (hlf : 
       exact ⟨va / 4096, w, va % 4096, hget, ⟨(hwf.1 _ _ hget).2.1.1, (vq_bitU w).2 hb.1⟩,
         (vq_bitW w).2 hqW, Nat.mod_lt _ (by decide), (Nat.div_add_mod' va 4096).symm⟩
     · cases hl
+
+/-- **At `lazyFree` the copy's grown table writes nothing new** (NI
+M2-G1e): a byte writable in a table `P'` that `P` grew into under the size
+`sz` (`UPtd.extSz`: every gained leaf below `sz`) is writable at `P` -- a
+gained leaf would be a page below the size absent from `P`, which
+`lazyFree` excludes. -/
+theorem lazyFree_wmapped_ext {P P' : UPtd} {sz : BitVec 64} (hext : P.extSz sz P')
+    (hlf : lazyFree P.um sz) {va : Nat} (h : uvaWmapped P' va) : uvaWmapped P va := by
+  obtain ⟨vpn, w, j, hl, hvu, hw, hj, hva⟩ := h
+  cases hP : Iris.Std.PartialMap.get? P.um vpn with
+  | some w0 =>
+    have h2 := hext.1.2.2 vpn w0 hP
+    rw [hl] at h2
+    cases h2
+    exact ⟨vpn, w, j, hP, hvu, hw, hj, hva⟩
+  | none =>
+    have hlt := hext.2.1 vpn w hP hl
+    have hs := hlf vpn (by unfold pgRoundUpN; omega)
+    rw [hP] at hs
+    cases hs
 
 end F4
 

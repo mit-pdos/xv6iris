@@ -110,7 +110,7 @@ fallback (+0x40..+0x56) and the shared epilogue (+0x58..+0x62).
    the arm's citation (the era's anchor `MachFixedGS.uEraAnchor k
    niNamesHere` out of the park world, the cited prefixes' lower bounds
    `NiEvid.niIotaLbs`, the cited row `SyscallDefs.syscEvRow`), or (F5)
-   wait's `-1` for the kill shot.  `SyscRows` is unchanged; every arm but
+   wait's `-1` for the kill shot (NI M2-G1e: with nothing moved).  `SyscRows` is unchanged; every arm but
    uptime's, wait's and fork's pays it by `syscEvOut_quiet`.
 
 Imports only definitional files and the 22 entries' Spec files (the slot
@@ -488,13 +488,17 @@ the deposit beside the pure rows -- the number cites nothing (not uptime,
 wait or fork); or the arm cites era `k`'s ledgers at `ι` (the era's anchor
 at its registered names, the cited prefixes' lower bounds, and the cited row
 `SyscallDefs.syscEvRow`); or (F5) wait answered `-1` for the kill shot,
-which usertrap's resume never takes.  Persistent. -/
+which usertrap's resume never takes -- (NI M2-G1e) with nothing moved: the
+column kept and the image unwritten (kwait's kill path copies no status
+byte), so usertrap can cite the boot prefix for it at any status pointer.
+Persistent. -/
 def syscEvOut (V : ProcPriv) (M : Nat → List (BitVec 8)) (V' : ProcPriv) (M' : Nat → List (BitVec 8))
     (cs cs' : ExtTreeSet GName compare) (gn : GName) : IProp GF :=
   iprop(⌜syscNum V ≠ USYS_uptime ∧ syscNum V ≠ USYS_wait ∧ syscNum V ≠ USYS_fork⌝ ∨
     (∃ (k : Nat) (ι : UIota), MachFixedGS.uEraAnchor (hlc := hlc) (GF := GF) k (niNamesHere (GF := GF)) ∗
       niIotaLbs (niNamesHere (GF := GF)) ι ∗ ⌜syscEvRow V V' (syscImg V M) (syscImg V' M') cs cs' ι⌝) ∨
-    (⌜syscNum V = USYS_wait ∧ syscA0 V' = -1#64⌝ ∗ killShot gn))
+    (⌜syscNum V = USYS_wait ∧ syscA0 V' = -1#64 ∧ cs' = cs ∧ syscImg V' M' = syscImg V M⌝ ∗
+      killShot gn))
 
 instance syscEvOut_persistent (V : ProcPriv) (M : Nat → List (BitVec 8)) (V' : ProcPriv)
     (M' : Nat → List (BitVec 8)) (cs cs' : ExtTreeSet GName compare) (gn : GName) :

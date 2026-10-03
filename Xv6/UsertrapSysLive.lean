@@ -115,45 +115,6 @@ theorem ut_sys_live (hW : UtReadWhy (GF := GF)) (A : UtArgs GF) (V2 : ProcPriv)
       intro _
       exact uexecLiveOk_ne _ _ _ _ hrd hwt
 
-/-- **A `-1` wait at a null pointer moved nothing** (NI M2-X2): read off
-wait's answer (the column kept, `waitAns_m1`; no status bytes at a null
-pointer, `syscUwaitWr`), the answer handed back. -/
-theorem syscWaitOut_m1 (V : ProcPriv) (M : Nat → List (BitVec 8)) (M' : ElfMem) (r : BitVec 64)
-    (cs cs' : ExtTreeSet GName compare) (pidv : BitVec 32) :
-    syscWaitOut (GF := GF) V M M' r cs cs' pidv ⊢
-      ⌜syscNum V = USYS_wait → r = -1#64 → tfW V.tf (tfArgIdx 0) = 0#64 → cs' = cs ∧ M' = syscImg V M⌝ ∗
-      syscWaitOut V M M' r cs cs' pidv := by
-  by_cases hg : syscNum V = USYS_wait ∧ r = -1#64 ∧ tfW V.tf (tfArgIdx 0) = 0#64
-  · obtain ⟨hwt, hr1, ha0⟩ := hg
-    unfold syscWaitOut syscUwaitAnsAtM
-    iintro Hw
-    ihave Hw := Hw $$ %hwt
-    icases Hw with ⟨%rv, %xw, %hr, %hwr, Ha⟩
-    have hm1 : BitVec.signExtend 64 rv = -1#64 := by rw [← hr]; exact hr1
-    icases waitAns_m1 rv (xstateVal xw) cs cs' _ _ pidv hm1 $$ Ha with ⟨%hf, #Hwhy⟩
-    obtain ⟨hrv, hcs⟩ := hf
-    obtain ⟨d, -, hd0, -, hM'⟩ := hwr
-    have hd : d = 0 := hd0 ha0
-    subst hrv hcs hd
-    isplitl []
-    · ipureintro
-      intro _ _ _
-      refine ⟨rfl, ?_⟩
-      rw [hM', ha0]; rfl
-    · iintro %_
-      iexists (-1#32), xw
-      isplitr
-      · ipureintro; exact hr
-      isplitr
-      · ipureintro; exact ⟨0, by decide, fun _ => rfl, fun h => absurd ha0 h, hM'⟩
-      iapply waitAns_neg _ _ _ _ pidv
-      iexact Hwhy
-  · iintro Hw
-    iframe Hw
-    ipureintro
-    intro h1 h2 h3
-    exact absurd ⟨h1, h2, h3⟩ hg
-
 end
 
 end Xv6

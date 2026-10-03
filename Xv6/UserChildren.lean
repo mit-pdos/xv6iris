@@ -64,10 +64,21 @@ Then the two answers a wait gives, relayed from kwait to the program:
    `waitAnsLed_of`, which builds the reaping arm at the explicit `γ'` the
    reading names; `waitWhy_notnull/_empty/_shot` gave way to
    `waitWhyLed_*` (kwait, their one caller, builds the led reason).
+5. **The status copyout's window in the led answer** (NI M2-G1e):
+   `waitAnsLed`/`waitWhyLed` take the window -- the status pointer `a0`, the
+   entry table `P`, the table `P'` the copyout handed back and the count `d`
+   of status bytes copied.  The copyout reason carries the ZOMBIE kwait
+   found (a lower bound `h` and `zLowest h act = some (j, pid, xs, γ')`, its
+   status `xs` the answer's) and the copied window (`waitCopyFail`: `d < 4`
+   bytes writable in `P'`, the byte at `d` not writable at `P`); the other
+   two reasons copied nothing (`d = 0`); the reap's arm carries the window's
+   writability (`waitCopyOk`).  `waitWhyLed_notnull` gave way to
+   `waitWhyLed_copyFail`.
 
 Imports only definitional files.
 -/
 import Xv6.SlotGen
+import Xv6.UPtDefs
 
 namespace Xv6
 
@@ -397,56 +408,94 @@ end ZombLedger
 section WaitAnsGen
 variable {GF : BundledGFunctors} [CtokG GF] [WchG GF]
 
-/-- THE REASON a led wait failed (NI G1c, G1 design §2(c)): `waitWhy`'s
-three reasons, the no-children one with the family ledger's reading beside
-it -- a lower bound `h` of the ledger, taken under `<wait_lock>` at the
-decision, at which the caller `act` has no child (`¬ zHasKids h act`).  The
-copyout reason (`nullst = false`) and the kill reason (`killShot`) are
-`waitWhy`'s.  Persistent. -/
-def waitWhyLed (cs : ExtTreeSet GName compare) (gn : GName) (nullst : Bool) (act : BitVec 64) :
-    IProp GF :=
-  iprop(⌜nullst = false⌝ ∨ (⌜cs = ∅⌝ ∗ ∃ h : List Zev, zombLedLb h ∗ ⌜¬ zHasKids h act⌝) ∨
-    killShot gn)
+/-- **The status copyout's failure, with its window** (NI M2-G1e): fewer
+than four status bytes were copied (`d`), each of them WRITABLE in the table
+the copy handed back (`P'`, `SpecCopyout`'s written prefix), and the byte at
+`d` NOT writable at the entry table `P` (copyout's `-1` reason). -/
+def waitCopyFail (a0 : BitVec 64) (P P' : UPtd) (d : Nat) : Prop :=
+  d < 4 ∧ uvaWprefix P' a0 d ∧ ¬ uvaWmapped P (a0 + BitVec.ofNat 64 d).toNat
+
+/-- **The status copyout's success** (NI M2-G1e): at a real pointer all four
+status bytes were writable in the table the copy handed back. -/
+def waitCopyOk (a0 : BitVec 64) (P' : UPtd) : Prop := a0 ≠ 0#64 → uvaWprefix P' a0 4
+
+/-- THE REASON a led wait failed (NI G1c, G1 design §2(c); NI M2-G1e):
+`waitWhy`'s three reasons, each with the family ledger's reading or the
+copied count beside it, at the status pointer `a0`, the entry table `P`, the
+returned table `P'` and the count `d` of status bytes copied:
+
+  * the copyout reason (`nullst = false`): THE ZOMBIE kwait found -- a lower
+    bound `h` of the ledger, taken under `<wait_lock>`, at which `j` is the
+    caller's lowest zombie child, its status `xs` (the status the answer
+    names) -- and the copied window (`waitCopyFail`);
+  * the no-children reason: `cs = ∅`, nothing copied, and the lower bound at
+    which the caller `act` has no child (`¬ zHasKids h act`);
+  * the kill reason: nothing copied, and `killShot`.
+
+Persistent. -/
+def waitWhyLed (cs : ExtTreeSet GName compare) (gn : GName) (nullst : Bool) (act : BitVec 64)
+    (xs : Int) (a0 : BitVec 64) (P P' : UPtd) (d : Nat) : IProp GF :=
+  iprop((⌜nullst = false⌝ ∗ ∃ (h : List Zev) (j : Nat) (pidc : BitVec 32) (γ' : GName),
+      zombLedLb h ∗ ⌜zLowest h act = some (j, pidc, xs, γ') ∧ waitCopyFail a0 P P' d⌝) ∨
+    (⌜cs = ∅ ∧ d = 0⌝ ∗ ∃ h : List Zev, zombLedLb h ∗ ⌜¬ zHasKids h act⌝) ∨
+    (⌜d = 0⌝ ∗ killShot gn))
 
 instance waitWhyLed_persistent (cs : ExtTreeSet GName compare) (gn : GName) (b : Bool)
-    (act : BitVec 64) : Persistent (waitWhyLed (GF := GF) cs gn b act) := by
+    (act : BitVec 64) (xs : Int) (a0 : BitVec 64) (P P' : UPtd) (d : Nat) :
+    Persistent (waitWhyLed (GF := GF) cs gn b act xs a0 P P' d) := by
   unfold waitWhyLed; infer_instance
 
 /-- The led reason drops to the landed one. -/
 theorem waitWhyLed_post (cs : ExtTreeSet GName compare) (gn : GName) (nullst : Bool)
-    (act : BitVec 64) : waitWhyLed (GF := GF) cs gn nullst act ⊢ waitWhy cs gn nullst := by
+    (act : BitVec 64) (xs : Int) (a0 : BitVec 64) (P P' : UPtd) (d : Nat) :
+    waitWhyLed (GF := GF) cs gn nullst act xs a0 P P' d ⊢ waitWhy cs gn nullst := by
   unfold waitWhyLed waitWhy
-  iintro (%h | ⟨%h, -⟩ | #H)
+  iintro (⟨%h, -⟩ | ⟨%h, -⟩ | ⟨-, #H⟩)
   · ileft; ipureintro; exact h
-  · iright; ileft; ipureintro; exact h
+  · iright; ileft; ipureintro; exact h.1
   · iright; iright; iexact H
 
-/-- ...and the three ways to build it: a non-null status pointer (the
-copyout failed), -/
-theorem waitWhyLed_notnull (cs : ExtTreeSet GName compare) (gn : GName) (nullst : Bool)
-    (act : BitVec 64) (h : nullst = false) : ⊢@{IProp GF} waitWhyLed cs gn nullst act := by
+/-- ...and the three ways to build it: the copyout failed at a non-null
+status pointer, with the ledger's reading at the zombie found and the
+copied window, -/
+theorem waitWhyLed_copyFail (cs : ExtTreeSet GName compare) (gn : GName) (nullst : Bool)
+    (act : BitVec 64) (xs : Int) (a0 : BitVec 64) (P P' : UPtd) (d : Nat) (h : List Zev) (j : Nat)
+    (pidc : BitVec 32) (γ' : GName) (hn : nullst = false) (hz : zLowest h act = some (j, pidc, xs, γ'))
+    (hc : waitCopyFail a0 P P' d) :
+    zombLedLb (GF := GF) h ⊢ waitWhyLed cs gn nullst act xs a0 P P' d := by
   unfold waitWhyLed
-  ileft; ipureintro; exact h
+  iintro #Hlb
+  ileft
+  isplitl []
+  · ipureintro; exact hn
+  iexists h, j, pidc, γ'
+  iframe Hlb
+  ipureintro; exact ⟨hz, hc⟩
 
 /-- ...no children, with the ledger's reading at the decision, -/
 theorem waitWhyLed_nokids (cs : ExtTreeSet GName compare) (gn : GName) (nullst : Bool)
-    (act : BitVec 64) (h : List Zev) (hcs : cs = ∅) (hk : ¬ zHasKids h act) :
-    zombLedLb (GF := GF) h ⊢ waitWhyLed cs gn nullst act := by
+    (act : BitVec 64) (xs : Int) (a0 : BitVec 64) (P P' : UPtd) (h : List Zev) (hcs : cs = ∅)
+    (hk : ¬ zHasKids h act) :
+    zombLedLb (GF := GF) h ⊢ waitWhyLed cs gn nullst act xs a0 P P' 0 := by
   unfold waitWhyLed
   iintro #Hlb
   iright; ileft
   isplitl []
-  · ipureintro; exact hcs
+  · ipureintro; exact ⟨hcs, rfl⟩
   iexists h
   iframe Hlb
   ipureintro; exact hk
 
 /-- ...or the kill shot. -/
 theorem waitWhyLed_shot (cs : ExtTreeSet GName compare) (gn : GName) (nullst : Bool)
-    (act : BitVec 64) : killShot (GF := GF) gn ⊢ waitWhyLed cs gn nullst act := by
+    (act : BitVec 64) (xs : Int) (a0 : BitVec 64) (P P' : UPtd) :
+    killShot (GF := GF) gn ⊢ waitWhyLed cs gn nullst act xs a0 P P' 0 := by
   unfold waitWhyLed
   iintro #H
-  iright; iright; iexact H
+  iright; iright
+  isplitl []
+  · ipureintro; rfl
+  · iexact H
 
 /-- THE ANSWER WITH THE FAMILY LEDGER'S READING (Rocq `wait_ans_led`, design
 ni-zombie-ledger.md D4, grown by NI G1c, G1 design §2(c)): `waitAns`, with
@@ -457,15 +506,22 @@ ni-zombie-ledger.md D4, grown by NI G1c, G1 design §2(c)): `waitAns`, with
     by the reaper `act` right after history `h` -- and THE READING at that
     same `h` (the prefix BEFORE the reap): slot `j` is the LOWEST slot below
     `NPROC` holding a zombie child of `act`, and its pid, status and
-    generation are `rv`, `xs` and the reaped `γ'` (`zLowest h act`).
+    generation are `rv`, `xs` and the reaped `γ'` (`zLowest h act`); and
+    (NI M2-G1e) at a real status pointer the four status bytes were
+    writable in the returned table (`waitCopyOk a0 P'`).
+
+The window's parameters (NI M2-G1e): the status pointer `a0`, the entry
+table `P`, the table `P'` the copyout handed back, and the count `d` of
+status bytes it copied.
 
 kwait's led twin (`SpecKwait.wp_kwait_led_eb_body`) answers this;
 `waitAnsLed_post` is the step back to the landed row. -/
 def waitAnsLed (rv : BitVec 32) (xs : Int) (cs cs' : ExtTreeSet GName compare) (gn : GName)
-    (nullst : Bool) (pidv : BitVec 32) (act : BitVec 64) : IProp GF :=
-  iprop((⌜rv = -1#32 ∧ cs' = cs⌝ ∗ waitWhyLed cs gn nullst act) ∨
+    (nullst : Bool) (pidv : BitVec 32) (act : BitVec 64) (a0 : BitVec 64) (P P' : UPtd) (d : Nat) :
+    IProp GF :=
+  iprop((⌜rv = -1#32 ∧ cs' = cs⌝ ∗ waitWhyLed cs gn nullst act xs a0 P P' d) ∨
     ∃ (h : List Zev) (j : Nat) (γ' : GName),
-      zombReceipt h (.ZReap act j rv) ∗ ⌜zLowest h act = some (j, rv, xs, γ')⌝ ∗
+      zombReceipt h (.ZReap act j rv) ∗ ⌜zLowest h act = some (j, rv, xs, γ') ∧ waitCopyOk a0 P'⌝ ∗
       ⌜cs' = cs \ {γ'} ∧ 1 ≤ rv.toNat ∧ rv.toNat ≤ genPidMax⌝ ∗
       ⌜γ' ∈ cs ∨ pidv = 1#32⌝ ∗
       exitTok γ' rv xs ∗ genUniq cs rv γ')
@@ -473,20 +529,21 @@ def waitAnsLed (rv : BitVec 32) (xs : Int) (cs cs' : ExtTreeSet GName compare) (
 /-- The landed row is the led one with the reason's reading, the receipt and
 the reading dropped (Rocq `wait_ans_led_post`). -/
 theorem waitAnsLed_post (rv : BitVec 32) (xs : Int) (cs cs' : ExtTreeSet GName compare) (gn : GName)
-    (nullst : Bool) (pidv : BitVec 32) (act : BitVec 64) :
-    waitAnsLed (GF := GF) rv xs cs cs' gn nullst pidv act ⊢ waitAns rv xs cs cs' gn nullst pidv := by
+    (nullst : Bool) (pidv : BitVec 32) (act : BitVec 64) (a0 : BitVec 64) (P P' : UPtd) (d : Nat) :
+    waitAnsLed (GF := GF) rv xs cs cs' gn nullst pidv act a0 P P' d ⊢ waitAns rv xs cs cs' gn nullst pidv := by
   unfold waitAnsLed waitAns
   iintro (⟨%hf, #Hwhy⟩ | ⟨%h, %j, %γ', -, -, Hr⟩)
   · ileft
     isplitr
     · ipureintro; exact hf
-    · iapply waitWhyLed_post cs gn nullst act $$ Hwhy
+    · iapply waitWhyLed_post cs gn nullst act xs a0 P P' d $$ Hwhy
   · iright; iexists γ'; iexact Hr
 
 /-- The `-1` answer, for the three exits that reap nothing. -/
 theorem waitAnsLed_neg (xs : Int) (cs : ExtTreeSet GName compare) (gn : GName) (nullst : Bool)
-    (pidv : BitVec 32) (act : BitVec 64) :
-    waitWhyLed (GF := GF) cs gn nullst act ⊢ waitAnsLed (-1#32) xs cs cs gn nullst pidv act := by
+    (pidv : BitVec 32) (act : BitVec 64) (a0 : BitVec 64) (P P' : UPtd) (d : Nat) :
+    waitWhyLed (GF := GF) cs gn nullst act xs a0 P P' d ⊢
+      waitAnsLed (-1#32) xs cs cs gn nullst pidv act a0 P P' d := by
   unfold waitAnsLed
   iintro #Hwhy
   ileft
@@ -501,19 +558,20 @@ column, or I am init" is the GENERATION form, crossed here by two
 agreements: the caller's own registration says which pid its generation was
 given, and the sealed pid says which pid init was given. -/
 theorem waitAnsLed_of (rv : BitVec 32) (xs : Int) (cs cs' : ExtTreeSet GName compare) (gn : GName)
-    (nullst : Bool) (pidme : BitVec 32) (act : BitVec 64) (h : List Zev) (j : Nat) (γ' : GName)
-    (hz : zLowest h act = some (j, rv, xs, γ'))
+    (nullst : Bool) (pidme : BitVec 32) (act : BitVec 64) (a0 : BitVec 64) (P P' : UPtd) (d : Nat)
+    (h : List Zev) (j : Nat) (γ' : GName)
+    (hz : zLowest h act = some (j, rv, xs, γ')) (hok : waitCopyOk a0 P')
     (hc : cs' = cs \ {γ'} ∧ 1 ≤ rv.toNat ∧ rv.toNat ≤ genPidMax) :
     genPid (GF := GF) gn pidme ∗ initPidIs 1#32 ∗ zombReceipt h (.ZReap act j rv) ∗
       (⌜γ' ∈ cs⌝ ∨ genIsInit gn) ∗ exitTok γ' rv xs ∗ genUniq cs rv γ' ⊢
-      waitAnsLed rv xs cs cs' gn nullst pidme act := by
+      waitAnsLed rv xs cs cs' gn nullst pidme act a0 P P' d := by
   unfold waitAnsLed
   iintro ⟨#Hgp, #Hi, #Hzr, Hoci, Hesc, Huniq⟩
   iright
   iexists h, j, γ'
   iframe Hzr
   isplitr
-  · ipureintro; exact hz
+  · ipureintro; exact ⟨hz, hok⟩
   isplitr
   · ipureintro; exact hc
   isplitr [Hesc Huniq]
@@ -542,31 +600,36 @@ theorem zLowest_none_of_noKids {h : List Zev} {act : BitVec 64} (hk : ¬ zHasKid
     obtain ⟨hi, hpar, -⟩ := (zLowest_spec h act i pid xs g).1 hz
     exact absurd ⟨i, hi, hpar⟩ hk
 
-/-- **WHAT A LED WAIT ANSWER CITES** (NI M2-X2, design "M2-X design" §2(a)):
-the persistent part of `waitAnsLed` -- at `-1`, the reason with the
-no-children reason's lower bound read as the family ledger's reading
-(`zLowest h act = none`); at a reap, the receipt lowered to the prefix
-BEFORE the reap (`zombLedLb h`, `MonoList.lb_own_le`) with the reading at
-it. -/
+/-- **WHAT A LED WAIT ANSWER CITES** (NI M2-X2, design "M2-X design" §2(a);
+NI M2-G1e): the persistent part of `waitAnsLed` -- at `-1`, the reason: the
+copyout's with the zombie's reading and the copied window, the no-children
+one's lower bound read as the family ledger's reading (`zLowest h act =
+none`) with nothing copied, or the kill shot with nothing copied; at a reap,
+the receipt lowered to the prefix BEFORE the reap (`zombLedLb h`,
+`MonoList.lb_own_le`) with the reading at it and the window's writability. -/
 def waitLedCite (rv : BitVec 32) (xs : Int) (cs cs' : ExtTreeSet GName compare) (gn : GName)
-    (nullst : Bool) (act : BitVec 64) : IProp GF :=
+    (nullst : Bool) (act : BitVec 64) (a0 : BitVec 64) (P P' : UPtd) (d : Nat) : IProp GF :=
   iprop((⌜rv = -1#32 ∧ cs' = cs⌝ ∗
-      (⌜nullst = false⌝ ∨ (∃ h : List Zev, zombLedLb h ∗ ⌜zLowest h act = none⌝) ∨ killShot gn)) ∨
+      ((⌜nullst = false⌝ ∗ ∃ (h : List Zev) (j : Nat) (pidc : BitVec 32) (γ' : GName),
+          zombLedLb h ∗ ⌜zLowest h act = some (j, pidc, xs, γ') ∧ waitCopyFail a0 P P' d⌝) ∨
+        (⌜d = 0⌝ ∗ ∃ h : List Zev, zombLedLb h ∗ ⌜zLowest h act = none⌝) ∨
+        (⌜d = 0⌝ ∗ killShot gn))) ∨
     ∃ (h : List Zev) (j : Nat) (γ' : GName),
       zombLedLb h ∗ ⌜zLowest h act = some (j, rv, xs, γ') ∧ cs' = cs \ {γ'} ∧ 1 ≤ rv.toNat ∧
-        rv.toNat ≤ genPidMax⌝)
+        rv.toNat ≤ genPidMax ∧ waitCopyOk a0 P'⌝)
 
 instance waitLedCite_persistent (rv : BitVec 32) (xs : Int) (cs cs' : ExtTreeSet GName compare)
-    (gn : GName) (nullst : Bool) (act : BitVec 64) :
-    Persistent (waitLedCite (GF := GF) rv xs cs cs' gn nullst act) := by
+    (gn : GName) (nullst : Bool) (act : BitVec 64) (a0 : BitVec 64) (P P' : UPtd) (d : Nat) :
+    Persistent (waitLedCite (GF := GF) rv xs cs cs' gn nullst act a0 P P' d) := by
   unfold waitLedCite; infer_instance
 
 /-- **The led answer's citation, read off** (NI M2-X2); the answer goes back
 untouched. -/
 theorem waitAnsLed_cite (rv : BitVec 32) (xs : Int) (cs cs' : ExtTreeSet GName compare) (gn : GName)
-    (nullst : Bool) (pidv : BitVec 32) (act : BitVec 64) :
-    waitAnsLed (GF := GF) rv xs cs cs' gn nullst pidv act ⊢
-      waitLedCite rv xs cs cs' gn nullst act ∗ waitAnsLed rv xs cs cs' gn nullst pidv act := by
+    (nullst : Bool) (pidv : BitVec 32) (act : BitVec 64) (a0 : BitVec 64) (P P' : UPtd) (d : Nat) :
+    waitAnsLed (GF := GF) rv xs cs cs' gn nullst pidv act a0 P P' d ⊢
+      waitLedCite rv xs cs cs' gn nullst act a0 P P' d ∗
+        waitAnsLed rv xs cs cs' gn nullst pidv act a0 P P' d := by
   unfold waitAnsLed
   iintro (⟨%hf, #Hwhy⟩ | ⟨%h, %j, %γ', #Hr, %hz, %hc, Hrest⟩)
   · isplitl []
@@ -574,13 +637,23 @@ theorem waitAnsLed_cite (rv : BitVec 32) (xs : Int) (cs cs' : ExtTreeSet GName c
       ileft
       isplitl []
       · ipureintro; exact hf
-      icases Hwhy with (%hn | ⟨-, %h, #Hlb, %hk⟩ | #Hsh)
-      · ileft; ipureintro; exact hn
+      icases Hwhy with (⟨%hn, %h, %j, %pidc, %γ', #Hlb, %hz⟩ | ⟨%hcd, %h, #Hlb, %hk⟩ | ⟨%hd, #Hsh⟩)
+      · ileft
+        isplitl []
+        · ipureintro; exact hn
+        iexists h, j, pidc, γ'
+        iframe Hlb
+        ipureintro; exact hz
       · iright; ileft
+        isplitl []
+        · ipureintro; exact hcd.2
         iexists h
         iframe Hlb
         ipureintro; exact zLowest_none_of_noKids hk
-      · iright; iright; iexact Hsh
+      · iright; iright
+        isplitl []
+        · ipureintro; exact hd
+        · iexact Hsh
     · ileft
       isplitl []
       · ipureintro; exact hf
@@ -592,7 +665,7 @@ theorem waitAnsLed_cite (rv : BitVec 32) (xs : Int) (cs cs' : ExtTreeSet GName c
       isplitl []
       · unfold zombReceipt zombLedLb
         iapply MonoList.lb_own_le _ h (List.prefix_append h [_]) $$ Hr
-      · ipureintro; exact ⟨hz, hc⟩
+      · ipureintro; exact ⟨hz.1, hc.1, hc.2.1, hc.2.2, hz.2⟩
     · iright
       iexists h, j, γ'
       iframe Hr Hrest

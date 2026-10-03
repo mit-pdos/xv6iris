@@ -107,7 +107,7 @@ def wp_sys_wait_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [X
     (rv xw : BitVec 32) (d : Nat) (cs' : ExtTreeSet GName compare) (k' : Nat),
     ⌜calleeSaved k.regs R' ∧ R' 10#5 = BitVec.signExtend 64 rv ∧ V.upt.extSz V.sz P' ∧ d ≤ 4 ∧
       kwaitAns rv v d ∧ umMapped P' v.toNat d⌝ -∗
-    waitAnsLed rv (xstateVal xw) cs cs' V.gen (decide (v = 0#64)) pid (procAddr j) -∗
+    waitAnsLed rv (xstateVal xw) cs cs' V.gen (decide (v = 0#64)) pid (procAddr j) v V.upt P' d -∗
     chFrag V.chg (procAddr j) cs' -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗

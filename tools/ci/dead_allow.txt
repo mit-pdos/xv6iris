@@ -20,13 +20,6 @@ decl Xv6.Memcpy
 decl Xv6.Procdump
 decl Xv6.Spin
 
-# -- NI M2-G1c finding F4 (copyout's -1 at lazy = false is a function of the
-#    key).  G1d did NOT re-admit wait at lazy = false and a non-null status
-#    pointer (UsysDet deviation 5: kwait's led answer leaves the -1 image
-#    unconstrained there), so nothing reads it yet; remove this row with the
-#    lane that strengthens kwait's copyout-failure answer
-decl Xv6.lazyFree_wmapped_iff
-
 # -- the user tier's M0 engine reading (NI M0 / M2-W3): the landed
 #    relational arm at getpid / uptime IS the functional arm `usysDet`
 #    (`uexecRetContF_det`, with `usysIotaFits_exists`, which supplies the

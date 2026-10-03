@@ -54,7 +54,19 @@ theorem ec_copyout_call (CO : COPYOUT) [CurCtx] (c : CPU) (k' : KCtx) (γl : GNa
   have h := CO.wp_copyout (hlc := hlc) (GF := GF) c k' γl γk P M dqs bs ke hnoff hK hlk hroot hsz hlen hlen'
   unfold wp_copyout_body at h
   simp only [copyoutAddr] at h
-  exact h
+  -- the written prefix's writability (NI M2-G1e) is dropped
+  iintro ⟨Hk, Hpc, #Hl, #Hav, Hpt, Hbuf, Hlend, HΦ⟩
+  iapply h
+  iframe Hk Hpc Hl Hav Hpt Hbuf Hlend
+  iapply wpNext_mono _ _ _ _ _ $$ HΦ
+  iintro %c' HK %spie %spp %R' %hs Hk Hpc Hlend Hbuf ⟨%P', %M', %hw, Hpt⟩ %hcs
+  iapply HK $$ %spie %spp %R' %hs Hk Hpc Hlend Hbuf [Hpt] %hcs
+  iexists P', M'
+  iframe Hpt
+  ipureintro
+  obtain ⟨he, ⟨h0, hM, hm, -⟩ | ⟨h1, d, hd, hM, hm, -, hn⟩⟩ := hw
+  · exact ⟨he, Or.inl ⟨h0, hM, hm⟩⟩
+  · exact ⟨he, Or.inr ⟨h1, d, hd, hM, hm, hn⟩⟩
 
 /-! ## `either_copyout` -/
 

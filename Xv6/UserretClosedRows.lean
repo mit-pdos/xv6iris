@@ -91,34 +91,37 @@ theorem urc_a0_run (W : Uvis) (V : ProcPriv) (hl : V.tf.length = 36) :
   show tfW (utSysTf (tfW W.tf tfEpcIdx) (urcV0 V W)) (tfArgIdx 0) = _
   rw [urc_sysTf_arg W V hl 0 (by decide), uvisRun_arg W 0 (by decide)]
 
-/-- **THE CITED ROW, RE-KEYED** (NI M2-X2, next to `urc_skey` / `urc_num`):
-the dispatcher's `syscEvRow` at the record `syscall()` was called with,
-read at the trapped key's run projection and the key the round left. -/
+/-- **THE CITED ROW, RE-KEYED** (NI M2-X2, next to `urc_skey` / `urc_num`;
+NI M2-G1e): the dispatcher's `syscEvRow` at the record `syscall()` was
+called with, read at the trapped key's run projection and the key the round
+left -- wait's at the key's permission view, status pointer, lazy bit,
+children and image (`hpi`, `hlz`, `hch`, `hM`: the record's `permOf V.upt.um
+V.sz`, `pvLazy`, column and lazy image ARE the key's). -/
 theorem urc_evRow (W : Uvis) (V : ProcPriv) (Mp : Nat → List (BitVec 8)) (V' : ProcPriv)
     (M' : Nat → List (BitVec 8)) (cs cs' : ExtTreeSet GName compare) (ι : UIota)
     (hl : V.tf.length = 36) (hch : W.ch = cs) (hsc : W.secc = V.pvSecc)
+    (hM : umemLazy V.upt V.sz.toNat Mp = W.M) (hpi : W.perm = permOf V.upt.um V.sz.toNat)
+    (hlz : W.lazy = V.pvLazy)
     (hev : syscEvRow (utSysRec (tfW W.tf tfEpcIdx) (urcV0 V W)) V'
       (syscImg (utSysRec (tfW W.tf tfEpcIdx) (urcV0 V W)) Mp) (syscImg V' M') cs cs' ι) :
     (uvisNum (uvisRun W) = USYS_uptime → tfW V'.tf (tfArgIdx 0) = usysUptimeWord ι.ticks) ∧
-    (uvisNum (uvisRun W) = USYS_wait → tfW (uvisRun W).tf (tfArgIdx 0) = 0#64 →
-      match zLowest ι.zev ι.act with
-      | some (_, pid, _, γ) => tfW V'.tf (tfArgIdx 0) = BitVec.signExtend 64 pid ∧ cs' = (uvisRun W).ch \ {γ}
-      | none => tfW V'.tf (tfArgIdx 0) = -1#64 ∧ cs' = (uvisRun W).ch) ∧
+    (uvisNum (uvisRun W) = USYS_wait → (tfW (uvisRun W).tf (tfArgIdx 0) = 0#64 ∨ (uvisRun W).lazy = false) →
+      usysWaitFits (uvisRun W) ι (tfW V'.tf (tfArgIdx 0)) cs' (syscImg V' M')) ∧
     (uvisNum (uvisRun W) = USYS_fork → tfW V'.tf (tfArgIdx 0) ≠ -1#64 →
       tfW V'.tf (tfArgIdx 0) = BitVec.signExtend 64 (BitVec.ofNat 32 (pidPick PIDMAX ι.pev))) := by
   have hnum := urc_num_run W V hl hsc
   have ha0 := urc_a0_run W V hl
-  have hchr : (uvisRun W).ch = cs := hch
   obtain ⟨hu, hw, hf⟩ := hev
-  refine ⟨fun h => hu (hnum.trans h), fun h h0 => ?_, fun h hne => (hf (hnum.trans h) hne).1⟩
-  have hw' := hw (hnum.trans h) (ha0.trans h0)
-  rw [hchr]
-  revert hw'
-  cases zLowest ι.zev ι.act with
-  | none => intro hw'; exact ⟨hw'.1, hw'.2.1⟩
-  | some v =>
-    obtain ⟨_, pid, _, γ⟩ := v
-    intro hw'; exact ⟨hw'.1, hw'.2.1⟩
+  refine ⟨fun h => hu (hnum.trans h), fun h hcl => ?_, fun h hne => (hf (hnum.trans h) hne).1⟩
+  have hcl' : tfW (utSysRec (tfW W.tf tfEpcIdx) (urcV0 V W)).tf (tfArgIdx 0) = 0#64 ∨
+      (utSysRec (tfW W.tf tfEpcIdx) (urcV0 V W)).pvLazy = false := by
+    rcases hcl with h0 | h0
+    · exact Or.inl (ha0.trans h0)
+    · exact Or.inr (hlz.symm.trans h0)
+  have hw' := hw (hnum.trans h) hcl'
+  show usysWaitFitsAt W.perm (tfW (uvisRun W).tf (tfArgIdx 0)) W.ch W.M ι _ _ _
+  rw [hpi, ← hM, ← ha0, hch]
+  exact hw'
 
 /-- **M0's ROW AT THE CITED ι** (NI M2-X2): `uexecRet_roundDet` at the cited
 prefix, from usertrap's rows (`utChKept`, `utFdEcall`, `utRetPid`), the
@@ -157,9 +160,9 @@ theorem urc_niDetRow (W : Uvis) (V : ProcPriv) (Mp : Nat → List (BitVec 8)) (s
   have hpidrow : sc = uecallScause →
       usysRetPid (uvisNum (uvisRun W)) (tfW (uvisOf V' M' sts' gn cs' pid).tf (tfArgIdx 0)) W.pid := by
     intro h; rw [← hnr, ← hnum0, hpid]; exact hrp h
-  obtain ⟨hup, hw, -⟩ := urc_evRow W V Mp V' M' cs cs' ι hl hch hsc hev
+  obtain ⟨hup, hw, -⟩ := urc_evRow W V Mp V' M' cs cs' ι hl hch hsc hM hpi hlz hev
   have hfit : usysIotaFits (uvisNum (uvisRun W)) (uvisRun W) (tfW (uvisOf V' M' sts' gn cs' pid).tf (tfArgIdx 0))
-      (uvisOf V' M' sts' gn cs' pid).ch ι :=
+      (uvisOf V' M' sts' gn cs' pid).ch (uvisOf V' M' sts' gn cs' pid).M ι :=
     usysIotaFits_of_ev hcls.2 hup hw
   exact uexecRet_roundDet sc W (uvisOf V' M' sts' gn cs' pid) ι hlw (hgn.symm ▸ rfl) hpid.symm hchrow hfdrow
     hpidrow hr hsce hcls hfit
@@ -172,7 +175,7 @@ theorem urc_niForkRow (W : Uvis) (V : ProcPriv) (Mp : Nat → List (BitVec 8)) (
     (hev : syscEvRow (utSysRec (tfW W.tf tfEpcIdx) (urcV0 V W)) V'
       (syscImg (utSysRec (tfW W.tf tfEpcIdx) (urcV0 V W)) Mp) (syscImg V' M') cs cs' ι) :
     niForkRow sc W (uvisOf V' M' sts' gn cs' pid) (some (k, ι)) :=
-  fun _ hf hne => (urc_evRow W V Mp V' M' cs cs' ι hl hch hsc hev).2.2 hf hne
+  fun _ hf hne => (hev.2.2 ((urc_num_run W V hl hsc).trans hf) hne).1
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]

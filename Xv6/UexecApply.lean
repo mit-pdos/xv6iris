@@ -16,13 +16,15 @@ round resumed.  Everything here is what that re-keying needs:
   arm re-keyed at the resume state (`uexecRet_roundSlot`/`_of`), the bundle
   built row by row and the continuation applied (`ukc_apply`,
   `uslot_applyLoop`).  NOTHING IS MINTED: every arm is the process's own.
-* §5 THE FUNCTIONAL ROWS (NI M0 / M2-W3, grown by M2-G1d, `UsysDet`):
-  `round_det` -- at a class number AT THE KEY (`usysDetClassAt`: wait at a
-  null status pointer) the round's actual resume key IS `usysDet` at the
-  round's ι-prefix (`uexecRet_roundDet`, at the ι the round CITES: NI
-  M2-X's `UserretClosedRows.urc_niDetRow`; the answer fits ι, `hfit`: at
-  wait the family ledger's reading) -- and the quiet members' returning arm
-  READ AS THE POLICY (`uexecRetDetF`, `uexecRetContF_det`).
+* §5 THE FUNCTIONAL ROWS (NI M0 / M2-W3, grown by M2-G1d and M2-G1e,
+  `UsysDet`): `round_det` -- at a class number AT THE KEY
+  (`usysDetClassAt`: wait at a null status pointer or with the key's lazy
+  bit off) the round's actual resume key IS `usysDet` at the round's
+  ι-prefix (`uexecRet_roundDet`, at the ι the round CITES: NI M2-X's
+  `UserretClosedRows.urc_niDetRow`; the answer, children set and image fit
+  ι, `hfit`: at wait the family ledger's reading through the key's status
+  window) -- and the quiet members' returning arm READ AS THE POLICY
+  (`uexecRetDetF`, `uexecRetContF_det`).
 
 ## Deviations from Rocq
 
@@ -545,14 +547,17 @@ section Det
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF]
 open UexecSG
 
-/-- **`round_det`** (NI M0, grown by G1d): at an ecall whose effective number
-is in the private class AT THE KEY (`usysDetClassAt`: at wait, a null status
-pointer), the key the round resumed IS `usysDet` at the round's ι-prefix,
-from the loop's own rows (`uexecRet_roundSlot`'s premises: the round, the
-descriptor, pid, generation and children rows) and the receipt-derived fact
-`hfit` (uptime's count; wait's answer and children set at the family
-ledger's reading).  Exit's arm is empty (`uroundOk_exit`).  The equality is
-the KEY's (`UsysDet` deviation 3). -/
+/-- **`round_det`** (NI M0, grown by G1d and G1e): at an ecall whose
+effective number is in the private class AT THE KEY (`usysDetClassAt`: at
+wait, a null status pointer or the key's lazy bit off), the key the round
+resumed IS `usysDet` at the round's ι-prefix, from the loop's own rows
+(`uexecRet_roundSlot`'s premises: the round, the descriptor, pid,
+generation and children rows) and the receipt-derived fact `hfit` (uptime's
+count; wait's answer, children set and image at the family ledger's reading
+through the key's status window -- the kernel's window is turned into the
+key's at the arm, `SyscallArmsWait.syscArmWait_win`, so this is pure on the
+keys).  Exit's arm is empty (`uroundOk_exit`).  The equality is the KEY's
+(`UsysDet` deviation 3). -/
 theorem uexecRet_roundDet (sc : BitVec 64) (W W' : Uvis) (ι : UIota) (hl : W.tf.length = 36)
     (hgn : W'.gen = W.gen) (hpidk : W'.pid = W.pid)
     (hch : ¬ (sc = uecallScause ∧ (uvisNum (uvisRun W) = USYS_fork ∨ uvisNum (uvisRun W) = USYS_wait)) →
@@ -563,8 +568,8 @@ theorem uexecRet_roundDet (sc : BitVec 64) (W W' : Uvis) (ι : UIota) (hl : W.tf
     (hr : uroundOk sc (uvisRun W).tf W.M W.perm W.sz W.cwd W.lazy W.secc W'.tf W'.M W'.perm W'.sz W'.cwd
       W'.lazy W'.secc)
     (hsc : sc = uecallScause)
-    (hcls : usysDetClassAt (uvisNum (uvisRun W)) (tfW (uvisRun W).tf (tfArgIdx 0)))
-    (hfit : usysIotaFits (uvisNum (uvisRun W)) (uvisRun W) (tfW W'.tf (tfArgIdx 0)) W'.ch ι) :
+    (hcls : usysDetClassAt (uvisNum (uvisRun W)) (tfW (uvisRun W).tf (tfArgIdx 0)) (uvisRun W).lazy)
+    (hfit : usysIotaFits (uvisNum (uvisRun W)) (uvisRun W) (tfW W'.tf (tfArgIdx 0)) W'.ch W'.M ι) :
     ukeyEq (usysDet (uvisNum (uvisRun W)) (uvisRun W) ι) W' := by
   subst hsc
   rcases uroundOk_ecall hr with ⟨hexec, -, -⟩ | ⟨hnex, r, hb, hm, hc, hs⟩
@@ -582,7 +587,7 @@ theorem uexecRet_roundDet (sc : BitVec 64) (W W' : Uvis) (ι : UIota) (hl : W.tf
     rw [ha0] at hfdrow hpidrow hfit
     have hchq : uvisNum (uvisRun W) ≠ USYS_wait → W'.ch = (uvisRun W).ch :=
       fun hw => hch (fun h => h.2.elim hf hw)
-    obtain ⟨-, heq⟩ := usysDet_of_rows (uvisRun W) ι hres hcls.2 r W'.M W'.perm W'.sz W'.fd W'.cwd W'.gen
+    obtain ⟨-, heq⟩ := usysDet_of_rows (uvisRun W) ι hres r W'.M W'.perm W'.sz W'.fd W'.cwd W'.gen
       W'.ch W'.lazy W'.secc hm (hfdrow rfl) hc hgn (hpidrow rfl) hs hchq hfit
     rw [← heq]
     refine ⟨?_, ?_, rfl, rfl, rfl, rfl, rfl, rfl, rfl, hpidk.symm, rfl, rfl⟩
@@ -618,11 +623,11 @@ theorem uexecRetContF_det (X : Uvis → IProp GF) (n : Int) (f : sfam GF) (W : U
     iintro H %r %M' %π' %szv' %fdv' %cw' %g' %cs' %lz' %secc' %hm %hfd %_ %hc %hg %hpid %_ %hs %hch Hsp
     have hup : n = USYS_uptime → usysUptimeRet r := fun hu => by
       subst hu; exact usysMemOk_uptimeRet hm
-    obtain ⟨ι, hfit⟩ := usysIotaFits_exists (W := W) (cs' := cs') hup (fun hw => absurd hw h3)
+    obtain ⟨ι, hfit⟩ := usysIotaFits_exists (W := W) (cs' := cs') (M' := M') hup h3
     obtain ⟨hM, -, -⟩ := usysMemOk_quiet h7 h12 h3 h4 h5 h8 hm
     have hfd' := usysFdOk_quiet hcl hdp hop h4 hfd
     have hc' := usysCwdOk_quiet hcd hc
-    obtain ⟨hr, heq⟩ := usysDet_of_rows W ι (usysDetQuiet_resumes h) (fun hw => absurd hw h3) r M' π' szv'
+    obtain ⟨hr, heq⟩ := usysDet_of_rows W ι (usysDetQuiet_resumes h) r M' π' szv'
       fdv' cw' g' cs' lz' secc' hm hfd hc hg hpid hs (fun _ => hch) hfit
     rw [heq]
     have hch' : cs' = W.ch := hch
