@@ -20,7 +20,8 @@ D31 accessor), splits the fraction out for the duration of the call and
 puts everything back before kwait.  The argument is named as a fact
 about the block's own trapframe record, `V.tf[tfArgIdx 0]? = some v`.
 
-WHAT IT SAYS ABOUT THE RESULT is kwait's verbatim, with `v` -- the
+WHAT IT SAYS ABOUT THE RESULT is kwait's verbatim (the eb form: kwait's
+LED answer `waitAnsLed`, NI G1d), with `v` -- the
 syscall's argument 0 -- in place of kwait's `a0`: `-1` with nothing
 moved, or the reaped child's pid with the four-byte status word at `v`
 (nothing when `v = 0`), and kwait's D8 answer (`waitAns`: the escrow, the
@@ -78,10 +79,13 @@ def wp_sys_wait_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
     wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
 
-/-- **WP of `sys_wait()`, at either entry `SIE`**: kwait's eb-generic
-contract (`KWAIT.wp_kwait_eb`) passed through -- the trap-CSR complement
-`trapCsrsExt` / `cpuClaimExt` in and out; sys_wait takes no lock of its own,
-so it mints nothing and every stretch outside kwait is level 0. -/
+/-- **WP of `sys_wait()`, at either entry `SIE`**: kwait's eb-generic LED
+contract (`KWAIT.wp_kwait_led_eb`, NI G1d) passed through -- the trap-CSR
+complement `trapCsrsExt` / `cpuClaimExt` in and out; sys_wait takes no lock
+of its own, so it mints nothing and every stretch outside kwait is level 0.
+The answer is kwait's led one (`waitAnsLed … (procAddr j)`: the reap's
+receipt and the family ledger's reading at it), which the syscall arm reads
+`SyscRows.wait` off. -/
 def wp_sys_wait_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
@@ -103,7 +107,7 @@ def wp_sys_wait_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [X
     (rv xw : BitVec 32) (d : Nat) (cs' : ExtTreeSet GName compare) (k' : Nat),
     ⌜calleeSaved k.regs R' ∧ R' 10#5 = BitVec.signExtend 64 rv ∧ V.upt.extSz V.sz P' ∧ d ≤ 4 ∧
       kwaitAns rv v d ∧ umMapped P' v.toNat d⌝ -∗
-    waitAns rv (xstateVal xw) cs cs' V.gen (decide (v = 0#64)) pid -∗
+    waitAnsLed rv (xstateVal xw) cs cs' V.gen (decide (v = 0#64)) pid (procAddr j) -∗
     chFrag V.chg (procAddr j) cs' -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗

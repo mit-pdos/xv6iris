@@ -408,7 +408,8 @@ theorem syscRows_ofile (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts sts' : 
   refine ⟨?_, ?_, ?_, syscChOk_refl V cs, hn 2 h2, Or.inr ⟨r, rfl⟩,
     Or.inr (Or.inr (UMemL.extSz_refl _ _)), Or.inr (Or.inr rfl), Or.inr (Or.inr rfl), rfl, rfl, rfl,
     rfl, Or.inr rfl, Or.inl (hn 12 h12), Or.inl (hn 1 h1), Or.inl (hn 5 h5), ?_, rfl,
-    usysSeccOk_refl _ _ _ _ (hn 23 h23), Or.inl (hn 14 h14)⟩
+    usysSeccOk_refl _ _ _ _ (hn 23 h23), Or.inl (hn 14 h14),
+    Or.inl (hn 3 h3)⟩
   · unfold syscMemOk
     rw [if_neg (hn USYS_exec h7), if_neg (hn USYS_sbrk h12), if_neg (hn USYS_wait h3),
       if_neg (hn USYS_pipe h4), if_neg (hn USYS_read h5), if_neg (hn USYS_fstat h8)]
@@ -427,14 +428,16 @@ theorem syscRows_upt (V : ProcPriv) (M M1 : Nat → List (BitVec 8)) (sts : List
     (hl : tfArgIdx 0 < V.tf.length) (hext : V.upt.extSz V.sz P')
     (hmem : syscMemOk V (syscStore { V with upt := P' } r) (syscImg V M)
       (syscImg (syscStore { V with upt := P' } r) M1))
-    (hread : syscNum V ≠ USYS_read ∨ syscReadRet V.tf r) (h23 : n ≠ 23 := by decide) (h14 : n ≠ 14 := by decide) :
+    (hread : syscNum V ≠ USYS_read ∨ syscReadRet V.tf r) (h23 : n ≠ 23 := by decide) (h14 : n ≠ 14 := by decide)
+    (h3 : n ≠ 3 := by decide) :
     SyscRows V M (syscStore { V with upt := P' } r) M1 sts sts cs cs pid := by
   have hn : ∀ m : Int, n ≠ m → syscNum V ≠ m := fun m h => by rw [hnum]; exact h
   have ha0 : syscA0 (syscStore { V with upt := P' } r) = r := syscStore_a0 { V with upt := P' } r hl
   refine ⟨hmem, ?_, ?_, syscChOk_refl V cs, hn 2 h2, Or.inr ⟨r, rfl⟩,
     Or.inr (Or.inr hext), Or.inr (Or.inr rfl), Or.inr (Or.inr rfl), hext.1.2.1, rfl, rfl, rfl,
     Or.inr rfl, Or.inl (hn 12 h12), Or.inl (hn 1 h1), ?_, ?_, rfl,
-    usysSeccOk_refl _ _ _ _ (hn 23 h23), Or.inl (hn 14 h14)⟩
+    usysSeccOk_refl _ _ _ _ (hn 23 h23), Or.inl (hn 14 h14),
+    Or.inl (hn 3 h3)⟩
   · exact syscFdOk_refl_at V _ sts n hnum h21 h10 h15 h4
   · exact syscPipeOk_quiet V _ _ _ sts sts (hn 4 h4)
   · rw [ha0]; exact hread
@@ -452,7 +455,7 @@ theorem syscRows_gen (V : ProcPriv) (M M1 : Nat → List (BitVec 8)) (sts sts' :
       (syscImg (syscStore { V with ofile := fs, upt := P' } r) M1))
     (hfd : syscFdOk V r sts sts')
     (hpipe : syscPipeOk V (syscImg V M) (syscImg (syscStore { V with ofile := fs, upt := P' } r) M1)
-      r sts sts') (h23 : n ≠ 23 := by decide) (h14 : n ≠ 14 := by decide) :
+      r sts sts') (h23 : n ≠ 23 := by decide) (h14 : n ≠ 14 := by decide) (h3 : n ≠ 3 := by decide) :
     SyscRows V M (syscStore { V with ofile := fs, upt := P' } r) M1 sts sts' cs cs pid := by
   have hn : ∀ m : Int, n ≠ m → syscNum V ≠ m := fun m h => by rw [hnum]; exact h
   have ha0 : syscA0 (syscStore { V with ofile := fs, upt := P' } r) = r :=
@@ -460,7 +463,8 @@ theorem syscRows_gen (V : ProcPriv) (M M1 : Nat → List (BitVec 8)) (sts sts' :
   refine ⟨hmem, ?_, ?_, syscChOk_refl V cs, hn 2 h2, Or.inr ⟨r, rfl⟩,
     Or.inr (Or.inr hext), Or.inr (Or.inr rfl), Or.inr (Or.inr rfl), hext.1.2.1, rfl, rfl, rfl,
     Or.inr rfl, Or.inl (hn 12 h12), Or.inl (hn 1 h1), Or.inl (hn 5 h5), ?_, rfl,
-    usysSeccOk_refl _ _ _ _ (hn 23 h23), Or.inl (hn 14 h14)⟩
+    usysSeccOk_refl _ _ _ _ (hn 23 h23), Or.inl (hn 14 h14),
+    Or.inl (hn 3 h3)⟩
   · rw [ha0]; exact hfd
   · rw [ha0]; exact hpipe
   · rw [ha0]; exact syscRetPid_ne _ _ _ n hnum h11

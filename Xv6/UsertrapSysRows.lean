@@ -8,7 +8,10 @@ number, nor the table, nor the descriptor / pipe / pid rows read
 (`usysNum_epc`, `usysMemOk_argCong`, `usysFdOk_epc`, `usysPipeOk_epc`); the
 bump is `bumpTf` of the prologue's frame (`tfResumeGpr0_bump`,
 `tfResumePc_bump`); the permission view survives a lazy fill
-(`permOf_extSz`), sbrk's is derived from its own row (`usysSbrkPerm_of_row`).
+(`permOf_extSz`), sbrk's is derived from its own row (`usysSbrkPerm_of_row`);
+the answers fork, read, uptime and (NI G1d) wait gave join the table
+(`SyscRows.wait`'s shape, `syscWaitRow_ret`, is `usysMemOk`'s wait branch's
+`usysWaitRet`).
 
 Pure.
 -/
@@ -116,8 +119,13 @@ theorem ut_rows_of_sysc (A : UtArgs GF) (V2 : ProcPriv) (M2 : Nat → List (BitV
             rcases hr.uptime with h | h
             · exact absurd hu h
             · rw [ha0] at h; exact h
+          have hwt : syscNum (utSysRec A.sep A.V) = USYS_wait → usysWaitRet w := by
+            intro hw
+            rcases hr.wait with h | ⟨_, _, h⟩
+            · exact absurd hw h
+            · rw [← ha0]; exact syscWaitRow_ret h
           exact syscMemOk_usys (utSysRec A.sep A.V) V2 _ _ w _ _ _ _ _ _ hx hs
-            (by rw [hsz]; exact permOf_extSz hup) (by rw [hsz]) hlz hfk hrd hut hr.mem
+            (by rw [hsz]; exact permOf_extSz hup) (by rw [hsz]) hlz hfk hrd hut hwt hr.mem
       · -- the cwd
         rw [hnp]
         unfold usysCwdOk

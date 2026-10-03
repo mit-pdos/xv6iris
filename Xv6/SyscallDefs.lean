@@ -16,7 +16,8 @@ the dispatch table of Rocq `ProofSyscall.v` §Vocab).
 §1 the rows the dispatcher's post carries, keyed by the number it reads
 (`syscNum`, the `ld a5,168(s2)` at `+0x16`): what the entry did to the
 image (`syscMemOk`, sbrk's `syscSbrkOk`), to the descriptor table
-(`syscFdOk`), and pipe's two rows joined (`syscPipeOk`).  They are the
+(`syscFdOk`), pipe's two rows joined (`syscPipeOk`), and (NI G1d) wait's
+answer at the family ledger's reading (`syscWaitRow`).  They are the
 user-side table `UsysMemOk.usysMemOk` read at the kernel's vocabulary;
 `UsysMemOkSpec` is the bridge.
 
@@ -48,6 +49,7 @@ shift `slli a4,a3,3` of the sign-extended number is slot `num`'s offset
 -/
 import Xv6.UsysMemOk
 import Xv6.KernelData
+import Xv6.ZombEv
 
 namespace Xv6
 
@@ -117,6 +119,33 @@ theorem syscFdOk_refl_at (V : ProcPriv) (r : BitVec 64) (sts : List FdState) (k 
     (hk : syscNum V = k) (hc : k ≠ USYS_close) (hd : k ≠ USYS_dup) (ho : k ≠ USYS_open)
     (hp : k ≠ USYS_pipe) : syscFdOk V r sts sts :=
   usysFdOk_refl_at _ k _ r sts hk hc hd ho hp
+
+/-- **WAIT'S ROW AT THE RECEIPT** (NI G1d, Lean-only; G1 design §3): the pure
+image of kwait's led answer (`UserChildren.waitAnsLed`) at the dispatch's
+vocabulary -- `V`/`img` the entry record and its image, `V'`/`img'` the
+record the call left, `cs`/`cs'` the caller's children column before and
+after, `hz` a family-ledger history and `act` the caller's slot address.
+Either `-1` with the column kept (copyout's failure, no children, or the
+kill shot -- the pure row cannot tell them apart: the kill shot is refuted
+only at usertrap's post-syscall check, `UsertrapParts.ut_kill_lend`, after
+the rows are fixed; so this arm names no history), or the REAP: `zLowest hz act` names the slot, pid,
+status and generation of the lowest zombie child, the answer is that pid
+(in `[1, PIDMAX]`) sign-extended, the generation left the column, and the
+image is the status's bytes at the a0 pointer (none at null). -/
+def syscWaitRow (V V' : ProcPriv) (img img' : ElfMem) (cs cs' : ExtTreeSet GName compare)
+    (hz : List Zev) (act : BitVec 64) : Prop :=
+  (tfW V'.tf (tfArgIdx 0) = -1#64 ∧ cs' = cs) ∨
+  ∃ (j : Nat) (pid : BitVec 32) (xs : Int) (γ : GName), zLowest hz act = some (j, pid, xs, γ) ∧
+    1 ≤ pid.toNat ∧ pid.toNat ≤ PIDMAX ∧ tfW V'.tf (tfArgIdx 0) = BitVec.signExtend 64 pid ∧
+    cs' = cs \ {γ} ∧ img' = usysWr img (tfW V.tf (tfArgIdx 0)) (usysWaitBytes (tfW V.tf (tfArgIdx 0)) xs)
+
+/-- The row's answer has wait's shape (`usysMemOk`'s wait branch). -/
+theorem syscWaitRow_ret {V V' : ProcPriv} {img img' : ElfMem} {cs cs' : ExtTreeSet GName compare}
+    {hz : List Zev} {act : BitVec 64} (h : syscWaitRow V V' img img' cs cs' hz act) :
+    usysWaitRet (tfW V'.tf (tfArgIdx 0)) := by
+  rcases h with ⟨h, -⟩ | ⟨-, pid, -, -, -, h1, h2, h3, -⟩
+  · exact Or.inl h
+  · exact Or.inr ⟨pid, h1, h2, h3⟩
 
 /-! ## §2 The dispatch table -/
 

@@ -291,7 +291,7 @@ theorem syscRows_sbrk (V V' : ProcPriv) (M M' : Nat → List (BitVec 8)) (sts : 
     Or.inr (by rw [ha0]; exact hret), Or.inl (hn 1 (by decide)), Or.inl (hn 5 (by decide)),
     syscRetPid_ne _ _ _ 12 hnum (by decide), hks,
     by rw [show (syscStore V' r).pvSecc = V.pvSecc from hsc]; exact usysSeccOk_refl _ _ _ _ (hn 23 (by decide)),
-    Or.inl (hn 14 (by decide))⟩
+    Or.inl (hn 14 (by decide)), Or.inl (hn 3 (by decide))⟩
   · unfold syscMemOk
     rw [if_neg (hn USYS_exec (by decide)), if_pos (show syscNum V = USYS_sbrk from hnum)]
     exact ⟨hmem, hlz⟩

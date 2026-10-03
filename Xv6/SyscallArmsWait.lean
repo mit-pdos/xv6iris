@@ -14,6 +14,13 @@ dispatch's rows, per the frozen recipe (notes/design-rulings.md).
   post's `extSz`; the children set moves (wait's own row).
 * The answer: `syscWaitOut` via `syscWaitOut_of` from kwait's `waitAns` and
   the window (`syscUwaitWr`, Rocq `uwait_wr`) from `kwaitAns`'s two guards.
+* WAIT'S ROW (NI G1d): `SYSWAIT` now relays kwait's LED answer
+  (`waitAnsLed … (procAddr j)`); `waitAnsLed_row` reads its pure image --
+  `-1` with the column kept, or the reap at the family ledger's reading at
+  the receipt (`zLowest hz (procAddr j) = some (n, rv, xs, γ')`, the column
+  without `γ'`, the pid in range) -- which, with the copyout's window
+  (`syscArmWait_bytes`), is `SyscRows.wait` (`syscWaitRow` at the caller's
+  slot); the landed answer `waitAns` goes on to `syscWaitOut`.
 
 The wait post's raised event count (permit sweep L1a) reaches the
 dispatcher's ∀-general post through `SyscallRet.SyscRows.updEv`.
@@ -48,13 +55,16 @@ theorem syscArmWait_img (P P' : UPtd) (sz : BitVec 64) (M : Nat → List (BitVec
   rw [syscImg_write P' sz.toNat _ v bs hmap hlen' hnw, syscImg_faulted P P' sz M hext]
 
 /-- **The rows of wait's arm** (Rocq `sysc_arm_wait`'s premises of
-`sysc_ret_tail`). -/
+`sysc_ret_tail`; NI G1d: and wait's own row, `hw`, read off kwait's led
+answer). -/
 theorem syscRows_wait (V : ProcPriv) (M M2 : Nat → List (BitVec 8)) (P' : UPtd) (sts : List FdState)
     (cs cs' : ExtTreeSet GName compare) (pid : BitVec 32) (r : BitVec 64) (bs : List (BitVec 8))
     (a : BitVec 64) (ha : tfW V.tf (tfArgIdx 0) = a)
     (hnum : syscNum V = 3) (hext : V.upt.extSz V.sz P') (hbs : bs.length ≤ 4)
     (hz : a = 0#64 → bs = [])
-    (himg : syscImg { V with upt := P' } M2 = usysWr (syscImg V M) a bs) :
+    (himg : syscImg { V with upt := P' } M2 = usysWr (syscImg V M) a bs)
+    (hw : ∃ (hz : List Zev) (act : BitVec 64), syscWaitRow V (syscStore { V with upt := P' } r)
+      (syscImg V M) (syscImg { V with upt := P' } M2) cs cs' hz act) :
     SyscRows V M (syscStore { V with upt := P' } r) M2 sts sts cs cs' pid := by
   have hn : ∀ m : Int, (3 : Int) ≠ m → syscNum V ≠ m := fun m h => by rw [hnum]; exact h
   refine ⟨?_, ?_, syscPipeOk_quiet V _ _ _ sts sts (hn 4 (by decide)),
@@ -62,13 +72,53 @@ theorem syscRows_wait (V : ProcPriv) (M M2 : Nat → List (BitVec 8)) (P' : UPtd
     Or.inr (Or.inr rfl), Or.inr (Or.inr rfl), hext.1.2.1, rfl, rfl, rfl, Or.inr rfl,
     Or.inl (hn 12 (by decide)), Or.inl (hn 1 (by decide)), Or.inl (hn 5 (by decide)),
     syscRetPid_ne _ _ _ 3 hnum (by decide), rfl,
-    usysSeccOk_refl _ _ _ _ (hn 23 (by decide)), Or.inl (hn 14 (by decide))⟩
+    usysSeccOk_refl _ _ _ _ (hn 23 (by decide)), Or.inl (hn 14 (by decide)), Or.inr hw⟩
   · unfold syscMemOk
     rw [if_neg (hn USYS_exec (by decide)), if_neg (hn USYS_sbrk (by decide)),
       if_pos (show syscNum V = USYS_wait from hnum)]
     subst ha
     exact ⟨bs, hbs, hz, himg⟩
   · exact syscFdOk_refl_at V _ sts 3 hnum (by decide) (by decide) (by decide) (by decide)
+
+/-- **The status bytes kwait copied out are wait's row's** (NI G1d): at a
+null pointer none, at a real one on a reap the whole word (`kwaitAns`). -/
+theorem syscArmWait_bytes (rv xw : BitVec 32) (v : BitVec 64) (d : Nat) (hans : kwaitAns rv v d)
+    (hrv : rv ≠ -1#32) : (xstateBytes xw).take d = usysWaitBytes v (xstateVal xw) := by
+  unfold usysWaitBytes xstateVal
+  by_cases h0 : v = 0#64
+  · rw [if_pos h0, hans.1 h0]; rfl
+  · rw [if_neg h0, hans.2 h0 hrv, BitVec.ofInt_toInt]; rfl
+
+section
+variable {GF : BundledGFunctors} [CtokG GF] [WchG GF]
+
+/-- **kwait's led answer, read** (NI G1d): its pure image -- `-1` with the
+column kept, or the reap at the family ledger's reading (`zLowest` at the
+receipt's history, the column without the reaped generation, the pid in
+range) -- beside the landed answer (`waitAnsLed_post`). -/
+theorem waitAnsLed_row (rv : BitVec 32) (xs : Int) (cs cs' : ExtTreeSet GName compare) (gn : GName)
+    (nullst : Bool) (pidv : BitVec 32) (act : BitVec 64) :
+    waitAnsLed (GF := GF) rv xs cs cs' gn nullst pidv act ⊢
+      ⌜(rv = -1#32 ∧ cs' = cs) ∨ ∃ (hz : List Zev) (j : Nat) (γ' : GName),
+        zLowest hz act = some (j, rv, xs, γ') ∧ cs' = cs \ {γ'} ∧ 1 ≤ rv.toNat ∧ rv.toNat ≤ genPidMax⌝ ∗
+      waitAns rv xs cs cs' gn nullst pidv := by
+  unfold waitAnsLed waitAns
+  iintro (⟨%hf, #Hwhy⟩ | ⟨%h, %j, %γ', -, %hz, %hc, Hr⟩)
+  · isplitl []
+    · ipureintro; exact Or.inl hf
+    · ileft
+      isplitl []
+      · ipureintro; exact hf
+      · iapply waitWhyLed_post cs gn nullst act $$ Hwhy
+  · isplitl []
+    · ipureintro; exact Or.inr ⟨h, j, γ', hz, hc⟩
+    · iright
+      iexists γ'
+      isplitl []
+      · ipureintro; exact hc
+      · iexact Hr
+
+end
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
@@ -144,10 +194,24 @@ theorem syscall_arm_wait (SW : SYSWAIT)
     intro h0
     have : d = 0 := hans.1 h0
     subst this; rfl
-  have hrows := syscRows_wait V M _ P' sts cs cs' pid (R2 10#5) ((xstateBytes xw).take d) v hw0 hn3 hext
-    (by rw [hbl]; exact hd) hz himg
   have hsa0 : syscA0 (syscStore { V.updEv k' with upt := P' } (R2 10#5)) = R2 10#5 :=
     syscStore_a0 _ _ (by show tfArgIdx 0 < V.tf.length; rw [hl]; decide)
+  -- WAIT'S ROW (NI G1d): kwait's led answer, read at the dispatch -- the
+  -- reap at the family ledger's reading at the receipt, the caller's slot
+  icases waitAnsLed_row rv (xstateVal xw) cs cs' V.gen _ pid (procAddr j) $$ Hwa with ⟨%hwl, Hwa⟩
+  have hwrow : ∃ (hz : List Zev) (act : BitVec 64), syscWaitRow V (syscStore { V with upt := P' } (R2 10#5))
+      (syscImg V M) (syscImg { V with upt := P' } (umemWrite (viewFaulted V.upt P' M) v.toNat
+        ((xstateBytes xw).take d))) cs cs' hz act := by
+    have hsa : tfW (syscStore { V with upt := P' } (R2 10#5)).tf (tfArgIdx 0) = R2 10#5 := hsa0
+    rcases hwl with ⟨hrv, hcs'⟩ | ⟨hz', jj, γ', hzl, hcs', h1, h2⟩
+    · exact ⟨[], procAddr j, Or.inl ⟨by rw [hsa, ha0, hrv]; decide, hcs'⟩⟩
+    · have hrv : rv ≠ -1#32 := fun h => by subst h; exact absurd h2 (by decide)
+      refine ⟨hz', procAddr j, Or.inr ⟨jj, rv, xstateVal xw, γ', hzl, h1, by simpa [PIDMAX, genPidMax] using h2,
+        by rw [hsa, ha0], hcs', ?_⟩⟩
+      show umemLazy P' V.sz.toNat _ = _
+      rw [himg, hw0, syscArmWait_bytes rv xw v d hans hrv]
+  have hrows := syscRows_wait V M _ P' sts cs cs' pid (R2 10#5) ((xstateBytes xw).take d) v hw0 hn3 hext
+    (by rw [hbl]; exact hd) hz himg hwrow
   unfold syscallRet syscallAddr at *
   -- the block at the reap's raised event count (permit sweep L1a): the rows
   -- do not read it (`SyscRows.updEv`)

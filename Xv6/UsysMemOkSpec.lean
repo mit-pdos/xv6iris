@@ -37,8 +37,8 @@ open Iris.Std (get?)
 
 /-- **Every entry but exec and sbrk**: the kernel's table implies the
 user's, given the permission view, the break and the lazy bit did not move
-and what fork, read and uptime answered (Rocq `sysc_mem_ok_usys`; the uptime
-premise is NI M0's, Lean-only). -/
+and what fork, read, uptime and wait answered (Rocq `sysc_mem_ok_usys`; the
+uptime premise is NI M0's, the wait premise NI G1d's, both Lean-only). -/
 theorem syscMemOk_usys (V V' : ProcPriv) (M M' : ElfMem) (r : BitVec 64)
     (π π' : Nat → Option UPerm) (szv szv' : Nat) (lz lz' : Bool)
     (h7 : syscNum V ≠ USYS_exec) (h12 : syscNum V ≠ USYS_sbrk)
@@ -46,6 +46,7 @@ theorem syscMemOk_usys (V V' : ProcPriv) (M M' : ElfMem) (r : BitVec 64)
     (hfk : syscNum V = USYS_fork → r = -1#64 ∨ (1 ≤ r.toInt ∧ r.toInt ≤ PIDMAX))
     (hrd : syscNum V = USYS_read → usysReadRet V.tf r)
     (hup : syscNum V = USYS_uptime → usysUptimeRet r)
+    (hwt : syscNum V = USYS_wait → usysWaitRet r)
     (H : syscMemOk V V' M M') : usysMemOk (syscNum V) V.tf r M π szv lz M' π' szv' lz' := by
   unfold syscMemOk at H
   unfold usysMemOk
@@ -53,7 +54,7 @@ theorem syscMemOk_usys (V V' : ProcPriv) (M M' : ElfMem) (r : BitVec 64)
   by_cases h3 : syscNum V = USYS_wait
   · rw [if_pos h3] at H ⊢
     obtain ⟨bs, hl, hz, hM⟩ := H
-    refine ⟨⟨bs, hl, fun h0 => hz (BitVec.eq_of_toNat_eq (by simpa using h0)), hM⟩, hp, hs, hlz⟩
+    refine ⟨⟨bs, hl, fun h0 => hz (BitVec.eq_of_toNat_eq (by simpa using h0)), hM⟩, hp, hs, hlz, hwt h3⟩
   rw [if_neg h3] at H ⊢
   by_cases h4 : syscNum V = USYS_pipe
   · rw [if_pos h4] at H ⊢; exact ⟨H, hp, hs, hlz⟩

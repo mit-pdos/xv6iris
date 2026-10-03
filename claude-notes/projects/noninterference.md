@@ -1458,6 +1458,90 @@ proof content (~100 lines in `ap_pidloop`, ~60 in the steps). G2b is 6 files, me
   comes from the cited prefix and the success bit from the slot/allocator prefixes, with F6's honesty paragraph
   in the as-landed note. The alternative, fork's whole answer as a reading now (cheap, §5), is not recommended:
   it would declassify an unexplained success bit.
+### M2-G1d as landed (2026-10-03)
+
+Lane `lane/g1`, one commit on G1a+b and G1c.  Rulings R4 and R5 applied, R4 NARROWED (deviation 1).
+
+- **The functional row (`UsysDet`).**  `UIota` gains `act` (the caller's slot address); `UIota.reap := zLowest
+  ι.zev ι.act`.  The class, as numbers: `usysDetClass n := exit ∨ getpid ∨ uptime ∨ wait`; `usysDetQuiet`
+  (getpid, uptime: the old `usysDetResumes`), `usysDetResumes := usysDetQuiet ∨ wait`; KEY-DEPENDENT at wait:
+
+      def usysDetClassAt (n : Int) (a0 : BitVec 64) : Prop := usysDetClass n ∧ (n = USYS_wait → a0 = 0#64)
+
+  `usysDet n W ι := if n = USYS_wait then usysDetWait W ι else if usysDetQuiet n then bump … else W`, with
+
+      def usysDetWait (W : Uvis) (ι : UIota) : Uvis :=
+        match ι.reap with
+        | some (_, pid, xs, γ) =>
+          bump W (BitVec.signExtend 64 pid)
+            (usysWr W.M (tfW W.tf (tfArgIdx 0)) (usysWaitBytes (tfW W.tf (tfArgIdx 0)) xs)) W.perm W.sz W.fd W.cwd
+            W.gen (W.ch \ {γ}) W.lazy W.secc
+        | none => bump W (-1#64) W.M W.perm W.sz W.fd W.cwd W.gen W.ch W.lazy W.secc
+
+  (the design's "no children" and "children, none a zombie" arms are the same key, -1 with nothing moved, and
+  `¬ zHasKids` gives `zLowest = none`; the design's first test is not there, deviation 1).  `usysWaitFits` /
+  `usysIotaFits n W r cs' ι` (uptime's count; wait's answer and children set at `ι.reap`), `usysWaitRow` (the
+  kernel row at the keys), `usysIotaFits_exists` (at a -1 the empty history); `usysDet_mem` (+ `hwr`: the
+  answer's shape at wait), `usysDet_rows` (all resuming members; the children row off wait; the fit),
+  `usysDet_of_rows` (+ `hnull`, `hch` now `n ≠ USYS_wait → cs' = W.ch`, the fit at `(W, r, cs')`).
+- **The kernel's row.**  `SyscallDefs.syscWaitRow V V' img img' cs cs' hz act` (`-1` with the column kept, or
+  `zLowest hz act = some (j, pid, xs, γ)`, pid in `[1, PIDMAX]`, the answer its sign-extension, `cs' = cs \ {γ}`,
+  `img' = usysWr img a0 (usysWaitBytes a0 xs)`); `SyscRows.wait : syscNum V ≠ USYS_wait ∨ ∃ hz act, syscWaitRow V
+  V' (syscImg V M) (syscImg V' M') cs cs' hz act` (LAST field).  `SpecSysWait.wp_sys_wait_eb_body`'s answer is
+  `waitAnsLed … (procAddr j)`; `ProofSysWait` calls `KWAIT.wp_kwait_led_eb`; `SyscallArmsWait.syscall_arm_wait`
+  reads the row off `waitAnsLed_row` (the led answer's pure image beside `waitAns`) and the window
+  (`syscArmWait_bytes`), at `act = procAddr j`.  The `-1` arm carries no history: its kill reason is refuted only
+  at usertrap's +0xa6 check (F3), after the pure rows are fixed.  Every other row builder rules the row out
+  (`syscRows_keep`/`_ofile`/`_exec`/`_fork`/`_secc`/sbrk's/path's off their existing `h3`; `syscRows_upt` and
+  `syscRows_gen` gain a defaulted `h3 : n ≠ 3`).  `usysMemOk`'s wait branch gains `∧ usysWaitRet r` (`usysWaitRet
+  r := r = -1 ∨ ∃ pid, 1 ≤ pid ≤ PIDMAX ∧ r = sext pid`); `syscMemOk_usys` (+`hwt`); `UsertrapSysRows` carries
+  `SyscRows.wait`'s shape (`syscWaitRow_ret`) into it.  `UexecApply.uexecRet_roundDet(_exists)` at
+  `usysDetClassAt (uvisNum (uvisRun W)) (tfW (uvisRun W).tf (tfArgIdx 0))`, the fit at `W'.ch`; `_exists` takes
+  `hwait` (the kernel's row at the keys: what supplies ι's history and actor) -- nothing in the loop carries it
+  yet (wait's children row is in-logic, `uwaitAnsPid`), as before `round_det` is reached by no root.
+  `uexecRetContF_det` at `usysDetQuiet`.
+- **W4 (`NiLedger`, `NiTrace`).**  `niWaitRow sc W W' := sc = uecallScause → usysEff … = USYS_wait →
+  usysWaitRet (tfW W'.tf (tfArgIdx 0))`, after `niPidRow` in `niFit`'s and `niEntryOk`'s round arms; derivable
+  from the round (`niWaitRow_of_round`, through `usysMemOk`'s wait branch), supplied at
+  `UserretClosedRound.urc_exit` that way.  `NiStep.reads` admits wait, so `events` = the uptime AND wait
+  readings; `niRoundLaw`'s resume clause covers wait through `usysDetResumes`, its new conjunct
+  `(gprsNum secc xg = USYS_wait → usysWaitRet (gprsA0 eg))`; `NiInClass` at `usysDetClassAt (gprsNum secc xg)
+  (gprsA0 xg)` (the exit's own a0: no `lazy` bit rides the filing, deviation 1).  `niTwoRun`'s `events₁ =
+  events₂` includes the wait answers.  The three NI roots' statements byte-identical.
+- **Honesty (G1-R5), in `NiTrace`'s header (scope 6).**  At the trace level wait's answer is a declassified
+  reading, like uptime's: equal readings and equal inputs give equal outputs; not WHY the reading is what it is.
+  The content is in-logic, in `round_det`: the answer is `zLowest` of a prefix of the family ledger at the
+  caller's slot (forks with placement, exits with statuses, reaps, the reparenting).  Wait declassifies the
+  family's exit order up to slot order, the statuses, and the slot placement of the caller's children (F1).
+- **Deviation 1 (R4 narrowed: the class at wait is `a0 = 0`, not `lazy = false ∨ a0 = 0`).**  At `lazy = false`
+  and a non-null pointer the `-1` image is NOT pinned by the landed kernel: kwait calls `COPYOUT.wp_copyout_nr`
+  (no failure reason) and `waitAnsLed`'s copyout reason is only `nullst = false`, so `syscUwaitWr` at a `-1`
+  writes an unconstrained prefix `d ≤ 4` of an unconstrained status word.  Also, the design's first test ("bad
+  pointer at `lazy = false` → -1, nothing moved") is not xv6's behaviour: with a zombie child, a status word
+  straddling a writable and a non-writable page is copied out up to the boundary before the -1.  Re-admitting it
+  needs kwait's led answer to carry, at a copyout failure, the zombie's reading (an lb with `zLowest`) and the
+  copied prefix (`d` = the first non-writable byte, via `wp_copyout`'s reason and `lazyFree_wmapped_iff`): a
+  `SpecKwait`/`waitAnsLed` move outside G1d's sanctioned list, so not done.  `lazyFree_wmapped_iff` stays
+  unreached; its `dead_allow.txt` row stays (comment updated).
+- **Deviation 2.**  `SyscRows.wait` quantifies the slot (`∃ hz act`); `SyscRows` has no slot parameter, and the
+  arm supplies `procAddr j`.  `niWaitRow` is the answer's shape only (the round already carries it); the
+  children move does not reach the filing (it is in-logic in the loop).
+- **TCB.**  Unchanged for all 11 recorded theorems (module sets and opaques identical to
+  `tools/tcb/expected.json`; no `--update`): `usysWaitRet` is in `UsysMemOk`, `usysDetClassAt` in `UsysDet`,
+  both already in the NI roots' TCB, and `usysDetClassAt` names no `Zev`, so `ZombEv` does not enter.  Audit: 9
+  roots PASS, no new axiom or opaque.
+- Reached from a root (`run_all.sh reports`): `syscWaitRow`(+`_ret`), `waitAnsLed_row`, `syscArmWait_bytes`,
+  `usysWaitRet`, `usysWaitBytes`, `usysMemOk_waitRet`, `niWaitRow`(+`_of_round`), `usysDetClassAt`,
+  `usysDetResumes_ne` and the NiTrace changes; G1c's `zLowest_spec`, `zHasKids_iff` still reached.  NOT reached
+  (as W3's M0 core before it): `UIota.reap`, `usysDetWait`, `usysDet_quiet/_wait`, `usysWaitFits`, `usysWaitRow`,
+  `usysIotaFits_exists`, `usysDet_mem/_rows/_of_rows`, `usysDetQuiet_ne`, `uexecRet_roundDet(_exists)`,
+  `uexecRetContF_det`, `zLowest_nil`, `usysWaitBytes_null/_length`, `usysWr_nil`; `lazyFree_wmapped_iff` only via
+  the allowlist.
+
+Also open (deviation 1): wait at `lazy = false` and a non-null status pointer (kwait's copyout-failure
+answer).
+
+What remains of G1: fork's slot −1 (parked, §6); G2; G3; G4; M2-X
 
 ## Lanes (opened 2026-09-15)
 

@@ -208,7 +208,7 @@ theorem syscRows_exec (V : ProcPriv) (M : Nat → List (BitVec 8)) (V' : ProcPri
     Or.inr hcwi, Or.inl (hne 12 (by decide)), Or.inl (hne 1 (by decide)), Or.inl (hne 5 (by decide)),
     syscRetPid_ne _ _ _ 7 hn (by decide), hks,
     by rw [show (syscStore V' r).pvSecc = V.pvSecc from hsc]; exact usysSeccOk_refl _ _ _ _ (hne 23 (by decide)),
-    Or.inl (hne 14 (by decide))⟩
+    Or.inl (hne 14 (by decide)), Or.inl (hne 3 (by decide))⟩
 
 /-- The trapframe's word `i < 36` is its `tfW` reading. -/
 theorem syscTf_get (tf : List (BitVec 64)) (hl : tf.length = 36) (i : Nat) (hi : i < 36) :

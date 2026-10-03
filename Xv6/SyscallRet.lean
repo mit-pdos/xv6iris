@@ -79,7 +79,7 @@ theorem SyscRows.updEv {V : ProcPriv} {M : Nat → List (BitVec 8)} {V' : ProcPr
     {pid : BitVec 32} (k : Nat) (h : SyscRows V M V' M' sts sts' cs cs' pid) :
     SyscRows V M (V'.updEv k) M' sts sts' cs cs' pid :=
   ⟨h.mem, h.fd, h.pipe, h.ch, h.ret, h.tf, h.upt, h.sz, h.lazy, h.tfp, h.fdg, h.chg, h.gen, h.cwi,
-    h.sbrk, h.fork, h.read, h.pid, h.ks, h.secc, h.uptime⟩
+    h.sbrk, h.fork, h.read, h.pid, h.ks, h.secc, h.uptime, h.wait⟩
 
 /-- **The rows of an entry that moved nothing but a0** (Rocq's
 `sysc_mem_ok_quiet` / `sysc_fd_ok_refl_at` / `sysc_pipe_ok_quiet` /
@@ -87,7 +87,8 @@ theorem SyscRows.updEv {V : ProcPriv} {M : Nat → List (BitVec 8)} {V' : ProcPr
 sync hand the block back at the entry record with only the answer stored;
 getpid supplies its pid row (`syscRetPid_of`), the others refute it
 (`syscRetPid_ne`); uptime supplies its answer row (`h14`, NI M0, off the
-tick ledger's receipt), the others refute it by default. -/
+tick ledger's receipt), the others refute it by default; none is wait
+(`h3`), so wait's row (NI G1d) is refuted. -/
 theorem syscRows_keep (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState)
     (cs : ExtTreeSet GName compare) (pid : BitVec 32) (r : BitVec 64) (n : Int)
     (hnum : syscNum V = n) (h1 : n ≠ 1) (h2 : n ≠ 2) (h3 : n ≠ 3) (h4 : n ≠ 4) (h5 : n ≠ 5)
@@ -100,7 +101,7 @@ theorem syscRows_keep (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List F
   refine ⟨?_, ?_, ?_, syscChOk_refl V cs, hn 2 h2, Or.inr ⟨r, rfl⟩,
     Or.inr (Or.inr (UMemL.extSz_refl _ _)), Or.inr (Or.inr rfl), Or.inr (Or.inr rfl), rfl, rfl, rfl,
     rfl, Or.inr rfl, Or.inl (hn 12 h12), Or.inl (hn 1 h1), Or.inl (hn 5 h5), hpid, rfl,
-    usysSeccOk_refl _ _ _ _ (hn 23 h23), ?_⟩
+    usysSeccOk_refl _ _ _ _ (hn 23 h23), ?_, Or.inl (hn 3 h3)⟩
   · unfold syscMemOk
     rw [if_neg (hn USYS_exec h7), if_neg (hn USYS_sbrk h12), if_neg (hn USYS_wait h3),
       if_neg (hn USYS_pipe h4), if_neg (hn USYS_read h5), if_neg (hn USYS_fstat h8)]
@@ -125,7 +126,7 @@ theorem syscRows_secc (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List F
   refine ⟨?_, ?_, ?_, syscChOk_refl V cs, hn 2 (by decide), Or.inr ⟨r, rfl⟩,
     Or.inr (Or.inr (UMemL.extSz_refl _ _)), Or.inr (Or.inr rfl), Or.inr (Or.inr rfl), rfl, rfl, rfl,
     rfl, Or.inr rfl, Or.inl (hn 12 (by decide)), Or.inl (hn 1 (by decide)), Or.inl (hn 5 (by decide)),
-    syscRetPid_ne _ _ _ 23 hnum (by decide), rfl, ?_, Or.inl (hn 14 (by decide))⟩
+    syscRetPid_ne _ _ _ 23 hnum (by decide), rfl, ?_, Or.inl (hn 14 (by decide)), Or.inl (hn 3 (by decide))⟩
   · unfold syscMemOk
     rw [if_neg (hn USYS_exec (by decide)), if_neg (hn USYS_sbrk (by decide)),
       if_neg (hn USYS_wait (by decide)), if_neg (hn USYS_pipe (by decide)),

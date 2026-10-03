@@ -17,7 +17,10 @@ THE ROWS, one for one with `syscMemOk`:
   at the process's two breaks; the permission view moves as a FUNCTION of the
   two breaks (`usysSbrkPerm`); what sbrk ANSWERED (`usysSbrkRet`); which arm
   ran, on the lazy bit's terms (`usysSbrkLazy`).
-* wait (3)   -- at most four bytes at argument 0 (none at a NULL pointer).
+* wait (3)   -- at most four bytes at argument 0 (none at a NULL pointer), and
+  (NI G1d) the RETURN VALUE's shape: -1 or a reaped pid in `[1, PIDMAX]`,
+  sign-extended (`usysWaitRet`; the kernel's arm reads it off kwait's led
+  answer, `SpecSyscall.SyscRows.wait`).
 * pipe (4)   -- at most eight bytes at argument 0.
 * read (5)   -- at most the caller's own count, at argument 1.
 * fstat (8)  -- at most one 24-byte `struct stat`, at argument 1.
@@ -214,6 +217,26 @@ def usysUptimeWord (t : Nat) : BitVec 64 := BitVec.setWidth 64 (BitVec.ofNat 32 
 -- the count the tick ledger's receipt names (`WaitInv.tickLb`). -/
 def usysUptimeRet (r : BitVec 64) : Prop := ∃ t : Nat, r = usysUptimeWord t
 
+/-- **What wait answered, as a word** (NI G1d, Lean-only): `-1`, or the
+reaped child's pid -- in `[1, PIDMAX]` -- sign-extended (kwait's `int`
+return through `sys_wait`; `UserChildren.waitAnsLed`'s reaping arm). -/
+def usysWaitRet (r : BitVec 64) : Prop :=
+  r = -1#64 ∨ ∃ pid : BitVec 32, 1 ≤ pid.toNat ∧ pid.toNat ≤ PIDMAX ∧ r = BitVec.signExtend 64 pid
+
+/-- **The status bytes a reaping wait copies out** (NI G1d): none at a null
+pointer, else the four little-endian bytes of the status word. -/
+def usysWaitBytes (a0 : BitVec 64) (xs : Int) : List (BitVec 8) :=
+  if a0 = 0#64 then [] else wordToBytes4 (BitVec.ofInt 32 xs)
+
+theorem usysWaitBytes_null (xs : Int) : usysWaitBytes 0#64 xs = [] := by
+  unfold usysWaitBytes; rw [if_pos rfl]
+
+theorem usysWaitBytes_length (a0 : BitVec 64) (xs : Int) : (usysWaitBytes a0 xs).length ≤ 4 := by
+  unfold usysWaitBytes; split <;> simp [wordToBytes4]
+
+/-- Nothing written is nothing moved. -/
+theorem usysWr_nil (M : ElfMem) (a : BitVec 64) : usysWr M a [] = M := rfl
+
 /-- **THE TABLE** (Rocq `usys_mem_ok`): syscall `n`, entered with trapframe
 words `tf`, returned `r`, may take the image from `M` to `M'`, the permission
 view from `π` to `π'`, the break from `szv` to `szv'` and the lazy bit from
@@ -228,7 +251,7 @@ def usysMemOk (n : Int) (tf : List (BitVec 64)) (r : BitVec 64)
       usysSbrkLazy lz lz' tf szv szv'
   else if n = USYS_wait then
     (∃ bs : List (BitVec 8), bs.length ≤ 4 ∧ ((tfW tf (tfArgIdx 0)).toNat = 0 → bs = []) ∧
-      M' = usysWr M (tfW tf (tfArgIdx 0)) bs) ∧ π' = π ∧ szv' = szv ∧ lz' = lz
+      M' = usysWr M (tfW tf (tfArgIdx 0)) bs) ∧ π' = π ∧ szv' = szv ∧ lz' = lz ∧ usysWaitRet r
   else if n = USYS_pipe then
     (∃ bs : List (BitVec 8), bs.length ≤ 8 ∧ M' = usysWr M (tfW tf (tfArgIdx 0)) bs) ∧
       π' = π ∧ szv' = szv ∧ lz' = lz
@@ -270,7 +293,7 @@ theorem usysMemOk_lazy {n : Int} {tf : List (BitVec 64)} {r : BitVec 64} {M M' :
   · rw [if_pos h7] at H; exact H.2.2.2.2
   rw [if_neg h7, if_neg h12] at H
   by_cases h3 : n = USYS_wait
-  · rw [if_pos h3] at H; exact H.2.2.2
+  · rw [if_pos h3] at H; exact H.2.2.2.1
   rw [if_neg h3] at H
   by_cases h4 : n = USYS_pipe
   · rw [if_pos h4] at H; exact H.2.2.2
@@ -315,6 +338,14 @@ theorem usysMemOk_waitNull {tf : List (BitVec 64)} {r : BitVec 64} {M M' : ElfMe
   obtain ⟨⟨bs, -, hnull, hM⟩, hp, hs, -⟩ := H
   rw [hnull hz] at hM
   exact ⟨hM, hp, hs⟩
+
+/-- wait's answer (NI G1d, Lean-only): -1 or a reaped pid's word. -/
+theorem usysMemOk_waitRet {tf : List (BitVec 64)} {r : BitVec 64} {M M' : ElfMem}
+    {π π' : Nat → Option UPerm} {szv szv' : Nat} {lz lz' : Bool}
+    (H : usysMemOk USYS_wait tf r M π szv lz M' π' szv' lz') : usysWaitRet r := by
+  unfold usysMemOk at H
+  rw [if_neg (by decide), if_neg (by decide), if_pos rfl] at H
+  exact H.2.2.2.2
 
 /-- Fork's return value (Rocq `usys_mem_ok_fork_ret`). -/
 theorem usysMemOk_forkRet {tf : List (BitVec 64)} {r : BitVec 64} {M M' : ElfMem}

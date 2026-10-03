@@ -13,6 +13,10 @@ duration of `argaddr` and put back before `kwait`, which takes the whole
 block.  `kwait` parks (`wpNext true`), so from its return on the hart is
 arbitrary and the spec's own `wpNext true` post is reached with `wpNext_at`.
 
+THE LED ANSWER (NI G1d): `kwait` is called at its led contract
+(`KWAIT.wp_kwait_led_eb`), and its answer `waitAnsLed … (procAddr j)` (the
+reap's receipt and the family ledger's reading) is relayed verbatim.
+
 THE EVENT COUNT (permit sweep L1a, Rocq f344a089a): kwait's raised count
 `k'` (`V.ev ≤ k'`) is relayed to the post verbatim (`sw_exit`).
 -/
@@ -68,7 +72,7 @@ theorem sw_kwait (KW : KWAIT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
       (rv xw : BitVec 32) (d : Nat) (cs' : ExtTreeSet GName compare) (ke' : Nat),
       ⌜calleeSaved k'.regs R' ∧ R' 10#5 = BitVec.signExtend 64 rv ∧ V.upt.extSz V.sz P' ∧ d ≤ 4 ∧
         kwaitAns rv a d ∧ umMapped P' a.toNat d⌝ -∗
-      waitAns rv (xstateVal xw) cs cs' V.gen (decide (a = 0#64)) pid -∗
+      waitAnsLed rv (xstateVal xw) cs cs' V.gen (decide (a = 0#64)) pid (procAddr j) -∗
       chFrag V.chg (procAddr j) cs' -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       trapCsrsExt cpu' s -∗ cpuClaimExt cpu' s p -∗
@@ -78,8 +82,8 @@ theorem sw_kwait (KW : KWAIT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
       wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   subst hs hp
-  have h := KW.wp_kwait_eb (hlc := hlc) (GF := GF) Γ c k' γw γp γl γk γ j pid V M cs hj hproc hK hnoff htier
-  unfold wp_kwait_eb_body at h
+  have h := KW.wp_kwait_led_eb (hlc := hlc) (GF := GF) Γ c k' γw γp γl γk γ j pid V M cs hj hproc hK hnoff htier
+  unfold wp_kwait_led_eb_body at h
   simp only [kwaitAddr] at h
   rw [ha] at h
   exact h
@@ -148,13 +152,13 @@ theorem sw_exit (cpu cr : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : BitV
     trapCsrsExt cr k.sie ∗ cpuClaimExt cr k.sie k.proc ∗
     procPrivFd γ (procAddr j) pid { V.updEv k' with upt := P' }
       (umemWrite (viewFaulted V.upt P' M) v.toNat ((xstateBytes xw).take d)) ∗
-    waitAns rv (xstateVal xw) cs cs' V.gen (decide (v = 0#64)) pid ∗
+    waitAnsLed rv (xstateVal xw) cs cs' V.gen (decide (v = 0#64)) pid (procAddr j) ∗
     chFrag V.chg (procAddr j) cs' ∗
     wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd)
       (rv xw : BitVec 32) (d : Nat) (cs' : ExtTreeSet GName compare) (k' : Nat),
       ⌜calleeSaved k.regs R' ∧ R' 10#5 = BitVec.signExtend 64 rv ∧ V.upt.extSz V.sz P' ∧ d ≤ 4 ∧
         kwaitAns rv v d ∧ umMapped P' v.toNat d⌝ -∗
-      waitAns rv (xstateVal xw) cs cs' V.gen (decide (v = 0#64)) pid -∗
+      waitAnsLed rv (xstateVal xw) cs cs' V.gen (decide (v = 0#64)) pid (procAddr j) -∗
       chFrag V.chg (procAddr j) cs' -∗
       kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
       trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
@@ -170,7 +174,7 @@ theorem sw_exit (cpu cr : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : BitV
       iprop(trapCsrsExt cr k.sie ∗ cpuClaimExt cr k.sie k.proc ∗
         procPrivFd γ (procAddr j) pid { V.updEv k' with upt := P' }
           (umemWrite (viewFaulted V.upt P' M) v.toNat ((xstateBytes xw).take d)) ∗
-        waitAns rv (xstateVal xw) cs cs' V.gen (decide (v = 0#64)) pid ∗
+        waitAnsLed rv (xstateVal xw) cs cs' V.gen (decide (v = 0#64)) pid (procAddr j) ∗
         chFrag V.chg (procAddr j) cs'))
     $$ [- $Hk $Hpc $Hframe]
   isplitl [Hte Hce Hblk Hans Hch]

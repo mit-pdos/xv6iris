@@ -10,7 +10,9 @@ incarnation's first key).
   them (`MachCSL.gprList`, `x_k` at trapframe word `4 + k`), and the bridge
   `gprList_tfResumeGpr0`: the file userret rebuilds IS `tfGprs`.
 * §2 `exitFits` / `enterFits`: an event read at a key; `niFit`, the meaning
-  of an entry's evidence (`MachFixedGS.uFit`'s Xv6 reading, ruling O2).
+  of an entry's evidence (`MachFixedGS.uFit`'s Xv6 reading, ruling O2),
+  with the round's getpid row (`niPidRow`, M2-W2d) and wait row
+  (`niWaitRow`, NI G1d: the answer's shape, carried by the round).
 * §3 `NiEntry`, `niOk h F` (every filing is valid in `h`, every enter in `h`
   is filed once): the ledger's pure fact (ruling O6: `∃ F`); `niOk_snoc`
   steps it blind on non-enter events, `niOk_file` files an enter.
@@ -92,15 +94,42 @@ def niPidRow (sc : BitVec 64) (W W' : Uvis) : Prop :=
     usysRetPid (usysEff W.secc (tfOf (tfResumeGpr0 W.tf) (retPc (tfW W.tf tfEpcIdx))))
       (tfW W'.tf (tfArgIdx 0)) W.pid
 
+/-- wait's answer at a round (NI G1d, W4's wait conjunct): an ecall round
+whose effective number is wait answers `-1` or a reaped pid in `[1,
+PIDMAX]`, sign-extended -- the kernel's row (`SpecSyscall.SyscRows.wait`,
+kwait's led answer) carried by the round (`usysMemOk`'s wait branch,
+`niWaitRow_of_round`); supplied at `UserretClosedRound.urc_exit`. -/
+def niWaitRow (sc : BitVec 64) (W W' : Uvis) : Prop :=
+  sc = uecallScause →
+    usysEff W.secc (tfOf (tfResumeGpr0 W.tf) (retPc (tfW W.tf tfEpcIdx))) = USYS_wait →
+      usysWaitRet (tfW W'.tf (tfArgIdx 0))
+
+/-- **The round carries wait's row**: a lawful round at a wait ecall
+answered with wait's shape (`usysMemOk_waitRet` at the bumped `a0`). -/
+theorem niWaitRow_of_round {sc : BitVec 64} {W W' : Uvis} (hr : roundOkKeys sc W W') :
+    niWaitRow sc W W' := by
+  intro hsc hw
+  unfold roundOkKeys at hr
+  rw [hsc] at hr
+  rcases uroundOk_ecall hr with ⟨hexec, -⟩ | ⟨-, r, ⟨hb1, -⟩, hm, -⟩
+  · rw [hw] at hexec; exact absurd hexec (by decide)
+  · have ha0 : tfW W'.tf (tfArgIdx 0) = r := by
+      have := congrFun hb1 10#5
+      rw [tfResumeGpr0, tfResumeGpr_a0] at this
+      rw [this]; simp
+    rw [hw] at hm
+    rw [ha0]; exact usysMemOk_waitRet hm
+
 /-- **The evidence's meaning** (the Xv6 reading of `MachFixedGS.uFit`): an
 origin is any key the enter fits (the CLAIM it spends makes it honest, §5,
 F4); a round cites the exit it resumes, read at the trapped key `W`, and the
 resumed key `W'` is lawful from it, keeps its pid, and (M2-W2d) answers
-getpid with it. -/
+getpid with it and (NI G1d) wait with wait's shape. -/
 def niFit : Option (Nat × Obs) → Obs → Prop
   | none, e => ∃ W0, enterFits e W0
   | some (_, x), e => ∃ (sc : BitVec 64) (W W' : Uvis),
-      exitFits x sc W ∧ enterFits e W' ∧ roundOkKeys sc W W' ∧ W'.pid = W.pid ∧ niPidRow sc W W'
+      exitFits x sc W ∧ enterFits e W' ∧ roundOkKeys sc W W' ∧ W'.pid = W.pid ∧ niPidRow sc W W' ∧
+        niWaitRow sc W W'
 
 /-! ## §3 The filing -/
 
@@ -122,7 +151,7 @@ def niEntryOk (h : List Obs) : NiEntry → Prop
   | .origin j W0 _ => ∃ e, h[j]? = some e ∧ enterFits e W0
   | .round i j sc W W' => i < j ∧ (∃ x, h[i]? = some x ∧ exitFits x sc W) ∧
       (∃ e, h[j]? = some e ∧ enterFits e W') ∧ roundOkKeys sc W W' ∧ W'.pid = W.pid ∧
-      niPidRow sc W W'
+      niPidRow sc W W' ∧ niWaitRow sc W W'
 
 /-- **THE LEDGER'S FACT**: every filing is valid, and every enter in `h` is
 filed exactly once (`∃!`, spelled out). -/
@@ -203,10 +232,10 @@ theorem niFiling_ok {h : List Obs} {e : Obs} {ox : Option (Nat × Obs)} (hfit : 
     exact ⟨W0, 0#64, W0, W0, e, hlast, hW0⟩
   | some ix =>
     obtain ⟨i, x⟩ := ix
-    obtain ⟨sc, W, W', hx, hen, hr, hp, hq⟩ := hfit
+    obtain ⟨sc, W, W', hx, hen, hr, hp, hq, hw⟩ := hfit
     obtain ⟨hi, hxi⟩ := hrc i x rfl
     exact ⟨W, sc, W, W', hi, ⟨x, by rw [List.getElem?_append_left hi]; exact hxi, hx⟩,
-      ⟨e, hlast, hen⟩, hr, hp, hq⟩
+      ⟨e, hlast, hen⟩, hr, hp, hq, hw⟩
 
 /-- **Filing one more enter** (the coverage half): a valid filing of the new
 last position extends the filing. -/

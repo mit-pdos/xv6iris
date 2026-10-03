@@ -104,7 +104,7 @@ theorem syscPath_rows (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts sts' : L
     ?_, Or.inl (hn 12 h12), Or.inl (hn 1 h1), Or.inl (hn 5 h5),
     syscRetPid_ne _ _ _ n hnum h11, hks,
     by rw [show (syscStore V1 r).pvSecc = V.pvSecc from hsc]; exact usysSeccOk_refl _ _ _ _ (hn 23 h23),
-    Or.inl (hn 14 h14)⟩
+    Or.inl (hn 14 h14), Or.inl (hn 3 h3)⟩
   · unfold syscMemOk
     rw [if_neg (hn USYS_exec h7), if_neg (hn USYS_sbrk h12), if_neg (hn USYS_wait h3),
       if_neg (hn USYS_pipe h4), if_neg (hn USYS_read h5), if_neg (hn USYS_fstat h8)]

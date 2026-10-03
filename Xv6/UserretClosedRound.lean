@@ -148,11 +148,14 @@ theorem urc_exit (UR : USERRET) [NiFitIs (hlc := hlc) GF] (PT : SchedNames → I
   have hctx' : utCtxOk (((uservecCtx k (tfResumeGpr0 W.tf) V.tf).intrOff true false).withRegs R') :=
     ⟨rfl, rfl, rfl⟩
   -- THE FILING (NI M2-W2c): the resume is this round's, citing the exit at
-  -- `i`; the trapped key `W`, the key the round left, lawful, same pid
+  -- `i`; the trapped key `W`, the key the round left, lawful, same pid; the
+  -- getpid row (M2-W2d) and wait's (NI G1d: the kernel's `SyscRows.wait`,
+  -- carried by the round's `usysMemOk`)
   have hfit : niFit (some (i, x)) (.uEnter cpu' (satpOf KTier.kpt P'.root) uepc (tfGprs V'.tf)) :=
     ⟨sc, W, uvisOf V' M' sts' gn cs' pid, hx, ⟨cpu', _, uepc, rfl, hpc'⟩,
       urc_roundOkKeys W V Mp sc V' M' sts' gn cs' pid hl hM hpi hsz hcw hlz hsc hround, hpid.symm,
-      urc_niPidRow W V sc V' M' sts' gn cs' pid hl hpid hsc hrp⟩
+      urc_niPidRow W V sc V' M' sts' gn cs' pid hl hpid hsc hrp,
+      niWaitRow_of_round (urc_roundOkKeys W V Mp sc V' M' sts' gn cs' pid hl hM hpi hsz hcw hlz hsc hround)⟩
   have HRS := urc_resume (hlc := hlc) (GF := GF) UR PT Γ j cpu'
     (((uservecCtx k (tfResumeGpr0 W.tf) V.tf).intrOff true false).withRegs R') 0
     P' ksp V' M' sts' gn cs' pid uepc sc2 tv2 hproc hctx' htier hnoff hsp' hav' ha0 hpc'

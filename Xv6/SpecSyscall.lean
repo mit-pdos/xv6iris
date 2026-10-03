@@ -80,6 +80,9 @@ fallback (+0x40..+0x56) and the shared epilogue (+0x58..+0x62).
    (M0 as designed for Lean; Rocq never landed it) adds one more Lean-only
    row LAST, `uptime`: the answer is a tick count's word
    (`UsysMemOk.usysUptimeRet`), the count the tick ledger's receipt names.
+   NI G1d adds one more after it, `wait`: kwait's led answer read at the
+   dispatch (`SyscallDefs.syscWaitRow`, the family ledger's `zLowest` at
+   the receipt).
 5. **`kfork_child` is `syscForkChild`** (Rocq `KforkChild.v`, not ported;
    `{ V with tf := V.tf.set (tfArgIdx 0) 0 }`), and **`uwait_wr` /
    `uwait_ans_at_m` are `syscUwaitWr` / `syscUwaitAnsAtM`** (Rocq
@@ -260,6 +263,16 @@ structure SyscRows (V : ProcPriv) (M : Nat → List (BitVec 8)) (V' : ProcPriv)
   the tick ledger's receipt names (`SpecSysUptime.wp_sys_uptime_led`'s
   `tickLb n ∗ ⌜t = ofNat 32 n⌝`; the arm reads it off the receipt). -/
   uptime : syscNum V ≠ USYS_uptime ∨ usysUptimeRet (syscA0 V')
+  /-- **wait's answer** (NI G1d, Lean-only, after uptime): kwait's led
+  answer read at the dispatch (`SyscallDefs.syscWaitRow`) -- `-1` with the
+  children column kept, or the reap the family ledger's reading at the
+  receipt names (`zLowest hz act`: the lowest zombie child of the caller's
+  slot `act`), its pid, the column without its generation, and the status
+  bytes at the a0 pointer.  The history and the slot are the receipt's
+  (`SyscallArmsWait.syscall_arm_wait`); the row is pure, so the receipt
+  itself stops at the arm (G1 design F6). -/
+  wait : syscNum V ≠ USYS_wait ∨
+    ∃ (hz : List Zev) (act : BitVec 64), syscWaitRow V V' (syscImg V M) (syscImg V' M') cs cs' hz act
 
 /-! ## §2 The deposit channels (Rocq `Section SyscExec`, deviation 2) -/
 
