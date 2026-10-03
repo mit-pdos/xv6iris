@@ -109,7 +109,8 @@ instance hwConfig_persistent (cpu : CPU) : Persistent (hwConfig (GF := GF) cpu) 
 /-- A pinned frozen register, off the bundle. -/
 theorem hwConfig_reg (cpu : CPU) (r : Register) (v : RegisterType r) (h : hwVal r = some v) :
     hwConfig (GF := GF) cpu ⊢ r ↦ᵣ[cpu]□ v := by
-  cases r <;> simp only [hwVal, Option.some.injEq, reduceCtorEq] at h
+  unfold hwVal at h
+  split at h <;> simp only [Option.some.injEq, reduceCtorEq] at h
   all_goals first | subst h | (have h := Option.some.inj h; subst h)
   all_goals
     unfold hwConfig
@@ -132,7 +133,8 @@ theorem hwConfig_any (cpu : CPU) (r : Register) (h : hwAny r = true) :
     hwConfig (GF := GF) cpu ⊢ ∃ v : RegisterType r, r ↦ᵣ[cpu]□ v := by
   iintro #H
   icases hwConfig_counters cpu $$ H with ⟨%ctr, #H1, #H2, #H3, -, #H4⟩
-  cases r <;> simp only [hwAny, reduceCtorEq] at h
+  unfold hwAny at h
+  split at h <;> simp only [reduceCtorEq] at h
   all_goals first
     | (iexists ctr.mci; iexact H1) | (iexists ctr.mic; iexact H2) | (iexists ctr.mcc; iexact H3)
     | (iexists ctr.scen; iexact H4)

@@ -75,7 +75,8 @@ theorem txtImgOk :
       (fun kv => !txtNameb kv.1) = true := by
   unfold imgRootBlk fsimgRootData fsimgRootNrec
   rw [fsimgP_eq]
-  decide +kernel
+  fsimg_decide [fsFileData, fsDataOf, dirEntry, dirWins, dirBname, dirFirst, dirMatchb, dirLiveb, dirFreeb,
+    dirName, dirInum, fsDinode, fsDinodeBytes]
 
 /-- L4 at the map, off the sweep. -/
 theorem txtImg_map : ∀ nm z, imgRootEnts[nm]? = some z → ¬ txtName nm := by

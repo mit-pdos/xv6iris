@@ -72,7 +72,8 @@ def uxrPin (f : RegFile) : RegPin
 /-- The table's domain is the read set. -/
 theorem uxrPin_dom (f : RegFile) (r : Register) (v : RegisterType r) (h : uxrPin f r = some v) :
     r ∈ uxrReads := by
-  cases r <;> simp only [uxrPin, reduceCtorEq] at h <;> decide
+  unfold uxrPin at h
+  split at h <;> (try simp only [reduceCtorEq] at h) <;> decide
 
 /-- **The footprint premise of every CSR fact**: the footprint reads `uxrReads`. -/
 def UxrFoot (D : UFoot) : Prop := ∀ r ∈ uxrReads, D.Dr r = true
@@ -93,7 +94,8 @@ structure UxrCfg (s : UWSt) : Prop where
 /-- The file agrees with the table. -/
 theorem UxrCfg.val {s : UWSt} (hc : UxrCfg s) (r : Register) (v : RegisterType r)
     (h : uxrPin s.file r = some v) : s.file r = v := by
-  cases r <;> simp only [uxrPin, hwVal, reduceCtorEq, Option.some.injEq] at h <;> subst h
+  unfold uxrPin at h
+  split at h <;> simp only [hwVal, reduceCtorEq, Option.some.injEq] at h <;> subst h
   all_goals simp only [hc.priv, hc.misa, hc.menvcfg, hc.senvcfg, hc.mstateen0, hc.sstateen0]
 
 /-- The bridge at the CSR table. -/

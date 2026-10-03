@@ -70,17 +70,10 @@ theorem ushNulRow_facts {ty : Int} {row : Nat} {rowv : BitVec 32} {arm : Nat} (h
   rcases hr with ⟨rfl, rfl, rfl, rfl⟩ | ⟨rfl, rfl, rfl, rfl⟩ | ⟨rfl, rfl, rfl, rfl⟩ <;>
     exact ⟨by decide, by decide, by decide, by decide, by decide, by decide, by decide, by decide, by decide⟩
 
-set_option maxRecDepth 100000 in
 /-- The row's bytes are the image's (Rocq `ushp_ro_byte` at the row). -/
 theorem ushNulRow_bytes {ty : Int} {row : Nat} {rowv : BitVec 32} {arm : Nat} (hr : ushNulRow ty row rowv arm) :
     ∀ j, j < 4 → User.Sh.code.byte (row + j) = some (nthByte (n := 4) rowv j) := by
-  intro j hj
-  rcases hr with ⟨rfl, rfl, rfl, rfl⟩ | ⟨rfl, rfl, rfl, rfl⟩ | ⟨rfl, rfl, rfl, rfl⟩ <;>
-    match j, hj with
-    | 0, _ => rfl
-    | 1, _ => rfl
-    | 2, _ => rfl
-    | 3, _ => rfl
+  rcases hr with ⟨rfl, rfl, rfl, rfl⟩ | ⟨rfl, rfl, rfl, rfl⟩ | ⟨rfl, rfl, rfl, rfl⟩ <;> decide +kernel
 
 section UshNulParts
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]

@@ -270,7 +270,8 @@ structure UcMisa (D : UFoot) (s : UWSt) : Prop where
 theorem UcMisa.dref {s : UWSt} (h : UcMisa D s) :
     ∀ r v, ucDrefMisa r = some v → D.Dr r = true ∧ s.file r = v := by
   intro r v hr
-  cases r <;> simp only [ucDrefMisa, reduceCtorEq] at hr
+  unfold ucDrefMisa at hr
+  split at hr <;> try simp only [reduceCtorEq] at hr
   cases hr
   exact ⟨h.rd, h.val⟩
 

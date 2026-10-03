@@ -186,11 +186,8 @@ theorem gprFile_gprCells (cpu : CPU) (m : RegMap) :
   unfold gprFile gprList gprIdxs
   simp only [Iris.Algebra.BigOpL.bigOpL_cons, Iris.Algebra.BigOpL.bigOpL_nil, List.map_cons, List.map_nil]
   dsimp only [gpr, gprCells, BitVec.reduceToNat]
-  constructor
-  · iintro ⟨H1, H2, H3, H4, H5, H6, H7, H8, H9, H10, H11, H12, H13, H14, H15, H16, H17, H18, H19, H20, H21, H22, H23, H24, H25, H26, H27, H28, H29, H30, H31, -⟩
-    iframe
-  · iintro ⟨H1, H2, H3, H4, H5, H6, H7, H8, H9, H10, H11, H12, H13, H14, H15, H16, H17, H18, H19, H20, H21, H22, H23, H24, H25, H26, H27, H28, H29, H30, H31⟩
-    iframe
+  -- the two sides differ only by the file's trailing `∗ emp`
+  repeat (first | exact sep_emp | refine sep_congr_right ?_)
 
 /-- Take one register out of the file, and put it back at any value. -/
 theorem gprFile_acc (cpu : CPU) (m : RegMap) (i : BitVec 5) (hi : i ≠ 0#5) :

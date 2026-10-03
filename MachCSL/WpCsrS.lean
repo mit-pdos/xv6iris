@@ -100,7 +100,8 @@ def drefMisa : (r : Register) → Option (RegisterType r)
 theorem misa_drefMisa_acc (cpu : CPU) (r : Register) (v : RegisterType r)
     (hv : drefMisa r = some v) :
     hwConfig cpu ⊢@{IProp GF} ∃ dq : DFrac, r ↦ᵣ[cpu]{dq} v ∗ (r ↦ᵣ[cpu]{dq} v -∗ hwConfig cpu) := by
-  cases r <;> simp only [drefMisa, Option.some.injEq, reduceCtorEq] at hv
+  unfold drefMisa at hv
+  split at hv <;> simp only [Option.some.injEq, reduceCtorEq] at hv
   subst hv
   iintro #H
   iexists DFrac.discard

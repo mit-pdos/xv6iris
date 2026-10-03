@@ -64,7 +64,8 @@ def spikeUCells (cpu : CPU) (dq : DFrac) : IProp GF := iprop%
 theorem spikeUCells_acc (cpu : CPU) (dq : DFrac) (r : Register) (v : RegisterType r)
     (hv : spikeDrefU r = some v) :
     spikeUCells (GF := GF) cpu dq ⊢ ∃ dq' : DFrac, r ↦ᵣ[cpu]{dq'} v ∗ (r ↦ᵣ[cpu]{dq'} v -∗ spikeUCells cpu dq) := by
-  cases r <;> simp only [spikeDrefU, Option.some.injEq, reduceCtorEq] at hv
+  unfold spikeDrefU at hv
+  split at hv <;> simp only [Option.some.injEq, reduceCtorEq] at hv
   all_goals (subst hv; unfold spikeUCells; iintro ⟨H1, H2, H3, H4, H5⟩; iexists dq)
   all_goals
     first

@@ -65,7 +65,8 @@ theorem uk_udrefU_hd {C : UCfg} {P : UPtd} (s : UWSt) (hc : UfCfg C P s.file)
     (hp : s.file .cur_privilege = Privilege.User) :
     ∀ r v, udrefU r = some v → ufFoot.Dr r = true ∧ s.file r = v := by
   intro r v h
-  cases r <;> simp only [udrefU, reduceCtorEq, Option.some.injEq] at h <;> subst h <;>
+  unfold udrefU at h
+  split at h <;> simp only [reduceCtorEq, Option.some.injEq] at h <;> subst h <;>
     first
     | exact ⟨ufFoot_rd _ (by decide), hp⟩
     | exact ⟨ufFoot_rd _ (by decide), hc.hw _ _ rfl⟩

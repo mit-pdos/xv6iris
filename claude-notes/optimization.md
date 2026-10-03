@@ -1123,6 +1123,55 @@ times are sequential CPU).  Eight causes; each is a rule.
   `FsImgCheckSweeps.fsimgRegionBareB` (1.8 s) reads ~10k bytes one at a
   time; a whole-record `Nat` test needs a byte-vs-`Nat` equivalence lemma.
 
+### Lean: profiling the whole tree, and the outliers it finds
+
+- **Profile the build with `profiler = true` only; trace modules alone.**
+  `-Dtrace.profiler=true` in the libraries' `moreLeanArgs` costs up to 5x in
+  some modules (it keeps and prints every trace tree: `UlibVprintfCode` 6.7 →
+  35 s), and one Link module grew past 45 GB and got lake OOM-killed.  The
+  cumulative `profiler` summary is cheap; per-declaration traces are for one
+  isolated `lake env lean -DElab.async=false` at a time.  The build's
+  per-declaration seconds are wall under 32 threads of `Elab.async`: 20-30x
+  inflated for kernel-heavy decisions (`BootCarve`'s 0.7 s rows read 20 s).
+- **The startup spine is wall, one for one.**  For the first ~100 s only the
+  chain `ObsTrace` → `Resources` → `Ctx` → `Wp` → `HwConfig` → `Tactics` /
+  `KCtx` runs, on a mostly idle machine; a second off a spine module is a
+  second off the build.  Find the chain by walking, from a module that starts
+  late, to the import that finished last.
+- **`cases r <;> simp only [f, …] at h` over `Register` (~180 arms) costs
+  ~1 s** where `f` is a `match` with a wildcard (`hwVal`, `drefM`, `drefU`,
+  `uxrPin`, …).  `unfold f at h; split at h <;> simp only […] at h` splits on
+  `f`'s own arms (a handful plus the wildcard, whose `h : none = some v`
+  `reduceCtorEq` closes).  An arm whose `h` is `some x = some v` makes a bare
+  `simp only [reduceCtorEq]` fail with no progress: wrap it in `try`.
+- **`split` on a long list pattern builds its splitter**: `gprCells`'
+  31-element match cost ~2.5 s (10 s under load) in `split` alone.  Case the
+  list by shape (`rcases gs with _ | ⟨a1, _ | ⟨a2, …⟩⟩`), close the short and
+  long lists by `sep_elim_right.trans false_elim` (by goal position:
+  `iterate 31 exact …; rotate_left`; an `all_goals try exact` reached the
+  31-cell goal and ran away unifying it with `False`), `dsimp only` the main one.
+- **Per-cell proof mode over a 31-register frame is seconds.**  `iframe` after
+  `iintro ⟨H1, …, H31⟩` (`gprFile_gprCells`: the sides differ by a trailing
+  `∗ emp`) is `repeat (first | exact sep_emp | refine sep_congr_right ?_)`;
+  31 `ihave`s reading pins off an interpretation are one pure step lemma
+  (`gprCells_valid_step`, `pure_elim` + `sep_elim_left/right`) applied by
+  `iterate 30 refine`.
+- **`cases e <;> simp_all […]` inside an induction** rewrites the induction
+  hypothesis and the `∀ e ∈ κ` premise in every arm.  When the arms are "the
+  step leaves it alone" or "the premise is false", say so:
+  `cases e <;> first | exact ih' | simp [isUser] at he` (`ObsTrace`).
+- **A CSR `swp_run` reads without its `read_CSR` fact walks the model's whole
+  CSR `match`**: `csrr rd, satp` with no `read_CSR_satp` in `sail_facts` was
+  16 of a module's 22 s.  Every `read_CSR`/`write_CSR` number a rule touches
+  needs its `rfl` fact.
+- **Image bytes by `rfl`, again** (see lane S): `| 0, _ => rfl` per byte of a
+  user program's code is ~0.4 s a byte; one `decide +kernel` per row of the
+  statement is free.  And a `decide +kernel` reading the fs image through
+  `fsimgP` belongs in `fsimg_decide` (`FileNamePins.txtImgOk`).
+- **What is NOT a lever: the import line.**  Every module pays ~1 s to load
+  `Lean` itself (`import Lean` alone: 1.0 s, 1.5 GB); `import Xv6.ProofKfork`
+  is 1.3 s.  Closure pruning does not move it; only fewer modules would.
+
 ### Lean: what a step still cost after lane P, and five cuts (lane K)
 
 Measured Oct 1 2026 on origin/lean 06ca39eef.  Kernel time was located with a

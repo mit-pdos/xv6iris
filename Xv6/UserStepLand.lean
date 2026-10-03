@@ -334,6 +334,7 @@ theorem ust_drefU_hd (s : UWSt) (hc : UfCfg C P s.file) (hp : s.file .cur_privil
     ∀ r v, drefU r = some v → ufFoot.Dr r = true ∧ s.file r = v := by
   intro r v h
   refine ⟨?_, uf_drefU C P s.file hc hp r v h⟩
-  cases r <;> simp only [drefU, reduceCtorEq] at h <;> exact ufFoot_rd _ (by decide)
+  unfold drefU at h
+  split at h <;> (try simp only [reduceCtorEq] at h) <;> exact ufFoot_rd _ (by decide)
 
 end Xv6

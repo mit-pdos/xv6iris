@@ -466,7 +466,7 @@ theorem obsWire_user (i : UartId) (κ : List Obs) (hκ : ∀ e ∈ κ, isUser e 
   | cons e κ ih =>
     have he := hκ e (List.mem_cons_self ..)
     have ih' := ih (fun e' he' => hκ e' (List.mem_cons_of_mem _ he'))
-    cases e <;> simp_all [isUser, obsWire]
+    cases e <;> first | exact ih' | simp [isUser] at he
 
 /-- ...and accept no byte. -/
 theorem obsIns_user (i : UartId) (κ : List Obs) (hκ : ∀ e ∈ κ, isUser e = true) :
@@ -476,7 +476,7 @@ theorem obsIns_user (i : UartId) (κ : List Obs) (hκ : ∀ e ∈ κ, isUser e =
   | cons e κ ih =>
     have he := hκ e (List.mem_cons_self ..)
     have ih' := ih (fun e' he' => hκ e' (List.mem_cons_of_mem _ he'))
-    cases e <;> simp_all [isUser, obsIns]
+    cases e <;> first | exact ih' | simp [isUser] at he
 
 /-- A hart node never moves a wire: register effects and RAM accesses do not
 touch the device fabric, and an MMIO transaction goes through
@@ -732,7 +732,7 @@ theorem traceShape_io (h κ : List Obs) (hs : traceShape h true) (hκ : ∀ e �
     apply ih
     · apply traceShape_snoc h e true true hs
       have := hκ e (List.mem_cons_self ..)
-      cases e <;> simp_all [isIo, obsStep]
+      cases e <;> first | rfl | simp [isIo] at this
     · exact fun e' he' => hκ e' (List.mem_cons_of_mem _ he')
 
 theorem traceShape_user (h κ : List Obs) (hs : traceShape h true) (hκ : ∀ e ∈ κ, isUser e = true) :
@@ -744,7 +744,7 @@ theorem traceShape_user (h κ : List Obs) (hs : traceShape h true) (hκ : ∀ e 
     apply ih
     · apply traceShape_snoc h e true true hs
       have := hκ e (List.mem_cons_self ..)
-      cases e <;> simp_all [isUser, obsStep]
+      cases e <;> first | rfl | simp [isUser] at this
     · exact fun e' he' => hκ e' (List.mem_cons_of_mem _ he')
 
 /-- The boot count: how many times the power came on. -/
@@ -767,7 +767,7 @@ theorem obsBoots_io (κ : List Obs) (hκ : ∀ e ∈ κ, isIo e = true) : obsBoo
   | cons e κ ih =>
     have he := hκ e (List.mem_cons_self ..)
     have ih' := ih (fun e' he' => hκ e' (List.mem_cons_of_mem _ he'))
-    cases e <;> simp_all [isIo, obsBoots]
+    cases e <;> first | exact ih' | simp [isIo] at he
 
 theorem obsBoots_user (κ : List Obs) (hκ : ∀ e ∈ κ, isUser e = true) : obsBoots κ = 0 := by
   induction κ with
@@ -775,7 +775,7 @@ theorem obsBoots_user (κ : List Obs) (hκ : ∀ e ∈ κ, isUser e = true) : ob
   | cons e κ ih =>
     have he := hκ e (List.mem_cons_self ..)
     have ih' := ih (fun e' he' => hκ e' (List.mem_cons_of_mem _ he'))
-    cases e <;> simp_all [isUser, obsBoots]
+    cases e <;> first | exact ih' | simp [isUser] at he
 
 /-- The CURRENT power cycle's I/O: the events since the last power event.  A
 power event resets it, so with the power off it is empty. -/
@@ -813,7 +813,7 @@ theorem foldl_seg_user (seg κ : List Obs) (hκ : ∀ e ∈ κ, isUser e = true)
   | cons e κ ih =>
     have he := hκ e (List.mem_cons_self ..)
     have ih' := ih seg (fun e' he' => hκ e' (List.mem_cons_of_mem _ he'))
-    cases e <;> simp_all [isUser, segStep]
+    cases e <;> first | exact ih' | simp [isUser] at he
 
 theorem openSeg_user (h κ : List Obs) (hκ : ∀ e ∈ κ, isUser e = true) :
     openSeg (h ++ κ) = openSeg h := by
@@ -830,7 +830,7 @@ theorem foldl_seg_era (seg κ : List Obs) (hκ : ∀ e ∈ κ, isIo e = true ∨
     have ih' := ih (segStep seg e) (fun e' he' => hκ e' (List.mem_cons_of_mem _ he'))
     simp only [List.foldl_cons]
     rw [ih']
-    cases e <;> simp_all [isIo, isUser, segStep]
+    cases e <;> first | (simp [isIo, isUser] at he; done) | simp [segStep, isIo]
 
 theorem openSeg_io (h κ : List Obs) (hκ : ∀ e ∈ κ, isIo e = true) :
     openSeg (h ++ κ) = openSeg h ++ κ := by
@@ -1088,7 +1088,7 @@ theorem cyclesOf_user (h κ : List Obs) (hκ : ∀ e ∈ κ, isUser e = true) :
     | cons e κ' ih =>
       have he := hκ' e (List.mem_cons_self ..)
       have ih' := ih cs (fun e' he' => hκ' e' (List.mem_cons_of_mem _ he'))
-      cases e <;> simp_all [isUser, cycStep]
+      cases e <;> first | exact ih' | simp [isUser] at he
   simp [cyclesOf, cyclesRev_app, hf _ κ hκ]
 
 /-- A console event extends the open cycle, and only it. -/

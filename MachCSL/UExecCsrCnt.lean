@@ -265,7 +265,8 @@ theorem uxr_readCSR_cnt (hD : UxrFoot D) (orc : UOrc) (i : BitVec 5) :
     intro _
     obtain ⟨w, b⟩ := p
     refine runRW_of_runRead D (uxrCntPin s.file) orc s (fun r v hv => ?_) _ w b hr
-    cases r <;> simp only [uxrCntPin, reduceCtorEq, Option.some.injEq] at hv <;> subst hv <;>
+    unfold uxrCntPin at hv
+    split at hv <;> simp only [reduceCtorEq, Option.some.injEq] at hv <;> subst hv <;>
       exact ⟨hD _ (by decide), rfl⟩
 
 /-- **`doCSR`'s `CSR_Check_OK` continuation at a low counter, for a read**

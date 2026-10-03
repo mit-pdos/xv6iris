@@ -238,7 +238,8 @@ theorem mConf_drefM_acc (cpu : CPU) (dq : DFrac) (c : MConf) (r : Register) (v :
     (hv : drefM r = some v) :
     mConf (GF := GF) cpu dq c ⊢
       ∃ dq' : DFrac, r ↦ᵣ[cpu]{dq'} v ∗ (r ↦ᵣ[cpu]{dq'} v -∗ mConf (GF := GF) cpu dq c) := by
-  cases r <;> simp only [drefM, Option.some.injEq, reduceCtorEq] at hv
+  unfold drefM at hv
+  split at hv <;> simp only [Option.some.injEq, reduceCtorEq] at hv
   all_goals subst hv
   all_goals first
     | exact confCells_hw_acc cpu dq _ c _ _ rfl
@@ -262,7 +263,8 @@ theorem sConf_drefS_acc (cpu : CPU) (dq : DFrac) (c : MConf) (hm : c.menvcfg = m
     confCells (GF := GF) cpu dq Privilege.Supervisor c ⊢
       ∃ dq' : DFrac, r ↦ᵣ[cpu]{dq'} v ∗
         (r ↦ᵣ[cpu]{dq'} v -∗ confCells (GF := GF) cpu dq Privilege.Supervisor c) := by
-  cases r <;> simp only [drefS, Option.some.injEq, reduceCtorEq] at hv
+  unfold drefS at hv
+  split at hv <;> simp only [Option.some.injEq, reduceCtorEq] at hv
   all_goals subst hv
   all_goals first
     | exact confCells_hw_acc cpu dq _ c _ _ rfl

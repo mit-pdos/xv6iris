@@ -196,13 +196,15 @@ structure UfCfg (C : UCfg) (P : UPtd) (f : RegFile) : Prop where
 theorem ufCfg_file (C : UCfg) (P : UPtd) (v : UfVals) (hv : v.lf.ok) : UfCfg C P (ufFile C P v) := by
   refine ⟨rfl, rfl, rfl, rfl, rfl, rfl, hv, ?_⟩
   intro r x h
-  cases r <;> simp only [hwVal, reduceCtorEq, Option.some.injEq] at h <;> (subst h; rfl)
+  unfold hwVal at h
+  split at h <;> simp only [reduceCtorEq, Option.some.injEq] at h <;> (subst h; rfl)
 
 /-- A register `hwVal` pins is one of `hwRegs` (a case split over every
 register, in an empty context: under `ufCfg_of_ro`'s hypotheses each of the
 ~250 arms' `simp_all` cost ~9 ms). -/
 theorem uf_hwVal_mem (r : Register) (x : RegisterType r) (h : hwVal r = some x) : r ∈ hwRegs := by
-  cases r <;> simp only [hwVal, reduceCtorEq] at h <;> decide
+  unfold hwVal at h
+  split at h <;> (try simp only [reduceCtorEq] at h) <;> decide
 
 /-- The pins only mention read-only cells: a file agreeing there keeps them. -/
 theorem ufCfg_of_ro (C : UCfg) (P : UPtd) (f f' : RegFile) (hc : UfCfg C P f)
@@ -665,7 +667,8 @@ reference map is the frozen configuration: User privilege, `misa`,
 theorem uf_drefU (C : UCfg) (P : UPtd) (f : RegFile) (hc : UfCfg C P f)
     (hpriv : f .cur_privilege = Privilege.User) : ∀ r v, drefU r = some v → f r = v := by
   intro r v h
-  cases r <;> simp only [drefU, reduceCtorEq, Option.some.injEq] at h <;> subst h <;>
+  unfold drefU at h
+  split at h <;> simp only [reduceCtorEq, Option.some.injEq] at h <;> subst h <;>
     first | exact hpriv | exact hc.hw _ _ rfl | exact hc.menvcfg
 
 theorem uf_uxcCfg (C : UCfg) (P : UPtd) (s : UWSt) (hc : UfCfg C P s.file)

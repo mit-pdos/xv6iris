@@ -795,111 +795,27 @@ def gprCells (cpu : CPU) : List (BitVec 64) → IProp GF
       Register.x31 ↦ᵣ[cpu] a31)
   | _ => iprop(False)
 
+/-- One cell of `gprCells_valid`: read its pin off the interpretation, then drop it. -/
+theorem gprCells_valid_step (cpu : CPU) (f : RegFile) (r : Register) (a : RegisterType r)
+    (Q : IProp GF) (φ : Prop) (h : f r = a → regInterp cpu f ∗ Q ⊢ ⌜φ⌝) :
+    regInterp cpu f ∗ (r ↦ᵣ[cpu] a ∗ Q) ⊢ ⌜φ⌝ :=
+  pure_elim (f r = a) (sep_assoc.2.trans (sep_elim_left.trans (reg_valid cpu f r (DFrac.own 1) a)))
+    (fun e => (sep_mono_right sep_elim_right).trans (h e))
+
 /-- The cells pin the file's GPRs: the event's `hartGprs` is the list. -/
 theorem gprCells_valid (cpu : CPU) (f : RegFile) (gs : List (BitVec 64)) :
     regInterp (GF := GF) cpu f ∗ gprCells cpu gs ⊢ ⌜hartGprs f = gs⌝ := by
+  -- by the list's shape (`split` would build the splitter of the 31-cell match);
+  -- the 31 shorter lists, then, rotated past the 31-cell goal, the longer ones
   unfold gprCells
-  split
-  · rename_i a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11 a12 a13 a14 a15 a16 a17 a18 a19 a20 a21 a22 a23 a24 a25 a26 a27 a28 a29 a30 a31
-    iintro ⟨Hregs, ⟨H1, H2, H3, H4, H5, H6, H7, H8, H9, H10, H11, H12, H13, H14, H15, H16, H17, H18, H19, H20, H21, H22, H23, H24, H25, H26, H27, H28, H29, H30, H31⟩⟩
-    ihave %h1 : ⌜f Register.x1 = a1⌝ $$ [Hregs H1]
-    · icases reg_valid cpu f Register.x1 (DFrac.own 1) a1 $$ [$Hregs $H1] with %_
-      itrivial
-    ihave %h2 : ⌜f Register.x2 = a2⌝ $$ [Hregs H2]
-    · icases reg_valid cpu f Register.x2 (DFrac.own 1) a2 $$ [$Hregs $H2] with %_
-      itrivial
-    ihave %h3 : ⌜f Register.x3 = a3⌝ $$ [Hregs H3]
-    · icases reg_valid cpu f Register.x3 (DFrac.own 1) a3 $$ [$Hregs $H3] with %_
-      itrivial
-    ihave %h4 : ⌜f Register.x4 = a4⌝ $$ [Hregs H4]
-    · icases reg_valid cpu f Register.x4 (DFrac.own 1) a4 $$ [$Hregs $H4] with %_
-      itrivial
-    ihave %h5 : ⌜f Register.x5 = a5⌝ $$ [Hregs H5]
-    · icases reg_valid cpu f Register.x5 (DFrac.own 1) a5 $$ [$Hregs $H5] with %_
-      itrivial
-    ihave %h6 : ⌜f Register.x6 = a6⌝ $$ [Hregs H6]
-    · icases reg_valid cpu f Register.x6 (DFrac.own 1) a6 $$ [$Hregs $H6] with %_
-      itrivial
-    ihave %h7 : ⌜f Register.x7 = a7⌝ $$ [Hregs H7]
-    · icases reg_valid cpu f Register.x7 (DFrac.own 1) a7 $$ [$Hregs $H7] with %_
-      itrivial
-    ihave %h8 : ⌜f Register.x8 = a8⌝ $$ [Hregs H8]
-    · icases reg_valid cpu f Register.x8 (DFrac.own 1) a8 $$ [$Hregs $H8] with %_
-      itrivial
-    ihave %h9 : ⌜f Register.x9 = a9⌝ $$ [Hregs H9]
-    · icases reg_valid cpu f Register.x9 (DFrac.own 1) a9 $$ [$Hregs $H9] with %_
-      itrivial
-    ihave %h10 : ⌜f Register.x10 = a10⌝ $$ [Hregs H10]
-    · icases reg_valid cpu f Register.x10 (DFrac.own 1) a10 $$ [$Hregs $H10] with %_
-      itrivial
-    ihave %h11 : ⌜f Register.x11 = a11⌝ $$ [Hregs H11]
-    · icases reg_valid cpu f Register.x11 (DFrac.own 1) a11 $$ [$Hregs $H11] with %_
-      itrivial
-    ihave %h12 : ⌜f Register.x12 = a12⌝ $$ [Hregs H12]
-    · icases reg_valid cpu f Register.x12 (DFrac.own 1) a12 $$ [$Hregs $H12] with %_
-      itrivial
-    ihave %h13 : ⌜f Register.x13 = a13⌝ $$ [Hregs H13]
-    · icases reg_valid cpu f Register.x13 (DFrac.own 1) a13 $$ [$Hregs $H13] with %_
-      itrivial
-    ihave %h14 : ⌜f Register.x14 = a14⌝ $$ [Hregs H14]
-    · icases reg_valid cpu f Register.x14 (DFrac.own 1) a14 $$ [$Hregs $H14] with %_
-      itrivial
-    ihave %h15 : ⌜f Register.x15 = a15⌝ $$ [Hregs H15]
-    · icases reg_valid cpu f Register.x15 (DFrac.own 1) a15 $$ [$Hregs $H15] with %_
-      itrivial
-    ihave %h16 : ⌜f Register.x16 = a16⌝ $$ [Hregs H16]
-    · icases reg_valid cpu f Register.x16 (DFrac.own 1) a16 $$ [$Hregs $H16] with %_
-      itrivial
-    ihave %h17 : ⌜f Register.x17 = a17⌝ $$ [Hregs H17]
-    · icases reg_valid cpu f Register.x17 (DFrac.own 1) a17 $$ [$Hregs $H17] with %_
-      itrivial
-    ihave %h18 : ⌜f Register.x18 = a18⌝ $$ [Hregs H18]
-    · icases reg_valid cpu f Register.x18 (DFrac.own 1) a18 $$ [$Hregs $H18] with %_
-      itrivial
-    ihave %h19 : ⌜f Register.x19 = a19⌝ $$ [Hregs H19]
-    · icases reg_valid cpu f Register.x19 (DFrac.own 1) a19 $$ [$Hregs $H19] with %_
-      itrivial
-    ihave %h20 : ⌜f Register.x20 = a20⌝ $$ [Hregs H20]
-    · icases reg_valid cpu f Register.x20 (DFrac.own 1) a20 $$ [$Hregs $H20] with %_
-      itrivial
-    ihave %h21 : ⌜f Register.x21 = a21⌝ $$ [Hregs H21]
-    · icases reg_valid cpu f Register.x21 (DFrac.own 1) a21 $$ [$Hregs $H21] with %_
-      itrivial
-    ihave %h22 : ⌜f Register.x22 = a22⌝ $$ [Hregs H22]
-    · icases reg_valid cpu f Register.x22 (DFrac.own 1) a22 $$ [$Hregs $H22] with %_
-      itrivial
-    ihave %h23 : ⌜f Register.x23 = a23⌝ $$ [Hregs H23]
-    · icases reg_valid cpu f Register.x23 (DFrac.own 1) a23 $$ [$Hregs $H23] with %_
-      itrivial
-    ihave %h24 : ⌜f Register.x24 = a24⌝ $$ [Hregs H24]
-    · icases reg_valid cpu f Register.x24 (DFrac.own 1) a24 $$ [$Hregs $H24] with %_
-      itrivial
-    ihave %h25 : ⌜f Register.x25 = a25⌝ $$ [Hregs H25]
-    · icases reg_valid cpu f Register.x25 (DFrac.own 1) a25 $$ [$Hregs $H25] with %_
-      itrivial
-    ihave %h26 : ⌜f Register.x26 = a26⌝ $$ [Hregs H26]
-    · icases reg_valid cpu f Register.x26 (DFrac.own 1) a26 $$ [$Hregs $H26] with %_
-      itrivial
-    ihave %h27 : ⌜f Register.x27 = a27⌝ $$ [Hregs H27]
-    · icases reg_valid cpu f Register.x27 (DFrac.own 1) a27 $$ [$Hregs $H27] with %_
-      itrivial
-    ihave %h28 : ⌜f Register.x28 = a28⌝ $$ [Hregs H28]
-    · icases reg_valid cpu f Register.x28 (DFrac.own 1) a28 $$ [$Hregs $H28] with %_
-      itrivial
-    ihave %h29 : ⌜f Register.x29 = a29⌝ $$ [Hregs H29]
-    · icases reg_valid cpu f Register.x29 (DFrac.own 1) a29 $$ [$Hregs $H29] with %_
-      itrivial
-    ihave %h30 : ⌜f Register.x30 = a30⌝ $$ [Hregs H30]
-    · icases reg_valid cpu f Register.x30 (DFrac.own 1) a30 $$ [$Hregs $H30] with %_
-      itrivial
-    ihave %h31 : ⌜f Register.x31 = a31⌝ $$ [Hregs H31]
-    · icases reg_valid cpu f Register.x31 (DFrac.own 1) a31 $$ [$Hregs $H31] with %_
-      itrivial
-    ipureintro
-    simp only [hartGprs, h1, h2, h3, h4, h5, h6, h7, h8, h9, h10, h11, h12, h13, h14, h15, h16, h17, h18, h19, h20, h21, h22, h23, h24, h25, h26, h27, h28, h29, h30, h31]
-  · iintro ⟨-, H⟩
-    iexfalso
-    iexact H
+  rcases gs with _ | ⟨a1, _ | ⟨a2, _ | ⟨a3, _ | ⟨a4, _ | ⟨a5, _ | ⟨a6, _ | ⟨a7, _ | ⟨a8, _ | ⟨a9, _ | ⟨a10, _ | ⟨a11, _ | ⟨a12, _ | ⟨a13, _ | ⟨a14, _ | ⟨a15, _ | ⟨a16, _ | ⟨a17, _ | ⟨a18, _ | ⟨a19, _ | ⟨a20, _ | ⟨a21, _ | ⟨a22, _ | ⟨a23, _ | ⟨a24, _ | ⟨a25, _ | ⟨a26, _ | ⟨a27, _ | ⟨a28, _ | ⟨a29, _ | ⟨a30, _ | ⟨a31, _ | ⟨_, _⟩⟩⟩⟩⟩⟩⟩⟩⟩⟩⟩⟩⟩⟩⟩⟩⟩⟩⟩⟩⟩⟩⟩⟩⟩⟩⟩⟩⟩⟩⟩⟩
+  iterate 31 exact sep_elim_right.trans false_elim
+  rotate_left
+  exact sep_elim_right.trans false_elim
+  dsimp only
+  iterate 30 refine gprCells_valid_step cpu f _ _ _ _ (fun _ => ?_)
+  refine pure_elim _ (reg_valid cpu f _ (DFrac.own 1) _) (fun _ => pure_intro ?_)
+  simp only [hartGprs, *]
 
 /-- **The exit's read frame**: the cells `uExit` reads at a trap delegated to
 Supervisor -- `satp`, `scause`, `sepc`, the GPRs. -/
