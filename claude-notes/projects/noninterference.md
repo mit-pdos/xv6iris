@@ -109,7 +109,7 @@ the class with its `round_det` discharge):
 | **M2-G3 sbrk** | `sysSbrkOk`'s −1 only when the pool is empty (growproc/uvmalloc functional in the allocator ledger), and the eager grow's page-table pages as events (`Alloc A vpn`-grained, §3 "concedes more") | `sbrk` |
 | **M2-G4 console write** | the kernel's short count stated at the key's permission view `π` (copyin at the key, not the table) and a write row in the trap contract | console `write` |
 
-- [ ] M2-G1 (DESIGNED 2026-10-03, "M2-G1 design" below; awaiting rulings G1-R1..R6)  - [ ] M2-G2 (DESIGNED 2026-10-03, "M2-G2 design" below; awaiting rulings G2-R1..R5)  - [ ] M2-G3  - [ ] M2-G4
+- [ ] M2-G1 (DESIGNED 2026-10-03, "M2-G1 design" below; awaiting rulings G1-R1..R6)  - [ ] M2-G2 (DESIGNED 2026-10-03, "M2-G2 design" below; awaiting rulings G2-R1..R5)  - [ ] M2-G3  - [ ] M2-G4  - [ ] M2-X (ι export; DESIGNED 2026-10-03, "M2-X design" below; awaiting rulings X-R1..R7)
 
 Risk register (honest): W1 changes the language and every lifting lemma -- mechanical but wide, and the device
 suite must not notice; W3 is the proof's content and may find a row that cannot be made functional in `(key,
@@ -1572,6 +1572,456 @@ in `ProofAllocproc` / `ProofFreeproc`, above `PidLock` (moving them was not sanc
 premise: a cell holding 0 is in no `pidCells`, so the tie re-closes without it. (3) `cycAt_succ` at `0 < pidmax`.
 
 What remains of G2: G2b with M2-X; G2c the joint lane.
+
+### M2-X design (2026-10-03)
+
+Design pass on `lane/m2x` (based on `lean` 44a07e970: G1a–d and G2a landed). No code landed. Rulings X-R1…R7
+at the end are needed before a lane starts.
+
+**Short version.**
+- **The carrier is W3's own `UIota`, one per round.** A round that reads a ledger (uptime, wait, fork) cites
+  ONE `(era, ι)`: the four ledgers' prefixes at the read, as persistent lower bounds, plus the actor. A ledger
+  the round does not read sits at `UIota.boot`'s `[]` / `0`, whose lower bounds are free. So it is one record per
+  round, not one per ledger. The per-ledger chain is built in the NI ledger, not in the carrier.
+- **The route is W2d's.** The arm keeps its receipts in a new persistent deposit, `syscEvOut`, next to the pure
+  rows. It travels: `syscallPost` → `usertrapPost` (`utEvOut`) → `urc_exit` → `urc_resume` → `USERRET` → the
+  permit's entry arm. That arm takes a new `MachFixedGS` client slot, `uEvid ox e` (persistent), and hands it to
+  the entry hook.
+- **The chain.** The hook keeps, per (era, ledger), the longest lower bound it has been cited. Two lower bounds
+  at one name are prefix-comparable (iris-lean `MonoList.lb_own_valid : γ ↪◯ML l1 -∗ γ ↪◯ML l2 -∗ ⌜l1 <+: l2 ∨
+  l2 <+: l1⌝`), so every citation of one era's ledger is a prefix of one history. `niHist F` is their join.
+- **The functional row at the cited ι.** The filing states `ukeyEq (usysDet n (uvisRun W) ι) W'`. `urc_exit`
+  proves it with `uexecRet_roundDet` at the receipt's ι. So `UsysDet` and `round_det` are reached by the NI root
+  and come off `dead_allow.txt`.
+- **The theorem.** `events` disappears: every class answer is DERIVED from `niHist F` at the round's cited
+  positions. `xv6NiTwoRun`'s hypothesis becomes: equal inputs (now including each round's cited positions and
+  actor) and EQUAL LEDGER HISTORIES. After M2-X no reading is declassified inside the class.
+- **What G1 §4's sketch missed (F1): the anchor.** A lower bound is evidence about THE ledger only if the hook
+  knows that the name is the era's ledger name. Those names are minted by each era's boot, after the power-on
+  hook has run. So M2-X also needs a per-era REGISTRATION:
+  - the power-on hook mints a one-shot ticket `uEraTok k`;
+  - the era's boot shoots it at the era's names;
+  - every citation carries the resulting persistent `uEraAnchor k ns`.
+
+  This takes two more client slots. It needs no new camera.
+
+**Findings.**
+- **F1 (the anchor is required for honesty, not for soundness).** Without the anchor, the hook could key the
+  chain only by NAME. A proof that allocated a fresh mono-list per round, and cited a lower bound of it, would
+  satisfy the chain while choosing each answer freely. That is G1 §4's rejected "answer in disguise", one level
+  down.
+  - The permit can validate `uRcpt` against `obsHistAuth` because the machine owns that name.
+  - The ledgers' names belong to the client, and each era has its own (`WaitInvTies.childrenRes_alloc` mints
+    the `WchG` instance with `wtkName`/`wplName`/`wzlName`; `FsCfgSnap` runs `kmemGhost_alloc` for
+    `fsReadyKmem.pend`).
+  - So the client must register them. Where the registration happens is fixed by who holds what. The power
+    hook holds `niR`'s authority but not the names. The boot holds the names but not the authority. Hence: the
+    hook mints a one-shot ticket at power-on, the boot shoots it once the names exist (`xv6Era_run`, which has
+    `bootSharedOut`'s `[WchG GF]` and `fsReadyKmem`), and the persistent anchor rides with `wireInv` into
+    `parkWorld`, so it reaches every syscall arm through `syscallEnv`.
+- **F2 (the evidence must carry the filing's witnesses).** `uFit` is a Prop over `(ox, e)`, and its `∃ sc W W'`
+  is separate from any existential the evidence carries. `exitFits` pins only the trap frame, so two witnesses
+  could disagree on `W.secc`, `W.lazy` or `W.M`. So the evidence's pure part SUBSUMES `niFit`'s round arm
+  (`niFitEv`, §2), and the NI hook files from the evidence's witnesses.
+  - `uFit` and `NiFitIs.fit` stay: they keep the system record's blind Prop and W2c's TCB arrangement.
+  - For the NI record they become redundant (X-R5).
+- **F3 (the histories are ghost: §6's caveat, honestly).** The cited histories cannot enter `h`. Kernel-internal
+  writes have no machine event (G1 §4, O5), so they export only through the filing `F`, which is already
+  existential (O6).
+  - **Making `H := niHist F` canonical** (the join of `F`'s citations) keeps ONE existential per run. A free
+    `∃ H` next to `∃ F` would add a second witness and buy nothing.
+  - **What M2-X exports:**
+    - (i) every class answer FACTORS through `usysDet` at a prefix of ONE history per (era, ledger). This is
+      consistent across all incarnations' rounds of the run: a cross-round constraint that `events` cannot
+      state (two forks' pids are `pidPick` of comparable prefixes; a wait's `zLowest` is consistent with every
+      other citation of the family ledger);
+    - (ii) the two-run hypothesis names ι (§2).
+  - **What it does not do:** make ι observable. That stays the limit of the unary export (§6).
+- **F4 (positions are the schedule).** A citation splits into POSITIONS (the era; the cited lengths of the pid,
+  family and allocator prefixes; the tick count; the actor) and the HISTORY `H`.
+  - For the pid and family ledgers, `H` carries the other actors' events and the positions carry the order of
+    rounds. Both are §0's ι ("the order of rounds").
+  - For ticks every event is the same (a `MonoNat`). `H.ticks` carries nothing, and uptime's answer IS its
+    position, the count at the read. So "uptime declassifies its place in the tick order": §5's "the schedule",
+    O5 restated.
+  - So the two-run INPUTS gain, per round, the cited positions. The HISTORIES are the separate hypothesis.
+- **F5 (wait's kill alternative).** `waitAnsLed`'s −1 reason may be `killShot gn`, which is refuted only at
+  usertrap's +0xa6 check (G1c F3). So `syscEvOut` at wait's −1 is `cite ∨ killShot gn`, and
+  `UsertrapTailA6` discharges the second disjunct (`ut_kill_lend_shot` / `KillRow.killPaid_shot_nz`, the same
+  refutation the resume already uses) before `utEvOut` is formed.
+  - A non-killed −1 at `a0 = 0` (the class) has the no-children lower bound from `waitWhyLed`
+    (`∃ h, zombLedLb h ∗ ⌜¬ zHasKids h act⌝`). Its reading is `zLowest h act = none`, which is
+    `usysDetWait`'s −1 arm.
+  - The copyout reason (`nullst = false`) is excluded by the class.
+- **F6 (era equality is not exportable, and is not needed).** The hook registers era `k = obsBoots (h ++
+  [powerEv true])`, the count W4 uses for incarnations.
+  - A round cites its kernel's era. The hook can check only `k ≤ obsBoots (h.take j)`: the anchor was
+    registered before the enter.
+  - Equality holds in every run, because nothing carries an anchor across a power cycle. But no hook sees
+    `genId`, so equality cannot be exported.
+  - The chain is keyed by the CITED era, which is an input, so nothing depends on equality.
+
+**1. The evidence per round.**
+
+| Ledger | Receipt at the arm | Contract that returns it | Dropped today at | What it pins | Cited component of ι |
+|---|---|---|---|---|---|
+| ticks | `tickLb n` (`MonoNat` at `wtkName`) | `SYSUPTIME.wp_sys_uptime_led` (`tickLb n ∗ ⌜t = ofNat 32 n⌝`) | `syscall_arm_uptime` (only the SHAPE reaches `SyscRows.uptime`) | the count at the read | `ι.ticks := n`; the answer is `usysUptimeWord n` |
+| family, at wait | reap: `zombReceipt h (.ZReap act j rv)` with `⌜zLowest h act = some (j, rv, xs, γ')⌝`; −1: `zombLedLb h ∗ ⌜¬ zHasKids h act⌝` (or `killShot`, F5) | `KWAIT.wp_kwait_led_eb` through `SYSWAIT` (`waitAnsLed`, G1c/d) | `syscall_arm_wait` (`waitAnsLed_row` keeps the pure image) | wait's answer = `UIota.reap`, and the children column | `ι.zev := h` (the prefix BEFORE the reap), `ι.act := procAddr j` |
+| family, at fork | `zombReceipt hz (.ZFork act i rv γc)` | `kf_wait_fork` (G1b); exported by G2b's `KFORK.wp_kfork_led_eb` | `kfork_proof` | the child's slot, pid and generation `γc` (G2 F5) | `ι.zev := hz ++ [.ZFork act i rv γc]` (`γc` for the joint lane) |
+| pid | `pidAllocRcpt act rv = ∃ h, pidReceipt h (.PAlloc act rv) ∗ ⌜rv.toNat = pidPick PIDMAX h⌝` | `AL.wp_allocproc_led` (G2a) → G2b's led kfork / sys_fork | `kfork_proof` (calls the unled allocproc) | fork's pid on success | `ι.pev := h` (the prefix BEFORE the `PAlloc`) |
+| allocator | `ledReceipt γk h e` | the led `kalloc`/`kfree` (L3b) | every caller since L3b | one `Kev`'s position | NONE in M2-X (X-R4); `ι.kev := []` |
+
+**The pure fact the filing needs** is one row per citing number, stated at the arm's records. It is written
+next to `SyscallDefs.syscWaitRow`, as follows:
+
+    -- Xv6/SyscallDefs.lean
+    def syscEvRow (V V' : ProcPriv) (img img' : ElfMem) (cs cs' : ExtTreeSet GName compare) (ι : UIota) : Prop :=
+      (syscNum V = USYS_uptime → syscA0 V' = usysUptimeWord ι.ticks) ∧
+      (syscNum V = USYS_wait → tfW V.tf (tfArgIdx 0) = 0#64 →
+        match zLowest ι.zev ι.act with
+        | some (_, pid, xs, γ) => syscA0 V' = BitVec.signExtend 64 pid ∧ cs' = cs \ {γ} ∧
+                                  img' = usysWr img 0#64 (usysWaitBytes 0#64 xs)
+        | none => syscA0 V' = -1#64 ∧ cs' = cs ∧ img' = img) ∧
+      (syscNum V = USYS_fork → syscA0 V' ≠ -1#64 →
+        syscA0 V' = BitVec.signExtend 64 (BitVec.ofNat 32 (pidPick PIDMAX ι.pev)) ∧
+        ∃ hz i γ, ι.zev = hz ++ [.ZFork ι.act i (BitVec.ofNat 32 (pidPick PIDMAX ι.pev)) γ] ∧ cs' = cs ∪ {γ})
+
+**The carrier** goes in a new file, `Xv6/NiEvid.lean`, after `UsysDet`. It is Iris-level, over `[MachGS]` and
+`[WchG]`:
+
+    /-- the era's ledger names, in a fixed order: ticks, pid, family, allocator -/
+    def niNamesHere [WchG GF] : List GName :=
+      [WchG.wtkName GF, WchG.wplName GF, WchG.wzlName GF, fsReadyKmem.pend]
+    /-- THE PER-ROUND EVIDENCE: a lower bound of every ledger at ι (uncited ones at `[]`/`0`: free) -/
+    def niIotaLbs (ns : List GName) (ι : UIota) : IProp GF :=
+      MonoNat.lb_own (ns.getD 0 0) (.ofNat ι.ticks) ∗ (ns.getD 1 0) ↪◯ML ι.pev ∗
+      (ns.getD 2 0) ↪◯ML ι.zev ∗ (ns.getD 3 0) ↪◯ML ι.kev                       -- persistent, timeless
+    def niBelow (ι H : UIota) : Prop :=
+      ι.pev <+: H.pev ∧ ι.zev <+: H.zev ∧ ι.kev <+: H.kev ∧ ι.ticks ≤ H.ticks
+    def niJoin (H ι : UIota) : UIota      -- the longer list per ledger, the larger count (act: H's)
+    theorem niIotaLbs_boot : ⊢ |==> niIotaLbs ns UIota.boot             -- MonoList.lb_own_nil, MonoNat.lb_own_0
+    theorem niIotaLbs_compat : niIotaLbs ns ι₁ -∗ niIotaLbs ns ι₂ -∗
+        ⌜(ι₁.pev <+: ι₂.pev ∨ ι₂.pev <+: ι₁.pev) ∧ (… zev …) ∧ (… kev …)⌝   -- MonoList.lb_own_valid, three times
+    theorem niIotaLbs_join : niIotaLbs ns H -∗ niIotaLbs ns ι -∗ niIotaLbs ns (niJoin H ι) ∗ ⌜niBelow ι (niJoin H ι)⌝
+
+**One record per round, not one per ledger.** The reasons:
+- the filing is per round;
+- a fork round cites two ledgers at once (`pev` and `zev`);
+- each citation needs one anchor;
+- `UIota` is already M0's argument, so the row reads `usysDet` at it with no conversion.
+
+**2. The route, step by step, with the statements that move.**
+
+**(a) The arms keep their receipts.**
+- uptime: already led. `syscall_arm_uptime` keeps `tickLb nt` (it is destructured as `-` today) and cites
+  `{UIota.boot with ticks := nt, act := procAddr j}`.
+- wait: already led (G1d). A new `UserChildren.waitAnsLed_cite` extracts the persistent part of each arm, the
+  receipt (lowered to `zombLedLb h` by `MonoList.lb_own_le`) with its `zLowest` fact, or the no-children lower
+  bound, or `killShot` (F5). `syscall_arm_wait` cites `{boot with zev := h, act := procAddr j}`.
+- fork: G2b's led twins land INSIDE M2-X (G2-R3), as the G2 design §3 describes. They are `kforkRetLed`
+  (success arm `+ pidAllocRcpt (procAddr j) rv ∗ ∃ hz i, zombReceipt hz (.ZFork (procAddr j) i rv γc)` at the
+  same `γc`), `kforkPostLed`, `KFORK.wp_kfork_led_eb` (with the landed `wp_kfork_eb` as its corollary),
+  `SYSFORK.wp_sys_fork_led_eb`, and `kfork_proof` on `AL.wp_allocproc_led` with both receipts kept in the
+  intuitionistic context to `kf_epilogue'`. `syscall_arm_fork` then switches to `SF.wp_sys_fork_led_eb` and cites
+  `{boot with pev := h, zev := hz ++ [ZFork …], act := procAddr j}` on success, and `UIota.boot` on −1.
+- sbrk and the other kalloc-touching arms: NOTHING in M2-X (X-R4). Carrying `ledLb` from the posts that drop it
+  would add dead evidence that no row reads. Also, sbrk's outcome reads SEVERAL interleaved `Kev` positions,
+  not one snapshot (W3), so the shape of its citation is G3's decision. M2-X registers the allocator's name
+  now (`niNamesHere`'s fourth entry), because the registration is the expensive statement and should move only
+  once.
+
+**(b) The deposit, beside the pure rows.** `SyscRows` stays pure and byte-identical. In `SpecSyscall`:
+
+    def syscEvOut (V : ProcPriv) (M : Nat → List (BitVec 8)) (V' : ProcPriv) (M' : Nat → List (BitVec 8))
+        (cs cs' : ExtTreeSet GName compare) (gn : GName) : IProp GF :=
+      ⌜syscNum V ≠ USYS_uptime ∧ syscNum V ≠ USYS_wait ∧ syscNum V ≠ USYS_fork⌝ ∨
+      (∃ (k : Nat) (ι : UIota), MachFixedGS.uEraAnchor k niNamesHere ∗ niIotaLbs niNamesHere ι ∗
+         ⌜syscEvRow V V' (syscImg V M) (syscImg V' M') cs cs' ι⌝) ∨
+      (⌜syscNum V = USYS_wait ∧ syscA0 V' = -1#64⌝ ∗ killShot gn)                   -- F5; persistent
+
+- `syscallPost` gains `syscEvOut V M V' M' cs cs' gn -∗` as its LAST premise, after `syscWaitOut`. This moves
+  `SYSCALL`'s text.
+- Every non-citing arm discharges the deposit by the left disjunct. A builder `syscEvOut_quiet (h14 : n ≠ 14)
+  (h3 : n ≠ 3) (h1 : n ≠ 1)` takes defaulted hypotheses, as G1d's `h3` on `syscRows_keep`/`_upt`/`_gen` did.
+- The anchor comes from `syscallEnv` → `parkWorld`, whose DEFINITION gains `∃ k,
+  MachFixedGS.uEraAnchor k niNamesHere` next to `wireInv`. The texts that name `parkWorld` are byte-identical.
+- Producers of the anchor (the route `wireInv` already takes):
+  - `SystemBootEra.xv6Era_run` takes `MachFixedGS.uEraTok k` next to `uClaimO` (from `powerBootRes_unpack`
+    through `xv6BootEra`) and shoots it with `NiFitIs.reg` at `niNamesHere`;
+  - the persistent anchor then rides `bootPrimarySupply(_intro)` → `MAIN`'s pre (next to `wireInv`) →
+    `ProofMain`'s phases → `SpecUserinit.userinitPark` (definition) → `ProofUserinit`'s `parkWorld` build;
+  - kfork copies `parkWorld` to the child, so there is no new obligation there.
+
+**(c) Through usertrap.** In `SpecUsertrap`:
+
+    def utEvOut (sc sep : BitVec 64) (V : ProcPriv) (M : Nat → List (BitVec 8)) (V' : ProcPriv)
+        (M' : Nat → List (BitVec 8)) (cs cs' : ExtTreeSet GName compare) : IProp GF :=
+      iprop(⌜sc = uecallScause⌝ -∗ <syscEvOut's first two disjuncts at (utSysRec sep V)>)   -- the kill one gone
+
+- `usertrapPost` gains `utEvOut sc sep V M V' M' cs cs' -∗` as its LAST premise, after `utSysOut`. This moves
+  `USERTRAP`'s text.
+- Producers:
+  - the syscall path (`UsertrapSys`, `UsertrapSysTail`, `UsertrapSysRows` for the re-keying next to
+    `ut_rows_of_sysc`);
+  - `UsertrapTailA6`, which refutes the kill disjunct (F5);
+  - the non-ecall arms (`UsertrapParts`: vacuous, `utEvOut_nonecall`).
+- `SpecUservec` does not move. The evidence is produced after uservec, and W2d's exit-token route is
+  unaffected.
+
+**(d) At the filing (`urc_exit` → `urc_resume` → `USERRET` → the permit).**
+
+The machine (`MachCSL/Resources.lean`): `MachFixedGS` gains three client slots, carried and never read, like
+`uClaimO`:
+
+    uEvid : Option (Nat × Obs) → Obs → IProp GF          -- what an entry's hook is shown (persistent field)
+    uEvid_persistent : ∀ ox e, Persistent (uEvid ox e)
+    uEraTok : Nat → IProp GF                              -- era k's one-shot registration ticket, minted at power-on
+    uEraAnchor : Nat → List GName → IProp GF              -- era k's names, registered (persistent field)
+    uEraAnchor_persistent : ∀ k ns, Persistent (uEraAnchor k ns)
+    def hartObsPermit : IProp GF := iprop%
+      □ ((∀ e, ⌜isUExit e = true⌝ -∗ hartObsStep e (uExitTok e)) ∧
+         (∀ e ox, ⌜isUEnter e = true ∧ MachFixedGS.uFit ox e⌝ -∗
+            uRcptOpt ox -∗ uClaimFor ox -∗ MachFixedGS.uEvid ox e -∗ hartObsStep e emp))
+
+- `hartObsPermit_of_hook`'s `HuserEnter` is handed `uClaimFor ox ∗ uEvid ox e ∗ …`.
+- `powerYield` and `powerBootRes` carry `… ∗ uClaimO ∗ uEraTok k` (with `k = obsBoots (h ++ [powerEv true])`).
+- `wp_power`, `riscvPowerAdequacy` (`Ue Uet Uea : CT → …`), `bootFixedGS`, `AppIface.bootFixedGS`, and the
+  blind wrappers (`uenterHook_drop` drops `uEvid`; `powerHook_emp`) all move with them.
+- **Choice of mechanism (the brief's alternative).** The fourth slot is chosen over generalising `uClaimR`.
+  `uClaimR i` is minted at the EXIT, before the round runs, so it cannot carry evidence the round produces.
+  Generalising `uFit` to an `IProp` would undo W2c's arrangement that keeps `NiLedger` out of the system
+  theorem's TCB.
+
+The kernel's law (`NiLedger.NiFitIs`) gains three fields:
+
+    reg      : ∀ k ns, MachFixedGS.uEraTok k ⊢ |==> MachFixedGS.uEraAnchor k ns
+    evid     : ∀ i x e c, niFitEv (some (i, x)) e c →
+                 (match c with | none => emp | some (k, ι) => ∃ ns, MachFixedGS.uEraAnchor k ns ∗ niIotaLbs ns ι)
+                 ⊢ MachFixedGS.uEvid (some (i, x)) e
+    evidNone : ∀ e, niFit none e → ⊢ MachFixedGS.uEvid none e
+
+The pure fit (`NiLedger`) is a single existential (F2), and a citation is required exactly at the citing
+numbers:
+
+    def niCiting (sc : BitVec 64) (W : Uvis) : Prop :=
+      sc = uecallScause ∧ (uvisNum (uvisRun W) = USYS_uptime ∨ uvisNum (uvisRun W) = USYS_wait ∨
+                           uvisNum (uvisRun W) = USYS_fork)
+    def niDetRow (sc : BitVec 64) (W W' : Uvis) : Option (Nat × UIota) → Prop
+      | some (_, ι) => sc = uecallScause →
+          usysDetClassAt (uvisNum (uvisRun W)) (tfW (uvisRun W).tf (tfArgIdx 0)) →
+          ukeyEq (usysDet (uvisNum (uvisRun W)) (uvisRun W) ι) W'                        -- M0's row, AT THE CITED ι
+      | none => True
+    def niForkRow (sc : BitVec 64) (W W' : Uvis) : Option (Nat × UIota) → Prop
+      | some (_, ι) => sc = uecallScause → uvisNum (uvisRun W) = USYS_fork →
+          tfW W'.tf (tfArgIdx 0) ≠ -1#64 →
+          tfW W'.tf (tfArgIdx 0) = BitVec.signExtend 64 (BitVec.ofNat 32 (pidPick PIDMAX ι.pev))
+      | none => True
+    def niFitEv : Option (Nat × Obs) → Obs → Option (Nat × UIota) → Prop
+      | none, e, c => c = none ∧ ∃ W0, enterFits e W0
+      | some (_, x), e, c => ∃ (sc : BitVec 64) (W W' : Uvis),
+          exitFits x sc W ∧ enterFits e W' ∧ roundOkKeys sc W W' ∧ W'.pid = W.pid ∧
+          niPidRow sc W W' ∧ niWaitRow sc W W' ∧ (niCiting sc W ↔ c.isSome) ∧
+          niDetRow sc W W' c ∧ niForkRow sc W W' c
+
+- `urc_exit` (`UserretClosedRound`) receives `utEvOut` among `Hxo Hfo Hwo Hko Hso`, re-keys it to `(W, W')`
+  (a new `urc_evRow`, next to `urc_skey`/`urc_num`), and proves `niDetRow` with
+  **`uexecRet_roundDet sc W W' ι hlw hgn hpidk hch hfdrow hpidrow hr rfl hcls hfit`**:
+  - `hr` is `urc_roundOkKeys`;
+  - `hch`, `hfdrow`, `hpidrow` come from usertrap's rows (`utChKept`, `utFdEcall`, `utRetPid`);
+  - `hfit` comes from a new pure `UsysDet.usysIotaFits_of_ev` (the key-level `syscEvRow` IS the fit:
+    uptime's count, and wait's reap with its children column).
+- It proves `niForkRow` from the row. It builds `uEvid (some (i, x)) e` by `NiFitIs.evid` from the anchor and
+  the lower bounds. A non-citing round uses `c := none`.
+- `urc_resume` takes `MachFixedGS.uEvid ox e` (persistent) and passes it on. The origin filing
+  (`userretClosed_proof`) uses `NiFitIs.evidNone`.
+- `SpecUserret.wp_userret_body` gains `MachFixedGS.uEvid ox (.uEnter cpu (satpOf .kpt P.root) sep (tfGprs ws))`
+  next to `uClaimFor ox`. This moves `USERRET`'s text. `ProofUserret` / `UserretPt.userret_exit`/`_usret` thread
+  it to the permit.
+
+**(e) The NI ledger keeps the chain (`NiLedger` §6, new).**
+
+    def niEraKey (γe : GName) (k : Nat) (γs : GName) : IProp GF := γe ↪◯MAP□[Nat.pair k γs] ()   -- gmUnitG, discarded
+    def niEraTok (γe : GName) (k : Nat) : IProp GF :=                                            -- the NI record's uEraTok
+      ∃ γs, niEraKey γe k γs ∗ ghost_var γs 1 (none : Option Nat)
+    def niEraAnchor (γe : GName) (k : Nat) (ns : List GName) : IProp GF :=                      -- uEraAnchor
+      ∃ γs, niEraKey γe k γs ∗ ghost_var γs □ (some (niNamesCode ns))
+    def niEvid (γe : GName) : Option (Nat × Obs) → Obs → IProp GF                               -- uEvid
+      | none, e => ⌜niFit none e⌝
+      | some ix, e => ∃ c, ⌜niFitEv (some ix) e c⌝ ∗
+          match c with | none => emp | some (k, ι) => ∃ ns, niEraAnchor γe k ns ∗ niIotaLbs ns ι
+    def niChain (F : List NiEntry) (H : Nat → UIota) : Prop :=
+      ∀ f ∈ F, ∀ k ι, f.cite = some (k, ι) → niBelow ι (H k)
+    def niHist (F : List NiEntry) (k : Nat) : UIota      -- the join of F's citations of era k, from UIota.boot
+    def niChainSt (γe : GName) (h : List Obs) (F : List NiEntry) : IProp GF :=
+      ∃ (T : Nat → Option GName) (Hc : Nat → UIota),
+        <γe's auth, keys exactly {Nat.pair k γs | T k = some γs}> ∗ ⌜∀ k γs, T k = some γs → k ≤ obsBoots h⌝ ∗
+        <∀ k γs, T k = some γs → ⌜Hc k = UIota.boot⌝ ∨ ∃ ns, ghost_var γs □ (some (niNamesCode ns)) ∗
+                                                         niIotaLbs ns (Hc k)> ∗
+        ⌜niChain F Hc⌝
+    def niR (γ γe : GName) (h : List Obs) : IProp GF := ∃ F, ⌜niOk h F⌝ ∗ niClaims γ h F ∗ niChainSt γe h F
+
+- `NiEntry.round` gains a LAST field `cite : Option (Nat × UIota)`.
+- `niEntryOk`'s round clause gains `(niCiting sc W ↔ cite.isSome) ∧ niDetRow sc W W' cite ∧ niForkRow sc W W'
+  cite ∧ (∀ k ι, cite = some (k, ι) → k ≤ obsBoots (h.take j))` (F6). The CITED PREFIXES are recorded whole;
+  their lengths are `UIota.pos`.
+- Steps:
+  - `niR_powerOn` also allocates `γs` (a `ghost_var` at `none`) and the key `Nat.pair k γs`, and returns
+    `niEraTok γe k` next to `initClaim`.
+  - `niR_enter` takes `niEvid γe ox e` next to `niSpend`. At a citation, the key against the authority gives
+    `γs = T k`. The discarded ghost variables agree, so the names agree. `niIotaLbs_compat` against `Hc k`'s
+    lower bounds, then `niIotaLbs_join`, gives `Hc k := niJoin (Hc k) ι`. Old citations stay below by prefix
+    transitivity, and the new one is below by `_join`.
+  - `niR_pure : niR γ γe h ⊢ ⌜∃ F, niOk h F ∧ niOneShot h F ∧ niChain F (niHist F)⌝`, through
+    `niHist_below : niChain F Hc → niChain F (niHist F)` (the join of prefixes of one list is the longest, a
+    prefix of it).
+- The NI record's `NiFitIs`: `reg` is `niEraTok_shoot` (`ghost_var_update` then `ghost_var_persist`), `evid` is
+  by definition, and `evidNone` is `⌜_⌝`.
+- **No new camera.** The shot reuses `DiskInvDefs.gvStageG : GhostVarG GF (Option Nat)` at fresh names, with
+  `niNamesCode : List GName → Nat` an injective encoding. The era keys reuse `Xv6G.gmUnitG` at a second NI name
+  `γe`, born in `niBirth` next to `γ`. If X1 finds the `Option Nat` slot unfit, a `GhostVarG GF (Option (List
+  GName))` slot costs G1b's full rebuild.
+
+**3. What the theorem becomes.**
+
+`NiTrace`:
+
+    inductive NiStep | origin (W0 : Uvis) (e : Obs) | round (secc : BitVec 64) (x e : Obs) (c : Option (Nat × UIota))
+    structure NiPos where era : Nat; kev pev zev ticks : Nat; act : BitVec 64     -- a citation's POSITIONS
+    def UIota.pos (k : Nat) (ι : UIota) : NiPos := ⟨k, ι.kev.length, ι.pev.length, ι.zev.length, ι.ticks, ι.act⟩
+    def NiStep.input : NiStep → Uvis ⊕ (BitVec 64 × Option (…exitView…) × Option NiPos)  -- + the cited positions
+    def usysWaitAns (ι : UIota) : BitVec 64 := match ι.reap with | some (_, pid, _, _) => BitVec.signExtend 64 pid
+                                                                | none => -1#64
+    def niRoundLaw (secc) (pid) (x e) (c : Option (Nat × UIota)) : Prop :=   -- W4's, with three clauses re-cut:
+      … (gprsNum secc xg = USYS_uptime → ∃ k ι, c = some (k, ι) ∧ gprsA0 eg = usysUptimeWord ι.ticks)
+        (gprsNum secc xg = USYS_wait → gprsA0 xg = 0#64 → ∃ k ι, c = some (k, ι) ∧ gprsA0 eg = usysWaitAns ι)
+        (sc = uecallScause → gprsNum secc xg = USYS_fork → gprsA0 eg ≠ -1#64 →
+           ∃ k ι, c = some (k, ι) ∧ gprsA0 eg = BitVec.signExtend 64 (BitVec.ofNat 32 (pidPick PIDMAX ι.pev)))
+    def niTraceChain (H : Nat → UIota) (tr : List NiStep) : Prop :=
+      ∀ secc x e k ι, NiStep.round secc x e (some (k, ι)) ∈ tr → niBelow ι (H k)
+    theorem niBelow_pos : niBelow ι₁ H → niBelow ι₂ H → ι₁.pos k = ι₂.pos k → ι₁ = ι₂ -- equal-length prefixes of one list
+
+- `niOk_classLaw`'s uptime and wait clauses are derived FROM `niDetRow` (`usysDet_quiet`,
+  `usysDetRet_uptime`, `usysDet_wait` read the resumed `a0` off `usysDet`), no longer from `usysMemOk`'s shape.
+  That is what puts `usysDet` on the root's path.
+- `usysUptimeRet`/`usysWaitRet` stay as `usysMemOk`'s shapes, and are no longer the law.
+- `NiStep.reads`, `NiStep.reading`, `traceEvents` and **`events` are deleted** (X-R3).
+- `NiInClass` is unchanged: wait at `a0 = 0`; fork stays OUT (X-R6).
+- The theorem, in the brief's shape at `H := niHist F` (X-R2):
+
+      def xv6NiPhi (_ : GState) (h : List Obs) : Prop :=
+        ∃ F, niOk h F ∧ niOneShot h F ∧ niChain F (niHist F) ∧ ∀ q, NiClassLaw q (utrace q h F)
+      theorem niTwoRun {h₁ h₂ F₁ F₂} (hF₁ : niOk h₁ F₁) (hC₁ : niChain F₁ (niHist F₁))
+          (hF₂ : niOk h₂ F₂) (hC₂ : niChain F₂ (niHist F₂)) (q : NiInc) (hcls : NiInClass (utrace q h₁ F₁))
+          (hin : (utrace q h₁ F₁).map NiStep.input = (utrace q h₂ F₂).map NiStep.input) -- keys, masks, exits, POSITIONS
+          (hH : niHist F₁ = niHist F₂) :                                                 -- EQUAL LEDGER HISTORIES
+          (utrace q h₁ F₁).map NiStep.output = (utrace q h₂ F₂).map NiStep.output
+
+  - The proof: from equal positions and equal histories, `niBelow_pos` gives equal ι per step. The law then
+    gives equal `a0`, and the rest is W4's.
+  - `xv6NiTwoRun` (`LinkNiAdequacy`): `events … = events …` is replaced by `niChain`s in the `∃` and `niHist F₁
+    = niHist F₂` as the hypothesis.
+  - `xv6NiAdequacy` and `xv6NiStrongInstance` are byte-identical; their meaning grows.
+  - A per-era `hH` (only the eras `q` cites) is a one-line generalisation, and X4 may state that instead.
+- **What is still declassified after M2-X.** Nothing inside the class is read. What `q`'s two-run hypothesis
+  concedes:
+  - the SCHEDULE: per round, the cited era, ledger lengths and tick count (F4), plus the actor, the caller's
+    own slot, which G1 F1 already conceded;
+  - the HISTORIES: the other actors' pid events (`PAlloc`/`PFree`, with actors) and family events (`ZFork` with
+    placement and generation, `ZExit` with status and reparent target, `ZReap` with slot). Ticks carry
+    nothing.
+
+  OUTSIDE the class, unchanged and not covered:
+  - fork: its pid is DERIVED on success (the law's conjunct), but the success bit is unexplained until the
+    joint lane G1f+G2+G3;
+  - sbrk and the allocator: G3;
+  - console write: G4;
+  - wait at a non-null pointer: G1d deviation 1;
+  - every other ecall.
+- **The honesty scopes** (`NiTrace`'s header):
+  - (1) the class: unchanged;
+  - (2) origins: unchanged;
+  - (3) the mask, AND the actor, are carried per filing;
+  - (4) uptime: its answer is its position in the era's tick count (the schedule, F4), DERIVED, no longer a
+    reading;
+  - (5) `F` is existential and now carries the histories; `H = niHist F` is not observable (F3);
+  - (6) wait: derived from the family history at the cited position and actor. What it concedes moves from a
+    reading into `H` and the positions;
+  - (7) NEW: the cited era is an input, and its equality with the incarnation's era is not exported (F6).
+- **`round_det` is reached; that is the requirement.** After M2-X:
+  - `module Xv6.UsysDet` and `decl Xv6.uexecRet_roundDet` come OFF `dead_allow.txt`;
+  - `uexecRet_roundDet_exists` (F6 of G1: ι supplied from the answer) is DELETED, superseded by the cited ι;
+  - every `UsysDet` declaration still unreached is deleted, or re-added by its own lane (`UIota.poolEmpty` /
+    `nextPid` / `zombies` / `status`, for G3/G2c);
+  - `uexecRetContF_det`, and the `usysIotaFits_exists` it uses, stay allowlisted. They are the user tier's M0
+    engine reading, reached only when a program proof takes the det arm. The comment is updated;
+  - X4 runs the dead report and drops each row that is now reached (`zLowest_nil`, `usysWaitBytes_null` /
+    `_length`, `usysWr_nil`).
+- **TCB.** The NI roots' statements now name `UIota` (in `NiStep`/`niEntryOk`), `zLowest` and `pidPick`. So
+  `KallocEv`, `PidEv` and `ZombEv` (all pure) enter the three NI roots' TCB, and `tools/tcb/expected.json` moves
+  for them. The system roots are unchanged, because their record is blind.
+
+**4. The per-era subtlety.**
+- Each ledger is reborn at power-on, at fresh names:
+  - `childrenBootRows` in `childrenRes_alloc`: the tick `MonoNat` at 0, and the pid and family mono-lists at
+    `[]`;
+  - `kmemGhost_alloc` (`FsCfgSnap`): the allocator's.
+- So the chain is per (era, ledger). The era is the one REGISTERED at the power-on that minted its ticket,
+  `k = obsBoots (h ++ [powerEv true])`, the same count W4 keys incarnations by (`obsBoots (h.take j)`). F6
+  covers the equality.
+- `niHist F k` is era `k`'s history: frozen once the era dies, and empty for an era whose kernel never cited.
+- A ticket minted at a power-on whose era never reaches `xv6Era_run` is never shot. Its key stays in the
+  authority with `Hc k = UIota.boot`, which is harmless.
+
+**5. Lanes** (on `lane/m2x`, one `lake` at a time; per-lane gate `lake build Xv6 MachCSL` + `tools/ci/lint.sh` +
+no `sorry`; baselines in the same commit when they move).
+
+| Lane | Content | Files | Statements that move | Gate |
+|---|---|---|---|---|
+| **X1 the slots and the permit** | §2(d)'s machine part: `MachFixedGS.uEvid`/`uEraTok`/`uEraAnchor` (+ persistence fields), the entry arm, `HuserEnter`, the power yield; Xv6 kept green and blind: `xv6FixedGSU` (+`Ue Uet Uea`), `xv6FixedGS` at `emp`/`emp`/`True`, `xv6BootEra`/`xv6PowerAdequacyGenU` (+ hypotheses), `NiFitIs` + `reg`/`evid`/`evidNone` with `niFitEv` at its INTERIM shape (`niFit ∧ c = none`; marked `M2-X1 interim: X2 removes this`), `USERRET` + `uEvid`, `urc_resume`/`urc_exit`/origin pass `c := none` | `MachCSL/Resources`, `Power`, `WireInv`, `Adequacy`, `AppIface`; `SystemBootEra`, `SystemAdequacy`, `NiLedger`, `SpecUserret`, `ProofUserret`, `UserretPt`, `UserretClosed*`, `ProofUserretClosed`, `NiAdequacy` (blind instance) | `MachFixedGS`, `hartObsPermit`, `hartObsPermit_of_hook`, `powerYield`/`powerBootRes`, `wp_power`, `riscvPowerAdequacy`, `bootFixedGS`; `USERRET`; `NiFitIs`. `xv6PowerAdequacyGen`'s statement byte-identical | full `run_all.sh` (device suite, `check-gen`), `tcb.sh`, `audit.sh` |
+| **X2 the kernel route** (with G2b) | §1's row and carrier, §2(a)–(c): `NiEvid.lean`; `syscEvRow`; `syscEvOut` + `syscallPost`; the three citing arms keep their receipts (`waitAnsLed_cite`); G2b's led kfork/sys_fork and `syscall_arm_fork` on it; `syscEvOut_quiet` at every other arm; `utEvOut` + `usertrapPost`; the A6 refutation; the anchor's route (`xv6Era_run` shoots; `bootPrimarySupply`, `MAIN`, `userinitPark`, `parkWorld`); `urc_exit` proves `niDetRow` by `uexecRet_roundDet` (+ `usysIotaFits_of_ev`) and `niForkRow`, builds `uEvid`; `niFitEv` at its full shape (the interim removed) | `NiEvid` (new), `SyscallDefs`, `SpecSyscall`, `SyscallArms*`, `UserChildren`, `SpecKfork`/`ProofKfork`, `SpecSysFork`/`ProofSysFork`, `LinkKfork`/`LinkSysFork`, `SpecUsertrap`, `UsertrapSys`/`SysRows`/`SysTail`/`TailA6`/`Parts`, `SyscallEnv`, `SystemBootEra`, `BootShared*` (if the supply moves), `SpecMain`/`ProofMain`, `SpecUserinit`/`ProofUserinit`, `UserretClosedRound`, `UsysDet` (`usysIotaFits_of_ev`), `NiLedger` | `SYSCALL` (`syscallPost`), `USERTRAP` (`usertrapPost`), `KFORK`/`SYSFORK` (+ one field each), `MAIN`'s pre, `parkWorld`/`userinitPark` (definitions), `NiFitIs`'s `niFitEv`; `SyscRows`, `SpecUservec` byte-identical | full `run_all.sh`; `audit.sh` (roots' texts); `tcb.sh` |
+| **X3 the ledger** | §2(e): `NiEntry.round` + `cite`, `niEntryOk`'s clauses, `niEraKey`/`niEraTok`/`niEraAnchor`/`niEvid`, `niChainSt`, `niR γ γe`, `niR_powerOn` (the ticket), `niR_enter` (the chain step), `niHist`, `niHist_below`, `niR_pure`; the NI record's `reg`/`evid`/`evidNone` (`niEraTok_shoot`) | `NiLedger`, `NiEvid` (`_compat`, `_join`), `NiAdequacy` (`niBirth` + `γe`, `niLedger_pow` yields the ticket, `niLedger_enter`) | the NI ledger's own (no Spec) | build + lint |
+| **X4 the theorem** | §3: `NiStep.round` + `c`, `NiPos`, `NiStep.input`, `niRoundLaw`'s three clauses, `niOk_classLaw` through `niDetRow`, `niTraceChain`, `niBelow_pos`, `niTwoRun` (+`hH`), `events`/`reads`/`reading` deleted; `xv6NiPhi`; `xv6NiTwoRun`; the honesty scopes; `dead_allow.txt` (§3's rows); `expected.json` | `NiTrace`, `NiAdequacy`, `LinkNiAdequacy`, `UsysDet`/`UexecApply` (deletions), `tools/ci/dead_allow.txt`, `tools/tcb/expected.json`, `tools/audit/baseline.json` | `xv6NiTwoRun` (hypotheses), `xv6NiPhi` (definition: the other two roots' meaning) | full `run_all.sh` + `reports` (dead code), `tcb.sh --update` (justified: `KallocEv`/`PidEv`/`ZombEv`), `audit.sh` |
+
+**Order and size.**
+- Order: X1 → (X2 ∥ X3) → X4. X3 is the hook side and needs only X1's slots. X2 is the kernel side. X4 needs
+  both.
+- X1: about 25 files, mechanical (W2a/W2d's shape).
+- X2: the wide one, about 40 files. Most of it is `syscEvOut_quiet` at each arm and the anchor's route. The
+  content is `urc_exit`'s `round_det` call and G2b's ~860-line kfork success path, which frames two persistent
+  receipts.
+- X3: 3 files. The content is `niR_enter`'s chain step.
+- X4: 5 files. The pure proofs are short, because `niBelow_pos` does the work.
+
+**RULINGS REQUESTED.**
+- **X-R1 (the anchor, F1).** Recommended: two more `MachFixedGS` slots (`uEraTok`, `uEraAnchor`); the
+  registration at `xv6Era_run`; the anchor riding next to `wireInv` into `parkWorld`; no new camera (the
+  `Option Nat` ghost variable and `gmUnitG`).
+  - Alternative: the power hook ALLOCATES each era's ledgers and the boot adopts them. That needs no ticket, but
+    `childrenRes_alloc`'s and `kmemGhost_alloc`'s statements move, and the boot loses its own mints. Not
+    recommended.
+  - Without either, the chain can only be keyed by name, and F1's disguise is open.
+- **X-R2 (one existential).** Recommended: `H := niHist F` (canonical: the join of `F`'s citations), so
+  `xv6NiPhi` keeps W4's single `∃ F`. The brief's `∃ F H` has the same content with a second, uncanonical
+  witness.
+- **X-R3 (`events`).** Recommended: delete `events`/`reading`. The class has no reading left, and keeping the
+  readings form beside `hH` would keep §2's rejected oracle in the statement. Alternative: a second root
+  `xv6NiTwoRunObs` with W4's observable-hypothesis form. It is a ~10-line pure corollary of the same law, since
+  equal readings still give equal outputs. It is not recommended, but it is cheap if the owner wants a form
+  whose hypothesis is checkable on `h`.
+- **X-R4 (the allocator).** Recommended: nothing beyond registering its name, and `ι.kev := []`. G3 decides the
+  shape of an sbrk citation (several `Kev` positions, W3).
+- **X-R5 (`uFit`).** Recommended: keep it (the system record's blind Prop, W2c's TCB arrangement). The NI hook
+  files from `uEvid`'s witnesses (F2). Retiring `uFit` later would move `USERRET` and the five `[NiFitIs]`
+  structures for no content.
+- **X-R6 (fork).** Recommended: G2b lands in X2. Its receipts are carried, and the law's success conjunct (`a0
+  = sext (pidPick (H.pid.take i))`) holds for every fork. Fork stays OUT of `NiInClass` until the joint lane
+  (G2-R5: the success bit is unexplained).
+  - Alternative: admit fork now, with the success bit as the only residual reading. That is §2's oracle, at one
+    bit. Not recommended.
+- **X-R7 (`dead_allow`).** Recommended as §3:
+  - `UsysDet` and `uexecRet_roundDet` come off;
+  - `_exists` is deleted;
+  - `uexecRetContF_det` (+ `usysIotaFits_exists`) stays allowlisted, with a new comment.
 
 ## Lanes (opened 2026-09-15)
 
