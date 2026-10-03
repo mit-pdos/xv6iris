@@ -703,24 +703,26 @@ theorem obsLedgerAt_uexit (R : List Obs → IProp GF) [∀ h, Timeless (R h)]
 
 /-- THE USER-ENTRY STEP AT THE LEDGER, SPENDING (NI M2-W2d): the client's
 ledger closed under the user entries with their evidence and the claim they
-spend (`Hu`, handed the justification `uf ox e`, the cited receipt's reading
-and the claim) is the slot's `HuserEnter`. -/
+spend (`Hu`, handed the justification `uf ox e`, the cited receipt's reading,
+the claim and (NI M2-X3) the record's evidence `Ev ox e`, `uEvid`) is the
+slot's `HuserEnter`. -/
 theorem obsLedgerAt_uenterS (R : List Obs → IProp GF) [∀ h, Timeless (R h)]
     (uf : Option (Nat × Obs) → Obs → Prop) (Cr : Nat → IProp GF) (Co : IProp GF)
+    (Ev : Option (Nat × Obs) → Obs → IProp GF)
     (Hu : ∀ (h : List Obs) (e : Obs) (ox : Option (Nat × Obs)), isUEnter e = true → uf ox e →
       (∀ i x, ox = some (i, x) → i < h.length ∧ h[i]? = some x) →
-      uClaimForRaw Cr Co ox ∗ R h ⊢@{IProp GF} |==> R (h ++ [e]))
+      uClaimForRaw Cr Co ox ∗ Ev ox e ∗ R h ⊢@{IProp GF} |==> R (h ++ [e]))
     (γ : GName) (h : List Obs) (e : Obs) (ox : Option (Nat × Obs)) (he : isUEnter e = true)
     (hf : uf ox e) (hv : ∀ i x, ox = some (i, x) → i < h.length ∧ h[i]? = some x) :
-    uClaimForRaw Cr Co ox ∗ ▷ obsLedgerAt R γ ∗ (γ ↪VAR{.own (1 : Qp).half} h) ⊢@{IProp GF}
+    uClaimForRaw Cr Co ox ∗ Ev ox e ∗ ▷ obsLedgerAt R γ ∗ (γ ↪VAR{.own (1 : Qp).half} h) ⊢@{IProp GF}
       |==> ◇ (▷ obsLedgerAt R γ ∗ (γ ↪VAR{.own (1 : Qp).half} (h ++ [e]))) := by
   unfold obsLedgerAt
-  iintro ⟨Hcl, ⟨%h', >Hfrag, >HR⟩, Hauth⟩
+  iintro ⟨Hcl, Hev, ⟨%h', >Hfrag, >HR⟩, Hauth⟩
   ihave %hh := ghost_var_agree γ h' _ h _ $$ Hfrag Hauth
   subst hh
   imod ghost_var_update_halves (h' ++ [e]) γ h' h' $$ Hauth Hfrag with ⟨Hauth, Hfrag⟩
-  imod Hu h' e ox he hf hv $$ [Hcl HR] with HR
-  · iframe Hcl HR
+  imod Hu h' e ox he hf hv $$ [Hcl Hev HR] with HR
+  · iframe Hcl Hev HR
   imodintro
   imodintro
   isplitl [Hfrag HR]
@@ -765,16 +767,6 @@ theorem uenterHook_drop (Cl Ev P H H' : IProp GF)
     Cl ∗ Ev ∗ P ∗ H ⊢@{IProp GF} |==> ◇ (P ∗ H') := by
   iintro ⟨-, -, HP⟩
   iapply Hk $$ HP
-
-/-- ...and an entry hook that spends the claim is one also handed evidence it
-drops (NI M2-X1).  M2-X1 interim: X3 removes this (the NI ledger's entry hook
-files the evidence, `niLedger_enter` taking `niEvid`). -/
-theorem uenterHook_dropEv (Cl Ev P H H' : IProp GF)
-    (Hk : Cl ∗ P ∗ H ⊢@{IProp GF} |==> ◇ (P ∗ H')) :
-    Cl ∗ Ev ∗ P ∗ H ⊢@{IProp GF} |==> ◇ (P ∗ H') := by
-  iintro ⟨Hc, -, HP⟩
-  iapply Hk
-  iframe Hc HP
 
 /-- ...and a power hook that founds the era's claim and turn is one that also
 yields the (empty) origin ticket (NI M2-W2d) and the (empty) registration

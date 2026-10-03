@@ -2180,6 +2180,76 @@ rows stay for X4/R7, with `uexecRet_roundDet_exists`). `NiTrace`/`niOk` do not r
 
 Gates: full build (2739 jobs), `lint.sh`, `tcb.sh` (no change), `audit.sh` (9 roots PASS), `run_all.sh`.
 
+### M2-X3 as landed (2026-10-03)
+
+Lane `lane/m2x`, one commit on X2: §2(e), §4 and §5 row X3. No Spec text moves; the three NI roots'
+statements are byte-identical (their meaning grows: the NI record now files the evidence into the chain).
+
+**The pure side** (`NiLedger` §2/§3/§6). `niCiting`/`niDetRow`/`niForkRow`/`niFitEv` moved up into §2 (before
+the filing, which reads them; texts unchanged). `NiEntry.round` gains a LAST field:
+
+    | round (i j : Nat) (sc : BitVec 64) (W W' : Uvis) (cite : Option (Nat × UIota))   -- arity 6
+    def NiEntry.cite : NiEntry → Option (Nat × UIota)       -- origin: none; round: its cite
+
+`niEntryOk`'s round clause gains, after `niWaitRow sc W W'`:
+`(niCiting sc W ↔ cite.isSome) ∧ niDetRow sc W W' cite ∧ niForkRow sc W W' cite ∧ (∀ k ι, cite = some (k, ι) →
+k ≤ obsBoots (h.take j))`. `niFiling … (c)` carries the citation; `niFiling_ok` takes `niFitEv ox e c` (F2: filed
+from the evidence's witnesses) and `hcb : ∀ k ι, c = some (k, ι) → k ≤ obsBoots h`, and returns `.cite = c`
+too. The chain: `niChain F H := ∀ f ∈ F, ∀ k ι, f.cite = some (k, ι) → niBelow ι (H k)`;
+
+    def niHist (F : List NiEntry) (k : Nat) : UIota := F.foldl (niHistStep k) UIota.boot
+    theorem niHist_below {F} {Hc} (h : niChain F Hc) : niChain F (niHist F)
+
+(`niHistStep k H f` joins `f`'s citation of era `k` by `niJoin`; `niHist_fold`, `niJoin_below`,
+`niBelow_refl/_trans/_boot`, `niOk_cite_le`, `obsBoots_take_le/_snoc_le/_snoc_powerOn`.)
+
+**The ghost** (`NiLedger` §7, section `[MonoNatG] [Xv6G] [WchGpre] [DiskG]`): `niEraKey γe k γs := γe ↪◯MAP[niPair
+k γs]{.discard} ()`, `niEraTok`, `niEraAnchor`, `niEvid` exactly §2(e) (`niEvid γe (some ix) e := ∃ c, ⌜niFitEv
+(some ix) e c⌝ ∗ niCiteResRaw (niEraAnchor γe) c`, i.e. the design's match); `niEraTok_shoot` (`ghost_var_update`
+then `ghost_var_persist`), `niEvid_cite`/`niEvid_none`/`niEvid_open`. `niChainSt γe h F := ∃ T Hc m, γe ↪●MAP m ∗
+⌜(∀ n, get? m n = some () ↔ ∃ k γs, n = niPair k γs ∧ T k = some γs) ∧ (∀ k γs, T k = some γs → k ≤ obsBoots
+h)⌝ ∗ □ (∀ k γs, ⌜T k = some γs⌝ -∗ ⌜Hc k = UIota.boot⌝ ∨ ∃ ns, γs ↪VAR{.discard} some (niNamesCode ns) ∗
+niIotaLbs ns (Hc k)) ∗ ⌜niChain F Hc⌝`; steps `niChainSt_alloc/_snoc/_powerOn/_file`, `niEra_lbs`.
+`niR γ γe h := ∃ F, ⌜niOk h F⌝ ∗ niClaims γ h F ∗ niChainSt γe h F`; `niR_alloc : ⊢ |==> ∃ γ γe, niR γ γe []`;
+`niR_snoc`/`niR_exit` frame the chain; `niR_powerOn` yields `… ∗ initClaim γ h.length ∗ niEraTok γe (obsBoots h +
+1)`; `niR_enter γ γe h e ox (_he) (hrc) : niSpend γ ox ∗ niEvid γe ox e ∗ niR γ γe h ⊢ |==> niR γ γe (h ++ [e])`
+(no `niFit` premise: subsumed by the evidence).
+
+**The NI record** (`NiAdequacy`): `CT := A.fixed × GName × GName` (`p.2.1` the claims, `p.2.2 = γe`), `niBirth`
+births both; `niLedgerR A c γ γe`; `Ue := niEvid p.2.2`, `Uet := niEraTok p.2.2`, `Uea := niEraAnchor p.2.2`,
+`hUreg := niEraTok_shoot`, `hUevid := niEvid_cite`, `hUevidNone := niEvid_none`; `niLedger_pow` yields `A.turn ∗
+niOriginTicket γ ∗ niEraTok γe (obsBoots h + 1)`; `niLedger_enter` takes `niEvid γe ox e`. Every `M2-X1 interim`
+marker is gone (`grep -rn 'M2-X1 interim' Xv6 MachCSL` is empty). `MachCSL.Adequacy`: `uenterHook_dropEv`
+deleted; `obsLedgerAt_uenterS` gains an evidence family `Ev` (its `Hu` and conclusion take `Ev ox e` after the
+claim). `niLedger_niR_snoc` pins the UART permits' snoc at the ambient `MachGpreS.mono_pre` (in their `[MachGS]`
+context `MonoNatG` would resolve to the era's `MachFixedGS.mono`).
+
+**Deviations.**
+1. The era keys use a local Cantor pairing `niPair` (no Mathlib, so no `Nat.pair`); `niNamesCode` is built on
+   it (`niPair_inj`, `niNamesCode_inj`). The `Option Nat` slot (`DiskG.gvStageG`) was fit; no rebuild.
+2. `niR_enter` drops `hfit : niFit ox e` (F2: the evidence's `niFitEv` subsumes it); `niLedger_enter` keeps it
+   as an unused `_hf` (the hook hands it).
+3. `niChainSt_file` returns the registration bound and `∀ fn, ⌜fn.cite = c⌝ -∗ niChainSt γe (h ++ [e]) (F ++
+   [fn])`: the filing is built from the bound.
+4. `NiTrace.niStepOf_law`'s round pattern gains a trailing `-` (its last name absorbed the new conjuncts);
+   nothing else in `NiTrace`/`LinkNiAdequacy` moved.
+5. In a citation's first filing of an era (`Hc k = UIota.boot`) the old lower bounds are minted fresh
+   (`niIotaLbs_boot`) at the anchor's names, so the step is uniform (`niEra_lbs`).
+
+**For X4** (what it must absorb):
+- `theorem niR_pure (γ γe : GName) (h : List Obs) : niR γ γe h ⊢ ⌜∃ F, niOk h F ∧ niOneShot h F ∧ niChain F
+  (niHist F)⌝` (`NiAdequacy`'s `Hphi` currently drops the chain conjunct: `obtain ⟨F, hF, h1, -⟩`).
+- `NiEntry.round` has arity 6 (`cite` last); `NiEntry.cite`.
+- `niHist (F : List NiEntry) (k : Nat) : UIota`; `niChain (F : List NiEntry) (H : Nat → UIota) : Prop`.
+- `niEntryOk`'s round clause carries `niDetRow`/`niForkRow` at `cite` and `cite`'s era bound (F6).
+- `niOk_enter` (unreached before and after) now takes `niFitEv` and `hcb`.
+
+Gates: full build (2739 jobs), `lint.sh`, `tcb.sh --update` (the three NI roots only: `KallocEv`, `PidEv`,
+`ZombEv`, `UexecApply`, `KernelImage`, `SlotSupply`, `MachCSL.ByteWordDefs` enter all three, `UsysDet` enters
+`xv6NiStrongInstance`'s; no axiom or opaque moves; every other root unchanged), `audit.sh` (9 roots PASS,
+baseline unchanged), `run_all.sh` (all 11 steps). `dead_allow.txt`: `decl Xv6.niIotaLbs_join` removed (reached
+through `niChainSt_file`).
+
 ## Lanes (opened 2026-09-15)
 
 Execution order is §6's, adjusted for one territory fact: upstream's

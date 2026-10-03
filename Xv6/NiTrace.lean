@@ -320,7 +320,7 @@ theorem niStepOf_law {h : List Obs} {f : NiEntry} {s : NiStep} (hf : niEntryOk h
     show enterView _ = _
     simp only [enterView, hpc]
   | .round i j sc W W' .., hf, hs =>
-    obtain ⟨-, ⟨x, hx, cpu, sa, rfl⟩, ⟨e, he, cpu', sa', ep', rfl, hpc⟩, hr, hpid, hprow, hwrow⟩ := hf
+    obtain ⟨-, ⟨x, hx, cpu, sa, rfl⟩, ⟨e, he, cpu', sa', ep', rfl, hpc⟩, hr, hpid, hprow, hwrow, -⟩ := hf
     simp only [niStepOf, hx, he, Option.some.injEq] at hs
     subst hs
     -- the trapped frame `roundOkKeys` reads

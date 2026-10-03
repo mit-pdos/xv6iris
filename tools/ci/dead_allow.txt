@@ -39,9 +39,3 @@ decl Xv6.zLowest_nil
 decl Xv6.usysWaitBytes_null
 decl Xv6.usysWaitBytes_length
 decl Xv6.usysWr_nil
-
-# -- NI M2-X2: the NI ledger's chain step over the per-round evidence
-#    (`NiEvid.niIotaLbs_join`, with `niIotaLbs_compat`, `niBelow`, `niJoin`):
-#    reached when X3 files each citation into the ledger's chain (`niR_enter`);
-#    remove this row with X3
-decl Xv6.niIotaLbs_join
