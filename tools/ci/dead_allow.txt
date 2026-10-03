@@ -26,3 +26,16 @@ decl Xv6.Spin
 #    unconstrained there), so nothing reads it yet; remove this row with the
 #    lane that strengthens kwait's copyout-failure answer
 decl Xv6.lazyFree_wmapped_iff
+
+# -- the NI campaign's in-logic core (M0 / M2-W3, G1d): round_det and the
+#    functional rows are reached by no root until M2-X carries the ledger
+#    receipts into the trace filing (claude-notes/projects/noninterference.md,
+#    "### M2-G1 design" §4 "M2-X"); keep them until then
+module Xv6.UsysDet
+decl Xv6.uexecRet_roundDet
+decl Xv6.uexecRet_roundDet_exists
+decl Xv6.uexecRetContF_det
+decl Xv6.zLowest_nil
+decl Xv6.usysWaitBytes_null
+decl Xv6.usysWaitBytes_length
+decl Xv6.usysWr_nil
