@@ -15,7 +15,6 @@ reservation CONTENT: `match_reservation` / `valid_reservation` read the opaque
 `xv6_resv_matches` / `xv6_resv_is_valid`, and every proof that reads one must
 handle both answers.
 -/
-import MachCSL.SimpAttr
 import LeanRV64D.Xv6Extras
 
 namespace LeanRV64D.Functions

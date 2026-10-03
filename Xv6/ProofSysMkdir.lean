@@ -47,6 +47,7 @@ import Xv6.SysMkdirTails
 import Xv6.SysMkdirCalls
 import Xv6.KexecACode
 import Xv6.ReadiDefs
+import Xv6.DirlookupParts
 
 namespace Xv6
 

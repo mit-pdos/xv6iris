@@ -35,7 +35,6 @@ reads the same name back): the head `fheadAt` and the turn `fturnPreAt` over
 5. Rocq's curried wands are stated `⊢ A -∗ B` (the `GenParams` field form).
 -/
 import Xv6.FileLinksLine
-import Xv6.GenLinksLine
 
 namespace Xv6
 

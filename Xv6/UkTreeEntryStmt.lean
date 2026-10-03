@@ -35,15 +35,9 @@ replaces the hypothesis by `rfl` of its type.
 -/
 import Xv6.UkCatTree
 import Xv6.UkGrepTreeDefs
-import Xv6.GrepFilt
 import Xv6.ExecEntry
-import Xv6.ExecWords
-import Xv6.UexecRet
 import Xv6.UexecExecInst
 import Xv6.UkEchoTree
-import Xv6.ElfUser
-import Xv6.EchoDisc
-import Xv6.UshEchoPure
 import Xv6.UshEchoImg
 import Xv6.User.CatElfRaw
 import Xv6.User.EchoElfRaw

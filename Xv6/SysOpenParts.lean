@@ -167,6 +167,7 @@ import Xv6.KexecParts
 import Xv6.PrintkDefs
 import Xv6.SysfileCalls
 import Xv6.SpecFdalloc
+import Xv6.SysOpenBits
 
 namespace Xv6
 

@@ -19,6 +19,7 @@ import Xv6.SpecSeccMain
 import Xv6.SeccMainArms
 import Xv6.UkProgAbi
 import Xv6.UkFork
+import Xv6.UkRunMem
 
 namespace Xv6
 

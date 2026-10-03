@@ -20,7 +20,6 @@ Rocq's `secc_lit*` are the generic kit (`seccLit`/`seccLitOk` name it).
 -/
 import Xv6.UserLit
 import Xv6.User.SeccompImage
-import Xv6.User.SeccompTree
 
 namespace Xv6.User.Seccomp
 

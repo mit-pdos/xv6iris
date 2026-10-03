@@ -63,7 +63,6 @@ import Xv6.SysOpenShared
 import MachCSL.WpStoreFree4
 import MachCSL.WpSmodeLh
 import Xv6.SpecFilealloc
-import Xv6.FsWords
 import Xv6.SysOpenTails
 import Xv6.DirlookupParts
 import Xv6.SysMknodFrame

@@ -104,14 +104,11 @@ is needed to share the context.
 -/
 import Xv6.CreateSharedBody
 import MachCSL.WpSmodeLh
-import Xv6.SpecNamexEra
 import Xv6.SpecNparWrapEra
 import Xv6.DirlookupParts
 import Xv6.KexecTail
 import Xv6.NamexParts
-import MachCSL.BvLemmas
 import Xv6.IcacheShortCarve
-import Xv6.ProcPrivAcc
 import Xv6.SysUnlinkShared
 
 namespace Xv6

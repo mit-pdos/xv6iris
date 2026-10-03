@@ -12,7 +12,6 @@ deed is lent from the core to UkFileDev's `file_read(_std)` and comes back.
 2. The tail handle is read out of the family by `fifHdls_acc`
    (UkFileIfaceHdls), Rocq's `big_sepM_lookup_acc`.
 -/
-import Xv6.UkFileIfaceDevP
 import Xv6.UkFileIfaceHdls
 import Xv6.UkFileDevRead
 

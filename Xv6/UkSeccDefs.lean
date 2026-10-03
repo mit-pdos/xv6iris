@@ -56,8 +56,6 @@ THE CHILD LEAVES THE VERIFIED TIER AT ROW 23 (Rocq ruling G1): after
    leaf's `pidv`).
 -/
 import Xv6.UkStub
-import Xv6.UkRunMem
-import Xv6.UkRunBr
 import Xv6.UkSysP
 import Xv6.UkSeccLit
 import Xv6.UexecSeccMasked

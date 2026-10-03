@@ -19,7 +19,6 @@ import Xv6.SpecWalk
 import Xv6.CodeTactics
 import Xv6.CopyLemmas
 import Xv6.ReadiFrame
-import Xv6.VmfaultDefs
 import Xv6.KvmLemmas
 import Xv6.UPtLemmas
 import Xv6.UPtAllocLemmas

@@ -27,6 +27,7 @@ contributes.  S2 is the "pipe" message's byte facts.
 -/
 import Xv6.UshDiagLeaf
 import Xv6.PipeDisc
+import Xv6.SpecShPanic
 
 namespace Xv6
 

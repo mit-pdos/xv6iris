@@ -68,7 +68,6 @@ import Xv6.SpecBeginOp
 import Xv6.SpecNamei
 import Xv6.SpecIlock
 import Xv6.FsCallSitesI
-import Xv6.DirlookupParts
 
 namespace Xv6
 

@@ -53,7 +53,6 @@ producer that has to supply it is era 0's carve (`FsDurAlloc`, batch CF).
 * `log_region_between` -- deviation 3.
 -/
 import Xv6.FsState
-import Xv6.FsCrashPure
 import Xv6.InodeRegionDefs
 
 namespace Xv6

@@ -21,6 +21,7 @@ two dispatch facts with the stronger outcome `UclCtlStep` (`UxcStep` +
 -/
 import MachCSL.UExecCtl
 import MachCSL.UWait
+import MachCSL.UExecCtlJump
 
 namespace MachCSL
 

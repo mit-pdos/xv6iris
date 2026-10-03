@@ -32,7 +32,6 @@ Already landed: `f0_typed_none` is `FileOutEra.f0Typed_none`.  Not ported
    deviation 4).
 -/
 import Xv6.FileOutClaim
-import Xv6.FileDiscSeal
 import Xv6.AppFileSeal
 import Xv6.EchoOutSealEra
 

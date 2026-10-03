@@ -14,7 +14,6 @@ the callees enter only by their interfaces (`SH_SYS_WAIT`, `SH_SYS_EXEC`,
 `SH_SYS_CLOSE`, `SH_SYS_DUP`, `SH_FORK1`) and the syscall rows by `UK_SYS_P`.
 -/
 import Xv6.UshRunWalk
-import Xv6.UshRedirArm
 import Xv6.UshPipeArmG3
 import Xv6.UshRunEntry
 

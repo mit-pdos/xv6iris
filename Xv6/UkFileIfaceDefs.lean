@@ -42,10 +42,8 @@ UkFileDev's `file_in`.)
 5. The deposit instance is `uexecSGXv6` (ExecRun deviation 1).
 -/
 import Xv6.UkFileIfaceReg
-import Xv6.UkFreeHandler
 import Xv6.UkConsOut
 import Xv6.UEchoFile
-import Xv6.UexecExecInst
 import Xv6.UkFileOpenDefs
 import Xv6.FileOutEra
 

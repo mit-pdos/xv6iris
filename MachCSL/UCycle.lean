@@ -41,7 +41,6 @@ DecodeBridge's read congruence).
 -/
 import MachCSL.UCycleDefs
 import MachCSL.UDispatch
-import MachCSL.UDecode
 import MachCSL.UTranslate
 
 namespace MachCSL

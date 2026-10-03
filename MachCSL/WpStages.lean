@@ -8,8 +8,6 @@ execution of that stage alone and is then applied by the whole-instruction
 leaf rules.
 -/
 import MachCSL.WpPmp
-import MachCSL.PlatformFacts
-import MachCSL.ModelFacts
 
 namespace MachCSL
 

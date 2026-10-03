@@ -27,7 +27,6 @@ a separate obligation).  `DevM.Lease` subsumes `DevM.LocalR` -- see
 `uart_lease` at the end of the file.  The loop is for a SILENT device
 (`DevSilent`: the disk).
 -/
-import MachCSL.WpDev
 import MachCSL.WpDma
 
 namespace MachCSL

@@ -8,7 +8,6 @@ back.
   pins survive `sret` from the kernel's configuration with `SPIE = 1`,
   `SPP = U`.
 -/
-import Xv6.SpecUser
 import Xv6.UptWalkTramp
 import MachCSL.WpSmodeSretU
 

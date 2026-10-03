@@ -31,6 +31,7 @@ projections / `pnsKit` / `pnsCon`.  Not reached: the local instances
 -/
 import Xv6.UkCatFIfaceReg
 import Xv6.UkPipesIfaceKit
+import Xv6.HfpPipeClaimsP
 
 namespace Xv6
 

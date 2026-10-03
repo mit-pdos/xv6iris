@@ -34,6 +34,7 @@ The stubs are walked ONCE by `UkStub.stubLaw` (instantiated at init's text:
    take a free number's deposit (dup, wait).
 -/
 import Xv6.UkInitDefs
+import Xv6.UkSysP
 
 namespace Xv6
 

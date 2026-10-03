@@ -32,18 +32,13 @@ already moved (`itRowPost`), `W.drop t` not yet (`itRowPre`); on the
 recovering arm BOTH are `emp` beyond the log slot's own half.
 -/
 import Xv6.SpecInstallTrans
-import Xv6.CodeTactics
 import Xv6.FsCallSites
 import Xv6.SpecMemmove
 import Xv6.SpecBwrite
 import Xv6.SpecBunpin
 import Xv6.EndOpDefs
-import Xv6.FsWords
-import Xv6.IcacheEscrowPool
 import Xv6.InitlogHead
-import Xv6.VirtioDiskRwDefs2
 import Xv6.VirtioDiskRwDefs3
-import MachCSL.BvLemmas
 import MachCSL.LockFacts
 
 namespace Xv6

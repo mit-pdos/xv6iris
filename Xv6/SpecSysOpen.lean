@@ -203,7 +203,6 @@ import Xv6.SysOpenKept
 import Xv6.ConsoleInvDefs
 import Xv6.UMemLazy
 import Xv6.UserOff
-import Xv6.SysOpenBits
 
 namespace Xv6
 

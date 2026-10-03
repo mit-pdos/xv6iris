@@ -12,7 +12,6 @@ index a switch can happen at (xv6 holds `p->lock` across it).
 -/
 import MachCSL.KCtxMove
 import MachCSL.WpSmodeCycle
-import MachCSL.WpSmodeMem
 import MachCSL.WpSmodeMemLd
 
 namespace MachCSL

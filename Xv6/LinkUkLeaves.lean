@@ -19,8 +19,6 @@ and the fetch-and-decode side of every leaf is `uk_fetchDec_of_instr`.
 import Xv6.UkFetchDec
 import Xv6.UkRetireAlu
 import Xv6.UkRetireCtl
-import Xv6.UkLoad
-import Xv6.UkLoadText
 import Xv6.UkStoreX
 import Xv6.UkAbi
 

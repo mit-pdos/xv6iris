@@ -17,10 +17,8 @@ the SAME line, and `pipecmd`'s node the last allocation of the chain.
 Deviations from Rocq: as in `SpecShParsepipe`.
 -/
 import Xv6.SpecShParsepipe
-import Xv6.SpecShGettoken
 import Xv6.SpecShPipecmd
 import Xv6.UshPipeWalk
-import Xv6.UshCodePipe
 import Xv6.UshRedirsWalk
 
 namespace Xv6

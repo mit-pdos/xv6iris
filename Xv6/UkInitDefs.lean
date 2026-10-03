@@ -40,14 +40,12 @@ for the `UlibRunP.ofUkRun` bridge.
 6. NOT PORTED (unreached): `uki_cons_in`, `init_exec_sup`,
    `init_exec_sup_of_uxsup`, the unreached register notations.
 -/
-import Xv6.UkSysP
 import Xv6.UkStub
 import Xv6.UkRunExecRef
 import Xv6.UserConsole
 import Xv6.UInitFdHead
 import Xv6.UkInitLit
 import Xv6.User.InitText
-import Xv6.FsGeom
 import Xv6.UkForkHeap
 
 namespace Xv6

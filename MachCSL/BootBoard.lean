@@ -14,7 +14,6 @@ which §1 has written.
 -/
 import MachCSL.ArchReset
 import MachCSL.BootPeel
-import MachCSL.Platform
 
 namespace MachCSL
 

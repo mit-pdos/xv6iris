@@ -7,7 +7,6 @@ import MachCSL.WpAtomic
 import MachCSL.WpSmodeAuDefs
 import MachCSL.SConfPhysDefs
 import MachCSL.WpPmpXv6
-import MachCSL.WpStages
 
 namespace MachCSL
 

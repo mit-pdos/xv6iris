@@ -22,7 +22,6 @@ Deviations from Rocq: spelling only (`last E = Some x` is
 `E_index` is `eIndex`, `hist_chain` is `histChain`, `trace_shape` is
 `traceShape`, `obs_boots` is `obsBoots`).
 -/
-import Xv6.FileDisc
 import Xv6.EchoOutPure
 import Xv6.EchoOut
 

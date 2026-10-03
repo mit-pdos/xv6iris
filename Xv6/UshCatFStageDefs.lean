@@ -83,12 +83,10 @@ echo and cat discharge them) with `hnode` (`P.echo_node_img` is
 3. `FsImgCheck.fname_cat` is `fnameCat` (= sibling cat's `catPl`).
 -/
 import Xv6.UshPipesDefs
-import Xv6.UkCatFEntries
 import Xv6.UshExecPin
-import Xv6.SpecShRuncmdExec
-import Xv6.UNamePath
 import Xv6.UNamePathCat
 import Xv6.AppFileNames
+import Xv6.UkCatFIfaceReg
 
 namespace Xv6
 

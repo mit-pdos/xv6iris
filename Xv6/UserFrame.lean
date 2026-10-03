@@ -56,7 +56,6 @@ import Xv6.UserBytesAcc
 import MachCSL.UFrameDf
 import MachCSL.UExecCtlBase
 import MachCSL.UTranslate
-import MachCSL.URunRWMono
 import MachCSL.WpSmodeSret
 
 namespace Xv6

@@ -43,7 +43,6 @@ conversion.  A STAGE file (no `Proof` prefix).
    outputs run at `{ A with V := A.V.updEv kb }` and the loop path's phases
    C and D at the record raised twice.
 -/
-import Xv6.KexecACode
 import Xv6.KexecB3
 import Xv6.KexecC
 import Xv6.KexecD

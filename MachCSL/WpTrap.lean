@@ -7,7 +7,6 @@ set), and the trap an interrupt takes (`swp_handle_interrupt_S`): `sepc`,
 vocabulary (`trapMs`, `trapConf`, `sCause`, `sCauseOk`, `stvecDirect`) is
 in `MachCSL.KCtx`, where the handler contract needs it.
 -/
-import MachCSL.SConfPhysDefs
 import MachCSL.ModelFacts
 import MachCSL.PlatformFacts
 import MachCSL.KCtx

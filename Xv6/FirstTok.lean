@@ -135,7 +135,6 @@ import Xv6.FsCfgKits
 import Xv6.FsCfgBoot
 import Xv6.FsCollect
 import Xv6.SpecPanic
-import Xv6.PtOwnLemmas
 import Xv6.FsReady
 
 namespace Xv6

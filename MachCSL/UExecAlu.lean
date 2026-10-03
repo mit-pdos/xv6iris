@@ -21,7 +21,6 @@ the `ExecuteAs` redirect of `run_hart_active`).
 import MachCSL.UExecAluC
 import MachCSL.UExecAluBit
 import MachCSL.UExecAluZicond
-import MachCSL.UDecode
 
 namespace MachCSL
 

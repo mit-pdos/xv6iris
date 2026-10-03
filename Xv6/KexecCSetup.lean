@@ -70,6 +70,7 @@ a STAGE file (no `Proof` prefix).
 import Xv6.KexecCParts
 import Xv6.CopyLemmas
 import MachCSL.LockFacts
+import Xv6.UmodeArith
 
 namespace Xv6
 

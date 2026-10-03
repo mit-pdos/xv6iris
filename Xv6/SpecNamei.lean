@@ -75,7 +75,6 @@ callers the same, `Xv6/SpecNameiparent.lean`).
 Imports only definitional files and callee `Spec*` files.
 -/
 import Xv6.SpecNamex
-import Xv6.ProcInv
 
 namespace Xv6
 

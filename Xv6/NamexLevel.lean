@@ -28,6 +28,7 @@ reopened by it, so it is re-closed here before each exit.
 import Xv6.NamexLook
 import MachCSL.WpSmodeLh
 import Xv6.NamexScan
+import Xv6.InodeRegionMovers
 
 namespace Xv6
 

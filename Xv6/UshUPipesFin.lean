@@ -22,10 +22,8 @@ gG` one by one to `UShPipesDefs`'s lemmas; here they are sibling b's record
 4. `uopen`'s `uWcl … 3` is read at the record's block arm by `uWcl3_eq`
    (Rocq's `cbn [lk_pin lk_lpr union_link_inst_at gen_link_inst gwc_lpr]`).
 -/
-import Xv6.UshUPipesClaim
 import Xv6.UshPipesNodeDefs
 import Xv6.UshPipesFork
-import Xv6.UexecRet
 import Xv6.UshURoundShapes
 import Xv6.UshURoundBody
 

@@ -21,7 +21,6 @@ splitting the allocation in two lets the round name `pn` BEFORE `pipe(2)`.
    not stated; Rocq's `alt_execL_echo` is `rfl` here too.
 -/
 import Xv6.PipeProto
-import Xv6.PipeDisc
 
 namespace Xv6
 

@@ -27,7 +27,6 @@ file as `Hgprs`.  The entry's receipt is dropped here.  The S→S return (`WpSmo
 privilege already there and stays silent.
 -/
 import MachCSL.WpSmodeSret
-import MachCSL.WpSmodeCycleT
 
 namespace MachCSL
 
