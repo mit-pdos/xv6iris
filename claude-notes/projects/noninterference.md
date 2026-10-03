@@ -109,7 +109,7 @@ the class with its `round_det` discharge):
 | **M2-G3 sbrk** | `sysSbrkOk`'s −1 only when the pool is empty (growproc/uvmalloc functional in the allocator ledger), and the eager grow's page-table pages as events (`Alloc A vpn`-grained, §3 "concedes more") | `sbrk` |
 | **M2-G4 console write** | the kernel's short count stated at the key's permission view `π` (copyin at the key, not the table) and a write row in the trap contract | console `write` |
 
-- [ ] M2-G1 (DESIGNED 2026-10-03, "M2-G1 design" below; awaiting rulings G1-R1..R6)  - [ ] M2-G2  - [ ] M2-G3  - [ ] M2-G4
+- [ ] M2-G1 (DESIGNED 2026-10-03, "M2-G1 design" below; awaiting rulings G1-R1..R6)  - [ ] M2-G2 (DESIGNED 2026-10-03, "M2-G2 design" below; awaiting rulings G2-R1..R5)  - [ ] M2-G3  - [ ] M2-G4
 
 Risk register (honest): W1 changes the language and every lifting lemma -- mechanical but wide, and the device
 suite must not notice; W3 is the proof's content and may find a row that cannot be made functional in `(key,
@@ -1176,6 +1176,286 @@ answers grow through it); `waitAns`, its readers, `SYSWAIT`/`SpecSysWait` untouc
 - **F4.**  `VmfaultQuiet.lazyFree_wmapped_iff (P) (sz) (hwf : uptWf P) (hlf : lazyFree P.um sz) (va : Nat) :
   uvaWmapped P va ↔ ∃ q, permOf P.um sz.toNat (va / 4096) = some q ∧ q.W = true` -- every `va`, no size
   premise.  Unreached until G1d: allowlisted in `tools/ci/dead_allow.txt` (remove the row when G1d lands).
+
+### M2-G2 design (2026-10-03)
+
+Design pass on `lane/g2` (based on `lean` 0dec77fa1: G1a–c landed, G1d running in parallel on `lane/g1`). No
+code landed. The pure vocabulary of §1 was shape-checked in a scratch file: `liveB`, `cycAt`, `pidPick`,
+`cycAt_zero`, `cycAt_succ` proved, plus five `native_decide` examples (the wrap and the F4 witness among
+them). It is not in the tree. The rulings G2-R1…R5 at the end are needed before a lane starts.
+
+**Short version.**
+- **The brief's premise is the pre-ded23f2 kernel.** "`pid = nextpid++`, no wrap, so first-ness is trivial"
+  was true before upstream's ded23f2. The pinned kernel WRAPS and REUSES pids (`kernel-defects.md`, "FIXED
+  UPSTREAM (ded23f2)"). So the pid is NOT the counter. It is the first candidate, going cyclically from the
+  counter, that no proc slot holds.
+  - So R2(b) alone does not pin it, and R2(c) first-ness is not trivial.
+  - But R2(c) is cheap (F2): the whole of allocpid runs under `pid_lock` and reads only cells that the
+    payload owns.
+- **The channel.** fork's pid is `pidPick PIDMAX h`, where `h` is the pid-ledger prefix just before the
+  round's `PAlloc`:
+  - `pidPick` is the first `c` in `nextOf h, next(nextOf h), …` (wrapping `PIDMAX → 1`) with `c ∉ liveOf h`;
+  - so it is a function of the history: its counter and its live set.
+- **The ghost.**
+  - One pure conjunct, `pidTie np pids h`, inside `pidLedger`, which gains the payload's `np` and `pids` as
+    parameters.
+  - No camera, no new name, no new append, no new permit step.
+  - The boot is `nextOf [] = 1` with every cell 0. The two existing appends re-establish the tie by
+    construction.
+- **The loop.** `ap_pidloop` gains one ghost index: the candidate is the `k`-th cyclic successor of the
+  counter, and every earlier one was held by some slot.
+- **The receipt.** `allocprocPostLed`'s found arm carries `pidAllocRcpt act pid := ∃ h, pidReceipt h (.PAlloc
+  act pid) ∗ ⌜pid.toNat = pidPick PIDMAX h⌝`.
+- **The row: none in G2 (F4).** Before M2-X, a pure `∃ h, r = pidPick h` row is EQUIVALENT to the landed range
+  row, because `pidPick` is onto `[1, PIDMAX]`. Fork is re-admitted by the joint lane after M2-X.
+
+**Findings.**
+- **F1 (the kernel wraps and reuses; the counter's range).** The compiled allocpid is inlined in allocproc
+  (`ProofAllocproc`, `0x80001bb6…0x80001c06`):
+  - `lw a3, nextpid`, then the loop. At the head (`+0x62`): `a1 := 1`; `beq a3, a6(=1000)`; else `addiw
+    a1, a3, 1`.
+  - The 64-word scan of `proc[i].pid` (`+0x74…+0x7e`, `ap_pidscan`): on a match, `mv a3, a1` and retry; on
+    fall-through (`+0x82`), `sw a1 → nextpid` and then `c.sw a3 → p->pid`.
+  - **The counter is stored ONCE, after the loop**, at `apNewPid pid` (`= if pid = 1000 then 1 else pid + 1`).
+    The retries' intermediate counter values live only in `a1`.
+  - So after a `PAlloc _ pid` the cell is exactly `nextStep PIDMAX _ (.PAlloc _ pid)`. The landed `PidEv.nextOf`
+    already models the wrap, so nothing in `nextOf` changes.
+  - **Range.** The payload says `1 ≤ np ≤ PIDMAX` (`PIDMAX = genPidMax = 1000`, `ProcGeom`, `SlotGen` by
+    `rfl`). At the bound the candidate is 1000 and the counter wraps to 1. Every candidate is in
+    `[1, 1000]`, and neither 0 nor 1001 is ever reached.
+  - **Termination** (`|live| ≤ NPROC = 64 < 1000`) is not proved and is not needed. `ap_pidloop` is a Löb
+    partial-correctness loop, and the tie speaks only about the exit.
+  - **Rocq's estimate does not apply.** Rocq said "the merge point knows only the interval", and so priced
+    R2(b) as a loop change. Lean's loop already carries `R' 11 = signExtend (apNewPid pid)` to the exit
+    (`apExitCont`), so R2(b) costs nothing in the loop, only the payload's close.
+- **F2 (one snapshot, no window; unlike G1 F1/F2).** `pid_lock` is held from the counter read (`+0x48`)
+  through the scan, both stores, the register insert and the `PAlloc` append, up to the `release` (`+0x94`).
+  - A pid cell is written only as a whole word (`ap_pid_joinA`: the private half, the payload's `pidLockQ`
+    quarter and `p->lock`'s quarter).
+  - So no cell moves while the scan holds the payload's quarters. Every verdict of the scan is a reading of
+    the ONE function `pids` that the payload binds.
+  - The tie turns that snapshot into the history. No per-visit lb, no invariant-held ledger, no
+    `SFull`-style event.
+- **F3 (the tie is to the cells, not to the register).**
+  - `pidRegDom` gives one direction only: registered → held by some slot.
+  - First-ness needs the converse: a candidate that some slot holds is live in `h`.
+  - So the new tie is stated against the cells: `∀ z, liveOf h z ↔ pidCells pids z`.
+  - It holds by construction at the three payload builders, and there are no others (`PidLock`'s body is
+    unfolded only in `MainKvm.mn_pidRes_boot`, `ProofAllocproc.ap_found` and `ProofFreeproc.fp_pidRes_acc`):
+    - boot: every cell 0 and `h = []`;
+    - alloc: the store fills a cell that held 0 (`hpidsn0`), beside `PAlloc pid`;
+    - free: it clears slot `j`'s cell, the only cell holding `pid` (`pidsOk`), beside `PFree pid`.
+  - `liveOf h = dom R` (R2(a)) stays as it is.
+- **F4 (a pure row is vacuous before M2-X; sharper than G1 F6).** `pidPick PIDMAX` is onto `[1, PIDMAX]`:
+  `[] ↦ 1`, and `[PAlloc a (p-1), PFree a (p-1)] ↦ p`.
+  - So `∃ hp, r = sext (pidPick PIDMAX hp)` holds exactly when the landed `1 ≤ r ≤ PIDMAX` does.
+  - A `SyscRows.fork` or `usysDet` strengthening through an unanchored `∃` adds nothing.
+  - The content of G2 is in the RECEIPT: an lb of THE ledger with the `pidPick` fact at its prefix. It reaches a
+    row only when M2-X carries the lb to the filing, where all cited prefixes form one chain.
+  - Uptime's row (W3) is equally shape-only, but there the shape is the whole claim (O5). Here the claim is
+    the dependence on `h`, and the `∃` erases it.
+- **F5 (the parent's key also moves by a fresh ghost name).**
+  - The parent resumes with `ch ∪ {γc}` (`uforkAns` / `uexecForkParentF`; `kforkRet`'s success arm,
+    `γc ∉ csP`).
+  - `γc` is `V_c.gen`, minted by `gen_alloc` inside allocproc. It is a function of no prefix. It is the
+    `g` of the `ZFork pa i pid g` that `kf_wait_fork` appends (G1b), with the same name (`kf_wait_fork …
+    V_c.gen …`, `chFrag … (cs ∪ {g})`).
+  - So whatever the joint lane's row is, it reads `γc` off the round's `ZFork` receipt (which kfork drops
+    today), or concludes `ukeyEq` up to `ch` at fork.
+  - The trace never sees it (W4's law reads registers only).
+  - Both receipts are persistent, so G2b carries both.
+- **F6 (what the channel concedes).** `pidPick` reads the GLOBAL counter. A process's fork answer reveals:
+  - how many allocations every actor made since the counter was last seen (mod `PIDMAX`);
+  - which pids are live just past the counter.
+  This is §3's "pid allocation: `nextpid` is global". R1 conceded pids as public. It is inherent to xv6:
+  removing it means per-process pid namespaces, a kernel change. After M2-X, the two-run hypothesis for fork
+  is "equal pid-ledger histories", which says exactly this.
+
+**1. The vocabulary (pure; `Xv6/PidEv.lean` grows, no new file).**
+
+    /-- the live set as a Bool reading (the decidable twin of `liveOf`) -/
+    def liveStepB (S : Nat → Bool) : Pev → Nat → Bool
+      | .PAlloc _ p => fun z => z == p.toNat || S z
+      | .PFree _ p  => fun z => S z && z != p.toNat
+    def liveB (h : List Pev) : Nat → Bool := h.foldl liveStepB (fun _ => false)
+    /-- the i-th candidate from n, cyclically in [1, pidmax] -/
+    def cycAt (pidmax n i : Nat) : Nat := (n - 1 + i) % pidmax + 1
+    /-- THE PID A FORK GETS after history h: the first cyclic candidate from the counter that is not live -/
+    def pidPick (pidmax : Nat) (h : List Pev) : Nat :=
+      match (List.range pidmax).find? (fun i => !liveB h (cycAt pidmax (nextOf pidmax h) i)) with
+      | some i => cycAt pidmax (nextOf pidmax h) i
+      | none   => nextOf pidmax h          -- unreachable while |live| < pidmax
+
+- `liveB_iff : liveB h z = true ↔ liveOf h (z : Int)`.
+- `cycAt_zero` (at `1 ≤ n ≤ pidmax`): the 0-th candidate is `n`.
+- `cycAt_succ` (at `2 ≤ pidmax`): `cycAt n (i+1) = if cycAt n i = pidmax then 1 else cycAt n i + 1`, which is
+  `nextStep`'s arm. Proved in the scratch with `Nat.add_mod_eq_ite`.
+- `cycAt_period`: `cycAt n (i + pidmax) = cycAt n i`.
+- **`pidPick_spec`**: if `∀ i < k, liveOf h (cycAt … i)` and `¬ liveOf h (cycAt … k)`, then `pidPick
+  pidmax h = cycAt … k`.
+  - `k < pidmax` follows from `cycAt_period` and leastness. No pigeonhole is needed.
+- `pidPick_surj` (F4's witness; for the record and the M2-X lane).
+- `nextOf_snoc_alloc` / `nextOf_snoc_free`.
+- `nextOf_bound`, re-landed only if a reader appears (the dead-code pass baa85f62c deleted it).
+
+`PidLock.lean` (Iris; beside the landed ledger):
+
+    def pidCells (pids : Nat → BitVec 32) (z : Nat) : Prop := z ≠ 0 ∧ ∃ j, j < NPROC ∧ (pids j).toNat = z
+    /-- R2(b)+(c): the counter IS the history's, and the cells' live set IS the history's -/
+    def pidTie (np : BitVec 32) (pids : Nat → BitVec 32) (h : List Pev) : Prop :=
+      np.toNat = nextOf PIDMAX h ∧ ∀ z : Nat, liveOf h (z : Int) ↔ pidCells pids z
+    def pidLedger (np : BitVec 32) (pids : Nat → BitVec 32) (R : IntMapF GName) : IProp GF :=
+      ∃ h, pidLedAuth h ∗ ⌜liveOf h = PartialMap.dom R ∧ pidTie np pids h⌝
+    /-- THE ALLOCATION RECEIPT: the PAlloc's prefix, and the pid it was bound to give -/
+    def pidAllocRcpt (act : BitVec 64) (pid : BitVec 32) : IProp GF :=
+      ∃ h, pidReceipt h (.PAlloc act pid) ∗ ⌜pid.toNat = pidPick PIDMAX h⌝
+    def pidNext (c : BitVec 32) : BitVec 32 := if c = 1000#32 then 1#32 else c + 1#32  -- ProofAllocproc.apNewPid, moved
+
+**2. The ghost and the three steps.**
+- **The payload.**
+  - `pidLockResAt`'s body changes in one place: `pidLedger R` becomes `pidLedger np pids R`, where `np` and
+    `pids` are the body's outer binders.
+  - `pidLockResAt`'s and `pidLockPay`'s statements are byte-identical, and so is every `isLock … "nextpid"
+    pidLockPay` namer (20 files).
+  - The `CtxMorph` instance needs nothing: the conjunct is context-free.
+- **The steps.**
+  - `pidLedger_empty : pidLedAuth [] ⊢ pidLedger 1#32 (fun _ => 0#32) ∅`.
+  - `pidLedger_alloc` takes:
+    - `n < NPROC` and `pids n = 0`;
+    - `1 ≤ pid ≤ PIDMAX`;
+    - `∀ j < NPROC, pids j ≠ pid` (the scan's fall-through, which the landed loop already gives);
+    - first-ness `∃ k, pid.toNat = cycAt PIDMAX np.toNat k ∧ ∀ i < k, pidCells pids (cycAt PIDMAX
+      np.toNat i)`.
+
+    It gives `|==> pidLedger (pidNext pid) (apPidsSet pids n pid) (insert R pid g) ∗ pidAllocRcpt act pid`.
+    - The `pidPick` fact is `pidPick_spec` through the tie at the OPENED `h`.
+    - The re-closed tie is `nextOf_snoc_alloc` + `(pidNext pid).toNat = nextStep …`, and `liveOf_snoc_alloc`
+      against the filled cell.
+  - `pidLedger_free` takes `j < NPROC`, `pids j = pid`, `pidsOk pids` and `pid ≠ 0`. It gives
+    `pidLedger np (pidsClear pids j) (delete R pid) ∗ ∃ h, pidReceipt h (.PFree act pid)`. The counter is
+    untouched (`nextOf_snoc_free`).
+- **The loop (`ProofAllocproc`; internal statements).**
+  - `ap_pidloop` gains a ghost start `n0 : BitVec 32`. Its ∀-binders gain `k : Nat` with `cand.toNat = cycAt
+    PIDMAX n0.toNat k ∧ ∀ i < k, pidCells pids (cycAt PIDMAX n0.toNat i)`.
+  - The retry arm already has `pids m' = cand` (`ap_pidscan`'s match). `cand ≥ 1` makes it a `pidCells`
+    witness, and `cycAt_succ` + `(apNewPid cand).toNat = …` give `k + 1`.
+  - The entry is `k = 0` (`cycAt_zero` at the payload's bound).
+  - `apExitCont` gains the first-ness conjunct. `ap_pidscan` is unchanged.
+- **`ap_found`.** The payload open restates the body text (the `icases (show pidLockPay … ⊢ …)` at the pid
+  section), so that text moves. The close calls the new `pidLedger_alloc` with the exit's first-ness.
+  `ap_pid_mint`, `ap_tok_read` and the boot-era marks are untouched.
+- **The receipt in the Spec.**
+  - `SpecAllocproc.allocprocPostLed`'s found arm changes `(∃ h, pidReceipt h (.PAlloc act pid))` to
+    `pidAllocRcpt act pid`. This is the LED TWIN's text; nobody consumes it yet.
+  - `apPostCells` likewise.
+  - `allocprocPostLed_post`, `allocprocPost` and `wp_allocproc_body` are byte-identical.
+- **The other builders.** `MainKvm.mn_pidRes_boot` (proof only) and `ProofFreeproc.fp_pidRes_acc` (proof only;
+  `pidsOk` is already in hand at the close).
+  - `childrenBootRows`, `mn_pidWait_born` and `xv6GF` are untouched.
+  - No camera changes, so no ~1000-file camera rebuild. But `PidLock` is widely imported.
+
+**3. The receipt to the kernel's row (G2b: the led-twin route, as W3/G1 did for uptime and wait).**
+- **`SpecKfork`.**
+  - `kforkRetLed γ j pid V M stsP Q csP Rc rv` is `kforkRet`'s copy whose success arm adds, at the SAME `γc`
+    (F5):
+    - `pidAllocRcpt (procAddr j) rv`;
+    - `∃ hz i, zombReceipt hz (.ZFork (procAddr j) i rv γc)`.
+  - Also: `kforkRetLed_ret` (the drop), `kforkPostLed`, `wp_kfork_led_eb_body`, and the field
+    `KFORK.wp_kfork_led_eb`.
+  - The landed `wp_kfork_eb` becomes its corollary, as allocproc's did.
+- **`ProofKfork`.**
+  - `kfork_proof` switches to `AL.wp_allocproc_led` and destructs the found arm's receipt as `#Hrcpt`.
+  - Persistent receipts ride the intuitionistic context to the success epilogue (`kf_epilogue'` at
+    `kforkRetLed`), and so does `kf_wait_fork`'s receipt (dropped today).
+  - The −1 arms (uvmcopy failure → freeproc) drop them. The actor is `procAddr j` (`hproc`).
+- **`SpecSysFork` / `ProofSysFork`.** `wp_sys_fork_led_eb_body` and the field `SYSFORK.wp_sys_fork_led_eb`, a
+  forwarder. `LinkKfork` / `LinkSysFork` build the structures with the new field.
+- **`SyscallArmsFork` does not switch in G2** (F4: there is nothing pure for it to record).
+  - The arm switch, and the receipt's route past the arm (W2d's: syscall arm → usertrap → userret →
+    filing), are M2-X's.
+  - `SyscRows.fork`, `usysMemOk`'s fork branch, `UsertrapSysRows`, `uexecForkParentF` and `uforkAns`:
+    byte-identical.
+
+**4. The row (deferred to the joint lane G1f+G2+G3, after M2-X).** For the record, the partial row G2 alone
+supports:
+- the pid reading `usysForkPid ι := signExtend 64 (BitVec.ofNat 32 (pidPick PIDMAX ι.pev))`, with `ι.pev` the
+  prefix BEFORE the round's `PAlloc` (the receipt's `h`);
+- **`r = -1 ∨ r = usysForkPid ι`** — the pid is pinned whenever fork succeeds;
+- on success, the parent's key is `bump W r W.M W.perm W.sz W.fd W.cwd W.gen (W.ch ∪ {γ}) W.lazy W.secc`, with
+  `γ` the round's `ZFork` generation (F5). On −1 it is `bump W (-1) …` with `W.ch` kept.
+- The child's key is unchanged: it is already functional (`bump W 0 …` at the child's first key), and its pid
+  is the same `pidPick` (a first-key datum, `q.2`).
+
+**Not admitted now; no `usysDetPartial`.** Three reasons:
+- (i) F4: before M2-X the row is equivalent to the landed one.
+- (ii) The success bit is unexplained. It depends on slot exhaustion (G1f's `SFull`, an invariant-held
+  ledger) and on allocproc's and uvmcopy's kallocs (G3).
+- (iii) `γ` needs the `ZFork` receipt in ι, which is M2-X's route too.
+
+**The joint lane re-admits fork as follows.**
+- `usysDet USYS_fork W ι := if forkOk ι then <success key> else <−1 key>`, where `forkOk ι := ¬ SFull at the
+  round ∧ no KNull at the round's allocator positions` (as G3 states them).
+- `usysDetClassAt` (G1d's shape, `n a0`) gains fork under G3's key conditions (uvmcopy's count depends on the
+  page table's interior, UsysDet §4).
+- `round_det`'s `_exists` supplies `ι.pev` and `ι.zev` from the exported lbs.
+
+**5. W4's law.**
+- **Now: nothing.** `events`, `NiStep.reads`, `NiInClass` and `niRoundLaw` are unchanged by G2.
+- **Cheap, but NOT recommended now: fork's answer as a reading.** `NiStep.reads` would admit `gprsNum = USYS_fork`
+  and the resume clause would cover it (pc + 4, `x1..x31` kept but `a0`). The conjunct `a0 = −1 ∨ 1 ≤ sint a0 ≤
+  PIDMAX` is already derivable from `niFit` (`roundOkKeys` → `uroundOk` → `usysMemOk`'s fork branch, `M' =
+  M`), with no kernel work.
+  - But the reading would carry BOTH the success bit and the pid.
+  - The pid part is explained in-logic only after M2-X; the bit not at all until G1f+G3.
+  - So the bit would be §2's rejected "oracle of outcomes". wait's reading (G1-R5) and uptime's (O5) each have
+    an in-logic receipt behind the whole answer; fork's would not.
+- **After M2-X and the joint lane.**
+  - `niRoundLaw`'s fork conjunct becomes `a0 = sext (pidPick PIDMAX hc)` on success, where `hc` is the filing's
+    cited pid-ledger prefix. Prefixes are chain-comparable (M2-X), so there is ONE pid history per run.
+  - The pid part then leaves `events`. The two-run hypothesis "equal pid-ledger histories" replaces "equal fork
+    readings".
+  - The success bit becomes a function of the cited slot/allocator prefixes.
+- **Honesty cost** (for the as-landed note, F6): fork declassifies the global allocation count since the
+  caller last looked (mod `PIDMAX`) and the live pids just past the counter. The in-logic row says it is
+  EXACTLY that (`pidPick` of a prefix of the one pid ledger) and nothing else: not slot placement (that is
+  `ZFork`'s, G1), and not the scheduler's interleaving beyond the order of `PAlloc`/`PFree` events.
+
+**6. Lanes** (on `lane/g2`, rebased onto G1d when it lands; one `lake` at a time).
+- Gate per lane: `lake build Xv6 MachCSL` + `tools/ci/lint.sh` + no `sorry`.
+- Full `tools/ci/run_all.sh` at G2a: `PidLock` is imported by ~20 namers and their cones.
+- `tools/ci/dead_allow.txt` rows for anything unreached.
+
+| Lane | Content | Files | Moves | Gate |
+|---|---|---|---|---|
+| **G2a the tie, first-ness, the receipt** | §1 (pure) + §2: `pidCells`, `pidTie`, `pidLedger np pids R`, `pidAllocRcpt`, `pidNext`, the three steps; `ap_pidloop`'s index; the open/close in `ap_found`; `allocprocPostLed`'s receipt | `PidEv`, `PidLock`, `ProofAllocproc`, `SpecAllocproc`, `ProofFreeproc`, `MainKvm` | `pidLockResAt` body; `pidLedger` (+`np pids`) and `pidLedger_empty/alloc/free`; `allocprocPostLed` (led twin text); `apPostCells`, `ap_pidloop`, `apExitCont` (internal); `apNewPid` → `PidLock.pidNext`. Byte-identical: `pidLockPay` and its namers, `allocprocPost`, `wp_allocproc_body`, `wp_freeproc(_led)_body`, every kfork/userinit statement | full; `pidPick_surj` unreached (dead_allow, or keep it out of the tree and cite the scratch) |
+| **G2b the led kfork** | §3: `kforkRetLed` (+ both receipts), `kforkPostLed`, `KFORK.wp_kfork_led_eb`, `SYSFORK.wp_sys_fork_led_eb`; `kfork_proof` on the led allocproc; the landed fields as corollaries | `SpecKfork`, `ProofKfork`, `SpecSysFork`, `ProofSysFork`, `LinkKfork`, `LinkSysFork` | `KFORK`, `SYSFORK` (+ one field each); no landed body text | build + lint; the two led fields are unreached until M2-X switches the arm (dead_allow rows, or land G2b inside M2-X) |
+| **G2c = the joint lane** | §4's row with `forkOk`, `usysDetClassAt` fork, `SyscRows.fork` strengthened, `round_det`, W4's fork conjunct | (G1f + G3 + M2-X files) | — | after M2-X |
+
+G2a stands alone. G2b depends on G2a and is independent of G1d: G1d touches `SyscallArmsFork` only for the
+`SyscRows.wait` builder, and G2b does not touch it. Estimate: G2a is 6 files, with the loop index the only
+proof content (~100 lines in `ap_pidloop`, ~60 in the steps). G2b is 6 files, mechanical but long
+(the success path runs from `kfork_proof`'s allocproc call through `kf_publish`, ~860 lines, to
+`kf_epilogue'`; the persistent receipts are framed through it).
+
+**Owner rulings requested.**
+- **G2-R1 (the counter at `PIDMAX`).** xv6 (ded23f2) wraps and reuses, so the tie uses `nextOf`'s landed wrap
+  (`pid = PIDMAX → 1`), and first-ness is the cyclic scan (`pidPick`). Recommended: state BOTH R2(b) and R2(c).
+  - In Rocq, R2(c) was "heavy". In Lean it is one ghost index in `ap_pidloop`: the loop already carries the
+    counter register and the scan's verdict, and one snapshot decides everything (F2).
+  - Termination stays unproved: it is not needed.
+- **G2-R2 (the tie against the cells).** Recommended: the new `pidCells` equivalence beside the landed register
+  tie (F3). The alternative is to strengthen `SlotGen.pidRegDom` to an iff, which moves `pidRegDom_*` and
+  `ap_pid_mint`'s freshness path for the same content.
+- **G2-R3 (led twins vs a Spec move for kfork).** Recommended: led twins (`kforkRetLed`, `KFORK.wp_kfork_led_eb`,
+  `SYSFORK.wp_sys_fork_led_eb`), carrying both persistent receipts (`PAlloc`'s with `pidPick`, and `ZFork`'s with
+  `γc`, F5). Timing: land G2b with M2-X, which is the first reader. The alternative is now, with dead_allow rows.
+- **G2-R4 (no partial row, no `SyscRows.fork` move before M2-X).** Recommended, because of F4. The alternative,
+  `SyscRows.fork : … ∨ ∃ hp, syscA0 V' = sext (pidPick PIDMAX hp)` now, is a Spec move with provably no content
+  (`pidPick_surj`). `usysDetClassAt` does not admit fork until the joint lane.
+- **G2-R5 (W4).** Recommended: fork's answer stays out of `events` until the joint lane. After it, the pid part
+  comes from the cited prefix and the success bit from the slot/allocator prefixes, with F6's honesty paragraph
+  in the as-landed note. The alternative, fork's whole answer as a reading now (cheap, §5), is not recommended:
+  it would declassify an unexplained success bit.
 
 ## Lanes (opened 2026-09-15)
 
